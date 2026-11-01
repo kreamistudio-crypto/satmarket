@@ -76663,3 +76663,89 @@ COSA RESTA DA GUARDARE. iPhone è dentro per prudenza: che il `blob:`
 non si salvi dentro Telegram iOS NON è provato, è dedotto dal
 WKWebView. Non provato su telefono vero.
 
+## La cancellazione dell'account (1 nov 2026, cantiere cancella-account)
+
+Andrea: «dobbiamo dare la possibilità agli utenti di cancellare il
+proprio account [...] purché non ci siano ordini in pending». Proposta in
+sette punti, ok di Andrea con una correzione: «punto 5 con hash».
+
+COSA FA. Nel Profilo, in «Privacy», la voce «🗑 Cancella il mio account»
+apre un foglio che chiede al server cosa c'è ancora in corso. Se c'è
+qualcosa, il foglio lo elenca e il bottone non c'è. Se non c'è niente,
+dice cosa sparisce e cosa resta, e il gesto parte solo scrivendo
+CANCELLA. Dopo, la Mini App mostra un saluto e non chiama più il server.
+Leva `ACCOUNT_CANCELLABILE`, spenta di serie e in produzione.
+
+DECISIONI E PERCHÉ.
+- UN SOLO GIUDICE DEGLI IMPEGNI (`_impegni_cancellazione`), letto due
+  volte: dal foglio e dentro la transazione `BEGIN IMMEDIATE` del gesto.
+  Fra il foglio e il bottone può nascere un ordine: la seconda lettura
+  lo ferma con un 409 e il foglio si ridisegna con l'elenco nuovo.
+- «PENDING» LETTO LARGO: non solo gli ordini del mercatino non chiusi,
+  ma tutto quello in cui ci sono sats o una persona che aspetta — il
+  pagamento in uscita verso di lui non ancora partito, le aste e le
+  puntate saldate, i rimborsi d'asta da riscuotere, il P2P (ordini,
+  dispute, on-chain 2-di-3), swap e cambi in volo. Gli admin non si
+  cancellano da qui. Gli ordini `creato` vecchi di mezz'ora non bloccano:
+  si annullano.
+- IL FANTASMA E NON LA CANCELLAZIONE DELLE RIGHE: ordini, rilanci e
+  pagamenti non si cancellano mai (`orfani.py`), gli annunci nemmeno
+  (FTS). Le righe che servono all'altra parte (l'ordine chiuso, la
+  recensione scritta, il pagamento) passano a un id nuovo in [2^52, 2^53)
+  con una riga «Utente cancellato» in `utenti`: chi ha comprato da lui
+  ritrova il suo ordine, ma senza un nome. Il fantasma è uno per
+  cancellazione, così due cancellati non si sommano in un «utente» solo.
+- L'IMPRONTA E NON L'ID (il «punto 5 con hash» di Andrea): resta
+  `scrypt(id, sale fisso)` con la data, mai l'id in chiaro. Serve a una
+  cosa sola: chi si cancella e rientra ritrova le penalità P2P
+  (`mancato`, `disputa_persa`), così cancellarsi non lava un contatore.
+  Gli scambi completati e tutto il resto no: rientra da zero. Lo scrypt
+  (~77 ms) e non uno SHA: gli id Telegram sono pochi miliardi, e uno SHA
+  si rovescia provandoli tutti in pochi minuti; con scrypt costa anni di
+  calcolo. Resta comunque un'impronta, non un segreto: chi ha il database
+  e un id può controllare se quell'id si è cancellato, e la pagina
+  privacy lo dice.
+- I DATI DI SPEDIZIONE DA COMPRATORE si svuotano anche negli ordini
+  chiusi (indirizzo, email corriere, busta, nota): al venditore non
+  servono più, e sono i dati più personali che teniamo.
+- LA PAGINA PRIVACY ha una frase gemella nascosta che dice cosa
+  teniamo; la vecchia («non si può ancora fare con un bottone») resta
+  finché la leva è spenta, perché è ancora vera.
+
+STRADE SCARTATE. Cancellare le righe degli ordini: rompe lo storico
+dell'altra parte e gli orfani. Tenere l'id in chiaro per le penalità:
+Andrea ha chiesto l'hash. Un SHA dell'id: si rovescia per forza bruta.
+Un id negativo per il fantasma: sono già dei nativi Nostr. Lasciare il
+foglio aperto sull'app dopo il gesto: la prima `fetch` con l'initData
+di Telegram ricreerebbe l'account vuoto; per questo il saluto spegne
+`fetch`. Una funzione a parte per la leva nel pannello: la trappola del
+`_ConfigFinto` di prove.py (chi non è registrato vale 7), quindi la riga
+è scritta dentro il gruppo «👥 Più account».
+
+PROVE. `collaudo_cancella_account.py` (40 controlli, nel server vero con
+TestClient: semina larga su quasi ogni tabella legata a un utente,
+blocchi, parola sbagliata, cancellazione, fantasma, impronta, rientro con
+penalità e senza il resto, foto staccate dall'annuncio in vetrina e
+tenute su quello venduto, notifica muta, leva spenta = 404),
+con la SENTINELLA LARGA che cerca l'id vecchio in ogni colonna di
+entrambi i database; in `ci/collaudi.txt` e `ci/compila.txt`. Controprove
+rosse: preferiti, venditori seguiti, `preso_da`, `account_insieme`
+dimenticati (li trova la sentinella); il rientro senza penalità; gli
+ordini ignorati come impegno; la notifica al fantasma; i dati del
+compratore lasciati; l'admin cancellabile; il fantasma senza riga in
+`utenti`. `prove_pagina_dati` guarda la frase gemella. Giro nel browser
+(Playwright, server locale in collaudo, relay morti): voce visibile a
+leva accesa, foglio bloccato con un ordine spedito, bottone spento finché
+non si scrive «cancella», saluto, `fetch` spenta, Annulla che torna al
+Profilo, nessun errore di pagina. Suite intera in un venv senza
+coincurve.
+
+COSA RESTA DA GUARDARE. Non provato dal vivo: va sul collaudo (voce 6 di
+DA-FARE-ANDREA). Se l'utente riapre la Mini App dopo il saluto, Telegram
+gli ricrea un account vuoto (è giusto: è un utente nuovo, con le sole
+penalità). I badge NIP-58 già pubblicati su Nostr non si ritirano, e gli
+eventi firmati da LUI (non dal server) restano suoi da ritirare. Le
+statistiche che contano le righe di `utenti` contano anche i fantasmi.
+La cancellazione dei FILE dal disco (`_dopo_cancellazione`) non ha un
+controllo suo nel collaudo: gira in sottofondo dopo la risposta. In
+produzione la leva si accende solo dopo la promozione e il sì di Andrea.

@@ -178,3 +178,4 @@ collaudo_semina_collaudo.py
 collaudo_certificati_relay.py
 collaudo_filtro_avorio.py
 collaudo_assistente_bot.py
+collaudo_cancella_account.py

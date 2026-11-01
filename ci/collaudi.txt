@@ -141,6 +141,7 @@ collaudo_leve_pannello
 collaudo_certificati_relay
 collaudo_filtro_avorio
 collaudo_assistente_bot
+collaudo_cancella_account
 
 # ---- FUORI DALLA CI ---------------------------------------------------
 # Erano fuori anche quando l'elenco stava nel workflow, e fuori restano:

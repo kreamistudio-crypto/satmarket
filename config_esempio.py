@@ -1920,6 +1920,16 @@ MAX_ACCOUNT_BROWSER = 5
 # anche a leva spenta. SPENTA di serie: si accende dopo la prova.
 PIU_ACCOUNT_OVUNQUE = False
 
+# LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026, cantiere cancella-account,
+# decisione di Andrea): nel Profilo, sotto Privacy, «🗑 Cancella il mio
+# account». Si puo' solo senza niente in corso (ordini, scambi P2P,
+# dispute, aste, pagamenti in viaggio, cambi): il foglio dice cosa manca.
+# Via i dati della persona; ordini e pagamenti chiusi restano senza nome
+# («Utente cancellato»); del numero resta solo un'impronta lenta, che
+# riattacca le penalita' P2P a chi rientra. SPENTA di serie: si accende
+# sul collaudo, poi qui quando Andrea decide.
+ACCOUNT_CANCELLABILE = False
+
 # ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot): sul web e
 # nella PWA «Entra con Telegram» apre il bot con un codice monouso, e
 # entra l'account ATTIVO nell'app di Telegram (il widget di Telegram

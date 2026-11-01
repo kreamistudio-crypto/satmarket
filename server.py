@@ -10738,7 +10738,14 @@ def _upsert_da_telegram(con, tg_id: int, nome: str, username: str):
     'telegram'/'nessuna' vince sempre Telegram, com'e' sempre stato:
     e' la stessa precedenza gia' scritta per la foto in
     aggiorna_profilo_social. `username` non ha questa preferenza —
-    Nostr non ne ha uno equivalente — e si aggiorna sempre."""
+    Nostr non ne ha uno equivalente — e si aggiorna sempre.
+
+    CHI RIENTRA DOPO ESSERSI CANCELLATO (1 nov 2026, cantiere
+    cancella-account): la riga NUOVA si riprende le penalita' P2P del suo
+    fantasma (`_riprendi_penalita`). La SELECT davanti e' l'unico modo di
+    sapere che la riga nasce adesso: l'UPSERT non lo dice."""
+    nuovo = con.execute("SELECT 1 FROM utenti WHERE tg_id=?",
+                        (tg_id,)).fetchone() is None
     con.execute(
         "INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "
         "VALUES(?,?,?,?,?) "
@@ -10746,6 +10753,8 @@ def _upsert_da_telegram(con, tg_id: int, nome: str, username: str):
         "nome=CASE WHEN avatar_scelta='nostr' THEN nome ELSE excluded.nome END, "
         "username=excluded.username",
         (tg_id, nome, username, int(time.time()), nuovo_codice_negozio(con)))
+    if nuovo:
+        _riprendi_penalita(con, tg_id)
 
 
 def upsert_utente(user: dict):
@@ -11904,6 +11913,9 @@ def crea_utente_nostr(pubkey: str, npub: str) -> int:
             "npub, npub_verificata, npub_accesso) VALUES(?,?,?,?,?,?,1,?)",
             (tg_id, npub[:10] + "…" + npub[-4:], "", int(time.time()),
              nuovo_codice_negozio(con), npub, npub))
+        # chi rientra dopo essersi cancellato (1 nov 2026): la stessa
+        # chiave da' lo stesso numero, e le penalita' tornano con lui
+        _riprendi_penalita(con, tg_id)
         con.commit()
     except sqlite3.IntegrityError:
         raise HTTPException(409, "Questa chiave sta entrando proprio ora "
@@ -18240,7 +18252,13 @@ async def notifica(tg_id: int, testo: str, bottone: tuple = None):
     `bottone` (10 ott 2026) e' la coppia `(etichetta, indirizzo)` di un
     bottone sotto il messaggio, o niente: su Telegram e' un bottone, nel
     DM una riga in coda. Ai due rami arriva SOLO quando c'e': chi non lo
-    passa li chiama come li ha sempre chiamati."""
+    passa li chiama come li ha sempre chiamati.
+    UN ACCOUNT CANCELLATO NON RICEVE NIENTE (1 nov 2026): il suo fantasma
+    vive in [2^52, 2^53) — `FANTASMA_BASE`, scritto qui a numeri perche'
+    le prove montano questa funzione da sola — e un avviso verso di lui
+    andrebbe a Telegram con un id che non e' di nessuno."""
+    if 2 ** 52 <= int(tg_id or 0) < 2 ** 53:
+        return ""
     riga = None
     try:
         con = db()
@@ -33344,6 +33362,18 @@ def _leve_stato():
                             "il widget"),
                   spento="sul web resta il bottone di Telegram (il widget), "
                          "che entra con l'account ricordato dal browser"),
+            # LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026, cantiere
+            # cancella-account): la riga sta QUI e non in una `_x_leve()`
+            # in fondo al file — ogni funzione-pannello in piu' e' un nome
+            # da insegnare al censimento delle prove (la «trappola»)
+            _leva("Cancellazione dell'account", "ACCOUNT_CANCELLABILE",
+                  bool(ACCOUNT_CANCELLABILE),
+                  acceso="nel Profilo (Privacy) c'è «🗑 Cancella il mio "
+                         "account»: chi non ha niente in corso lo cancella "
+                         "scrivendo CANCELLA",
+                  spento="la voce non c'è e le rotte rispondono 404: per "
+                         "cancellare un account si scrive al contatto dei "
+                         "dati"),
         ]},
         {"gruppo": "🏆 Classifica", "voci": [
             _leva("La classifica del mercatino", "CLASSIFICA_ATTIVA",
@@ -47140,6 +47170,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # selettore vive anche dentro Telegram, le conferme col volto e
     # «Esci da tutti». Il FATTO, dalla leva viva.
     profilo["piu_account"] = bool(PIU_ACCOUNT_OVUNQUE)
+    # LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026): il client mostra la voce
+    # nel Profilo solo a leva accesa. Il FATTO, dalla leva viva.
+    profilo["account_cancellabile"] = bool(ACCOUNT_CANCELLABILE)
     # Stessa regola dei distintivi: catalogo COMPLETO col flag, cosi'
     # chi non ha ancora sbloccato un titolo vede comunque cosa c'e' e
     # cosa serve — che e' la molla.
@@ -98389,3 +98422,633 @@ def _swap_quota_leve() -> list:
 # (Qui finisce il blocco dell'indirizzo della quota. La riga non e' un
 # vezzo: le prove ritagliano una funzione fino alle due righe vuote che
 # la seguono, e l'ultima del file senza niente dopo non si ritaglia.)
+
+
+# ============ LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026) ============
+# Cantiere «cancella-account», richiesta di Andrea: «dobbiamo dare la
+# possibilita' agli utenti di cancellare il proprio account [...]
+# purche' non ci siano ordini in pending». La proposta in sette punti
+# l'ha approvata il 1 nov 2026 con una correzione sola — «punto 5 con
+# hash» — e la voce intera, coi perche' e le strade scartate, sta in
+# CANTIERI («La cancellazione dell'account»).
+#
+# LE TRE PAROLE DEL CANTIERE, che sono anche le tre decisioni:
+# • SI CANCELLA cio' che e' DELLA PERSONA: la riga in `utenti` (nome,
+#   username, foto, banner, Lightning address, npub, preferenze), le
+#   sessioni, le chiavi P2P, i preferiti, gli avvisi, i punti di
+#   ritiro, gli indirizzi e le buste degli ordini, la chat, le
+#   recensioni RICEVUTE; i suoi annunci escono dalla vetrina, da Nostr
+#   e dai canali.
+# • SI TIENE, SENZA NOME, cio' che e' della CONTABILITA' o di un ALTRO:
+#   ordini, pagamenti, rilanci, rimborsi, dispute, scambi chiusi. Mai un
+#   DELETE su `ordini`, `rilanci`, `pagamenti`: `orfani.py` chiama
+#   «orfano» ogni incasso senza riga, e una riga cancellata qui sarebbe
+#   un orfano creato apposta. Le recensioni che ha SCRITTO restano —
+#   sono la reputazione di qualcun altro — senza firma.
+# • IL SEGNO MINIMO E' UN'IMPRONTA (la correzione di Andrea): il numero
+#   dell'account non resta scritto da nessuna parte. Al suo posto, in
+#   ogni riga tenuta, c'e' un FANTASMA — un id nuovo, uno per account
+#   cancellato — e in `account_cancellati` l'impronta lenta (scrypt) del
+#   numero vecchio. Serve a una cosa sola: chi rientra si riprende le
+#   sue penalita' P2P (mancati e dispute perse), cosi' chi e' stato
+#   sanzionato non riparte pulito cancellandosi.
+#
+# IL FANTASMA VIVE IN [2^52, 2^53). Telegram promette id di al piu' 52
+# bit significativi (sotto 2^52), i nativi Nostr sono negativi
+# (`tg_id_da_pubkey`), e 2^53 e' il tetto degli interi esatti in
+# JavaScript: un id oltre si arrotonderebbe nel telefono. Il fantasma
+# HA una riga in `utenti` («Utente cancellato»), ed e' voluto: le
+# pagine dell'altra parte fanno JOIN su `utenti`, e senza riga un ordine
+# di chi e' rimasto sparirebbe dalla sua lista.
+#
+# LA LEVA NASCE SPENTA (ACCOUNT_CANCELLABILE = False): spenta, le rotte
+# rispondono 404 e la voce nel Profilo non c'e'.
+
+try:
+    from config import ACCOUNT_CANCELLABILE
+except ImportError:
+    ACCOUNT_CANCELLABILE = False
+if not isinstance(ACCOUNT_CANCELLABILE, bool):
+    print("[account] ACCOUNT_CANCELLABILE non e' True/False: la "
+          "cancellazione dell'account resta spenta", flush=True)
+    ACCOUNT_CANCELLABILE = False
+
+FANTASMA_BASE = 2 ** 52
+FANTASMA_TETTO = 2 ** 53
+NOME_FANTASMA = "Utente cancellato"
+PAROLA_CANCELLA = "CANCELLA"
+# L'IMPRONTA E' LENTA APPOSTA: i numeri Telegram sono pochi miliardi, e
+# un hash veloce si rovescia provandoli tutti in un pomeriggio. Con
+# scrypt a 2^15 (32 MB, ~80 ms a prova) rovesciare un database rubato
+# costa decine di anni-CPU, mentre l'unica domanda onesta — «questo
+# numero si era cancellato?» — costa una prova sola. Il sale e' FISSO e
+# scritto qui, ed e' voluto: non protegge un segreto (non ce n'e'), e
+# un sale che ruota col BOT_TOKEN farebbe dimenticare le penalita' al
+# primo cambio di token.
+IMPRONTA_SALE = b"barattolo-account-cancellati-v1"
+IMPRONTA_SCRYPT_N = 2 ** 15
+# le penalita' che seguono la persona (le leggono `_conti_p2p` e i
+# filtri della presa): niente altro torna, nemmeno i completati
+PENALITA_CHE_RESTANO = ("mancato", "disputa_persa")
+# un cambio «nato» non ha uno stato di fine: per tre giorni si considera
+# in volo (la sua riga e' l'unico filo verso il fornitore, se va storto)
+CAMBIO_IN_VOLO_S = 3 * 86400
+# un ordine P2P del libro senza una fine vista oltre la memoria del
+# libro non e' piu' «in corso»: e' un ordine che non sapremo mai chiudere
+CANCELLA_P2P_MEMORIA_S = 40 * 86400
+
+
+def e_fantasma(tg_id) -> bool:
+    """PURA: l'id e' quello di un account cancellato."""
+    try:
+        return FANTASMA_BASE <= int(tg_id) < FANTASMA_TETTO
+    except (TypeError, ValueError):
+        return False
+
+
+def impronta_account(tg_id) -> str:
+    """PURA: l'impronta lenta del numero di un account (esadecimale)."""
+    return hashlib.scrypt(str(int(tg_id)).encode(), salt=IMPRONTA_SALE,
+                          n=IMPRONTA_SCRYPT_N, r=8, p=1,
+                          maxmem=64 * 1024 * 1024, dklen=32).hex()
+
+
+def _cancellati_prepara(con):
+    """La tabella dei segni minimi, che nasce alla prima cancellazione.
+    Niente nome, niente numero: il fantasma, l'impronta, le due date."""
+    con.execute("""CREATE TABLE IF NOT EXISTS account_cancellati(
+        fantasma INTEGER PRIMARY KEY,
+        impronta TEXT NOT NULL,
+        cancellato_il INTEGER NOT NULL,
+        ripreso_il INTEGER DEFAULT 0)""")
+    con.execute("CREATE INDEX IF NOT EXISTS account_cancellati_impronta "
+                "ON account_cancellati(impronta)")
+
+
+def _colonne_di(con, tabella: str) -> set:
+    """Le colonne di una tabella, vuoto se non c'e' (le tabelle che
+    nascono pigre — on-chain, cambi — su un database che non le ha mai
+    aperte)."""
+    try:
+        return {r[1] for r in con.execute(f"PRAGMA table_info({tabella})")}
+    except sqlite3.Error:
+        return set()
+
+
+def _riprendi_penalita(con, tg_id: int) -> int:
+    """CHI RIENTRA SI RIPRENDE LE PENALITA' (il punto 5 della proposta):
+    la chiamano le due porte che CREANO una riga in `utenti` —
+    `_upsert_da_telegram` e `crea_utente_nostr` — solo quando la riga
+    e' nuova. Senza cancellazioni alle spalle costa una SELECT su una
+    tabella che non esiste: l'impronta lenta si calcola solo se c'e'
+    almeno un account cancellato. Torna quante righe ha riattaccato.
+    Gira dentro la scrittura di chi la chiama: niente commit."""
+    try:
+        if not con.execute("SELECT 1 FROM account_cancellati "
+                           "LIMIT 1").fetchone():
+            return 0
+    except sqlite3.OperationalError:
+        return 0          # mai cancellato nessuno: la tabella non c'e'
+    fantasmi = [r[0] for r in con.execute(
+        "SELECT fantasma FROM account_cancellati WHERE impronta=?",
+        (impronta_account(tg_id),)).fetchall()]
+    if not fantasmi:
+        return 0
+    segni = ",".join("?" * len(fantasmi))
+    esiti = ",".join("?" * len(PENALITA_CHE_RESTANO))
+    n = con.execute(
+        f"UPDATE OR IGNORE p2p_esiti SET tg_id=? WHERE tg_id IN ({segni}) "
+        f"AND esito IN ({esiti})",
+        (int(tg_id), *fantasmi, *PENALITA_CHE_RESTANO)).rowcount
+    con.execute(f"UPDATE account_cancellati SET ripreso_il=? "
+                f"WHERE fantasma IN ({segni})",
+                (int(time.time()), *fantasmi))
+    return n
+
+
+def _impegni_cancellazione(con, tg_id: int) -> list:
+    """NON SI CANCELLA CON QUALCOSA IN CORSO: il calco di
+    `_impegni_aperti` delle ferie — righe LEGGIBILI, ognuna con la sua
+    via d'uscita, perche' il foglio deve dire COSA manca e non che
+    «qualcosa» manca. Lista vuota = si puo' cancellare. Pura sulla
+    connessione: le tabelle pigre che non ci sono valgono «niente in
+    corso»."""
+    adesso = int(time.time())
+    tg = int(tg_id)
+    voci = []
+    if e_admin(tg):
+        voci.append("sei un moderatore: prima va tolto il tuo numero "
+                    "da ADMIN_IDS nel config")
+    # 1) GLI ORDINI DEL MERCATINO. Chiusi davvero sono tre stati soli;
+    #    'confirmed' e 'refund' hanno ancora sats da far uscire. La
+    #    fattura annullata e poi pagata conta per chi COMPRA (aspetta il
+    #    suo rimborso) e non per chi vende (l'ordine non e' mai stato
+    #    suo: la regola di `_ordini_vivi_annuncio`).
+    for o in con.execute(
+            "SELECT id, stato, compratore_id FROM ordini WHERE "
+            "stato NOT IN ('creato','released','refunded','annullato') AND "
+            f"(compratore_id=? OR (venditore_id=? AND {SQL_NON_ANNULLATA_PAGATA}))"
+            " ORDER BY id", (tg, tg)):
+        lato = "acquisto" if o["compratore_id"] == tg else "vendita"
+        voci.append(f"ordine #{o['id']} ({lato}): non è ancora concluso — "
+                    f"va chiuso prima")
+    # ...e un pagamento della coda 🧊 su un ordine chiuso che aspetta LUI:
+    #    chi vende su un 'released', chi compra su un 'refunded'. Se i sats
+    #    aspettano l'altra parte non lo ferma: il fantasma non tocca il
+    #    pagamento di nessuno.
+    n = con.execute(
+        "SELECT COUNT(*) FROM ordini WHERE "
+        "COALESCE(payout_stato,'') NOT IN ('','uscito') AND "
+        "((venditore_id=? AND stato='released') OR "
+        " (compratore_id=? AND stato='refunded'))",
+        (tg, tg)).fetchone()[0]
+    if n:
+        voci.append(f"{n} pagament{'o' if n == 1 else 'i'} di un ordine "
+                    f"ancora in viaggio: aspetta che arrivi")
+    n = con.execute(
+        "SELECT COUNT(*) FROM ordini WHERE stato='creato' AND creato>=? "
+        "AND (compratore_id=? OR venditore_id=?)",
+        (adesso - 1800, tg, tg)).fetchone()[0]
+    if n:
+        voci.append(f"{n} pagament{'o' if n == 1 else 'i'} in corso: "
+                    f"aspetta qualche minuto e riprova")
+    # 2) LE ASTE: chi ha versato sta gareggiando, e un'asta con puntate
+    #    salde e' vincolante per chi la vende
+    for p in con.execute(
+            "SELECT p.annuncio_id, a.titolo FROM puntate p "
+            "LEFT JOIN annunci a ON a.id=p.annuncio_id "
+            "WHERE p.tg_id=? AND p.stato='attiva' AND p.versato_sats>0",
+            (tg,)):
+        voci.append(f"asta «{(p['titolo'] or '?')[:40]}»: hai una puntata "
+                    f"in gara, aspetta la chiusura")
+    for a in con.execute(
+            "SELECT id, titolo FROM annunci WHERE venditore_id=? AND "
+            "asta_base_sats>0 AND id IN (SELECT annuncio_id FROM puntate "
+            "WHERE stato='attiva' AND versato_sats>0)", (tg,)):
+        voci.append(f"asta «{(a['titolo'] or '?')[:40]}»: ha già delle "
+                    f"puntate, si chiude da sola alla scadenza")
+    n = con.execute(
+        "SELECT COUNT(*) FROM rilanci WHERE tg_id=? AND stato='creato' "
+        "AND creato>=?", (tg, adesso - 1800)).fetchone()[0]
+    if n:
+        voci.append("un rilancio in pagamento: aspetta qualche minuto")
+    for r in con.execute(
+            "SELECT COALESCE(SUM(importo_sats),0) AS s, COUNT(*) AS n "
+            "FROM rimborsi_asta WHERE tg_id=? AND stato='da_riscuotere'",
+            (tg,)):
+        if r["n"]:
+            voci.append(f"hai {_fmt_sats(r['s'])} sats d'asta da riscuotere: "
+                        f"riscuotili prima")
+    # 3) I PAGAMENTI A BARATTOLO (banner, indirizzo del negozio): una
+    #    fattura viva, o un rimborso deciso e non ancora uscito
+    n = con.execute(
+        "SELECT COUNT(*) FROM pagamenti WHERE tg_id=? AND ("
+        "(stato='creato' AND creato>=?) OR "
+        "(rimborso_il>0 AND payout_stato<>'uscito'))",
+        (tg, adesso - 1800)).fetchone()[0]
+    if n:
+        voci.append("un pagamento a Barattolo è ancora in corso "
+                    "(o un suo rimborso): aspetta che si chiuda")
+    # 4) GLI SCAMBI P2P DI MOSTRO: pubblicati o presi, finche' il libro
+    #    non ne ha visto la fine. Una riga mai vista sul libro vale per
+    #    le sue due ore; una che non si e' mai chiusa, per la memoria
+    #    del libro — oltre, non lo sapremo mai, e non tiene in ostaggio
+    #    nessuno.
+    for o in con.execute(
+            "SELECT ordine, stato FROM p2p_ordini WHERE "
+            "(tg_id=? OR preso_da=? OR preso_dichiarato=?) AND "
+            "stato NOT IN ('success','canceled','expired') AND creato>=? "
+            "AND NOT (stato='' AND creato<?)",
+            (tg, tg, tg, adesso - CANCELLA_P2P_MEMORIA_S,
+             adesso - P2P_LIBRO_FRESCHI_S)):
+        voci.append(f"scambio P2P {str(o['ordine'])[:8]}…: è ancora sul "
+                    f"libro o in corso — ritiralo o portalo a termine")
+    for d in con.execute(
+            "SELECT ordine FROM p2p_dispute WHERE stato IN ('aperta','presa') "
+            "AND (compratore=? OR venditore=?)", (tg, tg)):
+        voci.append(f"disputa P2P {str(d['ordine'])[:8]}…: aspetta la "
+                    f"decisione del moderatore")
+    # 5) LE TABELLE PIGRE: on-chain, scambi on-chain, cambi
+    if "stato" in _colonne_di(con, "onchain_ordini"):
+        for o in con.execute(
+                "SELECT id FROM onchain_ordini WHERE stato IN "
+                "('attesa','pagato') AND (compratore_id=? OR venditore_id=?)",
+                (tg, tg)):
+            voci.append(f"ordine on-chain #{o['id']}: non è ancora concluso")
+    if "stato" in _colonne_di(con, "p2p_onchain_ordini"):
+        n = _p2p_onchain_vivi_di(con, tg)
+        if n:
+            voci.append(f"{n} scambi{'o' if n == 1 else ''} P2P on-chain "
+                        f"ancora apert{'o' if n == 1 else 'i'}")
+    if "stato" in _colonne_di(con, "swap_pagamenti"):
+        n = con.execute(
+            "SELECT COUNT(*) FROM swap_pagamenti WHERE venditore_id=? AND "
+            "stato NOT IN ('pagato','fallito')", (tg,)).fetchone()[0]
+        if n:
+            voci.append("un incasso col cambio è ancora in viaggio")
+    for tab in ("cambi_liberi", "cambi_p2p"):
+        if "stato" not in _colonne_di(con, tab):
+            continue
+        n = con.execute(
+            f"SELECT COUNT(*) FROM {tab} WHERE tg_id=? AND ("
+            f"(stato='nato' AND creato>=?) OR (stato='chiesto' AND creato>=?))",
+            (tg, adesso - CAMBIO_IN_VOLO_S,
+             adesso - CAMBIO_CHIESTO_VALE_S)).fetchone()[0]
+        if n:
+            voci.append("un cambio iniziato da meno di tre giorni: "
+                        "aspetta che sia arrivato")
+            break
+    return voci
+
+
+def _cosa_perdi(con, tg_id: int) -> dict:
+    """I NUMERI DEL FOGLIO: cosa sparisce e cosa resta senza nome. Solo
+    conteggi — la prosa la scrive il telefono."""
+    tg = int(tg_id)
+    u = con.execute("SELECT xp, coorte FROM utenti WHERE tg_id=?",
+                    (tg,)).fetchone()
+
+    def uno(sql, *a):
+        return int(con.execute(sql, a).fetchone()[0] or 0)
+    return {
+        "annunci": uno("SELECT COUNT(*) FROM annunci WHERE venditore_id=? "
+                       "AND stato IN ('attivo','revisione')", tg),
+        "ordini": uno("SELECT COUNT(*) FROM ordini WHERE (compratore_id=? "
+                      "OR venditore_id=?) AND stato IN ('released','refunded')",
+                      tg, tg),
+        "recensioni": uno("SELECT COUNT(*) FROM feedback WHERE per_tg_id=?", tg),
+        "xp": int(u["xp"] or 0) if u else 0,
+        "pioniere": bool(u and u["coorte"] == "pioniere"),
+    }
+
+
+def _foto_dell_annuncio(valore) -> list:
+    """PURA: i nomi dei file di un annuncio (la colonna `foto` e' una
+    lista JSON di nomi o di URL). Solo i nomi che la whitelist di
+    `/foto/*` riconosce: un URL o una forma strana non e' un file
+    nostro, e non si tocca."""
+    try:
+        lista = json.loads(valore) if valore else []
+    except (ValueError, TypeError):
+        return []
+    fuori = []
+    for n in lista if isinstance(lista, list) else []:
+        n = str(n or "")
+        if n and "/" not in n and NOME_FOTO.match(n):
+            fuori.append(n)
+            if n.endswith(".jpg") and not n.endswith("_min.jpg"):
+                fuori.append(n[:-4] + "_min.jpg")
+    return fuori
+
+
+# (tabella, colonna): dove la PERSONA diventa il suo fantasma. Ogni riga
+# qui e' contabilita' o storia di qualcun altro. L'ordine conta in un
+# caso solo — `feedback` e `inviti` passano prima dalle cancellazioni
+# (quelle RICEVUTE / dove era l'invitato se ne vanno, poi il resto si
+# anonimizza).
+CANCELLA_ANONIMIZZA = (
+    ("ordini", "compratore_id"), ("ordini", "venditore_id"),
+    ("offerte", "compratore_id"), ("offerte", "venditore_id"),
+    ("puntate", "tg_id"), ("puntate", "venditore_id"),
+    ("rilanci", "tg_id"), ("rimborsi_asta", "tg_id"),
+    ("pagamenti", "tg_id"),
+    ("feedback", "da_tg_id"),
+    ("inviti", "invitante"),
+    ("annunci", "venditore_id"), ("codici_sconto", "venditore_id"),
+    ("moderazione_log", "venditore_id"),
+    ("account_insieme", "chi"), ("account_insieme", "altro"),
+    ("p2p_esiti", "tg_id"),
+    ("p2p_ordini", "tg_id"), ("p2p_ordini", "preso_da"),
+    ("p2p_ordini", "preso_dichiarato"),
+    ("p2p_scambi", "compratore"), ("p2p_scambi", "venditore"),
+    ("p2p_dispute", "compratore"), ("p2p_dispute", "venditore"),
+    ("p2p_dispute", "presa_da"), ("p2p_dispute_registro", "tg_id"),
+    ("swap_pagamenti", "venditore_id"),
+    ("cambi_liberi", "tg_id"), ("cambi_p2p", "tg_id"),
+    ("onchain_indirizzi", "compratore_id"),
+    ("onchain_indirizzi", "venditore_id"),
+    ("onchain_ordini", "compratore_id"), ("onchain_ordini", "venditore_id"),
+    ("onchain_ordini", "proposta_da"), ("onchain_ordini", "decisione_da"),
+    ("p2p_onchain_ordini", "maker_id"), ("p2p_onchain_ordini", "taker_id"),
+    ("p2p_onchain_ordini", "depositante_id"),
+    ("p2p_onchain_ordini", "ricevente_id"),
+    ("p2p_onchain_ordini", "proposta_da"),
+    ("p2p_onchain_ordini", "decisione_da"),
+    ("p2p_onchain_ordini", "disputa_da"),
+)
+# (tabella, colonna): cio' che era SUO e se ne va con lui
+CANCELLA_TOGLI = (
+    ("sessioni", "tg_id"), ("biglietti_collegamento", "tg_id"),
+    ("avvisi_app", "tg_id"), ("avvisi_notificati", "tg_id"),
+    ("avvisi_ricerca", "tg_id"), ("badge_utente", "tg_id"),
+    ("barattoli_condivisi", "tg_id"),
+    ("carrello_salvato", "tg_id"), ("carrello_salvato", "venditore_id"),
+    ("chiavi_p2p", "tg_id"), ("p2p_indice", "tg_id"),
+    ("doppioni_ignorati", "tg_id"), ("firme_nostr", "tg_id"),
+    ("interessi", "tg_id"), ("inviti_codici", "tg_id"),
+    ("inviti", "invitato"),
+    ("mercatino_avvisi_coda", "tg_id"),
+    ("mercatino_avvisi_coda", "venditore_id"),
+    ("modifiche_massive", "tg_id"), ("nostr_reputazione", "tg_id"),
+    ("p2p_attese", "tg_id"), ("p2p_avvisi", "tg_id"),
+    ("p2p_avvisi_nuovi", "tg_id"), ("p2p_moderatori", "tg_id"),
+    ("p2p_paracadute", "tg_id"), ("p2p_pause", "tg_id"),
+    ("p2p_semi", "tg_id"), ("p2p_sveglie", "tg_id"),
+    ("p2p_tentativi", "tg_id"), ("p2p_tolti", "tg_id"),
+    ("p2p_presenze", "caricata_da"), ("p2p_sono_qui", "caricata_da"),
+    ("p2p_appuntamenti", "caricata_da"),
+    ("preferiti", "tg_id"), ("punti_ritiro", "tg_id"),
+    ("venditori_seguiti", "tg_id"), ("venditori_seguiti", "venditore_id"),
+    ("xp_eventi", "tg_id"), ("offerte_lampo", "venditore_id"),
+    ("feedback", "per_tg_id"),
+    ("onchain_xpub", "tg_id"), ("onchain_incasso", "tg_id"),
+    ("onchain_modo", "tg_id"),
+)
+# Le colonne personali di chi COMPRA, svuotate negli ordini chiusi che
+# restano: l'indirizzo, l'email per il corriere, la busta di ritiro, il
+# recapito per un servizio, le note. Chi vende non ne ha (il codice
+# digitale che ha venduto e' di chi l'ha comprato, e resta).
+CANCELLA_ORDINE_COMPRATORE = (
+    "indirizzo", "email_corriere", "busta_nome", "busta_codice",
+    "busta_file", "busta_file_tipo", "busta_file_nome",
+    "nota_compratore", "accesso_testo", "punto_obiezione_nota")
+
+
+def esegui_cancellazione(tg_id: int) -> dict:
+    """L'ATTO, in UNA transazione: o tutto o niente — il calco di
+    `esegui_fusione`. Le guardie si rileggono DENTRO il lock (un ordine
+    pagato fra il foglio e il «CANCELLA» non deve sfuggire). Torna cio'
+    che serve al dopo (`_dopo_cancellazione`: relay, canali, file) o
+    alza 409 con le righe di cio' che manca."""
+    tg = int(tg_id)
+    adesso = int(time.time())
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                        (tg,)).fetchone()
+        if not u or e_fantasma(tg):
+            con.rollback()
+            raise HTTPException(404, "Account non trovato")
+        impegni = _impegni_cancellazione(con, tg)
+        if impegni:
+            con.rollback()
+            raise HTTPException(409, {"impegni": impegni})
+        _cancellati_prepara(con)
+        ultimo = con.execute("SELECT COALESCE(MAX(fantasma), ?) FROM "
+                             "account_cancellati",
+                             (FANTASMA_BASE,)).fetchone()[0]
+        fantasma = int(ultimo) + 1
+        con.execute("INSERT INTO account_cancellati(fantasma, impronta, "
+                    "cancellato_il) VALUES(?,?,?)",
+                    (fantasma, impronta_account(tg), adesso))
+        # --- GLI ANNUNCI: escono dalla vetrina, da Nostr e dai canali.
+        #     Mai un DELETE (la docstring del trigger della ricerca: «nessun
+        #     DELETE FROM annunci esiste oggi»): la riga resta, rimossa e
+        #     senza luogo. LE FOTO restano solo dove qualcuno ha comprato o
+        #     puntato (la sua ricevuta di cosa era); altrove se ne vanno.
+        annunci = con.execute(
+            "SELECT id, stato, foto, nostr_event_id, nostr_autore "
+            "FROM annunci WHERE venditore_id=?", (tg,)).fetchall()
+        ritira_nostr, ritira_canali, file_foto = [], [], []
+        for a in annunci:
+            usato = con.execute(
+                "SELECT 1 FROM ordini WHERE annuncio_id=? UNION ALL "
+                "SELECT 1 FROM ordine_righe WHERE annuncio_id=? UNION ALL "
+                "SELECT 1 FROM puntate WHERE annuncio_id=? LIMIT 1",
+                (a["id"], a["id"], a["id"])).fetchone()
+            if a["stato"] != "rimosso":
+                ritira_canali.append(a["id"])
+            if a["nostr_event_id"] and not a["nostr_autore"]:
+                ritira_nostr.append(a["id"])
+            if not usato:
+                file_foto += _foto_dell_annuncio(a["foto"])
+            con.execute(
+                "UPDATE annunci SET stato='rimosso', descrizione='', "
+                "zona='', regione='', lat=0, lon=0, contatto_nostr='', "
+                "foto=CASE WHEN ? THEN foto ELSE '' END WHERE id=?",
+                (1 if usato else 0, a["id"]))
+        ids_annunci = [a["id"] for a in annunci]
+        if ids_annunci:
+            segni = ",".join("?" * len(ids_annunci))
+            # le fatture non pagate sui suoi pezzi, come `rimuovi_annuncio`
+            con.execute(
+                f"UPDATE ordini SET stato='annullato', aggiornato=? "
+                f"WHERE stato='creato' AND (annuncio_id IN ({segni}) OR id IN "
+                f"(SELECT ordine_id FROM ordine_righe WHERE annuncio_id "
+                f"IN ({segni})))", (adesso, *ids_annunci, *ids_annunci))
+            # ...e cio' che ALTRI tenevano dei suoi pezzi
+            for tab in ("preferiti", "avvisi_notificati", "coda_vetrina",
+                        "ritiri_per_scelta", "mercatino_avvisi_coda",
+                        "viste_annuncio"):
+                con.execute(f"DELETE FROM {tab} WHERE annuncio_id IN "
+                            f"({segni})", ids_annunci)
+        con.execute("DELETE FROM viste_annuncio WHERE identita=?",
+                    (f"tg:{tg}",))
+        # --- LE TRATTATIVE VIVE decadono (non trattengono niente)
+        con.execute(
+            "UPDATE offerte SET stato='decaduta', aggiornato=? WHERE "
+            "stato IN ('proposta','controproposta','accettata') AND "
+            "(compratore_id=? OR venditore_id=?)", (adesso, tg, tg))
+        con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                    "WHERE stato='creato' AND compratore_id=?", (adesso, tg))
+        # --- GLI ORDINI DOVE HA COMPRATO: via i suoi dati personali. NON
+        #     si tocca `aggiornato` (la riga 2 di `pulisci_indirizzi`)
+        busta_file = [r[0] for r in con.execute(
+            "SELECT busta_file FROM ordini WHERE compratore_id=? AND "
+            "busta_file<>''", (tg,)).fetchall()]
+        col_ord = _colonne_di(con, "ordini")
+        vuote = [c for c in CANCELLA_ORDINE_COMPRATORE if c in col_ord]
+        if vuote:
+            con.execute(f"UPDATE ordini SET "
+                        f"{', '.join(c + '=' + chr(39) * 2 for c in vuote)} "
+                        f"WHERE compratore_id=?", (tg,))
+        if "recapito" in _colonne_di(con, "p2p_onchain_ordini"):
+            con.execute("UPDATE p2p_onchain_ordini SET recapito='' WHERE "
+                        "maker_id=? OR taker_id=?", (tg, tg))
+        # --- LA REPUTAZIONE SU NOSTR: si ritira dopo, coi suoi dati
+        rep = con.execute("SELECT pubkey, evento_id FROM nostr_reputazione "
+                          "WHERE tg_id=?", (tg,)).fetchone()
+        # --- I NEGOZI COLLEGATI: le credenziali se ne vanno con la riga
+        if _colonne_di(con, "connettori"):
+            con.execute("DELETE FROM connettori_uscite WHERE connettore_id IN "
+                        "(SELECT id FROM connettori WHERE tg_id=?)", (tg,))
+            con.execute("DELETE FROM connettori WHERE tg_id=?", (tg,))
+        if u["negozio"]:
+            con.execute("DELETE FROM negozio_visite WHERE negozio=?",
+                        (u["negozio"],))
+        if u["negozio_slug"]:
+            con.execute("DELETE FROM sponsor_aperture WHERE slug=?",
+                        (u["negozio_slug"],))
+        con.execute("UPDATE codici_sconto SET attivo=0 WHERE venditore_id=?",
+                    (tg,))
+        # --- CIO' CHE ERA SUO se ne va
+        for tab, col in CANCELLA_TOGLI:
+            if col in _colonne_di(con, tab):
+                con.execute(f"DELETE FROM {tab} WHERE {col}=?", (tg,))
+        # --- CIO' CHE RESTA passa al fantasma
+        for tab, col in CANCELLA_ANONIMIZZA:
+            if col in _colonne_di(con, tab):
+                con.execute(f"UPDATE {tab} SET {col}=? WHERE {col}=?",
+                            (fantasma, tg))
+        # --- LA RIGA: via la sua, al suo posto quella del fantasma
+        con.execute("DELETE FROM utenti WHERE tg_id=?", (tg,))
+        con.execute(
+            "INSERT INTO utenti(tg_id, nome, username, registrato, negozio, "
+            "classifica_nascosta, avvisi_p2p, annunci_su_profilo_nostr) "
+            "VALUES(?,?,?,0,?,1,0,0)",
+            (fantasma, NOME_FANTASMA, "", nuovo_codice_negozio(con)))
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    # --- LA CHAT, nel suo cassetto: le buste e i file che ha mandato, le
+    #     sue chiavi e i suoi segnalibri. Fuori dalla transazione per
+    #     forza (un altro file): un intoppo qui lo dice il journal, e la
+    #     scopa delle chat finisce il lavoro a scambio chiuso.
+    try:
+        cc = db_chat()
+        try:
+            for tab, col in (("buste", "da"), ("allegati", "da"),
+                             ("chiamate", "da"), ("letture", "tg_id"),
+                             ("chiavi_ordine", "tg_id"), ("scorta", "tg_id")):
+                cc.execute(f"DELETE FROM {tab} WHERE {col}=?", (tg,))
+            cc.commit()
+        finally:
+            cc.close()
+    except Exception as e:
+        print(f"⚠️ Cancellazione account: chat non pulita ({e})", flush=True)
+    file_foto += [x for x in (u["avatar"], u["banner_foto"],
+                              u["banner_foto_att"])
+                  if x and "/" not in str(x) and NOME_FOTO.match(str(x))]
+    print(f"🗑 Account cancellato: {len(ids_annunci)} annunci ritirati, "
+          f"il resto ora porta il fantasma {fantasma}", flush=True)
+    return {"fantasma": fantasma, "ritira_nostr": ritira_nostr,
+            "ritira_canali": ritira_canali, "foto": file_foto,
+            "buste": [b for b in busta_file
+                      if b and os.path.basename(b) == b],
+            "reputazione": (rep["pubkey"], rep["evento_id"] or "")
+            if rep else None}
+
+
+async def _dopo_cancellazione(esito: dict):
+    """In sottofondo, DOPO il commit: i file se ne vanno (prima la riga,
+    poi il disco — il patto di `_togli_banner_file`), i relay ricevono
+    le NIP-09 di cio' che Barattolo aveva firmato, i canali perdono i
+    post. Fail-open come ogni ritiro: un relay muto non riapre niente."""
+    for nome in esito.get("foto") or []:
+        try:
+            os.remove(os.path.join(FOTO_DIR, nome))
+        except OSError:
+            pass
+    for nome in esito.get("buste") or []:
+        try:
+            os.remove(os.path.join(BUSTE_DIR, nome))
+        except OSError:
+            pass
+    for aid in esito.get("ritira_nostr") or []:
+        try:
+            await ritira_da_nostr(aid)
+        except Exception as e:
+            print(f"⚠️ Cancellazione account: ritiro Nostr #{aid} ({e})")
+    for aid in esito.get("ritira_canali") or []:
+        try:
+            await promo_rimuovi(aid)
+        except Exception as e:
+            print(f"⚠️ Cancellazione account: post #{aid} ({e})")
+    rep = esito.get("reputazione")
+    if rep and _NOSTR:
+        try:
+            await _spedisci_ai_relay(_lapide_reputazione(rep[0], rep[1]))
+        except Exception as e:
+            print(f"⚠️ Cancellazione account: reputazione ({e})")
+
+
+def _cancella_porta():
+    if not ACCOUNT_CANCELLABILE:
+        raise HTTPException(404, "Not Found")
+
+
+@app.get("/api/me/cancella-account")
+def cancella_account_anteprima(x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """IL FOGLIO PRIMA DEL GESTO: cosa manca (le righe di
+    `_impegni_cancellazione`) e cosa si perde (i numeri di
+    `_cosa_perdi`). Non scrive niente."""
+    _cancella_porta()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        return {"impegni": _impegni_cancellazione(con, user["id"]),
+                "perdi": _cosa_perdi(con, user["id"]),
+                "parola": PAROLA_CANCELLA}
+    finally:
+        con.close()
+
+
+@app.post("/api/me/cancella-account")
+async def cancella_account(req: Request, response: Response,
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """IL GESTO. Vuole la parola scritta a mano (`{"conferma":
+    "CANCELLA"}`): e' irreversibile, e un tocco solo non basta. Si
+    cancella l'account di QUESTA richiesta — dentro la Mini App con piu'
+    account, quello scelto. Sul web il cookie della sessione muore qui
+    (le righe in `sessioni` le ha gia' tolte l'atto)."""
+    _cancella_porta()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    if str(d.get("conferma") or "").strip().upper() != PAROLA_CANCELLA:
+        raise HTTPException(400, f"Per cancellare scrivi {PAROLA_CANCELLA}")
+    esito = await asyncio.to_thread(esegui_cancellazione, user["id"])
+    asyncio.create_task(_dopo_cancellazione(esito))
+    if not x_tg_init_data:
+        response.delete_cookie("barattolo_sessione", path="/")
+    return {"ok": True}
+
+
+# (Qui finisce il blocco della cancellazione dell'account. La riga non
+# e' un vezzo: le prove ritagliano una funzione fino alle due righe vuote
+# che la seguono, e l'ultima del file senza niente dopo non si ritaglia.)

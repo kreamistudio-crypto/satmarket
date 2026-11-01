@@ -14289,6 +14289,9 @@ def prove_initdata():
         # _upsert_da_telegram, la porta unica delle tre — reale() e non
         # uno stub, per non imitarne anche i bug (la lezione di sempre)
         exec(pezzo("_upsert_da_telegram"), amb)
+        # ...e chi rientra dopo una cancellazione (1 nov 2026): il pezzo
+        # VERO, che sul database di cartone non trova cancellati e torna 0
+        exec(pezzo("_riprendi_penalita"), amb)
         # dal 26 set 2026 firma e freschezza stanno in _utente_da_initdata,
         # che verifica_utente chiama prima di scrivere: si montano insieme
         exec(pezzo("_utente_da_initdata"), amb)
@@ -17024,8 +17027,10 @@ def prove_nome_da_nostr():
 
     # --- _upsert_da_telegram: protegge SOLO chi ha scelto 'nostr' ---
     def upsert(con, tg_id, nome, username):
-        amb = {"time": _time, "nuovo_codice_negozio": lambda con: "zz00zz00"}
+        amb = {"time": _time, "nuovo_codice_negozio": lambda con: "zz00zz00",
+               "sqlite3": sqlite3}
         exec(pezzo("_upsert_da_telegram"), amb)
+        exec(pezzo("_riprendi_penalita"), amb)   # 1 nov 2026: il pezzo vero
         amb["_upsert_da_telegram"](con, tg_id, nome, username)
 
     c = con_utenti()
@@ -21218,6 +21223,9 @@ def prove_npub_una_casa():
                  "_accoda_trasloco_di",
                  "_spegni_badge_altrove", "disabilita_accesso_nostr",
                  "tg_id_da_pubkey", "crea_utente_nostr",
+                 # chi rientra dopo una cancellazione (1 nov 2026): il
+                 # pezzo vero, che qui non trova cancellati e torna 0
+                 "_riprendi_penalita",
                  "casa_della_chiave", "venditori_nostr_attivi"):
         exec(pezzo(nome), amb)
     for nome in ("collega_npub_firma", "login_nostr",
@@ -57815,7 +57823,17 @@ def prove_server_che_si_riavvia(mini, node):
     prova("il portinaio si monta nello script dell'app...", True,
           i_app < i_monta)
     prova("...PRIMA di ogni fetch del file", 0, mini[:i_monta].count("fetch("))
-    prova("...e ce n'e' uno solo", 1, mini.count("window.fetch = "))
+    # (1 nov 2026, cancella-account, EMENDATA) il portinaio resta uno;
+    # l'altra riga che tocca window.fetch e' il SIGILLO del saluto dopo
+    # la cancellazione (`salutoCancellato`): spegne le chiamate perche'
+    # la prima /api/me con l'initData ricreerebbe l'account. Non monta
+    # niente: rifiuta e basta, e vive solo li' dentro.
+    sigillo = "window.fetch = () => Promise.reject(new Error('account cancellato'));"
+    k_sal = mini.index("function salutoCancellato")
+    prova("...e ce n'e' uno solo (piu' il sigillo del saluto)", (1, 1, True),
+          (mini.count("window.fetch = fetchColConto("), mini.count(sigillo),
+           k_sal < mini.index(sigillo) < mini.index("\n}", k_sal)))
+    prova("...e nessun'altra riga lo tocca", 2, mini.count("window.fetch = "))
     prova("la pastiglia c'e', col testo del cantiere", 1, mini.count(
         '<div class="riprovo" id="riprovo" role="status">'
         'Un attimo, riprovo…</div>'))
@@ -58927,6 +58945,16 @@ def prove_pagina_dati():
     prova("...e che l'account non si cancella con un bottone", True,
           "cancellare l'account non si può ancora fare con un bottone"
           in piatto)
+    # la gemella (1 nov 2026, cancella-account): a leva accesa la pagina
+    # dice che il gesto c'e', e dice cosa TENIAMO — l'impronta e le
+    # penalita' P2P. Nasce nascosta: la scopre solo /api/me.
+    prova("...e la gemella, nascosta, dice cosa resta dopo la"
+          " cancellazione", True,
+          '<span id="privCancellaSi" style="display:none">' in vista
+          and "<b>un'impronta</b>" in piatto
+          and "penalità degli scambi P2P" in piatto
+          and "el('privCancellaSi').style.display = myCancellabile"
+          in mini)
 
     # --- 6) il contatto per i diritti (ago 2026, deciso da Andrea)
     #
@@ -119270,7 +119298,7 @@ def prove_profilo_elegante():
         "grpIncassi": ["accLnAddress", "accOnchainIncasso", "accNwc", "vocEsporta"],
         "grpLivello": ["accLivello", "accInviti", "accDistintivi"],
         "grpAspetto": ["accAvvisi", "accAspetto"],
-        "grpPrivacy": ["accIdentita", "vocPrivacy", "accTor"],
+        "grpPrivacy": ["accIdentita", "vocPrivacy", "vocCancella", "accTor"],
     }
     fuori = []
     for g, voci in CASSETTI.items():

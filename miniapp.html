@@ -13715,10 +13715,25 @@ document.getElementById('cartello')?.remove();</script>
         <b>titolare del trattamento</b>. Finché non c'è, il contatto
         qui sopra non è un <b>recapito formale</b> — ma è vero, lo
         leggiamo e rispondiamo.<br>
-        E una cosa manca come strumento: <b>cancellare l'account non si
+        <!-- LE DUE FRASI GEMELLE (1 nov 2026, cantiere cancella-account).
+             La pagina e' markup fisso, ma la cancellazione vive dietro
+             una leva: la frase vera la sceglie la stessa riga di /api/me
+             che accende la voce nel Profilo. Leva spenta, resta la
+             vecchia — ed e' ancora vera. -->
+        <span id="privCancellaNo">E una cosa manca come strumento: <b>cancellare l'account non si
         può ancora fare con un bottone</b>. Quasi tutto lo puoi già
         togliere da solo dal Profilo, ma un gesto che cancella tutto in
-        una volta non esiste — meglio dirlo che lasciarlo scoprire.
+        una volta non esiste — meglio dirlo che lasciarlo scoprire.</span>
+        <span id="privCancellaSi" style="display:none">E da novembre
+        2026 c'è anche il gesto che toglie tutto in una volta:
+        <b>«🗑 Cancella il mio account»</b>, nel Profilo sotto la
+        privacy, quando non hai niente in corso. Spariscono profilo,
+        annunci, preferiti, chat e collegamenti; gli ordini e le
+        recensioni già chiusi restano senza nome, come
+        «Utente cancellato». Di te teniamo solo <b>un'impronta</b> del
+        numero del tuo account — non il numero, e mai il telefono: un
+        calcolo che non si rovescia — con la data, e le eventuali <b>penalità degli
+        scambi P2P</b>: se torni, ritrovi quelle e nient'altro.</span>
       </div>
     </div>
   </div>
@@ -14552,6 +14567,16 @@ document.getElementById('cartello')?.remove();</script>
            pagina; dal set 2026 e' la voce-porta di «Privacy». -->
       <div class="acc voce-porta" id="vocPrivacy">
         <button type="button" class="acc-h" onclick="apriPrivacy()"><span class="em">🔐</span>I tuoi dati<span class="fr">›</span></button>
+      </div>
+
+      <!-- 🗑 CANCELLA IL MIO ACCOUNT (1 nov 2026, cantiere cancella-account,
+           leva ACCOUNT_CANCELLABILE). Nasce SPENTA come il sito Tor qui
+           sotto: la accende la lettura di /api/me solo se il server dice
+           `account_cancellabile`. Sta in «Privacy» accanto a «I tuoi dati»
+           perche' e' la stessa domanda — che fine fanno i miei dati — col
+           gesto in mano invece del racconto. -->
+      <div class="acc voce-porta" id="vocCancella" style="display:none">
+        <button type="button" class="acc-h" onclick="apriCancellaAccount()"><span class="em">🗑</span>Cancella il mio account<span class="fr">›</span></button>
       </div>
 
       <!-- 🧅 IL SITO TOR. Il servizio nascosto ESISTE da prima di questo
@@ -15770,6 +15795,27 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn ghost" id="accountEsciTutti" style="display:none"
       onclick="esciDaTutti()">🚪 Esci da tutti</button>
     <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
+  </div>
+
+  <!-- ============ SHEET CANCELLA ACCOUNT (1 nov 2026) ============
+       Il foglio PRIMA del gesto: cosa manca (se manca qualcosa il bottone
+       non c'e'), cosa sparisce, cosa resta senza nome. Poi la parola
+       scritta a mano: un gesto che non si annulla non si fa con un tocco.
+       Il corpo lo scrive renderCancella(), l'unico posto che lo disegna. -->
+  <div class="sheet" id="cancellaSheet" role="dialog" aria-modal="true"
+       aria-labelledby="cancellaTit">
+    <div class="grab"></div>
+    <h3 id="cancellaTit">🗑 Cancella il mio account</h3>
+    <div id="cancellaCorpo" style="font-size:13px;color:var(--muted);font-weight:600"></div>
+    <div id="cancellaParola" style="display:none;margin-top:14px">
+      <label for="cancellaInput" style="font-size:13px;font-weight:700">Per confermare scrivi <b>CANCELLA</b></label>
+      <div class="field" style="margin:6px 0 0"><input id="cancellaInput" type="text" autocomplete="off"
+             autocapitalize="characters" spellcheck="false" placeholder="CANCELLA"
+             oninput="cancellaControlla()"></div>
+    </div>
+    <button class="btn allarme" id="cancellaVai" style="display:none;margin-top:12px" disabled
+      onclick="cancellaAccount()">🗑 Cancella per sempre</button>
+    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
   <!-- ============ SHEET INVITO (vetrina dal browser) ============ -->
@@ -34206,6 +34252,7 @@ function closeSheet(){
   el('paccoSvuotaSheet').classList.remove('open');
   el('corrieriSheet').classList.remove('open');
   el('accountSheet').classList.remove('open');
+  el('cancellaSheet').classList.remove('open');
   el('botEntraSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
   /* il focus torna al campo-bottone che ha aperto il picker (vale per
@@ -54309,6 +54356,131 @@ function chiudiBarraWeb(){
   timbraVisto('barraweb');
   el('demoBanner').style.display = 'none';
 }
+/* ============ LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026) ============
+   Cantiere cancella-account, leva ACCOUNT_CANCELLABILE (server.py, in
+   fondo: «LA CANCELLAZIONE DELL'ACCOUNT»). Il foglio chiede al server
+   cosa manca e cosa si perde, e il gesto vuole la parola scritta.
+   DOPO IL SI' DA QUI NON PARTE PIU' NIENTE: dentro Telegram ogni
+   richiesta firmata ricreerebbe un account nuovo, vuoto, e l'utente
+   appena cancellato si ritroverebbe iscritto senza aver chiesto niente.
+   Per questo `fetch` si spegne e la pagina diventa il saluto: si esce
+   chiudendo la Mini App (o, sul web, tornando alla vetrina). */
+let myCancellabile = false;
+let cancellaInfo = null;
+
+async function apriCancellaAccount(){
+  haptic();
+  cancellaInfo = null;
+  el('cancellaCorpo').textContent = 'Controllo cosa c\'è in corso…';
+  el('cancellaParola').style.display = 'none';
+  el('cancellaInput').value = '';
+  el('cancellaVai').style.display = 'none';
+  el('sheetBg').classList.add('open');
+  el('cancellaSheet').classList.add('open');
+  try {
+    const r = await fetch(`${API_BASE}/me/cancella-account`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      el('cancellaCorpo').textContent = typeof d.detail === 'string'
+        ? d.detail : 'Non riesco a controllare: riprova tra poco';
+      return;
+    }
+    cancellaInfo = d;
+    renderCancella();
+  } catch(e) { el('cancellaCorpo').textContent = 'Rete assente: riprova'; }
+}
+
+/* L'unico posto che disegna il foglio. Le righe di cio' che manca
+   arrivano dal server con dentro i titoli degli annunci, cioe' testo
+   degli utenti: passano da esc() come ovunque. */
+function renderCancella(){
+  const d = cancellaInfo || {};
+  const imp = Array.isArray(d.impegni) ? d.impegni : [];
+  const vai = el('cancellaVai');
+  if (imp.length) {
+    el('cancellaCorpo').innerHTML =
+      `<p>Prima di cancellare l'account va chiuso quello che è ancora in corso:</p>`
+      + `<ul style="margin:8px 0 8px 18px;padding:0">${imp.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`
+      + `<p>Quando è tutto chiuso, torna qui.</p>`;
+    el('cancellaParola').style.display = 'none';
+    vai.style.display = 'none';
+    return;
+  }
+  const p = d.perdi || {};
+  const via = [`<li>Spariscono il tuo profilo (nome, foto, Lightning address, chiave Nostr collegata), i preferiti, gli avvisi, gli indirizzi salvati e le chat.</li>`];
+  if (p.annunci) via.push(`<li>${p.annunci === 1 ? 'Il tuo annuncio in vetrina viene ritirato' : `I tuoi ${fmt(p.annunci)} annunci in vetrina vengono ritirati`}, anche da Nostr e dai canali.</li>`);
+  if (p.recensioni) via.push(`<li>${p.recensioni === 1 ? 'La recensione che hai ricevuto viene cancellata' : `Le ${fmt(p.recensioni)} recensioni che hai ricevuto vengono cancellate`}.</li>`);
+  if (p.xp || p.pioniere) via.push(`<li>Perdi ${p.xp ? `i tuoi ${fmt(p.xp)} punti` : ''}${p.xp && p.pioniere ? ' e ' : ''}${p.pioniere ? 'il posto da pioniere, che non torna' : ''}.</li>`);
+  const resta = [`<li>${p.ordini ? `I tuoi ${fmt(p.ordini)} ordini conclusi` : 'Gli ordini conclusi'} e i pagamenti restano senza il tuo nome, per la contabilità e per eventuali contestazioni: chi ha fatto affari con te vedrà «Utente cancellato».</li>`,
+    `<li>Le recensioni che hai scritto restano, senza firma.</li>`,
+    `<li>Se un giorno rientri con lo stesso account parti da zero: tornano solo le eventuali penalità degli scambi P2P.</li>`,
+    `<li>La chat col bot la togli tu da Telegram, e i messaggi Nostr firmati da te restano tuoi.</li>`];
+  el('cancellaCorpo').innerHTML =
+    `<p><b>Cosa sparisce</b></p><ul style="margin:6px 0 10px 18px;padding:0">${via.join('')}</ul>`
+    + `<p><b>Cosa resta</b></p><ul style="margin:6px 0 10px 18px;padding:0">${resta.join('')}</ul>`
+    + `<p><b>Non si può annullare.</b></p>`;
+  el('cancellaParola').style.display = '';
+  vai.style.display = '';
+  vai.textContent = '🗑 Cancella per sempre';
+  cancellaControlla();
+}
+
+function cancellaControlla(){
+  const parola = String(cancellaInfo?.parola || 'CANCELLA');
+  el('cancellaVai').disabled =
+    el('cancellaInput').value.trim().toUpperCase() !== parola;
+}
+
+async function cancellaAccount(){
+  const vai = el('cancellaVai');
+  if (vai.disabled) return;
+  vai.disabled = true; vai.textContent = '…';
+  try {
+    const r = await fetch(`${API_BASE}/me/cancella-account`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({conferma: el('cancellaInput').value.trim().toUpperCase()})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      /* 409: fra il foglio e il gesto qualcosa si e' aperto (un ordine
+         pagato proprio adesso): il foglio torna a dire cosa manca */
+      if (r.status === 409 && d.detail && Array.isArray(d.detail.impegni)) {
+        cancellaInfo = Object.assign({}, cancellaInfo, {impegni: d.detail.impegni});
+        renderCancella();
+        return;
+      }
+      toast(typeof d.detail === 'string' ? d.detail : 'Non è riuscito, riprova', 6000);
+      vai.textContent = '🗑 Cancella per sempre'; cancellaControlla();
+      return;
+    }
+  } catch(e) {
+    toast('Rete assente: riprova');
+    vai.textContent = '🗑 Cancella per sempre'; cancellaControlla();
+    return;
+  }
+  await salutoCancellato();
+}
+
+async function salutoCancellato(){
+  haptic('success');
+  /* chi se ne va lascia il dispositivo: la sua nsec non resta qui */
+  try { await scordaNsecAccount(); } catch(e){}
+  try { if (typeof miniAccount === 'function' && miniAccount()) { scriviContoMini(''); CONTO_MINI = ''; } } catch(e){}
+  window.fetch = () => Promise.reject(new Error('account cancellato'));
+  document.body.innerHTML =
+    `<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;`
+    + `justify-content:center;gap:14px;padding:24px;text-align:center;background:var(--bg);color:var(--ink)">`
+    + `<div style="font-size:48px">👋</div>`
+    + `<h2 style="margin:0">Account cancellato</h2>`
+    + `<div style="font-size:14px;color:var(--muted);max-width:340px">I tuoi dati sono stati tolti. Grazie di essere passato da Barattolo.</div>`
+    + `<button class="btn ghost" style="max-width:280px" onclick="chiudiDopoCancella()">Chiudi</button></div>`;
+}
+
+function chiudiDopoCancella(){
+  if (tg?.initData && typeof tg.close === 'function') { tg.close(); return; }
+  location.href = '/';
+}
+
 async function esciWeb(){
   /* chi esce lascia il dispositivo: la sua nsec non resta qui */
   try { await scordaNsecAccount(); } catch(e){}
@@ -91998,6 +92170,14 @@ async function avvia(){
     /* PIU' ACCOUNT OVUNQUE: la leva viva (un server di ieri non la
        manda, e resta spenta) */
     piuAccount = !!me.piu_account;
+    /* LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026): la leva viva — un
+       server di ieri non la manda, e la voce resta spenta */
+    myCancellabile = !!me.account_cancellabile && !DEMO && !VETRINA;
+    if (el('vocCancella')) el('vocCancella').style.display = myCancellabile ? '' : 'none';
+    if (el('privCancellaSi')) {
+      el('privCancellaSi').style.display = myCancellabile ? '' : 'none';
+      el('privCancellaNo').style.display = myCancellabile ? 'none' : '';
+    }
     myClassificaNascosta = !!me.classifica_nascosta;
     myAnnunciSulProfilo = me.annunci_su_profilo_nostr == null ? true : !!me.annunci_su_profilo_nostr;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
