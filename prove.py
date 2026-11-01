@@ -159132,9 +159132,13 @@ def prove_apri_nel_wallet():
            GANCIO in fn("function orologioHoldP2P(o){"),
            mini.count("pw.onclick = tentativoWalletP2P")])
     anw = nudo(fn("function apriNelWallet(a, ev, tentativo){"))
-    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei tre QR "
+    # EMENDATA (1 nov 2026, cantiere presa-altra-rete tappa 3): i QR
+    # Lightning sono diventati QUATTRO — si aggiunge quello del deposito
+    # on-chain pagato in Lightning (`renderDepositoOnchainP2P`) — e il suo
+    # «Apri nel wallet» nasce con href `#`: lo schema lo scrive la porta.
+    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei quattro QR "
           "e nel Riprova, e in nessuna navigazione da script",
-          [0, 4],
+          [0, 5],
           [len([l for l in mini.splitlines()
                 if re.search(r"""location(\.href)?\s*=\s*['"`]lightning:""", l)]),
            mini.count("('lightning:' + ")])
@@ -182713,8 +182717,10 @@ def prove_cambio_p2p():
           "if (conCambio && p2pIncassoRete[o.id] === 'oc') {" in rend
           and "box.innerHTML = intro + sceltaRete + corpoCambioIncassoP2P(o, netto);" in rend
           and "box.innerHTML = intro + sceltaRete +\n    vie +" in rend)
+    # EMENDATA (1 nov 2026, presa-altra-rete tappa 3): anche il cambio del
+    # deposito di uno scambio on-chain (`p2pDeposito`) si chiama cosi'
     prova("la lista della pagina «Cambio» lo chiama «Scambio P2P»", (1, 1, 1),
-          (js.count("rec.p2p || rec.p2pOnchain ? t.scambioP2P"), js.count("scambioP2P: 'Scambio P2P'"),
+          (js.count("rec.p2p || rec.p2pOnchain || rec.p2pDeposito ? t.scambioP2P"), js.count("scambioP2P: 'Scambio P2P'"),
            js.count("scambioP2P: 'P2P trade'")))
 
 
@@ -182835,6 +182841,81 @@ console.log(JSON.stringify({
     prova("il giro vero sta nella gabbia e nella CI", (True, True),
           ("\ncollaudo_cambio_onchain_p2p\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
            "\ncollaudo_cambio_onchain_p2p.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
+
+
+def prove_deposito_ln_p2p():
+    """CHI VENDE BITCOIN SU UNO SCAMBIO P2P ON-CHAIN PAGA IL DEPOSITO IN
+    LIGHTNING, TAPPA 3 (1 nov 2026, cantiere presa-altra-rete). Chi ha
+    PRESO l'ordine vendendo sceglie «⚡ Lightning» nel foglio del deposito:
+    il telefono fa nascere un cambio Lightning → bitcoin di SATS Routing
+    per almeno l'importo, e il ritiro va dritto all'indirizzo 2-di-3. Il
+    giro vero, server e telefono contro il cartone, e'
+    `collaudo_deposito_ln_p2p`; qui le sentinelle."""
+    print("\n[scambio P2P on-chain: chi vende paga il deposito in Lightning]")
+    src = _SORGENTE.replace("\r\n", "\n")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    js = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read().replace("\r\n", "\n")
+    porta = pezzo("p2p_onchain_deposito_ln_per")
+    prova("il cancello: la leva della presa sull'altra rete, lo scambio on-chain e le "
+          "reti giuste; la strada bitcoin → Lightning qui non c'entra",
+          (True, True, True, False),
+          ("p2p_altra_rete_per(tg_id)" in porta, "p2p_onchain_ammesso(tg_id)" in porta,
+           "onchain_ln_rete_ok()" in porta, "cambio_strade()" in porta))
+    for rotta in ('@app.get("/api/p2p/onchain/{oid}/deposito-ln/preventivo")',
+                  '@app.post("/api/p2p/onchain/{oid}/deposito-ln")'):
+        prova(f"la rotta {rotta[10:-1]} c'e', una volta", 1, src.count(rotta))
+    mio = pezzo("_p2p_onchain_mio_deposito_ln")
+    prova("solo chi deposita, solo se ha PRESO lui, solo a scambio preso senza un sats "
+          "visto, con mezz'ora davanti", (True,) * 4,
+          ('_p2p_onchain_ruolo(o, tg_id) != "compratore"' in mio,
+           'int(o["depositante_id"] or 0) != int(o["taker_id"] or 0)' in mio,
+           'o["stato"] != "preso" or int(o["visti_sats"] or 0)' in mio,
+           "< P2P_DEPOSITO_LN_PRIMA_S" in mio))
+    prev = pezzo("p2p_onchain_deposito_ln_preventivo")
+    prova("il preventivo: il conto al contrario sull'importo, SENZA la nostra fee, e "
+          "mai sotto l'importo", (True, True, True),
+          ("swap_dovuto_per_ricevere(importo, tariffa, 0)" in prev,
+           "preventivo_swap(dovuto, tariffa, 0, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)" in prev,
+           'int(p["ricevi"]) < importo' in prev))
+    big = pezzo("p2p_onchain_deposito_ln_biglietto")
+    prova("il biglietto: sopra l'importo, nei tetti, nella tabella della tappa 1 col "
+          "nome «oc:<numero>»", (True, True, True),
+          ('cifra <= int(o["importo_sats"])' in big,
+           "ordine = p2p_onchain_deposito_ln_ordine(oid)" in big,
+           "cambi_p2p_vivi(con, user[\"id\"], ordine, adesso) >= P2P_CAMBI_PER_SCAMBIO" in big))
+    ann = pezzo("p2p_onchain_annulla")
+    prova("l'annullo: un cambio che ha bloccato i bitcoin ferma tutto, il fornitore "
+          "muto e' un 503", (True, True),
+          ("in_volo = await p2p_onchain_deposito_ln_in_volo(oid)" in ann,
+           "if in_volo is None:\n            raise HTTPException(503" in ann))
+    prova("la ronda ha le parole e il bottone del deposito", (True, True),
+          ("testo, bottone = _avviso_ritiro_p2p(r)" in pezzo("ronda_cambi_p2p"),
+           "return _testo_deposito_ln_p2p(r), (P2P_BOTTONE_DEPOSITO_LN, dove)"
+           in pezzo("_avviso_ritiro_p2p")))
+    # --- il telefono
+    crea = pezzo_js(js, "async function swapCreaPerDepositoP2PDentro(scambio, indirizzo, prima){", "\n}\n")
+    prova("il telefono: l'indirizzo e' quello del preventivo, le tariffe rilette, il "
+          "ritiro almeno l'importo, il biglietto PRIMA del cambio, il ritiro verso il "
+          "deposito", (True,) * 5,
+          ("indirizzo !== String(prima.indirizzo || '')" in crea,
+           "await leggiPreventivoDepositoP2P(scambio, f.id, prima.hash)" in crea,
+           "if (!(Number(nuovo.ricevi) >= Number(p.importo)))" in crea,
+           crea.index("chiediBigliettoDepositoP2P(") < crea.index("await f.crea("),
+           "f.crea({parole: seme.parole, indice: indice, preventivo: p, indirizzo: indirizzo})" in crea))
+    prova("...un cambio vivo per deposito, e il record non e' ne' un ordine ne' uno "
+          "scambio di Mostro", (True, True, False),
+          ("if (vivo && !['scaduto', 'fallito', 'ripreso'].includes(swapFase(vivo))) throw swapNoP2P('doppio');" in js,
+           "p2pDeposito: scambio, indice: indice, seme: 'onchain'" in crea,
+           "ordine:" in crea or "p2p: " in crea))
+    prova("le parole del deposito, nelle due lingue", (1, 1),
+          (js.count("depositoPaga: n => `Paga questa richiesta dal tuo wallet Lightning"),
+           js.count("depositoPaga: n => `Pay this request from your Lightning wallet")))
+    corpo = pezzo_js(mini, "function corpoDepositoLnOnchainP2P(o){", "\n}\n")
+    prova("il foglio dice prima che un annullo o un rimborso tornano ON-CHAIN", True,
+          "tornano <b>on-chain</b> al tuo wallet di Barattolo, non in Lightning" in corpo)
+    prova("il giro vero sta nella gabbia e nella CI", (True, True),
+          ("\ncollaudo_deposito_ln_p2p\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
+           "\ncollaudo_deposito_ln_p2p.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
 
 
 def prove_grafica_swap():
@@ -184542,7 +184623,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
-              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p,
+              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p,
               prove_margine_cassaforte,
               prove_quantita_servizi,
               prove_sintassi_client,

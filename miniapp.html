@@ -18911,7 +18911,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '4632c34ee7';
+const SWAP_TELEFONO_VER = 'fb3b192508';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -19238,6 +19238,36 @@ async function natoCambioP2PAlServer(id, rec){
       body: JSON.stringify({swap_id: rec.id, impronta: rec.impronta,
         indirizzo: rec.lockupAddress, onchain: rec.onchainAmount})});
     const j = await r.json().catch(() => null);
+    return r.ok && j ? j : null;
+  } catch(e) { return null; }
+}
+/* (1 nov 2026, presa-altra-rete, tappa 3) il deposito di uno scambio
+   on-chain pagato in Lightning: il preventivo (quanto pagare perche' al
+   deposito arrivi almeno l'importo) e il biglietto, sulle rotte dello
+   scambio; la nascita e l'annullo sono quelli qui sopra e qui sotto. */
+async function leggiPreventivoDepositoP2P(scambio, fornitore, hash){
+  let d;
+  try {
+    const q = new URLSearchParams();
+    if (fornitore) q.set('fornitore', fornitore);
+    if (hash) q.set('hash', hash);
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(scambio)}/deposito-ln/preventivo?${q.toString()}`,
+      {headers: {'X-Tg-Init-Data': authHdr()}});
+    d = await r.json().catch(() => null);
+    if (!r.ok || !d) d = r.status === 403 ? {ok: false, motivo: 'spento'}
+      : r.status === 409 ? {ok: false, motivo: 'chiuso', detail: String((d && d.detail) || '')}
+      : {ok: false, motivo: 'non_risponde'};
+  } catch(e) { d = {ok: false, motivo: 'non_risponde'}; }
+  return d;
+}
+async function chiediBigliettoDepositoP2P(d){
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(d.scambio)}/deposito-ln`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({sats: Number(d.sats) || 0, fornitore: d.fornitore || ''})});
+    const j = await r.json().catch(() => null);
+    if (r.status === 403) return {ok: false, motivo: 'spento'};
     return r.ok && j ? j : null;
   } catch(e) { return null; }
 }
@@ -58969,7 +58999,23 @@ function renderDepositoOnchainP2P(){
   const o = p2pOcDeposito;
   if (!box || !o) return;
   const prova = typeof onchainRete === 'function' && onchainRete().prova;
-  box.innerHTML =
+  /* (tappa 3) chi ha preso vendendo puo' pagare in Lightning: la scelta in
+     cima, e un cambio gia' nato fa partire il foglio dal suo lato */
+  const vivoLn = depositoLnVivoOnchainP2P(o.id);
+  const sceltaLn = depositoLnPossibileOnchainP2P(o) || !!vivoLn;
+  if (sceltaLn && !p2pOcDepositoRete[o.id] && vivoLn) p2pOcDepositoRete[o.id] = 'ln';
+  if (sceltaLn && p2pOcDepositoRete[o.id] === 'ln') {
+    if (!vivoLn) caricaDepositoLnOnchainP2P(o.id);
+    box.innerHTML = sceltaReteDepositoOnchainP2P(o.id, true) + corpoDepositoLnOnchainP2P(o);
+    const q = el('p2pOcDepositoLnQr');
+    if (q && vivoLn) disegnaQr(q, ('lightning:' + String(vivoLn.invoice).trim()).toUpperCase(), 'Alphanumeric');
+    const a = el('p2pOcDepositoLnWallet');
+    if (a && vivoLn && typeof portaWallet === 'function') portaWallet(a, vivoLn.invoice);
+    return;
+  }
+  box.innerHTML = (sceltaLn ? sceltaReteDepositoOnchainP2P(o.id, false) : '')
+    + (vivoLn && swapFase(vivoLn) === 'creato'
+       ? '<div class="hint">⚠️ Hai una richiesta Lightning aperta per questo deposito: se depositi on-chain, non pagarla.</div>' : '') +
     '<div class="hint">Manda <b>' + fmt(o.importo_sats) + ' sats</b> dal tuo wallet Bitcoin: '
       + 'restano <b>bloccati nel 2-di-3</b> e non escono finché non li liberi tu. '
       + 'Dentro ci sono ' + fmt(o.margine_sats) + ' sats di margine per la rete.'
@@ -59005,6 +59051,158 @@ function battitoFoglioDepositoOnchainP2P(){
   el('p2pOcDepositoScade').textContent = t.testo;
   el('p2pOcDepositoWallet').style.display = t.viva ? '' : 'none';
   return t.viva && !!t.testo;
+}
+
+/* ---- IL DEPOSITO PAGATO IN LIGHTNING (1 nov 2026, cantiere
+   presa-altra-rete, tappa 3; studio del 30 ott, caso B2) ----
+   Chi ha PRESO un ordine on-chain vendendo bitcoin trova in cima al foglio
+   del deposito la scelta «₿ On-chain / ⚡ Lightning». Su Lightning: quanto
+   paga (il conto al contrario del server: al deposito arriva almeno
+   l'importo), il costo del cambio, che un annullo o un rimborso tornano
+   ON-CHAIN, e «Crea la richiesta Lightning». Il telefono fa nascere il
+   cambio (`swapCreaPerDepositoP2P`, swap/instradatore.js) col ritiro verso
+   l'indirizzo 2-di-3; la richiesta si paga dal QR, dal wallet o dal wallet
+   collegato. Pagata, la sorveglianza dei cambi ritira i bitcoin dritti nel
+   deposito; il foglio si chiude da solo quando il deposito si vede in
+   rete, come sempre. Il cancello lo dice il server
+   (`deposito_ln_possibile`); un cambio gia' nato si segue anche a leva
+   spenta. */
+const p2pOcDepositoRete = {};   // scambio -> 'ln' | 'oc', la scelta nel foglio
+const p2pOcDepositoLn = {};     // scambio -> {stato, dati, quando, errore}
+const DEPOSITO_LN_MORTI = new Set(['scaduto', 'fallito', 'ripreso']);
+function depositoLnPossibileOnchainP2P(o){
+  return !!(o && o.deposito_ln_possibile && typeof swapCreaPerDepositoP2P === 'function'
+    && typeof swapAcceso === 'function' && swapAcceso());
+}
+/* il cambio del deposito ancora vivo (nato, non scaduto ne' fallito) */
+function depositoLnVivoOnchainP2P(id){
+  const rec = typeof swapDiDepositoP2P === 'function' ? swapDiDepositoP2P(id) : null;
+  return rec && !DEPOSITO_LN_MORTI.has(swapFase(rec)) ? rec : null;
+}
+function sceltaReteDepositoOnchainP2P(id, ln){
+  return '<div style="display:flex;gap:8px;margin-bottom:12px" role="group" aria-label="Come depositi">' +
+    '<button class="btn ' + (ln ? 'ghost' : 'orange') + '" type="button" style="flex:1;margin:0" aria-pressed="' + !ln + '" ' +
+      'onclick="scegliReteDepositoOnchainP2P(' + Number(id) + ', \'oc\')">₿ On-chain</button>' +
+    '<button class="btn ' + (ln ? 'orange' : 'ghost') + '" type="button" style="flex:1;margin:0" aria-pressed="' + ln + '" ' +
+      'onclick="scegliReteDepositoOnchainP2P(' + Number(id) + ', \'ln\')">⚡ Lightning</button></div>';
+}
+function scegliReteDepositoOnchainP2P(id, rete){
+  haptic();
+  p2pOcDepositoRete[Number(id)] = rete === 'ln' ? 'ln' : 'oc';
+  renderDepositoOnchainP2P();
+}
+/* PURA: il perche' di un no del preventivo, nelle parole di chi deposita */
+function percheDepositoLnOnchainP2P(d){
+  const m = (d && d.motivo) || '';
+  if (m === 'sotto_minimo') return d.minimo ? 'Il cambio parte da ' + fmt(d.minimo) + ' sats: questo deposito è troppo piccolo. Deposita on-chain.'
+    : 'Questo deposito è troppo piccolo per il cambio: deposita on-chain.';
+  if (m === 'sopra_tetto') return 'Il cambio arriva al massimo a ' + fmt(d.massimo || 0) + ' sats: deposita on-chain.';
+  if (m === 'spento') return 'Il cambio non è disponibile: deposita on-chain.';
+  if (m === 'chiuso') return (d && d.detail) || 'Su questo scambio il deposito in Lightning non si fa più.';
+  return 'Il cambio adesso non risponde: riprova fra poco, o deposita on-chain.';
+}
+function fraseDepositoLnOnchainP2P(e){
+  const t = (e && e.tipo) || '';
+  if (t === 'indirizzo') return 'L\'indirizzo del deposito non torna: riapri lo scambio e riprova.';
+  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «Il wallet di Barattolo».';
+  if (t === 'seme') return 'Non riesco a preparare la chiave del cambio: riprova.';
+  if (t === 'casa') return 'Questo telefono non riesce a salvare il cambio: libera un po\' di spazio e riprova.';
+  if (t === 'cambiata') return 'Il costo del cambio è appena cambiato: guarda le cifre nuove e tocca di nuovo «Crea la richiesta».';
+  if (t === 'preventivo') return percheDepositoLnOnchainP2P(e.dati);
+  if (t === 'mente') return 'Il cambio ha risposto con dati che non tornano: non è partito niente. Deposita on-chain.';
+  if (t === 'biglietto')
+    return e.motivo === 'troppi' ? 'Su questo scambio ci sono già troppi cambi aperti: deposita on-chain.'
+         : e.motivo === 'spento' ? 'Il cambio non è disponibile: deposita on-chain.'
+         : 'Barattolo non risponde: riprova fra poco.';
+  return 'Il cambio adesso non risponde: riprova fra poco, o deposita on-chain.';
+}
+/* il preventivo, riletto se ha piu' del suo minuto (anche quello di un no:
+   mai una domanda a ogni ridisegno) */
+async function caricaDepositoLnOnchainP2P(id){
+  id = Number(id);
+  const st = p2pOcDepositoLn[id];
+  if (st && (st.stato === 'leggo' || (st.dati && Date.now() - st.quando < (Number(st.dati.valido_s) || 60) * 1000))) return;
+  p2pOcDepositoLn[id] = {stato: 'leggo', errore: (st && st.errore) || ''};
+  let d;
+  try { d = await leggiPreventivoDepositoP2P(id, '', ''); } catch(e){ d = {ok: false, motivo: 'non_risponde'}; }
+  p2pOcDepositoLn[id] = {stato: 'pronto', dati: d, quando: Date.now(), errore: (st && st.errore) || ''};
+  if (p2pOcDeposito && p2pOcDeposito.id === id) renderDepositoOnchainP2P();
+}
+/* PURA (a parte la lista dei cambi): il corpo del foglio su «⚡ Lightning» */
+function corpoDepositoLnOnchainP2P(o){
+  const rec = depositoLnVivoOnchainP2P(o.id);
+  if (rec) {
+    const paga = swapFase(rec) === 'creato' && rec.invoice;
+    const collegato = paga && typeof walletNwcPaga === 'function' && walletNwcPaga();
+    return '<div class="hint" role="status">' + esc(frasestatoSwap(rec)) + '</div>'
+      + (paga
+        ? '<div class="hint">Paghi <b>' + fmt(rec.sats || (leggiBolt11(rec.invoice) || {}).sats || 0) + ' sats</b>: nel deposito arrivano '
+            + fmt(rec.ricevi) + ' sats.</div>'
+          + '<div class="qr" id="p2pOcDepositoLnQr"></div>'
+          + '<div class="invoice">' + esc(rec.invoice) + '</div>'
+          + '<div class="pay-scade"><a class="btn mini" id="p2pOcDepositoLnWallet" href="#">⚡ Apri nel wallet</a></div>'
+          + (collegato ? '<button class="btn orange" onclick="pagaDepositoLnOnchainP2P(this, ' + o.id + ')">⚡ Paga col wallet collegato</button>' : '')
+          + '<button class="btn primary" onclick="copiaDepositoLnOnchainP2P(' + o.id + ')">📋 Copia la richiesta</button>'
+          + '<div class="hint">Dopo il pagamento i bitcoin li mette nel deposito il tuo telefono: se l\'app è chiusa ti avvisiamo col bot, e basta aprirla.</div>'
+        : '')
+      + (rec.errore && !paga ? '<div class="hint">Il telefono riprova da solo a mettere i bitcoin nel deposito.</div>' : '');
+  }
+  const st = p2pOcDepositoLn[o.id];
+  if (!st || st.stato === 'leggo' || !st.dati) return '<div class="hint">Chiedo il prezzo del cambio…</div>';
+  const d = st.dati;
+  const nome = esc(d.fornitore_nome || 'SATS Routing');
+  if (!d.ok) return '<div class="hint">' + esc(percheDepositoLnOnchainP2P(d)) + '</div>';
+  return '<div class="hint">Paghi <b>' + fmt(d.paghi) + ' sats</b> dal tuo wallet Lightning: ' + nome
+      + ' li cambia in bitcoin e il tuo telefono mette <b>' + fmt(d.ricevi) + ' sats</b> nel deposito di garanzia (ne servono ' + fmt(d.importo) + ').</div>'
+    + '<div class="hint">È un cambio, fatto da ' + nome + ': costa <b>' + fmt(d.costo) + ' sats</b>, li paghi tu. Barattolo non aggiunge niente.</div>'
+    + '<div class="hint">⚠️ Se lo scambio si annulla o finisce col rimborso, i bitcoin tornano <b>on-chain</b> al tuo wallet di Barattolo, non in Lightning.</div>'
+    + (st.errore ? '<div class="hint" role="alert">' + esc(st.errore) + '</div>' : '')
+    + '<button class="btn orange" id="p2pOcDepositoLnBtn" onclick="creaDepositoLnOnchainP2P(this, ' + o.id + ')">⚡ Crea la richiesta Lightning</button>';
+}
+async function creaDepositoLnOnchainP2P(btn, id){
+  const o = p2pOcDeposito && p2pOcDeposito.id === Number(id) ? p2pOcDeposito : null;
+  const st = p2pOcDepositoLn[Number(id)];
+  if (!o || !st || !st.dati || !st.dati.ok) return;
+  /* un cambio gia' nato e vivo si segue, non se ne fa un altro */
+  if (depositoLnVivoOnchainP2P(id)) return renderDepositoOnchainP2P();
+  haptic();
+  const rip = btn && typeof bottoneInAttesa === 'function' ? bottoneInAttesa(btn, 'Preparo il cambio…') : () => {};
+  try {
+    await swapCreaPerDepositoP2P({scambio: o.id, indirizzo: (o.indirizzo || {}).indirizzo, preventivo: st.dati});
+    st.errore = '';
+  } catch(e){
+    if (e && e.tipo === 'doppio') return;
+    /* le cifre nuove si mostrano: un prezzo cambiato non parte di nascosto */
+    if (e && (e.tipo === 'cambiata' || e.tipo === 'preventivo') && e.dati) { st.dati = e.dati; st.quando = Date.now(); }
+    st.errore = fraseDepositoLnOnchainP2P(e);
+  } finally { rip(); }
+  renderDepositoOnchainP2P();
+}
+async function pagaDepositoLnOnchainP2P(btn, id){
+  const rec = depositoLnVivoOnchainP2P(id);
+  if (!rec || swapFase(rec) !== 'creato' || typeof clientNwc !== 'function') return;
+  haptic();
+  const rip = btn && typeof bottoneInAttesa === 'function' ? bottoneInAttesa(btn, '⚡ Il tuo wallet sta pagando…') : () => {};
+  try {
+    const cliente = await clientNwc(walletNwcPaga());
+    await cliente.paga(rec.invoice);
+    toast('⚡ Pagato: il cambio prepara i bitcoin per il deposito', 5000);
+  } catch(e){
+    toast('Il wallet collegato non ha pagato: paga la richiesta dal QR o con «Apri nel wallet»', 6000);
+  } finally { rip(); }
+}
+function copiaDepositoLnOnchainP2P(id){
+  const rec = depositoLnVivoOnchainP2P(id);
+  if (!rec || !navigator.clipboard) return toast('Copia a mano la richiesta', 3000);
+  navigator.clipboard.writeText(rec.invoice).then(() => toast('📋 Richiesta copiata', 2500),
+                                                  () => toast('Copia a mano la richiesta', 3000));
+}
+/* (swap/instradatore.js) lo stato del cambio del deposito e' cambiato:
+   col foglio aperto su quello scambio, si ridisegna */
+function ridisegnaDepositoLnOnchainP2P(rec){
+  const s = el('p2pOcDepositoSheet');
+  if (rec && p2pOcDeposito && p2pOcDeposito.id === Number(rec.p2pDeposito) && s && s.classList.contains('open'))
+    renderDepositoOnchainP2P();
 }
 
 /* I GESTI SEMPLICI: una POST, un toast, la scheda rifatta. Quelli che

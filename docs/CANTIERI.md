@@ -76925,3 +76925,69 @@ COSA RESTA. Alan rivede le parti 2-di-3: l'eccezione nella seconda firma
 (`p2p_onchain_cambio_nasce`), la pulizia in disputa, e nel telefono
 `onchainPrimaDiChiVende` allargata e `confermaCambioOnchainP2P`. Non
 provato dal vivo: serve l'on-chain in mainnet. MiCA prima di aprire.
+
+## Su uno scambio P2P on-chain chi vende paga il deposito in Lightning (1 nov 2026, cantiere presa-altra-rete, tappa 3)
+
+Il caso B2 dello studio del 30 ott (Luca/Mario): Mario vuole comprare
+bitcoin on-chain, Luca li vende ma ha solo sats Lightning. Andrea alle
+19:59 ha deciso di finire tutte le tappe prima della promozione.
+
+COM'È FATTA. Chi PRENDE un ordine on-chain vendendo trova in cima al
+foglio del deposito («🔒 Blocca i sats») la scelta «₿ On-chain /
+⚡ Lightning». Su Lightning vede quanto paga, quanto arriva nel deposito,
+il costo del cambio e che un annullo o un rimborso tornano ON-CHAIN al
+suo wallet di Barattolo. «⚡ Crea la richiesta Lightning»: il telefono fa
+nascere un cambio Lightning → bitcoin (reverse) di SATS Routing, come il
+Cambio libero, ma col ritiro verso l'indirizzo 2-di-3 dello scambio. Lui
+paga la richiesta (QR, «Apri nel wallet» o il wallet collegato), SATS
+Routing blocca i bitcoin, la sorveglianza dei cambi li ritira nel
+deposito. Da lì il 2-di-3 vede un deposito come un altro: con una
+conferma lo scambio va avanti, e il resto non cambia.
+
+DECISIONI E PERCHÉ.
+- ALMENO L'IMPORTO, AL SAT: il ritiro del reverse porta ESATTAMENTE il
+  `ricevi` del preventivo, quindi il server fa il conto al contrario
+  (`swap_dovuto_per_ricevere` sull'importo, prezzo + margine) e il
+  telefono rifiuta un cambio che porterebbe meno. Senza la nostra fee: il
+  costo che vede è solo quello di SATS Routing.
+- SOLO CHI PRENDE: chi ha pubblicato on-chain ha scelto lui la rete del
+  deposito (l'idea di Andrea: la rete dell'annuncio dice come paga chi
+  pubblica). E con almeno mezz'ora di deposito davanti: dopo il pagamento
+  servono il ritiro e una conferma.
+- UN CAMBIO VIVO PER DEPOSITO: pagarne due metterebbe il doppio nel
+  2-di-3. Il secondo tocco segue il primo; uno scaduto o fallito ne
+  lascia fare un altro.
+- L'ANNULLO SI FERMA SE I BITCOIN STANNO ARRIVANDO: a scambio preso il
+  server chiede lo stato dei cambi nati del deposito; bloccati o già
+  ritirati = 409, fornitore muto = 503 (mai alla cieca). Un cambio nato e
+  non pagato non ferma niente.
+- LA TABELLA DELLA TAPPA 1: i biglietti stanno in `cambi_p2p` col nome
+  «oc:<numero>», che nessuno scambio di Mostro può avere; nascita,
+  annullo e ronda dell'avviso sono gli stessi, e la ronda sceglie solo
+  parole e bottone.
+
+STRADE SCARTATE. Pagare la fattura del cambio con i sats che Barattolo
+tiene: sarebbe custodia. Far ritirare il cambio al server: le chiavi
+stanno solo nel telefono (regola ferrea 2), e l'avviso del bot copre
+l'app chiusa. Il cambio anche per chi ha pubblicato: non serve, ha
+scelto lui.
+
+PROVE. `collaudo_deposito_ln_p2p.py` (51 controlli: server vero, SATS
+Routing di cartone, telefono in node — il cancello con le reti e chi ha
+preso, il preventivo che porta almeno l'importo e i suoi no, il
+biglietto, il foglio con la scelta e il conto, le parole prima,
+l'indirizzo che deve essere quello del preventivo, la nascita, il QR e
+il wallet collegato, il secondo tocco, il ritiro con UNA uscita dritta
+all'indirizzo 2-di-3, la ronda con le parole del deposito, l'annullo
+fermato e quello col fornitore muto, il deposito confermato, la leva
+rispenta), in `ci/collaudi.txt` e `ci/compila.txt`;
+`prove_deposito_ln_p2p` (sentinelle). Controprove rosse: tolta la
+guardia dell'annullo, tolto il controllo «chi ha preso», tolte le due
+guardie del doppio. Emendata la sentinella della lista «Scambio P2P».
+
+COSA RESTA. Alan rivede la parte 2-di-3: che un deposito arrivato da un
+ritiro di cambio vada bene al giudice di sempre, e la guardia
+dell'annullo. Se chi deposita paga la richiesta DOPO aver annullato lo
+scambio (l'aveva copiata), i bitcoin arrivano su un indirizzo chiuso: è la
+coda dei ritardatari, il moderatore li rimanda indietro. Non provato dal
+vivo: serve l'on-chain in mainnet. MiCA prima di aprire.

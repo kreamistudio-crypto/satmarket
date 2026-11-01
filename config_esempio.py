@@ -835,6 +835,10 @@ CAMBIO_BTC_LN_ATTIVO = False
 # la sua richiesta Lightning. Per questa strada servono in piu'
 # P2P_ONCHAIN_ATTIVO, CAMBIO_BTC_LN_ATTIVO e l'on-chain sulla rete del
 # fornitore (ONCHAIN_RETE = "mainnet" contro SATS Routing vero).
+# E la tappa 3 (1 nov 2026): chi PRENDE un ordine on-chain vendendo
+# bitcoin puo' pagare il deposito in Lightning; un cambio di SATS Routing
+# porta i bitcoin dritti all'indirizzo 2-di-3. Serve l'on-chain sulla rete
+# del fornitore; CAMBIO_BTC_LN_ATTIVO qui non serve (e' l'altra strada).
 P2P_ALTRA_RETE_ATTIVO = False
 P2P_ALTRA_RETE_SOLO_MODERATORI = True
 P2P_ALTRA_RETE_MAX_SATS = 500_000

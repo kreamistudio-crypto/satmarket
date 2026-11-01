@@ -34609,6 +34609,33 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `cambioDaFirmareOnchainP2P` dentro `daFirmareOnchainP2P`,
   `rilascioDaFirmareOnchainP2P` in `p2pOnchainCofirmeInAttesa`,
   `onchainPrimaDiChiVende` che accetta gli stati P2P con la `rotta`.
+- SU UNO SCAMBIO P2P ON-CHAIN CHI VENDE PAGA IL DEPOSITO IN LIGHTNING (1
+  nov 2026, cantiere presa-altra-rete, tappa 3; perché in CANTIERI, «Su
+  uno scambio P2P on-chain chi vende paga il deposito in Lightning»).
+  Cancello `p2p_onchain_deposito_ln_per` (`p2p_altra_rete_per`,
+  `p2p_onchain_ammesso`, `onchain_ln_rete_ok`; niente «btc-ln»);
+  `/p2p/onchain/{id}` porta `deposito_ln_possibile` (chi deposita, se ha
+  PRESO lui, a scambio preso). Giudice `_p2p_onchain_mio_deposito_ln`:
+  depositante = taker, stato preso, nessun sats visto, almeno
+  `P2P_DEPOSITO_LN_PRIMA_S` (30 min) davanti. Rotte: `GET
+  …/deposito-ln/preventivo` (`swap_dovuto_per_ricevere(importo, tariffa,
+  0)` poi `preventivo_swap` con fee 0 e il tetto `P2P_ALTRA_RETE_MAX_SATS`;
+  porta `importo`, `indirizzo`, `paghi`, `costo`), `POST …/deposito-ln`
+  (biglietto in `cambi_p2p` con ordine «oc:<id>»,
+  `p2p_onchain_deposito_ln_ordine`; nascita e annullo sono quelli della
+  tappa 1). `ronda_cambi_p2p` sceglie testo e bottone con
+  `_avviso_ritiro_p2p` («🔒 Metti i sats nel deposito»,
+  `_testo_deposito_ln_p2p`). `p2p_onchain_annulla` a scambio preso chiede
+  `p2p_onchain_deposito_ln_in_volo`: bitcoin già bloccati = 409, fornitore
+  muto = 503. Telefono: `swap/instradatore.js` §6e (`swapDiDepositoP2P`,
+  `swapCreaPerDepositoP2P`: un cambio vivo per deposito, indirizzo = quello
+  del preventivo, preventivo riletto, `ricevi` ≥ importo, record
+  `p2pDeposito` senza `ordine` né `p2p`, ritiro all'indirizzo 2-di-3;
+  frasi `deposito*`); `miniapp.html` (`renderDepositoOnchainP2P` con
+  `sceltaReteDepositoOnchainP2P`, `corpoDepositoLnOnchainP2P`,
+  `creaDepositoLnOnchainP2P`, `pagaDepositoLnOnchainP2P` dal wallet
+  collegato, `ridisegnaDepositoLnOnchainP2P`; rotte
+  `leggiPreventivoDepositoP2P`, `chiediBigliettoDepositoP2P`).
 - CHI VENDE ON-CHAIN RICEVE IN LIGHTNING (28 ott 2026, cantiere
   onchain-verso-lightning; perché in CANTIERI, «Chi vende on-chain riceve
   in Lightning»). La leva `ONCHAIN_INCASSO_LN_ATTIVO` (False) e il giudice

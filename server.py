@@ -32919,7 +32919,9 @@ def _leve_stato():
                          "SWAP_ATTIVO. E il contrario (tappa 2): sugli "
                          "scambi on-chain chi compra puo' ricevere in "
                          "Lightning, se c'e' anche CAMBIO_BTC_LN_ATTIVO e "
-                         "l'on-chain sta sulla rete del fornitore",
+                         "l'on-chain sta sulla rete del fornitore; e chi "
+                         "prende vendendo bitcoin puo' pagare il deposito "
+                         "in Lightning (tappa 3, stessa rete)",
                   spento="chi compra riceve solo sulla rete dell'ordine"),
             _leva("P2P on-chain dal cambio: solo moderatori",
                   "P2P_ALTRA_RETE_SOLO_MODERATORI",
@@ -76415,9 +76417,10 @@ async def ronda_cambi_p2p(adesso: int | None = None) -> int:
         finito = stato in P2P_CAMBIO_FINITI
         if avvisa:
             try:
-                esito = await notifica(
-                    int(r["tg_id"]), _testo_ritiro_p2p(r),
-                    (P2P_BOTTONE_RITIRO, f"{URL_PUBBLICO}/p2p?scambio={r['ordine']}"))
+                # (tappa 3) un cambio del deposito di uno scambio on-chain
+                # ha le sue parole e il suo bottone (`_avviso_ritiro_p2p`)
+                testo, bottone = _avviso_ritiro_p2p(r)
+                esito = await notifica(int(r["tg_id"]), testo, bottone)
             except Exception as e:
                 esito = f"SALTATO ({type(e).__name__}: {e})"
             mandati += 1
@@ -94400,6 +94403,11 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "rilascio_firma": _p2p_onchain_campo(o, "rilascio_firma", "") or "",
         "cambio": _onchain_cambio_letto({"cambio": _p2p_onchain_campo(o, "cambio", "")}),
         "ln_possibile": bool(ruolo == "venditore" and p2p_onchain_ln_per(tg_id)),
+        # (tappa 3) chi ha preso vendendo bitcoin puo' depositare in Lightning
+        "deposito_ln_possibile": bool(
+            ruolo == "compratore" and o["stato"] == "preso"
+            and dep == int(o["taker_id"] or 0)
+            and p2p_onchain_deposito_ln_per(tg_id)),
     }
     if parte_vera and not admin:
         d["recapito"] = o["recapito"] or ""
@@ -94750,6 +94758,15 @@ async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
         except Exception:
             raise HTTPException(503, "mempool non risponde: non annullo alla "
                                      "cieca, riprova fra poco")
+        # (tappa 3) il deposito pagato in Lightning: se il cambio ha gia'
+        # bloccato i bitcoin, stanno arrivando, e lo scambio non si annulla
+        in_volo = await p2p_onchain_deposito_ln_in_volo(oid)
+        if in_volo is None:
+            raise HTTPException(503, "Il cambio del deposito non risponde: non "
+                                     "annullo alla cieca, riprova fra poco")
+        if in_volo:
+            raise HTTPException(409, "Il cambio in Lightning sta portando i "
+                                     "bitcoin nel deposito: aspetta che arrivino")
     adesso = int(time.time())
     con = _p2p_onchain_db()
     try:
@@ -95811,6 +95828,215 @@ async def p2p_onchain_cambio_togli_rotta(oid: int, x_tg_init_data: str = Header(
     if not await _p2p_onchain_cambio_togli(o, "tolto da chi compra", avvisa=False):
         raise HTTPException(409, "Su questo scambio non c'è un cambio da togliere")
     return {"ok": True}
+
+
+# ============ CHI VENDE BITCOIN SU UNO SCAMBIO P2P ON-CHAIN PAGA IN
+# LIGHTNING (1 nov 2026, cantiere presa-altra-rete, tappa 3; studio del 30
+# ott, caso B2; Andrea alle 19:59: «finire prima tutte le tappe») ============
+# Chi PRENDE un ordine on-chain di chi compra bitcoin, e quindi deve
+# depositare nel 2-di-3, puo' pagare in Lightning: il suo telefono fa
+# nascere un cambio Lightning → bitcoin («reverse») di SATS Routing per
+# ALMENO l'importo del deposito, e il ritiro di quel cambio va DRITTO
+# all'indirizzo 2-di-3 dello scambio. Il 2-di-3 non cambia: arriva un
+# deposito come un altro (una transazione di ritiro al posto di quella del
+# suo wallet), con la sua conferma, e da li' lo scambio va avanti come
+# sempre. Se lo scambio si annulla o finisce col rimborso, i bitcoin
+# tornano ON-CHAIN al suo wallet di Barattolo, non in Lightning: il
+# telefono lo dice prima.
+# Il server qui non tocca i sats, come nella tappa 1: il PREVENTIVO (la
+# cifra da pagare perche' al deposito arrivi almeno l'importo, col conto al
+# contrario `swap_dovuto_per_ricevere`, SENZA la nostra fee), il BIGLIETTO
+# nella stessa tabella dei cambi P2P (`cambi_p2p`, con lo scambio scritto
+# «oc:<numero>», che nessuno scambio di Mostro puo' avere) e la RONDA
+# DELL'AVVISO di sempre: pagato il Lightning, i bitcoin li ritira il
+# telefono, e ad app chiusa il bot dice di aprirla. Le chiavi del cambio
+# stanno solo nel telefono (regola ferrea 2).
+# SOLO CHI PRENDE: chi ha pubblicato on-chain ha scelto la rete del suo
+# deposito. E con almeno mezz'ora di deposito davanti, perche' dopo il
+# pagamento serve ancora il ritiro e la conferma.
+P2P_DEPOSITO_LN_PRIMA_S = 30 * 60
+P2P_BOTTONE_DEPOSITO_LN = "🔒 Metti i sats nel deposito"
+
+
+def p2p_onchain_deposito_ln_per(tg_id) -> bool:
+    """IL DEPOSITO IN LIGHTNING C'E' PER CHI VENDE BITCOIN? La leva della
+    presa sull'altra rete (`p2p_altra_rete_per`, sopra lo swap), lo scambio
+    on-chain e le reti giuste (`onchain_ln_rete_ok`: oggi signet contro
+    bitcoin, e la strada resta chiusa anche a leve accese). La strada
+    Lightning → bitcoin e' quella di serie del cambio: niente altre leve."""
+    return bool(p2p_altra_rete_per(tg_id) and p2p_onchain_ammesso(tg_id)
+                and onchain_ln_rete_ok())
+
+
+def p2p_onchain_deposito_ln_ordine(oid) -> str:
+    """Il nome dello scambio nei biglietti `cambi_p2p`: «oc:<numero>»."""
+    return f"oc:{int(oid)}"
+
+
+def _p2p_onchain_mio_deposito_ln(con, oid: int, tg_id: int, adesso: int):
+    """Lo scambio su cui chi vende bitcoin paga il deposito in Lightning:
+    suo da depositante, PRESO da lui, senza un sats visto, con almeno
+    `P2P_DEPOSITO_LN_PRIMA_S` di tempo. Torna (riga, indirizzo)."""
+    o = _p2p_onchain_carica(con, oid)
+    if _p2p_onchain_ruolo(o, tg_id) != "compratore":
+        raise HTTPException(403, "In Lightning paga chi vende bitcoin")
+    if int(o["depositante_id"] or 0) != int(o["taker_id"] or 0):
+        raise HTTPException(409, "Hai pubblicato un ordine on-chain: il deposito "
+                                 "si fa on-chain")
+    if o["stato"] != "preso" or int(o["visti_sats"] or 0) or int(o["ricevuti_sats"] or 0):
+        raise HTTPException(409, "Su questo scambio il deposito non si fa più adesso")
+    if int(o["deposito_entro"] or 0) - int(adesso) < P2P_DEPOSITO_LN_PRIMA_S:
+        raise HTTPException(409, "Manca troppo poco alla fine del deposito per un "
+                                 "cambio: deposita on-chain")
+    ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                      (o["indirizzo_id"],)).fetchone()
+    if not ind:
+        raise HTTPException(409, "L'indirizzo del deposito non c'è ancora")
+    return o, ind
+
+
+def _p2p_onchain_deposito_ln_porta(user, oid: int):
+    """Le due porte del deposito in Lightning: chi c'e', lo scambio, e
+    (riga, indirizzo) come li vede adesso."""
+    _p2p_onchain_serve(user)
+    if not p2p_onchain_deposito_ln_per(user["id"]):
+        raise HTTPException(403, "Il cambio non è disponibile")
+    con = _p2p_onchain_db()
+    try:
+        return _p2p_onchain_mio_deposito_ln(con, oid, user["id"], int(time.time()))
+    finally:
+        con.close()
+
+
+@app.get("/api/p2p/onchain/{oid}/deposito-ln/preventivo")
+async def p2p_onchain_deposito_ln_preventivo(oid: int, fornitore: str = "satsrouting",
+                                             hash: str = "",
+                                             x_tg_init_data: str = Header(""),
+                                             barattolo_sessione: str = Cookie("")):
+    """QUANTO PAGA IN LIGHTNING chi vende bitcoin perche' nel deposito
+    arrivi ALMENO l'importo (prezzo + margine): il conto al contrario del
+    cambio, senza la nostra fee. `paghi` e' la fattura del cambio, `costo`
+    quel che costa piu' del deposito. Non crea niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    o, ind = _p2p_onchain_deposito_ln_porta(user, oid)
+    _frena("onchain_cambio", user["id"])
+    chi = swap_fornitore(str(fornitore or ""))
+    if chi is None:
+        raise HTTPException(404, "Fornitore sconosciuto")
+    importo = int(o["importo_sats"])
+    busta = {"importo": importo, "indirizzo": ind["indirizzo"],
+             "fornitore": chi["id"], "fornitore_nome": chi["nome"],
+             "valido_s": SWAP_PREVENTIVO_VALE_S}
+    tariffa = await leggi_tariffa_swap(chi)
+    if tariffa is None:
+        return dict(busta, ok=False, motivo="non_risponde")
+    dovuto = swap_dovuto_per_ricevere(importo, tariffa, 0)
+    if not dovuto:
+        return dict(busta, ok=False, motivo="sotto_minimo")
+    p = preventivo_swap(dovuto, tariffa, 0, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)
+    if p.get("ok") and int(p["ricevi"]) < importo:
+        p = dict(p, ok=False, motivo="non_risponde")   # il conto al contrario non torna
+    if p.get("ok"):
+        p["paghi"] = int(p["fattura"])
+        p["costo"] = int(p["fattura"]) - importo
+    p["cambiata"] = bool(hash) and hash != tariffa["hash"]
+    return dict(busta, **p)
+
+
+@app.post("/api/p2p/onchain/{oid}/deposito-ln")
+async def p2p_onchain_deposito_ln_biglietto(oid: int, req: Request,
+                                            x_tg_init_data: str = Header(""),
+                                            barattolo_sessione: str = Cookie("")):
+    """IL BIGLIETTO del cambio del deposito, chiesto dal telefono PRIMA di
+    chiedere lo swap al fornitore: lo scambio, la cifra della fattura
+    (sopra l'importo, perche' il cambio costa) e il fornitore. Dentro il
+    lucchetto dei cambi P2P, con lo stesso numero di biglietti vivi. La
+    nascita e l'annullo sono quelli della tappa 1 (`/api/swap/p2p/{id}/…`).
+    {ok, id} o {ok: false, motivo}."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    o, _ind = _p2p_onchain_deposito_ln_porta(user, oid)
+    d = await leggi_json(req)
+    chi = swap_fornitore(str(d.get("fornitore") or "satsrouting"))
+    if chi is None:
+        return {"ok": False, "motivo": "fornitore"}
+    cifra = _cambio_sats(d.get("sats"))
+    if not cifra or cifra <= int(o["importo_sats"]):
+        return {"ok": False, "motivo": "cifra"}
+    if cifra < int(SWAP_MIN_SATS or 0):
+        return {"ok": False, "motivo": "sotto_minimo"}
+    if int(P2P_ALTRA_RETE_MAX_SATS or 0) and cifra > int(P2P_ALTRA_RETE_MAX_SATS):
+        return {"ok": False, "motivo": "sopra_tetto"}
+    ordine = p2p_onchain_deposito_ln_ordine(oid)
+    adesso = int(time.time())
+    async with _lucchetto_cambi_p2p:
+        con = _cambi_p2p_db()
+        try:
+            if cambi_p2p_vivi(con, user["id"], ordine, adesso) >= P2P_CAMBI_PER_SCAMBIO:
+                return {"ok": False, "motivo": "troppi"}
+            cur = con.execute(
+                "INSERT INTO cambi_p2p(tg_id,ordine,sats,fornitore,stato,"
+                "creato,aggiornato) VALUES(?,?,?,?,'chiesto',?,?)",
+                (int(user["id"]), ordine, cifra, chi["id"], adesso, adesso))
+            con.commit()
+            cid = int(cur.lastrowid)
+        finally:
+            con.close()
+    return {"ok": True, "id": cid}
+
+
+async def p2p_onchain_deposito_ln_in_volo(oid: int):
+    """C'E' UN CAMBIO DEL DEPOSITO CHE HA GIA' BLOCCATO I BITCOIN? (per
+    l'annullo: un deposito che sta arrivando non si annulla alla cieca).
+    True / False; None = il fornitore tace. Senza biglietti nati non chiede
+    niente a nessuno."""
+    con = _cambi_p2p_db()
+    try:
+        righe = [dict(r) for r in con.execute(
+            "SELECT * FROM cambi_p2p WHERE ordine=? AND stato='nato'",
+            (p2p_onchain_deposito_ln_ordine(oid),))]
+    finally:
+        con.close()
+    for r in righe:
+        f = swap_fornitore(str(r["fornitore"] or "satsrouting"))
+        stato = await swap_stato_di(f, r["swap_id"]) if f else None
+        if not stato:
+            return None
+        if stato in P2P_CAMBIO_DA_RITIRARE or stato == "invoice.settled":
+            return True
+    return False
+
+
+def _testo_deposito_ln_p2p(r) -> str:
+    """PURA: l'avviso di chi ha pagato in Lightning il deposito di uno
+    scambio on-chain, quando il cambio ha bloccato i bitcoin."""
+    onchain = int(r["onchain"] or 0)
+    quanti = f" ({_fmt_sats(onchain)} sats)" if onchain > 0 else ""
+    return ("🔒 Il cambio del tuo deposito è pronto" + quanti + ".\n"
+            "Apri Barattolo: il tuo telefono mette i bitcoin nel deposito di "
+            "garanzia dello scambio. Se non lo apri in tempo il cambio scade "
+            "e il pagamento Lightning torna al tuo wallet.")
+
+
+def _avviso_ritiro_p2p(r) -> tuple:
+    """(testo, bottone) dell'avviso della ronda: il ritiro all'indirizzo di
+    chi compra (tappa 1), o il deposito di uno scambio on-chain (tappa 3)."""
+    ordine = str(r["ordine"] or "")
+    if not ordine.startswith("oc:"):
+        return _testo_ritiro_p2p(r), (P2P_BOTTONE_RITIRO,
+                                      f"{URL_PUBBLICO}/p2p?scambio={ordine}")
+    dove = LINK_LIBRO_P2P
+    try:
+        con = _p2p_onchain_db()
+        try:
+            o = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                            (int(ordine[3:]),)).fetchone()
+        finally:
+            con.close()
+        if o:
+            dove = _p2p_onchain_bottone(o)[1]
+    except Exception:
+        pass
+    return _testo_deposito_ln_p2p(r), (P2P_BOTTONE_DEPOSITO_LN, dove)
 
 
 def _p2p_onchain_passata_paracadute(con, prezzo, letto, adesso: int) -> list:
