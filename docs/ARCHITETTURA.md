@@ -34945,3 +34945,44 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   saluto `salutoCancellato`, che spegne `fetch` per non far rinascere
   l'account. Il collaudo: `collaudo_cancella_account` (con la
   sentinella larga che cerca l'id vecchio in OGNI colonna dei due DB).
+- GLI ORDINI P2P IN USDT (1 nov 2026, cantiere p2p-usdt; il perché in
+  CANTIERI, «Gli ordini P2P in USDT»). Sono ordini di Mostro come gli
+  altri: il `f` del 38383 vale `USDT` invece di `EUR`, la garanzia resta
+  la hold invoice Lightning in sats, e gli USDT viaggiano FUORI da Mostro,
+  da persona a persona, sulla rete del metodo. Il nodo li prezza col
+  provider `pegged` (1 USDT = 1 dollaro); Barattolo non li tocca mai.
+  SERVER: le leve `P2P_USDT_ATTIVO` (spenta) e `P2P_USDT_SOLO_ADMIN`
+  (accesa), il giudice unico `p2p_usdt_ammesso(tg_id)` (leva E P2P
+  acceso E, a solo-admin, `e_admin`, E il P2P per la persona), che
+  /api/me manda come `p2p_usdt`; `_evento_libro_p2p` porta `fiat`; gli
+  avvisi «ordine nuovo» (`_accoda_nuovi_p2p`) dicono USDT e vanno solo a
+  chi passa il giudice, con la convenienza misurata sul dollaro; la busta
+  del cambio porta `cambio_usd` accanto a `cambio`; le frasi del bot di
+  uno scambio (`_testo_libro_p2p`) dicono USDT. APP: il blocco «GLI
+  ORDINI IN USDT» in `miniapp.html` — le reti `P2P_RETI_USDT` (Tron
+  TRC-20, Polygon e Ethereum ERC-20, col contratto del vero USDT e la
+  catena), i metodi `P2P_METODI_USDT` con la grafia del protocollo
+  («USDT (Tron)»), il cancello `usdtVistoP2P` (da `myP2PUsdt`) e i suoi
+  derivati `valuteVisibiliP2P(oc)` / `valutaVistaP2P(cod)` (il filtro
+  della prima lettura `libroDaEventi` e di quella dal vivo
+  `fondiLibroP2P`), il metro `perSatP2P(o)` (dollaro o euro), il tetto
+  `tettoValutaP2P(cod)` (i 250 € tradotti al cambio di adesso, 1 senza
+  cambi), i conti puri `sha256P2P` / `keccak256P2P` / `base58P2P`, i
+  giudici puri `reteIndirizzoP2P`, `giudiceIndirizzoUsdtP2P(testo, r)`
+  (la RETE SBAGLIATA: Tron contro EVM, bitcoin, Lightning, Liquid, il
+  contratto al posto del proprio indirizzo, il refuso del controllo) e
+  `giudiceTxidUsdtP2P(testo, r)`, e il QR `qrUsdtP2P` (EIP-681 col
+  contratto e la catena sulle EVM, l'indirizzo nudo su Tron). Il foglio
+  sceglie la valuta con `valutaFoglioP2P()` (mai USDT a rete on-chain), e
+  `ordineDaCampiP2P` / `payloadPresaP2P` scrivono la valuta sul filo. Il
+  recapito ha una forma per rete (`usdt-tron`, `usdt-polygon`,
+  `usdt-ethereum` in `P2P_FORME_RECAPITO`), che `inviaCampoP2P` passa dal
+  giudice prima di comporre; chi paga lo rilegge con
+  `reteUsdtDaRecapitoP2P` e vede la rete in grande e il QR. «Ho inviato
+  gli USDT» (`usdtInviatiP2P`) vuole l'id della transazione
+  (`campoTxidUsdtP2P`), lo tiene sulla riga (`o.txidUsdt`) e lo manda
+  nella chat dello scambio. ⚠️ Polygon ed Ethereum hanno la STESSA forma
+  d'indirizzo: fra loro nessun giudice distingue, e lo dicono il recapito,
+  il QR con la catena e l'id della transazione. Il gesto sul nodo
+  (`fiat_currencies_accepted` con `USDT`, `[price.providers.pegged]` con
+  `only = ["USDT"]`) sta in DA-FARE-ANDREA. Le prove: `prove_p2p_usdt`.

@@ -76749,3 +76749,103 @@ statistiche che contano le righe di `utenti` contano anche i fantasmi.
 La cancellazione dei FILE dal disco (`_dopo_cancellazione`) non ha un
 controllo suo nel collaudo: gira in sottofondo dopo la risposta. In
 produzione la leva si accende solo dopo la promozione e il sì di Andrea.
+
+## Gli ordini P2P in USDT (1 nov 2026, cantiere p2p-usdt, T1)
+
+DA DOVE VIENE. Lo studio «USDT e altre coin» (1 nov, in
+`/mnt/project-files/usdt-altre-coin/`) ha consigliato l'USDT via Mostro
+come VALUTA dell'ordine, e no all'USDT nel 2-di-3, no a USDe, no a
+Liquid. Andrea: «ok partiamo», poi sul piano «ok Tron + Polygon mettiamo
+anche ethereum. tetto 250 €, NODO solo dopo le prove». Il parere MiCA è
+accantonato per ora (sua parola), e le stablecoin conformi a MiCA (USDC,
+EURC) restano fuori per scelta sua.
+
+COSA SI È DECISO.
+- NON È USDT SU LIGHTNING: l'ordine è di Mostro, il `f` del 38383 dice
+  `USDT`, la garanzia resta la hold invoice in sats. Gli USDT viaggiano
+  da persona a persona come un bonifico, sulla rete del metodo. Il nodo
+  li prezza col provider `pegged` della 0.20.2 (1 USDT = 1 dollaro).
+- LE RETI SONO I METODI, con la grafia del protocollo
+  (`stablecoins.md`: «USDT (Tron)», «USDT (Polygon)», «USDT (Ethereum)»),
+  così un altro client Mostro le legge uguali. In USDT si scelgono solo
+  le reti, e le reti valgono solo in USDT. Mai a rete on-chain (il 2-di-3
+  blocca bitcoin, non USDT).
+- LA RETE SBAGLIATA SI FERMA (richiesta di Andrea: «come negli
+  exchange»): l'indirizzo di chi riceve passa dal giudice
+  `giudiceIndirizzoUsdtP2P` prima di partire. Tron è Base58 con 0x41 e il
+  doppio SHA-256; le reti EVM sono `0x` + 40 cifre col controllo EIP-55
+  (Keccak-256). Un indirizzo dell'altra famiglia, bitcoin, Lightning,
+  Liquid, un id di transazione o il contratto stesso si fermano con la
+  frase che nomina la rete sbagliata e quella giusta. SHA-256 e Keccak
+  sono scritti nella pagina, puri, senza librerie: il giudice risponde
+  anche prima che nostr-tools arrivi, e un banco node li prova da soli.
+- IL RECAPITO dice la rete PRIMA dell'indirizzo («⚠️ Manda solo su
+  Polygon, mai su un'altra rete»), poi rete, indirizzo e contratto del
+  vero USDT (contro i token falsi chiamati «USDT»). Una forma per rete:
+  un indirizzo Tron ricordato non precompila uno scambio su Polygon. Chi
+  paga vede il riquadro «💵 Dove mandare gli USDT» col QR: EIP-681 con
+  contratto e catena (137 Polygon, 1 Ethereum) sulle EVM, l'indirizzo
+  nudo su Tron (un formato comune non c'è).
+- «HO INVIATO GLI USDT» vuole l'id della transazione, col suo giudice
+  (64 esadecimali su Tron, `0x` + 64 sulle EVM, e la forma dell'altra
+  famiglia si ferma). Resta sulla riga e parte nella chat dello scambio:
+  chi vende lo controlla, in disputa il moderatore lo legge
+  sull'explorer della rete giusta.
+- IL TETTO è uno, in euro (250, `P2P_MAX_EURO`), e in USDT si traduce al
+  cambio di adesso (`tettoValutaP2P`: euro e dollaro dalla stessa
+  lettura del server, `cambio_usd` nuovo nella busta). Senza i due cambi
+  vale 1, cioè fermo: mai un via libera inventato. Anche il tetto del
+  collaudo, alla presa, si misura in USDT.
+- DUE CANCELLI: la leva `P2P_USDT_ATTIVO` (spenta) con
+  `P2P_USDT_SOLO_ADMIN` (accesa: prima fase solo admin), giudice unico
+  `p2p_usdt_ammesso`; e il nodo, che deve avere USDT fra le valute
+  accettate. Il libro filtra per valuta con lo stesso giudice sia alla
+  prima lettura sia dal vivo; gli avvisi «ordine nuovo» in USDT vanno
+  solo a chi passa il giudice, e dicono USDT.
+- LA VALUTA NON SI PERDE SUL FILO: `ordineDaCampiP2P` scrive la valuta
+  del foglio, `payloadPresaP2P` quella della riga (la 0010 legge solo
+  metodo e cifra, ma un EUR scritto su un USDT è una bugia sul filo), e
+  lo scambio preso si porta `fiat` dalla riga. La prova che «guardava
+  avanti» sul catalogo delle valute è diventata rossa come prometteva, e
+  adesso controlla che ogni codice del catalogo abbia la sua strada.
+
+STRADE SCARTATE. L'USDT nel 2-di-3: è un altro escrow (multisig su
+un'altra catena), non riusa niente e porta MiCA in casa. USDe: fuori
+tabella `pegged`, solo a prezzo fisso, e non è un dollaro stabile nel
+senso che serve qui. Arbitrum e altre reti: Andrea ha scelto tre reti,
+e ogni rete in più è un contratto e un explorer in più. Una rete sola
+«EVM» per Polygon ed Ethereum: avrebbe nascosto la differenza invece di
+dirla. Distinguere Polygon da Ethereum dall'indirizzo: impossibile, la
+forma è la stessa; si dice la rete in grande, la catena va nel QR, e
+c'è l'id della transazione.
+
+PROVE. `prove_p2p_usdt` (43 controlli): il Keccak della pagina contro un
+Keccak di riferimento scritto a parte in Python (che a sua volta torna
+con lo SHA3-256 di hashlib), anche oltre il blocco da 136 byte; lo
+SHA-256 contro hashlib ai bordi del riempimento; i vettori dell'EIP-55 e
+i tre contratti; un indirizzo Tron e uno EVM fatti nella prova (non dal
+telefono) e le loro versioni con un carattere sbagliato; ogni ramo del
+giudice dell'indirizzo e di quello dell'id; il QR; i cancelli del
+telefono e del server; il tetto; il metro; le forme del recapito e la
+rilettura di chi paga; la valuta sul filo alla pubblicazione e alla
+presa; le sentinelle dove i pezzi si incontrano. CONTROPROVE ROSSE (17):
+una costante del Keccak, una dello SHA-256, il controllo Tron tolto,
+l'EIP-55 tolto, il ramo della rete sbagliata tolto, la catena tolta dal
+QR, il tetto non tradotto, il tetto senza la guardia del cambio, EUR
+scritto a mano nella pubblicazione e nella presa, l'USDT offerto a rete
+on-chain, il giudice tolto dall'invio, il filtro dal vivo di prima, la
+valuta non portata nello scambio preso, il metro del dollaro tolto, la
+porticina admin tolta, la leva accesa nel config d'esempio. Riscritte:
+la prova del payload («in EUR, l'unica valuta») e quella del catalogo;
+il tetto del collaudo prende la valuta (`giudiceTettoProvaP2P(euro, cod)`).
+
+NON PROVATO E DA GUARDARE. Niente dal vivo: il nodo oggi accetta solo
+EUR, e il gesto (DA-FARE-ANDREA, voce 7) è di Andrea DOPO le prove sul
+collaudo. Limiti detti: il paracadute di un ordine in USDT misura il
+prezzo sull'euro; dopo la presa la convenienza in USDT tace (il cambio
+della presa del server è in euro); uno scambio ricostruito dalla copia
+del profilo senza `fiat` torna euro. T2, non fatto: gli altri testi del
+bot per USDT (il recapito arrivato, l'archivio degli scambi, la
+colonna `euro` di `p2p_ordini` resta testo in «€» perché la leggono le
+statistiche), la guida dei moderatori (guardare l'id sull'explorer), e
+le ultime frasi «gli euro» nella pagina dello scambio.

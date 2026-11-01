@@ -266,3 +266,87 @@ Privacy → «🗑 Cancella il mio account». Con un ordine in corso il foglio
 deve elencarlo senza bottone; senza niente in corso, scrivere CANCELLA e
 confermare. Il gesto NON si annulla. In produzione la leva resta spenta
 finché Andrea non dice sì, dopo la promozione.
+
+## 7. Gli ordini P2P in USDT: la leva sul collaudo, poi il nodo (1 nov 2026, cantiere p2p-usdt; Andrea: «Tron + Polygon mettiamo anche ethereum. tetto 250 €, NODO solo dopo le prove»)
+
+**Perché.** L'app sa pubblicare, prendere e pagare ordini in USDT (le
+tre reti, il controllo della rete sbagliata, il QR con la catena, l'id
+della transazione), dietro la leva `P2P_USDT_ATTIVO`, spenta di serie e
+di serie solo per gli admin. Il nodo però oggi accetta solo l'euro
+(`fiat_currencies_accepted = ['EUR']`): finché non si fa il gesto qui
+sotto un ordine in USDT il nodo lo rifiuta. Il perché di tutto:
+CANTIERI, «Gli ordini P2P in USDT».
+
+**A. Il collaudo, la leva** (si può fare subito, dopo che il collaudo ha
+tirato `develop` col cantiere). Sola lettura, deve dire `0`:
+```
+sudo grep -c "^P2P_USDT_ATTIVO" /srv/collaudo/barattolo/config.py
+```
+Scrive: la copia, la riga, il controllo, il riavvio.
+```
+sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-usdt
+```
+```
+printf '\nP2P_USDT_ATTIVO = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
+```
+Atteso 200. Da admin, nel foglio «Pubblica» compare la valuta ₮ USDT e
+i metodi diventano le tre reti; un altro account non admin non vede
+niente. Da guardare a mano qui, senza pubblicare: il recapito di prova
+che rifiuta un indirizzo Tron su Polygon e uno bitcoin su Tron.
+
+**B. Il nodo, SOLO DOPO le prove della parte A** (gesto di Andrea, a
+libro fermo, un comando alla volta). Prima, sul browser, che il
+contratto USDT di Polygon sia quello che l'app scrive:
+https://polygonscan.com/token/0xc2132D05D31c914a87C6611C10748AEb04B58e8F
+deve dire «(PoS) Tether USD (USDT)».
+
+Sola lettura sul nodo (`ssh … debian@vm-1937.lnvps.cloud`, poi `cd ~/nodo`):
+```
+grep -n -E "^fiat_currencies_accepted|^\[price|^\[" ~/nodo/mostro/settings.toml
+```
+Atteso: `fiat_currencies_accepted = ['EUR']`, e NESSUNA riga
+`[price.providers.pegged]`. Se c'è già, ci si ferma e si chiede a Claude.
+```
+sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute('SELECT status, COUNT(*) FROM orders GROUP BY status ORDER BY 2 DESC').fetchall())"
+```
+Devono comparire SOLO `pending` e stati finali (lo stesso controllo
+della salita alla 0.20.2, PRODUZIONE, «IL LIBRO FERMO»): uno scambio in
+corso = si ASPETTA.
+
+Scrive: la copia, la valuta, il provider, il controllo, il riavvio.
+```
+cp -p ~/nodo/mostro/settings.toml ~/nodo/mostro/settings.toml.prima-usdt
+```
+```
+sed -i "s/^fiat_currencies_accepted = \['EUR'\]$/fiat_currencies_accepted = ['EUR', 'USDT']/" ~/nodo/mostro/settings.toml && grep -n "^fiat_currencies_accepted" ~/nodo/mostro/settings.toml
+```
+Atteso: `fiat_currencies_accepted = ['EUR', 'USDT']`.
+```
+printf '\n[price.providers.pegged]\nenabled = true\nonly = ["USDT"]\n' >> ~/nodo/mostro/settings.toml && tail -4 ~/nodo/mostro/settings.toml
+```
+```
+python3 -c "import tomllib; d=tomllib.load(open('/home/debian/nodo/mostro/settings.toml','rb')); print(d['mostro']['fiat_currencies_accepted'], d['price']['providers']['pegged'])"
+```
+Atteso: `['EUR', 'USDT'] {'enabled': True, 'only': ['USDT']}`. Se
+`tomllib` dice un errore, si rimette la copia (`cp -p
+~/nodo/mostro/settings.toml.prima-usdt ~/nodo/mostro/settings.toml`) e
+si chiede a Claude.
+```
+docker compose restart mostro && sleep 20 && docker compose logs --since 2m mostro | grep -i -E "price|pegged|usdt|error|warn" | tail -20
+```
+Atteso: il nodo riparte, i provider dicono «ok», nessun avviso su USDT.
+
+**C. La prova a due account sul collaudo**, cifre piccole (10 USDT):
+Andrea pubblica «vendo sats per 10 USDT su Polygon», un secondo account
+admin (Alan, se è in `ADMIN_IDS` del collaudo) prende, mette il suo indirizzo, Andrea manda gli USDT e incolla
+l'id della transazione, Alan controlla sull'explorer e libera. Quel che
+si vede va nel verbale (CANTIERI, «Gli ordini P2P in USDT», «NON
+PROVATO»). In produzione la leva resta spenta fino alla promozione e a
+un sì di Andrea; poi `P2P_USDT_ATTIVO = True` (solo admin) e, più
+avanti, `P2P_USDT_SOLO_ADMIN = False` per tutti.

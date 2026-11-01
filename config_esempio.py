@@ -1278,6 +1278,20 @@ ONCHAIN_MAX_EURO = 250
 # Spento di serie: in produzione si accende dopo il parere MiCA e la
 # revisione di Alan delle parti 2-di-3. Sul collaudo: True.
 P2P_ONCHAIN_ATTIVO = False
+# GLI ORDINI P2P IN USDT (1 nov 2026, decisione di Andrea: «Tron +
+# Polygon mettiamo anche ethereum. tetto 250 €, NODO solo dopo le
+# prove»): accanto agli ordini in euro, ordini Mostro in USDT. La
+# garanzia resta la hold invoice Lightning di sempre; gli USDT viaggiano
+# FUORI da Mostro, come gli euro del bonifico, su una delle tre reti
+# (Tron, Polygon, Ethereum). L'app controlla che l'indirizzo sia della
+# rete scelta e chiede l'id della transazione a «Ho inviato». Serve
+# anche il gesto sul nodo (USDT fra le valute accettate, provider
+# pegged): sta in DA-FARE-ANDREA, si fa DOPO le prove. Spento di serie.
+P2P_USDT_ATTIVO = False
+# Con la leva accesa, gli USDT li vedono solo gli admin finche' questa
+# resta True: la prima fase e' delle prove. False = tutti gli ammessi
+# al P2P.
+P2P_USDT_SOLO_ADMIN = True
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
 # RGB_ATTIVO si accende; una riga storta vale «chiusa a tutti» e lo dice.

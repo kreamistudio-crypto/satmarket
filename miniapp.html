@@ -18287,6 +18287,7 @@ async function loadListings(anonimo){
     impostaCambio(j.cambio_eur);
     impostaOraCambio(j.cambio_eur, j.cambio_eta_s);
   }
+  if (j.cambio_usd !== undefined) impostaCambioUsd(j.cambio_usd);
   /* il dominio di casa, che serve solo a chi arriva dall'onion: la
      riga la legge baseCondivisione, e senza (server di ieri) resta
      location.origin, cioe' il comportamento di sempre */
@@ -25208,6 +25209,16 @@ function impostaCambio(eurPerBtc){
   eurPerSat = v / 100000000; cambioVivo = true;
   cambioChiesto = Date.now();   // un cambio appena arrivato non si richiede
 }
+/* IL DOLLARO (1 nov 2026, cantiere p2p-usdt): la stessa lettura del
+   server, per le sole stime in sats degli ordini P2P in USDT — 1 USDT =
+   1 $, come il prezzo `pegged` del nodo. Mai una cifra di riserva: senza
+   dollaro vero le stime in USDT tacciono («—») e il tetto in USDT non si
+   sa, quindi ferma (vedi `tettoValutaP2P`). */
+let usdPerSat = 0;
+function impostaCambioUsd(usdPerBtc){
+  const v = Number(usdPerBtc) || 0;
+  if (v > 0) usdPerSat = v / 100000000;
+}
 /* IL CAMBIO SUL LIBRO P2P (10 ott 2026, cantiere cambio-libro-p2p).
    La busta di /api/listings basta a chi sfoglia la vetrina, che la
    rilegge di continuo; chi RESTA sul libro del P2P quella busta non la
@@ -25384,7 +25395,9 @@ function rileggiCambio(){
       const j = await r.json();
       impostaCambio(j && j.cambio_eur);
       if (j) impostaOraCambio(j.cambio_eur, j.cambio_eta_s);
-      return cambioVivo && eurPerSat !== prima;
+      const primaUsd = usdPerSat;
+      if (j) impostaCambioUsd(j.cambio_usd);
+      return (cambioVivo && eurPerSat !== prima) || usdPerSat !== primaUsd;
     } catch(e) {
       return false;
     } finally { clearTimeout(t); cambioGiro = null; cambioDubbio = false; }
@@ -57535,6 +57548,9 @@ function onchainUriPagamento(o){
    `myP2POnchain` (il cancello del server: leva + on-chain + P2P, per
    me); senza, il libro si vede e basta. */
 let myP2POnchain = false;
+/* ...e gli ordini P2P in USDT (1 nov 2026, cantiere p2p-usdt): il cancello
+   del server, `p2p_usdt` di /api/me. Vedi il blocco «GLI ORDINI IN USDT». */
+let myP2PUsdt = false;
 let p2pOnchainLibro = {eventi: [], miei: [], quando: 0, rete: 'signet', minSats: 10000, oreDeposito: 6};
 let p2pOnchainMiei = [];        // /api/p2p/onchain/miei, gli ultimi trenta
 let p2pOnchainAperto = 0;       // lo scambio nella pagina; 0 = l'elenco
@@ -61843,7 +61859,11 @@ function libroDaEventi(eventi, adesso){
   }
   return {
     ordini: [...perId.values()]
-      .filter(o => o.stato === 'pending' && o.fiat === P2P_VALUTA
+      /* (1 nov 2026, cantiere p2p-usdt) l'euro per tutti, l'USDT per chi
+         lo vede (`valutaVistaP2P`, il cancello del server); nel banco del
+         motore il giudice non c'e' e vale l'euro solo, come ieri */
+      .filter(o => o.stato === 'pending'
+                && (typeof valutaVistaP2P === 'function' ? valutaVistaP2P(o.fiat) : o.fiat === P2P_VALUTA)
                 && !((morti.get(o.id) || 0) >= o.creato))
       .sort((a, b) => b.creato - a.creato),
     info
@@ -62255,13 +62275,17 @@ function stellineP2P(f){
    98039 dove il coordinatore consegna 98000: la stima ora dice il
    numero che il taker riceve davvero. */
 function satsMercatoP2P(o){
-  if (!cambioVivo || !(eurPerSat > 0)) return 0;
+  /* IL METRO DELLA VALUTA DELL'ORDINE (1 nov 2026, cantiere p2p-usdt):
+     un sat in euro, o in dollari per un ordine in USDT; 0 = non lo so */
+  const metro = typeof perSatP2P === 'function' ? perSatP2P(o)
+              : ((cambioVivo && eurPerSat > 0) ? eurPerSat : 0);
+  if (!(metro > 0)) return 0;
   /* SU UN BARATTOZON A MERCATO LA BASE E' L'INTERO PER ECCESSO (30 set
      2026): il coordinatore fa i sats sul `fiat_amount`, che per un
      PayCode da 25,47 € e' 26 — la stima dice quel numero, non uno
      piu' basso del 2% che poi la presa smentirebbe */
   const base = tabacchinoP2P(o.metodi) ? euroFiloTabacchinoP2P(o.euro, false) : o.euro;
-  return Math.round((base / eurPerSat) * (1 - o.premium / 100));
+  return Math.round((base / metro) * (1 - o.premium / 100));
 }
 /* I SATS DEL TABACCHINO (22 set 2026): l'importo esatto coi centesimi
    al cambio del momento, col premio COTTO dentro — stessa formula del
@@ -62802,7 +62826,9 @@ function rigaOrdineP2P(o){
     ? (o.sats > 0 && netto === o.sats ? '' : '≈ ')
       + capiP2P(fmt(netto), stima2 ? fmt(stima2) : '') + ' sats'
     : 'sats';
-  const eurTxt = capiP2P(esc(fmtEur(o.euro)), o.euroMax ? esc(fmtEur(o.euroMax)) : '') + ' €'
+  /* il segno della valuta dell'ordine (1 nov 2026, cantiere p2p-usdt) */
+  const eurTxt = capiP2P(esc(fmtEur(o.euro)), o.euroMax ? esc(fmtEur(o.euroMax)) : '') + ' '
+    + (typeof segnoValutaP2P === 'function' ? esc(segnoValutaP2P(o.fiat)) : '€')
     /* il range: chi prende sceglie la cifra, e lo dice la riga
        dell'euro — e' li' che la scelta si fa */
     /* «scegli tu» va a capo INTERO: col «da … a …» la riga s'e'
@@ -63615,7 +63641,7 @@ function scegliMetodoFiltroP2P(m){
   haptic();
   const i = b.metodi.indexOf(m);
   if (i >= 0) b.metodi.splice(i, 1);
-  else b.metodi = P2P_METODI.filter(x => x === m || b.metodi.indexOf(x) >= 0);
+  else b.metodi = metodiFiltroP2P().filter(x => x === m || b.metodi.indexOf(x) >= 0);
   renderFiltroP2P();
 }
 function renderFiltroP2P(){
@@ -63648,11 +63674,11 @@ function renderFiltroP2P(){
     '</div>';
   box.innerHTML = rete +
     '<div class="section-label">Valute</div>' +
-    '<div class="p2p-metodi">' + P2P_VALUTE.map(v =>
+    '<div class="p2p-metodi">' + (typeof valuteVisibiliP2P === 'function' ? valuteVisibiliP2P() : P2P_VALUTE).map(v =>
       pill(v.cod, b.valute.indexOf(v.cod) >= 0, 'scegliValutaFiltroP2P')).join('') +
     '</div>' +
     '<div class="section-label">Metodi di pagamento</div>' +
-    '<div class="p2p-metodi">' + P2P_METODI.map(m =>
+    '<div class="p2p-metodi">' + metodiFiltroP2P().map(m =>
       pill(m, b.metodi.indexOf(m) >= 0, 'scegliMetodoFiltroP2P',
            marchioMetodoP2P(m), !!vesteMetodoP2P(m))).join('') +
     '</div>' +
@@ -67426,7 +67452,10 @@ function fondiLibroP2P(libro, ev, adesso){
     return fuori;
   }
   const o = ordineDaEvento(ev, adesso);
-  if (!o || o.fiat !== P2P_VALUTA) return fuori;
+  /* la valuta passa dallo stesso giudice della prima lettura
+     (`libroDaEventi`): un ordine in USDT arrivato dal vivo entra solo
+     per chi gli USDT li vede, come al ricaricare */
+  if (!o || !(typeof valutaVistaP2P === 'function' ? valutaVistaP2P(o.fiat) : o.fiat === P2P_VALUTA)) return fuori;
   if (i < 0) { ordini.unshift(o); fuori.cambiato = true; fuori.nuovo = id; }
   else if (o.creato > ordini[i].creato) { ordini[i] = o; fuori.cambiato = true; }
   return fuori;
@@ -69613,7 +69642,7 @@ function applicaMessaggioP2P(ord, dentro){
      il server ha timbrato all'evento di mostrod (l'archivio, che lo
      riscrive comunque). Una volta sola. */
   if (nuovo.sats > 0 && nuovo.satsMiei > 0 && !(ord.satsMiei > 0) && !(nuovo.cambioPresa > 0)
-      && cambioVivo && eurPerSat > 0
+      && cambioVivo && eurPerSat > 0 && !(typeof usdtP2P === 'function' && usdtP2P(ord))
       && quando > 0 && Math.abs(Math.floor(Date.now() / 1000) - quando) <= P2P_PRESA_FRESCA_S)
     nuovo.cambioPresa = eurPerSat * 1e8;
   diarioP2P('msg ' + String(ord.id).slice(0, 8) + ' ' + azione + ' t=' + quando
@@ -69807,7 +69836,9 @@ function chiudiFoglioFermoP2P(idFoglio){
    l'ha preso, una cifra sola appena il coordinatore la fissa. Un
    posto solo, che le due viste dello scambio non possano divergere. */
 function euroTestoP2P(o){
-  return capiP2P(fmtEur(o.euro), o.euroMax ? fmtEur(o.euroMax) : '') + ' €';
+  /* col segno della valuta dell'ordine (1 nov 2026, cantiere p2p-usdt) */
+  return capiP2P(fmtEur(o.euro), o.euroMax ? fmtEur(o.euroMax) : '') + ' '
+    + (typeof segnoValutaP2P === 'function' ? segnoValutaP2P(o.fiat) : '€');
 }
 /* PURA: i due capi di un intervallo dentro UNA riga di testo (6 ott
    2026, ritocco di Andrea): «da 5,00 a 15,00», «da 6 534 a 19 601».
@@ -70407,7 +70438,10 @@ function contoDettP2P(o){
      in euro la stima in sats non ha una base: si dice «—», come a cambio
      muto. I sats FISSATI (o detti dal coordinatore) restano un fatto. */
   const euroNoto = Number(o.euro) > 0;
-  const vivo = esatto || (euroNoto && cambioVivo && eurPerSat > 0);
+  /* il metro nella valuta dell'ordine (1 nov 2026, cantiere p2p-usdt) */
+  const metroVivo = typeof perSatP2P === 'function' ? perSatP2P(o)
+                  : ((cambioVivo && eurPerSat > 0) ? eurPerSat : 0);
+  const vivo = esatto || (euroNoto && metroVivo > 0);
   /* la fee di CHI LEGGE: con lo sconto fedelta' la sua meta' e' piu'
      piccola, e tutte le righe qui sotto la prendono da qui */
   const fee = feeMiaP2P(o);
@@ -70427,10 +70461,10 @@ function contoDettP2P(o){
        detta dal coordinatore e' vero anche a cambio muto, e una
        divisione per `eurPerSat` a zero darebbe Infinity. Si chiede
        al cambio solo dove il cambio serve davvero. */
-    const stimabile = cambioVivo && eurPerSat > 0;
+    const stimabile = metroVivo > 0;
     const merc = detto > 0 ? detto
                : fisso ? o.sats
-               : (stimabile ? satsMercatoP2P({euro: e, premium: o.premium}) : 0);
+               : (stimabile ? satsMercatoP2P({euro: e, premium: o.premium, fiat: o.fiat}) : 0);
     /* a sats fissi il Controvalore torna a essere il MERCATO — i sats
        pieni per quegli euro al METRO del conto, adesso o alla presa —
        e il Subtotale resta la cifra fissa: la differenza fra i due e'
@@ -70439,7 +70473,7 @@ function contoDettP2P(o){
     const ctrl = (fisso && premioTab) ? Math.round(e / metro)
                : detto > 0 ? scorporaPremioP2P(detto, o.premium)
                : fisso ? o.sats
-               : (stimabile ? Math.round(e / eurPerSat) : 0);
+               : (stimabile ? Math.round(e / metroVivo) : 0);
     const meta = (vivo && fee > 0) ? Math.round(merc * fee / 2) : 0;
     return {ctrl: ctrl, premio: Math.abs(ctrl - merc), merc: merc,
             meta: meta,
@@ -71373,7 +71407,7 @@ function confermaDettaglioP2P(){
   if (troppo) { toast(troppo); return; }
   /* il tetto del collaudo (20 ott 2026): vale anche per chi prende */
   const oltre = typeof giudiceTettoProvaP2P === 'function'
-    ? giudiceTettoProvaP2P(g ? g.euro : o.euro) : '';
+    ? giudiceTettoProvaP2P(g ? g.euro : o.euro, o.fiat) : '';
   if (oltre) { toast(oltre); return; }
   haptic();
   chiudiFoglioP2P('p2pDettSheet');
@@ -71486,6 +71520,9 @@ async function eseguiPresaP2P(id, scelto, metodo){
     stato: 'prendo', euro: scelta || riga.euro, euroMax: 0, importoScelto: scelta,
     sats: riga.sats, satsNetti: 0, metodoScelto: met,
     metodi: (riga.metodi || []).slice(), premium: riga.premium || 0, peer: '',
+    /* la valuta della riga viaggia con lo scambio (gli USDT, 1 nov 2026):
+       senza, la pagina dello scambio direbbe € a un ordine in USDT */
+    fiat: riga.fiat || 'EUR',
     hold: null, contattato: false, cantDo: '', errore: '', votabile: false,
     creato: adesso, aggiornato: adesso
   };
@@ -71668,7 +71705,10 @@ function payloadPresaP2P(riga, scelta, metodo, sulMetodo){
   /* a leva spenta (`sulMetodo`, vedi `cauzioneSulMetodoP2P`) come ieri:
      il nodo senza la 0010 non legge l'ordine nel payload */
   if (!m || !sulMetodo) return cifra ? {amount: cifra} : null;
-  return {order: {kind: null, status: null, amount: 0, fiat_code: 'EUR',
+  /* la valuta e' quella della riga (gli USDT, 1 nov 2026): la 0010 legge
+     solo metodo e cifra, ma sul filo non si scrive EUR per un USDT */
+  const valuta = String((riga && riga.fiat) || '').toUpperCase() === 'USDT' ? 'USDT' : 'EUR';
+  return {order: {kind: null, status: null, amount: 0, fiat_code: valuta,
     min_amount: null, max_amount: null,
     fiat_amount: cifra || Math.floor(Number(riga && riga.euro) || 0),
     payment_method: m, premium: Math.floor(Number(riga && riga.premium) || 0),
@@ -71921,6 +71961,15 @@ function riquadroRecapitoP2P(testo, titolo){
   const righe = righeRecapitoP2P(testo);
   if (!righe.length) return '';
   const FORMA_IBAN = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{8,30}$/;
+  /* GLI USDT (1 nov 2026, cantiere p2p-usdt): la rete si riconosce dalla
+     riga «Rete», il titolo dice USDT, e sotto c'e' il QR — EIP-681 sulle
+     reti EVM, cosi' il wallet sceglie da se' catena e token */
+  const usdt = typeof reteUsdtDaRecapitoP2P === 'function' ? reteUsdtDaRecapitoP2P(righe) : null;
+  const qr = usdt && typeof qrUsdtP2P === 'function' ? qrUsdtP2P(usdt.rete, usdt.indirizzo, 0) : '';
+  if (qr && typeof disegnaQr === 'function' && typeof setTimeout === 'function')
+    setTimeout(() => { const b = typeof el === 'function' ? el('p2pQrUsdt') : null;
+                       if (b) disegnaQr(b, qr); }, 0);
+  if (!titolo && usdt) titolo = '💵 Dove mandare gli USDT';
   return '<div class="p2p-recapito">'
     + '<div class="p2p-paycode-tit">' + esc(titolo || '💶 Dove mandare gli euro') + '</div>'
     + righe.map(r => {
@@ -71929,9 +71978,30 @@ function riquadroRecapitoP2P(testo, titolo){
         return FORMA_IBAN.test(nudo)
           ? rigaDato(r.et, nudo, {vista: nudo.replace(/(.{4})(?=.)/g, '$1 '),
                                   mono: true, copia: true})
-          : rigaDato(r.et, r.v, {mono: /^iban$/i.test(r.et), copia: daIncollareP2P(r)});
+          : rigaDato(r.et, r.v, {mono: /^(iban|indirizzo|contratto usdt)$/i.test(r.et), copia: daIncollareP2P(r)});
       }).join('')
+    + (qr ? '<div class="qr p2p-qr-usdt" id="p2pQrUsdt" role="img" aria-label="QR dell\'indirizzo USDT su '
+            + esc(usdt.rete.nome) + '"></div>'
+            + '<div class="hint">Inquadralo col wallet sulla rete <b>' + esc(usdt.rete.nome) + '</b>.</div>' : '')
     + '</div>';
+}
+/* PURA: dalle righe di un recapito, la rete USDT e l'indirizzo, o null
+   (1 nov 2026, cantiere p2p-usdt). La rete si legge dalla riga «Rete»
+   che scrive la nostra forma («Tron (TRC-20)»): il nome davanti. */
+function reteUsdtDaRecapitoP2P(righe){
+  const riga = k => (righe || []).find(x => !x.testa && String(x.et || '').toLowerCase() === k);
+  const rete = riga('rete'), ind = riga('indirizzo');
+  if (!rete || !ind) return null;
+  const nome = String(rete.v).split(' ')[0].toLowerCase();
+  const r = P2P_RETI_USDT.find(x => x.nome.toLowerCase() === nome);
+  return r ? {rete: r, indirizzo: String(ind.v).trim()} : null;
+}
+/* la frase sotto il campo dell'indirizzo: la rete in chiaro, e per le
+   reti EVM il limite detto (Polygon ed Ethereum hanno la stessa forma) */
+function notaReteUsdtP2P(r){
+  return r.forma === 'evm'
+    ? '⚠️ Rete ' + r.nome + ' (' + r.standard + '). Polygon ed Ethereum hanno indirizzi uguali: chi ti paga deve mandare SOLO su ' + r.nome + ', e glielo diciamo noi.'
+    : '⚠️ Rete ' + r.nome + ' (' + r.standard + '): l\'indirizzo comincia con T. Un indirizzo di un\'altra rete non parte.';
 }
 /* I DATI DA INCOLLARE (16 ott 2026, copia-recapito). PURA. Una riga ha
    il suo «📋 Copia» se il suo valore e' un dato che si incolla in
@@ -71946,7 +72016,7 @@ function riquadroRecapitoP2P(testo, titolo){
    dell'appuntamento — e resta testo da leggere. L'IBAN ha la sua strada
    nel riquadro (per forma, senza spazi): un «IBAN: da chiedere» non e'
    un dato. */
-const ETICHETTE_DA_INCOLLARE_P2P = /^(intestatario|causale|revolut|revtag|satispay|paypal)$/i;
+const ETICHETTE_DA_INCOLLARE_P2P = /^(intestatario|causale|revolut|revtag|satispay|paypal|indirizzo|contratto usdt)$/i;
 const FORME_DA_INCOLLARE_P2P = [
   /^@[\w.\-]{2,40}$/,
   /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
@@ -72518,8 +72588,10 @@ function renderOrdineP2P(){
     cauzione: '<button class="btn orange" onclick="apriCauzioneP2P()">🔐 Blocca la cauzione</button>',
     'euro-inviati': tabOrd
       ? '<button class="btn orange" onclick="euroInviatiP2P()">✅ Ho pagato al tabacchino</button>'
-      /* il contanti di persona ha il suo verbo (1 ott 2026) */
-      : '<button class="btn orange" onclick="euroInviatiP2P()">✅ ' + esc(gestoPagoP2P(o)) + '</button>',
+      /* il contanti di persona ha il suo verbo (1 ott 2026); in USDT
+         prima del bottone il campo dell'id della transazione (1 nov 2026) */
+      : (typeof campoTxidUsdtP2P === 'function' ? campoTxidUsdtP2P(o) : '')
+        + '<button class="btn orange" onclick="euroInviatiP2P()">✅ ' + esc(gestoPagoP2P(o)) + '</button>',
     /* il gesto di chi vende a garanzia bloccata (18 set 2026) */
     recapito: '<button class="btn orange" onclick="apriCampiP2P()">💶 Indica dove ricevere gli euro</button>',
     /* col PayCode il rilascio e' un riquadro con i due gesti e il
@@ -72529,6 +72601,9 @@ function renderOrdineP2P(){
   };
   /* col contanti di persona il recapito E' l'appuntamento (1 ott 2026):
      lo stesso foglio, col suo verbo */
+  /* in USDT il recapito e' un indirizzo su una rete (1 nov 2026, p2p-usdt) */
+  if (typeof usdtP2P === 'function' && usdtP2P(o))
+    bottoni.recapito = '<button class="btn orange" onclick="apriCampiP2P()">💵 Indica dove ricevere gli USDT</button>';
   if (contantiQui) bottoni.recapito = '<button class="btn orange" onclick="apriCampiP2P()">📍 Indica dove e quando vedervi</button>';
   /* ...e col PayCode il recapito E' il PayCode (15 ott 2026, lo scambio
      101e20d6): «dove ricevere gli euro» e' la frase dei bonifici, e chi
@@ -72590,6 +72665,9 @@ function renderOrdineP2P(){
        messa e, dall'altro lato, la meta' che gli spetta se e' bruciata */
     riquadroCauzioneP2P(o) +
     riquadroIncassoCauzioneP2P(o) +
+    /* l'id della transazione USDT, a chi l'ha scritto (1 nov 2026) */
+    (o.txidUsdt && typeof usdtP2P === 'function' && usdtP2P(o)
+      ? '<div class="p2p-recapito">' + rigaDato('Id della transazione', o.txidUsdt, {mono: true, copia: true}) + '</div>' : '') +
     anelloneTabacchinoP2P(o) +
     '<div class="p2p-passi"><div class="steps">' +
       passi.map((p, i) => {
@@ -74176,13 +74254,72 @@ function recapitoAltroveP2P(){
 /* IL VERBO DEL GESTO DI CHI PAGA (1 ott 2026): col contanti di persona
    gli euro non si «inviano», si consegnano — sul bottone, su quello
    spento che aspetta il recapito, e nella conferma */
+/* ---- «HO INVIATO GLI USDT» (1 nov 2026, cantiere p2p-usdt) ----
+   Il protocollo chiede a chi paga di incollare l'id della transazione
+   nella chat dello scambio (`stablecoins.md`): e' quello che il
+   moderatore guarda in disputa — rete, destinatario, importo,
+   conferme. Qui il campo sta SOPRA il bottone, il giudice
+   (`giudiceTxidUsdtP2P`) ferma un id dell'altra rete, e alla conferma
+   l'id parte nella chat (se la chat c'e') e resta sulla riga, visibile
+   nella pagina dello scambio: chi paga non deve ricordarselo. */
+let p2pTxidBozza = {};   // per scambio, quel che si sta scrivendo nel campo
+/* la rete dello scambio: quella del recapito di chi vende (e' li' che si
+   manda), poi il metodo scelto, poi l'unica rete dell'ordine; o null */
+function reteUsdtScambioP2P(o){
+  if (!o) return null;
+  const testo = ((o.campiLoro || {}).euro || {}).testo || '';
+  const dal = testo ? reteUsdtDaRecapitoP2P(righeRecapitoP2P(testo)) : null;
+  if (dal) return dal.rete;
+  const scelto = typeof metodoSceltoP2P === 'function' ? metodoSceltoP2P(o) : '';
+  if (scelto && reteUsdtDaMetodoP2P(scelto)) return reteUsdtDaMetodoP2P(scelto);
+  const reti = (o.metodi || []).map(reteUsdtDaMetodoP2P).filter(Boolean);
+  return reti.length === 1 ? reti[0] : null;
+}
+function campoTxidUsdtP2P(o){
+  const r = usdtP2P(o) ? reteUsdtScambioP2P(o) : null;
+  if (!r) return '';
+  const v = p2pTxidBozza[o.id] !== undefined ? p2pTxidBozza[o.id] : (o.txidUsdt || '');
+  return '<div class="field"><label for="p2pTxidUsdt">Id della transazione su ' + esc(r.nome) + '</label>'
+    + '<input type="text" id="p2pTxidUsdt" maxlength="80" autocomplete="off" autocapitalize="off" spellcheck="false" '
+    + 'placeholder="' + (r.forma === 'tron' ? '64 caratteri, dal tuo wallet' : '0x… (66 caratteri), dal tuo wallet') + '" '
+    + 'value="' + esc(v) + '" oninput="p2pTxidBozza[' + JSON.stringify(String(o.id)).replace(/"/g, '&quot;') + ']=this.value">'
+    + '<div class="hint">Lo trovi nei dettagli dell\'invio. Lo vedono chi vende e, in disputa, il moderatore.</div></div>';
+}
+function usdtInviatiP2P(o){
+  const r = reteUsdtScambioP2P(o);
+  const inp = el('p2pTxidUsdt');
+  const txid = String((inp && inp.value) || p2pTxidBozza[o.id] || o.txidUsdt || '').replace(/\s+/g, '');
+  const no = giudiceTxidUsdtP2P(txid, r);
+  if (no) { toast(no, 7000); if (inp) inp.focus(); return; }
+  o.txidUsdt = txid;
+  scriviOrdineP2P(o);
+  chiediConferma({
+    titolo: 'Hai inviato gli USDT?',
+    corpo: 'Dillo solo dopo aver davvero mandato ' + fmtEur(o.euro) + ' USDT su ' + r.nome
+      + ' all\'indirizzo di chi vende. L\'id della transazione parte nella chat dello scambio. '
+      + 'Chi vende lo controlla e libera i sats. Da qui non potrai più annullare: se qualcosa va storto, resta la disputa.',
+    etichetta: 'Sì, li ho inviati',
+    /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
+    poi: async () => {
+      await mossaOrdineP2P(o.id, 'fiat-sent', 'Fatto ✅', 'Sto avvisando che hai pagato…');
+      if (typeof chatScInviaP2P === 'function') {
+        try { await chatScInviaP2P(o.id, '🧾 USDT inviati su ' + r.nome + '. Id della transazione: ' + txid); }
+        catch(e) { /* la chat non c'e' ancora: l'id resta sulla riga e nella pagina */ }
+      }
+    }
+  });
+}
 function gestoPagoP2P(o){
+  /* in USDT il gesto dice USDT (1 nov 2026, cantiere p2p-usdt) */
+  if (typeof usdtP2P === 'function' && usdtP2P(o)) return 'Ho inviato gli USDT';
   return typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o)
     ? 'Ho consegnato i contanti' : 'Ho inviato gli euro';
 }
 function euroInviatiP2P(){
   const o = ordiniP2P()[p2pOrdineAperto];
   if (!o) return;
+  /* in USDT il gesto ha la sua strada: l'id della transazione prima */
+  if (typeof usdtInviatiP2P === 'function' && usdtP2P(o) && reteUsdtScambioP2P(o)) return usdtInviatiP2P(o);
   const tab = tabacchinoP2P(o.metodi);
   /* COL CONTANTI LA CONFERMA PORTA LA REGOLA INTERA (1 ott 2026): a
      incontro fatto il riquadro e' una riga, e questo e' il momento in
@@ -74196,7 +74333,7 @@ function euroInviatiP2P(){
   const senzaPresenza = contanti && !(o.presenze && o.presenze.mia);
   chiediConferma({
     titolo: tab ? 'Hai pagato il PayCode al tabacchino?'
-      : contanti ? 'Hai consegnato i contanti?' : 'Hai inviato gli euro?',
+      : contanti ? 'Hai consegnato i contanti?' : (typeof usdtP2P === 'function' && usdtP2P(o)) ? 'Hai inviato gli USDT?' : 'Hai inviato gli euro?',
     corpo: tab
       /* IL BUONO REGALO, UNA RIGA (10 ott 2026, guida-paycode, col si' di
          Andrea): e' l'ultimo cancello prima di un gesto che non si
@@ -74211,7 +74348,7 @@ function euroInviatiP2P(){
                          + ' Puoi tornare indietro e segnarlo adesso, o proseguire.\n\n' : '')
         + 'Dillo quando consegni ' + fmtEur(o.euro) + ' € a chi vende, lì di persona. ' + REGOLA_CONTANTI_COMPRA
         + ' Da qui non potrai più annullare: se qualcosa va storto, resta la disputa.'
-      : 'Dillo solo dopo aver davvero mandato ' + fmtEur(o.euro) + ' € con il metodo concordato. Chi vende lo vedrà e libererà i sats. Da qui non potrai più annullare: se qualcosa va storto, resta la disputa.',
+      : 'Dillo solo dopo aver davvero mandato ' + fmtEur(o.euro) + ' ' + (typeof segnoValutaP2P === 'function' ? segnoValutaP2P(o.fiat) : '€') + ' con il metodo concordato. Chi vende lo vedrà e libererà i sats. Da qui non potrai più annullare: se qualcosa va storto, resta la disputa.',
     etichetta: tab ? 'Sì, ho pagato' : contanti ? 'Sì, li ho consegnati' : 'Sì, li ho inviati',
     /* il ripensamento ha il nome che la frase gli da' */
     indietro: senzaPresenza ? 'Indietro' : '',
@@ -74284,6 +74421,7 @@ function rilasciaP2P(){
       ? 'Fallo solo se su Amazon il tuo ordine da ' + fmtEur(o.euro) + ' € risulta pagato davvero. I sats partono verso chi compra e non tornano indietro.'
       : contanti
       ? 'Libera i sats solo lì, davanti a chi ti ha dato ' + fmtEur(o.euro) + ' € in contanti, dopo averli contati insieme. I sats partono verso chi compra e non tornano indietro.'
+      : (typeof usdtP2P === 'function' && usdtP2P(o)) ? 'Fallo solo se hai ricevuto ' + fmtEur(o.euro) + ' USDT davvero, sulla rete giusta, e la transazione è confermata. I sats partono verso chi compra e non tornano indietro.'
       : 'Fallo solo se hai ricevuto ' + fmtEur(o.euro) + ' € davvero. I sats partono verso chi compra e non tornano indietro.',
     etichetta: contanti ? 'Sì, li ho contati: libero i sats' : 'Sì, libero i sats',
     /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
@@ -74367,7 +74505,13 @@ async function mossaOrdineP2P(id, azione, fatto, sto){
    una sola. Chi aggiunge una voce qui deve portarla anche la' — c'e'
    una prova che diventa rossa apposta il giorno che questa lista
    cresce. */
-const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺'}];
+/* (1 nov 2026, cantiere p2p-usdt) LA SECONDA VOCE E' ARRIVATA: l'USDT,
+   il giorno che il coordinatore l'accetta. E le righe erano davvero due:
+   `ordineDaCampiP2P` scrive adesso la valuta del foglio (`v.valuta`), e
+   la prova che guardava avanti e' diventata quella del giro. Il ₮ e' il
+   segno del Tether, non una bandiera inventata. Chi la vede lo dice
+   `valuteVisibiliP2P`, nel blocco degli USDT qui sotto. */
+const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺'}, {cod: 'USDT', nome: 'Tether USD', segno: 'USDT', bandiera: '₮'}];
 /* I METODI SONO UN VOCABOLARIO CHIUSO (set 2026, decisione di Andrea
    che ROVESCIA la scelta di prima, dove le pillole erano un
    suggerimento e sotto c'era un campo di testo libero).
@@ -74403,6 +74547,328 @@ const P2P_TABACCHINO = 'Contanti al tabacchino';
    altrui leggono il numero come parte del nome del metodo, e non si
    rompono. I giudici cercano il PREFISSO, mai l'uguaglianza. */
 const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
+/* ═══ GLI ORDINI IN USDT (1 nov 2026, cantiere p2p-usdt, decisione di
+   Andrea dopo lo studio «USDT e altre coin») ═════════════════════════
+   COS'E' E COSA NON E'. Mostro dalla 0.20.2 accetta l'USDT come VALUTA
+   dell'ordine (il `f` del 38383 vale «USDT»), col prezzo agganciato a
+   1 dollaro. La garanzia resta la hold invoice in sats Lightning di
+   sempre: chi vende sats li blocca come oggi, chi compra manda gli USDT
+   da persona a persona, FUORI da Mostro, sulla rete scritta nel metodo.
+   NON e' «USDT su Lightning»: il nodo non vede ne' la rete ne' il
+   trasferimento, e Barattolo gli USDT non li tocca mai.
+   LE RETI SONO I METODI, con la grafia del protocollo
+   (`protocol/src/stablecoins.md`: «<CODE> (<Network>)»), cosi' un altro
+   client le legge e le filtra uguali: Tron, Polygon, Ethereum (scelte
+   di Andrea, 1 nov 2026). Il contratto di ogni rete e' quello del vero
+   USDT: chi riceve lo vede scritto, contro i token falsi che si
+   chiamano «USDT» anche loro.
+   LA RETE SBAGLIATA E' IL GUAI DA FERMARE (richiesta di Andrea: «come
+   negli exchange»). L'indirizzo dice la sua famiglia con certezza —
+   Tron e' Base58 col controllo, le reti EVM sono `0x` piu' quaranta
+   cifre col controllo nelle maiuscole (EIP-55) — e un indirizzo
+   dell'altra famiglia, o bitcoin, o Lightning, o Liquid, si ferma con
+   la frase che lo dice. ⚠️ IL LIMITE, DETTO: Polygon ed Ethereum hanno
+   la STESSA forma d'indirizzo, quindi fra loro due nessun controllo
+   puo' distinguere — si dice la rete in grande (nel recapito, nel QR,
+   che porta dentro la catena col formato EIP-681) e si chiede l'id
+   della transazione, che il moderatore legge sulla rete giusta. E il
+   wallet di chi paga resta suo: da quale rete spedisce lo decide lui.
+   DIETRO DUE CANCELLI: `myP2PUsdt` (la leva `P2P_USDT_ATTIVO` del
+   server, di serie solo per gli admin) e il nodo, che deve avere USDT
+   fra le valute accettate. Senza il primo il libro non mostra gli
+   ordini in USDT e il foglio offre l'euro solo. (`myP2PUsdt` vive accanto
+   a `myP2POnchain`: la busta di /api/me lo scrive prima di qui.) */
+const P2P_RETI_USDT = [
+  {rete: 'tron', nome: 'Tron', metodo: 'USDT (Tron)', standard: 'TRC-20',
+   forma: 'tron', contratto: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'},
+  {rete: 'polygon', nome: 'Polygon', metodo: 'USDT (Polygon)', standard: 'ERC-20',
+   forma: 'evm', catena: 137, contratto: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'},
+  {rete: 'ethereum', nome: 'Ethereum', metodo: 'USDT (Ethereum)', standard: 'ERC-20',
+   forma: 'evm', catena: 1, contratto: '0xdAC17F958D2ee523a2206206994597C13D831ec7'}
+];
+const P2P_METODI_USDT = P2P_RETI_USDT.map(r => r.metodo);
+/* la rete di un metodo, o null: si guarda il nome ESATTO, che e' quello
+   che scriviamo e che il protocollo chiede */
+function reteUsdtDaMetodoP2P(m){
+  const t = String(m || '').trim().toLowerCase();
+  return P2P_RETI_USDT.find(r => r.metodo.toLowerCase() === t) || null;
+}
+function usdtVistoP2P(){
+  return typeof myP2PUsdt !== 'undefined' && !!myP2PUsdt;
+}
+/* le valute che il foglio OFFRE: l'USDT solo a chi lo vede e mai a rete
+   on-chain (il 2-di-3 blocca bitcoin, non USDT) */
+function valuteVisibiliP2P(oc){
+  return P2P_VALUTE.filter(v => v.cod !== 'USDT' || (usdtVistoP2P() && !oc));
+}
+/* una valuta del libro che chi guarda puo' vedere (PURA sul cancello) */
+function valutaVistaP2P(cod){
+  const c = String(cod || '').toUpperCase();
+  return c === P2P_VALUTA || (c === 'USDT' && usdtVistoP2P());
+}
+function valutaOrdineP2P(o){
+  return String((o && o.fiat) || P2P_VALUTA).toUpperCase();
+}
+function metodiValutaP2P(cod){
+  return String(cod || '').toUpperCase() === 'USDT' ? P2P_METODI_USDT : P2P_METODI;
+}
+function segnoValutaP2P(cod){
+  const c = String(cod || P2P_VALUTA).toUpperCase();
+  const v = P2P_VALUTE.find(x => x.cod === c);
+  return v ? v.segno : c;
+}
+/* «gli euro» / «gli USDT», per le frasi del gesto */
+function soldiValutaP2P(cod){
+  return String(cod || '').toUpperCase() === 'USDT' ? 'gli USDT' : 'gli euro';
+}
+function usdtP2P(o){ return valutaOrdineP2P(o) === 'USDT'; }
+/* IL METRO DI UN ORDINE: quanto vale un sat nella SUA valuta, adesso; 0
+   = non lo so, e allora le stime tacciono. L'USDT vale un dollaro (il
+   prezzo `pegged` del nodo), e senza dollaro vero non si inventa. */
+function perSatP2P(o){
+  if (usdtP2P(o)) return usdPerSat > 0 ? usdPerSat : 0;
+  return (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
+}
+/* IL TETTO NELLA VALUTA DEL FOGLIO (1 nov 2026, decisione di Andrea:
+   «tetto 250 €» anche in USDT). Il tetto di Barattolo resta UNO, in
+   euro (`maxEuroP2P`); in USDT si traduce al cambio di adesso, euro e
+   dollaro dalla stessa lettura del server. Spento resta spento (0); e
+   senza i due cambi non si sa, quindi 1: fermo, mai un via libera
+   inventato (la regola del tetto del collaudo). */
+function tettoValutaP2P(cod){
+  const t = maxEuroP2P();
+  if (String(cod || '').toUpperCase() !== 'USDT' || !(t > 0)) return t;
+  if (!(cambioVivo && eurPerSat > 0 && usdPerSat > 0)) return 1;
+  return Math.max(1, Math.floor(t * usdPerSat / eurPerSat));
+}
+
+/* ---- I CONTI DEGLI INDIRIZZI, scritti qui e PURI ----
+   SHA-256 (Tron: il controllo del Base58) e Keccak-256 (EIP-55) in
+   poche righe, senza librerie: il giudice dell'indirizzo deve
+   rispondere MENTRE si scrive, anche prima che nostr-tools sia
+   arrivato, e un banco di node lo deve poter girare da solo. Provati
+   contro i vettori noti (la stringa vuota, i quattro indirizzi
+   dell'EIP-55, il contratto USDT su Tron). */
+function sha256P2P(bytes){
+  const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const n = bytes.length;
+  const lung = ((n + 9 + 63) >> 6) << 6;
+  const m = new Uint8Array(lung);
+  m.set(bytes); m[n] = 0x80;
+  const bit = n * 8;
+  m[lung - 4] = (bit >>> 24) & 255; m[lung - 3] = (bit >>> 16) & 255;
+  m[lung - 2] = (bit >>> 8) & 255; m[lung - 1] = bit & 255;
+  m[lung - 5] = Math.floor(n / 0x20000000) & 255;
+  const W = new Uint32Array(64);
+  const rotr = (x, k) => (x >>> k) | (x << (32 - k));
+  for (let i = 0; i < lung; i += 64) {
+    for (let t = 0; t < 16; t++)
+      W[t] = (m[i + 4 * t] << 24) | (m[i + 4 * t + 1] << 16) | (m[i + 4 * t + 2] << 8) | m[i + 4 * t + 3];
+    for (let t = 16; t < 64; t++) {
+      const s0 = rotr(W[t - 15], 7) ^ rotr(W[t - 15], 18) ^ (W[t - 15] >>> 3);
+      const s1 = rotr(W[t - 2], 17) ^ rotr(W[t - 2], 19) ^ (W[t - 2] >>> 10);
+      W[t] = (W[t - 16] + s0 + W[t - 7] + s1) | 0;
+    }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let t = 0; t < 64; t++) {
+      const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const t1 = (h + S1 + ((e & f) ^ (~e & g)) + K[t] + W[t]) | 0;
+      const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const t2 = (S0 + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+    H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+  }
+  const out = new Uint8Array(32);
+  H.forEach((x, i) => { out[4 * i] = x >>> 24; out[4 * i + 1] = (x >>> 16) & 255;
+                        out[4 * i + 2] = (x >>> 8) & 255; out[4 * i + 3] = x & 255; });
+  return out;
+}
+/* Keccak-256 col riempimento ORIGINALE (0x01), quello di Ethereum: lo
+   SHA3-256 del NIST (0x06) da' un'altra impronta, e l'EIP-55 lo vuole
+   cosi'. Lo stato a 64 bit sta in coppie di interi a 32 (alto, basso). */
+function keccak256P2P(bytes){
+  const RC = [[0x00000000,0x00000001],[0x00000000,0x00008082],[0x80000000,0x0000808a],[0x80000000,0x80008000],
+    [0x00000000,0x0000808b],[0x00000000,0x80000001],[0x80000000,0x80008081],[0x80000000,0x00008009],
+    [0x00000000,0x0000008a],[0x00000000,0x00000088],[0x00000000,0x80008009],[0x00000000,0x8000000a],
+    [0x00000000,0x8000808b],[0x80000000,0x0000008b],[0x80000000,0x00008089],[0x80000000,0x00008003],
+    [0x80000000,0x00008002],[0x80000000,0x00000080],[0x00000000,0x0000800a],[0x80000000,0x8000000a],
+    [0x80000000,0x80008081],[0x80000000,0x00008080],[0x00000000,0x80000001],[0x80000000,0x80008008]];
+  const ROT = [0, 1, 62, 28, 27, 36, 44, 6, 55, 20, 3, 10, 43, 25, 39, 41, 45, 15, 21, 8, 18, 2, 61, 56, 14];
+  const hi = new Uint32Array(25), lo = new Uint32Array(25);
+  const rate = 136;
+  const lung = (Math.floor(bytes.length / rate) + 1) * rate;
+  const m = new Uint8Array(lung);
+  m.set(bytes); m[bytes.length] ^= 0x01; m[lung - 1] ^= 0x80;
+  const rotl = (h, l, k) => {
+    if (k === 0) return [h, l];
+    if (k >= 32) { const t = h; h = l; l = t; k -= 32; }
+    if (k === 0) return [h, l];
+    return [((h << k) | (l >>> (32 - k))) >>> 0, ((l << k) | (h >>> (32 - k))) >>> 0];
+  };
+  for (let off = 0; off < lung; off += rate) {
+    for (let i = 0; i < rate / 8; i++) {
+      const p = off + 8 * i;
+      lo[i] ^= (m[p] | (m[p + 1] << 8) | (m[p + 2] << 16) | (m[p + 3] << 24)) >>> 0;
+      hi[i] ^= (m[p + 4] | (m[p + 5] << 8) | (m[p + 6] << 16) | (m[p + 7] << 24)) >>> 0;
+    }
+    for (let r = 0; r < 24; r++) {
+      const ch = new Uint32Array(5), cl = new Uint32Array(5);
+      for (let x = 0; x < 5; x++) {
+        ch[x] = hi[x] ^ hi[x + 5] ^ hi[x + 10] ^ hi[x + 15] ^ hi[x + 20];
+        cl[x] = lo[x] ^ lo[x + 5] ^ lo[x + 10] ^ lo[x + 15] ^ lo[x + 20];
+      }
+      for (let x = 0; x < 5; x++) {
+        const [rh, rl] = rotl(ch[(x + 1) % 5], cl[(x + 1) % 5], 1);
+        const dh = ch[(x + 4) % 5] ^ rh, dl = cl[(x + 4) % 5] ^ rl;
+        for (let y = 0; y < 25; y += 5) { hi[x + y] ^= dh; lo[x + y] ^= dl; }
+      }
+      const bh = new Uint32Array(25), bl = new Uint32Array(25);
+      for (let x = 0; x < 5; x++) for (let y = 0; y < 5; y++) {
+        const i = x + 5 * y;
+        const [rh, rl] = rotl(hi[i], lo[i], ROT[i]);
+        const j = y + 5 * ((2 * x + 3 * y) % 5);
+        bh[j] = rh; bl[j] = rl;
+      }
+      for (let x = 0; x < 5; x++) for (let y = 0; y < 5; y++) {
+        const i = x + 5 * y, i1 = (x + 1) % 5 + 5 * y, i2 = (x + 2) % 5 + 5 * y;
+        hi[i] = bh[i] ^ (~bh[i1] & bh[i2]);
+        lo[i] = bl[i] ^ (~bl[i1] & bl[i2]);
+      }
+      hi[0] ^= RC[r][0]; lo[0] ^= RC[r][1];
+    }
+  }
+  const out = new Uint8Array(32);
+  for (let i = 0; i < 4; i++) {
+    for (let b = 0; b < 4; b++) out[8 * i + b] = (lo[i] >>> (8 * b)) & 255;
+    for (let b = 0; b < 4; b++) out[8 * i + 4 + b] = (hi[i] >>> (8 * b)) & 255;
+  }
+  return out;
+}
+const ALFABETO_B58_P2P = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+/* Base58 → byte, o null se c'e' un carattere fuori alfabeto */
+function base58P2P(s){
+  let n = [0];
+  for (const ch of String(s)) {
+    let v = ALFABETO_B58_P2P.indexOf(ch);
+    if (v < 0) return null;
+    for (let i = 0; i < n.length; i++) { v += n[i] * 58; n[i] = v & 255; v >>= 8; }
+    while (v > 0) { n.push(v & 255); v >>= 8; }
+  }
+  for (const ch of String(s)) { if (ch === '1') n.push(0); else break; }
+  return Uint8Array.from(n.reverse());
+}
+/* Tron: 25 byte, il primo 0x41, gli ultimi quattro = i primi quattro
+   del doppio SHA-256 dei ventuno davanti */
+function tronValidoP2P(s){
+  const b = base58P2P(s);
+  if (!b || b.length !== 25 || b[0] !== 0x41) return false;
+  const h = sha256P2P(sha256P2P(b.slice(0, 21)));
+  return h[0] === b[21] && h[1] === b[22] && h[2] === b[23] && h[3] === b[24];
+}
+/* EIP-55: tutto minuscolo o tutto maiuscolo e' un indirizzo SENZA
+   controllo (vale, ma un refuso non si vede); misto deve tornare col
+   Keccak dell'indirizzo in minuscolo, lettera per lettera */
+function eip55P2P(s){
+  const nudo = String(s).slice(2);
+  const basso = nudo.toLowerCase();
+  const h = keccak256P2P(new TextEncoder().encode(basso));
+  let out = '0x';
+  for (let i = 0; i < 40; i++) {
+    const n = (h[i >> 1] >> (i % 2 ? 0 : 4)) & 15;
+    out += n >= 8 ? basso[i].toUpperCase() : basso[i];
+  }
+  return out;
+}
+function evmValidoP2P(s){
+  const nudo = String(s).slice(2);
+  if (nudo === nudo.toLowerCase() || nudo === nudo.toUpperCase()) return true;
+  return eip55P2P(s) === String(s);
+}
+/* PURA: che cos'e' quel che e' stato scritto. {forma, valido} o null.
+   `forma`: 'tron', 'evm', 'bitcoin', 'lightning', 'liquid', 'hash' (un
+   id di transazione, non un indirizzo) */
+function reteIndirizzoP2P(testo){
+  const s = String(testo || '').trim();
+  if (!s) return null;
+  if (/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(s)) return {forma: 'tron', valido: tronValidoP2P(s)};
+  if (/^0x[0-9a-fA-F]{40}$/.test(s)) return {forma: 'evm', valido: evmValidoP2P(s)};
+  if (/^0x[0-9a-fA-F]{64}$/.test(s) || /^[0-9a-fA-F]{64}$/.test(s)) return {forma: 'hash', valido: true};
+  if (/^(?:lightning:)?(?:lnbc|lntb|lntbs|lnbcrt|lnurl)[0-9a-z]+$/i.test(s)
+      || /^[a-z0-9._-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) return {forma: 'lightning', valido: true};
+  if (/^(?:lq1|ex1|tlq1|tex1)[0-9a-z]{20,}$/i.test(s) || /^VJL[1-9A-HJ-NP-Za-km-z]{60,}$/.test(s))
+    return {forma: 'liquid', valido: true};
+  if (/^(?:bitcoin:)?(?:bc1|tb1|bcrt1)[0-9a-z]{8,87}$/i.test(s)
+      || /^[13mn2][1-9A-HJ-NP-Za-km-z]{25,34}$/.test(s)) return {forma: 'bitcoin', valido: true};
+  return null;
+}
+const P2P_NOME_FORMA_USDT = {tron: 'Tron', evm: 'Ethereum o Polygon'};
+/* PURA: il giudice dell'indirizzo USDT di chi riceve, per la rete dello
+   scambio (`r` = una voce di P2P_RETI_USDT). '' = va bene; sennò la
+   frase da dire, che nomina la rete sbagliata e quella giusta. */
+function giudiceIndirizzoUsdtP2P(testo, r){
+  if (!r) return '';
+  const s = String(testo || '').trim();
+  const giusta = r.nome;
+  if (!s) return 'Scrivi il tuo indirizzo USDT su ' + giusta;
+  const contratto = P2P_RETI_USDT.some(x => x.contratto.toLowerCase() === s.toLowerCase());
+  if (contratto)
+    return 'Questo è l\'indirizzo del contratto USDT, non il tuo: copia dal wallet l\'indirizzo dove ricevi';
+  const d = reteIndirizzoP2P(s);
+  if (!d) return 'Questo non sembra un indirizzo USDT su ' + giusta + ': copialo di nuovo dal tuo wallet';
+  if (d.forma === 'bitcoin')
+    return '⚠️ Questo è un indirizzo bitcoin, non USDT: con la rete sbagliata i fondi si perdono. Serve il tuo indirizzo USDT su ' + giusta;
+  if (d.forma === 'lightning')
+    return '⚠️ Questa è una richiesta Lightning, non un indirizzo USDT. Serve il tuo indirizzo USDT su ' + giusta;
+  if (d.forma === 'liquid')
+    return '⚠️ Questo è un indirizzo Liquid: in questo scambio gli USDT viaggiano su ' + giusta + '. Con la rete sbagliata si perdono';
+  if (d.forma === 'hash')
+    return 'Questo sembra l\'id di una transazione, non un indirizzo: serve il tuo indirizzo USDT su ' + giusta;
+  if (d.forma !== r.forma)
+    return '⚠️ Questo è un indirizzo ' + P2P_NOME_FORMA_USDT[d.forma] + ', ma hai scelto ' + giusta
+      + ': con la rete sbagliata gli USDT si perdono. Usa il tuo indirizzo su ' + giusta;
+  if (!d.valido)
+    return 'In questo indirizzo c\'è un carattere sbagliato (il controllo non torna): copialo di nuovo dal tuo wallet';
+  return '';
+}
+/* PURA: il giudice dell'id della transazione che chi paga incolla a
+   «Ho inviato gli USDT». Tron: 64 cifre esadecimali; reti EVM: 0x e 64.
+   '' = va bene. */
+function giudiceTxidUsdtP2P(testo, r){
+  if (!r) return '';
+  const s = String(testo || '').trim();
+  if (!s) return 'Incolla l\'id della transazione: lo trovi nel tuo wallet, nei dettagli dell\'invio';
+  const evm = /^0x[0-9a-fA-F]{64}$/.test(s), tron = /^[0-9a-fA-F]{64}$/.test(s);
+  if (r.forma === 'tron' && evm)
+    return '⚠️ Questo id ha la forma di Ethereum o Polygon, ma lo scambio è su Tron: controlla da che rete hai mandato';
+  if (r.forma === 'evm' && tron)
+    return '⚠️ Questo id ha la forma di Tron, ma lo scambio è su ' + r.nome + ': controlla da che rete hai mandato';
+  if (!(r.forma === 'tron' ? tron : evm))
+    return 'Questo non sembra l\'id di una transazione su ' + r.nome + ': copialo di nuovo dal wallet';
+  return '';
+}
+/* PURA: quel che va nel QR del recapito. Sulle reti EVM l'EIP-681 col
+   contratto, la catena e l'importo in unita' da sei decimali: un wallet
+   che lo capisce sceglie da se' la rete e il token giusti. Su Tron un
+   formato comune non c'e': l'indirizzo e basta (e la rete scritta in
+   grande accanto). */
+function qrUsdtP2P(r, indirizzo, importo){
+  const a = String(indirizzo || '').trim();
+  if (!r || !a) return '';
+  if (r.forma !== 'evm') return a;
+  const n = Math.floor(Number(importo) || 0);
+  return 'ethereum:' + r.contratto + '@' + r.catena + '/transfer?address=' + a
+    + (n > 0 ? '&uint256=' + n + '000000' : '');
+}
 /* ---- IL PERCORSO BARATTOZON (23 set 2026, decisione di Andrea) ----
    La struttura e' quella del bot di riferimento, non i testi: il
    PAYCODE a 9 cifre della mail Amazon «paga in contanti nel punto
@@ -74832,7 +75298,14 @@ function convenienzaFissaP2P(o, metro){
    convenienza col mercato. Preso e senza cambio della presa: 0, e la
    convenienza tace. `o.preso` lo dice chi chiama: dal libro mai. */
 function metroFissoP2P(o){
+  /* IN USDT IL CAMBIO DELLA PRESA NON C'E' (1 nov 2026, cantiere
+     p2p-usdt): quello che il server timbra e' in EURO, e usato su un
+     ordine in USDT direbbe una convenienza falsa. Dopo la presa la
+     convenienza di un ordine in USDT tace — detto, non inventato. */
+  const usdt = typeof usdtP2P === 'function' && usdtP2P(o);
+  if (usdt && o.preso) return 0;
   if (o && o.preso) return Number(o.cambioPresa) > 0 ? Number(o.cambioPresa) / 1e8 : 0;
+  if (usdt) return perSatP2P(o);
   return (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
 }
 /* PURA: il passo del percorso in cui si sta (1 PayCode, 2 importo,
@@ -75818,6 +76291,11 @@ function ripubblicaParacaduteP2P(){
   setLatoP2P(o.lato === 'compro' ? 'compro' : 'vendo', true);
   vaiP2P();
   apriNuovoOrdineP2P();
+  /* la valuta dell'ordine vecchio (1 nov 2026, cantiere p2p-usdt): un
+     ordine in USDT si ripubblica in USDT. La soglia si misura sul prezzo
+     di BTC in euro anche li': e' una percentuale, e il dollaro e l'euro
+     si muovono insieme a meno di un soffio */
+  p2pNuovoValuta = typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : 'EUR';
   p2pNuovoMetodi = c.metodi;
   p2pNuovoEuro = c.euro; p2pNuovoEuroMax = c.euroMax; p2pNuovoDue = !!c.euroMax;
   p2pNuovoFisso = c.fisso; p2pNuovoSats = c.sats; p2pNuovoPremio = c.premio;
@@ -76859,7 +77337,17 @@ function iconaMetodiP2P(metodi){
 /* i metodi che il foglio OFFRE dipendono dal lato (set 2026): il
    tabacchino lo puo' scegliere solo chi vende sats, perche' l'ordine
    Amazon lo genera lui. Nel filtro del libro resta per tutti. */
+/* i metodi del FILTRO del libro: quelli dell'euro, e le reti USDT per
+   chi gli ordini in USDT li vede (1 nov 2026, cantiere p2p-usdt) */
+function metodiFiltroP2P(){
+  return typeof usdtVistoP2P === 'function' && usdtVistoP2P() ? P2P_METODI.concat(P2P_METODI_USDT) : P2P_METODI;
+}
 function metodiPubblicabiliP2P(lato){
+  /* in USDT i metodi sono le RETI (1 nov 2026, cantiere p2p-usdt): uguali
+     per i due lati, e il tabacchino non c'e'. La valuta e' quella del
+     foglio (`valutaFoglioP2P`, mai USDT a rete on-chain) */
+  if (typeof valutaFoglioP2P === 'function' && valutaFoglioP2P() === 'USDT'
+      && typeof P2P_METODI_USDT !== 'undefined') return P2P_METODI_USDT;
   return lato === 'vendo' ? P2P_METODI : P2P_METODI.filter(m => m !== P2P_TABACCHINO);
 }
 /* dal campo <input type="datetime-local"> («2026-09-17T14:30», ora
@@ -76967,6 +77455,16 @@ let p2pNuovoSats = '';
 let p2pNuovoMetodi = [];      // i metodi scelti, nell'ordine del vocabolario
 let p2pNuovoAperta = false;   // la tendina dei metodi e' aperta
 let p2pNuovoValuta = 'EUR';  // la valuta scelta nel foglio-picker di casa
+/* LA VALUTA DEL FOGLIO CHE VALE (1 nov 2026, cantiere p2p-usdt): quella
+   scelta, se chi guarda la puo' usare adesso — l'USDT a chi lo vede e
+   mai a rete on-chain; sennò l'euro. Tutti i pezzi del foglio la
+   chiedono qui e non alla variabile: una leva spenta a foglio aperto,
+   o l'interruttore passato a on-chain, non lascia un USDT appeso. */
+function valutaFoglioP2P(){
+  const oc = typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc;
+  const viste = typeof valuteVisibiliP2P === 'function' ? valuteVisibiliP2P(oc) : P2P_VALUTE.slice(0, 1);
+  return viste.some(v => v.cod === p2pNuovoValuta) ? p2pNuovoValuta : P2P_VALUTA;
+}
 let p2pNuovoDue = false;     // il secondo campo dell'importo si e' fatto vedere
 let p2pNuovoFisso = false;    // true = prezzo fisso in sats | false = prezzo di mercato
 let p2pNuovoPremio = 0;       // il premio in percento, quando e' a mercato
@@ -77828,9 +78326,14 @@ function valeNuovoOrdineP2P(v){
      vedere. Sta qui e non nell'avviso perche' la frase e il campo
      sono la stessa decisione — separati, il giorno che si aggiunge un
      controllo nuovo la frase arriva e il campo no, in silenzio. */
+  /* la valuta dell'ordine (1 nov 2026, cantiere p2p-usdt): le frasi la
+     dicono, e di serie e' l'euro di sempre */
+  const inUsdt = String(v.valuta || '').toUpperCase() === 'USDT';
+  const segno = inUsdt ? 'USDT' : '€';
+  const retiUsdt = typeof P2P_METODI_USDT !== 'undefined' ? P2P_METODI_USDT : [];
   if (!(euro > 0))
     return {ok: false, manca: tab ? 'Scrivi l\'importo dell\'ordine Amazon, coi centesimi se servono'
-                                  : 'Scrivi l\'importo in euro', campo: 'p2pNuovoEuro'};
+                                  : inUsdt ? 'Scrivi l\'importo in USDT' : 'Scrivi l\'importo in euro', campo: 'p2pNuovoEuro'};
   if (!x.vuoto && !(max > euro))
     return {ok: false, manca: 'L\'importo massimo deve superare il primo',
             campo: 'p2pNuovoEuroMax'};
@@ -77842,11 +78345,23 @@ function valeNuovoOrdineP2P(v){
      ma sfora i sats si ferma comunque al controllo dei sats. */
   const tettoEuro = Math.floor(Number(v.maxEuro)) || 0;
   if (tettoEuro > 0 && euro > tettoEuro)
-    return {ok: false, manca: 'Troppi: il massimo è ' + fmt(tettoEuro) + ' €',
+    return {ok: false, manca: 'Troppi: il massimo è ' + fmt(tettoEuro) + ' ' + segno,
             campo: 'p2pNuovoEuro'};
   if (tettoEuro > 0 && max > tettoEuro)
-    return {ok: false, manca: 'Troppi: il massimo è ' + fmt(tettoEuro) + ' €',
+    return {ok: false, manca: 'Troppi: il massimo è ' + fmt(tettoEuro) + ' ' + segno,
             campo: 'p2pNuovoEuroMax'};
+  /* IN USDT I METODI SONO LE RETI (1 nov 2026): un metodo dell'euro in un
+     ordine in USDT — o una rete USDT in un ordine in euro — direbbe a chi
+     prende di pagare in un modo che l'ordine non conosce */
+  if (inUsdt && (v.metodi || []).some(m => retiUsdt.indexOf(m) < 0))
+    return {ok: false, manca: 'In USDT si sceglie la rete: Tron, Polygon o Ethereum',
+            campo: 'p2pNuovoMetodiBtn'};
+  if (!inUsdt && (v.metodi || []).some(m => retiUsdt.indexOf(m) >= 0))
+    return {ok: false, manca: 'Le reti USDT valgono solo per un ordine in USDT',
+            campo: 'p2pNuovoMetodiBtn'};
+  if (inUsdt && v.oc)
+    return {ok: false, manca: 'Gli scambi on-chain sono solo in euro',
+            campo: 'p2pNuovoEuro'};
   /* IL TETTO DEL CONTANTI DI PERSONA (30 set 2026): la leva
      P2P_CONTANTI_MAX_EURO, per il solo metodo «Contanti», SOTTO quello
      generale — con piu' metodi e «Contanti» fra questi vale lo stesso,
@@ -78009,8 +78524,12 @@ function campiNuovoP2P(){
     maxSats: (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) ? 0 : (p2pInfo && p2pInfo.maxSats) || 0,
     minSats: (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) ? (p2pOnchainLibro.minSats || 0)
       : (p2pInfo && p2pInfo.minSats) || 0,
-    /* il tetto in euro di Barattolo, dalla busta delle leve: 0 = spento */
-    maxEuro: maxEuroP2P(),
+    /* la valuta del foglio (1 nov 2026, cantiere p2p-usdt): EUR o USDT */
+    valuta: typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR',
+    /* il tetto di Barattolo, dalla busta delle leve: 0 = spento. In euro, o
+       tradotto in USDT al cambio di adesso (`tettoValutaP2P`) */
+    maxEuro: typeof tettoValutaP2P === 'function'
+      ? tettoValutaP2P(typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR') : maxEuroP2P(),
     /* il minimo di Barattozon (30 set 2026), dalla stessa busta: 0 = spento */
     minEuroBz: minEuroBzP2P(),
     /* ...e quello del contanti di persona (30 set 2026), stessa busta */
@@ -78074,7 +78593,9 @@ function ordineDaCampiP2P(v, lato){
     /* 0 = al prezzo di mercato col premio; a prezzo fisso e' la
        quantita' scritta, e allora il premio scende a zero qui sotto */
     amount: satsFissi,
-    fiat_code: 'EUR',
+    /* la valuta del foglio (1 nov 2026, cantiere p2p-usdt): «USDT» solo
+       quando e' scelta, e qualunque altra cosa resta l'euro di sempre */
+    fiat_code: String(v.valuta || '').toUpperCase() === 'USDT' ? 'USDT' : 'EUR',
     min_amount: range ? euro : null,
     max_amount: range ? euroMax : null,
     fiat_amount: range ? 0 : euro,
@@ -78126,7 +78647,9 @@ function ordineDaRigaP2P(o){
        i sats si RIFANNO al cambio di adesso — e' un ordine nuovo */
     scade: o.scade || 0,
     adesso: Math.floor(Date.now() / 1000),
-    cambio: (cambioVivo && eurPerSat > 0) ? eurPerSat : 0
+    cambio: (cambioVivo && eurPerSat > 0) ? eurPerSat : 0,
+    /* la valuta della riga (1 nov 2026): un ordine in USDT si ripubblica in USDT */
+    valuta: o.fiat || 'EUR'
   }, o.lato);
 }
 /* IL TETTO SOTTO IL CAMPO (17 set 2026, ritocco di Andrea): la
@@ -78168,13 +78691,16 @@ function maxEuroP2P(){
 }
 /* ...e lo stesso tetto quando si PRENDE un ordine dal collaudo: la frase,
    o '' quando non c'è niente da dire (in produzione, sempre). */
-function giudiceTettoProvaP2P(euro){
+function giudiceTettoProvaP2P(euro, cod){
   const c = p2pCoord();
   const sats = c ? Math.floor(Number(c.maxSatsProva)) || 0 : 0;
   if (!(sats > 0)) return '';
-  const max = maxEuroP2P();
+  /* un ordine in USDT si misura in USDT (1 nov 2026, cantiere p2p-usdt):
+     lo stesso tetto tradotto da `tettoValutaP2P`, come al pubblicare */
+  const usdt = String(cod || '').toUpperCase() === 'USDT' && typeof tettoValutaP2P === 'function';
+  const max = usdt ? tettoValutaP2P('USDT') : maxEuroP2P();
   return euro > max ? 'Sul collaudo il massimo è ' + fmt(sats) + ' sats (circa '
-                      + fmt(max) + ' €)' : '';
+                      + fmt(max) + (usdt ? ' USDT)' : ' €)') : '';
 }
 /* IL TETTO DEL CONTANTI DI PERSONA (30 set 2026): la gemella, in busta
    come `maxEuroContanti` — 250 di serie sul server, 0 = spenta. Vale
@@ -78192,7 +78718,11 @@ function maxEuroContantiP2P(){
    Il riepilogo in fondo (rigaTettoFeeP2P) li dice invece TUTT'E DUE
    quando ci sono tutt'e due: la' c'e' lo spazio per la frase intera. */
 function maxTestoP2P(){
-  const eur = maxEuroP2P();
+  /* nella valuta del foglio (1 nov 2026, cantiere p2p-usdt): lo stesso
+     tetto, in USDT al cambio di adesso */
+  const cod = typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR';
+  const eur = typeof tettoValutaP2P === 'function' ? tettoValutaP2P(cod) : maxEuroP2P();
+  if (eur > 0 && cod === 'USDT') return fmt(eur) + ' USDT';
   if (eur > 0) return fmt(eur) + ' €';
   return maxSatsTestoP2P();
 }
@@ -78217,15 +78747,18 @@ function rigaTettoFeeP2P(){
      campo: due letture dello stesso numero si scollano, e a scoprirlo
      sarebbe chi legge due cifre diverse nello stesso foglio */
   const tetto = maxSatsTestoP2P();
-  const tettoEur = maxEuroP2P();
+  /* nella valuta del foglio (1 nov 2026, cantiere p2p-usdt) */
+  const codT = typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR';
+  const tettoEur = typeof tettoValutaP2P === 'function' ? tettoValutaP2P(codT) : maxEuroP2P();
+  const segT = codT === 'USDT' ? ' USDT' : ' €';
   /* con TUTT'E DUE i tetti si dicono tutt'e due: quello in euro e'
      la regola di Barattolo, quello in sats resta valido sotto —
      tacerne uno lo farebbe scoprire al momento del rifiuto */
   if (tettoEur > 0 && tetto)
     pezzi.push('al momento si accettano ordini fino a ' + fmt(tettoEur)
-               + ' € (e mai oltre ' + tetto + ')');
+               + segT + ' (e mai oltre ' + tetto + ')');
   else if (tettoEur > 0)
-    pezzi.push('al momento si accettano ordini fino a ' + fmt(tettoEur) + ' €');
+    pezzi.push('al momento si accettano ordini fino a ' + fmt(tettoEur) + segT);
   else if (tetto)
     pezzi.push('al momento si accettano ordini fino a ' + tetto);
   const fee = feeMiaP2P(null);
@@ -78385,7 +78918,7 @@ function renderNuovoOrdineP2P(){
      ammesso all'on-chain, e nel banco del motore non c'e' */
   const rete = el('p2pNuovoRete');
   if (rete) rete.innerHTML = typeof interruttoreReteP2P === 'function' ? interruttoreReteP2P(oc ? 'onchain' : 'ln', tab) : '';
-  const val = P2P_VALUTE.find(v => v.cod === p2pNuovoValuta) || P2P_VALUTE[0];
+  const val = P2P_VALUTE.find(v => v.cod === (typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR')) || P2P_VALUTE[0];
   const scelti = p2pNuovoMetodi.length
     ? p2pNuovoMetodi.join(', ') : 'Seleziona metodi di pagamento';
 
@@ -79902,7 +80435,7 @@ function confermaPayCodeTabP2P(){
   if (p2pPayCodeTrigger) { try { p2pPayCodeTrigger.focus({preventScroll: true}); } catch(e){} p2pPayCodeTrigger = null; }
 }
 function segnoValutaTabP2P(){
-  return (P2P_VALUTE.find(v => v.cod === p2pNuovoValuta) || P2P_VALUTE[0]).segno;
+  return (P2P_VALUTE.find(v => v.cod === (typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR')) || P2P_VALUTE[0]).segno;
 }
 function apriEuroTabP2P(modo){
   haptic();
@@ -80038,7 +80571,10 @@ function scegliMetodoP2P(m){
     p2pNuovoDue = false;
   }
   else {
-    p2pNuovoMetodi = P2P_METODI.filter(x =>
+    /* (1 nov 2026, cantiere p2p-usdt) dal catalogo della valuta del
+       foglio: in USDT le reti, in euro i metodi di sempre */
+    const catalogo = typeof valutaFoglioP2P === 'function' && typeof metodiValutaP2P === 'function' ? metodiValutaP2P(valutaFoglioP2P()) : P2P_METODI;
+    p2pNuovoMetodi = catalogo.filter(x =>
       x !== P2P_TABACCHINO && (x === m || p2pNuovoMetodi.indexOf(x) >= 0));
   }
   /* L'IMPORTO DAVANTI AL METODO NUOVO (23 set 2026): resta se vale, e
@@ -80191,8 +80727,9 @@ function apriValutaP2P(){
   haptic();
   pickerTrigger = el('p2pNuovoValutaBtn');
   el('pickerTitolo').textContent = 'Valuta';
-  el('pickerLista').innerHTML = P2P_VALUTE.map(v => {
-    const mia = v.cod === p2pNuovoValuta;
+  const oc = typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc;
+  el('pickerLista').innerHTML = valuteVisibiliP2P(oc).map(v => {
+    const mia = v.cod === valutaFoglioP2P();
     return '<button type="button" role="radio" aria-checked="' + (mia ? 'true' : 'false') +
       '" class="picker-voce' + (mia ? ' sel' : '') + '" data-val="' + esc(v.cod) +
       '" onclick="scegliValutaP2P(this.dataset.val)">' +
@@ -80205,8 +80742,13 @@ function apriValutaP2P(){
   if (sel) sel.focus();
 }
 function scegliValutaP2P(cod){
-  if (!P2P_VALUTE.some(v => v.cod === cod)) return;
+  const oc = typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc;
+  if (!valuteVisibiliP2P(oc).some(v => v.cod === cod)) return;
+  /* (1 nov 2026, cantiere p2p-usdt) i metodi dell'altra valuta se ne
+     vanno: le reti USDT non valgono per l'euro, e viceversa */
+  const cambia = cod !== p2pNuovoValuta;
   p2pNuovoValuta = cod;
+  if (cambia) p2pNuovoMetodi = p2pNuovoMetodi.filter(m => metodiPubblicabiliP2P(p2pLato).indexOf(m) >= 0);
   haptic();
   chiudiPicker();
   renderNuovoOrdineP2P();
@@ -80387,7 +80929,9 @@ async function inviaNuovoOrdineP2P(confermato){
         riga, mai sul filo. Il libro rileggeva i sats e diceva, giusto,
         «al prezzo di mercato». */
      premioTab: campi.premioTab,
-     scade: campi.scade, adesso: campi.adesso, cambio: campi.cambio}, lato);
+     scade: campi.scade, adesso: campi.adesso, cambio: campi.cambio,
+     /* la valuta del foglio (1 nov 2026, cantiere p2p-usdt) */
+     valuta: campi.valuta}, lato);
   /* i centesimi del tabacchino: sulla riga e nel canale sta l'esatto,
      sul filo l'intero (22 set 2026) */
   const esattoTab = campi.scade > 0 ? centesimiP2P(campi.euro).n : 0;
@@ -80402,6 +80946,8 @@ async function inviaNuovoOrdineP2P(confermato){
     euro: ordine.max_amount ? ordine.min_amount : ordine.fiat_amount,
     euroMax: ordine.max_amount || 0,
     sats: ordine.amount, satsNetti: 0, importoScelto: 0,
+    /* la valuta che e' partita (1 nov 2026): la riga la porta come il libro */
+    fiat: ordine.fiat_code,
     metodi: metodi, premium: ordine.premium, peer: '',
     hold: null, contattato: false, cantDo: '', errore: '', votabile: false,
     creato: adesso, aggiornato: adesso
@@ -81255,6 +81801,22 @@ function bloccoModeratoreP2P(o){
       come gli scambi: un IBAN non passa MAI dal server di Barattolo. */
 const RECAPITI_CHIAVE = 'barattolo_p2p_recapiti';
 const P2P_FORME_RECAPITO = [
+  /* GLI USDT (1 nov 2026, cantiere p2p-usdt): una forma per RETE, e non
+     una per tutte, apposta — il ricordo vive per forma, e un indirizzo
+     Tron ricordato non deve precompilare il campo di uno scambio su
+     Polygon (il giudice lo fermerebbe, ma e' meglio non offrirlo). Il
+     testo che parte dice la rete PRIMA dell'indirizzo, e la prima riga
+     senza cifre e' il titolo del riquadro di chi paga: l'avviso della
+     rete e' la cosa che si legge per prima. Il giudice e'
+     `giudiceIndirizzoUsdtP2P`, chiamato dall'invio (`fr.usdt`). */
+  ...(typeof P2P_RETI_USDT !== 'undefined' ? P2P_RETI_USDT : []).map(r => ({forma: 'usdt-' + r.rete, usdt: r,
+    riconosce: new RegExp('^' + r.metodo.replace(/[()]/g, '\\$&') + '$', 'i'),
+    campi: [{k: 'indirizzo', et: 'Il tuo indirizzo USDT su ' + r.nome + ' (' + r.standard + ')',
+             ph: r.forma === 'tron' ? 'T… (34 caratteri)' : '0x… (42 caratteri)', max: 80}],
+    componi: c => '⚠️ Manda solo su ' + r.nome + ', mai su un\'altra rete'
+      + '\nRete: ' + r.nome + ' (' + r.standard + ')'
+      + '\nIndirizzo: ' + c.indirizzo
+      + '\nContratto USDT: ' + r.contratto})),
   /* LA CAUSALE (9 ott 2026, richiesta di Andrea): facoltativa, al piu'
      140 caratteri — il limite del bonifico SEPA — e solo i caratteri che
      il circuito accetta (`giudiceCausaleSepaP2P`, chiamato dall'invio
@@ -81925,7 +82487,7 @@ function renderCampiP2P(){
     const deciso = metodoSceltoP2P(o);
     parteEuro =
       (metodi.length > 1 && !deciso
-        ? '<div class="field"><label>Con quale metodo ricevi gli euro</label>' +
+        ? '<div class="field"><label>' + ((typeof usdtP2P === 'function' && usdtP2P(o)) ? 'Su quale rete ricevi gli USDT' : 'Con quale metodo ricevi gli euro') + '</label>' +
           '<div class="p2p-metodi">' + metodi.map(m =>
             '<button type="button" class="tema-pill'
             + (m === scelto ? ' active' : '')
@@ -81935,6 +82497,8 @@ function renderCampiP2P(){
         : (scelto ? '<div class="hint">💶 Il metodo dello scambio è <b>'
                     + marchioMetodoP2P(scelto) + '</b>.</div>' : '')) +
       fr.campi.map(campoRecapitoP2P).join('') +
+      /* la rete detta sotto il campo (1 nov 2026, cantiere p2p-usdt) */
+      (fr.usdt ? '<div class="hint">' + esc(notaReteUsdtP2P(fr.usdt)) + '</div>' : '') +
       (fr.appuntamento
         ? '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">📍 ' +
           (miei.euro ? 'Aggiorna l\'appuntamento' : 'Invia a chi compra') + '</button>' +
@@ -81962,6 +82526,7 @@ function renderCampiP2P(){
            riquadro, col titolo del contanti di persona dove serve */
         ? riquadroRecapitoP2P(loro.euro.testo,
             typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o) ? '📍 Dove vedervi' : '')
+        : (typeof usdtP2P === 'function' && usdtP2P(o)) ? '<div class="hint">💵 Chi vende non ha ancora detto dove ricevere gli USDT: appena lo fa lo leggi qui.</div>'
         : '<div class="hint">💶 Chi vende non ha ancora detto dove ricevere gli euro: appena lo fa lo leggi qui.</div>')
       : '') +
     /* ⚠️ IL CAMPO DEL PROPRIO RECAPITO NON C'E' PIU' (17 set 2026):
@@ -82039,6 +82604,15 @@ async function inviaCampoP2P(tipo, btn){
       const no = giudiceQuandoP2P(quandoDaCampoP2P(campi.quando), Math.floor(Date.now() / 1000));
       /* il fuoco va sulla riga del selettore: il deposito e' nascosto (12 ott 2026) */
       if (no) { toast(no); (el('p2pCampoEuro_quando_btn') || el('p2pCampoEuro_quando'))?.focus(); return; }
+    }
+    /* L'INDIRIZZO USDT SULLA RETE GIUSTA (1 nov 2026, cantiere p2p-usdt,
+       richiesta di Andrea: «come negli exchange»): un indirizzo di
+       un'altra rete, o bitcoin, o Lightning, non parte — la frase dice
+       quale rete e' e quale serve */
+    if (fr.usdt) {
+      campi.indirizzo = String(campi.indirizzo || '').replace(/\s+/g, '');
+      const no = giudiceIndirizzoUsdtP2P(campi.indirizzo, fr.usdt);
+      if (no) { toast(no, 7000); el('p2pCampoEuro_indirizzo')?.focus(); return; }
     }
     /* controllo LEGGERO, sulla sagoma e non sul contenuto: due lettere
        di paese, due cifre, e una lunghezza da IBAN */
@@ -92041,6 +92615,8 @@ async function avvia(){
     myOnchainRete = me.onchain_rete || '';
     /* ...e gli scambi P2P con la garanzia 2-di-3 (30 ott 2026) */
     myP2POnchain = !!me.p2p_onchain;
+    /* ...e gli ordini in USDT (1 nov 2026) */
+    myP2PUsdt = !!me.p2p_usdt;
     myOnchainIncasso = me.onchain_incasso || '';
     myOnchainLn = me.onchain_ln || {attivo: false};
     /* le co-firme on-chain che aspettano me partono da sole (tappa 3) */
