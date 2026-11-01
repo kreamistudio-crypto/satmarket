@@ -87129,6 +87129,17 @@ function apriChiaveModP2P(modo){
    si OFFRE di salvare la password con un'etichetta parlante */
 const MOD_CAMPO_UTENTE = '<input type="text" name="username" value="barattolo-chiave-di-moderatore" autocomplete="username" '
   + 'readonly tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px">';
+/* IL FILE DELLA CHIAVE SUL TELEFONO NON ARRIVA (1 nov 2026, la stessa
+   causa del PDF degli ordini, cantiere allegati-android): dentro
+   Telegram su Android e iPhone il `<a download>` su un `blob:` non salva
+   niente, e «File scaricato» mentiva. La cura del PDF (la app scarica un
+   URL del server) qui NON si fa, ed e' voluto: la chiave non passa MAI
+   dal server, nemmeno cifrata (ARCHITETTURA, «LA COPIA DELLA CHIAVE»).
+   Quindi sul telefono dentro Telegram il bottone del file non si offre:
+   resta «Copia», che li' funziona. Dal PC e dal browser il file c'e'. */
+function chiaveSoloDaCopiare(){
+  return !!(tg?.initData && ['android', 'android_x', 'ios'].includes(tg.platform));
+}
 function renderChiaveModP2P(){
   const box = el('modChiaveCorpo');
   if (!box || !modChiaveModo) return;
@@ -87143,8 +87154,11 @@ function renderChiaveModP2P(){
         + 'mai nello stesso messaggio.</div>'
         + '<textarea class="mod-cifrata" id="modChiaveTesto" readonly rows="5" spellcheck="false" aria-label="La chiave cifrata"></textarea>'
         + '<button class="btn orange" onclick="copiaChiaveCifrataModP2P()">📋 Copia la chiave cifrata</button>'
-        + '<button class="btn ghost" onclick="scaricaChiaveCifrataModP2P()">💾 Scarica come file</button>'
-        + '<div class="hint">Dentro Telegram il file può non scaricarsi: in quel caso copia il testo.</div>';
+        + (chiaveSoloDaCopiare()
+          ? '<div class="hint">Dentro Telegram sul telefono il file non si salva: copia il testo. '
+            + 'Dal computer puoi anche scaricarlo come file.</div>'
+          : '<button class="btn ghost" onclick="scaricaChiaveCifrataModP2P()">💾 Scarica come file</button>'
+            + '<div class="hint">Dentro Telegram il file può non scaricarsi: in quel caso copia il testo.</div>');
       /* il testo entra col .value: mai dentro un template */
       el('modChiaveTesto').value = modChiaveCifrata;
       return;

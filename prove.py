@@ -144190,6 +144190,7 @@ const out = {};
 const diario = [];
 for (const m of ['log', 'warn', 'error', 'info']) console[m] = (...a) => diario.push(a.map(String).join(' '));
 let DEMO = false, VETRINA = false, isAdmin = true, myTgId = 999;
+let tg = null;   // fuori da Telegram, come il browser
 const API_BASE = '/api';
 function authHdr(){ return 'collaudo'; }
 let toasts = []; function toast(m){ toasts.push(String(m)); }
@@ -144266,6 +144267,18 @@ __PEZZI__
   scaricaChiaveCifrataModP2P();
   out.copiaEFile = {copiato: copiati[0] === cifrata, nome: anchors[0] && anchors[0].download,
                     contenuto: anchors[0] && anchors[0].href === 'blob:' + cifrata + '\n'};
+  // il file si offre solo dove si salva davvero (1 nov 2026): dentro
+  // Telegram sul telefono il blob non arriva, e la chiave non passa
+  // dal server — quindi li' solo «Copia»
+  out.fileOfferto = {};
+  for (const [nome, t] of [['browser', null], ['android', {initData: 'x', platform: 'android'}],
+                           ['ios', {initData: 'x', platform: 'ios'}],
+                           ['desktop', {initData: 'x', platform: 'tdesktop'}]]) {
+    tg = t; renderChiaveModP2P();
+    const h = el('modChiaveCorpo').innerHTML;
+    out.fileOfferto[nome] = [h.includes('scaricaChiaveCifrataModP2P()'), h.includes('copiaChiaveCifrataModP2P()')];
+  }
+  tg = null; renderChiaveModP2P();
   pulisciChiaveModP2P();
   out.pulito = [modChiaveCifrata, el('modChiaveCorpo').innerHTML, modChiaveModo];
 
@@ -144491,6 +144504,10 @@ def prove_chiave_moderatore_portatile():
     prova("...si copia intera e si scarica con quel nome e quel contenuto", [True, True, True],
           [o["copiaEFile"]["copiato"], str(o["copiaEFile"]["nome"]).startswith("barattolo-moderatore-npub1")
            and str(o["copiaEFile"]["nome"]).endswith(".ncryptsec.txt"), o["copiaEFile"]["contenuto"]])
+    prova("il file della chiave si offre solo dove si salva: non dentro Telegram sul telefono, "
+          "e «Copia» c'e' sempre",
+          {"browser": [True, True], "android": [False, True], "ios": [False, True],
+           "desktop": [True, True]}, o.get("fileOfferto"))
     prova("...e la pulizia del foglio non lascia niente", ["", "", ""], o["pulito"])
     u = o["importaUguale"]
     prova("IMPORTA su un dispositivo vuoto la chiave registrata: nessuna domanda, nessun fetch, chiave scritta (maiuscole e a capo tollerati)",

@@ -31620,6 +31620,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   rotta della creazione) SOLO se quella registrata è un'altra, e la
   scrittura sul dispositivo viene DOPO, come alla creazione. Il server
   non vede né la chiave né la password: le funzioni non hanno `fetch`.
+  SUL TELEFONO SOLO «COPIA» (1 nov 2026, cantiere chiave-mod-telefono):
+  dentro Telegram su Android e iPhone (`chiaveSoloDaCopiare()`, cioè
+  initData vero e `tg.platform` android, android_x o ios) il bottone
+  «💾 Scarica come file» non si offre, perché il `<a download>` su un
+  `blob:` lì non salva niente (la causa del PDF degli ordini, cantiere
+  allegati-android). La cura del PDF (la app scarica un URL del server)
+  qui NON si usa: la chiave non passerebbe più solo dal dispositivo.
+  Dal PC, da Telegram Desktop e dal browser il file resta.
   IL BUNDLE: `nip49` è il sesto export di `/vendor/nostr.js`
   (`?v=2.23.12-mostro3`, SW `barattolo-v10`), ma non è un export di
   codice che c'era già — è un INNESTO in fondo al file, scritto da

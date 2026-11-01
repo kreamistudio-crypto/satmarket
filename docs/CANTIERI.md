@@ -76629,3 +76629,37 @@ sul collaudo da un Android (meglio GrapheneOS) e da un iPhone, con un
 ordine digitale con PDF e un documento di ritiro in PDF. Telegram
 sotto la 8.0 resta sulla strada vecchia (`<a download>`).
 
+
+## Il file della chiave del moderatore sul telefono: solo «Copia» (1 nov 2026, cantiere chiave-mod-telefono)
+
+NOTATO nel cantiere allegati-android e chiesto da Andrea («ok anche
+ncryptsec»). Il bottone «💾 Scarica come file» della chiave di
+moderatore cifrata (NIP-49) fa lo stesso `<a download>` su un `blob:`
+che dentro Telegram Android non salva niente, e il toast «File
+scaricato» mentiva come quello del PDF.
+
+LA DECISIONE. La cura del PDF (biglietto del server e `tg.downloadFile`)
+qui vorrebbe dire far passare la chiave dal server, anche se cifrata e
+per 5 minuti, e rovesciare «il server non vede né la chiave né la
+password» (1 ott 2026, «Esporta / importa la chiave di moderatore»).
+Quindi dentro Telegram sul telefono (Android e iPhone) il bottone del
+file non c'è più, e al suo posto una riga dice di copiare il testo e
+che dal computer il file si può scaricare. «Copia» c'era già e lì
+funziona. Raccomandata ad Andrea con una scelta a tre; il lavoro è
+partito sulla raccomandata.
+
+STRADE SCARTATE. Il biglietto del server (la regola del 1 ott). La
+condivisione col `navigator.share` di un File: la WebView di Telegram
+non la offre. Lasciare il bottone con un avviso: è il bottone che
+finge.
+
+PROVE. Nel banco node di `prove_chiave_moderatore_portatile` il foglio
+si disegna in quattro posti (browser, Telegram Android, iPhone,
+Desktop): il file si offre solo nel browser e su Desktop, «Copia» c'è
+sempre. Controprove rosse: file sempre offerto, file mai offerto,
+iPhone dimenticato.
+
+COSA RESTA DA GUARDARE. iPhone è dentro per prudenza: che il `blob:`
+non si salvi dentro Telegram iOS NON è provato, è dedotto dal
+WKWebView. Non provato su telefono vero.
+
