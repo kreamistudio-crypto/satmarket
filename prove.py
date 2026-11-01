@@ -44465,11 +44465,16 @@ def prove_fogli_di_casa():
     # dove si riceve on-chain, nel Profilo (Andrea e Alan durante la prova)
     # CENTOTRE (1 nov 2026, p2p-usdt): «Hai inviato gli USDT?», la conferma
     # col suo id della transazione (`usdtInviatiP2P`)
-    prova("i gesti che passano dalla domanda unica sono centotre (dal 30 ott "
+    # CENTOQUATTRO (1 nov 2026, cantiere presa-altra-rete tappa 2): «Hai
+    # ricevuto gli euro?» quando chi compra vuole i sats in Lightning
+    # (`liberaOnchainP2P` → `euroRicevutiOnchainP2P`): chi vende conferma
+    # gli euro e NON firma, perché la firma la mette chi fa il cambio.
+    prova("i gesti che passano dalla domanda unica sono centoquattro (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
-          "dal 1 nov «Hai inviato gli USDT?»)",
-          103, solo_codice(mini).count("chiediConferma({"))
+          "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
+          "cambio in Lightning)",
+          104, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -153558,7 +153563,10 @@ def prove_p2p_onchain():
     prova("la seconda firma: mai chi ha proposto, solo chi riceve quell'uscita, "
           "stesso txid", (True, True, True),
           ('if int(o["proposta_da"] or 0) == int(user["id"]):' in pezzo("p2p_onchain_firma"),
-           'if o["proposta_verso"] != ruolo:' in pezzo("p2p_onchain_firma"),
+           # EMENDATA (1 nov 2026, presa-altra-rete): l'unica eccezione e' il
+           # cambio in Lightning di chi compra, che chi vende co-firma dopo
+           # la sua conferma firmata (collaudo_cambio_onchain_p2p)
+           'if o["proposta_verso"] != ruolo and not cambio:' in pezzo("p2p_onchain_firma"),
            "if atteso != arrivato:" in pezzo("p2p_onchain_firma")))
     prova("i ruoli: chi deposita (vende bitcoin) e' il «compratore» del 2-di-3, "
           "e l'indirizzo nasce con lui per primo", (True, True),
@@ -153610,7 +153618,10 @@ def prove_p2p_onchain():
            "VISTE_NAV_P2P.add('p2ponchain');" in mini,
            "+ onchainCarte\n    + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')" in mini))
     # il giudice della firma che aspetta me, in node
-    banco = pezzo_js(mini, "function daFirmareOnchainP2P(o){", "\n}\n") + "\n}\n" + """
+    # (EMENDATA 1 nov 2026, presa-altra-rete: il giudice chiama anche quello
+    # del cambio di chi compra, che entra nel banco con lui)
+    banco = pezzo_js(mini, "function daFirmareOnchainP2P(o){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function cambioDaFirmareOnchainP2P(o){", "\n}\n") + "\n}\n" + """
 const casi = [
   [{proposta: {mia: false, verso: 'venditore'}, ruolo: 'venditore', stato: 'euro_inviati'}, true],
   [{proposta: {mia: true, verso: 'venditore'}, ruolo: 'venditore', stato: 'euro_inviati'}, false],
@@ -153709,6 +153720,7 @@ console.log(JSON.stringify(casi.map(depositoVistoOnchainP2P)));
     banco = ("const P2P_ONCHAIN_VIVI = new Set(['pending', 'preso', 'depositato', 'euro_inviati', 'disputa']);\n"
              + "".join(pz(f) for f in (
                  "function depositoVistoOnchainP2P(o){", "function daFirmareOnchainP2P(o){",
+                 "function cambioDaFirmareOnchainP2P(o){",   # (1 nov 2026, presa-altra-rete)
                  "function toccaAMeOnchainP2P(o){", "function gruppoOnchainP2P(o){",
                  "function statoOnchainCardP2P(o){", "function tintaOnchainP2P(o){",
                  "function segnoReteCardP2P(rete){", "function pagaReteCardP2P(paga, rete){",
@@ -154334,7 +154346,9 @@ const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n), hapti
 const disegnaQr = (nodo, testo, modo) => QR.push([testo, modo]);
 const onchainRete = () => ({prova: true, nome: 'signet'});
 const daFirmareOnchainP2P = () => false;
+const cambioDaFirmareOnchainP2P = () => false;
 const incassoMancanteOnchainP2P = () => '';
+const incassoLnOnchainP2P = () => '';
 let p2pOnchainMiei = [];
 """ + pezzo_js(mini, "const P2P_ONCHAIN_VIVI = ", ";\n") + ";\n" \
         + pezzo_js(mini, "const P2P_ONCHAIN_STATI = {", "};\n") + "};\n" \
@@ -182700,8 +182714,127 @@ def prove_cambio_p2p():
           and "box.innerHTML = intro + sceltaRete + corpoCambioIncassoP2P(o, netto);" in rend
           and "box.innerHTML = intro + sceltaRete +\n    vie +" in rend)
     prova("la lista della pagina «Cambio» lo chiama «Scambio P2P»", (1, 1, 1),
-          (js.count("rec.p2p ? t.scambioP2P"), js.count("scambioP2P: 'Scambio P2P'"),
+          (js.count("rec.p2p || rec.p2pOnchain ? t.scambioP2P"), js.count("scambioP2P: 'Scambio P2P'"),
            js.count("scambioP2P: 'P2P trade'")))
+
+
+def prove_cambio_onchain_p2p():
+    """CHI COMPRA BITCOIN SU UNO SCAMBIO P2P ON-CHAIN RICEVE IN LIGHTNING,
+    TAPPA 2 (1 nov 2026, cantiere presa-altra-rete). Il calco del cambio
+    del mercatino del 28 ott: chi compra sceglie «⚡ Lightning», chi vende
+    conferma gli euro FIRMANDO col seme, chi compra fa il cambio e mette la
+    prima firma verso il cambio, il telefono di chi vende la seconda da
+    solo; prima di trasmettere il server chiede se il cambio e' vivo; in
+    disputa il cambio se ne va. Il giro vero, server e telefono contro il
+    cartone, e' `collaudo_cambio_onchain_p2p`; qui le sentinelle."""
+    print("\n[scambio P2P on-chain: chi compra riceve in Lightning]")
+    import subprocess
+    src = _SORGENTE.replace("\r\n", "\n")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    js = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read().replace("\r\n", "\n")
+    porta = pezzo("p2p_onchain_ln_per")
+    prova("il cancello: la leva della presa sull'altra rete, lo scambio on-chain, la "
+          "strada bitcoin → Lightning e le reti giuste", (True, True, True, True),
+          ("p2p_altra_rete_per(tg_id)" in porta, "p2p_onchain_ammesso(tg_id)" in porta,
+           '"btc-ln" in cambio_strade()' in porta, "onchain_ln_rete_ok()" in porta))
+    for rotta in ('@app.post("/api/p2p/onchain/{oid}/ricevi-lightning")',
+                  '@app.post("/api/p2p/onchain/{oid}/euro-ricevuti")',
+                  '@app.get("/api/p2p/onchain/{oid}/cambio/preventivo")',
+                  '@app.post("/api/p2p/onchain/{oid}/cambio/fattura")',
+                  '@app.post("/api/p2p/onchain/{oid}/cambio")',
+                  '@app.post("/api/p2p/onchain/{oid}/cambio/togli")'):
+        prova(f"la rotta {rotta[10:-1]} c'e', una volta", 1, src.count(rotta))
+    nasce = pezzo("p2p_onchain_cambio_nasce")
+    prova("il cambio nasce solo col cancello, dopo la conferma firmata di chi vende, "
+          "col seme di chi compra sul valore «p2p:…» e la prima firma giudicata "
+          "verso l'indirizzo del cambio", (True,) * 5,
+          ('if not p2p_onchain_ln_per(user["id"]):' in nasce,
+           "_p2p_onchain_mio_ln(con, oid, user[\"id\"], confermato=True)" in nasce,
+           'valore = f"p2p:{o[\'id\']}:{lockup}"' in nasce,
+           'onchain_firma_valida(ind["xpub_venditore"], "cambio", valore, firma)' in nasce,
+           'giudicato["incasso"] = lockup' in nasce))
+    conf = pezzo("_p2p_onchain_confermato")
+    prova("la conferma di chi vende si rilegge col SUO seme sul testo del mercatino",
+          True, 'ind["xpub_compratore"],\n        onchain_messaggio_ricevuto(o["id"], ind["indirizzo"])'
+          in conf)
+    firma = pezzo("p2p_onchain_firma")
+    prova("la seconda firma di chi vende sul cambio: solo prima firma di chi compra, "
+          "niente decisione, conferma valida; e prima di trasmettere il cambio "
+          "dev'essere vivo (il fornitore muto e' un 503)", (True,) * 4,
+          ('int(o["proposta_da"] or 0) == int(o["ricevente_id"] or 0)' in firma,
+           "_p2p_onchain_confermato(con, o)" in firma,
+           "perche = await onchain_cambio_perche_morto(o)" in firma
+           and firma.index("onchain_cambio_perche_morto(o)") < firma.index("await onchain_mempool_invia(tx_hex)"),
+           'raise HTTPException(503, "SATS Routing ora non risponde' in firma))
+    disp = pezzo("p2p_onchain_disputa")
+    prova("in disputa il cambio se ne va e torna il wallet del Profilo", (True, True),
+          ("WHERE id=? AND (incasso_tipo='cambio' OR incasso_ln=1)" in disp,
+           '_p2p_onchain_riempi_incassi(con, int(o["ricevente_id"]))' in disp))
+    prova("l'incasso scelto dopo non riempie chi ha scelto il Lightning", True,
+          "AND proposta_psbt='' AND COALESCE(incasso_ln,0)=0" in pezzo("_p2p_onchain_riempi_incassi"))
+    prova("le quattro colonne nascono da sole", 4,
+          sum(f'("{c}", ' in pezzo("_p2p_onchain_prepara")
+              for c in ("incasso_ln", "rilascio_chiesto_il", "rilascio_firma", "cambio")))
+    # --- il telefono
+    cc = pezzo_js(mini, "async function confermaCambioOnchainP2P(btn, id){", "\n}\n")
+    prova("il telefono di chi compra: il preventivo riletto, la conferma, la rete del "
+          "cambio, la firma «p2p:…» e la prima firma verso il cambio col prezzo",
+          (True,) * 5,
+          ("p = st.p = await leggiPreventivoOnchainP2P(id);" in cc,
+           "if (!p.confermato)" in cc,
+           "if (!dove || dove.type !== 'tr')" in cc,
+           "onchainFirmaDestinazione(B, parole, 'cambio', `p2p:${o.id}:${rec.lockupAddress}`)" in cc,
+           "onchainUsciteVersoVenditore(o, rec.lockupAddress, 12)" in cc))
+    prova("...il cambio nasce con lo STESSO seme del 2-di-3 e se lo ricorda come "
+          "dello scambio", (True, True, True),
+          ("swapCreaPerOnchain({ordine: null, onchain: o.id, scambio: o.id," in cc,
+           "scambio ? {p2pOnchain: Number(scambio)} : {}" in js,
+           "rec.p2pOnchain ? t.subDaScambio(n)" in js))
+    prova("le parole del cambio dello scambio, nelle due lingue", (1, 1),
+          (js.count("subDaScambio: n => `I bitcoin partono dal deposito di garanzia appena chi vende"),
+           js.count("subDaScambio: n => `The bitcoin leave the escrow deposit as soon as the seller")))
+    cof = pezzo_js(mini, "async function p2pOnchainCofirmeInAttesa(parole){", "\n}\n")
+    prova("chi vende torna a firmare da solo solo sulla conferma del SUO seme", True,
+          cof.index("if (!(await onchainRicevutoMio(await caricaBitcoin(), parole, o))) continue;")
+          < cof.index("await onchainFirmaProposta(o, 'venditore');"))
+    prova("«Ricevuti» di chi vende, se chi compra riceve in Lightning, conferma col seme",
+          True, "poi: () => euroRicevutiOnchainP2P(id)});" in pezzo_js(
+              mini, "function liberaOnchainP2P(btn, id){", "\n}\n"))
+    # i giudici puri in node
+    pz = lambda inizio: pezzo_js(mini, inizio, "\n}\n") + "\n}\n"
+    banco = (pz("function daFirmareOnchainP2P(o){") + pz("function cambioDaFirmareOnchainP2P(o){")
+             + pz("function rilascioDaFirmareOnchainP2P(o){") + pz("function onchainPrimaDiChiVende(o){")
+             + r"""
+const c = {ruolo: 'compratore', stato: 'euro_inviati', rotta: '/p2p/onchain/3', rilascio_chiesto_il: 9,
+  rilascio_firma: 'ab', destinazione: {tipo: 'cambio'},
+  proposta: {mia: false, verso: 'venditore', barattolo: ''}};
+const v = (o) => Object.assign({}, c, o);
+console.log(JSON.stringify({
+  cambio: [daFirmareOnchainP2P(c), onchainPrimaDiChiVende(c),
+           daFirmareOnchainP2P(v({rilascio_firma: ''})), daFirmareOnchainP2P(v({destinazione: {tipo: 'indirizzo'}})),
+           daFirmareOnchainP2P(v({proposta: {mia: false, verso: 'venditore', barattolo: 'disputa'}})),
+           daFirmareOnchainP2P(v({stato: 'disputa'})), onchainPrimaDiChiVende(v({rotta: ''}))],
+  riprendi: [rilascioDaFirmareOnchainP2P(v({proposta: null, incasso: 'tb1q'})),
+             rilascioDaFirmareOnchainP2P(v({proposta: null, incasso: ''})),
+             rilascioDaFirmareOnchainP2P(v({proposta: null, incasso: 'tb1q', rilascio_firma: ''})),
+             rilascioDaFirmareOnchainP2P(v({proposta: null, incasso: 'tb1q', ruolo: 'venditore'})),
+             rilascioDaFirmareOnchainP2P(v({proposta: null, incasso: 'tb1q', stato: 'rilasciato'}))]}));
+""")
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+        prova("il telefono di chi vende co-firma il cambio solo con la conferma, verso "
+              "il cambio, senza Barattolo, a scambio aperto; e il mercatino resta 'pagato'",
+              [True, True, False, False, False, False, False],
+              (json.loads(r.stdout.strip() or "null") or {}).get("cambio"))
+        prova("...e firma da solo il rilascio confermato solo se l'incasso c'e', la "
+              "conferma c'e', e' lui che deposita e lo scambio e' aperto",
+              [True, False, False, False, False],
+              (json.loads(r.stdout.strip() or "null") or {}).get("riprendi"))
+    except (OSError, subprocess.TimeoutExpired):
+        salta("i giudici del cambio dello scambio", "node assente")
+    prova("il giro vero sta nella gabbia e nella CI", (True, True),
+          ("\ncollaudo_cambio_onchain_p2p\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
+           "\ncollaudo_cambio_onchain_p2p.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
 
 
 def prove_grafica_swap():
@@ -184409,7 +184542,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
-              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p,
+              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p,
               prove_margine_cassaforte,
               prove_quantita_servizi,
               prove_sintassi_client,

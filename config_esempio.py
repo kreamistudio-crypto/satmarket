@@ -829,6 +829,12 @@ CAMBIO_BTC_LN_ATTIVO = False
 # cassaforte non c'entra. Vuole SWAP_ATTIVO. Nasce SPENTA; a leva accesa,
 # di serie la vedono solo i moderatori. Il massimo e' per cambio (il
 # minimo e' SWAP_MIN_SATS).
+# La stessa leva apre anche il contrario (1 nov 2026, tappa 2): sugli
+# scambi P2P on-chain chi compra bitcoin sceglie «⚡ Lightning», e allo
+# sblocco il 2-di-3 manda i bitcoin a un cambio di SATS Routing che paga
+# la sua richiesta Lightning. Per questa strada servono in piu'
+# P2P_ONCHAIN_ATTIVO, CAMBIO_BTC_LN_ATTIVO e l'on-chain sulla rete del
+# fornitore (ONCHAIN_RETE = "mainnet" contro SATS Routing vero).
 P2P_ALTRA_RETE_ATTIVO = False
 P2P_ALTRA_RETE_SOLO_MODERATORI = True
 P2P_ALTRA_RETE_MAX_SATS = 500_000

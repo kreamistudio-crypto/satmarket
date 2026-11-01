@@ -76849,3 +76849,79 @@ bot per USDT (il recapito arrivato, l'archivio degli scambi, la
 colonna `euro` di `p2p_ordini` resta testo in «€» perché la leggono le
 statistiche), la guida dei moderatori (guardare l'id sull'explorer), e
 le ultime frasi «gli euro» nella pagina dello scambio.
+
+## Su uno scambio P2P on-chain chi compra riceve in Lightning (1 nov 2026, cantiere presa-altra-rete, tappa 2)
+
+Andrea alle 19:44 ha scelto «Subito la tappa 2» (caso B1 dello studio del
+30 ott), e alle 19:59 ha deciso: niente promozione adesso, si finiscono
+tutte le tappe (2, 3 e caso 4) e poi tutto su main in una volta.
+
+COM'È FATTA. È il calco di «chi vende on-chain riceve in Lightning» del
+mercatino (28 ott): il 2-di-3 non cambia, chi vende bitcoin deposita come
+sempre, e allo sblocco il prezzo esce verso l'indirizzo di un cambio
+bitcoin → Lightning (submarine) di SATS Routing, che paga la richiesta
+Lightning di chi compra quando vede i bitcoin. I gesti, in quest'ordine
+perché la richiesta scade:
+1. chi compra sceglie «⚡ Ricevi in Lightning» nel riquadro dello scambio
+   (`ricevi-lightning`): l'incasso si svuota anche se nel Profilo ha un
+   wallet, e vede già quanto arriva;
+2. chi vende, visti gli euro, non può liberare (non c'è un'uscita): tocca
+   «Ricevuti» e il telefono firma col suo seme la conferma
+   (`euro-ricevuti`, lo stesso testo `onchain_messaggio_ricevuto` del
+   mercatino, che porta l'indirizzo del 2-di-3 ed è quindi unico);
+3. chi compra incolla la sua richiesta (o la prende dal Lightning address)
+   e conferma: il telefono fa nascere il cambio con lo STESSO seme del
+   2-di-3 (rimborso al suo /1/n), firma l'indirizzo del cambio come
+   destinazione col valore «p2p:<scambio>:<indirizzo>» e mette la prima
+   firma verso il cambio col prezzo esatto (`cambio`);
+4. il telefono di chi vende mette la seconda firma da solo, dopo aver
+   riletto la SUA conferma; il server, prima di trasmettere, chiede a SATS
+   Routing se il cambio è ancora vivo (muto = 503, morto = si toglie e chi
+   compra lo rifà).
+
+DECISIONI E PERCHÉ.
+- LA SECONDA FIRMA DI CHI NON RICEVE. Nel P2P la regola era «co-firma chi
+  riceve quell'uscita». Il cambio è l'unica eccezione, ed è stretta: prima
+  firma di chi compra, verso il cambio, nessuna decisione di Barattolo, la
+  conferma di chi vende valida col suo seme. Senza la conferma firmata il
+  server non crea il cambio e il telefono di chi vende non co-firma.
+- IL PREFISSO «p2p:» nella firma della destinazione: i numeri degli
+  scambi P2P e degli ordini del mercatino si sovrappongono, e una firma
+  di un libro non deve valere nell'altro (il collaudo lo prova).
+- LA SCELTA RESTA DI CHI COMPRA fino al cambio: può tornare all'on-chain
+  (torna il wallet del Profilo, o scrive l'indirizzo al volo). Se chi
+  vende aveva già confermato, viene avvisato e il suo telefono firma da
+  solo il rilascio, solo sulla conferma del SUO seme.
+- IN DISPUTA NIENTE CAMBIO: il cambio scade in ore e una decisione può
+  metterci di più. Aprendo la disputa il cambio e la scelta del Lightning
+  se ne vanno, torna il wallet del Profilo (o l'indirizzo al volo) e il
+  moderatore decide come sempre.
+- IL CANCELLO: la leva della tappa 1 (`P2P_ALTRA_RETE_*`, sopra lo swap)
+  più lo scambio on-chain, `CAMBIO_BTC_LN_ATTIVO` e le reti giuste. Oggi
+  l'on-chain sta su signet e SATS Routing su bitcoin: la strada resta
+  chiusa anche a leve accese finché l'on-chain non va in mainnet. Il
+  tetto `P2P_ALTRA_RETE_MAX_SATS` vale anche qui.
+
+STRADE SCARTATE. Il cambio creato alla presa: la richiesta Lightning
+scadrebbe prima della fine dello scambio. Una firma di chi vende verso il
+cambio al posto della conferma: chi vende non sa ancora l'indirizzo, e
+dovrebbe tornare nell'app due volte.
+
+PROVE. `collaudo_cambio_onchain_p2p.py` (61 controlli: server vero, SATS
+Routing di cartone, telefono in node — il cancello con le reti, la scelta,
+la conferma firmata, il cambio dal telefono e i no del server, la seconda
+firma dal telefono coi suoi no, il fornitore muto e quello vivo, il cambio
+morto, la disputa, il ritorno all'on-chain con la firma da sola, la leva
+rispenta), in `ci/collaudi.txt` e `ci/compila.txt`; `prove_cambio_onchain_p2p`
+(21 controlli). Controprove rosse: tolta l'eccezione della seconda firma,
+tolto il controllo del cambio vivo, tolta la pulizia della disputa, tolti
+gli stati P2P da `onchainPrimaDiChiVende`. Tre banchi vecchi emendati
+(il giudice della firma che chiama quello del cambio, il riquadro nuovo
+nella scheda, la sentinella della seconda firma) e il censimento della
+domanda unica da 102 a 103 («Hai ricevuto gli euro?»).
+
+COSA RESTA. Alan rivede le parti 2-di-3: l'eccezione nella seconda firma
+(`p2p_onchain_firma`), la conferma firmata (`euro-ricevuti`), il cambio
+(`p2p_onchain_cambio_nasce`), la pulizia in disputa, e nel telefono
+`onchainPrimaDiChiVende` allargata e `confermaCambioOnchainP2P`. Non
+provato dal vivo: serve l'on-chain in mainnet. MiCA prima di aprire.

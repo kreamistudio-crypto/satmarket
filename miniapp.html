@@ -18911,7 +18911,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '4990292aec';
+const SWAP_TELEFONO_VER = '4632c34ee7';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -57225,9 +57225,13 @@ async function onchainRicevutoMio(B, parole, oc){
    aspetta: di chi vende, non di Barattolo, su un ordine che ho
    confermato io. */
 function onchainPrimaDiChiVende(o){
+  /* (1 nov 2026, presa-altra-rete) anche lo scambio P2P on-chain in cui chi
+     compra bitcoin riceve in Lightning: li' la prima firma e' sua (il
+     «venditore» del 2-di-3), e lo scambio e' depositato o con gli euro inviati */
   return o.ruolo === 'compratore' && !!o.proposta && o.proposta.verso === 'venditore'
     && !o.proposta.mia && !o.proposta.barattolo && !!o.rilascio_chiesto_il
-    && !!o.rilascio_firma && (o.stato === 'pagato');
+    && !!o.rilascio_firma && (o.stato === 'pagato'
+      || (!!o.rotta && (o.stato === 'depositato' || o.stato === 'euro_inviati')));
 }
 
 /* La firma DER di una PSBT nella forma r||s (64 byte) che vuole la
@@ -58060,6 +58064,7 @@ function depositoVistoOnchainP2P(o){
    che aspettavano (`_p2p_onchain_riempi_incassi`) e la pagina si rifa'. */
 function incassoMancanteOnchainP2P(o){
   if (!o || o.ruolo !== 'venditore' || o.incasso || o.proposta) return '';
+  if (o.incasso_ln) return '';   // riceve in Lightning: il riquadro e' `incassoLnOnchainP2P`
   if (!['preso', 'depositato', 'euro_inviati', 'disputa'].includes(o.stato)) return '';
   const rt = onchainRete();
   return '<div class="p2p-box p2p-onchain-incasso"><b>Dove ricevi i bitcoin?</b>'
@@ -58099,6 +58104,243 @@ async function incassoQuiOnchainP2P(btn, id){
   } catch(e) {
     toast('⚠️ ' + (e.message && e.message.length < 120 ? e.message : 'indirizzo non salvato'), 6000);
   } finally { rip(); }
+}
+
+/* ====== CHI COMPRA BITCOIN RICEVE IN LIGHTNING (1 nov 2026, cantiere
+   presa-altra-rete, tappa 2) ======
+   Il calco del cambio del mercatino (`onchainCambioBlocco`, 28 ott) nello
+   scambio P2P on-chain. Chi compra sceglie «⚡ Ricevi in Lightning» e vede
+   quanto arriva; quando chi vende conferma gli euro col suo seme
+   («Ricevuti» → `euroRicevutiOnchainP2P`), incolla la sua richiesta
+   Lightning (o la prende dal Lightning address) e conferma: il telefono fa
+   nascere il cambio bitcoin → Lightning di SATS Routing con lo STESSO seme
+   del 2-di-3 (`swapCreaPerOnchain`, il rimborso al suo /1/n), firma
+   l'indirizzo del cambio come destinazione e mette la prima firma verso di
+   lui. La seconda la mette il telefono di chi vende, da solo, dopo aver
+   riletto la sua conferma (`onchainCofirma`). Chi compra puo' sempre
+   tornare all'on-chain finche' non ha fatto il cambio. */
+const p2pOcCambi = {};
+/* PURA: le leggi del rilascio che il telefono di chi vende firma da solo:
+   aveva confermato gli euro per un cambio, e chi compra e' tornato
+   all'on-chain (ora l'incasso c'e', la proposta no) */
+function rilascioDaFirmareOnchainP2P(o){
+  return !!(o && o.ruolo === 'compratore' && o.rilascio_chiesto_il && o.rilascio_firma
+    && o.incasso && !o.proposta && (o.stato === 'depositato' || o.stato === 'euro_inviati'));
+}
+/* il riquadro di chi compra bitcoin: la scelta, il conto, il cambio */
+function incassoLnOnchainP2P(o){
+  if (!o || o.ruolo !== 'venditore' || !['preso', 'depositato', 'euro_inviati'].includes(o.stato)) return '';
+  const apri = '<div class="p2p-box p2p-onchain-ln" id="p2pOcLn_' + Number(o.id) + '">', chiudi = '</div>';
+  const indietro = '<button type="button" class="btn ghost" onclick="sceltaLnOnchainP2P(this, ' + Number(o.id)
+    + ', false)">₿ Ricevi on-chain invece</button>';
+  if (o.destinazione && o.destinazione.tipo === 'cambio') {
+    if (!o.proposta || !o.proposta.mia) return '';
+    const c = o.cambio || {};
+    return apri + '<b>⚡ Cambio fatto</b><div class="hint">Ricevi <b>' + fmt(Number(c.ricevi) || 0)
+      + ' sats in Lightning</b>. I bitcoin partono verso il cambio appena chi vende apre l\'app (la seconda '
+      + 'firma la mette il suo telefono), poi SATS Routing paga la tua richiesta.</div>'
+      + '<button type="button" class="btn ghost" onclick="togliCambioOnchainP2P(this, ' + Number(o.id)
+      + ')">Togli il cambio</button>' + chiudi;
+  }
+  if (o.proposta || o.decisione) return '';
+  if (!o.incasso_ln) {
+    if (!o.ln_possibile) return '';
+    return apri + '<b>Vuoi ricevere in Lightning?</b><div class="hint">Col cambio di SATS Routing: i bitcoin del '
+      + '2-di-3 vanno al cambio, e a te arriva in Lightning il prezzo meno il costo del cambio, che vedi prima di confermare.</div>'
+      + '<button type="button" class="btn ghost" onclick="sceltaLnOnchainP2P(this, ' + Number(o.id)
+      + ', true)">⚡ Ricevi in Lightning</button>' + chiudi;
+  }
+  const st = p2pOcCambi[o.id] || (p2pOcCambi[o.id] = {});
+  if (!st.stato) { st.stato = 'carico'; caricaCambioOnchainP2P(o.id); }
+  const p = st.p || {}, nome = onchainNomeCambio(p);
+  const errore = st.errore ? '<div class="swap-rifiuto" role="status">' + esc(st.errore) + '</div>' : '';
+  let conto = '<div class="hint">Chiedo il prezzo del cambio…</div>';
+  if (st.p && p.ok) conto = '<div class="hint"><b>È un cambio, fatto da ' + esc(nome) + '</b>: costa ' + fmt(Number(p.costo) || 0)
+    + ' sats. Ricevi circa <b>' + fmt(Number(p.ricevi) || 0) + ' sats in Lightning</b> invece di '
+    + fmt(Number(p.prezzo) || 0) + ' on-chain.</div>';
+  else if (st.p) conto = '<div class="hint">' + esc(p.motivo === 'sotto_minimo'
+      ? 'Il cambio in Lightning parte da ' + fmt(Number(p.minimo) || 0) + ' sats: questo scambio lo ricevi on-chain.'
+      : p.motivo === 'sopra_tetto'
+      ? 'Il cambio in Lightning arriva al massimo a ' + fmt(Number(p.massimo) || 0) + ' sats: questo scambio lo ricevi on-chain.'
+      : nome + ' ora non risponde: riprova fra poco, o ricevi on-chain.') + '</div>';
+  const pronto = !!o.rilascio_chiesto_il && o.stato !== 'preso';
+  if (!pronto) return apri + '<b>⚡ Ricevi in Lightning</b>' + conto
+    + '<div class="hint">Quando chi vende conferma gli euro, qui fai il cambio con una tua richiesta Lightning.</div>'
+    + errore + indietro + chiudi;
+  const ore = Math.round((Number(p.vita_incollata_s) || 82800) / 3600);
+  return apri + '<b>⚡ Chi vende ha ricevuto gli euro: fai il cambio</b>' + conto
+    + '<div class="hint">⚠️ <b>Il tuo wallet Lightning deve poter ricevere ' + fmt(Number(p.ricevi) || 0)
+    + ' sats in una volta.</b> Se la richiesta non si riesce a pagare, i bitcoin tornano da soli al tuo wallet '
+    + 'on-chain di Barattolo, quello delle tue stesse 12 parole.</div>'
+    + '<div class="hint">Crea una richiesta di <b>' + fmt(Number(p.ricevi) || 0) + ' sats esatti</b> che valga almeno '
+    + ore + ' ore (chi vende può aprire l\'app domani), e incollala qui.</div>'
+    + (p.ln_address ? '<button type="button" class="btn ghost" onclick="prendiFatturaOnchainP2P(this, ' + Number(o.id)
+      + ')">⚡ Prendila dal mio Lightning address</button>' : '')
+    + '<textarea class="swap-indirizzo" id="p2pOcFattura_' + Number(o.id) + '" rows="3" autocomplete="off" spellcheck="false"'
+    + ' placeholder="lnbc…" oninput="(p2pOcCambi[' + Number(o.id) + '] || {}).fattura = this.value">' + esc(st.fattura || '') + '</textarea>'
+    + errore
+    + '<button type="button" class="btn orange" onclick="confermaCambioOnchainP2P(this, ' + Number(o.id)
+    + ')">✅ Conferma il cambio</button>' + indietro + chiudi;
+}
+/* il riquadro si rifa' da solo, senza rileggere lo scambio dal server */
+function ridisegnaLnOnchainP2P(id){
+  const b = el('p2pOcLn_' + Number(id));
+  const o = p2pOnchainMiei.find(x => x.id === Number(id));
+  if (b && o) b.outerHTML = incassoLnOnchainP2P(o);
+}
+async function leggiPreventivoOnchainP2P(id){
+  const r = await fetch(`${API_BASE}/p2p/onchain/${Number(id)}/cambio/preventivo`,
+    {headers: {'X-Tg-Init-Data': authHdr()}});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.detail || 'preventivo non arrivato');
+  return d;
+}
+async function caricaCambioOnchainP2P(id){
+  const st = p2pOcCambi[id] || (p2pOcCambi[id] = {});
+  try { st.p = await leggiPreventivoOnchainP2P(id); delete st.errore; }
+  catch(e) { st.p = {ok: false, motivo: 'non_risponde'}; }
+  st.stato = 'pronto';
+  ridisegnaLnOnchainP2P(id);
+}
+async function sceltaLnOnchainP2P(btn, id, si){
+  haptic();
+  const rip = onchainAttesa(btn, '…');
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(id)}/ricevi-lightning`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({si: !!si})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non riuscito');
+    delete p2pOcCambi[id];
+    toast(si ? '⚡ Ricevi in Lightning: il cambio lo fai quando chi vende conferma gli euro'
+             : '₿ Ricevi on-chain', 5000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+  finally { rip(); }
+  renderP2POnchain();
+}
+/* chi vende: «Ricevuti» quando chi compra riceve in Lightning */
+async function euroRicevutiOnchainP2P(id){
+  const o = p2pOnchainMiei.find(x => x.id === id);
+  if (!o) return;
+  const rip = attesaP2P('Firmo la conferma…');
+  try {
+    const parole = onchainSemeLocale();
+    if (!parole) throw new Error('su questo dispositivo non c\'è la tua chiave');
+    const firma = await onchainFirmaRicevuto(await caricaBitcoin(), parole, o);
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(id)}/euro-ricevuti`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({firma})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non riuscito');
+  } catch(e) {
+    rip();
+    toast('⚠️ ' + (e.message || 'non firmato'), 7000);
+    renderP2POnchain();
+    return;
+  }
+  await fattoOnchainP2P(rip);
+  toast('🔓 Confermato: chi compra fa il cambio, e il tuo telefono mette la seconda firma da solo', 7000);
+}
+async function prendiFatturaOnchainP2P(btn, id){
+  haptic();
+  const st = p2pOcCambi[id];
+  if (!st || !st.p || !st.p.ok) return;
+  const rip = onchainAttesa(btn, 'La chiedo…');
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(id)}/cambio/fattura`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({sats: Number(st.p.ricevi)})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.fattura) throw new Error(d.detail || 'richiesta non arrivata');
+    st.fattura = st.daAddress = String(d.fattura).trim();
+    delete st.errore;
+  } catch(e) { st.errore = e.message || 'errore'; }
+  finally { rip(); }
+  ridisegnaLnOnchainP2P(id);
+}
+async function confermaCambioOnchainP2P(btn, id){
+  haptic();
+  const st = p2pOcCambi[id] || (p2pOcCambi[id] = {});
+  if (st.stato === 'creo') return;
+  const campo = el('p2pOcFattura_' + Number(id));
+  if (campo) st.fattura = String(campo.value || '');
+  st.fattura = String(st.fattura || '').trim().replace(/^lightning:/i, '').trim();
+  delete st.errore;
+  const fattura = st.fattura;
+  const rip = onchainAttesa(btn, 'Preparo il cambio…');
+  let finito = false, p = st.p || {};
+  try {
+    /* il preventivo si rilegge adesso: le tariffe si muovono, e la
+       conferma di chi vende deve esserci gia' */
+    p = st.p = await leggiPreventivoOnchainP2P(id);
+    const nome = onchainNomeCambio(p);
+    if (!p.ok) throw new Error(p.motivo === 'non_risponde' ? `${nome} ora non risponde: riprova fra poco.`
+      : 'Questo scambio non si può cambiare in Lightning: ricevilo on-chain.');
+    if (!p.confermato) throw new Error('Chi vende non ha ancora confermato gli euro.');
+    const b = fattura ? leggiBolt11(fattura) : null;
+    const daAddress = !!st.daAddress && st.daAddress === fattura;
+    const vita = Number(daAddress ? p.vita_address_s : p.vita_incollata_s) || 0;
+    if (!fattura) throw new Error('Prima incolla la richiesta del tuo wallet Lightning.');
+    if (!b || !b.hash) throw new Error(onchainFatturaPerche('fattura', p));
+    if (b.scade - Date.now() / 1000 < vita)
+      throw new Error(`Questa richiesta scade fra meno di ${Math.round(vita / 3600)} ore: creane una che duri di più.`);
+    if (!(await caricaSwapTelefono())) throw new Error('non riesco a caricare il cambio: riprova');
+    st.stato = 'creo';
+    await leggiMieiOnchainP2P();
+    const o = p2pOnchainMiei.find(x => x.id === Number(id));
+    if (!o || !['depositato', 'euro_inviati'].includes(o.stato) || o.incasso || o.proposta || !o.incasso_ln)
+      throw new Error('lo scambio è cambiato: riaprilo');
+    const B = await caricaBitcoin();
+    const parole = onchainSemeLocale();
+    if (!parole) throw new Error('su questo dispositivo non c\'è la tua chiave');
+    const io = onchainMieChiavi(B, parole, o);
+    if (B.hex.encode(io.firma.publicKey) !== o.indirizzo.chiavi.venditore)
+      throw new Error('la chiave dello scambio non è del tuo seme');
+    const w = onchainScriptOrdine(B, o);
+    const rec = await swapCreaPerOnchain({ordine: null, onchain: o.id, scambio: o.id, fattura: fattura,
+      preventivo: p, rimborso: io.incasso});
+    let dove = null;
+    try { dove = B.Address(onchainReteBtc(B)).decode(rec.lockupAddress); } catch(e) { dove = null; }
+    if (!dove || dove.type !== 'tr') throw new Error('l\'indirizzo del cambio non è della rete giusta');
+    if (!(rec.mandi > 0 && rec.mandi <= o.prezzo_sats)) throw new Error('le cifre del cambio non tornano');
+    const firma = await onchainFirmaDestinazione(B, parole, 'cambio', `p2p:${o.id}:${rec.lockupAddress}`);
+    const psbt = onchainPsbtFirmata(B, o, io, w, onchainUsciteVersoVenditore(o, rec.lockupAddress, 12));
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(o.id)}/cambio`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({cambio: {fornitore: rec.fornitore, id: rec.id, lockup: rec.lockupAddress,
+        ricevi: rec.ricevi, mandi: rec.mandi, scade_fattura: b.scade, timeout: rec.timeoutBlockHeight},
+        firma, psbt})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'cambio rifiutato');
+    delete p2pOcCambi[id];
+    finito = true;
+    toast('⚡ Fatto: hai messo la prima firma. I bitcoin partono verso il cambio appena chi vende apre l\'app', 8000);
+  } catch(e) {
+    st.stato = 'pronto';
+    const nome = onchainNomeCambio(p);
+    st.errore = e && e.tipo === 'fattura' ? onchainFatturaPerche(e.perche, p)
+      : e && e.tipo === 'mente' ? `${nome} ha risposto con dati che non tornano: non è partito niente.`
+      : e && e.tipo === 'giu' ? `${nome} ora non risponde: riprova fra poco.`
+      : e && e.tipo === 'casa' ? t3().nienteCasa
+      : e && e.tipo === 'seme' ? 'su questo dispositivo non c\'è la tua chiave'
+      : (e && e.message) || 'errore';
+  } finally { rip(); }
+  if (finito) renderP2POnchain();
+  else ridisegnaLnOnchainP2P(id);
+}
+async function togliCambioOnchainP2P(btn, id){
+  haptic();
+  const rip = onchainAttesa(btn, '…');
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(id)}/cambio/togli`, {method: 'POST',
+      headers: {'X-Tg-Init-Data': authHdr()}});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non riuscito');
+    delete p2pOcCambi[id];
+    toast('⚡ Cambio tolto: non si è mosso niente', 5000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+  finally { rip(); }
+  renderP2POnchain();
 }
 
 async function leggiMieiOnchainP2P(){
@@ -58150,10 +58392,13 @@ function toccaAMeOnchainP2P(o){
   if (daFirmareOnchainP2P(o)) return true;
   if (o.proposta) return false;
   const ricevo = o.ruolo === 'venditore', deposito = o.ruolo === 'compratore';
-  if (ricevo && !o.incasso && o.stato !== 'disputa') return true;
+  /* (1 nov 2026) chi riceve in Lightning non ha un incasso fino al cambio:
+     tocca a lui quando chi vende ha confermato gli euro */
+  if (ricevo && !o.incasso && o.stato !== 'disputa'
+      && (!o.incasso_ln || (!!o.rilascio_chiesto_il && o.stato !== 'preso'))) return true;
   if (o.stato === 'preso') return deposito && !depositoVistoOnchainP2P(o);
   if (o.stato === 'depositato') return ricevo;
-  if (o.stato === 'euro_inviati') return deposito;
+  if (o.stato === 'euro_inviati') return deposito && !(o.incasso_ln && o.rilascio_chiesto_il);
   return false;
 }
 /* PURA: il gruppo della lista (`P2P_GRUPPI`), dallo stato e dal giudice
@@ -58338,7 +58583,17 @@ async function renderP2POnchain(){
    Barattolo, verso di me, su uno scambio ancora aperto */
 function daFirmareOnchainP2P(o){
   return !!(o.proposta && !o.proposta.mia && o.proposta.verso === o.ruolo
-    && o.stato !== 'rilasciato' && o.stato !== 'rimborsato');
+    && o.stato !== 'rilasciato' && o.stato !== 'rimborsato') || cambioDaFirmareOnchainP2P(o);
+}
+/* (1 nov 2026, presa-altra-rete) IL CAMBIO DI CHI COMPRA, che aspetta la
+   seconda firma di chi vende: la prima e' di chi compra, verso il cambio,
+   e chi vende aveva confermato gli euro col suo seme (`onchainCofirma` la
+   rilegge prima di firmare) */
+function cambioDaFirmareOnchainP2P(o){
+  return !!(o && o.ruolo === 'compratore' && o.proposta && !o.proposta.mia
+    && !o.proposta.barattolo && o.proposta.verso === 'venditore'
+    && o.destinazione && o.destinazione.tipo === 'cambio' && o.rilascio_firma
+    && (o.stato === 'depositato' || o.stato === 'euro_inviati'));
 }
 
 /* ====== IL FOGLIO «PUBBLICA» DELL'ON-CHAIN (30 ott 2026, cantiere
@@ -58521,11 +58776,25 @@ function schedaOnchainP2P(o){
         : 'Annullato prima del deposito.') + (o.ricevuti_sats ? ' <b>Attenzione:</b> dopo l\'annullo sono arrivati sats: un moderatore li rimanda indietro.' : ''); break;
     case 'scaduto': testo = 'Scaduto nel libro senza essere preso.'; break;
   }
+  /* (1 nov 2026, presa-altra-rete) chi compra riceve in Lightning: chi
+     vende conferma gli euro col suo seme al posto di liberare, e dopo
+     aspetta il cambio di chi compra */
+  if (deposito && o.incasso_ln && !o.incasso && (o.stato === 'depositato' || o.stato === 'euro_inviati')) {
+    if (o.rilascio_chiesto_il) {
+      gesti = gesti.replace(bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'), '');
+      testo += '<br>⚡ Hai confermato gli euro. Chi compra riceve in Lightning e sta facendo il cambio: '
+        + 'quando l\'ha fatto, il tuo telefono mette la seconda firma da solo.';
+    } else {
+      testo += '<br>⚡ Chi compra riceve in Lightning: quando vedi gli euro, «Ricevuti» lo conferma '
+        + 'col tuo seme e lui fa il cambio.';
+    }
+  }
   /* la seconda firma, quando tocca a me: lo stesso bottone in ogni stato */
   if (daFirmareOnchainP2P(o) && !mod) {
     gesti = bott('orange', `cofirmaOnchainP2P(this, ${o.id})`,
       '✍️ Metti la seconda firma' + (o.proposta.barattolo ? ' (Barattolo ha firmato)' : '')) + gesti;
-    testo += '<br><b>' + (o.proposta.verso === 'venditore' ? 'I sats stanno per arrivare sul tuo wallet' : 'Il rimborso sta per tornare a te')
+    testo += '<br><b>' + (cambioDaFirmareOnchainP2P(o) ? 'Chi compra ha fatto il cambio in Lightning'
+        : o.proposta.verso === 'venditore' ? 'I sats stanno per arrivare sul tuo wallet' : 'Il rimborso sta per tornare a te')
       + ':</b> manca solo la tua firma, che il telefono mette da solo.';
   } else if (o.proposta && o.proposta.mia && o.stato !== 'rilasciato' && o.stato !== 'rimborsato') {
     testo += '<br>Hai firmato: si aspetta la seconda firma dell\'altra parte (il suo telefono la mette quando apre l\'app).';
@@ -58580,6 +58849,7 @@ function schedaOnchainP2P(o){
     /* chi compra senza un posto dove ricevere lo scrive qui (thread del
        2-di-3, richiesta di Alan): subito sotto la nota, ben in vista */
     + `${incassoMancanteOnchainP2P(o)}`
+    + incassoLnOnchainP2P(o)
     + recapitoBox
     + indirizzoBox
     + uscita
@@ -58801,6 +59071,15 @@ async function recapitoOnchainP2P(btn, id){
    con l'ordine passato intero: la `rotta` dice dove mandarla. */
 function liberaOnchainP2P(btn, id){
   haptic();
+  /* (1 nov 2026, presa-altra-rete) chi compra riceve in Lightning: niente
+     uscita ancora, si conferma col seme e il cambio lo fa lui */
+  const o = p2pOnchainMiei.find(x => x.id === id);
+  if (o && o.incasso_ln && !o.incasso) return chiediConferma({titolo: '🔓 Hai ricevuto gli euro?',
+    etichetta: 'Sì, li ho ricevuti',
+    corpo: 'Chi compra riceve in Lightning: con la tua conferma, firmata dal tuo seme, fa il cambio e i sats '
+      + 'partono verso di lui senza altri gesti tuoi (la seconda firma la mette il tuo telefono). '
+      + 'Conferma solo se hai VISTO gli euro sul tuo conto.',
+    poi: () => euroRicevutiOnchainP2P(id)});
   chiediConferma({titolo: '🔓 Liberi i sats?', etichetta: 'Sì, li ho ricevuti: libera',
     corpo: 'Hai VISTO gli euro sul tuo conto? Liberando, i sats partono verso chi compra e non tornano.',
     poi: () => firmaOnchainP2P(id, 'venditore')});
@@ -58872,6 +59151,18 @@ async function p2pOnchainCofirmeInAttesa(parole){
   const fatte = [];
   if (!myP2POnchain) return fatte;
   for (const o of await leggiMieiOnchainP2P()) {
+    /* (1 nov 2026, presa-altra-rete) chi vende aveva confermato gli euro
+       per un cambio in Lightning, e chi compra e' tornato all'on-chain:
+       ora l'uscita c'e', e la prima firma la mette questo telefono — ma
+       solo sulla conferma che ha firmato IL MIO seme */
+    if (rilascioDaFirmareOnchainP2P(o)) {
+      try {
+        if (!(await onchainRicevutoMio(await caricaBitcoin(), parole, o))) continue;
+        await onchainFirmaProposta(o, 'venditore');
+        fatte.push(`🔓 scambio #${o.id}: firmato il rilascio che avevi confermato`);
+      } catch(e) { fatte.push(`⚠️ scambio #${o.id}: ${e.message || 'errore'}`); }
+      continue;
+    }
     if (!daFirmareOnchainP2P(o)) continue;
     try {
       const no = await onchainCofirma(o, parole);

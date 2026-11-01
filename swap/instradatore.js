@@ -304,6 +304,7 @@ const SWAP_TESTI_T3 = {
     /* (28 ott 2026, onchain-verso-lightning) il cambio di una vendita
        pagata on-chain: i bitcoin li manda il deposito di garanzia */
     subDaOrdine: n => `I bitcoin partono dal deposito di garanzia appena chi ha comprato mette la seconda firma: poi ${n} paga la tua richiesta Lightning.`,
+    subDaScambio: n => `I bitcoin partono dal deposito di garanzia appena chi vende mette la seconda firma: poi ${n} paga la tua richiesta Lightning.`,
     copiaIndirizzo: 'Copia l\'indirizzo',
     subBloccato: 'Bitcoin visti: aspetto la conferma della rete, di solito una decina di minuti.',
     subConfermato: n => `Confermati: ${n} sta pagando la tua richiesta.`,
@@ -413,6 +414,7 @@ const SWAP_TESTI_T3 = {
     fatturaScaduta: 'This request expires too soon: create a new one.',
     mandaTu: (sats, n) => `Send exactly ${sats} sats to this address, from your bitcoin wallet: once the network confirms them, ${n} pays your request.`,
     subDaOrdine: n => `The bitcoin leave the escrow deposit as soon as the buyer adds the second signature: then ${n} pays your Lightning request.`,
+    subDaScambio: n => `The bitcoin leave the escrow deposit as soon as the seller adds the second signature: then ${n} pays your Lightning request.`,
     copiaIndirizzo: 'Copy the address',
     subBloccato: 'Bitcoin seen: waiting for the network to confirm, usually about ten minutes.',
     subConfermato: n => `Confirmed: ${n} is paying your request.`,
@@ -657,7 +659,7 @@ function frasestatoSwap(rec){
     const fase = swapFase(rec), n = swapNomeFornitore(swapDiChi(rec));
     if (rec.spesoDa) return t.spesoAltri(n);
     if (fase === 'ripreso') return t.subRipreso(swapCorto(rec.rimborso.txid, 8));
-    if (fase === 'creato') return rec.onchain ? t.subDaOrdine(n) : t.mandaTu(fmt(rec.mandi || rec.onchainAmount || 0), n);
+    if (fase === 'creato') return rec.p2pOnchain ? t.subDaScambio(n) : rec.onchain ? t.subDaOrdine(n) : t.mandaTu(fmt(rec.mandi || rec.onchainAmount || 0), n);
     if (fase === 'bloccato') return t.subBloccato;
     if (fase === 'confermato') return t.subConfermato(n);
     if (fase === 'pagata') return t.subPagata;
@@ -1121,7 +1123,10 @@ function swapParoleDi(rec){
   }
   return swapCassetto(swapDiChi(rec));
 }
-async function swapCreaPerOnchain({ordine, onchain, fattura, preventivo, rimborso}){
+/* (1 nov 2026, presa-altra-rete, tappa 2) `scambio`: il cambio di chi
+   compra bitcoin su uno scambio P2P on-chain. Stesso cambio, stesso seme;
+   il record lo ricorda (`p2pOnchain`) per dire le parole giuste */
+async function swapCreaPerOnchain({ordine, onchain, fattura, preventivo, rimborso, scambio}){
   const f = swapFornitore(preventivo && preventivo.fornitore);
   if (!f || !f.creaSub) throw swapNoOnchain('giu');
   const perche = f.fatturaValida(fattura, Number(preventivo.ricevi));
@@ -1136,7 +1141,7 @@ async function swapCreaPerOnchain({ordine, onchain, fattura, preventivo, rimbors
   const nuovo = await f.creaSub({parole: parole, indice: indice, preventivo: preventivo, fattura: fattura});
   const rec = Object.assign(nuovo, {fornitore: f.id, ordine: Number(ordine) || null,
     onchain: Number(onchain), indice: indice, seme: 'onchain', indirizzo: String(rimborso),
-    creato: Date.now(), pagamento: ''});
+    creato: Date.now(), pagamento: ''}, scambio ? {p2pOnchain: Number(scambio)} : {});
   swapSalvaRecord(rec);
   swapSorveglia();
   return rec;
@@ -1767,7 +1772,7 @@ function renderSwapTelefono(){
       <div class="cambio-voce-riga">
         ${swapMoneta(swapESub(rec) ? 'ln' : 'btc')}
         <span class="cambio-voce-dati">
-          <b>${esc(swapECambio(rec) ? t.cambio : rec.p2p ? t.scambioP2P : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
+          <b>${esc(swapECambio(rec) ? t.cambio : rec.p2p || rec.p2pOnchain ? t.scambioP2P : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
           <span>${esc(frasestatoSwap(rec))}</span>
           ${piu ? `<span class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</span>` : ''}
           ${barretteSwap(rec)}
