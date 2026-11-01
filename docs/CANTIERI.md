@@ -76569,3 +76569,63 @@ funzione apre a tutti). Tappa 2 (ordine on-chain, ricevi Lightning) e
 tappa 3 (Luca/Mario: ordine on-chain, chi vende paga in Lightning dentro
 il 2-di-3) toccano il 2-di-3: le rivede Alan. Prima di aprire a tutti,
 il parere MiCA come per il Cambio libero.
+
+
+## Il documento dell'ordine che sul telefono non si scaricava (1 nov 2026, cantiere allegati-android)
+
+DAL CAMPO. Un compratore su GrapheneOS, Mini App Telegram, compra una
+chiave di licenza con un PDF di istruzioni allegato. Tocca «📄 Apri il
+documento», legge «📄 Documento scaricato: lo trovi fra i tuoi file», e
+il file non c'è: né in Download né fra i download di Telegram. Dal PC
+non aveva provato. La scritta sopra il bottone diceva per giunta «Il
+venditore ha allegato un'immagine: Istruzioni….pdf».
+
+LA CAUSA. `apriFotoContenuto` (e il gemello del locker, `apriDocBusta`)
+scaricava i byte con la sua fetch, ne faceva un URL `blob:` e cliccava
+un `<a download>`. La WebView Android di Telegram quei link non li
+salva, e non dà errore. Il toast partiva subito dopo il clic, senza
+sapere niente: per questo mentiva. Il commento del documento di
+ritiro aveva già scartato `tg.openLink` (un objectURL vive solo nella
+pagina) ma non aveva visto che anche il download, su Android, non
+arriva.
+
+LA CURA, la strada che regge già per l'export dei dati: dentro Telegram
+8.0+ un PDF lo scarica la APP (`tg.downloadFile`). La app bussa senza
+il nostro header, quindi la pagina chiede prima un biglietto di 5
+minuti (`POST …/busta-ritiro/biglietto`, `POST …/contenuto/biglietto`)
+e le rotte `/file` lo accettano al posto di initData (e rispondono
+anche a HEAD, la sonda). Il POST passa dalla rotta dei byte vera prima
+di staccarlo, così le guardie sono UNA e non due copie che possono
+divergere, e il GET col biglietto le rifà. «In download» compare solo
+quando la app dice sì; un rifiuto o la rete caduta si dicono. La
+scritta dice «un documento» quando il file non è un'immagine.
+Ok di Andrea il 1 nov, compreso il documento del locker.
+
+STRADE SCARTATE. Un `data:` URL al posto del `blob:`: stesso destino
+nella WebView, e 15 MB in una stringa. `tg.openLink` sull'URL della
+rotta: il browser esterno non ha né initData né il cookie, quindi
+servirebbe comunque il biglietto, e porta fuori da Telegram chi sta
+leggendo un ordine. Un biglietto monouso: il downloader di Telegram
+bussa più volte (la lezione già pagata con l'export).
+
+PROVE. In `prove_busta_ritiro` il biglietto girato per davvero sulla
+rotta vera (12 controlli: byte veri SENZA header, `attachment`, non
+monouso, estraneo e 404 senza biglietto, un altro ordine, un altro
+allegato, l'inventato, lo scaduto che se ne va, le guardie rifatte al
+download). `prove_allegati_da_telegram` (19): le sentinelle del gemello
+del contenuto e del client, e `allegatoDaTelegram` eseguito in node
+(versione e initData, POST con l'header, URL assoluto col biglietto,
+toast solo col sì, errore e rete detti). Censimenti emendati:
+l'attesa ritardata la chiamano 11 letture (era 10), e
+`${location.origin}${API_BASE}` sta in 3 posti (era 2, 7 in tutto
+nel codice). Controprove rosse, una per una: biglietto non legato
+all'ordine, all'allegato o alla scadenza, rotta che ignora il
+biglietto, POST senza controlli, biglietto monouso, toast sempre, busta
+senza il ramo Telegram, scritta «immagine», versione ignorata,
+contenuto col biglietto della busta, errore muto.
+
+COSA RESTA DA GUARDARE. NON provato su un telefono vero: va guardato
+sul collaudo da un Android (meglio GrapheneOS) e da un iPhone, con un
+ordine digitale con PDF e un documento di ritiro in PDF. Telegram
+sotto la 8.0 resta sulla strada vecchia (`<a download>`).
+
