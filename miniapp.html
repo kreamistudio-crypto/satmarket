@@ -64155,6 +64155,7 @@ function rigaOrdineP2P(o){
   /* il segno della valuta dell'ordine (1 nov 2026, cantiere p2p-usdt) */
   const eurTxt = capiP2P(esc(fmtEur(o.euro)), o.euroMax ? esc(fmtEur(o.euroMax)) : '') + ' '
     + (typeof segnoValutaP2P === 'function' ? esc(segnoValutaP2P(o.fiat)) : '€')
+    + (typeof bandieraValutaP2P === 'function' ? bandieraValutaP2P(o.fiat) : '')
     /* il range: chi prende sceglie la cifra, e lo dice la riga
        dell'euro — e' li' che la scelta si fa */
     /* «scegli tu» va a capo INTERO: col «da … a …» la riga s'e'
@@ -75995,6 +75996,16 @@ function segnoValutaP2P(cod){
   const v = P2P_VALUTE.find(x => x.cod === c);
   return v ? v.segno : c;
 }
+/* LA BANDIERINA DELLA VALUTA SULLA CARD DEL LIBRO (2 nov 2026, Andrea:
+   «il simbolo usdt per un ordine usdt e la bandierina europa per una
+   card euro»): quella del catalogo, accanto alla cifra; una valuta che
+   nel catalogo non c'e' non ne porta nessuna. HTML gia' pronto (il logo
+   di Tether e' un SVG). */
+function bandieraValutaP2P(cod){
+  const c = String(cod || P2P_VALUTA).toUpperCase();
+  const v = P2P_VALUTE.find(x => x.cod === c);
+  return v && v.bandiera ? ' <span class="p2p-bandiera">' + v.bandiera + '</span>' : '';
+}
 /* «gli euro» / «gli USDT», per le frasi del gesto */
 function soldiValutaP2P(cod){
   return String(cod || '').toUpperCase() === 'USDT' ? 'gli USDT' : 'gli euro';
@@ -84550,6 +84561,10 @@ function comeLibroP2P(o){
           euro: o.euro, euroMax: o.euroMax || 0,
           sats: o.sats || 0, premium: o.premium || 0,
           metodi: o.metodi || [],
+          /* LA VALUTA VIAGGIA ANCHE QUI (2 nov 2026, Andrea: «nel dettaglio
+             c'e' scritto totale da inviare x euro e non x usdt»): senza, il
+             conto della pagina dello scambio diceva € a un ordine in USDT */
+          fiat: o.fiat || '',
           id: o.id, cambioPub: o.cambioPub || 0,
           /* E SE E' GIA' PRESO, col cambio di quel momento (27 set 2026):
              a sats fissi la convenienza si ferma alla presa

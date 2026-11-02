@@ -154071,6 +154071,38 @@ console.log(JSON.stringify(out));
           ('"cambio_usd": cambio_noto_ora("usd")' in src,
            "impostaCambioUsd(j.cambio_usd)" in mini))
 
+    # --- I RITOCCHI DELLA PROVA DAL VIVO (2 nov 2026, Andrea e Alan in
+    # produzione) --- la card del libro porta il segno della valuta (la
+    # bandierina dell'euro, il logo di Tether) accanto alla cifra; e il conto
+    # della pagina del MIO scambio non perde la valuta passando da
+    # `comeLibroP2P` («Totale da inviare 10 USDT», non «€»)
+    riga_libro = pezzo_js(mini, "function rigaOrdineP2P(", "\n}\n")
+    prova("la card del libro mette la bandierina della valuta accanto alla cifra", True,
+          "+ (typeof bandieraValutaP2P === 'function' ? bandieraValutaP2P(o.fiat) : '')"
+          in riga_libro)
+    i = mini.index("const P2P_VALUTE = [")
+    js = ("const P2P_VALUTA = 'EUR';\n" + mini[i:mini.index("];", i) + 2] + "\n"
+          + _fn_js(mini, "function bandieraValutaP2P(cod){") + "\n"
+          + _fn_js(mini, "function comeLibroP2P(o){") + "\n"
+          + "console.log(JSON.stringify({eur: bandieraValutaP2P('EUR'), vuota: bandieraValutaP2P(''),\n"
+          + "  usdt: bandieraValutaP2P('usdt'), altra: bandieraValutaP2P('BRL'),\n"
+          + "  fiat: [comeLibroP2P({lato: 'compro', euro: 10, fiat: 'USDT'}).fiat,\n"
+          + "         comeLibroP2P({lato: 'compro', euro: 10}).fiat]}));\n")
+    o = _node_banco(js)
+    if o is None:
+        salta("la bandierina della card e la valuta del conto, sul banco", "node non c'e'")
+    else:
+        o = o or {}
+        prova("...🇪🇺 all'euro (anche a valuta non detta), il logo di Tether all'USDT, "
+              "niente a una valuta fuori dal catalogo",
+              [' <span class="p2p-bandiera">🇪🇺</span>', ' <span class="p2p-bandiera">🇪🇺</span>',
+               True, ""],
+              [o.get("eur"), o.get("vuota"),
+               str(o.get("usdt") or "").startswith(' <span class="p2p-bandiera"><svg class="ico-usdt"'),
+               o.get("altra")])
+        prova("il conto del mio scambio tiene la valuta: USDT resta USDT, senza resta vuota (euro)",
+              ["USDT", ""], o.get("fiat"))
+
 
 def prove_p2p_onchain():
     """GLI SCAMBI P2P CON LA GARANZIA 2-DI-3 (30 ott 2026, cantiere
