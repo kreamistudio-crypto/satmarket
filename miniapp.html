@@ -8010,6 +8010,11 @@
   .pay-metodo button.oc.attiva small{color:var(--card);opacity:.8}
   .pay-metodo button.spento{opacity:.55}
   .pay-metodo button[aria-busy="true"]{cursor:progress}
+  /* la scelta della rete al «Paga» e l'interruttore in cima al foglio
+     (2 nov 2026): quelli del P2P; sbiadito On-chain dove non si paga */
+  .pay-rete{margin:4px 0 10px}
+  .pay-rete .p2p-rete-tasto.spento,.btn.p2p-scelta-rete.spento{opacity:.5}
+  .pay-scelta-nota{margin:10px 0 2px}
   /* nel foglio puntata le chip vestono il blu dell'asta */
   #puntaSheet .consegna-pill.attiva{border-color:var(--asta);
     background:none;color:var(--asta-text)}
@@ -14973,6 +14978,16 @@ document.getElementById('cartello')?.remove();</script>
     <div id="payHint"></div>
   </div>
 
+  <!-- ============ LA SCELTA DELLA RETE AL «PAGA» (2 nov 2026) ============
+       Prima del foglio della fattura, a chi vede l'on-chain: i due tasti
+       grandi della scelta del + del P2P. Lo apre `apriSceltaPagaRete`
+       (dentro startBuy), dietro la leva MERCATINO_SCELTA_RETE. -->
+  <div class="sheet" id="paySceltaSheet" role="dialog" aria-modal="true" aria-labelledby="paySceltaTit">
+    <div class="grab"></div>
+    <h3 id="paySceltaTit">Come vuoi pagare?</h3>
+    <div id="paySceltaCorpo"></div>
+  </div>
+
   <!-- ============ SHEET CONFERMA «COMPRA SUBITO» (wallet NWC) ============ -->
   <div class="sheet" id="nwcConfermaSheet">
     <div class="grab"></div>
@@ -16797,6 +16812,7 @@ let myTgId = null, isAdmin = false;
    falso anche per i moderatori. */
 let myOnchain = false;
 let myOnchainRete = '';     // «signet» o «mainnet», detta da /api/me (30 ott 2026)
+let mySceltaRete = false;   // al «Paga» di un oggetto si sceglie prima la rete (2 nov 2026)
 let myOnchainIncasso = '';   // dove ricevo on-chain: '' | 'indirizzo' | 'xpub' (27 ott 2026)
 /* come ricevo quando vendo on-chain (28 ott 2026): {attivo, modo, minimo} */
 let myOnchainLn = {attivo: false};
@@ -33212,7 +33228,9 @@ async function convertiAsta(id){
     }});
 }
 
-async function startBuy(){
+/* `rete` e `pronto` arrivano dalla scelta della rete (2 nov 2026,
+   `sceltaPagaRete`): senza, e con la leva accesa, si chiede prima quella */
+async function startBuy(rete, pronto){
   haptic();
   rilancioCorrente = null;   /* il paySheet torna al poll degli ordini */
   pagamentoCorrente = null;
@@ -33236,6 +33254,15 @@ async function startBuy(){
   const offAcc = offertaAccettataPer(l.id, true);
   const p = acqDati?.preventivo;
   const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
+  /* LA SCELTA DELLA RETE PRIMA DEL FOGLIO (2 nov 2026, Andrea: «quando
+     uno compra un oggetto e clicca su paga deve comparire esattamente
+     come nel P2P il banner grosso on-chain o Lightning»): solo con la
+     leva, e solo dove la porta ⛓️ si aprirebbe; il tocco torna qui con
+     la rete scelta (e la risposta di /onchain/pronto gia' letta) */
+  if (rete === undefined && mySceltaRete && portaOnchainPossibile(l, offAcc)) {
+    apriSceltaPagaRete(l, via ? via.totale_sats : 0);
+    return;
+  }
   /* «Articolo» dice il LORDO e lo sconto ha la sua riga (ago 2026, il
      mono sconta): la stima di ripiego resta senza sconto, dichiarato —
      senza preventivo la regola non si conosce, e i sats veri arrivano
@@ -33264,7 +33291,13 @@ async function startBuy(){
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
   aggiornaPayHint();
-  payMetodoPrepara(l, offAcc, totS);
+  payMetodoPrepara(l, offAcc, totS, pronto);
+  /* scelto On-chain: niente fattura Lightning, si apre subito l'indirizzo
+     (se non nasce, `payPassaA` rifa' la fattura da se') */
+  if (rete === 'onchain' && payMetodoAcceso && pronto && pronto.pronto) {
+    await payPassaA('onchain');
+    return;
+  }
   if (DEMO) {
     el('payInvoice').textContent =
       'lnbc'+l.price+'n1p_demo_invoice_'+Math.random().toString(36).slice(2,26)+'…';
@@ -34272,6 +34305,7 @@ function invitoTelegram(testo, chiave){
 function closeSheet(){
   el('sheetBg').classList.remove('open');
   el('paySheet').classList.remove('open');
+  el('paySceltaSheet').classList.remove('open');
   payMetodoSpegni();   /* le due porte e il controllo on-chain non restano */
   el('invitoSheet').classList.remove('open');
   el('nostrSheet').classList.remove('open');
@@ -56891,14 +56925,23 @@ function payMetodoSpegni(){
   if (nota) { nota.style.display = 'none'; nota.innerHTML = ''; }
 }
 
-function payMetodoPrepara(l, offAcc, sats){
+/* dove la porta ⛓️ si apre: chi vede l'on-chain, un oggetto solo, al
+   prezzo di listino (la regola del server, vedi sopra) */
+function portaOnchainPossibile(l, offAcc){
+  return !!(myOnchain && !DEMO && !VETRINA && acqDati && acqDati.tipo === 'mono'
+            && !offAcc && !corpoCodiceSconto().codice_sconto && l);
+}
+
+/* `pronto`: la risposta di /onchain/pronto gia' letta dalla scelta della
+   rete (2 nov 2026), che non si richiede */
+function payMetodoPrepara(l, offAcc, sats, pronto){
   payMetodoSpegni();
-  if (!myOnchain || DEMO || VETRINA || !acqDati || acqDati.tipo !== 'mono'
-      || offAcc || corpoCodiceSconto().codice_sconto || !l) return;
+  if (!portaOnchainPossibile(l, offAcc)) return;
   payMetodoAcceso = true;
   payOffAcc = offAcc || null;
   payNotaLn = {mostra: el('payEurNota').style.display,
                testo: el('payEurNota').textContent};
+  if (pronto) { payOcPronto = pronto; renderPayMetodo(); return; }
   renderPayMetodo();
   fetch(`${API_BASE}/onchain/pronto/${l.sellerId}?sats=${Math.max(0, Math.floor(Number(sats) || 0))}`, {headers: {'X-Tg-Init-Data': authHdr()}})
     .then(r => r.ok ? r.json() : {pronto: false, motivo: 'on-chain spento su questo server'})
@@ -56910,6 +56953,25 @@ function renderPayMetodo(){
   const box = el('payMetodo');
   if (!box || !payMetodoAcceso) return;
   const ocSi = payOcPronto && payOcPronto.pronto;
+  /* L'INTERRUTTORE DEL P2P IN CIMA (2 nov 2026, Andrea: «in alto nella
+     pagina della fattura lo switch tra on-chain e Lightning»): con la
+     leva, lo stesso di `interruttoreReteP2P` — le due monete, On-chain
+     prima di Lightning, acceso quello del foglio; On-chain sbiadito se
+     questo oggetto non si paga on-chain (il tocco dice perche') */
+  if (mySceltaRete) {
+    const tasto = (m, moneta, nome, spento) => `<button type="button" role="radio"
+       class="p2p-rete-tasto${acqMetodo === m ? ' su' : ''}${spento ? ' spento' : ''}"
+       aria-checked="${acqMetodo === m}"${payMetodoOccupato ? ' aria-busy="true"' : ''}
+       onclick="payPassaA('${m}')">${moneta}<span>${nome}</span></button>`;
+    /* fuori dalle regole di `.pay-metodo`, che vestirebbero i tasti */
+    box.className = 'pay-rete';
+    box.innerHTML = '<div class="p2p-rete-scelta" role="radiogroup" aria-label="Come paghi">'
+      + tasto('onchain', P2P_OC_MONETA, 'On-chain', !ocSi)
+      + tasto('ln', P2P_LN_MONETA, 'Lightning', false) + '</div>';
+    box.style.display = 'block';
+    return;
+  }
+  box.className = 'pay-metodo';
   const porta = (m, cls, titolo, sotto, spento) =>
     `<button type="button" role="tab" class="${cls}${acqMetodo === m ? ' attiva' : ''}${spento ? ' spento' : ''}"
        aria-selected="${acqMetodo === m}"${payMetodoOccupato ? ' aria-busy="true"' : ''}
@@ -56924,6 +56986,54 @@ function payMetodoNota(html){
   if (!n) return;
   n.innerHTML = html || '';
   n.style.display = html ? 'block' : 'none';
+}
+
+/* ============ LA SCELTA DELLA RETE AL «PAGA» (2 nov 2026, Andrea:
+   «quando uno compra un oggetto e clicca su paga deve comparire
+   esattamente come nel P2P il banner grosso on-chain o Lightning»)
+   ============
+   I due tasti grandi della scelta del + del P2P (`apriSceltaPubblicaP2P`:
+   stesse classi, stesse monete, On-chain sopra), in un foglio prima di
+   quello della fattura. Intanto si chiede a /onchain/pronto se questo
+   venditore riceve on-chain: finche' non si sa, o se no, On-chain e'
+   sbiadito e il tocco lo dice sotto. Il tocco chiude la scelta e torna a
+   startBuy con la rete e la risposta, cosi' il foglio della fattura si
+   apre gia' sulla porta giusta. */
+let paySceltaPronto = null;
+let paySceltaNota = '';
+function apriSceltaPagaRete(l, sats){
+  paySceltaPronto = null; paySceltaNota = '';
+  renderSceltaPagaRete();
+  el('sheetBg').classList.add('open');
+  el('paySceltaSheet').classList.add('open');
+  fetch(`${API_BASE}/onchain/pronto/${l.sellerId}?sats=${Math.max(0, Math.floor(Number(sats) || 0))}`, {headers: {'X-Tg-Init-Data': authHdr()}})
+    .then(r => r.ok ? r.json() : {pronto: false, motivo: 'on-chain spento su questo server'})
+    .then(x => { paySceltaPronto = x; renderSceltaPagaRete(); })
+    .catch(() => { paySceltaPronto = {pronto: false, motivo: 'rete assente'}; renderSceltaPagaRete(); });
+}
+function renderSceltaPagaRete(){
+  const box = el('paySceltaCorpo');
+  if (!box) return;
+  const ocSi = paySceltaPronto && paySceltaPronto.pronto;
+  const tasto = (cls, rete, dentro, spento) => '<button type="button" class="btn ' + cls + ' p2p-scelta-rete'
+    + (spento ? ' spento' : '') + '" onclick="sceltaPagaRete(\'' + rete + '\')">' + dentro + '</button>';
+  box.innerHTML = '<div class="p2p-scelta">'
+    + tasto('p2p-scelta-oc', 'onchain', P2P_OC_MONETA + '<span>On-chain</span>', !ocSi)
+    + tasto('p2p-scelta-ln', 'ln', P2P_LN_MONETA + '<span>Lightning</span>', false)
+    + '</div>'
+    + (paySceltaNota ? '<div class="escrow-note pay-scelta-nota">' + paySceltaNota + '</div>' : '');
+}
+function sceltaPagaRete(rete){
+  if (rete === 'onchain' && !(paySceltaPronto && paySceltaPronto.pronto)) {
+    paySceltaNota = paySceltaPronto
+      ? 'On-chain non disponibile: ' + esc(paySceltaPronto.motivo || '')
+      : 'Sto chiedendo se questo venditore riceve on-chain…';
+    renderSceltaPagaRete();
+    return;
+  }
+  const pronto = rete === 'onchain' ? paySceltaPronto : null;
+  el('paySceltaSheet').classList.remove('open');
+  startBuy(rete, pronto);
 }
 
 async function payPassaA(m){
@@ -93304,6 +93414,8 @@ async function avvia(){
        giorno che la beta si allarga questa riga e' gia' giusta */
     myOnchain = !!me.onchain;
     myOnchainRete = me.onchain_rete || '';
+    /* ...e la scelta della rete al «Paga» (2 nov 2026, MERCATINO_SCELTA_RETE) */
+    mySceltaRete = !!me.scelta_rete;
     /* ...e gli scambi P2P con la garanzia 2-di-3 (30 ott 2026) */
     myP2POnchain = !!me.p2p_onchain;
     /* ...e gli ordini in USDT (1 nov 2026) */

@@ -77045,3 +77045,45 @@ legato al solo `transaction.claimed` tre controlli diventano rossi.
 COSA RESTA. Alan rivede il flusso. Non provato dal vivo: serve SATS
 Routing vero e una presa vera in mainnet (la prova a due di Andrea e Alan).
 MiCA prima di aprire a tutti.
+
+## La scelta della rete al «Paga» del mercatino (2 nov 2026, cantiere paga-rete)
+
+Andrea, 07:15: «quando uno compra un oggetto e clicca su paga deve
+comparire esattamente come nel P2P il banner grosso on-chain o
+Lightning, e poi in alto nella pagina della fattura lo switch tra
+on-chain e Lightning; mettilo acceso nel collaudo e dietro una leva
+spenta quando lo portiamo in produzione». 07:20: la domanda è «Come
+vuoi pagare?» (non «Vuoi comprare/vendere Bitcoin» del P2P).
+- COM'ERA: dal 27 ott (cantiere onchain-cassa) ⚡/⛓️ si sceglie DENTRO
+  il foglio della fattura, con due porte gialla e nera (`renderPayMetodo`),
+  e il foglio si apre sempre sul Lightning con la sua fattura.
+- LA SCELTA PRIMA DEL FOGLIO: `startBuy(rete, pronto)`. Senza rete, con
+  la leva e dove la porta ⛓️ si aprirebbe (`portaOnchainPossibile`, la
+  stessa condizione di prima tirata fuori da `payMetodoPrepara`: chi vede
+  l'on-chain, un oggetto solo, niente accordo né codice sconto), apre
+  `paySceltaSheet` coi due tasti della scelta del + del P2P (stesse
+  classi, monete, On-chain sopra) e intanto chiede `/onchain/pronto`.
+  On-chain resta sbiadito finché non si sa o se il venditore non riceve
+  on-chain, e il tocco dice il perché sotto. Il tocco torna a startBuy
+  con la rete e la risposta: su Lightning il foglio di sempre; su
+  On-chain il foglio si apre e va SUBITO all'indirizzo (`payPassaA`),
+  senza creare una fattura Lightning da chiudere (prima nasceva e si
+  annullava). Se l'indirizzo non nasce, `payPassaA` rifà la fattura da sé.
+- L'INTERRUTTORE IN CIMA: con la leva `renderPayMetodo` disegna quello
+  di `interruttoreReteP2P` (On-chain, Lightning, monete) e toglie la
+  classe `pay-metodo`, le cui regole vestirebbero i tasti; senza leva le
+  due porte di sempre. La risposta di /onchain/pronto data dalla scelta
+  non si richiede.
+- LA LEVA `MERCATINO_SCELTA_RETE`, spenta di serie: nel server, nel
+  pannello (in allarme senza `ONCHAIN_ATTIVO`), in `/api/me` come
+  `scelta_rete` solo per chi vede l'on-chain. Sul collaudo la riga la
+  mette Andrea: DA-FARE-ANDREA voce 8. Nessuna rotta nuova, nessun
+  effetto in produzione.
+
+Prove: `prove_scelta_rete_mercatino` (banco in node: la porta, l'
+interruttore con e senza leva, la scelta che chiede, aspetta, dice il no
+e torna a startBuy; fili di startBuy, del foglio e della leva).
+Controprova rossa: l'interruttore con On-chain mai sbiadito e la scelta
+senza leva. Visto dal vivo nei due temi con le risposte del server finte
+(foto 48). NON provato: il passaggio a On-chain fino all'indirizzo vero
+(serve il collaudo con due account e la chiave).
