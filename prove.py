@@ -154094,14 +154094,21 @@ console.log(JSON.stringify(out));
     # `comeLibroP2P` («Totale da inviare 10 USDT», non «€»)
     riga_libro = pezzo_js(mini, "function rigaOrdineP2P(", "\n}\n")
     prova("la card del libro mette la bandierina della valuta accanto alla cifra", True,
-          "+ (typeof bandieraValutaP2P === 'function' ? bandieraValutaP2P(o.fiat) : '')"
+          "+ (typeof bandieraValutaP2P === 'function' ? bandieraValutaP2P(o.fiat, o.metodi || []) : '')"
           in riga_libro)
     i = mini.index("const P2P_VALUTE = [")
     js = ("const P2P_VALUTA = 'EUR';\n" + mini[i:mini.index("];", i) + 2] + "\n"
-          + _fn_js(mini, "function bandieraValutaP2P(cod){") + "\n"
+          + mini[mini.index("const P2P_RETI_USDT = ["):mini.index("];", mini.index("const P2P_RETI_USDT = [")) + 2] + "\n"
+          + _fn_js(mini, "function reteUsdtDaMetodoP2P(m){") + "\n"
+          + _riga_js(mini, "const P2P_BADGE_RETI_USDT = {") + "\n"
+          + _fn_js(mini, "function bandieraValutaP2P(cod, metodi){") + "\n"
           + _fn_js(mini, "function comeLibroP2P(o){") + "\n"
           + "console.log(JSON.stringify({eur: bandieraValutaP2P('EUR'), vuota: bandieraValutaP2P(''),\n"
           + "  usdt: bandieraValutaP2P('usdt'), altra: bandieraValutaP2P('BRL'),\n"
+          + "  tron: bandieraValutaP2P('USDT', ['USDT (Tron)']),\n"
+          + "  eth: bandieraValutaP2P('USDT', ['USDT (Ethereum)']),\n"
+          + "  due: bandieraValutaP2P('USDT', ['USDT (Tron)', 'USDT (Ethereum)']),\n"
+          + "  eurSepa: bandieraValutaP2P('EUR', ['SEPA']),\n"
           + "  fiat: [comeLibroP2P({lato: 'compro', euro: 10, fiat: 'USDT'}).fiat,\n"
           + "         comeLibroP2P({lato: 'compro', euro: 10}).fiat]}));\n")
     o = _node_banco(js)
@@ -154116,6 +154123,12 @@ console.log(JSON.stringify(out));
               [o.get("eur"), o.get("vuota"),
                str(o.get("usdt") or "").startswith(' <span class="p2p-bandiera"><svg class="ico-usdt"'),
                o.get("altra")])
+        _n = lambda x: str(x or "").count('class="p2p-rete-badge"')
+        prova("il bollino della rete sul logo di Tether (2 nov 2026): rosso di Tron, rombo "
+              "di Ethereum; a due reti solo il logo (la rete si sceglie dopo), all'euro niente",
+              [1, True, 1, True, 0, 0],
+              [_n(o.get("tron")), "#EF0027" in str(o.get("tron")), _n(o.get("eth")),
+               "#E9ECEF" in str(o.get("eth")), _n(o.get("due")), _n(o.get("eurSepa"))])
         prova("il conto del mio scambio tiene la valuta: USDT resta USDT, senza resta vuota (euro)",
               ["USDT", ""], o.get("fiat"))
     # LA PAGINA DEI RECAPITI ALLEGGERITA (2 nov 2026, Andrea: «troppe
