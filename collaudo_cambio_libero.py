@@ -560,14 +560,13 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   // --- «Conferma» senza indirizzo: lo dice, niente biglietto
   await run('swapAvanti(0)');
   out.senzaIndirizzo = [run("swapErrori[0] || ''"), server().length];
-  // --- con l'indirizzo: la prima volta le parole (qui senza copia fuori
-  // dal telefono), poi «Continua»
+  // --- con l'indirizzo «Conferma» fa nascere il cambio, anche qui dove
+  // le parole non hanno copia fuori dal telefono: il passo delle parole
+  // non c'e' piu' (2 nov 2026 sera, Andrea), stanno nel Profilo
   run(`elementi.swapIndirizzo_0 = {value: '${D.indirizzo}'}`);
-  await run('swapAvanti(0)');
-  out.parole = [run("swapPassi[0] || ''"), box().includes('class="swap-parole"'), box().includes('nel Profilo, in «Il wallet di Barattolo»'), server().length];
-  run("elementi.swapSpunta_0 = {checked: true}");
   const vPrima = await visto();
-  await run('swapParoleFatte(0)');
+  await run('swapAvanti(0)');
+  out.parole = [run("swapPassi[0] || ''"), box().includes('class="swap-parole"'), server().length];
   const vDopo = await visto();
   const l1 = lista();
   const r1 = l1[0] || {};
@@ -925,10 +924,11 @@ def il_telefono(base):
           [100_000, 98_842, 150_000_000, 12_345_678, 0, 0, 10_000], r["leggi"])
     prova("«Conferma» senza indirizzo: lo dice, e al server non va niente",
           ["Prima metti il tuo indirizzo bitcoin: tocca «Incolla».", 0], r["senzaIndirizzo"])
-    prova("con l'indirizzo, la prima volta le 12 parole (che dicono dove ritrovarle: il Profilo)",
-          ["parole", True, True, 0], r["parole"])
+    prova("con l'indirizzo «Conferma» va dritto alla nascita: nessun passo delle 12 parole "
+          "(2 nov 2026 sera: stanno nel Profilo)",
+          ["", False, 2], r["parole"])
     n = r["nato"]
-    prova("«Continua»: PRIMA il biglietto, poi lo swap al cartone, poi la nascita; "
+    prova("«Conferma»: PRIMA il biglietto, poi lo swap al cartone, poi la nascita; "
           "mai il pagamento di Barattolo",
           ["biglietto", "nato"], n["ordini"])
     prova("...il biglietto porta direzione, cifra, fornitore e impronta delle tariffe",

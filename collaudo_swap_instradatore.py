@@ -229,9 +229,8 @@ const O = D.ordini;
   html.push(pp);
   /* (parole-corte) il titolo e' «Le tue 12 parole», senza il nome del fornitore */
   out.titoloParole = [pp.includes('Le tue 12 parole<'), pp.includes('12 parole per ')];
-  A.run(`elementi.swapSpunta_${o1} = {checked: true}`);
-  /* «Continua» fa nascere lo swap da solo */
-  await A.run(`swapParoleFatte(${o1})`);
+  /* (2 nov 2026 sera, Andrea) niente passo delle parole: «Conferma»
+     l'ha gia' fatto nascere, senza «Continua» */
   const r1 = lista(mem).find(r => r.ordine === o1) || {};
   const v2 = await visto(B2), v1 = await visto(B1);
   out.nato = {fornitore: r1.fornitore, ricevi: r1.ricevi, errore: A.run(`swapErrori[${o1}] || ''`),
@@ -422,8 +421,11 @@ def il_telefono(dati):
            m.get("voce")))
     # (29 ott 2026, parole-uniche) erano le parole di Cartone Due: ora sono
     # quelle del wallet di Barattolo, una sola serie per ogni fornitore
-    prova("le parole sono quelle del wallet di Barattolo, nessun cassetto per fornitore",
-          (["parole", True, False, False], [True, False]), (r["paroleSue"], r["titoloParole"]))
+    # (2 nov 2026 sera, Andrea) e il passo delle parole non compare piu':
+    # «Conferma» fa nascere il cambio, le parole stanno nel Profilo
+    prova("le parole sono quelle del wallet di Barattolo, nessun cassetto per fornitore, "
+          "e nessun passo delle parole in mezzo",
+          ([None, True, False, False], [False, False]), (r["paroleSue"], r["titoloParole"]))
     prova("lo swap nasce da Cartone Due, e solo li', con la prima chiave del wallet",
           {"fornitore": "cartone2", "ricevi": 47_298, "errore": "", "daDue": 1, "daUno": 0,
            "seme": "onchain", "indice": 0},

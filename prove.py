@@ -155636,12 +155636,16 @@ const giro = async (o) => {
     prova("il ritiro prende le parole del SUO record (wallet, o cassetto di prima)",
           True, "const c = swapParoleDi(rec);" in pezzo_js(js, "async function swapRitira(rec){", "\n}\n"))
     pannello = pezzo_js(js, "function pannelloSwapTelefono(o){", "\n}\n")
-    prova("il passo delle parole mostra quelle del wallet, e c'e' solo dove non "
-          "hanno copia e non sono gia' state copiate",
-          [True, True, True],
+    # (2 nov 2026 sera, Andrea) il passo delle parole nel cambio NON
+    # compare piu', nemmeno dove la copia manca: le parole stanno nel Profilo
+    prova("il passo delle parole nel cambio non compare MAI (le parole stanno nel "
+          "Profilo); la domanda «c'e' una copia?» gira lo stesso, perche' scrive "
+          "la copia nel cloud vuoto",
+          [True, True, False, True],
           ["const testo = swapParoleOnchain();" in pannello,
-           "if (seme.mostrare) { swapPassi[n] = 'parole';" in js,
-           "return parole !== swapParoleCoperte && !swapStatoSeme().copiata;" in js])
+           "function swapSemeDaMostrare(parole){\n  return false;\n}" in js,
+           "return parole !== swapParoleCoperte && !swapStatoSeme().copiata;" in js,
+           "coperte = !!(await onchainSemeCoperto(parole));" in js])
     prova("la pagina «Cambio» non ha piu' la riga delle parole: la porta del Profilo",
           [False, True, True],
           ['data-swap="riserva"' in js, 'data-swap="al-profilo"' in js,

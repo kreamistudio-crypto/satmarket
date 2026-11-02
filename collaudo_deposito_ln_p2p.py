@@ -196,19 +196,19 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   run('renderDepositoOnchainP2P()');
   out.conto = corpo();
   out.preventivoChiesto = run('preventivi.slice()');
-  /* le parole senza copia: prima il Profilo, e non nasce niente */
-  run('paroleCoperte = false; swapParoleCoperte = ""');
-  await run(`creaDepositoLnOnchainP2P({}, ${O.id})`);
-  out.paroleNo = [corpo().includes('Prima di usare il cambio guarda le tue 12 parole'), run('server.length'), lista().length];
-  run('paroleCoperte = true');
   /* l'indirizzo del foglio diverso da quello del preventivo: no */
   run(`p2pOcDeposito = ${JSON.stringify(Object.assign({}, O, {indirizzo: {indirizzo: D.altro}}))}`);
   await run(`creaDepositoLnOnchainP2P({}, ${O.id})`);
   out.indirizzoNo = [corpo().includes("L'indirizzo del deposito non torna"), run('server.length'), lista().length];
   run(`p2pOcDeposito = ${JSON.stringify(O)}`);
-  /* «Crea la richiesta Lightning» */
+  /* «Crea la richiesta Lightning» — con le parole SENZA copia fuori da
+     qui, che dal 2 nov 2026 sera (Andrea) non fermano piu' niente: nessun
+     «prima il Profilo», il cambio nasce */
+  run('paroleCoperte = false; swapParoleCoperte = ""');
   const v0 = (await (await fetchVero(BASE + '/cartone/visto')).json()).swap;
   await run(`creaDepositoLnOnchainP2P({}, ${O.id})`);
+  out.paroleNo = corpo().includes('Prima di usare il cambio guarda le tue 12 parole');
+  run('paroleCoperte = true');
   const rec = lista().find(r => r.p2pDeposito === O.id) || {};
   out.nato = {ordini: run('server.map(s => s[0])'), biglietto: run('server[0] && server[0][1]'),
               swap: (await (await fetchVero(BASE + '/cartone/visto')).json()).swap - v0,
@@ -524,8 +524,8 @@ def main():
            f"creaDepositoLnOnchainP2P(this, {oid})" in cc))
     prova("...dal preventivo dello scambio", [{"scambio": oid, "fornitore": "", "hash": ""}],
           t["preventivoChiesto"][:1])
-    prova("le 12 parole senza copia: prima il Profilo, e non nasce niente",
-          [True, 0, 0], t["paroleNo"])
+    prova("le 12 parole senza copia non fermano piu' il cambio (2 nov 2026 sera: "
+          "stanno nel Profilo, nessun avviso)", False, t["paroleNo"])
     prova("un indirizzo che non e' quello del preventivo: no, e non nasce niente",
           [True, 0, 0], t["indirizzoNo"])
     n = t["nato"]
