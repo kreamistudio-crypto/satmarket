@@ -69922,9 +69922,10 @@ function passoDopoGaranziaP2P(o){
   if (o.stato === 'attivo' && !(o.campiMiei || {}).euro
       && typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi))
     return 'Garanzia bloccata ✓: ora manda il PayCode a chi compra';
-  if (o.stato === 'attivo')
-    return (o.campiMiei || {}).euro ? 'Garanzia bloccata ✓: aspetta gli euro'
-                                    : 'Garanzia bloccata ✓: ora indica dove ricevere gli euro';
+  /* in USDT con le sue parole (2 nov 2026, usdt-moderatori) */
+  if (o.stato === 'attivo') return (typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P : (x, s) => s)(o,
+           (o.campiMiei || {}).euro ? 'Garanzia bloccata ✓: aspetta gli euro'
+                                    : 'Garanzia bloccata ✓: ora indica dove ricevere gli euro');
   if (o.stato === 'attesa_fattura_compratore')
     return 'Garanzia bloccata ✓: ora chi compra indica dove ricevere i sats';
   return '';
@@ -69995,8 +69996,10 @@ function corpoAnnulloDisputaP2P(o, modo){
   const testa = modo === 'accetta'
     ? 'Lo scambio si annulla, la disputa si chiude e i sats tornano a chi li aveva bloccati.'
     : 'La disputa è aperta, ma potete ancora chiuderla fra voi: se anche l\'altra persona è d\'accordo lo scambio si annulla, la disputa si chiude e i sats tornano a chi li ha bloccati.';
+  /* in USDT con le sue parole (2 nov 2026, usdt-moderatori) */
   return testa + (o && o.lato === 'compro'
-    ? ' Se hai già inviato gli euro non annullare: aspetta il moderatore.' : '');
+    ? (typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P : (x, s) => s)(o,
+      ' Se hai già inviato gli euro non annullare: aspetta il moderatore.') : '');
 }
 /* PURA: i gesti che stanno SOTTO il bottone pieno. Mai il passo
    successivo — quello e' uno solo ed e' azioniDisponibili. */
@@ -73674,7 +73677,12 @@ function renderOrdineP2P(){
      (vedi «LA BOZZA SOPRAVVIVE AL RIDISEGNO») */
   const bozza = bozzaRecensioneP2P(o.id);
   /* si ridisegna solo dove cambia: vedi `ridisegnaSeCambiaP2P` */
-  ridisegnaSeCambiaP2P(box,
+  /* ...e in USDT con le sue parole (2 nov 2026, usdt-moderatori): vedi
+     `paroleUsdtHtmlP2P`. PRIMA del confronto, cosi' un pezzo uguale
+     resta uguale e il ridisegno non lo tocca */
+  const paroleUsdt = typeof paroleUsdtHtmlP2P === 'function'
+    ? h => paroleUsdtHtmlP2P(o, h, P2P_USDT_DOVE) : h => h;
+  ridisegnaSeCambiaP2P(box, paroleUsdt(
     /* ⚠️ SOTTO IL CONTO NON C'E' PIU' LA RIGA DI SERVIZIO (set 2026,
        decisione di Andrea): portava il metodo di pagamento e il lato
        («💳 SEPA · ⬆️ Vendi sats»), e tutt'e due lo dicono gia' altri
@@ -73845,7 +73853,7 @@ function renderOrdineP2P(){
     riquadroRecensioneP2P(o, rec) +
     secondarie.map(a => (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && SECONDARI_CHIUSI_P2P[a])
                         || (scadutoTab && SECONDARI_EVIDENZA_P2P[a])
-                        || SECONDARI_P2P[a] || '').join(''));
+                        || SECONDARI_P2P[a] || '').join('')));
   /* il richiamo della chat si nasconde sullo schermo largo (vedi
      `chatScSegnaColonnaP2P`) */
   if (typeof chatScSegnaColonnaP2P === 'function') chatScSegnaColonnaP2P(box);
@@ -75272,7 +75280,8 @@ function recapitoAltroveP2P(){
   if (!o) return;
   chiediConferma({
     titolo: 'Hai già il recapito?',
-    corpo: 'Qui dentro non è arrivato. Se chi vende ti ha detto dove mandare gli euro per un\'altra strada, accendi il bottone — ma invia gli euro solo a un recapito che ti ha dato LUI, e solo perché questa pagina dice «Sats in garanzia».',
+    corpo: (typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P : (x, s) => s)(o,
+      'Qui dentro non è arrivato. Se chi vende ti ha detto dove mandare gli euro per un\'altra strada, accendi il bottone — ma invia gli euro solo a un recapito che ti ha dato LUI, e solo perché questa pagina dice «Sats in garanzia».'),
     etichetta: 'Sì, ce l\'ho',
     poi: () => {
       const agg = ordiniP2P()[o.id];
@@ -75688,6 +75697,56 @@ function soldiValutaP2P(cod){
   return String(cod || '').toUpperCase() === 'USDT' ? 'gli USDT' : 'gli euro';
 }
 function usdtP2P(o){ return valutaOrdineP2P(o) === 'USDT'; }
+/* LE PAROLE DEGLI USDT NELLA PAGINA DELLO SCAMBIO (2 nov 2026, cantiere
+   usdt-moderatori, si' di Andrea). Le frasi di uno scambio sono scritte
+   per gli euro — gli stati, i quattro passi, le attese, i fogli — e uno
+   scambio in USDT le legge tutte. Invece di una gemella per ogni frase,
+   un traduttore solo, il fratello di `p2p_usdt_frase` del server: cambia
+   le parole dei soldi e nient'altro. Su un ordine in euro torna il
+   testo com'era, lettera per lettera. */
+const P2P_USDT_PAROLE = [
+  ['Euro inviati', 'USDT inviati'],
+  ['Controlla il conto', 'Controlla il tuo wallet'],
+  ['controlla il conto', 'controlla il tuo wallet'],
+  ['💶', '💵'],
+  ['Gli euro', 'Gli USDT'], ['gli euro', 'gli USDT'], ['in euro', 'in USDT'],
+  [' €', ' USDT'], ['\u00a0€', '\u00a0USDT']
+];
+function paroleUsdtP2P(o, testo){
+  const t = String(testo == null ? '' : testo);
+  if (!usdtP2P(o)) return t;
+  let s = t;
+  for (const [a, b] of P2P_USDT_PAROLE) s = s.split(a).join(b);
+  /* e ogni «euro» rimasto («i tuoi euro»), parola intera */
+  return s.replace(/\b[Ee]uro\b/g, 'USDT');
+}
+/* ...E SULL'HTML: SOLO I TESTI, e solo dentro le scatole che parlano
+   l'app (`dove`, un selettore; vuoto = tutto). Mai gli attributi — le
+   classi (`p2p-euro`), gli `onclick` (`euroInviatiP2P`), i valori dei
+   campi — e mai quel che hanno scritto le persone: la chat, i
+   recapiti, un campo da riempire, un id da copiare. Senza un DOM (un
+   banco) torna l'HTML com'era. */
+const P2P_USDT_MAI = 'textarea, code, .mono, .chatmod, .chatmod-msg, .p2p-recapito';
+function paroleUsdtHtmlP2P(o, html, dove){
+  if (!usdtP2P(o)) return html;
+  try {
+    const t = document.createElement('template');
+    t.innerHTML = html;
+    const giro = document.createTreeWalker(t.content, NodeFilter.SHOW_TEXT);
+    for (let n = giro.nextNode(); n; n = giro.nextNode()) {
+      const padre = n.parentElement;
+      if (padre && padre.closest(P2P_USDT_MAI)) continue;
+      if (dove && !(padre && padre.closest(dove))) continue;
+      n.nodeValue = paroleUsdtP2P(o, n.nodeValue);
+    }
+    return t.innerHTML;
+  } catch(e) {
+    return html;
+  }
+}
+/* le scatole della pagina dello scambio che parlano l'app: i quattro
+   passi, le note dello stato, i bottoni, le righe d'aiuto, il tempo */
+const P2P_USDT_DOVE = '.steps, .trust-note, button, .hint, .p2p-gesto-tempo, label';
 /* IL METRO DI UN ORDINE: quanto vale un sat nella SUA valuta, adesso; 0
    = non lo so, e allora le stime tacciono. L'USDT vale un dollaro (il
    prezzo `pegged` del nodo), e senza dollaro vero non si inventa. */
@@ -82630,7 +82689,8 @@ function campoScrivi(o, tipo, campo, mio){
     haptic();
     toast(typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o)
       ? '📍 ' + nomeControparteP2P(o, 'Chi vende') + ' ' + P2P_TOAST_APPUNTAMENTO
-      : '💶 ' + nomeControparteP2P(o, 'Chi vende') + ' ' + P2P_TOAST_RECAPITO, 6000);
+      : (typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P : (x, s) => s)(o,
+          '💶 ' + nomeControparteP2P(o, 'Chi vende') + ' ' + P2P_TOAST_RECAPITO), 6000);
   }
   if (mio && tipo === 'euro' && typeof avvisaRecapitoP2P === 'function') avvisaRecapitoP2P(o.id);
   if (p2pCampiOrdine === o.id) renderCampiP2P();
@@ -84422,7 +84482,32 @@ function pubblicatoPresoP2P(o, prog, fermo){
    `passo_euro` lo decide il server dalla riga della disputa. */
 function nomePassoEuroModP2P(d){
   const k = d && d.passo_euro;
+  /* in USDT (2 nov 2026, usdt-moderatori) */
+  if (k === 'usdt') return 'USDT inviati';
   return k === 'paycode' ? 'PayCode pagato' : k === 'contanti' ? 'Contanti consegnati' : 'Euro inviati';
+}
+/* PURA: COSA GUARDARE IN UNA DISPUTA IN USDT (2 nov 2026, cantiere
+   usdt-moderatori, si' di Andrea). Gli USDT non passano dal nodo: la
+   prova e' la transazione sulla rete scritta nel metodo, e il moderatore
+   la guarda coi suoi occhi sull'explorer — il server non chiama nessuna
+   API. Il contratto si scrive per intero: un token falso puo' chiamarsi
+   «USDT» anche lui, e su un explorer si distingue solo da li'. */
+const P2P_EXPLORER_USDT = {tron: 'tronscan.org', ethereum: 'etherscan.io'};
+function guidaUsdtModP2P(d){
+  const metodi = String((d && d.metodi) || '');
+  const reti = P2P_RETI_USDT.filter(r => metodi.indexOf(r.metodo) >= 0);
+  const righe = (reti.length ? reti : P2P_RETI_USDT).map(r =>
+    '<li><b>' + esc(r.nome) + '</b> (' + esc(r.standard) + '): explorer <b>'
+    + esc(P2P_EXPLORER_USDT[r.rete] || '') + '</b>, contratto dell\'USDT vero '
+    + '<span class="mono">' + esc(r.contratto) + '</span></li>');
+  return '<div class="trust-note"><span>💵</span><span><b>Disputa in USDT: la prova è sulla rete.</b> '
+    + 'Gli USDT non passano dal nodo. Nella chat cerca l\'id della transazione e l\'indirizzo '
+    + 'che chi vende ha dato (se non li vedi, chiedili), apri l\'id sull\'explorer della rete e '
+    + 'controlla quattro cose: il token è l\'USDT vero (il contratto qui sotto: un token falso '
+    + 'può chiamarsi «USDT» anche lui), arriva all\'indirizzo di chi vende, l\'importo è quello '
+    + 'dello scambio, e la transazione è confermata. Un id che non esiste, o che sta su '
+    + 'un\'altra rete, non prova l\'invio.'
+    + '<ul>' + righe.join('') + '</ul></span></div>';
 }
 /* PURA: la riga piccola e grigia sotto un passo */
 function rigaOraPassoP2P(testo){
@@ -85637,7 +85722,9 @@ function scambiP2P(){
       + vuotoFiltroMieiP2P(righe.length, p2pMieiFiltro, p2pMieiVerso)
       + '<button type="button" class="scopri-link" onclick="azzeraFiltroMieiP2P()">Togli il filtro</button></div>';
   const troppi = mostrati.length - P2P_SCAMBI_MAX;
-  return mostrati.slice(0, P2P_SCAMBI_MAX).map(rigaScambioP2P).join('')
+  /* in USDT con le sue parole (2 nov 2026, usdt-moderatori) */
+  return mostrati.slice(0, P2P_SCAMBI_MAX).map(o => typeof paroleUsdtHtmlP2P === 'function'
+    ? paroleUsdtHtmlP2P(o, rigaScambioP2P(o), '') : rigaScambioP2P(o)).join('')
     + (troppi > 0 ? '<div class="hint">…e altri ' + troppi + ' più vecchi</div>' : '');
 }
 /* PURA: il titolo e la riga dello stato vuoto col filtro acceso.
@@ -89829,6 +89916,8 @@ function cardDisputaModP2P(d, ho){
     /* la prova d'incontro del contanti (30 set 2026): la riga che si legge
        PRIMA di decidere, con la sua cautela quando la card e' aperta */
     + rigaIncontroModP2P(d, aperta)
+    /* in USDT, cosa guardare sull'explorer (2 nov 2026, usdt-moderatori) */
+    + (aperta && d.usdt && typeof guidaUsdtModP2P === 'function' ? guidaUsdtModP2P(d) : '')
     /* la linea dei passi con le loro ore, a card aperta (16 ott 2026,
        orari-passi): le stesse che leggono le due parti */
     + (aperta ? passiModP2P(d) : '');

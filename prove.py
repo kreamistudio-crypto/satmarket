@@ -153226,7 +153226,137 @@ console.log(JSON.stringify([
           ("if p2p_usdt_ordine(con, ev[\"ordine\"]):" in manda
            and "avvisi = [(tg, p2p_usdt_frase(t)) for tg, t in avvisi]" in manda,
            src.count("if a_chi and p2p_usdt_ordine(con, (d or {}).get(\"ordine\")):"),
-           src.count('_usdt = globals().get("p2p_usdt_ordine")')))
+           # 2 qui; dal 2 nov 2026 (usdt-moderatori) altri 3 per i
+           # moderatori — disputa, garanzia lunga, card — provati in
+           # `prove_usdt_moderatori`
+           src.count('_usdt = globals().get("p2p_usdt_ordine")') - 3))
+
+
+def prove_usdt_moderatori():
+    """I MODERATORI E LA PAGINA DELLO SCAMBIO IN USDT (2 nov 2026, cantiere
+    usdt-moderatori, si' di Andrea alle due voci lasciate fuori dal
+    giro di prima). Ai moderatori: la cifra col suo segno, il gesto
+    «Ho inviato gli USDT», il terzo passo «USDT inviati» e la guida
+    dell'explorer col contratto vero (un token falso puo' chiamarsi
+    USDT). Alle parti: un traduttore solo, `paroleUsdtP2P`, il fratello
+    di `p2p_usdt_frase`, che sull'euro non cambia una lettera, e
+    `paroleUsdtHtmlP2P`, che tocca SOLO i testi delle scatole dell'app
+    (la chat, i recapiti e i campi mai)."""
+    print("\n₮ USDT: i moderatori e la pagina dello scambio")
+    import re as _re
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    ini = mini.index("const STATI_P2P = {")
+    stati = mini[ini:mini.index("\n};\n", ini) + 4]
+    ini = mini.index("const P2P_RETI_USDT = [")
+    reti = mini[ini:mini.index("];", ini) + 3]
+    base = ("const P2P_VALUTA = 'EUR';\nconst esc = s => String(s);\n"
+            + _riga_js(mini, "const P2P_VALUTE = [") + reti
+            + _fn_js(mini, "function valutaOrdineP2P(o){")
+            + _riga_js(mini, "function usdtP2P(o){")
+            + mini[mini.index("const P2P_USDT_PAROLE = ["):mini.index("/* ...E SULL'HTML: SOLO I TESTI")])
+    js = (base + stati
+          + _fn_js(mini, "function passoDopoGaranziaP2P(o){")
+          + _fn_js(mini, "function corpoAnnulloDisputaP2P(o, modo){")
+          + _fn_js(mini, "function nomePassoEuroModP2P(d){")
+          + _riga_js(mini, "const P2P_EXPLORER_USDT = {")
+          + _fn_js(mini, "function guidaUsdtModP2P(d){") + r"""
+const U = {fiat: 'USDT'}, E = {fiat: 'EUR'}, N = {};
+const frasi = [];
+for (const s of Object.values(STATI_P2P))
+  for (const k of Object.keys(s)) if (typeof s[k] === 'string') frasi.push(s[k]);
+const tradotte = frasi.map(f => paroleUsdtP2P(U, f));
+const vende = Object.assign({lato: 'vendo', stato: 'attivo'}, U);
+const g = [passoDopoGaranziaP2P(vende),
+           passoDopoGaranziaP2P(Object.assign({campiMiei: {euro: 1}}, vende)),
+           corpoAnnulloDisputaP2P(Object.assign({lato: 'compro'}, U), 'chiedi')];
+const gE = [passoDopoGaranziaP2P(Object.assign({}, vende, {fiat: 'EUR'})),
+            corpoAnnulloDisputaP2P({lato: 'compro', fiat: 'EUR'}, 'chiedi')];
+const tron = guidaUsdtModP2P({metodi: 'USDT (Tron)'});
+const eth = guidaUsdtModP2P({metodi: 'USDT (Ethereum)'});
+console.log(JSON.stringify({
+  sporche: tradotte.filter(f => /\beuro\b|€|💶|[Cc]ontrolla il conto/i.test(f)),
+  usdt: tradotte.filter(f => /USDT/.test(f)).length,
+  uguali: frasi.every(f => paroleUsdtP2P(E, f) === f && paroleUsdtP2P(N, f) === f),
+  passo: paroleUsdtP2P(U, 'Euro inviati'),
+  cifra: paroleUsdtP2P(U, 'Hai detto di aver mandato 50,00\u00a0€'),
+  classi: paroleUsdtP2P(U, 'euroInviatiP2P'),
+  conto: paroleUsdtP2P(U, 'Controlla il conto e libera i sats'),
+  g: g, gE: gE,
+  mod: [nomePassoEuroModP2P({passo_euro: 'usdt'}), nomePassoEuroModP2P({passo_euro: ''}),
+        nomePassoEuroModP2P({passo_euro: 'contanti'})],
+  tron: [tron.indexOf('tronscan.org') >= 0, tron.indexOf('TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t') >= 0,
+         tron.indexOf('etherscan') < 0],
+  eth: [eth.indexOf('etherscan.io') >= 0, eth.indexOf('0xdAC17F958D2ee523a2206206994597C13D831ec7') >= 0,
+        eth.indexOf('tronscan') < 0]}));""")
+    o = _node_banco(js)
+    if o is None:
+        salta("le parole degli USDT nella pagina dello scambio", "node non c'e'")
+    else:
+        prova("la pagina dello scambio: tradotti, gli stati non dicono piu' euro, € "
+              "ne' «controlla il conto», e su un ordine in euro (o senza valuta) non "
+              "cambia una lettera",
+              ([], True, True), (o.get("sporche"), o.get("usdt", 0) >= 5, o.get("uguali")))
+        prova("...il terzo passo e' «USDT inviati», la cifra col segno vero anche "
+              "dopo lo spazio unificatore, un nome di funzione resta quello, e il "
+              "conto diventa il wallet",
+              ["USDT inviati", "Hai detto di aver mandato 50,00\u00a0USDT", "euroInviatiP2P",
+               "Controlla il tuo wallet e libera i sats"],
+              [o.get("passo"), o.get("cifra"), o.get("classi"), o.get("conto")])
+        prova("...il toast di garanzia bloccata e il foglio dell'annullo in disputa "
+              "dicono USDT, e in euro restano quelli di ieri",
+              (["Garanzia bloccata ✓: ora indica dove ricevere gli USDT",
+                "Garanzia bloccata ✓: aspetta gli USDT", True],
+               ["Garanzia bloccata ✓: ora indica dove ricevere gli euro", True]),
+              ([o["g"][0], o["g"][1], "Se hai già inviato gli USDT non annullare" in o["g"][2]],
+               [o["gE"][0], "Se hai già inviato gli euro non annullare" in o["gE"][1]]))
+        prova("il moderatore: il terzo passo «USDT inviati», e la guida dice l'explorer "
+              "e il contratto vero della SUA rete, non dell'altra",
+              (["USDT inviati", "Euro inviati", "Contanti consegnati"], [True] * 3, [True] * 3),
+              (o.get("mod"), o.get("tron"), o.get("eth")))
+    # --- l'HTML: le scatole dell'app si', le persone no ---
+    sel = _re.search(r"const P2P_USDT_MAI = '([^']*)'", mini)
+    prova("l'HTML si traduce SOLO nei testi: mai la chat, i recapiti, i campi, gli "
+          "id da copiare (e il ridisegno lo riceve gia' tradotto)",
+          (True, True, True),
+          (bool(sel) and all(x in sel.group(1) for x in
+                             ("textarea", ".chatmod-msg", ".p2p-recapito", ".mono", "code")),
+           "n.nodeValue = paroleUsdtP2P(o, n.nodeValue);" in mini
+           and "innerHTML = paroleUsdt" not in mini,
+           "ridisegnaSeCambiaP2P(box, paroleUsdt(" in mini
+           and "? paroleUsdtHtmlP2P(o, rigaScambioP2P(o), '') : rigaScambioP2P(o)" in mini))
+    # --- il server: i due avvisi ai moderatori ---
+    import html as _html, time as _time
+    amb = {"html": _html, "time": _time, "_fmt_sats": lambda n: f"{n:,}".replace(",", "."),
+           "P2P_GARANZIA_COORD_H": 92, "P2P_GARANZIA_LND_H": 96,
+           "GESTO_PAGATO_P2P": {"": "Ho inviato gli euro"},
+           "_quando_garanzia_p2p": lambda ts: "il 02/11 alle 09:00"}
+    exec(pezzo("_testo_disputa_aperta_p2p"), amb)
+    exec(pezzo("_testo_garanzia_mod_p2p"), amb)
+    d = {"ordine": "abcdef1234", "aperta_da": "compra", "compra": "Mario",
+         "vende": "Luca", "sats": 70000, "euro": "50,00 €", "metodi": "USDT (Tron)"}
+    ap_u = amb["_testo_disputa_aperta_p2p"](dict(d, usdt=True), 0)
+    ap_e = amb["_testo_disputa_aperta_p2p"](d, 0)
+    ga_u = amb["_testo_garanzia_mod_p2p"](72, 72, dict(d, usdt=True, fiat_il=1), 0)
+    ga_e = amb["_testo_garanzia_mod_p2p"](72, 72, dict(d, fiat_il=1), 0)
+    prova("all'apertura della disputa il moderatore legge «50,00 USDT» e cosa "
+          "guardare sull'explorer; senza USDT la frase di sempre",
+          (True, False, True, True, False),
+          ("50,00 USDT" in ap_u, "€" in ap_u, "tronscan.org" in ap_u and "etherscan.io" in ap_u,
+           "50,00 €" in ap_e, "tronscan" in ap_e))
+    prova("alla garanzia lunga: la cifra e il gesto «Ho inviato gli USDT»; in euro "
+          "quelli di ieri",
+          (True, True, False, True),
+          ("50,00 USDT" in ga_u, "«Ho inviato gli USDT»" in ga_u, "€" in ga_u,
+           "«Ho inviato gli euro»" in ga_e and "50,00 €" in ga_e))
+    dis, gar, riga = (pezzo("_disputa_evento_p2p"), pezzo("_garanzie_lunghe_p2p"),
+                      pezzo("_riga_disputa_p2p"))
+    prova("...e chi li scrive sa se l'ordine e' in USDT: la disputa che si apre, la "
+          "garanzia lunga, la card della disputa nell'app",
+          (True, True, True),
+          ('d["usdt"] = bool(_usdt and _usdt(con, ordine))' in dis,
+           'd["usdt"] = bool(_usdt and _usdt(con, ordine))' in gar,
+           'passo_euro="usdt"' in riga and "usdt=True" in riga))
 
 
 def prove_lista_corta_metodi():
@@ -185204,6 +185334,7 @@ def main():
     prove_usdt_due_reti,
     prove_p2p_onchain_usdt,
     prove_lista_corta_metodi,
+    prove_usdt_moderatori,
     prove_grafica_p2p_onchain,
     prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,
