@@ -142,6 +142,8 @@ function swapPrenotaIndice(){
 /* le parole che una copia fuori da qui ridà, viste in questa apertura:
    chi le ha gia' viste coperte non le richiede a ogni cambio */
 let swapParoleCoperte = '';
+/* quanto si aspetta la domanda sulla copia prima di andare avanti */
+const SWAP_COPIA_ATTESA_MS = 5000;
 /* LE PAROLE NEL CAMBIO NON SI MOSTRANO PIU', MAI (2 nov 2026 sera,
    Andrea, durante la prova vera in produzione: «confonde l'utente ed è
    una complessità che dobbiamo nascondere, la seed è nelle impostazioni
@@ -166,10 +168,17 @@ async function swapSemePronto(){
   try { parole = String(await onchainSemeAssicurato() || '').trim(); }
   catch(e){ throw swapNoOnchain('seme'); }
   if (!parole) throw swapNoOnchain('seme');
+  /* (2 nov 2026 sera, conferma-appesa: Andrea premeva «Conferma» e la
+     pagina restava coi puntini) la domanda sulla copia puo' passare dal
+     firmatario Nostr dell'account collegato, e un bunker aspetta
+     l'approvazione di una persona per minuti, in silenzio. Le parole non
+     si mostrano piu' (sopra), quindi la risposta non decide niente per
+     il cambio: la si aspetta al piu' `SWAP_COPIA_ATTESA_MS`, poi si va
+     avanti e lei finisce da sola (la scrittura nel cloud vuoto compresa) */
   if (parole !== swapParoleCoperte && typeof onchainSemeCoperto === 'function') {
-    let coperte = false;
-    try { coperte = !!(await onchainSemeCoperto(parole)); } catch(e){ coperte = false; }
-    if (coperte) swapParoleCoperte = parole;
+    const domanda = Promise.resolve().then(() => onchainSemeCoperto(parole))
+      .then(c => { if (c) swapParoleCoperte = parole; return !!c; }, () => false);
+    await Promise.race([domanda, new Promise(ok => setTimeout(() => ok(false), SWAP_COPIA_ATTESA_MS))]);
   }
   return {parole: parole, mostrare: swapSemeDaMostrare(parole)};
 }
@@ -300,6 +309,9 @@ const SWAP_TESTI_T3 = {
     pagaTu: n => `Paga questa richiesta col tuo wallet Lightning: appena ${n} la vede, i bitcoin partono verso il tuo indirizzo.`,
     copia: 'Copia', copiata: 'Copiata', apriWallet: 'Apri nel wallet',
     valeFino: h => `Vale fino alle ${h}`,
+    attimo: 'Un attimo, preparo il cambio…',
+    doveTit: 'Indirizzo di destinazione', doveLn: 'Il tuo wallet Lightning',
+    doveNo: 'Non salvato su questo telefono',
     cambioScaduto: 'Scaduto: nessun sats si è mosso. Puoi fare un cambio nuovo.',
     cambioFallito: 'Non riuscito: nessun sats si è mosso. Puoi fare un cambio nuovo.',
     cambioRipreso: n => `${n} si è ripreso i bitcoin, e il tuo pagamento torna al tuo wallet.`,
@@ -419,6 +431,9 @@ const SWAP_TESTI_T3 = {
     pagaTu: n => `Pay this request with your Lightning wallet: as soon as ${n} sees it, the bitcoin leave for your address.`,
     copia: 'Copy', copiata: 'Copied', apriWallet: 'Open in wallet',
     valeFino: h => `Valid until ${h}`,
+    attimo: 'One moment, preparing the exchange…',
+    doveTit: 'Destination address', doveLn: 'Your Lightning wallet',
+    doveNo: 'Not saved on this phone',
     cambioScaduto: 'Expired: no sats moved. You can start a new exchange.',
     cambioFallito: 'Failed: no sats moved. You can start a new exchange.',
     cambioRipreso: n => `${n} took the bitcoin back, and your payment returns to your wallet.`,
@@ -790,7 +805,15 @@ async function swapAvanti(n){
   haptic();
   if (swapInCorso.has(n) || swapDiOrdine(n)) return;
   swapInCorso.add(n);
-  try { await swapAvantiDentro(n); } finally { swapInCorso.delete(n); }
+  /* (2 nov 2026 sera, Andrea: «mentre uno aspetta deve uscire il solito
+     anello che gira con scritto qualcosa tipo aspetta») dal tocco fino
+     al QR, o al perche' del no, il velo di casa col suo anello: chi
+     aspetta vede che si lavora, e un secondo tocco non parte. Alla fine
+     si ridisegna SEMPRE: un preventivo ricontrollato e cambiato (o
+     rifiutato) tornava senza ridisegno, e la pagina restava coi puntini */
+  const rip = typeof bottoneInAttesa === 'function' ? bottoneInAttesa(null, t3().attimo) : () => {};
+  try { await swapAvantiDentro(n); }
+  finally { swapInCorso.delete(n); rip(); ridisegnaIncassoSwap(); }
 }
 /* (tappa 3) la richiesta Lightning scritta nel campo, pulita; '' se manca */
 function swapFatturaScritta(n){
@@ -1805,8 +1828,9 @@ function renderSwapCambio(){
   const campo = sub ? campoFatturaSwap(0, '') : campoIndirizzoSwap(0, '');
   const limiti = esc(t.cifraTra(swapCambioNum(l.minimo || 0), swapCambioNum(l.massimo || 0), swapCambioUnitaNome()))
     + (l.al_giorno ? ' · ' + esc(t.oggi(l.oggi || 0, l.al_giorno)) : '');
-  const tessere = t.tessere.map(([ic, testo]) =>
-    `<li><span class="cambio-tessera-ico">${swapIcona(ic)}</span>${esc(testo)}</li>`).join('');
+  /* (2 nov 2026 sera, Alan: «sembrano bottoni, li metterei solo come
+     testo in un elenco puntato») tre righe di testo, niente riquadri */
+  const tessere = t.tessere.map(([ic, testo]) => `<li>${esc(testo)}</li>`).join('');
   forma(forma0);
   box.innerHTML = `<div class="swap-cambio">
     <div class="cambio-carta" role="group" aria-label="${esc(sub ? tp.titoloPrevSub : tp.titoloPrev)}">
@@ -1943,6 +1967,21 @@ function barretteSwap(rec){
   if (q < 0) return '';
   return `<span class="cambio-barrette" aria-hidden="true">${[0, 1, 2].map(i => `<i class="${i < q ? 'fatto' : ''}"></i>`).join('')}</span>`;
 }
+/* LO STORICO DICE DOVE (2 nov 2026 sera, Alan: «anche lo storico
+   cliccandolo dovrebbe dire l'indirizzo di destinazione»): toccata, una
+   voce si apre e mostra dove vanno i sats — l'indirizzo bitcoin, o il
+   wallet Lightning per la strada rovesciata. Le voci aperte si ricordano
+   qui: la lista si ridisegna da sola a ogni giro della sorveglianza */
+const swapVociAperte = new Set();
+function doveVaSwap(rec){
+  const t = t3();
+  const dove = swapESub(rec)
+    ? `<span class="cambio-dove-val">${esc(t.doveLn)}</span>`
+    : rec.indirizzo
+      ? `<span class="cambio-dove-val mono">${esc(rec.indirizzo)}</span>`
+      : `<span class="cambio-dove-val">${esc(t.doveNo)}</span>`;
+  return `<div class="cambio-dove"><span class="cambio-dove-eti">${esc(t.doveTit)}</span>${dove}</div>`;
+}
 function renderSwapTelefono(){
   const box = el('swapTelefono');
   if (!box) return;
@@ -1952,7 +1991,7 @@ function renderSwapTelefono(){
      nessuno» della tappa 1 tace */
   if (el('swapVuoto')) el('swapVuoto').style.display = lista.length || swapCambioAcceso() ? 'none' : '';
   const righe = lista.map(rec => `<div class="cambio-voce">
-      <div class="cambio-voce-riga">
+      <button type="button" class="cambio-voce-riga" data-swap="voce" data-id="${esc(rec.id)}" aria-expanded="${swapVociAperte.has(rec.id)}">
         ${swapMoneta(swapESub(rec) ? 'ln' : 'btc')}
         <span class="cambio-voce-dati">
           <b>${esc(swapECambio(rec) ? t.cambio : rec.p2p || rec.p2pOnchain || rec.p2pDeposito || rec.p2pPresa ? t.scambioP2P : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
@@ -1961,7 +2000,8 @@ function renderSwapTelefono(){
           ${barretteSwap(rec)}
         </span>
         ${Number(rec.ricevi) > 0 ? `<span class="cambio-voce-cifra">${fmt(rec.ricevi)}</span>` : ''}
-      </div>
+      </button>
+      ${swapVociAperte.has(rec.id) ? doveVaSwap(rec) : ''}
       ${(!rec.indirizzo && SWAP_FASI_RITIRO.has(swapFase(rec)) && !swapESub(rec)) || (swapDaRimborsare(rec) && !rec.indirizzo) ? `
         <input class="swap-indirizzo" id="swapIndirizzoR_${esc(rec.id)}" type="text" autocomplete="off" spellcheck="false" placeholder="bc1…">
         <button class="btn ghost" type="button" data-swap="ritira-a" data-id="${esc(rec.id)}">${esc(swapESub(rec) ? t.rimborsaA : t.ritiraA)}</button>` : ''}
@@ -2122,6 +2162,12 @@ if (typeof document !== 'undefined') {
     else if (a === 'ritrova') swapRitrovaCambi();
     else if (a === 'al-profilo' && typeof apriCassettoProfilo === 'function') { haptic(); apriCassettoProfilo('accOnchainIncasso'); }
     else if (a === 'ritira-a') swapRitiraA(String(b.dataset.id || ''));
+    else if (a === 'voce') {
+      haptic();
+      const id = String(b.dataset.id || '');
+      if (swapVociAperte.has(id)) swapVociAperte.delete(id); else swapVociAperte.add(id);
+      renderSwapTelefono();
+    }
     else if (a === 'cambio-gira') swapCambioScegliStrada(String(b.dataset.strada || 'ln-btc'));
     else if (a === 'cambio-unita') swapCambioScegliUnita(String(b.dataset.unita || 'sats'));
     else if (a === 'cambio-onion' && typeof apriSitoOnion === 'function') apriSitoOnion();

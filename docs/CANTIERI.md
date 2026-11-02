@@ -77698,3 +77698,61 @@ PROVATO. `prove_parole_uniche` riscritta sulla regola nuova;
 `collaudo_swap_telefono` senza il passo (58 verdi), con le parole che
 nascono valide alla prima «Conferma» e il pannello che non le mostra;
 controprova con la regola vecchia: rosso. Suite severa e collaudi CI.
+
+## «Conferma» del Cambio appeso alla domanda sulla copia, e il velo (2 nov 2026, cantiere conferma-appesa)
+
+Prova vera della leva 3 (cambio libero, 25.000 sats LN → indirizzo, dentro
+Telegram, account Telegram collegato a una chiave Nostr): il preventivo
+arriva, «Conferma» si accende; premuto, la pagina torna ai puntini e resta
+ferma. Un secondo «Conferma» non fa NIENTE: il primo giro è ancora in
+corso (`swapInCorso`), appeso a metà di `swapAvantiDentro`.
+
+IL PUNTO. Dopo il ricontrollo del preventivo, `swapSemePronto` aspettava
+la risposta di `onchainSemeCoperto`: il cloud di Telegram e, se lì non c'è
+la stessa copia, la cassetta su Nostr, che apre il firmatario dell'account
+collegato. Un bunker (NIP-46) aspetta una persona per minuti, e un Amber
+chiuso non la sente nemmeno: nessuna notifica, nessun errore. Dal 2 nov
+sera le parole nel cambio non si mostrano più (voce qui sopra), quindi
+quella risposta non decide niente per il cambio.
+
+COSA CAMBIA. In `swapSemePronto` la domanda si aspetta al più
+`SWAP_COPIA_ATTESA_MS` (5 secondi), poi si va avanti; la domanda finisce
+da sola (la scrittura nel cloud vuoto compresa) e un sì arrivato tardi si
+ricorda lo stesso.
+
+IL VELO (Andrea, subito dopo: «mentre uno aspetta deve uscire il solito
+anello che gira con scritto qualcosa tipo aspetta»). `swapAvanti` alza
+dal tocco il velo di casa (`bottoneInAttesa(null, t3().attimo)`: «Un
+attimo, preparo il cambio…») e lo toglie alla fine, quando c'è il QR o il
+perché del no; vale per il Cambio e per l'incasso dell'ordine. Alla fine
+si ridisegna SEMPRE: un preventivo ricontrollato e cambiato, o rifiutato,
+tornava senza ridisegno e la pagina del Cambio restava coi puntini.
+
+LE DUE DI ALAN (stessa sera, girate da Andrea). Lo storico del Cambio:
+toccata, una voce si apre (`swapVociAperte`, ricordate perché la lista si
+ridisegna da sola a ogni giro della sorveglianza) e dice «Indirizzo di
+destinazione» con l'indirizzo scritto, o «Il tuo wallet Lightning» sulla
+strada rovesciata, o «Non salvato su questo telefono». Le tre tessere
+«Veloce · Restano tuoi · Due strade», che sembravano bottoni, sono un
+elenco puntato di solo testo, senza riquadri né icone. Il tasto che
+inverte e le tendine che si girano da sole c'erano già: compaiono con due
+strade, cioè con `CAMBIO_BTC_LN_ATTIVO` (leva 4), ancora spenta in
+produzione. `SWAP_TELEFONO_VER` = 2d7e2557a4.
+
+LA CONTROPROVA DAL VIVO (prima della cura): con Amber aperto in
+sottofondo, lo stesso «Conferma» è andato dritto al QR da pagare, senza
+nessuna notifica di Amber (il permesso era già dato). Il blocco era
+quello. Resta un indiziato non toccato: la lettura del cloud in
+`onchainSemeAssicurato` quando sul telefono non ci sono parole (lì il
+tetto non si mette: una casa muta non è vuota).
+
+PROVATO. `prove_parole_uniche`: un banco node con la domanda che non
+risponde MAI (tetto 50 ms), che risponde con un errore e con un sì;
+controprova sul codice di prima: rossa (il banco resta appeso). Un
+secondo banco per il velo (alzato col suo testo, un secondo tocco che
+non ne alza un altro, tolto e ridisegno alla fine); controprova rossa.
+`collaudo_cambio_libero`: le tre righe puntate senza icona, la voce dello
+storico chiusa e aperta (indirizzo scritto; wallet Lightning sulla strada
+rovesciata); una sentinella sul CSS dell'elenco. Collaudi
+dello swap e del cambio (telefono, instradatore, cambio libero, cambio
+P2P, deposito, presa, pagamento) verdi; suite severa.

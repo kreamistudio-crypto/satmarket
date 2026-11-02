@@ -155645,7 +155645,77 @@ const giro = async (o) => {
           ["const testo = swapParoleOnchain();" in pannello,
            "function swapSemeDaMostrare(parole){\n  return false;\n}" in js,
            "return parole !== swapParoleCoperte && !swapStatoSeme().copiata;" in js,
-           "coperte = !!(await onchainSemeCoperto(parole));" in js])
+           "Promise.resolve().then(() => onchainSemeCoperto(parole))" in js])
+    # (2 nov 2026 sera, conferma-appesa) la domanda sulla copia passa
+    # anche dal firmatario Nostr (un bunker aspetta una persona, minuti):
+    # «Conferma» non la aspetta piu' di SWAP_COPIA_ATTESA_MS. Il banco:
+    # una domanda che non risponde MAI, un tetto di 50 ms.
+    pronto = pezzo_js(js, "async function swapSemePronto(){", "\n}\n") + "\n}\n"
+    banco_appeso = """
+const SWAP_COPIA_ATTESA_MS = 50;
+let swapParoleCoperte = '', risposta = 'mai';
+function swapNoOnchain(t){ const e = new Error(t); e.tipo = t; return e; }
+function swapSemeDaMostrare(){ return false; }
+async function onchainSemeAssicurato(){ return 'uno due tre'; }
+function onchainSemeCoperto(){
+  if (risposta === 'mai') return new Promise(() => {});
+  if (risposta === 'errore') return Promise.reject(new Error('giu'));
+  return Promise.resolve(risposta === 'si');
+}
+""" + pronto + """
+(async () => {
+  const out = [];
+  for (const r of ['mai', 'errore', 'si']) {
+    risposta = r; swapParoleCoperte = '';
+    const t0 = Date.now();
+    const p = await swapSemePronto();
+    out.push([p.parole, p.mostrare, Date.now() - t0 < 1000, swapParoleCoperte]);
+  }
+  console.log(JSON.stringify(out));
+})();
+"""
+    r = _node_banco(banco_appeso)
+    if r is None:
+        salta("«Conferma» non aspetta una domanda sulla copia appesa", "node non c'e'")
+    else:
+        prova("«Conferma» non resta appeso alla domanda sulla copia (un bunker che "
+              "non risponde): si va avanti dopo il tetto, coi soli sats e parole "
+              "del telefono; un errore non ferma; un sì si ricorda",
+              [["uno due tre", False, True, ""], ["uno due tre", False, True, ""],
+               ["uno due tre", False, True, "uno due tre"]], r)
+    # (2 nov 2026 sera, Andrea: «deve uscire il solito anello che gira»)
+    # dal tocco di «Conferma» alla fine il velo di casa col suo testo; un
+    # secondo tocco non parte; alla fine si ridisegna SEMPRE (anche il
+    # ritorno muto del preventivo cambiato, che lasciava i puntini)
+    avanti = pezzo_js(js, "async function swapAvanti(n){", "\n}\n") + "\n}\n"
+    banco_velo = """
+const swapInCorso = new Set();
+let veli = [], tolti = 0, ridisegni = 0, giri = 0, libera = null;
+function haptic(){}
+function swapDiOrdine(){ return null; }
+function t3(){ return {attimo: 'Un attimo, preparo il cambio…'}; }
+function bottoneInAttesa(b, t){ veli.push(t); return () => { tolti++; }; }
+function ridisegnaIncassoSwap(){ ridisegni++; }
+async function swapAvantiDentro(n){ giri++; await new Promise(ok => { libera = ok; }); }
+""" + avanti + """
+(async () => {
+  const primo = swapAvanti(0);
+  await Promise.resolve();
+  const durante = [veli.slice(), tolti];
+  await swapAvanti(0);          // il secondo tocco, mentre il primo lavora
+  const doppio = [veli.length, giri];
+  libera(); await primo;
+  console.log(JSON.stringify([durante, doppio, tolti, ridisegni, swapInCorso.has(0)]));
+})();
+"""
+    r = _node_banco(banco_velo)
+    if r is None:
+        salta("il velo di «Conferma»", "node non c'e'")
+    else:
+        prova("«Conferma» alza il velo col suo anello e «Un attimo, preparo il "
+              "cambio…»; un secondo tocco non ne alza un altro; alla fine il velo "
+              "si toglie e la pagina si ridisegna sempre",
+              [[["Un attimo, preparo il cambio…"], 0], [1, 1], 1, 1, False], r)
     prova("la pagina «Cambio» non ha piu' la riga delle parole: la porta del Profilo",
           [False, True, True],
           ['data-swap="riserva"' in js, 'data-swap="al-profilo"' in js,
@@ -184724,6 +184794,14 @@ console.log(JSON.stringify(fuori));
            rende.count("</div>${onion}"),
            "box.querySelector('.cambio-tessere')" in pezzi,
            "border-radius:14px;" in re.search(r"\.cambio-onion\{[^}]*\}", mini).group(0)))
+    # (2 nov 2026 sera, Alan: «"veloce", "restano tuoi", "due strade"
+    # sembrano bottoni, li metterei solo come testo in un elenco puntato»)
+    _tess = re.search(r"\.cambio-tessere\{[^}]*\}", mini).group(0)
+    prova("(Alan) le tre tessere sono un elenco puntato di solo testo: il pallino, "
+          "niente riquadro, niente icona",
+          (True, False, False, False),
+          ("list-style:disc" in _tess, "background" in _tess,
+           ".cambio-tessere li{" in mini, "cambio-tessera-ico" in rende))
     # (30 ott 2026, cifre-stessa-misura, Andrea: «quando cambio da bitcoin
     # a satoshi ... la grandezza dei numeri dentro le caselle cambiano?
     # non dovrebbero») la cifra in BTC non ha una grandezza sua: la

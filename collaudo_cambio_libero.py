@@ -495,7 +495,10 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
                         f1.indexOf('data-unita="btc"') < f1.indexOf('data-unita="sats"')],
                 gira: (f1.match(/data-swap="cambio-gira"/g) || []).length,
                 tra: f1.includes('Da 25000 a 500000 sats · oggi 0 di 5'),
-                tessere: (f1.match(/<li><span class="cambio-tessera-ico"><svg/g) || []).length,
+                /* (2 nov 2026 sera, Alan) le tessere sono un elenco puntato di
+                   solo testo: tre righe, nessuna icona */
+                tessere: [(f1.match(/<ul class="cambio-tessere"><li>Veloce<\/li><li>Restano tuoi<\/li><li>Due strade<\/li><\/ul>/g) || []).length,
+                          f1.includes('cambio-tessera-ico')],
                 indirizzo: f1.includes('id="swapIndirizzo_0"'),
                 fermo: f1.includes('id="swapCambioVai" type="button" data-swap="avanti" data-ordine="0" disabled'),
                 vecchi: ['data-swap="cambia"', 'cambio-chiudi', 'data-swap="cambio-calcola"', 'Cambia i tuoi sats'].filter(x => f1.includes(x)),
@@ -592,6 +595,15 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   const pag = run('elementi.swapTelefono.innerHTML');
   out.pagina = {cambio: pag.includes('<b>Cambio</b>'), frase: run('frasestatoSwap(swapLista()[0])'),
                 vuotoNascosto: run("elementi.swapVuoto.style.display")};
+  /* (2 nov 2026 sera, Alan) la voce si tocca e dice dove vanno i sats:
+     chiusa no, aperta l'indirizzo scritto */
+  run(`swapVociAperte.add(${JSON.stringify(r1.id)}); renderSwapTelefono()`);
+  const pagAperta = run('elementi.swapTelefono.innerHTML');
+  run(`swapVociAperte.delete(${JSON.stringify(r1.id)}); renderSwapTelefono()`);
+  out.dove = {chiusa: pag.includes('Indirizzo di destinazione') || pag.includes(D.indirizzo),
+              bottone: pag.includes(`<button type="button" class="cambio-voce-riga" data-swap="voce" data-id="${r1.id}" aria-expanded="false">`),
+              aperta: pagAperta.includes(`<span class="cambio-dove-eti">Indirizzo di destinazione</span><span class="cambio-dove-val mono">${D.indirizzo}</span>`),
+              espansa: pagAperta.includes(`data-id="${r1.id}" aria-expanded="true"`)};
   // --- un secondo cambio mentre il primo e' vivo: il riquadro mostra il primo
   run('renderSwapCambio()');
   out.secondoMentreVivo = box().includes('data-swap="cambio-copia"');
@@ -753,8 +765,11 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   await run('swapGiro()');
   run('renderSwapCambio()');
   sub.fatto = [frase(), box().includes('id="swapCambioRicevi"'), rec().stato];
-  run('renderSwapTelefono()');
+  run(`swapVociAperte.add(${JSON.stringify(rS.id)}); renderSwapTelefono()`);
   sub.lista = run('elementi.swapTelefono.innerHTML').includes('<b>Cambio</b>');
+  /* (2 nov 2026 sera, Alan) la strada rovesciata va al wallet Lightning */
+  sub.dove = run('elementi.swapTelefono.innerHTML').includes('<span class="cambio-dove-val">Il tuo wallet Lightning</span>');
+  run(`swapVociAperte.delete(${JSON.stringify(rS.id)})`);
   /* IL CAMBIO FALLITO: i bitcoin tornano a due, all'indirizzo scritto */
   const nuovoSub = async f => {
     run("bigliettoRisposta = {ok: true, id: bigliettoRisposta.id + 1, oggi: 1}");
@@ -892,9 +907,9 @@ def il_telefono(base):
     prova("a leva del cambio spenta il riquadro e' vuoto", "", r["spento"])
     prova("accesa, SUBITO APERTO: «Mandi» col fulmine «LN» e «Ricevi circa» con la moneta "
           "«BTC» (unita-tendine; una strada sola: niente tendine, niente tondo), i due campi, "
-          "il selettore ₿ / sats (sats scelto), i tetti, tre tesserine, l'indirizzo e "
+          "il selettore ₿ / sats (sats scelto), i tetti, le tre righe puntate di solo testo, l'indirizzo e "
           "«Conferma» spento; niente tasti di ieri, niente emoji fuori dalle icone disegnate",
-          {"campo": True, "mandi": True, "ricevi": True, "tendine": 0, "unita": [2, True, True, True], "gira": 0, "tra": True, "tessere": 3,
+          {"campo": True, "mandi": True, "ricevi": True, "tendine": 0, "unita": [2, True, True, True], "gira": 0, "tra": True, "tessere": [1, False],
            "indirizzo": True, "fermo": True, "vecchi": [], "emoji": []}, r["aperto"])
     prova("senza cifra: lo dice e non chiede niente", [True, 0], r["senzaCifra"])
     prova("la cifra scritta tasto per tasto: intanto «…» e «Conferma» spento, nessun "
@@ -956,6 +971,9 @@ def il_telefono(base):
           (True, True, "none"), (r["pagina"]["cambio"],
                                  r["pagina"]["frase"].startswith("Paga questa richiesta col tuo wallet Lightning"),
                                  r["pagina"]["vuotoNascosto"]))
+    prova("(Alan) la voce dello storico si tocca: chiusa non dice l'indirizzo, aperta "
+          "dice «Indirizzo di destinazione» e quello scritto",
+          {"chiusa": False, "bottone": True, "aperta": True, "espansa": True}, r["dove"])
     prova("un secondo cambio mentre il primo aspetta: si vede il primo", True, r["secondoMentreVivo"])
     prova("a cambio finito il riquadro torna aperto e PULITO: niente cifra ne' indirizzo di prima",
           [True, True, True], r["finito"])
@@ -1031,6 +1049,7 @@ def il_telefono(base):
     prova("fatto: la frase, il riquadro torna aperto, lo stato",
           ["Fatto: i sats sono nel tuo wallet Lightning.", True, "transaction.claimed"], s.get("fatto"))
     prova("...e nella lista si chiama «Cambio»", True, s.get("lista"))
+    prova("...e toccata dice che i sats vanno al wallet Lightning (Alan)", True, s.get("dove"))
     prova("un cambio fallito coi bitcoin mandati: «fallito», la frase chiede dove rimandarli, "
           "il campo nella lista, il riquadro libero, e NON e' in sorveglianza senza indirizzo",
           {"fase": "fallito", "frase": "Non riuscito: i tuoi bitcoin tornano a te. Scrivi sotto dove rimandarli.",
