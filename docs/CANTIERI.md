@@ -77157,3 +77157,108 @@ scambio vero in USDT (DA-FARE-ANDREA, voce 7, parte C). Restano in euro: gli
 avvisi ai MODERATORI di una disputa e la loro guida (guardare l'id
 sull'explorer), e qualche frase «gli euro» nella pagina dello scambio
 dell'app.
+
+## Gli USDT negli scambi P2P on-chain (2 nov 2026, cantiere p2p-onchain-usdt)
+
+LA RICHIESTA. Andrea, 2 nov 2026 08:20 UTC: «usdt onchain assolutamente
+e' da fare». Lo studio dell'1 nov («USDT e altre coin») aveva detto NO a
+«USDT nel 2-di-3» per quattro motivi: il nostro 2-di-3 è un multisig
+bitcoin e su Tron o Ethereum andrebbe rifatto da zero (mesi), Tether può
+congelare l'indirizzo della garanzia che porta la nostra firma, serve il
+gas oltre agli USDT, e MiCA (che Andrea ha tolto dal tavolo).
+
+LA STRADA, DI ALAN (08:27 UTC, incollata da Andrea): «noi non facciamo
+escrow su altre chain, facciamo escrow sempre e solo su LN o Bitcoin
+onchain; l'altra parte è il sostituto della moneta FIAT che non ha
+escrow, e non ne ha bisogno». Quindi la GARANZIA NON CAMBIA: i sats di
+chi vende bitcoin restano nel 2-di-3 bitcoin di sempre, e chi compra
+paga in USDT su Tron o Ethereum al posto degli euro, da persona a
+persona, come negli ordini in USDT di Mostro. Andrea, 08:29: «ok». E
+08:30: «come controparte possiamo mettere qualunque cosa, l'importante
+che nell'annuncio sia chiaro per gli utenti».
+
+COSA SI È DECISO E PERCHÉ.
+- LA VALUTA SI LEGGE DAI METODI, nessuna colonna nuova: lo scambio è in
+  USDT quando OGNI metodo è una nostra rete («USDT (Tron)», «USDT
+  (Ethereum)», la grafia del protocollo Mostro), e reti e metodi
+  dell'euro non si mescolano (il giudice dell'ordine nuovo dice no; un
+  «USDT (Polygon)» scritto a mano è un metodo dell'euro che dice USDT, e
+  non passa). È la stessa regola degli ordini in USDT di Mostro
+  (`p2p_usdt_ordine`). `euro_cent` porta i centesimi di USDT, 1 USDT = 1
+  dollaro: a mercato i sats si contano col cambio in dollari, la stima
+  del libro anche. Un ordine non accetta euro E USDT insieme: la cifra è
+  in una valuta sola (anche per Mostro); chi vuole tutte e due ne
+  pubblica due (detto ad Andrea, 08:36: «giusto»).
+- IL TETTO è quello del P2P, 250 €, tradotto in USDT al cambio di adesso
+  come fa il telefono; senza cambi vale 1 (fermo, mai un via libera
+  inventato). Il PARACADUTE resta in euro: misura quanto si muove BTC, e
+  la ronda legge l'euro.
+- LA RETE SBAGLIATA SI FERMA ANCHE NEL SERVER, perché l'ordine on-chain è
+  suo (quello di Mostro lo giudica solo il telefono): l'indirizzo di chi
+  vende bitcoin passa da `p2p_onchain_giudica_recapito_usdt` alla
+  pubblicazione, alla presa (chi prende un «compro» vendendo) e quando lo
+  cambia. Tron col SUO controllo (Base58Check), EVM solo la forma: nel
+  server non c'è keccak, e il controllo EIP-55 lo fa il telefono. Con
+  due reti nell'ordine la rete dello scambio la dice l'indirizzo: Tron ed
+  Ethereum non si confondono.
+- «HO INVIATO GLI USDT» è la rotta di sempre (`euro-inviati`) con
+  `{txid}`: senza l'indirizzo di chi riceve non si parte, l'id si giudica
+  sulla rete dello scambio, si scrive in `txid_usdt` e arriva a chi vende
+  nell'avviso. Qui non c'è chat dello scambio (lo scambio on-chain non
+  l'ha mai avuta): l'id sta nella scheda delle due parti, con il link a
+  Tronscan o Etherscan.
+- IL MODERATORE VEDE L'INDIRIZZO USDT, a differenza del recapito degli
+  euro: è un indirizzo pubblico di una catena, non un IBAN, e in disputa
+  deve cercare sull'explorer l'invio verso QUELL'indirizzo.
+- GLI AVVISI DEL BOT passano tutti da `_notifica_p2p_onchain`, che usa il
+  traduttore unico degli USDT (`p2p_usdt_frase`, con due coppie nuove:
+  «sul tuo conto» e «il tuo conto» → «il tuo wallet»). Unica eccezione
+  il paracadute, che parla del prezzo di BTC in euro: lì la cifra
+  dell'ordine si dice con la sua valuta, e il resto non si traduce.
+- IL TELEFONO: a rete on-chain il foglio offre la valuta ₮ USDT solo con
+  `myP2POnchainUsdt`; «Dove vuoi gli USDT» col giudice mentre si scrive;
+  card, presa, scheda, conto, passi e «I miei scambi» con la cifra e le
+  parole della valuta; a chi paga il riquadro con la rete in grande, il
+  QR (EIP-681 sulle EVM) e il contratto del vero USDT; il campo dell'id
+  sopra «💵 Ho inviato gli USDT». Il traduttore del telefono `paroleOcP2P`
+  lavora solo sulle FRASI, mai sull'HTML dei bottoni (lì c'è
+  'euro-inviati'). Le funzioni di ieri prendono i pezzi nuovi col typeof:
+  i banchi delle prove che le ritagliano da sole restano quelli di ieri.
+
+STRADE SCARTATE. La prima proposta di questo thread (08:25): un Safe
+2-di-3 su Ethereum come garanzia degli USDT, col gas rimborsato in USDT e
+Tron dopo (multifirma nativo a ~100 TRX per scambio, o un contratto
+nostro da far revisionare). Ritirata dopo il parere di Alan: la garanzia
+su un'altra catena riporta tutti i problemi dello studio. Una colonna
+`fiat`: i metodi lo dicono già. Un tasto «₮ USDT» in prima fila fra i
+metodi (Andrea 08:33, poi «giusto e allora niente»): la valuta si sceglie
+in cima al foglio.
+
+PROVE. `collaudo_p2p_onchain_usdt` (il giro col server vero: leva e due
+cancelli, mescolati, Polygon, rete sbagliata, contratto, refuso, bitcoin,
+tetto senza cambi e con i cambi, il 38383 con `f` USDT, il libro per chi
+è ammesso, la porta di chi prende da sola, gli avvisi senza euro,
+«Ho inviato» senza id, con l'id dell'altra rete e giusto, il moderatore,
+la liberazione con le due firme, Ethereum con due reti e chi prende
+vendendo). `prove_p2p_onchain_usdt` (i pezzi puri del server contro un
+riferimento di Tron scritto a parte, quelli del telefono in node, le
+sentinelle delle porte e degli avvisi). Riallineate tre prove di ieri:
+il conto dei gesti con la domanda unica (104 → 105) e due banchi che
+ritagliano `p2p_onchain_tags`, il giudice e `_accoda_onchain_nuovo_p2p`
+(ora vogliono i pezzi veri della valuta). CONTROPROVE ROSSE (10): «any»
+invece di «all» sui metodi; il controllo di Tron sempre vero; la rete
+sbagliata non guardata; l'id non giudicato; il filtro del libro tolto;
+il traduttore tolto dagli avvisi; la porta di chi prende tolta (questa
+all'inizio restava verde: il collaudo provava la porta solo a leva
+spenta, dove si chiude anche quella di chi ha pubblicato; ora la prova
+da sola); il lookahead di 'euro-inviati' tolto; il foglio on-chain di
+nuovo senza USDT; l'explorer di Tron tolto.
+
+NON PROVATO E DA GUARDARE. Niente di questo è girato dal vivo: la leva
+sul collaudo e la prova a due account stanno in DA-FARE-ANDREA, voce 8
+(gli USDT della prova sono VERI, i sats di signet no). Da guardare dal
+telefono: il QR del riquadro con un wallet vero (Tron: indirizzo nudo;
+Ethereum: EIP-681), il campo dell'id dentro Telegram, la scheda del
+moderatore con l'indirizzo e l'id. Resta il limite detto anche per
+Mostro: un indirizzo 0x vale anche su reti che non offriamo, e chi paga
+può mandare da lì; lo dicono il riquadro, il QR con la catena e l'id.

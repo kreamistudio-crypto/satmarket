@@ -33760,6 +33760,17 @@ def _leve_stato():
                          "gli ordini in USDT; vale solo se il nodo ha USDT "
                          "fra le valute accettate",
                   spento="il P2P è solo in euro, come ieri"),
+            # GLI USDT NEGLI SCAMBI ON-CHAIN (2 nov 2026, cantiere
+            # p2p-onchain-usdt): la garanzia resta il 2-di-3 bitcoin, chi
+            # compra paga in USDT invece che in euro
+            _leva("USDT negli scambi on-chain", "P2P_ONCHAIN_USDT_ATTIVO",
+                  bool(P2P_ONCHAIN_USDT_ATTIVO),
+                  acceso="negli scambi on-chain (2-di-3) si può pagare in "
+                         "USDT su Tron o Ethereum invece che in euro; vale "
+                         "solo per chi ha sia il P2P on-chain sia gli USDT",
+                  spento="gli scambi on-chain si pagano solo in euro",
+                  allarme=bool(P2P_ONCHAIN_USDT_ATTIVO) and not (
+                      P2P_ONCHAIN_ATTIVO and P2P_USDT_ATTIVO)),
             _leva("USDT solo agli admin", "P2P_USDT_SOLO_ADMIN",
                   bool(P2P_USDT_SOLO_ADMIN),
                   acceso="gli ordini in USDT li vedono solo i moderatori "
@@ -46828,6 +46839,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # P2P_USDT_ATTIVO, la porticina degli admin e il P2P per me. Senza,
     # il libro non mostra gli ordini in USDT e il foglio offre l'euro solo.
     profilo["p2p_usdt"] = p2p_usdt_ammesso(user["id"])
+    # ...e gli USDT negli scambi on-chain col 2-di-3 (2 nov 2026, cantiere
+    # p2p-onchain-usdt): la leva sua sotto i due cancelli di sopra
+    profilo["p2p_onchain_usdt"] = p2p_onchain_usdt_ammesso(user["id"])
     # dove ricevo on-chain quando vendo ('' = da nessuna parte, e quindi
     # niente on-chain per i miei annunci): la voce di «Completa il
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
@@ -52806,6 +52820,9 @@ P2P_USDT_FRASI = (
      "aspetta pure; se invece qualcosa non torna apri una disputa",
      "Cerca l'id della transazione (è nella chat dello scambio) "
      "sull'explorer della rete: se qualcosa non torna apri una disputa"),
+    # (2 nov 2026, cantiere p2p-onchain-usdt) gli avvisi del 2-di-3
+    ("sul tuo conto", "sul tuo wallet"),
+    ("il tuo conto", "il tuo wallet"),
     ("Controlla il conto", "Controlla il tuo wallet"),
     ("controlla il conto", "controlla il tuo wallet"),
     ("💶", "💵"),
@@ -63324,8 +63341,14 @@ def _accoda_onchain_nuovo_p2p(o, cambio: float, adesso: int) -> int:
     except (TypeError, ValueError):
         metodi = []
     euro = int(o["euro_cent"] or 0) / 100
-    conv = _convenienza_nuovo_p2p(o["lato"], o["premio"], o["prezzo_sats"], euro, cambio)
+    # in USDT (2 nov 2026) la convenienza si misura sul dollaro, la cifra
+    # dice USDT, e l'avviso va solo a chi gli USDT on-chain li puo' usare
+    usdt = p2p_onchain_usdt(o)
+    conv = _convenienza_nuovo_p2p(o["lato"], o["premio"], o["prezzo_sats"], euro,
+                                  cambio_noto_ora("usd") if usdt else cambio)
     euro_txt = _euro_libro([euro])
+    if usdt and euro_txt.endswith(" €"):
+        euro_txt = euro_txt[:-2] + " USDT"
     metodi_txt = ", ".join(_metodi_libro(metodi))
     autore = int(o["maker_id"] or 0)
     con = db()
@@ -63336,6 +63359,8 @@ def _accoda_onchain_nuovo_p2p(o, cambio: float, adesso: int) -> int:
             if tg == autore:
                 continue                      # mai per i suoi
             if not p2p_onchain_ammesso(tg):
+                continue
+            if usdt and not p2p_onchain_usdt_ammesso(tg):
                 continue
             if not _passa_avviso_nuovo_p2p(_pref_avvisi_nuovi_p2p(p), tipo, conv, "onchain"):
                 continue
@@ -94000,6 +94025,41 @@ if not isinstance(P2P_ONCHAIN_ATTIVO, bool):
           "on-chain restano spenti", flush=True)
     P2P_ONCHAIN_ATTIVO = False
 
+# GLI USDT NEGLI SCAMBI ON-CHAIN (2 nov 2026, cantiere p2p-onchain-usdt,
+# Andrea: «usdt onchain assolutamente è da fare»; la strada di Alan: «noi
+# non facciamo escrow su altre chain, facciamo escrow sempre e solo su LN
+# o Bitcoin onchain; l'altra parte è il sostituto della moneta FIAT»).
+# LA GARANZIA NON CAMBIA: i sats di chi vende bitcoin restano nel 2-di-3
+# bitcoin di sempre, PSBT, firme e dispute uguali. Cambia solo QUEL CHE
+# PAGA chi compra: invece degli euro, USDT su Tron o su Ethereum, da
+# persona a persona, fuori da Barattolo — come gli ordini in USDT di
+# Mostro (`p2p_usdt_ammesso`), di cui si riusano le reti, i giudici e il
+# traduttore delle frasi del bot. Niente contratti, niente gas nostro,
+# nessuna catena nuova da guardare: Barattolo gli USDT non li tocca mai.
+# L'ORDINE E' IN USDT QUANDO OGNI SUO METODO E' UNA NOSTRA RETE
+# («USDT (Tron)», «USDT (Ethereum)», la grafia del protocollo Mostro), e
+# i metodi dell'euro non si mescolano: nessuna colonna nuova per la
+# valuta, `euro_cent` porta i centesimi di USDT (1 USDT = 1 dollaro, come
+# il nodo). Dietro una leva sua, spenta, sotto i due cancelli: quello
+# del P2P on-chain e quello degli USDT (di serie solo gli admin).
+try:
+    from config import P2P_ONCHAIN_USDT_ATTIVO
+except ImportError:
+    P2P_ONCHAIN_USDT_ATTIVO = False
+if not isinstance(P2P_ONCHAIN_USDT_ATTIVO, bool):
+    print("[p2p] P2P_ONCHAIN_USDT_ATTIVO non e' True/False: gli USDT negli "
+          "scambi on-chain restano spenti", flush=True)
+    P2P_ONCHAIN_USDT_ATTIVO = False
+# le reti, coi nomi del metodo e il contratto del vero USDT (contro i
+# token falsi che si chiamano «USDT» anche loro); gemelle di
+# `P2P_RETI_USDT` del telefono
+P2P_ONCHAIN_RETI_USDT = {
+    "USDT (Tron)": {"rete": "tron", "nome": "Tron",
+                    "contratto": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"},
+    "USDT (Ethereum)": {"rete": "ethereum", "nome": "Ethereum",
+                        "contratto": "0xdAC17F958D2ee523a2206206994597C13D831ec7"},
+}
+
 P2P_ONCHAIN_PREFISSO = "bar-onchain-"   # il `d` del 38383: nostro, riconoscibile
 P2P_ONCHAIN_ORE_LIBRO = 24      # quanto resta nel libro un ordine non preso
 P2P_ONCHAIN_ORE_DEPOSITO = 6    # dalla presa: entro quando il deposito va confermato
@@ -94038,6 +94098,181 @@ def p2p_onchain_ammesso(tg_id) -> bool:
     lo legge chiunque: e' su Nostr."""
     return (p2p_onchain_leva() and onchain_ammesso(tg_id)
             and bool(_p2p_per(tg_id)["attivo"]))
+
+
+def p2p_onchain_usdt_ammesso(tg_id) -> bool:
+    """Chi puo' pubblicare e prendere uno scambio on-chain PAGATO IN USDT
+    (2 nov 2026): la leva sua, il cancello del P2P on-chain E quello degli
+    USDT (`p2p_usdt_ammesso`, di serie solo gli admin). Una sola spenta =
+    no, per chiunque."""
+    return bool(P2P_ONCHAIN_USDT_ATTIVO and p2p_onchain_ammesso(tg_id)
+                and p2p_usdt_ammesso(tg_id))
+
+
+def _p2p_onchain_metodi(o) -> list:
+    """PURA: i metodi di una riga, come lista (storta = vuota)."""
+    try:
+        m = json.loads(_p2p_onchain_campo(o, "metodi", "[]") or "[]")
+    except (TypeError, ValueError):
+        return []
+    return [str(x) for x in m] if isinstance(m, list) else []
+
+
+def p2p_onchain_metodi_usdt(metodi) -> bool:
+    """PURA: dei metodi sono USDT se TUTTI sono nostre reti (e ce n'e'
+    almeno uno). Vale per una lista e per una riga."""
+    m = metodi if isinstance(metodi, list) else []
+    return len(m) > 0 and all(str(x) in P2P_ONCHAIN_RETI_USDT for x in m)
+
+
+def p2p_onchain_usdt(o) -> bool:
+    """PURA: lo scambio si paga in USDT (vedi il blocco degli USDT)."""
+    return p2p_onchain_metodi_usdt(_p2p_onchain_metodi(o))
+
+
+def p2p_onchain_valuta(o) -> str:
+    """PURA: 'USDT' o 'EUR', il `f` del 38383 e il `fiat` del telefono."""
+    return "USDT" if p2p_onchain_usdt(o) else "EUR"
+
+
+def _p2p_onchain_parole(o, testo: str) -> str:
+    """PURA: un avviso scritto per gli euro, detto nella valuta dello
+    scambio — per gli USDT il traduttore unico degli avvisi del P2P."""
+    return p2p_usdt_frase(testo) if p2p_onchain_usdt(o) else testo
+
+
+async def _notifica_p2p_onchain(o, chi, testo: str, bottone=None):
+    """Ogni avviso di uno scambio on-chain passa di qui: le parole della
+    sua valuta, poi la `notifica` di sempre."""
+    return await notifica(chi, _p2p_onchain_parole(o, testo), bottone)
+
+
+_BASE58_ALFABETO = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def _tron_valido(s: str) -> bool:
+    """PURA: un indirizzo Tron col suo controllo (Base58Check, 0x41 in
+    testa): un carattere sbagliato non passa."""
+    n = 0
+    for c in s:
+        i = _BASE58_ALFABETO.find(c)
+        if i < 0:
+            return False
+        n = n * 58 + i
+    try:
+        b = n.to_bytes(25, "big")
+    except OverflowError:
+        return False
+    corpo, controllo = b[:21], b[21:]
+    if corpo[0] != 0x41:
+        return False
+    return hashlib.sha256(hashlib.sha256(corpo).digest()).digest()[:4] == controllo
+
+
+def p2p_onchain_rete_indirizzo(testo: str) -> str:
+    """PURA: la FAMIGLIA di un indirizzo USDT, 'tron' | 'evm' | ''. Tron e'
+    Base58 col controllo (provato qui); le reti EVM sono 0x e quaranta
+    cifre (il controllo delle maiuscole, EIP-55, lo fa il telefono: qui
+    non c'e' keccak)."""
+    s = str(testo or "").strip()
+    if re.fullmatch(r"T[1-9A-HJ-NP-Za-km-z]{33}", s) and _tron_valido(s):
+        return "tron"
+    if re.fullmatch(r"0x[0-9a-fA-F]{40}", s):
+        return "evm"
+    return ""
+
+
+def p2p_onchain_rete_scambio(o) -> dict:
+    """PURA: la rete USDT dello scambio, o {} se non si sa ancora. Con una
+    rete sola e' quella; con due la dice l'indirizzo di chi riceve (Tron
+    ed Ethereum hanno forme che non si confondono)."""
+    metodi = [m for m in _p2p_onchain_metodi(o) if m in P2P_ONCHAIN_RETI_USDT]
+    if not metodi:
+        return {}
+    if len(metodi) == 1:
+        return dict(P2P_ONCHAIN_RETI_USDT[metodi[0]], metodo=metodi[0])
+    forma = p2p_onchain_rete_indirizzo(_p2p_onchain_campo(o, "recapito", ""))
+    for m in metodi:
+        r = P2P_ONCHAIN_RETI_USDT[m]
+        if (forma == "tron") == (r["rete"] == "tron") and forma:
+            return dict(r, metodo=m)
+    return {}
+
+
+def p2p_onchain_giudica_recapito_usdt(recapito, metodi) -> str:
+    """PURA: l'indirizzo dove chi vende bitcoin vuole gli USDT. '' va
+    bene (anche vuoto: si scrive dopo); sennò la frase. LA RETE SBAGLIATA
+    E' IL GUAI DA FERMARE: un indirizzo dell'altra famiglia, bitcoin,
+    Lightning o il contratto del token si dicono per nome."""
+    s = str(recapito or "").strip()
+    if not s:
+        return ""
+    reti = [P2P_ONCHAIN_RETI_USDT[m] for m in metodi if m in P2P_ONCHAIN_RETI_USDT]
+    nomi = " o ".join(r["nome"] for r in reti) or "la rete scelta"
+    if any(s.lower() == r["contratto"].lower() for r in P2P_ONCHAIN_RETI_USDT.values()):
+        return ("Questo è l'indirizzo del contratto USDT, non il tuo: copia dal "
+                "wallet l'indirizzo dove ricevi")
+    forma = p2p_onchain_rete_indirizzo(s)
+    if not forma:
+        if re.fullmatch(r"T[1-9A-HJ-NP-Za-km-z]{33}", s):
+            return ("In questo indirizzo Tron c'è un carattere sbagliato (il "
+                    "controllo non torna): copialo di nuovo dal tuo wallet")
+        if re.match(r"(?i)(bitcoin:)?(bc1|tb1|bcrt1)", s) or re.fullmatch(
+                r"[13mn2][1-9A-HJ-NP-Za-km-z]{25,34}", s):
+            return ("⚠️ Questo è un indirizzo bitcoin, non USDT: con la rete "
+                    f"sbagliata i fondi si perdono. Serve il tuo indirizzo USDT su {nomi}")
+        if re.match(r"(?i)(lightning:)?(lnbc|lntb|lnurl)", s) or "@" in s:
+            return ("⚠️ Questa è una richiesta Lightning, non un indirizzo USDT. "
+                    f"Serve il tuo indirizzo USDT su {nomi}")
+        return (f"Questo non sembra un indirizzo USDT su {nomi}: copialo di "
+                "nuovo dal tuo wallet")
+    if not any((forma == "tron") == (r["rete"] == "tron") for r in reti):
+        dove = "Tron" if forma == "tron" else "Ethereum"
+        return (f"⚠️ Questo è un indirizzo {dove}, ma lo scambio è su {nomi}: con "
+                f"la rete sbagliata gli USDT si perdono. Usa il tuo indirizzo su {nomi}")
+    return ""
+
+
+def p2p_onchain_giudica_txid_usdt(txid, rete: str) -> str:
+    """PURA: l'id della transazione che chi paga scrive a «Ho inviato gli
+    USDT». Tron: 64 cifre esadecimali; Ethereum: 0x e 64. '' va bene."""
+    s = str(txid or "").strip()
+    if not s:
+        return ("Incolla l'id della transazione: lo trovi nel tuo wallet, nei "
+                "dettagli dell'invio")
+    evm = bool(re.fullmatch(r"0x[0-9a-fA-F]{64}", s))
+    tron = bool(re.fullmatch(r"[0-9a-fA-F]{64}", s))
+    if rete == "tron" and evm:
+        return ("⚠️ Questo id ha la forma di Ethereum, ma lo scambio è su Tron: "
+                "controlla da che rete hai mandato")
+    if rete != "tron" and tron:
+        return ("⚠️ Questo id ha la forma di Tron, ma lo scambio è su Ethereum: "
+                "controlla da che rete hai mandato")
+    if not (tron if rete == "tron" else evm):
+        return "Questo non sembra l'id di una transazione: copialo di nuovo dal wallet"
+    return ""
+
+
+def p2p_onchain_tetto_usdt(tetto_euro, eur_btc, usd_btc) -> int:
+    """PURA: il tetto del P2P (in euro, UNO per tutti) tradotto in USDT al
+    cambio di adesso, come `tettoValutaP2P` del telefono. Spento resta
+    spento (0); senza i due cambi non si sa, quindi 1: fermo, mai un via
+    libera inventato."""
+    try:
+        t, e, u = int(tetto_euro or 0), float(eur_btc or 0), float(usd_btc or 0)
+    except (TypeError, ValueError):
+        return 1
+    if t <= 0:
+        return 0
+    if not (e > 0 and u > 0):
+        return 1
+    return max(1, int(t * u / e))
+
+
+def _p2p_onchain_cambio(o) -> float:
+    """Il cambio che misura QUESTO scambio: dollari per bitcoin se e' in
+    USDT, euro sennò."""
+    return cambio_noto_ora("usd" if p2p_onchain_usdt(o) else "eur")
 
 
 def _p2p_onchain_prepara(con):
@@ -94120,7 +94355,10 @@ def _p2p_onchain_prepara(con):
                       ("incasso_ln", "INTEGER DEFAULT 0"),
                       ("rilascio_chiesto_il", "INTEGER DEFAULT 0"),
                       ("rilascio_firma", "TEXT DEFAULT ''"),
-                      ("cambio", "TEXT DEFAULT ''")):
+                      ("cambio", "TEXT DEFAULT ''"),
+                      # 2 nov 2026, cantiere p2p-onchain-usdt: l'id della
+                      # transazione USDT che chi compra scrive a «Ho inviato»
+                      ("txid_usdt", "TEXT DEFAULT ''")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -94247,7 +94485,8 @@ def p2p_onchain_tags(o, adesso: int = None) -> list:
     scad = int(o["scade"]) if stato == "pending" else adesso + 7 * 24 * 3600
     return [["d", o["ordine"]],
             ["k", o["lato"]],
-            ["f", "EUR"],
+            # la valuta di chi paga: EUR, o USDT (2 nov 2026)
+            ["f", p2p_onchain_valuta(o)],
             ["s", P2P_ONCHAIN_STATO_LIBRO.get(stato, "canceled")],
             ["amt", str(int(o["prezzo_sats"]))],
             ["fa", _p2p_onchain_euro_testo(o["euro_cent"])],
@@ -94334,6 +94573,7 @@ def _p2p_onchain_riga_pubblica(o, nome: str = "") -> dict:
          "stato": o["stato"],
          "sats": int(o["prezzo_sats"]), "euro": int(o["euro_cent"]) / 100,
          "metodi": metodi, "scade": int(o["scade"]), "creato": int(o["creato"]),
+         "fiat": p2p_onchain_valuta(o),
          "rete": ONCHAIN_RETE, "onchain": True, **_p2p_onchain_foglio(o, pubblico=True)}
     if nome:
         r["nome"] = nome
@@ -94350,7 +94590,8 @@ def _p2p_onchain_foglio(o, pubblico: bool = False) -> dict:
     d = {"mercato": mercato, "premio": int(_p2p_onchain_campo(o, "premio", 0) or 0),
          "filtro": _soglia_filtro_p2p(_p2p_onchain_campo(o, "filtro", 0))}
     if mercato and not int(o["prezzo_sats"] or 0):
-        d["stima"] = p2p_onchain_sats_mercato(o["euro_cent"], d["premio"], cambio_noto_ora())
+        d["stima"] = p2p_onchain_sats_mercato(o["euro_cent"], d["premio"],
+                                              _p2p_onchain_cambio(o))
     if not pubblico:
         d["paracadute"] = int(_p2p_onchain_campo(o, "paracadute", 0) or 0)
         d["chiuso_perche"] = str(_p2p_onchain_campo(o, "chiuso_perche", "") or "")
@@ -94398,7 +94639,11 @@ def _p2p_onchain_libro(chi: int) -> dict:
         _p2p_onchain_rifai_foto()
     eventi, miei = [], []
     adesso = int(time.time())
+    usdt_si = bool(chi) and p2p_onchain_usdt_ammesso(chi)
     for o, maker, nome in F["righe"]:
+        # gli scambi pagati in USDT solo a chi li puo' prendere (2 nov 2026)
+        if p2p_onchain_usdt(o) and not usdt_si:
+            continue
         riga = _p2p_onchain_riga_pubblica(o, nome if chi else "")
         # in pausa fino a quell'ora: la card grigia, e da qui non si prende
         if int(o.get("_pausa_fino") or 0) > adesso:
@@ -94528,6 +94773,18 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
     }
     if parte_vera and not admin:
         d["recapito"] = o["recapito"] or ""
+    # GLI USDT (2 nov 2026): la valuta, la rete e l'id della transazione.
+    # L'indirizzo USDT e' un indirizzo pubblico di una catena, non un
+    # IBAN: in una disputa lo vede anche il moderatore, che sull'explorer
+    # deve trovare l'invio verso QUELL'indirizzo
+    d["fiat"] = p2p_onchain_valuta(o)
+    if d["fiat"] == "USDT":
+        r = p2p_onchain_rete_scambio(o)
+        d["usdt"] = {"rete": r.get("rete", ""), "nome": r.get("nome", ""),
+                     "contratto": r.get("contratto", ""),
+                     "txid": _p2p_onchain_campo(o, "txid_usdt", "") or ""}
+        if admin and not parte_vera:
+            d["usdt"]["indirizzo"] = o["recapito"] or ""
     if admin and not parte_vera:
         # il moderatore vede chi sono le due parti (deve poterle sentire)
         d["parti"] = {"vende": _onchain_nome(con, dep) if dep else "",
@@ -94651,7 +94908,8 @@ def _p2p_onchain_porta_presa(con, o, tg_id: int, adesso: int) -> str:
 
 def p2p_onchain_giudica_nuovo(lato, sats, euro_cent, metodi, recapito,
                               tetto_euro: int, tetto_sats: int,
-                              tipo: str = "fisso", premio=0, cambio=0) -> str:
+                              tipo: str = "fisso", premio=0, cambio=0,
+                              valuta: str = "EUR") -> str:
     """PURA: il perche' un ordine nuovo non va, o '' se va. A PREZZO
     FISSO sats ed euro li scrive chi pubblica, e tutt'e due devono essere
     numeri interi sensati. A MERCATO (30 ott 2026) si scrivono gli euro e
@@ -94659,7 +94917,13 @@ def p2p_onchain_giudica_nuovo(lato, sats, euro_cent, metodi, recapito,
     adesso (euro per bitcoin; 0 = non c'e', e allora giudica la presa),
     si guarda che la stima non stia sotto il minimo ne' sopra il tetto
     di prova. I metodi sono parole corte del catalogo o scritte a mano
-    (testo di sconosciuti: escono scappati)."""
+    (testo di sconosciuti: escono scappati).
+    IN USDT (2 nov 2026, `valuta` 'USDT'): `euro_cent` sono centesimi di
+    USDT, `cambio` e' in dollari, `tetto_euro` e' gia' tradotto in USDT,
+    e i metodi sono SOLO le nostre reti: un «USDT» scritto a mano, o
+    mescolato coi metodi dell'euro, non passa."""
+    usdt = valuta == "USDT"
+    soldi = "USDT" if usdt else "euro"
     if lato not in ("sell", "buy"):
         return "Di' se vendi o compri bitcoin"
     if tipo not in ("fisso", "mercato"):
@@ -94676,24 +94940,25 @@ def p2p_onchain_giudica_nuovo(lato, sats, euro_cent, metodi, recapito,
         try:
             sats = p2p_onchain_sats_mercato(int(euro_cent), premio, cambio)
         except (TypeError, ValueError):
-            return "Gli euro devono essere un numero"
+            return f"Gli {soldi} devono essere un numero"
         if not sats:
             sats = P2P_ONCHAIN_MIN_SATS   # senza cambio: lo dira' la presa
     try:
         sats, euro_cent = int(sats), int(euro_cent)
     except (TypeError, ValueError):
-        return "Sats ed euro devono essere numeri"
+        return f"Sats e {soldi} devono essere numeri"
     if sats < P2P_ONCHAIN_MIN_SATS and tipo == "mercato":
         return (f"Al cambio di adesso sono circa {_fmt_sats(sats)} sats: il minimo "
-                f"è {_fmt_sats(P2P_ONCHAIN_MIN_SATS)}, scrivi qualche euro in più")
+                f"è {_fmt_sats(P2P_ONCHAIN_MIN_SATS)}, scrivi qualche {soldi} in più")
     if sats < P2P_ONCHAIN_MIN_SATS:
         return f"Minimo {_fmt_sats(P2P_ONCHAIN_MIN_SATS)} sats: sotto, la commissione di rete mangia lo scambio"
     if sats > 21_000_000 * 100_000_000:
         return "Troppi sats"
     if euro_cent <= 0:
-        return "Scrivi quanti euro"
+        return f"Scrivi quanti {soldi}"
     if tetto_euro and euro_cent > tetto_euro * 100:
-        return f"In questa fase gli ordini P2P arrivano fino a {tetto_euro} €"
+        return (f"In questa fase gli ordini P2P arrivano fino a {tetto_euro} "
+                + ("USDT (250 € al cambio di adesso)" if usdt else "€"))
     if tetto_sats and sats > tetto_sats:
         return f"Dal collaudo non si va oltre {_fmt_sats(tetto_sats)} sats"
     if not isinstance(metodi, list) or not metodi:
@@ -94704,8 +94969,12 @@ def p2p_onchain_giudica_nuovo(lato, sats, euro_cent, metodi, recapito,
         if not isinstance(m, str) or not m.strip() or len(m) > P2P_ONCHAIN_METODO_MAX \
                 or "," in m:
             return "Un metodo di pagamento non si legge"
+    if usdt != p2p_onchain_metodi_usdt(metodi) or (
+            not usdt and any("usdt" in m.lower() for m in metodi)):
+        return ("Gli USDT si scambiano solo su Tron o Ethereum, e senza i "
+                "metodi dell'euro: scegli la valuta USDT nel foglio")
     if recapito is not None and len(str(recapito)) > P2P_ONCHAIN_RECAPITO_MAX:
-        return "Il recapito per gli euro è troppo lungo"
+        return f"Il recapito per gli {soldi} è troppo lungo"
     return ""
 
 
@@ -94794,10 +95063,23 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     recapito = str(d.get("recapito") or "").strip()
     tipo = str(d.get("tipo") or "fisso")
     premio = d.get("premio") or 0
-    cambio = cambio_noto_ora()
+    # LA VALUTA (2 nov 2026): in USDT se ogni metodo e' una nostra rete, e
+    # solo per chi gli USDT on-chain li puo' usare; il cambio e' in dollari
+    # e il tetto e' quello in euro tradotto
+    usdt = p2p_onchain_metodi_usdt(metodi if isinstance(metodi, list) else [])
+    if usdt and not p2p_onchain_usdt_ammesso(user["id"]):
+        raise HTTPException(400, "Gli scambi on-chain in USDT non sono accesi per te")
+    cambio = cambio_noto_ora("usd" if usdt else "eur")
+    tetto = int(P2P_MAX_EURO or 0)
+    if usdt:
+        tetto = p2p_onchain_tetto_usdt(tetto, cambio_noto_ora("eur"), cambio)
     perche = p2p_onchain_giudica_nuovo(lato, d.get("sats"), d.get("euro_cent"),
-                                       metodi, recapito, int(P2P_MAX_EURO or 0),
-                                       tetto_sats_prova(), tipo, premio, cambio)
+                                       metodi, recapito, tetto,
+                                       tetto_sats_prova(), tipo, premio, cambio,
+                                       "USDT" if usdt else "EUR")
+    if not perche and usdt and lato == "sell":
+        # chi vende bitcoin scrive dove vuole gli USDT: la rete giusta
+        perche = p2p_onchain_giudica_recapito_usdt(recapito, metodi)
     if perche:
         raise HTTPException(400, perche)
     # a mercato i sats nascono alla presa: nel libro 0, il `amt` di NIP-69
@@ -94807,7 +95089,10 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     # IL PARACADUTE parte dal cambio di ADESSO, scritto dal server come nel
     # Lightning: il telefono manda la sola soglia
     para = _soglia_paracadute_p2p(d.get("paracadute")) if P2P_PARACADUTE else 0
-    para_da = cambio if para and cambio > 0 else 0.0
+    # (anche in USDT si misura in euro: la ronda legge l'euro, e il
+    # paracadute guarda quanto si e' mosso BTC, non la valuta)
+    cambio_eur = cambio_noto_ora()
+    para_da = cambio_eur if para and cambio_eur > 0 else 0.0
     para_letto = int(_cambio_cache["quando"] or 0) if para_da else 0
     try:
         onchain_xpub_barattolo()
@@ -94916,7 +95201,7 @@ async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
     _p2p_onchain_rifai_foto()
     asyncio.create_task(_p2p_onchain_pubblica(oid))
     if altro and o["stato"] == "preso":
-        await notifica(altro, "❌ <b>L'altra parte ha annullato lo scambio on-chain.</b> "
+        await _notifica_p2p_onchain(o, altro, "❌ <b>L'altra parte ha annullato lo scambio on-chain.</b> "
                               f"Era {_p2p_onchain_quanto(o)}.\n\nNessun sats si è mosso.",
                        _p2p_onchain_bottone(o))
     return {"ok": True}
@@ -94954,6 +95239,20 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
         if not p2p_onchain_ammesso(o["maker_id"]):
             raise HTTPException(409, "Chi ha pubblicato non può più scambiare "
                                      "on-chain adesso")
+        # in USDT (2 nov 2026): li prende solo chi li puo' usare, e chi ha
+        # pubblicato deve poterli usare ancora
+        usdt = p2p_onchain_usdt(o)
+        if usdt and not p2p_onchain_usdt_ammesso(user["id"]):
+            raise HTTPException(409, "Quest'ordine si paga in USDT, che per te "
+                                     "non sono accesi")
+        if usdt and not p2p_onchain_usdt_ammesso(o["maker_id"]):
+            raise HTTPException(409, "Chi ha pubblicato non può più scambiare "
+                                     "in USDT adesso")
+        if usdt and o["lato"] == "buy" and recapito:
+            # chi prende vendendo bitcoin scrive dove vuole gli USDT
+            perche = p2p_onchain_giudica_recapito_usdt(recapito, _p2p_onchain_metodi(o))
+            if perche:
+                raise HTTPException(400, perche)
         if _p2p_onchain_vivi_di(con, user["id"]) >= P2P_ONCHAIN_APERTI_MAX:
             raise HTTPException(409, f"Hai già {P2P_ONCHAIN_APERTI_MAX} scambi "
                                      "on-chain aperti: chiudine uno prima")
@@ -94964,8 +95263,10 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
             raise HTTPException(409, perche)
         prezzo, cambio_presa = int(o["prezzo_sats"]), 0.0
         if _p2p_onchain_mercato(o):
-            cambio_presa = cambio_noto_ora()
-            eta = cambio_eta_ora()
+            # in USDT il metro e' il dollaro (1 USDT = 1 $)
+            valuta = "usd" if usdt else "eur"
+            cambio_presa = cambio_noto_ora(valuta)
+            eta = cambio_eta_ora(valuta)
             if not cambio_presa > 0 or eta is None or eta > P2P_ONCHAIN_CAMBIO_FRESCO_S:
                 raise HTTPException(503, "Il cambio di adesso non c'è: è un ordine "
                                          "a prezzo di mercato, riprova fra un minuto")
@@ -95030,7 +95331,7 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
     _p2p_onchain_rifai_foto()
     asyncio.create_task(_p2p_onchain_pubblica(oid))
     for chi, testo in _p2p_onchain_testi_presa(o, nome).items():
-        await notifica(chi, testo, _p2p_onchain_bottone(o))
+        await _notifica_p2p_onchain(o, chi, testo, _p2p_onchain_bottone(o))
     return fuori
 
 
@@ -95092,7 +95393,7 @@ async def _p2p_onchain_controlla(oid: int) -> str:
     if stato == "depositato" and avvisi:
         asyncio.create_task(_p2p_onchain_pubblica(int(o["id"])))
     for chi, testo in avvisi:
-        await notifica(chi, testo, _p2p_onchain_bottone(o))
+        await _notifica_p2p_onchain(o, chi, testo, _p2p_onchain_bottone(o))
     return stato
 
 
@@ -95123,36 +95424,68 @@ async def p2p_onchain_controlla_rotta(oid: int, x_tg_init_data: str = Header("")
 
 
 @app.post("/api/p2p/onchain/{oid}/euro-inviati")
-async def p2p_onchain_euro_inviati(oid: int, x_tg_init_data: str = Header(""),
+async def p2p_onchain_euro_inviati(oid: int, req: Request, x_tg_init_data: str = Header(""),
                                    barattolo_sessione: str = Cookie("")):
     """«HO INVIATO GLI EURO»: lo dice chi compra bitcoin, a sats
     depositati. Non muove niente: avvisa chi vende di guardare il conto.
     Da qui chi compra non puo' piu' rinunciare da solo (ha detto di aver
-    pagato): resta la disputa."""
+    pagato): resta la disputa.
+    IN USDT (2 nov 2026) «Ho inviato gli USDT» vuole `{txid}`, l'id della
+    transazione sulla rete dello scambio: va a chi vende e, in una
+    disputa, al moderatore, che lo cerca sull'explorer. E vuole che
+    l'indirizzo di chi riceve ci sia: senza, gli USDT non hanno dove
+    andare. Il corpo e' facoltativo per gli euro (il telefono di ieri
+    manda {})."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     _p2p_onchain_serve(user)
+    try:
+        d = await req.json()
+    except Exception:
+        d = {}
+    if not isinstance(d, dict):
+        d = {}
     adesso = int(time.time())
     con = _p2p_onchain_db()
     try:
         o = _p2p_onchain_carica(con, oid)
         if _p2p_onchain_ruolo(o, user["id"]) != "venditore":
             raise HTTPException(403, "Lo dice chi compra bitcoin")
+        usdt = p2p_onchain_usdt(o)
         if o["stato"] != "depositato":
-            raise HTTPException(409, "Gli euro si mandano quando i sats sono "
-                                     "depositati, e una volta sola")
+            raise HTTPException(409, ("Gli USDT" if usdt else "Gli euro")
+                                + " si mandano quando i sats sono depositati, "
+                                  "e una volta sola")
+        txid = ""
+        if usdt:
+            rete = p2p_onchain_rete_scambio(o)
+            if not rete or not (o["recapito"] or "").strip():
+                raise HTTPException(409, "Chi vende non ha ancora scritto il suo "
+                                         "indirizzo USDT: aspetta che lo scriva")
+            txid = str(d.get("txid") or "").strip()
+            perche = p2p_onchain_giudica_txid_usdt(txid, rete["rete"])
+            if perche:
+                raise HTTPException(400, perche)
         con.execute("UPDATE p2p_onchain_ordini SET stato='euro_inviati',"
-                    " euro_inviati_il=?, aggiornato=? WHERE id=? AND stato='depositato'",
-                    (adesso, adesso, oid))
+                    " euro_inviati_il=?, txid_usdt=?, aggiornato=?"
+                    " WHERE id=? AND stato='depositato'",
+                    (adesso, txid, adesso, oid))
         con.commit()
         euro = _fmt_eur(int(o["euro_cent"]) / 100)
     finally:
         con.close()
-    await notifica(o["depositante_id"],
-                   f"💶 <b>Chi compra dice di averti inviato {euro} €.</b> "
-                   f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
-                   "Controlla il tuo conto: quando li vedi, apri lo scambio e tocca "
-                   "«Ricevuti: libera i sats». Se non arrivano, apri una disputa.",
-                   _p2p_onchain_bottone(o))
+    if usdt:
+        testo = (f"💵 <b>Chi compra dice di averti inviato {euro} USDT su "
+                 f"{html.escape(rete['nome'])}.</b> Vendi {_p2p_onchain_quanto(o)}.\n\n"
+                 f"Id della transazione: <code>{html.escape(txid)}</code>\n\n"
+                 "Controlla il tuo wallet sulla rete giusta: quando li vedi, apri "
+                 "lo scambio e tocca «Ricevuti: libera i sats». Se non arrivano, "
+                 "apri una disputa.")
+    else:
+        testo = (f"💶 <b>Chi compra dice di averti inviato {euro} €.</b> "
+                 f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
+                 "Controlla il tuo conto: quando li vedi, apri lo scambio e tocca "
+                 "«Ricevuti: libera i sats». Se non arrivano, apri una disputa.")
+    await _notifica_p2p_onchain(o, o["depositante_id"], testo, _p2p_onchain_bottone(o))
     return {"ok": True}
 
 
@@ -95177,13 +95510,18 @@ async def p2p_onchain_recapito(oid: int, req: Request, x_tg_init_data: str = Hea
             raise HTTPException(403, "Il recapito lo scrive chi vende bitcoin")
         if o["stato"] not in ("pending", "preso", "depositato"):
             raise HTTPException(409, "Il recapito non si cambia più")
+        if p2p_onchain_usdt(o):
+            # in USDT e' un indirizzo, sulla rete giusta (2 nov 2026)
+            perche = p2p_onchain_giudica_recapito_usdt(testo, _p2p_onchain_metodi(o))
+            if perche:
+                raise HTTPException(400, perche)
         con.execute("UPDATE p2p_onchain_ordini SET recapito=?, aggiornato=? WHERE id=?",
                     (testo, int(time.time()), oid))
         con.commit()
     finally:
         con.close()
     if o["stato"] in ("preso", "depositato") and o["ricevente_id"]:
-        await notifica(o["ricevente_id"], "💶 <b>Chi vende ha scritto dove vuole gli "
+        await _notifica_p2p_onchain(o, o["ricevente_id"], "💶 <b>Chi vende ha scritto dove vuole gli "
                                           "euro.</b>\n\nLo trovi nello scambio.",
                        _p2p_onchain_bottone(o))
     return {"ok": True}
@@ -95270,8 +95608,8 @@ async def p2p_onchain_proposta(oid: int, req: Request, x_tg_init_data: str = Hea
         o = _p2p_onchain_carica(con, oid)
         ruolo = _p2p_onchain_ruolo(o, user["id"])
         if verso == "venditore" and ruolo != "compratore":
-            raise HTTPException(403, "I sats li libera chi vende bitcoin, "
-                                     "quando ha ricevuto gli euro")
+            raise HTTPException(403, _p2p_onchain_parole(o, "I sats li libera chi vende bitcoin, "
+                                     "quando ha ricevuto gli euro"))
         if verso == "compratore" and ruolo != "venditore":
             raise HTTPException(403, "Il rimborso lo propone chi compra bitcoin")
         if o["stato"] == "disputa":
@@ -95292,8 +95630,8 @@ async def p2p_onchain_proposta(oid: int, req: Request, x_tg_init_data: str = Hea
                                      "Lightning: manca solo la tua firma, che il "
                                      "telefono mette da solo")
         if verso == "venditore" and not o["incasso"] and o["incasso_ln"]:
-            raise HTTPException(409, "Chi compra riceve in Lightning: conferma che "
-                                     "hai ricevuto gli euro, e lui fa il cambio")
+            raise HTTPException(409, _p2p_onchain_parole(o, "Chi compra riceve in Lightning: conferma che "
+                                     "hai ricevuto gli euro, e lui fa il cambio"))
         if verso == "venditore" and not o["incasso"]:
             raise HTTPException(409, "Chi compra non ha ancora scelto dove ricevere "
                                      "(Profilo → Incassi on-chain): i sats restano "
@@ -95312,7 +95650,7 @@ async def p2p_onchain_proposta(oid: int, req: Request, x_tg_init_data: str = Hea
         altro = o["ricevente_id"] if ruolo == "compratore" else o["depositante_id"]
     finally:
         con.close()
-    await notifica(altro, (
+    await _notifica_p2p_onchain(o, altro, (
         "🔓 <b>Sats liberati!</b> Chi vende ha confermato gli euro e ha firmato. "
         f"Compri {_p2p_onchain_quanto(o)}.\n\n"
         "Apri Barattolo: il tuo telefono mette la seconda firma e i sats "
@@ -95416,7 +95754,7 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
                  o["ricevente_id"]: f"↩️ <b>Scambio on-chain annullato:</b> i sats sono tornati a chi "
                                     f"li aveva depositati. Era {quanto}."}
     for chi, testo in testi.items():
-        await notifica(chi, testo + tx, _p2p_onchain_bottone(o))
+        await _notifica_p2p_onchain(o, chi, testo + tx, _p2p_onchain_bottone(o))
     return {"ok": True, "stato": stato, "txid": txid or arrivato}
 
 
@@ -95464,7 +95802,7 @@ async def p2p_onchain_disputa(oid: int, req: Request, x_tg_init_data: str = Head
     finally:
         con.close()
     asyncio.create_task(_p2p_onchain_pubblica(oid))
-    await notifica(altro, "⚖️ <b>L'altra parte ha aperto una disputa</b> sullo scambio "
+    await _notifica_p2p_onchain(o, altro, "⚖️ <b>L'altra parte ha aperto una disputa</b> sullo scambio "
                           f"on-chain di {_p2p_onchain_quanto(o)}.\n\nUn moderatore di "
                           "Barattolo guarderà e deciderà a chi vanno i sats. Scrivi ai "
                           "moderatori quel che sai.", _p2p_onchain_bottone(o))
@@ -95552,10 +95890,10 @@ async def p2p_onchain_decidi(oid: int, req: Request, x_tg_init_data: str = Heade
         perde = o["depositante_id"] if verso == "venditore" else o["ricevente_id"]
     finally:
         con.close()
-    await notifica(vince, "⚖️ <b>Disputa decisa a tuo favore:</b> Barattolo ha firmato.\n\n"
+    await _notifica_p2p_onchain(o, vince, "⚖️ <b>Disputa decisa a tuo favore:</b> Barattolo ha firmato.\n\n"
                           "Apri Barattolo: il tuo telefono mette la seconda firma e "
                           "i sats partono.", _p2p_onchain_bottone(o))
-    await notifica(perde, "⚖️ <b>Disputa decisa:</b> il moderatore ha dato ragione "
+    await _notifica_p2p_onchain(o, perde, "⚖️ <b>Disputa decisa:</b> il moderatore ha dato ragione "
                           "all'altra parte, e Barattolo ha firmato.\n\nSe pensi che ci "
                           "sia un errore, scrivi ai moderatori.", _p2p_onchain_bottone(o))
     await notifica_admin(argomento="dispute", testo=
@@ -95624,7 +95962,7 @@ async def _p2p_onchain_avvisa_confermato(o) -> None:
     chi vende aveva gia' confermato gli euro: il telefono di chi vende ora
     puo' firmare il rilascio, e glielo si dice."""
     if o["incasso"] and o["rilascio_chiesto_il"] and not o["proposta_psbt"]:
-        await notifica(o["depositante_id"],
+        await _notifica_p2p_onchain(o, o["depositante_id"],
             "🔓 <b>Chi compra ha scelto dove ricevere</b> (on-chain) sullo scambio "
             f"di {_p2p_onchain_quanto(o)}.\n\nApri Barattolo: il tuo telefono firma "
             "il rilascio che avevi confermato, e i sats partono.",
@@ -95666,7 +96004,7 @@ async def _p2p_onchain_cambio_togli(o, perche: str, avvisa: bool = True) -> bool
     finally:
         con.close()
     if tolto and avvisa:
-        await notifica(o["ricevente_id"],
+        await _notifica_p2p_onchain(o, o["ricevente_id"],
             "⚡ <b>Il cambio in Lightning non è partito</b> sullo scambio di "
             f"{_p2p_onchain_quanto(o)} ({html.escape(perche)}). Non si è mosso "
             "niente: apri lo scambio e rifallo, o ricevi on-chain.",
@@ -95734,7 +96072,7 @@ async def p2p_onchain_euro_ricevuti(oid: int, req: Request,
     try:
         o = _p2p_onchain_carica(con, oid)
         if _p2p_onchain_ruolo(o, user["id"]) != "compratore":
-            raise HTTPException(403, "Gli euro li conferma chi vende bitcoin")
+            raise HTTPException(403, _p2p_onchain_parole(o, "Gli euro li conferma chi vende bitcoin"))
         if (o["stato"] not in ("depositato", "euro_inviati") or not o["incasso_ln"]
                 or o["incasso"] or o["proposta_psbt"] or o["decisione_da"]):
             raise HTTPException(409, "Su questo scambio non c'è niente da confermare così")
@@ -95755,7 +96093,7 @@ async def p2p_onchain_euro_ricevuti(oid: int, req: Request,
     finally:
         con.close()
     if not gia:
-        await notifica(o["ricevente_id"],
+        await _notifica_p2p_onchain(o, o["ricevente_id"],
             "⚡ <b>Chi vende ha ricevuto gli euro</b> per lo scambio di "
             f"{_p2p_onchain_quanto(o)}.\n\nApri Barattolo: fai il cambio in "
             "Lightning (vedi quanto costa prima di confermare) e i sats partono.",
@@ -95921,7 +96259,7 @@ async def p2p_onchain_cambio_nasce(oid: int, req: Request,
             raise HTTPException(409, "Lo scambio è cambiato nel frattempo: riaprilo")
     finally:
         con.close()
-    await notifica(o["depositante_id"],
+    await _notifica_p2p_onchain(o, o["depositante_id"],
         "⚡ <b>Chi compra ha fatto il cambio in Lightning</b> sullo scambio di "
         f"{_p2p_onchain_quanto(o)}.\n\nApri Barattolo: il tuo telefono firma il "
         "rilascio che avevi confermato, e i sats partono.", _p2p_onchain_bottone(o))
@@ -96338,7 +96676,8 @@ def _p2p_onchain_passata_paracadute(con, prezzo, letto, adesso: int) -> list:
                                "maker_id": int(o["maker_id"]),
                                "soglia": int(o["paracadute"]), "partenza": p["partenza"],
                                "arrivo": float(prezzo), "lato": o["lato"],
-                               "euro_cent": int(o["euro_cent"])})
+                               "euro_cent": int(o["euro_cent"]),
+                               "metodi": o["metodi"]})
             toccati += cur.rowcount
             continue
         toccati += con.execute(
@@ -96357,7 +96696,8 @@ def _p2p_onchain_testo_paracadute(a: dict) -> str:
     scarto = _scarto_paracadute_p2p(a.get("partenza"), a.get("arrivo"))
     perc = f"{abs(scarto):.1f}".replace(".", ",")
     cosa = {"sell": " di vendita", "buy": " di acquisto"}.get(a.get("lato") or "", "")
-    euro = f" da {_fmt_eur(int(a['euro_cent']) / 100)} €" if a.get("euro_cent") else ""
+    segno = "USDT" if p2p_onchain_usdt(a) else "€"
+    euro = f" da {_fmt_eur(int(a['euro_cent']) / 100)} {segno}" if a.get("euro_cent") else ""
     return (f"{P2P_ONCHAIN_SEGNO} 🪂 <b>Il paracadute si è aperto</b>: BTC è passato da "
             f"{_euro_btc_p2p(a.get('partenza'))} a {_euro_btc_p2p(a.get('arrivo'))} "
             f"({'+' if scarto > 0 else '−'}{perc}%), il tuo ordine on-chain{cosa}{euro} "
@@ -96403,6 +96743,8 @@ async def _p2p_onchain_ronda() -> None:
         try:
             # il bottone di ogni avviso on-chain: apre lo scambio, che dice
             # «annullato dal paracadute»; da li' si ripubblica
+            # NON passa dal traduttore degli USDT: il prezzo di BTC del
+            # paracadute e' in euro anche per uno scambio in USDT
             await notifica(a["maker_id"], _p2p_onchain_testo_paracadute(a),
                            _p2p_onchain_bottone(a))
         except Exception as e:

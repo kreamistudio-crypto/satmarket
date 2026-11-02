@@ -1317,6 +1317,14 @@ P2P_USDT_ATTIVO = False
 # resta True: la prima fase e' delle prove. False = tutti gli ammessi
 # al P2P.
 P2P_USDT_SOLO_ADMIN = True
+# GLI USDT NEGLI SCAMBI ON-CHAIN (2 nov 2026, decisione di Andrea:
+# «usdt onchain assolutamente è da fare», con la strada di Alan: la
+# garanzia sta sempre e solo dal lato bitcoin). Negli scambi col 2-di-3
+# chi compra bitcoin paga in USDT su Tron o Ethereum invece che in euro;
+# i sats restano nel 2-di-3 di sempre, Barattolo gli USDT non li tocca.
+# Vale solo per chi ha P2P_ONCHAIN_ATTIVO e gli USDT (P2P_USDT_ATTIVO,
+# con P2P_USDT_SOLO_ADMIN). Spento di serie; sul collaudo si accende.
+P2P_ONCHAIN_USDT_ATTIVO = False
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
 # RGB_ATTIVO si accende; una riga storta vale «chiusa a tutti» e lo dice.

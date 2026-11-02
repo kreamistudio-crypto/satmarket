@@ -44469,12 +44469,15 @@ def prove_fogli_di_casa():
     # ricevuto gli euro?» quando chi compra vuole i sats in Lightning
     # (`liberaOnchainP2P` → `euroRicevutiOnchainP2P`): chi vende conferma
     # gli euro e NON firma, perché la firma la mette chi fa il cambio.
-    prova("i gesti che passano dalla domanda unica sono centoquattro (dal 30 ott "
+    # CENTOCINQUE (2 nov 2026, cantiere p2p-onchain-usdt): «Hai inviato gli
+    # USDT?» negli scambi on-chain, dopo l'id della transazione
+    # (`usdtInviatiOcP2P`).
+    prova("i gesti che passano dalla domanda unica sono centocinque (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
-          "cambio in Lightning)",
-          104, solo_codice(mini).count("chiediConferma({"))
+          "cambio in Lightning; dal 2 nov «Hai inviato gli USDT?» on-chain)",
+          105, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -115751,6 +115754,11 @@ def prove_avvisi_nuovi_ordini():
             pass
     amb.update(P2P_AVVISI_NUOVI_ORDINI=True, p2p_onchain_leva=lambda: True,
                json=json, db=lambda: _Tieni())
+    # (2 nov 2026, p2p-onchain-usdt) la valuta dello scambio: i pezzi veri
+    amb["P2P_ONCHAIN_RETI_USDT"] = {"USDT (Tron)": {}, "USDT (Ethereum)": {}}
+    for _n in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
+               "p2p_onchain_usdt"):
+        exec(pezzo(_n), amb)
     exec(_senza_prosa(pezzo("_accoda_onchain_nuovo_p2p")), amb)
     accoda(con2, [ev("m1", T, amt="51500")], CAMBIO, T)
     oc_riga = {"stato": "pending", "lato": "sell", "metodi": '["SEPA"]', "euro_cent": 5000,
@@ -153219,6 +153227,253 @@ console.log(JSON.stringify([
            src.count('_usdt = globals().get("p2p_usdt_ordine")')))
 
 
+def prove_p2p_onchain_usdt():
+    """GLI USDT NEGLI SCAMBI P2P ON-CHAIN (2 nov 2026, cantiere
+    p2p-onchain-usdt, Andrea: «usdt onchain assolutamente è da fare»; la
+    strada di Alan: «noi non facciamo escrow su altre chain [...] l'altra
+    parte è il sostituto della moneta FIAT»). La garanzia resta il 2-di-3
+    bitcoin; chi compra paga in USDT su Tron o Ethereum invece che in euro.
+    Il giro vero sta in collaudo_p2p_onchain_usdt; qui i pezzi puri del
+    server (la valuta dai metodi, la famiglia dell'indirizzo col controllo
+    di Tron, il giudice della rete sbagliata, quello dell'id, il tetto
+    tradotto, il traduttore degli avvisi), quelli del telefono (la valuta
+    nel foglio a rete on-chain, le parole che non toccano i bottoni, il
+    giudice dell'indirizzo per i metodi dell'ordine, l'explorer), e le
+    sentinelle di forma: la leva spenta, i cancelli in ogni porta, ogni
+    avviso dello scambio dal traduttore."""
+    print("\n💵 Gli USDT negli scambi P2P on-chain")
+    import hashlib as _h
+    import re as _re
+    src = _SORGENTE
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    # --- 1) la leva e i cancelli ---
+    prova("la leva nasce spenta, nel config d'esempio e nel codice, e il "
+          "giudice vuole la leva, il P2P on-chain E gli USDT",
+          (True, True, True),
+          ("\nP2P_ONCHAIN_USDT_ATTIVO = False" in esempio,
+           "except ImportError:\n    P2P_ONCHAIN_USDT_ATTIVO = False" in src,
+           "return bool(P2P_ONCHAIN_USDT_ATTIVO and p2p_onchain_ammesso(tg_id)\n"
+           "                and p2p_usdt_ammesso(tg_id))" in pezzo("p2p_onchain_usdt_ammesso")))
+    prova("/api/me lo dice al telefono, il pannello delle leve lo mostra, e il "
+          "telefono lo tiene in myP2POnchainUsdt",
+          (1, True, 1),
+          (src.count('profilo["p2p_onchain_usdt"] = p2p_onchain_usdt_ammesso(user["id"])'),
+           '_leva("USDT negli scambi on-chain", "P2P_ONCHAIN_USDT_ATTIVO",' in src,
+           mini.count("myP2POnchainUsdt = !!me.p2p_onchain_usdt;")))
+    pub = pezzo("p2p_onchain_pubblica_rotta")
+    pre = pezzo("p2p_onchain_prendi")
+    prova("i cancelli in ogni porta: pubblicare, prendere (chi prende E chi ha "
+          "pubblicato), il libro, gli avvisi «ordine nuovo»",
+          (True, True, True, True, True),
+          ("if usdt and not p2p_onchain_usdt_ammesso(user[\"id\"]):" in pub,
+           "if usdt and not p2p_onchain_usdt_ammesso(user[\"id\"]):" in pre,
+           "if usdt and not p2p_onchain_usdt_ammesso(o[\"maker_id\"]):" in pre,
+           "if p2p_onchain_usdt(o) and not usdt_si:" in pezzo("_p2p_onchain_libro"),
+           "if usdt and not p2p_onchain_usdt_ammesso(tg):" in pezzo("_accoda_onchain_nuovo_p2p")))
+    prova("a mercato in USDT i sats si contano col dollaro, la stima del libro "
+          "anche; il paracadute resta in euro (la ronda legge l'euro)",
+          (True, True, True),
+          ('valuta = "usd" if usdt else "eur"' in pre and "cambio_noto_ora(valuta)" in pre,
+           "_p2p_onchain_cambio(o))" in pezzo("_p2p_onchain_foglio"),
+           "para_da = cambio_eur if para and cambio_eur > 0 else 0.0" in pub))
+    # --- 2) i pezzi puri del server ---
+    amb = {"json": json, "re": _re, "hashlib": _h, "html": __import__("html")}
+    i = src.index("P2P_ONCHAIN_RETI_USDT = {")
+    exec(src[i:src.index("\n}\n", i) + 3], amb)
+    for nome in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
+                 "p2p_onchain_usdt", "p2p_onchain_valuta", "_tron_valido",
+                 "p2p_onchain_rete_indirizzo", "p2p_onchain_rete_scambio",
+                 "p2p_onchain_giudica_recapito_usdt", "p2p_onchain_giudica_txid_usdt",
+                 "p2p_onchain_tetto_usdt", "p2p_usdt_frase", "_p2p_onchain_parole"):
+        exec(pezzo(nome), amb)
+    amb["_BASE58_ALFABETO"] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    j = src.index("P2P_USDT_FRASI = (")
+    exec(src[j:src.index("\n\n\n", j)], amb)
+    V = amb["p2p_onchain_valuta"]
+    prova("la valuta dai metodi: USDT solo se OGNI metodo e' una nostra rete; "
+          "mescolati, Polygon, nessuno o storti = euro",
+          ["USDT", "USDT", "EUR", "EUR", "EUR", "EUR", "EUR"],
+          [V({"metodi": '["USDT (Tron)"]'}), V({"metodi": '["USDT (Tron)", "USDT (Ethereum)"]'}),
+           V({"metodi": '["USDT (Tron)", "SEPA"]'}), V({"metodi": '["USDT (Polygon)"]'}),
+           V({"metodi": '[]'}), V({"metodi": 'storto'}), V({})])
+    venti = bytes(range(1, 21))
+    tron_vero = _tron_riferimento(venti)
+    tron_rotto = tron_vero[:-1] + ("2" if tron_vero[-1] != "2" else "3")
+    F = amb["p2p_onchain_rete_indirizzo"]
+    prova("la famiglia dell'indirizzo: Tron col SUO controllo (contro il "
+          "riferimento scritto a parte), 0x e quaranta, il resto niente",
+          ["tron", "", "tron", "evm", "", "", ""],
+          [F(tron_vero), F(tron_rotto), F("TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"),
+           F("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"), F("0x123"),
+           F("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq"), F("")])
+    R = amb["p2p_onchain_giudica_recapito_usdt"]
+    eth = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"
+    prova("il giudice della RETE SBAGLIATA: vuoto va (si scrive dopo), Tron su "
+          "Tron va, Ethereum su Tron no, Tron su Ethereum no, il contratto no, "
+          "un refuso no, bitcoin e Lightning detti per nome; con due reti "
+          "l'indirizzo sceglie",
+          ["", "", "rete", "rete", "contratto", "carattere", "bitcoin", "Lightning", "", ""],
+          [(lambda x: "" if not x else "bitcoin" if "indirizzo bitcoin" in x else
+            "rete" if "rete sbagliata" in x else
+            "contratto" if "contratto" in x else "carattere" if "carattere sbagliato" in x
+            else "Lightning" if "Lightning" in x
+            else x)(R(t, m)) for t, m in (
+              ("", ["USDT (Tron)"]), (tron_vero, ["USDT (Tron)"]),
+              (eth, ["USDT (Tron)"]), (tron_vero, ["USDT (Ethereum)"]),
+              ("TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", ["USDT (Tron)"]),
+              (tron_rotto, ["USDT (Tron)"]),
+              ("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", ["USDT (Tron)"]),
+              ("mario@getalby.com", ["USDT (Tron)"]),
+              (tron_vero, ["USDT (Tron)", "USDT (Ethereum)"]),
+              (eth, ["USDT (Tron)", "USDT (Ethereum)"]))])
+    S = amb["p2p_onchain_rete_scambio"]
+    due = '["USDT (Tron)", "USDT (Ethereum)"]'
+    prova("la rete dello scambio: l'unica dei metodi, o con due quella "
+          "dell'indirizzo di chi riceve; senza indirizzo non si sa",
+          ["tron", "ethereum", "tron", "ethereum", None, None],
+          [S({"metodi": '["USDT (Tron)"]'}).get("rete"),
+           S({"metodi": '["USDT (Ethereum)"]'}).get("rete"),
+           S({"metodi": due, "recapito": tron_vero}).get("rete"),
+           S({"metodi": due, "recapito": eth}).get("rete"),
+           S({"metodi": due, "recapito": ""}).get("rete"),
+           S({"metodi": '["SEPA"]'}).get("rete")])
+    T = amb["p2p_onchain_giudica_txid_usdt"]
+    prova("il giudice dell'id: vuoto no, Tron 64 cifre si', 0x su Tron no, "
+          "0x+64 su Ethereum si', 64 nude su Ethereum no, storto no",
+          [True, "", True, "", True, True],
+          [bool(T("", "tron")), T("a" * 64, "tron"), "forma di Ethereum" in T("0x" + "a" * 64, "tron"),
+           T("0x" + "b" * 64, "ethereum"), "forma di Tron" in T("b" * 64, "ethereum"),
+           bool(T("ciao", "tron"))])
+    U = amb["p2p_onchain_tetto_usdt"]
+    prova("il tetto tradotto: 250 € a 90.000 €/BTC e 100.000 $/BTC = 277 USDT; "
+          "spento resta 0; senza un cambio 1 (fermo, mai un via libera inventato)",
+          [277, 0, 1, 1], [U(250, 90000, 100000), U(0, 90000, 100000), U(250, 0, 100000),
+                           U(250, 90000, 0)])
+    P = amb["_p2p_onchain_parole"]
+    euro_frase = ("🔒 <b>Deposito confermato ✓:</b> aspetta gli euro. Chi compra sta per "
+                  "mandarti 90,00 €: quando li vedi sul tuo conto, libera.")
+    prova("il traduttore: in USDT niente euro, € ne' conto; in euro la frase "
+          "resta com'era",
+          ([], euro_frase),
+          ([w for w in ("euro", "€", "conto") if w in P({"metodi": '["USDT (Tron)"]'}, euro_frase)],
+           P({"metodi": '["SEPA"]'}, euro_frase)))
+    # --- 3) il giudice dell'ordine nuovo, in USDT ---
+    amb2 = {"P2P_ONCHAIN_MIN_SATS": 10_000, "P2P_ONCHAIN_METODI_MAX": 5,
+            "P2P_ONCHAIN_METODO_MAX": 40, "P2P_ONCHAIN_RECAPITO_MAX": 300,
+            "P2P_ONCHAIN_PREMIO_MAX": 20, "_fmt_sats": reale("_fmt_sats"),
+            "P2P_ONCHAIN_RETI_USDT": amb["P2P_ONCHAIN_RETI_USDT"],
+            "p2p_onchain_metodi_usdt": amb["p2p_onchain_metodi_usdt"]}
+    exec(pezzo("p2p_onchain_sats_mercato"), amb2)
+    exec(pezzo("p2p_onchain_giudica_nuovo"), amb2)
+    G = amb2["p2p_onchain_giudica_nuovo"]
+    prova("il giudice in USDT: mescolati no, un «USDT» in euro no, Polygon no, "
+          "il tetto detto in USDT, gli importi detti in USDT, e il si'",
+          [True, True, True, True, True, ""],
+          ["senza i metodi dell'euro" in G("sell", 50_000, 9000, ["USDT (Tron)", "SEPA"], "", 0, 0, valuta="USDT"),
+           "senza i metodi dell'euro" in G("sell", 50_000, 9000, ["USDT (Tron)"], "", 0, 0),
+           "senza i metodi dell'euro" in G("sell", 50_000, 9000, ["USDT (Polygon)"], "", 0, 0),
+           "fino a 277 USDT" in G("sell", 50_000, 27_800, ["USDT (Tron)"], "", 277, 0, valuta="USDT"),
+           G("sell", 50_000, 0, ["USDT (Tron)"], "", 0, 0, valuta="USDT").startswith("Scrivi quanti USDT"),
+           G("sell", 50_000, 9000, ["USDT (Tron)", "USDT (Ethereum)"], "", 277, 0, valuta="USDT")])
+    # --- 4) il filo: tag, riga, «Ho inviato», recapito, avvisi ---
+    prova("il 38383 dice la valuta dello scambio, la riga del libro e quella "
+          "delle parti portano `fiat`",
+          (True, True, True),
+          ('["f", p2p_onchain_valuta(o)],' in pezzo("p2p_onchain_tags"),
+           '"fiat": p2p_onchain_valuta(o),' in pezzo("_p2p_onchain_riga_pubblica"),
+           'd["fiat"] = p2p_onchain_valuta(o)' in pezzo("_p2p_onchain_per")))
+    inv = pezzo("p2p_onchain_euro_inviati")
+    prova("«Ho inviato gli USDT» vuole l'indirizzo di chi riceve e l'id giudicato "
+          "sulla rete, e lo scrive sulla riga; gli euro restano senza corpo",
+          (True, True, True, True),
+          ("perche = p2p_onchain_giudica_txid_usdt(txid, rete[\"rete\"])" in inv,
+           "indirizzo USDT: aspetta che lo scriva" in inv,
+           "txid_usdt=?" in inv,
+           "except Exception:\n        d = {}" in inv))
+    prova("il recapito in USDT passa dal giudice della rete, anche dopo",
+          True, "perche = p2p_onchain_giudica_recapito_usdt(testo, _p2p_onchain_metodi(o))"
+          in pezzo("p2p_onchain_recapito"))
+    blocco = src[src.index("async def p2p_onchain_pubblica_rotta("):src.index("def _p2p_onchain_passata_paracadute(")]
+    nudi = [r.strip() for r in codice(blocco).split("\n") if "await notifica(" in r]
+    prova("ogni avviso di uno scambio on-chain passa dal traduttore "
+          "(`_notifica_p2p_onchain`): nessuna `notifica` nuda fra le rotte",
+          ([], True), (nudi, codice(blocco).count("await _notifica_p2p_onchain(") >= 14))
+    para = src[src.index("    for a in aperti:\n        try:", src.index("async def _p2p_onchain_ronda(")):]
+    para = para[:para.index("\n\n\n")]
+    prova("...tranne il paracadute, che parla del prezzo di BTC in euro e dice "
+          "la cifra dell'ordine con la sua valuta",
+          (True, True),
+          ("await notifica(a[\"maker_id\"], _p2p_onchain_testo_paracadute(a)," in para,
+           'segno = "USDT" if p2p_onchain_usdt(a) else "€"' in pezzo("_p2p_onchain_testo_paracadute")))
+    prova("la colonna dell'id e' una migrazione, come le altre", True,
+          '("txid_usdt", "TEXT DEFAULT \'\'")' in pezzo("_p2p_onchain_prepara"))
+    # --- 5) il telefono ---
+    ini = mini.index("/* ═══ GLI ORDINI IN USDT (1 nov 2026")
+    fine = mini.index("\n}\n", mini.index("function qrUsdtP2P(")) + 3
+    usdt_js = mini[ini:fine]
+    i = mini.index("const P2P_VALUTE = [")
+    valute = mini[i:mini.index("];", i) + 2]
+    oc = mini[mini.index("/* ═══ GLI USDT NEGLI SCAMBI ON-CHAIN (2 nov 2026"):
+              mini.index("/* «Dove vuoi gli euro»: la sezione in piu' di chi vende on-chain")]
+    js = ("var cambioVivo = true, eurPerSat = 0.0009, usdPerSat = 0.001;\n"
+          "var myP2PUsdt = true, myP2POnchainUsdt = false;\n"
+          "const P2P_VALUTA = 'EUR', P2P_METODI = ['SEPA'];\n"
+          "const maxEuroP2P = () => 250;\n"
+          "const fmtEur = n => Number(n).toFixed(2).replace('.', ',');\n"
+          "const esc = s => String(s);\n"
+          + valute + "\n" + usdt_js + "\n" + _fn_js(mini, "function valuteVisibiliP2P(oc){")
+          + oc + "\n" + "const TRON = " + json.dumps(tron_vero) + ";\n" + r"""
+const vis = () => [valuteVisibiliP2P(false).map(v => v.cod), valuteVisibiliP2P(true).map(v => v.cod)];
+const prima = vis();
+myP2POnchainUsdt = true;
+const dopo = vis();
+const u = {fiat: 'USDT', euro: 90, metodi: ['USDT (Tron)']}, e = {fiat: 'EUR', euro: 90, metodi: ['SEPA']};
+console.log(JSON.stringify([prima, dopo,
+  cifraOcP2P(u), cifraOcP2P(e),
+  paroleOcP2P(u, 'Manda gli euro: 90,00 € sul tuo conto. Euro inviati'),
+  paroleOcP2P(u, "gestoOnchainP2P(this, 5, 'euro-inviati') class=\"tot euro_x\""),
+  paroleOcP2P(e, 'Manda gli euro'),
+  giudiceRecapitoOcUsdtP2P('', ['USDT (Tron)']),
+  giudiceRecapitoOcUsdtP2P(TRON, ['USDT (Tron)']),
+  /rete sbagliata/.test(giudiceRecapitoOcUsdtP2P('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed', ['USDT (Tron)'])),
+  giudiceRecapitoOcUsdtP2P('0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed', ['USDT (Tron)', 'USDT (Ethereum)']),
+  esploraUsdtP2P(P2P_RETI_USDT[0], 'tx', 'ab'), esploraUsdtP2P(P2P_RETI_USDT[1], 'address', '0x1'),
+  (reteOcUsdtP2P({fiat: 'USDT', metodi: ['USDT (Tron)', 'USDT (Ethereum)'], usdt: {rete: 'ethereum'}}) || {}).nome,
+  reteOcUsdtP2P({fiat: 'USDT', metodi: ['USDT (Tron)', 'USDT (Ethereum)']}),
+  reteOcUsdtP2P(e)]));""")
+    o = _node_banco(js)
+    if o is None:
+        salta("il telefono degli USDT on-chain", "node non c'e'")
+    else:
+        prova("il foglio a rete on-chain offre gli USDT solo con myP2POnchainUsdt "
+              "(a Lightning come prima)",
+              [[["EUR", "USDT"], ["EUR"]], [["EUR", "USDT"], ["EUR", "USDT"]]], o[:2])
+        prova("la cifra con la sua valuta", ["90,00 USDT", "90,00 €"], o[2:4])
+        prova("le parole: gli euro, €, conto ed Euro diventano USDT e wallet; "
+              "'euro-inviati' e le classi restano; in euro niente cambia",
+              ["Manda gli USDT: 90,00 USDT sul tuo wallet. USDT inviati",
+               "gestoOnchainP2P(this, 5, 'euro-inviati') class=\"tot euro_x\"",
+               "Manda gli euro"], o[4:7])
+        prova("il giudice del telefono per i metodi dell'ordine: vuoto va, Tron su "
+              "Tron va, Ethereum su Tron no, Ethereum fra le due reti va",
+              ["", "", True, ""], o[7:11])
+        prova("l'explorer della rete: Tronscan per Tron, Etherscan per Ethereum",
+              ["https://tronscan.org/#/transaction/ab", "https://etherscan.io/address/0x1"], o[11:13])
+        prova("la rete dello scambio nel telefono: quella del server, sennò "
+              "l'unica dei metodi; in euro nessuna", ["Ethereum", None, None], o[13:16])
+    prova("nella scheda: «💵 Ho inviato gli USDT» col campo dell'id sopra, il "
+          "riquadro con la rete, il QR disegnato dopo, l'id e il moderatore",
+          (1, 1, 1, 1, 1),
+          (mini.count("bott('orange', `usdtInviatiOcP2P(this, ${o.id})`, '💵 Ho inviato gli USDT')"),
+           mini.count("+ (gesti.includes('usdtInviatiOcP2P') ? campoTxidOcP2P(o) : '')"),
+           mini.count("usdt && ricevo && o.stato === 'depositato' ? riquadroUsdtOcP2P(o)"),
+           mini.count("if (qu && qu.dataset.qr) disegnaQr(qu, qu.dataset.qr, 'Byte');"),
+           mini.count("+ (usdt && mod ? modUsdtOcP2P(o) : '')")))
+    prova("...e «Ho inviato» manda l'id al server, che lo giudica di nuovo",
+          1, mini.count("poi: () => eseguiGestoOnchainP2P(id, 'euro-inviati', {txid}, btn)});"))
+
+
 def prove_p2p_usdt():
     """GLI ORDINI P2P IN USDT (1 nov 2026, cantiere p2p-usdt, decisione di
     Andrea: «Tron + Polygon mettiamo anche ethereum. tetto 250 €, NODO
@@ -153568,6 +153823,11 @@ def prove_p2p_onchain():
                "annullato": "canceled", "scaduto": "canceled"}}
     exec(pezzo("_p2p_onchain_euro_testo"), amb)
     exec(pezzo("_p2p_onchain_campo"), amb)
+    # (2 nov 2026, p2p-onchain-usdt) il `f` dice la valuta dello scambio
+    amb["P2P_ONCHAIN_RETI_USDT"] = {"USDT (Tron)": {}, "USDT (Ethereum)": {}}
+    for _n in ("_p2p_onchain_metodi", "p2p_onchain_metodi_usdt", "p2p_onchain_usdt",
+               "p2p_onchain_valuta"):
+        exec(pezzo(_n), amb)
     exec(pezzo("p2p_onchain_tags"), amb)
     o = {"ordine": "bar-onchain-abc", "lato": "sell", "stato": "pending",
          "prezzo_sats": 100000, "euro_cent": 9050, "scade": 5000,
@@ -153593,7 +153853,10 @@ def prove_p2p_onchain():
     # --- il giudice dell'ordine nuovo: puro ---
     amb = {"P2P_ONCHAIN_MIN_SATS": 10_000, "P2P_ONCHAIN_METODI_MAX": 5,
            "P2P_ONCHAIN_METODO_MAX": 40, "P2P_ONCHAIN_RECAPITO_MAX": 300,
-           "_fmt_sats": reale("_fmt_sats")}
+           "_fmt_sats": reale("_fmt_sats"),
+           # (2 nov 2026) il giudice sa quali metodi sono reti USDT: il pezzo vero
+           "P2P_ONCHAIN_RETI_USDT": {"USDT (Tron)": {}, "USDT (Ethereum)": {}}}
+    exec(pezzo("p2p_onchain_metodi_usdt"), amb)
     exec(pezzo("p2p_onchain_giudica_nuovo"), amb)
     G = amb["p2p_onchain_giudica_nuovo"]
     prova("il giudice: lato, numeri, minimo, euro, tetto euro, tetto sats di "
@@ -184862,6 +185125,7 @@ def main():
     prove_p2p_onchain,
     prove_p2p_usdt,
     prove_usdt_due_reti,
+    prove_p2p_onchain_usdt,
     prove_grafica_p2p_onchain,
     prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,
