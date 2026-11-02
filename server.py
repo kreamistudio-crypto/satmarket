@@ -75634,25 +75634,34 @@ def swap_indirizzo_p2tr(indirizzo: str, rete: str) -> bool:
     on-chain bloccano i bitcoin in un p2tr (la chiave MuSig con l'albero
     dello swap): bech32m (BIP-350), versione 1, 32 byte. Il checksum si
     verifica davvero: un carattere sbagliato e' un no."""
+    return _swap_programma_p2tr(indirizzo, rete) is not None
+
+
+def _swap_programma_p2tr(indirizzo: str, rete: str) -> bytes | None:
+    """I 32 byte che un indirizzo TAPROOT di questa rete porta dentro (la
+    chiave x-only dell'uscita), o None se non e' un p2tr di questa rete.
+    (2 nov 2026, cantiere swap-auto) staccata da `swap_indirizzo_p2tr`
+    perche' lo swap automatico deve CONFRONTARE l'indirizzo del lockup
+    con la chiave che rifa' da se', non solo sapere che e' un p2tr."""
     s = str(indirizzo or "").strip()
     if s != s.lower() and s != s.upper():
-        return False
+        return None
     s = s.lower()
     hrp = SWAP_HRP.get(rete, "bc")
     if not s.startswith(hrp + "1"):
-        return False
+        return None
     try:
         v = [_BECH32_ALFABETO.index(c) for c in s[len(hrp) + 1:]]
     except ValueError:
-        return False
+        return None
     if len(v) < 7:
-        return False
+        return None
     espanso = [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp]
     if _bech32_polymod(espanso + v) != _SWAP_BECH32M:
-        return False
+        return None
     dati = v[:-6]
     if dati[0] != 1:
-        return False
+        return None
     programma, acc, bits = [], 0, 0
     for g in dati[1:]:
         acc = (acc << 5) | g
@@ -75661,8 +75670,8 @@ def swap_indirizzo_p2tr(indirizzo: str, rete: str) -> bool:
             bits -= 8
             programma.append((acc >> bits) & 0xff)
     if bits >= 5 or (acc & ((1 << bits) - 1)):
-        return False
-    return len(programma) == 32
+        return None
+    return bytes(programma) if len(programma) == 32 else None
 
 
 async def _swap_mempool_leggi(base: str, percorso: str) -> str | None:
@@ -76052,6 +76061,518 @@ async def swap_pagamento_stato(ordine_id: int,
         return {"stato": "", "swap_id": ""}
     return {"stato": _swap_pag_dell_ordine(ordine_id, r["id"]),
             "swap_id": r["swap_id"]}
+
+
+# --- LO SWAP AUTOMATICO DEL MERCATINO (2 nov 2026, cantiere swap-auto) ---
+# Chi vende in Lightning e vuole i bitcoin on-chain non fa niente col
+# telefono: il cambio lo fa il SERVER, perche' i sats sono gia' sul nodo
+# (strada B, decisione di Andrea del 2 nov; via di Alan). Le chiavi del
+# ritiro sono di BARATTOLO, non del venditore: dodici parole sul VPS
+# (`chiavi/swap-barattolo.json`, nate da un admin col gesto del pannello,
+# nell'archivio di `backup-fuori.sh` come la chiave on-chain), una chiave
+# NUOVA per ogni swap, lo schema delle chiavi di SATS Routing (m/44/0/0/0/i,
+# segreto = sha256 della privata) cosi' uno swap si ritrova anche dalla
+# loro pagina «Rescue» con le nostre parole. Lo swap ESPLICITO della
+# pagina «Cambio» resta del telefono e delle sue chiavi.
+# QUESTA E' LA TAPPA 1 (piano approvato da Andrea, «ok parti»): le
+# parole, l'indice di ogni swap, la nascita dal fornitore e la VERIFICA
+# della sua risposta, in Python, gemella di `swapVerifica` di
+# `swap/boltz.js` — e una prova le fa giudicare le STESSE risposte, nate
+# dal bundle del telefono (boltz-core 5.0.0). Nessun sats si muove: la
+# fattura si paga dalla tappa 3, il ritiro e' la tappa 2.
+# L'aritmetica della curva qui sotto e' Python puro, e tocca SOLO chiavi
+# pubbliche (la chiave MuSig a due e il ritocco taproot): nessun segreto
+# passa da qui, quindi una conta lenta o non a tempo costante non
+# racconta niente a nessuno. Le chiavi private le deriva embit.
+_SWAP_EC_P = 2 ** 256 - 2 ** 32 - 977
+_SWAP_EC_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+_SWAP_EC_G = (0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798,
+              0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8)
+# la versione delle foglie dello swap su bitcoin (BIP-342; Liquid ne ha
+# un'altra, e qui Liquid non c'e')
+SWAP_FOGLIA_VERSIONE = 0xc0
+
+
+def _swap_ec_somma(a, b):
+    """La somma di due punti della curva (None = il punto all'infinito)."""
+    p = _SWAP_EC_P
+    if a is None:
+        return b
+    if b is None:
+        return a
+    if a[0] == b[0] and (a[1] + b[1]) % p == 0:
+        return None
+    if a == b:
+        m = 3 * a[0] * a[0] * pow(2 * a[1], p - 2, p) % p
+    else:
+        m = (b[1] - a[1]) * pow(b[0] - a[0], p - 2, p) % p
+    x = (m * m - a[0] - b[0]) % p
+    return (x, (m * (a[0] - x) - a[1]) % p)
+
+
+def _swap_ec_per(punto, k: int):
+    """Un punto per un numero (raddoppia e somma)."""
+    r = None
+    k = int(k) % _SWAP_EC_N
+    while k:
+        if k & 1:
+            r = _swap_ec_somma(r, punto)
+        punto = _swap_ec_somma(punto, punto)
+        k >>= 1
+    return r
+
+
+def _swap_ec_punto(sec: bytes, pari: bool = False):
+    """Il punto di una chiave pubblica compressa da 33 byte (o, con
+    `pari`, quello di una x-only da 32 con la y pari). ValueError se non
+    sta sulla curva."""
+    sec = bytes(sec)
+    if pari:
+        if len(sec) != 32:
+            raise ValueError("chiave x-only della lunghezza sbagliata")
+        sec = b"\x02" + sec
+    if len(sec) != 33 or sec[0] not in (2, 3):
+        raise ValueError("chiave pubblica non compressa")
+    p = _SWAP_EC_P
+    x = int.from_bytes(sec[1:], "big")
+    if x >= p:
+        raise ValueError("chiave pubblica fuori dalla curva")
+    y = pow((pow(x, 3, p) + 7) % p, (p + 1) // 4, p)
+    if (y * y - pow(x, 3, p) - 7) % p:
+        raise ValueError("chiave pubblica fuori dalla curva")
+    if (y & 1) != (sec[0] & 1):
+        y = p - y
+    return (x, y)
+
+
+def _swap_etichettato(etichetta: str, *pezzi: bytes) -> bytes:
+    """L'hash etichettato del BIP-340: sha256(sha256(e)||sha256(e)||dati)."""
+    e = hashlib.sha256(etichetta.encode()).digest()
+    return hashlib.sha256(e + e + b"".join(pezzi)).digest()
+
+
+def _swap_spinta(dati: bytes) -> bytes:
+    """Lo script che mette `dati` sulla pila (fino a 75 byte, che qui
+    bastano: 20, 32 e i pochi del numero del blocco)."""
+    if not 1 <= len(dati) <= 75:
+        raise ValueError("spinta fuori misura")
+    return bytes([len(dati)]) + dati
+
+
+def _swap_numero_script(n: int) -> bytes:
+    """Un numero nello script come lo scrive btc-signer: OP_0, OP_1..16,
+    oppure la spinta del numero minimo in little-endian col segno."""
+    n = int(n)
+    if n == 0:
+        return b"\x00"
+    if 1 <= n <= 16:
+        return bytes([0x50 + n])
+    if n < 0:
+        raise ValueError("numero negativo nello script")
+    b = n.to_bytes((n.bit_length() + 7) // 8, "little")
+    if b[-1] & 0x80:
+        b += b"\x00"
+    return _swap_spinta(b)
+
+
+def swap_albero_reverse(impronta: bytes, pub_ritiro: bytes,
+                        pub_rimborso: bytes, scadenza: int) -> dict:
+    """L'ALBERO DI UNO SWAP REVERSE, come lo serializza boltz-core 5.0.0
+    (`reverseSwapTree` + `serializeSwapTree`): due foglie, e l'esadecimale
+    dello script di ognuna.
+      ritiro:   SIZE 32 EQUALVERIFY HASH160 <ripemd160(impronta)>
+                EQUALVERIFY <x della chiave di ritiro> CHECKSIG
+      rimborso: <x della chiave del fornitore> CHECKSIGVERIFY <scadenza>
+                CHECKLOCKTIMEVERIFY
+    Chi ritira (noi) mostra il segreto; il fornitore si riprende i
+    bitcoin solo dopo il blocco `scadenza`."""
+    from embit.hashes import ripemd160
+    impronta, pub_ritiro, pub_rimborso = (bytes(impronta), bytes(pub_ritiro),
+                                          bytes(pub_rimborso))
+    if len(impronta) != 32:
+        raise ValueError("impronta della lunghezza sbagliata")
+    _swap_ec_punto(pub_ritiro)
+    _swap_ec_punto(pub_rimborso)
+    if not 0 < int(scadenza) < 500_000_000:
+        raise ValueError("scadenza fuori misura")
+    ritiro = (b"\x82" + _swap_numero_script(32) + b"\x88" + b"\xa9"
+              + _swap_spinta(ripemd160(impronta)) + b"\x88"
+              + _swap_spinta(pub_ritiro[1:]) + b"\xac")
+    rimborso = (_swap_spinta(pub_rimborso[1:]) + b"\xad"
+                + _swap_numero_script(scadenza) + b"\xb1")
+    return {"claimLeaf": {"version": SWAP_FOGLIA_VERSIONE,
+                          "output": ritiro.hex()},
+            "refundLeaf": {"version": SWAP_FOGLIA_VERSIONE,
+                           "output": rimborso.hex()}}
+
+
+def _swap_radice_albero(albero: dict) -> bytes:
+    """La radice taproot dell'albero a due foglie (BIP-341): TapLeaf di
+    ognuna, poi TapBranch coi due hash in ordine."""
+    foglie = []
+    for nome in ("claimLeaf", "refundLeaf"):
+        script = bytes.fromhex(albero[nome]["output"])
+        if len(script) >= 0xfd:
+            raise ValueError("foglia troppo lunga")
+        foglie.append(_swap_etichettato(
+            "TapLeaf", bytes([int(albero[nome]["version"])]),
+            bytes([len(script)]), script))
+    return _swap_etichettato("TapBranch", *sorted(foglie))
+
+
+def swap_chiave_musig(pubbliche: list):
+    """LA CHIAVE MUSIG2 DI PIU' CHIAVI (BIP-327, KeyAgg), nell'ordine
+    dato e SENZA riordinarle — come `Musig.create` di boltz-core, che le
+    prende cosi' come arrivano (la chiave del fornitore PER PRIMA). Torna
+    il punto."""
+    if len(pubbliche) < 2:
+        raise ValueError("servono almeno due chiavi")
+    pubbliche = [bytes(k) for k in pubbliche]
+    punti = [_swap_ec_punto(k) for k in pubbliche]
+    if len(set(pubbliche)) != len(pubbliche):
+        raise ValueError("chiavi doppie")
+    seconda = next((k for k in pubbliche[1:] if k != pubbliche[0]), None)
+    lista = _swap_etichettato("KeyAgg list", *pubbliche)
+    somma = None
+    for k, punto in zip(pubbliche, punti):
+        a = 1 if k == seconda else int.from_bytes(
+            _swap_etichettato("KeyAgg coefficient", lista, k), "big") % _SWAP_EC_N
+        somma = _swap_ec_somma(somma, _swap_ec_per(punto, a))
+    if somma is None:
+        raise ValueError("la somma delle chiavi e' all'infinito")
+    return somma
+
+
+def swap_programma_lockup(pub_fornitore: bytes, pub_nostra: bytes,
+                          albero: dict) -> bytes:
+    """I 32 byte dell'indirizzo dove il fornitore deve bloccare i
+    bitcoin: la chiave MuSig a due (la sua PER PRIMA, poi la nostra)
+    ritoccata con la radice dell'albero (BIP-341, TapTweak sulla x)."""
+    interna = swap_chiave_musig([pub_fornitore, pub_nostra])
+    if interna[1] & 1:
+        interna = (interna[0], _SWAP_EC_P - interna[1])
+    x = interna[0].to_bytes(32, "big")
+    t = int.from_bytes(_swap_etichettato("TapTweak", x,
+                                         _swap_radice_albero(albero)), "big")
+    if t >= _SWAP_EC_N:
+        raise ValueError("ritocco fuori misura")
+    q = _swap_ec_somma(interna, _swap_ec_per(_SWAP_EC_G, t))
+    if q is None:
+        raise ValueError("ritocco all'infinito")
+    return q[0].to_bytes(32, "big")
+
+
+def swap_auto_chiavi(parole: str, indice: int) -> dict:
+    """LE CHIAVI DELLO SWAP NUMERO `indice` (lo schema di SATS Routing,
+    come `swapChiavi` del telefono): la privata in m/44/0/0/0/indice
+    dalle dodici parole, la pubblica compressa, il segreto della fattura
+    (sha256 della privata) e la sua impronta (sha256 del segreto)."""
+    from embit import bip32, bip39
+    indice = int(indice)
+    if not 0 <= indice < 2 ** 31:
+        raise ValueError("indice fuori misura")
+    k = bip32.HDKey.from_seed(bip39.mnemonic_to_seed(
+        str(parole or "").strip())).derive(f"m/44/0/0/0/{indice}")
+    privata = k.key.secret
+    segreto = hashlib.sha256(privata).digest()
+    return {"privata": privata, "pubblica": k.key.get_public_key().sec(),
+            "segreto": segreto, "impronta": hashlib.sha256(segreto).digest()}
+
+
+def swap_auto_xpub(parole: str) -> str:
+    """La xpub della RADICE delle parole, quella che la pagina «Rescue»
+    di SATS Routing manda al recupero (come `swapXpub` del telefono)."""
+    from embit import bip32, bip39
+    return bip32.HDKey.from_seed(bip39.mnemonic_to_seed(
+        str(parole or "").strip())).to_public().to_string()
+
+
+def swap_auto_verifica(r, chiavi: dict, attesa: dict, rete: str):
+    """LA VERIFICA DELLA RISPOSTA DEL FORNITORE, prima di fidarsi: None =
+    tutto torna, altrimenti la ragione, con gli STESSI nomi di
+    `swapVerifica` del telefono (una prova le mette a confronto):
+      risposta   non e' una risposta di swap
+      fattura    la fattura non si legge
+      importo    la fattura non chiede quel che il preventivo dice
+      impronta   la fattura non e' legata al NOSTRO segreto (il fornitore
+                 incasserebbe senza che noi ritiriamo)
+      albero     l'albero non e' quello che rifacciamo coi nostri pezzi
+      indirizzo  l'indirizzo del lockup non e' quello di quell'albero e
+                 delle due chiavi
+      meno       on-chain blocca meno del preventivo
+    `attesa` = {"sats": la fattura, "onchainMin": il minimo on-chain}."""
+    if not isinstance(r, dict) or not isinstance(r.get("invoice"), str):
+        return "risposta"
+    letta = leggi_bolt11(r["invoice"], con_hash=True)
+    sats = importo_bolt11(r["invoice"])
+    if not letta or sats is None:
+        return "fattura"
+    if sats != int(attesa["sats"]):
+        return "importo"
+    if not letta.get("hash") or letta["hash"] != chiavi["impronta"].hex():
+        return "impronta"
+    try:
+        scadenza = int(r.get("timeoutBlockHeight"))
+        loro = bytes.fromhex(str(r.get("refundPublicKey") or ""))
+        atteso = swap_albero_reverse(chiavi["impronta"], chiavi["pubblica"],
+                                     loro, scadenza)
+        albero = r.get("swapTree")
+        if isinstance(albero, str):
+            albero = json.loads(albero)
+        # un albero con una terza foglia (il «covenant» di Liquid) non e'
+        # il nostro: le chiavi devono essere ESATTAMENTE le due
+        if not isinstance(albero, dict) or set(albero) != {"claimLeaf",
+                                                          "refundLeaf"}:
+            return "albero"
+        for nome in ("claimLeaf", "refundLeaf"):
+            f = albero[nome]
+            if (int(f["version"]) != atteso[nome]["version"]
+                    or str(f["output"]).lower() != atteso[nome]["output"]):
+                return "albero"
+    except (TypeError, ValueError, KeyError, AttributeError):
+        return "albero"
+    try:
+        programma = swap_programma_lockup(loro, chiavi["pubblica"], atteso)
+    except ValueError:
+        return "indirizzo"
+    if _swap_programma_p2tr(r.get("lockupAddress"), rete) != programma:
+        return "indirizzo"
+    try:
+        if not int(r.get("onchainAmount")) >= int(attesa["onchainMin"]):
+            return "meno"
+    except (TypeError, ValueError):
+        return "meno"
+    return None
+
+
+# LE PAROLE DELLO SWAP AUTOMATICO STANNO SUL VPS, come la chiave on-chain
+# (`onchain_crea_chiave_barattolo`): nascono con un gesto di un admin dal
+# pannello, una volta sola, con `os.urandom`; il file e' 600 in
+# `chiavi/`, e `backup-fuori.sh` porta via la cartella intera. Le parole
+# non escono MAI dal server: ne' nella risposta, ne' nel journal, ne' nel
+# pannello (che vede impronta, xpub di radice e se il backup le ha).
+# PERCHE' NON LE STESSE PAROLE DELLA CHIAVE ON-CHAIN: quella firma le
+# dispute del 2-di-3, queste ritirano gli swap; un incidente su una non
+# deve aprire l'altra, e il recupero di SATS Routing vuole la xpub di
+# radice delle SUE parole — darla vorrebbe dire dare la radice del 2-di-3.
+def _swap_auto_file() -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(DB)), "chiavi",
+                        "swap-barattolo.json")
+
+
+def _swap_auto_parole_vps():
+    """Il file delle parole letto, o None se non e' nato. Un file che
+    c'e' e non si legge, o che e' nato su un'altra rete, ALZA: tirare
+    dritto vorrebbe dire far nascere swap che non sappiamo ritirare."""
+    f = _swap_auto_file()
+    if not os.path.exists(f):
+        return None
+    with open(f, encoding="utf-8") as h:
+        d = json.load(h)
+    if not d.get("parole") or not d.get("xpub"):
+        raise ValueError("il file delle parole dello swap e' monco")
+    if d.get("rete") != swap_rete():
+        raise ValueError(f"le parole dello swap sono nate su {d.get('rete')}, "
+                         f"ma la rete dello swap adesso e' {swap_rete()}")
+    return d
+
+
+def swap_auto_crea_parole(admin_id: int) -> dict:
+    """Il gesto dell'admin: dodici parole nuove, il file. Una volta sola
+    (FileExistsError). Torna solo la parte pubblica."""
+    from embit import bip32, bip39
+    f = _swap_auto_file()
+    if os.path.exists(f):
+        raise FileExistsError(f)
+    parole = bip39.mnemonic_from_bytes(os.urandom(16))
+    radice = bip32.HDKey.from_seed(bip39.mnemonic_to_seed(parole))
+    d = {"parole": parole, "rete": swap_rete(),
+         "xpub": radice.to_public().to_string(),
+         "impronta": radice.my_fingerprint.hex(),
+         "creata_il": int(time.time()), "creata_da": int(admin_id)}
+    os.makedirs(os.path.dirname(f), mode=0o700, exist_ok=True)
+    # O_EXCL: due admin che premono insieme non fanno due file
+    fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as h:
+        json.dump(d, h)
+    return {k: d[k] for k in ("xpub", "impronta", "creata_il", "rete")}
+
+
+def swap_auto_stato_parole() -> dict:
+    """Quel che il pannello mostra delle parole dello swap, mai le parole:
+    nate o no, l'impronta, la xpub di radice (per la pagina «Rescue»), e
+    se l'ultimo backup fuori sede e' venuto dopo la nascita."""
+    try:
+        d = _swap_auto_parole_vps()
+    except Exception as e:
+        return {"dove": "rotta", "motivo": str(e)[:200]}
+    if not d:
+        return {"dove": "nessuna", "rete": swap_rete()}
+    ultimo = 0
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(DB)), "backup",
+                               "fuori", ".ultimo-successo")) as h:
+            ultimo = int(h.read().strip() or 0)
+    except Exception:
+        pass
+    nata = int(d.get("creata_il") or 0)
+    return {"dove": "vps", "xpub": d["xpub"], "impronta": d.get("impronta", ""),
+            "rete": d["rete"], "creata_il": nata, "file": _swap_auto_file(),
+            "backup_ultimo": ultimo, "nel_backup": ultimo >= nata > 0}
+
+
+# OGNI SWAP HA LA SUA CHIAVE: l'indice e' una riga di `swap_auto`, scritta
+# PRIMA di bussare al fornitore e mai riusata (anche se la nascita va
+# storta: la chiave pubblica e l'impronta possono essere gia' uscite).
+# La riga tiene le sole parti PUBBLICHE della risposta: le private si
+# rifanno dalle parole e dall'indice quando servono (il ritiro, tappa 2).
+SWAP_AUTO_CHIESTO = "chiesto"     # indice preso, il fornitore non ha risposto
+SWAP_AUTO_NATO = "nato"           # risposta verificata: lo swap c'e'
+SWAP_AUTO_MENTE = "mente"         # la risposta non torna: non si paga mai
+SWAP_AUTO_GIU = "giu"             # il fornitore non risponde o dice di no
+
+
+def _swap_auto_prepara(con):
+    con.execute("""CREATE TABLE IF NOT EXISTS swap_auto(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        indice INTEGER NOT NULL UNIQUE,
+        ordine_id INTEGER NOT NULL,
+        fornitore TEXT NOT NULL,
+        swap_id TEXT DEFAULT '',
+        stato TEXT DEFAULT 'chiesto',
+        perche TEXT DEFAULT '',
+        sats INTEGER DEFAULT 0,
+        onchain_min INTEGER DEFAULT 0,
+        risposta TEXT DEFAULT '',
+        creato INTEGER DEFAULT 0,
+        aggiornato INTEGER DEFAULT 0)""")
+
+
+def swap_auto_prenota_indice(con, ordine_id: int, fornitore: str,
+                             sats: int, onchain_min: int) -> int:
+    """Il prossimo indice libero, preso in UNA istruzione (due richieste
+    insieme non prendono lo stesso: lo vieta anche l'UNIQUE)."""
+    _swap_auto_prepara(con)
+    adesso = int(time.time())
+    cur = con.execute(
+        "INSERT INTO swap_auto(indice, ordine_id, fornitore, sats, "
+        "onchain_min, creato, aggiornato) SELECT COALESCE(MAX(indice), -1) "
+        "+ 1, ?, ?, ?, ?, ?, ? FROM swap_auto",
+        (int(ordine_id), str(fornitore), int(sats), int(onchain_min),
+         adesso, adesso))
+    con.commit()
+    return int(con.execute("SELECT indice FROM swap_auto WHERE id=?",
+                           (cur.lastrowid,)).fetchone()[0])
+
+
+# i soli campi della risposta che il ritiro (tappa 2) vorra' rileggere
+SWAP_AUTO_CAMPI = ("id", "invoice", "lockupAddress", "refundPublicKey",
+                   "swapTree", "timeoutBlockHeight", "onchainAmount")
+
+
+async def swap_auto_crea(fornitore: dict, ordine_id: int,
+                         preventivo: dict) -> dict:
+    """LA NASCITA DI UNO SWAP AUTOMATICO: l'indice, le chiavi, la
+    richiesta al fornitore col codice partner, la VERIFICA. Non paga
+    niente: torna {"stato", "perche", "indice", "swap_id", "fattura",
+    "lockup", "onchain"} e la fattura si paga solo se `stato` e' «nato»
+    (tappa 3). `preventivo` = quello di `preventivo_swap` (fattura, hash,
+    onchain). ValueError se le parole non ci sono o non si leggono."""
+    d = _swap_auto_parole_vps()
+    if not d:
+        raise ValueError("le parole dello swap automatico non sono ancora "
+                         "nate: un admin le crea dal pannello")
+    sats, minimo = int(preventivo["fattura"]), int(preventivo["onchain"])
+    con = db()
+    try:
+        indice = swap_auto_prenota_indice(con, ordine_id, fornitore["id"],
+                                          sats, minimo)
+    finally:
+        con.close()
+    chiavi = swap_auto_chiavi(d["parole"], indice)
+    corpo = {"from": "BTC", "to": "BTC", "invoiceAmount": sats,
+             "preimageHash": chiavi["impronta"].hex(),
+             "claimPublicKey": chiavi["pubblica"].hex(),
+             "pairHash": str(preventivo.get("hash") or "")}
+    if fornitore.get("referral"):
+        corpo["referralId"] = fornitore["referral"]
+    base = str(fornitore.get("api") or "").rstrip("/")
+    r, perche = None, ""
+    if swap_lettura_simulata(base):
+        stato, perche = SWAP_AUTO_GIU, "simulato"
+    else:
+        try:
+            async with httpx.AsyncClient(timeout=15) as c:
+                h = await c.post(f"{base}/v2/swap/reverse", json=corpo)
+            if h.status_code not in (200, 201):
+                stato, perche = SWAP_AUTO_GIU, f"http {h.status_code}"
+            else:
+                r = h.json()
+                stato = SWAP_AUTO_NATO
+        except Exception as e:
+            stato, perche = SWAP_AUTO_GIU, type(e).__name__
+    if stato == SWAP_AUTO_NATO:
+        perche = swap_auto_verifica(r, chiavi, {"sats": sats,
+                                                "onchainMin": minimo},
+                                    fornitore.get("rete") or swap_rete()) or ""
+        if not perche and not _SWAP_ID_FORMA.match(str(r.get("id") or "")):
+            perche = "risposta"
+        if perche:
+            stato = SWAP_AUTO_MENTE
+    pubblica = ({k: r.get(k) for k in SWAP_AUTO_CAMPI}
+                if isinstance(r, dict) and stato == SWAP_AUTO_NATO else {})
+    con = db()
+    try:
+        con.execute("UPDATE swap_auto SET stato=?, perche=?, swap_id=?, "
+                    "risposta=?, aggiornato=? WHERE indice=?",
+                    (stato, perche[:80], str(pubblica.get("id") or ""),
+                     json.dumps(pubblica) if pubblica else "",
+                     int(time.time()), indice))
+        con.commit()
+    finally:
+        con.close()
+    if stato != SWAP_AUTO_NATO:
+        print(f"⚠️ Swap automatico dell'ordine {int(ordine_id)} (indice "
+              f"{indice}): {stato} ({perche})", flush=True)
+    return {"stato": stato, "perche": perche, "indice": indice,
+            "swap_id": str(pubblica.get("id") or ""),
+            "fattura": pubblica.get("invoice") or "",
+            "lockup": pubblica.get("lockupAddress") or "",
+            "onchain": int(pubblica.get("onchainAmount") or 0)}
+
+
+@app.get("/api/admin/swap/parole")
+async def swap_auto_parole_vedi(x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: com'e' fatta la chiave dello swap automatico (mai le
+    parole)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    return swap_auto_stato_parole()
+
+
+@app.post("/api/admin/swap/parole")
+async def swap_auto_parole_crea(x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: «Crea le parole dello swap», una volta sola."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    _onchain_serve_embit()
+    try:
+        d = swap_auto_crea_parole(user["id"])
+    except FileExistsError:
+        raise HTTPException(409, "Le parole dello swap ci sono già: non si "
+                                 "rifanno")
+    print(f"🔁 Parole dello swap automatico create da {user['id']} "
+          f"(impronta {d['impronta']})", flush=True)
+    await notifica_admin(argomento="liquidita", testo=
+        f"🔁 <b>Nate le parole dello swap automatico</b> (impronta "
+        f"{d['impronta']}), create dal moderatore {int(user['id'])}. Stanno "
+        "solo sul VPS ed entrano nel prossimo backup fuori sede: fino ad "
+        "allora non c'è una copia.")
+    return swap_auto_stato_parole()
 
 
 # --- IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero) ---------------

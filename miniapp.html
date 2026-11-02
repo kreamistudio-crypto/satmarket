@@ -49400,6 +49400,14 @@ async function loadAdminStats(){
         {headers:{'X-Tg-Init-Data':authHdr()}});
       if (rk.ok) admChiaveOc = await rk.json();
     } catch(e) {}
+    /* le parole dello swap automatico (2 nov 2026): solo dove lo swap
+       c'e' per questo admin */
+    admSwapParole = null;
+    if (swapAcceso()) try {
+      const rp = await fetch(`${API_BASE}/admin/swap/parole`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rp.ok) admSwapParole = await rp.json();
+    } catch(e) {}
     /* i badge Nostr NIP-58 delle live: solo l'elenco coi conteggi qui
        (interroga una tabella minuscola), il dettaglio di uno solo
        (partecipanti, challenge attive) si carica al bisogno quando lo
@@ -49538,6 +49546,7 @@ async function loadAdminStats(){
       </div>
       ${boxLeve(leve)}
       ${boxChiaveBarattolo()}
+      ${boxParoleSwap()}
       ${boxBadgeLive()}
       ${boxPersonalizzazioniPreview()}
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
@@ -50555,6 +50564,57 @@ function creaChiaveBarattolo(btn){
         toast('⛓️ Chiave di Barattolo creata, impronta ' + (d.impronta || '?'), 6000);
         loadAdminStats();
       } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+      finally { rip(); }
+    }});
+}
+
+/* ---- 🔁 LE PAROLE DELLO SWAP AUTOMATICO (2 nov 2026, cantiere swap-auto) ----
+   Il cambio da Lightning a bitcoin di chi vende lo fa il server, con
+   chiavi di Barattolo: dodici parole sul VPS, una chiave nuova per ogni
+   swap. Qui si vede se sono nate e se il backup le ha; le parole NON
+   arrivano mai qui. Nascono con un gesto, una volta sola. */
+let admSwapParole = null;
+function boxParoleSwap(){
+  const k = admSwapParole;
+  if (!k) return '';
+  let conta, dentro;
+  if (k.dove === 'vps') {
+    conta = k.nel_backup ? 'sul VPS' : '⚠️ senza backup';
+    dentro = `<div class="sub">Le parole che ritirano i bitcoin degli swap automatici stanno <b>solo sul VPS</b>. Ogni swap ha la sua chiave.</div>
+      <div class="hint" style="margin-top:8px">Impronta <b>${esc(k.impronta)}</b> · nate il ${dataOraBreve(k.creata_il)} · rete ${esc(k.rete)}</div>
+      <div class="hint" style="word-break:break-all">Chiave pubblica di radice: <code>${esc(k.xpub)}</code></div>
+      <div class="hint">${k.nel_backup
+        ? `✅ <b>Sono nel backup fuori sede</b> del ${dataOraBreve(k.backup_ultimo)}.`
+        : '⚠️ <b>Non sono ancora in un backup fuori sede</b>: entrano nel prossimo (alle 04:30, o al prossimo deploy). Fino ad allora la copia è una sola.'}</div>
+      <div class="hint">Se il server si perde, uno swap si ritrova anche dalla pagina «Rescue» di SATS Routing con le parole dell'archivio (<code>chiavi/swap-barattolo.json</code>).</div>`;
+  } else if (k.dove === 'rotta') {
+    conta = '⚠️ illeggibili';
+    dentro = `<div class="sub">⚠️ Il file delle parole c'è ma non si usa (${esc(k.motivo || '')}). Non si ricrea da qui: va guardato sul VPS.</div>`;
+  } else {
+    conta = 'non nate';
+    dentro = `<div class="sub">Lo swap automatico ha bisogno delle sue parole: dodici, nuove, solo sul VPS. Finché non nascono nessuno swap automatico parte.</div>
+      <button class="btn orange" style="margin-top:10px" onclick="creaParoleSwap(this)">🔁 Crea le parole dello swap</button>`;
+  }
+  return cassettoAdm('accAdmParoleSwap', '🔁', 'Parole dello swap', conta, dentro);
+}
+function creaParoleSwap(btn){
+  haptic();
+  chiediConferma({
+    titolo: 'Crei le parole dello swap?',
+    corpo: 'Nascono dodici parole nuove, solo sul VPS: servono al server per ritirare i bitcoin degli swap automatici di chi vende.\n\nSi creano una volta sola e non si rifanno. Entrano nel prossimo backup fuori sede.',
+    etichetta: 'Crea le parole',
+    poi: async () => {
+      const rip = bottoneInAttesa(btn, 'Creo le parole…');
+      try {
+        const r = await fetch(`${API_BASE}/admin/swap/parole`,
+          {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'non create');
+        admSwapParole = d;
+        accAdmAperti.add('accAdmParoleSwap');
+        toast('🔁 Parole dello swap create, impronta ' + (d.impronta || '?'), 6000);
+        loadAdminStats();
+      } catch(e) { toast('🔁 ' + (e.message || 'errore'), 6000); }
       finally { rip(); }
     }});
 }

@@ -44472,12 +44472,15 @@ def prove_fogli_di_casa():
     # CENTOCINQUE (2 nov 2026, cantiere p2p-onchain-usdt): «Hai inviato gli
     # USDT?» negli scambi on-chain, dopo l'id della transazione
     # (`usdtInviatiOcP2P`).
-    prova("i gesti che passano dalla domanda unica sono centocinque (dal 30 ott "
+    # CENTOSEI (2 nov 2026, cantiere swap-auto): «Crei le parole dello
+    # swap?» nel pannello admin (`creaParoleSwap`).
+    prova("i gesti che passano dalla domanda unica sono centosei (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
-          "cambio in Lightning; dal 2 nov «Hai inviato gli USDT?» on-chain)",
-          105, solo_codice(mini).count("chiediConferma({"))
+          "cambio in Lightning; dal 2 nov «Hai inviato gli USDT?» on-chain "
+          "e «Crei le parole dello swap?»)",
+          106, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -168159,8 +168162,10 @@ def prove_canale_admin():
           # dispute, la nascita della sua chiave nella liquidita'
           # (28 ott 2026, bot-assistente) «🙋 Parla con una persona»
           # nella stanza sua, l'assistenza
+          # (2 nov 2026, swap-auto) la nascita delle parole dello swap
+          # automatico nella liquidita', come la chiave on-chain
           {"assistenza": 1, "dispute": 5, "dm": 1, "errori": 33,
-           "liquidita": 2, "moderazione": 14, "riepiloghi": 27}, per_stanza)
+           "liquidita": 3, "moderazione": 14, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -168195,14 +168200,15 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "92 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "93 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
           "margine della cassaforte, dall'on-chain la firma di Barattolo "
           "e la nascita della sua chiave, e chi chiede una persona "
           "all'assistente del bot, e le dispute P2P on-chain: aperta e "
-          "decisa, 30 ott 2026)", 92,
+          "decisa, 30 ott 2026; dal 2 nov la nascita delle parole dello "
+          "swap automatico)", 93,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -180990,8 +180996,18 @@ def prove_swap_preventivo():
     # (28 ott 2026, onchain-verso-lightning: la terza e' la sola LETTURA
     # dello stato di un cambio prima di trasmettere, `swap_stato_di`, che
     # passa dal giudice del collaudo come le altre)
-    prova("nessun'altra strada verso SATS Routing nel server (le due letture delle tariffe e lo stato)", 3,
+    # (2 nov 2026, swap-auto: la quarta e' la NASCITA di uno swap
+    # automatico, `swap_auto_crea`, l'unica che scrive: una POST che passa
+    # dal giudice del collaudo e porta solo parti pubbliche — la decisione
+    # di Andrea della strada B; le sue prove sono `prove_swap_auto`)
+    prova("nessun'altra strada verso SATS Routing nel server (le due letture delle tariffe, lo stato, la nascita automatica)", 4,
           len(re.findall(r"[\"']\S*/v2/swap/", src)))
+    nascita = pezzo("swap_auto_crea")
+    prova("...e l'unica che scrive e' la nascita automatica, dal giudice del collaudo",
+          (1, 1, True),
+          (src.count('await c.post(f"{base}/v2/swap/'),
+           nascita.count('await c.post(f"{base}/v2/swap/reverse", json=corpo)'),
+           nascita.index("swap_lettura_simulata(base)") < nascita.index(".post(")))
     stato_di = pezzo("swap_stato_di")
     prova("...e lo stato si legge e basta, dal giudice del collaudo", (True, False),
           ("swap_lettura_simulata(base)" in stato_di, ".post(" in stato_di))
@@ -182358,6 +182374,7 @@ def prove_swap_pagamento():
            "_SWAP_BECH32M": 0x2bc830a3}
     exec(pezzo("_bech32_polymod"), amb)
     exec(pezzo("swap_indirizzo_p2tr"), amb)
+    exec(pezzo("_swap_programma_p2tr"), amb)
     p2tr = amb["swap_indirizzo_p2tr"]
     bip = "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0"
     reg = _taproot("bcrt", bytes(range(1, 33)))
@@ -182692,6 +182709,330 @@ def prove_swap_pagamento():
     prova("il collaudo dello swap intero sta negli elenchi della CI", (True, True),
           ("\ncollaudo_swap_pagamento\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
            "\ncollaudo_swap_pagamento.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
+
+
+def prove_swap_auto():
+    """LO SWAP AUTOMATICO DEL MERCATINO, TAPPA 1 (2 nov 2026, cantiere
+    swap-auto, piano approvato da Andrea). Il server rifa' in Python quel
+    che il telefono fa col bundle (boltz-core 5.0.0): le chiavi dello
+    schema di SATS Routing, l'albero dello swap reverse, la chiave MuSig2
+    a due col ritocco taproot, l'indirizzo del lockup, la verifica della
+    risposta. Una seconda aritmetica vale solo se da' GLI STESSI byte
+    della prima, quindi:
+    1. I LORO VETTORI: le parole di `rescueDerivation.spec.ts` danno la
+       loro xpub di radice e la loro chiave 0 (come `prove_swap_telefono`).
+    2. LO STESSO ALBERO E LO STESSO INDIRIZZO del bundle, su dodici swap
+       con scadenze scelte sui bordi dei numeri dello script (1, 16, 17,
+       127, 128, 255, 256, 32767, 32768...).
+    3. LO STESSO GIUDIZIO di `swapVerifica` del telefono sulle stesse
+       risposte: l'onesta passa, ogni bugia ha lo stesso nome.
+    4. LE PAROLE: nascono una volta sola, file 600 in `chiavi/` (che il
+       backup fuori sede porta via intera), e non escono mai.
+    5. LA NASCITA con un fornitore finto: l'indice nuovo a ogni swap, la
+       richiesta senza segreti, «nato» solo se la verifica passa, «mente»
+       e «giu» col perche'; in collaudo non si esce dal computer."""
+    print("\n[lo swap automatico, tappa 1]")
+    import asyncio as _aio, hashlib as _hl, sqlite3 as _sq, stat as _st
+    import tempfile as _tf
+    try:
+        import embit  # noqa: F401
+    except ImportError:
+        salta("swap automatico", "embit non installato (pip install -r "
+              "requirements.txt)")
+        return
+    src = _SORGENTE
+    amb = {"hashlib": _hl, "json": json, "re": re, "os": os,
+           "time": __import__("time"),
+           "_SWAP_EC_P": 2 ** 256 - 2 ** 32 - 977,
+           "_SWAP_EC_N": 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141,
+           "_SWAP_EC_G": (0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798,
+                          0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8),
+           "SWAP_FOGLIA_VERSIONE": 0xc0,
+           "_BECH32_ALFABETO": "qpzry9x8gf2tvdw0s3jn54khce6mua7l",
+           "_BECH32_GEN": (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3),
+           "SWAP_HRP": {"bitcoin": "bc", "testnet": "tb", "regtest": "bcrt"},
+           "_SWAP_BECH32M": 0x2bc830a3,
+           "_SWAP_ID_FORMA": re.compile(r"^[A-Za-z0-9_-]{4,80}$")}
+    for n in ("_swap_ec_somma", "_swap_ec_per", "_swap_ec_punto",
+              "_swap_etichettato", "_swap_spinta", "_swap_numero_script",
+              "swap_albero_reverse", "_swap_radice_albero",
+              "swap_chiave_musig", "swap_programma_lockup", "_bech32_polymod",
+              "_swap_programma_p2tr", "swap_auto_chiavi", "swap_auto_xpub",
+              "swap_auto_verifica", "leggi_bolt11", "importo_bolt11"):
+        exec(pezzo(n), amb)
+    prova("swap auto: le costanti della curva sono quelle di secp256k1",
+          (True, True, True),
+          ("_SWAP_EC_P = 2 ** 256 - 2 ** 32 - 977\n" in src,
+           "_SWAP_EC_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141\n" in src,
+           "0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8)\n" in src))
+    p_, g_ = amb["_SWAP_EC_P"], amb["_SWAP_EC_G"]
+    prova("...e il generatore sta sulla curva, e n volte lui fa l'infinito",
+          (0, None), ((g_[1] ** 2 - g_[0] ** 3 - 7) % p_,
+                      amb["_swap_ec_somma"](amb["_swap_ec_per"](g_, amb["_SWAP_EC_N"] - 1), g_)))
+
+    # --- 1. i loro vettori ---
+    M = "invite smile evidence shield frost source truly ball odor unfold example nuclear"
+    k0 = amb["swap_auto_chiavi"](M, 0)
+    prova("swap auto: le loro 12 parole danno la loro xpub di radice",
+          VETTORE_SWAP_XPUB, amb["swap_auto_xpub"](M))
+    prova("swap auto: la chiave 0 e' la loro, il segreto e' il loro",
+          (VETTORE_SWAP_PRIV, VETTORE_SWAP_SEGRETO),
+          (k0["privata"].hex(), k0["segreto"].hex()))
+    prova("swap auto: impronta = sha256(segreto), chiavi diverse a ogni indice",
+          (True, False), (k0["impronta"] == _hl.sha256(k0["segreto"]).digest(),
+                          amb["swap_auto_chiavi"](M, 1)["pubblica"] == k0["pubblica"]))
+
+    # --- 2. e 3. gli stessi byte e lo stesso giudizio del bundle ---
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    banco = r"""
+const fs = require('fs'); const vm = require('vm');
+const ctx = {console, crypto: globalThis.crypto, TextEncoder, TextDecoder, Uint8Array, BigInt};
+ctx.window = ctx; vm.createContext(ctx);
+vm.runInContext(fs.readFileSync('vendor/swap.bundle.js', 'utf8'), ctx);
+vm.runInContext(__BOLT11__, ctx);
+vm.runInContext("const FOTO_BASE = '';", ctx);
+vm.runInContext(fs.readFileSync('swap/boltz.js', 'utf8'), ctx);
+const run = c => vm.runInContext(c, ctx);
+const S = ctx.BarattoloSwap; const h = S.hex; const enc = new TextEncoder();
+const out = {casi: [], risposte: {}, verdetti: {}};
+for (let i = 0; i < 12; i++) {
+  const nPriv = S.sha256(enc.encode('nostra ' + i)), fPriv = S.sha256(enc.encode('fornitore ' + i));
+  const nPub = new S.HDKey({privateKey: nPriv}).publicKey, fPub = new S.HDKey({privateKey: fPriv}).publicKey;
+  const imp = S.sha256(enc.encode('impronta ' + i));
+  const scad = [1, 16, 17, 127, 128, 255, 256, 32767, 32768, 900000, 8388608, 499999999][i];
+  const albero = S.reverseSwapTree(false, imp, nPub, fPub, scad);
+  const agg = S.TaprootUtils.tweakMusig(S.Musig.create(nPriv, [fPub, nPub]), albero.tree);
+  const script = S.Scripts.p2trOutput(agg.aggPubkey);
+  out.casi.push({nPub: h.encode(nPub), fPub: h.encode(fPub), imp: h.encode(imp), scad,
+    albero: S.SwapTreeSerializer.serializeSwapTree(albero),
+    ind: S.Address(S.NETWORK).encode(S.OutScript.decode(script))});
+}
+const ALF = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+function chk(hrp, dati){
+  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  const v = []; for (const c of hrp) v.push(c.charCodeAt(0) >> 5); v.push(0);
+  for (const c of hrp) v.push(c.charCodeAt(0) & 31); v.push(...dati, 0, 0, 0, 0, 0, 0);
+  let x = 1; for (const y of v) { const b = x >>> 25; x = ((x & 0x1ffffff) << 5) ^ y;
+    for (let i = 0; i < 5; i++) if ((b >> i) & 1) x ^= GEN[i]; }
+  x ^= 1; const o = []; for (let i = 0; i < 6; i++) o.push((x >> (5 * (5 - i))) & 31); return o;
+}
+function a5(b){ let acc = 0, bit = 0; const o = []; for (const y of b) { acc = (acc << 8) | y; bit += 8;
+  while (bit >= 5) { bit -= 5; o.push((acc >> bit) & 31); } } if (bit) o.push((acc << (5 - bit)) & 31); return o; }
+function n5(n, l){ const o = []; for (let i = l - 1; i >= 0; i--) o.push(Math.floor(n / 32 ** i) % 32); return o; }
+function fattura(sats, imp){
+  const hrp = 'lnbc' + sats * 10 + 'n'; const p = a5(imp);
+  const d = [...n5(1760000000, 7), 1, ...n5(p.length, 2), ...p, ...Array(104).fill(0)];
+  return hrp + '1' + [...d, ...chk(hrp, d)].map(x => ALF[x]).join('');
+}
+/* le risposte di un fornitore per lo swap numero `indice` delle parole */
+ctx.__M = __PAROLE__;
+const ind = a => S.Address(S.NETWORK).encode(S.OutScript.decode(a));
+function risposte(indice){
+  const k = run(`swapChiavi(BarattoloSwap, __M, ${indice})`);
+  const sPriv = S.sha256(enc.encode('cartone ' + indice));
+  const sPub = new S.HDKey({privateKey: sPriv}).publicKey;
+  const albero = S.reverseSwapTree(false, k.impronta, k.pubblica, sPub, 900000);
+  const agg = S.TaprootUtils.tweakMusig(S.Musig.create(sPriv, [sPub, k.pubblica]), albero.tree);
+  const R = {id: 'swapNumero' + indice, invoice: fattura(48000, k.impronta),
+    swapTree: S.SwapTreeSerializer.serializeSwapTree(albero),
+    lockupAddress: ind(S.Scripts.p2trOutput(agg.aggPubkey)), refundPublicKey: h.encode(sPub),
+    timeoutBlockHeight: 900000, onchainAmount: 47388};
+  const altro = new S.HDKey({privateKey: S.sha256(enc.encode('un altro'))}).publicKey;
+  const finto = S.TaprootUtils.tweakMusig(S.Musig.create(sPriv, [sPub, altro]), albero.tree);
+  const nostroPrimo = S.TaprootUtils.tweakMusig(S.Musig.create(sPriv, [k.pubblica, sPub]), albero.tree);
+  const terza = Object.assign({}, R.swapTree, {covenantClaimLeaf: R.swapTree.claimLeaf});
+  return {k, R: {
+    buona: R,
+    importo: Object.assign({}, R, {invoice: fattura(47000, k.impronta)}),
+    impronta: Object.assign({}, R, {invoice: fattura(48000, S.sha256(k.impronta))}),
+    albero: Object.assign({}, R, {swapTree: S.SwapTreeSerializer.serializeSwapTree(
+      S.reverseSwapTree(false, k.impronta, k.pubblica, sPub, 900001))}),
+    scadenza: Object.assign({}, R, {timeoutBlockHeight: 900001}),
+    terzaFoglia: Object.assign({}, R, {swapTree: terza}),
+    indirizzo: Object.assign({}, R, {lockupAddress: ind(S.Scripts.p2trOutput(finto.aggPubkey))}),
+    ordineChiavi: Object.assign({}, R, {lockupAddress: ind(S.Scripts.p2trOutput(nostroPrimo.aggPubkey))}),
+    meno: Object.assign({}, R, {onchainAmount: 47387}),
+    risposta: {invoice: 3},
+    fattura: Object.assign({}, R, {invoice: 'lnbc1storta'})}};
+}
+const t = risposte(3);
+ctx.__k = t.k; ctx.__S = S;
+for (const [nome, r] of Object.entries(t.R)) {
+  ctx.__r = r;
+  out.risposte[nome] = r;
+  out.verdetti[nome] = run('swapVerifica(__S, __S.NETWORK, __r, __k, {sats: 48000, onchainMin: 47388})');
+}
+/* per la nascita: le risposte oneste degli indici 0 e 1 */
+out.nascita = [risposte(0).R.buona, risposte(1).R.importo];
+console.log(JSON.stringify(out));
+"""
+    i = mini.index("function importoBolt11(pr){")
+    bolt = mini[i:mini.index("\n}\n", i) + 3]
+    i = mini.index("function leggiBolt11(pr){")
+    bolt += mini[i:mini.index("\n}\n", i) + 3]
+    r = _node_banco(banco.replace("__BOLT11__", json.dumps(bolt))
+                    .replace("__PAROLE__", json.dumps(M)))
+    if r is None:
+        salta("swap auto: gli stessi byte del bundle", "node non c'e'")
+        return
+    alb, prog, p2tr = (amb["swap_albero_reverse"], amb["swap_programma_lockup"],
+                       amb["_swap_programma_p2tr"])
+    uguali = []
+    for c in r.get("casi") or []:
+        a = alb(bytes.fromhex(c["imp"]), bytes.fromhex(c["nPub"]),
+                bytes.fromhex(c["fPub"]), c["scad"])
+        uguali.append((a == c["albero"],
+                       prog(bytes.fromhex(c["fPub"]), bytes.fromhex(c["nPub"]), a)
+                       == p2tr(c["ind"], "bitcoin")))
+    prova("swap auto: dodici swap, lo stesso albero e lo stesso lockup del bundle",
+          [(True, True)] * 12, uguali)
+    k3 = amb["swap_auto_chiavi"](M, 3)
+    giudizi = {n: amb["swap_auto_verifica"](risp, k3, {"sats": 48000, "onchainMin": 47388},
+                                            "bitcoin")
+               for n, risp in (r.get("risposte") or {}).items()}
+    prova("swap auto: il telefono giudica cosi' le risposte...",
+          {"buona": None, "importo": "importo", "impronta": "impronta",
+           "albero": "albero", "scadenza": "albero", "terzaFoglia": "albero",
+           "indirizzo": "indirizzo", "ordineChiavi": "indirizzo", "meno": "meno",
+           "risposta": "risposta", "fattura": "fattura"}, r.get("verdetti"))
+    prova("...e il server le giudica TUTTE allo stesso modo", r.get("verdetti"), giudizi)
+    prova("...anche con l'albero scritto come testo JSON, e su un'altra rete no",
+          (None, "indirizzo"),
+          (amb["swap_auto_verifica"](dict(r["risposte"]["buona"],
+                                          swapTree=json.dumps(r["risposte"]["buona"]["swapTree"])),
+                                     k3, {"sats": 48000, "onchainMin": 47388}, "bitcoin"),
+           amb["swap_auto_verifica"](r["risposte"]["buona"], k3,
+                                     {"sats": 48000, "onchainMin": 47388}, "regtest")))
+
+    # --- 4. le parole ---
+    cartella = _tf.mkdtemp()
+    stampe = []
+    amb.update({"DB": os.path.join(cartella, "barattolo.db"),
+                "swap_rete": lambda: "bitcoin", "print": lambda *a, **k: stampe.append(a)})
+    for n in ("_swap_auto_file", "_swap_auto_parole_vps", "swap_auto_crea_parole",
+              "swap_auto_stato_parole"):
+        exec(pezzo(n), amb)
+    d = amb["swap_auto_crea_parole"](999)
+    f = amb["_swap_auto_file"]()
+    salvato = json.load(open(f, encoding="utf-8"))
+    try:
+        amb["swap_auto_crea_parole"](999)
+        seconda = "rifatta"
+    except FileExistsError:
+        seconda = "no"
+    stato = amb["swap_auto_stato_parole"]()
+    prova("swap auto: le parole nascono in chiavi/swap-barattolo.json, 600, una volta",
+          (os.path.join(cartella, "chiavi", "swap-barattolo.json"), 0o600, 12, "no"),
+          (f, _st.S_IMODE(os.stat(f).st_mode), len(salvato["parole"].split()), seconda))
+    prova("...la risposta e il pannello non portano le parole (ne' il seme)",
+          (False, False, "vps", salvato["xpub"], False),
+          (salvato["parole"] in json.dumps(d), salvato["parole"] in json.dumps(stato),
+           stato["dove"], stato["xpub"], "parole" in stato))
+    prova("...e la xpub e' quella di radice delle parole (per la pagina «Rescue»)",
+          amb["swap_auto_xpub"](salvato["parole"]), salvato["xpub"])
+    amb["swap_rete"] = lambda: "regtest"
+    prova("...nate su un'altra rete non si usano: il pannello lo dice", "rotta",
+          amb["swap_auto_stato_parole"]()["dove"])
+    amb["swap_rete"] = lambda: "bitcoin"
+    fuori = open(os.path.join("deploy", "backup-fuori.sh"), encoding="utf-8").read()
+    prova("...e il backup fuori sede porta via la cartella chiavi/ intera", True,
+          'cp -a "$DIR_APP/chiavi" "$TMP/chiavi"' in fuori)
+    rotte = src[src.index('@app.get("/api/admin/swap/parole")'):]
+    rotte = rotte[:rotte.index("\n\n\n# --- IL CAMBIO LIBERO")]
+    prova("...le due rotte sono SOLO ADMIN, e non ripetono le parole", (2, 0),
+          (rotte.count('if not e_admin(user["id"]):\n        raise HTTPException(403'),
+           rotte.count("parole\"]")))
+
+    # --- 5. la nascita, con un fornitore finto ---
+    # le parole del banco al posto di quelle nuove (i loro vettori)
+    json.dump(dict(salvato, parole=M), open(f, "w", encoding="utf-8"))
+    dbf = os.path.join(cartella, "swap.db")
+
+    def _db():
+        c = _sq.connect(dbf)
+        c.row_factory = _sq.Row
+        return c
+    chiamate, coda = [], []
+
+    class _Risp:
+        def __init__(self, codice, corpo):
+            self.status_code, self._corpo = codice, corpo
+
+        def json(self):
+            return self._corpo
+
+    class _Cliente:
+        def __init__(self, timeout=None):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, json=None):
+            chiamate.append((url, json))
+            return coda.pop(0)
+    simulato = {"si": False}
+    amb.update({"db": _db, "httpx": type("H", (), {"AsyncClient": _Cliente}),
+                "swap_lettura_simulata": lambda base: simulato["si"]})
+    for n in ("_swap_auto_prepara", "swap_auto_prenota_indice"):
+        exec(pezzo(n), amb)
+    exec("async " + pezzo("swap_auto_crea"), amb)
+    for n in ("SWAP_AUTO_CHIESTO", "SWAP_AUTO_NATO", "SWAP_AUTO_MENTE", "SWAP_AUTO_GIU",
+              "SWAP_AUTO_CAMPI"):
+        i = src.index(f"\n{n} = ")
+        exec(src[i + 1:src.index("\n\n", i + 1)].split("\n#")[0], amb)
+    forn = {"id": "satsrouting", "api": "https://api.finto.example", "referral": "barattolo",
+            "rete": "bitcoin"}
+    prev = {"fattura": 48000, "onchain": 47388, "hash": "abc"}
+    coda.extend([_Risp(201, r["nascita"][0]), _Risp(201, r["nascita"][1]),
+                 _Risp(503, {"error": "giu"})])
+    esiti = [_aio.run(amb["swap_auto_crea"](forn, 70 + j, prev)) for j in range(3)]
+    simulato["si"] = True
+    esiti.append(_aio.run(amb["swap_auto_crea"](forn, 73, prev)))
+    prova("swap auto: indici nuovi a ogni swap; nato, mente, giu, simulato",
+          [(0, "nato", ""), (1, "mente", "importo"), (2, "giu", "http 503"),
+           (3, "giu", "simulato")],
+          [(e["indice"], e["stato"], e["perche"]) for e in esiti])
+    prova("...la fattura esce SOLO da uno swap nato e verificato",
+          [True, "", "", ""],
+          [esiti[0]["fattura"] == r["nascita"][0]["invoice"]] + [e["fattura"] for e in esiti[1:]])
+    url, corpo = chiamate[0]
+    kc = amb["swap_auto_chiavi"](M, 0)
+    prova("...la richiesta: la nostra chiave pubblica, l'impronta, il codice partner",
+          ("https://api.finto.example/v2/swap/reverse",
+           {"from": "BTC", "to": "BTC", "invoiceAmount": 48000,
+            "preimageHash": kc["impronta"].hex(), "claimPublicKey": kc["pubblica"].hex(),
+            "pairHash": "abc", "referralId": "barattolo"}),
+          (url, corpo))
+    tutto = json.dumps(chiamate)
+    prova("...e in nessuna richiesta c'e' un segreto o una chiave privata", (False, False),
+          (kc["segreto"].hex() in tutto, kc["privata"].hex() in tutto))
+    con = _db()
+    righe = [dict(x) for x in con.execute(
+        "SELECT indice, ordine_id, stato, swap_id, risposta FROM swap_auto ORDER BY indice")]
+    con.close()
+    prova("...le righe: una per indice, la risposta pubblica solo per il nato",
+          [(0, 70, "nato", "swapNumero0", True), (1, 71, "mente", "", False),
+           (2, 72, "giu", "", False), (3, 73, "giu", "", False)],
+          [(x["indice"], x["ordine_id"], x["stato"], x["swap_id"],
+            bool(x["risposta"]) and json.loads(x["risposta"])["invoice"]
+            == r["nascita"][0]["invoice"]) for x in righe])
+    os.unlink(f)
+    try:
+        _aio.run(amb["swap_auto_crea"](forn, 74, prev))
+        senza = "partito"
+    except ValueError:
+        senza = "fermo"
+    con = _db()
+    quante = con.execute("SELECT COUNT(*) FROM swap_auto").fetchone()[0]
+    con.close()
+    prova("...e senza le parole non nasce niente (nemmeno un indice)", ("fermo", 4),
+          (senza, quante))
+    import shutil as _sh
+    _sh.rmtree(cartella, ignore_errors=True)
 
 
 def prove_cartone_submarine():
@@ -185399,6 +185740,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
+              prove_swap_auto,
               prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,
               prove_margine_cassaforte,
               prove_quantita_servizi,
