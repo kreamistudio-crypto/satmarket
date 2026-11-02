@@ -77616,3 +77616,29 @@ NON PROVATO E DA GUARDARE. Il bollino della rete e il logo dentro Telegram
 vero, su Android e iPhone; il link a Tronscan/Etherscan aperto dalla
 WebView. Proposte non fatte: «Scegli almeno un metodo» che in USDT diventa
 «una rete»; accorciare le righe 🔒/⚠️ comuni dei recapiti.
+
+## La promozione della sera rossa per una prova saltata (2 nov 2026, cantiere ritiro-in-collaudo)
+
+La promozione di swap-auto e dei ritocchi USDT (c42328c, 15 commit
+firmati da Andrea) ha fatto la CI rossa con 27.010 prove passate e 0
+fallite: `prove_swap_auto_ritiro` (tappa 2 dello swap automatico) e'
+stata SALTATA perche' vuole httpx, e con PROVE_SEVERE una saltata vale
+una rossa. Nella CI httpx arriva solo DOPO le prove («Le dipendenze del
+server, per i collaudi»): prove.py deve girare senza. In cloud era verde
+perche' la suite girava nel venv dei collaudi, che httpx l'ha.
+
+LA CURA. La prova resta la stessa funzione di prove.py, ma la chiama un
+collaudo nuovo, `collaudo_swap_auto_ritiro` (righe in ci/collaudi.txt e
+ci/compila.txt), dove httpx, embit e node ci sono; li' una SALTATA conta
+come rossa. Il workflow non si tocca (un commit su prove.yml puo'
+fermare `pronto`, ed e' cambiare l'ambiente di tutte le prove).
+
+PROVATO. Il collaudo nella gabbia (`collaudi_ci.py`, senza variabili del
+proxy): 18 passate; controprova con la firma del ritiro rotta
+(`ext_flag=0`): rosso. La suite severa in un venv uguale al passo «Le
+prove» della CI (websocket-client, pillow, cryptography,
+snowballstemmer, embit; niente httpx ne' fastapi).
+
+LA LEZIONE. Prima di una promozione la suite si gira nell'ambiente del
+passo «Le prove» della CI, non in quello dei collaudi: un venv piu'
+ricco fa sparire le saltate.

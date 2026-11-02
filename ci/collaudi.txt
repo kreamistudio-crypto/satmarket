@@ -129,6 +129,7 @@ collaudo_avvisi_nostr_arrivano
 collaudo_swap_instradatore
 collaudo_swap_pagamento
 collaudo_swap_auto
+collaudo_swap_auto_ritiro
 collaudo_cambio_libero
 collaudo_cambio_p2p
 collaudo_cambio_onchain_p2p

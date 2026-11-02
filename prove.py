@@ -186332,7 +186332,9 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
-              prove_swap_auto, prove_swap_auto_ritiro, prove_swap_auto_schermate,
+              prove_swap_auto, prove_swap_auto_schermate,
+              # prove_swap_auto_ritiro gira nei collaudi (collaudo_swap_auto_ritiro):
+              # vuole httpx, che la CI installa solo DOPO le prove (2 nov 2026)
               prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,
               prove_margine_cassaforte,
               prove_quantita_servizi,
