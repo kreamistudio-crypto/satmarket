@@ -10137,18 +10137,25 @@
   .swap-campo .hint{margin:-2px 2px 8px}
   .btn.cambio-vai{width:100%;margin-top:14px}
   .cambio-limiti{margin-top:8px;text-align:center;font-size:12.5px;font-weight:600;color:var(--ink-soft)}
-  .cambio-tessere{list-style:none;margin:18px 0 0;padding:0;display:grid;
-    grid-template-columns:repeat(3,1fr);gap:8px}
-  .cambio-tessere li{display:flex;flex-direction:column;align-items:center;gap:6px;
-    padding:12px 4px;border-radius:14px;background:var(--card);border:1px solid var(--line-soft);
-    font-size:12.5px;font-weight:800;color:var(--ink);text-align:center}
-  .cambio-tessera-ico{color:var(--sats-text)}
-  .cambio-tessera-ico .cambio-svg{width:22px;height:22px;vertical-align:0}
+  /* (2 nov 2026 sera, Alan) le tre «tessere» sembravano bottoni: un
+     elenco puntato di solo testo, piccolo e sommesso */
+  .cambio-tessere{margin:18px 4px 0;padding:0 0 0 20px;list-style:disc;
+    font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.6}
+  .cambio-tessere li::marker{color:var(--sats-text)}
   .cambio-sez{margin:24px 2px 8px;font-size:12px;font-weight:800;letter-spacing:.3px;
     text-transform:uppercase;color:var(--muted)}
   .cambio-voce{padding:12px;margin-bottom:8px;border-radius:16px;background:var(--card);
     border:1px solid var(--line-soft)}
   .cambio-voce-riga{display:flex;align-items:center;gap:12px}
+  /* (2 nov 2026 sera, Alan) la riga si tocca e si apre: un bottone vestito
+     da riga, e sotto dove vanno i sats */
+  button.cambio-voce-riga{width:100%;padding:0;margin:0;border:0;background:none;
+    font:inherit;color:inherit;text-align:left;cursor:pointer}
+  .cambio-dove{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:var(--bg);
+    display:flex;flex-direction:column;gap:4px}
+  .cambio-dove-eti{font-size:12px;font-weight:800;color:var(--muted)}
+  .cambio-dove-val{font-size:13px;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+  .cambio-dove-val.mono{user-select:all;-webkit-user-select:all}
   .cambio-voce .cambio-moneta{width:36px;height:36px}
   .cambio-voce .cambio-moneta .cambio-svg{width:19px;height:19px}
   .cambio-voce-dati{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;
@@ -18971,7 +18978,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '6f9d5d5b17';
+const SWAP_TELEFONO_VER = '2d7e2557a4';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
