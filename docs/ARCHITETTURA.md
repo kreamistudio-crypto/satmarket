@@ -35040,12 +35040,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   del cambio porta `cambio_usd` accanto a `cambio`; le frasi del bot di
   uno scambio (`_testo_libro_p2p`) dicono USDT. APP: il blocco «GLI
   ORDINI IN USDT» in `miniapp.html` — le reti `P2P_RETI_USDT` (Tron
-  TRC-20, Polygon e Ethereum ERC-20, col contratto del vero USDT e la
-  catena), i metodi `P2P_METODI_USDT` con la grafia del protocollo
+  TRC-20 ed Ethereum ERC-20, col contratto del vero USDT e la catena;
+  Polygon tolto il 2 nov 2026), i metodi `P2P_METODI_USDT` con la grafia del protocollo
   («USDT (Tron)»), il cancello `usdtVistoP2P` (da `myP2PUsdt`) e i suoi
-  derivati `valuteVisibiliP2P(oc)` / `valutaVistaP2P(cod)` (il filtro
+  derivati `valuteVisibiliP2P(oc)` / `valutaVistaP2P(cod, metodi)` (il filtro
   della prima lettura `libroDaEventi` e di quella dal vivo
-  `fondiLibroP2P`), il metro `perSatP2P(o)` (dollaro o euro), il tetto
+  `fondiLibroP2P`: un ordine in USDT solo se TUTTE le sue reti sono
+  nostre), il metro `perSatP2P(o)` (dollaro o euro), il tetto
   `tettoValutaP2P(cod)` (i 250 € tradotti al cambio di adesso, 1 senza
   cambi), i conti puri `sha256P2P` / `keccak256P2P` / `base58P2P`, i
   giudici puri `reteIndirizzoP2P`, `giudiceIndirizzoUsdtP2P(testo, r)`
@@ -35055,14 +35056,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   contratto e la catena sulle EVM, l'indirizzo nudo su Tron). Il foglio
   sceglie la valuta con `valutaFoglioP2P()` (mai USDT a rete on-chain), e
   `ordineDaCampiP2P` / `payloadPresaP2P` scrivono la valuta sul filo. Il
-  recapito ha una forma per rete (`usdt-tron`, `usdt-polygon`,
+  recapito ha una forma per rete (`usdt-tron`,
   `usdt-ethereum` in `P2P_FORME_RECAPITO`), che `inviaCampoP2P` passa dal
   giudice prima di comporre; chi paga lo rilegge con
   `reteUsdtDaRecapitoP2P` e vede la rete in grande e il QR. «Ho inviato
   gli USDT» (`usdtInviatiP2P`) vuole l'id della transazione
   (`campoTxidUsdtP2P`), lo tiene sulla riga (`o.txidUsdt`) e lo manda
-  nella chat dello scambio. ⚠️ Polygon ed Ethereum hanno la STESSA forma
-  d'indirizzo: fra loro nessun giudice distingue, e lo dicono il recapito,
-  il QR con la catena e l'id della transazione. Il gesto sul nodo
+  nella chat dello scambio. ⚠️ Un indirizzo 0x vale anche su reti che non
+  offriamo: lo dicono il recapito, il QR con la catena e l'id della
+  transazione. GLI AVVISI DEL BOT di uno scambio in USDT (dal 2 nov 2026)
+  passano dal traduttore puro `p2p_usdt_frase` (le coppie
+  `P2P_USDT_FRASI`, poi ogni «euro» rimasto), chiamato dove partono:
+  `_manda_evento_p2p`, la rotta del recapito, `_scarica_attese_p2p` e la
+  garanzia lunga; l'ordine e' in USDT per `p2p_usdt_ordine(con, ordine)`
+  (ogni metodo di `p2p_ordini` e' una rete «USDT (…)»). Il gesto sul nodo
   (`fiat_currencies_accepted` con `USDT`, `[price.providers.pegged]` con
-  `only = ["USDT"]`) sta in DA-FARE-ANDREA. Le prove: `prove_p2p_usdt`.
+  `only = ["USDT"]`) sta in DA-FARE-ANDREA. Le prove: `prove_p2p_usdt`, `prove_usdt_due_reti`.
