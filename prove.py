@@ -153462,6 +153462,17 @@ def prove_lista_corta_metodi():
            "  p2pNuovoAperta = false;\n  p2pNuovoAltri = false;\n" in mini))
     prova("la riga «Wise:» si copia", True,
           "|paypal|wise|" in re.search(r"const ETICHETTE_DA_INCOLLARE_P2P = [^\n]*", mini).group(0))
+    # CON GLI USDT LA TENDINA CHIEDE LA RETE (2 nov 2026, Andrea): «Seleziona
+    # la rete» e l'icona della rete al posto della carta di pagamento; con
+    # l'euro tutto come prima. Il giudice e' la valuta del foglio (`val`).
+    prova("con gli USDT la tendina dice «Seleziona la rete» e l'icona e' la rete; "
+          "con l'euro resta «Seleziona metodi di pagamento» con la carta",
+          (True, True, True, True, True),
+          ("const usdtRete = val.cod === 'USDT';" in rn,
+           ": (usdtRete ? 'Seleziona la rete' : 'Seleziona metodi di pagamento');" in rn,
+           "ico: usdtRete ? 'rete' : 'metodi'," in rn,
+           re.search(r"\n  rete: '<path class=\"velo\"", mini) is not None,
+           ".p2p-sez-ico.ico-rete{" in mini))
 
 
 def prove_p2p_onchain_usdt():

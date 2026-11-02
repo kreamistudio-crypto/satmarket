@@ -5262,6 +5262,8 @@
   .p2p-sez-ico.ico-valuta{background:var(--tg-soft);color:var(--tg-soft-on)}
   .p2p-sez-ico.ico-importo{background:var(--trust-soft);color:var(--trust-text)}
   .p2p-sez-ico.ico-metodi{background:var(--ship-bg);color:var(--ship-text)}
+  /* la rete degli USDT veste il colore dei metodi: ne prende il posto */
+  .p2p-sez-ico.ico-rete{background:var(--ship-bg);color:var(--ship-text)}
   .p2p-sez-ico.ico-prezzo{background:var(--nostr-soft);color:var(--nostr-text)}
   .p2p-sez-ico.ico-sats{background:var(--sats-soft);color:var(--sats-text)}
   .p2p-sez-ico.ico-btc{background:var(--sats-soft);color:var(--sats-text)}
@@ -78843,7 +78845,15 @@ const P2P_ICONE = {
      P2P della barra, coi suoi tratti */
   btc: '<g transform="rotate(13 12 12)"><path class="velo" d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3zM8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3z"/>'
     + '<path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/>'
-    + '<path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g>'
+    + '<path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g>',
+  /* LA RETE (2 nov 2026, Andrea): con gli USDT i «metodi» sono le reti
+     (Tron, Ethereum), e la carta di pagamento li' diceva una cosa falsa.
+     Tre nodi legati, stesso tratto e stesso velo delle sorelle */
+  rete: '<path class="velo" d="M12 4.8L5 17.4h14z"/>'
+    + '<path d="M12 2.3a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/>'
+    + '<path d="M5 14.9a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/>'
+    + '<path d="M19 14.9a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/>'
+    + '<path d="M10.79 6.99l-4.58 8.22M13.21 6.99l4.58 8.22M7.5 17.4h9"/>'
 };
 /* IL «$» E' IL GLIFO VERO del carattere di casa (scelta di Andrea) e
    non un disegno a tratto: il dollaro E' un segno tipografico, con le
@@ -80331,8 +80341,11 @@ function renderNuovoOrdineP2P(){
   const rete = el('p2pNuovoRete');
   if (rete) rete.innerHTML = typeof interruttoreReteP2P === 'function' ? interruttoreReteP2P(oc ? 'onchain' : 'ln', tab) : '';
   const val = P2P_VALUTE.find(v => v.cod === (typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR')) || P2P_VALUTE[0];
+  /* CON GLI USDT I METODI SONO LE RETI (2 nov 2026, Andrea): la tendina
+     chiede la rete, e l'icona non e' piu' la carta di pagamento */
+  const usdtRete = val.cod === 'USDT';
   const scelti = p2pNuovoMetodi.length
-    ? p2pNuovoMetodi.join(', ') : 'Seleziona metodi di pagamento';
+    ? p2pNuovoMetodi.join(', ') : (usdtRete ? 'Seleziona la rete' : 'Seleziona metodi di pagamento');
 
   /* LA VALUTA PASSA DAL FOGLIO-PICKER DI CASA e non dal selettore del
      telefono: il <select> resta come DEPOSITO del valore (hidden) e a
@@ -80418,7 +80431,7 @@ function renderNuovoOrdineP2P(){
     ? vociTendinaMetodiP2P(listaMetodi, p2pNuovoMetodi, typeof p2pNuovoAltri !== 'undefined' && p2pNuovoAltri)
     : {voci: listaMetodi, nascosti: 0};
   const metodi = sezioneNuovoP2P({
-    ico: 'metodi',
+    ico: usdtRete ? 'rete' : 'metodi',
     /* il nome segue il verso (`nomeMetodiP2P`); la coda dopo il
        trattino resta quella di prima, parola per parola */
     titolo: nomeMetodiP2P(p2pLato) + (tab ? ' — col tabacchino, uno solo'
