@@ -2741,6 +2741,10 @@ FRENI = {
     # xpub dedicata e un gesto di una volta, un indirizzo di prova
     # scrive una riga e consuma tre numeri
     "onchain_xpub": (5, 3600),        # «Accendi l'on-chain», per persona
+    # il wallet unico (2 nov 2026 sera): l'impronta si registra di rado,
+    # un numero si prenota a ogni cambio
+    "wallet_unico": (20, 3600),       # registrare l'impronta del wallet, per persona
+    "wallet_numero": (120, 3600),     # il numero di un cambio, per persona
     "onchain_indirizzo": (20, 3600),  # un indirizzo di prova fra due ammessi, per persona
     # la tappa 3 (23 ott 2026): il «controlla adesso» chiede a mempool,
     # e una proposta firmata e' un PSBT da leggere con embit
@@ -101117,6 +101121,167 @@ def _swap_quota_leve() -> list:
 # (Qui finisce il blocco dell'indirizzo della quota. La riga non e' un
 # vezzo: le prove ritagliano una funzione fino alle due righe vuote che
 # la seguono, e l'ultima del file senza niente dopo non si ritaglia.)
+
+
+# --- IL WALLET UNICO (2 nov 2026 sera, cantiere wallet-unico) -------------
+# Alan, durante la prova vera: «dall'app e la miniapp di telegram ho due
+# seed phrase differenti». Le 12 parole del wallet di Barattolo nascono
+# random nel telefono (regola ferrea 2: il server non le sa rifare) e
+# si ritrovano dalle loro copie — il cloud di Telegram, la cassetta su
+# Nostr. Nell'app fuori da Telegram, per un account senza Nostr, nessuna
+# copia si raggiunge: il telefono ne faceva nascere un'altra. Idea di
+# Alan, scelta di Andrea («Ferma e incolla»): il server sa SE il wallet
+# esiste, senza saperne il contenuto. Tiene due cose PUBBLICHE:
+# - l'IMPRONTA del seme (gli 8 caratteri della master fingerprint del
+#   BIP-32, quella che ogni descrittore e ogni PSBT scrive in chiaro):
+#   con lei un telefono senza parole sa che non deve farne nascere altre,
+#   e chi incolla le parole sa se sono quelle giuste;
+# - il NUMERO DEL PROSSIMO CAMBIO: le stesse parole su due dispositivi,
+#   ciascuno col suo contatore, darebbero la STESSA chiave a due cambi —
+#   e il segreto di un cambio e' lo sha256 della sua chiave. Il pavimento
+#   sta qui, e sale soltanto.
+# Nessuna parola, nessuna chiave privata, nessuna xpub: con l'impronta
+# non si spende e non si ricava niente.
+_WALLET_IMPRONTA_FORMA = re.compile(r"^[0-9a-f]{8}$")
+# un gesto alla volta sulla riga: la lettura del pavimento e la sua
+# salita non si separano mai (due dispositivi che chiedono insieme)
+_lucchetto_wallet = asyncio.Lock()
+
+
+def _wallet_prepara(con):
+    """`wallet_unico`: una riga per account."""
+    con.execute("""CREATE TABLE IF NOT EXISTS wallet_unico(
+        tg_id INTEGER PRIMARY KEY,
+        impronta TEXT NOT NULL,
+        prossimo INTEGER DEFAULT 0,
+        creato INTEGER DEFAULT 0,
+        aggiornato INTEGER DEFAULT 0)""")
+
+
+def _wallet_db():
+    con = db()
+    _wallet_prepara(con)
+    return con
+
+
+def _wallet_riga(con, tg_id: int) -> dict:
+    r = con.execute("SELECT impronta, prossimo FROM wallet_unico "
+                    "WHERE tg_id=?", (int(tg_id),)).fetchone()
+    return ({"impronta": r["impronta"], "prossimo": int(r["prossimo"] or 0)}
+            if r else {"impronta": "", "prossimo": 0})
+
+
+def _wallet_numero(valore) -> int:
+    """Un numero di cambio sano (0 se non lo e'): intero, non negativo,
+    e sotto il tetto dei figli non induriti del BIP-32."""
+    try:
+        n = int(valore)
+    except (TypeError, ValueError):
+        return -1
+    return n if 0 <= n < 2 ** 31 else -1
+
+
+@app.get("/api/wallet/unico")
+async def wallet_unico_leggi(x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """C'E' GIA' UN WALLET? L'impronta registrata (vuota = nessuno) e il
+    pavimento dei numeri dei cambi. Solo lettura."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = _wallet_db()
+    try:
+        return _wallet_riga(con, user["id"])
+    finally:
+        con.close()
+
+
+@app.post("/api/wallet/unico")
+async def wallet_unico_registra(req: Request, x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """REGISTRA L'IMPRONTA del wallet di questo account. Nessuna riga: la
+    scrive. La stessa: ok. Un'ALTRA: 409 col `motivo` «altro» e
+    l'impronta che c'e', e non tocca niente — a meno di `sostituisci`,
+    il gesto esplicito di chi ha perso le parole del principale (o
+    sceglie questo come principale). Il pavimento dei numeri non scende
+    mai, nemmeno sostituendo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("wallet_unico", user["id"])
+    d = await leggi_json(req)
+    impronta = d.get("impronta")
+    impronta = impronta.strip().lower() if isinstance(impronta, str) else ""
+    if not _WALLET_IMPRONTA_FORMA.match(impronta):
+        raise HTTPException(400, "Impronta non valida")
+    sostituisci = d.get("sostituisci") is True
+    adesso = int(time.time())
+    async with _lucchetto_wallet:
+        return _wallet_registra(int(user["id"]), impronta, sostituisci, adesso)
+
+
+def _wallet_registra(tg_id: int, impronta: str, sostituisci: bool,
+                     adesso: int):
+    """Il corpo di `wallet_unico_registra`, dentro il lucchetto."""
+    con = _wallet_db()
+    try:
+        c = _wallet_riga(con, tg_id)
+        if not c["impronta"]:
+            con.execute("INSERT INTO wallet_unico(tg_id, impronta, prossimo, "
+                        "creato, aggiornato) VALUES (?,?,0,?,?) "
+                        "ON CONFLICT(tg_id) DO NOTHING",
+                        (tg_id, impronta, adesso, adesso))
+            con.commit()
+            c = _wallet_riga(con, tg_id)
+        if c["impronta"] == impronta:
+            return {"ok": True, "impronta": impronta, "prossimo": c["prossimo"]}
+        if not sostituisci:
+            return JSONResponse(status_code=409, content={
+                "ok": False, "motivo": "altro", "impronta": c["impronta"],
+                "prossimo": c["prossimo"]})
+        con.execute("UPDATE wallet_unico SET impronta=?, aggiornato=? "
+                    "WHERE tg_id=?", (impronta, adesso, tg_id))
+        con.commit()
+        print(f"🔑 Wallet unico: l'account {tg_id} ha scelto un altro "
+              f"wallet principale", flush=True)
+        return {"ok": True, "impronta": impronta, "prossimo": c["prossimo"],
+                "sostituito": True}
+    finally:
+        con.close()
+
+
+@app.post("/api/wallet/unico/numero")
+async def wallet_unico_numero(req: Request, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """PRENOTA IL NUMERO DI UN CAMBIO: il telefono dice il primo numero
+    che lui userebbe (`minimo`, dal suo contatore e dalla sua lista), il
+    server risponde col piu' alto fra quello e il suo pavimento, e alza
+    il pavimento a quel numero piu' uno — nello stesso gesto, cosi' due
+    dispositivi che chiedono insieme non ricevono mai lo stesso. Prima
+    l'impronta: un numero si prenota solo per un wallet registrato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("wallet_numero", user["id"])
+    d = await leggi_json(req)
+    minimo = _wallet_numero(d.get("minimo", 0))
+    if minimo < 0:
+        raise HTTPException(400, "Numero non valido")
+    async with _lucchetto_wallet:
+        return _wallet_prenota(int(user["id"]), minimo)
+
+
+def _wallet_prenota(tg_id: int, minimo: int):
+    """Il corpo di `wallet_unico_numero`, dentro il lucchetto."""
+    con = _wallet_db()
+    try:
+        c = _wallet_riga(con, tg_id)
+        if not c["impronta"]:
+            return JSONResponse(status_code=409, content={
+                "ok": False, "motivo": "nessuno"})
+        numero = max(minimo, c["prossimo"])
+        if numero + 1 >= 2 ** 31:
+            raise HTTPException(400, "Numero non valido")
+        con.execute("UPDATE wallet_unico SET prossimo=?, aggiornato=? "
+                    "WHERE tg_id=?", (numero + 1, int(time.time()), tg_id))
+        con.commit()
+        return {"ok": True, "numero": numero}
+    finally:
+        con.close()
 
 
 # ============ LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026) ============

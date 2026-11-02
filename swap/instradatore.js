@@ -132,12 +132,29 @@ function swapParoleOnchain(){
 /* l'indice della prossima chiave, PRENOTATO e salvato prima di chiedere:
    mai sotto uno gia' in lista (un telefono che ha perso il contatore non
    riusa). -1 se il telefono non riesce a salvarlo: allora non parte niente */
-function swapPrenotaIndice(){
+async function swapPrenotaIndice(){
   const c = swapStatoSeme();
   const usati = swapLista().filter(r => r.seme === 'onchain').map(r => (Number(r.indice) || 0) + 1);
-  const indice = Math.max(Number(c.prossimo) || 0, ...usati, 0);
+  let indice = Math.max(Number(c.prossimo) || 0, ...usati, 0);
+  /* (2 nov 2026 sera, wallet-unico) LE STESSE PAROLE SU DUE DISPOSITIVI:
+     ognuno col suo contatore darebbe la stessa chiave a due cambi. Il
+     numero lo prenota il server, mai sotto quello di qui; muto lui, non
+     parte niente (-2) */
+  if (typeof walletUnicoNumero === 'function') {
+    try { indice = await walletUnicoNumero(swapParoleOnchain(), indice); }
+    catch(e){ return -2; }
+  }
   c.prossimo = indice + 1;
   return swapScrivi(swapCasaOnchain(), c) ? indice : -1;
+}
+/* (wallet-unico) i cambi nati con delle parole che si stanno sostituendo
+   se le ricordano dall'impronta: `swapParoleDi` le ritrova fra quelle
+   di prima, e il ritiro o il rimborso restano possibili */
+function swapTimbraImpronta(impronta){
+  const l = swapLista();
+  let toccati = 0;
+  for (const r of l) if (r.seme === 'onchain' && !r.impronta) { r.impronta = impronta; toccati++; }
+  return toccati ? swapScrivi(swapCasaLista(), l) : true;
 }
 /* le parole che una copia fuori da qui ridà, viste in questa apertura:
    chi le ha gia' viste coperte non le richiede a ogni cambio */
@@ -166,7 +183,7 @@ async function swapSemePronto(){
   if (typeof onchainSemeAssicurato !== 'function') throw swapNoOnchain('seme');
   let parole = '';
   try { parole = String(await onchainSemeAssicurato() || '').trim(); }
-  catch(e){ throw swapNoOnchain('seme'); }
+  catch(e){ throw swapNoOnchain(e && e.tipo === 'altrove' ? 'altrove' : 'seme'); }
   if (!parole) throw swapNoOnchain('seme');
   /* (2 nov 2026 sera, conferma-appesa: Andrea premeva «Conferma» e la
      pagina restava coi puntini) la domanda sulla copia puo' passare dal
@@ -238,6 +255,8 @@ const SWAP_TESTI_T3 = {
     creo: n => `Preparo il cambio con ${n} e controllo la sua risposta…`,
     nienteCasa: 'Questo telefono non riesce a conservare le 12 parole: da qui si incassa solo in Lightning.',
     semeNo: 'Non riesco a preparare la chiave del tuo wallet di Barattolo: riprova fra un momento. Nessun sats si è mosso.',
+    semeAltrove: 'Il tuo wallet di Barattolo è già nato su un altro dispositivo: per usarlo anche qui apri Profilo → «Il wallet di Barattolo» e incolla le sue 12 parole. Nessun sats si è mosso.',
+    numeroNo: 'Barattolo ora non risponde: riprova fra un momento. Nessun sats si è mosso.',
     rifiuto: n => `${n} ha risposto con dati che non tornano: non parte niente, nessun sats si è mosso.`,
     nonRisponde: n => `${n} ora non risponde: riprova, o incassa in Lightning.`,
     tuoSwap: 'Il tuo incasso in bitcoin',
@@ -368,6 +387,8 @@ const SWAP_TESTI_T3 = {
     creo: n => `Preparing the exchange with ${n} and checking its answer…`,
     nienteCasa: 'This phone cannot keep the 12 words: from here you can only receive via Lightning.',
     semeNo: 'I cannot prepare the key of your Barattolo wallet: try again in a moment. No sats moved.',
+    semeAltrove: 'Your Barattolo wallet was already created on another device: to use it here open Profile → «Barattolo wallet» and paste its 12 words. No sats moved.',
+    numeroNo: 'Barattolo is not responding: try again in a moment. No sats moved.',
     rifiuto: n => `${n} answered with data that does not add up: nothing starts, no sats moved.`,
     nonRisponde: n => `${n} is not responding: try again, or receive via Lightning.`,
     tuoSwap: 'Your payout in bitcoin',
@@ -762,12 +783,25 @@ function fatturaCambio(rec){
 /* (tappa 3) I BITCOIN DA MANDARE: il QR del link bitcoin: (lo disegna la
    pagina), l'indirizzo in chiaro con «Copia», «Apri nel wallet» (il link
    bitcoin: nudo: `portaWallet` e' solo per Lightning) */
+/* IL LINK «APRI NEL WALLET» DEI BITCOIN DA MANDARE (2 nov 2026 sera, Alan
+   nella prova della leva 4: «mi dice apri nel wallet ma non suggerisce
+   blue wallet»). Il link lo scriviamo NOI, sempre nella forma piu' nuda
+   del BIP-21 — `bitcoin:` minuscolo, l'indirizzo, l'importo — e non piu'
+   quello del fornitore: Android abbina lo schema del link alle app
+   MAIUSCOLE E MINUSCOLE DISTINTE (al contrario della RFC), e le aggiunte
+   del fornitore (`label`, `lightning=`) fanno sembrare il link una cosa
+   Lightning a piu' di un wallet. Il link vero del fornitore non l'abbiamo
+   visto: la cura e' la forma che ogni wallet on-chain capisce. */
+function swapLinkBitcoin(rec){
+  const sats = Number(rec.mandi || rec.onchainAmount) || 0;
+  return `bitcoin:${String(rec.lockupAddress || '').trim()}?amount=${(sats / 1e8).toFixed(8).replace(/\.?0+$/, '')}`;
+}
 function bitcoinDaMandare(rec){
   const t = t3();
   /* (onchain-verso-lightning) il cambio d'una vendita on-chain non si
      paga da qui: i bitcoin li manda il deposito di garanzia */
   if (!swapESub(rec) || rec.onchain || swapFase(rec) !== 'creato' || !rec.lockupAddress) return '';
-  const link = rec.bip21 || `bitcoin:${rec.lockupAddress}?amount=${(Number(rec.mandi || rec.onchainAmount) / 1e8).toFixed(8)}`;
+  const link = swapLinkBitcoin(rec);
   return `<div class="swap-fattura">
     <div class="qr swap-qr-fattura" id="swapCambioQr" aria-label="QR"></div>
     <div class="mono swap-indirizzo-chiaro">${esc(rec.lockupAddress)}</div>
@@ -861,7 +895,7 @@ async function swapAvantiDentro(n){
      nessuna copia fuori da questo dispositivo */
   let seme;
   try { seme = await swapSemePronto(); }
-  catch(e){ swapErrori[n] = t.semeNo; return ridisegnaIncassoSwap(); }
+  catch(e){ swapErrori[n] = e && e.tipo === 'altrove' ? t.semeAltrove : t.semeNo; return ridisegnaIncassoSwap(); }
   if (seme.mostrare) { swapPassi[n] = 'parole'; return ridisegnaIncassoSwap(); }
   return swapCreaDentro(n);
 }
@@ -912,8 +946,8 @@ async function swapCreaDentro(n){
   if (swapSemeDaMostrare(parole)) { swapPassi[n] = 'parole'; return ridisegnaIncassoSwap(); }
   /* L'INDICE SI PRENOTA PRIMA DI CHIEDERE: se il telefono si spegne a meta',
      al giro dopo si usa il successivo, mai lo stesso */
-  const indice = swapPrenotaIndice();
-  if (indice < 0) { swapPassi[n] = 'preventivo'; swapErrori[n] = t.nienteCasa; return ridisegnaIncassoSwap(); }
+  const indice = await swapPrenotaIndice();
+  if (indice < 0) { swapPassi[n] = 'preventivo'; swapErrori[n] = indice === -2 ? t.numeroNo : t.nienteCasa; return ridisegnaIncassoSwap(); }
   swapPassi[n] = 'creo';
   delete swapErrori[n];
   ridisegnaIncassoSwap();
@@ -1173,6 +1207,9 @@ function swapNoOnchain(tipo){ const e = new Error(tipo); e.tipo = tipo; return e
 /* le parole di uno swap: quelle del fornitore, o quelle dell'on-chain */
 function swapParoleDi(rec){
   if (rec && rec.seme === 'onchain') {
+    /* (wallet-unico) nato con parole poi sostituite: quelle di prima */
+    const prima = rec.impronta && typeof onchainParolePrima === 'function' ? onchainParolePrima(rec.impronta) : '';
+    if (prima) return {parole: prima};
     const parole = swapParoleOnchain();
     return parole ? {parole: parole} : null;
   }
@@ -1191,8 +1228,8 @@ async function swapCreaPerOnchain({ordine, onchain, fattura, preventivo, rimbors
   if (!rimborso) throw swapNoOnchain('seme');
   /* L'INDICE SI PRENOTA PRIMA DI CHIEDERE, come per gli altri: mai sotto
      uno gia' in lista (un telefono che ha perso il contatore non riusa) */
-  const indice = swapPrenotaIndice();
-  if (indice < 0) throw swapNoOnchain('casa');
+  const indice = await swapPrenotaIndice();
+  if (indice < 0) throw swapNoOnchain(indice === -2 ? 'giu' : 'casa');
   const nuovo = await f.creaSub({parole: parole, indice: indice, preventivo: preventivo, fattura: fattura});
   const rec = Object.assign(nuovo, {fornitore: f.id, ordine: Number(ordine) || null,
     onchain: Number(onchain), indice: indice, seme: 'onchain', indirizzo: String(rimborso),
@@ -1266,8 +1303,8 @@ async function swapCreaPerP2PDentro(id, sats, scritto, prima){
   catch(e){ throw swapNoP2P('seme'); }
   if (seme.mostrare) throw swapNoP2P('parole');
   /* L'INDICE SI PRENOTA PRIMA DI CHIEDERE, come per gli altri */
-  const indice = swapPrenotaIndice();
-  if (indice < 0) throw swapNoP2P('casa');
+  const indice = await swapPrenotaIndice();
+  if (indice < 0) throw swapNoP2P(indice === -2 ? 'giu' : 'casa');
   let biglietto = null;
   try { biglietto = await chiediBigliettoCambioP2P({ordine: id, sats: sats, fornitore: f.id}); }
   catch(e){ biglietto = null; }
@@ -1347,8 +1384,8 @@ async function swapCreaPerDepositoP2PDentro(scambio, indirizzo, prima){
   try { seme = await swapSemePronto(); }
   catch(e){ throw swapNoP2P('seme'); }
   if (seme.mostrare) throw swapNoP2P('parole');
-  const indice = swapPrenotaIndice();
-  if (indice < 0) throw swapNoP2P('casa');
+  const indice = await swapPrenotaIndice();
+  if (indice < 0) throw swapNoP2P(indice === -2 ? 'giu' : 'casa');
   let biglietto = null;
   try { biglietto = await chiediBigliettoDepositoP2P({scambio: scambio, sats: Number(p.fattura), fornitore: f.id}); }
   catch(e){ biglietto = null; }
@@ -1416,8 +1453,8 @@ async function swapCreaPerPresaP2PDentro(ordine, fattura, prima){
   try { seme = await swapSemePronto(); }
   catch(e){ throw swapNoP2P('seme'); }
   if (seme.mostrare) throw swapNoP2P('parole');
-  const indice = swapPrenotaIndice();
-  if (indice < 0) throw swapNoP2P('casa');
+  const indice = await swapPrenotaIndice();
+  if (indice < 0) throw swapNoP2P(indice === -2 ? 'giu' : 'casa');
   let biglietto = null;
   try { biglietto = await chiediBigliettoPresaP2P({ordine: ordine, sats: sats, fornitore: f.id}); }
   catch(e){ biglietto = null; }
