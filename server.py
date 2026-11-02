@@ -33728,6 +33728,16 @@ def _leve_stato():
                          "(ADMIN_IDS): è la beta chiusa di Andrea e Alan",
                   spento="appena ONCHAIN_ATTIVO si accende vale per "
                          "chiunque: è il gesto che allarga la beta")),
+            # LA SCELTA DELLA RETE AL «PAGA» DEL MERCATINO (2 nov 2026)
+            _leva("Scelta della rete al «Paga»", "MERCATINO_SCELTA_RETE",
+                  bool(MERCATINO_SCELTA_RETE),
+                  acceso="comprando un oggetto, chi vede l'on-chain sceglie "
+                         "prima fra i due tasti grandi On-chain/Lightning, e "
+                         "nel foglio della fattura ha in cima l'interruttore "
+                         "del P2P",
+                  spento="il foglio della fattura si apre sul Lightning con "
+                         "le due porte ⚡/⛓️ di sempre",
+                  allarme=bool(MERCATINO_SCELTA_RETE) and not ONCHAIN_ATTIVO),
             # GLI SCAMBI P2P CON IL 2-DI-3 (30 ott 2026): la garanzia
             # on-chain negli scambi bitcoin ↔ euro, nel server e nell'app,
             # Mostro non toccato. Sotto il cancello dell'on-chain e del P2P.
@@ -46806,6 +46816,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # l'accensione da sola partono dall'avvio. Si dice anche a cancello
     # chiuso: non e' un segreto, e' la rete.
     profilo["onchain_rete"] = ONCHAIN_RETE
+    # ...e se al «Paga» di un oggetto si sceglie prima la rete coi due
+    # tasti grandi (2 nov 2026, MERCATINO_SCELTA_RETE): solo a chi vede
+    # l'on-chain, agli altri non c'e' niente da scegliere
+    profilo["scelta_rete"] = bool(MERCATINO_SCELTA_RETE and profilo["onchain"])
     # ...e chi puo' pubblicare e prendere scambi P2P con la garanzia
     # 2-di-3 (30 ott 2026): la leva P2P_ONCHAIN_ATTIVO sotto il cancello
     # dell'on-chain e quello del P2P. Il libro, invece, lo vede chiunque.
@@ -51905,6 +51919,18 @@ try:
 except ImportError:
     ONCHAIN_SOLO_ADMIN = True
     ONCHAIN_SOLO_ADMIN_DAL_CONFIG = False
+# LA SCELTA DELLA RETE AL «PAGA» DEL MERCATINO (2 nov 2026): i due tasti
+# grandi On-chain/Lightning prima del foglio, e l'interruttore del P2P in
+# cima al foglio della fattura. Solo grafica e ordine dei passi: le rotte
+# del pagamento sono quelle di sempre. Vale per chi l'on-chain lo vede.
+try:
+    from config import MERCATINO_SCELTA_RETE
+except ImportError:
+    MERCATINO_SCELTA_RETE = False
+if not isinstance(MERCATINO_SCELTA_RETE, bool):
+    print("[onchain] MERCATINO_SCELTA_RETE non e' True/False: la scelta "
+          "della rete al «Paga» resta spenta", flush=True)
+    MERCATINO_SCELTA_RETE = False
 # L'XPUB DI BARATTOLO: la TERZA chiave del 2-di-3, quella che serve solo
 # in disputa. Qui ne sta la META' PUBBLICA e nient'altro — la privata
 # non entra su questa macchina (vivra' in un firmatario sul nodo), e da

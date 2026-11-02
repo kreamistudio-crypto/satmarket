@@ -12400,7 +12400,7 @@ def prove_nota_compratore():
     prova("client: i chiamanti di corpoConsegna sono quattro", 4,
           mini.count("...corpoConsegna()"))
     prova("client: ...e nessuno dei tre la aggiunge per conto suo", [],
-          [n for n, f in (("startBuy", "async function startBuy(){"),
+          [n for n, f in (("startBuy", "async function startBuy(rete, pronto){"),
                           ("startBuySet", "async function startBuySet(){"),
                           ("compraSubito",
                            "async function confermaCompraSubito(btn){"),
@@ -153861,6 +153861,129 @@ console.log(JSON.stringify([
            "\ncollaudo_p2p_onchain.py\n" in open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()))
 
 
+def prove_scelta_rete_mercatino():
+    """LA SCELTA DELLA RETE AL «PAGA» DEL MERCATINO (2 nov 2026, Andrea:
+    «quando uno compra un oggetto e clicca su paga deve comparire
+    esattamente come nel P2P il banner grosso on-chain o Lightning, e poi
+    in alto nella pagina della fattura lo switch»). Dietro la leva
+    MERCATINO_SCELTA_RETE, spenta di serie: a leva spenta il foglio resta
+    quello di ieri. I pezzi del telefono girano in node con finte minime;
+    le sentinelle guardano i fili del server e di startBuy."""
+    print("\n[la scelta della rete al «Paga» del mercatino]")
+    import subprocess
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    srv = _SORGENTE
+    es = open("config_esempio.py", encoding="utf-8").read()
+    blocco = mini[mini.index("let acqMetodo = 'ln';"):mini.index("async function payPassaA(m){")]
+    banco = r"""
+const NODI = {};
+function el(id){
+  if (!NODI[id]) NODI[id] = {id, innerHTML: '', textContent: '', className: 'pay-metodo',
+    style: {display: ''}, classList: {set: new Set(),
+      add(c){ this.set.add(c); }, remove(c){ this.set.delete(c); }, contains(c){ return this.set.has(c); }}};
+  return NODI[id];
+}
+let myOnchain = true, mySceltaRete = true, DEMO = false, VETRINA = false;
+let acqDati = {tipo: 'mono'}, sconto = '';
+const corpoCodiceSconto = () => sconto ? {codice_sconto: sconto} : {};
+const P2P_OC_MONETA = '<i>OC</i>', P2P_LN_MONETA = '<i>LN</i>';
+const esc = s => String(s).replace(/</g, '&lt;');
+const API_BASE = '/api', authHdr = () => 'x', haptic = () => {}, aggiornaPayHint = () => {};
+const CHIESTE = [], AVVII = [];
+function fetch(u){ CHIESTE.push(u); return new Promise(() => {}); }
+function startBuy(rete, pronto){ AVVII.push([rete, pronto ? !!pronto.pronto : null]); }
+""" + blocco + r"""
+const out = {};
+const l = {id: 1, sellerId: 222};
+out.porta = [portaOnchainPossibile(l, null), portaOnchainPossibile(l, {id: 5}),
+             (acqDati.tipo = 'set', portaOnchainPossibile(l, null)),
+             (acqDati.tipo = 'mono', sconto = 'X', portaOnchainPossibile(l, null)),
+             (sconto = '', myOnchain = false, portaOnchainPossibile(l, null))];
+myOnchain = true;
+// l'interruttore del P2P in cima al foglio, con la leva
+payMetodoPrepara(l, null, 25000, {pronto: false, motivo: 'no'});
+let h = el('payMetodo').innerHTML;
+out.interruttore = [el('payMetodo').className, /p2p-rete-scelta/.test(h),
+  h.indexOf('On-chain') < h.indexOf('Lightning'), /p2p-rete-tasto spento[^>]*\n?[^>]*payPassaA\('onchain'\)/.test(h)
+    || /class="p2p-rete-tasto spento"/.test(h.replace(/\s+/g, ' ')),
+  /p2p-rete-tasto su/.test(h.replace(/\s+/g, ' ')) && /payPassaA\('ln'\)/.test(h), CHIESTE.length];
+// ...e senza leva, le due porte di sempre
+mySceltaRete = false;
+payMetodoPrepara(l, null, 25000, {pronto: true});
+h = el('payMetodo').innerHTML;
+out.senzaLeva = [el('payMetodo').className, /⚡ Lightning/.test(h), /p2p-rete-scelta/.test(h)];
+mySceltaRete = true;
+// la scelta prima del foglio
+apriSceltaPagaRete(l, 25000);
+h = el('paySceltaCorpo').innerHTML;
+out.scelta = [el('paySceltaSheet').classList.contains('open'), CHIESTE[CHIESTE.length - 1],
+  /p2p-scelta-oc p2p-scelta-rete spento/.test(h), /p2p-scelta-ln p2p-scelta-rete"/.test(h),
+  h.indexOf('On-chain') < h.indexOf('Lightning')];
+sceltaPagaRete('onchain');
+out.attesa = [AVVII.length, /Sto chiedendo/.test(el('paySceltaCorpo').innerHTML),
+              el('paySceltaSheet').classList.contains('open')];
+paySceltaPronto = {pronto: false, motivo: 'il venditore <b>no</b>'};
+sceltaPagaRete('onchain');
+out.no = [AVVII.length, /On-chain non disponibile: il venditore &lt;b>no/.test(el('paySceltaCorpo').innerHTML)];
+paySceltaPronto = {pronto: true}; renderSceltaPagaRete();
+out.si = /p2p-scelta-oc p2p-scelta-rete"/.test(el('paySceltaCorpo').innerHTML);
+sceltaPagaRete('onchain');
+out.oc = [AVVII.slice(), el('paySceltaSheet').classList.contains('open')];
+apriSceltaPagaRete(l, 0); sceltaPagaRete('ln');
+out.ln = AVVII[AVVII.length - 1];
+console.log(JSON.stringify(out));
+"""
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+        out = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else None
+    except (OSError, subprocess.TimeoutExpired):
+        salta("il banco della scelta della rete al «Paga»", "node assente")
+        out = None
+    if out is None:
+        prova("il banco della scelta della rete al «Paga» gira", "", (locals().get("r") and r.stderr or "")[-600:])
+    else:
+        prova("la porta ⛓️ si apre solo a chi vede l'on-chain, su un oggetto solo, "
+              "senza accordo ne' codice sconto", [True, False, False, False, False], out["porta"])
+        prova("con la leva, in cima al foglio l'interruttore del P2P: On-chain prima, "
+              "sbiadito se non si paga on-chain, acceso Lightning; nessuna domanda in piu' "
+              "al server quando la risposta arriva dalla scelta",
+              ["pay-rete", True, True, True, True, 0], out["interruttore"])
+        prova("...e senza leva le due porte ⚡/⛓️ di sempre", ["pay-metodo", True, False], out["senzaLeva"])
+        prova("la scelta «Come vuoi pagare?»: il foglio si apre, chiede /onchain/pronto per "
+              "quel venditore e quella cifra, On-chain sbiadito finche' non si sa, sopra Lightning",
+              [True, "/api/onchain/pronto/222?sats=25000", True, True, True], out["scelta"])
+        prova("...On-chain toccato prima della risposta: lo dice e resta li'",
+              [0, True, True], out["attesa"])
+        prova("...con un no: il perche', scritto pulito, e nessun avvio", [0, True], out["no"])
+        prova("...con un si' On-chain si accende e il tocco torna a startBuy con la rete "
+              "e la risposta, a scelta chiusa; Lightning senza risposta",
+              (True, [[["onchain", True]], False], ["ln", None]), (out["si"], out["oc"], out["ln"]))
+    # I FILI
+    sb = pezzo_js(mini, "async function startBuy(rete, pronto){", "\n}\n")
+    prova("startBuy: senza rete e con la leva, dove la porta ⛓️ si aprirebbe, apre "
+          "prima la scelta; scelto On-chain apre subito l'indirizzo, senza fattura Lightning",
+          (True, True, True),
+          ("if (rete === undefined && mySceltaRete && portaOnchainPossibile(l, offAcc)) {\n"
+           "    apriSceltaPagaRete(l, via ? via.totale_sats : 0);\n    return;\n  }" in sb,
+           "payMetodoPrepara(l, offAcc, totS, pronto);" in sb,
+           "if (rete === 'onchain' && payMetodoAcceso && pronto && pronto.pronto) {\n"
+           "    await payPassaA('onchain');\n    return;\n  }" in sb
+           and sb.index("await payPassaA('onchain');") < sb.index("await payCreaFattura(l, offAcc);")))
+    prova("il foglio «Come vuoi pagare?» c'e', e la chiusura di tutti i fogli lo chiude",
+          (True, True),
+          ('<h3 id="paySceltaTit">Come vuoi pagare?</h3>' in mini,
+           "el('paySceltaSheet').classList.remove('open');" in pezzo_js(mini, "function closeSheet(){", "\n}\n")))
+    prova("la leva: spenta di serie nel server e nell'esempio, detta al telefono solo "
+          "a chi vede l'on-chain, nel pannello in allarme senza l'on-chain",
+          (True, True, True, True, True),
+          ("except ImportError:\n    MERCATINO_SCELTA_RETE = False\n" in srv,
+           "\nMERCATINO_SCELTA_RETE = False\n" in es,
+           'profilo["scelta_rete"] = bool(MERCATINO_SCELTA_RETE and profilo["onchain"])' in srv,
+           "mySceltaRete = !!me.scelta_rete;" in mini,
+           '"MERCATINO_SCELTA_RETE",\n                  bool(MERCATINO_SCELTA_RETE),' in srv
+           and "allarme=bool(MERCATINO_SCELTA_RETE) and not ONCHAIN_ATTIVO)" in srv))
+
+
 def prove_grafica_p2p_onchain():
     """LA SEZIONE ON-CHAIN DEL P2P RIDISEGNATA (30 ott 2026, cantiere
     grafica-p2p-onchain, richieste di Andrea dalle schermate del
@@ -184648,6 +184771,7 @@ def main():
     prove_p2p_onchain,
     prove_p2p_usdt,
     prove_grafica_p2p_onchain,
+    prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,
     prove_parole_uniche,
     prove_ripristino_visibile,

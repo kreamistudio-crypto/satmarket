@@ -1282,6 +1282,17 @@ ONCHAIN_QUOTA_FISSA_SATS = 0
 # la rete) non si paga on-chain, resta il Lightning. 0 = nessun tetto.
 # Il valore del codice e' gia' 250: la riga serve il giorno che sale.
 ONCHAIN_MAX_EURO = 250
+# LA SCELTA DELLA RETE AL «PAGA» DEL MERCATINO (2 nov 2026, Andrea: «quando
+# uno compra un oggetto e clicca su paga deve comparire esattamente come
+# nel P2P il banner grosso on-chain o Lightning, e poi in alto nella
+# pagina della fattura lo switch»): acceso, chi vede l'on-chain e compra
+# un oggetto che si puo' pagare on-chain sceglie PRIMA fra i due tasti
+# grandi della scelta del + del P2P, e nel foglio della fattura ha in
+# cima l'interruttore On-chain/Lightning del P2P. Spento, il foglio si
+# apre sul Lightning con le due porte ⚡/⛓️ di sempre. Vale solo per chi
+# l'on-chain lo vede (ONCHAIN_ATTIVO e il suo cancello). Spento di serie,
+# in produzione si accende col sì di Andrea. Sul collaudo: True.
+MERCATINO_SCELTA_RETE = False
 # GLI SCAMBI P2P CON LA GARANZIA 2-DI-3 (30 ott 2026, decisione di Andrea
 # con Alan): nel P2P, accanto agli ordini Lightning di Mostro, gli scambi
 # bitcoin on-chain ↔ euro in cui chi vende bitcoin li deposita nel 2-di-3
