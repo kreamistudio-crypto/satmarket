@@ -778,6 +778,13 @@ SWAP_MAX_SATS_GIORNO = 200_000
 # La nostra fee sullo swap, in percentuale: 0 = spenta (la quota del 10 %
 # della loro commissione non costa niente a chi vende).
 SWAP_FEE_PERCENTO = 0
+# LO SWAP AUTOMATICO (2 nov 2026): chi vende in Lightning e ha scelto nel
+# Profilo di ricevere on-chain conferma sull'ordine, e il cambio lo fa il
+# server con le parole dello swap (pannello admin, 🔁). Spenta di serie;
+# accesa, di serie solo per gli admin. La fee resta 0: sopra 0 si ferma.
+SWAP_AUTO_ATTIVO = False
+SWAP_AUTO_SOLO_ADMIN = True
+SWAP_AUTO_FEE_PERCENTO = 0
 # Dove si leggono le tariffe. Nel collaudo e sulla VM di collaudo: il
 # SATS Routing di cartone, es. "http://127.0.0.1:9077" (cartone_satsrouting.py);
 # in collaudo una base fuori dal computer non si legge mai.

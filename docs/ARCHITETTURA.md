@@ -35141,3 +35141,42 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   li prendono col typeof (`usdtOc`, `cifraOc`, `paroleOc`): i banchi che
   le ritagliano da sole restano quelli di ieri. Il collaudo:
   `collaudo_p2p_onchain_usdt`; le prove: `prove_p2p_onchain_usdt`.
+- LO SWAP AUTOMATICO DEL MERCATINO (2 nov 2026, cantiere swap-auto;
+  CANTIERI, «Lo swap automatico del mercatino»). Chi vende in Lightning e
+  ha scelto nel Profilo di ricevere on-chain (`swap_auto_preferenze`, una
+  riga per chi l'ha scelto) riceve in bitcoin con un reverse swap di SATS
+  Routing fatto dal SERVER con chiavi di Barattolo: le dodici parole in
+  `chiavi/swap-barattolo.json` accanto al database (600, nate una volta
+  dal pannello, `POST /api/admin/swap/parole`, dentro il backup fuori
+  sede con `chiavi/`), la chiave `m/44/0/0/0/i` con un indice per swap
+  mai riusato (`swap_auto.indice`), il segreto = sha256 della chiave.
+  Lo swap esplicito della pagina «Cambio» resta del telefono. I PEZZI:
+  la curva solo su chiavi pubbliche (`_swap_ec_*`), l'albero e il lockup
+  come il bundle del telefono (`swap_albero_reverse`, `swap_chiave_musig`
+  BIP-327 senza riordino, chiave del fornitore per prima,
+  `swap_programma_lockup`), il giudice della risposta `swap_auto_verifica`
+  (stessi verdetti di `swapVerifica`), la nascita `swap_auto_crea`, il
+  ritiro dallo SCRIPT con embit (`swap_auto_tx_ritiro`: firma BIP-341 a
+  foglia, witness [firma, segreto, foglia, control block]; il cooperativo
+  MuSig2 embit non lo sa), `swap_auto_ritira` (scrive il txid PRIMA di
+  trasmettere, riconosce un ritiro gia' fatto). IL GIRO: a ordine
+  confermato `_sblocca_sats` salta il Lightning address se
+  `swap_auto_aspetta` (scelta + cifra nei tetti del cambio) e dice a chi
+  vende di premere «Conferma»; `GET/POST /api/swap/auto/ordine/{id}`
+  (carta e «Conferma»: indirizzo proposto dal Profilo — l'xpub o
+  l'indirizzo fisso dell'on-chain, `swap_auto_proposta` — o scritto;
+  `swap_auto_incassa` crea e paga per la PORTA di sempre,
+  `swap_registra_pagamento`); il battito dei pagamenti ritira
+  (`swap_auto_giro`, solo swap con la fattura partita; si sveglia anche
+  per loro, `_swap_auto_da_guardare`) e avvisa col txid. LA MONETA SULLA
+  CARD: `venditore_incasso` ('onchain' | 'ln' | '') da
+  `_segna_incasso_venditori` in `arricchisci_righe_vetrina`, la moneta ₿
+  del Cambio o il fulmine (`P2P_OC_MONETA`/`P2P_LN_MONETA`) in
+  `iconeCard` e nel dettaglio, mai il ⛓️. LE LEVE: `SWAP_AUTO_ATTIVO`
+  (spenta), `SWAP_AUTO_SOLO_ADMIN` (accesa), `SWAP_AUTO_FEE_PERCENTO` (0;
+  sopra 0 oggi non parte niente). APP: il blocco «LO SWAP AUTOMATICO»
+  accanto a `selettoreIncassoSwap` (`renderSwapAutoProfilo` in
+  «Lightning address», `selettoreIncassoAuto`, `pannelloSwapAuto`,
+  `confermaSwapAuto`), e in `payoutPanel` il ramo `autoQui`. Prove:
+  `prove_swap_auto`, `prove_swap_auto_ritiro`, `prove_swap_auto_schermate`;
+  collaudo: `collaudo_swap_auto`.

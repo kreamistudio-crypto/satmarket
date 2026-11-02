@@ -160,6 +160,7 @@ collaudo_swap_preventivo.py
 collaudo_swap_telefono.py
 collaudo_swap_instradatore.py
 collaudo_swap_pagamento.py
+collaudo_swap_auto.py
 collaudo_cambio_libero.py
 collaudo_cambio_p2p.py
 collaudo_cambio_onchain_p2p.py

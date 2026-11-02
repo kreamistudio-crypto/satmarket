@@ -77480,3 +77480,99 @@ NON PROVATO E DA GUARDARE. L'ordine nuovo si vede solo al prossimo
 riavvio del nodo: dopo, `sudo journalctl -b -u docker -u wg-quick@wg0
 -o short-iso | grep -E "Started|No chain"` deve mostrare Docker prima
 del tunnel e nessun «No chain», e la ronda `ponte wg ok`.
+
+## Lo swap automatico del mercatino (2 nov 2026, cantiere swap-auto)
+
+LA RICHIESTA. Alan, via Andrea (14:27): lo swap «interno» — chi compra
+paga in Lightning, chi vende riceve on-chain — può farlo un account di
+Barattolo, perché i sats sono già sul nodo. Andrea (14:31-14:35): la fa
+il SERVER con chiavi di Barattolo (rovescia, solo per questo caso, il
+«le chiavi sono del telefono» della tappa 3 dello swap); lo swap
+esplicito della pagina «Cambio» resta del telefono; l'indirizzo viene
+dall'xpub del Profilo (o dall'indirizzo fisso) con conferma, sennò si
+scrive al volo; una piccola fee della comodità, oggi 0, come leva. 14:39
+«ok parti» al piano in 4 tappe (Claude Doc TxQeQCqLfZ78eRUav3caHS).
+14:43: dentro anche l'avviso a chi compra, PRIMA di pagare, se chi vende
+preferisce on-chain o Lightning. 14:55: l'icona è quella on-chain di
+SATS Routing, la moneta ₿ arancione del Cambio, non il ⛓️.
+
+TAPPA 1, LA NASCITA (910c98f). La curva in Python puro solo su chiavi
+pubbliche, l'albero (claimLeaf, refundLeaf, versione 0xc0), la chiave
+MuSig2 (BIP-327 SENZA riordino, chiave del fornitore per prima: è quel
+che fa boltz-core) e il lockup, fatti uguali al bundle del telefono: 12
+swap identici, 11 risposte giudicate come `swapVerifica`. Le parole
+nascono UNA volta dal pannello in `chiavi/swap-barattolo.json` (600,
+O_EXCL, con la rete scritta dentro: un file di un'altra rete ALZA invece
+di far nascere swap che non sapremmo ritirare). Un indice per swap, mai
+riusato (UNIQUE): il segreto è lo sha256 della chiave, quindi un indice
+riusato sarebbe un segreto riusato.
+
+TAPPA 2, IL RITIRO (1f8eb4b). Dallo SCRIPT, con embit (`sighash_taproot`
+con ext_flag=1 e la foglia): il cooperativo MuSig2 embit non lo sa, e
+una seconda libreria sul VPS per risparmiare qualche vbyte non valeva.
+Il txid si scrive PRIMA di trasmettere, e il giro dopo riconosce il
+ritiro già fatto. I controlli fermano il ritiro PRIMA che il segreto
+esca: lockup che non è il nostro script, meno sats del promesso, uscita
+sotto la polvere, indirizzo di un'altra rete. Una lezione: il cartone
+non controlla il control block, e la parità sbagliata passava; c'è una
+prova sua (`blocco_regge`, con `ec_pubkey_add` perché `taproot_tweak`
+di embit perde la parità).
+
+TAPPA 3, LA SCELTA, LA CONFERMA, IL RITIRO NEL BATTITO, LA MONETA SULLA
+CARD (questo commit). Nel Profilo, dentro «Lightning address»: «Quando
+vendi in Lightning, ricevi: Lightning / On-chain». A ordine confermato
+`_sblocca_sats` salta il Lightning address (`swap_auto_aspetta`: scelta,
+e cifra nei tetti del cambio; sotto i 25.000 sats si riceve in Lightning
+come sempre) e dice a chi vende di aprire l'ordine e premere «Conferma»
+(Alan: «previa conferma»). La carta dell'ordine ha i riquadri del Cambio
+con le monete di casa, il costo in una riga, le voci in un `<details>`
+nativo (senza l'ascoltatore dell'instradatore, che qui può non esserci),
+l'indirizzo proposto già scritto. «Conferma» manda SEMPRE l'indirizzo
+che si vede: il server lo riconosce come la proposta (e ne conta
+l'indice dell'xpub, così la vendita dopo ne riceve uno nuovo) o lo
+tratta come scritto. Lo swap nasce, lo paga la PORTA di sempre
+(`swap_registra_pagamento`, coi suoi tetti e controlli: niente strada
+nuova per i sats), e il battito dei pagamenti ritira e avvisa chi vende
+col txid. Sulle card e nel dettaglio `venditore_incasso` dal collo di
+bottiglia `arricchisci_righe_vetrina`: la vetrina anonima la riceve dal
+codice del negozio, come il bollino staff, senza nessun id. Leve:
+`SWAP_AUTO_ATTIVO` (spenta), `SWAP_AUTO_SOLO_ADMIN` (accesa),
+`SWAP_AUTO_FEE_PERCENTO` (0).
+
+STRADE SCARTATE. La fee della comodità sopra 0 che parte già oggi: la
+porta paga solo il dovuto intero, e una fee a chi vende va riletta con la
+regola ferrea 10 — sopra 0 il «Conferma» dice di no e non parte niente.
+La moneta su OGNI card anche a leva spenta: direbbe «Lightning» di
+venditori che non hanno mai potuto scegliere. Il ⛓️ (Andrea). Un ritiro
+cooperativo (vedi tappa 2). Lo swap fatto dal telefono anche qui: chi
+vende avrebbe dovuto tenere le 12 parole per un incasso.
+
+DUE DIFETTI TROVATI DAL COLLAUDO, prima del commit: il giro dei ritiri
+leggeva `o.titolo`, che in `ordini` non c'è (il battito sarebbe saltato a
+ogni giro, in silenzio nel journal); e chiedeva al mempool anche degli
+swap mai pagati, per tre giorni. Adesso il titolo viene dall'annuncio, e
+il giro guarda solo gli swap con la fattura partita (in volo o pagata).
+
+COSA È PROVATO. `prove_swap_auto` (21) e `prove_swap_auto_ritiro` (18)
+delle tappe 1-2; `prove_swap_auto_schermate` (10, il codice vero della
+pagina in node: la moneta ₿ e il fulmine sulla card e niente ⛓️, il
+Profilo, la carta, il cambio in corso, il no sotto il minimo; 3
+controprove rosse). `collaudo_swap_auto` (42, server vero, SATS Routing
+e LNbits di cartone): la leva spenta, solo-admin, la moneta sulla card
+anonima e con sessione, il Lightning address saltato solo per chi ha
+scelto e sopra il minimo, la carta solo a chi vende, «Conferma» senza
+parole / indirizzo storto / di un'altra rete, lo swap nato e pagato una
+volta sola anche al secondo tocco, il ritiro preso dal cartone, l'avviso
+col txid, nessun doppio ritiro, la fattura chiusa che chiude l'ordine, la
+fee sopra 0. Controprove sul server: 5 su 6 rosse; la sesta (togliere la
+scorciatoia a leva spenta in `_segna_incasso_venditori`) resta verde
+perché il cancello lo ridice `swap_auto_per`: è una scorciatoia, non una
+guardia.
+
+NON PROVATO E DA GUARDARE. Tappa 4: la prova vera in produzione con 30.000
+sats, Andrea e Alan, leve accese solo per gli admin, parole create dal
+pannello e un backup fuori sede subito dopo (DA-FARE). Il messaggio del
+promemoria degli incassi fermi (`sollecita_incassi`) per chi ha scelto
+on-chain parla ancora di Lightning address e fattura. La riga «via …»
+del pannello del pagamento dice «il cambio» solo se la carta è stata
+aperta in quella sessione.

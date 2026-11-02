@@ -1820,6 +1820,28 @@ try:
     from config import SWAP_FEE_PERCENTO
 except ImportError:
     SWAP_FEE_PERCENTO = 0
+# LO SWAP AUTOMATICO DEL MERCATINO (2 nov 2026, cantiere swap-auto, via di
+# Alan e piano approvato da Andrea): chi vende in Lightning e ha scelto
+# nel Profilo di ricevere in bitcoin on-chain non fa il cambio dal
+# telefono — lo fa il SERVER, con chiavi di Barattolo, dopo il suo
+# «Conferma» sull'ordine. SPENTA di serie, e a leva accesa di serie solo
+# gli admin. La fee nostra sul cambio automatico e' una leva a parte
+# (Andrea: «a 0, ma nel config, cosi' in futuro la alziamo cambiando il
+# parametro»): oggi 0; sopra 0 il cambio automatico si FERMA e lo dice,
+# perche' la porta dei pagamenti paga solo il dovuto intero e la quota
+# andrebbe contata (e la regola ferrea 10 riletta) prima di trattenerla.
+try:
+    from config import SWAP_AUTO_ATTIVO
+except ImportError:
+    SWAP_AUTO_ATTIVO = False
+try:
+    from config import SWAP_AUTO_SOLO_ADMIN
+except ImportError:
+    SWAP_AUTO_SOLO_ADMIN = True
+try:
+    from config import SWAP_AUTO_FEE_PERCENTO
+except ImportError:
+    SWAP_AUTO_FEE_PERCENTO = 0
 # DOVE SI LEGGONO LE TARIFFE: l'API pubblica di SATS Routing, senza
 # chiavi. Nel collaudo e sulla VM di collaudo punta al SATS Routing di
 # CARTONE (`cartone_satsrouting.py`, su una porta di casa): in
@@ -2741,6 +2763,9 @@ FRENI = {
     # Lightning address, la nascita legge un PSBT
     "onchain_cambio": (40, 3600),     # preventivo, fattura e cambio di un ordine, per persona
     "leva_pannello": (20, 3600),      # una leva cambiata dal pannello, per admin
+    # (2 nov 2026) il «Conferma» del cambio automatico: ogni tocco puo'
+    # far nascere uno swap dal fornitore
+    "swap_auto": (10, 3600),          # il cambio automatico di un ordine, per persona
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
 MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
@@ -26091,6 +26116,11 @@ def arricchisci_righe_vetrina(righe):
     # dal giudice unico (`e_staff`). Qui e non in SQL perche' la lista
     # dello staff vive nel config, non nel database.
     _segna_staff_venditori(righe)
+    # 7) COME PREFERISCE RICEVERE chi vende (2 nov 2026, swap-auto,
+    # Andrea: «il compratore deve capire quando un venditore preferisce
+    # ricevere on-chain piuttosto che Lightning»): dalla sua scelta nel
+    # Profilo, e solo dove lo swap automatico c'e' per lui.
+    _segna_incasso_venditori(righe)
     return righe
 
 
@@ -32945,6 +32975,26 @@ def _leve_stato():
                   spento="nessuna fee nostra (deve restare 0: sopra 0 "
                          "Barattolo non paga gli swap). Il guadagno e' la "
                          "quota del 10 % della commissione di SATS Routing"),
+            # (2 nov 2026, cantiere swap-auto) il cambio fatto dal server
+            _leva("Swap automatico: chi vende riceve on-chain senza telefono",
+                  "SWAP_AUTO_ATTIVO", bool(SWAP_AUTO_ATTIVO),
+                  acceso="chi ha scelto nel Profilo «₿ On-chain» non riceve "
+                         "sul Lightning address: alla conferma preme "
+                         "«Conferma» sull'ordine e il server fa il cambio "
+                         "con SATS Routing, con le parole dello swap del "
+                         "pannello (🔁)",
+                  spento="il cambio in bitcoin di un ordine lo fa solo il "
+                         "telefono di chi vende, come prima"),
+            _leva("Swap automatico: solo admin", "SWAP_AUTO_SOLO_ADMIN",
+                  bool(SWAP_AUTO_SOLO_ADMIN),
+                  acceso="a leva accesa lo vedono solo gli admin",
+                  spento="a leva accesa lo vedono TUTTI"),
+            _leva("Swap automatico: la nostra fee (%)", "SWAP_AUTO_FEE_PERCENTO",
+                  float(SWAP_AUTO_FEE_PERCENTO or 0),
+                  acceso="⚠️ sopra 0 il cambio automatico si FERMA col no "
+                         "«fee»: trattenere la quota vuole prima il conto "
+                         "della quota e la regola ferrea 10 riletta",
+                  spento="nessuna fee nostra sul cambio automatico"),
             _leva("Swap: dove si leggono le tariffe", "SWAP_API_BASE",
                   str(SWAP_API_BASE or "")),
             _leva("Swap: la rete", "SWAP_RETE", swap_rete()),
@@ -46103,6 +46153,42 @@ def e_staff(tg_id) -> bool:
     return bool(n) and n in _ids_staff()
 
 
+def _segna_incasso_venditori(righe):
+    """`venditore_incasso` su ogni riga d'annuncio: «onchain» se chi
+    vende ha scelto nel Profilo di ricevere on-chain e il prezzo sta nei
+    tetti del cambio (sotto il minimo riceve comunque in Lightning),
+    «ln» se lo swap automatico c'e' per lui ma riceve in Lightning, «»
+    se per lui non c'e' (leva spenta, o solo-admin e non e' admin). Il
+    tg_id come per il bollino dello staff: `venditore_id` se c'e', sennò
+    dal CODICE del negozio, pubblico — e qui non esce nessun id."""
+    for r in righe:
+        r["venditore_incasso"] = ""
+    if not righe or not SWAP_AUTO_ATTIVO or not EMBIT:
+        return
+    con = db()
+    try:
+        _swap_auto_pref_prepara(con)
+        negozi = sorted({r.get("venditore_negozio") for r in righe
+                         if "venditore_id" not in r and r.get("venditore_negozio")})
+        da_negozio = {x["negozio"]: x["tg_id"] for x in con.execute(
+            "SELECT tg_id, negozio FROM utenti WHERE negozio IN "
+            f"({','.join('?' * len(negozi))})", negozi)} if negozi else {}
+        scelti = {x["tg_id"] for x in con.execute(
+            "SELECT tg_id FROM swap_auto_preferenze")}
+    finally:
+        con.close()
+    for r in righe:
+        tg = (r.get("venditore_id") if "venditore_id" in r
+              else da_negozio.get(r.get("venditore_negozio")))
+        if not tg or not swap_auto_per(tg):
+            continue
+        netto = netto_venditore(int(r.get("prezzo_sats") or 0))
+        nei_tetti = netto >= int(SWAP_MIN_SATS or 0) and not (
+            int(SWAP_MAX_SATS or 0) > 0 and netto > int(SWAP_MAX_SATS))
+        r["venditore_incasso"] = ("onchain" if int(tg) in scelti and nei_tetti
+                                  else "ln")
+
+
 def _segna_staff_venditori(righe):
     """`venditore_staff` su ogni riga d'annuncio. Con `venditore_id`
     (chi guarda ha una sessione) si giudica sul tg_id; senza — la
@@ -47161,7 +47247,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
                             "cambio": cambio_leve(user["id"]),
                             # (1 nov 2026, presa-altra-rete) chi compra su
                             # un ordine P2P Lightning riceve on-chain
-                            "p2p": p2p_altra_rete_leve(user["id"])}
+                            "p2p": p2p_altra_rete_leve(user["id"]),
+                            # (2 nov 2026, swap-auto) il cambio fatto dal
+                            # server: il cancello, la scelta del Profilo
+                            "auto": swap_auto_busta(user["id"])}
     # E lo scambio P2P, dallo STESSO giudice della busta di prima
     # pagina: due letture della stessa cosa un giorno dicono due cose
     # diverse, e il client ha gia' il calco di `asteAccese` per
@@ -76436,6 +76525,8 @@ def _swap_auto_prepara(con):
         ritiro_txid TEXT DEFAULT '',
         destinazione TEXT DEFAULT '',
         ricevi INTEGER DEFAULT 0,
+        dest_valore TEXT DEFAULT '',
+        dest_indice INTEGER DEFAULT -1,
         creato INTEGER DEFAULT 0,
         aggiornato INTEGER DEFAULT 0)""")
 
@@ -76530,7 +76621,9 @@ async def swap_auto_crea(fornitore: dict, ordine_id: int,
             "swap_id": str(pubblica.get("id") or ""),
             "fattura": pubblica.get("invoice") or "",
             "lockup": pubblica.get("lockupAddress") or "",
-            "onchain": int(pubblica.get("onchainAmount") or 0)}
+            "onchain": int(pubblica.get("onchainAmount") or 0),
+            "scade_blocco": int(pubblica.get("timeoutBlockHeight") or 0),
+            "impronta": chiavi["impronta"].hex() if pubblica else ""}
 
 
 @app.get("/api/admin/swap/parole")
@@ -76802,6 +76895,359 @@ async def swap_auto_ritira(indice: int, destinazione: str,
     finally:
         con.close()
     return {"stato": SWAP_AUTO_RITIRATO, "txid": t["txid"], "perche": ""}
+
+
+# --- TAPPA 3: CHI VENDE SCEGLIE, CONFERMA, E I BITCOIN ARRIVANO -------
+# (2 nov 2026, cantiere swap-auto) La scelta sta nel Profilo: «Quando
+# vendi in Lightning, ricevi ⚡ in Lightning o ₿ on-chain». Chi sceglie
+# on-chain, a ordine confermato, NON riceve sul Lightning address
+# (`_sblocca_sats` lo salta: `swap_auto_aspetta`): apre l'ordine, vede
+# quanto arriva e dove, e preme «Conferma» (Alan: «riceve in automatico,
+# previa conferma»). L'indirizzo: il prossimo della xpub che ha dato per
+# l'on-chain (un indirizzo nuovo per ogni vendita) o l'indirizzo fisso
+# che ha scelto la', se sono della rete dello swap; sennò lo scrive li'.
+# Da «Conferma» in poi fa tutto il server: nasce lo swap (tappa 1), lo
+# paga la porta di sempre (`swap_registra_pagamento`, coi suoi tetti e
+# controlli), e il battito dei pagamenti ritira i bitcoin (tappa 2) e lo
+# dice a chi vende. Il costo del cambio e' di chi lo sceglie, scritto
+# prima del tocco: «Ricevi circa X».
+_swap_auto_lucchetti = defaultdict(asyncio.Lock)
+
+
+def swap_auto_per(tg_id) -> bool:
+    """LO SWAP AUTOMATICO C'E' PER QUESTA PERSONA? La leva, embit, e a
+    solo-admin acceso la sola lista degli admin. Decide il server."""
+    if not SWAP_AUTO_ATTIVO or not EMBIT:
+        return False
+    if SWAP_AUTO_SOLO_ADMIN:
+        return e_admin(int(tg_id or 0))
+    return True
+
+
+def _swap_auto_pref_prepara(con):
+    """Chi ha scelto «₿ On-chain» nel Profilo: una riga, e niente altro.
+    Non e' un segreto e non sposta sats da solo."""
+    con.execute("""CREATE TABLE IF NOT EXISTS swap_auto_preferenze(
+        tg_id INTEGER PRIMARY KEY,
+        aggiornato INTEGER DEFAULT 0)""")
+
+
+def swap_auto_preferisce(con, tg_id) -> bool:
+    """Ha scelto on-chain, e lo swap automatico c'e' per lui? A leva
+    spenta tutti tornano in Lightning, come ieri."""
+    if not swap_auto_per(tg_id):
+        return False
+    _swap_auto_pref_prepara(con)
+    return con.execute("SELECT 1 FROM swap_auto_preferenze WHERE tg_id=?",
+                       (int(tg_id),)).fetchone() is not None
+
+
+def swap_auto_aspetta(con, tg_id, netto: int) -> bool:
+    """`_sblocca_sats` deve LASCIARE STARE il Lightning address? Si', se
+    chi vende ha scelto on-chain e la cifra sta nei tetti del cambio;
+    sotto il minimo (o sopra il massimo) si paga in Lightning come
+    sempre, e il Profilo lo dice."""
+    if not swap_auto_preferisce(con, tg_id):
+        return False
+    netto = int(netto)
+    if netto < int(SWAP_MIN_SATS or 0):
+        return False
+    return not (int(SWAP_MAX_SATS or 0) > 0 and netto > int(SWAP_MAX_SATS))
+
+
+def swap_auto_proposta(tg_id) -> dict | None:
+    """L'INDIRIZZO CHE SI PROPONE a chi vende, dalla destinazione on-chain
+    del suo Profilo (`onchain_incasso`, firmata dal suo seme): l'indirizzo
+    fisso, o il prossimo `/0/i` della sua xpub, contato con le vendite
+    on-chain e gli scambi P2P (`_p2p_onchain_prossimo_esterno`, che conta
+    anche gli swap automatici). None se non c'e', se non si legge, o se e'
+    di un'altra rete (l'on-chain su signet, lo swap su bitcoin)."""
+    if not EMBIT or ONCHAIN_RETE_DEL_CAMBIO.get(ONCHAIN_RETE) != swap_rete():
+        return None
+    try:
+        con = _onchain_db_ordini()
+        try:
+            r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                            (int(tg_id),)).fetchone()
+            dest = (_onchain_destinazione_viva(con, tg_id, r["xpub"])
+                    if r else None)
+            if not dest:
+                return None
+            indice = (_p2p_onchain_prossimo_esterno(con, tg_id, dest["valore"])
+                      if dest["tipo"] == "xpub" else -1)
+        finally:
+            con.close()
+        indirizzo = onchain_indirizzo_esterno(dest["tipo"], dest["valore"],
+                                              max(indice, 0))
+    except Exception:
+        return None
+    if not _swap_script_destinazione(indirizzo, swap_rete()):
+        return None
+    return {"indirizzo": indirizzo, "tipo": dest["tipo"],
+            "valore": dest["valore"] if dest["tipo"] == "xpub" else "",
+            "indice": indice}
+
+
+def _swap_auto_no(ordine_id: int, motivo: str, detto: str = "") -> dict:
+    """Un no PRIMA di creare o pagare: non e' partito niente."""
+    print(f"🔁 Swap automatico dell'ordine #{int(ordine_id)}: no — {motivo}"
+          + (f" ({detto})" if detto else ""), flush=True)
+    return {"ok": False, "motivo": motivo}
+
+
+async def swap_auto_incassa(venditore_id: int, ordine_id: int,
+                            indirizzo: str = "") -> dict:
+    """IL «CONFERMA» DI CHI VENDE: l'indirizzo (quello scritto, o quello
+    del Profilo), il preventivo di adesso, lo swap nato e verificato, il
+    pagamento per la porta di sempre. Un tocco doppio non fa due swap: il
+    lucchetto dell'ordine, e dentro la porta il suo."""
+    async with _swap_auto_lucchetti[int(ordine_id)]:
+        if not swap_auto_per(venditore_id):
+            return _swap_auto_no(ordine_id, "spento")
+        if float(SWAP_AUTO_FEE_PERCENTO or 0) > 0:
+            return _swap_auto_no(ordine_id, "fee", "SWAP_AUTO_FEE_PERCENTO "
+                                 "sopra 0: la porta paga solo il dovuto intero")
+        con = _swap_pag_db()
+        try:
+            o = con.execute("SELECT * FROM ordini WHERE id=?",
+                            (int(ordine_id),)).fetchone()
+            vivo = None
+            if o:
+                for r in con.execute("SELECT * FROM swap_pagamenti WHERE "
+                                     "ordine_id=?", (int(ordine_id),)).fetchall():
+                    if _swap_pag_aggiorna(con, r) != SWAP_PAG_FALLITO:
+                        vivo = r
+        finally:
+            con.close()
+        if not o or int(o["venditore_id"]) != int(venditore_id):
+            return {"ok": False, "motivo": "ordine", "non_trovato": True}
+        if vivo:
+            return {"ok": True, "stato": _swap_pag_dell_ordine(ordine_id,
+                                                               vivo["id"])}
+        if o["stato"] != "confirmed" or (_campo(o, "cassaforte") or "") == "onchain":
+            return _swap_auto_no(ordine_id, "ordine", f"stato {o['stato']}")
+        chi = swap_fornitore("satsrouting")
+        # La carta manda SEMPRE l'indirizzo che mostra: se e' proprio quello
+        # proposto dal Profilo, vale come proposta (e il suo `/0/i` resta
+        # contato, cosi' la vendita dopo ne riceve uno nuovo); se e' un
+        # altro, l'ha scritto chi vende e conta solo la sua rete.
+        scritto = str(indirizzo or "").strip()
+        proposta = swap_auto_proposta(venditore_id)
+        if proposta and scritto in ("", proposta["indirizzo"]):
+            dest = proposta
+        elif scritto:
+            if not _swap_script_destinazione(scritto, chi["rete"]):
+                return _swap_auto_no(ordine_id, "indirizzo",
+                                     "non e' un indirizzo di questa rete")
+            dest = {"indirizzo": scritto, "valore": "", "indice": -1}
+        else:
+            return _swap_auto_no(ordine_id, "indirizzo",
+                                 "nel Profilo non c'e' un indirizzo")
+        dovuto = netto_venditore(o["prezzo_sats"] - o["protezione_sats"])
+        tariffa = await leggi_tariffa_swap(chi)
+        if tariffa is None:
+            return _swap_auto_no(ordine_id, "non_risponde")
+        p = preventivo_swap(dovuto, tariffa, 0, SWAP_MIN_SATS, SWAP_MAX_SATS)
+        if not p["ok"]:
+            return _swap_auto_no(ordine_id, p["motivo"])
+        try:
+            nato = await swap_auto_crea(chi, ordine_id, p)
+        except ValueError as e:
+            return _swap_auto_no(ordine_id, "parole", str(e))
+        if nato["stato"] != SWAP_AUTO_NATO:
+            return _swap_auto_no(ordine_id, nato["stato"], nato["perche"])
+        con = db()
+        try:
+            con.execute("UPDATE swap_auto SET destinazione=?, ricevi=?, "
+                        "dest_valore=?, dest_indice=?, aggiornato=? "
+                        "WHERE indice=?",
+                        (dest["indirizzo"], int(p["ricevi"]), dest["valore"],
+                         int(dest["indice"]), int(time.time()), nato["indice"]))
+            con.commit()
+        finally:
+            con.close()
+        esito = await swap_registra_pagamento(
+            int(venditore_id), int(ordine_id), chi,
+            {"swap_id": nato["swap_id"], "impronta": nato["impronta"],
+             "bolt11": nato["fattura"], "onchain": nato["onchain"],
+             "indirizzo": nato["lockup"], "scade_blocco": nato["scade_blocco"]})
+        return dict(esito, ricevi=int(p["ricevi"]), indirizzo=dest["indirizzo"])
+
+
+def swap_auto_dell_ordine(ordine_id: int) -> dict:
+    """A che punto e' il cambio automatico di un ordine, per la carta di
+    chi vende: {} se non c'e'; sennò lo stato del pagamento (la porta
+    di sempre), dove vanno i bitcoin, quanti, e l'id del ritiro."""
+    con = db()
+    try:
+        _swap_auto_prepara(con)
+        r = con.execute("SELECT * FROM swap_auto WHERE ordine_id=? AND "
+                        "stato IN (?, ?) AND destinazione!='' ORDER BY "
+                        "indice DESC LIMIT 1", (int(ordine_id), SWAP_AUTO_NATO,
+                                                SWAP_AUTO_RITIRATO)).fetchone()
+        pag = None
+        if r:
+            pag = con.execute("SELECT id FROM swap_pagamenti WHERE "
+                              "ordine_id=? AND swap_id=?",
+                              (int(ordine_id), r["swap_id"])).fetchone() \
+                if con.execute("SELECT name FROM sqlite_master WHERE "
+                               "name='swap_pagamenti'").fetchone() else None
+    finally:
+        con.close()
+    if not r:
+        return {}
+    return {"pagamento": _swap_pag_dell_ordine(ordine_id, pag["id"]) if pag else "",
+            "ritirato": r["stato"] == SWAP_AUTO_RITIRATO,
+            "txid": r["ritiro_txid"] or "", "indirizzo": r["destinazione"],
+            "ricevi": int(r["ricevi"] or 0)}
+
+
+def _msg_swap_auto_conferma(sats: int, testa: str) -> str:
+    """Le parole per chi ha scelto on-chain, a ordine confermato: il suo
+    gesto e' un tocco, non una fattura."""
+    return (f"{testa} Hai scelto di ricevere in <b>bitcoin on-chain</b>: apri "
+            "l'ordine nella Mini App, controlla l'indirizzo e premi "
+            f"<b>«Conferma»</b>. I tuoi <b>{_fmt_sats(sats)} sats</b> intanto "
+            "restano al sicuro nel deposito di garanzia.")
+
+
+async def swap_auto_giro() -> int:
+    """IL RITIRO NEL BATTITO DEI PAGAMENTI: per ogni swap automatico nato
+    e confermato degli ultimi tre giorni, se il fornitore ha bloccato i
+    bitcoin si ritirano (tappa 2). Chi vende lo sa con l'id della
+    transazione. Torna quanti ne sono partiti in questo giro."""
+    con = _swap_pag_db()
+    try:
+        _swap_auto_prepara(con)
+        # solo gli swap la cui fattura e' partita: uno mai pagato (o
+        # fallito) non avra' mai un lockup, e non si chiede al mempool
+        righe = con.execute(
+            "SELECT s.*, o.venditore_id, a.titolo FROM swap_auto s JOIN "
+            "ordini o ON o.id=s.ordine_id LEFT JOIN annunci a ON "
+            "a.id=o.annuncio_id JOIN swap_pagamenti p ON p.ordine_id="
+            "s.ordine_id AND p.swap_id=s.swap_id WHERE s.stato=? AND "
+            "s.destinazione!='' AND s.creato>? AND p.stato IN (?, ?)",
+            (SWAP_AUTO_NATO, int(time.time()) - 3 * 86_400,
+             SWAP_PAG_IN_VOLO, SWAP_PAG_PAGATO)).fetchall()
+    finally:
+        con.close()
+    partiti = 0
+    for r in righe:
+        try:
+            esito = await swap_auto_ritira(r["indice"], r["destinazione"],
+                                           r["ricevi"])
+        except Exception as e:
+            print(f"⚠️ Swap automatico {r['indice']}: il giro salta "
+                  f"({type(e).__name__})", flush=True)
+            continue
+        if esito["stato"] != SWAP_AUTO_RITIRATO:
+            continue
+        partiti += 1
+        print(f"₿ Swap automatico dell'ordine #{r['ordine_id']}: ritiro "
+              f"{esito['txid']} verso {r['destinazione'][:10]}…", flush=True)
+        await notifica(r["venditore_id"],
+            f"₿ <b>{html.escape(str(r['titolo'] or '')[:40])}:</b> i tuoi "
+            f"bitcoin sono partiti, <b>{_fmt_sats(r['ricevi'])} sats</b> verso "
+            f"<code>{html.escape(r['destinazione'])}</code>. La transazione è "
+            f"<code>{esito['txid']}</code>: arrivano con la prima conferma.")
+    return partiti
+
+
+@app.post("/api/swap/auto/preferenza")
+async def swap_auto_preferenza(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """«QUANDO VENDI IN LIGHTNING, RICEVI…» dal Profilo: {onchain: bool}.
+    Vale dalle conferme dopo; un ordine gia' confermato si sceglie
+    dall'ordine."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not swap_auto_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    d = await leggi_json(req)
+    onchain = bool(d.get("onchain"))
+    con = db()
+    try:
+        _swap_auto_pref_prepara(con)
+        if onchain:
+            con.execute("INSERT INTO swap_auto_preferenze(tg_id, aggiornato) "
+                        "VALUES (?,?) ON CONFLICT(tg_id) DO UPDATE SET "
+                        "aggiornato=excluded.aggiornato",
+                        (user["id"], int(time.time())))
+        else:
+            con.execute("DELETE FROM swap_auto_preferenze WHERE tg_id=?",
+                        (user["id"],))
+        con.commit()
+    finally:
+        con.close()
+    return swap_auto_busta(user["id"])
+
+
+def swap_auto_busta(tg_id) -> dict:
+    """La busta di `/api/me` (`swap_leve.auto`): il cancello, la scelta,
+    l'indirizzo che si proporrebbe (solo pubblico), i tetti."""
+    attivo = swap_auto_per(tg_id)
+    preferisce = False
+    proposta = None
+    if attivo:
+        con = db()
+        try:
+            preferisce = swap_auto_preferisce(con, tg_id)
+        finally:
+            con.close()
+        proposta = swap_auto_proposta(tg_id)
+    return {"attivo": attivo, "onchain": preferisce,
+            "indirizzo": (proposta or {}).get("indirizzo", ""),
+            "da": (proposta or {}).get("tipo", ""),
+            "minimo": int(SWAP_MIN_SATS or 0), "massimo": int(SWAP_MAX_SATS or 0),
+            "fornitore": "SATS Routing"}
+
+
+@app.get("/api/swap/auto/ordine/{ordine_id}")
+async def swap_auto_ordine_vedi(ordine_id: int,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """La carta del cambio automatico di un ordine, per chi vende: il
+    preventivo di adesso, l'indirizzo proposto e, se c'e', il cambio in
+    corso. Non crea niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not swap_auto_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
+    con.close()
+    if not o or o["venditore_id"] != user["id"]:
+        raise HTTPException(404, "Ordine non trovato")
+    corso = swap_auto_dell_ordine(ordine_id)
+    proposta = swap_auto_proposta(user["id"])
+    d = {"corso": corso, "indirizzo": (proposta or {}).get("indirizzo", ""),
+         "da": (proposta or {}).get("tipo", ""), "rete": swap_rete()}
+    # un cambio fallito (non e' uscito niente) lascia rifare il preventivo
+    if o["stato"] != "confirmed" or (corso and corso["pagamento"] != SWAP_PAG_FALLITO):
+        return d
+    chi = swap_fornitore("satsrouting")
+    dovuto = netto_venditore(o["prezzo_sats"] - o["protezione_sats"])
+    tariffa = await leggi_tariffa_swap(chi)
+    d["preventivo"] = ({"ok": False, "motivo": "non_risponde", "dovuto": dovuto}
+                       if tariffa is None else
+                       preventivo_swap(dovuto, tariffa, 0, SWAP_MIN_SATS,
+                                       SWAP_MAX_SATS))
+    return d
+
+
+@app.post("/api/swap/auto/ordine/{ordine_id}")
+async def swap_auto_ordine_conferma(ordine_id: int, req: Request,
+                                    x_tg_init_data: str = Header(""),
+                                    barattolo_sessione: str = Cookie("")):
+    """«CONFERMA»: {indirizzo?} — vuoto = quello del Profilo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not swap_auto_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("swap_auto", user["id"])
+    d = await leggi_json(req)
+    esito = await swap_auto_incassa(user["id"], ordine_id,
+                                    str(d.get("indirizzo") or "")[:120])
+    if esito.get("non_trovato"):
+        raise HTTPException(404, "Ordine non trovato")
+    return esito
 
 
 # --- IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero) ---------------
@@ -77614,10 +78060,20 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         bolt11 = ""
         taccuino = {"etichetta": f"Incasso del venditore sull'ordine "
                                  f"#{ordine_id}"}
+        # (2 nov 2026, swap-auto) CHI HA SCELTO I BITCOIN ON-CHAIN nel
+        # Profilo non riceve sul Lightning address: l'ordine resta
+        # 'confirmed' e chi vende conferma il cambio dall'ordine (Alan:
+        # «in automatico, previa conferma»). Una fattura incollata vince
+        # (e' un suo gesto), e sotto il minimo del cambio si paga in
+        # Lightning come sempre (`swap_auto_aspetta`).
+        aspetta_onchain = bool(not oc and not o["invoice_venditore"]
+                               and o["payout_stato"] != "uscito"
+                               and swap_auto_aspetta(con, o["venditore_id"],
+                                                     netto))
         try:
             if o["payout_stato"] != "uscito" and not oc:
                 bolt11 = o["invoice_venditore"]
-                if not bolt11 and v and v["ln_address"]:
+                if not bolt11 and v and v["ln_address"] and not aspetta_onchain:
                     bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
             esito = (PAGATO if o["payout_stato"] == "uscito" or oc
                      else await paga_venditore(bolt11, netto, taccuino,
@@ -77911,6 +78367,14 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             # ordine #152, questa riga disse «la rete non ha trovato una
             # strada» di una fattura scaduta da quattro giorni.
             msg = _msg_fattura_nuova(netto, taccuino)
+        elif aspetta_onchain:
+            # (2 nov 2026, swap-auto) ha scelto on-chain: il suo gesto e'
+            # un «Conferma», non una fattura
+            msg = _msg_swap_auto_conferma(
+                netto, "⚖️ <b>La disputa è stata decisa a tuo favore!</b>"
+                if o["disputata"] else "⏳ <b>Il tempo di conferma è scaduto!</b>"
+                if automatico else
+                "✅ <b>L'acquirente ha confermato la ricezione!</b>")
         elif o["invoice_venditore"] or (v and v["ln_address"]):
             # Un metodo c'era, ma al nodo non ci siamo nemmeno arrivati:
             # non si dichiara un fallimento che non e' stato osservato.
@@ -84427,17 +84891,37 @@ def _pagamenti_da_guardare() -> bool:
         con.close()
 
 
+def _swap_auto_da_guardare() -> bool:
+    """C'e' uno swap automatico confermato e non ancora ritirato? (2 nov
+    2026) Il suo pagamento puo' essersi chiuso prima che il battito lo
+    vedesse: il ritiro e l'avviso a chi vende non devono restare indietro."""
+    con = db()
+    try:
+        return con.execute(
+            "SELECT 1 FROM swap_auto WHERE stato=? AND destinazione!='' AND "
+            "creato>? LIMIT 1", (SWAP_AUTO_NATO,
+                                 int(time.time()) - 3 * 86_400)).fetchone() \
+            is not None
+    except sqlite3.OperationalError:
+        return False
+    finally:
+        con.close()
+
+
 async def orologio_pagamenti():
     while True:
         await asyncio.sleep(BATTITO_PAGAMENTI_S)
         try:
-            if _giro_pagamenti.locked() or not _pagamenti_da_guardare():
+            if _giro_pagamenti.locked() or not (
+                    _pagamenti_da_guardare() or _swap_auto_da_guardare()):
                 continue
             async with _giro_pagamenti:
                 await risolvi_pagamenti_in_volo(solo_in_volo=True)
                 await riprova_pagamenti_sospesi()
                 # il journal dei pagamenti di swap, a ogni passo
                 swap_pagamenti_ripassa()
+                # (2 nov 2026) e i ritiri degli swap automatici
+                await swap_auto_giro()
         except Exception as e:
             print(f"⚠️ Battito dei pagamenti saltato: {e}")
 
@@ -95588,7 +96072,16 @@ def _p2p_onchain_prossimo_esterno(con, tg_id: int, valore: str) -> int:
                     "ricevente_id=? AND incasso_tipo='xpub' AND incasso_valore=?",
                     (int(tg_id), valore)).fetchone()
     b = 0 if r[0] is None else int(r[0]) + 1
-    return max(a, b)
+    # (2 nov 2026, swap-auto) e gli indirizzi dati ai cambi automatici
+    try:
+        r = con.execute("SELECT MAX(s.dest_indice) FROM swap_auto s JOIN "
+                        "ordini o ON o.id=s.ordine_id WHERE o.venditore_id=? "
+                        "AND s.dest_valore=? AND s.dest_indice>=0",
+                        (int(tg_id), valore)).fetchone()
+        c = 0 if r[0] is None else int(r[0]) + 1
+    except sqlite3.OperationalError:
+        c = 0                     # la tabella non e' ancora nata
+    return max(a, b, c)
 
 
 def _p2p_onchain_incasso_di(con, ricevente_id: int, xpub_dedicata: str) -> tuple:

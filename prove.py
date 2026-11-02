@@ -5241,6 +5241,11 @@ def ambiente_in_pagamento(notifica=None, commissione=0):
     return {**{n: p[n] for n in NOMI_IN_PAGAMENTO},
             "_limite_in_volo": lambda tab, rid, h, quando:
                 int(quando or 0) + p["IN_VOLO_LIMITE_S"],
+            # ...e dallo swap automatico (2 nov 2026) la domanda «chi vende
+            # ha scelto on-chain?»: sui banchi nessuno l'ha scelto, quindi
+            # la strada resta il Lightning di sempre. L'altra strada la
+            # gira `prove_swap_auto_incasso`, col giudice vero.
+            "swap_auto_aspetta": lambda *a, **k: False,
             **ambiente_altra_cassaforte()}
 
 
@@ -6707,6 +6712,10 @@ def prove_fattura_solo_incasso():
           # il banco prova il pannello di sempre (lo swap acceso lo
           # prova `prove_swap_preventivo`)
           "const swapAcceso = () => false;\n"
+          # ...e dal 2 nov 2026 lo swap automatico (il cambio fatto dal
+          # server), SPENTO per la stessa ragione: acceso lo prova
+          # `prove_swap_auto_schermate`, e il giro vero `collaudo_swap_auto`
+          "const swapAutoAcceso = () => false, swapAuto = () => ({});\n"
           + pezzo_js(mini, "function importoBolt11(pr){", "\n}\n") + "\n}\n"
           + pezzo_js(mini, "function leggiBolt11(pr){", "\n}\n") + "\n}\n"
           + pp +
@@ -8382,7 +8391,9 @@ def prove_altra_cassaforte():
           "due volte" in foglio and "CREDITO DA RECUPERARE" in foglio)
     pannello = pezzo_js(mini, "function payoutPanel(o){", "\n}\n")
     prova("client: a chi vende il campo della fattura si apre anche se "
-          "l'ordine non e' 'confirmed'", (True, 2),
+          # (2 nov 2026) tre: anche il riquadro «ricevi on-chain» dello
+          # swap automatico, prima della conferma, cede al gesto che tocca
+          "l'ordine non e' 'confirmed'", (True, 3),
           ("const tocca = !!(o.pagamento && o.pagamento.gesto_venditore);"
            in pannello, pannello.count("&& !tocca")))
     prova("client: la scatola dei crediti c'e', e chiude con una nota",
@@ -44474,13 +44485,14 @@ def prove_fogli_di_casa():
     # (`usdtInviatiOcP2P`).
     # CENTOSEI (2 nov 2026, cantiere swap-auto): «Crei le parole dello
     # swap?» nel pannello admin (`creaParoleSwap`).
-    prova("i gesti che passano dalla domanda unica sono centosei (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centosette (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
           "cambio in Lightning; dal 2 nov «Hai inviato gli USDT?» on-chain "
-          "e «Crei le parole dello swap?»)",
-          106, solo_codice(mini).count("chiediConferma({"))
+          "e «Crei le parole dello swap?» e «Ricevi on-chain?» dello swap "
+          "automatico)",
+          107, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -147349,7 +147361,9 @@ def prove_freni():
            "p2p_onchain_controlla": (300, 3600), "p2p_onchain_disputa": (5, 3600),
            # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
            # un login con la sua coda sta largo in 60 al minuto per IP
-           "cassetta_spedisci": (60, 60)}, F)
+           "cassetta_spedisci": (60, 60),
+           # 2 nov 2026: il «Conferma» del cambio automatico, 10 all'ora
+           "swap_auto": (10, 3600)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------
@@ -183047,6 +183061,82 @@ console.log(JSON.stringify(out));
     _sh.rmtree(cartella, ignore_errors=True)
 
 
+def prove_swap_auto_schermate():
+    """LO SWAP AUTOMATICO, TAPPA 3: LE SCHERMATE (2 nov 2026, cantiere
+    swap-auto). Il giro col server vero sta in `collaudo_swap_auto`; qui
+    il codice VERO della pagina, girato in node:
+    1. la moneta sulla card: la ₿ arancione del Cambio (quella di SATS
+       Routing) per chi preferisce on-chain, il fulmine per Lightning,
+       niente senza il campo — MAI il ⛓️ (Andrea, 14:55);
+    2. la scelta nel Profilo: vuota a leva spenta, il tasto giusto acceso,
+       il minimo detto in parole;
+    3. la carta dell'ordine: il preventivo coi riquadri e l'indirizzo
+       proposto gia' scritto, il cambio in corso, il no sotto il minimo."""
+    print("\n[lo swap automatico, tappa 3: le schermate]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i = mini.index("const P2P_OC_MONETA = ")
+    monete = mini[i:mini.index("\n\n", i)]
+    icone = pezzo_js(mini, "function iconeCard(l){", "\n}\n") + "\n}\n"
+    blocco = pezzo_js(mini, "/* ---- ₿ LO SWAP AUTOMATICO (2 nov 2026",
+                      "/* LA LETTURA DI UN PREVENTIVO")
+    prova("nel blocco dello swap automatico non c'e' il ⛓️", False, "⛓" in blocco)
+    prova("...ne' sulle righe «Preferisce ricevere»", [],
+          [r for r in mini.splitlines() if "Preferisce ricevere" in r and "⛓" in r])
+    js = ("const el = id => (globalThis.__box = globalThis.__box || {})[id] || null;\n"
+          "const esc = s => String(s ?? '').replace(/[&<>\"']/g, c => '&#' + c.charCodeAt(0) + ';');\n"
+          "const fmt = n => String(n);\nlet DEMO = false, swapLeve = null;\n"
+          "let sceltaIncassoSwap = {};\nconst haptic = () => {}, toast = () => {};\n"
+          "const spedGratis = () => false, spedGratisQui = () => false;\n"
+          "const testiSwap = () => ({reti: {ln: 'LN', btc: 'BTC'}, voci: {dovuto: 'Ti spettano'},\n"
+          "  ricevi: 'Ricevi circa', costo: 'Costo', dettagli: 'Dettagli', titoloPrev: 'Quanto ricevi',\n"
+          "  conferma: 'Conferma'});\n"
+          "const etichettaVoceSwap = r => r.voce;\n"
+          + monete + "\n" + icone + blocco + "\n"
+          "const out = {};\n"
+          "out.oc = iconeCard({incasso: 'onchain'});\n"
+          "out.ln = iconeCard({incasso: 'ln'});\n"
+          "out.niente = iconeCard({});\n"
+          "globalThis.__box = {swapAutoBlocco: {innerHTML: 'x'}};\n"
+          "swapLeve = {auto: {attivo: false}}; renderSwapAutoProfilo();\n"
+          "out.spento = __box.swapAutoBlocco.innerHTML;\n"
+          "swapLeve = {auto: {attivo: true, onchain: true, minimo: 25000, indirizzo: '', da: '',\n"
+          "  fornitore: 'SATS Routing'}}; renderSwapAutoProfilo();\n"
+          "out.profilo = __box.swapAutoBlocco.innerHTML;\n"
+          "swapAutoDati[7] = {indirizzo: 'bc1qproposto', da: 'xpub', rete: 'bitcoin', corso: {},\n"
+          "  preventivo: {ok: true, dovuto: 50000, ricevi: 49142, righe: [{voce: 'dovuto', sats: 50000},\n"
+          "    {voce: 'commissione', sats: -300}, {voce: 'rete_invio', sats: -154}, {voce: 'rete_ritiro', sats: -111}]}};\n"
+          "out.carta = pannelloSwapAuto({id: 7});\n"
+          "swapAutoDati[8] = {corso: {pagamento: 'in_volo', indirizzo: 'bc1qdove', ricevi: 49142}};\n"
+          "out.corso = pannelloSwapAuto({id: 8});\n"
+          "swapAutoDati[9] = {corso: {}, preventivo: {ok: false, motivo: 'sotto_minimo', minimo: 25000}};\n"
+          "out.sotto = pannelloSwapAuto({id: 9});\n"
+          "console.log(JSON.stringify(out));\n")
+    r = _node_banco(js)
+    if r is None:
+        salta("lo swap automatico, le schermate", "node non c'e'")
+        return
+    prova("card on-chain: la moneta ₿ del Cambio, col suo titolo",
+          (True, True), ("cambio-moneta btc" in r["oc"], "Preferisce ricevere on-chain" in r["oc"]))
+    prova("card Lightning: il fulmine", (True, False),
+          ("cambio-moneta ln" in r["ln"], "cambio-moneta btc" in r["ln"]))
+    prova("card senza il campo: niente moneta", False, "card-incasso" in r["niente"])
+    prova("Profilo a leva spenta: vuoto", "", r["spento"])
+    prova("Profilo: On-chain acceso, «Conferma» e il minimo in parole",
+          (True, True, True),
+          ('aria-checked="true"\n      class="on" onclick="scegliSwapAutoProfilo(true)"' in r["profilo"],
+           "«Conferma»" in r["profilo"], "Sotto i 25000 sats" in r["profilo"]))
+    prova("carta dell'ordine: i due riquadri, il costo, l'indirizzo proposto, «Conferma»",
+          (True, True, True, True),
+          ("cambio-carta" in r["carta"] and "cambio-moneta btc" in r["carta"],
+           "<b>565 sats</b>" in r["carta"], 'value="bc1qproposto"' in r["carta"],
+           "confermaSwapAuto(7, this)" in r["carta"]))
+    prova("carta: il cambio in corso dice dove, e niente «Conferma»",
+          (True, True, False), ("Cambio in corso" in r["corso"], "bc1qdove" in r["corso"],
+                                "confermaSwapAuto" in r["corso"]))
+    prova("carta: sotto il minimo, Lightning", (True, True),
+          ("Sotto i 25000 sats" in r["sotto"], "scegliIncassoAuto(9,'ln')" in r["sotto"]))
+
+
 def prove_swap_auto_ritiro():
     """LO SWAP AUTOMATICO, TAPPA 2: IL RITIRO DAL SERVER (2 nov 2026,
     cantiere swap-auto). Il server porta i bitcoin bloccati dal fornitore
@@ -185974,7 +186064,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
-              prove_swap_auto, prove_swap_auto_ritiro,
+              prove_swap_auto, prove_swap_auto_ritiro, prove_swap_auto_schermate,
               prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,
               prove_margine_cassaforte,
               prove_quantita_servizi,

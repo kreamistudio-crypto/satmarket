@@ -402,3 +402,60 @@ signet, Alan manda gli USDT veri (pochi: sono veri, su Tron serve un po'
 di TRX) e incolla l'id; Andrea guarda su Tronscan e libera. Quel che si
 vede va nel verbale (CANTIERI, «NON PROVATO»). In produzione la leva
 resta spenta fino alla promozione e a un sì di Andrea.
+
+## 9. Lo swap automatico, la prova da 30.000 sats in produzione (2 nov 2026, cantiere swap-auto; Andrea: «ok parti»)
+
+**Perché.** Chi vende in Lightning e ha scelto nel Profilo di ricevere
+on-chain riceve in bitcoin: il cambio con SATS Routing lo fa il SERVER
+con parole di Barattolo, lui preme solo «Conferma» sull'ordine. È su
+`develop` dietro `SWAP_AUTO_ATTIVO`, spenta, e a leva accesa vale solo
+per gli admin (`SWAP_AUTO_SOLO_ADMIN`, accesa di serie). Il perché di
+tutto: CANTIERI, «Lo swap automatico del mercatino». Si fa DOPO la
+promozione (la frase di Andrea), con Andrea e Alan.
+
+**Passo 1, sola lettura** sul VPS (atteso: nessuna riga, e «No such file»
+per le parole):
+```
+grep -n "^SWAP_AUTO" /srv/barattolo/config.py
+```
+```
+sudo ls -l /root/satmarket/chiavi/swap-barattolo.json
+```
+
+**Passo 2, scrive: la copia, la riga, il controllo, il riavvio** (dopo il sì di Andrea):
+```
+cp -a /srv/barattolo/config.py /root/config-prima-swap-auto-$(date +%F).py
+```
+```
+printf '\nSWAP_AUTO_ATTIVO = True\n' | sudo tee -a /srv/barattolo/config.py > /dev/null
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo && sleep 30 && curl -s -o /dev/null -w 'salute %{http_code}\n' http://127.0.0.1:8080/api/salute
+```
+
+**Passo 3, dal telefono (Andrea, admin).** Pannello admin, cassetto «🔁
+Parole dello swap»: «Crea le parole», UNA volta. Controllo in sola
+lettura, poi SUBITO il backup fuori sede (finché la copia è una sola):
+```
+sudo ls -l /root/satmarket/chiavi/swap-barattolo.json
+```
+```
+cd /srv/barattolo && sudo -u barattolo ./deploy/backup-fuori.sh
+```
+Atteso `-rw-------` e l'archivio in chat.
+
+**Passo 4, la prova.** Alan (venditore): Profilo → «Lightning address» →
+«Quando vendi in Lightning, ricevi: On-chain»; la sua card deve mostrare
+la moneta ₿ arancione, e il dettaglio «Preferisce ricevere on-chain».
+Mette in vendita un oggetto da 30.000 sats; Andrea compra e conferma la
+ricezione; Alan riceve in chat «premi «Conferma»» (NON i sats sul
+Lightning address), apre l'ordine, controlla l'indirizzo (quello del suo
+wallet on-chain, o lo scrive) e preme «Conferma». Entro qualche minuto
+deve arrivargli in chat «i tuoi bitcoin sono partiti» col txid; si guarda
+su mempool.space. Quel che si vede (tempi, costo, frasi storte) va nel
+verbale (CANTIERI, «NON PROVATO»). Per tornare indietro:
+`SWAP_AUTO_ATTIVO = False` e riavvio (uno swap già confermato il battito
+lo finisce lo stesso: la leva ferma solo i «Conferma» nuovi).

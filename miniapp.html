@@ -8629,6 +8629,12 @@
   .pill{background:var(--card);border:1.5px solid var(--field-line);border-radius:999px;
     padding:6px 12px;font-size:13px;font-weight:700}
   /* la scatola graduata dentro la pillola, appoggiata sulla riga del testo */
+  .pill-incasso{display:inline-flex;align-items:center;gap:6px}
+  .pill-incasso .cambio-moneta.p2p-oc-moneta{width:20px;height:20px;margin-left:-6px}
+  .pill-incasso .cambio-moneta.p2p-oc-moneta .cambio-svg{width:12px;height:12px}
+  .card .meta .ico .card-incasso{display:inline-flex}
+  .card .meta .ico .card-incasso .cambio-moneta.p2p-oc-moneta{width:15px;height:15px}
+  .card .meta .ico .card-incasso .cambio-moneta.p2p-oc-moneta .cambio-svg{width:10px;height:10px}
   .pill .taglia-ico{vertical-align:-3.5px;margin-right:1px}
   /* LA FAMIGLIA NELLA SCHEDA (set 2026): una riga per opzione — il
      nome sopra, i bottoncini sotto — col vestito delle pillole di
@@ -9871,6 +9877,10 @@
     padding:9px 6px;min-height:40px;font:800 14px/1.2 Nunito,sans-serif;
     color:var(--ink);cursor:pointer}
   .scelta-incasso button.on{background:var(--ink);color:var(--on-ink)}
+  /* (2 nov 2026, swap-auto) le monete del Cambio accanto alla parola */
+  .scelta-incasso.scelta-auto button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+  .scelta-incasso.scelta-auto .cambio-moneta.p2p-oc-moneta{width:22px;height:22px}
+  .scelta-incasso.scelta-auto .cambio-moneta.p2p-oc-moneta .cambio-svg{width:13px;height:13px}
   .swap-righe{border:1.5px solid var(--line);border-radius:12px;
     padding:2px 12px;margin:10px 0 8px}
   .swap-riga{display:flex;justify-content:space-between;align-items:baseline;
@@ -10092,6 +10102,12 @@
     font:800 13.5px/1 'Nunito',sans-serif;color:var(--sats-text)}
   .cambio-voci{margin:2px 6px 6px;padding:2px 12px 8px;border-radius:12px;background:var(--bg)}
   .cambio-voci[hidden]{display:none}
+  /* (2 nov 2026, swap-auto) le voci del cambio fatto dal server: un
+     <details> nativo, senza l'ascoltatore dell'instradatore */
+  .swap-auto-voci>summary{list-style:none;cursor:pointer}
+  .swap-auto-voci>summary::-webkit-details-marker{display:none}
+  .swap-auto-voci[open]>summary .cambio-dettagli{opacity:.7}
+  .swap-auto-voci .swap-riga{font-size:13px;margin:0 14px}
   .cambio-voci .swap-riga{font-size:13px}
   .cambio-voci .swap-riga:last-of-type{border-bottom:0}
   .cambio-voci-nota{font-size:12px;font-weight:600;color:var(--muted);line-height:1.45;padding-top:4px}
@@ -14434,7 +14450,10 @@ document.getElementById('cartello')?.remove();</script>
            Lightning anche lui. -->
       <div class="acc" id="accLnAddress">
         <button class="acc-h" onclick="toggleAcc('accLnAddress')"><span class="em">⚡</span>Lightning address<span class="fr">▾</span></button>
-        <div class="acc-b"><div id="lnAddrBlocco"></div></div>
+        <div class="acc-b"><div id="lnAddrBlocco"></div>
+          <!-- ₿ (2 nov 2026, swap-auto) «Quando vendi in Lightning, ricevi»:
+               la riempie renderSwapAutoProfilo, vuota a leva spenta -->
+          <div id="swapAutoBlocco"></div></div>
       </div>
 
       <!-- 🔑 IL WALLET DI BARATTOLO (29 ott 2026, cantiere parole-uniche,
@@ -17449,6 +17468,12 @@ function iconeCard(l){
       ? 'Di persona, su appuntamento' : l.servDove === 'online'
       ? 'In videoconferenza, su appuntamento' : 'Su appuntamento'
       }">📅</span>`;
+  /* (2 nov 2026, swap-auto) come preferisce ricevere chi vende: la moneta
+     ₿ del Cambio (quella di SATS Routing) o il fulmine, mai la catena (Andrea) */
+  if (l.incasso)
+    i += `<span class="card-incasso" title="${l.incasso === 'onchain'
+      ? 'Preferisce ricevere on-chain' : 'Preferisce ricevere in Lightning'}">${
+      l.incasso === 'onchain' ? P2P_OC_MONETA : P2P_LN_MONETA}</span>`;
   return i ? `<span class="ico">${i}</span>` : '';
 }
 function mapListing(a){
@@ -17551,6 +17576,9 @@ function mapListing(a){
     sellerNpub:a.venditore_npub||'', sellerNpubOk:!!a.venditore_npub_verificata,
     /* il bollino 🛡️ Staff: il si' lo dice il server (e_staff) */
     sellerStaff:!!a.venditore_staff,
+    /* (2 nov 2026, swap-auto) come preferisce ricevere chi vende:
+       'onchain' | 'ln' | '' — lo dice il server, dalla scelta nel Profilo */
+    incasso:['onchain','ln'].includes(a.venditore_incasso) ? a.venditore_incasso : '',
     negozio:a.venditore_negozio||'',
     /* il francobollo del venditore: nome file, gia' vuoto se la sua
        levetta «Mostra la mia foto» e' spenta (decide il server) */
@@ -19131,6 +19159,168 @@ function scegliIncassoSwap(id, s){
     rileggiCambio().then(mosso => { if (mosso) ridisegnaIncassoSwap(); }).catch(() => {});
   if (s === 'swap' && vecchio) { caricaPreventivoSwap(id, false); return; }
   ridisegnaIncassoSwap();
+}
+/* ---- ₿ LO SWAP AUTOMATICO (2 nov 2026, cantiere swap-auto) ----
+   Chi vende in Lightning sceglie nel Profilo se ricevere ⚡ in Lightning
+   (come sempre) o ₿ on-chain: a ordine confermato apre l'ordine, vede
+   quanto arriva e dove, e preme «Conferma». Il cambio lo fa il SERVER
+   (non il telefono, non servono le 12 parole): qui si sceglie, si guarda
+   e si tocca, e basta. Le monete sono quelle del Cambio (P2P_OC_MONETA,
+   P2P_LN_MONETA), mai la catena (Andrea, 2 nov). */
+const swapAuto = () => (swapLeve && swapLeve.auto) || {};
+const swapAutoAcceso = () => !!swapAuto().attivo;
+let swapAutoDati = {};      // ordine -> risposta di /api/swap/auto/ordine
+let swapAutoInVolo = {};    // ordine -> true mentre si legge o si conferma
+function renderSwapAutoProfilo(){
+  const box = el('swapAutoBlocco');
+  if (!box) return;
+  const a = swapAuto();
+  if (DEMO || !a.attivo) { box.innerHTML = ''; return; }
+  const tasto = (on, cosa, testo) => `<button type="button" role="radio" aria-checked="${on}"
+      class="${on ? 'on' : ''}" onclick="scegliSwapAutoProfilo(${cosa})">${testo}</button>`;
+  const dove = a.indirizzo
+    ? (a.da === 'xpub'
+      ? 'Arrivano al <b>tuo wallet on-chain</b>, a un indirizzo nuovo per ogni vendita.'
+      : `Arrivano a <span class="mono" style="word-break:break-all">${esc(a.indirizzo)}</span>.`)
+    : 'L\'indirizzo lo scrivi quando confermi.';
+  box.innerHTML = `<div class="section-label" style="margin-top:16px">Quando vendi in Lightning, ricevi</div>
+    <div class="scelta-incasso scelta-auto" role="radiogroup" aria-label="Come ricevi quando vendi in Lightning">
+      ${tasto(!a.onchain, 'false', P2P_LN_MONETA + 'Lightning')}${tasto(!!a.onchain, 'true', P2P_OC_MONETA + 'On-chain')}</div>
+    <div style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">${a.onchain
+      ? `Alla conferma dell'acquirente apri l'ordine e premi <b>«Conferma»</b>: Barattolo cambia i sats in bitcoin con ${esc(a.fornitore || 'SATS Routing')}. ${dove}
+         Il costo del cambio lo vedi prima. Sotto i ${fmt(a.minimo || 0)} sats ricevi in Lightning.`
+      : 'Ricevi in Lightning: al Lightning address qui sopra, o con una fattura nell\'ordine.'}</div>`;
+}
+async function scegliSwapAutoProfilo(onchain){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/swap/auto/preferenza`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({onchain: !!onchain})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non salvato');
+    if (swapLeve) swapLeve.auto = d;
+    renderSwapAutoProfilo();
+    toast(d.onchain ? '₿ Dalle prossime vendite ricevi on-chain' : '⚡ Dalle prossime vendite ricevi in Lightning');
+  } catch(e) { toast(e.message || 'Non salvato, riprova'); }
+}
+/* il selettore dell'ordine col cambio del server: lo stesso vestito di
+   quello del telefono (`selettoreIncassoSwap`), ma con onclick suoi —
+   l'ascoltatore delegato dell'instradatore qui non serve */
+function selettoreIncassoAuto(id, scelta){
+  const n = Number(id);
+  const tasto = (s, testo) => `<button type="button" role="radio" aria-checked="${scelta === s}"
+      class="${scelta === s ? 'on' : ''}" onclick="scegliIncassoAuto(${n},'${s}')">${testo}</button>`;
+  return `<div class="scelta-incasso scelta-auto" role="radiogroup" aria-label="Come ricevi i sats">`
+    + tasto('ln', P2P_LN_MONETA + 'Lightning') + tasto('swap', P2P_OC_MONETA + 'On-chain') + `</div>`;
+}
+function scegliIncassoAuto(id, s){
+  haptic();
+  sceltaIncassoSwap[id] = s;
+  if (s === 'swap') caricaSwapAuto(id);
+  ridisegnaIncassoSwap();
+}
+async function caricaSwapAuto(id){
+  if (swapAutoInVolo[id]) return;
+  swapAutoInVolo[id] = true;
+  try {
+    const r = await fetch(`${API_BASE}/swap/auto/ordine/${Number(id)}`,
+      {headers: {'X-Tg-Init-Data': authHdr()}});
+    const d = await r.json().catch(() => ({}));
+    swapAutoDati[id] = r.ok ? d : {errore: d.detail || 'non risponde'};
+  } catch(e) { swapAutoDati[id] = {errore: 'non risponde'}; }
+  swapAutoInVolo[id] = false;
+  ridisegnaIncassoSwap();
+}
+const SWAP_AUTO_NO = {
+  sotto_minimo: n => `Sotto i ${fmt(n)} sats mandarli a un indirizzo costa troppo: incassa in Lightning.`,
+  sopra_tetto: n => `Sopra i ${fmt(n)} sats, per ora, solo Lightning.`,
+  non_risponde: () => 'SATS Routing ora non risponde: riprova fra poco, o incassa in Lightning.',
+  indirizzo: () => 'Scrivi un indirizzo bitcoin valido.',
+  spento: () => 'Ora non si può ricevere on-chain: incassa in Lightning.',
+  fee: () => 'Ora non si può ricevere on-chain: incassa in Lightning.',
+  occupato: () => 'C\'è già un incasso in corso su questo ordine.',
+  tetto_utente: () => 'Per oggi hai già cambiato il massimo: incassa in Lightning o riprova domani.',
+  tetto_giorno: () => 'Per oggi i cambi sono finiti: incassa in Lightning o riprova domani.'};
+function pannelloSwapAuto(o){
+  const id = Number(o.id), d = swapAutoDati[id];
+  if (!d) { caricaSwapAuto(id); return `<div class="hint" style="margin-top:12px">Calcolo quanto ricevi…</div>`; }
+  if (d.errore) return `<div class="hint" style="margin-top:12px">⚠️ ${esc(d.errore)}</div>`;
+  const c = d.corso || {};
+  if (c.ritirato || c.pagamento === 'pagato') {
+    const link = c.txid && d.rete === 'bitcoin'
+      ? `<a class="btn ghost" style="margin-top:8px" href="https://mempool.space/tx/${esc(c.txid)}" target="_blank" rel="noopener">🔎 Guarda la transazione</a>` : '';
+    return `<h4>${P2P_OC_MONETA} I tuoi bitcoin sono partiti</h4>
+      <div class="hint"><b class="net">${fmt(c.ricevi)}<span class="unit">sats</span></b> verso <span class="mono" style="word-break:break-all">${esc(c.indirizzo)}</span>.
+        Arrivano con la prima conferma della rete bitcoin.</div>
+      ${c.txid ? `<div class="hint mono" style="word-break:break-all;font-size:11px">${esc(c.txid)}</div>` : ''}${link}`;
+  }
+  /* un cambio fallito non ha mosso niente: sotto c'e' il preventivo nuovo */
+  if (c.pagamento && c.pagamento !== 'fallito') return `<h4>${P2P_OC_MONETA} Cambio in corso</h4>
+      <div class="hint">Abbiamo pagato il cambio: appena SATS Routing blocca i bitcoin li mandiamo a
+        <span class="mono" style="word-break:break-all">${esc(c.indirizzo)}</span>
+        (<b>${fmt(c.ricevi)} sats</b> circa). Ci vogliono alcuni minuti: ti avvisiamo noi, puoi chiudere.</div>`;
+  const p = d.preventivo || {};
+  const fallito = c.pagamento === 'fallito'
+    ? `<div class="swap-rifiuto" role="status">Il cambio di prima non è andato e non è uscito niente: puoi riprovare.</div>` : '';
+  if (!p.ok) {
+    const f = SWAP_AUTO_NO[p.motivo] || SWAP_AUTO_NO.non_risponde;
+    return `<div class="hint" style="margin-top:12px">${f(p.motivo === 'sopra_tetto' ? p.massimo : p.minimo)}</div>
+      <button class="btn ghost" onclick="scegliIncassoAuto(${id},'ln')">Incassa in Lightning</button>`;
+  }
+  const t = testiSwap();
+  /* i riquadri del cambio (`.cambio-carta`), con le monete di casa al
+     posto delle icone dell'instradatore, che qui puo' non esserci */
+  const lato = (moneta, rete, eti, cifra, classe) => `<div class="cambio-lato${classe ? ' ' + classe : ''}">`
+    + `<span class="cambio-dati"><span class="cambio-eti">${esc(eti)}</span><span class="cambio-pillola">${moneta}<b>${esc(t.reti[rete])}</b></span></span>`
+    + `<span class="cambio-cifra">${fmt(cifra)}<small>sats</small></span></div>`;
+  const dovuto = ((p.righe || []).find(r => r.voce === 'dovuto') || {}).sats || p.dovuto || 0;
+  const costo = (p.righe || []).filter(r => r.sats < 0).reduce((s, r) => s + Math.abs(Number(r.sats) || 0), 0);
+  const voci = (p.righe || []).map(r => `<div class="swap-riga${r.sats < 0 ? ' meno' : ''}">`
+    + `<span>${esc(etichettaVoceSwap(r, t, 'SATS Routing'))}</span><b>${r.sats < 0 ? '−' : ''}${fmt(Math.abs(r.sats))}</b></div>`).join('');
+  return `<div class="swap-prev">${fallito}
+    <div class="cambio-carta" role="group" aria-label="${esc(t.titoloPrev)}">
+      ${lato(P2P_LN_MONETA, 'ln', t.voci.dovuto, dovuto, '')}
+      <div class="cambio-gira"></div>
+      ${lato(P2P_OC_MONETA, 'btc', t.ricevi, p.ricevi, 'arriva')}
+      <details class="swap-auto-voci"><summary class="cambio-costo"><span>${esc(t.costo)} <b>${fmt(costo)} sats</b> · SATS Routing</span>
+        <span class="cambio-dettagli">${esc(t.dettagli)}</span></summary>${voci}</details>
+    </div>
+    <div class="field" style="margin-top:12px"><label>${d.indirizzo && d.da === 'xpub'
+      ? 'Il tuo indirizzo (nuovo, dal tuo wallet on-chain)' : 'Il tuo indirizzo bitcoin'}</label>
+      <input id="swapAutoIndirizzo${id}" class="mono" autocomplete="off" spellcheck="false"
+        placeholder="bc1…" value="${esc(d.indirizzo || '')}"></div>
+    <div class="hint" style="font-size:12px">Il cambio lo fa Barattolo con SATS Routing: tu premi solo «Conferma». Le cifre si ricontrollano quando confermi.</div>
+    <button class="btn orange cambio-vai" type="button" onclick="confermaSwapAuto(${id}, this)">${esc(t.conferma)}</button>
+  </div>`;
+}
+function confermaSwapAuto(id, btn){
+  haptic();
+  const d = swapAutoDati[id] || {};
+  const scritto = String((el('swapAutoIndirizzo' + id) || {}).value || '').trim();
+  if (!scritto) { toast(SWAP_AUTO_NO.indirizzo()); return; }
+  const p = d.preventivo || {};
+  chiediConferma({
+    titolo: 'Ricevi on-chain?',
+    corpo: `Ricevi circa ${fmt(p.ricevi || 0)} sats in bitcoin a:\n${scritto}\n\nControlla l'indirizzo: i bitcoin mandati non tornano indietro.`,
+    etichetta: 'Conferma',
+    poi: async () => {
+      const rip = bottoneInAttesa(btn, 'Faccio il cambio…');
+      try {
+        const r = await fetch(`${API_BASE}/swap/auto/ordine/${id}`, {method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+          /* si manda SEMPRE quello che si vede: se e' la proposta del
+             Profilo il server la riconosce (e ne conta l'indice) */
+          body: JSON.stringify({indirizzo: scritto})});
+        const e = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(e.detail || 'non partito');
+        if (!e.ok) throw new Error((SWAP_AUTO_NO[e.motivo] || SWAP_AUTO_NO.non_risponde)(p.minimo));
+        toast('₿ Cambio partito: ti avvisiamo quando i bitcoin arrivano', 6000);
+      } catch(err) { toast(err.message || 'Non partito, riprova'); }
+      finally { rip(); }
+      delete swapAutoDati[id];
+      caricaSwapAuto(id);
+    }});
 }
 /* LA LETTURA DI UN PREVENTIVO (20 ott 2026, l'instradatore): di un
    ordine, di UN fornitore (vuoto = SATS Routing), con l'impronta delle
@@ -32175,6 +32365,10 @@ function openDetail(id){
       </div>
       ${(p => p ? `<div class="pills">${p}</div>` : '')(
         spedBadge(l) + pilloleModalita(l)
+        /* (2 nov 2026, swap-auto) come preferisce ricevere chi vende */
+        + (l.incasso ? `<span class="pill pill-incasso">${l.incasso === 'onchain'
+            ? P2P_OC_MONETA + 'Preferisce ricevere on-chain'
+            : P2P_LN_MONETA + 'Preferisce ricevere in Lightning'}</span>` : '')
         /* UN SERVIZIO NON HA UNO STOCK DA MOSTRARE (cantiere
            quantita-servizi): l.quantita per lui e' un sentinel
            tecnico, mai un numero da dire al compratore — la sola
@@ -37816,6 +38010,21 @@ function payoutPanel(o){
      (`gesto_venditore`), e allora il campo della fattura serve ADESSO:
      i due fogli «prima della conferma» qui sotto non valgono. */
   const tocca = !!(o.pagamento && o.pagamento.gesto_venditore);
+  /* (2 nov 2026, swap-auto) chi ha scelto nel Profilo di ricevere
+     on-chain: prima della conferma il pannello lo dice, invece di
+     promettere il Lightning address che `_sblocca_sats` saltera'. Sotto
+     il minimo del cambio (o sopra il tetto) resta il Lightning di sempre. */
+  const sa = swapAutoAcceso() ? swapAuto() : {};
+  const autoOnchain = !!sa.onchain && net >= (sa.minimo || 0)
+    && !(sa.massimo > 0 && net > sa.massimo);
+  if (autoOnchain && o.state!=='confirmed' && !tocca) return `
+    <div class="payout">
+      <h4>${P2P_OC_MONETA} Ricevi in bitcoin on-chain</h4>
+      <div class="hint">Hai scelto nel Profilo di ricevere on-chain. Quando l'acquirente conferma, apri questo ordine e premi
+        <b>«Conferma»</b>: Barattolo cambia i tuoi <b class="net">${fmt(net)}<span class="unit">sats</span></b> con SATS Routing
+        e ti manda i bitcoin${sa.indirizzo ? (sa.da === 'xpub' ? ' a un indirizzo nuovo del tuo wallet' : ` a <span class="mono" style="word-break:break-all">${esc(sa.indirizzo)}</span>`) : ''}.
+        Il costo del cambio lo vedi prima di confermare.</div>
+    </div>`;
 
   /* Incasso automatico già attivo */
   if (myLnAddress && o.state!=='confirmed' && !tocca) return `
@@ -37877,10 +38086,21 @@ function payoutPanel(o){
   /* (20 ott 2026, tappa 3) lo swap si fa DAL TELEFONO: la scelta compare
      quando il suo file e' arrivato (`swapTelefonoPronto`), e se su
      quest'ordine c'e' gia' uno swap la scelta di serie e' lui */
-  const swapQui = swapAcceso() && swapTelefonoPronto() && o.state === 'confirmed';
+  /* (2 nov 2026, swap-auto) col cambio fatto dal SERVER acceso, la
+     scelta on-chain dell'ordine e' sua: niente parole, niente telefono.
+     Uno swap gia' nato sul telefono per quest'ordine resta del telefono. */
+  const autoQui = swapAutoAcceso() && o.state === 'confirmed'
+    && !(swapTelefonoPronto() && swapDiOrdine(o.id));
+  if (autoQui) {
+    const sceltaAuto = sceltaIncassoSwap[Number(o.id)] || (autoOnchain ? 'swap' : 'ln');
+    if (sceltaAuto === 'swap') return `
+    <div class="payout${tocca ? ' pag-evidenza' : ''}" id="payoutIncasso">${selettoreIncassoAuto(o.id, 'swap')}${pannelloSwapAuto(o)}</div>`;
+  }
+  const swapQui = !autoQui && swapAcceso() && swapTelefonoPronto() && o.state === 'confirmed';
   const sceltaSwap = !swapQui ? 'ln'
     : (sceltaIncassoSwap[Number(o.id)] || (swapDiOrdine(o.id) ? 'swap' : 'ln'));
-  const selettoreSwap = swapQui ? selettoreIncassoSwap(o.id, sceltaSwap) : '';
+  const selettoreSwap = autoQui ? selettoreIncassoAuto(o.id, 'ln')
+    : swapQui ? selettoreIncassoSwap(o.id, sceltaSwap) : '';
   if (sceltaSwap === 'swap') return `
     <div class="payout" id="payoutIncasso">${selettoreSwap}${pannelloSwapTelefono(o)}</div>`;
   return `
@@ -37971,6 +38191,7 @@ function renderLnAddress(){
   aggiornaCassettoWallet();
   renderIncassoOnchainProfilo();
   renderWalletBarattolo();
+  renderSwapAutoProfilo();
   if (DEMO) return;
   if (myLnAddress && !lnAddrModifica) {
     box.innerHTML = `
