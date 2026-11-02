@@ -8856,6 +8856,12 @@ def init_db():
                     # 'ln'. Conta solo per chi l'on-chain lo vede
                     # (`p2p_onchain_ammesso`): per gli altri vale tutte.
                     "avvisi_nuovi_rete TEXT DEFAULT ''",
+                    # LA VALUTA DEGLI AVVISI (2 nov 2026, Andrea: «nelle
+                    # notifiche dare la possibilita' di scegliere usdt»):
+                    # '' = tutte, 'EUR', 'USDT'. Conta solo per chi gli
+                    # USDT li vede (`p2p_usdt_ammesso`): per gli altri
+                    # vale tutte, cioe' l'euro.
+                    "avvisi_nuovi_valuta TEXT DEFAULT ''",
                     # GLI AVVISI DEL MERCATINO (9 ott 2026, richiesta di
                     # Andrea): «🆕 Avvisami dei nuovi annunci», 0 = SPENTO
                     # di serie, con le categorie volute coi pipe ai bordi
@@ -50543,14 +50549,27 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
         r = con.execute("SELECT avvisi_nuovi_rete FROM utenti WHERE tg_id=?",
                         (user["id"],)).fetchone()
         rete = str(r[0] or "") if r else ""
+    # LA VALUTA (2 nov 2026): '' = tutte, 'EUR', 'USDT'. Un telefono di
+    # ieri non la manda, e allora resta quella scritta
+    if "valuta" in d:
+        valuta = str(d.get("valuta") or "").strip().upper()
+        if valuta not in ("",) + VALUTE_AVVISI_NUOVI_P2P:
+            con.close()
+            raise HTTPException(400, "Valuta sconosciuta: tutte, euro o USDT")
+    else:
+        r = con.execute("SELECT avvisi_nuovi_valuta FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        valuta = str(r[0] or "") if r else ""
     con.execute("UPDATE utenti SET avvisi_nuovi_p2p=?, avvisi_nuovi_tipi=?, "
-                "avvisi_nuovi_soglia=?, avvisi_nuovi_rete=? WHERE tg_id=?",
-                (attivo, "|" + "|".join(tipi) + "|", soglia, rete, user["id"]))
+                "avvisi_nuovi_soglia=?, avvisi_nuovi_rete=?, avvisi_nuovi_valuta=? "
+                "WHERE tg_id=?",
+                (attivo, "|" + "|".join(tipi) + "|", soglia, rete, valuta, user["id"]))
     con.commit()
     con.close()
     return {"ok": True, "avvisi_nuovi_p2p": _pref_avvisi_nuovi_p2p(
         {"avvisi_nuovi_p2p": attivo, "avvisi_nuovi_tipi": "|" + "|".join(tipi) + "|",
-         "avvisi_nuovi_soglia": soglia, "avvisi_nuovi_rete": rete})}
+         "avvisi_nuovi_soglia": soglia, "avvisi_nuovi_rete": rete,
+         "avvisi_nuovi_valuta": valuta})}
 
 
 # I MOTIVI DELLO SCONOSCIUTO (12 ott 2026, chi-e-l-altro): quando
@@ -63194,6 +63213,7 @@ NOMI_TIPI_AVVISI_NUOVI_P2P = {"vendita": "vendita BTC", "acquisto": "acquisto BT
                               "barattozon": "Barattozon"}
 SOGLIE_AVVISI_NUOVI_P2P = ("0", "2", "5")   # le tre chip, gemelle di P2P_AVVISI_SOGLIE nel client
 RETI_AVVISI_NUOVI_P2P = ("onchain", "ln")   # '' = tutte; gemelle di P2P_AVVISI_RETI nel client
+VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT")   # '' = tutte; gemelle di P2P_AVVISI_VALUTE nel client
 TIMBRO_NUOVI_P2P = "p2p_nuovi_ordini_visto"  # il segnalibro: il created_at piu' nuovo gia' guardato
 _P2P_NUOVI = {"noti": None}   # gli id che la fotografia conosceva al giro prima (None = mai guardata)
 
@@ -63214,7 +63234,8 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     vale SPENTO coi tre tipi e «tutti»: lo spento di serie e' una regola,
     non un default del database."""
     if not riga:
-        return {"attivo": False, "tipi": list(TIPI_AVVISI_NUOVI_P2P), "soglia": "", "rete": ""}
+        return {"attivo": False, "tipi": list(TIPI_AVVISI_NUOVI_P2P), "soglia": "", "rete": "",
+                "valuta": ""}
     try:
         attivo = bool(int(_campo_riga(riga, "avvisi_nuovi_p2p", 0) or 0))
     except (TypeError, ValueError):
@@ -63228,7 +63249,10 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     rete = str(_campo_riga(riga, "avvisi_nuovi_rete", "") or "").strip()
     if rete not in RETI_AVVISI_NUOVI_P2P:
         rete = ""
-    return {"attivo": attivo, "tipi": tipi, "soglia": soglia, "rete": rete}
+    valuta = str(_campo_riga(riga, "avvisi_nuovi_valuta", "") or "").strip().upper()
+    if valuta not in VALUTE_AVVISI_NUOVI_P2P:
+        valuta = ""
+    return {"attivo": attivo, "tipi": tipi, "soglia": soglia, "rete": rete, "valuta": valuta}
 
 
 def _tipo_nuovo_p2p(lato: str, metodi) -> str:
@@ -63290,15 +63314,20 @@ def _convenienza_nuovo_p2p(lato: str, premio, sats, euro: float, cambio: float):
     return p if lato == "buy" else -p
 
 
-def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv, rete: str = "ln") -> bool:
+def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv, rete: str = "ln",
+                            valuta: str = "EUR") -> bool:
     """PURA: queste preferenze vogliono quest'ordine? Acceso, del tipo
     giusto, della RETE giusta (30 ott 2026: 'onchain' o 'ln', '' = tutte;
-    chi chiama la spegne a chi l'on-chain non lo vede) e — se la soglia
-    c'e' — con una convenienza nota almeno pari alla soglia. Con
-    «tutti» ('') passa anche a convenienza ignota."""
+    chi chiama la spegne a chi l'on-chain non lo vede), della VALUTA
+    giusta (2 nov 2026: 'EUR' o 'USDT', '' = tutte; chi chiama la spegne a
+    chi gli USDT non li vede) e — se la soglia c'e' — con una convenienza
+    nota almeno pari alla soglia. Con «tutti» ('') passa anche a
+    convenienza ignota."""
     if not pref.get("attivo") or tipo not in (pref.get("tipi") or []):
         return False
     if pref.get("rete") and pref.get("rete") != rete:
+        return False
+    if pref.get("valuta") and pref.get("valuta") != valuta:
         return False
     soglia = pref.get("soglia") or ""
     if soglia == "":
@@ -63399,6 +63428,12 @@ def _persone_avvisi_nuovi_p2p(con):
     try:
         return con.execute(
             "SELECT tg_id, avvisi_nuovi_p2p, avvisi_nuovi_tipi, avvisi_nuovi_soglia, "
+            "avvisi_nuovi_rete, avvisi_nuovi_valuta FROM utenti WHERE avvisi_nuovi_p2p=1").fetchall()
+    except sqlite3.OperationalError:
+        pass
+    try:
+        return con.execute(
+            "SELECT tg_id, avvisi_nuovi_p2p, avvisi_nuovi_tipi, avvisi_nuovi_soglia, "
             "avvisi_nuovi_rete FROM utenti WHERE avvisi_nuovi_p2p=1").fetchall()
     except sqlite3.OperationalError:
         return con.execute(
@@ -63414,6 +63449,10 @@ def _pref_rete_vista_p2p(riga) -> dict:
     pref = _pref_avvisi_nuovi_p2p(riga)
     if pref["rete"] and not p2p_onchain_ammesso(int(riga["tg_id"])):
         pref["rete"] = ""
+    # ...e la VALUTA (2 nov 2026) conta solo se gli USDT lei li vede: chi
+    # aveva scelto «solo USDT» e li ha persi torna a sentire l'euro
+    if pref["valuta"] and not p2p_usdt_ammesso(int(riga["tg_id"])):
+        pref["valuta"] = ""
     return pref
 
 
@@ -63460,7 +63499,8 @@ def _accoda_onchain_nuovo_p2p(o, cambio: float, adesso: int) -> int:
                 continue
             if usdt and not p2p_onchain_usdt_ammesso(tg):
                 continue
-            if not _passa_avviso_nuovo_p2p(_pref_avvisi_nuovi_p2p(p), tipo, conv, "onchain"):
+            if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "onchain",
+                                           "USDT" if usdt else "EUR"):
                 continue
             if not _avvisi_p2p_accesi(con, tg):
                 continue
@@ -63534,7 +63574,7 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
             tg = int(p["tg_id"])
             if autore and tg == autore:
                 continue                      # mai per i suoi
-            if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln"):
+            if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat):
                 continue
             if not _p2p_per(tg)["attivo"] or not _avvisi_p2p_accesi(con, tg):
                 continue

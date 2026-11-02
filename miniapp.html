@@ -40145,6 +40145,10 @@ const P2P_AVVISI_SOGLIE = [['0', 'A prezzo di mercato o meglio'],
    RETI_AVVISI_NUOVI_P2P nel server; la sezione la vede solo chi
    l'on-chain lo vede (`myP2POnchain`) */
 const P2P_AVVISI_RETI = [['', 'Tutte'], ['onchain', 'Solo on-chain'], ['ln', 'Solo Lightning']];
+/* LA VALUTA DEGLI AVVISI (2 nov 2026, Andrea: «nelle notifiche dare la
+   possibilita' di scegliere usdt»): una scelta sola, e la sezione solo a
+   chi gli USDT li vede (`usdtVistoP2P`). Gemelle di VALUTE_AVVISI_NUOVI_P2P */
+const P2P_AVVISI_VALUTE = [['', 'Tutte'], ['EUR', 'Solo euro'], ['USDT', 'Solo USDT']];
 /* PURA: le preferenze come arrivano dal server, rimesse in forma — i
    tipi nell'ordine delle chip (vuoto = tutti), la soglia solo se e' una
    delle tre, spento se manca tutto (un server di ieri) */
@@ -40153,9 +40157,11 @@ function normalizzaAvvisiNuoviP2P(p){
   const tipi = (p && Array.isArray(p.tipi)) ? tutti.filter(t => p.tipi.indexOf(t) >= 0) : [];
   const soglia = String((p && p.soglia != null) ? p.soglia : '');
   const rete = String((p && p.rete) || '');
+  const valuta = String((p && p.valuta) || '').toUpperCase();
   return {attivo: !!(p && p.attivo), tipi: tipi.length ? tipi : tutti,
           soglia: P2P_AVVISI_SOGLIE.some(s => s[0] === soglia) ? soglia : '',
-          rete: P2P_AVVISI_RETI.some(r => r[0] === rete) ? rete : ''};
+          rete: P2P_AVVISI_RETI.some(r => r[0] === rete) ? rete : '',
+          valuta: P2P_AVVISI_VALUTE.some(v => v[0] === valuta) ? valuta : ''};
 }
 let myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(null);   // spento di serie
 function avvisiNuoviP2PInCasa(){
@@ -40209,6 +40215,12 @@ function contenutoAvvisiNuoviP2P(){
         ? '<div class="section-label">Rete</div>'
           + '<div class="p2p-metodi">' + P2P_AVVISI_RETI.map(r =>
               pill(r[1], p.rete === r[0], "scegliReteAvvisiNuoviP2P('" + r[0] + "')")).join('')
+          + '</div>'
+        : '')
+    + (typeof usdtVistoP2P === 'function' && usdtVistoP2P()
+        ? '<div class="section-label">Valuta</div>'
+          + '<div class="p2p-metodi">' + P2P_AVVISI_VALUTE.map(v =>
+              pill(v[1], p.valuta === v[0], "scegliValutaAvvisiNuoviP2P('" + v[0] + "')")).join('')
           + '</div>'
         : '')
     + '<div class="section-label">Tipo di ordini</div>'
@@ -40272,7 +40284,7 @@ async function setAvvisiNuoviP2P(patch){
     const r = await fetch(`${API_BASE}/me/avvisi-nuovi-p2p`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
        body: JSON.stringify({attivo: !!voluto.attivo, tipi: voluto.tipi, soglia: voluto.soglia,
-                             rete: voluto.rete || ''})});
+                             rete: voluto.rete || '', valuta: voluto.valuta || ''})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
     myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(d.avvisi_nuovi_p2p);
@@ -40295,6 +40307,10 @@ function scegliTipoAvvisiNuoviP2P(t){
 function scegliReteAvvisiNuoviP2P(r){
   if (!myAvvisiNuoviP2P.attivo) return;
   setAvvisiNuoviP2P({rete: r === 'onchain' || r === 'ln' ? r : ''});
+}
+function scegliValutaAvvisiNuoviP2P(v){
+  if (!myAvvisiNuoviP2P.attivo) return;
+  setAvvisiNuoviP2P({valuta: v === 'EUR' || v === 'USDT' ? v : ''});
 }
 function scegliSogliaAvvisiNuoviP2P(s){
   if (!myAvvisiNuoviP2P.attivo) return;

@@ -115577,7 +115577,8 @@ def prove_avvisi_nuovi_ordini():
     # --- 2) I GIUDICI PURI --------------------------------------------------
     amb = {"html": html, "URL_PUBBLICO": "https://barattolo.store", "time": time}
     gemelli_link_telegram(amb)      # a leva spenta: il link di sempre
-    for riga in ("TIPI_AVVISI_NUOVI_P2P = ", "SOGLIE_AVVISI_NUOVI_P2P = ", "RETI_AVVISI_NUOVI_P2P = "):
+    for riga in ("TIPI_AVVISI_NUOVI_P2P = ", "SOGLIE_AVVISI_NUOVI_P2P = ", "RETI_AVVISI_NUOVI_P2P = ",
+                 "VALUTE_AVVISI_NUOVI_P2P = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("   #")[0], amb)
     i = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
@@ -115590,14 +115591,14 @@ def prove_avvisi_nuovi_ordini():
         exec(_senza_prosa(pezzo(f)), amb)
     pref = amb["_pref_avvisi_nuovi_p2p"]
     T3 = ["vendita", "acquisto", "barattozon"]
-    SPENTO = {"attivo": False, "tipi": T3, "soglia": "", "rete": ""}
+    SPENTO = {"attivo": False, "tipi": T3, "soglia": "", "rete": "", "valuta": ""}
     prova("SPENTO DI SERIE: riga assente, riga di ieri senza le colonne, riga coi default",
           [SPENTO, SPENTO, SPENTO],
           [pref(None), pref({"tg_id": 1}),
            pref({"avvisi_nuovi_p2p": 0, "avvisi_nuovi_tipi": "", "avvisi_nuovi_soglia": ""})])
     prova("le preferenze scritte si rileggono: tipi nell'ordine delle chip, soglia solo se e' una delle tre",
-          [{"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "2", "rete": ""},
-           {"attivo": True, "tipi": T3, "soglia": "", "rete": ""}],
+          [{"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "2", "rete": "", "valuta": ""},
+           {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": ""}],
           [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_tipi": "|barattozon|vendita|", "avvisi_nuovi_soglia": "2"}),
            pref({"avvisi_nuovi_p2p": "1", "avvisi_nuovi_tipi": "|x|", "avvisi_nuovi_soglia": "7"})])
     # LA RETE (30 ott 2026, Andrea: «ricevere notifiche solo per onchain,
@@ -115606,6 +115607,12 @@ def prove_avvisi_nuovi_ordini():
           ["onchain", "ln", "", ""],
           [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_rete": r})["rete"]
            for r in ("onchain", "ln", "tutte", None)])
+    # LA VALUTA (2 nov 2026, Andrea: «nelle notifiche dare la possibilita'
+    # di scegliere usdt»)
+    prova("...la valuta si rilegge se e' euro o USDT (anche scritta piccola), sennò tutte",
+          ["EUR", "USDT", "USDT", "", ""],
+          [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_valuta": v})["valuta"]
+           for v in ("EUR", "USDT", "usdt", "BTC", None)])
     tipo = amb["_tipo_nuovo_p2p"]
     prova("il tipo: sell = vendita, buy = acquisto, il tabacchino = Barattozon qualunque sia il lato",
           ["vendita", "acquisto", "barattozon", "barattozon", ""],
@@ -115633,6 +115640,15 @@ def prove_avvisi_nuovi_ordini():
            passa(PR("onchain"), "vendita", None, "onchain"), passa(PR("onchain"), "vendita", None, "ln"),
            passa(PR("onchain"), "vendita", None), passa(PR("ln"), "vendita", None),
            passa(PR("ln"), "vendita", None, "ln"), passa(PR("ln"), "vendita", None, "onchain")])
+    PV = lambda v: {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": v}
+    prova("LA VALUTA: «tutte» passa euro e USDT, «solo euro» solo l'euro, «solo USDT» "
+          "solo l'USDT; chi non la dice e' euro",
+          [True, True, True, False, True, False, True, False],
+          [passa(PV(""), "vendita", None, "ln", "EUR"), passa(PV(""), "vendita", None, "ln", "USDT"),
+           passa(PV("EUR"), "vendita", None, "ln", "EUR"), passa(PV("EUR"), "vendita", None, "ln", "USDT"),
+           passa(PV("EUR"), "vendita", None), passa(PV("USDT"), "vendita", None),
+           passa(PV("USDT"), "vendita", None, "onchain", "USDT"),
+           passa(PV("USDT"), "acquisto", None, "ln", "EUR")])
     prova("spento non passa niente; acceso passa il tipo scelto e non gli altri",
           [False, True, False],
           [passa(P(False, ["vendita"], ""), "vendita", 9), passa(P(True, ["vendita"], ""), "vendita", None),
@@ -115914,6 +115930,7 @@ def prove_avvisi_nuovi_ordini():
         + pezzo_js(m, "function scegliTipoAvvisiNuoviP2P(t){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function scegliSogliaAvvisiNuoviP2P(s){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function scegliReteAvvisiNuoviP2P(r){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function scegliValutaAvvisiNuoviP2P(v){", "\n}\n") + "\n}\n"
         + r"""
 const out = {};
 const attive = h => (h.match(/class="tema-pill active" aria-pressed="true" onclick="([^"]+)"/g) || [])
@@ -115961,6 +115978,17 @@ out.rete = [senzaOc.indexOf('>Rete<') < 0, conOc.indexOf('<div class="section-la
   attive(conOc).filter(a => /Rete/.test(a)), INVII.slice(),
   normalizzaAvvisiNuoviP2P({rete: 'tutte'}).rete, normalizzaAvvisiNuoviP2P({rete: 'ln'}).rete];
 myP2POnchain = false;
+// LA VALUTA (2 nov 2026): la sezione solo a chi gli USDT li vede, una
+// scelta sola, e il gesto manda la valuta al server
+myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, soglia: '', valuta: 'USDT'});
+const senzaUsdt = contenutoAvvisiNuoviP2P();
+globalThis.usdtVistoP2P = () => true;
+const conUsdt = contenutoAvvisiNuoviP2P();
+INVII = []; scegliValutaAvvisiNuoviP2P('EUR'); scegliValutaAvvisiNuoviP2P('BTC');
+out.valuta = [senzaUsdt.indexOf('>Valuta<') < 0, conUsdt.indexOf('<div class="section-label">Valuta</div>') >= 0,
+  attive(conUsdt).filter(a => /Valuta/.test(a)), INVII.slice(),
+  normalizzaAvvisiNuoviP2P({valuta: 'btc'}).valuta, normalizzaAvvisiNuoviP2P({valuta: 'usdt'}).valuta];
+delete globalThis.usdtVistoP2P;
 p2pLeve.avvisiNuovi = false;
 out.fuoriCasa = [campanellaP2P(), rigaAvvisiNuoviP2P()];
 p2pLeve.avvisiNuovi = true; DEMO = true;
@@ -116008,17 +116036,37 @@ console.log(JSON.stringify(out));
           "aria-disabled, l'interruttore no", [5, 5, True, True], out["spentoChip"])
     prova("...e un gesto che arrivasse lo stesso non chiama il server", 0, out["inviiSpento"])
     prova("il normalizzatore: tipi nell'ordine delle chip, soglia fuori dalle tre = «tutti»",
-          {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "", "rete": ""}, out["normalizza"])
+          {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "", "rete": "", "valuta": ""},
+          out["normalizza"])
     prova("LA RETE: la sezione solo a chi l'on-chain lo vede, accesa la scelta salvata, il "
           "gesto manda la rete (una sconosciuta vale «tutte»), e il normalizzatore tiene le due",
           [True, True, ["scegliReteAvvisiNuoviP2P('onchain')"], [{"rete": "ln"}, {"rete": ""}], "", "ln"],
           out["rete"])
     prova("...e il gesto la porta al server, coi nomi del server", True,
-          "rete: voluto.rete || ''})});" in m
+          "rete: voluto.rete || '', valuta: voluto.valuta || ''})});" in m
           and re.findall(r"\['(\w*)', '[^']+'\]", m[m.index("const P2P_AVVISI_RETI = ["):
                                                  m.index("];", m.index("const P2P_AVVISI_RETI = ["))])
           == ["", "onchain", "ln"]
           and 'RETI_AVVISI_NUOVI_P2P = ("onchain", "ln")' in src)
+    prova("LA VALUTA: la sezione solo a chi gli USDT li vede, accesa la scelta salvata, il "
+          "gesto manda la valuta (una sconosciuta vale «tutte»), e il normalizzatore tiene le due",
+          [True, True, ["scegliValutaAvvisiNuoviP2P('USDT')"], [{"valuta": "EUR"}, {"valuta": ""}],
+           "", "USDT"],
+          out["valuta"])
+    prova("...e il gesto la porta al server, coi nomi del server, che la salva e la rilegge", True,
+          "valuta: voluto.valuta || ''})});" in m
+          and re.findall(r"\['(\w*)', '[^']+'\]", m[m.index("const P2P_AVVISI_VALUTE = ["):
+                                                 m.index("];", m.index("const P2P_AVVISI_VALUTE = ["))])
+          == ["", "EUR", "USDT"]
+          and 'VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT")' in src
+          and '"avvisi_nuovi_valuta TEXT DEFAULT \'\'",' in src
+          and "avvisi_nuovi_rete=?, avvisi_nuovi_valuta=? " in src)
+    prova("...e i due giri la passano al giudice: la valuta dell'ordine Lightning, "
+          "USDT o EUR per l'on-chain; e a chi gli USDT non li vede la scelta vale «tutte»",
+          (True, True, True),
+          ('_passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat)' in src,
+           '"USDT" if usdt else "EUR"):' in pezzo("_accoda_onchain_nuovo_p2p"),
+           'if pref["valuta"] and not p2p_usdt_ammesso(int(riga["tg_id"])):' in pezzo("_pref_rete_vista_p2p")))
     prova("a leva globale spenta, in demo e da anonimi: niente campana e niente riga",
           [["", ""], ["", ""], ["", ""]], [out["fuoriCasa"], out["demo"], out["anonimo"]])
 
