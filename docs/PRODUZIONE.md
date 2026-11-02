@@ -1145,6 +1145,15 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   primo giro NON si cura con `--impara`: o e' vero, o la ronda legge
   male l'`iptables -S` vero (provata solo su un banco finto) — si
   guarda prima. Rollback: il `.prima-22set` al suo posto.
+  SE SUONA «DOCKER-USER: manca il DROP di wg0» (2 nov 2026, dopo un
+  riavvio del nodo): la riga non e' entrata perche' il tunnel e' salito
+  prima di Docker. Si rimette a mano, identica al PostUp, senza
+  riavviare niente (il ponte passa dal socat sull'host, cioe' da
+  INPUT, e non si taglia): copia `sudo sh -c 'iptables-save >
+  /root/iptables-prima-docker-user-<data>.txt'`, poi `sudo iptables -w
+  -I DOCKER-USER 1 -i wg0 -j DROP`, poi il drop-in
+  `wg-quick-dopo-docker.conf` (voce «IL PONTE VIA WIREGUARD», passo 4)
+  se manca, e la ronda a mano deve dire `ponte wg ok`.
 - LA RONDA DEL NODO OGNI ORA, E I PAGAMENTI CHE SI RICONOSCONO DA SOLI
   (28 set 2026). Quattro file in `deploy/nodo/`, copie di quel che
   gira sul nodo: `ronda.sh` (in `~/nodo`, la chiama il timer),
@@ -2375,7 +2384,7 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `scp -i $env:USERPROFILE\.ssh\lnvps "$env:TEMP\ponte.tar" debian@vm-1937.lnvps.cloud:/tmp/`
   Poi SUL NODO: `tar -xf /tmp/ponte.tar -C /tmp && sha256sum /tmp/deploy/ponte/*`
   e SUL VPS: `sha256sum /srv/barattolo/deploy/ponte/*`
-  — le quattro impronte devono essere IDENTICHE sulle due macchine. Se
+  — le cinque impronte devono essere IDENTICHE sulle due macchine. Se
   una differisce, il file è arrivato storto: non si va avanti.
   PASSO 4 — SUL NODO, il tunnel e il socat:
   `sudo install -m 600 /tmp/deploy/ponte/wg0-nodo.conf /etc/wireguard/wg0.conf`
@@ -2383,12 +2392,20 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   — al posto di `LA_PUBBLICA_DEL_VPS` i 44 caratteri del passo 2.
   `sudo grep -c INCOLLA_QUI /etc/wireguard/wg0.conf`
   — deve dire `0`.
+  `sudo install -D -m 644 /tmp/deploy/ponte/wg-quick-dopo-docker.conf /etc/systemd/system/wg-quick@wg0.service.d/dopo-docker.conf`
+  `sudo systemctl daemon-reload`
+  `systemctl show -p After wg-quick@wg0 | grep -o docker.service`
+  — deve stampare `docker.service`: il tunnel parte SEMPRE dopo Docker,
+  sennò al riavvio la riga in DOCKER-USER non entra in silenzio, e la
+  ronda lo vede solo al giro lungo del giorno dopo (successo il 1 nov
+  2026: Cantieri, «Il tunnel del ponte parte dopo Docker»).
   `sudo systemctl enable --now wg-quick@wg0`
   `sudo iptables -S WG-PONTE`
   — sei righe: la catena, un ACCEPT per `10.77.0.2` sulla 18080, due
   DROP, l'ACCEPT della 51820 per `46.62.162.103`, il suo DROP.
   `sudo iptables -S INPUT | head -2` — la prima regola è `-j WG-PONTE`.
   `sudo iptables -S FORWARD | head -3` — in cima i due DROP di `wg0`.
+  `sudo iptables -S DOCKER-USER` — c'è `-A DOCKER-USER -i wg0 -j DROP`.
   `echo 'LND_REST=172.28.1.N:8080' | sudo tee /etc/default/lnd-rest-wg`
   — con l'IP vero del passo 0.
   `sudo install -m 644 /tmp/deploy/ponte/lnd-rest-wg.service /etc/systemd/system/`

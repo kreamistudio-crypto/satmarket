@@ -54326,6 +54326,19 @@ def prove_guardiano_ponte():
           "-I FORWARD 1 -i %i -j DROP" in regole
           and "-I FORWARD 1 -o %i -j DROP" in regole
           and "-I DOCKER-USER 1 -i %i -j DROP" in regole)
+    # IL TUNNEL PARTE DOPO DOCKER (2 nov 2026): la riga in DOCKER-USER
+    # ha il suo `|| true` per le macchine senza Docker, quindi se il
+    # tunnel sale PRIMA di Docker non entra e nessuno se ne accorge -
+    # successo al riavvio del 1 nov. L'ordine lo tiene un drop-in: che
+    # dica After= (l'ordine) e NON Requires= (senza Docker il tunnel
+    # deve salire lo stesso), e che la procedura lo installi.
+    dopo = _righe_vive("wg-quick-dopo-docker.conf")
+    prova("il tunnel del nodo parte DOPO Docker, e basta",
+          ["[Unit]", "After=docker.service"], dopo)
+    _prod = open("docs/PRODUZIONE.md", encoding="utf-8").read()
+    prova("...e la procedura del ponte installa il drop-in al suo posto",
+          True, "/tmp/deploy/ponte/wg-quick-dopo-docker.conf /etc/systemd/"
+          "system/wg-quick@wg0.service.d/dopo-docker.conf" in _prod)
     prova("la catena sta in cima a INPUT", True,
           "-I INPUT 1 -j WG-PONTE" in regole)
     prova("una peer sola per capo, di un indirizzo solo", (1, 1, True, True),
