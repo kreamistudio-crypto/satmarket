@@ -62860,12 +62860,18 @@ def _testo_garanzia_mod_p2p(livello: int, ore: int, d: dict, per: int = 0) -> st
     corto = html.escape(str(d.get("ordine") or "")[:8])
     sats = int(d.get("sats") or 0)
     euro = str(d.get("euro") or "")
+    # IN USDT (2 nov 2026, usdt-moderatori): la cifra del libro porta il
+    # segno dell'euro, e qui si dice quello vero
+    if d.get("usdt"):
+        euro = euro.replace(" €", " USDT")
     importo = (f"{_fmt_sats(sats)} sats" if sats > 0 else "")
     if euro:
         importo += (" per " if importo else "") + euro
     if importo and d.get("metodi"):
         importo += f" via {d['metodi']}"
     gesto = GESTO_PAGATO_P2P.get(d.get("modo") or "", GESTO_PAGATO_P2P[""])
+    if d.get("usdt"):
+        gesto = "Ho inviato gli USDT"
     fiat = int(d.get("fiat_il") or 0)
     disp = int(d.get("disputa_il") or 0)
     if livello >= 88:
@@ -63028,6 +63034,9 @@ def _garanzie_lunghe_p2p(con, adesso: int, bottoni: dict = None) -> list:
                      "metodi": dati["metodi"], "modo": modo,
                      "fiat_il": fiat_il, "disputa_il": disputa_il}
                 d["parti_mod"] = _parti_mod_p2p(d)
+                # in USDT (2 nov 2026, usdt-moderatori): cifra e gesto
+                _usdt = globals().get("p2p_usdt_ordine")
+                d["usdt"] = bool(_usdt and _usdt(con, ordine))
             fuori.append((mod, _testo_garanzia_mod_p2p(livello, ore, d, mod),
                           f"⏰ Garanzia lunga P2P: {corto} {livello}h → {mod} "
                           f"(moderatore; {stato})"))
@@ -66350,6 +66359,10 @@ def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
     chi = {"compra": "chi compra", "vende": "chi vende"}.get(d.get("aperta_da"), "")
     sats = int(d.get("sats") or 0)
     euro = str(d.get("euro") or "")
+    # IN USDT (2 nov 2026, usdt-moderatori): la cifra del libro porta il
+    # segno dell'euro, e qui si dice quello vero
+    if d.get("usdt"):
+        euro = euro.replace(" €", " USDT")
     importo = (f"{_fmt_sats(sats)} sats" if sats > 0 else "")
     if euro:
         importo += (" per " if importo else "") + euro
@@ -66366,6 +66379,17 @@ def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
     if d.get("riaperta"):
         righe.append("• Era già stata chiusa una volta: chi l'aveva presa deve "
                      "riprenderla.")
+    # ...E COSA GUARDARE (2 nov 2026, usdt-moderatori, sì di Andrea): gli
+    # USDT non passano dal nodo, e la prova e' la transazione sulla rete
+    # scritta nel metodo. Il contratto conta: un token falso puo'
+    # chiamarsi «USDT» anche lui
+    if d.get("usdt"):
+        righe.append("• 💵 In USDT: l'id della transazione sta nella chat dello "
+                     "scambio. Aprilo sull'explorer della rete (Tron: tronscan.org, "
+                     "Ethereum: etherscan.io) e controlla che il token sia l'USDT "
+                     "vero, che arrivi all'indirizzo dato da chi vende, l'importo "
+                     "e che sia confermata. La guida intera è nell'app, nella "
+                     "card della disputa.")
     if d.get("automatica"):
         righe += ["", "⏳ <b>L'ha aperta il coordinatore da solo:</b> chi compra "
                   "ha segnato il pagamento, i sats non sono stati liberati e la "
@@ -66514,6 +66538,11 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
              "automatica": ev["dettaglio"] == "escrow-deadline",
              "riaperta": bool(riaperta)}
         d["parti_mod"] = _parti_mod_p2p(d)
+        # in USDT (2 nov 2026, usdt-moderatori): il `globals()` e' quello
+        # di `_scarica_attese_p2p`, i banchi che ritagliano questa
+        # funzione il giudice non lo portano
+        _usdt = globals().get("p2p_usdt_ordine")
+        d["usdt"] = bool(_usdt and _usdt(con, ordine))
         # la riapertura ha il SUO timbro: non e' il doppione della prima
         timbro = f"disputa_mod_r{riaperta}" if riaperta else "disputa_mod"
         for mod in _avvisati_mod_p2p():
@@ -66731,6 +66760,13 @@ def _riga_disputa_p2p(con, r, io: int) -> dict:
         "presenze": _confronto_giro_p2p(con, ordine, int(r["giro"] or 0)),
         "incontro": _incontro_p2p(con, ordine, int(r["giro"] or 0)),
     }
+    # IN USDT (2 nov 2026, usdt-moderatori, sì di Andrea): la cifra col
+    # suo segno, il terzo passo «USDT inviati» e `usdt`, che accende la
+    # guida dell'explorer nella card (`guidaUsdtModP2P`)
+    _usdt = globals().get("p2p_usdt_ordine")
+    if _usdt and _usdt(con, ordine):
+        fuori.update(usdt=True, euro=fuori["euro"].replace(" €", " USDT"),
+                     passo_euro="usdt")
     if mia and not parte:
         s = con.execute("SELECT chiave_compratore, chiave_venditore FROM p2p_scambi "
                         "WHERE ordine=?", (ordine,)).fetchone()

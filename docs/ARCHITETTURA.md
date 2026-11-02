@@ -35072,7 +35072,26 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   garanzia lunga; l'ordine e' in USDT per `p2p_usdt_ordine(con, ordine)`
   (ogni metodo di `p2p_ordini` e' una rete «USDT (…)»). Il gesto sul nodo
   (`fiat_currencies_accepted` con `USDT`, `[price.providers.pegged]` con
-  `only = ["USDT"]`) sta in DA-FARE-ANDREA. Le prove: `prove_p2p_usdt`, `prove_usdt_due_reti`.
+  `only = ["USDT"]`) e' fatto dal 2 nov 2026 (DA-FARE-ANDREA, voce 7).
+  I MODERATORI (dal 2 nov 2026, usdt-moderatori): chi scrive i loro
+  avvisi sa se l'ordine e' in USDT (`d["usdt"]` in `_disputa_evento_p2p`
+  e nella garanzia lunga, col `globals()` dei banchi) e i testi puri
+  `_testo_disputa_aperta_p2p` / `_testo_garanzia_mod_p2p` dicono la
+  cifra in USDT, il gesto «Ho inviato gli USDT» e cosa guardare
+  sull'explorer; `_riga_disputa_p2p` manda alla card `usdt`, la cifra e
+  `passo_euro = "usdt"` («USDT inviati» in `nomePassoEuroModP2P`), e la
+  card aperta mostra `guidaUsdtModP2P(d)`: explorer e contratto VERO
+  della rete del metodo (`P2P_EXPLORER_USDT`). Il server non chiama
+  nessuna API: guarda il moderatore. LA PAGINA DELLO SCAMBIO in USDT
+  passa dal traduttore puro `paroleUsdtP2P(o, testo)` (le coppie
+  `P2P_USDT_PAROLE`, poi ogni «euro» rimasto; sull'euro torna il testo
+  identico) e, per l'HTML, da `paroleUsdtHtmlP2P(o, html, dove)`, che
+  cambia SOLO i nodi di testo dentro le scatole dell'app
+  (`P2P_USDT_DOVE`) e mai dentro `P2P_USDT_MAI` (chat, recapiti, campi,
+  id): in `renderOrdineP2P` PRIMA di `ridisegnaSeCambiaP2P`, sulle card
+  di «I miei scambi» card per card; i fogli e i toast lo chiamano sulla
+  loro frase. Senza DOM (un banco) torna l'HTML com'era. Le prove:
+  `prove_p2p_usdt`, `prove_usdt_due_reti`, `prove_usdt_moderatori`.
 - GLI USDT NEGLI SCAMBI P2P ON-CHAIN (2 nov 2026, cantiere
   p2p-onchain-usdt; il perché in CANTIERI, «Gli USDT negli scambi P2P
   on-chain»). La GARANZIA NON CAMBIA: i sats nel 2-di-3 bitcoin di

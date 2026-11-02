@@ -77306,3 +77306,69 @@ nascosto; «Altri metodi» che resta aperto al foglio dopo). GUIDA-P2P-PASSI
 
 DA GUARDARE. A occhio sul telefono, dal collaudo: la voce «Altri metodi
 ▾» nella tendina, e il form di Wise.
+
+## I moderatori e la pagina dello scambio in USDT (2 nov 2026, cantiere usdt-moderatori)
+
+DA DOVE VIENE. Il giro di stamattina (usdt-due-reti) aveva lasciato
+fuori, scritte nel verbale, due cose: gli avvisi e la guida dei
+MODERATORI in una disputa in USDT, e le ultime «gli euro» della pagina
+dello scambio. Andrea: «si».
+
+COSA SI È DECISO.
+- I MODERATORI. L'avviso Telegram di una disputa che si apre dice la
+  cifra in USDT e aggiunge una riga: l'id della transazione sta nella
+  chat dello scambio, si apre sull'explorer della rete (tronscan.org,
+  etherscan.io) e si controllano token vero, indirizzo di chi vende,
+  importo e conferme. L'avviso delle 72 e 88 ore dice la cifra e il
+  gesto «Ho inviato gli USDT». Nell'app la card della disputa ha il
+  terzo passo «USDT inviati» e, aperta, la guida intera con il
+  CONTRATTO VERO della rete del metodo, scritto per intero: un token
+  falso può chiamarsi «USDT» anche lui, e su un explorer si distingue
+  solo da lì. Il server non chiama nessuna API: guarda il moderatore,
+  come per un bonifico.
+- LA PAGINA DELLO SCAMBIO. Le frasi sono decine, sparse fra stati,
+  passi, attese, toast e fogli: invece di una gemella per ognuna, un
+  traduttore solo nell'app, `paroleUsdtP2P`, il fratello di
+  `p2p_usdt_frase` del server («Euro inviati» → «USDT inviati», «gli
+  euro» → «gli USDT», «€» → «USDT», «controlla il conto» → «controlla il
+  tuo wallet», 💶 → 💵). Sull'HTML lavora SOLO sui nodi di testo e solo
+  dentro le scatole dell'app (passi, note dello stato, bottoni, aiuti):
+  mai attributi (la classe `p2p-euro`, `euroInviatiP2P()`), mai la chat,
+  i recapiti, i campi o gli id da copiare, cioè mai le parole delle
+  persone. Si applica PRIMA del ridisegno a pezzi, così un pezzo uguale
+  resta lo stesso nodo. Su un ordine in euro il testo torna identico.
+
+STRADE SCARTATE. Una gemella USDT per ogni frase (decine di righe da
+tenere in pari, e i banchi che le ritagliano). Tradurre l'HTML come
+stringa (avrebbe cambiato `p2p-euro` e gli `onclick`). Tradurre DOPO il
+ridisegno (ogni giro avrebbe riscritto i pezzi, perdendo quel che si
+sta scrivendo). Leggere la transazione da un'API dal server (un terzo in
+mezzo e una chiamata per scambio: per ora guarda il moderatore).
+Una regola di decisione nella guida («un id falso vale come USDT mai
+inviati»): è una regola delle dispute e la decide Andrea, la guida dice
+solo che quell'id non prova l'invio.
+
+COSA È PROVATO. `prove_usdt_moderatori`, 8 controlli: in un banco node
+tutti gli stati tradotti senza euro, € né «il conto» e identici
+sull'euro, il passo, la cifra con lo spazio unificatore, i toast e il
+foglio dell'annullo, il passo del moderatore, la guida con explorer e
+contratto della SUA rete; i due testi Telegram, eseguiti; chi li
+scrive sa se l'ordine è in USDT. 13 controprove, tutte rosse. La
+traduzione dell'HTML è stata vista in Chromium (Playwright, fuori dalla
+suite: i banchi node non hanno un DOM): passi, note e bottoni tradotti,
+chat, recapito, campo e id intatti, l'HTML in euro uguale byte per byte.
+Emendata `prove_usdt_due_reti`: conta 2 chiamate del giudice coi
+`globals()`, adesso sono 5 (le 3 nuove le prova la funzione nuova).
+COSA È GIRATO SU QUALE ALBERO. Sopra 0377ec5: suite severa 26.880/0,
+collaudi 115/0 con e senza coincurve. Rebase sopra 57002ab (USDT nel
+P2P on-chain, l'altro thread): suite severa 26.906/0, collaudi 116/0
+con e senza coincurve. Rebase sopra 4b4f5e1 (Wise e la lista corta,
+stesso thread): le sezioni toccate dai tre commit, 644/0, e i collaudi
+116/0 senza coincurve. Le 3 saltate di ogni suite sono d'ambiente
+(nostr-tools due volte, l'origin nella copia senza .git).
+
+NON PROVATO E DA GUARDARE. Lo si vede solo con uno scambio vero in USDT
+sul collaudo, dalla parte C della voce 7 di DA-FARE-ANDREA, e la card
+del moderatore solo con una disputa. Restano in euro, perché non sono
+di uno scambio: le pagine d'aiuto del P2P, che spiegano lo scambio in
+euro.
