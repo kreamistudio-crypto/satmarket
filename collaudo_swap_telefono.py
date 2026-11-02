@@ -190,45 +190,14 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   await A.run('swapAvanti(7)');
   out.senzaIndirizzo = [A.run('swapErrori[7] || ""'), cassetto(), A.run('swapPassi[7] || ""')];
 
-  // --- la prima volta: le parole (l'indirizzo sta sopra «Conferma»)
-  A.run(`elementi.swapIndirizzo_7 = {value: '${D.indirizzo}'}`);
-  await A.run('swapAvanti(7)');
-  const c0 = cassetto();
-  out.parole = {quante: c0 && c0.parole.split(' ').length,
-                valide: !!(c0 && S.validateMnemonic(c0.parole, S.wordlist)),
-                copiata: c0 && c0.copiata, prossimo: c0 && c0.prossimo,
-                passo: A.run('swapPassi[7]')};
-  const p0 = A.run('pannelloSwapTelefono({id: 7})');
-  html.push(p0);
-  /* le parole sole: sopra ci sono le tre regole, anche loro in lista */
-  const elenco0 = (p0.split('class="swap-parole"')[1] || '').split('</ol>')[0];
-  out.parolePannello = (elenco0.match(/<li>/g) || []).length;
-  /* (29 ott 2026, parole-corte) due frasi e due regole: la riga in
-     grassetto «nessuno può recuperarli» è entrata nella spiegazione */
-  out.paroleCalma = [p0.includes('Se perdi il telefono, con queste riprendi i tuoi bitcoin.'),
-                     (p0.match(/class="swap-regole"/g) || []).length,
-                     !p0.includes('class="swap-calma forte"'),
-                     p0.includes('>Continua<'),
-                     /* (parole-uniche) dove ritrovarle: il Profilo, non la pagina «Cambio» */
-                     p0.includes('Le ritrovi nel Profilo, in «Il wallet di Barattolo»'),
-                     p0.includes('Qui non c&#39;è una copia') || p0.includes("Qui non c'è una copia")];
-  A.run("elementi.swapSpunta_7 = {checked: false}");
-  A.run('swapParoleFatte(7)');
-  out.senzaSpunta = [A.run('swapPassi[7]'), A.run('swapErrori[7]'), cassetto().copiata];
-  /* «Continua» fa partire lo swap da solo: qui con un indirizzo storto,
-     che lo ferma al preventivo col suo perche' (le bugie, sotto, vogliono
-     lo swap ancora da fare) */
-  A.run("swapIndirizziScritti[7] = 'bc1qnonvalido'");
-  A.run("elementi.swapSpunta_7 = {checked: true}");
-  await A.run('swapParoleFatte(7)');
-  out.conSpunta = [A.run('swapPassi[7]'), cassetto().copiata, A.run('swapErrori[7] || ""')];
-  html.push(A.run('pannelloSwapTelefono({id: 7})'));
-
+  // --- (2 nov 2026 sera, Andrea) IL PASSO DELLE PAROLE NON C'E' PIU':
+  // il banco dice ancora che fuori da qui non esiste copia, e lo stesso
+  // nessun «Continua» si mette in mezzo — le parole stanno nel Profilo
   // --- un indirizzo sbagliato non chiede niente
   const primaCh = chiamate.length;
   A.run("elementi.swapIndirizzo_7 = {value: 'bc1qnonvalido'}");
   await A.run('swapAvanti(7)');
-  out.indirizzoNo = [A.run('swapErrori[7]'), chiamate.length - primaCh, cassetto().prossimo,
+  out.indirizzoNo = [A.run('swapErrori[7]'), chiamate.length - primaCh, (cassetto() || {}).prossimo || 0,
                      /* ...e il campo, ridisegnato, ricorda quel che c'era scritto */
                      A.run('pannelloSwapTelefono({id: 7})').includes('value="bc1qnonvalido"')];
 
@@ -241,6 +210,13 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
     out.bugie[m] = [A.run('swapErrori[7] || ""'), lista(memA).length, A.run('swapPassi[7]')];
   }
   out.dopoBugie = cassetto().prossimo;
+  /* le parole sono nate (quelle del wallet di Barattolo, alla prima
+     «Conferma» con l'indirizzo giusto) senza che il passo comparisse */
+  const c0 = cassetto();
+  out.parole = {quante: c0 && c0.parole.split(' ').length,
+                valide: !!(c0 && S.validateMnemonic(c0.parole, S.wordlist)),
+                copiata: c0 && c0.copiata, passo: A.run('swapPassi[7]'),
+                pannello: A.run('pannelloSwapTelefono({id: 7})').includes('class="swap-parole"')};
   await modo('normale');
 
   // --- lo swap vero
@@ -657,7 +633,7 @@ def il_telefono(base):
     if "ERRORE" in r:
         prova("il banco del telefono gira", "", r["ERRORE"])
         return
-    print("\n[la prima volta: le 12 parole]")
+    print("\n[la prima volta: niente passo delle parole]")
     # (27 ott 2026, grafica-swap) tre ascoltatori: i click, l'input del campo
     # dell'indirizzo, la fotocamera spenta ad app in secondo piano; (28 ott
     # 2026, grafica-cambio) piu' il focusout, che rimette i puntini alla cifra
@@ -667,21 +643,6 @@ def il_telefono(base):
     prova("«Conferma» senza indirizzo: lo dice, e le parole non nascono",
           ["Prima metti il tuo indirizzo bitcoin: tocca «Incolla».", None, ""],
           r["senzaIndirizzo"])
-    # (29 ott 2026, parole-uniche) sono quelle del wallet di Barattolo, e il
-    # passo c'e' perche' il banco dice che fuori da qui non ne esiste copia
-    prova("nascono 12 parole valide, non ancora copiate, dal passo «parole»",
-          {"quante": 12, "valide": True, "copiata": False, "prossimo": 0, "passo": "parole"},
-          r["parole"])
-    prova("...e il pannello le mostra tutte", 12, r["parolePannello"])
-    prova("...spiegate con calma: a cosa servono, le tre regole, nessuno senza, "
-          "e «Continua», e che stanno nel Profilo perche' qui non hanno copia",
-          [True, 1, True, True, True, True], r["paroleCalma"])
-    prova("senza la spunta non si va avanti", ["parole", "Prima spunta «Le ho scritte su carta».", False],
-          r["senzaSpunta"])
-    prova("...con la spunta lo swap parte da solo: qui l'indirizzo storto lo "
-          "ferma al preventivo, col perche'",
-          ["preventivo", True, "Questo non è un indirizzo bitcoin valido."], r["conSpunta"])
-
     print("\n[l'indirizzo e le bugie]")
     prova("un indirizzo sbagliato: lo dice, nessuna chiamata, nessun indice speso, "
           "e il campo non si svuota",
@@ -691,6 +652,13 @@ def il_telefono(base):
         prova(f"SATS Routing che mente ({m.split('_')[1]}): rifiutato, niente salvato",
               [rifiuto, 0, "preventivo"], r.get("bugie", {}).get(m))
     prova("...e ogni tentativo ha speso il suo indice (mai un segreto riusato)", 5, r["dopoBugie"])
+    # (2 nov 2026 sera, Andrea: «confonde l'utente ed è una complessità che
+    # dobbiamo nascondere») il passo delle parole non compare MAI nel
+    # cambio, nemmeno dove il banco dice che una copia fuori da qui non c'e'
+    prova("le 12 parole nascono valide alla prima «Conferma», e il passo "
+          "«parole» non compare mai: si va dritti alla nascita",
+          {"quante": 12, "valide": True, "copiata": False, "passo": "preventivo", "pannello": False},
+          r.get("parole"))
 
     print("\n[lo swap vero]")
     cr = r["creato"]

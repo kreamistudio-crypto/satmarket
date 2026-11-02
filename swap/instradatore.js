@@ -142,8 +142,19 @@ function swapPrenotaIndice(){
 /* le parole che una copia fuori da qui ridà, viste in questa apertura:
    chi le ha gia' viste coperte non le richiede a ogni cambio */
 let swapParoleCoperte = '';
+/* LE PAROLE NEL CAMBIO NON SI MOSTRANO PIU', MAI (2 nov 2026 sera,
+   Andrea, durante la prova vera in produzione: «confonde l'utente ed è
+   una complessità che dobbiamo nascondere, la seed è nelle impostazioni
+   e si può recuperare da Telegram e da Nostr»). Rovescia l'eccezione del
+   29 ott (il passo 'parole' una volta, dove nessuna copia le ridava): le
+   parole stanno solo nel Profilo, «Il wallet di Barattolo». La domanda
+   «c'e' una copia?» (`onchainSemeCoperto`) gira lo stesso in
+   `swapSemePronto`, perche' dentro Telegram, a cloud vuoto, la copia la
+   SCRIVE. Il limite, detto: dove nessuna copia esiste (fuori da Telegram
+   e senza Nostr, o col cloud che tiene un'altra chiave) le parole stanno
+   solo su questo telefono finche' chi le usa non le guarda nel Profilo. */
 function swapSemeDaMostrare(parole){
-  return parole !== swapParoleCoperte && !swapStatoSeme().copiata;
+  return false;
 }
 /* IL SEME PRONTO PER UN CAMBIO: le parole (ritrovate o nate adesso,
    dalla pagina) e se va mostrato il passo delle parole. Alza con

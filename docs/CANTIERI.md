@@ -77669,3 +77669,32 @@ PROVATO. `prove_p2p_usdt`: l'ordine delle icone nelle due card, la moneta
 giusta per rete, il CSS; controprova (bandierina dopo la cifra, una moneta
 sola): 2 rosse. Suite severa nell'ambiente del passo «Le prove» della CI
 e collaudi CI senza proxy. Schermata vera: bandiera-invia-fatta.png.
+
+## Le 12 parole fuori dal cambio dell'ordine (2 nov 2026, cantiere parole-nascoste)
+
+Durante la prova vera della leva 2 (Alan incassa on-chain un ordine del
+mercatino, dal telefono) dopo l'indirizzo è comparso il passo «🔑 Le tue
+12 parole … Qui non c'è una copia: scrivile tu», con spunta e «Continua».
+Andrea: «confonde l'utente ed è una complessità che dobbiamo nascondere,
+inoltre la seed è nelle impostazioni nel caso di problema e si può
+recuperare da Telegram e da Nostr».
+
+COSA CAMBIA. `swapSemeDaMostrare` (swap/instradatore.js) dice sempre no:
+il passo 'parole' nel cambio non compare MAI, e «Conferma» va dritta alla
+nascita. Rovescia l'eccezione del 29 ott (parole-uniche: il passo restava
+una volta dove nessuna copia ridava le stesse parole). La domanda «c'è una
+copia?» (`onchainSemeCoperto`) gira lo stesso, perché dentro Telegram a
+cloud vuoto la copia la SCRIVE. Le parole restano nel Profilo, «Il wallet
+di Barattolo».
+
+IL LIMITE, DETTO. Dove nessuna copia esiste davvero (fuori da Telegram e
+senza Nostr, o col cloud di Telegram che tiene un'ALTRA chiave, che non si
+sovrascrive) le parole stanno solo su quel telefono: un telefono perso a
+cambio andato storto perde quei bitcoin. Perché ad Alan il passo è
+comparso dentro Telegram non è stato indagato (le ipotesi: cloud con
+un'altra chiave, o lettura del cloud fallita).
+
+PROVATO. `prove_parole_uniche` riscritta sulla regola nuova;
+`collaudo_swap_telefono` senza il passo (58 verdi), con le parole che
+nascono valide alla prima «Conferma» e il pannello che non le mostra;
+controprova con la regola vecchia: rosso. Suite severa e collaudi CI.

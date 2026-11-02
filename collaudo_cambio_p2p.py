@@ -364,15 +364,14 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   campo('bc1qnonvalido');
   await run('inviaCambioP2P()');
   out.indirizzoNo = [run('elementi.p2pIncassoAvviso.textContent'), run('server.length'), run('mostro.length')];
-  /* le parole senza copia: prima il Profilo, e non nasce niente */
+  /* (2 nov 2026 sera, Andrea) le parole SENZA copia fuori da qui non
+     fermano piu' niente: nessun «prima il Profilo», il cambio nasce */
   run('paroleCoperte = false; swapParoleCoperte = ""');
-  campo(D.indirizzo);
-  await run('inviaCambioP2P()');
-  out.paroleNo = [run('elementi.p2pIncassoAvviso.textContent'), run('server.length'), lista().length];
-  run('paroleCoperte = true');
   /* «Invia»: biglietto, swap, nascita, la fattura del cambio a Mostro */
   campo(D.indirizzo);
   await run('inviaCambioP2P()');
+  out.paroleNo = run('elementi.p2pIncassoAvviso.textContent || ""').includes('12 parole');
+  run('paroleCoperte = true');
   const rec = lista().find(r => r.p2p === D.scambio);
   const m = run('mostro.slice()');
   out.nato = {ordini: run('server.map(s => s[0])'),
@@ -482,9 +481,8 @@ def il_telefono(c, base):
     prova("i no prima di tutto: senza indirizzo, indirizzo storto (niente biglietto, niente Mostro)",
           ["Prima scrivi il tuo indirizzo bitcoin.", ["Questo non è un indirizzo bitcoin valido.", 0, 0]],
           [r["senzaIndirizzo"], r["indirizzoNo"]])
-    prova("le 12 parole senza una copia fuori dal telefono: prima il Profilo, non nasce niente",
-          ["Prima di usare il cambio guarda le tue 12 parole: Profilo › «Il wallet di Barattolo».", 0, 0],
-          r["paroleNo"])
+    prova("le 12 parole senza una copia fuori dal telefono non fermano piu' il cambio "
+          "(2 nov 2026 sera: stanno nel Profilo, nessun avviso)", False, r["paroleNo"])
     n = r["nato"]
     prova("«Invia»: PRIMA il biglietto (lo scambio, la cifra, il fornitore), poi lo swap al "
           "cartone, poi la nascita col biglietto",
