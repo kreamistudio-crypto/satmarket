@@ -77576,3 +77576,43 @@ promemoria degli incassi fermi (`sollecita_incassi`) per chi ha scelto
 on-chain parla ancora di Lightning address e fattura. La riga «via …»
 del pannello del pagamento dice «il cambio» solo se la carta è stata
 aperta in quella sessione.
+
+## I tredici ritocchi degli USDT, chiesti durante la prova delle leve (2 nov 2026, cantiere usdt-simbolo)
+
+Il 2 nov, mentre si provava in produzione la leva P2P_USDT_ATTIVO (solo
+admin), Andrea ha chiesto tredici ritocchi alla grafica degli ordini in
+USDT. Sono rimasti fermi su un ramo loro, con la regola «tutti insieme
+alla fine», e alle 16:47 UTC Andrea ha detto di promuoverli insieme allo
+swap automatico («promuovi tutto ora… anche quelle modifiche di prima su
+usdt»). Rebase sopra develop 830a5e1 senza conflitti.
+
+COSA CAMBIA. Il logo vero di Tether al posto del ₮; nel foglio «Pubblica»
+la tendina chiede la rete, con l'icona della rete; negli avvisi dei nuovi
+ordini P2P si sceglie la valuta (tutte, solo euro, solo USDT: colonna
+nuova `avvisi_nuovi_valuta`, di serie '' cioè tutte, e conta solo per chi
+gli USDT li vede); la card del libro porta la bandierina della valuta
+(🇪🇺 o Tether) e, a rete unica, il bollino della rete sul logo; il conto
+del mio scambio non perde più la valuta; la pagina dei recapiti di chi
+riceve è più leggera; «Invia» resta spento finché l'indirizzo non è giusto;
+lo scambio riconosce gli USDT anche quando la riga ha perso la valuta (i
+metodi sono solo reti USDT), e tasto, foglio di conferma e cifre dicono
+USDT; il contratto perde «Copia» (si copiava quello al posto
+dell'indirizzo) e l'id della transazione ha «🔎 Controlla su
+Tronscan/Etherscan», per chi paga e per chi riceve.
+
+PERCHÉ IN PRODUZIONE NON SI VEDE QUASI NIENTE. Tutto vive dietro
+P2P_USDT_ATTIVO, accesa solo per gli admin: a chi non vede gli USDT la
+scelta della valuta negli avvisi non compare e vale «tutte», cioè l'euro;
+la bandierina 🇪🇺 sulle card in euro è l'unica cosa nuova per tutti.
+
+STRADE SCARTATE. Pubblicarli uno alla volta su main con cherry-pick: ogni
+promozione è un gesto dal PC di Andrea, e lui li voleva tutti insieme.
+
+COSA È PROVATO. Prove e controprove rosse per ogni ritocco in prove.py
+(sul ramo, 2 nov); sopra develop: suite severa e collaudi CI anche senza
+variabili del proxy, e i due passi del job «segreti» rifatti in locale.
+
+NON PROVATO E DA GUARDARE. Il bollino della rete e il logo dentro Telegram
+vero, su Android e iPhone; il link a Tronscan/Etherscan aperto dalla
+WebView. Proposte non fatte: «Scegli almeno un metodo» che in USDT diventa
+«una rete»; accorciare le righe 🔒/⚠️ comuni dei recapiti.
