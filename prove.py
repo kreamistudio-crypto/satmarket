@@ -154102,6 +154102,22 @@ console.log(JSON.stringify(out));
                o.get("altra")])
         prova("il conto del mio scambio tiene la valuta: USDT resta USDT, senza resta vuota (euro)",
               ["USDT", ""], o.get("fiat"))
+    # LA PAGINA DEI RECAPITI ALLEGGERITA (2 nov 2026, Andrea: «troppe
+    # scritte»): in USDT niente riga «Il metodo dello scambio è», e sotto
+    # il campo una riga corta con la rete e il suo segno
+    js = (_fn_js(mini, "function notaReteUsdtP2P(r){") + "\n"
+          + "console.log(JSON.stringify([notaReteUsdtP2P({nome: 'Ethereum', forma: 'evm', standard: 'ERC-20'}),"
+          + " notaReteUsdtP2P({nome: 'Tron', forma: 'tron', standard: 'TRC-20'})]));\n")
+    o = _node_banco(js)
+    if o is None:
+        salta("la riga corta della rete USDT, sul banco", "node non c'e'")
+    else:
+        prova("sotto il campo dell'indirizzo una riga sola e corta, con la rete e il suo segno",
+              ["⚠️ Solo rete Ethereum: l'indirizzo comincia con 0x.",
+               "⚠️ Solo rete Tron: l'indirizzo comincia con T."], o)
+    prova("...e in USDT la riga «Il metodo dello scambio è» non c'e' (con l'euro resta)", True,
+          ": (scelto && !fr.usdt ? '<div class=\"hint\">💶 Il metodo dello scambio è <b>'"
+          in pezzo_js(mini, "function renderCampiP2P(){", "\n}\n"))
 
 
 def prove_p2p_onchain():

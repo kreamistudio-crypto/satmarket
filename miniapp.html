@@ -73334,10 +73334,12 @@ function reteUsdtDaRecapitoP2P(righe){
 /* la frase sotto il campo dell'indirizzo: la rete in chiaro, e per
    Ethereum il limite detto (lo stesso 0x vale anche su altre reti, che
    noi non offriamo, ma il wallet di chi paga si') */
+/* ALLEGGERITA (2 nov 2026, Andrea dalla prova dal vivo: «troppe scritte,
+   alleggerisci il testo»): la rete e il suo segno, e basta. Che chi paga
+   mandi solo su quella rete glielo dice il suo riquadro, e un indirizzo
+   di un'altra rete lo ferma il giudice con la sua frase. */
 function notaReteUsdtP2P(r){
-  return r.forma === 'evm'
-    ? '⚠️ Rete ' + r.nome + ' (' + r.standard + '): l\'indirizzo comincia con 0x. Lo stesso indirizzo esiste anche su altre reti: chi ti paga deve mandare SOLO su ' + r.nome + ', e glielo diciamo noi.'
-    : '⚠️ Rete ' + r.nome + ' (' + r.standard + '): l\'indirizzo comincia con T. Un indirizzo di un\'altra rete non parte.';
+  return '⚠️ Solo rete ' + r.nome + ': l\'indirizzo comincia con ' + (r.forma === 'evm' ? '0x' : 'T') + '.';
 }
 /* I DATI DA INCOLLARE (16 ott 2026, copia-recapito). PURA. Una riga ha
    il suo «📋 Copia» se il suo valore e' un dato che si incolla in
@@ -83971,7 +83973,10 @@ function renderCampiP2P(){
             + (vesteMetodoP2P(m) ? ' p2p-pill-marchio' : '') +
             '" data-m="' + esc(m) + '" onclick="scegliMetodoRecapito(this.dataset.m)">' +
             marchioMetodoP2P(m) + '</button>').join('') + '</div></div>'
-        : (scelto ? '<div class="hint">💶 Il metodo dello scambio è <b>'
+        /* in USDT la riga del metodo non c'e' (2 nov 2026, «troppe
+           scritte»): la rete la dicono gia' l'etichetta del campo e la
+           riga sotto */
+        : (scelto && !fr.usdt ? '<div class="hint">💶 Il metodo dello scambio è <b>'
                     + marchioMetodoP2P(scelto) + '</b>.</div>' : '')) +
       fr.campi.map(campoRecapitoP2P).join('') +
       /* la rete detta sotto il campo (1 nov 2026, cantiere p2p-usdt) */
