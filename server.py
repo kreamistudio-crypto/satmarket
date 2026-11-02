@@ -76248,18 +76248,7 @@ def swap_programma_lockup(pub_fornitore: bytes, pub_nostra: bytes,
     """I 32 byte dell'indirizzo dove il fornitore deve bloccare i
     bitcoin: la chiave MuSig a due (la sua PER PRIMA, poi la nostra)
     ritoccata con la radice dell'albero (BIP-341, TapTweak sulla x)."""
-    interna = swap_chiave_musig([pub_fornitore, pub_nostra])
-    if interna[1] & 1:
-        interna = (interna[0], _SWAP_EC_P - interna[1])
-    x = interna[0].to_bytes(32, "big")
-    t = int.from_bytes(_swap_etichettato("TapTweak", x,
-                                         _swap_radice_albero(albero)), "big")
-    if t >= _SWAP_EC_N:
-        raise ValueError("ritocco fuori misura")
-    q = _swap_ec_somma(interna, _swap_ec_per(_SWAP_EC_G, t))
-    if q is None:
-        raise ValueError("ritocco all'infinito")
-    return q[0].to_bytes(32, "big")
+    return _swap_ritocco(pub_fornitore, pub_nostra, albero)[1][0].to_bytes(32, "big")
 
 
 def swap_auto_chiavi(parole: str, indice: int) -> dict:
@@ -76444,6 +76433,9 @@ def _swap_auto_prepara(con):
         sats INTEGER DEFAULT 0,
         onchain_min INTEGER DEFAULT 0,
         risposta TEXT DEFAULT '',
+        ritiro_txid TEXT DEFAULT '',
+        destinazione TEXT DEFAULT '',
+        ricevi INTEGER DEFAULT 0,
         creato INTEGER DEFAULT 0,
         aggiornato INTEGER DEFAULT 0)""")
 
@@ -76573,6 +76565,243 @@ async def swap_auto_parole_crea(x_tg_init_data: str = Header(""),
         "solo sul VPS ed entrano nel prossimo backup fuori sede: fino ad "
         "allora non c'è una copia.")
     return swap_auto_stato_parole()
+
+
+# --- TAPPA 2: IL RITIRO DAL SERVER (2 nov 2026, cantiere swap-auto) ---
+# Quando il fornitore ha bloccato i bitcoin, il server li porta
+# all'indirizzo di chi vende. DALLO SCRIPT, con la sola chiave nostra e
+# il segreto: il permesso del fornitore non serve, e la firma MuSig2 a
+# due (il ritiro «cooperativo», un po' piu' leggero) embit non la sa
+# fare — e una seconda libreria di firme a piu' mani sul VPS non vale i
+# pochi vbyte. E' la strada di riserva del telefono (`swapRitiro` con
+# `cooperativo = false`), e il cartone la verifica col bundle.
+# I CONTROLLI PRIMA DEL SEGRETO, gli stessi del telefono (cantiere
+# swap-lockup): il segreto esce di qui nella transazione, e un fornitore
+# che mente se lo farebbe dare senza aver bloccato i bitcoin. Quindi
+# (1) il lockup si legge dalla RETE, non dal fornitore, e la rete deve
+# dire proprio quell'id; (2) l'uscita e' ESATTAMENTE il p2tr della
+# chiave MuSig con l'albero; (3) porta non meno di quanto promesso alla
+# nascita; (4) la fee del ritiro (lockup - ricevi) e' positiva.
+_SWAP_RETI_EMBIT = {"bitcoin": "main", "testnet": "test", "regtest": "regtest"}
+
+
+def _swap_ritocco(pub_fornitore: bytes, pub_nostra: bytes, albero: dict):
+    """La chiave interna (x, 32 byte) e il punto dell'uscita ritoccata:
+    servono al ritiro dallo script (il blocco di controllo vuole la x
+    interna e la parita' dell'uscita)."""
+    interna = swap_chiave_musig([pub_fornitore, pub_nostra])
+    if interna[1] & 1:
+        interna = (interna[0], _SWAP_EC_P - interna[1])
+    x = interna[0].to_bytes(32, "big")
+    t = int.from_bytes(_swap_etichettato("TapTweak", x,
+                                         _swap_radice_albero(albero)), "big")
+    if t >= _SWAP_EC_N:
+        raise ValueError("ritocco fuori misura")
+    q = _swap_ec_somma(interna, _swap_ec_per(_SWAP_EC_G, t))
+    if q is None:
+        raise ValueError("ritocco all'infinito")
+    return x, q
+
+
+def _swap_script_destinazione(indirizzo: str, rete: str) -> bytes | None:
+    """Lo script di un indirizzo bitcoin DI QUESTA RETE (segwit v0/v1, o
+    i vecchi 1… e 3…), o None. Il checksum lo controlla embit; la rete
+    la controlliamo noi, che embit non la guarda."""
+    from embit import script as _esc
+    from embit.networks import NETWORKS
+    s = str(indirizzo or "").strip()
+    rete_e = NETWORKS.get(_SWAP_RETI_EMBIT.get(rete, "main"))
+    if not s or not rete_e:
+        return None
+    try:
+        script = _esc.address_to_scriptpubkey(s).data
+    except Exception:
+        return None
+    if s.lower().startswith(rete_e["bech32"] + "1"):
+        return script
+    try:
+        from embit import base58
+        prefisso = base58.decode_check(s)[:1]
+    except Exception:
+        return None
+    return script if prefisso in (rete_e["p2pkh"], rete_e["p2sh"]) else None
+
+
+def swap_auto_tx_ritiro(rec: dict, chiavi: dict, lockup_hex: str,
+                        destinazione: str, ricevi: int, rete: str) -> dict:
+    """LA TRANSAZIONE DEL RITIRO, dallo script: spende l'uscita del lockup
+    verso `destinazione`, con un'uscita sola da `ricevi` sats (la
+    differenza e' la fee per i minatori, come `createAdjustedClaim`).
+    `rec` = le parti pubbliche della nascita (refundPublicKey, swapTree,
+    onchainAmount). Torna {"hex", "txid", "sats", "fee"}; ValueError col
+    perche' se un controllo non torna — e allora il segreto non esce."""
+    from embit.ec import PrivateKey
+    from embit.script import Script, Witness
+    from embit.transaction import (SIGHASH, Transaction, TransactionInput,
+                                   TransactionOutput)
+    loro = bytes.fromhex(str(rec.get("refundPublicKey") or ""))
+    albero = rec.get("swapTree")
+    if isinstance(albero, str):
+        albero = json.loads(albero)
+    x_interna, q = _swap_ritocco(loro, chiavi["pubblica"], albero)
+    atteso = b"\x51\x20" + q[0].to_bytes(32, "big")
+    lockup = Transaction.parse(bytes.fromhex(str(lockup_hex or "")))
+    uscita = next((i for i, o in enumerate(lockup.vout)
+                   if o.script_pubkey.data == atteso), None)
+    if uscita is None:
+        raise ValueError("nel lockup non c'e' il nostro swap")
+    valore = int(lockup.vout[uscita].value)
+    if valore < int(rec.get("onchainAmount") or 0):
+        raise ValueError("il lockup porta meno di quanto promesso")
+    ricevi = int(ricevi)
+    if not 546 <= ricevi < valore:
+        raise ValueError("il lockup non copre quel che il preventivo promette")
+    script_dest = _swap_script_destinazione(destinazione, rete)
+    if not script_dest:
+        raise ValueError("indirizzo di destinazione non valido")
+    foglia = bytes.fromhex(albero["claimLeaf"]["output"])
+    tx = Transaction(version=2, locktime=0,
+                     vin=[TransactionInput(lockup.txid(), uscita,
+                                           sequence=0xfffffffd)],
+                     vout=[TransactionOutput(ricevi, Script(script_dest))])
+    impronta = tx.sighash_taproot(0, [Script(atteso)], [valore],
+                                  sighash=SIGHASH.DEFAULT, ext_flag=1,
+                                  script=Script(foglia),
+                                  leaf_version=SWAP_FOGLIA_VERSIONE)
+    firma = PrivateKey(chiavi["privata"]).schnorr_sign(impronta).serialize()
+    rimborso = bytes.fromhex(albero["refundLeaf"]["output"])
+    fratello = _swap_etichettato("TapLeaf",
+                                 bytes([int(albero["refundLeaf"]["version"])]),
+                                 bytes([len(rimborso)]), rimborso)
+    controllo = (bytes([SWAP_FOGLIA_VERSIONE | (q[1] & 1)]) + x_interna
+                 + fratello)
+    tx.vin[0].witness = Witness([firma, chiavi["segreto"], foglia, controllo])
+    return {"hex": tx.serialize().hex(), "txid": tx.txid().hex(),
+            "sats": ricevi, "fee": valore - ricevi}
+
+
+SWAP_AUTO_RITIRATO = "ritirato"   # il ritiro e' partito ed e' stato preso
+
+
+async def _swap_auto_trasmetti(fornitore: dict, hex_: str) -> bool:
+    """LA TRASMISSIONE DEL RITIRO, su due strade come il telefono: la rete
+    (`POST /tx` del mempool, testo) e il fornitore. Basta che una la
+    prenda. In collaudo nessuna delle due esce dal computer."""
+    prese = False
+    strade = ((str(fornitore.get("mempool") or "").rstrip("/"), "/tx", hex_,
+               None),
+              (str(fornitore.get("api") or "").rstrip("/"),
+               "/v2/chain/BTC/transaction", None, {"hex": hex_}))
+    for base, percorso, testo, corpo in strade:
+        if not base or swap_lettura_simulata(base):
+            continue
+        try:
+            async with httpx.AsyncClient(timeout=15) as c:
+                h = await (c.post(base + percorso, content=testo)
+                           if corpo is None
+                           else c.post(base + percorso, json=corpo))
+            prese = prese or h.status_code in (200, 201)
+        except Exception as e:
+            print(f"⚠️ Swap automatico: la trasmissione su {base} non va "
+                  f"({type(e).__name__})", flush=True)
+    return prese
+
+
+async def swap_auto_ritira(indice: int, destinazione: str,
+                           ricevi: int) -> dict:
+    """IL RITIRO DI UNO SWAP AUTOMATICO NATO: il lockup letto dalla rete
+    (prima l'indirizzo, poi i byte; l'id deve tornare), la transazione
+    dallo script, l'id scritto nella riga PRIMA di trasmettere (se la
+    risposta si perde, il giro dopo lo riconosce), la trasmissione.
+    Torna {"stato", "txid", "perche"}: «ritirato», oppure «aspetta» (il
+    lockup non c'e' ancora, o la rete non risponde: si riprova) o «no»
+    (un controllo non torna: niente segreto a nessuno)."""
+    con = db()
+    try:
+        _swap_auto_prepara(con)
+        r = con.execute("SELECT * FROM swap_auto WHERE indice=?",
+                        (int(indice),)).fetchone()
+    finally:
+        con.close()
+    if not r or r["stato"] not in (SWAP_AUTO_NATO, SWAP_AUTO_RITIRATO):
+        return {"stato": "no", "txid": "", "perche": "swap non nato"}
+    rec = json.loads(r["risposta"] or "{}")
+    fornitore = swap_fornitore(r["fornitore"]) or {}
+    rete = fornitore.get("rete") or swap_rete()
+    base = str(fornitore.get("mempool") or "").rstrip("/")
+    # gia' ritirato: la rete conosce la nostra transazione? (se la
+    # risposta della trasmissione si e' persa, il giro dopo la ritrova)
+    if r["ritiro_txid"]:
+        try:
+            gia = json.loads(await _swap_mempool_leggi(
+                base, f"/tx/{r['ritiro_txid']}") or "{}")
+        except ValueError:
+            gia = {}
+        if isinstance(gia, dict) and gia.get("txid") == r["ritiro_txid"]:
+            if r["stato"] != SWAP_AUTO_RITIRATO:
+                con = db()
+                try:
+                    con.execute("UPDATE swap_auto SET stato=?, aggiornato=? "
+                                "WHERE indice=?", (SWAP_AUTO_RITIRATO,
+                                                   int(time.time()),
+                                                   int(indice)))
+                    con.commit()
+                finally:
+                    con.close()
+            return {"stato": SWAP_AUTO_RITIRATO, "txid": r["ritiro_txid"],
+                    "perche": ""}
+    testo = await _swap_mempool_leggi(
+        base, f"/address/{rec.get('lockupAddress', '')}/utxo")
+    txid = ""
+    try:
+        uscite = [u for u in json.loads(testo or "[]")
+                  if isinstance(u, dict)
+                  and re.fullmatch(r"[0-9a-f]{64}", str(u.get("txid") or ""))]
+        piena = next((u for u in uscite if int(u.get("value") or 0)
+                      >= int(rec.get("onchainAmount") or 0)), None)
+        txid = str((piena or (uscite[0] if uscite else {})).get("txid") or "")
+    except (ValueError, TypeError):
+        txid = ""
+    if not txid:
+        return {"stato": "aspetta", "txid": "", "perche": "lockup non visto"}
+    lockup_hex = (await _swap_mempool_leggi(base, f"/tx/{txid}/hex") or "").strip()
+    try:
+        from embit.transaction import Transaction
+        if Transaction.parse(bytes.fromhex(lockup_hex)).txid().hex() != txid:
+            return {"stato": "no", "txid": "", "perche": "la rete risponde "
+                    "con un altro lockup"}
+    except Exception:
+        return {"stato": "aspetta", "txid": "", "perche": "lockup illeggibile"}
+    d = _swap_auto_parole_vps()
+    if not d:
+        return {"stato": "no", "txid": "", "perche": "parole assenti"}
+    try:
+        t = swap_auto_tx_ritiro(rec, swap_auto_chiavi(d["parole"], indice),
+                                lockup_hex, destinazione, ricevi, rete)
+    except ValueError as e:
+        print(f"⚠️ Swap automatico {int(indice)}: ritiro fermo ({e})",
+              flush=True)
+        return {"stato": "no", "txid": "", "perche": str(e)}
+    con = db()
+    try:
+        con.execute("UPDATE swap_auto SET ritiro_txid=?, destinazione=?, "
+                    "ricevi=?, aggiornato=? WHERE indice=?",
+                    (t["txid"], str(destinazione), int(ricevi),
+                     int(time.time()), int(indice)))
+        con.commit()
+    finally:
+        con.close()
+    if not await _swap_auto_trasmetti(fornitore, t["hex"]):
+        return {"stato": "aspetta", "txid": t["txid"],
+                "perche": "nessuna strada ha preso il ritiro"}
+    con = db()
+    try:
+        con.execute("UPDATE swap_auto SET stato=?, aggiornato=? WHERE indice=?",
+                    (SWAP_AUTO_RITIRATO, int(time.time()), int(indice)))
+        con.commit()
+    finally:
+        con.close()
+    return {"stato": SWAP_AUTO_RITIRATO, "txid": t["txid"], "perche": ""}
 
 
 # --- IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero) ---------------

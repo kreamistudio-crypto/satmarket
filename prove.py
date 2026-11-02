@@ -182711,6 +182711,36 @@ def prove_swap_pagamento():
            "\ncollaudo_swap_pagamento.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
 
 
+def _amb_swap_auto():
+    """L'ambiente delle prove dello swap automatico: le costanti e i
+    pezzi puri di server.py (la curva, l'albero, le chiavi, la verifica,
+    il ritiro), senza importare il server."""
+    import hashlib
+    amb = {"hashlib": hashlib, "json": json, "re": re, "os": os,
+           "time": __import__("time"),
+           "_SWAP_EC_P": 2 ** 256 - 2 ** 32 - 977,
+           "_SWAP_EC_N": 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141,
+           "_SWAP_EC_G": (0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798,
+                          0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8),
+           "SWAP_FOGLIA_VERSIONE": 0xc0,
+           "_BECH32_ALFABETO": "qpzry9x8gf2tvdw0s3jn54khce6mua7l",
+           "_BECH32_GEN": (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3),
+           "SWAP_HRP": {"bitcoin": "bc", "testnet": "tb", "regtest": "bcrt"},
+           "_SWAP_BECH32M": 0x2bc830a3,
+           "_SWAP_ID_FORMA": re.compile(r"^[A-Za-z0-9_-]{4,80}$"),
+           "_SWAP_RETI_EMBIT": {"bitcoin": "main", "testnet": "test",
+                                "regtest": "regtest"}}
+    for n in ("_swap_ec_somma", "_swap_ec_per", "_swap_ec_punto",
+              "_swap_etichettato", "_swap_spinta", "_swap_numero_script",
+              "swap_albero_reverse", "_swap_radice_albero",
+              "swap_chiave_musig", "swap_programma_lockup", "_bech32_polymod",
+              "_swap_programma_p2tr", "swap_auto_chiavi", "swap_auto_xpub",
+              "_swap_ritocco", "_swap_script_destinazione", "swap_auto_tx_ritiro",
+              "swap_auto_verifica", "leggi_bolt11", "importo_bolt11"):
+        exec(pezzo(n), amb)
+    return amb
+
+
 def prove_swap_auto():
     """LO SWAP AUTOMATICO DEL MERCATINO, TAPPA 1 (2 nov 2026, cantiere
     swap-auto, piano approvato da Andrea). Il server rifa' in Python quel
@@ -182741,25 +182771,7 @@ def prove_swap_auto():
               "requirements.txt)")
         return
     src = _SORGENTE
-    amb = {"hashlib": _hl, "json": json, "re": re, "os": os,
-           "time": __import__("time"),
-           "_SWAP_EC_P": 2 ** 256 - 2 ** 32 - 977,
-           "_SWAP_EC_N": 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141,
-           "_SWAP_EC_G": (0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798,
-                          0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8),
-           "SWAP_FOGLIA_VERSIONE": 0xc0,
-           "_BECH32_ALFABETO": "qpzry9x8gf2tvdw0s3jn54khce6mua7l",
-           "_BECH32_GEN": (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3),
-           "SWAP_HRP": {"bitcoin": "bc", "testnet": "tb", "regtest": "bcrt"},
-           "_SWAP_BECH32M": 0x2bc830a3,
-           "_SWAP_ID_FORMA": re.compile(r"^[A-Za-z0-9_-]{4,80}$")}
-    for n in ("_swap_ec_somma", "_swap_ec_per", "_swap_ec_punto",
-              "_swap_etichettato", "_swap_spinta", "_swap_numero_script",
-              "swap_albero_reverse", "_swap_radice_albero",
-              "swap_chiave_musig", "swap_programma_lockup", "_bech32_polymod",
-              "_swap_programma_p2tr", "swap_auto_chiavi", "swap_auto_xpub",
-              "swap_auto_verifica", "leggi_bolt11", "importo_bolt11"):
-        exec(pezzo(n), amb)
+    amb = _amb_swap_auto()
     prova("swap auto: le costanti della curva sono quelle di secp256k1",
           (True, True, True),
           ("_SWAP_EC_P = 2 ** 256 - 2 ** 32 - 977\n" in src,
@@ -182938,7 +182950,7 @@ console.log(JSON.stringify(out));
     prova("...e il backup fuori sede porta via la cartella chiavi/ intera", True,
           'cp -a "$DIR_APP/chiavi" "$TMP/chiavi"' in fuori)
     rotte = src[src.index('@app.get("/api/admin/swap/parole")'):]
-    rotte = rotte[:rotte.index("\n\n\n# --- IL CAMBIO LIBERO")]
+    rotte = rotte[:rotte.index("\n\n\n# --- TAPPA 2: IL RITIRO DAL SERVER")]
     prova("...le due rotte sono SOLO ADMIN, e non ripetono le parole", (2, 0),
           (rotte.count('if not e_admin(user["id"]):\n        raise HTTPException(403'),
            rotte.count("parole\"]")))
@@ -183032,6 +183044,228 @@ console.log(JSON.stringify(out));
     prova("...e senza le parole non nasce niente (nemmeno un indice)", ("fermo", 4),
           (senza, quante))
     import shutil as _sh
+    _sh.rmtree(cartella, ignore_errors=True)
+
+
+def prove_swap_auto_ritiro():
+    """LO SWAP AUTOMATICO, TAPPA 2: IL RITIRO DAL SERVER (2 nov 2026,
+    cantiere swap-auto). Il server porta i bitcoin bloccati dal fornitore
+    all'indirizzo di chi vende, DALLO SCRIPT (la sola chiave nostra e il
+    segreto). Il giudice non e' il nostro codice: e' il SATS Routing di
+    cartone, che accetta un ritiro solo se il BUNDLE del telefono
+    (boltz-core 5.0.0) lo legge come spesa del lockup e la firma BIP-340
+    regge (`cartone_satsrouting.trasmetti`). Qui, per HTTP vero contro
+    un cartone acceso su 127.0.0.1, e su due reti (bitcoin e regtest,
+    quella della VM di collaudo):
+    1. la nascita (tappa 1), il lockup, il ritiro preso dal cartone con
+       la via «script», l'uscita giusta all'indirizzo giusto;
+    2. il giro dopo riconosce il ritiro gia' fatto (niente doppioni);
+    3. i lockup che mentono (meno sats, un altro script) e le cifre
+       storte fermano il ritiro PRIMA che il segreto esca;
+    4. la rete della destinazione: solo indirizzi di questa rete."""
+    print("\n[lo swap automatico, tappa 2: il ritiro]")
+    import asyncio as _aio, shutil as _sh, sqlite3 as _sq, tempfile as _tf
+    from urllib.parse import urlparse as _up
+    try:
+        import embit  # noqa: F401
+        import httpx as _hx
+    except ImportError:
+        salta("swap automatico, il ritiro", "embit o httpx non installati")
+        return
+    if not _sh.which("node"):
+        salta("swap automatico, il ritiro", "node non c'e' (il cartone lo vuole)")
+        return
+    import cartone_satsrouting as _cart
+    amb = _amb_swap_auto()
+    cartella = _tf.mkdtemp()
+    dbf = os.path.join(cartella, "swap.db")
+
+    def _db():
+        c = _sq.connect(dbf)
+        c.row_factory = _sq.Row
+        return c
+    M = "invite smile evidence shield frost source truly ball odor unfold example nuclear"
+    os.makedirs(os.path.join(cartella, "chiavi"))
+    amb.update({"DB": os.path.join(cartella, "barattolo.db"), "db": _db,
+                "httpx": _hx, "urlparse": _up, "MODALITA_COLLAUDO": True,
+                "_SWAP_DETTO_SIMULATO": set(), "_SWAP_MEMPOOL_DETTO": set(),
+                "print": lambda *a, **k: None})
+    for n in ("_swap_base_di_casa", "swap_lettura_simulata", "_swap_auto_file",
+              "_swap_auto_parole_vps", "_swap_auto_prepara",
+              "swap_auto_prenota_indice"):
+        exec(pezzo(n), amb)
+    for n in ("_swap_mempool_leggi", "swap_auto_crea", "_swap_auto_trasmetti",
+              "swap_auto_ritira"):
+        exec("async " + pezzo(n), amb)
+    for n in ("SWAP_AUTO_CHIESTO", "SWAP_AUTO_NATO", "SWAP_AUTO_MENTE",
+              "SWAP_AUTO_GIU", "SWAP_AUTO_CAMPI", "SWAP_AUTO_RITIRATO"):
+        i = _SORGENTE.index(f"\n{n} = ")
+        exec(_SORGENTE[i + 1:_SORGENTE.index("\n\n", i + 1)].split("\n#")[0], amb)
+    from embit import ec as _ec, script as _esc
+    from embit.networks import NETWORKS as _NET
+    from embit.transaction import Transaction as _Tx
+
+    def giro(rete, ordine, modo="normale"):
+        srv, porta = _cart.avvia(0, rete)
+        c = srv.cartone
+        base = f"http://127.0.0.1:{porta}"
+        forn = {"id": "satsrouting", "api": base, "mempool": base + "/esplora",
+                "referral": "", "rete": rete}
+        amb["swap_rete"] = lambda: rete
+        amb["swap_fornitore"] = lambda fid: forn
+        json.dump({"parole": M, "xpub": "x", "rete": rete},
+                  open(amb["_swap_auto_file"](), "w", encoding="utf-8"))
+        tar = _cart.tariffe_del_modo("normale")["BTC"]["BTC"]
+        nato = _aio.run(amb["swap_auto_crea"](forn, ordine, {
+            "fattura": 50000, "onchain": _cart.onchain_di(50000, tar),
+            "hash": tar["hash"]}))
+        dest = _esc.p2wpkh(_ec.PrivateKey(bytes([ordine]) * 32).get_public_key()
+                           ).address(_NET[amb["_SWAP_RETI_EMBIT"][rete]])
+        prima = _aio.run(amb["swap_auto_ritira"](nato["indice"], dest,
+                                                 nato["onchain"] - 400))
+        c["stato"]["modo"] = modo
+        sid = nato["swap_id"]
+        _cart.sposta(c, sid, "transaction.mempool")
+        c["stato"]["modo"] = "normale"
+        dopo = _aio.run(amb["swap_auto_ritira"](nato["indice"], dest,
+                                                nato["onchain"] - 400))
+        return srv, c, nato, dest, prima, dopo
+
+    for rete, ordine in (("bitcoin", 1), ("regtest", 2)):
+        srv, c, nato, dest, prima, dopo = giro(rete, ordine)
+        tr = c["stato"]["trasmesse"]
+        lk = c["swap"][nato["swap_id"]]["lockup"]["id"]
+        uscita = (c["spese"].get(lk) or {}).get("vout")
+        atteso_dest = _esc.address_to_scriptpubkey(dest).data.hex()
+        prova(f"swap auto ({rete}): nato, e senza lockup il ritiro aspetta",
+              ("nato", "aspetta", "lockup non visto"),
+              (nato["stato"], prima["stato"], prima["perche"]))
+        prova(f"swap auto ({rete}): il ritiro dallo script, preso dal cartone col bundle",
+              ("ritirato", 1, "script", "invoice.settled", True),
+              (dopo["stato"], len(tr), tr[0]["via"] if tr else None,
+               c["swap"][nato["swap_id"]]["stato"],
+               bool(tr) and tr[0]["txid"] == dopo["txid"]))
+        prova(f"swap auto ({rete}): un'uscita sola, i sats promessi all'indirizzo di chi vende",
+              [{"scriptpubkey": atteso_dest, "value": nato["onchain"] - 400}], uscita)
+        con = _db()
+        r = con.execute("SELECT stato, ritiro_txid, destinazione, ricevi FROM swap_auto "
+                        "WHERE indice=?", (nato["indice"],)).fetchone()
+        con.close()
+        prova(f"swap auto ({rete}): la riga ricorda il ritiro", ("ritirato", dopo["txid"], dest,
+                                                               nato["onchain"] - 400),
+              tuple(r))
+        ancora = _aio.run(amb["swap_auto_ritira"](nato["indice"], dest, nato["onchain"] - 400))
+        prova(f"swap auto ({rete}): il giro dopo lo riconosce, niente seconda trasmissione",
+              ("ritirato", dopo["txid"], 1), (ancora["stato"], ancora["txid"],
+                                              len(c["stato"]["trasmesse"])))
+        srv.shutdown()
+
+    # --- 3. le bugie del lockup e le cifre storte ---
+    esiti = {}
+    for modo in ("lockup_meno", "lockup_altro_script"):
+        srv, c, nato, dest, prima, dopo = giro("bitcoin", 3, modo)
+        esiti[modo] = (dopo["stato"], dopo["perche"], len(c["stato"]["trasmesse"]))
+        srv.shutdown()
+    prova("swap auto: un lockup che porta meno, o con un altro script: niente ritiro",
+          {"lockup_meno": ("no", "il lockup porta meno di quanto promesso", 0),
+           "lockup_altro_script": ("aspetta", "lockup non visto", 0)}, esiti)
+    srv, porta = _cart.avvia(0, "bitcoin")
+    c = srv.cartone
+    k = amb["swap_auto_chiavi"](M, 40)
+    tar = _cart.tariffe_del_modo("normale")["BTC"]["BTC"]
+    _, risp = _cart.crea_swap(c, {"from": "BTC", "to": "BTC", "invoiceAmount": 50000,
+                                  "preimageHash": k["impronta"].hex(),
+                                  "claimPublicKey": k["pubblica"].hex(),
+                                  "pairHash": tar["hash"]})
+    _cart.sposta(c, risp["id"], "transaction.mempool")
+    lock = c["swap"][risp["id"]]["lockup"]["hex"]
+    tx = amb["swap_auto_tx_ritiro"]
+    buona = "bc1q0xcqpzrky6eff2g52qdye53xkk9jxkvrh6yhyw"
+
+    def perche(*a):
+        try:
+            tx(*a)
+            return "passa"
+        except ValueError as e:
+            return str(e)
+    v = risp["onchainAmount"]
+    prova("swap auto: le cifre e gli indirizzi storti fermano il ritiro",
+          ["il lockup non copre quel che il preventivo promette"] * 3
+          + ["indirizzo di destinazione non valido"] * 3 + ["passa"] * 3,
+          [perche(risp, k, lock, buona, v, "bitcoin"),
+           perche(risp, k, lock, buona, 545, "bitcoin"),
+           perche(risp, k, lock, buona, v + 1, "bitcoin"),
+           perche(risp, k, lock, "tb1q0xcqpzrky6eff2g52qdye53xkk9jxkvraulyla", v - 300, "bitcoin"),
+           perche(risp, k, lock, "bcrt1q0xcqpzrky6eff2g52qdye53xkk9jxkvrl4xfg5", v - 300, "bitcoin"),
+           perche(risp, k, lock, buona[:-1] + "x", v - 300, "bitcoin"),
+           perche(risp, k, lock, "bc1p5e6v9v2j5wp3y6c79gaqdqltq7jdv45fswnnm7exmmp2020mqepsmcx06p",
+                  v - 300, "bitcoin"),
+           perche(risp, k, lock, "1111111111111111111114oLvT2", v - 300, "bitcoin"),
+           perche(risp, k, lock, "2MsFDzHRUAMpjHxKyoEHU3aMCMsVtMqs1PV", v - 300, "regtest")])
+    prova("...e i vecchi indirizzi di un'altra rete non passano",
+          ["indirizzo di destinazione non valido"] * 2,
+          [perche(risp, k, lock, "1111111111111111111114oLvT2", v - 300, "regtest"),
+           perche(risp, k, lock, "2MsFDzHRUAMpjHxKyoEHU3aMCMsVtMqs1PV", v - 300, "bitcoin")])
+    # un lockup che paga un ALTRO p2tr (la stessa cifra, un'altra chiave):
+    # non e' il nostro swap, e il segreto non esce
+    from embit.script import Script as _Scr
+    altro = _Tx.parse(bytes.fromhex(lock))
+    altro.vout[0].script_pubkey = _Scr(b"\x51\x20" + bytes(32 * [7]))
+    prova("...e un lockup su un altro p2tr non e' il nostro swap",
+          "nel lockup non c'e' il nostro swap",
+          perche(risp, k, altro.serialize().hex(), buona, v - 300, "bitcoin"))
+    fatto = tx(risp, k, lock, buona, v - 300, "bitcoin")
+    w = _Tx.parse(bytes.fromhex(fatto["hex"])).vin[0].witness.items
+    prova("swap auto: il testimone e' firma, segreto, foglia del ritiro, blocco di controllo",
+          (4, 64, k["segreto"].hex(), risp["swapTree"]["claimLeaf"]["output"], 65, 300),
+          (len(w), len(w[0]), w[1].hex(), w[2].hex(), len(w[3]), fatto["fee"]))
+    # IL BLOCCO DI CONTROLLO (BIP-341), che il cartone NON guarda (giudica
+    # la firma e la foglia) e bitcoind si': la chiave interna ritoccata
+    # con la radice rifatta da foglia e fratello deve dare ESATTAMENTE
+    # l'uscita del lockup, parita' compresa. Lo rifa' embit, con la sua
+    # aritmetica (non la nostra).
+    from embit.hashes import tagged_hash as _th
+
+    def blocco_regge(cb, foglia, programma):
+        if len(cb) != 65 or cb[0] & 0xfe != 0xc0:
+            return False
+        h = _th("TapLeaf", bytes([0xc0, len(foglia)]) + foglia)
+        a, b = sorted([h, cb[33:65]])
+        radice = _th("TapBranch", a + b)
+        # (non `PublicKey.taproot_tweak`: torna la x-only e la parita'
+        # la perde; qui serve il punto intero)
+        from embit.util import secp256k1 as _s
+        q = _s.ec_pubkey_serialize(_s.ec_pubkey_add(
+            _s.ec_pubkey_parse(b"\x02" + cb[1:33]),
+            _th("TapTweak", cb[1:33] + radice)))
+        return q[1:] == programma and (q[0] & 1) == (cb[0] & 1)
+    programma = _Tx.parse(bytes.fromhex(lock)).vout[0].script_pubkey.data[2:]
+    storto = bytearray(w[3])
+    storto[0] ^= 1
+    prova("swap auto: il blocco di controllo regge per BIP-341 (e con la parita' "
+          "girata no)", (True, False),
+          (blocco_regge(w[3], w[2], programma), blocco_regge(bytes(storto), w[2], programma)))
+    prova("...e il cartone lo prende", 201, _cart.trasmetti(c, {"hex": fatto["hex"]})[0])
+    # tutt'e due le parita' dell'uscita, su dieci swap: il blocco regge
+    # sempre, e la prova non passa per caso su una parita' sola
+    parita, reggono = set(), []
+    for i in range(41, 51):
+        ki = amb["swap_auto_chiavi"](M, i)
+        _, ri = _cart.crea_swap(c, {"from": "BTC", "to": "BTC", "invoiceAmount": 50000,
+                                    "preimageHash": ki["impronta"].hex(),
+                                    "claimPublicKey": ki["pubblica"].hex(),
+                                    "pairHash": tar["hash"]})
+        _cart.sposta(c, ri["id"], "transaction.mempool")
+        li = c["swap"][ri["id"]]["lockup"]["hex"]
+        fi = tx(ri, ki, li, buona, ri["onchainAmount"] - 300, "bitcoin")
+        wi = _Tx.parse(bytes.fromhex(fi["hex"])).vin[0].witness.items
+        parita.add(wi[3][0] & 1)
+        reggono.append(blocco_regge(wi[3], wi[2], _Tx.parse(bytes.fromhex(li))
+                                    .vout[0].script_pubkey.data[2:])
+                       and _cart.trasmetti(c, {"hex": fi["hex"]})[0] == 201)
+    prova("...su dieci swap, con tutt'e due le parita': reggono tutti",
+          ([True] * 10, {0, 1}), (reggono, parita))
+    srv.shutdown()
     _sh.rmtree(cartella, ignore_errors=True)
 
 
@@ -185740,7 +185974,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
-              prove_swap_auto,
+              prove_swap_auto, prove_swap_auto_ritiro,
               prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,
               prove_margine_cassaforte,
               prove_quantita_servizi,
