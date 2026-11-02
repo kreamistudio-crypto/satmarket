@@ -154093,9 +154093,32 @@ console.log(JSON.stringify(out));
     # della pagina del MIO scambio non perde la valuta passando da
     # `comeLibroP2P` («Totale da inviare 10 USDT», non «€»)
     riga_libro = pezzo_js(mini, "function rigaOrdineP2P(", "\n}\n")
-    prova("la card del libro mette la bandierina della valuta accanto alla cifra", True,
-          "+ (typeof bandieraValutaP2P === 'function' ? bandieraValutaP2P(o.fiat, o.metodi || []) : '')"
-          in riga_libro)
+    # (2 nov 2026 sera, variante «C» di Andrea) la bandierina NON sta piu'
+    # dopo la cifra: apre la riga, davanti a «Invia/Ricevi»; e la moneta
+    # della rete apre la riga dei sats. Sulle due card, Mostro e on-chain.
+    riga_oc = pezzo_js(mini, "function rigaOnchainP2P(", "\n}\n")
+    prova("la card del libro mette la bandierina della valuta DAVANTI al verbo, e la "
+          "moneta della rete davanti a «Ricevi/Invia … sats» (Lightning su Mostro, "
+          "bitcoin on-chain)", (True, True, False, True, True, True),
+          ("bandieraValutaP2P(o.fiat, o.metodi || []).trim()" in riga_libro,
+           "'<span class=\"p2p-grande p2p-euro\">' + bandiera\n    + (paghiEuro ? 'Invia ' : 'Ricevi ')" in riga_libro,
+           "+ (typeof bandieraValutaP2P === 'function' ? bandieraValutaP2P(o.fiat, o.metodi || []) : '')" in riga_libro,
+           "monetaRigaP2P('ln') : '')\n    + '<span class=\"p2p-verbo\">'" in riga_libro,
+           "'<span class=\"p2p-grande p2p-euro\">' + bandiera + (paghiEuro ? 'Invia ' : 'Ricevi ')" in riga_oc,
+           "monetaRigaP2P('btc') : '') + '<span class=\"p2p-verbo\">'" in riga_oc))
+    js_m = ("const P2P_OC_MONETA = 'OC'; const P2P_LN_MONETA = 'LN';\n"
+            + _fn_js(mini, "function monetaRigaP2P(rete){") + "\n"
+            + "console.log(JSON.stringify([monetaRigaP2P('ln'), monetaRigaP2P('btc')]));")
+    om = _node_banco(js_m)
+    if om is None:
+        salta("la moneta davanti ai sats, sul banco", "node non c'e'")
+    else:
+        prova("...la moneta e' il fulmine per Lightning e la ₿ per on-chain, mai un'emoji",
+              ['<span class="p2p-moneta-riga" role="img" aria-label="Lightning">LN</span>',
+               '<span class="p2p-moneta-riga" role="img" aria-label="on-chain">OC</span>'], om)
+    prova("...e il CSS la tiene in riga, alta quanto il testo", (True, True),
+          (".p2p-moneta-riga{display:inline-flex;vertical-align:-.3em;margin-right:.35em;line-height:0}" in mini,
+           ".p2p-euro > .p2p-bandiera{margin-right:.3em}" in mini))
     i = mini.index("const P2P_VALUTE = [")
     js = ("const P2P_VALUTA = 'EUR';\n" + mini[i:mini.index("];", i) + 2] + "\n"
           + mini[mini.index("const P2P_RETI_USDT = ["):mini.index("];", mini.index("const P2P_RETI_USDT = [")) + 2] + "\n"

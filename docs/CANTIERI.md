@@ -77642,3 +77642,30 @@ snowballstemmer, embit; niente httpx ne' fastapi).
 LA LEZIONE. Prima di una promozione la suite si gira nell'ambiente del
 passo «Le prove» della CI, non in quello dei collaudi: un venv piu'
 ricco fa sparire le saltate.
+
+## Le icone davanti al verbo sulla card del P2P (2 nov 2026, cantiere bandiera-invia)
+
+Dopo la promozione della sera Andrea ha chiesto di spostare la bandierina
+della valuta «davanti alla parola Invia», e anche il logo di Tether. Ha
+visto tre varianti (anteprima /mnt/project-files/leve-admin/
+bandiera-invia-varianti.png: A davanti al verbo, B fra verbo e cifra, C
+come A più la moneta della rete davanti alla riga dei sats) e ha scelto
+la C, «con anche il simbolo lightning o onchain davanti a ricevi».
+
+COSA CAMBIA. Sulla card di Mostro (`rigaOrdineP2P`) e su quella on-chain
+(`rigaOnchainP2P`) la bandierina (🇪🇺, o il logo di Tether col bollino
+della rete) apre la riga dei soldi: «🇪🇺 Invia 50,00 €». La riga dei sats
+si apre con la moneta della rete, `monetaRigaP2P`: il fulmine sulle card
+di Mostro, la ₿ arancio su quelle on-chain, le stesse monete della pagina
+Cambio (mai emoji). La moneta c'è per TUTTI e sempre, anche a on-chain
+spento: dice su che rete arrivano i sats.
+
+NON TOCCATO. La moneta nel riquadro dei metodi (`pagaConReteP2P`, solo a
+chi vede l'on-chain) resta dov'era: sulla card on-chain, e sulle card di
+Mostro di chi vede l'on-chain, oggi la moneta compare due volte. Toglierla
+da lì è una scelta di Andrea.
+
+PROVATO. `prove_p2p_usdt`: l'ordine delle icone nelle due card, la moneta
+giusta per rete, il CSS; controprova (bandierina dopo la cifra, una moneta
+sola): 2 rosse. Suite severa nell'ambiente del passo «Le prove» della CI
+e collaudi CI senza proxy. Schermata vera: bandiera-invia-fatta.png.

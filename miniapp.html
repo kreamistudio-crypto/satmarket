@@ -3042,6 +3042,13 @@
   /* il bollino della rete sul logo di Tether (2 nov 2026): l'anello col
      colore della card lo stacca dal logo, come nei wallet */
   .p2p-bandiera.con-rete{position:relative;display:inline-block;margin-right:.3em}
+  /* davanti al verbo (2 nov 2026, variante «C»): la bandierina apre la
+     riga dei soldi, la moneta della rete quella dei sats */
+  .p2p-euro > .p2p-bandiera{margin-right:.3em}
+  .p2p-euro > .p2p-bandiera.con-rete{margin-right:.5em}
+  .p2p-moneta-riga{display:inline-flex;vertical-align:-.3em;margin-right:.35em;line-height:0}
+  .p2p-moneta-riga .cambio-moneta{width:1.25em;height:1.25em}
+  .p2p-moneta-riga .cambio-moneta .cambio-svg{width:.75em;height:.75em}
   .p2p-bandiera .p2p-rete-badge{position:absolute;top:-.3em;right:-.38em;width:.62em;height:.62em;
     border-radius:50%;box-shadow:0 0 0 1.5px var(--card)}
   .p2p-ord{background:var(--card);border:1px solid var(--line-soft);border-radius:16px;
@@ -58291,6 +58298,14 @@ function pagaConReteP2P(paga, rete){
   return paga.replace('<div class="p2p-box p2p-paga', '<div class="p2p-box p2p-paga p2p-paga-rete')
     .replace(/<\/div>$/, segno + '</div>');
 }
+/* LA MONETA DAVANTI A «RICEVI/INVIA … SATS» (2 nov 2026, Andrea): la
+   rete dei sats della card, sempre, anche a on-chain spento — e' il
+   fulmine (o la ₿) della pagina Cambio, mai un'emoji */
+function monetaRigaP2P(rete){
+  return '<span class="p2p-moneta-riga" role="img" aria-label="'
+    + (rete === 'btc' ? 'on-chain' : 'Lightning') + '">'
+    + (rete === 'btc' ? P2P_OC_MONETA : P2P_LN_MONETA) + '</span>';
+}
 function segnoReteP2P(rete){
   if (rete !== 'btc' && !(p2pOnchainLibro.quando > 0 || myP2POnchain)) return '';
   return '<span class="p2p-rete" role="img" aria-label="'
@@ -58327,9 +58342,14 @@ function rigaOnchainP2P(o){
   const paroleOc = typeof paroleOcP2P === 'function' ? paroleOcP2P : (x, t) => t;
   const paghiEuro = o.lato === 'sell';
   const mio = p2pOnchainLibro.miei.includes(String(o.ordine));
-  const rigaEuro = '<span class="p2p-grande p2p-euro">' + (paghiEuro ? 'Invia ' : 'Ricevi ')
+  /* le icone davanti al verbo, come la card di Mostro (2 nov 2026,
+     variante «C»): la bandierina della valuta e la moneta di bitcoin */
+  const bandiera = typeof bandieraValutaP2P === 'function'
+    ? bandieraValutaP2P(usdtOc(o) ? 'USDT' : 'EUR', Array.isArray(o.metodi) ? o.metodi : []).trim() : '';
+  const rigaEuro = '<span class="p2p-grande p2p-euro">' + bandiera + (paghiEuro ? 'Invia ' : 'Ricevi ')
     + esc(cifraOc(o)) + '</span>';
-  const rigaSats = '<span class="p2p-piccola p2p-sats"><span class="p2p-verbo">'
+  const rigaSats = '<span class="p2p-piccola p2p-sats">'
+    + (typeof monetaRigaP2P === 'function' ? monetaRigaP2P('btc') : '') + '<span class="p2p-verbo">'
     + (paghiEuro ? 'Ricevi ' : 'Invia ') + '</span>' + esc(satsCardOnchainP2P(o)) + '</span>';
   /* IL FOGLIO DI LIGHTNING SULLA CARD (30 ott 2026, cantiere oc-identico):
      il premio a mercato col badge di Lightning, chi puo' prendere, e la
@@ -64180,7 +64200,6 @@ function rigaOrdineP2P(o){
   /* il segno della valuta dell'ordine (1 nov 2026, cantiere p2p-usdt) */
   const eurTxt = capiP2P(esc(fmtEur(o.euro)), o.euroMax ? esc(fmtEur(o.euroMax)) : '') + ' '
     + (typeof segnoValutaP2P === 'function' ? esc(segnoValutaP2P(o.fiat)) : '€')
-    + (typeof bandieraValutaP2P === 'function' ? bandieraValutaP2P(o.fiat, o.metodi || []) : '')
     /* il range: chi prende sceglie la cifra, e lo dice la riga
        dell'euro — e' li' che la scelta si fa */
     /* «scegli tu» va a capo INTERO: col «da … a …» la riga s'e'
@@ -64211,12 +64230,20 @@ function rigaOrdineP2P(o){
      PayCode, che sono pagamenti davvero. Quindi a comprare la riga grande (l'euro) sta in cima,
      a vendere ci arriva seconda: cambia l'ORDINE, mai la taglia —
      euro grande e sats piccoli in tutt'e due i tab. */
-  const rigaEuro = '<span class="p2p-grande p2p-euro">'
+  /* L'ICONA DAVANTI AL VERBO (2 nov 2026, Andrea, variante «C»
+     dell'anteprima): la bandierina della valuta (🇪🇺, o il logo di
+     Tether col bollino della rete) apre la riga dei soldi, e la moneta
+     della rete (il fulmine, qui sempre Lightning: e' un ordine di Mostro)
+     apre quella dei sats. Prima la bandierina stava DOPO la cifra. */
+  const bandiera = typeof bandieraValutaP2P === 'function'
+    ? bandieraValutaP2P(o.fiat, o.metodi || []).trim() : '';
+  const rigaEuro = '<span class="p2p-grande p2p-euro">' + bandiera
     + (paghiEuro ? 'Invia ' : 'Ricevi ') + eurTxt + '</span>';
   /* il verbo esce dalla tinta del lato e la cifra ci resta: vedi il
      CSS di `.p2p-sats .p2p-verbo` — in colore va quel che il colore
      distingue, cioe' i sats */
   const rigaSats = '<span class="p2p-piccola p2p-sats">'
+    + (typeof monetaRigaP2P === 'function' ? monetaRigaP2P('ln') : '')
     + '<span class="p2p-verbo">' + (paghiEuro ? 'Ricevi ' : 'Invia ')
     + '</span>' + sats + '</span>';
   /* LA RIGA DEL PREZZO E' MORTA CON LA CARD ESSENZIALE (10 set 2026,
