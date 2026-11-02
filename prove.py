@@ -154136,6 +154136,36 @@ console.log(JSON.stringify(out));
           in pezzo_js(mini, "function renderCampiP2P(){", "\n}\n"))
 
 
+    # --- IL TASTO DICE USDT ANCHE SE LA RIGA HA PERSO LA VALUTA (2 nov 2026,
+    # Andrea: «c'e' il tasto ho inviato gli euro al posto di ho inviato gli
+    # USDT») --- la riga nata dal server non porta `fiat`, e la presa scrive
+    # 'EUR' a chi non ce l'ha: i metodi, che in USDT sono SOLO reti, lo dicono
+    i = mini.index("const P2P_RETI_USDT = [")
+    js = ("const P2P_VALUTA = 'EUR';\n" + mini[i:mini.index("];", i) + 2] + "\n"
+          + _fn_js(mini, "function reteUsdtDaMetodoP2P(m){") + "\n"
+          + _fn_js(mini, "function valutaOrdineP2P(o){") + "\n"
+          + _riga_js(mini, "function usdtP2P(o){") + "\n"
+          + _fn_js(mini, "function gestoPagoP2P(o){") + "\n"
+          + "console.log(JSON.stringify([\n"
+          + "  valutaOrdineP2P({fiat: 'USDT', metodi: ['USDT (Tron)']}),\n"
+          + "  valutaOrdineP2P({metodi: ['USDT (Ethereum)']}),\n"
+          + "  valutaOrdineP2P({fiat: 'EUR', metodi: ['USDT (Tron)']}),\n"
+          + "  valutaOrdineP2P({fiat: 'EUR', metodi: ['SEPA']}),\n"
+          + "  valutaOrdineP2P({metodi: ['SEPA', 'USDT (Tron)']}),\n"
+          + "  valutaOrdineP2P({metodi: []}), valutaOrdineP2P(null),\n"
+          + "  gestoPagoP2P({fiat: 'EUR', metodi: ['USDT (Ethereum)']}),\n"
+          + "  gestoPagoP2P({fiat: 'EUR', metodi: ['Revolut']})]));\n")
+    o = _node_banco(js)
+    if o is None:
+        salta("la valuta dai metodi, sul banco", "node non c'e'")
+    else:
+        prova("la valuta dello scambio: USDT se lo dice il campo o se TUTTI i metodi "
+              "sono reti USDT (anche con 'EUR' scritto dalla presa); euro altrimenti; "
+              "e il tasto dice «Ho inviato gli USDT»",
+              ["USDT", "USDT", "USDT", "EUR", "EUR", "EUR", "EUR",
+               "Ho inviato gli USDT", "Ho inviato gli euro"], o)
+
+
 def prove_p2p_onchain():
     """GLI SCAMBI P2P CON LA GARANZIA 2-DI-3 (30 ott 2026, cantiere
     p2p-onchain-2di3, decisione di Andrea con Alan). Il giro vero — server,

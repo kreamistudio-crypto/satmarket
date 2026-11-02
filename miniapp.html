@@ -75988,7 +75988,18 @@ function valutaVistaP2P(cod, metodi){
   return m.length > 0 && m.every(x => !!reteUsdtDaMetodoP2P(x));
 }
 function valutaOrdineP2P(o){
-  return String((o && o.fiat) || P2P_VALUTA).toUpperCase();
+  const f = String((o && o.fiat) || '').toUpperCase();
+  if (f && f !== P2P_VALUTA) return f;
+  /* I METODI LO DICONO ANCHE QUANDO LA RIGA L'HA PERSO (2 nov 2026,
+     Andrea: «c'e' il tasto ho inviato gli euro al posto di ho inviato
+     gli USDT»): la riga che nasce dal server non porta la valuta, e
+     la presa scrive 'EUR' a chi non ce l'ha. Un ordine in USDT ha SOLO
+     reti per metodi, mai mescolate con l'euro: se lo sono tutte, e'
+     in USDT, qualunque cosa dica il campo. */
+  const m = (o && Array.isArray(o.metodi)) ? o.metodi : [];
+  if (m.length && typeof reteUsdtDaMetodoP2P === 'function'
+      && m.every(x => !!reteUsdtDaMetodoP2P(x))) return 'USDT';
+  return f || P2P_VALUTA;
 }
 function metodiValutaP2P(cod){
   return String(cod || '').toUpperCase() === 'USDT' ? P2P_METODI_USDT : P2P_METODI;
