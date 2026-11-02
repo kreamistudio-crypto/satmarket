@@ -34317,6 +34317,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `swapBloccoProfilo()` dell'instradatore: «Ritrova i miei cambi» =
   `swapRitrovaCambi`, la xpub di radice a ogni fornitore, e le parole
   dei cambi di prima solo se un cassetto vecchio c'è).
+  UN WALLET SOLO PER ACCOUNT (2 nov 2026 sera, cantiere wallet-unico;
+  perché in CANTIERI, «Un wallet solo fra l'app e Telegram»). Il server
+  tiene per account, tabella `wallet_unico`, l'impronta del seme (master
+  fingerprint BIP-32, 8 esadecimali) e il pavimento dei numeri dei cambi;
+  mai parole. Rotte: `GET`/`POST /api/wallet/unico` (registra; un'altra
+  impronta 409 «altro», salvo `sostituisci: true`) e `POST
+  /api/wallet/unico/numero` (max fra `minimo` e pavimento, sotto
+  `_lucchetto_wallet`; freni `wallet_unico` e `wallet_numero`). Nel
+  telefono: `onchainSemeAssicurato(opz)` chiede `walletUnicoLeggi` dopo
+  cloud e relay e prima di far nascere (un wallet altrove → errore
+  `tipo: 'altrove'`, `walletAltrove`; `opz.nuovoPrincipale` sostituisce),
+  e registra con `walletUnicoRegistra` PRIMA di scrivere; `swapPrenotaIndice`
+  è asincrona e prende il numero da `walletUnicoNumero` (muto: −2). Nel
+  Profilo `#walletUnico` in cima al cassetto, disegnato da
+  `walletUnicoDisegna` → `walletUnicoControlla` (stati uguale / diverso /
+  altrove / nessuno / muto) → `walletUnicoBlocco`; i gesti
+  `walletIncollaParole` (→ `walletUsaParoleDi`), `walletRendiPrincipale`,
+  `walletNuovoPrincipale`. Le parole sostituite: `walletConservaPrima`
+  (localStorage `barattolo_onchain_prima_<tg>` e cloud
+  `barattolo_onchain_prima`), `onchainParolePrima(impronta)`, e i record dei
+  cambi timbrati con `impronta` (`swapTimbraImpronta`), che
+  `swapParoleDi` guarda per primo.
   I PASSI (`swapPassi[ordine]`): `preventivo` → `parole` (solo con le
   parole non ancora `copiata`) → `creo`; il passo `indirizzo` non c'è
   più. Il campo dell'indirizzo (`campoIndirizzoSwap`: `#swapIndirizzo_<n>`,

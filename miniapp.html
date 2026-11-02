@@ -18978,7 +18978,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '2d7e2557a4';
+const SWAP_TELEFONO_VER = 'cd5b52c3f2';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -44398,6 +44398,7 @@ async function onchainCambioConferma(btn, o){
       : e && e.tipo === 'mente' ? `${nome} ha risposto con dati che non tornano: non è partito niente.`
       : e && e.tipo === 'giu' ? `${nome} ora non risponde: riprova fra poco.`
       : e && e.tipo === 'casa' ? t3().nienteCasa
+      : e && e.tipo === 'altrove' ? t3().semeAltrove
       : e && e.tipo === 'seme' ? 'su questo dispositivo non c\'è la tua chiave'
       : (e && e.message) || 'errore';
   } finally {
@@ -55996,11 +55997,202 @@ function eventoCopiaOnchain(cifrato, adesso){
           tags: [['d', ONCHAIN_COPIA_D]], content: String(cifrato || '')};
 }
 
+/* ============ IL WALLET UNICO (2 nov 2026 sera, cantiere wallet-unico) ==
+   Alan, nella prova vera: «dall'app e la miniapp di telegram ho due seed
+   phrase differenti». Nell'app fuori da Telegram, per un account senza
+   Nostr, nessuna copia delle parole si raggiunge, e qui sotto ne nasceva
+   un'altra. Idea di Alan, scelta di Andrea («Ferma e incolla»): il server
+   sa SE il wallet esiste, senza saperne il contenuto — l'IMPRONTA (la
+   master fingerprint del BIP-32: otto caratteri pubblici, quelli che ogni
+   descrittore scrive in chiaro) e il pavimento dei numeri dei cambi.
+   - prima di far nascere parole nuove si chiede: se un wallet c'e' gia',
+     non ne nasce un secondo, e il Profilo chiede di incollare le sue 12
+     parole (controllate contro l'impronta);
+   - il server muto ferma la nascita (una casa muta non e' una casa vuota);
+   - un dispositivo che ha GIA' parole sue le registra se il server non ne
+     ha; se ne ha altre il Profilo lo dice, e offre le due strade;
+   - le parole sostituite NON si buttano: restano qui (e nel cloud di
+     Telegram, dove c'e') per i cambi gia' fatti con loro. */
+const walletImpronte = new Map();     // parole -> impronta (il conto costa)
+let walletUnicoStato = null;          // {impronta, prossimo} dal server
+const ONCHAIN_CLOUD_PRIMA = 'barattolo_onchain_prima';
+function walletPrimaChiave(){ return `barattolo_onchain_prima_${myTgId || 'x'}`; }
+
+/* L'IMPRONTA DELLE PAROLE: la fingerprint della chiave madre, in esadecimale */
+async function onchainImpronta(parole){
+  const p = String(parole || '').trim();
+  if (walletImpronte.has(p)) return walletImpronte.get(p);
+  const B = await caricaBitcoin();
+  const madre = B.HDKey.fromMasterSeed(B.mnemonicToSeedSync(p, ''));
+  const hex = (Number(madre.fingerprint) >>> 0).toString(16).padStart(8, '0');
+  walletImpronte.set(p, hex);
+  return hex;
+}
+/* l'errore di chi ha gia' un wallet altrove: il messaggio e' per l'utente */
+function walletAltrove(impronta){
+  const e = new Error('Il tuo wallet di Barattolo è già nato su un altro '
+    + 'dispositivo. Per usarlo anche qui apri Profilo → «Il wallet di '
+    + 'Barattolo» e incolla le sue 12 parole.');
+  e.tipo = 'altrove';
+  e.impronta = String(impronta || '');
+  return e;
+}
+/* A CHE PUNTO E' QUESTO DISPOSITIVO: 'uguale' (le sue parole sono il
+   principale, o lo sono diventate adesso), 'diverso' (ha parole sue, il
+   principale e' un altro), 'altrove' (non ha parole, il principale c'e'),
+   'nessuno' (niente parole e niente wallet), 'muto' (il server tace). */
+async function walletUnicoControlla(){
+  let parole = onchainSemeLocale();
+  let st;
+  try { st = await walletUnicoLeggi(); } catch(e){ return {stato: 'muto'}; }
+  /* dentro Telegram la copia del cloud vale come «qui»: si legge senza
+     chiedere niente a nessuno (i relay no: vorrebbero il firmatario) */
+  if (!parole && st.impronta && cloudTelegram()) {
+    try {
+      const r = await cloudLeggiEsito(ONCHAIN_CLOUD);
+      const p = r.ok && r.testo ? String(JSON.parse(r.testo).parole || '').trim() : '';
+      const B = await caricaBitcoin();
+      if (p && B.validateMnemonic(p, B.wordlist) && onchainScriviLocale(p)) {
+        onchainNato = onchainNato || 'nuvola';
+        parole = p;
+      }
+    } catch(e){}
+  }
+  if (!parole) return {stato: st.impronta ? 'altrove' : 'nessuno', principale: st.impronta};
+  const mia = await onchainImpronta(parole);
+  if (!st.impronta) {
+    try {
+      const reg = await walletUnicoRegistra(mia, false);
+      if (!reg.ok) return {stato: 'diverso', principale: reg.altro, mia: mia};
+    } catch(e){ return {stato: 'muto'}; }
+    return {stato: 'uguale', principale: mia, mia: mia};
+  }
+  return {stato: st.impronta === mia ? 'uguale' : 'diverso', principale: st.impronta, mia: mia};
+}
+
+/* LE PAROLE DI PRIMA: quelle sostituite, con la loro impronta, qui e
+   nel cloud di Telegram dove c'e'. Servono ai cambi gia' fatti con loro */
+function walletParolePrima(){
+  try {
+    const l = JSON.parse(localStorage.getItem(walletPrimaChiave()) || '[]');
+    return Array.isArray(l) ? l.filter(x => x && x.impronta && x.parole) : [];
+  } catch(e){ return []; }
+}
+function onchainParolePrima(impronta){
+  const x = walletParolePrima().find(v => v.impronta === impronta);
+  return x ? x.parole : '';
+}
+async function walletConservaPrima(parole){
+  const imp = await onchainImpronta(parole);
+  const l = walletParolePrima().filter(x => x.impronta !== imp);
+  l.push({impronta: imp, parole: parole, quando: Date.now()});
+  try { localStorage.setItem(walletPrimaChiave(), JSON.stringify(l)); }
+  catch(e){ return ''; }
+  /* il cloud di Telegram: una copia in piu', dove c'e' */
+  let nuvola = false;
+  try { nuvola = !!(await cloudScrivi(ONCHAIN_CLOUD_PRIMA, JSON.stringify(l.map(x => ({impronta: x.impronta, parole: x.parole}))))); }
+  catch(e){ nuvola = false; }
+  /* i cambi nati con quelle parole se lo ricordano */
+  if (typeof swapTimbraImpronta === 'function') swapTimbraImpronta(imp);
+  return {impronta: imp, nuvola: nuvola};
+}
+/* METTERE LE PAROLE DEL PRINCIPALE SU QUESTO DISPOSITIVO: devono essere
+   valide e avere l'impronta del principale; quelle di prima si conservano */
+async function walletUsaParoleDi(testo){
+  const B = await caricaBitcoin();
+  const parole = String(testo || '').trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+  if (parole.split(' ').length !== 12 || !B.validateMnemonic(parole, B.wordlist))
+    throw new Error('Non sono 12 parole valide: controlla di averle copiate tutte, nell\'ordine.');
+  const imp = await onchainImpronta(parole);
+  const st = await walletUnicoLeggi();
+  if (st.impronta && st.impronta !== imp)
+    throw new Error(`Queste parole non sono quelle del wallet principale (finisce in ${st.impronta}, queste in ${imp}).`);
+  const vecchie = onchainSemeLocale();
+  let prima = null;
+  if (vecchie && vecchie !== parole) {
+    prima = await walletConservaPrima(vecchie);
+    if (!prima) throw new Error('Questo dispositivo non riesce a conservare le parole di prima: non cambio niente.');
+  }
+  if (!onchainScriviLocale(parole)) throw new Error('Questo dispositivo non riesce a salvare le parole.');
+  onchainNato = 'incollate';
+  onchainCase = {nuvola: null, relay: null};
+  if (!st.impronta) await walletUnicoRegistra(imp, false);
+  /* LE COPIE: il cloud di Telegram che teneva le parole di prima si
+     riscrive SOLO se quelle sono gia' al sicuro nella sua lista «di
+     prima» (sennò resta com'e', e le parole di prima con lei) */
+  if (!prima || prima.nuvola || !cloudTelegram()) await onchainMettiAlSicuro(parole);
+  return imp;
+}
+
+/* IL BACKUP CHE NON SI ARRENDE (2 nov 2026 sera, Alan: «durante la
+   generazione deve fare già il backup su telegram/relay»; Andrea: sì al
+   nuovo tentativo a ogni apertura). La copia si tenta quando le parole
+   nascono, ma se fallisce — ad Alan i relay non l'avevano presa — non
+   si riprovava piu'. Adesso ogni apertura fa una RONDA, solo dove non
+   disturba nessuno: il cloud di Telegram (silenzioso) e i relay con la
+   nsec conservata nel browser (silenziosa). Un firmatario remoto (Amber,
+   bunker) o l'estensione chiederebbero un'approvazione: per loro c'e'
+   l'avviso nel Profilo col tasto «Salva il backup». La RICEVUTA delle
+   copie riuscite sta nel dispositivo, per impronta. */
+function walletCopieChiave(){ return `barattolo_onchain_copie_${myTgId || 'x'}`; }
+function walletCopieLette(imp){
+  try {
+    const d = JSON.parse(localStorage.getItem(walletCopieChiave()) || '{}');
+    return d && typeof d === 'object' && d.impronta === imp ? d : {impronta: imp};
+  } catch(e){ return {impronta: imp}; }
+}
+function walletSegnaCopia(imp, dove){
+  const d = walletCopieLette(imp);
+  d[dove] = Date.now();
+  try { localStorage.setItem(walletCopieChiave(), JSON.stringify(d)); } catch(e){}
+}
+let walletRondaFatta = false, walletRondaAvvisata = false;
+/* torna true se ha fatto (o trovato) una copia nuova */
+async function walletBackupRonda(){
+  if (walletRondaFatta || DEMO || !(myOnchain || (typeof swapAcceso === 'function' && swapAcceso()))) return false;
+  const parole = onchainSemeLocale();
+  if (!parole) return false;
+  walletRondaFatta = true;
+  let imp, st;
+  try { imp = await onchainImpronta(parole); st = await walletUnicoLeggi(); }
+  catch(e){ walletRondaFatta = false; return false; }
+  /* le parole di qui non sono il principale: il Profilo lo dice, e la
+     loro copia non deve finire sopra quella del principale */
+  if (st.impronta && st.impronta !== imp) return false;
+  const corpo = JSON.stringify({parole, strada: onchainSrv?.strada || onchainRete().strada});
+  const prima = walletCopieLette(imp);
+  if (!prima.nuvola && cloudTelegram()) {
+    try {
+      const c = await cloudLeggiEsito(ONCHAIN_CLOUD);
+      let dentro = '';
+      try { dentro = String(JSON.parse(c.testo || '{}').parole || '').trim(); } catch(e){ dentro = ''; }
+      if (c.ok && dentro === parole) walletSegnaCopia(imp, 'nuvola');
+      /* solo una casa VUOTA si riempie: una che dice altre parole no */
+      else if (c.ok && !c.testo && await cloudScrivi(ONCHAIN_CLOUD, corpo)) walletSegnaCopia(imp, 'nuvola');
+    } catch(e){}
+  }
+  if (!prima.relay && typeof firmatarioNsecSalvata === 'function') {
+    let nsec = null;
+    try { nsec = await firmatarioNsecSalvata(); } catch(e){ nsec = null; }
+    if (nsec) {
+      try { if (typeof nsec.chiudi === 'function') nsec.chiudi(); } catch(e){}
+      try { if (await onchainSuiRelay(corpo) === true) walletSegnaCopia(imp, 'relay'); } catch(e){}
+    }
+  }
+  const dopo = walletCopieLette(imp);
+  if (!dopo.nuvola && !dopo.relay && !dopo.carta && !walletRondaAvvisata) {
+    walletRondaAvvisata = true;
+    toast('⚠️ Il wallet di Barattolo non ha ancora un backup: Profilo → «Il wallet di Barattolo»', 8000);
+  }
+  return !!((dopo.nuvola && !prima.nuvola) || (dopo.relay && !prima.relay));
+}
+
 /* IL SEME, CHE CI SIA GIA' O CHE DEBBA NASCERE. Si cerca PRIMA nelle
    case — una chiave nuova a chi ne aveva gia' una sarebbe un secondo
    mazzo, cioe' due identita' per la stessa persona (la lezione dei due
    mazzi, set 2026) — e solo se non c'e' da nessuna parte nasce. */
-async function onchainSemeAssicurato(){
+async function onchainSemeAssicurato(opz){
+  opz = opz || {};
   const B = await caricaBitcoin();
   let parole = onchainSemeLocale();
   if (parole) { onchainNato = onchainNato || 'locale'; return parole; }
@@ -56030,11 +56222,20 @@ async function onchainSemeAssicurato(){
   /* 2) la cassetta sui relay, per chi ha una chiave Nostr */
   parole = await onchainDaiRelay();
   if (parole) { onchainScriviLocale(parole); onchainNato = 'relay'; return parole; }
-  /* 3) nasce adesso, random, qui dentro */
+  /* 3) (wallet-unico) PRIMA DI FARNE NASCERE UNO si chiede al server se
+     questo account ne ha gia' uno: se si', non nasce un secondo wallet —
+     le sue parole si incollano dal Profilo. Il server muto ferma tutto */
+  const st = await walletUnicoLeggi();
+  if (st.impronta && !opz.nuovoPrincipale) throw walletAltrove(st.impronta);
+  /* 4) nasce adesso, random, qui dentro */
   parole = B.generateMnemonic(B.wordlist, 128);
   if (!B.validateMnemonic(parole, B.wordlist)) {
     throw new Error('parole non valide (non dovrebbe capitare)');
   }
+  /* ...e si registra PRIMA di salvarla: due dispositivi che nascono
+     insieme, uno solo vince, l'altro butta le sue e lo dice */
+  const reg = await walletUnicoRegistra(await onchainImpronta(parole), !!opz.nuovoPrincipale);
+  if (!reg.ok) throw walletAltrove(reg.altro);
   onchainScriviLocale(parole);
   onchainNato = 'nuovo';
   await onchainMettiAlSicuro(parole);
@@ -56051,6 +56252,13 @@ async function onchainMettiAlSicuro(parole){
   catch(e){ onchainCase.nuvola = false; }
   try { onchainCase.relay = await onchainSuiRelay(corpo); }
   catch(e){ onchainCase.relay = false; }
+  /* (wallet-unico) la ricevuta delle copie riuscite: la ronda e l'avviso
+     del Profilo la leggono */
+  try {
+    const imp = await onchainImpronta(parole);
+    if (onchainCase.nuvola === true) walletSegnaCopia(imp, 'nuvola');
+    if (onchainCase.relay === true) walletSegnaCopia(imp, 'relay');
+  } catch(e){}
 }
 
 /* La cassetta sui relay, in SCRITTURA: riusa il firmatario, i relay e
@@ -56379,6 +56587,53 @@ function onchainAttesa(btn, testo){
 }
 
 let onchainSrv = null;         // quel che il server dice (xpub, strada)
+/* (wallet-unico) LE DOMANDE AL SERVER, fuori dal banco del seme: viaggiano
+   solo l'impronta e i numeri dei cambi, mai le parole (la sentinella del
+   banco conta le fetch la' dentro, e devono restare zero) */
+function walletServerMuto(){
+  const e = new Error('Barattolo ora non risponde: non faccio nascere un '
+    + 'wallet nuovo, riprova fra un momento.');
+  e.tipo = 'muto';
+  return e;
+}
+async function walletUnicoLeggi(){
+  const r = await fetch(`${API_BASE}/wallet/unico`, {headers: {'X-Tg-Init-Data': authHdr()}});
+  const d = await r.json().catch(() => null);
+  if (!r.ok || !d) throw walletServerMuto();
+  walletUnicoStato = {impronta: String(d.impronta || ''), prossimo: Number(d.prossimo) || 0};
+  return walletUnicoStato;
+}
+/* registra l'impronta; {ok} o {ok: false, altro: l'impronta che c'e'} */
+async function walletUnicoRegistra(impronta, sostituisci){
+  const r = await fetch(`${API_BASE}/wallet/unico`, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify({impronta: impronta, sostituisci: !!sostituisci})});
+  const d = await r.json().catch(() => null);
+  if (r.status === 409 && d) {
+    walletUnicoStato = {impronta: String(d.impronta || ''), prossimo: Number(d.prossimo) || 0};
+    return {ok: false, altro: walletUnicoStato.impronta};
+  }
+  if (!r.ok || !d) throw walletServerMuto();
+  walletUnicoStato = {impronta: String(d.impronta || ''), prossimo: Number(d.prossimo) || 0};
+  return {ok: true};
+}
+/* IL NUMERO DI UN CAMBIO, dal pavimento del server: le stesse parole su
+   due dispositivi non danno mai la stessa chiave a due cambi. `minimo` e'
+   quel che il telefono userebbe da solo. Se il server non ha ancora
+   un'impronta, prima la registra (quella di queste parole). */
+async function walletUnicoNumero(parole, minimo){
+  const chiedi = () => fetch(`${API_BASE}/wallet/unico/numero`, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify({minimo: Math.max(0, Math.floor(Number(minimo) || 0))})});
+  let r = await chiedi();
+  if (r.status === 409) {
+    await walletUnicoRegistra(await onchainImpronta(parole), false);
+    r = await chiedi();
+  }
+  const d = await r.json().catch(() => null);
+  if (!r.ok || !d || !Number.isSafeInteger(d.numero) || d.numero < 0) throw walletServerMuto();
+  return d.numero;
+}
 /* LE QUATTRO SCHEDE (27 ott 2026, cantiere onchain-pagina, richiesta di
    Andrea: «invece del pippone ci deve essere un tab Info», «tutti i
    tecnicismi si devono vedere in una sezione dedicata o nelle info
@@ -56977,7 +57232,7 @@ async function renderWalletBarattolo(){
   const box = el('walletBarattolo'), sotto = el('walletParole');
   if (!box || !sotto || DEMO || !(myOnchain || swapAcceso())) return;
   const parole = onchainSemeLocale();
-  box.innerHTML = `<div class="payout"><h4>La tua chiave</h4>
+  box.innerHTML = `<div id="walletUnico"></div><div class="payout"><h4>La tua chiave</h4>
     <div class="hint">La tieni solo tu, in questo telefono. Ogni ordine
       e ogni cambio ne usa una <b>nuova</b>.</div>
     <div class="hint" id="walletCoda" style="margin-top:6px">${parole ? ''
@@ -56993,6 +57248,8 @@ async function renderWalletBarattolo(){
     <button class="btn ghost" onclick="onchainGuarda(this, 'walletBackup')">🔍 Controlla il backup</button>
     <div id="walletBackup" class="hint"></div>
     ${cambi}</div>`;
+  /* (wallet-unico) il server dice se questo e' il wallet principale */
+  walletUnicoDisegna();
   /* la metà pubblica, solo per chi ha l'on-chain: la libreria arriva
      quando serve, e la riga si scrive dopo */
   if (parole && myOnchain) {
@@ -57003,6 +57260,142 @@ async function renderWalletBarattolo(){
         <span class="mono">…${esc(onchainCoda(x))}</span>`;
     } catch(e){}
   }
+}
+/* (2 nov 2026 sera, wallet-unico) IL RIQUADRO DEL WALLET PRINCIPALE, in
+   cima al cassetto, solo quando c'e' qualcosa da fare: questo
+   dispositivo ha un wallet diverso dal principale, o non ne ha e il
+   principale e' nato altrove. Le due strade sono sempre dette per intero:
+   incollare le parole del principale (quelle di qui restano conservate),
+   oppure — gesto esplicito, con conferma — fare di questo il principale. */
+async function walletUnicoDisegna(){
+  const posto = el('walletUnico');
+  if (!posto) return;
+  let c;
+  try { c = await walletUnicoControlla(); } catch(e){ c = {stato: 'muto'}; }
+  const disegna = async () => {
+    const qui = el('walletUnico');
+    if (!qui) return;
+    if (c.stato === 'uguale') {
+      c.copie = walletCopieLette(c.mia);
+      c.tg = !!cloudTelegram();
+      try { c.nostr = !!(await pubAccount()); } catch(e){ c.nostr = false; }
+    }
+    qui.innerHTML = walletUnicoBlocco(c);
+  };
+  await disegna();
+  /* la ronda del backup: se trova o fa una copia, l'avviso se ne va */
+  let fatta = false;
+  try { fatta = await walletBackupRonda(); } catch(e){ fatta = false; }
+  if (fatta) await disegna();
+}
+function walletUnicoBlocco(c){
+  if (c && c.stato === 'uguale') return walletBloccoBackup(c);
+  if (!c || (c.stato !== 'diverso' && c.stato !== 'altrove')) return '';
+  const campo = `<textarea id="walletIncolla" class="mono" rows="3" autocomplete="off"
+      autocapitalize="off" spellcheck="false" placeholder="le 12 parole, separate da uno spazio"></textarea>
+    <button class="btn orange" onclick="walletIncollaParole(this)">Usa queste parole</button>`;
+  const dove = `le trovi sul dispositivo dove è nato: Profilo → «Il wallet di
+      Barattolo» → «Mostra le 12 parole»`;
+  if (c.stato === 'diverso') return `<div class="payout wallet-unico"><h4>Hai due wallet</h4>
+    <div class="hint">Su questo dispositivo c'è un wallet diverso da quello
+      principale del tuo account (il principale finisce in
+      <span class="mono">${esc(c.principale)}</span>, questo in
+      <span class="mono">${esc(c.mia)}</span>). Per averne uno solo,
+      incolla qui le 12 parole del principale: ${dove}. Le parole di
+      questo dispositivo restano conservate qui per i cambi già fatti.</div>
+    ${campo}
+    <button class="btn link" onclick="walletRendiPrincipale(this)">Rendi principale questo</button></div>`;
+  return `<div class="payout wallet-unico"><h4>Il tuo wallet è su un altro dispositivo</h4>
+    <div class="hint">Il wallet di Barattolo del tuo account è nato su un
+      altro dispositivo (finisce in <span class="mono">${esc(c.principale)}</span>).
+      Per usarlo anche qui incolla le sue 12 parole: ${dove}. Se ne hai
+      una copia sui relay Nostr, «👁 Mostra le 12 parole» qui sotto la
+      riprende da sola.</div>
+    ${campo}
+    <button class="btn link" onclick="walletNuovoPrincipale(this)">Ho perso quelle parole: fai nascere un wallet nuovo</button></div>`;
+}
+/* L'AVVISO DEL BACKUP: c'e' solo se questo wallet (il principale) non ha
+   nessuna copia fuori da qui, e non e' stato scritto su carta */
+function walletBloccoBackup(c){
+  const k = c.copie || {};
+  if (k.nuvola || k.relay || k.carta) return '';
+  const puo = c.tg || c.nostr;
+  const dove = c.tg && c.nostr ? 'nel cloud di Telegram e, cifrata, sui relay Nostr'
+    : c.tg ? 'nel cloud di Telegram' : 'cifrata sui relay Nostr';
+  return `<div class="payout wallet-unico"><h4>⚠️ Il tuo wallet non ha ancora un backup</h4>
+    <div class="hint">Le 12 parole stanno solo su questo dispositivo: se lo perdi,
+      perdi il wallet. ${puo
+      ? `Tocca «Salva il backup»: la copia va ${dove}${c.nostr ? ' (il tuo firmatario Nostr può chiederti di approvare)' : ''}.`
+      : 'Qui non si può fare una copia da sola: apri Barattolo dentro Telegram (la copia nel cloud si fa da sola), oppure scrivi le 12 parole su carta con «👁 Mostra le 12 parole».'}</div>
+    ${puo ? '<button class="btn orange" onclick="walletSalvaBackup(this)">Salva il backup</button>' : ''}
+    <button class="btn link" onclick="walletParoleSuCarta()">Le ho scritte su carta</button></div>`;
+}
+async function walletSalvaBackup(btn){
+  haptic();
+  const parole = onchainSemeLocale();
+  if (!parole) return toast('⚠️ Su questo dispositivo non ci sono parole da salvare');
+  const rip = onchainAttesa(btn, 'Salvo…');
+  try { await onchainMettiAlSicuro(parole); } catch(e){}
+  rip();
+  const fatte = [onchainCase.nuvola === true ? 'cloud di Telegram' : '',
+                 onchainCase.relay === true ? 'relay Nostr' : ''].filter(Boolean);
+  toast(fatte.length ? `✅ Backup fatto: ${fatte.join(' e ')}`
+                     : '⚠️ Nessuna copia è riuscita: riprova fra un momento', 6000);
+  renderWalletBarattolo();
+}
+async function walletParoleSuCarta(){
+  haptic();
+  const parole = onchainSemeLocale();
+  if (!parole) return;
+  try { walletSegnaCopia(await onchainImpronta(parole), 'carta'); } catch(e){}
+  toast('Bene: tienile al sicuro, lontano dal telefono', 5000);
+  renderWalletBarattolo();
+}
+async function walletIncollaParole(btn){
+  haptic();
+  const campo = el('walletIncolla');
+  const testo = campo ? campo.value : '';
+  const rip = onchainAttesa(btn, 'Controllo…');
+  try {
+    await walletUsaParoleDi(testo);
+    if (campo) campo.value = '';
+    toast('✅ Fatto: ora qui usi il wallet principale', 5000);
+  } catch(e){
+    toast('⚠️ ' + (e.message || 'parole non usate'), 8000);
+    rip();
+    return;
+  }
+  rip();
+  walletParoleViste = false;
+  renderWalletBarattolo();
+}
+function walletRendiPrincipale(btn){
+  chiediConferma({titolo: 'Rendere principale questo wallet?', etichetta: 'Rendi principale', vestito: 'allarme',
+    corpo: 'Il wallet di questo dispositivo diventa quello del tuo account. Sugli altri dispositivi ti chiederemo di incollare le sue 12 parole; le parole che avevano restano conservate lì per i cambi già fatti.',
+    poi: async () => {
+      const rip = onchainAttesa(btn, 'Registro…');
+      try {
+        const parole = onchainSemeLocale();
+        if (!parole) throw new Error('su questo dispositivo non ci sono parole');
+        await walletUnicoRegistra(await onchainImpronta(parole), true);
+        toast('✅ Questo è il wallet principale', 5000);
+      } catch(e){ toast('⚠️ ' + (e.message || 'non registrato'), 6000); }
+      finally { rip(); }
+      renderWalletBarattolo();
+    }});
+}
+function walletNuovoPrincipale(btn){
+  chiediConferma({titolo: 'Fare nascere un wallet nuovo?', etichetta: 'Fai nascere', vestito: 'allarme',
+    corpo: 'Fallo solo se le 12 parole del wallet di prima sono perse davvero: i bitcoin che ci sono si riprendono SOLO con quelle. Il wallet nuovo diventa quello del tuo account.',
+    poi: async () => {
+      const rip = onchainAttesa(btn, 'Preparo…');
+      try {
+        await onchainSemeAssicurato({nuovoPrincipale: true});
+        toast('✅ Wallet nuovo pronto: le sue 12 parole sono qui sotto, in «Mostra»', 6000);
+      } catch(e){ toast('⚠️ ' + (e.message || 'non pronto'), 6000); }
+      finally { rip(); }
+      renderWalletBarattolo();
+    }});
 }
 async function walletMostraParole(btn){
   haptic();
@@ -58837,6 +59230,7 @@ async function confermaCambioOnchainP2P(btn, id){
       : e && e.tipo === 'mente' ? `${nome} ha risposto con dati che non tornano: non è partito niente.`
       : e && e.tipo === 'giu' ? `${nome} ora non risponde: riprova fra poco.`
       : e && e.tipo === 'casa' ? t3().nienteCasa
+      : e && e.tipo === 'altrove' ? t3().semeAltrove
       : e && e.tipo === 'seme' ? 'su questo dispositivo non c\'è la tua chiave'
       : (e && e.message) || 'errore';
   } finally { rip(); }
@@ -59961,7 +60355,10 @@ function rigaPresaOcP2P(o){
   if (rec && typeof swapDaRimborsare === 'function' && swapDaRimborsare(rec))
     return testa + esc(frasestatoSwap(rec)) + ' <button type="button" class="btn ghost" onclick="vaiSwap()">Vai al Cambio</button></div>';
   if (rec && !['scaduto', 'fallito', 'ripreso'].includes(fase)) {
-    const link = rec.bip21 || `bitcoin:${rec.lockupAddress}?amount=${(Number(rec.mandi || rec.onchainAmount) / 1e8).toFixed(8)}`;
+    /* (2 nov 2026 sera) il link nudo dell'instradatore, come nel Cambio:
+       quello del fornitore non apriva Blue Wallet ad Alan */
+    const link = typeof swapLinkBitcoin === 'function' ? swapLinkBitcoin(rec)
+      : `bitcoin:${rec.lockupAddress}?amount=${(Number(rec.mandi || rec.onchainAmount) / 1e8).toFixed(8)}`;
     return testa + '<div class="hint" role="status">' + esc(frasestatoSwap(rec)) + '</div>'
       + (fase === 'creato' && rec.lockupAddress
         ? '<div class="qr" id="p2pPresaOcQr"></div>'
@@ -60582,6 +60979,14 @@ async function onchainGuarda(btn, dove){
   catch(e){ dalCloud = ''; }
   const combaciano = [dalCloud, suiRelay].filter(Boolean)
                      .every(x => x === qui);
+  /* (wallet-unico) una copia vista con gli occhi vale come ricevuta */
+  if (qui) {
+    try {
+      const imp = await onchainImpronta(qui);
+      if (dalCloud === qui) walletSegnaCopia(imp, 'nuvola');
+      if (suiRelay === qui) walletSegnaCopia(imp, 'relay');
+    } catch(e){}
+  }
   if (qui && (dalCloud || suiRelay)) {
     righe.push(combaciano
       ? '✅ Le copie dicono <b>la stessa chiave</b> di questo dispositivo: '
@@ -60590,6 +60995,8 @@ async function onchainGuarda(btn, dove){
         + 'fermati e dimmelo, è il caso che non deve succedere.');
   }
   box.innerHTML = righe.join('<br>');
+  /* nel Profilo l'avviso del backup si rilegge (wallet-unico) */
+  if (dove === 'walletBackup' && typeof walletUnicoDisegna === 'function') walletUnicoDisegna();
 }
 
 /* C'E' UNA COPIA FUORI DA QUI CHE RIDA' QUESTE PAROLE? (29 ott 2026,
@@ -94262,6 +94669,8 @@ async function avvia(){
     if (myOnchain) setTimeout(onchainCofirmeInSottofondo, 3000);
     /* ...e l'on-chain si accende da solo (27 ott 2026) */
     if (myOnchain) setTimeout(onchainAccendiDaSolo, 4000);
+    /* ...e la ronda del backup del wallet di Barattolo (wallet-unico) */
+    setTimeout(() => { walletBackupRonda().catch(() => {}); }, 6000);
     allineaContoP2P();   // il P2P sul dispositivo si lega a QUESTO conto (vedi «IL CONTO SUL DISPOSITIVO»)
     aggiornaAdmDot(me.in_revisione || 0);   // il pallino dei moderatori
     myNpub = me.npub || ''; myNpubVerified = !!me.npub_verificata;

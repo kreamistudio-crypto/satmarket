@@ -77756,3 +77756,124 @@ storico chiusa e aperta (indirizzo scritto; wallet Lightning sulla strada
 rovesciata); una sentinella sul CSS dell'elenco. Collaudi
 dello swap e del cambio (telefono, instradatore, cambio libero, cambio
 P2P, deposito, presa, pagamento) verdi; suite severa.
+
+## Un wallet solo fra l'app e Telegram: «Ferma e incolla» (2 nov 2026 sera, cantiere wallet-unico)
+
+Alan, nella prova vera della leva 4: «dall'app e la miniapp di telegram ho
+due seed phrase differenti». Le 12 parole del wallet di Barattolo nascono
+random nel telefono (regola ferrea 2: il server non le sa rifare) e si
+ritrovano dalle loro copie, il cloud di Telegram e la cassetta NIP-78 sui
+relay. Nell'app fuori da Telegram, per un account senza Nostr, nessuna copia
+si raggiunge, e ne nasceva un'altra: due wallet per una persona, e i cambi
+fatti con uno che l'altro non vede.
+
+LA DECISIONE. Idea di Alan («durante la generazione deve fare già il backup
+su telegram/relay, e noi dobbiamo sapere quanto meno se c'è, senza saperne il
+contenuto»), scelta di Andrea sulla card: «Ferma e incolla». Il server tiene
+due cose PUBBLICHE per account, tabella `wallet_unico`: l'IMPRONTA (la master
+fingerprint del BIP-32, 8 esadecimali, quella che ogni descrittore e ogni
+PSBT scrive in chiaro: non si spende e non si ricava niente) e il PAVIMENTO
+dei numeri dei cambi. Mai parole, chiavi, xpub. Tre rotte:
+`GET /api/wallet/unico`, `POST /api/wallet/unico` (registra; un'altra
+impronta → 409 «altro» senza toccare niente, salvo `sostituisci: true`) e
+`POST /api/wallet/unico/numero` (max fra il `minimo` del telefono e il
+pavimento, che sale a numero+1 nello stesso gesto, sotto un lucchetto).
+
+COSA FA IL TELEFONO.
+- Prima di far nascere parole nuove (dopo cloud e relay, che restano le prime
+  case) chiede al server: se un wallet c'è, NON ne nasce un secondo, e
+  l'errore dice di incollare le 12 parole dal Profilo. La nascita si registra
+  PRIMA di scriversi: due dispositivi che nascono insieme, uno solo vince.
+- Il server muto ferma la nascita (una casa muta non è una casa vuota, come
+  per il cloud).
+- Il Profilo («Il wallet di Barattolo») ha in cima un riquadro solo quando
+  c'è qualcosa da fare: «Hai due wallet» (incolla le parole del principale,
+  oppure «Rendi principale questo», con conferma) e «Il tuo wallet è su un
+  altro dispositivo» (incolla, oppure «Ho perso quelle parole: fai nascere un
+  wallet nuovo», con conferma). Dentro Telegram la copia del cloud vale come
+  «qui» anche se il localStorage è vuoto (i relay no: vorrebbero il
+  firmatario, e il Profilo non deve far suonare Amber).
+- Un dispositivo che ha già parole sue e trova il server vuoto le registra:
+  il primo che apre il Profilo (o fa un cambio) diventa il principale.
+- LE PAROLE SOSTITUITE NON SI BUTTANO: restano in una lista «di prima»
+  (localStorage e, dentro Telegram, `barattolo_onchain_prima` nel cloud), e i
+  cambi nati con loro si timbrano con l'impronta (`swapTimbraImpronta`), così
+  un rimborso le ritrova. La copia principale del cloud si riscrive SOLO se la
+  lista «di prima» è arrivata nel cloud: sennò si lascia com'è, e le parole
+  di prima restano almeno là.
+- IL NUMERO DEL CAMBIO viene dal server (`swapPrenotaIndice` è asincrona): le
+  stesse parole su due dispositivi, ciascuno col suo contatore, darebbero la
+  STESSA chiave a due cambi (e il segreto di un cambio è lo sha256 della
+  chiave). Server muto: −2, il cambio non parte.
+
+STRADE SCARTATE. Parole derivate dal server (custodial: la trappola della
+tappa 1c). Copia delle parole sul server anche cifrata (regola ferrea 2, la
+stessa ragione per cui il secret NWC fu respinto). Fondere da soli i due
+wallet (non si può: due semi random non diventano uno).
+
+PROVATO. `collaudo_wallet_unico` (31 controlli: vuoto, registra, stessa
+impronta, altra impronta 409, `sostituisci` solo se true, forme storte 400,
+numeri monotoni, sostituire non abbassa il pavimento, due account separati,
+le colonne della tabella). In `prove.py`: il banco della nascita col server
+che ha già un wallet, muto, la corsa, «Ho perso quelle parole», il vettore
+dell'impronta (`abandon … about` = `73c5da0a`); il banco dei numeri; il banco
+del Profilo col bundle vero (stati, riquadri, incolla storte/sbagliate/giuste,
+il cloud che non si riscrive).
+
+DA GUARDARE. Per Alan oggi: aprire PRIMA la mini app di Telegram (il suo
+wallet ha la copia nel cloud) così diventa il principale, poi nell'app
+incollare quelle parole. Un account Nostr fuori da Telegram con la copia sui
+relay vede il riquadro «altrove» finché non preme «Mostra le 12 parole» (che
+le riprende dai relay): il testo lo dice. Nei percorsi P2P un server muto al
+momento del numero mostra il messaggio «… ora non risponde» col nome del
+fornitore: impreciso, da ritoccare se capita. Le schermate del Profilo vanno
+ad Andrea prima della promozione.
+
+## «Apri nel wallet» dei bitcoin che non proponeva Blue Wallet (2 nov 2026 sera, cantiere wallet-unico)
+
+Alan, nella prova della leva 4 (bitcoin → Lightning): «mi dice apri nel
+wallet ma non suggerisce blue wallet». Il link era il `bip21` del fornitore,
+copiato com'era. Quel link vero non l'abbiamo visto, quindi la cura va sulla
+forma: ora il link lo scrive `swapLinkBitcoin(rec)` dell'instradatore, sempre
+nudo (`bitcoin:` minuscolo, indirizzo, importo in BTC senza zeri in coda), nel
+Cambio (`bitcoinDaMandare`) e nel riquadro del P2P (`rigaPresaOcP2P`). Il
+perché: Android abbina lo schema alle app distinguendo maiuscole e minuscole
+(al contrario della RFC), e le aggiunte del fornitore (`label`, `lightning=`)
+fanno passare il link per Lightning in più di un wallet. Il QR resta quello
+del fornitore. Provato: tre forme in `prove_cambio_libero`, e la sentinella
+che il `rec.bip21` non torni nel link. Da guardare: Alan riprova dopo la
+promozione; se Blue Wallet ancora non compare, serve il link copiato dal
+telefono per vederlo.
+
+## Il backup che non si arrende (2 nov 2026 sera, cantiere wallet-unico)
+
+Il terzo pezzo dell'idea di Alan («durante la generazione deve fare già il
+backup su telegram/relay»): la copia si tentava alla nascita delle parole, ma
+se falliva (ad Alan i relay non l'avevano presa) non si riprovava più, e il
+«⚠️ Nessun backup» compariva solo a chi andava a «Controlla il backup».
+Andrea ha detto sì a un nuovo tentativo a ogni apertura.
+
+COSA FA. Una RICEVUTA delle copie riuscite sta nel dispositivo
+(`barattolo_onchain_copie_<tg>`, per impronta: `nuvola`, `relay`, `carta`),
+scritta da `onchainMettiAlSicuro` e da «Controlla il backup» quando vede la
+copia giusta. `walletBackupRonda()` gira una volta per apertura (all'avvio
+dopo 6 s, e dal Profilo), solo per il wallet PRINCIPALE, solo dove non
+disturba: il cloud di Telegram (silenzioso; una casa vuota si riempie, una
+con altre parole non si tocca) e i relay con la nsec conservata nel browser.
+Con Amber, un bunker o l'estensione non chiede niente: resta l'avviso. Se
+alla fine non c'è nessuna copia, un toast una volta per apertura manda al
+Profilo, dove «⚠️ Il tuo wallet non ha ancora un backup» offre «Salva il
+backup» (dove una copia si può fare) e «Le ho scritte su carta» (fuori da
+Telegram senza Nostr è l'unica strada, insieme ad aprire dentro Telegram).
+
+SCARTATO. Fermare la nascita finché la copia non riesce: un relay giù
+fermerebbe un pagamento (la regola fail-open della tappa 1c). Riprovare i
+relay anche col firmatario remoto: farebbe suonare Amber a ogni apertura (la
+lezione di «Conferma» appeso, stessa sera).
+
+PROVATO nel banco del Profilo (`prove_parole_uniche`): l'avviso e i tasti nei
+casi, la ronda in Telegram (cloud vuoto riempito, una volta sola), il cloud
+con altre parole intatto, le parole non principali mai copiate, i relay solo
+con la nsec, niente ronda senza parole. Da guardare: chi ha già la copia sui
+relay via Amber vede l'avviso finché non preme «Controlla il backup» o «Salva
+il backup» (la ricevuta prima non esisteva).
