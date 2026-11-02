@@ -77262,3 +77262,47 @@ Ethereum: EIP-681), il campo dell'id dentro Telegram, la scheda del
 moderatore con l'indirizzo e l'id. Resta il limite detto anche per
 Mostro: un indirizzo 0x vale anche su reti che non offriamo, e chi paga
 può mandare da lì; lo dicono il riquadro, il QR con la catena e l'id.
+
+## La lista corta dei metodi, e Wise (2 nov 2026, cantiere p2p-onchain-usdt, secondo commit)
+
+LA RICHIESTA. Sideral chiedeva Wise come metodo di pagamento, e Andrea:
+«se l'utente vuole Wise può farlo, no problem, tanto noi non tocchiamo
+nessuna banca [...] Solo che dobbiamo aggiungere il tastino, e la lista
+comincia a diventare grande». La forma proposta e scelta: «per la lista
+corta come hai proposta va bene».
+
+DECISO. `P2P_METODI` ha l'ottava voce, «Wise», dopo PayPal, col suo form
+(`wise`: un campo solo, Wisetag, email o IBAN del conto Wise, perché
+Wise riceve in tutti e tre; parte come «Wise: …», e l'etichetta «wise»
+entra fra quelle col «📋 Copia»). La regex è `\bwise\b`: «Wise EUR» di
+un altro client prende il form, «otherwise» no. Nella tendina di
+«Pubblica» si vedono SEPA, Revolut, Satispay e Contanti; «Altri metodi
+▾» apre SEPA Instant, PayPal, Wise e il tabacchino, e resta aperto fino
+al prossimo foglio. Un metodo già scelto resta in vista, al suo posto
+nell'ordine del vocabolario. La lista scritta è quella da NASCONDERE
+(`P2P_METODI_ALTRI`), non quella da mostrare: le reti USDT e ogni voce
+nuova si vedono finché qualcuno non decide di metterle fra gli altri.
+Il giudice è `vociTendinaMetodiP2P`, puro.
+
+SCARTATO. Un tasto «₮ USDT» in prima fila (chiesto e poi lasciato da
+Andrea: un ordine è in euro o in USDT, non tutt'e due, e la valuta si
+sceglie in cima al foglio). Accorciare anche il filtro del libro: non
+era nella richiesta, resta con tutte le voci. Il tabacchino scritto col
+nome della variabile in `P2P_METODI_ALTRI`: i banchi delle prove
+raccolgono le liste `const P2P_… = [...]` una per una e una lista che ne
+chiama un'altra li rompeva (successo: ReferenceError nel banco «il
+pagamento a chi compra»); è scritto per esteso, e una prova controlla che
+ogni voce sia nel vocabolario.
+
+PROVATO. `prove_lista_corta_metodi` (13): chiusa, aperta, il metodo
+scelto in vista, il tabacchino scelto, chi compra, le reti USDT tutte in
+vista, il form e il testo di Wise, la regex, il foglio che usa il
+giudice, il bottone solo con qualcosa di nascosto, il ritorno a chiuso.
+Le prove di prima contano otto voci, e quella dei form legge
+`P2P_METODI` vero invece di una copia (una copia avrebbe lasciato
+entrare Wise senza form). Due controprove rosse (il metodo scelto
+nascosto; «Altri metodi» che resta aperto al foglio dopo). GUIDA-P2P-PASSI
+§5 aggiornata.
+
+DA GUARDARE. A occhio sul telefono, dal collaudo: la voce «Altri metodi
+▾» nella tendina, e il form di Wise.

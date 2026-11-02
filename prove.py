@@ -78710,9 +78710,10 @@ def prove_p2p_pubblica():
     # IL VOCABOLARIO E' CHIUSO (set 2026, decisione di Andrea che
     # ROVESCIA il campo libero di ieri): il perche' e' che ogni voce
     # deve avere il SUO form di recapito, e lo prova il blocco 9.
-    prova("...e il vocabolario e' chiuso, sette voci", True,
+    # (2 nov 2026) l'ottava e' Wise, chiesta da Sideral
+    prova("...e il vocabolario e' chiuso, otto voci", True,
           "const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', "
-          "'Satispay', 'PayPal', 'Contanti', 'Contanti al tabacchino'];" in mini)
+          "'Satispay', 'PayPal', 'Wise', 'Contanti', 'Contanti al tabacchino'];" in mini)
     prova("...e del campo libero di ieri non resta niente", False,
           "Oppure scrivilo tu" in mini or "p2pNuovoMetodo =" in mini)
     # ⚠️ LE TRE PAROLE CHE LA RIGA DEL CANALE CHIEDE, e non e' pedanteria:
@@ -79031,8 +79032,9 @@ def prove_p2p_pubblica():
         + "\n" + re.search(r"const P2P_TABACCHINO = [^\n]*;", mini).group(0)
         + "\n" + re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0)
         + "\n" + re.search(r"const P2P_TABACCHINO_VITA_S = [^\n]*;", mini).group(0)
-        + "\nconst METODI = ['SEPA', 'SEPA Instant', 'Revolut',"
-          " 'Satispay', 'PayPal', 'Contanti', 'Contanti al tabacchino'];\n"
+        # le voci VERE (2 nov 2026): con una copia scritta qui, Wise
+        # sarebbe entrata senza che la prova dei form la vedesse
+        + "\nconst METODI = P2P_METODI;\n"
         "const base = {metodi: ['SEPA', 'Revolut'], maxSats: 100000, minSats: 100};\n"
         "console.log(JSON.stringify({\n"
         # a mercato, importo singolo: i sats a zero, il premio vivo
@@ -79680,8 +79682,8 @@ def prove_p2p_pubblica():
     prova("il campo data va e torna, e a mano vale la forma delle gemelle",
           [True, True], [tv["giro"], tv["aMano"]])
     prova("...e sulle date storte tace", [0, 0, 0, ""], tv["storta"])
-    prova("il foglio offre il tabacchino solo a chi vende: sette voci di la', sei di qua",
-          [-1, 6, 7], tv["offerti"])
+    prova("il foglio offre il tabacchino solo a chi vende: otto voci di la', sette di qua",
+          [-1, 7, 8], tv["offerti"])
     # le righe del foglio che il banco puro non vede
     _sc = pezzo_js(mini, "function scegliMetodoP2P(m){", "\n}\n")
     prova("scegliere il tabacchino toglie gli altri, e viceversa", True,
@@ -79814,8 +79816,8 @@ def prove_p2p_pubblica():
     # PERCHE' ogni voce ha il suo form di recapito. Se un giorno se ne
     # aggiunge una senza forma, chi deve ricevere gli euro si trova la
     # casella generica — e questa riga diventa rossa prima.
-    prova("ognuna delle sette voci ha il suo form di recapito",
-          ["sepa", "sepa", "revolut", "satispay", "paypal", "contanti",
+    prova("ognuna delle otto voci ha il suo form di recapito",
+          ["sepa", "sepa", "revolut", "satispay", "paypal", "wise", "contanti",
            "tabacchino"],
           out["forme"])
     # --- IL TABACCHINO (set 2026) ---------------------------------
@@ -153227,6 +153229,81 @@ console.log(JSON.stringify([
            src.count('_usdt = globals().get("p2p_usdt_ordine")')))
 
 
+def prove_lista_corta_metodi():
+    """LA LISTA CORTA DEI METODI, E WISE (2 nov 2026, Andrea: «se l'utente
+    vuole Wise può farlo [...] Solo che dobbiamo aggiungere il tastino, e
+    la lista comincia a diventare grande»; la forma scelta da lui: «per
+    la lista corta come hai proposta va bene»). Nella tendina del foglio
+    «Pubblica» si vedono SEPA, Revolut, Satispay e Contanti; «Altri
+    metodi ▾» apre SEPA Instant, PayPal, Wise e il tabacchino; un metodo
+    gia' scelto resta sempre in vista. Wise ha il suo form di recapito."""
+    print("\n🧾 La lista corta dei metodi, e Wise")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    lista = re.search(r"const P2P_METODI = \[[^\n]*\];", mini).group(0)
+    altri = re.search(r"const P2P_METODI_ALTRI = \[[^\n]*\];", mini).group(0)
+    i = mini.index("const P2P_FORME_RECAPITO = [")
+    forme = mini[i:mini.index("\n];\n", i) + 4]
+    js = ("function esc(x){return String(x)}\n"
+          "function testoAppuntamentoP2P(){return ''}\n"
+          "function quandoDaCampoP2P(){return ''}\nfunction puntoDaCampoP2P(){return ''}\n"
+          + lista + "\n" + altri + "\n"
+          + _fn_js(mini, "function vociTendinaMetodiP2P(lista, scelti, aperti){") + "\n"
+          + forme + "\n"
+          + _fn_js(mini, "function formaRecapito(") + "\n"
+          + "const v = (s, a) => vociTendinaMetodiP2P(P2P_METODI, s, a);\n"
+          + "const ven = P2P_METODI.filter(m => m !== 'Contanti al tabacchino');\n"
+          + "console.log(JSON.stringify({\n"
+          + "  chiusa: v([], false), aperta: v([], true),\n"
+          + "  scelto: v(['Wise'], false), tab: v(['Contanti al tabacchino'], false),\n"
+          + "  compro: vociTendinaMetodiP2P(ven, [], false),\n"
+          + "  usdt: vociTendinaMetodiP2P(['USDT (Tron)', 'USDT (Ethereum)'], [], false),\n"
+          + "  dentro: P2P_METODI_ALTRI.every(m => P2P_METODI.indexOf(m) >= 0),\n"
+          + "  wise: formaRecapito('Wise').forma,\n"
+          + "  wiseTesto: formaRecapito('Wise').componi({conto: '@mariorossi'}),\n"
+          + "  altrui: [formaRecapito('Wise EUR').forma, formaRecapito('otherwise').forma],\n"
+          + "}));\n")
+    o = _node_banco(js)
+    if o is None:
+        salta("la lista corta dei metodi, sul banco", "node non c'e'")
+    else:
+        prova("il banco della lista corta gira", True, bool(o))
+        o = o or {}
+        prova("chiusa: i quattro di tutti i giorni, e quattro nascosti",
+              [["SEPA", "Revolut", "Satispay", "Contanti"], 4],
+              [(o.get("chiusa") or {}).get("voci"), (o.get("chiusa") or {}).get("nascosti")])
+        prova("aperta: tutte e otto, nell'ordine del vocabolario, e niente da aprire",
+              [8, 0, "Wise"],
+              [len((o.get("aperta") or {}).get("voci") or []),
+               (o.get("aperta") or {}).get("nascosti"),
+               ((o.get("aperta") or {}).get("voci") or [""] * 6)[5]])
+        prova("un metodo scelto fra gli altri resta in vista, al suo posto",
+              [["SEPA", "Revolut", "Satispay", "Wise", "Contanti"], 3],
+              [(o.get("scelto") or {}).get("voci"), (o.get("scelto") or {}).get("nascosti")])
+        prova("...anche il tabacchino scelto, che il titolo dice «uno solo»",
+              True, "Contanti al tabacchino" in ((o.get("tab") or {}).get("voci") or []))
+        prova("chi compra: niente tabacchino, e tre nascosti", 3,
+              (o.get("compro") or {}).get("nascosti"))
+        prova("le reti USDT non sono fra gli altri: si vedono tutte e due", [2, 0],
+              [len((o.get("usdt") or {}).get("voci") or []), (o.get("usdt") or {}).get("nascosti")])
+        prova("ogni voce degli altri e' una voce del vocabolario", True, o.get("dentro"))
+        prova("Wise ha il suo form, e parte come «Wise: …»", ["wise", "Wise: @mariorossi"],
+              [o.get("wise"), o.get("wiseTesto")])
+        prova("...riconosce Wise come parola, non dentro un'altra", ["wise", "altro:otherwise"],
+              o.get("altrui"))
+    rn = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
+    prova("il foglio usa il giudice della lista, e il bottone c'e' solo se qualcosa e' nascosto",
+          (True, True, True),
+          ("vociTendinaMetodiP2P(" in rn and "vociMetodi.voci.map(m =>" in rn,
+           "(vociMetodi.nascosti\n" in rn,
+           'onclick="altriMetodiP2P()">' in rn and "Altri metodi ▾</button>" in rn))
+    prova("«Altri metodi» resta aperto fino al prossimo foglio",
+          (True, True),
+          ("p2pNuovoAltri = true;" in _fn_js(mini, "function altriMetodiP2P(){"),
+           "  p2pNuovoAperta = false;\n  p2pNuovoAltri = false;\n" in mini))
+    prova("la riga «Wise:» si copia", True,
+          "|paypal|wise|" in re.search(r"const ETICHETTE_DA_INCOLLARE_P2P = [^\n]*", mini).group(0))
+
+
 def prove_p2p_onchain_usdt():
     """GLI USDT NEGLI SCAMBI P2P ON-CHAIN (2 nov 2026, cantiere
     p2p-onchain-usdt, Andrea: «usdt onchain assolutamente è da fare»; la
@@ -158362,8 +158439,8 @@ def prove_contanti_zona():
           [o["voce"][1], o["voce"][4], o["voce"][5], o["voce"][6]])
     prova("...Barattozon tiene il suo marchio, senza banconote", [True, False, False],
           ['class="p2p-marca"' in o["tabVoce"], "💵" in o["tabVoce"], "p2p-contanti" in o["tabVoce"]])
-    prova("...nel vocabolario dei sette metodi l'etichetta ce l'ha uno solo, «Contanti»",
-          [False, False, False, False, False, True, False], o["etichette"])
+    prova("...nel vocabolario degli otto metodi l'etichetta ce l'ha uno solo, «Contanti»",
+          [False, False, False, False, False, False, True, False], o["etichette"])
     prova("il 💳 se ne va quando ogni voce ha il suo segno (solo contanti, solo marchio) e resta a intestare i nomi",
           ["", "💳 ", "💳 ", "", "💳 ", "💳 ", "💳 ", "💳 "], o["icone"])
     prova("...ma l'INSEGNA navy e' dei soli marchi: la scatola del contanti non lo diventa",
@@ -185126,6 +185203,7 @@ def main():
     prove_p2p_usdt,
     prove_usdt_due_reti,
     prove_p2p_onchain_usdt,
+    prove_lista_corta_metodi,
     prove_grafica_p2p_onchain,
     prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,

@@ -788,9 +788,16 @@ La sezione col problema lampeggia e un toast dice cosa manca:
 ## 5. Metodi di pagamento
 
 L'elenco è chiuso, nell'ordine dell'app: **SEPA**, **SEPA Instant**,
-**Revolut**, **Satispay**, **PayPal**, **Contanti**, **Contanti al
-tabacchino** (che nell'app si vede col logo **Barattozon**). Chi pubblica
-ne sceglie uno o più; chi prende ne sceglie uno nel dettaglio. Gli euro
+**Revolut**, **Satispay**, **PayPal**, **Wise** (dal 2 nov 2026),
+**Contanti**, **Contanti al tabacchino** (che nell'app si vede col logo
+**Barattozon**). Chi pubblica ne sceglie uno o più; chi prende ne sceglie
+uno nel dettaglio.
+
+La tendina del foglio «Pubblica» (dal 2 nov 2026) mostra subito **SEPA**,
+**Revolut**, **Satispay** e **Contanti**; sotto c'è **«Altri metodi ▾»**,
+che apre **SEPA Instant**, **PayPal**, **Wise** e il tabacchino. Un
+metodo già scelto resta sempre in vista; il filtro del libro li mostra
+tutti. Gli euro
 non passano da Barattolo: viaggiano fra le due persone.
 
 Cosa chiede il foglio «🤝 I vostri recapiti» a chi vende, per metodo:
@@ -801,12 +808,13 @@ Cosa chiede il foglio «🤝 I vostri recapiti» a chi vende, per metodo:
 | Revolut | «Il tuo RevTag» → «@mariorossi» | «Revolut: @…» |
 | Satispay | «Numero di telefono Satispay» → «333 1234567» | «Satispay: …» |
 | PayPal | «Email o link paypal.me» → «mario@esempio.it» | «PayPal: …» |
+| Wise | «Il tuo Wisetag, l'email Wise o l'IBAN del conto Wise» → «@mariorossi» | «Wise: …», col «📋 Copia» |
 | Contanti | «📍 Dove proponi di vedervi», «🕒 Quando» (§6) | l'appuntamento |
 | Contanti al tabacchino | parte da solo, vedi §7 | il PayCode |
 | un metodo che arriva da un'altra app | «Dove vuoi ricevere gli euro (<metodo>)» → «IBAN, @tag, numero…» | «<metodo>: …» |
 
 Il bottone di chi compra cambia nome col metodo: «✅ Ho inviato gli
-euro» (bonifico, Revolut, Satispay, PayPal), «✅ Ho consegnato i
+euro» (bonifico, Revolut, Satispay, PayPal, Wise), «✅ Ho consegnato i
 contanti» (contanti di persona), «✅ Ho pagato al tabacchino»
 (Barattozon).
 

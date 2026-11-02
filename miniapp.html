@@ -5408,6 +5408,8 @@
      (misurato, non immaginato). */
   .p2p-voce-marchio{padding-top:4px;padding-bottom:4px}
   .p2p-voce-marchio .p2p-marca img{height:26px}
+  /* «Altri metodi ▾» (2 nov 2026): una voce come le sorelle, piu' quieta */
+  .p2p-voce-altri{color:var(--muted);font-weight:600}
   /* la leva del tipo di prezzo */
   .p2p-leva{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;border:0;
     background:none;font:inherit;font-weight:700;font-size:12.5px;color:var(--muted);
@@ -73038,7 +73040,7 @@ function notaReteUsdtP2P(r){
    il suo «📋 Copia» se il suo valore e' un dato che si incolla in
    un'altra app — e lo si riconosce in due modi:
    • per ETICHETTA, quelle che scrivono i nostri form (`P2P_FORME_RECAPITO`):
-     intestatario e causale del bonifico, Revolut, Satispay, PayPal;
+     intestatario e causale del bonifico, Revolut, Satispay, PayPal, Wise;
    • per FORMA, per i metodi che il form non conosce («Wise: @mario»,
      «Postepay: 5333 …») e per i recapiti scritti da un altro client: un
      @tag, un'email, un numero (almeno sei cifre, col + davanti e gli
@@ -73047,7 +73049,7 @@ function notaReteUsdtP2P(r){
    dell'appuntamento — e resta testo da leggere. L'IBAN ha la sua strada
    nel riquadro (per forma, senza spazi): un «IBAN: da chiedere» non e'
    un dato. */
-const ETICHETTE_DA_INCOLLARE_P2P = /^(intestatario|causale|revolut|revtag|satispay|paypal|indirizzo|contratto usdt)$/i;
+const ETICHETTE_DA_INCOLLARE_P2P = /^(intestatario|causale|revolut|revtag|satispay|paypal|wise|indirizzo|contratto usdt)$/i;
 const FORME_DA_INCOLLARE_P2P = [
   /^@[\w.\-]{2,40}$/,
   /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
@@ -75563,10 +75565,33 @@ const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺
    ordine Amazon e' nuovo — e la stringa viaggia in chiaro nel tag
    `pm` del libro pubblico: cambiarla vuol dire cambiare quel che
    leggono i client altrui. */
-const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Contanti', 'Contanti al tabacchino'];
+/* L'OTTAVA E' «Wise» (2 nov 2026, richiesta di Sideral, ok di Andrea:
+   «se l'utente vuole Wise può farlo, noi non tocchiamo nessuna banca»).
+   Ha il suo form (`wise`: il Wisetag, l'email o l'IBAN del conto Wise),
+   e nel foglio sta fra gli «Altri metodi» — vedi `P2P_METODI_ALTRI`. */
+const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Wise', 'Contanti', 'Contanti al tabacchino'];
 /* la voce del tabacchino ha il suo nome in UN posto: i giudici la
    cercano per questo, mai per un testo ribattuto */
 const P2P_TABACCHINO = 'Contanti al tabacchino';
+/* LA LISTA CORTA DEL FOGLIO (2 nov 2026, Andrea: «la lista comincia a
+   diventare grande»). Nella tendina di «Pubblica» si vedono subito i
+   quattro di tutti i giorni — SEPA, Revolut, Satispay, Contanti — e
+   sotto «Altri metodi ▾» apre questi. UN METODO GIA' SCELTO RESTA
+   SEMPRE IN VISTA: chi l'ha scelto deve poterlo togliere senza
+   riaprire niente. La lista e' di quelli da NASCONDERE e non di quelli
+   da mostrare, apposta: le reti USDT, e qualunque voce nuova, si vedono
+   finche' qualcuno non decide di metterle qui. Il filtro del libro non
+   cambia. Il giudice e' `vociTendinaMetodiP2P`, PURA.
+   ⚠️ IL TABACCHINO QUI E' SCRITTO PER ESTESO, come in `P2P_METODI`, e
+   non col suo nome di variabile: i banchi delle prove raccolgono le
+   liste `const P2P_… = [...]` una per una, e una che ne chiama un'altra
+   li romperebbe. Una prova controlla che ogni voce sia in `P2P_METODI`. */
+const P2P_METODI_ALTRI = ['SEPA Instant', 'PayPal', 'Wise', 'Contanti al tabacchino'];
+function vociTendinaMetodiP2P(lista, scelti, aperti){
+  const s = scelti || [];
+  const voci = (lista || []).filter(m => aperti || P2P_METODI_ALTRI.indexOf(m) < 0 || s.indexOf(m) >= 0);
+  return {voci: voci, nascosti: (lista || []).length - voci.length};
+}
 /* L'IMPORTO ESATTO VIAGGIA NEL `pm` (22 set 2026, Barattozon coi
    centesimi): un ordine Amazon vale 23,47 €, ma `fiat_amount` e' un
    i64 del protocollo — struct, db, tag `fa`, quote — e nessun client
@@ -78495,6 +78520,7 @@ let p2pNuovoEuroMax = '';
 let p2pNuovoSats = '';
 let p2pNuovoMetodi = [];      // i metodi scelti, nell'ordine del vocabolario
 let p2pNuovoAperta = false;   // la tendina dei metodi e' aperta
+let p2pNuovoAltri = false;    // ...e dentro, gli «Altri metodi» sono aperti
 let p2pNuovoValuta = 'EUR';  // la valuta scelta nel foglio-picker di casa
 /* LA VALUTA DEL FOGLIO CHE VALE (1 nov 2026, cantiere p2p-usdt): quella
    scelta, se chi guarda la puo' usare adesso — l'USDT a chi lo vede, e
@@ -78984,6 +79010,7 @@ function apriNuovoOrdineP2P(metodo){
   if (metodo && metodiPubblicabiliP2P(p2pLato).indexOf(metodo) >= 0)
     p2pNuovoMetodi = [metodo];
   p2pNuovoAperta = false;
+  p2pNuovoAltri = false;
   p2pNuovoValuta = P2P_VALUTE[0].cod;
   p2pNuovoDue = false;
   p2pNuovoFisso = false;
@@ -80039,6 +80066,13 @@ function renderNuovoOrdineP2P(){
           '>💡 Tocca il secondo campo solo se vuoi creare un ordine a intervallo</div>')
   });
 
+  /* le voci della tendina, con la lista corta (2 nov 2026). Il giudice
+     col typeof: i banchi che prendono questo foglio da solo vedono la
+     lista intera, come prima */
+  const listaMetodi = (oc ? metodiOnchainP2P(compro ? 'compro' : 'vendo') : metodiPubblicabiliP2P(compro ? 'compro' : 'vendo'));
+  const vociMetodi = typeof vociTendinaMetodiP2P === 'function'
+    ? vociTendinaMetodiP2P(listaMetodi, p2pNuovoMetodi, typeof p2pNuovoAltri !== 'undefined' && p2pNuovoAltri)
+    : {voci: listaMetodi, nascosti: 0};
   const metodi = sezioneNuovoP2P({
     ico: 'metodi',
     /* il nome segue il verso (`nomeMetodiP2P`); la coda dopo il
@@ -80053,7 +80087,7 @@ function renderNuovoOrdineP2P(){
       (p2pNuovoAperta ? 'true' : 'false') + '" onclick="apriTendinaMetodiP2P()">' +
       '<span>' + esc(scelti) + '</span><i aria-hidden="true">▾</i></button>',
     sotto: (p2pNuovoAperta
-      ? '<div class="p2p-voci">' + (oc ? metodiOnchainP2P(compro ? 'compro' : 'vendo') : metodiPubblicabiliP2P(compro ? 'compro' : 'vendo')).map(m =>
+      ? '<div class="p2p-voci">' + vociMetodi.voci.map(m =>
           /* la voce col marchio stringe il respiro per farlo grande:
              la classe la chiede il CATALOGO, come la pillola */
           '<button type="button" class="p2p-voce' +
@@ -80064,6 +80098,10 @@ function renderNuovoOrdineP2P(){
           (p2pNuovoMetodi.indexOf(m) >= 0 ? '✓' : '') + '</b>'
           /* il marchio accanto al nome, per chi ce l'ha (16 set 2026) */
           + marchioMetodoP2P(m, true) + '</button>').join('') +
+        /* la lista corta (2 nov 2026): vedi `P2P_METODI_ALTRI` */
+        (vociMetodi.nascosti
+          ? '<button type="button" class="p2p-voce p2p-voce-altri" onclick="altriMetodiP2P()">'
+            + '<b aria-hidden="true"></b>Altri metodi ▾</button>' : '') +
         '</div>'
       : '')
       /* LA REGOLA DEL CONTANTI STA SUL METODO (30 set 2026): la riga
@@ -81544,6 +81582,12 @@ function apriTendinaMetodiP2P(){
   p2pNuovoAperta = !p2pNuovoAperta;
   renderNuovoOrdineP2P();
 }
+/* «Altri metodi ▾» (2 nov 2026): li apre fino al prossimo foglio */
+function altriMetodiP2P(){
+  haptic();
+  p2pNuovoAltri = true;
+  renderNuovoOrdineP2P();
+}
 /* ---- L'IMPORTO QUANDO CAMBIA IL METODO (23 set 2026, ritocco di
    Andrea) ----
    Il metodo si sceglie prima dell'importo, ma chi torna su dopo aver
@@ -82887,6 +82931,13 @@ const P2P_FORME_RECAPITO = [
   {forma: 'paypal', riconosce: /paypal/i,
    campi: [{k: 'conto', et: 'Email o link paypal.me', ph: 'mario@esempio.it'}],
    componi: c => 'PayPal: ' + c.conto},
+  /* WISE (2 nov 2026): un campo solo, perche' Wise riceve in tre modi
+     e chi paga dall'app Wise li accetta tutti — il Wisetag, l'email
+     del conto, o l'IBAN che Wise da' (e allora paga anche chi Wise
+     non ce l'ha, con un bonifico). La riga «Wise:» si copia intera */
+  {forma: 'wise', riconosce: /\bwise\b/i,
+   campi: [{k: 'conto', et: 'Il tuo Wisetag, l\'email Wise o l\'IBAN del conto Wise', ph: '@mariorossi'}],
+   componi: c => 'Wise: ' + c.conto},
   /* IL TABACCHINO STA PRIMA DEI CONTANTI, e non e' ordine di
      comparsa: la regex di `contanti` prende anche «Contanti al
      tabacchino», e `formaRecapito` tiene la PRIMA che riconosce.
