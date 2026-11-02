@@ -349,7 +349,13 @@ jobs:
       # la riga d'esempio di PRODUZIONE finita nella cronologia il
       # giorno stesso in cui P2P_SCONTO_SEGRETO e' entrato fra le
       # FORME. Tre punti non sono la forma di nessuna chiave.
-      SEGNAPOSTI: INCOLLA_QUI|collaudo-usa-e-getta|KEY *= *"[a-z][0-9]"|SEGRETO *= *"\.\.\."
+      # Il quinto (2 nov 2026, promozione rossa): le due chiavi di
+      # cartone che ae7b81e (29 ott, collaudo_margine_cassaforte) ha
+      # scritto come «collaudo-nodo-lettura» e «collaudo-nodo-paga»,
+      # arrivate su main con la promozione del 2 nov. Il banco ora usa
+      # «collaudo-usa-e-getta-…», ma la storia non si riscrive. Scritte
+      # INTERE, mai un prefisso: nessuna chiave vera ha quella forma.
+      SEGNAPOSTI: INCOLLA_QUI|collaudo-usa-e-getta|KEY *= *"[a-z][0-9]"|SEGRETO *= *"\.\.\."|"collaudo-nodo-lettura"|"collaudo-nodo-paga"
       # LE CHIAVI DI CARTONE IN ESADECIMALE: 64 volte LO STESSO
       # carattere (i test Rust della patch 0005 ne avevano due, e sono
       # nella cronologia). Si TOGLIE IL VALORE dalla riga prima di
@@ -384,7 +390,12 @@ jobs:
       # sha256, per VALORE col prefisso di 16. Nell'albero di oggi sta
       # SPEZZATA IN DUE in prove.py, quindi questa eccezione serve
       # soltanto alla cronologia (provato in locale sui due passi).
-      CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g;s/\bf91e9d7c30894cb0[0-9a-f]{48}\b//g;s/\b85d68c6972360099[0-9a-f]{48}\b//g;s/\b3501454135014541[0-9a-f]{48}\b//g;s/\be8e936915bc05165[0-9a-f]{48}\b//g'
+      # E IL KECCAK-256 DELLA STRINGA VUOTA (2 nov 2026, promozione
+      # rossa): il vettore noto di Ethereum che prove_p2p_usdt confronta
+      # (p2p-usdt T1, 1 nov), entrato intero nella storia di main con la
+      # promozione del 2 nov. Pubblico come gli altri: per VALORE, col
+      # prefisso di 16; in prove.py ora sta spezzato in due.
+      CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g;s/\bf91e9d7c30894cb0[0-9a-f]{48}\b//g;s/\b85d68c6972360099[0-9a-f]{48}\b//g;s/\b3501454135014541[0-9a-f]{48}\b//g;s/\be8e936915bc05165[0-9a-f]{48}\b//g;s/\bc5d2460186f7233c[0-9a-f]{48}\b//g'
       FORMA_HEX: '\b[0-9a-f]{64}\b'
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5

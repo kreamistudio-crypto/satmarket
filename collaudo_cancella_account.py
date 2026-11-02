@@ -231,9 +231,18 @@ def main():
     global SRV
     SRV = avvio()
     from fastapi.testclient import TestClient
+    import contextlib
+
+    # SENZA L'AVVIO DEL SERVER (2 nov 2026, promozione rossa): `with
+    # TestClient(app)` fa girare anche l'avvio vero, coi compiti di
+    # sfondo, e uno di loro chiede il cambio a CoinGecko — la gabbia
+    # della CI l'ha fermato (DNS api.coingecko.com). Gli altri collaudi
+    # usano la TestClient senza `with`: qui lo stesso, tenendo i blocchi.
+    def cliente():
+        return contextlib.nullcontext(TestClient(SRV.app))
 
     print("\n[1. a leva spenta non esiste]")
-    with TestClient(SRV.app) as c:
+    with cliente() as c:
         prova("la leva nasce spenta", False, SRV.ACCOUNT_CANCELLABILE)
         prova("GET 404", 404, c.get("/api/me/cancella-account",
                                     headers=h(VENDE)).status_code)
@@ -245,7 +254,7 @@ def main():
 
     SRV.ACCOUNT_CANCELLABILE = True
     ordine, venduto, in_vetrina = semina(SRV)
-    with TestClient(SRV.app) as c:
+    with cliente() as c:
         prova("/api/me la offre a leva accesa", True,
               c.get("/api/me", headers=h(VENDE)).json().get("account_cancellabile"))
 

@@ -248,8 +248,11 @@ def main():
     # della riga (`cassaforte_payout`): il saas resta senza doveri.
     SRV.LIQUIDITA_MARGINE_PERCENTO, SRV.LIQUIDITA_MARGINE_MIN_SATS = 1, 10_000
     SRV.LNBITS_NODO_URL = SRV.LNBITS_URL
-    SRV.LNBITS_NODO_INVOICE_KEY = "collaudo-nodo-lettura"
-    SRV.LNBITS_NODO_ADMIN_KEY = "collaudo-nodo-paga"
+    # le chiavi di cartone nella forma che il controllo dei segreti
+    # riconosce («collaudo-usa-e-getta»): scritte «collaudo-nodo-…» la
+    # CI le ha prese per chiavi vere (2 nov 2026, promozione rossa)
+    SRV.LNBITS_NODO_INVOICE_KEY = "collaudo-usa-e-getta-nodo-lettura"
+    SRV.LNBITS_NODO_ADMIN_KEY = "collaudo-usa-e-getta-nodo-paga"
     SRV.CASSAFORTE_NUOVA = True
     banco.NODO["saldo"] = 50_000 + soglia
     voci = asyncio.run(SRV._voci_margine())

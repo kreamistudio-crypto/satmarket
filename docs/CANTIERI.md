@@ -77372,3 +77372,46 @@ sul collaudo, dalla parte C della voce 7 di DA-FARE-ANDREA, e la card
 del moderatore solo con una disputa. Restano in euro, perché non sono
 di uno scambio: le pagine d'aiuto del P2P, che spiegano lo scambio in
 euro.
+
+## La promozione rossa del 2 nov: la gabbia dietro un proxy e i segreti mai guardati (2 nov 2026, cantiere ci-rossa-promozione)
+
+COSA È SUCCESSO. La promozione intera del 2 nov (89 commit, main
+a761767 → 8d5c258, firmata dal PC) ha avuto la CI rossa in due job, e
+`pronto` è restato fermo: il VPS non ha preso niente.
+1. «prove», i collaudi senza rete: `collaudo_cancella_account` (1 nov)
+   apriva la TestClient con `with`, che fa girare l'AVVIO VERO del
+   server coi compiti di sfondo, e uno chiede il cambio a CoinGecko: la
+   gabbia l'ha fermato (DNS api.coingecko.com). Era l'unico collaudo
+   con `with TestClient(...)`.
+2. «segreti»: `collaudo_margine_cassaforte` (29 ott, margine-uscita)
+   scriveva `SRV.LNBITS_NODO_INVOICE_KEY = "collaudo-nodo-lettura"` e
+   `..._ADMIN_KEY = "collaudo-nodo-paga"`, la forma di una chiave vera.
+3. DIETRO il secondo, nascosto perché il passo si ferma al primo rosso:
+   il Keccak-256 della stringa vuota, vettore pubblico di Ethereum, scritto
+   intero in `prove_p2p_usdt` (p2p-usdt T1, 1 nov): sessantaquattro
+   esadecimali di fila, la regola dell'esadecimale nudo. Sarebbe stato il
+   rosso della corsa dopo.
+
+PERCHÉ LA SESSIONE DELLA PROMOZIONE NON L'HA VISTO. Il «116/0» del
+rapporto era vero ma non diceva la CI: (a) la sessione cloud ha un proxy
+HTTPS nell'ambiente, e httpx bussa al proxy invece di risolvere il nome,
+quindi la gabbia (che guarda `getaddrinfo`) non vedeva la bussata; (b) il
+job «segreti» non l'aveva fatto girare nessuno, né i thread dei cantieri
+né la promozione. LEZIONE: prima di una promozione i collaudi si girano
+SENZA le variabili del proxy (`env -u HTTPS_PROXY -u https_proxy …`), e i
+due passi del job «segreti» si rifanno in locale, albero e cronologia.
+
+LA CURA. (1) `collaudo_cancella_account` usa la TestClient senza avvio,
+come gli altri (`contextlib.nullcontext`, i blocchi `with` restano).
+(2) Le due chiavi di cartone diventano «collaudo-usa-e-getta-nodo-…», il
+segnaposto che la regola conosce. (3) Il vettore Keccak in `prove.py`
+spezzato in due. (4) `prove.yml`: ai SEGNAPOSTI i due valori vecchi
+SCRITTI INTERI tra virgolette (non un prefisso, la regola non si
+allarga), e a CARTONE_HEX il vettore per valore col prefisso di 16, come
+gli sha256 dei loghi: tutti e due servono solo alla cronologia, che non
+si riscrive. Tocca il workflow: dopo la promozione `pronto` può restare
+indietro e lo sposta Andrea.
+
+STRADE SCARTATE. Riscrivere la storia di main (vietato). Un commit
+diretto su main (su main arrivano solo promozioni). Allargare i
+SEGNAPOSTI a `collaudo-` (coprirebbe una chiave vera scritta così).

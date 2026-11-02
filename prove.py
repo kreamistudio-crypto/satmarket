@@ -153709,7 +153709,10 @@ def prove_p2p_usdt():
           True, all(_keccak_riferimento(b, 0x06) == _h.sha3_256(b).digest()
                     for b in campioni))
     prova("...e col suffisso di Ethereum dice il vettore noto della stringa vuota",
-          "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+          # spezzato in due (2 nov 2026): sessantaquattro esadecimali di
+          # fila sono la forma che il job «segreti» della CI ferma
+          "c5d2460186f7233c927e7db2dcc703c0"
+          "e500b653ca82273b7bfad8045d85a470",
           _keccak_riferimento(b"").hex())
 
     # --- 1) i cancelli del server ---
