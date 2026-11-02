@@ -77091,3 +77091,69 @@ senza leva. Visto dal vivo nei due temi con le risposte del server finte
 SEGUITO, 2 nov 07:55 UTC: Andrea ha messo la riga sul collaudo (copia
 `config.py.prima-scelta-rete`, salute 200) e ha comprato e venduto un
 oggetto là coi sats finti: «ok perfetto». Voce 8 tolta da DA-FARE-ANDREA.
+
+## USDT su due reti, e il bot con le parole degli USDT (2 nov 2026, cantiere usdt-due-reti)
+
+DA DOVE VIENE. Letto il limite detto nel cantiere di ieri (Polygon ed
+Ethereum hanno gli indirizzi uguali, nessun controllo li distingue),
+Andrea: «allora leviamo polygon, accendiamo la leva nel collaudo, il
+gesto sul nodo e sistemiamo i messaggi del bot».
+
+COSA SI È DECISO.
+- POLYGON VIA: le reti sono Tron ed Ethereum. Un indirizzo 0x adesso è
+  sempre Ethereum per noi; resta il limite che lo stesso indirizzo vale
+  anche su reti che non offriamo, ed è detto sotto il campo.
+- IL LIBRO MOSTRA UN ORDINE IN USDT SOLO SE TUTTE LE SUE RETI SONO
+  NOSTRE (`valutaVistaP2P(cod, metodi)`): col nodo aperto agli USDT
+  un'altra app può pubblicare «USDT (Polygon)» o «USDT (BSC)», e da noi
+  non avrebbe né il controllo della rete né il QR.
+- IL BOT IN USDT con un TRADUTTORE SOLO (`p2p_usdt_frase`, le coppie
+  `P2P_USDT_FRASI` e poi ogni «euro» rimasto) invece di una famiglia
+  gemella per ogni frase: le famiglie dei solleciti le ritagliano le
+  prove da sole, e un doppione per ogni testo sarebbe raddoppiato i
+  posti da tenere allineati. Le due frasi dei bonifici («un bonifico può
+  metterci un giorno lavorativo», «un bonifico ancora in viaggio») si
+  riscrivono intere: per gli USDT si guarda l'id della transazione
+  sull'explorer. Si chiama dove l'avviso PARTE (`_manda_evento_p2p`, la
+  rotta del recapito, `_scarica_attese_p2p`, la garanzia lunga), e
+  l'ordine è in USDT quando ogni suo metodo è una rete «USDT (…)»
+  (`p2p_usdt_ordine`). In `_scarica_attese_p2p` e nella garanzia lunga
+  il traduttore si prende con `globals().get`, come fa già
+  `_e_punto_barattolo`: quelle funzioni le ritagliano trenta banchi
+  delle prove, che restano quelli di ieri.
+
+STRADE SCARTATE. Una colonna `fiat` in `p2p_ordini`: i metodi lo dicono
+già, e la colonna `euro` resta testo in «€» perché la leggono le
+statistiche e l'archivio (un «USDT» lì dentro le azzererebbe). Una
+famiglia di testi USDT per ogni sollecito: vedi sopra.
+
+PROVE. `prove_usdt_due_reti` (8 controlli): le due reti; il libro con
+reti nostre, Polygon, BSC, nessuna rete; il traduttore su tutte le
+famiglie dei solleciti e sulle frasi degli avvisi, che non devono più
+dire euro, €, bonifico, conto né 💶, e devono nominare i bottoni veri
+dell'app; `p2p_usdt_ordine` su righe in USDT, miste, euro, vuote,
+storte, assenti; i quattro posti dove il traduttore è chiamato.
+`prove_p2p_usdt` riallineata alle due reti. CONTROPROVE ROSSE (7): il
+filtro delle reti nostre tolto, una coppia del traduttore tolta, la
+frase del bonifico cambiata, la traduzione tolta dagli eventi, «any»
+invece di «all» sui metodi, la parola «euro» non più presa, Polygon
+rimesso. Trovato dalla prova stessa: «aspettano i tuoi euro» sfuggiva
+alle coppie, da cui la regola finale sulla parola intera.
+
+I GESTI FUORI DAL CODICE, FATTI (2 nov 2026, 07:40-07:47 UTC, Andrea un
+comando alla volta). Collaudo: `P2P_USDT_ATTIVO = True`, salute 200.
+Nodo, a libro fermo (3 offerte `pending`, nessuno scambio a metà):
+`['EUR', 'USDT']` e `[price.providers.pegged]` con `only = ["USDT"]`,
+riavvio, «pegged ok». Letto prima nel sorgente 0.20.2: il prezzo
+dell'USDT viene da quello del DOLLARO, e sul nodo nessuna fonte esclude
+l'USD (solo `currency_api` esclude CUP e MLC). La valuta l'ha cambiata
+un Python che riscrive lo stesso file e si ferma se la riga non è
+quella, non `sed -i`. Da qui il nodo accetta USDT da qualunque app
+Mostro (Andrea lo sapeva e ha detto sì); in produzione i nostri utenti
+non lo vedono finché la leva lì è spenta.
+
+NON PROVATO E DA GUARDARE. Gli avvisi tradotti si vedono solo con uno
+scambio vero in USDT (DA-FARE-ANDREA, voce 7, parte C). Restano in euro: gli
+avvisi ai MODERATORI di una disputa e la loro guida (guardare l'id
+sull'explorer), e qualche frase «gli euro» nella pagina dello scambio
+dell'app.

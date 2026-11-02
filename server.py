@@ -33756,7 +33756,7 @@ def _leve_stato():
             _leva("Ordini P2P in USDT", "P2P_USDT_ATTIVO",
                   bool(P2P_USDT_ATTIVO),
                   acceso="nel foglio «Pubblica» c'è anche la valuta USDT "
-                         "(reti Tron, Polygon, Ethereum) e il libro mostra "
+                         "(reti Tron ed Ethereum) e il libro mostra "
                          "gli ordini in USDT; vale solo se il nodo ha USDT "
                          "fra le valute accettate",
                   spento="il P2P è solo in euro, come ieri"),
@@ -52239,7 +52239,7 @@ except (TypeError, ValueError):
 # 38383 vale «USDT», il prezzo e' agganciato a 1 dollaro): la garanzia
 # resta la hold invoice in sats Lightning di sempre, e gli USDT passano
 # da persona a persona FUORI da Mostro, sulla rete scritta nel metodo
-# («USDT (Tron)», «USDT (Polygon)», «USDT (Ethereum)», la grafia del
+# («USDT (Tron)», «USDT (Ethereum)», la grafia del
 # protocollo). Barattolo non li tocca mai.
 # DUE LEVE, il calco dell'on-chain: `P2P_USDT_ATTIVO` dice se la
 # funzione esiste, `P2P_USDT_SOLO_ADMIN` per chi (di serie solo i
@@ -52784,6 +52784,60 @@ def _p2p_leve() -> dict:
             # dizionario vale «nessuno»
             "indirizziNo": dict(P2P_INDIRIZZI_NON_PASSANO)
             if isinstance(P2P_INDIRIZZI_NON_PASSANO, dict) else {}}
+
+
+# LE PAROLE DEL BOT IN USDT (2 nov 2026, cantiere usdt-due-reti, richiesta
+# di Andrea: «sistemiamo i messaggi del bot»). Gli avvisi di uno scambio
+# P2P sono scritti per gli euro — decine di frasi, in famiglie che le
+# prove ritagliano da sole — e uno scambio in USDT li riceve TUTTI. Invece
+# di una famiglia gemella per ogni frase, un traduttore solo, applicato
+# dove l'avviso PARTE: cambia le parole dei soldi («gli euro», «€», «💶»)
+# e le tre frasi dei bonifici che per gli USDT direbbero il falso. La
+# prova `prove_usdt_due_reti` passa ogni famiglia di qui e vuole zero
+# «euro», «€», «bonifico» e «conto» nel risultato: una frase nuova che
+# sfugge la fa diventare rossa.
+P2P_USDT_FRASI = (
+    ("Se non li vedi ancora aspetta pure — un bonifico può metterci fino a "
+     "un giorno lavorativo — e libera solo quando ci sono davvero.",
+     "Controlla che siano arrivati sulla rete giusta, con l'id della "
+     "transazione che trovi nella chat dello scambio, e libera solo quando "
+     "ci sono davvero."),
+    ("Se è un bonifico ancora in viaggio — nel fine settimana capita — "
+     "aspetta pure; se invece qualcosa non torna apri una disputa",
+     "Cerca l'id della transazione (è nella chat dello scambio) "
+     "sull'explorer della rete: se qualcosa non torna apri una disputa"),
+    ("Controlla il conto", "Controlla il tuo wallet"),
+    ("controlla il conto", "controlla il tuo wallet"),
+    ("💶", "💵"),
+    ("Gli euro", "Gli USDT"),
+    ("gli euro", "gli USDT"),
+    ("in euro", "in USDT"),
+    (" €", " USDT"),
+)
+
+
+def p2p_usdt_frase(testo: str) -> str:
+    """PURA: un avviso scritto per gli euro, detto per gli USDT."""
+    t = str(testo or "")
+    for vecchio, nuovo in P2P_USDT_FRASI:
+        t = t.replace(vecchio, nuovo)
+    # e ogni «euro» rimasto («i tuoi euro»), parola intera
+    return re.sub(r"\beuro\b", "USDT", t)
+
+
+def p2p_usdt_ordine(con, ordine) -> bool:
+    """L'ordine e' in USDT? Lo dicono i METODI del libro (`p2p_ordini`):
+    in USDT ogni metodo e' una rete, «USDT (Tron)» o «USDT (Ethereum)»,
+    e l'app non mescola reti e metodi dell'euro (`valeNuovoOrdineP2P`).
+    Senza riga, o con la riga storta, e' l'euro di sempre."""
+    try:
+        r = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=?",
+                        (str(ordine or ""),)).fetchone()
+        metodi = json.loads((r["metodi"] if r else "") or "[]")
+    except Exception:
+        return False
+    return (isinstance(metodi, list) and len(metodi) > 0
+            and all(str(m).startswith("USDT (") for m in metodi))
 
 
 def p2p_usdt_ammesso(tg_id) -> bool:
@@ -57336,6 +57390,9 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
             ripetuto=(d or {}).get("ripetuto") is True,
             contanti=forma if isinstance(forma, bool) else None,
             versione=_versione_recapito_p2p((d or {}).get("versione")))
+        # in USDT con le sue parole (2 nov 2026, usdt-due-reti)
+        if a_chi and p2p_usdt_ordine(con, (d or {}).get("ordine")):
+            testo = p2p_usdt_frase(testo)
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -61493,6 +61550,14 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
                       f"coordinatore NON l'ha raccontato in {P2P_RISERVA_S}s: "
                       "parla il libro (nel log del nodo: barattolo_eventi)",
                       flush=True)
+        # IN USDT CON LE SUE PAROLE (2 nov 2026, usdt-due-reti): i
+        # solleciti e il libro parlano di euro, e qui si traducono. Il
+        # `globals()` e' voluto (il precedente e' `_e_punto_barattolo`):
+        # questa funzione la ritagliano trenta banchi delle prove, che il
+        # traduttore non lo portano e devono restare quelli di ieri
+        _usdt = globals().get("p2p_usdt_ordine")
+        if _usdt and _usdt(con, r["ordine"]):
+            testo = p2p_usdt_frase(testo)
         if bottoni is not None:
             # (dal 10 ott 2026 anche i solleciti — a chi vende e a chi
             # compra — portano il bottone: dicono «dalla pagina dello
@@ -62903,8 +62968,14 @@ def _garanzie_lunghe_p2p(con, adesso: int, bottoni: dict = None) -> list:
                                         adesso, "garanzia"):
                     if bottoni is not None:
                         bottoni[len(fuori)] = _bottone_scambio_p2p(ordine)
-                    fuori.append((chi, _testo_garanzia_parte_p2p(
-                        ruolo, bool(fiat_il), bool(disputa_il), cifra, modo),
+                    testo_g = _testo_garanzia_parte_p2p(
+                        ruolo, bool(fiat_il), bool(disputa_il), cifra, modo)
+                    # in USDT con le sue parole (2 nov 2026): il `globals()`
+                    # come in `_scarica_attese_p2p`, per i banchi delle prove
+                    _usdt = globals().get("p2p_usdt_ordine")
+                    if _usdt and _usdt(con, ordine):
+                        testo_g = p2p_usdt_frase(testo_g)
+                    fuori.append((chi, testo_g,
                         f"⏰ Garanzia lunga P2P: {corto} 48h → {chi} ({ruolo}; {stato})"))
 
         # --- i moderatori, a 72 e a 88 ore ------------------------------
@@ -67067,6 +67138,13 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
             # non la vedono. Un guasto toglie la riga, mai l'avviso
             try:
                 avvisi = _riga_paracadute_presa_p2p(avvisi, fatto)
+            except Exception:
+                pass
+            # ...e IN USDT le parole dei soldi (2 nov 2026, usdt-due-reti):
+            # alle sole parti, e un guasto lascia l'avviso com'era
+            try:
+                if p2p_usdt_ordine(con, ev["ordine"]):
+                    avvisi = [(tg, p2p_usdt_frase(t)) for tg, t in avvisi]
             except Exception:
                 pass
             # ...e i MODERATORI, se l'evento apre o chiude una disputa

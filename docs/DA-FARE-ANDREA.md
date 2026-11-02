@@ -277,6 +277,18 @@ di serie solo per gli admin. Il nodo però oggi accetta solo l'euro
 sotto un ordine in USDT il nodo lo rifiuta. Il perché di tutto:
 CANTIERI, «Gli ordini P2P in USDT».
 
+**A e B FATTE il 2 nov 2026, 07:40-07:47 UTC** (Andrea, un comando alla
+volta). Collaudo: `P2P_USDT_ATTIVO = True` in fondo al config, copia
+`config.py.prima-usdt`, salute 200. Nodo a libro fermo (3 `pending`, il
+resto finito): riga 111 `['EUR', 'USDT']`, `[price.providers.pegged]`
+alle righe 305-307, copia `~/nodo/mostro/settings.toml.prima-usdt`,
+riavvio dal compose, nel log «pegged ok (6 currencies)» (il provider le
+calcola tutte, `only` fa passare solo USDT) e nessun errore. Due
+differenze dai comandi qui sotto: la valuta è stata cambiata con un
+Python che riscrive LO STESSO file e si ferma se la riga non è quella
+(non `sed -i`, che fa un file nuovo), e al posto dei `tail` si sono
+usati `grep` mirati (le righe vicine non si stampano). Resta la C.
+
 **A. Il collaudo, la leva** (si può fare subito, dopo che il collaudo ha
 tirato `develop` col cantiere). Sola lettura, deve dire `0`:
 ```
@@ -298,13 +310,14 @@ sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w
 Atteso 200. Da admin, nel foglio «Pubblica» compare la valuta ₮ USDT e
 i metodi diventano le tre reti; un altro account non admin non vede
 niente. Da guardare a mano qui, senza pubblicare: il recapito di prova
-che rifiuta un indirizzo Tron su Polygon e uno bitcoin su Tron.
+che rifiuta un indirizzo Tron su Ethereum e uno bitcoin su Tron. (Dal
+2 nov le reti sono due, Tron ed Ethereum: Polygon è stato tolto.)
 
 **B. Il nodo, SOLO DOPO le prove della parte A** (gesto di Andrea, a
-libro fermo, un comando alla volta). Prima, sul browser, che il
-contratto USDT di Polygon sia quello che l'app scrive:
-https://polygonscan.com/token/0xc2132D05D31c914a87C6611C10748AEb04B58e8F
-deve dire «(PoS) Tether USD (USDT)».
+libro fermo, un comando alla volta). Da qui gli ordini in USDT si
+possono pubblicare sul nostro nodo da QUALUNQUE app Mostro (Andrea l'ha
+saputo e ha detto sì il 2 nov 2026); i nostri utenti in produzione non
+li vedono finché la leva lì resta spenta.
 
 Sola lettura sul nodo (`ssh … debian@vm-1937.lnvps.cloud`, poi `cd ~/nodo`):
 ```
@@ -343,7 +356,8 @@ docker compose restart mostro && sleep 20 && docker compose logs --since 2m most
 Atteso: il nodo riparte, i provider dicono «ok», nessun avviso su USDT.
 
 **C. La prova a due account sul collaudo**, cifre piccole (10 USDT):
-Andrea pubblica «vendo sats per 10 USDT su Polygon», un secondo account
+Andrea pubblica «vendo sats per 10 USDT su Tron» (su Tron serve un po'
+di TRX per la commissione; Ethereum costa di più), un secondo account
 admin (Alan, se è in `ADMIN_IDS` del collaudo) prende, mette il suo indirizzo, Andrea manda gli USDT e incolla
 l'id della transazione, Alan controlla sull'explorer e libera. Quel che
 si vede va nel verbale (CANTIERI, «Gli ordini P2P in USDT», «NON

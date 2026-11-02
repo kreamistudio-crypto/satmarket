@@ -1307,9 +1307,9 @@ P2P_ONCHAIN_ATTIVO = False
 # Polygon mettiamo anche ethereum. tetto 250 €, NODO solo dopo le
 # prove»): accanto agli ordini in euro, ordini Mostro in USDT. La
 # garanzia resta la hold invoice Lightning di sempre; gli USDT viaggiano
-# FUORI da Mostro, come gli euro del bonifico, su una delle tre reti
-# (Tron, Polygon, Ethereum). L'app controlla che l'indirizzo sia della
-# rete scelta e chiede l'id della transazione a «Ho inviato». Serve
+# FUORI da Mostro, come gli euro del bonifico, su una delle due reti
+# (Tron ed Ethereum; Polygon tolto il 2 nov, aveva gli indirizzi uguali
+# a Ethereum). L'app controlla che l'indirizzo sia della rete scelta e chiede l'id della transazione a «Ho inviato». Serve
 # anche il gesto sul nodo (USDT fra le valute accettate, provider
 # pegged): sta in DA-FARE-ANDREA, si fa DOPO le prove. Spento di serie.
 P2P_USDT_ATTIVO = False

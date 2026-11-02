@@ -62659,7 +62659,7 @@ function libroDaEventi(eventi, adesso){
          lo vede (`valutaVistaP2P`, il cancello del server); nel banco del
          motore il giudice non c'e' e vale l'euro solo, come ieri */
       .filter(o => o.stato === 'pending'
-                && (typeof valutaVistaP2P === 'function' ? valutaVistaP2P(o.fiat) : o.fiat === P2P_VALUTA)
+                && (typeof valutaVistaP2P === 'function' ? valutaVistaP2P(o.fiat, o.metodi || []) : o.fiat === P2P_VALUTA)
                 && !((morti.get(o.id) || 0) >= o.creato))
       .sort((a, b) => b.creato - a.creato),
     info
@@ -68251,7 +68251,7 @@ function fondiLibroP2P(libro, ev, adesso){
   /* la valuta passa dallo stesso giudice della prima lettura
      (`libroDaEventi`): un ordine in USDT arrivato dal vivo entra solo
      per chi gli USDT li vede, come al ricaricare */
-  if (!o || !(typeof valutaVistaP2P === 'function' ? valutaVistaP2P(o.fiat) : o.fiat === P2P_VALUTA)) return fuori;
+  if (!o || !(typeof valutaVistaP2P === 'function' ? valutaVistaP2P(o.fiat, o.metodi || []) : o.fiat === P2P_VALUTA)) return fuori;
   if (i < 0) { ordini.unshift(o); fuori.cambiato = true; fuori.nuovo = id; }
   else if (o.creato > ordini[i].creato) { ordini[i] = o; fuori.cambiato = true; }
   return fuori;
@@ -72797,11 +72797,12 @@ function reteUsdtDaRecapitoP2P(righe){
   const r = P2P_RETI_USDT.find(x => x.nome.toLowerCase() === nome);
   return r ? {rete: r, indirizzo: String(ind.v).trim()} : null;
 }
-/* la frase sotto il campo dell'indirizzo: la rete in chiaro, e per le
-   reti EVM il limite detto (Polygon ed Ethereum hanno la stessa forma) */
+/* la frase sotto il campo dell'indirizzo: la rete in chiaro, e per
+   Ethereum il limite detto (lo stesso 0x vale anche su altre reti, che
+   noi non offriamo, ma il wallet di chi paga si') */
 function notaReteUsdtP2P(r){
   return r.forma === 'evm'
-    ? '⚠️ Rete ' + r.nome + ' (' + r.standard + '). Polygon ed Ethereum hanno indirizzi uguali: chi ti paga deve mandare SOLO su ' + r.nome + ', e glielo diciamo noi.'
+    ? '⚠️ Rete ' + r.nome + ' (' + r.standard + '): l\'indirizzo comincia con 0x. Lo stesso indirizzo esiste anche su altre reti: chi ti paga deve mandare SOLO su ' + r.nome + ', e glielo diciamo noi.'
     : '⚠️ Rete ' + r.nome + ' (' + r.standard + '): l\'indirizzo comincia con T. Un indirizzo di un\'altra rete non parte.';
 }
 /* I DATI DA INCOLLARE (16 ott 2026, copia-recapito). PURA. Una riga ha
@@ -75359,8 +75360,9 @@ const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
    trasferimento, e Barattolo gli USDT non li tocca mai.
    LE RETI SONO I METODI, con la grafia del protocollo
    (`protocol/src/stablecoins.md`: «<CODE> (<Network>)»), cosi' un altro
-   client le legge e le filtra uguali: Tron, Polygon, Ethereum (scelte
-   di Andrea, 1 nov 2026). Il contratto di ogni rete e' quello del vero
+   client le legge e le filtra uguali: Tron ed Ethereum (scelte di
+   Andrea: il 1 nov 2026 anche Polygon, TOLTO il 2 nov — aveva la stessa
+   forma d'indirizzo di Ethereum, e fra loro nessun controllo distingue). Il contratto di ogni rete e' quello del vero
    USDT: chi riceve lo vede scritto, contro i token falsi che si
    chiamano «USDT» anche loro.
    LA RETE SBAGLIATA E' IL GUAI DA FERMARE (richiesta di Andrea: «come
@@ -75368,11 +75370,12 @@ const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
    Tron e' Base58 col controllo, le reti EVM sono `0x` piu' quaranta
    cifre col controllo nelle maiuscole (EIP-55) — e un indirizzo
    dell'altra famiglia, o bitcoin, o Lightning, o Liquid, si ferma con
-   la frase che lo dice. ⚠️ IL LIMITE, DETTO: Polygon ed Ethereum hanno
-   la STESSA forma d'indirizzo, quindi fra loro due nessun controllo
-   puo' distinguere — si dice la rete in grande (nel recapito, nel QR,
-   che porta dentro la catena col formato EIP-681) e si chiede l'id
-   della transazione, che il moderatore legge sulla rete giusta. E il
+   la frase che lo dice. ⚠️ IL LIMITE CHE RESTA, DETTO: un indirizzo 0x
+   vale anche su reti che non offriamo (Polygon, BNB, Arbitrum...), e il
+   wallet di chi paga puo' mandare da li' — si dice la rete in grande
+   (nel recapito, nel QR, che porta dentro la catena col formato
+   EIP-681) e si chiede l'id della transazione, che il moderatore legge
+   sulla rete giusta. E il
    wallet di chi paga resta suo: da quale rete spedisce lo decide lui.
    DIETRO DUE CANCELLI: `myP2PUsdt` (la leva `P2P_USDT_ATTIVO` del
    server, di serie solo per gli admin) e il nodo, che deve avere USDT
@@ -75382,8 +75385,6 @@ const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
 const P2P_RETI_USDT = [
   {rete: 'tron', nome: 'Tron', metodo: 'USDT (Tron)', standard: 'TRC-20',
    forma: 'tron', contratto: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'},
-  {rete: 'polygon', nome: 'Polygon', metodo: 'USDT (Polygon)', standard: 'ERC-20',
-   forma: 'evm', catena: 137, contratto: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'},
   {rete: 'ethereum', nome: 'Ethereum', metodo: 'USDT (Ethereum)', standard: 'ERC-20',
    forma: 'evm', catena: 1, contratto: '0xdAC17F958D2ee523a2206206994597C13D831ec7'}
 ];
@@ -75403,9 +75404,17 @@ function valuteVisibiliP2P(oc){
   return P2P_VALUTE.filter(v => v.cod !== 'USDT' || (usdtVistoP2P() && !oc));
 }
 /* una valuta del libro che chi guarda puo' vedere (PURA sul cancello) */
-function valutaVistaP2P(cod){
+/* ...e con i `metodi` dell'ordine (2 nov 2026, due reti): un ordine in
+   USDT si vede solo se TUTTE le sue reti sono nostre. Un altro client
+   Mostro puo' pubblicare «USDT (Polygon)» o «USDT (BSC)»: da noi non
+   avrebbe il controllo della rete ne' il QR, quindi non si mostra. */
+function valutaVistaP2P(cod, metodi){
   const c = String(cod || '').toUpperCase();
-  return c === P2P_VALUTA || (c === 'USDT' && usdtVistoP2P());
+  if (c === P2P_VALUTA) return true;
+  if (c !== 'USDT' || !usdtVistoP2P()) return false;
+  if (metodi === undefined) return true;
+  const m = Array.isArray(metodi) ? metodi : [];
+  return m.length > 0 && m.every(x => !!reteUsdtDaMetodoP2P(x));
 }
 function valutaOrdineP2P(o){
   return String((o && o.fiat) || P2P_VALUTA).toUpperCase();
@@ -75612,7 +75621,7 @@ function reteIndirizzoP2P(testo){
       || /^[13mn2][1-9A-HJ-NP-Za-km-z]{25,34}$/.test(s)) return {forma: 'bitcoin', valido: true};
   return null;
 }
-const P2P_NOME_FORMA_USDT = {tron: 'Tron', evm: 'Ethereum o Polygon'};
+const P2P_NOME_FORMA_USDT = {tron: 'Tron', evm: 'Ethereum'};
 /* PURA: il giudice dell'indirizzo USDT di chi riceve, per la rete dello
    scambio (`r` = una voce di P2P_RETI_USDT). '' = va bene; sennò la
    frase da dire, che nomina la rete sbagliata e quella giusta. */
@@ -75650,7 +75659,7 @@ function giudiceTxidUsdtP2P(testo, r){
   if (!s) return 'Incolla l\'id della transazione: lo trovi nel tuo wallet, nei dettagli dell\'invio';
   const evm = /^0x[0-9a-fA-F]{64}$/.test(s), tron = /^[0-9a-fA-F]{64}$/.test(s);
   if (r.forma === 'tron' && evm)
-    return '⚠️ Questo id ha la forma di Ethereum o Polygon, ma lo scambio è su Tron: controlla da che rete hai mandato';
+    return '⚠️ Questo id ha la forma di Ethereum, ma lo scambio è su Tron: controlla da che rete hai mandato';
   if (r.forma === 'evm' && tron)
     return '⚠️ Questo id ha la forma di Tron, ma lo scambio è su ' + r.nome + ': controlla da che rete hai mandato';
   if (!(r.forma === 'tron' ? tron : evm))
@@ -79155,7 +79164,7 @@ function valeNuovoOrdineP2P(v){
      ordine in USDT — o una rete USDT in un ordine in euro — direbbe a chi
      prende di pagare in un modo che l'ordine non conosce */
   if (inUsdt && (v.metodi || []).some(m => retiUsdt.indexOf(m) < 0))
-    return {ok: false, manca: 'In USDT si sceglie la rete: Tron, Polygon o Ethereum',
+    return {ok: false, manca: 'In USDT si sceglie la rete: Tron o Ethereum',
             campo: 'p2pNuovoMetodiBtn'};
   if (!inUsdt && (v.metodi || []).some(m => retiUsdt.indexOf(m) >= 0))
     return {ok: false, manca: 'Le reti USDT valgono solo per un ordine in USDT',
@@ -82605,7 +82614,7 @@ const P2P_FORME_RECAPITO = [
   /* GLI USDT (1 nov 2026, cantiere p2p-usdt): una forma per RETE, e non
      una per tutte, apposta — il ricordo vive per forma, e un indirizzo
      Tron ricordato non deve precompilare il campo di uno scambio su
-     Polygon (il giudice lo fermerebbe, ma e' meglio non offrirlo). Il
+     Ethereum (il giudice lo fermerebbe, ma e' meglio non offrirlo). Il
      testo che parte dice la rete PRIMA dell'indirizzo, e la prima riga
      senza cifre e' il titolo del riquadro di chi paga: l'avviso della
      rete e' la cosa che si legge per prima. Il giudice e'
