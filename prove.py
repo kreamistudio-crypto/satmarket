@@ -154146,7 +154146,8 @@ console.log(JSON.stringify(out));
           + _fn_js(mini, "function valutaOrdineP2P(o){") + "\n"
           + _riga_js(mini, "function usdtP2P(o){") + "\n"
           + _fn_js(mini, "function gestoPagoP2P(o){") + "\n"
-          + "console.log(JSON.stringify([\n"
+          + mini[mini.index("const P2P_USDT_PAROLE = ["):mini.index("/* ...E SULL'HTML: SOLO I TESTI")]
+          + "\nconsole.log(JSON.stringify([\n"
           + "  valutaOrdineP2P({fiat: 'USDT', metodi: ['USDT (Tron)']}),\n"
           + "  valutaOrdineP2P({metodi: ['USDT (Ethereum)']}),\n"
           + "  valutaOrdineP2P({fiat: 'EUR', metodi: ['USDT (Tron)']}),\n"
@@ -154154,16 +154155,50 @@ console.log(JSON.stringify(out));
           + "  valutaOrdineP2P({metodi: ['SEPA', 'USDT (Tron)']}),\n"
           + "  valutaOrdineP2P({metodi: []}), valutaOrdineP2P(null),\n"
           + "  gestoPagoP2P({fiat: 'EUR', metodi: ['USDT (Ethereum)']}),\n"
-          + "  gestoPagoP2P({fiat: 'EUR', metodi: ['Revolut']})]));\n")
+          + "  gestoPagoP2P({fiat: 'EUR', metodi: ['Revolut']}),\n"
+          + "  paroleUsdtP2P({fiat: 'EUR', metodi: ['USDT (Tron)']}, 'Hai detto di aver inviato gli euro')]));\n")
     o = _node_banco(js)
     if o is None:
         salta("la valuta dai metodi, sul banco", "node non c'e'")
     else:
         prova("la valuta dello scambio: USDT se lo dice il campo o se TUTTI i metodi "
               "sono reti USDT (anche con 'EUR' scritto dalla presa); euro altrimenti; "
-              "e il tasto dice «Ho inviato gli USDT»",
+              "e il tasto dice «Ho inviato gli USDT», e cosi' le frasi DOPO (Andrea: "
+              "«anche il banner dopo dice hai inviato gli euro»)",
               ["USDT", "USDT", "USDT", "EUR", "EUR", "EUR", "EUR",
-               "Ho inviato gli USDT", "Ho inviato gli euro"], o)
+               "Ho inviato gli USDT", "Ho inviato gli euro",
+               "Hai detto di aver inviato gli USDT"], o)
+
+
+    # ...E IL FOGLIO DI CONFERMA E LE CIFRE DELLO SCAMBIO (2 nov 2026, Andrea:
+    # «dopo aver cliccato ho inviato gli euro esce un banner sbagliato che fa
+    # riferimento ancora ad euro»): il segno viene dal giudice della valuta,
+    # non dal campo grezzo
+    i = mini.index("const P2P_RETI_USDT = [")
+    j = mini.index("const P2P_VALUTE = [")
+    js = ("const P2P_VALUTA = 'EUR';\nconst esc = s => String(s);\n"
+          + mini[i:mini.index("];", i) + 2] + "\n" + mini[j:mini.index("];", j) + 2] + "\n"
+          + _fn_js(mini, "function reteUsdtDaMetodoP2P(m){") + "\n"
+          + _fn_js(mini, "function valutaOrdineP2P(o){") + "\n"
+          + _fn_js(mini, "function segnoValutaP2P(cod){") + "\n"
+          + _fn_js(mini, "function segnoMonetaP2P(o){") + "\n"
+          + "console.log(JSON.stringify([segnoMonetaP2P({fiat: 'EUR', metodi: ['USDT (Tron)']}),\n"
+          + "  segnoMonetaP2P({fiat: 'EUR', metodi: ['SEPA']})]));\n")
+    o = _node_banco(js)
+    if o is None:
+        salta("il segno delle cifre dello scambio, sul banco", "node non c'e'")
+    else:
+        prova("le cifre dello scambio («Totale da inviare», «Controvalore») dicono USDT "
+              "anche a riga senza valuta; l'euro resta €", ["USDT", "€"], o)
+    conferma = pezzo_js(mini, "function euroInviatiP2P(){", "\n}\n")
+    euro_testo = pezzo_js(mini, "function euroTestoP2P(o){", "\n}\n")
+    prova("il foglio «Hai inviato gli USDT?» e la cifra dello scambio prendono il segno "
+          "dal giudice della valuta, mai dal campo grezzo",
+          (True, False, True, False),
+          ("segnoValutaP2P(typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : o.fiat)" in conferma,
+           "segnoValutaP2P(o.fiat) : '€') + ' con il metodo" in conferma,
+           "valutaOrdineP2P(o)" in euro_testo,
+           "segnoValutaP2P(o.fiat) : '€');" in euro_testo))
 
 
 def prove_p2p_onchain():

@@ -71168,7 +71168,8 @@ function chiudiFoglioFermoP2P(idFoglio){
 function euroTestoP2P(o){
   /* col segno della valuta dell'ordine (1 nov 2026, cantiere p2p-usdt) */
   return capiP2P(fmtEur(o.euro), o.euroMax ? fmtEur(o.euroMax) : '') + ' '
-    + (typeof segnoValutaP2P === 'function' ? segnoValutaP2P(o.fiat) : '€');
+    + (typeof segnoValutaP2P === 'function'
+       ? segnoValutaP2P(typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : o.fiat) : '€');
 }
 /* PURA: i due capi di un intervallo dentro UNA riga di testo (6 ott
    2026, ritocco di Andrea): «da 5,00 a 15,00», «da 6 534 a 19 601».
@@ -71675,7 +71676,10 @@ function monetaP2P(o){
    La regola del catalogo resta identica: una valuta che non c'e' porta
    la sua sigla, mai una bandiera inventata. */
 function segnoMonetaP2P(o){
-  const cod = String(o.fiat || P2P_VALUTA).toUpperCase();
+  /* la valuta dello scambio dal suo giudice (2 nov 2026): anche quando la
+     riga l'ha persa, i metodi USDT la dicono (`valutaOrdineP2P`) */
+  const cod = typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o)
+    : String(o.fiat || P2P_VALUTA).toUpperCase();
   const val = P2P_VALUTE.find(v => v.cod === cod);
   return val ? esc(val.segno) : esc(cod);
 }
@@ -75692,7 +75696,7 @@ function euroInviatiP2P(){
                          + ' Puoi tornare indietro e segnarlo adesso, o proseguire.\n\n' : '')
         + 'Dillo quando consegni ' + fmtEur(o.euro) + ' € a chi vende, lì di persona. ' + REGOLA_CONTANTI_COMPRA
         + ' Da qui non potrai più annullare: se qualcosa va storto, resta la disputa.'
-      : 'Dillo solo dopo aver davvero mandato ' + fmtEur(o.euro) + ' ' + (typeof segnoValutaP2P === 'function' ? segnoValutaP2P(o.fiat) : '€') + ' con il metodo concordato. Chi vende lo vedrà e libererà i sats. Da qui non potrai più annullare: se qualcosa va storto, resta la disputa.',
+      : 'Dillo solo dopo aver davvero mandato ' + fmtEur(o.euro) + ' ' + (typeof segnoValutaP2P === 'function' ? segnoValutaP2P(typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : o.fiat) : '€') + ' con il metodo concordato. Chi vende lo vedrà e libererà i sats. Da qui non potrai più annullare: se qualcosa va storto, resta la disputa.',
     etichetta: tab ? 'Sì, ho pagato' : contanti ? 'Sì, li ho consegnati' : 'Sì, li ho inviati',
     /* il ripensamento ha il nome che la frase gli da' */
     indietro: senzaPresenza ? 'Indietro' : '',
