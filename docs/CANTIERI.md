@@ -77087,3 +77087,7 @@ Controprova rossa: l'interruttore con On-chain mai sbiadito e la scelta
 senza leva. Visto dal vivo nei due temi con le risposte del server finte
 (foto 48). NON provato: il passaggio a On-chain fino all'indirizzo vero
 (serve il collaudo con due account e la chiave).
+
+SEGUITO, 2 nov 07:55 UTC: Andrea ha messo la riga sul collaudo (copia
+`config.py.prima-scelta-rete`, salute 200) e ha comprato e venduto un
+oggetto là coi sats finti: «ok perfetto». Voce 8 tolta da DA-FARE-ANDREA.

@@ -350,36 +350,3 @@ si vede va nel verbale (CANTIERI, «Gli ordini P2P in USDT», «NON
 PROVATO»). In produzione la leva resta spenta fino alla promozione e a
 un sì di Andrea; poi `P2P_USDT_ATTIVO = True` (solo admin) e, più
 avanti, `P2P_USDT_SOLO_ADMIN = False` per tutti.
-
-## 8. La scelta della rete al «Paga» del mercatino sul collaudo (2 nov 2026, cantiere paga-rete; Andrea: «mettilo acceso nel collaudo e dietro una leva spenta quando lo portiamo in produzione»)
-
-**Perché.** Comprando un oggetto, prima del foglio della fattura compare
-«Come vuoi pagare?» coi due tasti grandi del P2P, e in cima al foglio
-l'interruttore On-chain/Lightning. È su `develop` dietro la leva
-`MERCATINO_SCELTA_RETE`, spenta di serie. Vale solo per chi vede
-l'on-chain (sul collaudo gli admin: `ONCHAIN_ATTIVO` è già acceso là).
-Il perché: CANTIERI, «La scelta della rete al «Paga» del mercatino».
-
-**Sola lettura** (la riga non c'è già: deve dire `0`):
-```
-sudo grep -c "^MERCATINO_SCELTA_RETE" /srv/collaudo/barattolo/config.py
-```
-
-**Scrive**, dopo che il collaudo ha tirato `develop` con il cantiere. La
-copia di riserva, poi la riga, poi il riavvio:
-```
-sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-scelta-rete
-```
-```
-printf '\nMERCATINO_SCELTA_RETE = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
-```
-```
-sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
-```
-```
-sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
-```
-Atteso 200. Poi, dal telefono con l'account admin: un oggetto di un
-altro → «🔒 Compra in sicurezza» → deve comparire «Come vuoi pagare?».
-In produzione la leva resta spenta finché Andrea non dice sì, dopo la
-promozione.
