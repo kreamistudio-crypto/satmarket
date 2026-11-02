@@ -364,3 +364,41 @@ si vede va nel verbale (CANTIERI, «Gli ordini P2P in USDT», «NON
 PROVATO»). In produzione la leva resta spenta fino alla promozione e a
 un sì di Andrea; poi `P2P_USDT_ATTIVO = True` (solo admin) e, più
 avanti, `P2P_USDT_SOLO_ADMIN = False` per tutti.
+
+## 8. Gli USDT negli scambi P2P on-chain, sul collaudo (2 nov 2026, cantiere p2p-onchain-usdt; Andrea: «usdt onchain assolutamente è da fare»)
+
+**Perché.** Negli scambi on-chain col 2-di-3 chi compra bitcoin può
+pagare in USDT su Tron o Ethereum al posto degli euro; i sats restano
+nel 2-di-3 di sempre. È su `develop` dietro la leva
+`P2P_ONCHAIN_USDT_ATTIVO`, spenta, e vale solo dove ci sono già
+`P2P_ONCHAIN_ATTIVO` e `P2P_USDT_ATTIVO` (sul collaudo ci sono tutte e
+due). Il nodo non c'entra: questi scambi non passano da Mostro. Il
+perché di tutto: CANTIERI, «Gli USDT negli scambi P2P on-chain».
+
+**Sola lettura** sulla VM (deve dire `0`):
+```
+sudo grep -c "^P2P_ONCHAIN_USDT_ATTIVO" /srv/collaudo/barattolo/config.py
+```
+
+**Scrive**, dopo che il collaudo ha tirato `develop` col cantiere. La
+copia, la riga, il controllo, il riavvio:
+```
+sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-usdt-onchain
+```
+```
+printf '\nP2P_ONCHAIN_USDT_ATTIVO = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
+```
+Atteso 200. Poi dal telefono, due account admin (Andrea vende, Alan
+compra), cifre piccole: nel foglio «Pubblica» con l'interruttore su
+On-chain la valuta ₮ USDT, metodo «USDT (Tron)», l'indirizzo Tron di
+Andrea in «Dove vuoi gli USDT»; Alan prende, Andrea deposita i sats di
+signet, Alan manda gli USDT veri (pochi: sono veri, su Tron serve un po'
+di TRX) e incolla l'id; Andrea guarda su Tronscan e libera. Quel che si
+vede va nel verbale (CANTIERI, «NON PROVATO»). In produzione la leva
+resta spenta fino alla promozione e a un sì di Andrea.

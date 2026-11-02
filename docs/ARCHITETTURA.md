@@ -35054,7 +35054,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   contratto al posto del proprio indirizzo, il refuso del controllo) e
   `giudiceTxidUsdtP2P(testo, r)`, e il QR `qrUsdtP2P` (EIP-681 col
   contratto e la catena sulle EVM, l'indirizzo nudo su Tron). Il foglio
-  sceglie la valuta con `valutaFoglioP2P()` (mai USDT a rete on-chain), e
+  sceglie la valuta con `valutaFoglioP2P()` (a rete on-chain solo con
+  `myP2POnchainUsdt`, dal 2 nov 2026), e
   `ordineDaCampiP2P` / `payloadPresaP2P` scrivono la valuta sul filo. Il
   recapito ha una forma per rete (`usdt-tron`,
   `usdt-ethereum` in `P2P_FORME_RECAPITO`), che `inviaCampoP2P` passa dal
@@ -35072,3 +35073,52 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (ogni metodo di `p2p_ordini` e' una rete «USDT (…)»). Il gesto sul nodo
   (`fiat_currencies_accepted` con `USDT`, `[price.providers.pegged]` con
   `only = ["USDT"]`) sta in DA-FARE-ANDREA. Le prove: `prove_p2p_usdt`, `prove_usdt_due_reti`.
+- GLI USDT NEGLI SCAMBI P2P ON-CHAIN (2 nov 2026, cantiere
+  p2p-onchain-usdt; il perché in CANTIERI, «Gli USDT negli scambi P2P
+  on-chain»). La GARANZIA NON CAMBIA: i sats nel 2-di-3 bitcoin di
+  sempre (PSBT, firme, dispute, ronda); cambia solo quel che paga chi
+  compra bitcoin, USDT su Tron o Ethereum al posto degli euro, da
+  persona a persona, fuori da Barattolo. Nessuna colonna per la valuta:
+  lo scambio è in USDT quando OGNI metodo è una nostra rete
+  (`P2P_ONCHAIN_RETI_USDT`, «USDT (Tron)» / «USDT (Ethereum)» col
+  contratto del vero USDT; `p2p_onchain_metodi_usdt`, `p2p_onchain_usdt`,
+  `p2p_onchain_valuta` → il `f` del 38383 e il `fiat` di riga pubblica e
+  riga delle parti), e `euro_cent` porta i centesimi di USDT (1 USDT = 1
+  $). Leva `P2P_ONCHAIN_USDT_ATTIVO` (spenta), giudice
+  `p2p_onchain_usdt_ammesso` = leva E `p2p_onchain_ammesso` E
+  `p2p_usdt_ammesso`; in `/api/me` come `p2p_onchain_usdt`. Le porte:
+  `pubblica` (400 a chi non è ammesso; il giudice `p2p_onchain_giudica_nuovo`
+  con `valuta`, che non mescola reti e metodi dell'euro; il tetto
+  `p2p_onchain_tetto_usdt`, i 250 € tradotti, 1 senza cambi; a mercato il
+  cambio in dollari), `prendi` (chi prende E chi ha pubblicato; i sats a
+  mercato col dollaro), il libro `_p2p_onchain_libro` (gli USDT solo a chi
+  è ammesso), gli avvisi «ordine nuovo» `_accoda_onchain_nuovo_p2p`. La
+  RETE dello scambio `p2p_onchain_rete_scambio` (l'unica dei metodi, o
+  con due quella dell'indirizzo di chi riceve: `p2p_onchain_rete_indirizzo`,
+  Tron col controllo Base58Check `_tron_valido`, EVM solo la forma — il
+  controllo EIP-55 lo fa il telefono); il giudice dell'indirizzo
+  `p2p_onchain_giudica_recapito_usdt` (pubblica, presa, `recapito`) e
+  quello dell'id `p2p_onchain_giudica_txid_usdt`; «Ho inviato gli USDT» è
+  la rotta `euro-inviati` con `{txid}` (corpo facoltativo per gli euro),
+  la colonna `txid_usdt`, e nella riga delle parti `usdt` = {rete, nome,
+  contratto, txid} (+ `indirizzo` al MODERATORE terzo: un indirizzo di
+  catena, non un IBAN). Gli avvisi dello scambio passano TUTTI da
+  `_notifica_p2p_onchain(o, chi, testo, bottone)` → `_p2p_onchain_parole`
+  → `p2p_usdt_frase` (il traduttore degli USDT di Mostro, con «il tuo
+  conto» → «il tuo wallet»), tranne il paracadute, che parla del prezzo
+  di BTC in euro (`_p2p_onchain_testo_paracadute` dice la cifra con la sua
+  valuta) e la cui partenza resta in euro. APP: il blocco «GLI USDT NEGLI
+  SCAMBI ON-CHAIN» accanto a `metodiOnchainP2P` — `myP2POnchainUsdt`,
+  `valuteVisibiliP2P(oc)`, `usdtOcP2P`, `cifraOcP2P`, `paroleOcP2P` (solo
+  sulle FRASI, mai sui bottoni: il lookahead salva `euro-inviati`),
+  `reteOcUsdtP2P`, `giudiceRecapitoOcUsdtP2P(testo, metodi)`,
+  `esploraUsdtP2P` (Tronscan, Etherscan), `riquadroUsdtOcP2P` (rete in
+  grande, indirizzo, QR `p2pOcUsdtQr` disegnato da `renderP2POnchain`,
+  contratto, Copia), `txidUsdtOcP2P`, `modUsdtOcP2P`, `campoTxidOcP2P`,
+  `usdtInviatiOcP2P`; il foglio «Dove vuoi gli USDT» in
+  `sezioneRecapitoOnchainP2P` e il tetto in `riquadroOnchainP2P`. Le
+  funzioni di ieri che li chiamano (card del libro e di «I miei scambi»,
+  presa, scheda, conto, passi, libera, rinuncia, recapito, moderazione)
+  li prendono col typeof (`usdtOc`, `cifraOc`, `paroleOc`): i banchi che
+  le ritagliano da sole restano quelli di ieri. Il collaudo:
+  `collaudo_p2p_onchain_usdt`; le prove: `prove_p2p_onchain_usdt`.
