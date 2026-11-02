@@ -29898,6 +29898,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che hanno un giudice solo (`capiDoppioP2P`). Il verbale in CANTIERI,
   «I quattro ritocchi al P2P».
 
+- UN ACCOUNT, UN PROFILO DI SCAMBIO: LA PENSIONE (2 nov 2026, cantiere
+  profilo-unico, regola di Andrea: «qualunque login dello stesso
+  account deve sempre finire sullo stesso account Mostro»; dal campo:
+  l'ordine fe03ac9b di Michele). Il profilo dell'ACCOUNT — il seme per
+  chi è nato con Telegram, la copia sui relay o la nsec per chi è nato
+  su Nostr — vince su ogni superficie. Un profilo diverso trovato su un
+  dispositivo (locale o nel cloud di Telegram) non si tiene più perché
+  «ha una storia» (`'tenuto'`, la regola del 14 set): va IN PENSIONE
+  (`mandaInPensioneP2P`, `barattolo_mostro_pensione@<conto>`, solo nel
+  browser) e serve SOLO a finire i suoi scambi. Le righe restano dove
+  sono — niente parcheggio — e ogni gesto o ascolto di uno scambio
+  prende il mazzo DELLA RIGA (`mazzoRigaP2P`: la restore se dice di
+  chi è, altrimenti la derivazione della trade key). Pubblicare e
+  prendere derivano sempre dal mazzo VIVO, cioè dall'account. Anche il
+  gesto (`assicuraMazzo`) mette il conto PRIMA del cloud. Restano
+  fuori la strada sovrana (`origine 'mia'`, una chiave messa
+  dall'utente) e il mazzo di un ALTRO conto (mensola). La copia nel
+  cloud di un profilo in pensione non si tocca: è quella che lo porta
+  a un altro dispositivo Telegram, dove a sua volta si adotta, si
+  giudica e va in pensione. Il prezzo: le stelle del coordinatore
+  restano al profilo vecchio, le recensioni di Barattolo sono
+  dell'account. Il verbale in CANTIERI, «Un account, un profilo di
+  scambio».
+
 - IL MAZZO VIAGGIA DAVVERO FRA I DISPOSITIVI (set 2026, dal campo:
   Mini App sul telefono e Mini App su Telegram Desktop avevano due
   mazzi DIVERSI, e un ordine pubblicato dall'uno non si vedeva

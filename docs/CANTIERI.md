@@ -73310,3 +73310,85 @@ cambio a tutti; le prove dal vivo elencate nella tappa 3; per dopo, a
 parte: chi riceve in bitcoin dal 2-di-3 di Alan che vuole cambiare in
 Lightning (stessa strada rovesciata, un ordine vero al posto
 dell'ordine 0).
+
+## Un account, un profilo di scambio: il bottone morto di fe03ac9b e la pensione del profilo vecchio (2 nov 2026, cantiere profilo-unico, dal campo: Michele, regola di Andrea)
+
+**IL CASO.** Il 31 ott Michele, che vendeva, vedeva «🔒 Blocca i sats»
+e toccandolo riceveva solo «La richiesta di pagamento non è ancora
+arrivata», sia sull'app sia sulla miniapp. La diagnosi del suo telefono
+diceva: `fe03ac9b vendo mio stato=attesa_mia_hold indice=0 giro=2
+chiave= hold=no`, `restore: 0 ordini`, profilo `1341d06c`. Quindi
+l'ordine era stato pubblicato il 25 ott con un ALTRO profilo P2P, ed
+era stato preso una seconda volta il 31 alle 08:56 UTC. Il telefono
+conosceva lo scambio solo dall'archivio del server, non aveva la sua
+chiave e non poteva né leggere la richiesta né firmare. La mia prima
+lettura («scambio scaduto dal 25») era sbagliata: lo stepper mostra
+l'ora della prima presa, e la diagnosi l'ha corretta.
+
+**I DUE DIFETTI.** 1) IL BOTTONE MORTO. Una riga nata dall'archivio
+senza chiave è `soloVista`: niente gesti, e la nota «le chiavi stanno
+altrove». Però quando il mio ordine viene ripreso (giro nuovo),
+l'archivista lo fa ripartire in place cancellando `P2P_DELLA_PRESA`, e
+`soloVista` stava in quella lista. La riga perdeva il segno e tornava
+governabile senza chiave: bottone acceso, richiesta impossibile. Adesso
+dopo la pulizia `if (!gia.pubTrade) gia.soloVista = true;`, e la chiave
+ritrovata la promuove come prima. 2) DUE PROFILI PER UN ACCOUNT. Un
+profilo già presente su un dispositivo con una storia vinceva sul
+profilo dell'account (`'tenuto'`, 14 set), e nel gesto il cloud di
+Telegram vinceva sul seme. Andrea ha deciso: «qualunque login dello
+stesso account deve sempre finire sullo stesso account Mostro».
+
+**COSA È CAMBIATO.** Il giudice manda in pensione il profilo con
+storia (`pensionaPerIlContoP2P`) invece di tenerlo. Il gesto
+(`assicuraMazzo`) mette il seme prima del cloud, e manda in pensione
+la copia diversa, purché sia mia e non sovrana. La pensione vive nel
+browser (`barattolo_mostro_pensione@<conto>`) e le righe restano al
+loro posto. `mazzoRigaP2P` dà a ogni scambio il mazzo con cui è nato
+(restore, poi derivazione), e lo usano l'arrivo dei messaggi, la porta
+unica dei gesti, la chat, il canale col moderatore, la presenza e la
+chat dello scambio. La restore chiede anche le identità in pensione,
+l'archivio del server le prova dopo il vivo, e «Dimentica il profilo»
+le dimentica. Il cloud col profilo in pensione dice `pensione`, non
+`diverso`, e il mazzo adottato dal cloud si rigiudica. Il foglio del
+profilo dice in una riga che il vecchio resta solo per finire i suoi
+scambi.
+
+**STRADE SCARTATE.** Sostituire e basta: chi ha uno scambio aperto sul
+profilo vecchio resterebbe bloccato come Michele. Chiedere ogni volta
+all'utente: più domande e il rischio della scelta sbagliata. Tenere il
+profilo vecchio sul server per darlo agli altri dispositivi: regola
+ferrea 2. Nessuna delle tre è la mia raccomandazione.
+La scelta fra le tre è sulla carta ad Andrea (raccomandata la
+pensione). Il codice segue la raccomandata.
+
+**PROVATO.** Sezione nuova `prove_profilo_pensione` (sentinelle sulle
+porte, banco node sulle funzioni vere: pensione, passaggio, mazzo della
+riga, restore). In `prove_giro_nuovo_stesso_id` il caso g5 (il caso
+fe03ac9b: riga senza chiave, presa nuova, resta soloVista) e g6 (la
+chiave si ritrova, torna governabile). Il banco della cessione in
+`prove_p2p_conto_dispositivo` emendato col perché: con una storia ora
+va in pensione. Il banco del cloud in `prove_p2p_nuvola` ha due casi
+nuovi. Emendate col perché le sentinelle che dicevano l'invariante di
+ieri: «il cloud vince sul seme» in `prove_p2p_chiavi` (ora il seme
+vince e il cloud va in pensione), «con una storia si tiene» per la
+stessa npub in `prove_tor_chiavi_scambio`, i conteggi (`semeContoP2P`
+4, `registraChiaviP2P` 10, `mazzoDalSemeP2P` 6, `numeroConto` 21).
+I banchi che estraggono le funzioni una per una non hanno
+`mazzoRigaP2P`, quindi le chiamate passano da un `typeof`, come altrove
+nel file. Suite intera nel worktree, senza config e senza
+`PROVE_SEVERE`: 26.362 passate, 1 fallita (la sentinella della stessa
+npub, emendata subito dopo e verde da sola), 5 saltate per dipendenze
+assenti qui (nostr-tools da riga di comando, embit, snowballstemmer). I
+collaudi della CI non li ho girati: sono da girare prima della
+promozione.
+
+**COSA RESTA DA GUARDARE.** Il caso di Michele non si ripara da
+qui: la chiave del 25 ott sta solo sul dispositivo (o nel cloud
+Telegram) dove ha pubblicato. Se c'è, aprendo l'app lì il profilo
+vecchio va in pensione e lo scambio si governa. La penalità, se gli è
+stata contata, si toglie a mano sul VPS. Da provare dal vivo sul
+collaudo: un dispositivo col profilo vecchio e uno scambio aperto, poi
+l'aggiornamento. Il bottone «🔁 Usa il profilo del tuo account» e lo
+stato `'tenuto'` restano nel codice ma non nascono più: si tolgono in
+un cantiere a parte se Andrea vuole.
+
