@@ -153889,6 +153889,7 @@ def prove_p2p_usdt():
           + "const centesimiP2P = interoP2P;\n"
           + _fn_js(mini, "function ordineDaCampiP2P(v, lato){")
           + _fn_js(mini, "function payloadPresaP2P(riga, scelta, metodo, sulMetodo){")
+          + _fn_js(mini, "function statoIndirizzoUsdtP2P(testo, r){")
           + "const CAMPIONI = " + json.dumps(campioni_hex) + ";\n"
           + "const TRON = " + json.dumps([tron_vero, tron_rotto]) + ";\n"
           + "const EVM = " + json.dumps([evm_vero, evm_rotto]) + ";\n"
@@ -153924,6 +153925,10 @@ out.giudice = {
   hash: giudiceIndirizzoUsdtP2P('0x' + 'ab'.repeat(32), E),
   vuoto: giudiceIndirizzoUsdtP2P('', T)
 };
+/* il tasto spento mentre si scrive (2 nov 2026) */
+out.stato = [statoIndirizzoUsdtP2P('', T), statoIndirizzoUsdtP2P(' ' + TRON[0] + ' ', T),
+  statoIndirizzoUsdtP2P(TRON[0], E).spento, !!statoIndirizzoUsdtP2P(TRON[0], E).frase,
+  statoIndirizzoUsdtP2P(TRON[1], T).spento];
 out.txid = [giudiceTxidUsdtP2P('ab'.repeat(32), T), giudiceTxidUsdtP2P('0x' + 'ab'.repeat(32), E),
   giudiceTxidUsdtP2P('0x' + 'ab'.repeat(32), T), giudiceTxidUsdtP2P('ab'.repeat(32), E),
   giudiceTxidUsdtP2P('', T), giudiceTxidUsdtP2P('xyz', E)];
@@ -153995,6 +154000,17 @@ console.log(JSON.stringify(out));
           [True, True],
           [g.get("refuso", "").startswith("In questo indirizzo c'è un carattere sbagliato"),
            g.get("refusoEvm", "").startswith("In questo indirizzo c'è un carattere sbagliato")])
+    st = o.get("stato") or []
+    prova("IL TASTO «INVIA» SPENTO finche' l'indirizzo non e' giusto: vuoto spento senza "
+          "frase, quello giusto (anche con gli spazi) acceso, la rete sbagliata e il refuso "
+          "spenti con la frase del giudice",
+          [{"spento": True, "frase": ""}, {"spento": False, "frase": ""}, True, True, True], st)
+    _rc = pezzo_js(mini, "function renderCampiP2P(){", "\n}\n")
+    prova("...e il foglio lo giudica a ogni lettera, senza ridisegnare, col tasto e la riga "
+          "che lo dicono", (True, True, True, True),
+          ("inp.addEventListener('input', () => giudicaIndirizzoUsdtVivoP2P(inp.value, fr.usdt));" in _rc,
+           'id="p2pInviaRecapitoBtn"' in _rc, 'id="p2pUsdtGiudizio"' in _rc,
+           "if (bt) bt.disabled = st.spento;" in _fn_js(mini, "function giudicaIndirizzoUsdtVivoP2P(testo, r){")))
     prova("...un id di transazione al posto dell'indirizzo, e il campo vuoto, si dicono",
           [True, "Scrivi il tuo indirizzo USDT su Tron"],
           [g.get("hash", "").startswith("Questo sembra l'id di una transazione"), g.get("vuoto")])

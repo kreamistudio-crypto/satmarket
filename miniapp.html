@@ -83980,7 +83980,10 @@ function renderCampiP2P(){
                     + marchioMetodoP2P(scelto) + '</b>.</div>' : '')) +
       fr.campi.map(campoRecapitoP2P).join('') +
       /* la rete detta sotto il campo (1 nov 2026, cantiere p2p-usdt) */
-      (fr.usdt ? '<div class="hint">' + esc(notaReteUsdtP2P(fr.usdt)) + '</div>' : '') +
+      (fr.usdt ? '<div class="hint">' + esc(notaReteUsdtP2P(fr.usdt)) + '</div>'
+        /* il giudizio mentre si scrive (2 nov 2026): col tasto spento,
+           la frase del giudice sta qui invece che in un avviso */
+        + '<div class="hint" id="p2pUsdtGiudizio" style="color:var(--rosso-p2p-testo)" hidden></div>' : '') +
       (fr.appuntamento
         ? '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">📍 ' +
           (miei.euro ? 'Aggiorna l\'appuntamento' : 'Invia a chi compra') + '</button>' +
@@ -83989,7 +83992,7 @@ function renderCampiP2P(){
         ? '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">🧾 ' +
           (miei.euro ? 'Aggiorna il PayCode' : 'Manda il PayCode a chi compra') + '</button>' +
           (miei.euro ? '<div class="hint">✓ PayCode inviato. Se lo cambi, vale l\'ultimo: cambialo solo se chi compra non ha ancora pagato.</div>' : '')
-        : '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">💶 ' +
+        : '<button class="btn orange" id="p2pInviaRecapitoBtn" onclick="inviaCampoP2P(\'euro\', this)">💶 ' +
           (miei.euro ? 'Aggiorna il recapito' : 'Invia a chi compra') + '</button>' +
           (miei.euro ? '<div class="hint">✓ Recapito inviato. Se lo cambi, vale l\'ultimo: cambialo solo se chi compra non ha ancora pagato.</div>' : ''));
     /* quel che resta su QUESTO dispositivo, in coda alla riga del 🔒:
@@ -84044,6 +84047,31 @@ function renderCampiP2P(){
   if (typeof selettoreCasaAllineaTutti === 'function') selettoreCasaAllineaTutti();
   /* la riga del punto sotto il luogo, coi valori appena rimessi */
   if (fr && fr.appuntamento && typeof aggiornaPuntoLuogoP2P === 'function') aggiornaPuntoLuogoP2P();
+  /* IL TASTO SPENTO FINCHE' L'INDIRIZZO USDT NON E' GIUSTO (2 nov 2026,
+     Andrea dalla prova dal vivo): si giudica a ogni lettera, senza
+     ridisegnare (la tastiera non si chiude), col giudice dell'invio */
+  if (fr && fr.usdt) {
+    const inp = el('p2pCampoEuro_indirizzo');
+    if (inp) {
+      inp.addEventListener('input', () => giudicaIndirizzoUsdtVivoP2P(inp.value, fr.usdt));
+      giudicaIndirizzoUsdtVivoP2P(inp.value, fr.usdt);
+    }
+  }
+}
+/* PURA sul giudizio: il tasto «Invia» acceso solo con un indirizzo che il
+   giudice promuove, e sotto il campo la sua frase — solo quando qualcosa
+   e' scritto: il campo vuoto non e' un errore, e' un campo da riempire */
+function statoIndirizzoUsdtP2P(testo, r){
+  const v = String(testo || '').replace(/\s+/g, '');
+  const no = giudiceIndirizzoUsdtP2P(v, r);
+  return {spento: !!no, frase: v ? no : ''};
+}
+function giudicaIndirizzoUsdtVivoP2P(testo, r){
+  const st = statoIndirizzoUsdtP2P(testo, r);
+  const bt = el('p2pInviaRecapitoBtn');
+  if (bt) bt.disabled = st.spento;
+  const g = el('p2pUsdtGiudizio');
+  if (g) { g.textContent = st.frase; g.hidden = !st.frase; }
 }
 async function inviaCampoP2P(tipo, btn){
   const o = ordiniP2P()[p2pCampiOrdine];
