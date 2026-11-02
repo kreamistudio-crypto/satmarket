@@ -153651,6 +153651,20 @@ def prove_p2p_onchain_usdt():
     usdt_js = mini[ini:fine]
     i = mini.index("const P2P_VALUTE = [")
     valute = mini[i:mini.index("];", i) + 2]
+    # IL SEGNO DEGLI USDT E' IL LOGO DI TETHER (2 nov 2026, Andrea): il
+    # cerchio verde con la T bianca in SVG, accanto alla sigla, e non piu'
+    # il ₮ di testo; tutto sulla riga del catalogo, che i banchi tagliano
+    # al primo «];».
+    _usdt = valute[valute.index("{cod: 'USDT'"):]
+    _usdt = _usdt[:_usdt.index("}") + 1]
+    prova("accanto a USDT c'e' il logo di Tether (cerchio verde #26A17B e la T "
+          "bianca, in SVG nascosto ai lettori di schermo), non il ₮ di testo",
+          (True, True, True, True, False),
+          ("bandiera: '<svg class=\"ico-usdt\"" in _usdt,
+           '<circle cx="16" cy="16" r="16" fill="#26A17B"/>' in _usdt,
+           '<path fill="#FFF"' in _usdt,
+           'aria-hidden="true"' in _usdt,
+           "'₮'" in valute))
     oc = mini[mini.index("/* ═══ GLI USDT NEGLI SCAMBI ON-CHAIN (2 nov 2026"):
               mini.index("/* «Dove vuoi gli euro»: la sezione in piu' di chi vende on-chain")]
     js = ("var cambioVivo = true, eurPerSat = 0.0009, usdPerSat = 0.001;\n"
