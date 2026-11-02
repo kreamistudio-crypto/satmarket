@@ -154201,6 +154201,59 @@ console.log(JSON.stringify(out));
            "segnoValutaP2P(o.fiat) : '€');" in euro_testo))
 
 
+    # --- IL CONTRATTO USDT SENZA «📋 Copia» (2 nov 2026, Andrea: «qualcuno si
+    # sbaglia e clicca su quello al posto dell'indirizzo») ---
+    i = mini.index("const ETICHETTE_DA_INCOLLARE_P2P = ")
+    js = (mini[i:mini.index("\n", i)] + "\n"
+          + mini[mini.index("const FORME_DA_INCOLLARE_P2P = ["):mini.index("];", mini.index("const FORME_DA_INCOLLARE_P2P = [")) + 2] + "\n"
+          + _fn_js(mini, "function daIncollareP2P(r){") + "\n"
+          + "console.log(JSON.stringify([\n"
+          + "  daIncollareP2P({et: 'Contratto USDT', v: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'}),\n"
+          + "  daIncollareP2P({et: 'Contratto USDT', v: '0xdAC17F958D2ee523a2206206994597C13D831ec7'}),\n"
+          + "  daIncollareP2P({et: 'Indirizzo', v: 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE'})]));\n")
+    o = _node_banco(js)
+    if o is None:
+        salta("il contratto USDT senza tasto copia, sul banco", "node non c'e'")
+    else:
+        prova("il contratto USDT (Tron ed Ethereum) non ha il tasto «📋 Copia»; "
+              "l'indirizzo dove mandare si'", [False, False, True], o)
+
+
+    # --- IL TASTO DELL'EXPLORER SOTTO L'ID DEGLI USDT (2 nov 2026, Andrea:
+    # «esiste una mempool di usdt? ... in caso di disputa e' facile dimostrare
+    # chi ha ragione») --- il link lo costruiamo noi, mai dal testo dell'altro
+    i = mini.index("const P2P_RETI_USDT = [")
+    js = ("const esc = s => String(s);\n" + mini[i:mini.index("];", i) + 2] + "\n"
+          + _fn_js(mini, "function reteUsdtDaMetodoP2P(m){") + "\n"
+          + _fn_js(mini, "function reteUsdtScambioP2P(o){") + "\n"
+          + _fn_js(mini, "function giudiceTxidUsdtP2P(testo, r){") + "\n"
+          + _fn_js(mini, "function esploraUsdtP2P(r, cosa, valore){") + "\n"
+          + _fn_js(mini, "function esploraTxUsdtP2P(o, txid){") + "\n"
+          + _fn_js(mini, "function txidUsdtDaChatP2P(testo){") + "\n"
+          + "const tx = 'a'.repeat(64), ex = '0x' + 'b'.repeat(64);\n"
+          + "const T = {metodi: ['USDT (Tron)']}, E = {metodi: ['USDT (Ethereum)']};\n"
+          + "console.log(JSON.stringify([\n"
+          + "  txidUsdtDaChatP2P('🧾 USDT inviati su Tron. Id della transazione: ' + tx) === tx,\n"
+          + "  txidUsdtDaChatP2P('guarda qui https://tronscan.org/#/transaction/' + tx),\n"
+          + "  esploraTxUsdtP2P(T, tx).indexOf('https://tronscan.org/#/transaction/' + tx) > 0,\n"
+          + "  esploraTxUsdtP2P(T, tx).indexOf('Controlla su Tronscan') > 0,\n"
+          + "  esploraTxUsdtP2P(E, ex).indexOf('https://etherscan.io/tx/' + ex) > 0,\n"
+          + "  esploraTxUsdtP2P(T, ex), esploraTxUsdtP2P(E, 'non un id'),\n"
+          + "  esploraTxUsdtP2P({metodi: ['SEPA']}, tx), esploraTxUsdtP2P(T, '')]));\n")
+    o = _node_banco(js)
+    if o is None:
+        salta("il tasto dell'explorer, sul banco", "node non c'e'")
+    else:
+        prova("l'id degli USDT si apre su Tronscan o Etherscan con un link nostro; niente "
+              "tasto a un id della rete sbagliata, a un testo qualsiasi, all'euro",
+              [True, "", True, True, True, "", "", "", ""], o)
+    prova("...e il tasto sta sotto l'id nella pagina di chi paga e sotto il messaggio "
+          "in chat (non nel mercatino)", (True, True),
+          ("esploraTxUsdtP2P(o, o.txidUsdt)" in mini,
+           "esploraTxUsdtP2P(o, txidUsdtDaChatP2P(m.testo))" in
+           pezzo_js(mini, "function chatScMessaggiHTML(c, altro, o){", "\n}\n")))
+
+
 def prove_p2p_onchain():
     """GLI SCAMBI P2P CON LA GARANZIA 2-DI-3 (30 ott 2026, cantiere
     p2p-onchain-2di3, decisione di Andrea con Alan). Il giro vero — server,

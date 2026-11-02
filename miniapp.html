@@ -59189,6 +59189,26 @@ function esploraUsdtP2P(r, cosa, valore){
   if (r.rete === 'tron') return 'https://tronscan.org/#/' + (cosa === 'tx' ? 'transaction' : 'address') + '/' + v;
   return 'https://etherscan.io/' + (cosa === 'tx' ? 'tx' : 'address') + '/' + v;
 }
+/* IL TASTO DELL'EXPLORER SOTTO L'ID DEGLI USDT (2 nov 2026, Andrea: «una
+   volta ricevuti usdt esiste una mempool di usdt? ... in caso di disputa
+   e' facile dimostrare chi ha ragione»): Tronscan o Etherscan, per chi ha
+   pagato (sotto l'id nella pagina) e per chi riceve (sotto il messaggio
+   «🧾 USDT inviati» in chat). Il link lo costruiamo NOI, dalla rete dello
+   scambio e da un id che passa il giudice: mai un link scritto dall'altra
+   parte, che resta sotto la riga rossa della chat. '' = niente tasto. */
+function esploraTxUsdtP2P(o, txid){
+  const t = String(txid || '').replace(/\s+/g, '');
+  const r = t && typeof reteUsdtScambioP2P === 'function' ? reteUsdtScambioP2P(o) : null;
+  if (!r || giudiceTxidUsdtP2P(t, r)) return '';
+  const nome = r.rete === 'tron' ? 'Tronscan' : 'Etherscan';
+  return '<a class="btn ghost" style="display:block;text-align:center;margin-top:6px" href="'
+    + esc(esploraUsdtP2P(r, 'tx', t)) + '" target="_blank" rel="noopener">🔎 Controlla su ' + nome + '</a>';
+}
+/* PURA: l'id dal messaggio che scrive «Ho inviato gli USDT», o '' */
+function txidUsdtDaChatP2P(testo){
+  const m = /^🧾 USDT inviati su [^.]+\. Id della transazione: (\S+)$/.exec(String(testo || '').trim());
+  return m ? m[1] : '';
+}
 /* il riquadro dell'indirizzo USDT per chi PAGA: la rete in grande, il
    contratto del vero USDT, l'indirizzo e il QR (EIP-681 sulle EVM) */
 function riquadroUsdtOcP2P(o){
@@ -73358,7 +73378,10 @@ function notaReteUsdtP2P(r){
    dell'appuntamento — e resta testo da leggere. L'IBAN ha la sua strada
    nel riquadro (per forma, senza spazi): un «IBAN: da chiedere» non e'
    un dato. */
-const ETICHETTE_DA_INCOLLARE_P2P = /^(intestatario|causale|revolut|revtag|satispay|paypal|wise|indirizzo|contratto usdt)$/i;
+/* IL CONTRATTO USDT SENZA «📋 Copia» (2 nov 2026, Andrea: «qualcuno si
+   sbaglia e clicca su quello al posto dell'indirizzo»): si legge e si
+   copia a mano, ma il tasto lo ha solo l'indirizzo dove mandare */
+const ETICHETTE_DA_INCOLLARE_P2P = /^(intestatario|causale|revolut|revtag|satispay|paypal|wise|indirizzo)$/i;
 const FORME_DA_INCOLLARE_P2P = [
   /^@[\w.\-]{2,40}$/,
   /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
@@ -74014,7 +74037,8 @@ function renderOrdineP2P(){
     riquadroIncassoCauzioneP2P(o) +
     /* l'id della transazione USDT, a chi l'ha scritto (1 nov 2026) */
     (o.txidUsdt && typeof usdtP2P === 'function' && usdtP2P(o)
-      ? '<div class="p2p-recapito">' + rigaDato('Id della transazione', o.txidUsdt, {mono: true, copia: true}) + '</div>' : '') +
+      ? '<div class="p2p-recapito">' + rigaDato('Id della transazione', o.txidUsdt, {mono: true, copia: true})
+        + (typeof esploraTxUsdtP2P === 'function' ? esploraTxUsdtP2P(o, o.txidUsdt) : '') + '</div>' : '') +
     anelloneTabacchinoP2P(o) +
     '<div class="p2p-passi"><div class="steps">' +
       passi.map((p, i) => {
@@ -92704,6 +92728,9 @@ function chatScMessaggiHTML(c, altro, o){
       + ((m.f && m.testo === testoAllegatoChatScP2P(m.f.tipo)) ? '' : chatScTestoHTML(m.testo, true))
       + (m.f ? allegatoChatScHTML(m.f, (o && o.id) || '', false) : '')
       + li.pdf.map(x => schedaPdfPayCodeP2P(x, pcScambio)).join('')
+      /* l'id degli USDT inviati, coi NOSTRI link (2 nov 2026) */
+      + (typeof txidUsdtDaChatP2P === 'function' && o && !o.mercatino
+         ? esploraTxUsdtP2P(o, txidUsdtDaChatP2P(m.testo)) : '')
       + (li.altri.length ? '<div class="chatsc-copie">' + li.altri.map(x => '<button type="button" class="chatsc-copia" data-l="' + esc(x) + '" '
           + 'onclick="copiaLink(this.dataset.l, \'Link copiato 📋\')">📋 Copia link</button>').join('') + '</div>' : '')
       + (al.link ? '<div class="chatsc-allarme">⚠️ ' + esc(CHATSC_RIGA_LINK) + '</div>' : '')
