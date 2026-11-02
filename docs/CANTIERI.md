@@ -77372,3 +77372,64 @@ sul collaudo, dalla parte C della voce 7 di DA-FARE-ANDREA, e la card
 del moderatore solo con una disputa. Restano in euro, perché non sono
 di uno scambio: le pagine d'aiuto del P2P, che spiegano lo scambio in
 euro.
+
+## Il tunnel del ponte parte dopo Docker (2 nov 2026, cantiere ponte-dopo-docker)
+
+L'ALLARME. Il 2 nov, al giro lungo del mattino, la ronda-superficie del
+nodo ha suonato con una riga sola: «DOCKER-USER: manca il DROP di wg0».
+WG-PONTE in cima a INPUT con le sue 5 regole e i due DROP di wg0 in
+FORWARD c'erano; DOCKER-USER era vuota, e in FORWARD Docker (il suo
+`-j DOCKER-USER` e `-j DOCKER-FORWARD`) stava sopra i nostri due DROP.
+
+LA CAUSA, letta nel journal del nodo. Il riavvio del 1 nov 17:51 UTC (il
+kernel della CVE-2026-98432): `wg-quick@wg0` è salito alle 17:51:30,
+Docker alle 17:51:33. Il PostUp di DOCKER-USER ha trovato la catena che
+non c'era ancora («iptables: No chain/target/match by that name») e il
+suo `|| true` — scritto per le macchine SENZA Docker — l'ha lasciato
+correre. Poi Docker ha creato la catena vuota. La unit di wg-quick
+aveva solo `After=network-online.target nss-lookup.target`: l'ordine fra
+i due era il caso. Il buco è durato 16 ore perché la superficie si
+guarda solo al giro lungo, una volta al giorno dalle 9 UTC, e quello del
+1 nov era già passato prima del riavvio.
+
+COSA VOLEVA DIRE. Quel che arriva dal tunnel, cioè dal VPS, veniva
+giudicato prima dalle regole di Docker e solo dopo dal nostro DROP. Per
+usarlo bisognava aver preso il VPS, e Docker da solo ferma già quasi
+tutto: era la seconda cintura, non la porta.
+
+LA CURA, fatta da Andrea sul nodo il 2 nov 10:25 UTC, senza riavviare
+niente (il ponte passa dal socat sull'host, cioè da INPUT, e non si è
+interrotto): copia `/root/iptables-prima-docker-user-2026-11-02.txt`, la
+riga rimessa a mano identica al PostUp, e un drop-in
+`/etc/systemd/system/wg-quick@wg0.service.d/dopo-docker.conf` con
+`After=docker.service`. Dopo: `systemctl show -p After` dice
+`docker.service`, la ronda a mano «superficie ok» e «ponte wg ok».
+Nel repo il drop-in è `deploy/ponte/wg-quick-dopo-docker.conf`, il passo
+4 del ponte (PRODUZIONE, «IL PONTE VIA WIREGUARD») lo installa e guarda
+DOCKER-USER, e la voce della ronda-superficie dice come si cura
+l'allarme. Un commento in `wg0-nodo.conf` accanto alla riga ne spiega il
+perché.
+
+STRADE SCARTATE. Togliere il `|| true` (il tunnel non salirebbe più su
+una macchina senza Docker, e al riavvio col Docker lento il ponte
+resterebbe giù: fail-closed sì, ma per un difetto d'ordine). Un
+`Requires=docker.service` (senza Docker il tunnel non serve, ma non c'è
+ragione di legarli: basta l'ordine). Rimettere la riga da un'altra unit
+o da un timer (la lezione del 15 set: regole tenute da un altro processo
+restano indietro in silenzio). La ronda-superficie che guarda anche il
+drop-in: non chiesto.
+
+COSA È PROVATO. In `prove_guardiano_ponte`, sezione dei file del ponte,
+2 controlli nuovi: il drop-in dice `[Unit]` e `After=docker.service` e
+nient'altro, e la procedura di PRODUZIONE lo installa al suo posto. Due
+controprove rosse: `Requires=` al posto di `After=` e il percorso di
+installazione sbagliato. Dal vivo sul nodo: la riga entrata, l'ordine
+letto da systemd, la ronda verde.
+COSA È GIRATO SU QUALE ALBERO. Sopra e016d50 (develop prima della
+promozione del 2 nov): suite severa 26.927/0 con 2 saltate d'ambiente
+(nostr-tools), collaudi 116/0 con e senza coincurve.
+
+NON PROVATO E DA GUARDARE. L'ordine nuovo si vede solo al prossimo
+riavvio del nodo: dopo, `sudo journalctl -b -u docker -u wg-quick@wg0
+-o short-iso | grep -E "Started|No chain"` deve mostrare Docker prima
+del tunnel e nessun «No chain», e la ronda `ponte wg ok`.
