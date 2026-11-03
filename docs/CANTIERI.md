@@ -77877,3 +77877,70 @@ con altre parole intatto, le parole non principali mai copiate, i relay solo
 con la nsec, niente ronda senza parole. Da guardare: chi ha già la copia sui
 relay via Amber vede l'avviso finché non preme «Controlla il backup» o «Salva
 il backup» (la ricevuta prima non esisteva).
+
+## Il Cambio più asciutto e le icone del libro P2P centrate (3 nov 2026, cantiere ritocchi-cambio)
+
+Tre ritocchi di Andrea, la mattina dopo la promozione:
+- nella pagina «Cambio» via le tre righe «Veloce», «Restano tuoi», «Due
+  strade» (testi IT/EN, il CSS `.cambio-tessere` e la loro lista); il tasto
+  «onion» ora sta subito sotto il tetto, e il ridisegno a pezzi lo cerca
+  accanto a `.cambio-limiti`;
+- sotto «Conferma» solo «Fase BETA fino a 0,005 BTC» (o «500 000 sats», nell'unità
+  scelta; in BTC la cifra si dice corta, senza zeri in coda), più il «oggi n
+  di m» se c'è il tetto al giorno. Il minimo («Da 0,00025…») è tolto: lo dice
+  già l'avviso appena si scrive una cifra più piccola, e lì confondeva;
+- nel libro P2P la moneta della rete (fulmine o ₿) pendeva in basso rispetto a
+  «Ricevi/Invia»: `vertical-align` da -.3em a -.12em, misurato nel browser
+  (centro della moneta e centro delle parole a meno di mezzo pixel); e le due
+  righe della card respirano, 9px fra l'una e l'altra in tutti e due i tab
+  (`.p2p-ord>.p2p-piccola` e `.p2p-ord>.p2p-grande`);
+- quarto ritocco, dopo il «perfetto»: con «USDT (Tron)» o «USDT (Ethereum)» la
+  scatola dei metodi non porta più il 💳 («non c'entra nulla»). Il giudice è
+  `iconaMetodiP2P`: una rete USDT nostra (`reteUsdtDaMetodoP2P`) si intesta da
+  sola come il contanti; una rete non nostra e il misto con l'euro tengono il 💳.
+  La scatola NON diventa insegna navy (`soloMarchiP2P` invariato);
+- quinto ritocco: l'avviso «⚠️ Il wallet di Barattolo non ha ancora un backup»
+  (la ronda del backup di ieri sera, wallet-unico) non è più un toast di otto
+  secondi ma un BOTTONE fisso sopra la barra in basso, con la ✕ (Andrea: «un
+  bottone fisso chiudibile che riporta esattamente dentro a quella
+  impostazione»). Il tocco apre Profilo → «🔑 Il wallet di Barattolo»
+  (`apriCassettoProfilo`), dove stanno «Salva il backup» e «Le ho scritte su
+  carta»; chiuso, torna alla prossima apertura finché la copia non c'è; una
+  copia segnata (`walletSegnaCopia`) lo toglie da sola. Pelle del toast,
+  z-index 29 (sotto i fogli e la barra del carrello, che lo nasconde), centrato
+  con margin auto e non con transform (l'animazione `barraSu` lo avrebbe
+  azzerato). Lo vede solo chi ha il Cambio o l'on-chain (oggi gli admin) e
+  parole senza nessuna copia.
+- sesto: «in Incassi e pagamenti manca la sezione on-chain per la xpub». Il
+  campo c'è, ma vive nell'on-chain del mercatino (`onchain_incasso`, firmato dal
+  seme, rete di `ONCHAIN_RETE`), e in produzione l'on-chain era spento: col
+  «ricevi On-chain» scelto, l'indirizzo si scriveva alla «Conferma». Scelta di
+  Andrea fra tre (campo solo per lo swap, indirizzo a mano, leva 6): accendere
+  la leva 6, niente secondo campo. Qui solo la porta: sotto «On-chain» dello
+  swap automatico «Scegli dove ricevere: xpub o indirizzo ›» (o «Cambia…»), che
+  apre il cassetto del wallet, e solo con `myOnchain`;
+- settimo, trovato da Andrea alla prima xpub vera in produzione: «l'xpub deve
+  dare indirizzi mai usati, invece suggerisce il primo con indice 0 che è già
+  stato usato». La fila `_onchain_prossimo_esterno` contava solo gli indirizzi
+  dati da Barattolo. Adesso la rete dice fin dove la chiave è stata usata:
+  `onchain_xpub_scruta` legge `/0/i` su mempool fino a 20 vuoti di fila (il
+  limite dei wallet, tetto 200 letture), la base (uno dopo l'ultimo usato) sta
+  in `onchain_xpub_base` (chiave pubblica → numero), nasce al «Firma e salva»
+  PRIMA di riempire gli ordini in attesa, la ronda on-chain la rilegge ogni 6
+  ore (il wallet vive anche fuori di qui), non scende mai, e la rete muta
+  lascia quella di prima. `_onchain_prossimo_esterno` prende il massimo fra
+  le due file, quindi mercatino, P2P on-chain e swap automatico insieme. Il
+  controllo del campo dice l'indice e l'indirizzo, e il telefono lo rifà e lo
+  confronta; a rete muta non promette più /0/0. Scartato: leggere la rete a
+  ogni vendita (le funzioni della cassa sono sincrone e una rete lenta
+  fermerebbe la cassa). I collaudi on-chain hanno ora la loro mempool di
+  cartone anche per `onchain_mempool_indirizzo` (prima non serviva).
+  E il manuale del VPS diceva `sudo -u barattolo backup-fuori.sh`, che da
+  `barattolo` non entra in `/root/satmarket`; e la cartella `chiavi/` in
+  `/srv/barattolo` (di root) il server non sa crearla: DA-FARE voci 4 e 9
+  corrette (`install -d … chiavi`, backup con `systemctl start barattolo-backup`).
+Prove: sentinelle in `prove_cambio_libero` e nella card P2P, il caso USDT nel
+banco di `prove_p2p_barattozon`, le sentinelle del bottone, della porta xpub e del primo
+indirizzo mai usato in `prove_parole_uniche`, i nove controlli nuovi di
+`collaudo_onchain_incasso` (68/0) (col banco della ronda che conta il bottone come il toast),
+`collaudo_cambio_libero` (108/0). Schermate in /mnt/project-files/ritocchi-cambio/.

@@ -494,11 +494,10 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
                         f1.includes('data-unita="btc" aria-pressed="false" aria-label="BTC"><svg'),
                         f1.indexOf('data-unita="btc"') < f1.indexOf('data-unita="sats"')],
                 gira: (f1.match(/data-swap="cambio-gira"/g) || []).length,
-                tra: f1.includes('Da 25000 a 500000 sats · oggi 0 di 5'),
-                /* (2 nov 2026 sera, Alan) le tessere sono un elenco puntato di
-                   solo testo: tre righe, nessuna icona */
-                tessere: [(f1.match(/<ul class="cambio-tessere"><li>Veloce<\/li><li>Restano tuoi<\/li><li>Due strade<\/li><\/ul>/g) || []).length,
-                          f1.includes('cambio-tessera-ico')],
+                tra: f1.includes('Fase BETA fino a 500000 sats · oggi 0 di 5') && !f1.includes('Da 25000'),
+                /* (3 nov 2026, Andrea) le tre righe «Veloce», «Restano tuoi»,
+                   «Due strade» sono tolte */
+                tessere: [f1.includes('cambio-tessere'), f1.includes('Restano tuoi')],
                 indirizzo: f1.includes('id="swapIndirizzo_0"'),
                 fermo: f1.includes('id="swapCambioVai" type="button" data-swap="avanti" data-ordine="0" disabled'),
                 vecchi: ['data-swap="cambia"', 'cambio-chiudi', 'data-swap="cambio-calcola"', 'Cambia i tuoi sats'].filter(x => f1.includes(x)),
@@ -554,7 +553,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   out.unita = {mandi: /id="swapCambioMandi"[^>]*inputmode="decimal"[^>]*value="0,00100000"><small>BTC<\/small>/.test(fU),
                ricevi: /id="swapCambioRicevi"[^>]*value="0,00098842"><small>BTC<\/small>/.test(fU),
                costo: fU.includes('Costo <b>0,00001158 BTC</b> · SATS Routing'), riga: fU.includes('<b>−0,00000600</b>'),
-               limiti: fU.includes('Da 0,00025000 a 0,00500000 BTC · oggi 0 di 5'),
+               limiti: fU.includes('Fase BETA fino a 0,005 BTC · oggi 0 di 5'),
                acceso: fU.includes('data-unita="btc" aria-pressed="true"'), casa: memoria.get('barattolo_cambio_unita'),
                cifra: run('swapCambioCifra()'), richiesti: preventivi().length - pU};
   out.leggi = run("[['0,001','btc'],['0.00098842','btc'],['1,5','btc'],['0,123456789','btc'],['abc','btc'],['1,2,3','btc'],['10.000','sats']].map(([t, u]) => swapCambioLeggi(t, u))");
@@ -660,8 +659,8 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   sub.tendina.stessa = [run('swapCambioTendina'), run('swapCambioStradaScelta()'), box().includes('role="listbox"')];
   /* (euro-ordine) IL TASTO «onion»: c'e' solo con l'indirizzo dal server
      e non a chi e' gia' su Tor; toccato, apre. Dal 30 ott (cifre-stessa-
-     misura) sta subito sotto le tre tessere, non piu' accanto al selettore */
-  const onionB = () => (box().match(/<ul class="cambio-tessere">[^]*?<\/ul><button type="button" class="cambio-onion" data-swap="cambio-onion">onion<\/button>/g) || []).length;
+     misura) sotto le tessere, dal 3 nov sotto il tetto della beta */
+  const onionB = () => (box().match(/<div class="cambio-limiti">[^<]*<\/div><button type="button" class="cambio-onion" data-swap="cambio-onion">onion<\/button>/g) || []).length;
   sub.onion = {senza: onionB()};
   run("var onionHost = 'barattoloprova.onion', suOnioneFinto = false; function suOnion(){ return suOnioneFinto; } var aperture = 0; function apriSitoOnion(){ aperture++; }");
   run('swapCambioRidisegna()');
@@ -909,7 +908,7 @@ def il_telefono(base):
           "«BTC» (unita-tendine; una strada sola: niente tendine, niente tondo), i due campi, "
           "il selettore ₿ / sats (sats scelto), i tetti, le tre righe puntate di solo testo, l'indirizzo e "
           "«Conferma» spento; niente tasti di ieri, niente emoji fuori dalle icone disegnate",
-          {"campo": True, "mandi": True, "ricevi": True, "tendine": 0, "unita": [2, True, True, True], "gira": 0, "tra": True, "tessere": [1, False],
+          {"campo": True, "mandi": True, "ricevi": True, "tendine": 0, "unita": [2, True, True, True], "gira": 0, "tra": True, "tessere": [False, False],
            "indirizzo": True, "fermo": True, "vecchi": [], "emoji": []}, r["aperto"])
     prova("senza cifra: lo dice e non chiede niente", [True, 0], r["senzaCifra"])
     prova("la cifra scritta tasto per tasto: intanto «…» e «Conferma» spento, nessun "
@@ -1001,7 +1000,7 @@ def il_telefono(base):
           "LN quella rovesciata; la rete che c'e' gia' chiude e basta",
           {"pillole": 2, "menu": 2, "ln": True, "btc": True, "aperta": True, "chiusaFuori": True,
            "ricevi": [True, True], "stessa": [None, "ln-btc", False]}, s.get("tendina"))
-    prova("(euro-ordine) il tasto «onion» subito sotto le tre tessere: solo con "
+    prova("(euro-ordine) il tasto «onion» subito sotto il tetto della beta: solo con "
           "l'indirizzo .onion dal server, mai a chi e' gia' su Tor; toccato, apre il sito Tor",
           {"senza": 0, "con": 1, "aperto": 1, "suTor": 0}, s.get("onion"))
     prova("...un sat in piu', mai in meno: scritti 100.015 da mandare, ne servono "

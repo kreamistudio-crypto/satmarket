@@ -131,6 +131,11 @@ def main():
 
     SRV.onchain_mempool_utxo = utxo_finte
     SRV.onchain_mempool_tariffa = tariffa_finta
+    # (3 nov 2026) la chiave di conto si legge sulla rete fino al primo
+    # indirizzo mai usato: qui nessuno e' usato, e nessuna rete vera
+    async def scheda_vuota(indirizzo):
+        return {"chain_stats": {"tx_count": 0}, "mempool_stats": {"tx_count": 0}}
+    SRV.onchain_mempool_indirizzo = scheda_vuota
     SRV.onchain_mempool_invia = invia_finta
 
     con = SRV.db()

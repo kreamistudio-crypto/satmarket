@@ -93138,6 +93138,10 @@ async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
         if not onchain_firma_valida(r["xpub"], tipo, valore, firma):
             raise HTTPException(400, "La scelta non è firmata dal tuo seme: "
                                      "rifalla da questo telefono")
+        if tipo == "xpub":
+            # fin dove il wallet l'ha gia' usata (3 nov 2026): PRIMA di
+            # riempire gli ordini in attesa, che prendono il prossimo indice
+            await onchain_xpub_aggiorna_base(valore)
         adesso = int(time.time())
         con.execute(
             "INSERT INTO onchain_incasso(tg_id, tipo, valore, firma, creato,"
@@ -93196,7 +93200,18 @@ async def onchain_incasso_controlla(req: Request,
     if motivo:
         return {"ok": False, "motivo": motivo, "usato": None, "tx": 0}
     if tipo != "indirizzo":
-        return {"ok": True, "motivo": "", "usato": False, "tx": 0}
+        # la chiave di conto: il primo `/0/i` mai usato (3 nov 2026), e
+        # None se la rete e' muta. Non scrive: la base nasce al «salva»
+        con = db()
+        try:
+            base = _onchain_xpub_base(con, valore)
+        finally:
+            con.close()
+        primo = await onchain_xpub_scruta(valore, base)
+        return {"ok": True, "motivo": "", "usato": False, "tx": 0,
+                "indice": primo,
+                "indirizzo": (onchain_indirizzo_esterno(tipo, valore, primo)
+                              if primo is not None else "")}
     dove = onchain_indirizzo_esterno(tipo, valore, 0)
     try:
         j = await onchain_mempool_indirizzo(dove)
@@ -93517,7 +93532,113 @@ def _onchain_prossimo_esterno(con, venditore_id: int, valore: str) -> int:
     r = con.execute("SELECT MAX(incasso_indice) FROM onchain_ordini WHERE "
                     "venditore_id=? AND incasso_tipo='xpub' AND "
                     "incasso_valore=?", (int(venditore_id), valore)).fetchone()
-    return 0 if r[0] is None else int(r[0]) + 1
+    nostro = 0 if r[0] is None else int(r[0]) + 1
+    # ...e mai sotto l'ultimo indirizzo che la RETE ha gia' visto usato
+    # (3 nov 2026, `onchain_xpub_base`)
+    return max(nostro, _onchain_xpub_base(con, valore))
+
+
+# GLI INDIRIZZI GIA' USATI FUORI DA BARATTOLO (3 nov 2026, Andrea:
+# «l'xpub deve dare indirizzi mai usati, invece suggerisce il primo con
+# indice 0 che però è già stato usato»). La fila di `_onchain_prossimo_
+# esterno` contava solo quel che Barattolo aveva dato: una chiave di
+# conto che il wallet usava gia' ripartiva da `/0/0`. Adesso la rete dice
+# fin dove la chiave e' stata usata: si leggono gli indirizzi `/0/i` su
+# mempool, uno dopo l'altro, e ci si ferma a `ONCHAIN_XPUB_VUOTI` vuoti di
+# fila (il limite di 20 dei wallet, lo stesso che usano per ritrovarsi le
+# monete). La base = uno dopo l'ultimo usato, scritta in
+# `onchain_xpub_base` (chiave PUBBLICA → numero: niente di segreto) alla
+# scelta della destinazione, e riletta dalla ronda on-chain ogni
+# `ONCHAIN_XPUB_RILEGGI` secondi, perche' il wallet continua a vivere fuori
+# di qui. La rete muta non ferma niente: resta la base di prima.
+ONCHAIN_XPUB_VUOTI = 20
+ONCHAIN_XPUB_LETTURE_MAX = 200
+ONCHAIN_XPUB_RILEGGI = 6 * 3600
+
+
+def _onchain_xpub_base_prepara(con):
+    con.execute("CREATE TABLE IF NOT EXISTS onchain_xpub_base ("
+                "valore TEXT PRIMARY KEY, base INTEGER NOT NULL DEFAULT 0, "
+                "letto INTEGER NOT NULL DEFAULT 0)")
+
+
+def _onchain_xpub_base(con, valore: str) -> int:
+    """La base scritta per questa chiave di conto, o 0."""
+    try:
+        r = con.execute("SELECT base FROM onchain_xpub_base WHERE valore=?",
+                        (str(valore),)).fetchone()
+    except sqlite3.OperationalError:
+        return 0                      # la tabella non e' ancora nata
+    return int(r[0]) if r and r[0] is not None else 0
+
+
+async def onchain_xpub_scruta(valore: str, da: int = 0):
+    """Il primo indice dopo l'ultimo `/0/i` che la rete ha visto usato,
+    partendo da `da`; None se la rete non risponde (nessuna base nuova)."""
+    ultimo, vuoti, i, letture = -1, 0, max(int(da), 0), 0
+    while vuoti < ONCHAIN_XPUB_VUOTI and letture < ONCHAIN_XPUB_LETTURE_MAX:
+        dove = onchain_indirizzo_esterno("xpub", valore, i)
+        try:
+            j = await onchain_mempool_indirizzo(dove)
+        except Exception:
+            return None
+        letture += 1
+        tx = (int((j.get("chain_stats") or {}).get("tx_count") or 0)
+              + int((j.get("mempool_stats") or {}).get("tx_count") or 0))
+        if tx > 0:
+            ultimo, vuoti = i, 0
+        else:
+            vuoti += 1
+        i += 1
+    return max(int(da), ultimo + 1)
+
+
+async def onchain_xpub_aggiorna_base(valore: str):
+    """Rilegge la rete per questa chiave e alza la base (mai la abbassa).
+    Torna la base di adesso, o None se la rete e' muta."""
+    con = db()
+    try:
+        _onchain_xpub_base_prepara(con)
+        prima = _onchain_xpub_base(con, valore)
+    finally:
+        con.close()
+    nuova = await onchain_xpub_scruta(valore, prima)
+    if nuova is None:
+        return None
+    con = db()
+    try:
+        _onchain_xpub_base_prepara(con)
+        con.execute("INSERT INTO onchain_xpub_base(valore, base, letto) "
+                    "VALUES (?,?,?) ON CONFLICT(valore) DO UPDATE SET "
+                    "base=MAX(base, excluded.base), letto=excluded.letto",
+                    (str(valore), int(nuova), int(time.time())))
+        con.commit()
+        return _onchain_xpub_base(con, valore)
+    finally:
+        con.close()
+
+
+async def _onchain_xpub_rileggi_tutte():
+    """La ronda: le chiavi di conto scelte come destinazione, lette da
+    piu' di `ONCHAIN_XPUB_RILEGGI` secondi (o mai). Una alla volta; un
+    errore salta quella e basta."""
+    con = db()
+    try:
+        _onchain_prepara_tabelle(con)
+        _onchain_xpub_base_prepara(con)
+        valori = [r[0] for r in con.execute(
+            "SELECT DISTINCT i.valore FROM onchain_incasso i LEFT JOIN "
+            "onchain_xpub_base b ON b.valore=i.valore WHERE i.tipo='xpub' "
+            "AND COALESCE(b.letto, 0) < ?",
+            (int(time.time()) - ONCHAIN_XPUB_RILEGGI,))]
+    finally:
+        con.close()
+    for v in valori:
+        try:
+            await onchain_xpub_aggiorna_base(v)
+        except Exception as e:
+            print(f"⚠️ On-chain: chiave di conto non riletta "
+                  f"({type(e).__name__})", flush=True)
 
 
 def _onchain_incasso_mio(tg_id: int) -> str:
@@ -95238,6 +95359,11 @@ async def orologio_onchain():
             await _p2p_onchain_ronda()
         except Exception as e:
             print(f"⚠️ P2P on-chain: ronda saltata: {e}", flush=True)
+        # le chiavi di conto rilette sulla rete (3 nov 2026)
+        try:
+            await _onchain_xpub_rileggi_tutte()
+        except Exception as e:
+            print(f"⚠️ On-chain: chiavi di conto non rilette: {e}", flush=True)
 
 
 @app.on_event("startup")

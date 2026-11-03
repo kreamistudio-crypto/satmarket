@@ -81822,6 +81822,10 @@ def prove_p2p_barattozon():
             + re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0) + "\n"
             + _intera("function marchioMetodoP2P(m, conTesto){")
             + _intera("function iconaMetodiP2P(metodi){")
+            # le reti USDT si intestano da sole (3 nov 2026, Andrea)
+            + mini[mini.index("const P2P_RETI_USDT = ["):
+                   mini.index("\n];", mini.index("const P2P_RETI_USDT = [")) + 3] + "\n"
+            + _intera("function reteUsdtDaMetodoP2P(m){")
             + "const T = 'Contanti al tabacchino';\n"
             "console.log(JSON.stringify({\n"
             "  sepa: marchioMetodoP2P('SEPA'),\n"
@@ -81829,7 +81833,9 @@ def prove_p2p_barattozon():
             "  tab: marchioMetodoP2P(T),\n"
             "  conTesto: marchioMetodoP2P(T, true),\n"
             "  icone: [iconaMetodiP2P([T]), iconaMetodiP2P(['SEPA']),\n"
-            "          iconaMetodiP2P(['SEPA', T]), iconaMetodiP2P([]), iconaMetodiP2P(null)]\n"
+            "          iconaMetodiP2P(['SEPA', T]), iconaMetodiP2P([]), iconaMetodiP2P(null)],\n"
+            "  usdt: [iconaMetodiP2P(['USDT (Tron)']), iconaMetodiP2P(['USDT (Ethereum)']),\n"
+            "         iconaMetodiP2P(['USDT (Polygon)']), iconaMetodiP2P(['SEPA', 'USDT (Tron)'])]\n"
             "}));\n")
         _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
                                     encoding="utf-8")
@@ -81861,6 +81867,11 @@ def prove_p2p_barattozon():
             _c = chr(0x1F4B3) + " "
             prova("l'icona sparisce col solo marchio, e resta in tutti gli altri casi",
                   ["", _c, _c, _c, _c], out["icone"])
+            # (3 nov 2026, Andrea) USDT Tron o Ethereum: niente carta di
+            # credito, «non c'entra nulla»; una rete non nostra e il misto
+            # con l'euro la tengono
+            prova("le reti USDT non portano il 💳, il resto si'",
+                  ["", "", _c, _c], out["usdt"])
 
     # --- 5) IL CSS: l'insegna, la tessera, e i due conti delle misure
     _marca = pezzo_js(css, ".p2p-marca{", "}")
@@ -143135,7 +143146,7 @@ def prove_conto_intervallo():
     # le celle in colonna, e la riga dell'euro della card che lascia il
     # posto all'anello
     prova("CSS: nessuna regola delle due colonne", False, ".conto-due" in mini)
-    for regola in (".p2p-ord>.p2p-grande{display:block;padding-right:52px}",
+    for regola in (".p2p-ord>.p2p-grande{display:block;padding-right:52px;margin-top:9px}",
                    # (7 ott 2026) «sats» veste come «da» e «a» delle card
                    # P2P: la STESSA regola, non una copia che si scolla
                    ".card-p2p .p2p-vt-verbo,\n  .conto-p2p .unita-sats{font-family:Nunito,sans-serif;font-size:10.5px;\n"
@@ -154181,9 +154192,13 @@ console.log(JSON.stringify(out));
         prova("...la moneta e' il fulmine per Lightning e la ₿ per on-chain, mai un'emoji",
               ['<span class="p2p-moneta-riga" role="img" aria-label="Lightning">LN</span>',
                '<span class="p2p-moneta-riga" role="img" aria-label="on-chain">OC</span>'], om)
-    prova("...e il CSS la tiene in riga, alta quanto il testo", (True, True),
-          (".p2p-moneta-riga{display:inline-flex;vertical-align:-.3em;margin-right:.35em;line-height:0}" in mini,
-           ".p2p-euro > .p2p-bandiera{margin-right:.3em}" in mini))
+    # (3 nov 2026, Andrea) la moneta centrata sulle parole (-.12em, misurato)
+    # e le due righe della card distanziate
+    prova("...e il CSS la tiene in riga, centrata sulle parole, e le due righe respirano",
+          (True, True, True),
+          (".p2p-moneta-riga{display:inline-flex;vertical-align:-.12em;margin-right:.35em;line-height:0}" in mini,
+           ".p2p-euro > .p2p-bandiera{margin-right:.3em}" in mini,
+           ".p2p-ord>.p2p-piccola{margin-top:9px}" in mini))
     i = mini.index("const P2P_VALUTE = [")
     js = ("const P2P_VALUTA = 'EUR';\n" + mini[i:mini.index("];", i) + 2] + "\n"
           + mini[mini.index("const P2P_RETI_USDT = ["):mini.index("];", mini.index("const P2P_RETI_USDT = [")) + 2] + "\n"
@@ -155880,6 +155895,10 @@ const swapAcceso = () => false;
 const onchainSrv = null;
 const onchainRete = () => ({strada: 'm/0'});
 const toast = (t) => TOAST.push(t);
+/* dal 3 nov 2026 l'avviso e' il bottone fisso: si conta come il toast,
+   e una copia fatta lo toglie */
+const walletPillolaMostra = () => TOAST.push('pillola');
+const walletPillolaVia = () => { TOAST = TOAST.filter(t => t !== 'pillola'); };
 function walletCopieChiave(){ return 'copie_' + myTgId; }
 const firmatarioNsecSalvata = async () => (NSEC ? {chiudi(){}} : null);
 const onchainSuiRelay = async () => { RELAY_SCRITTI++; return RELAY_OK; };
@@ -156006,6 +156025,49 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
            "onclick=\"walletMostraParole(this)\"" in mini,
            "onchainGuarda(this, 'walletBackup')" in mini,
            "swapAcceso() && typeof swapBloccoProfilo === 'function' ? swapBloccoProfilo() : ''" in mini])
+    # (3 nov 2026, Andrea: «al posto del messaggio fai comparire un
+    # bottone fisso chiudibile che riporta esattamente dentro a quella
+    # impostazione») il toast del backup e' un bottone: porta al
+    # cassetto, si chiude con la ✕, se ne va da solo con una copia
+    _ronda = pezzo_js(mini, "async function walletBackupRonda(){", "\n}\n")
+    _segna = pezzo_js(mini, "function walletSegnaCopia(imp, dove){", "\n}\n")
+    _apri = pezzo_js(mini, "function walletPillolaApri(){", "\n}\n")
+    _mostra = pezzo_js(mini, "function walletPillolaMostra(){", "\n}\n")
+    _cssp = re.search(r"\.wallet-pillola\{[^}]*\}", mini)
+    prova("(3 nov) l'avviso del backup e' un bottone fisso chiudibile che apre "
+          "«Il wallet di Barattolo», non piu' un toast",
+          (False, True, True, True, True, True, True),
+          ("non ha ancora un backup: Profilo" in mini,
+           "walletPillolaMostra();" in _ronda,
+           "walletPillolaVia();" in _segna,
+           "apriCassettoProfilo('accOnchainIncasso')" in _apri,
+           'aria-label="Chiudi" onclick="walletPillolaVia()"' in _mostra,
+           bool(_cssp) and "position:fixed" in _cssp.group(0)
+           and "z-index:29" in _cssp.group(0),
+           "body.con-pacco .wallet-pillola{display:none}" in mini))
+    # (3 nov 2026, Andrea: «dovrebbe chiedere la xpub») sotto «On-chain»
+    # dello swap automatico la porta al campo UNICO dell'on-chain, solo
+    # dove quel campo c'e' (myOnchain)
+    # (3 nov 2026, Andrea: «l'xpub deve dare indirizzi mai usati») il
+    # telefono mostra il primo MAI usato che dice il server (x.indice),
+    # lo rifa' da se' e lo confronta; a rete muta non promette /0/0
+    _guarda = mini[mini.index("      /* (3 nov 2026, Andrea: «l'xpub deve dare indirizzi mai usati») il"):]
+    _guarda = _guarda[:_guarda.index("    } else if (x.usato === true) {")]
+    prova("(3 nov) la chiave di conto: il primo indirizzo MAI usato, rifatto e "
+          "confrontato dal telefono",
+          (True, True, True, False),
+          ("indice: n === null ? 0 : n" in _guarda,
+           "x.indirizzo && x.indirizzo !== primo" in _guarda,
+           "la rete adesso non risponde" in _guarda,
+           "{tipo, valore, indice: 0}" in _guarda))
+    _auto = pezzo_js(mini, "function renderSwapAutoProfilo(){", "\n}\n")
+    prova("(3 nov) lo swap automatico porta al campo xpub del wallet, solo con "
+          "l'on-chain acceso",
+          (True, True),
+          ("a.onchain && typeof myOnchain !== 'undefined' && myOnchain" in _auto,
+           "onclick=\"apriCassettoProfilo('accOnchainIncasso')\">${a.indirizzo ? "
+           "'Cambia dove ricevi on-chain ›' : 'Scegli dove ricevere: xpub o "
+           "indirizzo ›'}" in _auto))
 
 
 def prove_incasso_esterno_onchain():
@@ -185082,22 +185144,22 @@ console.log(JSON.stringify(fuori));
            "u.insertAdjacentHTML('afterend', serve)" in pezzi and "vicino.remove()" in pezzi,
            pezzi.index("box.dataset.forma === forma0") < pezzi.index("u.insertAdjacentHTML")))
     # (30 ott 2026, cifre-stessa-misura, Andrea: «il tasto onion fammelo
-    # rettangolare in stile barattolo sotto le card») il tasto sta subito
-    # dopo le tre tessere, e il ridisegno a pezzi lo cerca li'
-    prova("(cifre-stessa-misura) il tasto «onion» sotto le tre tessere, rettangolare",
-          (1, 0, True, True),
-          (rende.count('<ul class="cambio-tessere">${tessere}</ul>${onion}'),
-           rende.count("</div>${onion}"),
-           "box.querySelector('.cambio-tessere')" in pezzi,
+    # rettangolare in stile barattolo sotto le card»; dal 3 nov, tolte le
+    # tessere, sta subito dopo il tetto della beta, e il ridisegno a pezzi
+    # lo cerca li')
+    prova("(cifre-stessa-misura) il tasto «onion» sotto il tetto della beta, rettangolare",
+          (1, True, True),
+          (rende.count('<div class="cambio-limiti">${limiti}</div>${onion}'),
+           "box.querySelector('.cambio-limiti')" in pezzi,
            "border-radius:14px;" in re.search(r"\.cambio-onion\{[^}]*\}", mini).group(0)))
-    # (2 nov 2026 sera, Alan: «"veloce", "restano tuoi", "due strade"
-    # sembrano bottoni, li metterei solo come testo in un elenco puntato»)
-    _tess = re.search(r"\.cambio-tessere\{[^}]*\}", mini).group(0)
-    prova("(Alan) le tre tessere sono un elenco puntato di solo testo: il pallino, "
-          "niente riquadro, niente icona",
-          (True, False, False, False),
-          ("list-style:disc" in _tess, "background" in _tess,
-           ".cambio-tessere li{" in mini, "cambio-tessera-ico" in rende))
+    # (3 nov 2026, Andrea: «leva le parole veloce, restano tuoi e due
+    # strade») e sotto «Conferma» solo il tetto della beta, senza minimo
+    prova("(3 nov) «Veloce», «Restano tuoi», «Due strade» non ci sono piu', ne' il "
+          "loro CSS; sotto «Conferma» «Fase BETA fino a …», senza il minimo",
+          (False, False, False, False, True, False),
+          ("cambio-tessere" in rende, "tessere:" in js, ".cambio-tessere" in mini,
+           "Restano tuoi" in js, "beta: (b, u) => `Fase BETA fino a ${b} ${u || 'sats'}`," in js,
+           "cifraTra" in js))
     # (30 ott 2026, cifre-stessa-misura, Andrea: «quando cambio da bitcoin
     # a satoshi ... la grandezza dei numeri dentro le caselle cambiano?
     # non dovrebbero») la cifra in BTC non ha una grandezza sua: la

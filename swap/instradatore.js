@@ -309,10 +309,9 @@ const SWAP_TESTI_T3 = {
        delle parole e del recupero che stava in fondo e' passata al
        Profilo il 29 ott 2026, cantiere parole-uniche) */
     direzioni: {'ln-btc': 'Da Lightning a bitcoin', 'btc-ln': 'Da bitcoin a Lightning'},
-    cifraTra: (a, b, u) => `Da ${a} a ${b} ${u || 'sats'}`,
+    beta: (b, u) => `Fase BETA fino a ${b} ${u || 'sats'}`,
     oggi: (n, m) => `oggi ${n} di ${m}`,
     unita: 'Unità delle cifre',
-    tessere: [['ln', 'Veloce'], ['scudo', 'Restano tuoi'], ['gira', 'Due strade']],
     /* (parole-uniche, 29 ott 2026) le parole stanno nel Profilo */
     riservaDove: 'Le 12 parole sono nel Profilo',
     ritrovaTit: 'I tuoi cambi',
@@ -434,10 +433,9 @@ const SWAP_TESTI_T3 = {
     ritiraA: 'Send to this address',
     cambio: 'Exchange',
     direzioni: {'ln-btc': 'From Lightning to bitcoin', 'btc-ln': 'From bitcoin to Lightning'},
-    cifraTra: (a, b, u) => `From ${a} to ${b} ${u || 'sats'}`,
+    beta: (b, u) => `BETA phase: up to ${b} ${u || 'sats'}`,
     oggi: (n, m) => `today ${n} of ${m}`,
     unita: 'Unit of the figures',
-    tessere: [['ln', 'Fast'], ['scudo', 'Stays yours'], ['gira', 'Two ways']],
     riservaDove: 'The 12 words are in the Profile',
     ritrovaTit: 'Your exchanges',
     ritrovaSpiega: 'New phone? Tap here to find your exchanges.',
@@ -1758,7 +1756,8 @@ function swapCambioSpiega(dovuto){
    sats aggiungi anche un piccolo tasto ... con la scritta "onion"») il
    tasto porta a Barattolo sul sito Tor. Solo se il server ha un
    indirizzo .onion, e non a chi c'e' gia' sopra. Dal 30 ott sta sotto
-   le tre tessere, rettangolare (cifre-stessa-misura) */
+   le tre tessere, rettangolare (cifre-stessa-misura); dal 3 nov, tolte
+   le tessere, sotto il tetto della beta */
 function onionSwap(){
   return typeof onionHost === 'string' && onionHost && !(typeof suOnion === 'function' && suOnion())
     ? '<button type="button" class="cambio-onion" data-swap="cambio-onion">onion</button>' : '';
@@ -1811,9 +1810,9 @@ function renderSwapCambio(){
     /* (30 ott 2026, cantiere onion-tardi: Andrea non vedeva il tasto)
        l'indirizzo .onion arriva con la busta della vetrina, e chi apre
        il Cambio prima di lei l'aveva gia' disegnato senza: il tasto si
-       aggiunge (o si toglie) qui sotto le tessere, senza ridisegnare i
-       campi */
-    const u = box.querySelector ? box.querySelector('.cambio-tessere') : null;
+       aggiunge (o si toglie) qui sotto il tetto della beta, senza
+       ridisegnare i campi */
+    const u = box.querySelector ? box.querySelector('.cambio-limiti') : null;
     if (u) {
       const vicino = u.nextElementSibling, ce = !!(vicino && vicino.classList.contains('cambio-onion'));
       const serve = onionSwap();
@@ -1863,11 +1862,14 @@ function renderSwapCambio(){
     ? `<div class="cambio-gira"><button type="button" data-swap="cambio-gira" data-strada="${esc(altraStrada)}" aria-label="${esc(t.direzioni[altraStrada] || altraStrada)}">${swapIcona('gira')}</button></div>`
     : '<div class="cambio-gira"></div>';
   const campo = sub ? campoFatturaSwap(0, '') : campoIndirizzoSwap(0, '');
-  const limiti = esc(t.cifraTra(swapCambioNum(l.minimo || 0), swapCambioNum(l.massimo || 0), swapCambioUnitaNome()))
-    + (l.al_giorno ? ' · ' + esc(t.oggi(l.oggi || 0, l.al_giorno)) : '');
-  /* (2 nov 2026 sera, Alan: «sembrano bottoni, li metterei solo come
-     testo in un elenco puntato») tre righe di testo, niente riquadri */
-  const tessere = t.tessere.map(([ic, testo]) => `<li>${esc(testo)}</li>`).join('');
+  /* (3 nov 2026, Andrea) sotto «Conferma» solo il tetto della beta: il
+     minimo lo dice gia' l'avviso appena si scrive una cifra piu' piccola,
+     e qui faceva solo confusione. Le tre righe (veloce, restano tuoi,
+     due strade) sono tolte (stessa richiesta) */
+  /* in BTC la cifra si dice corta, «0,005» (come la scrive Andrea), non «0,00500000» */
+  const tetto = swapCambioUnita === 'btc' ? swapCambioNum(l.massimo || 0).replace(/,?0+$/, '') : swapCambioNum(l.massimo || 0);
+  const limiti = [l.massimo ? esc(t.beta(tetto, swapCambioUnitaNome())) : '',
+                  l.al_giorno ? esc(t.oggi(l.oggi || 0, l.al_giorno)) : ''].filter(Boolean).join(' · ');
   forma(forma0);
   box.innerHTML = `<div class="swap-cambio">
     <div class="cambio-carta" role="group" aria-label="${esc(sub ? tp.titoloPrevSub : tp.titoloPrev)}">
@@ -1878,8 +1880,7 @@ function renderSwapCambio(){
     <div id="swapCambioAvviso">${pz.avviso}</div>
     ${campo}
     <button class="btn orange cambio-vai" id="swapCambioVai" type="button" data-swap="avanti" data-ordine="0"${pz.pronto ? '' : ' disabled'}>${esc(tp.conferma)}</button>
-    <div class="cambio-limiti">${limiti}</div>
-    <ul class="cambio-tessere">${tessere}</ul>${onion}
+    <div class="cambio-limiti">${limiti}</div>${onion}
   </div>`;
 }
 /* LA CIFRA SCRITTA: a ogni tasto si ricorda e si mostra «…» nell'altro

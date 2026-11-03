@@ -144,9 +144,13 @@ grep -n "^ONCHAIN_" /srv/barattolo/config.py
 ```
 sudo ls -l /root/satmarket/chiavi/
 ```
-Attesi: nessuna riga `ONCHAIN_`, e «No such file or directory». Se c'è un
-file, FERMATI: è nato su signet e su mainnet non vale (si sposta via con
-copia, prima del passo 3).
+Attesi: nessuna riga `ONCHAIN_`, e nella cartella al più
+`swap-barattolo.json` (le parole dello swap automatico, nate il 3 nov
+2026: restano dove sono). Se c'è `onchain-barattolo.json`, FERMATI: è nato
+su signet e su mainnet non vale (si sposta via con copia, prima del passo
+3). Se manca la cartella intera la si crea a mano, come al passo 2 della
+voce 9: il server gira come `barattolo` e in `/srv/barattolo`, che è di
+root, non può crearla da sé.
 
 **Passo 2, scrive: la copia e le quattro righe** (dopo il sì di Andrea):
 ```
@@ -179,7 +183,7 @@ Atteso `-rw-------`, `mainnet m/48'/0'/0'/2' xpub6…`. SUBITO il backup
 fuori sede (finché la copia è una sola, su mainnet quella chiave vale
 sats):
 ```
-cd /srv/barattolo && sudo -u barattolo ./deploy/backup-fuori.sh
+sudo systemctl start barattolo-backup && sudo journalctl -u barattolo-backup -n 15 --no-pager
 ```
 Il pannello delle leve deve poi dire «sul VPS (impronta …)» senza l'avviso del backup.
 
@@ -419,7 +423,7 @@ per le parole):
 grep -n "^SWAP_AUTO" /srv/barattolo/config.py
 ```
 ```
-sudo ls -l /root/satmarket/chiavi/swap-barattolo.json
+sudo ls -l /srv/barattolo/chiavi/
 ```
 
 **Passo 2, scrive: la copia, la riga, il controllo, il riavvio** (dopo il sì di Andrea):
@@ -435,17 +439,30 @@ sudo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read());
 ```
 sudo systemctl restart barattolo && sleep 30 && curl -s -o /dev/null -w 'salute %{http_code}\n' http://127.0.0.1:8080/api/salute
 ```
+La cassaforte `chiavi/`, se non c'è ancora: il server gira come
+`barattolo` e `/srv/barattolo` è di root, quindi la cartella non sa
+crearla da sé (3 nov 2026: «Crea le parole» rispondeva «non create», nel
+journal `PermissionError: … '/srv/barattolo/chiavi'`). Atteso
+`drwx------ … barattolo barattolo`:
+```
+sudo install -d -m 700 -o barattolo -g barattolo /srv/barattolo/chiavi
+```
+```
+sudo ls -ld /srv/barattolo/chiavi
+```
 
 **Passo 3, dal telefono (Andrea, admin).** Pannello admin, cassetto «🔁
 Parole dello swap»: «Crea le parole», UNA volta. Controllo in sola
 lettura, poi SUBITO il backup fuori sede (finché la copia è una sola):
 ```
-sudo ls -l /root/satmarket/chiavi/swap-barattolo.json
+sudo ls -l /srv/barattolo/chiavi/
 ```
 ```
-cd /srv/barattolo && sudo -u barattolo ./deploy/backup-fuori.sh
+sudo systemctl start barattolo-backup && sudo journalctl -u barattolo-backup -n 15 --no-pager
 ```
-Atteso `-rw-------` e l'archivio in chat.
+Atteso `-rw-------` e l'archivio in chat. Il backup a mano è il
+giornaliero lanciato adesso: gira da root, come alle 04:30 (come
+`barattolo` non entrerebbe in `/root/satmarket`, che sta dentro `/root`).
 
 **Passo 4, la prova.** Alan (venditore): Profilo → «Lightning address» →
 «Quando vendi in Lightning, ricevi: On-chain»; la sua card deve mostrare

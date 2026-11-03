@@ -96,6 +96,11 @@ def main():
 
     SRV.onchain_mempool_utxo = utxo_finte
     SRV.onchain_mempool_tariffa = tariffa_finta
+    # (3 nov 2026) la chiave di conto si legge sulla rete fino al primo
+    # indirizzo mai usato: qui nessuno e' usato, e nessuna rete vera
+    async def scheda_vuota(indirizzo):
+        return {"chain_stats": {"tx_count": 0}, "mempool_stats": {"tx_count": 0}}
+    SRV.onchain_mempool_indirizzo = scheda_vuota
     SRV.onchain_mempool_invia = invia_finta
 
     con = SRV.db()
@@ -104,7 +109,8 @@ def main():
                     "registrato,ln_address) VALUES(?,?,?,1,'')",
                     (tg, nome, f"neg{tg}{tg}"))
     annunci = []
-    for n in range(5):
+    # il sesto (3 nov 2026): la vendita dopo la base delle chiavi di conto
+    for n in range(6):
         cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
             "categoria,zona,stato,creato,consegna,quantita,valuta,condizione)"
@@ -418,7 +424,62 @@ def main():
     prova("...e il controllo non scrive niente", None,
           (lambda: (come(888), c.get("/api/onchain/prova").json()["incasso"])[1])())
 
+    # GLI INDIRIZZI GIA' USATI FUORI DA BARATTOLO (3 nov 2026, Andrea:
+    # «l'xpub deve dare indirizzi mai usati»): il wallet ha gia' usato
+    # /0/0../0/6 per conto suo (piu' di quelli dati da Barattolo)
+    print("\n[la chiave di conto: mai un indirizzo che la rete ha gia' visto]")
+    for i in range(0, 40):
+        SCHEDE[dal_wallet(i)] = {"chain_stats": {"tx_count": 1 if i <= 6 else 0},
+                                 "mempool_stats": {"tx_count": 0}}
+
+    def base_ora():
+        con = SRV.db()
+        try:
+            return SRV._onchain_xpub_base(con, vpub)
+        finally:
+            con.close()
+    prima = base_ora()
+    x = guarda(tipo="xpub", valore=vpub)
+    prova("il controllo dice il primo MAI usato (/0/7), non /0/0",
+          (True, 7, dal_wallet(7)), (x["ok"], x.get("indice"), x.get("indirizzo")))
+    prova("...e non scrive la base", prima, base_ora())
     r = scegli(888, tipo="xpub", valore=vpub, firma=firma_dest(888, "xpub", vpub))
+    prova("al «salva» la base nasce: 7", (200, 7), (r.status_code, base_ora()))
+    o7 = compra(999, annunci[5]).json().get("onchain") or {}
+    prova("...e la vendita dopo va a /0/7 o oltre, mai a uno usato",
+          (True, True),
+          ((o7.get("destinazione") or {}).get("indice", -1) >= 7,
+           o7.get("incasso") in [dal_wallet(i) for i in range(7, 40)]))
+    # la rete muta non abbassa niente, e la base non scende mai
+    SCHEDE.clear()
+    prova("rete muta: il controllo dice «non so» (indice None)", None,
+          guarda(tipo="xpub", valore=vpub).get("indice"))
+    import asyncio as _aio
+    prova("...e la rilettura non tocca la base", (None, 7),
+          (_aio.run(SRV.onchain_xpub_aggiorna_base(vpub)), base_ora()))
+    for i in range(0, 60):
+        SCHEDE[dal_wallet(i)] = {"chain_stats": {"tx_count": 1 if i == 9 else 0},
+                                 "mempool_stats": {"tx_count": 0}}
+    prova("il wallet usa /0/9 fuori di qui: la ronda alza la base a 10", 10,
+          _aio.run(SRV.onchain_xpub_aggiorna_base(vpub)))
+    for i in range(0, 60):
+        SCHEDE[dal_wallet(i)] = {"chain_stats": {"tx_count": 0},
+                                 "mempool_stats": {"tx_count": 0}}
+    prova("...e una rilettura con tutto vuoto non la abbassa", 10,
+          _aio.run(SRV.onchain_xpub_aggiorna_base(vpub)))
+    con = SRV.db()
+    try:
+        con.execute("UPDATE onchain_xpub_base SET letto=0")
+        con.commit()
+    finally:
+        con.close()
+    for i in range(0, 60):
+        SCHEDE[dal_wallet(i)] = {"chain_stats": {"tx_count": 1 if i == 12 else 0},
+                                 "mempool_stats": {"tx_count": 0}}
+    _aio.run(SRV._onchain_xpub_rileggi_tutte())
+    prova("la ronda rilegge le chiavi vecchie di 6 ore: base 13", 13, base_ora())
+
+    # la risposta e' quella del «salva» qui sopra: un secondo urterebbe il freno
     come(888)
     prova("di nuovo la vpub: il profilo dice «xpub»", (200, "xpub"),
           (r.status_code, c.get("/api/me").json().get("onchain_incasso")))
