@@ -3,6 +3,7 @@ importa_nostr.py
 prove.py
 genera_icone.py
 genera_icone_apk.py
+genera_mappa_italia.py
 censimento_nostr.py
 censimento_spedizione.py
 censimento_payout.py
