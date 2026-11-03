@@ -87283,9 +87283,14 @@ def _seo_ordine_p2p(oid: str):
     if not frase:
         return TESTA_P2P, TITOLO_P2P
     titolo = f"{_taglia_meta(frase, 80)} — Barattolo P2P"
+    # IL TITOLO E' UN NODO DI TESTO, come quello dell'annuncio
+    # (`_seo_annuncio`): i metodi sono testo libero di chi pubblica, e
+    # `_monta_pagina` lo scrive dentro <title> cosi' com'e'. I meta lo
+    # scappano da se' (`_attr`), il <title> no: si scappa qui, al
+    # ritorno, una volta sola (3 nov 2026, sicurezza B-01).
     return _testa_seo(titolo, META_TESTO_ORDINE_P2P,
                       f"{URL_PUBBLICO}/p2p?ordine={oid}",
-                      immagine=IMMAGINE_ORDINE_P2P, indicizza=False), titolo
+                      immagine=IMMAGINE_ORDINE_P2P, indicizza=False), _testo(titolo)
 
 
 # E NEMMENO LA QUARTA, e per una ragione sua: la pagina dei Consigliati
