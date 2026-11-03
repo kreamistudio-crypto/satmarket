@@ -130873,6 +130873,9 @@ def prove_effetti_ridotti():
     #     volta, che smette di aspettare un'immagine uscita dal riquadro
     #     (il suo `decode()` non risponderebbe mai) — non anima niente, e
     #     si ferma da sola al decode, all'uscita o ad ATTESA_IMMAGINE_MAX
+    #   zoomQuiMappaP2P (3 nov 2026, mappa-contanti): segue le DITA e la
+    #     rotellina sulla mappa del contanti, un ridisegno per fotogramma
+    #     — come lbApplica, non e' un'animazione
     chi = collections.Counter()
     for m in re.finditer(r"requestAnimationFrame", js):
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
@@ -130880,7 +130883,7 @@ def prove_effetti_ridotti():
     prova("chi chiama requestAnimationFrame e' censito, col suo perche'",
           {"togliGuscio": 2, "decodificaInVista": 2, "navArrivoSecco": 2,
            "avviaTour": 2, "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1,
-           "passo": 2},
+           "passo": 2, "zoomQuiMappaP2P": 1},
           dict(chi))
 
     # --- 5) PRIMA DEL PRIMO PAINT, E DOPO /me -----------------------
@@ -154801,6 +154804,11 @@ out.zoom = zoomVistaMappaP2P({x:0,y:0,w:920,h:1180}, 100, 100, 2.5);
 out.zoomFondo = zoomVistaMappaP2P({x:0,y:0,w:50,h:60}, 0, 0, 2.5).w;
 out.zoomFuori = zoomVistaMappaP2P({x:0,y:0,w:920,h:1180}, 460, 590, 1/2.5);
 out.nome = nomeCortoMappaP2P("Reggio nell'Emilia (RE)");
+const intera = {x:-100, y:0, w:1120, h:1180};
+const z1 = zoomFissoMappaP2P({x:0,y:0,w:920,h:1180}, 200, 300, 2, intera);
+out.fisso = [z1.w, z1.h, Math.round((200 - z1.x) / z1.w * 1000), Math.round((300 - z1.y) / z1.h * 1000)];
+out.fissoFondo = zoomFissoMappaP2P({x:0,y:0,w:50,h:60}, 10, 10, 4, intera).w;
+out.fissoFuori = zoomFissoMappaP2P({x:0,y:0,w:920,h:1180}, 200, 300, 0.5, intera);
 out.tracciato = [tracciatoSagomaP2P('<svg><path fill="none" d="M8 16h0M24 16h0"/></svg>'),
   tracciatoSagomaP2P('<path d="M0 0h0"/><script>'), tracciatoSagomaP2P('<path d="M0 0<b>x</b>"/>'),
   tracciatoSagomaP2P(null)];
@@ -154833,6 +154841,17 @@ console.log(JSON.stringify(out));
           [{"x": -84, "y": -136, "w": 368, "h": 472}, 40, None],
           [r.get("zoom"), r.get("zoomFondo"), r.get("zoomFuori")])
     prova("il nome sull'etichetta perde la sigla", "Reggio nell'Emilia", r.get("nome"))
+    # (3 nov 2026, ritocco di Andrea) lo zoom del pizzico e della rotellina
+    prova("lo zoom col punto fermo: il punto sotto le dita resta dov'era, in proporzione",
+          [460, 590, 217, 254], r.get("fisso"))
+    prova("...non scende sotto i 40, e allargando oltre l'Italia torna all'Italia intera",
+          [40, {"x": -100, "y": 0, "w": 1120, "h": 1180}],
+          [r.get("fissoFondo"), r.get("fissoFuori")])
+    prova("pizzico, rotellina (non passiva, o la pagina scorre) e doppio tocco ci sono",
+          [True, True, True, True],
+          ["p2pMappaDita.size === 2" in mini, "svg.addEventListener('wheel'" in mini
+           and "{ passive: false }" in mini, "svg.addEventListener('dblclick'" in mini,
+           "window.addEventListener('pointercancel', su);" in mini])
     prova("della sagoma si tiene solo il tracciato fatto di comandi e numeri",
           ["M8 16h0M24 16h0", "M0 0h0", "", ""], r.get("tracciato"))
     prova("...e il file vero passa da quel giudice (non un tracciato vuoto)", True,

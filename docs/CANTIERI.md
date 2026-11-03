@@ -73378,8 +73378,26 @@ tocco su Milano lascia le sue due card, il trascinamento sposta la
 vista. Nessun errore di pagina.
 
 NON PROVATO, DA GUARDARE. Sul telefono vero dentro Telegram: il dito
-che trascina (il `touch-action:none` dello svg contro lo scorrimento
-di Telegram) e il pizzico, che NON c'è — si zooma coi tasti e col
-tocco sul grappolo. Le offerte della vetrina di Esplora e il post del
+che trascina e il pizzico (il `touch-action:none` dello svg contro lo
+scorrimento e lo zoom di Telegram).
+
+LO ZOOM VERO (3 nov 2026, ritocco di Andrea: «molto bella la mappa,
+deve essere interattiva, quindi zoomabile»; la card della mappa chiusa
+sulla mappa nostra con la stessa frase). Oltre a ＋ − ⟲ e al tocco sul
+grappolo: il PIZZICO con due dita, la ROTELLINA (e il pizzico del
+touchpad, che il browser manda come rotellina), il DOPPIO TOCCO. Lo
+zoom tiene FERMO il punto sotto le dita o sotto il puntatore
+(`zoomFissoMappaP2P`, pura: mai sotto i 40 di larghezza, e allargando
+oltre l'Italia torna l'Italia intera centrata), e il ridisegno — i
+pallini che si rifondono alla scala nuova — va al fotogramma dopo,
+uno per fotogramma (`zoomQuiMappaP2P`). Le dita giù stanno in una
+mappa per `pointerId`; con la seconda il trascinamento e il tocco si
+spengono, e il dito che resta dopo un pizzico non trascina finché non
+si alzano tutte. La rotellina è un ascoltatore NON passivo, o la
+pagina scorrerebbe sotto la mappa. Provato in `prove_mappa_contanti`
+(il punto fermo in proporzione, i due limiti, i quattro ascoltatori) e
+dal vivo con Playwright nei due temi: rotellina sopra il grappolo del
+nord (resta sotto il puntatore), pizzico vero via CDP con due tocchi,
+doppio tocco. Nessun errore di pagina. Le offerte della vetrina di Esplora e il post del
 canale non hanno la mappa (solo il libro). Un comune omonimo conteso
 («Castro») resta senza punto, come negli avvisi.

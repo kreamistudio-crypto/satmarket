@@ -31848,7 +31848,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   scelto restringe l'elenco e il conto della pillola Filtro),
   `disegnaMappaP2P` (dopo l'innerHTML del libro: grappoli in pixel con
   `grappoliMappaP2P`, sagoma come tratto con lo spessore per zoom),
-  vista in `p2pMappaVista`, proiezione `MAPPA_P2P_PROIEZIONE` uguale a
+  vista in `p2pMappaVista` (dal 3 nov 2026 anche pizzico, rotellina e
+  doppio tocco: `zoomFissoMappaP2P` col punto fermo, `zoomQuiMappaP2P`
+  che ridisegna al fotogramma, le dita in `p2pMappaDita`), proiezione `MAPPA_P2P_PROIEZIONE` uguale a
   quella di `genera_mappa_italia.py`. IL GIRO: `registraOrdiniP2P` la dichiara nella POST
   dell'intestazione (`zone: {ordine: zona}`, da `zoneDaDichiarareP2P`:
   solo le righe `mio` col contanti); la rotta chiama
