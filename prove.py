@@ -56081,9 +56081,13 @@ def prove_condividi_ordine_p2p():
            if x in T2])
     # LE PAROLE DI UNO SCONOSCIUTO: il `pm` e' testo libero
     F["eventi"] = [ev(ID, "sell", [50], ['"><script>alert(1)</script>'])]
-    T3, _t = seo(ID)
+    T3, t3 = seo(ID)
     prova("un metodo ostile esce escapato, mai come markup", (False, True),
           ("<script>" in T3, "&lt;script&gt;" in T3))
+    # (3 nov 2026, B-01) ...e anche il TITOLO, che va dentro <title> cosi'
+    # com'e': un «</title>» ne uscirebbe portandosi dietro lo script
+    prova("...e il <title> dell'ordine pure: niente «<» vivo", (False, False, True),
+          ("<script>" in t3, "</title>" in t3, "&lt;/script&gt;" in t3))
     # L'ORDINE SPARITO ricade sulla testa del libro, IDENTICA
     for nome, eventi in (("preso", [ev(ID, "sell", [50], ["SEPA"], s="in-progress")]),
                          ("mai esistito", [])):

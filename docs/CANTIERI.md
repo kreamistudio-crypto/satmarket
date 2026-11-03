@@ -73310,3 +73310,31 @@ cambio a tutti; le prove dal vivo elencate nella tappa 3; per dopo, a
 parte: chi riceve in bitcoin dal 2-di-3 di Alan che vuole cambiare in
 Lightning (stessa strada rovesciata, un ordine vero al posto
 dell'ordine 0).
+
+## Il titolo della pagina di un ordine P2P si ripulisce come quello degli annunci (3 nov 2026, cantiere sicurezza-b01, richiesta di Andrea)
+
+**COSA C'ERA.** Un'analisi di sicurezza del 3 nov 2026 (riservata, non
+sta nel repo: la tiene Andrea) ha trovato che `/p2p?ordine=<id>`
+scriveva nel `<title>` la frase dell'ordine — lato, cifra e METODI DI
+PAGAMENTO, che sono testo libero di chi pubblica — così com'era. I meta
+delle anteprime la scappavano già (`_attr` dentro `_meta_anteprima`), il
+`<title>` no: `_monta_pagina` lo infila nella fessura senza toccarlo, e
+il patto (scritto in `_seo_annuncio`) è che chi costruisce il titolo lo
+consegna già scappato. Annunci, negozi e categorie lo facevano;
+`_seo_ordine_p2p` era l'unica sorella che se ne dimenticava.
+
+**LA CURA.** Una riga: `_seo_ordine_p2p` restituisce `_testo(titolo)`,
+mentre ai meta continua a passare il titolo nudo (`_attr` lo scappa da
+sé, e scapparlo due volte farebbe comparire «&amp;amp;» nelle
+anteprime). `prove_condividi_ordine_p2p` ora guarda anche il titolo, non
+solo la testa: con un metodo ostile niente «<» vivo e niente
+«</title>».
+
+**STRADE SCARTATE.** Scappare dentro `_monta_pagina`, per tutte le rotte
+in un colpo: le altre consegnano già il titolo scappato, e lì si
+scapperebbe due volte. Ripulire i metodi quando arrivano dal libro:
+l'evento è di Mostro e il client li mostra già col suo `esc`, la
+pagina deve solo non fidarsi.
+
+**COSA RESTA.** Le altre voci dell'analisi, in PR piccole: il piano sta
+nel documento condiviso con Andrea.
