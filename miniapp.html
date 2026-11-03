@@ -87070,7 +87070,8 @@ function haOrdiniViviP2P(){
    COME SI USA: «🗺️ Mappa» apre e chiude; un pallino con piu' comuni
    dentro si tocca e la mappa si avvicina; quello di un comune solo
    restringe l'elenco sotto a quel comune, con una pillola che lo dice e
-   lo toglie. ＋ − ⟲ e il trascinamento col dito per muoversi.
+   lo toglie. ＋ − ⟲, il trascinamento col dito, il pizzico con due
+   dita, la rotellina e il doppio tocco per muoversi (3 nov 2026).
    I filtri del libro valgono anche qui: sulla mappa c'e' quello che c'e'
    nell'elenco, mai di piu'.
    STA FUORI DAL MOTORE DELLO SCAMBIO, dopo il suo marcatore di chiusura:
@@ -87322,13 +87323,81 @@ let p2pMappaUltimi = [];
    un tocco sul pallino. Gli ascoltatori stanno sull'svg, che vive
    finche' la mappa resta aperta; il movimento sulla finestra, cosi' il
    dito che esce dalla scatola non perde la presa. */
+/* LO ZOOM COL PUNTO FERMO (3 nov 2026, ritocco di Andrea: «deve essere
+   interattiva, quindi zoomabile»). PURA: la vista che si avvicina di `f`
+   tenendo FERMO il punto (ux, uy) — quello sotto le dita o sotto il
+   puntatore resta sotto le dita —, mai piu' stretta di
+   MAPPA_P2P_LARGO_MIN e mai piu' larga di `intera` (l'Italia intera
+   nella scatola): li' si torna a lei, centrata. */
+function zoomFissoMappaP2P(v, ux, uy, f, intera){
+  let w = v.w / f;
+  if (intera && w >= intera.w) return { ...intera };
+  if (w < MAPPA_P2P_LARGO_MIN) w = MAPPA_P2P_LARGO_MIN;
+  const k = w / v.w;
+  return { x: ux - (ux - v.x) * k, y: uy - (uy - v.y) * k, w, h: v.h * k };
+}
+/* dallo schermo alle unita' della vista: (px, py) in pixel della pagina */
+function puntoMappaP2P(svg, v, px, py){
+  const r = svg.getBoundingClientRect();
+  const upp = Math.max(v.w / (r.width || 1), v.h / (r.height || 1));
+  /* meet: la vista sta al centro della scatola */
+  const ox = (r.width - v.w / upp) / 2, oy = (r.height - v.h / upp) / 2;
+  return [v.x + (px - r.left - ox) * upp, v.y + (py - r.top - oy) * upp];
+}
+/* uno zoom attorno a un punto dello schermo, e il ridisegno al
+   fotogramma dopo (i pallini si rifondono alla scala nuova): tanti
+   eventi di rotellina o di pizzico in fila costano UN disegno */
+let p2pMappaFotogramma = 0;
+function zoomQuiMappaP2P(svg, px, py, f){
+  const v = p2pMappaVista;
+  if (!v) return;
+  const r = svg.getBoundingClientRect();
+  const [ux, uy] = puntoMappaP2P(svg, v, px, py);
+  p2pMappaVista = zoomFissoMappaP2P(v, ux, uy, f, vistaInteraMappaP2P(r.width || 320, r.height || 360));
+  if (p2pMappaFotogramma) return;
+  p2pMappaFotogramma = requestAnimationFrame(() => { p2pMappaFotogramma = 0; ridisegnaMappaP2P(); });
+}
+/* IL DITO E LE DUE DITA: un dito trascina, un tocco fermo (meno di 6 px)
+   e' un tocco sul pallino, DUE DITA pizzicano e lo zoom segue la loro
+   distanza attorno al punto di mezzo. La rotellina (e il pizzico del
+   touchpad, che il browser manda come rotellina con ctrl) zooma attorno
+   al puntatore; il doppio tocco avvicina li'. Gli ascoltatori di
+   movimento stanno sulla finestra, una volta sola, cosi' il dito che
+   esce dalla scatola non perde la presa; quelli dell'svg nascono con
+   lui (un svg nuovo a ogni apertura della mappa). */
 let p2pMappaGiu = null;               // il dito appoggiato, se c'e'
+let p2pMappaDita = new Map();        // pointerId -> [x, y] delle dita giu'
+let p2pMappaPizzico = null;          // {d, svg}: la distanza di prima fra le due dita
 let p2pMappaFinestra = false;        // gli ascoltatori della finestra, una volta sola
+function distanzaDitaMappaP2P(){
+  const [a, b] = [...p2pMappaDita.values()];
+  return [Math.hypot(a[0] - b[0], a[1] - b[1]), (a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+}
 function armaMappaP2P(svg){
   svg.addEventListener('pointerdown', ev => {
     if (!p2pMappaVista) return;
+    p2pMappaDita.set(ev.pointerId, [ev.clientX, ev.clientY]);
+    if (p2pMappaDita.size === 2) {
+      /* la seconda dita: niente piu' trascinamento ne' tocco, si pizzica */
+      p2pMappaGiu = null;
+      p2pMappaPizzico = { d: distanzaDitaMappaP2P()[0], svg };
+      return;
+    }
+    if (p2pMappaDita.size > 2) return;
     p2pMappaGiu = { svg, x: ev.clientX, y: ev.clientY, v: { ...p2pMappaVista }, mosso: false,
                     pin: ev.target.closest && ev.target.closest('.p2p-mappa-pin') };
+  });
+  svg.addEventListener('wheel', ev => {
+    if (!p2pMappaVista) return;
+    ev.preventDefault();
+    /* deltaY in righe (Firefox) vale ~16 pixel: il passo e' lo stesso */
+    const passo = ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaY;
+    zoomQuiMappaP2P(svg, ev.clientX, ev.clientY, Math.exp(-passo / 300));
+  }, { passive: false });
+  svg.addEventListener('dblclick', ev => {
+    if (!p2pMappaVista) return;
+    ev.preventDefault();
+    zoomQuiMappaP2P(svg, ev.clientX, ev.clientY, MAPPA_P2P_ZOOM);
   });
   svg.addEventListener('keydown', ev => {
     const pin = ev.target.closest && ev.target.closest('.p2p-mappa-pin');
@@ -87337,6 +87406,15 @@ function armaMappaP2P(svg){
   if (p2pMappaFinestra) return;
   p2pMappaFinestra = true;
   window.addEventListener('pointermove', ev => {
+    if (p2pMappaDita.has(ev.pointerId)) p2pMappaDita.set(ev.pointerId, [ev.clientX, ev.clientY]);
+    const pz = p2pMappaPizzico;
+    if (pz && p2pMappaDita.size === 2) {
+      if (!pz.svg.isConnected) { p2pMappaPizzico = null; return; }
+      const [d, mx, my] = distanzaDitaMappaP2P();
+      if (pz.d > 0 && d > 0) zoomQuiMappaP2P(pz.svg, mx, my, d / pz.d);
+      pz.d = d;
+      return;
+    }
     const giu = p2pMappaGiu;
     if (!giu || !giu.svg.isConnected) return;
     const dx = ev.clientX - giu.x, dy = ev.clientY - giu.y;
@@ -87348,7 +87426,14 @@ function armaMappaP2P(svg){
     giu.svg.setAttribute('viewBox', [p2pMappaVista.x, p2pMappaVista.y, p2pMappaVista.w, p2pMappaVista.h]
       .map(n => n.toFixed(1)).join(' '));
   });
-  const su = () => {
+  const su = ev => {
+    p2pMappaDita.delete(ev.pointerId);
+    if (p2pMappaPizzico) {
+      /* finito il pizzico, il dito che resta non trascina e non tocca:
+         si riparte quando si alzano tutte */
+      if (!p2pMappaDita.size) p2pMappaPizzico = null;
+      return;
+    }
     const giu = p2pMappaGiu;
     p2pMappaGiu = null;
     if (!giu || !giu.svg.isConnected) return;
@@ -87356,7 +87441,7 @@ function armaMappaP2P(svg){
     if (giu.pin) toccaGrappoloMappaP2P(+giu.pin.dataset.i);
   };
   window.addEventListener('pointerup', su);
-  window.addEventListener('pointercancel', () => { p2pMappaGiu = null; });
+  window.addEventListener('pointercancel', su);
 }
 
 /* ═══ IL CONTROLLO DELLA FATTURA PRIMA DEL COORDINATORE (10 ott 2026,
