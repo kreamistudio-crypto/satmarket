@@ -154781,7 +154781,9 @@ def prove_p2p_onchain():
           (mini.count('<div class="view" id="view-p2ponchain">'),
            "else if (view === 'p2ponchain') view = 'p2pmiei';" in mini,
            "VISTE_NAV_P2P.add('p2ponchain');" in mini,
-           "+ onchainCarte\n    + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')" in mini))
+           # (3 nov 2026, mappa-contanti) fra le card on-chain e quelle di
+           # Mostro la mappa del contanti, e l'elenco ristretto al comune scelto
+           "+ onchainCarte\n    + mappa\n    + (elenco.length ? elenco.map(rigaOrdineP2P).join('')" in mini))
     # il giudice della firma che aspetta me, in node
     # (EMENDATA 1 nov 2026, presa-altra-rete: il giudice chiama anche quello
     # del cambio di chi compra, che entra nel banco con lui)
