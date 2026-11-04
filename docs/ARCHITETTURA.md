@@ -34218,6 +34218,33 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'indirizzo col nome resta per l'intestazione Host, e la libreria con
   `socket=` non risolve e non riapre niente. La consegna (EVENT, OK,
   chiusura nello stesso thread) è `_consegna_ws`, comune alle due strade.
+- L'ASSISTENZA IN APP (3 nov 2026, cantiere assistenza, passo 1 di 3;
+  richiesta di Andrea). Leva `ASSISTENZA_ATTIVA`, SPENTA di serie: a
+  leva spenta le quattro rotte rispondono 404 e la voce non compare.
+  Tabelle: `assistenza` (id, utente, autore, admin, testo, quando) —
+  UNA conversazione per utente, ed è la colonna `utente`; `autore` è
+  chi ha scritto, `admin` = 1 per le risposte dello staff (la colonna
+  NON si chiama `staff`: la sentinella del bollino vieta ogni colonna
+  che lo possa scrivere) — e `assistenza_letture` (utente, ultimo_id),
+  fin dove l'utente ha letto. Rotte: `GET/POST /api/assistenza` (la MIA
+  conversazione; aprirla segna lette le risposte), `GET
+  /api/admin/assistenza` (l'elenco, una riga per utente, dall'ultima
+  mossa; `da_rispondere` se l'ultima parola è dell'utente, e vale per
+  TUTTI gli admin insieme: non c'è un «letto» per admin), `GET/POST
+  /api/admin/assistenza/{utente}` (la conversazione e la risposta; 403
+  prima di tutto, 404 a utente inesistente). All'utente lo staff è
+  «Staff» col bollino, MAI il nome dell'admin; agli admin il nome di
+  chi ha risposto. IL TESTO si salva com'è (via i caratteri di
+  controllo, 2000 al massimo) e si scappa all'USCITA (esc() nella
+  pagina); l'avviso all'utente (`notifica`, il suo canale) NON porta il
+  testo: «ti ha risposto», e il bottone `_link_casa_telegram()`. Freni:
+  `assistenza` 20/ora per chi scrive, `assistenza_staff` 120/ora per
+  admin. /api/me porta `assistenza` (la leva) e `assistenza_nuove`. La
+  fusione degli account porta la conversazione della metà Nostr a
+  quella Telegram. Client: la voce-porta `vocAssistenza` in «Privacy»,
+  il bottone `admAssistenza` in «Amministrazione», le viste
+  `assistenza` e `assistenzaadm` (`renderAssistenza`,
+  `renderAssistenzaAdmin`). Collaudo: `collaudo_assistenza`.
 - LO SWAP, L'INSTRADATORE (20 ott 2026, cantiere swap-instradatore;
   perché in CANTIERI, «Lo swap, l'instradatore»). La tappa 3 qui sopra è
   divisa: `swap/boltz.js` (il TIPO «boltz»: il motore della tappa 3 —
