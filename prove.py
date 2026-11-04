@@ -56673,14 +56673,16 @@ def prove_link_dentro_telegram():
     prova("...e la home del sito che ARRIVA non si traduce mai: gli avvisi del "
           "mercatino e i link condivisi restano com'erano", [BASE, BASE + "/"],
           [ld(BASE), ld(BASE + "/")])
-    prova("...la chiedono per nome in quattro: la riga delle tastiere, il post P2P nel "
-          "canale e i due «🫙 Sfoglia il mercatino» del riepilogo (il vero e la sua prova)",
-          [4, True, True, 2],
+    prova("...la chiedono per nome in cinque: la riga delle tastiere, il post P2P nel "
+          "canale, i due «🫙 Sfoglia il mercatino» del riepilogo (il vero e la sua prova) "
+          "e la risposta dell'assistenza (3 nov 2026)",
+          [5, True, True, 2, True],
           [codice(src).count("_link_casa_telegram(") - 1,
            '"url": _link_casa_telegram()}' in pezzo("_riga_webapp"),
            'href=\\"{_link_casa_telegram()}\\">🫙 Apri lo Scambio P2P su Barattolo</a>'
            in pezzo("_caption_canale_p2p"),
-           src.count('<a href=\\"{_link_casa_telegram()}\\">🫙 Sfoglia il mercatino</a>')])
+           src.count('<a href=\\"{_link_casa_telegram()}\\">🫙 Sfoglia il mercatino</a>'),
+           '("🫙 Apri Barattolo", _link_casa_telegram())' in pezzo("assistenza_rispondi_admin")])
 
     # ---------------- 3ter) ESPLORA COI SUOI FILTRI (il terzo si') ---------
     # «🫙 Apri Esplora» degli avvisi del mercatino: il link della Mini App
@@ -118914,7 +118916,8 @@ def prove_profilo_elegante():
         "grpIncassi": ["accLnAddress", "accNwc", "vocEsporta"],
         "grpLivello": ["accLivello", "accInviti", "accDistintivi"],
         "grpAspetto": ["accAvvisi", "accAspetto"],
-        "grpPrivacy": ["accIdentita", "vocPrivacy", "accTor"],
+        # l'assistenza in app (3 nov 2026) sta con «I tuoi dati»
+        "grpPrivacy": ["accIdentita", "vocAssistenza", "vocPrivacy", "accTor"],
     }
     fuori = []
     for g, voci in CASSETTI.items():
@@ -146875,7 +146878,10 @@ def prove_freni():
            "onchain_controlla": (60, 3600), "onchain_firma": (30, 3600),
            # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
            # un login con la sua coda sta largo in 60 al minuto per IP
-           "cassetta_spedisci": (60, 60)}, F)
+           "cassetta_spedisci": (60, 60),
+           # l'assistenza in app (3 nov 2026): 20 messaggi all'ora per
+           # chi scrive, 120 risposte all'ora per un admin
+           "assistenza": (20, 3600), "assistenza_staff": (120, 3600)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------

@@ -2476,6 +2476,10 @@ FRENI = {
     # e una proposta firmata e' un PSBT da leggere con embit
     "onchain_controlla": (60, 3600),  # «ho pagato, guarda» di un ordine on-chain, per persona
     "onchain_firma": (30, 3600),      # proposte e co-firme on-chain, per persona
+    # l'assistenza in app (3 nov 2026): chi scrive allo staff, e lo staff
+    # che risponde — un dito non ci arriva, una raffica si'
+    "assistenza": (20, 3600),         # messaggi allo staff, per persona
+    "assistenza_staff": (120, 3600),  # risposte di un admin, per admin
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
 MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
@@ -6556,6 +6560,31 @@ def init_db():
         letto INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_avvisi_app_tg ON avvisi_app(tg_id, id);
+    CREATE TABLE IF NOT EXISTS assistenza(
+        -- L'ASSISTENZA IN APP (3 nov 2026, richiesta di Andrea): UNA
+        -- conversazione per utente, ed e' la colonna `utente` (il tg_id
+        -- di chi chiede aiuto). `autore` e' chi ha scritto la riga:
+        -- l'utente stesso, o l'admin che risponde (`admin` = 1). Il testo
+        -- si salva COM'E' (spoglio dei caratteri di controllo) e si
+        -- scappa all'USCITA: nella pagina con esc(), nel bot con
+        -- html.escape — mai HTML costruito qui dentro.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        utente INTEGER NOT NULL,
+        autore INTEGER NOT NULL,
+        admin INTEGER NOT NULL DEFAULT 0,
+        testo TEXT NOT NULL,
+        quando INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_assistenza_utente ON assistenza(utente, id);
+    CREATE TABLE IF NOT EXISTS assistenza_letture(
+        -- fin dove l'utente ha letto la SUA conversazione: le risposte
+        -- dello staff oltre `ultimo_id` sono «nuove» (il pallino della
+        -- voce). Gli admin non hanno un segno loro: per loro conta se
+        -- l'ultima parola e' dell'utente, cioe' «da rispondere», e vale
+        -- per tutti gli admin insieme.
+        utente INTEGER PRIMARY KEY,
+        ultimo_id INTEGER NOT NULL DEFAULT 0
+    );
     CREATE TABLE IF NOT EXISTS venditori_seguiti(
         -- «🔔 Segui» sulla pagina di un venditore (9 ott 2026,
         -- richiesta di Andrea): chi segue chi, una riga per coppia e
@@ -10830,6 +10859,16 @@ try:
     from config import PIU_ACCOUNT_OVUNQUE
 except ImportError:
     PIU_ACCOUNT_OVUNQUE = False
+
+# L'ASSISTENZA IN APP (3 nov 2026, richiesta di Andrea): la chat fra chi
+# usa Barattolo e lo staff, in Profilo → Impostazioni → «💬 Assistenza»;
+# gli admin la vedono tutta, una conversazione per utente. Spenta di
+# serie: le rotte rispondono 404 e la voce non compare (vedi «L'ASSISTENZA
+# IN APP», piu' sotto, accanto agli avvisi in app).
+try:
+    from config import ASSISTENZA_ATTIVA
+except ImportError:
+    ASSISTENZA_ATTIVA = False
 
 # ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot, idea di
 # Andrea): sul web e nella PWA «Entra con Telegram» passa dal bot, cosi'
@@ -19115,6 +19154,16 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # aveva Telegram: da qui gli avvisi arrivano nel bot, e la lista
         # della meta' che muore se ne va con lei
         con.execute("DELETE FROM avvisi_app WHERE tg_id=?", (id_nostr,))
+        # ...e L'ASSISTENZA IN APP (3 nov 2026): la conversazione della
+        # meta' Nostr passa a quella Telegram (stessa persona, una
+        # conversazione sola, in ordine di id); le righe che la meta'
+        # Nostr aveva scritto da admin restano col suo nuovo numero
+        con.execute("UPDATE assistenza SET utente=? WHERE utente=?",
+                    (id_telegram, id_nostr))
+        con.execute("UPDATE assistenza SET autore=? WHERE autore=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM assistenza_letture WHERE utente=?",
+                    (id_nostr,))
         # ...e la coda degli avvisi dei nuovi ordini P2P (9 ott 2026),
         # in unione come il dedup qui sopra: una riga per ordine basta
         con.execute("UPDATE OR IGNORE p2p_avvisi_nuovi SET tg_id=? "
@@ -32607,6 +32656,12 @@ def _leve_stato():
                          f"annullabile per 24 ore",
                   spento="il bottone non c'è e le rotte rispondono 404: "
                          "gli annunci si modificano uno per uno"),
+            # L'ASSISTENZA IN APP (3 nov 2026): spenta di serie
+            _leva("Assistenza in app", "ASSISTENZA_ATTIVA",
+                  bool(ASSISTENZA_ATTIVA),
+                  acceso="in Profilo → Impostazioni c'è «💬 Assistenza», e "
+                         "gli admin rispondono da «💬 Assistenza clienti»",
+                  spento="la voce non c'è e le rotte rispondono 404"),
             _leva("Cartello «fase di test»", "BANNER_TEST", bool(BANNER_TEST),
                   acceso="il cartello si apre una volta al giorno per "
                          "dispositivo, e la fascia resta sotto la vetrina"),
@@ -45406,6 +45461,15 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # selettore vive anche dentro Telegram, le conferme col volto e
     # «Esci da tutti». Il FATTO, dalla leva viva.
     profilo["piu_account"] = bool(PIU_ACCOUNT_OVUNQUE)
+    # L'ASSISTENZA IN APP (3 nov 2026): la voce c'e' solo a leva accesa,
+    # e porta il conto delle risposte dello staff non ancora lette
+    profilo["assistenza"] = bool(ASSISTENZA_ATTIVA)
+    if ASSISTENZA_ATTIVA:
+        _cn = db()
+        try:
+            profilo["assistenza_nuove"] = _assistenza_nuove(_cn, user["id"])
+        finally:
+            _cn.close()
     # Stessa regola dei distintivi: catalogo COMPLETO col flag, cosi'
     # chi non ha ancora sbloccato un titolo vede comunque cosa c'e' e
     # cosa serve — che e' la molla.
@@ -45780,6 +45844,203 @@ async def avvisi_app_letti(x_tg_init_data: str = Header(""),
     finally:
         con.close()
     return {"ok": True, "nuovi": 0}
+
+
+# ---------------- L'ASSISTENZA IN APP (3 nov 2026) ------------------
+# La richiesta di Andrea: «una chat di assistenza clienti dentro
+# Barattolo, nelle impostazioni; si risponde anche direttamente in app,
+# le chat accessibili a tutti gli admin e viste per utente».
+# UNA conversazione per utente (la tabella `assistenza`), che tutti gli
+# admin leggono e a cui tutti rispondono: per l'utente chi risponde e'
+# «lo staff» col bollino 🛡️, mai il nome dell'admin; nel pannello gli
+# admin vedono anche chi di loro ha risposto.
+# IL TESTO ESCE SEMPRE SCAPPATO e non entra MAI in un avviso: l'avviso
+# all'utente dice solo «ti abbiamo risposto» (lo stesso principio della
+# chat degli ordini — il messaggio vive dentro Barattolo). Il passo 2
+# porta l'avviso dei messaggi nuovi agli admin; il passo 3 la risposta
+# dal bot.
+ASSISTENZA_TESTO_MAX = 2000      # caratteri per messaggio
+ASSISTENZA_RIGHE_MAX = 300       # messaggi mostrati per conversazione
+ASSISTENZA_ELENCO_MAX = 300      # conversazioni nell'elenco degli admin
+_CONTROLLO_ASSISTENZA = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+
+
+def _testo_assistenza(grezzo) -> str:
+    """PURA: il testo di un messaggio, pronto per il database — via i
+    caratteri di controllo (gli a-capo restano), spazi ai bordi tolti.
+    Vuoto o troppo lungo: 400. Niente HTML costruito qui: si scappa
+    all'uscita."""
+    t = _CONTROLLO_ASSISTENZA.sub("", str(grezzo or "")).replace("\r", "").strip()
+    if not t:
+        raise HTTPException(400, "Scrivi qualcosa prima di mandare")
+    if len(t) > ASSISTENZA_TESTO_MAX:
+        raise HTTPException(400, f"Al massimo {ASSISTENZA_TESTO_MAX} "
+                                 "caratteri per messaggio")
+    return t
+
+
+def _assistenza_accesa():
+    """A leva spenta l'assistenza non esiste: 404, come le sorelle."""
+    if not ASSISTENZA_ATTIVA:
+        raise HTTPException(404, "Not Found")
+
+
+def _assistenza_nuove(con, utente: int) -> int:
+    """Le risposte dello staff che l'utente non ha ancora visto."""
+    r = con.execute("SELECT ultimo_id FROM assistenza_letture WHERE utente=?",
+                    (int(utente),)).fetchone()
+    return int(con.execute(
+        "SELECT COUNT(*) FROM assistenza WHERE utente=? AND admin=1 AND id>?",
+        (int(utente), int(r["ultimo_id"]) if r else 0)).fetchone()[0] or 0)
+
+
+def _righe_assistenza(con, utente: int, per_admin: bool) -> list:
+    """I messaggi di una conversazione, dal piu' vecchio. Per l'utente
+    chi risponde e' «lo staff»; per gli admin anche il nome di chi."""
+    righe = con.execute(
+        "SELECT a.id, a.autore, a.admin, a.testo, a.quando, u.nome "
+        "FROM assistenza a LEFT JOIN utenti u ON u.tg_id = a.autore "
+        "WHERE a.utente=? ORDER BY a.id DESC LIMIT ?",
+        (int(utente), ASSISTENZA_RIGHE_MAX)).fetchall()
+    fuori = []
+    for r in reversed(righe):
+        m = {"id": r["id"], "staff": bool(r["admin"]), "testo": r["testo"],
+             "quando": r["quando"]}
+        if per_admin and r["admin"]:
+            m["chi"] = r["nome"] or "Admin"
+        fuori.append(m)
+    return fuori
+
+
+@app.get("/api/assistenza")
+def assistenza_mia(x_tg_init_data: str = Header(""),
+                   barattolo_sessione: str = Cookie("")):
+    """La MIA conversazione con lo staff. Aprirla segna lette le
+    risposte: il pallino della voce si spegne."""
+    _assistenza_accesa()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        righe = _righe_assistenza(con, user["id"], False)
+        if righe:
+            con.execute(
+                "INSERT INTO assistenza_letture(utente, ultimo_id) VALUES(?,?) "
+                "ON CONFLICT(utente) DO UPDATE SET ultimo_id=excluded.ultimo_id",
+                (user["id"], righe[-1]["id"]))
+            con.commit()
+    finally:
+        con.close()
+    return {"messaggi": righe, "max": ASSISTENZA_TESTO_MAX}
+
+
+@app.post("/api/assistenza")
+async def assistenza_scrivi(req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Un messaggio allo staff, nella MIA conversazione."""
+    _assistenza_accesa()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("assistenza", user["id"])
+    d = await leggi_json(req)
+    testo = _testo_assistenza(d.get("testo"))
+    con = db()
+    try:
+        con.execute("INSERT INTO assistenza(utente, autore, admin, testo, "
+                    "quando) VALUES(?,?,0,?,?)",
+                    (user["id"], user["id"], testo, int(time.time())))
+        con.commit()
+        righe = _righe_assistenza(con, user["id"], False)
+    finally:
+        con.close()
+    return {"ok": True, "messaggi": righe}
+
+
+def _solo_admin_assistenza(x_tg_init_data, barattolo_sessione) -> dict:
+    """Il 403 PRIMA di tutto, come le sorelle del pannello."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    _assistenza_accesa()
+    return user
+
+
+@app.get("/api/admin/assistenza")
+def assistenza_elenco_admin(x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: le conversazioni, una per utente, dall'ultima che si
+    e' mossa. «Da rispondere» se l'ultima parola e' dell'utente."""
+    _solo_admin_assistenza(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        righe = con.execute(
+            "SELECT g.utente, g.n, m.testo, m.admin, m.quando, "
+            "       u.nome, u.username, u.negozio "
+            "FROM (SELECT utente, MAX(id) AS ultimo, COUNT(*) AS n "
+            "      FROM assistenza GROUP BY utente) g "
+            "JOIN assistenza m ON m.id = g.ultimo "
+            "LEFT JOIN utenti u ON u.tg_id = g.utente "
+            "ORDER BY g.ultimo DESC LIMIT ?",
+            (ASSISTENZA_ELENCO_MAX,)).fetchall()
+    finally:
+        con.close()
+    return {"conversazioni": [{
+        "utente": r["utente"], "nome": r["nome"] or "",
+        "username": r["username"] or "", "negozio": r["negozio"] or "",
+        "staff_utente": e_staff(r["utente"]), "messaggi": r["n"],
+        "ultimo": r["testo"][:140], "quando": r["quando"],
+        "da_rispondere": not r["admin"]} for r in righe]}
+
+
+def _utente_assistenza(con, utente: int):
+    u = con.execute("SELECT tg_id, nome, username, negozio FROM utenti "
+                    "WHERE tg_id=?", (int(utente),)).fetchone()
+    if not u:
+        raise HTTPException(404, "Utente non trovato")
+    return u
+
+
+@app.get("/api/admin/assistenza/{utente}")
+def assistenza_conversazione_admin(utente: int,
+                                   x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: la conversazione di un utente, coi suoi dati."""
+    _solo_admin_assistenza(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        u = _utente_assistenza(con, utente)
+        righe = _righe_assistenza(con, utente, True)
+    finally:
+        con.close()
+    return {"utente": u["tg_id"], "nome": u["nome"] or "",
+            "username": u["username"] or "", "negozio": u["negozio"] or "",
+            "messaggi": righe, "max": ASSISTENZA_TESTO_MAX}
+
+
+@app.post("/api/admin/assistenza/{utente}")
+async def assistenza_rispondi_admin(utente: int, req: Request,
+                                    x_tg_init_data: str = Header(""),
+                                    barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: la risposta dello staff. L'utente riceve l'avviso sul
+    canale che ha scelto, SENZA il testo: la risposta si legge in app."""
+    admin = _solo_admin_assistenza(x_tg_init_data, barattolo_sessione)
+    _frena("assistenza_staff", admin["id"])
+    d = await leggi_json(req)
+    testo = _testo_assistenza(d.get("testo"))
+    con = db()
+    try:
+        _utente_assistenza(con, utente)
+        con.execute("INSERT INTO assistenza(utente, autore, admin, testo, "
+                    "quando) VALUES(?,?,1,?,?)",
+                    (int(utente), admin["id"], testo, int(time.time())))
+        con.commit()
+        righe = _righe_assistenza(con, utente, True)
+    finally:
+        con.close()
+    # dopo il commit, mai dentro: notifica e' fail-open e non alza
+    await notifica(int(utente),
+                   "💬 <b>L'assistenza di Barattolo ti ha risposto</b>\n"
+                   "Trovi la risposta in Profilo → 💬 Assistenza.",
+                   ("🫙 Apri Barattolo", _link_casa_telegram()))
+    return {"ok": True, "messaggi": righe}
 
 
 @app.post("/api/me/relay-dm/avvisato")

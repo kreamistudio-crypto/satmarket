@@ -3471,6 +3471,19 @@
       font-size:14px;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
     .chatmod-msg.mio{background:var(--sats-soft)}
     .chatmod-msg small{display:block;font-size:12px}
+    /* L'ASSISTENZA IN APP (3 nov 2026): il vestito della chat col
+       moderatore, con la lista piu' alta (e' la pagina intera) e le
+       righe dell'elenco degli admin, una per utente */
+    .assist-lista{max-height:none;min-height:120px}
+    .assist-conv{display:block;width:100%;text-align:left;margin:8px 0;padding:10px 12px;
+      border-radius:14px;border:1px solid var(--field-line);background:var(--card);
+      color:var(--ink);font:inherit;cursor:pointer}
+    .assist-conv.da-rispondere{border-color:var(--sats)}
+    .assist-conv b{font-size:15px}
+    .assist-conv small{display:block;color:var(--ink-soft);font-size:12.5px;margin-top:3px;
+      overflow-wrap:anywhere}
+    .assist-pallino{display:inline-block;width:9px;height:9px;border-radius:50%;
+      background:var(--danger);margin-left:6px;vertical-align:middle}
     /* LA CHAT NELLO SCAMBIO (12 ott 2026): il vestito e' quello della
        chat col moderatore; di suo ha l'avviso fisso, la riga rossa
        sotto un messaggio e il link che si vede e non si apre */
@@ -3528,7 +3541,7 @@
     .chatsc-giu{color:var(--ink-soft)}
     /* ...e il riquadro a cui porta non finisce sotto la testata */
     #p2pChatSc{scroll-margin-top:76px}
-    .chatmod textarea,.mod-decidi textarea{width:100%;box-sizing:border-box;margin-top:6px;
+    .chatmod textarea,.mod-decidi textarea,.assist-casella textarea{width:100%;box-sizing:border-box;margin-top:6px;
       padding:10px 12px;border-radius:12px;border:1px solid var(--field-line);
       background:var(--bg);color:var(--ink);font:inherit;font-size:16px;resize:vertical}
     .p2p-scambio.tono-annullato{--tinta:var(--muted)}
@@ -12532,6 +12545,32 @@ document.getElementById('cartello')?.remove();</script>
       <div id="p2pModCorpo"></div>
     </div>
   </div>
+  <!-- L'ASSISTENZA IN APP (3 nov 2026): la chat di chi usa Barattolo con
+       lo staff, e la pagina degli admin (l'elenco per utente, e la
+       conversazione aperta). Le riempiono renderAssistenza e
+       renderAssistenzaAdmin. -->
+  <div class="view" id="view-assistenza">
+    <div class="sicu">
+      <div class="foglio-testa">
+        <button type="button" class="foglio-back" onclick="navIndietro()"
+                title="Torna indietro" aria-label="Torna indietro">&#10005;</button>
+        <h3>💬 Assistenza</h3>
+        <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
+      </div>
+      <div id="assistenzaCorpo"></div>
+    </div>
+  </div>
+  <div class="view" id="view-assistenzaadm">
+    <div class="sicu">
+      <div class="foglio-testa">
+        <button type="button" class="foglio-back" onclick="indietroAssistenzaAdmin()"
+                title="Torna indietro" aria-label="Torna indietro">&#10005;</button>
+        <h3>💬 Assistenza clienti</h3>
+        <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
+      </div>
+      <div id="assistenzaAdmCorpo"></div>
+    </div>
+  </div>
 
   <!-- ============ VISTA: LA PAGINA DEL PACCO (ago 2026) ============
        Il rifacimento di «Riempi il pacco»: una pagina a tutto schermo
@@ -13912,6 +13951,12 @@ document.getElementById('cartello')?.remove();</script>
 
       <!-- «I tuoi dati»: era un bottone a tutta larghezza in fondo alla
            pagina; dal set 2026 e' la voce-porta di «Privacy». -->
+      <!-- L'ASSISTENZA IN APP (3 nov 2026): la porta della chat con lo
+           staff. Nasce SPENTA: la accende `vestiAssistenza` solo se il
+           server dice `assistenza: true` (la leva ASSISTENZA_ATTIVA). -->
+      <div class="acc voce-porta" id="vocAssistenza" style="display:none">
+        <button type="button" class="acc-h" onclick="go('assistenza')"><span class="em">💬</span>Assistenza<span id="assistenzaPallino"></span><span class="fr">›</span></button>
+      </div>
       <div class="acc voce-porta" id="vocPrivacy">
         <button type="button" class="acc-h" onclick="apriPrivacy()"><span class="em">🔐</span>I tuoi dati<span class="fr">›</span></button>
       </div>
@@ -13944,6 +13989,10 @@ document.getElementById('cartello')?.remove();</script>
       <!-- il rimando alla moderazione delle dispute P2P (28 set 2026):
            la sezione vive nel P2P, qui c'e' la porta -->
       <button type="button" class="btn ghost" id="admModP2P" onclick="go('p2pmod')">⚖️ Moderazione P2P</button>
+      <!-- l'assistenza in app (3 nov 2026): le conversazioni di tutti,
+           una per utente. Spenta finche' il server non dice di si' -->
+      <button type="button" class="btn ghost" id="admAssistenza" style="display:none"
+              onclick="go('assistenzaadm')">💬 Assistenza clienti</button>
       <!-- IL BANCO DI PROVA DELL'ON-CHAIN (16 ott 2026): nasce
            NASCOSTO e lo accende `renderProfilo` solo se il server ha
            detto `onchain: true` — cioe' se si passa dal CANCELLO, non
@@ -18714,6 +18763,10 @@ function go(view){
   /* il banco delle chiavi on-chain: il bundle lo carica LUI, alla
      prima apertura, e chi non entra qui non lo scarica mai */
   if (view==='onchain') renderOnchain();
+  /* L'ASSISTENZA IN APP (3 nov 2026): si ridisegna a ogni ingresso, da
+     qualunque strada (la voce, il gesto indietro, la cronologia) */
+  if (view==='assistenza') renderAssistenza();
+  if (view==='assistenzaadm') renderAssistenzaAdmin();
   /* LA MODERAZIONE (28 set 2026): la striscia in cima a «I miei
      scambi» e la sua pagina, solo per chi e' moderatore — a tutti gli
      altri `chiediModerazioneP2P` non chiede niente */
@@ -47920,6 +47973,8 @@ async function loadAdminStats(){
     if (el('admOnchain')) {
       el('admOnchain').style.display = myOnchain ? '' : 'none';
     }
+    /* l'assistenza in app (3 nov 2026): leva viva E admin */
+    vestiAssistenza();
   } catch(e) {
     box.innerHTML = '';
     if (el('grpAdmin')) el('grpAdmin').style.display = 'none';
@@ -52336,6 +52391,204 @@ let accountAperti = [], accountAttivo = null, accountMax = 0;
 let accountAttivoId = '', accountTelegramId = '';
 /* la leva viva, da /api/me (un server di ieri non la manda: spenta) */
 let piuAccount = false;
+/* ============ L'ASSISTENZA IN APP (3 nov 2026) =====================
+   La richiesta di Andrea: una chat con lo staff dentro Barattolo, nelle
+   impostazioni; gli admin vedono TUTTE le conversazioni, una per
+   utente, e rispondono da qui. Il server tiene la conversazione
+   (`/api/assistenza`, `/api/admin/assistenza`): qui si disegna e basta.
+   OGNI testo esce da esc(): quel che scrive l'utente non diventa mai
+   HTML, nemmeno nella pagina degli admin. */
+let assistenzaAttiva = false, assistenzaNuove = 0;
+let assistenzaMsgs = null, assistenzaMax = 2000;
+let assistenzaAdmLista = null, assistenzaAdmAperta = null;
+let assistenzaInvio = false;
+function vestiAssistenza(){
+  const v = el('vocAssistenza');
+  if (v) v.style.display = assistenzaAttiva && !DEMO ? '' : 'none';
+  const p = el('assistenzaPallino');
+  if (p) p.innerHTML = assistenzaNuove > 0 ? '<span class="assist-pallino" aria-label="Risposte nuove"></span>' : '';
+  const b = el('admAssistenza');
+  if (b) b.style.display = assistenzaAttiva && isAdmin ? '' : 'none';
+}
+/* PURA: giorno e ora di un messaggio */
+function quandoAssistenza(ts){
+  const n = Number(ts) || 0;
+  if (!n) return '';
+  return new Date(n * 1000).toLocaleString('it-IT',
+    {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
+}
+/* PURA: i messaggi di una conversazione, scappati. `perAdmin`: chi
+   guarda e' lo staff (la sua voce e' a destra, e si legge chi di loro
+   ha risposto); sennò e' l'utente, e lo staff e' «Staff» col bollino. */
+function messaggiAssistenzaHTML(lista, perAdmin, nomeUtente){
+  const l = Array.isArray(lista) ? lista : [];
+  if (!l.length) return '<div class="hint">' + (perAdmin
+    ? 'Ancora nessun messaggio.'
+    : 'Scrivici qui sotto: rispondiamo appena possiamo, e ti avvisiamo quando c\'è una risposta.') + '</div>';
+  return l.map(m => {
+    const mio = perAdmin ? m.staff : !m.staff;
+    const chi = m.staff
+      ? (perAdmin ? esc(m.chi || 'Staff') + ' ' + bollinoStaff() : bollinoStaff())
+      : (perAdmin ? esc(nomeUtente || 'Utente') : 'Tu');
+    return '<div class="chatmod-msg' + (mio ? ' mio' : '') + '"><small>' + chi
+      + (m.quando ? ' · ' + esc(quandoAssistenza(m.quando)) : '') + '</small>'
+      + esc(m.testo) + '</div>';
+  }).join('');
+}
+function casellaAssistenzaHTML(id, invia, segnaposto){
+  return '<div class="assist-casella"><textarea id="' + id + '" rows="3" maxlength="' + Number(assistenzaMax) + '" '
+    + 'placeholder="' + esc(segnaposto) + '"></textarea>'
+    + '<button class="btn orange" id="' + id + 'Btn" onclick="' + invia + '">Invia</button></div>';
+}
+function scorriInFondoAssistenza(id){
+  const l = el(id);
+  if (l) l.scrollTop = l.scrollHeight;
+  window.scrollTo(0, document.body.scrollHeight);
+}
+async function renderAssistenza(){
+  const box = el('assistenzaCorpo');
+  if (!box) return;
+  const disegna = () => {
+    box.innerHTML = '<div class="hint">Hai un dubbio su un ordine, un pagamento o il tuo profilo? '
+      + 'Scrivi allo staff di Barattolo: risponde una persona vera, col bollino ' + bollinoStaff() + '. '
+      + 'Non chiederemo mai la tua frase segreta, una chiave o un pagamento.</div>'
+      + '<div class="chatmod-lista assist-lista" id="assistenzaLista">'
+      + (assistenzaMsgs ? messaggiAssistenzaHTML(assistenzaMsgs, false)
+                        : '<div class="hint">Carico la conversazione…</div>') + '</div>'
+      + casellaAssistenzaHTML('assistenzaTesto', 'inviaAssistenza()', 'Scrivi allo staff…');
+    scorriInFondoAssistenza('assistenzaLista');
+  };
+  disegna();
+  if (DEMO || !assistenzaAttiva) return;
+  try {
+    const r = await fetch(`${API_BASE}/assistenza`, {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non riesco ad aprire l\'assistenza, riprova', 6000); return; }
+    assistenzaMsgs = d.messaggi || [];
+    assistenzaMax = Number(d.max) || assistenzaMax;
+    assistenzaNuove = 0; vestiAssistenza();
+    const bozza = el('assistenzaTesto') ? el('assistenzaTesto').value : '';
+    disegna();
+    if (bozza && el('assistenzaTesto')) el('assistenzaTesto').value = bozza;
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+async function inviaAssistenza(){
+  const t = el('assistenzaTesto');
+  const testo = t ? t.value.trim() : '';
+  if (!testo || assistenzaInvio) return;
+  haptic();
+  assistenzaInvio = true;
+  try {
+    const r = await fetch(`${API_BASE}/assistenza`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({testo})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Messaggio non mandato, riprova', 6000); return; }
+    assistenzaMsgs = d.messaggi || [];
+    if (el('assistenzaLista')) {
+      el('assistenzaLista').innerHTML = messaggiAssistenzaHTML(assistenzaMsgs, false);
+      scorriInFondoAssistenza('assistenzaLista');
+    }
+    if (t) t.value = '';
+    toast('Mandato allo staff');
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { assistenzaInvio = false; }
+}
+/* LA PAGINA DEGLI ADMIN: l'elenco (una riga per utente, dall'ultima che
+   si e' mossa, «da rispondere» in evidenza), o la conversazione aperta.
+   La ✕ dalla conversazione torna all'elenco, dall'elenco esce. */
+function indietroAssistenzaAdmin(){
+  if (assistenzaAdmAperta) { assistenzaAdmAperta = null; renderAssistenzaAdmin(); return; }
+  navIndietro();
+}
+async function renderAssistenzaAdmin(){
+  const box = el('assistenzaAdmCorpo');
+  if (!box) return;
+  if (assistenzaAdmAperta) return renderConversazioneAdmin();
+  box.innerHTML = '<div class="hint">Carico le conversazioni…</div>';
+  try {
+    const r = await fetch(`${API_BASE}/admin/assistenza`, {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { box.innerHTML = '<div class="hint">' + esc(d.detail || 'Non riesco a leggere le conversazioni') + '</div>'; return; }
+    assistenzaAdmLista = d.conversazioni || [];
+  } catch(e) { box.innerHTML = '<div class="hint">Rete assente: riprova</div>'; return; }
+  const l = assistenzaAdmLista;
+  const da = l.filter(c => c.da_rispondere).length;
+  box.innerHTML = '<div class="hint">Tutti gli admin vedono le stesse conversazioni, una per utente. '
+    + (da ? '<b>' + da + ' da rispondere.</b>' : 'Nessuna in attesa di risposta.') + '</div>'
+    + (l.length ? l.map(c =>
+        '<button type="button" class="assist-conv' + (c.da_rispondere ? ' da-rispondere' : '') + '" '
+        + 'onclick="apriConversazioneAdmin(' + Number(c.utente) + ')">'
+        + '<b>' + esc(c.nome || 'Senza nome') + '</b>'
+        + (c.staff_utente ? ' ' + bollinoStaff() : '')
+        + (c.da_rispondere ? '<span class="assist-pallino" aria-label="Da rispondere"></span>' : '')
+        + '<small>' + (c.username ? '@' + esc(c.username) + ' · ' : '')
+        + esc(c.messaggi) + (c.messaggi === 1 ? ' messaggio' : ' messaggi')
+        + ' · ' + esc(quandoAssistenza(c.quando)) + '</small>'
+        + '<small>' + (c.da_rispondere ? '' : 'Staff: ') + esc(c.ultimo) + '</small>'
+        + '</button>').join('')
+      : '<div class="hint">Ancora nessuna conversazione.</div>');
+}
+function apriConversazioneAdmin(utente){
+  haptic();
+  assistenzaAdmAperta = {utente: Number(utente), dati: null};
+  renderConversazioneAdmin();
+  window.scrollTo(0, 0);
+}
+async function renderConversazioneAdmin(){
+  const box = el('assistenzaAdmCorpo');
+  const a = assistenzaAdmAperta;
+  if (!box || !a) return;
+  const disegna = () => {
+    const d = a.dati;
+    box.innerHTML = (d
+      ? '<div class="hint"><b>' + esc(d.nome || 'Senza nome') + '</b>'
+        + (d.username ? ' · @' + esc(d.username) : '')
+        + (d.negozio ? ' · negozio ' + esc(d.negozio) : '')
+        + ' · n. ' + esc(d.utente) + '</div>'
+      : '')
+      + '<div class="chatmod-lista assist-lista" id="assistenzaAdmLista">'
+      + (d ? messaggiAssistenzaHTML(d.messaggi, true, d.nome)
+           : '<div class="hint">Carico la conversazione…</div>') + '</div>'
+      + casellaAssistenzaHTML('assistenzaAdmTesto', 'rispondiAssistenzaAdmin()',
+                              'Rispondi come staff…')
+      + '<button class="btn ghost" onclick="indietroAssistenzaAdmin()">← Tutte le conversazioni</button>';
+    scorriInFondoAssistenza('assistenzaAdmLista');
+  };
+  disegna();
+  try {
+    const r = await fetch(`${API_BASE}/admin/assistenza/${Number(a.utente)}`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Conversazione non trovata', 6000); return; }
+    if (assistenzaAdmAperta !== a) return;
+    a.dati = d;
+    assistenzaMax = Number(d.max) || assistenzaMax;
+    const bozza = el('assistenzaAdmTesto') ? el('assistenzaAdmTesto').value : '';
+    disegna();
+    if (bozza && el('assistenzaAdmTesto')) el('assistenzaAdmTesto').value = bozza;
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+async function rispondiAssistenzaAdmin(){
+  const a = assistenzaAdmAperta;
+  const t = el('assistenzaAdmTesto');
+  const testo = t ? t.value.trim() : '';
+  if (!a || !testo || assistenzaInvio) return;
+  haptic();
+  assistenzaInvio = true;
+  try {
+    const r = await fetch(`${API_BASE}/admin/assistenza/${Number(a.utente)}`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({testo})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Risposta non mandata, riprova', 6000); return; }
+    if (a.dati) a.dati.messaggi = d.messaggi || a.dati.messaggi;
+    if (t) t.value = '';
+    if (assistenzaAdmAperta === a) renderConversazioneAdmin();
+    toast('Risposta mandata: l\'utente riceve l\'avviso');
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { assistenzaInvio = false; }
+}
 
 /* Dentro Telegram il selettore c'e' solo a leva accesa */
 function accountVivi(){ return !DEMO && !VETRINA && (WEB || miniAccount()); }
@@ -87243,6 +87496,11 @@ async function avvia(){
     /* PIU' ACCOUNT OVUNQUE: la leva viva (un server di ieri non la
        manda, e resta spenta) */
     piuAccount = !!me.piu_account;
+    /* L'ASSISTENZA IN APP (3 nov 2026): la leva viva e il conto delle
+       risposte non lette (un server di ieri non le manda: spenta) */
+    assistenzaAttiva = me.assistenza === true;
+    assistenzaNuove = Number(me.assistenza_nuove) || 0;
+    vestiAssistenza();
     myClassificaNascosta = !!me.classifica_nascosta;
     myAnnunciSulProfilo = me.annunci_su_profilo_nostr == null ? true : !!me.annunci_su_profilo_nostr;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
