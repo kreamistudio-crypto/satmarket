@@ -73310,3 +73310,46 @@ cambio a tutti; le prove dal vivo elencate nella tappa 3; per dopo, a
 parte: chi riceve in bitcoin dal 2-di-3 di Alan che vuole cambiare in
 Lightning (stessa strada rovesciata, un ordine vero al posto
 dell'ordine 0).
+
+## Le procedure lunghe diventano skill, e CLAUDE.md dimagrisce da 281 a 200 righe (3 nov 2026, cantiere igiene-token, richiesta di Andrea)
+
+Andrea ha chiesto una «igiene dei token»: che le sessioni di Claude
+spendano meno contesto. Il conto fatto prima di toccare niente:
+CLAUDE.md aveva 281 righe (18 KB), esattamente al tetto, e rientra
+INTERO a ogni avvio e a ogni /compact; dentro c'erano procedure che
+servono una volta per cantiere (la chiusura, la pulizia del worktree),
+una volta ogni tanto (la promozione su main) o solo quando si parla
+del nodo (le sue regole, quaranta righe).
+
+LA DECISIONE: quelle procedure sono diventate quattro SKILL di
+progetto in `.claude/skills/` — `chiusura-cantiere`, `promozione-main`,
+`nodo-mostro`, `cerca-nei-docs` (l'ultima è nuova: il come si trova una
+sezione nei file giganti, coi comandi `grep`/`awk`/`sed -n` e il `cut`
+che serve per le righe da 40.000 caratteri di miniapp.html). Di una
+skill la sessione vede solo nome e descrizione; il resto lo apre
+quando serve. In CLAUDE.md è rimasta ogni REGOLA (cosa si fa e cosa
+non si fa), con un rimando alla skill per il COME. CLAUDE.md passa a
+200 righe (12,5 KB) e il tetto SCENDE a 220, come il 30 set: il freno
+vale anche all'ingiù.
+
+`.claude/` era ignorato per intero (lì vivono i worktree dei cantieri e
+la config locale): ora `.gitignore` dice `.claude/*` più
+`!.claude/skills/`, così le skill viaggiano col repo e le vedono Andrea,
+Alan e le sessioni cloud, mentre i worktree restano fuori.
+
+SCARTATO: spezzare server.py o miniapp.html (un refactoring di massa,
+regola 7); un indice dei documenti (la ricerca per titolo è l'indice);
+le skill nell'account di Andrea invece che nel repo (Alan non le
+vedrebbe, e non seguirebbero i rami).
+
+PROVATO: la bussola (ogni documento di `docs/` resta nominato in
+CLAUDE.md), il tetto, le frasi che tre prove cercano dentro CLAUDE.md
+(`ci/collaudi.txt`, le sessioni cloud, la VM di collaudo), e la suite
+intera con PROVE_SEVERE.
+
+DA GUARDARE: la sezione «Adesso» e l'elenco degli studi su questo ramo
+sono quelli di main; quando il ramo si incontra con `develop` CLAUDE.md
+andrà unito a mano (develop ha la -bar9 e tre documenti in più). Restano
+proposti e non fatti: le voci di CANTIERI più vecchie di 30 giorni
+nell'archivio, e un `.claude/settings.json` che vieti a Claude di
+leggere i segreti.

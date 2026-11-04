@@ -54640,7 +54640,12 @@ def prove_script_nel_workflow():
     prova("nessuna prova e' definita e mai eseguita", [], orfane)
 
 
-TETTO_CLAUDE_MD = 281   # misurato: 518 righe il giorno del taglio, piu' 20;
+TETTO_CLAUDE_MD = 220   # SCESO a 220 il 3 nov 2026 (200 righe + 20): le
+                        # procedure lunghe (chiusura del cantiere, promozione
+                        # su main, nodo Mostro) sono andate nelle skill di
+                        # `.claude/skills/`, che si aprono solo quando
+                        # servono (cantiere igiene-token, richiesta di Andrea).
+                        # Prima: 281. Misurato: 518 righe il giorno del taglio, piu' 20;
                         # 271 il 19 ott 2026: +8 per due regole nuove di
                         # Andrea (il backup prima di ogni deploy, il socket
                         # chiuso solo dal suo thread); 273 lo stesso giorno:
