@@ -152769,11 +152769,14 @@ def prove_banco_chiavi_onchain():
     prova("la rete e' una LEVA: signet di serie, mainnet ammessa, una parola "
           "storta resta signet, nessun'altra assegnazione",
           [True, True, True, True, 0, True, True],
-          ['ONCHAIN_RETI = ("signet", "mainnet")' in blocco_rete,
+          # (3 nov 2026, cantiere onchain-testnet4) tre parole: testnet4 e'
+          # la seconda rete di prova; la parola storta passa dal giudice
+          ['ONCHAIN_RETI = ("signet", "testnet4", "mainnet")' in blocco_rete,
            "    from config import ONCHAIN_RETE\n" in blocco_rete,
            "except ImportError:\n    ONCHAIN_RETE = \"signet\"" in blocco_rete,
-           "if ONCHAIN_RETE not in ONCHAIN_RETI:" in blocco_rete
-           and 'ONCHAIN_RETE = "signet"' in blocco_rete.split("not in ONCHAIN_RETI:")[1],
+           "ONCHAIN_RETE = _onchain_rete_normale(_scritta)" in blocco_rete
+           and "if ONCHAIN_RETE is None:" in blocco_rete
+           and 'ONCHAIN_RETE = "signet"' in blocco_rete.split("if ONCHAIN_RETE is None:")[1],
            len(re.findall(r"^ONCHAIN_RETE = ", src, re.M)),
            '"rete": ONCHAIN_RETE,' in src,
            'profilo["onchain_rete"] = ONCHAIN_RETE' in src])
@@ -152787,6 +152790,7 @@ def prove_banco_chiavi_onchain():
           "prova, 0 su mainnet), e lo dice la rotta",
           [True, True, True, False],
           ["\nONCHAIN_STRADA_PER_RETE = {\"signet\": \"m/48'/1'/0'/2'\",\n"
+           "                           \"testnet4\": \"m/48'/1'/0'/2'\",\n"
            "                           \"mainnet\": \"m/48'/0'/0'/2'\"}\n" in src,
            "\nONCHAIN_STRADA_CONTO = ONCHAIN_STRADA_PER_RETE[ONCHAIN_RETE]\n" in src,
            '"strada": ONCHAIN_STRADA_CONTO,' in src,
@@ -152812,7 +152816,7 @@ def prove_banco_chiavi_onchain():
            "B.HDKey.fromMasterSeed(seme, onchainRete().versioni).derive(strada);" in mini])
     prova("...e il foglio dice la rete che il server dice, signet o sats veri",
           [True, True, True, False, False],
-          ["Rete <b>signet</b>, la rete di prova" in mini,
+          ["Rete <b>${esc(rt.nome)}</b>, la rete di prova" in mini,
            "Rete <b>Bitcoin\n      (mainnet)</b>" in mini
            and "<b>i sats sono veri</b>" in mini,
            ">Barattolo — on-chain (${onchainRete().nome})" in mini,
@@ -156928,6 +156932,7 @@ console.log(JSON.stringify({
         amb = {"__builtins__": __builtins__, "HTTPException": _H,
                "ONCHAIN_RETE": rete,
                "ONCHAIN_STRADA_CONTO": {"signet": "m/48'/1'/0'/2'",
+                                        "testnet4": "m/48'/1'/0'/2'",
                                         "mainnet": "m/48'/0'/0'/2'"}[rete],
                "ONCHAIN_XPUB": xpub_barattolo,
                "XPUB_CARTONE": vett["bip32"][0]["catene"][0]["xpub"],
@@ -157045,8 +157050,34 @@ console.log(JSON.stringify({
         S_sig["DB"] = M["DB"]
         prova("...e lo stesso file su signet e' la terza chiave di sempre",
               (conto(parole[3]), False), S_sig["onchain_xpub_barattolo"]())
+        # (3 nov 2026, cantiere onchain-testnet4) ...e su testnet4 pure:
+        # stesse tpub, stesso coin type, e sul collaudo nessuno deve
+        # spostare un file per cambiare rete di prova
+        S_t4 = esegui(rete="testnet4")
+        S_t4["DB"] = M["DB"]
+        prova("...e lo stesso file nato su signet vale su testnet4 (tutt'e "
+              "due di prova)", (conto(parole[3]), False),
+              S_t4["onchain_xpub_barattolo"]())
     finally:
         _sh.rmtree(casa_k, ignore_errors=True)
+
+    # --- 1-ter) TESTNET4 (3 nov 2026, cantiere onchain-testnet4) ----------
+    # la seconda rete di prova: le forme di signet (tpub, coin type 1,
+    # tb1q), la cartone ammessa, la catena guardata e' un'altra
+    T4 = esegui(rete="testnet4")
+    prova("testnet4: la xpub dedicata di signet passa, una xpub di mainnet "
+          "no, e la cartone si usa", ["", True, True],
+          [T4["onchain_xpub_motivo"](conto(parole[0])),
+           "cominciare per tpub" in T4["onchain_xpub_motivo"](
+               conto(parole[0], versione="main")),
+           T4["onchain_xpub_barattolo"]()[1]])
+    k4 = [T4["onchain_chiave"](conto(parole[i]), 5) for i in range(3)]
+    ks = [S["onchain_chiave"](conto(parole[i]), 5) for i in range(3)]
+    ind4 = T4["onchain_indirizzo_da"](T4["onchain_descrittore"](*k4))
+    prova("...l'indirizzo di un ordine testnet4 e' tb1q, lo stesso che su "
+          "signet (cambia la catena, non la forma)", [True, True],
+          [ind4.startswith("tb1q"),
+           ind4 == S["onchain_indirizzo_da"](S["onchain_descrittore"](*ks))])
 
     # il database: in un file, perche' i fili hanno bisogno di
     # connessioni loro
@@ -186802,6 +186833,19 @@ def prove_rete_onchain_dal_pannello():
            amb["_giudice_rete_onchain"]("bitcoin"),
            amb["_giudice_rete_onchain"]("testnet")[0],
            amb["_giudice_rete_onchain"](None)[0]])
+    # (3 nov 2026, cantiere onchain-testnet4) la terza parola: «testnet4»
+    # si', «testnet» da sola no (vorrebbe dire la testnet3, un'altra catena)
+    prova("...e testnet4 e' la terza parola, «testnet» da sola resta fuori",
+          [("testnet4", ""), None, None],
+          [amb["_giudice_rete_onchain"](" TestNet4 "),
+           amb["_giudice_rete_onchain"]("testnet")[0],
+           amb["_giudice_rete_onchain"]("testnet3")[0]])
+    prova("...e la sua catena: mempool testnet4, embit «test», il tasto "
+          "e la tabella del telefono", [True, True, True, True],
+          ['"testnet4": "https://mempool.space/testnet4/api",' in src,
+           'ONCHAIN_RETE_EMBIT = {"signet": "signet", "testnet4": "test",' in src,
+           "testnet4: '🧪 Testnet4'" in mini,
+           "esplora: 'https://mempool.space/testnet4'}" in mini])
     # un database vero, con le due tabelle ridotte all'osso
     d = tempfile.mkdtemp()
     percorso = os.path.join(d, "rete.db")
@@ -186909,7 +186953,7 @@ def prove_rete_onchain_dal_pannello():
     prova("le descrizioni dicono la rete del server, mai signet cucita",
           [0, 1, 1, 0, 0],
           [mini.count("`Signet, rete di prova. L'indirizzo"),
-           mini.count("${onchainRete().prova ? 'Signet, rete di prova.' : "
+           mini.count("${onchainRete().prova ? nomeReteProva() + ', rete di prova.' : "
                       "'Rete Bitcoin: sats veri.'} L'indirizzo vale fino a"),
            mini.count("'https://mempool.space/signet'"),
            mini.count("busta.rete || 'signet'"),

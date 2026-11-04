@@ -1259,7 +1259,7 @@ ONCHAIN_XPUB = ""
 # m/48'/1'/0'/2', i sats non valgono niente): e' il valore del codice e
 # del collaudo. "mainnet" (o "bitcoin") = SATS VERI: indirizzi bc1…,
 # chiavi xpub…, conto m/48'/0'/0'/2', mempool.space. Una parola storta
-# resta signet e lo dice nel journal. Solo dal VPS, mai dal pannello.
+# resta signet e lo dice nel journal. Dal 30 ott anche dal pannello (vale al riavvio).
 # ⚠️ SU MAINNET LA TERZA CHIAVE DI CARTONE NON SI USA: finche' la
 # chiave di Barattolo non nasce dal pannello («⛓️ Crea la chiave di
 # Barattolo», DOPO aver messo questa riga e riavviato) l'on-chain e'
@@ -1269,11 +1269,17 @@ ONCHAIN_XPUB = ""
 # una nuova. La procedura intera: PRODUZIONE, «L'ON-CHAIN IN MAINNET».
 # Le xpub dedicate date dai telefoni su signet non valgono su mainnet:
 # l'app le rida' da sola alla prima apertura (si accende da sola).
+# "testnet4" (3 nov 2026, cantiere onchain-testnet4) = la SECONDA rete di
+# prova: le forme di signet (tb1…, tpub…, lo stesso conto), un'altra
+# catena (https://mempool.space/testnet4/api; in Sparrow la modalita'
+# Testnet4). Fra signet e testnet4 la chiave di Barattolo e le xpub dei
+# telefoni restano buone. «testnet» da sola NON vale: sarebbe la
+# testnet3, dismessa. Si sceglie anche dal pannello delle leve.
 ONCHAIN_RETE = "signet"
 # L'API mempool che guarda i pagamenti degli ordini on-chain (tappa 4) e
 # trasmette le transazioni d'uscita. Vuota = quella di serie della rete
-# (signet: https://mempool.space/signet/api; mainnet:
-# https://mempool.space/api).
+# (signet: https://mempool.space/signet/api; testnet4:
+# https://mempool.space/testnet4/api; mainnet: https://mempool.space/api).
 ONCHAIN_MEMPOOL_API = ""
 # LA QUOTA FISSA DI BARATTOLO SULL'ON-CHAIN (27 ott 2026): sats che chi
 # COMPRA aggiunge al conto (li vede prima di pagare) e che vanno a un

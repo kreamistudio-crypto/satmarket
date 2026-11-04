@@ -188,7 +188,10 @@ aggiunge, si toglie la vecchia da GitHub.
   verifica dei pagamenti (tappa 4), l'API pubblica signet di
   mempool.space (`https://mempool.space/signet/api`), nessun nodo
   nostro. Le monete di prova si chiedono a un faucet signet
-  (la catena signet di RGB sulla VM resta spenta).
+  (la catena signet di RGB sulla VM resta spenta). DAL 3 NOV 2026 c'è
+  anche **testnet4** (stessa leva, terza scelta, dal pannello: Andrea
+  paga da Sparrow in modalità Testnet4; API
+  `https://mempool.space/testnet4/api`, monete da un faucet testnet4).
 - **Telegram**: il bot di prova e il solo canale «Vetrina · prova».
 - **Lo swap dei venditori** (regola di Andrea): ogni tappa
   si prova QUI col SATS Routing di cartone (`cartone_satsrouting.py`)

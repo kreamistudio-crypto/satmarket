@@ -33860,8 +33860,8 @@ def _leve_stato():
                           "sats VERI: indirizzi bc1…, conto m/48'/0'/0'/2', "
                           "mempool.space; la terza chiave di cartone non si "
                           "usa" if ONCHAIN_RETE == "mainnet" else
-                          "la rete di prova: indirizzi tb1…, i sats non "
-                          "valgono niente"),
+                          f"la rete di prova ({ONCHAIN_RETE}): indirizzi "
+                          "tb1…, i sats non valgono niente"),
                   allarme=bool(ONCHAIN_RETE_TRATTENUTA)),
             _leva("Tetto ordini on-chain (€)", "ONCHAIN_MAX_EURO",
                   ONCHAIN_MAX_EURO,
@@ -34159,17 +34159,21 @@ _LEVE_SOLO_AL_RIAVVIO = frozenset({"ONCHAIN_RETE"})
 
 
 def _onchain_rete_normale(valore):
-    """«signet» o «mainnet» («bitcoin» vale mainnet), o None se e' altro."""
+    """«signet», «testnet4» o «mainnet» («bitcoin» vale mainnet), o None
+    se e' altro. «testnet» da sola NON vale (3 nov 2026): oggi vorrebbe
+    dire la testnet3, che e' un'altra catena, e una parola che puo'
+    voler dire due catene qui non entra."""
     t = str(valore if valore is not None else "").strip().lower()
     if t == "bitcoin":
         t = "mainnet"
-    return t if t in ("signet", "mainnet") else None
+    return t if t in ("signet", "testnet4", "mainnet") else None
 
 
 def _giudice_rete_onchain(valore):
     v = _onchain_rete_normale(valore)
     if v is None:
-        return None, "signet (la prova) oppure mainnet (i sats veri)"
+        return None, ("signet o testnet4 (la prova) oppure mainnet (i sats "
+                      "veri)")
     return v, ""
 
 
@@ -52104,14 +52108,19 @@ except ImportError:
 # di mempool.space (`https://mempool.space/signet/api`), e un pagamento
 # mandato da un wallet testnet li' non si vede. Su mainnet: `bc1...`,
 # `xpub...`, coin type 0, `https://mempool.space/api`.
-ONCHAIN_RETI = ("signet", "mainnet")
+# LA TERZA PAROLA, "testnet4" (3 nov 2026, cantiere onchain-testnet4,
+# Andrea: «cambia in collaudo la rete da signet a testnet», e alla
+# domanda quale: testnet4, perche' la testnet3 e' dismessa). Stesse
+# forme di signet (`tb1`, `tpub`, coin type 1): cambia solo la catena,
+# cioe' l'API di mempool (`https://mempool.space/testnet4/api`) e il nome
+# per embit ("test"). Si sceglie dal pannello come le altre due.
+ONCHAIN_RETI = ("signet", "testnet4", "mainnet")
 try:
     from config import ONCHAIN_RETE
-    ONCHAIN_RETE = str(ONCHAIN_RETE or "").strip().lower()
-    if ONCHAIN_RETE == "bitcoin":
-        ONCHAIN_RETE = "mainnet"
-    if ONCHAIN_RETE not in ONCHAIN_RETI:
-        print(f"[onchain] ONCHAIN_RETE «{ONCHAIN_RETE}» non e' una rete "
+    _scritta = str(ONCHAIN_RETE or "").strip().lower()
+    ONCHAIN_RETE = _onchain_rete_normale(_scritta)
+    if ONCHAIN_RETE is None:
+        print(f"[onchain] ONCHAIN_RETE «{_scritta}» non e' una rete "
               f"conosciuta ({', '.join(ONCHAIN_RETI)}): resta signet")
         ONCHAIN_RETE = "signet"
 except ImportError:
@@ -52132,6 +52141,7 @@ ONCHAIN_RETE, ONCHAIN_RETE_TRATTENUTA = _onchain_rete_al_riavvio(ONCHAIN_RETE)
 # apposta — una xpub di signet non vale su mainnet, e viceversa (il
 # telefono ha la stessa tabella, `ONCHAIN_RETI` in miniapp.html).
 ONCHAIN_STRADA_PER_RETE = {"signet": "m/48'/1'/0'/2'",
+                           "testnet4": "m/48'/1'/0'/2'",
                            "mainnet": "m/48'/0'/0'/2'"}
 ONCHAIN_STRADA_CONTO = ONCHAIN_STRADA_PER_RETE[ONCHAIN_RETE]
 # LA QUOTA FISSA DI BARATTOLO SULL'ON-CHAIN (27 ott 2026, decisione di
@@ -92504,16 +92514,20 @@ except ImportError:
 # versioni BIP-32 delle chiavi di conto dei wallet (vpub/zpub). Chi
 # scrive «tpub» o «tb1» in un testo passa da qui, mai a mano: il
 # telefono ha la stessa tabella (`ONCHAIN_RETI` in miniapp.html).
-ONCHAIN_RETE_EMBIT = {"signet": "signet", "mainnet": "main"}
+ONCHAIN_RETE_EMBIT = {"signet": "signet", "testnet4": "test",
+                      "mainnet": "main"}
 ONCHAIN_PREFISSI = {
     "signet": {"xpub": "tpub", "indirizzo": "tb1", "conto": "vpub",
                "strada_wallet": "m/84'/1'/0'"},
+    "testnet4": {"xpub": "tpub", "indirizzo": "tb1", "conto": "vpub",
+                 "strada_wallet": "m/84'/1'/0'"},
     "mainnet": {"xpub": "xpub", "indirizzo": "bc1", "conto": "zpub",
                 "strada_wallet": "m/84'/0'/0'"},
 }
 # la versione BIP-32 della chiave di CONTO di un wallet BIP-84 (quella
 # che Sparrow mostra): vpub sulle reti di prova, zpub su mainnet
 ONCHAIN_VERSIONE_CONTO = {"signet": b"\x04\x5f\x1c\xf6",
+                          "testnet4": b"\x04\x5f\x1c\xf6",
                           "mainnet": b"\x04\xb2\x47\x46"}
 
 
@@ -92521,6 +92535,12 @@ def _onchain_rete():
     """La rete di embit per la leva di adesso: si rilegge a ogni chiamata,
     cosi' il collaudo la cambia a caldo come ogni altra leva."""
     return _EMBIT_RETI[ONCHAIN_RETE_EMBIT[ONCHAIN_RETE]]
+
+
+def _onchain_rete_di_prova(rete: str) -> bool:
+    """Signet e testnet4 sono tutt'e due «la prova»: stesse forme (tb1,
+    tpub, coin type 1), sats che non valgono niente."""
+    return rete != "mainnet"
 
 
 def _onchain_prefisso(cosa: str) -> str:
@@ -92592,7 +92612,7 @@ def onchain_xpub_barattolo() -> tuple:
                              "due. Va tolta la riga dal config")
         return vps["xpub"], False
     if not s:
-        if ONCHAIN_RETE != "signet":
+        if not _onchain_rete_di_prova(ONCHAIN_RETE):
             raise ValueError("su mainnet la terza chiave di cartone non si "
                              "usa: la chiave di Barattolo va creata dal "
                              "pannello admin («⛓️ Crea la chiave di "
@@ -92664,7 +92684,13 @@ def _onchain_chiave_vps():
     # Si dice, e non si calcola niente: la chiave di mainnet si crea dal
     # pannello DOPO aver spostato quel file (PRODUZIONE, «L'ON-CHAIN IN
     # MAINNET»). I file di prima del 30 ott dicevano "signet" gia' allora.
-    if (d.get("rete") or "signet") != ONCHAIN_RETE:
+    # (3 nov 2026, cantiere onchain-testnet4) fra le due reti di prova la
+    # chiave resta buona: signet e testnet4 hanno lo stesso conto (coin
+    # type 1) e le stesse tpub, e la chiave del collaudo nata su signet
+    # vale su testnet4 senza che nessuno debba spostare un file sulla VM.
+    # Fra la prova e mainnet no, come prima.
+    if (_onchain_rete_di_prova(d.get("rete") or "signet")
+            != _onchain_rete_di_prova(ONCHAIN_RETE)):
         raise ValueError(f"la chiave di Barattolo sul VPS e' nata su "
                          f"{d.get('rete') or 'signet'}, ma la rete adesso e' "
                          f"{ONCHAIN_RETE}: non e' la terza chiave di questa "
@@ -92751,7 +92777,7 @@ def _onchain_terza_chiave_a_parole() -> str:
                 "config: qui non firma")
     if st["dove"] == "rotta":
         return "⚠️ file illeggibile: " + st.get("motivo", "")
-    if ONCHAIN_RETE != "signet":
+    if not _onchain_rete_di_prova(ONCHAIN_RETE):
         # (30 ott 2026) su mainnet la cartone non si usa: l'on-chain e'
         # fermo finche' la chiave non nasce, e il pannello lo grida
         return ("⚠️ di cartone su MAINNET: l'on-chain è FERMO (503) finché "
@@ -93334,6 +93360,7 @@ try:
 except ImportError:
     ONCHAIN_MEMPOOL_API = ""
 ONCHAIN_MEMPOOL_DI_SERIE = {"signet": "https://mempool.space/signet/api",
+                            "testnet4": "https://mempool.space/testnet4/api",
                             "mainnet": "https://mempool.space/api"}
 # quanto vive un indirizzo che aspetta i sats: un bonifico on-chain non
 # e' un tocco, e un giorno copre chi paga da un wallet che non ha sotto
@@ -94809,7 +94836,10 @@ async def onchain_ordine_firma(oid: int, req: Request,
 ONCHAIN_MODI = ("onchain", "lightning", "ogni_volta")
 # La rete del fornitore che va bene per ogni rete dell'on-chain: signet
 # ha le forme di testnet (tb1…, lntb…), e la mainnet vuole bitcoin.
+# testnet4 (3 nov 2026) va con un fornitore di testnet4, che oggi non c'e'
+# (la "testnet" dei fornitori e' la testnet3): il cambio resta fermo.
 ONCHAIN_RETE_DEL_CAMBIO = {"signet": "testnet", "testnet": "testnet",
+                           "testnet4": "testnet4",
                            "mainnet": "bitcoin", "bitcoin": "bitcoin"}
 # Quanto deve restare alla fattura di chi vende quando i bitcoin partono:
 # il fornitore paga dopo una conferma, e una conferma puo' metterci ore.
