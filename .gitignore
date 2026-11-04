@@ -65,5 +65,8 @@ deploy/relay/policy/chiavi.txt
 .DS_Store
 Thumbs.db
 
-# Config locale di Claude Code (launch.json ecc.)
-.claude/
+# Config locale di Claude Code (launch.json, i worktree dei cantieri ecc.)
+# — TRANNE le skill del progetto (3 nov 2026): sono istruzioni per ogni
+# sessione, di Andrea e di Alan, e devono viaggiare col repo.
+.claude/*
+!.claude/skills/
