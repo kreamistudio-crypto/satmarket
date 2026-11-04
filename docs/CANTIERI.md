@@ -78164,3 +78164,52 @@ Provato: `prove.py` severa (sei sentinelle rovesciate coi perché, una nuova sul
 nome del tasto, il banco del tasto con la fascia aperta), i collaudi, e a
 schermo con Playwright (capsula su «Compra» col + verde, foglio con fascia e
 marchio). Da guardare: la prova sul telefono vero sul collaudo.
+## L'assistenza in app, passo 1: la chat con lo staff nelle impostazioni, e tutti gli admin la vedono per utente (3-4 nov 2026, cantiere assistenza, disegno approvato da Andrea)
+
+**LA RICHIESTA.** «Una chat di assistenza clienti dentro Barattolo,
+magari nelle impostazioni; i messaggi devono finire anche su
+Telegram/Nostr secondo il profilo dell'admin, ma si risponde anche in
+app; le chat accessibili a tutti gli admin e viste per utente». Il
+disegno, approvato da Andrea il 3 nov, è in tre passi, un ramo
+ciascuno: (1) la chat in app, questo; (2) l'avviso dei messaggi nuovi
+a OGNI admin con `notifica` — quindi col canale che ognuno ha scelto
+nel suo profilo, e NON nel gruppo degli admin — al più uno ogni 10
+minuti per conversazione; (3) la risposta dell'admin dal bot, col
+«Rispondi» di Telegram. La risposta da Nostr NON si fa (decisione di
+Andrea del 3 nov): vorrebbe che il server aprisse i DM, e oggi per
+scelta non ne legge mai il contenuto; chi è su Nostr risponde dall'app.
+
+**COSA C'È.** La leva `ASSISTENZA_ATTIVA`, spenta di serie: si accende
+col passo 2, sennò chi scrive parla al vuoto. Le tabelle, le rotte e il
+client li descrive ARCHITETTURA, «L'ASSISTENZA IN APP». Una
+conversazione per utente; lo staff, per l'utente, è «Staff» col
+bollino e mai un nome; il testo esce sempre da esc() e non entra mai
+in un avviso (B-01 e B-35 dell'analisi di sicurezza: il testo di un
+utente non diventa HTML né nella pagina né nel bot); freni 20/ora per
+chi scrive e 120/ora per un admin.
+
+**LE STRADE SCARTATE.** La colonna `staff`: la sentinella del bollino
+(«NON SI COMPRA») vieta ogni colonna con quel nome, e ha ragione — si
+chiama `admin`. Un «letto» per ogni admin: tutti vedono le stesse
+conversazioni, e quello che serve sapere è se tocca allo staff, cioè
+se l'ultima parola è dell'utente. Il testo della risposta dentro
+l'avviso: la regola della chat degli ordini, il messaggio vive dentro
+Barattolo. Il link profondo alla pagina dell'assistenza: tocca il
+vocabolario `startapp` nei suoi tre gemelli, e va col passo 2 (che lo
+vuole anche per gli admin); per ora il bottone apre Barattolo e il
+testo dice dove guardare.
+
+**PROVATO.** `PROVE_SEVERE=1 python prove.py` verde (26380, le 2
+saltate sono nostr-tools che in questa macchina non c'è, come prima);
+`collaudo_assistenza` nella gabbia, 30/30, e in `ci/collaudi.txt` e
+`ci/compila.txt`; i collaudi della CI; un giro nel browser (Playwright,
+390 px): la voce in «Privacy», la chat dell'utente, l'elenco e la
+conversazione dell'admin, l'invio dai due lati, un `<script>` scritto
+dall'utente che resta testo. Toccate tre attese di `prove.py`, ognuna
+per un fatto nuovo: la voce nel censimento dei cassetti, i due freni
+nei numeri concordati, `_link_casa_telegram` chiesta in cinque posti.
+
+**DA GUARDARE.** Andrea, a leva accesa sulla VM di collaudo, prima
+del passo 2: la voce, una conversazione, la risposta da admin e
+l'avviso che arriva sul canale di chi ha scritto.
+

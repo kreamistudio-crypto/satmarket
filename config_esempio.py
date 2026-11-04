@@ -1989,6 +1989,13 @@ PIU_ACCOUNT_OVUNQUE = False
 # riattacca le penalita' P2P a chi rientra. SPENTA di serie: si accende
 # sul collaudo, poi qui quando Andrea decide.
 ACCOUNT_CANCELLABILE = False
+# L'ASSISTENZA IN APP (3 nov 2026, richiesta di Andrea): in Profilo →
+# Impostazioni la voce «💬 Assistenza», una chat fra chi usa Barattolo e
+# lo staff; gli admin (ADMIN_IDS) vedono TUTTE le conversazioni, una per
+# utente, nel gruppo Amministrazione, e rispondono da li'. SPENTA di
+# serie: si accende quando gli admin ricevono anche l'avviso dei
+# messaggi nuovi (passo 2), sennò chi scrive parla al vuoto.
+ASSISTENZA_ATTIVA = False
 
 # ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot): sul web e
 # nella PWA «Entra con Telegram» apre il bot con un codice monouso, e
