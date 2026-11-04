@@ -50997,10 +50997,11 @@ const EFFETTO_LEVA = {
   /* la rete (30 ott 2026, cantiere onchain-rete-pannello) */
   ONCHAIN_RETE: x => x === 'mainnet'
     ? 'Mainnet, la rete Bitcoin: i sats sono veri.'
+    : x === 'testnet4' ? 'Testnet4, la rete di prova: i sats non valgono niente (in Sparrow, la modalità Testnet4).'
     : 'Signet, la rete di prova: i sats non valgono niente.',
 };
 /* i nomi dei tasti di una leva a scelte */
-const NOME_SCELTA = {signet: '🧪 Signet', mainnet: '₿ Mainnet'};
+const NOME_SCELTA = {signet: '🧪 Signet', testnet4: '🧪 Testnet4', mainnet: '₿ Mainnet'};
 const effettoLeva = (chiave, x) => EFFETTO_LEVA[chiave] ? EFFETTO_LEVA[chiave](x) : '';
 const tutteLeLeve = () => admLeve.flatMap(g => g.voci || []);
 const levaDi = chiave => tutteLeLeve().find(v => v.chiave === chiave);
@@ -56532,6 +56533,12 @@ const ONCHAIN_RETI = {
             versioni: ONCHAIN_VERSIONI_PROVA, xpub: 'tpub', indirizzo: 'tb1',
             conto: 'vpub', versioniConto: {private: 0x045f18bc, public: 0x045f1cf6},
             stradaWallet: "m/84'/1'/0'", esplora: 'https://mempool.space/signet'},
+  /* (3 nov 2026, cantiere onchain-testnet4) la seconda rete di prova: le
+     forme di signet (tb1, tpub, coin type 1), un'altra catena */
+  testnet4: {nome: 'testnet4', prova: true, strada: "m/48'/1'/0'/2'",
+            versioni: ONCHAIN_VERSIONI_PROVA, xpub: 'tpub', indirizzo: 'tb1',
+            conto: 'vpub', versioniConto: {private: 0x045f18bc, public: 0x045f1cf6},
+            stradaWallet: "m/84'/1'/0'", esplora: 'https://mempool.space/testnet4'},
   mainnet: {nome: 'mainnet', prova: false, strada: "m/48'/0'/0'/2'",
             versioni: undefined, xpub: 'xpub', indirizzo: 'bc1',
             conto: 'zpub', versioniConto: {private: 0x04b2430c, public: 0x04b24746},
@@ -56543,6 +56550,13 @@ function onchainRete(){
   const detta = (srv && srv.rete)
     || (typeof myOnchainRete !== 'undefined' && myOnchainRete) || 'signet';
   return ONCHAIN_RETI[detta] || ONCHAIN_RETI.signet;
+}
+
+/* il nome della rete di prova con la maiuscola, per le frasi («Signet»,
+   «Testnet4») */
+function nomeReteProva(){
+  const n = onchainRete().nome;
+  return n.charAt(0).toUpperCase() + n.slice(1);
 }
 
 /* la rete del bundle (@scure/btc-signer) per indirizzi e script */
@@ -56926,7 +56940,7 @@ function onchainSchedaImpostazioni(miaXpub){
 function onchainTestoRete(){
   const rt = onchainRete();
   return rt.prova
-    ? `<div class="hint">Rete <b>signet</b>, la rete di prova: gli
+    ? `<div class="hint">Rete <b>${esc(rt.nome)}</b>, la rete di prova: gli
       indirizzi cominciano per <span class="mono">tb1</span> e i sats non
       valgono niente.</div>`
     : `<div class="hint" style="color:var(--danger)">Rete <b>Bitcoin
@@ -57120,7 +57134,7 @@ function onchainModuloIncasso(pref){
       (<span class="mono">${onchainRete().indirizzo}…</span>) oppure, meglio, <b>la chiave pubblica del conto</b>
       del tuo wallet (<span class="mono">${onchainRete().conto}…</span>: in Sparrow, Impostazioni → Keystore,
       strada <span class="mono">${esc(onchainRete().stradaWallet)}</span>): con la chiave ogni vendita arriva a
-      un indirizzo nuovo, e con lei non si spende niente. ${onchainRete().prova ? 'Signet, rete di prova.' : 'Rete Bitcoin: sats veri.'}</div>`;
+      un indirizzo nuovo, e con lei non si spende niente. ${onchainRete().prova ? nomeReteProva() + ', rete di prova.' : 'Rete Bitcoin: sats veri.'}</div>`;
 }
 
 const onchainIncassoTimer = {};
@@ -57970,7 +57984,7 @@ async function payDisegnaOnchain(){
     + riga(o.margine_sats, 'Margine di rete (se avanza più di 546 sats, torna a te)')
     + riga(o.importo_sats, 'Da mandare', true);
   el('payEurNota').style.display = 'block';
-  el('payEurNota').textContent = `${onchainRete().prova ? 'Signet, rete di prova.' : 'Rete Bitcoin: sats veri.'} L'indirizzo vale fino a ${new Date(o.scade * 1000).toLocaleString('it-IT')}.`;
+  el('payEurNota').textContent = `${onchainRete().prova ? nomeReteProva() + ', rete di prova.' : 'Rete Bitcoin: sats veri.'} L'indirizzo vale fino a ${new Date(o.scade * 1000).toLocaleString('it-IT')}.`;
   el('payPatto').innerHTML = 'Paga con un wallet Bitcoin. I sats vanno in un <b style="color:var(--trust)">2-di-3</b> fra te, chi vende e Barattolo: escono solo con due firme, e al venditore arrivano quando confermi di aver ricevuto l\'oggetto. Serve una conferma, circa dieci minuti.'
     + (o.visti_sats ? `<br><b>Visti in rete: ${fmt(o.visti_sats)} sats</b>, confermati ${fmt(o.ricevuti_sats)}.` : '');
   el('payScadeRiga').style.display = 'none';
@@ -60195,7 +60209,7 @@ function renderDepositoOnchainP2P(){
     '<div class="hint">Manda <b>' + fmt(o.importo_sats) + ' sats</b> dal tuo wallet Bitcoin: '
       + 'restano <b>bloccati nel 2-di-3</b> e non escono finché non li liberi tu. '
       + 'Dentro ci sono ' + fmt(o.margine_sats) + ' sats di margine per la rete.'
-      + (prova ? ' Rete di prova (signet).' : '') + '</div>'
+      + (prova ? ' Rete di prova (' + esc(onchainRete().nome) + ').' : '') + '</div>'
     + (o.visti_sats ? '<div class="hint">👀 Visti in rete ' + fmt(o.visti_sats) + ' sats: aspetto la conferma.</div>' : '')
     + '<div class="qr" id="p2pOcDepositoQr"></div>'
     + '<div class="invoice" id="p2pOcDepositoIndirizzo"></div>'

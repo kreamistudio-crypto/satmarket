@@ -78100,3 +78100,38 @@ nord (resta sotto il puntatore), pizzico vero via CDP con due tocchi,
 doppio tocco. Nessun errore di pagina. Le offerte della vetrina di Esplora e il post del
 canale non hanno la mappa (solo il libro). Un comune omonimo conteso
 («Castro») resta senza punto, come negli avvisi.
+
+## Il collaudo su testnet4: la terza parola della rete on-chain (3 nov 2026, cantiere onchain-testnet4, richiesta di Andrea)
+
+Andrea: «cambia in collaudo la rete da signet a testnet». Alla domanda quale
+testnet (la 3 è dismessa, blocchi a raffiche e faucet a secco) ha scelto
+**testnet4**. Il 20 ott era stato lui a passare da testnet a signet: qui non si
+toglie signet, si aggiunge la terza scelta al tasto `ONCHAIN_RETE` del pannello
+(«🧪 Testnet4»), che vale al riavvio come le altre due.
+- COSA CAMBIA E COSA NO. Testnet4 ha le forme di signet: `tb1…`, `tpub`/`vpub`,
+  conto `m/48'/1'/0'/2'`. Cambiano solo la catena guardata (`ONCHAIN_MEMPOOL_DI_SERIE`:
+  `https://mempool.space/testnet4/api`; l'esploratore del telefono
+  `https://mempool.space/testnet4`) e il nome per embit («test»). Le tabelle
+  gemelle del server (`ONCHAIN_RETI`, `ONCHAIN_STRADA_PER_RETE`,
+  `ONCHAIN_RETE_EMBIT`, `ONCHAIN_PREFISSI`, `ONCHAIN_VERSIONE_CONTO`) e del
+  telefono (`ONCHAIN_RETI`, `NOME_SCELTA`, `EFFETTO_LEVA`) hanno la riga in più.
+- «LA PROVA» È UNA FAMIGLIA: `_onchain_rete_di_prova` (tutto tranne mainnet)
+  prende il posto dei tre `!= "signet"`. La cartone resta ammessa su testnet4, e
+  il file della chiave di Barattolo nato su signet vale su testnet4 (stesso
+  conto): sul collaudo nessuno deve spostare un file per cambiare rete di prova,
+  e Andrea la VM non la tocca. Fra prova e mainnet la serratura è quella di prima.
+- «TESTNET» DA SOLA NON È UNA PAROLA: vorrebbe dire la testnet3, un'altra catena;
+  il giudice la rifiuta (400) e il config la fa restare signet col journal.
+- IL CAMBIO verso Lightning su testnet4 resta fermo (`ONCHAIN_RETE_DEL_CAMBIO`:
+  «testnet4», che nessun fornitore ha; la loro «testnet» è la 3).
+- I testi «Signet, rete di prova» del foglio dicono la rete del server
+  (`nomeReteProva()`, `rt.nome`).
+Scartato: scrivere `ONCHAIN_MEMPOOL_API` testnet4 nel config della VM (zero
+codice, ma i testi direbbero signet e serve la VM); sostituire signet con
+testnet4 (signet serve ancora a RGB e ai banchi).
+Gli ordini di prova aperti su signet restano lì quando si passa: valgono zero, e
+tornando su signet ripartono. Provato: `prove.py` (sentinelle nuove nel banco
+delle chiavi, nell'indirizzo dell'ordine — tb1q identico a signet, cartone e
+chiave nata su signet ammesse — e nel pannello), `collaudo_onchain_rete_pannello`
+(tre scelte, testnet4 al riavvio col conto di prova). Da guardare dal vivo: il
+primo pagamento da Sparrow testnet4 visto dalla ronda.

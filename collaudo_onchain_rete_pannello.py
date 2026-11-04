@@ -4,7 +4,10 @@ LA RETE DELL'ON-CHAIN DAL PANNELLO (30 ott 2026, cantiere
 onchain-rete-pannello, Andrea: «signet e mainnet devono essere
 automatici nelle descrizioni, e devono essere un tasto configurabile
 direttamente dalle impostazioni») — il giro col SERVER VERO, per HTTP:
-- la scheda è un tasto a due scelte, signet e mainnet;
+- la scheda è un tasto a tre scelte, signet, testnet4 e mainnet (la
+  terza dal 3 nov 2026, cantiere onchain-testnet4);
+- «testnet4»: si scrive, e un server nuovo riparte su testnet4 col conto
+  di prova (coin type 1), che è quello di signet;
 - una parola storta: 400; «mainnet»: si scrive, ma il server di ADESSO
   resta su signet (vale al riavvio) e la scheda lo dice;
 - un secondo processo sullo stesso database riparte su mainnet;
@@ -81,12 +84,27 @@ def main():
     # ---- 1) la scheda -------------------------------------------------------
     print("\n[la scheda: due tasti, signet di serie]")
     w = scheda().get("scrivibile") or {}
-    prova("un tasto a due scelte, signet adesso, niente in attesa",
-          ("scelta", ["signet", "mainnet"], "signet", "", False, ""),
+    prova("un tasto a tre scelte, signet adesso, niente in attesa",
+          ("scelta", ["signet", "testnet4", "mainnet"], "signet", "", False, ""),
           (w.get("tipo"), w.get("scelte"), w.get("attuale"),
            w.get("dal_riavvio"), w.get("subito"), w.get("trattenuta")))
     prova("chi non è admin: 403", 403, leva(111, valore="mainnet").status_code)
     prova("una parola storta: 400", 400, leva(999, valore="testnet").status_code)
+
+    # ---- 1-bis) verso testnet4, al riavvio (3 nov 2026) ---------------------
+    print("\n[«testnet4»: la seconda rete di prova, al riavvio]")
+    r = leva(999, valore="testnet4")
+    prova("scritta, dal pannello, e non subito", (200, "testnet4", False),
+          (r.status_code, r.json().get("valore"), r.json().get("subito")))
+    prova("...il server di adesso resta signet", "signet", SRV.ONCHAIN_RETE)
+    f = figlio()
+    prova("un server nuovo riparte su testnet4, col conto di prova di sempre",
+          ("testnet4", "m/48'/1'/0'/2'", ""),
+          (f.get("ONCHAIN_RETE"), f.get("STRADA"), f.get("TRATTENUTA")))
+    r = leva(999, torna_al_config=True)
+    prova("«Torna al config»: niente più in attesa", (200, "signet", ""),
+          (r.status_code, r.json().get("valore"),
+           scheda()["scrivibile"].get("dal_riavvio")))
 
     # ---- 2) verso mainnet, al riavvio --------------------------------------
     print("\n[«mainnet»: si scrive, vale al riavvio]")
