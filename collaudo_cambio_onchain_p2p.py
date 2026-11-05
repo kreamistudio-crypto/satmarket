@@ -61,7 +61,8 @@ def pezzi_pagina():
     def riga(inizio):
         i = mini.index(inizio)
         return mini[i:mini.index("\n", i) + 1]
-    firme = ["async function onchainFirmaProposta(oid, verso){",
+    firme = ["function onchainParolePerOrdine(B, parole, o){",
+             "async function onchainFirmaProposta(oid, verso){",
              "function daFirmareOnchainP2P(o){",
              "function cambioDaFirmareOnchainP2P(o){",
              "function rilascioDaFirmareOnchainP2P(o){",

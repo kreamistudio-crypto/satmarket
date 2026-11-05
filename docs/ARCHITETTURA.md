@@ -9944,6 +9944,16 @@
   dai feedback migrati. `_guardie_fusione` (ricontrollate DENTRO la
   transazione) rifiutano: P già collegato, P con badge verificato
   DIVERSO, affari ancora aperti tra i due (auto-ordine in escrow).
+  Dal 5 nov 2026 (CANTIERI, «L'unione dei due account col seme on-chain
+  unico») anche qualcosa di on-chain in corso in una delle due metà, con
+  chiunque (`_impegni_onchain`, lo stesso giudice della cancellazione).
+  L'unione sposta lo storico on-chain e dei cambi, e del wallet on-chain
+  tiene UN seme (`_unione_semi`: quello di Telegram se c'è, sennò passa
+  quello Nostr); lo scartato sta in `unioni_semi` per impronta, 7 giorni,
+  e il telefono (`walletUnioneRonda`) lo tiene fra le parole «di prima»
+  finché `POST /api/wallet/unione/lascia` non dice che è scaduto e vuoto.
+  Quel che l'unione sceglie da sola finisce in `unioni_registro` e nel
+  cassetto admin «🔀 Unioni» (`/api/admin/unioni`).
   `bot_api()` è il gemello completo di `notifica()` ma in collaudo
   simula SEMPRE (`🤖 [telegram simulato]`); il webhook in collaudo
   accetta il segreto fisso "collaudo" per suonarlo con curl.

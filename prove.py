@@ -20985,6 +20985,11 @@ def prove_collega_npub_firma():
     exec("async " + pezzo("unisci_nostr"), amb)
     exec(pezzo("_pulisci_fusioni"), amb)
     exec(pezzo("_guardie_fusione"), amb)
+    # la guardia dell'on-chain in corso (5 nov 2026, unione-seme): qui
+    # le tabelle pigre non ci sono, e il giudice vero dice «niente»
+    exec(pezzo("_colonne_di"), amb)
+    exec(pezzo("_impegni_onchain"), amb)
+    exec(pezzo("_unione_coda_admin"), amb)
 
     esito_verifica = {"pubkey": ""}
     amb["verifica_evento_login"] = lambda evento, host: esito_verifica["pubkey"]
@@ -156466,6 +156471,10 @@ def prove_incasso_esterno_onchain():
         pezzo_js(mini, "function onchainMieChiavi(B, parole, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainScriptOrdine(B, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "async function onchainProponi(btn, oid){", "\n}\n") + "\n}",
+        # il seme giusto per l'ordine (5 nov 2026, unione-seme): qui
+        # non ci sono parole «di prima», e vince il principale
+        pezzo_js(mini, "function onchainParolePerOrdine(B, parole, o){", "\n}\n") + "\n}",
+        "const walletParolePrima = () => [];",
         pezzo_js(mini, "async function onchainFirmaProposta(oid, verso){", "\n}\n") + "\n}",
         cofirma_js + "\n}"])
     banco = open("vendor/btc.bundle.js", encoding="utf-8").read() + """
@@ -156717,6 +156726,10 @@ def prove_ordine_onchain():
         pezzo_js(mini, "function onchainMieChiavi(B, parole, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainScriptOrdine(B, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "async function onchainProponi(btn, oid){", "\n}\n") + "\n}",
+        # il seme giusto per l'ordine (5 nov 2026, unione-seme): qui
+        # non ci sono parole «di prima», e vince il principale
+        pezzo_js(mini, "function onchainParolePerOrdine(B, parole, o){", "\n}\n") + "\n}",
+        "const walletParolePrima = () => [];",
         pezzo_js(mini, "async function onchainFirmaProposta(oid, verso){", "\n}\n") + "\n}",
         cofirma_js + "\n}"])
     banco = open("vendor/btc.bundle.js", encoding="utf-8").read() + '''

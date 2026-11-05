@@ -188,3 +188,4 @@ collaudo_assistente_bot.py
 collaudo_cancella_account.py
 collaudo_wallet_unico.py
 collaudo_assistenza.py
+collaudo_unione_seme.py
