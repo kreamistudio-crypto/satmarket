@@ -78249,3 +78249,106 @@ chat e i due gemelli del client rispondono come il server.
 admin su Telegram e a uno su Nostr, e il tasto che apre la
 conversazione dentro la Mini App.
 
+
+## L'unione dei due account col seme on-chain unico (5 nov 2026, cantiere unione-seme, richiesta di Andrea)
+
+Andrea: «se ora un utente entra con telegram, poi entra con nostr, ma
+quell'account aveva già un account, si deve mergiare [...] se c'è qualche
+cosa che può andare in conflitto, lo segnali nella sezione admin»; e
+sulle chiavi on-chain: «il tutto si deve risolvere in automatico tenendo
+solo una seed phrase [...] quando però non ci sono ordini in corso». Poi,
+nel thread: il seme vecchio «può rimanere una settimana e poi
+automaticamente si cancella», «se il seme ha dei sats non deve essere
+cancellato», e «la seed phrase non può mai stare solo sul dispositivo».
+
+**L'UNIONE C'ERA GIÀ** (`esegui_fusione`, dal bot e dal 20 ott anche da
+«Entra anche con Nostr»), ma non sapeva niente dell'on-chain: le tabelle
+nate dopo (`onchain_ordini`, `onchain_indirizzi`, `p2p_onchain_ordini`,
+`swap_pagamenti`, `cambi_liberi`, `cambi_p2p`, `swap_auto_preferenze`)
+restavano intestate alla metà che muore, e il suo wallet (`wallet_unico`,
+`onchain_xpub`, `onchain_incasso`, `onchain_modo`) restava orfano. Nel
+telefono le parole stanno sotto il numero dell'account
+(`barattolo_onchain_<tg>`), quindi dopo l'unione il telefono della metà
+Nostr non le trovava più: un ordine on-chain di quella metà non avrebbe
+avuto chi firma.
+
+**COSA.**
+- LA GUARDIA. `_guardie_fusione` dice di no se una delle due metà ha
+  qualcosa di on-chain in corso, con chiunque (ordini, scambi P2P
+  on-chain, incassi col cambio, cambi in volo): lo stesso giudice della
+  cancellazione, estratto in `_impegni_onchain` (`_impegni_cancellazione`
+  lo chiama, il testo è lo stesso).
+- LO STORICO SEGUE. Le tabelle sopra passano all'account Telegram
+  (pigre: quella non ancora nata non ha niente da spostare).
+- IL SEME UNICO (`_unione_semi`). Vince il seme dell'account Telegram se
+  ne ha uno (è l'account che sopravvive, come per tutto il resto); se
+  non ce l'ha, passa quello della metà Nostr con la sua destinazione
+  firmata (stessa xpub, la firma vale ancora). Lo scartato va in
+  `unioni_semi` per IMPRONTA (mai parole né chiavi, come `wallet_unico`)
+  con `scade` a 7 giorni (`SEME_UNIONE_VIVE_S`); il seme che passa ha una
+  riga con `scade` 0, che dice al telefono «sposta queste parole sotto il
+  numero nuovo».
+- IL TELEFONO (`walletUnioneRonda`, una promessa per apertura, che la
+  cassa e l'accensione aspettano): legge `/api/wallet/unione`, sposta le
+  parole uniche e ne rifà le copie; lo scartato va fra le parole «di
+  prima» del 2 nov (localStorage e cloud di Telegram). Nella settimana
+  `onchainParolePerOrdine` fa firmare ogni ordine col seme la cui chiave
+  è davvero quella dell'ordine. Passata la settimana chiede
+  `/api/wallet/unione/lascia`: il server dice sì solo se nessun ordine
+  nato con quel seme è aperto e nessun suo indirizzo noto (il 2-di-3, il
+  rimborso, l'incasso) ha monete; una rete muta dice no. Solo dopo il sì
+  le parole se ne vanno (`walletDimenticaPrima`).
+- IL BACKUP OBBLIGATORIO (`onchainBackupObbligatorio`). Prima di un
+  ordine nuovo (la cassa) e prima di accendersi per ricevere, le parole
+  devono avere la copia nella casa da cui si entra: il cloud dentro
+  Telegram, i relay fuori. Se manca si prova a farla (solo per il
+  principale); se non riesce, l'on-chain si ferma e lo dice. Le firme
+  degli ordini già nati non passano da qui: fermarle chiuderebbe sats
+  che ci sono già.
+- I CONFLITTI AGLI ADMIN. `unioni_registro` tiene ogni unione con quel
+  che è stato scelto da solo (nome, Lightning address, due carrelli, due
+  profili P2P, due wallet); il cassetto «🔀 Unioni» del pannello
+  (`GET /api/admin/unioni`, `POST /api/admin/unioni/{id}/guardata`) le
+  mostra finché un moderatore non tocca «Guardata». L'avviso «Doppia
+  cittadinanza» dice quanti conflitti aspettano.
+
+**SCARTATO.** Fondere i due semi: due semi random non diventano uno.
+Unire comunque con un ordine on-chain aperto e far firmare col seme
+vecchio: è proprio il caso che Andrea non vuole («altrimenti è un grosso
+problema»). Cancellare lo scartato subito: un indirizzo pagato tardi
+resterebbe senza firma. Il saldo letto dal telefono: il server sa già
+quali indirizzi guardare e ha già la sonda di mempool.
+
+**L'ALTERNATIVA DI ANDREA** (cancellare l'account Nostr e ricollegarlo)
+funziona, ma è un ripiego: chi si cancella perde catalogo e storico, e
+la cancellazione in produzione è ancora spenta.
+
+**PROVATO.** `collaudo_unione_seme` (nuovo, in CI): la guardia con un
+ordine on-chain aperto e il passaggio a ordine chiuso, lo storico
+on-chain che segue, il seme Nostr che passa, i due semi col Telegram che
+vince e lo scartato a 7 giorni, il cassetto degli admin (403, conflitti
+a parole, «Guardata»), `lascia` (prima della settimana, ordine aperto,
+sats sul rimborso, rete muta, vuoto). `collaudo_fusione_da_telegram`,
+`collaudo_cancella_account` e `collaudo_wallet_unico` restano verdi.
+Suite intera severa su questo albero: 27.071 verdi, 0 rosse, 2 saltate
+per nostr-tools che nel container mancava; installato, le due sezioni
+(`prove_relay_di_barattolo`, `prove_annuncio_identita`) 97/0. Collaudi
+della CI: 118 verdi e 2 rossi al primo giro (`collaudo_cambio_onchain_p2p`
+e `collaudo_onchain_verso_lightning`: i loro banchi estraggono
+`onchainCofirma` a pezzi e non avevano `onchainParolePerOrdine`),
+aggiunta la riga ai due elenchi, 2/0. Tre sentinelle di prove.py
+aggiornate per la stessa ragione (i banchi delle firme e
+`prove_collega_npub_firma`, che esegue la guardia vera). Develop
+intanto è corso (i quattro commit dell'assistenza, `59892ed`..`cf96e1b`,
+di un'altra sessione): rebase, conflitti solo in coda a `ci/` e qui
+(tenute le due parti); sull'albero finale le quattro sezioni toccate
+121/0 e nove collaudi (unione, fusione, cancellazione, wallet unico, i
+due banchi delle firme, assistenza, account, più account) 9/0.
+
+**DA FARE (deciso da Andrea, non ancora qui).** Rimborsi e resti del
+compratore e il rimborso dello swap «aspettano il suo wallet», come per
+chi vende dal 27 ott: oggi vanno ancora al `/1/n` del suo seme. Solo
+dopo il testo delle 12 parole potrà dire «qui non ci saranno mai fondi,
+non importarle altrove». **DA GUARDARE.** Il giro dal vivo sul collaudo
+con due account veri; la pillola del backup per chi entra con Amber
+(la copia sui relay vuole la sua approvazione).

@@ -11758,6 +11758,56 @@ def account_insieme_admin(x_tg_init_data: str = Header(""),
     return [dict(r) for r in righe]
 
 
+@app.get("/api/admin/unioni")
+def unioni_admin(x_tg_init_data: str = Header(""),
+                 barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: le unioni di un account Nostr in uno Telegram con
+    qualcosa che l'unione ha risolto da sola scegliendo una parte (5 nov
+    2026, cantiere unione-seme, richiesta di Andrea: «se c'è qualche
+    cosa che può andare in conflitto, lo segnali nella sezione admin e
+    vediamo come risolverla»). Solo quelle con conflitti e non ancora
+    segnate «guardata». Il 403 prima di tutto, come le sorelle."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    try:
+        _unione_prepara(con)
+        righe = con.execute(
+            "SELECT r.id, r.tg_id, r.npub, r.conflitti, r.creato, u.nome "
+            "FROM unioni_registro r LEFT JOIN utenti u ON u.tg_id=r.tg_id "
+            "WHERE r.risolto=0 AND r.conflitti<>'[]' "
+            "ORDER BY r.id DESC LIMIT 100").fetchall()
+    finally:
+        con.close()
+    return [{"id": r["id"], "tg_id": r["tg_id"], "nome": r["nome"] or "",
+             "npub": _npub_breve(r["npub"] or ""),
+             "conflitti": json.loads(r["conflitti"] or "[]"),
+             "creato": r["creato"]} for r in righe]
+
+
+@app.post("/api/admin/unioni/{uid}/guardata")
+def unione_guardata_admin(uid: int, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: «l'ho guardata»: la riga esce dal cassetto, e resta
+    nel registro con chi l'ha chiusa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    try:
+        _unione_prepara(con)
+        n = con.execute("UPDATE unioni_registro SET risolto=1, risolto_da=? "
+                        "WHERE id=? AND risolto=0",
+                        (int(user["id"]), int(uid))).rowcount
+        con.commit()
+    finally:
+        con.close()
+    if not n:
+        raise HTTPException(404, "Non trovata")
+    return {"ok": True}
+
+
 @app.post("/api/logout/tutti")
 def logout_tutti(response: Response, x_tg_init_data: str = Header(""),
                  barattolo_sessione: str = Cookie(""),
@@ -19415,7 +19465,158 @@ def _guardie_fusione(con, n, p) -> str | None:
         # invece passano: restano una curiosita' nello storico.
         return ("⚖️ C'e' un affare ancora aperto tra questi due account: "
                 "chiudetelo prima, poi collegatevi.")
+    # L'ON-CHAIN IN CORSO, di una qualunque delle due meta' e con
+    # chiunque (5 nov 2026, cantiere unione-seme, regola di Andrea): dopo
+    # l'unione resta UN seme solo, e un ordine on-chain si firma col seme
+    # con cui e' nato. Finche' qualcosa e' in volo, i due semi non si
+    # toccano: si unisce dopo, a cose chiuse.
+    adesso = int(time.time())
+    for chi in (n, p):
+        voci = _impegni_onchain(con, chi["tg_id"], adesso)
+        if voci:
+            return ("⛓️ C'e' ancora qualcosa di on-chain in corso ("
+                    + voci[0] + "): aspetta che si chiuda, poi unisci "
+                    "i due account. Il wallet on-chain deve restare uno "
+                    "solo, e quello in corso va firmato con le sue parole.")
     return None
+
+
+# QUANTO VIVE IL SEME SCARTATO DA UN'UNIONE (5 nov 2026, Andrea): una
+# settimana. Basta a coprire un indirizzo nato e pagato in ritardo (un
+# indirizzo on-chain scade in 24 ore): in quella settimana il telefono
+# firma ancora con lui. Poi si cancella da solo, ma MAI se ha dei sats.
+SEME_UNIONE_VIVE_S = 7 * 86400
+
+
+def _unione_prepara(con):
+    """`unioni_registro`: una riga per ogni unione, con quel che e' stato
+    scartato (i CONFLITTI), da far vedere agli admin. `unioni_semi`: il
+    seme scartato, per IMPRONTA (pubblica, come in `wallet_unico`: mai
+    parole, mai chiavi), con la sua scadenza — il telefono lo legge e sa
+    che deve tenerlo da parte e poi lasciarlo andare."""
+    con.execute("""CREATE TABLE IF NOT EXISTS unioni_registro(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER NOT NULL,
+        da_id INTEGER NOT NULL,
+        npub TEXT DEFAULT '',
+        conflitti TEXT NOT NULL DEFAULT '[]',
+        risolto INTEGER DEFAULT 0,
+        risolto_da INTEGER DEFAULT 0,
+        creato INTEGER DEFAULT 0)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS unioni_semi(
+        tg_id INTEGER NOT NULL,
+        da_id INTEGER NOT NULL,
+        impronta TEXT NOT NULL,
+        xpub TEXT DEFAULT '',
+        scade INTEGER NOT NULL,
+        creato INTEGER DEFAULT 0,
+        PRIMARY KEY(tg_id, impronta))""")
+
+
+def _unione_semi(con, id_telegram: int, id_nostr: int, adesso: int) -> list:
+    """IL SEME UNICO. Ogni meta' puo' avere il suo wallet on-chain
+    (`wallet_unico` = l'impronta, `onchain_xpub` = la xpub dedicata, e
+    con loro la destinazione firmata e il modo d'incasso). Dopo l'unione
+    ne resta UNO: quello dell'account Telegram se ne ha uno (e' l'account
+    che sopravvive, come per tutto il resto), altrimenti passa quello
+    della meta' Nostr. Lo scartato non si butta: va in `unioni_semi` con
+    la sua scadenza. Torna i conflitti, a parole, per il registro."""
+    _wallet_prepara(con)
+    _onchain_prepara_tabelle(con)
+
+    def seme(tg):
+        w = con.execute("SELECT impronta FROM wallet_unico WHERE tg_id=?",
+                        (tg,)).fetchone()
+        x = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                        (tg,)).fetchone()
+        return (w["impronta"] if w else ""), (x["xpub"] if x else "")
+    it, xt = seme(id_telegram)
+    inn, xn = seme(id_nostr)
+    conflitti = []
+    vince_telegram = bool(it or xt)
+    if vince_telegram:
+        stesso = (inn and inn == it) or (xn and xn == xt)
+        if (inn or xn) and not stesso:
+            conflitti.append(
+                "due wallet on-chain: tenuto quello di Telegram"
+                + (f" ({it})" if it else "") + ", scartato quello di Nostr"
+                + (f" ({inn})" if inn else "") + " — resta nel telefono "
+                "per 7 giorni, poi si cancella se è vuoto")
+            if inn:
+                con.execute(
+                    "INSERT OR REPLACE INTO unioni_semi(tg_id, da_id, "
+                    "impronta, xpub, scade, creato) VALUES (?,?,?,?,?,?)",
+                    (id_telegram, id_nostr, inn, xn,
+                     adesso + SEME_UNIONE_VIVE_S, adesso))
+        elif stesso and inn:
+            con.execute(
+                "INSERT OR REPLACE INTO unioni_semi(tg_id, da_id, impronta, "
+                "xpub, scade, creato) VALUES (?,?,?,?,?,?)",
+                (id_telegram, id_nostr, inn, xn, 0, adesso))
+        for tab in ("wallet_unico", "onchain_xpub", "onchain_incasso",
+                    "onchain_modo"):
+            con.execute(f"DELETE FROM {tab} WHERE tg_id=?", (id_nostr,))
+    else:
+        # Telegram non ha un seme: passa quello della meta' Nostr, con
+        # la sua destinazione firmata (vale ancora: stessa xpub). Il modo
+        # d'incasso scelto da Telegram, se c'e', resta il suo.
+        for tab in ("wallet_unico", "onchain_xpub", "onchain_incasso",
+                    "onchain_modo"):
+            con.execute(f"UPDATE OR IGNORE {tab} SET tg_id=? WHERE tg_id=?",
+                        (id_telegram, id_nostr))
+            con.execute(f"DELETE FROM {tab} WHERE tg_id=?", (id_nostr,))
+        # Le parole del seme che passa stanno nel telefono sotto il
+        # numero della meta' Nostr: la riga con `scade` 0 dice al
+        # telefono «queste sono le parole UNICHE, spostale sotto il
+        # numero nuovo» (non scadono: sono il wallet dell'account).
+        if inn:
+            con.execute(
+                "INSERT OR REPLACE INTO unioni_semi(tg_id, da_id, impronta, "
+                "xpub, scade, creato) VALUES (?,?,?,?,?,?)",
+                (id_telegram, id_nostr, inn, xn, 0, adesso))
+    return conflitti
+
+
+def _unione_coda_admin(esito: dict) -> str:
+    """La coda dell'avviso agli admin: quanti conflitti aspettano nel
+    cassetto «🔀 Unioni» del pannello."""
+    n = int(esito.get("conflitti") or 0)
+    if not n:
+        return ""
+    return (f"\n⚠️ {n} conflitt{'o' if n == 1 else 'i'} risolt"
+            f"{'o' if n == 1 else 'i'} da solo: Admin → «🔀 Unioni»")
+
+
+def _unione_conflitti(con, n, p) -> list:
+    """Quel che l'unione risolve da sola scegliendo una parte, detto a
+    parole per gli admin. Si legge PRIMA di spostare le righe."""
+    out = []
+    tn, tp = n["tg_id"], p["tg_id"]
+    if (n["nome"] or "") and (n["nome"] or "") != (p["nome"] or ""):
+        out.append(f"nome diverso: tenuto «{p['nome'] or ''}», scartato "
+                   f"«{n['nome'] or ''}»")
+    if (n["ln_address"] and p["ln_address"]
+            and n["ln_address"] != p["ln_address"]):
+        out.append(f"due Lightning address: tenuto {p['ln_address']}, "
+                   f"scartato {n['ln_address']}")
+    try:
+        doppio = con.execute(
+            "SELECT COUNT(*) FROM carrello_salvato WHERE tg_id IN (?,?)",
+            (tn, tp)).fetchone()[0]
+        if doppio >= 2:
+            out.append("due carrelli salvati: tenuto quello di Telegram")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        mazzi = con.execute(
+            "SELECT COUNT(DISTINCT tg_id) FROM chiavi_p2p WHERE tg_id IN "
+            "(?,?)", (tn, tp)).fetchone()[0]
+        if mazzi >= 2:
+            out.append("due profili P2P: vale quello dell'account, l'altro "
+                       "va in pensione (finisce solo i suoi scambi)")
+    except sqlite3.OperationalError:
+        pass
+    return out
 
 
 def esegui_fusione(id_telegram: int, id_nostr: int):
@@ -19435,6 +19636,34 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         if errore:
             con.rollback()
             return errore
+        _unione_prepara(con)
+        adesso_unione = int(time.time())
+        conflitti = _unione_conflitti(con, n, p)
+        conflitti += _unione_semi(con, id_telegram, id_nostr, adesso_unione)
+        # GLI ORDINI ON-CHAIN E I CAMBI (5 nov 2026): prima non passavano,
+        # e lo storico on-chain della meta' Nostr restava intestato a un
+        # account che non c'e' piu'. Le guardie hanno gia' detto che
+        # niente e' in volo: qui si sposta lo storico. Le tabelle sono
+        # pigre: quella che non e' ancora nata non ha niente da spostare.
+        for tab, colonne in (
+                ("onchain_ordini", ("compratore_id", "venditore_id",
+                                    "proposta_da")),
+                ("onchain_indirizzi", ("compratore_id", "venditore_id")),
+                ("p2p_onchain_ordini", ("maker_id", "taker_id",
+                                        "depositante_id", "ricevente_id")),
+                ("swap_pagamenti", ("venditore_id",)),
+                ("cambi_liberi", ("tg_id",)),
+                ("cambi_p2p", ("tg_id",))):
+            ci_sono = _colonne_di(con, tab)
+            for col in colonne:
+                if col in ci_sono:
+                    con.execute(f"UPDATE {tab} SET {col}=? WHERE {col}=?",
+                                (id_telegram, id_nostr))
+        if "tg_id" in _colonne_di(con, "swap_auto_preferenze"):
+            con.execute("UPDATE OR IGNORE swap_auto_preferenze SET tg_id=? "
+                        "WHERE tg_id=?", (id_telegram, id_nostr))
+            con.execute("DELETE FROM swap_auto_preferenze WHERE tg_id=?",
+                        (id_nostr,))
         annunci = con.execute(
             "UPDATE annunci SET venditore_id=? WHERE venditore_id=?",
             (id_telegram, id_nostr)).rowcount
@@ -19980,9 +20209,15 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # (Specchiato, rodato...): valutazione silenziosa, li vedra'
         # al prossimo giro di Profilo.
         controlla_distintivi(con, id_telegram)
+        con.execute("INSERT INTO unioni_registro(tg_id, da_id, npub, "
+                    "conflitti, creato) VALUES (?,?,?,?,?)",
+                    (id_telegram, id_nostr, n["npub"] or "",
+                     json.dumps(conflitti, ensure_ascii=False),
+                     adesso_unione))
         con.commit()
         return {"annunci": annunci, "ordini": acquisti + vendite,
-                "npub": n["npub"], "negozio": p["negozio"]}
+                "npub": n["npub"], "negozio": p["negozio"],
+                "conflitti": len(conflitti)}
     except Exception:
         con.rollback()
         raise
@@ -21237,7 +21472,8 @@ async def gestisci_callback(cb: dict):
         "Telegram arrivano anche per gli affari nati su Nostr.\n"
         + coda)
     await notifica_admin(f"🔗 Doppia cittadinanza: "
-                         f"{_npub_breve(esito['npub'])} → tg {dati[0]}",
+                         f"{_npub_breve(esito['npub'])} → tg {dati[0]}"
+                         + _unione_coda_admin(esito),
                          argomento="riepiloghi")
 
 
@@ -69750,7 +69986,8 @@ async def unisci_nostr(req: Request, x_tg_init_data: str = Header(""),
     await premia_distintivi(dati[0])
     await premia_reputazione_nostr(dati[0])
     await notifica_admin(f"🔗 Doppia cittadinanza dal web: "
-                         f"{_npub_breve(esito['npub'])} → tg {dati[0]}",
+                         f"{_npub_breve(esito['npub'])} → tg {dati[0]}"
+                         + _unione_coda_admin(esito),
                          argomento="riepiloghi")
     return {"ok": True, "npub": esito["npub"], "npub_verificata": True,
             "npub_accesso": True, "annunci": esito["annunci"],
@@ -101742,6 +101979,118 @@ async def wallet_unico_leggi(x_tg_init_data: str = Header(""),
         con.close()
 
 
+@app.get("/api/wallet/unione")
+async def wallet_unione_leggi(x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """I SEMI DI UN'UNIONE (5 nov 2026, cantiere unione-seme). Dopo
+    l'unione di un account Nostr in questo, le parole della meta' Nostr
+    stanno nel telefono sotto il SUO numero (`da_id`): qui il telefono
+    legge quali impronte cercare. `scade` 0 = sono le parole uniche
+    dell'account, da spostare sotto il numero nuovo; `scade` > 0 = il
+    seme scartato, da tenere da parte fino a quel giorno. Solo impronte
+    e numeri: niente che si spenda."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        _unione_prepara(con)
+        return {"semi": [
+            {"da_id": int(r["da_id"]), "impronta": r["impronta"],
+             "scade": int(r["scade"] or 0)}
+            for r in con.execute(
+                "SELECT da_id, impronta, scade FROM unioni_semi "
+                "WHERE tg_id=? ORDER BY creato", (int(user["id"]),))]}
+    finally:
+        con.close()
+
+
+def _seme_unione_indirizzi(con, xpub: str):
+    """IL SEME SCARTATO HA ANCORA QUALCOSA? Quel che il server sa di
+    quella xpub: gli ordini on-chain nati con lei che non sono chiusi
+    (il motivo a parole), e gli indirizzi che le appartengono da
+    guardare in rete — il 2-di-3 (un pagamento arrivato tardi) e le
+    uscite fotografate verso di lei (rimborso, incasso). Pura sulla
+    connessione: la rete la guarda chi chiama, a connessione chiusa."""
+    if not xpub:
+        return "", []
+    _onchain_prepara_tabelle(con)
+    righe = con.execute(
+        "SELECT id, indirizzo, xpub_compratore FROM onchain_indirizzi "
+        "WHERE xpub_compratore=? OR xpub_venditore=?",
+        (xpub, xpub)).fetchall()
+    indirizzi = set()
+    oc = _colonne_di(con, "onchain_ordini")
+    for r in righe:
+        indirizzi.add(r["indirizzo"])
+        if "stato" not in oc:
+            continue
+        o = con.execute("SELECT stato, rimborso, incasso FROM onchain_ordini "
+                        "WHERE indirizzo_id=?", (r["id"],)).fetchone()
+        if not o:
+            continue
+        if o["stato"] in ("attesa", "pagato"):
+            return "c'è ancora un ordine on-chain aperto nato con lui", []
+        lato = "rimborso" if r["xpub_compratore"] == xpub else "incasso"
+        if o[lato]:
+            indirizzi.add(o[lato])
+    return "", sorted(indirizzi)
+
+
+async def _indirizzi_con_sats(indirizzi: list) -> str:
+    """'' se nessuno ha monete; sennò il motivo. Una rete muta non e'
+    una rete vuota: dice di no."""
+    for ind in indirizzi:
+        try:
+            if await onchain_mempool_utxo(ind):
+                return "ci sono ancora dei sats su un suo indirizzo"
+        except Exception:
+            return "la rete non risponde: riprovo più tardi"
+    return ""
+
+
+@app.post("/api/wallet/unione/lascia")
+async def wallet_unione_lascia(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """IL TELEFONO CHIEDE SE PUO' LASCIARE ANDARE UN SEME DI UN'UNIONE.
+    Con `scade` 0 la riga era solo l'indirizzo per trovare le parole
+    uniche: spostate, la riga se ne va. Col seme scartato si dice si'
+    SOLO se la settimana e' passata E non ha piu' niente dentro (regola
+    di Andrea: con dei sats non si cancella mai). Il telefono cancella
+    le parole solo dopo questo si'."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("wallet_unico", user["id"])
+    d = await leggi_json(req)
+    impronta = d.get("impronta")
+    impronta = impronta.strip().lower() if isinstance(impronta, str) else ""
+    if not _WALLET_IMPRONTA_FORMA.match(impronta):
+        raise HTTPException(400, "Impronta non valida")
+    con = db()
+    try:
+        _unione_prepara(con)
+        r = con.execute("SELECT * FROM unioni_semi WHERE tg_id=? AND "
+                        "impronta=?", (int(user["id"]), impronta)).fetchone()
+        if not r:
+            return {"libero": True, "motivo": ""}
+        scade = int(r["scade"] or 0)
+        if scade and scade > int(time.time()):
+            return {"libero": False, "motivo": "la settimana non è passata"}
+        motivo, indirizzi = (_seme_unione_indirizzi(con, r["xpub"] or "")
+                             if scade else ("", []))
+    finally:
+        con.close()
+    if not motivo and indirizzi:
+        motivo = await _indirizzi_con_sats(indirizzi)
+    if motivo:
+        return {"libero": False, "motivo": motivo}
+    con = db()
+    try:
+        con.execute("DELETE FROM unioni_semi WHERE tg_id=? AND impronta=?",
+                    (int(user["id"]), impronta))
+        con.commit()
+    finally:
+        con.close()
+    return {"libero": True, "motivo": ""}
+
+
 @app.post("/api/wallet/unico")
 async def wallet_unico_registra(req: Request, x_tg_init_data: str = Header(""),
                                 barattolo_sessione: str = Cookie("")):
@@ -102077,6 +102426,17 @@ def _impegni_cancellazione(con, tg_id: int) -> list:
         voci.append(f"disputa P2P {str(d['ordine'])[:8]}…: aspetta la "
                     f"decisione del moderatore")
     # 5) LE TABELLE PIGRE: on-chain, scambi on-chain, cambi
+    voci.extend(_impegni_onchain(con, tg, adesso))
+    return voci
+
+
+def _impegni_onchain(con, tg: int, adesso: int) -> list:
+    """LE TABELLE PIGRE: on-chain, scambi on-chain, cambi. Estratte da
+    `_impegni_cancellazione` (5 nov 2026, cantiere unione-seme) perche'
+    le legge anche l'unione dei due account: un ordine on-chain in corso
+    va firmato dal seme con cui e' nato, e unire i semi sotto i suoi
+    piedi lo lascerebbe senza chi firma. Righe leggibili, come il resto."""
+    voci = []
     if "stato" in _colonne_di(con, "onchain_ordini"):
         for o in con.execute(
                 "SELECT id FROM onchain_ordini WHERE stato IN "

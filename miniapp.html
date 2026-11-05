@@ -49705,6 +49705,13 @@ async function loadAdminStats(){
         {headers:{'X-Tg-Init-Data':authHdr()}});
       admInsieme = ri.ok ? await ri.json() : null;
     } catch(e) { admInsieme = null; }
+    /* le unioni con dei conflitti (5 nov 2026): una fetch sempre, il
+       cassetto c'e' solo con qualcosa dentro */
+    try {
+      const ru = await fetch(`${API_BASE}/admin/unioni`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      admUnioni = ru.ok ? await ru.json() : null;
+    } catch(e) { admUnioni = null; }
     let rev = [];
     if (s.in_revisione) {
       try {
@@ -49848,6 +49855,7 @@ async function loadAdminStats(){
       ${boxRacconti(admRacconti)}
       ${boxSponsor(admSponsor)}
       ${boxInsieme(admInsieme)}
+      ${boxUnioni(admUnioni)}
       ${decisi.length ? cassettoAdm('accAdmDecisi', '↩︎',
         'Decisi di recente', decisi.length, `
         <div class="sub">Si può ancora ripensarci: rimette l'annuncio in attesa.</div>
@@ -50776,6 +50784,48 @@ function boxRacconti(lista){
    o si recensiscono NON si bloccano — si annota, e qui il moderatore
    legge chi, l'altro, cosa e quando. Niente IP ne' impronte: e' tutto
    quel che il server sa. Il cassetto c'e' solo con qualcosa dentro. */
+/* «🔀 UNIONI» (5 nov 2026, cantiere unione-seme, Andrea: «se c'è qualche
+   cosa che può andare in conflitto, lo segnali nella sezione admin e
+   vediamo come risolverla»). L'unione di un account Nostr in uno
+   Telegram sceglie da sola una parte quando le due dicono cose diverse
+   (il nome, il Lightning address, il carrello, il profilo P2P, il wallet
+   on-chain): qui il moderatore legge cosa ha tenuto e cosa ha scartato.
+   «Guardata» la toglie dal cassetto. */
+let admUnioni = null;
+function boxUnioni(lista){
+  if (!Array.isArray(lista) || !lista.length) return '';
+  const righe = lista.map(x => {
+    const quando = new Date((Number(x.creato) || 0) * 1000).toLocaleString('it-IT',
+      {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+    const voci = (Array.isArray(x.conflitti) ? x.conflitti : [])
+      .map(c => `<li>${esc(String(c))}</li>`).join('');
+    return `<div class="order">
+        <b>${esc(x.nome || 'senza nome')}</b>
+        <div class="sub">${esc(x.npub || '')} · ${esc(quando)}</div>
+        <ul class="sub" style="margin:6px 0 8px 18px;padding:0">${voci}</ul>
+        <button class="btn ghost" onclick="unioneGuardata(${Number(x.id) || 0}, this)">✓ Guardata</button>
+      </div>`;
+  }).join('');
+  return cassettoAdm('accAdmUnioni', '🔀', 'Unioni',
+    `${lista.length}`, `
+    <div class="sub">Account Nostr uniti a un account Telegram, dove le due parti dicevano cose diverse. L'unione ha già scelto: qui vedete cosa ha tenuto e cosa ha scartato.</div>
+    <div style="margin-top:10px">${righe}</div>`);
+}
+async function unioneGuardata(id, btn){
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch(`${API_BASE}/admin/unioni/${Number(id) || 0}/guardata`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    if (r.ok && Array.isArray(admUnioni)) {
+      admUnioni = admUnioni.filter(x => x.id !== id);
+      const riga = btn && btn.closest('.order');
+      if (riga) riga.remove();
+      return;
+    }
+  } catch(e){}
+  if (btn) btn.disabled = false;
+  toast('Non riesco a segnarla: riprova');
+}
 let admInsieme = null;
 function boxInsieme(lista){
   if (!Array.isArray(lista) || !lista.length) return '';
@@ -56976,6 +57026,117 @@ let onchainSrv = null;         // quel che il server dice (xpub, strada)
 /* (wallet-unico) LE DOMANDE AL SERVER, fuori dal banco del seme: viaggiano
    solo l'impronta e i numeri dei cambi, mai le parole (la sentinella del
    banco conta le fetch la' dentro, e devono restare zero) */
+/* L'UNIONE DI DUE ACCOUNT E IL SEME UNICO (5 nov 2026, cantiere
+   unione-seme; sta QUI, fuori dal banco delle chiavi, perche' parla
+   col server — il banco non ha nessuna fetch, ed e' provato; Andrea: «il tutto si deve risolvere in automatico tenendo
+   solo una seed phrase da backuppare su telegram e nostr»). Dopo che un
+   account Nostr si e' unito a questo, le sue parole stanno nel telefono
+   sotto il numero di PRIMA (`barattolo_onchain_<da_id>`), e il conto
+   ha un numero nuovo. Il server dice quali impronte cercare
+   (`/api/wallet/unione`), mai le parole:
+   - `scade` 0: sono le parole UNICHE dell'account → si spostano sotto il
+     numero nuovo (se qui non ce ne sono gia');
+   - `scade` > 0: e' il seme SCARTATO → va fra le parole «di prima», dove
+     per una settimana firma ancora da solo gli ordini nati con lui
+     (`onchainParolePerOrdine`). Passata la settimana si chiede al server
+     se e' vuoto, e solo col suo si' le parole se ne vanno: con dei sats
+     dentro non si cancellano mai (regola di Andrea).
+   Gira una volta per apertura, in silenzio. */
+let walletUnionePromessa = null;
+/* una promessa sola per apertura: chi arriva dopo (la cassa, l'accensione)
+   aspetta che le parole siano gia' al loro posto */
+function walletUnioneRonda(){
+  if (DEMO) return Promise.resolve();
+  if (!walletUnionePromessa) walletUnionePromessa = walletUnioneGiro().catch(() => {});
+  return walletUnionePromessa;
+}
+async function walletUnioneGiro(){
+  let semi = [];
+  try {
+    const r = await fetch(`${API_BASE}/wallet/unione`, {headers: {'X-Tg-Init-Data': authHdr()}});
+    if (!r.ok) return;
+    semi = (await r.json()).semi || [];
+  } catch(e){ return; }
+  if (!semi.length) return;
+  const lascia = async (impronta) => {
+    try {
+      const r = await fetch(`${API_BASE}/wallet/unione/lascia`, {method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+        body: JSON.stringify({impronta})});
+      return r.ok ? !!(await r.json()).libero : false;
+    } catch(e){ return false; }
+  };
+  for (const s of semi) {
+    const chiaveDi = `barattolo_onchain_${Number(s.da_id) || 'x'}`;
+    let quelle = '';
+    try { quelle = localStorage.getItem(chiaveDi) || ''; } catch(e){ quelle = ''; }
+    let imp = '';
+    try { imp = quelle ? await onchainImpronta(quelle) : ''; } catch(e){ imp = ''; }
+    const sono = imp && imp === s.impronta;
+    if (!s.scade) {
+      /* le parole uniche: sotto il numero nuovo, e la copia nelle due case */
+      const qui = onchainSemeLocale();
+      if (sono && !qui && onchainScriviLocale(quelle)) {
+        try { localStorage.removeItem(chiaveDi); } catch(e){}
+        try { await onchainMettiAlSicuro(quelle); } catch(e){}
+      }
+      let quiImp = '';
+      try { quiImp = onchainSemeLocale() ? await onchainImpronta(onchainSemeLocale()) : ''; } catch(e){}
+      if (quiImp === s.impronta) await lascia(s.impronta);
+      continue;
+    }
+    /* il seme scartato: fra le parole «di prima», con la sua scadenza */
+    if (sono) {
+      const fatto = await walletConservaPrima(quelle);
+      if (fatto) { try { localStorage.removeItem(chiaveDi); } catch(e){} }
+    }
+    const l = walletParolePrima();
+    const x = l.find(v => v.impronta === s.impronta);
+    if (!x) continue;
+    if (!x.scade) {
+      x.scade = Number(s.scade) * 1000;
+      try { localStorage.setItem(walletPrimaChiave(), JSON.stringify(l)); } catch(e){}
+    }
+    if (Date.now() < Number(s.scade) * 1000) continue;
+    /* passata la settimana: via SOLO se il server dice che e' vuoto */
+    if (await lascia(s.impronta)) walletDimenticaPrima(s.impronta);
+  }
+}
+/* Toglie un seme «di prima» dal telefono e dal cloud di Telegram. La
+   chiama solo il si' del server: vuoto e scaduto. */
+async function walletDimenticaPrima(impronta){
+  const l = walletParolePrima().filter(x => x.impronta !== impronta);
+  try { localStorage.setItem(walletPrimaChiave(), JSON.stringify(l)); } catch(e){}
+  try { await cloudScrivi(ONCHAIN_CLOUD_PRIMA, JSON.stringify(l.map(x => ({impronta: x.impronta, parole: x.parole})))); }
+  catch(e){}
+}
+
+/* IL BACKUP E' OBBLIGATORIO (5 nov 2026, Andrea: «la seed phrase non può
+   mai stare solo sul dispositivo [...] se entra con nostr, finché non
+   stanno sui relay in modo cifrato non si può avere la seed phrase, idem
+   con telegram»). Prima di un ordine on-chain nuovo — pagare, o
+   accendersi per ricevere — le parole devono avere la copia nella casa
+   da cui si entra: il cloud dentro Telegram, i relay fuori. Se manca si
+   prova a farla adesso; se non riesce, l'on-chain si ferma e lo dice.
+   Le FIRME degli ordini gia' nati non passano da qui: fermarle
+   chiuderebbe dei sats che ci sono gia'. */
+async function onchainBackupObbligatorio(parole){
+  const imp = await onchainImpronta(parole);
+  const casa = cloudTelegram() ? 'nuvola' : 'relay';
+  if (walletCopieLette(imp)[casa]) return;
+  /* si copia solo il principale: le parole di un secondo wallet non
+     devono finire sopra la copia di quello vero */
+  let st = null;
+  try { st = await walletUnicoLeggi(); } catch(e){ st = null; }
+  if (st && (!st.impronta || st.impronta === imp)) {
+    try { await onchainMettiAlSicuro(parole); } catch(e){}
+  }
+  if (walletCopieLette(imp)[casa]) return;
+  throw new Error(casa === 'nuvola'
+    ? 'Prima salva le parole del wallet di Barattolo nel cloud di Telegram: senza una copia fuori dal telefono l\'on-chain non parte. Riprova fra un momento.'
+    : 'Prima salva le parole del wallet di Barattolo sui relay Nostr, cifrate con la tua chiave: senza una copia fuori dal telefono l\'on-chain non parte. Apri Profilo → «Il wallet di Barattolo» → «Salva il backup».');
+}
+
 function walletServerMuto(){
   const e = new Error('Barattolo ora non risponde: non faccio nascere un '
     + 'wallet nuovo, riprova fra un momento.');
@@ -58220,7 +58381,9 @@ async function onchainOrdineDallaCassa(){
     if (!r.ok) throw new Error('on-chain spento su questo server');
     srv = await r.json();
   }
+  await walletUnioneRonda();
   const parole = await onchainSemeAssicurato();
+  await onchainBackupObbligatorio(parole);
   const miaXpub = await onchainMiaXpub(parole, srv);
   if (srv.mia_xpub !== miaXpub) {
     const q = await fetch(`${API_BASE}/onchain/xpub`, {method: 'POST',
@@ -58603,7 +58766,7 @@ async function onchainFirmaProposta(oid, verso){
   if (!o) o = (await onchainLeggiOrdini()).find(x => x.id === oid);
   if (!o) throw new Error('ordine on-chain non trovato');
   const B = await caricaBitcoin();
-  const parole = onchainSemeLocale();
+  const parole = onchainParolePerOrdine(B, onchainSemeLocale(), o);
   if (!parole) throw new Error('su questo dispositivo non c\'è la tua chiave');
   const io = onchainMieChiavi(B, parole, o);
   if (B.hex.encode(io.firma.publicKey) !== o.indirizzo.chiavi[o.ruolo])
@@ -58639,8 +58802,27 @@ async function onchainFirmaProposta(oid, verso){
    del no ('' = firmata e trasmessa). Si firma solo se la transazione
    spende le monete dell'ordine, paga a una chiave del MIO seme quel
    che mi spetta, e lascia alla rete al piu' il margine. */
+/* LE PAROLE GIUSTE PER QUESTO ORDINE (5 nov 2026, cantiere unione-seme):
+   un ordine si firma col seme con cui e' nato. Di solito e' quello di
+   adesso; dopo un'unione di account, nella settimana di grazia, puo'
+   essere il seme scartato che sta fra le parole «di prima». Si prova il
+   principale e poi quelle, e vince quella la cui chiave e' DAVVERO
+   quella dell'ordine — nessuna si fida del server. */
+function onchainParolePerOrdine(B, parole, o){
+  const giusta = p => {
+    try {
+      const io = onchainMieChiavi(B, p, o);
+      return B.hex.encode(io.firma.publicKey) === o.indirizzo.chiavi[o.ruolo];
+    } catch(e){ return false; }
+  };
+  if (!parole || giusta(parole) || typeof walletParolePrima !== 'function') return parole;
+  const tutte = walletParolePrima().map(x => x.parole).filter(Boolean);
+  return tutte.find(giusta) || parole;
+}
+
 async function onchainCofirma(o, parole){
   const B = await caricaBitcoin();
+  parole = onchainParolePerOrdine(B, parole, o);
   const io = onchainMieChiavi(B, parole, o);
   if (B.hex.encode(io.firma.publicKey) !== o.indirizzo.chiavi[o.ruolo])
     return 'la chiave dell\'ordine non è del tuo seme';
@@ -58765,7 +58947,9 @@ async function onchainAccendiDaSolo(){
     if (!r.ok) return;
     const srv = await r.json();
     if (srv.mia_xpub) return;
+    await walletUnioneRonda();
     const parole = await onchainSemeAssicurato();
+    await onchainBackupObbligatorio(parole);
     const xpub = await onchainMiaXpub(parole, srv);
     const q = await fetch(`${API_BASE}/onchain/xpub`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
@@ -95794,6 +95978,9 @@ async function avvia(){
     /* ...e l'on-chain si accende da solo (27 ott 2026) */
     if (myOnchain) setTimeout(onchainAccendiDaSolo, 4000);
     /* ...e la ronda del backup del wallet di Barattolo (wallet-unico) */
+    /* ...e il seme unico dopo un'unione di account (5 nov 2026): prima
+       della ronda del backup, che cosi' copre le parole gia' spostate */
+    setTimeout(() => { walletUnioneRonda().catch(() => {}); }, 5000);
     setTimeout(() => { walletBackupRonda().catch(() => {}); }, 6000);
     allineaContoP2P();   // il P2P sul dispositivo si lega a QUESTO conto (vedi «IL CONTO SUL DISPOSITIVO»)
     aggiornaAdmDot(me.in_revisione || 0);   // il pallino dei moderatori

@@ -123,6 +123,7 @@ def pezzi_pagina():
         "function onchainFirmataDaChiVende(B, tx, o, w){",
         "function onchainUsciteVersoVenditore(o, incasso, piuVb){",
         "function onchainPsbtFirmata(B, o, io, w, uscite){",
+        "function onchainParolePerOrdine(B, parole, o){",
         "async function onchainCofirma(o, parole){",
         "function onchainNomeCambio(p){", "function onchainFatturaPerche(perche, p){",
         "function onchainCambioRidisegna(o){", "function onchainCambioBlocco(o){",
