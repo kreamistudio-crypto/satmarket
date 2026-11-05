@@ -69982,7 +69982,7 @@ def prove_nav_p2p():
     prova("il tocco sul tab scuote il logo, anche sul gia' attivo",
           True, "if (!senzaScossa) scuotiLogoP2P();" in _sl
           and _sl.index("scuotiLogoP2P()")
-              < _sl.index("if (lato === p2pLato) return;"))
+              < _sl.index("if (lato === p2pLato) { if (typeof vestiTastoBzP2P === 'function') vestiTastoBzP2P(); return; }"))
     prova("...e i due tab chiamano setLatoP2P col solo lato: la scossa c'e'",
           [1, 1], [mini.count('onclick="setLatoP2P(\'compro\')"'),
                    mini.count('onclick="setLatoP2P(\'vendo\')"')])
@@ -70548,7 +70548,7 @@ def prove_nav_p2p():
     # (24 set 2026) a «Vendi BTC» il + SALE DI PIU' (31 invece di 15) per
     # far posto alla B nella tendina: stessa media, prima del neutro
     _gr = ("@media (max-width:767px){\n"
-           "    body.nav-p2p.p2p-vendo nav button.sell .ic{transform:translateY(-31px)}\n"
+           "    body.nav-p2p nav button.sell .ic{transform:translateY(-31px)}\n"
            "    body.nav-p2p.p2p-piu-neutro nav button.sell .ic{")
     prova("il + fuori dal libro sta sotto i 768px, dopo il rosso", True,
           _gr in css)
@@ -71386,10 +71386,22 @@ def prove_tasto_barattozon():
     prova("...ma si comporta da bottone: ruolo, Tab, nome, Invio e spazio",
           [True] * 5,
           ['role="button"' in _tag, 'tabindex="0"' in _tag,
-           'aria-label="Vendi con Barattozon: contanti al tabacchino"' in _tag,
+           'aria-label="Barattozon: contanti al tabacchino"' in _tag,
            'onclick="toccaTendinaP2P()"' in _tag,
            "if(event.key==='Enter'||event.key===' ')"
            "{event.preventDefault();toccaTendinaP2P()}" in _tag])
+    # (5 nov 2026, Barattozon anche in compra) il nome segue il lato: lo
+    # scrive vestiTastoBzP2P, chiamata da setLatoP2P anche col lato fermo
+    # (cosi' vale anche al primo giro)
+    _vb = pezzo_js(mini, "function vestiTastoBzP2P(){", "\n}\n")
+    prova("...e il nome dice il lato: «Compra con» o «Vendi con» Barattozon",
+          [True, True, 2],
+          ["'Compra con Barattozon: contanti al tabacchino'" in _vb
+           and "'Vendi con Barattozon: contanti al tabacchino'" in _vb,
+           "if (lato === p2pLato) { if (typeof vestiTastoBzP2P === 'function') vestiTastoBzP2P(); return; }"
+           in pezzo_js(mini, "function setLatoP2P(lato, senzaScossa){", "\n}\n"),
+           pezzo_js(mini, "function setLatoP2P(lato, senzaScossa){", "\n}\n")
+           .count("if (typeof vestiTastoBzP2P === 'function') vestiTastoBzP2P();")])
     prova("...col logo 41x40, e l'immagine che manca si toglie", True,
           '<img src="/assets/barattozon-tasto.webp" width="41" height="40" '
           'alt="" onerror="this.remove()"></div></div>' in barra)
@@ -71400,7 +71412,8 @@ def prove_tasto_barattozon():
     _sel = sorted(_norm(s) for s, _c in
                   re.findall(r"([^{}]+)\{([^{}]*)\}", senza)
                   if "navBarattozon" in s or "navTendina" in s)
-    VISTO = ("body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) "
+    # (5 nov 2026) ai due lati: Barattozon anche in compra
+    VISTO = ("body.nav-p2p:not(.p2p-piu-neutro):not(.barra-via) "
              "#navBarattozon")
     # sedici regole e nessuna di piu': chi ne aggiunge una la scrive qui, e
     # soprattutto nessun'altra la ACCENDE — il giudice e' uno.
@@ -71410,15 +71423,16 @@ def prove_tasto_barattozon():
     # ferma sotto il fantasma della tasca che se ne sono andate con lei;
     # (sesto giro) il binario non c'e' piu', e le regole che lo nominavano
     # nominano la sola capsula
-    prova("le regole della tendina e del suo telaio sono queste sedici", sorted([
+    # (5 nov 2026) quindici: la regola del telaio a «Vendi» e' caduta, la
+    # capsula e' la stessa ai due lati
+    prova("le regole della tendina e del suo telaio sono queste quindici", sorted([
         "#navTendina", "body.nav-p2p #navTendina",
-        "body.nav-p2p.p2p-vendo #navTendina",
         "body.nav-p2p.p2p-piu-neutro #navTendina",
         "#navBarattozon", "#navBarattozon img", "#navBarattozon:focus-visible",
         VISTO, "#navBarattozon::before", "#navBarattozon::after",
         "body.p2p-sopra #navBarattozon::after,body.p2p-sopra nav::after",
         "body.p2p-trascina #navTendina,body.p2p-trascina #navBarattozon",
-        "body.nav-p2p.p2p-vendo.p2p-binario:not(.p2p-piu-neutro):not(.barra-via) "
+        "body.nav-p2p.p2p-binario:not(.p2p-piu-neutro):not(.barra-via) "
         "#navBarattozon",
         "body.capsula-via #navTendina",
         "#navTendina,#navBarattozon,#navBarattozon::after,nav::after",
@@ -71466,10 +71480,13 @@ def prove_tasto_barattozon():
     _m_pad = re.search(r"padding:\s*([\d.]+)px", _nav)
     _lato = _px(_casa, "width")
     _su_compra = _sale(_regola(mini, "  body.nav-p2p nav button.sell .ic{transform:translateY(", "}"))
-    _su_vendi = _sale(_regola(mini, "    body.nav-p2p.p2p-vendo nav button.sell .ic{transform:", "}"))
+    # (5 nov 2026) la salita da 31 vale ai due lati del libro, sotto i 768px
+    _su_vendi = _sale(_regola(mini, "    body.nav-p2p nav button.sell .ic{transform:", "}"))
     _su_fuori = _sale(_regola(mini, "    body.nav-p2p.p2p-piu-neutro nav button.sell .ic{transform:", "}"))
-    prova("a «Vendi BTC» il + sale di piu' — 31 invece di 15 — e fuori dal "
-          "libro non sale", [-15.0, -31.0, 0.0], [_su_compra, _su_vendi, _su_fuori])
+    # (5 nov 2026) i 31 valgono ai due lati sotto i 768px (Barattozon anche
+    # in compra): i 15 restano la regola senza media, la sola fuori dal telefono
+    prova("nel libro il + sale di 31 (il posto della B), 15 senza media, e "
+          "fuori dal libro non sale", [-15.0, -31.0, 0.0], [_su_compra, _su_vendi, _su_fuori])
     _equatore = (float(_m_pad.group(1)) + _px(_casa, "margin-top") + _su_vendi + _lato / 2
                  if _m_pad and _lato and _su_vendi is not None
                  and _px(_casa, "margin-top") is not None else None)
@@ -71493,12 +71510,12 @@ def prove_tasto_barattozon():
     # scende di quanto il + sta piu' in basso che a «Vendi»
     _tel_stati = {"mercatino": _sale(_tel),
                   "compra": _sale(_regola(css, "  body.nav-p2p #navTendina{", "}")),
-                  "vendi": _sale(_regola(css, "  body.nav-p2p.p2p-vendo #navTendina{", "}")),
+                  "vendi": _sale(_regola(css, "  body.nav-p2p #navTendina{", "}")),
                   "fuori": _sale(blocco_media("@media (max-width:767px){\n"
                                               "    body.nav-p2p.p2p-piu-neutro #navTendina{"))}
     prova("il telaio segue il + in ogni stato: la sua cima e' sempre l'equatore",
           {"mercatino": 0.0 - _su_vendi if _su_vendi is not None else None,
-           "compra": (_su_compra - _su_vendi) if None not in (_su_compra, _su_vendi) else None,
+           "compra": 0.0,
            "vendi": 0.0,
            "fuori": (_su_fuori - _su_vendi) if None not in (_su_fuori, _su_vendi) else None},
           _tel_stati)
@@ -71992,7 +72009,7 @@ def prove_tasto_barattozon():
     _stato = mini[_i:mini.index("let p2pNuovoEuroVia = '';", _i)
                   + len("let p2pNuovoEuroVia = '';")]
     banco = ("\n".join(_riga(n) for n in ("P2P_VALUTE", "P2P_METODI",
-                                           "P2P_TABACCHINO")) + "\n"
+                                           "P2P_TABACCHINO", "P2P_TABACCHINO_PM")) + "\n"
              + _stato + "\n"
              + "".join(_una(f) for f in (
                  "function metodiPubblicabiliP2P(lato){",
@@ -72001,6 +72018,8 @@ def prove_tasto_barattozon():
                  # (7 ott 2026) il passo 2 e 3 dal giudizio della spia
                  "function giudizioTappaTabP2P(n, v){",
                  "function apriNuovoOrdineP2P(metodo){",
+                 # (5 nov 2026) la fascia nasce aperta col tabacchino in compra
+                 "function metodoBaseP2P(m){", "function tabacchinoP2P(metodi){",
                  "function apriBarattozonP2P(){"))
              + r"""
 let DEMO = false, VETRINA = false, myTgId = 111, p2pLato = 'vendo';
@@ -72024,7 +72043,7 @@ caso('tondo', () => { p2pLato = 'vendo'; p2pNuovoMetodi = ['SEPA', 'Revolut'];
   apriBarattozonP2P(); return {passi, metodi: p2pNuovoMetodi, passo: passo()}; });
 /* se il lato non e' quello, il tabacchino non si mette di nascosto */
 caso('compro', () => { p2pLato = 'compro'; apriBarattozonP2P();
-  return {passi, metodi: p2pNuovoMetodi}; });
+  return {passi, metodi: p2pNuovoMetodi, due: p2pNuovoDue}; });
 /* il + apre lo stesso foglio senza metodo, come sempre */
 caso('piu', () => { p2pLato = 'vendo'; apriNuovoOrdineP2P();
   return {passi, metodi: p2pNuovoMetodi}; });
@@ -72056,9 +72075,12 @@ console.log(JSON.stringify(out));
     # ⚠️ ROVESCIATA IL 31 OTT 2026 (Barattozon anche in compra): il
     # giudice dei metodi lo offre ai due lati, quindi anche su «Compra
     # BTC» il foglio nasce col tabacchino (la fascia, senza percorso)
-    prova("...e su «Compra BTC» il tabacchino si mette anche li'", {
+    # (5 nov 2026, il tasto anche in compra) e la fascia nasce coi due
+    # campi a vista: in compra il massimo e' obbligatorio
+    prova("...e su «Compra BTC» il tabacchino si mette anche li', coi due "
+          "campi della fascia gia' aperti", {
               "passi": ["disegno:" + T, "sheetBg open", "morfosi:" + T,
-                        "p2pNuovoSheet open"], "metodi": [T]}, out["compro"])
+                        "p2pNuovoSheet open"], "metodi": [T], "due": True}, out["compro"])
     prova("il + apre lo stesso foglio senza metodo, come sempre", {
               "passi": ["disegno:", "sheetBg open", "morfosi:",
                         "p2pNuovoSheet open"], "metodi": []}, out["piu"])
@@ -72239,7 +72261,8 @@ caso('vaEVieni', VENDI, [['giu', ...C], ['muove', 187, 790], ['muove', 187, 750]
 caso('cancel', VENDI, [['giu', ...C], ['muove', 187, 790], ['cancel'], ['click']]);
 /* 9) cambio di vista a meta' (il gesto indietro, go): niente, anche al rilascio */
 caso('vista', VENDI, [['giu', ...C], ['muove', 187, 790], ['vista'], ['su', 187, 790]]);
-/* 10) a «Compra BTC» la tendina non c'e': niente gesto, il click di sempre */
+/* 10) a «Compra BTC» dal 5 nov 2026 la tendina c'e' (Barattozon anche in
+   compra): il gesto e' lo stesso di «Vendi BTC» */
 caso('compra', ['nav-p2p'], [['giu', ...C], ['muove', 187, 790], ['su', 187, 790], ['click']]);
 /* 11) il tasto destro del mouse non trascina */
 caso('destro', VENDI, [['giu', ...C, {pointerType: 'mouse', button: 2}],
@@ -72378,8 +72401,12 @@ console.log(JSON.stringify(out));
               "meta': niente, e il + torna a casa",
               [dict(_casa, fatti=["vibra"], classi=["p2p-binario"])] * 2,
               [_sub(out3[k], _K) for k in ("cancel", "vista")])
-        prova("a «Compra BTC» niente gesto: il click di sempre apre il foglio",
-              {"fatti": ["foglio"], "tr": "", "preso": 0},
+        # ⚠️ ROVESCIATA IL 5 NOV 2026 (richiesta di Andrea: «il pulsante
+        # Barattozon anche nella sezione compra proprio come nella sezione
+        # vendi»): la capsula c'e' ai due lati, e il gesto con lei
+        prova("a «Compra BTC» il gesto c'e' come a «Vendi BTC»: giu' sul logo "
+              "apre Barattozon",
+              {"fatti": ["vibra", "barattozon"], "tr": "translateY(24px)", "preso": 1},
               _sub(out3["compra"], ("fatti", "tr", "preso")))
         prova("...il tasto destro non trascina, e la tastiera apre il foglio",
               [{"fatti": [], "preso": 0}, {"fatti": ["foglio"]}],
@@ -72540,7 +72567,7 @@ console.log(JSON.stringify(out));
     _rn = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
     prova("il foglio passa dal giudice del titolo, e la frase non se la scrive "
           "piu' da solo", [True, False],
-          ["if (tit) titoloNuovoP2P(tit, compro, tab);" in _rn, "tit.textContent" in _rn])
+          ["if (tit) titoloNuovoP2P(tit, compro, tabMetodo);" in _rn, "tit.textContent" in _rn])
     _mt = re.search(r"const MARCHIO_TITOLO_P2P = '([^\n]*)';", mini)
     _mt = _mt.group(1) if _mt else ""
     prova("il marchio: di giorno il file con «aratto» scuro, di sera quello "
@@ -72617,8 +72644,8 @@ titoloNuovoP2P(tit, false, true); out.tab = vede();
 titoloNuovoP2P(tit, false, true); titoloNuovoP2P(tit, false, true); out.ridisegno = vede();
 titoloNuovoP2P(tit, false, false); out.via = vede();
 titoloNuovoP2P(tit, true, false); out.compro = vede();
-/* compro col tabacchino non capita (il tabacchino e' di chi vende), ma se
-   capitasse il marchio non si mette: il percorso Barattozon e' di chi vende */
+/* compro col tabacchino: dal 5 nov 2026 c'e' (Barattozon anche in compra),
+   e il marchio si mette anche li' */
 titoloNuovoP2P(tit, true, true); out.comproTab = vede();
 titoloNuovoP2P(tit, false, true); ripiegoTitoloP2P(); out.ripiego = vede();
 titoloNuovoP2P(tit, false, true); out.dopo = vede();
@@ -72643,8 +72670,10 @@ console.log(JSON.stringify(out));
               {"vendo": _T(False, V, None, 0), "tab": _T(True, "", V, 1),
                "via": _T(False, V, None, 1), "compro": _T(False, CO, None, 1)},
               {k: out4[k] for k in ("vendo", "tab", "via", "compro")})
-        prova("...e a «Compra BTC» niente marchio, nemmeno col tabacchino (che li' "
-              "non si puo' scegliere)", _T(False, CO, None, 1), out4["comproTab"])
+        # ⚠️ ROVESCIATA IL 5 NOV 2026: Barattozon c'e' anche in compra, e il
+        # marchio con lui; il nome per chi non vede dice «comprare»
+        prova("...e a «Compra BTC» col tabacchino il marchio anche li', col nome "
+              "«Vuoi comprare Bitcoin»", _T(True, "", CO, 2), out4["comproTab"])
         prova("...il marchio si scrive entrando, non a ogni disegno del foglio",
               _T(True, "", V, 1), out4["ridisegno"])
         prova("...e se un file non arriva torna la frase, e ci resta",
@@ -80144,8 +80173,10 @@ def prove_p2p_pubblica():
     # C) UN CAMPO SOLO ALL'APERTURA: la garanzia non e' il render, e'
     # l'AZZERAMENTO — il foglio si apre da un posto solo (`toccaPiu`),
     # e di li' passa questa riga.
-    prova("aprire il foglio richiude il secondo campo", True,
-          "p2pNuovoDue = false;"
+    # (5 nov 2026) tranne col tasto Barattozon in compra: li' la fascia e'
+    # obbligatoria e i due campi nascono a vista
+    prova("aprire il foglio richiude il secondo campo (tranne Barattozon in compra)", True,
+          "p2pNuovoDue = p2pLato === 'compro' && typeof tabacchinoP2P === 'function'\n    && tabacchinoP2P(p2pNuovoMetodi);"
           in pezzo_js(mini, "function apriNuovoOrdineP2P(metodo){", "\n}\n"))
 
     # D) LA PAGINA NON SCENDE PIU' AL TOCCO DEL CAMPO. Non era uno

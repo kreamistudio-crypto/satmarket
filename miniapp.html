@@ -6430,8 +6430,12 @@
      gli scende da sotto — vedi LA CAPSULA, qui sotto. Solo sotto i
      768px, come il neutro: da desktop il + e' la pillola della topbar.
      Il neutro sta DOPO a pari catena, e fuori dal libro vince lui. */
+  /* ⚠️ E DAL 5 NOV 2026 ANCHE A «COMPRA BTC» (Barattozon anche in compra,
+     richiesta di Andrea: «il pulsante Barattozon anche nella sezione
+     compra proprio come nella sezione vendi»): la capsula e' la stessa
+     ai due lati, e cambia solo il colore del +. */
   @media (max-width:767px){
-    body.nav-p2p.p2p-vendo nav button.sell .ic{transform:translateY(-31px)}
+    body.nav-p2p nav button.sell .ic{transform:translateY(-31px)}
     body.nav-p2p.p2p-piu-neutro nav button.sell .ic{transform:none}
     /* la scritta «Vendi» scende via in opacity: il suo colore cambia di
        colpo mentre sparisce, e non tiene una corsa sul thread principale */
@@ -6504,8 +6508,9 @@
   /* il telaio segue il +: la sua cima e' l'equatore del cerchio in ogni
      stato — 16px piu' giu' a «Compra BTC», 31 fuori dal libro, dove il
      + non e' sollevato */
-  body.nav-p2p #navTendina{transform:translateY(16px)}
-  body.nav-p2p.p2p-vendo #navTendina{transform:none}
+  /* ai due lati dal 5 nov 2026 (Barattozon anche in compra): prima a
+     «Compra BTC» stava 16px piu' giu', col + che saliva solo di 15 */
+  body.nav-p2p #navTendina{transform:none}
   @media (max-width:767px){
     body.nav-p2p.p2p-piu-neutro #navTendina{transform:translateY(31px)}
   }
@@ -6533,7 +6538,7 @@
   /* l'anello del Tab sta DENTRO: il telaio taglia tutto quel che esce */
   #navBarattozon:focus-visible{outline:2px solid #FFB25C;outline-offset:-5px}
   /* srotolata: la corsa parte .1s dopo (la scala della barra) */
-  body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #navBarattozon{
+  body.nav-p2p:not(.p2p-piu-neutro):not(.barra-via) #navBarattozon{
     transform:none;visibility:visible;pointer-events:auto;
     transition-delay:.1s,0s}
   /* LA LUCE DEL TRASCINO (scelta di Andrea: bianca): col + sopra la
@@ -6609,7 +6614,7 @@
      meta' alta del cerchio. Sopra il +, in ogni punto della corsa, c'e'
      solo la barra. */
   body.p2p-trascina #navTendina,body.p2p-trascina #navBarattozon{transition:none}
-  body.nav-p2p.p2p-vendo.p2p-binario:not(.p2p-piu-neutro):not(.barra-via) #navBarattozon{
+  body.nav-p2p.p2p-binario:not(.p2p-piu-neutro):not(.barra-via) #navBarattozon{
     transition-delay:0s,0s}
   /* ⚠️ IL DITO, CHE IL CLICK DA JS NON VEDE: il + e' una cella della
      barra, e la sua SCATOLA (72px per 44, vuota: la scritta e' scesa)
@@ -6627,9 +6632,9 @@
      il trascino. Dove i versi di touch-action non esistono (Safari) la
      riga cade e vale `none`, scritta prima apposta. */
   @media (max-width:767px){
-    body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #nav-vendi{
+    body.nav-p2p:not(.p2p-piu-neutro):not(.barra-via) #nav-vendi{
       pointer-events:none}
-    body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #nav-vendi .ic{
+    body.nav-p2p:not(.p2p-piu-neutro):not(.barra-via) #nav-vendi .ic{
       pointer-events:auto;touch-action:none;touch-action:pan-down}
   }
   @media (prefers-reduced-motion:reduce){
@@ -14964,7 +14969,8 @@ document.getElementById('cartello')?.remove();</script>
     <button id="nav-p2plibro" class="strato-p2p" onclick="go('p2p')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 6.1C10.2 4.9 7.7 4.6 5.1 5.2v12.5c2.6-.6 5.1-.3 6.9 1 1.8-1.3 4.3-1.6 6.9-1V5.1c-2.6-.5-5.1-.2-6.9 1z"/><path d="M12 6.1C10.2 4.9 7.7 4.6 5.1 5.2v12.5c2.6-.6 5.1-.3 6.9 1"/><path d="M12 6.1c1.8-1.2 4.3-1.5 6.9-1v12.6c-2.6-.6-5.1-.3-6.9 1"/><path d="M12 6.1v12.6"/></svg></span>Libro ordini</button>
     </div>
     <!-- IL TASTO BARATTOZON (23 set 2026, ritoccato il 24): la tendina
-         col logo intero che nel libro, su «Vendi BTC», scende dal fondo
+         col logo intero che nel libro, su «Vendi BTC» e dal 5 nov 2026
+         anche su «Compra BTC» (dove apre la fascia), scende dal fondo
          del + e con lui fa una capsula sola; apre il foglio col
          tabacchino gia' scelto. Vive in un TELAIO (#navTendina) che la
          taglia all'equatore del + e lo segue: lei ci scivola dentro, solo
@@ -14973,8 +14979,8 @@ document.getElementById('cartello')?.remove();</script>
          (vedi il suo CSS), e da nascosta non si tocca e non si raggiunge
          col Tab. -->
     <div id="navTendina"><div id="navBarattozon" role="button" tabindex="0"
-         aria-label="Vendi con Barattozon: contanti al tabacchino"
-         title="Vendi con Barattozon"
+         aria-label="Barattozon: contanti al tabacchino"
+         title="Barattozon"
          onclick="toccaTendinaP2P()"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toccaTendinaP2P()}"><img src="/assets/barattozon-tasto.webp" width="41" height="40" alt="" onerror="this.remove()"></div></div>
     <!-- Il + di Vendi: nel P2P la scritta scende e il tondo si
@@ -63845,7 +63851,7 @@ let p2pLogoSalutato = false;
 function setLatoP2P(lato, senzaScossa){
   if (!P2P_LATO_K[lato]) return;
   if (!senzaScossa) scuotiLogoP2P();
-  if (lato === p2pLato) return;
+  if (lato === p2pLato) { if (typeof vestiTastoBzP2P === 'function') vestiTastoBzP2P(); return; }
   if (!senzaScossa) haptic();
   p2pLato = lato;
   /* il + della nav trasformata veste il colore del lato: verde a
@@ -63853,6 +63859,8 @@ function setLatoP2P(lato, senzaScossa){
      ed e' voluto: da sola non veste niente (serve anche nav-p2p),
      e al ritorno il lato e' ancora quello scelto. */
   document.body.classList.toggle('p2p-vendo', p2pLato === 'vendo');
+  /* il tasto Barattozon dice il lato (5 nov 2026): in compra apre la fascia */
+  if (typeof vestiTastoBzP2P === 'function') vestiTastoBzP2P();
   renderP2P();
 }
 /* IL LOGO CHE VOLTA IL LIBRO (11 ott 2026, cantieri «logo-compra-vendi»
@@ -80257,7 +80265,10 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoAperta = false;
   p2pNuovoAltri = false;
   p2pNuovoValuta = P2P_VALUTE[0].cod;
-  p2pNuovoDue = false;
+  /* col tasto Barattozon di «Compra BTC» (5 nov 2026) la fascia e'
+     obbligatoria: i due campi nascono a vista, come scegliendo il metodo */
+  p2pNuovoDue = p2pLato === 'compro' && typeof tabacchinoP2P === 'function'
+    && tabacchinoP2P(p2pNuovoMetodi);
   p2pNuovoFisso = false;
   p2pNuovoPremio = 0;
   p2pNuovoPremioMano = false;
@@ -80300,6 +80311,16 @@ function apriNuovoOrdineP2P(metodo){
    parte dal passo 1 del percorso, il PayCode. Senza fuoco sul campo, per
    la ragione del foglio: la tastiera coprirebbe il cappello che dice
    cos'e' Barattozon. */
+/* il nome del tasto Barattozon segue il lato del libro (5 nov 2026,
+   Barattozon anche in compra): il disegno e' lo stesso, la parola no */
+function vestiTastoBzP2P(){
+  const t = typeof el === 'function' ? el('navBarattozon') : null;
+  if (!t) return;
+  const compro = typeof p2pLato !== 'undefined' && p2pLato === 'compro';
+  t.setAttribute('aria-label', compro ? 'Compra con Barattozon: contanti al tabacchino'
+                                      : 'Vendi con Barattozon: contanti al tabacchino');
+  t.setAttribute('title', compro ? 'Compra con Barattozon' : 'Vendi con Barattozon');
+}
 function apriBarattozonP2P(){
   apriNuovoOrdineP2P(P2P_TABACCHINO);
 }
@@ -80359,7 +80380,8 @@ let p2pDiscesaTimer = null;      /* il + che scende da solo al tocco sulla tendi
 /* il gesto c'e' dove c'e' la tendina, e lo dicono le stesse classi */
 function trascinoPuoiP2P(){
   const b = document.body.classList;
-  return b.contains('nav-p2p') && b.contains('p2p-vendo')
+  /* ai due lati dal 5 nov 2026: Barattozon c'e' anche in compra */
+  return b.contains('nav-p2p')
     && !b.contains('p2p-piu-neutro') && !b.contains('barra-via')
     && matchMedia('(max-width: 767px)').matches;
 }
@@ -81236,7 +81258,8 @@ const MARCHIO_TITOLO_P2P = '<span class="tit-marchio"><img class="tit-m-chiaro" 
 let p2pTitoloMarchio = false, p2pTitoloSenzaMarchio = false;
 function titoloNuovoP2P(tit, compro, tab){
   const testo = compro ? 'Vuoi comprare Bitcoin' : 'Vuoi vendere Bitcoin';
-  const marchio = !!tab && !compro && !p2pTitoloSenzaMarchio;
+  /* il marchio anche in compra (5 nov 2026, Barattozon anche in compra) */
+  const marchio = !!tab && !p2pTitoloSenzaMarchio;
   if (marchio && !p2pTitoloMarchio) tit.innerHTML = MARCHIO_TITOLO_P2P;
   if (!marchio) tit.textContent = testo;
   if (marchio) tit.setAttribute('aria-label', testo);
@@ -81264,7 +81287,7 @@ function renderNuovoOrdineP2P(){
   const tab = (tabacchinoP2P(p2pNuovoMetodi) && p2pLato !== 'compro');
   const bzCompro = tabMetodo && compro;
   const tit = el('p2pNuovoTit');
-  if (tit) titoloNuovoP2P(tit, compro, tab);
+  if (tit) titoloNuovoP2P(tit, compro, tabMetodo);
   /* l'interruttore della rete in cima (30 ott 2026): vuoto a chi non e'
      ammesso all'on-chain, e nel banco del motore non c'e' */
   const rete = el('p2pNuovoRete');

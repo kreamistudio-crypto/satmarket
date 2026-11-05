@@ -78135,3 +78135,32 @@ delle chiavi, nell'indirizzo dell'ordine — tb1q identico a signet, cartone e
 chiave nata su signet ammesse — e nel pannello), `collaudo_onchain_rete_pannello`
 (tre scelte, testnet4 al riavvio col conto di prova). Da guardare dal vivo: il
 primo pagamento da Sparrow testnet4 visto dalla ronda.
+
+## Il tasto Barattozon anche su «Compra BTC» (5 nov 2026, cantiere bz-tasto-compra, richiesta di Andrea)
+
+Andrea: «non vedo il tasto compra in contanti al tabacchino e poi dovrebbe
+esserci proprio il pulsante Barattozon anche nella sezione compra proprio come
+nella sezione vendi, solamente con barattozon in compra deve essere
+obbligatorio poter inserire un range». Il cantiere del 31 ott («Barattozon
+anche in compra») aveva messo il metodo nel foglio del +, ma la tendina col
+logo restava solo su «Vendi BTC».
+- LA CAPSULA È LA STESSA AI DUE LATI. Le regole che la accendevano con
+  `.p2p-vendo` (la salita da 31 del + sotto i 768px, il telaio fermo, la
+  tendina a vista, il binario, il dito sul solo cerchio) ora valgono con
+  `nav-p2p` e basta: cambia solo il colore del + (verde/rosso). La regola del
+  telaio 16px più giù a «Compra» è caduta; quella da 15 senza media resta.
+- IL GESTO anche in compra (`trascinoPuoiP2P` senza `p2p-vendo`).
+- LA FASCIA NASCE APERTA: col tasto in compra `apriNuovoOrdineP2P` mette
+  `p2pNuovoDue` (i due campi a vista, il massimo obbligatorio lo giudicava già
+  `valeNuovoOrdineP2P`), come quando si sceglie il metodo a mano.
+- IL MARCHIO in testa al foglio anche in compra (`titoloNuovoP2P` col metodo, e
+  il nome per chi non vede dice «Vuoi comprare Bitcoin»); il nome del tasto
+  segue il lato (`vestiTastoBzP2P`, chiamata da `setLatoP2P` anche col lato
+  fermo, così vale al primo giro).
+Perché Andrea «non vedeva il tasto»: oltre alla tendina che mancava, il cantiere
+del 31 ott sta solo su develop (collaudo), non in produzione; e con la rete
+on-chain accesa nel foglio il tabacchino non c'è (`metodiOnchainP2P`), ed è voluto.
+Provato: `prove.py` severa (sei sentinelle rovesciate coi perché, una nuova sul
+nome del tasto, il banco del tasto con la fascia aperta), i collaudi, e a
+schermo con Playwright (capsula su «Compra» col + verde, foglio con fascia e
+marchio). Da guardare: la prova sul telefono vero sul collaudo.
