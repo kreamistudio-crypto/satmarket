@@ -34059,6 +34059,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   il bottone `admAssistenza` in «Amministrazione», le viste
   `assistenza` e `assistenzaadm` (`renderAssistenza`,
   `renderAssistenzaAdmin`). Collaudo: `collaudo_assistenza`.
+  IL PASSO 2 (5 nov 2026): ogni messaggio dell'utente avvisa OGNI admin
+  (`_ids_staff`, chi scrive escluso) con `notifica`, quindi sul canale
+  del SUO profilo — non il gruppo degli admin (`notifica_admin`), per
+  richiesta di Andrea. L'avviso (`_testo_avviso_assistenza`, pura) porta
+  nome, numero e il messaggio SCAPPATO (al più 400 caratteri) e il tasto
+  «💬 Apri la conversazione». Al più uno ogni
+  `ASSISTENZA_AVVISO_PAUSA_S` (600) per conversazione: il timbro sta
+  nella tabella `assistenza_avvisi` (utente, quando), scritto nella
+  stessa transazione del messaggio (`_assistenza_da_avvisare`), e la
+  risposta di un admin lo cancella. Parte con `create_task` dopo il
+  commit: chi scrive non aspetta i relay. I TASTI: `/?assistenza=mia`
+  (la propria chat, il tasto dell'avviso all'utente) e
+  `/?assistenza=<utente>` (la conversazione, per gli admin; negativo
+  per gli account solo-Nostr); per Telegram `_startapp_da_link` li fa
+  `assistenza` e `assistenza_<utente>`, `percorsoDaStartapp` li rilegge
+  e `apriAssistenzaDaUrl` li apre dopo /api/me.
 - LO SWAP, L'INSTRADATORE (20 ott 2026, cantiere swap-instradatore;
   perché in CANTIERI, «Lo swap, l'instradatore»). La tappa 3 qui sopra è
   divisa: `swap/boltz.js` (il TIPO «boltz»: il motore della tappa 3 —

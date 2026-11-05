@@ -15454,6 +15454,13 @@ function percorsoDaStartapp(p){
      dritti alla chat: `&chat=1` */
   const om = /^mercatino_([1-9][0-9]{0,11})(_chat)?$/.exec(p);
   if (om) return '/?ordine=' + om[1] + (om[2] ? '&chat=1' : '');
+  /* L'ASSISTENZA IN APP (5 nov 2026, passo 2): `assistenza` e' la propria
+     chat con lo staff, `assistenza_<utente>` la conversazione di un
+     utente per gli admin (il tasto del loro avviso). Si rilegge in
+     `/?assistenza=mia|<utente>`, che `apriAssistenzaDaUrl` sa aprire */
+  if (p === 'assistenza') return '/?assistenza=mia';
+  const as = /^assistenza_(-?[1-9][0-9]{0,15})$/.exec(p);
+  if (as) return '/?assistenza=' + as[1];
   const sc = /^scambio_([0-9a-zA-Z-]{8,64})_chat$/.exec(p);
   if (sc && p.length <= 64) return '/p2p?scambio=' + sc[1] + '&chat=1';
   const m = /^(scambio|ordine)_([0-9a-zA-Z-]{8,64})$/.exec(p);
@@ -15784,6 +15791,9 @@ function startappDaLink(link, base){
   /* ...e dritti alla chat (20 ott 2026): `&chat=1` diventa `_chat` */
   const om = /^\/\?ordine=([1-9][0-9]{0,11})(&chat=1)?$/.exec(u.indexOf(base) === 0 ? u.slice(base.length) : '');
   if (om) return 'mercatino_' + om[1] + (om[2] ? '_chat' : '');
+  /* l'assistenza (5 nov 2026): il gemello di `_startapp_da_link` */
+  const as = /^\/\?assistenza=(mia|-?[1-9][0-9]{0,15})$/.exec(u.indexOf(base) === 0 ? u.slice(base.length) : '');
+  if (as) return as[1] === 'mia' ? 'assistenza' : 'assistenza_' + as[1];
   if (u === radice) return 'p2p';
   if (u === radice + '?pausa=1') return 'pausa';
   for (const nome of ['scambio', 'ordine']) {
@@ -52402,6 +52412,21 @@ let assistenzaAttiva = false, assistenzaNuove = 0;
 let assistenzaMsgs = null, assistenzaMax = 2000;
 let assistenzaAdmLista = null, assistenzaAdmAperta = null;
 let assistenzaInvio = false;
+/* IL TASTO DELL'AVVISO (5 nov 2026, passo 2): `/?assistenza=mia` apre
+   la propria chat, `/?assistenza=<utente>` la conversazione per un
+   admin. Una volta sola, dopo /api/me (serve sapere leva e admin). */
+const ASSISTENZA_URL = /^\/(miniapp\.html)?$/.test(location.pathname)
+  ? (location.search.match(/[?&]assistenza=(mia|-?[1-9][0-9]{0,15})(?:&|$)/) || [])[1] || '' : '';
+let assistenzaUrlAperta = false;
+function apriAssistenzaDaUrl(){
+  if (!ASSISTENZA_URL || assistenzaUrlAperta) return;
+  assistenzaUrlAperta = true;
+  if (DEMO || VETRINA || !assistenzaAttiva) return;
+  if (ASSISTENZA_URL === 'mia') { go('assistenza'); return; }
+  if (!isAdmin) return;
+  assistenzaAdmAperta = {utente: Number(ASSISTENZA_URL), dati: null};
+  go('assistenzaadm');
+}
 function vestiAssistenza(){
   const v = el('vocAssistenza');
   if (v) v.style.display = assistenzaAttiva && !DEMO ? '' : 'none';
@@ -87164,7 +87189,7 @@ function spegniLinkDaUrl(){
   negozioAperto = annuncioAperto = sicurezzaAperta = privacyAperta = true;
   categoriaAperta = p2pApertoDaUrl = consigliatiApertiDaUrl = true;
   offertaAperta = barattoloAperto = invitoDaUrlMostrato = true;
-  bozzaAperta = ordineUrlAperto = true;
+  bozzaAperta = ordineUrlAperto = assistenzaUrlAperta = true;
   /* ...e la porta del P2P non si aprira': il velo d'apertura non la
      aspetta (vedi IL LINK DEL P2P SENZA IL LAMPO DELLA HOME) */
   arrivoP2PFatto();
@@ -87229,6 +87254,7 @@ async function avviaVetrina(){
     apriConsigliatiDaUrl();
     apriOffertaDaUrl();
     apriOrdineDaUrl();
+    apriAssistenzaDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();
     apriInvitoDaUrl();
@@ -87678,6 +87704,7 @@ async function avvia(){
     apriConsigliatiDaUrl();
     apriOffertaDaUrl();
     apriOrdineDaUrl();
+    apriAssistenzaDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();
     /* Il cartello del rodaggio ha la precedenza su tutti: il tour

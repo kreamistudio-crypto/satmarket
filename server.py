@@ -6585,6 +6585,15 @@ def init_db():
         utente INTEGER PRIMARY KEY,
         ultimo_id INTEGER NOT NULL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS assistenza_avvisi(
+        -- il passo 2 (5 nov 2026): quando gli admin sono stati avvisati
+        -- l'ultima volta per QUESTA conversazione. Un avviso ogni
+        -- ASSISTENZA_AVVISO_PAUSA_S; la risposta di un admin cancella la
+        -- riga, e il messaggio dopo riavvisa subito. Sul database e non in
+        -- memoria: un deploy non deve far ripartire la raffica.
+        utente INTEGER PRIMARY KEY,
+        quando INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS venditori_seguiti(
         -- «🔔 Segui» sulla pagina di un venditore (9 ott 2026,
         -- richiesta di Andrea): chi segue chi, una riga per coppia e
@@ -17681,6 +17690,18 @@ def _startapp_da_link(url) -> str:
     `&chat=1` in coda — `/?ordine=<numero>&chat=1` e `/p2p?scambio=<id>&chat=1`
     — la parola prende `_chat` in coda."""
     u = str(url or "")
+    # L'ASSISTENZA IN APP (5 nov 2026, passo 2): `/?assistenza=mia` →
+    # `assistenza` (la propria chat), `/?assistenza=<utente>` →
+    # `assistenza_<utente>` (la conversazione, per gli admin; un account
+    # solo-Nostr ha il numero negativo, e il trattino e' nella forma)
+    testa = URL_PUBBLICO + "/?assistenza="
+    if u.startswith(testa):
+        chi = u[len(testa):]
+        if chi == "mia":
+            return "assistenza"
+        if re.fullmatch(r"-?[1-9][0-9]{0,15}", chi):
+            return "assistenza_" + chi
+        return ""
     testa = URL_PUBBLICO + "/?ordine="
     if u.startswith(testa):
         resto = u[len(testa):]
@@ -45854,15 +45875,64 @@ async def avvisi_app_letti(x_tg_init_data: str = Header(""),
 # admin leggono e a cui tutti rispondono: per l'utente chi risponde e'
 # «lo staff» col bollino 🛡️, mai il nome dell'admin; nel pannello gli
 # admin vedono anche chi di loro ha risposto.
-# IL TESTO ESCE SEMPRE SCAPPATO e non entra MAI in un avviso: l'avviso
-# all'utente dice solo «ti abbiamo risposto» (lo stesso principio della
-# chat degli ordini — il messaggio vive dentro Barattolo). Il passo 2
-# porta l'avviso dei messaggi nuovi agli admin; il passo 3 la risposta
-# dal bot.
+# IL TESTO ESCE SEMPRE SCAPPATO. All'utente l'avviso dice solo «ti
+# abbiamo risposto» (lo stesso principio della chat degli ordini — il
+# messaggio vive dentro Barattolo); agli admin, che sono lo staff,
+# l'avviso porta il messaggio scappato (passo 2, 5 nov 2026). Il passo 3
+# e' la risposta dal bot.
 ASSISTENZA_TESTO_MAX = 2000      # caratteri per messaggio
 ASSISTENZA_RIGHE_MAX = 300       # messaggi mostrati per conversazione
 ASSISTENZA_ELENCO_MAX = 300      # conversazioni nell'elenco degli admin
 _CONTROLLO_ASSISTENZA = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+# IL PASSO 2 (5 nov 2026): l'avviso agli admin. A OGNUNO con `notifica`,
+# cioe' sul canale che ha scelto nel SUO profilo (Telegram, DM Nostr, o
+# entrambi) — non nel gruppo degli admin: e' la richiesta di Andrea.
+# Uno per conversazione ogni ASSISTENZA_AVVISO_PAUSA_S: chi scrive tre
+# righe di fila non fa suonare tre volte i telefoni dello staff.
+ASSISTENZA_AVVISO_PAUSA_S = 600
+ASSISTENZA_AVVISO_TESTO_MAX = 400   # quanto del messaggio entra nell'avviso
+
+
+def _testo_avviso_assistenza(nome: str, utente: int, testo: str) -> str:
+    """PURA: l'avviso per gli admin. Il nome e il messaggio arrivano
+    GREZZI e si scappano QUI, una volta (la regola degli avvisi: si
+    scappa all'assegnazione, e qui l'assegnazione e' questa)."""
+    corto = testo if len(testo) <= ASSISTENZA_AVVISO_TESTO_MAX \
+        else testo[:ASSISTENZA_AVVISO_TESTO_MAX].rstrip() + "…"
+    return (f"💬 <b>Assistenza</b>: scrive {html.escape(nome or 'un utente')} "
+            f"(n. {int(utente)})\n\n«{html.escape(corto)}»\n\n"
+            "Rispondi dall'app: Profilo → Amministrazione → "
+            "💬 Assistenza clienti.")
+
+
+def _assistenza_da_avvisare(con, utente: int, adesso: int) -> bool:
+    """Tocca avvisare gli admin per questa conversazione? Se si', il
+    timbro si scrive SUBITO (chi chiama committa): due messaggi in fila
+    non passano tutti e due."""
+    r = con.execute("SELECT quando FROM assistenza_avvisi WHERE utente=?",
+                    (int(utente),)).fetchone()
+    if r and adesso - int(r["quando"]) < ASSISTENZA_AVVISO_PAUSA_S:
+        return False
+    con.execute("INSERT INTO assistenza_avvisi(utente, quando) VALUES(?,?) "
+                "ON CONFLICT(utente) DO UPDATE SET quando=excluded.quando",
+                (int(utente), int(adesso)))
+    return True
+
+
+async def _avvisa_admin_assistenza(utente: int, nome: str, testo: str):
+    """Ogni admin, sul suo canale. Fail-open: un avviso che non parte
+    non tocca il messaggio, che e' gia' salvato. Chi scrive, se e' admin
+    lui stesso, non avvisa se stesso."""
+    try:
+        avviso = _testo_avviso_assistenza(nome, utente, testo)
+        bottone = ("💬 Apri la conversazione",
+                   f"{URL_PUBBLICO}/?assistenza={int(utente)}")
+        for admin in sorted(_ids_staff()):
+            if admin != int(utente):
+                await notifica(admin, avviso, bottone)
+    except Exception as e:
+        print(f"⚠️ Avviso dell'assistenza agli admin saltato "
+              f"(utente {utente}): {e}")
 
 
 def _testo_assistenza(grezzo) -> str:
@@ -45944,13 +46014,21 @@ async def assistenza_scrivi(req: Request, x_tg_init_data: str = Header(""),
     testo = _testo_assistenza(d.get("testo"))
     con = db()
     try:
+        adesso = int(time.time())
         con.execute("INSERT INTO assistenza(utente, autore, admin, testo, "
                     "quando) VALUES(?,?,0,?,?)",
-                    (user["id"], user["id"], testo, int(time.time())))
+                    (user["id"], user["id"], testo, adesso))
+        avvisa = _assistenza_da_avvisare(con, user["id"], adesso)
         con.commit()
         righe = _righe_assistenza(con, user["id"], False)
+        u = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
     finally:
         con.close()
+    # dopo il commit e in sottofondo: chi scrive non aspetta i relay
+    if avvisa:
+        nome = (u["nome"] if u else "") or user.get("first_name") or ""
+        asyncio.create_task(_avvisa_admin_assistenza(user["id"], nome, testo))
     return {"ok": True, "messaggi": righe}
 
 
@@ -46031,6 +46109,9 @@ async def assistenza_rispondi_admin(utente: int, req: Request,
         con.execute("INSERT INTO assistenza(utente, autore, admin, testo, "
                     "quando) VALUES(?,?,1,?,?)",
                     (int(utente), admin["id"], testo, int(time.time())))
+        # lo staff ha risposto: il prossimo messaggio riavvisa subito
+        con.execute("DELETE FROM assistenza_avvisi WHERE utente=?",
+                    (int(utente),))
         con.commit()
         righe = _righe_assistenza(con, utente, True)
     finally:
@@ -46039,7 +46120,7 @@ async def assistenza_rispondi_admin(utente: int, req: Request,
     await notifica(int(utente),
                    "💬 <b>L'assistenza di Barattolo ti ha risposto</b>\n"
                    "Trovi la risposta in Profilo → 💬 Assistenza.",
-                   ("🫙 Apri Barattolo", _link_casa_telegram()))
+                   ("💬 Apri l'assistenza", f"{URL_PUBBLICO}/?assistenza=mia"))
     return {"ok": True, "messaggi": righe}
 
 
