@@ -78957,3 +78957,101 @@ tolto; il firmatario lento oltre il tetto (velo tolto, toast col
 perché, testo del velo cambiato, ricevuta segnata quando il sì arriva);
 la sentinella della cassa. **DA GUARDARE** dal vivo: «Salva» con Amber
 spento (dopo un minuto il perché) e acceso (l'anello, poi il ✅).
+
+## Le prove per categoria: `--categoria` e `--dai-file` (5 nov 2026, cantiere prove-categorie, richiesta di Andrea)
+
+**LA RICHIESTA.** Andrea, 3 nov: «le prove devi gestirle in macro
+categorie, per esempio P2P, mercatino, infrastruttura... di modo che
+ogni volta si eseguono solo quelle necessarie, non tutte per forza».
+Proposta in tre passi (categorie; scelta dai file toccati; la regola
+per le sessioni), e il 5 nov la sua scelta: i primi due insieme.
+
+**COSA C'È.** In prove.py, accanto a `main()`:
+- `CATEGORIE`: le sezioni di `main()` in cinque categorie scritte a
+  mano. Sul ramo base del 5 nov erano 505; portato su develop il 10
+  nov, sono 536 — p2p (169), mercatino (237), infrastruttura (93),
+  swap (16), onchain (21, col RGB). La prima divisione è venuta dai nomi, poi
+  ricontrollata sui titoli e sul testo delle sezioni (quante volte
+  dicono p2p/mostro/scambi contro ordini/annunci): una trentina sono
+  cambiate di posto, per esempio gli annulli del mercatino e il libro
+  mastro (che non è il libro P2P) sono tornati al mercatino.
+- `SEMPRE`: sei sentinelle che girano con qualunque scelta (tetto di
+  CLAUDE.md, bussola, elenco dei collaudi, script nel compileall, leve
+  mai doppie, la mappa stessa), tutte sotto i due secondi.
+- `python prove.py --categoria p2p` (anche `--categoria=p2p,swap`);
+  `python prove.py --dai-file` sceglie da sé guardando i file toccati
+  rispetto al ramo base (fra develop, promozione-senza-onchain, onchain
+  e main, quello più vicino a HEAD; o `--dai-file=origin/x`), commit
+  del ramo + lavoro non committato + file nuovi; `--mostra` dice cosa
+  girerebbe e perché, senza girare. Senza argomenti gira TUTTO, come
+  prima: la CI non è stata toccata.
+- `prove_categorie_delle_prove` (infrastruttura e SEMPRE): ogni sezione
+  di `main()` in una categoria e una sola, nessun nome in più, le
+  cinque categorie, un `--categoria` storto che si ferma col 2 invece
+  di girare tutto, e il giudice dei file coi cambi di cartone.
+
+**IL GIUDICE DEI FILE** (`scegli_dai_cambi`, senza git dentro per
+poterlo provare). Nei file grandi (server.py, miniapp.html, prove.py,
+config_esempio.py) non conta il nome del file, che lo nominano quasi
+tutte le sezioni, ma la FUNZIONE che contiene la riga toccata: valgono
+le categorie delle sezioni che la nominano. In prove.py una sezione
+toccata porta la sua categoria e basta; le righe dell'elenco di
+`main()` non portano niente (le porta la `def`), il resto di `main()`
+porta tutto. Nell'HTML conta dove sta la riga: funzione nello
+<script>, selettore nello <style>, id e classi nel markup. Una funzione
+che non nomina nessuno prende la categoria dal suo nome (swap, p2p,
+onchain...) o dal VICINATO (il primo nome nominato sopra e sotto, entro
+300 righe: il codice sta raggruppato per argomento). Un elenco che
+nominano tutti (`_leve_stato`, `avvia`) cede alla riga: la leva
+aggiunta. Un documento o un disegno porta le sole SEZIONI che lo
+nominano, non la categoria (CANTIERI.md lo nominano sezioni di tre
+categorie: un verbale in fondo avrebbe fatto girare quasi tutto). Un
+file nato o sparito porta l'infrastruttura (i censimenti dei file del
+repo). Un altro file porta le categorie delle sezioni che lo nominano,
+o l'infrastruttura se non lo nomina nessuno. Nel dubbio, TUTTO.
+
+**QUANTO SI RISPARMIA, MISURATO.** La suite intera sull'albero base,
+sezione per sezione (in questa macchina, 549 s): p2p 291 s (53%),
+infrastruttura 142 s (26%), mercatino 91 s (17%), swap 17 s, onchain
+8 s. Il giudice provato sugli ultimi 60 commit di
+promozione-senza-onchain, uno per uno: 6 solo documenti (sentinelle e
+le sezioni che li nominano), 23 sotto la metà del tempo, 1 che chiede
+tutto, in media il 63% del tempo della suite intera. Quei 60 sono quasi
+tutti cantieri grossi a più facce; un ritocco piccolo sta sotto.
+
+**LE STRADE SCARTATE.** La categoria scritta in testa a ogni sezione (un
+decoratore): 505 ritocchi sparsi in un file da 10 MB, e la mappa non si
+legge più in un colpo d'occhio. La mappa per nome di file soltanto:
+server.py e miniapp.html li nominano tutte, e ogni cambio sarebbe stato
+«tutto». Le sezioni singole al posto delle categorie in `--dai-file`:
+più stretto, ma Andrea ha chiesto le categorie, e una categoria intera
+copre anche le sezioni che provano una funzione senza nominarla (per
+rotta, per testo). I nomi scritti sulla riga presi sempre: `TypeError`
+e `setAttribute` portavano tre categorie a ogni cambio; ora contano
+solo quando la funzione non dice niente, e solo se li nominano al più
+dieci sezioni.
+
+**LA REGOLA, che resta quella di prima per la promozione.** Nel
+cantiere si gira `python prove.py --dai-file` (o la categoria del
+cantiere, se è chiara); la suite intera `PROVE_SEVERE=1 python
+prove.py` resta obbligatoria prima della promozione su main, e la CI su
+main la gira sempre intera. La riga per le sessioni va nella skill
+della chiusura del cantiere (la scrive il cantiere delle skill, PR
+#31), non in CLAUDE.md.
+
+**SU DEVELOP (10 nov 2026, «manda in produzione» di Andrea).** La PR
+#35 puntava su promozione-senza-onchain, rimasto indietro: il cantiere
+è stato ripreso sopra develop (41f3549). Conflitti solo di coda (le
+sezioni nuove prima di `main()`, la fine dell'elenco, questo file). Le
+31 sezioni arrivate dal 5 nov hanno avuto la loro categoria — la
+sentinella le ha elencate da sola, che è il suo mestiere — e la
+sentinella ha imparato che dentro l'elenco di `main()` ci sono
+commenti (una sezione spostata nei collaudi, col perché) che non sono
+sezioni.
+
+**COSA RESTA.** I collaudi (`collaudi_ci.py`) non hanno categorie: si
+girano come prima. Una sezione nuova va scritta in `main()` E in
+`CATEGORIE` (la sentinella lo ricorda). Il giudice è un'euristica:
+può scegliere meno del necessario quando una funzione cambia
+comportamento per una sezione che non la nomina; la rete è la suite
+intera prima della promozione.
