@@ -476,3 +476,36 @@ su mempool.space. Quel che si vede (tempi, costo, frasi storte) va nel
 verbale (CANTIERI, «NON PROVATO»). Per tornare indietro:
 `SWAP_AUTO_ATTIVO = False` e riavvio (uno swap già confermato il battito
 lo finisce lo stesso: la leva ferma solo i «Conferma» nuovi).
+
+## 10. L'assistenza in app sul collaudo (5 nov 2026, cantiere assistenza; Andrea: «ok porta su develop»)
+
+**Perché.** La chat con lo staff (Profilo → Privacy → «💬 Assistenza») e
+la pagina degli admin («💬 Assistenza clienti») sono su `develop` dietro
+la leva `ASSISTENZA_ATTIVA`, spenta di serie. Ogni messaggio avvisa ogni
+admin sul canale del suo profilo. Il perché di tutto: CANTIERI,
+«L'assistenza in app», passi 1 e 2.
+
+**Sola lettura** (la riga non c'è già: deve dire `0`):
+```
+sudo grep -c "^ASSISTENZA_ATTIVA" /srv/collaudo/barattolo/config.py
+```
+
+**Scrive**, dopo che il collaudo ha tirato `develop` con il cantiere. La
+copia di riserva, poi la riga, poi il riavvio:
+```
+sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-assistenza
+```
+```
+printf '\nASSISTENZA_ATTIVA = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
+```
+Atteso 200. Poi, dal telefono: con un account di prova scrivi
+all'assistenza; da admin guarda che l'avviso arrivi sul tuo canale (il
+tasto apre la conversazione), rispondi dall'app, e controlla che l'utente
+riceva «ti ha risposto» col tasto che apre la sua chat. In produzione la
+leva resta spenta finché Andrea non dice sì, dopo la promozione.
