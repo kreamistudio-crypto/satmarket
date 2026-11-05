@@ -94307,7 +94307,9 @@ def prove_ricarica_resta():
         m = re.search(r"\|\| (\w+)\) return;", corpo)
         bandiere[p] = m.group(1) if m else ""
     # (16 ott 2026, chat-mercatino) la dodicesima: `apriOrdineDaUrl`, il tasto dell'avviso della chat
-    prova("le porte dei link d'arrivo sono dodici, ognuna con la sua bandierina", [12, []],
+    # (5 nov 2026, assistenza passo 2) la tredicesima: `apriAssistenzaDaUrl`,
+    # il tasto dell'avviso dell'assistenza
+    prova("le porte dei link d'arrivo sono tredici, ognuna con la sua bandierina", [13, []],
           [len(porte), [p for p, b in bandiere.items() if not b]])
     prova("...e spegniLinkDaUrl le alza tutte", [],
           [b for b in bandiere.values() if not re.search(r"\b%s = " % b, sp)])
@@ -118914,7 +118916,8 @@ def prove_profilo_elegante():
         "grpIncassi": ["accLnAddress", "accNwc", "vocEsporta"],
         "grpLivello": ["accLivello", "accInviti", "accDistintivi"],
         "grpAspetto": ["accAvvisi", "accAspetto"],
-        "grpPrivacy": ["accIdentita", "vocPrivacy", "accTor"],
+        # l'assistenza in app (3 nov 2026) sta con «I tuoi dati»
+        "grpPrivacy": ["accIdentita", "vocAssistenza", "vocPrivacy", "accTor"],
     }
     fuori = []
     for g, voci in CASSETTI.items():
@@ -146875,7 +146878,10 @@ def prove_freni():
            "onchain_controlla": (60, 3600), "onchain_firma": (30, 3600),
            # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
            # un login con la sua coda sta largo in 60 al minuto per IP
-           "cassetta_spedisci": (60, 60)}, F)
+           "cassetta_spedisci": (60, 60),
+           # l'assistenza in app (3 nov 2026): 20 messaggi all'ora per
+           # chi scrive, 120 risposte all'ora per un admin
+           "assistenza": (20, 3600), "assistenza_staff": (120, 3600)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------
