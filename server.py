@@ -2137,6 +2137,21 @@ except ImportError:
     RIEPILOGO_MINIMO = 3   # sotto tanti annunci nuovi E senza nemmeno
                            # un ordine si tace: un riepilogo che dice
                            # «0 ordini» fa piu' danno del silenzio
+# LE NOVITA' DELLA SETTIMANA NEL RIEPILOGO (nov 2026, chiesto da
+# Andrea): la domenica sera l'AI scrive due-cinque righe da utente coi
+# commit arrivati in produzione, la bozza va agli admin coi bottoni, e
+# il lunedi' esce dentro il post di sempre SOLO SE un admin l'ha
+# approvata. Spenta di serie: si accende nel config del VPS. Il diario
+# dei commit lo scrive deploy.sh in una cartella di ROOT (vedi
+# `NOVITA_DIARIO`, col perche').
+try:
+    from config import NOVITA_SETTIMANALI
+except ImportError:
+    NOVITA_SETTIMANALI = False
+try:
+    from config import NOVITA_DIARIO
+except ImportError:
+    NOVITA_DIARIO = "/var/lib/barattolo-deploy/novita-commit"
 try:
     from config import CONTROLLO_LIBRO_MASTRO
 except ImportError:
@@ -20049,6 +20064,7 @@ async def comando_anteprima(mittente: dict, testo: str):
         /anteprima            l'ultimo annuncio pubblicabile
         /anteprima 42         quell'annuncio
         /anteprima riepilogo  il post del lunedì, coi tre barattoli
+        /anteprima novita     la bozza delle novità, scritta ora
 
     A COSA SERVE, ed è la ragione per cui esiste: fino a ieri l'unico
     modo di vedere com'è fatto un post era pubblicarlo — cioè provare
@@ -20077,6 +20093,8 @@ async def comando_anteprima(mittente: dict, testo: str):
     arg = arg[1].strip().lower() if len(arg) == 2 else ""
     if arg.startswith("riep"):
         return await _anteprima_riepilogo(chat)
+    if arg.startswith("novit"):
+        return await _anteprima_novita(chat)
     con = db()
     if arg.isdigit():
         riga = con.execute(
@@ -20773,6 +20791,9 @@ async def gestisci_callback(cb: dict):
     if azione == "ban":
         # la tastiera ✅/❌ del banner del negozio (solo moderatori)
         return await callback_banner(cb, token)
+    if azione == "nov":
+        # la bozza delle novita' della settimana (solo moderatori)
+        return await callback_novita(cb, token)
     if azione == "entra":
         # le figure dell'ingresso dal bot (ENTRA DAL BOT)
         return await callback_ingresso_bot(cb, token)
@@ -32545,6 +32566,12 @@ def _leve_stato():
                          "annunci nuovi, ordini e i tre più venduti"),
             _leva("Annunci minimi per il riepilogo", "RIEPILOGO_MINIMO",
                   RIEPILOGO_MINIMO),
+            _leva("Novità della settimana nel riepilogo",
+                  "NOVITA_SETTIMANALI", bool(NOVITA_SETTIMANALI),
+                  acceso="la domenica sera l'AI scrive le novità dai "
+                         "commit della settimana; escono il lunedì solo "
+                         "se un admin le approva",
+                  spento="il riepilogo del lunedì racconta solo i numeri"),
             _leva("Negozi raccontati per raffica", "MAX_NEGOZI_RAFFICA",
                   MAX_NEGOZI_RAFFICA,
                   spento="una raffica esce sempre come un post solo che "
@@ -84734,6 +84761,11 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Riepilogo settimanale saltato: {e}")
         try:
+            # la domenica sera, la bozza delle novita' agli admin
+            await bozza_novita()
+        except Exception as e:
+            print(f"⚠️ Bozza delle novità saltata: {e}")
+        try:
             # DOPO l'import, ed e' la precedenza: chi ha appena
             # ricevuto il completamento ha il ritmo chiuso e qui non
             # passa (vedi suggerisci_funzioni)
@@ -85280,18 +85312,28 @@ async def riepilogo_settimana():
     oggi = time.strftime("%Y-%m-%d")
     if time.localtime().tm_wday != 0 or timbro_letto(TIMBRO_RIEPILOGO) == oggi:
         return
+    # LE NOVITA' (nov 2026): una bozza che aspetta ancora un admin fa
+    # aspettare il lunedi' — senza timbrare, cosi' il giro dopo (dieci
+    # minuti) ci ripassa — ma non oltre `NOVITA_ORA_LIMITE`: poi si
+    # esce coi soli numeri. Leva spenta: (True, []) e il post di sempre.
+    pronte, novita = _novita_del_lunedi(oggi)
+    if not pronte:
+        return
     con = db()
     nuovi, ordini, top = _conta_settimana(con, int(time.time()) - 7 * 86400)
     con.close()
     # Il turno si consuma comunque, anche quando si tace: vedi il
     # cappello qui sopra, e' la riga che si sbaglia per prima.
     timbro_scrivi(TIMBRO_RIEPILOGO, oggi)
-    if nuovi < RIEPILOGO_MINIMO and not ordini:
+    magra = nuovi < RIEPILOGO_MINIMO and not ordini
+    if magra and not novita:
         print(f"📊 Riepilogo settimana ({oggi}): {nuovi} annunci, "
               f"{ordini} ordini — settimana magra, non esce")
         return
-    righe = [f"🫙 {nuovi} "
-             + ("nuovi annunci" if nuovi != 1 else "nuovo annuncio")]
+    # una settimana magra CON le novita' approvate esce lo stesso, ma
+    # coi soli «✨»: il «🫙 1 nuovo annuncio» resta il silenzio di sempre
+    righe = [] if magra else [
+        f"🫙 {nuovi} " + ("nuovi annunci" if nuovi != 1 else "nuovo annuncio")]
     if ordini:
         righe.append(f"🛒 {ordini} "
                      + ("ordini" if ordini != 1 else "ordine"))
@@ -85305,8 +85347,14 @@ async def riepilogo_settimana():
             for t in top if t["titolo"])
         if venduti:
             righe.append(f"🏆 I più venduti: {venduti}")
+    blocchi = ["\n".join(righe)] if righe else []
+    if novita:
+        # le righe si salvano NUDE e si scappano QUI, all'uscita (B-35):
+        # un «<» scritto dall'AI spegnerebbe il post in silenzio
+        blocchi.append("✨ <b>Le novità della settimana</b>\n"
+                       + "\n".join(html.escape(r) for r in novita))
     testo = ("📊 <b>La settimana di Barattolo</b>\n\n"
-             + "\n".join(righe)
+             + "\n\n".join(blocchi)
              + f"\n\n<a href=\"{_link_casa_telegram()}\">🫙 Sfoglia il mercatino</a>")
     # IL PODIO si ALLEGA, non sostituisce: la didascalia resta quella
     # di sempre, coi titoli — chi ha le immagini spente, o un client
@@ -85316,6 +85364,10 @@ async def riepilogo_settimana():
     con = db()
     nome = _salva_podio(con, top, oggi)
     con.close()
+    if nome and len(testo) > NOVITA_DIDASCALIA_MAX:
+        # la didascalia di una foto sta in 1024 caratteri: con le
+        # novita' lunghe il post esce di TESTO, mai tagliato a meta'
+        nome = ""
     print(f"📊 Riepilogo settimana ({oggi}): {nuovi} annunci, "
           f"{ordini} ordini, {len(top)} in classifica — post mandato"
           + (f" col podio ({nome})" if nome else " (senza figura)"))
@@ -85331,6 +85383,346 @@ async def riepilogo_settimana():
     await bot_api("sendMessage", {
         "chat_id": canale_riepilogo(), "parse_mode": "HTML",
         "disable_web_page_preview": True, "text": testo})
+
+
+# ============ LE NOVITA' DELLA SETTIMANA (nov 2026) =================
+# Chiesto da Andrea: «un riepilogo figo di tutte le novita' di
+# Barattolo su Telegram, ogni settimana». Si cuce al post del lunedi'
+# invece di farne un secondo: il canale ha gia' il suo appuntamento, e
+# due post dello stesso giorno si mangiano l'un l'altro.
+#
+# LA STRADA, IN QUATTRO PASSI:
+#   1. deploy.sh, a deploy riuscito, scrive i titoli dei commit nuovi
+#      nel DIARIO (`NOVITA_DIARIO`): «quando<TAB>sha<TAB>titolo». Il
+#      server non chiama `git` (l'unica porta verso un sottoprocesso e'
+#      quella del ponte) e non legge gli oggetti di .git: legge un file
+#      di testo. Il diario sta in una cartella di ROOT, fuori dal repo:
+#      in /srv/barattolo, che e' del mercatino, root che scrive a nome
+#      fisso seguirebbe un collegamento piantato dall'utente
+#      `barattolo` (la lezione di /tmp nell'audit del 19 set).
+#   2. La domenica dalle `NOVITA_ORA_BOZZA` l'AI (la chiave del server,
+#      `MODELLO_RICERCA`) fa di quei titoli due-cinque righe da utente.
+#      PRIMA dell'AI passano due setacci: la SICUREZZA (l'analisi e'
+#      riservata: un commit che ne parla non arriva nemmeno al
+#      modello) e i lavori INTERNI (prove, documenti, deploy, leve
+#      spente). Lo stesso setaccio ripassa sulle righe che tornano.
+#   3. La bozza va agli admin coi bottoni ✅ Pubblica / 🔄 Riscrivi /
+#      ❌ Salta. Senza un ✅ non esce niente: e' la regola, non una
+#      cortesia — un modello puo' annunciare una cosa che non c'e'.
+#   4. Il lunedi' `riepilogo_settimana` aspetta la decisione fino alle
+#      `NOVITA_ORA_LIMITE`, poi esce col «✨» approvato o senza.
+#
+# LA BOZZA STA IN UN TIMBRO (`novita_bozza`), JSON: il lunedi' a cui
+# appartiene, le righe NUDE (si scappano all'uscita, B-35), lo stato
+# (attesa | ok | no | vuota) e quante volte si e' riscritta.
+
+NOVITA_ORA_BOZZA = 18          # domenica, ora italiana: la bozza nasce
+NOVITA_ORA_LIMITE = 10         # lunedi': fin qui si aspetta un admin
+NOVITA_RIGHE_MAX = 5           # righe nel post
+NOVITA_RIGA_MAX = 140          # caratteri per riga, tagliati su uno spazio
+NOVITA_COMMIT_MAX = 80         # titoli passati all'AI, i piu' recenti
+NOVITA_RISCRITTURE_MAX = 3     # 🔄 per settimana: poi si decide
+NOVITA_DIDASCALIA_MAX = 1000   # oltre, il post esce di testo (foto: 1024)
+TIMBRO_NOVITA = "novita_bozza"
+
+# IL SETACCIO DELLA SICUREZZA: l'analisi di novembre 2026 e i suoi
+# rimedi sono riservati, e qui si sbaglia nel verso del silenzio — una
+# novita' vera persa costa niente, una falla raccontata costa molto.
+NOVITA_SEGRETE = re.compile(
+    r"sicurezz|security|\bB-?\d{1,2}\b|vulnerab|\bfall[ae]\b|attacc|"
+    r"exploit|\bCVE\b|inject|\bXSS\b|CSRF|SSRF|\bCSP\b|segret|nsec|"
+    r"macaroon|password|\btoken\b|\baudit|chiav[ei] |impersona|furt|"
+    r"frode|truff|abus", re.I)
+# I LAVORI DI CASA: veri, ma non sono novita' per chi compra e vende
+NOVITA_INTERNE = re.compile(
+    r"\bprov[ae]\b|collaud|sentinell|\bCI\b|deploy|backup|documenti|"
+    r"voce del cantiere|CANTIERI|ARCHITETTURA|PRODUZIONE|CLAUDE\.md|"
+    r"\bdocs?\b|verbale|ronda|journal|refactor|leva .{0,40}spent|"
+    r"resta spent|restano spent|dietro la leva|pannello|admin|moderat|"
+    r"\bVPS\b|\bnodo\b|mostrod|ramo\b|cherry|rebase|promozione|revert|"
+    r"regex|python",
+    re.I)
+
+PROMPT_NOVITA = (
+    "Scrivi la sezione «Novità della settimana» per il canale Telegram "
+    "di Barattolo, un mercatino dell'usato in cui si paga solo in "
+    "bitcoin (satoshi), con il deposito di garanzia e gli scambi P2P. "
+    "Ricevi i titoli TECNICI dei cambiamenti andati online questa "
+    "settimana, scritti dagli sviluppatori. Trasformali in righe per "
+    "chi compra e vende, in italiano, con tono caldo e semplice, in "
+    "seconda persona («adesso puoi…»).\n"
+    "REGOLE:\n"
+    "- Al massimo 5 righe, una per novità; unisci quelle simili.\n"
+    "- Ogni riga comincia con UNA emoji adatta e sta sotto i 120 "
+    "caratteri.\n"
+    "- Solo cose che un utente VEDE o USA. Salta correzioni interne, "
+    "prove, documenti, strumenti degli amministratori, e tutto ciò che "
+    "è dietro un interruttore spento o «in prova».\n"
+    "- Non parlare MAI di sicurezza, falle, protezioni o attacchi, "
+    "anche se un titolo lo lascia intuire: salta quel titolo.\n"
+    "- Non inventare niente che i titoli non dicano. Niente numeri di "
+    "versione, nomi di file, codice, link o nomi di persone.\n"
+    "- Testo semplice: niente HTML, niente Markdown, niente elenchi "
+    "puntati, niente frase introduttiva o di chiusura.\n"
+    "- Se non c'è niente di interessante per gli utenti rispondi solo: "
+    "NIENTE")
+
+
+def _novita_dal_diario(dal: int, percorso: str = "") -> tuple[list, int]:
+    """I titoli del diario arrivati dal `dal` in poi, gia' passati dai
+    due setacci: ([titolo, ...], quanti scartati). Il file manca o non
+    si legge: ([], 0), e la domenica tace. Una riga storta si salta."""
+    tenuti, scartati = [], 0
+    try:
+        with open(percorso or NOVITA_DIARIO, encoding="utf-8",
+                  errors="replace") as f:
+            righe = f.read().splitlines()[-2000:]
+    except OSError:
+        return [], 0
+    visti = set()
+    for riga in righe:
+        pezzi = riga.split("\t", 2)
+        if len(pezzi) != 3 or not pezzi[0].strip().isdigit():
+            continue
+        quando, sha, titolo = int(pezzi[0]), pezzi[1].strip(), pezzi[2]
+        if quando < dal or sha in visti:
+            continue
+        visti.add(sha)          # un --forza riscrive gli stessi commit
+        titolo = re.sub(r"[\x00-\x1f\x7f]", " ", titolo).strip()[:600]
+        if not titolo:
+            continue
+        if NOVITA_SEGRETE.search(titolo) or NOVITA_INTERNE.search(titolo):
+            scartati += 1
+            continue
+        tenuti.append(titolo)
+    return tenuti[-NOVITA_COMMIT_MAX:], scartati
+
+
+def _righe_novita(risposta: str) -> list:
+    """PURA: dalla risposta dell'AI alle righe da pubblicare. Toglie
+    puntini, numeri e asterischi da elenco, le righe che il setaccio
+    della sicurezza ferma (il modello puo' non aver ubbidito), taglia
+    su uno spazio. Una riga che comincia con una lettera o una cifra
+    non e' una novita' (ogni riga apre con la sua emoji): e' il «Ecco
+    le novita':» che il modello aggiunge anche se gli si dice di no.
+    Tutta la risposta «NIENTE» = nessuna riga."""
+    if (risposta or "").strip(" .!\n").upper() == "NIENTE":
+        return []
+    fuori = []
+    for riga in (risposta or "").splitlines():
+        r = re.sub(r"[\x00-\x1f\x7f]", " ", riga).strip()
+        r = re.sub(r"^(?:[-*•·]+|\d+[.)])\s*", "", r).replace("**", "").strip()
+        if not r or r[0].isalnum() or r.strip(" .!").upper() == "NIENTE":
+            continue
+        if NOVITA_SEGRETE.search(r) or re.search(r"https?://|</?\w", r):
+            continue
+        if len(r) > NOVITA_RIGA_MAX:
+            r = r[:NOVITA_RIGA_MAX].rsplit(" ", 1)[0].rstrip(",;:") + "…"
+        fuori.append(r)
+        if len(fuori) >= NOVITA_RIGHE_MAX:
+            break
+    return fuori
+
+
+async def _scrivi_novita(titoli: list) -> tuple[list, str]:
+    """L'AI fa dei titoli le righe: (righe, perche' sono vuote). Fail-
+    closed come deve: chiave assente o chiamata caduta = nessuna riga,
+    e la ragione la legge l'admin nella bozza."""
+    if not titoli:
+        return [], "nessun commit da raccontare"
+    if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY.startswith("INCOLLA"):
+        return [], "manca la chiave dell'AI"
+    try:
+        r = await asyncio.to_thread(
+            ai.messages.create,
+            model=MODELLO_RICERCA, max_tokens=500, timeout=30,
+            system=PROMPT_NOVITA,
+            messages=[{"role": "user", "content":
+                       "TITOLI DELLA SETTIMANA:\n"
+                       + "\n".join(f"- {t}" for t in titoli)}])
+        testo = "".join(b.text for b in r.content if b.type == "text")
+    except Exception as e:
+        print(f"⚠️ Novità della settimana: l'AI non ha risposto ({e})")
+        return [], "l'AI non ha risposto"
+    righe = _righe_novita(testo)
+    return righe, ("" if righe else "per l'AI niente di nuovo per gli utenti")
+
+
+def _bozza_novita() -> dict:
+    """La bozza nel timbro, o {} (mai scritta, o JSON storto)."""
+    try:
+        b = json.loads(timbro_letto(TIMBRO_NOVITA) or "{}")
+        return b if isinstance(b, dict) else {}
+    except ValueError:
+        return {}
+
+
+def _salva_bozza_novita(b: dict):
+    timbro_scrivi(TIMBRO_NOVITA, json.dumps(b, ensure_ascii=False))
+
+
+def _testo_bozza_novita(b: dict) -> tuple[str, dict]:
+    """Il messaggio agli admin e la sua tastiera (None a bozza decisa o
+    vuota). Le righe si scappano qui: sono testo dell'AI."""
+    testa = f"✨ <b>Novità della settimana</b> · lunedì {b.get('lunedi', '?')}\n\n"
+    righe = b.get("righe") or []
+    conti = (f"\n\n<i>Scritte dall'AI da {b.get('commit', 0)} commit "
+             f"({b.get('scartati', 0)} lasciati fuori: sicurezza o "
+             f"lavori interni).</i>")
+    if not righe:
+        return (testa + "Questa settimana niente novità da raccontare: "
+                + html.escape(b.get("perche") or "nessun motivo")
+                + ". Il riepilogo esce coi soli numeri.", None)
+    corpo = "\n".join(html.escape(r) for r in righe)
+    stato = b.get("stato")
+    if stato == "ok":
+        return testa + corpo + "\n\n✅ <b>Approvate</b>: escono nel riepilogo.", None
+    if stato == "no":
+        return testa + "<s>" + corpo + "</s>\n\n❌ <b>Saltate</b>: il " \
+            "riepilogo esce coi soli numeri.", None
+    lu = b.get("lunedi", "")
+    tastiera = {"inline_keyboard": [[
+        {"text": "✅ Pubblica", "callback_data": f"nov:ok:{lu}"},
+        {"text": "🔄 Riscrivi", "callback_data": f"nov:rif:{lu}"},
+        {"text": "❌ Salta", "callback_data": f"nov:no:{lu}"}]]}
+    return (testa + corpo + conti
+            + f"\n\nEscono nel riepilogo del canale solo se le approvi "
+              f"(entro lunedì alle {NOVITA_ORA_LIMITE})."), tastiera
+
+
+async def bozza_novita():
+    """La domenica sera: scrive la bozza del lunedi' dopo e la manda
+    agli admin. Una volta sola per lunedi': il timbro si scrive PRIMA
+    di mandare (il patto di `timbro_scrivi`), e un deploy di domenica
+    sera non ne fa nascere una seconda."""
+    if not (NOVITA_SETTIMANALI and RIEPILOGO_SETTIMANALE):
+        return
+    t = time.localtime()
+    if t.tm_wday != 6 or t.tm_hour < NOVITA_ORA_BOZZA:
+        return
+    lunedi = time.strftime("%Y-%m-%d", time.localtime(time.time() + 86400))
+    if _bozza_novita().get("lunedi") == lunedi:
+        return
+    titoli, scartati = _novita_dal_diario(int(time.time()) - 7 * 86400)
+    b = {"lunedi": lunedi, "stato": "vuota", "righe": [], "giri": 0,
+         "commit": len(titoli) + scartati, "scartati": scartati,
+         "perche": ""}
+    _salva_bozza_novita(b)        # il turno, prima della chiamata lenta
+    righe, perche = await _scrivi_novita(titoli)
+    b.update(righe=righe, perche=perche, stato="attesa" if righe else "vuota")
+    _salva_bozza_novita(b)
+    print(f"✨ Novità per lunedì {lunedi}: {len(righe)} righe da "
+          f"{len(titoli)} commit ({scartati} scartati)")
+    await _manda_bozza_novita(b)
+
+
+async def _manda_bozza_novita(b: dict):
+    """Nel gruppo degli admin (stanza «riepiloghi»), o in privato a
+    ognuno: come la revisione, chi tocca per primo decide."""
+    testo, tastiera = _testo_bozza_novita(b)
+    if await _al_gruppo_admin(testo, "riepiloghi", tastiera=tastiera,
+                              urgente=bool(tastiera),
+                              ripiego={"via": "tastiera" if tastiera
+                                       else "notifica"}):
+        return
+    destinatari = set(ADMIN_IDS)
+    if MODALITA_COLLAUDO:
+        destinatari.add(999)
+    for admin in destinatari:
+        dati = {"chat_id": admin, "parse_mode": "HTML", "text": testo}
+        if tastiera:
+            dati["reply_markup"] = tastiera
+        await bot_api("sendMessage", dati)
+
+
+def _novita_del_lunedi(oggi: str) -> tuple[bool, list]:
+    """Per `riepilogo_settimana`: (si puo' uscire?, righe approvate).
+    Leva spenta o nessuna bozza per oggi: (True, []), il post di
+    sempre. Bozza in attesa: si aspetta fino alle NOVITA_ORA_LIMITE."""
+    if not NOVITA_SETTIMANALI:
+        return True, []
+    b = _bozza_novita()
+    if b.get("lunedi") != oggi:
+        return True, []
+    if b.get("stato") == "attesa":
+        if time.localtime().tm_hour < NOVITA_ORA_LIMITE:
+            return False, []
+        return True, []
+    if b.get("stato") == "ok":
+        return True, [str(r) for r in (b.get("righe") or [])][:NOVITA_RIGHE_MAX]
+    return True, []
+
+
+async def callback_novita(cb: dict, dati: str):
+    """Il tocco su ✅/🔄/❌ della bozza. Solo i moderatori, e solo sulla
+    bozza di QUEL lunedi' ancora in attesa: un bottone vecchio non
+    decide la settimana dopo."""
+    if not e_admin((cb.get("from") or {}).get("id") or 0):
+        return
+    azione, _, lunedi = dati.partition(":")
+    if azione not in ("ok", "rif", "no"):
+        return
+    msg = cb.get("message") or {}
+    chat = (msg.get("chat") or {}).get("id")
+    b = _bozza_novita()
+    if b.get("lunedi") != lunedi or b.get("stato") != "attesa":
+        testo = ("⏳ Questa bozza non aspetta più: è già stata decisa, "
+                 "o è di un'altra settimana.")
+        tastiera = None
+    elif timbro_letto(TIMBRO_RIEPILOGO) == lunedi:
+        testo, tastiera = "⏳ Il riepilogo di lunedì è già uscito.", None
+    else:
+        chi = cb["from"]["id"]
+        if azione == "rif":
+            if int(b.get("giri") or 0) >= NOVITA_RISCRITTURE_MAX:
+                testo, tastiera = _testo_bozza_novita(b)
+                testo += (f"\n\n🔄 Riscritta già {NOVITA_RISCRITTURE_MAX} "
+                          "volte: pubblica o salta.")
+            else:
+                titoli, scartati = _novita_dal_diario(
+                    int(time.time()) - 7 * 86400)
+                righe, perche = await _scrivi_novita(titoli)
+                if righe:
+                    b.update(righe=righe, perche="")
+                b["giri"] = int(b.get("giri") or 0) + 1
+                _salva_bozza_novita(b)
+                testo, tastiera = _testo_bozza_novita(b)
+                if not righe:
+                    testo += f"\n\n🔄 Riscrittura non riuscita: {html.escape(perche)}."
+        else:
+            b["stato"] = azione
+            _salva_bozza_novita(b)
+            testo, tastiera = _testo_bozza_novita(b)
+            await notifica_admin(
+                f"✨ Novità di lunedì {lunedi}: "
+                + ("approvate" if azione == "ok" else "saltate")
+                + f" (da tg {chi})", argomento="riepiloghi")
+    if chat:
+        dati_msg = {"chat_id": chat, "message_id": msg.get("message_id"),
+                    "text": testo, "parse_mode": "HTML"}
+        if tastiera:
+            dati_msg["reply_markup"] = tastiera
+        await bot_api("editMessageText", dati_msg)
+
+
+async def _anteprima_novita(chat: int):
+    """`/anteprima novita`: la bozza come la scriverebbe l'AI ADESSO,
+    sui sette giorni indietro da oggi. Non si salva e non timbra: la
+    domenica resta quella vera."""
+    titoli, scartati = _novita_dal_diario(int(time.time()) - 7 * 86400)
+    righe, perche = await _scrivi_novita(titoli)
+    b = {"lunedi": "anteprima", "righe": righe, "stato": "anteprima",
+         "commit": len(titoli) + scartati, "scartati": scartati,
+         "perche": perche}
+    testo, _ = _testo_bozza_novita(b)
+    if not os.path.isfile(NOVITA_DIARIO):
+        testo += (f"\n\n⚠️ Il diario <code>{html.escape(NOVITA_DIARIO)}</code> "
+                  "non c'è ancora: lo scrive deploy.sh al prossimo deploy.")
+    elif not NOVITA_SETTIMANALI:
+        testo += "\n\n💤 La leva NOVITA_SETTIMANALI è spenta."
+    await bot_api("sendMessage", {"chat_id": chat, "text": testo,
+                                  "parse_mode": "HTML",
+                                  "reply_markup": tastiera_bot()})
 
 
 # ============ LA RONDA DEL LIBRO MASTRO (ago 2026) ==================

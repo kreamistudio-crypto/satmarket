@@ -333,6 +333,32 @@ giudica() {
   esac
 }
 
+# IL DIARIO DELLE NOVITA' (nov 2026): a deploy riuscito, una riga per
+# commit arrivato — «quando<TAB>sha<TAB>titolo» — che la domenica sera
+# il mercatino legge per scrivere le novita' della settimana (server.py,
+# «LE NOVITA' DELLA SETTIMANA»). Il server non chiama git: legge questo.
+# STA IN UNA CARTELLA DI ROOT, FUORI DAL REPO, ed e' il punto: il repo e'
+# di `barattolo`, e root che scrive a nome fisso in una cartella altrui
+# seguirebbe un collegamento piantato li' (la lezione di /tmp, audit del
+# 19 set). Qui `barattolo` legge e basta. Si riscrive per intero con un
+# `mv` (atomico), si tengono le ultime 2000 righe. Fail-open: un diario
+# che non si scrive non ferma niente, al piu' una domenica tace.
+DIARIO_NOVITA="${BARATTOLO_DIARIO_NOVITA:-/var/lib/barattolo-deploy/novita-commit}"
+diario_novita() {
+  local cartella adesso nuovo
+  cartella="$(dirname "$DIARIO_NOVITA")"
+  mkdir -p "$cartella" && chmod 755 "$cartella" || return 0
+  adesso="$(date +%s)"
+  nuovo="$(mktemp "$cartella/.novita.XXXXXX")" || return 0
+  {
+    cat "$DIARIO_NOVITA" 2>/dev/null
+    git --no-pager log --reverse --no-merges --format='%h%x09%s' "$1..$2" 2>/dev/null \
+      | awk -v t="$adesso" '{print t "\t" $0}'
+  } | tail -n 2000 > "$nuovo" && chmod 644 "$nuovo" && mv -f "$nuovo" "$DIARIO_NOVITA" \
+    || rm -f "$nuovo"
+  return 0
+}
+
 firme_dette() {
   [[ -s "$FIRMATARI" ]] && echo "firma richiesta ($FIRMATARI)" \
     || echo "⚠️ FIRME NON RICHIESTE: manca $FIRMATARI, vale solo l'autore"
@@ -518,6 +544,7 @@ systemctl restart "$SERVIZIO" || {
 if aspetta_che_stia_bene; then
   rm -f .deploy-bocciato .deploy-rifiutato
   dillo "✅ in produzione ${LA:0:8}"
+  diario_novita "$QUI" "$LA"
   avvisa "🚀 <b>Barattolo aggiornato</b> (<code>${LA:0:7}</code>)
 $NOVITA" riepiloghi
   exit 0

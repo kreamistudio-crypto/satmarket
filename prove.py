@@ -34082,6 +34082,7 @@ def _censimento(acceso, dopo=None):
                  "SUGGERIMENTI_OGNI_GIORNI", "PROMO_GIORNI_VENDITORE",
                  "POST_LAMPO_CANALE", "RIEPILOGO_SETTIMANALE",
                  "RIEPILOGO_MINIMO", "RIEPILOGO_IMMAGINE",
+                 "NOVITA_SETTIMANALI",
                  "MAX_NEGOZI_RAFFICA", "MAX_LINK_NEGOZIO",
                  "CONNETTORI_NEGOZIO_APERTI", "CONNETTORI_NEGOZIO_PER_TUTTI",
                  "MAX_PRODOTTI_CONNETTORE",
@@ -35082,6 +35083,304 @@ def prove_vetrina_negozio():
           '("pod_", "neg_")' in pezzo("genera_miniature_mancanti"))
 
 
+def prove_novita_settimanali():
+    """LE NOVITA' DELLA SETTIMANA (nov 2026, chiesto da Andrea): il
+    diario dei commit coi suoi due setacci, le righe dell'AI ripulite,
+    la bozza che aspetta un admin, il lunedi' che aspetta la bozza, i
+    bottoni che decidono una volta sola, e deploy.sh che scrive il
+    diario in una cartella di root. Si scappa all'USCITA (B-35)."""
+    print("\n✨ Le novità della settimana")
+    import asyncio as _aio
+    import html as _html
+    import json as _json
+    import sqlite3
+    import subprocess
+    import tempfile
+
+    # --- 1) IL DIARIO E I DUE SETACCI ----------------------------
+    amb = {"re": re, "NOVITA_COMMIT_MAX": 80, "NOVITA_RIGHE_MAX": 5,
+           "NOVITA_RIGA_MAX": 140}
+    for nome in ("NOVITA_SEGRETE", "NOVITA_INTERNE"):
+        m = re.search(rf"^{nome} = re\.compile\(.*?re\.I\)\n", _SORGENTE,
+                      re.M | re.S)
+        exec(m.group(0), amb)
+    for f in ("_novita_dal_diario", "_righe_novita"):
+        exec(pezzo(f), amb)
+    ora = 2_000_000_000
+    with tempfile.TemporaryDirectory() as cartella:
+        diario = os.path.join(cartella, "novita-commit")
+        with open(diario, "w", encoding="utf-8") as f:
+            f.write("\n".join([
+                f"{ora}\taaa1111\tP2P: Wise fra i metodi di pagamento",
+                f"{ora}\tbbb2222\tIl titolo si ripulisce (cantiere sicurezza-b01)",
+                f"{ora}\tccc3333\tB-12: il login che non si lascia rubare",
+                f"{ora}\tddd4444\tLe prove del cambio girano nei collaudi",
+                f"{ora}\teee5555\tSwap automatico, dietro la leva SWAP_ATTIVO che resta spenta",
+                f"{ora - 9 * 86400}\tfff6666\tVecchio di nove giorni",
+                "riga storta senza tab",
+                f"{ora}\taaa1111\tP2P: Wise fra i metodi di pagamento",
+                f"{ora}\tggg7777\tLa mappa del contanti\x07 di persona"]) + "\n")
+        tenuti, scartati = amb["_novita_dal_diario"](ora - 7 * 86400, diario)
+    prova("il diario tiene le novita' vere, una volta sola",
+          ["P2P: Wise fra i metodi di pagamento",
+           "La mappa del contanti  di persona"], tenuti)
+    prova("...e conta i quattro scartati (sicurezza, B-xx, prove, leva spenta)",
+          4, scartati)
+    prova("un diario che non c'e' tace", ([], 0),
+          amb["_novita_dal_diario"](0, "/non/esiste/novita"))
+    for frase in ("Chiusa una falla nel login", "Il CSP piu' stretto",
+                  "B-07 sistemata", "Il token del bot", "audit fatto",
+                  "Protezione dagli attacchi"):
+        prova(f"il setaccio della sicurezza ferma «{frase}»", True,
+              bool(amb["NOVITA_SEGRETE"].search(frase)))
+    prova("...e lascia passare una novita' vera", None,
+          amb["NOVITA_SEGRETE"].search("Adesso puoi pagare in USDT su Tron"))
+
+    # --- 2) LE RIGHE DELL'AI, RIPULITE ---------------------------
+    risposta = ("Ecco le novità della settimana:\n"
+                "- 💸 Adesso puoi pagare in USDT\n"
+                "2) 🔒 Chiusa una falla nel login\n"
+                "**🫙 Il wallet è uno solo**\n"
+                "🧪 Prova <b>grassetto</b>\n"
+                "🗺 La mappa https://barattolo.store\n"
+                "🎉 " + "parola " * 40 + "\n"
+                "🟢 una\n🟢 due\n🟢 tre\n🟢 quattro\n")
+    righe = amb["_righe_novita"](risposta)
+    prova("via l'intro, i puntini e gli asterischi",
+          ["💸 Adesso puoi pagare in USDT", "🫙 Il wallet è uno solo"],
+          righe[:2])
+    prova("una riga di sicurezza dall'AI non passa", False,
+          any("falla" in r for r in righe))
+    prova("niente HTML e niente link", False,
+          any("<" in r or "http" in r for r in righe))
+    prova("la riga lunga si taglia su uno spazio", True,
+          righe[2].endswith("…") and len(righe[2]) <= 141)
+    prova("al massimo cinque righe", 5, len(righe))
+    prova("«NIENTE» = nessuna riga", [], amb["_righe_novita"]("NIENTE."))
+    prova("vuoto = nessuna riga", [], amb["_righe_novita"](""))
+
+    # --- 3) LA BOZZA, IL LUNEDI', I BOTTONI ----------------------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE timbri(nome TEXT PRIMARY KEY, valore TEXT, "
+                "quando INTEGER)")
+    con.commit()
+
+    class ConFinta:
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass
+
+    class Tempo:
+        """Un giorno e un'ora finti; il calendario lo da' `wday`."""
+        def __init__(self, wday, ora_del_giorno, data):
+            self.wday, self.h, self.data = wday, ora_del_giorno, data
+
+        def time(self):
+            return ora
+
+        def localtime(self, *a):
+            return type("t", (), {"tm_wday": self.wday, "tm_hour": self.h})()
+
+        def strftime(self, f, *a):
+            return self.data
+
+    mandati, chiamate_ai = [], []
+
+    async def bot_api_finta(metodo, dati):
+        mandati.append((metodo, dati))
+        return {"ok": True, "result": {"message_id": 1}}
+
+    async def scrivi_finta(titoli):
+        chiamate_ai.append(list(titoli))
+        return ["💸 Adesso puoi pagare in <USDT> & co"], ""
+
+    async def gruppo_muto(*a, **k):
+        return False
+
+    async def notifica_admin_finta(*a, **k):
+        mandati.append(("admin", a[0]))
+
+    def ambiente(tempo, leva=True):
+        a = {"db": lambda: ConFinta(), "time": tempo, "json": _json,
+             "html": _html, "print": lambda *x, **k: None,
+             "bot_api": bot_api_finta, "_scrivi_novita": scrivi_finta,
+             "_al_gruppo_admin": gruppo_muto,
+             "notifica_admin": notifica_admin_finta,
+             "_novita_dal_diario": lambda dal, percorso="": (["Wise"], 2),
+             "e_admin": lambda tg: tg == 7, "ADMIN_IDS": [7],
+             "MODALITA_COLLAUDO": False, "NOVITA_SETTIMANALI": leva,
+             "RIEPILOGO_SETTIMANALE": True, "NOVITA_ORA_BOZZA": 18,
+             "NOVITA_ORA_LIMITE": 10, "NOVITA_RIGHE_MAX": 5,
+             "NOVITA_RISCRITTURE_MAX": 3, "TIMBRO_NOVITA": "novita_bozza",
+             "TIMBRO_RIEPILOGO": "riepilogo_settimana"}
+        for f in ("timbro_letto", "timbro_scrivi", "_bozza_novita",
+                  "_salva_bozza_novita", "_testo_bozza_novita",
+                  "_novita_del_lunedi"):
+            exec(pezzo(f), a)
+        for f in ("bozza_novita", "_manda_bozza_novita", "callback_novita"):
+            exec("async " + pezzo(f), a)
+        return a
+
+    # di sabato, e di domenica prima delle 18: niente
+    _aio.run(ambiente(Tempo(5, 20, "2026-11-08"))["bozza_novita"]())
+    _aio.run(ambiente(Tempo(6, 17, "2026-11-09"))["bozza_novita"]())
+    prova("prima della domenica alle 18 nessuna bozza", (0, 0),
+          (len(mandati), len(chiamate_ai)))
+    # a leva spenta nemmeno la domenica
+    _aio.run(ambiente(Tempo(6, 19, "2026-11-09"), leva=False)["bozza_novita"]())
+    prova("a leva spenta nessuna bozza", 0, len(chiamate_ai))
+    # domenica sera: una bozza, anche con tre giri dell'orologio
+    for _ in range(3):
+        _aio.run(ambiente(Tempo(6, 19, "2026-11-09"))["bozza_novita"]())
+    prova("domenica sera: l'AI si chiama una volta sola", 1, len(chiamate_ai))
+    prova("...e la bozza arriva all'admin coi tre bottoni", True,
+          len(mandati) == 1 and mandati[0][1]["chat_id"] == 7
+          and [b["callback_data"] for b in
+               mandati[0][1]["reply_markup"]["inline_keyboard"][0]]
+          == ["nov:ok:2026-11-09", "nov:rif:2026-11-09", "nov:no:2026-11-09"])
+    prova("...con le righe scappate (B-35)", True,
+          "&lt;USDT&gt; &amp; co" in mandati[0][1]["text"]
+          and "<USDT>" not in mandati[0][1]["text"])
+    prova("i callback stanno nei 64 byte di Telegram", True,
+          all(len(b["callback_data"].encode()) <= 64 for b in
+              mandati[0][1]["reply_markup"]["inline_keyboard"][0]))
+    lun = ambiente(Tempo(0, 8, "2026-11-09"))
+    prova("lunedi' alle 8, bozza in attesa: il riepilogo aspetta",
+          (False, []), lun["_novita_del_lunedi"]("2026-11-09"))
+    prova("lunedi' alle 10 senza decisione: esce coi soli numeri",
+          (True, []), ambiente(Tempo(0, 10, "2026-11-09"))
+          ["_novita_del_lunedi"]("2026-11-09"))
+    # il tocco di chi non e' admin non conta
+    cb = {"from": {"id": 5}, "message": {"chat": {"id": 7}, "message_id": 3}}
+    _aio.run(lun["callback_novita"](cb, "ok:2026-11-09"))
+    prova("il tocco di un non-admin non decide", "attesa",
+          lun["_bozza_novita"]()["stato"])
+    # un bottone di un'altra settimana non decide questa
+    cb["from"]["id"] = 7
+    _aio.run(lun["callback_novita"](cb, "ok:2026-11-02"))
+    prova("un bottone vecchio non decide", "attesa",
+          lun["_bozza_novita"]()["stato"])
+    # 🔄: riscrive e resta in attesa, col conto dei giri
+    _aio.run(lun["callback_novita"](cb, "rif:2026-11-09"))
+    prova("🔄 riscrive e la bozza resta in attesa", ("attesa", 1, 2),
+          (lun["_bozza_novita"]()["stato"], lun["_bozza_novita"]()["giri"],
+           len(chiamate_ai)))
+    # ✅: approvate, e il lunedi' le prende
+    _aio.run(lun["callback_novita"](cb, "ok:2026-11-09"))
+    prova("✅ approva", "ok", lun["_bozza_novita"]()["stato"])
+    prova("...e il lunedi' esce con le righe NUDE (si scappano dopo)",
+          (True, ["💸 Adesso puoi pagare in <USDT> & co"]),
+          lun["_novita_del_lunedi"]("2026-11-09"))
+    _aio.run(lun["callback_novita"](cb, "no:2026-11-09"))
+    prova("una bozza decisa non si ridecide", "ok",
+          lun["_bozza_novita"]()["stato"])
+    prova("un altro lunedi' non prende la bozza di questo", (True, []),
+          lun["_novita_del_lunedi"]("2026-11-16"))
+    prova("a leva spenta il lunedi' e' quello di sempre", (True, []),
+          ambiente(Tempo(0, 8, "2026-11-09"), leva=False)
+          ["_novita_del_lunedi"]("2026-11-09"))
+
+    # --- 4) IL POST DEL LUNEDI' CON LE NOVITA' -------------------
+    post = []
+
+    async def bot_api_post(metodo, dati):
+        post.append(dati)
+        return {"ok": True}
+
+    def riepilogo(novita, nuovi=0, ordini=0):
+        a = {"db": lambda: ConFinta(), "html": _html,
+             "time": Tempo(0, 11, "2026-11-09"), "print": lambda *x, **k: None,
+             "bot_api": bot_api_post, "canale_riepilogo": lambda: "@riep",
+             "URL_PUBBLICO": "https://barattolo.store",
+             "RIEPILOGO_SETTIMANALE": True, "RIEPILOGO_MINIMO": 3,
+             "TIMBRO_RIEPILOGO": "riepilogo_settimana",
+             "_salva_podio": lambda con, top, oggi: "",
+             "_conta_settimana": lambda con, da: (nuovi, ordini, []),
+             "_novita_del_lunedi": lambda oggi: novita,
+             "NOVITA_DIDASCALIA_MAX": 1000}
+        gemelli_link_telegram(a)
+        for f in ("timbro_letto", "timbro_scrivi"):
+            exec(pezzo(f), a)
+        exec("async " + pezzo("riepilogo_settimana"), a)
+        con.execute("DELETE FROM timbri WHERE nome='riepilogo_settimana'")
+        _aio.run(a["riepilogo_settimana"]())
+        return post.pop()["text"] if post else None
+
+    testo = riepilogo((True, ["💸 Paga in <USDT> & co"]), nuovi=5, ordini=2)
+    prova("le novita' escono nel post, scappate", True,
+          "✨ <b>Le novità della settimana</b>\n💸 Paga in &lt;USDT&gt; &amp; co"
+          in testo and "🫙 5 nuovi annunci" in testo)
+    prova("settimana magra CON novita': esce, coi soli ✨", True,
+          (lambda t: t is not None and "✨" in t and "nuovo annuncio" not in t)(
+              riepilogo((True, ["💸 Paga in USDT"]), nuovi=1)))
+    prova("settimana magra senza novita': il silenzio di sempre", None,
+          riepilogo((True, []), nuovi=1))
+    prova("bozza in attesa: il riepilogo non esce e non timbra", (None, 0),
+          (riepilogo((False, []), nuovi=5),
+           con.execute("SELECT COUNT(*) FROM timbri WHERE "
+                       "nome='riepilogo_settimana'").fetchone()[0]))
+
+    # --- 5) LE SENTINELLE ----------------------------------------
+    prova("la leva e' spenta di serie", True,
+          "    NOVITA_SETTIMANALI = False\n" in _SORGENTE)
+    prova("il router porta i bottoni «nov» a callback_novita", True,
+          'if azione == "nov":\n        # la bozza delle novita\' della '
+          'settimana (solo moderatori)\n        return await '
+          'callback_novita(cb, token)' in _SORGENTE)
+    prova("l'orologio chiama la bozza della domenica", True,
+          "await bozza_novita()" in codice(pezzo("orologio")))
+    blocco = _SORGENTE[_SORGENTE.index("# ============ LE NOVITA' DELLA "
+                                       "SETTIMANA"):
+                       _SORGENTE.index("# ============ LA RONDA DEL LIBRO")]
+    prova("le novita' non chiamano git ne' altri processi", False,
+          any(k in codice(blocco) for k in
+              ("subprocess", "create_subprocess", "os.system", "Popen")))
+    prova("il diario sta fuori dal repo, in un percorso assoluto", True,
+          '    NOVITA_DIARIO = "/var/lib/barattolo-deploy/novita-commit"'
+          in _SORGENTE)
+    prova("l'anteprima non timbra e non salva", False,
+          any(k in codice(pezzo("_anteprima_novita")) for k in
+              ("timbro_scrivi", "_salva_bozza_novita")))
+    sh = open("deploy.sh", encoding="utf-8").read().replace("\r\n", "\n")
+    prova("deploy.sh scrive il diario solo a deploy riuscito", True,
+          'dillo "✅ in produzione ${LA:0:8}"\n  diario_novita "$QUI" "$LA"'
+          in sh)
+    prova("...in una cartella di root, di serie fuori dal repo", True,
+          'DIARIO_NOVITA="${BARATTOLO_DIARIO_NOVITA:-/var/lib/'
+          'barattolo-deploy/novita-commit}"' in sh)
+    funzione = re.search(r"^diario_novita\(\) \{\n.*?^\}\n", sh,
+                         re.M | re.S).group(0)
+    prova("...con un mv atomico, mai un >> a nome fisso", True,
+          'mv -f "$nuovo" "$DIARIO_NOVITA"' in funzione
+          and ">>" not in funzione)
+    # e gira davvero, su questo stesso repo
+    if subprocess.run(["git", "rev-parse", "--verify", "-q", "HEAD~2"],
+                      capture_output=True).returncode != 0:
+        salta("deploy.sh scrive il diario", "qui non c'e' un repo git "
+              "con almeno tre commit (clone poco profondo?)")
+        return
+    with tempfile.TemporaryDirectory() as cartella:
+        dove = os.path.join(cartella, "sotto", "novita-commit")
+        prova_sh = (funzione + 'diario_novita HEAD~2 HEAD\n'
+                    'diario_novita HEAD~1 HEAD\n')
+        r = subprocess.run(["bash", "-c", prova_sh],
+                           env={**os.environ, "DIARIO_NOVITA": dove},
+                           capture_output=True, text=True, timeout=30)
+        righe_d = open(dove, encoding="utf-8").read().splitlines() \
+            if os.path.isfile(dove) else []
+        prova("il diario nasce con tre righe «quando<TAB>sha<TAB>titolo»",
+              (0, 3, True),
+              (r.returncode, len(righe_d),
+               all(len(x.split("\t")) >= 3 and x.split("\t")[0].isdigit()
+                   for x in righe_d)))
+        prova("...leggibile da tutti, scrivibile solo da chi l'ha scritto",
+              "0o644", oct(os.stat(dove).st_mode & 0o777)
+              if os.path.isfile(dove) else "manca")
+
+
 def prove_podio_riepilogo():
     """IL PODIO DEL LUNEDI' (ago 2026, chiesto da Andrea): i tre piu'
     venduti come tre barattoli con dentro la foto dell'articolo.
@@ -35572,7 +35871,11 @@ def prove_vetrina_canale():
              # prove in prove_podio_riepilogo. A mani vuote si prende
              # la strada del post di testo, cioe' quella che queste
              # prove sorvegliano da sempre.
-             "_salva_podio": lambda con, top, oggi: ""}
+             "_salva_podio": lambda con, top, oggi: "",
+             # LE NOVITA' (nov 2026) hanno le prove loro, in
+             # prove_novita_settimanali: qui leva spenta, il post di sempre
+             "_novita_del_lunedi": lambda oggi: (True, []),
+             "NOVITA_DIDASCALIA_MAX": 1000}
         gemelli_link_telegram(a)    # a leva spenta: il link di sempre
         for f in ("timbro_letto", "timbro_scrivi", "_conta_settimana"):
             exec(pezzo(f), a)
@@ -164578,21 +164881,26 @@ def prove_canale_admin():
     # (20 ott 2026, cantiere fusione-da-telegram: l'unione dei due account
     # fatta dal web, `unisci_nostr`, gemella di quella dal bot — UNO, nei
     # riepiloghi: 76 chiamate, 86 punti.)
+    # (5 nov 2026, cantiere novita-settimanali: la bozza delle novita'
+    # della domenica e' la TERZA tastiera, `_manda_bozza_novita`, gemella
+    # della revisione, e la decisione presa si dice nei riepiloghi — DUE
+    # punti in piu': 89.)
     prova("censimento: le 69 chiamate a notifica_admin di prima ci sono "
           "tutte, piu' la disputa del mercatino (che era un ciclo suo), e "
           "OGNUNA dice la sua stanza",
           # (27 ott 2026, margine-cassaforte) «manca margine nella
           # cassaforte» va nella stanza della liquidita', come la guardia
           {"dispute": 2, "dm": 1, "errori": 33, "liquidita": 1,
-           "moderazione": 14, "riepiloghi": 27}, per_stanza)
+           "moderazione": 14, "riepiloghi": 28}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
     porta = sorted(d for d, _ in chiamate("_al_gruppo_admin"))
-    prova("la porta del gruppo ha sei ingressi e non uno di piu': "
-          "notifica_admin, le due tastiere, ponte, liquidita' e il P2P dei "
+    prova("la porta del gruppo ha sette ingressi e non uno di piu': "
+          "notifica_admin, le tre tastiere, ponte, liquidita' e il P2P dei "
           "moderatori",
           sorted(["notifica_admin", "avvisa_revisione", "avvisa_banner",
+                  "_manda_bozza_novita",
                   "_avvisa_ponte", "_avvisa_liquidita", "_recapita_p2p"]),
           porta)
     cicli_p2p = sorted(f.name for f in funzioni for n in _ast.walk(f)
@@ -164617,13 +164925,15 @@ def prove_canale_admin():
           sorted(d for d, _ in chiamate("_recapita_p2p")))
     totale = (len(stanze_scritte) + len(cicli_p2p)
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
+                                              "_manda_bozza_novita",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "87 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "89 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
-          "quota arrivata su swap@, l'unione degli account dal web e il "
-          "margine della cassaforte)", 87,
+          "quota arrivata su swap@, l'unione degli account dal web, il "
+          "margine della cassaforte e la bozza delle novita' con la sua "
+          "decisione)", 89,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -164631,7 +164941,8 @@ def prove_canale_admin():
           "funzione nuova che ci gira sopra per mandare un avviso salta "
           "il gruppo: passi da notifica_admin, e poi si aggiorna l'elenco",
           ["_admin_in_privato", "_avvisa_liquidita", "_avvisa_ponte",
-           "_chi_avvisa_ponte", "_ids_staff", "_leve_stato", "_moderatori_p2p",
+           "_chi_avvisa_ponte", "_ids_staff", "_leve_stato",
+           "_manda_bozza_novita", "_moderatori_p2p",
            "_ripiego_privato_admin", "assegna_admin_live", "avvisa_banner", "avvisa_revisione",
            "e_admin", "notifica_admin"], con_admin_ids)
     disputa = codice(pezzo("apri_disputa"))
@@ -180296,7 +180607,8 @@ def main():
               prove_divisione_a_ritroso,
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_canale_bot,
-              prove_podio_riepilogo, prove_vetrina_negozio,
+              prove_podio_riepilogo, prove_novita_settimanali,
+              prove_vetrina_negozio,
               prove_vetrina_canale, prove_relay_leva, prove_relay_di_barattolo, prove_posta_relay, prove_backup_prima_del_deploy,
               prove_backup_database_occupato,
               prove_cambio, prove_recupero_cambi,
