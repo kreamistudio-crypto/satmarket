@@ -104,26 +104,3 @@ che si vede va nel verbale (CANTIERI, «Il cambio libero, tappa 3»,
 «COSA RESTA») e questa voce si cancella. ATTENZIONE alle copie vecchie
 del config: `config.py.prima-prova-aperta` (23 ott) e
 `config.py.prima-swap` (27 ott) NON hanno queste righe.
-
-## 4. Le novità della settimana nel riepilogo (5 nov 2026, cantiere novita-settimanali, richiesta di Andrea)
-
-**Perché.** La domenica sera l'AI scrive le novità dai commit della
-settimana, tu le approvi coi bottoni, e il lunedì escono nel riepilogo
-del canale. La leva è spenta di serie, e si accende DOPO la promozione
-su main: il diario dei commit lo scrive il deploy, quindi nasce col
-primo deploy dopo.
-
-**Sola lettura** (sul VPS, dopo la promozione e un deploy): il diario
-c'è, e la leva non è già scritta?
-```
-ls -la /var/lib/barattolo-deploy/ && tail -3 /var/lib/barattolo-deploy/novita-commit; grep -n "NOVITA_SETTIMANALI" /srv/barattolo/config.py
-```
-
-**Poi** (una riga in fondo al config, e il riavvio):
-```
-echo 'NOVITA_SETTIMANALI = True' >> /srv/barattolo/config.py && systemctl restart barattolo
-```
-
-**Per guardare subito**, dal bot in privato: `/anteprima novita`. La
-prima bozza vera arriva domenica dopo le 18.
-

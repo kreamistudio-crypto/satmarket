@@ -73336,7 +73336,9 @@ ASPETTA la decisione fino alle 10, senza timbrare; poi esce col «✨»
 approvato o coi soli numeri. Una settimana magra con le novità
 approvate esce lo stesso, coi soli «✨». `/anteprima novita` fa vedere
 la bozza di adesso senza salvare né timbrare. Leva `NOVITA_SETTIMANALI`,
-spenta di serie, nel pannello «⚙️ Stato delle leve».
+ACCESA di serie, nel pannello «⚙️ Stato delle leve»: Andrea (5 nov)
+«niente righe nel config, tanto va solo agli admin nel gruppo e
+decidiamo noi se pubblicarlo». La guardia è il ✅, non la leva.
 
 **I perché.** Il SERVER NON CHIAMA GIT: la sua unica porta verso un
 sottoprocesso è quella del ponte, e leggere gli oggetti di `.git` a
@@ -73368,8 +73370,8 @@ commit sopra `promozione-senza-onchain` (f17f25d).
 NON provato: l'AI vera (qui non c'è la chiave), il gruppo degli admin
 vero, il diario scritto dal deploy vero.
 
-**Cosa resta.** Accendere sul VPS (DA-FARE-ANDREA, voce 4) dopo la
-promozione: il diario nasce col primo deploy dopo, quindi la prima
-domenica racconta solo i commit da lì in poi. Da guardare alla prima
+**Cosa resta.** Niente sul VPS: dopo la promozione il diario nasce col
+primo deploy, quindi la prima domenica racconta solo i commit da lì in
+poi. Da guardare alla prima
 bozza vera: se l'AI annuncia cose dietro leve spente che i titoli non
 dicono, si stringe `NOVITA_INTERNE` o il prompt.

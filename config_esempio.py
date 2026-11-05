@@ -1659,8 +1659,9 @@ RIEPILOGO_IMMAGINE = True
 # ✅ Pubblica / 🔄 Riscrivi / ❌ Salta, e il lunedi' le righe approvate
 # escono dentro il riepilogo, sotto «✨». Senza un ✅ non esce niente, e
 # il lunedi' aspetta la decisione fino alle 10. I commit che parlano di
-# sicurezza non arrivano nemmeno all'AI. Spenta di serie.
-NOVITA_SETTIMANALI = False
+# sicurezza non arrivano nemmeno all'AI. Accesa di serie: la guardia e'
+# il ✅ di un admin, non la leva.
+NOVITA_SETTIMANALI = True
 # Il diario dei commit: lo scrive deploy.sh a ogni deploy riuscito, in
 # una cartella di root FUORI dal repo (il mercatino legge e basta).
 # Senza il deploy automatico (in locale) il file non c'e' e la domenica

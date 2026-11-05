@@ -5682,7 +5682,7 @@ RIPIEGA sul canale di casa — a differenza degli altri due, dove il
 vuoto vuol dire «non ci andiamo» e non esiste nessun ripiego: sono
 canali di qualcun ALTRO.
 LE NOVITA' DELLA SETTIMANA (5 nov 2026, leva `NOVITA_SETTIMANALI`,
-spenta di serie) escono DENTRO quel riepilogo, quindi nello stesso
+ACCESA di serie: nessuna riga nel config, decisione di Andrea) escono DENTRO quel riepilogo, quindi nello stesso
 canale. Il diario dei commit lo scrive `deploy.sh` a ogni deploy
 riuscito in `/var/lib/barattolo-deploy/novita-commit` (cartella di
 root, il mercatino legge e basta; un altro percorso: `NOVITA_DIARIO`

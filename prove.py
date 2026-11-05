@@ -35324,8 +35324,10 @@ def prove_novita_settimanali():
                        "nome='riepilogo_settimana'").fetchone()[0]))
 
     # --- 5) LE SENTINELLE ----------------------------------------
-    prova("la leva e' spenta di serie", True,
-          "    NOVITA_SETTIMANALI = False\n" in _SORGENTE)
+    # accesa di serie (5 nov 2026, decisione di Andrea): la guardia e'
+    # il ✅ di un admin, provato qui sopra, non la leva
+    prova("la leva e' accesa di serie", True,
+          "    NOVITA_SETTIMANALI = True\n" in _SORGENTE)
     prova("il router porta i bottoni «nov» a callback_novita", True,
           'if azione == "nov":\n        # la bozza delle novita\' della '
           'settimana (solo moderatori)\n        return await '

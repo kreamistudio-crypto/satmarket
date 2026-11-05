@@ -2141,13 +2141,15 @@ except ImportError:
 # Andrea): la domenica sera l'AI scrive due-cinque righe da utente coi
 # commit arrivati in produzione, la bozza va agli admin coi bottoni, e
 # il lunedi' esce dentro il post di sempre SOLO SE un admin l'ha
-# approvata. Spenta di serie: si accende nel config del VPS. Il diario
+# approvata. ACCESA DI SERIE (5 nov 2026, Andrea: «niente righe nel
+# config, tanto va solo agli admin e decidiamo noi»): senza un ✅ non
+# esce niente, quindi accesa non rischia nulla. Il diario
 # dei commit lo scrive deploy.sh in una cartella di ROOT (vedi
 # `NOVITA_DIARIO`, col perche').
 try:
     from config import NOVITA_SETTIMANALI
 except ImportError:
-    NOVITA_SETTIMANALI = False
+    NOVITA_SETTIMANALI = True
 try:
     from config import NOVITA_DIARIO
 except ImportError:
@@ -32571,7 +32573,8 @@ def _leve_stato():
                   acceso="la domenica sera l'AI scrive le novità dai "
                          "commit della settimana; escono il lunedì solo "
                          "se un admin le approva",
-                  spento="il riepilogo del lunedì racconta solo i numeri"),
+                  spento="il riepilogo del lunedì racconta solo i numeri, "
+                         "e la domenica nessuna bozza"),
             _leva("Negozi raccontati per raffica", "MAX_NEGOZI_RAFFICA",
                   MAX_NEGOZI_RAFFICA,
                   spento="una raffica esce sempre come un post solo che "
