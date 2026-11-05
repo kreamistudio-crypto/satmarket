@@ -187694,11 +187694,671 @@ def _leva_apribile_di_nome_vera(chiave):
     return amb["_leva_apribile_di_nome"](chiave)
 
 
+def prove_categorie_delle_prove():
+    """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
+    categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
+    `main()` ci sta UNA volta: una dimenticata non girerebbe mai con
+    `--categoria`, e nessuno se ne accorgerebbe. Poi il giudice di
+    `--dai-file`, coi cambi di cartone: la parte che conta e' il
+    fail-closed — nel dubbio, tutto."""
+    print("\n[le categorie delle prove: la mappa e il giudice dei file]")
+    src = open(__file__, encoding="utf-8").read()
+    m = src[src.index("\ndef main():"):]
+    m = m[m.index("tutte = ("):m.index("\n    sezioni, titolo = ")]
+    # i commenti dentro l'elenco (una sezione spostata nei collaudi, col
+    # perche') non sono sezioni
+    in_main = re.findall(r"prove_\w+", codice(m.replace("#", "\n#")))
+    in_mappa = ["prove_" + n for nomi in CATEGORIE.values() for n in nomi]
+    prova("main() non chiama due volte la stessa sezione", [],
+          sorted({n for n in in_main if in_main.count(n) > 1}))
+    prova("ogni sezione di main() ha la sua categoria", [],
+          sorted(set(in_main) - set(in_mappa)))
+    prova("nella mappa nessun nome che main() non chiama", [],
+          sorted(set(in_mappa) - set(in_main)))
+    prova("nessuna sezione sta in due categorie", [],
+          sorted({n for n in in_mappa if in_mappa.count(n) > 1}))
+    prova("le sentinelle di SEMPRE esistono in main()", [],
+          sorted(set("prove_" + n for n in SEMPRE) - set(in_main)))
+    prova("le categorie sono le cinque concordate",
+          ["infrastruttura", "mercatino", "onchain", "p2p", "swap"],
+          sorted(CATEGORIE))
+    prova("un --categoria storto si ferma col 2, non gira tutto", 2,
+          _esce(lambda: _scelta_da_riga_di_comando(["--categoria=pp2"], [])))
+    prova("un argomento sconosciuto si ferma col 2", 2,
+          _esce(lambda: _scelta_da_riga_di_comando(["--tutte"], [])))
+    import types
+    finte = [types.SimpleNamespace(__name__=n) for n in in_main]
+    scelte, _ = _scelta_da_riga_di_comando(["--categoria", "swap"], finte)
+    prova("--categoria swap: le sezioni dello swap e le sentinelle, e basta",
+          sorted(["prove_" + n for n in CATEGORIE["swap"] + SEMPRE]),
+          sorted(f.__name__ for f in scelte))
+    prova("senza argomenti gira tutto, come in CI", None,
+          _scelta_da_riga_di_comando([], finte)[0])
+
+    # il giudice dei file, con un server e una miniapp di cartone
+    server = ("import os\n\n\ndef p2p_motore_finto():\n    return 1\n\n\n"
+              "def funzione_che_nessuno_nomina_zz():\n    return 2\n\n\n"
+              "COSTANTE_DEL_LIBRO_MASTRO_ZZ = 3\n")
+    finto = {"server.py": server}
+    leggi = finto.__getitem__
+    sorgente = ("def prove_p2p_motore():\n    pezzo('p2p_motore_finto')\n\n"
+                "def prove_libro_mastro():\n    'COSTANTE_DEL_LIBRO_MASTRO_ZZ'\n")
+    giudice = lambda c: scegli_dai_cambi(c, leggi, sorgente)[0]
+    prova("una funzione del server nominata da una sezione P2P → p2p",
+          {"p2p"}, giudice({"server.py": ("cambiato", [5])}))
+    prova("una costante nominata dal libro mastro → mercatino",
+          {"mercatino"}, giudice({"server.py": ("cambiato", [13])}))
+    prova("una funzione che nessuna sezione nomina prende il vicinato",
+          {"p2p"}, giudice({"server.py": ("cambiato", [9])}))
+    finto["solo.py"] = "def funzione_che_nessuno_nomina_zz():\n    return 2\n"
+    prova("...e senza nessuno di nominato nei paraggi → TUTTO (fail-closed)",
+          None, scegli_dai_cambi({"server.py": ("cambiato", [2])},
+                                 {"server.py": finto["solo.py"]}.__getitem__,
+                                 sorgente)[0])
+    prova("un disegno che nessuno nomina → solo le sentinelle", set(),
+          giudice({"appunti/disegno-zz.png": ("cambiato", [1])}))
+    con_disegno = sorgente.replace("pezzo('p2p_motore_finto')",
+                                   "pezzo('p2p_motore_finto'), 'motore-zz.png'")
+    prova("un disegno nominato → la sola sezione che lo nomina, non la "
+          "categoria", (set(), {"prove_p2p_motore"}),
+          scegli_dai_cambi({"assets/motore-zz.png": ("cambiato", [1])},
+                           leggi, con_disegno)[:2])
+    prova("un file di codice che nessuno nomina → solo l'infrastruttura "
+          "(lo guardano i censimenti dei file)", {"infrastruttura"},
+          giudice({"zz_script_ignoto.sh": ("cambiato", [1])}))
+    prova("un file nato porta l'infrastruttura (i censimenti dei file)",
+          {"infrastruttura"}, giudice({"appunti/nuovo-zz.png": ("nuovo", [])}))
+    pagina = ("<style>\n.foglio-zz {\n  color: red;\n}\n</style>\n"
+              "<div>testo qualunque</div>\n<script>\n"
+              "function p2p_motore_finto(){\n  return 1;\n}\n</script>\n")
+    finto["miniapp.html"] = pagina
+    prova("nella pagina, una riga di funzione → la sezione che la nomina",
+          {"p2p"}, giudice({"miniapp.html": ("cambiato", [9])}))
+    prova("nella pagina, markup senza id ne' classi → il vicinato", {"p2p"},
+          giudice({"miniapp.html": ("cambiato", [6])}))
+    prova("nella pagina, CSS di un selettore che nessuno nomina → il vicinato",
+          {"p2p"}, giudice({"miniapp.html": ("cambiato", [3])}))
+    nuda = "<style>\n.foglio-zz {\n  color: red;\n}\n</style>\n<div>testo</div>\n"
+    prova("nella pagina, niente di nominato nemmeno vicino → TUTTO", None,
+          scegli_dai_cambi({"miniapp.html": ("cambiato", [3])},
+                           {"miniapp.html": nuda}.__getitem__, sorgente)[0])
+    prova("una classe col nome dello swap → swap, anche se nessuno la nomina",
+          {"swap"}, scegli_dai_cambi(
+              {"miniapp.html": ("cambiato", [2])},
+              {"miniapp.html": "<style>\n.swap-nuova-zz{color:red}\n</style>\n"
+               }.__getitem__, sorgente)[0])
+    giro = "def main():\n    tutte = (prove_swap_cella,\n    for f in tutte:\n"
+    prova("una sezione aggiunta all'elenco di main() → niente in piu'",
+          set(), scegli_dai_cambi({"prove.py": ("cambiato", [2])},
+                                  {"prove.py": giro}.__getitem__, sorgente)[0])
+    prova("il giro di main() toccato → TUTTO", None,
+          scegli_dai_cambi({"prove.py": ("cambiato", [3])},
+                           {"prove.py": giro}.__getitem__, sorgente)[0])
+    prova("una sezione di prove.py toccata → la sua categoria", {"swap"},
+          scegli_dai_cambi({"prove.py": ("cambiato", [2])},
+                           {"prove.py": "def prove_swap_cella():\n    x = 1\n"
+                            }.__getitem__, sorgente)[0])
+
+
+def _esce(f):
+    """Il codice d'uscita di una chiamata che fa sys.exit, None se non
+    esce (e la stampa d'errore resta nel giro, che e' giusto vederla)."""
+    try:
+        f()
+    except SystemExit as e:
+        return e.code
+    return None
+
+
+# LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per categoria»,
+# richiesta di Andrea: «le prove devi gestirle in macro categorie, per
+# esempio P2P, mercatino, infrastruttura... di modo che ogni volta si
+# eseguono solo quelle necessarie, non tutte per forza»).
+#
+# Ogni sezione di `main()` sta in UNA categoria, scritta qui a mano (i
+# nomi senza il `prove_` davanti). Una sezione nuova si aggiunge a
+# `main()` E qui: `prove_categorie_delle_prove` diventa rossa se ne
+# manca una, se ce n'e' una in piu' o se una sta in due posti — una
+# sezione dimenticata non resta fuori in silenzio, la lezione di
+# `ci/collaudi.txt`.
+#
+# COME SI SCEGLIE (vedi `main()`):
+#   python prove.py                       tutto, come sempre (la CI e la
+#                                         promozione su main girano COSI')
+#   python prove.py --categoria p2p       una categoria (o piu', con la
+#                                         virgola: p2p,swap)
+#   python prove.py --dai-file            le categorie dei file toccati
+#                                         rispetto al ramo base
+#   python prove.py --dai-file --mostra   dice cosa girerebbe, e perche',
+#                                         senza girare niente
+#
+# Le categorie: p2p (lo scambio con Mostro, Barattozon, contanti,
+# PayCode), mercatino (annunci, ordini, pagamenti, spedizioni, negozi,
+# vetrina), infrastruttura (deploy, CI, backup, collaudo, sicurezza,
+# account e identita' Nostr, relay, leve, app Android), swap (swap e
+# cambio libero), onchain (il 2-di-3 e RGB).
+CATEGORIE = {
+    "p2p": """
+    controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano
+    luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
+    autocomplete_comuni scambi_p2p_vecchi scambi_ovunque
+    disputa_per_sbaglio tor_chiavi_scambio chi_e_l_altro
+    voto_dopo_concluso giro_nuovo_stesso_id ritocchi_flusso_p2p
+    volto_card_ascolto volto_unico schermo_segue_mostro
+    annulla_riallinea annullo_chiave_maker annullati_ritocchi
+    orari_passi passi_dati_disputa card_annullati annullo_in_disputa
+    dispute_p2p_moderatori moderazione_p2p chiave_moderatore_portatile
+    tocco_scheda_p2p statistiche_p2p dispute_cruscotto_p2p
+    recupero_cambi scoprire_p2p p2p_in_arrivo condividi_ordine_p2p
+    apri_wallet_p2p foglio_pagato_p2p conto_intervallo p2p_sconto
+    livello_accanto_al_titolo p2p_server p2p_libro tour_p2p
+    tour_p2p_finale libro_subito avviso_elenco_parziale giro_guidato_p2p
+    banner_fee_personale banner_fee_primo_ingresso card_p2p_vetrina
+    ritocchi_prova_alan p2p_invii velo_p2p p2p_dettaglio nav_p2p
+    tasto_barattozon timbro_asset volti_libro parti_si_vedono p2p_chiavi
+    p2p_card_scambio p2p_vista_miei pallino_scambi intestazione_scambi
+    banner_fee_p2p logo_p2p_nitido tessera_testata card_tinte_stato
+    p2p_campanello p2p_eventi p2p_riserva_libro p2p_avvisi_in_ordine
+    avviso_chi_annulla recapito_aggiornato chat_scambio
+    paycode_riconosciuto paycode_ripresa paycode_testi p2p_avvisi_libro
+    p2p_orologio p2p_tutti_i_relay p2p_ascolto p2p_esito_notifiche
+    p2p_silenzi p2p_avvisi_precisi p2p_recapito_passo p2p_motore
+    p2p_stati p2p_chat p2p_pubblica p2p_velo_pubblica p2p_barattozon
+    p2p_paycode premio_barattozon convenienza_vera barattozon_mercato
+    scadenza_barattozon foglio_coperto passi_barattozon_fogli
+    importo_foglio pubblica_metodo_prima libro_vuoto_monete
+    indietro_dal_libro ricarica_resta p2p_canale p2p_canonico p2p_bundle
+    p2p_nuvola p2p_conto_dispositivo recensione_p2p ritocchi_scambio
+    pagina_scambio_ridisegno foglio_tastiera_iphone chiavi_p2p_firmate
+    rotte_p2p_riverificate vestito_bottoni p2p_schermi_larghi
+    scambi_verso passi_libro_p2p tolti_ovunque spia_passi_barattozon
+    stellina_card_p2p recapito_corto causale_sepa testi_p2p_confondono
+    garanzia_lunga promemoria_gesto solleciti_p2p cambio_libro_p2p
+    cambio_ovunque tasso_in_chiaro avvisi_nuovi_ordini
+    anteprima_avvisi_p2p testo_ricevere_sats indirizzo_non_verificato
+    prese_dalle_10 campagna_p2p_tutti prendi_metodo contanti_zona
+    riquadro_contanti_sepa banner_ingresso tour_banner_p2p
+    reputazione_p2p dati_reputazione_p2p malus_p2p feedback_p2p
+    logo_compra_vendi tempo_di_chi_pubblica tempo_pubblica_app
+    disputa_automatica_p2p pausa_in_vista paracadute_p2p paracadute_app
+    selettore_di_casa ordine_in_pausa relay_per_mostro
+    notifica_porta_allo_scambio barre_paycode importo_copia
+    barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
+    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori
+    lista_corta_metodi
+    """.split(),
+    "mercatino": """
+    filtro_italiano testo_evento tag_commercio tag_client
+    consegna_firmata anello categorie senza_condizione sottocategorie
+    ricategorizza collaudo_ricategorizza asta proxy_asta annullo
+    annullo_venditore spunta_rimborso abbandonati pagamenti_non_arrivati
+    ritiro disarmo importo_uscita foto foto_scarti fotocamera_pagina
+    tela_bugiarda duplica_annuncio avatar foto_spenta
+    foto_telegram_fallita pagamento_incerto esito_pagamento
+    pagamenti_in_volo fatture_scadute fattura_solo_incasso in_pagamento
+    altra_cassaforte chiusura_saas doppio_wallet saas_senza_doveri
+    orfani capitale_cassa disputa_incagliata busta_ritiro
+    contenuto_digitale_forma foto_contenuto indirizzo_casa
+    email_corriere nota_compratore nascondi_ordine lista_ordini
+    dettaglio_ordine card_ordini righe_ordine niente_ai_nella_ricerca
+    tracking_corretto tracking_venditore tracking_facoltativo
+    vantaggi_livelli cruscotto_admin cruscotto_semplice buoni_cumulabili
+    barattolo savers_proprietario visualizzazioni barattolo_in_striscia
+    interesse barattolo_filtra barattolo_condiviso notifica_fail_open
+    messaggio_admin avviso_contatto forma_tracking bip353 conta_feedback
+    classifica classifica_nascosta classifica_recensioni_tutte ferie
+    stock_raccontato pausa xp inviti coorti_titoli pionieri_congelati
+    conto_acquisto zone_spedizione supplemento_spedizione sconto_pacco
+    forma_sconto_pacco codice_a_valore divisione_a_ritroso sped_gratis
+    valuta_soglia suggerimenti libro_mastro canale_bot podio_riepilogo
+    vetrina_negozio vetrina_canale cambio consegna_payload_punto
+    reti_corriere punti_corrieri indirizzo_giusto rimborso_meno_spese
+    annulla_chiude punti_barattolo presa_in_carico punti_pubblici
+    punti_salvati pagina_acquisto posizione_vetrina liste_ritorno
+    impersonazione avviso_spedizione tracciamento_nei_messaggi
+    niente_passo_intermedio ricevuta_compratore titoli_scappati
+    timbri_periodici offerta_quantita offerta_carrello ritiro_offerta
+    link_offerte deep_link_offerta rilancio_offerta fogli_di_casa
+    sollecito_a_comando sat_non_e_barattolo ai_segnala piani_condivisi
+    filtro_avorio obiezione_punto ordini_fermi numero_ordine
+    promesse_badge promesse_raggiungibili percentuale_della_promessa
+    verde_e_filtri prezzo_accordo scoprire strisce_web sponsor
+    numeri_negozio racconto_girato racconti_bozza storia_dal_link
+    consigliati guardia_is_bot altri_scorrimento widget ricerca
+    condivisione_venditore condividi_col_link link_dentro_telegram
+    zona_comune_in_modifica cassa_strada_chiusa casa_vuota_gratis
+    spedizione_standard cambio_converte paga_ora apri_nel_wallet
+    prova_wallet catalogo_esterno modulo_negozio canale_comunita
+    podio_sfondo introduzioni_leggibili filtri_prezzo_convertono
+    anteprima_prezzo_condiviso pagina_dati note_piccole
+    feedback_tre_e_tondi loghi_tondi card_parte_ordine font porta_timer
+    feedback_confermato dati_spedizione_copia servizi quantita_servizi
+    banner_negozio paracadute_motivo rimborso_motivo slug_negozio
+    link_descrizione foto_vuota foto_metadati connettori connettori_sync
+    connettori_woo connettori_registro connettori_ingresso
+    titoli_importati connettori_varianti connettore_interrompibile
+    famiglie connettori_cassetto finestra ordini_prova tutorial
+    timbri_visti effetti_ridotti morfosi_vendi copertura_home
+    profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
+    db_contesa_negozi negozi_grandi pc_tema_e_ricerca schermo_largo
+    carrello_salvato bollino_staff anello_ovunque avvisi_mercatino
+    x_risonanza indirizzo_lightning foto_obbligatorie vibrazione
+    servizio_senza_corriere gesti_ordine backfill_annullo_venditore
+    annullata_pagata allegati_chat pdf_allegati modifica_massiva
+    venduto_canale chat_mercatino chat_dalla_notifica
+    modifica_massiva_foto miniature_leggere leva_mercato_lavoro
+    allegati_da_telegram domande_compratore incasso_annuncio
+    """.split(),
+    "infrastruttura": """
+    categorie_delle_prove
+    nome_nostr initdata portachiavi piu_account_ovunque
+    pallino_altri_account account_doppio login_dal_bot
+    dizionari_nel_loop logout_apk logout_apk_due nome_da_nostr
+    foto_nostr_relay_muti idor_verifica contenuti_cifrati ssrf_redirect
+    firme_nostr firme_nsec trasloco_nostr collega_npub_firma
+    npub_una_casa leve relay_leva relay_di_barattolo posta_relay
+    backup_prima_del_deploy backup_database_occupato sbirciata anteprime
+    seo onion cookie_onion script_nel_workflow deploy giudice_deploy
+    collaudi_in_ci ci_leggera ci_solo_main elenco_dei_collaudi
+    collaudi_senza_coincurve servizio_non_root guardiano_ponte
+    guardia_liquidita canale_admin gruppo_admin_coda deploy_nel_gruppo
+    bussola tetto_claude_md annotazioni_negli_ambienti nwc_cifratura
+    bundle_nostr relay_chiavi ronda_nodo semina_demo
+    indietro_app_android esclusioni_relay letture_relay_collaudo
+    telegram_simulato_collaudo leve_mai_doppie sintassi_client
+    guscio_apertura guscio_barra_e_scarto app_android
+    permesso_splash_apk avvio_apk bunker_muto login_qr cassetta_nip46
+    nostr_da_telefono badge_nostr reputazione_nostr nip89_handler
+    csp_prova ssrf_ln_address foto_anomala quattro_piccole runner_fisso
+    runner_vm node_fisso freni avviso_dm_nostr stampa_e_salti
+    bundle_bitcoin journal_senza_buffer istanza_prova
+    collaudo_segue_develop avvisi_nostr_arrivano filtro_10050
+    semina_collaudo relay_risolti certificati_relay config_esempio
+    assistente_bot
+    """.split(),
+    "swap": """
+    swap_cella swap_preventivo swap_telefono swap_fornitori
+    swap_pagamento grafica_swap cartone_submarine cambio_libero
+    margine_cassaforte indirizzo_swap
+    swap_auto swap_auto_scalini swap_auto_schermate swap_auto_tasto
+    onchain_verso_lightning parole_uniche
+    """.split(),
+    "onchain": """
+    cancello_onchain banco_chiavi_onchain indirizzo_ordine_onchain
+    ordine_onchain ripristino_visibile chiave_che_nasce_da_sola
+    checksum_descrittore leva_rgb annuncio_identita mutinynet_prep
+    deposito_p2p_onchain grafica_p2p_onchain incasso_esterno_onchain
+    onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto
+    p2p_onchain p2p_onchain_usdt rete_onchain_dal_pannello
+    scelta_rete_mercatino
+    """.split(),
+}
+
+# LE SENTINELLE CHE GIRANO SEMPRE, qualunque categoria si scelga: costano
+# meno di un secondo l'una e guardano cose che un cantiere qualsiasi puo'
+# rompere senza saperlo (il tetto di CLAUDE.md, la bussola verso docs/,
+# l'elenco dei collaudi, gli script nel compileall,
+# l'unicita' dei nomi delle leve e questa stessa mappa).
+SEMPRE = """
+    categorie_delle_prove tetto_claude_md bussola elenco_dei_collaudi
+    script_nel_workflow leve_mai_doppie
+""".split()
+
+# I FILE GRANDI, quelli che toccano tutto: per loro non conta il nome del
+# file (lo nominano quasi tutte le sezioni) ma il NOME DELLA FUNZIONE
+# toccata, cercato nel testo delle sezioni. Il config d'esempio sta con
+# loro: lo tocca ogni leva nuova, e conta il nome della leva.
+_FILE_GRANDI = ("server.py", "miniapp.html", "prove.py", "config_esempio.py")
+
+# Quando un nome non lo nomina nessuna sezione, si guarda il nome stesso;
+# se non dice niente nemmeno lui, si gira TUTTO (fail-closed: nel dubbio
+# una prova in piu', mai una in meno).
+_PAROLE_CATEGORIA = (("onchain", r"onchain|multisig|descrittore|psbt|rgb"),
+                     ("swap", r"swap|submarine|boltz|instradatore"),
+                     ("p2p", r"p2p|mostro|scambi|barattozon|paycode"))
+
+# I DOCUMENTI E I DISEGNI non si portano dietro una categoria intera:
+# CANTIERI.md lo nominano sezioni di tre categorie, e un verbale in fondo
+# al file farebbe girare quasi tutto. Per loro girano le SOLE sezioni
+# che li nominano (piu' le sentinelle di SEMPRE, la bussola compresa).
+_SENZA_CODICE = (".md", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".txt",
+                 ".gif", ".ico", ".pdf")
+
+# I nomi scritti SULLA riga toccata contano solo quando la funzione che
+# la contiene non la nomina nessuno, e anche allora un nome che nominano
+# piu' di tante sezioni non dice DOVE si sta lavorando (`TypeError`,
+# `setAttribute`): si ignora. Il nome della FUNZIONE invece conta
+# sempre: un aiutante usato ovunque, toccato, chiede davvero tutto.
+_TROPPO_COMUNE = 10
+
+# ...e quando la funzione che contiene la riga la nominano sezioni di
+# almeno tante categorie (`_leve_stato`, l'elenco delle leve; `avvia`, i
+# giri che partono all'accensione), e' un elenco di tutti: li' la riga
+# dice di piu' (la leva o il giro aggiunti), se dice qualcosa.
+_CAPO_LARGO = 4
+
+
+def _sezioni_testo(sorgente):
+    """{nome della sezione: il suo testo}, tagliando prove.py a ogni `def`
+    di colonna zero. Un aiutante fra due sezioni finisce attaccato a
+    quella sopra: per la ricerca dei nomi e' una sezione in piu' scelta,
+    mai una in meno."""
+    pezzi = re.split(r"\n(?=def \w+\()", sorgente)
+    out = {}
+    for p in pezzi:
+        m = re.match(r"def (prove_\w+)\(", p)
+        if m:
+            out[m.group(1)] = p
+    return out
+
+
+def _categoria_di():
+    """{prove_nome: categoria}, dalla mappa scritta qui sopra."""
+    return {"prove_" + n: c for c, nomi in CATEGORIE.items() for n in nomi}
+
+
+def _nomi_toccati(righe_file, toccate, nome_file):
+    """I nomi da cercare per le righe toccate di un file grande: la
+    funzione (o la costante, o il selettore CSS) che le contiene, piu'
+    gli id, le classi e i nomi composti scritti SULLA riga. `toccate`
+    sono numeri di riga dal 1, nel file com'e' adesso. Torna un insieme
+    di terne (funzione che contiene la riga o None, nomi sulla riga,
+    numero della riga).
+
+    Nell'HTML conta DOVE sta la riga: dentro uno <script> vale la
+    funzione di colonna zero che la contiene, dentro uno <style> il
+    selettore, nel markup solo gli id e le classi della riga stessa (la
+    funzione piu' vicina, li', sarebbe un nome a caso)."""
+    capi = re.compile(
+        r"^(?:async\s+)?(?:def|function|class)\s+(\w+)"
+        r"|^(?:const|let|var)\s+(\w+)"
+        r"|^([A-Za-z_]\w*)\s*[:=]"
+        r"|^@app\.\w+\(")
+    if nome_file == "prove.py":
+        # qui dentro, a colonna zero, ci sono anche pezzi di JS e di Python
+        # DENTRO le stringhe: vale solo il `def` vero
+        capi = re.compile(r"^def\s+(\w+)")
+    elif nome_file.endswith(".py"):
+        capi = re.compile(r"^(?:async\s+)?(?:def|class)\s+(\w+)"
+                          r"|^([A-Za-z_]\w*)\s*="
+                          r"|^@app\.\w+\(")
+    html = nome_file.endswith(".html")
+    zona, zone = "markup" if html else "codice", []
+    for r in righe_file:
+        if html and re.search(r"<script\b(?![^>]*\bsrc=)", r):
+            zona = "script"
+        elif html and "<style" in r:
+            zona = "style"
+        zone.append(zona)
+        if html and ("</script>" in r or "</style>" in r):
+            zona = "markup"
+    out = set()
+    for n in toccate:
+        if not 0 < n <= len(righe_file):
+            out.add((None, frozenset(), n))
+            continue
+        riga = righe_file[n - 1]
+        nomi = set(re.findall(r"""(?:id|class)=["']([\w-]+)""", riga))
+        nomi.update(w for w in re.findall(r"\b[A-Za-z_]\w{5,}\b", riga)
+                    if "_" in w.strip("_") or re.search(r"[a-z][A-Z]", w))
+        dove, capo = zone[n - 1], None
+        for k in range(n - 1, -1, -1):
+            if zone[k] != dove:
+                break
+            r = righe_file[k]
+            if dove == "style":
+                # il selettore e' quel che sta prima della graffa aperta
+                sel = re.match(r"^\s*([.#:\[\w][^{};]*)\{", r)
+                if sel and not r.lstrip().startswith(("/*", "*")):
+                    nomi.update(re.findall(r"[.#]([\w-]{4,})", sel.group(1)))
+                    break
+                continue
+            if dove == "markup":
+                break
+            m = capi.match(r)
+            if m and r.startswith("@app."):
+                # un decoratore di rotta: vale la funzione che segue
+                m = next((capi.match(x) for x in righe_file[k + 1:k + 4]
+                          if capi.match(x) and not x.startswith("@")), None)
+            if m:
+                capo = next(g for g in m.groups() if g)
+                break
+        out.add((capo, frozenset(nomi), n))
+    return out
+
+
+def _vicini(righe_file, n, da_nome, raggio=300):
+    """IL VICINATO, per una riga il cui nome nessuna sezione nomina (una
+    costante nuova, una funzione mai provata, una classe CSS nuova, del
+    markup senza id): nei
+    file grandi il codice sta raggruppato per argomento, e le funzioni
+    dello swap stanno accanto alle funzioni dello swap. Si cerca il
+    primo nome NOMINATO sopra e il primo sotto, entro `raggio` righe, e
+    valgono le categorie di tutti e due. Nessuno nei paraggi: set vuoto,
+    e il chiamante gira tutto."""
+    capi = re.compile(r"^(?:async\s+)?(?:def|function|class)\s+(\w+)"
+                      r"|^(?:const|let|var)\s+(\w+)")
+    trovate = set()
+    for passo in (-1, 1):
+        k = n - 1 + passo
+        while 0 <= k < len(righe_file) and abs(k - n + 1) <= raggio:
+            r = righe_file[k]
+            m = capi.match(r)
+            sel = re.match(r"^\s*([.#][^{};]*)\{", r)
+            nomi = [next(g for g in m.groups() if g)] if m else \
+                re.findall(r"[.#]([\w-]{4,})", sel.group(1)) if sel else \
+                re.findall(r"""\bid=["']([\w-]+)""", r)
+            cat = set()
+            for nome in nomi:
+                cat |= da_nome(nome)
+            if cat:
+                trovate |= cat
+                break
+            k += passo
+    return trovate
+
+
+def scegli_dai_cambi(cambi, leggi, sorgente_prove):
+    """IL GIUDICE DI `--dai-file`, senza git dentro (cosi' si prova).
+    `cambi` = {percorso: ("nuovo"|"tolto"|"cambiato", [righe toccate])},
+    `leggi(percorso)` da' il testo del file com'e' adesso.
+    Torna (categorie, sezioni, perche'): categorie e' un set, o None per
+    TUTTO; sezioni le singole sezioni in piu' (quelle dei documenti);
+    perche' le righe da stampare.
+
+    LE REGOLE, nell'ordine:
+    - un file nato o sparito porta l'infrastruttura (i censimenti dei
+      file del repo: collaudi, compileall, docs);
+    - nei file grandi (server.py, miniapp.html, prove.py) conta la
+      funzione toccata: le categorie delle sezioni che la nominano. Una
+      sezione di prove.py toccata porta la sua categoria e basta;
+    - un documento o un disegno porta le sole sezioni che lo nominano;
+    - un altro file porta le categorie delle sezioni che lo nominano; se
+      non lo nomina nessuno, puo' toccarlo solo un censimento dei file:
+      infrastruttura;
+    - una funzione che nessuna sezione nomina, e il cui nome non dice la
+      categoria, prende quella del vicinato (`_vicini`);
+    - nel dubbio TUTTO: niente di nominato nemmeno nei paraggi, un file
+      che non si legge."""
+    sezioni = _sezioni_testo(sorgente_prove)
+    cat_di = _categoria_di()
+    scelte, extra, perche = set(), set(), []
+
+    def chi_nomina(nome):
+        return [s for s, t in sezioni.items() if s in cat_di and nome in t]
+
+    def da_nome(nome):
+        trovate = {cat_di[s] for s in chi_nomina(nome)}
+        if not trovate:
+            for c, r in _PAROLE_CATEGORIA:
+                if re.search(r, nome, re.I):
+                    return {c}
+        return trovate
+
+    for percorso, (stato, righe) in sorted(cambi.items()):
+        base = percorso.rsplit("/", 1)[-1]
+        if stato != "cambiato":
+            scelte.add("infrastruttura")
+        if base in _FILE_GRANDI and stato == "cambiato":
+            try:
+                testo = leggi(percorso).split("\n")
+            except OSError:
+                return None, extra, perche + [f"  {percorso}: non si legge → tutto"]
+            qui = set()
+            for capo, nomi, n in _nomi_toccati(testo, righe, base):
+                if base == "prove.py" and capo in cat_di:
+                    qui.add(cat_di[capo])
+                    continue
+                if base == "prove.py" and capo == "main":
+                    # una sezione aggiunta all'elenco la porta la sua def, e
+                    # la mappa la guarda la sentinella di SEMPRE; il resto di
+                    # main() e' il giro stesso: toccato, si gira tutto
+                    if re.fullmatch(r"\s*(tutte = \()?(prove_\w+,?\s*)+\)?\s*",
+                                    testo[n - 1] if 0 < n <= len(testo) else ""):
+                        continue
+                    return None, extra, perche + [
+                        f"  {percorso}: main(), il giro stesso → tutto"]
+                trovate = da_nome(capo) if capo else set()
+                sulla_riga = set()
+                for nome in nomi:
+                    chi = chi_nomina(nome)
+                    if len(chi) <= _TROPPO_COMUNE:
+                        sulla_riga |= {cat_di[s] for s in chi}
+                if not trovate or (len(trovate) >= _CAPO_LARGO and sulla_riga):
+                    # un elenco che nominano tutte (`_leve_stato`, `avvia`):
+                    # conta la riga, cioe' la leva o il giro aggiunti
+                    trovate = sulla_riga
+                if not trovate:
+                    for nome in nomi:
+                        trovate |= {c for c, r in _PAROLE_CATEGORIA
+                                    if re.search(r, nome, re.I)}
+                if not trovate:
+                    trovate = _vicini(testo, n, da_nome)
+                if not trovate:
+                    quale = capo or ", ".join(sorted(nomi)) or "una riga senza nome"
+                    return None, extra, perche + [
+                        f"  {percorso}: {quale} — nessuna sezione lo nomina → tutto"]
+                qui |= trovate
+            scelte |= qui
+            perche.append(f"  {percorso} ({len(righe)} righe) → "
+                          + ", ".join(sorted(qui)))
+            continue
+        nome_file = re.sub(r"\.py$", "", base)
+        chi = [s for s, t in sezioni.items() if s in cat_di and (
+            base in t or (nome_file != base and nome_file in t))]
+        if percorso.lower().endswith(_SENZA_CODICE):
+            extra |= set(chi)
+            perche.append(f"  {percorso} → " + (f"{len(chi)} sezioni che lo nominano"
+                                                 if chi else "bastano le sentinelle"))
+            continue
+        trovate = {cat_di[s] for s in chi} or da_nome(percorso) \
+            or {"infrastruttura"}
+        scelte |= trovate
+        perche.append(f"  {percorso} → " + ", ".join(sorted(trovate)))
+    return scelte, extra, perche
+
+
+def _cambi_da_git(base=None):
+    """{percorso: (stato, righe)} rispetto al ramo base: i commit del
+    ramo, il lavoro non committato e i file nuovi non ancora aggiunti.
+    Senza un ramo detto, il base e' quello fra develop,
+    promozione-senza-onchain, onchain e main che sta PIU' VICINO a HEAD
+    (meno commit di distanza)."""
+    import subprocess
+
+    def git(*a):
+        return subprocess.run(("git",) + a, capture_output=True, text=True,
+                              check=True).stdout
+    if base is None:
+        migliore = None
+        for ramo in ("origin/develop", "origin/promozione-senza-onchain",
+                     "origin/onchain", "origin/main"):
+            try:
+                mb = git("merge-base", "HEAD", ramo).strip()
+                dist = int(git("rev-list", "--count", f"{mb}..HEAD"))
+            except (subprocess.CalledProcessError, ValueError):
+                continue
+            if migliore is None or dist < migliore[0]:
+                migliore = (dist, mb, ramo)
+        if migliore is None:
+            raise RuntimeError("nessun ramo base trovato (manca git fetch?)")
+        _, mb, ramo = migliore
+    else:
+        mb, ramo = git("merge-base", "HEAD", base).strip(), base
+    cambi = {}
+    for riga in git("diff", "--name-status", "--no-renames", mb).splitlines():
+        st, p = riga.split("\t", 1)
+        cambi[p] = ({"A": "nuovo", "D": "tolto"}.get(st[0], "cambiato"), [])
+    for p in git("ls-files", "--others", "--exclude-standard").splitlines():
+        cambi[p] = ("nuovo", [])
+    corrente = None
+    for riga in git("diff", "-U0", "--no-renames", mb).splitlines():
+        if riga.startswith("+++ "):
+            corrente = riga[6:] if riga.startswith("+++ b/") else None
+        elif riga.startswith("@@") and corrente in cambi:
+            m = re.match(r"@@ -\S+ \+(\d+)(?:,(\d+))? @@", riga)
+            inizio, quante = int(m.group(1)), int(m.group(2) or 1)
+            cambi[corrente][1].extend(range(inizio, inizio + quante)
+                                      if quante else [max(inizio, 1)])
+    return cambi, ramo
+
+
+def _scelta_da_riga_di_comando(argv, tutte):
+    """Dagli argomenti alle sezioni da girare. Torna (sezioni, titolo);
+    sezioni None vuol dire tutto. Esce col 2 su un argomento storto."""
+    cat = _categoria_di()
+    chieste, dai_file, base = set(), False, None
+    argv = list(argv)
+    while argv:
+        a = argv.pop(0)
+        if a == "--categoria" and argv:
+            chieste |= set(argv.pop(0).split(","))
+        elif a.startswith("--categoria="):
+            chieste |= set(a.split("=", 1)[1].split(","))
+        elif a == "--dai-file":
+            dai_file = True
+        elif a.startswith("--dai-file="):
+            dai_file, base = True, a.split("=", 1)[1]
+        elif a == "--mostra":
+            pass
+        else:
+            print(f"  argomento sconosciuto: {a}\n  uso: python prove.py "
+                  "[--categoria=p2p,mercatino] [--dai-file[=ramo]] [--mostra]")
+            sys.exit(2)
+    storte = chieste - set(CATEGORIE)
+    if storte:
+        print(f"  categoria sconosciuta: {', '.join(sorted(storte))} "
+              f"(ci sono: {', '.join(CATEGORIE)})")
+        sys.exit(2)
+    if dai_file:
+        cambi, ramo = _cambi_da_git(base)
+        scelte, extra, perche = scegli_dai_cambi(
+            cambi, lambda p: open(p, encoding="utf-8").read(),
+            open(__file__, encoding="utf-8").read())
+        print(f"  I file toccati rispetto a {ramo}:")
+        for r in perche or ["  (niente)"]:
+            print(r)
+        if scelte is None:
+            return None, "tutto (un dubbio dai file)"
+        chieste |= scelte
+    else:
+        extra = set()
+    if not chieste and not dai_file:
+        return None, "tutto"
+    sezioni = [f for f in tutte if cat.get(f.__name__) in chieste
+               or f.__name__ in extra
+               or f.__name__[len("prove_"):] in SEMPRE]
+    titolo = ", ".join(sorted(chieste)) or "solo le sentinelle"
+    if extra - {f.__name__ for f in tutte if cat.get(f.__name__) in chieste}:
+        titolo += " e le sezioni dei documenti"
+    return sezioni, titolo
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
-    for f in (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
+    tutte = (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
               prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_disputa_per_sbaglio, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_orari_passi, prove_passi_dati_disputa, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
@@ -188077,7 +188737,19 @@ def main():
               prove_certificati_relay,
               prove_config_esempio,
               prove_allegati_da_telegram,
-              prove_domande_compratore):
+              prove_domande_compratore,
+              prove_categorie_delle_prove)
+    sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
+    if "--mostra" in sys.argv[1:]:
+        quali = tutte if sezioni is None else sezioni
+        print(f"  Girerebbero {len(quali)} sezioni su {len(tutte)} ({titolo}):")
+        for f in quali:
+            print("   ", f.__name__)
+        return 0
+    if sezioni is not None:
+        print(f"  Solo {titolo}: {len(sezioni)} sezioni su {len(tutte)}, "
+              "piu' le sentinelle di sempre")
+    for f in (tutte if sezioni is None else sezioni):
         try:
             f()
         except Exception as e:
