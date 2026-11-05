@@ -56945,16 +56945,14 @@ def prove_link_dentro_telegram():
     prova("...e la home del sito che ARRIVA non si traduce mai: gli avvisi del "
           "mercatino e i link condivisi restano com'erano", [BASE, BASE + "/"],
           [ld(BASE), ld(BASE + "/")])
-    prova("...la chiedono per nome in cinque: la riga delle tastiere, il post P2P nel "
-          "canale, i due «🫙 Sfoglia il mercatino» del riepilogo (il vero e la sua prova) "
-          "e la risposta dell'assistenza (3 nov 2026)",
-          [5, True, True, 2, True],
+    prova("...la chiedono per nome in quattro: la riga delle tastiere, il post P2P nel "
+          "canale e i due «🫙 Sfoglia il mercatino» del riepilogo (il vero e la sua prova)",
+          [4, True, True, 2],
           [codice(src).count("_link_casa_telegram(") - 1,
            '"url": _link_casa_telegram()}' in pezzo("_riga_webapp"),
            'href=\\"{_link_casa_telegram()}\\">🫙 Apri lo Scambio P2P su Barattolo</a>'
            in pezzo("_caption_canale_p2p"),
-           src.count('<a href=\\"{_link_casa_telegram()}\\">🫙 Sfoglia il mercatino</a>'),
-           '("🫙 Apri Barattolo", _link_casa_telegram())' in pezzo("assistenza_rispondi_admin")])
+           src.count('<a href=\\"{_link_casa_telegram()}\\">🫙 Sfoglia il mercatino</a>')])
 
     # ---------------- 3ter) ESPLORA COI SUOI FILTRI (il terzo si') ---------
     # «🫙 Apri Esplora» degli avvisi del mercatino: il link della Mini App
@@ -94882,7 +94880,9 @@ def prove_ricarica_resta():
         m = re.search(r"\|\| (\w+)\) return;", corpo)
         bandiere[p] = m.group(1) if m else ""
     # (16 ott 2026, chat-mercatino) la dodicesima: `apriOrdineDaUrl`, il tasto dell'avviso della chat
-    prova("le porte dei link d'arrivo sono dodici, ognuna con la sua bandierina", [12, []],
+    # (5 nov 2026, assistenza passo 2) la tredicesima: `apriAssistenzaDaUrl`,
+    # il tasto dell'avviso dell'assistenza
+    prova("le porte dei link d'arrivo sono tredici, ognuna con la sua bandierina", [13, []],
           [len(porte), [p for p, b in bandiere.items() if not b]])
     prova("...e spegniLinkDaUrl le alza tutte", [],
           [b for b in bandiere.values() if not re.search(r"\b%s = " % b, sp)])
