@@ -73310,3 +73310,68 @@ cambio a tutti; le prove dal vivo elencate nella tappa 3; per dopo, a
 parte: chi riceve in bitcoin dal 2-di-3 di Alan che vuole cambiare in
 Lightning (stessa strada rovesciata, un ordine vero al posto
 dell'ordine 0).
+
+## Le novità della settimana nel riepilogo del lunedì: l'AI scrive dai commit, un admin approva (5 nov 2026, cantiere novita-settimanali, richiesta di Andrea)
+
+Andrea: «un flusso settimanale che fa un riepilogo figo di tutte le
+novità di Barattolo su Telegram». Il riepilogo del lunedì esisteva già
+(annunci, ordini, podio): le novità si CUCIONO lì sotto «✨ Le novità
+della settimana», invece di fare un secondo post nello stesso giorno.
+Scelta di Andrea fra tre (scheda del 3 nov): **l'AI dai commit, e un
+admin approva**. Le strade scartate: una riga per utenti scritta a mano
+in un NOVITA.md a ogni cantiere (lavoro in più ogni volta, e si
+dimentica), e le due insieme.
+
+**Come gira.** (1) `deploy.sh`, a deploy riuscito, scrive i titoli dei
+commit nuovi nel diario `/var/lib/barattolo-deploy/novita-commit`
+(«quando⇥sha⇥titolo», ultime 2000 righe, riscritto con un `mv`). (2) La
+domenica dalle 18 `bozza_novita` legge i sette giorni, passa due
+setacci (`NOVITA_SEGRETE`: sicurezza, B-xx, audit, token, chiavi...;
+`NOVITA_INTERNE`: prove, documenti, deploy, leve spente, admin) e
+chiede all'AI (`MODELLO_RICERCA`, la chiave del server) al massimo
+cinque righe da utente, ognuna con la sua emoji. (3) La bozza va agli
+admin (stanza «riepiloghi», o in privato) con ✅ Pubblica / 🔄 Riscrivi
+(tre volte al massimo) / ❌ Salta. (4) Il lunedì `riepilogo_settimana`
+ASPETTA la decisione fino alle 10, senza timbrare; poi esce col «✨»
+approvato o coi soli numeri. Una settimana magra con le novità
+approvate esce lo stesso, coi soli «✨». `/anteprima novita` fa vedere
+la bozza di adesso senza salvare né timbrare. Leva `NOVITA_SETTIMANALI`,
+ACCESA di serie, nel pannello «⚙️ Stato delle leve»: Andrea (5 nov)
+«niente righe nel config, tanto va solo agli admin nel gruppo e
+decidiamo noi se pubblicarlo». La guardia è il ✅, non la leva.
+
+**I perché.** Il SERVER NON CHIAMA GIT: la sua unica porta verso un
+sottoprocesso è quella del ponte, e leggere gli oggetti di `.git` a
+mano (pack, delta) è un cantiere a sé; un file di testo scritto da chi
+git ce l'ha già, deploy.sh, costa quindici righe. IL DIARIO STA FUORI
+DAL REPO, in una cartella di root: `/srv/barattolo` è di `barattolo`, e
+root che scrive a nome fisso in una cartella altrui seguirebbe un
+collegamento piantato lì (la lezione di /tmp, audit del 19 set). LA
+SICUREZZA NON ARRIVA NEMMENO AL MODELLO: l'analisi di novembre è
+riservata, quindi il setaccio sta PRIMA dell'AI, e ripassa sulle righe
+che tornano; poi c'è l'admin. Si sbaglia nel verso del silenzio (una
+novità persa non costa niente). LE RIGHE SI SALVANO NUDE E SI SCAPPANO
+ALL'USCITA (B-35), nella bozza e nel post. La didascalia di una foto
+sta in 1024 caratteri: oltre i 1000 il post esce di testo. Il timbro
+della bozza si scrive PRIMA della chiamata all'AI: tre giri
+dell'orologio di domenica sera non fanno tre bozze.
+
+**Provato.** `prove_novita_settimanali` (diario e setacci, righe
+ripulite, bozza una volta sola, bottoni di un non-admin o di un'altra
+settimana che non decidono, il lunedì che aspetta e poi esce, il post
+con le righe scappate, le sentinelle sul router, sull'orologio, su
+deploy.sh, e `diario_novita` girato davvero su questo repo). Il setaccio
+è stato girato sui 50 commit di main dal 27 ott: 39 restano, 11 fuori.
+Il censimento degli avvisi da admin (`prove_canale_admin`) sale a 89
+punti: la bozza è la terza tastiera, la decisione una riga nei
+riepiloghi. Suite severa 26428/0 (due saltate: nostr-tools, che in
+questa macchina non c'è), collaudi della CI 104/0, sull'albero del
+commit sopra `promozione-senza-onchain` (f17f25d).
+NON provato: l'AI vera (qui non c'è la chiave), il gruppo degli admin
+vero, il diario scritto dal deploy vero.
+
+**Cosa resta.** Niente sul VPS: dopo la promozione il diario nasce col
+primo deploy, quindi la prima domenica racconta solo i commit da lì in
+poi. Da guardare alla prima
+bozza vera: se l'AI annuncia cose dietro leve spente che i titoli non
+dicono, si stringe `NOVITA_INTERNE` o il prompt.

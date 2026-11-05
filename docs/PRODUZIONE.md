@@ -5681,6 +5681,15 @@ Il riepilogo del lunedì ha un canale suo a parte
 RIPIEGA sul canale di casa — a differenza degli altri due, dove il
 vuoto vuol dire «non ci andiamo» e non esiste nessun ripiego: sono
 canali di qualcun ALTRO.
+LE NOVITA' DELLA SETTIMANA (5 nov 2026, leva `NOVITA_SETTIMANALI`,
+ACCESA di serie: nessuna riga nel config, decisione di Andrea) escono DENTRO quel riepilogo, quindi nello stesso
+canale. Il diario dei commit lo scrive `deploy.sh` a ogni deploy
+riuscito in `/var/lib/barattolo-deploy/novita-commit` (cartella di
+root, il mercatino legge e basta; un altro percorso: `NOVITA_DIARIO`
+nel config e `BARATTOLO_DIARIO_NOVITA` nell'unità del deploy). La bozza
+arriva la domenica dopo le 18 nella stanza «riepiloghi» coi bottoni;
+`/anteprima novita` la fa vedere subito. Perché: CANTIERI, «Le novità
+della settimana nel riepilogo del lunedì».
 IL BOT DEV'ESSERE AMMINISTRATORE di ogni canale a cui parla, col
 permesso di pubblicare E di modificare i propri messaggi (serve al
 ✅ Venduto, che rieèdita il post già fatto). Il comando si prova prima

@@ -104,4 +104,3 @@ che si vede va nel verbale (CANTIERI, «Il cambio libero, tappa 3»,
 «COSA RESTA») e questa voce si cancella. ATTENZIONE alle copie vecchie
 del config: `config.py.prima-prova-aperta` (23 ott) e
 `config.py.prima-swap` (27 ott) NON hanno queste righe.
-

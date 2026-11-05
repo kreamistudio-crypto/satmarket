@@ -1653,6 +1653,20 @@ RIEPILOGO_MINIMO = 3
 # — resta un barattolo di vetro vuoto, che nel nostro alfabeto e' una
 # figura e non un buco.
 RIEPILOGO_IMMAGINE = True
+# LE NOVITA' DELLA SETTIMANA (nov 2026): la domenica dalle 18 l'AI
+# (ANTHROPIC_API_KEY) fa dei commit andati online in settimana due-
+# cinque righe da utente; la bozza arriva agli admin coi bottoni
+# ✅ Pubblica / 🔄 Riscrivi / ❌ Salta, e il lunedi' le righe approvate
+# escono dentro il riepilogo, sotto «✨». Senza un ✅ non esce niente, e
+# il lunedi' aspetta la decisione fino alle 10. I commit che parlano di
+# sicurezza non arrivano nemmeno all'AI. Accesa di serie: la guardia e'
+# il ✅ di un admin, non la leva.
+NOVITA_SETTIMANALI = True
+# Il diario dei commit: lo scrive deploy.sh a ogni deploy riuscito, in
+# una cartella di root FUORI dal repo (il mercatino legge e basta).
+# Senza il deploy automatico (in locale) il file non c'e' e la domenica
+# tace.
+NOVITA_DIARIO = "/var/lib/barattolo-deploy/novita-commit"
 
 # --- La raffica raccontata per negozio --------------------------------
 # Quando piu' annunci arrivano insieme, chi ne ha pubblicati almeno DUE
@@ -2096,6 +2110,7 @@ PROVA_APERTA = False
 #   ADMIN_CANALE_ID = 0
 #   POST_AUTOMATICI = False
 #   RIEPILOGO_SETTIMANALE = False
+#   NOVITA_SETTIMANALI = False
 #   # il resto del mondo: spento
 #   ANTHROPIC_API_KEY = "INCOLLA_QUI_LA_API_KEY"
 #   CONNETTORI_NEGOZIO_APERTI = False
