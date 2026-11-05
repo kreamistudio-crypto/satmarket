@@ -34241,7 +34241,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `assistenza` 20/ora per chi scrive, `assistenza_staff` 120/ora per
   admin. /api/me porta `assistenza` (la leva) e `assistenza_nuove`. La
   fusione degli account porta la conversazione della metà Nostr a
-  quella Telegram. Client: la voce-porta `vocAssistenza` in «Privacy»,
+  quella Telegram. La cancellazione dell'account (develop, 5 nov 2026)
+  toglie la SUA conversazione intera (`CANCELLA_TOGLI`: `assistenza`,
+  `assistenza_letture`, `assistenza_avvisi` per `utente`), e le risposte
+  di un admin che se ne va restano negli altri senza il suo nome
+  (`CANCELLA_ANONIMIZZA`: `assistenza.autore`). Client: la voce-porta `vocAssistenza` in «Privacy»,
   il bottone `admAssistenza` in «Amministrazione», le viste
   `assistenza` e `assistenzaadm` (`renderAssistenza`,
   `renderAssistenzaAdmin`). Collaudo: `collaudo_assistenza`.
