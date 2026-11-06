@@ -151,6 +151,7 @@ collaudo_cancella_account
 collaudo_wallet_unico
 collaudo_assistenza
 collaudo_unione_seme
+collaudo_domande_compratore
 
 # ---- FUORI DALLA CI ---------------------------------------------------
 # Erano fuori anche quando l'elenco stava nel workflow, e fuori restano:

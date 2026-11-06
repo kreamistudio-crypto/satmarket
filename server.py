@@ -9184,6 +9184,10 @@ def init_db():
                     # esistente resta vero; lecito solo con una modalita'
                     # fisica (con 'digitale' o '' si forza 0)
                     "anche_digitale INTEGER DEFAULT 0",
+                    # le DOMANDE del venditore a chi compra (6 nov
+                    # 2026): JSON, '' = nessuna (il mondo di ieri).
+                    # Solo accanto al digitale: domande_da_payload.
+                    "domande TEXT DEFAULT ''",
                     # condizione dell'oggetto (lug 2026): la scala a 5
                     # livelli del form ('' = annunci storici e importati,
                     # nessun obbligo retroattivo; la modifica la chiede)
@@ -10279,6 +10283,13 @@ def init_db():
                     # solo grazie a questa colonna — il libro mastro
                     # guarda «purgata ma ancora scritta».
                     "email_corriere_purgata_il INTEGER DEFAULT 0",
+                    # LE RISPOSTE alle domande del venditore (6 nov
+                    # 2026): cifrate come l'indirizzo, lette solo dalle
+                    # due parti, via con la scopa a ordine chiuso. Il
+                    # `_il` e' il FATTO che esce (anche al moderatore).
+                    "risposte TEXT DEFAULT ''",
+                    "risposte_il INTEGER DEFAULT 0",
+                    "risposte_purgate_il INTEGER DEFAULT 0",
                     "nascosto_compratore INTEGER DEFAULT 0",
                     "nascosto_venditore INTEGER DEFAULT 0",
                     # LA PORTA DEL TIMER (ago 2026): QUANDO uno sblocco
@@ -27491,6 +27502,9 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     (consegna, sped_sats, sped_eur, punto_sats, punto_eur, punto_dich,
      extra_sats, extra_eur, taglia, anche_dig,
      domestico, zone) = await consegna_da_payload(d, valuta)
+    # le domande a chi compra (6 nov 2026): il giudice PRIMA di ogni
+    # scrittura, cosi' il 400 non lascia un annuncio a meta'
+    domande = domande_da_payload(d, consegna, anche_dig)
     no_casa = non_spedisce_casa_da_payload(d, consegna)
     guardia_almeno_una_zona(consegna, zone, no_casa)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
@@ -27668,6 +27682,11 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
          durata_da_payload(d, consegna),
          servizio_limite_ordine_da_payload(d, consegna)))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    # le domande con un UPDATE a parte e non dentro l'INSERT da 36
+    # colonne: stessa transazione (il commit e' sotto), diff piccolo
+    if domande:
+        con.execute("UPDATE annunci SET domande=? WHERE id=?",
+                    (domande, annuncio_id))
     con.commit()
     con.close()
     # Le foto in un thread: convertire una HEIC da 15MB costa secondi
@@ -27920,7 +27939,9 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     # — stesso patto del venditore_id qui sopra, un giro in piu'.
     campi = CAMPI_VETRINA + (", a.venditore_id, a.visualizzazioni" if user else "")
     con = db()
-    r = con.execute(f"SELECT {campi}, a.stato FROM annunci a "
+    # le domande a chi compra escono SOLO qui, nella scheda: sono
+    # pubbliche (sono testi del venditore), ma alla vetrina non servono
+    r = con.execute(f"SELECT {campi}, a.stato, a.domande FROM annunci a "
                     "JOIN utenti u ON u.tg_id = a.venditore_id "
                     "WHERE a.id=? AND a.stato IN ('attivo','venduto')",
                     (annuncio_id,)).fetchone()
@@ -27943,6 +27964,7 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     if not r:
         raise HTTPException(404, "Annuncio non trovato")
     riga = arricchisci_righe_vetrina([dict(r)])[0]
+    riga["domande"] = domande_lette(riga.get("domande"))
     if riga.get("famiglia"):
         riga["famiglia_varianti"] = sorelle
     if not user or (user["id"] != riga.get("venditore_id")
@@ -29481,6 +29503,9 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     (consegna, sped_sats, sped_eur, punto_sats, punto_eur, punto_dich,
      extra_sats, extra_eur, taglia, anche_dig,
      domestico, zone) = await consegna_da_payload(d, valuta)
+    # le domande a chi compra (6 nov 2026): il giudice PRIMA di ogni
+    # scrittura, cosi' il 400 non lascia un annuncio a meta'
+    domande = domande_da_payload(d, consegna, anche_dig)
     no_casa = non_spedisce_casa_da_payload(d, consegna)
     guardia_almeno_una_zona(consegna, zone, no_casa)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
@@ -29698,6 +29723,14 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
          servizio_dove_da_payload(d, consegna),
          durata_da_payload(d, consegna),
          servizio_limite_ordine_da_payload(d, consegna), annuncio_id))
+    # LE DOMANDE (6 nov 2026): chiave assente = si conservano, ma non
+    # sopravvivono al digitale tolto — un annuncio che non offre piu'
+    # il codice online non ha niente da chiedere alla cassa.
+    if domande is None and consegna != "digitale" and not anche_dig:
+        domande = ""
+    if domande is not None:
+        con.execute("UPDATE annunci SET domande=? WHERE id=?",
+                    (domande, annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -35978,6 +36011,186 @@ def _indirizzo_letto(blob: str):
     return dati if isinstance(dati, dict) else None
 
 
+# ------- LE DOMANDE DEL VENDITORE AL COMPRATORE (6 nov 2026) -------
+# Chi vende un bene a consegna digitale (un biglietto, un corso, una
+# licenza intestata) puo' chiedere a chi compra dei dati: nome,
+# cognome, email, una scelta da un elenco. Nasce per i biglietti di
+# BitCare (FooEvents manda il biglietto all'email del compratore), ma
+# e' una funzione generale: le domande le decide il venditore, quante
+# ne vuole e ognuna obbligatoria o facoltativa (decisione di Andrea).
+# IL MONDO DI IERI NON SI TOCCA: `annunci.domande` vuota = nessuna
+# domanda, e la cassa resta byte per byte quella di prima.
+# LE RISPOSTE SONO DATI PERSONALI e fanno la strada dell'indirizzo:
+# cifrate in colonna, lette SOLO dalle due parti dalla loro rotta
+# (il moderatore mai, nemmeno in disputa: gli escono i fatti), e via
+# con la scopa a ordine chiuso — «le trasportiamo, non le conserviamo».
+# ⚠️ IL TELEFONO NON SI CHIEDE: vincolo permanente di Andrea (ago
+# 2026, «L'EMAIL PER IL CORRIERE»), e vale anche qui — una domanda che
+# lo nomina e' un 400 che lo dice.
+MAX_DOMANDE = 30            # «quante ne vuole»: il tetto e' solo tecnico
+MAX_TESTO_DOMANDA = 80
+MAX_OPZIONI_DOMANDA = 20
+MAX_TESTO_OPZIONE = 60
+MAX_RISPOSTA = 200
+TIPI_DOMANDA = ("testo", "scelta", "email", "sino")
+_RE_TELEFONO = re.compile(r"telefon|cellular|\bcell\b|whats ?app|\btel\b"
+                          r"|\bcel\b|\bphone\b|\bmobile\b", re.I)
+
+
+def _una_riga(x, tetto: int) -> str:
+    """Gli spazi collassati e gli a-capo via (il patto della nota):
+    e' quel che fa bastare esc() alla resa. Il tetto lo controlla il
+    chiamante, col 400 che nomina il campo."""
+    return " ".join(str(x if x is not None else "").split())[:tetto * 4]
+
+
+def domande_da_payload(d: dict, consegna: str, anche_digitale) -> str | None:
+    """Il giudice unico delle domande di un annuncio (pubblica e
+    modifica): il JSON da scrivere in colonna, '' per «nessuna», None
+    se la chiave NON c'e' (in modifica = conserva quelle di prima: il
+    patto dello stock, la dichiarazione e' la PRESENZA della chiave).
+
+    VIVONO SOLO DOVE C'E' IL DIGITALE: l'annuncio deve offrire il codice
+    online, da solo o accanto a una consegna fisica (`anche_digitale`).
+    Altrove si forzano a '' in silenzio, come `anche_digitale` col suo
+    giudice: il client di ieri non deve rompersi.
+
+    Ogni domanda e' {"t": testo, "k": tipo, "o": [opzioni], "obb": bool}.
+    IL 400 E NON IL TRONCAMENTO (la regola della nota): una domanda
+    tagliata a meta' non e' una domanda piu' corta."""
+    if "domande" not in d:
+        return None
+    if consegna != "digitale" and not anche_digitale:
+        return ""
+    grezze = d.get("domande") or []
+    if not isinstance(grezze, list):
+        raise HTTPException(400, "Le domande per chi compra non si "
+                                 "leggono: riprova")
+    if len(grezze) > MAX_DOMANDE:
+        raise HTTPException(400, f"Al massimo {MAX_DOMANDE} domande per "
+                                 f"annuncio")
+    pulite = []
+    for g in grezze:
+        if not isinstance(g, dict):
+            raise HTTPException(400, "Una domanda per chi compra non si "
+                                     "legge: riprova")
+        testo = _una_riga(g.get("t"), MAX_TESTO_DOMANDA)
+        if not testo:
+            # la riga lasciata vuota nel modulo: si toglie, non e' un
+            # errore (chi scrive cinque domande e ne cancella una non
+            # deve sentirsi dire di no)
+            continue
+        if len(testo) > MAX_TESTO_DOMANDA:
+            raise HTTPException(400, f"La domanda «{testo[:30]}…» è troppo "
+                                     f"lunga (massimo {MAX_TESTO_DOMANDA} "
+                                     f"caratteri)")
+        if _RE_TELEFONO.search(testo):
+            raise HTTPException(400, "Il numero di telefono non si può "
+                                     "chiedere su Barattolo: chiedi "
+                                     "l'email")
+        tipo = g.get("k") if g.get("k") in TIPI_DOMANDA else "testo"
+        opzioni = []
+        if tipo == "scelta":
+            for o in (g.get("o") or [])[:MAX_OPZIONI_DOMANDA * 2]:
+                o = _una_riga(o, MAX_TESTO_OPZIONE)
+                if not o or o in opzioni:
+                    continue
+                if len(o) > MAX_TESTO_OPZIONE:
+                    raise HTTPException(400, f"La scelta «{o[:30]}…» è "
+                                             f"troppo lunga (massimo "
+                                             f"{MAX_TESTO_OPZIONE} caratteri)")
+                opzioni.append(o)
+            if len(opzioni) > MAX_OPZIONI_DOMANDA:
+                raise HTTPException(400, f"Al massimo {MAX_OPZIONI_DOMANDA} "
+                                         f"scelte per domanda")
+            if len(opzioni) < 2:
+                raise HTTPException(400, f"«{testo}»: scrivi almeno due "
+                                         f"scelte nell'elenco")
+        pulite.append({"t": testo, "k": tipo, "o": opzioni,
+                       "obb": bool(g.get("obb"))})
+    return json.dumps(pulite, ensure_ascii=False) if pulite else ""
+
+
+def domande_lette(colonna) -> list:
+    """La lista delle domande di un annuncio, difensiva: una colonna
+    vuota o storta e' «nessuna domanda», mai un 500 alla cassa."""
+    try:
+        v = json.loads(colonna or "[]")
+    except Exception:
+        return []
+    return [x for x in v if isinstance(x, dict) and x.get("t")] \
+        if isinstance(v, list) else []
+
+
+def _risposte_da_payload(domande: list, d: dict) -> str:
+    """Le risposte del compratore alle domande dell'annuncio: il blob
+    CIFRATO da scrivere in colonna ('' = nessuna domanda o nessuna
+    risposta). Si fotografa anche la DOMANDA accanto alla risposta: se
+    domani il venditore la riscrive, l'ordine racconta ancora quella
+    a cui si e' risposto.
+
+    IL SERVER E' IL GIUDICE delle obbligatorie, ed e' la riga che tiene
+    in piedi il client di ieri: chi ha l'app vecchia in cache non manda
+    le risposte, e qui si sente dire di aggiornarla invece di far
+    nascere un ordine monco (che per un biglietto vorrebbe dire un
+    biglietto senza nome).
+    FORMA MINIMA sull'email (una chiocciola, niente spazi): e' un campo
+    che il venditore ha chiesto APPOSTA per scriverci, e una risposta
+    senza chiocciola e' sicuramente sbagliata. Il resto delle prove
+    vive nel client, che chiede invece di impedire.
+    SENZA CHIAVE, il 503 dell'indirizzo: un nome e un'email in chiaro
+    nel database no (in collaudo 'plain:', come tutto il resto)."""
+    if not domande:
+        return ""
+    grezze = d.get("risposte")
+    if not isinstance(grezze, list):
+        grezze = []
+    coppie, piene = [], False
+    for i, q in enumerate(domande):
+        r = _una_riga(grezze[i] if i < len(grezze) else "", MAX_RISPOSTA)
+        if len(r) > MAX_RISPOSTA:
+            raise HTTPException(400, f"La risposta a «{q['t']}» è troppo "
+                                     f"lunga (massimo {MAX_RISPOSTA} "
+                                     f"caratteri)")
+        if not r and q.get("obb"):
+            if not grezze:
+                raise HTTPException(400, "Il venditore ti chiede alcuni "
+                                         "dati: aggiorna l'app e riprova")
+            raise HTTPException(400, f"Rispondi a «{q['t']}»: il venditore "
+                                     f"ne ha bisogno")
+        if r and q.get("k") == "scelta" and r not in (q.get("o") or []):
+            raise HTTPException(400, f"«{q['t']}»: scegli una delle voci "
+                                     f"dell'elenco")
+        if r and q.get("k") == "sino" and r not in ("Sì", "No"):
+            raise HTTPException(400, f"«{q['t']}»: rispondi sì o no")
+        if r and q.get("k") == "email" and ("@" not in r or " " in r):
+            raise HTTPException(400, f"«{q['t']}»: controlla l'email, "
+                                     f"sembra incompleta")
+        piene = piene or bool(r)
+        coppie.append({"d": q["t"], "r": r})
+    if not piene:
+        return ""
+    if (not CHIAVE_CONTENUTI_DIGITALI or Fernet is None) \
+            and not MODALITA_COLLAUDO:
+        raise HTTPException(503, "Le risposte per il venditore non si "
+                                 "possono salvare in questo momento: "
+                                 "riprova più tardi")
+    return _cifra_contenuto(json.dumps(coppie, ensure_ascii=False))
+
+
+def risposte_lette(blob: str):
+    """Le coppie domanda/risposta di un ordine, o None se non si
+    leggono (il parse difensivo di `_indirizzo_letto`: su una chiave
+    mancante _decifra_contenuto torna una FRASE, che non e' JSON)."""
+    if not blob:
+        return None
+    try:
+        v = json.loads(_decifra_contenuto(blob))
+    except Exception:
+        return None
+    return v if isinstance(v, list) else None
+
+
 MAX_NOTA = 200
 
 
@@ -41772,6 +41985,9 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # non e' scattata (serve all'invito), con le coppie speculari che
     # si spengono a vicenda — la regola d'oro di _sconto_pubblico.
     return {"set": False, "quantita": richiesti,
+            # le domande del venditore (6 nov 2026): la cassa le chiede
+            # sulla sola via digitale, e il giudice in compra() le esige
+            "domande": domande_lette(a["domande"]),
             "articolo_sats": conto["netto"],
             "articolo_lordo_sats": articolo,
             "sconto_sats": sconto,
@@ -42647,6 +42863,18 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         con.close()
         raise
 
+    # LE RISPOSTE ALLE DOMANDE DEL VENDITORE (6 nov 2026): solo sulla
+    # via digitale, l'unica dove le domande vivono — su una combo chi
+    # sceglie la spedizione non ha niente da dire. PRIMA della invoice
+    # e col con.close() sul rifiuto, come la nota qui sopra.
+    risposte = ""
+    if scelta == "digitale":
+        try:
+            risposte = _risposte_da_payload(domande_lette(a["domande"]), d)
+        except HTTPException:
+            con.close()
+            raise
+
     # L'EMAIL PER IL CORRIERE, ALLA CASSA (ago 2026): il punto di
     # ritiro si sceglie PRIMA di pagare e l'email si lasciava DOPO,
     # nell'ordine — sono la stessa decisione («come mi arriva il
@@ -42806,6 +43034,17 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                 con.execute(
                     "UPDATE ordini SET nota_compratore=? "
                     "WHERE id=? AND stato='creato'", (nota, mio["id"]))
+                con.commit()
+            # LE RISPOSTE fanno la strada della nota (6 nov 2026): non
+            # toccano il prezzo, quindi un refuso nel nome non annulla
+            # la fattura. Si riscrivono SEMPRE: i blob Fernet non si
+            # confrontano, e riscrivere la stessa cosa non costa niente.
+            if risposte or mio["risposte"]:
+                con.execute(
+                    "UPDATE ordini SET risposte=?, risposte_il=? "
+                    "WHERE id=? AND stato='creato'",
+                    (risposte, int(time.time()) if risposte else 0,
+                     mio["id"]))
                 con.commit()
             # L'EMAIL fa la strada della NOTA — fuori dal confronto e
             # riscritta qui — e per la STESSA ragione: non tocca il
@@ -43192,6 +43431,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "zona": zona if scelta == "spedizione" else "",
             "paese": paese if scelta == "spedizione" else "",
             "nota": nota, "indirizzo": ind,
+            # le risposte viaggiano GIA' cifrate, come l'indirizzo
+            "risposte": risposte,
             "articolo_sats": conto["netto"], "spedizione_sats": sped,
             "protezione_sats": prot,
             # il resto della riga di `ordini` che nascera' al pagamento
@@ -43275,8 +43516,9 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         "nota_compratore,email_corriere,email_corriere_il,"
         "indirizzo,indirizzo_il,indirizzo_atteso,spedizione_sats,"
         "protezione_sats,quantita,sconto_sats,sconto_percento,"
-        "sped_gratis_sats,codice_sconto,codice_sconto_id) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "sped_gratis_sats,codice_sconto,codice_sconto_id,"
+        "risposte,risposte_il) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (cf, a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
@@ -43296,7 +43538,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
          sconto, pct if sconto else 0, sped_gratis_sats,
          # il NOME anche se il codice ha perso (lo confronta la
          # ripresa), l'ID solo se ha VINTO (lo conta il tetto)
-         cod_nome, cod_id if chi_sc else 0))
+         cod_nome, cod_id if chi_sc else 0,
+         risposte, int(time.time()) if risposte else 0))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     # LA CONFERMA DELL'INDIRIZZO (13 ott 2026): un UPDATE sulla riga
     # appena nata e non una colonna in piu' nell'INSERT qui sopra —
@@ -44586,6 +44829,39 @@ async def leggi_indirizzo(ordine_id: int,
             "indicato_il": o["indirizzo_il"],
             "corretto_il": o["indirizzo_corretto_il"],
             "correzioni": o["indirizzo_correzioni"]}
+
+
+@app.get("/api/orders/{ordine_id}/risposte")
+async def leggi_risposte(ordine_id: int,
+                         x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """Le risposte alle domande del venditore (6 nov 2026): la strada
+    di leggi_indirizzo, alla lettera — solo le due parti, il
+    moderatore MAI (in disputa gli esce il fatto, `risposte_il`), il
+    400 opaco prima dell'esistenza, GET puro."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND "
+                    "(compratore_id=? OR venditore_id=?)",
+                    (ordine_id, user["id"], user["id"])).fetchone()
+    con.close()
+    if not o or _nascosto_a(o, user["id"]):
+        raise HTTPException(400, "Operazione non permessa")
+    if o["risposte_purgate_il"]:
+        quando = time.strftime("%d/%m/%Y",
+                               time.localtime(o["risposte_purgate_il"]))
+        raise HTTPException(404, f"Le risposte sono state cancellate il "
+                                 f"{quando}, alla chiusura dell'ordine")
+    if not o["risposte"]:
+        raise HTTPException(404, "Nessuna risposta su questo ordine")
+    coppie = risposte_lette(o["risposte"])
+    if coppie is None:
+        raise HTTPException(503, "Le risposte non si riescono a leggere: "
+                                 "scrivetevi in chat")
+    return {"risposte": [{"domanda": str(c.get("d") or ""),
+                          "risposta": str(c.get("r") or "")}
+                         for c in coppie if isinstance(c, dict)],
+            "indicate_il": o["risposte_il"]}
 
 
 # --------- L'EMAIL PER IL CORRIERE (ago 2026, tappa B) ---------
@@ -76033,6 +76309,13 @@ def pulisci_indirizzi():
                 "WHERE email_corriere<>'' AND email_corriere_purgata_il=0 "
                 "AND stato='released' AND disputata=0",
                 (adesso,)).rowcount
+            # e le risposte alle domande del venditore (6 nov 2026),
+            # stessa forma e stesse tre righe da non ammorbidire
+            veloce += con.execute(
+                "UPDATE ordini SET risposte='', risposte_purgate_il=? "
+                "WHERE risposte<>'' AND risposte_purgate_il=0 "
+                "AND stato='released' AND disputata=0",
+                (adesso,)).rowcount
         # 2) LA FINESTRA: chi si e' chiuso senza quella conferma
         n = con.execute(
             "UPDATE ordini SET indirizzo='', indirizzo_purgato_il=? "
@@ -76043,6 +76326,11 @@ def pulisci_indirizzi():
             "UPDATE ordini SET email_corriere='', "
             "email_corriere_purgata_il=? "
             "WHERE email_corriere<>'' AND email_corriere_purgata_il=0 "
+            "AND stato IN ('released','refunded') AND aggiornato < ?",
+            (adesso, adesso - GIORNI_INDIRIZZO * 86400)).rowcount
+        n += con.execute(
+            "UPDATE ordini SET risposte='', risposte_purgate_il=? "
+            "WHERE risposte<>'' AND risposte_purgate_il=0 "
             "AND stato IN ('released','refunded') AND aggiornato < ?",
             (adesso, adesso - GIORNI_INDIRIZZO * 86400)).rowcount
         con.commit()
@@ -82509,6 +82797,10 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # cancellazione. Servono al client per disegnare il cassetto
         # senza poter sbirciare.
         r.pop("email_corriere", "")
+        # E le risposte alle domande del venditore idem (6 nov 2026):
+        # si leggono solo da /risposte, e solo le due parti. Escono
+        # `risposte_il` e il timbro della cancellazione.
+        r.pop("risposte", "")
         # Il collegamento del servizio idem: si legge solo da
         # /accesso, e solo le due parti. `accesso_il` e le correzioni
         # ESCONO — sono il SE e il QUANDO, cioe' il secondo dei due
@@ -94500,6 +94792,11 @@ def _onchain_nasce_ordine(con, o) -> int:
     if d.get("indirizzo_confermato_il"):
         con.execute("UPDATE ordini SET indirizzo_confermato_il=? WHERE id=?",
                     (int(d["indirizzo_confermato_il"]), oid))
+    # le risposte alle domande del venditore (6 nov 2026), gia' cifrate
+    # alla cassa: con un UPDATE a parte, il patto della conferma qui sopra
+    if d.get("risposte"):
+        con.execute("UPDATE ordini SET risposte=?, risposte_il=? "
+                    "WHERE id=?", (d["risposte"], o["creato"], oid))
     con.execute("UPDATE onchain_ordini SET ordine_id=? WHERE id=?",
                 (oid, o["id"]))
     return oid
@@ -94675,7 +94972,11 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
                          if o["incasso_tipo"] else None),
         "quota_sats": o["quota_sats"] or 0,
         "quota_indirizzo": o["quota_indirizzo"] or "",
-        "dettagli": json.loads(o["dettagli"] or "{}"),
+        # le risposte alle domande del venditore NON escono da qui (6
+        # nov 2026): si leggono solo da /api/orders/{id}/risposte
+        "dettagli": {k: v for k, v in
+                     json.loads(o["dettagli"] or "{}").items()
+                     if k != "risposte"},
         "indirizzo": onchain_riga_per(ind, tg_id, _onchain_nome(con, altro)),
         "proposta": proposta, "txid_uscita": o["txid_uscita"],
         # l'ordine di sempre, dalla strada A (0 = un ordine di prima)

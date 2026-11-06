@@ -35322,3 +35322,42 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `confermaSwapAuto`), e in `payoutPanel` il ramo `autoQui`. Prove:
   `prove_swap_auto`, `prove_swap_auto_ritiro`, `prove_swap_auto_schermate`;
   collaudo: `collaudo_swap_auto`.
+- LE DOMANDE DEL VENDITORE A CHI COMPRA (6 nov 2026, cantiere
+  domande-compratore; il perché in CANTIERI, «Le domande del venditore a
+  chi compra»). Chi vende un CODICE ONLINE (da solo o nella combo con
+  `anche_digitale`) può chiedere dei dati a chi compra: quante domande
+  vuole (tetto tecnico `MAX_DOMANDE` 30), ognuna obbligatoria o no, di
+  quattro tipi (`TIPI_DOMANDA`: testo breve, scelta da un elenco, email,
+  sì/no). Nasce per i biglietti di BitCare (FooEvents manda il biglietto
+  all'email del compratore), ma è generale.
+  L'ANNUNCIO: `annunci.domande` (JSON `[{t, k, o, obb}]`, '' = nessuna,
+  il mondo di ieri). Il giudice unico è `domande_da_payload` (pubblica e
+  modifica; chiave assente = None = conserva, il patto dello stock; fuori
+  dal digitale si forzano a ''; righe vuote tolte, tipi ignoti → testo,
+  una scelta vuole almeno due voci). IL TELEFONO NON SI CHIEDE
+  (`_RE_TELEFONO`, il vincolo permanente dell'email per il corriere): una
+  domanda che lo nomina è un 400 che lo dice, e il form lo avvisa sotto
+  il campo. Le domande escono SOLO da `/api/listings/{id}` (`domande`,
+  lista) e dal preventivo mono (`domande`), mai dalla vetrina.
+  LA CASSA: le chiede `cassettoDomandeAcquisto` sulla sola via digitale
+  dell'acquisto singolo (il carrello porta solo strade fisiche), prima
+  di pagare; nome e cognome si precompilano dal nome Telegram, l'email
+  dall'ultima scritta (`barattolo_email_risposte`, solo nel telefono).
+  La guardia `mancanoRisposte` sta su «Paga» e sul ⚡; il giudice vero è
+  `_risposte_da_payload` in `compra()`: obbligatorie, scelta nell'elenco,
+  sì/no, email con la chiocciola; senza lista = «aggiorna l'app» (il
+  client di ieri non fa nascere un ordine monco), sempre PRIMA della
+  invoice.
+  L'ORDINE: `ordini.risposte` (le coppie domanda/risposta, la domanda
+  FOTOGRAFATA), cifrate con `_cifra_contenuto` (senza chiave in
+  produzione 503, in collaudo 'plain:'), `risposte_il` e
+  `risposte_purgate_il`. La strada dell'INDIRIZZO alla lettera: il testo
+  non esce da `/api/orders` (`r.pop`), si legge solo da
+  `GET /api/orders/{id}/risposte` e solo le due parti — il moderatore
+  MAI, nemmeno in disputa: gli esce il fatto; la ripresa le riscrive
+  senza coniare una fattura; la scopa (`pulisci_indirizzi`) le cancella
+  alle due velocità dell'indirizzo. On-chain viaggiano già cifrate nei
+  `dettagli` della cassa fino a `_onchain_nasce_ordine`, e la scheda
+  on-chain non le mostra. Nell'ordine il riquadro `pannelloRisposte`
+  («📋 Leggi le risposte»). La strada firmata (Nostr) le domande non le
+  porta. Prove: `prove_domande_compratore`, `collaudo_domande_compratore`.
