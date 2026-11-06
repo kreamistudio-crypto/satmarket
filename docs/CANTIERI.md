@@ -78352,3 +78352,51 @@ dopo il testo delle 12 parole potrà dire «qui non ci saranno mai fondi,
 non importarle altrove». **DA GUARDARE.** Il giro dal vivo sul collaudo
 con due account veri; la pillola del backup per chi entra con Amber
 (la copia sui relay vuole la sua approvazione).
+
+## I ritocchi delle prove del 6 novembre: il tasto del «Conferma», la testata del P2P su una riga, una moneta per card (6 nov 2026, cantiere prove-6nov)
+
+LA RICHIESTA. Durante le prove delle leve in produzione (Andrea col suo
+secondo account al posto di Alan; lo swap automatico da 30.000 sats è
+andato fino ai bitcoin su Tangem), Andrea manda le modifiche man mano:
+«io ti do tutte le modifiche che vedo, tu le fai, le salvi e le portiamo
+in produzione tutte assieme». Tre, un commit ciascuna.
+
+1. IL TASTO DELL'AVVISO (`576a1e8`). La conferma dello swap automatico
+RESTA (Andrea: «ok lasciamo così»: era il «previa conferma» di Alan del
+2 nov), ma sotto il messaggio «controlla l'indirizzo e premi Conferma»
+c'è «₿ Controlla e conferma» (`SWAP_AUTO_BOTTONE`), verso
+`/?ordine=<n>&incasso=1`. Il vocabolario del tasto impara `_incasso`
+(`mercatino_<n>_incasso`, server e client in pari), e la pagina, aperto
+l'ordine, scorre al riquadro dell'incasso (`payoutIncasso`, dov'è il
+«Conferma») e lo illumina due secondi (`incassoDaAvviso`, gemella di
+`chatDaAvvisoP2P`: si riguarda ogni quarto di secondo per 15 s, e ci si
+torna una volta se la pagina è cresciuta sopra). Il tasto parte SOLO su
+quel ramo di `_sblocca_sats`: gli altri avvisi chiamano `notifica` come
+prima (e le finte dei collaudi, che hanno due argomenti, non se ne
+accorgono). Scartato: un messaggio senza conferma (è una decisione di
+Alan, non si rovescia qui).
+
+2. LA TESTATA DEL LIBRO P2P SU UNA RIGA (`7638cc8`). Con «Convenienza»
+(più lunga di «Recenti») campanella e levetta del tema scendevano sotto
+già a 375 px. ROVESCIA il «cede l'ospite» del 9 ott: la riga non va più
+a capo e i due cerchietti stanno sempre in alto a destra; cedono le
+pillole, in quest'ordine: sotto i 430 respiro, distanze, icona e corpo;
+sotto i 380 il Filtro dice solo il numero («128», la parola «offerte» si
+nasconde); sotto i 340 «Ordina» lascia l'icona. I puntini sono la rete
+di sicurezza. Misurato in Chromium a 414/390/375/360/320, chiaro e
+scuro: tutto su una riga, nessuna parola tagliata. Foto in
+`/mnt/project-files/prove-6nov/`.
+
+3. UNA MONETA PER CARD (`c0b91e4`). Sulle card del libro il fulmine (o
+la ₿) c'era due volte: davanti a «Ricevi/Invia» (2 nov) e nella scatola
+dei metodi (30 ott). Resta solo la prima: la scatola dei metodi delle
+card del libro torna nuda. Le card di «I miei scambi», che la riga con
+la moneta non ce l'hanno, tengono la scatola con la moneta.
+
+PROVATO. `prove_swap_auto_tasto` (nuova: il vocabolario nei due lati,
+le sentinelle del ramo, il banco dello scorrimento in node; tre
+controprove rosse), `collaudo_swap_auto` col tasto annotato sul ramo
+on-chain e assente sotto il minimo e senza scelta; le sentinelle della
+testata e della scatola emendate col perché. **DA GUARDARE** dal
+telefono dopo la promozione: il tasto dentro Telegram (apre la Mini App
+sull'ordine e scorre), la testata su un Android stretto.
