@@ -184226,6 +184226,102 @@ console.log(JSON.stringify(out));
     _sh.rmtree(cartella, ignore_errors=True)
 
 
+def prove_swap_auto_tasto():
+    """IL TASTO DELL'AVVISO DELLO SWAP AUTOMATICO (6 nov 2026, cantiere
+    swap-auto-tasto, richiesta di Andrea: «nel messaggio del bot voglio un
+    tasto che riporti esattamente dove l'utente deve compiere l'azione»).
+    Sotto «premi Conferma» c'e' «₿ Controlla e conferma»: apre l'ordine
+    (`/?ordine=<n>&incasso=1`, nella Mini App `mercatino_<n>_incasso`) e la
+    pagina scorre fino al riquadro dell'incasso e lo illumina."""
+    import json as _json, os, re, subprocess as _sp, shutil as _sh, tempfile as _tf
+    print("\n[il tasto dell'avviso dello swap automatico: dritti al «Conferma»]")
+    src = _SORGENTE.replace("\r\n", "\n")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    def pezzo(nome):
+        m = re.search(r"\n((?:async )?def %s\()" % re.escape(nome), src)
+        return src[m.start(1):src.index("\n\n\n", m.start(1))]
+
+    BASE = "https://barattolo.store"
+    ID = "c4a70000-0000-4000-8000-0000000000c1"
+    amb = {"re": re, "URL_PUBBLICO": BASE}
+    for nome in ("STARTAPP_MAX", "_FORMA_STARTAPP", "_FORMA_ID_STARTAPP", "SWAP_AUTO_BOTTONE"):
+        m = re.search(r"\n%s = ([^\n]+)\n" % nome, src)
+        amb[nome] = eval(m.group(1), {"re": re})
+    exec(pezzo("_startapp_da_link"), amb)
+    exec(pezzo("_bottone_swap_auto"), amb)
+    tasto = amb["_bottone_swap_auto"](42)
+    prova("IL TASTO: «₿ Controlla e conferma», verso l'ordine col segno dell'incasso",
+          ("₿ Controlla e conferma", BASE + "/?ordine=42&incasso=1"), tasto)
+    LINK = [tasto[1], BASE + "/?ordine=42&chat=1", BASE + "/?ordine=42", BASE + "/?ordine=42&incasso=2",
+            BASE + "/?ordine=042&incasso=1", BASE + "/?ordine=42&incasso=1&chat=1",
+            BASE + "/p2p?scambio=" + ID + "&incasso=1", BASE + "/p2p?scambio=" + ID + "&chat=1"]
+    ATTESI = ["mercatino_42_incasso", "mercatino_42_chat", "mercatino_42", "", "", "", "", "scambio_" + ID + "_chat"]
+    prova("IL SERVER: `&incasso=1` diventa `_incasso`, solo sull'ordine del mercatino; la chat resta com'era",
+          ATTESI, [amb["_startapp_da_link"](u) for u in LINK])
+
+    sb = pezzo("_sblocca_sats")
+    prova("L'AVVISO: il tasto solo sul ramo di chi ha scelto on-chain, e parte col messaggio",
+          (True, True, True, 1),
+          (sb.find("bottone = None") < sb.find("if ritenta:") and sb.find("bottone = None") > 0,
+           0 < sb.find("bottone = _bottone_swap_auto(ordine_id)") < sb.find("msg = _msg_swap_auto_conferma("),
+           'if (not ritenta or not gia_detto) and bottone:\n            await notifica(o["venditore_id"], msg, bottone)' in sb,
+           sb.count("_bottone_swap_auto(")))
+    apri = pezzo_js(mini, "function apriOrdineDaUrl(){", "\n}\n")
+    prova("LA PAGINA: `incasso=1` nell'indirizzo, e chi apre l'ordine dal tasto va all'incasso",
+          (True, True),
+          ("const INCASSO_DA_AVVISO = /[?&]incasso=1(?:&|$)/" in mini,
+           "else if (typeof INCASSO_DA_AVVISO !== 'undefined' && INCASSO_DA_AVVISO) incassoDaAvviso(id);" in apri))
+    node = _sh.which("node")
+    if not node:
+        salta("i gemelli del tasto e lo scorrimento in node", "node non c'e'")
+        return
+    js = (pezzo_js(mini, "function percorsoDaStartapp(p){", "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function startappDaLink(link, base){", "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function incassoDaAvviso(id){", "\n}\n") + "\n}\n"
+          + "const L = " + _json.dumps(LINK) + ", B = " + _json.dumps(BASE) + ";\n"
+          + r"""
+const R = {scrive: L.map(u => startappDaLink(u, B)), rilegge: L.map(u => percorsoDaStartapp(startappDaLink(u, B)))};
+/* il banco dello scorrimento: il riquadro arriva al terzo sguardo */
+var document = {}, scrollY = 0, innerHeight = 800, currentOrder = {id: 42}, sguardi = 0, coda = [];
+const scorsi = [], classi = new Set();
+let primo = 0;
+const box = {scrollIntoView: o => { if (!scorsi.length) primo = sguardi; scorsi.push(o.block); }, getBoundingClientRect: () => ({top: 900, bottom: 1100}),
+             classList: {add: n => classi.add(n), remove: n => classi.delete(n)}};
+var el = id => (id === 'payoutIncasso' && ++sguardi >= 3) ? box : null;
+/* l'orologio finto: i rinvii girano in ordine di tempo */
+let adesso = 0;
+var setTimeout = (f, ms) => coda.push([adesso + ms, f]);
+const prossimo = () => { coda.sort((a, b) => a[0] - b[0]); const [t, f] = coda.shift(); adesso = t; f(); };
+const gira = () => { let n = 0; while (coda.length && n++ < 50) prossimo(); };
+incassoDaAvviso(42);
+const accesa = () => classi.has('incasso-evidenza');
+let dopoTrovato = null;
+while (coda.length) { prossimo(); if (dopoTrovato === null && scorsi.length) dopoTrovato = accesa(); }
+R.scorre = [primo, scorsi.slice(), dopoTrovato, accesa()];
+/* un altro ordine aperto nel frattempo: niente scorre */
+scorsi.length = 0; sguardi = 5; currentOrder = {id: 7}; incassoDaAvviso(42); gira();
+R.altro = scorsi.length;
+console.log(JSON.stringify(R));
+""")
+    with _tf.TemporaryDirectory() as d:
+        f = os.path.join(d, "tasto.js")
+        open(f, "w", encoding="utf-8").write(js)
+        r = _sp.run([node, f], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    try:
+        t = _json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        prova("il banco del tasto gira", "", (r.stdout + r.stderr)[-1500:])
+        return
+    prova("IL CLIENT scrive le stesse parole del server", ATTESI, t["scrive"])
+    prova("...e le rilegge nell'indirizzo di partenza, `&incasso=1` compreso",
+          ["/?ordine=42&incasso=1", "/?ordine=42&chat=1", "/?ordine=42", "", "", "", "",
+           "/p2p?scambio=" + ID + "&chat=1"], t["rilegge"])
+    prova("LO SCORRIMENTO: aspetta il riquadro, ci va (e ci torna se la pagina e' cresciuta), lo illumina "
+          "e poi lo spegne", [3, ["center", "center"], True, False], t["scorre"])
+    prova("...ma non se nel frattempo si e' aperto un altro ordine", 0, t["altro"])
+
+
 def prove_swap_auto_schermate():
     """LO SWAP AUTOMATICO, TAPPA 3: LE SCHERMATE (2 nov 2026, cantiere
     swap-auto). Il giro col server vero sta in `collaudo_swap_auto`; qui
@@ -187268,7 +187364,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
-              prove_swap_auto, prove_swap_auto_schermate,
+              prove_swap_auto, prove_swap_auto_schermate, prove_swap_auto_tasto,
               # prove_swap_auto_ritiro gira nei collaudi (collaudo_swap_auto_ritiro):
               # vuole httpx, che la CI installa solo DOPO le prove (2 nov 2026)
               prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,

@@ -18060,7 +18060,10 @@ def _startapp_da_link(url) -> str:
     messaggio nuovo nella chat dell'ordine. Solo cifre, senza zeri davanti.
     (20 ott 2026, cantiere chat-dalla-notifica) E DRITTI ALLA CHAT: con
     `&chat=1` in coda — `/?ordine=<numero>&chat=1` e `/p2p?scambio=<id>&chat=1`
-    — la parola prende `_chat` in coda."""
+    — la parola prende `_chat` in coda.
+    (6 nov 2026, swap-auto-tasto) E DRITTI ALL'INCASSO: `/?ordine=<numero>
+    &incasso=1` → `mercatino_<numero>_incasso`, il tasto dell'avviso «premi
+    Conferma» dello swap automatico (`SWAP_AUTO_BOTTONE`)."""
     u = str(url or "")
     # L'ASSISTENZA IN APP (5 nov 2026, passo 2): `/?assistenza=mia` →
     # `assistenza` (la propria chat), `/?assistenza=<utente>` →
@@ -18077,11 +18080,15 @@ def _startapp_da_link(url) -> str:
     testa = URL_PUBBLICO + "/?ordine="
     if u.startswith(testa):
         resto = u[len(testa):]
-        chat = resto.endswith("&chat=1")
-        if chat:
-            resto = resto[:-len("&chat=1")]
+        coda = ""
+        # (6 nov 2026, swap-auto-tasto) `&incasso=1` → `_incasso`: dritti
+        # al riquadro dell'incasso, dove si preme «Conferma» del cambio
+        for dove in ("chat", "incasso"):
+            if resto.endswith(f"&{dove}=1"):
+                resto, coda = resto[:-len(f"&{dove}=1")], "_" + dove
+                break
         if re.fullmatch(r"[1-9][0-9]{0,11}", resto):
-            return "mercatino_" + resto + ("_chat" if chat else "")
+            return "mercatino_" + resto + coda
     base = URL_PUBBLICO + "/p2p"
     if u == base:
         return "p2p"
@@ -77769,6 +77776,19 @@ def swap_auto_dell_ordine(ordine_id: int) -> dict:
             "ricevi": int(r["ricevi"] or 0)}
 
 
+# IL TASTO DELL'AVVISO (6 nov 2026, richiesta di Andrea: «nel messaggio
+# del bot voglio un tasto che riporti esattamente dove l'utente deve
+# compiere l'azione»): apre l'ordine e scorre fino al riquadro
+# dell'incasso, quello col «Conferma» del cambio (`&incasso=1`, vedi
+# `_startapp_da_link` e `incassoDaAvviso` nel telefono).
+SWAP_AUTO_BOTTONE = "₿ Controlla e conferma"
+
+
+def _bottone_swap_auto(ordine_id: int) -> tuple:
+    """La coppia (etichetta, indirizzo) del tasto sotto l'avviso."""
+    return (SWAP_AUTO_BOTTONE, f"{URL_PUBBLICO}/?ordine={int(ordine_id)}&incasso=1")
+
+
 def _msg_swap_auto_conferma(sats: int, testa: str) -> str:
     """Le parole per chi ha scelto on-chain, a ordine confermato: il suo
     gesto e' un tocco, non una fattura."""
@@ -79008,6 +79028,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 f"scrivi ai moderatori col numero dell'ordine "
                 f"(<b>#{ordine_id}</b>): finché i sats sono lì, il caso si "
                 f"può ancora decidere.")
+        bottone = None    # solo l'avviso dello swap automatico ha il tasto
         if ritenta:
             msg = _msg_ritentiamo(netto, taccuino)
         elif bolt11 and _fattura_di_swap(ordine_id, bolt11):
@@ -79037,6 +79058,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         elif aspetta_onchain:
             # (2 nov 2026, swap-auto) ha scelto on-chain: il suo gesto e'
             # un «Conferma», non una fattura
+            bottone = _bottone_swap_auto(ordine_id)
             msg = _msg_swap_auto_conferma(
                 netto, "⚖️ <b>La disputa è stata decisa a tuo favore!</b>"
                 if o["disputata"] else "⏳ <b>Il tempo di conferma è scaduto!</b>"
@@ -79079,7 +79101,11 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         # UNA volta, non a ogni giro — senza tetto ai tentativi sarebbe
         # un messaggio all'ora per tutto il tempo del guasto. Dove
         # invece serve un suo gesto lo si dice sempre.
-        if not ritenta or not gia_detto:
+        # (il tasto solo quando c'e': chi chiama notifica senza, la
+        # chiama come l'ha sempre chiamata)
+        if (not ritenta or not gia_detto) and bottone:
+            await notifica(o["venditore_id"], msg, bottone)
+        elif not ritenta or not gia_detto:
             await notifica(o["venditore_id"], msg)
         return {"ok": False, "stato": "confirmed", "ritenta": ritenta,
                 "motivo": taccuino.get("motivo") or "",

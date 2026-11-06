@@ -147,6 +147,15 @@ def giro(c, ids):
     preferisce(c, 999, True)
 
     print("\n[4. alla conferma: il Lightning address si salta solo per chi ha scelto]")
+    # (6 nov 2026, swap-auto-tasto) il TASTO sotto l'avviso: chi notifica
+    # col bottone si annota qui, poi passa alla finta del banco
+    TASTI = []
+    finta = SRV.notifica
+
+    async def col_tasto(chi, testo, *a, **k):
+        TASTI.append((chi, a[0] if a else k.get("bottone")))
+        return await finta(chi, testo)
+    SRV.notifica = col_tasto
     LN_ADDRESS.clear()
     oid = confermato(ids["grande"])
     o = banco.riga(oid)
@@ -157,6 +166,10 @@ def giro(c, ids):
     prova("...e chi vende sa che tocca a lui: «Conferma», non una fattura",
           (True, True, False), ("«Conferma»" in detto, "bitcoin on-chain" in detto,
                                 "invoice" in detto))
+    prova("...col tasto che apre l'ordine dritto all'incasso (Andrea, 6 nov)",
+          [("₿ Controlla e conferma", f"{SRV.URL_PUBBLICO}/?ordine={oid}&incasso=1")],
+          [b for chi, b in TASTI if chi == 999 and b])
+    TASTI.clear()
     LN_ADDRESS.clear()
     confermato(ids["piccolo"])
     prova("sotto il minimo del cambio: il Lightning address come sempre",
@@ -165,6 +178,9 @@ def giro(c, ids):
     LN_ADDRESS.clear()
     confermato(ids["ln"])
     prova("chi non l'ha scelto: il Lightning address come sempre", 1, len(LN_ADDRESS))
+    prova("...e sotto il minimo o senza la scelta, nessun tasto dell'incasso", [],
+          [b for chi, b in TASTI if chi == 999 and b])
+    SRV.notifica = finta
     preferisce(c, 999, True)
 
     print("\n[5. la carta dell'ordine]")
