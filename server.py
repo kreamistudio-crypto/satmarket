@@ -77491,6 +77491,12 @@ def _swap_auto_prepara(con):
         dest_indice INTEGER DEFAULT -1,
         creato INTEGER DEFAULT 0,
         aggiornato INTEGER DEFAULT 0)""")
+    # (6 nov 2026, ritiro a scalini) il ritiro ha la sua prima conferma:
+    # da li' nessun rilancio lo guarda piu'
+    if "confermato" not in {x[1] for x in con.execute(
+            "PRAGMA table_info(swap_auto)")}:
+        con.execute("ALTER TABLE swap_auto ADD COLUMN confermato "
+                    "INTEGER DEFAULT 0")
 
 
 def swap_auto_prenota_indice(con, ordine_id: int, fornitore: str,
@@ -77732,7 +77738,20 @@ def swap_auto_tx_ritiro(rec: dict, chiavi: dict, lockup_hex: str,
                  + fratello)
     tx.vin[0].witness = Witness([firma, chiavi["segreto"], foglia, controllo])
     return {"hex": tx.serialize().hex(), "txid": tx.txid().hex(),
-            "sats": ricevi, "fee": valore - ricevi}
+            "sats": ricevi, "fee": valore - ricevi, "valore": valore,
+            "vsize": _swap_tx_vsize(tx)}
+
+
+def _swap_tx_vsize(tx) -> int:
+    """I vbyte di una transazione di embit: il peso e' tre volte la parte
+    senza testimoni piu' la transazione intera, diviso quattro per eccesso."""
+    from embit.script import Witness
+    from embit.transaction import Transaction
+    intera = tx.serialize()
+    nuda = Transaction.parse(intera)
+    for i in nuda.vin:
+        i.witness = Witness([])
+    return (len(nuda.serialize()) * 3 + len(intera) + 3) // 4
 
 
 SWAP_AUTO_RITIRATO = "ritirato"   # il ritiro e' partito ed e' stato preso
@@ -77760,6 +77779,77 @@ async def _swap_auto_trasmetti(fornitore: dict, hex_: str) -> bool:
             print(f"⚠️ Swap automatico: la trasmissione su {base} non va "
                   f"({type(e).__name__})", flush=True)
     return prese
+
+
+# LA COMMISSIONE DEL RITIRO A SCALINI (6 nov 2026, dalla prova di Andrea:
+# il primo ritiro vero pagava 123 sats, ~1 sat/vB, la stima che SATS
+# Routing dava al preventivo del mattino; il pomeriggio la coda era piena
+# e la transazione e' rimasta ferma per ore, con la scadenza dello swap a
+# 122 blocchi). Dopo il «Conferma» i bitcoin vanno ritirati PRIMA della
+# scadenza (`timeoutBlockHeight`), o il fornitore se li riprende col suo
+# rimborso: «non accetto» qui non esiste, si sceglie solo quanto pagare e
+# quanto aspettare. Andrea: «chi riceve puo' scegliere se accettare se
+# diventa troppo costosa?» — si', ma PRIMA, alla carta del «Conferma»;
+# dopo, il server paga il meno possibile che arrivi in tempo:
+#   1. il ritiro usa la tariffa per entrare in circa un'ora (`hourFee`), e
+#      mai meno di quel che il preventivo aveva messo da parte;
+#   2. fermo da due ore, o a meno di SWAP_AUTO_BLOCCHI_MEZZORA blocchi
+#      dalla scadenza: la tariffa da mezz'ora (`halfHourFee`);
+#   3. a meno di SWAP_AUTO_BLOCCHI_URGENTE blocchi: la piu' veloce.
+# Il rilancio SOSTITUISCE la transazione (e' gia' RBF: sequenza
+# 0xfffffffd), pagando almeno un sat/vB in piu' di prima, come chiede la
+# rete. Il di piu' esce da `ricevi`: i costi del cambio sono di chi vende
+# (decisione del 2 nov). Mai sotto la polvere.
+SWAP_AUTO_TARIFFA_MAX = 500           # sat/vB: oltre e' una risposta storta
+SWAP_AUTO_RILANCIO_DOPO = 20 * 60     # secondi prima di guardare un ritiro
+SWAP_AUTO_RILANCIO_OGNI = 10 * 60     # ...e poi una volta ogni dieci minuti
+SWAP_AUTO_FERMO_A_LUNGO = 2 * 3600    # fermo da due ore: lo scalino 2
+SWAP_AUTO_BLOCCHI_MEZZORA = 72        # circa mezza giornata
+SWAP_AUTO_BLOCCHI_URGENTE = 36        # circa sei ore
+_SWAP_AUTO_GUARDATO = {}              # indice -> quando l'ho guardato
+
+
+def swap_auto_scalino(restano, fermo_da: int) -> str:
+    """PURA: la tariffa di mempool da usare. `restano` = blocchi alla
+    scadenza (None = la rete non l'ha detto), `fermo_da` = secondi da
+    quando il ritiro e' partito (0 al primo ritiro)."""
+    if restano is not None and restano < SWAP_AUTO_BLOCCHI_URGENTE:
+        return "fastestFee"
+    if (restano is not None and restano < SWAP_AUTO_BLOCCHI_MEZZORA) \
+            or fermo_da >= SWAP_AUTO_FERMO_A_LUNGO:
+        return "halfHourFee"
+    return "hourFee"
+
+
+def swap_auto_ricevi_con_tariffa(valore: int, ricevi: int, vsize: int,
+                                 sat_vb: float, minimo_fee: int = 0) -> int:
+    """PURA: quanto arriva a chi vende perche' il ritiro paghi almeno
+    `sat_vb` (e almeno `minimo_fee` sats). Mai piu' di `ricevi` (la
+    promessa del preventivo), mai sotto la polvere: 0 = non si puo'."""
+    serve = max(int(math.ceil(float(sat_vb) * int(vsize))), int(minimo_fee))
+    nuovo = min(int(ricevi), int(valore) - serve)
+    return nuovo if nuovo >= 546 else 0
+
+
+async def _swap_auto_tariffa(base: str, scalino: str) -> float:
+    """sat/vB dello scalino dal mempool del fornitore; 0 = non risponde."""
+    try:
+        d = json.loads(await _swap_mempool_leggi(base, "/v1/fees/recommended")
+                       or "{}")
+        v = float(d.get(scalino) or 0) if isinstance(d, dict) else 0
+    except (ValueError, TypeError):
+        v = 0
+    return min(max(v, 1.0), SWAP_AUTO_TARIFFA_MAX) if v > 0 else 0.0
+
+
+async def _swap_auto_restano(base: str, rec: dict):
+    """Blocchi alla scadenza dello swap, o None se la rete tace."""
+    try:
+        cima = int(str(await _swap_mempool_leggi(base, "/blocks/tip/height")
+                       or "").strip())
+        return int(rec.get("timeoutBlockHeight")) - cima
+    except (ValueError, TypeError):
+        return None
 
 
 async def swap_auto_ritira(indice: int, destinazione: str,
@@ -77831,8 +77921,20 @@ async def swap_auto_ritira(indice: int, destinazione: str,
     if not d:
         return {"stato": "no", "txid": "", "perche": "parole assenti"}
     try:
-        t = swap_auto_tx_ritiro(rec, swap_auto_chiavi(d["parole"], indice),
-                                lockup_hex, destinazione, ricevi, rete)
+        chiavi = swap_auto_chiavi(d["parole"], indice)
+        t = swap_auto_tx_ritiro(rec, chiavi, lockup_hex, destinazione,
+                                ricevi, rete)
+        # (6 nov 2026) LO SCALINO 1: la coda di adesso, non la stima del
+        # preventivo — se chiede di piu', il di piu' esce da `ricevi`
+        sat_vb = await _swap_auto_tariffa(base, swap_auto_scalino(
+            await _swap_auto_restano(base, rec), 0))
+        if sat_vb:
+            nuovo = swap_auto_ricevi_con_tariffa(t["valore"], ricevi,
+                                                 t["vsize"], sat_vb)
+            if nuovo and nuovo < int(ricevi):
+                ricevi = nuovo
+                t = swap_auto_tx_ritiro(rec, chiavi, lockup_hex,
+                                        destinazione, ricevi, rete)
     except ValueError as e:
         print(f"⚠️ Swap automatico {int(indice)}: ritiro fermo ({e})",
               flush=True)
@@ -77856,7 +77958,187 @@ async def swap_auto_ritira(indice: int, destinazione: str,
         con.commit()
     finally:
         con.close()
-    return {"stato": SWAP_AUTO_RITIRATO, "txid": t["txid"], "perche": ""}
+    return {"stato": SWAP_AUTO_RITIRATO, "txid": t["txid"], "perche": "",
+            "sats": int(t["sats"])}
+
+
+async def swap_auto_rilancia(indice: int) -> dict:
+    """IL RILANCIO DI UN RITIRO FERMO (6 nov 2026, scalini 2 e 3): chi ha
+    speso il lockup lo dice la rete (`/address/<lockup>/txs`). Speso e
+    confermato: fatto, la riga non si guarda piu'. Speso ma fermo: se lo
+    scalino di adesso chiede piu' di quel che paga, si rifa' la stessa
+    transazione con meno sats in uscita (RBF) e si trasmette; la riga
+    cambia SOLO se una strada l'ha presa (una risposta persa si
+    ritrova al giro dopo: la firma e' la stessa, la transazione anche).
+    Torna {"stato": «confermato» | «rilanciato» | «fermo» | «aspetta» |
+    «no», "txid", "sats", "prima", "perche"}."""
+    con = db()
+    try:
+        _swap_auto_prepara(con)
+        r = con.execute("SELECT * FROM swap_auto WHERE indice=?",
+                        (int(indice),)).fetchone()
+    finally:
+        con.close()
+    vuoto = {"txid": "", "sats": 0, "prima": 0}
+    if not r or r["stato"] != SWAP_AUTO_RITIRATO or not r["ritiro_txid"]:
+        return dict(vuoto, stato="no", perche="niente ritiro da guardare")
+    rec = json.loads(r["risposta"] or "{}")
+    fornitore = swap_fornitore(r["fornitore"]) or {}
+    rete = fornitore.get("rete") or swap_rete()
+    base = str(fornitore.get("mempool") or "").rstrip("/")
+    indirizzo = str(rec.get("lockupAddress") or "")
+    try:
+        txs = json.loads(await _swap_mempool_leggi(
+            base, f"/address/{indirizzo}/txs") or "null")
+    except ValueError:
+        txs = None
+    if not isinstance(txs, list):
+        return dict(vuoto, stato="aspetta", perche="la rete non risponde")
+    txs = [x for x in txs if isinstance(x, dict)]
+    spesa = next((x for x in txs if any(
+        isinstance(i, dict) and isinstance(i.get("prevout"), dict)
+        and i["prevout"].get("scriptpubkey_address") == indirizzo
+        for i in x.get("vin") or [])), None)
+    if spesa and (spesa.get("status") or {}).get("confirmed"):
+        con = db()
+        try:
+            con.execute("UPDATE swap_auto SET confermato=1 WHERE indice=?",
+                        (int(indice),))
+            con.commit()
+        finally:
+            con.close()
+        return dict(vuoto, stato="confermato", txid=str(spesa.get("txid")
+                                                         or ""))
+    if spesa:
+        lockup_txid = next(str(i.get("txid") or "") for i in spesa["vin"]
+                           if isinstance(i, dict) and isinstance(
+                               i.get("prevout"), dict)
+                           and i["prevout"].get("scriptpubkey_address")
+                           == indirizzo)
+    else:
+        # nessuno l'ha speso: il ritiro e' uscito dalla coda (la rete
+        # butta le transazioni povere dopo giorni) — si ritrasmette
+        lockup_txid = next((str(x.get("txid") or "") for x in txs if any(
+            isinstance(o, dict) and o.get("scriptpubkey_address") == indirizzo
+            for o in x.get("vout") or [])), "")
+    if not re.fullmatch(r"[0-9a-f]{64}", lockup_txid):
+        return dict(vuoto, stato="aspetta", perche="lockup non visto")
+    lockup_hex = (await _swap_mempool_leggi(base, f"/tx/{lockup_txid}/hex")
+                  or "").strip()
+    try:
+        from embit.transaction import Transaction
+        if Transaction.parse(bytes.fromhex(lockup_hex)).txid().hex() \
+                != lockup_txid:
+            return dict(vuoto, stato="no", perche="la rete risponde con un "
+                        "altro lockup")
+    except Exception:
+        return dict(vuoto, stato="aspetta", perche="lockup illeggibile")
+    d = _swap_auto_parole_vps()
+    if not d:
+        return dict(vuoto, stato="no", perche="parole assenti")
+    destinazione = r["destinazione"]
+    try:
+        chiavi = swap_auto_chiavi(d["parole"], indice)
+        t = swap_auto_tx_ritiro(rec, chiavi, lockup_hex, destinazione,
+                                int(r["ricevi"]), rete)
+        # quel che paga davvero la transazione in coda, se e' la nostra
+        # (stesso indirizzo d'arrivo); sennò l'ultima scritta nella riga
+        attuale = int(r["ricevi"])
+        dest_hex = (_swap_script_destinazione(destinazione, rete)
+                    or b"").hex()
+        if spesa:
+            uscite = [o for o in spesa.get("vout") or []
+                      if isinstance(o, dict)]
+            if len(uscite) == 1 and uscite[0].get("scriptpubkey") == dest_hex:
+                attuale = int(uscite[0].get("value") or attuale)
+        prima_fee = t["valore"] - attuale
+        fermo_da = max(0, int(time.time()) - int(r["aggiornato"] or 0))
+        sat_vb = await _swap_auto_tariffa(base, swap_auto_scalino(
+            await _swap_auto_restano(base, rec), fermo_da))
+        if not sat_vb:
+            return dict(vuoto, stato="aspetta", perche="tariffe mute")
+        if spesa and math.ceil(sat_vb * t["vsize"]) <= prima_fee:
+            return dict(vuoto, stato="fermo", txid=str(spesa.get("txid")
+                                                      or ""),
+                        sats=attuale, perche="la commissione basta")
+        nuovo = swap_auto_ricevi_con_tariffa(
+            t["valore"], attuale, t["vsize"], sat_vb,
+            prima_fee + t["vsize"] if spesa else 0)
+        if not nuovo:
+            print(f"⚠️ Swap automatico {int(indice)}: il rilancio a "
+                  f"{sat_vb} sat/vB scenderebbe sotto la polvere", flush=True)
+            return dict(vuoto, stato="no", perche="sotto la polvere")
+        t = swap_auto_tx_ritiro(rec, chiavi, lockup_hex, destinazione,
+                                nuovo, rete)
+    except ValueError as e:
+        print(f"⚠️ Swap automatico {int(indice)}: rilancio fermo ({e})",
+              flush=True)
+        return dict(vuoto, stato="no", perche=str(e))
+    if not await _swap_auto_trasmetti(fornitore, t["hex"]):
+        return dict(vuoto, stato="aspetta", txid=t["txid"],
+                    perche="nessuna strada ha preso il rilancio")
+    con = db()
+    try:
+        # `aggiornato` resta l'ora del primo ritiro: «fermo da» si conta
+        # da li', non dall'ultimo rilancio
+        con.execute("UPDATE swap_auto SET ritiro_txid=?, ricevi=? "
+                    "WHERE indice=?", (t["txid"], int(nuovo), int(indice)))
+        con.commit()
+    finally:
+        con.close()
+    print(f"🔁 Swap automatico {int(indice)}: ritiro rilanciato a {sat_vb} "
+          f"sat/vB, {_fmt_sats(attuale)} → {_fmt_sats(nuovo)} sats "
+          f"({t['txid']})", flush=True)
+    return {"stato": "rilanciato", "txid": t["txid"], "sats": int(nuovo),
+            "prima": int(attuale), "perche": ""}
+
+
+async def swap_auto_rilancia_fermi() -> int:
+    """I RITIRI ANCORA SENZA CONFERMA degli ultimi sette giorni, guardati
+    dal battito dei pagamenti: ognuno una volta ogni dieci minuti, dopo i
+    primi venti. Chi vende sa di ogni rilancio. Torna quanti."""
+    ora = int(time.time())
+    con = _swap_pag_db()
+    try:
+        _swap_auto_prepara(con)
+        righe = con.execute(
+            "SELECT s.indice, s.ordine_id, s.destinazione, o.venditore_id, "
+            "a.titolo FROM swap_auto s JOIN ordini o ON o.id=s.ordine_id "
+            "LEFT JOIN annunci a ON a.id=o.annuncio_id WHERE s.stato=? AND "
+            "s.ritiro_txid!='' AND COALESCE(s.confermato, 0)=0 AND "
+            "s.creato>? AND s.aggiornato<?",
+            (SWAP_AUTO_RITIRATO, ora - 7 * 86_400,
+             ora - SWAP_AUTO_RILANCIO_DOPO)).fetchall()
+    finally:
+        con.close()
+    rilanciati = 0
+    for r in righe:
+        if ora - _SWAP_AUTO_GUARDATO.get(r["indice"], 0) \
+                < SWAP_AUTO_RILANCIO_OGNI:
+            continue
+        _SWAP_AUTO_GUARDATO[r["indice"]] = ora
+        try:
+            esito = await swap_auto_rilancia(r["indice"])
+        except Exception as e:
+            print(f"⚠️ Swap automatico {r['indice']}: il rilancio salta "
+                  f"({type(e).__name__})", flush=True)
+            continue
+        if esito["stato"] != "rilanciato":
+            continue
+        rilanciati += 1
+        titolo = html.escape(str(r['titolo'] or '')[:40])
+        if esito["sats"] >= esito["prima"]:
+            # la rete l'aveva buttato: ritrasmesso com'era, niente da dire
+            # sui sats (la transazione e' la stessa)
+            continue
+        await notifica(r["venditore_id"],
+            f"🔁 <b>{titolo}:</b> la rete bitcoin è intasata e il tuo ritiro "
+            "era fermo, così l'abbiamo rilanciato con una commissione più "
+            f"alta. Arrivano <b>{_fmt_sats(esito['sats'])} sats</b> (prima "
+            f"{_fmt_sats(esito['prima'])}) verso <code>"
+            f"{html.escape(r['destinazione'])}</code>. La nuova transazione "
+            f"è <code>{esito['txid']}</code>: la vecchia non vale più.")
+    return rilanciati
 
 
 # --- TAPPA 3: CHI VENDE SCEGLIE, CONFERMA, E I BITCOIN ARRIVANO -------
@@ -78122,9 +78404,16 @@ async def swap_auto_giro() -> int:
               f"{esito['txid']} verso {r['destinazione'][:10]}…", flush=True)
         await notifica(r["venditore_id"],
             f"₿ <b>{html.escape(str(r['titolo'] or '')[:40])}:</b> i tuoi "
-            f"bitcoin sono partiti, <b>{_fmt_sats(r['ricevi'])} sats</b> verso "
+            f"bitcoin sono partiti, <b>{_fmt_sats(esito.get('sats') or r['ricevi'])}"
+            f" sats</b> verso "
             f"<code>{html.escape(r['destinazione'])}</code>. La transazione è "
             f"<code>{esito['txid']}</code>: arrivano con la prima conferma.")
+    # (6 nov 2026) i ritiri gia' partiti e ancora fermi: lo scalino dopo
+    try:
+        await swap_auto_rilancia_fermi()
+    except Exception as e:
+        print(f"⚠️ Swap automatico: i rilanci saltano ({type(e).__name__})",
+              flush=True)
     return partiti
 
 
@@ -85877,16 +86166,27 @@ def _pagamenti_da_guardare() -> bool:
 
 
 def _swap_auto_da_guardare() -> bool:
-    """C'e' uno swap automatico confermato e non ancora ritirato? (2 nov
+    """C'e' uno swap automatico confermato e non ancora ritirato, o un
+    ritiro fermo da rilanciare (6 nov)? (2 nov
     2026) Il suo pagamento puo' essersi chiuso prima che il battito lo
     vedesse: il ritiro e l'avviso a chi vende non devono restare indietro."""
     con = db()
     try:
-        return con.execute(
-            "SELECT 1 FROM swap_auto WHERE stato=? AND destinazione!='' AND "
-            "creato>? LIMIT 1", (SWAP_AUTO_NATO,
-                                 int(time.time()) - 3 * 86_400)).fetchone() \
-            is not None
+        ora = int(time.time())
+        if con.execute(
+                "SELECT 1 FROM swap_auto WHERE stato=? AND destinazione!='' AND "
+                "creato>? LIMIT 1", (SWAP_AUTO_NATO,
+                                     ora - 3 * 86_400)).fetchone():
+            return True
+        # (6 nov 2026, ritiro a scalini) e un ritiro partito, ancora senza
+        # conferma, che tocca guardare: il rilancio vive nello stesso giro
+        _swap_auto_prepara(con)
+        return any(ora - _SWAP_AUTO_GUARDATO.get(x[0], 0)
+                   >= SWAP_AUTO_RILANCIO_OGNI for x in con.execute(
+            "SELECT indice FROM swap_auto WHERE stato=? AND ritiro_txid!='' "
+            "AND COALESCE(confermato, 0)=0 AND creato>? AND aggiornato<?",
+            (SWAP_AUTO_RITIRATO, ora - 7 * 86_400,
+             ora - SWAP_AUTO_RILANCIO_DOPO)))
     except sqlite3.OperationalError:
         return False
     finally:

@@ -78448,3 +78448,61 @@ venditore che «ci sono le risposte» (oggi le trova aprendo l'ordine);
 gli annunci importati da un negozio collegato non si modificano, quindi
 le domande lì non si possono ancora mettere (serve per BitCare: nel
 cantiere WooCommerce).
+
+## Il ritiro dello swap automatico a scalini: la coda di adesso e il rilancio RBF (6 nov 2026, cantiere prove-6nov, «si fai la 2» di Andrea)
+
+PERCHÉ. La prima prova vera dello swap automatico (30k sats, 6 nov,
+secondo account di Andrea) ha ritirato pagando 123 sats, circa 1 sat/vB:
+la stima che SATS Routing dava al preventivo del mattino. Il pomeriggio
+la coda di bitcoin era piena e la transazione è rimasta ferma per ore,
+con la scadenza dello swap a 122 blocchi (`timeoutBlockHeight` 974953).
+Oltre la scadenza il fornitore può riprendersi i bitcoin col suo
+rimborso: un ritiro fermo non è solo lento, è un rischio. Andrea ha
+chiesto se chi riceve può rifiutare una commissione troppo alta: sì, ma
+PRIMA, alla carta del «Conferma» («Ricevi circa X»); dopo il server
+paga il meno possibile che arrivi in tempo.
+
+COSA. Tre scalini, dalle tariffe di mempool del fornitore
+(`/v1/fees/recommended`) e dall'altezza della rete
+(`swap_auto_scalino`, pura): al ritiro `hourFee`; fermo da due ore, o a
+meno di 72 blocchi dalla scadenza, `halfHourFee`; a meno di 36 blocchi
+`fastestFee`. Al ritiro la coda di adesso decide solo se chiede PIÙ del
+preventivo (mai si dà a chi vende più della promessa). Il rilancio
+(`swap_auto_rilancia`) rifà la stessa transazione con meno sats in
+uscita: è già RBF (sequenza 0xfffffffd), paga almeno un sat/vB in più
+della vecchia come vuole la regola BIP-125, e mai sotto la polvere
+(`swap_auto_ricevi_con_tariffa`, pura). Chi ha speso il lockup lo dice
+la rete (`/address/<lockup>/txs`): confermato → colonna nuova
+`confermato` e la riga non si guarda più; nessuno l'ha speso (la rete
+butta le transazioni povere dopo giorni) → si ritrasmette. La riga
+cambia SOLO dopo che una strada ha preso il rilancio; `aggiornato` resta
+l'ora del primo ritiro. Il battito dei pagamenti lo guarda
+(`swap_auto_rilancia_fermi` in coda a `swap_auto_giro`, e
+`_swap_auto_da_guardare` si sveglia anche per loro): dopo 20 minuti,
+poi ogni 10, per sette giorni. Chi vende riceve «🔁 … rilanciato con una
+commissione più alta. Arrivano X sats (prima Y)» con l'id nuovo; una
+semplice ritrasmissione non lo disturba. Il di più è suo: i costi del
+cambio sono di chi vende (decisione del 2 nov).
+
+SCARTATO. Una tariffa fissa più alta per tutti (si paga troppo quando
+la coda è vuota); il CPFP dall'indirizzo di chi riceve (non è nostro e
+Tangem non lo fa); l'acceleratore a pagamento di mempool.space dentro il
+server (serve un conto, ed è una spesa di Barattolo); chiedere di nuovo
+a chi vende prima di ogni rilancio (dopo il «Conferma» il «no» non
+esiste: o si ritira in tempo o si perde tutto).
+
+PROVATO. `prove_swap_auto_scalini` (8, puri: la tabella degli scalini
+coi bordi, con la controprova rossa di «<=»; quanto arriva con fee
+minima e polvere; i vbyte rifatti a mano; i fili col battito).
+`prove_swap_auto_ritiro` (nei collaudi, +11 contro il cartone che ora
+sostituisce come bitcoind: più fee, +100 sats almeno, mai una
+confermata): la coda a 10 sat/vB al ritiro, lo scalino 1, il 2 fermo da
+tre ore con la sostituzione e la riga che segue, il 3 a 30 blocchi, la
+polvere che ferma, il ritiro buttato e ritrasmesso, il confermato; la
+controprova senza «+1 sat/vB» va rossa (il cartone rifiuta).
+`collaudo_swap_auto` scena 7b, server vero: il battito si sveglia, il
+rilancio, l'avviso con l'id nuovo, dieci minuti di silenzio, la
+conferma. Il cartone ha `/cartone/tariffa` e `/cartone/conferma_spesa`.
+**DA GUARDARE** dopo la promozione: il ritiro fermo del 6 nov
+(06e59d87…9b4e), se non è ancora confermato, il server lo rilancia da
+solo allo scalino del momento (è nei sette giorni, `confermato` 0).

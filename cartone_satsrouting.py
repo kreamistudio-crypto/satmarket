@@ -80,6 +80,12 @@ swap tappa 4) `GET /esplora/blocks/tip/height` l'altezza della rete, che
 (`firme`: lì arriva il segreto) e le trasmissioni tentate (`tentate`);
 ogni ritiro accettato sta in `trasmesse` una volta sola, con le `strade`
 da cui e' arrivato («rete», «fornitore»).
+(6 nov 2026, ritiro a scalini) La coda si sposta a comando, `GET
+/cartone/tariffa?hourFee=..&halfHourFee=..&fastestFee=..`; un ritiro
+trasmesso di nuovo con un'altra transazione la SOSTITUISCE come in
+bitcoind (RBF) solo se paga almeno 100 sats in piu' e se la vecchia non
+e' confermata (`sostituite` le ricorda); `GET
+/cartone/conferma_spesa?lockup=<id>` mette la spesa in un blocco.
 Lo stato di uno swap si sposta a comando come lo sposterebbe SATS Routing
 (`GET /cartone/stato?id=...&s=transaction.mempool`: a bitcoin bloccati
 nasce il lockup). `GET /cartone/visto` dice letture, l'ultima intestazione
@@ -186,11 +192,13 @@ CRIPTO = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "cartone_satsrouting_cripto.js")
 
 
-def spendi(c, s, txid, uscite):
+def spendi(c, s, txid, uscite, nostra=False):
     """La «rete» registra chi ha speso il lockup di `s`: l'uscita 0 del
-    lockup va a `txid`, che paga `uscite` ([{sats, script}])."""
+    lockup va a `txid`, che paga `uscite` ([{sats, script}]). `nostra` =
+    arrivata da una trasmissione (la sola che un rilancio RBF puo'
+    sostituire; quella di `spendi_altro` no)."""
     c["spese"][s["lockup"]["id"]] = {
-        "txid": txid,
+        "txid": txid, "nostra": nostra, "confermata": False,
         "vout": [{"scriptpubkey": u["script"], "value": u["sats"]} for u in uscite]}
 
 
@@ -638,8 +646,22 @@ def trasmetti(c, corpo, strada="fornitore"):
             return 400, {"error": "transazione rifiutata"}
         if not sub:
             s["stato"] = "invoice.settled"
-        if s["lockup"]["id"] not in c["spese"]:
-            spendi(c, s, esito["txid"], esito["uscite"])
+        prima = c["spese"].get(s["lockup"]["id"])
+        if prima and prima["txid"] != esito["txid"] and prima.get("nostra"):
+            # (6 nov 2026, ritiro a scalini) IL RILANCIO RBF, come
+            # bitcoind: la stessa uscita spesa di nuovo sostituisce la
+            # vecchia solo se paga di piu' (qui: almeno 100 sats, il
+            # sat/vB in piu' di un ritiro), e mai una gia' confermata
+            fee = lambda us: s["lockup"]["valore"] - sum(
+                int(u.get("value", u.get("sats", 0))) for u in us)
+            if prima.get("confermata"):
+                return 400, {"error": "bad-txns-inputs-missingorspent"}
+            if fee(esito["uscite"]) < fee(prima["vout"]) + 100:
+                return 400, {"error": "insufficient fee"}
+            c["stato"]["sostituite"].append(prima["txid"])
+            spendi(c, s, esito["txid"], esito["uscite"], True)
+        elif not prima:
+            spendi(c, s, esito["txid"], esito["uscite"], True)
         gia = next((x for x in c["stato"]["trasmesse"]
                     if x["txid"] == esito["txid"]), None)
         if gia:
@@ -674,7 +696,8 @@ def tx_json(c, txid):
                         "value": s["lockup"]["valore"]} if s else {})
             return {"txid": txid,
                     "vin": [{"txid": lockup, "vout": 0, "prevout": prevout}],
-                    "vout": spesa["vout"], "status": {"confirmed": False}}
+                    "vout": spesa["vout"],
+                    "status": {"confirmed": bool(spesa.get("confermata"))}}
     return None
 
 
@@ -861,7 +884,8 @@ class Sportello(BaseHTTPRequestHandler):
                 if pezzi[4] != "0" or not spesa:
                     return self._rispondi(200, {"spent": False})
                 return self._rispondi(200, {"spent": True, "txid": spesa["txid"], "vin": 0,
-                                            "status": {"confirmed": False}})
+                                            "status": {"confirmed": bool(
+                                                spesa.get("confermata"))}})
             if u.path == "/cartone/spendi_altro":
                 sid = (q.get("id") or [""])[0]
                 s = c["swap"].get(sid)
@@ -871,9 +895,20 @@ class Sportello(BaseHTTPRequestHandler):
                        [{"sats": s["onchainAmount"] - 300, "script": "0014" + "11" * 20}])
                 return self._rispondi(200, {"ok": True})
             if u.path == "/esplora/v1/fees/recommended":
-                return self._rispondi(200, {"fastestFee": 2, "halfHourFee": 2,
-                                            "hourFee": 1, "economyFee": 1,
-                                            "minimumFee": 1})
+                return self._rispondi(200, dict(c["stato"]["tariffe"]))
+            if u.path == "/cartone/tariffa":
+                # (6 nov 2026) la coda della rete, a comando:
+                # ?hourFee=..&halfHourFee=..&fastestFee=..
+                for k in list(c["stato"]["tariffe"]):
+                    if k in q:
+                        c["stato"]["tariffe"][k] = float(q[k][0])
+                return self._rispondi(200, dict(c["stato"]["tariffe"]))
+            if u.path == "/cartone/conferma_spesa":
+                # (6 nov 2026) la spesa del lockup entra in un blocco
+                spesa = c["spese"].get((q.get("lockup") or [""])[0])
+                if spesa:
+                    spesa["confermata"] = True
+                return self._rispondi(200 if spesa else 400, {"ok": bool(spesa)})
             if (len(pezzi) == 4 and pezzi[0] == "esplora" and pezzi[1] == "tx"
                     and pezzi[3] == "hex"):
                 # il finto mempool: testo semplice, come mempool.space
@@ -974,6 +1009,12 @@ def nuovo_cartone(rete="bitcoin", percento=None):
                       # tariffe, le richieste di rimborso cooperativo, le
                       # meta' di firma portate per il ritiro a due
                       "letture_sub": 0, "rimborsi": [], "ritiri": [],
+                      # (6 nov 2026, ritiro a scalini) la coda della rete
+                      # e i ritiri sostituiti da un rilancio RBF
+                      "tariffe": {"fastestFee": 2, "halfHourFee": 2,
+                                  "hourFee": 1, "economyFee": 1,
+                                  "minimumFee": 1},
+                      "sostituite": [],
                       # (24 ott 2026, swap tappa 4) l'altezza della rete:
                       # 144 blocchi prima della scadenza degli swap
                       "cima": SCADENZA_BLOCCO - 144},
@@ -1002,7 +1043,8 @@ def main(argv):
         percento = float(argv[argv.index("--percento") + 1])
     srv = ThreadingHTTPServer(("127.0.0.1", porta), Sportello)
     STATO.update(firme=[], tentate=0, letture_sub=0, rimborsi=[], ritiri=[],
-                 cima=SCADENZA_BLOCCO - 144)
+                 tariffe=dict(nuovo_cartone()["stato"]["tariffe"]),
+                 sostituite=[], cima=SCADENZA_BLOCCO - 144)
     srv.cartone = {"stato": STATO, "swap": SWAP, "chiave": CHIAVE,
                    "percento": percento, "rete": {}, "spese": {}}
     print(f"🧃 SATS Routing di cartone su http://127.0.0.1:{porta} "

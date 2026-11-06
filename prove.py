@@ -184078,7 +184078,7 @@ def _amb_swap_auto():
     il ritiro), senza importare il server."""
     import hashlib
     amb = {"hashlib": hashlib, "json": json, "re": re, "os": os,
-           "time": __import__("time"),
+           "time": __import__("time"), "math": __import__("math"),
            "_SWAP_EC_P": 2 ** 256 - 2 ** 32 - 977,
            "_SWAP_EC_N": 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141,
            "_SWAP_EC_G": (0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798,
@@ -184097,6 +184097,7 @@ def _amb_swap_auto():
               "swap_chiave_musig", "swap_programma_lockup", "_bech32_polymod",
               "_swap_programma_p2tr", "swap_auto_chiavi", "swap_auto_xpub",
               "_swap_ritocco", "_swap_script_destinazione", "swap_auto_tx_ritiro",
+              "_swap_tx_vsize", "swap_auto_scalino", "swap_auto_ricevi_con_tariffa",
               "swap_auto_verifica", "leggi_bolt11", "importo_bolt11"):
         exec(pezzo(n), amb)
     return amb
@@ -184580,6 +184581,81 @@ def prove_swap_auto_schermate():
           ("Sotto i 25000 sats" in r["sotto"], "scegliIncassoAuto(9,'ln')" in r["sotto"]))
 
 
+def prove_swap_auto_scalini():
+    """IL RITIRO A SCALINI (6 nov 2026, dalla prova di Andrea: il primo
+    ritiro vero, a ~1 sat/vB, e' rimasto fermo per ore con la coda piena).
+    Le due funzioni pure che decidono quanto paga il ritiro dello swap
+    automatico, e i fili che le legano al battito. Il resto — il rilancio
+    RBF contro un cartone che sostituisce come bitcoind — vuole httpx e
+    gira nei collaudi (`prove_swap_auto_ritiro`)."""
+    print("\n[lo swap automatico: il ritiro a scalini]")
+    import math as _m
+    amb = {"math": _m}
+    i = _SORGENTE.index("\nSWAP_AUTO_TARIFFA_MAX = ")
+    exec(_SORGENTE[i + 1:_SORGENTE.index("\n\n", i + 1)], amb)
+    for n in ("swap_auto_scalino", "swap_auto_ricevi_con_tariffa"):
+        exec(pezzo(n), amb)
+    casi = [(None, 0), (200, 0), (72, 0), (71, 0), (36, 0), (35, 0), (0, 0),
+            (-5, 0), (None, 7199), (None, 7200), (200, 9999), (10, 9999)]
+    attesi = ["hourFee", "hourFee", "hourFee", "halfHourFee", "halfHourFee",
+              "fastestFee", "fastestFee", "fastestFee", "hourFee", "halfHourFee",
+              "halfHourFee", "fastestFee"]
+    prova("scalini: un'ora di norma; mezz'ora fermo da 2 ore o a meno di 72 blocchi; "
+          "la piu' veloce a meno di 36 (e la rete muta non spinge)",
+          attesi, [amb["swap_auto_scalino"](*x) for x in casi])
+    # controprova: col bordo spostato di un blocco la tabella diventa rossa
+    storto = {"math": _m}
+    exec(_SORGENTE[i + 1:_SORGENTE.index("\n\n", i + 1)], storto)
+    exec(pezzo("swap_auto_scalino").replace("restano < SWAP_AUTO_BLOCCHI_URGENTE",
+                                            "restano <= SWAP_AUTO_BLOCCHI_URGENTE"), storto)
+    prova("...controprova: con «<=» al posto di «<» la tabella non torna",
+          True, [storto["swap_auto_scalino"](*x) for x in casi] != attesi)
+    f = amb["swap_auto_ricevi_con_tariffa"]
+    prova("scalini: chi vende riceve il valore meno la tariffa per i vbyte, mai piu' "
+          "della promessa, almeno la fee minima chiesta, mai sotto la polvere",
+          [49600, 48500, 48470, 48350, 0, 546, 0, 49600],
+          [f(50000, 49600, 150, 1), f(50000, 49600, 150, 10),
+           f(50000, 49600, 150, 10.2), f(50000, 48500, 150, 10, 1650),
+           f(50000, 49600, 150, 330), f(50000, 49600, 150, 1, 49454),
+           f(50000, 49600, 150, 1, 49455), f(50000, 49600, 150, 0)])
+    src = _SORGENTE.replace("\r\n", "\n")
+    giro = pezzo("swap_auto_giro")
+    ril = pezzo("swap_auto_rilancia")
+    fermi = pezzo("swap_auto_rilancia_fermi")
+    prova("scalini: il battito dei pagamenti guarda anche i ritiri gia' partiti",
+          True, "await swap_auto_rilancia_fermi()" in giro)
+    prova("...la riga cambia SOLO dopo che una strada ha preso il rilancio, e l'ora "
+          "del primo ritiro non si tocca",
+          (True, False),
+          (ril.index("_swap_auto_trasmetti(") < ril.index("UPDATE swap_auto SET ritiro_txid"),
+           "aggiornato" in ril[ril.index("UPDATE swap_auto SET ritiro_txid"):
+                               ril.index("UPDATE swap_auto SET ritiro_txid") + 120]))
+    prova("...un ritiro confermato non si guarda piu', e ognuno al piu' ogni dieci minuti",
+          (True, True, True),
+          ("COALESCE(s.confermato, 0)=0" in fermi, "SWAP_AUTO_RILANCIO_OGNI" in fermi,
+           "ADD COLUMN confermato" in pezzo("_swap_auto_prepara")))
+    prova("...il ritiro guarda la coda di adesso, e chi vende sa dei sats veri",
+          (True, True), ("_swap_auto_tariffa(base, swap_auto_scalino(" in
+                         pezzo("swap_auto_ritira"),
+                         "esito.get('sats') or r['ricevi']" in giro))
+    try:
+        from embit.transaction import Transaction as _Tx, TransactionInput as _TI, \
+            TransactionOutput as _TO
+        from embit.script import Script as _S, Witness as _W
+    except ImportError:
+        salta("scalini: i vbyte del ritiro", "embit non installato")
+        return
+    exec(pezzo("_swap_tx_vsize"), amb)
+    tx = _Tx(version=2, locktime=0, vin=[_TI(bytes(32), 0, sequence=0xfffffffd)],
+             vout=[_TO(49000, _S(b"\x00\x14" + bytes(20)))])
+    tx.vin[0].witness = _W([bytes(64), bytes(32), bytes(100), bytes(65)])
+    # a mano: la parte nuda e' 4+1+41+1+31+4 = 82 byte (peso 4 l'uno), i
+    # testimoni 2 (marcatore) + 1 + 65 + 33 + 101 + 66 = 268 (peso 1)
+    prova("scalini: i vbyte del ritiro, rifatti a mano (82*4 + 268, diviso 4 per eccesso)",
+          (len(tx.serialize()), -(-(82 * 4 + 268) // 4)),
+          (82 + 268, amb["_swap_tx_vsize"](tx)))
+
+
 def prove_swap_auto_ritiro():
     """LO SWAP AUTOMATICO, TAPPA 2: IL RITIRO DAL SERVER (2 nov 2026,
     cantiere swap-auto). Il server porta i bitcoin bloccati dal fornitore
@@ -184625,22 +184701,25 @@ def prove_swap_auto_ritiro():
                 "print": lambda *a, **k: None})
     for n in ("_swap_base_di_casa", "swap_lettura_simulata", "_swap_auto_file",
               "_swap_auto_parole_vps", "_swap_auto_prepara",
-              "swap_auto_prenota_indice"):
+              "swap_auto_prenota_indice", "_fmt_sats"):
         exec(pezzo(n), amb)
     for n in ("_swap_mempool_leggi", "swap_auto_crea", "_swap_auto_trasmetti",
-              "swap_auto_ritira"):
+              "swap_auto_ritira", "_swap_auto_tariffa", "_swap_auto_restano",
+              "swap_auto_rilancia"):
         exec("async " + pezzo(n), amb)
     for n in ("SWAP_AUTO_CHIESTO", "SWAP_AUTO_NATO", "SWAP_AUTO_MENTE",
-              "SWAP_AUTO_GIU", "SWAP_AUTO_CAMPI", "SWAP_AUTO_RITIRATO"):
+              "SWAP_AUTO_GIU", "SWAP_AUTO_CAMPI", "SWAP_AUTO_RITIRATO",
+              "SWAP_AUTO_TARIFFA_MAX"):
         i = _SORGENTE.index(f"\n{n} = ")
         exec(_SORGENTE[i + 1:_SORGENTE.index("\n\n", i + 1)].split("\n#")[0], amb)
     from embit import ec as _ec, script as _esc
     from embit.networks import NETWORKS as _NET
     from embit.transaction import Transaction as _Tx
 
-    def giro(rete, ordine, modo="normale"):
+    def giro(rete, ordine, modo="normale", tariffe=None):
         srv, porta = _cart.avvia(0, rete)
         c = srv.cartone
+        c["stato"]["tariffe"].update(tariffe or {})
         base = f"http://127.0.0.1:{porta}"
         forn = {"id": "satsrouting", "api": base, "mempool": base + "/esplora",
                 "referral": "", "rete": rete}
@@ -184692,6 +184771,102 @@ def prove_swap_auto_ritiro():
               ("ritirato", dopo["txid"], 1), (ancora["stato"], ancora["txid"],
                                               len(c["stato"]["trasmesse"])))
         srv.shutdown()
+
+    # --- (6 nov 2026) IL RITIRO A SCALINI: la coda di adesso al ritiro,
+    # e il rilancio RBF di un ritiro fermo, contro il cartone che
+    # sostituisce come bitcoind (piu' fee, mai una confermata) ---
+    srv, c, nato, dest, prima, dopo = giro("bitcoin", 5, tariffe={"hourFee": 10})
+
+    def rec_di(indice):
+        con = _db()
+        r = con.execute("SELECT risposta FROM swap_auto WHERE indice=?",
+                        (indice,)).fetchone()[0]
+        con.close()
+        return json.loads(r)
+    lk = c["swap"][nato["swap_id"]]["lockup"]["id"]
+    valore = c["swap"][nato["swap_id"]]["lockup"]["valore"]
+    vb = amb["swap_auto_tx_ritiro"](rec_di(nato["indice"]),
+                                    amb["swap_auto_chiavi"](M, nato["indice"]),
+                                    c["rete"][lk], dest, 1000, "bitcoin")["vsize"]
+    prova("ritiro a scalini: con la coda a 10 sat/vB il ritiro paga la coda, non i 400 "
+          "del preventivo (il di piu' esce da chi vende)",
+          ("ritirato", valore - 10 * vb, valore - 10 * vb),
+          (dopo["stato"], dopo.get("sats"), c["spese"][lk]["vout"][0]["value"]))
+    srv.shutdown()
+    srv, c, nato, dest, prima, dopo = giro("bitcoin", 6)
+    lk = c["swap"][nato["swap_id"]]["lockup"]["id"]
+    valore = c["swap"][nato["swap_id"]]["lockup"]["valore"]
+    prova("...e con la coda a 1 sat/vB resta la promessa del preventivo (mai di piu')",
+          ("ritirato", nato["onchain"] - 400), (dopo["stato"], dopo.get("sats")))
+
+    def riga():
+        con = _db()
+        r = con.execute("SELECT ritiro_txid, ricevi, aggiornato, confermato FROM swap_auto "
+                        "WHERE indice=?", (nato["indice"],)).fetchone()
+        con.close()
+        return tuple(r)
+
+    def rilancia():
+        return _aio.run(amb["swap_auto_rilancia"](nato["indice"]))
+
+    def atteso(sat_vb, prima_fee):
+        # come bitcoind: la tariffa nuova, e almeno un sat/vB piu' di prima
+        return valore - max(-(-sat_vb * vb // 1), prima_fee + vb)
+
+    t0 = riga()
+    e1 = rilancia()
+    prova("ritiro a scalini: appena partito, a coda quieta, il rilancio non tocca niente",
+          ("fermo", dopo["txid"], 1, t0), (e1["stato"], e1["txid"],
+                                           len(c["stato"]["trasmesse"]), riga()))
+    c["stato"]["tariffe"].update(hourFee=3, halfHourFee=20, fastestFee=60)
+    e2 = rilancia()
+    prova("...la coda sale: lo scalino 1 rilancia a 3 sat/vB, almeno un sat/vB sopra "
+          "la vecchia (la regola RBF)", ("rilanciato", atteso(3, 400), nato["onchain"] - 400),
+          (e2["stato"], e2["sats"], e2["prima"]))
+    con = _db()
+    con.execute("UPDATE swap_auto SET aggiornato=? WHERE indice=?",
+                (int(__import__("time").time()) - 3 * 3600, nato["indice"]))
+    con.commit()
+    con.close()
+    ora_ritiro = riga()[2]
+    e3 = rilancia()
+    prova("...fermo da tre ore: lo scalino 2, la tariffa da mezz'ora, SOSTITUISCE la "
+          "transazione (RBF), la riga la segue e l'ora del primo ritiro resta",
+          ("rilanciato", valore - 20 * vb, e2["sats"], (e3["txid"], valore - 20 * vb,
+                                                        ora_ritiro, 0),
+           [dopo["txid"], e2["txid"]]),
+          (e3["stato"], e3["sats"], e3["prima"], riga(), c["stato"]["sostituite"]))
+    prova("...e la rete ha la nuova: un'uscita sola, all'indirizzo di chi vende",
+          (e3["txid"], [{"scriptpubkey": _esc.address_to_scriptpubkey(dest).data.hex(),
+                         "value": valore - 20 * vb}]),
+          (c["spese"][lk]["txid"], c["spese"][lk]["vout"]))
+    c["stato"]["cima"] = rec_di(nato["indice"])["timeoutBlockHeight"] - 30
+    e4 = rilancia()
+    prova("...a 30 blocchi dalla scadenza: lo scalino 3, la piu' veloce",
+          ("rilanciato", valore - 60 * vb), (e4["stato"], e4["sats"]))
+    c["stato"]["tariffe"].update(fastestFee=400)
+    e5 = rilancia()
+    prova("...e una coda che si mangerebbe tutto non scende sotto la polvere: si ferma",
+          ("no", "sotto la polvere", e4["txid"]), (e5["stato"], e5["perche"], riga()[0]))
+    c["stato"]["tariffe"].update(fastestFee=60)
+    # la rete butta il ritiro (giorni a una tariffa povera): il lockup
+    # torna libero, e il rilancio lo ritrasmette com'e'
+    del c["spese"][lk]
+    e6 = rilancia()
+    prova("...se la rete ha buttato il ritiro, il rilancio lo ritrasmette (stessi sats)",
+          ("rilanciato", valore - 60 * vb, e4["sats"], e6["txid"], e6["txid"]),
+          (e6["stato"], e6["sats"], e6["prima"], c["spese"][lk]["txid"], riga()[0]))
+    import urllib.request as _ur
+    _ur.urlopen(f"http://127.0.0.1:{srv.server_address[1]}/cartone/conferma_spesa"
+                f"?lockup={lk}").read()
+    e7 = rilancia()
+    prova("...confermato: la riga lo ricorda, e da li' nessun rilancio",
+          ("confermato", e6["txid"], 1), (e7["stato"], e7["txid"], riga()[3]))
+    prova("...e la rete rifiuta di sostituire una spesa confermata",
+          400, _cart.trasmetti(c, {"hex": amb["swap_auto_tx_ritiro"](
+              rec_di(nato["indice"]), amb["swap_auto_chiavi"](M, nato["indice"]),
+              c["rete"][lk], dest, valore - 100 * vb, "bitcoin")["hex"]})[0])
+    srv.shutdown()
 
     # --- 3. le bugie del lockup e le cifre storte ---
     esiti = {}
@@ -187547,6 +187722,7 @@ def main():
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
               prove_swap_auto, prove_swap_auto_schermate, prove_swap_auto_tasto,
+              prove_swap_auto_scalini,
               # prove_swap_auto_ritiro gira nei collaudi (collaudo_swap_auto_ritiro):
               # vuole httpx, che la CI installa solo DOPO le prove (2 nov 2026)
               prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,

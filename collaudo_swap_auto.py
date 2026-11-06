@@ -42,6 +42,7 @@ USO:  python collaudo_swap_auto.py
 """
 import asyncio
 import os
+import time
 
 import collaudo_lnbits_muto as banco
 import collaudo_swap_pagamento as sp
@@ -254,6 +255,45 @@ def giro(c, ids):
           (rr["stato"], bool(rr["ritiro_txid"]), rr["ritiro_txid"] in detto))
     prova("il giro dopo non ritira due volte", 0, asyncio.run(SRV.swap_auto_giro()))
     prova("...e il battito torna a dormire", False, SRV._swap_auto_da_guardare())
+
+    print("\n[7b. il ritiro fermo si rilancia (6 nov 2026, ritiro a scalini)]")
+    ctx = CARTONE.cartone
+    lk = swap["lockup"]["id"]
+    ctx["stato"]["tariffe"].update(halfHourFee=20)
+    con = SRV.db()
+    con.execute("UPDATE swap_auto SET aggiornato=? WHERE ordine_id=?",
+                (int(time.time()) - 3 * 3600, oid))
+    con.commit()
+    con.close()
+    SRV._SWAP_AUTO_GUARDATO.clear()
+    banco.DETTO.clear()
+    prova("fermo da tre ore con la coda piena: il battito si sveglia per lui", True,
+          SRV._swap_auto_da_guardare())
+    prova("...il giro non ritira niente di nuovo", 0, asyncio.run(SRV.swap_auto_giro()))
+    con = SRV.db()
+    r3 = dict(con.execute("SELECT * FROM swap_auto WHERE ordine_id=?", (oid,)).fetchone())
+    con.close()
+    detto = " ".join(t for chi, t in banco.DETTO if chi == 999)
+    prova("...ma lo rilancia: la rete ha la nuova (RBF), la riga la segue con meno "
+          "sats, chi vende lo sa con l'id nuovo",
+          (True, r3["ritiro_txid"], True, True, True, [rr["ritiro_txid"]]),
+          (r3["ritiro_txid"] != rr["ritiro_txid"], ctx["spese"][lk]["txid"],
+           r3["ricevi"] < rr["ricevi"], r3["ritiro_txid"] in detto, "rilanciato" in detto,
+           ctx["stato"]["sostituite"]))
+    n_tr = len(ctx["stato"]["trasmesse"])
+    prova("...e per dieci minuti il battito non lo riguarda", (False, n_tr),
+          (SRV._swap_auto_da_guardare(), len(ctx["stato"]["trasmesse"])))
+    ctx["spese"][lk]["confermata"] = True
+    SRV._SWAP_AUTO_GUARDATO.clear()
+    asyncio.run(SRV.swap_auto_giro())
+    con = SRV.db()
+    conf = con.execute("SELECT confermato FROM swap_auto WHERE ordine_id=?",
+                       (oid,)).fetchone()[0]
+    con.close()
+    SRV._SWAP_AUTO_GUARDATO.clear()
+    prova("confermato: la riga lo ricorda e il battito torna a dormire", (1, False),
+          (conf, SRV._swap_auto_da_guardare()))
+    ctx["stato"]["tariffe"].update(halfHourFee=2)
     con = SRV._swap_pag_db()
     h = con.execute("SELECT hash FROM swap_pagamenti WHERE ordine_id=?",
                     (oid,)).fetchone()[0]
