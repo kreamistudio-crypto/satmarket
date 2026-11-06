@@ -59323,7 +59323,14 @@ function pagaConReteP2P(paga, rete){
 }
 /* LA MONETA DAVANTI A «RICEVI/INVIA … SATS» (2 nov 2026, Andrea): la
    rete dei sats della card, sempre, anche a on-chain spento — e' il
-   fulmine (o la ₿) della pagina Cambio, mai un'emoji */
+   fulmine (o la ₿) della pagina Cambio, mai un'emoji.
+   ⚠️ DAL 6 NOV 2026 E' L'UNICA SULLE CARD DEL LIBRO (Andrea: «nella card
+   ci sono delle icone doppie: se un ordine e' Lightning l'icona va
+   mostrata una volta sola, affianco a Ricevi, e non anche nel rettangolo
+   dei metodi di pagamento; stessa cosa per l'on-chain»): le card del
+   libro (vera, d'esempio, on-chain) passano la scatola dei metodi
+   NUDA, senza `pagaConReteP2P`. La scatola con la moneta resta dove la
+   riga «Ricevi» non c'e': le card di «I miei scambi» (`pagaReteCardP2P`). */
 function monetaRigaP2P(rete){
   return '<span class="p2p-moneta-riga" role="img" aria-label="'
     + (rete === 'btc' ? 'on-chain' : 'Lightning') + '">'
@@ -59396,7 +59403,7 @@ function rigaOnchainP2P(o){
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloOnchainP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
     ${badge ? '<div class="p2p-badge-riga">' + badge + '</div>' : ''}
-    ${pagaConReteP2P(paga, 'btc')}
+    ${paga}
     ${filtro}
     ${o.nome ? '<div class="p2p-box">👤 ' + esc(o.nome) + '</div>' : ''}
     ${mio && pausa ? '<div class="p2p-box p2p-pausa">⏸ In pausa fino ' + esc(quandoPausaP2P(pausa)) + '</div>' : ''}
@@ -65401,7 +65408,7 @@ function rigaOrdineP2P(o){
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
     ${badge ? `<div class="p2p-badge-riga">${badge}${affarone}</div>` : ''}
-    ${typeof pagaConReteP2P === 'function' ? pagaConReteP2P(paga, 'ln') : paga}
+    ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
   </div>`;
   /* IN PAUSA RESTA NEL LIBRO, GRIGIA (13 ott 2026, cantiere libro-vuoto,
@@ -65419,7 +65426,7 @@ function rigaOrdineP2P(o){
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
     ${badge ? `<div class="p2p-badge-riga">${badge}${affarone}</div>` : ''}
-    ${typeof pagaConReteP2P === 'function' ? pagaConReteP2P(paga, 'ln') : paga}
+    ${paga}
     ${zona}
     ${typeof segnoFiltroP2P === 'function' ? segnoFiltroP2P(o) : ''}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}

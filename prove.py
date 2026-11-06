@@ -62067,9 +62067,10 @@ def prove_giro_guidato_p2p():
     prova("...con l'etichetta «Esempio» e le righe vere (cifra, badge, metodo, stelle)",
           [True] * 5, ['<span class="p2p-esempio-tag">Esempio</span>' in _es,
                        "anelloScadenzaP2P(o)" in _es, "${affarone}" in _es,
-                       # (30 ott 2026, oc-tutorial) la scatola dei metodi porta
-                       # tutta a destra la moneta della rete
-                       "${typeof pagaConReteP2P === 'function' ? pagaConReteP2P(paga, 'ln') : paga}" in _es,
+                       # (6 nov 2026, Andrea) la scatola dei metodi NUDA: la moneta
+                       # della rete sta solo davanti a «Ricevi/Invia» (dal 30 ott
+                       # al 6 nov la portava anche lei, tutta a destra)
+                       "    ${paga}\n" in _es and "pagaConReteP2P" not in _es,
                        "p2p-rep" in _es])
     prova("...e il volto e le stelle se li porta dietro, senza toccare quelli veri", [True, True],
           ["const rep = stellineP2P(o.faccia || p2pFacce[o.id]);" in riga,
@@ -155656,11 +155657,17 @@ console.log(JSON.stringify(out));
                '<div class="p2p-box p2p-paga p2p-paga-rete"><span class="p2p-rete">btc</span></div>'], paga)
     riga_oc = pezzo_js(mini, "function rigaOnchainP2P(o){", "\n}\n")
     riga_ln = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
-    prova("...sulle card on-chain e Lightning (vera e d'esempio), non piu' nella testa; "
-          "la scatola tiene la moneta a destra",
-          (True, False, 2, True),
-          ("${pagaConReteP2P(paga, 'btc')}" in riga_oc, "segnoReteP2P(" in riga_oc + riga_ln,
-           riga_ln.count("${typeof pagaConReteP2P === 'function' ? pagaConReteP2P(paga, 'ln') : paga}"),
+    # EMENDATA (6 nov 2026, Andrea: «icone doppie: l'icona Lightning una
+    # volta sola, affianco a Ricevi, e non anche nel rettangolo dei metodi;
+    # stessa cosa per l'on-chain»): sulle card del LIBRO la moneta sta solo
+    # davanti alla riga dei sats; la scatola dei metodi e' nuda. La scatola
+    # con la moneta (la `pagaConReteP2P` qui sopra) resta per «I miei scambi»
+    prova("...sulle card del libro (on-chain e Lightning, vera e d'esempio) la moneta e' UNA: "
+          "davanti a «Ricevi/Invia», mai nella scatola dei metodi ne' nella testa",
+          (0, False, 2, 1, 1, True),
+          ((riga_oc + riga_ln).count("pagaConReteP2P"), "segnoReteP2P(" in riga_oc + riga_ln,
+           riga_ln.count("    ${paga}\n"), riga_oc.count("    ${paga}\n"),
+           riga_oc.count("monetaRigaP2P('btc')") * riga_ln.count("monetaRigaP2P('ln')"),
            ".p2p-paga-rete > .p2p-rete{position:absolute;right:6px;top:50%;transform:translateY(-50%)}" in css))
     # il cambio di rete senza salto: dal foglio unico (cantiere
     # oc-identico) nessun foglio si apre o si chiude, si ridisegna e basta
@@ -159628,8 +159635,8 @@ def prove_contanti_zona():
           ["const zona = typeof rigaZonaP2P === 'function' ? rigaZonaP2P(o) : '';" in riga
            # (10 ott 2026, reputazione-p2p) fra la zona e le stelline il
            # segno piccolo del filtro di chi pubblica
-           # (30 ott 2026, oc-tutorial) la scatola porta la moneta della rete
-           and "    ${typeof pagaConReteP2P === 'function' ? pagaConReteP2P(paga, 'ln') : paga}\n    ${zona}\n"
+           # (6 nov 2026) la scatola nuda: la moneta sta davanti a «Ricevi»
+           and "    ${paga}\n    ${zona}\n"
                "    ${typeof segnoFiltroP2P === 'function' ? segnoFiltroP2P(o) : ''}\n    ${rep ? " in riga,
            riga.count("${zona}")])
     dett = fn("function metodiDettP2P(o){")
