@@ -10402,6 +10402,9 @@
   .pag-linea .quando{font-family:'JetBrains Mono',monospace;white-space:nowrap;min-width:84px}
   .pag-linea li.ora{color:var(--ink);font-weight:800}
   .payout.pag-evidenza{border-color:var(--sats);box-shadow:0 0 0 3px var(--sats-soft)}
+  /* il tasto dell'avviso dello swap automatico (6 nov 2026): il riquadro
+     dell'incasso si accende due secondi, come la chat dal suo tasto */
+  .payout.incasso-evidenza{outline:3px solid var(--sats);outline-offset:2px}
   .order .sub{color:var(--muted);font-size:12.5px;font-weight:600;margin-top:3px}
   /* La cifra di un ordine non si spezza MAI: «≈», numero e unita'
      sono un gruppo solo, e a cedere e' il testo attorno. Senza, la
@@ -16297,8 +16300,10 @@ function percorsoDaStartapp(p){
      rilegge in `/?ordine=<numero>`, che `apriOrdineDaUrl` sa aprire */
   /* ...e con `_chat` in coda (20 ott 2026, cantiere chat-dalla-notifica)
      dritti alla chat: `&chat=1` */
-  const om = /^mercatino_([1-9][0-9]{0,11})(_chat)?$/.exec(p);
-  if (om) return '/?ordine=' + om[1] + (om[2] ? '&chat=1' : '');
+  /* ...e con `_incasso` (6 nov 2026, swap-auto-tasto) dritti al riquadro
+     dell'incasso: `&incasso=1`, il tasto dello swap automatico */
+  const om = /^mercatino_([1-9][0-9]{0,11})(_chat|_incasso)?$/.exec(p);
+  if (om) return '/?ordine=' + om[1] + (om[2] ? '&' + om[2].slice(1) + '=1' : '');
   /* L'ASSISTENZA IN APP (5 nov 2026, passo 2): `assistenza` e' la propria
      chat con lo staff, `assistenza_<utente>` la conversazione di un
      utente per gli admin (il tasto del loro avviso). Si rilegge in
@@ -16637,8 +16642,9 @@ function startappDaLink(link, base){
   const u = String(link || ''), radice = base + '/p2p';
   /* l'ordine del mercatino (16 ott 2026): il gemello di `_startapp_da_link` */
   /* ...e dritti alla chat (20 ott 2026): `&chat=1` diventa `_chat` */
-  const om = /^\/\?ordine=([1-9][0-9]{0,11})(&chat=1)?$/.exec(u.indexOf(base) === 0 ? u.slice(base.length) : '');
-  if (om) return 'mercatino_' + om[1] + (om[2] ? '_chat' : '');
+  /* ...e dritti all'incasso (6 nov 2026): `&incasso=1` diventa `_incasso` */
+  const om = /^\/\?ordine=([1-9][0-9]{0,11})(&chat=1|&incasso=1)?$/.exec(u.indexOf(base) === 0 ? u.slice(base.length) : '');
+  if (om) return 'mercatino_' + om[1] + (om[2] ? '_' + om[2].slice(1, -2) : '');
   /* l'assistenza (5 nov 2026): il gemello di `_startapp_da_link` */
   const as = /^\/\?assistenza=(mia|-?[1-9][0-9]{0,15})$/.exec(u.indexOf(base) === 0 ? u.slice(base.length) : '');
   if (as) return as[1] === 'mia' ? 'assistenza' : 'assistenza_' + as[1];
@@ -95595,8 +95601,44 @@ function apriOrdineDaUrl(){
     openOrder(id);
     /* il tasto di un avviso della chat (20 ott 2026): dritti alla chat */
     if (typeof CHAT_DA_AVVISO !== 'undefined' && CHAT_DA_AVVISO) chatDaAvvisoP2P('m' + id);
+    /* il tasto dello swap automatico (6 nov 2026): dritti all'incasso */
+    else if (typeof INCASSO_DA_AVVISO !== 'undefined' && INCASSO_DA_AVVISO) incassoDaAvviso(id);
   }
   else go('affari');
+}
+/* DRITTI ALL'INCASSO DAL TASTO DELL'AVVISO (6 nov 2026, cantiere
+   swap-auto-tasto, richiesta di Andrea: «nel messaggio del bot voglio un
+   tasto che riporti esattamente dove l'utente deve compiere l'azione»).
+   Il tasto «₿ Controlla e conferma» dello swap automatico porta
+   `&incasso=1`: aperto l'ordine, la pagina scorre fino al riquadro
+   dell'incasso (`payoutIncasso`, dove sta «Conferma») e lo illumina per
+   due secondi. Il riquadro arriva dopo il disegno dell'ordine: si
+   riguarda ogni quarto di secondo, per quindici secondi al massimo, e
+   una volta trovato ci si torna se la pagina e' cresciuta sopra e
+   nessuno ha scorso nel frattempo. Il gemello della chat e'
+   `chatDaAvvisoP2P`. */
+const INCASSO_DA_AVVISO = /[?&]incasso=1(?:&|$)/.test(typeof location !== 'undefined' ? location.search : '');
+function incassoDaAvviso(id){
+  if (typeof document === 'undefined' || !id) return;
+  const fino = Date.now() + 15000;
+  const prova = () => {
+    if (Date.now() > fino || !currentOrder || Number(currentOrder.id) !== Number(id)) return;
+    const box = el('payoutIncasso');
+    if (!box) { setTimeout(prova, 250); return; }
+    box.scrollIntoView({behavior: 'auto', block: 'center'});
+    box.classList.add('incasso-evidenza');
+    setTimeout(() => { const b = el('payoutIncasso'); if (b) b.classList.remove('incasso-evidenza'); }, 2000);
+    let lasciato = typeof scrollY === 'number' ? scrollY : 0;
+    setTimeout(() => {
+      const b2 = el('payoutIncasso');
+      if (!b2 || !currentOrder || Number(currentOrder.id) !== Number(id)) return;
+      if (Math.abs((scrollY || 0) - lasciato) > 2) return;
+      const r = b2.getBoundingClientRect();
+      if (r.top >= 0 && r.bottom <= (innerHeight || 0)) return;
+      b2.scrollIntoView({behavior: 'auto', block: 'center'});
+    }, 700);
+  };
+  prova();
 }
 const OFFERTA_URL = location.pathname.match(/^\/offerta\/(\d+)/);
 let offertaAperta = false;
