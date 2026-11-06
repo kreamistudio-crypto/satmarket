@@ -65594,7 +65594,7 @@ def prove_p2p_libro():
           # (31 ott 2026, mappa-contanti) il comune scelto sulla mappa
           # restringe ancora: si conta e si disegna l'`elenco`, che senza
           # comune scelto E' `mostrati`
-          and "${elenco.length} " in _rp
+          and '<em>${elenco.length}<span class="p2p-filtro-parola"> ' in _rp
           and "elenco.map(rigaOrdineP2P)" in _rp
           and "const elenco = conMappa ? elencoMappaP2P(mostrati) : mostrati;" in _rp)
     prova("...e i volti si chiedono PRIMA della reputazione, o non si chiedono mai",
@@ -65722,8 +65722,20 @@ def prove_p2p_libro():
     # la pillola non spezza mai la sua etichetta, e la riga VA A CAPO
     # invece di sfondare — a scendere e' la levetta, che e' l'ospite,
     # mai uno dei due comandi.
-    prova("la riga va a capo invece di sfondare", True,
-          "flex-wrap:wrap" in _riga and "justify-content:flex-end" in _riga)
+    # EMENDATA (6 nov 2026, richiesta di Andrea): la riga NON va piu' a
+    # capo — con «Convenienza» campana e levetta scendevano gia' a 375.
+    # I due cerchietti stanno sempre in alto a destra, e a cedere sono le
+    # pillole: piu' strette sotto i 430, il conteggio solo numero sotto i
+    # 380, «Ordina» senza icona sotto i 340, i puntini come ultima rete.
+    prova("la riga sta su UNA riga (6 nov 2026): niente piu' a capo, i cerchietti non cedono", True,
+          "justify-content:flex-end" in _riga
+          and "  .p2p-testa-riga{flex-wrap:nowrap}" in mini
+          and ".p2p-testa-cerchi{display:flex;align-items:center;gap:8px;flex:none}" in mini)
+    prova("...a cedere sono le pillole, nell'ordine detto", (True, True, True, True),
+          (".p2p-testa-riga .p2p-filtro{flex:0 1 auto;min-width:0;" in mini,
+           "  @media (max-width:429px){\n    .p2p-testa-riga{gap:4px}\n    .p2p-testa-riga .p2p-filtro{padding:8px 7px;gap:4px;font-size:12.5px}" in mini,
+           "  @media (max-width:379px){\n    .p2p-testa-riga .p2p-filtro-parola{display:none}\n  }" in mini,
+           "  @media (max-width:339px){\n    .p2p-testa-riga .p2p-ordina .p2p-ico{display:none}\n  }" in mini))
     prova("...e una pillola non spezza mai la sua etichetta", True,
           "white-space:nowrap" in pezzo_js(
               mini, "  .p2p-testa-riga .p2p-filtro{", "}"))

@@ -2961,6 +2961,45 @@
     .p2p-testa-riga .p2p-filtro .p2p-ico{width:15px;height:15px}
     .p2p-testa-cerchi{gap:5px}
   }
+  /* ⚠️ LA RIGA NON VA PIU' A CAPO (6 nov 2026, richiesta di Andrea:
+     «quando filtro per convenienza i toggle notifiche e colore tema si
+     spostano in basso, invece devono rimanere allineati in alto a
+     destra; se stringi Ordina e Filtro ci stanno anche loro»). ROVESCIA
+     il «cede l'ospite» del 9 ott: con «Convenienza» la campana e la
+     levetta scendevano gia' a 375. Adesso i due cerchietti stanno SEMPRE
+     in alto a destra e a cedere sono le due pillole, in due tempi:
+     sotto i 430 si stringono ancora un poco (respiro e distanze, mai il
+     corpo), sotto i 380 il Filtro dice solo il numero, e se ancora non
+     bastasse le parole si accorciano coi puntini invece di spingere la
+     riga a capo. */
+  .p2p-testa-riga{flex-wrap:nowrap}
+  .p2p-testa-riga .p2p-filtro{flex:0 1 auto;min-width:0;
+    grid-template-columns:auto auto minmax(0,auto)}
+  .p2p-testa-riga .p2p-filtro.p2p-ordina .cs-val,
+  .p2p-testa-riga .p2p-filtro em{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .p2p-testa-riga .p2p-filtro .p2p-ico,
+  .p2p-testa-riga .p2p-filtro .p2p-filtro-sx{flex:none}
+  @media (max-width:429px){
+    .p2p-testa-riga{gap:4px}
+    .p2p-testa-riga .p2p-filtro{padding:8px 7px;gap:4px;font-size:12.5px}
+    .p2p-testa-riga .p2p-filtro .p2p-ico{width:15px;height:15px}
+    .p2p-testa-riga .p2p-filtro.p2p-ordina,
+    .p2p-testa-riga .p2p-filtro .p2p-filtro-sx{gap:4px}
+    .p2p-testa-cerchi{gap:4px}
+  }
+  /* ...e sotto i 380 il conteggio del Filtro resta il NUMERO («128»,
+     non «128 offerte»): la parola e' quella che costa di piu' e dice
+     meno, accanto a «Filtro» il numero si legge da solo. Cosi' fino a
+     320 non serve nessun puntino; i puntini restano la rete di
+     sicurezza per i casi che non sappiamo misurare. */
+  @media (max-width:379px){
+    .p2p-testa-riga .p2p-filtro-parola{display:none}
+  }
+  /* ...e sotto i 340 (i telefoni piu' piccoli, 320) «Ordina» lascia la
+     sua icona e tiene la parola: la parola dice il criterio, l'icona no */
+  @media (max-width:339px){
+    .p2p-testa-riga .p2p-ordina .p2p-ico{display:none}
+  }
   /* LE DUE PILLOLE HANNO LA STESSA PELLE e cambiano solo il dentro:
      `.p2p-filtro` porta bordo, raggio, respiro e i due stati accesi
      (che vestono il lato), `.p2p-ordina` gli toglie la griglia e mette
@@ -65693,8 +65732,8 @@ function renderP2P(){
   const pillola = `<button type="button" class="p2p-filtro${
       filtroAccesoP2P(p2pFiltro) ? ' acceso' : ''}" onclick="apriFiltroP2P()">`
     + `<span class="p2p-filtro-sx">` + icoFiltroP2P() + `<b>Filtro</b></span>`
-    + `<s></s><em>${elenco.length} `
-    + `offert${elenco.length === 1 ? 'a' : 'e'}</em></button>`;
+    + `<s></s><em>${elenco.length}<span class="p2p-filtro-parola"> `
+    + `offert${elenco.length === 1 ? 'a' : 'e'}</span></em></button>`;
   /* GLI AVVISI RESTANO COL LIBRO e non salgono nella testata
      attaccata: la pillola e' un COMANDO e vale sempre, questi
      raccontano com'e' andata la lettura di adesso — appesi in alto
