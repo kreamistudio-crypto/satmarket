@@ -78400,3 +78400,51 @@ on-chain e assente sotto il minimo e senza scelta; le sentinelle della
 testata e della scatola emendate col perché. **DA GUARDARE** dal
 telefono dopo la promozione: il tasto dentro Telegram (apre la Mini App
 sull'ordine e scorre), la testata su un Android stretto.
+
+## Le domande del venditore a chi compra: nome, cognome, email e quel che serve, per i biglietti di BitCare (6 nov 2026, cantiere domande-compratore, richiesta di Andrea)
+
+IL PERCHÉ. Andrea vuole portare su Barattolo i biglietti del Bitcare
+Forum 2027 (bitcareforum.it, WooCommerce + FooEvents). L'analisi
+(Claude Doc «Biglietti FooEvents dentro Barattolo») ha scelto con lui la
+strada semplice: FooEvents manda il biglietto per email, Barattolo crea
+l'ordine su WooCommerce e segna consegnato da sé. Per farlo servono
+nome, cognome ed email di chi compra, che oggi la cassa non chiede. Da
+qui la richiesta, più larga del caso: «a fronte di contenuti digitali il
+venditore può decidere dei campi, obbligatori o facoltativi, nel numero
+che vuole; si auto-suggeriscono nome, cognome, email; a prova di
+boomer; non deve rompere niente». Questo cantiere è SOLO la parte delle
+domande: l'ordine su WooCommerce è il prossimo.
+
+DECISO. Quattro tipi e basta (testo, elenco a tendina, email, sì/no):
+ogni tipo in più è una domanda in più per chi vende. Il preset si
+SUGGERISCE con un tocco, non si aggiunge da solo. Nessun tetto vero sul
+numero (30 tecnico). Le domande vivono solo accanto al codice online
+(anche nella combo, e allora solo per chi sceglie il codice). Le
+risposte fanno la strada dell'indirizzo, non della nota: sono dati
+personali — cifrate, lette dalle due parti, mai dal moderatore, via con
+la scopa. Il telefono resta fuori (vincolo permanente di agosto), con
+un 400 che lo dice. Il server è il giudice delle obbligatorie: l'app
+vecchia in cache si sente dire di aggiornarsi invece di far nascere un
+biglietto senza nome. Due UPDATE piccoli invece di allargare gli INSERT
+da 36 colonne di pubblica e della cassa on-chain.
+
+SCARTATO. Le risposte in chiaro come la nota (sono nomi ed email, non
+preferenze sull'oggetto); le domande nella vetrina (non servono alle
+card e appesantiscono ogni pagina); le domande nel carrello (porta solo
+strade fisiche); un tipo «data» e un tipo «numero» (per ora bastano
+l'elenco e il testo); un nome per OGNI biglietto quando se ne comprano
+due (per partire uno per ordine; resta una scelta aperta di Andrea).
+
+PROVATO. `prove_domande_compratore` (33: i giudici puri girano davvero,
+il telefono in quattro forme, «Hotel» che non è un telefono, il 503
+senza chiave, le sentinelle di /api/orders, /risposte, scopa, cassa e
+on-chain, i pezzi del client in node), `collaudo_domande_compratore`
+(28, server vero: preventivo, cassa coi suoi no, ripresa, chi legge,
+combo, regressione, scopa, l'ordine on-chain che nasce con le
+risposte). **DA GUARDARE** sul collaudo dal telefono: il form (aggiungi,
+preset, elenco a tendina, togli), la cassa on-chain con le domande, il
+riquadro nell'ordine dalle due parti. **NON FATTO**: l'avviso Telegram al
+venditore che «ci sono le risposte» (oggi le trova aprendo l'ordine);
+gli annunci importati da un negozio collegato non si modificano, quindi
+le domande lì non si possono ancora mettere (serve per BitCare: nel
+cantiere WooCommerce).

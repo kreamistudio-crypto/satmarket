@@ -9691,7 +9691,10 @@ def prove_busta_ritiro():
            # scritture sorelle dell'ordine, salvaNota e
            # salvaPuntoRitiro, un velo non ce l'hanno affatto, e questo
            # elenco vale finche' resta di sole letture
-           "apriEmailCorriere", "mostraEmailCorriere"},
+           "apriEmailCorriere", "mostraEmailCorriere",
+           # le risposte alle domande del venditore (6 nov 2026): una
+           # LETTURA, come l'indirizzo e l'email
+           "mostraRisposte"},
           _chi_chiama("attesaRitardata(btn,"))
     # ⚠️ con find() e non index(): una prova che ESPLODE invece di
     # farsi rossa si porta dietro tutte le sorelle dopo di lei — la
@@ -11721,6 +11724,7 @@ def prove_email_corriere():
         email_corriere_correzioni INT DEFAULT 0,
         email_corriere_purgata_il INT DEFAULT 0,
         indirizzo TEXT DEFAULT '', indirizzo_purgato_il INT DEFAULT 0,
+        risposte TEXT DEFAULT '', risposte_purgate_il INT DEFAULT 0,
         punto_barattolo TEXT DEFAULT '',
         disputata INT DEFAULT 0);
       -- 1: via punto, pagato: il caso normale
@@ -12252,6 +12256,164 @@ def prove_email_corriere():
     vero.close()
 
 
+def prove_domande_compratore():
+    """LE DOMANDE DEL VENDITORE A CHI COMPRA (6 nov 2026, cantiere
+    domande-compratore): chi vende un codice online chiede dei dati —
+    quante domande vuole, obbligatorie o facoltative, quattro tipi.
+
+    Qui i GIUDICI PURI girano davvero (exec del blocco del server) e le
+    righe da non ammorbidire si guardano nel sorgente: il telefono
+    escluso, il testo che non esce da /api/orders, la scopa, la cassa
+    on-chain. Il giro col server vero sta in collaudo_domande_compratore."""
+    print("\n[le domande del venditore a chi compra]")
+    import json as _json
+    src = _SORGENTE
+    blocco = src[src.index("MAX_DOMANDE = 30"):src.index("MAX_NOTA = 200")]
+
+    class _No(Exception):
+        def __init__(self, codice, testo=""):
+            super().__init__(testo)
+            self.status_code, self.detail = codice, testo
+
+    amb = {"re": re, "json": _json, "HTTPException": _No,
+           "CHIAVE_CONTENUTI_DIGITALI": "", "Fernet": None,
+           "MODALITA_COLLAUDO": True}
+    exec(pezzo("_cifra_contenuto"), amb)
+    exec(pezzo("_decifra_contenuto"), amb)
+    exec(blocco, amb)
+    dp, rp = amb["domande_da_payload"], amb["_risposte_da_payload"]
+
+    def no(fn, *a):
+        try:
+            fn(*a)
+        except _No as e:
+            return e.status_code, e.detail
+        return None
+
+    # --- il giudice delle domande dell'annuncio -----------------------
+    prova("chiave assente = None (la modifica conserva)", None,
+          dp({}, "digitale", 0))
+    prova("senza il codice online le domande non vivono", "",
+          dp({"domande": [{"t": "Nome"}]}, "spedizione", 0))
+    prova("...ma sulla combo si'", True,
+          bool(dp({"domande": [{"t": "Nome"}]}, "spedizione", 1)))
+    d = _json.loads(dp({"domande": [
+        {"t": "  Nome  ", "k": "testo", "obb": 1},
+        {"t": "", "k": "testo"},
+        {"t": "Giorno", "k": "scelta", "o": ["Ven", "", "Sab", "Ven"]},
+        {"t": "Boh", "k": "inventato"}]}, "digitale", 0))
+    prova("le righe vuote spariscono, i tipi ignoti diventano testo, le "
+          "scelte si puliscono", [("Nome", "testo", [], True),
+                                  ("Giorno", "scelta", ["Ven", "Sab"], False),
+                                  ("Boh", "testo", [], False)],
+          [(q["t"], q["k"], q["o"], q["obb"]) for q in d])
+    for t in ("Numero di telefono", "Cellulare", "WhatsApp", "Tel"):
+        prova(f"IL TELEFONO NON SI CHIEDE: «{t}» e' un 400 che lo dice",
+              (400, True), (lambda r: (r[0], "telefono" in r[1]))(
+                  no(dp, {"domande": [{"t": t}]}, "digitale", 0)))
+    prova("«Hotel» non e' un telefono (la parola intera)", True,
+          bool(dp({"domande": [{"t": "Hotel"}]}, "digitale", 0)))
+    prova("una scelta con meno di due voci e' un 400", 400,
+          (no(dp, {"domande": [{"t": "G", "k": "scelta", "o": ["a"]}]},
+              "digitale", 0) or (0,))[0])
+    prova("il tetto e' tecnico e alto («quante ne vuole»)", True,
+          amb["MAX_DOMANDE"] >= 30)
+
+    # --- il giudice delle risposte -----------------------------------
+    dom = [{"t": "Nome", "k": "testo", "o": [], "obb": True},
+           {"t": "Email", "k": "email", "o": [], "obb": True},
+           {"t": "Giorno", "k": "scelta", "o": ["Ven", "Sab"], "obb": False},
+           {"t": "Veg", "k": "sino", "o": [], "obb": False}]
+    prova("nessuna domanda = nessun blob, qualunque cosa arrivi", "",
+          rp([], {"risposte": ["x"]}))
+    prova("l'app vecchia (nessuna lista) si sente dire di aggiornarsi",
+          True, "aggiorna" in (no(rp, dom, {}) or (0, ""))[1])
+    prova("l'obbligatoria vuota si nomina", True,
+          "Email" in (no(rp, dom, {"risposte": ["Mario", ""]}) or (0, ""))[1])
+    prova("la scelta fuori elenco e' un 400", 400,
+          (no(rp, dom, {"risposte": ["M", "m@e.it", "Dom"]}) or (0,))[0])
+    prova("il si'/no accetta solo Sì o No", 400,
+          (no(rp, dom, {"risposte": ["M", "m@e.it", "", "forse"]})
+           or (0,))[0])
+    prova("l'email senza chiocciola e' un 400", 400,
+          (no(rp, dom, {"risposte": ["M", "mario"]}) or (0,))[0])
+    b = rp(dom, {"risposte": ["  Mario  Rossi ", "m@e.it", "Sab", "No"]})
+    prova("le coppie fotografano la domanda, una riga sola", [
+        {"d": "Nome", "r": "Mario Rossi"}, {"d": "Email", "r": "m@e.it"},
+        {"d": "Giorno", "r": "Sab"}, {"d": "Veg", "r": "No"}],
+        amb["risposte_lette"](b))
+    amb["MODALITA_COLLAUDO"] = False
+    prova("SENZA CHIAVE in produzione: 503, mai un nome in chiaro", 503,
+          (no(rp, dom, {"risposte": ["M", "m@e.it"]}) or (0,))[0])
+    amb["MODALITA_COLLAUDO"] = True
+    prova("una colonna storta si legge come «nessuna domanda»", [],
+          amb["domande_lette"]("{rotto"))
+
+    # --- le righe da non ammorbidire, nel sorgente --------------------
+    mo = pezzo("miei_ordini")
+    prova("/api/orders toglie il testo delle risposte (a tutti)", True,
+          'r.pop("risposte", "")' in mo)
+    lr = pezzo("leggi_risposte")
+    prova("/risposte: solo le due parti, nella query", True,
+          "(compratore_id=? OR venditore_id=?)" in lr
+          and "e_admin" not in codice(lr))
+    pi = pezzo("pulisci_indirizzi")
+    prova("la scopa passa anche dalle risposte, alle due velocita'", 2,
+          pi.count("UPDATE ordini SET risposte='', risposte_purgate_il=?"))
+    cp = pezzo("compra")
+    prova("la cassa: risposte lette solo sulla via digitale, prima "
+          "della invoice", True,
+          'if scelta == "digitale":' in cp
+          and cp.index("_risposte_da_payload")
+          < cp.index("crea_invoice_escrow("))
+    prova("...e scritte nell'INSERT, nella ripresa e nei dettagli "
+          "on-chain", (True, True, True),
+          ("risposte,risposte_il) " in cp,
+           "UPDATE ordini SET risposte=?, risposte_il=?" in cp,
+           '"risposte": risposte,' in cp))
+    prova("l'ordine on-chain le porta nella riga di `ordini`", True,
+          'd.get("risposte")' in pezzo("_onchain_nasce_ordine"))
+    prova("...e la scheda on-chain non le mostra nei dettagli", True,
+          'if k != "risposte"' in src)
+
+    # --- il client: i pezzi puri girano in node -----------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il form manda le domande in pubblica e in modifica", 2,
+          mini.count("const cns = {...consegnaPayload(), ...domandePayload()};"))
+    prova("la guardia delle risposte sta su «Paga» e sul ⚡", 2,
+          mini.count("if (mancanoRisposte("))
+    js = "\n".join([
+        "let domandeSell = null;",
+        pezzo_js(mini, "function domandePayload(){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function domandeCassa(d){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function risposteCassa(d){", "\n}\n") + "\n}",
+        "const out = {nulle: domandePayload()};",
+        "domandeSell = [{t:' Nome ', k:'testo', obb:true, o:[]},"
+        " {t:'', k:'testo'}, {t:'G', k:'scelta', o:[' a ', '', 'b']}];",
+        "out.piene = domandePayload();",
+        "const p = {domande:[{t:'Nome'}]};",
+        "out.mono = domandeCassa({tipo:'mono', via:'digitale', preventivo:p}).length;",
+        "out.sped = domandeCassa({tipo:'mono', via:'spedizione', preventivo:p}).length;",
+        "out.set = domandeCassa({tipo:'set', via:'digitale', preventivo:p}).length;",
+        "out.risp = risposteCassa({risposte:[' x ', null]});",
+        "console.log(JSON.stringify(out));"])
+    import subprocess
+    r = subprocess.run(["node", "-e", js], capture_output=True, text=True)
+    try:
+        out = _json.loads(r.stdout)
+    except Exception:
+        out = {"errore": r.stderr[-300:]}
+    prova("domande non ancora note: il payload NON porta la chiave", {},
+          out.get("nulle"))
+    prova("...note: righe vuote via, scelte pulite", {"domande": [
+        {"t": "Nome", "k": "testo", "obb": True, "o": []},
+        {"t": "G", "k": "scelta", "obb": False, "o": ["a", "b"]}]},
+        out.get("piene"))
+    prova("la cassa chiede solo su acquisto singolo e via digitale",
+          (1, 0, 0), (out.get("mono"), out.get("sped"), out.get("set")))
+    prova("le risposte partono ripulite", ["x", ""], out.get("risp"))
+
+
 def prove_nota_compratore():
     """LA NOTA DEL COMPRATORE (ago 2026): quel che chi compra deve poter
     dire sull'OGGETTO — la taglia, il numero, la variante.
@@ -12428,7 +12590,7 @@ def prove_nota_compratore():
     # riga di sopra restava verde (l'ha detto la tortura). Si guarda
     # anche il POSTO: dopo le vie e prima del conto.
     prova("client: ...ed e' montato nello scheletro, dopo le vie", True,
-          "${vie}${note}${cassettoNota}" in mini)
+          "${vie}${note}${cassettoDomandeAcquisto(d)}${cassettoNota}" in mini)
     # ROVESCIATA (ago 2026, la nota per categoria): il default non e'
     # piu' un false secco — lo decide notaApertaDefault, e i
     # costruttori devono passare dallo STESSO giudice, o mono e set
@@ -13685,13 +13847,13 @@ console.log(JSON.stringify(out));
     # ---- 32-40: LE BUSTE SI CHIUDONO A ORDINE FINITO ----
     bu = solo_codice(pezzo_js(mini, "function busteOrdine(o){", "\n}\n"))
     BUSTE = ["pannelloContenutoDigitale", "pannelloNota",
-             "pannelloIndirizzoCasa", "pannelloEmailCorriere",
+             "pannelloRisposte", "pannelloIndirizzoCasa", "pannelloEmailCorriere",
              "pannelloBustaRitiro"]
-    prova("le cinque buste passano tutte di qui", BUSTE,
+    prova("le sei buste passano tutte di qui", BUSTE,
           re.findall(r"(pannello[A-Za-z]+)\(o\)", bu))
     # ...e il dettaglio non le chiama piu' una per una: una sola
     # chiamata, o una busta resterebbe fuori dalla chiusura
-    prova("...e il dettaglio ne chiama UNA, il gruppo", (1, [1] * 5),
+    prova("...e il dettaglio ne chiama UNA, il gruppo", (1, [1] * len(BUSTE)),
           (mini.count("${busteOrdine(o)}"),
            [mini.count(b + "(o)") - mini.count("function " + b + "(o){")
             for b in BUSTE]))
@@ -31004,7 +31166,7 @@ def prove_forma_sconto_pacco():
     # ...e le due colonne del codice IN CODA, dopo sped_gratis_sats:
     # il nome (che la ripresa confronta) e l'id (che il tetto conta)
     prova("compra (mono): l'INSERT scrive anche le colonne del codice",
-          True, "sped_gratis_sats,codice_sconto,codice_sconto_id) "
+          True, "sped_gratis_sats,codice_sconto,codice_sconto_id,"
           in corpo_mono)
     # ...e `articolo_sats` e' il NETTO su tutti e due i percorsi mono,
     # come nel set: lordo e sconto sono chiavi in piu' che si sommano
@@ -46518,7 +46680,8 @@ def prove_promesse_badge():
           ".cassetto-cassa + .cassetto-cassa{margin-top:10px}" in mini)
     # ...e i cassetti la portano TUTTI: il quarto di domani mette la
     # classe e ha finito — se se la dimentica, si ricompra lo zero
-    prova("...e i cassetti della cassa la portano tutti", 2,
+    # (6 nov 2026) il terzo: le domande del venditore a chi compra
+    prova("...e i cassetti della cassa la portano tutti", 3,
           mini.count('class="cassetto-cassa '))
     # 2) «APPLICA» NON COMPETE CON «PAGA»: a tutta larghezza e arancio
     # era IDENTICO al bottone che paga due dita sotto — stessa misura
@@ -128678,8 +128841,8 @@ def prove_dati_spedizione_copia():
     prova("...il 📋 piccolo lo chiedono le righe di chi vende e il tracciamento, e basta",
           # (20 ott 2026, chat-dalla-notifica) la terza in «Spedisci a» e' la riga
           # dell'email nello spazio riservato: invisibile e intoccabile
-          (["copiaTracking", "rigaDato"], ["pannelloEmailCorriere", "righeIndirizzo",
-                                           "riquadroSpedisciA", "riquadroSpedisciA", "riquadroSpedisciA"]),
+          (["copiaTracking", "rigaDato"], ["pannelloEmailCorriere", "pannelloRisposte",
+                                           "righeIndirizzo", "riquadroSpedisciA", "riquadroSpedisciA", "riquadroSpedisciA"]),
           (sorted(chi for chi in [mini[mini.rfind("function ", 0, m.start()) + 9:
                                        mini.index("(", mini.rfind("function ", 0, m.start()) + 9)]
                                   for m in re.finditer(r"bottoneCopiaPiccolo\(", mini)]
@@ -187515,7 +187678,8 @@ def main():
               prove_relay_risolti,
               prove_certificati_relay,
               prove_config_esempio,
-              prove_allegati_da_telegram):
+              prove_allegati_da_telegram,
+              prove_domande_compratore):
         try:
             f()
         except Exception as e:

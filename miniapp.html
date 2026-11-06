@@ -8138,6 +8138,33 @@
      il venditore spunta tutte quelle che offre. Specificita' alta di
      proposito: le regole generiche .field label/.field input (testo
      maiuscolo, padding da campo) vincerebbero sulla classe nuda. */
+  /* LE DOMANDE A CHI COMPRA (6 nov 2026): una scheda per domanda,
+     sotto al codice online. Le regole di .field (maiuscolo, padding da
+     campo) si rimettono a mano dove non servono. */
+  .field .dom-box{margin-top:12px;padding:12px;border:1px solid var(--line);
+    border-radius:12px;background:var(--card)}
+  .field .dom-tit{font-size:14px;font-weight:800;color:var(--ink)}
+  .field .dom-fac{font-size:12px;font-weight:600;color:var(--muted)}
+  .field .dom-hint{margin-top:4px;font-size:12px;color:var(--muted);
+    font-weight:600;line-height:1.4}
+  .field .dom-card{margin-top:10px;padding:10px;border-radius:10px;
+    background:var(--bg)}
+  .field .dom-riga{display:flex;gap:8px;align-items:center;margin-top:8px;
+    flex-wrap:wrap}
+  .field .dom-riga select{flex:1 1 140px;min-width:0}
+  .field label.dom-obb{display:flex;align-items:center;gap:6px;margin:0;
+    font-size:13px;font-weight:700;text-transform:none;letter-spacing:normal;
+    color:var(--ink);cursor:pointer}
+  .field .dom-obb input{width:17px;height:17px;padding:0;margin:0;
+    accent-color:var(--sats)}
+  .field .dom-via{border:0;background:none;font-size:18px;cursor:pointer;
+    padding:4px 6px}
+  .field .dom-opz{margin-top:8px;width:100%}
+  .field .dom-tel{margin-top:4px;font-size:12px;font-weight:700;
+    color:var(--danger, #c0392b)}
+  .field .dom-azioni{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .field .dom-azioni .btn{flex:1 1 auto;width:auto}
+  .dom-cassa select, .dom-cassa input{width:100%}
   .field label.cons-riga{display:flex;align-items:flex-start;gap:9px;
     margin:8px 0 0;font-size:13.5px;font-weight:700;color:var(--ink);
     text-transform:none;letter-spacing:normal;line-height:1.4;
@@ -14094,6 +14121,9 @@ document.getElementById('cartello')?.remove();</script>
         <label class="cons-riga"><input type="checkbox" id="sellConsRitiro" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🤝</span>Ritiro in zona</span></label>
         <label class="cons-riga" id="sellConsDigRiga"><input type="checkbox" id="sellConsDig" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">💾</span>Invio del codice online<span class="cons-sub">buono regalo, codice sconto, licenza</span></span></label>
         <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Se l'acquirente sceglie il codice, lo consegnerai dentro Barattolo dopo il pagamento: niente chat private, tutto tracciato. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div>
+        <!-- LE DOMANDE A CHI COMPRA (6 nov 2026): solo accanto al codice
+             online, le disegna renderDomandeForm -->
+        <div id="sellDomandeBox" class="dom-box" style="display:none"></div>
         <!-- IL SERVIZIO (ago 2026): una prestazione non viaggia,
              quindi la sua casella non convive con le altre tre — la
              spunta le SPEGNE, come fa il toggle dell'asta con
@@ -17715,6 +17745,9 @@ function mapListing(a){
     /* la combo della gift card: modalita' fisica + codice in
        piattaforma, sceglie chi compra */
     ancheDigitale:!!a.anche_digitale,
+    /* le domande a chi compra (6 nov 2026): arrivano SOLO dalla
+       scheda (/api/listings/{id}); null = «non le so», mai «nessuna» */
+    domande: (Array.isArray(a.domande) && a.domande) || null,
     servDove:a.servizio_dove||'', durataMin:a.durata_min||0,
     /* il limite per ordine (cantiere quantita-servizi): 0 = nessuno.
        NON e' lo stock — vedi qtaMassimaAnnuncio, che lo usa al posto
@@ -18033,6 +18066,9 @@ function mapOrder(o){
     /* la conferma di chi compra (13 ott 2026): il quando, 0 = mai */
     indirizzoConfermatoIl:o.indirizzo_confermato_il||0,
     indirizzoPurgatoIl:o.indirizzo_purgato_il||0,
+    /* le risposte alle domande del venditore (6 nov 2026): come
+       l'indirizzo, qui solo i FATTI — il testo da /risposte */
+    risposteIl:o.risposte_il||0, rispostePurgateIl:o.risposte_purgate_il||0,
     /* il feedback che ho lasciato io e quello che ho ricevuto */
     mioVoto:o.mio_voto||0, mioCommento:o.mio_commento||'',
     suoVoto:o.suo_voto||0, suoCommento:o.suo_commento||'',
@@ -28765,6 +28801,9 @@ function apriAcquisto(l){
              email:'',
              nota:'', notaAperta: notaApertaDefault([l.cat]),
              codice:'', codiceAperto:false,
+             /* le risposte alle domande del venditore (6 nov 2026):
+                null = non ancora precompilate (lo fa la cassa) */
+             risposte:null,
              errore:''};
   go('acquisto');
   renderAcquisto();                 /* lo scheletro, subito */
@@ -30501,7 +30540,7 @@ function renderAcquisto(){
      interpolato, le partenze riunite) vive nei ferri condivisi
      barreCattura/barreCorri, qui sopra */
   const barraDa = barreCattura(box);
-  box.innerHTML = `${articoli}${accQta}${fila}${tornaCarrello}${vie}${note}${cassettoNota}${cassettoCodice}
+  box.innerHTML = `${articoli}${accQta}${fila}${tornaCarrello}${vie}${note}${cassettoDomandeAcquisto(d)}${cassettoNota}${cassettoCodice}
     <div class="section-label conto-tit">Il conto${toggleValuta()}</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}
@@ -31129,6 +31168,11 @@ function corpoConsegna(){
   if (!v) return extra;
   /* il servizio esce di qui con le due vie che non hanno niente da
      aggiungere: nessun punto, nessun indirizzo, nessuna tariffa */
+  /* le risposte alle domande del venditore viaggiano sulla sola via
+     digitale (6 nov 2026), dove vivono: chiave assente se non ce ne
+     sono, il patto della nota */
+  if (v==='digitale' && domandeCassa(acqDati).length)
+    return {consegna: v, ...extra, risposte: risposteCassa(acqDati)};
   if (v==='ritiro' || v==='digitale' || v==='servizio')
     return {consegna: v, ...extra};
   const out = {consegna:'spedizione', ...extra,
@@ -31233,6 +31277,92 @@ function puntoDiCasaMancante(d){
   return d?.via === 'punto' && !!casa && !d.puntoBarattolo;
 }
 
+/* ---- LE DOMANDE DEL VENDITORE, ALLA CASSA (6 nov 2026) ----
+   Le manda il PREVENTIVO (`domande`), cioe' il server: la cassa non
+   deve fidarsi di una scheda in cache. Solo sull'acquisto singolo e
+   sulla via digitale, l'unica dove le domande vivono (il carrello
+   porta solo strade fisiche). Nome e cognome si precompilano dal nome
+   Telegram, l'email dall'ultima scritta QUI, ricordata solo in questo
+   telefono e mai sul server. */
+function domandeCassa(d){
+  if (!d || d.tipo !== 'mono' || d.via !== 'digitale') return [];
+  return Array.isArray(d.preventivo?.domande) ? d.preventivo.domande : [];
+}
+const CHIAVE_EMAIL_RISPOSTE = 'barattolo_email_risposte';
+function precompilaRisposte(d, dom){
+  if (Array.isArray(d.risposte) && d.risposte.length === dom.length) return;
+  const u = tg?.initDataUnsafe?.user || {};
+  let mail = '';
+  try { mail = localStorage.getItem(CHIAVE_EMAIL_RISPOSTE) || ''; } catch(e){}
+  d.risposte = dom.map(q => {
+    const t = String(q.t||'').trim().toLowerCase();
+    if (q.k === 'email') return mail;
+    if (q.k !== 'testo') return '';
+    if (t === 'nome') return u.first_name || '';
+    if (t === 'cognome') return u.last_name || '';
+    if (t === 'nome e cognome') return [u.first_name, u.last_name].filter(Boolean).join(' ');
+    return '';
+  });
+}
+function risposteCassa(d){
+  return (d.risposte || []).map(r => String(r||'').trim());
+}
+function cassettoDomandeAcquisto(d){
+  const dom = domandeCassa(d);
+  if (!dom.length) return '';
+  precompilaRisposte(d, dom);
+  const campo = (q, i) => {
+    const v = d.risposte[i] || '';
+    const id = 'acqRisp_' + i;
+    const scrivi = `if(acqDati&&acqDati.risposte)acqDati.risposte[${i}]=this.value`;
+    const et = `<label for="${id}">${esc(q.t)}${q.obb ? '' : ' (facoltativo)'}</label>`;
+    if (q.k === 'scelta') return et + `<select id="${id}" onchange="${scrivi}">
+        <option value="">Scegli…</option>
+        ${(q.o||[]).map(o => `<option value="${esc(o)}"${o===v ? ' selected' : ''}>${esc(o)}</option>`).join('')}
+      </select>`;
+    if (q.k === 'sino') return et + `<select id="${id}" onchange="${scrivi}">
+        <option value="">Scegli…</option>
+        <option value="Sì"${v==='Sì' ? ' selected' : ''}>Sì</option>
+        <option value="No"${v==='No' ? ' selected' : ''}>No</option>
+      </select>`;
+    return et + `<input id="${id}" maxlength="200" value="${esc(v)}"
+        ${q.k==='email' ? 'type="email" inputmode="email" autocomplete="email"' : 'autocomplete="off"'}
+        oninput="${scrivi}">`;
+  };
+  return `<div class="cassetto-cassa field dom-cassa" id="acqDomande">
+    <div class="section-label">📋 Il venditore ti chiede</div>
+    ${dom.map(campo).join('')}
+    <div class="acq-nota">Le risposte le legge solo il venditore, per preparare quello che compri. Le cancelliamo quando l'ordine si chiude.</div>
+  </div>`;
+}
+/* la guardia di «Paga»: torna vero se manca qualcosa, dopo aver
+   portato gli occhi sul campo. L'email si guarda nella forma minima
+   del server (chiocciola, niente spazi): chiedere qui costa meno di
+   un 400 dopo. */
+function mancanoRisposte(d){
+  const dom = domandeCassa(d);
+  if (!dom.length) return false;
+  precompilaRisposte(d, dom);
+  const r = risposteCassa(d);
+  for (let i = 0; i < dom.length; i++){
+    const q = dom[i], v = r[i];
+    let msg = '';
+    if (!v && q.obb) msg = `Rispondi a «${q.t}»: il venditore ne ha bisogno`;
+    else if (v && q.k === 'email' && (!v.includes('@') || /\s/.test(v)))
+      msg = `«${q.t}»: controlla l'email, sembra incompleta`;
+    if (msg){
+      const c = el('acqRisp_' + i);
+      if (c){ c.scrollIntoView({block:'center'}); c.focus({preventScroll:true}); }
+      toast(msg);
+      return true;
+    }
+  }
+  /* l'email buona si ricorda per la prossima volta, solo qui */
+  const im = dom.findIndex(q => q.k === 'email');
+  if (im >= 0 && r[im])
+    try { localStorage.setItem(CHIAVE_EMAIL_RISPOSTE, r[im]); } catch(e){}
+  return false;
+}
 function ctaAcquisto(){
   haptic();
   const d = acqDati; if (!d || !d.preventivo) return;
@@ -31284,6 +31414,9 @@ function ctaAcquisto(){
      (13 ott 2026). DOPO la guardia dell'indirizzo: quando scatta
      questa la casella e' in pagina per costruzione. */
   if (mancaConfermaIndirizzo(d)) return;
+  /* le domande del venditore (6 nov 2026): le obbligatorie prima di
+     pagare, col fuoco sul campo che manca — il server ripete il no */
+  if (mancanoRisposte(d)) return;
   /* (la via on-chain non esce piu' di qui: dal 27 ott 2026 ⚡ o ⛓️ si
      sceglie DENTRO il foglio del pagamento, `payPassaA`) */
   if (d.tipo==='set') startBuySet(); else startBuy();
@@ -34222,6 +34355,7 @@ function compraSubito(){
   /* la gemella della guardia di ctaAcquisto: chi paga col wallet
      collegato la casella la spunta come tutti */
   if (mancaConfermaIndirizzo(acqDati)) return;
+  if (mancanoRisposte(acqDati)) return;   /* le domande del venditore */
   const circaS = (p.stima || via.stima) ? '≈ ' : '';
   el('nwcConfermaSats').textContent = circaS + fmt(via.totale_sats);
   el('nwcScomposto').innerHTML = contoScomposto({
@@ -47092,7 +47226,7 @@ function pannelloNota(o){
    dove li cerca — e riaprirli e' una riga, non un secondo giro. */
 function busteOrdine(o){
   const buste = [pannelloContenutoDigitale(o), pannelloNota(o),
-                 pannelloIndirizzoCasa(o), pannelloEmailCorriere(o),
+                 pannelloRisposte(o), pannelloIndirizzoCasa(o), pannelloEmailCorriere(o),
                  pannelloBustaRitiro(o)].join('');
   if (!buste || !CONCLUSI.includes(o.state)) return buste;
   return `<div id="ordBuste" style="display:none">${buste}</div>
@@ -47146,6 +47280,51 @@ function togliNota(){ salvaNota(''); }
    venditore continuerebbe ad aspettarlo in chat — silenzio da tutte
    e due le parti. E' la stessa ragione per cui la busta si gatea su
    viaPunto, che e' un fatto scritto nell'ordine alla nascita. */
+/* LE RISPOSTE ALLE DOMANDE DEL VENDITORE (6 nov 2026): la strada
+   dell'indirizzo — il testo si chiede a /risposte, solo le due parti,
+   l'admin mai; qui si disegna il riquadro dai FATTI. Si leggono con un
+   tocco: leggere non muove niente, quindi nessuna conferma. */
+const risposteLette = {};
+function pannelloRisposte(o){
+  if (o.role==='admin' || !(o.risposteIl || o.rispostePurgateIl)) return '';
+  if (o.state==='creato' || o.state==='annullato') return '';
+  const data = ts => new Date(ts*1000).toLocaleString('it-IT',
+    {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+  const tit = o.role==='seller' ? '📋 I dati che hai chiesto' : '📋 Le tue risposte al venditore';
+  if (o.rispostePurgateIl) return `
+    <div class="payout">
+      <h4>${tit}</h4>
+      <div class="hint">Cancellate il ${data(o.rispostePurgateIl)}, dopo la chiusura dell'ordine.</div>
+    </div>`;
+  const r = risposteLette[o.id];
+  if (!r) return `
+    <div class="payout">
+      <h4>${tit}</h4>
+      <div class="hint">${o.role==='seller'
+        ? 'Chi ha comprato ha risposto alle tue domande: ti servono per preparare quello che consegni.'
+        : 'Le hai date alla cassa. Le legge solo il venditore.'}</div>
+      <button class="btn ${o.role==='seller' ? 'orange' : 'ghost'}" style="margin-top:10px" onclick="mostraRisposte(this)">📋 Leggi le risposte</button>
+    </div>`;
+  return `
+    <div class="payout">
+      <h4>${tit}</h4>
+      <div class="dati-copia">${r.map(x => rigaDato(x.domanda, x.risposta || '—', COPIA_PICCOLA)).join('')}</div>
+    </div>`;
+}
+async function mostraRisposte(btn){
+  haptic();
+  const id = currentOrder.id;
+  const ripristina = attesaRitardata(btn, 'Apro le risposte…');
+  try {
+    const r = await fetch(`${API_BASE}/orders/${id}/risposte`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    ripristina();
+    if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return; }
+    risposteLette[id] = d.risposte || [];
+    if (currentOrder && currentOrder.id === id) openOrder(id);
+  } catch(e) { ripristina(); toast('Errore di rete'); }
+}
 function pannelloIndirizzoCasa(o){
   if (o.role==='admin' || !(o.indirizzoAtteso || o.indirizzoIl)) return '';
   /* prima che i sats siano in cassaforte non c'e' ancora un affare:
@@ -52513,6 +52692,118 @@ function impostaConsegnaForm(c, ancheDig, dove, durata, limite){
   servDove = '';
   setServDove(dove || '');        /* '' spegne tutte e due */
 }
+/* ---- LE DOMANDE A CHI COMPRA (6 nov 2026, richiesta di Andrea) ----
+   Chi vende un codice online (un biglietto, un corso) puo' chiedere a
+   chi compra dei dati: quante domande vuole, ognuna obbligatoria o
+   facoltativa, di quattro tipi soli. A PROVA DI BOOMER: un tocco su
+   «Nome, cognome ed email» le mette gia' pronte; non si aggiungono da
+   sole, si suggeriscono. Il telefono non si chiede (vincolo permanente
+   di Andrea, ago 2026): lo dice il server, e qui la riga sotto il campo.
+   `domandeSell` null = «non le so ancora» (la modifica le sta
+   chiedendo alla scheda): in quel caso il payload NON porta la chiave,
+   e il server conserva quelle di prima (il patto dello stock).
+   Il testo si scrive nello stato a ogni tasto SENZA ridisegnare: il
+   render porterebbe via cursore e fuoco a chi sta scrivendo. */
+let domandeSell = [];
+const TIPI_DOMANDA = [['testo', 'Testo breve'], ['scelta', 'Elenco a tendina'],
+                      ['email', 'Email'], ['sino', 'Sì o no']];
+const PRESET_DOMANDE = [{t:'Nome', k:'testo'}, {t:'Cognome', k:'testo'},
+                        {t:'Email', k:'email'}];
+const RE_TELEFONO = /telefon|cellular|\bcell\b|whats ?app|\btel\b|\bcel\b|\bphone\b|\bmobile\b/i;
+function renderDomandeForm(){
+  const box = el('sellDomandeBox'); if (!box) return;
+  /* la strada firmata (Nostr) le domande non le porta: un evento
+     NIP-99 non ha dove scriverle, e l'import non le rileggerebbe */
+  const on = !!el('sellConsDig')?.checked && !editandoNostr;
+  box.style.display = on ? '' : 'none';
+  if (!on) return;
+  if (domandeSell === null){
+    box.innerHTML = '<div class="dom-hint">Carico le domande…</div>';
+    return;
+  }
+  const c = t => domandeSell.some(q => (q.t||'').trim().toLowerCase() === t);
+  const preset = !(c('nome') && c('cognome') && c('email'));
+  box.innerHTML = `
+    <div class="dom-tit">📋 Dati da chiedere a chi compra <span class="dom-fac">facoltativo</span></div>
+    <div class="dom-hint">Per esempio nome e cognome da scrivere su un biglietto. Chi compra risponde prima di pagare; le risposte le leggi solo tu, nell'ordine.</div>
+    ${domandeSell.map((q, i) => `
+      <div class="dom-card">
+        <input class="dom-testo" id="domT_${i}" maxlength="80"
+          placeholder="La domanda, per esempio «Nome»" value="${esc(q.t||'')}"
+          oninput="domandeSell[${i}].t=this.value;avvisoTelefono(${i})">
+        <div class="dom-tel" id="domTel_${i}"${RE_TELEFONO.test(q.t||'') ? '' : ' style="display:none"'}>Il numero di telefono non si può chiedere su Barattolo: chiedi l'email.</div>
+        <div class="dom-riga">
+          <select id="domK_${i}" aria-label="Tipo di risposta" onchange="setTipoDomanda(${i}, this.value)">${
+            TIPI_DOMANDA.map(([k, n]) => `<option value="${k}"${q.k===k ? ' selected' : ''}>${n}</option>`).join('')}</select>
+          <label class="dom-obb"><input type="checkbox"${q.obb ? ' checked' : ''}
+            onchange="domandeSell[${i}].obb=this.checked"> Obbligatoria</label>
+          <button type="button" class="dom-via" onclick="togliDomanda(${i})" aria-label="Togli questa domanda">🗑</button>
+        </div>
+        ${q.k==='scelta' ? `<textarea class="dom-opz" rows="3" maxlength="1300"
+          placeholder="Le scelte, una per riga"
+          oninput="domandeSell[${i}].o=this.value.split('\\n')">${esc((q.o||[]).join('\n'))}</textarea>
+          <div class="dom-hint">Chi compra le vedrà in un menu a tendina.</div>` : ''}
+      </div>`).join('')}
+    <div class="dom-azioni">
+      ${preset ? '<button type="button" class="btn ghost" onclick="aggiungiPresetDomande()">＋ Nome, cognome ed email</button>' : ''}
+      <button type="button" class="btn ghost" onclick="aggiungiDomanda()">＋ Aggiungi una domanda</button>
+    </div>`;
+}
+function avvisoTelefono(i){
+  const r = el('domTel_' + i);
+  if (r) r.style.display = RE_TELEFONO.test(domandeSell[i]?.t || '') ? '' : 'none';
+}
+function aggiungiDomanda(){
+  if (domandeSell === null) return;
+  haptic();
+  domandeSell.push({t:'', k:'testo', o:[], obb:false});
+  renderDomandeForm();
+  el('domT_' + (domandeSell.length - 1))?.focus();
+}
+function aggiungiPresetDomande(){
+  if (domandeSell === null) return;
+  haptic();
+  for (const p of PRESET_DOMANDE)
+    if (!domandeSell.some(q => (q.t||'').trim().toLowerCase() === p.t.toLowerCase()))
+      domandeSell.push({t:p.t, k:p.k, o:[], obb:true});
+  renderDomandeForm();
+}
+function togliDomanda(i){
+  haptic();
+  domandeSell.splice(i, 1);
+  renderDomandeForm();
+}
+function setTipoDomanda(i, k){
+  if (!domandeSell[i]) return;
+  domandeSell[i].k = k;
+  if (k !== 'scelta') domandeSell[i].o = [];
+  renderDomandeForm();
+}
+/* il pezzo del payload: chiave assente finche' non le sappiamo (null),
+   e le righe lasciate vuote non partono (il server le toglierebbe) */
+function domandePayload(){
+  if (domandeSell === null) return {};
+  return {domande: domandeSell
+    .map(q => ({t: String(q.t||'').trim(), k: q.k || 'testo', obb: !!q.obb,
+                o: (q.o||[]).map(x => String(x).trim()).filter(Boolean)}))
+    .filter(q => q.t)};
+}
+/* la modifica e il duplicato: le domande stanno nella SCHEDA, non nella
+   riga della vetrina, quindi se non le abbiamo si chiedono. Fino alla
+   risposta `domandeSell` resta null e il salvataggio non le tocca. */
+async function caricaDomandeForm(l){
+  domandeSell = Array.isArray(l.domande) ? l.domande.map(q => ({...q, o:[...(q.o||[])]})) : null;
+  renderDomandeForm();
+  if (domandeSell !== null || DEMO || !l.id) { if (domandeSell === null) domandeSell = []; renderDomandeForm(); return; }
+  try {
+    const r = await fetch(`${API_BASE}/listings/${l.id}`,
+                          {headers:{'X-Tg-Init-Data': authHdr()}});
+    const a = r.ok ? await r.json() : null;
+    if (a && Array.isArray(a.domande))
+      domandeSell = a.domande.map(q => ({...q, o:[...(q.o||[])]}));
+  } catch(e) {}
+  renderDomandeForm();
+}
 /* Il campo costo (e la taglia) esistono solo se l'annuncio spedisce;
    il codice online mostra il suo hint operativo (consegna in
    piattaforma + screenshot). */
@@ -52811,6 +53102,7 @@ function aggiornaConsegnaForm(){
   if (el('sellQtaField'))
     el('sellQtaField').style.display = (asta || serv) ? 'none' : '';
   el('sellDigitaleHint').style.display = el('sellConsDig').checked ? '' : 'none';
+  renderDomandeForm();   /* le domande vivono solo accanto al codice */
   /* la zona segue la consegna: col ritiro e' obbligatoria e deve
      essere un comune vero, senza resta facoltativa */
   const zl = el('zonaLabel');
@@ -52958,6 +53250,7 @@ function riempiFormDa(l){
   el('sellDesc').value = l.desc==='—' ? '' : l.desc;
   impostaConsegnaForm(l.consegna||'', l.ancheDigitale,
                       l.servDove, l.durataMin, l.servizioLimiteOrdine);
+  caricaDomandeForm(l);
   el('sellTaglia').value = l.taglia||'';
   /* uno storico senza condizione arriva vuoto: publish() la esige,
      ed e' cosi' che la modifica «la chiede» senza obblighi retroattivi */
@@ -53127,6 +53420,7 @@ function annullaModifica(){
   if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
   aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
+  domandeSell = []; renderDomandeForm();
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
   precompilaSpedStd(true);   // il form rinasce: col costo standard, se c'e'
@@ -54139,7 +54433,7 @@ async function publish(){
   /* il prezzo nel payload parla la valuta scelta dal venditore */
   const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
   let nuovoId, inRevisione = false, attesaOre = 24, avvisoFotoTesto = '';
-  const cns = consegnaPayload();
+  const cns = {...consegnaPayload(), ...domandePayload()};
   const asta = astaForm();   /* null = vendita normale */
   if (DEMO) {
     nuovoId = Date.now();
@@ -54229,6 +54523,7 @@ async function publish(){
   if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
   aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
+  domandeSell = []; renderDomandeForm();
   impostaSellValuta('sats');
   /* il duplicato si spegne qui: senza, rientrando in Vendi si
      ritroverebbe il banner «stai duplicando» sopra un form vuoto —
@@ -54272,7 +54567,7 @@ async function salvaModifica(t, p){
      tutto la congelerebbe. */
   const ripristina = bottoneInAttesa(el('sellSubmit'), 'Salvo le modifiche…');
   try {
-  const cns = consegnaPayload();
+  const cns = {...consegnaPayload(), ...domandePayload()};
   let avvisoFotoTesto = '';
   if (DEMO) {
     const l = listings.find(x=>x.id===id) || myListings.find(x=>x.id===id);
