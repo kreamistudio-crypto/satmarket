@@ -78662,3 +78662,50 @@ chiave in fondo, nessun testo per l'utente col nome vecchio),
 automatico accesi, chiaro e scuro) mandata ad Andrea. DA GUARDARE dopo
 la promozione: la voce sul telefono di un admin (oggi la vedono solo
 gli admin, come prima).
+
+## Come vuoi ricevere, annuncio per annuncio (9 nov 2026, cantiere incasso-annuncio, Andrea: «la scelta dovrebbe essere su ogni annuncio prima di pubblicarlo»)
+
+PERCHÉ. Dopo la voce «On-chain» Andrea ha chiesto come fa un venditore a
+scegliere Lightning o on-chain: pubblicando non gli si chiedeva niente,
+e nel Profilo le scritte non dicevano a quale pagamento si riferivano.
+Parole sue: «magari un oggetto da 10 euro posso ricevere lighting un
+oggetto da +100 euro voglio ricevere onchain», e «nel menu metti le
+scritte giuste: quando ti pagano tramite lighting ricevi in x o y o
+scegli ogni volta, quando ti pagano onchain ricevi in x o y o scegli
+ogni volta». Approvato con «Ok così mi torna fai le modifiche e porta
+tutto in produzione».
+
+COSA SI È DECISO. Nel Profilo, voce «On-chain», due righe gemelle, tre
+tasti ciascuna: «Quando ti pagano in Lightning, ricevi in» Lightning /
+On-chain / Ogni volta, e «Quando ti pagano on-chain, ricevi in» On-chain
+/ Lightning / Ogni volta. Sull'annuncio, sotto il prezzo, «Come vuoi
+ricevere per questo oggetto?»: Come nel profilo (la partenza) /
+Lightning / On-chain, con la riga che dice cosa vale e, sotto il minimo
+del cambio, che si riceve come si è pagati. La scelta dell'annuncio
+VINCE sul Profilo per tutt'e due i pagamenti; a leva spenta tutto è
+come prima. «Ogni volta» per chi paga in Lightning prima non c'era: i
+sats aspettano come per l'on-chain, l'avviso del bot chiede di scegliere
+(stesso tasto «Controlla e conferma»), e nell'ordine c'è la conferma
+dello swap o «⚡ Ricevi al mio Lightning address», che fa la fattura dal
+suo address e la paga per la stessa porta delle fatture incollate. Le
+righe vecchie di `swap_auto_preferenze` restano «on-chain» (colonna
+`modo` col default giusto). Monete del Cambio nei tasti, mai ⛓️.
+
+SCARTATI. La scelta solo nel Profilo (non risponde all'oggetto da 10 €
+contro quello da 100 €). «Ogni volta» sull'annuncio (c'è già nel
+Profilo: sull'annuncio servono le due risposte nette). Decidere la scelta
+alla nascita dell'ordine e congelarla: oggi anche il Profilo si legge
+allo sblocco, e due regole diverse confonderebbero; chi cambia
+l'annuncio a ordine aperto cambia anche quell'ordine.
+
+PROVATO. `prove_incasso_annuncio` (nuova: giudice del payload, righe
+vecchie, leva spenta, l'annuncio che vince sui due lati, i tetti del
+cambio, la colonna che manca, le porte del server, il form e il
+Profilo), più le sentinelle aggiornate in `prove_banco_chiavi_onchain`,
+`prove_parole_uniche`, `prove_swap_auto_tasto`,
+`prove_swap_auto_schermate`; `prove_sintassi_client` ha preso un
+ReferenceError (le monete usate prima di nascere) poi curato. Anteprima
+dal vivo, chiaro e scuro, mandata ad Andrea. DA GUARDARE dopo la
+promozione: un ordine vero con «Ogni volta» e il tasto «Ricevi al mio
+Lightning address» (oggi solo admin, leva SWAP_AUTO solo admin).
+

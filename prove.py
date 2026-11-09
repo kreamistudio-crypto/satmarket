@@ -5246,6 +5246,11 @@ def ambiente_in_pagamento(notifica=None, commissione=0):
             # la strada resta il Lightning di sempre. L'altra strada la
             # gira `prove_swap_auto_incasso`, col giudice vero.
             "swap_auto_aspetta": lambda *a, **k: False,
+            # ...e (9 nov 2026, incasso-annuncio) come riceve chi vende
+            # quell'ordine: sui banchi Lightning, e lo swap non c'e'. La
+            # prova vera e' `prove_incasso_annuncio`
+            "swap_auto_per": lambda t: False,
+            "incasso_ln_ordine": lambda *a, **k: "ln",
             **ambiente_altra_cassaforte()}
 
 
@@ -8393,7 +8398,8 @@ def prove_altra_cassaforte():
     prova("client: a chi vende il campo della fattura si apre anche se "
           # (2 nov 2026) tre: anche il riquadro «ricevi on-chain» dello
           # swap automatico, prima della conferma, cede al gesto che tocca
-          "l'ordine non e' 'confirmed'", (True, 3),
+          # (9 nov 2026, incasso-annuncio) quattro: anche «Ogni volta»
+          "l'ordine non e' 'confirmed'", (True, 4),
           ("const tocca = !!(o.pagamento && o.pagamento.gesto_venditore);"
            in pannello, pannello.count("&& !tocca")))
     prova("client: la scatola dei crediti c'e', e chiude con una nota",
@@ -12378,8 +12384,9 @@ def prove_domande_compratore():
 
     # --- il client: i pezzi puri girano in node -----------------------
     mini = open("miniapp.html", encoding="utf-8").read()
+    # (9 nov 2026, incasso-annuncio) in coda anche l'incasso dell'annuncio
     prova("il form manda le domande in pubblica e in modifica", 2,
-          mini.count("const cns = {...consegnaPayload(), ...domandePayload()};"))
+          mini.count("const cns = {...consegnaPayload(), ...domandePayload(), ...incassoPayload()};"))
     prova("la guardia delle risposte sta su «Paga» e sul ⚡", 2,
           mini.count("if (mancanoRisposte("))
     js = "\n".join([
@@ -60208,6 +60215,7 @@ def prove_card_parte_ordine():
     amb["_chat_mercatino_vista"] = lambda *a: ""
     amb["_chat_mercatino_ferma"] = lambda *a: False
     amb["MERCATINO_CHAT_ORDINI"] = False
+    amb["swap_auto_per"] = lambda t: False   # (9 nov 2026, incasso-annuncio)
     for f in ("livello_utente", "_volti_persone", "miei_ordini"):
         exec(pezzo(f), amb)
     # la SPIA sul costruttore: chi gli si chiede, a ogni giro
@@ -153077,8 +153085,10 @@ def prove_banco_chiavi_onchain():
           "swap automatico e mai in DEMO, col campo dentro e la voce in «Completa il profilo»",
           [True, True, True, True],
           ["el('accOnchainIncasso').style.display = ((myOnchain || swapAcceso() || swapAutoAcceso()) && !DEMO) ? '' : 'none';" in mini,
+           # (9 nov, incasso-annuncio) fra lo swap e la chiave la riga
+           # «Quando ti pagano on-chain, ricevi in»
            '<div class="acc-b"><div id="walletBarattolo"></div><div id="onchainIncassoProfilo"></div>'
-           '<div id="swapAutoBlocco"></div><div id="walletParole"></div></div>' in mini,
+           '<div id="swapAutoBlocco"></div><div id="onchainModoProfilo"></div><div id="walletParole"></div></div>' in mini,
            "onchainModuloIncasso('ocProf')" in mini,
            "acc:'accOnchainIncasso'});" in pezzo_js(mini, "function renderChecklist(){", "\n}\n")])
     prova("...e la porta alla scheda Impostazioni resta, per i dettagli",
@@ -156561,7 +156571,8 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
     prova("(3 nov) lo swap automatico porta al campo xpub del wallet, solo con "
           "l'on-chain acceso",
           (True, True),
-          ("a.onchain && typeof myOnchain !== 'undefined' && myOnchain" in _auto,
+          # (9 nov, incasso-annuncio) anche con «Ogni volta» il tasto c'e'
+          ("modo !== 'ln' && typeof myOnchain !== 'undefined' && myOnchain" in _auto,
            "onclick=\"onchainVaiAlCampo()\">${a.indirizzo ? "
            "'Cambia dove ricevi ↑' : 'Scegli dove ricevere: xpub o "
            "indirizzo ↑'}" in _auto))
@@ -184514,7 +184525,9 @@ def prove_swap_auto_tasto():
     prova("L'AVVISO: il tasto solo sul ramo di chi ha scelto on-chain, e parte col messaggio",
           (True, True, True, 1),
           (sb.find("bottone = None") < sb.find("if ritenta:") and sb.find("bottone = None") > 0,
-           0 < sb.find("bottone = _bottone_swap_auto(ordine_id)") < sb.find("msg = _msg_swap_auto_conferma("),
+           # (9 nov, incasso-annuncio) col «Ogni volta» lo stesso tasto, e
+           # il messaggio che chiede di scegliere
+           0 < sb.find("bottone = _bottone_swap_auto(ordine_id)") < sb.find("else _msg_swap_auto_conferma)("),
            'if (not ritenta or not gia_detto) and bottone:\n            await notifica(o["venditore_id"], msg, bottone)' in sb,
            sb.count("_bottone_swap_auto(")))
     apri = pezzo_js(mini, "function apriOrdineDaUrl(){", "\n}\n")
@@ -184570,6 +184583,134 @@ console.log(JSON.stringify(R));
     prova("LO SCORRIMENTO: aspetta il riquadro, ci va (e ci torna se la pagina e' cresciuta), lo illumina "
           "e poi lo spegne", [3, ["center", "center"], True, False], t["scorre"])
     prova("...ma non se nel frattempo si e' aperto un altro ordine", 0, t["altro"])
+
+
+def prove_incasso_annuncio():
+    """COME VUOI RICEVERE, ANNUNCIO PER ANNUNCIO (9 nov 2026, cantiere
+    incasso-annuncio, Andrea: «la scelta dovrebbe essere su ogni annuncio
+    prima di pubblicarlo perché magari un oggetto da 10 euro posso
+    ricevere lighting un oggetto da +100 euro voglio ricevere onchain»).
+    1. IL PROFILO ha tre scelte per parte: «Quando ti pagano in Lightning,
+       ricevi in» Lightning / On-chain / Ogni volta, e la gemella per chi
+       paga on-chain. Le righe di prima (solo «on-chain») restano on-chain.
+    2. L'ANNUNCIO puo' dire Lightning, On-chain o «Come nel profilo» (la
+       partenza): la sua scelta VINCE sul Profilo, per i due lati.
+    3. A LEVA SPENTA tutto torna com'era: Lightning per chi paga in
+       Lightning, on-chain per chi paga on-chain.
+    4. «OGNI VOLTA»: i sats aspettano come per l'on-chain, e nell'ordine
+       chi vende sceglie; «⚡ Ricevi al mio Lightning address» passa dalla
+       stessa porta delle fatture incollate."""
+    print("\n[come vuoi ricevere, annuncio per annuncio]")
+    import sqlite3 as _sq
+    src = _SORGENTE
+    AMMESSI = {222}
+    amb = {"sqlite3": _sq, "SWAP_MIN_SATS": 25000, "SWAP_MAX_SATS": 2_000_000,
+           "ONCHAIN_MODI": ("onchain", "lightning", "ogni_volta"),
+           "swap_auto_per": lambda t: int(t) in AMMESSI,
+           "onchain_ln_per": lambda t: int(t) in AMMESSI}
+    exec(pezzo("_colonne_di"), amb)
+    exec("SWAP_AUTO_MODI = " + re.search(r"\nSWAP_AUTO_MODI = ([^\n]+)\n", src).group(1), amb)
+    for nome in ("_swap_auto_pref_prepara", "swap_auto_modo", "swap_auto_preferisce",
+                 "incasso_da_payload", "incasso_annuncio", "incasso_ln_ordine",
+                 "swap_auto_aspetta", "_onchain_modo_salvato", "onchain_modo_ordine"):
+        exec(pezzo(nome), amb)
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, incasso TEXT DEFAULT '')")
+    # la tabella com'era prima del 9 nov: senza `modo`
+    con.execute("CREATE TABLE swap_auto_preferenze(tg_id INTEGER PRIMARY KEY, aggiornato INTEGER DEFAULT 0)")
+    con.execute("INSERT INTO swap_auto_preferenze(tg_id) VALUES (222)")
+    con.execute("CREATE TABLE onchain_modo(tg_id INTEGER PRIMARY KEY, modo TEXT)")
+    con.executemany("INSERT INTO annunci(id, incasso) VALUES (?,?)",
+                    [(1, ""), (2, "ln"), (3, "onchain"), (4, "pippo")])
+    A = amb
+    prova("incasso: dal payload solo 'ln', 'onchain' o '' (come nel profilo)",
+          ["onchain", "ln", "", "", ""],
+          [A["incasso_da_payload"](x) for x in ({"incasso": " OnChain "}, {"incasso": "ln"},
+                                                {"incasso": "lightning"}, {}, None)])
+    prova("incasso: la riga di prima del 9 nov resta «on-chain»; la leva spenta riporta Lightning",
+          ("onchain", True, "ln", "ln"),
+          (A["swap_auto_modo"](con, 222), A["swap_auto_preferisce"](con, 222),
+           A["swap_auto_modo"](con, 333), A["swap_auto_modo"](con, 111)))
+    con.execute("INSERT INTO swap_auto_preferenze(tg_id, modo) VALUES (111, 'ogni_volta')")
+    AMMESSI.add(111)
+    prova("incasso: «Ogni volta» si legge, e non e' «preferisce on-chain»",
+          ("ogni_volta", False), (A["swap_auto_modo"](con, 111), A["swap_auto_preferisce"](con, 111)))
+    o = lambda v, a: {"venditore_id": v, "annuncio_id": a}
+    prova("pagato in Lightning: l'annuncio vince sul Profilo, «come nel profilo» e le parole ignote no",
+          ["onchain", "ln", "onchain", "onchain", "ogni_volta", "ln", "onchain", "ln"],
+          [A["incasso_ln_ordine"](con, o(222, 1)), A["incasso_ln_ordine"](con, o(222, 2)),
+           A["incasso_ln_ordine"](con, o(222, 3)), A["incasso_ln_ordine"](con, o(222, 4)),
+           A["incasso_ln_ordine"](con, o(111, 1)), A["incasso_ln_ordine"](con, o(111, 2)),
+           A["incasso_ln_ordine"](con, o(111, 3)), A["incasso_ln_ordine"](con, o(999, 3))])
+    prova("i sats aspettano per on-chain e «ogni volta», nei tetti del cambio; Lightning mai",
+          [True, True, False, False, False, False],
+          [A["swap_auto_aspetta"](con, 111, 30000, "onchain"),
+           A["swap_auto_aspetta"](con, 111, 30000, "ogni_volta"),
+           A["swap_auto_aspetta"](con, 111, 30000, "ln"),
+           A["swap_auto_aspetta"](con, 111, 10000, "ogni_volta"),
+           A["swap_auto_aspetta"](con, 111, 3_000_000, "onchain"),
+           A["swap_auto_aspetta"](con, 999, 30000, "onchain")])
+    con.execute("INSERT INTO onchain_modo(tg_id, modo) VALUES (222, 'ogni_volta')")
+    prova("pagato on-chain: l'annuncio vince ('ln' = «lightning»), sennò il Profilo; leva spenta = on-chain",
+          ["ogni_volta", "lightning", "onchain", "ogni_volta", "onchain", "onchain"],
+          [A["onchain_modo_ordine"](con, o(222, 1)), A["onchain_modo_ordine"](con, o(222, 2)),
+           A["onchain_modo_ordine"](con, o(222, 3)), A["onchain_modo_ordine"](con, o(222, 4)),
+           A["onchain_modo_ordine"](con, o(111, 1)), A["onchain_modo_ordine"](con, o(999, 2))])
+    con.execute("ALTER TABLE annunci RENAME TO vecchi")
+    prova("incasso: un database senza la colonna non rompe niente (come nel profilo)",
+          "", A["incasso_annuncio"](con, 2))
+
+    # --- il server: dove nasce e dove si legge ---
+    prova("server: la colonna nasce sola, la pubblicazione la scrive, la modifica solo se c'e' nel payload",
+          (True, True, True, True),
+          ("\"incasso TEXT DEFAULT ''\"" in src,
+           "    if incasso_da_payload(d):\n        con.execute(\"UPDATE annunci SET incasso=? WHERE id=?\"," in src,
+           "    if \"incasso\" in d:\n        con.execute(\"UPDATE annunci SET incasso=? WHERE id=?\"," in src,
+           ", a.stato, a.domande, a.incasso FROM annunci a" in src))
+    sb = pezzo("_sblocca_sats")
+    prova("server: lo sblocco usa il modo dell'ORDINE, e col «Ogni volta» chiede di scegliere",
+          (True, True),
+          ("modo_ln = incasso_ln_ordine(con, o)" in sb and "netto, modo_ln))" in sb,
+           "(_msg_swap_auto_scegli if modo_ln == \"ogni_volta\"" in sb))
+    lnp = src[src.index('@app.post("/api/swap/auto/ordine/{ordine_id}/lightning")'):]
+    lnp = lnp[:lnp.index("\n\n\n")]
+    prova("«⚡ Ricevi al mio Lightning address»: solo chi vende, ordine confermato, la porta delle "
+          "fatture incollate (colonna vuota, niente in volo), poi lo sblocco",
+          (True, True, True, True, True),
+          ('o["venditore_id"] != user["id"]' in lnp,
+           'if o["stato"] != "confirmed":' in lnp,
+           "AND COALESCE(invoice_venditore,'')='' " in lnp,
+           "('in_volo','incerto','uscito')" in lnp,
+           lnp.rstrip().endswith("return await _sblocca_sats(ordine_id)")))
+    prova("server: nessuna chiamata a `onchain_modo_vivo` con un ordine in mano",
+          [], [r for r in src.splitlines() if "onchain_modo_vivo(con, o" in r
+               or "onchain_modo_vivo(con, x" in r or "onchain_modo_vivo(con, oc" in r])
+
+    # --- il telefono ---
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    forma = pezzo_js(mini, "function renderIncassoForm(){", "\n}\n")
+    prova("app: «Come vuoi ricevere per questo oggetto?» sotto il prezzo, coi tre tasti e le monete",
+          (True, True, True, True),
+          ('<label>Come vuoi ricevere per questo oggetto?</label>' in mini,
+           mini.index('id="sellPrice"') < mini.index('id="sellIncassoField"'),
+           "tasto('', '<span>👤</span><span>Come nel profilo</span>') + tasto('ln', P2P_LN_MONETA + 'Lightning') + "
+           "tasto('onchain', P2P_OC_MONETA + '<span class=\"nw\">On-chain</span>')" in forma,
+           "il cambio non si fa</b>: ricevi come ti pagano" in forma))
+    prova("app: la scelta parte con l'annuncio nuovo e con la modifica (mai a meta' caricamento)",
+          (2, 2, True),
+          (mini.count("...domandePayload(), ...incassoPayload()}"),
+           mini.count("incassoSell = ''; renderIncassoForm();"),
+           "if (incassoSell === null || !incassoFormAcceso()) return {};" in mini))
+    prova("app: il Profilo dice le due righe giuste, con tre scelte",
+          (True, True, True),
+          ("<h4>Quando ti pagano in Lightning, ricevi in</h4>" in mini,
+           "Quando ti pagano on-chain, ricevi in" in mini,
+           "tasto('ogni_volta', '<span>🤔</span><span class=\"nw\">Ogni volta</span>')" in mini))
+    prova("app: nell'ordine il tasto «⚡ Ricevi al mio Lightning address» chiama la porta nuova",
+          (True, True),
+          ("⚡ Ricevi al mio Lightning address" in mini,
+           "/swap/auto/ordine/${Number(id)}/lightning" in mini))
 
 
 def prove_swap_auto_schermate():
@@ -184634,7 +184775,8 @@ def prove_swap_auto_schermate():
     prova("Profilo a leva spenta: vuoto", "", r["spento"])
     prova("Profilo: On-chain acceso, «Conferma» e il minimo in parole",
           (True, True, True),
-          ('aria-checked="true"\n      class="on" onclick="scegliSwapAutoProfilo(true)"' in r["profilo"],
+          # (9 nov, incasso-annuncio) tre scelte, col nome della scelta
+          ('aria-checked="true"\n      class="on" onclick="scegliSwapAutoProfilo(\'onchain\')"' in r["profilo"],
            "«Conferma»" in r["profilo"], "Sotto i 25000 sats" in r["profilo"]))
     prova("carta dell'ordine: i due riquadri, il costo, l'indirizzo proposto, «Conferma»",
           (True, True, True, True),
@@ -187793,6 +187935,7 @@ def main():
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
               prove_swap_auto, prove_swap_auto_schermate, prove_swap_auto_tasto,
+              prove_incasso_annuncio,
               prove_swap_auto_scalini,
               # prove_swap_auto_ritiro gira nei collaudi (collaudo_swap_auto_ritiro):
               # vuole httpx, che la CI installa solo DOPO le prove (2 nov 2026)

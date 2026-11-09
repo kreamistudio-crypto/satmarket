@@ -9368,7 +9368,15 @@ def init_db():
                     # privato, lo vede solo il proprietario (e gli
                     # admin) — vedi la CREATE TABLE qui sopra per il
                     # perche' e viste_annuncio per il deduplicatore.
-                    "visualizzazioni INTEGER DEFAULT 0"):
+                    "visualizzazioni INTEGER DEFAULT 0",
+                    # COME VUOLE RICEVERE chi vende PER QUESTO OGGETTO
+                    # (9 nov 2026, cantiere incasso-annuncio, Andrea:
+                    # «un oggetto da 10 euro posso ricevere lighting, uno
+                    # da +100 euro voglio ricevere onchain»): '' = come
+                    # nel Profilo, 'ln' o 'onchain'. Vince sul Profilo,
+                    # per tutt'e due le strade di chi paga
+                    # (`incasso_ln_ordine`, `onchain_modo_ordine`).
+                    "incasso TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -27687,6 +27695,11 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     if domande:
         con.execute("UPDATE annunci SET domande=? WHERE id=?",
                     (domande, annuncio_id))
+    # come vuole ricevere per questo oggetto (9 nov 2026): stesso UPDATE
+    # a parte, stessa transazione
+    if incasso_da_payload(d):
+        con.execute("UPDATE annunci SET incasso=? WHERE id=?",
+                    (incasso_da_payload(d), annuncio_id))
     con.commit()
     con.close()
     # Le foto in un thread: convertire una HEIC da 15MB costa secondi
@@ -27941,7 +27954,7 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     con = db()
     # le domande a chi compra escono SOLO qui, nella scheda: sono
     # pubbliche (sono testi del venditore), ma alla vetrina non servono
-    r = con.execute(f"SELECT {campi}, a.stato, a.domande FROM annunci a "
+    r = con.execute(f"SELECT {campi}, a.stato, a.domande, a.incasso FROM annunci a "
                     "JOIN utenti u ON u.tg_id = a.venditore_id "
                     "WHERE a.id=? AND a.stato IN ('attivo','venduto')",
                     (annuncio_id,)).fetchone()
@@ -29731,6 +29744,11 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     if domande is not None:
         con.execute("UPDATE annunci SET domande=? WHERE id=?",
                     (domande, annuncio_id))
+    # (9 nov 2026) l'incasso dell'annuncio si tocca solo se il payload lo
+    # dice: un client di prima non lo cancella
+    if "incasso" in d:
+        con.execute("UPDATE annunci SET incasso=? WHERE id=?",
+                    (incasso_da_payload(d), annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -46782,8 +46800,16 @@ def _segna_incasso_venditori(righe):
         da_negozio = {x["negozio"]: x["tg_id"] for x in con.execute(
             "SELECT tg_id, negozio FROM utenti WHERE negozio IN "
             f"({','.join('?' * len(negozi))})", negozi)} if negozi else {}
+        # (9 nov 2026) solo chi ha scelto «On-chain»: «scelgo ogni volta»
+        # non e' una preferenza da mostrare a chi compra
         scelti = {x["tg_id"] for x in con.execute(
-            "SELECT tg_id FROM swap_auto_preferenze")}
+            "SELECT tg_id FROM swap_auto_preferenze "
+            "WHERE COALESCE(modo, 'onchain')='onchain'")}
+        # (9 nov 2026, incasso-annuncio) la scelta dell'annuncio vince
+        ids = sorted({int(r["id"]) for r in righe if r.get("id")})
+        per_annuncio = {x["id"]: x["incasso"] for x in con.execute(
+            "SELECT id, incasso FROM annunci WHERE incasso IN ('ln','onchain') "
+            f"AND id IN ({','.join('?' * len(ids))})", ids)} if ids else {}
     finally:
         con.close()
     for r in righe:
@@ -46794,7 +46820,9 @@ def _segna_incasso_venditori(righe):
         netto = netto_venditore(int(r.get("prezzo_sats") or 0))
         nei_tetti = netto >= int(SWAP_MIN_SATS or 0) and not (
             int(SWAP_MAX_SATS or 0) > 0 and netto > int(SWAP_MAX_SATS))
-        r["venditore_incasso"] = ("onchain" if int(tg) in scelti and nei_tetti
+        vuole = per_annuncio.get(r.get("id")) or (
+            "onchain" if int(tg) in scelti else "ln")
+        r["venditore_incasso"] = ("onchain" if vuole == "onchain" and nei_tetti
                                   else "ln")
 
 
@@ -78170,28 +78198,81 @@ def swap_auto_per(tg_id) -> bool:
 
 def _swap_auto_pref_prepara(con):
     """Chi ha scelto «₿ On-chain» nel Profilo: una riga, e niente altro.
-    Non e' un segreto e non sposta sats da solo."""
+    Non e' un segreto e non sposta sats da solo. (9 nov 2026) la colonna
+    `modo` dice quale delle due scelte che non sono Lightning: 'onchain'
+    (le righe di prima) o 'ogni_volta'. Nessuna riga = Lightning."""
     con.execute("""CREATE TABLE IF NOT EXISTS swap_auto_preferenze(
         tg_id INTEGER PRIMARY KEY,
         aggiornato INTEGER DEFAULT 0)""")
+    if "modo" not in _colonne_di(con, "swap_auto_preferenze"):
+        try:
+            con.execute("ALTER TABLE swap_auto_preferenze ADD COLUMN "
+                        "modo TEXT DEFAULT 'onchain'")
+        except sqlite3.OperationalError:
+            pass
+
+
+SWAP_AUTO_MODI = ("ln", "onchain", "ogni_volta")
+
+
+def swap_auto_modo(con, tg_id) -> str:
+    """«QUANDO TI PAGANO IN LIGHTNING, RICEVI IN…» (9 nov 2026): 'ln',
+    'onchain' o 'ogni_volta'. A leva spenta tutti tornano in Lightning,
+    come ieri."""
+    if not swap_auto_per(tg_id):
+        return "ln"
+    _swap_auto_pref_prepara(con)
+    r = con.execute("SELECT modo FROM swap_auto_preferenze WHERE tg_id=?",
+                    (int(tg_id),)).fetchone()
+    if r is None:
+        return "ln"
+    return "ogni_volta" if r["modo"] == "ogni_volta" else "onchain"
 
 
 def swap_auto_preferisce(con, tg_id) -> bool:
     """Ha scelto on-chain, e lo swap automatico c'e' per lui? A leva
     spenta tutti tornano in Lightning, come ieri."""
-    if not swap_auto_per(tg_id):
-        return False
-    _swap_auto_pref_prepara(con)
-    return con.execute("SELECT 1 FROM swap_auto_preferenze WHERE tg_id=?",
-                       (int(tg_id),)).fetchone() is not None
+    return swap_auto_modo(con, tg_id) == "onchain"
 
 
-def swap_auto_aspetta(con, tg_id, netto: int) -> bool:
+def incasso_da_payload(d) -> str:
+    """L'incasso scelto sull'annuncio (9 nov 2026): 'ln', 'onchain' o ''
+    (come nel Profilo). Una parola ignota vale ''."""
+    v = str((d or {}).get("incasso") or "").strip().lower()
+    return v if v in ("ln", "onchain") else ""
+
+
+def incasso_annuncio(con, annuncio_id) -> str:
+    """Come vuole ricevere chi vende per QUESTO annuncio: 'ln', 'onchain'
+    o '' (come nel Profilo)."""
+    try:
+        r = con.execute("SELECT incasso FROM annunci WHERE id=?",
+                        (int(annuncio_id or 0),)).fetchone()
+    except (sqlite3.OperationalError, TypeError, ValueError):
+        return ""
+    v = (r["incasso"] if r else "") or ""
+    return v if v in ("ln", "onchain") else ""
+
+
+def incasso_ln_ordine(con, o) -> str:
+    """UN ORDINE PAGATO IN LIGHTNING, COME RICEVE CHI VENDE (9 nov 2026):
+    la scelta dell'annuncio vince, sennò quella del Profilo. 'ln',
+    'onchain' o 'ogni_volta'; senza lo swap automatico, sempre 'ln'."""
+    if not swap_auto_per(o["venditore_id"]):
+        return "ln"
+    return (incasso_annuncio(con, o["annuncio_id"])
+            or swap_auto_modo(con, o["venditore_id"]))
+
+
+def swap_auto_aspetta(con, tg_id, netto: int, modo: str | None = None) -> bool:
     """`_sblocca_sats` deve LASCIARE STARE il Lightning address? Si', se
-    chi vende ha scelto on-chain e la cifra sta nei tetti del cambio;
-    sotto il minimo (o sopra il massimo) si paga in Lightning come
-    sempre, e il Profilo lo dice."""
-    if not swap_auto_preferisce(con, tg_id):
+    chi vende ha scelto on-chain (o di scegliere ogni volta) e la cifra
+    sta nei tetti del cambio; sotto il minimo (o sopra il massimo) si
+    paga in Lightning come sempre, e il Profilo lo dice. `modo` e' quello
+    dell'ordine (`incasso_ln_ordine`); senza, quello del Profilo."""
+    if modo is None:
+        modo = swap_auto_modo(con, tg_id)
+    if modo not in ("onchain", "ogni_volta") or not swap_auto_per(tg_id):
         return False
     netto = int(netto)
     if netto < int(SWAP_MIN_SATS or 0):
@@ -78359,6 +78440,15 @@ def _bottone_swap_auto(ordine_id: int) -> tuple:
     return (SWAP_AUTO_BOTTONE, f"{URL_PUBBLICO}/?ordine={int(ordine_id)}&incasso=1")
 
 
+def _msg_swap_auto_scegli(sats: int, testa: str) -> str:
+    """(9 nov 2026) Le parole per chi ha scelto di decidere ogni volta:
+    il suo gesto e' la scelta, poi un tocco o una fattura."""
+    return (f"{testa} Hai scelto di decidere a ogni vendita come ricevere: "
+            "apri l'ordine nella Mini App e scegli <b>⚡ Lightning</b> o "
+            f"<b>₿ on-chain</b>. I tuoi <b>{_fmt_sats(sats)} sats</b> intanto "
+            "restano al sicuro nel deposito di garanzia.")
+
+
 def _msg_swap_auto_conferma(sats: int, testa: str) -> str:
     """Le parole per chi ha scelto on-chain, a ordine confermato: il suo
     gesto e' un tocco, non una fattura."""
@@ -78420,22 +78510,25 @@ async def swap_auto_giro() -> int:
 @app.post("/api/swap/auto/preferenza")
 async def swap_auto_preferenza(req: Request, x_tg_init_data: str = Header(""),
                                barattolo_sessione: str = Cookie("")):
-    """«QUANDO VENDI IN LIGHTNING, RICEVI…» dal Profilo: {onchain: bool}.
-    Vale dalle conferme dopo; un ordine gia' confermato si sceglie
-    dall'ordine."""
+    """«QUANDO TI PAGANO IN LIGHTNING, RICEVI IN…» dal Profilo: {modo:
+    'ln' | 'onchain' | 'ogni_volta'} (o {onchain: bool} di un client di
+    prima). Vale dalle conferme dopo; un ordine gia' confermato si
+    sceglie dall'ordine."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not swap_auto_per(user["id"]):
         raise HTTPException(404, "Non esiste")
     d = await leggi_json(req)
-    onchain = bool(d.get("onchain"))
+    modo = str(d.get("modo") or "").strip()
+    if modo not in SWAP_AUTO_MODI:
+        modo = "onchain" if d.get("onchain") else "ln"
     con = db()
     try:
         _swap_auto_pref_prepara(con)
-        if onchain:
-            con.execute("INSERT INTO swap_auto_preferenze(tg_id, aggiornato) "
-                        "VALUES (?,?) ON CONFLICT(tg_id) DO UPDATE SET "
-                        "aggiornato=excluded.aggiornato",
-                        (user["id"], int(time.time())))
+        if modo != "ln":
+            con.execute("INSERT INTO swap_auto_preferenze(tg_id, aggiornato, modo) "
+                        "VALUES (?,?,?) ON CONFLICT(tg_id) DO UPDATE SET "
+                        "aggiornato=excluded.aggiornato, modo=excluded.modo",
+                        (user["id"], int(time.time()), modo))
         else:
             con.execute("DELETE FROM swap_auto_preferenze WHERE tg_id=?",
                         (user["id"],))
@@ -78449,16 +78542,16 @@ def swap_auto_busta(tg_id) -> dict:
     """La busta di `/api/me` (`swap_leve.auto`): il cancello, la scelta,
     l'indirizzo che si proporrebbe (solo pubblico), i tetti."""
     attivo = swap_auto_per(tg_id)
-    preferisce = False
+    modo = "ln"
     proposta = None
     if attivo:
         con = db()
         try:
-            preferisce = swap_auto_preferisce(con, tg_id)
+            modo = swap_auto_modo(con, tg_id)
         finally:
             con.close()
         proposta = swap_auto_proposta(tg_id)
-    return {"attivo": attivo, "onchain": preferisce,
+    return {"attivo": attivo, "onchain": modo == "onchain", "modo": modo,
             "indirizzo": (proposta or {}).get("indirizzo", ""),
             "da": (proposta or {}).get("tipo", ""),
             "minimo": int(SWAP_MIN_SATS or 0), "massimo": int(SWAP_MAX_SATS or 0),
@@ -78512,6 +78605,57 @@ async def swap_auto_ordine_conferma(ordine_id: int, req: Request,
     if esito.get("non_trovato"):
         raise HTTPException(404, "Ordine non trovato")
     return esito
+
+
+@app.post("/api/swap/auto/ordine/{ordine_id}/lightning")
+async def swap_auto_ordine_lightning(ordine_id: int,
+                                     x_tg_init_data: str = Header(""),
+                                     barattolo_sessione: str = Cookie("")):
+    """«⚡ RICEVI AL MIO LIGHTNING ADDRESS» (9 nov 2026, incasso-annuncio):
+    su un ordine confermato che aspetta la scelta di chi vende (ha scelto
+    on-chain o «ogni volta», nel Profilo o sull'annuncio), chi vende sceglie
+    Lightning con un tocco. La fattura la chiede il server al suo
+    Lightning address e la mette in colonna come una incollata — la stessa
+    porta, con la stessa ancora degli swap (stato confermato, colonna
+    vuota, nessun pagamento in volo) — e poi `_sblocca_sats` la paga."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not swap_auto_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("swap_auto", user["id"])
+    con = db()
+    try:
+        o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
+        v = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+    finally:
+        con.close()
+    if not o or o["venditore_id"] != user["id"]:
+        raise HTTPException(404, "Ordine non trovato")
+    if o["stato"] != "confirmed":
+        raise HTTPException(409, "Quest'ordine non aspetta un incasso")
+    indirizzo = ((v["ln_address"] if v else "") or "").strip()
+    if not indirizzo:
+        raise HTTPException(400, "Non hai un Lightning address: incolla una fattura")
+    netto = netto_venditore(o["prezzo_sats"] - o["protezione_sats"])
+    bolt11 = await invoice_da_ln_address(indirizzo, netto)
+    if not bolt11:
+        raise HTTPException(502, "Il tuo Lightning address non ha risposto: "
+                                 "riprova, o incolla una fattura")
+    con = db()
+    try:
+        messa = con.execute(
+            "UPDATE ordini SET invoice_venditore=?, aggiornato=? "
+            "WHERE id=? AND stato='confirmed' "
+            "AND COALESCE(invoice_venditore,'')='' "
+            "AND COALESCE(payout_stato,'') NOT IN "
+            "('in_volo','incerto','uscito')",
+            (bolt11, int(time.time()), ordine_id)).rowcount
+        con.commit()
+    finally:
+        con.close()
+    if not messa:
+        raise HTTPException(409, "C'è già un incasso in corso su questo ordine")
+    return await _sblocca_sats(ordine_id)
 
 
 # --- IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero) ---------------
@@ -79330,10 +79474,13 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         # «in automatico, previa conferma»). Una fattura incollata vince
         # (e' un suo gesto), e sotto il minimo del cambio si paga in
         # Lightning come sempre (`swap_auto_aspetta`).
+        # (9 nov 2026, incasso-annuncio) il modo e' quello dell'ORDINE:
+        # la scelta dell'annuncio vince su quella del Profilo
+        modo_ln = incasso_ln_ordine(con, o)
         aspetta_onchain = bool(not oc and not o["invoice_venditore"]
                                and o["payout_stato"] != "uscito"
                                and swap_auto_aspetta(con, o["venditore_id"],
-                                                     netto))
+                                                     netto, modo_ln))
         try:
             if o["payout_stato"] != "uscito" and not oc:
                 bolt11 = o["invoice_venditore"]
@@ -79636,7 +79783,8 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             # (2 nov 2026, swap-auto) ha scelto on-chain: il suo gesto e'
             # un «Conferma», non una fattura
             bottone = _bottone_swap_auto(ordine_id)
-            msg = _msg_swap_auto_conferma(
+            msg = (_msg_swap_auto_scegli if modo_ln == "ogni_volta"
+                   else _msg_swap_auto_conferma)(
                 netto, "⚖️ <b>La disputa è stata decisa a tuo favore!</b>"
                 if o["disputata"] else "⏳ <b>Il tempo di conferma è scaduto!</b>"
                 if automatico else
@@ -83028,6 +83176,13 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
     volti = _volti_persone(con, sorted(
         {r[k] for r in righe for k in ("compratore_id", "venditore_id")}
         - {user["id"]}), int(time.time()))
+    # (9 nov 2026, incasso-annuncio) COME RICEVE CHI VENDE QUEST'ORDINE se
+    # chi compra ha pagato in Lightning: la scelta dell'annuncio vince sul
+    # Profilo. Solo a chi vende, e solo dove lo swap automatico c'e'
+    # (la carta dell'ordine preseleziona Lightning o On-chain da qui)
+    for r in righe:
+        if r["venditore_id"] == user["id"] and swap_auto_per(user["id"]):
+            r["incasso_atteso"] = incasso_ln_ordine(con, r)
     con.close()
     for r in righe:
         if r["id"] in stadi:
@@ -83168,7 +83323,7 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
                     # (28 ott 2026) il cambio in Lightning: come riceve chi
                     # vende, e il cambio nato (le parti pubbliche)
                     "incasso_tipo": oc["incasso_tipo"] or "",
-                    "modo_venditore": onchain_modo_vivo(con, oc["venditore_id"]),
+                    "modo_venditore": onchain_modo_ordine(con, oc),
                     "cambio": _onchain_cambio_letto(oc),
                     "prezzo_sats": int(oc["prezzo_sats"]),
                 } if oc else None)
@@ -94934,13 +95089,16 @@ def _onchain_riempi_incassi(con, venditore_id: int) -> list:
                     (int(venditore_id),)).fetchone()
     dest = _onchain_destinazione_viva(con, venditore_id, r["xpub"]) if r else None
     # (28 ott 2026) chi riceve in Lightning, o sceglie ogni volta, decide
-    # ordine per ordine allo sblocco: niente incassi riempiti da soli
-    if not dest or onchain_modo_vivo(con, venditore_id) != "onchain":
+    # ordine per ordine allo sblocco: niente incassi riempiti da soli.
+    # (9 nov 2026) il modo e' quello di OGNI ordine: l'annuncio vince sul
+    # Profilo, quindi si guarda riga per riga
+    if not dest:
         return []
-    righe = con.execute(
+    righe = [x for x in con.execute(
         "SELECT * FROM onchain_ordini WHERE venditore_id=? AND incasso='' "
         "AND stato IN ('attesa','pagato') AND proposta_psbt='' ORDER BY id",
         (int(venditore_id),)).fetchall()
+             if onchain_modo_ordine(con, x) == "onchain"]
     fatti = []
     for o in righe:
         indice = (_onchain_prossimo_esterno(con, venditore_id, dest["valore"])
@@ -95198,7 +95356,9 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
                                           ind["xpub_venditore"])
         # (28 ott 2026) chi vende in Lightning, o che sceglie ogni volta,
         # decide allo sblocco: l'incasso resta vuoto anche se ha un wallet
-        if onchain_modo_vivo(con, venditore) != "onchain":
+        # (9 nov 2026) il modo dell'ORDINE: la scelta dell'annuncio vince
+        if onchain_modo_ordine(con, {"venditore_id": venditore,
+                                     "annuncio_id": a["id"]}) != "onchain":
             dest = None
         if dest:
             d_tipo, d_valore, d_firma = dest["tipo"], dest["valore"], dest["firma"]
@@ -95291,7 +95451,7 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
         # Lightning di chi vende (le sole parti pubbliche), e come riceve
         "rilascio_firma": o["rilascio_firma"] or "",
         "cambio": _onchain_cambio_letto(o),
-        "modo_venditore": onchain_modo_vivo(con, o["venditore_id"]),
+        "modo_venditore": onchain_modo_ordine(con, o),
         "scade": o["scade"], "creato": o["creato"],
         "pagato_il": o["pagato_il"], "chiuso_il": o["chiuso_il"],
         "tariffa": _ONCHAIN_TARIFFA["sat_vb"] or 2.0,
@@ -95829,7 +95989,7 @@ async def onchain_rilascio_chiesto(oid: int, req: Request,
                     " (rilascio_chiesto_il=0 OR rilascio_firma='')",
                     (int(time.time()), firma, int(time.time()), oid))
         con.commit()
-        modo = onchain_modo_vivo(con, o["venditore_id"])
+        modo = onchain_modo_ordine(con, o)
     finally:
         con.close()
     if not gia:
@@ -96112,6 +96272,20 @@ def onchain_modo_vivo(con, tg_id: int) -> str:
     return _onchain_modo_salvato(con, tg_id)
 
 
+def onchain_modo_ordine(con, o) -> str:
+    """UN ORDINE PAGATO ON-CHAIN, COME RICEVE CHI VENDE (9 nov 2026,
+    cantiere incasso-annuncio): la scelta dell'annuncio vince sul
+    Profilo — 'ln' diventa «lightning», 'onchain' resta — ma solo se il
+    cambio c'e' per lui; a leva spenta «onchain», come ieri. `o` ha
+    `venditore_id` e `annuncio_id`."""
+    if not onchain_ln_per(o["venditore_id"]):
+        return "onchain"
+    a = incasso_annuncio(con, o["annuncio_id"])
+    if a:
+        return "lightning" if a == "ln" else "onchain"
+    return _onchain_modo_salvato(con, o["venditore_id"])
+
+
 def onchain_ln_busta(tg_id: int) -> dict:
     """La busta di `/api/me`: il cancello, il modo scelto, il minimo."""
     attivo = onchain_ln_per(tg_id)
@@ -96173,7 +96347,7 @@ def _onchain_puo_firmare_prima(con, o, ind) -> bool:
     return bool(
         o["stato"] == "pagato" and o["rilascio_chiesto_il"]
         and o["rilascio_firma"] and not o["decisione_da"]
-        and onchain_modo_vivo(con, o["venditore_id"]) != "onchain"
+        and onchain_modo_ordine(con, o) != "onchain"
         and onchain_firma_valida_testo(
             ind["xpub_compratore"],
             onchain_messaggio_ricevuto(o["id"], ind["indirizzo"]),
@@ -96350,7 +96524,7 @@ async def onchain_cambio_preventivo(oid: int, x_tg_init_data: str = Header(""),
     con = _onchain_db_ordini()
     try:
         o, _ = _onchain_da_sbloccare(con, oid, user["id"])
-        modo = onchain_modo_vivo(con, user["id"])
+        modo = onchain_modo_ordine(con, o)
         u = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
                         (user["id"],)).fetchone()
     finally:

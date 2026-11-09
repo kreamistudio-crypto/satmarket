@@ -34433,7 +34433,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   si accende con `myOnchain || swapAcceso() || swapAutoAcceso()`
   (`aggiornaCassettoWallet`). Dal 9 nov l'ordine è: avvisi del wallet
   (`#walletBarattolo`), dove ricevi (`#onchainIncassoProfilo`), la scelta
-  dello swap automatico (`#swapAutoBlocco`), chiave e parole
+  dello swap automatico (`#swapAutoBlocco`), dal 9 nov sera la scelta
+  per chi paga on-chain (`#onchainModoProfilo`), chiave e parole
   (`#walletParole`). Prima:
   `renderWalletBarattolo` disegna la chiave (`#walletBarattolo`, la coda
   della xpub del conto 2-di-3), il blocco di prima (`#onchainIncassoProfilo`)
@@ -35327,6 +35328,33 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `confermaSwapAuto`), e in `payoutPanel` il ramo `autoQui`. Prove:
   `prove_swap_auto`, `prove_swap_auto_ritiro`, `prove_swap_auto_schermate`;
   collaudo: `collaudo_swap_auto`.
+- COME VUOI RICEVERE, ANNUNCIO PER ANNUNCIO (9 nov 2026, cantiere
+  incasso-annuncio; CANTIERI, «Come vuoi ricevere, annuncio per
+  annuncio»). DUE SCELTE NEL PROFILO, una per come paga chi compra, con
+  tre risposte ciascuna. «Quando ti pagano in Lightning, ricevi in»:
+  `swap_auto_preferenze.modo` ('onchain' | 'ogni_volta'; nessuna riga =
+  Lightning; le righe di prima del 9 nov valgono 'onchain'), letta da
+  `swap_auto_modo`; `POST /api/swap/auto/preferenza` prende `{modo}` (e
+  ancora `{onchain}`). «Quando ti pagano on-chain, ricevi in»: la
+  `onchain_modo` di prima (onchain | lightning | ogni_volta), disegnata in
+  `#onchainModoProfilo` da `onchainModoBlocco`. L'ANNUNCIO: `annunci.incasso`
+  ('ln' | 'onchain' | '' = come nel Profilo), scritto da pubblica e
+  modifica col giudice `incasso_da_payload` (modifica: solo se la chiave
+  c'è), letto da `incasso_annuncio`; nel form il campo
+  `#sellIncassoField` sotto il prezzo (`renderIncassoForm`,
+  `incassoPayload`, null = non toccare finché la scheda non arriva). LA
+  SCELTA DELL'ANNUNCIO VINCE: `incasso_ln_ordine` (ordine pagato in
+  Lightning: annuncio, sennò Profilo; senza swap automatico 'ln') va a
+  `swap_auto_aspetta` in `_sblocca_sats`; `onchain_modo_ordine` (ordine
+  on-chain: 'ln' → «lightning») sostituisce `onchain_modo_vivo` dovunque
+  c'è un ordine in mano. «OGNI VOLTA» lato Lightning: i sats aspettano
+  come per l'on-chain, l'avviso è `_msg_swap_auto_scegli` col tasto di
+  sempre, la carta dell'ordine (`incasso_atteso` nella lista di chi
+  vende) offre la conferma dello swap o «⚡ Ricevi al mio Lightning
+  address» (`POST /api/swap/auto/ordine/{id}/lightning`: fattura dal suo
+  address messa in `invoice_venditore` con l'ancora degli swap, poi
+  `_sblocca_sats`). Le monete nei tasti a tre (`.scelta-tre`), mai ⛓️.
+  Prove: `prove_incasso_annuncio`.
 - LE DOMANDE DEL VENDITORE A CHI COMPRA (6 nov 2026, cantiere
   domande-compratore; il perché in CANTIERI, «Le domande del venditore a
   chi compra»). Chi vende un CODICE ONLINE (da solo o nella combo con
