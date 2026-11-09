@@ -153296,6 +153296,17 @@ def prove_ripristino_visibile():
           "toccare il localStorage", [True, True, False],
           [".every(x => x === qui)" in guarda,
            "la ritrovi da sola" in guarda, "localStorage" in guarda])
+    # (9 nov 2026, Alan) «nessuna copia» e «nessuna chiave per cercarla»
+    # sono due cose: la seconda non deve sembrare la prima
+    dai = pezzo_js(mini, "async function onchainDaiRelay(){", "\n}\n")
+    prova("il controllo dice se sui relay NON C'E' la copia o se qui MANCA la "
+          "chiave per cercarla (e la chiave mancante si decide prima di cercare)",
+          [True, True, True, True],
+          ["onchainRelaySenzaChiave\n      ? '🟣 Su questo dispositivo non c\\'è una chiave Nostr" in guarda,
+           "Sui relay <b>non c\\'è nessuna copia</b>" in guarda,
+           dai.index("onchainRelaySenzaChiave = true;") < dai.index("firmatarioCifranteP2P()")
+           < dai.index("onchainRelaySenzaChiave = false;"),
+           "serve una chiave Nostr collegata" not in mini])
     dove = pezzo_js(mini, "function onchainDoveAbita(){", "\n}\n")
     prova("il cloud ha un nome: il CloudStorage di Telegram, cifrato con "
           "MTProto, in nessuna chat", [True, True, True, True],
@@ -156295,6 +156306,8 @@ async function walletUnicoNumero(parole, minimo){
         "async function walletUsaParoleDi(testo){",
         "function walletUnicoBlocco(c){",
         "function walletBloccoBackup(c){",
+        "function walletBloccoRelay(){",
+        "async function walletSalvaRelay(btn){",
         "function walletCopieLette(imp){",
         "function walletSegnaCopia(imp, dove){",
         "async function walletBackupRonda(){")]
@@ -156325,6 +156338,9 @@ const swapAcceso = () => false;
 const onchainSrv = null;
 const onchainRete = () => ({strada: 'm/0'});
 const toast = (t) => TOAST.push(t);
+const haptic = () => {};
+const onchainAttesa = () => () => {};
+const renderWalletBarattolo = () => {};
 /* dal 3 nov 2026 l'avviso e' il bottone fisso: si conta come il toast,
    e una copia fatta lo toglie */
 const walletPillolaMostra = () => TOAST.push('pillola');
@@ -156400,6 +156416,24 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
   out.rondaAmber = [await walletBackupRonda(), RELAY_SCRITTI, TOAST.length];
   /* il dispositivo senza parole non fa niente */
   pulito(); out.rondaVuota = [await walletBackupRonda(), walletRondaFatta];
+  /* 8) (9 nov 2026, Alan) la copia che apre il web: chi ha il cloud (o la
+        carta) e una chiave Nostr sull'account, ma niente relay, ha il suo
+        tasto; con la copia sui relay, o senza chiave Nostr, niente */
+  out.avvisoRelay = [avv({copie: {nuvola: 1}, nostr: true}).includes('Salva sui relay Nostr'),
+                     avv({copie: {carta: 1}, nostr: true}).includes('Salva sui relay Nostr'),
+                     avv({copie: {nuvola: 1, relay: 1}, nostr: true}), avv({copie: {nuvola: 1}}),
+                     avv({copie: {}, nostr: true}).includes('Salva il backup')];
+  /* ...e il tasto: riuscito segna la ricevuta; senza chiave e coi relay
+        che non tengono lo dice diverso, e non segna niente */
+  const salva = async (esito) => {
+    pulito(); LS.seme = A; RELAY_OK = esito;
+    await walletSalvaRelay({});
+    return [RELAY_SCRITTI, !!walletCopieLette(iA).relay, String(TOAST.slice(-1)[0] || '').slice(0, 2)
+            + (String(TOAST.slice(-1)[0] || '').includes('chiave Nostr') ? 'chiave' : '')
+            + (String(TOAST.slice(-1)[0] || '').includes('non hanno tenuto') ? 'relay' : '')];
+  };
+  out.salvaRelay = [await salva(true), await salva(null), await salva(false)];
+  pulito(); out.salvaVuoto = [await walletSalvaRelay({}), RELAY_SCRITTI, TOAST.length];
   console.log(JSON.stringify(out));
 })();
 """
@@ -156444,6 +156478,17 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
               [r.get("rondaNsec"), r.get("rondaAmber")])
         prova("(wallet-unico) un dispositivo senza parole non fa la ronda (e la "
               "rifara' quando le avra')", [False, False], r.get("rondaVuota"))
+        prova("(9 nov, Alan) la copia che apre il web: col cloud o la carta e una "
+              "chiave Nostr, senza copia sui relay, c'e' «Salva sui relay Nostr»; "
+              "con la copia sui relay o senza chiave Nostr niente; senza nessuna "
+              "copia resta «Salva il backup»",
+              [True, True, "", "", True], r.get("avvisoRelay"))
+        prova("...il tasto: riuscito segna la ricevuta dei relay; senza una chiave "
+              "che firmi e coi relay che non tengono lo dice, ognuno a modo suo, "
+              "e non segna niente; senza parole non scrive",
+              [[[1, True, "✅ "], [1, False, "⚠️chiave"], [1, False, "⚠️relay"]],
+               [0, 1]],
+              [r.get("salvaRelay"), (r.get("salvaVuoto") or [None])[1:]])
     prova("la pagina «Cambio» non ha piu' la riga delle parole: la porta del Profilo",
           [False, True, True],
           ['data-swap="riserva"' in js, 'data-swap="al-profilo"' in js,

@@ -78557,3 +78557,44 @@ prezzo accettato da nos.lol il 6 nov 21:36 UTC: il guaio e' di nos.lol
 verso le uscite Tor, non nostro, e la scelta (lasciarlo o cambiarlo nel
 settings del nodo, a libro fermo) e' di Andrea. Gli altri due relay (relay.mostro.network e il
 nostro) accettano tutto.
+
+## La copia sui relay che apre il web: «Salva sui relay Nostr» nel wallet di Barattolo (9 nov 2026, cantiere backup-relay, segnalazione di Alan, «dobbiamo risolvere questo problema» di Andrea)
+
+PERCHÉ. Alan: «dalla miniapp sono anche loggato su nostr, eppure via
+web nonostante io sia entrato con nostr non vede il backup sui relay»; il
+«🔍 Controlla il backup» della mini app diceva cloud sì, relay no. Le
+12 parole nate nella mini app hanno la copia nel cloud di Telegram, che
+fuori da Telegram non si legge: sul web l'unica strada automatica è la
+copia cifrata sui relay. Ma la ronda di ogni apertura (wallet-unico, 2
+nov) tocca i relay solo con la nsec nel browser — Amber, un bunker o
+l'estensione chiederebbero un'approvazione — e l'avviso del Profilo col
+suo «Salva il backup» compariva solo SENZA NESSUNA copia. Dentro Telegram
+il cloud c'è sempre, quindi a chi firma con un firmatario remoto la
+copia sui relay non nasceva mai.
+
+COSA. Nel cassetto «🔑 Il wallet di Barattolo», a chi ha la copia nel
+cloud (o su carta), una chiave Nostr sull'account e nessuna copia sui
+relay: il riquadro «🟣 Manca la copia sui relay Nostr» col tasto «Salva
+sui relay Nostr» (`walletBloccoRelay`, `walletSalvaRelay`). È un gesto,
+quindi il firmatario può chiedere; riuscito segna la ricevuta e il
+riquadro se ne va. Il toast dice tre cose diverse: salvata; qui non c'è
+una chiave Nostr che firmi; i relay non l'hanno tenuta. E «Controlla il
+backup» distingue «sui relay non c'è nessuna copia» da «su questo
+dispositivo non c'è una chiave Nostr che sappia aprire i relay»
+(`onchainRelaySenzaChiave`): prima le due cose avevano la stessa frase,
+«serve una chiave Nostr collegata», e Alan la leggeva come un errore.
+
+SCARTATO. La ronda che scrive sui relay anche col firmatario remoto (a
+ogni apertura una richiesta di approvazione su Amber: rumore, e chi non
+risponde resta col dubbio); le parole sul server per ritrovarle dal web
+(regola ferrea 2); un tasto sempre presente anche con la copia già sui
+relay (c'è «Rifai il backup adesso» nelle impostazioni on-chain).
+
+PROVATO. `prove_parole_uniche` (+2 nel banco del wallet, girato in node
+coi pezzi veri: quando il riquadro c'è e quando no; il tasto nei tre
+esiti e senza parole; controprova: togliendo la riga del riquadro la
+prova va rossa), `prove_ripristino_visibile` (+1: le due frasi del
+controllo e l'ordine in `onchainDaiRelay`). **DA GUARDARE** dal vivo
+(dopo la promozione, o sul collaudo): Alan nella mini app tocca «Salva
+sui relay Nostr» (Amber chiede), poi sul web entra con la stessa chiave
+Nostr e «👁 Mostra le 12 parole» deve ritrovare il wallet da solo.

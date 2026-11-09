@@ -56866,7 +56866,8 @@ async function walletUsaParoleDi(testo){
    disturba nessuno: il cloud di Telegram (silenzioso) e i relay con la
    nsec conservata nel browser (silenziosa). Un firmatario remoto (Amber,
    bunker) o l'estensione chiederebbero un'approvazione: per loro c'e'
-   l'avviso nel Profilo col tasto «Salva il backup». La RICEVUTA delle
+   l'avviso nel Profilo col tasto «Salva il backup» e, se la copia del
+   cloud c'e' gia', «Salva sui relay Nostr» (9 nov). La RICEVUTA delle
    copie riuscite sta nel dispositivo, per impronta. */
 function walletCopieChiave(){ return `barattolo_onchain_copie_${myTgId || 'x'}`; }
 function walletCopieLette(imp){
@@ -57055,10 +57056,16 @@ async function onchainSuiRelay(corpo){
 
 /* ...e in LETTURA: la copia piu' recente che sia nostra e porti il
    nostro `d`, decifrata col firmatario. '' se non c'e' o non si apre. */
+/* (9 nov 2026) e dice PERCHE' non ha trovato niente: senza una chiave
+   Nostr che cifri, su questo dispositivo, la copia non si puo' cercare —
+   che non e' come dire che non c'e' */
+let onchainRelaySenzaChiave = false;
 async function onchainDaiRelay(){
+  onchainRelaySenzaChiave = true;
   if (typeof firmatarioCifranteP2P !== 'function') return '';
   const auto = await firmatarioCifranteP2P();
   if (!auto) return '';
+  onchainRelaySenzaChiave = false;
   try {
     const pub = String(await auto.f.pubkey() || '').toLowerCase();
     if (!FORMA_HEX64.test(pub)) return '';
@@ -58213,6 +58220,7 @@ function walletUnicoBlocco(c){
    nessuna copia fuori da qui, e non e' stato scritto su carta */
 function walletBloccoBackup(c){
   const k = c.copie || {};
+  if ((k.nuvola || k.carta) && !k.relay && c.nostr) return walletBloccoRelay();
   if (k.nuvola || k.relay || k.carta) return '';
   const puo = c.tg || c.nostr;
   const dove = c.tg && c.nostr ? 'nel cloud di Telegram e, cifrata, sui relay Nostr'
@@ -58224,6 +58232,44 @@ function walletBloccoBackup(c){
       : 'Qui non si può fare una copia da sola: apri Barattolo dentro Telegram (la copia nel cloud si fa da sola), oppure scrivi le 12 parole su carta con «👁 Mostra le 12 parole».'}</div>
     ${puo ? '<button class="btn orange" onclick="walletSalvaBackup(this)">Salva il backup</button>' : ''}
     <button class="btn link" onclick="walletParoleSuCarta()">Le ho scritte su carta</button></div>`;
+}
+/* LA COPIA CHE APRE IL WEB (9 nov 2026, Alan: «dalla miniapp sono anche
+   loggato su nostr, eppure via web non vede il backup sui relay»). Dentro
+   Telegram la copia del cloud c'e' sempre, ma fuori da Telegram non si
+   legge; e la ronda tocca i relay solo con la nsec nel browser (Amber o
+   un bunker chiederebbero un'approvazione). L'avviso qui sopra c'era solo
+   SENZA nessuna copia, quindi a chi ha il cloud e firma con Amber la
+   copia sui relay non nasceva mai, e il web non ritrovava il wallet. Chi
+   ha una chiave Nostr sull'account e non ha ancora la copia sui relay ha
+   il suo tasto: e' un gesto, quindi il firmatario puo' chiedere. */
+function walletBloccoRelay(){
+  return `<div class="payout wallet-unico"><h4>🟣 Manca la copia sui relay Nostr</h4>
+    <div class="hint">La copia nel cloud di Telegram si legge solo dentro
+      Telegram. Con una copia cifrata sui relay Nostr, entrando dal web con
+      la tua chiave Nostr ritrovi il wallet da solo («👁 Mostra le 12
+      parole»). Il tuo firmatario Nostr può chiederti di approvare.</div>
+    <button class="btn orange" onclick="walletSalvaRelay(this)">Salva sui relay Nostr</button></div>`;
+}
+async function walletSalvaRelay(btn){
+  haptic();
+  const parole = onchainSemeLocale();
+  if (!parole) return toast('⚠️ Su questo dispositivo non ci sono parole da salvare');
+  const rip = onchainAttesa(btn, 'Salvo…');
+  let esito = false;
+  try {
+    esito = await onchainSuiRelay(JSON.stringify({parole,
+      strada: onchainSrv?.strada || onchainRete().strada}));
+  } catch(e){ esito = false; }
+  rip();
+  if (esito === true) {
+    try { walletSegnaCopia(await onchainImpronta(parole), 'relay'); } catch(e){}
+    toast('✅ Copia salvata sui relay Nostr: dal web la ritrovi con «👁 Mostra le 12 parole»', 7000);
+  } else {
+    toast(esito === null
+      ? '⚠️ Qui non c\'è una chiave Nostr che sappia firmare: collega la tua chiave (nsec o firmatario) e riprova'
+      : '⚠️ I relay non hanno tenuto la copia: riprova fra un momento', 7000);
+  }
+  renderWalletBarattolo();
 }
 async function walletSalvaBackup(btn){
   haptic();
@@ -61895,8 +61941,11 @@ async function onchainGuarda(btn, dove){
   }
   righe.push(suiRelay
     ? '🟣 Sui relay c\'è la <b>copia cifrata</b>, e si apre con la tua chiave.'
-    : '🟣 Sui relay non ho trovato nessuna copia (serve una chiave Nostr '
-      + 'collegata).');
+    : onchainRelaySenzaChiave
+      ? '🟣 Su questo dispositivo non c\'è una chiave Nostr che sappia aprire '
+        + 'i relay (nsec, firmatario o estensione): una copia lì, se c\'è, da '
+        + 'qui non si legge.'
+      : '🟣 Sui relay <b>non c\'è nessuna copia</b> con la tua chiave.');
   /* e la riga che conta: le due case dicono la STESSA chiave? */
   const qui = onchainSemeLocale();
   let dalCloud = '';
