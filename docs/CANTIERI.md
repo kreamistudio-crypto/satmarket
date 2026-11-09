@@ -78810,3 +78810,53 @@ per scelta, un form senza scelta invariato, il disegno: tre bottoni, il
 nascosto, quattro scatole; l'invio e il foglio). Anteprima del form
 nelle tre scelte a 390 px. DA GUARDARE: uno scambio vero con Revolut via
 telefono e via IBAN, il riquadro di chi compra.
+
+## Tutto l'ordine nel CSV, locker compreso (9 nov 2026, cantiere export-completo, richiesta di Andrea)
+
+PERCHÉ. Andrea: «quando esporto tutti gli ordini devo poter vedere
+anche gli indirizzi dei locker e tutte le informazioni relative
+all'ordine, nessuna informazione mancata». Il buco vero era il locker:
+una spedizione a un punto di ritiro (`via_punto=1`) non ha `indirizzo`
+per costruzione, e «dove» restava bianco proprio sugli ordini da
+spedire. La causa di fondo: `scarica_export` leggeva un ELENCO A MANO
+di colonne, e ogni colonna nata dopo (il punto, le domande del 6 nov,
+l'on-chain del 27 ott) avrebbe dovuto ricordarsi di passare di qui.
+
+COSA. `SELECT o.*` al posto dell'elenco, e 32 colonne nuove TUTTE IN
+CODA (le prime dieci restano dove erano: chi ha un foglio con delle
+formule non si ritrova le celle spostate): numero e data dell'ordine,
+venditore (solo sugli acquisti: è «a chi ho comprato», il dato che la
+voce «Chi ha comprato, e dove consegnare» diceva mancante), quantità,
+righe del set con pezzi e cifre, pagamento Lightning/on-chain, il conto
+scomposto (articolo, spedizione, protezione, sconto, codice, spedizione
+gratis, accordo, spese trattenute), tipo/rete/testo del punto, email per
+il corriere, corriere e tracking (andata e reso) con le date di
+spedizione e consegna, appuntamento e luogo dell'incontro del servizio,
+nota del compratore, risposte alle domande, disputa, annullo del
+venditore (quando, motivo, nota), e le transazioni on-chain (ingresso
+dagli `utxo`, uscita). «Dove» sul locker dice «Locker automatico InPost:
+<punto>»; sull'indirizzo di casa aggiunge le note per il corriere.
+
+CHI VEDE COSA. Quel che l'app mostra a tutte e due le parti nel
+dettaglio dell'ordine (punto scelto, nota, risposte, luogo dell'incontro)
+esce su tutti e due i lati; quel che serve solo a chi SPEDISCE (email
+per il corriere) solo sulle vendite, come «compratore» e «dove».
+
+RESTANO FUORI, di proposito: il codice della busta e il contenuto
+digitale (segreti operativi, escono solo dai loro endpoint: la
+decisione del cantiere di settembre), le fatture Lightning, i contatori
+dei solleciti e i dati interni dei pagamenti. E l'indirizzo di casa,
+le risposte e l'email GIÀ PURGATI alla chiusura dell'ordine restano
+vuoti: la promessa «trasporta, non conserva» vale anche qui. Il testo
+del punto non si purga (è l'indirizzo di un negozio o di un locker).
+
+PROVATO. `prove_lista_ordini` (+15: il locker in «dove» e nelle sue
+colonne, on-chain con la transazione una volta sola, il conto
+scomposto, risposte/nota/email/disputa, il set con le righe, il
+venditore sugli acquisti, chi compra vede il suo punto ma non le
+colonne di chi spedisce, nessuna colonna per busta/contenuto/fattura,
+le prime dieci colonne ferme). Giro vero col server reale (database
+nuovo, `TestClient` su `/api/export/{biglietto}`): un ordine via locker
+on-chain e uno a casa con indirizzo cifrato escono completi.
+**DA GUARDARE** dal vivo: scaricare «📄 Esporta tutti gli ordini in
+CSV» da Telegram e aprirlo in Excel.
