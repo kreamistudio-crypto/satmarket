@@ -10022,6 +10022,17 @@
   .scelta-incasso.scelta-auto button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
   .scelta-incasso.scelta-auto .cambio-moneta.p2p-oc-moneta{width:22px;height:22px}
   .scelta-incasso.scelta-auto .cambio-moneta.p2p-oc-moneta .cambio-svg{width:13px;height:13px}
+  /* (9 nov 2026, incasso-annuncio) le scelte a tre del Profilo: «quando
+     ti pagano in Lightning / on-chain, ricevi in…» Lightning, On-chain,
+     Ogni volta. Tre colonne strette: moneta e parola più piccole */
+  .scelta-incasso.scelta-tre{grid-template-columns:1fr 1fr 1fr}
+  /* tre tasti stretti: la moneta sopra la parola, e «On-chain» mai
+     spezzato sul trattino */
+  .scelta-incasso.scelta-tre button{font-size:12.5px;gap:3px;padding:8px 2px;
+    flex-direction:column;line-height:1.2;text-align:center}
+  .scelta-incasso.scelta-tre .nw{white-space:nowrap}
+  .scelta-incasso.scelta-tre .cambio-moneta.p2p-oc-moneta{width:18px;height:18px}
+  .scelta-incasso.scelta-tre .cambio-moneta.p2p-oc-moneta .cambio-svg{width:11px;height:11px}
   .swap-righe{border:1.5px solid var(--line);border-radius:12px;
     padding:2px 12px;margin:10px 0 8px}
   .swap-riga{display:flex;justify-content:space-between;align-items:baseline;
@@ -14107,6 +14118,14 @@ document.getElementById('cartello')?.remove();</script>
              aggiornaHintPolitiche, che e' anche l'unico posto che la
              sa spegnere. -->
         <div id="sellScontoHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div></div>
+      <!-- ₿ COME VUOI RICEVERE PER QUESTO OGGETTO (9 nov 2026, cantiere
+           incasso-annuncio, Andrea: «la scelta dovrebbe essere su ogni
+           annuncio prima di pubblicarlo»). Solo a chi ha un cambio di rete
+           (swap automatico o on-chain verso Lightning); la disegna
+           renderIncassoForm, accanto al prezzo perche' dipende da lui. -->
+      <div class="field" id="sellIncassoField" style="display:none"><label>Come vuoi ricevere per questo oggetto?</label>
+        <div id="sellIncassoScelta"></div>
+        <div id="sellIncassoHint" style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4"></div></div>
       <div class="field" id="sellAstaField" style="display:none"><label>Vendita</label>
         <label class="cons-riga"><input type="checkbox" id="sellAsta" onchange="aggiornaAstaForm()"> <span><span class="cons-ico" aria-hidden="true">🔨</span>Vendi all'asta<span class="cons-sub">base + durata: vince la puntata più alta</span></span></label>
         <div id="sellAstaOpzioni" style="display:none;margin-top:8px">
@@ -14678,7 +14697,7 @@ document.getElementById('cartello')?.remove();</script>
            parole. La moneta è quella del Cambio (P2P_OC_MONETA), mai ⛓️. -->
       <div class="acc" id="accOnchainIncasso" style="display:none">
         <button class="acc-h" onclick="toggleAcc('accOnchainIncasso')"><span class="em"><span class="cambio-moneta btc p2p-oc-moneta" aria-hidden="true"><svg class="cambio-svg" viewBox="0 0 24 24"><g transform="rotate(13 12 12)"><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g></svg></span></span>On-chain<span class="fr">▾</span></button>
-        <div class="acc-b"><div id="walletBarattolo"></div><div id="onchainIncassoProfilo"></div><div id="swapAutoBlocco"></div><div id="walletParole"></div></div>
+        <div class="acc-b"><div id="walletBarattolo"></div><div id="onchainIncassoProfilo"></div><div id="swapAutoBlocco"></div><div id="onchainModoProfilo"></div><div id="walletParole"></div></div>
       </div>
 
       <div class="acc" id="accNwc">
@@ -17754,6 +17773,9 @@ function mapListing(a){
     /* le domande a chi compra (6 nov 2026): arrivano SOLO dalla
        scheda (/api/listings/{id}); null = «non le so», mai «nessuna» */
     domande: (Array.isArray(a.domande) && a.domande) || null,
+    /* (9 nov 2026) come vuole ricevere chi vende per QUESTO annuncio:
+       arriva solo dalla scheda (undefined = «non lo so») */
+    incassoAnn: typeof a.incasso === 'string' ? (['ln', 'onchain'].includes(a.incasso) ? a.incasso : '') : undefined,
     servDove:a.servizio_dove||'', durataMin:a.durata_min||0,
     /* il limite per ordine (cantiere quantita-servizi): 0 = nessuno.
        NON e' lo stock — vedi qtaMassimaAnnuncio, che lo usa al posto
@@ -19404,8 +19426,12 @@ function renderSwapAutoProfilo(){
   if (!box) return;
   const a = swapAuto();
   if (DEMO || !a.attivo) { box.innerHTML = ''; return; }
-  const tasto = (on, cosa, testo) => `<button type="button" role="radio" aria-checked="${on}"
-      class="${on ? 'on' : ''}" onclick="scegliSwapAutoProfilo(${cosa})">${testo}</button>`;
+  /* (9 nov 2026, incasso-annuncio) tre scelte e non due: «Ogni volta»
+     = a ogni vendita si sceglie nell'ordine. Vale per gli annunci che
+     dicono «Come nel profilo»; quelli con la loro scelta tengono la loro */
+  const modo = a.modo || (a.onchain ? 'onchain' : 'ln');
+  const tasto = (cosa, testo) => `<button type="button" role="radio" aria-checked="${modo === cosa}"
+      class="${modo === cosa ? 'on' : ''}" onclick="scegliSwapAutoProfilo('${cosa}')">${testo}</button>`;
   const dove = a.indirizzo
     ? (a.da === 'xpub'
       ? 'Arrivano al <b>tuo wallet on-chain</b>, a un indirizzo nuovo per ogni vendita.'
@@ -19413,13 +19439,16 @@ function renderSwapAutoProfilo(){
     : 'L\'indirizzo lo scrivi quando confermi.';
   /* (9 nov 2026, nome-onchain) sta nella voce «On-chain», sotto «Dove
      ricevi i bitcoin»: prima era dentro «Lightning address» */
-  box.innerHTML = `<div class="payout"><h4>Quando vendi in Lightning, ricevi</h4>
-    <div class="scelta-incasso scelta-auto" role="radiogroup" aria-label="Come ricevi quando vendi in Lightning">
-      ${tasto(!a.onchain, 'false', P2P_LN_MONETA + 'Lightning')}${tasto(!!a.onchain, 'true', P2P_OC_MONETA + 'On-chain')}</div>
-    <div style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">${a.onchain
+  box.innerHTML = `<div class="payout"><h4>Quando ti pagano in Lightning, ricevi in</h4>
+    <div class="scelta-incasso scelta-auto scelta-tre" role="radiogroup" aria-label="Quando ti pagano in Lightning, ricevi in">
+      ${tasto('ln', P2P_LN_MONETA + 'Lightning')}${tasto('onchain', P2P_OC_MONETA + '<span class="nw">On-chain</span>')}${tasto('ogni_volta', '<span>🤔</span><span class="nw">Ogni volta</span>')}</div>
+    <div style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">${modo === 'onchain'
       ? `Alla conferma dell'acquirente apri l'ordine e premi <b>«Conferma»</b>: Barattolo cambia i sats in bitcoin con ${esc(a.fornitore || 'SATS Routing')}. ${dove}
          Il costo del cambio lo vedi prima. Sotto i ${fmt(a.minimo || 0)} sats ricevi in Lightning.`
-      : 'Ricevi in Lightning: al tuo Lightning address, o con una fattura nell\'ordine.'}</div>${a.onchain && typeof myOnchain !== 'undefined' && myOnchain
+      : modo === 'ogni_volta'
+      ? `Alla conferma dell'acquirente apri l'ordine e scegli lì: Lightning, o bitcoin on-chain col cambio (il costo lo vedi prima). Sotto i ${fmt(a.minimo || 0)} sats ricevi in Lightning.`
+      : 'Ricevi in Lightning: al tuo Lightning address, o con una fattura nell\'ordine.'}
+      Su ogni annuncio puoi sceglierlo anche solo per quell'oggetto.</div>${modo !== 'ln' && typeof myOnchain !== 'undefined' && myOnchain
       /* (3 nov 2026, Andrea: «dovrebbe chiedere la xpub») il campo e' UNO,
          quello di «Dove ricevi i bitcoin»; dal 9 nov sta nella stessa
          voce, qui sopra: il tasto ci riporta il dito */
@@ -19432,17 +19461,19 @@ function onchainVaiAlCampo(){
   c.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'center'});
   c.focus({preventScroll: true});
 }
-async function scegliSwapAutoProfilo(onchain){
+async function scegliSwapAutoProfilo(modo){
   haptic();
   try {
     const r = await fetch(`${API_BASE}/swap/auto/preferenza`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({onchain: !!onchain})});
+      body: JSON.stringify({modo})});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non salvato');
     if (swapLeve) swapLeve.auto = d;
     renderSwapAutoProfilo();
-    toast(d.onchain ? '₿ Dalle prossime vendite ricevi on-chain' : '⚡ Dalle prossime vendite ricevi in Lightning');
+    toast(d.modo === 'onchain' ? '₿ Dalle prossime vendite ricevi on-chain'
+      : d.modo === 'ogni_volta' ? '🤔 Dalle prossime vendite scegli tu, ordine per ordine'
+      : '⚡ Dalle prossime vendite ricevi in Lightning');
   } catch(e) { toast(e.message || 'Non salvato, riprova'); }
 }
 /* il selettore dell'ordine col cambio del server: lo stesso vestito di
@@ -38358,12 +38389,24 @@ function payoutPanel(o){
      promettere il Lightning address che `_sblocca_sats` saltera'. Sotto
      il minimo del cambio (o sopra il tetto) resta il Lightning di sempre. */
   const sa = swapAutoAcceso() ? swapAuto() : {};
-  const autoOnchain = !!sa.onchain && net >= (sa.minimo || 0)
-    && !(sa.massimo > 0 && net > sa.massimo);
+  /* (9 nov 2026, incasso-annuncio) il modo e' quello dell'ORDINE, detto
+     dal server (`incasso_atteso`): la scelta dell'annuncio vince sul
+     Profilo. Senza (un server di prima), quello del Profilo */
+  const modoOrd = swapAutoAcceso()
+    ? (o.incasso_atteso || sa.modo || (sa.onchain ? 'onchain' : 'ln')) : 'ln';
+  const neiTetti = net >= (sa.minimo || 0) && !(sa.massimo > 0 && net > sa.massimo);
+  const autoOnchain = modoOrd === 'onchain' && neiTetti;
+  if (modoOrd === 'ogni_volta' && neiTetti && o.state!=='confirmed' && !tocca) return `
+    <div class="payout">
+      <h4>🤔 Come ricevi lo scegli tu</h4>
+      <div class="hint">Quando l'acquirente conferma, apri questo ordine e scegli: <b>⚡ Lightning</b>,
+        o <b>₿ bitcoin on-chain</b> col cambio di SATS Routing (il costo lo vedi prima). I tuoi
+        <b class="net">${fmt(net)}<span class="unit">sats</span></b> intanto restano nel deposito di garanzia.</div>
+    </div>`;
   if (autoOnchain && o.state!=='confirmed' && !tocca) return `
     <div class="payout">
       <h4>${P2P_OC_MONETA} Ricevi in bitcoin on-chain</h4>
-      <div class="hint">Hai scelto nel Profilo di ricevere on-chain. Quando l'acquirente conferma, apri questo ordine e premi
+      <div class="hint">Hai scelto di ricevere on-chain. Quando l'acquirente conferma, apri questo ordine e premi
         <b>«Conferma»</b>: Barattolo cambia i tuoi <b class="net">${fmt(net)}<span class="unit">sats</span></b> con SATS Routing
         e ti manda i bitcoin${sa.indirizzo ? (sa.da === 'xpub' ? ' a un indirizzo nuovo del tuo wallet' : ` a <span class="mono" style="word-break:break-all">${esc(sa.indirizzo)}</span>`) : ''}.
         Il costo del cambio lo vedi prima di confermare.</div>
@@ -38446,9 +38489,15 @@ function payoutPanel(o){
     : swapQui ? selettoreIncassoSwap(o.id, sceltaSwap) : '';
   if (sceltaSwap === 'swap') return `
     <div class="payout" id="payoutIncasso">${selettoreSwap}${pannelloSwapTelefono(o)}</div>`;
+  /* (9 nov 2026, incasso-annuncio) chi aspettava di scegliere (on-chain o
+     «ogni volta») e ha un Lightning address: un tocco, e la fattura la
+     chiede il server al suo address */
+  const alMioAddress = autoQui && myLnAddress ? `
+      <button class="btn orange" onclick="incassaAlMioAddress(this, ${Number(o.id)})">⚡ Ricevi al mio Lightning address</button>
+      <div class="hint" style="margin:6px 0 12px">Va a <span class="mono">${esc(myLnAddress)}</span>. Oppure, qui sotto, un altro address o una fattura.</div>` : '';
   return `
     <div class="payout${o.pagamento && o.pagamento.gesto_venditore ? ' pag-evidenza' : ''}" id="payoutIncasso">
-      ${selettoreSwap}
+      ${selettoreSwap}${alMioAddress}
       <h4>💰 Incassa subito i tuoi sats</h4>
       <div class="hint">${o.pagamento && o.pagamento.motivo==='altra_cassaforte'
         ? 'Il pagamento di prima è rimasto <b>bloccato per un guasto nostro</b>, non tuo, e te li mandiamo da un\'altra strada: ci serve una fattura <b>nuova</b>. Ti aspettano'
@@ -38465,6 +38514,21 @@ function payoutPanel(o){
     </div>`;
 }
 
+async function incassaAlMioAddress(btn, id){
+  haptic();
+  const ripristina = bottoneInAttesa(btn, 'Un attimo…');
+  try {
+    const r = await fetch(`${API_BASE}/swap/auto/ordine/${Number(id)}/lightning`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()}, body: '{}'});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { toast(d.detail || 'Non è partito, riprova'); return; }
+    toast(d.ok ? '⚡ Sats partiti verso il tuo Lightning address'
+      : (d.in_volo || d.incerto) ? '⏳ Pagamento in corso: te lo diciamo appena arriva'
+      : 'Non è arrivato al tuo Lightning address: ti abbiamo scritto nel bot cosa fare');
+    await loadOrders(); openOrder(Number(id));
+  } catch(e) { toast('Non è partito, riprova'); }
+  finally { ripristina(); }
+}
 async function saveLnAddress(btn){
   haptic();
   const o = currentOrder;
@@ -52794,6 +52858,53 @@ function setTipoDomanda(i, k){
   if (k !== 'scelta') domandeSell[i].o = [];
   renderDomandeForm();
 }
+/* ---- ₿ COME VUOI RICEVERE PER QUESTO OGGETTO (9 nov 2026, cantiere
+   incasso-annuncio) ----
+   '' = come nel Profilo (la scelta di partenza), 'ln' o 'onchain'. null =
+   «non lo so ancora» (la modifica, prima che arrivi la scheda): allora il
+   salvataggio non lo tocca. La conversione la fa Barattolo: chi paga in
+   Lightning e tu vuoi on-chain = swap automatico; chi paga on-chain e tu
+   vuoi Lightning = il cambio di `onchain_ln`. Sotto il minimo del cambio
+   arriva com'e' stato pagato, e la riga lo dice. */
+let incassoSell = '';
+const incassoFormAcceso = () => !DEMO && (swapAutoAcceso()
+  || !!(typeof myOnchainLn !== 'undefined' && myOnchainLn && myOnchainLn.attivo));
+function incassoProfiloRiassunto(){
+  const nome = m => m === 'onchain' ? 'on-chain' : m === 'ogni_volta' || m === 'ogni volta' ? 'scegli ogni volta' : 'Lightning';
+  const ln = swapAutoAcceso() ? (swapAuto().modo || (swapAuto().onchain ? 'onchain' : 'ln')) : 'ln';
+  const oc = myOnchainLn && myOnchainLn.attivo ? (myOnchainLn.modo === 'lightning' ? 'ln' : myOnchainLn.modo || 'onchain') : 'onchain';
+  return `Se ti pagano in Lightning: <b style="white-space:nowrap">${nome(ln)}</b>. Se ti pagano on-chain: <b style="white-space:nowrap">${nome(oc)}</b>.`;
+}
+function renderIncassoForm(){
+  const campo = el('sellIncassoField');
+  if (!campo) return;
+  if (!incassoFormAcceso()) { campo.style.display = 'none'; return; }
+  campo.style.display = '';
+  const scelta = incassoSell || '';
+  const tasto = (cosa, testo) => `<button type="button" role="radio" aria-checked="${scelta === cosa}"
+      class="${scelta === cosa ? 'on' : ''}" onclick="scegliIncassoSell('${cosa}')">${testo}</button>`;
+  el('sellIncassoScelta').innerHTML = `<div class="scelta-incasso scelta-auto scelta-tre" role="radiogroup" aria-label="Come vuoi ricevere per questo oggetto">`
+    + tasto('', '<span>👤</span><span>Come nel profilo</span>') + tasto('ln', P2P_LN_MONETA + 'Lightning') + tasto('onchain', P2P_OC_MONETA + '<span class="nw">On-chain</span>') + `</div>`;
+  const p = Number(el('sellPrice') && el('sellPrice').value) || 0;
+  const sats = sellValuta === 'eur' && typeof eurPerSat === 'number' && eurPerSat > 0 ? Math.round(p / eurPerSat) : p;
+  const minimo = Number((swapAutoAcceso() && swapAuto().minimo) || (myOnchainLn && myOnchainLn.minimo) || 0);
+  const sotto = minimo && sats > 0 && sats < minimo
+    ? ` <b>Sotto i ${fmt(minimo)} sats il cambio non si fa</b>: ricevi come ti pagano.` : '';
+  el('sellIncassoHint').innerHTML = scelta === 'ln'
+    ? `Ricevi in Lightning anche se chi compra paga on-chain: il cambio lo fa Barattolo, e il costo lo vedi prima.${sotto}`
+    : scelta === 'onchain'
+    ? `Ricevi bitcoin on-chain anche se chi compra paga in Lightning: il cambio lo fa Barattolo, e il costo lo vedi prima.${sotto}`
+    : `${incassoProfiloRiassunto()} Lo cambi nel Profilo, voce «On-chain».`;
+}
+function scegliIncassoSell(cosa){
+  haptic();
+  incassoSell = cosa;
+  renderIncassoForm();
+}
+function incassoPayload(){
+  if (incassoSell === null || !incassoFormAcceso()) return {};
+  return {incasso: incassoSell || ''};
+}
 /* il pezzo del payload: chiave assente finche' non le sappiamo (null),
    e le righe lasciate vuote non partono (il server le toglierebbe) */
 function domandePayload(){
@@ -52808,16 +52919,25 @@ function domandePayload(){
    risposta `domandeSell` resta null e il salvataggio non le tocca. */
 async function caricaDomandeForm(l){
   domandeSell = Array.isArray(l.domande) ? l.domande.map(q => ({...q, o:[...(q.o||[])]})) : null;
-  renderDomandeForm();
-  if (domandeSell !== null || DEMO || !l.id) { if (domandeSell === null) domandeSell = []; renderDomandeForm(); return; }
+  /* (9 nov 2026) l'incasso dell'annuncio arriva con la scheda, come le
+     domande: finche' non c'e', null (il salvataggio non lo tocca) */
+  incassoSell = typeof l.incassoAnn === 'string' ? l.incassoAnn : null;
+  renderDomandeForm(); renderIncassoForm();
+  if ((domandeSell !== null && incassoSell !== null) || DEMO || !l.id) {
+    if (domandeSell === null) domandeSell = [];
+    if (incassoSell === null) incassoSell = '';
+    renderDomandeForm(); renderIncassoForm(); return;
+  }
   try {
     const r = await fetch(`${API_BASE}/listings/${l.id}`,
                           {headers:{'X-Tg-Init-Data': authHdr()}});
     const a = r.ok ? await r.json() : null;
-    if (a && Array.isArray(a.domande))
+    if (a && Array.isArray(a.domande) && domandeSell === null)
       domandeSell = a.domande.map(q => ({...q, o:[...(q.o||[])]}));
+    if (a && incassoSell === null)
+      incassoSell = ['ln', 'onchain'].includes(a.incasso) ? a.incasso : '';
   } catch(e) {}
-  renderDomandeForm();
+  renderDomandeForm(); renderIncassoForm();
 }
 /* Il campo costo (e la taglia) esistono solo se l'annuncio spedisce;
    il codice online mostra il suo hint operativo (consegna in
@@ -53049,6 +53169,9 @@ function aggiornaHintPolitiche(){
       metti tu. Cambia nel Profilo ›
       <span style="white-space:nowrap">🚚&nbsp;Spedizione gratis</span>.`;
   }
+  /* (9 nov 2026, incasso-annuncio) «sotto il minimo del cambio» col
+     prezzo nuovo: nello stesso momento di quiete, mai sotto le dita */
+  renderIncassoForm();
 }
 function aggiornaConsegnaForm(){
   /* IL SERVIZIO SPEGNE LE ALTRE TRE, ed e' l'unica riga che serve
@@ -53436,6 +53559,7 @@ function annullaModifica(){
   aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
   domandeSell = []; renderDomandeForm();
+  incassoSell = ''; renderIncassoForm();
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
   precompilaSpedStd(true);   // il form rinasce: col costo standard, se c'e'
@@ -54448,7 +54572,7 @@ async function publish(){
   /* il prezzo nel payload parla la valuta scelta dal venditore */
   const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
   let nuovoId, inRevisione = false, attesaOre = 24, avvisoFotoTesto = '';
-  const cns = {...consegnaPayload(), ...domandePayload()};
+  const cns = {...consegnaPayload(), ...domandePayload(), ...incassoPayload()};
   const asta = astaForm();   /* null = vendita normale */
   if (DEMO) {
     nuovoId = Date.now();
@@ -54539,6 +54663,7 @@ async function publish(){
   aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
   domandeSell = []; renderDomandeForm();
+  incassoSell = ''; renderIncassoForm();
   impostaSellValuta('sats');
   /* il duplicato si spegne qui: senza, rientrando in Vendi si
      ritroverebbe il banner «stai duplicando» sopra un form vuoto —
@@ -54582,7 +54707,7 @@ async function salvaModifica(t, p){
      tutto la congelerebbe. */
   const ripristina = bottoneInAttesa(el('sellSubmit'), 'Salvo le modifiche…');
   try {
-  const cns = {...consegnaPayload(), ...domandePayload()};
+  const cns = {...consegnaPayload(), ...domandePayload(), ...incassoPayload()};
   let avvisoFotoTesto = '';
   if (DEMO) {
     const l = listings.find(x=>x.id===id) || myListings.find(x=>x.id===id);
@@ -58055,16 +58180,22 @@ function onchainBloccoIncasso(miaXpub){
    la vendita arriva on-chain: per questo il wallet qui sotto serve
    anche a chi riceve in Lightning. Si vede solo a leva accesa. */
 let onchainEsempioCambio = null;
-const ONCHAIN_MODI_TESTI = {onchain: '⛓️ Sempre on-chain', lightning: '⚡ Sempre Lightning',
-                            ogni_volta: '🤔 Scelgo ogni volta'};
+/* (9 nov 2026, incasso-annuncio) «Quando ti pagano on-chain, ricevi
+   in…»: la stessa scelta a tre della riga Lightning, con le monete del
+   Cambio (mai le catenine) */
+/* funzione e non costante: le monete nascono più in basso nel file */
+const ONCHAIN_MODI_TESTI = () => ({onchain: P2P_OC_MONETA + '<span class="nw">On-chain</span>', lightning: P2P_LN_MONETA + 'Lightning',
+                            ogni_volta: '<span>🤔</span><span class="nw">Ogni volta</span>'});
 function onchainModoBlocco(){
   if (!myOnchainLn || !myOnchainLn.attivo) return '';
   const modo = myOnchainLn.modo || 'onchain';
-  const pillole = Object.keys(ONCHAIN_MODI_TESTI).map(m =>
-    `<button type="button" class="consegna-pill${m === modo ? ' attiva' : ''}" onclick="onchainModoScegli(this, '${m}')">${ONCHAIN_MODI_TESTI[m]}</button>`).join('');
-  if (modo === 'onchain') return `<div class="payout"><h4>Come ricevi quando vendi on-chain</h4>
-    <div class="consegna-scelta">${pillole}</div>
-    <div class="hint">I sats arrivano dove hai scelto qui sopra.</div></div>`;
+  const pillole = `<div class="scelta-incasso scelta-auto scelta-tre" role="radiogroup" aria-label="Quando ti pagano on-chain, ricevi in">`
+    + Object.entries(ONCHAIN_MODI_TESTI()).map(([m, testo]) =>
+    `<button type="button" role="radio" aria-checked="${m === modo}" class="${m === modo ? 'on' : ''}" onclick="onchainModoScegli(this, '${m}')">${testo}</button>`).join('')
+    + `</div>`;
+  if (modo === 'onchain') return `<div class="payout"><h4>Quando ti pagano on-chain, ricevi in</h4>
+    ${pillole}
+    <div class="hint">I bitcoin arrivano dove hai scelto qui sopra. Su ogni annuncio puoi sceglierlo anche solo per quell'oggetto.</div></div>`;
   if (!onchainEsempioCambio) onchainEsempioCarica();
   const e = onchainEsempioCambio || {};
   const nome = esc(e.fornitore_nome || myOnchainLn.fornitore || 'SATS Routing');
@@ -58078,8 +58209,8 @@ function onchainModoBlocco(){
     ? (myLnAddress ? 'Quando chi compra conferma di averlo ricevuto, la richiesta la prendiamo dal tuo Lightning address: tu vedi il costo e confermi.'
                    : 'Quando chi compra conferma di averlo ricevuto, incolli la richiesta del tuo wallet Lightning, vedi il costo e confermi.')
     : 'Quando chi compra conferma di averlo ricevuto, scegli nell\'ordine se ricevere on-chain o in Lightning.';
-  return `<div class="payout"><h4>Come ricevi quando vendi on-chain</h4>
-    <div class="consegna-scelta">${pillole}</div>
+  return `<div class="payout"><h4>Quando ti pagano on-chain, ricevi in</h4>
+    ${pillole}
     <div class="hint">${esempio}</div>
     <div class="hint" style="margin-top:6px">⚠️ <b>Il tuo wallet Lightning deve avere la capienza</b> per ricevere la cifra intera.
       ${minimo ? `Sotto i ${fmt(minimo)} sats il cambio non si fa: quella vendita arriva on-chain, dove hai scelto qui sopra.` : ''}</div>
@@ -58126,8 +58257,10 @@ function renderIncassoOnchainProfilo(){
          Chi compra può pagarti on-chain lo stesso: i sats restano al sicuro
          nel 2-di-3 ed escono appena scegli. Non finiscono mai in un conto di Barattolo.</div>`)
     + onchainModuloIncasso('ocProf')
-    + `<button class="btn link" style="margin-top:4px" onclick="onchainApriIncassi()">Dettagli nella pagina On-chain ›</button></div>`
-    + onchainModoBlocco();
+    + `<button class="btn link" style="margin-top:4px" onclick="onchainApriIncassi()">Dettagli nella pagina On-chain ›</button></div>`;
+  /* (9 nov 2026, incasso-annuncio) «quando ti pagano on-chain» ha il suo
+     posto, sotto la riga Lightning */
+  if (el('onchainModoProfilo')) el('onchainModoProfilo').innerHTML = onchainModoBlocco();
 }
 
 /* ============ IL WALLET DI BARATTOLO NEL PROFILO (29 ott 2026,
