@@ -9,8 +9,9 @@
 # container USCISSE: questa e' la quinta domanda, e la fa dal namespace
 # di mostro, cioe' dal punto di vista di chi deve uscire.
 # Tre giudici, dal piu' vero al piu' fine:
-#   1) check.torproject.org dal namespace di mostro: 000 = non esce;
-#      IsTor false = esce IN CHIARO (peggio);
+#   1) check.torproject.org dal namespace di mostro: 000 = non esce (due
+#      volte, a 30 s: un circuito lento non e' un guasto, 9 nov 2026);
+#      IsTor false = esce IN CHIARO (peggio, e non si riprova);
 #   2) MOSTRO DENTRO MOSTRO-NET (22 set 2026): il sidecar del 15 set non
 #      c'e' piu' (le regole stanno in tor-entrypoint.sh, nel namespace di
 #      tor stesso), ma il namespace PRESTATO che resta e' quello di
@@ -60,17 +61,32 @@ if [ -z "$SM" ]; then
 elif [ "$SM" != running ]; then
   a+=("mostro e' FERMO (stato: $SM): il coordinator non risponde; uscita e namespace non misurati, perche' non c'e' niente da misurare")
 else
-  # 1) la curl dal namespace di mostro: la sola prova end-to-end
-  RISP=$(docker run --rm --pull never --network "container:$M" "$IMG" \
-           -s -m 60 -w '\n%{http_code}' https://check.torproject.org/api/ip 2>/dev/null)
+  # 1) la curl dal namespace di mostro: la sola prova end-to-end.
+  # LA SECONDA PROVA (9 nov 2026): alle 09:20 di quel giorno la ronda ha
+  # suonato «000» e venti minuti dopo, a mano, tutto rispondeva 200 con
+  # le regole al loro posto: un circuito Tor lento oltre il minuto, non
+  # un guasto (2 allarmi cosi' in 8 giorni). Un codice diverso da 200 si
+  # riprova UNA volta dopo una pausa, e il quadro lo dice («al secondo
+  # tentativo»), cosi' --prova e il journal tengono il conto dei buchi.
+  # IsTor non true NON si riprova mai: uscire in chiaro anche una volta
+  # e' gia' l'allarme, e una seconda curl in chiaro non lo cancella.
+  curl_tor() { docker run --rm --pull never --network "container:$M" "$IMG" \
+                 -s -m 60 -w '\n%{http_code}' https://check.torproject.org/api/ip 2>/dev/null; }
+  RISP=$(curl_tor); PRIMO=''
   CODICE=$(printf '%s' "$RISP" | tail -n 1)
+  if [ "$CODICE" != "200" ]; then
+    PRIMO=${CODICE:-nulla}
+    sleep "${PAUSA:-30}"
+    RISP=$(curl_tor)
+    CODICE=$(printf '%s' "$RISP" | tail -n 1)
+  fi
   CORPO=$(printf '%s' "$RISP" | sed '$d')
   if [ "$CODICE" != "200" ]; then
-    a+=("mostro NON ESCE: check.torproject.org risponde ${CODICE:-nulla} dal container $M")
+    a+=("mostro NON ESCE: check.torproject.org risponde ${CODICE:-nulla} dal container $M (anche al secondo tentativo; il primo: $PRIMO)")
   elif ! printf '%s' "$CORPO" | grep -q '"IsTor":true'; then
     a+=("mostro esce IN CHIARO: IsTor non e' true ($CORPO)")
   else
-    q+=("esce da Tor ($(printf '%s' "$CORPO" | grep -o '"IP":"[^"]*"' | cut -d'"' -f4))")
+    q+=("esce da Tor ($(printf '%s' "$CORPO" | grep -o '"IP":"[^"]*"' | cut -d'"' -f4))${PRIMO:+ al secondo tentativo (il primo: $PRIMO)}")
   fi
 
   # 2) mostro dentro mostro-net, con l'IP giusto e tor come gateway

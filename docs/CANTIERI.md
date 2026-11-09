@@ -78506,3 +78506,54 @@ conferma. Il cartone ha `/cartone/tariffa` e `/cartone/conferma_spesa`.
 **DA GUARDARE** dopo la promozione: il ritiro fermo del 6 nov
 (06e59d87…9b4e), se non è ancora confermato, il server lo rilancia da
 solo allo scalino del momento (è nei sette giorni, `confermato` 0).
+
+## La ronda tor riprova una volta prima di suonare (9 nov 2026, allarme delle 09:20, «si» di Andrea)
+
+**IL FATTO.** Alle 09:20 UTC la ronda ha suonato «mostro NON ESCE:
+check.torproject.org risponde 000», con gli altri tre giudici sani
+(namespace, IP, gateway, DROP). Letto a mano mezz'ora dopo, in sola
+lettura: tor su da 7 giorni e agganciato (consenso scaricato ogni 6 ore,
+LND esce dal SOCKS), le tre REDIRECT nel nat di tor al loro posto,
+`ip_forward` a 1, dal namespace di mostro 200 su check.torproject.org e
+su 1.1.1.1, e la ronda rifatta «tor ok, esce da Tor». Niente riavvii.
+Causa piu' probabile: il circuito di quella curl non ha risposto entro
+il minuto. Nel journal di `nodo-tor.service`, 2 allarmi cosi' in 8
+giorni. Il ponte WireGuard del 2 nov non c'entra: la sua riga in
+DOCKER-USER prende solo `-i wg0`.
+
+**LA SCELTA.** Un codice diverso da 200 si riprova UNA volta, dopo
+`PAUSA` (30 s di serie), e solo se anche la seconda fallisce si suona,
+col primo codice nel testo. Se la seconda passa, la ronda tace ma il
+quadro (`--prova`, journal) dice «al secondo tentativo (il primo:
+000)»: i buchi si contano ancora, non spariscono. IsTor non true NON si
+riprova mai: uscire in chiaro una volta e' gia' l'allarme. Il tempo
+peggiore sale da 60 a 150 s, e il servizio e' oneshot senza tetto.
+
+**SCARTATE.** Allungare il `-m 60`: un circuito morto resta morto, si
+aspetta solo di piu'. Due curl in parallelo: rischiano lo stesso
+circuito, e non dicono quale ha risposto. Un secondo sito di prova: il
+giudice deve dire «esce da Tor», e lo dice solo check.torproject.org.
+Nota onesta: tor tiene un circuito per circa 10 minuti, quindi la
+seconda curl a 30 s puo' finire sullo stesso; se il primo era morto in
+costruzione, la seconda ne costruisce un altro.
+
+**PROVATO.** Banco con `docker`, `readlink`, `nsenter` finti (non nel
+repo, come il 22 set), la nuova contro la vecchia di origin/develop:
+sano (tace, una curl), 000 poi 200 (la nuova tace e lo scrive nel
+quadro, la vecchia suona), lo stesso con `--prova`, 000 e 000 (tutte e
+due suonano, la nuova col primo codice), in chiaro (tutte e due suonano
+subito), 000 poi in chiaro (la nuova dice IN CHIARO, la vecchia solo
+000). `bash -n` pulito.
+
+**NON PROVATO.** Sul nodo: l'installazione e' di Andrea, coi comandi di
+PRODUZIONE («MOSTRO DENTRO MOSTRO-NET», INSTALLAZIONE), copia di
+riserva `/root/ronda-tor.sh.prima-9nov`.
+
+**NOTATO E A PARTE.** Mostro dice da stamattina `wss://nos.lol` «relay
+not connected», e dal suo namespace https://nos.lol va in timeout a 40
+s mentre gli altri siti rispondono; dal PC di Andrea, senza Tor, nos.lol
+risponde 200. Primo «not connected» nel log il 3 nov 19:28 UTC, ultimo
+prezzo accettato da nos.lol il 6 nov 21:36 UTC: il guaio e' di nos.lol
+verso le uscite Tor, non nostro, e la scelta (lasciarlo o cambiarlo nel
+settings del nodo, a libro fermo) e' di Andrea. Gli altri due relay (relay.mostro.network e il
+nostro) accettano tutto.

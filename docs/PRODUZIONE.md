@@ -1075,7 +1075,10 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `nodo-tor.timer` (09:20 UTC, Persistent), copie in `deploy/nodo/`.
   Tre giudici dal namespace di mostro: la curl a check.torproject.org
   (allarme su codice diverso da 200 o `IsTor` non true — il secondo e'
-  il caso peggiore, esce in chiaro), MOSTRO DENTRO MOSTRO-NET (dal 22
+  il caso peggiore, esce in chiaro; dal 9 nov 2026 un codice diverso
+  da 200 si riprova UNA volta dopo 30 s, e il quadro scrive «al secondo
+  tentativo (il primo: 000)»: un circuito lento non e' un guasto, IsTor
+  falso invece suona subito), MOSTRO DENTRO MOSTRO-NET (dal 22
   set 2026 al posto del giudice del sidecar, che non tornera'), e il
   DROP del FORWARD nel namespace vivo
   di tor, letto con l'iptables DI TOR via `docker exec` (ripiego nsenter
