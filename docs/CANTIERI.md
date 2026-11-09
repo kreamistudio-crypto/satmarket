@@ -78623,3 +78623,44 @@ PROVATO. `collaudo_onchain_ordine` (+1, server vero: l'avviso a chi vende
 una volta sola su due controlli, le parole, niente «Hai venduto», niente
 a chi compra). **DA GUARDARE** alla prossima prova on-chain in
 produzione: l'avviso arriva a chi vende entro due minuti dal pagamento.
+
+## La disputa dopo una richiesta di annullo (9 nov 2026, dal campo, segnalato da Andrea)
+
+**IL CASO.** Nel P2P chi vendeva ha bloccato i sats in garanzia e poi
+ha chiesto di annullare; chi comprava non era d'accordo e ha mandato gli
+euro. Da quel momento la sua pagina mostrava SOLO «🤝 Accetta di
+annullare»: niente «Ho inviato gli euro», niente «⚠️ Apri una
+disputa». L'unica strada era accettare, cioè ridare i sats a chi aveva
+già gli euro.
+
+**IL PERCHÉ.** La richiesta di annullo porta la riga negli stati di casa
+`annullo_chiesto`/`annullo_proposto`, che NON stavano in
+`P2P_DISPUTABILI`, e `azioniDisponibili` non dava il bottone degli euro
+fuori da `attivo`. Ma per il coordinatore quegli stati non esistono:
+letto sul sorgente di mostrod v0.20.2, la prima richiesta
+(`cancel_cooperative_execution_step_1`) scrive solo
+`cancel_initiator_pubkey` e lascia l'ordine `active` (o `fiat-sent`);
+`dispute.rs` accetta proprio `Active | FiatSent`, `fiat_sent.rs` vuole
+`Active`. Le patch `-bar9` non toccano quei cancelli. La vecchia prova
+(«chi ha davanti una proposta di annullo ha una cosa sola da fare,
+dire di sì») è EMENDATA: era giusta sul non richiederlo a sua volta,
+sbagliata sul resto.
+
+**COSA CAMBIA.** `annullo_chiesto` e `annullo_proposto` entrano in
+`P2P_DISPUTABILI`: la disputa c'è per tutt'e due (e il riquadro del
+contanti resta vivo). Chi compra con la proposta davanti ritrova «Ho
+inviato gli euro» quando il recapito è arrivato, tranne se la proposta
+è caduta a euro già segnati: `avanzaOrdineP2P` scrive `primaAnnullo`
+(lo stato da cui è partita la richiesta) e lo toglie appena si esce.
+Detto «ho pagato», il coordinatore manda `fiat-sent-ok` a tutt'e due e
+chi vende passa a «Libera i sats» come sempre. La frase dello stato,
+a chi compra: «Non sei obbligato: se hai già inviato gli euro non
+accettare, dillo qui sotto o apri una disputa».
+
+**PROVATO.** `prove_annullo_in_disputa`, punto 10 (il caso del campo,
+senza recapito, a euro già segnati, dopo «ho pagato», la disputa che si
+porta la nota). NON provato dal vivo coi due telefoni.
+
+**STRADE SCARTATE.** Togliere gli stati `annullo_*` e tenere la
+richiesta come nota anche fuori dalla disputa: diff grande, tocca
+archivio, restore e gruppi; il bisogno era il bottone.
