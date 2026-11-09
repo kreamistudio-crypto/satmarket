@@ -153051,12 +153051,34 @@ def prove_banco_chiavi_onchain():
     # (29 ott 2026, parole-uniche) il cassetto si chiama «🔑 Il wallet di
     # Barattolo», si accende col cancello dell'on-chain O con quello del
     # cambio, e tiene la chiave sopra e le parole sotto il campo di prima
-    prova("«🔑 Il wallet di Barattolo» nel Profilo, col cancello dell'on-chain o del "
-          "cambio e mai in DEMO, col campo dentro e la voce in «Completa il profilo»",
+    # (9 nov 2026, nome-onchain) il cassetto si chiama «₿ On-chain» e
+    # tiene tutto l'on-chain: dove ricevi in cima, le due scelte di come
+    # ricevi (anche quella dello swap automatico, che stava in «Lightning
+    # address»), in fondo la chiave e le parole
+    _lnaddr = mini[mini.index('<div class="acc" id="accLnAddress">'):mini.index('<div class="acc" id="accOnchainIncasso"')]
+    _testa = mini[mini.index('<button class="acc-h" onclick="toggleAcc(\'accOnchainIncasso\')">'):]
+    _testa = _testa[:_testa.index("</button>")]
+    _dove = pezzo_js(mini, "function renderIncassoOnchainProfilo(){", "\n}\n")
+    _wb = pezzo_js(mini, "async function renderWalletBarattolo(){", "\n}\n")
+    _utente = [r for r in mini.splitlines()
+               if "Il wallet di Barattolo" in r and not r.lstrip().startswith(("/*", "*", "//", "<!--"))
+               and "«Il wallet di Barattolo» non diceva" not in r]
+    prova("(9 nov) la voce «On-chain» con la moneta ₿, lo swap automatico dentro, "
+          "dove ricevi prima della scelta, la chiave in fondo, nessun testo col nome vecchio",
+          [True, True, False, True, True, True, []],
+          [_testa.endswith("</span></span>On-chain<span class=\"fr\">▾</span>"),
+           "cambio-moneta btc p2p-oc-moneta" in _testa,
+           "swapAutoBlocco" in _lnaddr,
+           _dove.index("<h4>Dove ricevi i bitcoin</h4>") < _dove.index("onchainModoBlocco()"),
+           "box.innerHTML = `<div id=\"walletUnico\"></div>`;" in _wb,
+           _wb.index("<h4>La tua chiave</h4>") < _wb.index("<h4>Le 12 parole</h4>"),
+           _utente])
+    prova("«₿ On-chain» nel Profilo, col cancello dell'on-chain, del cambio o dello "
+          "swap automatico e mai in DEMO, col campo dentro e la voce in «Completa il profilo»",
           [True, True, True, True],
-          ["el('accOnchainIncasso').style.display = ((myOnchain || swapAcceso()) && !DEMO) ? '' : 'none';" in mini,
+          ["el('accOnchainIncasso').style.display = ((myOnchain || swapAcceso() || swapAutoAcceso()) && !DEMO) ? '' : 'none';" in mini,
            '<div class="acc-b"><div id="walletBarattolo"></div><div id="onchainIncassoProfilo"></div>'
-           '<div id="walletParole"></div></div>' in mini,
+           '<div id="swapAutoBlocco"></div><div id="walletParole"></div></div>' in mini,
            "onchainModuloIncasso('ocProf')" in mini,
            "acc:'accOnchainIncasso'});" in pezzo_js(mini, "function renderChecklist(){", "\n}\n")])
     prova("...e la porta alla scheda Impostazioni resta, per i dettagli",
@@ -156540,9 +156562,9 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
           "l'on-chain acceso",
           (True, True),
           ("a.onchain && typeof myOnchain !== 'undefined' && myOnchain" in _auto,
-           "onclick=\"apriCassettoProfilo('accOnchainIncasso')\">${a.indirizzo ? "
-           "'Cambia dove ricevi on-chain ›' : 'Scegli dove ricevere: xpub o "
-           "indirizzo ›'}" in _auto))
+           "onclick=\"onchainVaiAlCampo()\">${a.indirizzo ? "
+           "'Cambia dove ricevi ↑' : 'Scegli dove ricevere: xpub o "
+           "indirizzo ↑'}" in _auto))
 
 
 def prove_incasso_esterno_onchain():
@@ -185960,7 +185982,7 @@ def prove_deposito_ln_p2p():
            js.count("depositoPaga: n => `Pay this request from your Lightning wallet")))
     corpo = pezzo_js(mini, "function corpoDepositoLnOnchainP2P(o){", "\n}\n")
     prova("il foglio dice prima che un annullo o un rimborso tornano ON-CHAIN", True,
-          "tornano <b>on-chain</b> al tuo wallet di Barattolo, non in Lightning" in corpo)
+          "tornano al tuo wallet <b>on-chain</b>, non in Lightning" in corpo)
     prova("il giro vero sta nella gabbia e nella CI", (True, True),
           ("\ncollaudo_deposito_ln_p2p\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
            "\ncollaudo_deposito_ln_p2p.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
@@ -186128,7 +186150,11 @@ console.log(JSON.stringify(fuori));
            ".cambio-cifra{font-size:20px}" in mini[mini.index("@media (max-width:350px){\n    .cambio-lato{gap:8px"):][:200]))
     prova("...il sottotitolo del Cambio dice «bitcoin on-chain» (Andrea), mai spezzato",
           [1, 1, 2], [frasi.count(a) for a in ammesse] + [testi.count("on-\\u2060chain")])
-    trovate = sorted({p for f in frasi if f not in ammesse for p in vietate if p in f.lower()})
+    # (9 nov 2026, nome-onchain) «On-chain» fra virgolette e' il NOME della
+    # voce del Profilo dove stanno le parole, non una parola tecnica della
+    # frase: si guarda il resto
+    trovate = sorted({p for f in frasi if f not in ammesse for p in vietate
+                      if p in f.replace("«On-chain»", "").lower()})
     prova("nelle frasi della pagina e del telefono nessuna parola tecnica "
           "(swap, HTLC, RGB, fornitore, lockup, on-chain)", ([], True),
           (trovate, len(frasi) > 150))
@@ -186181,7 +186207,7 @@ console.log(JSON.stringify(fuori));
            "Qui non c\\'è una copia: scrivile tu." in it,
            it[it.index("paroleRegole: ["):it.index("],", it.index("paroleRegole: ["))].count("',") + 1,
            "paroleNessuno" in t3,
-           "'Le ritrovi nel Profilo, in «Il wallet di Barattolo».'" in it))
+           "'Le ritrovi nel Profilo, in «On-chain».'" in it))
     avanti = js[js.index("async function swapAvantiDentro(n){"):js.index("/* «Continua» delle parole")]
     prova("...e solo dove serve: il passo «parole» c'e' solo con le parole "
           "senza copia fuori e non ancora copiate, sennò lo swap parte subito",

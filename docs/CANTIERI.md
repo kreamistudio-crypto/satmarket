@@ -78623,3 +78623,42 @@ PROVATO. `collaudo_onchain_ordine` (+1, server vero: l'avviso a chi vende
 una volta sola su due controlli, le parole, niente «Hai venduto», niente
 a chi compra). **DA GUARDARE** alla prossima prova on-chain in
 produzione: l'avviso arriva a chi vende entro due minuti dal pagamento.
+
+## La voce «₿ On-chain» al posto di «Il wallet di Barattolo» (9 nov 2026, cantiere nome-onchain, Andrea: «chi vuole ricevere onchain cosa deve compilare? è confusionario»)
+
+PERCHÉ. Nel Profilo, «Incassi e pagamenti», l'on-chain stava in due
+posti: la scelta «Quando vendi in Lightning, ricevi» (lo swap automatico)
+dentro «⚡ Lightning address», e «dove ricevi», la chiave e le 12 parole
+dentro «🔑 Il wallet di Barattolo», un nome che non diceva a cosa serve.
+Andrea: «mettiamo onchain al posto di wallet barattolo»; sulla carta ha
+scelto la voce unica riordinata (non il solo cambio di nome).
+
+COSA SI È DECISO. Il cassetto (id `accOnchainIncasso`, invariato: lo
+aprono «Completa il profilo» e gli ordini) si chiama «On-chain», con la
+moneta ₿ arancio del Cambio (mai ⛓️, decisione del 2 nov). Dentro,
+nell'ordine in cui serve: gli avvisi del wallet (backup, due wallet),
+«Dove ricevi i bitcoin» (l'unica cosa da compilare, col suo titolo), la
+scelta «Come ricevi quando vendi on-chain» (a leva accesa), «Quando vendi
+in Lightning, ricevi» (spostata qui), in fondo «La tua chiave» e «Le 12
+parole». Il cassetto si accende anche con lo swap automatico da solo
+(`swapAutoAcceso()`), perché la sua scelta adesso vive qui. Il tasto
+dello swap automatico che portava al campo («Scegli dove ricevere ›»)
+ora scorre al campo qui sopra (`onchainVaiAlCampo`). I testi che
+indicavano «Profilo → Il wallet di Barattolo» (telefono e instradatore,
+anche in inglese) dicono «On-chain»; dove il nome era il concetto si
+dice «il tuo wallet on-chain», e nel Cambio solo «il tuo wallet» (la
+regola delle parole tecniche della pagina: «On-chain» fra virgolette è
+il nome della voce, la prova lo toglie prima di guardare).
+
+SCARTATI. Il solo cambio di nome (lasciava la scelta dello swap dentro
+«Lightning address»). Un cassetto nuovo per lo swap (tre posti invece di
+due).
+
+PROVATO. `prove_banco_chiavi_onchain` (+1: nome e moneta, swap dentro e
+non più in «Lightning address», dove ricevi prima della scelta, la
+chiave in fondo, nessun testo per l'utente col nome vecchio),
+`prove_grafica_swap`, `prove_parole_uniche`, `prove_swap_auto_schermate`,
+`prove_deposito_ln_p2p`; anteprima dal vivo (banco con on-chain e swap
+automatico accesi, chiaro e scuro) mandata ad Andrea. DA GUARDARE dopo
+la promozione: la voce sul telefono di un admin (oggi la vedono solo
+gli admin, come prima).

@@ -10289,7 +10289,7 @@
   .cambio-barrette i{width:22px;height:4px;border-radius:2px;background:var(--line)}
   .cambio-barrette i.fatto{background:var(--trust)}
   /* (29 ott 2026, cantiere parole-uniche) la riga chiusa delle parole e
-     del recupero e' passata al Profilo, «Il wallet di Barattolo»: in
+     del recupero e' passata al Profilo, «On-chain»: in
      fondo alla pagina «Cambio» resta la porta, col disegno della chiave */
   .cambio-al-profilo{display:flex;align-items:center;justify-content:center;gap:6px;
     margin-top:24px;font-size:13px;font-weight:700;color:var(--ink-soft)}
@@ -14642,10 +14642,7 @@ document.getElementById('cartello')?.remove();</script>
            Lightning anche lui. -->
       <div class="acc" id="accLnAddress">
         <button class="acc-h" onclick="toggleAcc('accLnAddress')"><span class="em">⚡</span>Lightning address<span class="fr">▾</span></button>
-        <div class="acc-b"><div id="lnAddrBlocco"></div>
-          <!-- ₿ (2 nov 2026, swap-auto) «Quando vendi in Lightning, ricevi»:
-               la riempie renderSwapAutoProfilo, vuota a leva spenta -->
-          <div id="swapAutoBlocco"></div></div>
+        <div class="acc-b"><div id="lnAddrBlocco"></div></div>
       </div>
 
       <!-- 🔑 IL WALLET DI BARATTOLO (29 ott 2026, cantiere parole-uniche,
@@ -14669,10 +14666,19 @@ document.getElementById('cartello')?.remove();</script>
            bene e se non è già stato usato, o xpub»): la voce di
            «Completa il profilo» apre questo. La scelta resta una sola,
            firmata dal seme, la stessa della scheda Impostazioni. Si
-           accende col CANCELLO (`myOnchain`), come il resto dell'on-chain. -->
+           accende col CANCELLO (`myOnchain`), come il resto dell'on-chain.
+           ₿ LA VOCE UNICA «On-chain» (9 nov 2026, cantiere nome-onchain,
+           Andrea: «chi vuole ricevere onchain cosa deve compilare? è
+           confusionario»). Il nome «Il wallet di Barattolo» non diceva
+           niente, e l'on-chain stava in due posti: la scelta «Quando vendi
+           in Lightning, ricevi» era dentro «Lightning address». Ora tutto
+           qui, nell'ordine in cui serve: in cima gli avvisi del wallet
+           (backup, due wallet), poi DOVE RICEVI (l'unica cosa da compilare),
+           poi le due scelte di come ricevi, in fondo la chiave e le 12
+           parole. La moneta è quella del Cambio (P2P_OC_MONETA), mai ⛓️. -->
       <div class="acc" id="accOnchainIncasso" style="display:none">
-        <button class="acc-h" onclick="toggleAcc('accOnchainIncasso')"><span class="em">🔑</span>Il wallet di Barattolo<span class="fr">▾</span></button>
-        <div class="acc-b"><div id="walletBarattolo"></div><div id="onchainIncassoProfilo"></div><div id="walletParole"></div></div>
+        <button class="acc-h" onclick="toggleAcc('accOnchainIncasso')"><span class="em"><span class="cambio-moneta btc p2p-oc-moneta" aria-hidden="true"><svg class="cambio-svg" viewBox="0 0 24 24"><g transform="rotate(13 12 12)"><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g></svg></span></span>On-chain<span class="fr">▾</span></button>
+        <div class="acc-b"><div id="walletBarattolo"></div><div id="onchainIncassoProfilo"></div><div id="swapAutoBlocco"></div><div id="walletParole"></div></div>
       </div>
 
       <div class="acc" id="accNwc">
@@ -19179,7 +19185,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '1152bdcc8c';
+const SWAP_TELEFONO_VER = 'e012c1f263';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -19405,17 +19411,26 @@ function renderSwapAutoProfilo(){
       ? 'Arrivano al <b>tuo wallet on-chain</b>, a un indirizzo nuovo per ogni vendita.'
       : `Arrivano a <span class="mono" style="word-break:break-all">${esc(a.indirizzo)}</span>.`)
     : 'L\'indirizzo lo scrivi quando confermi.';
-  box.innerHTML = `<div class="section-label" style="margin-top:16px">Quando vendi in Lightning, ricevi</div>
+  /* (9 nov 2026, nome-onchain) sta nella voce «On-chain», sotto «Dove
+     ricevi i bitcoin»: prima era dentro «Lightning address» */
+  box.innerHTML = `<div class="payout"><h4>Quando vendi in Lightning, ricevi</h4>
     <div class="scelta-incasso scelta-auto" role="radiogroup" aria-label="Come ricevi quando vendi in Lightning">
       ${tasto(!a.onchain, 'false', P2P_LN_MONETA + 'Lightning')}${tasto(!!a.onchain, 'true', P2P_OC_MONETA + 'On-chain')}</div>
     <div style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">${a.onchain
       ? `Alla conferma dell'acquirente apri l'ordine e premi <b>«Conferma»</b>: Barattolo cambia i sats in bitcoin con ${esc(a.fornitore || 'SATS Routing')}. ${dove}
          Il costo del cambio lo vedi prima. Sotto i ${fmt(a.minimo || 0)} sats ricevi in Lightning.`
-      : 'Ricevi in Lightning: al Lightning address qui sopra, o con una fattura nell\'ordine.'}</div>${a.onchain && typeof myOnchain !== 'undefined' && myOnchain
+      : 'Ricevi in Lightning: al tuo Lightning address, o con una fattura nell\'ordine.'}</div>${a.onchain && typeof myOnchain !== 'undefined' && myOnchain
       /* (3 nov 2026, Andrea: «dovrebbe chiedere la xpub») il campo e' UNO,
-         quello dell'on-chain nel cassetto del wallet: qui la porta */
-      ? `<button type="button" class="btn link" style="margin-top:4px" onclick="apriCassettoProfilo('accOnchainIncasso')">${a.indirizzo ? 'Cambia dove ricevi on-chain ›' : 'Scegli dove ricevere: xpub o indirizzo ›'}</button>`
-      : ''}`;
+         quello di «Dove ricevi i bitcoin»; dal 9 nov sta nella stessa
+         voce, qui sopra: il tasto ci riporta il dito */
+      ? `<button type="button" class="btn link" style="margin-top:4px" onclick="onchainVaiAlCampo()">${a.indirizzo ? 'Cambia dove ricevi ↑' : 'Scegli dove ricevere: xpub o indirizzo ↑'}</button>`
+      : ''}</div>`;
+}
+function onchainVaiAlCampo(){
+  const c = el('ocProfValore');
+  if (!c) return;
+  c.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'center'});
+  c.focus({preventScroll: true});
 }
 async function scegliSwapAutoProfilo(onchain){
   haptic();
@@ -56764,9 +56779,9 @@ async function onchainImpronta(parole){
 }
 /* l'errore di chi ha gia' un wallet altrove: il messaggio e' per l'utente */
 function walletAltrove(impronta){
-  const e = new Error('Il tuo wallet di Barattolo è già nato su un altro '
-    + 'dispositivo. Per usarlo anche qui apri Profilo → «Il wallet di '
-    + 'Barattolo» e incolla le sue 12 parole.');
+  const e = new Error('Il tuo wallet on-chain è già nato su un altro '
+    + 'dispositivo. Per usarlo anche qui apri Profilo → «On-chain» '
+    + 'e incolla le sue 12 parole.');
   e.tipo = 'altrove';
   e.impronta = String(impronta || '');
   return e;
@@ -56897,7 +56912,7 @@ function walletPillolaMostra(){
   p.id = 'walletPillola';
   p.className = 'wallet-pillola';
   p.setAttribute('role', 'status');
-  p.innerHTML = `<button type="button" class="wallet-pillola-vai" onclick="walletPillolaApri()">⚠️ Il wallet di Barattolo non ha un backup <b>Sistema ›</b></button>`
+  p.innerHTML = `<button type="button" class="wallet-pillola-vai" onclick="walletPillolaApri()">⚠️ Il tuo wallet on-chain non ha un backup <b>Sistema ›</b></button>`
     + `<button type="button" class="wallet-pillola-x" aria-label="Chiudi" onclick="walletPillolaVia()">✕</button>`;
   document.body.appendChild(p);
 }
@@ -57480,8 +57495,8 @@ async function onchainBackupObbligatorio(parole){
   }
   if (walletCopieLette(imp)[casa]) return;
   throw new Error(casa === 'nuvola'
-    ? 'Prima salva le parole del wallet di Barattolo nel cloud di Telegram: senza una copia fuori dal telefono l\'on-chain non parte. Riprova fra un momento.'
-    : 'Prima salva le parole del wallet di Barattolo sui relay Nostr, cifrate con la tua chiave: senza una copia fuori dal telefono l\'on-chain non parte. Apri Profilo → «Il wallet di Barattolo» → «Salva il backup».');
+    ? 'Prima salva le 12 parole del tuo wallet on-chain nel cloud di Telegram: senza una copia fuori dal telefono l\'on-chain non parte. Riprova fra un momento.'
+    : 'Prima salva le 12 parole del tuo wallet on-chain sui relay Nostr, cifrate con la tua chiave: senza una copia fuori dal telefono l\'on-chain non parte. Apri Profilo → «On-chain» → «Salva il backup».');
 }
 
 function walletServerMuto(){
@@ -58049,7 +58064,7 @@ function onchainModoBlocco(){
     `<button type="button" class="consegna-pill${m === modo ? ' attiva' : ''}" onclick="onchainModoScegli(this, '${m}')">${ONCHAIN_MODI_TESTI[m]}</button>`).join('');
   if (modo === 'onchain') return `<div class="payout"><h4>Come ricevi quando vendi on-chain</h4>
     <div class="consegna-scelta">${pillole}</div>
-    <div class="hint">I sats arrivano al tuo wallet on-chain, quello qui sotto.</div></div>`;
+    <div class="hint">I sats arrivano dove hai scelto qui sopra.</div></div>`;
   if (!onchainEsempioCambio) onchainEsempioCarica();
   const e = onchainEsempioCambio || {};
   const nome = esc(e.fornitore_nome || myOnchainLn.fornitore || 'SATS Routing');
@@ -58067,7 +58082,7 @@ function onchainModoBlocco(){
     <div class="consegna-scelta">${pillole}</div>
     <div class="hint">${esempio}</div>
     <div class="hint" style="margin-top:6px">⚠️ <b>Il tuo wallet Lightning deve avere la capienza</b> per ricevere la cifra intera.
-      ${minimo ? `Sotto i ${fmt(minimo)} sats il cambio non si fa: quella vendita arriva on-chain, al wallet qui sotto.` : ''}</div>
+      ${minimo ? `Sotto i ${fmt(minimo)} sats il cambio non si fa: quella vendita arriva on-chain, dove hai scelto qui sopra.` : ''}</div>
     <div class="hint" style="margin-top:6px">${come}</div></div>`;
 }
 async function onchainEsempioCarica(){
@@ -58100,7 +58115,9 @@ async function onchainModoScegli(btn, modo){
 function renderIncassoOnchainProfilo(){
   const box = el('onchainIncassoProfilo');
   if (!box || !myOnchain || DEMO) return;
-  box.innerHTML = onchainModoBlocco() + (myOnchainIncasso
+  /* (9 nov 2026, nome-onchain) prima DOVE RICEVI, col suo titolo: e'
+     l'unica cosa da compilare; la scelta di come ricevi viene dopo */
+  box.innerHTML = `<div class="payout"><h4>Dove ricevi i bitcoin</h4>` + (myOnchainIncasso
     ? `<div class="hint" style="color:var(--ok);margin-top:10px"><b>✅ Ricevi nel tuo wallet</b>
          (${myOnchainIncasso === 'xpub' ? 'la chiave del conto: un indirizzo nuovo a ogni vendita' : 'un tuo indirizzo'}).
          Per cambiarlo, incolla qui sotto.
@@ -58109,12 +58126,13 @@ function renderIncassoOnchainProfilo(){
          Chi compra può pagarti on-chain lo stesso: i sats restano al sicuro
          nel 2-di-3 ed escono appena scegli. Non finiscono mai in un conto di Barattolo.</div>`)
     + onchainModuloIncasso('ocProf')
-    + `<button class="btn link" style="margin-top:4px" onclick="onchainApriIncassi()">Dettagli nella pagina On-chain ›</button>`;
+    + `<button class="btn link" style="margin-top:4px" onclick="onchainApriIncassi()">Dettagli nella pagina On-chain ›</button></div>`
+    + onchainModoBlocco();
 }
 
 /* ============ IL WALLET DI BARATTOLO NEL PROFILO (29 ott 2026,
    cantiere parole-uniche, idea di Alan, ok di Andrea) ============
-   Il cassetto «🔑 Il wallet di Barattolo» di «Incassi e pagamenti»: in
+   Il cassetto «₿ On-chain» (dal 9 nov; prima «il wallet di Barattolo») di «Incassi e pagamenti»: in
    cima la CHIAVE (la parte che entra nei 2-di-3, con le ultime otto
    lettere della sua metà pubblica), in mezzo dove ricevi on-chain (il
    blocco di prima, `renderIncassoOnchainProfilo`), in fondo le 12
@@ -58128,19 +58146,23 @@ function renderIncassoOnchainProfilo(){
 let walletParoleViste = false;
 function aggiornaCassettoWallet(){
   if (el('accOnchainIncasso'))
-    el('accOnchainIncasso').style.display = ((myOnchain || swapAcceso()) && !DEMO) ? '' : 'none';
+    el('accOnchainIncasso').style.display = ((myOnchain || swapAcceso() || swapAutoAcceso()) && !DEMO) ? '' : 'none';
 }
 async function renderWalletBarattolo(){
   const box = el('walletBarattolo'), sotto = el('walletParole');
   if (!box || !sotto || DEMO || !(myOnchain || swapAcceso())) return;
   const parole = onchainSemeLocale();
-  box.innerHTML = `<div id="walletUnico"></div><div class="payout"><h4>La tua chiave</h4>
+  /* (9 nov 2026, nome-onchain) in cima solo gli avvisi del wallet; la
+     chiave scende in fondo, accanto alle parole: prima viene «dove
+     ricevi», l'unica cosa da compilare */
+  box.innerHTML = `<div id="walletUnico"></div>`;
+  const cambi = swapAcceso() && typeof swapBloccoProfilo === 'function' ? swapBloccoProfilo() : '';
+  sotto.innerHTML = `<div class="payout"><h4>La tua chiave</h4>
     <div class="hint">La tieni solo tu, in questo telefono. Ogni ordine
       e ogni cambio ne usa una <b>nuova</b>.</div>
     <div class="hint" id="walletCoda" style="margin-top:6px">${parole ? ''
-      : 'Nasce da sola la prima volta che serve.'}</div></div>`;
-  const cambi = swapAcceso() && typeof swapBloccoProfilo === 'function' ? swapBloccoProfilo() : '';
-  sotto.innerHTML = `<div class="payout"><h4>Le 12 parole</h4>
+      : 'Nasce da sola la prima volta che serve.'}</div></div>
+    <div class="payout"><h4>Le 12 parole</h4>
     <div class="hint">Con queste riprendi i tuoi bitcoin da un altro
       telefono. Non darle a nessuno, nemmeno a noi.</div>
     ${walletParoleViste && parole
@@ -58196,8 +58218,8 @@ function walletUnicoBlocco(c){
   const campo = `<textarea id="walletIncolla" class="mono" rows="3" autocomplete="off"
       autocapitalize="off" spellcheck="false" placeholder="le 12 parole, separate da uno spazio"></textarea>
     <button class="btn orange" onclick="walletIncollaParole(this)">Usa queste parole</button>`;
-  const dove = `le trovi sul dispositivo dove è nato: Profilo → «Il wallet di
-      Barattolo» → «Mostra le 12 parole»`;
+  const dove = `le trovi sul dispositivo dove è nato: Profilo → «On-chain»
+      → «Mostra le 12 parole»`;
   if (c.stato === 'diverso') return `<div class="payout wallet-unico"><h4>Hai due wallet</h4>
     <div class="hint">Su questo dispositivo c'è un wallet diverso da quello
       principale del tuo account (il principale finisce in
@@ -58208,7 +58230,7 @@ function walletUnicoBlocco(c){
     ${campo}
     <button class="btn link" onclick="walletRendiPrincipale(this)">Rendi principale questo</button></div>`;
   return `<div class="payout wallet-unico"><h4>Il tuo wallet è su un altro dispositivo</h4>
-    <div class="hint">Il wallet di Barattolo del tuo account è nato su un
+    <div class="hint">Il wallet on-chain del tuo account è nato su un
       altro dispositivo (finisce in <span class="mono">${esc(c.principale)}</span>).
       Per usarlo anche qui incolla le sue 12 parole: ${dove}. Se ne hai
       una copia sui relay Nostr, «👁 Mostra le 12 parole» qui sotto la
@@ -61155,7 +61177,7 @@ function percheDepositoLnOnchainP2P(d){
 function fraseDepositoLnOnchainP2P(e){
   const t = (e && e.tipo) || '';
   if (t === 'indirizzo') return 'L\'indirizzo del deposito non torna: riapri lo scambio e riprova.';
-  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «Il wallet di Barattolo».';
+  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «On-chain».';
   if (t === 'seme') return 'Non riesco a preparare la chiave del cambio: riprova.';
   if (t === 'casa') return 'Questo telefono non riesce a salvare il cambio: libera un po\' di spazio e riprova.';
   if (t === 'cambiata') return 'Il costo del cambio è appena cambiato: guarda le cifre nuove e tocca di nuovo «Crea la richiesta».';
@@ -61206,7 +61228,7 @@ function corpoDepositoLnOnchainP2P(o){
   return '<div class="hint">Paghi <b>' + fmt(d.paghi) + ' sats</b> dal tuo wallet Lightning: ' + nome
       + ' li cambia in bitcoin e il tuo telefono mette <b>' + fmt(d.ricevi) + ' sats</b> nel deposito di garanzia (ne servono ' + fmt(d.importo) + ').</div>'
     + '<div class="hint">È un cambio, fatto da ' + nome + ': costa <b>' + fmt(d.costo) + ' sats</b>, li paghi tu. Barattolo non aggiunge niente.</div>'
-    + '<div class="hint">⚠️ Se lo scambio si annulla o finisce col rimborso, i bitcoin tornano <b>on-chain</b> al tuo wallet di Barattolo, non in Lightning.</div>'
+    + '<div class="hint">⚠️ Se lo scambio si annulla o finisce col rimborso, i bitcoin tornano al tuo wallet <b>on-chain</b>, non in Lightning.</div>'
     + (st.errore ? '<div class="hint" role="alert">' + esc(st.errore) + '</div>' : '')
     + '<button class="btn orange" id="p2pOcDepositoLnBtn" onclick="creaDepositoLnOnchainP2P(this, ' + o.id + ')">⚡ Crea la richiesta Lightning</button>';
 }
@@ -61301,7 +61323,7 @@ function perchePresaOcP2P(d){
 function frasePresaOcP2P(e){
   const t = (e && e.tipo) || '';
   if (t === 'fattura') return typeof swapFatturaPerche === 'function' ? swapFatturaPerche(e.perche) : 'Questa richiesta non va bene.';
-  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «Il wallet di Barattolo».';
+  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «On-chain».';
   if (t === 'seme') return 'Non riesco a preparare la chiave del cambio: riprova.';
   if (t === 'casa') return 'Questo telefono non riesce a salvare il cambio: libera un po\' di spazio e riprova.';
   if (t === 'cambiata') return 'Il costo del cambio è appena cambiato: guarda le cifre nuove e tocca di nuovo «Crea il cambio».';
@@ -76940,7 +76962,7 @@ function ridisegnaCambioP2P(rec){
 function fraseCambioP2P(e){
   const t = (e && e.tipo) || '';
   if (t === 'indirizzo') return 'Questo non è un indirizzo bitcoin valido.';
-  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «Il wallet di Barattolo».';
+  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «On-chain».';
   if (t === 'seme') return 'Non riesco a preparare la chiave del cambio: riprova.';
   if (t === 'casa') return 'Questo telefono non riesce a salvare il cambio: libera un po\' di spazio e riprova.';
   if (t === 'cambiata') return 'Il costo del cambio è appena cambiato: guarda le cifre nuove e tocca di nuovo «Invia».';
