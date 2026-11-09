@@ -7546,7 +7546,7 @@ def prove_in_pagamento():
         prova("col cambio la riga dice «al tuo indirizzo bitcoin», "
               "senza resta «Lightning ⚡», e on-chain resta on-chain",
               ["via il cambio, al tuo indirizzo bitcoin", "via Lightning ⚡",
-               "via on-chain ⛓"], vie)
+               "via on-chain ₿"], vie)
         tutte = {(r[0], r[1], r[2]): r for r in righe}
         prova("nessuna frase esce con un «undefined» dentro", [],
               [k for k, r in tutte.items() if "undefined" in r[4] + r[5]])
@@ -116271,8 +116271,8 @@ def prove_avvisi_nuovi_ordini():
     prova("...il messaggio dice quanti sono on-chain, e il migliore se e' on-chain; "
           "senza on-chain e' quello di ieri",
           (True, True, True, False),
-          ("\n⛓️ On-chain: 1 · ⚡ Lightning: 1\n" in msg2[601],
-           "\n⛓️ On-chain: 1\nPer te: vendita BTC on-chain da 50,00 € via SEPA, 3% più conveniente" in msg2[602],
+          ("\n₿ On-chain: 1 · ⚡ Lightning: 1\n" in msg2[601],
+           "\n₿ On-chain: 1\nPer te: vendita BTC on-chain da 50,00 € via SEPA, 3% più conveniente" in msg2[602],
            msg2[603].startswith("🔔 <b>1 nuovo ordine nel libro P2P</b>\nvendita BTC: 1\nPer te: vendita BTC da"),
            "On-chain" in msg2[603]))
     prova("il prefisso degli on-chain e' lo stesso del nome che nasce alla pubblica", True,
@@ -157201,7 +157201,7 @@ def prove_indirizzo_ordine_onchain():
           [True, True, True, True, False, False],
           ["const schede = [['info', 'Info'], ['impostazioni', 'Impostazioni'],\n                  ['tecnico', 'Tecnico']];" in mini,
            "['ordini', 'Ordini']" not in mini,
-           "<h4>⛓️ L'on-chain non è ancora acceso</h4>" in mini,
+           "<h4>${P2P_OC_MONETA}L'on-chain non è ancora acceso</h4>" in mini,
            "<b>🧪 Un indirizzo di prova con un'altra persona</b>" in mini,
            "<h4>5. Un indirizzo vero, con un altro admin</h4>" in mini,
            "<h4>7. La prova del ripristino</h4>" in mini])
@@ -184778,6 +184778,14 @@ def prove_swap_auto_schermate():
     prova("nel blocco dello swap automatico non c'e' il ⛓️", False, "⛓" in blocco)
     prova("...ne' sulle righe «Preferisce ricevere»", [],
           [r for r in mini.splitlines() if "Preferisce ricevere" in r and "⛓" in r])
+    # (9 nov 2026, Andrea: «il simbolo onchain deve essere dappertutto
+    # l'icona Bitcoin solita e non le catenine») in NESSUN testo: app
+    # (tolti i commenti) e messaggi del bot (tolti commenti e log)
+    _senza = re.sub(r"/\*.*?\*/|<!--.*?-->", "", mini, flags=re.S)
+    _srv = [r.strip()[:70] for r in _SORGENTE.splitlines()
+            if "⛓" in r and not r.lstrip().startswith("#") and "print(" not in r]
+    prova("(9 nov) le catenine ⛓️ non ci sono più: né nell'app né nei messaggi del bot",
+          ([], []), ([r.strip()[:70] for r in _senza.splitlines() if "⛓" in r], _srv))
     js = ("const el = id => (globalThis.__box = globalThis.__box || {})[id] || null;\n"
           "const esc = s => String(s ?? '').replace(/[&<>\"']/g, c => '&#' + c.charCodeAt(0) + ';');\n"
           "const fmt = n => String(n);\nlet DEMO = false, swapLeve = null;\n"

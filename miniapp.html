@@ -14676,7 +14676,7 @@ document.getElementById('cartello')?.remove();</script>
            gli ordini. Si accende col cancello dell'on-chain (`myOnchain`)
            O con quello del cambio (`swapAcceso`): le parole servono a
            tutti e due.
-           ⛓️ GLI INCASSI ON-CHAIN NEL PROFILO (27 ott 2026, Andrea: «il
+           ₿ GLI INCASSI ON-CHAIN NEL PROFILO (27 ott 2026, Andrea: «il
            venditore deve poter configurare nel profilo dove ricevere i
            fondi, un indirizzo o una xpub»). Era una porta verso la
            pagina On-chain; dal secondo giro della stessa sera e' un
@@ -14867,7 +14867,7 @@ document.getElementById('cartello')?.remove();</script>
            diverse: a leva spenta questo bottone non compare a nessuno,
            moderatori compresi. -->
       <button type="button" class="btn ghost" id="admOnchain" style="display:none"
-              onclick="onchainTab='info';go('onchain')">⛓️ On-chain</button>
+              onclick="onchainTab='info';go('onchain')"><span class="cambio-moneta btc p2p-oc-moneta" aria-hidden="true"><svg class="cambio-svg" viewBox="0 0 24 24"><g transform="rotate(13 12 12)"><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g></svg></span>On-chain</button>
       <div id="adminStats"></div>
         </div>
       </div>
@@ -14912,7 +14912,7 @@ document.getElementById('cartello')?.remove();</script>
        un ridisegno non debba ricostruire la pagina. -->
   <div class="view" id="view-onchain">
     <div class="form">
-      <h2 class="profilo-tit">⛓️ On-chain</h2>
+      <h2 class="profilo-tit"><span class="cambio-moneta btc p2p-oc-moneta" aria-hidden="true"><svg class="cambio-svg" viewBox="0 0 24 24"><g transform="rotate(13 12 12)"><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g></svg></span>On-chain</h2>
       <div id="onchainCorpo"></div>
     </div>
   </div>
@@ -18720,10 +18720,10 @@ async function caricaOnchainDaPagare(){
 function cardOnchainDaPagare(o){
   return `<div class="order" onclick="payRiapriOnchain(${Number(o.id)})">
       <div class="ord-card">
-        <span class="order-ic ord-foto">⛓️</span>
+        <span class="order-ic ord-foto">${P2P_OC_MONETA}</span>
         <div class="order-main">
           <b class="ord-titolo">${esc(o.titolo)}</b>
-          <div class="ord-verbo">⛓️ Compri on-chain · ${fmt(o.importo_sats)} sats</div>
+          <div class="ord-verbo">₿ Compri on-chain · ${fmt(o.importo_sats)} sats</div>
         </div>
         <span class="badge dapagare">${STATES.creato.label}</span>
         <div class="ord-foto-data">${new Date(o.creato * 1000).toLocaleDateString('it-IT')}</div>
@@ -33826,7 +33826,7 @@ async function startBuy(rete, pronto){
   /* LA SCELTA DELLA RETE PRIMA DEL FOGLIO (2 nov 2026, Andrea: «quando
      uno compra un oggetto e clicca su paga deve comparire esattamente
      come nel P2P il banner grosso on-chain o Lightning»): solo con la
-     leva, e solo dove la porta ⛓️ si aprirebbe; il tocco torna qui con
+     leva, e solo dove la porta ₿ si aprirebbe; il tocco torna qui con
      la rete scelta (e la risposta di /onchain/pronto gia' letta) */
   if (rete === undefined && mySceltaRete && portaOnchainPossibile(l, offAcc)) {
     apriSceltaPagaRete(l, via ? via.totale_sats : 0);
@@ -33878,7 +33878,7 @@ async function startBuy(rete, pronto){
 
 /* La fattura dell'acquisto di un oggetto, e il suo controllo ogni 4
    secondi. Staccata da startBuy (27 ott 2026) perche' la chiama anche
-   il ritorno da ⛓️ a ⚡ nel foglio (`payPassaA`). */
+   il ritorno da ₿ a ⚡ nel foglio (`payPassaA`). */
 async function payCreaFattura(l, offAcc){
   el('payInvoice').textContent = 'creazione invoice…';
   mostraQr('');
@@ -34626,7 +34626,7 @@ async function disegnaQr(box, testo, modo){
    pagamenti: l'ordine di sempre e la fattura di puntata (rilancio). */
 async function annullaPagamento(){
   if (DEMO || VETRINA) { navIndietro(); return; }
-  if (payOc) { payOcAnnulla(); return; }   /* il foglio sta su ⛓️ */
+  if (payOc) { payOcAnnulla(); return; }   /* il foglio sta su ₿ */
   const ril = rilancioCorrente, oid = currentOrderId,
         pag = pagamentoCorrente;
   if (!ril && !oid && !pag) { navIndietro(); return; }
@@ -35115,7 +35115,7 @@ Object.keys(PICKER).forEach(aggiornaPicker);
 
 function sheetPaid(){
   if (DEMO) return simulatePaid();
-  if (payOc) { payOcControlla(); return; }   /* il foglio sta su ⛓️ */
+  if (payOc) { payOcControlla(); return; }   /* il foglio sta su ₿ */
   toast('Verifico il pagamento…');
   /* il paySheet serve TRE pagamenti: l'ordine di sempre, la fattura
      di puntata e lo sblocco del banner — a dirlo e' la variabile
@@ -37729,7 +37729,7 @@ function openOrder(id){
             Torna — in evidenza — solo se serve un gesto di chi vende. */''}
       ${/* on-chain il pannello del Lightning address non c'entra: chi
             vende riceve dove ha scelto in Profilo → «Incassi on-chain»,
-            e il riquadro ⛓️ qui sopra lo dice */''}
+            e il riquadro ₿ qui sopra lo dice */''}
       ${o.role==='seller' && !o.onchain && ['locked','shipped','delivered','confirmed'].includes(s)
           && !(inPagamento(o) && !o.pagamento.gesto_venditore) ? payoutPanel(o) : ''}
       ${o.role==='buyer' && s==='locked' && o.asta && !o.consegnaScelta ? `
@@ -38357,7 +38357,7 @@ function pannelloPagamento(o){
      quindi a chi compra resta la riga di sempre. */
   const conCambio = p.via!=='onchain' && typeof swapDiOrdine === 'function'
     && !!swapDiOrdine(o.id);
-  const via = p.via==='onchain' ? 'on-chain ⛓'
+  const via = p.via==='onchain' ? 'on-chain ₿'
     : conCambio ? 'il cambio, al tuo indirizzo bitcoin' : 'Lightning ⚡';
   return `
     <div class="payout" id="pannelloPagamento">
@@ -38946,7 +38946,7 @@ function renderChecklist(){
      cui dovrebbe essergli suggerito durante la fase di completezza del
      profilo»): solo per chi l'on-chain lo vede */
   if (myOnchain)
-    voci.push({ok: !!myOnchainIncasso, em:'⛓️', txt:'Dove ricevi on-chain: senza, i sats delle vendite on-chain aspettano nel 2-di-3', acc:'accOnchainIncasso'});
+    voci.push({ok: !!myOnchainIncasso, em:P2P_OC_MONETA, txt:'Dove ricevi on-chain: senza, i sats delle vendite on-chain aspettano nel 2-di-3', acc:'accOnchainIncasso'});
   const fatte = voci.filter(v=>v.ok).length;
   if (fatte === voci.length) { box.innerHTML = ''; return; }
   /* Alla PRIMA visita in assoluto del Profilo (per dispositivo) con
@@ -44421,7 +44421,7 @@ async function adminResolve(esito, btn){
   /* on-chain la decisione E' la firma di Barattolo: chi vince la finisce
      col suo telefono, e una firma data non si ritira */
   const corpoOc = o.onchain && esito !== 'reso'
-    ? corpo.split('\n\nLa decisione è definitiva.')[0] + '\n\n⛓️ Ordine on-chain: Barattolo firma adesso, e i sats partono quando chi vince apre l\'app. La firma non si ritira.'
+    ? corpo.split('\n\nLa decisione è definitiva.')[0] + '\n\n₿ Ordine on-chain: Barattolo firma adesso, e i sats partono quando chi vince apre l\'app. La firma non si ritira.'
     : corpo;
   chiediConferma({titolo, corpo: corpoOc, etichetta: 'Decidi così',
     poi: async () => {
@@ -44445,8 +44445,8 @@ async function adminResolve(esito, btn){
         d.onchain && d.attesa_firma ? {onchain: onchainFirmatoDaBarattolo(o, d.attesa_firma, 'disputa')} : {}));
       toast(d.onchain && d.attesa_firma
             ? (d.attesa_firma === 'venditore'
-                ? '⛓️ Firmato da Barattolo: i sats partono quando il venditore apre l\'app'
-                : '⛓️ Firmato da Barattolo: il rimborso parte quando l\'acquirente apre l\'app')
+                ? '₿ Firmato da Barattolo: i sats partono quando il venditore apre l\'app'
+                : '₿ Firmato da Barattolo: il rimborso parte quando l\'acquirente apre l\'app')
           : d.meno_spese
             ? (d.compratore_pagato && d.venditore_pagato
                 ? '⚖️ Deciso: acquirente rimborsato, spese rese al venditore'
@@ -44591,7 +44591,7 @@ async function onchainLiberaDallOrdine(btn, o){
         ? '🔓 Hai firmato: i sats partono appena il venditore apre la Mini App'
         : '↩️ Hai firmato il rimborso: parte appena l\'acquirente apre la Mini App', 7000);
     }
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 7000); }
+  } catch(e) { toast('₿ ' + (e.message || 'errore'), 7000); }
   finally { rip(); }
   try { await loadOrders(); renderOrders(); } catch(e) {}
   openOrder(o.id);
@@ -44644,7 +44644,7 @@ function onchainCambioRidisegna(o){
 function onchainCambioBlocco(o){
   const oc = o.onchain, st = onchainCambi[oc.id];
   const sceglie = oc.modo_venditore === 'ogni_volta';
-  const suOnchain = `<button class="btn ghost" onclick="onchainRiceviOnchainOra(this, currentOrder)">⛓️ Ricevi on-chain</button>`;
+  const suOnchain = `<button class="btn ghost" onclick="onchainRiceviOnchainOra(this, currentOrder)">₿ Ricevi on-chain</button>`;
   if (!st) return `<button class="btn orange" onclick="onchainCambioApri(this, currentOrder)">⚡ Vedi quanto ricevi in Lightning</button>${sceglie ? suOnchain : ''}`;
   if (st.stato === 'carico') return '<div class="hint">Chiedo il prezzo del cambio…</div>';
   const p = st.p || {}, nome = onchainNomeCambio(p);
@@ -44805,7 +44805,7 @@ async function onchainRiceviOnchainOra(btn, o){
       {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
     const d = await r.json().catch(() => ({}));
     if (r.status === 409 && /Profilo/.test(String(d.detail || ''))) {
-      toast('⛓️ ' + d.detail, 7000);
+      toast('₿ ' + d.detail, 7000);
       rip();
       return apriCassettoProfilo('accOnchainIncasso');
     }
@@ -44814,8 +44814,8 @@ async function onchainRiceviOnchainOra(btn, o){
     await onchainFirmaProposta(Number(o.onchain.id), 'venditore');
     delete onchainCambi[o.onchain.id];
     fatto = true;
-    toast('⛓️ Hai firmato: i sats partono verso il tuo wallet appena chi ha comprato apre la Mini App', 7000);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 7000); }
+    toast('₿ Hai firmato: i sats partono verso il tuo wallet appena chi ha comprato apre la Mini App', 7000);
+  } catch(e) { toast('₿ ' + (e.message || 'errore'), 7000); }
   finally { rip(); }
   if (fatto) { try { await loadOrders(); renderOrders(); } catch(e) {} openOrder(o.id); }
 }
@@ -44874,7 +44874,7 @@ function pannelloOnchainOrdine(o, s){
              && ['locked','shipped','delivered'].includes(s)) {
     /* (28 ott 2026) chi sceglie ogni volta ha preso l'on-chain allo
        sblocco, e ha firmato per primo verso il suo wallet */
-    riga = '⛓️ <b>Hai messo la prima firma</b> verso il tuo wallet on-chain: i sats partono appena chi ha comprato apre la Mini App, e il suo telefono mette la seconda.';
+    riga = '₿ <b>Hai messo la prima firma</b> verso il tuo wallet on-chain: i sats partono appena chi ha comprato apre la Mini App, e il suo telefono mette la seconda.';
   } else if (p && p.verso === 'venditore' && io === 'compratore' && !p.mia
              && ['locked','shipped','delivered'].includes(s)) {
     riga = '🔓 <b>Chi vende ha messo la prima firma.</b> Manca la seconda, quella del tuo telefono: si mette da sola quando apri la Mini App.';
@@ -44918,7 +44918,7 @@ function pannelloOnchainOrdine(o, s){
     if (oc.rilascio_chiesto) cambio = `<div id="onchainCambio_${Number(oc.id)}">${onchainCambioBlocco(o)}</div>`;
   } else if (senzaDove) {
     dove = ' ⚠️ <b>Non hai ancora scelto dove ricevere:</b> i sats restano al sicuro nel 2-di-3, ed escono appena lo scegli.';
-    if (!gesto) gesto = `<button class="btn orange" onclick="apriCassettoProfilo('accOnchainIncasso')">⛓️ Scegli dove ricevere</button>`;
+    if (!gesto) gesto = `<button class="btn orange" onclick="apriCassettoProfilo('accOnchainIncasso')">₿ Scegli dove ricevere</button>`;
   } else if (o.role === 'buyer' && oc.rilascio_chiesto && !p) {
     dove = oc.modo_venditore && oc.modo_venditore !== 'onchain'
       ? ' ✅ <b>Hai confermato:</b> chi vende sceglie adesso come ricevere, e appena mette la prima firma il tuo telefono mette la seconda da solo.'
@@ -44929,7 +44929,7 @@ function pannelloOnchainOrdine(o, s){
   const fatto = (oc.indirizzo && oc.indirizzo.indirizzo)
     ? onchainComeEFatto(Object.assign({}, oc, {ruolo: o.role === 'buyer' ? 'compratore' : o.role === 'seller' ? 'venditore' : ''}), {})
     : '';
-  return `<div class="trust-note">⛓️ <span>${riga ? riga + '<br>' : ''}Pagato <b>on-chain</b>, in un 2-di-3: tu, l'altra parte e Barattolo.${dove}${tx}</span></div>${cambio}${fatto}${gesto}`;
+  return `<div class="trust-note">${P2P_OC_MONETA}<span>${riga ? riga + '<br>' : ''}Pagato <b>on-chain</b>, in un 2-di-3: tu, l'altra parte e Barattolo.${dove}${tx}</span></div>${cambio}${fatto}${gesto}`;
 }
 
 async function annullaOrdine(){
@@ -48451,7 +48451,7 @@ async function resoRicevuto(btn){
       if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
       segnaOrdine(o, Object.assign({state: d.stato || 'refund'},
         d.onchain && d.attesa_firma ? {onchain: onchainFirmatoDaBarattolo(o, d.attesa_firma, 'reso')} : {}));
-      toast(d.onchain ? '⛓️ Barattolo ha firmato il rimborso: parte quando l\'acquirente apre l\'app'
+      toast(d.onchain ? '₿ Barattolo ha firmato il rimborso: parte quando l\'acquirente apre l\'app'
             : d.stato==='refunded' ? '↩️ Acquirente rimborsato' : '↩️ Registrato: rimborso in attesa del metodo dell\'acquirente');
       ridisegnaOrdine(o);
     }});
@@ -51283,10 +51283,10 @@ function boxChiaveBarattolo(){
   } else {
     conta = 'di cartone';
     dentro = `<div class="sub">Oggi la terza chiave è <b>di cartone</b>: quella dei vettori di prova del BIP-32, la cui privata è pubblica. Va bene su signet; prima dei sats veri serve la chiave vera. ${firma}</div>
-      ${onchainRete().prova ? '' : '<div class="sub" style="color:var(--danger)"><b>⚠️ La rete è mainnet e la chiave non c\'è: l\'on-chain è fermo</b> (nessun indirizzo nasce, la cassa non offre ⛓️) finché non la crei qui sotto.</div>'}
-      <button class="btn orange" style="margin-top:10px" onclick="creaChiaveBarattolo(this)">⛓️ Crea la chiave di Barattolo</button>`;
+      ${onchainRete().prova ? '' : '<div class="sub" style="color:var(--danger)"><b>⚠️ La rete è mainnet e la chiave non c\'è: l\'on-chain è fermo</b> (nessun indirizzo nasce, la cassa non offre ₿) finché non la crei qui sotto.</div>'}
+      <button class="btn orange" style="margin-top:10px" onclick="creaChiaveBarattolo(this)">₿ Crea la chiave di Barattolo</button>`;
   }
-  return cassettoAdm('accAdmChiaveOc', '⛓️', 'Chiave di Barattolo', conta, dentro);
+  return cassettoAdm('accAdmChiaveOc', '₿', 'Chiave di Barattolo', conta, dentro);
 }
 function creaChiaveBarattolo(btn){
   haptic();
@@ -51303,9 +51303,9 @@ function creaChiaveBarattolo(btn){
         if (!r.ok) throw new Error(d.detail || 'non creata');
         admChiaveOc = d;
         accAdmAperti.add('accAdmChiaveOc');
-        toast('⛓️ Chiave di Barattolo creata, impronta ' + (d.impronta || '?'), 6000);
+        toast('₿ Chiave di Barattolo creata, impronta ' + (d.impronta || '?'), 6000);
         loadAdminStats();
-      } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+      } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
       finally { rip(); }
     }});
 }
@@ -57760,7 +57760,7 @@ async function renderOnchain(){
     else corpo = onchainSchedaInfo();
     /* le co-firme fatte qui sopra si dicono comunque: la scheda degli
        ordini che le mostrava non c'e' piu' */
-    if (esiti.length) toast('⛓️ ' + esiti.join(' · '), 7000);
+    if (esiti.length) toast('₿ ' + esiti.join(' · '), 7000);
     box.innerHTML = onchainSchede() + corpo;
   } catch(e) {
     box.innerHTML = `<div class="hint">Non sono riuscito a preparare la
@@ -57888,8 +57888,8 @@ function onchainTestoFerma(){
   return f ? `<div class="payout" style="border-color:var(--danger)">
       <h4>⚠️ L'on-chain è fermo su questa rete</h4>
       <div class="hint">${esc(f)}. Nessun indirizzo nasce e la cassa non
-        offre ⛓️ finché un admin non sistema la terza chiave (pannello
-        «⛓️ Chiave di Barattolo»).</div></div>` : '';
+        offre ₿ finché un admin non sistema la terza chiave (pannello
+        «₿ Chiave di Barattolo»).</div></div>` : '';
 }
 
 /* 🔧 TECNICO: per chi vuole sapere esattamente cosa c'e' sotto. Qui e
@@ -58004,11 +58004,11 @@ function onchainBloccoAccendi(miaXpub){
       veri; con «Usa questa» i prossimi nasceranno da questo seme.</div>
       <button class="btn ghost" onclick="onchainAccendi(this)">🔁 Usa questa</button>`;
   } else {
-    stato = `<button class="btn" onclick="onchainAccendi(this)">⛓️ Accendi l'on-chain</button>`;
+    stato = `<button class="btn" onclick="onchainAccendi(this)">₿ Accendi l'on-chain</button>`;
   }
   return `
     <div class="payout">
-      <h4>⛓️ L'on-chain non è ancora acceso</h4>
+      <h4>${P2P_OC_MONETA}L'on-chain non è ancora acceso</h4>
       <div class="hint">Per pagare e ricevere on-chain, Barattolo deve
         poter calcolare l'indirizzo di ogni ordine anche quando il tuo
         telefono è spento. Per questo gli dai la <b>metà pubblica</b> di
@@ -58235,7 +58235,7 @@ async function onchainModoScegli(btn, modo){
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non salvato');
     myOnchainLn.modo = modo;
-    toast(modo === 'onchain' ? '⛓️ Salvato: ricevi on-chain'
+    toast(modo === 'onchain' ? '₿ Salvato: ricevi on-chain'
       : modo === 'lightning' ? '⚡ Salvato: dalle prossime vendite ricevi in Lightning, col cambio'
       : '🤔 Salvato: a ogni vendita scegli tu come ricevere', 5000);
   } catch(e) { toast('⚠️ ' + (e.message || 'errore'), 6000); }
@@ -58649,7 +58649,7 @@ async function onchainAccendi(btn){
     const d = await q.json().catch(()=>({}));
     rip();
     if (!q.ok) return toast(`⚠️ ${d.detail || 'Non riuscito'}`, 4000);
-    toast('⛓️ On-chain acceso: il server ha la tua chiave pubblica dedicata');
+    toast('₿ On-chain acceso: il server ha la tua chiave pubblica dedicata');
   } catch(e) {
     rip();
     return toast('Rete assente: riprova');
@@ -58682,7 +58682,7 @@ async function onchainNuovoIndirizzo(btn, altro){
    fatto niente e che niente gli e' stato chiesto. */
 /* ============ L'ORDINE ON-CHAIN (23 ott 2026, cantiere onchain-tappa3)
    ============
-   Con ⛓️ il server crea un ordine SUO (`/api/onchain/ordini`) con
+   Con ₿ il server crea un ordine SUO (`/api/onchain/ordini`) con
    l'indirizzo 2-di-3. Dal 27 ott 2026 si paga nello STESSO foglio del
    Lightning (`payPassaA`, qui sotto), e una volta pagato l'ordine e'
    uno di sempre, in «Ordini»: e' li' che poi si liberano i sats.
@@ -58699,7 +58699,7 @@ const ONCHAIN_POLVERE = 546;
    «nel mentre clicco LN o onchain già deve dare il QR, esperienza
    simile a btcpayserver») ============
    La scelta non sta piu' nella cassa: sta DENTRO il foglio, sopra il
-   QR. Si apre su ⚡ con la sua fattura, come sempre; un tocco su ⛓️ e
+   QR. Si apre su ⚡ con la sua fattura, come sempre; un tocco su ₿ e
    al posto della fattura c'e' l'indirizzo 2-di-3 col suo QR, nello
    stesso foglio. UN PAGAMENTO VIVO ALLA VOLTA: passando da una porta
    all'altra quella di prima si chiude (la fattura con l'annullo di
@@ -58708,7 +58708,7 @@ const ONCHAIN_POLVERE = 546;
    rete prima di chiudere. Due pagamenti vivi sullo stesso oggetto
    sarebbero due prenotazioni dello stock, e un doppio pagamento a un
    tocco di distanza.
-   La porta ⛓️ c'e' solo per chi l'on-chain lo vede, su un oggetto solo,
+   La porta ₿ c'e' solo per chi l'on-chain lo vede, su un oggetto solo,
    al prezzo di listino (accordi e codici restano col Lightning, come
    dice il server); se chi vende non riceve on-chain si vede SPENTA, e
    il tocco dice perche'. L'indirizzo si mostra solo se questo telefono
@@ -58786,7 +58786,7 @@ function renderPayMetodo(){
        aria-selected="${acqMetodo === m}"${payMetodoOccupato ? ' aria-busy="true"' : ''}
        onclick="payPassaA('${m}')">${titolo}<small>${sotto}</small></button>`;
   box.innerHTML = porta('ln', 'ln', '⚡ Lightning', 'subito, in un secondo', false)
-    + porta('onchain', 'oc', '⛓️ On-chain 🛡️', ocSi ? '2-di-3, una conferma' : (payOcPronto ? 'non per questo oggetto' : 'guardo…'), !ocSi);
+    + porta('onchain', 'oc', P2P_OC_MONETA + 'On-chain 🛡️', ocSi ? '2-di-3, una conferma' : (payOcPronto ? 'non per questo oggetto' : 'guardo…'), !ocSi);
   box.style.display = 'flex';
 }
 
@@ -58850,8 +58850,8 @@ async function payPassaA(m){
   haptic();
   if (m === 'onchain' && !(payOcPronto && payOcPronto.pronto)) {
     payMetodoNota(payOcPronto
-      ? '⛓️ On-chain non disponibile: ' + esc(payOcPronto.motivo || '')
-      : '⛓️ Sto chiedendo se questo venditore riceve on-chain…');
+      ? '₿ On-chain non disponibile: ' + esc(payOcPronto.motivo || '')
+      : '₿ Sto chiedendo se questo venditore riceve on-chain…');
     return;
   }
   payMetodoOccupato = true; renderPayMetodo();
@@ -58889,7 +58889,7 @@ async function payPassaA(m){
           {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));
-          toast('⛓️ ' + (d.detail || 'L\'indirizzo non si chiude: resto on-chain'), 7000);
+          toast('₿ ' + (d.detail || 'L\'indirizzo non si chiude: resto on-chain'), 7000);
           return;
         }
       }
@@ -58944,7 +58944,7 @@ async function onchainOrdineDallaCassa(){
 }
 
 async function payMostraOnchain(){
-  el('payInvoice').textContent = '⛓️ Preparo l\'indirizzo…';
+  el('payInvoice').textContent = '₿ Preparo l\'indirizzo…';
   mostraQr('');
   try {
     const {o, srv, parole} = await onchainOrdineDallaCassa();
@@ -58956,7 +58956,7 @@ async function payMostraOnchain(){
   } catch(e) {
     payOc = null;
     el('payInvoice').textContent = '';
-    payMetodoNota('⛓️ On-chain non disponibile: ' + esc(e.message || 'errore') + '. Qui sotto c\'è di nuovo la fattura ⚡.');
+    payMetodoNota('₿ On-chain non disponibile: ' + esc(e.message || 'errore') + '. Qui sotto c\'è di nuovo la fattura ⚡.');
   }
 }
 
@@ -59036,7 +59036,7 @@ async function payOcControlla(){
     if (d.stato === 'attesa') toast(d.visti_sats ? '⏳ Visti in rete, aspetto una conferma (circa dieci minuti)'
                                                 : '⏳ Ancora niente sull\'indirizzo', 5000);
     await payOcAggiorna(d);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore')); }
+  } catch(e) { toast('₿ ' + (e.message || 'errore')); }
 }
 
 function payOcAnnulla(){
@@ -59050,7 +59050,7 @@ function payOcAnnulla(){
       const r = await fetch(`${API_BASE}/onchain/ordini/${o.id}/annulla`,
         {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { toast('⛓️ ' + (d.detail || 'Non annullato'), 7000); return; }
+      if (!r.ok) { toast('₿ ' + (d.detail || 'Non annullato'), 7000); return; }
       payMetodoSpegni();
       chiudiFoglioFattura();
       toast('✖️ Ordine annullato');
@@ -59080,7 +59080,7 @@ async function payRiapriOnchain(oid){
     mostraQr('');            /* il vestito del deposito, da mostraQr come tutti */
     await payDisegnaOnchain();
     payOcTimer = setInterval(payOcGuarda, 15000);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+  } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
 }
 
 /* La mia chiave per firmare e il mio incasso, per l'ordine `o`: lo
@@ -59291,7 +59291,7 @@ async function onchainProponi(btn, oid){
     toast(verso === 'venditore'
       ? '🔓 Firmato: i sats partono appena il venditore apre la Mini App'
       : '↩️ Firmato: il rimborso parte appena chi ha comprato apre la Mini App', 6000);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+  } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }
   renderOnchain();
 }
@@ -59514,7 +59514,7 @@ async function onchainCofirmeInSottofondo(){
     if (typeof p2pOnchainCofirmeInAttesa === 'function')
       fatte.push(...await p2pOnchainCofirmeInAttesa(parole));
     if (fatte.length) {
-      toast('⛓️ ' + fatte.join(' · '), 7000);
+      toast('₿ ' + fatte.join(' · '), 7000);
       /* l'ordine di sempre si e' chiuso sul server: «Ordini» lo dice */
       try { await loadOrders(); renderOrders(); } catch(e) {}
     }
@@ -59543,7 +59543,7 @@ function onchainUriPagamento(o){
    parole dell'app, `o.ruolo` resta quello del 2-di-3 per le firme.
    Il libro arriva dentro `/api/p2p/libro` (busta `onchain`, dalla
    memoria del server) e le sue card stanno IN CIMA al libro di Mostro,
-   col segno «⛓️ on-chain · 2-di-3»; tutto il resto — pubblicare,
+   col segno «₿ on-chain · 2-di-3»; tutto il resto — pubblicare,
    prendere, depositare, gli euro, le firme, la disputa — vive nella
    pagina «Scambi on-chain», sorella di «I miei scambi». Tutto dietro
    `myP2POnchain` (il cancello del server: leva + on-chain + P2P, per
@@ -59938,7 +59938,7 @@ function apriOnchainP2P(id, modo){
   const cifraOc = typeof cifraOcP2P === 'function' ? cifraOcP2P : x => fmtEur(x.euro) + ' €';
   const paroleOc = typeof paroleOcP2P === 'function' ? paroleOcP2P : (x, t) => t;
   if (!myP2POnchain) {
-    chiediConferma({titolo: '⛓️ Scambi on-chain', etichetta: 'Ho capito', avviso: true,
+    chiediConferma({titolo: '₿ Scambi on-chain', etichetta: 'Ho capito', avviso: true,
       corpo: 'Gli scambi con la garanzia 2-di-3 sono in prova: il libro lo vedi, '
         + 'ma pubblicare e prendere oggi lo fanno solo i moderatori di Barattolo.'});
     return;
@@ -59950,7 +59950,7 @@ function apriOnchainP2P(id, modo){
     return go('p2ponchain');
   }
   const o = p2pOnchainLibro.eventi.find(x => Number(x.id) === Number(id));
-  if (!o) return toast('⛓️ Quest\'ordine non è più nel libro', 4000);
+  if (!o) return toast('₿ Quest\'ordine non è più nel libro', 4000);
   if (p2pOnchainLibro.miei.includes(String(o.ordine))) return apriDettaglioOnchainP2P(o.id);
   /* in pausa non si prende (30 ott 2026): la carta lo dice, il tocco
      vibra e lo ripete — il server comunque direbbe di no */
@@ -60007,9 +60007,9 @@ async function prendiOnchainP2P(id){
     await leggiMieiOnchainP2P();
     apriDettaglioOnchainP2P(id);
     toast(d.ruolo === 'compratore'
-      ? '⛓️ Preso: ora deposita i sats nell\'indirizzo 2-di-3'
-      : '⛓️ Preso: chi vende sta depositando i sats', 6000);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+      ? '₿ Preso: ora deposita i sats nell\'indirizzo 2-di-3'
+      : '₿ Preso: chi vende sta depositando i sats', 6000);
+  } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
   rinfrescaOnchainP2P(true);
 }
 
@@ -60248,7 +60248,7 @@ async function sceltaLnOnchainP2P(btn, id, si){
     delete p2pOcCambi[id];
     toast(si ? '⚡ Ricevi in Lightning: il cambio lo fai quando chi vende conferma gli euro'
              : '₿ Ricevi on-chain', 5000);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+  } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }
   renderP2POnchain();
 }
@@ -60373,7 +60373,7 @@ async function togliCambioOnchainP2P(btn, id){
     if (!r.ok) throw new Error(d.detail || 'non riuscito');
     delete p2pOcCambi[id];
     toast('⚡ Cambio tolto: non si è mosso niente', 5000);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+  } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }
   renderP2POnchain();
 }
@@ -61593,7 +61593,7 @@ function ridisegnaPresaOcP2P(rec){
 function gestoOnchainP2P(btn, id, cosa){
   haptic();
   if (cosa === 'annulla') {
-    return chiediConferma({titolo: '⛓️ Annulli lo scambio?', etichetta: 'Annulla lo scambio',
+    return chiediConferma({titolo: '₿ Annulli lo scambio?', etichetta: 'Annulla lo scambio',
       vestito: 'allarme',
       corpo: 'Nessun sats si è mosso: lo scambio si chiude qui e l\'altra parte lo sa subito.',
       poi: () => eseguiGestoOnchainP2P(id, 'annulla', {})});
@@ -61618,13 +61618,13 @@ async function eseguiGestoOnchainP2P(id, cosa, corpo, btn){
       body: JSON.stringify(corpo || {})});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non riuscito');
-    if (cosa === 'controlla') toast(d.stato === 'depositato' ? '⛓️ Deposito confermato' : d.visti_sats
-      ? `⛓️ Visti ${fmt(d.visti_sats)} sats, aspetto la conferma` : '⛓️ Niente ancora sull\'indirizzo', 5000);
+    if (cosa === 'controlla') toast(d.stato === 'depositato' ? '₿ Deposito confermato' : d.visti_sats
+      ? `₿ Visti ${fmt(d.visti_sats)} sats, aspetto la conferma` : '₿ Niente ancora sull\'indirizzo', 5000);
     else if (cosa === 'euro-inviati') toast(corpo && corpo.txid ? '💵 Detto a chi vende, con l\'id della transazione'
       : '💶 Detto a chi vende: controlla il conto e libera i sats', 5000);
     else if (cosa === 'disputa') toast('⚖️ Disputa aperta: un moderatore guarderà', 5000);
-    else toast('⛓️ Fatto', 3000);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+    else toast('₿ Fatto', 3000);
+  } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }
   renderP2POnchain();
   rinfrescaOnchainP2P(true);
@@ -61651,7 +61651,7 @@ async function recapitoOnchainP2P(btn, id){
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non salvato');
     toast('💶 Recapito salvato', 3000);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+  } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }
   renderP2POnchain();
 }
@@ -61920,7 +61920,7 @@ async function eseguiDecisioneOnchainP2P(id, verso){
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non deciso');
     toast('⚖️ Barattolo ha firmato: manca la firma di chi ha ragione', 6000);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 7000); }
+  } catch(e) { toast('₿ ' + (e.message || 'errore'), 7000); }
   finally { rip(); }
   renderP2POnchain();
 }

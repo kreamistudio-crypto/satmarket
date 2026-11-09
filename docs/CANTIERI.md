@@ -78750,3 +78750,24 @@ dal vivo, chiaro e scuro, mandata ad Andrea. DA GUARDARE dopo la
 promozione: un ordine vero con «Ogni volta» e il tasto «Ricevi al mio
 Lightning address» (oggi solo admin, leva SWAP_AUTO solo admin).
 
+
+## La moneta ₿ al posto delle catenine ⛓️, dappertutto (9 nov 2026, cantiere incasso-annuncio, Andrea: «il simbolo onchain deve essere dappertutto l'icona Bitcoin solita e non le catenine»)
+
+COSA SI È DECISO. Le catenine ⛓️ escono da ogni testo dell'app e da ogni
+messaggio del bot. Dove è un'ICONA (il segno dell'ordine on-chain da
+pagare, il riquadro «Pagato on-chain» dell'ordine, la voce «Dove ricevi
+on-chain» di «Completa il profilo», la porta «On-chain 🛡️» del foglio di
+pagamento, il tasto e il titolo della pagina on-chain degli admin, «L'on-chain
+non è ancora acceso») c'è la moneta arancio del Cambio (`P2P_OC_MONETA`,
+o il suo markup scritto nell'HTML dove il JS non arriva). Dove è TESTO
+nudo (toast, titoli di `chiediConferma`, avvisi del bot, tasti, righe
+del pannello) c'è il carattere ₿: il toast e il titolo si scrivono col
+textContent, e Telegram non disegna l'SVG. Restano i commenti e le
+righe di log del journal, e i commenti che raccontano la storia («mai
+⛓️», «era «⛓️ Compri bitcoin on-chain»»).
+
+PROVATO. Sentinella nuova in `prove_swap_auto_schermate`: nessun ⛓ in
+miniapp tolti i commenti, né nelle righe di server.py che non sono
+commento o log; aggiornate le prove che leggevano i testi vecchi
+(`via on-chain ₿`, il riepilogo degli avvisi P2P «₿ On-chain: 1», il
+titolo dell'on-chain spento).
