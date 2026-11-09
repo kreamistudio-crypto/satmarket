@@ -78039,9 +78039,13 @@ process.stdout.write(JSON.stringify(out));
           "fondo c'e' l'uscita",
           ["annulla", "disputa"], out["secAnnulla"])
     # e NON si offre anche di richiederlo: chi ha davanti una proposta
-    # di annullo ha una cosa sola da fare, dire di si'
-    prova("...e se l'ha chiesto l'altro si accetta, e basta",
-          ["accetta-annullo"], out["secProposto"])
+    # di annullo non deve chiederla a sua volta.
+    # ⚠️ EMENDATA (9 nov 2026, dal campo, parola di Andrea: «non è
+    # giusto»): «dire di si'» NON e' l'unica cosa — chi compra puo' dire
+    # di no e pagare, e la disputa resta: per mostrod lo scambio e'
+    # ancora `active` (`dispute.rs` lo accetta).
+    prova("...e se l'ha chiesto l'altro si accetta, o si apre la disputa",
+          ["accetta-annullo", "disputa"], out["secProposto"])
     # ⚠️ EMENDATA (set 2026, le recensioni degli scambi): a scambio
     # concluso il gesto lo decide la risposta del SERVER — finche' non
     # arriva non si offre niente (il bottone cambierebbe sotto il dito).
@@ -78652,8 +78656,11 @@ def prove_p2p_chat():
     prova("la disputa e' l'ULTIMA della colonna", True,
           0 <= sec.rfind("fuori.push(gesto)")
           < sec.rfind("fuori.push('disputa')"))
+    # (9 nov 2026) ...anche con una richiesta di annullo in sospeso: per
+    # mostrod lo scambio resta `active`, e la disputa c'e' ancora
     prova("...e si apre solo dove i sats sono gia' in custodia", True,
-          "const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati'];"
+          "const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati',\n"
+          "                         'annullo_chiesto', 'annullo_proposto'];"
           in mini)
     ren = pezzo_js(mini, "function renderOrdineP2P(", "\n}\n")
     prova("i recapiti stanno FRA il passo da fare e le uscite", True,
@@ -87188,9 +87195,11 @@ console.log(JSON.stringify(out));
            "compro:fattura_nuova",
            "vendo:attesa_mia_hold", "vendo:euro_inviati"],
           o["fare"])
-    prova("...e col recapito in gioco sono sei: chi compra quando gli e' "
-          "arrivato, chi vende finche' non l'ha mandato",
-          ["compro:attesa_mia_fattura", "compro:attivo",
+    # SETTE dal 9 nov 2026: chi compra con una proposta di annullo davanti
+    # puo' dire di no e pagare — «Ho inviato gli euro» resta suo
+    prova("...e col recapito in gioco sono sette: chi compra quando gli e' "
+          "arrivato (anche con la proposta di annullo), chi vende finche' non l'ha mandato",
+          ["compro:annullo_proposto", "compro:attesa_mia_fattura", "compro:attivo",
            "compro:fattura_nuova",
            "vendo:attesa_mia_hold", "vendo:attivo", "vendo:euro_inviati"],
           o["fareVestito"])
@@ -139307,6 +139316,24 @@ p2pControparti = {d: {nome: 'Alan Rossi'}};
 out.frasiNome = [statoTestoP2P(chi).d, statoTestoP2P(pro).d];
 out.aspetta = [attesaAltraParteP2P(base('compro')), attesaAltraParteP2P(chi), attesaAltraParteP2P(pro)];
 p2pControparti = {};
+// 10) DAL CAMPO (9 nov 2026): chi vende chiede di annullare a sats in
+//     garanzia, chi compra dice no e paga. Per mostrod resta `active`.
+const conIban = lato => ({id: 'n', lato, stato: 'attivo', peer: 'p', euro: 10,
+                          campiLoro: {euro: {testo: 'IBAN: IT60X0542811101000000123456'}}});
+const propC = avanzaOrdineP2P(conIban('compro'), PROPOSTO, null);
+const chieV = avanzaOrdineP2P(conIban('vendo'), CHIESTO, null);
+out.campo = [pochi(propC), pochi(chieV), propC.primaAnnullo];
+//     ...senza IBAN arrivato il bottone degli euro non c'e', la disputa si'
+out.campoSenzaIban = pochi(avanzaOrdineP2P({id: 'n', lato: 'compro', stato: 'attivo', peer: 'p'}, PROPOSTO, null));
+//     ...la proposta arrivata a euro gia' segnati non ridà il bottone
+out.campoGiaPagato = pochi(avanzaOrdineP2P(Object.assign(conIban('compro'), {stato: 'euro_inviati'}), PROPOSTO, null));
+//     ...detto «ho pagato»: tutt'e due a euro inviati, e la nota cade
+const pagato = avanzaOrdineP2P(propC, 'fiat-sent-ok', null);
+const pagatoV = avanzaOrdineP2P(chieV, 'fiat-sent-ok', null);
+out.campoDopo = [pochi(pagato), pagato.primaAnnullo === undefined, pochi(pagatoV)];
+//     ...e la disputa aperta porta la nota della richiesta, come il 28 set
+out.campoDisputa = pochi(avanzaOrdineP2P(propC, 'dispute-initiated-by-you', null));
+out.campoFrase = statoTestoP2P(propC).d;
 // 8) l'attesa che rilegge: «chiesto» a disputa aperta e' la nota
 archivio = {nuda: base('compro'), chi: chi, pro: pro, ann: {stato: 'annullato'}, vec: {stato: 'annullo_chiesto'}};
 archivio.chi = Object.assign({}, chi);
@@ -139335,7 +139362,8 @@ process.stdout.write(JSON.stringify(out));
     prova("...il «no» vecchio si pulisce, e la riga di partenza non e' stata toccata",
           ["", "", True], o["pulito"])
     prova("3) fuori dalla disputa e' tutto come prima: gli stati di sempre, senza nota",
-          [["annullo_chiesto", "", [], ""], ["annullo_proposto", "", ["accetta-annullo"], ""]], o["daAttivo"])
+          # (9 nov 2026) ...e la disputa resta: una richiesta di annullo non la toglie
+          [["annullo_chiesto", "", ["disputa"], ""], ["annullo_proposto", "", ["accetta-annullo", "disputa"], ""]], o["daAttivo"])
     prova("4) la restore che dice `dispute` non si porta via la nota (non muove niente)",
           [None, None], o["restoreSullaNota"])
     prova("...mentre sugli stati di sempre l'avrebbe fatto: e' il perche' della scelta",
@@ -139360,6 +139388,22 @@ process.stdout.write(JSON.stringify(out));
     prova("8) l'attesa che rilegge: «chiedi» e' fatto con la nota, non con la disputa nuda",
           [["nuda", False, False], ["chi", True, False], ["pro", False, False],
            ["ann", True, True], ["vec", True, False]], o["esiti"])
+    prova("10) dal campo (9 nov 2026): con la proposta di annullo chi compra puo' "
+          "ancora dire «ho inviato gli euro» o aprire la disputa; chi vende, che ha chiesto, "
+          "puo' aprire la disputa",
+          [["annullo_proposto", "", ["accetta-annullo", "disputa"], "euro-inviati"],
+           ["annullo_chiesto", "", ["disputa"], ""], "attivo"], o["campo"])
+    prova("...senza recapito arrivato niente bottone degli euro, ma la disputa resta",
+          ["annullo_proposto", "", ["accetta-annullo", "disputa"], ""], o["campoSenzaIban"])
+    prova("...la proposta arrivata a euro gia' segnati non ridà «ho inviato gli euro»",
+          ["annullo_proposto", "", ["accetta-annullo", "disputa"], ""], o["campoGiaPagato"])
+    prova("...detto «ho pagato»: tutt'e due a euro inviati, chi vende ha «Libera i sats»",
+          [["euro_inviati", "", ["disputa"], ""], True, ["euro_inviati", "", ["disputa"], "rilascia"]],
+          o["campoDopo"])
+    prova("...e la disputa aperta da li' si porta la proposta come nota",
+          ["in_disputa", "proposto", ["accetta-annullo"], ""], o["campoDisputa"])
+    prova("...e la frase dice a chi compra che non e' obbligato",
+          True, "Non sei obbligato" in o["campoFrase"] and "apri una disputa" in o["campoFrase"])
     AVVISO = " Se hai già inviato gli euro non annullare: aspetta il moderatore."
     prova("9) il foglio: a chi compra l'avviso degli euro, a chi vende no",
           [True, False, True, False], [f.endswith(AVVISO) for f in o["fogli"]])
