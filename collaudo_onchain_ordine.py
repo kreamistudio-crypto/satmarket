@@ -255,10 +255,21 @@ def main():
     oid = o["id"]
     prova("niente sull'indirizzo: resta in attesa", "attesa",
           controlla(999, oid).json()["stato"])
+    banco.DETTO.clear()
     paga(o, confermata=False)
     d = controlla(999, oid).json()
     prova("visti ma non confermati: ancora attesa, e lo si vede",
           ("attesa", 51080, 0), (d["stato"], d["visti_sats"], d["ricevuti_sats"]))
+    # (9 nov 2026, Andrea nella prova da 5 €) chi vende lo sa SUBITO, una
+    # volta sola, e non come un «venduto»
+    controlla(888, oid)
+    arrivo = [t for chi, t in banco.DETTO if chi == 888]
+    prova("...e chi vende lo sa subito, una volta sola (due controlli): "
+          "«Pagamento in arrivo», non spedire ancora; a chi compra niente",
+          (1, True, True, False, []),
+          (len(arrivo), "Pagamento in arrivo" in "".join(arrivo),
+           "Non spedire" in "".join(arrivo), "Hai venduto" in "".join(arrivo),
+           [chi for chi, _ in banco.DETTO if chi != 888]))
     come(999)
     prova("...e ora annullare non si puo' piu': 409", 409,
           c.post(f"/api/onchain/ordini/{oid}/annulla").status_code)

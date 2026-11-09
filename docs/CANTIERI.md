@@ -78598,3 +78598,28 @@ controllo e l'ordine in `onchainDaiRelay`). **DA GUARDARE** dal vivo
 (dopo la promozione, o sul collaudo): Alan nella mini app tocca «Salva
 sui relay Nostr» (Amber chiede), poi sul web entra con la stessa chiave
 Nostr e «👁 Mostra le 12 parole» deve ritrovare il wallet da solo.
+
+## Il pagamento on-chain in arrivo: chi vende lo sa subito (9 nov 2026, cantiere backup-relay, Andrea nella prova da 5 €)
+
+PERCHÉ. Prova del mercatino on-chain in produzione: Alan compra
+l'oggetto da 5 € di Andrea e paga on-chain; la transazione aspetta la
+prima conferma e Andrea non riceve niente. È il disegno della strada A
+(27 ott): l'ordine di sempre nasce alla prima conferma, perché in
+mempool un pagamento si può ancora sostituire. Andrea: «servirebbe una
+notifica subito dove almeno si avvisa che l'ordine è stato preso».
+
+COSA. In `onchain_controlla` (ronda ogni due minuti e tocco
+«Controlla»), quando nel mempool c'è tutto l'importo ma non è ancora
+confermato, a chi vende parte UNA volta «⛓️ Pagamento in arrivo:
+[titolo]… L'oggetto è prenotato per lui. Non spedire e non consegnare
+ancora: ti avviso io alla conferma, con l'ordine.» Il lucchetto è la
+colonna nuova `visto_avvisato` (UPDATE condizionato: la ronda e il tocco
+possono passare insieme). Non è un «Hai venduto»: quello resta alla
+conferma, con l'ordine. Chi compra non riceve niente di nuovo (lo vede
+già nella sua pagina). Pagato e confermato nello stesso controllo: solo
+il «venduto».
+
+PROVATO. `collaudo_onchain_ordine` (+1, server vero: l'avviso a chi vende
+una volta sola su due controlli, le parole, niente «Hai venduto», niente
+a chi compra). **DA GUARDARE** alla prossima prova on-chain in
+produzione: l'avviso arriva a chi vende entro due minuti dal pagamento.

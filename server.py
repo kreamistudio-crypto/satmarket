@@ -95030,7 +95030,10 @@ def _onchain_prepara_ordini(con):
                       # Lightning di chi vende (JSON delle parti pubbliche:
                       # fornitore, id, quanto, la scadenza della fattura)
                       ("rilascio_firma", "TEXT DEFAULT ''"),
-                      ("cambio", "TEXT DEFAULT ''")):
+                      ("cambio", "TEXT DEFAULT ''"),
+                      # 9 nov 2026: chi vende sa gia' del pagamento visto
+                      # nel mempool (l'avviso «in arrivo», una volta sola)
+                      ("visto_avvisato", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -95321,12 +95324,26 @@ async def onchain_controlla(oid: int) -> str:
     ricevuti = sum(u["value"] for u in buone)
     adesso = int(time.time())
     nuovo_ordine = 0
+    in_arrivo = False
     con = _onchain_db_ordini()
     try:
         con.execute("UPDATE onchain_ordini SET visti_sats=?, ricevuti_sats=?,"
                     " utxo=?, aggiornato=? WHERE id=? AND stato='attesa'",
                     (visti, ricevuti, json.dumps(buone), adesso, o["id"]))
         stato = "attesa"
+        # IL PAGAMENTO IN ARRIVO (9 nov 2026, Andrea nella prova da 5 €:
+        # «servirebbe una notifica subito dove almeno si avvisa che
+        # l'ordine e' stato preso»). L'ordine di sempre nasce solo alla
+        # prima conferma, e fino ad allora chi vende non sapeva niente.
+        # Visto tutto nel mempool e non ancora confermato: lo si dice
+        # UNA volta (la colonna e' il lucchetto, la ronda e il tocco
+        # «Controlla» possono passare insieme). Non e' un «venduto»:
+        # in mempool un pagamento si puo' ancora sostituire.
+        if visti >= o["importo_sats"] and ricevuti < o["importo_sats"]:
+            in_arrivo = bool(con.execute(
+                "UPDATE onchain_ordini SET visto_avvisato=1 WHERE id=? AND"
+                " stato='attesa' AND COALESCE(visto_avvisato,0)=0",
+                (o["id"],)).rowcount)
         if ricevuti >= o["importo_sats"]:
             cur = con.execute("UPDATE onchain_ordini SET stato='pagato',"
                               " pagato_il=? WHERE id=? AND stato='attesa'",
@@ -95347,6 +95364,13 @@ async def onchain_controlla(oid: int) -> str:
         con.commit()
     finally:
         con.close()
+    if in_arrivo:
+        await notifica(o["venditore_id"],
+            f"⛓️ <b>Pagamento in arrivo:</b> {html.escape(o['titolo'][:40])}. "
+            "Il compratore ha pagato on-chain e ora la rete deve confermarlo "
+            "(di solito fra dieci minuti e un'ora). L'oggetto è prenotato per "
+            "lui. <b>Non spedire e non consegnare ancora</b>: ti avviso io "
+            "alla conferma, con l'ordine.")
     if nuovo_ordine:
         # niente await fra il commit qui sopra e il CAS di
         # `_incassa_ordine`: la riga 'creato' non resta a meta'. Se
