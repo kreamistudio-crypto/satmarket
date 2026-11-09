@@ -520,7 +520,7 @@ def main():
            f"Paghi <b>{p['paghi']} sats</b> dal tuo wallet Lightning" in cc,
            f"mette <b>{p['ricevi']} sats</b> nel deposito di garanzia (ne servono {importo})" in cc,
            f"costa <b>{p['costo']} sats</b>, li paghi tu. Barattolo non aggiunge niente" in cc,
-           "i bitcoin tornano <b>on-chain</b> al tuo wallet di Barattolo, non in Lightning" in cc,
+           "i bitcoin tornano al tuo wallet <b>on-chain</b>, non in Lightning" in cc,
            f"creaDepositoLnOnchainP2P(this, {oid})" in cc))
     prova("...dal preventivo dello scambio", [{"scambio": oid, "fornitore": "", "hash": ""}],
           t["preventivoChiesto"][:1])

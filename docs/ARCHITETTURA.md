@@ -34428,8 +34428,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   le parole del wallet SOLO senza copia fuori e non ancora `copiata`
   (`swapSemeDaMostrare`). I cassetti per fornitore di prima
   (`swapCassetto`) restano per i record senza `seme`. Nel Profilo il
-  cassetto `accOnchainIncasso` si chiama «🔑 Il wallet di Barattolo» e
-  si accende con `myOnchain || swapAcceso()` (`aggiornaCassettoWallet`):
+  cassetto `accOnchainIncasso` si chiama «₿ On-chain» (fino al 9 nov
+  2026 «il wallet di Barattolo»: Cantieri, «La voce «₿ On-chain»») e
+  si accende con `myOnchain || swapAcceso() || swapAutoAcceso()`
+  (`aggiornaCassettoWallet`). Dal 9 nov l'ordine è: avvisi del wallet
+  (`#walletBarattolo`), dove ricevi (`#onchainIncassoProfilo`), la scelta
+  dello swap automatico (`#swapAutoBlocco`), chiave e parole
+  (`#walletParole`). Prima:
   `renderWalletBarattolo` disegna la chiave (`#walletBarattolo`, la coda
   della xpub del conto 2-di-3), il blocco di prima (`#onchainIncassoProfilo`)
   e le parole (`#walletParole`: «Mostra» via `walletMostraParole`,
