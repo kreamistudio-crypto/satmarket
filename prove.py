@@ -154108,6 +154108,69 @@ def prove_lista_corta_metodi():
            ".p2p-sez-ico.ico-rete{" in mini))
 
 
+def prove_revolut_tre_modi():
+    """REVOLUT IN TRE MODI (9 nov 2026, richiesta di Andrea: «aggiungi il
+    revtag come metodo di pagamento selezionando revolut nel p2p, mettilo
+    selezionabile»; la scelta sua: «RevTag / telefono / IBAN»). Il form
+    di Revolut ha tre bottoni; si chiedono e partono solo i campi della
+    scelta; il RevTag resta di serie e la sua riga e' quella di ieri."""
+    print("\n💳 Revolut in tre modi: RevTag, telefono, IBAN")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    i = mini.index("const P2P_FORME_RECAPITO = [")
+    forme = mini[i:mini.index("\n];\n", i) + 4]
+    js = ("function esc(x){return String(x)}\nconst CAMPO_MAX_TESTO = 300;\n"
+          "function testoAppuntamentoP2P(){return ''}\n"
+          "function quandoDaCampoP2P(){return ''}\nfunction puntoDaCampoP2P(){return ''}\n"
+          + forme + "\n"
+          + _fn_js(mini, "function formaRecapito(") + "\n"
+          + _fn_js(mini, "function viaFormaP2P(fr, valore){") + "\n"
+          + _fn_js(mini, "function campoInViaP2P(c, via){") + "\n"
+          + _fn_js(mini, "function campoRecapitoP2P(c){") + "\n"
+          + "const fr = formaRecapito('Revolut');\n"
+          + "const chiesti = v => fr.campi.filter(c => campoInViaP2P(c, viaFormaP2P(fr, v))).map(c => c.k);\n"
+          + "const html = fr.campi.map(campoRecapitoP2P).join('');\n"
+          + "console.log(JSON.stringify({\n"
+          + "  forma: fr.forma,\n"
+          + "  tag: fr.componi({via: 'tag', tag: '@mariorossi'}),\n"
+          + "  ieri: fr.componi({tag: '@mariorossi'}),\n"
+          + "  tel: fr.componi({via: 'tel', tel: '+39 333 1234567'}),\n"
+          + "  iban: fr.componi({via: 'iban', nome: 'Mario Rossi', iban: 'LT123250000000000000'}),\n"
+          + "  vie: [viaFormaP2P(fr, ''), viaFormaP2P(fr, 'tel'), viaFormaP2P(fr, 'iban'), viaFormaP2P(fr, 'boh')],\n"
+          + "  chiesti: [chiesti(''), chiesti('tel'), chiesti('iban')],\n"
+          + "  senza: [viaFormaP2P(formaRecapito('Satispay'), 'tel'), campoInViaP2P({k: 'x'}, '')],\n"
+          + "  bottoni: (html.match(/class=\"tema-pill p2p-via-pill\"/g) || []).length,\n"
+          + "  nascosto: html.indexOf('<input type=\"hidden\" id=\"p2pCampoEuro_via\">') >= 0,\n"
+          + "  scatole: (html.match(/class=\"p2p-via-campi\" data-via=/g) || []).length,\n"
+          + "}));\n")
+    o = _node_banco(js)
+    if o is None:
+        salta("Revolut in tre modi, sul banco", "node non c'e'")
+    else:
+        prova("il banco di Revolut gira", True, bool(o))
+        o = o or {}
+        prova("Revolut ha ancora il suo form", "revolut", o.get("forma"))
+        prova("col RevTag parte la riga di ieri, anche dal ricordo senza scelta",
+              ["Revolut: @mariorossi", "Revolut: @mariorossi"], [o.get("tag"), o.get("ieri")])
+        prova("col telefono: il titolo e il numero", "Revolut\nTelefono: +39 333 1234567", o.get("tel"))
+        prova("con l'IBAN: il titolo, l'intestatario e l'IBAN",
+              "Revolut\nIntestatario: Mario Rossi\nIBAN: LT123250000000000000", o.get("iban"))
+        prova("la scelta di serie e' il RevTag, e una scelta sconosciuta torna al RevTag",
+              ["tag", "tel", "iban", "tag"], o.get("vie"))
+        prova("si chiedono solo i campi della scelta",
+              [["via", "tag"], ["via", "tel"], ["via", "nome", "iban"]], o.get("chiesti"))
+        prova("un form senza scelta resta com'era", ["", True], o.get("senza"))
+        prova("tre bottoni, il nascosto della scelta e quattro scatole di campi",
+              [3, True, 4], [o.get("bottoni"), o.get("nascosto"), o.get("scatole")])
+    inv = _fn_js(mini, "async function inviaCampoP2P(")
+    prova("l'invio salta i campi delle altre scelte e manda la scelta",
+          (True, True),
+          ("if (via && c.via && c.via !== via) continue;" in inv,
+           "if (c.tipo === 'scelta') { campi[c.k] = via; continue; }" in inv))
+    prova("il foglio allinea la scelta dopo aver messo i valori", True,
+          "if (typeof allineaViaP2P === 'function') allineaViaP2P();" in
+          _fn_js(mini, "function renderCampiP2P(){"))
+
+
 def prove_p2p_onchain_usdt():
     """GLI USDT NEGLI SCAMBI P2P ON-CHAIN (2 nov 2026, cantiere
     p2p-onchain-usdt, Andrea: «usdt onchain assolutamente è da fare»; la
@@ -187936,6 +187999,7 @@ def main():
     prove_usdt_due_reti,
     prove_p2p_onchain_usdt,
     prove_lista_corta_metodi,
+    prove_revolut_tre_modi,
     prove_usdt_moderatori,
     prove_grafica_p2p_onchain,
     prove_scelta_rete_mercatino,
