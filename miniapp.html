@@ -63906,6 +63906,13 @@ function avanzaOrdineP2P(ordine, azione, payload){
     else if (P2P_GIRO_APERTO.indexOf(nuovo) >= 0 || nuovo === 'attivo') o.preso = true;
     /* una mossa vera del coordinatore chiude anche lo stato grezzo */
     delete o.statoGrezzo;
+    /* DA DOVE E' PARTITA LA RICHIESTA DI ANNULLO (9 nov 2026): lo
+       stato di prima, che il coordinatore tiene e noi no — lo legge
+       `azioniDisponibili` per non offrire «Ho inviato gli euro» due volte */
+    const ANNULLI_IN_CORSO = ['annullo_chiesto', 'annullo_proposto'];
+    if (ANNULLI_IN_CORSO.indexOf(nuovo) >= 0) {
+      if (ANNULLI_IN_CORSO.indexOf(o.stato) < 0) o.primaAnnullo = o.stato;
+    } else delete o.primaAnnullo;
     /* ...e la nota dell'annullo vive solo dentro la disputa */
     if (nuovo !== 'in_disputa') delete o.annulloDisputa;
     /* ...dove ENTRA con la richiesta che c'era gia' (28 set 2026, la
@@ -64232,6 +64239,14 @@ function azioniDisponibili(o){
      te», e chi aspetta non ha niente da fare. */
   if (o.lato === 'compro' && o.stato === 'attivo')
     return recapitoEuroArrivatoP2P(o) ? 'euro-inviati' : '';
+  /* LA PROPOSTA DI ANNULLO NON E' UN OBBLIGO (9 nov 2026): per il
+     coordinatore lo scambio resta `active`, e chi compra puo' dire di
+     no e pagare — «Ho inviato gli euro» resta suo. Non quando la
+     proposta e' arrivata a euro gia' segnati (`primaAnnullo`): li' il
+     gesto e' gia' fatto. */
+  if (o.lato === 'compro' && o.stato === 'annullo_proposto'
+      && o.primaAnnullo !== 'euro_inviati')
+    return recapitoEuroArrivatoP2P(o) ? 'euro-inviati' : '';
   if (o.lato === 'vendo'  && o.stato === 'attivo' && o.peer
       && !(o.campiMiei || {}).euro)                            return 'recapito';
   if (o.lato === 'vendo'  && o.stato === 'euro_inviati')       return 'rilascia';
@@ -64304,7 +64319,17 @@ const P2P_ANNULLA_INSIEME = ['attesa_mia_fattura', 'attesa_hold_venditore',
 /* gli stati in cui una disputa vuol dire qualcosa: i sats sono gia'
    in custodia e c'e' una controparte dall'altra parte. Prima non
    c'e' niente da contendere, dopo la cosa e' decisa. */
-const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati'];
+/* ⚠️ UNA RICHIESTA DI ANNULLO NON TOGLIE LA DISPUTA (9 nov 2026, dal
+   campo: chi vendeva ha bloccato i sats e poi chiesto di annullare, chi
+   comprava ha detto no e mandato gli euro, e gli restava solo «Accetta
+   di annullare»). Letto sul sorgente di mostrod v0.20.2: la prima
+   richiesta (`cancel_cooperative_execution_step_1`) scrive solo CHI
+   l'ha chiesta e lascia l'ordine `active` (o `fiat-sent`); `dispute.rs`
+   accetta proprio quei due stati, e `fiat_sent.rs` vuole `active`.
+   Quindi `annullo_chiesto`/`annullo_proposto` sono stati da noi, non
+   dal coordinatore, e la disputa resta di tutt'e due. */
+const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati',
+                         'annullo_chiesto', 'annullo_proposto'];
 /* GLI STATI DOVE L'ANNULLO E' SUBITO (7 ott 2026, «testi P2P che
    confondono», letto sul sorgente della v0.19.0 che il nodo gira):
    `cancel_action` manda `waiting-payment` e `waiting-buyer-invoice` a
@@ -64500,7 +64525,9 @@ const STATI_P2P = {
                   d: 'Il pagamento dei sats a chi compra non è riuscito: si aspetta la sua fattura nuova. Tu non devi fare niente.'},
   concluso: {t: 'Scambio concluso', d: 'È andato tutto a buon fine.'},
   annullo_chiesto: {t: 'Hai chiesto di annullare', d: 'Serve anche il sì dell\'altra persona.'},
-  annullo_proposto: {t: 'L\'altra persona vuole annullare', d: 'Se sei d\'accordo, i sats tornano a chi li ha bloccati.'},
+  annullo_proposto: {t: 'L\'altra persona vuole annullare', d: 'Se sei d\'accordo, i sats tornano a chi li ha bloccati.',
+    /* (9 nov 2026) chi compra puo' dire di no: lo scambio resta in piedi */
+    d_compro: 'Se sei d\'accordo, i sats tornano a chi li ha bloccati. Non sei obbligato: se hai già inviato gli euro non accettare, dillo qui sotto o apri una disputa.'},
   in_disputa: {t: 'Disputa aperta', d: 'Un moderatore esaminerà lo scambio. I sats restano bloccati fino alla decisione.'},
   annullato: {t: 'Scambio annullato', d: 'Nessuno ha perso niente: i sats sono tornati a chi li aveva bloccati.',
               /* IL MIO ORDINE MAI PRESO (26 set 2026: da oggi resta sotto
