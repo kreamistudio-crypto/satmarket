@@ -13258,9 +13258,54 @@ def prove_lista_ordini():
         -- l'export salta: DOPO gli INSERT, che vanno per posizione
         ALTER TABLE ordini ADD COLUMN pagata_da_annullata_il INT DEFAULT 0;
         """)
+        # TUTTO L'ORDINE (9 nov 2026): l'export legge `o.*`, quindi il
+        # cartone porta anche le colonne che il foglio ha imparato a
+        # scrivere — col DEFAULT vero di `ordini`, cosi' i quattro
+        # ordini di sopra restano «ordini di ieri» senza ritocchi
+        for col in ("creato INT DEFAULT 0", "quantita INT DEFAULT 1",
+                    "cassaforte TEXT DEFAULT ''",
+                    "spedizione_sats INT DEFAULT 0",
+                    "protezione_sats INT DEFAULT 0",
+                    "sconto_sats INT DEFAULT 0",
+                    "codice_sconto TEXT DEFAULT ''",
+                    "sped_gratis_sats INT DEFAULT 0",
+                    "accordo_sats INT DEFAULT 0",
+                    "spese_rese_sats INT DEFAULT 0",
+                    "via_punto INT DEFAULT 0", "tipo_punto TEXT DEFAULT ''",
+                    "rete_punto TEXT DEFAULT ''",
+                    "punto_ritiro TEXT DEFAULT ''",
+                    "email_corriere TEXT DEFAULT ''",
+                    "email_corriere_purgata_il INT DEFAULT 0",
+                    "corriere TEXT DEFAULT ''", "tracking TEXT DEFAULT ''",
+                    "spedito_il INT DEFAULT 0", "consegnato INT DEFAULT 0",
+                    "corriere_reso TEXT DEFAULT ''",
+                    "tracking_reso TEXT DEFAULT ''",
+                    "appuntamento_il INT DEFAULT 0",
+                    "accesso_testo TEXT DEFAULT ''",
+                    "nota_compratore TEXT DEFAULT ''",
+                    "risposte TEXT DEFAULT ''",
+                    "risposte_purgate_il INT DEFAULT 0",
+                    "disputata INT DEFAULT 0",
+                    "annullato_venditore_il INT DEFAULT 0",
+                    "motivo_annullo TEXT DEFAULT ''",
+                    "nota_annullo TEXT DEFAULT ''"):
+            c.execute(f"ALTER TABLE ordini ADD COLUMN {col}")
+        c.executescript("""
+        CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
+          titolo TEXT, quantita INT, unitario_sats INT);
+        INSERT INTO utenti VALUES(333,'lucaverdi');
+        """)
         return c
 
-    def _righe_csv(con, tutti, chi=111):
+    def reale_valore(nome):
+        # un catalogo VERO di server.py (una tupla, un dizionario): il
+        # blocco dell'assegnazione fino alla riga vuota, eseguito a parte
+        i = _SORGENTE.index(f"\n{nome} = ") + 1
+        amb_v = {}
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb_v)
+        return amb_v[nome]
+
+    def _righe_csv(con, tutti, chi=111, con_oc=None):
         amb = {"db": lambda: _SenzaClose(con), "time": time,
                "csv": csv_mod, "io": io_mod, "HTTPException": _ErrExp,
                "Response": lambda content, **k: content,
@@ -13274,7 +13319,21 @@ def prove_lista_ordini():
                # prova il FILO, ma la frase dev'essere quella di
                # produzione o il foglio direbbe un'altra cosa
                "frase_zona": reale("frase_zona", CATALOGHI_ZONE),
-               "BIGLIETTI_EXPORT": {"tik": (chi, time.time() + 300, tutti)}}
+               "BIGLIETTI_EXPORT": {"tik": (chi, time.time() + 300, tutti)},
+               # le colonne del 9 nov 2026: i giudici VERI dove sono
+               # puri (cataloghi), finti e in chiaro dove cifrano
+               "TIPI_PUNTO": reale_valore("TIPI_PUNTO"),
+               "MOTIVI_ANNULLO_VENDITORE":
+                   reale_valore("MOTIVI_ANNULLO_VENDITORE"),
+               "CASSAFORTE_ONCHAIN": "onchain", "json": json_mod,
+               "_fmt_sats": reale("_fmt_sats"),
+               "_decifra_contenuto": lambda b: b,
+               "risposte_lette": lambda b: json_mod.loads(b) if b else None,
+               "_email_corriere_letta": lambda b: b if "@" in b else "",
+               "_onchain_db_ordini": lambda: _SenzaClose(con_oc),
+               "_onchain_di_ordine": lambda c, oid: c.execute(
+                   "SELECT * FROM onchain_ordini WHERE ordine_id=?",
+                   (oid,)).fetchone()}
         exec(pezzo("scarica_export"), amb)
         testo = amb["scarica_export"]("tik").lstrip("﻿")
         return list(csv_mod.reader(io_mod.StringIO(testo), delimiter=";"))
@@ -13339,6 +13398,105 @@ def prove_lista_ordini():
     prova("il compratore non vede 'compratore' ne' 'dove' nel proprio "
           "export: sono dati per chi vende, non per chi ha comprato",
           {("", "")}, {(r[6], r[9]) for r in dal_compratore[1:]})
+
+    # ---- TUTTO L'ORDINE, LOCKER COMPRESO (9 nov 2026) ----
+    # Andrea: «quando esporto tutti gli ordini devo vedere anche gli
+    # indirizzi dei locker e tutte le informazioni dell'ordine». Il
+    # locker era il buco vero: una spedizione via punto non ha
+    # `indirizzo`, e «dove» restava bianco proprio sugli ordini da
+    # spedire. Il cartone di sopra, piu' un ordine via locker pagato
+    # on-chain con le risposte e l'email, e un SET.
+    con_exp.executescript("""
+    INSERT INTO ordini(id, annuncio_id, compratore_id, venditore_id,
+      prezzo_sats, stato, cambio_eur, aggiornato, creato, consegna_scelta,
+      indirizzo, indirizzo_purgato_il, quantita, cassaforte,
+      spedizione_sats, protezione_sats, sconto_sats, codice_sconto,
+      via_punto, tipo_punto, rete_punto, punto_ritiro, email_corriere,
+      corriere, tracking, spedito_il, nota_compratore, risposte, disputata)
+    VALUES (5, 1, 222, 111, 10000, 'shipped', 60000, 5000, 4500,
+      'spedizione', '', 0, 2, 'onchain', 1500, 200, 300, 'NATALE',
+      1, 'locker', 'InPost', 'Locker TO123 - Via Po 5 - Torino',
+      'ada@esempio.it', 'InPost', 'TRK999', 4800, 'Lascia al portiere',
+      '[{"d":"Nome","r":"Ada"},{"d":"Taglia","r":"M"}]', 1);
+    INSERT INTO ordini(id, annuncio_id, compratore_id, venditore_id,
+      prezzo_sats, stato, cambio_eur, aggiornato, creato, consegna_scelta,
+      indirizzo, indirizzo_purgato_il, quantita)
+    VALUES (6, 0, 111, 333, 33000, 'locked', 60000, 6000, 5900,
+      'ritiro', '', 0, 3);
+    INSERT INTO ordine_righe(ordine_id, titolo, quantita, unitario_sats)
+    VALUES (6, 'Miele', 2, 12000), (6, 'Crema', 1, 9000);
+    """)
+    con_oc = sqlite3.connect(":memory:")
+    con_oc.row_factory = sqlite3.Row
+    con_oc.executescript("""
+    CREATE TABLE onchain_ordini(id INTEGER PRIMARY KEY, ordine_id INT,
+      utxo TEXT, txid_uscita TEXT);
+    INSERT INTO onchain_ordini VALUES(1, 5,
+      '[{"txid":"aa11","vout":0},{"txid":"aa11","vout":1}]', '');
+    """)
+    pieno = _righe_csv(con_exp, True, con_oc=con_oc)
+    testa = pieno[0]
+    prova("le prime dieci colonne restano dove erano (le formule di "
+          "chi ci ha costruito sopra non si spostano)",
+          ["data", "ruolo", "annuncio", "sats", "esito",
+           "controvalore_eur", "compratore", "consegna", "zona", "dove"],
+          testa[:10])
+    col = {n: i for i, n in enumerate(testa)}
+    prova("...e ogni riga ha tante celle quante l'intestazione", {len(testa)},
+          {len(r) for r in pieno[1:]})
+    loc = next(r for r in pieno[1:] if r[col["ordine"]] == "5")
+    prova("IL LOCKER entra in «dove» (tipo, rete e punto)",
+          "Locker automatico InPost: Locker TO123 - Via Po 5 - Torino",
+          loc[col["dove"]])
+    prova("...e ha le sue colonne", ("Locker automatico", "InPost",
+                                     "Locker TO123 - Via Po 5 - Torino"),
+          (loc[col["tipo_punto"]], loc[col["rete_punto"]],
+           loc[col["punto_ritiro"]]))
+    prova("pagamento on-chain, con la transazione d'ingresso una volta "
+          "sola", ("on-chain", "aa11"),
+          (loc[col["pagamento"]], loc[col["txid_pagamento"]]))
+    prova("il conto scomposto: articolo = totale − spedizione − "
+          "protezione", ("8300", "1500", "200", "300", "NATALE"),
+          (loc[col["articolo_sats"]], loc[col["spedizione_sats"]],
+           loc[col["protezione_sats"]], loc[col["sconto_sats"]],
+           loc[col["codice_sconto"]]))
+    prova("spedizione: corriere, tracking e quando", ("InPost", "TRK999"),
+          (loc[col["corriere"]], loc[col["tracking"]]))
+    prova("...e la data di spedizione non e' vuota", True,
+          bool(loc[col["spedito_il"]]))
+    prova("le risposte alle domande, la nota, l'email e la disputa",
+          ("Nome: Ada | Taglia: M", "Lascia al portiere",
+           "ada@esempio.it", "sì"),
+          (loc[col["risposte"]], loc[col["nota_compratore"]],
+           loc[col["email_corriere"]], loc[col["disputa"]]))
+    prova("un ordine Lightning dice Lightning", "Lightning",
+          next(r for r in pieno[1:] if r[col["ordine"]] == "3")
+          [col["pagamento"]])
+    st = next(r for r in pieno[1:] if r[col["ordine"]] == "6")
+    prova("il SET elenca le righe, coi pezzi e le cifre",
+          "2× Miele (24.000 sats) | 1× Crema (9.000 sats)",
+          st[col["articoli"]])
+    prova("...e sull'ACQUISTO dice da chi si e' comprato",
+          ("acquisto", "lucaverdi", ""),
+          (st[col["ruolo"]], st[col["venditore"]], st[col["compratore"]]))
+    prova("sulla VENDITA il venditore sono io: colonna vuota", "",
+          loc[col["venditore"]])
+    # dal lato di chi COMPRA: il punto lo vede (l'ha scelto lui, e
+    # l'app glielo mostra), l'email per il corriere no — e' una colonna
+    # per chi spedisce, come «dove»
+    loc_c = next(r for r in _righe_csv(con_exp, True, chi=222,
+                                        con_oc=con_oc)[1:]
+                 if r[col["ordine"]] == "5")
+    prova("chi compra vede il suo punto ma non le colonne di chi spedisce",
+          ("Locker TO123 - Via Po 5 - Torino", "", ""),
+          (loc_c[col["punto_ritiro"]], loc_c[col["dove"]],
+           loc_c[col["email_corriere"]]))
+    # I SEGRETI OPERATIVI RESTANO FUORI: il codice della busta e il
+    # contenuto digitale non hanno colonna, e non devono averne
+    prova("nessuna colonna per il codice della busta o il contenuto "
+          "digitale", [], [n for n in testa
+                           if "busta" in n or "contenuto" in n
+                           or n == "invoice"])
 
 
 def prove_dettaglio_ordine():

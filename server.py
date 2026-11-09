@@ -83380,18 +83380,21 @@ def scarica_export(biglietto: str):
     tg_id, _, tutti = dati
     con = db()
     dove = "" if tutti else "AND o.stato IN ('released','refunded') "
+    # TUTTO L'ORDINE (9 nov 2026, richiesta di Andrea: «nessuna
+    # informazione mancata», il locker per primo). `o.*` e non piu'
+    # l'elenco a mano: l'elenco a mano e' come il punto di ritiro era
+    # rimasto fuori — ogni colonna nuova di `ordini` doveva ricordarsi
+    # di passare anche di qui, e nessuna se lo ricordava.
     righe = con.execute(
-        "SELECT o.id, o.annuncio_id, o.aggiornato, o.prezzo_sats, o.stato, "
-        "o.cambio_eur, o.venditore_id, o.consegna_scelta, o.indirizzo, "
-        # la zona applicata: la colonna nuova del foglio (set 2026)
-        "o.zona_sped, o.paese_sped, o.domestico_sped, "
-        "o.indirizzo_purgato_il, a.titolo, a.zona, a.servizio_dove, "
-        "uc.username AS compratore_username FROM ordini o "
+        "SELECT o.*, a.titolo, a.zona, a.servizio_dove, "
+        "uc.username AS compratore_username, "
+        "uv.username AS venditore_username FROM ordini o "
         # LEFT: i SET (annuncio_id=0) devono uscire in contabilita'
         "LEFT JOIN annunci a ON a.id=o.annuncio_id "
         # LEFT anche qui: un compratore mai arrivato a completare la
         # riga non deve far sparire l'ordine dall'export di chi vende
         "LEFT JOIN utenti uc ON uc.tg_id=o.compratore_id "
+        "LEFT JOIN utenti uv ON uv.tg_id=o.venditore_id "
         "WHERE (o.venditore_id=? OR o.compratore_id=?) "
         # (13 ott 2026) la fattura annullata e pagata non e' un affare:
         # fuori dalla contabilita' di tutti e due — e chi vende di
@@ -83400,23 +83403,61 @@ def scarica_export(biglietto: str):
         f"{dove}"
         "ORDER BY o.aggiornato DESC", (tg_id, tg_id)).fetchall()
     # Un set = UNA riga di CSV (un incasso = una riga di contabilita'),
-    # col titolo sintetizzato dalle righe fotografate all'acquisto
-    titoli_set = {}
+    # col titolo sintetizzato dalle righe fotografate all'acquisto.
+    # Dal 9 nov 2026 anche il DETTAGLIO delle righe, in una cella sola
+    # («2× Miele (24.000 sats) | 1× Crema (9.000 sats)»): il titolo
+    # sintetico dice «e altri 2», la contabilita' vuole sapere quali.
+    titoli_set, articoli_set = {}, {}
     for r in righe:
         if not r["annuncio_id"]:
-            titoli_set[r["id"]] = _titolo_ordine([dict(x) for x in con.execute(
-                "SELECT titolo, quantita FROM ordine_righe "
-                "WHERE ordine_id=? ORDER BY id", (r["id"],))])
+            rr = [dict(x) for x in con.execute(
+                "SELECT titolo, quantita, unitario_sats FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (r["id"],))]
+            titoli_set[r["id"]] = _titolo_ordine(rr)
+            articoli_set[r["id"]] = " | ".join(
+                f"{x.get('quantita') or 1}× {x.get('titolo') or '?'} "
+                f"({_fmt_sats((x.get('unitario_sats') or 0) * (x.get('quantita') or 1))}"
+                f" sats)" for x in rr)
     con.close()
+    # L'ON-CHAIN (9 nov 2026): con che cosa si e' pagato, e le
+    # transazioni — vivono nella cassaforte on-chain, un altro database
+    onchain = {}
+    if any((r["cassaforte"] or "") == CASSAFORTE_ONCHAIN for r in righe):
+        con_oc = _onchain_db_ordini()
+        try:
+            for r in righe:
+                if (r["cassaforte"] or "") == CASSAFORTE_ONCHAIN:
+                    onchain[r["id"]] = _onchain_di_ordine(con_oc, r["id"])
+        finally:
+            con_oc.close()
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")    # il ; e' il CSV che Excel italiano apre bene
     # «zona» dopo «consegna»: e' la tariffa che e' stata applicata,
     # e in contabilita' una spedizione in Australia e una a Bari non si
     # distinguerebbero altrimenti (set 2026).
+    # LE COLONNE DEL 9 NOV 2026 stanno TUTTE IN CODA: le prime dieci
+    # restano dove erano, cosi' il foglio di chi ci ha gia' costruito
+    # sopra una formula non si sposta di una cella.
     w.writerow(["data", "ruolo", "annuncio", "sats", "esito",
-               "controvalore_eur", "compratore", "consegna", "zona", "dove"])
+               "controvalore_eur", "compratore", "consegna", "zona", "dove",
+               "ordine", "data_ordine", "venditore", "quantita", "articoli",
+               "pagamento", "articolo_sats", "spedizione_sats",
+               "protezione_sats", "sconto_sats", "codice_sconto",
+               "spedizione_gratis_sats", "accordo_sats",
+               "spese_trattenute_sats", "tipo_punto", "rete_punto",
+               "punto_ritiro", "email_corriere", "corriere", "tracking",
+               "spedito_il", "consegnato_il", "corriere_reso",
+               "tracking_reso", "appuntamento", "luogo_incontro",
+               "nota_compratore", "risposte", "disputa",
+               "annullo_venditore", "txid_pagamento", "txid_uscita"])
     CONSEGNA_ETICHETTA = {"spedizione": "spedizione", "ritiro": "ritiro in zona",
                           "digitale": "digitale", "servizio": "servizio"}
+    TIPO_PUNTO_ETICHETTA = {t[0]: t[1] for t in TIPI_PUNTO}
+
+    def quando(ts):
+        # un istante (0 = mai): giorno e ora, l'ora conta per un ritiro
+        return time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else ""
+
     for r in righe:
         eur = ""
         if r["cambio_eur"]:               # 0 = ordine storico: campo vuoto, onesto
@@ -83439,6 +83480,19 @@ def scarica_export(biglietto: str):
                 dove_consegnare = r["zona"] or ""
             elif r["consegna_scelta"] == "servizio":
                 dove_consegnare = r["servizio_dove"] or ""
+            elif r["via_punto"]:
+                # IL LOCKER (9 nov 2026): una spedizione a un punto di
+                # ritiro non ha un indirizzo di casa — `indirizzo` e'
+                # vuoto per costruzione — e «dove» restava bianco
+                # proprio sugli ordini da spedire. Il testo del punto
+                # non si purga: e' l'indirizzo di un negozio o di un
+                # locker, non quello di una persona.
+                dove_consegnare = " ".join(x for x in (
+                    TIPO_PUNTO_ETICHETTA.get(r["tipo_punto"], ""),
+                    r["rete_punto"] or "") if x)
+                dove_consegnare = (f"{dove_consegnare}: {r['punto_ritiro']}"
+                                   if dove_consegnare and r["punto_ritiro"]
+                                   else r["punto_ritiro"] or dove_consegnare)
             elif (r["consegna_scelta"] in ("spedizione", "")
                   and r["indirizzo"] and not r["indirizzo_purgato_il"]):
                 # onesto e non un errore: un indirizzo gia' PURGATO (10
@@ -83454,7 +83508,52 @@ def scarica_export(biglietto: str):
                     ) if x)
                     dove_consegnare = ", ".join(x for x in (
                         campi.get("nome"), riga_via, campi.get("provincia"),
-                        campi.get("telefono")) if x)
+                        campi.get("telefono"),
+                        # la nota per il corriere vive DENTRO l'indirizzo
+                        # e va sull'etichetta: chi spedisce deve vederla
+                        campi.get("note")) if x)
+        # --- le colonne del 9 nov 2026 ---
+        # Le parti che l'app mostra a TUTTI E DUE nel dettaglio
+        # dell'ordine (il punto scelto, la nota, le risposte, il luogo
+        # dell'incontro) escono su tutti e due i lati; quelle che
+        # servono solo a chi SPEDISCE (l'email per il corriere) solo
+        # sulle vendite, come «compratore» e «dove». Restano FUORI di
+        # proposito i SEGRETI OPERATIVI: il codice della busta di ritiro
+        # e il contenuto digitale, che escono solo dai loro endpoint
+        # (la decisione del cantiere «Chi ha comprato, e dove
+        # consegnare»), e le fatture Lightning.
+        risposte = ""
+        if r["risposte"] and not r["risposte_purgate_il"]:
+            coppie = risposte_lette(r["risposte"]) or []
+            risposte = " | ".join(
+                f"{c.get('d') or ''}: {c.get('r') or ''}"
+                for c in coppie if isinstance(c, dict))
+        email = ""
+        if (mio_lato_vendita and r["email_corriere"]
+                and not r["email_corriere_purgata_il"]):
+            email = _email_corriere_letta(r["email_corriere"])
+        luogo = ""
+        if r["accesso_testo"]:
+            luogo = _decifra_contenuto(r["accesso_testo"])
+        annullo = ""
+        if r["annullato_venditore_il"]:
+            annullo = " — ".join(x for x in (
+                MOTIVI_ANNULLO_VENDITORE.get(r["motivo_annullo"],
+                                             r["motivo_annullo"] or ""),
+                r["nota_annullo"] or "") if x)
+            annullo = f"{quando(r['annullato_venditore_il'])} {annullo}".strip()
+        oc = onchain.get(r["id"])
+        txid_in = ""
+        if oc:
+            try:
+                monete = json.loads(oc["utxo"] or "[]")
+            except Exception:
+                monete = []
+            txid_in = " ".join(dict.fromkeys(
+                m.get("txid", "") for m in monete
+                if isinstance(m, dict) and m.get("txid")))
+        spedizione = r["spedizione_sats"] or 0
+        protezione = r["protezione_sats"] or 0
         w.writerow([time.strftime("%Y-%m-%d", time.localtime(r["aggiornato"])),
                     "vendita" if mio_lato_vendita else "acquisto",
                     titoli_set.get(r["id"], r["titolo"] or "?"), r["prezzo_sats"],
@@ -83465,7 +83564,27 @@ def scarica_export(biglietto: str):
                     (frase_zona(r["zona_sped"], r["paese_sped"],
                                 r["domestico_sped"])
                      if r["consegna_scelta"] == "spedizione" else ""),
-                    dove_consegnare])
+                    dove_consegnare,
+                    r["id"], quando(r["creato"]),
+                    "" if mio_lato_vendita else (r["venditore_username"] or ""),
+                    r["quantita"] or 1, articoli_set.get(r["id"], ""),
+                    ("on-chain" if (r["cassaforte"] or "") == CASSAFORTE_ONCHAIN
+                     else "Lightning"),
+                    # l'articolo si deriva per sottrazione: prezzo_sats e'
+                    # il TOTALE in cassaforte (il conto scomposto, lug 2026)
+                    r["prezzo_sats"] - spedizione - protezione,
+                    spedizione, protezione, r["sconto_sats"] or 0,
+                    r["codice_sconto"] or "", r["sped_gratis_sats"] or 0,
+                    r["accordo_sats"] or 0, r["spese_rese_sats"] or 0,
+                    TIPO_PUNTO_ETICHETTA.get(r["tipo_punto"], ""),
+                    r["rete_punto"] or "", r["punto_ritiro"] or "",
+                    email, r["corriere"] or "", r["tracking"] or "",
+                    quando(r["spedito_il"]), quando(r["consegnato"]),
+                    r["corriere_reso"] or "", r["tracking_reso"] or "",
+                    quando(r["appuntamento_il"]), luogo,
+                    r["nota_compratore"] or "", risposte,
+                    "sì" if r["disputata"] else "", annullo,
+                    txid_in, (oc["txid_uscita"] or "") if oc else ""])
     nome = time.strftime(
         f"barattolo-affari{'-tutti' if tutti else ''}-%Y%m%d.csv")
     return Response(content="\ufeff" + buf.getvalue(),   # BOM: cosi' Excel legge l'UTF-8
