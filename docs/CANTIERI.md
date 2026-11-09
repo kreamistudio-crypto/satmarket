@@ -78860,3 +78860,31 @@ nuovo, `TestClient` su `/api/export/{biglietto}`): un ordine via locker
 on-chain e uno a casa con indirizzo cifrato escono completi.
 **DA GUARDARE** dal vivo: scaricare «📄 Esporta tutti gli ordini in
 CSV» da Telegram e aprirlo in Excel.
+
+## La voce «📥 Come ricevi» (9 nov 2026 sera, cantiere come-ricevi, Andrea dal telefono: «perché mi hai messo tutto nella sezione onchain?»)
+
+PERCHÉ. Dopo la promozione Andrea ha visto le due righe «Quando ti pagano
+in Lightning / on-chain, ricevi in» dentro la voce «₿ On-chain». Le avevo
+messe lì perché «On-chain» si sceglie solo con un posto dove ricevere, e
+perché a mezzogiorno lui aveva scelto la voce unica dell'on-chain. Ma
+«come ricevi» riguarda anche chi usa solo Lightning, e dentro «On-chain»
+non lo cerca nessuno. Sulla carta ha scelto «Voce nuova "Come ricevi"».
+
+COSA SI È DECISO. In «Incassi e pagamenti», fra «⚡ Lightning address» e
+«₿ On-chain», la voce «📥 Come ricevi» con le due righe
+(`#swapAutoBlocco`, `#onchainModoProfilo`); si accende con lo swap
+automatico o col cambio in Lightning (`renderComeRicevi`), mai in DEMO.
+In «On-chain» restano gli avvisi del wallet, dove ricevi, la chiave e le
+12 parole. Il tasto dello swap automatico «Cambia dove ricevi ›» apre la
+voce «On-chain» e scorre al campo; le righe che dicevano «qui sopra»
+dicono «nella voce «On-chain»»; il form dell'annuncio rimanda a «Come
+ricevi».
+
+SCARTATI. Le due righe sotto «Lightning address» (la riga on-chain lì
+non c'entra). Lasciare tutto in «On-chain».
+
+PROVATO. `prove_banco_chiavi_onchain` (+1: la voce, il posto, il
+contenuto, il cancello), `prove_parole_uniche` (il tasto ›), più
+`prove_swap_auto_schermate`, `prove_incasso_annuncio`,
+`prove_sintassi_client`; anteprima chiaro e scuro mandata ad Andrea.
+

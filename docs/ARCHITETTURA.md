@@ -34433,9 +34433,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   si accende con `myOnchain || swapAcceso() || swapAutoAcceso()`
   (`aggiornaCassettoWallet`). Dal 9 nov l'ordine è: avvisi del wallet
   (`#walletBarattolo`), dove ricevi (`#onchainIncassoProfilo`), la scelta
-  dello swap automatico (`#swapAutoBlocco`), dal 9 nov sera la scelta
-  per chi paga on-chain (`#onchainModoProfilo`), chiave e parole
-  (`#walletParole`). Prima:
+  chiave e parole (`#walletParole`). Le due scelte di come ricevi
+  (`#swapAutoBlocco`, `#onchainModoProfilo`) dalla sera del 9 nov stanno
+  nella voce «📥 Come ricevi» (`accComeRicevi`, fra «Lightning address» e
+  «On-chain», accesa da `renderComeRicevi`). Prima:
   `renderWalletBarattolo` disegna la chiave (`#walletBarattolo`, la coda
   della xpub del conto 2-di-3), il blocco di prima (`#onchainIncassoProfilo`)
   e le parole (`#walletParole`: «Mostra» via `walletMostraParole`,
@@ -35337,7 +35338,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `swap_auto_modo`; `POST /api/swap/auto/preferenza` prende `{modo}` (e
   ancora `{onchain}`). «Quando ti pagano on-chain, ricevi in»: la
   `onchain_modo` di prima (onchain | lightning | ogni_volta), disegnata in
-  `#onchainModoProfilo` da `onchainModoBlocco`. L'ANNUNCIO: `annunci.incasso`
+  `#onchainModoProfilo` da `onchainModoBlocco` (tutt'e due nella voce
+  «📥 Come ricevi», `accComeRicevi`). L'ANNUNCIO: `annunci.incasso`
   ('ln' | 'onchain' | '' = come nel Profilo), scritto da pubblica e
   modifica col giudice `incasso_da_payload` (modifica: solo se la chiave
   c'è), letto da `incasso_annuncio`; nel form il campo

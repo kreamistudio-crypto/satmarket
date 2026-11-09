@@ -119996,7 +119996,7 @@ def prove_profilo_elegante():
                        "accCodici", "accBanner", "accSlugNegozio", "accFerie"],
         "grpCompri": ["accPreferiti", "accRicerche", "accPuntiRitiro",
                       "vocSicurezza"],
-        "grpIncassi": ["accLnAddress", "accOnchainIncasso", "accNwc", "vocEsporta"],
+        "grpIncassi": ["accLnAddress", "accComeRicevi", "accOnchainIncasso", "accNwc", "vocEsporta"],
         "grpLivello": ["accLivello", "accInviti", "accDistintivi"],
         "grpAspetto": ["accAvvisi", "accAspetto"],
         # l'assistenza in app (3 nov 2026) sta con «I tuoi dati»
@@ -153265,7 +153265,11 @@ def prove_banco_chiavi_onchain():
     # tiene tutto l'on-chain: dove ricevi in cima, le due scelte di come
     # ricevi (anche quella dello swap automatico, che stava in «Lightning
     # address»), in fondo la chiave e le parole
-    _lnaddr = mini[mini.index('<div class="acc" id="accLnAddress">'):mini.index('<div class="acc" id="accOnchainIncasso"')]
+    # (9 nov 2026 sera, come-ricevi) le due scelte escono in «📥 Come
+    # ricevi», fra «Lightning address» e «On-chain»
+    _lnaddr = mini[mini.index('<div class="acc" id="accLnAddress">'):mini.index('<div class="acc" id="accComeRicevi"')]
+    _come = mini[mini.index('<div class="acc" id="accComeRicevi"'):mini.index('<div class="acc" id="accOnchainIncasso"')]
+    _rc = pezzo_js(mini, "function renderComeRicevi(){", "\n}\n")
     _testa = mini[mini.index('<button class="acc-h" onclick="toggleAcc(\'accOnchainIncasso\')">'):]
     _testa = _testa[:_testa.index("</button>")]
     _dove = pezzo_js(mini, "function renderIncassoOnchainProfilo(){", "\n}\n")
@@ -153279,7 +153283,7 @@ def prove_banco_chiavi_onchain():
           [_testa.endswith("</span></span>On-chain<span class=\"fr\">▾</span>"),
            "cambio-moneta btc p2p-oc-moneta" in _testa,
            "swapAutoBlocco" in _lnaddr,
-           _dove.index("<h4>Dove ricevi i bitcoin</h4>") < _dove.index("onchainModoBlocco()"),
+           _dove.index("<h4>Dove ricevi i bitcoin</h4>") < _dove.index("renderComeRicevi();"),
            "box.innerHTML = `<div id=\"walletUnico\"></div>`;" in _wb,
            _wb.index("<h4>La tua chiave</h4>") < _wb.index("<h4>Le 12 parole</h4>"),
            _utente])
@@ -153287,12 +153291,18 @@ def prove_banco_chiavi_onchain():
           "swap automatico e mai in DEMO, col campo dentro e la voce in «Completa il profilo»",
           [True, True, True, True],
           ["el('accOnchainIncasso').style.display = ((myOnchain || swapAcceso() || swapAutoAcceso()) && !DEMO) ? '' : 'none';" in mini,
-           # (9 nov, incasso-annuncio) fra lo swap e la chiave la riga
-           # «Quando ti pagano on-chain, ricevi in»
+           # (9 nov sera, come-ricevi) le due scelte non stanno piu' qui
            '<div class="acc-b"><div id="walletBarattolo"></div><div id="onchainIncassoProfilo"></div>'
-           '<div id="swapAutoBlocco"></div><div id="onchainModoProfilo"></div><div id="walletParole"></div></div>' in mini,
+           '<div id="walletParole"></div></div>' in mini,
            "onchainModuloIncasso('ocProf')" in mini,
            "acc:'accOnchainIncasso'});" in pezzo_js(mini, "function renderChecklist(){", "\n}\n")])
+    prova("(9 nov sera) «📥 Come ricevi»: le due righe, fra «Lightning address» e «On-chain», "
+          "accesa dallo swap automatico o dal cambio in Lightning, mai in DEMO",
+          [True, True, True, True],
+          ['<span class="em">📥</span>Come ricevi<span class="fr">▾</span>' in _come,
+           '<div class="acc-b"><div id="swapAutoBlocco"></div><div id="onchainModoProfilo"></div></div>' in _come,
+           "onchainModoBlocco()" in _rc and "(!DEMO && (swapAutoAcceso()" in _rc,
+           "renderSwapAutoProfilo();\n  renderComeRicevi();" in mini])
     prova("...e la porta alla scheda Impostazioni resta, per i dettagli",
           [True, True], ['onclick="onchainApriIncassi()"' in mini,
                          "onchainTab = 'impostazioni';\n  go('onchain');" in mini])
@@ -156838,9 +156848,10 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
           (True, True),
           # (9 nov, incasso-annuncio) anche con «Ogni volta» il tasto c'e'
           ("modo !== 'ln' && typeof myOnchain !== 'undefined' && myOnchain" in _auto,
+           # (9 nov sera, come-ricevi) il campo sta nell'altra voce: ›
            "onclick=\"onchainVaiAlCampo()\">${a.indirizzo ? "
-           "'Cambia dove ricevi ↑' : 'Scegli dove ricevere: xpub o "
-           "indirizzo ↑'}" in _auto))
+           "'Cambia dove ricevi ›' : 'Scegli dove ricevere: xpub o "
+           "indirizzo ›'}" in _auto))
 
 
 def prove_incasso_esterno_onchain():

@@ -14664,6 +14664,18 @@ document.getElementById('cartello')?.remove();</script>
         <div class="acc-b"><div id="lnAddrBlocco"></div></div>
       </div>
 
+      <!-- 📥 COME RICEVI (9 nov 2026 sera, Andrea: «perché mi hai messo
+           tutto nella sezione onchain?», scelta sulla carta «Voce nuova
+           Come ricevi»). Le due righe «Quando ti pagano in Lightning /
+           on-chain, ricevi in» riguardano anche chi usa solo Lightning:
+           dentro «On-chain» non le cercava nessuno. In «On-chain» restano
+           dove ricevi, la chiave e le 12 parole. Si accende con lo swap
+           automatico o col cambio in Lightning (`renderComeRicevi`). -->
+      <div class="acc" id="accComeRicevi" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accComeRicevi')"><span class="em">📥</span>Come ricevi<span class="fr">▾</span></button>
+        <div class="acc-b"><div id="swapAutoBlocco"></div><div id="onchainModoProfilo"></div></div>
+      </div>
+
       <!-- 🔑 IL WALLET DI BARATTOLO (29 ott 2026, cantiere parole-uniche,
            Alan: «dove vedo la parte LN deve esserci una sezione che
            mostri il wallet di Barattolo per la composizione del multisig
@@ -14697,7 +14709,7 @@ document.getElementById('cartello')?.remove();</script>
            parole. La moneta è quella del Cambio (P2P_OC_MONETA), mai ⛓️. -->
       <div class="acc" id="accOnchainIncasso" style="display:none">
         <button class="acc-h" onclick="toggleAcc('accOnchainIncasso')"><span class="em"><span class="cambio-moneta btc p2p-oc-moneta" aria-hidden="true"><svg class="cambio-svg" viewBox="0 0 24 24"><g transform="rotate(13 12 12)"><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g></svg></span></span>On-chain<span class="fr">▾</span></button>
-        <div class="acc-b"><div id="walletBarattolo"></div><div id="onchainIncassoProfilo"></div><div id="swapAutoBlocco"></div><div id="onchainModoProfilo"></div><div id="walletParole"></div></div>
+        <div class="acc-b"><div id="walletBarattolo"></div><div id="onchainIncassoProfilo"></div><div id="walletParole"></div></div>
       </div>
 
       <div class="acc" id="accNwc">
@@ -19437,8 +19449,8 @@ function renderSwapAutoProfilo(){
       ? 'Arrivano al <b>tuo wallet on-chain</b>, a un indirizzo nuovo per ogni vendita.'
       : `Arrivano a <span class="mono" style="word-break:break-all">${esc(a.indirizzo)}</span>.`)
     : 'L\'indirizzo lo scrivi quando confermi.';
-  /* (9 nov 2026, nome-onchain) sta nella voce «On-chain», sotto «Dove
-     ricevi i bitcoin»: prima era dentro «Lightning address» */
+  /* (9 nov 2026, nome-onchain) stava nella voce «On-chain»; dalla sera
+     dello stesso giorno sta in «📥 Come ricevi», con la gemella on-chain */
   box.innerHTML = `<div class="payout"><h4>Quando ti pagano in Lightning, ricevi in</h4>
     <div class="scelta-incasso scelta-auto scelta-tre" role="radiogroup" aria-label="Quando ti pagano in Lightning, ricevi in">
       ${tasto('ln', P2P_LN_MONETA + 'Lightning')}${tasto('onchain', P2P_OC_MONETA + '<span class="nw">On-chain</span>')}${tasto('ogni_volta', '<span>🤔</span><span class="nw">Ogni volta</span>')}</div>
@@ -19452,14 +19464,19 @@ function renderSwapAutoProfilo(){
       /* (3 nov 2026, Andrea: «dovrebbe chiedere la xpub») il campo e' UNO,
          quello di «Dove ricevi i bitcoin»; dal 9 nov sta nella stessa
          voce, qui sopra: il tasto ci riporta il dito */
-      ? `<button type="button" class="btn link" style="margin-top:4px" onclick="onchainVaiAlCampo()">${a.indirizzo ? 'Cambia dove ricevi ↑' : 'Scegli dove ricevere: xpub o indirizzo ↑'}</button>`
+      ? `<button type="button" class="btn link" style="margin-top:4px" onclick="onchainVaiAlCampo()">${a.indirizzo ? 'Cambia dove ricevi ›' : 'Scegli dove ricevere: xpub o indirizzo ›'}</button>`
       : ''}</div>`;
 }
 function onchainVaiAlCampo(){
-  const c = el('ocProfValore');
-  if (!c) return;
-  c.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'center'});
-  c.focus({preventScroll: true});
+  /* (9 nov 2026 sera) la scelta sta in «Come ricevi», il campo in
+     «On-chain»: si apre quella voce, poi si scorre al campo */
+  apriCassettoProfilo('accOnchainIncasso');
+  setTimeout(() => {
+    const c = el('ocProfValore');
+    if (!c) return;
+    c.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'center'});
+    c.focus({preventScroll: true});
+  }, 350);
 }
 async function scegliSwapAutoProfilo(modo){
   haptic();
@@ -38599,6 +38616,7 @@ function renderLnAddress(){
   renderIncassoOnchainProfilo();
   renderWalletBarattolo();
   renderSwapAutoProfilo();
+  renderComeRicevi();
   if (DEMO) return;
   if (myLnAddress && !lnAddrModifica) {
     box.innerHTML = `
@@ -52894,7 +52912,7 @@ function renderIncassoForm(){
     ? `Ricevi in Lightning anche se chi compra paga on-chain: il cambio lo fa Barattolo, e il costo lo vedi prima.${sotto}`
     : scelta === 'onchain'
     ? `Ricevi bitcoin on-chain anche se chi compra paga in Lightning: il cambio lo fa Barattolo, e il costo lo vedi prima.${sotto}`
-    : `${incassoProfiloRiassunto()} Lo cambi nel Profilo, voce «On-chain».`;
+    : `${incassoProfiloRiassunto()} Lo cambi nel Profilo, voce «Come ricevi».`;
 }
 function scegliIncassoSell(cosa){
   haptic();
@@ -58195,7 +58213,7 @@ function onchainModoBlocco(){
     + `</div>`;
   if (modo === 'onchain') return `<div class="payout"><h4>Quando ti pagano on-chain, ricevi in</h4>
     ${pillole}
-    <div class="hint">I bitcoin arrivano dove hai scelto qui sopra. Su ogni annuncio puoi sceglierlo anche solo per quell'oggetto.</div></div>`;
+    <div class="hint">I bitcoin arrivano dove hai scelto nella voce «On-chain». Su ogni annuncio puoi sceglierlo anche solo per quell'oggetto.</div></div>`;
   if (!onchainEsempioCambio) onchainEsempioCarica();
   const e = onchainEsempioCambio || {};
   const nome = esc(e.fornitore_nome || myOnchainLn.fornitore || 'SATS Routing');
@@ -58213,7 +58231,7 @@ function onchainModoBlocco(){
     ${pillole}
     <div class="hint">${esempio}</div>
     <div class="hint" style="margin-top:6px">⚠️ <b>Il tuo wallet Lightning deve avere la capienza</b> per ricevere la cifra intera.
-      ${minimo ? `Sotto i ${fmt(minimo)} sats il cambio non si fa: quella vendita arriva on-chain, dove hai scelto qui sopra.` : ''}</div>
+      ${minimo ? `Sotto i ${fmt(minimo)} sats il cambio non si fa: quella vendita arriva on-chain, dove hai scelto nella voce «On-chain».` : ''}</div>
     <div class="hint" style="margin-top:6px">${come}</div></div>`;
 }
 async function onchainEsempioCarica(){
@@ -58258,9 +58276,16 @@ function renderIncassoOnchainProfilo(){
          nel 2-di-3 ed escono appena scegli. Non finiscono mai in un conto di Barattolo.</div>`)
     + onchainModuloIncasso('ocProf')
     + `<button class="btn link" style="margin-top:4px" onclick="onchainApriIncassi()">Dettagli nella pagina On-chain ›</button></div>`;
-  /* (9 nov 2026, incasso-annuncio) «quando ti pagano on-chain» ha il suo
-     posto, sotto la riga Lightning */
-  if (el('onchainModoProfilo')) el('onchainModoProfilo').innerHTML = onchainModoBlocco();
+  renderComeRicevi();
+}
+/* (9 nov 2026 sera) LA VOCE «📥 COME RICEVI»: la riga Lightning la
+   disegna `renderSwapAutoProfilo`, quella on-chain si disegna qui; il
+   cassetto c'e' se almeno una delle due c'e', mai in DEMO */
+function renderComeRicevi(){
+  if (el('onchainModoProfilo')) el('onchainModoProfilo').innerHTML = DEMO ? '' : onchainModoBlocco();
+  const acc = el('accComeRicevi');
+  if (acc) acc.style.display = (!DEMO && (swapAutoAcceso()
+    || !!(typeof myOnchainLn !== 'undefined' && myOnchainLn && myOnchainLn.attivo))) ? '' : 'none';
 }
 
 /* ============ IL WALLET DI BARATTOLO NEL PROFILO (29 ott 2026,
