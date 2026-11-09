@@ -78771,3 +78771,42 @@ miniapp tolti i commenti, né nelle righe di server.py che non sono
 commento o log; aggiornate le prove che leggevano i testi vecchi
 (`via on-chain ₿`, il riepilogo degli avvisi P2P «₿ On-chain: 1», il
 titolo dell'on-chain spento).
+
+
+## Revolut in tre modi: RevTag, telefono o IBAN (9 nov 2026, richiesta di Andrea: «aggiungi il revtag come metodo di pagamento selezionando revolut nel p2p, cioè mettilo selezionabile»)
+
+COSA SI È DECISO. La richiesta si leggeva in due modi, e ad Andrea sono
+state messe davanti le due strade: il campo del RevTag nel foglio
+on-chain (dove «Dove vuoi gli euro» è un campo libero) o la scelta
+dentro il form di Revolut del P2P. Ha scelto la seconda. Nel foglio
+«🤝 I vostri recapiti», con Revolut, chi vende vede «Come vuoi ricevere
+su Revolut» e tre bottoni: RevTag (di serie), Telefono, IBAN (con
+l'intestatario, che a chi paga da un'altra banca serve). Si vedono, si
+chiedono e partono solo i campi della scelta.
+
+COME. Un tipo di campo nuovo, `scelta`: un nascosto con l'id di sempre
+(`p2pCampoEuro_via`) e i bottoni sopra; i campi di una sola scelta
+portano `via` e stanno in una scatola che `allineaViaP2P` mostra o
+nasconde, senza ridisegnare (la tastiera resta aperta). I giudici puri
+sono `viaFormaP2P` (la scelta che vale: quella scritta se è un'opzione,
+sennò la prima) e `campoInViaP2P`; l'invio salta i campi delle altre
+scelte. Il campo del RevTag resta `tag` e la scelta di serie è il
+RevTag APPOSTA: il ricordo di ieri ({tag}, senza `via`) precompila come
+prima e la riga che parte è byte per byte quella di ieri, «Revolut: @…».
+Telefono e IBAN partono come il bonifico (il titolo «Revolut», poi le
+righe): il riquadro di chi compra sa già copiare il numero (per forma) e
+l'IBAN (la sua strada). Il server, il tag `pm` e il vocabolario dei
+metodi non cambiano: Revolut resta UN metodo.
+
+SCARTATI. Tre metodi separati nel libro («Revolut RevTag»…): il `pm`
+viaggia in chiaro e lo leggono i client altrui, e chi compra non sceglie
+il circuito per il modo in cui chi vende riceve. Il campo libero
+«RevTag, telefono o IBAN» (come Wise): Andrea ha chiesto un selezionabile.
+Il campo on-chain: proposto, non scelto (resta libero come prima).
+
+PROVATO. `prove_revolut_tre_modi` (nuova: le tre righe composte, il
+ricordo di ieri, la scelta di serie e quella sconosciuta, i campi chiesti
+per scelta, un form senza scelta invariato, il disegno: tre bottoni, il
+nascosto, quattro scatole; l'invio e il foglio). Anteprima del form
+nelle tre scelte a 390 px. DA GUARDARE: uno scambio vero con Revolut via
+telefono e via IBAN, il riquadro di chi compra.

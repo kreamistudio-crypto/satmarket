@@ -85288,9 +85288,29 @@ const P2P_FORME_RECAPITO = [
    componi: (c, m) => (/instant/i.test(String(m || '')) ? 'Bonifico SEPA Instant' : 'Bonifico SEPA')
      + '\nIntestatario: ' + c.nome + '\nIBAN: ' + c.iban
      + (c.causale ? '\nCausale: ' + c.causale : '')},
+  /* REVOLUT IN TRE MODI (9 nov 2026, richiesta di Andrea: «aggiungi il
+     revtag come metodo di pagamento selezionando revolut nel p2p,
+     mettilo selezionabile», e la scelta sua fra le proposte: «RevTag /
+     telefono / IBAN»). Chi vende sceglie coi tre bottoni del campo
+     `via` (`tipo: 'scelta'`, un nascosto coi suoi bottoni sopra), e si
+     vedono solo i campi col suo `via`: gli altri non si chiedono, non
+     partono e non si ricordano (vedi `campoInViaP2P`). Il RevTag resta
+     DI SERIE e il campo resta `tag`, apposta: il ricordo di ieri
+     ({tag: '@…'}, senza `via`) precompila come prima, e la riga che
+     parte col RevTag e' byte per byte quella di ieri, «Revolut: @…».
+     Telefono e IBAN partono come il bonifico: il titolo «Revolut» (una
+     riga senza cifre) e sotto i dati, che il riquadro di chi compra sa
+     gia' copiare — il numero per forma, l'IBAN per la sua strada. */
   {forma: 'revolut', riconosce: /revolut/i,
-   campi: [{k: 'tag', et: 'Il tuo RevTag', ph: '@mariorossi'}],
-   componi: c => 'Revolut: ' + c.tag},
+   campi: [{k: 'via', tipo: 'scelta', et: 'Come vuoi ricevere su Revolut', facoltativo: true,
+            opzioni: [{v: 'tag', nome: 'RevTag'}, {v: 'tel', nome: 'Telefono'}, {v: 'iban', nome: 'IBAN'}]},
+           {k: 'tag', via: 'tag', et: 'Il tuo RevTag', ph: '@mariorossi'},
+           {k: 'tel', via: 'tel', et: 'Il numero di telefono del tuo Revolut', ph: '+39 333 1234567'},
+           {k: 'nome', via: 'iban', et: 'Intestatario (nome e cognome)', ph: 'Mario Rossi'},
+           {k: 'iban', via: 'iban', et: 'IBAN del tuo conto Revolut', ph: 'LT12 3250 0000 0000 0000'}],
+   componi: c => c.via === 'tel' ? 'Revolut\nTelefono: ' + c.tel
+     : c.via === 'iban' ? 'Revolut\nIntestatario: ' + c.nome + '\nIBAN: ' + c.iban
+     : 'Revolut: ' + c.tag},
   {forma: 'satispay', riconosce: /satispay/i,
    campi: [{k: 'tel', et: 'Numero di telefono Satispay', ph: '333 1234567'}],
    componi: c => 'Satispay: ' + c.tel},
@@ -85394,6 +85414,19 @@ function giudiceCausaleSepaP2P(v, max){
 function campoRecapitoP2P(c){
   const id = 'p2pCampoEuro_' + c.k;
   if (c.tipo === 'hidden') return '<input type="hidden" id="' + id + '">';
+  /* LA SCELTA (9 nov 2026, Revolut in tre modi): il valore sta in un
+     nascosto con l'id di sempre — chi lo salva, lo rilegge e lo manda
+     non cambia — e i bottoni sopra lo scrivono (`scegliViaP2P`); quale
+     e' acceso lo dice `allineaViaP2P`, dopo che i valori sono entrati */
+  if (c.tipo === 'scelta')
+    return '<div class="field"><label>' + esc(c.et) + '</label><div class="p2p-metodi">'
+      + c.opzioni.map(op => '<button type="button" class="tema-pill p2p-via-pill" data-v="' + esc(op.v)
+        + '" onclick="scegliViaP2P(this.dataset.v)">' + esc(op.nome) + '</button>').join('')
+      + '</div><input type="hidden" id="' + id + '"></div>';
+  /* un campo di una sola delle scelte sta nella sua scatola, che
+     `allineaViaP2P` mostra o nasconde */
+  if (c.via) return '<div class="p2p-via-campi" data-via="' + esc(c.via) + '">'
+    + campoRecapitoP2P(Object.assign({}, c, {via: ''})) + '</div>';
   if (c.tipo === 'datetime-local') {
     /* IL SELETTORE DI CASA (12 ott 2026, pausa-leggera) al posto di quello
        di sistema: i giorni a bottoni (e' una settimana), le ore e i
@@ -85431,6 +85464,43 @@ function formaRecapito(metodo){
                               : 'Dove vuoi ricevere gli euro',
              ph: 'IBAN, @tag, numero…'}],
     componi: c => (m ? m + ': ' : '') + c.dove};
+}
+/* ---- LA SCELTA DENTRO UN FORM (9 nov 2026, Revolut in tre modi) ----
+   PURE le prime due: la scelta che vale (quella scritta, se e' una
+   delle opzioni; sennò la prima, che e' quella di ieri), e se un campo
+   conta per quella scelta. Un form senza `scelta` resta com'era: ogni
+   campo conta. */
+function viaFormaP2P(fr, valore){
+  const sc = ((fr && fr.campi) || []).find(c => c.tipo === 'scelta');
+  if (!sc) return '';
+  const v = String(valore || '');
+  return sc.opzioni.some(op => op.v === v) ? v : sc.opzioni[0].v;
+}
+function campoInViaP2P(c, via){
+  return !c.via || c.via === via;
+}
+/* la scelta nel foglio: il nascosto si allinea alla scelta che vale,
+   il bottone giusto si accende, si vedono solo i campi suoi. Niente
+   ridisegno: la tastiera aperta resta aperta */
+function allineaViaP2P(){
+  if (typeof document === 'undefined') return;
+  const inp = el('p2pCampoEuro_via');
+  if (!inp) return;
+  const sc = {campi: [{tipo: 'scelta', opzioni: Array.from(document.querySelectorAll('#p2pCampiCorpo .p2p-via-pill'))
+    .map(b => ({v: b.dataset.v}))}]};
+  if (!sc.campi[0].opzioni.length) return;
+  const via = viaFormaP2P(sc, inp.value);
+  inp.value = via;
+  document.querySelectorAll('#p2pCampiCorpo .p2p-via-pill')
+    .forEach(b => b.classList.toggle('active', b.dataset.v === via));
+  document.querySelectorAll('#p2pCampiCorpo .p2p-via-campi')
+    .forEach(d => { d.hidden = d.dataset.via !== via; });
+}
+function scegliViaP2P(v){
+  if (typeof haptic === 'function') haptic();
+  const inp = el('p2pCampoEuro_via');
+  if (inp) inp.value = v;
+  allineaViaP2P();
 }
 /* ---- LA DATA DEL TABACCHINO, andata e ritorno (set 2026) ----
    Sul filo viaggia testo composto, mai una struttura (la regola 2
@@ -86030,6 +86100,8 @@ function renderCampiP2P(){
   /* ...e la riga del «🕒 Quando» dice il valore appena rimesso nel suo
      deposito (12 ott 2026): un `.value` scritto da qui non avvisa nessuno */
   if (typeof selettoreCasaAllineaTutti === 'function') selettoreCasaAllineaTutti();
+  /* ...e la scelta dentro il form (9 nov 2026, Revolut in tre modi) */
+  if (typeof allineaViaP2P === 'function') allineaViaP2P();
   /* la riga del punto sotto il luogo, coi valori appena rimessi */
   if (fr && fr.appuntamento && typeof aggiornaPuntoLuogoP2P === 'function') aggiornaPuntoLuogoP2P();
   /* IL TASTO SPENTO FINCHE' L'INDIRIZZO USDT NON E' GIUSTO (2 nov 2026,
@@ -86074,9 +86146,15 @@ async function inviaCampoP2P(tipo, btn){
     const fr = formaRecapito(metodoRecapitoScelto(o));
     appuntamento = !!fr.appuntamento;
     const campi = {};
+    /* la scelta dentro il form (9 nov 2026, Revolut in tre modi): i campi
+       delle altre scelte non si chiedono e non partono. Col typeof: i
+       banchi che ritagliano questa funzione da sola restano quelli di ieri */
+    const via = typeof viaFormaP2P === 'function' ? viaFormaP2P(fr, (el('p2pCampoEuro_via') || {}).value) : '';
     for (const c of fr.campi) {
+      if (via && c.via && c.via !== via) continue;
       const inp = el('p2pCampoEuro_' + c.k);
       let v = String((inp && inp.value) || '').trim();
+      if (c.tipo === 'scelta') { campi[c.k] = via; continue; }
       if (c.k === 'iban') v = v.replace(/\s+/g, '').toUpperCase();
       /* la causale SEPA ha il suo giudice (9 ott 2026): tetto e alfabeto
          del circuito; vuota passa, perche' e' facoltativa */
