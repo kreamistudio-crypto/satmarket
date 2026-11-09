@@ -19500,7 +19500,7 @@ def _guardie_fusione(con, n, p) -> str | None:
     for chi in (n, p):
         voci = _impegni_onchain(con, chi["tg_id"], adesso)
         if voci:
-            return ("⛓️ C'e' ancora qualcosa di on-chain in corso ("
+            return ("₿ C'e' ancora qualcosa di on-chain in corso ("
                     + voci[0] + "): aspetta che si chiuda, poi unisci "
                     "i due account. Il wallet on-chain deve restare uno "
                     "solo, e quello in corso va firmato con le sue parole.")
@@ -34141,7 +34141,7 @@ def _leve_stato():
                          "qualunque del coro, anche di uno da cui il "
                          "coordinator non legge"),
         ]},
-        {"gruppo": "⛓️ Pagamento on-chain", "voci": [
+        {"gruppo": "₿ Pagamento on-chain", "voci": [
             # IL CANCELLO E LA SUA PORTICINA (16 ott 2026): due leve
             # perche' dicono due cose diverse — se la funzione esiste, e
             # per chi. Oggi non c'e' nessuna rotta da aprire: il
@@ -34166,14 +34166,14 @@ def _leve_stato():
                          "nel foglio della fattura ha in cima l'interruttore "
                          "del P2P",
                   spento="il foglio della fattura si apre sul Lightning con "
-                         "le due porte ⚡/⛓️ di sempre",
+                         "le due porte ⚡/₿ di sempre",
                   allarme=bool(MERCATINO_SCELTA_RETE) and not ONCHAIN_ATTIVO),
             # GLI SCAMBI P2P CON IL 2-DI-3 (30 ott 2026): la garanzia
             # on-chain negli scambi bitcoin ↔ euro, nel server e nell'app,
             # Mostro non toccato. Sotto il cancello dell'on-chain e del P2P.
             _leva("Scambi P2P on-chain (2-di-3)", "P2P_ONCHAIN_ATTIVO",
                   bool(P2P_ONCHAIN_ATTIVO),
-                  acceso="nel P2P compaiono gli scambi «⛓️ on-chain»: chi "
+                  acceso="nel P2P compaiono gli scambi «₿ on-chain»: chi "
                          "vende bitcoin li deposita nel 2-di-3, gli ordini "
                          "escono su Nostr (38383) firmati dal server; vale "
                          "solo con ONCHAIN_ATTIVO e il P2P accesi, per chi è "
@@ -64306,7 +64306,7 @@ def _testo_avviso_nuovi_p2p(righe: list) -> str:
     # messaggio e' quello di ieri, byte per byte
     oc = sum(1 for r in righe if _avviso_onchain_p2p(r))
     if oc:
-        testo += f"\n⛓️ On-chain: {oc}" + (f" · ⚡ Lightning: {n - oc}" if n - oc else "")
+        testo += f"\n₿ On-chain: {oc}" + (f" · ⚡ Lightning: {n - oc}" if n - oc else "")
     noti = [r for r in righe if r.get("conv") is not None]
     if noti:
         m = max(noti, key=lambda r: float(r["conv"]))
@@ -93967,7 +93967,7 @@ def onchain_xpub_barattolo() -> tuple:
         if not _onchain_rete_di_prova(ONCHAIN_RETE):
             raise ValueError("su mainnet la terza chiave di cartone non si "
                              "usa: la chiave di Barattolo va creata dal "
-                             "pannello admin («⛓️ Crea la chiave di "
+                             "pannello admin («₿ Crea la chiave di "
                              "Barattolo») prima di qualunque ordine")
         return XPUB_CARTONE, True
     if _onchain_sembra_privata(s):
@@ -94133,7 +94133,7 @@ def _onchain_terza_chiave_a_parole() -> str:
         # (30 ott 2026) su mainnet la cartone non si usa: l'on-chain e'
         # fermo finche' la chiave non nasce, e il pannello lo grida
         return ("⚠️ di cartone su MAINNET: l'on-chain è FERMO (503) finché "
-                "un admin non preme «⛓️ Crea la chiave di Barattolo»")
+                "un admin non preme «₿ Crea la chiave di Barattolo»")
     return "di cartone (vettori BIP-32: la privata è pubblica)"
 
 
@@ -94374,7 +94374,7 @@ async def onchain_prova(x_tg_init_data: str = Header(""),
     """LA PRIMA PORTA DELL'ON-CHAIN, e l'unica di questa tappa: dice al
     browser la TERZA chiave del 2-di-3 (l'xpub di Barattolo) e su che
     rete si sta giocando. Non scrive niente, non legge il database, non
-    sa chi compra o chi vende: e' il foglio «⛓️ On-chain (prova)» del
+    sa chi compra o chi vende: e' il foglio «₿ On-chain (prova)» del
     Profilo, dove si guardano le chiavi e si prova il ripristino.
 
     PASSA DAL CANCELLO, che e' il motivo per cui il cancello esisteva
@@ -94574,7 +94574,7 @@ async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
     for o in riempiti:
         if o["rilascio_chiesto_il"]:
             await notifica(o["compratore_id"],
-                f"⛓️ <b>{html.escape(o['titolo'][:40])}:</b> chi vende ha "
+                f"₿ <b>{html.escape(o['titolo'][:40])}:</b> chi vende ha "
                 "scelto dove ricevere. Apri la Mini App: il tuo telefono firma "
                 "il rilascio che avevi confermato, e i sats partono.")
     return {"ok": True, "ordini_aggiornati": len(riempiti)}
@@ -95526,7 +95526,7 @@ async def onchain_controlla(oid: int) -> str:
         con.close()
     if in_arrivo:
         await notifica(o["venditore_id"],
-            f"⛓️ <b>Pagamento in arrivo:</b> {html.escape(o['titolo'][:40])}. "
+            f"₿ <b>Pagamento in arrivo:</b> {html.escape(o['titolo'][:40])}. "
             "Il compratore ha pagato on-chain e ora la rete deve confermarlo "
             "(di solito fra dieci minuti e un'ora). L'oggetto è prenotato per "
             "lui. <b>Non spedire e non consegnare ancora</b>: ti avviso io "
@@ -95541,7 +95541,7 @@ async def onchain_controlla(oid: int) -> str:
         # sono al sicuro nel 2-di-3, e chi vende lo sa subito
         if not o["incasso"]:
             await notifica(o["venditore_id"],
-                f"⛓️ <b>Hai venduto on-chain:</b> {html.escape(o['titolo'][:40])}. "
+                f"₿ <b>Hai venduto on-chain:</b> {html.escape(o['titolo'][:40])}. "
                 "I sats sono al sicuro nel 2-di-3. Scegli dove riceverli "
                 "(Profilo → «Incassi on-chain»: un tuo indirizzo o la chiave "
                 "del conto del tuo wallet): senza, al momento del rilascio non "
@@ -95767,7 +95767,7 @@ async def _onchain_decide(ordine_id: int, verso: str, chi_id: int,
     # la trasparenza di Andrea: ogni firma di Barattolo si dice agli admin,
     # con chi l'ha decisa
     await notifica_admin(argomento="dispute", testo=
-        f"⛓️ <b>Barattolo ha firmato</b> l'ordine on-chain #{ordine_id} "
+        f"₿ <b>Barattolo ha firmato</b> l'ordine on-chain #{ordine_id} "
         f"({tit}) a favore " + ("del venditore" if verso == "venditore"
                                 else "di chi ha comprato")
         + (f", dal reso ricevuto da {int(chi_id)}" if perche == "reso"
@@ -95995,7 +95995,7 @@ async def onchain_rilascio_chiesto(oid: int, req: Request,
     if not gia:
         tit = html.escape(o['titolo'][:40])
         await notifica(o["venditore_id"],
-            f"⛓️ <b>{tit}:</b> chi ha comprato ha confermato di averlo "
+            f"₿ <b>{tit}:</b> chi ha comprato ha confermato di averlo "
             "ricevuto. Scegli dove ricevere i sats (Profilo → «Incassi "
             "on-chain») e partono." if modo == "onchain" else
             f"⚡ <b>{tit}:</b> chi ha comprato ha confermato di averlo "
@@ -96082,14 +96082,14 @@ async def onchain_ordine_proposta(oid: int, req: Request,
     finally:
         con.close()
     await notifica(altro, (
-        f"⛓️ <b>{tit}:</b> chi vende ha scelto dove ricevere. Apri la Mini "
+        f"₿ <b>{tit}:</b> chi vende ha scelto dove ricevere. Apri la Mini "
         "App: il tuo telefono firma il rilascio che avevi confermato, e i "
         "sats partono."
         if prima_di_chi_vende else
-        f"⛓️ <b>Sats liberati:</b> {tit}. Apri la Mini App: il tuo "
+        f"₿ <b>Sats liberati:</b> {tit}. Apri la Mini App: il tuo "
         "telefono mette la seconda firma e i sats partono."
         if verso == "venditore" else
-        f"⛓️ <b>Rimborso proposto:</b> {tit}. Apri la Mini App: il tuo "
+        f"₿ <b>Rimborso proposto:</b> {tit}. Apri la Mini App: il tuo "
         "telefono mette la seconda firma e i sats tornano a te."))
     return {"ok": True}
 
@@ -96189,7 +96189,7 @@ async def onchain_ordine_firma(oid: int, req: Request,
         return {"ok": True, "stato": stato, "txid": txid or arrivato,
                 "ordine_id": int(o["ordine_id"])}
     tit = html.escape(o["titolo"][:40])
-    testo = (f"⛓️ <b>Sats partiti:</b> {tit} — "
+    testo = (f"₿ <b>Sats partiti:</b> {tit} — "
              + ("al venditore." if verso == "venditore" else "rimborso a chi ha comprato.")
              + f" Transazione {(txid or arrivato)[:12]}…")
     for chi in (o["compratore_id"], o["venditore_id"]):
@@ -96478,7 +96478,7 @@ async def onchain_incasso_modo(req: Request, x_tg_init_data: str = Header(""),
     for o in riempiti:
         if o["rilascio_chiesto_il"]:
             await notifica(o["compratore_id"],
-                f"⛓️ <b>{html.escape(o['titolo'][:40])}:</b> chi vende ha "
+                f"₿ <b>{html.escape(o['titolo'][:40])}:</b> chi vende ha "
                 "scelto dove ricevere. Apri la Mini App: il tuo telefono firma "
                 "il rilascio che avevi confermato, e i sats partono.")
     return {"ok": True, "modo": modo, "ordini_aggiornati": len(riempiti)}
@@ -96667,7 +96667,7 @@ async def onchain_cambio_nasce(oid: int, req: Request,
     finally:
         con.close()
     await notifica(o["compratore_id"],
-        f"⛓️ <b>{html.escape(o['titolo'][:40])}:</b> chi vende ha scelto di "
+        f"₿ <b>{html.escape(o['titolo'][:40])}:</b> chi vende ha scelto di "
         "ricevere in Lightning. Apri la Mini App: il tuo telefono firma il "
         "rilascio che avevi confermato, e i sats partono.")
     return {"ok": True}
@@ -96767,7 +96767,7 @@ async def onchain_chiave_barattolo_crea(x_tg_init_data: str = Header(""),
     print(f"⛓️ Chiave di Barattolo creata da {user['id']}: {d['xpub'][:16]}…",
           flush=True)
     await notifica_admin(argomento="liquidita", testo=
-        f"⛓️ <b>Nata la chiave di Barattolo</b> (impronta {d['impronta']}), "
+        f"₿ <b>Nata la chiave di Barattolo</b> (impronta {d['impronta']}), "
         f"creata dal moderatore {int(user['id'])}. Sta solo sul VPS ed entra "
         "nel prossimo backup fuori sede: fino ad allora non c'è una copia.")
     return onchain_stato_chiave_barattolo()
@@ -98814,7 +98814,7 @@ async def p2p_onchain_decidi(oid: int, req: Request, x_tg_init_data: str = Heade
                           "all'altra parte, e Barattolo ha firmato.\n\nSe pensi che ci "
                           "sia un errore, scrivi ai moderatori.", _p2p_onchain_bottone(o))
     await notifica_admin(argomento="dispute", testo=
-        f"⛓️ <b>Barattolo ha firmato</b> lo scambio P2P on-chain #{int(oid)} a favore "
+        f"₿ <b>Barattolo ha firmato</b> lo scambio P2P on-chain #{int(oid)} a favore "
         + ("di chi compra bitcoin" if verso == "venditore" else "di chi vende bitcoin")
         + f", deciso dal moderatore {int(user['id'])}.")
     return {"ok": True, "attesa_firma": verso}
