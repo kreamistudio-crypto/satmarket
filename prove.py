@@ -188557,7 +188557,7 @@ CATEGORIE = {
     p2p_stati p2p_chat p2p_pubblica p2p_velo_pubblica p2p_barattozon
     p2p_paycode premio_barattozon convenienza_vera barattozon_mercato
     scadenza_barattozon foglio_coperto passi_barattozon_fogli
-    importo_foglio pubblica_metodo_prima libro_vuoto_monete
+    importo_foglio pubblica_metodo_prima libro_vuoto_monete revolut_tre_modi
     indietro_dal_libro ricarica_resta p2p_canale p2p_canonico p2p_bundle
     p2p_nuvola p2p_conto_dispositivo recensione_p2p ritocchi_scambio
     pagina_scambio_ridisegno foglio_tastiera_iphone chiavi_p2p_firmate
