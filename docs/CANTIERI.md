@@ -79631,3 +79631,40 @@ firma». Suite e collaudi: nel verbale del commit.
 DA GUARDARE. Dal telefono, alla prossima disputa o rilascio on-chain:
 l'anello e la frase finale. Ordine 4: ora il riquadro dice «Il rimborso
 è partito».
+## La convenienza negli ordini P2P in vetrina, e Subito Crypto solo da Telegram (10 nov 2026, cantiere vetrina-p2p-convenienza, Andrea: «quando pubblichi annunci p2p nella vetrina, vorrei che mettessi anche la convenienza positiva o negativa e che la pubblicassi anche in subito crypto sempre e solo se viene da utenti telegram»)
+
+COSA SI È DECISO. Il post di un ordine P2P appena pubblicato
+(`/api/p2p/canale`) porta la riga «🏷️» per OGNI ordine, non più solo per
+Barattozon: «3% più conveniente», «5% meno conveniente», «al prezzo di
+mercato», dal lato di chi legge, con lo stesso giudice di prima
+(`_premio_canale_p2p`). Il numero lo calcola il client
+(`convenienzaCanaleP2P`): Barattozon il premio scelto come dal 26 set; a
+mercato il premio del cursore; a sats fissi la convenienza di adesso, la
+stessa del badge della card (`convenienzaFissaP2P`), senza tetto; a
+cambio muto niente riga. Lo stesso post esce anche su Subito Crypto
+(`canale_vetrina()`), ma solo per un account Telegram (`tg_id > 0`) con
+@username: è la regola che gli annunci normali hanno già in
+`_posta_promo_singolo`, così le due porte di casa d'altri non divergono.
+I due canali falliscono per conto loro; doppione e raffica valgono per
+tutti e due.
+
+PERCHÉ COSÌ. Sul server una convenienza storta non è un 400 (un client di
+ieri non la manda, e la vetrina non ferma nessuno): si ignora e il post
+esce senza la riga. Il Barattozon tiene il suo 400 fuori scala, com'era.
+L'argine è `P2P_CONVENIENZA_CANALE_MAX = 1000`, solo contro un numero
+assurdo: a sats fissi il 20 del cursore non vale.
+
+SCARTATI. Calcolare la convenienza sul server: non parla col coordinatore
+e non sa se l'ordine è a sats fissi. Subito Crypto per ogni utente
+Telegram anche senza @username: la firma «da @tizio» è la maniglia di
+quel pubblico (decisione di ago 2026). BitcoinPodcast per il P2P: il
+config lo nomina come destinazione, ma non è stato chiesto (in coda).
+
+PROVATO. `collaudo_freni`, sezione nuova sul server vero: il post esce in
+casa e su Subito Crypto identico per Telegram con @username; solo in casa
+senza @username e da Nostr; convenienza nei due versi, oltre il 20, a
+zero, storta senza 400, Barattozon col suo 400; un canale spento non
+ferma l'altro. `prove_p2p_canale`: il giudice del client gira in node
+(Barattozon, mercato, fissi arrotondati, muto). Sentinelle aggiornate in
+`prove_p2p_canale` e nella fotografia subito. DA GUARDARE: il primo
+ordine vero da un account Telegram, su Subito Crypto.
