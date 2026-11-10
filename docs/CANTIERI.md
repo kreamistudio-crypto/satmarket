@@ -78925,3 +78925,35 @@ due cassette sulla stessa chiave, la prima chiusa non chiude al server,
 la seconda sì; una spedizione con 404 riapre e rispedisce.
 **DA GUARDARE** dal vivo dopo il deploy: un acquisto on-chain e «Salva»
 della copia delle 12 parole col firmatario bunker.
+
+## L'anello mentre si salva la copia, e il firmatario che non risponde (10 nov 2026 sera, Andrea: «ci vorrebbe il solito messaggino che gira aspetta… e se il firmatario non risponde va detto»)
+
+PERCHÉ. Dopo la cura della cassetta (voce qui sopra) «Salva» della copia
+sui relay restava ancora su «Salvo…»: il diario del VPS mostrava le
+richieste partite tutte e nessuna risposta. Amber era spento. Acceso,
+la copia si è salvata subito. Andrea ha chiesto due cose: l'anello che
+gira mentre si aspetta, e il perché quando il firmatario non risponde,
+invece del bottone fermo per i cinque minuti del tempo umano.
+
+COSA. `attesaCopiaOnchain()`: il velo di casa (`bottoneInAttesa(null, …)`,
+come nel Cambio) con «Salvo la copia delle 12 parole…», che dopo
+`ONCHAIN_COPIA_DOPO_MS` (6 s) diventa «Aspetto il tuo firmatario Nostr:
+se ti chiede di approvare, dai l'ok…». Lo usano i tre «Salva» della
+copia (`walletSalvaRelay`, `walletSalvaBackup`, `onchainBackup`).
+`onchainSuiRelayAtteso()`: la copia sui relay si aspetta al più
+`ONCHAIN_FIRMATARIO_MS` (60 s); poi `onchainFirmatarioMuto` e il toast
+«Il tuo firmatario Nostr non risponde: aprilo (per esempio Amber),
+lascialo acceso e riprova». Il giro non si ferma: un sì arrivato tardi
+segna la ricevuta lo stesso. `onchainMettiAlSicuro` passa da lì, quindi
+anche la cassa on-chain (il backup obbligatorio prima del primo ordine)
+non resta su «Preparo l'indirizzo…»: dopo il tetto dice il perché del
+firmatario.
+
+SCARTATO. Il tetto corto del Cambio (5 s): qui la copia è il gesto che
+si è chiesto, e Amber vuole il tempo di aprire l'app e approvare.
+
+PROVATO. `prove_parole_uniche` (+3): il velo alzato col suo testo e
+tolto; il firmatario lento oltre il tetto (velo tolto, toast col
+perché, testo del velo cambiato, ricevuta segnata quando il sì arriva);
+la sentinella della cassa. **DA GUARDARE** dal vivo: «Salva» con Amber
+spento (dopo un minuto il perché) e acceso (l'anello, poi il ✅).

@@ -156656,6 +156656,9 @@ async function walletUnicoNumero(parole, minimo){
         "function walletCopieLette(imp){",
         "function walletSegnaCopia(imp, dove){",
         "async function walletBackupRonda(){")]
+    # (10 nov 2026) il tetto del firmatario e il velo della copia
+    pezzi_w.append(pezzo_js(mini, "let ONCHAIN_FIRMATARIO_MS = 60000;",
+                            "\n\n/* La cassetta sui relay, in SCRITTURA") + "\n")
     banco_wallet = """
 const fs = require('fs');
 const B = new Function(fs.readFileSync(""" + json.dumps(os.path.join(QUI, "vendor", "btc.bundle.js")) + """, 'utf8') + '; return BarattoloBTC;')();
@@ -156692,7 +156695,11 @@ const walletPillolaMostra = () => TOAST.push('pillola');
 const walletPillolaVia = () => { TOAST = TOAST.filter(t => t !== 'pillola'); };
 function walletCopieChiave(){ return 'copie_' + myTgId; }
 const firmatarioNsecSalvata = async () => (NSEC ? {chiudi(){}} : null);
-const onchainSuiRelay = async () => { RELAY_SCRITTI++; return RELAY_OK; };
+let RELAY_TARDI = 0, VELO = [], TESTO_VELO = {};
+const onchainSuiRelay = async () => { RELAY_SCRITTI++;
+  if (RELAY_TARDI) await new Promise(ok => setTimeout(ok, RELAY_TARDI)); return RELAY_OK; };
+const bottoneInAttesa = (b, t) => { VELO.push(t); return () => VELO.push('via'); };
+const el = () => TESTO_VELO;
 const walletUnicoLeggi = async () => { if (MUTO) throw new Error('muto'); return SERVER; };
 const walletUnicoRegistra = async (imp, sost) => {
   if (SERVER.impronta && SERVER.impronta !== imp && !sost) return {ok: false, altro: SERVER.impronta};
@@ -156700,7 +156707,8 @@ const walletUnicoRegistra = async (imp, sost) => {
 };
 """ + "".join(pezzi_w) + """
 const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = false; NUVOLA = {}; NUVOLA_ROTTA = false; TG = false; SICURO = [];
-  NSEC = false; RELAY_OK = false; TOAST = []; RELAY_SCRITTI = 0; walletRondaFatta = false; walletRondaAvvisata = false; };
+  NSEC = false; RELAY_OK = false; TOAST = []; RELAY_SCRITTI = 0; walletRondaFatta = false; walletRondaAvvisata = false;
+  RELAY_TARDI = 0; VELO = []; TESTO_VELO = {}; ONCHAIN_FIRMATARIO_MS = 60000; ONCHAIN_COPIA_DOPO_MS = 6000; };
 (async () => {
   const out = {};
   const iA = await onchainImpronta(A), iC = await onchainImpronta(C);
@@ -156779,6 +156787,18 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
   };
   out.salvaRelay = [await salva(true), await salva(null), await salva(false)];
   pulito(); out.salvaVuoto = [await walletSalvaRelay({}), RELAY_SCRITTI, TOAST.length];
+  /* 9) (10 nov 2026, Andrea) il velo che gira mentre si salva, e il
+        firmatario che non risponde: dopo il tetto lo dice, e il si'
+        arrivato tardi si ricorda lo stesso */
+  pulito(); LS.seme = A; RELAY_OK = true;
+  await walletSalvaRelay({});
+  out.veloSalva = [VELO[0] === ONCHAIN_COPIA_ATTESA, VELO.slice(-1)[0]];
+  pulito(); LS.seme = A; RELAY_OK = true; RELAY_TARDI = 150; ONCHAIN_FIRMATARIO_MS = 30; ONCHAIN_COPIA_DOPO_MS = 10;
+  await walletSalvaRelay({});
+  const tardiSubito = [String(TOAST.slice(-1)[0] || '').includes('non risponde'), !!walletCopieLette(iA).relay,
+                       VELO.slice(-1)[0], TESTO_VELO.textContent === ONCHAIN_COPIA_FIRMATARIO];
+  await new Promise(ok => setTimeout(ok, 250));
+  out.firmatarioMuto = [tardiSubito, !!walletCopieLette(iA).relay];
   console.log(JSON.stringify(out));
 })();
 """
@@ -156828,6 +156848,16 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
               "con la copia sui relay o senza chiave Nostr niente; senza nessuna "
               "copia resta «Salva il backup»",
               [True, True, "", "", True], r.get("avvisoRelay"))
+        prova("(10 nov, Andrea) «Salva sui relay Nostr» alza l'anello col suo "
+              "testo e lo toglie alla fine", [True, "via"], r.get("veloSalva"))
+        prova("(10 nov, Andrea) il firmatario che non risponde: dopo il tetto il "
+              "velo si toglie e si dice il perche' (dopo qualche secondo il velo "
+              "nomina il firmatario); il si' arrivato tardi si ricorda lo stesso",
+              [[True, False, "via", True], True], r.get("firmatarioMuto"))
+        prova("(10 nov, Andrea) alla cassa on-chain, senza la copia sui relay e col "
+              "firmatario muto, il perche' e' quello del firmatario",
+              True, "casa === 'relay' && onchainFirmatarioMuto" in pezzo_js(
+                  mini, "async function onchainBackupObbligatorio(parole){", "\n}\n"))
         prova("...il tasto: riuscito segna la ricevuta dei relay; senza una chiave "
               "che firmi e coi relay che non tengono lo dice, ognuno a modo suo, "
               "e non segna niente; senza parole non scrive",

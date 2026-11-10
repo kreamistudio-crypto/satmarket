@@ -57172,7 +57172,7 @@ async function onchainMettiAlSicuro(parole){
   const corpo = JSON.stringify({parole, strada: onchainSrv?.strada || onchainRete().strada});
   try { onchainCase.nuvola = await cloudScrivi(ONCHAIN_CLOUD, corpo); }
   catch(e){ onchainCase.nuvola = false; }
-  try { onchainCase.relay = await onchainSuiRelay(corpo); }
+  try { onchainCase.relay = await onchainSuiRelayAtteso(corpo); }
   catch(e){ onchainCase.relay = false; }
   /* (wallet-unico) la ricevuta delle copie riuscite: la ronda e l'avviso
      del Profilo la leggono */
@@ -57181,6 +57181,51 @@ async function onchainMettiAlSicuro(parole){
     if (onchainCase.nuvola === true) walletSegnaCopia(imp, 'nuvola');
     if (onchainCase.relay === true) walletSegnaCopia(imp, 'relay');
   } catch(e){}
+}
+
+/* IL FIRMATARIO CHE NON RISPONDE (10 nov 2026, Andrea: «se il
+   firmatario non risponde va detto, non come adesso che rimane bloccato
+   per sempre senza dire niente: deve dire la causa dopo un po'»). La
+   copia sui relay si cifra e si firma col firmatario dell'account, e un
+   bunker (Amber) spento non dice niente: la richiesta parte e nessuno
+   la sente, fino ai cinque minuti del tempo umano. Qui la copia si
+   aspetta al piu' ONCHAIN_FIRMATARIO_MS; poi si dice il perche'
+   (`onchainFirmatarioMuto`) e si va avanti. Il giro non si ferma: un
+   si' arrivato tardi si ricorda lo stesso, come nel Cambio
+   (`SWAP_COPIA_ATTESA_MS`). `let`: il banco lo accorcia. */
+let ONCHAIN_FIRMATARIO_MS = 60000;
+let onchainFirmatarioMuto = false;
+const ONCHAIN_FIRMATARIO_MUTO = 'Il tuo firmatario Nostr non risponde: aprilo '
+  + '(per esempio Amber), lascialo acceso e riprova';
+async function onchainSuiRelayAtteso(corpo){
+  onchainFirmatarioMuto = false;
+  const giro = Promise.resolve().then(() => onchainSuiRelay(corpo));
+  let t = null;
+  const tetto = new Promise(ok => { t = setTimeout(() => ok('muto'), ONCHAIN_FIRMATARIO_MS); });
+  const esito = await Promise.race([giro.catch(() => false), tetto]);
+  clearTimeout(t);
+  if (esito !== 'muto') return esito;
+  onchainFirmatarioMuto = true;
+  giro.then(async ok => {
+    if (ok !== true) return;
+    onchainCase.relay = true;
+    try { walletSegnaCopia(await onchainImpronta(JSON.parse(corpo).parole), 'relay'); } catch(e){}
+  }).catch(() => {});
+  return false;
+}
+/* IL VELO DELLA COPIA (stesso giorno, Andrea: «ci vorrebbe il solito
+   messaggino che gira, aspetta…, cosi' uno capisce che sta succedendo
+   qualcosa»): l'anello di casa col suo testo, e dopo qualche secondo
+   il testo dice chi si aspetta. Il bottone resta com'e': sta sotto il
+   velo, e li' non lo legge nessuno. */
+const ONCHAIN_COPIA_ATTESA = 'Salvo la copia delle 12 parole…';
+const ONCHAIN_COPIA_FIRMATARIO = 'Aspetto il tuo firmatario Nostr: se ti chiede di approvare, dai l\'ok…';
+let ONCHAIN_COPIA_DOPO_MS = 6000;
+function attesaCopiaOnchain(){
+  const rip = bottoneInAttesa(null, ONCHAIN_COPIA_ATTESA);
+  const t = setTimeout(() => { el('attesaTesto').textContent = ONCHAIN_COPIA_FIRMATARIO; },
+                       ONCHAIN_COPIA_DOPO_MS);
+  return () => { clearTimeout(t); rip(); };
 }
 
 /* La cassetta sui relay, in SCRITTURA: riusa il firmatario, i relay e
@@ -57637,6 +57682,9 @@ async function onchainBackupObbligatorio(parole){
     try { await onchainMettiAlSicuro(parole); } catch(e){}
   }
   if (walletCopieLette(imp)[casa]) return;
+  if (casa === 'relay' && onchainFirmatarioMuto)
+    throw new Error('Prima serve la copia delle 12 parole sui relay Nostr. '
+      + ONCHAIN_FIRMATARIO_MUTO + '.');
   throw new Error(casa === 'nuvola'
     ? 'Prima salva le 12 parole del tuo wallet on-chain nel cloud di Telegram: senza una copia fuori dal telefono l\'on-chain non parte. Riprova fra un momento.'
     : 'Prima salva le 12 parole del tuo wallet on-chain sui relay Nostr, cifrate con la tua chiave: senza una copia fuori dal telefono l\'on-chain non parte. Apri Profilo → «On-chain» → «Salva il backup».');
@@ -58434,10 +58482,10 @@ async function walletSalvaRelay(btn){
   haptic();
   const parole = onchainSemeLocale();
   if (!parole) return toast('⚠️ Su questo dispositivo non ci sono parole da salvare');
-  const rip = onchainAttesa(btn, 'Salvo…');
+  const rip = attesaCopiaOnchain();
   let esito = false;
   try {
-    esito = await onchainSuiRelay(JSON.stringify({parole,
+    esito = await onchainSuiRelayAtteso(JSON.stringify({parole,
       strada: onchainSrv?.strada || onchainRete().strada}));
   } catch(e){ esito = false; }
   rip();
@@ -58447,6 +58495,7 @@ async function walletSalvaRelay(btn){
   } else {
     toast(esito === null
       ? '⚠️ Qui non c\'è una chiave Nostr che sappia firmare: collega la tua chiave (nsec o firmatario) e riprova'
+      : onchainFirmatarioMuto ? '⚠️ ' + ONCHAIN_FIRMATARIO_MUTO
       : '⚠️ I relay non hanno tenuto la copia: riprova fra un momento', 7000);
   }
   renderWalletBarattolo();
@@ -58455,13 +58504,14 @@ async function walletSalvaBackup(btn){
   haptic();
   const parole = onchainSemeLocale();
   if (!parole) return toast('⚠️ Su questo dispositivo non ci sono parole da salvare');
-  const rip = onchainAttesa(btn, 'Salvo…');
+  const rip = attesaCopiaOnchain();
   try { await onchainMettiAlSicuro(parole); } catch(e){}
   rip();
   const fatte = [onchainCase.nuvola === true ? 'cloud di Telegram' : '',
                  onchainCase.relay === true ? 'relay Nostr' : ''].filter(Boolean);
-  toast(fatte.length ? `✅ Backup fatto: ${fatte.join(' e ')}`
-                     : '⚠️ Nessuna copia è riuscita: riprova fra un momento', 6000);
+  const muto = onchainFirmatarioMuto ? ' ⚠️ ' + ONCHAIN_FIRMATARIO_MUTO : '';
+  toast(fatte.length ? `✅ Backup fatto: ${fatte.join(' e ')}.${muto}`
+                     : (muto || '⚠️ Nessuna copia è riuscita: riprova fra un momento'), muto ? 9000 : 6000);
   renderWalletBarattolo();
 }
 async function walletParoleSuCarta(){
@@ -62078,17 +62128,17 @@ function onchainRigaChiave(chi, chiave, nota){
 
 async function onchainBackup(btn){
   haptic();
-  const rip = onchainAttesa(btn, 'Salvo…');
   const parole = onchainSemeLocale();
-  if (!parole) { rip(); return toast('⚠️ Non c\'è nessuna chiave da salvare'); }
-  await onchainMettiAlSicuro(parole);
-  rip();
+  if (!parole) return toast('⚠️ Non c\'è nessuna chiave da salvare');
+  const rip = attesaCopiaOnchain();
+  try { await onchainMettiAlSicuro(parole); } finally { rip(); }
   const fatte = [onchainCase.nuvola === true ? 'cloud di Telegram' : '',
                  onchainCase.relay === true ? 'relay Nostr' : '']
                 .filter(Boolean);
-  toast(fatte.length ? `✅ Copia nelle case: ${fatte.join(' e ')}`
-                     : '⚠️ Nessuna casa ha risposto: la chiave resta '
-                       + 'solo su questo dispositivo');
+  const muto = onchainFirmatarioMuto ? ' ⚠️ ' + ONCHAIN_FIRMATARIO_MUTO : '';
+  toast(fatte.length ? `✅ Copia nelle case: ${fatte.join(' e ')}.${muto}`
+                     : (muto || '⚠️ Nessuna casa ha risposto: la chiave resta '
+                       + 'solo su questo dispositivo'), muto ? 9000 : undefined);
   renderOnchain();
 }
 
