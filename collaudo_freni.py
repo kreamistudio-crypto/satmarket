@@ -89,6 +89,88 @@ def main():
         prova("due post di fila: tutt'e due 200, mai un 429", [200, 200], [r1.status_code, r2.status_code])
         prova("...e il secondo dice di aver saltato il post (raffica, il canale e' spento)",
               "raffica", r2.json().get("saltato"))
+    print("\n[il canale P2P: la convenienza nel post, e Subito Crypto solo da Telegram]")
+    # (10 nov 2026, richiesta di Andrea) due canali finti, la fabbrica dei
+    # post che ANNOTA invece di spedire, e tre persone: Telegram con
+    # @username, Telegram senza, e un nativo Nostr (tg_id < 0)
+    mandati = []
+
+    async def annota(dove, caption, foto):
+        mandati.append((dove, caption))
+        return 1
+    prima = (S._manda_post_canale, S.canale_id, S.canale_vetrina,
+             S.verifica_utente, S._p2p_per, S._foto_subito_p2p)
+    S._manda_post_canale = annota
+    S.canale_id = lambda: "@casa"
+    S.canale_vetrina = lambda: "@subito_crypto_vetrina"
+    S._p2p_per = lambda tg: {"attivo": True}
+    S._foto_subito_p2p = lambda *a: None
+    con = S.db()
+    for tg, nome, username in ((4401, "Tele", "tele"), (4402, "Muto", ""),
+                               (-4403, "Nostrano", "")):
+        con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,username,negozio,registrato) "
+                    "VALUES(?,?,?,?,1)", (tg, nome, username, f"neg{abs(tg)}"))
+    con.commit()
+    con.close()
+
+    def posta(tg, corpo):
+        mandati.clear()
+        S._SECCHI.clear()
+        S._CANALE_POSTATI.clear()
+        S.verifica_utente = lambda *a, **k: {"id": tg}
+        r = c.post("/api/p2p/canale", json=corpo)
+        return r.status_code, r.json().get("postato"), [d for d, _ in mandati], \
+            (mandati[0][1] if mandati else "")
+    try:
+        st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50,
+                                         "metodo": "Revolut", "premio": 3})
+        prova("Telegram con @username: il post esce in casa E su Subito Crypto, uguale",
+              (200, True, ["@casa", "@subito_crypto_vetrina"]), (st, ok, dove))
+        prova("...con la convenienza dal lato di chi guarda (vende a +3: 3% meno conveniente)",
+              True, "🏷️ 3% meno conveniente" in cap
+              and mandati[0][1] == mandati[1][1])
+        st, ok, dove, cap = posta(4401, {"lato": "compro", "euro": 50,
+                                         "metodo": "Revolut", "premio": 4})
+        prova("...e chi compra a +4 e' 4% più conveniente per chi legge", True,
+              "🏷️ 4% più conveniente" in cap)
+        st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50,
+                                         "metodo": "SEPA", "premio": -150})
+        prova("...a sats fissi la convenienza passa il 20 (−150: 150% più conveniente)", True,
+              "🏷️ 150% più conveniente" in cap)
+        st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50,
+                                         "metodo": "SEPA", "premio": 0})
+        prova("...a zero «al prezzo di mercato»", True, "🏷️ al prezzo di mercato" in cap)
+        esiti = []
+        for storto in ("3", 2.5, True, 5000, None):
+            corpo = {"lato": "vendo", "euro": 50, "metodo": "SEPA"}
+            if storto is not None:
+                corpo["premio"] = storto
+            st, ok, dove, cap = posta(4401, corpo)
+            esiti.append((st, "🏷️" in cap))
+        prova("...una convenienza storta o assente non e' un 400: il post esce senza la riga",
+              [(200, False)] * 5, esiti)
+        st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50,
+                                         "metodo": "Contanti al tabacchino", "premio": 25})
+        prova("...mentre il Barattozon tiene il suo 400 fuori scala", 400, st)
+        st, ok, dove, cap = posta(4402, {"lato": "vendo", "euro": 50, "metodo": "SEPA"})
+        prova("Telegram senza @username: solo in casa", (200, True, ["@casa"]), (st, ok, dove))
+        st, ok, dove, cap = posta(-4403, {"lato": "vendo", "euro": 50, "metodo": "SEPA"})
+        prova("chi entra da Nostr: solo in casa, mai su Subito Crypto",
+              (200, True, ["@casa"]), (st, ok, dove))
+        S.canale_id = lambda: ""
+        st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50, "metodo": "SEPA"})
+        prova("a canale di casa spento Subito Crypto va lo stesso, per conto suo",
+              (200, True, ["@subito_crypto_vetrina"]), (st, ok, dove))
+        S.canale_id = lambda: "@casa"
+        S.canale_vetrina = lambda: ""
+        st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50, "metodo": "SEPA"})
+        prova("...e a Subito Crypto spento resta solo casa", ["@casa"], dove)
+    finally:
+        (S._manda_post_canale, S.canale_id, S.canale_vetrina,
+         S.verifica_utente, S._p2p_per, S._foto_subito_p2p) = prima
+        S._SECCHI.clear()
+        S._CANALE_POSTATI.clear()
+
     print("\n[gli ordini «creato» vivi per compratore: cinque, il sesto no]")
     async def zitto(*a, **k):
         return None

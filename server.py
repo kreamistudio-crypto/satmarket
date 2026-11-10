@@ -61536,6 +61536,10 @@ MAX_METODO_P2P_CANALE = 60      # il maxlength del campo nel foglio
 # numeri interi — il gemello di `P2P_PREMIO_TAB_MAX` del client, e una
 # prova li tiene uguali
 P2P_PREMIO_CANALE_MAX = 20
+# ...e l'argine della convenienza degli ALTRI ordini (10 nov 2026): a
+# sats fissi non ha tetto per costruzione, quindi qui c'e' solo un
+# freno contro un numero assurdo nel post, come `MAX_EURO_P2P_CANALE`
+P2P_CONVENIENZA_CANALE_MAX = 1000
 
 
 def _premio_canale_p2p(lato: str, premio: int) -> str:
@@ -61691,6 +61695,22 @@ async def annuncia_ordine_p2p_canale(req: Request,
         if (isinstance(premio, bool) or not isinstance(premio, int)
                 or abs(premio) > P2P_PREMIO_CANALE_MAX):
             raise HTTPException(400, "Premio storto")
+    # LA CONVENIENZA DI OGNI ALTRO ORDINE (10 nov 2026, richiesta di
+    # Andrea: «nella vetrina mettici anche la convenienza, positiva o
+    # negativa»). Il client manda il premio a mercato (da −20 a +20) o,
+    # a sats fissi, la convenienza di adesso col suo cambio — la stessa
+    # che dice il badge della card, `premioCardP2P`, e che puo' passare
+    # il 20 (vedi `convenienzaFissaP2P`: «212%» se e' 212). Il segno e'
+    # quello di mostro, e a dirlo con le parole giuste e' lo stesso
+    # giudice di Barattozon, `_premio_canale_p2p`.
+    # QUI UN NUMERO STORTO NON E' UN 400, ed e' la differenza col
+    # Barattozon qui sopra: un client di ieri non lo manda, e la vetrina
+    # non deve fermare nessuno — si ignora e il post esce senza la riga.
+    elif d.get("premio") is not None:
+        p = d.get("premio")
+        if (not isinstance(p, bool) and isinstance(p, int)
+                and abs(p) <= P2P_CONVENIENZA_CANALE_MAX):
+            premio = p
     # la zona di scambio (10 ott 2026): solo se fra i metodi c'e'
     # «Contanti» a parola intera, e solo pulita. Una zona storta NON e' un
     # 400: il post esce senza, che la vetrina non deve fermare nessuno.
@@ -61704,7 +61724,26 @@ async def annuncia_ordine_p2p_canale(req: Request,
     adesso_canale = time.time()
     doppione = bool(buono) and adesso_canale - _CANALE_POSTATI.get(ordine, 0) < 86400
     raffica = not _secchio_passa(f"canale:{user['id']}", *FRENI["canale"], adesso_canale)
-    if canale_id() and not doppione and not raffica:
+    # SUBITO CRYPTO (10 nov 2026, richiesta di Andrea): lo stesso post
+    # anche nel canale della comunita', `canale_vetrina()` — e SOLO per
+    # chi viene da Telegram. La regola e' quella degli annunci normali in
+    # `_posta_promo_singolo` (un account Telegram, `tg_id > 0`, con un
+    # @username: la firma «da @tizio» e' la maniglia che quel pubblico si
+    # aspetta), cosi' le due porte di casa d'altri non divergono. Chi
+    # entra da Nostr resta nel nostro canale, come per gli annunci.
+    # Ogni canale fallisce per conto suo, e gli stessi freni valgono per
+    # tutti e due: un doppione o una raffica non escono da nessuna parte.
+    vetrina_ok = False
+    if canale_vetrina() and user["id"] > 0:
+        try:
+            con = db()
+            r_u = con.execute("SELECT username FROM utenti WHERE tg_id=?",
+                              (user["id"],)).fetchone()
+            con.close()
+            vetrina_ok = bool(r_u and (r_u["username"] or ""))
+        except Exception as e:
+            print(f"⚠️ Post P2P su Subito Crypto saltato: {e}")
+    if (canale_id() or vetrina_ok) and not doppione and not raffica:
         try:
             con = db()
             riga = con.execute(
@@ -61720,7 +61759,17 @@ async def annuncia_ordine_p2p_canale(req: Request,
                 "venditore_negozio": (riga["negozio"] if riga else "") or "",
             }
             caption = _caption_canale_p2p(lato, euro, metodo, venditore, premio, zona)
-            postato = bool(await _manda_post_canale(canale_id(), caption, []))
+            if canale_id():
+                try:
+                    postato = bool(await _manda_post_canale(canale_id(), caption, []))
+                except Exception as e:
+                    print(f"⚠️ Post P2P nel canale saltato: {e}")
+            if vetrina_ok:
+                try:
+                    if await _manda_post_canale(canale_vetrina(), caption, []):
+                        postato = True
+                except Exception as e:
+                    print(f"⚠️ Post P2P su Subito Crypto saltato: {e}")
             if postato and buono:
                 if len(_CANALE_POSTATI) > 5000:
                     _CANALE_POSTATI.clear()

@@ -84806,7 +84806,9 @@ async function inviaNuovoOrdineP2P(confermato){
     /* col premio di Barattozon (26 set 2026): a prezzo fisso il post
        non avrebbe altro modo di dirlo, e chi legge il canale e' lo
        stesso che legge la card */
-    annunciaCanaleP2P(lato, euro, metodo, ord.tabacchino ? ord.premioCotto : null,
+    /* ...e dal 10 nov 2026 la convenienza di OGNI ordine, positiva o
+       negativa (richiesta di Andrea): `convenienzaCanaleP2P` */
+    annunciaCanaleP2P(lato, euro, metodo, convenienzaCanaleP2P(ord),
                       provvisorioP2P(agg.id) ? '' : agg.id);
     /* LA SPUNTA: il coordinatore ha risposto, l'ordine e' nel libro.
        Si ridisegna PRIMA la pagina sotto, cosi' quando il velo scende
@@ -93501,11 +93503,32 @@ function piattaformaMappeP2P(){
    Fail-open muta come le sorelle del mazzo: chi chiama (dal motore,
    dopo che l'ordine e' gia' partito davvero) non aspetta e non
    controlla l'esito. */
+/* PURA: LA CONVENIENZA CHE IL POST NEL CANALE DICE (10 nov 2026,
+   richiesta di Andrea: «nella vetrina mettici anche la convenienza,
+   positiva o negativa»). Un intero sulla scala e col verso di `premium`
+   di mostro — il server lo traduce in parole con lo stesso giudice della
+   card —, o null quando non si sa, e allora il post tace:
+   • Barattozon: il premio SCELTO, `premioCotto`, come dal 26 set 2026;
+   • a sats fissi: la convenienza di ADESSO, la stessa del badge della
+     card (`convenienzaFissaP2P` col metro di `metroFissoP2P`), senza
+     tetto — a cambio muto null, mai un numero inventato;
+   • a mercato: il premio scelto col cursore, da −20 a +20. */
+function convenienzaCanaleP2P(ord){
+  if (!ord) return null;
+  if (ord.tabacchino) return Number.isInteger(ord.premioCotto) ? ord.premioCotto : null;
+  if (ord.sats > 0) {
+    const c = convenienzaFissaP2P(ord, metroFissoP2P(ord));
+    return (c === null || !Number.isFinite(c)) ? null : Math.round(c);
+  }
+  const p = Number(ord.premium);
+  return Number.isFinite(p) ? Math.round(p) : null;
+}
 async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine){
   if (DEMO || VETRINA || !myTgId) return;
-  /* `premio` SOLO per Barattozon (26 set 2026): il premio scelto, che a
-     prezzo fisso non sta in nessun campo del libro; per gli altri
-     ordini la chiave non c'e' e il corpo resta quello di ieri */
+  /* `premio`: per Barattozon il premio scelto (26 set 2026), che a
+     prezzo fisso non sta in nessun campo del libro; dal 10 nov 2026
+     anche la convenienza di ogni altro ordine (`convenienzaCanaleP2P`).
+     Quando non si sa la chiave non c'e' e il post tace */
   const corpo = {lato: lato, euro: euro, metodo: metodo};
   if (Number.isInteger(premio)) corpo.premio = premio;
   /* l'id del mio ordine (27 set 2026): il server rifa' la fotografia
