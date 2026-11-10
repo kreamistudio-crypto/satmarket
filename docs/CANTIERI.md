@@ -79225,3 +79225,52 @@ Telegram taglia senza scorrere, e la scheda vera dovrà contarci).
 Guardata con Chromium in chiaro e scuro; prove.py severa 27.219 su 27.219; dei collaudi
 della CI girati i cinque del bot (widget, istanza di prova, canale admin, login, assistente), 5/0: il cambio tocca solo la costante della paginetta. Una scheda già mandata resta com'era (l'HTML non si
 cambia dopo l'invio): serve un `/provawidget` nuovo.
+
+## `NOVITA.md`: le novità per gli utenti, che n8n trasforma in bozze di post per il canale (10 nov 2026, cantiere novita, Andrea: «facciamolo ora»)
+
+IL PERCHÉ. Andrea vuole che a ogni novità di Barattolo che conta per gli
+utenti parta da solo un post sul canale (e poi sugli altri social), con
+dietro un'AI che conosce l'app. Il pezzo che manca fra il codice e il
+post è un testo PER GLI UTENTI: i messaggi dei commit sono verbali per
+noi (lunghi, con le prove dentro), e chi conosce meglio la novità è il
+thread che l'ha fatta, a fine cantiere. Da qui un file solo, in cima al
+repo, scritto in una forma che una macchina sa leggere.
+
+LA FORMA. Una voce per novità: `## aaaa-mm-gg · nome`, poi quattro righe
+in quest'ordine (`frase`, `dove`, `leva`, `pubblico`). `dove` serve al
+robot che registrerà lo schermo vero (tappa delle immagini). `leva` e
+`pubblico` esistono perché molte funzioni arrivano su main accese solo
+per gli admin: un post le annuncerebbe a tutti. `pubblico: sì` solo se
+la vede chiunque; nel dubbio `no`, che il config del VPS vince sul
+codice e il thread non lo vede. L'intestazione è la chiave con cui n8n
+riconosce una voce già vista, quindi non si ripete e una voce non si
+riscrive: la leva accesa più tardi per tutti è una voce nuova.
+
+IL GIRO, GIÀ ACCESO SUL RELAY (fuori dal repo, costruito via API da
+questo stesso thread): tabella `novita_da_annunciare` → flusso «coda
+delle novità» (ogni minuto) → flusso «bozze e tasti»: Claude Opus 5.5
+scrive la bozza coi fatti della voce e di `assistente/sapere.md`, il bot
+Barattolo News la manda ad Andrea con Pubblica / Modifica / Scarta,
+Pubblica la mette nel canale di PROVA. Provato dal vivo da Andrea il 10
+nov alle 17 (ora italiana): bozza, Modifica, riscrittura, Pubblica.
+Manca il grilletto: n8n che guarda main con un token GitHub di SOLA
+LETTURA (lo crea Andrea) e legge le voci nuove di questo file.
+
+SCARTATE. Il messaggio del commit come fonte del post (è un verbale, e
+spesso parla di cose che l'utente non vede). Una sezione dentro
+CANTIERI.md (2 MB, scritta per noi; n8n dovrebbe scaricarla tutta a
+ogni promozione). Le voci per commit (un cantiere fa più commit, e una
+novità è una cosa sola). Un campo `stato` aggiornato a mano dopo il post
+(n8n dovrebbe scrivere nel repo: gli basta leggere).
+
+**PROVATO.** `prove_novita_md`: la forma del file vero, le leve che
+devono esistere in `config_esempio.py`, e nove controprove (riga
+mancante, «si» senza accento, leva inventata, intestazione ripetuta,
+data impossibile, riga in più, frase lunga, trattino al posto del
+punto, campo vuoto) che il giudice vede tutte; e il file vero rotto
+apposta (`pubblico: forse`) fa rosso.
+**NON PROVATO:** il lettore dentro n8n è acceso (flusso «guarda main»,
+primo giro il 10 nov alle 16:36 UTC: ha letto main col token di sola
+lettura e si è segnato il punto di partenza), ma non ha ancora visto una
+voce vera scritta da un cantiere: il file nasce senza voci, la prima la
+scrive il prossimo cantiere che porta qualcosa di visibile.

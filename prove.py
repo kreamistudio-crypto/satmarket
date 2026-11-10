@@ -55354,6 +55354,134 @@ def prove_tetto_claude_md():
           % (TETTO_CLAUDE_MD, righe), True, righe <= TETTO_CLAUDE_MD)
 
 
+_NOVITA_TESTA = re.compile(r"## (\d{4}-\d{2}-\d{2}) · ([a-z0-9][a-z0-9-]*)")
+_NOVITA_CAMPI = ("frase", "dove", "leva", "pubblico")
+_NOVITA_FRASE_MAX = 400
+
+
+def _voci_novita(testo, leve_note):
+    """LE VOCI DI NOVITA.md, e cosa non va (10 nov 2026, cantiere novita).
+    Torna (voci, errori): una voce e' un dizionario con data, nome,
+    frase, dove, leva, pubblico. La regola e' la stessa che n8n segue
+    sul RELAY per leggerle: una voce comincia con `## data · nome` in
+    colonna zero, poi le quattro righe nell'ordine, poi solo righe
+    vuote fino alla voce dopo. `leve_note` e' l'insieme dei nomi di
+    leva che esistono davvero."""
+    voci, errori, viste = [], [], set()
+    righe = testo.split("\n")
+    i = 0
+    while i < len(righe) and not righe[i].startswith("## "):
+        i += 1
+    while i < len(righe):
+        riga = righe[i]
+        if not riga.strip():
+            i += 1
+            continue
+        m = _NOVITA_TESTA.fullmatch(riga)
+        if not m:
+            errori.append("riga %d: attesa un'intestazione «## aaaa-mm-gg · nome»,"
+                          " trovato %r" % (i + 1, riga[:60]))
+            i += 1
+            continue
+        voce = {"data": m.group(1), "nome": m.group(2), "riga": i + 1}
+        chiave = riga
+        if chiave in viste:
+            errori.append("riga %d: intestazione ripetuta %r" % (i + 1, riga))
+        viste.add(chiave)
+        try:
+            time.strptime(voce["data"], "%Y-%m-%d")
+        except ValueError:
+            errori.append("riga %d: data impossibile %r" % (i + 1, voce["data"]))
+        for k, campo in enumerate(_NOVITA_CAMPI):
+            r = righe[i + 1 + k] if i + 1 + k < len(righe) else ""
+            if not r.startswith(campo + ": ") or not r[len(campo) + 2:].strip():
+                errori.append("riga %d: attesa «%s: ...», trovato %r"
+                              % (i + 2 + k, campo, r[:60]))
+                voce[campo] = None
+            else:
+                voce[campo] = r[len(campo) + 2:].strip()
+        i += 1 + len(_NOVITA_CAMPI)
+        if voce["frase"] and len(voce["frase"]) > _NOVITA_FRASE_MAX:
+            errori.append("voce %s: frase di %d caratteri, il massimo e' %d"
+                          % (voce["nome"], len(voce["frase"]), _NOVITA_FRASE_MAX))
+        if voce["pubblico"] and voce["pubblico"] not in ("sì", "no"):
+            errori.append("voce %s: pubblico dev'essere «sì» o «no», non %r"
+                          % (voce["nome"], voce["pubblico"]))
+        if voce["leva"] and voce["leva"] != "nessuna":
+            nome_leva = voce["leva"].split()[0]
+            if nome_leva not in leve_note:
+                errori.append("voce %s: la leva %r non esiste in config_esempio.py"
+                              % (voce["nome"], nome_leva))
+        voci.append(voce)
+    return voci, errori
+
+
+def prove_novita_md():
+    """NOVITA.MD SI LEGGE A MACCHINA (10 nov 2026, cantiere novita).
+
+    A ogni promozione su main n8n, sul RELAY, legge le voci NUOVE di
+    NOVITA.md e per quelle con `pubblico: sì` fa scrivere a Claude una
+    bozza di post per il canale, che arriva ad Andrea coi tasti
+    Pubblica / Modifica / Scarta. Una voce scritta storta non fa
+    rumore: n8n la salta, o peggio la legge a meta', e la novita' non
+    viene annunciata. Qui la forma si controlla prima del push.
+
+    `pubblico: sì` e' la riga che pesa: una funzione dietro una leva
+    spenta o accesa solo per gli admin, annunciata a tutti, e' una
+    promessa falsa. Per questo la leva deve esistere davvero, e il
+    valore di pubblico e' solo «sì» o «no».
+
+    LE CONTROPROVE rompono apposta un testo buono, una cosa alla volta,
+    e guardano che il giudice se ne accorga: se un giorno _voci_novita
+    diventasse di manica larga, una di queste diventa rossa."""
+    print("\n[NOVITA.md, le novita' per gli utenti]")
+    leve = set(re.findall(r"^([A-Z][A-Z0-9_]+)\s*=",
+                          open("config_esempio.py", encoding="utf-8").read(),
+                          re.M))
+    prova("ci sono le leve di config_esempio.py da confrontare", True,
+          "P2P_USDT_ATTIVO" in leve)
+    testo = open("NOVITA.md", encoding="utf-8").read()
+    voci, errori = _voci_novita(testo, leve)
+    prova("NOVITA.md e' scritto nella forma che n8n sa leggere", [], errori)
+    prova("l'esempio rientrato nell'intestazione non conta come voce", True,
+          all(v["nome"] != "nome-del-cantiere" for v in voci))
+
+    buona = ("# titolo\n\nspiegazione\n\n    ## 2026-01-01 · esempio\n\n"
+             "## 2026-11-10 · prova-uno\nfrase: Una cosa nuova.\n"
+             "dove: Scheda P2P.\nleva: nessuna\npubblico: sì\n\n"
+             "## 2026-11-11 · prova-due\nfrase: Un'altra.\ndove: Profilo.\n"
+             "leva: P2P_USDT_ATTIVO spenta di serie\npubblico: no\n")
+    v, e = _voci_novita(buona, leve)
+    prova("un testo buono: due voci e nessun errore",
+          (["prova-uno", "prova-due"], []), ([x["nome"] for x in v], e))
+    prova("dalla voce si leggono i campi giusti",
+          ("Una cosa nuova.", "Scheda P2P.", "nessuna", "sì"),
+          (v[0]["frase"], v[0]["dove"], v[0]["leva"], v[0]["pubblico"]))
+    rotte = {
+        "manca la riga dove":
+            buona.replace("dove: Scheda P2P.\n", ""),
+        "pubblico scritto «si» senza accento":
+            buona.replace("pubblico: sì", "pubblico: si"),
+        "una leva inventata":
+            buona.replace("P2P_USDT_ATTIVO spenta", "LEVA_CHE_NON_ESISTE spenta"),
+        "un'intestazione ripetuta":
+            buona.replace("## 2026-11-11 · prova-due", "## 2026-11-10 · prova-uno"),
+        "una data impossibile":
+            buona.replace("2026-11-11", "2026-13-45"),
+        "una riga in piu' dentro la voce":
+            buona.replace("pubblico: sì\n", "pubblico: sì\nnota: in piu'\n"),
+        "una frase troppo lunga":
+            buona.replace("Una cosa nuova.", "x" * (_NOVITA_FRASE_MAX + 1)),
+        "il trattino al posto del punto in mezzo":
+            buona.replace("## 2026-11-10 · prova-uno", "## 2026-11-10 - prova-uno"),
+        "un campo vuoto":
+            buona.replace("frase: Una cosa nuova.", "frase: "),
+    }
+    for nome, testo_rotto in rotte.items():
+        prova("controprova, %s: il giudice se ne accorge" % nome, True,
+              bool(_voci_novita(testo_rotto, leve)[1]))
+
+
 def prove_annotazioni_negli_ambienti():
     """`Request` NELL'AMBIENTE DI OGNI ENDPOINT MONTATO (ago 2026, da
     una CI rossa che in locale era verde).
@@ -188404,7 +188532,7 @@ CATEGORIE = {
     collaudi_in_ci ci_leggera ci_solo_main elenco_dei_collaudi
     collaudi_senza_coincurve servizio_non_root guardiano_ponte
     guardia_liquidita canale_admin gruppo_admin_coda deploy_nel_gruppo
-    bussola tetto_claude_md annotazioni_negli_ambienti nwc_cifratura
+    bussola tetto_claude_md novita_md annotazioni_negli_ambienti nwc_cifratura
     bundle_nostr relay_chiavi ronda_nodo semina_demo
     indietro_app_android esclusioni_relay letture_relay_collaudo
     telegram_simulato_collaudo leve_mai_doppie sintassi_client
@@ -188932,6 +189060,7 @@ def main():
               prove_guardia_liquidita, prove_canale_admin, prove_gruppo_admin_coda,
               prove_deploy_nel_gruppo,
               prove_bussola, prove_tetto_claude_md,
+              prove_novita_md,
               prove_canale_comunita,
               prove_podio_sfondo,
               prove_annotazioni_negli_ambienti,

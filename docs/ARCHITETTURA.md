@@ -35396,3 +35396,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   on-chain non le mostra. Nell'ordine il riquadro `pannelloRisposte`
   («📋 Leggi le risposte»). La strada firmata (Nostr) le domande non le
   porta. Prove: `prove_domande_compratore`, `collaudo_domande_compratore`.
+- LE NOVITÀ PER GLI UTENTI (`NOVITA.md`, 10 nov 2026, cantiere novita).
+  Il file in cima al repo dove ogni cantiere che porta qualcosa di
+  VISIBILE scrive una voce: `## data · nome`, poi `frase:` (per gli
+  utenti, al massimo 400 caratteri), `dove:` (scheda e bottoni, per la
+  registrazione dello schermo), `leva:` (nome e stato di serie, o
+  `nessuna`), `pubblico:` (`sì` solo se la vede chiunque). Lo legge n8n
+  (`n8n-barattolo` sul RELAY, MAI sul VPS né sul nodo: è una macchina
+  senza soldi né chiavi di Barattolo, raggiunta solo dai campanelli
+  `/webhook/*` e dall'API `/api/v1/*`): a ogni promozione su main con la
+  CI verde confronta le intestazioni col main di prima, e per ogni voce
+  nuova con `pubblico: sì` mette una riga nella tabella
+  `novita_da_annunciare`; il flusso «coda delle novità» la passa a
+  «bozze e tasti», dove Claude (chiave Anthropic sua, solo nelle
+  Credentials di n8n) scrive il post coi fatti della voce e di
+  `assistente/sapere.md`, e il bot «Barattolo News» (NON @ilbarattolobot)
+  lo manda in privato ad Andrea con ✅ Pubblica / ✏️ Modifica / ❌ Scarta.
+  Nel canale non esce niente senza il suo tocco. Le intestazioni sono la
+  chiave: una voce non si cambia e non si ripete; una leva accesa per
+  tutti dopo si annuncia con una voce nuova. La forma la tiene
+  `prove_novita_md` (con `_voci_novita`, la stessa regola che segue n8n).
+  I flussi e il loro stato: `/mnt/project-files/marketing-n8n/` del
+  progetto (PASSAGGIO.md).
