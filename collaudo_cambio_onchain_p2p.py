@@ -62,6 +62,7 @@ def pezzi_pagina():
         i = mini.index(inizio)
         return mini[i:mini.index("\n", i) + 1]
     firme = ["function onchainParolePerOrdine(B, parole, o){",
+             "async function onchainRimborsoAtteso(B, parole, o, io){",
              "async function onchainFirmaProposta(oid, verso){",
              "function daFirmareOnchainP2P(o){",
              "function cambioDaFirmareOnchainP2P(o){",
@@ -363,6 +364,13 @@ def main():
     for tg in (999, 888):
         come(tg)
         c.post("/api/onchain/xpub", json={"xpub": conto(tg)})
+    # (10 nov 2026, rimborso-wallet) chi mette i sats ha un wallet SUO per
+    # i rimborsi e il resto: mai il seme di Barattolo
+    RIMBORSO_999 = script.p2wpkh(__import__("embit.ec", fromlist=["ec"]).PrivateKey(bytes([7]) * 32).get_public_key()).address(N)
+    come(999)
+    c.post("/api/onchain/incasso", json={
+        "tipo": "indirizzo", "valore": RIMBORSO_999,
+        "firma": firma_dest(999, "indirizzo", RIMBORSO_999)})
     come(888)
     r = c.post("/api/onchain/incasso", json={
         "tipo": "indirizzo", "valore": fisso,

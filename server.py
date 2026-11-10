@@ -19685,6 +19685,20 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                 if col in ci_sono:
                     con.execute(f"UPDATE {tab} SET {col}=? WHERE {col}=?",
                                 (id_telegram, id_nostr))
+        # LA CONVERSAZIONE CON L'ASSISTENZA (10 nov 2026, notata nel
+        # cantiere unione-seme): una per persona, quindi le due meta' si
+        # fondono in una (le righe sono in ordine di id, e restano in
+        # ordine). Il segno di lettura e il freno degli avvisi tengono
+        # quelli dell'account Telegram, come per il carrello.
+        if "utente" in _colonne_di(con, "assistenza"):
+            con.execute("UPDATE assistenza SET utente=? WHERE utente=?",
+                        (id_telegram, id_nostr))
+            con.execute("UPDATE assistenza SET autore=? WHERE autore=?",
+                        (id_telegram, id_nostr))
+            for _t in ("assistenza_letture", "assistenza_avvisi"):
+                con.execute(f"UPDATE OR IGNORE {_t} SET utente=? "
+                            "WHERE utente=?", (id_telegram, id_nostr))
+                con.execute(f"DELETE FROM {_t} WHERE utente=?", (id_nostr,))
         if "tg_id" in _colonne_di(con, "swap_auto_preferenze"):
             con.execute("UPDATE OR IGNORE swap_auto_preferenze SET tg_id=? "
                         "WHERE tg_id=?", (id_telegram, id_nostr))
@@ -94687,6 +94701,9 @@ async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
         riempiti = _onchain_riempi_incassi(con, user["id"])
         # ...e gli scambi P2P on-chain presi senza destinazione (30 ott 2026)
         _p2p_onchain_riempi_incassi(con, user["id"])
+        # ...e i RIMBORSI di quando ha messo lui i sats (10 nov 2026)
+        _p2p_onchain_prepara(con)
+        _onchain_riempi_rimborsi(con, user["id"])
         con.commit()
     finally:
         con.close()
@@ -95055,6 +95072,77 @@ def _onchain_destinazione_viva(con, tg_id: int, xpub_dedicata: str):
     return r
 
 
+def _onchain_rimborsi_usati(con, tg_id: int, valore: str) -> int:
+    """Uno dopo il piu' alto `/0/i` di `valore` gia' dato come RIMBORSO a
+    questa persona, nel mercatino e nel P2P (0 = nessuno). Le tabelle e
+    le colonne che non ci sono ancora valgono «nessuno»."""
+    alto = 0
+    for tab, chi in (("onchain_ordini", "compratore_id"),
+                     ("p2p_onchain_ordini", "depositante_id")):
+        try:
+            r = con.execute(f"SELECT MAX(rimborso_indice) FROM {tab} WHERE "
+                            f"{chi}=? AND rimborso_tipo='xpub' AND "
+                            f"rimborso_valore=?", (int(tg_id), valore)).fetchone()
+        except sqlite3.OperationalError:
+            continue
+        if r and r[0] is not None:
+            alto = max(alto, int(r[0]) + 1)
+    return alto
+
+
+def _onchain_rimborso_di(con, tg_id: int, xpub_dedicata: str) -> tuple:
+    """DOVE TORNA IL RIMBORSO di chi mette i sats (10 nov 2026, cantiere
+    rimborso-wallet, scelta di Andrea: «aspettano il suo wallet»): il
+    wallet SUO, firmato dal suo seme (`onchain_incasso`, la stessa
+    scelta di quando vende), o niente — e allora resta vuoto finche' non
+    sceglie (`_onchain_riempi_rimborsi`). Mai piu' il `/1/n` del seme di
+    Barattolo: le 12 parole servono solo a firmare, e li' non deve mai
+    esserci un sats. Torna (indirizzo, tipo, valore, firma, indice)."""
+    dest = _onchain_destinazione_viva(con, tg_id, xpub_dedicata)
+    if not dest:
+        return "", "", "", "", 0
+    indice = (_p2p_onchain_prossimo_esterno(con, tg_id, dest["valore"])
+              if dest["tipo"] == "xpub" else 0)
+    return (onchain_indirizzo_esterno(dest["tipo"], dest["valore"], indice),
+            dest["tipo"], dest["valore"], dest["firma"], indice)
+
+
+def _onchain_riempi_rimborsi(con, tg_id: int) -> list:
+    """IL RIMBORSO SCELTO DOPO, gemello di `_onchain_riempi_incassi`: gli
+    ordini e gli scambi in cui questa persona ha messo i sats, nati senza
+    un suo wallet, prendono quello vivo di adesso — se non c'e' ancora
+    una proposta firmata (un PSBT firmato non si cambia sotto i piedi).
+    Torna quante righe ha riempito."""
+    r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                    (int(tg_id),)).fetchone()
+    if not r or not _onchain_destinazione_viva(con, tg_id, r["xpub"]):
+        return 0
+    fatti = 0
+    for tab, chi, stati in (
+            ("onchain_ordini", "compratore_id", ("attesa", "pagato")),
+            ("p2p_onchain_ordini", "depositante_id",
+             ("preso", "depositato", "euro_inviati", "disputa"))):
+        try:
+            righe = con.execute(
+                f"SELECT id FROM {tab} WHERE {chi}=? AND rimborso='' AND "
+                f"proposta_psbt='' AND stato IN ({','.join('?' * len(stati))}) "
+                "ORDER BY id", (int(tg_id), *stati)).fetchall()
+        except sqlite3.OperationalError:
+            continue
+        for o in righe:
+            ind, tipo, valore, firma, indice = _onchain_rimborso_di(
+                con, tg_id, r["xpub"])
+            if not ind:
+                break
+            fatti += con.execute(
+                f"UPDATE {tab} SET rimborso=?, rimborso_tipo=?, "
+                "rimborso_valore=?, rimborso_firma=?, rimborso_indice=?, "
+                "aggiornato=? WHERE id=? AND rimborso='' AND proposta_psbt=''",
+                (ind, tipo, valore, firma, indice, int(time.time()),
+                 o["id"])).rowcount
+    return fatti
+
+
 def _onchain_prossimo_esterno(con, venditore_id: int, valore: str) -> int:
     """Il prossimo `/0/i` di una chiave di conto esterna: uno dopo il
     piu' alto gia' dato a un ordine di questo venditore con quella
@@ -95065,6 +95153,10 @@ def _onchain_prossimo_esterno(con, venditore_id: int, valore: str) -> int:
                     "venditore_id=? AND incasso_tipo='xpub' AND "
                     "incasso_valore=?", (int(venditore_id), valore)).fetchone()
     nostro = 0 if r[0] is None else int(r[0]) + 1
+    # (10 nov 2026) la stessa chiave riceve anche i RIMBORSI di quando la
+    # persona compra: una fila sola, o due ordini avrebbero lo stesso
+    # indirizzo
+    nostro = max(nostro, _onchain_rimborsi_usati(con, venditore_id, valore))
     # ...e mai sotto l'ultimo indirizzo che la RETE ha gia' visto usato
     # (3 nov 2026, `onchain_xpub_base`)
     return max(nostro, _onchain_xpub_base(con, valore))
@@ -95310,7 +95402,16 @@ def _onchain_prepara_ordini(con):
                       ("cambio", "TEXT DEFAULT ''"),
                       # 9 nov 2026: chi vende sa gia' del pagamento visto
                       # nel mempool (l'avviso «in arrivo», una volta sola)
-                      ("visto_avvisato", "INTEGER DEFAULT 0")):
+                      ("visto_avvisato", "INTEGER DEFAULT 0"),
+                      # 10 nov 2026, cantiere rimborso-wallet (Andrea: i
+                      # sats non stanno mai nel seme di Barattolo): il
+                      # rimborso di chi mette i sats va al wallet SUO,
+                      # con la firma del suo seme, come l'incasso. Vuoto =
+                      # aspetta la sua scelta
+                      ("rimborso_tipo", "TEXT DEFAULT ''"),
+                      ("rimborso_valore", "TEXT DEFAULT ''"),
+                      ("rimborso_firma", "TEXT DEFAULT ''"),
+                      ("rimborso_indice", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -95487,6 +95588,11 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
         else:
             d_tipo = d_valore = d_firma = incasso = ""
             d_indice = 0
+        # IL RIMBORSO DI CHI COMPRA (10 nov 2026, rimborso-wallet): al suo
+        # wallet, o vuoto finche' non lo sceglie — come l'incasso di chi
+        # vende. Mai il `/1/n` del seme di Barattolo
+        rimborso, r_tipo, r_valore, r_firma, r_indice = _onchain_rimborso_di(
+            con, user["id"], ind["xpub_compratore"])
         # la quota va a Barattolo su `/1/n` della SUA xpub, col numero di
         # Barattolo di questo ordine: una fila che non si ripete mai
         quota_dove = (onchain_incasso(ind["xpub_barattolo"],
@@ -95497,16 +95603,16 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
             " compratore_id, venditore_id, quantita, titolo, prezzo_sats,"
             " margine_sats, importo_sats, incasso, rimborso, dettagli,"
             " scade, creato, aggiornato, incasso_tipo, incasso_valore,"
-            " incasso_firma, incasso_indice, quota_sats, quota_indirizzo)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " incasso_firma, incasso_indice, quota_sats, quota_indirizzo,"
+            " rimborso_tipo, rimborso_valore, rimborso_firma, rimborso_indice)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ind_id, a["id"], user["id"], venditore, richiesti,
              r["titolo"] or "", prezzo, margine, prezzo + quota + margine,
-             incasso,
-             onchain_incasso(ind["xpub_compratore"],
-                             ind["numero_compratore"]),
+             incasso, rimborso,
              json.dumps(dettagli, ensure_ascii=False),
              adesso + ONCHAIN_ORE_ATTESA * 3600, adesso, adesso,
-             d_tipo, d_valore, d_firma, d_indice, quota, quota_dove))
+             d_tipo, d_valore, d_firma, d_indice, quota, quota_dove,
+             r_tipo, r_valore, r_firma, r_indice))
         con.execute("UPDATE onchain_indirizzi SET ordine_id=? WHERE id=?",
                     (cur.lastrowid, ind_id))
         con.commit()
@@ -95544,6 +95650,14 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
         "visti_sats": o["visti_sats"], "ricevuti_sats": o["ricevuti_sats"],
         "utxo": json.loads(o["utxo"] or "[]"),
         "incasso": o["incasso"], "rimborso": o["rimborso"],
+        # (10 nov 2026, rimborso-wallet) dove torna il rimborso di chi
+        # mette i sats, con la firma del SUO seme: il suo telefono la
+        # rilegge prima di firmare. None = vecchio /1/n o ancora vuoto
+        "destinazione_rimborso": ({"tipo": o["rimborso_tipo"],
+                                   "valore": o["rimborso_valore"],
+                                   "firma": o["rimborso_firma"],
+                                   "indice": o["rimborso_indice"]}
+                                  if _p2p_onchain_campo(o, "rimborso_tipo", "") else None),
         # la destinazione scelta da chi vende, con la firma del suo seme:
         # il suo telefono la rilegge prima della seconda firma. Vuota =
         # il conto di Barattolo (`/1/n`), che il seme rifa' da se'
@@ -95703,7 +95817,13 @@ def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
                                  "quota dell'ordine")
             permessi += (o["quota_indirizzo"],)
     else:
+        if not o["rimborso"]:
+            raise ValueError("chi ha messo i sats non ha ancora scelto dove "
+                             "riceverli: il rimborso aspetta il suo wallet")
         permessi = (o["rimborso"],)
+    # un rimborso vuoto non e' mai un indirizzo permesso (il resto di chi
+    # non ha ancora un wallet suo non ha dove andare)
+    permessi = tuple(d for d in permessi if d)
     if not uscite or any(d not in permessi for d, _ in uscite):
         raise ValueError("c'è un'uscita verso un indirizzo che l'ordine "
                          "non conosce")
@@ -95801,9 +95921,12 @@ def _onchain_psbt_barattolo(con, oc, verso: str) -> str:
         if quota:
             uscite.append((oc["quota_indirizzo"], quota))
         resto = tot - int(oc["prezzo_sats"]) - quota - rete(3 if quota else 2)
-        if resto >= ONCHAIN_POLVERE:
+        if resto >= ONCHAIN_POLVERE and oc["rimborso"]:
             uscite.append((oc["rimborso"], resto))
     else:
+        if not oc["rimborso"]:
+            raise ValueError("chi ha messo i sats non ha ancora scelto dove "
+                             "riceverli: decidi di nuovo quando l'ha fatto")
         uscite = [(oc["rimborso"], tot - rete(1))]
     tx = Transaction(
         vin=[TransactionInput(bytes.fromhex(m["txid"]), int(m["vout"]))
@@ -97385,7 +97508,16 @@ def _p2p_onchain_prepara(con):
                       ("cambio", "TEXT DEFAULT ''"),
                       # 2 nov 2026, cantiere p2p-onchain-usdt: l'id della
                       # transazione USDT che chi compra scrive a «Ho inviato»
-                      ("txid_usdt", "TEXT DEFAULT ''")):
+                      ("txid_usdt", "TEXT DEFAULT ''"),
+                      # 10 nov 2026, cantiere rimborso-wallet (Andrea: i
+                      # sats non stanno mai nel seme di Barattolo): il
+                      # rimborso di chi mette i sats va al wallet SUO,
+                      # con la firma del suo seme, come l'incasso. Vuoto =
+                      # aspetta la sua scelta
+                      ("rimborso_tipo", "TEXT DEFAULT ''"),
+                      ("rimborso_valore", "TEXT DEFAULT ''"),
+                      ("rimborso_firma", "TEXT DEFAULT ''"),
+                      ("rimborso_indice", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -97761,6 +97893,14 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "ricevuti_sats": int(o["ricevuti_sats"] or 0),
         "utxo": json.loads(o["utxo"] or "[]"),
         "incasso": o["incasso"] or "", "rimborso": o["rimborso"] or "",
+        # (10 nov 2026, rimborso-wallet) dove torna il rimborso di chi
+        # mette i sats, con la firma del SUO seme: il suo telefono la
+        # rilegge prima di firmare. None = vecchio /1/n o ancora vuoto
+        "destinazione_rimborso": ({"tipo": o["rimborso_tipo"],
+                                   "valore": o["rimborso_valore"],
+                                   "firma": o["rimborso_firma"],
+                                   "indice": o["rimborso_indice"]}
+                                  if _p2p_onchain_campo(o, "rimborso_tipo", "") else None),
         "destinazione": ({"tipo": o["incasso_tipo"], "valore": o["incasso_valore"],
                           "firma": o["incasso_firma"], "indice": o["incasso_indice"]}
                          if o["incasso_tipo"] else None),
@@ -98334,7 +98474,9 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
                           (ind_id,)).fetchone()
         incasso, i_tipo, i_val, i_firma, i_ind = _p2p_onchain_incasso_di(
             con, ric, ind["xpub_venditore"])
-        rimborso = onchain_incasso(ind["xpub_compratore"], ind["numero_compratore"])
+        # (10 nov 2026) il rimborso di chi deposita: il suo wallet, o vuoto
+        rimborso, r_tipo, r_valore, r_firma, r_indice = _onchain_rimborso_di(
+            con, dep, ind["xpub_compratore"])
         rec = o["recapito"] or ""
         if dep == int(user["id"]) and recapito and not rec:
             rec = recapito
@@ -98347,12 +98489,13 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
             " importo_sats=?, incasso=?, incasso_tipo=?, incasso_valore=?,"
             " incasso_firma=?, incasso_indice=?, rimborso=?, recapito=?,"
             " preso_il=?, deposito_entro=?, aggiornato=?, prezzo_sats=?,"
-            " cambio_presa=?"
+            " cambio_presa=?, rimborso_tipo=?, rimborso_valore=?,"
+            " rimborso_firma=?, rimborso_indice=?"
             " WHERE id=? AND stato='pending'",
             (user["id"], dep, ric, ind_id, margine, prezzo + margine,
              incasso, i_tipo, i_val, i_firma, i_ind, rimborso, rec, adesso,
              adesso + P2P_ONCHAIN_ORE_DEPOSITO * 3600, adesso, prezzo,
-             cambio_presa, oid))
+             cambio_presa, r_tipo, r_valore, r_firma, r_indice, oid))
         con.commit()
         if not cur.rowcount:
             raise HTTPException(409, "Qualcun altro l'ha preso un attimo fa")

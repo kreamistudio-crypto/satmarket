@@ -151,6 +151,13 @@ def main():
     for tg in (999, 888):
         come(tg)
         c.post("/api/onchain/xpub", json={"xpub": conto(tg)})
+    # (10 nov 2026, rimborso-wallet) chi mette i sats ha un wallet SUO per
+    # i rimborsi e il resto: mai il seme di Barattolo
+    RIMBORSO_999 = dal_wallet(50)
+    come(999)
+    c.post("/api/onchain/incasso", json={
+        "tipo": "indirizzo", "valore": RIMBORSO_999,
+        "firma": firma_dest(999, "indirizzo", RIMBORSO_999)})
 
     # ---- 1) dove ricevi --------------------------------------------------
     print("\n[«Dove ricevi i sats»: la scelta firmata dal seme]")

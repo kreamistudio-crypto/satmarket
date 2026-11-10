@@ -58369,8 +58369,11 @@ async function renderWalletBarattolo(){
     <div class="hint" id="walletCoda" style="margin-top:6px">${parole ? ''
       : 'Nasce da sola la prima volta che serve.'}</div></div>
     <div class="payout"><h4>Le 12 parole</h4>
-    <div class="hint">Con queste riprendi i tuoi bitcoin da un altro
-      telefono. Non darle a nessuno, nemmeno a noi.</div>
+    <div class="hint">Servono solo a firmare la tua parte del deposito
+      di garanzia on-chain, da questo o da un altro telefono. I sats delle
+      vendite e dei rimborsi non arrivano qui: arrivano al wallet che
+      scegli tu, che Barattolo non conosce. <b>Non importarle in un altro
+      wallet</b>, e non darle a nessuno, nemmeno a noi.</div>
     ${walletParoleViste && parole
       ? `<ol class="swap-parole">${parole.split(' ').map(p => `<li>${esc(p)}</li>`).join('')}</ol>
          <button class="btn ghost" onclick="walletParoleViste=false;renderWalletBarattolo()">🙈 Nascondi</button>`
@@ -59242,6 +59245,17 @@ async function onchainIncassoAtteso(B, parole, o, io){
   try { return onchainIndirizzoEsterno(B, o.destinazione); } catch(e) { return ''; }
 }
 
+/* DOVE DEVE TORNARE IL MIO RIMBORSO (10 nov 2026, cantiere
+   rimborso-wallet): il wallet che il MIO seme ha firmato come
+   destinazione, mai un indirizzo detto dal solo server; '' se la firma
+   non e' del mio seme. Gli ordini nati prima, senza destinazione del
+   rimborso, tornano al `/1/n` del mio seme come allora. */
+async function onchainRimborsoAtteso(B, parole, o, io){
+  if (!o.destinazione_rimborso) return io.incasso;
+  if (!(await onchainDestinazioneMia(B, parole, o.destinazione_rimborso))) return '';
+  try { return onchainIndirizzoEsterno(B, o.destinazione_rimborso); } catch(e) { return ''; }
+}
+
 /* «HO RICEVUTO», FIRMATO (28 ott 2026, cantiere onchain-verso-lightning).
    Quando chi compra conferma prima che l'uscita ci sia, la conferma la
    firma il SUO seme (la stessa chiave `/2/0` delle destinazioni, su un
@@ -59339,7 +59353,9 @@ function onchainUsciteVersoVenditore(o, incasso, piuVb){
   const resto = tot - o.prezzo_sats - quota - Math.ceil(vb(quota ? 3 : 2) * tar);
   const uscite = [[incasso, o.prezzo_sats]];
   if (quota) uscite.push([o.quota_indirizzo, quota]);
-  if (resto >= ONCHAIN_POLVERE) uscite.push([o.rimborso, resto]);
+  /* (10 nov 2026) il resto torna al wallet di chi ha comprato; se non ne
+     ha ancora scelto uno non ha dove andare, e resta alla rete */
+  if (resto >= ONCHAIN_POLVERE && o.rimborso) uscite.push([o.rimborso, resto]);
   return uscite;
 }
 
@@ -59393,8 +59409,9 @@ async function onchainFirmaProposta(oid, verso){
      volta e prende l'on-chain allo sblocco — e allora l'incasso deve
      essere quello che il SUO seme ha firmato */
   verso = verso || (o.ruolo === 'compratore' ? 'venditore' : 'compratore');
-  if (verso === 'venditore' && o.ruolo === 'compratore' && o.rimborso !== io.incasso)
-    throw new Error('il resto non tornerebbe a una tua chiave');
+  if (verso === 'venditore' && o.ruolo === 'compratore' && o.rimborso
+      && o.rimborso !== await onchainRimborsoAtteso(B, parole, o, io))
+    throw new Error('il resto non tornerebbe al tuo wallet');
   if (verso === 'venditore' && o.ruolo === 'venditore') {
     const atteso = await onchainIncassoAtteso(B, parole, o, io);
     if (!atteso || o.incasso !== atteso) throw new Error('l\'incasso non è firmato dal tuo seme');
@@ -59404,6 +59421,8 @@ async function onchainFirmaProposta(oid, verso){
   const tar = Math.max(1, Number(o.tariffa) || 2);
   /* la quota fissa di Barattolo, se l'ordine ne ha una: la paga chi
      compra, e `onchainUsciteVersoVenditore` controlla il tetto */
+  if (verso === 'compratore' && !o.rimborso)
+    throw new Error('chi ha messo i sats non ha ancora scelto dove riceverli: il rimborso aspetta il suo wallet');
   const uscite = verso === 'venditore' ? onchainUsciteVersoVenditore(o, o.incasso, 0)
     : [[o.rimborso, tot - Math.ceil(vb(1) * tar)]];
   const r = await fetch(`${API_BASE}${o.rotta || '/onchain/ordini/' + o.id}/proposta`, {method: 'POST',
@@ -59463,7 +59482,8 @@ async function onchainCofirma(o, parole){
        quota esatta, il resto del margine a una MIA chiave */
     if (!onchainPrimaDiChiVende(o) || !(await onchainRicevutoMio(B, parole, o)))
       return 'non hai confermato tu di averlo ricevuto';
-    if (o.rimborso !== io.incasso) return 'il resto non tornerebbe a una tua chiave';
+    if (o.rimborso && o.rimborso !== await onchainRimborsoAtteso(B, parole, o, io))
+      return 'il resto non tornerebbe al tuo wallet';
     if (!o.incasso) return 'chi vende non ha un incasso';
     if (!onchainFirmataDaChiVende(B, tx, o, w)) return 'la prima firma non è di chi vende';
     if (uscite.filter(([a]) => a === o.incasso).map(([, v]) => v).join() !== String(o.prezzo_sats))
@@ -59489,8 +59509,9 @@ async function onchainCofirma(o, parole){
     if (uscite.some(([a]) => a !== atteso && a !== o.rimborso
                              && !(quota && a === o.quota_indirizzo))) return 'c\'è un\'uscita estranea';
   } else {
-    if (o.ruolo !== 'compratore' || o.rimborso !== io.incasso) return 'non è il tuo rimborso';
-    if (uscite.some(([a]) => a !== io.incasso)) return 'c\'è un\'uscita estranea';
+    const mio = await onchainRimborsoAtteso(B, parole, o, io);
+    if (o.ruolo !== 'compratore' || !o.rimborso || o.rimborso !== mio) return 'non è il tuo rimborso';
+    if (uscite.some(([a]) => a !== mio)) return 'c\'è un\'uscita estranea';
   }
   const rete = o.utxo.reduce((s, u) => s + u.value, 0) - uscite.reduce((s, [, v]) => s + v, 0);
   if (rete <= 0 || rete > o.margine_sats) return 'la commissione esce dal margine';
