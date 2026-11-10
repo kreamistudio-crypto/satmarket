@@ -63532,7 +63532,7 @@ def prove_card_p2p_vetrina():
           can.index("raise HTTPException(\n            400, \"Amazon")
           < can.index('_foto_subito_p2p(ordine if buono else "")')
           # (cura 4) il post si salta anche sul doppione e sulla raffica
-          < can.index("if (canale_id() or vetrina_ok) and not doppione and not raffica:"))
+          < can.index("if (canale_id() or vetrina_ok or canale_bitcoin_podcast()) \\\n            and not doppione and not raffica:"))
     prova("la fotografia dell'orologio tiene fuori gli usciti, e la loro lista invecchia",
           True, "eventi=_senza_i_via_p2p(_vetrina_foto_p2p(ultimi, info, adesso), via))"
           in pezzo("_fotografa_libro_p2p")
@@ -82791,7 +82791,7 @@ def prove_p2p_canale():
     # --- 3) FAIL-OPEN: un canale spento o un post fallito non rompono
     prova("canale spento: nessun post, mai un errore", True,
           # (cura 4) il post si salta anche sul doppione e sulla raffica
-          "if (canale_id() or vetrina_ok) and not doppione and not raffica:" in rotta
+          "if (canale_id() or vetrina_ok or canale_bitcoin_podcast()) \\\n            and not doppione and not raffica:" in rotta
           and 'return {"ok": True' in rotta)
     prova("un post fallito si logga e non esplode", True,
           "except Exception as e:" in rotta
@@ -148396,7 +148396,7 @@ def prove_freni():
     prova("canale: doppione e raffica saltano il post senza un 429", True,
           "_CANALE_POSTATI.get(ordine, 0) < 86400" in c
           and '_secchio_passa(f"canale:{user[\'id\']}", *FRENI["canale"], adesso_canale)' in c
-          and "if (canale_id() or vetrina_ok) and not doppione and not raffica:" in c
+          and "if (canale_id() or vetrina_ok or canale_bitcoin_podcast()) \\\n            and not doppione and not raffica:" in c
           and "429" not in codice(c))
     prova("...e l'ordine si segna postato solo a post uscito", True,
           "if postato and buono:" in c and "_CANALE_POSTATI[ordine] = adesso_canale" in c)
