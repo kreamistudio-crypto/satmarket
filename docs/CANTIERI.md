@@ -78888,3 +78888,40 @@ contenuto, il cancello), `prove_parole_uniche` (il tasto ›), più
 `prove_swap_auto_schermate`, `prove_incasso_annuncio`,
 `prove_sintassi_client`; anteprima chiaro e scuro mandata ad Andrea.
 
+## La cassetta del bunker chiusa sotto i piedi (10 nov 2026, Andrea: «rimane bloccato nella schermata di pagamento dice preparo l'indirizzo»)
+
+PERCHÉ. Andrea, 10 nov: comprando un oggetto di Alan con «₿ On-chain» la
+cassa restava su «Preparo l'indirizzo…» e non andava avanti; poi, dal
+Profilo, «Salva» della copia delle 12 parole si fermava allo stesso
+modo. Tutti e due i giri passano dal firmatario Nostr collegato con la
+sessione bunker conservata (NIP-46): la copia delle parole si cifra e
+si firma lì. Il journal del VPS diceva il resto: una cassetta aperta,
+chiusa un attimo dopo, e la spedizione della richiesta successiva
+rifiutata con 404.
+
+LA CAUSA. La cassetta del server sta sotto la chiave EFFIMERA del
+telefono, e la sessione conservata usa sempre la stessa. Due motori in
+fila (la coda delle firme, poi quello della copia) aprivano la STESSA
+cassetta; quando arrivava il nuovo, `registraMotoreNip46` chiudeva il
+vecchio, e il vecchio chiudeva la cassetta anche al nuovo. Il server
+rispondeva 404 alla sua richiesta e smetteva di ascoltare il bunker per
+lui: la risposta passava solo dalle websocket del telefono, che dentro
+Telegram dormono, e il giro aspettava fino al tempo massimo (5 minuti
+per un gesto umano).
+
+COSA. Nel client, una conta delle cassette aperte per chiave
+(`cassetteAperteNip46`): la chiusura parte verso il server solo quando
+si chiude l'ultima. E come seconda cintura, una spedizione che trova la
+cassetta chiusa o scaduta (404) la riapre e rispedisce, una volta sola.
+Il server non cambia.
+
+SCARTATO. Una chiave effimera nuova per ogni motore: la sessione
+conservata è legata a quella chiave (il bunker la conosce), cambiarla
+vorrebbe dire ricollegare il firmatario. Accorciare il tempo massimo:
+avrebbe solo anticipato l'errore.
+
+PROVATO. `prove_nostr_da_telefono` (+1, giro in node col `fetch` finto):
+due cassette sulla stessa chiave, la prima chiusa non chiude al server,
+la seconda sì; una spedizione con 404 riapre e rispedisce.
+**DA GUARDARE** dal vivo dopo il deploy: un acquisto on-chain e «Salva»
+della copia delle 12 parole col firmatario bunker.

@@ -62610,8 +62610,21 @@ function ascoltoNip46(NT, coro, opz){
    e SUBITO quando la pagina torna. Gli eventi passano da `consegna`,
    che scarta le copie. Dopo meta' vita si rinnova (`rinfresca`): un
    giro col bunker puo' durare piu' di una cassetta. */
+/* LA CASSETTA E' UNA PER CHIAVE (10 nov 2026, Andrea: «si è bloccato su
+   salva»). Sul server la cassetta sta sotto la chiave effimera, e la
+   sessione bunker conservata usa SEMPRE la stessa: due motori in fila
+   (la coda delle firme, poi la copia delle 12 parole) aprivano la stessa
+   cassetta, e il vecchio, chiudendosi perche' arrivava il nuovo
+   (`registraMotoreNip46`), la chiudeva anche al nuovo. Il server
+   rispondeva 404 alla sua richiesta, smetteva di ascoltare per lui, e il
+   telefono aspettava una risposta che passava solo dalle sue websocket.
+   Adesso si contano le cassette aperte per chiave (sulla funzione
+   stessa: pubLocale -> quante aperte qui): al server la chiusura parte
+   solo quando si chiude l'ultima. */
 function cassettaNip46(pubLocale, relays, consegna, etichetta){
   let n = 0, viva = null, timer = null, ferma = false, orecchi = {}, apertaA = 0, biglietto = '';
+  const aperte = cassettaNip46.aperte || (cassettaNip46.aperte = new Map());
+  aperte.set(pubLocale, (aperte.get(pubLocale) || 0) + 1);
   let inApertura = null;   // l'apertura in corso: chi spedisce la aspetta
   function apri(){ return (inApertura = apriOra()); }
   async function apriOra(){
@@ -62658,7 +62671,7 @@ function cassettaNip46(pubLocale, relays, consegna, etichetta){
      SPEDISCE»). Il server non vede niente che non veda un relay. Torna
      quanti relay l'hanno presa (0 = niente, e si va avanti con le
      websocket sole: e' una riserva, non un passaggio obbligato). */
-  async function spedisci(ev){
+  async function spedisci(ev, ripresa){
     if (ferma) return 0;
     try { await inApertura; } catch(e){}
     if (!viva || !biglietto) return 0;
@@ -62667,6 +62680,14 @@ function cassettaNip46(pubLocale, relays, consegna, etichetta){
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({pub: pubLocale, biglietto, evento: ev})});
       const d = await r.json().catch(() => ({}));
+      /* (10 nov 2026) CHIUSA O SCADUTA SOTTO I PIEDI: si riapre (il
+         server rida' il biglietto, e riascolta) e si rispedisce, una
+         volta sola */
+      if (r.status === 404 && !ripresa && !ferma) {
+        console.log(`🟪 [${etichetta}] la cassetta era chiusa: la riapro e rispedisco`);
+        await apri();
+        return spedisci(ev, true);
+      }
       console.log(`🟪 [${etichetta}] spedita dal server: ${r.ok ? (d.gia ? 'gia\' partita' : (d.presi || 0) + ' relay') : 'rifiutata: ' + (d.detail || r.status)}`);
       return r.ok ? (d.presi || 0) : 0;
     } catch(e){
@@ -62691,6 +62712,11 @@ function cassettaNip46(pubLocale, relays, consegna, etichetta){
     ferma = true;
     clearInterval(timer);
     timer = null;
+    /* un'altra cassetta qui usa la stessa chiave: sul server resta */
+    const restano = (aperte.get(pubLocale) || 1) - 1;
+    if (restano > 0) aperte.set(pubLocale, restano);
+    else aperte.delete(pubLocale);
+    if (restano > 0) { console.log(`🟪 [${etichetta}] cassetta lasciata aperta: la usa un altro motore`); return; }
     if (!biglietto) return;
     try {
       fetch(`${API_BASE}/login/nostr/cassetta/chiudi`, {method:'POST', keepalive: true,

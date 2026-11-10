@@ -121747,6 +121747,44 @@ def prove_nostr_da_telefono():
           ("/login/nostr/cassetta/spedisci" in cas, "await inApertura;" in cas))
     prova("ogni richiesta del bunker parte ANCHE dal server", True,
           "const dalServer = cassetta.spedisci(ev);" in bun)
+    # (10 nov 2026, Andrea: «si è bloccato su salva») due motori con la
+    # stessa chiave effimera: il vecchio che si chiude non chiude la
+    # cassetta del nuovo; e uno spedisci che trova la cassetta chiusa la
+    # riapre e rispedisce, una volta
+    _cas2 = cas + "\n}\n"
+    _js = ("const API_BASE = '/api'; const CASSETTA_POLL_MS = 4000;\n"
+           "const chiamate = []; let chiusa = false;\n"
+           "globalThis.setInterval = () => 1; globalThis.clearInterval = () => {};\n"
+           "console.log = () => {};\n"
+           "globalThis.fetch = async (url, o) => { const b = JSON.parse((o && o.body) || '{}');\n"
+           "  chiamate.push(url.replace('/api/login/nostr/cassetta', 'C'));\n"
+           "  if (url.endsWith('/chiudi')) { chiusa = true; return {ok: true, status: 200, json: async () => ({ok: true})}; }\n"
+           "  if (url.endsWith('/spedisci')) { if (chiusa) return {ok: false, status: 404, json: async () => ({detail: 'chiusa'})};\n"
+           "    return {ok: true, status: 200, json: async () => ({presi: 2})}; }\n"
+           "  if (o && o.method === 'POST') { chiusa = false; return {ok: true, status: 200, json: async () => ({biglietto: 'b1', relays: b.relays})}; }\n"
+           "  return {ok: true, status: 200, json: async () => ({viva: true, eventi: []})}; };\n"
+           + _cas2 +
+           "(async () => {\n"
+           "  const P = 'e3'.repeat(32);\n"
+           "  const vecchia = cassettaNip46(P, ['wss://r'], () => {}, 'coda'); await vecchia.apri();\n"
+           "  const nuova = cassettaNip46(P, ['wss://r'], () => {}, 'bunker'); await nuova.apri();\n"
+           "  vecchia.chiudi();\n"
+           "  const presi1 = await nuova.spedisci({id: 'x'});\n"
+           "  const dopoUna = chiamate.filter(c => c === 'C/chiudi').length;\n"
+           "  nuova.chiudi();\n"
+           "  const dopoDue = chiamate.filter(c => c === 'C/chiudi').length;\n"
+           "  const terza = cassettaNip46(P, ['wss://r'], () => {}, 'bunker'); await terza.apri();\n"
+           "  chiusa = true;   /* scaduta sul server */\n"
+           "  const presi2 = await terza.spedisci({id: 'y'});\n"
+           "  console.info(JSON.stringify({presi1, dopoUna, dopoDue, presi2}));\n"
+           "})();\n")
+    _r = _node_banco(_js.replace("console.info(", "process.stdout.write('\\n' + ").replace("}));\n})();", "}) + '\\n');\n})();"))
+    if _r is None:
+        salta("la cassetta condivisa fra due motori", "node non c'e'")
+    else:
+        prova("(10 nov) la cassetta condivisa: il motore vecchio non la chiude al "
+              "nuovo, l'ultimo si', e una cassetta chiusa si riapre per spedire",
+              {"presi1": 2, "dopoUna": 0, "dopoDue": 1, "presi2": 2}, _r)
     prova("...e il rifiuto di tutti i relay del telefono non fa cadere "
           "l'attesa se il server l'ha consegnata", True,
           "dalServer.then(presi => {" in bun and "if (presi ||" in bun)
