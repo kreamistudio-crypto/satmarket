@@ -156734,6 +156734,7 @@ def prove_incasso_esterno_onchain():
         # il seme giusto per l'ordine (5 nov 2026, unione-seme): qui
         # non ci sono parole «di prima», e vince il principale
         pezzo_js(mini, "function onchainParolePerOrdine(B, parole, o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function onchainRimborsoAtteso(B, parole, o, io){", "\n}\n") + "\n}",
         "const walletParolePrima = () => [];",
         pezzo_js(mini, "async function onchainFirmaProposta(oid, verso){", "\n}\n") + "\n}",
         cofirma_js + "\n}"])
@@ -156989,6 +156990,7 @@ def prove_ordine_onchain():
         # il seme giusto per l'ordine (5 nov 2026, unione-seme): qui
         # non ci sono parole «di prima», e vince il principale
         pezzo_js(mini, "function onchainParolePerOrdine(B, parole, o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function onchainRimborsoAtteso(B, parole, o, io){", "\n}\n") + "\n}",
         "const walletParolePrima = () => [];",
         pezzo_js(mini, "async function onchainFirmaProposta(oid, verso){", "\n}\n") + "\n}",
         cofirma_js + "\n}"])

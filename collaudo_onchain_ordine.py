@@ -218,7 +218,15 @@ def main():
           c.post("/api/onchain/incasso", json={
               "tipo": "xpub", "valore": vpub,
               "firma": firma_dest(888, "xpub", vpub)}).status_code)
+    # (10 nov 2026, rimborso-wallet) anche chi compra sceglie il SUO
+    # wallet: il rimborso e il resto tornano li', mai al seme
+    RIMBORSO_999 = dal_wallet(50)
     come(999)
+    prova("chi compra sceglie il suo wallet per i rimborsi, firmato dal "
+          "suo seme", 200,
+          c.post("/api/onchain/incasso", json={
+              "tipo": "indirizzo", "valore": RIMBORSO_999,
+              "firma": firma_dest(999, "indirizzo", RIMBORSO_999)}).status_code)
     prova("ora si': pronto", True,
           c.get("/api/onchain/pronto/888").json()["pronto"])
     prova("...e la cassa che dice la cifra sotto il tetto resta pronta",
@@ -235,7 +243,7 @@ def main():
           (o["indirizzo"]["indirizzo"].startswith("tb1q"),
            o["indirizzo"]["ruolo"]))
     prova("...chi vende incassa sul SUO wallet, chi compra riprende sul "
-          "suo seme", (dal_wallet(0), incasso_mio(999, 0)),
+          "SUO wallet (mai sul seme)", (dal_wallet(0), RIMBORSO_999),
           (o["incasso"], o["rimborso"]))
     prova("...e nessuna xpub esce", [False, False],
           [conto(888) in r.text, conto(999) in r.text])
@@ -415,12 +423,20 @@ def main():
                 (annunci[2],))
     con.commit()
     con.close()
+    # (10 nov 2026, rimborso-wallet) chi compra SENZA un wallet suo: il
+    # rimborso nasce vuoto e aspetta la sua scelta, mai il seme
+    con = SRV.db()
+    con.execute("DELETE FROM onchain_incasso WHERE tg_id=999")
+    con.commit()
+    con.close()
     o = compra(999, annunci[2], metodo="onchain").json()["onchain"]
+    prova("senza un wallet suo, il rimborso di chi compra nasce vuoto", "",
+          o["rimborso"])
     paga(o)
     controlla(999, o["id"])
     o8 = ordine(888, o["id"])
     ord2 = o8["ordine_id"]
-    indietro = [(o8["rimborso"], o8["importo_sats"] - 400)]
+    indietro = [(RIMBORSO_999, o8["importo_sats"] - 400)]
     prova("il rimborso non si propone a ordine vivo: parte da «Annulla la "
           "vendita»", (409, True),
           (lambda r: (r.status_code, "Annulla" in r.json()["detail"]))(
@@ -433,6 +449,19 @@ def main():
           (r.status_code, r.json().get("stato"),
            (r.json().get("rimborso") or {}).get("onchain"),
            any("seconda firma" in t for chi, t in banco.DETTO if chi == 999)))
+    r = proponi(888, o["id"], "compratore", psbt_di(o8, indietro, 888))
+    prova("a rimborso vuoto il venditore non lo propone: aspetta il wallet "
+          "di chi ha comprato", (False, True),
+          (r.status_code == 200, "aspetta il suo wallet" in r.json()["detail"]))
+    come(999)
+    prova("chi compra sceglie il suo wallet", 200,
+          c.post("/api/onchain/incasso", json={
+              "tipo": "indirizzo", "valore": RIMBORSO_999,
+              "firma": firma_dest(999, "indirizzo", RIMBORSO_999)}).status_code)
+    o8 = ordine(888, o["id"])
+    prova("...e l'ordine che aspettava prende quel wallet come rimborso, "
+          "con la firma del suo seme", (RIMBORSO_999, "indirizzo"),
+          (o8["rimborso"], (o8.get("destinazione_rimborso") or {}).get("tipo")))
     prova("chi compra non si propone il rimborso da solo: 403", 403,
           proponi(999, o["id"], "compratore",
                   psbt_di(ordine(999, o["id"]), indietro, 999)).status_code)

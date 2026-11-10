@@ -258,6 +258,15 @@ def main():
     for tg in (999, 888):
         come(tg)
         c.post("/api/onchain/xpub", json={"xpub": conto(tg)})
+    # (10 nov 2026, rimborso-wallet) chi deposita ha un wallet SUO per i
+    # rimborsi e il resto: mai il seme di Barattolo. Un indirizzo fisso,
+    # cosi' i suoi incassi da chi compra restano un'altra storia
+    RIMBORSO_999 = dal_wallet(50)
+    come(999)
+    prova("Andrea sceglie il suo wallet (rimborsi e resti), firmato dal "
+          "suo seme", 200, c.post("/api/onchain/incasso", json={
+              "tipo": "indirizzo", "valore": RIMBORSO_999,
+              "firma": firma_dest(999, "indirizzo", RIMBORSO_999)}).status_code)
 
     # ---- 2) pubblicare ------------------------------------------------------
     print("\n[pubblicare: il giudice e il libro]")
@@ -348,9 +357,9 @@ def main():
           (r.status_code, o["stato"], o["ruolo"], o["parte"],
            o["margine_sats"], o["importo_sats"]))
     prova("...l'indirizzo e' un 2-di-3 di signet; chi compra non ha ancora "
-          "scelto dove ricevere (incasso vuoto), il rimborso torna al seme "
-          "di chi vende",
-          (True, "", rimborso_mio(999, 0), "Andrea"),
+          "scelto dove ricevere (incasso vuoto), il rimborso torna al "
+          "wallet di chi vende bitcoin (mai al seme)",
+          (True, "", RIMBORSO_999, "Andrea"),
           (o["indirizzo"]["indirizzo"].startswith("tb1q"), o["incasso"],
            o["rimborso"], o["altro"]))
     prova("...e il recapito per gli euro lo legge", "IT00 X 1234", o["recapito"])

@@ -78827,3 +78827,56 @@ girano come prima. Una sezione nuova va scritta in `main()` E in
 può scegliere meno del necessario quando una funzione cambia
 comportamento per una sezione che non la nomina; la rete è la suite
 intera prima della promozione.
+
+## Il rimborso di chi mette i sats aspetta il suo wallet, e le 12 parole dette per quel che sono (10 nov 2026, cantiere rimborso-wallet, scelta di Andrea sulla card del 5 nov)
+
+Andrea, 5 nov: «la seed phrase che si vede in barattolo serve solamente
+per la costruzione del multisig [...] qui non ci saranno mai fondi e non
+deve essere importata da nessuna parte»; sulla card «Dove vanno rimborsi
+e resti del compratore on-chain?» ha scelto «Aspettano il suo wallet». Il
+10 nov: «risolvilo».
+
+**COSA.** Chi vende non riceve sul `/1/n` dal 27 ott (cantiere
+onchain-dopo); chi mette i sats sì: il rimborso e il resto del margine
+nascevano su `/1/n` del suo seme. Adesso:
+- alla cassa del mercatino e alla presa del P2P il rimborso è il wallet
+  SUO (`_onchain_rimborso_di`: la stessa destinazione firmata di quando
+  vende, `onchain_incasso`), fotografato con la firma in quattro colonne
+  nuove (`rimborso_tipo/valore/firma/indice`, nelle due tabelle); senza
+  un wallet resta vuoto;
+- alla scelta del wallet `_onchain_riempi_rimborsi` lo scrive sugli
+  ordini e gli scambi aperti senza proposta, come per gli incassi;
+- il giudice dei PSBT dice no a un rimborso vuoto, e un rimborso vuoto
+  non è mai un'uscita permessa; il PSBT di Barattolo (disputa, reso) non
+  nasce verso chi ha comprato finché non ha un wallet, e verso chi vende
+  mette il resto solo se c'è dove;
+- il telefono: `onchainRimborsoAtteso` rilegge la firma del SUO seme
+  sulla destinazione del rimborso prima di co-firmare (mai un indirizzo
+  detto dal solo server); gli ordini nati prima tornano al `/1/n` come
+  allora; il resto senza wallet non si mette e va alla rete;
+- la fila degli indici `/0/i` di una chiave di conto conta anche i
+  rimborsi (`_onchain_rimborsi_usati`), sennò incasso e rimborso della
+  stessa persona avrebbero lo stesso indirizzo;
+- il testo delle 12 parole nel Profilo: «Servono solo a firmare la tua
+  parte del deposito di garanzia on-chain [...] I sats delle vendite e
+  dei rimborsi non arrivano qui [...] Non importarle in un altro wallet».
+- (notato nel cantiere unione-seme) l'unione dei due account fonde anche
+  la conversazione con l'assistenza.
+
+**APERTO, CON LA CARD DEL 10 NOV.** Il resto del margine di chi non ha
+ancora un wallet: per ora va alla rete (il rilascio a chi vende non
+aspetta). Se Andrea sceglie «chiederlo al rilascio» o «il rilascio
+aspetta», cambia solo il telefono.
+
+**NON ANCORA.** Il rimborso di un CAMBIO fallito (swap) va ancora al
+`/1/n` del seme (`swap/instradatore.js`, i record `seme: 'onchain'`):
+il testo delle parole per questo non dice «mai».
+
+**PROVATO.** I collaudi on-chain aggiornati al mondo nuovo (chi mette i
+sats sceglie il suo wallet all'inizio): `collaudo_onchain_ordine` con la
+sezione nuova (rimborso vuoto senza wallet, il venditore che non può
+proporlo, la scelta che lo riempie con la firma), `collaudo_p2p_onchain`,
+`collaudo_p2p_onchain_usdt`, `collaudo_onchain_incasso`,
+`collaudo_cambio_onchain_p2p`, `collaudo_onchain_verso_lightning`; i banchi
+delle firme in prove.py con `onchainRimborsoAtteso`. Suite intera severa
+27.202 verdi, 0 rosse, nessuna saltata; collaudi della CI 122/0.
