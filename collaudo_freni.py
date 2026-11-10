@@ -99,7 +99,10 @@ def main():
         mandati.append((dove, caption))
         return 1
     prima = (S._manda_post_canale, S.canale_id, S.canale_vetrina,
-             S.verifica_utente, S._p2p_per, S._foto_subito_p2p)
+             S.verifica_utente, S._p2p_per, S._foto_subito_p2p,
+             S.canale_bitcoin_podcast)
+    # (10 nov 2026, poi) BitcoinPodcast, la terza porta: entra TUTTO
+    S.canale_bitcoin_podcast = lambda: "@podcast"
     S._manda_post_canale = annota
     S.canale_id = lambda: "@casa"
     S.canale_vetrina = lambda: "@subito_crypto_vetrina"
@@ -124,11 +127,11 @@ def main():
     try:
         st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50,
                                          "metodo": "Revolut", "premio": 3})
-        prova("Telegram con @username: il post esce in casa E su Subito Crypto, uguale",
-              (200, True, ["@casa", "@subito_crypto_vetrina"]), (st, ok, dove))
+        prova("Telegram con @username: il post esce in casa, su Subito Crypto e su BitcoinPodcast, uguale",
+              (200, True, ["@casa", "@subito_crypto_vetrina", "@podcast"]), (st, ok, dove))
         prova("...con la convenienza dal lato di chi guarda (vende a +3: 3% meno conveniente)",
               True, "🏷️ 3% meno conveniente" in cap
-              and mandati[0][1] == mandati[1][1])
+              and mandati[0][1] == mandati[1][1] == mandati[2][1])
         st, ok, dove, cap = posta(4401, {"lato": "compro", "euro": 50,
                                          "metodo": "Revolut", "premio": 4})
         prova("...e chi compra a +4 e' 4% più conveniente per chi legge", True,
@@ -153,10 +156,12 @@ def main():
                                          "metodo": "Contanti al tabacchino", "premio": 25})
         prova("...mentre il Barattozon tiene il suo 400 fuori scala", 400, st)
         st, ok, dove, cap = posta(4402, {"lato": "vendo", "euro": 50, "metodo": "SEPA"})
-        prova("Telegram senza @username: solo in casa", (200, True, ["@casa"]), (st, ok, dove))
+        prova("Telegram senza @username: in casa e su BitcoinPodcast, non su Subito Crypto",
+              (200, True, ["@casa", "@podcast"]), (st, ok, dove))
         st, ok, dove, cap = posta(-4403, {"lato": "vendo", "euro": 50, "metodo": "SEPA"})
-        prova("chi entra da Nostr: solo in casa, mai su Subito Crypto",
-              (200, True, ["@casa"]), (st, ok, dove))
+        prova("chi entra da Nostr: in casa e su BitcoinPodcast, mai su Subito Crypto",
+              (200, True, ["@casa", "@podcast"]), (st, ok, dove))
+        S.canale_bitcoin_podcast = lambda: ""
         S.canale_id = lambda: ""
         st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50, "metodo": "SEPA"})
         prova("a canale di casa spento Subito Crypto va lo stesso, per conto suo",
@@ -167,7 +172,8 @@ def main():
         prova("...e a Subito Crypto spento resta solo casa", ["@casa"], dove)
     finally:
         (S._manda_post_canale, S.canale_id, S.canale_vetrina,
-         S.verifica_utente, S._p2p_per, S._foto_subito_p2p) = prima
+         S.verifica_utente, S._p2p_per, S._foto_subito_p2p,
+         S.canale_bitcoin_podcast) = prima
         S._SECCHI.clear()
         S._CANALE_POSTATI.clear()
 

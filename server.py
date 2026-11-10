@@ -61743,7 +61743,13 @@ async def annuncia_ordine_p2p_canale(req: Request,
             vetrina_ok = bool(r_u and (r_u["username"] or ""))
         except Exception as e:
             print(f"⚠️ Post P2P su Subito Crypto saltato: {e}")
-    if (canale_id() or vetrina_ok) and not doppione and not raffica:
+    # BITCOINPODCAST (10 nov 2026, Andrea: «su bitcoinpodcast devi
+    # mandare anche quelli relativi al p2p»): la terza porta, e qui entra
+    # TUTTO — la stessa regola degli annunci in `_posta_promo_singolo`,
+    # senza il filtro dell'@username, perche' quel pubblico e' di
+    # bitcoiner e la menzione Telegram non e' la maniglia che si aspetta.
+    if (canale_id() or vetrina_ok or canale_bitcoin_podcast()) \
+            and not doppione and not raffica:
         try:
             con = db()
             riga = con.execute(
@@ -61770,6 +61776,12 @@ async def annuncia_ordine_p2p_canale(req: Request,
                         postato = True
                 except Exception as e:
                     print(f"⚠️ Post P2P su Subito Crypto saltato: {e}")
+            if canale_bitcoin_podcast():
+                try:
+                    if await _manda_post_canale(canale_bitcoin_podcast(), caption, []):
+                        postato = True
+                except Exception as e:
+                    print(f"⚠️ Post P2P su BitcoinPodcast saltato: {e}")
             if postato and buono:
                 if len(_CANALE_POSTATI) > 5000:
                     _CANALE_POSTATI.clear()

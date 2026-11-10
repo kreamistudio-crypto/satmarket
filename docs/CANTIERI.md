@@ -79657,8 +79657,7 @@ assurdo: a sats fissi il 20 del cursore non vale.
 SCARTATI. Calcolare la convenienza sul server: non parla col coordinatore
 e non sa se l'ordine è a sats fissi. Subito Crypto per ogni utente
 Telegram anche senza @username: la firma «da @tizio» è la maniglia di
-quel pubblico (decisione di ago 2026). BitcoinPodcast per il P2P: il
-config lo nomina come destinazione, ma non è stato chiesto (in coda).
+quel pubblico (decisione di ago 2026).
 
 PROVATO. `collaudo_freni`, sezione nuova sul server vero: il post esce in
 casa e su Subito Crypto identico per Telegram con @username; solo in casa
@@ -79668,3 +79667,11 @@ ferma l'altro. `prove_p2p_canale`: il giudice del client gira in node
 (Barattozon, mercato, fissi arrotondati, muto). Sentinelle aggiornate in
 `prove_p2p_canale` e nella fotografia subito. DA GUARDARE: il primo
 ordine vero da un account Telegram, su Subito Crypto.
+
+IL GIORNO STESSO, BITCOINPODCAST (Andrea: «su bitcoinpodcast devi
+mandare anche quelli relativi al p2p»). Lo stesso post esce anche in
+`canale_bitcoin_podcast()`, e lì entra TUTTO: Telegram con o senza
+@username e chi viene da Nostr, la stessa regola degli annunci (quel
+pubblico è di bitcoiner, la menzione non è la sua maniglia). Il collaudo
+lo prova: tre canali col @username, casa più BitcoinPodcast senza o da
+Nostr; acceso o spento non tocca gli altri due.
