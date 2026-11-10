@@ -63532,7 +63532,7 @@ def prove_card_p2p_vetrina():
           can.index("raise HTTPException(\n            400, \"Amazon")
           < can.index('_foto_subito_p2p(ordine if buono else "")')
           # (cura 4) il post si salta anche sul doppione e sulla raffica
-          < can.index("if canale_id() and not doppione and not raffica:"))
+          < can.index("if (canale_id() or vetrina_ok) and not doppione and not raffica:"))
     prova("la fotografia dell'orologio tiene fuori gli usciti, e la loro lista invecchia",
           True, "eventi=_senza_i_via_p2p(_vetrina_foto_p2p(ultimi, info, adesso), via))"
           in pezzo("_fotografa_libro_p2p")
@@ -63605,7 +63605,7 @@ def prove_card_p2p_vetrina():
     _aio.run(uno())
     prova("...senza un ordine atteso il giro e' uno", 1, len(giri))
     prova("il client manda l'id del suo ordine al canale, mai un nome provvisorio", True,
-          "annunciaCanaleP2P(lato, euro, metodo, ord.tabacchino ? ord.premioCotto : null,\n"
+          "annunciaCanaleP2P(lato, euro, metodo, convenienzaCanaleP2P(ord),\n"
           "                      provvisorioP2P(agg.id) ? '' : agg.id);" in mini)
     prova("il ritorno nel libro aspetta il suo ordine, presa annullo e scadenza no", [True, True],
           ['_foto_subito_p2p(ev["ordine"])' in pezzo("_foto_dopo_evento_p2p"),
@@ -82099,6 +82099,7 @@ function provvisorioP2P(id){ return String(id || '').indexOf('provvisorio-') ===
 async function registraChiaviP2P(){} async function mostroRiascolta(){}
 function messaggioMostro(){ return {}; } function nuovaRichiestaP2P(){ return 7; }
 let canale = 0; function annunciaCanaleP2P(){ canale++; }
+function convenienzaCanaleP2P(){ return null; }   /* (10 nov 2026) il giudice della convenienza */
 /* il libro vero e' gia' in mano (26 set 2026, «IL LIBRO SUBITO»): su
    una copia il bottone aspetterebbe la lettura, che qui non c'entra */
 let p2pLibro = {ordini: [], quando: Date.now()};
@@ -82790,7 +82791,7 @@ def prove_p2p_canale():
     # --- 3) FAIL-OPEN: un canale spento o un post fallito non rompono
     prova("canale spento: nessun post, mai un errore", True,
           # (cura 4) il post si salta anche sul doppione e sulla raffica
-          "if canale_id() and not doppione and not raffica:" in rotta
+          "if (canale_id() or vetrina_ok) and not doppione and not raffica:" in rotta
           and 'return {"ok": True' in rotta)
     prova("un post fallito si logga e non esplode", True,
           "except Exception as e:" in rotta
@@ -82818,8 +82819,32 @@ def prove_p2p_canale():
           True, "fetch(" not in invia)
     prova("...e SOLO dopo che l'ordine e' partito davvero, col premio del solo Barattozon", True,
           # (27 set 2026: piu' l'id dell'ordine, mai un nome provvisorio)
-          invia.index("annunciaCanaleP2P(lato, euro, metodo, ord.tabacchino ? ord.premioCotto : null,")
+          invia.index("annunciaCanaleP2P(lato, euro, metodo, convenienzaCanaleP2P(ord),")
           > invia.index("agg.contattato = true;"))
+    # LA CONVENIENZA DI OGNI ORDINE (10 nov 2026, richiesta di Andrea):
+    # il giudice del client GIRA — Barattozon il premio scelto, a mercato
+    # il premio del cursore, a sats fissi la convenienza di adesso (senza
+    # tetto), e a cambio muto null. Il comportamento della rotta, coi due
+    # canali e Subito Crypto solo da Telegram, lo prova `collaudo_freni`.
+    conv = pezzo_js(mini, "function convenienzaCanaleP2P(ord){", "\n}\n") + "\n}\n"
+    ris = _node_banco(
+        "let fisso = null;\n"
+        "function convenienzaFissaP2P(o, m){ return fisso; }\n"
+        "function metroFissoP2P(o){ return 1; }\n" + conv +
+        "const r = [];\n"
+        "r.push(convenienzaCanaleP2P({tabacchino: {}, premioCotto: -7, sats: 5000}));\n"
+        "r.push(convenienzaCanaleP2P({premium: 3, sats: 0}));\n"
+        "r.push(convenienzaCanaleP2P({premium: -12}));\n"
+        "fisso = 212.4; r.push(convenienzaCanaleP2P({premium: 0, sats: 5000}));\n"
+        "fisso = -3.6; r.push(convenienzaCanaleP2P({premium: 0, sats: 5000}));\n"
+        "fisso = null; r.push(convenienzaCanaleP2P({premium: 0, sats: 5000}));\n"
+        "r.push(convenienzaCanaleP2P(null));\n"
+        "console.log(JSON.stringify(r));\n")
+    if ris is None:
+        prova("(node assente: il giudice della convenienza nel canale non gira)", True, True)
+    else:
+        prova("la convenienza del post: Barattozon −7, mercato +3 e −12, fissi 212 e −4, muto e nulla null",
+              [-7, 3, -12, 212, -4, None, None], ris)
 
 
 def prove_p2p_canonico():
@@ -148371,7 +148396,7 @@ def prove_freni():
     prova("canale: doppione e raffica saltano il post senza un 429", True,
           "_CANALE_POSTATI.get(ordine, 0) < 86400" in c
           and '_secchio_passa(f"canale:{user[\'id\']}", *FRENI["canale"], adesso_canale)' in c
-          and "if canale_id() and not doppione and not raffica:" in c
+          and "if (canale_id() or vetrina_ok) and not doppione and not raffica:" in c
           and "429" not in codice(c))
     prova("...e l'ordine si segna postato solo a post uscito", True,
           "if postato and buono:" in c and "_CANALE_POSTATI[ordine] = adesso_canale" in c)
