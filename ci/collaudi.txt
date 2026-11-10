@@ -175,3 +175,4 @@ fuori: collaudo_ricategorizza
 fuori: collaudo_ricerca
 fuori: collaudo_rilancio
 fuori: collaudo_servizio_dove
+collaudo_widget_prova
