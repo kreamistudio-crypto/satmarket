@@ -79372,3 +79372,48 @@ da tg 0, l'assistenza accesa dice «disponibile», la rotta senza
 `db()`, senza utente né Request, con il Cache-Control.
 **DA GUARDARE**: la rotta risponde 404 finché Andrea non promuove;
 n8n la legge con un ripiego (se manca, Tappo usa solo il libro).
+
+## La pillola «.onion disponibile» in Tor Browser: l'avviso Onion-Location (10 nov 2026, cantiere onion-location, Andrea: «manda anche questo in produzione con tutto il resto»)
+
+PERCHÉ. Un utente ha chiesto a Tappo perché Tor Browser non propone il
+sito .onion nella barra degli indirizzi. Tappo ha risposto giusto sul
+meccanismo — la pillola compare solo se la pagina manda l'intestazione
+`Onion-Location` — ma non sapeva il nostro indirizzo: né il codice né
+Caddy la mandavano (il codice cercato tutto, i documenti pure; Caddy
+non ha un registro degli accessi né una riga sua per questo).
+
+COSA. `_onion_location(host, percorso, query)` accanto alle cinture e
+una riga in `cinture_http`: sulle pagine HTML del dominio pubblico
+l'intestazione porta lo stesso percorso sul servizio nascosto. Va solo
+dove va l'HSTS (`_host_con_hsts`: mai sull'onion, in collaudo, in
+locale) e solo con un `ONION_HOST` che ha la forma v3: una riga storta
+nel config non deve mandare nessuno su un indirizzo che non è nostro.
+`setdefault`, come le altre cinture. Il libro di Tappo ora dice dell'IP
+(registro tecnico, mai database né profilo, niente da Telegram) e del
+sito .onion; la voce in NOVITA.md la annuncia.
+
+INSIEME, FUORI DAL REPO (n8n, stessa sera): Tappo legge l'indirizzo
+.onion vero dalla busta di prima pagina di `/api/listings`
+(`onion_host`, controllato sulla forma v3) e rilegge da main, al più
+una volta l'ora, il testo delle tre pagine informative della Mini App
+(«Lo scambio P2P», «Il pagamento protetto», «I tuoi dati»): una pagina
+cambiata arriva a Tappo da sola con la promozione. Lezione: il libro
+riassunto a mano aveva perso il .onion e la riga sull'IP, che stavano
+scritte nell'app da agosto.
+
+SCARTATO. La riga in Caddy sul VPS (fuori perimetro, e un gesto di
+Andrea per una cosa che il codice sa già fare: `ONION_HOST` sta nel
+config che il server legge); l'intestazione su ogni risposta (ai
+browser serve sul documento, non su foto e API).
+
+PROVATO. `prove_csp_prova`: il valore sul dominio pubblico col percorso
+e la query, la home con la barra, niente su onion/collaudo/locale,
+niente senza `ONION_HOST` o con uno di forma sbagliata, nessun
+carattere da intestazione nel valore, e la sentinella sul middleware.
+Suite severa 27295/0.
+**DA GUARDARE**: aprire barattolo.store con Tor Browser dopo il deploy e
+vedere la pillola. DECISIONE APERTA (Andrea, domattina): le righe
+d'accesso di uvicorn nel journal del VPS portano con ogni probabilità
+l'IP; spegnerle renderebbe vero «non conserviamo il tuo IP». Non
+toccato: è il servizio sul VPS.
+

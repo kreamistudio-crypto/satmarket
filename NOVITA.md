@@ -44,3 +44,9 @@ frase: Nel Profilo c'è una voce nuova, «📥 Come ricevi»: lì scegli in che 
 dove: Profilo → «📥 Come ricevi», con le due righe «Quando ti pagano in Lightning, ricevi in» e «Quando ti pagano on-chain, ricevi in».
 leva: SWAP_AUTO_ATTIVO spenta di serie
 pubblico: no
+
+## 2026-11-10 · onion-location
+frase: Se apri barattolo.store con Tor Browser, nella barra degli indirizzi compare «.onion disponibile»: un tocco e sei sul sito .onion di Barattolo, dove il server non vede il tuo indirizzo IP.
+dove: Tor Browser, barra degli indirizzi su barattolo.store: la pillola viola «.onion disponibile».
+leva: nessuna
+pubblico: sì

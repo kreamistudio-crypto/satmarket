@@ -2596,6 +2596,38 @@ def _host_con_hsts(host: str, collaudo: bool = MODALITA_COLLAUDO) -> bool:
     return True
 
 
+# L'AVVISO ONION-LOCATION (10 nov 2026, richiesta di Andrea): Tor Browser
+# mostra la pillola «.onion disponibile» nella barra degli indirizzi solo
+# se la pagina, arrivata in HTTPS, glielo dice con questa intestazione.
+# Prima non la mandavamo, e chi apriva barattolo.store da Tor non sapeva
+# che esiste il servizio nascosto. Va SOLO dove c'e' anche l'HSTS (il
+# dominio pubblico: mai sull'onion stesso, mai in collaudo, mai in
+# locale), SOLO sulle pagine HTML (ai browser serve sul documento, non
+# alle foto o alle API) e SOLO con un ONION_HOST che ha la forma di un
+# indirizzo v3: una riga storta nel config non deve mandare la gente su
+# un indirizzo che non e' il nostro. L'indirizzo e' pubblico: lo mostra
+# gia' la pagina «I tuoi dati».
+_FORMA_ONION_V3 = re.compile(r"^[a-z2-7]{56}\.onion$")
+_SICURI_URL = "/%-._~!$&'()*+,;=:@"
+
+
+def _onion_location(host: str, percorso: str, query: str = "",
+                    collaudo: bool = MODALITA_COLLAUDO,
+                    onion=None) -> str:
+    """Il valore dell'intestazione Onion-Location per questa richiesta,
+    o '' se non va mandata. Lo stesso percorso sul servizio nascosto,
+    ricodificato: dentro un'intestazione non deve passare niente che
+    non sia un carattere da URL."""
+    from urllib.parse import quote
+    o = str(ONION_HOST if onion is None else onion or "").strip().lower()
+    if not _FORMA_ONION_V3.match(o) or not _host_con_hsts(host, collaudo):
+        return ""
+    p = quote(percorso if (percorso or "").startswith("/") else "/",
+              safe=_SICURI_URL)
+    q = quote(query or "", safe=_SICURI_URL + "?/")
+    return "http://" + o + p + ("?" + q if q else "")
+
+
 @app.middleware("http")
 async def cinture_http(request, call_next):
     """Le cinture su OGNI risposta, con `setdefault`: chi ha gia' la sua
@@ -2614,6 +2646,12 @@ async def cinture_http(request, call_next):
             and not request.url.path.startswith("/widget/")
             and "Content-Security-Policy" not in r.headers):
         r.headers.setdefault(_nome_header_csp(), CSP_PROVA)
+    if (r.headers.get("content-type", "").startswith("text/html")
+            and not request.url.path.startswith("/widget/")):
+        dove = _onion_location(request.headers.get("host", ""),
+                               request.url.path, request.url.query)
+        if dove:
+            r.headers.setdefault("Onion-Location", dove)
     return r
 
 
