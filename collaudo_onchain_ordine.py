@@ -437,6 +437,14 @@ def main():
     o8 = ordine(888, o["id"])
     ord2 = o8["ordine_id"]
     indietro = [(RIMBORSO_999, o8["importo_sats"] - 400)]
+    # (10 nov 2026, Andrea: «il rilascio aspetta il suo wallet») senza il
+    # wallet di chi compra, dove torna il resto, i sats non escono
+    o9v = ordine(999, o["id"])
+    r = proponi(999, o["id"], "venditore",
+                psbt_di(o9v, [(o9v["incasso"], o9v["prezzo_sats"])], 999))
+    prova("senza il wallet di chi compra anche il rilascio aspetta", (False, True),
+          (r.status_code == 200, "il rilascio aspetta il suo wallet"
+           in r.json()["detail"]))
     prova("il rimborso non si propone a ordine vivo: parte da «Annulla la "
           "vendita»", (409, True),
           (lambda r: (r.status_code, "Annulla" in r.json()["detail"]))(

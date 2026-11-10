@@ -79108,3 +79108,34 @@ proporlo, la scelta che lo riempie con la firma), `collaudo_p2p_onchain`,
 `collaudo_cambio_onchain_p2p`, `collaudo_onchain_verso_lightning`; i banchi
 delle firme in prove.py con `onchainRimborsoAtteso`. Suite intera severa
 27.202 verdi, 0 rosse, nessuna saltata; collaudi della CI 122/0.
+
+## Il rilascio aspetta il wallet di chi compra (10 nov 2026, cantiere rilascio-aspetta, scelta di Andrea sulla card)
+
+La card del cantiere rimborso-wallet: «Il resto del margine, se il
+compratore non ha un wallet suo?». Andrea: «Il rilascio aspetta il suo
+wallet» (consigliato era chiederlo al tocco). Quindi il resto non va più
+alla rete: finché chi ha messo i sats non sceglie il suo wallet, verso
+chi vende non esce niente.
+- Il giudice dei PSBT dice no a un rilascio verso chi vende con il
+  rimborso vuoto.
+- «Ho ricevuto» senza il wallet di chi compra passa da
+  `rilascio-chiesto` (come quando manca l'incasso di chi vende): la
+  conferma firmata si scrive, la risposta dice `aspetta_wallet`, il
+  toast manda a Profilo → «₿ On-chain», e il telefono firma da solo
+  alla prima apertura dopo la scelta (`onchainRilascioDaFirmare` vuole
+  anche il rimborso). L'avviso a chi vende parte solo se manca il SUO
+  incasso.
+- Nel P2P chi deposita che libera senza wallet legge «prima scegli il
+  tuo wallet» e, scelto, rifà il gesto (il rilascio confermato per il
+  cambio in Lightning aspetta anche lui il rimborso).
+- **LA DISPUTA NO.** Il PSBT di Barattolo verso chi vende (disputa vinta,
+  reso) NON aspetta il wallet di chi ha perso: altrimenti chi perde una
+  disputa potrebbe tenere fermi i sats dell'altro per sempre. Lì il resto
+  senza wallet va alla rete, come prima. Da confermare con Andrea.
+
+PROVATO: `collaudo_onchain_ordine` (il rilascio rifiutato senza il wallet
+di chi compra, 95/0), le tre sezioni on-chain di prove.py (78/0), gli otto
+collaudi on-chain (8/0). Suite intera severa 27201 su 27202: l'unica
+rossa era la prova del rilascio P2P in `prove_cambio_onchain_p2p`, che
+non dava il rimborso; ora lo dà e prova anche il caso senza (21/0).
+Collaudi della CI 122/0, tutti sull'albero di questo commit.

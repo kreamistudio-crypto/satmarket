@@ -186376,7 +186376,7 @@ def prove_cambio_onchain_p2p():
              + pz("function rilascioDaFirmareOnchainP2P(o){") + pz("function onchainPrimaDiChiVende(o){")
              + r"""
 const c = {ruolo: 'compratore', stato: 'euro_inviati', rotta: '/p2p/onchain/3', rilascio_chiesto_il: 9,
-  rilascio_firma: 'ab', destinazione: {tipo: 'cambio'},
+  rilascio_firma: 'ab', rimborso: 'tb1qr', destinazione: {tipo: 'cambio'},
   proposta: {mia: false, verso: 'venditore', barattolo: ''}};
 const v = (o) => Object.assign({}, c, o);
 console.log(JSON.stringify({
@@ -186388,7 +186388,8 @@ console.log(JSON.stringify({
              rilascioDaFirmareOnchainP2P(v({proposta: null, incasso: ''})),
              rilascioDaFirmareOnchainP2P(v({proposta: null, incasso: 'tb1q', rilascio_firma: ''})),
              rilascioDaFirmareOnchainP2P(v({proposta: null, incasso: 'tb1q', ruolo: 'venditore'})),
-             rilascioDaFirmareOnchainP2P(v({proposta: null, incasso: 'tb1q', stato: 'rilasciato'}))]}));
+             rilascioDaFirmareOnchainP2P(v({proposta: null, incasso: 'tb1q', stato: 'rilasciato'})),
+             rilascioDaFirmareOnchainP2P(v({proposta: null, incasso: 'tb1q', rimborso: ''}))]}));
 """)
     try:
         r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
@@ -186397,8 +186398,9 @@ console.log(JSON.stringify({
               [True, True, False, False, False, False, False],
               (json.loads(r.stdout.strip() or "null") or {}).get("cambio"))
         prova("...e firma da solo il rilascio confermato solo se l'incasso c'e', la "
-              "conferma c'e', e' lui che deposita e lo scambio e' aperto",
-              [True, False, False, False, False],
+              "conferma c'e', e' lui che deposita, lo scambio e' aperto e il suo wallet "
+              "per il resto c'e' (senza, il rilascio aspetta)",
+              [True, False, False, False, False, False],
               (json.loads(r.stdout.strip() or "null") or {}).get("riprendi"))
     except (OSError, subprocess.TimeoutExpired):
         salta("i giudici del cambio dello scambio", "node assente")
