@@ -243,7 +243,7 @@ ACINQ 1M e ACINQ 400k. Gira il nostro fork di Mostro, `mostro:v0.20.2-bar9`
    L'architettura va in `docs/ARCHITETTURA.md`, le procedure di
    produzione in `docs/PRODUZIONE.md`, il nodo in `docs/NODO-MOSTRO.md`.
    Se l'utente vede o usa qualcosa di nuovo, anche una voce in fondo a
-   `NOVITA.md` (la forma è in cima al file): diventa il post del canale.
+   `NOVITA.md` (il post) e il ritocco di `assistente/sapere.md` (Tappo).
    Questo file si tocca SOLO se è cambiata una REGOLA di qui: rientra
    intero a ogni sessione e a ogni /compact, e ha un tetto provato
    (`TETTO_CLAUDE_MD` in prove.py). Proponilo come commit separato,
