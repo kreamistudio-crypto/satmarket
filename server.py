@@ -3183,14 +3183,16 @@ def _prova_ignora_update(aggiornamento, ammessi: set) -> bool:
     decisione di Andrea: chi non e' in lista non riceve NIENTE, nemmeno
     la risposta al /start, e non finisce scritto nel database.)
     Lista vuota = la produzione: non si lascia cadere nulla. Il mittente
-    e' il `from` del messaggio o del tocco su un bottone — i due soli
-    tipi che il webhook chiede (`allowed_updates`). Senza un mittente
+    e' il `from` del messaggio, del tocco su un bottone o (dal 10 nov
+    2026, solo sulla prova) del tocco dentro un widget: i tipi che il
+    webhook chiede (`aggiornamenti_chiesti`). Senza un mittente
     leggibile l'update cade: sulla prova si sbaglia dal lato chiuso."""
     if not ammessi:
         return False
     if not isinstance(aggiornamento, dict):
         return True
-    for chiave in ("message", "edited_message", "callback_query"):
+    for chiave in ("message", "edited_message", "callback_query",
+                   "widget_query"):
         corpo = aggiornamento.get(chiave)
         if isinstance(corpo, dict):
             mittente = corpo.get("from")
@@ -21517,6 +21519,175 @@ async def gestisci_callback(cb: dict):
                          argomento="riepiloghi")
 
 
+# ---------------------------------------------------------------------------
+# IL WIDGET DI PROVA (10 nov 2026, cantiere widget-prova, richiesta di
+# Andrea: «vai pure ma fallo prima per il bot di collaudo»).
+#
+# La Bot API 10.4 (9 nov 2026) porta i WIDGET: una paginetta HTML chiusa
+# dentro il messaggio, che il bot manda una volta e poi aggiorna cambiando
+# solo i suoi dati (`chat_data`), in silenzio. E' il mattone della «scheda
+# ordine viva» (il piano: una scheda per ordine al posto della raffica di
+# avvisi). Prima di costruirci sopra la si GUARDA: questo e' il cartellino
+# finto, uno stepper di cinque passi che si gira coi bottoni dentro il
+# widget o col comando, e che riferisce in chat ogni risposta storta di
+# Telegram — la pagina della Bot API non si e' lasciata leggere fino ai
+# parametri, e la prima prova e' anche il modo di scoprirli.
+#
+# SOLO SULL'ISTANZA DI PROVA (`PROVA_SOLO_IDS` non vuota) E SOLO AGLI
+# ADMIN, e nient'altro: in produzione `/provawidget` e' un comando che
+# non esiste (`_comando_sconosciuto`), il webhook non chiede gli update
+# dei widget e un `widget_query` arrivato per sbaglio non tocca niente.
+# Lo stato vive in memoria (un riavvio lo perde: e' una prova, non un
+# ordine), e i widget Telegram li accetta oggi SOLO in chat privata.
+
+PASSI_WIDGET_PROVA = ("Pagato, sats nel deposito di garanzia", "Spedito",
+                      "Consegnato", "Confermato", "Sats sbloccati")
+
+# chat dell'admin -> (message_id dell'ultima scheda, passo)
+_WIDGET_PROVA: dict[int, tuple[int, int]] = {}
+
+# La paginetta. Niente rete la' dentro (fetch e immagini esterne sono
+# spenti), i colori sono quelli del tema della chat (--tg-theme-*), e la
+# richiesta al bot parte DENTRO il tocco, come vuole la guida. Tetti:
+# 32 KB di HTML e 4 KB compressa (la prova li misura).
+HTML_WIDGET_PROVA = """<style>
+body{margin:0;font:15px system-ui,sans-serif;background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#000)}
+.w{padding:12px}h3{margin:0 0 2px;font-size:16px}
+.s{color:var(--tg-theme-hint-color,#888);font-size:13px;margin-bottom:8px}
+ol{list-style:none;margin:0;padding:0}
+li{display:flex;align-items:center;gap:8px;padding:3px 0;color:var(--tg-theme-hint-color,#888)}
+li b{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:2px solid currentColor;font-size:12px;flex:none}
+li.f{color:var(--tg-theme-text-color,#000)}
+li.f b{background:var(--tg-theme-button-color,#f7931a);border-color:var(--tg-theme-button-color,#f7931a);color:var(--tg-theme-button-text-color,#fff)}
+li.o{font-weight:600}.b{display:flex;gap:8px;margin-top:10px}
+button{flex:1;padding:8px;border:0;border-radius:8px;background:var(--tg-theme-button-color,#f7931a);color:var(--tg-theme-button-text-color,#fff);font:inherit}
+#e{color:var(--tg-theme-destructive-text-color,#c00);font-size:12px;min-height:14px;margin-top:6px}
+</style><div class="w"><h3>🫙 Ordine di prova</h3>
+<div class="s">Scheda viva: si aggiorna da sola, senza messaggi nuovi</div>
+<ol id="l"></ol><div class="b"><button id="i">◀ Indietro</button><button id="a">Avanti ▶</button></div>
+<div id="e"></div></div><script>
+var W=window.TelegramWidget,P=__PASSI__,C=["🔒","📦","📬","✅","⚡"];
+function passo(){try{return JSON.parse(W.chatData).passo|0}catch(x){return 0}}
+function draw(){var n=passo(),h="";for(var k=0;k<P.length;k++){h+='<li class="'+(k<=n?"f":"")+(k==n?" o":"")+'"><b>'+(k<n?"✓":k+1)+"</b>"+C[k]+" "+P[k]+"</li>"}document.getElementById("l").innerHTML=h}
+function vai(d){var e=document.getElementById("e");e.textContent="";if(!W){e.textContent="Fuori da Telegram";return}
+W.request("vai:"+(passo()+d)).catch(function(x){e.textContent="Errore: "+(x&&x.code||x)})}
+document.getElementById("a").onclick=function(){vai(1)};document.getElementById("i").onclick=function(){vai(-1)};
+if(W){W.onEvent("chatDataChanged",draw)}draw();
+</script>""".replace("__PASSI__", json.dumps(list(PASSI_WIDGET_PROVA),
+                                            ensure_ascii=False))
+
+
+def widget_prova_acceso() -> bool:
+    """IL GIUDICE: i widget di prova vivono solo sull'istanza di prova.
+    Nessuna leva nel config — la lista della prova E' il segno che questa
+    non e' la produzione, come per il recinto dei relay."""
+    return bool(PROVA_SOLO_IDS)
+
+
+def aggiornamenti_chiesti() -> list:
+    """Gli update che il webhook chiede a Telegram. I due di sempre, e
+    sull'istanza di prova anche quelli dei widget: in produzione la
+    richiesta resta parola per parola quella di ieri."""
+    return (["message", "callback_query"]
+            + (["widget_query"] if widget_prova_acceso() else []))
+
+
+def passo_widget_prova(dati) -> int | None:
+    """PURA: il passo chiesto dal widget («vai:N»), tenuto dentro lo
+    stepper; None se la richiesta non e' nostra. Il `data` di un widget
+    e' testo che arriva dal telefono: lo si legge come tale."""
+    testo = str(dati or "")
+    if not testo.startswith("vai:"):
+        return None
+    try:
+        n = int(testo[4:])
+    except ValueError:
+        return None
+    return max(0, min(len(PASSI_WIDGET_PROVA) - 1, n))
+
+
+async def _riferisci_widget(chat: int, metodo: str, r) -> bool:
+    """True se Telegram ha detto ok; altrimenti lo dice in chat, con le
+    sue parole (testo semplice: la descrizione di un errore puo' portare
+    caratteri che l'HTML di Telegram rifiuterebbe)."""
+    if r and r.get("ok"):
+        return True
+    perche = (r or {}).get("description") or "nessuna risposta da Telegram"
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": f"⚠️ {metodo} rifiutato: {perche}"})
+    return False
+
+
+async def _modifica_widget_prova(chat: int, message_id: int, passo: int):
+    r = await bot_api("editMessageWidgetData", {
+        "chat_id": chat, "message_id": message_id,
+        "chat_data": json.dumps({"passo": passo})})
+    if await _riferisci_widget(chat, "editMessageWidgetData", r):
+        _WIDGET_PROVA[chat] = (message_id, passo)
+
+
+async def comando_provawidget(mittente: dict, testo: str):
+    """`/provawidget` — manda la scheda di prova; `/provawidget avanti`,
+    `indietro` o un numero da 1 a 5 la girano dal lato del bot, senza
+    toccarla (la prova dell'aggiornamento silenzioso). Solo admin, solo
+    sull'istanza di prova: altrove e' un comando che non esiste."""
+    chat = mittente["id"]
+    if not (widget_prova_acceso() and e_admin_bot(mittente)):
+        return await _comando_sconosciuto(chat)
+    arg = testo.split(maxsplit=1)
+    arg = arg[1].strip().lower() if len(arg) == 2 else ""
+    if not arg:
+        dati = {"chat_id": chat, "html": HTML_WIDGET_PROVA,
+                "width": 0, "height": 0,
+                "chat_data": json.dumps({"passo": 0}),
+                "allow_queries": True,
+                "caption": "🧪 Scheda ordine viva, prova. Tocca ◀ ▶ "
+                           "dentro la scheda, oppure scrivi "
+                           "/provawidget avanti.",
+                "reply_markup": {"inline_keyboard": [_riga_webapp()]}}
+        r = await bot_api("sendWidget", dati)
+        if not (r and r.get("ok")):
+            # il bottone sotto e' la parte meno sicura: un secondo
+            # tentativo senza, e in chat restano scritte tutte e due
+            await _riferisci_widget(chat, "sendWidget (col bottone)", r)
+            dati = {k: v for k, v in dati.items() if k != "reply_markup"}
+            r = await bot_api("sendWidget", dati)
+        if await _riferisci_widget(chat, "sendWidget", r):
+            _WIDGET_PROVA[chat] = (r["result"]["message_id"], 0)
+        return
+    message_id, passo = _WIDGET_PROVA.get(chat) or (0, 0)
+    if not message_id:
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "Prima manda la scheda: /provawidget"})
+    if arg == "avanti":
+        nuovo = passo + 1
+    elif arg == "indietro":
+        nuovo = passo - 1
+    elif arg.isdigit():
+        nuovo = int(arg) - 1
+    else:
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "Si scrive /provawidget avanti, indietro, o un "
+                    f"numero da 1 a {len(PASSI_WIDGET_PROVA)}."})
+    await _modifica_widget_prova(
+        chat, message_id, passo_widget_prova(f"vai:{nuovo}"))
+
+
+async def gestisci_widget_query(q: dict):
+    """Il tocco dentro il widget. La risposta parte SUBITO e sempre
+    (Telegram la aspetta 15 secondi, poi il widget dice TIMEOUT); il
+    passo cambia dopo, e solo per un admin sull'istanza di prova."""
+    chi = (q.get("from") or {}).get("id") or 0
+    passo = (passo_widget_prova(q.get("data"))
+             if widget_prova_acceso() and e_admin(chi) else None)
+    await bot_api("answerWidgetQuery", {"widget_query_id": q.get("id"),
+                                        "data": "ok" if passo is not None else "no"})
+    chat = (q.get("chat") or {}).get("id")
+    if passo is None or not chat or not q.get("message_id"):
+        return
+    await _modifica_widget_prova(chat, q["message_id"], passo)
+
+
 async def comando_dove(msg: dict, mittente: dict):
     """`/dove` — «in che gruppo e in che argomento siamo?». Solo admin.
 
@@ -21986,6 +22157,9 @@ async def gestisci_update(update: dict):
     App: prima di tutto il benvenuto standard in anagrafe."""
     if "callback_query" in update:
         return await gestisci_callback(update["callback_query"])
+    if "widget_query" in update:
+        # il widget di prova (solo sull'istanza di prova: vedi sopra)
+        return await gestisci_widget_query(update["widget_query"])
     msg = update.get("message") or {}
     testo = (msg.get("text") or "").strip()
     mittente = msg.get("from") or {}
@@ -22044,6 +22218,8 @@ async def gestisci_update(update: dict):
         return await comando_sponsor(mittente, testo)
     if testo.startswith("/vetrina"):
         return await comando_vetrina(mittente, testo)
+    if testo.startswith("/provawidget"):
+        return await comando_provawidget(mittente, testo)
     if testo.startswith("/punti"):
         return await comando_punti(mittente, testo)
     if testo.startswith("/canali"):
@@ -22140,7 +22316,7 @@ async def registra_webhook_telegram():
                     f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook",
                     json={"url": f"{URL_PUBBLICO}/api/telegram/aggiornamenti",
                           "secret_token": TELEGRAM_WEBHOOK_SEGRETO,
-                          "allowed_updates": ["message", "callback_query"]})
+                          "allowed_updates": aggiornamenti_chiesti()})
                 print("🔔 Webhook Telegram: "
                       f"{r.json().get('description', '?')}", flush=True)
         except Exception as e:

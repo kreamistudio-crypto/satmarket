@@ -79139,3 +79139,68 @@ collaudi on-chain (8/0). Suite intera severa 27201 su 27202: l'unica
 rossa era la prova del rilascio P2P in `prove_cambio_onchain_p2p`, che
 non dava il rimborso; ora lo dà e prova anche il caso senza (21/0).
 Collaudi della CI 122/0, tutti sull'albero di questo commit.
+
+## Il widget di prova sul bot di collaudo: `/provawidget` (10 nov 2026, cantiere widget-prova, Andrea: «vai pure ma fallo prima per il bot di collaudo»)
+
+La Bot API 10.4 di Telegram (9 nov 2026) porta i WIDGET: una paginetta
+HTML chiusa dentro il messaggio, che il bot manda una volta e poi
+aggiorna cambiando solo i dati (`chat_data`), in silenzio. È il mattone
+della «scheda ordine viva»: una scheda per ordine, che si gira come un
+cartellino sulla porta, al posto di un avviso nuovo a ogni passo. Prima
+di costruirci sopra la si guarda: questo cantiere è la TAPPA 1 del
+piano, il cartellino finto.
+
+- `/provawidget` manda uno stepper di cinque passi (pagato, spedito,
+  consegnato, confermato, sbloccati); `/provawidget avanti`, `indietro`
+  o un numero da 1 a 5 lo girano dal lato del bot, e i due bottoni
+  ◀ ▶ DENTRO la scheda lo girano col tocco (`widget_query` →
+  `answerWidgetQuery` subito, poi `editMessageWidgetData`).
+- **SOLO SULL'ISTANZA DI PROVA E SOLO AGLI ADMIN.** Il giudice è
+  `widget_prova_acceso()`, cioè `PROVA_SOLO_IDS` non vuota: nessuna leva
+  nuova nel config, la lista della prova è già il segno che non siamo in
+  produzione (come per il recinto dei relay). In produzione il comando
+  non esiste (`_comando_sconosciuto`), un `widget_query` riceve «no» e
+  non tocca niente, e il webhook chiede a Telegram gli update di ieri
+  parola per parola: la lista ora la scrive `aggiornamenti_chiesti()`,
+  che solo sulla prova aggiunge `widget_query`.
+- Il bot di prova lasciava cadere ogni update che non fosse un messaggio
+  o un tocco su un bottone: `_prova_ignora_update` ora legge anche il
+  mittente del `widget_query`, o il tocco nel widget non sarebbe mai
+  arrivato.
+- Ogni rifiuto di Telegram si dice IN CHAT con le sue parole: la pagina
+  della Bot API non si è lasciata leggere fino ai parametri di
+  `sendWidget` (letta invece la guida, core.telegram.org/bots/widgets),
+  quindi la prima prova dal vivo è anche il modo di scoprirli. Il
+  bottone sotto la scheda è la parte meno sicura: se Telegram la rifiuta
+  col bottone, parte un secondo tentativo senza.
+- Lo stato (quale scheda, quale passo) vive in memoria: un riavvio lo
+  perde, ed è giusto per una prova.
+
+I LIMITI LETTI NELLA GUIDA, che decidono la tappa 2: in produzione i
+widget vanno solo in chat privata col bot (gruppi, inline e inoltri solo
+sul server di prova di Telegram; canali mai); 32 KB di HTML e 4 KB
+compressa (la nostra: 2,2 KB e 1,1 KB); dentro niente rete; l'HTML non
+si cambia dopo l'invio; `chat_data` 1024 byte; la modifica non suona e
+conta come un messaggio nel limite di invio; il tocco va risposto entro
+15 secondi.
+
+SCARTATE. Le risposte effimere nei post di Subito Crypto (la prima
+idea): quello è un canale, i nostri post lì non hanno bottoni e in un
+canale non c'è nessuno a cui rispondere. Una leva nel config
+(`WIDGET_PROVA`): una riga in più da ricordare sul VPS per una cosa che
+in produzione non deve esistere. `/provawidget` nel gruppo degli admin:
+i widget lì Telegram non li accetta, ed è l'unico comando di servizio
+che resta solo in privato (la sentinella dei comandi lo dice).
+
+**PROVATO.** `prove_widget_prova` (i tetti della paginetta, i giudici
+puri, la produzione che resta com'era) e `collaudo_widget_prova` col
+server vero (16/0: produzione muta, admin sì e gli altri no, risposta
+prima della modifica, i rifiuti detti in chat). Lo script della
+paginetta girato con node e un `TelegramWidget` di cartone. Suite intera
+severa 27.216 verdi, 0 rosse, nessuna saltata; collaudi della CI
+123/0, sull'albero di questo commit.
+**NON PROVATO, ed è il motivo del cantiere:** Telegram vero. Nessuna
+chiamata a `sendWidget` è mai partita: la prima la fa un admin scrivendo
+`/provawidget` a @barattolo_collaudo_bot. Resta da guardare come la
+scheda appare su Android, iPhone e desktop, e se i nomi dei parametri
+(`html`, `chat_data`, `allow_queries`, `widget_query_id`) sono quelli.

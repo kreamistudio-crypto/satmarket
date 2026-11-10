@@ -170207,7 +170207,10 @@ def prove_canale_admin():
           < smista.find('    if tipo != "private":\n        return await '
                         "_comando_nel_gruppo(msg, mittente, testo)\n")
           < smista.find("upsert_utente("))
-    in_privato = set(re.findall(r"await (comando_\w+)\(", smista))
+    # `/provawidget` (10 nov 2026, cantiere widget-prova) e' l'unico che
+    # resta in privato: i widget Telegram li accetta SOLO in chat privata
+    in_privato = set(re.findall(r"await (comando_\w+)\(", smista)) - {
+        "comando_provawidget"}
     nel_gruppo = set(re.findall(r"(?<!\w)comando_\w+",
                                 codice(pezzo("_comando_nel_gruppo"))))
     prova("i comandi di servizio sono gli stessi in privato e nel gruppo: "
@@ -170217,7 +170220,11 @@ def prove_canale_admin():
                         "comando_anteprima"} <= in_privato))
     prova("il webhook chiede a Telegram gli stessi aggiornamenti di ieri: "
           "i messaggi di un gruppo sono «message», i tocchi «callback_query»",
-          True, '"allowed_updates": ["message", "callback_query"]' in _SORGENTE)
+          (True, True),
+          # dal 10 nov 2026 la lista la scrive `aggiornamenti_chiesti`, che
+          # sulla sola istanza di prova aggiunge i widget (prove_widget_prova)
+          ('"allowed_updates": aggiornamenti_chiesti()' in _SORGENTE,
+           'return (["message", "callback_query"]' in _SORGENTE))
     prova("il collaudo col Telegram di cartone sta nella CI, compilato e "
           "girato", (True, True),
           ("collaudo_canale_admin.py" in _compilati_dalla_ci(),
@@ -188042,6 +188049,73 @@ def _leva_apribile_di_nome_vera(chiave):
     return amb["_leva_apribile_di_nome"](chiave)
 
 
+def prove_widget_prova():
+    """IL WIDGET DI PROVA (10 nov 2026, cantiere widget-prova). Il
+    cartellino della «scheda ordine viva» vive SOLO sull'istanza di
+    prova e solo per gli admin: qui i giudici puri, i tetti della
+    paginetta (32 KB, 4 KB compressa: la guida dei widget) e il fatto
+    che in produzione il webhook chieda gli update di sempre. Il giro
+    col server vero lo fa `collaudo_widget_prova.py`."""
+    print("\n[il widget di prova: solo sulla prova, solo agli admin]")
+    import zlib
+    amb = {"json": json, "PROVA_SOLO_IDS": set()}
+    src = _SORGENTE
+    i = src.index("PASSI_WIDGET_PROVA = (")
+    exec(src[i:src.index("\n\n\ndef widget_prova_acceso", i)], amb)
+    for nome in ("widget_prova_acceso", "aggiornamenti_chiesti",
+                 "passo_widget_prova"):
+        exec(pezzo(nome), amb)
+    html = amb["HTML_WIDGET_PROVA"].encode("utf-8")
+    prova("la paginetta sta nei 32 KB e nei 4 KB compressa, senza NUL",
+          (True, True, False),
+          (len(html) <= 32768, len(zlib.compress(html, 9)) <= 4096, b"\0" in html))
+    prova("...e porta i cinque passi, non il segnaposto", (False, 5),
+          ("__PASSI__" in amb["HTML_WIDGET_PROVA"],
+           sum(p in amb["HTML_WIDGET_PROVA"] for p in amb["PASSI_WIDGET_PROVA"])))
+    prova("...e non chiama la rete (dentro un widget e' spenta)", [],
+          [p for p in ("fetch(", "XMLHttpRequest", "WebSocket", "src=\"http",
+                       "url(http") if p in amb["HTML_WIDGET_PROVA"]])
+    passo = amb["passo_widget_prova"]
+    prova("il passo chiesto dal widget sta dentro lo stepper",
+          [0, 2, 4, 0, 4], [passo("vai:0"), passo("vai:2"), passo("vai:4"),
+                            passo("vai:-1"), passo("vai:99")])
+    prova("...e una richiesta che non e' nostra non e' un passo",
+          [None] * 5, [passo(""), passo(None), passo("vai:x"),
+                       passo("avanti"), passo("vai:")])
+    prova("in produzione (lista vuota) il widget e' spento e il webhook "
+          "chiede gli update di ieri", (False, ["message", "callback_query"]),
+          (amb["widget_prova_acceso"](), amb["aggiornamenti_chiesti"]()))
+    amb["PROVA_SOLO_IDS"] = {999}
+    prova("sulla prova si accende, e il webhook chiede anche i widget",
+          (True, ["message", "callback_query", "widget_query"]),
+          (amb["widget_prova_acceso"](), amb["aggiornamenti_chiesti"]()))
+    ig = {}
+    exec(pezzo("_prova_ignora_update"), ig)
+    ig = ig["_prova_ignora_update"]
+    q = lambda chi: {"update_id": 1, "widget_query": {"id": "1", "from": {"id": chi}}}
+    prova("il bot di prova lascia passare il tocco nel widget di chi e' in "
+          "lista, e cade quello degli altri", (False, True, False),
+          (ig(q(999), {999}), ig(q(222), {999}), ig(q(222), set())))
+    cmd = pezzo("comando_provawidget")
+    prova("il comando chiede prova E admin prima di ogni altra cosa", True,
+          cmd.index("if not (widget_prova_acceso() and e_admin_bot(mittente)):")
+          < cmd.index("_comando_sconosciuto(chat)") < cmd.index("bot_api("))
+    wq = pezzo("gestisci_widget_query")
+    prova("il tocco nel widget cambia il passo solo sulla prova e a un admin",
+          1, wq.count("if widget_prova_acceso() and e_admin(chi) else None"))
+    prova("...e la risposta a Telegram parte prima della modifica", True,
+          wq.index('"answerWidgetQuery"') < wq.index("_modifica_widget_prova("))
+    rw = pezzo("registra_webhook_telegram")
+    prova("la registrazione del webhook legge il giudice degli update", 1,
+          rw.count('"allowed_updates": aggiornamenti_chiesti()'))
+    gu = pezzo("gestisci_update")
+    prova("gestisci_update manda i widget_query al loro gestore", 1,
+          gu.count('return await gestisci_widget_query(update["widget_query"])'))
+    prova("il collaudo del server vero e' nella gabbia della CI", [True, True],
+          ["\ncollaudo_widget_prova\n" in "\n" + open("ci/collaudi.txt", encoding="utf-8").read(),
+           "\ncollaudo_widget_prova.py\n" in "\n" + open("ci/compila.txt", encoding="utf-8").read()])
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -188298,7 +188372,7 @@ CATEGORIE = {
     allegati_da_telegram domande_compratore incasso_annuncio
     """.split(),
     "infrastruttura": """
-    categorie_delle_prove
+    categorie_delle_prove widget_prova
     nome_nostr initdata portachiavi piu_account_ovunque
     pallino_altri_account account_doppio login_dal_bot
     dizionari_nel_loop logout_apk logout_apk_due nome_da_nostr
@@ -189087,6 +189161,7 @@ def main():
               prove_config_esempio,
               prove_allegati_da_telegram,
               prove_domande_compratore,
+              prove_widget_prova,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:

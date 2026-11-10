@@ -509,3 +509,24 @@ all'assistenza; da admin guarda che l'avviso arrivi sul tuo canale (il
 tasto apre la conversazione), rispondi dall'app, e controlla che l'utente
 riceva «ti ha risposto» col tasto che apre la sua chat. In produzione la
 leva resta spenta finché Andrea non dice sì, dopo la promozione.
+
+## 11. Il widget di prova, dal telefono (10 nov 2026, cantiere widget-prova)
+
+Niente da scrivere sulla VM: nessuna leva, nessuna riga nel config. Il
+collaudo tira `develop` e al riavvio registra da solo il webhook con gli
+update dei widget. **Sola lettura**, per vederlo (atteso: la riga
+«🔔 Webhook Telegram: Webhook was set»):
+```
+sudo journalctl -u barattolo-collaudo -n 200 --no-pager | grep "Webhook Telegram"
+```
+Poi, da un admin del collaudo, con Telegram AGGIORNATO, nella chat
+privata con @barattolo_collaudo_bot:
+1. `/provawidget` — deve arrivare una scheda con cinque passi, il primo
+   acceso. Se arriva «⚠️ sendWidget rifiutato: …», quella frase è il
+   risultato della prova: va incollata nella sessione.
+2. Tocca «Avanti ▶» dentro la scheda: il passo cambia senza un
+   messaggio nuovo e senza suono.
+3. Scrivi `/provawidget 5`, poi `/provawidget indietro`: la scheda si
+   gira dal lato del bot.
+4. Uno screenshot da Android, da iPhone e da desktop, in tema chiaro e
+   scuro: è quel che decide la tappa 2 (la scheda vera dell'ordine).
