@@ -24,7 +24,7 @@ Non servono email, password o numero di telefono. Si entra in due modi:
 
 Un account nato con Telegram può collegare anche una chiave Nostr dal Profilo, e viceversa.
 
-Nel Profilo si impostano le cose che servono a vendere e a scambiare: soprattutto l'indirizzo Lightning per incassare, il wallet collegato con NWC (facoltativo) e gli avvisi.
+Nel Profilo si impostano le cose che servono a vendere e a scambiare: soprattutto l'indirizzo Lightning per incassare (voce «Lightning address»), il wallet collegato con NWC (facoltativo) e gli avvisi. Chi usa anche i bitcoin on-chain trova altre due voci: «📥 Come ricevi» e «₿ On-chain» (vedi «Bitcoin on-chain»).
 
 # Il wallet Lightning
 
@@ -46,7 +46,9 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 
 Si può anche fare un'offerta più bassa con «Fai un'offerta»: il venditore la accetta o la rifiuta, e se la accetta hai un tempo per pagare, scritto nell'ordine. Un'offerta senza risposta scade da sola.
 
-Tutti i tuoi acquisti e le tue vendite stanno nella scheda «Ordini», con lo stato di ogni ordine e i bottoni per il passo successivo.
+Tutti i tuoi acquisti e le tue vendite stanno nella scheda «Ordini», con lo stato di ogni ordine e i bottoni per il passo successivo. In fondo all'elenco c'è «📄 Esporta tutti gli ordini in CSV», che scarica un file con tutti i dettagli dei tuoi ordini (utile a chi vende per tenere i conti).
+
+Per un contenuto digitale il venditore può chiederti qualche informazione prima di pagare (per esempio nome, cognome o email, una scelta da un elenco, un sì o un no): rispondi alla cassa. Le risposte viaggiano cifrate dentro l'ordine, le leggete solo tu e il venditore, e si cancellano come l'indirizzo. Il numero di telefono non si può chiedere.
 
 # Il deposito di garanzia
 
@@ -97,6 +99,8 @@ Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraff
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere.
 
+Chi vende contenuti digitali può aggiungere all'annuncio le domande da fare a chi compra (testo breve, elenco a tendina, email, sì/no), obbligatorie o facoltative; nome, cognome ed email si aggiungono con un tocco. Il numero di telefono non si può chiedere.
+
 # Spedizione, indirizzo e ritiro
 
 - Spedizione a un indirizzo: lo scrivi al momento dell'acquisto e resta dentro l'ordine. Lo vede solo il venditore, è cifrato nel database e viene cancellato appena confermi di aver ricevuto. I moderatori non lo leggono, nemmeno in disputa.
@@ -137,7 +141,27 @@ Contanti di persona (metodo «Contanti»): ci si incontra, chi compra sats porta
 - all'arrivo ognuno può toccare «📍 Sono qui»: registra ora e, se il telefono la dà, la posizione. È facoltativo ma aiuta nelle dispute;
 - c'è un tetto in euro per scambio (vedi i NUMERI DI OGGI); sopra si divide in più ordini. Chi prende un ordine in contanti può dover bloccare una piccola cauzione.
 
-Barattozon (nel libro «Contanti al tabacchino»): chi vende sats fa un ordine Amazon da pagare in contanti nel punto vendita, e chi compra lo paga alla cassa di un tabacchino abilitato col PayCode. Il PayCode vale almeno 25 € e Amazon lo accetta fino a 999 €. Si paga solo quando la pagina dice «Sats in garanzia», si tiene lo scontrino come prova, e poi si tocca «Ho pagato al tabacchino». Chi vende controlla su Amazon che l'ordine risulti pagato e libera i sats. Alla cassa bisogna dire «devo pagare un ordine Amazon in contanti con un PayCode»: non una ricarica e non un buono regalo.
+La mappa del contanti: nel libro P2P, sopra le card, la pillola «🗺️ Mappa» apre l'Italia coi pallini delle offerte in contanti di persona. Ogni pallino sta sul centro del comune dove la persona propone di vedersi, mai su un indirizzo. Si avvicina con due dita, con la rotellina o con un doppio tocco; toccando un comune l'elenco mostra solo le sue offerte.
+
+Revolut: chi riceve gli euro su Revolut sceglie come, con tre bottoni nel modulo del recapito: RevTag (di serie), numero di telefono, oppure IBAN con l'intestatario.
+
+Se chi vende chiede di annullare uno scambio coi sats già in garanzia, chi compra non è obbligato ad accettare: se ha già mandato gli euro o li vuole mandare, ha ancora «Ho inviato gli euro», e può aprire una disputa.
+
+Barattozon (nel libro «Contanti al tabacchino»): chi vende sats fa un ordine Amazon da pagare in contanti nel punto vendita, e chi compra lo paga alla cassa di un tabacchino abilitato col PayCode. Il PayCode vale almeno 25 € e Amazon lo accetta fino a 999 €. Si paga solo quando la pagina dice «Sats in garanzia», si tiene lo scontrino come prova, e poi si tocca «Ho pagato al tabacchino». Chi vende controlla su Amazon che l'ordine risulti pagato e libera i sats. Alla cassa bisogna dire «devo pagare un ordine Amazon in contanti con un PayCode»: non una ricarica e non un buono regalo. Barattozon c'è da tutti e due i lati del libro: anche chi COMPRA sats può pubblicare un ordine «al tabacchino», con una fascia di euro (per esempio da 30 a 80 €, il massimo è obbligatorio); chi vende lo prende scrivendo il PayCode (importo esatto, le nove cifre, la scadenza) e chi compra lo paga al tabacchino.
+
+Altre valute e reti (solo se nei NUMERI DI OGGI risultano disponibili): ordini P2P pagati in USDT (su Tron o su Ethereum, mai su altre reti) al posto degli euro, e scambi P2P coi bitcoin on-chain, con la garanzia a firme multiple (due chiavi su tre).
+
+# Bitcoin on-chain
+
+Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla rete principale di Bitcoin: la moneta arancione ₿ le indica in tutta l'app. Quali sono accese, e per chi, lo dicono i NUMERI DI OGGI: una funzione spenta lì non c'è.
+
+- Pagare un ordine on-chain: chi compra manda i bitcoin a un indirizzo e l'ordine nasce alla prima conferma della rete. Appena il pagamento si vede in rete, chi vende riceve «Pagamento in arrivo»: l'oggetto è prenotato, ma non si spedisce finché non arriva l'avviso vero, alla conferma.
+- Profilo → «📥 Come ricevi»: due righe, «Quando ti pagano in Lightning, ricevi in» e «Quando ti pagano on-chain, ricevi in». Lì scegli se i sats ti arrivano in Lightning, on-chain, oppure «Ogni volta» (decidi tu ordine per ordine).
+- Chi ha queste scelte trova anche, nel modulo dell'annuncio sotto il prezzo, «Come vuoi ricevere per questo oggetto?»: la scelta dell'annuncio vale più di quella del Profilo.
+- Profilo → «₿ On-chain»: «Dove ricevi i bitcoin» (l'unica cosa da compilare: il tuo indirizzo o il tuo wallet), poi la chiave e le 12 parole. Le 12 parole servono solo a FIRMARE i tuoi scambi on-chain: i sats non arrivano lì. Non darle mai a nessuno.
+- Le 12 parole hanno bisogno di una copia fuori dal telefono: Barattolo la salva cifrata nel cloud di Telegram e/o sui relay Nostr, e senza una copia non si apre un ordine on-chain nuovo. Se manca la copia sui relay, nel Profilo c'è «Salva sui relay Nostr».
+- Il wallet è uno solo, fra la Mini App in Telegram e il sito: se apri Barattolo da un altro posto, ti chiede di incollare le stesse 12 parole invece di crearne di nuove.
+- Se non hai ancora scelto dove ricevere, la consegna dei bitcoin a te aspetta: l'app ti manda a Profilo → «₿ On-chain» per sceglierlo.
 
 # Nostr
 
@@ -161,5 +185,7 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 - Nel P2P, libera i sats solo quando gli euro sono arrivati davvero sul tuo conto, non prima e non sulla fiducia di una ricevuta.
 
 # Parlare con una persona
+
+Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Privacy → «💬 Assistenza». Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta.
 
 Se l'assistente non basta, sotto ogni sua risposta c'è il bottone «🙋 Parla con una persona»: ti dà la chat privata di Barattolo (t.me/barattolostore?direct), dove risponde una persona dello staff. Per un problema con un ordine o uno scambio preciso, scrivi lì il numero dell'ordine e cosa è successo. Per una lite su un ordine coi sats in garanzia, la strada giusta resta la disputa, dalla pagina dell'ordine o dello scambio.

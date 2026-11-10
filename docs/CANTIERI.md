@@ -79326,3 +79326,49 @@ Niente voce in NOVITA.md: fuori dall'istanza di prova non si vede.
 **NON PROVATO:** Telegram vero. In particolare se una richiesta partita
 da sola (non da un tocco) viene accettata: la guida dice di sì in chat
 privata, una ogni cinque secondi; se non lo fosse resta il 🔄.
+
+
+PROVATO. `prove_lista_ordini` (+15: il locker in «dove» e nelle sue
+colonne, on-chain con la transazione una volta sola, il conto
+scomposto, risposte/nota/email/disputa, il set con le righe, il
+venditore sugli acquisti, chi compra vede il suo punto ma non le
+colonne di chi spedisce, nessuna colonna per busta/contenuto/fattura,
+le prime dieci colonne ferme). Giro vero col server reale (database
+nuovo, `TestClient` su `/api/export/{biglietto}`): un ordine via locker
+on-chain e uno a casa con indirizzo cifrato escono completi.
+**DA GUARDARE** dal vivo: scaricare «📄 Esporta tutti gli ordini in
+CSV» da Telegram e aprirlo in Excel.
+
+## Tappo sempre aggiornato (10 nov 2026, cantiere tappo-aggiornato)
+
+LA RICHIESTA. Andrea, del bot Tappo che risponde nel canale e in
+privato (gira su n8n, sul relay): «tappo deve aggiornarsi di continuo».
+Tappo rilegge a ogni domanda `assistente/sapere.md` e `NOVITA.md` dal
+ramo main su GitHub; ma il libro era fermo al 2 nov (mancavano
+on-chain, «📥 Come ricevi», USDT e on-chain nel P2P, l'assistenza in
+app) e Tappo non sapeva quali leve sono accese oggi.
+
+COSA. Tre fonti, tutte rilette a ogni domanda:
+1. IL LIBRO: `assistente/sapere.md` ripassato contro l'app di oggi
+   (Profilo, export CSV, contenuti digitali, P2P con mappa, Revolut,
+   USDT e on-chain solo se i numeri dicono che ci sono, una sezione
+   nuova «Bitcoin on-chain», l'assistenza in app). Niente di interno.
+2. I NUMERI DAL VIVO: la rotta pubblica `GET /api/assistente/numeri`
+   restituisce `numeri_assistente()` visti con gli occhi di chiunque
+   (tg 0): niente login, niente database, un minuto di cache. Nei
+   numeri entrano quattro righe nuove: assistenza in app, ricevere
+   on-chain, P2P in USDT, P2P on-chain.
+3. LA REGOLA: la regola 8 di CLAUDE.md chiede, a fine cantiere che
+   cambia ciò che vede l'utente, il ritocco di `assistente/sapere.md`
+   insieme alla voce di `NOVITA.md`.
+
+SCARTATO. Far leggere a n8n il config del VPS (fuori perimetro, e un
+segreto in più in giro); un libro rigenerato a mano dal codice a ogni
+promozione (si dimentica); i numeri con gli occhi dell'admin (Tappo
+direbbe «c'è» per leve accese solo per lo staff).
+
+PROVATO. `prove_assistente_bot`, sezione 10: le righe nuove, la vista
+da tg 0, l'assistenza accesa dice «disponibile», la rotta senza
+`db()`, senza utente né Request, con il Cache-Control.
+**DA GUARDARE**: la rotta risponde 404 finché Andrea non promuove;
+n8n la legge con un ripiego (se manca, Tappo usa solo il libro).

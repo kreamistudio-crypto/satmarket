@@ -35418,3 +35418,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_novita_md` (con `_voci_novita`, la stessa regola che segue n8n).
   I flussi e il loro stato: `/mnt/project-files/marketing-n8n/` del
   progetto (PASSAGGIO.md).
+- TAPPO, IL BOT CHE RISPONDE NEL CANALE (10 nov 2026, cantiere
+  tappo-aggiornato). Sullo stesso n8n, il bot Telegram «Tappo» (ex
+  «Barattolo News», NON @ilbarattolobot) risponde in privato e nei
+  commenti di @barattolostore, con Claude. Sa Barattolo da TRE fonti,
+  tutte rilette a OGNI domanda, così non resta mai indietro: il libro
+  `assistente/sapere.md` e `NOVITA.md` letti da GitHub al ref `main`
+  (quel che è in produzione, mai develop: il libro non deve raccontare
+  funzioni non ancora uscite), e i NUMERI DI OGGI dalla rotta pubblica
+  `GET /api/assistente/numeri` (JSON `{"numeri": ...}`, lo stesso testo
+  di `numeri_assistente` guardato con gli occhi di chiunque, tg 0:
+  niente login, niente database, un minuto di cache). Una leva girata
+  sul VPS vale per Tappo entro un minuto; una funzione accesa solo per
+  gli admin, per lui è spenta. Il libro e i numeri sono gli stessi
+  dell'assistente del bot (leva `ASSISTENTE_AI_ATTIVO`, spenta): un
+  libro solo, due voci. Perché resti al passo, la regola 8 di CLAUDE.md
+  vuole il ritocco del libro nello stesso cantiere di ogni novità
+  visibile, accanto alla voce di `NOVITA.md`.
