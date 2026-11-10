@@ -38,3 +38,9 @@ in quest'ordine; niente altro fra una voce e l'altra):
 La forma la controlla `prove_novita_md` in prove.py.
 
 <!-- LE VOCI COMINCIANO QUI SOTTO -->
+
+## 2026-11-10 · come-ricevi
+frase: Nel Profilo c'è una voce nuova, «📥 Come ricevi»: lì scegli in che forma ti arrivano i sats quando ti pagano in Lightning e quando ti pagano on-chain, senza cercarlo dentro la voce «₿ On-chain».
+dove: Profilo → «📥 Come ricevi», con le due righe «Quando ti pagano in Lightning, ricevi in» e «Quando ti pagano on-chain, ricevi in».
+leva: SWAP_AUTO_ATTIVO spenta di serie
+pubblico: no
