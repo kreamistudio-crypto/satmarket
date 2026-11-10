@@ -188072,6 +188072,26 @@ def prove_widget_prova():
     prova("...e porta i cinque passi, non il segnaposto", (False, 5),
           ("__PASSI__" in amb["HTML_WIDGET_PROVA"],
            sum(p in amb["HTML_WIDGET_PROVA"] for p in amb["PASSI_WIDGET_PROVA"])))
+    # la grafica dell'ordine nella Mini App (10 nov 2026): gli stessi
+    # gettoni di colore, di giorno e di sera, e il recinto tratteggiato
+    mini = open("miniapp.html", encoding="utf-8").read()
+    w = amb["HTML_WIDGET_PROVA"]
+    prova("la scheda veste i colori della Mini App, di giorno e di sera",
+          [True] * 8,
+          [f"{g}:{v}" in w and f"{n}:{v}" in mini for g, n, v in (
+              ("--bg", "--bg", "#FAF4E4"), ("--trust", "--trust", "#1B8B54"),
+              ("--ts", "--trust-soft", "#E7F5EC"), ("--sl", "--step-line", "#BADCC8"),
+              ("--bg", "--bg", "#211A10"), ("--trust", "--trust", "#34B47A"),
+              ("--ts", "--trust-soft", "#1B2C20"), ("--sl", "--step-line", "#3C5B49"))])
+    prova("...col recinto tratteggiato della cassaforte, e il tema della chat",
+          (True, True, True),
+          ("border:2px dashed var(--trust)" in w
+           and "border:2px dashed var(--trust)" in mini,
+           "@media(prefers-color-scheme:dark)" in w,
+           "--tg-theme" not in w))
+    prova("...e dice «deposito di garanzia», mai «escrow» ne' «assicurat»",
+          (True, False, False),
+          ("deposito di garanzia" in w, "escrow" in w.lower(), "assicurat" in w.lower()))
     prova("...e non chiama la rete (dentro un widget e' spenta)", [],
           [p for p in ("fetch(", "XMLHttpRequest", "WebSocket", "src=\"http",
                        "url(http") if p in amb["HTML_WIDGET_PROVA"]])

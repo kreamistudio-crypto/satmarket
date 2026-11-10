@@ -79204,3 +79204,24 @@ chiamata a `sendWidget` è mai partita: la prima la fa un admin scrivendo
 `/provawidget` a @barattolo_collaudo_bot. Resta da guardare come la
 scheda appare su Android, iPhone e desktop, e se i nomi dei parametri
 (`html`, `chat_data`, `allow_queries`, `widget_query_id`) sono quelli.
+
+**LA GRAFICA DELL'APP (stesso giorno, dopo la prova dal vivo).** Andrea
+l'ha provato sul bot di collaudo: «funziona molto bene, ora fallo
+graficamente come l'app di barattolo ma solamente per quell'ordine». La
+prova dal vivo dice quindi che i nomi dei parametri (`html`,
+`chat_data`, `allow_queries`, `widget_query_id`) sono quelli giusti. La
+paginetta ora è la pagina dell'ordine della Mini App e nient'altro: la
+testa con miniatura, «Ordine #8» e titolo, la cifra in arancio, la riga
+dello stato col lucchetto e il recinto verde tratteggiato coi quattro
+passi (fatto ✓, adesso il cerchio tratteggiato, dopo sbiadito). I cinque
+passi di prima sono diventati i cinque STATI veri (`locked`, `shipped`,
+`delivered`, `confirmed`, `released`), coi testi che l'app dice a chi
+compra. I colori sono i gettoni della Mini App, di giorno e di sera, e
+non quelli del tema di Telegram: il tema lo sceglie la chat. SCARTATI i
+caratteri dell'app: Baloo 2 e Nunito non entrano nei 4 KB compressi e
+dentro un widget la rete è spenta, restano quelli tondi di sistema.
+Misure: 4,2 KB, 2,0 KB compressa, alta 466 px (il tetto è 600: oltre,
+Telegram taglia senza scorrere, e la scheda vera dovrà contarci).
+Guardata con Chromium in chiaro e scuro; prove.py severa 27.219 su 27.219; dei collaudi
+della CI girati i cinque del bot (widget, istanza di prova, canale admin, login, assistente), 5/0: il cambio tocca solo la costante della paginetta. Una scheda già mandata resta com'era (l'HTML non si
+cambia dopo l'invio): serve un `/provawidget` nuovo.

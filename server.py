@@ -21528,8 +21528,8 @@ async def gestisci_callback(cb: dict):
 # solo i suoi dati (`chat_data`), in silenzio. E' il mattone della «scheda
 # ordine viva» (il piano: una scheda per ordine al posto della raffica di
 # avvisi). Prima di costruirci sopra la si GUARDA: questo e' il cartellino
-# finto, uno stepper di cinque passi che si gira coi bottoni dentro il
-# widget o col comando, e che riferisce in chat ogni risposta storta di
+# finto, un ordine di cartone coi suoi cinque stati (da «locked» a
+# «released») che si gira coi bottoni dentro il widget o col comando, e che riferisce in chat ogni risposta storta di
 # Telegram — la pagina della Bot API non si e' lasciata leggere fino ai
 # parametri, e la prima prova e' anche il modo di scoprirli.
 #
@@ -21540,41 +21540,75 @@ async def gestisci_callback(cb: dict):
 # Lo stato vive in memoria (un riavvio lo perde: e' una prova, non un
 # ordine), e i widget Telegram li accetta oggi SOLO in chat privata.
 
-PASSI_WIDGET_PROVA = ("Pagato, sats nel deposito di garanzia", "Spedito",
-                      "Consegnato", "Confermato", "Sats sbloccati")
+PASSI_WIDGET_PROVA = ("locked", "shipped", "delivered", "confirmed",
+                      "released")
 
 # chat dell'admin -> (message_id dell'ultima scheda, passo)
 _WIDGET_PROVA: dict[int, tuple[int, int]] = {}
 
 # La paginetta. Niente rete la' dentro (fetch e immagini esterne sono
-# spenti), i colori sono quelli del tema della chat (--tg-theme-*), e la
-# richiesta al bot parte DENTRO il tocco, come vuole la guida. Tetti:
-# 32 KB di HTML e 4 KB compressa (la prova li misura).
+# spenti) e la richiesta al bot parte DENTRO il tocco, come vuole la
+# guida. Tetti: 32 KB di HTML e 4 KB compressa (la prova li misura).
+#
+# LA GRAFICA E' QUELLA DELLA PAGINA DELL'ORDINE NELLA MINI APP (10 nov
+# 2026, Andrea: «fallo graficamente come l'app di barattolo ma solamente
+# per quell'ordine»): la testa con la miniatura, il numero e il titolo,
+# la cifra in arancio, la riga dello stato col lucchetto e il RECINTO
+# verde tratteggiato coi passi (`.vault`, `.steps`: fatto ✓, adesso il
+# cerchio tratteggiato, dopo sbiadito). I colori sono i gettoni della
+# Mini App, di giorno e di sera, e NON quelli del tema di Telegram: la
+# scheda deve sembrare un pezzo di Barattolo. Il tema lo sceglie la chat
+# (`prefers-color-scheme` dentro un widget segue la chat, non il
+# telefono). I caratteri no: Baloo 2 e Nunito non entrano in 4 KB, e la
+# rete e' spenta — restano quelli tondi di sistema. I testi sono quelli
+# che l'app dice a CHI COMPRA, stato per stato (regola ferrea 4: gli
+# stati sono quelli veri, e in `chat_data` viaggia solo il passo).
 HTML_WIDGET_PROVA = """<style>
-body{margin:0;font:15px system-ui,sans-serif;background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#000)}
-.w{padding:12px}h3{margin:0 0 2px;font-size:16px}
-.s{color:var(--tg-theme-hint-color,#888);font-size:13px;margin-bottom:8px}
-ol{list-style:none;margin:0;padding:0}
-li{display:flex;align-items:center;gap:8px;padding:3px 0;color:var(--tg-theme-hint-color,#888)}
-li b{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:2px solid currentColor;font-size:12px;flex:none}
-li.f{color:var(--tg-theme-text-color,#000)}
-li.f b{background:var(--tg-theme-button-color,#f7931a);border-color:var(--tg-theme-button-color,#f7931a);color:var(--tg-theme-button-text-color,#fff)}
-li.o{font-weight:600}.b{display:flex;gap:8px;margin-top:10px}
-button{flex:1;padding:8px;border:0;border-radius:8px;background:var(--tg-theme-button-color,#f7931a);color:var(--tg-theme-button-text-color,#fff);font:inherit}
-#e{color:var(--tg-theme-destructive-text-color,#c00);font-size:12px;min-height:14px;margin-top:6px}
-</style><div class="w"><h3>🫙 Ordine di prova</h3>
-<div class="s">Scheda viva: si aggiorna da sola, senza messaggi nuovi</div>
-<ol id="l"></ol><div class="b"><button id="i">◀ Indietro</button><button id="a">Avanti ▶</button></div>
+:root{--bg:#FAF4E4;--card:#fff;--ink:#23282C;--muted:#8A8271;--sats:#F7931A;--soft:#5B5648;--trust:#1B8B54;--ts:#E7F5EC;--sl:#BADCC8;--ot:#fff;--chip:#EFE7D2}
+@media(prefers-color-scheme:dark){:root{--bg:#211A10;--card:#2C2517;--ink:#F1E8D5;--muted:#A99F87;--soft:#CFC4AD;--trust:#34B47A;--ts:#1B2C20;--sl:#3C5B49;--ot:#0B2417;--chip:#3E3623}}
+body{margin:0;font:600 13.5px ui-rounded,"SF Pro Rounded",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+.w{padding:14px}b{font-weight:800}
+.t{display:flex;align-items:center;gap:12px}
+.f{width:64px;height:64px;border-radius:16px;background:var(--chip);display:flex;align-items:center;justify-content:center;font-size:34px;flex:none}
+.n{color:var(--soft);font-size:12.5px;font-weight:700;text-decoration:underline}
+.t b{display:block;font-size:17px;line-height:1.2}
+.p{margin:10px 0 0;font:700 20px ui-monospace,Menlo,monospace;color:var(--sats)}
+.p small{font-size:12px;color:var(--muted)}
+.h{display:flex;align-items:center;gap:10px;margin:14px 0 12px}
+.h i{width:38px;height:38px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:19px;font-style:normal;flex:none}
+.h b{font-size:14.5px}small{display:block;color:var(--muted);font-size:12px}
+.v{background:var(--ts);border:2px dashed var(--trust);border-radius:20px;padding:18px 16px 16px}
+.s{position:relative;margin-left:7px}
+.s:before{content:'';position:absolute;left:8px;top:8px;bottom:8px;width:2px;background:var(--sl)}
+.e{position:relative;padding:0 0 16px 32px}.e:last-child{padding-bottom:0}
+.e i{position:absolute;left:0;top:2px;width:18px;height:18px;box-sizing:border-box;border-radius:50%;background:var(--card);border:2px solid var(--sl);z-index:1;display:flex;align-items:center;justify-content:center;font:9px sans-serif;color:var(--ot)}
+.d i{background:var(--trust);border-color:var(--trust)}.d i:after{content:'✓'}
+.o i{border:2px dashed var(--trust)}.z{opacity:.45}
+.b{display:flex;gap:8px;margin-top:12px}
+button{flex:1;padding:9px;border:0;border-radius:14px;background:var(--chip);color:var(--ink);font:inherit;font-weight:800}
+#e{color:#C0392B;font-size:12px;min-height:14px;margin-top:6px}
+</style><div class="w"><div class="t"><div class="f">📦</div><div><span class="n">Ordine #8</span><b>Lampada vintage</b></div></div>
+<div class="p">30 000 <small style="display:inline">sats</small></div>
+<div class="h"><i id="c"></i><div><b id="hb"></b><small id="hd"></small></div></div>
+<div class="v"><div class="s" id="l"></div></div>
+<div class="b"><button id="i">◀ Indietro</button><button id="a">Avanti ▶</button></div>
 <div id="e"></div></div><script>
-var W=window.TelegramWidget,P=__PASSI__,C=["🔒","📦","📬","✅","⚡"];
-function passo(){try{return JSON.parse(W.chatData).passo|0}catch(x){return 0}}
-function draw(){var n=passo(),h="";for(var k=0;k<P.length;k++){h+='<li class="'+(k<=n?"f":"")+(k==n?" o":"")+'"><b>'+(k<n?"✓":k+1)+"</b>"+C[k]+" "+P[k]+"</li>"}document.getElementById("l").innerHTML=h}
-function vai(d){var e=document.getElementById("e");e.textContent="";if(!W){e.textContent="Fuori da Telegram";return}
+var W=window.TelegramWidget,P=__PASSI__,G=[1,2,2,3,4],
+T=["🔒","Sats nel deposito di garanzia","I sats sono al sicuro, nessuno può toccarli"],
+H=[T,T,T,["💸","In pagamento al venditore","La tua parte è finita: ora tocca a Barattolo"],["🔓","Deposito sbloccato","I sats sono stati consegnati al venditore"]];
+function passo(){try{var n=JSON.parse(W.chatData).passo|0;return n<0?0:n>=P.length?P.length-1:n}catch(x){return 0}}
+function el(k){return document.getElementById(k)}
+function draw(){var n=passo(),g=G[n],h="",S=[["Hai depositato i sats","Il pagamento è custodito dalla piattaforma"],
+["Oggetto spedito",n?"Il venditore ha consegnato al corriere":"Il venditore deve ancora spedire"],
+P[n]=="delivered"?["Consegnato: in attesa di conferma","I sats restano nel deposito finché non confermi"]:["Ricevuto e confermato","Hai verificato che è tutto ok"],
+["Sats sbloccati al venditore","Affare concluso, feedback reciproco"]];
+for(var k=0;k<4;k++)h+='<div class="e '+(k<g?"d":k==g?"o":"z")+'"><i></i><b>'+S[k][0]+"</b><small>"+S[k][1]+"</small></div>";
+el("l").innerHTML=h;el("c").textContent=H[n][0];el("hb").textContent=H[n][1];el("hd").textContent=H[n][2]}
+function vai(d){var e=el("e");e.textContent="";if(!W){e.textContent="Fuori da Telegram";return}
 W.request("vai:"+(passo()+d)).catch(function(x){e.textContent="Errore: "+(x&&x.code||x)})}
-document.getElementById("a").onclick=function(){vai(1)};document.getElementById("i").onclick=function(){vai(-1)};
+el("a").onclick=function(){vai(1)};el("i").onclick=function(){vai(-1)};
 if(W){W.onEvent("chatDataChanged",draw)}draw();
-</script>""".replace("__PASSI__", json.dumps(list(PASSI_WIDGET_PROVA),
-                                            ensure_ascii=False))
+</script>""".replace("__PASSI__", json.dumps(list(PASSI_WIDGET_PROVA)))
 
 
 def widget_prova_acceso() -> bool:
