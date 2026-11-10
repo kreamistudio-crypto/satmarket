@@ -6070,6 +6070,14 @@
   che dal 1 ott non usiamo (login a redirect). Restano le estensioni e
   i browser in-app, e la riga del journal lo dice: porta `@ file:riga`
   e il campione.
+  L'AVVISO ONION-LOCATION (10 nov 2026, cantiere onion-location):
+  `cinture_http` aggiunge `Onion-Location: http://<ONION_HOST><percorso>`
+  alle sole pagine HTML (non ai widget), dove `_onion_location` lo
+  ammette: lo stesso giudice dell'HSTS (dominio pubblico, mai onion,
+  collaudo, locale) più un `ONION_HOST` con la forma v3 (56 caratteri
+  base32 + `.onion`), sennò niente. Percorso e query ricodificati: in
+  un'intestazione non passa un carattere che non sia da URL. È la
+  pillola «.onion disponibile» di Tor Browser.
   I FRENI (1 ott 2026, stesso cantiere, cura 4): `FRENI` è la tabella
   dei numeri (annunci e anteprima foto 60 l'ora, verifica-pagamento e
   ln-address 30 al minuto, login 30 al minuto, canale uno ogni dieci

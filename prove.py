@@ -147169,6 +147169,28 @@ def prove_csp_prova():
     prova("...e un anno, senza preload ne' sottodomini", "max-age=31536000",
           amb["HSTS_UN_ANNO"])
 
+    # L'AVVISO ONION-LOCATION (10 nov 2026, Andrea): la pillola di Tor
+    # Browser, solo dove c'e' l'HSTS e solo con un indirizzo v3 vero
+    ol = amb["_onion_location"]
+    v3 = "a" * 52 + "bcdq.onion"
+    prova("Onion-Location sul dominio pubblico: lo stesso percorso sul servizio nascosto",
+          "http://" + v3 + "/p2p?x=1",
+          ol("barattolo.store", "/p2p", "x=1", False, v3))
+    prova("...la home porta la barra finale", "http://" + v3 + "/",
+          ol("barattolo.store", "/", "", False, v3))
+    prova("...mai sull'onion stesso, mai in collaudo, mai in locale",
+          ["", "", ""],
+          [ol(v3, "/", "", False, v3), ol("barattolo.store", "/", "", True, v3),
+           ol("127.0.0.1:8080", "/", "", False, v3)])
+    prova("...niente senza ONION_HOST, o con uno che non ha la forma v3",
+          ["", "", ""],
+          [ol("barattolo.store", "/", "", False, ""),
+           ol("barattolo.store", "/", "", False, "abcdefghijklmnop.onion"),
+           ol("barattolo.store", "/", "", False, "evil.com")])
+    prova("...e dentro l'intestazione non passa niente che non sia da URL",
+          False, any(c in ol("barattolo.store", "/a b\r\nX: y", "q=<1>", False, v3)
+                     for c in " \r\n<>"))
+
     # --- il middleware: il testo ---------------------------------------
     mw = pezzo("cinture_http")
     prova("il middleware aggiunge, non sovrascrive", True, "setdefault(" in mw)
@@ -147190,6 +147212,9 @@ def prove_csp_prova():
     prova("...e lascia stare chi ha una CSP sua (setdefault per gli altri)",
           True, 'r.headers.setdefault("Content-Security-Policy", fa)' in ni)
     prova("l'HSTS passa dal giudice dell'host", True, "_host_con_hsts(" in mw)
+    prova("Onion-Location solo sulle pagine HTML, non ai widget, e aggiunta e non sovrascritta",
+          True, 'r.headers.setdefault("Onion-Location", dove)' in mw
+          and "_onion_location(" in mw)
     # gira DENTRO no_iframe (prima nel file = piu' interno): vede la
     # risposta prima che la leva dell'iframe ci metta la sua CSP
     prova("le cinture stanno PRIMA di no_iframe nel file", True,
