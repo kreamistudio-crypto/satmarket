@@ -170337,10 +170337,11 @@ def prove_canale_admin():
           < smista.find('    if tipo != "private":\n        return await '
                         "_comando_nel_gruppo(msg, mittente, testo)\n")
           < smista.find("upsert_utente("))
-    # `/provawidget` (10 nov 2026, cantiere widget-prova) e' l'unico che
-    # resta in privato: i widget Telegram li accetta SOLO in chat privata
+    # `/provawidget` e `/ordini` (10 nov 2026, cantieri widget-prova e
+    # widget-ordini) restano in privato: i widget Telegram li accetta
+    # SOLO in chat privata
     in_privato = set(re.findall(r"await (comando_\w+)\(", smista)) - {
-        "comando_provawidget"}
+        "comando_provawidget", "comando_ordini"}
     nel_gruppo = set(re.findall(r"(?<!\w)comando_\w+",
                                 codice(pezzo("_comando_nel_gruppo"))))
     prova("i comandi di servizio sono gli stessi in privato e nel gruppo: "
@@ -188266,6 +188267,99 @@ def prove_widget_prova():
            "\ncollaudo_widget_prova.py\n" in "\n" + open("ci/compila.txt", encoding="utf-8").read()])
 
 
+def prove_widget_ordini():
+    """LA SCHEDA DEI MIEI ORDINI (10 nov 2026, cantiere widget-ordini):
+    `/ordini` sul bot di prova. Qui il giudice puro dell'elenco — chi
+    vede cosa, l'ordine delle righe, i tetti di Telegram — e la paginetta;
+    il giro col server vero sta in `collaudo_widget_prova.py`."""
+    print("\n[la scheda dei miei ordini: l'elenco stretto e i suoi tetti]")
+    import zlib
+    amb = {"json": json}
+    src = _SORGENTE
+    i = src.index("STATI_WIDGET_ORDINI = (")
+    exec(src[i:src.index("\n\n\ndef _riga_widget_ordini", i)], amb)
+    for nome in ("_campo", "_annullata_pagata", "_nascosto_a",
+                 "_riga_widget_ordini", "elenco_widget_ordini"):
+        exec(pezzo(nome), amb)
+    elenco = lambda righe, chi: json.loads(amb["elenco_widget_ordini"](righe, chi))
+
+    def o(n, stato, compra=111, vende=222, **altro):
+        return dict({"id": n, "stato": stato, "compratore_id": compra,
+                     "venditore_id": vende, "prezzo_sats": 1000 * n,
+                     "titolo": f"Oggetto {n}", "aggiornato": n,
+                     "consegna_scelta": ""}, **altro)
+    html = amb["HTML_WIDGET_ORDINI"]
+    b = html.encode("utf-8")
+    prova("la paginetta sta nei 32 KB e nei 4 KB compressa, senza NUL",
+          (True, True, False),
+          (len(b) <= 32768, len(zlib.compress(b, 9)) <= 4096, b"\0" in b))
+    prova("...non chiama la rete, e chiede al bot solo «o»", ([], 1),
+          ([p for p in ("fetch(", "XMLHttpRequest", "WebSocket", 'src="http')
+            if p in html], html.count('W.request("o")')))
+    mini = open("miniapp.html", encoding="utf-8").read()
+    etichette = re.findall(r"^  (\w+):\s*\{label:'([^']+)'", mini[
+        mini.index("const STATES = {"):mini.index("};", mini.index("const STATES = {"))], re.M)
+    prova("gli stati sono i dodici della Mini App, nello stesso ordine",
+          [e[0] for e in etichette], list(amb["STATI_WIDGET_ORDINI"]))
+    prova("...e la scheda li chiama come li chiama la Mini App", [],
+          [e[1] for e in etichette if f'"{e[1]}"' not in html])
+    prova("...dice «deposito di garanzia», mai «escrow» ne' «assicurat»",
+          (True, False, False),
+          ("deposito di garanzia" in html, "escrow" in html.lower(),
+           "assicurat" in html.lower()))
+    prova("il titolo di un annuncio passa per l'escape prima di finire "
+          "nella pagina", 2, html.count("hx(o[5])"))
+    righe = [o(1, "released"), o(2, "locked"), o(3, "dispute", compra=222, vende=111),
+             o(4, "annullato"), o(5, "shipped", compra=333, vende=444)]
+    e = elenco(righe, 111)
+    prova("ognuno vede i SUOI: gli attivi prima, poi i conclusi, dal piu' "
+          "mosso di recente", ([3, 2, 4, 1], 2, 4),
+          ([r[0] for r in e["o"]], e["a"], e["n"]))
+    prova("...col ruolo di chi guarda (compra / vende) e lo stato per indice",
+          [[3, 6, "s"], [2, 1, "b"]], [r[:3] for r in e["o"][:2]])
+    prova("un estraneo non vede niente", {"a": 0, "n": 0, "o": []},
+          elenco(righe, 999))
+    prova("la consegna scelta diventa la sua lettera", ["r", "d", "v", "s"],
+          [elenco([o(1, "locked", consegna_scelta=c)], 111)["o"][0][3]
+           for c in ("ritiro", "digitale", "servizio", "spedizione")])
+    prova("il carrello senza un annuncio suo si chiama dai pezzi",
+          "Carrello di 3 oggetti",
+          elenco([o(1, "locked", titolo=None, pezzi=3)], 111)["o"][0][5])
+    prova("la fattura annullata e pagata non esce a chi vende, a chi ha "
+          "pagato si'", (0, 1),
+          (elenco([o(1, "refund", pagata_da_annullata_il=5)], 222)["n"],
+           elenco([o(1, "refund", pagata_da_annullata_il=5)], 111)["n"]))
+    prova("l'ordine nascosto da una parte non esce a lei, all'altra si'",
+          (0, 1),
+          (elenco([o(1, "released", nascosto_compratore=1)], 111)["n"],
+           elenco([o(1, "released", nascosto_compratore=1)], 222)["n"]))
+    tanti = [o(n, "locked", titolo="È un titolo lunghissimo, pieno di "
+               "àccénti e di parole che non finiscono più") for n in range(1, 41)]
+    testo = amb["elenco_widget_ordini"](tanti, 111)
+    e = json.loads(testo)
+    prova("quaranta ordini: ne viaggiano al piu' otto, sotto i 1024 byte, "
+          "e il conto dice tutti e quaranta",
+          (True, True, 40, 40),
+          (len(e["o"]) <= 8, len(testo.encode("utf-8")) <= 1024, e["a"], e["n"]))
+    prova("...coi titoli accorciati", True,
+          all(len(r[5]) <= 30 for r in e["o"]))
+    prova("uno stato che non conosciamo non rompe la scheda", 1,
+          elenco([o(1, "boh")], 111)["o"][0][1])
+    cmd = pezzo("comando_ordini")
+    prova("il comando chiede l'istanza di prova prima di ogni altra cosa",
+          True, cmd.index("if not widget_prova_acceso():")
+          < cmd.index("_comando_sconosciuto(chat)") < cmd.index("bot_api("))
+    prova("...e legge gli ordini della chat che scrive, non di un numero "
+          "arrivato da fuori", 1, cmd.count('"chat_data": _leggi_widget_ordini(chat)'))
+    wq = pezzo("gestisci_widget_query")
+    prova("la richiesta della scheda risponde con gli ordini di CHI chiede "
+          "(il `from` di Telegram), e solo sulla prova", True,
+          "_leggi_widget_ordini(int(chi))" in wq
+          and "if widget_prova_acceso() and chi else \"\"" in wq)
+    prova("`notifica` non sa niente delle schede", False,
+          "widget" in pezzo("notifica").lower())
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -188522,7 +188616,7 @@ CATEGORIE = {
     allegati_da_telegram domande_compratore incasso_annuncio
     """.split(),
     "infrastruttura": """
-    categorie_delle_prove widget_prova
+    categorie_delle_prove widget_prova widget_ordini
     nome_nostr initdata portachiavi piu_account_ovunque
     pallino_altri_account account_doppio login_dal_bot
     dizionari_nel_loop logout_apk logout_apk_due nome_da_nostr
@@ -189313,6 +189407,7 @@ def main():
               prove_allegati_da_telegram,
               prove_domande_compratore,
               prove_widget_prova,
+              prove_widget_ordini,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:

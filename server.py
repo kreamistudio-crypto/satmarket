@@ -21712,6 +21712,13 @@ async def gestisci_widget_query(q: dict):
     (Telegram la aspetta 15 secondi, poi il widget dice TIMEOUT); il
     passo cambia dopo, e solo per un admin sull'istanza di prova."""
     chi = (q.get("from") or {}).get("id") or 0
+    if q.get("data") == "o":
+        # la scheda dei miei ordini chiede l'elenco: e' di chi chiede
+        # (lo dice Telegram), letto adesso; fuori dalla prova, niente
+        return await bot_api("answerWidgetQuery", {
+            "widget_query_id": q.get("id"),
+            "data": (_leggi_widget_ordini(int(chi))
+                     if widget_prova_acceso() and chi else "")})
     passo = (passo_widget_prova(q.get("data"))
              if widget_prova_acceso() and e_admin(chi) else None)
     await bot_api("answerWidgetQuery", {"widget_query_id": q.get("id"),
@@ -21720,6 +21727,213 @@ async def gestisci_widget_query(q: dict):
     if passo is None or not chat or not q.get("message_id"):
         return
     await _modifica_widget_prova(chat, q["message_id"], passo)
+
+
+# ---------------------------------------------------------------------------
+# LA SCHEDA DEI MIEI ORDINI (10 nov 2026, cantiere widget-ordini, Andrea
+# dopo aver provato il cartellino finto: «mostrami realmente i miei
+# ordini cosi' da monitorare davvero gli ultimi stati dei miei ordini
+# attivi e non»).
+#
+# `/ordini` manda UN widget con gli ordini VERI del mercatino di chi
+# scrive, da compratore e da venditore: prima gli attivi, poi i conclusi,
+# ognuno col suo stato; un tocco apre la pagina di quell'ordine (la
+# stessa grafica della Mini App) e un bottone lo apre in Barattolo.
+#
+# COME RESTA AGGIORNATA, senza toccare ne' gli avvisi ne' i pagamenti:
+# la scheda CHIEDE l'elenco quando compare e ogni venti secondi mentre
+# resta a schermo (`widget_query` «o» → `answerWidgetQuery` con l'elenco
+# di chi chiede), e il bottone 🔄 e' la stessa domanda fatta col dito.
+# Una scheda che nessuno guarda non ha bisogno di essere fresca. SCARTATO
+# il gancio dentro `notifica` (rinfrescare la scheda a ogni avviso): e'
+# la funzione da cui passa ogni avviso di Barattolo, le prove la montano
+# da sola, e una scheda di prova non vale una riga li' dentro.
+# L'elenco si legge SEMPRE dal database, mai da quel che manda il
+# telefono: il `data` di un widget dice solo «o», e di chi sono gli
+# ordini lo dice Telegram (`from`).
+#
+# I TETTI DI TELEGRAM decidono la forma: `chat_data` e la risposta a una
+# richiesta portano 1024 byte, quindi viaggiano al piu' OTTO ordini,
+# stretti (numero, stato, ruolo, consegna, sats, titolo corto), e il
+# resto e' «altri N nell'app». Niente indirizzi, codici o tracciamenti:
+# quelli restano nella Mini App. Gli scambi P2P non ci sono: vivono sul
+# telefono e su Mostro, il server non li conosce.
+#
+# SOLO SULL'ISTANZA DI PROVA, come il cartellino (`widget_prova_acceso`),
+# ma per CHIUNQUE ci sia ammesso: sono i suoi ordini.
+
+STATI_WIDGET_ORDINI = ("creato", "locked", "shipped", "delivered",
+                       "confirmed", "released", "dispute", "return_pending",
+                       "return_shipped", "refund", "refunded", "annullato")
+CONCLUSI_WIDGET_ORDINI = ("released", "refunded", "annullato")
+MAX_WIDGET_ORDINI = 8          # quanti ne entrano in 600 px d'altezza
+BYTE_WIDGET_ORDINI = 1000      # sotto i 1024 di `chat_data` e della risposta
+ALTEZZA_WIDGET_ORDINI = 540    # fissa: elenco e pagina dell'ordine ci stanno
+
+HTML_WIDGET_ORDINI = """<style>
+:root{--bg:#FAF4E4;--card:#fff;--ink:#23282C;--muted:#8A8271;--sats:#F7931A;--soft:#5B5648;--trust:#1B8B54;--ts:#E7F5EC;--sl:#BADCC8;--ot:#fff;--chip:#EFE7D2;--line:#E8DFC8}
+@media(prefers-color-scheme:dark){:root{--bg:#211A10;--card:#2C2517;--ink:#F1E8D5;--muted:#A99F87;--soft:#CFC4AD;--trust:#34B47A;--ts:#1B2C20;--sl:#3C5B49;--ot:#0B2417;--chip:#3E3623;--line:#3E3623}}
+body{margin:0;font:600 13.5px ui-rounded,"SF Pro Rounded",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+.w{padding:12px 14px}b{font-weight:800}small{display:block;color:var(--muted);font-size:12px}
+.k{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.k b{font-size:17px}
+.r{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px;margin-bottom:6px}
+.r>div{min-width:0;flex:1}.r b,.t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g{font-size:22px;flex:none}.x{opacity:.6}
+.q{flex:none;font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px;background:var(--chip);color:var(--soft)}
+.q.v{background:var(--ts);color:var(--trust)}.q.a{background:var(--sats);color:#fff}.q.d{background:#C0392B;color:#fff}
+.t{display:flex;align-items:center;gap:12px}.t>div{min-width:0}
+.f{width:52px;height:52px;border-radius:14px;background:var(--chip);display:flex;align-items:center;justify-content:center;font-size:28px;flex:none}
+.n{color:var(--soft);font-size:12.5px;font-weight:700}.t b{font-size:17px}
+.p{margin:8px 0 0;font:700 19px ui-monospace,Menlo,monospace;color:var(--sats)}.p span{font-size:12px;color:var(--muted)}
+.h{display:flex;align-items:center;gap:10px;margin:10px 0}
+.h i{width:38px;height:38px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:19px;font-style:normal;flex:none}
+.h b{font-size:14.5px}
+.v2{background:var(--ts);border:2px dashed var(--trust);border-radius:20px;padding:16px}
+.s{position:relative;margin-left:7px}
+.s:before{content:'';position:absolute;left:8px;top:8px;bottom:8px;width:2px;background:var(--sl)}
+.e{position:relative;padding:0 0 14px 32px}.e:last-child{padding-bottom:0}
+.e i{position:absolute;left:0;top:2px;width:18px;height:18px;box-sizing:border-box;border-radius:50%;background:var(--card);border:2px solid var(--sl);z-index:1;display:flex;align-items:center;justify-content:center;font:9px sans-serif;color:var(--ot)}
+.d i{background:var(--trust);border-color:var(--trust)}.d i:after{content:'✓'}
+.o i{border:2px dashed var(--trust)}.z{opacity:.45}
+.b{display:flex;gap:8px;margin-top:10px}
+button{padding:8px 12px;border:0;border-radius:14px;background:var(--chip);color:var(--ink);font:inherit;font-weight:800}
+.b button{flex:1}.b .y{background:var(--sats);color:#fff}
+#e{color:var(--muted);font-size:11.5px;margin-top:4px;text-align:center}
+</style><div class="w" id="w"></div><script>
+var W=window.TelegramWidget,U="__URL__",D=null,A=0,
+L=["Da pagare","Sats depositati","Spedito","Consegnato","Da incassare","Concluso","In disputa","Reso richiesto","Reso in viaggio","Da rimborsare","Rimborsato","Annullato"],
+C=["a","v","v","v","v","","d","a","a","a","",""],E={s:"📦",r:"🤝",d:"💾",v:"🛠"},
+G={0:0,1:1,2:2,3:2,4:3,5:4};
+function fm(n){return String(n).replace(/\\B(?=(\\d{3})+$)/g," ")}
+function hx(t){return String(t).replace(/[&<>"]/g,function(c){return"&#"+c.charCodeAt(0)+";"})}
+function leggi(t){try{var j=JSON.parse(t);if(j&&j.o)D=j}catch(x){}}
+function testa(s,c){return s==0?["⚡",c?"In attesa del tuo pagamento":"In attesa del pagamento",c?"Quando paghi, i sats entrano nel deposito di garanzia":"L'acquirente non ha ancora pagato"]
+:s==4?["💸","In pagamento al venditore",c?"La tua parte è finita: ora tocca a Barattolo":"I tuoi sats stanno arrivando"]
+:s==5?["🔓","Deposito sbloccato",c?"I sats sono stati consegnati al venditore":"Hai incassato i tuoi sats"]
+:s==6?["⚖️","Deposito congelato","Disputa in corso: i sats restano fermi fino alla decisione"]
+:s==7?["↩️","Reso in corso",c?"Rispedisci l'oggetto: al rientro ti rimborsiamo":"L'acquirente sta rispedendo l'oggetto"]
+:s==8?["↩️","Reso in corso",c?"Il reso è in viaggio: al rientro ti rimborsiamo":"L'acquirente ha rispedito l'oggetto"]
+:s==9?["↩️","Rimborso in corso","I sats tornano all'acquirente"]
+:s==10?["↩️","Deposito rimborsato","I sats sono tornati all'acquirente"]
+:s==11?["✖️","Ordine annullato","Nessun pagamento è stato trattenuto"]
+:["🔒","Sats nel deposito di garanzia","I sats sono al sicuro, nessuno può toccarli"]}
+function passi(s,c,t){return[s==0?(c?["Deposita i sats","Paga la fattura: i sats restano custoditi dalla piattaforma"]:["In attesa del pagamento","L'acquirente non ha ancora pagato"])
+:[c?"Hai depositato i sats":"Hai il pagamento in garanzia","I sats sono nel deposito di garanzia"],
+t=="r"?["Consegna a mano","Vi incontrate e l'oggetto passa di mano"]
+:t=="d"?["Contenuto consegnato",c?"Il venditore consegna il contenuto in piattaforma":"Consegni il contenuto qui in piattaforma"]
+:t=="v"?["Appuntamento","Giorno e ora si concordano nell'app"]
+:["Oggetto spedito",c?"Il venditore consegna al corriere":"Consegni al corriere"],
+s==3?["Consegnato: in attesa di conferma",c?"I sats restano nel deposito finché non confermi":"I sats restano nel deposito finché l'acquirente non conferma"]
+:["Ricevuto e confermato",c?"Hai verificato che è tutto ok":"L'acquirente ha verificato che è tutto ok"],
+c?["Sats sbloccati al venditore","Affare concluso, feedback reciproco"]:["Hai incassato i tuoi sats","Affare concluso: i sats sono nel tuo wallet"]]}
+function draw(){var w=document.getElementById("w"),h="",o,k;
+if(!D){w.innerHTML='<div class="k"><b>🫙 I tuoi ordini</b></div><small>Carico…</small><div id="e"></div>';return}
+for(k=0;k<D.o.length;k++)if(D.o[k][0]==A)o=D.o[k];
+if(!o){A=0;h='<div class="k"><b>🫙 I tuoi ordini</b><button id="u">🔄</button></div>';
+if(!D.o.length)h+="<small>Non hai ancora ordini nel mercatino.</small>";
+for(k=0;k<D.o.length;k++){o=D.o[k];h+='<div class="r'+(C[o[1]]?"":" x")+'" data-i="'+o[0]+'"><span class="g">'+(E[o[3]]||"📦")+'</span><div><b>'+hx(o[5])+"</b><small>#"+o[0]+" · "+(o[2]=="b"?"compri":"vendi")+" · "+fm(o[4])+' sats</small></div><span class="q '+C[o[1]]+'">'+L[o[1]]+"</span></div>"}
+h+="<small>"+D.a+(D.a==1?" attivo":" attivi")+" su "+D.n+(D.n>D.o.length?" · altri "+(D.n-D.o.length)+" nell'app":"")+"</small>"}
+else{var c=o[2]=="b",T=testa(o[1],c),S=passi(o[1],c,o[3]),g=G[o[1]];
+h='<div class="t"><div class="f">'+(E[o[3]]||"📦")+'</div><div><span class="n">Ordine #'+o[0]+" · "+(c?"compri":"vendi")+"</span><b>"+hx(o[5])+'</b></div></div><div class="p">'+fm(o[4])+" <span>sats</span></div>"
++'<div class="h"><i>'+T[0]+"</i><div><b>"+T[1]+"</b><small>"+T[2]+"</small></div></div>";
+if(g!=null){h+='<div class="v2"><div class="s">';for(k=0;k<4;k++)h+='<div class="e '+(k<g?"d":k==g?"o":"z")+'"><i></i><b>'+S[k][0]+"</b><small>"+S[k][1]+"</small></div>";h+="</div></div>"}
+h+='<div class="b"><button id="t">← I tuoi ordini</button>'+(U?'<button class="y" id="p">Apri in Barattolo</button>':"")+"</div>"}
+w.innerHTML=h+'<div id="e"></div>';
+var u=document.getElementById("u");if(u)u.onclick=function(){chiedi(1)};
+u=document.getElementById("t");if(u)u.onclick=function(){A=0;draw()};
+u=document.getElementById("p");if(u)u.onclick=function(){W&&W.openLink(U+"/?ordine="+A)};
+u=w.querySelectorAll(".r");for(k=0;k<u.length;k++)u[k].onclick=function(){A=+this.getAttribute("data-i");draw()}}
+function chiedi(dito){if(!W)return;W.request("o").then(function(r){if(r&&r.result){leggi(r.result);draw()}})
+.catch(function(x){if(dito){var e=document.getElementById("e");if(e)e.textContent="Non riesco ad aggiornare ("+(x&&x.code||x)+")"}})}
+if(W){leggi(W.chatData);W.onEvent("chatDataChanged",function(){leggi(W.chatData);draw()});draw();chiedi(0);setInterval(function(){chiedi(0)},20000)}else draw();
+</script>"""
+
+
+def _riga_widget_ordini(o, tg_id: int) -> list:
+    """PURA: un ordine stretto nei sei campi della scheda — numero,
+    stato (l'indice in `STATI_WIDGET_ORDINI`), ruolo di chi guarda
+    («b» compra, «s» vende), consegna (s/r/d/v), sats, titolo corto."""
+    stato = o["stato"] if o["stato"] in STATI_WIDGET_ORDINI else "locked"
+    tipo = {"ritiro": "r", "digitale": "d", "servizio": "v"}.get(
+        _campo(o, "consegna_scelta"), "s")
+    titolo = _campo(o, "titolo") or (
+        f"Carrello di {_campo(o, 'pezzi', 0)} oggetti"
+        if _campo(o, "pezzi", 0) else "Ordine")
+    titolo = " ".join(str(titolo).split())
+    if len(titolo) > 30:
+        titolo = titolo[:29].rstrip() + "…"
+    return [int(o["id"]), STATI_WIDGET_ORDINI.index(stato),
+            "b" if o["compratore_id"] == tg_id else "s", tipo,
+            int(o["prezzo_sats"] or 0), titolo]
+
+
+def elenco_widget_ordini(righe: list, tg_id: int) -> str:
+    """PURA: il JSON che viaggia nella scheda. Prima gli attivi, poi i
+    conclusi, in ciascun gruppo dal piu' mosso di recente; al piu'
+    `MAX_WIDGET_ORDINI`, e mai oltre `BYTE_WIDGET_ORDINI` byte (si
+    toglie dal fondo: un JSON tagliato a meta' non si leggerebbe). `a` e
+    `n` contano TUTTI gli ordini, anche quelli che non entrano. La
+    fattura annullata e pagata non esce a chi vende (`_nascosto_a`), e
+    nemmeno l'ordine che quella parte ha nascosto dalla sua lista."""
+    miei = []
+    for o in righe:
+        compra = o["compratore_id"] == tg_id
+        if not compra and o["venditore_id"] != tg_id:
+            continue      # non e' suo: la query lo dice gia', qui si ripete
+        if _nascosto_a(o, tg_id) or _campo(
+                o, "nascosto_compratore" if compra else "nascosto_venditore", 0):
+            continue
+        miei.append(o)
+    miei.sort(key=lambda o: (o["stato"] in CONCLUSI_WIDGET_ORDINI,
+                             -int(_campo(o, "aggiornato", 0) or _campo(o, "creato", 0) or 0),
+                             -int(o["id"])))
+    attivi = sum(o["stato"] not in CONCLUSI_WIDGET_ORDINI for o in miei)
+    scelti = [_riga_widget_ordini(o, tg_id) for o in miei[:MAX_WIDGET_ORDINI]]
+    while True:
+        testo = json.dumps({"a": attivi, "n": len(miei), "o": scelti},
+                           ensure_ascii=False, separators=(",", ":"))
+        if len(testo.encode("utf-8")) <= BYTE_WIDGET_ORDINI or not scelti:
+            return testo
+        scelti.pop()
+
+
+def _leggi_widget_ordini(tg_id: int) -> str:
+    """L'elenco di `tg_id`, letto adesso dal database (sola lettura)."""
+    con = db()
+    try:
+        righe = con.execute(
+            "SELECT o.*, a.titolo, (SELECT COALESCE(SUM(r.quantita),0) "
+            "FROM ordine_righe r WHERE r.ordine_id=o.id) AS pezzi "
+            "FROM ordini o LEFT JOIN annunci a ON a.id=o.annuncio_id "
+            "WHERE o.compratore_id=? OR o.venditore_id=?",
+            (tg_id, tg_id)).fetchall()
+    finally:
+        con.close()
+    return elenco_widget_ordini(righe, tg_id)
+
+
+def html_widget_ordini() -> str:
+    """La paginetta col suo indirizzo di casa: «Apri in Barattolo» vuole
+    un https (`openLink` non apre altro), e senza il bottone non c'e'."""
+    url = str(URL_PUBBLICO or "").rstrip("/")
+    return HTML_WIDGET_ORDINI.replace(
+        "__URL__", url if url.startswith("https://") and '"' not in url else "")
+
+
+async def comando_ordini(mittente: dict):
+    """`/ordini` — la scheda coi propri ordini del mercatino. Solo
+    sull'istanza di prova (altrove e' un comando che non esiste), per
+    chiunque ci sia ammesso: ognuno vede i suoi."""
+    chat = mittente["id"]
+    if not widget_prova_acceso():
+        return await _comando_sconosciuto(chat)
+    r = await bot_api("sendWidget", {
+        "chat_id": chat, "html": html_widget_ordini(),
+        "width": 0, "height": ALTEZZA_WIDGET_ORDINI,
+        "chat_data": _leggi_widget_ordini(chat), "allow_queries": True,
+        "caption": "🫙 I tuoi ordini del mercatino. La scheda si "
+                   "aggiorna da sola; tocca un ordine per vederne i passi."})
+    await _riferisci_widget(chat, "sendWidget", r)
 
 
 async def comando_dove(msg: dict, mittente: dict):
@@ -22254,6 +22468,8 @@ async def gestisci_update(update: dict):
         return await comando_vetrina(mittente, testo)
     if testo.startswith("/provawidget"):
         return await comando_provawidget(mittente, testo)
+    if testo.split()[0] == "/ordini":
+        return await comando_ordini(mittente)
     if testo.startswith("/punti"):
         return await comando_punti(mittente, testo)
     if testo.startswith("/canali"):

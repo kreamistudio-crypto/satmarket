@@ -79274,3 +79274,55 @@ primo giro il 10 nov alle 16:36 UTC: ha letto main col token di sola
 lettura e si è segnato il punto di partenza), ma non ha ancora visto una
 voce vera scritta da un cantiere: il file nasce senza voci, la prima la
 scrive il prossimo cantiere che porta qualcosa di visibile.
+
+## La scheda dei miei ordini sul bot di collaudo: `/ordini` (10 nov 2026, cantiere widget-ordini, Andrea: «mostrami realmente i miei ordini cosi da monitorare davvero gli ultimi stati dei miei ordini attivi e non»)
+
+Dopo il cartellino finto (`/provawidget`, qui sopra) la scheda vera:
+`/ordini` manda UN widget con gli ordini del mercatino di chi scrive,
+da compratore e da venditore. Prima gli attivi, poi i conclusi, ognuno
+con l'etichetta di stato della Mini App; un tocco apre la pagina di
+quell'ordine (la stessa grafica: testa, cifra, riga dello stato, recinto
+tratteggiato coi passi, testi girati a chi compra o a chi vende) e
+«Apri in Barattolo» lo apre nell'app.
+
+- **COME RESTA AGGIORNATA.** La scheda chiede l'elenco quando compare e
+  ogni venti secondi mentre resta a schermo (`widget_query` «o» →
+  `answerWidgetQuery`), e il bottone 🔄 è la stessa domanda col dito.
+  L'elenco si legge sempre dal database e di chi sono gli ordini lo dice
+  Telegram (`from`): dal telefono arriva solo la lettera «o».
+- **I TETTI DI TELEGRAM DECIDONO LA FORMA.** `chat_data` e la risposta a
+  una richiesta portano 1024 byte: viaggiano al più otto ordini, stretti
+  in sei campi (numero, stato, ruolo, consegna, sats, titolo a 30
+  caratteri), e il resto è «altri N nell'app». L'altezza è fissa a 540
+  px (il tetto è 600 e oltre Telegram taglia). Niente indirizzi, codici
+  o tracciamenti nella scheda.
+- **CHI VEDE COSA** è il giudice puro `elenco_widget_ordini`: solo gli
+  ordini di cui si è parte, non la fattura annullata e pagata a chi
+  vende (`_nascosto_a`), non l'ordine che quella parte ha nascosto.
+- **SOLO SULL'ISTANZA DI PROVA**, come il cartellino, ma per chiunque ci
+  sia ammesso (sono i suoi ordini). In produzione `/ordini` non esiste
+  e la richiesta «o» riceve una risposta vuota.
+
+SCARTATE. Il gancio dentro `notifica` per rinfrescare la scheda a ogni
+avviso: scritto e tolto, perché è la funzione da cui passa ogni avviso
+di Barattolo, le prove la montano da sola (dieci rosse), e una scheda
+che nessuno guarda non ha bisogno di essere fresca. Una richiesta per
+ogni ordine aperto: l'elenco stretto basta a disegnare anche la pagina.
+Gli scambi P2P: vivono sul telefono e su Mostro, il server non li
+conosce. I passi di disputa, reso e rimborso: la pagina di quegli stati
+mostra la riga dello stato e basta, il resto è nell'app.
+
+**PROVATO.** `prove_widget_ordini` (il giudice dell'elenco: chi vede
+cosa, l'ordine, i 1024 byte con quaranta ordini e titoli accentati; la
+paginetta nei 4 KB: 8,0 KB e 3,3 KB compressa; gli stati e le etichette
+uguali a `STATES` della Mini App) e `collaudo_widget_prova` col server
+vero e ordini seminati (28/0). La paginetta guardata con Chromium in
+chiaro e scuro, elenco e pagina. Suite intera severa 27.239 su 27.239 e collaudi
+della CI 123/0 sull'albero PRIMA del rebase; il ramo è corso (d090b06 e
+db25fd7, il cantiere novita, non miei: documenti, CLAUDE.md e prove.py),
+e sull'albero di questo commit sono girati la suite intera severa,
+27.253 su 27.253, e i collaudi del widget e dell'istanza di prova, 2/0.
+Niente voce in NOVITA.md: fuori dall'istanza di prova non si vede.
+**NON PROVATO:** Telegram vero. In particolare se una richiesta partita
+da sola (non da un tocco) viene accettata: la guida dice di sì in chat
+privata, una ogni cinque secondi; se non lo fosse resta il 🔄.

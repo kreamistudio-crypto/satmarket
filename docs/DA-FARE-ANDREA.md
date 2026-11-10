@@ -530,3 +530,15 @@ privata con @barattolo_collaudo_bot:
    gira dal lato del bot.
 4. Uno screenshot da Android, da iPhone e da desktop, in tema chiaro e
    scuro: è quel che decide la tappa 2 (la scheda vera dell'ordine).
+
+## 12. La scheda dei miei ordini, dal telefono (10 nov 2026, cantiere widget-ordini)
+
+Niente da scrivere sulla VM. Nella chat privata con
+@barattolo_collaudo_bot, da un account che sul collaudo ha degli ordini:
+1. `/ordini` — arriva la scheda coi tuoi ordini, gli attivi in alto.
+2. Tocca un ordine: si apre la sua pagina coi passi. «← I tuoi ordini»
+   torna all'elenco, «Apri in Barattolo» lo apre nell'app.
+3. Lascia la scheda a schermo e, da un altro account, fai avanzare un
+   ordine (per esempio segnalo spedito): entro una ventina di secondi
+   l'etichetta deve cambiare da sola. Se non cambia, tocca 🔄: se cambia
+   solo così, dillo alla sessione (le richieste da sole non passano).

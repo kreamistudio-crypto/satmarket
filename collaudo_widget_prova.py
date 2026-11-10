@@ -13,7 +13,10 @@ il SERVER VERO, dal campanello del bot in giu':
     il passo cambia solo per l'admin; il comando gira la scheda dal lato
     del bot, dentro i cinque passi;
   - un rifiuto di Telegram si dice in chat con le sue parole, e la
-    scheda senza bottone e' il secondo tentativo.
+    scheda senza bottone e' il secondo tentativo;
+  - `/ordini` (cantiere widget-ordini): ognuno riceve i SUOI ordini veri,
+    gli attivi prima; la richiesta della scheda risponde con l'elenco
+    fresco di chi chiede; in produzione niente di tutto questo esiste.
 
 NON TOCCA NIENTE DI VERO: il config finto lo installa `avvio()` del banco
 (MODALITA_COLLAUDO), e `bot_api` e' sostituita da un registro. Nessuna
@@ -157,6 +160,98 @@ def main():
                "reply_markup" in chiamate[2][1]))
         prova("...e la scheda nuova prende il posto della vecchia",
               (msg_id[0], 0), S._WIDGET_PROVA[999])
+
+        print("\n[la scheda dei miei ordini: /ordini]")
+        con = S.db()
+        for chi_e in (111, 222, 333):
+            con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,"
+                        "registrato,ln_address) VALUES(?,?,?,1,'')",
+                        (chi_e, f"U{chi_e}", f"neg{chi_e}"))
+        ann = con.execute(
+            "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
+            "categoria,zona,stato,creato,consegna,quantita,valuta,condizione)"
+            " VALUES(222,'Lampada <b>vintage</b>','una cosa',30000,'Altro',"
+            "'Pavia (PV)','attivo',1,'spedizione',5,'sats','nuovo')").lastrowid
+
+        def ordine(stato, compra, vende, mosso):
+            return con.execute(
+                "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
+                "prezzo_sats,stato,creato,aggiornato) VALUES(?,?,?,30000,?,?,?)",
+                (ann, compra, vende, stato, mosso, mosso)).lastrowid
+        concluso = ordine("released", 111, 222, 10)
+        vivo = ordine("locked", 111, 222, 20)
+        altrui = ordine("shipped", 333, 222, 30)
+        con.commit()
+        con.close()
+
+        chiamate.clear()
+        scrive(111, "/ordini")
+        m, d = chiamate[0]
+        e = json.loads(d["chat_data"])
+        prova("chi compra riceve la scheda coi SUOI due ordini, il vivo "
+              "prima del concluso", ("sendWidget", 111, [vivo, concluso], 1, 2, 1),
+              (m, d["chat_id"], [r[0] for r in e["o"]], e["a"], e["n"],
+               len(chiamate)))
+        prova("...con le richieste accese, l'altezza fissa e il titolo "
+              "dell'annuncio cosi' com'e' (l'escape lo fa la pagina)",
+              (True, S.ALTEZZA_WIDGET_ORDINI, "Lampada <b>vintage</b>"),
+              (d["allow_queries"], d["height"], e["o"][0][5]))
+        prova("...e sta nei 1024 byte di chat_data", True,
+              len(d["chat_data"].encode("utf-8")) <= 1024)
+        url_vero = S.URL_PUBBLICO
+        S.URL_PUBBLICO = "http://127.0.0.1:8000"
+        prova("senza un https niente bottone «Apri in Barattolo», che non "
+              "si aprirebbe", (True, False),
+              ('U=""' in S.html_widget_ordini(), "__URL__" in d["html"]))
+        S.URL_PUBBLICO = "https://collaudo.barattolo.store/"
+        prova("...con un https il bottone porta a casa", True,
+              'U="https://collaudo.barattolo.store"' in S.html_widget_ordini())
+        S.URL_PUBBLICO = url_vero
+        chiamate.clear()
+        scrive(222, "/ordini")
+        prova("chi non e' ammesso alla prova non riceve niente, nemmeno "
+              "la scheda", [], metodi())
+        S.PROVA_SOLO_IDS = {999, 111, 222, 333}
+        scrive(222, "/ordini")
+        e = json.loads(chiamate[0][1]["chat_data"])
+        prova("chi vende vede i suoi tre, da venditore",
+              ([altrui, vivo, concluso], {"s"}),
+              ([r[0] for r in e["o"]], {r[2] for r in e["o"]}))
+        chiamate.clear()
+        scrive(999, "/ordini")
+        prova("chi non ha ordini riceve la scheda vuota, non quella di un altro",
+              {"a": 0, "n": 0, "o": []}, json.loads(chiamate[0][1]["chat_data"]))
+
+        print("\n[la scheda chiede l'elenco: e' di chi chiede]")
+        con = S.db()
+        con.execute("UPDATE ordini SET stato='shipped', aggiornato=40 WHERE id=?",
+                    (vivo,))
+        con.commit()
+        con.close()
+        chiamate.clear()
+        tocca(111, "o", 77)
+        e = json.loads(chiamate[0][1]["data"])
+        prova("la richiesta «o» risponde con l'elenco FRESCO di chi chiede, "
+              "e non modifica niente", (["answerWidgetQuery"], [vivo, 2], 2),
+              (metodi(), e["o"][0][:2], e["n"]))
+        chiamate.clear()
+        tocca(333, "o", 77)
+        e = json.loads(chiamate[0][1]["data"])
+        prova("...a un altro risponde coi SUOI, anche se tocca la scheda di "
+              "un altro messaggio", [altrui], [r[0] for r in e["o"]])
+
+        print("\n[in produzione la scheda degli ordini non esiste]")
+        S.PROVA_SOLO_IDS = set()
+        chiamate.clear()
+        scrive(111, "/ordini")
+        prova("/ordini e' un comando che non esiste",
+              (["sendMessage"], True),
+              (metodi(), "Non conosco questo comando" in chiamate[0][1]["text"]))
+        chiamate.clear()
+        tocca(111, "o", 77)
+        prova("...e la richiesta «o» riceve una risposta vuota",
+              [("answerWidgetQuery", "")],
+              [(m, d.get("data")) for m, d in chiamate])
     finally:
         S.bot_api = vero
         S.PROVA_SOLO_IDS = set()
