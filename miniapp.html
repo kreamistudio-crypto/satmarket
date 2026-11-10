@@ -44570,7 +44570,7 @@ async function onchainLiberaDallOrdine(btn, o){
        dove ricevere, e una firma deve dire a chi vanno i sats. La
        conferma si scrive, chi vende viene avvisato, e questo telefono
        firma da solo alla prima apertura dopo la sua scelta */
-    if (o.role === 'buyer' && oc && !oc.incasso) {
+    if (o.role === 'buyer' && oc && (!oc.incasso || !oc.rimborso)) {
       /* (28 ott 2026) la conferma la firma il mio seme: il server la
          controlla, e il mio telefono la rilegge prima di firmare da solo */
       const parole = onchainSemeLocale();
@@ -44582,7 +44582,10 @@ async function onchainLiberaDallOrdine(btn, o){
          body: JSON.stringify({firma})});
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.detail || 'conferma non salvata');
-      toast(oc.modo_venditore && oc.modo_venditore !== 'onchain'
+      /* (10 nov 2026, Andrea: «il rilascio aspetta il suo wallet») manca
+         il MIO wallet, dove torna il resto: lo dico prima di tutto */
+      if (!oc.rimborso) toast('✅ Confermato. Per liberare i sats scegli prima il tuo wallet, dove torna il resto: Profilo → «₿ On-chain». Poi il tuo telefono firma da solo quando apri la Mini App', 10000);
+      else toast(oc.modo_venditore && oc.modo_venditore !== 'onchain'
         ? '✅ Confermato. Chi vende riceve in Lightning: l\'abbiamo avvisato, e appena prepara il cambio il tuo telefono mette la seconda firma da solo quando apri la Mini App'
         : '✅ Confermato. Chi vende deve ancora scegliere dove ricevere: l\'abbiamo avvisato, e appena lo fa il tuo telefono firma da solo quando apri la Mini App', 9000);
     } else {
@@ -59334,6 +59337,9 @@ async function onchainFirmaProposta(oid, verso){
      volta e prende l'on-chain allo sblocco — e allora l'incasso deve
      essere quello che il SUO seme ha firmato */
   verso = verso || (o.ruolo === 'compratore' ? 'venditore' : 'compratore');
+  /* (10 nov 2026, Andrea: «il rilascio aspetta il suo wallet») */
+  if (verso === 'venditore' && o.ruolo === 'compratore' && !o.rimborso)
+    throw new Error('prima scegli il tuo wallet, dove torna il resto: Profilo → «₿ On-chain»');
   if (verso === 'venditore' && o.ruolo === 'compratore' && o.rimborso
       && o.rimborso !== await onchainRimborsoAtteso(B, parole, o, io))
     throw new Error('il resto non tornerebbe al tuo wallet');
@@ -59483,7 +59489,7 @@ async function onchainCofirmeInAttesa(parole){
 
 function onchainRilascioDaFirmare(o){
   return o.ruolo === 'compratore' && o.stato === 'pagato' && o.rilascio_chiesto_il
-    && o.incasso && !o.proposta;
+    && o.incasso && o.rimborso && !o.proposta;
 }
 
 async function onchainLeggiOrdini(){
@@ -60180,7 +60186,7 @@ const p2pOcCambi = {};
    all'on-chain (ora l'incasso c'e', la proposta no) */
 function rilascioDaFirmareOnchainP2P(o){
   return !!(o && o.ruolo === 'compratore' && o.rilascio_chiesto_il && o.rilascio_firma
-    && o.incasso && !o.proposta && (o.stato === 'depositato' || o.stato === 'euro_inviati'));
+    && o.incasso && o.rimborso && !o.proposta && (o.stato === 'depositato' || o.stato === 'euro_inviati'));
 }
 /* il riquadro di chi compra bitcoin: la scelta, il conto, il cambio */
 function incassoLnOnchainP2P(o){

@@ -95687,6 +95687,13 @@ def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
     rete = _onchain_rete()
     uscite = [(u.script_pubkey.address(rete), u.value) for u in p.tx.vout]
     if verso == "venditore":
+        # (10 nov 2026, Andrea: «il rilascio aspetta il suo wallet») il
+        # resto del margine torna al wallet di chi ha messo i sats: finche'
+        # non c'e', i sats restano nel 2-di-3
+        if not o["rimborso"]:
+            raise ValueError("chi ha messo i sats non ha ancora scelto dove "
+                             "ricevere il resto: il rilascio aspetta il suo "
+                             "wallet")
         if [v for d, v in uscite if d == o["incasso"]] != [o["prezzo_sats"]]:
             raise ValueError("al venditore deve andare esattamente il prezzo")
         permessi = (o["incasso"], o["rimborso"])
@@ -96093,7 +96100,11 @@ async def onchain_rilascio_chiesto(oid: int, req: Request,
             raise HTTPException(404, "Ordine non trovato")
         if _onchain_parte(o, user["id"]) != "compratore":
             raise HTTPException(403, "Lo conferma chi compra")
-        if o["stato"] != "pagato" or o["incasso"] or o["proposta_psbt"]:
+        # (10 nov 2026, Andrea: «il rilascio aspetta il suo wallet») si
+        # aspetta anche quando manca il wallet di chi compra, dove torna
+        # il resto del margine
+        if (o["stato"] != "pagato" or (o["incasso"] and o["rimborso"])
+                or o["proposta_psbt"]):
             raise HTTPException(409, "Su questo ordine non c'è niente da "
                                      "mettere in attesa")
         _onchain_ordine_permette(con, o, "venditore")
@@ -96115,7 +96126,7 @@ async def onchain_rilascio_chiesto(oid: int, req: Request,
         modo = onchain_modo_ordine(con, o)
     finally:
         con.close()
-    if not gia:
+    if not gia and not o["incasso"]:
         tit = html.escape(o['titolo'][:40])
         await notifica(o["venditore_id"],
             f"₿ <b>{tit}:</b> chi ha comprato ha confermato di averlo "
@@ -96125,7 +96136,8 @@ async def onchain_rilascio_chiesto(oid: int, req: Request,
             "ricevuto. Apri l'ordine: ti mostriamo quanto costa il cambio "
             "in Lightning e, se confermi, i sats partono."
             + (" Puoi anche riceverli on-chain." if modo == "ogni_volta" else ""))
-    return {"ok": True}
+    return {"ok": True, "aspetta_wallet": not o["rimborso"],
+            "aspetta_incasso": not o["incasso"]}
 
 
 @app.post("/api/onchain/ordini/{oid}/proposta")
