@@ -187683,10 +187683,11 @@ def _banco_assistente(**leve):
            "AUTO_SBLOCCO_ATTIVO": False, "ORE_CONFERMA_DIGITALE": 24,
            "ORE_SILENZIO_DIGITALE": 48, "P2P_MAX_EURO": 250,
            "P2P_CONTANTI_MAX_EURO": 250, "ASTA_ABILITATA": True,
-           "MERCATO_LAVORO": False,
+           "MERCATO_LAVORO": False, "ASSISTENZA_ATTIVA": False,
            "_p2p_leve": lambda: {"attivo": True}}
     CHI_GUARDA = []
-    for nome in ("cambio_libero_per", "swap_per", "onchain_ammesso"):
+    for nome in ("cambio_libero_per", "swap_per", "onchain_ammesso",
+                 "swap_auto_per", "p2p_usdt_ammesso", "p2p_onchain_ammesso"):
         amb[nome] = (lambda n: lambda t: CHI_GUARDA.append((n, t)) or False)(nome)
     exec(src[k:src.index("\n", k)], amb)
     for nome in ("_riga_webapp", "tastiera_bot", "_secchio_passa"):
@@ -187986,6 +187987,30 @@ def prove_assistente_bot():
           True, "72 ore" in n0 and "NON partono da soli" in n0)
     prova("le funzioni si guardano con gli occhi di chiunque (tg 0)", {0},
           {t for _, t in CHI_GUARDA})
+    # (10 nov 2026, cantiere tappo-aggiornato) le funzioni nate dopo il 2
+    # novembre stanno nei numeri anche loro, e Tappo li legge da una rotta
+    prova("i numeri dicono anche assistenza, swap automatico, USDT e P2P "
+          "on-chain, spenti a leve spente", [True] * 4,
+          ["Assistenza in app" in n0 and "Assistenza in app (Profilo → Privacy"
+           in n0, "«📥 Come ricevi»" in n0,
+           "P2P pagati in USDT: SPENTO" in n0,
+           "P2P in bitcoin on-chain: SPENTO" in n0])
+    prova("...guardati tutti con gli occhi di chiunque",
+          {"swap_auto_per", "p2p_usdt_ammesso", "p2p_onchain_ammesso"},
+          {n for n, _ in CHI_GUARDA} & {"swap_auto_per", "p2p_usdt_ammesso",
+                                        "p2p_onchain_ammesso"})
+    amb["ASSISTENZA_ATTIVA"] = True
+    prova("...e l'assistenza accesa si dice disponibile", True,
+          "«💬 Assistenza», la chat con lo staff dentro Barattolo): "
+          "disponibile" in amb["numeri_assistente"]())
+    rotta = codice(pezzo("assistente_numeri"))
+    prova("la rotta pubblica dei numeri: GET, solo il testo dei numeri, "
+          "niente database, niente utente, un minuto di cache", [True] * 4,
+          ['@app.get("/api/assistente/numeri")' in _SORGENTE,
+           'JSONResponse({"numeri": numeri_assistente()}' in rotta,
+           all(x not in rotta.split('"""')[-1]
+               for x in ("db()", "execute", "tg_id", "Request", "utente")),
+           '"Cache-Control": "public, max-age=60"' in rotta])
 
     # --- 11) LE REGOLE, il PANNELLO, l'ARGOMENTO e la PRIVACY ------------
     regole = amb["ISTRUZIONI_ASSISTENTE"]

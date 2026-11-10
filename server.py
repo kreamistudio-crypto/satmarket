@@ -22204,6 +22204,16 @@ def numeri_assistente() -> str:
         f"- Swap degli incassi verso bitcoin on-chain: {si(swap_per(0))}.",
         f"- Pagare un ordine in bitcoin on-chain: {si(onchain_ammesso(0))}.",
         f"- Schede «Mercato» e «Lavoro» in vetrina: {si(MERCATO_LAVORO)}.",
+        # (10 nov 2026, cantiere tappo-aggiornato) le funzioni nate dopo il
+        # 2 novembre, sempre con gli occhi di chiunque: accese solo per gli
+        # admin, per chi chiede sono spente
+        f"- Assistenza in app (Profilo → Privacy → «💬 Assistenza», la chat "
+        f"con lo staff dentro Barattolo): {si(ASSISTENZA_ATTIVA)}.",
+        f"- Ricevere on-chain anche quando ti pagano in Lightning (Profilo → "
+        f"«📥 Come ricevi», e la scelta annuncio per annuncio): "
+        f"{si(swap_auto_per(0))}.",
+        f"- Scambi P2P pagati in USDT: {si(p2p_usdt_ammesso(0))}.",
+        f"- Scambi P2P in bitcoin on-chain: {si(p2p_onchain_ammesso(0))}.",
     ]
     return "\n".join(righe)
 
@@ -27201,6 +27211,22 @@ def conta_pionieri(con) -> int:
     quanti = con.execute("SELECT COUNT(*) AS n FROM utenti").fetchone()["n"]
     _pionieri_cache.update(quanti=quanti, quando=adesso)
     return quanti
+
+
+@app.get("/api/assistente/numeri")
+def assistente_numeri():
+    """I NUMERI DI OGGI, a chiunque li chieda (10 nov 2026, cantiere
+    tappo-aggiornato, Andrea: «tappo deve aggiornarsi di continuo»).
+    Tappo, il bot che risponde nel canale e in privato, gira su n8n e
+    non sul nostro server: per sapere quali funzioni sono accese
+    rilegge questa rotta a ogni domanda, cosi' una leva girata vale
+    subito anche per lui. NON DICE NIENTE CHE LA MINI APP NON DICA GIA'
+    A CHIUNQUE: e' lo stesso testo di `numeri_assistente`, guardato con
+    gli occhi di un utente qualunque (tg 0), senza login, senza
+    database, senza nomi. Un minuto di cache: il prezzo di una leva
+    girata e' al piu' un minuto di ritardo."""
+    return JSONResponse({"numeri": numeri_assistente()},
+                        headers={"Cache-Control": "public, max-age=60"})
 
 
 @app.get("/api/salute")
