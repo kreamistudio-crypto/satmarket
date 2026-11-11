@@ -79762,3 +79762,25 @@ normale; il submarine lo paga il wallet dell'utente verso un indirizzo
 che Payjoin non lo sa.
 
 PROVATO. `prove_novita_md`, `prove_assistente_bot` e la suite intera.
+
+## La cifra della richiesta Lightning si copia (11 nov 2026, cantiere cifra-copia, Andrea: «se la cifra esatta fosse cliccabile e si copiasse nella clipboard del telefono sarebbe estremamente user friendly»)
+
+PERCHÉ. Nel Cambio da bitcoin a Lightning si deve creare nel proprio
+wallet una richiesta di una cifra ESATTA («Dal tuo wallet Lightning crea
+una richiesta di 59 130 sats esatti»): riscriverla a mano dal telefono è
+scomodo e facile da sbagliare.
+
+COSA. La cifra nella frase è il bottoncino tratteggiato della cifra in
+BTC (`.cifra-btc`): `cifraSatsCopiabile` e `copiaCifraSats` nella pagina,
+accanto a `copiaCifraBtc`; negli appunti il numero nudo (59130), a
+schermo con lo spazio delle migliaia, e il toast «📋 Copiato: 59 130
+sats». Nell'instradatore `swapCambioSpiega` diventa
+`swapCambioSpiegaHtml`: la frase si scappa intera e la cifra entra al
+posto di un segno (\u0001) che `esc` lascia stare; va in pagina con
+innerHTML sia al disegno sia mentre si scrive. Nuova impronta
+`SWAP_TELEFONO_VER`.
+
+PROVATO. `prove_cifra_copia` (banco in node: bottone, numero nudo negli
+appunti, frase intera, BTC accanto, niente bottone senza cifra; i due
+punti in cui la frase va in pagina), controprova col textContent di
+prima rossa; `prove_swap_telefono`, suite e collaudi.
