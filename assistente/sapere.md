@@ -175,7 +175,7 @@ Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla ret
 
 La pagina «Cambio» (la scheda in basso) sposta i TUOI sats fra Lightning e un tuo indirizzo bitcoin on-chain, nelle due direzioni, senza un ordine di mezzo. Se è accesa lo dicono i NUMERI DI OGGI.
 - Lightning → bitcoin: scrivi la cifra (quella che mandi o quella che ricevi), incolli il tuo indirizzo bitcoin e paghi la fattura Lightning col tuo wallet; i bitcoin arrivano al tuo indirizzo.
-- Bitcoin → Lightning: scrivi quanto vuoi ricevere, incolli una tua fattura Lightning di quella cifra esatta e mandi i bitcoin all'indirizzo che l'app ti mostra; quando arrivano, la tua fattura viene pagata.
+- Bitcoin → Lightning: scrivi quanto vuoi ricevere, incolli una tua fattura Lightning di quella cifra esatta e mandi i bitcoin all'indirizzo che l'app ti mostra; quando arrivano, la tua fattura viene pagata. La cifra esatta nella frase «crea una richiesta di … sats esatti» si tocca e si copia, pronta da incollare nel wallet. Al posto della fattura puoi incollare il tuo Lightning address (nome@wallet): la fattura della cifra giusta la chiede Barattolo al tuo wallet quando premi «Conferma».
 - Il cambio lo fa un servizio esterno (SATS Routing). Barattolo non prende commissioni: prima di confermare vedi quanto ricevi, con dentro la commissione del servizio e quella della rete.
 - I sats non passano mai da Barattolo: partono dal tuo wallet e arrivano al tuo wallet.
 - Limiti: da 25.000 sats a 0,01 BTC (1.000.000 sats) a cambio, al massimo 5 cambi al giorno. Da bitcoin verso Lightning il minimo è 50.000 sats (è il minimo del servizio di cambio). Se il servizio cambia i suoi limiti, vale il più stretto.

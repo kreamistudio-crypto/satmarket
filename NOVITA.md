@@ -74,3 +74,9 @@ frase: La pagina «Cambio» è aperta a tutti: sposti i tuoi sats da Lightning a
 dove: la scheda «Cambio» in basso, col tasto «🔁 Cambia»; per chi vende, il riquadro dell'incasso nella pagina dell'ordine.
 leva: SWAP_ATTIVO e CAMBIO_LIBERO_ATTIVO accese per tutti dal 2026-11-11
 pubblico: sì
+
+## 2026-11-11 · cambio-address-e-cifra
+frase: Nel Cambio da bitcoin a Lightning non serve più creare a mano la richiesta nel wallet: incolli il tuo Lightning address (nome@wallet) e la richiesta della cifra giusta la chiede Barattolo al tuo wallet. E se preferisci crearla tu, la cifra esatta si tocca e si copia, pronta da incollare.
+dove: la scheda «Cambio», direzione da bitcoin a Lightning, il campo «La tua richiesta Lightning».
+leva: CAMBIO_BTC_LN_ATTIVO (nessuna leva nuova)
+pubblico: sì

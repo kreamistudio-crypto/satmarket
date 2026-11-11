@@ -19242,7 +19242,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '1ff4502a1c';
+const SWAP_TELEFONO_VER = '111317c759';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -19687,6 +19687,23 @@ async function pagaSwapAlServer(rec){
    {ok: false, motivo}; null = non si e' potuto chiedere. Poi la nascita
    porta le sole parti pubbliche (come `pagaSwapAlServer`), mai parole o
    chiavi: la fattura la paga l'utente col SUO wallet, non Barattolo. */
+/* IL LIGHTNING ADDRESS AL POSTO DELLA RICHIESTA (11 nov 2026, cantiere
+   cifra-copia): nel Cambio da bitcoin a Lightning la richiesta della
+   cifra esatta la chiede il server al wallet dell'address, come per gli
+   incassi del mercatino (il browser non puo' bussare a un dominio
+   qualunque: la CSP). {fattura} o {motivo}; null = non si e' potuto
+   chiedere. La fattura la rilegge poi il telefono. */
+async function chiediFatturaCambioDaAddress(address, sats){
+  try {
+    const r = await fetch(`${API_BASE}/swap/cambio/fattura`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({address: String(address || ''), sats: Number(sats) || 0})});
+    const j = await r.json().catch(() => null);
+    if (r.ok && j && j.fattura) return {fattura: String(j.fattura)};
+    return j && j.detail ? {motivo: String(j.detail)} : null;
+  } catch(e) { return null; }
+}
 async function chiediBigliettoCambio(d){
   try {
     const r = await fetch(`${API_BASE}/swap/cambio`, {

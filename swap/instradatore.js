@@ -52,7 +52,8 @@
    linguaSwap, pagaSwapAlServer, statoPagamentoSwap, chiediBigliettoCambio,
    natoCambioAlServer, liberaBigliettoCambio, disegnaQr, portaWallet,
    leggiBolt11, leggiPreventivoCambioP2P, chiediBigliettoCambioP2P,
-   natoCambioP2PAlServer, liberaBigliettoCambioP2P, cifraSatsCopiabile. */
+   natoCambioP2PAlServer, liberaBigliettoCambioP2P, cifraSatsCopiabile,
+   chiediFatturaCambioDaAddress. */
 
 /* ─── 1. LE STRADE E I FORNITORI ────────────────────────────────────── */
 /* la sola strada di oggi: i sats dell'incasso, ricevuti in bitcoin on-chain */
@@ -335,7 +336,10 @@ const SWAP_TESTI_T3 = {
     cambioRipreso: n => `${n} si è ripreso i bitcoin, e il tuo pagamento torna al tuo wallet.`,
     /* (tappa 3) la strada rovesciata: bitcoin → Lightning */
     fatturaTit: 'La tua richiesta Lightning',
-    fatturaSpiega: (n, b) => `Dal tuo wallet Lightning crea una richiesta di ${n} sats esatti${b ? ` (${b} BTC)` : ''} e incollala qui.`,
+    fatturaSpiega: (n, b) => `Dal tuo wallet Lightning crea una richiesta di ${n} sats esatti${b ? ` (${b} BTC)` : ''} e incollala qui, oppure incolla il tuo Lightning address.`,
+    /* (11 nov 2026, cantiere cifra-copia) il Lightning address al posto
+       della richiesta: la chiede l'app al wallet */
+    addressNo: 'Il tuo Lightning address non ci ha dato la richiesta: riprova, o incolla una richiesta creata dal wallet.',
     fatturaManca: 'Prima incolla la richiesta del tuo wallet Lightning: tocca «Incolla».',
     fatturaNo: 'Questa non sembra una richiesta Lightning: ricontrollala.',
     fatturaImporto: n => `La richiesta deve essere di ${n} sats esatti.`,
@@ -457,7 +461,8 @@ const SWAP_TESTI_T3 = {
     cambioFallito: 'Failed: no sats moved. You can start a new exchange.',
     cambioRipreso: n => `${n} took the bitcoin back, and your payment returns to your wallet.`,
     fatturaTit: 'Your Lightning request',
-    fatturaSpiega: (n, b) => `From your Lightning wallet create a request for exactly ${n} sats${b ? ` (${b} BTC)` : ''} and paste it here.`,
+    fatturaSpiega: (n, b) => `From your Lightning wallet create a request for exactly ${n} sats${b ? ` (${b} BTC)` : ''} and paste it here, or paste your Lightning address.`,
+    addressNo: 'Your Lightning address did not give us the request: try again, or paste a request created by your wallet.',
     fatturaManca: 'First paste the request from your Lightning wallet: tap «Paste».',
     fatturaNo: 'This does not look like a Lightning request: check it again.',
     fatturaImporto: n => `The request must be for exactly ${n} sats.`,
@@ -638,7 +643,7 @@ function campoFatturaSwap(n, errore){
       ${errore}
       <div class="cambio-campo-riga">
         <input class="swap-indirizzo" id="swapFattura_${n}" type="text" autocomplete="off"
-          spellcheck="false" placeholder="lnbc…" value="${esc(swapFattureScritte[n] || '')}">
+          spellcheck="false" placeholder="lnbc… / nome@wallet" value="${esc(swapFattureScritte[n] || '')}">
         <button class="cambio-ico" type="button" data-swap="incolla-fattura" data-ordine="${n}" aria-label="${esc(t.incolla)}" title="${esc(t.incolla)}">${swapIcona('incolla')}</button>
       </div>
     </div>`;
@@ -854,6 +859,10 @@ function swapFatturaScritta(n){
   if (campo) swapFattureScritte[n] = String(campo.value || '');
   return String(swapFattureScritte[n] || '').trim().replace(/^lightning:/i, '').trim();
 }
+/* un Lightning address (nome@dominio) e non una richiesta (11 nov 2026) */
+function swapEUnAddress(testo){
+  return /^[a-z0-9._+-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(String(testo || '').trim());
+}
 /* il no del giudice della richiesta, nelle parole dell'utente */
 function swapFatturaPerche(perche){
   const t = t3();
@@ -923,10 +932,29 @@ async function swapCreaDentro(n){
   const t = t3();
   const sub = swapStradaDi(n) === 'btc-ln';
   const indirizzo = sub ? '' : swapEstraiIndirizzo(swapIndirizziScritti[n]);
-  const fattura = sub ? swapFatturaScritta(n) : '';
+  let fattura = sub ? swapFatturaScritta(n) : '';
   const p = ((preventiviSwap[n] || {}).dati) || {};
   const fid = swapScelto(n), f = swapFornitore(fid);
   if (!f) { swapPassi[n] = 'preventivo'; return ridisegnaIncassoSwap(); }
+  /* (11 nov 2026, cantiere cifra-copia, Andrea: «si») UN LIGHTNING
+     ADDRESS AL POSTO DELLA RICHIESTA: la richiesta della cifra esatta la
+     chiede il server al wallet (`chiediFatturaCambioDaAddress` della
+     pagina, come gli incassi del mercatino), e da qui in giu' e' una
+     richiesta incollata come le altre: il giudice del fornitore la
+     rilegge (cifra, rete, scadenza), e nel campo resta lei */
+  if (sub && swapEUnAddress(fattura)) {
+    swapPassi[n] = 'creo';
+    ridisegnaIncassoSwap();
+    let d = null;
+    try { d = await chiediFatturaCambioDaAddress(fattura, swapCambioDovuto()); } catch(e){ d = null; }
+    if (!d || !d.fattura) {
+      swapPassi[n] = 'preventivo';
+      swapErrori[n] = (d && d.motivo) || t.addressNo;
+      return ridisegnaIncassoSwap();
+    }
+    fattura = String(d.fattura).trim();
+    swapFattureScritte[n] = fattura;
+  }
   if (sub) {
     const perche = !fattura ? 'manca' : (f.fatturaValida ? f.fatturaValida(fattura, swapCambioDovuto()) : 'fattura');
     if (perche) { swapPassi[n] = 'preventivo'; swapErrori[n] = perche === 'manca' ? t.fatturaManca : swapFatturaPerche(perche); return ridisegnaIncassoSwap(); }
