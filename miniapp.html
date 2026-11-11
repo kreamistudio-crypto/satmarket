@@ -58444,6 +58444,24 @@ function aggiornaCassettoWallet(){
   if (el('accOnchainIncasso'))
     el('accOnchainIncasso').style.display = ((myOnchain || swapAcceso() || swapAutoAcceso()) && !DEMO) ? '' : 'none';
 }
+/* A COSA SERVONO LE 12 PAROLE (11 nov 2026, Andrea: «si», al Cambio
+   aperto a tutti). La voce «₿ On-chain» la vede chi ha l'on-chain O il
+   Cambio, e a chi ha solo il Cambio la frase del 2-di-3 diceva una cosa
+   che per lui non e' vera: a lui le parole servono per firmare i suoi
+   cambi e per ritrovarli se uno resta a meta'. La frase dice il giusto
+   a seconda di quel che la persona ha. */
+function walletParoleACosaServono(){
+  const oc = !!myOnchain, cambio = swapAcceso();
+  const aCosa = oc && cambio
+    ? 'Servono a firmare la tua parte del deposito di garanzia on-chain e i tuoi cambi, e a ritrovare un cambio rimasto a metà'
+    : oc ? 'Servono solo a firmare la tua parte del deposito di garanzia on-chain'
+         : 'Servono a firmare i tuoi cambi e a ritrovare un cambio rimasto a metà, per riprenderti i sats';
+  const dove = oc ? 'I sats delle vendite e dei rimborsi' : 'I sats dei cambi';
+  return `${aCosa}, da questo o da un altro telefono. ${dove} non arrivano
+      qui: arrivano al wallet che scegli tu, che Barattolo non conosce.
+      <b>Non importarle in un altro wallet</b>, e non darle a nessuno,
+      nemmeno a noi.`;
+}
 async function renderWalletBarattolo(){
   const box = el('walletBarattolo'), sotto = el('walletParole');
   if (!box || !sotto || DEMO || !(myOnchain || swapAcceso())) return;
@@ -58459,11 +58477,7 @@ async function renderWalletBarattolo(){
     <div class="hint" id="walletCoda" style="margin-top:6px">${parole ? ''
       : 'Nasce da sola la prima volta che serve.'}</div></div>
     <div class="payout"><h4>Le 12 parole</h4>
-    <div class="hint">Servono solo a firmare la tua parte del deposito
-      di garanzia on-chain, da questo o da un altro telefono. I sats delle
-      vendite e dei rimborsi non arrivano qui: arrivano al wallet che
-      scegli tu, che Barattolo non conosce. <b>Non importarle in un altro
-      wallet</b>, e non darle a nessuno, nemmeno a noi.</div>
+    <div class="hint">${walletParoleACosaServono()}</div>
     ${walletParoleViste && parole
       ? `<ol class="swap-parole">${parole.split(' ').map(p => `<li>${esc(p)}</li>`).join('')}</ol>
          <button class="btn ghost" onclick="walletParoleViste=false;renderWalletBarattolo()">🙈 Nascondi</button>`

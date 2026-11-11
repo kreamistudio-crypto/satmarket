@@ -153505,6 +153505,26 @@ def prove_banco_chiavi_onchain():
            "box.innerHTML = `<div id=\"walletUnico\"></div>`;" in _wb,
            _wb.index("<h4>La tua chiave</h4>") < _wb.index("<h4>Le 12 parole</h4>"),
            _utente])
+    # (11 nov 2026, Andrea: «si») a cosa servono le 12 parole, detto a
+    # seconda di quel che la persona ha: solo il Cambio, solo l'on-chain, tutti e due
+    _aco = pezzo_js(mini, "function walletParoleACosaServono(){", "\n}\n") + "\n}\n"
+    _r_aco = _node_banco("let myOnchain = false, CAMBIO = false;\n"
+                         "const swapAcceso = () => CAMBIO;\n" + _aco +
+                         "const t = (oc, c) => { myOnchain = oc; CAMBIO = c; return walletParoleACosaServono(); };\n"
+                         "const solo = t(false, true), oc = t(true, false), tutti = t(true, true);\n"
+                         "console.log(JSON.stringify([solo.includes('i tuoi cambi') && !solo.includes('deposito di garanzia') && solo.includes('I sats dei cambi'),\n"
+                         "  oc.includes('Servono solo a firmare la tua parte del deposito di garanzia on-chain') && !oc.includes('cambi'),\n"
+                         "  tutti.includes('deposito di garanzia') && tutti.includes('i tuoi cambi'),\n"
+                         "  [solo, oc, tutti].every(x => x.includes('Non importarle in un altro wallet'))]));\n")
+    if _r_aco is None:
+        salta("a cosa servono le 12 parole", "node non c'e'")
+    else:
+        prova("(11 nov, Andrea) le 12 parole dicono a cosa servono a seconda di chi "
+              "legge: solo il Cambio (firmare e ritrovare i cambi), solo l'on-chain "
+              "(il 2-di-3), tutti e due; e sempre «non importarle»",
+              [True, True, True, True], _r_aco)
+        prova("...e il riquadro usa quella frase", True,
+              '<div class="hint">${walletParoleACosaServono()}</div>' in _wb)
     prova("«₿ On-chain» nel Profilo, col cancello dell'on-chain, del cambio o dello "
           "swap automatico e mai in DEMO, col campo dentro e la voce in «Completa il profilo»",
           [True, True, True, True],
