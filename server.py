@@ -22252,7 +22252,34 @@ def numeri_assistente() -> str:
         f"{si(swap_auto_per(0))}.",
         f"- Scambi P2P pagati in USDT: {si(p2p_usdt_ammesso(0))}.",
         f"- Scambi P2P in bitcoin on-chain: {si(p2p_onchain_ammesso(0))}.",
+        # (11 nov 2026, cantiere tappo-sa-tutto) chi ha un catalogo grande:
+        # Tappo rispondeva «solo uno alla volta». L'import da CSV non ha
+        # leva (sparisce solo in demo); il catalogo esterno ne ha due —
+        # il ponte acceso e la porta aperta a tutti — e a porta chiusa lo
+        # vedono solo i negozi gia' collegati e i moderatori
+        "- Import in blocco da CSV (Profilo → «📥 Importa in blocco»: il "
+        "modello CSV, una riga per annuncio, fino a 500 per volta, almeno "
+        "una foto per riga con un link o uno ZIP): disponibile.",
+        "- Collegare un negozio Shopify o WooCommerce (catalogo esterno, "
+        "nella stessa sezione): "
+        + ("SPENTO, oggi non disponibile" if not CONNETTORI_NEGOZIO_APERTI
+           else "disponibile" if CONNETTORI_NEGOZIO_PER_TUTTI else
+           "c'è, ma la sezione la vedono solo i negozi già collegati: per "
+           "collegarne uno nuovo si chiede allo staff")
+        + ".",
     ]
+    # LE ALTRE LEVE, DAL PANNELLO (11 nov 2026, cantiere tappo-sa-tutto,
+    # Andrea: «deve sapere tutto e deve rimanere sempre aggiornato»): le
+    # righe qui sopra sono scritte a mano e ogni funzione nuova restava
+    # fuori finche' qualcuno non se ne accorgeva (il .onion, i negozi
+    # collegati). Sotto vanno, DA SOLE, tutte le leve del pannello dello
+    # staff che non sono interne: una leva nuova nel pannello e' una riga
+    # nuova qui, senza che nessuno la scriva.
+    try:
+        righe += _numeri_dal_pannello()
+    except Exception as e:
+        print(f"⚠️ Numeri dal pannello non letti ({e}): vale il resto",
+              flush=True)
     return "\n".join(righe)
 
 
@@ -34921,6 +34948,79 @@ def _leve_stato():
                   spento="a 0 non risponde a nessuno"),
         ]},
     ]
+
+
+# I NUMERI DAL PANNELLO (11 nov 2026, cantiere tappo-sa-tutto): il
+# pannello «⚙️ Stato delle leve» e' gia' il censimento di TUTTE le leve,
+# e una leva nuova ci entra per regola. Per Tappo se ne prendono quelle
+# che un utente puo' sapere, con tre filtri che non si scrivono leva per
+# leva — o la prossima leva interna passerebbe da sola:
+#  - i GRUPPI interni interi (sicurezza, avvisi allo staff, l'assistente
+#    stesso, gli indirizzi di casa e di X);
+#  - le CHIAVI che dal nome sono interne: id, token, segreti, chiavi,
+#    npub, relay, URL, API, canali, xpub, referral, giudici e ronde;
+#  - i VALORI: solo si'/no e numeri (e le liste di numeri gia' rese dal
+#    pannello). Una stringa — un indirizzo, un nome di modello, una npub
+#    — non esce mai, qualunque sia la chiave.
+# Le note del pannello (scritte per lo staff) restano fuori. Un minuto di
+# memoria: il pannello legge due leve dal database, e Tappo lo chiede a
+# ogni domanda.
+_TAPPO_GRUPPI_INTERNI = ("🚦 Sicurezza", "🔔 Avvisi ai moderatori",
+                         "🤖 Assistente del bot", "🐦 Cassa di risonanza su X",
+                         "⚡ Indirizzo Lightning di casa",
+                         "🔄 Indirizzo della quota SATS Routing")
+_TAPPO_CHIAVE_INTERNA = re.compile(
+    r"(_IDS?$|_ID_|TOKEN|SEGRET|CHIAVE|_KEY|NPUB|RELAY|URL|API|CANALE|XPUB|"
+    r"REFERRAL|MACAROON|WEBHOOK|NIP05|MODELLO|MEMPOOL|FORNITORI|GUARDIA|"
+    r"GUARDIANO|CONTROLLO_|RICONCILIA|RONDA|COLLAUDO|PROVA|DISPUTE_ESCLUSE|"
+    r"ERRORI_MAX|AVVISI_ORDINI_ADMIN|RETE$)")
+_TAPPO_VALORE_LISTA = re.compile(r"[0-9 ·.,%€\-]{1,80}")
+_TAPPO_PANNELLO = {"quando": 0.0, "righe": []}
+
+
+def _righe_pannello_per_tappo(gruppi) -> list:
+    """Dal censimento alle righe per Tappo, coi tre filtri. Pura: le
+    prove la fanno girare su un pannello finto."""
+    righe = []
+    for g in gruppi or []:
+        nome_g = str(g.get("gruppo", ""))
+        if nome_g in _TAPPO_GRUPPI_INTERNI:
+            continue
+        for v in g.get("voci", []) or []:
+            chiave = str(v.get("chiave", ""))
+            val = v.get("valore")
+            if not chiave or _TAPPO_CHIAVE_INTERNA.search(chiave):
+                continue
+            if isinstance(val, bool):
+                resa = "accesa" if val else "spenta"
+            elif isinstance(val, int):
+                resa = str(val)
+            elif isinstance(val, float):
+                resa = f"{val:g}"
+            elif (isinstance(val, str)
+                  and _TAPPO_VALORE_LISTA.fullmatch(val.strip() or "x")):
+                resa = val.strip()
+            else:
+                continue
+            righe.append(f"- {nome_g} · {v.get('nome', chiave)}: {resa}")
+    if righe:
+        righe.insert(0, "LE REGOLAZIONI DEL PANNELLO, una per leva (valori "
+                        "del config di oggi: una funzione «accesa» qui può "
+                        "essere ancora riservata allo staff se nello stesso "
+                        "gruppo è accesa una riga «solo admin» o «solo i "
+                        "moderatori»; per le funzioni principali valgono "
+                        "le righe di sopra, viste con gli occhi di "
+                        "chiunque):")
+    return righe
+
+
+def _numeri_dal_pannello() -> list:
+    """Le righe del pannello per Tappo, con un minuto di memoria."""
+    adesso = time.time()
+    if adesso - _TAPPO_PANNELLO["quando"] > 60:
+        _TAPPO_PANNELLO.update(quando=adesso,
+                               righe=_righe_pannello_per_tappo(_leve_stato()))
+    return list(_TAPPO_PANNELLO["righe"])
 
 
 @app.get("/api/admin/leve")

@@ -187709,6 +187709,7 @@ def _banco_assistente(**leve):
            "ORE_SILENZIO_DIGITALE": 48, "P2P_MAX_EURO": 250,
            "P2P_CONTANTI_MAX_EURO": 250, "ASTA_ABILITATA": True,
            "MERCATO_LAVORO": False, "ASSISTENZA_ATTIVA": False,
+           "CONNETTORI_NEGOZIO_APERTI": False, "CONNETTORI_NEGOZIO_PER_TUTTI": False,
            "_p2p_leve": lambda: {"attivo": True}}
     CHI_GUARDA = []
     for nome in ("cambio_libero_per", "swap_per", "onchain_ammesso",
@@ -188024,6 +188025,56 @@ def prove_assistente_bot():
           {"swap_auto_per", "p2p_usdt_ammesso", "p2p_onchain_ammesso"},
           {n for n, _ in CHI_GUARDA} & {"swap_auto_per", "p2p_usdt_ammesso",
                                         "p2p_onchain_ammesso"})
+    # (11 nov 2026, cantiere tappo-sa-tutto) i cataloghi grandi: Tappo
+    # rispondeva «uno alla volta» con l'import da CSV e i negozi
+    # collegati gia' aperti a tutti
+    prova("l'import in blocco da CSV c'e' sempre, col suo posto e il tetto",
+          True, "«📥 Importa in blocco»" in n0 and "fino a 500" in n0)
+    prova("...il catalogo esterno a ponte spento si dice spento", True,
+          "Shopify o WooCommerce (catalogo esterno, nella stessa sezione): "
+          "SPENTO" in n0)
+    amb["CONNETTORI_NEGOZIO_APERTI"] = True
+    prova("...a ponte acceso ma porta chiusa: si chiede allo staff", True,
+          "si chiede allo staff" in amb["numeri_assistente"]())
+    amb["CONNETTORI_NEGOZIO_PER_TUTTI"] = True
+    prova("...e con la porta aperta a tutti e' disponibile", True,
+          "nella stessa sezione): disponibile" in amb["numeri_assistente"]())
+    # LE ALTRE LEVE ARRIVANO DA SOLE DAL PANNELLO: nessuna riga a mano, e
+    # un pannello che non si legge non ferma i numeri
+    na = codice(pezzo("numeri_assistente"))
+    prova("i numeri prendono il resto dal pannello, e un errore non li ferma",
+          True, "righe += _numeri_dal_pannello()" in na
+          and na.index("try:") < na.index("righe += _numeri_dal_pannello()")
+          and "except Exception" in na)
+    prova("...e il pannello e' quello dello staff, letto intero", True,
+          "_righe_pannello_per_tappo(_leve_stato())"
+          in codice(pezzo("_numeri_dal_pannello")))
+    i = _SORGENTE.index("_TAPPO_GRUPPI_INTERNI = (")
+    j = _SORGENTE.index("def _numeri_dal_pannello(")
+    tp = {"re": re}
+    exec(_SORGENTE[i:j], tp)
+    finto = [
+        {"gruppo": "🚦 Sicurezza", "voci": [
+            {"nome": "Modalità collaudo", "chiave": "MODALITA_COLLAUDO", "valore": False}]},
+        {"gruppo": "🆕 Una funzione nata domani", "voci": [
+            {"nome": "La cosa nuova", "chiave": "COSA_NUOVA_ATTIVA", "valore": True},
+            {"nome": "Quante al giorno", "chiave": "COSA_NUOVA_MAX", "valore": 12},
+            {"nome": "Durate (giorni)", "chiave": "COSA_NUOVA_DURATE", "valore": "1 · 3 · 7"},
+            {"nome": "Il suo indirizzo", "chiave": "COSA_NUOVA_INDIRIZZO", "valore": "https://x.y"},
+            {"nome": "Chi la prova", "chiave": "COSA_NUOVA_PROVA_IDS", "valore": "123 · 456"},
+            {"nome": "La sua chiave", "chiave": "COSA_NUOVA_API_KEY", "valore": True},
+            {"nome": "Moderatori", "chiave": "ADMIN_IDS", "valore": "1879103467"}],
+         }]
+    rp = "\n".join(tp["_righe_pannello_per_tappo"](finto))
+    prova("una leva NUOVA nel pannello arriva a Tappo da sola: si'/no, numeri, liste di numeri",
+          [True, True, True], ["La cosa nuova: accesa" in rp,
+                               "Quante al giorno: 12" in rp,
+                               "Durate (giorni): 1 · 3 · 7" in rp])
+    prova("...ma mai un gruppo interno, un indirizzo, degli id, una chiave",
+          [False] * 5, ["collaudo" in rp, "https://" in rp, "123" in rp,
+                        "La sua chiave" in rp, "1879103467" in rp])
+    prova("...e le righe dicono che «accesa» puo' voler dire ancora solo lo staff",
+          True, rp.startswith("LE REGOLAZIONI DEL PANNELLO") and "solo admin" in rp)
     amb["ASSISTENZA_ATTIVA"] = True
     prova("...e l'assistenza accesa si dice disponibile", True,
           "«💬 Assistenza», la chat con lo staff dentro Barattolo): "

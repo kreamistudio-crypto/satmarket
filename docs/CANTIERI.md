@@ -79417,3 +79417,46 @@ d'accesso di uvicorn nel journal del VPS portano con ogni probabilità
 l'IP; spegnerle renderebbe vero «non conserviamo il tuo IP». Non
 toccato: è il servizio sul VPS.
 
+## Tappo sa tutto e si aggiorna da solo: le leve dal pannello, l'import da CSV e i negozi collegati nei numeri di oggi (11 nov 2026, cantiere tappo-sa-tutto, Andrea: «deve sapere tutto e deve rimanere sempre aggiornato»)
+
+PERCHÉ. In una sera Tappo ha sbagliato tre volte per lo stesso motivo:
+non sapeva il sito .onion, non sapeva cosa diciamo dell'IP, e a chi
+chiedeva di caricare un catalogo ecommerce ha risposto «uno alla
+volta», con l'import da CSV (Profilo → «📥 Importa in blocco») e il
+collegamento Shopify/WooCommerce già aperti a tutti (parola di Andrea).
+La radice: il libro è un riassunto a mano e i numeri di oggi erano
+quattordici righe a mano. Ogni funzione nuova restava fuori finché
+qualcuno non se ne accorgeva.
+
+COSA. Tre fonti che si aggiornano da sole:
+1. LE SCHERMATE (n8n, fuori dal repo): Tappo legge da main il testo di
+   tutte le schermate di `miniapp.html` (bottoni compresi, commenti del
+   codice no), riletto al più ogni quindici minuti: ogni promozione
+   arriva a Tappo da sola.
+2. LE LEVE DAL PANNELLO: `numeri_assistente()` aggiunge in coda
+   `_numeri_dal_pannello()`, cioè tutto il censimento di `_leve_stato()`
+   tranne l'interno, con tre filtri che non si scrivono leva per leva:
+   i gruppi interni interi (sicurezza, avvisi allo staff, l'assistente,
+   gli indirizzi di casa e di X), le chiavi interne dal nome (id,
+   token, segreti, chiavi, npub, relay, URL, API, canali, xpub,
+   referral, ronde, prove) e i valori (solo sì/no, numeri e liste di
+   numeri: una stringa non esce mai). Un minuto di memoria, e un errore
+   del pannello non ferma i numeri.
+3. Le righe a mano restano per le funzioni principali viste con gli
+   occhi di chiunque (tg 0), più due nuove: l'import da CSV (sempre,
+   col tetto di 500 e la regola della foto) e il catalogo esterno a tre
+   stati (ponte spento; porta aperta a tutti; «chiedi allo staff»). Un
+   paragrafo nel libro, sezione «Vendere».
+
+SCARTATO. Le note del pannello (scritte per lo staff, con nomi del
+config); la guida P2P passo passo come fonte fissa (137 KB a domanda:
+la schermata «Lo scambio P2P» dice già le stesse cose); un elenco a
+mano delle leve «pubbliche» (è il difetto che si voleva togliere).
+
+PROVATO. `prove_assistente_bot`, sezione 10: l'import c'è sempre, il
+catalogo esterno nei tre stati, i numeri chiamano il pannello dentro
+un `try`, e su un pannello finto una leva nata domani arriva da sola
+(sì/no, numero, lista) mentre gruppo interno, indirizzo, id e chiave
+restano fuori. Suite severa 27304/0. Resa vera sul config d'esempio:
+circa 170 righe, nessun valore interno.
+
