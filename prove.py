@@ -186080,6 +186080,165 @@ async function rotta(hexTx){
 """
 
 
+def prove_volume_cambio():
+    """IL VOLUME DEL CAMBIO NEL PANNELLO (11 nov 2026, cantiere
+    volume-cambio). Andrea: «metti una sezione dove vediamo quanto volume
+    gli utenti hanno scambiato nella sezione cambio». Il biglietto dice
+    solo che lo swap e' NATO: la ronda degli esiti chiede al fornitore come
+    e' finito, e la card conta i FATTI, coi sats dal lato Lightning, per
+    7 giorni, 30 giorni e da sempre, e per direzione."""
+    print("\n[il volume del Cambio nel pannello]")
+    import sqlite3 as _sq, tempfile as _tf, asyncio
+    src = _SORGENTE.replace("\r\n", "\n")
+    admin = open("admin.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- l'esito: puro
+    amb = {}
+    exec("\n".join(l for l in src[src.index("CAMBIO_ESITI_FATTI = {"):
+                                   src.index("def cambio_esito_di(")].splitlines()), amb)
+    exec(pezzo("cambio_esito_di"), amb)
+    esito = amb["cambio_esito_di"]
+    prova("Lightning → bitcoin e' fatto solo quando il fornitore incassa la "
+          "fattura (dopo il ritiro dei bitcoin)",
+          ["fatto", "", "", "", "non_andato", "non_andato"],
+          [esito("ln-btc", s) for s in ("invoice.settled", "swap.created",
+                                         "transaction.mempool", "transaction.confirmed",
+                                         "swap.expired", "transaction.refunded")])
+    prova("bitcoin → Lightning e' fatto quando la fattura dell'utente e' "
+          "pagata; i bitcoin mai arrivati o non pagabili non sono andati",
+          ["fatto", "fatto", "fatto", "", "", "non_andato", "non_andato", "non_andato"],
+          [esito("btc-ln", s) for s in ("invoice.paid", "transaction.claim.pending",
+                                         "transaction.claimed", "invoice.set",
+                                         "transaction.mempool", "invoice.failedToPay",
+                                         "transaction.lockupFailed", "swap.sconosciuto")])
+    prova("...e «invoice.settled» non vale come fatto sulla strada rovesciata, "
+          "ne' «invoice.paid» su quella dritta", ("", ""),
+          (esito("btc-ln", "invoice.settled"), esito("ln-btc", "invoice.paid")))
+
+    # --- un database finto: la ronda e la card
+    cartella = _tf.mkdtemp()
+    percorso = os.path.join(cartella, "cambi.db")
+
+    def apri():
+        con = _sq.connect(percorso)
+        con.row_factory = _sq.Row
+        amb["_cambi_prepara"](con)
+        return con
+    amb.update({"sqlite3": _sq, "time": time, "_cambi_db": apri,
+                "CAMBIO_LIBERO_ATTIVO": True})
+    for k in ("CAMBIO_ESITO_OGNI_S", "CAMBIO_ESITO_GUARDA_S", "CAMBIO_ESITO_PER_GIRO",
+              "CAMBIO_PERIODI"):
+        exec(src[src.index(f"{k} = "):].split("\n\n")[0], amb)
+    for nome in ("_cambi_prepara", "dati_cambi_cruscotto"):
+        exec(pezzo(nome), amb)
+    exec("async " + pezzo("ronda_esiti_cambi"), amb)
+    ora = 1_800_000_000
+    giorno = 86400
+    righe = [  # tg, direzione, sats, stato, swap_id, eta' in giorni, stato del fornitore
+        (1, "ln-btc", 100_000, "nato", "aaaaaaaaaaaa", 0.1, "invoice.settled"),
+        (1, "ln-btc", 50_000, "nato", "bbbbbbbbbbbb", 0.2, "swap.expired"),
+        (2, "ln-btc", 30_000, "nato", "cccccccccccc", 0.3, "transaction.mempool"),
+        (2, "btc-ln", 80_000, "nato", "dddddddddddd", 0.4, "invoice.paid"),
+        (3, "btc-ln", 60_000, "nato", "eeeeeeeeeeee", 0.5, None),  # fornitore muto
+        (4, "ln-btc", 40_000, "chiesto", "", 0.1, None),
+        (5, "ln-btc", 70_000, "annullato", "", 0.1, None),
+        (6, "ln-btc", 200_000, "nato", "ffffffffffff", 10, None),  # vecchio: gia' fatto
+        (7, "btc-ln", 300_000, "nato", "gggggggggggg", 40, None),  # vecchissimo
+    ]
+    con = apri()
+    for tg, d, sats, st, sid, eta, _ in righe:
+        con.execute("INSERT INTO cambi_liberi(tg_id,direzione,sats,fornitore,swap_id,"
+                    "stato,creato,aggiornato) VALUES(?,?,?,?,?,?,?,?)",
+                    (tg, d, sats, "satsrouting", sid, st, int(ora - eta * giorno), ora))
+    con.execute("UPDATE cambi_liberi SET esito='fatto' WHERE swap_id IN "
+                "('ffffffffffff','gggggggggggg')")
+    con.commit(); con.close()
+    stati = {sid: f for _, _, _, _, sid, _, f in righe}
+    chiesti = []
+
+    async def finto_stato(f, sid):
+        chiesti.append(sid)
+        return stati.get(sid)
+    amb["swap_stato_di"] = finto_stato
+    amb["swap_fornitore"] = lambda chi: {"id": chi, "api": "https://x.example"}
+    scritti = asyncio.run(amb["ronda_esiti_cambi"](ora))
+    prova("la ronda chiede solo dei cambi nati, recenti e senza esito, e "
+          "scrive i finiti", (3, ["aaaaaaaaaaaa", "bbbbbbbbbbbb", "cccccccccccc",
+                                  "dddddddddddd", "eeeeeeeeeeee"]),
+          (scritti, sorted(chiesti)))
+    chiesti.clear()
+    prova("...e dieci minuti dopo non richiede subito: aspetta il suo turno",
+          (0, []), (asyncio.run(amb["ronda_esiti_cambi"](ora + 60)), chiesti))
+    asyncio.run(amb["ronda_esiti_cambi"](ora + 601))
+    prova("...poi richiede solo quelli ancora in corso",
+          ["cccccccccccc", "eeeeeeeeeeee"], sorted(chiesti))
+
+    c = amb["dati_cambi_cruscotto"](ora)
+    p7, p30, sempre = c["periodi"]
+    prova("i periodi: 7 giorni, 30 giorni, da sempre", ["7 giorni", "30 giorni", "da sempre"],
+          [p["nome"] for p in c["periodi"]])
+    prova("in 7 giorni: un fatto per strada, coi sats del lato Lightning",
+          ((1, 100_000, 1, 1, 1), (1, 80_000, 1, 1, 0), 180_000, 2, 2),
+          (tuple(p7["strade"][0][k] for k in ("fatti", "sats", "persone", "in_corso", "non_andati")),
+           tuple(p7["strade"][1][k] for k in ("fatti", "sats", "persone", "in_corso", "non_andati")),
+           p7["sats"], p7["fatti"], p7["persone"]))
+    prova("chiesti e annullati non contano mai: da sempre, per strada, "
+          "fatti + in corso + non andati = i soli nati", ([4, 3], 680_000),
+          ([x["fatti"] + x["in_corso"] + x["non_andati"] for x in sempre["strade"]],
+           sempre["sats"]))
+    prova("30 giorni prende il cambio di dieci giorni fa, da sempre anche quello "
+          "di quaranta", ((380_000, 3, 3), (680_000, 4, 4)),
+          ((p30["sats"], p30["fatti"], p30["persone"]),
+           (sempre["sats"], sempre["fatti"], sempre["persone"])))
+    prova("nella card solo numeri: niente utenti, indirizzi o swap", 0,
+          sum(str(c).count(k) for k in ("tg_id", "indirizzo", "swap_id", "aaaaaaaa")))
+    amb["CAMBIO_LIBERO_ATTIVO"] = False
+    prova("a Cambio spento i numeri restano, se c'e' stato qualche cambio", False,
+          amb["dati_cambi_cruscotto"](ora) is None)
+    os.remove(percorso)
+    prova("...e senza nessun cambio e a Cambio spento la card non c'e'", None,
+          amb["dati_cambi_cruscotto"](ora))
+    amb["CAMBIO_LIBERO_ATTIVO"] = True
+    prova("...a Cambio acceso c'e' anche vuota (zero)", (True, 0),
+          (amb["dati_cambi_cruscotto"](ora) is not None,
+           amb["dati_cambi_cruscotto"](ora)["periodi"][2]["sats"]))
+
+    # controprova: una card che contasse i biglietti nati, senza l'esito,
+    # gonfierebbe il volume coi cambi mai pagati — la prova sopra se ne
+    # accorgerebbe
+    os.remove(percorso)
+    con = apri()
+    for tg, d, sats, st, sid, eta, _ in righe:
+        con.execute("INSERT INTO cambi_liberi(tg_id,direzione,sats,fornitore,swap_id,"
+                    "stato,creato,aggiornato) VALUES(?,?,?,?,?,?,?,?)",
+                    (tg, d, sats, "satsrouting", sid, st, int(ora - eta * giorno), ora))
+    con.commit(); con.close()
+    rotta = dict(amb)
+    exec(pezzo("dati_cambi_cruscotto").replace("AND esito='fatto' AND", "AND"), rotta)
+    prova("controprova: senza l'esito il volume si gonfia (e la prova lo vede)", True,
+          rotta["dati_cambi_cruscotto"](ora)["periodi"][0]["sats"] != 180_000)
+    os.remove(percorso)
+
+    # --- i fili: il pannello, la ronda nell'orologio, la card
+    prova("il cruscotto porta la card, e l'orologio dei cambi gira la ronda",
+          (1, 1), (codice(pezzo("cruscotto_admin")).count('"cambi": dati_cambi_cruscotto()'),
+                   codice(pezzo("orologio_cambi_p2p")).count("await ronda_esiti_cambi()")))
+    prova("la ronda chiede al fornitore col solo numero dello swap", (1, 0, 0),
+          (codice(pezzo("ronda_esiti_cambi")).count("await swap_stato_di(f, r[\"swap_id\"])"),
+           codice(pezzo("ronda_esiti_cambi")).count("tg_id"),
+           codice(pezzo("ronda_esiti_cambi")).count("indirizzo")))
+    card = pezzo_js(admin, "function cardCambi(", "\n}\n")
+    prova("la pagina disegna la card «🔁 Volume del Cambio» dentro la sua tendina",
+          (True, True, True),
+          ("${cardCambi(D.cambi, D.eur_per_btc)}" in admin,
+           '<summary>🔁 Volume del Cambio</summary>' in admin,
+           "if (!C) return '';" in card))
+    prova("...e dice cosa conta: i finiti bene secondo SATS Routing, sats dal "
+          "lato Lightning, in corso e non andati", (True, True, True),
+          ("finiti bene" in card, "dal lato Lightning" in card,
+           "in corso" in card and "non andati" in card))
+
+
 def prove_cambio_libero():
     """IL CAMBIO LIBERO, TAPPA 2 (27 ott 2026, cantiere cambio-libero, piano
     approvato da Andrea): dalla pagina «Cambio» si cambiano i PROPRI sats
@@ -189059,7 +189218,7 @@ CATEGORIE = {
     """.split(),
     "swap": """
     swap_cella swap_preventivo swap_telefono swap_fornitori
-    swap_pagamento grafica_swap cartone_submarine cambio_libero
+    swap_pagamento grafica_swap cartone_submarine cambio_libero volume_cambio
     margine_cassaforte indirizzo_swap
     swap_auto swap_auto_scalini swap_auto_schermate swap_auto_tasto
     onchain_verso_lightning parole_uniche
@@ -189690,7 +189849,7 @@ def main():
               prove_swap_auto_scalini,
               # prove_swap_auto_ritiro gira nei collaudi (collaudo_swap_auto_ritiro):
               # vuole httpx, che la CI installa solo DOPO le prove (2 nov 2026)
-              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,
+              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_volume_cambio, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,
               prove_margine_cassaforte,
               prove_quantita_servizi,
               prove_sintassi_client,

@@ -484,6 +484,10 @@ function disegna(){
   ${cardSwap(D.swap)}
   </div></details>` : ''}
 
+  ${D.cambi ? `<details class="grp" id="altroCambi"><summary>🔁 Volume del Cambio</summary><div class="grp-b">
+  ${cardCambi(D.cambi, D.eur_per_btc)}
+  </div></details>` : ''}
+
   ${D.dispute_p2p ? `<details class="grp" id="altroDispute"><summary>⚖️ Dispute P2P</summary><div class="grp-b">
   ${cardDisputeP2P(D.dispute_p2p)}
   </div></details>` : ''}`;
@@ -772,6 +776,34 @@ function cardSwap(S){
     </div>
     <div class="tab">${tabella(['Quando', 'Sats', 'Messaggio'], (S.ultimi || []).map(u => [data(u.pagato_il), fmt(u.sats), esc(u.commento || '')]), [1])}</div>
     <div class="nota">Gli ultimi venti. Non sono zap e non sono garanzie: i sats si spostano a mano dal pannello di LNbits (wallet «swap»).</div>
+  </div>`;
+}
+
+/* ---- IL VOLUME DEL CAMBIO (11 nov 2026, cantiere volume-cambio) ----
+   Quanto hanno cambiato gli utenti nella pagina «Cambio»: per periodo, i
+   cambi FATTI come li dice SATS Routing (la ronda degli esiti), quanti
+   sats dal lato Lightning e quante persone diverse; per direzione, e
+   accanto quanti sono ancora in corso e quanti non sono andati (fattura
+   mai pagata, scaduti). `C` nullo = Cambio spento e nessun cambio: niente
+   card. Solo numeri, niente nomi e niente indirizzi. */
+function cardCambi(C, eurBtc){
+  if (!C) return '';
+  const eur = s => eurBtc > 0 && s ? `<div class="sub">≈ € ${fmtd(s / 1e8 * eurBtc, 0)}</div>` : '';
+  const strada = x => `${fmt(x.fatti)} · ${fmt(x.sats)} sats`
+    + (x.in_corso || x.non_andati ? `<div class="sub">${x.in_corso ? fmt(x.in_corso) + ' in corso' : ''}${x.in_corso && x.non_andati ? ' · ' : ''}${x.non_andati ? fmt(x.non_andati) + ' non andati' : ''}</div>` : '');
+  const righe = (C.periodi || []).map(p => {
+    const [lb, bl] = p.strade || [{}, {}];
+    return [esc(p.nome), `${fmt(p.fatti)}<div class="sub">${fmt(p.persone)} ${p.persone === 1 ? 'persona' : 'persone'}</div>`,
+      `${fmt(p.sats)}${eur(p.sats)}`, strada(lb), strada(bl)];
+  });
+  const sempre = (C.periodi || []).find(p => p.nome === 'da sempre') || {fatti: 0, sats: 0, persone: 0};
+  return `<div class="card"><h2>🔁 Volume del Cambio</h2>
+    <div class="tiles">
+      <div class="tile"><div class="k">Cambiati da sempre</div><div class="v">${fmt(sempre.sats)} sats</div><div class="d">${fmt(sempre.fatti)} ${sempre.fatti === 1 ? 'cambio fatto' : 'cambi fatti'}, ${fmt(sempre.persone)} ${sempre.persone === 1 ? 'persona' : 'persone'}</div></div>
+      <div class="tile"><div class="k">Pagina Cambio</div><div class="v" style="font-size:15px">${C.attivo ? 'accesa' : 'spenta'}</div><div class="d">i numeri restano anche da spenta</div></div>
+    </div>
+    <div class="tab">${tabella(['Periodo', 'Fatti', 'Sats', '⚡→₿', '₿→⚡'], righe, [1, 2])}</div>
+    <div class="nota">Contano i cambi che SATS Routing dice finiti bene: Lightning → bitcoin quando i bitcoin sono stati ritirati, bitcoin → Lightning quando la fattura dell'utente è stata pagata. I sats sono quelli dal lato Lightning. «In corso» sono i cambi di cui il servizio non ha ancora detto l'esito (si chiede ogni dieci minuti, per tre giorni); «non andati» sono fatture mai pagate o cambi scaduti.</div>
   </div>`;
 }
 

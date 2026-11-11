@@ -79693,3 +79693,50 @@ rimborsi». «Non importarle in un altro wallet» resta in tutte e tre.
 
 PROVATO. `prove_banco_chiavi_onchain` (+2: le tre frasi in node, il
 riquadro che la usa).
+
+## Il volume del Cambio nel pannello (11 nov 2026, cantiere volume-cambio, Andrea: «metti una sezione dove vediamo quanto volume gli utenti hanno scambiato nella sezione cambio»)
+
+PERCHÉ. Il Cambio si è aperto a tutti lo stesso giorno, e nel pannello
+non c'era niente: il server si segnava i biglietti (`cambi_liberi`) solo
+per contare i 5 al giorno, e la card «🔄 Quota SATS Routing» dice cosa è
+ARRIVATO su swap@, non quanto si è cambiato.
+
+COSA. Una tendina «🔁 Volume del Cambio» in `/admin` (`cardCambi`, dati da
+`dati_cambi_cruscotto` dentro `cruscotto_admin`): per 7 giorni, 30 giorni
+e da sempre, i cambi FATTI, i sats, le persone diverse, e per direzione
+(⚡→₿, ₿→⚡) anche quanti sono in corso e quanti non sono andati; in
+euro al cambio di adesso. Solo numeri: niente nomi, indirizzi o swap. La
+card c'è a Cambio acceso, e a Cambio spento se c'è stato almeno un cambio.
+
+IL NODO: NATO NON VUOL DIRE FATTO. Il biglietto passa a «nato» quando lo
+swap esiste presso il fornitore, ma la fattura la paga l'utente col suo
+wallet: chi chiude la pagina davanti alla fattura resta «nato» per
+sempre. Contare i biglietti avrebbe gonfiato il volume. Per questo LA
+RONDA DEGLI ESITI (`ronda_esiti_cambi`, nell'orologio dei cambi P2P, ogni
+due minuti) chiede a SATS Routing lo stato di ogni cambio nato negli
+ultimi tre giorni e senza esito, uno ogni dieci minuti, al più venti per
+giro, col solo numero dello swap (`swap_stato_di`), e scrive `esito`
+(«fatto», «non_andato») ed `esito_visto` nella riga: due colonne nuove,
+aggiunte con ALTER. Fatto: ⚡→₿ a «invoice.settled» (il fornitore incassa
+solo dopo il ritiro dei bitcoin), ₿→⚡ a «invoice.paid» e seguenti. Non
+andato: scaduti, fatture mai pagate, lockup falliti, swap sconosciuti. I
+sats sono la cifra del biglietto, cioè il lato Lightning (chi manda per
+⚡→₿, chi riceve per ₿→⚡).
+
+SCARTATI. Chiedere gli esiti all'apertura del pannello (lento, e senza
+pannello aperto i cambi finiti scadrebbero dalla vista del fornitore).
+Mettere nella stessa card i cambi del P2P (`cambi_p2p`) e gli incassi
+on-chain dei venditori (`swap_pagamenti`): Andrea ha chiesto la pagina
+Cambio; restano una riga di proposta. Il dovuto a SATS Routing (la quota
+partner): lo calcolano loro sulla commissione finale.
+
+PROVATO. `prove_volume_cambio`: gli esiti per le due strade (anche gli
+stati scambiati di strada), la ronda su un database finto (chiede solo
+dei nati recenti senza esito, aspetta i dieci minuti, poi solo gli in
+corso), la card (periodi, sats dal lato Lightning, chiesti e annullati
+mai contati, niente dati personali, spenta e vuota), i fili (cruscotto,
+orologio, pagina). Controprove: una card senza il filtro dell'esito si
+gonfia; «transaction.mempool» contato come fatto fa 6 prove rosse. DA
+GUARDARE: il primo esito vero in produzione (i cambi nati prima del
+deploy hanno più di tre giorni solo se vecchi: quelli di oggi la ronda li
+guarda da sé).
