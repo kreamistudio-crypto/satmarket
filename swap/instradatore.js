@@ -52,7 +52,7 @@
    linguaSwap, pagaSwapAlServer, statoPagamentoSwap, chiediBigliettoCambio,
    natoCambioAlServer, liberaBigliettoCambio, disegnaQr, portaWallet,
    leggiBolt11, leggiPreventivoCambioP2P, chiediBigliettoCambioP2P,
-   natoCambioP2PAlServer, liberaBigliettoCambioP2P. */
+   natoCambioP2PAlServer, liberaBigliettoCambioP2P, cifraSatsCopiabile. */
 
 /* ─── 1. LE STRADE E I FORNITORI ────────────────────────────────────── */
 /* la sola strada di oggi: i sats dell'incasso, ricevuti in bitcoin on-chain */
@@ -634,7 +634,7 @@ function campoFatturaSwap(n, errore){
   const t = t3();
   return `<div class="swap-campo">
       <label class="cambio-campo-et" for="swapFattura_${n}">${esc(t.fatturaTit)}</label>
-      <div class="hint" id="swapFatturaSpiega_${n}">${esc(swapCambioSpiega(swapCambioDovuto()))}</div>
+      <div class="hint" id="swapFatturaSpiega_${n}">${swapCambioSpiegaHtml(swapCambioDovuto())}</div>
       ${errore}
       <div class="cambio-campo-riga">
         <input class="swap-indirizzo" id="swapFattura_${n}" type="text" autocomplete="off"
@@ -1733,7 +1733,7 @@ function swapCambioPezzi(){
     pronto: pronto,
     euroMandi: swapCambioLato === 'mandi' ? euroMio : euroAltra,
     euroRicevi: swapCambioLato === 'mandi' ? euroAltra : euroMio,
-    spiega: sub ? swapCambioSpiega(dovuto) : ''};
+    spiega: sub ? swapCambioSpiegaHtml(dovuto) : ''};
 }
 /* IL CONTROVALORE IN EURO (28 ott 2026, cantiere cambio-euro, Andrea:
    «voglio vedere il controvalore in euro sotto alla cifra in sats o btc
@@ -1748,10 +1748,15 @@ function euroSwap(sats){
   return `≈ ${fmtEur(n * eurPerSat)} €`;
 }
 /* la frase della richiesta Lightning resta in sats (i wallet chiedono
-   quelli), coi BTC accanto se si e' scelto BTC */
-function swapCambioSpiega(dovuto){
-  const t = t3();
-  return t.fatturaSpiega(dovuto ? fmt(dovuto) : '…', dovuto && swapCambioUnita === 'btc' ? swapCambioNum(dovuto) : '');
+   quelli), coi BTC accanto se si e' scelto BTC. Dall'11 nov 2026
+   (cantiere cifra-copia) e' HTML: la cifra si tocca e va negli appunti
+   (`cifraSatsCopiabile` della pagina). La frase si scappa intera e la
+   cifra entra al posto di un segno che `esc` lascia stare. */
+function swapCambioSpiegaHtml(dovuto){
+  const t = t3(), segno = '\u0001';
+  const frase = esc(t.fatturaSpiega(dovuto ? segno : '…', dovuto && swapCambioUnita === 'btc' ? swapCambioNum(dovuto) : ''));
+  if (!dovuto) return frase;
+  return frase.replace(segno, typeof cifraSatsCopiabile === 'function' ? cifraSatsCopiabile(dovuto) : fmt(dovuto));
 }
 /* (28 ott 2026, cantiere euro-ordine, Andrea: «affianco al toggle btc
    sats aggiungi anche un piccolo tasto ... con la scritta "onion"») il
@@ -1806,7 +1811,7 @@ function renderSwapCambio(){
     if (avviso.innerHTML !== pz.avviso) avviso.innerHTML = pz.avviso;
     vai.disabled = !pz.pronto;
     const spiega = el('swapFatturaSpiega_0');
-    if (spiega && sub) spiega.textContent = pz.spiega;
+    if (spiega && sub) spiega.innerHTML = pz.spiega;
     const em = el('swapCambioEuroMandi'), er = el('swapCambioEuroRicevi');
     if (em) em.textContent = pz.euroMandi;
     if (er) er.textContent = pz.euroRicevi;

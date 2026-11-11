@@ -19242,7 +19242,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '75db41ddd3';
+const SWAP_TELEFONO_VER = '1ff4502a1c';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -59801,6 +59801,23 @@ function rigaCifraBtc(sats){
 function copiaCifraBtc(sats){
   haptic();
   copiaLink(satsInBtc(sats, true), '📋 Copiato: ' + satsInBtc(sats, true) + ' BTC');
+}
+/* LA CIFRA IN SATS DA COPIARE (11 nov 2026, cantiere cifra-copia, Andrea:
+   «se la cifra esatta fosse cliccabile e si copiasse nella clipboard del
+   telefono sarebbe estremamente user friendly»): la cifra esatta della
+   richiesta Lightning del Cambio. Lo stesso bottoncino della cifra in
+   BTC; a schermo con lo spazio delle migliaia, negli appunti il numero
+   nudo, come lo vuole il campo «importo» dei wallet. */
+function cifraSatsCopiabile(sats){
+  const n = Math.max(0, Math.round(Number(sats) || 0));
+  return '<button type="button" class="cifra-btc" onclick="copiaCifraSats(' + n + ')"'
+    + ' title="Tocca per copiare" aria-label="Copia la cifra: ' + fmt(n) + ' sats">'
+    + fmt(n) + ' <span aria-hidden="true">📋</span></button>';
+}
+function copiaCifraSats(sats){
+  const n = Math.max(0, Math.round(Number(sats) || 0));
+  haptic();
+  copiaLink(String(n), '📋 Copiato: ' + fmt(n) + ' sats');
 }
 
 function onchainUriPagamento(o){

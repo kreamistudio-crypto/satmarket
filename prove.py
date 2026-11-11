@@ -186239,6 +186239,54 @@ def prove_volume_cambio():
            "in corso" in card and "non andati" in card))
 
 
+def prove_cifra_copia():
+    """LA CIFRA DELLA RICHIESTA LIGHTNING SI COPIA (11 nov 2026, cantiere
+    cifra-copia, Andrea: «se la cifra esatta fosse cliccabile e si
+    copiasse nella clipboard del telefono sarebbe estremamente user
+    friendly»). Nel Cambio da bitcoin a Lightning la frase «crea una
+    richiesta di N sats esatti» porta N come bottoncino: negli appunti il
+    numero nudo, a schermo con gli spazi delle migliaia."""
+    print("\n[la cifra della richiesta Lightning si copia]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    js = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read().replace("\r\n", "\n")
+    spiega = pezzo_js(js, "function swapCambioSpiegaHtml(", "\n}\n") + "\n}\n"
+    bottone = pezzo_js(mini, "function cifraSatsCopiabile(", "\n}\n") + "\n}\n"
+    copia = pezzo_js(mini, "function copiaCifraSats(", "\n}\n") + "\n}\n"
+    fatt = re.search(r"fatturaSpiega: \(n, b\) => `Dal tuo[^\n]*", js).group(0)
+    banco = ("const esc = s => String(s ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'})[c]);\n"
+             "const fmt = n => Number(n || 0).toLocaleString('it-IT');\n"
+             "let swapCambioUnita = 'sats'; const swapCambioNum = n => (n / 1e8).toFixed(8).replace('.', ',');\n"
+             "const T = {" + fatt + "};\nconst t3 = () => T;\n"
+             "let copiato = null, vibra = 0; const haptic = () => { vibra++; };\n"
+             "const copiaLink = (testo, fatto) => { copiato = [testo, fatto]; };\n"
+             + spiega + bottone + copia + """
+const a = swapCambioSpiegaHtml(59130);
+swapCambioUnita = 'btc';
+const b = swapCambioSpiegaHtml(59130);
+const c = swapCambioSpiegaHtml(0);
+copiaCifraSats(59130);
+console.log(JSON.stringify([
+  a.includes('onclick="copiaCifraSats(59130)"'), a.includes('crea una richiesta di <button'),
+  a.includes('sats esatti e incollala qui.'), a.includes('\\u0001') || a.includes('\u0001'),
+  b.includes('(0,00059130 BTC)') && b.includes('copiaCifraSats(59130)'),
+  c.includes('<button'), c.includes('…'),
+  copiato && copiato[0], vibra]));
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("la frase con la cifra da copiare: il banco", "node non c'e'")
+    else:
+        prova("la cifra della frase e' un bottone che copia il numero nudo; la "
+              "frase resta intera, coi BTC se scelti; senza cifra niente bottone",
+              [True, True, True, False, True, False, True, "59130", 1], r)
+    prova("la frase va in pagina come HTML, sia al disegno sia mentre si scrive",
+          (1, 1, 0), (js.count('${swapCambioSpiegaHtml(swapCambioDovuto())}'),
+                      js.count("spiega.innerHTML = pz.spiega;"),
+                      js.count("spiega.textContent = pz.spiega;")))
+    prova("il bottoncino e' lo stesso della cifra in BTC (stesso stile)", True,
+          'class="cifra-btc" onclick="copiaCifraSats(' in bottone)
+
+
 def prove_cambio_libero():
     """IL CAMBIO LIBERO, TAPPA 2 (27 ott 2026, cantiere cambio-libero, piano
     approvato da Andrea): dalla pagina «Cambio» si cambiano i PROPRI sats
@@ -189218,7 +189266,7 @@ CATEGORIE = {
     """.split(),
     "swap": """
     swap_cella swap_preventivo swap_telefono swap_fornitori
-    swap_pagamento grafica_swap cartone_submarine cambio_libero volume_cambio
+    swap_pagamento grafica_swap cartone_submarine cambio_libero cifra_copia volume_cambio
     margine_cassaforte indirizzo_swap
     swap_auto swap_auto_scalini swap_auto_schermate swap_auto_tasto
     onchain_verso_lightning parole_uniche
@@ -189849,7 +189897,7 @@ def main():
               prove_swap_auto_scalini,
               # prove_swap_auto_ritiro gira nei collaudi (collaudo_swap_auto_ritiro):
               # vuole httpx, che la CI installa solo DOPO le prove (2 nov 2026)
-              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_volume_cambio, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,
+              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cifra_copia, prove_volume_cambio, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,
               prove_margine_cassaforte,
               prove_quantita_servizi,
               prove_sintassi_client,
