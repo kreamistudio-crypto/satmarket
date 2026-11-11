@@ -79675,3 +79675,21 @@ mandare anche quelli relativi al p2p»). Lo stesso post esce anche in
 pubblico è di bitcoiner, la menzione non è la sua maniglia). Il collaudo
 lo prova: tre canali col @username, casa più BitcoinPodcast senza o da
 Nostr; acceso o spento non tocca gli altri due.
+
+## Le 12 parole dicono a cosa servono, a chi ha solo il Cambio (11 nov 2026, Andrea: «si»)
+
+PERCHÉ. Col Cambio aperto a tutti (SWAP_SOLO_MODERATORI e
+CAMBIO_LIBERO_SOLO_MODERATORI a False sul VPS, 11 nov) la voce «₿ On-chain»
+del Profilo la vede chiunque, perché si accende con l'on-chain O col
+Cambio. Sotto «Le 12 parole» la frase diceva «Servono solo a firmare la
+tua parte del deposito di garanzia on-chain»: per chi ha solo il Cambio
+non è vero, a lui servono per firmare i suoi cambi e ritrovarne uno
+rimasto a metà.
+
+COSA. `walletParoleACosaServono()`: tre frasi, a seconda di `myOnchain` e
+`swapAcceso()` (solo il Cambio, solo l'on-chain, tutti e due); per chi ha
+solo il Cambio «I sats dei cambi» al posto di «delle vendite e dei
+rimborsi». «Non importarle in un altro wallet» resta in tutte e tre.
+
+PROVATO. `prove_banco_chiavi_onchain` (+2: le tre frasi in node, il
+riquadro che la usa).
