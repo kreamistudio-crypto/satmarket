@@ -62,3 +62,9 @@ frase: Quando paghi un ordine on-chain, appena la rete vede i tuoi sats la pagin
 dove: il foglio «Blocca … sats» del pagamento on-chain e la riga dell'ordine in «Ordini» (etichetta «In arrivo»).
 leva: ONCHAIN_ATTIVO spenta di serie
 pubblico: no
+
+## 2026-11-11 · seconda-firma-parla
+frase: Nell'ordine on-chain il tasto «✍️ Metti la seconda firma» ora mostra l'anello mentre firma e alla fine dice com'è andata, o perché non ha firmato. Quando i sats sono partiti, l'ordine scrive «Il rimborso è partito» o «I sats sono partiti» col link alla transazione, e il tasto sparisce.
+dove: la pagina di un ordine on-chain, nel riquadro ₿ «Pagato on-chain, in un 2-di-3».
+leva: ONCHAIN_ATTIVO spenta di serie
+pubblico: no

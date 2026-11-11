@@ -44650,11 +44650,63 @@ function onchainFirmatoDaBarattolo(o, verso, perche){
     {proposta: {verso, mia: false, barattolo: perche}});
 }
 
+/* IL TASTO «✍️ METTI LA SECONDA FIRMA» PARLA (11 nov 2026, cantiere
+   seconda-firma-parla, Andrea sulla disputa di prova: «la pagina si
+   blocca senza capire cosa sta facendo, e poi rimane la scritta metti la
+   seconda firma»). Prima passava da `onchainCofirmeInSottofondo`, che in
+   sottofondo deve tacere: quando il telefono non firmava, il tasto
+   tornava com'era senza un perche'. Qui si fa lo stesso lavoro solo per
+   QUESTO ordine, il tasto dice a che punto e', e alla fine c'e' sempre
+   una frase: firmato, oppure il motivo per cui no. Le stesse guardie di
+   sempre (`onchainCofirma`, `onchainFirmaProposta`): nessuna firma in
+   piu', solo le parole. */
+function onchainSecondaFirmaPerche(oc){
+  if (!oc) return 'questo ordine on-chain non risulta tuo: riapri l\'ordine';
+  if (oc.stato === 'rilasciato' || oc.stato === 'rimborsato' || oc.txid_uscita)
+    return 'i sats di questo ordine sono già partiti';
+  if (oc.stato !== 'pagato' && oc.stato !== 'attesa')
+    return 'in questo ordine non ci sono sats da muovere';
+  if (!oc.proposta) return 'non c\'è ancora una prima firma da completare';
+  if (oc.proposta.mia) return 'la prima firma è tua: la seconda la mette l\'altra parte';
+  return 'questa firma va a favore dell\'altra parte: la mette il suo telefono';
+}
 async function onchainSecondaFirmaDallOrdine(btn, o){
-  const rip = onchainAttesa(btn, 'Firmo…');
-  await onchainCofirmeInSottofondo();
-  rip();
-  try { await loadOrders(); renderOrders(); } catch(e) {}
+  haptic();
+  /* il velo con l'anello, e non l'attesa piccola: qui i sats PARTONO
+     (Andrea: «metti il solito tasto che ruota che fa capire»), e il velo
+     e' anche la guardia contro il secondo tocco. Si chiude nel finally */
+  const rip = attesaP2P('Leggo l\'ordine…', btn);
+  const passo = t => { el('attesaTesto').textContent = t; };
+  let esito = '', fatto = false;
+  try {
+    if (!o || !o.onchain || !myOnchain) throw new Error('l\'on-chain non è acceso per questo account');
+    const parole = onchainSemeLocale();
+    if (!parole) throw new Error('su questo dispositivo non c\'è la tua chiave: apri Barattolo dal telefono con cui hai pagato o venduto');
+    await onchainLeggiOrdini();
+    const oc = onchainOrdini.find(x => x.id === Number(o.onchain.id));
+    if (oc && onchainRilascioDaFirmare(oc)) {
+      passo('Metto la tua firma…');
+      await onchainFirmaProposta(oc.id);
+      await spuntaAttesaP2P('Firmato', 1500);
+      esito = '🔓 Hai firmato: ora la seconda firma è dell\'altra parte, quando apre Barattolo';
+      fatto = true;
+    } else if (oc && oc.proposta && !oc.proposta.mia && (oc.stato === 'pagato' || oc.stato === 'attesa')
+               && (oc.proposta.verso === oc.ruolo || onchainPrimaDiChiVende(oc))) {
+      passo('Metto la seconda firma e mando i sats in rete…');
+      const no = await onchainCofirma(oc, parole);
+      if (no) throw new Error('non ho firmato: ' + no);
+      await spuntaAttesaP2P('Seconda firma messa: i sats sono partiti', 1800);
+      esito = oc.proposta.verso === 'venditore' && oc.ruolo === 'venditore'
+        ? '✅ Seconda firma messa: i sats sono partiti verso di te. Arrivano con la prima conferma della rete, circa dieci minuti'
+        : '✅ Seconda firma messa: i sats sono partiti. Arrivano con la prima conferma della rete, circa dieci minuti';
+      fatto = true;
+    } else {
+      throw new Error(onchainSecondaFirmaPerche(oc));
+    }
+  } catch(e) { esito = '₿ ' + (e.message || 'errore'); }
+  finally { rip(); }
+  toast(esito, 9000);
+  if (fatto) { try { await loadOrders(); renderOrders(); } catch(e) {} }
   openOrder(o.id);
 }
 
@@ -44888,7 +44940,17 @@ function pannelloOnchainOrdine(o, s){
   const p = oc.proposta;
   const io = o.role === 'buyer' ? 'compratore' : 'venditore';
   let riga = '', gesto = '';
-  if (p && p.barattolo) {
+  if (p && p.barattolo && oc.txid_uscita) {
+    /* (11 nov 2026, cantiere seconda-firma-parla) LA SECONDA FIRMA C'E'
+       e la transazione e' partita: la proposta resta scritta sull'ordine,
+       ma il riquadro dice il fatto e il tasto non torna (Andrea: «rimane
+       la scritta metti la seconda firma») */
+    riga = p.verso === 'compratore'
+      ? (io === 'compratore' ? '↩️ <b>Il rimborso è partito</b> verso il tuo wallet: arriva con la prima conferma della rete, circa dieci minuti.'
+                             : '↩️ <b>Il rimborso è partito</b> verso chi ha comprato.')
+      : (io === 'venditore' ? '🔓 <b>I sats sono partiti</b> verso il tuo wallet: arrivano con la prima conferma della rete, circa dieci minuti.'
+                            : '🔓 <b>I sats sono partiti</b> verso chi vende.');
+  } else if (p && p.barattolo) {
     /* LA FIRMA DI BARATTOLO (27 ott 2026): un moderatore ha deciso (o
        chi vende ha ricevuto il reso), e manca la firma di chi vince */
     const perMe = p.verso === io;
