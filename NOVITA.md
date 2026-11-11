@@ -50,3 +50,9 @@ frase: Se apri barattolo.store con Tor Browser, nella barra degli indirizzi comp
 dove: Tor Browser, barra degli indirizzi su barattolo.store: la pillola viola «.onion disponibile».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-11 · cifra-btc
+frase: Quando paghi on-chain, accanto ai sats da mandare ora vedi anche la cifra in BTC (per esempio 0,00008128 BTC): la tocchi e la copi, pronta da incollare nel wallet. Nel pagamento di un ordine on-chain c'è anche «₿ Apri nel wallet», che apre il wallet con indirizzo e cifra già scritti.
+dove: il foglio «Blocca … sats» del pagamento on-chain, «🔒 Blocca i sats» degli scambi P2P on-chain, la scheda «Cambio» e il riquadro «Caricali in Lightning» del P2P: la riga «In BTC» col bottoncino 📋.
+leva: ONCHAIN_ATTIVO spenta di serie
+pubblico: no

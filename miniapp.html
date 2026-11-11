@@ -8197,6 +8197,17 @@
      disegnavano lo stesso una cornice vuota sotto il titolo, in ogni
      acquisto di un pezzo solo senza spedizione. */
   .conto-scomposto:empty{display:none}
+  /* LA CIFRA IN BTC DA COPIARE (11 nov 2026, cantiere cifra-btc, Andrea:
+     «in un wallet onchain devi inserire la cifra in btc e non in sats»):
+     il bottoncino accanto ai sats da mandare on-chain. Si tocca e la
+     cifra va negli appunti col punto, come la vuole il wallet. */
+  .cifra-btc-riga{display:flex;justify-content:space-between;align-items:center;
+    gap:8px;flex-wrap:wrap;margin-top:6px;font-size:13px;font-weight:600;color:var(--muted)}
+  .cifra-btc{display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+    font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;
+    color:var(--sats);background:transparent;border:1px dashed var(--sats);
+    border-radius:8px;padding:4px 8px;line-height:1.2}
+  .cifra-btc:active{transform:scale(.97)}
   .seller{
     display:flex;align-items:center;gap:12px;background:var(--card);
     border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin:14px 0;
@@ -19219,7 +19230,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = 'e012c1f263';
+const SWAP_TELEFONO_VER = '75db41ddd3';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -34155,6 +34166,8 @@ function orologioPay(invoice, ripiego){
   const inv = String(invoice || '').trim();
   const b = (!DEMO && inv) ? leggiBolt11(inv) : null;
   payScadeIl = (DEMO || !inv) ? 0 : ((b && b.scade) || ripiego || 0);
+  /* il foglio on-chain la vestiva da ₿ (cifra-btc): qui torna Lightning */
+  el('payWallet').textContent = '⚡ Apri nel wallet';
   portaWallet(el('payWallet'), inv);
   if (payOrologio) { clearInterval(payOrologio); payOrologio = null; }
   battitoPay();
@@ -59051,12 +59064,25 @@ async function payDisegnaOnchain(){
   el('payScomposto').innerHTML = riga(o.prezzo_sats, 'Prezzo')
     + (o.quota_sats ? riga(o.quota_sats, 'Quota fissa a Barattolo (spese di rete)') : '')
     + riga(o.margine_sats, 'Margine di rete (se avanza più di 546 sats, torna a te)')
-    + riga(o.importo_sats, 'Da mandare', true);
+    + riga(o.importo_sats, 'Da mandare', true)
+    + rigaCifraBtc(o.importo_sats);   /* il wallet on-chain la vuole in BTC (cifra-btc) */
   el('payEurNota').style.display = 'block';
   el('payEurNota').textContent = `${onchainRete().prova ? nomeReteProva() + ', rete di prova.' : 'Rete Bitcoin: sats veri.'} L'indirizzo vale fino a ${new Date(o.scade * 1000).toLocaleString('it-IT')}.`;
   el('payPatto').innerHTML = 'Paga con un wallet Bitcoin. I sats vanno in un <b style="color:var(--trust)">2-di-3</b> fra te, chi vende e Barattolo: escono solo con due firme, e al venditore arrivano quando confermi di aver ricevuto l\'oggetto. Serve una conferma, circa dieci minuti.'
     + (o.visti_sats ? `<br><b>Visti in rete: ${fmt(o.visti_sats)} sats</b>, confermati ${fmt(o.ricevuti_sats)}.` : '');
-  el('payScadeRiga').style.display = 'none';
+  /* «₿ Apri nel wallet» (11 nov 2026, cifra-btc): la riga della scadenza
+     della fattura diventa la porta del wallet Bitcoin, col link `bitcoin:`
+     del QR (cifra compresa), come nel deposito del P2P on-chain. Il link
+     nudo dal tocco, niente `apriNelWallet` (quello e' di Lightning);
+     `orologioPay` rimette il fulmine quando si torna alla fattura. */
+  el('payScadeRiga').style.display = payOc.ok ? '' : 'none';
+  el('payScade').textContent = '';
+  el('payRinnova').style.display = 'none';
+  const porta = el('payWallet');
+  porta.textContent = '₿ Apri nel wallet';
+  porta.href = payOc.ok ? onchainUriPagamento(o) : '#';
+  porta.onclick = null;
+  porta.style.display = payOc.ok ? '' : 'none';
   el('payQrNota').textContent = 'inquadra il QR col wallet Bitcoin, o tocca l\'indirizzo per copiarlo';
   el('payHint').innerHTML = '';   /* il wallet NWC e' Lightning: qui non c'entra */
   const hoPagato = el('payHoPagato');
@@ -59624,6 +59650,32 @@ async function onchainCofirmeInSottofondo(){
 }
 
 
+
+/* LA CIFRA IN BTC (11 nov 2026, cantiere cifra-btc). I wallet on-chain
+   chiedono BTC, non sats: chi copia l'indirizzo invece di inquadrare il
+   QR (che la cifra la porta gia', `amount=`) deve poter copiare anche
+   quella. PURA: sempre otto decimali, coi numeri INTERI (mai sats / 1e8
+   a schermo, dove un 0,1 + 0,2 sbaglia l'ultimo sat); con `punto` la
+   forma per il wallet e per gli appunti, senza la virgola italiana. */
+function satsInBtc(sats, punto){
+  const n = Math.max(0, Math.round(Number(sats) || 0));
+  return Math.floor(n / 100000000) + (punto ? '.' : ',') + String(n % 100000000).padStart(8, '0');
+}
+/* il bottoncino da toccare: a schermo con la virgola, negli appunti col punto */
+function cifraBtcCopiabile(sats){
+  const n = Math.max(0, Math.round(Number(sats) || 0));
+  return '<button type="button" class="cifra-btc" onclick="copiaCifraBtc(' + n + ')"'
+    + ' title="Tocca per copiare" aria-label="Copia la cifra in BTC: ' + satsInBtc(n) + '">'
+    + satsInBtc(n) + ' BTC <span aria-hidden="true">📋</span></button>';
+}
+/* la riga intera, per i fogli che mostrano la cifra in sats */
+function rigaCifraBtc(sats){
+  return '<div class="cifra-btc-riga"><span>In BTC</span>' + cifraBtcCopiabile(sats) + '</div>';
+}
+function copiaCifraBtc(sats){
+  haptic();
+  copiaLink(satsInBtc(sats, true), '📋 Copiato: ' + satsInBtc(sats, true) + ' BTC');
+}
 
 function onchainUriPagamento(o){
   return `bitcoin:${o.indirizzo.indirizzo}?amount=${(o.importo_sats / 1e8).toFixed(8)}`;
@@ -61328,6 +61380,7 @@ function renderDepositoOnchainP2P(){
       + 'restano <b>bloccati nel 2-di-3</b> e non escono finché non li liberi tu. '
       + 'Dentro ci sono ' + fmt(o.margine_sats) + ' sats di margine per la rete.'
       + (prova ? ' Rete di prova (' + esc(onchainRete().nome) + ').' : '') + '</div>'
+    + rigaCifraBtc(o.importo_sats)   /* il wallet on-chain la vuole in BTC (cifra-btc) */
     + (o.visti_sats ? '<div class="hint">👀 Visti in rete ' + fmt(o.visti_sats) + ' sats: aspetto la conferma.</div>' : '')
     + '<div class="qr" id="p2pOcDepositoQr"></div>'
     + '<div class="invoice" id="p2pOcDepositoIndirizzo"></div>'
@@ -61591,6 +61644,7 @@ function rigaPresaOcP2P(o){
       + (fase === 'creato' && rec.lockupAddress
         ? '<div class="qr" id="p2pPresaOcQr"></div>'
           + '<div class="mono" style="word-break:break-all">' + esc(rec.lockupAddress) + '</div>'
+          + (typeof rigaCifraBtc === 'function' ? rigaCifraBtc(rec.mandi || rec.onchainAmount) : '')
           + '<div class="row"><a class="btn orange" href="' + esc(link) + '">₿ Apri nel wallet</a>'
           + '<button type="button" class="btn ghost" onclick="copiaOnchainP2P(' + esc(JSON.stringify(rec.lockupAddress)) + ')">📋 Copia l\'indirizzo</button></div>'
         : '')
@@ -61679,8 +61733,10 @@ async function creaPresaOcP2P(btn, id){
 function qrPresaOcP2P(id){
   const q = el('p2pPresaOcQr');
   const rec = typeof swapDiPresaP2P === 'function' ? swapDiPresaP2P(id) : null;
+  /* (11 nov 2026, cifra-btc) il QR e' lo stesso link di «Apri nel wallet»,
+     il nostro nudo con la cifra: quello del fornitore aveva le sue aggiunte */
   if (q && rec && typeof disegnaQr === 'function')
-    disegnaQr(q, rec.bip21 || `bitcoin:${rec.lockupAddress}`, 'Byte');
+    disegnaQr(q, typeof swapLinkBitcoin === 'function' ? swapLinkBitcoin(rec) : `bitcoin:${rec.lockupAddress}`, 'Byte');
 }
 /* (swap/instradatore.js) lo stato del cambio e' cambiato: con la pagina
    di quell'ordine aperta, si ridisegna */

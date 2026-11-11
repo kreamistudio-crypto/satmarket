@@ -156383,6 +156383,9 @@ let p2pOnchainMiei = [];
         + pezzo_js(mini, "const P2P_ONCHAIN_STATI = {", "};\n") + "};\n" \
         + pezzo_js(mini, "function minutiSecondi(sec){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function onchainUriPagamento(o){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function satsInBtc(sats, punto){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function cifraBtcCopiabile(sats){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function rigaCifraBtc(sats){", "\n}\n") + "\n}\n" \
         + scheda + foglio + """
 const out = {};
 const ind = {indirizzo: 'tb1qdueditre', chiavi: {}, descrittore: 'wsh(sortedmulti(2,...))'};
@@ -188461,6 +188464,77 @@ def prove_widget_ordini():
           "widget" in pezzo("notifica").lower())
 
 
+def prove_cifra_btc():
+    """LA CIFRA IN BTC DA COPIARE (11 nov 2026, cantiere cifra-btc, Andrea:
+    «quando devo pagare un ordine onchain mi dice sats ma solitamente in un
+    wallet onchain devi inserire la cifra in btc»). Il conto PURO coi numeri
+    interi, il bottoncino (virgola a schermo, punto negli appunti), e le
+    quattro schermate on-chain che lo mostrano; il QR del Cambio e del
+    riquadro P2P col link nostro, e «₿ Apri nel wallet» nel foglio del
+    mercatino, col fulmine rimesso quando si torna alla fattura."""
+    print("\n[la cifra in BTC nei pagamenti on-chain: il conto, il tasto, le schermate]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    js = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "swap", "instradatore.js"),
+              encoding="utf-8").read()
+    pezzi = (pezzo_js(mini, "function satsInBtc(sats, punto){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function cifraBtcCopiabile(sats){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function rigaCifraBtc(sats){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function copiaCifraBtc(sats){", "\n}\n") + "\n}\n")
+    banco = (pezzi
+             + "let copiato = null, detto = null;\n"
+             + "function haptic(){}\n"
+             + "function copiaLink(t, f){ copiato = t; detto = f; }\n"
+             + "const fatte = [satsInBtc(8128), satsInBtc(8128, true), satsInBtc(1, true),"
+             + " satsInBtc(0), satsInBtc(100000000), satsInBtc(2100000000000000, true),"
+             + " satsInBtc(123456789), satsInBtc(29, true), satsInBtc(57, true), satsInBtc('8128')];\n"
+             + "copiaCifraBtc(8128);\n"
+             + "const tasto = cifraBtcCopiabile(8128);\n"
+             + "console.log(JSON.stringify({fatte, copiato, detto,"
+             + " tasto: [tasto.includes('0,00008128 BTC'), tasto.includes('copiaCifraBtc(8128)'),"
+             + " tasto.includes('type=\"button\"')],"
+             + " riga: rigaCifraBtc(8128).includes(tasto)}));")
+    r = _node_banco(banco)
+    if r is None:
+        salta("la cifra in BTC: il conto in node", "node non c'e'")
+    else:
+        prova("i sats in BTC: otto decimali, interi esatti (mai 0,0000005700000001)",
+              ["0,00008128", "0.00008128", "0.00000001", "0,00000000", "1,00000000",
+               "21000000.00000000", "1,23456789", "0.00000029", "0.00000057", "0,00008128"],
+              r.get("fatte"))
+        prova("il tocco copia la cifra col PUNTO (la forma del wallet) e lo dice",
+              ["0.00008128", "📋 Copiato: 0.00008128 BTC"], [r.get("copiato"), r.get("detto")])
+        prova("il bottoncino: virgola a schermo, il tocco giusto, un vero bottone",
+              [True, True, True], r.get("tasto"))
+        prova("...e la riga «In BTC» lo contiene", True, r.get("riga"))
+    disegna = pezzo_js(mini, "async function payDisegnaOnchain(){", "\n}\n")
+    deposito = pezzo_js(mini, "function renderDepositoOnchainP2P(){", "\n}\n")
+    presa = pezzo_js(mini, "function rigaPresaOcP2P(o){", "\n}\n")
+    qr_presa = pezzo_js(mini, "function qrPresaOcP2P(id){", "\n}\n")
+    cambio = pezzo_js(js, "function bitcoinDaMandare(rec){", "\n}\n")
+    render = pezzo_js(js, "function renderSwapCambio(){", "\n}\n")
+    prova("la cifra in BTC nelle quattro schermate on-chain: mercatino, deposito "
+          "P2P, Cambio, riquadro «Caricali in Lightning»", [True, True, True, True],
+          ["rigaCifraBtc(o.importo_sats)" in disegna, "rigaCifraBtc(o.importo_sats)" in deposito,
+           "rigaCifraBtc(rec.mandi || rec.onchainAmount)" in cambio,
+           "rigaCifraBtc(rec.mandi || rec.onchainAmount)" in presa])
+    prova("il QR del Cambio e del riquadro P2P e' il link nostro con la cifra, "
+          "mai il bip21 del fornitore", [True, False, True, False],
+          ["disegnaQr(q, swapLinkBitcoin(vivo), 'Byte')" in render, "vivo.bip21" in render,
+           "swapLinkBitcoin(rec)" in qr_presa, "rec.bip21" in qr_presa])
+    prova("il foglio del mercatino: «₿ Apri nel wallet» col link del QR, solo a "
+          "indirizzo ritrovato, senza la porta di Lightning",
+          [True, True, True, True],
+          ["porta.textContent = '₿ Apri nel wallet';" in disegna,
+           "porta.href = payOc.ok ? onchainUriPagamento(o) : '#';" in disegna,
+           "porta.onclick = null;" in disegna,
+           "el('payScadeRiga').style.display = payOc.ok ? '' : 'none';" in disegna])
+    orologio = pezzo_js(mini, "function orologioPay(invoice, ripiego){", "\n}\n")
+    prova("...e tornando alla fattura il bottone torna ⚡, prima della porta di Lightning",
+          True, orologio.index("el('payWallet').textContent = '⚡ Apri nel wallet';")
+          < orologio.index("portaWallet(el('payWallet'), inv);"))
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -188757,7 +188831,7 @@ CATEGORIE = {
     deposito_p2p_onchain grafica_p2p_onchain incasso_esterno_onchain
     onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto
     p2p_onchain p2p_onchain_usdt rete_onchain_dal_pannello
-    scelta_rete_mercatino
+    scelta_rete_mercatino cifra_btc
     """.split(),
 }
 
@@ -189509,6 +189583,7 @@ def main():
               prove_domande_compratore,
               prove_widget_prova,
               prove_widget_ordini,
+              prove_cifra_btc,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:

@@ -803,6 +803,7 @@ function bitcoinDaMandare(rec){
   return `<div class="swap-fattura">
     <div class="qr swap-qr-fattura" id="swapCambioQr" aria-label="QR"></div>
     <div class="mono swap-indirizzo-chiaro">${esc(rec.lockupAddress)}</div>
+    ${typeof rigaCifraBtc === 'function' ? rigaCifraBtc(rec.mandi || rec.onchainAmount) : ''}
     <div class="swap-attrezzi">
       <button class="btn ghost" type="button" data-swap="cambio-copia-indirizzo" data-id="${esc(rec.id)}">${swapIcona('copia')}${esc(t.copiaIndirizzo)}</button>
       <a class="btn orange" id="swapCambioWallet" href="${esc(link)}">${swapIcona('btc')}${esc(t.apriWallet)}</a>
@@ -1777,8 +1778,10 @@ function renderSwapCambio(){
     const a = el('swapCambioWallet');
     if (a && typeof portaWallet === 'function' && !swapESub(vivo)) portaWallet(a, vivo.invoice);
     /* (tappa 3) il QR del submarine e' il link bitcoin: (byte, com'e') */
+    /* (11 nov 2026, cifra-btc) lo stesso link di «Apri nel wallet»: il
+       nostro nudo con la cifra, non quello del fornitore con le aggiunte */
     if (q && swapESub(vivo) && typeof disegnaQr === 'function')
-      disegnaQr(q, vivo.bip21 || `bitcoin:${vivo.lockupAddress}`, 'Byte');
+      disegnaQr(q, swapLinkBitcoin(vivo), 'Byte');
     return;
   }
   /* dopo «Conferma»: le parole (solo dove non hanno copia), poi «Preparo il cambio…» */

@@ -79460,3 +79460,71 @@ un `try`, e su un pannello finto una leva nata domani arriva da sola
 restano fuori. Suite severa 27304/0. Resa vera sul config d'esempio:
 circa 170 righe, nessun valore interno.
 
+
+## La cifra in BTC nei pagamenti on-chain, da toccare e copiare (11 nov 2026, cantiere cifra-btc, Andrea: «quando devo pagare un ordine onchain mi dice sats ma solitamente in un wallet onchain devi inserire la cifra in btc e non in sats»)
+
+PERCHÉ. Il foglio «Blocca 8 128 sats» del pagamento on-chain diceva la
+cifra solo in sats. Il QR era già un BIP-21 con la cifra
+(`onchainUriPagamento`, `amount=0.00008128`): chi lo inquadra se la
+trova scritta. Ma chi copia l'indirizzo (il caso di Andrea, wallet sullo
+stesso telefono) la cifra la scrive a mano, e i wallet on-chain la
+chiedono in BTC: conti a mente con otto decimali, nel momento in cui si
+mandano soldi veri.
+
+COSA. Tre funzioni in `miniapp.html`, accanto a `onchainUriPagamento`:
+`satsInBtc(sats, punto)` (PURA, coi numeri interi: parte intera e resto
+su otto cifre, mai `sats / 1e8` a schermo), `cifraBtcCopiabile` (il
+bottoncino tratteggiato arancio «0,00008128 BTC 📋») e `rigaCifraBtc`
+(la riga «In BTC» col bottoncino). Il tocco (`copiaCifraBtc`) copia
+`0.00008128` col PUNTO, la forma che leggono i wallet e la stessa del
+QR; a schermo la virgola italiana. La riga sta nelle quattro schermate
+on-chain con una cifra da mandare: il foglio del mercatino (dentro il
+conto scomposto, sotto «Da mandare»), «🔒 Blocca i sats» degli scambi
+P2P on-chain, la carta del Cambio (`bitcoinDaMandare`, sotto
+l'indirizzo) e il riquadro «Caricali in Lightning» del P2P.
+Più due ritocchi chiesti nello stesso sì:
+- Il QR del Cambio e del riquadro P2P ora è `swapLinkBitcoin(rec)`, lo
+  stesso link nudo di «Apri nel wallet» (2 nov 2026 sera): disegnava
+  ancora `rec.bip21` del fornitore, con le sue aggiunte.
+- Il foglio del mercatino ha «₿ Apri nel wallet» (il deposito P2P
+  on-chain l'aveva già): la riga della scadenza della fattura, spenta in
+  on-chain, diventa la porta col link del QR, solo a indirizzo ritrovato
+  (`payOc.ok`), link nudo dal tocco senza `apriNelWallet` (quello è di
+  Lightning). `orologioPay` rimette «⚡ Apri nel wallet» quando si torna
+  alla fattura.
+
+STRADE SCARTATE. Copiare con la virgola (come a schermo): un wallet in
+inglese la legge male o la rifiuta, il punto lo leggono tutti; se un
+wallet di Andrea la vuole con la virgola, si cambia `copiaCifraBtc`.
+Mettere la cifra in BTC nel titolo «Blocca … sats»: il titolo lo
+riscrive `vestiPaySheet` per ogni flusso Lightning, il conto scomposto
+invece lo rifà ogni flusso da sé (si pulisce da solo).
+La cifra corta senza zeri in coda («0,005», come nel Cambio): qui si
+copia e si confronta con quella del wallet, otto decimali sempre.
+
+PROVATO. `prove_cifra_btc` (categoria onchain): il conto in node
+(8128, 1, 0, un bitcoin, 21 milioni, 29 e 57 sats), il tocco che copia
+col punto e lo dice, il bottoncino, le quattro schermate, il QR col
+link nostro, la porta ₿ del mercatino e il fulmine rimesso.
+CONTROPROVE: tolto il `padStart` le prove del conto e del tasto vanno
+rosse; rimesso `vivo.bip21 ||` nel QR del Cambio va rossa la prova del
+QR. I due banchi che girano `renderDepositoOnchainP2P` (in
+`prove_deposito_p2p_onchain` e in `collaudo_deposito_ln_p2p`) ora
+prendono le funzioni vere della cifra: senza, esplodevano con
+«rigaCifraBtc is not defined» (visto, ed è così che li ho trovati).
+`instradatore.js` è cambiato, quindi `SWAP_TELEFONO_VER` è la sua
+impronta nuova (`75db41ddd3`). Il bottoncino dentro la carta del Cambio
+ha un `onclick` scritto dalla pagina (`rigaCifraBtc`), non dal file del
+telefono: la regola «nessun onclick nei file del telefono» resta vera
+alla lettera, e il tocco non passa dall'ascoltatore delegato dello swap
+perché non è un'azione dello swap. Screenshot a 360 px, scuro e
+chiaro, del foglio del mercatino, del deposito P2P e della carta del
+Cambio (pagina servita in locale, rotte /api finte).
+Suite severa nel venv del workflow (senza coincurve): 27277 passate,
+0 fallite, 2 saltate (nostr-tools, come sempre fuori dal PC). Collaudi
+della CI nello stesso venv: 123 su 123 verdi (il rosso del primo giro
+era `collaudo_deposito_ln_p2p`, curato come sopra e rigirato verde).
+
+DA GUARDARE. Dal telefono sul collaudo: il tocco che copia dentro
+Telegram (Android e iPhone) e «₿ Apri nel wallet» del mercatino con un
+wallet vero.
