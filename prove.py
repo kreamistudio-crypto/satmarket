@@ -188609,6 +188609,127 @@ const A = (x) => Object.assign({id: 1, stato: 'attesa', importo_sats: 8128, vist
           "ne mancano <b>${fmt(o.importo_sats - o.visti_sats)}</b>" in disegna)
 
 
+def prove_seconda_firma_parla():
+    """IL TASTO «✍️ METTI LA SECONDA FIRMA» PARLA (11 nov 2026, cantiere
+    seconda-firma-parla, Andrea sulla disputa di prova: «la pagina si
+    blocca senza capire cosa sta facendo, e poi rimane la scritta metti la
+    seconda firma»). Il tasto firma solo QUESTO ordine, dice a che punto
+    e', torna sempre com'era e finisce SEMPRE con una frase: firmato, o il
+    motivo del no. Nessuna firma in piu': le guardie restano quelle di
+    `onchainCofirma` e `onchainFirmaProposta`."""
+    print("\n[il tasto della seconda firma parla]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    tasto = pezzo_js(mini, "async function onchainSecondaFirmaDallOrdine(btn, o){", "\n}\n")
+    banco = (pezzo_js(mini, "function onchainSecondaFirmaPerche(oc){", "\n}\n") + "\n}\n"
+             + tasto + "\n}\n"
+             + """
+const fatti = [];
+let myOnchain = true, seme = 'dodici parole', onchainOrdini = [], cofirma = '', lancia = '';
+function haptic(){}
+const velo = {t: '', su: false, giri: []};
+function el(id){ return {set textContent(t){ velo.t = t; velo.giri.push(t); }}; }
+function attesaP2P(t, btn){ const p = btn.innerHTML; btn.disabled = true; btn.innerHTML = '⏳ ' + t;
+  velo.su = true; velo.giri.push(t); return () => { btn.disabled = false; btn.innerHTML = p; velo.su = false; }; }
+async function spuntaAttesaP2P(t, ms){ velo.giri.push('spunta:' + t); }
+function onchainSemeLocale(){ return seme; }
+let righe = [];
+async function onchainLeggiOrdini(){ onchainOrdini = righe; return righe; }
+function onchainRilascioDaFirmare(o){ return o.ruolo === 'compratore' && o.stato === 'pagato'
+  && !!o.rilascio_chiesto_il && !!o.incasso && !!o.rimborso && !o.proposta; }
+function onchainPrimaDiChiVende(o){ return false; }
+async function onchainFirmaProposta(id){ fatti.push('prima:' + id); return 'venditore'; }
+async function onchainCofirma(o, p){ if (lancia) throw new Error(lancia); fatti.push('cofirma:' + o.id); return cofirma; }
+function toast(t){ fatti.push('toast:' + t); }
+async function loadOrders(){ fatti.push('rileggo'); }
+function renderOrders(){}
+function openOrder(id){ fatti.push('apro:' + id); }
+const R = x => Object.assign({id: 4, ruolo: 'compratore', stato: 'pagato', incasso: 'bc1v', rimborso: 'bc1c',
+  proposta: {verso: 'compratore', mia: false, barattolo: 'disputa'}}, x);
+const giro = async (riga, o) => {
+  righe = riga ? [riga] : []; fatti.length = 0; velo.giri = [];
+  const btn = {innerHTML: '✍️ Metti la seconda firma', disabled: false};
+  await onchainSecondaFirmaDallOrdine(btn, o || {id: 9, onchain: {id: 4}});
+  return {f: fatti.join(' | '), velo: velo.giri.join(' > '),
+          tornato: btn.innerHTML === '✍️ Metti la seconda firma' && !btn.disabled && !velo.su};
+};
+(async () => {
+  const g = [];
+  g.push(await giro(R()));
+  cofirma = 'non è il tuo rimborso'; g.push(await giro(R())); cofirma = '';
+  lancia = 'rete giù'; g.push(await giro(R())); lancia = '';
+  g.push(await giro(R({stato: 'rimborsato', txid_uscita: 'ab'})));
+  g.push(await giro(R({proposta: {verso: 'compratore', mia: true}})));
+  g.push(await giro(R({proposta: {verso: 'venditore', mia: false, barattolo: 'disputa'}})));
+  g.push(await giro(R({proposta: null, rilascio_chiesto_il: 5})));
+  g.push(await giro(null));
+  seme = ''; g.push(await giro(R())); seme = 'dodici parole';
+  myOnchain = false; g.push(await giro(R())); myOnchain = true;
+  console.log(JSON.stringify(g));
+})();
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("il tasto della seconda firma: il banco", "node non c'e'")
+    else:
+        f = [x["f"] for x in r]
+        prova("il tasto torna com'era e il velo si chiude, in ogni caso", [True] * 10,
+              [x["tornato"] for x in r])
+        prova("l'anello dice a che punto e', e la spunta arriva solo a firma fatta",
+              ["Leggo l'ordine… > Metto la seconda firma e mando i sats in rete… > "
+               "spunta:Seconda firma messa: i sats sono partiti",
+               "Leggo l'ordine… > Metto la seconda firma e mando i sats in rete…"],
+              [r[0]["velo"], r[1]["velo"]])
+        prova("firmato: co-firma, lo dice, rilegge «Ordini» e riapre l'ordine", True,
+              f[0].startswith("cofirma:4 | toast:✅ Seconda firma messa: i sats sono partiti")
+              and f[0].endswith("rileggo | apro:9"))
+        prova("il no di onchainCofirma si dice col suo motivo, e non rilegge", True,
+              f[1] == "cofirma:4 | toast:₿ non ho firmato: non è il tuo rimborso | apro:9")
+        prova("un errore si dice", True, f[2] == "toast:₿ rete giù | apro:9")
+        prova("i motivi del no, senza toccare le firme",
+              ["toast:₿ i sats di questo ordine sono già partiti | apro:9",
+               "toast:₿ la prima firma è tua: la seconda la mette l'altra parte | apro:9",
+               "toast:₿ questa firma va a favore dell'altra parte: la mette il suo telefono | apro:9",
+               "toast:₿ questo ordine on-chain non risulta tuo: riapri l'ordine | apro:9"],
+              [f[3], f[4], f[5], f[7]])
+        prova("il rilascio confermato prima: la prima firma, detta", True,
+              f[6].startswith("prima:4 | toast:🔓 Hai firmato"))
+        prova("senza la chiave su questo dispositivo lo dice, e non legge niente", True,
+              f[8].startswith("toast:₿ su questo dispositivo non c'è la tua chiave"))
+        prova("senza on-chain lo dice", True,
+              f[9].startswith("toast:₿ l'on-chain non è acceso"))
+    prova("il tasto non passa piu' dal sottofondo muto, alza l'anello e "
+          "finisce sempre con una frase", [False, True, True, True],
+          ["onchainCofirmeInSottofondo" in tasto, "attesaP2P('Leggo l\\'ordine…', btn)" in tasto,
+           "finally { rip(); }" in tasto, "toast(esito, 9000);" in tasto])
+    # il riquadro dell'ordine: a transazione partita il tasto non torna
+    pannello = pezzo_js(mini, "function pannelloOnchainOrdine(o, s){", "\n}\n") + "\n}\n"
+    banco = (pannello + """
+const esc = x => String(x), fmt = n => String(n), P2P_OC_MONETA = '₿';
+function onchainComeEFatto(){ return ''; }
+function onchainNomeCambio(){ return 'SATS Routing'; }
+const O = (role, oc) => ({role, onchain: Object.assign({esploratore: 'https://mempool.space',
+  proposta: {verso: 'compratore', mia: false, barattolo: 'disputa'}}, oc)});
+const tasto = h => h.includes('onchainSecondaFirmaDallOrdine');
+console.log(JSON.stringify([
+  tasto(pannelloOnchainOrdine(O('buyer', {}), 'dispute')),
+  tasto(pannelloOnchainOrdine(O('buyer', {txid_uscita: 'ab12', stato: 'rimborsato'}), 'refunded')),
+  pannelloOnchainOrdine(O('buyer', {txid_uscita: 'ab12'}), 'refunded').includes('Il rimborso è partito'),
+  pannelloOnchainOrdine(O('buyer', {txid_uscita: 'ab12'}), 'refunded').includes('Vedi la transazione'),
+  pannelloOnchainOrdine(O('buyer', {txid_uscita: 'ab12'}), 'refunded').includes('manca la seconda firma'),
+  pannelloOnchainOrdine(O('seller', {txid_uscita: 'ab12', proposta: {verso: 'venditore', mia: false, barattolo: 'disputa'}}),
+    'released').includes('I sats sono partiti</b> verso il tuo wallet'),
+]));
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("il riquadro a transazione partita: il banco", "node non c'e'")
+    else:
+        prova("il riquadro: disputa decisa → il tasto; transazione partita → "
+              "«partito», il link, niente tasto né «manca la seconda firma»",
+              [True, False, True, True, False, True], r)
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -188905,7 +189026,7 @@ CATEGORIE = {
     deposito_p2p_onchain grafica_p2p_onchain incasso_esterno_onchain
     onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto
     p2p_onchain p2p_onchain_usdt rete_onchain_dal_pannello
-    scelta_rete_mercatino cifra_btc foglio_oc_visto
+    scelta_rete_mercatino cifra_btc foglio_oc_visto seconda_firma_parla
     """.split(),
 }
 
@@ -189659,6 +189780,7 @@ def main():
               prove_widget_ordini,
               prove_cifra_btc,
               prove_foglio_oc_visto,
+              prove_seconda_firma_parla,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:

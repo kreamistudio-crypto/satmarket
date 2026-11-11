@@ -79578,3 +79578,56 @@ soglia a «un sat qualunque», tre prove rosse.
 DA GUARDARE. Dal telefono: il ritorno dal wallet dentro Telegram
 (Android e iPhone) chiude il foglio entro pochi secondi da quando la
 rete vede la transazione.
+
+## Il tasto della seconda firma parla, e sparisce a sats partiti (11 nov 2026, cantiere seconda-firma-parla, Andrea sulla disputa di prova: «la pagina si blocca senza capire cosa sta facendo e poi dice ok però rimane la scritta metti la seconda firma», «è tuttora cliccabile anche a disputa conclusa», «metti il solito tasto che ruota che fa capire»)
+
+PERCHÉ. Disputa di prova sull'ordine on-chain 4 (Andrea compratore):
+il terzo account ha deciso il rimborso, Barattolo ha firmato, e Andrea
+dal suo account ha toccato «✍️ Metti la seconda firma». Sul VPS
+l'ordine era già `rimborsato`, con `txid_uscita` e l'ordine di sempre
+`refunded`: la firma era andata. Ma due cose non lo dicevano.
+1. Il tasto chiamava `onchainCofirmeInSottofondo`, che è fatto per
+   TACERE (gira all'avvio): l'attesa piccola «Firmo…» e poi il tasto
+   tornava com'era, con al più il toast generico del sottofondo, e senza
+   un perché quando non firmava (niente seme su questo dispositivo,
+   niente da firmare: silenzio).
+2. `pannelloOnchainOrdine`, nel ramo della firma di Barattolo
+   (`p.barattolo`), non guardava se la transazione era partita: la
+   proposta resta scritta sull'ordine anche dopo, quindi il riquadro
+   diceva per sempre «manca la seconda firma» col tasto. Gli altri rami
+   erano già chiusi dallo stato dell'ordine (`s`) o da `txid_uscita`
+   (il cambio).
+
+COSA. `onchainSecondaFirmaDallOrdine` rifatta per QUESTO ordine: il
+velo con l'anello (`attesaP2P`, quello dei gesti che muovono sats, che
+è anche la guardia contro il secondo tocco), la frase del velo che dice
+a che punto è («Leggo l'ordine…», «Metto la seconda firma e mando i
+sats in rete…»), la spunta (`spuntaAttesaP2P`) solo a firma fatta, il
+velo chiuso nel `finally`, e alla fine SEMPRE un toast: firmato, il no
+di `onchainCofirma` col suo motivo, oppure il perché
+(`onchainSecondaFirmaPerche`, PURA: già partiti, niente sats, nessuna
+prima firma, la prima è tua, la firma è dell'altra parte, ordine non
+tuo; e prima ancora: on-chain spento, chiave non su questo dispositivo).
+Le guardie delle firme sono le stesse di prima (`onchainCofirma`,
+`onchainFirmaProposta` per il rilascio confermato prima): nessuna firma
+in più. Il riquadro, con la firma di Barattolo e `txid_uscita`: «↩️ Il
+rimborso è partito verso il tuo wallet…» (o «🔓 I sats sono partiti»),
+col «Vedi la transazione» di sempre, e niente tasto.
+
+STRADE SCARTATE. Ripristinare il seme dal cloud quando sul dispositivo
+manca: tocca la custodia della chiave (la strada di
+`onchainSemeAssicurato` può farne nascere una nuova), fuori da quel che
+è stato chiesto; il tasto lo dice e basta. Generalizzare il «partiti» a
+tutti i rami: gli altri erano già chiusi dallo stato.
+
+PROVE. `prove_seconda_firma_parla` (11 prove, nel gruppo onchain): il
+tasto in dieci giri col banco node (firmato, no col motivo, errore, già
+partiti, prima firma mia, firma dell'altra parte, rilascio confermato
+prima, ordine assente, niente seme, on-chain spento): torna sempre com'era
+col velo chiuso, l'anello dice i passi, la spunta solo a firma fatta; il
+riquadro con `txid_uscita` non ha più il tasto né «manca la seconda
+firma». Suite e collaudi: nel verbale del commit.
+
+DA GUARDARE. Dal telefono, alla prossima disputa o rilascio on-chain:
+l'anello e la frase finale. Ordine 4: ora il riquadro dice «Il rimborso
+è partito».
