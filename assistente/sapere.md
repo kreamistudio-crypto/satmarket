@@ -180,6 +180,14 @@ La pagina «Cambio» (la scheda in basso) sposta i TUOI sats fra Lightning e un 
 - I sats non passano mai da Barattolo: partono dal tuo wallet e arrivano al tuo wallet.
 - Limiti: da 25.000 sats a 0,01 BTC (1.000.000 sats) a cambio, al massimo 5 cambi al giorno. Da bitcoin verso Lightning il minimo è 50.000 sats (è il minimo del servizio di cambio). Se il servizio cambia i suoi limiti, vale il più stretto.
 
+La privacy del Cambio, cioè chi vede cosa:
+- Barattolo si segna, legati al tuo account, la direzione, la cifra, il numero del cambio e l'indirizzo del servizio di cambio dove passano i bitcoin. Non si segna il tuo indirizzo bitcoin né la tua fattura Lightning. Però dal numero del cambio, sulla blockchain pubblica, si può seguire dove sono andati i bitcoin.
+- SATS Routing vede quel che serve a fare il cambio: la fattura Lightning e il tuo indirizzo bitcoin. Non sa chi sei su Barattolo.
+- La pagina parla con SATS Routing e con mempool.space (da lì legge la rete e trasmette la transazione) direttamente dal tuo telefono o computer, quindi loro vedono il tuo IP. Se entri dal sito .onion con Tor Browser, non lo vede nessuno dei tre.
+- Sulla blockchain, da Lightning a bitcoin: al tuo indirizzo arriva una transazione con un solo ingresso, l'indirizzo del servizio, e una sola uscita, il tuo indirizzo; di solito ha l'aspetto di un pagamento qualunque. Da bitcoin a Lightning: si vede la transazione che parte dal tuo wallet verso l'indirizzo del servizio, come ogni pagamento on-chain.
+- Payjoin: nel Cambio non si usa. Da Lightning a bitcoin la transazione verso il tuo indirizzo la prepara il tuo telefono per il cambio, e non sa fare Payjoin: se incolli un link Payjoin («bitcoin:…?pj=…») l'app tiene solo l'indirizzo e i bitcoin arrivano lì con una transazione normale. Da bitcoin a Lightning l'indirizzo del servizio non accetta Payjoin, quindi anche il tuo wallet manda una transazione normale.
+- Il consiglio di sempre: un indirizzo nuovo per ogni cambio, in un wallet di cui solo tu hai le chiavi.
+
 # Nostr
 
 Gli annunci di Barattolo vengono pubblicati anche su Nostr, una rete aperta: esistono sui relay anche indipendentemente da Barattolo. Se colleghi una tua chiave Nostr dal Profilo, i tuoi annunci escono firmati da te (la firma la fa il tuo browser) e restano tuoi. Gli avvisi possono arrivarti anche su Nostr, oltre che su Telegram. La chiave privata (nsec) non va mai data a nessuno, nemmeno a Barattolo.

@@ -79740,3 +79740,25 @@ gonfia; «transaction.mempool» contato come fatto fa 6 prove rosse. DA
 GUARDARE: il primo esito vero in produzione (i cambi nati prima del
 deploy hanno più di tre giorni solo se vecchi: quelli di oggi la ronda li
 guarda da sé).
+
+## La privacy del Cambio nel libro di Tappo (11 nov 2026, Andrea: «ok si dopo la promozione pero»)
+
+PERCHÉ. Il giorno dell'apertura a tutti un utente ha chiesto a Tappo come
+funziona la privacy di un cambio da Lightning a on-chain, e se può usare
+un indirizzo Payjoin. Il libro non lo diceva, e Tappo (giustamente) ha
+mandato allo staff.
+
+COSA. In `assistente/sapere.md`, sotto «Il Cambio», sei righe «chi vede
+cosa», scritte leggendo il codice: Barattolo tiene col biglietto
+direzione, cifra, numero dello swap e indirizzo di lockup del fornitore
+(`cambio_nato`), mai l'indirizzo dell'utente né la sua fattura, ma dal
+numero dello swap la blockchain dice dove sono andati; SATS Routing vede
+fattura e indirizzo; SATS Routing e mempool.space li chiama il browser
+(`swapApiBoltz`, `swapMempool`, nessun proxy del server), quindi vedono
+l'IP, salvo Tor Browser sul .onion; il ritiro cooperativo è una spesa
+taproot a un ingresso e un'uscita; Payjoin non c'è: `swapEstraiIndirizzo`
+butta tutto dopo il «?», quindi `pj=` sparisce e resta una transazione
+normale; il submarine lo paga il wallet dell'utente verso un indirizzo
+che Payjoin non lo sa.
+
+PROVATO. `prove_novita_md`, `prove_assistente_bot` e la suite intera.
