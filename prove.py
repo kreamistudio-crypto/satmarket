@@ -186267,7 +186267,7 @@ const c = swapCambioSpiegaHtml(0);
 copiaCifraSats(59130);
 console.log(JSON.stringify([
   a.includes('onclick="copiaCifraSats(59130)"'), a.includes('crea una richiesta di <button'),
-  a.includes('sats esatti e incollala qui.'), a.includes('\\u0001') || a.includes('\u0001'),
+  a.includes('sats esatti e incollala qui, oppure incolla il tuo Lightning address.'), a.includes('\\u0001') || a.includes('\u0001'),
   b.includes('(0,00059130 BTC)') && b.includes('copiaCifraSats(59130)'),
   c.includes('<button'), c.includes('…'),
   copiato && copiato[0], vibra]));
@@ -186285,6 +186285,79 @@ console.log(JSON.stringify([
                       js.count("spiega.textContent = pz.spiega;")))
     prova("il bottoncino e' lo stesso della cifra in BTC (stesso stile)", True,
           'class="cifra-btc" onclick="copiaCifraSats(' in bottone)
+
+    # --- IL LIGHTNING ADDRESS AL POSTO DELLA RICHIESTA (stesso giorno,
+    # Andrea: «si»): la richiesta la chiede il server al wallet
+    import asyncio
+    eaddr = pezzo_js(js, "function swapEUnAddress(", "\n}\n") + "\n}\n"
+    r = _node_banco(eaddr + """
+console.log(JSON.stringify(['accasats@walletofsatoshi.com', 'Mario.Rossi@getalby.com',
+  'lnbc590u1p3xyz', 'nome@dominio', '@wallet.com', 'a@b.c d', ''].map(swapEUnAddress)));
+""")
+    if r is None:
+        salta("il riconoscitore dell'address: il banco", "node non c'e'")
+    else:
+        prova("un address si riconosce (nome@dominio.tld), una richiesta lnbc no",
+              [True, True, False, False, False, False, False], r)
+    crea = pezzo_js(js, "async function swapCreaDentro(", "\n}\n")
+    prova("nel Cambio l'address si scambia con la richiesta PRIMA del giudice "
+          "del fornitore, che la rilegge come le altre", True,
+          crea.index("if (sub && swapEUnAddress(fattura))")
+          < crea.index("await chiediFatturaCambioDaAddress(fattura, swapCambioDovuto())")
+          < crea.index("fattura = String(d.fattura).trim();")
+          < crea.index("f.fatturaValida(fattura, swapCambioDovuto())"))
+    prova("...e un no del wallet torna al preventivo col suo perche'", True,
+          "swapErrori[n] = (d && d.motivo) || t.addressNo;" in crea)
+    pagina = pezzo_js(mini, "async function chiediFatturaCambioDaAddress(", "\n}\n")
+    prova("la pagina la chiede al server, con la cifra", True,
+          "`${API_BASE}/swap/cambio/fattura`" in pagina and "sats: Number(sats) || 0" in pagina)
+
+    # la rotta, eseguita coi pezzi finti attorno
+    rotta = pezzo("cambio_fattura_da_address")
+    prova("la rotta: dietro il cancello del cambio e la strada rovesciata, col "
+          "freno dell'address, e non scrive niente", (1, 1, 1, 0, 0),
+          (rotta.count('if not cambio_libero_per(user["id"]) or "btc-ln" not in cambio_strade():'),
+           rotta.count('_frena("ln_address", user["id"])'),
+           rotta.count("await invoice_da_ln_address(address, cifra)"),
+           codice(rotta).count("INSERT"), codice(rotta).count("UPDATE")))
+
+    class _Http(Exception):
+        def __init__(self, codice, testo):
+            self.codice, self.testo = codice, testo
+    chiesti = []
+
+    async def finta_fattura(addr, sats):
+        chiesti.append((addr, sats))
+        return None if addr.startswith("muto") else f"lnbc{sats}"
+
+    async def json_di(req):
+        return req
+    amb = {"Request": object, "Header": lambda *a: "", "Cookie": lambda *a: "",
+           "app": type("A", (), {"post": staticmethod(lambda *a, **k: (lambda f: f))})(),
+           "HTTPException": _Http, "LnbitsMuto": type("LM", (Exception,), {}),
+           "verifica_utente": lambda a, b: {"id": 5},
+           "cambio_libero_per": lambda tg: True, "cambio_strade": lambda: ("ln-btc", "btc-ln"),
+           "_frena": lambda *a: None, "leggi_json": json_di, "SWAP_MIN_SATS": 25_000,
+           "CAMBIO_LIBERO_MAX_SATS": 1_000_000, "invoice_da_ln_address": finta_fattura,
+           "_fmt_sats": lambda n: f"{n:,}".replace(",", " ")}
+    exec(pezzo("_cambio_sats"), amb)
+    exec("async " + rotta, amb)
+
+    def chiama(corpo):
+        try:
+            return asyncio.run(amb["cambio_fattura_da_address"](corpo))
+        except _Http as e:
+            return e.codice
+    prova("l'address da' la richiesta della cifra; «lightning:» davanti si toglie",
+          ({"ok": True, "fattura": "lnbc59130"}, ("accasats@walletofsatoshi.com", 59130)),
+          (chiama({"address": "lightning:accasats@walletofsatoshi.com", "sats": 59130}),
+           chiesti[-1]))
+    prova("cifre fuori misura: 400 senza nemmeno bussare al wallet; wallet muto: 409",
+          (400, 400, 409, 2),
+          (chiama({"address": "a@b.com", "sats": 100}), chiama({"address": "a@b.com", "sats": 2_000_000}),
+           chiama({"address": "muto@b.com", "sats": 59130}), len(chiesti)))
+    amb["cambio_strade"] = lambda: ("ln-btc",)
+    prova("a strada rovesciata spenta: 403", 403, chiama({"address": "a@b.com", "sats": 59130}))
 
 
 def prove_cambio_libero():

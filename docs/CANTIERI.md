@@ -79784,3 +79784,23 @@ PROVATO. `prove_cifra_copia` (banco in node: bottone, numero nudo negli
 appunti, frase intera, BTC accanto, niente bottone senza cifra; i due
 punti in cui la frase va in pagina), controprova col textContent di
 prima rossa; `prove_swap_telefono`, suite e collaudi.
+
+IL GIORNO STESSO, IL LIGHTNING ADDRESS (Andrea, vista la sua schermata
+con «accasats@walletofsatoshi.com» incollato nel campo: «si»). Il campo
+della richiesta accetta anche un address: `swapEUnAddress` lo riconosce
+e, a «Conferma», `chiediFatturaCambioDaAddress` della pagina chiede al
+server la richiesta della cifra esatta (`POST /api/swap/cambio/fattura`,
+dietro `cambio_libero_per` e la strada btc-ln, freno «ln_address», cifra
+dentro i tetti del Cambio), che la prende con lo stesso
+`invoice_da_ln_address` degli incassi del mercatino. Il browser non può
+farlo da sé: la CSP non lo lascia bussare a un dominio qualunque. Poi è
+una richiesta incollata come le altre: il giudice del fornitore la
+rilegge (cifra, rete, scadenza). Né l'address né la fattura si scrivono
+da nessuna parte. LIMITE DICHIARATO, come per gli ordini: un server
+manomesso potrebbe dare una fattura sua. Testi: la frase dice «oppure
+incolla il tuo Lightning address», segnaposto «lnbc… / nome@wallet»;
+sapere.md e NOVITA.md (pubblico: sì, la bozza la decide Andrea).
+PROVATO in `prove_cifra_copia`: il riconoscitore in node, l'ordine dei
+passi in `swapCreaDentro`, la rotta eseguita coi pezzi finti attorno
+(cifra, «lightning:», 400 senza bussare, 409 col wallet muto, 403 a
+strada spenta).

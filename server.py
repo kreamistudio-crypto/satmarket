@@ -79605,6 +79605,43 @@ async def cambio_annulla(cid: int, x_tg_init_data: str = Header(""),
     return {"ok": True, "stato": "annullato"}
 
 
+@app.post("/api/swap/cambio/fattura")
+async def cambio_fattura_da_address(req: Request, x_tg_init_data: str = Header(""),
+                                    barattolo_sessione: str = Cookie("")):
+    """IL LIGHTNING ADDRESS AL POSTO DELLA RICHIESTA (11 nov 2026, cantiere
+    cifra-copia, Andrea: «si»). Nel Cambio da bitcoin a Lightning chi
+    incolla il suo address (nome@wallet) invece di una richiesta: la
+    richiesta della cifra esatta la chiede il server al suo wallet, con
+    lo stesso `invoice_da_ln_address` degli incassi del mercatino (forma
+    giudicata, niente redirect, cifra riletta). Il browser non puo'
+    farlo da se': la CSP non lo lascia bussare a un dominio qualunque.
+    L'address e la fattura non si scrivono da nessuna parte. LIMITE
+    DICHIARATO, come per gli ordini: un server manomesso potrebbe dare
+    una fattura sua; il telefono la rilegge comunque (cifra, rete,
+    scadenza) col giudice del fornitore prima di far nascere il cambio."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not cambio_libero_per(user["id"]) or "btc-ln" not in cambio_strade():
+        raise HTTPException(403, "Il cambio da bitcoin a Lightning non è acceso")
+    _frena("ln_address", user["id"])
+    d = await leggi_json(req)
+    address = str(d.get("address") or "").strip()
+    if address.lower().startswith("lightning:"):
+        address = address[10:].strip()
+    cifra = _cambio_sats(d.get("sats"))
+    if not cifra or cifra < int(SWAP_MIN_SATS or 0) or (
+            int(CAMBIO_LIBERO_MAX_SATS or 0) and cifra > int(CAMBIO_LIBERO_MAX_SATS)):
+        raise HTTPException(400, "Cifra della richiesta fuori misura")
+    try:
+        pr = await invoice_da_ln_address(address, cifra)
+    except LnbitsMuto:
+        raise HTTPException(503, "Adesso non riusciamo a leggere la richiesta: "
+                                 "riprova fra poco, o incollane una creata dal wallet")
+    if not pr:
+        raise HTTPException(409, f"Il tuo Lightning address non ha dato una "
+                                 f"richiesta da {_fmt_sats(cifra)} sats: "
+                                 "incollane una creata dal wallet")
+    return {"ok": True, "fattura": pr}
+
 # --- IL VOLUME DEL CAMBIO NEL PANNELLO (11 nov 2026, cantiere volume-cambio)
 # Andrea, il giorno in cui il Cambio si apre a tutti: «metti una sezione
 # dove vediamo quanto volume gli utenti hanno scambiato nella sezione
