@@ -33312,7 +33312,9 @@ async def cruscotto_admin(x_tg_init_data: str = Header(""),
     # ronde dei relay — tutto dalla memoria del server, nella COPIA
     return {**dati, "p2p_statistiche": vede_statistiche_p2p(user["id"]),
             "zap": await dati_zap_cruscotto(),
-            "swap": await dati_swap_cruscotto(), "salute": dati_salute()}
+            "swap": await dati_swap_cruscotto(),
+            # il volume della pagina Cambio (11 nov 2026, volume-cambio)
+            "cambi": dati_cambi_cruscotto(), "salute": dati_salute()}
 
 
 @app.get("/api/admin/stats")
@@ -79366,6 +79368,14 @@ def _cambi_prepara(con):
         stato TEXT DEFAULT 'chiesto',
         creato INTEGER DEFAULT 0,
         aggiornato INTEGER DEFAULT 0)""")
+    # L'ESITO (11 nov 2026, cantiere volume-cambio): '' = non si sa
+    # ancora, «fatto» o «non_andato» come lo dice il fornitore; `visto` =
+    # l'ultima volta che glielo si e' chiesto. Li scrive `ronda_esiti_cambi`.
+    for colonna in ("esito TEXT DEFAULT ''", "esito_visto INTEGER DEFAULT 0"):
+        try:
+            con.execute(f"ALTER TABLE cambi_liberi ADD COLUMN {colonna}")
+        except sqlite3.OperationalError:
+            pass
     con.execute("CREATE INDEX IF NOT EXISTS cambi_liberi_chi ON "
                 "cambi_liberi(tg_id, creato)")
     con.execute("CREATE UNIQUE INDEX IF NOT EXISTS cambi_liberi_swap ON "
@@ -79593,6 +79603,132 @@ async def cambio_annulla(cid: int, x_tg_init_data: str = Header(""),
         finally:
             con.close()
     return {"ok": True, "stato": "annullato"}
+
+
+# --- IL VOLUME DEL CAMBIO NEL PANNELLO (11 nov 2026, cantiere volume-cambio)
+# Andrea, il giorno in cui il Cambio si apre a tutti: «metti una sezione
+# dove vediamo quanto volume gli utenti hanno scambiato nella sezione
+# cambio». Il biglietto dice solo che lo swap e' NATO presso il fornitore:
+# la fattura la paga l'utente col suo wallet, e Barattolo da solo non sa se
+# l'ha pagata. Un volume fatto di biglietti conterebbe anche chi ha chiuso
+# la pagina davanti alla fattura. Per questo LA RONDA DEGLI ESITI chiede al
+# fornitore lo stato di ogni cambio nato (`swap_stato_di`: il solo numero
+# dello swap, niente chiavi, niente utente) finche' non e' finito, e lo
+# scrive nella riga. Il pannello conta i FATTI, e accanto dice quanti sono
+# ancora in corso e quanti non sono andati: un numero che si legge senza
+# dover sapere come e' fatto.
+# Quando e' fatto: Lightning → bitcoin quando il fornitore incassa la
+# fattura («invoice.settled»: succede solo dopo il ritiro dei bitcoin);
+# bitcoin → Lightning quando ha pagato la fattura dell'utente
+# («invoice.paid» e quel che viene dopo). I sats contati sono quelli dal
+# lato Lightning, la cifra del biglietto: chi manda per Lightning → bitcoin,
+# chi riceve per bitcoin → Lightning.
+CAMBIO_ESITI_FATTI = {
+    "ln-btc": ("invoice.settled",),
+    "btc-ln": ("invoice.paid", "transaction.claim.pending",
+               "transaction.claimed"),
+}
+CAMBIO_ESITI_NON_ANDATI = ("swap.expired", "invoice.expired",
+                           "transaction.failed", "transaction.refunded",
+                           "invoice.failedToPay", "transaction.lockupFailed",
+                           "swap.sconosciuto")
+# si guarda un cambio ogni dieci minuti, per tre giorni (un cambio vive
+# al piu' un giorno: la scadenza del fornitore); dopo resta «non si sa»
+CAMBIO_ESITO_OGNI_S = 600
+CAMBIO_ESITO_GUARDA_S = 3 * 86400
+CAMBIO_ESITO_PER_GIRO = 20
+
+
+def cambio_esito_di(direzione: str, stato: str) -> str:
+    """PURA: «fatto», «non_andato» o '' (ancora in corso) per lo stato
+    che dice il fornitore."""
+    if stato in CAMBIO_ESITI_FATTI.get(direzione, ()):
+        return "fatto"
+    if stato in CAMBIO_ESITI_NON_ANDATI:
+        return "non_andato"
+    return ""
+
+
+async def ronda_esiti_cambi(adesso: int | None = None) -> int:
+    """LA RONDA DEGLI ESITI: per i cambi nati negli ultimi tre giorni e
+    senza esito, lo stato dal fornitore, uno ogni dieci minuti, al piu'
+    venti per giro. Fornitore muto → si riprova dopo. Torna quanti esiti
+    ha scritto."""
+    adesso = int(adesso if adesso is not None else time.time())
+    con = _cambi_db()
+    try:
+        righe = [dict(r) for r in con.execute(
+            "SELECT id, direzione, fornitore, swap_id FROM cambi_liberi "
+            "WHERE stato='nato' AND swap_id<>'' AND COALESCE(esito,'')='' "
+            "AND creato>? AND COALESCE(esito_visto,0)<? "
+            "ORDER BY COALESCE(esito_visto,0), id LIMIT ?",
+            (adesso - CAMBIO_ESITO_GUARDA_S, adesso - CAMBIO_ESITO_OGNI_S,
+             CAMBIO_ESITO_PER_GIRO))]
+    finally:
+        con.close()
+    scritti = 0
+    for r in righe:
+        f = swap_fornitore(str(r["fornitore"] or "satsrouting"))
+        stato = await swap_stato_di(f, r["swap_id"]) if f else None
+        esito = cambio_esito_di(r["direzione"], stato) if stato else ""
+        con = _cambi_db()
+        try:
+            con.execute("UPDATE cambi_liberi SET esito=?, esito_visto=? "
+                        "WHERE id=?", (esito, adesso, int(r["id"])))
+            con.commit()
+        finally:
+            con.close()
+        scritti += 1 if esito else 0
+    return scritti
+
+
+CAMBIO_PERIODI = (("7 giorni", 7 * 86400), ("30 giorni", 30 * 86400),
+                  ("da sempre", 0))
+
+
+def dati_cambi_cruscotto(adesso: int | None = None):
+    """La card «🔁 Volume del Cambio» di `/admin`: per periodo e per
+    direzione, i cambi FATTI (quanti, sats, persone diverse), e quanti
+    sono in corso o non sono andati. Solo numeri: niente nomi, niente
+    indirizzi. None = niente card (Cambio spento e nessun cambio nato)."""
+    adesso = int(adesso if adesso is not None else time.time())
+    con = _cambi_db()
+    try:
+        nati = con.execute("SELECT COUNT(*) FROM cambi_liberi "
+                           "WHERE stato='nato'").fetchone()[0]
+        if not CAMBIO_LIBERO_ATTIVO and not nati:
+            return None
+        periodi = []
+        for nome, durata in CAMBIO_PERIODI:
+            dal = adesso - durata if durata else 0
+            riga = {"nome": nome, "strade": []}
+            for strada in ("ln-btc", "btc-ln"):
+                f = con.execute(
+                    "SELECT COUNT(*), COALESCE(SUM(sats),0), "
+                    "COUNT(DISTINCT tg_id) FROM cambi_liberi WHERE "
+                    "stato='nato' AND direzione=? AND esito='fatto' AND "
+                    "creato>=?", (strada, dal)).fetchone()
+                altri = dict(con.execute(
+                    "SELECT COALESCE(esito,''), COUNT(*) FROM cambi_liberi "
+                    "WHERE stato='nato' AND direzione=? AND creato>=? "
+                    "AND COALESCE(esito,'')<>'fatto' GROUP BY 1",
+                    (strada, dal)).fetchall())
+                riga["strade"].append({
+                    "strada": strada, "fatti": int(f[0]), "sats": int(f[1]),
+                    "persone": int(f[2]),
+                    "in_corso": int(altri.get("", 0)),
+                    "non_andati": int(altri.get("non_andato", 0))})
+            tot = con.execute(
+                "SELECT COUNT(DISTINCT tg_id) FROM cambi_liberi WHERE "
+                "stato='nato' AND esito='fatto' AND creato>=?",
+                (dal,)).fetchone()[0]
+            riga["persone"] = int(tot)
+            riga["sats"] = sum(x["sats"] for x in riga["strade"])
+            riga["fatti"] = sum(x["fatti"] for x in riga["strade"])
+            periodi.append(riga)
+    finally:
+        con.close()
+    return {"attivo": bool(CAMBIO_LIBERO_ATTIVO), "periodi": periodi}
 
 
 # --- PRENDERE UN ORDINE P2P LIGHTNING E RICEVERE ON-CHAIN (1 nov 2026,
@@ -79900,6 +80036,12 @@ async def orologio_cambi_p2p():
             await ronda_cambi_p2p()
         except Exception as e:
             print(f"⚠️ Cambi P2P: ronda saltata: {e}", flush=True)
+        # (11 nov 2026, volume-cambio) e gli esiti dei cambi della
+        # pagina Cambio, per il pannello: senza cambi nati non chiama nessuno
+        try:
+            await ronda_esiti_cambi()
+        except Exception as e:
+            print(f"⚠️ Cambio: ronda degli esiti saltata: {e}", flush=True)
 
 
 @app.on_event("startup")
