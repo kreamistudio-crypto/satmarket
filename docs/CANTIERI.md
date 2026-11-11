@@ -79528,3 +79528,53 @@ era `collaudo_deposito_ln_p2p`, curato come sopra e rigirato verde).
 DA GUARDARE. Dal telefono sul collaudo: il tocco che copia dentro
 Telegram (Android e iPhone) e «₿ Apri nel wallet» del mercatino con un
 wallet vero.
+
+## Il foglio on-chain si chiude quando la rete vede i sats (11 nov 2026, cantiere foglio-oc-visto, Andrea: «quando pago e torno nell'app vedo ancora la pagina del pagamento invece non dovrei» e «negli ordini risulta ancora da pagare»)
+
+PERCHÉ. Provando la cifra in BTC in produzione, Andrea ha pagato dal
+wallet sullo stesso telefono ed è tornato nell'app: il foglio «Blocca …
+sats» era ancora aperto, col QR, e «Ho pagato» rispondeva «visti in
+rete, aspetto una conferma». In «Ordini» la riga diceva «Da pagare». Il
+foglio si chiudeva solo alla CONFERMA (`payOcPagato`, ~10 minuti); al
+primo avvistamento in mempool aggiungeva una riga e restava lì. Il
+deposito del P2P on-chain invece si chiude già a deposito visto
+(`depositoVistoOnchainP2P`, grafica-p2p-onchain): due regole diverse
+per lo stesso gesto.
+
+COSA. `pagamentoVistoOnchain(o)` (PURA, la gemella del P2P: in attesa
+con almeno i sats da mandare visti in rete) decide tre cose:
+1. `payOcAggiorna` → `payOcVisto`: il foglio si spegne e si chiude, il
+   toast dice «⏳ Pagamento visto in rete: manca una conferma, circa
+   dieci minuti. Lo trovi in «Ordini».» e «Ordini» si rilegge. Con una
+   parte sola il foglio resta aperto e dice «ne mancano N».
+2. La riga di «Ordini» (`cardOnchainDaPagare`): «⏳ Visto in rete,
+   aspetto la conferma» con l'etichetta grigia «In arrivo» (`.badge.attesa`)
+   invece di «Da pagare»; il tocco (`payRiapriOnchain`) non riapre il QR,
+   ripete il toast.
+3. Il ritorno dal wallet (`payOcRitorno`, sul `visibilitychange`): la
+   ronda del server guarda la rete ogni due minuti, quindi al ritorno
+   col foglio aperto si chiede subito lo stesso «controlla» di «Ho
+   pagato» (freno del server 60 l'ora a persona; qui al più uno ogni 20
+   secondi, sennò la lettura leggera di sempre).
+«Ho pagato» non fa più il toast «visti in rete» quando il foglio si
+chiude da solo; con una parte dice «visti X sats su Y: manca il resto».
+
+STRADE SCARTATE. Chiudere già al primo sat visto (come chiedeva la
+riga vecchia): con un pagamento a metà chi compra perderebbe il QR
+proprio quando deve mandare il resto. Far nascere l'ordine di sempre
+(«Sats depositati») all'avvistamento: l'ordine on-chain nasce alla
+conferma per scelta (CANTIERI, l'ordine on-chain), e chi vende ha già
+«⛓️ Pagamento in arrivo» per l'avvistamento; qui cambia solo quello che
+vede chi compra.
+
+PROVATO. `prove_foglio_oc_visto` (categoria onchain): la funzione pura
+(cifra intera, di più, una parte, niente, già pagato, nulla), la riga di
+«Ordini» nei due casi, `payOcAggiorna` in un banco node (visto → chiude,
+parte → ridisegna, confermato → pagato, altro ordine → niente), il tocco
+che non riapre il QR, il ritorno col controlla e il freno, il «ne
+mancano». CONTROPROVA: tolta la chiusura in `payOcAggiorna` e messa la
+soglia a «un sat qualunque», tre prove rosse.
+
+DA GUARDARE. Dal telefono: il ritorno dal wallet dentro Telegram
+(Android e iPhone) chiude il foglio entro pochi secondi da quando la
+rete vede la transazione.

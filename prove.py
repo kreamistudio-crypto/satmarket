@@ -188535,6 +188535,80 @@ def prove_cifra_btc():
           < orologio.index("portaWallet(el('payWallet'), inv);"))
 
 
+def prove_foglio_oc_visto():
+    """IL FOGLIO ON-CHAIN SI CHIUDE A PAGAMENTO VISTO (11 nov 2026, cantiere
+    foglio-oc-visto, Andrea: «quando pago e torno nell'app vedo ancora la
+    pagina del pagamento invece non dovrei» e «negli ordini risulta ancora
+    da pagare»). Visti in rete tutti i sats da mandare: il foglio si chiude
+    e lo dice, la riga di «Ordini» dice «Visto in rete» e non riapre il QR;
+    una parte sola tiene il foglio aperto col «ne mancano». Al ritorno
+    dall'app del wallet si chiede alla rete subito."""
+    print("\n[il foglio on-chain si chiude a pagamento visto]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    banco = (pezzo_js(mini, "function pagamentoVistoOnchain(o){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "const FRASE_OC_VISTO = ", ";\n") + ";\n"
+             + pezzo_js(mini, "function cardOnchainDaPagare(o){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "async function payOcAggiorna(o){", "\n}\n") + "\n}\n"
+             + """
+const esc = x => String(x), fmt = n => String(n), P2P_OC_MONETA = '₿';
+const STATES = {creato: {label: 'Da pagare'}};
+const fatti = [];
+let payOc = null;
+async function payOcPagato(o){ fatti.push('pagato'); }
+async function payOcVisto(o){ fatti.push('visto'); }
+async function payDisegnaOnchain(){ fatti.push('ridisegno'); }
+function payMetodoSpegni(){ fatti.push('spegni'); }
+function closeSheet(){ fatti.push('chiudi'); }
+function toast(t){ fatti.push('toast'); }
+const A = (x) => Object.assign({id: 1, stato: 'attesa', importo_sats: 8128, visti_sats: 0, titolo: 'Lampada', creato: 1}, x);
+(async () => {
+  const puri = [pagamentoVistoOnchain(A({visti_sats: 8128})), pagamentoVistoOnchain(A({visti_sats: 9000})),
+    pagamentoVistoOnchain(A({visti_sats: 8127})), pagamentoVistoOnchain(A({visti_sats: 0})),
+    pagamentoVistoOnchain(A({visti_sats: 8128, stato: 'pagato'})), pagamentoVistoOnchain(null)];
+  const cv = cardOnchainDaPagare(A({visti_sats: 8128})), cn = cardOnchainDaPagare(A({visti_sats: 100}));
+  const carte = [cv.includes('Visto in rete, aspetto la conferma'), cv.includes('In arrivo'), cv.includes('Da pagare'),
+                 cn.includes('Da pagare'), cn.includes('Visto in rete')];
+  const giri = [];
+  payOc = {o: A()}; fatti.length = 0; await payOcAggiorna(A({visti_sats: 8128})); giri.push(fatti.join(','));
+  payOc = {o: A()}; fatti.length = 0; await payOcAggiorna(A({visti_sats: 4000})); giri.push(fatti.join(','));
+  payOc = {o: A()}; fatti.length = 0; await payOcAggiorna(A({visti_sats: 8128, stato: 'pagato'})); giri.push(fatti.join(','));
+  payOc = {o: A({id: 2})}; fatti.length = 0; await payOcAggiorna(A({visti_sats: 8128})); giri.push(fatti.join(','));
+  console.log(JSON.stringify({puri, carte, giri}));
+})();
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("il foglio on-chain a pagamento visto: il banco", "node non c'e'")
+    else:
+        prova("visto = in attesa con ALMENO i sats da mandare in rete; una parte no",
+              [True, True, False, False, False, False], r.get("puri"))
+        prova("la riga di «Ordini»: visto → «Visto in rete» e «In arrivo», mai «Da pagare»",
+              [True, True, False, True, False], r.get("carte"))
+        prova("il foglio: visto → si chiude (payOcVisto); una parte → ridisegna; "
+              "confermato → pagato; un altro ordine → niente",
+              ["visto", "ridisegno", "pagato", ""], r.get("giri"))
+    visto = pezzo_js(mini, "async function payOcVisto(o){", "\n}\n")
+    prova("payOcVisto spegne il controllo, chiude il foglio, lo dice e rilegge «Ordini»",
+          [True, True, True, True],
+          ["payMetodoSpegni();" in visto, "closeSheet();" in visto,
+           "toast(FRASE_OC_VISTO" in visto, "await loadOrders(); renderOrders();" in visto])
+    riapri = pezzo_js(mini, "async function payRiapriOnchain(oid){", "\n}\n")
+    prova("da «Ordini» un pagamento gia' visto non riapre il QR",
+          True, riapri.index("if (pagamentoVistoOnchain(o)) { toast(FRASE_OC_VISTO")
+          < riapri.index("el('paySheet').classList.add('open');"))
+    ritorno = pezzo_js(mini, "async function payOcRitorno(){", "\n}\n")
+    prova("al ritorno nell'app: il «controlla» subito (al piu' ogni 20 s), sennò la riga",
+          [True, True, True, True],
+          ["document.addEventListener('visibilitychange', payOcRitorno);" in mini,
+           "/onchain/ordini/${payOc.o.id}/controlla" in ritorno,
+           "< 20000) return payOcGuarda();" in ritorno,
+           "if (!r.ok) return payOcGuarda();" in ritorno])
+    disegna = pezzo_js(mini, "async function payDisegnaOnchain(){", "\n}\n")
+    prova("con una parte vista il foglio dice quanti sats mancano", True,
+          "ne mancano <b>${fmt(o.importo_sats - o.visti_sats)}</b>" in disegna)
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -188831,7 +188905,7 @@ CATEGORIE = {
     deposito_p2p_onchain grafica_p2p_onchain incasso_esterno_onchain
     onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto
     p2p_onchain p2p_onchain_usdt rete_onchain_dal_pannello
-    scelta_rete_mercatino cifra_btc
+    scelta_rete_mercatino cifra_btc foglio_oc_visto
     """.split(),
 }
 
@@ -189584,6 +189658,7 @@ def main():
               prove_widget_prova,
               prove_widget_ordini,
               prove_cifra_btc,
+              prove_foglio_oc_visto,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:

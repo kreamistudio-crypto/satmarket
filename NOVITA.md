@@ -56,3 +56,9 @@ frase: Quando paghi on-chain, accanto ai sats da mandare ora vedi anche la cifra
 dove: il foglio «Blocca … sats» del pagamento on-chain, «🔒 Blocca i sats» degli scambi P2P on-chain, la scheda «Cambio» e il riquadro «Caricali in Lightning» del P2P: la riga «In BTC» col bottoncino 📋.
 leva: ONCHAIN_ATTIVO spenta di serie
 pubblico: no
+
+## 2026-11-11 · foglio-oc-visto
+frase: Quando paghi un ordine on-chain, appena la rete vede i tuoi sats la pagina del pagamento si chiude da sola: in «Ordini» l'ordine dice «Visto in rete, aspetto la conferma» invece di «Da pagare», e dopo una conferma, circa dieci minuti, diventa pagato.
+dove: il foglio «Blocca … sats» del pagamento on-chain e la riga dell'ordine in «Ordini» (etichetta «In arrivo»).
+leva: ONCHAIN_ATTIVO spenta di serie
+pubblico: no

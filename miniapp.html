@@ -18740,15 +18740,27 @@ async function caricaOnchainDaPagare(){
     ordiniOnchainDaPagare = tutti.filter(o => o.stato === 'attesa' && o.ruolo === 'compratore');
   } catch(e) { ordiniOnchainDaPagare = []; }
 }
+/* PURA: il pagamento on-chain si vede gia' in rete? Visti almeno i sats
+   da mandare (11 nov 2026, cantiere foglio-oc-visto, Andrea: «quando pago
+   e torno nell'app vedo ancora la pagina del pagamento invece non
+   dovrei»). La gemella di `depositoVistoOnchainP2P`: da qui il foglio
+   del pagamento si chiude da solo e la riga di «Ordini» non dice piu'
+   «Da pagare». Una parte sola non basta: il foglio resta aperto. */
+function pagamentoVistoOnchain(o){
+  return !!o && o.stato === 'attesa'
+    && (Number(o.visti_sats) || 0) >= (Number(o.importo_sats) || 1);
+}
+const FRASE_OC_VISTO = '⏳ Pagamento visto in rete: manca una conferma, circa dieci minuti. Lo trovi in «Ordini».';
 function cardOnchainDaPagare(o){
+  const visto = pagamentoVistoOnchain(o);
   return `<div class="order" onclick="payRiapriOnchain(${Number(o.id)})">
       <div class="ord-card">
         <span class="order-ic ord-foto">${P2P_OC_MONETA}</span>
         <div class="order-main">
           <b class="ord-titolo">${esc(o.titolo)}</b>
-          <div class="ord-verbo">₿ Compri on-chain · ${fmt(o.importo_sats)} sats</div>
+          <div class="ord-verbo">${visto ? '⏳ Visto in rete, aspetto la conferma' : '₿ Compri on-chain'} · ${fmt(o.importo_sats)} sats</div>
         </div>
-        <span class="badge dapagare">${STATES.creato.label}</span>
+        ${visto ? '<span class="badge attesa">In arrivo</span>' : `<span class="badge dapagare">${STATES.creato.label}</span>`}
         <div class="ord-foto-data">${new Date(o.creato * 1000).toLocaleDateString('it-IT')}</div>
       </div>
     </div>`;
@@ -59069,7 +59081,10 @@ async function payDisegnaOnchain(){
   el('payEurNota').style.display = 'block';
   el('payEurNota').textContent = `${onchainRete().prova ? nomeReteProva() + ', rete di prova.' : 'Rete Bitcoin: sats veri.'} L'indirizzo vale fino a ${new Date(o.scade * 1000).toLocaleString('it-IT')}.`;
   el('payPatto').innerHTML = 'Paga con un wallet Bitcoin. I sats vanno in un <b style="color:var(--trust)">2-di-3</b> fra te, chi vende e Barattolo: escono solo con due firme, e al venditore arrivano quando confermi di aver ricevuto l\'oggetto. Serve una conferma, circa dieci minuti.'
-    + (o.visti_sats ? `<br><b>Visti in rete: ${fmt(o.visti_sats)} sats</b>, confermati ${fmt(o.ricevuti_sats)}.` : '');
+    /* (foglio-oc-visto) con la cifra intera vista il foglio si chiude da
+       solo: qui resta solo il caso di una parte, e si dice quanto manca */
+    + (o.visti_sats ? `<br><b>Visti in rete: ${fmt(o.visti_sats)} sats</b>`
+       + (o.visti_sats < o.importo_sats ? `: ne mancano <b>${fmt(o.importo_sats - o.visti_sats)}</b>.` : `, confermati ${fmt(o.ricevuti_sats)}.`) : '');
   /* «₿ Apri nel wallet» (11 nov 2026, cifra-btc): la riga della scadenza
      della fattura diventa la porta del wallet Bitcoin, col link `bitcoin:`
      del QR (cifra compresa), come nel deposito del P2P on-chain. Il link
@@ -59109,11 +59124,32 @@ async function payOcGuarda(){
   } catch(e) { /* al prossimo giro */ }
 }
 
+/* IL RITORNO DAL WALLET (11 nov 2026, foglio-oc-visto): chi paga col
+   wallet sullo stesso telefono torna nell'app col foglio aperto, e la
+   ronda del server guarda la rete solo ogni due minuti. Al ritorno si
+   chiede alla rete subito, in silenzio, lo stesso «controlla» di «Ho
+   pagato» (sul server il suo freno: 60 l'ora a persona); qui al piu' uno
+   ogni 20 secondi, e se non risponde si legge la riga come sempre. */
+let payOcRitornoIl = 0;
+async function payOcRitorno(){
+  if (document.hidden || !payOc || !el('paySheet').classList.contains('open')) return;
+  if (Date.now() - payOcRitornoIl < 20000) return payOcGuarda();
+  payOcRitornoIl = Date.now();
+  try {
+    const r = await fetch(`${API_BASE}/onchain/ordini/${payOc.o.id}/controlla`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+    if (!r.ok) return payOcGuarda();
+    await payOcAggiorna(await r.json());
+  } catch(e) { payOcGuarda(); }
+}
+document.addEventListener('visibilitychange', payOcRitorno);
+
 async function payOcAggiorna(o){
   if (!payOc || payOc.o.id !== o.id) return;
   const prima = payOc.o.visti_sats;
   payOc.o = o;
   if (o.stato === 'pagato') return payOcPagato(o);
+  if (pagamentoVistoOnchain(o)) return payOcVisto(o);
   if (o.stato !== 'attesa') {
     payMetodoSpegni();
     closeSheet();
@@ -59121,6 +59157,17 @@ async function payOcAggiorna(o){
     return;
   }
   if (o.visti_sats !== prima) await payDisegnaOnchain();
+}
+
+/* (11 nov 2026, foglio-oc-visto) i sats si vedono in rete: il foglio non
+   ha piu' niente da far pagare, si chiude e lo dice; l'ordine aspetta la
+   conferma in «Ordini» (`cardOnchainDaPagare`). Alla conferma l'avviso
+   del bot e la ronda del server lo fanno diventare un ordine di sempre. */
+async function payOcVisto(o){
+  payMetodoSpegni();
+  closeSheet();
+  toast(FRASE_OC_VISTO, 7000);
+  try { await loadOrders(); renderOrders(); } catch(e) {}
 }
 
 async function payOcPagato(o){
@@ -59140,8 +59187,9 @@ async function payOcControlla(){
       {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non riesco a guardare');
-    if (d.stato === 'attesa') toast(d.visti_sats ? '⏳ Visti in rete, aspetto una conferma (circa dieci minuti)'
-                                                : '⏳ Ancora niente sull\'indirizzo', 5000);
+    if (d.stato === 'attesa' && !pagamentoVistoOnchain(d))
+      toast(d.visti_sats ? '⏳ Visti in rete ' + fmt(d.visti_sats) + ' sats su ' + fmt(d.importo_sats || payOc.o.importo_sats) + ': manca il resto'
+                         : '⏳ Ancora niente sull\'indirizzo', 5000);
     await payOcAggiorna(d);
   } catch(e) { toast('₿ ' + (e.message || 'errore')); }
 }
@@ -59177,6 +59225,8 @@ async function payRiapriOnchain(oid){
     const parole = await onchainSemeAssicurato();
     const o = (await onchainLeggiOrdini()).find(x => x.id === Number(oid));
     if (!o || o.stato !== 'attesa') { await loadOrders(); renderOrders(); return; }
+    /* (foglio-oc-visto) gia' visto in rete: il QR non serve piu' */
+    if (pagamentoVistoOnchain(o)) { toast(FRASE_OC_VISTO, 6000); return; }
     rilancioCorrente = null; pagamentoCorrente = null; currentOrderId = null;
     payMetodoSpegni();
     acqMetodo = 'onchain';
