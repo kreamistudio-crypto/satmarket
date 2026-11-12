@@ -96,5 +96,5 @@ pubblico: sì
 ## 2026-11-12 · p2p-onchain-500
 frase: Negli scambi P2P on-chain ora si arriva fino a 500 € per ordine (prima 250 €), lo stesso tetto degli acquisti on-chain del mercatino. Gli scambi P2P in Lightning restano fino a 250 € durante la beta. E nelle card del libro, anche in quelle on-chain, toccando la faccia di chi ha pubblicato si apre il suo negozio, mai l'ordine.
 dove: la scheda «P2P», il foglio «Pubblica» a rete on-chain e le card del libro.
-leva: ONCHAIN_MAX_EURO (nessuna leva nuova)
-pubblico: sì
+leva: ONCHAIN_MAX_EURO (nessuna leva nuova; il P2P on-chain resta dietro ONCHAIN_SOLO_ADMIN)
+pubblico: no

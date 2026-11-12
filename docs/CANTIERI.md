@@ -79972,3 +79972,7 @@ fatti», «Pagina Swap») e nota dicono swap. I nomi interni restano
 (`cardCambi`, `dati_cambi_cruscotto`, `D.cambi`): solo testi.
 PROVATO: `prove_volume_cambio` con la sentinella nuova (nessun «cambi
 fatti» né «Pagina Cambio» nella card) e la suite della categoria swap.
+Stessa promozione: la voce di NOVITA.md «p2p-onchain-500» passa a
+«pubblico: no». L'avevo scritta «sì», ma il P2P on-chain resta dietro
+`ONCHAIN_SOLO_ADMIN` (solo admin, Andrea: «l'on-chain da 500 lo facciamo
+poi»), e il flusso di Tappo l'avrebbe annunciata a tutti.
