@@ -4407,6 +4407,22 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   stesso comando col conto degli scambi aperti, `docker compose restart
   mostro`. Libro fermo dalle 11:47:43 alle 11:47:53 UTC; dopo, «Sending
   Mostro relay list» e la parola `damus` zero volte nel registro.
+  NOS.LOL FUORI, PRIMAL DENTRO (12 nov 2026, stessa forma): nos.lol non
+  rispondeva piu' alle uscite Tor (timeout dal namespace di mostro, 200
+  dal PC; ultimo prezzo accettato il 6 nov). Riga 35 oggi:
+  `relays = ['wss://relay.barattolo.store', 'wss://relay.mostro.network',
+  'wss://relay.primal.net']` — APICI SINGOLI, un `sed` con le doppie non
+  trova niente. Copia `settings.toml.prima-senza-noslol`, file nuovo
+  `settings.toml.senza-noslol` coi permessi del vero (`chmod
+  --reference`: dentro c'e' la chiave di Mostro), `cp` SENZA `-p` sul
+  file vero. Libro fermo 11:59:41-51 UTC. Prima di scegliere un relay si
+  prova DA TOR: `docker run --rm --pull never --network
+  container:nodo-mostro-1 curlimages/curl -s -m 40 -o /dev/null -w
+  '%{http_code}' https://<relay>` (il 12 nov: primal, snort, damus 200;
+  nostr.mom e offchain.pub 000). La prova dopo, relay per relay:
+  `docker logs --since <ora del riavvio> nodo-mostro-1 2>&1 | grep
+  'published exchange rates' | tail -n1 | grep -oE
+  'wss://[a-z.]+"\): (Ack|"[^"]*")'` — tre `Ack`.
   NON PROVATO, e resta della FASE 5: la scadenza vera (l'ordine che
   TORNA nel libro alla prima mancata risposta e SPARISCE alla seconda,
   con le righe `barattolo_tempo` nel registro) — la prova del 13 si è

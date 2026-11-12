@@ -79963,6 +79963,44 @@ P2P_MAX_EURO a 250, il giudice chiamato col 500, la busta col 500; il
 negozio a chi è entrato, non all'anonimo). Suite severa e collaudi.
 DA GUARDARE dal telefono: il tocco sulla faccia di una card on-chain.
 
+## nos.lol fuori dai relay di Mostro, relay.primal.net dentro (12 nov 2026, «sostituirlo» di Andrea)
+
+**IL FATTO.** Dal 3 nov Mostro scriveva «relay not connected» per
+`wss://nos.lol`, e dal 6 nov 21:36 UTC nos.lol non ha piu' accettato
+niente. Dal namespace di mostro https://nos.lol andava in timeout a 40
+s (anche il 12 nov), dal PC di Andrea rispondeva 200: nos.lol chiude
+alle uscite Tor, non e' un guaio nostro. Il 9 nov Andrea aveva scelto di
+aspettare tre giorni; il 12, visto che non era tornato, di sostituirlo.
+
+**LA SCELTA.** Cinque candidati provati DA TOR, dal namespace di mostro:
+relay.primal.net, relay.snort.social e relay.damus.io 200; nostr.mom
+timeout, offchain.pub TLS chiuso. Damus scartato in partenza: tolto il
+13 ott perche' limitava la frequenza (PRODUZIONE, «DAMUS FUORI»).
+Preso primal: tra i piu' usati dai client Nostr, e Barattolo lo ha gia'
+nelle sue liste.
+
+**IL GESTO** (di Andrea, a libro fermo): copia
+`settings.toml.prima-senza-noslol`, file nuovo accanto, `diff` con la
+sola riga 35, poi il comando col conto degli scambi aperti. Il primo
+giro si e' fermato da solo per la disputa 08e841b5 («scambi aperti:
+1»); chiusa la disputa, il secondo ha cambiato e riavviato (11:59:41-51
+UTC). Due inciampi miei, presi prima del danno: il `sed` cercava le
+virgolette doppie e il settings usa gli apici singoli (file nuovo
+identico al vecchio, visto dal `diff` vuoto); e un `grep -A6` che
+avrebbe letto righe del settings oltre ai relay, corretto in `grep -n
+'wss://'` prima del lancio (segnalato dal coordinatore). Il file nuovo
+prende i permessi del vero, perche' dentro c'e' la chiave di Mostro.
+
+**PROVATO DAL VIVO.** Dopo il riavvio: ronda «tor ok», `nos.lol` zero
+volte nel registro, nessun avviso di relay (prima uno al minuto),
+l'ultima pubblicazione dei prezzi con `Ack` da relay.mostro.network,
+relay.primal.net e relay.barattolo.store. Restano gli avvisi gia' noti
+di blockchain.info 403 (1 fornitore di prezzo su 4).
+
+**NON PROVATO.** Che primal CONSERVI gli eventi del coordinator e li
+ridia a chi legge (la lezione del 12 ott su nos.lol: accettare non e'
+tenere): si guarda con la sonda di lettura da fuori quando serve.
+
 ## Il riquadro «Volume dello Swap» nel pannello (12 nov 2026, cantiere volume-swap, Andrea: «si il riquadro chiamalo swap»)
 
 Dopo nome-swap la card del pannello admin diceva ancora «🔁 Volume del
