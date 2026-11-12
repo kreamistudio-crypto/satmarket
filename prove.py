@@ -34551,6 +34551,9 @@ def _censimento(acceso, dopo=None):
     # il tetto del collaudo (20 ott 2026): una FUNZIONE, che `__missing__`
     # risolverebbe in un 7 da chiamare
     amb["tetto_sats_prova"] = lambda: 10_000 if acceso else 0
+    # il tetto dell'altra rete in euro (12 nov 2026): una FUNZIONE anche lui
+    amb["p2p_altra_rete_tetto"] = lambda: 775_170 if acceso else 0
+    amb["_fmt_sats"] = str
     amb["NIP05_NOMI"] = {"usdb": "a" * 64} if acceso else {}
     # IL SEGRETO DEL PROFILO E' UN DIZIONARIO, non una stringa: il
     # config finto darebbe la stringa di _SEGRETI_FINTI e il
@@ -187091,11 +187094,35 @@ def prove_cambio_p2p():
     # --- le tre leve: d'esempio, di serie, nel pannello
     for nome, valore in (("P2P_ALTRA_RETE_ATTIVO", "False"),
                          ("P2P_ALTRA_RETE_SOLO_MODERATORI", "True"),
-                         ("P2P_ALTRA_RETE_MAX_SATS", "500_000")):
+                         ("P2P_ALTRA_RETE_MAX_SATS", "500_000"),
+                         ("P2P_ALTRA_RETE_MAX_EURO", "0")):
         prova(f"la leva {nome}: d'esempio, di serie e nel pannello", (1, 1, 1),
               (esempio.count(f"\n{nome} = {valore}\n"),
                src.count(f"    {nome} = {valore}\n"),
                pannello.count(f'"{nome}"')))
+
+    # --- IL TETTO IN EURO (12 nov 2026, Andrea: «il controvalore di 500
+    # euro aggiornato»): un giudice solo, euro al cambio di adesso, e il
+    # tetto in sats come rete quando il cambio manca
+    def tetto_con(euro, sats, cambio):
+        a = {"P2P_ALTRA_RETE_MAX_EURO": euro, "P2P_ALTRA_RETE_MAX_SATS": sats,
+             "cambio_noto_ora": lambda valuta="eur": cambio}
+        exec(pezzo("p2p_altra_rete_tetto"), a)
+        return a["p2p_altra_rete_tetto"]()
+    prova("tetto in euro spento: vale quello in sats, come prima", (780_000, 500_000, 0),
+          (tetto_con(0, 780_000, 64_502.0), tetto_con(0, 500_000, 0.0),
+           tetto_con(0, 0, 64_502.0)))
+    prova("500 € a 64.502 €/BTC sono 775.170 sats; a 100.000 €/BTC 500.000", (775_170, 500_000),
+          (tetto_con(500, 780_000, 64_502.0), tetto_con(500, 780_000, 100_000.0)))
+    prova("...e senza cambio (0 = vecchio o assente) torna il tetto in sats", 780_000,
+          tetto_con(500, 780_000, 0.0))
+    prova("il cambio letto dalla CACHE, mai dalla rete (nessun await nel giudice)",
+          (1, 0), (pezzo("p2p_altra_rete_tetto").count("cambio_noto_ora()"),
+                   pezzo("p2p_altra_rete_tetto").count("cambio_btc_eur")))
+    prova("nessun tetto dell'altra rete legge piu' i sats a mano: tutti dal giudice "
+          "(la def, la busta, 3 preventivi, 3 biglietti e i 2 dell'incasso on-chain)", (0, 10),
+          (codice(src).count("int(P2P_ALTRA_RETE_MAX_SATS or 0) and"),
+           codice(src).count("p2p_altra_rete_tetto()") - codice(pezzo("_leve_stato")).count("p2p_altra_rete_tetto()")))
     prova("di serie SPENTA, sopra il cancello dello swap, e la busta in /api/me", (True, True),
           ("    if not swap_per(tg_id) or not P2P_ALTRA_RETE_ATTIVO:\n        return False"
            in pezzo("p2p_altra_rete_per"),
@@ -187117,7 +187144,7 @@ def prove_cambio_p2p():
     # LA FATTURA DEVE PORTARE LA CIFRA DI MOSTRO AL SAT: con la nostra fee
     # la fattura del cambio sarebbe piu' piccola, e Mostro la rifiuterebbe
     prova("il preventivo SENZA la nostra fee, coi tetti del cambio dello scambio", 1,
-          prev.count("preventivo_swap(cifra, tariffa, 0, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)"))
+          prev.count("preventivo_swap(cifra, tariffa, 0, SWAP_MIN_SATS, p2p_altra_rete_tetto())"))
     prova("...e mai SWAP_FEE_PERCENTO nelle rotte del cambio dello scambio", 0,
           prev.count("SWAP_FEE_PERCENTO") + big.count("SWAP_FEE_PERCENTO"))
     prova("il biglietto controlla la forma dello scambio e i vivi per scambio", (1, 1),
@@ -187360,7 +187387,7 @@ def prove_deposito_ln_p2p():
     prova("il preventivo: il conto al contrario sull'importo, SENZA la nostra fee, e "
           "mai sotto l'importo", (True, True, True),
           ("swap_dovuto_per_ricevere(importo, tariffa, 0)" in prev,
-           "preventivo_swap(dovuto, tariffa, 0, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)" in prev,
+           "preventivo_swap(dovuto, tariffa, 0, SWAP_MIN_SATS, p2p_altra_rete_tetto())" in prev,
            'int(p["ricevi"]) < importo' in prev))
     big = pezzo("p2p_onchain_deposito_ln_biglietto")
     prova("il biglietto: sopra l'importo, nei tetti, nella tabella della tappa 1 col "
@@ -187428,7 +187455,7 @@ def prove_presa_ln_p2p():
         prova(f"la rotta {rotta[10:-1]} c'e', una volta", 1, src.count(rotta))
     prev = pezzo("p2p_presa_preventivo")
     prova("il preventivo e' il conto del submarine, coi tetti della presa sull'altra rete",
-          True, "preventivo_sub(cifra, tariffa, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)" in prev)
+          True, "preventivo_sub(cifra, tariffa, SWAP_MIN_SATS, p2p_altra_rete_tetto())" in prev)
     big = pezzo("p2p_presa_biglietto")
     prova("il biglietto: la forma dell'ordine del libro, i tetti, la tabella della tappa 1 "
           "col nome «presa:<ordine>»", (True, True, True),

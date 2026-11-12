@@ -853,6 +853,9 @@ CAMBIO_BTC_LN_ATTIVO = False
 P2P_ALTRA_RETE_ATTIVO = False
 P2P_ALTRA_RETE_SOLO_MODERATORI = True
 P2P_ALTRA_RETE_MAX_SATS = 500_000
+# Sopra 0 il massimo e' in EURO, rifatto in sats al cambio di adesso (12
+# nov 2026); il tetto in sats qui sopra resta per quando il cambio manca.
+P2P_ALTRA_RETE_MAX_EURO = 0
 # Chi vende on-chain riceve in Lightning (28 ott 2026, cantiere
 # onchain-verso-lightning): allo sblocco i bitcoin del 2-di-3 vanno a un
 # cambio bitcoin → Lightning di SATS Routing, con la fattura di chi

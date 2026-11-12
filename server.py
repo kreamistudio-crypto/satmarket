@@ -1795,6 +1795,21 @@ try:
     from config import P2P_ALTRA_RETE_MAX_SATS
 except ImportError:
     P2P_ALTRA_RETE_MAX_SATS = 500_000
+# IL TETTO IN EURO (12 nov 2026, Andrea: «mettiamo il limite al
+# controvalore di 500 euro aggiornato»): sopra 0 il massimo dei cambi
+# dell'altra rete e' questa cifra in euro, rifatta in sats al cambio di
+# ADESSO, e P2P_ALTRA_RETE_MAX_SATS resta solo la rete di sicurezza per
+# quando il cambio non c'e' (o e' troppo vecchio). Un tetto in sats fisso
+# era 500 € oggi e 450 o 550 domani. Di serie 0: vale solo quello in sats.
+try:
+    from config import P2P_ALTRA_RETE_MAX_EURO
+    P2P_ALTRA_RETE_MAX_EURO = max(0, int(P2P_ALTRA_RETE_MAX_EURO or 0))
+except ImportError:
+    P2P_ALTRA_RETE_MAX_EURO = 0
+except (TypeError, ValueError):
+    P2P_ALTRA_RETE_MAX_EURO = 0   # storto: vale il tetto in sats
+    print("[p2p] P2P_ALTRA_RETE_MAX_EURO non e' un numero intero: vale il "
+          "tetto in sats (P2P_ALTRA_RETE_MAX_SATS)")
 # CHI VENDE ON-CHAIN RICEVE IN LIGHTNING (28 ott 2026, cantiere
 # onchain-verso-lightning, via di Alan e piano approvato da Andrea): allo
 # sblocco i bitcoin del 2-di-3 vanno a un cambio bitcoin → Lightning di
@@ -33876,7 +33891,13 @@ def _leve_stato():
                   spento="a leva accesa lo vedono TUTTI"),
             _leva("P2P on-chain dal cambio: massimo (sats)",
                   "P2P_ALTRA_RETE_MAX_SATS", int(P2P_ALTRA_RETE_MAX_SATS or 0),
-                  spento="a 0 vale solo il massimo del fornitore"),
+                  spento="a 0 vale solo il massimo del fornitore",
+                  acceso=("col tetto in euro acceso vale solo quando il "
+                          "cambio non c'e'" if P2P_ALTRA_RETE_MAX_EURO else "")),
+            _leva("P2P on-chain dal cambio: massimo (€, al cambio di adesso)",
+                  "P2P_ALTRA_RETE_MAX_EURO", int(P2P_ALTRA_RETE_MAX_EURO or 0),
+                  spento="a 0 vale il massimo in sats qui sopra",
+                  acceso=f"oggi sono {_fmt_sats(p2p_altra_rete_tetto())} sats"),
             # (26 ott 2026, decisione di Andrea) RESTA 0: sopra 0 la
             # fattura dello swap e' meno di quel che spetta a chi vende, e
             # la tappa 4 non la paga (`swap_registra_pagamento`, «fee»)
@@ -79841,13 +79862,29 @@ P2P_BOTTONE_RITIRO = "₿ Ritira i tuoi bitcoin"
 _lucchetto_cambi_p2p = asyncio.Lock()
 
 
+def p2p_altra_rete_tetto() -> int:
+    """Il massimo in sats dei cambi dell'altra rete, ADESSO: con
+    P2P_ALTRA_RETE_MAX_EURO sopra 0 sono quegli euro al cambio di adesso
+    (la cache, mai la rete: la tiene fresca `orologio_cambio`); senza
+    tetto in euro, o senza cambio, il tetto in sats di sempre. 0 = solo il
+    massimo del fornitore. Un solo giudice per i preventivi, i biglietti
+    e la busta del telefono: due conti diversi direbbero «sì» al
+    preventivo e «no» al biglietto."""
+    euro = int(P2P_ALTRA_RETE_MAX_EURO or 0)
+    if euro > 0:
+        cambio = cambio_noto_ora()
+        if cambio > 0:
+            return int(round(euro * 100_000_000 / cambio))
+    return int(P2P_ALTRA_RETE_MAX_SATS or 0)
+
+
 def p2p_altra_rete_leve(tg_id: int) -> dict:
     """La busta per `/api/me` → `swap_leve.p2p`: il cancello e i tetti."""
     return {"attivo": p2p_altra_rete_per(tg_id),
             # (caso 4) il cambio bitcoin → Lightning prima della presa
             "presa": p2p_presa_cambio_per(tg_id),
             "minimo": int(SWAP_MIN_SATS or 0),
-            "massimo": int(P2P_ALTRA_RETE_MAX_SATS or 0)}
+            "massimo": p2p_altra_rete_tetto()}
 
 
 def _cambi_p2p_prepara(con):
@@ -79914,7 +79951,7 @@ async def p2p_cambio_preventivo(sats: str = "", fornitore: str = "satsrouting",
     tariffa = await leggi_tariffa_swap(chi)
     if tariffa is None:
         return dict(busta, ok=False, motivo="non_risponde")
-    p = preventivo_swap(cifra, tariffa, 0, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)
+    p = preventivo_swap(cifra, tariffa, 0, SWAP_MIN_SATS, p2p_altra_rete_tetto())
     p["cambiata"] = bool(hash) and hash != tariffa["hash"]
     p["valido_s"] = SWAP_PREVENTIVO_VALE_S
     return dict(busta, **p)
@@ -79941,7 +79978,8 @@ async def p2p_cambio_biglietto(req: Request, x_tg_init_data: str = Header(""),
     cifra = _cambio_sats(d.get("sats"))
     if not cifra or cifra < int(SWAP_MIN_SATS or 0):
         return {"ok": False, "motivo": "sotto_minimo"}
-    if int(P2P_ALTRA_RETE_MAX_SATS or 0) and cifra > int(P2P_ALTRA_RETE_MAX_SATS):
+    tetto = p2p_altra_rete_tetto()
+    if tetto and cifra > tetto:
         return {"ok": False, "motivo": "sopra_tetto"}
     adesso = int(time.time())
     async with _lucchetto_cambi_p2p:
@@ -100202,7 +100240,7 @@ async def p2p_onchain_cambio_preventivo(oid: int, x_tg_init_data: str = Header("
     finally:
         con.close()
     p = await _onchain_preventivo_cambio(o["prezzo_sats"])
-    tetto = int(P2P_ALTRA_RETE_MAX_SATS or 0)
+    tetto = p2p_altra_rete_tetto()
     if tetto and p.get("ok") and int(p.get("mandi") or 0) > tetto:
         p = dict(p, ok=False, motivo="sopra_tetto", massimo=tetto)
     return dict(p, confermato=confermato,
@@ -100307,9 +100345,10 @@ async def p2p_onchain_cambio_nasce(oid: int, req: Request,
         if not 0 < ricevi < mandi <= int(o["prezzo_sats"]):
             raise HTTPException(400, "Le cifre dello swap non tornano col "
                                      "prezzo dello scambio")
-        if int(P2P_ALTRA_RETE_MAX_SATS or 0) and mandi > int(P2P_ALTRA_RETE_MAX_SATS):
+        tetto = p2p_altra_rete_tetto()
+        if tetto and mandi > tetto:
             raise HTTPException(400, "Lo swap supera il massimo di "
-                                     f"{_fmt_sats(int(P2P_ALTRA_RETE_MAX_SATS))} sats")
+                                     f"{_fmt_sats(tetto)} sats")
         valore = f"p2p:{o['id']}:{lockup}"
         if not onchain_firma_valida(ind["xpub_venditore"], "cambio", valore, firma):
             raise HTTPException(400, "Lo swap non è firmato dal tuo seme: "
@@ -100469,7 +100508,7 @@ async def p2p_onchain_deposito_ln_preventivo(oid: int, fornitore: str = "satsrou
     dovuto = swap_dovuto_per_ricevere(importo, tariffa, 0)
     if not dovuto:
         return dict(busta, ok=False, motivo="sotto_minimo")
-    p = preventivo_swap(dovuto, tariffa, 0, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)
+    p = preventivo_swap(dovuto, tariffa, 0, SWAP_MIN_SATS, p2p_altra_rete_tetto())
     if p.get("ok") and int(p["ricevi"]) < importo:
         p = dict(p, ok=False, motivo="non_risponde")   # il conto al contrario non torna
     if p.get("ok"):
@@ -100500,7 +100539,8 @@ async def p2p_onchain_deposito_ln_biglietto(oid: int, req: Request,
         return {"ok": False, "motivo": "cifra"}
     if cifra < int(SWAP_MIN_SATS or 0):
         return {"ok": False, "motivo": "sotto_minimo"}
-    if int(P2P_ALTRA_RETE_MAX_SATS or 0) and cifra > int(P2P_ALTRA_RETE_MAX_SATS):
+    tetto = p2p_altra_rete_tetto()
+    if tetto and cifra > tetto:
         return {"ok": False, "motivo": "sopra_tetto"}
     ordine = p2p_onchain_deposito_ln_ordine(oid)
     adesso = int(time.time())
@@ -100645,7 +100685,7 @@ async def p2p_presa_preventivo(sats: str = "", fornitore: str = "satsrouting",
     tariffa = await leggi_tariffa_sub(chi)
     if tariffa is None:
         return dict(busta, ok=False, motivo="non_risponde")
-    p = preventivo_sub(cifra, tariffa, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)
+    p = preventivo_sub(cifra, tariffa, SWAP_MIN_SATS, p2p_altra_rete_tetto())
     if p.get("ok"):
         p["costo"] = int(p["mandi"]) - cifra
     p["cambiata"] = bool(hash) and hash != tariffa["hash"]
@@ -100672,7 +100712,8 @@ async def p2p_presa_biglietto(req: Request, x_tg_init_data: str = Header(""),
     cifra = _cambio_sats(d.get("sats"))
     if not cifra or cifra < int(SWAP_MIN_SATS or 0):
         return {"ok": False, "motivo": "sotto_minimo"}
-    if int(P2P_ALTRA_RETE_MAX_SATS or 0) and cifra > int(P2P_ALTRA_RETE_MAX_SATS):
+    tetto = p2p_altra_rete_tetto()
+    if tetto and cifra > tetto:
         return {"ok": False, "motivo": "sopra_tetto"}
     nome = p2p_presa_ordine(ordine)
     adesso = int(time.time())

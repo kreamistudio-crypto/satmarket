@@ -80144,3 +80144,43 @@ condizione, e i due cancelli sono chiamati con tg 0.
 
 SCARTATO. Una pagina «guida» separata per il P2P on-chain: il libro è
 uno solo e Tappo lo legge intero.
+
+## Il tetto dell'altra rete in euro (12 nov 2026, cantiere altra-rete-euro, Andrea: «mettiamo il limite al controvalore di 500 euro aggiornato»)
+
+Il P2P «altra rete» (chi prende riceve, o paga, sull'altra rete con un
+cambio di SATS Routing) aveva un tetto solo in sats,
+`P2P_ALTRA_RETE_MAX_SATS`. Sul VPS non c'era la riga, e quindi valevano
+500.000 sats, circa 322 € a 64.502 €/BTC. Alle 15:48 UTC Andrea l'ha
+portato a 780.000 sats (riga 199, circa 500 €). Poi ha chiesto il
+controvalore aggiornato: un tetto in sats fisso fa 500 € oggi e 450 o
+550 domani.
+DECISO: una leva nuova, `P2P_ALTRA_RETE_MAX_EURO`, di serie 0. Sopra 0,
+il massimo sono quegli euro rifatti in sats al cambio di ADESSO. Il
+tetto in sats resta come rete di sicurezza per quando il cambio manca o
+è troppo vecchio: meglio un tetto vecchio che nessun tetto.
+Un giudice solo, `p2p_altra_rete_tetto()`, sostituisce le nove letture a
+mano del tetto in sats:
+- la busta `swap_leve.p2p.massimo` del telefono;
+- i tre preventivi (cambio della presa, deposito in Lightning, submarine
+  del caso 4);
+- i tre biglietti;
+- il preventivo e la conferma dell'incasso on-chain.
+Con due conti diversi il preventivo direbbe «sì» e il biglietto «no».
+Il cambio viene dalla cache (`cambio_noto_ora`), mai dalla rete: il
+giudice sta anche dentro funzioni non async, e `orologio_cambio` la
+rinfresca ogni minuto.
+SCARTATO: legarlo a `ONCHAIN_MAX_EURO`, che vale anch'esso 500 € e
+avrebbe evitato una leva. Ma il giorno in cui l'on-chain sale, l'altra
+rete salirebbe con lei senza che nessuno l'abbia deciso. Scartato anche
+il tetto in USDT: qui si parla di sats.
+PROVATO: in `prove_cambio_p2p`:
+- le quattro leve sono nell'esempio, di serie e nel pannello;
+- il giudice puro: euro spento → sats; 500 € a 64.502 → 775.170;
+  senza cambio → sats;
+- legge la cache e non `cambio_btc_eur`;
+- nessuna lettura a mano rimasta.
+Gli stessi collaudi del cambio P2P (che abbassano il tetto in sats a
+50.000) restano verdi con l'euro spento di serie.
+SUL VPS: aggiungere `P2P_ALTRA_RETE_MAX_EURO = 500` e riavviare. La riga
+199 da 780.000 può restare come rete di sicurezza. Il pannello «Stato
+delle leve» dice quanti sats sono oggi.
