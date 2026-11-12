@@ -79804,3 +79804,53 @@ PROVATO in `prove_cifra_copia`: il riconoscitore in node, l'ordine dei
 passi in `swapCreaDentro`, la rotta eseguita coi pezzi finti attorno
 (cifra, «lightning:», 400 senza bussare, 409 col wallet muto, 403 a
 strada spenta).
+
+## «Swap» al posto di «Cambio», e il minimo dal lato scritto (12 nov 2026, cantiere nome-swap, Andrea: «al posto di cambio nella nav ha senso invece scrivere swap?», «si», «non serve che mi mandi una prova fallo e basta»)
+
+IL NOME. La scheda in basso, il titolo della pagina e tutte le parole che
+la nominano dicono «Swap» (en «Swap», prima «Exchange»); il sostantivo
+dell'operazione segue: «lo swap», «gli swap», «uno swap», «Costo dello
+swap», «Togli lo swap», «Conferma lo swap», «I tuoi swap», nelle 12
+parole del Profilo e nei carrelli on-chain del mercatino e del P2P che
+passano da SATS Routing. Il perché (proposto da me, sì di Andrea):
+«Cambio» in italiano fa pensare al cambio valuta, e qualcuno poteva
+credere di cambiare euro in bitcoin; chi usa Lightning «swap» lo
+conosce (SATS Routing, Boltz, Phoenix), chi non lo conosce di quella
+pagina non ha bisogno. ROVESCIA due regole scritte: «Cambio» del 27 ott
+(cantiere cambio-libero) e «niente "swap" nelle parole di tutti» del
+cantiere grafica-swap. Il sottotitolo «Sposta i tuoi sats fra Lightning
+e bitcoin on-chain» resta e spiega. RESTA «cambio» il cambio euro/
+bitcoin (CoinGecko, prezzi, P2P, «Cambio non disponibile» dei campi in
+euro) e il verbo «cambiare». NON TOCCATI, apposta: i nomi interni
+(`swapCambio*`, `cambi_liberi`, le rotte `/api/swap/cambio*`, le
+classi `.cambio-*`), il pannello admin (leve «Cambio libero: …», card
+«🔁 Volume del Cambio»: lo leggono solo Andrea e Alan) e le voci vecchie
+di NOVITA.md. Avvisi del bot e messaggi d'errore del server dicono
+«swap» dove nominavano il cambio di SATS Routing; i NUMERI DI OGGI di
+Tappo dicono «Pagina «Swap»». SWAP_TELEFONO_VER ricalcolato.
+
+IL MINIMO DAL LATO SCRITTO (stessa mattina, Andrea dal telefono: «voglio
+cambiare 50000 sats da onchain a lightning e mi esce sotto l'errore il
+cambio parte da 50000», «anche con 50100 non va»). Il server era giusto:
+da bitcoin a Lightning il minimo di SATS Routing (50.000) vale sulla
+richiesta Lightning, cioè su quel che si RICEVE, e 50.100 mandati, meno
+lo 0,5 % e i 318 della rete, ne fanno ricevere circa 49.500. Sbagliata
+la frase: diceva la soglia del lato del dovuto a chi aveva scritto
+dall'altro. Ora `cambio_preventivo`, a no per `sotto_minimo` o
+`sopra_tetto` con la cifra scritta dall'altro lato, mette nella busta
+`minimo_scritto`/`massimo_scritto`, la soglia tradotta sul lato scritto
+(`preventivo_sub(soglia)["mandi"]` verso Lightning,
+`preventivo_swap(soglia)["ricevi"]` verso l'indirizzo); il telefono
+(`rifiutoSwap` + `latoSogliaSwap`) la preferisce e dice il lato: «Lo
+swap parte da 50.568 sats da mandare» / «… da ricevere». Vale anche
+da Lightning a bitcoin scritto in «Ricevi», e per il tetto. Strada
+scartata: abbassare il minimo o contarlo su quel che si manda (è il
+limite del fornitore, e il server lo deve rispettare com'è).
+
+PROVATO in `prove_nome_swap`: la scheda e i titoli it/en, nessun
+«pagina «Cambio»» rimasto, il cambio euro intatto; la rotta del
+preventivo eseguita coi pezzi finti (50.100 in «Mandi» → minimo 50.568,
+e 50.568 passa e riceve almeno 50.000; dal lato «Ricevi» niente
+traduzione; ln-btc in «Ricevi»; il tetto tradotto); il no del telefono
+in node. Suite severa e collaudi. NON PROVATO dal vivo: la frase nuova
+sul telefono di Andrea (arriva con la promozione).
