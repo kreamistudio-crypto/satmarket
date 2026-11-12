@@ -3078,21 +3078,6 @@
   /* i due capi del cursore doppio: a sinistra il meno, a destra il piu' */
   .p2p-capi{display:flex;justify-content:space-between;
     font-size:12px;font-weight:800;margin-bottom:2px}
-  /* il bollino della rete sul logo di Tether (2 nov 2026): l'anello col
-     colore della card lo stacca dal logo, come nei wallet */
-  .p2p-bandiera.con-rete{position:relative;display:inline-block;margin-right:.3em}
-  /* davanti al verbo (2 nov 2026, variante «C»): la bandierina apre la
-     riga dei soldi, la moneta della rete quella dei sats */
-  .p2p-euro > .p2p-bandiera{margin-right:.3em}
-  .p2p-euro > .p2p-bandiera.con-rete{margin-right:.5em}
-  /* (3 nov 2026, Andrea: «l'icona e' scentrata rispetto a Ricevi/Invia»)
-     -.12em mette il centro della moneta sul centro delle parole (misurato
-     nel browser: scarto sotto il mezzo pixel); a -.3em pendeva in basso */
-  .p2p-moneta-riga{display:inline-flex;vertical-align:-.12em;margin-right:.35em;line-height:0}
-  .p2p-moneta-riga .cambio-moneta{width:1.25em;height:1.25em}
-  .p2p-moneta-riga .cambio-moneta .cambio-svg{width:.75em;height:.75em}
-  .p2p-bandiera .p2p-rete-badge{position:absolute;top:-.3em;right:-.38em;width:.62em;height:.62em;
-    border-radius:50%;box-shadow:0 0 0 1.5px var(--card)}
   .p2p-ord{background:var(--card);border:1px solid var(--line-soft);border-radius:16px;
     padding:12px 14px;margin-top:10px;position:relative}
   /* La testa VA A CAPO. Senza wrap un flex non sfonda: STRINGE i figli,
@@ -3134,44 +3119,58 @@
   .p2p-ord>.ctrl-conto{background:none;border:0;border-radius:0;
     margin:0;padding:0}
   .p2p-ord>.ctrl-conto .ctrl-chiusa{margin:8px 0 2px;padding:0 10px}
-  /* IL TEMPO IN ALTO A DESTRA: e' il posto dove il riferimento mette
-     l'ETA' dell'offerta, e da noi il tempo che fa decidere e' un altro
-     — quanto ne RESTA, non quanto e' vecchia. Stesso posto, il tempo
-     nostro: la scadenza loro non ce l'hanno.
-     E DAL SET 2026 NON E' PIU' UN TESTO MA UN ANELLO che si svuota
-     (decisione di Andrea): la fretta si guarda, non si legge. La
-     pista e' il filo di casa, l'arco che resta l'inchiostro tenue, e
-     gli ultimi 10% passano al rosso — la soglia la decide il JS, che
-     e' un giudizio e non un vestito. Il testo vive nell'aria
-     dell'anello, quindi chi passa il dito e chi naviga a voce ce
-     l'hanno ancora. */
-  /* ⚠️ L'ANELLO E' ANCORATO, non in fila: dentro il flex della testa
-     una cifra lunga («≈ 74 029–148 058 sats») prendeva tutta la riga
-     e lo faceva scendere a meta' card — visto dal vivo. In assoluto
-     sta sempre in alto a destra e non entra nel giro del wrap, e la
-     riga grande gli lascia il posto col suo padding. */
-  .p2p-anello{position:absolute;top:12px;right:14px;line-height:0;
-    width:44px;height:44px}
-  /* L'ANELLO E' SEMPRE LA CORNICE DEL VOLTO (17 set 2026, dal campo
-     di Andrea): 44px e la faccia tonda al centro, anche quando la
-     faccia ancora NON C'E'. La variante piccola «senza volto» del
-     primo giro se n'e' andata: mentre i volti sono in viaggio — o il
-     server e' in riavvio e le facce tacciono per qualche secondo —
-     le card restavano con l'anello vuoto in mezzo, e un buco che si
-     riempie «di solito» si legge come un difetto. Dentro c'e' sempre
-     il tappo del mercatino (il giudice sta in anelloScadenzaP2P), e
-     la testa lascia il posto alla cornice su ogni card. */
-  .p2p-ord .p2p-testa{padding-right:52px}
-  /* la faccia: il cerchio dell'avatar di casa, rimpicciolito e
-     infilato nel buco dell'anello (l'inset lo tiene dentro il tratto).
-     L'iniziale sotto la foto e' la rete di sempre — se l'immagine non
-     arriva, `onerror` la toglie e resta la lettera. */
-  /* L'INSET E' 9px E NON 6, ed e' misurato: il tratto dell'anello a
-     44px va dal raggio 13,75 al 19,25, quindi un disco piu' largo di
-     13,75 gli si mangia la meta' interna — a 6px la faccia copriva
-     l'anello e i due scuri si impastavano (visto dal vivo). A 9 il
-     disco sta dentro il buco e fra i due resta la carta. */
-  .p2p-faccia{position:absolute;inset:9px;border-radius:50%;
+  /* ══ LA COPPIA, IL VOLTO IN BASSO E LA BARRA DEL TEMPO (12 nov 2026,
+     cantiere card-coppia) ══ — il perche' sta nel JS, sopra
+     `tesseraValutaP2P`. Qui come si vestono.
+     LA COPPIA E' ANCORATA, non in fila, come lo era l'anello: dentro il
+     flex della testa una cifra lunga («≈ 74 029–148 058 sats») la
+     spingerebbe a meta' card. In assoluto sta sempre in alto a destra, e
+     la riga grande le lascia il posto col suo padding (34 + 5 + 18 + 5 +
+     34 = 96, piu' 8 di respiro). */
+  .p2p-coppia{position:absolute;top:12px;right:14px;display:flex;
+    align-items:center;gap:5px;line-height:0}
+  .p2p-ord .p2p-testa{padding-right:104px}
+  /* LA TESSERA: il QUADRATO TONDO scelto da Andrea sulle foto (fra
+     cerchio, esagono e foglia) — tondo resta il volto, qui sotto.
+     Dentro, il segno; il fondo e' il colore della bandiera o della
+     moneta della pagina Cambio, che gira col tema. */
+  .p2p-tessera{position:relative;flex:none;width:34px;height:34px;
+    border-radius:10px;display:grid;place-items:center}
+  .p2p-tessera-eur{background:#003399}
+  .p2p-tessera-usdt{background:#26A17B}
+  .p2p-tessera-eur .p2p-tessera-svg{width:34px;height:34px;display:block}
+  .p2p-tessera-usdt .p2p-tessera-svg{width:26px;height:26px;display:block}
+  .p2p-tessera-rete .cambio-moneta.p2p-oc-moneta{width:34px;height:34px;
+    border-radius:inherit}
+  .p2p-tessera-rete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:20px;height:20px}
+  /* il bollino della rete sul logo di Tether (2 nov 2026): l'anello col
+     colore della card lo stacca dalla tessera, come nei wallet */
+  .p2p-tessera .p2p-rete-badge{position:absolute;top:-5px;right:-6px;
+    width:15px;height:15px;border-radius:50%;box-shadow:0 0 0 1.5px var(--card)}
+  .p2p-freccia{flex:none;width:18px;height:18px;color:var(--muted);fill:none;
+    stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  /* A 320 LA COPPIA SI STRINGE (misurato: con 104px di posto «Invia ≈
+     53 261 sats» mandava «sats» a capo nel tab «Vendi BTC»): tessere da
+     30 e freccia da 14, 30 + 4 + 14 + 4 + 30 = 82, piu' 8 di respiro */
+  @media (max-width:360px){
+    .p2p-coppia{gap:4px}
+    .p2p-tessera{width:30px;height:30px;border-radius:9px}
+    .p2p-tessera-eur .p2p-tessera-svg{width:30px;height:30px}
+    .p2p-tessera-usdt .p2p-tessera-svg{width:23px;height:23px}
+    .p2p-tessera-rete .cambio-moneta.p2p-oc-moneta{width:30px;height:30px}
+    .p2p-tessera-rete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:18px;height:18px}
+    .p2p-tessera .p2p-rete-badge{right:-4px;width:13px;height:13px}
+    .p2p-freccia{width:14px;height:14px}
+    .p2p-ord .p2p-testa{padding-right:90px}
+  }
+  /* IL VOLTO NELLA SCATOLA DELLE STELLINE: a sinistra, e la scatola si
+     alza quel tanto. Il volto e' il cerchio dell'avatar di casa;
+     l'iniziale sotto la foto e' la rete di sempre — se l'immagine non
+     arriva, `onerror` la toglie e resta la lettera. (Il flex della
+     scatola sta nella sua regola, quella delle stelline, piu' sotto.) */
+  .p2p-volto{position:relative;flex:none;width:32px;height:32px;line-height:0}
+  .p2p-rep-testo{min-width:0}
+  .p2p-faccia{position:absolute;inset:0;border-radius:50%;
     background:var(--ink);color:var(--on-ink);display:flex;
     align-items:center;justify-content:center;overflow:hidden;
     font-family:'Baloo 2',sans-serif;font-weight:800;font-size:14px;
@@ -3180,24 +3179,32 @@
     object-fit:cover}
   /* il volto che porta a un negozio lo dice anche al mouse */
   .p2p-faccia[role="button"]{cursor:pointer}
-  .p2p-anello svg{width:44px;height:44px;display:block;
-    transform:rotate(-90deg)}
-  .p2p-anello circle{fill:none;stroke-width:3;stroke-linecap:round}
-  .p2p-anello .pista{stroke:var(--line)}
-  /* TRE STATI NETTI, e le soglie le decide il JS: neutro finche' c'e'
-     tempo, arancio negli ultimi tre giorni, rosso che pulsa
-     nell'ultimo. Il neutro e' --ink-soft e NON il bianco: sulla card
-     bianca un anello bianco non esisterebbe, e questo token e' chiaro
-     di sera — dove la carta e' bruna — e scuro di giorno. */
-  .p2p-anello .resta{stroke:var(--ink-soft)}
-  .p2p-anello.vicina .resta{stroke:var(--sats)}
+  /* LA BARRA DEL TEMPO E' IL BORDO DI SOTTO della card: una cornice
+     grande quanto la card (inset -1px copre il suo bordo) che ne eredita
+     il raggio e taglia, e dentro la riga in fondo — cosi' la riga segue
+     la curva degli angoli senza che la card debba tagliare tutto il resto
+     (il cartellino «Esempio», l'evidenza, i bollini). La card le lascia
+     il posto col padding di sotto: la classe la mette chi disegna la
+     barra (niente `:has()`, che i webview vecchi di Telegram non hanno). */
+  .p2p-ord.con-barra{padding-bottom:17px}
+  .p2p-barra{position:absolute;inset:-1px;border-radius:inherit;overflow:hidden;
+    pointer-events:none}
+  .p2p-barra::before,.p2p-barra > i{content:"";position:absolute;left:0;bottom:0;height:5px}
+  .p2p-barra::before{right:0;background:var(--line)}
+  /* TRE STATI NETTI, e le soglie le decide il JS (`statoAnelloP2P`):
+     neutro finche' c'e' tempo, arancio negli ultimi tre giorni, rosso che
+     pulsa nell'ultimo. Il neutro e' --ink-soft e NON il bianco: sulla card
+     bianca una riga bianca non esisterebbe, e questo token e' chiaro di
+     sera — dove la carta e' bruna — e scuro di giorno. */
+  .p2p-barra > i{background:var(--ink-soft);border-radius:0 3px 3px 0}
+  .p2p-barra.vicina > i{background:var(--sats)}
   /* l'ultimo giorno non e' piu' un'informazione ma un avviso: rosso e
      PULSA */
-  .p2p-anello.ultimo-giorno .resta{stroke:var(--rosso-p2p);
+  .p2p-barra.ultimo-giorno > i{background:var(--rosso-p2p);
     animation:p2pPulsa 1.5s ease-in-out infinite}
   @keyframes p2pPulsa{0%,100%{opacity:1}50%{opacity:.3}}
   @media (prefers-reduced-motion:reduce){
-    .p2p-anello.ultimo-giorno .resta{animation:none}
+    .p2p-barra.ultimo-giorno > i{animation:none}
   }
   /* LA STIMA SCENDE SOTTO IL PREZZO nella sola card del libro: era
      l'unica riga del riferimento che avevamo in fila invece che
@@ -3243,8 +3250,12 @@
      44, non e' ancora finito. Finche' diceva «5,00–15,00 €, scegli tu»
      ci stava per caso; col «da 5,00 a 15,00 €» (6 ott 2026) finiva
      sotto la faccia. ⚠️ STA DOPO `.p2p-grande{`: una sentinella cerca
-     quella regola per testo, e la prima che trova vince. */
-  .p2p-ord>.p2p-grande{display:block;padding-right:52px;margin-top:9px}
+     quella regola per testo, e la prima che trova vince.
+     (12 nov 2026, cantiere card-coppia: al posto dell'anello c'e' la
+     COPPIA, alta 34 e larga 96 — il posto e' lo stesso della testa.) */
+  .p2p-ord>.p2p-grande{display:block;padding-right:104px;margin-top:9px}
+  /* ...e a 320 la coppia stretta lascia 90 anche a lei (vedi la coppia) */
+  @media (max-width:360px){.p2p-ord>.p2p-grande{padding-right:90px}}
   /* (3 nov 2026, Andrea: «distanzia le 2 righe invia e ricevi») con le
      icone davanti, le due righe della card respirano: 9px fra l'una e
      l'altra, in tutt'e due i tab */
@@ -4348,7 +4359,7 @@
     filter:grayscale(1);opacity:.62}
   /* la reputazione e' UNA FRASE (set 2026, il ridisegno): niente piu'
      due pezzi ai bordi — si legge come si dice */
-  .p2p-rep{font-size:12px}
+  .p2p-rep{font-size:12px;display:flex;align-items:center;gap:10px}
   /* LA STELLA CHE SI RIEMPIE: due disegni sovrapposti, e a decidere
      quanto se ne vede e' la larghezza della scatola che taglia. Il
      vuoto e' il solo tratto, il pieno e' tratto E campitura, cosi'
@@ -8283,10 +8294,10 @@
     margin:0;padding:0;width:20px;height:20px;justify-content:center;
     box-shadow:0 0 0 2px var(--card)}
   /* a 375 px uno scudo da 10 si leggeva come una macchia (visto dal
-     vivo); e dentro l'anello `.p2p-anello svg` lo ruotava di -90° col
-     tratto del tempo (anche questo visto dal vivo): qui si raddrizza */
+     vivo). (La riga che lo raddrizzava dentro l'anello del libro se n'e'
+     andata con l'anello, 12 nov 2026: il volto adesso sta nella scatola
+     delle stelline, e nessuno lo ruota piu'.) */
   .bollino-staff.mini svg{width:12px;height:14px}
-  .p2p-anello .bollino-staff svg{transform:none}
   .bollino-staff.grande{height:26px;padding:0 11px 0 9px;gap:5px;
     margin:0;font-size:14px;line-height:26px;cursor:default}
   .bollino-staff.grande svg{width:13px;height:15px}
@@ -60153,25 +60164,24 @@ function pagaConReteP2P(paga, rete){
    dei metodi di pagamento; stessa cosa per l'on-chain»): le card del
    libro (vera, d'esempio, on-chain) passano la scatola dei metodi
    NUDA, senza `pagaConReteP2P`. La scatola con la moneta resta dove la
-   riga «Ricevi» non c'e': le card di «I miei scambi» (`pagaReteCardP2P`). */
-function monetaRigaP2P(rete){
-  return '<span class="p2p-moneta-riga" role="img" aria-label="'
-    + (rete === 'btc' ? 'on-chain' : 'Lightning') + '">'
-    + (rete === 'btc' ? P2P_OC_MONETA : P2P_LN_MONETA) + '</span>';
-}
+   riga «Ricevi» non c'e': le card di «I miei scambi» (`pagaReteCardP2P`).
+   ⚠️ DAL 12 NOV 2026 LA MONETA NON STA PIU' DAVANTI A «RICEVI» (cantiere
+   card-coppia): e' la tessera di destra della COPPIA in alto
+   (`tesseraReteP2P`), e la regola del 6 nov vale ancora — una volta
+   sola, quindi la scatola dei metodi del libro resta nuda. */
 function segnoReteP2P(rete){
   if (rete !== 'btc' && !(p2pOnchainLibro.quando > 0 || myP2POnchain)) return '';
   return '<span class="p2p-rete" role="img" aria-label="'
     + (rete === 'btc' ? 'Si scambia on-chain' : 'Si scambia su Lightning') + '">'
     + (rete === 'btc' ? P2P_OC_MONETA : P2P_LN_MONETA) + '</span>';
 }
-/* l'anello della card on-chain: lo stesso della card di Mostro (tempo
-   che resta nel libro, la faccia dentro), con l'iniziale del nome
-   pubblico — il volto vero non c'e', e l'anello non apre negozi */
-function anelloOnchainP2P(o){
-  return typeof anelloScadenzaP2P === 'function'
-    ? anelloScadenzaP2P({id: 'oc-' + Number(o.id), scade: Number(o.scade) || 0,
-                         creato: Number(o.creato) || 0, faccia: {nome: o.nome || ''}}) : '';
+/* il tempo e il volto della card on-chain (12 nov 2026, cantiere
+   card-coppia): quelli della card di Mostro — la barra in fondo, il volto
+   nella scatola del nome — con l'iniziale del nome pubblico: il volto
+   vero non c'e', e non apre negozi */
+function ordineVoltoOnchainP2P(o){
+  return {id: 'oc-' + Number(o.id), scade: Number(o.scade) || 0,
+          creato: Number(o.creato) || 0, faccia: {nome: o.nome || ''}};
 }
 
 /* PURA: i sats della card — quelli scritti a prezzo fisso, a mercato la
@@ -60195,15 +60205,18 @@ function rigaOnchainP2P(o){
   const paroleOc = typeof paroleOcP2P === 'function' ? paroleOcP2P : (x, t) => t;
   const paghiEuro = o.lato === 'sell';
   const mio = p2pOnchainLibro.miei.includes(String(o.ordine));
-  /* le icone davanti al verbo, come la card di Mostro (2 nov 2026,
-     variante «C»): la bandierina della valuta e la moneta di bitcoin */
-  const bandiera = typeof bandieraValutaP2P === 'function'
-    ? bandieraValutaP2P(usdtOc(o) ? 'USDT' : 'EUR', Array.isArray(o.metodi) ? o.metodi : []).trim() : '';
-  const rigaEuro = '<span class="p2p-grande p2p-euro">' + bandiera + (paghiEuro ? 'Invia ' : 'Ricevi ')
+  /* LA COPPIA IN ALTO A DESTRA, come la card di Mostro (12 nov 2026,
+     cantiere card-coppia): la valuta e la ₿ arancio con la freccia del
+     gesto; davanti ai verbi non c'e' piu' nessuna icona */
+  const rigaEuro = '<span class="p2p-grande p2p-euro">' + (paghiEuro ? 'Invia ' : 'Ricevi ')
     + esc(cifraOc(o)) + '</span>';
-  const rigaSats = '<span class="p2p-piccola p2p-sats">'
-    + (typeof monetaRigaP2P === 'function' ? monetaRigaP2P('btc') : '') + '<span class="p2p-verbo">'
+  const rigaSats = '<span class="p2p-piccola p2p-sats"><span class="p2p-verbo">'
     + (paghiEuro ? 'Ricevi ' : 'Invia ') + '</span>' + esc(satsCardOnchainP2P(o)) + '</span>';
+  const coppia = typeof coppiaCardP2P === 'function'
+    ? coppiaCardP2P(usdtOc(o) ? 'USDT' : 'EUR', Array.isArray(o.metodi) ? o.metodi : [], 'btc', paghiEuro) : '';
+  const ov = ordineVoltoOnchainP2P(o);
+  const volto = typeof voltoCardP2P === 'function' ? voltoCardP2P(ov) : '';
+  const barra = typeof barraScadenzaP2P === 'function' ? barraScadenzaP2P(ov) : '';
   /* IL FOGLIO DI LIGHTNING SULLA CARD (30 ott 2026, cantiere oc-identico):
      il premio a mercato col badge di Lightning, chi puo' prendere, e la
      pausa — grigia con «Puoi prenderlo tra…» per chi guarda, «In pausa
@@ -60220,17 +60233,18 @@ function rigaOnchainP2P(o){
     ? `<div class="p2p-box p2p-paga" title="${esc(metodi.join(', '))}">`
       + metodi.map(m => typeof marchioMetodoP2P === 'function' ? marchioMetodoP2P(m) : esc(m)).join(', ')
       + '</div>' : '';
-  return `<div class="p2p-ord p2p-onchain${paghiEuro ? ' lato-compro' : ' lato-vendo'}${mio ? ' p2p-mio' : ''}${fermo ? ' p2p-in-pausa' : ''}" data-id="${Number(o.id)}" role="button" tabindex="0"${fermo ? ' aria-disabled="true"' : ''}
+  return `<div class="p2p-ord p2p-onchain${paghiEuro ? ' lato-compro' : ' lato-vendo'}${barra ? ' con-barra' : ''}${mio ? ' p2p-mio' : ''}${fermo ? ' p2p-in-pausa' : ''}" data-id="${Number(o.id)}" role="button" tabindex="0"${fermo ? ' aria-disabled="true"' : ''}
     onclick="apriOnchainP2P(Number(this.dataset.id))">
     ${fermo}
-    <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloOnchainP2P(o)}</div>
+    <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${coppia}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
     ${badge ? '<div class="p2p-badge-riga">' + badge + '</div>' : ''}
     ${paga}
     ${filtro}
-    ${o.nome ? '<div class="p2p-box">👤 ' + esc(o.nome) + '</div>' : ''}
+    <div class="p2p-box p2p-rep">${volto}${o.nome ? '<span class="p2p-rep-testo">' + esc(o.nome) + '</span>' : ''}</div>
     ${mio && pausa ? '<div class="p2p-box p2p-pausa">⏸ In pausa fino ' + esc(quandoPausaP2P(pausa)) + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
+    ${barra}
   </div>`;
 }
 
@@ -65380,89 +65394,109 @@ function frazioneVitaP2P(o, adesso){
   return Math.max(0, Math.min(1, (fine - adesso) / (fine - inizio)));
 }
 
-/* L'ANELLO CHE SI SVUOTA (set 2026, decisione di Andrea): al posto del
-   testo «⏳ scade fra 7 g» un cerchio di progresso in alto a destra —
-   pieno appena pubblicato, vuoto alla scadenza. Un tempo che si
-   guarda invece di leggersi: in un elenco che si scorre col pollice,
-   la fretta e' una FORMA prima che una parola.
-   IL TESTO NON SI PERDE, e' l'aria dell'anello (title + aria-label):
-   chi passa il dito o naviga con lo screen reader ha ancora la frase
-   esatta, e la sua casa nel dettaglio dello scambio si decide dopo.
-   IL COLORE RACCONTA ANCHE LUI, e dal set 2026 sono TRE STATI NETTI
-   (ritocco di Andrea, che rovescia lo sbiadimento con color-mix del
-   giro prima): NEUTRO finche' c'e' tempo, ARANCIO negli ultimi tre
-   giorni, ROSSO che PULSA nell'ultimo — e l'arco continua a
-   consumarsi in tutt'e tre. Tre stati si riconoscono al volo; una
-   sfumatura continua si legge solo confrontando due card.
-   ⚠️ IL NEUTRO NON E' BIANCO, ed e' una correzione misurata: la card
-   e' bianca (`--card` di giorno), quindi un anello bianco li' non
-   esisterebbe proprio. `--ink-soft` fa quel che «bianco acceso»
-   voleva dire — deciso e non timido — ed E' chiaro di sera, dove la
-   carta e' bruna: il token gira col tema, il bianco no.
-   LE DUE SOGLIE STANNO QUI E NON NEL CSS — sono giudizi, non vestiti
-   — e sono TEMPO che resta, non frazioni: su un ordine di sette
-   giorni l'ultimo giorno e' il 14%, su uno di quindici il 7%, e a
-   contare e' che manchi meno di un giorno.
-   Il raggio 9 su un viewBox da 24 da' una circonferenza di 56,55: il
-   dasharray e' tutta la pista e il dashoffset la parte gia' consumata,
-   che e' il modo di disegnare un arco senza matematica per ogni
-   segmento. La rotazione di -90° la mette a partire da mezzogiorno. */
-const P2P_ANELLO_R = 9;
-const P2P_ANELLO_GIRO = 2 * Math.PI * P2P_ANELLO_R;
-const P2P_ULTIMO_GIORNO_S = 86400;
-const P2P_ANELLO_VICINA_S = 3 * 86400;
-function anelloScadenzaP2P(o, adesso){
-  const resta = frazioneVitaP2P(o, adesso);
-  if (resta < 0) return '';
-  const manca = (o.scade || 0) - (adesso || Math.floor(Date.now() / 1000));
-  /* IL GIUDICE DEL COLORE E' UNO SOLO per i due anelli (set 2026, col
-     dettaglio-pagina): le due soglie stavano scritte qui, e adesso le
-     chiede anche l'anello grande. Due copie direbbero due colori sullo
-     stesso ordine, e a scoprirlo sarebbe chi guarda. */
-  const st = statoAnelloP2P(manca);
-  const stato = st ? ' ' + st : '';
-  const consumato = (P2P_ANELLO_GIRO * (1 - resta)).toFixed(2);
-  const aria = scadeTestoP2P(o.scade) || 'senza scadenza';
-  /* DENTRO L'ANELLO CI STA LA FACCIA (set 2026, i volti sul libro):
-     l'anello diventa la cornice del volto di chi ha pubblicato, e il
-     suo colore dice il tempo — un solo segno per due cose, nell'angolo
-     che gia' era suo.
-     ⚠️ E IL BUCO NON E' MAI VUOTO (17 set 2026, dal campo di Andrea):
-     mentre i volti sono in viaggio — o il server e' in riavvio e le
-     facce tacciono per qualche secondo — le card restavano con
-     l'anello vuoto in mezzo, come per la vetrina anonima e per gli
-     ordini di chi Barattolo non ce l'ha. Il ripiego e' il tappo del
-     mercatino, la stessa scala delle card degli annunci: foto se
-     c'e', iniziale se si sa il nome, «?» finche' non si sa niente.
-     Il vuoto-oggetto tiene vive le stesse letture di sempre (avatar,
-     nome, negozio) senza aprire un ramo per caso. */
-  /* la card d'esempio del giro guidato porta il suo volto con se' */
+/* ══ LA COPPIA, IL VOLTO IN BASSO E LA BARRA DEL TEMPO (12 nov 2026,
+   cantiere card-coppia, ridisegno di Andrea) ══
+   L'ANELLO COL VOLTO DENTRO SE N'E' ANDATO (era «L'ANELLO CHE SI
+   SVUOTA», set 2026): Andrea, guardando il libro, «le icone euro o
+   usdt affianco ai numeri fanno confusione». La card si e' rimessa in
+   ordine in tre mosse, ognuna nel posto che le spetta:
+   1) IN ALTO A DESTRA LA COPPIA, dove c'era il volto: due tessere — la
+      valuta (le stelle dell'Europa, o Tether col bollino della rete) e la
+      rete dei sats (il fulmine, o la ₿ arancio sulle card on-chain) — con
+      UNA freccia nel verso del gesto, da quel che invii a quel che ricevi.
+      Scelte di Andrea sulle foto: una freccia e non due (la doppia ⇄
+      diceva «si scambia» ma non da che parte), e il QUADRATO TONDO e non
+      il cerchio, l'esagono o la foglia: tondo resta il volto, e due forme
+      diverse non si confondono. Le icone davanti alle due righe dei soldi
+      sono uscite: la coppia dice tutt'e due le cose una volta sola.
+   2) IL VOLTO SCENDE NELLA SCATOLA DELLE STELLINE, a sinistra della
+      media e degli scambi: e' la stessa persona di cui parlano quei
+      numeri, e la scatola si alza quel tanto che serve. Il volto resta
+      una PORTA al negozio (apriNegozioP2P) e resta il volto unico, col
+      bollino 🛡️ all'angolo. Senza voti la scatola c'e' lo stesso, col
+      solo volto: chi ha pubblicato si vede sempre.
+   3) IL TEMPO CHE RESTA E' IL BORDO DI SOTTO della card: una riga che si
+      accorcia da destra, coi TRE STATI di sempre — neutro, arancio negli
+      ultimi tre giorni, rosso che pulsa nell'ultimo (il giudice resta
+      `statoAnelloP2P`, lo stesso dell'anello grande del dettaglio). Il
+      testo esatto vive nell'aria della barra (title + aria-label), come
+      viveva in quella dell'anello. */
+const P2P_STELLE_EU = '<svg class="p2p-tessera-svg" viewBox="0 0 32 32" aria-hidden="true">'
+  + '<path fill="#FFCC00" d="M16.00 3.90L16.46 5.17L17.81 5.21L16.74 6.04L17.12 7.34L16.00 6.58L14.88 7.34L15.26 6.04L14.19 5.21L15.54 5.17zM21.10 5.27L21.56 6.54L22.91 6.58L21.84 7.41L22.22 8.70L21.10 7.95L19.98 8.70L20.36 7.41L19.29 6.58L20.64 6.54zM24.83 9.00L25.29 10.27L26.64 10.31L25.58 11.14L25.95 12.44L24.83 11.68L23.72 12.44L24.09 11.14L23.03 10.31L24.37 10.27zM26.20 14.10L26.66 15.37L28.01 15.41L26.94 16.24L27.32 17.54L26.20 16.78L25.08 17.54L25.46 16.24L24.39 15.41L25.74 15.37zM24.83 19.20L25.29 20.47L26.64 20.51L25.58 21.34L25.95 22.64L24.83 21.88L23.72 22.64L24.09 21.34L23.03 20.51L24.37 20.47zM21.10 22.93L21.56 24.20L22.91 24.25L21.84 25.07L22.22 26.37L21.10 25.61L19.98 26.37L20.36 25.07L19.29 24.25L20.64 24.20zM16.00 24.30L16.46 25.57L17.81 25.61L16.74 26.44L17.12 27.74L16.00 26.98L14.88 27.74L15.26 26.44L14.19 25.61L15.54 25.57zM10.90 22.93L11.36 24.20L12.71 24.25L11.64 25.07L12.02 26.37L10.90 25.61L9.78 26.37L10.16 25.07L9.09 24.25L10.44 24.20zM7.17 19.20L7.63 20.47L8.97 20.51L7.91 21.34L8.28 22.64L7.17 21.88L6.05 22.64L6.42 21.34L5.36 20.51L6.71 20.47zM5.80 14.10L6.26 15.37L7.61 15.41L6.54 16.24L6.92 17.54L5.80 16.78L4.68 17.54L5.06 16.24L3.99 15.41L5.34 15.37zM7.17 9.00L7.63 10.27L8.97 10.31L7.91 11.14L8.28 12.44L7.17 11.68L6.05 12.44L6.42 11.14L5.36 10.31L6.71 10.27zM10.90 5.27L11.36 6.54L12.71 6.58L11.64 7.41L12.02 8.70L10.90 7.95L9.78 8.70L10.16 7.41L9.09 6.58L10.44 6.54z"/></svg>';
+/* LA TESSERA DELLA VALUTA: il fondo e' il colore della bandiera, il
+   segno sta dentro. PURA. Il bollino della rete sugli USDT solo a rete
+   UNICA, la stessa regola di `bandieraValutaP2P` (Andrea, 2 nov: «se
+   l'ordine e' tutte e due le reti basta solo il simbolo usdt») */
+function tesseraValutaP2P(cod, metodi){
+  const c = String(cod || P2P_VALUTA).toUpperCase();
+  if (c === 'USDT') {
+    const reti = Array.isArray(metodi) && typeof reteUsdtDaMetodoP2P === 'function'
+      ? [...new Set(metodi.map(m => (reteUsdtDaMetodoP2P(m) || {}).rete).filter(Boolean))] : [];
+    const bollino = reti.length === 1 ? (P2P_BADGE_RETI_USDT[reti[0]] || '') : '';
+    return '<span class="p2p-tessera p2p-tessera-usdt" role="img" aria-label="USDT">'
+      + P2P_TETHER_SEGNO + bollino + '</span>';
+  }
+  return '<span class="p2p-tessera p2p-tessera-eur" role="img" aria-label="Euro">'
+    + P2P_STELLE_EU + '</span>';
+}
+/* il segno di Tether senza il suo cerchio: il verde lo mette la tessera */
+const P2P_TETHER_SEGNO = '<svg class="p2p-tessera-svg" viewBox="4 4 24 24" aria-hidden="true">'
+  + '<path fill="#FFF" d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117"/></svg>';
+/* LA TESSERA DELLA RETE: la moneta della pagina Cambio (fulmine o ₿),
+   coi suoi colori di giorno e di sera, nella forma della tessera */
+function tesseraReteP2P(rete){
+  return '<span class="p2p-tessera p2p-tessera-rete" role="img" aria-label="'
+    + (rete === 'btc' ? 'on-chain' : 'Lightning') + '">'
+    + (rete === 'btc' ? P2P_OC_MONETA : P2P_LN_MONETA) + '</span>';
+}
+/* LA COPPIA: PURA. `invii` e' il lato di chi legge — true se manda la
+   valuta e riceve i sats (ordine k=sell), e allora valuta → rete; al
+   contrario rete → valuta. L'aria dice la frase intera. */
+function coppiaCardP2P(cod, metodi, rete, invii){
+  const v = tesseraValutaP2P(cod, metodi), r = tesseraReteP2P(rete);
+  const nome = String(cod || P2P_VALUTA).toUpperCase() === 'USDT' ? 'USDT' : 'euro';
+  const sats = rete === 'btc' ? 'bitcoin on-chain' : 'sats su Lightning';
+  const aria = invii ? 'Invia ' + nome + ', ricevi ' + sats : 'Invia ' + sats + ', ricevi ' + nome;
+  return '<span class="p2p-coppia" role="img" aria-label="' + esc(aria) + '" title="' + esc(aria) + '">'
+    + (invii ? v : r)
+    + '<svg class="p2p-freccia" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M14 7l5 5-5 5"/></svg>'
+    + (invii ? r : v) + '</span>';
+}
+/* IL VOLTO DI CHI HA PUBBLICATO, per la scatola delle stelline. Il
+   ripiego e' quello di sempre (17 set 2026, dal campo di Andrea): foto se
+   c'e', iniziale se si sa il nome, «?» finche' non si sa niente — mai un
+   buco. E resta una PORTA: toccarlo apre il NEGOZIO (lo stopPropagation
+   vive in apriNegozioP2P); senza negozio il tocco scivola sulla card. La
+   chiave e' l'ordine (il volto unico, 28 set 2026); la card d'esempio del
+   giro guidato, e quella on-chain, il volto se lo portano. */
+function voltoCardP2P(o){
   const f = o.faccia || p2pFacce[o.id] || {};
-  /* IL VOLTO E' UNA PORTA (set 2026, richiesta di Andrea): toccarlo
-     apre il NEGOZIO di chi ha pubblicato — la stessa pagina del
-     mercatino — mentre il resto della card resta l'ordine. Lo
-     stopPropagation vive in apriNegozioP2P: senza, il tocco cadrebbe
-     anche su prendiOrdineP2P. Senza un negozio da aprire il volto
-     resta un volto: nessun onclick, il tocco scivola sulla card. */
-  /* IL VOLTO E' QUELLO UNICO (28 set 2026): la chiave e' l'ordine, e
-     la card d'esempio — che il volto se lo porta — non ne ha una */
   const dentro = voltoHTML(f, 'p2p-faccia', {
     chiave: o.faccia ? '' : 'p2p:' + o.id,
     attr: f.negozio
       ? ' role="button" tabindex="0" data-negozio="' + esc(f.negozio)
         + '" onclick="apriNegozioP2P(event, this.dataset.negozio)"'
       : ''});
-  return '<span class="p2p-anello' + stato
-    + '" role="img" title="' + esc(aria) + '" aria-label="' + esc(aria) + '">'
-    + '<svg viewBox="0 0 24 24" aria-hidden="true">'
-    + '<circle class="pista" cx="12" cy="12" r="' + P2P_ANELLO_R + '"/>'
-    + '<circle class="resta" cx="12" cy="12" r="' + P2P_ANELLO_R + '"'
-    + ' stroke-dasharray="' + P2P_ANELLO_GIRO.toFixed(2) + '"'
-    + ' stroke-dashoffset="' + consumato + '"/></svg>'
-    /* il bollino 🛡️ Staff all'angolo dell'anello: sul libro il nome
-       non si vede, la faccia si' */
-    + dentro + (o.faccia ? '' : bollinoVolto('p2p:' + o.id)) + '</span>';
+  /* il bollino 🛡️ Staff all'angolo del volto: sul libro il nome non si
+     vede, la faccia si' */
+  return '<span class="p2p-volto">' + dentro
+    + (o.faccia ? '' : bollinoVolto('p2p:' + o.id)) + '</span>';
 }
+/* LA BARRA DEL TEMPO: PURA (l'orologio si passa). Senza una scadenza
+   onesta (vedi `frazioneVitaP2P`) non c'e' barra: una riga piena
+   direbbe «tutto il tempo» su un fatto che non si sa. */
+function barraScadenzaP2P(o, adesso){
+  const resta = frazioneVitaP2P(o, adesso);
+  if (resta < 0) return '';
+  const manca = (o.scade || 0) - (adesso || Math.floor(Date.now() / 1000));
+  const st = statoAnelloP2P(manca);
+  const aria = scadeTestoP2P(o.scade) || 'senza scadenza';
+  return '<div class="p2p-barra' + (st ? ' ' + st : '') + '" role="img" title="'
+    + esc(aria) + '" aria-label="' + esc(aria) + '"><i style="width:'
+    + (resta * 100).toFixed(1) + '%"></i></div>';
+}
+const P2P_ULTIMO_GIORNO_S = 86400;
+const P2P_ANELLO_VICINA_S = 3 * 86400;
 
 /* LE STELLINE DEL MERCATINO, in una riga sola (set 2026): «⭐ 4,8 ·
    💬 12» — l'icona al posto della parola «recensioni», che in una card
@@ -65514,7 +65548,12 @@ function stellineP2P(f){
      l'interessato. Chi non ha ancora una recensione ma ha gia' scambiato
      mostra quello: e' un fatto, e non un voto. Senza il numero la riga e'
      byte per byte quella di prima. */
-  const fatti = (f && typeof completatiP2P === 'function') ? completatiP2P(f.completati, true) : '';
+  /* ...SENZA «COMPLETATI» SULLA CARD DEL LIBRO (12 nov 2026, cantiere
+     card-coppia, Andrea: «levami la parola completato dopo p2p»; scelta
+     sulla carta: «✅ 22 scambi P2P», non «22x P2P» che a chi arriva
+     adesso dice meno). Sulla card lo spazio e' del volto; il profilo e il
+     dettaglio la frase intera la tengono (`completatiP2P`). */
+  const fatti = (f && typeof scambiCortiP2P === 'function') ? scambiCortiP2P(f.completati) : '';
   if (!f || !(f.voti > 0) || !(f.media > 0)) return fatti;
   return stellaP2P(f.media) + ' '
     + f.media.toLocaleString('it-IT',
@@ -66132,22 +66171,25 @@ function rigaOrdineP2P(o){
      PayCode, che sono pagamenti davvero. Quindi a comprare la riga grande (l'euro) sta in cima,
      a vendere ci arriva seconda: cambia l'ORDINE, mai la taglia —
      euro grande e sats piccoli in tutt'e due i tab. */
-  /* L'ICONA DAVANTI AL VERBO (2 nov 2026, Andrea, variante «C»
-     dell'anteprima): la bandierina della valuta (🇪🇺, o il logo di
-     Tether col bollino della rete) apre la riga dei soldi, e la moneta
-     della rete (il fulmine, qui sempre Lightning: e' un ordine di Mostro)
-     apre quella dei sats. Prima la bandierina stava DOPO la cifra. */
-  const bandiera = typeof bandieraValutaP2P === 'function'
-    ? bandieraValutaP2P(o.fiat, o.metodi || []).trim() : '';
-  const rigaEuro = '<span class="p2p-grande p2p-euro">' + bandiera
+  /* LE ICONE DAVANTI AL VERBO SONO USCITE (12 nov 2026, cantiere
+     card-coppia, Andrea: «le icone euro o usdt affianco ai numeri fanno
+     confusione»): la bandierina e la moneta della rete — la variante «C»
+     del 2 nov — sono diventate la COPPIA in alto a destra, al posto del
+     volto (vedi «LA COPPIA, IL VOLTO IN BASSO E LA BARRA DEL TEMPO»).
+     Qui le due righe dei soldi restano parole e cifre. */
+  const rigaEuro = '<span class="p2p-grande p2p-euro">'
     + (paghiEuro ? 'Invia ' : 'Ricevi ') + eurTxt + '</span>';
   /* il verbo esce dalla tinta del lato e la cifra ci resta: vedi il
      CSS di `.p2p-sats .p2p-verbo` — in colore va quel che il colore
      distingue, cioe' i sats */
   const rigaSats = '<span class="p2p-piccola p2p-sats">'
-    + (typeof monetaRigaP2P === 'function' ? monetaRigaP2P('ln') : '')
     + '<span class="p2p-verbo">' + (paghiEuro ? 'Ricevi ' : 'Invia ')
     + '</span>' + sats + '</span>';
+  /* la coppia (qui la rete e' sempre Lightning: e' un ordine di Mostro),
+     il volto per la scatola delle stelline e la barra del tempo */
+  const coppia = coppiaCardP2P(o.fiat, o.metodi || [], 'ln', paghiEuro);
+  const volto = voltoCardP2P(o);
+  const barra = barraScadenzaP2P(o);
   /* LA RIGA DEL PREZZO E' MORTA CON LA CARD ESSENZIALE (10 set 2026,
      ritocco di Andrea): «al prezzo di mercato» non serviva a
      decidere — la cifra qui sopra e' GIA' il netto di tutto, premio
@@ -66259,13 +66301,14 @@ function rigaOrdineP2P(o){
   /* LA CARD D'ESEMPIO DEL GIRO GUIDATO (26 set 2026): e' questa stessa
      card, ma senza id e senza tocco — non si prende — e con la sua
      etichetta. `o.esempio` e' il lato del tab; vedi IL GIRO GUIDATO. */
-  if (o.esempio) return `<div class="p2p-ord p2p-esempio${lato}" data-lato="${esc(o.esempio)}">
+  if (o.esempio) return `<div class="p2p-ord p2p-esempio${lato}${barra ? ' con-barra' : ''}" data-lato="${esc(o.esempio)}">
     <span class="p2p-esempio-tag">Esempio</span>
-    <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
+    <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${coppia}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
     ${badge ? `<div class="p2p-badge-riga">${badge}${affarone}</div>` : ''}
     ${paga}
-    ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
+    <div class="p2p-box p2p-rep">${volto}${rep ? '<span class="p2p-rep-testo">' + rep + '</span>' : ''}</div>
+    ${barra}
   </div>`;
   /* IN PAUSA RESTA NEL LIBRO, GRIGIA (13 ott 2026, cantiere libro-vuoto,
      decisione di Andrea): l'ordine di un ALTRO che adesso e' in pausa si
@@ -66276,20 +66319,21 @@ function rigaOrdineP2P(o){
      col suo «⏸ In pausa fino a…»: il giudice e' lo stesso, e dei miei
      non dice mai «fermo». */
   const fermo = typeof etichettaPausaP2P === 'function' ? etichettaPausaP2P(o) : '';
-  return `<div class="p2p-ord${lato}${mio ? ' p2p-mio' : ''}${typeof cardNuovaP2P === 'function' && cardNuovaP2P(o.id) ? ' p2p-nuova' : ''}${fermo ? ' p2p-in-pausa' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"${fermo ? ' aria-disabled="true"' : ''}
+  return `<div class="p2p-ord${lato}${barra ? ' con-barra' : ''}${mio ? ' p2p-mio' : ''}${typeof cardNuovaP2P === 'function' && cardNuovaP2P(o.id) ? ' p2p-nuova' : ''}${fermo ? ' p2p-in-pausa' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"${fermo ? ' aria-disabled="true"' : ''}
     onclick="prendiOrdineP2P(this.dataset.id)">
     ${fermo}
-    <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
+    <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${coppia}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
     ${badge ? `<div class="p2p-badge-riga">${badge}${affarone}</div>` : ''}
     ${paga}
     ${zona}
     ${typeof segnoFiltroP2P === 'function' ? segnoFiltroP2P(o) : ''}
-    ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
+    <div class="p2p-box p2p-rep">${volto}${rep ? '<span class="p2p-rep-testo">' + rep + '</span>' : ''}</div>
     ${typeof segnoVeloceP2P === 'function' ? segnoVeloceP2P(o) : ''}
     ${mio && typeof segnoPausaP2P === 'function' ? segnoPausaP2P(o) : ''}
     ${mio && typeof segnoParacaduteP2P === 'function' ? segnoParacaduteP2P(o) : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
+    ${barra}
   </div>`;
 }
 
@@ -78238,28 +78282,15 @@ function segnoValutaP2P(cod){
   const v = P2P_VALUTE.find(x => x.cod === c);
   return v ? v.segno : c;
 }
-/* LA BANDIERINA DELLA VALUTA SULLA CARD DEL LIBRO (2 nov 2026, Andrea:
-   «il simbolo usdt per un ordine usdt e la bandierina europa per una
-   card euro»): quella del catalogo, accanto alla cifra; una valuta che
-   nel catalogo non c'e' non ne porta nessuna. HTML gia' pronto (il logo
-   di Tether e' un SVG). */
+/* LA BANDIERINA DELLA VALUTA (2 nov 2026) NON C'E' PIU' (12 nov 2026,
+   cantiere card-coppia): la valuta sulla card del libro e' la tessera di
+   sinistra della COPPIA (`tesseraValutaP2P`), che si porta dietro la
+   regola del bollino della rete qui sotto. */
 /* IL BOLLINO DELLA RETE SUL LOGO DI TETHER (2 nov 2026, Andrea, con le
    foto di un wallet: «sotto rete ethereum sulla card si vede cosi'»): in
    alto a destra il rombo di Ethereum o il triangolo di Tron. Una riga
    sola, senza apici singoli: i banchi la tagliano al primo «;» di riga */
 const P2P_BADGE_RETI_USDT = {tron: '<svg class="p2p-rete-badge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#EF0027"/><path fill="#FFF" d="M21.932 9.913L7.5 7.257l7.595 19.112 10.583-12.894-3.746-3.562zm-.232 1.17l2.208 2.099-6.038 1.093 3.83-3.192zm-5.142 2.973l-6.364-5.278 10.402 1.914-4.038 3.364zm-.453.934l-1.038 8.58L9.472 9.487l6.633 5.502zm.96.455l6.687-1.21-7.67 9.343.983-8.133z"/></svg>', ethereum: '<svg class="p2p-rete-badge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#E9ECEF"/><g fill="#343434"><path fill-opacity=".6" d="M16.498 4v8.87l7.497 3.35z"/><path d="M16.498 4L9 16.22l7.498-3.35z"/><path fill-opacity=".6" d="M16.498 21.968v6.027L24 17.616z"/><path d="M16.498 27.995v-6.028L9 17.616z"/><path fill-opacity=".2" d="M16.498 20.573l7.497-4.353-7.497-3.348z"/><path fill-opacity=".6" d="M9 16.22l7.498 4.353v-7.701z"/></g></svg>'};
-function bandieraValutaP2P(cod, metodi){
-  const c = String(cod || P2P_VALUTA).toUpperCase();
-  const v = P2P_VALUTE.find(x => x.cod === c);
-  if (!v || !v.bandiera) return '';
-  /* le reti dell'ordine, una volta sola ciascuna; all'euro nessuna. IL
-     BOLLINO SOLO A RETE UNICA (Andrea, 14:09: «se l'ordine e' tutte e due
-     le reti basta solo il simbolo usdt, la rete la sceglie poi») */
-  const reti = c === 'USDT' && Array.isArray(metodi) && typeof reteUsdtDaMetodoP2P === 'function'
-    ? [...new Set(metodi.map(m => (reteUsdtDaMetodoP2P(m) || {}).rete).filter(Boolean))] : [];
-  const bollini = reti.length === 1 ? (P2P_BADGE_RETI_USDT[reti[0]] || '') : '';
-  return ' <span class="p2p-bandiera' + (bollini ? ' con-rete' : '') + '">' + v.bandiera + bollini + '</span>';
-}
 /* «gli euro» / «gli USDT», per le frasi del gesto */
 function soldiValutaP2P(cod){
   return String(cod || '').toUpperCase() === 'USDT' ? 'gli USDT' : 'gli euro';
@@ -79118,6 +79149,12 @@ function marchioMancatiP2P(n, inRiga){
    sola, col singolare a 1. */
 function paroleCompletatiP2P(n){
   return Number(n) === 1 ? 'scambio P2P completato' : 'scambi P2P completati';
+}
+/* la forma corta della card del libro: «✅ 1 scambio P2P», «✅ 22 scambi
+   P2P» (12 nov 2026, vedi `stellineP2P`) */
+function scambiCortiP2P(n){
+  n = Math.floor(Number(n) || 0);
+  return n >= 1 ? '✅ ' + n + ' ' + (n === 1 ? 'scambio P2P' : 'scambi P2P') : '';
 }
 function completatiP2P(n, inRiga){
   n = Math.floor(Number(n) || 0);

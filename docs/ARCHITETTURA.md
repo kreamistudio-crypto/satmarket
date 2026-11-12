@@ -7403,8 +7403,9 @@
   posto i volti gia' disegnati quando nome o foto arrivano (un «non so»
   arrivato dopo non cancella mai un nome). Dieci posti, censiti in
   `prove_volto_unico`: classifica, testata del negozio, recensioni,
-  riquadro venditore del dettaglio, Profilo, account aperti, anello del
-  libro P2P, «Chi ha pubblicato», fila in vetrina, `cardParte` (scambio e
+  riquadro venditore del dettaglio, Profilo, account aperti, card del
+  libro P2P (`voltoCardP2P`, dal 12 nov 2026 nella scatola delle
+  stelline e non piu' dentro l'anello), «Chi ha pubblicato», fila in vetrina, `cardParte` (scambio e
   ordine); il tappo in testata legge la stessa cache. I volti del P2P
   entrano da `prendiFacceP2P(facce, chiesti)`: gli id chiesti e non
   tornati diventano «?», e dalle fotografie del libro solo se la

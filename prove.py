@@ -62519,13 +62519,15 @@ def prove_giro_guidato_p2p():
     # --- 3) LA CARD D'ESEMPIO ---------------------------------------------
     riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
     # (28 set 2026) la card porta il suo lato prima di tutto: `${lato}`
-    _es = riga[riga.index("if (o.esempio) return"):riga.index("return `<div class=\"p2p-ord${lato}${mio")]
+    _es = riga[riga.index("if (o.esempio) return"):riga.index("return `<div class=\"p2p-ord${lato}${barra")]
     prova("la card d'esempio esce dalla stessa rigaOrdineP2P", True, "if (o.esempio) return" in riga)
     prova("...senza id, senza tocco, senza ruolo di bottone", [0, 0, 0, 0],
           [_es.count("data-id"), _es.count("onclick"), _es.count("role="), _es.count("tabindex")])
     prova("...con l'etichetta «Esempio» e le righe vere (cifra, badge, metodo, stelle)",
           [True] * 5, ['<span class="p2p-esempio-tag">Esempio</span>' in _es,
-                       "anelloScadenzaP2P(o)" in _es, "${affarone}" in _es,
+                       # (12 nov 2026, card-coppia) al posto dell'anello la
+                       # coppia in alto, e la barra del tempo in fondo
+                       "${coppia}" in _es and "${barra}" in _es, "${affarone}" in _es,
                        # (6 nov 2026, Andrea) la scatola dei metodi NUDA: la moneta
                        # della rete sta solo davanti a «Ricevi/Invia» (dal 30 ott
                        # al 6 nov la portava anche lei, tutta a destra)
@@ -62533,7 +62535,7 @@ def prove_giro_guidato_p2p():
                        "p2p-rep" in _es])
     prova("...e il volto e le stelle se li porta dietro, senza toccare quelli veri", [True, True],
           ["const rep = stellineP2P(o.faccia || p2pFacce[o.id]);" in riga,
-           "const f = o.faccia || p2pFacce[o.id] || {};" in pezzo_js(mini, "function anelloScadenzaP2P(o, adesso){", "\n}\n")])
+           "const f = o.faccia || p2pFacce[o.id] || {};" in pezzo_js(mini, "function voltoCardP2P(o){", "\n}\n")])
     prova("...tratteggiata, e il tocco non ce l'ha", [True, True],
           ["dashed" in pezzo_js(css, ".p2p-ord.p2p-esempio{", "}"),
            "cursor:default" in pezzo_js(css, ".p2p-ord.p2p-esempio{", "}")])
@@ -65964,7 +65966,8 @@ def prove_p2p_libro():
     prova("...mentre l'ORDINE delle righe segue il gesto", True,
           # (30 ott 2026, 17:29) la moneta della rete e' scesa nella scatola
           # dei metodi: nella testa restano le due righe e l'anello
-          "${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}"
+          # (12 nov 2026, card-coppia) ...e al posto dell'anello la coppia
+          "${paghiEuro ? rigaEuro : rigaSats}${coppia}"
           in mini
           and "${paghiEuro ? rigaSats : rigaEuro}" in mini)
     prova("il verbo della controparte non c'e' piu'", True,
@@ -65999,8 +66002,9 @@ def prove_p2p_libro():
     # L'ANELLO E' ANCORATO e non in fila: dentro il flex della testa
     # una cifra lunga prendeva tutta la riga e lo faceva scendere a
     # meta' card (visto dal vivo). In assoluto non entra nel wrap.
-    prova("l'anello sta ancorato in alto a destra", True,
-          "position:absolute" in pezzo_js(mini, ".p2p-anello{", "}")
+    # (12 nov 2026, card-coppia) al suo posto la COPPIA, ancorata uguale
+    prova("la coppia sta ancorata in alto a destra", True,
+          "position:absolute" in pezzo_js(mini, ".p2p-coppia{", "}")
           and "position:relative" in pezzo_js(mini, ".p2p-ord{", "}")
           and "padding-right" in pezzo_js(mini, ".p2p-ord .p2p-testa{", "}"))
     # ...e le ALTRE due case di .p2p-testa non si muovono: l'allineamento
@@ -66756,7 +66760,12 @@ def prove_p2p_libro():
         "function frazioneVitaP2P(o, adesso){",
         # il giudice del colore, che dal set 2026 e' UNO per i due anelli
         "function statoAnelloP2P(manca){",
-        "function anelloScadenzaP2P(o, adesso){",
+        # (12 nov 2026, card-coppia) al posto dell'anello: la coppia, il
+        # volto per la scatola delle stelline e la barra del tempo — un
+        # blocco solo, con dentro le due soglie del tempo
+        "const P2P_STELLE_EU = ",
+        # le due monete della pagina Cambio, che la tessera della rete veste
+        "const P2P_OC_MONETA = ",
         # i QUATTRO ordini del libro (set 2026): convenienza (il
         # predefinito), piu' recenti, importo nei due versi
         "function ordinaLibroP2P(righe, lato, criterio){",
@@ -66868,11 +66877,12 @@ def prove_p2p_libro():
     # qui non c'e' identita', e senza vale il nome di ieri
     pezzi.append("let myTgId = null;")
     pezzi.append(pezzo_js(mini, "function chiaveP2P(base){", "\n}\n") + "\n}")
-    # le due costanti dell'anello: il raggio e il giro, che
-    # anelloScadenzaP2P usa per il dasharray
-    for riga in ("const P2P_ANELLO_R = ", "const P2P_ANELLO_GIRO = ",
-                 "const P2P_ULTIMO_GIORNO_S = ",
-                 "const P2P_ANELLO_VICINA_S = ",
+    # (12 nov 2026, card-coppia) il raggio e il giro dell'anello se ne
+    # sono andati con lui; le due soglie arrivano col blocco della coppia.
+    # Il bollino della rete sugli USDT, che la tessera della valuta legge,
+    # e la forma corta degli scambi, che le stelline chiedono
+    pezzi.append(pezzo_js(mini, "function scambiCortiP2P(n){", "\n}\n") + "\n}")
+    for riga in ("const P2P_BADGE_RETI_USDT = ",
                  # la finestra della garanzia (set 2026): il margine
                  # e' nostro e dichiarato, e vive nel client
                  "const P2P_MARGINE_HOLD_BLOCCHI = ",
@@ -67220,17 +67230,18 @@ out.anelloSgoccioli = vita(1000, 2000, 1950);
 out.anelloOltre   = vita(1000, 2000, 3000);   // clampato a 0, mai negativo
 out.anelloSenza   = vita(1000, 0, 1500);      // nessuna scadenza: non si sa
 out.anelloStorto  = vita(2000, 1000, 1500);   // finestra rovescia: non si sa
-/* ...e il disegno: c'e', porta l'aria, sbiadisce e si allarma
-   nell'ULTIMO GIORNO — la finestra e' larga 30 giorni, cosi' «meta'
-   strada» e «ultimo giorno» sono due casi distinti davvero */
+/* ...e il disegno: c'e', porta l'aria e si allarma nell'ULTIMO GIORNO
+   — la finestra e' larga 30 giorni, cosi' «meta' strada» e «ultimo
+   giorno» sono due casi distinti davvero. (12 nov 2026, card-coppia:
+   il disegno non e' piu' l'anello ma la BARRA sul bordo di sotto.) */
 const meseS = 30 * 86400;
-out.svgMezzo = anelloScadenzaP2P({creato: 0, scade: meseS}, meseS / 2);
-out.svgUltimo = anelloScadenzaP2P({creato: 0, scade: meseS}, meseS - 3600);
-out.svgNiente = anelloScadenzaP2P({creato: 1000, scade: 0}, 1500);
-out.svgQuasiPieno = anelloScadenzaP2P({creato: 0, scade: meseS}, 60);
+out.barraMezzo = barraScadenzaP2P({creato: 0, scade: meseS}, meseS / 2);
+out.barraUltimo = barraScadenzaP2P({creato: 0, scade: meseS}, meseS - 3600);
+out.barraNiente = barraScadenzaP2P({creato: 1000, scade: 0}, 1500);
+out.barraQuasiPiena = barraScadenzaP2P({creato: 0, scade: meseS}, 60);
 /* ...e due giorni prima della fine: arancio, non ancora rosso */
-out.svgVicina = anelloScadenzaP2P({creato: 0, scade: meseS},
-                                  meseS - 2 * 86400);
+out.barraVicina = barraScadenzaP2P({creato: 0, scade: meseS},
+                                   meseS - 2 * 86400);
 out.rigaAvviso = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','ra'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50'],['premium','3'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
 /* ...e fra due copie dello stesso range vince la piu' recente: la
    dedup e' quella di TUTTI gli ordini, non un binario a parte */
@@ -67741,18 +67752,22 @@ console.log(JSON.stringify(out));
     # vecchio della nascita — roba che arriva da relay di sconosciuti).
     prova("senza scadenza non si disegna niente", [-1, -1],
           [out["anelloSenza"], out["anelloStorto"]])
-    prova("...e infatti il disegno non nasce", "", out["svgNiente"])
-    prova("il disegno porta la pista e l'arco che resta", True,
-          'class="pista"' in out["svgMezzo"]
-          and 'class="resta"' in out["svgMezzo"]
-          and "stroke-dasharray=" in out["svgMezzo"])
-    # a meta' strada il consumato e' mezzo giro: 56.55 / 2 = 28.27
-    prova("...e a meta' il consumato e' mezzo giro", True,
-          'stroke-dashoffset="28.27"' in out["svgMezzo"])
-    prova("il testo non si perde: vive nell'aria dell'anello", True,
-          'role="img"' in out["svgMezzo"]
-          and 'aria-label="' in out["svgMezzo"]
-          and 'title="' in out["svgMezzo"])
+    prova("...e infatti il disegno non nasce", "", out["barraNiente"])
+    # (12 nov 2026, cantiere card-coppia, ridisegno di Andrea) L'ANELLO
+    # E' DIVENTATO LA BARRA sul bordo di sotto della card: una riga che si
+    # accorcia da destra. Le domande sono le stesse di quelle dell'anello.
+    prova("il disegno porta la pista e la riga che resta", True,
+          'class="p2p-barra' in out["barraMezzo"]
+          and '<i style="width:' in out["barraMezzo"]
+          and ".p2p-barra::before{right:0;background:var(--line)}" in mini)
+    prova("...e a meta' la riga e' lunga meta'", True,
+          'width:50.0%' in out["barraMezzo"])
+    prova("...e appena pubblicato e' (quasi) tutta", True,
+          'width:100.0%' in out["barraQuasiPiena"])
+    prova("il testo non si perde: vive nell'aria della barra", True,
+          'role="img"' in out["barraMezzo"]
+          and 'aria-label="' in out["barraMezzo"]
+          and 'title="' in out["barraMezzo"])
     # TRE STATI NETTI (set 2026, ritocco di Andrea che rovescia lo
     # sbiadimento con color-mix): neutro finche' c'e' tempo, arancio
     # negli ultimi tre giorni, rosso che pulsa nell'ultimo. Tre stati
@@ -67761,41 +67776,50 @@ console.log(JSON.stringify(out));
     # esisterebbe — `--ink-soft` e' chiaro di sera e scuro di giorno.
     # EMENDATA (26 set 2026, la freccetta bianca del giro guidato): il
     # divieto guardava TUTTO il file, e la freccia del passo 7 e' bianca
-    # apposta — sul velo scuro, non su una card. Il divieto e' dell'ANELLO:
-    # si guarda nelle sue regole, dove il bianco sparirebbe sulla card.
-    _anello = " ".join(re.findall(r"\.p2p-anello[^{]*\{[^}]*\}", mini)).lower()
+    # apposta — sul velo scuro, non su una card. Il divieto e' della
+    # BARRA: si guarda nelle sue regole, dove il bianco sparirebbe.
+    _barra = " ".join(re.findall(r"\.p2p-barra[^{]*\{[^}]*\}", mini)).lower()
     prova("il neutro e' un token che gira col tema, mai il bianco",
-          True, ".p2p-anello .resta{stroke:var(--ink-soft)}" in mini
-          and "stroke:#fff" not in _anello and "p2p-anello" in _anello)
-    prova("...e a tre giorni l'anello passa all'arancio di casa", True,
-          ".p2p-anello.vicina .resta{stroke:var(--sats)}" in mini
-          and "vicina" in out["svgVicina"]
-          and "vicina" not in out["svgMezzo"])
+          True, ".p2p-barra > i{background:var(--ink-soft);" in mini
+          and "#fff" not in _barra and "white" not in _barra and "p2p-barra" in _barra)
+    prova("...e a tre giorni la barra passa all'arancio di casa", True,
+          ".p2p-barra.vicina > i{background:var(--sats)}" in mini
+          and "vicina" in out["barraVicina"]
+          and "vicina" not in out["barraMezzo"])
     # `color-mix` vive anche altrove (la barra degli XP), quindi la
-    # domanda si fa DOVE conta: nel disegno dell'anello
-    prova("...e dello sbiadimento inline non resta niente", True,
+    # domanda si fa DOVE conta: nel disegno della barra. L'UNICO stile
+    # inline e' la lunghezza: un colore li' vincerebbe sui tre stati
+    prova("...e l'unico stile inline e' la lunghezza, mai un colore", True,
           "color-mix" not in pezzo_js(
-              mini, "function anelloScadenzaP2P(o, adesso){", "\n}\n")
-          and "style=" not in out["svgMezzo"])
+              mini, "function barraScadenzaP2P(o, adesso){", "\n}\n")
+          and re.findall(r'style="[^"]*"', out["barraMezzo"]) == ['style="width:50.0%"'])
     # L'ULTIMO GIORNO E' UN AVVISO: rosso che pulsa, e la soglia sta
     # nel JS — e' un giudizio, non un vestito. Li' lo stile inline non
-    # si scrive, o vincerebbe sul rosso.
-    prova("...e nell'ultimo giorno l'anello si allarma", True,
-          "ultimo-giorno" in out["svgUltimo"]
-          and "ultimo-giorno" not in out["svgMezzo"])
+    # scrive colori, o vincerebbe sul rosso.
+    prova("...e nell'ultimo giorno la barra si allarma", True,
+          "ultimo-giorno" in out["barraUltimo"]
+          and "ultimo-giorno" not in out["barraMezzo"])
     prova("...senza stile inline che coprirebbe il rosso", True,
-          "color-mix" not in out["svgUltimo"])
+          "color-mix" not in out["barraUltimo"]
+          and "background" not in out["barraUltimo"])
     prova("...e il rosso PULSA, fermo con reduced-motion", True,
           "animation:p2pPulsa 1.5s" in mini
           and "@keyframes p2pPulsa{" in mini
-          and ".p2p-anello.ultimo-giorno .resta{animation:none}" in mini)
+          and ".p2p-barra.ultimo-giorno > i{animation:none}" in mini)
     prova("la soglia dell'ultimo giorno vive nel JS, non nel CSS", True,
           "const P2P_ULTIMO_GIORNO_S = 86400;" in mini
           and "manca <= P2P_ULTIMO_GIORNO_S" in mini)
-    prova("la card porta l'anello e non piu' il testo della scadenza",
-          True, "p2p-anello" in out["rigaCompra"]
+    prova("la card porta la barra, e non piu' l'anello ne' il testo della scadenza",
+          True, "p2p-barra" in out["rigaCompra"]
+          and "p2p-anello" not in out["rigaCompra"]
           and "p2p-quando" not in out["rigaCompra"]
           and "⏳" not in out["rigaCompra"])
+    # LA BARRA SEGUE GLI ANGOLI SENZA TAGLIARE LA CARD: la cornice
+    # eredita il raggio e taglia lei; un overflow:hidden sulla card si
+    # mangerebbe il cartellino «Esempio» (top:-10px)
+    prova("...e la barra segue gli angoli senza tagliare la card", [True, False],
+          ["border-radius:inherit;overflow:hidden" in pezzo_js(mini, ".p2p-barra{", "}"),
+           "overflow:hidden" in pezzo_js(mini, ".p2p-ord{", "}")])
     # A CAMBIO MUTO nessun ≈ e nessun numero inventato: la cifra
     # degrada a «sats» nudo, e il badge del premio resta — non ha
     # bisogno del cambio.
@@ -67873,9 +67897,16 @@ console.log(JSON.stringify(out));
     # server e' in riavvio e le facce tacciono, dentro l'anello sta il
     # tappo del mercatino col «?». Le stelline invece restano dei soli
     # volti coi voti.
-    prova("col volto la faccia sta dentro l'anello", True,
+    # (12 nov 2026, cantiere card-coppia, Andrea: «l'icona del venditore
+    # va messa nel rettangolo in basso dove ci sono gia' recensioni e
+    # numero di scambi») il volto e' SCESO nella scatola delle stelline,
+    # a sinistra; in alto a destra c'e' la coppia
+    prova("col volto la faccia sta nella scatola delle stelline, a sinistra", True,
           "p2p-faccia" in out["rigaConFaccia"]
-          and "av_x.jpg" in out["rigaConFaccia"])
+          and "av_x.jpg" in out["rigaConFaccia"]
+          and out["rigaConFaccia"].index('<div class="p2p-box p2p-rep"><span class="p2p-volto">')
+              < out["rigaConFaccia"].index("p2p-faccia")
+              < out["rigaConFaccia"].index("p2p-rep-testo"))
     prova("...e la card porta le stelline IN CODA", True,
           "p2p-rep" in out["rigaConFaccia"]
           and out["rigaConFaccia"].index("p2p-euro")
@@ -67889,14 +67920,16 @@ console.log(JSON.stringify(out));
           '<span class="volto-sagoma" aria-hidden="true"></span></span>' in out["rigaSenzaRep"]
           and ">?<" not in out["rigaSenzaRep"]
           and "av-foto" not in out["rigaSenzaRep"]
-          and "p2p-rep" not in out["rigaSenzaRep"]
-          and "p2p-anello" in out["rigaSenzaRep"])
+          # (12 nov 2026) la scatola c'e' sempre, col solo volto
+          and "p2p-rep-testo" not in out["rigaSenzaRep"]
+          and '<div class="p2p-box p2p-rep"><span class="p2p-volto">' in out["rigaSenzaRep"]
+          and "p2p-anello" not in out["rigaSenzaRep"])
     prova("...e il «?» per chi il server non conosce", True,
           'class="p2p-faccia volto-ignoto" data-volto="p2p:ord-ig">?</span>'
           in out["rigaIgnota"])
     prova("...e un volto senza voti porta la faccia, non la riga", True,
           "p2p-faccia" in out["rigaFacciaSenzaVoti"]
-          and "p2p-rep" not in out["rigaFacciaSenzaVoti"])
+          and "p2p-rep-testo" not in out["rigaFacciaSenzaVoti"])
     # CHI NON HA LA FOTO SU TELEGRAM ha il tappo del mercatino: niente
     # <img>, l'iniziale del nome sul tondo scuro — la stessa scala di
     # ripieghi delle card degli annunci.
@@ -68274,8 +68307,10 @@ def prove_p2p_dettaglio():
     # colori sullo stesso ordine, e a scoprirlo sarebbe chi guarda.
     prova("il colore del tempo ha un giudice solo", True,
           "function statoAnelloP2P(manca){" in mini
+          # (12 nov 2026, card-coppia) l'anello piccolo e' diventato la
+          # barra sul bordo della card: il giudice e' lo stesso
           and "statoAnelloP2P(manca)" in pezzo_js(
-              mini, "function anelloScadenzaP2P(o, adesso){", "\n}\n"))
+              mini, "function barraScadenzaP2P(o, adesso){", "\n}\n"))
     # NIENTE `id` NELL'SVG: la maschera che «sarebbe piu' semplice»
     # vuole un id, e un id nell'SVG e' la trappola gia' pagata con la
     # stella (in un elenco di N card il primo id vince per tutte).
@@ -137684,7 +137719,9 @@ def prove_volto_unico():
         # (16 ott 2026) le righe del foglio, la pastiglia e «Stai usando»
         # lo chiedono tutti a voltoConto, che e' il posto della chiamata
         "account": ("voltoHTML({nome: c.nome || c.username", "function voltoConto(c, cls){"),
-        "card del libro": ("voltoHTML(f, 'p2p-faccia'", "function anelloScadenzaP2P(o, adesso){"),
+        # (12 nov 2026, card-coppia) il volto del libro e' sceso nella
+        # scatola delle stelline: la sua funzione e' voltoCardP2P
+        "card del libro": ("voltoHTML(f, 'p2p-faccia'", "function voltoCardP2P(o){"),
         "chi ha pubblicato": ("voltoHTML(f, 'p2p-rep-volto'", "function repRiquadroP2P(f, id){"),
         "fila in vetrina": ("voltoHTML(f, 'p2p-vt-volto'", "function cardVetrinaP2P(o){"),
         "card dell'altra parte": ("voltoHTML(op.volto || Object.assign",
@@ -143962,9 +143999,9 @@ def prove_conto_intervallo():
     # un altro corpo), l'etichetta che a capo ci va per la sua parola
     # piu' lunga (cosi' a 320 le celle scendono invece di schiacciarla),
     # le celle in colonna, e la riga dell'euro della card che lascia il
-    # posto all'anello
+    # posto all'anello (dal 12 nov 2026, card-coppia, alla coppia: 104)
     prova("CSS: nessuna regola delle due colonne", False, ".conto-due" in mini)
-    for regola in (".p2p-ord>.p2p-grande{display:block;padding-right:52px;margin-top:9px}",
+    for regola in (".p2p-ord>.p2p-grande{display:block;padding-right:104px;margin-top:9px}",
                    # (7 ott 2026) «sats» veste come «da» e «a» delle card
                    # P2P: la STESSA regola, non una copia che si scolla
                    ".card-p2p .p2p-vt-verbo,\n  .conto-p2p .unita-sats{font-family:Nunito,sans-serif;font-size:10.5px;\n"
@@ -155148,69 +155185,94 @@ console.log(JSON.stringify(out));
     # della pagina del MIO scambio non perde la valuta passando da
     # `comeLibroP2P` («Totale da inviare 10 USDT», non «€»)
     riga_libro = pezzo_js(mini, "function rigaOrdineP2P(", "\n}\n")
-    # (2 nov 2026 sera, variante «C» di Andrea) la bandierina NON sta piu'
-    # dopo la cifra: apre la riga, davanti a «Invia/Ricevi»; e la moneta
-    # della rete apre la riga dei sats. Sulle due card, Mostro e on-chain.
+    # (2 nov 2026 sera, variante «C» di Andrea) la bandierina apriva la
+    # riga dei soldi e la moneta della rete quella dei sats.
+    # EMENDATA (12 nov 2026, cantiere card-coppia, Andrea: «le icone euro
+    # o usdt affianco ai numeri fanno confusione»): le due icone sono
+    # uscite dalle righe e sono diventate la COPPIA in alto a destra, al
+    # posto del volto — valuta e rete con UNA freccia nel verso del gesto,
+    # in tessere a QUADRATO TONDO (scelte di Andrea sulle foto). Sulle due
+    # card, Mostro e on-chain.
     riga_oc = pezzo_js(mini, "function rigaOnchainP2P(", "\n}\n")
-    prova("la card del libro mette la bandierina della valuta DAVANTI al verbo, e la "
-          "moneta della rete davanti a «Ricevi/Invia … sats» (Lightning su Mostro, "
-          "bitcoin on-chain)", (True, True, False, True, True, True),
-          ("bandieraValutaP2P(o.fiat, o.metodi || []).trim()" in riga_libro,
-           "'<span class=\"p2p-grande p2p-euro\">' + bandiera\n    + (paghiEuro ? 'Invia ' : 'Ricevi ')" in riga_libro,
-           "+ (typeof bandieraValutaP2P === 'function' ? bandieraValutaP2P(o.fiat, o.metodi || []) : '')" in riga_libro,
-           "monetaRigaP2P('ln') : '')\n    + '<span class=\"p2p-verbo\">'" in riga_libro,
-           "'<span class=\"p2p-grande p2p-euro\">' + bandiera + (paghiEuro ? 'Invia ' : 'Ricevi ')" in riga_oc,
-           "monetaRigaP2P('btc') : '') + '<span class=\"p2p-verbo\">'" in riga_oc))
-    js_m = ("const P2P_OC_MONETA = 'OC'; const P2P_LN_MONETA = 'LN';\n"
-            + _fn_js(mini, "function monetaRigaP2P(rete){") + "\n"
-            + "console.log(JSON.stringify([monetaRigaP2P('ln'), monetaRigaP2P('btc')]));")
-    om = _node_banco(js_m)
-    if om is None:
-        salta("la moneta davanti ai sats, sul banco", "node non c'e'")
-    else:
-        prova("...la moneta e' il fulmine per Lightning e la ₿ per on-chain, mai un'emoji",
-              ['<span class="p2p-moneta-riga" role="img" aria-label="Lightning">LN</span>',
-               '<span class="p2p-moneta-riga" role="img" aria-label="on-chain">OC</span>'], om)
-    # (3 nov 2026, Andrea) la moneta centrata sulle parole (-.12em, misurato)
-    # e le due righe della card distanziate
-    prova("...e il CSS la tiene in riga, centrata sulle parole, e le due righe respirano",
-          (True, True, True),
-          (".p2p-moneta-riga{display:inline-flex;vertical-align:-.12em;margin-right:.35em;line-height:0}" in mini,
-           ".p2p-euro > .p2p-bandiera{margin-right:.3em}" in mini,
-           ".p2p-ord>.p2p-piccola{margin-top:9px}" in mini))
+    prova("la card del libro non mette piu' icone davanti ai verbi, e porta la coppia "
+          "(Lightning su Mostro, bitcoin on-chain)", (0, 0, 0, 0, True, True),
+          (riga_libro.count("bandieraValutaP2P"), riga_libro.count("monetaRigaP2P"),
+           riga_oc.count("bandieraValutaP2P"), riga_oc.count("monetaRigaP2P"),
+           "coppiaCardP2P(o.fiat, o.metodi || [], 'ln', paghiEuro)" in riga_libro,
+           "'btc', paghiEuro)" in riga_oc))
+    prova("...e la bandierina e la moneta in riga non esistono piu', col loro vestito",
+          (0, 0, 0, 0), (mini.count("function bandieraValutaP2P("), mini.count("function monetaRigaP2P("),
+                         mini.count(".p2p-moneta-riga"), mini.count(".p2p-bandiera")))
+    prova("...e le due righe respirano come prima", True,
+          ".p2p-ord>.p2p-piccola{margin-top:9px}" in mini)
+    prova("...e la tessera e' il quadrato tondo, tondo resta il volto", (True, True),
+          ("border-radius:10px" in pezzo_js(mini, ".p2p-tessera{", "}"),
+           "border-radius:50%" in pezzo_js(mini, ".p2p-faccia{", "}")))
+    # A 320 LA COPPIA SI STRINGE (misurato dal vivo: a 104px «Invia ≈
+    # 53 261 sats» mandava «sats» a capo), e il posto lo lasciano tutt'e due
+    # le righe — la regola della riga dell'euro sta DOPO la sua, o vince lei
+    _cs = mini.index(".p2p-ord>.p2p-grande{display:block;padding-right:104px;")
+    prova("...e a 320 la coppia si stringe e le due righe le lasciano 90px", (True, True, True),
+          (".p2p-tessera{width:30px;height:30px;border-radius:9px}" in mini,
+           ".p2p-ord .p2p-testa{padding-right:90px}" in mini,
+           mini.find("@media (max-width:360px){.p2p-ord>.p2p-grande{padding-right:90px}}") > _cs))
     i = mini.index("const P2P_VALUTE = [")
     js = ("const P2P_VALUTA = 'EUR';\n" + mini[i:mini.index("];", i) + 2] + "\n"
+          + mini[mini.index("const esc = s =>"):mini.index(";\n", mini.index("const esc = s =>")) + 2]
           + mini[mini.index("const P2P_RETI_USDT = ["):mini.index("];", mini.index("const P2P_RETI_USDT = [")) + 2] + "\n"
           + _fn_js(mini, "function reteUsdtDaMetodoP2P(m){") + "\n"
           + _riga_js(mini, "const P2P_BADGE_RETI_USDT = {") + "\n"
-          + _fn_js(mini, "function bandieraValutaP2P(cod, metodi){") + "\n"
+          + "const P2P_OC_MONETA = 'OC'; const P2P_LN_MONETA = 'LN';\n"
+          + _riga_js(mini, "const P2P_STELLE_EU = ") + _riga_js(mini, "  + '<path fill=\"#FFCC00\"")
+          + _riga_js(mini, "const P2P_TETHER_SEGNO = ") + _riga_js(mini, "  + '<path fill=\"#FFF\" d=\"M17.922")
+          + _fn_js(mini, "function tesseraValutaP2P(cod, metodi){") + "\n"
+          + _fn_js(mini, "function tesseraReteP2P(rete){") + "\n"
+          + _fn_js(mini, "function coppiaCardP2P(cod, metodi, rete, invii){") + "\n"
           + _fn_js(mini, "function comeLibroP2P(o){") + "\n"
-          + "console.log(JSON.stringify({eur: bandieraValutaP2P('EUR'), vuota: bandieraValutaP2P(''),\n"
-          + "  usdt: bandieraValutaP2P('usdt'), altra: bandieraValutaP2P('BRL'),\n"
-          + "  tron: bandieraValutaP2P('USDT', ['USDT (Tron)']),\n"
-          + "  eth: bandieraValutaP2P('USDT', ['USDT (Ethereum)']),\n"
-          + "  due: bandieraValutaP2P('USDT', ['USDT (Tron)', 'USDT (Ethereum)']),\n"
-          + "  eurSepa: bandieraValutaP2P('EUR', ['SEPA']),\n"
+          + "const t = x => (x.match(/p2p-tessera-(eur|usdt|rete)/g) || []).map(y => y.slice(12));\n"
+          + "console.log(JSON.stringify({eur: tesseraValutaP2P('EUR'), vuota: tesseraValutaP2P(''),\n"
+          + "  usdt: tesseraValutaP2P('usdt'), altra: tesseraValutaP2P('BRL'),\n"
+          + "  tron: tesseraValutaP2P('USDT', ['USDT (Tron)']),\n"
+          + "  eth: tesseraValutaP2P('USDT', ['USDT (Ethereum)']),\n"
+          + "  due: tesseraValutaP2P('USDT', ['USDT (Tron)', 'USDT (Ethereum)']),\n"
+          + "  eurSepa: tesseraValutaP2P('EUR', ['SEPA']),\n"
+          + "  reti: [tesseraReteP2P('ln'), tesseraReteP2P('btc')],\n"
+          + "  invioEuro: coppiaCardP2P('EUR', [], 'ln', true), invioSats: coppiaCardP2P('EUR', [], 'ln', false),\n"
+          + "  usdtOc: coppiaCardP2P('USDT', ['USDT (Tron)'], 'btc', true),\n"
+          + "  ordine: [t(coppiaCardP2P('EUR', [], 'ln', true)), t(coppiaCardP2P('EUR', [], 'ln', false))],\n"
+          + "  frecce: [coppiaCardP2P('EUR', [], 'ln', true).split('p2p-freccia').length - 1],\n"
           + "  fiat: [comeLibroP2P({lato: 'compro', euro: 10, fiat: 'USDT'}).fiat,\n"
           + "         comeLibroP2P({lato: 'compro', euro: 10}).fiat]}));\n")
     o = _node_banco(js)
     if o is None:
-        salta("la bandierina della card e la valuta del conto, sul banco", "node non c'e'")
+        salta("la coppia della card e la valuta del conto, sul banco", "node non c'e'")
     else:
         o = o or {}
-        prova("...🇪🇺 all'euro (anche a valuta non detta), il logo di Tether all'USDT, "
-              "niente a una valuta fuori dal catalogo",
-              [' <span class="p2p-bandiera">🇪🇺</span>', ' <span class="p2p-bandiera">🇪🇺</span>',
-               True, ""],
-              [o.get("eur"), o.get("vuota"),
-               str(o.get("usdt") or "").startswith(' <span class="p2p-bandiera"><svg class="ico-usdt"'),
-               o.get("altra")])
+        prova("...le stelle dell'Europa all'euro (anche a valuta non detta) e a ogni valuta "
+              "fuori catalogo, il segno di Tether all'USDT",
+              [True, True, True, True, False],
+              ['p2p-tessera-eur' in str(o.get("eur")), 'p2p-tessera-eur' in str(o.get("vuota")),
+               'p2p-tessera-usdt' in str(o.get("usdt")), 'p2p-tessera-eur' in str(o.get("altra")),
+               'ico-usdt' in str(o.get("usdt"))])
         _n = lambda x: str(x or "").count('class="p2p-rete-badge"')
-        prova("il bollino della rete sul logo di Tether (2 nov 2026): rosso di Tron, rombo "
-              "di Ethereum; a due reti solo il logo (la rete si sceglie dopo), all'euro niente",
+        prova("il bollino della rete sulla tessera di Tether (2 nov 2026): rosso di Tron, rombo "
+              "di Ethereum; a due reti solo il segno (la rete si sceglie dopo), all'euro niente",
               [1, True, 1, True, 0, 0],
               [_n(o.get("tron")), "#EF0027" in str(o.get("tron")), _n(o.get("eth")),
                "#E9ECEF" in str(o.get("eth")), _n(o.get("due")), _n(o.get("eurSepa"))])
+        prova("la tessera della rete e' il fulmine per Lightning e la ₿ per on-chain, mai un'emoji",
+              ['<span class="p2p-tessera p2p-tessera-rete" role="img" aria-label="Lightning">LN</span>',
+               '<span class="p2p-tessera p2p-tessera-rete" role="img" aria-label="on-chain">OC</span>'],
+              o.get("reti"))
+        # IL VERSO DEL GESTO: da quel che invii a quel che ricevi — e la
+        # freccia e' UNA (Andrea ha scelto la foto con una, non con ⇄)
+        prova("la coppia va nel verso del gesto: valuta → rete a chi invia la valuta, "
+              "rete → valuta a chi invia i sats, con una freccia sola",
+              [[["eur", "rete"], ["rete", "eur"]], [1]], [o.get("ordine"), o.get("frecce")])
+        prova("...e l'aria dice la frase intera", [True, True, True],
+              ['aria-label="Invia euro, ricevi sats su Lightning"' in str(o.get("invioEuro")),
+               'aria-label="Invia sats su Lightning, ricevi euro"' in str(o.get("invioSats")),
+               'aria-label="Invia USDT, ricevi bitcoin on-chain"' in str(o.get("usdtOc"))])
         prova("il conto del mio scambio tiene la valuta: USDT resta USDT, senza resta vuota (euro)",
               ["USDT", ""], o.get("fiat"))
     # LA PAGINA DEI RECAPITI ALLEGGERITA (2 nov 2026, Andrea: «troppe
@@ -156382,12 +156444,15 @@ console.log(JSON.stringify(out));
     # stessa cosa per l'on-chain»): sulle card del LIBRO la moneta sta solo
     # davanti alla riga dei sats; la scatola dei metodi e' nuda. La scatola
     # con la moneta (la `pagaConReteP2P` qui sopra) resta per «I miei scambi»
+    # EMENDATA ANCORA (12 nov 2026, cantiere card-coppia): la moneta non
+    # sta piu' davanti a «Ricevi», e' la tessera della rete nella COPPIA in
+    # alto a destra — sempre UNA, e la scatola dei metodi resta nuda
     prova("...sulle card del libro (on-chain e Lightning, vera e d'esempio) la moneta e' UNA: "
-          "davanti a «Ricevi/Invia», mai nella scatola dei metodi ne' nella testa",
+          "nella coppia, mai nella scatola dei metodi ne' davanti ai verbi",
           (0, False, 2, 1, 1, True),
           ((riga_oc + riga_ln).count("pagaConReteP2P"), "segnoReteP2P(" in riga_oc + riga_ln,
            riga_ln.count("    ${paga}\n"), riga_oc.count("    ${paga}\n"),
-           riga_oc.count("monetaRigaP2P('btc')") * riga_ln.count("monetaRigaP2P('ln')"),
+           riga_oc.count("'btc', paghiEuro)") * riga_ln.count("'ln', paghiEuro)"),
            ".p2p-paga-rete > .p2p-rete{position:absolute;right:6px;top:50%;transform:translateY(-50%)}" in css))
     # il cambio di rete senza salto: dal foglio unico (cantiere
     # oc-identico) nessun foglio si apre o si chiude, si ridisegna e basta
@@ -160427,8 +160492,11 @@ def prove_contanti_zona():
            # (10 ott 2026, reputazione-p2p) fra la zona e le stelline il
            # segno piccolo del filtro di chi pubblica
            # (6 nov 2026) la scatola nuda: la moneta sta davanti a «Ricevi»
+           # (12 nov 2026, card-coppia) la scatola delle stelline c'e'
+           # sempre, col volto: comincia col suo div e non con un «rep ?»
            and "    ${paga}\n    ${zona}\n"
-               "    ${typeof segnoFiltroP2P === 'function' ? segnoFiltroP2P(o) : ''}\n    ${rep ? " in riga,
+               "    ${typeof segnoFiltroP2P === 'function' ? segnoFiltroP2P(o) : ''}\n"
+               "    <div class=\"p2p-box p2p-rep\">${volto}" in riga,
            riga.count("${zona}")])
     dett = fn("function metodiDettP2P(o){")
     prova("il dettaglio la mette sotto il metodo, con uno e con piu' metodi", [True, True, True],
@@ -164371,9 +164439,12 @@ def prove_feedback_p2p():
            amb["_completati_p2p"](sqlite3.connect(":memory:"), [V])])
 
     # --- 6) IL CLIENT, in node -------------------------------------------------
+    # (12 nov 2026, card-coppia) la riga delle stelline, sulla card del
+    # libro, dice la forma CORTA («✅ 22 scambi P2P»): il suo posto c'e'
+    # ancora, con la sua funzione
     prova("il numero dei completati sta nei quattro posti: riga delle stelline, riquadro, "
           "card dell'altra parte, negozio", [1, 1, 1, 2],
-          [m.count("completatiP2P(f.completati, true)"), m.count("completatiP2P(f.completati)"),
+          [m.count("scambiCortiP2P(f.completati)"), m.count("completatiP2P(f.completati)"),
            m.count("completatiP2P(c.completati, true)"),
            m.count("completatiP2P(v.scambi_completati, true)")])
     porta = ("if (!o || (o.stato !== 'concluso' && !(o.stato === 'annullato' && rec\n"
@@ -164400,6 +164471,7 @@ function stelleSceltaP2P(){ return '[stelle]'; }
 function nomeControparteP2P(o, altrimenti){ return altrimenti; }
 """ + "".join(_fn_js(m, f) for f in (
         "function paroleCompletatiP2P(n){", "function completatiP2P(n, inRiga){",
+        "function scambiCortiP2P(n){",
         "function stellineP2P(f){",
         "function gestoRecensioneP2P(o, rec){",
         "function riquadroRecensioneP2P(o, rec){", "function moduloRecensioneP2P(o){",
@@ -164409,7 +164481,8 @@ c.riga = [0, 1, 2, 12, 'x', -3].map(n => completatiP2P(n, true));
 c.box = [completatiP2P(1), completatiP2P(12), completatiP2P(0)];
 c.stelline = [stellineP2P({voti: 24, media: 4.9}), stellineP2P({voti: 24, media: 4.9, completati: 12}),
               stellineP2P({voti: 0, media: 0, completati: 3}), stellineP2P({voti: 0, media: 0}),
-              stellineP2P(null)];
+              stellineP2P(null), stellineP2P({voti: 0, media: 0, completati: 1})];
+c.corti = [0, 1, 2, 22, 'x', -3].map(scambiCortiP2P);
 const A = {id: 'x', stato: 'annullato'}, K = {id: 'y', stato: 'concluso'};
 c.aperto = [gestoRecensioneP2P({id: 'z', stato: 'attivo'}, {si: true}),
             riquadroRecensioneP2P({id: 'z', stato: 'attivo'}, {si: true}),
@@ -164435,10 +164508,17 @@ console.log(JSON.stringify(c));
         prova("...e nel riquadro la forma intera", [True, True, ""],
               ["✅ <b>1</b> scambio P2P completato" in c["box"][0],
                "✅ <b>12</b> scambi P2P completati" in c["box"][1], c["box"][2]])
+        # (12 nov 2026, cantiere card-coppia, Andrea: «levami la parola
+        # completato dopo p2p», e sulla carta «✅ 22 scambi P2P» invece di
+        # «22x P2P»): sulla card del libro la forma CORTA; nel riquadro,
+        # nel profilo e nel negozio resta quella intera, qui sopra
         prova("client: la riga delle stelline SENZA il numero e' quella di sempre; col numero "
-              "lo porta in coda; senza voti ma con scambi fatti mostra quelli; senza niente tace",
-              ["[stella 4.9] 4,9 · [omino] 24", "[stella 4.9] 4,9 · [omino] 24 · ✅ 12 scambi P2P completati",
-               "✅ 3 scambi P2P completati", "", ""], c["stelline"])
+              "lo porta in coda, corto; senza voti ma con scambi fatti mostra quelli; senza niente tace",
+              ["[stella 4.9] 4,9 · [omino] 24", "[stella 4.9] 4,9 · [omino] 24 · ✅ 12 scambi P2P",
+               "✅ 3 scambi P2P", "", "", "✅ 1 scambio P2P"], c["stelline"])
+        prova("client: la forma corta della card — niente a zero, «scambio» a uno, «scambi» dopo, "
+              "mai «completati»", ["", "✅ 1 scambio P2P", "✅ 2 scambi P2P", "✅ 22 scambi P2P", "", ""],
+              c["corti"])
         prova("client: a scambio aperto, senza scambio, o con un si' che non e' un true "
               "vero, niente — mai per lo stato da solo", [""] * 6, c["aperto"])
         prova("client: sullo scambio annullato il gesto e' la recensione solo col si' del "
