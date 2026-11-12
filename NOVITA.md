@@ -80,3 +80,9 @@ frase: Nel Cambio da bitcoin a Lightning non serve più creare a mano la richies
 dove: la scheda «Cambio», direzione da bitcoin a Lightning, il campo «La tua richiesta Lightning».
 leva: CAMBIO_BTC_LN_ATTIVO (nessuna leva nuova)
 pubblico: sì
+
+## 2026-11-12 · nome-swap
+frase: La scheda «Cambio» ora si chiama «Swap»: è la stessa pagina, sposta i tuoi sats fra Lightning e il tuo indirizzo bitcoin. E da bitcoin a Lightning, se scrivi una cifra troppo piccola, l'app ti dice il minimo dal lato dove l'hai scritta: il minimo di 50.000 sats vale per quello che ricevi, quindi in «Mandi» serve un po' di più.
+dove: la scheda «Swap» in basso, i riquadri «Mandi» e «Ricevi».
+leva: CAMBIO_LIBERO_ATTIVO (nessuna leva nuova)
+pubblico: sì

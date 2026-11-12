@@ -14574,10 +14574,10 @@ async def _msg_swap_arrivato(ordine_id: int, bolt11: str,
                 + ("<b>già confermati</b>." if confermata else
                    "<b>aspettano la prima conferma</b> della rete, di solito "
                    "una decina di minuti.") + coda)
-    return (f"₿ <b>Bitcoin in arrivo.</b> Barattolo ha pagato il cambio: "
+    return (f"₿ <b>Bitcoin in arrivo.</b> Barattolo ha pagato lo swap: "
             f"<b>{_fmt_sats(int(r['onchain']))} sats</b> ti aspettano, e il "
             f"tuo telefono li manda al tuo indirizzo (meno il costo della "
-            f"rete). Come va lo vedi nella pagina «Cambio»." + coda)
+            f"rete). Come va lo vedi nella pagina «Swap»." + coda)
 
 
 def _msg_swap_non_andato(sats: int) -> str:
@@ -14586,8 +14586,8 @@ def _msg_swap_non_andato(sats: int) -> str:
     lui. Niente «fattura nuova»: si sceglie di nuovo come incassare."""
     # (27 ott 2026, cantiere grafica-swap) le parole di tutti: niente
     # «swap», il cambio in bitcoin come lo chiama la pagina
-    return ("⚠️ <b>Il cambio in bitcoin non è andato.</b> Il pagamento del "
-            "cambio non è arrivato a destinazione, e i tuoi "
+    return ("⚠️ <b>Lo swap in bitcoin non è andato.</b> Il pagamento dello "
+            "swap non è arrivato a destinazione, e i tuoi "
             f"<b>{_fmt_sats(sats)} sats</b> sono al sicuro nel deposito di "
             "garanzia. Apri l'ordine nella Mini App e scegli di nuovo come "
             "incassare: in Lightning o al tuo indirizzo bitcoin.")
@@ -22237,7 +22237,7 @@ def numeri_assistente() -> str:
         f"- P2P in contanti di persona: massimo "
         f"{int(P2P_CONTANTI_MAX_EURO or 0)} € per scambio.",
         f"- Aste: {si(ASTA_ABILITATA)}.",
-        f"- Pagina «Cambio» (cambiare i propri sats): "
+        f"- Pagina «Swap» (cambiare i propri sats fra Lightning e on-chain): "
         f"{si(cambio_libero_per(0))}.",
         f"- Swap degli incassi verso bitcoin on-chain: {si(swap_per(0))}.",
         f"- Pagare un ordine in bitcoin on-chain: {si(onchain_ammesso(0))}.",
@@ -33821,7 +33821,7 @@ def _leve_stato():
             # ordine, dalla pagina «Cambio»: vuole lo swap acceso
             _leva("Cambio libero: acceso", "CAMBIO_LIBERO_ATTIVO",
                   bool(CAMBIO_LIBERO_ATTIVO),
-                  acceso="dalla pagina «Cambio» si cambiano i propri sats "
+                  acceso="dalla pagina «Swap» si cambiano i propri sats "
                          "senza un ordine (col proprio wallet: la "
                          "cassaforte non c'entra); vuole SWAP_ATTIVO",
                   spento="il tasto «Cambia» non c'e'"),
@@ -35744,7 +35744,7 @@ async def leve_storia_annulla(sid: int, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     if not r:
-        raise HTTPException(404, "Cambio non trovato")
+        raise HTTPException(404, "Swap non trovato")
     try:
         if r["prima_dal_pannello"]:
             return _leva_scrivi(r["chiave"], _leva_leggibile(_leva_da_json(r["prima"])),
@@ -79450,7 +79450,7 @@ async def cambio_preventivo(sats: str = "", direzione: str = "ln-btc",
     scritta (`scritta`): il telefono butta le risposte vecchie con quelle."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not cambio_libero_per(user["id"]):
-        raise HTTPException(403, "Il cambio non e' disponibile")
+        raise HTTPException(403, "Lo swap non è disponibile")
     if direzione not in cambio_strade():
         raise HTTPException(400, "Direzione sconosciuta")
     chi = swap_fornitore(str(fornitore or ""))
@@ -79493,6 +79493,30 @@ async def cambio_preventivo(sats: str = "", direzione: str = "ln-btc",
             return dict(busta, ok=False, motivo="cifra")
         p = preventivo_swap(dovuto, tariffa, SWAP_FEE_PERCENTO,
                             SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)
+    # (12 nov 2026, cantiere nome-swap, Andrea: «voglio cambiare 50000
+    # sats da onchain a lightning e mi esce lo swap parte da 50000») il
+    # minimo e il massimo valgono sul lato del `dovuto` (la richiesta
+    # Lightning, verso Lightning; quel che si manda, verso l'indirizzo).
+    # Chi ha scritto dall'altro lato li legge nella SUA cifra: 50.000
+    # mandati in bitcoin ne fanno ricevere meno di 50.000, e «parte da
+    # 50.000» gli sembrava falso. `minimo_scritto` e `massimo_scritto`
+    # sono le soglie tradotte sul lato scritto, solo quando servono.
+    if not p.get("ok") and lato != lato_dovuto and \
+            p.get("motivo") in ("sotto_minimo", "sopra_tetto"):
+        try:
+            soglia = int(p["minimo"] if p["motivo"] == "sotto_minimo"
+                         else p["massimo"])
+            if direzione == "btc-ln":
+                q = preventivo_sub(soglia, tariffa)
+                tradotta = int(q["mandi"]) if q.get("ok") else 0
+            else:
+                q = preventivo_swap(soglia, tariffa, SWAP_FEE_PERCENTO)
+                tradotta = int(q["ricevi"]) if q.get("ok") else 0
+            if tradotta > 0:
+                p["minimo_scritto" if p["motivo"] == "sotto_minimo"
+                  else "massimo_scritto"] = tradotta
+        except Exception:
+            pass
     p["cambiata"] = bool(hash) and hash != tariffa["hash"]
     p["valido_s"] = SWAP_PREVENTIVO_VALE_S
     return dict(busta, **p)
@@ -79507,7 +79531,7 @@ async def cambio_biglietto(req: Request, x_tg_init_data: str = Header(""),
     motivo}; a tetto raggiunto `tetto_giorno`."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not cambio_libero_per(user["id"]):
-        raise HTTPException(403, "Il cambio non e' disponibile")
+        raise HTTPException(403, "Lo swap non è disponibile")
     d = await leggi_json(req)
     direzione = str(d.get("direzione") or "ln-btc")
     if direzione not in cambio_strade():
@@ -79621,7 +79645,7 @@ async def cambio_fattura_da_address(req: Request, x_tg_init_data: str = Header("
     scadenza) col giudice del fornitore prima di far nascere il cambio."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not cambio_libero_per(user["id"]) or "btc-ln" not in cambio_strade():
-        raise HTTPException(403, "Il cambio da bitcoin a Lightning non è acceso")
+        raise HTTPException(403, "Lo swap da bitcoin a Lightning non è acceso")
     _frena("ln_address", user["id"])
     d = await leggi_json(req)
     address = str(d.get("address") or "").strip()
@@ -79869,7 +79893,7 @@ async def p2p_cambio_preventivo(sats: str = "", fornitore: str = "satsrouting",
     lui la rifiuterebbe. Non crea niente."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not p2p_altra_rete_per(user["id"]):
-        raise HTTPException(403, "Il cambio non e' disponibile")
+        raise HTTPException(403, "Lo swap non è disponibile")
     chi = swap_fornitore(str(fornitore or ""))
     if chi is None:
         raise HTTPException(404, "Fornitore sconosciuto")
@@ -79897,7 +79921,7 @@ async def p2p_cambio_biglietto(req: Request, x_tg_init_data: str = Header(""),
     {ok: false, motivo}."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not p2p_altra_rete_per(user["id"]):
-        raise HTTPException(403, "Il cambio non e' disponibile")
+        raise HTTPException(403, "Lo swap non è disponibile")
     d = await leggi_json(req)
     ordine = str(d.get("ordine") or "").strip()
     if not FORMA_ORDINE_P2P.fullmatch(ordine):
@@ -79999,7 +80023,7 @@ def _testo_ritiro_p2p(r) -> str:
     quanti = f" ({_fmt_sats(onchain)} sats)" if onchain > 0 else ""
     return ("₿ I bitcoin del tuo scambio P2P sono pronti" + quanti + ".\n"
             "Apri Barattolo per ritirarli sul tuo indirizzo: il ritiro lo "
-            "fa il tuo telefono. Se non lo apri in tempo il cambio scade, "
+            "fa il tuo telefono. Se non lo apri in tempo lo swap scade, "
             "i sats tornano fermi al sicuro e ti chiediamo una fattura nuova.")
 
 
@@ -97082,7 +97106,7 @@ async def onchain_rilascio_chiesto(oid: int, req: Request,
             "ricevuto. Scegli dove ricevere i sats (Profilo → «Incassi "
             "on-chain») e partono." if modo == "onchain" else
             f"⚡ <b>{tit}:</b> chi ha comprato ha confermato di averlo "
-            "ricevuto. Apri l'ordine: ti mostriamo quanto costa il cambio "
+            "ricevuto. Apri l'ordine: ti mostriamo quanto costa lo swap "
             "in Lightning e, se confermi, i sats partono."
             + (" Puoi anche riceverli on-chain." if modo == "ogni_volta" else ""))
     return {"ok": True, "aspetta_wallet": not o["rimborso"],
@@ -97144,7 +97168,7 @@ async def onchain_ordine_proposta(oid: int, req: Request,
         if verso == "venditore" and o["incasso_tipo"] == "cambio":
             # il cambio in Lightning ha gia' la prima firma, quella di chi
             # vende: un'altra proposta verso di lui non lo sostituisce
-            raise HTTPException(409, "Chi vende ha già firmato il cambio in "
+            raise HTTPException(409, "Chi vende ha già firmato lo swap in "
                                      "Lightning: manca solo la seconda firma")
         if o["decisione_da"]:
             # la proposta di Barattolo non si sostituisce: e' la decisione
@@ -97243,7 +97267,7 @@ async def onchain_ordine_firma(oid: int, req: Request,
                                      "fra poco, non è partito niente")
         if perche:
             await _onchain_cambio_togli(o, perche)
-            raise HTTPException(409, "Il cambio di chi vende è scaduto prima "
+            raise HTTPException(409, "Lo swap di chi vende è scaduto prima "
                                      "che partissero i sats: gli abbiamo "
                                      "chiesto di rifarlo. Non è partito niente")
     try:
@@ -100573,7 +100597,7 @@ async def p2p_presa_preventivo(sats: str = "", fornitore: str = "satsrouting",
     nostra. Non crea niente."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not p2p_presa_cambio_per(user["id"]):
-        raise HTTPException(403, "Il cambio non e' disponibile")
+        raise HTTPException(403, "Lo swap non è disponibile")
     chi = swap_fornitore(str(fornitore or ""))
     if chi is None:
         raise HTTPException(404, "Fornitore sconosciuto")
@@ -100601,7 +100625,7 @@ async def p2p_presa_biglietto(req: Request, x_tg_init_data: str = Header(""),
     motivo}."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not p2p_presa_cambio_per(user["id"]):
-        raise HTTPException(403, "Il cambio non e' disponibile")
+        raise HTTPException(403, "Lo swap non è disponibile")
     d = await leggi_json(req)
     ordine = str(d.get("ordine") or "").strip()
     if not FORMA_ORDINE_P2P.fullmatch(ordine):
@@ -100641,8 +100665,8 @@ def _testo_presa_p2p(r, pagata: bool) -> str:
                 "Tocca per prendere l'ordine: la garanzia la paghi dal tuo "
                 "wallet. Se intanto l'ha preso qualcun altro, i sats restano "
                 "tuoi, nel wallet.")
-    return ("₿ Il cambio dei tuoi bitcoin non è riuscito.\n"
-            "Apri Barattolo: nella pagina «Cambio» scrivi dove rimandarli, e "
+    return ("₿ Lo swap dei tuoi bitcoin non è riuscito.\n"
+            "Apri Barattolo: nella pagina «Swap» scrivi dove rimandarli, e "
             "il tuo telefono te li rimanda. Non si è perso niente.")
 
 

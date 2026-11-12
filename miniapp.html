@@ -19242,7 +19242,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '111317c759';
+const SWAP_TELEFONO_VER = '479e2f21ef';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -19284,7 +19284,7 @@ let cellaAsteMarkup = null;
 const CELLA_SWAP = '<span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true">'
   + '<path d="M18.6 9.4A7 7 0 0 0 6.3 7.6"/><path d="M5.4 14.6a7 7 0 0 0 12.3 1.8"/>'
   + '<path d="M6.3 3.8v3.8h3.8"/><path d="M17.7 20.2v-3.8h-3.8"/></svg></span>'
-  + '<span class="eti-ricevi">Cambio</span>';
+  + '<span class="eti-ricevi">Swap</span>';
 function vestiCellaAste(){
   const b = el('nav-aste');
   if (!b) return;
@@ -19329,12 +19329,12 @@ const SWAP_TESTI = {
      le due direzioni, chiesto da Andrea; prima «Ricevi in bitcoin»), per
      non confonderli con la cassa on-chain che arrivera'. Le chiavi
      interne (onchain, conferma...) restano quelle. */
-  it: {titolo: 'Cambio',
+  it: {titolo: 'Swap',
        /* (28 ott 2026, euro-ordine) Andrea: «aggiungi on-chain dopo
           bitcoin»: l'unica eccezione alla regola qui sopra, solo qui.
           Il \u2060 (word joiner) tiene «on-chain» intero a 320 px */
        testo: 'Sposta i tuoi sats fra Lightning e bitcoin on-\u2060chain.',
-       vuoto: 'Per ora nessun cambio e nessun incasso al tuo indirizzo bitcoin.',
+       vuoto: 'Per ora nessuno swap e nessun incasso al tuo indirizzo bitcoin.',
        scegli: 'Come ricevi i sats', onchain: 'Al tuo indirizzo bitcoin',
        carico: 'Calcolo quanto ricevi…',
        titoloPrev: 'Quanto ricevi al tuo indirizzo', ricevi: 'Ricevi circa',
@@ -19345,16 +19345,19 @@ const SWAP_TESTI = {
        cambiata: 'Le cifre sono cambiate: ecco quelle nuove.',
        nonRisponde: '{f} ora non risponde: incassa in Lightning.',
        spento: 'Ora non si può ricevere a un indirizzo bitcoin: incassa in Lightning.',
-       eseguitoDa: 'Il cambio lo fa {n}',
+       eseguitoDa: 'Lo swap lo fa {n}',
        ripiego: '{a} ha dato cifre che non tornano: ecco quelle di {b}.',
        /* (cambio-libero) i rifiuti del cambio libero: niente «incassa in
           Lightning», che li' non c'e' nessun incasso */
-       cambioSottoMinimo: 'Il cambio parte da {n} {u}.',
-       cambioSopraTetto: 'Per ora si cambiano al più {n} {u} alla volta.',
-       cambioTettoGiorno: 'Per oggi hai fatto i {n} cambi possibili: riprova domani.',
+       cambioSottoMinimo: 'Lo swap parte da {n} {u} {l}.',
+       cambioSopraTetto: 'Per ora al più {n} {u} {l} alla volta.',
+       /* (12 nov 2026, nome-swap) il lato della cifra nel no: la soglia
+          detta «da mandare» o «da ricevere», come l'ha scritta */
+       latoSoglia: {mandi: 'da mandare', ricevi: 'da ricevere'},
+       cambioTettoGiorno: 'Per oggi hai fatto i {n} swap possibili: riprova domani.',
        cambioCifra: 'Scrivi quanti sats vuoi cambiare.',
        cambioNonRisponde: '{f} ora non risponde: riprova fra poco.',
-       cambioSpento: 'Ora il cambio non si può fare.',
+       cambioSpento: 'Ora lo swap non si può fare.',
        ricalcola: 'Ricalcola',
        /* (grafica-cambio, 28 ott 2026) i riquadri: il nome della rete
           sotto l'etichetta, il costo in una riga, le voci a richiesta */
@@ -19364,12 +19367,12 @@ const SWAP_TESTI = {
        titoloPrevSub: 'Quanto mandi in bitcoin', mandi: 'Mandi all\'indirizzo',
        voci: {dovuto: 'Ti spettano', cambi: 'Cambi',
               ricevi_ln: 'Ricevi in Lightning', rete_loro: 'Rete bitcoin: il ritiro di {f}', fee_barattolo: 'Commissione Barattolo ({p} %)',
-              commissione: 'Costo del cambio, {f} ({p} %)',
+              commissione: 'Costo dello swap, {f} ({p} %)',
               rete_invio: 'Rete bitcoin: partenza',
               rete_ritiro: 'Rete bitcoin: arrivo a te (stima)'}},
-  en: {titolo: 'Exchange',
+  en: {titolo: 'Swap',
        testo: 'Move your sats between Lightning and on-\u2060chain bitcoin.',
-       vuoto: 'No exchanges and no payouts to your bitcoin address yet.',
+       vuoto: 'No swaps and no payouts to your bitcoin address yet.',
        scegli: 'How you receive the sats', onchain: 'To your bitcoin address',
        carico: 'Working out how much you receive…',
        titoloPrev: 'What you receive at your address', ricevi: 'You receive about',
@@ -19380,21 +19383,22 @@ const SWAP_TESTI = {
        cambiata: 'The figures have changed: here are the new ones.',
        nonRisponde: '{f} is not responding: receive via Lightning.',
        spento: 'Receiving to a bitcoin address is not available right now: receive via Lightning.',
-       eseguitoDa: 'The exchange is done by {n}',
+       eseguitoDa: 'The swap is done by {n}',
        ripiego: '{a} gave figures that do not add up: here are the {b} ones.',
-       cambioSottoMinimo: 'The exchange starts from {n} {u}.',
-       cambioSopraTetto: 'For now you can exchange at most {n} {u} at a time.',
-       cambioTettoGiorno: 'You made the {n} exchanges allowed for today: try again tomorrow.',
-       cambioCifra: 'Write how many sats you want to exchange.',
+       cambioSottoMinimo: 'The swap starts from {n} {u} {l}.',
+       cambioSopraTetto: 'For now at most {n} {u} {l} at a time.',
+       latoSoglia: {mandi: 'to send', ricevi: 'to receive'},
+       cambioTettoGiorno: 'You made the {n} swaps allowed for today: try again tomorrow.',
+       cambioCifra: 'Write how many sats you want to swap.',
        cambioNonRisponde: '{f} is not responding: try again shortly.',
-       cambioSpento: 'The exchange is not available right now.',
+       cambioSpento: 'Swaps are not available right now.',
        ricalcola: 'Recalculate',
        reti: {ln: 'LN', btc: 'BTC'}, mandiBreve: 'You send', riceviBreve: 'You receive',
        costo: 'Cost', dettagli: 'Details', nascondiDettagli: 'Hide',
        titoloPrevSub: 'What you send in bitcoin', mandi: 'You send to the address',
-       voci: {dovuto: 'You are owed', cambi: 'You exchange',
+       voci: {dovuto: 'You are owed', cambi: 'You swap',
               ricevi_ln: 'You receive on Lightning', rete_loro: 'Bitcoin network: the claim by {f}', fee_barattolo: 'Barattolo fee ({p}%)',
-              commissione: 'Exchange fee, {f} ({p}%)',
+              commissione: 'Swap fee, {f} ({p}%)',
               rete_invio: 'Bitcoin network: departure',
               rete_ritiro: 'Bitcoin network: arrival to you (estimate)'}}};
 function linguaSwap(){
@@ -19479,9 +19483,9 @@ function renderSwapAutoProfilo(){
       ${tasto('ln', P2P_LN_MONETA + 'Lightning')}${tasto('onchain', P2P_OC_MONETA + '<span class="nw">On-chain</span>')}${tasto('ogni_volta', '<span>🤔</span><span class="nw">Ogni volta</span>')}</div>
     <div style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">${modo === 'onchain'
       ? `Alla conferma dell'acquirente apri l'ordine e premi <b>«Conferma»</b>: Barattolo cambia i sats in bitcoin con ${esc(a.fornitore || 'SATS Routing')}. ${dove}
-         Il costo del cambio lo vedi prima. Sotto i ${fmt(a.minimo || 0)} sats ricevi in Lightning.`
+         Il costo dello swap lo vedi prima. Sotto i ${fmt(a.minimo || 0)} sats ricevi in Lightning.`
       : modo === 'ogni_volta'
-      ? `Alla conferma dell'acquirente apri l'ordine e scegli lì: Lightning, o bitcoin on-chain col cambio (il costo lo vedi prima). Sotto i ${fmt(a.minimo || 0)} sats ricevi in Lightning.`
+      ? `Alla conferma dell'acquirente apri l'ordine e scegli lì: Lightning, o bitcoin on-chain con lo swap (il costo lo vedi prima). Sotto i ${fmt(a.minimo || 0)} sats ricevi in Lightning.`
       : 'Ricevi in Lightning: al tuo Lightning address, o con una fattura nell\'ordine.'}
       Su ogni annuncio puoi sceglierlo anche solo per quell'oggetto.</div>${modo !== 'ln' && typeof myOnchain !== 'undefined' && myOnchain
       /* (3 nov 2026, Andrea: «dovrebbe chiedere la xpub») il campo e' UNO,
@@ -19553,7 +19557,7 @@ const SWAP_AUTO_NO = {
   fee: () => 'Ora non si può ricevere on-chain: incassa in Lightning.',
   occupato: () => 'C\'è già un incasso in corso su questo ordine.',
   tetto_utente: () => 'Per oggi hai già cambiato il massimo: incassa in Lightning o riprova domani.',
-  tetto_giorno: () => 'Per oggi i cambi sono finiti: incassa in Lightning o riprova domani.'};
+  tetto_giorno: () => 'Per oggi gli swap sono finiti: incassa in Lightning o riprova domani.'};
 function pannelloSwapAuto(o){
   const id = Number(o.id), d = swapAutoDati[id];
   if (!d) { caricaSwapAuto(id); return `<div class="hint" style="margin-top:12px">Calcolo quanto ricevi…</div>`; }
@@ -19568,13 +19572,13 @@ function pannelloSwapAuto(o){
       ${c.txid ? `<div class="hint mono" style="word-break:break-all;font-size:11px">${esc(c.txid)}</div>` : ''}${link}`;
   }
   /* un cambio fallito non ha mosso niente: sotto c'e' il preventivo nuovo */
-  if (c.pagamento && c.pagamento !== 'fallito') return `<h4>${P2P_OC_MONETA} Cambio in corso</h4>
-      <div class="hint">Abbiamo pagato il cambio: appena SATS Routing blocca i bitcoin li mandiamo a
+  if (c.pagamento && c.pagamento !== 'fallito') return `<h4>${P2P_OC_MONETA} Swap in corso</h4>
+      <div class="hint">Abbiamo pagato lo swap: appena SATS Routing blocca i bitcoin li mandiamo a
         <span class="mono" style="word-break:break-all">${esc(c.indirizzo)}</span>
         (<b>${fmt(c.ricevi)} sats</b> circa). Ci vogliono alcuni minuti: ti avvisiamo noi, puoi chiudere.</div>`;
   const p = d.preventivo || {};
   const fallito = c.pagamento === 'fallito'
-    ? `<div class="swap-rifiuto" role="status">Il cambio di prima non è andato e non è uscito niente: puoi riprovare.</div>` : '';
+    ? `<div class="swap-rifiuto" role="status">Lo swap di prima non è andato e non è uscito niente: puoi riprovare.</div>` : '';
   if (!p.ok) {
     const f = SWAP_AUTO_NO[p.motivo] || SWAP_AUTO_NO.non_risponde;
     return `<div class="hint" style="margin-top:12px">${f(p.motivo === 'sopra_tetto' ? p.massimo : p.minimo)}</div>
@@ -19602,7 +19606,7 @@ function pannelloSwapAuto(o){
       ? 'Il tuo indirizzo (nuovo, dal tuo wallet on-chain)' : 'Il tuo indirizzo bitcoin'}</label>
       <input id="swapAutoIndirizzo${id}" class="mono" autocomplete="off" spellcheck="false"
         placeholder="bc1…" value="${esc(d.indirizzo || '')}"></div>
-    <div class="hint" style="font-size:12px">Il cambio lo fa Barattolo con SATS Routing: tu premi solo «Conferma». Le cifre si ricontrollano quando confermi.</div>
+    <div class="hint" style="font-size:12px">Lo swap lo fa Barattolo con SATS Routing: tu premi solo «Conferma». Le cifre si ricontrollano quando confermi.</div>
     <button class="btn orange cambio-vai" type="button" onclick="confermaSwapAuto(${id}, this)">${esc(t.conferma)}</button>
   </div>`;
 }
@@ -19617,7 +19621,7 @@ function confermaSwapAuto(id, btn){
     corpo: `Ricevi circa ${fmt(p.ricevi || 0)} sats in bitcoin a:\n${scritto}\n\nControlla l'indirizzo: i bitcoin mandati non tornano indietro.`,
     etichetta: 'Conferma',
     poi: async () => {
-      const rip = bottoneInAttesa(btn, 'Faccio il cambio…');
+      const rip = bottoneInAttesa(btn, 'Faccio lo swap…');
       try {
         const r = await fetch(`${API_BASE}/swap/auto/ordine/${id}`, {method: 'POST',
           headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
@@ -19627,7 +19631,7 @@ function confermaSwapAuto(id, btn){
         const e = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(e.detail || 'non partito');
         if (!e.ok) throw new Error((SWAP_AUTO_NO[e.motivo] || SWAP_AUTO_NO.non_risponde)(p.minimo));
-        toast('₿ Cambio partito: ti avvisiamo quando i bitcoin arrivano', 6000);
+        toast('₿ Swap partito: ti avvisiamo quando i bitcoin arrivano', 6000);
       } catch(err) { toast(err.message || 'Non partito, riprova'); }
       finally { rip(); }
       delete swapAutoDati[id];
@@ -19930,13 +19934,22 @@ function costoSwap(n, d){
     + `<div class="cambio-voci"${aperto ? '' : ' hidden'}>${vociSwap(n, d)}`
     + `<div class="cambio-voci-nota">${esc(t.valgonoOra)} ${esc(t.eseguitoDa.replace('{n}', chi))}.</div></div>`;
 }
+/* (12 nov 2026, nome-swap) da che lato vale la soglia del no: quello in
+   cui si e' scritta la cifra (`lato` della busta; il server traduce la
+   soglia li' con `minimo_scritto`/`massimo_scritto`). Senza `lato`, il
+   lato del dovuto: la richiesta verso Lightning, quel che si manda verso
+   l'indirizzo. */
+function latoSogliaSwap(t, d){
+  const lato = d.lato || (d.direzione === 'btc-ln' ? 'ricevi' : 'mandi');
+  return (t.latoSoglia && t.latoSoglia[lato]) || '';
+}
 /* il no del preventivo, nelle parole giuste: il cambio libero (ordine 0)
    non dice «incassa in Lightning», che li' non c'e' nessun incasso */
 function rifiutoSwap(n, d){
   const t = testiSwap(), f = d.fornitore_nome || 'SATS Routing';
   if (Number(n) === 0)
-    return d.motivo === 'sotto_minimo' ? t.cambioSottoMinimo.replace('{n}', numSwap(0, d.minimo)).replace('{u}', unitaSwap(0))
-      : d.motivo === 'sopra_tetto' ? t.cambioSopraTetto.replace('{n}', numSwap(0, d.massimo)).replace('{u}', unitaSwap(0))
+    return d.motivo === 'sotto_minimo' ? t.cambioSottoMinimo.replace('{n}', numSwap(0, d.minimo_scritto || d.minimo)).replace('{u}', unitaSwap(0)).replace('{l}', latoSogliaSwap(t, d))
+      : d.motivo === 'sopra_tetto' ? t.cambioSopraTetto.replace('{n}', numSwap(0, d.massimo_scritto || d.massimo)).replace('{u}', unitaSwap(0)).replace('{l}', latoSogliaSwap(t, d))
       : d.motivo === 'tetto_giorno' ? t.cambioTettoGiorno.replace('{n}', fmt(d.al_giorno || 0))
       : d.motivo === 'cifra' ? t.cambioCifra
       : d.motivo === 'spento' ? t.cambioSpento
@@ -38417,7 +38430,7 @@ function pannelloPagamento(o){
   const conCambio = p.via!=='onchain' && typeof swapDiOrdine === 'function'
     && !!swapDiOrdine(o.id);
   const via = p.via==='onchain' ? 'on-chain ₿'
-    : conCambio ? 'il cambio, al tuo indirizzo bitcoin' : 'Lightning ⚡';
+    : conCambio ? 'lo swap, al tuo indirizzo bitcoin' : 'Lightning ⚡';
   return `
     <div class="payout" id="pannelloPagamento">
       <h4>${fatto ? '✅ Pagamento al venditore' : '💸 In pagamento al venditore'}</h4>
@@ -44646,7 +44659,7 @@ async function onchainLiberaDallOrdine(btn, o){
          il MIO wallet, dove torna il resto: lo dico prima di tutto */
       if (!oc.rimborso) toast('✅ Confermato. Per liberare i sats scegli prima il tuo wallet, dove torna il resto: Profilo → «₿ On-chain». Poi il tuo telefono firma da solo quando apri la Mini App', 10000);
       else toast(oc.modo_venditore && oc.modo_venditore !== 'onchain'
-        ? '✅ Confermato. Chi vende riceve in Lightning: l\'abbiamo avvisato, e appena prepara il cambio il tuo telefono mette la seconda firma da solo quando apri la Mini App'
+        ? '✅ Confermato. Chi vende riceve in Lightning: l\'abbiamo avvisato, e appena prepara lo swap il tuo telefono mette la seconda firma da solo quando apri la Mini App'
         : '✅ Confermato. Chi vende deve ancora scegliere dove ricevere: l\'abbiamo avvisato, e appena lo fa il tuo telefono firma da solo quando apri la Mini App', 9000);
     } else {
       await onchainFirmaProposta(o.onchain.id);
@@ -44761,16 +44774,16 @@ function onchainCambioBlocco(o){
   const sceglie = oc.modo_venditore === 'ogni_volta';
   const suOnchain = `<button class="btn ghost" onclick="onchainRiceviOnchainOra(this, currentOrder)">₿ Ricevi on-chain</button>`;
   if (!st) return `<button class="btn orange" onclick="onchainCambioApri(this, currentOrder)">⚡ Vedi quanto ricevi in Lightning</button>${sceglie ? suOnchain : ''}`;
-  if (st.stato === 'carico') return '<div class="hint">Chiedo il prezzo del cambio…</div>';
+  if (st.stato === 'carico') return '<div class="hint">Chiedo il prezzo dello swap…</div>';
   const p = st.p || {}, nome = onchainNomeCambio(p);
   const errore = st.errore ? `<div class="swap-rifiuto" role="status">${esc(st.errore)}</div>` : '';
   if (!p.ok) {
     /* SOTTO IL MINIMO (o sopra il tetto) la vendita arriva on-chain, e
        lo si dice prima: il Profilo lo scrive accanto alla scelta */
     const perche = p.motivo === 'sotto_minimo'
-      ? `Il cambio in Lightning parte da ${fmt(Number(p.minimo) || 0)} sats ricevuti: questa vendita la ricevi on-chain.`
+      ? `Lo swap in Lightning parte da ${fmt(Number(p.minimo) || 0)} sats ricevuti: questa vendita la ricevi on-chain.`
       : p.motivo === 'sopra_tetto'
-      ? `Il cambio in Lightning arriva al massimo a ${fmt(Number(p.massimo) || 0)} sats: questa vendita la ricevi on-chain.`
+      ? `Lo swap in Lightning arriva al massimo a ${fmt(Number(p.massimo) || 0)} sats: questa vendita la ricevi on-chain.`
       : `${nome} ora non risponde: riprova fra poco, o ricevi on-chain.`;
     return `<div class="payout">${errore}<div class="hint">${esc(perche)}</div>
       ${p.motivo === 'non_risponde' ? `<button class="btn orange" onclick="onchainCambioApri(this, currentOrder)">🔄 Riprova</button>` : ''}
@@ -44779,7 +44792,7 @@ function onchainCambioBlocco(o){
   const ore = Math.round((Number(p.vita_incollata_s) || 82800) / 3600);
   return `<div class="payout">
     <h4>⚡ Ricevi in Lightning</h4>
-    <div class="hint"><b>È un cambio, fatto da ${esc(nome)}</b>: costa ${fmt(Number(p.costo) || 0)} sats.
+    <div class="hint"><b>È uno swap, fatto da ${esc(nome)}</b>: costa ${fmt(Number(p.costo) || 0)} sats.
       Ricevi <b>${fmt(Number(p.ricevi) || 0)} sats in Lightning</b> invece di ${fmt(Number(p.prezzo) || 0)} on-chain.</div>
     <div class="hint" style="margin-top:6px">⚠️ <b>Il tuo wallet Lightning deve poter ricevere ${fmt(Number(p.ricevi) || 0)} sats in una volta:</b>
       se è nuovo o piccolo, controlla prima che abbia abbastanza capienza (alcuni wallet la
@@ -44792,7 +44805,7 @@ function onchainCambioBlocco(o){
     <textarea class="swap-indirizzo" id="ocCambioFattura_${Number(oc.id)}" rows="3" autocomplete="off"
       spellcheck="false" placeholder="lnbc…">${esc(st.fattura || '')}</textarea>
     ${errore}
-    <button class="btn orange" onclick="onchainCambioConferma(this, currentOrder)">✅ Conferma il cambio</button>
+    <button class="btn orange" onclick="onchainCambioConferma(this, currentOrder)">✅ Conferma lo swap</button>
     ${sceglie ? suOnchain : ''}
   </div>`;
 }
@@ -44857,10 +44870,10 @@ async function onchainCambioConferma(btn, o){
   else if (b.scade - Date.now() / 1000 < vita)
     st.errore = `Questa richiesta scade fra meno di ${Math.round(vita / 3600)} ore: creane una che duri di più.`;
   if (st.errore) return onchainCambioRidisegna(o);
-  const rip = onchainAttesa(btn, 'Preparo il cambio…');
+  const rip = onchainAttesa(btn, 'Preparo lo swap…');
   let finito = false;
   try {
-    if (!(await caricaSwapTelefono())) throw new Error('non riesco a caricare il cambio: riprova');
+    if (!(await caricaSwapTelefono())) throw new Error('non riesco a caricare lo swap: riprova');
     /* NIENTE 12 PAROLE A PARTE (29 ott 2026): la chiave di riserva del
        cambio nasce dallo STESSO seme del 2-di-3, e il rimborso va da
        solo al suo /1/n (`swapCreaPerOnchain`, in instradatore.js) */
@@ -44879,8 +44892,8 @@ async function onchainCambioConferma(btn, o){
       preventivo: p, rimborso: io.incasso});
     let dove = null;
     try { dove = B.Address(onchainReteBtc(B)).decode(rec.lockupAddress); } catch(e) { dove = null; }
-    if (!dove || dove.type !== 'tr') throw new Error('l\'indirizzo del cambio non è della rete giusta');
-    if (!(rec.mandi > 0 && rec.mandi <= oc.prezzo_sats)) throw new Error('le cifre del cambio non tornano');
+    if (!dove || dove.type !== 'tr') throw new Error('l\'indirizzo dello swap non è della rete giusta');
+    if (!(rec.mandi > 0 && rec.mandi <= oc.prezzo_sats)) throw new Error('le cifre dello swap non tornano');
     const firma = await onchainFirmaDestinazione(B, parole, 'cambio', `${oc.id}:${rec.lockupAddress}`);
     const psbt = onchainPsbtFirmata(B, oc, io, w, onchainUsciteVersoVenditore(oc, rec.lockupAddress, 12));
     const r = await fetch(`${API_BASE}/onchain/ordini/${Number(oc.id)}/cambio`, {method: 'POST',
@@ -44889,10 +44902,10 @@ async function onchainCambioConferma(btn, o){
         ricevi: rec.ricevi, mandi: rec.mandi, scade_fattura: b.scade, timeout: rec.timeoutBlockHeight},
         firma, psbt})});
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.detail || 'cambio rifiutato');
+    if (!r.ok) throw new Error(d.detail || 'swap rifiutato');
     delete onchainCambi[oc0.id];
     finito = true;
-    toast('⚡ Fatto: hai messo la prima firma. I bitcoin partono verso il cambio appena chi ha comprato apre la Mini App', 8000);
+    toast('⚡ Fatto: hai messo la prima firma. I bitcoin partono verso lo swap appena chi ha comprato apre la Mini App', 8000);
   } catch(e) {
     st.stato = 'pronto';
     st.errore = e && e.tipo === 'fattura' ? onchainFatturaPerche(e.perche, p)
@@ -44942,7 +44955,7 @@ async function onchainCambioTogli(btn, o){
       {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non riuscito');
-    toast('✖️ Cambio tolto: non si è mosso niente. Puoi rifarlo, o ricevere on-chain', 6000);
+    toast('✖️ Swap tolto: non si è mosso niente. Puoi rifarlo, o ricevere on-chain', 6000);
   } catch(e) { toast('⚡ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }
   try { await loadOrders(); renderOrders(); } catch(e) {}
@@ -44986,11 +44999,11 @@ function pannelloOnchainOrdine(o, s){
     const c = oc.cambio || {};
     if (oc.txid_uscita) {
       riga = io === 'venditore'
-        ? `⚡ <b>I bitcoin sono partiti verso il cambio</b>: ${esc(onchainNomeCambio(c))} paga la tua richiesta Lightning di ${fmt(c.ricevi || 0)} sats appena la rete li conferma. Lo segui nella pagina «Cambio».`
+        ? `⚡ <b>I bitcoin sono partiti verso lo swap</b>: ${esc(onchainNomeCambio(c))} paga la tua richiesta Lightning di ${fmt(c.ricevi || 0)} sats appena la rete li conferma. Lo segui nella pagina «Swap».`
         : '🔓 <b>I sats sono partiti</b> verso chi vende.';
     } else if (io === 'venditore') {
-      riga = `⚡ <b>Hai preparato il cambio</b>: ricevi ${fmt(c.ricevi || 0)} sats in Lightning (il cambio lo fa ${esc(onchainNomeCambio(c))}). I bitcoin partono appena chi ha comprato apre la Mini App e il suo telefono mette la seconda firma.`;
-      gesto = `<button class="btn ghost" onclick="onchainCambioTogli(this, currentOrder)">✖️ Togli il cambio</button>`;
+      riga = `⚡ <b>Hai preparato lo swap</b>: ricevi ${fmt(c.ricevi || 0)} sats in Lightning (lo swap lo fa ${esc(onchainNomeCambio(c))}). I bitcoin partono appena chi ha comprato apre la Mini App e il suo telefono mette la seconda firma.`;
+      gesto = `<button class="btn ghost" onclick="onchainCambioTogli(this, currentOrder)">✖️ Togli lo swap</button>`;
     } else {
       riga = '🔓 <b>Chi vende ha messo la prima firma</b> (riceve in Lightning). Manca la seconda, quella del tuo telefono: si mette da sola quando apri la Mini App.';
       gesto = `<button class="btn orange" onclick="onchainSecondaFirmaDallOrdine(this, currentOrder)">✍️ Metti la seconda firma</button>`;
@@ -45038,7 +45051,7 @@ function pannelloOnchainOrdine(o, s){
     dove = oc.rilascio_chiesto
       ? ' ✅ <b>Chi ha comprato ha confermato di averlo ricevuto.</b> Scegli qui sotto come ricevere.'
       : (oc.modo_venditore === 'lightning'
-        ? ' ⚡ Ricevi in Lightning: quando chi ha comprato conferma di averlo ricevuto, qui vedi quanto costa il cambio e confermi.'
+        ? ' ⚡ Ricevi in Lightning: quando chi ha comprato conferma di averlo ricevuto, qui vedi quanto costa lo swap e confermi.'
         : ' 🤔 Quando chi ha comprato conferma di averlo ricevuto, qui scegli se ricevere on-chain o in Lightning.');
     if (oc.rilascio_chiesto) cambio = `<div id="onchainCambio_${Number(oc.id)}">${onchainCambioBlocco(o)}</div>`;
   } else if (senzaDove) {
@@ -53014,11 +53027,11 @@ function renderIncassoForm(){
   const sats = sellValuta === 'eur' && typeof eurPerSat === 'number' && eurPerSat > 0 ? Math.round(p / eurPerSat) : p;
   const minimo = Number((swapAutoAcceso() && swapAuto().minimo) || (myOnchainLn && myOnchainLn.minimo) || 0);
   const sotto = minimo && sats > 0 && sats < minimo
-    ? ` <b>Sotto i ${fmt(minimo)} sats il cambio non si fa</b>: ricevi come ti pagano.` : '';
+    ? ` <b>Sotto i ${fmt(minimo)} sats lo swap non si fa</b>: ricevi come ti pagano.` : '';
   el('sellIncassoHint').innerHTML = scelta === 'ln'
-    ? `Ricevi in Lightning anche se chi compra paga on-chain: il cambio lo fa Barattolo, e il costo lo vedi prima.${sotto}`
+    ? `Ricevi in Lightning anche se chi compra paga on-chain: lo swap lo fa Barattolo, e il costo lo vedi prima.${sotto}`
     : scelta === 'onchain'
-    ? `Ricevi bitcoin on-chain anche se chi compra paga in Lightning: il cambio lo fa Barattolo, e il costo lo vedi prima.${sotto}`
+    ? `Ricevi bitcoin on-chain anche se chi compra paga in Lightning: lo swap lo fa Barattolo, e il costo lo vedi prima.${sotto}`
     : `${incassoProfiloRiassunto()} Lo cambi nel Profilo, voce «Come ricevi».`;
 }
 function scegliIncassoSell(cosa){
@@ -58374,9 +58387,9 @@ function onchainModoBlocco(){
   const nome = esc(e.fornitore_nome || myOnchainLn.fornitore || 'SATS Routing');
   const esempio = e.ok
     ? `Per esempio: su ${fmt(Number(e.prezzo) || 0)} sats venduti ne ricevi circa <b>${fmt(Number(e.ricevi) || 0)} in Lightning</b>.
-       È un cambio, fatto da ${nome}: costa ${fmt(Number(e.costo) || 0)} sats, e la cifra esatta la vedi nell'ordine prima di confermare.`
+       È uno swap, fatto da ${nome}: costa ${fmt(Number(e.costo) || 0)} sats, e la cifra esatta la vedi nell'ordine prima di confermare.`
     : e.carico ? 'Calcolo un esempio…'
-    : `È un cambio, fatto da ${nome}, e ha un costo: ora non risponde, ma la cifra esatta la vedi nell'ordine prima di confermare.`;
+    : `È uno swap, fatto da ${nome}, e ha un costo: ora non risponde, ma la cifra esatta la vedi nell'ordine prima di confermare.`;
   const minimo = Number(e.minimo || myOnchainLn.minimo) || 0;
   const come = modo === 'lightning'
     ? (myLnAddress ? 'Quando chi compra conferma di averlo ricevuto, la richiesta la prendiamo dal tuo Lightning address: tu vedi il costo e confermi.'
@@ -58386,7 +58399,7 @@ function onchainModoBlocco(){
     ${pillole}
     <div class="hint">${esempio}</div>
     <div class="hint" style="margin-top:6px">⚠️ <b>Il tuo wallet Lightning deve avere la capienza</b> per ricevere la cifra intera.
-      ${minimo ? `Sotto i ${fmt(minimo)} sats il cambio non si fa: quella vendita arriva on-chain, dove hai scelto nella voce «On-chain».` : ''}</div>
+      ${minimo ? `Sotto i ${fmt(minimo)} sats lo swap non si fa: quella vendita arriva on-chain, dove hai scelto nella voce «On-chain».` : ''}</div>
     <div class="hint" style="margin-top:6px">${come}</div></div>`;
 }
 async function onchainEsempioCarica(){
@@ -58409,7 +58422,7 @@ async function onchainModoScegli(btn, modo){
     if (!r.ok) throw new Error(d.detail || 'non salvato');
     myOnchainLn.modo = modo;
     toast(modo === 'onchain' ? '₿ Salvato: ricevi on-chain'
-      : modo === 'lightning' ? '⚡ Salvato: dalle prossime vendite ricevi in Lightning, col cambio'
+      : modo === 'lightning' ? '⚡ Salvato: dalle prossime vendite ricevi in Lightning, con lo swap'
       : '🤔 Salvato: a ogni vendita scegli tu come ricevere', 5000);
   } catch(e) { toast('⚠️ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }
@@ -58470,10 +58483,10 @@ function aggiornaCassettoWallet(){
 function walletParoleACosaServono(){
   const oc = !!myOnchain, cambio = swapAcceso();
   const aCosa = oc && cambio
-    ? 'Servono a firmare la tua parte del deposito di garanzia on-chain e i tuoi cambi, e a ritrovare un cambio rimasto a metà'
+    ? 'Servono a firmare la tua parte del deposito di garanzia on-chain e i tuoi swap, e a ritrovare uno swap rimasto a metà'
     : oc ? 'Servono solo a firmare la tua parte del deposito di garanzia on-chain'
-         : 'Servono a firmare i tuoi cambi e a ritrovare un cambio rimasto a metà, per riprenderti i sats';
-  const dove = oc ? 'I sats delle vendite e dei rimborsi' : 'I sats dei cambi';
+         : 'Servono a firmare i tuoi swap e a ritrovare uno swap rimasto a metà, per riprenderti i sats';
+  const dove = oc ? 'I sats delle vendite e dei rimborsi' : 'I sats degli swap';
   return `${aCosa}, da questo o da un altro telefono. ${dove} non arrivano
       qui: arrivano al wallet che scegli tu, che Barattolo non conosce.
       <b>Non importarle in un altro wallet</b>, e non darle a nessuno,
@@ -58490,7 +58503,7 @@ async function renderWalletBarattolo(){
   const cambi = swapAcceso() && typeof swapBloccoProfilo === 'function' ? swapBloccoProfilo() : '';
   sotto.innerHTML = `<div class="payout"><h4>La tua chiave</h4>
     <div class="hint">La tieni solo tu, in questo telefono. Ogni ordine
-      e ogni cambio ne usa una <b>nuova</b>.</div>
+      e ogni swap ne usa una <b>nuova</b>.</div>
     <div class="hint" id="walletCoda" style="margin-top:6px">${parole ? ''
       : 'Nasce da sola la prima volta che serve.'}</div></div>
     <div class="payout"><h4>Le 12 parole</h4>
@@ -58666,7 +58679,7 @@ async function walletIncollaParole(btn){
 }
 function walletRendiPrincipale(btn){
   chiediConferma({titolo: 'Rendere principale questo wallet?', etichetta: 'Rendi principale', vestito: 'allarme',
-    corpo: 'Il wallet di questo dispositivo diventa quello del tuo account. Sugli altri dispositivi ti chiederemo di incollare le sue 12 parole; le parole che avevano restano conservate lì per i cambi già fatti.',
+    corpo: 'Il wallet di questo dispositivo diventa quello del tuo account. Sugli altri dispositivi ti chiederemo di incollare le sue 12 parole; le parole che avevano restano conservate lì per gli swap già fatti.',
     poi: async () => {
       const rip = onchainAttesa(btn, 'Registro…');
       try {
@@ -60002,7 +60015,7 @@ const TAPPE_TUTORIAL_OC_P2P = [
       + `<svg viewBox="0 0 44 24"><path d="M4 7h34m-6-5 6 5-6 5"/><path d="M40 17H6m6-5-6 5 6 5"/></svg></span>`
       + `${P2P_OC_MONETA}</span><span class="tour-arrivo">In arrivo</span>`
       + `Ordine <b>Lightning</b> ma vuoi ricevere <b>on-chain</b>, o il contrario? Lo farai qui, `
-      + `col cambio di SATS Routing. La commissione la vedi prima di confermare.` },
+      + `con lo swap di SATS Routing. La commissione la vedi prima di confermare.` },
 ];
 function tutorialOnchainP2P(){
   if (tourInCorso || !myP2POnchain || document.querySelector('.view.active')?.id !== 'view-p2p') {
@@ -60484,17 +60497,17 @@ function incassoLnOnchainP2P(o){
   if (o.destinazione && o.destinazione.tipo === 'cambio') {
     if (!o.proposta || !o.proposta.mia) return '';
     const c = o.cambio || {};
-    return apri + '<b>⚡ Cambio fatto</b><div class="hint">Ricevi <b>' + fmt(Number(c.ricevi) || 0)
-      + ' sats in Lightning</b>. I bitcoin partono verso il cambio appena chi vende apre l\'app (la seconda '
+    return apri + '<b>⚡ Swap fatto</b><div class="hint">Ricevi <b>' + fmt(Number(c.ricevi) || 0)
+      + ' sats in Lightning</b>. I bitcoin partono verso lo swap appena chi vende apre l\'app (la seconda '
       + 'firma la mette il suo telefono), poi SATS Routing paga la tua richiesta.</div>'
       + '<button type="button" class="btn ghost" onclick="togliCambioOnchainP2P(this, ' + Number(o.id)
-      + ')">Togli il cambio</button>' + chiudi;
+      + ')">Togli lo swap</button>' + chiudi;
   }
   if (o.proposta || o.decisione) return '';
   if (!o.incasso_ln) {
     if (!o.ln_possibile) return '';
-    return apri + '<b>Vuoi ricevere in Lightning?</b><div class="hint">Col cambio di SATS Routing: i bitcoin del '
-      + '2-di-3 vanno al cambio, e a te arriva in Lightning il prezzo meno il costo del cambio, che vedi prima di confermare.</div>'
+    return apri + '<b>Vuoi ricevere in Lightning?</b><div class="hint">Con lo swap di SATS Routing: i bitcoin del '
+      + '2-di-3 vanno allo swap, e a te arriva in Lightning il prezzo meno il costo dello swap, che vedi prima di confermare.</div>'
       + '<button type="button" class="btn ghost" onclick="sceltaLnOnchainP2P(this, ' + Number(o.id)
       + ', true)">⚡ Ricevi in Lightning</button>' + chiudi;
   }
@@ -60502,21 +60515,21 @@ function incassoLnOnchainP2P(o){
   if (!st.stato) { st.stato = 'carico'; caricaCambioOnchainP2P(o.id); }
   const p = st.p || {}, nome = onchainNomeCambio(p);
   const errore = st.errore ? '<div class="swap-rifiuto" role="status">' + esc(st.errore) + '</div>' : '';
-  let conto = '<div class="hint">Chiedo il prezzo del cambio…</div>';
-  if (st.p && p.ok) conto = '<div class="hint"><b>È un cambio, fatto da ' + esc(nome) + '</b>: costa ' + fmt(Number(p.costo) || 0)
+  let conto = '<div class="hint">Chiedo il prezzo dello swap…</div>';
+  if (st.p && p.ok) conto = '<div class="hint"><b>È uno swap, fatto da ' + esc(nome) + '</b>: costa ' + fmt(Number(p.costo) || 0)
     + ' sats. Ricevi circa <b>' + fmt(Number(p.ricevi) || 0) + ' sats in Lightning</b> invece di '
     + fmt(Number(p.prezzo) || 0) + ' on-chain.</div>';
   else if (st.p) conto = '<div class="hint">' + esc(p.motivo === 'sotto_minimo'
-      ? 'Il cambio in Lightning parte da ' + fmt(Number(p.minimo) || 0) + ' sats: questo scambio lo ricevi on-chain.'
+      ? 'Lo swap in Lightning parte da ' + fmt(Number(p.minimo) || 0) + ' sats: questo scambio lo ricevi on-chain.'
       : p.motivo === 'sopra_tetto'
-      ? 'Il cambio in Lightning arriva al massimo a ' + fmt(Number(p.massimo) || 0) + ' sats: questo scambio lo ricevi on-chain.'
+      ? 'Lo swap in Lightning arriva al massimo a ' + fmt(Number(p.massimo) || 0) + ' sats: questo scambio lo ricevi on-chain.'
       : nome + ' ora non risponde: riprova fra poco, o ricevi on-chain.') + '</div>';
   const pronto = !!o.rilascio_chiesto_il && o.stato !== 'preso';
   if (!pronto) return apri + '<b>⚡ Ricevi in Lightning</b>' + conto
-    + '<div class="hint">Quando chi vende conferma gli euro, qui fai il cambio con una tua richiesta Lightning.</div>'
+    + '<div class="hint">Quando chi vende conferma gli euro, qui fai lo swap con una tua richiesta Lightning.</div>'
     + errore + indietro + chiudi;
   const ore = Math.round((Number(p.vita_incollata_s) || 82800) / 3600);
-  return apri + '<b>⚡ Chi vende ha ricevuto gli euro: fai il cambio</b>' + conto
+  return apri + '<b>⚡ Chi vende ha ricevuto gli euro: fai lo swap</b>' + conto
     + '<div class="hint">⚠️ <b>Il tuo wallet Lightning deve poter ricevere ' + fmt(Number(p.ricevi) || 0)
     + ' sats in una volta.</b> Se la richiesta non si riesce a pagare, i bitcoin tornano da soli al tuo wallet '
     + 'on-chain di Barattolo, quello delle tue stesse 12 parole.</div>'
@@ -60528,7 +60541,7 @@ function incassoLnOnchainP2P(o){
     + ' placeholder="lnbc…" oninput="(p2pOcCambi[' + Number(o.id) + '] || {}).fattura = this.value">' + esc(st.fattura || '') + '</textarea>'
     + errore
     + '<button type="button" class="btn orange" onclick="confermaCambioOnchainP2P(this, ' + Number(o.id)
-    + ')">✅ Conferma il cambio</button>' + indietro + chiudi;
+    + ')">✅ Conferma lo swap</button>' + indietro + chiudi;
 }
 /* il riquadro si rifa' da solo, senza rileggere lo scambio dal server */
 function ridisegnaLnOnchainP2P(id){
@@ -60560,7 +60573,7 @@ async function sceltaLnOnchainP2P(btn, id, si){
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non riuscito');
     delete p2pOcCambi[id];
-    toast(si ? '⚡ Ricevi in Lightning: il cambio lo fai quando chi vende conferma gli euro'
+    toast(si ? '⚡ Ricevi in Lightning: lo swap lo fai quando chi vende conferma gli euro'
              : '₿ Ricevi on-chain', 5000);
   } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }
@@ -60587,7 +60600,7 @@ async function euroRicevutiOnchainP2P(id){
     return;
   }
   await fattoOnchainP2P(rip);
-  toast('🔓 Confermato: chi compra fa il cambio, e il tuo telefono mette la seconda firma da solo', 7000);
+  toast('🔓 Confermato: chi compra fa lo swap, e il tuo telefono mette la seconda firma da solo', 7000);
 }
 async function prendiFatturaOnchainP2P(btn, id){
   haptic();
@@ -60615,7 +60628,7 @@ async function confermaCambioOnchainP2P(btn, id){
   st.fattura = String(st.fattura || '').trim().replace(/^lightning:/i, '').trim();
   delete st.errore;
   const fattura = st.fattura;
-  const rip = onchainAttesa(btn, 'Preparo il cambio…');
+  const rip = onchainAttesa(btn, 'Preparo lo swap…');
   let finito = false, p = st.p || {};
   try {
     /* il preventivo si rilegge adesso: le tariffe si muovono, e la
@@ -60632,7 +60645,7 @@ async function confermaCambioOnchainP2P(btn, id){
     if (!b || !b.hash) throw new Error(onchainFatturaPerche('fattura', p));
     if (b.scade - Date.now() / 1000 < vita)
       throw new Error(`Questa richiesta scade fra meno di ${Math.round(vita / 3600)} ore: creane una che duri di più.`);
-    if (!(await caricaSwapTelefono())) throw new Error('non riesco a caricare il cambio: riprova');
+    if (!(await caricaSwapTelefono())) throw new Error('non riesco a caricare lo swap: riprova');
     st.stato = 'creo';
     await leggiMieiOnchainP2P();
     const o = p2pOnchainMiei.find(x => x.id === Number(id));
@@ -60649,8 +60662,8 @@ async function confermaCambioOnchainP2P(btn, id){
       preventivo: p, rimborso: io.incasso});
     let dove = null;
     try { dove = B.Address(onchainReteBtc(B)).decode(rec.lockupAddress); } catch(e) { dove = null; }
-    if (!dove || dove.type !== 'tr') throw new Error('l\'indirizzo del cambio non è della rete giusta');
-    if (!(rec.mandi > 0 && rec.mandi <= o.prezzo_sats)) throw new Error('le cifre del cambio non tornano');
+    if (!dove || dove.type !== 'tr') throw new Error('l\'indirizzo dello swap non è della rete giusta');
+    if (!(rec.mandi > 0 && rec.mandi <= o.prezzo_sats)) throw new Error('le cifre dello swap non tornano');
     const firma = await onchainFirmaDestinazione(B, parole, 'cambio', `p2p:${o.id}:${rec.lockupAddress}`);
     const psbt = onchainPsbtFirmata(B, o, io, w, onchainUsciteVersoVenditore(o, rec.lockupAddress, 12));
     const r = await fetch(`${API_BASE}/p2p/onchain/${Number(o.id)}/cambio`, {method: 'POST',
@@ -60659,10 +60672,10 @@ async function confermaCambioOnchainP2P(btn, id){
         ricevi: rec.ricevi, mandi: rec.mandi, scade_fattura: b.scade, timeout: rec.timeoutBlockHeight},
         firma, psbt})});
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.detail || 'cambio rifiutato');
+    if (!r.ok) throw new Error(d.detail || 'swap rifiutato');
     delete p2pOcCambi[id];
     finito = true;
-    toast('⚡ Fatto: hai messo la prima firma. I bitcoin partono verso il cambio appena chi vende apre l\'app', 8000);
+    toast('⚡ Fatto: hai messo la prima firma. I bitcoin partono verso lo swap appena chi vende apre l\'app', 8000);
   } catch(e) {
     st.stato = 'pronto';
     const nome = onchainNomeCambio(p);
@@ -60686,7 +60699,7 @@ async function togliCambioOnchainP2P(btn, id){
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non riuscito');
     delete p2pOcCambi[id];
-    toast('⚡ Cambio tolto: non si è mosso niente', 5000);
+    toast('⚡ Swap tolto: non si è mosso niente', 5000);
   } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }
   renderP2POnchain();
@@ -61305,18 +61318,18 @@ function schedaOnchainP2P(o){
   if (deposito && o.incasso_ln && !o.incasso && (o.stato === 'depositato' || o.stato === 'euro_inviati')) {
     if (o.rilascio_chiesto_il) {
       gesti = gesti.replace(bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'), '');
-      testo += '<br>⚡ Hai confermato gli euro. Chi compra riceve in Lightning e sta facendo il cambio: '
+      testo += '<br>⚡ Hai confermato gli euro. Chi compra riceve in Lightning e sta facendo lo swap: '
         + 'quando l\'ha fatto, il tuo telefono mette la seconda firma da solo.';
     } else {
       testo += '<br>⚡ Chi compra riceve in Lightning: quando vedi gli euro, «Ricevuti» lo conferma '
-        + 'col tuo seme e lui fa il cambio.';
+        + 'col tuo seme e lui fa lo swap.';
     }
   }
   /* la seconda firma, quando tocca a me: lo stesso bottone in ogni stato */
   if (daFirmareOnchainP2P(o) && !mod) {
     gesti = bott('orange', `cofirmaOnchainP2P(this, ${o.id})`,
       '✍️ Metti la seconda firma' + (o.proposta.barattolo ? ' (Barattolo ha firmato)' : '')) + gesti;
-    testo += '<br><b>' + (cambioDaFirmareOnchainP2P(o) ? 'Chi compra ha fatto il cambio in Lightning'
+    testo += '<br><b>' + (cambioDaFirmareOnchainP2P(o) ? 'Chi compra ha fatto lo swap in Lightning'
         : o.proposta.verso === 'venditore' ? 'I sats stanno per arrivare sul tuo wallet' : 'Il rimborso sta per tornare a te')
       + ':</b> manca solo la tua firma, che il telefono mette da solo.';
   } else if (o.proposta && o.proposta.mia && o.stato !== 'rilasciato' && o.stato !== 'rimborsato') {
@@ -61615,27 +61628,27 @@ function scegliReteDepositoOnchainP2P(id, rete){
 /* PURA: il perche' di un no del preventivo, nelle parole di chi deposita */
 function percheDepositoLnOnchainP2P(d){
   const m = (d && d.motivo) || '';
-  if (m === 'sotto_minimo') return d.minimo ? 'Il cambio parte da ' + fmt(d.minimo) + ' sats: questo deposito è troppo piccolo. Deposita on-chain.'
-    : 'Questo deposito è troppo piccolo per il cambio: deposita on-chain.';
-  if (m === 'sopra_tetto') return 'Il cambio arriva al massimo a ' + fmt(d.massimo || 0) + ' sats: deposita on-chain.';
-  if (m === 'spento') return 'Il cambio non è disponibile: deposita on-chain.';
+  if (m === 'sotto_minimo') return d.minimo ? 'Lo swap parte da ' + fmt(d.minimo) + ' sats: questo deposito è troppo piccolo. Deposita on-chain.'
+    : 'Questo deposito è troppo piccolo per lo swap: deposita on-chain.';
+  if (m === 'sopra_tetto') return 'Lo swap arriva al massimo a ' + fmt(d.massimo || 0) + ' sats: deposita on-chain.';
+  if (m === 'spento') return 'Lo swap non è disponibile: deposita on-chain.';
   if (m === 'chiuso') return (d && d.detail) || 'Su questo scambio il deposito in Lightning non si fa più.';
-  return 'Il cambio adesso non risponde: riprova fra poco, o deposita on-chain.';
+  return 'Lo swap adesso non risponde: riprova fra poco, o deposita on-chain.';
 }
 function fraseDepositoLnOnchainP2P(e){
   const t = (e && e.tipo) || '';
   if (t === 'indirizzo') return 'L\'indirizzo del deposito non torna: riapri lo scambio e riprova.';
-  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «On-chain».';
-  if (t === 'seme') return 'Non riesco a preparare la chiave del cambio: riprova.';
-  if (t === 'casa') return 'Questo telefono non riesce a salvare il cambio: libera un po\' di spazio e riprova.';
-  if (t === 'cambiata') return 'Il costo del cambio è appena cambiato: guarda le cifre nuove e tocca di nuovo «Crea la richiesta».';
+  if (t === 'parole') return 'Prima di usare lo swap guarda le tue 12 parole: Profilo › «On-chain».';
+  if (t === 'seme') return 'Non riesco a preparare la chiave dello swap: riprova.';
+  if (t === 'casa') return 'Questo telefono non riesce a salvare lo swap: libera un po\' di spazio e riprova.';
+  if (t === 'cambiata') return 'Il costo dello swap è appena cambiato: guarda le cifre nuove e tocca di nuovo «Crea la richiesta».';
   if (t === 'preventivo') return percheDepositoLnOnchainP2P(e.dati);
-  if (t === 'mente') return 'Il cambio ha risposto con dati che non tornano: non è partito niente. Deposita on-chain.';
+  if (t === 'mente') return 'Lo swap ha risposto con dati che non tornano: non è partito niente. Deposita on-chain.';
   if (t === 'biglietto')
-    return e.motivo === 'troppi' ? 'Su questo scambio ci sono già troppi cambi aperti: deposita on-chain.'
-         : e.motivo === 'spento' ? 'Il cambio non è disponibile: deposita on-chain.'
+    return e.motivo === 'troppi' ? 'Su questo scambio ci sono già troppi swap aperti: deposita on-chain.'
+         : e.motivo === 'spento' ? 'Lo swap non è disponibile: deposita on-chain.'
          : 'Barattolo non risponde: riprova fra poco.';
-  return 'Il cambio adesso non risponde: riprova fra poco, o deposita on-chain.';
+  return 'Lo swap adesso non risponde: riprova fra poco, o deposita on-chain.';
 }
 /* il preventivo, riletto se ha piu' del suo minuto (anche quello di un no:
    mai una domanda a ogni ridisegno) */
@@ -61669,13 +61682,13 @@ function corpoDepositoLnOnchainP2P(o){
       + (rec.errore && !paga ? '<div class="hint">Il telefono riprova da solo a mettere i bitcoin nel deposito.</div>' : '');
   }
   const st = p2pOcDepositoLn[o.id];
-  if (!st || st.stato === 'leggo' || !st.dati) return '<div class="hint">Chiedo il prezzo del cambio…</div>';
+  if (!st || st.stato === 'leggo' || !st.dati) return '<div class="hint">Chiedo il prezzo dello swap…</div>';
   const d = st.dati;
   const nome = esc(d.fornitore_nome || 'SATS Routing');
   if (!d.ok) return '<div class="hint">' + esc(percheDepositoLnOnchainP2P(d)) + '</div>';
   return '<div class="hint">Paghi <b>' + fmt(d.paghi) + ' sats</b> dal tuo wallet Lightning: ' + nome
       + ' li cambia in bitcoin e il tuo telefono mette <b>' + fmt(d.ricevi) + ' sats</b> nel deposito di garanzia (ne servono ' + fmt(d.importo) + ').</div>'
-    + '<div class="hint">È un cambio, fatto da ' + nome + ': costa <b>' + fmt(d.costo) + ' sats</b>, li paghi tu. Barattolo non aggiunge niente.</div>'
+    + '<div class="hint">È uno swap, fatto da ' + nome + ': costa <b>' + fmt(d.costo) + ' sats</b>, li paghi tu. Barattolo non aggiunge niente.</div>'
     + '<div class="hint">⚠️ Se lo scambio si annulla o finisce col rimborso, i bitcoin tornano al tuo wallet <b>on-chain</b>, non in Lightning.</div>'
     + (st.errore ? '<div class="hint" role="alert">' + esc(st.errore) + '</div>' : '')
     + '<button class="btn orange" id="p2pOcDepositoLnBtn" onclick="creaDepositoLnOnchainP2P(this, ' + o.id + ')">⚡ Crea la richiesta Lightning</button>';
@@ -61687,7 +61700,7 @@ async function creaDepositoLnOnchainP2P(btn, id){
   /* un cambio gia' nato e vivo si segue, non se ne fa un altro */
   if (depositoLnVivoOnchainP2P(id)) return renderDepositoOnchainP2P();
   haptic();
-  const rip = btn && typeof bottoneInAttesa === 'function' ? bottoneInAttesa(btn, 'Preparo il cambio…') : () => {};
+  const rip = btn && typeof bottoneInAttesa === 'function' ? bottoneInAttesa(btn, 'Preparo lo swap…') : () => {};
   try {
     await swapCreaPerDepositoP2P({scambio: o.id, indirizzo: (o.indirizzo || {}).indirizzo, preventivo: st.dati});
     st.errore = '';
@@ -61707,7 +61720,7 @@ async function pagaDepositoLnOnchainP2P(btn, id){
   try {
     const cliente = await clientNwc(walletNwcPaga());
     await cliente.paga(rec.invoice);
-    toast('⚡ Pagato: il cambio prepara i bitcoin per il deposito', 5000);
+    toast('⚡ Pagato: lo swap prepara i bitcoin per il deposito', 5000);
   } catch(e){
     toast('Il wallet collegato non ha pagato: paga la richiesta dal QR o con «Apri nel wallet»', 6000);
   } finally { rip(); }
@@ -61763,26 +61776,26 @@ function garanziaVendoP2P(o){
 }
 function perchePresaOcP2P(d){
   const m = (d && d.motivo) || '';
-  if (m === 'sotto_minimo') return 'Il cambio parte da ' + fmt(d.minimo || 0) + ' sats: per questo ordine usa i sats che hai già.';
-  if (m === 'sopra_tetto') return 'Il cambio arriva al massimo a ' + fmt(d.massimo || 0) + ' sats.';
-  if (m === 'spento') return 'Il cambio non è disponibile.';
-  return 'Il cambio adesso non risponde: riprova fra poco.';
+  if (m === 'sotto_minimo') return 'Lo swap parte da ' + fmt(d.minimo || 0) + ' sats: per questo ordine usa i sats che hai già.';
+  if (m === 'sopra_tetto') return 'Lo swap arriva al massimo a ' + fmt(d.massimo || 0) + ' sats.';
+  if (m === 'spento') return 'Lo swap non è disponibile.';
+  return 'Lo swap adesso non risponde: riprova fra poco.';
 }
 function frasePresaOcP2P(e){
   const t = (e && e.tipo) || '';
   if (t === 'fattura') return typeof swapFatturaPerche === 'function' ? swapFatturaPerche(e.perche) : 'Questa richiesta non va bene.';
-  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «On-chain».';
-  if (t === 'seme') return 'Non riesco a preparare la chiave del cambio: riprova.';
-  if (t === 'casa') return 'Questo telefono non riesce a salvare il cambio: libera un po\' di spazio e riprova.';
-  if (t === 'cambiata') return 'Il costo del cambio è appena cambiato: guarda le cifre nuove e tocca di nuovo «Crea il cambio».';
+  if (t === 'parole') return 'Prima di usare lo swap guarda le tue 12 parole: Profilo › «On-chain».';
+  if (t === 'seme') return 'Non riesco a preparare la chiave dello swap: riprova.';
+  if (t === 'casa') return 'Questo telefono non riesce a salvare lo swap: libera un po\' di spazio e riprova.';
+  if (t === 'cambiata') return 'Il costo dello swap è appena cambiato: guarda le cifre nuove e tocca di nuovo «Crea lo swap».';
   if (t === 'preventivo') return perchePresaOcP2P(e.dati);
-  if (t === 'mente') return 'Il cambio ha risposto con dati che non tornano: non è partito niente.';
+  if (t === 'mente') return 'Lo swap ha risposto con dati che non tornano: non è partito niente.';
   if (t === 'wallet') return 'Il wallet collegato non ha dato la richiesta: incollane una tu.';
   if (t === 'biglietto')
-    return e.motivo === 'troppi' ? 'Per quest\'ordine ci sono già troppi cambi aperti.'
-         : e.motivo === 'spento' ? 'Il cambio non è disponibile.'
+    return e.motivo === 'troppi' ? 'Per quest\'ordine ci sono già troppi swap aperti.'
+         : e.motivo === 'spento' ? 'Lo swap non è disponibile.'
          : 'Barattolo non risponde: riprova fra poco.';
-  return 'Il cambio adesso non risponde: riprova fra poco.';
+  return 'Lo swap adesso non risponde: riprova fra poco.';
 }
 /* il riquadro nella pagina dell'ordine (solo a chi venderebbe) */
 function rigaPresaOcP2P(o){
@@ -61794,7 +61807,7 @@ function rigaPresaOcP2P(o){
   if (rec && (fase === 'pagata' || fase === 'fatto'))
     return testa + '⚡ <b>I sats sono nel tuo wallet Lightning.</b> Ora tocca «Vendi» qui sotto e paga la garanzia dal tuo wallet.</div>';
   if (rec && typeof swapDaRimborsare === 'function' && swapDaRimborsare(rec))
-    return testa + esc(frasestatoSwap(rec)) + ' <button type="button" class="btn ghost" onclick="vaiSwap()">Vai al Cambio</button></div>';
+    return testa + esc(frasestatoSwap(rec)) + ' <button type="button" class="btn ghost" onclick="vaiSwap()">Vai allo Swap</button></div>';
   if (rec && !['scaduto', 'fallito', 'ripreso'].includes(fase)) {
     /* (2 nov 2026 sera) il link nudo dell'instradatore, come nel Cambio:
        quello del fornitore non apriva Blue Wallet ad Alan */
@@ -61815,7 +61828,7 @@ function rigaPresaOcP2P(o){
     return testa + '₿ Hai solo bitcoin on-chain? <button type="button" class="btn ghost" onclick="apriPresaOcP2P(' + esc(JSON.stringify(o.id)) + ')">Caricali in Lightning</button></div>';
   const g = garanziaVendoP2P(o);
   if (!(g.sats > 0)) return testa + 'Per sapere quanti sats servono scegli prima la cifra.</div>';
-  if (st.stato !== 'pronto' || !st.dati) return testa + 'Chiedo il prezzo del cambio…</div>';
+  if (st.stato !== 'pronto' || !st.dati) return testa + 'Chiedo il prezzo dello swap…</div>';
   const d = st.dati;
   if (!d.ok) return testa + esc(perchePresaOcP2P(d)) + '</div>';
   const nome = esc(d.fornitore_nome || 'SATS Routing');
@@ -61824,12 +61837,12 @@ function rigaPresaOcP2P(o){
     + '<div class="hint">Per la garanzia ti servono ' + (g.stima ? 'circa ' : '') + '<b>' + fmt(g.sats) + ' sats</b> in Lightning'
       + (g.stima ? ' (a prezzo di mercato la cifra si fissa quando prendi: il poco in più resta nel tuo wallet)' : '') + '.</div>'
     + '<div class="hint">Mandi <b>' + fmt(d.mandi) + ' sats</b> on-chain: ' + nome + ' li cambia e paga una richiesta del <b>tuo</b> wallet Lightning. '
-      + 'È un cambio: costa ' + fmt(d.costo) + ' sats, li paghi tu. Barattolo non aggiunge niente e non tiene i tuoi sats.</div>'
+      + 'È uno swap: costa ' + fmt(d.costo) + ' sats, li paghi tu. Barattolo non aggiunge niente e non tiene i tuoi sats.</div>'
     + (wallet ? '<div class="hint">La richiesta la chiedo al tuo wallet collegato.</div>'
       : '<div class="field"><label>Una richiesta del tuo wallet Lightning di ' + fmt(g.sats) + ' sats</label>'
         + '<input type="text" id="p2pPresaOcFattura" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="lnbc…"></div>')
     + (st.errore ? '<div class="hint" role="alert">' + esc(st.errore) + '</div>' : '')
-    + '<button type="button" class="btn orange" id="p2pPresaOcBtn" onclick="creaPresaOcP2P(this, ' + esc(JSON.stringify(o.id)) + ')">₿ Crea il cambio</button>'
+    + '<button type="button" class="btn orange" id="p2pPresaOcBtn" onclick="creaPresaOcP2P(this, ' + esc(JSON.stringify(o.id)) + ')">₿ Crea lo swap</button>'
     + '<div class="hint">Poi, coi sats nel wallet, tocchi «Vendi» come sempre.</div></div>';
 }
 function presaOcOrdineP2P(id){
@@ -61864,7 +61877,7 @@ async function creaPresaOcP2P(btn, id){
     if (vivo && !['scaduto', 'fallito', 'ripreso'].includes(swapFase(vivo))) { renderDettaglioP2P(); return; }
   }
   haptic();
-  const rip = btn && typeof bottoneInAttesa === 'function' ? bottoneInAttesa(btn, 'Preparo il cambio…') : () => {};
+  const rip = btn && typeof bottoneInAttesa === 'function' ? bottoneInAttesa(btn, 'Preparo lo swap…') : () => {};
   try {
     let fattura = '';
     const w = typeof walletNwcFattura === 'function' && walletNwcFattura();
@@ -61992,7 +62005,7 @@ function liberaOnchainP2P(btn, id){
   const pa = t => o ? paroleOc(o, t) : t;
   if (o && o.incasso_ln && !o.incasso) return chiediConferma({titolo: pa('🔓 Hai ricevuto gli euro?'),
     etichetta: 'Sì, li ho ricevuti',
-    corpo: pa('Chi compra riceve in Lightning: con la tua conferma, firmata dal tuo seme, fa il cambio e i sats '
+    corpo: pa('Chi compra riceve in Lightning: con la tua conferma, firmata dal tuo seme, fa lo swap e i sats '
       + 'partono verso di lui senza altri gesti tuoi (la seconda firma la mette il tuo telefono). '
       + 'Conferma solo se hai VISTO gli euro sul tuo conto.'),
     poi: () => euroRicevutiOnchainP2P(id)});
@@ -77420,22 +77433,22 @@ function contoCambioP2P(id, netto){
   const d = p.dati;
   if (d.ok) {
     const costo = Math.max(0, netto - Number(d.ricevi || 0));
-    return 'Ricevi circa <b>' + esc(fmt(d.ricevi)) + ' sats</b> sul tuo indirizzo bitcoin · costo del cambio ' + esc(fmt(costo)) + ' sats.';
+    return 'Ricevi circa <b>' + esc(fmt(d.ricevi)) + ' sats</b> sul tuo indirizzo bitcoin · costo dello swap ' + esc(fmt(costo)) + ' sats.';
   }
   return esc(percheCambioP2P(d));
 }
 function percheCambioP2P(d){
   const m = (d && d.motivo) || '';
-  if (m === 'sotto_minimo') return 'Il cambio parte da ' + fmt(d.minimo || 0) + ' sats: questo scambio è troppo piccolo. Ricevi in Lightning.';
-  if (m === 'sopra_tetto') return 'Il cambio arriva al massimo a ' + fmt(d.massimo || 0) + ' sats: ricevi in Lightning.';
-  if (m === 'spento') return 'Il cambio non è disponibile.';
-  return 'Il cambio adesso non risponde: riprova fra poco, o ricevi in Lightning.';
+  if (m === 'sotto_minimo') return 'Lo swap parte da ' + fmt(d.minimo || 0) + ' sats: questo scambio è troppo piccolo. Ricevi in Lightning.';
+  if (m === 'sopra_tetto') return 'Lo swap arriva al massimo a ' + fmt(d.massimo || 0) + ' sats: ricevi in Lightning.';
+  if (m === 'spento') return 'Lo swap non è disponibile.';
+  return 'Lo swap adesso non risponde: riprova fra poco, o ricevi in Lightning.';
 }
 function corpoCambioIncassoP2P(o, netto){
   if (!(netto > 0))
-    return '<div class="hint">La cifra esatta qui non la sappiamo, e per il cambio serve: ricevi in Lightning.</div>';
-  return '<div class="hint">I tuoi <b>' + esc(fmt(netto)) + ' sats</b> partono in Lightning: il cambio di SATS Routing ' +
-      'li porta al tuo indirizzo bitcoin. Il costo del cambio lo paghi tu, Barattolo non aggiunge niente.</div>' +
+    return '<div class="hint">La cifra esatta qui non la sappiamo, e per lo swap serve: ricevi in Lightning.</div>';
+  return '<div class="hint">I tuoi <b>' + esc(fmt(netto)) + ' sats</b> partono in Lightning: lo swap di SATS Routing ' +
+      'li porta al tuo indirizzo bitcoin. Il costo dello swap lo paghi tu, Barattolo non aggiunge niente.</div>' +
     '<div class="hint" id="p2pCambioConto">' + contoCambioP2P(o.id, netto) + '</div>' +
     '<div class="hint">Al rilascio i bitcoin li ritira il tuo telefono: se l\'app è chiusa ti avvisiamo col bot, e basta aprirla.</div>' +
     '<div class="field"><label>Il tuo indirizzo bitcoin</label>' +
@@ -77466,17 +77479,17 @@ function ridisegnaCambioP2P(rec){
 function fraseCambioP2P(e){
   const t = (e && e.tipo) || '';
   if (t === 'indirizzo') return 'Questo non è un indirizzo bitcoin valido.';
-  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «On-chain».';
-  if (t === 'seme') return 'Non riesco a preparare la chiave del cambio: riprova.';
-  if (t === 'casa') return 'Questo telefono non riesce a salvare il cambio: libera un po\' di spazio e riprova.';
-  if (t === 'cambiata') return 'Il costo del cambio è appena cambiato: guarda le cifre nuove e tocca di nuovo «Invia».';
+  if (t === 'parole') return 'Prima di usare lo swap guarda le tue 12 parole: Profilo › «On-chain».';
+  if (t === 'seme') return 'Non riesco a preparare la chiave dello swap: riprova.';
+  if (t === 'casa') return 'Questo telefono non riesce a salvare lo swap: libera un po\' di spazio e riprova.';
+  if (t === 'cambiata') return 'Il costo dello swap è appena cambiato: guarda le cifre nuove e tocca di nuovo «Invia».';
   if (t === 'preventivo') return percheCambioP2P(e.dati);
-  if (t === 'mente') return 'Il cambio ha risposto con dati che non tornano: non è partito niente. Ricevi in Lightning.';
+  if (t === 'mente') return 'Lo swap ha risposto con dati che non tornano: non è partito niente. Ricevi in Lightning.';
   if (t === 'biglietto')
-    return e.motivo === 'troppi' ? 'Su questo scambio ci sono già troppi cambi aperti: ricevi in Lightning.'
-         : e.motivo === 'spento' ? 'Il cambio non è disponibile.'
+    return e.motivo === 'troppi' ? 'Su questo scambio ci sono già troppi swap aperti: ricevi in Lightning.'
+         : e.motivo === 'spento' ? 'Lo swap non è disponibile.'
          : 'Barattolo non risponde: riprova fra poco.';
-  return 'Il cambio adesso non risponde: riprova fra poco, o ricevi in Lightning.';
+  return 'Lo swap adesso non risponde: riprova fra poco, o ricevi in Lightning.';
 }
 /* UN CAMBIO GIA' NATO SI RIUSA: se la fattura non e' partita (la rete e'
    caduta dopo la nascita) il tocco dopo manda la stessa, se porta ancora
@@ -77517,7 +77530,7 @@ async function inviaCambioP2P(){
   haptic();
   let rec = cambioP2PRiusabile(o.id, deve, indirizzo);
   if (!rec) {
-    const ripS = attesaP2P('Preparo il cambio…', el('p2pIncassoBtn'));
+    const ripS = attesaP2P('Preparo lo swap…', el('p2pIncassoBtn'));
     try {
       rec = await swapCreaPerP2P({ordine: o.id, sats: deve, indirizzo: indirizzo, preventivo: p.dati});
     } catch(e){
@@ -77537,11 +77550,11 @@ async function inviaCambioP2P(){
      consiglio parte, e lo si dice */
   const bolt = String(rec.invoice || '').trim();
   const b = leggiBolt11(bolt);
-  if (!b || b.sats !== deve) { dillo('Il cambio ha fatto una fattura che non torna: non è partito niente. Ricevi in Lightning.'); return; }
+  if (!b || b.sats !== deve) { dillo('Lo swap ha fatto una fattura che non torna: non è partito niente. Ricevi in Lightning.'); return; }
   const altraRete = avvisoReteBolt11(bolt);
   if (altraRete) { dillo(altraRete); return; }
   const adesso = Math.floor(Date.now() / 1000);
-  if (b.scade < adesso + finestraFatturaP2P()) { dillo('La fattura del cambio scade troppo presto per questo scambio: ricevi in Lightning.'); return; }
+  if (b.scade < adesso + finestraFatturaP2P()) { dillo('La fattura dello swap scade troppo presto per questo scambio: ricevi in Lightning.'); return; }
   const corta = b.scade < adesso + vitaMinimaFatturaP2P(o);
   const ripC = attesaP2P('Controllo che sia pagabile…', el('p2pIncassoBtn'));
   let fermo = null;

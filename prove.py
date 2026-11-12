@@ -186360,6 +186360,114 @@ console.log(JSON.stringify(['accasats@walletofsatoshi.com', 'Mario.Rossi@getalby
     prova("a strada rovesciata spenta: 403", 403, chiama({"address": "a@b.com", "sats": 59130}))
 
 
+def prove_nome_swap():
+    """«SWAP» AL POSTO DI «CAMBIO» (12 nov 2026, cantiere nome-swap,
+    Andrea: «al posto di cambio nella nav ha senso invece scrivere
+    swap?», «si», «fallo e basta»). La scheda in basso, il titolo della
+    pagina e le parole che la nominano dicono «Swap»; il cambio euro/
+    bitcoin resta «cambio». E LA SOGLIA DAL LATO SCRITTO (stessa mattina,
+    Andrea: «voglio cambiare 50000 sats da onchain a lightning e mi esce
+    lo swap parte da 50000», «anche con 50100 non va»): il minimo vale
+    sui sats RICEVUTI in Lightning, e chi scrive in «Mandi» lo legge
+    tradotto nella sua cifra (`minimo_scritto`)."""
+    print("\n[«Swap» al posto di «Cambio», e la soglia dal lato scritto]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    js = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read().replace("\r\n", "\n")
+    prova("la scheda in basso e il titolo della pagina dicono «Swap», in "
+          "italiano e in inglese", (1, 0, 1, 1, 2, 1),
+          (mini.count("+ '<span class=\"eti-ricevi\">Swap</span>';"),
+           mini.count("+ '<span class=\"eti-ricevi\">Cambio</span>';"),
+           mini.count("it: {titolo: 'Swap',"), mini.count("en: {titolo: 'Swap',"),
+           js.count("    cambio: 'Swap',"), js.count("Vai allo Swap") + mini.count("Vai allo Swap")))
+    prova("nessun «pagina «Cambio»» rimasto nelle parole dette agli utenti",
+          (0, 0, 0),
+          (mini.count("pagina «Cambio».`"), mini.count("Vai al Cambio"),
+           codice(_SORGENTE).count("nella pagina «Cambio»")))
+    prova("il cambio euro/bitcoin resta «cambio»", True,
+          "Cambio non disponibile: i numeri sono rimasti com'erano" in mini)
+
+    # --- la soglia dal lato scritto: la rotta, coi pezzi finti attorno
+    import asyncio
+    rotta = pezzo("cambio_preventivo")
+
+    class _Http(Exception):
+        def __init__(self, codice, testo):
+            self.codice = codice
+
+    class _Con:
+        def close(self):
+            pass
+    sub = {"minimo": 50_000, "massimo": 5_000_000, "percento": 0.5, "rete": 318, "hash": "s"}
+    rev = {"minimo": 25_000, "massimo": 5_000_000, "percento": 0.5, "lockup": 200,
+           "claim": 150, "hash": "r"}
+
+    async def t_sub(chi):
+        return sub
+
+    async def t_rev(chi):
+        return rev
+    amb = {"Header": lambda *a: "", "Cookie": lambda *a: "", "HTTPException": _Http,
+           "app": type("A", (), {"get": staticmethod(lambda *a, **k: (lambda f: f))})(),
+           "verifica_utente": lambda a, b: {"id": 5}, "cambio_libero_per": lambda tg: True,
+           "cambio_strade": lambda: ("ln-btc", "btc-ln"),
+           "swap_fornitore": lambda f: {"id": "satsrouting", "nome": "SATS Routing"},
+           "_cambi_db": lambda: _Con(), "cambi_oggi": lambda *a: 0,
+           "CAMBIO_LIBERO_MAX_AL_GIORNO": 5, "_cambio_tetto_giorno": lambda oggi: False,
+           "leggi_tariffa_sub": t_sub, "leggi_tariffa_swap": t_rev, "SWAP_MIN_SATS": 25_000,
+           "CAMBIO_LIBERO_MAX_SATS": 1_000_000, "SWAP_FEE_PERCENTO": 0,
+           "SWAP_PREVENTIVO_VALE_S": 60, "time": time}
+    for nome in ("_cambio_sats", "preventivo_sub", "preventivo_swap", "_swap_ricevi_di",
+                 "swap_dovuto_per_ricevere", "sub_ricevi_per_mandare"):
+        exec(pezzo(nome), amb)
+    exec("async " + rotta, amb)
+
+    def chiedi(sats, direzione, lato):
+        return asyncio.run(amb["cambio_preventivo"](str(sats), direzione, "satsrouting",
+                                                    "", lato))
+    a = chiedi(50_100, "btc-ln", "mandi")
+    prova("da bitcoin a Lightning, 50.100 scritti in «Mandi»: sotto il minimo, "
+          "e il minimo tradotto in quel che si manda (50.000 + 0,5 % + 318)",
+          (False, "sotto_minimo", 50_000, 50_568, "mandi"),
+          (a["ok"], a["motivo"], a["minimo"], a.get("minimo_scritto"), a["lato"]))
+    b = chiedi(50_568, "btc-ln", "mandi")
+    prova("...e scrivendo proprio quella cifra il preventivo passa, e si "
+          "ricevono almeno i 50.000", (True, True), (b["ok"], b.get("ricevi", 0) >= 50_000))
+    c = chiedi(40_000, "btc-ln", "ricevi")
+    prova("scritto dal lato del minimo (Ricevi) non serve tradurre",
+          (False, "sotto_minimo", None), (c["ok"], c["motivo"], c.get("minimo_scritto")))
+    d = chiedi(20_000, "ln-btc", "ricevi")
+    q = amb["preventivo_swap"](25_000, rev, 0)
+    prova("da Lightning a bitcoin, scritto in «Ricevi»: il minimo detto in quel "
+          "che si riceve", (False, "sotto_minimo", q["ricevi"]),
+          (d["ok"], d["motivo"], d.get("minimo_scritto")))
+    e = chiedi(2_000_000, "btc-ln", "mandi")
+    prova("sopra il tetto, scritto in «Mandi»: il massimo tradotto in quel che "
+          "si manda", ("sopra_tetto", amb["preventivo_sub"](1_000_000, sub)["mandi"]),
+          (e["motivo"], e.get("massimo_scritto")))
+
+    # --- il telefono: il no dice la soglia del lato scritto, col suo lato
+    rif = pezzo_js(mini, "function rifiutoSwap(", "\n}\n") + "\n}\n"
+    lato = pezzo_js(mini, "function latoSogliaSwap(", "\n}\n") + "\n}\n"
+    testi = re.search(r"cambioSottoMinimo: '[^']*'", mini).group(0)
+    r = _node_banco(
+        "const fmt = n => Number(n || 0).toLocaleString('it-IT');\n"
+        "const numSwap = (n, s) => fmt(s); const unitaSwap = () => 'sats';\n"
+        "const T = {" + testi + ", latoSoglia: {mandi: 'da mandare', ricevi: 'da ricevere'}};\n"
+        "const testiSwap = () => T;\n" + lato + rif + """
+console.log(JSON.stringify([
+  rifiutoSwap(0, {motivo: 'sotto_minimo', minimo: 50000, minimo_scritto: 50568, lato: 'mandi', direzione: 'btc-ln'}),
+  rifiutoSwap(0, {motivo: 'sotto_minimo', minimo: 50000, lato: 'ricevi', direzione: 'btc-ln'}),
+  rifiutoSwap(0, {motivo: 'sotto_minimo', minimo: 25000, direzione: 'ln-btc'})]));
+""")
+    if r is None:
+        salta("il no della soglia: il banco", "node non c'e'")
+    else:
+        prova("il no dice la cifra del lato scritto e il lato",
+              ["Lo swap parte da 50.568 sats da mandare.",
+               "Lo swap parte da 50.000 sats da ricevere.",
+               "Lo swap parte da 25.000 sats da mandare."], r)
+
+
 def prove_cambio_libero():
     """IL CAMBIO LIBERO, TAPPA 2 (27 ott 2026, cantiere cambio-libero, piano
     approvato da Andrea): dalla pagina «Cambio» si cambiano i PROPRI sats
@@ -189339,7 +189447,7 @@ CATEGORIE = {
     """.split(),
     "swap": """
     swap_cella swap_preventivo swap_telefono swap_fornitori
-    swap_pagamento grafica_swap cartone_submarine cambio_libero cifra_copia volume_cambio
+    swap_pagamento grafica_swap cartone_submarine cambio_libero cifra_copia nome_swap volume_cambio
     margine_cassaforte indirizzo_swap
     swap_auto swap_auto_scalini swap_auto_schermate swap_auto_tasto
     onchain_verso_lightning parole_uniche
@@ -189970,7 +190078,7 @@ def main():
               prove_swap_auto_scalini,
               # prove_swap_auto_ritiro gira nei collaudi (collaudo_swap_auto_ritiro):
               # vuole httpx, che la CI installa solo DOPO le prove (2 nov 2026)
-              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cifra_copia, prove_volume_cambio, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,
+              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cifra_copia, prove_nome_swap, prove_volume_cambio, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,
               prove_margine_cassaforte,
               prove_quantita_servizi,
               prove_sintassi_client,
