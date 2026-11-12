@@ -188471,7 +188471,8 @@ def _banco_assistente(**leve):
            "_p2p_leve": lambda: {"attivo": True}}
     CHI_GUARDA = []
     for nome in ("cambio_libero_per", "swap_per", "onchain_ammesso",
-                 "swap_auto_per", "p2p_usdt_ammesso", "p2p_onchain_ammesso"):
+                 "swap_auto_per", "p2p_usdt_ammesso", "p2p_onchain_ammesso",
+                 "p2p_onchain_usdt_ammesso", "p2p_altra_rete_per"):
         amb[nome] = (lambda n: lambda t: CHI_GUARDA.append((n, t)) or False)(nome)
     exec(src[k:src.index("\n", k)], amb)
     for nome in ("_riga_webapp", "tastiera_bot", "_secchio_passa"):
@@ -188783,6 +188784,23 @@ def prove_assistente_bot():
           {"swap_auto_per", "p2p_usdt_ammesso", "p2p_onchain_ammesso"},
           {n for n, _ in CHI_GUARDA} & {"swap_auto_per", "p2p_usdt_ammesso",
                                         "p2p_onchain_ammesso"})
+    # (12 nov 2026, cantiere sapere-onchain) gli USDT negli scambi on-chain
+    # e il P2P su un'altra rete: il libro li spiega con queste due righe
+    # come condizione, quindi le righe ci sono e guardano con gli occhi
+    # di chiunque, come le sorelle
+    prova("i numeri dicono anche USDT on-chain e altra rete, spenti a leve "
+          "spente, coi nomi che usa il libro", [True] * 3,
+          ["Scambi P2P on-chain pagati in USDT: SPENTO" in n0,
+           "P2P su un'altra rete (" in n0 and "SPENTO" in n0.split(
+               "P2P su un'altra rete (")[1].split("\n")[0],
+           all(f"«{r}»" in open(os.path.join(QUI, "assistente", "sapere.md"),
+                                 encoding="utf-8").read() for r in (
+               "Scambi P2P on-chain pagati in USDT", "P2P su un'altra rete",
+               "Scambi P2P in bitcoin on-chain"))])
+    prova("...e le guardano con gli occhi di chiunque",
+          {"p2p_onchain_usdt_ammesso", "p2p_altra_rete_per"},
+          {n for n, _ in CHI_GUARDA} & {"p2p_onchain_usdt_ammesso",
+                                        "p2p_altra_rete_per"})
     # (11 nov 2026, cantiere tappo-sa-tutto) i cataloghi grandi: Tappo
     # rispondeva «uno alla volta» con l'import da CSV e i negozi
     # collegati gia' aperti a tutti

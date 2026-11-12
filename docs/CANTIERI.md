@@ -80102,3 +80102,45 @@ browser, l'arancio sopra e il verde sotto, e il tutorial USDT da lì. Foto in
 Da guardare: il tutorial dal telefono vero in Telegram (la morfosi del +
 che apre il foglio sotto il velo); i due «Novità» col libro on-chain vero
 il giorno che l'on-chain si accende.
+
+## Il libro di Tappo pronto per le leve ancora spente: P2P on-chain, USDT on-chain, altra rete, Entra dal bot (12 nov 2026, cantiere sapere-onchain, Andrea: «sì» al giro sulle leve, «si manda tutto in produzione dopo»)
+
+PERCHÉ. Dopo il paragrafo USDT Andrea ha chiesto se il giro va rifatto
+per ogni leva accesa. No, se chi costruisce scrive anche il paragrafo
+(regola 8). Il giro sulle funzioni che Tappo vede ha trovato quattro buchi:
+quelle che stanno per accendersi (on-chain nel mercatino e nel P2P, USDT
+on-chain: Andrea, «a breve») e una già accesa senza una riga, Entra dal
+bot. Il P2P on-chain aveva una riga sola. Il paragrafo USDT diceva
+«i sats restano su Lightning», che a `P2P_ONCHAIN_USDT_ATTIVO` accesa
+sarebbe stato falso. L'altra rete non c'era affatto.
+
+COSA. `assistente/sapere.md`:
+- il P2P on-chain passo per passo, coi testi veri dell'app (moneta
+  arancio, rettangolo «On-Chain», il + con la scelta della rete,
+  6 ore per «🔒 Blocca i sats», una conferma, «💶 Ho inviato gli euro»,
+  «🔓 Ricevuti: libera i sats», «Dove ricevi i bitcoin?», rinuncia,
+  annullo, disputa e terza firma, gli esiti);
+- gli USDT negli scambi on-chain (la garanzia resta il 2-di-3 bitcoin,
+  la via di Alan del 2 nov);
+- le tre strade dell'altra rete (Lightning→on-chain nel foglio «Dove
+  ricevere i sats», on-chain→Lightning con «⚡ Ricevi in Lightning», il
+  deposito pagato in Lightning da chi prende vendendo);
+- Entra dal bot (Avvia, le tre figure, due minuti, «❌ Non sono stato
+  io», il QR sull'onion).
+
+Ognuno dietro la sua condizione dei NUMERI DI OGGI (Entra dal bot dietro
+la riga del pannello).
+
+LE DUE RIGHE NUOVE NEI NUMERI. `numeri_assistente` dice ora anche
+«Scambi P2P on-chain pagati in USDT» (`p2p_onchain_usdt_ammesso(0)`) e
+«P2P su un'altra rete» (`p2p_altra_rete_per(0)`). Dal pannello
+arrivavano solo come «accesa/spenta» del config, che a leva accesa per i
+soli admin avrebbe fatto dire a Tappo «c'è» a chi non la vede. Si
+guardano con gli occhi di chiunque (tg 0), come le sorelle.
+
+PROVATO. `prove_assistente_bot` ha due prove nuove: le righe ci sono, a
+leve spente dicono SPENTO, il libro usa proprio quei nomi come
+condizione, e i due cancelli sono chiamati con tg 0.
+
+SCARTATO. Una pagina «guida» separata per il P2P on-chain: il libro è
+uno solo e Tappo lo legge intero.

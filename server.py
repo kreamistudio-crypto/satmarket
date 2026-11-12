@@ -22252,6 +22252,13 @@ def numeri_assistente() -> str:
         f"{si(swap_auto_per(0))}.",
         f"- Scambi P2P pagati in USDT: {si(p2p_usdt_ammesso(0))}.",
         f"- Scambi P2P in bitcoin on-chain: {si(p2p_onchain_ammesso(0))}.",
+        # (12 nov 2026, cantiere sapere-onchain) le due leve del P2P che
+        # il libro di Tappo spiega e che dal pannello arrivavano solo come
+        # «accesa/spenta» del config, senza il cancello degli admin
+        f"- Scambi P2P on-chain pagati in USDT: "
+        f"{si(p2p_onchain_usdt_ammesso(0))}.",
+        f"- P2P su un'altra rete (ordine Lightning e ricevi on-chain, o il "
+        f"contrario, con uno swap): {si(p2p_altra_rete_per(0))}.",
         # (11 nov 2026, cantiere tappo-sa-tutto) chi ha un catalogo grande:
         # Tappo rispondeva «solo uno alla volta». L'import da CSV non ha
         # leva (sparisce solo in demo); il catalogo esterno ne ha due —
