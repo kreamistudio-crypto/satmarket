@@ -156004,8 +156004,8 @@ def prove_novita_usdt_p2p():
     usdt-banner, Andrea: «oggi abbiamo acceso usdt sul p2p, voglio un
     banner similmente a quello che avevamo fatto per l'onchain con
     tutorial annesso», «ovviamente la versione usdt verde»). Il gemello
-    del «Novità» on-chain: solo a chi vede gli USDT, appeso finche' non lo
-    apri (e allora quello on-chain scorre), il tutorial di otto tappe sul
+    del «Novità» on-chain: solo a chi vede gli USDT, appeso sempre (dal 12
+    nov sera, anche quello on-chain, e questo gli sta sotto), il tutorial di otto tappe sul
     motore dei giri, il foglio «Pubblica» gia' in USDT, e alla fine tutto
     come prima. I pezzi girano in node con finte minime."""
     print("\n[il «Novità» degli USDT e il suo tutorial]")
@@ -156099,13 +156099,21 @@ console.log(JSON.stringify(out));
     prova("...sotto il rettangolo on-chain e sopra le card on-chain; senza il blocco "
           "on-chain il libro lo mette da solo", [[True, True, True], ""],
           [out["ordine"], out["soloUsdt"]])
-    prova("...appeso uno solo: finche' quello on-chain di sopra e' da aprire, questo "
-          "scorre; aperto quello, si appende questo; l'on-chain aperto non torna appeso",
-          [False, True, False], [out["ocScorre"], out["dopoOc"], out["ocAppeso"]])
-    prova("...toccato: segnato nel browser, verde acceso, tutorial dal lato «Compra BTC» "
+    # APPESO SEMPRE (12 nov 2026, sera, Andrea: «quando scorri verso il basso
+    # deve rimanere sempre visibile», e «stessa cosa» per quello on-chain):
+    # tutti e due appesi, questo sotto quello on-chain (la regola `~` del CSS)
+    prova("...appesi sempre tutti e due: questo anche con quello on-chain appeso "
+          "sopra, e l'on-chain anche dopo il tocco",
+          [True, True, True], [out["ocScorre"], out["dopoOc"], out["ocAppeso"]])
+    prova("...e nel CSS si appende sotto quello on-chain, 62 px piu' giu', senza "
+          "la sua aria di sopra", (True, True),
+          (".p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-usdt-novita.appeso{\n"
+           "    top:calc(var(--p2p-testa-alta,0px) + 62px);height:52px}" in mini,
+           ".p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-usdt-novita.appeso .p2p-oc-faccia{top:0}" in mini))
+    prova("...toccato: nessun segno nel browser, verde acceso, tutorial dal lato «Compra BTC» "
           "in otto tappe; il foglio prepara due tappe e la chiusura una; tonde le due "
           "tessere e il +; l'ultima al centro",
-          [["lato:compro", "tour:8"], ["p2pUsdtNovitaAperta"], True,
+          [["lato:compro", "tour:8"], [], True,
            [False, False, False, False, False, True, True, True],
            [False, False, True, True, True, False, False, False],
            [False, False, False, False, False, False, False, True]], out["tutorial"])
@@ -156116,10 +156124,10 @@ console.log(JSON.stringify(out));
            [["disegno:USDT:true"], True], ["chiudi:p2pNuovoSheet"]],
           [out["valuta"], out["reti"], out["centro"]])
     prova("il secondo tocco a giro aperto non fa niente", [], out["dueVolte"])
-    prova("la fine: foglio chiuso, lato di partenza, spento, staccato, e il prossimo "
-          "disegno scorre", [["chiudi:p2pNuovoSheet", "lato:vendo"], "vendo", False, False, False, False],
+    prova("la fine: foglio chiuso, lato di partenza, spento, e resta appeso anche "
+          "nel prossimo disegno", [["chiudi:p2pNuovoSheet", "lato:vendo"], "vendo", False, True, True, False],
           out["fine"])
-    prova("senza memoria del browser il «Novità» non resta mai appeso", False, out["rotto"])
+    prova("...e appeso anche senza memoria del browser: non la usa piu'", True, out["rotto"])
     prova("chi non vede piu' gli USDT: il tutorial non parte e il verde si spegne",
           [[], False], out["chiuso"])
     _libro = pezzo_js(mini, "function renderP2P(){", "\n}\n")
@@ -156221,14 +156229,11 @@ apriNovitaOnchainP2P();
 out.tutorial = [LOG.slice(), TOUR.tappe.map(t => !!t.prima), TOUR.tappe.map(t => !!t.tondo)];
 LOG.length = 0; TOUR.dopo(true);
 out.fineTutorial = [LOG.slice(), p2pLato];
-// appeso finche' non si apre: aperto una volta, il prossimo disegno scorre;
-// e senza memoria del browser non resta mai appeso
+// APPESO SEMPRE (12 nov 2026, sera): anche dopo il tocco e il tutorial, e
+// la fine non lo stacca; niente piu' segno nel browser
+el('p2pOcNovita').classList.add('appeso'); TOUR.dopo(true);
 out.appeso = [/appeso/.test(porta), Object.keys(MEMORIA), el('p2pOcNovita').classList.contains('appeso'),
   /appeso/.test(carteOnchainLibroP2P('sell'))];
-el('p2pOcNovita').classList.add('appeso'); TOUR.dopo(true);
-out.appeso.push(el('p2pOcNovita').classList.contains('appeso'));
-delete MEMORIA.p2pOcNovitaAperta; localStorage.rotto = true;
-out.appeso.push(/appeso/.test(carteOnchainLibroP2P('sell'))); localStorage.rotto = false;
 tourInCorso = true; LOG.length = 0; apriNovitaOnchainP2P(); out.dueVolte = LOG.slice(); tourInCorso = false; p2pLato = 'compro';
 out.sceltaCompra = [apriSceltaPubblicaP2P(), el('p2pSceltaSheet').classList.contains('open'), el('p2pSceltaTit').textContent];
 let c = el('p2pSceltaCorpo').innerHTML;
@@ -156337,10 +156342,11 @@ console.log(JSON.stringify(out));
         # APPESO FINCHE' NON LO APRI (30 ott 2026, 17:57-17:59, Andrea: «finché
         # non lo clicchi rimane bloccato in quella posizione, quando avvii il
         # tutorial la prima volta poi scorre normalmente»)
-        prova("...il «Novità» resta appeso finche' nessuno l'ha aperto; il tocco lo "
-              "segna nel browser, il disegno dopo scorre, la fine del tutorial lo "
-              "stacca anche dal disegno che c'e'; senza memoria del browser scorre",
-              [True, ["p2pOcNovitaAperta"], False, False, False, False], out["appeso"])
+        # APPESO SEMPRE (12 nov 2026, sera, Andrea: «stessa cosa quando
+        # accenderemo onchain, quel banner deve stare incollato»)
+        prova("...il «Novità» resta appeso sempre: prima e dopo il tutorial, la fine "
+              "non lo stacca, e il browser non tiene piu' nessun segno",
+              [True, [], True, True], out["appeso"])
         prova("...e a tutorial aperto un secondo tocco non ne apre un altro", [], out["dueVolte"])
         prova("a chi non e' ammesso il + non chiede niente (la scelta torna falso e "
               "non si apre)", [False, False], out["sceltaNo"])

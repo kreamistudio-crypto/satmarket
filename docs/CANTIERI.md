@@ -80184,3 +80184,32 @@ Gli stessi collaudi del cambio P2P (che abbassano il tetto in sats a
 SUL VPS: aggiungere `P2P_ALTRA_RETE_MAX_EURO = 500` e riavviare. La riga
 199 da 780.000 può restare come rete di sicurezza. Il pannello «Stato
 delle leve» dice quanti sats sono oggi.
+
+## I due «Novità» del P2P appesi sempre, il verde sotto l'arancio (12 nov 2026, sera, cantiere usdt-banner-fisso)
+
+Andrea, 19:09-19:10, dopo averlo visto in produzione: «il banner nel p2p
+di usdt, quando scorri verso il basso, deve rimanere sempre visibile,
+quindi deve incollarsi alla pagina sotto ai toggle filtro», «quando
+scorri lui rimane appeso in alto», e «stessa cosa quando accenderemo
+onchain, quel banner deve stare incollato»; il banner delle fee invece
+se ne va scorrendo, come prima.
+ROVESCIA la regola del 30 ott («appeso finché non lo clicchi, poi scorre
+normalmente») per tutti e due: `novitaUsdtAppesaP2P` torna vero a chi
+vede gli USDT, `carteOnchainLibroP2P` mette `appeso` a chi è ammesso
+all'on-chain, e le due fini dei tutorial non tolgono più la classe. Le
+chiavi `p2pOcNovitaAperta` e `p2pUsdtNovitaAperta` in localStorage non
+si scrivono e non si leggono più (quelle già scritte restano lì, inerti).
+DUE APPESI, UNO SOTTO L'ALTRO: con lo stesso `top` si coprirebbero; il
+verde, che sta dopo l'arancio nel libro, si appende 62 px più giù
+(l'altezza dell'appeso) senza la sua aria di sopra, con la regola
+`.p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-usdt-novita.appeso`: segue la
+classe dell'altro da sé, senza un numero da tenere in pari nel codice.
+Prove: `prove_novita_usdt_p2p` e `prove_grafica_p2p_onchain` riscritte
+sulla regola nuova (appesi prima e dopo il tutorial, la fine non stacca,
+niente segno nel browser, la regola `~` nel CSS). Controprove: cinque
+mutazioni, cinque rosse. Dal vivo a 390 px tema scuro, Compratore 111:
+il libro scorso di 700 px col verde fermo sotto i filtri (169 px), il
+tutorial e poi il libro scorso di 900 px, ancora fermo; con `myP2POnchain`
+acceso a mano, l'arancio a 169 px e il verde a 231 px, prima e dopo il
+tutorial. Foto 8-10 in `/mnt/project-files/usdt-novita/`.
+Da guardare: dal telefono vero in Telegram.

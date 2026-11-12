@@ -4122,7 +4122,10 @@
      gli passano sotto. L'aria sopra e sotto e' fondo DIPINTO, da bordo a
      bordo come quella della testata: con un margine si vedrebbero passare
      le card nella fessura. Il colpo di partenza qui lo prende la sola
-     faccia, o si schiaccerebbe anche il fondo. */
+     faccia, o si schiaccerebbe anche il fondo.
+     DAL 12 NOV 2026 SERA APPESO SEMPRE (Andrea: «quando scorri verso il
+     basso deve rimanere sempre visibile», per il verde degli USDT e
+     «stessa cosa» per questo): la classe la mettono sempre i due disegni. */
   .p2p-oc-novita.appeso{position:sticky;top:var(--p2p-testa-alta,0px);z-index:2;
     margin:0;height:62px;border-radius:0;background:var(--bg);
     box-shadow:0 0 0 100vmax var(--bg);clip-path:inset(0 -100vmax)}
@@ -4159,6 +4162,13 @@
   .cambio-moneta.usdt{background:#26A17B;color:#fff}
   .cambio-moneta.usdt .cambio-svg{fill:#fff;stroke:none}
   .p2p-oc-faccia .cambio-moneta.usdt.p2p-oc-moneta .cambio-svg{width:21px;height:21px}
+  /* SEMPRE APPESO, E SOTTO QUELLO ON-CHAIN SE ANCHE LUI LO E' (12 nov 2026,
+     sera): stesso `top` vorrebbe dire coprirsi, quindi si appende 62 px
+     piu' giu' (l'altezza dell'appeso), senza la sua aria di sopra. Il `~`
+     segue la classe dell'altro: aperto il tutorial on-chain, sale da solo. */
+  .p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-usdt-novita.appeso{
+    top:calc(var(--p2p-testa-alta,0px) + 62px);height:52px}
+  .p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-usdt-novita.appeso .p2p-oc-faccia{top:0}
   /* il tasto puro della pagina */
   .btn.p2p-oc-pubblica{display:flex;align-items:center;justify-content:center;gap:10px}
   /* LA SCELTA DEL +: tasti rettangolari alti, la moneta su un tondo
@@ -59993,8 +60003,6 @@ let p2pOcTutorialTimer = null;
 function apriNovitaOnchainP2P(){
   if (tourInCorso || p2pOcTutorialTimer) return;
   haptic();
-  /* aperto una volta, dal prossimo disegno scorre con la pagina */
-  try { localStorage.setItem(P2P_OC_NOVITA_CHIAVE, Date.now()); } catch(e){}
   accendiNovitaOcP2P(true);
   const r = el('p2pOcNovita');
   if (!r || effettiRidotti()) { tutorialOnchainP2P(); return; }
@@ -60103,7 +60111,6 @@ function fineTutorialOcP2P(){
   document.querySelectorAll('.p2p-oc-esempi').forEach(n => n.remove());
   if (el('p2pSceltaSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pSceltaSheet');
   if (lato && lato !== p2pLato) setLatoP2P(lato, true);
-  el('p2pOcNovita')?.classList.remove('appeso');
   accendiNovitaOcP2P(false);
 }
 /* IL «NOVITÀ» ARANCIO MENTRE IL TUTORIAL GIRA (30 ott 2026, 19:01): si
@@ -60113,14 +60120,10 @@ function accendiNovitaOcP2P(si){
   const r = el('p2pOcNovita');
   if (r) r.classList[si ? 'add' : 'remove']('acceso');
 }
-/* IL «NOVITÀ» APPESO (vedi il CSS): appeso finche' nessuno l'ha aperto da
-   questo browser. ⚠️ Se `localStorage` non risponde vale «gia' aperto»,
-   come per il giro guidato: un banner che non si stacca mai sarebbe
-   peggio di uno che scorre. */
-const P2P_OC_NOVITA_CHIAVE = 'p2pOcNovitaAperta';
-function novitaOcApertaP2P(){
-  try { return localStorage.getItem(P2P_OC_NOVITA_CHIAVE) !== null; } catch(e){ return true; }
-}
+/* IL «NOVITÀ» APPESO (vedi il CSS): fino al 12 nov 2026 appeso finche'
+   nessuno l'aveva aperto da questo browser (la chiave `p2pOcNovitaAperta`
+   in localStorage); dal 12 nov sera appeso SEMPRE, scelta di Andrea —
+   vedi `carteOnchainLibroP2P`. */
 /* l'altezza della testata appiccicosa, che cambia con la pillola del
    filtro e la larghezza: la segue un ResizeObserver, messo una volta */
 let p2pTestaOsservata = false;
@@ -60143,7 +60146,10 @@ function carteOnchainLibroP2P(k, sotto){
   const righe = p2pFiltro && p2pFiltro.rete === 'ln' ? []
     : p2pOnchainLibro.eventi.filter(o => o.lato === k);
   if (!righe.length && !myP2POnchain) return '';
-  const appeso = myP2POnchain && !novitaOcApertaP2P();
+  /* APPESO SEMPRE (12 nov 2026, sera, Andrea: «stessa cosa quando
+     accenderemo onchain, quel banner deve stare incollato»): non piu'
+     finche' non lo apri, ma sempre, come quello degli USDT */
+  const appeso = !!myP2POnchain;
   if (appeso) testaAltaP2P();
   const porta = myP2POnchain
     ? '<div class="p2p-oc-novita' + (appeso ? ' appeso' : '')
@@ -60167,33 +60173,27 @@ function carteOnchainLibroP2P(k, sotto){
    «ovviamente la versione usdt verde».
    E' IL GEMELLO DEL «NOVITÀ» ON-CHAIN, pezzo per pezzo: lo stesso
    rettangolo (le classi `p2p-oc-*`, piu' `p2p-usdt-novita` che lo veste
-   di verde), appeso sotto la testata finche' non lo apri da questo
-   browser, il colpo di partenza, acceso durante il giro, e il giro sul
+   di verde), appeso sotto la testata, il colpo di partenza, acceso durante il giro, e il giro sul
    motore di sempre (`avviaTour`). Lo vede chi vede gli USDT
    (`usdtVistoP2P`, la leva del server): a leva spenta il libro e' quello
    di ieri. Sta SOTTO quello on-chain (Andrea, 17:01: «il banner usdt
    starà sotto al banner onchain»), da solo in cima a chi l'on-chain non
-   lo vede; se tutti e due sono da aprire, appeso ne resta UNO solo,
-   quello on-chain di sopra — due rettangoli appiccicosi allo stesso
-   `top` si coprirebbero —, e questo si appende quando l'altro e' aperto. */
+   lo vede.
+   APPESO SEMPRE (12 nov 2026, sera, Andrea: «quando scorri verso il basso
+   deve rimanere sempre visibile, quindi deve incollarsi alla pagina sotto
+   ai toggle filtro», «quando scorri lui rimane appeso in alto»): non piu'
+   «finche' non lo apri» come quello on-chain — resta sotto la testata
+   anche dopo il tutorial, su ogni disegno. Se sopra c'e' quello on-chain
+   ancora appeso, questo si appende SOTTO di lui (la regola `~` del CSS),
+   cosi' i due non si coprono; aperto quello, questo sale da solo. */
 const P2P_USDT_MONETA = '<span class="cambio-moneta usdt p2p-oc-moneta" aria-hidden="true">'
   + '<svg class="cambio-svg" viewBox="4 4 24 24"><path d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117"/></svg></span>';
-const P2P_USDT_NOVITA_CHIAVE = 'p2pUsdtNovitaAperta';
-/* ⚠️ come per l'on-chain: se `localStorage` non risponde vale «gia'
-   aperto», un banner che non si stacca mai e' peggio di uno che scorre */
-function novitaUsdtApertaP2P(){
-  try { return localStorage.getItem(P2P_USDT_NOVITA_CHIAVE) !== null; } catch(e){ return true; }
-}
 function novitaUsdtVistaP2P(){
   return typeof usdtVistoP2P === 'function' && usdtVistoP2P() && !DEMO && !VETRINA;
 }
-/* appeso: finche' quello on-chain, che gli sta sopra, e' appeso lui,
-   questo scorre */
+/* appeso sempre, a chi lo vede (vedi sopra) */
 function novitaUsdtAppesaP2P(){
-  if (!novitaUsdtVistaP2P() || novitaUsdtApertaP2P()) return false;
-  const ocAppeso = typeof myP2POnchain !== 'undefined' && !!myP2POnchain
-    && typeof novitaOcApertaP2P === 'function' && !novitaOcApertaP2P();
-  return !ocAppeso;
+  return novitaUsdtVistaP2P();
 }
 let tutorialUsdtLato = null;   // il lato da rimettere alla fine; null = nessun tutorial
 let p2pUsdtTutorialTimer = null;
@@ -60217,7 +60217,6 @@ function accendiNovitaUsdtP2P(si){
 function apriNovitaUsdtP2P(){
   if (tourInCorso || p2pUsdtTutorialTimer) return;
   haptic();
-  try { localStorage.setItem(P2P_USDT_NOVITA_CHIAVE, Date.now()); } catch(e){}
   accendiNovitaUsdtP2P(true);
   const r = el('p2pUsdtNovita');
   if (!r || effettiRidotti()) { tutorialUsdtP2P(); return; }
@@ -60310,14 +60309,14 @@ function foglioTutorialUsdtP2P(reti){
   if (corpo && !reti) corpo.scrollTop = 0;
 }
 /* la fine, qualunque strada la porti: via le card finte e il foglio, il
-   lato di partenza, e si torna al libro (il «Novità» resta dov'e') */
+   lato di partenza, e si torna al libro (il «Novità» resta dov'e', e
+   resta appeso: e' sempre visibile) */
 function fineTutorialUsdtP2P(){
   const lato = tutorialUsdtLato;
   tutorialUsdtLato = null;
   document.querySelectorAll('.p2p-usdt-esempi').forEach(n => n.remove());
   if (el('p2pNuovoSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pNuovoSheet');
   if (lato && lato !== p2pLato) setLatoP2P(lato, true);
-  el('p2pUsdtNovita')?.classList.remove('appeso');
   accendiNovitaUsdtP2P(false);
 }
 /* ============ fine del «Novità» degli USDT ============ */
