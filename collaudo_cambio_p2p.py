@@ -351,7 +351,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   out.foglioPrima = {calcolo: corpo0.includes('Calcolo quanto ricevi'), cifra: corpo0.includes('<b>100000 sats</b>'),
                      campo: corpo0.includes('id="p2pIncassoOcInp"'), invia: corpo0.includes('onclick="inviaCambioP2P()"'),
                      costo: corpo0.includes('Barattolo non aggiunge niente'), bot: corpo0.includes('ti avvisiamo col bot')};
-  out.senzaCifra = run('corpoCambioIncassoP2P(scambi[ID], 0)').includes('per il cambio serve');
+  out.senzaCifra = run('corpoCambioIncassoP2P(scambi[ID], 0)').includes('per lo swap serve');
   campo('');
   await run('inviaCambioP2P()');
   out.senzaPreventivo = [run('elementi.p2pIncassoAvviso.textContent'), run('server.length')];
@@ -475,7 +475,7 @@ def il_telefono(c, base):
     prova("«Invia» senza preventivo: aspetta, e al server non va niente",
           ["Aspetta un attimo: sto calcolando quanto ricevi.", 0], r["senzaPreventivo"])
     prova("il conto: quanto arriva e il costo del cambio, dalla rotta del preventivo P2P",
-          ("Ricevi circa <b>98842 sats</b> sul tuo indirizzo bitcoin · costo del cambio 1158 sats.",
+          ("Ricevi circa <b>98842 sats</b> sul tuo indirizzo bitcoin · costo dello swap 1158 sats.",
            [{"sats": 100_000, "fornitore": "satsrouting", "hash": ""}]),
           (r["conto"], r["preventivoChiesto"]))
     prova("i no prima di tutto: senza indirizzo, indirizzo storto (niente biglietto, niente Mostro)",
@@ -505,7 +505,7 @@ def il_telefono(c, base):
     prova("un secondo «Invia»: lo STESSO cambio e la stessa fattura, niente biglietto nuovo",
           {"biglietti": 1, "swap": 1, "mostro": 2, "stessa": True}, r["riuso"])
     prova("le tariffe mosse alla conferma: si dice, il conto nuovo si vede, nessun biglietto",
-          ["Il costo del cambio è appena cambiato: guarda le cifre nuove e tocca di nuovo «Invia».", True, 1],
+          ["Il costo dello swap è appena cambiato: guarda le cifre nuove e tocca di nuovo «Invia».", True, 1],
           r["cambiata"])
     prova("la sentinella: Barattolo non paga, il cambio libero non si tocca, il telefono parla "
           "solo col cartone", {"paga": 0, "libero": 0, "fuori": []}, r["sentinella"])

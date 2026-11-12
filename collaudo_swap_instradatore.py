@@ -216,8 +216,8 @@ const O = D.ordini;
   html.push(pann1);
   out.migliore = {chi: p1.dati.fornitore, ricevi: p1.dati.ricevi,
                   chiesti: letti.filter(l => l[0] === o1).map(l => l[1]).sort(),
-                  eseguito: pann1.includes('Il cambio lo fa Cartone Due'),
-                  voce: pann1.includes('Costo del cambio, Cartone Due (0,3\u00a0%)')};
+                  eseguito: pann1.includes('Lo swap lo fa Cartone Due'),
+                  voce: pann1.includes('Costo dello swap, Cartone Due (0,3\u00a0%)')};
   /* (27 ott 2026, grafica-swap) l'indirizzo sta sopra «Conferma» */
   A.run(`elementi.swapIndirizzo_${o1} = {value: '${D.indirizzo}'}`);
   await A.run(`swapAvanti(${o1})`);
@@ -237,7 +237,7 @@ const O = D.ordini;
               daDue: v2.swap, daUno: v1.swap, seme: r1.seme, indice: r1.indice};
   const carta = A.run(`pannelloSwapTelefono({id: ${o1}})`);
   html.push(carta);
-  out.carta = carta.includes('Il cambio lo fa Cartone Due');
+  out.carta = carta.includes('Lo swap lo fa Cartone Due');
   await stato(B2, r1.id, 'transaction.mempool');
   await A.run('swapGiro()');
   await A.run('swapGiro()');
@@ -259,7 +259,7 @@ const O = D.ordini;
   out.ripiego = {passo: A.run(`swapPassi[${o2}]`), nota: p2.nota, chi: p2.dati.fornitore,
                  ricevi: p2.dati.ricevi, salvati: lista(mem).filter(r => r.ordine === o2).length,
                  frase: pann2.includes('Cartone Due ha dato cifre che non tornano: ecco quelle di SATS Routing.'),
-                 eseguito: pann2.includes('Il cambio lo fa SATS Routing'),
+                 eseguito: pann2.includes('Lo swap lo fa SATS Routing'),
                  conferma: pann2.includes('data-swap="avanti"')};
   /* (parole-uniche) le parole sono gia' copiate: la conferma fa nascere
      lo swap da SATS Routing, senza un passo di parole sue */
@@ -470,7 +470,7 @@ def il_telefono(dati):
     # telefono di prima
     prova("telefono nuovo: le parole del wallet ritrovano i cambi di tutti e due i fornitori, "
           "e la xpub va a tutti e due",
-          {"nota": "Ritrovati 5 cambi.", "fornitori": ["cartone2", "satsrouting"], "prossimo": [5, 5],
+          {"nota": "Ritrovati 5 swap.", "fornitori": ["cartone2", "satsrouting"], "prossimo": [5, 5],
            "seme": True, "vecchi": False, "dove": ["cartone2", "satsrouting"]}, rc)
 
     print("\n[la sentinella]")

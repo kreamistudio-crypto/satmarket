@@ -531,10 +531,10 @@ def main():
         cartone(f"/cartone/stato?id={sid2}&s=swap.expired")
         prova("scaduto coi bitcoin visti partire: UN avviso", 1, asyncio.run(SRV.ronda_cambi_p2p()))
         tg, testo, bott = avvisi[-1]
-        prova("...«Riprenditi i bitcoin», dalla pagina del Cambio",
+        prova("...«Riprenditi i bitcoin», dalla pagina dello Swap",
               (True, True, SRV.P2P_BOTTONE_PRESA_RIMBORSO, "finito"),
-              (testo.startswith("₿ Il cambio dei tuoi bitcoin non è riuscito"),
-               "nella pagina «Cambio»" in testo, bott[0], riga_di(cid2)[0]))
+              (testo.startswith("₿ Lo swap dei tuoi bitcoin non è riuscito"),
+               "nella pagina «Swap»" in testo, bott[0], riga_di(cid2)[0]))
 
         o3 = "3333aaaa-bbbb"
         cid3, sid3, _ = nasce(o3)

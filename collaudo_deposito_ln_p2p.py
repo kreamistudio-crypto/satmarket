@@ -194,7 +194,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   run(`p2pOcDeposito = ${JSON.stringify(O)}`);
   /* «⚡ Lightning»: prima «Chiedo il prezzo», poi il conto */
   run(`scegliReteDepositoOnchainP2P(${O.id}, 'ln')`);
-  out.chiedo = corpo().includes('Chiedo il prezzo del cambio');
+  out.chiedo = corpo().includes('Chiedo il prezzo dello swap');
   await finche(() => run(`(p2pOcDepositoLn[${O.id}] || {}).stato`) === 'pronto');
   run('renderDepositoOnchainP2P()');
   out.conto = corpo();
@@ -599,7 +599,7 @@ def main():
               "scambio on-chain",
               (999, True, True, (SRV.P2P_BOTTONE_DEPOSITO_LN,
                                  f"{SRV.LINK_LIBRO_P2P}?scambio={o['ordine']}")),
-              (tg, testo.startswith("🔒 Il cambio del tuo deposito è pronto"),
+              (tg, testo.startswith("🔒 Lo swap del tuo deposito è pronto"),
                "mette i bitcoin nel deposito di garanzia" in testo, bott))
         r = gesto(999, oid, "annulla")
         prova("chi deposita non annulla mentre il cambio porta i bitcoin: 409", (409, True),

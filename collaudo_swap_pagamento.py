@@ -670,7 +670,7 @@ def il_giro(r, ordini, tee):
     if "ERRORE" in r:
         prova("il banco del telefono gira", "", r["ERRORE"])
         return
-    P = "Barattolo sta pagando il cambio: poi i bitcoin partono verso il tuo indirizzo."
+    P = "Barattolo sta pagando lo swap: poi i bitcoin partono verso il tuo indirizzo."
     print("\n[lo swap intero]")
     i = r["intero"]
     prova("lo swap nasce col segreto del telefono e il server lo paga: in volo",
@@ -739,12 +739,14 @@ def il_giro(r, ordini, tee):
           ("Il pagamento non è partito: nessun sats si è mosso. Scegli di nuovo "
            "come incassare.", True), (f["frase"], f["scegliDiNuovo"]))
     av = f.get("avviso") or ""
+    # (12 nov 2026, nome-swap) dal nome «Swap» della pagina, lo swap si
+    # chiama per nome; resta che non si parla di «fattura»
     prova("...e su Telegram chi vende legge che lo swap non e' andato, "
-          "senza «fattura» e senza «swap»: sceglie di nuovo",
+          "senza «fattura» e senza «cambio»: sceglie di nuovo",
           (True, False, True, True, False),
-          ("Il cambio in bitcoin non è andato" in av, "fattura" in av.lower(),
+          ("Lo swap in bitcoin non è andato" in av, "fattura" in av.lower(),
            "scegli di nuovo come incassare" in av, "30.000 sats" in av,
-           "swap" in av.lower()))
+           "cambio" in av.lower()))
     m = r["aMano"]
     prova("pagato a mano, poi uno swap nuovo: NON si paga, nessuna uscita per lui",
           (True, 0, 1), (m["nuovo"], m["usciteNuovo"], m["usciteVecchio"]))
