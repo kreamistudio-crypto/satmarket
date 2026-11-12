@@ -98,3 +98,9 @@ frase: Negli scambi P2P on-chain ora si arriva fino a 500 € per ordine (prima 
 dove: la scheda «P2P», il foglio «Pubblica» a rete on-chain e le card del libro.
 leva: ONCHAIN_MAX_EURO (nessuna leva nuova; il P2P on-chain resta dietro ONCHAIN_SOLO_ADMIN)
 pubblico: no
+
+## 2026-11-12 · usdt-novita-tutorial
+frase: In cima al libro del P2P c'è un rettangolo verde «USDT · Novità»: toccalo e un breve tutorial ti mostra come riconoscere un ordine in USDT dalla T verde di Tether, come pubblicarne uno scegliendo USDT e la rete (Tron o Ethereum), e come si paga senza sbagliare rete. Si rivede quando vuoi, con lo stesso tocco.
+dove: la scheda «P2P», in cima al libro degli ordini (Compra BTC e Vendi BTC).
+leva: P2P_USDT_ATTIVO (nessuna leva nuova)
+pubblico: no

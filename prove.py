@@ -155626,7 +155626,9 @@ def prove_p2p_onchain():
            "VISTE_NAV_P2P.add('p2ponchain');" in mini,
            # (3 nov 2026, mappa-contanti) fra le card on-chain e quelle di
            # Mostro la mappa del contanti, e l'elenco ristretto al comune scelto
-           "+ onchainCarte\n    + mappa\n    + (elenco.length ? elenco.map(rigaOrdineP2P).join('')" in mini))
+           # (12 nov 2026, usdt-banner) col «Novità» degli USDT, che sta
+           # dentro il blocco on-chain o da solo quando quello non c'e'
+           "+ (onchainCarte || usdtNovita)\n    + mappa\n    + (elenco.length ? elenco.map(rigaOrdineP2P).join('')" in mini))
     # il giudice della firma che aspetta me, in node
     # (EMENDATA 1 nov 2026, presa-altra-rete: il giudice chiama anche quello
     # del cambio di chi compra, che entra nel banco con lui)
@@ -155994,6 +155996,142 @@ console.log(JSON.stringify(out));
            and "allarme=bool(MERCATINO_SCELTA_RETE) and not ONCHAIN_ATTIVO)" in srv))
 
 
+def prove_novita_usdt_p2p():
+    """IL «NOVITÀ» DEGLI USDT E IL SUO TUTORIAL (12 nov 2026, cantiere
+    usdt-banner, Andrea: «oggi abbiamo acceso usdt sul p2p, voglio un
+    banner similmente a quello che avevamo fatto per l'onchain con
+    tutorial annesso», «ovviamente la versione usdt verde»). Il gemello
+    del «Novità» on-chain: solo a chi vede gli USDT, appeso finche' non lo
+    apri (e allora quello on-chain scorre), il tutorial di otto tappe sul
+    motore dei giri, il foglio «Pubblica» gia' in USDT, e alla fine tutto
+    come prima. I pezzi girano in node con finte minime."""
+    print("\n[il «Novità» degli USDT e il suo tutorial]")
+    import subprocess
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    blocco = mini[mini.index("const P2P_USDT_MONETA = "):
+                  mini.index("/* ============ fine del «Novità» degli USDT")]
+    banco = """
+const NODI = {};
+function el(id){ return NODI[id] || (NODI[id] = {innerHTML: '', textContent: '', parentNode: null,
+  classList: {s: new Set(), add(c){ this.s.add(c); }, remove(c){ this.s.delete(c); }, contains(c){ return this.s.has(c); }}}); }
+const LOG = [];
+const haptic = () => {}, effettiRidotti = () => true, testaAltaP2P = () => LOG.push('testa');
+let USDT = false, DEMO = false, VETRINA = false, tourInCorso = false, TOUR = null, p2pLato = 'vendo';
+let myP2POnchain = false, p2pFiltro = null, tutorialOcLato = null, p2pOcTutorialTimer = null;
+let p2pOnchainLibro = {eventi: []};
+const usdtVistoP2P = () => USDT;
+const piuGiroP2P = () => ({}), rigaOrdineP2P = o => '<card ' + o.fiat + '>', rigaOnchainP2P = o => '<oc>';
+function setLatoP2P(l){ p2pLato = l; LOG.push('lato:' + l); }
+function avviaTour(tappe, dopo){ TOUR = {tappe, dopo}; LOG.push('tour:' + tappe.length); return true; }
+function chiudiFoglioP2P(id){ el(id).classList.remove('open'); LOG.push('chiudi:' + id); }
+let p2pNuovoValuta = 'EUR', p2pNuovoMetodi = ['SEPA'], p2pNuovoAperta = false, p2pNuovoReteChiesta = 'onchain';
+function apriNuovoOrdineP2P(){ LOG.push('apri:' + (p2pNuovoReteChiesta || 'ln')); el('p2pNuovoSheet').classList.add('open'); }
+function renderNuovoOrdineP2P(){ LOG.push('disegno:' + p2pNuovoValuta + ':' + p2pNuovoAperta); }
+const document = {querySelector: () => ({id: 'view-p2p'}), querySelectorAll: () => []};
+const MEMORIA = {}, localStorage = {rotto: false,
+  getItem(k){ if (this.rotto) throw new Error('chiusa'); return k in MEMORIA ? MEMORIA[k] : null; },
+  setItem(k, v){ if (this.rotto) throw new Error('chiusa'); MEMORIA[k] = String(v); }};
+function novitaOcApertaP2P(){ return 'oc' in MEMORIA; }
+""" + blocco + "\n" + pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto){", "\n}\n") + "\n}\n" + """
+const P2P_OC_MONETA = '<oc-moneta>';
+const out = {};
+out.spento = novitaUsdtLibroP2P();
+USDT = true; DEMO = true; out.demo = novitaUsdtLibroP2P(); DEMO = false;
+const b = novitaUsdtLibroP2P();
+out.banner = [/class="p2p-oc-novita p2p-usdt-novita appeso" id="p2pUsdtNovita"/.test(b),
+  /cambio-moneta usdt p2p-oc-moneta/.test(b),
+  /p2p-oc-novita-testo">USDT<\\/span><span class="p2p-oc-novita-tag">Novità<\\/span>/.test(b),
+  /onclick="apriNovitaUsdtP2P\\(\\)"/.test(b)];
+// SOTTO quello on-chain (17:01, Andrea), sopra le card on-chain; e appeso
+// uno solo: finche' quello on-chain di sopra e' da aprire, questo scorre
+myP2POnchain = true; p2pOnchainLibro.eventi = [{lato: 'sell'}];
+const blocco = carteOnchainLibroP2P('sell', '<U>');
+out.ordine = [blocco.indexOf('p2pOcNovita') < blocco.indexOf('<U>'), blocco.indexOf('<U>') < blocco.indexOf('<oc>'),
+  /appeso/.test(blocco)];
+p2pOnchainLibro.eventi = []; myP2POnchain = false;
+out.soloUsdt = carteOnchainLibroP2P('sell', '<U>'); myP2POnchain = true;
+out.ocScorre = /appeso/.test(novitaUsdtLibroP2P());
+MEMORIA.oc = '1';
+out.dopoOc = /appeso/.test(novitaUsdtLibroP2P());
+LOG.length = 0;
+apriNovitaUsdtP2P();
+out.tutorial = [LOG.slice(), Object.keys(MEMORIA).filter(k => k !== 'oc'), el('p2pUsdtNovita').classList.contains('acceso'),
+  TOUR.tappe.map(t => !!t.prima), TOUR.tappe.map(t => !!t.tondo), TOUR.tappe.map(t => !!t.centro)];
+out.ocAppeso = /appeso/.test(carteOnchainLibroP2P('sell'));
+out.acceso = /acceso/.test(novitaUsdtLibroP2P());
+// il foglio: aperto sotto il velo, sulla rete Lightning, gia' in USDT
+LOG.length = 0; TOUR.tappe[5].prima();
+out.valuta = [LOG.slice(), p2pNuovoValuta, p2pNuovoMetodi.length, p2pNuovoAperta];
+LOG.length = 0; TOUR.tappe[6].prima();
+out.reti = [LOG.slice(), p2pNuovoAperta];
+LOG.length = 0; TOUR.tappe[7].prima();
+out.centro = LOG.slice();
+// il secondo tocco a giro aperto non fa niente
+tourInCorso = true; LOG.length = 0; apriNovitaUsdtP2P(); out.dueVolte = LOG.slice(); tourInCorso = false;
+el('p2pUsdtNovita').classList.add('appeso'); el('p2pNuovoSheet').classList.add('open');
+LOG.length = 0; TOUR.dopo(true);
+out.fine = [LOG.slice(), p2pLato, el('p2pUsdtNovita').classList.contains('acceso'),
+  el('p2pUsdtNovita').classList.contains('appeso'), /appeso/.test(novitaUsdtLibroP2P()), /acceso/.test(novitaUsdtLibroP2P())];
+// senza memoria del browser non resta mai appeso
+delete MEMORIA.p2pUsdtNovitaAperta; localStorage.rotto = true;
+out.rotto = /appeso/.test(novitaUsdtLibroP2P()); localStorage.rotto = false;
+// fuori dal libro il tutorial non parte, e il banner si spegne
+USDT = false; el('p2pUsdtNovita').classList.add('acceso'); LOG.length = 0; tutorialUsdtP2P();
+out.chiuso = [LOG.slice(), el('p2pUsdtNovita').classList.contains('acceso')];
+console.log(JSON.stringify(out));
+"""
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+        out = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else None
+    except (OSError, subprocess.TimeoutExpired):
+        salta("il banco del «Novità» degli USDT", "node assente")
+        return
+    if out is None:
+        prova("il banco del «Novità» degli USDT gira", "", (locals().get("r") and r.stderr or "")[-600:])
+        return
+    prova("il «Novità» degli USDT solo a chi vede gli USDT, mai nel demo", ["", ""],
+          [out["spento"], out["demo"]])
+    prova("...con la moneta di Tether, «USDT» e «Novità» accanto alla freccia, appeso "
+          "finche' non lo apri, e il tocco apre il tutorial", [True, True, True, True], out["banner"])
+    prova("...sotto il rettangolo on-chain e sopra le card on-chain; senza il blocco "
+          "on-chain il libro lo mette da solo", [[True, True, True], ""],
+          [out["ordine"], out["soloUsdt"]])
+    prova("...appeso uno solo: finche' quello on-chain di sopra e' da aprire, questo "
+          "scorre; aperto quello, si appende questo; l'on-chain aperto non torna appeso",
+          [False, True, False], [out["ocScorre"], out["dopoOc"], out["ocAppeso"]])
+    prova("...toccato: segnato nel browser, verde acceso, tutorial dal lato «Compra BTC» "
+          "in otto tappe; il foglio prepara due tappe e la chiusura una; tonde le due "
+          "tessere e il +; l'ultima al centro",
+          [["lato:compro", "tour:8"], ["p2pUsdtNovitaAperta"], True,
+           [False, False, False, False, False, True, True, True],
+           [False, False, True, True, True, False, False, False],
+           [False, False, False, False, False, False, False, True]], out["tutorial"])
+    prova("...e un libro ridisegnato durante il giro lo rimette acceso", True, out["acceso"])
+    prova("la tappa della valuta apre il foglio di Lightning (non quello on-chain) gia' "
+          "in USDT, senza metodi; quella delle reti apre la tendina; l'ultima chiude il foglio",
+          [[["apri:ln", "disegno:USDT:false"], "USDT", 0, False],
+           [["disegno:USDT:true"], True], ["chiudi:p2pNuovoSheet"]],
+          [out["valuta"], out["reti"], out["centro"]])
+    prova("il secondo tocco a giro aperto non fa niente", [], out["dueVolte"])
+    prova("la fine: foglio chiuso, lato di partenza, spento, staccato, e il prossimo "
+          "disegno scorre", [["chiudi:p2pNuovoSheet", "lato:vendo"], "vendo", False, False, False, False],
+          out["fine"])
+    prova("senza memoria del browser il «Novità» non resta mai appeso", False, out["rotto"])
+    prova("chi non vede piu' gli USDT: il tutorial non parte e il verde si spegne",
+          [[], False], out["chiuso"])
+    _libro = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    _tappe = pezzo_js(mini, "const TAPPE_TUTORIAL_USDT_P2P = [", "\n];")
+    prova("le sentinelle: il banner sotto quello on-chain nel libro, il verde di Tether "
+          "sfumato e pieno da acceso, le reti nel testo, il «deposito di garanzia»",
+          (True, True, True, True, True),
+          ("carteOnchainLibroP2P(k, usdtNovita)" in _libro
+           and "+ (onchainCarte || usdtNovita)" in _libro,
+           "background:linear-gradient(90deg,rgba(38,161,123,.42) 0%,rgba(38,161,123,.10) 100%),var(--card);" in mini,
+           ".p2p-oc-novita.p2p-usdt-novita.acceso .p2p-oc-faccia{background:#26A17B;" in mini,
+           "<b>Tron</b>, <b>Ethereum</b>" in _tappe,
+           "<b>deposito di garanzia</b>" in _tappe))
+
+
 def prove_grafica_p2p_onchain():
     """LA SEZIONE ON-CHAIN DEL P2P RIDISEGNATA (30 ott 2026, cantiere
     grafica-p2p-onchain, richieste di Andrea dalle schermate del
@@ -156049,8 +156187,8 @@ const MEMORIA = {}, localStorage = {rotto: false,
   getItem(k){ if (this.rotto) throw new Error('chiusa'); return k in MEMORIA ? MEMORIA[k] : null; },
   setItem(k, v){ if (this.rotto) throw new Error('chiusa'); MEMORIA[k] = String(v); }};
 """ + monete + "\n" + pezzo_js(mini, "function segnoReteP2P(rete){", "\n}\n") + "\n}\n" \
-        + mini[mini.index("let p2pOcTutorialTimer = null;"):mini.index("function carteOnchainLibroP2P(k){")] \
-        + pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n") + "\n}\n" \
+        + mini[mini.index("let p2pOcTutorialTimer = null;"):mini.index("function carteOnchainLibroP2P(k, sotto){")] \
+        + pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function apriSceltaPubblicaP2P(){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function sceltaReteP2P(rete){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function interruttoreReteP2P(attiva, soloLn){", "\n}\n") + "\n}\n" \
@@ -156382,7 +156520,7 @@ console.log(JSON.stringify(out));
            "accendiNovitaOcP2P(true);" in _acc,
            "accendiNovitaOcP2P(false);" in pezzo_js(mini, "function fineTutorialOcP2P(){", "\n}\n"),
            "if (tutorialOcLato === null) accendiNovitaOcP2P(false);" in pezzo_js(mini, "function tutorialOnchainP2P(){", "\n}\n"),
-           "(tutorialOcLato !== null || p2pOcTutorialTimer ? ' acceso' : '')" in pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n")))
+           "(tutorialOcLato !== null || p2pOcTutorialTimer ? ' acceso' : '')" in pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto){", "\n}\n")))
     # LA RETE NEL FOGLIO DEL FILTRO (30 ott 2026, Andrea: «aggiungi anche la
     # possibilita' di filtrare per onchain e lightning»): in cima, una
     # scelta sola, solo a chi l'on-chain lo vede
@@ -156591,7 +156729,7 @@ console.log(JSON.stringify(out));
     # il «Novità» apre il foglio, e ogni strada verso uno scambio passa
     # dalla porta unica del dettaglio, che la lista di «I miei scambi»
     # chiama anche lei; nel dettaglio niente rimando a un elenco a parte
-    porta = pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n")
+    porta = pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto){", "\n}\n")
     dett = pezzo_js(mini, "function apriDettaglioOnchainP2P(id){", "\n}\n")
     pubb = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
     prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
@@ -189537,7 +189675,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori
+    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori novita_usdt_p2p
     lista_corta_metodi
     """.split(),
     "mercatino": """
@@ -190211,6 +190349,7 @@ def main():
     prove_revolut_tre_modi,
     prove_usdt_moderatori,
     prove_grafica_p2p_onchain,
+    prove_novita_usdt_p2p,
     prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,
     prove_parole_uniche,

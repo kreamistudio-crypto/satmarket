@@ -80031,3 +80031,74 @@ indirizzi 0x, il contratto del vero USDT, l'id della transazione e
 «💵 Ho inviato gli USDT», il tasto Tronscan/Etherscan e la disputa.
 Resta dietro la frase «se nei NUMERI DI OGGI è acceso», come il resto
 delle funzioni a leva. Solo testo: niente codice.
+
+## Il «Novità» verde degli USDT e il suo tutorial (12 nov 2026, cantiere usdt-banner, Andrea: «oggi abbiamo acceso usdt sul p2p, voglio un banner similmente a quello che avevamo fatto per l'onchain con tutorial annesso»)
+
+LA RICHIESTA. Il giorno in cui gli ordini P2P in USDT si aprono a tutti
+(12:29 UTC), un banner come il «Novità» on-chain, con tutorial: «il
+banner è quello gradiente arancione che sta nel p2p pagina del libro
+ordini» e «ovviamente la versione usdt verde».
+
+DECISO. Un gemello, non un nuovo disegno: il rettangolo usa le classi
+del «Novità» on-chain (`p2p-oc-novita`, `p2p-oc-faccia`) più
+`p2p-usdt-novita`, che lo veste del verde di Tether (#26A17B, quello
+della T sulle card) con lo stesso sfumato dell'arancio leggero (42%
+dietro la moneta, 10% dietro la freccia, sopra `--card`, filo di mezzo
+pixel al 30%), e verde pieno con le scritte bianche da acceso. La
+moneta è nuova (`P2P_USDT_MONETA`, `.cambio-moneta.usdt`): la T piena
+bianca sul tondo verde, sorella di quelle della pagina Cambio. Appeso
+sotto la testata finché non lo apri da questo browser
+(`p2pUsdtNovitaAperta`; senza memoria vale «già aperto»), il colpo di
+partenza, acceso durante il giro: le regole sono quelle del 30 ott.
+Lo vede chi vede gli USDT (`usdtVistoP2P`, la leva del server), mai nel
+demo né in vetrina. SOTTO IL «NOVITÀ» ON-CHAIN (17:01, Andrea: «quando
+domani accenderemo la leva onchain il banner usdt starà sotto al banner
+onchain»): `carteOnchainLibroP2P(k, sotto)` lo mette fra il rettangolo
+on-chain e le card on-chain; senza il blocco on-chain sta da solo in
+cima, e da solo non toglie il vuoto di Mostro (è un banner, non un
+libro). Oggi in produzione l'on-chain è spento per gli utenti: vedono il
+solo verde.
+APPESO UNO SOLO: due rettangoli appiccicosi allo stesso `top` si
+coprirebbero. Finché quello on-chain di sopra è da aprire, quello degli
+USDT scorre (`novitaUsdtAppesaP2P` guarda `myP2POnchain` e
+`novitaOcApertaP2P`); aperto quello, si appende questo. Prima versione
+(USDT sopra e prioritario) superata dalla parola di Andrea delle 17:01.
+IL TUTORIAL, otto tappe sul motore dei giri (`TAPPE_TUTORIAL_USDT_P2P`):
+la novità (1 USDT = 1 dollaro), il deposito di garanzia che resta sui
+sats mentre gli USDT passano da persona a persona, la T verde su una
+card finta in USDT e le stelle su una in euro (le card d'esempio del
+giro guidato, sotto il banner, `p2p-usdt-esempi`), il +, il foglio
+«Pubblica» aperto sotto il velo già in USDT con la valuta illuminata,
+la tendina aperta con Tron ed Ethereum, e al centro, a foglio chiuso,
+la regola che salva i soldi: chi riceve scrive l'indirizzo e l'app
+controlla la rete, chi paga incolla l'id della transazione. Il foglio
+è quello di Lightning: la tappa azzera `p2pNuovoReteChiesta`, così un
+admin con l'on-chain non si trova il foglio a tre chiavi. Le tappe del
+foglio hanno il ripiego `p2pNuovoCorpo`, perché il motore scarta
+all'avvio le tappe senza bersaglio e il foglio nasce alla sua tappa.
+Alla fine (`fineTutorialUsdtP2P`), per qualunque strada: via le card
+finte e il foglio, il lato di partenza, spento e staccato.
+Scartato: un'immagine-banner come quella delle commissioni (non si
+rivede, non si legge a 320 px, e Andrea ha chiesto quello del libro);
+il tasto «₮ USDT» in prima fila (già scartato il 2 nov). NOVITA.md:
+voce con `pubblico: no`, perché il post degli USDT per tutti è già
+uscito oggi e un secondo post sarebbe un doppione; lo decide Andrea.
+
+Prove: `prove_novita_usdt_p2p` (il banco node: chi lo vede, il disegno,
+appeso uno solo, le otto tappe col lato, il foglio di Lightning in USDT
+e la tendina, il secondo tocco a giro aperto, la fine, la memoria rotta,
+chi perde gli USDT; le sentinelle del libro, del verde e dei testi).
+Controprove: nove mutazioni, nove rosse (fra cui l'ordine dei due
+rettangoli e l'appeso). `prove_grafica_p2p_onchain` legge la firma
+nuova `carteOnchainLibroP2P(k, sotto)` e resta verde.
+Dal vivo (Chromium a 390×844 e 320×844, tema scuro e chiaro, server nella
+gabbia del worktree, relay morti, Compratore 111 non admin con la leva
+USDT aperta a tutti come in produzione, cinque ordini finti nel libro):
+il banner fermo, il verde al tocco, le otto tappe una per una, il libro
+dopo con il banner che scorre; con `myP2POnchain` acceso a mano nel
+browser, l'arancio sopra e il verde sotto, e il tutorial USDT da lì. Foto in
+`/mnt/project-files/usdt-novita/`.
+
+Da guardare: il tutorial dal telefono vero in Telegram (la morfosi del +
+che apre il foglio sotto il velo); i due «Novità» col libro on-chain vero
+il giorno che l'on-chain si accende.

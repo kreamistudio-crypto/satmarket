@@ -4138,6 +4138,27 @@
   /* il titolo della pagina e la striscia: la moneta prima del nome */
   .p2p-oc-tit{display:inline-flex;align-items:center;gap:8px}
   .p2p-oc-tit .cambio-moneta.p2p-oc-moneta{width:26px;height:26px}
+  /* IL «NOVITÀ» DEGLI USDT (12 nov 2026, cantiere usdt-banner, Andrea:
+     «oggi abbiamo acceso usdt sul p2p, voglio un banner similmente a
+     quello che avevamo fatto per l'onchain con tutorial annesso»): lo
+     stesso rettangolo del «Novità» on-chain — misure, appeso, colpo di
+     partenza e acceso sono le sue regole, qui sopra — vestito del verde
+     di Tether (#26A17B, il colore della T sulle card). Lo sfumato e' lo
+     stesso disegno dell'arancio leggero: 42% dietro la moneta, 10%
+     dietro la freccia, sopra il fondo delle card; acceso, il verde pieno
+     con le scritte bianche. */
+  .p2p-oc-novita.p2p-usdt-novita .p2p-oc-faccia{
+    background:linear-gradient(90deg,rgba(38,161,123,.42) 0%,rgba(38,161,123,.10) 100%),var(--card);
+    box-shadow:inset 0 0 0 .5px rgba(38,161,123,.30)}
+  .p2p-usdt-novita .p2p-oc-novita-tag{color:#1F9A73}
+  html[data-tema="scuro"] .p2p-usdt-novita .p2p-oc-novita-tag{color:#3CC495}
+  .p2p-oc-novita.p2p-usdt-novita.acceso .p2p-oc-faccia{background:#26A17B;box-shadow:inset 0 0 0 1px #1B7A5C}
+  .p2p-oc-novita.p2p-usdt-novita.acceso .p2p-oc-novita-tag{color:#fff}
+  /* la moneta di Tether, sorella di quelle della pagina Cambio: il segno
+     e' pieno, non un tratto */
+  .cambio-moneta.usdt{background:#26A17B;color:#fff}
+  .cambio-moneta.usdt .cambio-svg{fill:#fff;stroke:none}
+  .p2p-oc-faccia .cambio-moneta.usdt.p2p-oc-moneta .cambio-svg{width:21px;height:21px}
   /* il tasto puro della pagina */
   .btn.p2p-oc-pubblica{display:flex;align-items:center;justify-content:center;gap:10px}
   /* LA SCELTA DEL +: tasti rettangolari alti, la moneta su un tondo
@@ -60113,7 +60134,10 @@ function testaAltaP2P(){
     new ResizeObserver(metti).observe(t);
   }
 }
-function carteOnchainLibroP2P(k){
+/* `sotto` (12 nov 2026, cantiere usdt-banner) e' quel che sta fra il
+   rettangolo e le card: il «Novità» degli USDT, che Andrea vuole SOTTO
+   quello on-chain («il banner usdt starà sotto al banner onchain») */
+function carteOnchainLibroP2P(k, sotto){
   /* il filtro «solo Lightning» lascia fuori le card on-chain, non il
      rettangolo (30 ott 2026) */
   const righe = p2pFiltro && p2pFiltro.rete === 'ln' ? []
@@ -60131,8 +60155,172 @@ function carteOnchainLibroP2P(k){
       + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
       + '</div>'
     : '';
-  return porta + righe.map(rigaOnchainP2P).join('');
+  return porta + (sotto || '') + righe.map(rigaOnchainP2P).join('');
 }
+
+
+/* ============ IL «NOVITÀ» DEGLI USDT E IL SUO TUTORIAL (12 nov 2026) ============
+   Cantiere usdt-banner. Andrea, il giorno in cui gli ordini P2P in USDT
+   si aprono a tutti: «voglio un banner similmente a quello che avevamo
+   fatto per l'onchain con tutorial annesso», «il banner e' quello
+   gradiente arancione che sta nel p2p pagina del libro ordini», e
+   «ovviamente la versione usdt verde».
+   E' IL GEMELLO DEL «NOVITÀ» ON-CHAIN, pezzo per pezzo: lo stesso
+   rettangolo (le classi `p2p-oc-*`, piu' `p2p-usdt-novita` che lo veste
+   di verde), appeso sotto la testata finche' non lo apri da questo
+   browser, il colpo di partenza, acceso durante il giro, e il giro sul
+   motore di sempre (`avviaTour`). Lo vede chi vede gli USDT
+   (`usdtVistoP2P`, la leva del server): a leva spenta il libro e' quello
+   di ieri. Sta SOTTO quello on-chain (Andrea, 17:01: «il banner usdt
+   starà sotto al banner onchain»), da solo in cima a chi l'on-chain non
+   lo vede; se tutti e due sono da aprire, appeso ne resta UNO solo,
+   quello on-chain di sopra — due rettangoli appiccicosi allo stesso
+   `top` si coprirebbero —, e questo si appende quando l'altro e' aperto. */
+const P2P_USDT_MONETA = '<span class="cambio-moneta usdt p2p-oc-moneta" aria-hidden="true">'
+  + '<svg class="cambio-svg" viewBox="4 4 24 24"><path d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117"/></svg></span>';
+const P2P_USDT_NOVITA_CHIAVE = 'p2pUsdtNovitaAperta';
+/* ⚠️ come per l'on-chain: se `localStorage` non risponde vale «gia'
+   aperto», un banner che non si stacca mai e' peggio di uno che scorre */
+function novitaUsdtApertaP2P(){
+  try { return localStorage.getItem(P2P_USDT_NOVITA_CHIAVE) !== null; } catch(e){ return true; }
+}
+function novitaUsdtVistaP2P(){
+  return typeof usdtVistoP2P === 'function' && usdtVistoP2P() && !DEMO && !VETRINA;
+}
+/* appeso: finche' quello on-chain, che gli sta sopra, e' appeso lui,
+   questo scorre */
+function novitaUsdtAppesaP2P(){
+  if (!novitaUsdtVistaP2P() || novitaUsdtApertaP2P()) return false;
+  const ocAppeso = typeof myP2POnchain !== 'undefined' && !!myP2POnchain
+    && typeof novitaOcApertaP2P === 'function' && !novitaOcApertaP2P();
+  return !ocAppeso;
+}
+let tutorialUsdtLato = null;   // il lato da rimettere alla fine; null = nessun tutorial
+let p2pUsdtTutorialTimer = null;
+function novitaUsdtLibroP2P(){
+  if (!novitaUsdtVistaP2P()) return '';
+  const appeso = novitaUsdtAppesaP2P();
+  if (appeso && typeof testaAltaP2P === 'function') testaAltaP2P();
+  return '<div class="p2p-oc-novita p2p-usdt-novita' + (appeso ? ' appeso' : '')
+    + (tutorialUsdtLato !== null || p2pUsdtTutorialTimer ? ' acceso' : '') + '" id="p2pUsdtNovita">'
+    + '<button type="button" class="p2p-oc-faccia" onclick="apriNovitaUsdtP2P()">'
+    + P2P_USDT_MONETA + '<span class="p2p-oc-novita-testo">USDT</span>'
+    + '<span class="p2p-oc-novita-tag">Novità</span>'
+    + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
+    + '</div>';
+}
+function accendiNovitaUsdtP2P(si){
+  const r = el('p2pUsdtNovita');
+  if (r) r.classList[si ? 'add' : 'remove']('acceso');
+}
+/* il tocco: il colpo del rimbalzo, e a colpo finito il giro */
+function apriNovitaUsdtP2P(){
+  if (tourInCorso || p2pUsdtTutorialTimer) return;
+  haptic();
+  try { localStorage.setItem(P2P_USDT_NOVITA_CHIAVE, Date.now()); } catch(e){}
+  accendiNovitaUsdtP2P(true);
+  const r = el('p2pUsdtNovita');
+  if (!r || effettiRidotti()) { tutorialUsdtP2P(); return; }
+  r.classList.remove('urto');
+  void r.offsetWidth;            // l'animazione riparte anche al secondo tocco
+  r.classList.add('urto');
+  p2pUsdtTutorialTimer = setTimeout(() => {
+    p2pUsdtTutorialTimer = null;
+    r.classList.remove('urto');
+    tutorialUsdtP2P();
+  }, 480);
+}
+/* LE TAPPE: la novita' e la garanzia sul banner, la T verde su una card
+   finta e le stelle su una card in euro, il +, il foglio «Pubblica» con
+   la valuta USDT e le due reti, e al centro come si paga senza sbagliare
+   rete. Testi in due righe a 320 px, la regola del giro guidato. Le
+   tappe del foglio hanno un ripiego (`p2pNuovoCorpo`): il motore scarta
+   all'avvio le tappe senza bersaglio, e il foglio nasce alla sua tappa. */
+const TAPPE_TUTORIAL_USDT_P2P = [
+  { trova: () => el('p2pUsdtNovita'),
+    testo: `<b>Novità!</b> Da oggi puoi scambiare bitcoin anche in <b>USDT</b>, il dollaro digitale: 1 USDT vale 1 dollaro.` },
+  { trova: () => el('p2pUsdtNovita'),
+    testo: `I sats restano nel <b>deposito di garanzia</b> come sempre; gli USDT passano direttamente da una persona all'altra.` },
+  { trova: () => esempioTutorialUsdtP2P('USDT'), tondo: true,
+    testo: `Un ordine in USDT lo riconosci dalla <b>T verde</b> di Tether.` },
+  { trova: () => esempioTutorialUsdtP2P('EUR'), tondo: true,
+    testo: `Gli ordini in euro hanno invece le <b>stelle dell'Europa</b>.` },
+  { trova: () => piuGiroP2P(), tondo: true,
+    testo: `Vuoi pubblicarne uno tu? Tocca il <b>+</b>…` },
+  { prima: () => foglioTutorialUsdtP2P(false), trova: () => el('p2pNuovoValutaBtn')?.closest('.p2p-sez') || el('p2pNuovoCorpo'),
+    testo: `…e in cima al foglio scegli la valuta: <b>USDT</b> al posto degli euro.` },
+  { prima: () => foglioTutorialUsdtP2P(true),
+    trova: () => el('p2pNuovoMetodiBtn')?.closest('.p2p-sez') || el('p2pNuovoMetodiBtn') || el('p2pNuovoCorpo'),
+    testo: `Al posto dei metodi scegli la rete: <b>Tron</b>, <b>Ethereum</b> o tutte e due.` },
+  /* AL CENTRO, a foglio chiuso: la regola che salva i soldi, la rete */
+  { prima: () => { if (el('p2pNuovoSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pNuovoSheet'); },
+    trova: () => el('p2pCorpo'), centro: true,
+    testo: `<span class="tour-reti" aria-hidden="true">${P2P_USDT_MONETA}</span>`
+      + `Chi riceve scrive il suo indirizzo USDT e l'app controlla che la <b>rete</b> sia giusta. `
+      + `Chi paga incolla l'id della transazione e tocca «Ho inviato gli USDT».` },
+];
+function tutorialUsdtP2P(){
+  if (tourInCorso || !novitaUsdtVistaP2P() || document.querySelector('.view.active')?.id !== 'view-p2p') {
+    if (tutorialUsdtLato === null) accendiNovitaUsdtP2P(false);
+    return;
+  }
+  tutorialUsdtLato = p2pLato;
+  if (p2pLato !== 'compro') setLatoP2P('compro', true);
+  if (!avviaTour(TAPPE_TUTORIAL_USDT_P2P, fineTutorialUsdtP2P)) fineTutorialUsdtP2P();
+}
+/* LE DUE CARD FINTE, una in USDT e una in euro, subito sotto il
+   «Novità»: la card d'esempio del giro guidato (`rigaOrdineP2P` con
+   `esempio`), senza id e senza tocco. Si chiedono a ogni
+   riposizionamento, quindi un libro ridisegnato le rimette. Torna la
+   tessera della valuta da illuminare. */
+function esempioTutorialUsdtP2P(cod){
+  const box = el('p2pCorpo');
+  if (!box) return null;
+  let t = box.querySelector('.p2p-usdt-esempi');
+  if (!t) {
+    const adesso = Math.floor(Date.now() / 1000);
+    const carta = (fiat, metodi, euro) => rigaOrdineP2P({id: '', esempio: p2pLato,
+      lato: p2pLato === 'compro' ? 'sell' : 'buy', fiat, euro, euroMax: 0, sats: 0, premium: 0,
+      metodi, creato: adesso - 86400, scade: adesso + 6 * 86400,
+      faccia: {nome: 'Esempio', voti: 24, media: 4.9}});
+    t = document.createElement('div');
+    t.className = 'p2p-usdt-esempi';
+    t.setAttribute('aria-hidden', 'true');
+    t.innerHTML = carta('USDT', ['USDT (Tron)'], 50) + carta('EUR', ['Revolut'], 50);
+    const nov = el('p2pUsdtNovita');
+    if (nov && nov.parentNode === box) nov.after(t); else box.prepend(t);
+  }
+  const card = t.querySelectorAll('.p2p-ord')[cod === 'USDT' ? 0 : 1];
+  return card ? card.querySelector(cod === 'USDT' ? '.p2p-tessera-usdt' : '.p2p-tessera-eur') : null;
+}
+/* il + «toccato» dal tutorial: il foglio «Pubblica» di Lightning si apre
+   sotto il velo, gia' in USDT; alla tappa delle reti la tendina e'
+   aperta, cosi' Tron ed Ethereum si vedono */
+function foglioTutorialUsdtP2P(reti){
+  if (!el('p2pNuovoSheet')?.classList.contains('open')) {
+    if (typeof p2pNuovoReteChiesta !== 'undefined') p2pNuovoReteChiesta = '';
+    apriNuovoOrdineP2P();
+  }
+  if (!el('p2pNuovoSheet')?.classList.contains('open')) return;
+  p2pNuovoValuta = 'USDT';
+  p2pNuovoMetodi = [];
+  p2pNuovoAperta = !!reti;
+  renderNuovoOrdineP2P();
+  const corpo = el('p2pNuovoCorpo');
+  if (corpo && !reti) corpo.scrollTop = 0;
+}
+/* la fine, qualunque strada la porti: via le card finte e il foglio, il
+   lato di partenza, e si torna al libro (il «Novità» resta dov'e') */
+function fineTutorialUsdtP2P(){
+  const lato = tutorialUsdtLato;
+  tutorialUsdtLato = null;
+  document.querySelectorAll('.p2p-usdt-esempi').forEach(n => n.remove());
+  if (el('p2pNuovoSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pNuovoSheet');
+  if (lato && lato !== p2pLato) setLatoP2P(lato, true);
+  el('p2pUsdtNovita')?.classList.remove('appeso');
+  accendiNovitaUsdtP2P(false);
+}
+/* ============ fine del «Novità» degli USDT ============ */
 
 /* LA RETE SU OGNI CARD (30 ott 2026, Andrea: «l'icona lightning e
    l'icona onchain dovrebbero essere visibili in ogni card nel libro
@@ -66756,12 +66944,17 @@ function renderP2P(){
   /* LE CARD ON-CHAIN IN CIMA (30 ott 2026): il secondo libro, dello
      stesso lato, sopra quello di Mostro; con solo quelle il vuoto di
      Mostro non si scrive. E il libro on-chain si rilegge ogni mezzo minuto. */
-  const onchainCarte = typeof carteOnchainLibroP2P === 'function' ? carteOnchainLibroP2P(k) : '';
+  /* ...e il «Novità» degli USDT (12 nov 2026, cantiere usdt-banner)
+     subito SOTTO il rettangolo on-chain, sopra le card on-chain. Se il
+     blocco on-chain non c'e' sta da solo in cima; e da solo non e' un
+     libro, quindi non toglie il vuoto di Mostro */
+  const usdtNovita = typeof novitaUsdtLibroP2P === 'function' ? novitaUsdtLibroP2P() : '';
+  const onchainCarte = typeof carteOnchainLibroP2P === 'function' ? carteOnchainLibroP2P(k, usdtNovita) : '';
   if (typeof rinfrescaOnchainP2P === 'function') rinfrescaOnchainP2P();
   box.innerHTML = avvisi
     /* l'avviso di chi e' su Tor (11 ott 2026): una riga, sopra il libro */
     + (typeof avvisoMemoriaBrowserP2P === 'function' ? avvisoMemoriaBrowserP2P(typeof suOnion === 'function' && suOnion()) : '')
-    + onchainCarte
+    + (onchainCarte || usdtNovita)
     + mappa
     + (elenco.length ? elenco.map(rigaOrdineP2P).join('')
        : onchainCarte ? ''
