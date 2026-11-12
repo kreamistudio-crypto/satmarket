@@ -80014,3 +80014,20 @@ Stessa promozione: la voce di NOVITA.md «p2p-onchain-500» passa a
 «pubblico: no». L'avevo scritta «sì», ma il P2P on-chain resta dietro
 `ONCHAIN_SOLO_ADMIN` (solo admin, Andrea: «l'on-chain da 500 lo facciamo
 poi»), e il flusso di Tappo l'avrebbe annunciata a tutti.
+
+## Il paragrafo USDT nel libro di Tappo (12 nov 2026, cantiere sapere-usdt, Andrea: «ok si scrivilo»)
+
+Aperto a tutti il P2P in USDT su Lightning (`P2P_USDT_SOLO_ADMIN = False`
+sul VPS, 12 nov 12:29 UTC), Andrea ha chiesto se Tappo sa rispondere.
+Sapeva le basi dai NUMERI DI OGGI («Ordini P2P in USDT» acceso) e da
+una riga sola del libro, scritta il 1-2 nov quando gli USDT erano solo
+per gli admin: la promozione porta il codice, non le spiegazioni che
+nessuno aveva scritto. Ora `assistente/sapere.md` ha un paragrafo
+intero: cos'è (1 USDT = 1 $, sats su Lightning con la garanzia, USDT da
+persona a persona), le due reti come metodi, la T verde nel libro, come
+si pubblica (valuta in cima al foglio, reti, tetto beta convertito),
+l'indirizzo col controllo della rete sbagliata e il limite detto degli
+indirizzi 0x, il contratto del vero USDT, l'id della transazione e
+«💵 Ho inviato gli USDT», il tasto Tronscan/Etherscan e la disputa.
+Resta dietro la frase «se nei NUMERI DI OGGI è acceso», come il resto
+delle funzioni a leva. Solo testo: niente codice.
