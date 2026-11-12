@@ -561,7 +561,7 @@ def main():
           (bool(o1["rilascio_chiesto_il"]), o1["rilascio_firma"]))
     prova("...e chi vende viene avvisato col costo del cambio, non «scegli "
           "dove ricevere»", True,
-          any(chi == 888 and "cambio in Lightning" in testo
+          any(chi == 888 and "swap in Lightning" in testo
               for chi, testo in banco.DETTO))
     ria = riassunto(888, oid1)["onchain"]
     prova("nell'ordine chi vende vede: in Lightning, confermato, niente incasso",
@@ -622,7 +622,7 @@ def main():
     rq = t.get("riquadro", "")
     prova("il riquadro dice che e' un cambio, quanto costa, quanto arriva, e "
           "avvisa della capienza", (True, True, True, True),
-          ("È un cambio, fatto da SATS Routing</b>: costa 814 sats" in rq,
+          ("È uno swap, fatto da SATS Routing</b>: costa 814 sats" in rq,
            "Ricevi <b>99186 sats in Lightning</b> invece di 100000 on-chain" in rq,
            "deve poter ricevere 99186 sats in una volta" in rq,
            "Prendila dal mio Lightning address" in rq))

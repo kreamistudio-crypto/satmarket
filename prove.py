@@ -7545,7 +7545,7 @@ def prove_in_pagamento():
             os.unlink(f.name)
         prova("col cambio la riga dice «al tuo indirizzo bitcoin», "
               "senza resta «Lightning ⚡», e on-chain resta on-chain",
-              ["via il cambio, al tuo indirizzo bitcoin", "via Lightning ⚡",
+              ["via lo swap, al tuo indirizzo bitcoin", "via Lightning ⚡",
                "via on-chain ₿"], vie)
         tutte = {(r[0], r[1], r[2]): r for r in righe}
         prova("nessuna frase esce con un «undefined» dentro", [],
@@ -153512,9 +153512,9 @@ def prove_banco_chiavi_onchain():
                          "const swapAcceso = () => CAMBIO;\n" + _aco +
                          "const t = (oc, c) => { myOnchain = oc; CAMBIO = c; return walletParoleACosaServono(); };\n"
                          "const solo = t(false, true), oc = t(true, false), tutti = t(true, true);\n"
-                         "console.log(JSON.stringify([solo.includes('i tuoi cambi') && !solo.includes('deposito di garanzia') && solo.includes('I sats dei cambi'),\n"
-                         "  oc.includes('Servono solo a firmare la tua parte del deposito di garanzia on-chain') && !oc.includes('cambi'),\n"
-                         "  tutti.includes('deposito di garanzia') && tutti.includes('i tuoi cambi'),\n"
+                         "console.log(JSON.stringify([solo.includes('i tuoi swap') && !solo.includes('deposito di garanzia') && solo.includes('I sats degli swap'),\n"
+                         "  oc.includes('Servono solo a firmare la tua parte del deposito di garanzia on-chain') && !oc.includes('swap'),\n"
+                         "  tutti.includes('deposito di garanzia') && tutti.includes('i tuoi swap'),\n"
                          "  [solo, oc, tutti].every(x => x.includes('Non importarle in un altro wallet'))]));\n")
     if _r_aco is None:
         salta("a cosa servono le 12 parole", "node non c'e'")
@@ -154118,13 +154118,14 @@ def prove_onchain_verso_lightning():
     rc = rc[:rc.index("\n@app.")]
     prova("«Ho ricevuto» prima dell'uscita vuole la firma del seme di chi compra",
           True, "onchain_messaggio_ricevuto(o[\"id\"], ind[\"indirizzo\"]), firma)" in rc)
-    # le parole per chi legge: un cambio, mai «swap»
+    # le parole per chi legge: uno swap (dal 12 nov 2026, cantiere
+    # nome-swap: prima «un cambio», e «swap» era vietato)
     blocco = pezzo_js(mini, "function onchainCambioBlocco(o){", "\n}\n")
-    prova("il riquadro dice «È un cambio, fatto da …» e il costo, e non dice "
-          "«swap» a nessuno", (True, True, False),
-          ("È un cambio, fatto da ${esc(nome)}</b>: costa" in blocco,
+    prova("il riquadro dice «È uno swap, fatto da …» e il costo, e non dice "
+          "piu' «cambio»", (True, True, False),
+          ("È uno swap, fatto da ${esc(nome)}</b>: costa" in blocco,
            "deve poter ricevere" in blocco,
-           re.search(r"\bswap\b", re.sub(r"<[^>]*>|swap[A-Z]\w*", "", blocco),
+           re.search(r"\bcambio\b", re.sub(r"<[^>]*>|[a-z]+Cambio\w*|cambio-\w*", "", blocco),
                      re.I) is not None))
 
 
@@ -156109,12 +156110,12 @@ console.log(JSON.stringify(out));
         # funzione oggi e' solo uno studio)
         _ultima = pezzo_js(mini, "  /* L'ALTRA RETE, IN ARRIVO", "\n];")
         prova("l'ultima tappa del tutorial: fulmine, frecce e moneta, «In arrivo», "
-              "il cambio di SATS Routing e la commissione prima di confermare",
+              "lo swap di SATS Routing e la commissione prima di confermare",
               (True, True, True, True, True),
               ("${P2P_LN_MONETA}<span class=\"tour-reti-frecce\">" in _ultima
                and "${P2P_OC_MONETA}</span>" in _ultima,
                '<span class="tour-arrivo">In arrivo</span>' in _ultima,
-               "col cambio di SATS Routing" in _ultima,
+               "con lo swap di SATS Routing" in _ultima,
                "La commissione la vedi prima di confermare." in _ultima,
                ".tour-reti .cambio-moneta.p2p-oc-moneta{width:52px;height:52px}" in mini))
         # (20:11-20:12, Andrea: «perché il riflettore sui tasti acceso? ...
@@ -180103,7 +180104,7 @@ ramoVetrina = 'esplora';
 swapLeve = {attivo: true};
 vestiCellaAste();
 toccaCellaAste();
-out.acceso = [ELS['nav-aste'].innerHTML.endsWith('</svg></span><span class="eti-ricevi">Cambio</span>'),
+out.acceso = [ELS['nav-aste'].innerHTML.endsWith('</svg></span><span class="eti-ricevi">Swap</span>'),
               ELS['nav-aste'].dataset.vestito,
               ELS['portaAste'].style.display, aste, viste.slice()];
 out.voceAcceso = [voceNav('swap'), voceNav('astepresto'),
@@ -180144,7 +180145,8 @@ console.log(JSON.stringify(out));
     # (27 ott 2026, cantiere grafica-swap) il vestito si chiamava «Ricevi in
     # bitcoin»; dal cantiere cambio-libero (stesso giorno) «Cambio», un nome
     # per le due direzioni, chiesto da Andrea
-    prova("a leva accesa la STESSA cella si veste da «Cambio» e apre la pagina",
+    # (12 nov 2026, cantiere nome-swap, Andrea: «si») ora «Swap»
+    prova("a leva accesa la STESSA cella si veste da «Swap» e apre la pagina",
           [True, "swap", "", 1, ["swap"]], r.get("acceso"))
     prova("...e le aste, raggiunte dalla porta, accendono Esplora",
           ["aste", "esplora", "esplora"], r.get("voceAcceso"))
@@ -180153,10 +180155,10 @@ console.log(JSON.stringify(out));
     prova("...e chi era sulla pagina «Swap» esce su Esplora",
           (["esplora"], 0), (r.get("uscita"), r.get("ferma")))
     prova("i testi in inglese per Telegram in un'altra lingua",
-          ["Exchange", "No exchanges and no payouts to your bitcoin address yet."], r.get("en"))
+          ["Swap", "No swaps and no payouts to your bitcoin address yet."], r.get("en"))
     prova("...in italiano per l'italiano e senza Telegram",
-          ["Per ora nessun cambio e nessun incasso al tuo indirizzo bitcoin.",
-           "Per ora nessun cambio e nessun incasso al tuo indirizzo bitcoin."],
+          ["Per ora nessuno swap e nessun incasso al tuo indirizzo bitcoin.",
+           "Per ora nessuno swap e nessun incasso al tuo indirizzo bitcoin."],
           [r.get("it"), r.get("senza")])
 
 
@@ -183082,7 +183084,7 @@ preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: true, hash
   righe: [{voce: 'dovuto', sats: 48000}, {voce: 'commissione', sats: -288, percento: 0.6},
           {voce: 'rete_invio', sats: -324}, {voce: 'rete_ritiro', sats: -234}]}};
 const sw = payoutPanel(o);
-out.swap = [sw.includes('Costo del cambio, SATS Routing (0,6\u00a0%)'), sw.includes('−288'),
+out.swap = [sw.includes('Costo dello swap, SATS Routing (0,6\u00a0%)'), sw.includes('−288'),
             sw.includes('Ricevi circa'), sw.includes('47154'),
             sw.includes('sellerInvoice'), sw.includes('data-swap="avanti" data-ordine="7"')];
 /* (28 ott 2026, euro-ordine) sotto le due cifre il controvalore: vuoto
@@ -183109,7 +183111,7 @@ tg.initDataUnsafe.user.language_code = 'en';
 preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: true, hash: 'h', ricevi: 1,
   righe: [{voce: 'commissione', sats: -288, percento: 0.6}]}};
 const en = payoutPanel(o);
-out.en = [en.includes('Exchange fee, SATS Routing (0.6%)'), en.includes('>Confirm<')];
+out.en = [en.includes('Swap fee, SATS Routing (0.6%)'), en.includes('>Confirm<')];
 out.onclick = [sw, giu, en].filter(x => /\son[a-z]+=/.test(x)).length;
 console.log(JSON.stringify(out));
 """.replace("__TESTI__", testi).replace("__LINGUA__", lingua).replace(
@@ -183144,10 +183146,10 @@ console.log(JSON.stringify(out));
     # (19 ott: il titolo del preventivo si chiamava `titolo` come quello
     # della pagina Swap, e nell'oggetto dei testi lo sovrascriveva)
     prova("il titolo della pagina e quello del preventivo sono due chiavi",
-          (1, 1, 1, 1), (testi.count("titolo: 'Cambio',"),
+          (1, 1, 1, 1), (testi.count("titolo: 'Swap',\n       /* (28 ott"),
                          testi.count("titoloPrev: 'Quanto ricevi al tuo indirizzo'"),
                          testi.count("titoloPrev: 'What you receive at your address'"),
-                         testi.count("titolo: 'Exchange',\n       testo: 'Move")))
+                         testi.count("titolo: 'Swap',\n       testo: 'Move")))
 
 
 def prove_swap_telefono():
@@ -184563,9 +184565,10 @@ def prove_swap_pagamento():
     amb = {"_fmt_sats": reale("_fmt_sats")}
     exec(pezzo("_msg_swap_non_andato"), amb)
     m = amb["_msg_swap_non_andato"](30_000)
-    prova("l'avviso a chi vende dopo uno swap non andato: niente «fattura» ne' "
-          "«swap», i sats al sicuro, si sceglie di nuovo",
-          (False, False, True, True, True),
+    # (12 nov 2026, nome-swap) dal nome «Swap» della pagina, «swap» si dice
+    prova("l'avviso a chi vende dopo uno swap non andato: niente «fattura», "
+          "lo swap per nome, i sats al sicuro, si sceglie di nuovo",
+          (False, True, True, True, True),
           ("fattura" in m.lower(), "swap" in m.lower(), "30.000 sats" in m,
            "deposito di garanzia" in m, "scegli di nuovo come incassare" in m))
     sb = codice(pezzo("_sblocca_sats"))
@@ -184693,10 +184696,11 @@ def prove_swap_pagamento():
            ("54.571 sats" in giu, "54.460" in giu, "nel tuo wallet" in giu)])
     # (27 ott 2026, cantiere grafica-swap) le parole di tutti: in nessuno
     # dei quattro messaggi la parola «swap», e il nome della pagina giusto
-    prova("...e nessuno dei quattro dice «swap»; senza ritiro, la pagina "
-          "«Cambio»", (0, True),
-          (sum("swap" in m.lower() for m in (in_attesa, confermato, senza, giu)),
-           "«Cambio»" in senza))
+    # (12 nov 2026, nome-swap) la pagina ora si chiama «Swap»
+    prova("...e nessuno dei quattro dice «cambio»; senza ritiro, la pagina "
+          "«Swap»", (0, True),
+          (sum("cambio" in m.lower() for m in (in_attesa, confermato, senza, giu)),
+           "«Swap»" in senza))
     prova("...e una fattura che non e' di uno swap non cambia niente", "",
           msg("lnbc-altra"))
     sb = codice(pezzo("_sblocca_sats"))
@@ -185253,7 +185257,7 @@ def prove_incasso_annuncio():
            mini.index('id="sellPrice"') < mini.index('id="sellIncassoField"'),
            "tasto('', '<span>👤</span><span>Come nel profilo</span>') + tasto('ln', P2P_LN_MONETA + 'Lightning') + "
            "tasto('onchain', P2P_OC_MONETA + '<span class=\"nw\">On-chain</span>')" in forma,
-           "il cambio non si fa</b>: ricevi come ti pagano" in forma))
+           "lo swap non si fa</b>: ricevi come ti pagano" in forma))
     prova("app: la scelta parte con l'annuncio nuovo e con la modifica (mai a meta' caricamento)",
           (2, 2, True),
           (mini.count("...domandePayload(), ...incassoPayload()}"),
@@ -185349,7 +185353,7 @@ def prove_swap_auto_schermate():
            "<b>565 sats</b>" in r["carta"], 'value="bc1qproposto"' in r["carta"],
            "confermaSwapAuto(7, this)" in r["carta"]))
     prova("carta: il cambio in corso dice dove, e niente «Conferma»",
-          (True, True, False), ("Cambio in corso" in r["corso"], "bc1qdove" in r["corso"],
+          (True, True, False), ("Swap in corso" in r["corso"], "bc1qdove" in r["corso"],
                                 "confermaSwapAuto" in r["corso"]))
     prova("carta: sotto il minimo, Lightning", (True, True),
           ("Sotto i 25000 sats" in r["sotto"], "scegliIncassoAuto(9,'ln')" in r["sotto"]))
@@ -186616,9 +186620,9 @@ def prove_cambio_libero():
           ([2] * 6, 0), ([testi.count(f"cambio{k}:") for k in chiavi],
                          sum("lightning" in r.lower() for r in testi.split("\n")
                              if any(f"cambio{k}:" in r for k in chiavi))))
-    prova("la cella in basso e la pagina: «Cambio» / «Exchange»", (1, 1, 1),
-          (mini.count("""+ '<span class="eti-ricevi">Cambio</span>';"""),
-           testi.count("titolo: 'Cambio',"), testi.count("titolo: 'Exchange',")))
+    prova("la cella in basso e la pagina: «Swap», in due lingue (12 nov 2026)", (1, 2),
+          (mini.count("""+ '<span class="eti-ricevi">Swap</span>';"""),
+           testi.count("titolo: 'Swap',")))
     lista = open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read()
     compila = open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()
     prova("il collaudo nuovo sta negli elenchi della CI", (True, True),
@@ -187188,7 +187192,9 @@ console.log(JSON.stringify(fuori));
     if frasi is None:
         salta("le parole della grafica dello swap", "node non c'e'")
         return
-    vietate = ("swap", "htlc", "rgb", "fornitore", "lockup", "on-chain", "onchain")
+    # (12 nov 2026, cantiere nome-swap, Andrea: «si», «fallo e basta»)
+    # «swap» e' il nome della pagina e della cosa: non e' piu' vietato
+    vietate = ("htlc", "rgb", "fornitore", "lockup", "on-chain", "onchain")
     # (28 ott 2026, euro-ordine) l'unica eccezione, chiesta da Andrea:
     # «on-chain» dopo «bitcoin» nel sottotitolo della pagina «Cambio»
     ammesse = ("Sposta i tuoi sats fra Lightning e bitcoin on-chain.",
@@ -187253,7 +187259,7 @@ console.log(JSON.stringify(fuori));
     trovate = sorted({p for f in frasi if f not in ammesse for p in vietate
                       if p in f.replace("«On-chain»", "").lower()})
     prova("nelle frasi della pagina e del telefono nessuna parola tecnica "
-          "(swap, HTLC, RGB, fornitore, lockup, on-chain)", ([], True),
+          "(HTLC, RGB, fornitore, lockup, on-chain)", ([], True),
           (trovate, len(frasi) > 150))
     # (28 ott 2026, unita-tendine, Andrea: «usa esattamente queste unità di
     # misura e stessi loghi e tendine») le pillole dei riquadri dicono le
@@ -187275,11 +187281,11 @@ console.log(JSON.stringify(fuori));
            js.count("class=\"cambio-euro\"") + js.count("con-euro', tendina")))
     # (cambio-libero, 27 ott 2026) «Ricevi in bitcoin» e' diventato «Cambio»:
     # un nome che valga per le due direzioni, chiesto da Andrea
-    prova("il tasto in basso e la pagina si chiamano «Cambio»",
-          (True, False, 1, 1),
-          (cella.rstrip().endswith("+ '<span class=\"eti-ricevi\">Cambio</span>';"),
-           "Swap';" in cella, testi.count("titolo: 'Cambio',"),
-           testi.count("titolo: 'Exchange',")))
+    # (12 nov 2026, cantiere nome-swap, Andrea: «si») ora «Swap», it e en
+    prova("il tasto in basso e la pagina si chiamano «Swap»",
+          (True, False, 2),
+          (cella.rstrip().endswith("+ '<span class=\"eti-ricevi\">Swap</span>';"),
+           "Cambio" in cella, testi.count("titolo: 'Swap',")))
     # (28 ott 2026, costo-una-riga) in BTC la riga del costo andava a capo a
     # 360 px: resta una, il nome si accorcia coi puntini, «Dettagli» no
     # (misurata col Chromium a 320, 360 e 375 px: 20 px di altezza, una riga)

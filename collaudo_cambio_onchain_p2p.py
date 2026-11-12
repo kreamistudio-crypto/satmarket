@@ -466,11 +466,11 @@ def main():
     prova("il riquadro: prima il preventivo che arriva, poi il cambio col suo "
           "costo, la capienza, la richiesta da incollare, la via d'uscita",
           (True, True, True, True, True, True),
-          ("Chiedo il prezzo del cambio" in t.get("prima", ""),
-           "È un cambio, fatto da SATS Routing</b>: costa 814 sats" in rq,
+          ("Chiedo il prezzo dello swap" in t.get("prima", ""),
+           "È uno swap, fatto da SATS Routing</b>: costa 814 sats" in rq,
            "Ricevi circa <b>99186 sats in Lightning</b> invece di 100000 on-chain" in rq,
            "deve poter ricevere 99186 sats in una volta" in rq,
-           "✅ Conferma il cambio" in rq, "₿ Ricevi on-chain invece" in rq))
+           "✅ Conferma lo swap" in rq, "₿ Ricevi on-chain invece" in rq))
     prova("...e prima della conferma di chi vende niente richiesta da incollare",
           (True, False), ("Quando chi vende conferma gli euro" in t.get("attesa", ""),
                           "p2pOcFattura_" in t.get("attesa", "")))
@@ -535,7 +535,7 @@ def main():
     prova("...e una seconda volta no: 409", 409, nasce(oid1, corpo).status_code)
     prova("chi vende non propone al posto del cambio: 409", (409, True),
           (gesto(999, oid1, "proposta", verso="venditore", psbt=finta).status_code,
-           "già firmato il cambio" in gesto(999, oid1, "proposta", verso="venditore",
+           "già firmato lo swap" in gesto(999, oid1, "proposta", verso="venditore",
                                             psbt=finta).json()["detail"]))
     o1 = uno(888, oid1)
     prova("nello scambio: il cambio, coi sats che arrivano in Lightning, e la "
@@ -544,7 +544,7 @@ def main():
           (o1["destinazione"]["tipo"], (o1["cambio"] or {}).get("ricevi"),
            o1["incasso"], o1["proposta"]["mia"], o1["proposta"]["verso"]))
     prova("...e chi vende viene avvisato che tocca al suo telefono", True,
-          detto_a(999, "Chi compra ha fatto il cambio in Lightning"))
+          detto_a(999, "Chi compra ha fatto lo swap in Lightning"))
 
     # ---- 5) la seconda firma dal telefono di chi vende -----------------------
     print("\n[la seconda firma dal telefono di chi vende]")

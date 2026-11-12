@@ -232,7 +232,7 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
                 chiaviCorpo: v1.creazione ? Object.keys(v1.creazione).sort() : []};
   const carta = A.run('pannelloSwapTelefono({id: 7})');
   html.push(carta);
-  out.carta = carta.includes('Barattolo sta pagando il cambio');
+  out.carta = carta.includes('Barattolo sta pagando lo swap');
 
   // --- gli stati e il ritiro cooperativo
   await A.run('swapGiro()');
@@ -712,7 +712,7 @@ def il_telefono(base):
           [True, False, False], r["profilo"])
     rt = r["ritrova"]
     prova("telefono nuovo: «Ritrova i miei cambi» li ritrova tutti con le parole del wallet, senza chiederle",
-          ("Ritrovati 8 cambi.", 8, True, list(range(8))),
+          ("Ritrovati 8 swap.", 8, True, list(range(8))),
           (rt.get("nota"), rt.get("quanti"), rt.get("seme"), rt.get("indici")))
     prova("...il contatore della chiave unica riparte dopo il piu' alto, e nessun cassetto vecchio nasce",
           (8, False), (rt.get("prossimo"), rt.get("vecchio")))

@@ -97520,7 +97520,7 @@ async def onchain_cambio_perche_morto(o) -> str | None:
     if stato is None:
         return None
     if stato != "invoice.set":
-        return f"il cambio è «{stato}»"
+        return f"lo swap è «{stato}»"
     return ""
 
 
@@ -97542,7 +97542,7 @@ async def _onchain_cambio_togli(o, perche: str, avvisa: bool = True) -> bool:
         con.close()
     if tolto and avvisa:
         await notifica(o["venditore_id"],
-            f"⚡ <b>{html.escape(o['titolo'][:40])}:</b> il cambio in "
+            f"⚡ <b>{html.escape(o['titolo'][:40])}:</b> lo swap in "
             f"Lightning non è partito ({html.escape(perche)}). Non si è "
             "mosso niente: apri l'ordine e rifallo, o ricevi on-chain.")
     return tolto
@@ -97564,7 +97564,7 @@ async def onchain_incasso_modo(req: Request, x_tg_init_data: str = Header(""),
     if modo not in ONCHAIN_MODI:
         raise HTTPException(400, "Scelta sconosciuta")
     if modo != "onchain" and not onchain_ln_per(user["id"]):
-        raise HTTPException(403, "Il cambio in Lightning non è disponibile")
+        raise HTTPException(403, "Lo swap in Lightning non è disponibile")
     riempiti = []
     con = _onchain_db()
     try:
@@ -97717,12 +97717,12 @@ async def onchain_cambio_nasce(oid: int, req: Request,
         scade = int(c.get("scade_fattura") or 0)
         timeout = int(c.get("timeout") or 0)
     except (TypeError, ValueError):
-        raise HTTPException(400, "Il cambio non si legge")
+        raise HTTPException(400, "Lo swap non si legge")
     fornitore = swap_fornitore(str(c.get("fornitore") or "satsrouting"))
     if fornitore is None or not onchain_ln_rete_ok(fornitore):
         raise HTTPException(400, "Fornitore sconosciuto")
     if not _SWAP_ID_FORMA.match(swap_id) or timeout <= 0:
-        raise HTTPException(400, "Il cambio non si legge")
+        raise HTTPException(400, "Lo swap non si legge")
     # l'indirizzo del cambio: un taproot della rete dell'on-chain
     from embit.script import address_to_scriptpubkey
     rete = _onchain_rete()
@@ -97732,7 +97732,7 @@ async def onchain_cambio_nasce(oid: int, req: Request,
     except Exception:
         buono = False
     if not buono:
-        raise HTTPException(400, "L'indirizzo del cambio non è della rete "
+        raise HTTPException(400, "L'indirizzo dello swap non è della rete "
                                  "giusta")
     if scade - time.time() < ONCHAIN_CAMBIO_VITA_MIN_S:
         raise HTTPException(400, "La fattura scade troppo presto: creane "
@@ -97741,12 +97741,12 @@ async def onchain_cambio_nasce(oid: int, req: Request,
     try:
         o, ind = _onchain_da_sbloccare(con, oid, user["id"])
         if not 0 < ricevi < mandi <= int(o["prezzo_sats"]):
-            raise HTTPException(400, "Le cifre del cambio non tornano col "
+            raise HTTPException(400, "Le cifre dello swap non tornano col "
                                      "prezzo dell'ordine")
         valore = f"{o['id']}:{lockup}"
         if not onchain_firma_valida(ind["xpub_venditore"], "cambio", valore,
                                     firma):
-            raise HTTPException(400, "Il cambio non è firmato dal tuo seme: "
+            raise HTTPException(400, "Lo swap non è firmato dal tuo seme: "
                                      "rifallo da questo telefono")
         giudicato = dict(o)
         giudicato["incasso"] = lockup
@@ -97796,11 +97796,11 @@ async def onchain_cambio_togli(oid: int, x_tg_init_data: str = Header(""),
         if not o:
             raise HTTPException(404, "Ordine non trovato")
         if _onchain_parte(o, user["id"]) != "venditore":
-            raise HTTPException(403, "Il cambio lo toglie chi vende")
+            raise HTTPException(403, "Lo swap lo toglie chi vende")
     finally:
         con.close()
     if not await _onchain_cambio_togli(o, "tolto da chi vende", avvisa=False):
-        raise HTTPException(409, "Su questo ordine non c'è un cambio da togliere")
+        raise HTTPException(409, "Su questo ordine non c'è uno swap da togliere")
     return {"ok": True}
 
 
@@ -99206,10 +99206,10 @@ async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
         # bloccato i bitcoin, stanno arrivando, e lo scambio non si annulla
         in_volo = await p2p_onchain_deposito_ln_in_volo(oid)
         if in_volo is None:
-            raise HTTPException(503, "Il cambio del deposito non risponde: non "
+            raise HTTPException(503, "Lo swap del deposito non risponde: non "
                                      "annullo alla cieca, riprova fra poco")
         if in_volo:
-            raise HTTPException(409, "Il cambio in Lightning sta portando i "
+            raise HTTPException(409, "Lo swap in Lightning sta portando i "
                                      "bitcoin nel deposito: aspetta che arrivino")
     adesso = int(time.time())
     con = _p2p_onchain_db()
@@ -99671,7 +99671,7 @@ async def p2p_onchain_proposta(oid: int, req: Request, x_tg_init_data: str = Hea
         if verso == "venditore" and o["incasso_tipo"] == "cambio":
             # (1 nov 2026, presa-altra-rete) il cambio in Lightning porta gia'
             # la prima firma, quella di chi compra: non si sostituisce
-            raise HTTPException(409, "Chi compra ha già firmato il cambio in "
+            raise HTTPException(409, "Chi compra ha già firmato lo swap in "
                                      "Lightning: manca solo la tua firma, che il "
                                      "telefono mette da solo")
         if verso == "venditore" and not o["incasso"] and o["incasso_ln"]:
@@ -99765,7 +99765,7 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
                                      "fra poco, non è partito niente")
         if perche:
             await _p2p_onchain_cambio_togli(o, perche)
-            raise HTTPException(409, "Il cambio di chi compra è scaduto prima "
+            raise HTTPException(409, "Lo swap di chi compra è scaduto prima "
                                      "che partissero i sats: gli abbiamo "
                                      "chiesto di rifarlo. Non è partito niente")
     try:
@@ -99790,7 +99790,7 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
     if verso == "venditore":
         testi = {o["depositante_id"]: f"✅ <b>Scambio on-chain concluso!</b> Hai venduto {quanto}.",
                  o["ricevente_id"]: f"✅ <b>Scambio on-chain concluso!</b> Hai comprato {quanto}: "
-                                    + ("i bitcoin vanno al cambio, e SATS Routing paga la "
+                                    + ("i bitcoin vanno allo swap, e SATS Routing paga la "
                                        "tua richiesta Lightning dopo una conferma."
                                        if o["incasso_tipo"] == "cambio" else
                                        "i sats arrivano al tuo wallet.")}
@@ -100020,15 +100020,15 @@ def _p2p_onchain_mio_ln(con, oid: int, tg_id: int, confermato: bool = False):
     anche la conferma firmata di chi vende. Torna (riga, indirizzo)."""
     o = _p2p_onchain_carica(con, oid)
     if _p2p_onchain_ruolo(o, tg_id) != "venditore":
-        raise HTTPException(403, "Il cambio lo fa chi compra bitcoin")
+        raise HTTPException(403, "Lo swap lo fa chi compra bitcoin")
     if (o["stato"] not in P2P_CAMBIO_STATI_SI or not o["incasso_ln"]
             or o["incasso"] or o["proposta_psbt"] or o["decisione_da"]):
-        raise HTTPException(409, "Su questo scambio non c'è un cambio da fare adesso")
+        raise HTTPException(409, "Su questo scambio non c'è uno swap da fare adesso")
     ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
                       (o["indirizzo_id"],)).fetchone()
     if confermato and (o["stato"] == "preso" or not _p2p_onchain_confermato(con, o, ind)):
         raise HTTPException(409, "Chi vende non ha ancora confermato gli euro: "
-                                 "il cambio si fa dopo, perché la richiesta scade")
+                                 "lo swap si fa dopo, perché la richiesta scade")
     return o, ind
 
 
@@ -100050,7 +100050,7 @@ async def _p2p_onchain_cambio_togli(o, perche: str, avvisa: bool = True) -> bool
         con.close()
     if tolto and avvisa:
         await _notifica_p2p_onchain(o, o["ricevente_id"],
-            "⚡ <b>Il cambio in Lightning non è partito</b> sullo scambio di "
+            "⚡ <b>Lo swap in Lightning non è partito</b> sullo scambio di "
             f"{_p2p_onchain_quanto(o)} ({html.escape(perche)}). Non si è mosso "
             "niente: apri lo scambio e rifallo, o ricevi on-chain.",
             _p2p_onchain_bottone(o))
@@ -100071,7 +100071,7 @@ async def p2p_onchain_ricevi_lightning(oid: int, req: Request,
     d = await leggi_json(req)
     si = bool(d.get("si"))
     if si and not p2p_onchain_ln_per(user["id"]):
-        raise HTTPException(403, "Il cambio in Lightning non è disponibile")
+        raise HTTPException(403, "Lo swap in Lightning non è disponibile")
     con = _p2p_onchain_db()
     try:
         o = _p2p_onchain_carica(con, oid)
@@ -100140,7 +100140,7 @@ async def p2p_onchain_euro_ricevuti(oid: int, req: Request,
     if not gia:
         await _notifica_p2p_onchain(o, o["ricevente_id"],
             "⚡ <b>Chi vende ha ricevuto gli euro</b> per lo scambio di "
-            f"{_p2p_onchain_quanto(o)}.\n\nApri Barattolo: fai il cambio in "
+            f"{_p2p_onchain_quanto(o)}.\n\nApri Barattolo: fai lo swap in "
             "Lightning (vedi quanto costa prima di confermare) e i sats partono.",
             _p2p_onchain_bottone(o))
     return {"ok": True}
@@ -100247,12 +100247,12 @@ async def p2p_onchain_cambio_nasce(oid: int, req: Request,
         scade = int(c.get("scade_fattura") or 0)
         timeout = int(c.get("timeout") or 0)
     except (TypeError, ValueError):
-        raise HTTPException(400, "Il cambio non si legge")
+        raise HTTPException(400, "Lo swap non si legge")
     fornitore = swap_fornitore(str(c.get("fornitore") or "satsrouting"))
     if fornitore is None or not onchain_ln_rete_ok(fornitore):
         raise HTTPException(400, "Fornitore sconosciuto")
     if not _SWAP_ID_FORMA.match(swap_id) or timeout <= 0:
-        raise HTTPException(400, "Il cambio non si legge")
+        raise HTTPException(400, "Lo swap non si legge")
     from embit.script import address_to_scriptpubkey
     rete = _onchain_rete()
     try:
@@ -100261,7 +100261,7 @@ async def p2p_onchain_cambio_nasce(oid: int, req: Request,
     except Exception:
         buono = False
     if not buono:
-        raise HTTPException(400, "L'indirizzo del cambio non è della rete giusta")
+        raise HTTPException(400, "L'indirizzo dello swap non è della rete giusta")
     if scade - time.time() < ONCHAIN_CAMBIO_VITA_MIN_S:
         raise HTTPException(400, "La fattura scade troppo presto: creane "
                                  "una che duri di più")
@@ -100269,14 +100269,14 @@ async def p2p_onchain_cambio_nasce(oid: int, req: Request,
     try:
         o, ind = _p2p_onchain_mio_ln(con, oid, user["id"], confermato=True)
         if not 0 < ricevi < mandi <= int(o["prezzo_sats"]):
-            raise HTTPException(400, "Le cifre del cambio non tornano col "
+            raise HTTPException(400, "Le cifre dello swap non tornano col "
                                      "prezzo dello scambio")
         if int(P2P_ALTRA_RETE_MAX_SATS or 0) and mandi > int(P2P_ALTRA_RETE_MAX_SATS):
-            raise HTTPException(400, "Il cambio supera il massimo di "
+            raise HTTPException(400, "Lo swap supera il massimo di "
                                      f"{_fmt_sats(int(P2P_ALTRA_RETE_MAX_SATS))} sats")
         valore = f"p2p:{o['id']}:{lockup}"
         if not onchain_firma_valida(ind["xpub_venditore"], "cambio", valore, firma):
-            raise HTTPException(400, "Il cambio non è firmato dal tuo seme: "
+            raise HTTPException(400, "Lo swap non è firmato dal tuo seme: "
                                      "rifallo da questo telefono")
         giudicato = dict(o)
         giudicato["incasso"] = lockup
@@ -100305,7 +100305,7 @@ async def p2p_onchain_cambio_nasce(oid: int, req: Request,
     finally:
         con.close()
     await _notifica_p2p_onchain(o, o["depositante_id"],
-        "⚡ <b>Chi compra ha fatto il cambio in Lightning</b> sullo scambio di "
+        "⚡ <b>Chi compra ha fatto lo swap in Lightning</b> sullo scambio di "
         f"{_p2p_onchain_quanto(o)}.\n\nApri Barattolo: il tuo telefono firma il "
         "rilascio che avevi confermato, e i sats partono.", _p2p_onchain_bottone(o))
     return {"ok": True}
@@ -100322,11 +100322,11 @@ async def p2p_onchain_cambio_togli_rotta(oid: int, x_tg_init_data: str = Header(
     try:
         o = _p2p_onchain_carica(con, oid)
         if _p2p_onchain_ruolo(o, user["id"]) != "venditore":
-            raise HTTPException(403, "Il cambio lo toglie chi compra bitcoin")
+            raise HTTPException(403, "Lo swap lo toglie chi compra bitcoin")
     finally:
         con.close()
     if not await _p2p_onchain_cambio_togli(o, "tolto da chi compra", avvisa=False):
-        raise HTTPException(409, "Su questo scambio non c'è un cambio da togliere")
+        raise HTTPException(409, "Su questo scambio non c'è uno swap da togliere")
     return {"ok": True}
 
 
@@ -100386,8 +100386,8 @@ def _p2p_onchain_mio_deposito_ln(con, oid: int, tg_id: int, adesso: int):
     if o["stato"] != "preso" or int(o["visti_sats"] or 0) or int(o["ricevuti_sats"] or 0):
         raise HTTPException(409, "Su questo scambio il deposito non si fa più adesso")
     if int(o["deposito_entro"] or 0) - int(adesso) < P2P_DEPOSITO_LN_PRIMA_S:
-        raise HTTPException(409, "Manca troppo poco alla fine del deposito per un "
-                                 "cambio: deposita on-chain")
+        raise HTTPException(409, "Manca troppo poco alla fine del deposito per uno "
+                                 "swap: deposita on-chain")
     ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
                       (o["indirizzo_id"],)).fetchone()
     if not ind:
@@ -100400,7 +100400,7 @@ def _p2p_onchain_deposito_ln_porta(user, oid: int):
     (riga, indirizzo) come li vede adesso."""
     _p2p_onchain_serve(user)
     if not p2p_onchain_deposito_ln_per(user["id"]):
-        raise HTTPException(403, "Il cambio non è disponibile")
+        raise HTTPException(403, "Lo swap non è disponibile")
     con = _p2p_onchain_db()
     try:
         return _p2p_onchain_mio_deposito_ln(con, oid, user["id"], int(time.time()))
@@ -100511,9 +100511,9 @@ def _testo_deposito_ln_p2p(r) -> str:
     scambio on-chain, quando il cambio ha bloccato i bitcoin."""
     onchain = int(r["onchain"] or 0)
     quanti = f" ({_fmt_sats(onchain)} sats)" if onchain > 0 else ""
-    return ("🔒 Il cambio del tuo deposito è pronto" + quanti + ".\n"
+    return ("🔒 Lo swap del tuo deposito è pronto" + quanti + ".\n"
             "Apri Barattolo: il tuo telefono mette i bitcoin nel deposito di "
-            "garanzia dello scambio. Se non lo apri in tempo il cambio scade "
+            "garanzia dello scambio. Se non lo apri in tempo lo swap scade "
             "e il pagamento Lightning torna al tuo wallet.")
 
 
@@ -104406,7 +104406,7 @@ def _impegni_onchain(con, tg: int, adesso: int) -> list:
             "SELECT COUNT(*) FROM swap_pagamenti WHERE venditore_id=? AND "
             "stato NOT IN ('pagato','fallito')", (tg,)).fetchone()[0]
         if n:
-            voci.append("un incasso col cambio è ancora in viaggio")
+            voci.append("un incasso con lo swap è ancora in viaggio")
     for tab in ("cambi_liberi", "cambi_p2p"):
         if "stato" not in _colonne_di(con, tab):
             continue
@@ -104416,7 +104416,7 @@ def _impegni_onchain(con, tg: int, adesso: int) -> list:
             (tg, adesso - CAMBIO_IN_VOLO_S,
              adesso - CAMBIO_CHIESTO_VALE_S)).fetchone()[0]
         if n:
-            voci.append("un cambio iniziato da meno di tre giorni: "
+            voci.append("uno swap iniziato da meno di tre giorni: "
                         "aspetta che sia arrivato")
             break
     return voci
