@@ -293,15 +293,20 @@ riprova».
 
 - «Invia 50 €» (la cifra grande) e «Ricevi ≈ 72 000 sats» (la ≈ dice
   che è una stima al cambio di adesso; senza ≈ se i sats sono fissati);
-- l'anello della scadenza (se ci passi sopra: «scade fra 3 g», «scade
-  fra 5 h», «scade fra 12 min»);
+- in alto a destra la coppia: due quadratini con la freccia, da quel che
+  invii a quel che ricevi (stelle dell'Europa o Tether → fulmine; sul lato
+  «Vendi BTC» fulmine → stelle), dal 12 nov 2026;
 - il cartellino del prezzo: «al prezzo di mercato», oppure «<N>% più
   conveniente» (verde) / «<N>% meno conveniente», e dal 10% «⚡ Ottimo
   affare», oltre il 15% «⚡⚡ Super affare»;
 - i metodi: «💳 Revolut, SEPA» (Barattozon col suo logo);
-- la reputazione di chi ha pubblicato: stella, media e numero di
-  recensioni, «★ 4,9 · 👤 24»;
-- sul proprio ordine: «È il tuo ordine — tocca per aprirlo».
+- la reputazione di chi ha pubblicato, con la sua faccia a sinistra:
+  stella, media, numero di recensioni e scambi fatti, «★ 4,9 · 👤 24 ·
+  ✅ 22 scambi P2P»;
+- sul proprio ordine: «È il tuo ordine — tocca per aprirlo»;
+- sul bordo di sotto la riga del tempo che resta (se ci passi sopra:
+  «scade fra 3 g», «scade fra 5 h», «scade fra 12 min»): si accorcia,
+  arancio negli ultimi tre giorni, rossa che lampeggia nell'ultimo.
 
 Ordinamento (in cima): «Recenti» / «Convenienza» / «Più grandi» / «Più
 piccoli». C'è anche un «Filtro». Accanto alla levetta del tema, sulla
@@ -1339,7 +1344,7 @@ tarda: controllo com'è andata…».
 | Metà della cauzione vinta | 15 giorni per incassarla | dopo «il servizio se la tiene» |
 | Righe chiuse in «I miei scambi» | 30 giorni (24 h le prese rifiutate) | spariscono da sole; restano i conclusi senza recensione |
 
-📱 Il tempo si vede: l'anello sulla card del libro, «Tempo rimasto: …» nel
+📱 Il tempo si vede: la riga sul bordo della card del libro, «Tempo rimasto: …» nel
 dettaglio, l'orologio dentro il foglio da pagare.
 
 ---
@@ -1831,9 +1836,10 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
 - **Gli scambi completati** (dal 10 ott 2026) stanno accanto alle
   stelline, da uno in su, e dal 13 ott 2026 con le stesse parole in
   ogni posto («✅ 1 scambio P2P completato» al singolare): sulla card
-  del libro «★ 4,9 · 👤 24 · ✅ 12 scambi P2P completati» (chi non ha
-  ancora recensioni ma ha già scambiato mostra solo «✅ 3 scambi P2P
-  completati»), nel dettaglio sotto le tre colonne «✅ **12** scambi
+  del libro, dal 12 nov 2026, senza «completati» e con la faccia a
+  sinistra, «★ 4,9 · 👤 24 · ✅ 12 scambi P2P» (chi non ha ancora
+  recensioni ma ha già scambiato mostra solo «✅ 3 scambi P2P», al
+  singolare «✅ 1 scambio P2P»), nel dettaglio sotto le tre colonne «✅ **12** scambi
   P2P completati», nella card dell'altra persona e nel negozio «✅ 12
   scambi P2P completati» (lì accanto alle vendite concluse), nella
   scheda Profilo la stessa frase su una riga sua, sotto vendite e

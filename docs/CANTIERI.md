@@ -79805,6 +79805,75 @@ passi in `swapCreaDentro`, la rotta eseguita coi pezzi finti attorno
 (cifra, «lightning:», 400 senza bussare, 409 col wallet muto, 403 a
 strada spenta).
 
+## La card del P2P con la coppia, il volto in basso e la barra del tempo (12 nov 2026, cantiere card-coppia, Andrea: «le icone euro o usdt affianco ai numeri fanno confusione»)
+
+PERCHÉ. Sulla card del libro la bandierina (🇪🇺 o Tether col bollino
+della rete) apriva la riga dei soldi e la moneta della rete quella dei
+sats (la variante «C» del 2 nov): quattro segni in due righe, accanto ai
+numeri, e il volto di chi ha pubblicato in alto a destra dentro l'anello
+della scadenza. Andrea chiede: al posto del volto un'icona della coppia
+(bandiera dell'Europa e fulmine con una freccia o due), il volto nel
+riquadro in basso con recensioni e scambi, il tempo che scade come riga
+colorata sul bordo inferiore.
+
+DECISO SULLE FOTO, PRIMA DEL CODICE (Andrea le ha volute prima, girate
+in locale sulle card vere col DOM ritoccato; in
+/mnt/project-files/card-p2p-coppia/): UNA freccia nel verso del gesto
+(da quel che invii a quel che ricevi; la ⇄ diceva «si scambia» ma non da
+che parte); tessere a QUADRATO TONDO (scartati cerchio, esagono e
+foglia: tondo resta il volto, e due forme diverse non si confondono);
+nella scatola «✅ 22 scambi P2P» senza «completati» (scartato «22x
+P2P»: a chi arriva adesso dice meno), al singolare «✅ 1 scambio P2P».
+
+COSA. Il blocco «LA COPPIA, IL VOLTO IN BASSO E LA BARRA DEL TEMPO» al
+posto di `anelloScadenzaP2P`: `tesseraValutaP2P` (stelle dell'Europa su
+blu, il segno di Tether su verde col bollino della rete a rete unica, la
+regola di `bandieraValutaP2P`), `tesseraReteP2P` (la moneta della
+pagina Cambio, fulmine o ₿, coi colori di giorno e di sera),
+`coppiaCardP2P` (pura, l'aria dice la frase intera col verbo della card,
+«Invia euro, ricevi sats su Lightning»), `voltoCardP2P` (il volto unico
+con la porta al negozio e il bollino 🛡️, ripiegato da dentro l'anello) e
+`barraScadenzaP2P` (pura: la lunghezza è `frazioneVitaP2P`, il colore
+`statoAnelloP2P`, lo stesso giudice dell'anello grande del dettaglio;
+il testo esatto nell'aria). La scatola delle stelline c'è SEMPRE, col
+solo volto se non ci sono voti (chi ha pubblicato si vede sempre).
+Stesse mosse sulla card on-chain (`rigaOnchainP2P`: la ₿ arancio nella
+coppia, il volto con l'iniziale nella scatola del nome al posto di «👤»,
+la barra). La forma corta degli scambi è `scambiCortiP2P`, chiesta solo
+da `stellineP2P`: profilo, negozio, dettaglio e card dell'altra parte
+tengono «completati». Uscite: `bandieraValutaP2P`, `monetaRigaP2P`,
+`anelloOnchainP2P`, le costanti del raggio dell'anello, i vestiti
+`.p2p-bandiera`, `.p2p-moneta-riga`, `.p2p-anello`.
+
+IL BORDO SENZA TAGLIARE LA CARD. La barra è una cornice grande quanto
+la card (`inset:-1px`, `border-radius:inherit`, `overflow:hidden`) con
+dentro la riga in fondo: segue la curva degli angoli, mentre un
+`overflow:hidden` sulla card si sarebbe mangiato il cartellino
+«Esempio» del giro guidato (`top:-10px`). La pista è `--line`, la riga
+`--ink-soft` / `--sats` / `--rosso-p2p` che pulsa (ferma con
+reduced-motion).
+
+MISURATO A 320. Con 104px di posto per la coppia, nel tab «Vendi BTC»
+«Invia ≈ 53 261 sats» mandava «sats» a capo: sotto i 360px le tessere
+scendono a 30, la freccia a 14 e il posto a 90 (la regola della riga
+dell'euro sta DOPO la sua, o vincerebbe lei). Una trappola pagata: una
+regola nuova `.p2p-rep{` PRIMA di `.p2p-paga{` accorciava il ritaglio
+CSS di `prove_p2p_libro` (che va da `.p2p-ord{` a `.p2p-rep{`): il flex
+della scatola sta nella regola di sempre, più sotto; e nemmeno un
+commento può dire «`.p2p-rep{`».
+
+PROVATO. Sentinelle riscritte coi loro perché (anello → barra, volto
+nella scatola, bandierina e moneta in riga → coppia, completati corti) e
+nuove: la coppia nel verso del gesto con una freccia sola, le tessere sul
+banco node (euro, USDT, bollino Tron/Ethereum, fuori catalogo), l'aria,
+la barra (metà, quasi piena, niente senza scadenza, tre stati, l'unico
+stile inline è la lunghezza), il quadrato tondo, la stretta a 320.
+Suite severa e collaudi della CI (il verbale del push dice su quale
+albero). Foto dal codice vero, chiaro, scuro e 320.
+
+DA GUARDARE. Sul collaudo dal telefono: il tocco sul volto in basso apre
+il negozio e non prende l'ordine; il rosso che pulsa sulla barra.
+
 ## «Swap» al posto di «Cambio», e il minimo dal lato scritto (12 nov 2026, cantiere nome-swap, Andrea: «al posto di cambio nella nav ha senso invece scrivere swap?», «si», «non serve che mi mandi una prova fallo e basta»)
 
 IL NOME. La scheda in basso, il titolo della pagina e tutte le parole che

@@ -81,6 +81,12 @@ dove: la scheda «Cambio», direzione da bitcoin a Lightning, il campo «La tua 
 leva: CAMBIO_BTC_LN_ATTIVO (nessuna leva nuova)
 pubblico: sì
 
+## 2026-11-12 · card-p2p-coppia
+frase: Le card del P2P si leggono al volo: in alto a destra due quadratini con la freccia dicono cosa invii e cosa ricevi (euro o USDT verso i sats, o il contrario), la faccia di chi ha pubblicato sta in fondo accanto alle sue stelline e ai suoi scambi, e il tempo che resta è la riga colorata sul bordo di sotto, che si accorcia e diventa arancio e poi rossa quando l'ordine sta per scadere.
+dove: la scheda «P2P», le card del libro (Compra BTC e Vendi BTC, anche quelle on-chain).
+leva: nessuna
+pubblico: sì
+
 ## 2026-11-12 · nome-swap
 frase: La scheda «Cambio» ora si chiama «Swap»: è la stessa pagina, sposta i tuoi sats fra Lightning e il tuo indirizzo bitcoin. E da bitcoin a Lightning, se scrivi una cifra troppo piccola, l'app ti dice il minimo dal lato dove l'hai scritta: il minimo di 50.000 sats vale per quello che ricevi, quindi in «Mandi» serve un po' di più.
 dove: la scheda «Swap» in basso, i riquadri «Mandi» e «Ricevi».
