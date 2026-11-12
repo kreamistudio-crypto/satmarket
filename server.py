@@ -34520,7 +34520,8 @@ def _leve_stato():
             _leva("Tetto ordini P2P (€)", "P2P_MAX_EURO", P2P_MAX_EURO,
                   acceso="il foglio Pubblica rifiuta gli importi sopra "
                          "questa cifra; il tetto in sats del "
-                         "coordinatore resta valido sotto",
+                         "coordinatore resta valido sotto (gli scambi "
+                         "on-chain seguono ONCHAIN_MAX_EURO)",
                   spento="nessun tetto in euro: vale solo il tetto in "
                          "sats del coordinatore (38385)"),
             _leva("Minimo PayCode Barattozon (€)", "BARATTOZON_MIN_EURO",
@@ -34769,7 +34770,8 @@ def _leve_stato():
             _leva("Tetto ordini on-chain (€)", "ONCHAIN_MAX_EURO",
                   ONCHAIN_MAX_EURO,
                   acceso="un ordine on-chain sopra questa cifra non si "
-                         "paga on-chain: resta il Lightning",
+                         "paga on-chain: resta il Lightning; vale anche "
+                         "per gli scambi P2P on-chain",
                   spento="nessun tetto: l'on-chain vale per qualunque cifra"),
             # la prima leva che si cambia anche da qui (27 ott 2026)
             _leva_scrivibile_riga(_leva(
@@ -98647,6 +98649,22 @@ def _p2p_onchain_rifai_foto() -> None:
                         pause[maker] = 0
             for o, maker, _ in foto:
                 o["_pausa_fino"] = pause.get(maker, 0)
+            # IL NEGOZIO di chi pubblica (12 nov 2026, Andrea sul collaudo:
+            # «quando clicco sulla faccia si apre l'ordine e non l'utente»):
+            # il volto della card on-chain e' una porta come quello di
+            # Lightning, con lo stesso codice di `_facce_ordini_p2p`
+            # (negozio, o lo username); esce solo con la sessione, come il nome
+            negozi = {}
+            for o, maker, _ in foto:
+                if maker not in negozi:
+                    try:
+                        u = con.execute("SELECT negozio, username FROM utenti "
+                                        "WHERE tg_id=?", (maker,)).fetchone()
+                        negozi[maker] = ((u["negozio"] or u["username"] or "")
+                                         if u else "")
+                    except Exception:
+                        negozi[maker] = ""
+                o["_negozio"] = negozi[maker]
         finally:
             con.close()
     except Exception as e:
@@ -98670,6 +98688,9 @@ def _p2p_onchain_libro(chi: int) -> dict:
         if p2p_onchain_usdt(o) and not usdt_si:
             continue
         riga = _p2p_onchain_riga_pubblica(o, nome if chi else "")
+        # la porta del volto, con la sessione come il nome (12 nov 2026)
+        if chi and o.get("_negozio"):
+            riga["negozio"] = o["_negozio"]
         # in pausa fino a quell'ora: la card grigia, e da qui non si prende
         if int(o.get("_pausa_fino") or 0) > adesso:
             riga["pausa_fino"] = int(o["_pausa_fino"])
@@ -98677,7 +98698,11 @@ def _p2p_onchain_libro(chi: int) -> dict:
         if chi and maker == int(chi):
             miei.append(o["ordine"])
     fuori = {"eventi": eventi, "quando": F["quando"], "rete": ONCHAIN_RETE,
-             "minSats": P2P_ONCHAIN_MIN_SATS, "oreDeposito": P2P_ONCHAIN_ORE_DEPOSITO}
+             "minSats": P2P_ONCHAIN_MIN_SATS, "oreDeposito": P2P_ONCHAIN_ORE_DEPOSITO,
+             # il tetto in euro degli scambi on-chain (12 nov 2026, Andrea:
+             # «p2p onchain metti 500»): quello dell'on-chain, non del P2P
+             # Lightning; lo giudica il foglio Pubblica, 0 = spento
+             "maxEuro": int(ONCHAIN_MAX_EURO or 0)}
     if chi:
         fuori["miei"] = miei
     return fuori
@@ -99091,8 +99116,9 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     `paracadute` (5, 10, 20, solo a leva accesa). Chi pubblica
     deve avere la sua chiave on-chain (la xpub dedicata): e' una delle
     tre del 2-di-3 che nascera' alla presa, e senza non c'e' niente da
-    promettere. Il tetto in euro e' quello del P2P (`P2P_MAX_EURO`),
-    quello in sats dell'istanza di prova. L'ordine nasce nel nostro
+    promettere. Il tetto in euro e' quello dell'on-chain
+    (`ONCHAIN_MAX_EURO`, dal 12 nov 2026: prima era quello del P2P
+    Lightning, `P2P_MAX_EURO`), quello in sats dell'istanza di prova. L'ordine nasce nel nostro
     libro e parte verso i relay; la risposta non aspetta i relay."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     _p2p_onchain_serve(user)
@@ -99112,7 +99138,10 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     if usdt and not p2p_onchain_usdt_ammesso(user["id"]):
         raise HTTPException(400, "Gli scambi on-chain in USDT non sono accesi per te")
     cambio = cambio_noto_ora("usd" if usdt else "eur")
-    tetto = int(P2P_MAX_EURO or 0)
+    # IL TETTO DEGLI SCAMBI ON-CHAIN (12 nov 2026, Andrea: «p2p onchain
+    # metti 500»): lo stesso dell'on-chain del mercatino, non quello del
+    # P2P Lightning; sul VPS e' gia' 500, nessuna riga nuova
+    tetto = int(ONCHAIN_MAX_EURO or 0)
     if usdt:
         tetto = p2p_onchain_tetto_usdt(tetto, cambio_noto_ora("eur"), cambio)
     perche = p2p_onchain_giudica_nuovo(lato, d.get("sats"), d.get("euro_cent"),

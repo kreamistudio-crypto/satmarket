@@ -287,6 +287,25 @@ def main():
           [pubblica(999, sats=5000).status_code,
            pubblica(999, euro_cent=30000).status_code,
            pubblica(999, metodi=[]).status_code])
+    # IL TETTO E' QUELLO DELL'ON-CHAIN (12 nov 2026, Andrea: «p2p onchain
+    # metti 500»): ONCHAIN_MAX_EURO, non P2P_MAX_EURO del Lightning
+    vecchi = (SRV.ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.p2p_onchain_giudica_nuovo)
+    SRV.ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO = 500, 250
+    visti = []
+    def spia(*a, **k):
+        visti.append(a[5])
+        return vecchi[2](*a, **k)
+    SRV.p2p_onchain_giudica_nuovo = spia
+    try:
+        r6 = pubblica(999, euro_cent=60000)
+        busta = libro()["onchain"]
+    finally:
+        SRV.ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.p2p_onchain_giudica_nuovo = vecchi
+    prova("il tetto degli scambi on-chain e' ONCHAIN_MAX_EURO (500), non "
+          "quello del P2P Lightning (250): 600 € no «fino a 500 €», e il "
+          "libro lo dice al foglio", ([500], 400, True, 500),
+          (visti, r6.status_code, "fino a 500 €" in r6.json().get("detail", ""),
+           busta.get("maxEuro")))
     r = pubblica(999)
     o = r.json()
     prova("vendo 100.000 sats per 90 €: nasce nel libro, pending, mio, "
@@ -312,6 +331,13 @@ def main():
           ("Andrea", [o["ordine"]], []),
           (libro(888)["onchain"]["eventi"][0]["nome"], libro(999)["onchain"]["miei"],
            libro(888)["onchain"]["miei"]))
+    # LA PORTA DEL VOLTO (12 nov 2026, Andrea: «quando clicco sulla faccia
+    # si apre l'ordine e non l'utente»): il negozio di chi pubblica, con
+    # la sessione come il nome, mai al libro anonimo
+    prova("...e il suo negozio, perche' la faccia apra quello; l'anonimo no",
+          ("neg999999", False),
+          (libro(888)["onchain"]["eventi"][0].get("negozio"),
+           "negozio" in libro()["onchain"]["eventi"][0]))
     con = SRV.db()
     riga = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
                        (oid,)).fetchone()
