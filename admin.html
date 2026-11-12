@@ -484,7 +484,7 @@ function disegna(){
   ${cardSwap(D.swap)}
   </div></details>` : ''}
 
-  ${D.cambi ? `<details class="grp" id="altroCambi"><summary>🔁 Volume del Cambio</summary><div class="grp-b">
+  ${D.cambi ? `<details class="grp" id="altroCambi"><summary>🔁 Volume dello Swap</summary><div class="grp-b">
   ${cardCambi(D.cambi, D.eur_per_btc)}
   </div></details>` : ''}
 
@@ -780,6 +780,8 @@ function cardSwap(S){
 }
 
 /* ---- IL VOLUME DEL CAMBIO (11 nov 2026, cantiere volume-cambio) ----
+   (12 nov 2026: «Volume dello Swap», Andrea: «il riquadro chiamalo
+   swap»; la pagina dal 12 nov si chiama «Swap».)
    Quanto hanno cambiato gli utenti nella pagina «Cambio»: per periodo, i
    cambi FATTI come li dice SATS Routing (la ronda degli esiti), quanti
    sats dal lato Lightning e quante persone diverse; per direzione, e
@@ -797,13 +799,13 @@ function cardCambi(C, eurBtc){
       `${fmt(p.sats)}${eur(p.sats)}`, strada(lb), strada(bl)];
   });
   const sempre = (C.periodi || []).find(p => p.nome === 'da sempre') || {fatti: 0, sats: 0, persone: 0};
-  return `<div class="card"><h2>🔁 Volume del Cambio</h2>
+  return `<div class="card"><h2>🔁 Volume dello Swap</h2>
     <div class="tiles">
-      <div class="tile"><div class="k">Cambiati da sempre</div><div class="v">${fmt(sempre.sats)} sats</div><div class="d">${fmt(sempre.fatti)} ${sempre.fatti === 1 ? 'cambio fatto' : 'cambi fatti'}, ${fmt(sempre.persone)} ${sempre.persone === 1 ? 'persona' : 'persone'}</div></div>
-      <div class="tile"><div class="k">Pagina Cambio</div><div class="v" style="font-size:15px">${C.attivo ? 'accesa' : 'spenta'}</div><div class="d">i numeri restano anche da spenta</div></div>
+      <div class="tile"><div class="k">Swap da sempre</div><div class="v">${fmt(sempre.sats)} sats</div><div class="d">${fmt(sempre.fatti)} ${sempre.fatti === 1 ? 'swap fatto' : 'swap fatti'}, ${fmt(sempre.persone)} ${sempre.persone === 1 ? 'persona' : 'persone'}</div></div>
+      <div class="tile"><div class="k">Pagina Swap</div><div class="v" style="font-size:15px">${C.attivo ? 'accesa' : 'spenta'}</div><div class="d">i numeri restano anche da spenta</div></div>
     </div>
     <div class="tab">${tabella(['Periodo', 'Fatti', 'Sats', '⚡→₿', '₿→⚡'], righe, [1, 2])}</div>
-    <div class="nota">Contano i cambi che SATS Routing dice finiti bene: Lightning → bitcoin quando i bitcoin sono stati ritirati, bitcoin → Lightning quando la fattura dell'utente è stata pagata. I sats sono quelli dal lato Lightning. «In corso» sono i cambi di cui il servizio non ha ancora detto l'esito (si chiede ogni dieci minuti, per tre giorni); «non andati» sono fatture mai pagate o cambi scaduti.</div>
+    <div class="nota">Contano gli swap che SATS Routing dice finiti bene: Lightning → bitcoin quando i bitcoin sono stati ritirati, bitcoin → Lightning quando la fattura dell'utente è stata pagata. I sats sono quelli dal lato Lightning. «In corso» sono gli swap di cui il servizio non ha ancora detto l'esito (si chiede ogni dieci minuti, per tre giorni); «non andati» sono fatture mai pagate o swap scaduti.</div>
   </div>`;
 }
 

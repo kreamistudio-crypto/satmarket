@@ -186314,11 +186314,16 @@ def prove_volume_cambio():
            codice(pezzo("ronda_esiti_cambi")).count("tg_id"),
            codice(pezzo("ronda_esiti_cambi")).count("indirizzo")))
     card = pezzo_js(admin, "function cardCambi(", "\n}\n")
-    prova("la pagina disegna la card «🔁 Volume del Cambio» dentro la sua tendina",
+    prova("la pagina disegna la card «🔁 Volume dello Swap» dentro la sua tendina",
           (True, True, True),
           ("${cardCambi(D.cambi, D.eur_per_btc)}" in admin,
-           '<summary>🔁 Volume del Cambio</summary>' in admin,
+           '<summary>🔁 Volume dello Swap</summary>' in admin
+           and '<h2>🔁 Volume dello Swap</h2>' in card and 'Volume del Cambio' not in card,
            "if (!C) return '';" in card))
+    # (12 nov 2026) dalla card dello Swap e' uscita la parola «cambi»
+    prova("il riquadro parla di swap, non di «cambi» (Andrea: «il riquadro "
+          "chiamalo swap»)", (False, False, True),
+          ("cambi fatti" in card, "Pagina Cambio" in card, "Pagina Swap" in card))
     prova("...e dice cosa conta: i finiti bene secondo SATS Routing, sats dal "
           "lato Lightning, in corso e non andati", (True, True, True),
           ("finiti bene" in card, "dal lato Lightning" in card,

@@ -79750,7 +79750,7 @@ CAMBIO_PERIODI = (("7 giorni", 7 * 86400), ("30 giorni", 30 * 86400),
 
 
 def dati_cambi_cruscotto(adesso: int | None = None):
-    """La card «🔁 Volume del Cambio» di `/admin`: per periodo e per
+    """La card «🔁 Volume dello Swap» (fino al 12 nov 2026 «del Cambio») di `/admin`: per periodo e per
     direzione, i cambi FATTI (quanti, sats, persone diverse), e quanti
     sono in corso o non sono andati. Solo numeri: niente nomi, niente
     indirizzi. None = niente card (Cambio spento e nessun cambio nato)."""

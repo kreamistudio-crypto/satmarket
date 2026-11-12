@@ -79962,3 +79962,13 @@ Lightning e on-chain, tocco fermato senza negozio, avviso), e in
 P2P_MAX_EURO a 250, il giudice chiamato col 500, la busta col 500; il
 negozio a chi è entrato, non all'anonimo). Suite severa e collaudi.
 DA GUARDARE dal telefono: il tocco sulla faccia di una card on-chain.
+
+## Il riquadro «Volume dello Swap» nel pannello (12 nov 2026, cantiere volume-swap, Andrea: «si il riquadro chiamalo swap»)
+
+Dopo nome-swap la card del pannello admin diceva ancora «🔁 Volume del
+Cambio» (lasciata apposta: la vedono solo Andrea e Alan, e l'avevo
+chiesto). Ora titolo, tendina, tasselli («Swap da sempre», «swap
+fatti», «Pagina Swap») e nota dicono swap. I nomi interni restano
+(`cardCambi`, `dati_cambi_cruscotto`, `D.cambi`): solo testi.
+PROVATO: `prove_volume_cambio` con la sentinella nuova (nessun «cambi
+fatti» né «Pagina Cambio» nella card) e la suite della categoria swap.
