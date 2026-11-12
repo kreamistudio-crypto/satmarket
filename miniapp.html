@@ -59913,7 +59913,9 @@ function accogliLibroOnchainP2P(busta){
     quando: Number(busta.quando) || 0,
     rete: busta.rete || onchainRete().nome,
     minSats: Number(busta.minSats) || 10000,
-    oreDeposito: Number(busta.oreDeposito) || 6};
+    oreDeposito: Number(busta.oreDeposito) || 6,
+    /* il tetto degli scambi on-chain (12 nov 2026): null = server di ieri */
+    maxEuro: busta.maxEuro == null ? null : Number(busta.maxEuro)};
   p2pOnchainLetto = Date.now();
   return p2pOnchainLibro.eventi.length > 0;
 }
@@ -60180,8 +60182,13 @@ function segnoReteP2P(rete){
    nella scatola del nome — con l'iniziale del nome pubblico: il volto
    vero non c'e', e non apre negozi */
 function ordineVoltoOnchainP2P(o){
+  /* col NEGOZIO il volto e' una porta come sulla card di Lightning (12 nov
+     2026, Andrea sul collaudo: «quando clicco sulla faccia si apre l'ordine
+     e non l'utente»): il server lo manda con la sessione, accanto al nome */
+  const faccia = {nome: o.nome || ''};
+  if (o.negozio) faccia.negozio = String(o.negozio);
   return {id: 'oc-' + Number(o.id), scade: Number(o.scade) || 0,
-          creato: Number(o.creato) || 0, faccia: {nome: o.nome || ''}};
+          creato: Number(o.creato) || 0, faccia};
 }
 
 /* PURA: i sats della card — quelli scritti a prezzo fisso, a mercato la
@@ -65476,7 +65483,12 @@ function voltoCardP2P(o){
     attr: f.negozio
       ? ' role="button" tabindex="0" data-negozio="' + esc(f.negozio)
         + '" onclick="apriNegozioP2P(event, this.dataset.negozio)"'
-      : ''});
+      /* SENZA NEGOZIO IL TOCCO NON SCIVOLA PIU' SULLA CARD (12 nov 2026,
+         Andrea sul collaudo: «quando clicco sulla faccia si apre l'ordine
+         e non l'utente»): nella scatola delle stelline la faccia e' di
+         una persona, e chi la tocca vuole lei, mai prendere l'ordine.
+         Il tocco si ferma qui e dice perche' il negozio non si apre */
+      : ' onclick="voltoSenzaNegozioP2P(event)"'});
   /* il bollino 🛡️ Staff all'angolo del volto: sul libro il nome non si
      vede, la faccia si' */
   return '<span class="p2p-volto">' + dentro
@@ -82480,7 +82492,15 @@ function maxSatsTestoP2P(){
    stesso dal giudice del foglio. */
 function maxEuroP2P(){
   const c = p2pCoord();
-  const n = c ? Math.floor(Number(c.maxEuro)) : 0;
+  let n = c ? Math.floor(Number(c.maxEuro)) : 0;
+  /* NEL FOGLIO ON-CHAIN il tetto e' quello dell'on-chain (12 nov 2026,
+     Andrea: «p2p onchain metti 500»), in busta col libro on-chain; un
+     server di ieri senza il numero lascia quello del P2P */
+  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc && typeof myP2POnchain !== 'undefined' && myP2POnchain
+      && typeof p2pOnchainLibro !== 'undefined' && p2pOnchainLibro && p2pOnchainLibro.maxEuro != null) {
+    const oc = Math.floor(Number(p2pOnchainLibro.maxEuro));
+    if (Number.isFinite(oc) && oc >= 0) n = oc;
+  }
   const tetto = Number.isFinite(n) && n > 0 ? n : 0;
   /* IL TETTO DEL COLLAUDO (20 ott 2026): `maxSatsProva` in busta, 0 in
      produzione (e allora qui non cambia niente). Sul collaudo i sats
@@ -90824,6 +90844,12 @@ function apriNegozioP2P(ev, chi){
   if (ev && ev.stopPropagation) ev.stopPropagation();
   haptic();
   apriNegozio(chi);
+}
+/* ...e il volto SENZA negozio (12 nov 2026): il tocco si ferma lo stesso
+   — la card sotto prenderebbe l'ordine — e si dice il perche' */
+function voltoSenzaNegozioP2P(ev){
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  toast('Chi ha pubblicato non ha ancora un negozio su Barattolo', 3500);
 }
 /* ============ fine dei volti sul libro ============ */
 

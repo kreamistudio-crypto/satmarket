@@ -67915,8 +67915,10 @@ console.log(JSON.stringify(out));
     # mai un anello vuoto, ma nemmeno il «?» per chi non e' ancora
     # arrivato — dentro c'e' la SAGOMA, e il «?» e' solo di chi il
     # server ha detto di non conoscere
+    # (12 nov 2026, cantiere p2p-onchain-tetto) senza negozio la faccia
+    # ferma il tocco col suo avviso: non scivola piu' sulla card
     prova("senza volto la sagoma: mai un anello vuoto, e mai il «?» di attesa", True,
-          'class="p2p-faccia volto-attesa" data-volto="p2p:ord-1">'
+          'class="p2p-faccia volto-attesa" data-volto="p2p:ord-1" onclick="voltoSenzaNegozioP2P(event)">'
           '<span class="volto-sagoma" aria-hidden="true"></span></span>' in out["rigaSenzaRep"]
           and ">?<" not in out["rigaSenzaRep"]
           and "av-foto" not in out["rigaSenzaRep"]
@@ -67925,7 +67927,7 @@ console.log(JSON.stringify(out));
           and '<div class="p2p-box p2p-rep"><span class="p2p-volto">' in out["rigaSenzaRep"]
           and "p2p-anello" not in out["rigaSenzaRep"])
     prova("...e il «?» per chi il server non conosce", True,
-          'class="p2p-faccia volto-ignoto" data-volto="p2p:ord-ig">?</span>'
+          'class="p2p-faccia volto-ignoto" data-volto="p2p:ord-ig" onclick="voltoSenzaNegozioP2P(event)">?</span>'
           in out["rigaIgnota"])
     prova("...e un volto senza voti porta la faccia, non la riga", True,
           "p2p-faccia" in out["rigaFacciaSenzaVoti"]
@@ -67934,7 +67936,7 @@ console.log(JSON.stringify(out));
     # <img>, l'iniziale del nome sul tondo scuro — la stessa scala di
     # ripieghi delle card degli annunci.
     prova("...e senza foto l'iniziale sul tondo, senza <img>", True,
-          'class="p2p-faccia" data-volto="p2p:ord-1">B</span>' in out["rigaFacciaSenzaVoti"]
+          'class="p2p-faccia" data-volto="p2p:ord-1" onclick="voltoSenzaNegozioP2P(event)">B</span>' in out["rigaFacciaSenzaVoti"]
           and "av-foto" not in out["rigaFacciaSenzaVoti"])
     # ...e la variante piccola dell'anello e' USCITA col suo nome:
     # l'anello e' sempre la cornice del volto, pure quando il volto
@@ -186444,6 +186446,97 @@ console.log(JSON.stringify(['accasats@walletofsatoshi.com', 'Mario.Rossi@getalby
     prova("a strada rovesciata spenta: 403", 403, chiama({"address": "a@b.com", "sats": 59130}))
 
 
+def prove_p2p_onchain_tetto():
+    """IL TETTO DEGLI SCAMBI P2P ON-CHAIN (12 nov 2026, Andrea: «p2p
+    onchain metti 500»). Il P2P Lightning resta a `P2P_MAX_EURO` (250 sul
+    VPS); gli scambi on-chain seguono `ONCHAIN_MAX_EURO`, lo stesso del
+    mercatino on-chain (gia' 500 sul VPS, nessuna riga nuova). Il server
+    lo giudica alla pubblicazione e lo manda col libro on-chain; il
+    foglio Pubblica, a rete on-chain, lo legge da li'. La rotta vera la
+    prova `collaudo_p2p_onchain`."""
+    print("\n[il tetto degli scambi P2P on-chain]")
+    src = open("server.py", encoding="utf-8").read().replace("\r\n", "\n")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    rotta = pezzo_js(src, "async def p2p_onchain_pubblica_rotta(", "\n\n\n")
+    prova("la pubblicazione on-chain giudica con ONCHAIN_MAX_EURO, non "
+          "con P2P_MAX_EURO", (True, False),
+          ("tetto = int(ONCHAIN_MAX_EURO or 0)" in rotta,
+           "tetto = int(P2P_MAX_EURO or 0)" in rotta))
+    prova("il libro on-chain porta il tetto al telefono", True,
+          '"maxEuro": int(ONCHAIN_MAX_EURO or 0)' in src)
+    accogli = pezzo_js(mini, "function accogliLibroOnchainP2P(", "\n}\n")
+    prova("il telefono lo tiene quando legge il libro (null se il server "
+          "non lo dice)", True, "maxEuro: busta.maxEuro == null ? null" in accogli)
+    fn = pezzo_js(mini, "function maxEuroP2P(){", "\n}\n") + "\n}\n"
+    r = _node_banco(
+        "let cambioVivo = false, eurPerSat = 0;\n"
+        "let C = {maxEuro: 250, maxSatsProva: 0};\n"
+        "const p2pCoord = () => C;\n"
+        "let p2pNuovoOc = false, myP2POnchain = true;\n"
+        "let p2pOnchainLibro = {maxEuro: 500};\n" + fn + """
+const fuori = [];
+fuori.push(maxEuroP2P());                       // foglio Lightning
+p2pNuovoOc = true; fuori.push(maxEuroP2P());    // foglio on-chain
+p2pOnchainLibro = {maxEuro: null}; fuori.push(maxEuroP2P());  // server di ieri
+p2pOnchainLibro = {maxEuro: 0}; fuori.push(maxEuroP2P());     // spento
+p2pOnchainLibro = {maxEuro: 500}; myP2POnchain = false; fuori.push(maxEuroP2P());
+console.log(JSON.stringify(fuori));
+""")
+    if r is None:
+        salta("il tetto del foglio on-chain: il banco", "node non c'e'")
+    else:
+        prova("il foglio Lightning dice 250, quello on-chain 500; senza il "
+              "numero resta 250, a 0 e' spento, senza on-chain 250",
+              [250, 500, 250, 0, 250], r)
+
+
+def prove_volto_porta_card():
+    """LA FACCIA NELLA CARD NON PRENDE MAI L'ORDINE (12 nov 2026, Andrea
+    sul collaudo: «quando clicco sulla faccia si apre l'ordine e non
+    l'utente»). Col negozio apre il negozio — anche sulla card on-chain,
+    che il negozio ora lo riceve dal server con la sessione —; senza, il
+    tocco si ferma lo stesso e un avviso dice perche'. Il server lo prova
+    `collaudo_p2p_onchain`."""
+    print("\n[la faccia nella card apre il negozio, mai l'ordine]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    pezzi = [pezzo_js(mini, "function voltoCardP2P(o){", "\n}\n") + "\n}\n",
+             pezzo_js(mini, "function ordineVoltoOnchainP2P(o){", "\n}\n") + "\n}\n",
+             pezzo_js(mini, "function voltoSenzaNegozioP2P(ev){", "\n}\n") + "\n}\n"]
+    r = _node_banco(
+        "const esc = s => String(s);\n"
+        "const voltoHTML = (f, cls, o) => '<span class=\"' + cls + '\"' + (o.attr || '') + '>x</span>';\n"
+        "const bollinoVolto = () => '';\n"
+        "let p2pFacce = {'a1': {nome: 'Ada', negozio: 'ab12'}, 'b2': {nome: 'Bea'}};\n"
+        "let avvisi = [];\n"
+        "const toast = (m) => avvisi.push(m);\n" + "\n".join(pezzi) + """
+const fuori = {};
+fuori.lnPorta = voltoCardP2P({id: 'a1'});
+fuori.lnSenza = voltoCardP2P({id: 'b2'});
+fuori.ocPorta = voltoCardP2P(ordineVoltoOnchainP2P({id: 7, nome: 'Andrea', negozio: 'neg9'}));
+fuori.ocSenza = voltoCardP2P(ordineVoltoOnchainP2P({id: 8, nome: 'Andrea'}));
+let fermato = false;
+voltoSenzaNegozioP2P({stopPropagation(){ fermato = true; }});
+fuori.fermato = fermato; fuori.avvisi = avvisi;
+console.log(JSON.stringify(fuori));
+""")
+    if r is None:
+        salta("la faccia della card: il banco", "node non c'e'")
+        return
+    porta = 'onclick="apriNegozioP2P(event, this.dataset.negozio)"'
+    senza = 'onclick="voltoSenzaNegozioP2P(event)"'
+    prova("card Lightning col negozio: la faccia apre il negozio", (True, True),
+          (porta in r["lnPorta"], 'data-negozio="ab12"' in r["lnPorta"]))
+    prova("card on-chain col negozio dal server: la stessa porta", (True, True),
+          (porta in r["ocPorta"], 'data-negozio="neg9"' in r["ocPorta"]))
+    prova("senza negozio (Lightning e on-chain) il tocco si ferma sulla "
+          "faccia invece di scivolare sulla card", (True, True, False, False),
+          (senza in r["lnSenza"], senza in r["ocSenza"],
+           "apriNegozioP2P" in r["lnSenza"], "apriNegozioP2P" in r["ocSenza"]))
+    prova("...e il tocco non arriva alla card, con l'avviso del perche'",
+          (True, ["Chi ha pubblicato non ha ancora un negozio su Barattolo"]),
+          (r["fermato"], r["avvisi"]))
+
+
 def prove_nome_swap():
     """«SWAP» AL POSTO DI «CAMBIO» (12 nov 2026, cantiere nome-swap,
     Andrea: «al posto di cambio nella nav ha senso invece scrivere
@@ -189544,7 +189637,7 @@ CATEGORIE = {
     checksum_descrittore leva_rgb annuncio_identita mutinynet_prep
     deposito_p2p_onchain grafica_p2p_onchain incasso_esterno_onchain
     onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto
-    p2p_onchain p2p_onchain_usdt rete_onchain_dal_pannello
+    p2p_onchain p2p_onchain_usdt p2p_onchain_tetto volto_porta_card rete_onchain_dal_pannello
     scelta_rete_mercatino cifra_btc foglio_oc_visto seconda_firma_parla
     """.split(),
 }
@@ -190107,6 +190200,8 @@ def main():
     prove_p2p_usdt,
     prove_usdt_due_reti,
     prove_p2p_onchain_usdt,
+    prove_p2p_onchain_tetto,
+    prove_volto_porta_card,
     prove_lista_corta_metodi,
     prove_revolut_tre_modi,
     prove_usdt_moderatori,

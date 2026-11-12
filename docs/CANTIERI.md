@@ -79923,3 +79923,42 @@ e 50.568 passa e riceve almeno 50.000; dal lato «Ricevi» niente
 traduzione; ln-btc in «Ricevi»; il tetto tradotto); il no del telefono
 in node. Suite severa e collaudi. NON PROVATO dal vivo: la frase nuova
 sul telefono di Andrea (arriva con la promozione).
+
+## Il tetto del P2P on-chain a 500 €, e la faccia della card che non prende l'ordine (12 nov 2026, cantiere p2p-onchain-tetto, Andrea: «p2p onchain metti 500»; sul collaudo: «quando clicco sulla faccia si apre l'ordine e non l'utente», «così fa la modifica e poi manda in produzione»)
+
+IL TETTO. Gli scambi P2P on-chain giudicavano con `P2P_MAX_EURO`, il
+tetto del P2P di Mostro (250 sul VPS), mentre l'on-chain del mercatino
+ha il suo, `ONCHAIN_MAX_EURO` (500 sul VPS dall'11 nov). Andrea li
+voleva a 500: la pubblicazione on-chain (`p2p_onchain_pubblica_rotta`)
+ora usa `ONCHAIN_MAX_EURO` (tradotto in USDT come prima), il libro
+on-chain lo manda al telefono (`maxEuro` nella busta) e `maxEuroP2P()`,
+a foglio on-chain, legge quello; un server di ieri senza il numero
+lascia il tetto del P2P. SCARTATA una leva nuova
+(`P2P_ONCHAIN_MAX_EURO`): una riga in più sul VPS per lo stesso numero,
+e «on-chain = 500» è il modo in cui Andrea lo pensa. Il P2P Lightning
+resta a `P2P_MAX_EURO`. Le due leve nel pannello lo dicono.
+
+LA FACCIA. Il volto nella scatola delle stelline (card-coppia, stessa
+mattina) apriva il negozio solo se il volto portava `negozio`; senza,
+per una scelta di settembre, il tocco «scivolava sulla card» e prendeva
+l'ordine. La card on-chain il negozio non lo aveva MAI (faccia col solo
+nome), e sul collaudo molte card Lightning non lo hanno (ordini della
+produzione, che il database del collaudo non conosce). Due cure: il
+libro on-chain manda il `negozio` di chi pubblica (negozio, o lo
+username, come `_facce_ordini_p2p`), solo con la sessione come il nome;
+e senza negozio il tocco sulla faccia si FERMA lì
+(`voltoSenzaNegozioP2P`: stopPropagation e un avviso «Chi ha
+pubblicato non ha ancora un negozio su Barattolo»). Rovescia lo
+«scivola sulla card» di settembre: con la faccia in basso, dentro la
+scatola della persona, chi la tocca vuole la persona. La diagnosi
+l'aveva fatta anche il thread delle card (Playwright: col negozio il
+tocco apre il negozio e non l'ordine).
+
+PROVATO. `prove_p2p_onchain_tetto` (le due rotte nel sorgente, il banco
+di `maxEuroP2P`: 250 Lightning, 500 on-chain, 250 senza numero, 0
+spento), `prove_volto_porta_card` (banco di `voltoCardP2P`: porta su
+Lightning e on-chain, tocco fermato senza negozio, avviso), e in
+`collaudo_p2p_onchain` la rotta vera (600 € no «fino a 500 €» con
+P2P_MAX_EURO a 250, il giudice chiamato col 500, la busta col 500; il
+negozio a chi è entrato, non all'anonimo). Suite severa e collaudi.
+DA GUARDARE dal telefono: il tocco sulla faccia di una card on-chain.
