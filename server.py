@@ -59262,6 +59262,150 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
     return {"ok": True}
 
 
+# ═══ IL METODO SCELTO, ANCHE SU TELEGRAM (13 nov 2026, cantiere
+# rete-scelta, Andrea: «aggiungi anche la notifica del bot») ═══════════
+# Chi prende un ordine con piu' metodi ne sceglie uno («USDT (Tron)» fra
+# Tron ed Ethereum, «SEPA Instant» fra SEPA e Instant), ma il
+# coordinatore non lo trasmette (il take porta il metodo solo per la
+# cauzione, patch 0010, e non lo scrive da nessuna parte): la scelta
+# viaggia fra i due telefoni sul filo dei recapiti. Dal campo (13 nov
+# 2026) chi aveva pubblicato non la vedeva, e mandava un indirizzo della
+# rete sbagliata. Qui il telefono di chi ha preso la DICHIARA, e chi ha
+# pubblicato la legge anche su Telegram.
+# COSA PASSA DI QUI: il nome di UNO dei metodi gia' scritti nell'elenco
+# pubblico dell'ordine (`p2p_ordini.metodi`), e nient'altro — il
+# recapito resta fuori dal filo come sempre. Un metodo fuori elenco non
+# e' una scelta, e non parte niente.
+
+def _avviso_metodo_p2p(con, ordine, io: int, metodo, adesso: int) -> tuple:
+    """Chi ha preso dice quale metodo ha scelto: a chi dirlo, e con che
+    frase. Puro sulla connessione. Torna `(tg_id, testo)`, o `(0,
+    perche')` quando non parte niente (il perche' e' per il journal).
+    CHI CHIAMA DEV'ESSERE UNA DELLE DUE PARTI e NON chi ha pubblicato
+    (`p2p_ordini.tg_id`): a scegliere il metodo e' chi prende. Lo scambio
+    dev'essere VIVO, l'ordine deve avere PIU' di un metodo (con uno solo
+    non c'era niente da scegliere) e il metodo dev'essere uno dei suoi.
+    UNA VOLTA PER GIRO e per persona: il timbro in `p2p_avvisi`
+    (momento 'metodo'), PRIMA dell'invio — il patto delle sorelle.
+    IL ⏳ DAVANTI AL PERCHE' vuol dire «non ancora»: il telefono puo'
+    sapere della presa prima del server (gli eventi del coordinatore,
+    patch 0007, viaggiano per Tor), e allora la rotta gli dice di
+    riprovare. Non dice niente dell'altra persona: solo che lo scambio,
+    per il server, non e' ancora suo."""
+    pulite = _ordini_puliti_p2p([ordine] if isinstance(ordine, str) else ordine)
+    if len(pulite) != 1:
+        raise ValueError("Serve un ordine")
+    ordine = pulite[0]
+    m = str(metodo or "").strip()
+    if not m or len(m) > 80:
+        raise ValueError("Serve un metodo")
+    if not io:
+        return 0, "chi chiama non si sa"
+    r = con.execute("SELECT tg_id, metodi FROM p2p_ordini WHERE ordine=?",
+                    (ordine,)).fetchone()
+    if not r:
+        return 0, "⏳ ordine sconosciuto"
+    try:
+        metodi = json.loads(r["metodi"] or "[]")
+    except Exception:
+        metodi = []
+    if not isinstance(metodi, list):
+        metodi = []
+    metodi = [str(x).strip() for x in metodi if str(x).strip()]
+    if len(metodi) < 2:
+        return 0, "l'ordine ha un metodo solo: non c'era niente da scegliere"
+    if m not in metodi:
+        return 0, "il metodo non e' fra quelli dell'ordine"
+    maker = int(r["tg_id"] or 0)
+    parti = _parti_scambio_p2p(con, ordine)
+    compra, vende = parti["compratore"], parti["venditore"]
+    if io == maker:
+        return 0, "e' chi ha pubblicato: il metodo lo sceglie chi prende"
+    if io not in (compra, vende) or compra == vende:
+        return 0, "⏳ non e' (ancora) una delle due parti"
+    if not parti["vivo"]:
+        return 0, "⏳ lo scambio non e' in corso (non ancora preso, o gia' chiuso)"
+    altro = compra if io == vende else vende
+    if not altro:
+        return 0, "l'altra parte non e' dei nostri (un altro client, o non annotata)"
+    if not _avvisi_p2p_accesi(con, altro):
+        return 0, f"{altro} ha gli avvisi P2P spenti"
+    giro = parti["giro"]
+    scritto = con.execute(
+        "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, tg_id, "
+        "quando, fonte) VALUES(?,'metodo',?,?,?,'metodo')",
+        (ordine, giro, altro, adesso)).rowcount
+    con.commit()
+    if not scritto:
+        return 0, "gia' detto in questo giro"
+    return altro, _testo_metodo_p2p(
+        _nome_altro_p2p(con, ordine, altro, adesso), m, altro == vende)
+
+
+def _testo_metodo_p2p(chi: str, metodo: str, riceve: bool) -> str:
+    """PURA: la frase per chi ha pubblicato. `chi` e' il nome dell'altra
+    parte gia' scappato (o vuoto), `riceve` = chi legge RICEVE i soldi
+    (vende i sats: deve dare il recapito su quel metodo), altrimenti li
+    manda. Gli USDT si dicono con la loro rete («USDT su Tron»)."""
+    usdt = re.fullmatch(r"USDT \((\w+)\)", metodo)
+    nome = f"USDT su {usdt.group(1)}" if usdt else metodo
+    nome = html.escape(nome)
+    if riceve:
+        di_chi = chi or "Chi ti compra i sats"
+        dopo = ("Indica dove ricevere gli USDT solo su questa rete: un "
+                "indirizzo di un'altra rete non gli serve." if usdt else
+                "Indica dove ricevere con questo metodo.")
+    else:
+        di_chi = chi or "Chi ti vende i sats"
+        dopo = ("Manda gli USDT solo su questa rete." if usdt else
+                "Paga con questo metodo.")
+    return (f"🔗 <b>{di_chi} ha scelto {nome}.</b>\n{dopo}\n\n"
+            "Apri Barattolo → P2P → I miei scambi: lo vedi anche lì.")
+
+
+@app.post("/api/p2p/metodo")
+async def metodo_p2p(req: Request, x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """«Ho scelto questo metodo»: il server lo dice a chi ha pubblicato.
+    Nel corpo l'id dell'ordine e il NOME del metodo, che dev'essere uno
+    di quelli dell'ordine. LA RISPOSTA E' SEMPRE `{"ok": true}` quando
+    la richiesta si legge, come per il recapito: se l'avviso e' partito
+    lo dice il journal, non la rotta."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    if not isinstance(d, dict):
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        a_chi, testo = _avviso_metodo_p2p(con, d.get("ordine"), user["id"],
+                                          d.get("metodo"), int(time.time()))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    if not a_chi:
+        print(f"· Metodo P2P: da {user['id']}, nessun avviso ({testo})", flush=True)
+        # «non ancora»: il telefono riprova al giro dopo (vedi il ⏳)
+        return {"ok": True, "riprova": True} if testo.startswith("⏳") else {"ok": True}
+    try:
+        o_avviso = d.get("ordine")
+        if isinstance(o_avviso, str) and FORMA_ORDINE_P2P.fullmatch(o_avviso):
+            esito = await notifica(a_chi, testo, _bottone_scambio_p2p(o_avviso))
+        else:
+            esito = await notifica(a_chi, testo)
+    except Exception as e:
+        esito = f"SALTATO ({type(e).__name__}: {e})"
+    print(f"🔗 Metodo P2P: {user['id']} ha detto il metodo scelto, avvisato "
+          f"{a_chi}", flush=True)
+    _esiti_p2p_dice("🔗", [(a_chi, esito)])
+    return {"ok": True}
+
+
 # ═══ LA CHAT NELLO SCAMBIO: IL SERVER FA IL POSTINO (12 ott 2026,
 # cantiere chat-nello-scambio, decisione di Andrea con Alan) ═══════════
 # Dentro ogni scambio P2P preso le due parti si scrivono. Il 9 set 2026

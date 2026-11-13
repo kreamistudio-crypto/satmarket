@@ -76563,6 +76563,9 @@ function renderOrdineP2P(){
       || (o.stato === 'annullato' && (o.disputaId || o.moderatore))) chiediRecensibileP2P(o.id);
   /* ...e il voto rimasto indietro si riprende da qui (12 ott 2026) */
   if (o.stato === 'concluso' && typeof riprendiVotoP2P === 'function') riprendiVotoP2P(o);
+  /* ...e il metodo scelto, se non e' ancora partito (13 nov 2026, vedi
+     «LA SCELTA RIPARTE FINCHE' NON E' ARRIVATA») */
+  if (typeof pianificaMetodoP2P === 'function') pianificaMetodoP2P(o.id);
   /* SATS IN PAGAMENTO, A CHI VENDE (23 set 2026): la domanda al server
      parte anche da qui — «il pagamento a chi compra e' passato?» — e
      quando la risposta muove la riga la pagina si ridisegna da se'. Il
@@ -76611,6 +76614,10 @@ function renderOrdineP2P(){
     '<div class="p2p-ord lato-' + (o.lato === 'vendo' ? 'vendo' : 'compro') + '">' + conto + '</div>' +
     /* LA CAUZIONE, sotto il conto (1 ott 2026): la riga di chi l'ha
        messa e, dall'altro lato, la meta' che gli spetta se e' bruciata */
+    /* IL METODO SCELTO, DI QUA E DI LA' (13 nov 2026, cantiere rete-
+       scelta): subito sotto il conto, e rosso se il recapito e' di
+       un'altra forma — vedi «LA SCELTA SI VEDE» */
+    rigaMetodoSceltoP2P(o) +
     riquadroCauzioneP2P(o) +
     riquadroIncassoCauzioneP2P(o) +
     /* l'id della transazione USDT, a chi l'ha scritto (1 nov 2026) */
@@ -86950,19 +86957,155 @@ function metodoSceltoP2P(o){
      dell'ordine non e' una scelta, e vale come «non ha scelto». */
   return (o.metodi || []).indexOf(m) >= 0 ? m : '';
 }
-let p2pMetodoInviato = {};      // per sessione: un invio per scambio
+/* ⚠️ LA SCELTA RIPARTE FINCHE' NON E' ARRIVATA (13 nov 2026, cantiere
+   rete-scelta, dal campo: Andrea prende un ordine in USDT scegliendo
+   Tron, e chi vende gli scrive «non vedo quale chain hai scelto» — e
+   gli manda un indirizzo Ethereum). Prima partiva UNA volta, e solo se
+   la controparte si scopriva da un messaggio del coordinatore: se la
+   portavano prima l'archivio del server o la restore (`adottaScambi
+   ServerP2P`, `adottaOrdiniAltroveP2P`: app chiusa mentre l'altro
+   paga la garanzia, poi riaperta) il metodo NON PARTIVA MAI, e un invio
+   caduto non si riprovava. Adesso la domanda «e' gia' partito?» si fa
+   da ogni strada che porta la controparte, alla pagina dello scambio e
+   alla fine di ogni giro dell'archivio, e un invio caduto si riprova
+   dopo `P2P_METODO_RIPROVA_MS`.
+   LA REGOLA DEI CAMPI («nessun rinvio automatico») NON SI ROVESCIA:
+   vale per il recapito, dove un rinvio puo' scavalcare una correzione.
+   Il metodo e' un fatto deciso alla presa e non cambia piu': mandarlo
+   due volte dice due volte la stessa cosa, e il lettore tiene il piu'
+   recente — che e' uguale. */
+let p2pMetodoInviato = {};      // per sessione: 'in-corso' | 'fatto' | ora del tentativo caduto
+let P2P_METODO_RIPROVA_MS = 60000;   // `let`: il banco lo accorcia
+/* PURA: il metodo che questo telefono deve ancora dire all'altra parte,
+   o ''. Solo chi ha PRESO ce l'ha scritto sulla riga; non se e' gia'
+   partito (da questo o da un altro dispositivo: l'eco lo scrive in
+   `campiMiei`), non prima di sapere con chi, non a scambio finito, e
+   mai un metodo fuori dall'elenco dell'ordine. */
+function metodoDaDireP2P(o){
+  if (!o || !o.metodoScelto || !o.peer) return '';
+  if ((o.campiMiei || {}).metodo) return '';
+  if (typeof P2P_FINALI !== 'undefined' && P2P_FINALI.indexOf(o.stato) >= 0) return '';
+  return (o.metodi || []).indexOf(o.metodoScelto) >= 0 ? o.metodoScelto : '';
+}
 function pianificaMetodoP2P(id){
-  if (p2pMetodoInviato[id]) return;
   const o = ordiniP2P()[id];
-  /* solo chi ha PRESO ce l'ha scritto sulla riga, e solo se non e'
-     gia' partito da questo o da un altro dispositivo */
-  if (!o || !o.metodoScelto || (o.campiMiei || {}).metodo) return;
+  const m = metodoDaDireP2P(o);
+  /* ...e lo stesso fatto al server, per l'avviso a chi ha pubblicato
+     (vedi `avvisaMetodoP2P`): ha le sue cinture, e parte anche se il
+     filo dei recapiti non c'e' ancora */
+  if (typeof avvisaMetodoP2P === 'function') avvisaMetodoP2P(id);
+  if (!m) return;
+  const st = p2pMetodoInviato[id];
+  if (st === 'in-corso' || st === 'fatto') return;
+  if (typeof st === 'number' && Date.now() - st < P2P_METODO_RIPROVA_MS) return;
   if (!chiaviChatOrdine(o)) return;
-  p2pMetodoInviato[id] = 1;
-  /* SE NON PARTE NON SI RIPROVA da solo, la regola dei campi: chi
-     vende sceglie come ieri, e a valere e' il metodo del suo
-     recapito — che il testo composto NOMINA sempre. */
-  campoInvia(o, 'metodo', o.metodoScelto).catch(() => {});
+  p2pMetodoInviato[id] = 'in-corso';
+  campoInvia(o, 'metodo', m)
+    .then(() => { p2pMetodoInviato[id] = 'fatto'; })
+    .catch(() => { p2pMetodoInviato[id] = Date.now(); });
+}
+/* il giro su tutti gli scambi: dopo l'archivio del server e la restore,
+   che sono le due strade da cui la controparte arriva senza passare dal
+   messaggio del coordinatore */
+function pianificaMetodiP2P(){
+  const tutti = ordiniP2P();
+  for (const id in tutti) if (tutti[id] && tutti[id].metodoScelto && tutti[id].peer) pianificaMetodoP2P(id);
+}
+
+/* ---- LA SCELTA SI VEDE, DI QUA E DI LA' (13 nov 2026, cantiere
+   rete-scelta, Andrea: «non vedo quale chain hai scelto», e con gli
+   euro «non vedo se ha scelto SEPA o SEPA Instant») ----
+   Una riga in cima allo scambio, sotto il conto: chi ha preso legge la
+   sua scelta, chi ha pubblicato quella arrivata — o che non e' ancora
+   arrivata, e che allora la chieda in chat prima di dare un recapito o
+   di pagare. Solo sugli ordini con PIU' di un metodo: con uno solo non
+   c'era niente da scegliere, e la riga sarebbe un'etichetta in piu'.
+   E sotto, rossa, la riga che non deve mancare: il recapito che e'
+   viaggiato e' di un'ALTRA forma rispetto alla scelta (Tron scelto, un
+   indirizzo Ethereum arrivato). Non ferma niente — i due possono
+   essersi accordati in chat — ma lo dice a chi paga e a chi l'ha dato. */
+/* PURA: il nome di un metodo come si legge in una frase: gli USDT con la
+   loro rete («USDT su Tron»), il resto com'e' */
+function nomeMetodoSceltoP2P(m){
+  const r = typeof reteUsdtDaMetodoP2P === 'function' ? reteUsdtDaMetodoP2P(m) : null;
+  return r ? 'USDT su ' + r.nome : String(m || '');
+}
+/* PURA: la forma (e un nome da dire) del recapito che e' viaggiato, o
+   null se non c'e' o non si riconosce. Le stesse forme del foglio
+   (`P2P_FORME_RECAPITO`), lette sulla PRIMA riga, che il testo composto
+   dedica sempre al metodo; gli USDT e le monete dalla riga «Rete». */
+function formaDelRecapitoP2P(testo){
+  const righe = righeRecapitoP2P(testo);
+  if (!righe.length) return null;
+  const u = typeof reteUsdtDaRecapitoP2P === 'function' ? reteUsdtDaRecapitoP2P(righe) : null;
+  if (u) return {forma: 'usdt-' + u.rete.rete, nome: u.rete.metodo};
+  const c = typeof reteCoinDaRecapitoP2P === 'function' ? reteCoinDaRecapitoP2P(righe) : null;
+  if (c) return {forma: 'coin-' + c.rete.chiave, nome: c.rete.metodo};
+  const r0 = righe[0];
+  const prima = r0.testa || (r0.et ? r0.et + ': ' + r0.v : r0.v);
+  const f = P2P_FORME_RECAPITO.find(f => !f.usdt && !f.coin && f.riconosce.test(prima));
+  return f ? {forma: f.forma, nome: String(r0.testa || r0.et || r0.v).slice(0, 40)} : null;
+}
+/* PURA: {scelto, recapito} se il recapito viaggiato e' di un'altra
+   forma rispetto al metodo scelto, o null. SEPA e SEPA Instant sono la
+   stessa forma (lo stesso IBAN): non e' un errore. Un recapito che non
+   si riconosce non dice niente, e nemmeno una scelta di forma «altro». */
+function metodoDiversoP2P(o){
+  if (!o || (o.metodi || []).length < 2) return null;
+  const scelto = metodoSceltoP2P(o);
+  if (!scelto) return null;
+  const rec = formaDelRecapitoP2P(testoRecapitoScambioP2P(o));
+  if (!rec) return null;
+  const fs = formaRecapito(scelto).forma;
+  if (/^altro/.test(fs) || fs === rec.forma) return null;
+  return {scelto: scelto, recapito: rec};
+}
+/* PURA: le righe in cima allo scambio (la scelta, l'attesa, il recapito
+   diverso), o '' */
+function rigaMetodoSceltoP2P(o){
+  if (!o || !o.peer || (o.metodi || []).length < 2) return '';
+  if (P2P_FINALI.indexOf(o.stato) >= 0) return '';
+  const usdt = typeof usdtP2P === 'function' && usdtP2P(o);
+  const altro = nomeControparteP2P(o, o.lato === 'vendo' ? 'Chi compra' : 'Chi vende');
+  const scelto = metodoSceltoP2P(o);
+  const mia = !!o.metodoScelto;
+  const nota = (ico, testo) => '<div class="trust-note p2p-metodo-scelto"><span>' + ico + '</span><span>' + testo + '</span></div>';
+  let h;
+  if (scelto) {
+    const nome = '<b>' + esc(nomeMetodoSceltoP2P(scelto)) + '</b>';
+    h = nota('🔗', mia
+      ? 'Hai scelto ' + nome + ': lo scambio si fa così.'
+      : esc(altro) + ' ha scelto ' + nome + '. '
+        + (o.lato === 'vendo'
+          ? (usdt ? 'Indica dove ricevere su questa rete.' : 'Indica dove ricevere con questo metodo.')
+          : (usdt ? 'Manda gli USDT su questa rete.' : 'Paga con questo metodo.')));
+  } else if (o.mio) {
+    h = nota('⏳', esc(altro) + ' non ha ancora detto quale ' + (usdt ? 'rete' : 'metodo') + ' ha scelto. '
+      + 'Chiediglielo in chat prima di ' + (o.lato === 'vendo' ? 'indicare dove ricevere.' : 'pagare.'));
+  } else return '';
+  const d = metodoDiversoP2P(o);
+  if (d) {
+    const chi = mia ? 'Hai scelto' : esc(altro) + ' ha scelto';
+    const sc = '<b>' + esc(nomeMetodoSceltoP2P(d.scelto)) + '</b>';
+    const rc = '<b>' + esc(nomeMetodoSceltoP2P(d.recapito.nome)) + '</b>';
+    h += '<div class="trust-note p2p-metodo-diverso" style="background:var(--rosso-p2p-tenue);color:var(--rosso-p2p-testo)"><span>⛔</span><span>'
+      + (o.lato === 'vendo'
+        ? chi + ' ' + sc + ', ma il tuo recapito è per ' + rc + '. Aggiornalo prima che ti paghi.'
+        : chi + ' ' + sc + ', ma il recapito arrivato è per ' + rc + '. Non pagare: scrivilo in chat e chiedi di aggiornarlo.')
+      + '</span></div>';
+  }
+  return h;
+}
+/* PURA: la riga del metodo in testa alla chat dello scambio, o '' */
+function rigaChatMetodoP2P(o){
+  if (!o || o.mercatino || (o.metodi || []).length < 2) return '';
+  const scelto = metodoSceltoP2P(o);
+  if (scelto) return '<div class="chatsc-avviso p2p-chat-metodo"><span>🔗</span><span>Metodo scelto: <b>'
+    + esc(nomeMetodoSceltoP2P(scelto)) + '</b></span></div>';
+  return o.mio ? '<div class="chatsc-avviso p2p-chat-metodo"><span>⏳</span><span>'
+    + ((typeof usdtP2P === 'function' && usdtP2P(o)) ? 'La rete scelta non è ancora arrivata'
+                                                       : 'Il metodo scelto non è ancora arrivato')
+    + ': chiedilo qui.</span></div>' : '';
 }
 
 /* il metodo su cui sta il form: quello scelto con le pillole se
@@ -86970,12 +87113,17 @@ function pianificaMetodoP2P(id){
    e solo alla fine il primo che ha un ricordo */
 function metodoRecapitoScelto(o){
   const metodi = (o && o.metodi && o.metodi.length) ? o.metodi : [''];
-  if (metodi.indexOf(p2pCampoMetodo) >= 0) return p2pCampoMetodo;
   /* ⚠️ LA SCELTA DI CHI PRENDE BATTE IL RICORDO, ed e' il punto di
      tutto il cantiere: mandare l'IBAN a chi ha scelto Satispay
-     vuol dire far ricominciare l'accordo a voce. */
+     vuol dire far ricominciare l'accordo a voce.
+     ...E BATTE ANCHE LA PILLOLA TOCCATA PRIMA (13 nov 2026, cantiere
+     rete-scelta): chi vende aveva toccato «Ethereum» quando la scelta
+     non c'era ancora; arrivata «Tron», le pillole spariscono — e il
+     foglio restava su Ethereum, col giudice di Ethereum, senza piu' un
+     modo di vederlo. Adesso la scelta arrivata vince sempre. */
   const deciso = metodoSceltoP2P(o);
   if (deciso) return deciso;
+  if (metodi.indexOf(p2pCampoMetodo) >= 0) return p2pCampoMetodo;
   const salvati = recapitiMiei();
   return metodi.find(m => salvati[formaRecapito(m).forma]) || metodi[0];
 }
@@ -87254,6 +87402,10 @@ function renderCampiP2P(){
     parteEuro =
       (metodi.length > 1 && !deciso
         ? '<div class="field"><label>' + ((typeof usdtP2P === 'function' && usdtP2P(o)) ? 'Su quale rete ricevi gli USDT' : 'Con quale metodo ricevi gli euro') + '</label>' +
+          /* la scelta di chi prende non e' ancora arrivata (13 nov 2026,
+             cantiere rete-scelta): prima di scegliere da solo, chiedere */
+          (o.mio && o.peer ? '<div class="hint">⏳ ' + esc(nomeControparteP2P(o, 'Chi compra')) + ' non ha ancora detto quale '
+            + ((typeof usdtP2P === 'function' && usdtP2P(o)) ? 'rete' : 'metodo') + ' ha scelto: chiediglielo in chat prima di inviare.</div>' : '') +
           '<div class="p2p-metodi">' + metodi.map(m =>
             '<button type="button" class="tema-pill'
             + (m === scelto ? ' active' : '')
@@ -88665,7 +88817,9 @@ const P2P_DELLA_PRESA = ['peer', 'hold', 'satsMiei', 'satsNetti', 'importoScelto
      stesso id, un giro nuovo»): la cauzione, l'incasso, la disputa e il
      suo moderatore, la chat, i recapiti e la scadenza della fattura */
   'cauzione', 'incasso', 'moderatore', 'disputaId', 'annulloDisputa', 'chatMod',
-  'chatModNuovi', 'campiNuovi', 'recapitoFermo', 'recapitoAltrove', 'fatturaScade'];
+  'chatModNuovi', 'campiNuovi', 'recapitoFermo', 'recapitoAltrove', 'fatturaScade',
+  /* ...e l'avviso del metodo scelto (13 nov 2026, cantiere rete-scelta) */
+  'metodoAvvisato'];
 function riparaChiaveMakerP2P(id, locali){
   const mz = mazzoMostro();
   const tutti = locali || ordiniP2P();
@@ -88897,6 +89051,10 @@ function adottaOrdiniAltroveP2P(locali){
     });
     nati++;
   }
+  /* la controparte puo' essere arrivata da qui, senza il messaggio del
+     coordinatore: il metodo scelto riparte se non e' ancora partito
+     (13 nov 2026, vedi «LA SCELTA RIPARTE FINCHE' NON E' ARRIVATA») */
+  if (typeof pianificaMetodiP2P === 'function') pianificaMetodiP2P();
   return nati;
 }
 /* ═══ L'ARCHIVIO DEL SERVER: I MIEI SCAMBI SU OGNI DISPOSITIVO ═══════
@@ -89330,6 +89488,10 @@ function adottaScambiServerP2P(locali){
     if (typeof archiviaRitiratoP2P === 'function') archiviaRitiratoP2P(o.id);
     nati++;
   }
+  /* la controparte puo' essere arrivata da qui, senza il messaggio del
+     coordinatore: il metodo scelto riparte se non e' ancora partito
+     (13 nov 2026, vedi «LA SCELTA RIPARTE FINCHE' NON E' ARRIVATA») */
+  if (typeof pianificaMetodiP2P === 'function') pianificaMetodiP2P();
   return nati;
 }
 /* ---- «I tuoi scambi», in cima al libro ----
@@ -94654,6 +94816,43 @@ function avvisaRecapitoP2P(id){
       scriviOrdineP2P(agg);
     }).catch(() => {});
 }
+/* ---- IL METODO SCELTO, ANCHE SU TELEGRAM (13 nov 2026, cantiere
+   rete-scelta, Andrea: «aggiungi anche la notifica del bot») ----
+   Chi ha preso dice al server QUALE dei metodi dell'ordine ha scelto, e
+   il server lo scrive a chi ha pubblicato: «ha scelto USDT su Tron». E'
+   la gemella di `avvisaRecapitoP2P`, con meno da dire: il metodo non e'
+   un segreto — sta gia' nell'elenco pubblico dell'ordine, ne' piu' ne'
+   meno — e il recapito resta fuori dal filo come sempre. Una volta per
+   scambio (`metodoAvvisato`, e il server tiene il suo anti-doppione),
+   solo su un ordine con piu' di un metodo, e a scambio vivo. Un invio
+   caduto si riprova al giro dopo, non prima di un minuto. */
+let p2pMetodoAvvisoTentati = {};
+function avvisaMetodoP2P(id){
+  if (typeof VETRINA !== 'undefined' && VETRINA) return;
+  if (typeof DEMO !== 'undefined' && DEMO) return;
+  if (!myTgId) return;
+  const o = ordiniP2P()[id];
+  if (!o || o.mio || !o.metodoScelto || !o.peer || !idMostroVero(o.id)) return;
+  const metodi = o.metodi || [];
+  if (metodi.length < 2 || metodi.indexOf(o.metodoScelto) < 0) return;
+  if (P2P_FINALI.indexOf(o.stato) >= 0) return;
+  if (o.metodoAvvisato === o.metodoScelto) return;
+  const adesso = Date.now();
+  if ((p2pMetodoAvvisoTentati[id] || 0) > adesso - 60000) return;
+  p2pMetodoAvvisoTentati[id] = adesso;
+  fetch(`${API_BASE}/p2p/metodo`, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify({ordine: o.id, metodo: o.metodoScelto})})
+    .then(r => (r && r.ok) ? r.json() : null)
+    .then(j => {
+      /* «riprova» = il server non sa ancora dello scambio: al giro dopo */
+      if (!j || j.riprova) return;
+      const agg = ordiniP2P()[id];
+      if (!agg) return;
+      agg.metodoAvvisato = agg.metodoScelto;
+      scriviOrdineP2P(agg);
+    }).catch(() => {});
+}
 
 /* ═══ LA CHAT NELLO SCAMBIO (12 ott 2026, cantiere chat-nello-scambio,
    decisione di Andrea con Alan) ═══
@@ -96521,6 +96720,8 @@ function chatScBloccoHTML(o, c, sa){
   return '<div class="chatmod chatsc" id="p2pChatSc">'
     + '<b>💬 Chat con ' + esc(chatScNomeP2P(o, merc ? (o.lato === 'compro' ? 'chi vende' : 'chi compra') : 'l\'altra persona')) + '</b>'
     + '<div class="chatsc-avviso"><span>🛡️</span><span>' + esc(merc ? CHATSC_MERC_AVVISO : CHATSC_AVVISO) + '</span></div>'
+    /* il metodo scelto in testa alla chat (13 nov 2026, cantiere rete-scelta) */
+    + (!merc && typeof rigaChatMetodoP2P === 'function' ? rigaChatMetodoP2P(o) : '')
     + '<div class="chatmod-lista" id="p2pChatScLista">' + chatScListaP2P(o, c) + '</div>'
     + '<div id="p2pChatScPiede" data-modo="' + piede.modo + '">' + piede.html + '</div>'
     + '<div class="hint">🔒 ' + esc(merc ? (o.ferma ? CHATSC_MERC_PATTO_FERMA : CHATSC_MERC_PATTO) : CHATSC_PATTO) + '</div>'
