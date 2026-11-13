@@ -80408,3 +80408,67 @@ messaggio), i conti in
 `staticData.tappo_conti` di qualche giorno: quante PASSA, e se i pezzi
 scelti bastano. Se l'esperto costa troppo, il budget del suo resto
 (30.000 caratteri) si abbassa nel nodo.
+
+## Il foglio «Quanto» e le card di un ordine in USDT parlano USDT, coi sats al cambio del dollaro (13 nov 2026, cantiere usdt-foglio-presa, Andrea in produzione: «la card parla usdt, poi mi fa inserire euro», «infatti il controvalore è riferito a euro e non usdt»)
+
+PERCHÉ. Su un ordine in USDT a intervallo (nel libro: «Invia da 50,00
+a 276,00 USDT, scegli tu») il foglio della presa diceva «Quest'offerta
+va da 50,00 € a 276,00 €», «QUANTI EURO» e «€50», e sopra la pagina
+«Metodo di pagamento — come invii gli euro». Peggio i sats: il foglio
+diceva «Riceverai circa 412 942 sats» per 276, il conto subito dopo ne
+diceva circa 373 000. La causa è UNA: `satsMercatoP2P` sceglie il metro
+(euro o dollaro) da `perSatP2P(o)`, che guarda la valuta e i metodi
+dell'ordine; il foglio (`quantoValeP2P`), il capo ALTO della card
+(`rigaOrdineP2P`) e quello delle card di «I miei scambi»
+(`satsScambioP2P`) lo chiamavano con un oggetto nuovo, `{euro,
+premium}`, senza valuta né metodi, e il metro diventava quello
+dell'euro. Il capo basso della card passava l'ordine intero ed era
+giusto: per questo la card diceva «da 67 464 a 411 744 sats», un capo
+in dollari e uno in euro. La cifra vera la fa il coordinatore col
+prezzo `pegged` (1 USDT = 1 $), quindi il foglio PROMETTEVA circa il
+10% di sats in più di quelli che sarebbero arrivati. Sul tetto nessun
+errore: 276 USDT sono i 250 € del tetto al cambio di quel momento
+(`tettoValutaP2P`, 250 × dollari per euro).
+
+COSA. (1) Le chiamate a `satsMercatoP2P` con una cifra diversa da
+quella della riga portano `fiat` e `metodi` (foglio, capo alto della
+card, capo alto di «I miei scambi», conto del dettaglio, base della
+cauzione); i metodi servono perché la riga che nasce dal server può
+aver perso la valuta, e `valutaOrdineP2P` la ritrova da lì. (2) Il
+foglio «Quanto» prende segno e nome dal giudice della valuta
+(`segnoMonetaP2P`, `usdtP2P`): «da 50,00 USDT a 276,00 USDT», «Quanti
+USDT», «USDT» davanti al campo (con un respiro, `.pre-parola`: «USDT50»
+si leggeva come una parola), e il messaggio fuori fascia. (3) La riga
+dei metodi dice «come invii/ricevi gli USDT». (4) Nel conto del
+dettaglio il cambio in chiaro dice «1 BTC ≈ … USDT» al dollaro (prima
+l'euro); senza dollaro vero tace, come le stime. (5) «Come funziona»
+passa dal traduttore della pagina dello scambio (`paroleUsdtP2P`):
+«Invii gli USDT col metodo scelto». Sugli ordini in euro non cambia
+una lettera, provato.
+
+SCARTATO. Una funzione nuova «sats di una cifra» al posto delle
+chiamate ritoccate: sei righe toccate, la stessa forma di quella della
+cauzione che già passava i metodi. Toccare `paroleUsdtHtmlP2P`
+sull'intero dettaglio: tradurrebbe anche testi che non sono soldi, e la
+pagina dello scambio lo fa già solo dentro scatole scelte.
+
+PROVATO. `prove_usdt_foglio_presa` (nuova, 19 controlli): i pezzi veri
+in node — foglio, stima, card, «I miei scambi», titolo dei metodi,
+cambio del conto, «Come funziona» — su un ordine in USDT, uno in euro
+con la stessa fascia, uno che ha perso la valuta e uno nel verso
+«Vendi BTC»; e una sentinella che nessuna chiamata a `satsMercatoP2P`
+con la cifra resti senza valuta. Controprove: tolta ogni correzione una
+alla volta (dodici rotture), la sua riga diventa rossa. Giro nel
+browser (Chromium, la pagina vera con un libro di cartone: un ordine
+USDT 50-276 e il suo gemello in euro, euro a 1/1590 sat e dollaro a
+1,104): prima «Riceverai circa 412 510 sats» col € e il conto a 373 650;
+dopo foglio, card e conto dicono tutti 373 650, e nel dettaglio USDT
+nessuna riga con «euro» o «€»; quello in euro identico a prima.
+Suite severa sull'albero del cantiere (da develop cab3ce6a), in un
+venv senza coincurve con le sole dipendenze del workflow: 27448 verdi,
+0 rosse, 2 saltate d'ambiente (nostr-tools, lo script della 10002: non
+c'è nel container). Collaudi della CI nello stesso venv: 124 verdi, 0
+rossi. Due banchi vecchi (`prove_p2p_dettaglio`, `prove_p2p_pubblica`)
+ritagliano `quantoValeP2P` e ora si portano dietro anche il suo segno.
+Da guardare: dopo la promozione, dal telefono, lo stesso ordine USDT
+del libro (foglio, conto, «Come funziona»).

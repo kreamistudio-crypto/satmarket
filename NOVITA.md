@@ -104,3 +104,9 @@ frase: In cima al libro del P2P c'è un rettangolo verde «USDT · Novità»: to
 dove: la scheda «P2P», in cima al libro degli ordini (Compra BTC e Vendi BTC).
 leva: P2P_USDT_ATTIVO (nessuna leva nuova)
 pubblico: no
+
+## 2026-11-13 · usdt-foglio-presa
+frase: Negli ordini P2P in USDT con un intervallo, quando scegli quanto scambiare il foglio ora parla USDT come la card: «Quanti USDT», la fascia in USDT, e i sats che ricevi contati al cambio del dollaro, gli stessi del conto che vedi subito dopo. Anche «come invii gli USDT», «Come funziona» e il cambio «1 BTC ≈ … USDT» nella pagina dell'ordine.
+dove: la scheda «P2P», toccando un ordine in USDT con «scegli tu» nel libro.
+leva: P2P_USDT_ATTIVO (nessuna leva nuova)
+pubblico: no
