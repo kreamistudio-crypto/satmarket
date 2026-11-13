@@ -16005,6 +16005,14 @@ async def orologio_cambio():
                 print("⚠️ Cambio BTC/EUR: CoinGecko non risponde da dieci "
                       "minuti. Vale l'ultimo cambio noto finché non "
                       "invecchia; si continua a riprovare.", flush=True)
+        # ...e ETH e XMR, SOLO sull'istanza di prova (13 nov 2026, cantiere
+        # eth-xmr): in produzione il giro resta quello di ieri, una
+        # domanda sola a CoinGecko. Vedi «ETH E XMR NEL P2P».
+        if p2p_coin_acceso():
+            try:
+                await _rileggi_cambio_coin()
+            except Exception:
+                pass
         if CAMBIO_RINFRESCO_S <= 0:
             # Leva spenta: la lettura del boot si fa lo stesso (o il
             # primo che compra pagherebbe lui il giro di rete), poi il
@@ -16059,10 +16067,15 @@ def cambio_da_solo():
     # (1 nov 2026, cantiere p2p-usdt) anche il dollaro, dalla stessa
     # lettura: fa le stime in sats degli ordini in USDT (1 USDT = 1 $,
     # come il prezzo `pegged` del nodo). Mai nei percorsi del denaro.
-    return JSONResponse({"cambio_eur": cambio_noto_ora(),
-                         "cambio_usd": cambio_noto_ora("usd"),
-                         "cambio_eta_s": cambio_eta_ora()},
-                        headers={"Cache-Control": "no-store"})
+    busta = {"cambio_eur": cambio_noto_ora(),
+             "cambio_usd": cambio_noto_ora("usd"),
+             "cambio_eta_s": cambio_eta_ora()}
+    # ...e quanti euro vale un ETH e un XMR (13 nov 2026, cantiere
+    # eth-xmr), solo sull'istanza di prova: la cifra da mandare negli
+    # scambi pagati in ETH o in Monero. Sempre la cache, mai la rete.
+    if p2p_coin_acceso():
+        busta["cambio_coin"] = cambio_coin_noto_ora()
+    return JSONResponse(busta, headers={"Cache-Control": "no-store"})
 
 
 # ==================== LA FEE DINAMICA (set 2026) =======================
@@ -48201,6 +48214,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # ...e gli USDT negli scambi on-chain col 2-di-3 (2 nov 2026, cantiere
     # p2p-onchain-usdt): la leva sua sotto i due cancelli di sopra
     profilo["p2p_onchain_usdt"] = p2p_onchain_usdt_ammesso(user["id"])
+    # ...e i metodi ETH e XMR (13 nov 2026, cantiere eth-xmr): solo
+    # sull'istanza di prova. Vedi «ETH E XMR NEL P2P».
+    profilo["p2p_coin"] = p2p_coin_ammesso(user["id"])
     # dove ricevo on-chain quando vendo ('' = da nessuna parte, e quindi
     # niente on-chain per i miei annunci): la voce di «Completa il
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
@@ -54516,6 +54532,79 @@ def p2p_usdt_ammesso(tg_id) -> bool:
     if P2P_USDT_SOLO_ADMIN and not e_admin(tg_id):
         return False
     return bool(_p2p_per(tg_id)["attivo"])
+
+
+# ═══ ETH E XMR NEL P2P (13 nov 2026, cantiere eth-xmr, richiesta di
+# AndreAI: «in collaudo aggiungi nel P2P anche Ethereum e Monero come
+# altre coin, tanto l'escrow è sempre Bitcoin onchain o LN»). ═════════
+# NON SONO VALUTE COME L'USDT, e il perche' e' il protocollo: Mostro
+# porta la cifra in `fiat_amount`, un intero, e un ordine «in ETH» si
+# potrebbe scrivere solo a ETH interi (uno vale migliaia di euro) — e
+# il nodo dovrebbe anche saperli prezzare. Quindi l'ordine resta IN
+# EURO, e «ETH (Ethereum)» e «XMR (Monero)» sono due METODI, come
+# Revolut: chi paga manda l'equivalente al cambio di adesso, da persona
+# a persona, sulla sua catena. La garanzia resta la hold invoice in
+# sats di sempre; Barattolo ETH e XMR non li tocca mai. Indirizzo, cifra,
+# QR, id della transazione e link all'explorer li fa il TELEFONO
+# (blocco «ETH E XMR COME METODI» di miniapp.html): qui stanno il
+# cancello e il cambio.
+# IL CANCELLO E' L'ISTANZA DI PROVA, senza leva nel config: la lista di
+# `PROVA_SOLO_IDS` piena e' il segno che questa non e' la produzione,
+# come per i widget di prova. Il giorno della produzione si mette una
+# leva qui, e il resto non cambia.
+def p2p_coin_acceso() -> bool:
+    """La funzione esiste su questo server? Solo sull'istanza di prova,
+    e solo col P2P acceso."""
+    return bool(PROVA_SOLO_IDS) and bool(_p2p_leve()["attivo"])
+
+
+def p2p_coin_ammesso(tg_id) -> bool:
+    """Chi vede i metodi ETH e XMR: sull'istanza di prova, chi ha il P2P."""
+    return p2p_coin_acceso() and bool(_p2p_per(tg_id)["attivo"])
+
+
+# IL CAMBIO DI ETH E XMR: una domanda a CoinGecko accanto a quella di
+# sempre, nello stesso orologio (`orologio_cambio`), e una cache sua. Il
+# prezzo di un altcoin si muove piu' del bitcoin, e la cifra da mandare
+# conta: oltre un quarto d'ora la cifra tace invece di inventare.
+CAMBIO_COIN_VALIDO_S = 15 * 60
+CAMBIO_COIN_RIPROVA_S = 60
+_cambio_coin_cache = {"eth": 0.0, "xmr": 0.0, "quando": 0.0, "tentato": 0.0}
+
+
+def cambio_coin_noto_ora() -> dict:
+    """Quanti euro vale UN ETH e UN XMR, adesso, dalla cache: 0 = non lo
+    so (mai letto, o piu' vecchio di un quarto d'ora). Mai la rete."""
+    fresco = (time.time() - _cambio_coin_cache["quando"]) < CAMBIO_COIN_VALIDO_S
+    return {k: (_cambio_coin_cache[k] if fresco and _cambio_coin_cache[k] > 0 else 0.0)
+            for k in ("eth", "xmr")}
+
+
+async def _rileggi_cambio_coin() -> bool:
+    """Una lettura vera, al piu' una al minuto. True se e' andata. Una
+    moneta che non arriva non cancella quella di prima."""
+    adesso = time.time()
+    if adesso - _cambio_coin_cache["tentato"] < CAMBIO_COIN_RIPROVA_S:
+        return False
+    _cambio_coin_cache["tentato"] = adesso
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get("https://api.coingecko.com/api/v3/simple/price",
+                            params={"ids": "ethereum,monero",
+                                    "vs_currencies": "eur"})
+            r.raise_for_status()
+            j = r.json()
+            letti = {"eth": float((j.get("ethereum") or {}).get("eur") or 0),
+                     "xmr": float((j.get("monero") or {}).get("eur") or 0)}
+    except Exception:
+        return False
+    if not any(v > 0 for v in letti.values()):
+        return False
+    for k, v in letti.items():
+        if v > 0:
+            _cambio_coin_cache[k] = v
+    _cambio_coin_cache["quando"] = time.time()
+    return True
 
 
 def _p2p_per(tg_id) -> dict:

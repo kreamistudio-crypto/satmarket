@@ -3140,6 +3140,14 @@
   .p2p-tessera-usdt{background:#26A17B}
   .p2p-tessera-eur .p2p-tessera-svg{width:34px;height:34px;display:block}
   .p2p-tessera-usdt .p2p-tessera-svg{width:26px;height:26px;display:block}
+  /* ETH E XMR (13 nov 2026, cantiere eth-xmr): il logo intero, col suo
+     cerchio sul fondo dello stesso colore — si vede il segno */
+  .p2p-tessera-eth{background:#627EEA}
+  .p2p-tessera-xmr{background:#F60}
+  .p2p-tessera-coin .p2p-coin-svg{width:34px;height:34px;display:block}
+  /* il logo piccolo davanti al nome del metodo: card, pillole, tendina */
+  .p2p-coin-ico{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.22em;margin-right:5px}
+  .p2p-coin-ico .p2p-coin-svg{width:100%;height:100%;display:block}
   .p2p-tessera-rete .cambio-moneta.p2p-oc-moneta{width:34px;height:34px;
     border-radius:inherit}
   .p2p-tessera-rete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:20px;height:20px}
@@ -3157,6 +3165,7 @@
     .p2p-tessera{width:30px;height:30px;border-radius:9px}
     .p2p-tessera-eur .p2p-tessera-svg{width:30px;height:30px}
     .p2p-tessera-usdt .p2p-tessera-svg{width:23px;height:23px}
+    .p2p-tessera-coin .p2p-coin-svg{width:30px;height:30px}
     .p2p-tessera-rete .cambio-moneta.p2p-oc-moneta{width:30px;height:30px}
     .p2p-tessera-rete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:18px;height:18px}
     .p2p-tessera .p2p-rete-badge{right:-4px;width:13px;height:13px}
@@ -26048,6 +26057,9 @@ function rileggiCambio(){
       if (j) impostaOraCambio(j.cambio_eur, j.cambio_eta_s);
       const primaUsd = usdPerSat;
       if (j) impostaCambioUsd(j.cambio_usd);
+      /* ...e quanto vale un ETH e un XMR (13 nov 2026, cantiere eth-xmr):
+         c'e' solo sull'istanza di prova */
+      if (j && j.cambio_coin && typeof impostaCambioCoinP2P === 'function') impostaCambioCoinP2P(j.cambio_coin);
       return (cambioVivo && eurPerSat !== prima) || usdPerSat !== primaUsd;
     } catch(e) {
       return false;
@@ -59925,6 +59937,9 @@ let myP2PUsdt = false;
    p2p-onchain-usdt): `p2p_onchain_usdt` di /api/me. La garanzia resta il
    2-di-3 bitcoin; chi compra paga in USDT invece che in euro. */
 let myP2POnchainUsdt = false;
+/* ...e i metodi ETH e XMR (13 nov 2026, cantiere eth-xmr): `p2p_coin` di
+   /api/me, oggi solo sull'istanza di prova. Vedi «ETH E XMR COME METODI». */
+let myP2PCoin = false;
 let p2pOnchainLibro = {eventi: [], miei: [], quando: 0, rete: 'signet', minSats: 10000, oreDeposito: 6};
 let p2pOnchainMiei = [];        // /api/p2p/onchain/miei, gli ultimi trenta
 let p2pOnchainAperto = 0;       // lo scambio nella pagina; 0 = l'elenco
@@ -61226,7 +61241,11 @@ function apriPubblicaOnchainP2P(lato){
 
 /* i metodi che l'on-chain pubblica: quelli del lato, senza il tabacchino */
 function metodiOnchainP2P(lato){
-  return metodiPubblicabiliP2P(lato).filter(m => m !== P2P_TABACCHINO);
+  /* ETH e XMR non ancora sugli scambi on-chain (13 nov 2026, cantiere
+     eth-xmr): li' il recapito e l'id vivono nel server, e la loro strada
+     e' un passo a parte. Per ora solo su Lightning */
+  return metodiPubblicabiliP2P(lato).filter(m => m !== P2P_TABACCHINO
+    && !(typeof reteCoinDaMetodoP2P === 'function' && reteCoinDaMetodoP2P(m)));
 }
 
 /* ═══ GLI USDT NEGLI SCAMBI ON-CHAIN (2 nov 2026, cantiere
@@ -65630,6 +65649,12 @@ function tesseraValutaP2P(cod, metodi){
     return '<span class="p2p-tessera p2p-tessera-usdt" role="img" aria-label="USDT">'
       + P2P_TETHER_SEGNO + bollino + '</span>';
   }
+  /* UN ORDINE IN EURO CHE SI PAGA SOLO IN ETH O SOLO IN XMR (13 nov
+     2026, cantiere eth-xmr) veste il logo di quella moneta: e' quel che
+     chi paga manda davvero. La cifra resta in euro, e lo dice l'aria */
+  const coin = typeof coinUnicaP2P === 'function' ? coinUnicaP2P(metodi) : null;
+  if (coin) return '<span class="p2p-tessera p2p-tessera-coin p2p-tessera-' + coin.chiave + '" role="img" aria-label="'
+    + esc(coin.coin) + ', al valore in euro">' + P2P_LOGHI_COIN[coin.chiave] + '</span>';
   return '<span class="p2p-tessera p2p-tessera-eur" role="img" aria-label="Euro">'
     + P2P_STELLE_EU + '</span>';
 }
@@ -65648,7 +65673,10 @@ function tesseraReteP2P(rete){
    contrario rete → valuta. L'aria dice la frase intera. */
 function coppiaCardP2P(cod, metodi, rete, invii){
   const v = tesseraValutaP2P(cod, metodi), r = tesseraReteP2P(rete);
-  const nome = String(cod || P2P_VALUTA).toUpperCase() === 'USDT' ? 'USDT' : 'euro';
+  const coin = typeof coinUnicaP2P === 'function' && String(cod || P2P_VALUTA).toUpperCase() === P2P_VALUTA
+    ? coinUnicaP2P(metodi) : null;
+  const nome = String(cod || P2P_VALUTA).toUpperCase() === 'USDT' ? 'USDT'
+    : coin ? coin.coin + ' (al valore in euro)' : 'euro';
   const sats = rete === 'btc' ? 'bitcoin on-chain' : 'sats su Lightning';
   const aria = invii ? 'Invia ' + nome + ', ricevi ' + sats : 'Invia ' + sats + ', ricevi ' + nome;
   return '<span class="p2p-coppia" role="img" aria-label="' + esc(aria) + '" title="' + esc(aria) + '">'
@@ -75704,7 +75732,7 @@ function recapitoCompratoreP2P(o){
   if (contanti && riquadroAppuntamentoP2P(o))
     return (P2P_PROGRESSO[o.stato] || 0) < P2P_PROGRESSO.attivo && P2P_FINALI.indexOf(o.stato) < 0
       ? '<div class="hint">⚠️ <b>Non consegnare ancora niente:</b> aspetta che questa pagina dica «Sats in garanzia».</div>' : '';
-  return riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : '')
+  return riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : '', o)
     /* IL RECAPITO PUO' ARRIVARE PRIMA DELLA GARANZIA (i dati del
        tabacchino partono alla presa, e un'app di ieri — o un altro
        client — manda ancora il recapito ricordato): finche' la pagina non
@@ -75763,7 +75791,7 @@ function righeRecapitoP2P(testo){
    compra doveva selezionarli col dito. Il giudice e' `daIncollareP2P`,
    qui sotto; il nome del metodo e le righe descrittive restano senza:
    con Revolut c'e' UN tasto, e la colonna del 23 set non torna. */
-function riquadroRecapitoP2P(testo, titolo){
+function riquadroRecapitoP2P(testo, titolo, o){
   const righe = righeRecapitoP2P(testo);
   if (!righe.length) return '';
   const FORMA_IBAN = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{8,30}$/;
@@ -75776,6 +75804,16 @@ function riquadroRecapitoP2P(testo, titolo){
     setTimeout(() => { const b = typeof el === 'function' ? el('p2pQrUsdt') : null;
                        if (b) disegnaQr(b, qr); }, 0);
   if (!titolo && usdt) titolo = '💵 Dove mandare gli USDT';
+  /* ETH E XMR (13 nov 2026, cantiere eth-xmr): il titolo con la moneta,
+     la cifra al cambio di adesso (con lo scambio in mano, `o`), il QR
+     col formato della catena e, su Ethereum, l'indirizzo sull'explorer */
+  const coin = !usdt && typeof reteCoinDaRecapitoP2P === 'function' ? reteCoinDaRecapitoP2P(righe) : null;
+  const euroCoin = coin && o ? Number(o.euro) || 0 : 0;
+  const qrCoin = coin ? qrCoinP2P(coin.rete, coin.indirizzo, importoCoinP2P(euroCoin, eurPerCoinP2P(coin.rete))) : '';
+  if (qrCoin && typeof disegnaQr === 'function' && typeof setTimeout === 'function')
+    setTimeout(() => { const b = typeof el === 'function' ? el('p2pQrCoin') : null;
+                       if (b) disegnaQr(b, qrCoin); }, 0);
+  if (!titolo && coin) titolo = '🪙 Dove mandare gli ' + coin.rete.coin;
   return '<div class="p2p-recapito">'
     + '<div class="p2p-paycode-tit">' + esc(titolo || '💶 Dove mandare gli euro') + '</div>'
     + righe.map(r => {
@@ -75789,18 +75827,60 @@ function riquadroRecapitoP2P(testo, titolo){
     + (qr ? '<div class="qr p2p-qr-usdt" id="p2pQrUsdt" role="img" aria-label="QR dell\'indirizzo USDT su '
             + esc(usdt.rete.nome) + '"></div>'
             + '<div class="hint">Inquadralo col wallet sulla rete <b>' + esc(usdt.rete.nome) + '</b>.</div>' : '')
+    + (coin ? (euroCoin ? riquadroCifraCoinP2P(coin.rete, coin.indirizzo, euroCoin)
+                        : linkIndirizzoCoinP2P(coin.rete, coin.indirizzo))
+        + '<div class="qr p2p-qr-usdt" id="p2pQrCoin" role="img" aria-label="QR dell\'indirizzo '
+        + esc(coin.rete.nome) + '"></div>'
+        + '<div class="hint">Inquadralo col wallet ' + esc(coin.rete.nome) + ': dentro ci sono indirizzo e cifra.</div>' : '')
     + '</div>';
 }
 /* PURA: dalle righe di un recapito, la rete USDT e l'indirizzo, o null
    (1 nov 2026, cantiere p2p-usdt). La rete si legge dalla riga «Rete»
    che scrive la nostra forma («Tron (TRC-20)»): il nome davanti. */
 function reteUsdtDaRecapitoP2P(righe){
+  /* «Rete: Ethereum (ETH)» e' di un recapito in ETH, non in USDT su
+     Ethereum (13 nov 2026, cantiere eth-xmr) */
+  if (typeof reteCoinDaRecapitoP2P === 'function' && reteCoinDaRecapitoP2P(righe)) return null;
   const riga = k => (righe || []).find(x => !x.testa && String(x.et || '').toLowerCase() === k);
   const rete = riga('rete'), ind = riga('indirizzo');
   if (!rete || !ind) return null;
   const nome = String(rete.v).split(' ')[0].toLowerCase();
   const r = P2P_RETI_USDT.find(x => x.nome.toLowerCase() === nome);
   return r ? {rete: r, indirizzo: String(ind.v).trim()} : null;
+}
+/* PURA: dalle righe di un recapito, la moneta (ETH o XMR) e l'indirizzo,
+   o null (13 nov 2026, cantiere eth-xmr). La riga «Rete» della nostra
+   forma dice «Ethereum (ETH)» o «Monero (XMR)»: nome e codice insieme. */
+function reteCoinDaRecapitoP2P(righe){
+  const riga = k => (righe || []).find(x => !x.testa && String(x.et || '').toLowerCase() === k);
+  const rete = riga('rete'), ind = riga('indirizzo');
+  if (!rete || !ind || typeof P2P_RETI_COIN === 'undefined') return null;
+  const m = /^(\S+)\s+\(([A-Za-z]+)\)$/.exec(String(rete.v).trim());
+  if (!m) return null;
+  const r = P2P_RETI_COIN.find(x => x.coin === m[2].toUpperCase() && x.nome.toLowerCase() === m[1].toLowerCase());
+  return r ? {rete: r, indirizzo: String(ind.v).trim()} : null;
+}
+/* IL RIQUADRO DELLA CIFRA IN ETH O XMR, per chi paga (13 nov 2026): la
+   cifra da mandare al cambio di adesso, da toccare e copiare, col
+   cambio scritto sotto; e su Ethereum l'indirizzo sull'explorer, per
+   vedere che e' un indirizzo vero prima di mandare. `euro` = la cifra
+   dello scambio. Senza cambio la cifra tace e lo dice. */
+function riquadroCifraCoinP2P(r, indirizzo, euro){
+  if (!r) return '';
+  const uno = eurPerCoinP2P(r);
+  const q = importoCoinP2P(euro, uno);
+  return (q
+      ? rigaDato('Da mandare', q + ' ' + r.coin, {vista: q.replace('.', ',') + ' ' + r.coin, mono: true, copia: true})
+        + '<div class="hint">Sono ' + esc(fmtEur(euro)) + ' € al cambio di adesso (1 ' + esc(r.coin) + ' ≈ '
+        + esc(fmt(Math.round(uno))) + ' €), arrotondati in su. Se il prezzo si muove di poco, va bene lo stesso.</div>'
+      : '<div class="hint">Il cambio di ' + esc(r.coin) + ' adesso non lo so: manda l\'equivalente di '
+        + esc(fmtEur(euro)) + ' € al cambio del tuo wallet.</div>')
+    + linkIndirizzoCoinP2P(r, indirizzo);
+}
+function linkIndirizzoCoinP2P(r, indirizzo){
+  const link = esploraCoinP2P(r, 'address', indirizzo);
+  return link ? '<a class="btn ghost" style="display:block;text-align:center;margin-top:6px" href="' + esc(link)
+    + '" target="_blank" rel="noopener">🔎 Vedi l\'indirizzo su ' + esc(r.esploraNome) + '</a>' : '';
 }
 /* la frase sotto il campo dell'indirizzo: la rete in chiaro, e per
    Ethereum il limite detto (lo stesso 0x vale anche su altre reti, che
@@ -76403,6 +76483,8 @@ function renderOrdineP2P(){
       /* il contanti di persona ha il suo verbo (1 ott 2026); in USDT
          prima del bottone il campo dell'id della transazione (1 nov 2026) */
       : (typeof campoTxidUsdtP2P === 'function' ? campoTxidUsdtP2P(o) : '')
+        /* ...e con ETH o XMR il suo (13 nov 2026, cantiere eth-xmr) */
+        + (typeof campoTxidCoinP2P === 'function' ? campoTxidCoinP2P(o) : '')
         + '<button class="btn orange" onclick="euroInviatiP2P()">✅ ' + esc(gestoPagoP2P(o)) + '</button>',
     /* il gesto di chi vende a garanzia bloccata (18 set 2026) */
     recapito: '<button class="btn orange" onclick="apriCampiP2P()">💶 Indica dove ricevere gli euro</button>',
@@ -76416,6 +76498,9 @@ function renderOrdineP2P(){
   /* in USDT il recapito e' un indirizzo su una rete (1 nov 2026, p2p-usdt) */
   if (typeof usdtP2P === 'function' && usdtP2P(o))
     bottoni.recapito = '<button class="btn orange" onclick="apriCampiP2P()">💵 Indica dove ricevere gli USDT</button>';
+  /* ...e con ETH o XMR un indirizzo di quella catena (13 nov 2026) */
+  const coinQui = typeof reteCoinScambioP2P === 'function' ? reteCoinScambioP2P(o) : null;
+  if (coinQui) bottoni.recapito = '<button class="btn orange" onclick="apriCampiP2P()">🪙 Indica dove ricevere gli ' + esc(coinQui.coin) + '</button>';
   if (contantiQui) bottoni.recapito = '<button class="btn orange" onclick="apriCampiP2P()">📍 Indica dove e quando vedervi</button>';
   /* ...e col PayCode il recapito E' il PayCode (15 ott 2026, lo scambio
      101e20d6): «dove ricevere gli euro» e' la frase dei bonifici, e chi
@@ -76486,6 +76571,8 @@ function renderOrdineP2P(){
     (o.txidUsdt && typeof usdtP2P === 'function' && usdtP2P(o)
       ? '<div class="p2p-recapito">' + rigaDato('Id della transazione', o.txidUsdt, {mono: true, copia: true})
         + (typeof esploraTxUsdtP2P === 'function' ? esploraTxUsdtP2P(o, o.txidUsdt) : '') + '</div>' : '') +
+    /* ...e quello degli ETH o degli XMR (13 nov 2026, cantiere eth-xmr) */
+    (typeof riquadroTxCoinP2P === 'function' ? riquadroTxCoinP2P(o) : '') +
     anelloneTabacchinoP2P(o) +
     '<div class="p2p-passi"><div class="steps">' +
       passi.map((p, i) => {
@@ -78128,9 +78215,132 @@ function usdtInviatiP2P(o){
     }
   });
 }
+/* ---- «HO INVIATO GLI ETH / GLI XMR» (13 nov 2026, cantiere eth-xmr) ----
+   Il calco di quello degli USDT: il campo dell'id SOPRA il bottone, col
+   suo giudice, e con Monero anche la chiave della transazione (vedi
+   «ETH E XMR COME METODI»: senza, nessuno puo' provare a chi sono andati).
+   Alla conferma tutto parte nella chat dello scambio — con Monero anche
+   l'indirizzo di chi riceve, cosi' i tre pezzi della prova stanno in un
+   messaggio solo — e resta sulla riga, visibile nella pagina. */
+let p2pChiaveXmrBozza = {};   // per scambio, la chiave che si sta scrivendo
+/* la moneta dello scambio: quella del recapito di chi vende (e' li' che
+   si manda: un recapito SEPA vuol dire euro, anche se l'ordine offre ETH),
+   poi il metodo scelto, poi l'ordine che si paga solo in quella moneta */
+function reteCoinScambioP2P(o){
+  if (!o || typeof P2P_RETI_COIN === 'undefined') return null;
+  const testo = ((o.campiLoro || {}).euro || {}).testo || '';
+  if (testo) {
+    const d = reteCoinDaRecapitoP2P(righeRecapitoP2P(testo));
+    return d ? d.rete : null;
+  }
+  const scelto = typeof metodoSceltoP2P === 'function' ? metodoSceltoP2P(o) : '';
+  if (scelto) return reteCoinDaMetodoP2P(scelto);
+  return coinUnicaP2P(o.metodi);
+}
+/* l'indirizzo di chi riceve, dal suo recapito, o '' */
+function indirizzoCoinScambioP2P(o){
+  const testo = ((o && o.campiLoro || {}).euro || {}).testo || '';
+  const d = testo ? reteCoinDaRecapitoP2P(righeRecapitoP2P(testo)) : null;
+  return d ? d.indirizzo : '';
+}
+function campoTxidCoinP2P(o){
+  const r = o && o.lato === 'compro' ? reteCoinScambioP2P(o) : null;
+  if (!r) return '';
+  const id = JSON.stringify(String(o.id)).replace(/"/g, '&quot;');
+  const v = p2pTxidBozza[o.id] !== undefined ? p2pTxidBozza[o.id] : (o.txidCoin || '');
+  const k = p2pChiaveXmrBozza[o.id] !== undefined ? p2pChiaveXmrBozza[o.id] : (o.chiaveTxCoin || '');
+  return '<div class="field"><label for="p2pTxidCoin">Id della transazione ' + esc(r.nome) + '</label>'
+    + '<input type="text" id="p2pTxidCoin" maxlength="80" autocomplete="off" autocapitalize="off" spellcheck="false" '
+    + 'placeholder="' + (r.forma === 'evm' ? '0x… (66 caratteri), dal tuo wallet' : '64 caratteri, dal tuo wallet') + '" '
+    + 'value="' + esc(v) + '" oninput="p2pTxidBozza[' + id + ']=this.value">'
+    + '<div class="hint">Lo trovi nei dettagli dell\'invio. Lo vedono chi vende e, in disputa, il moderatore.</div></div>'
+    + (r.forma === 'monero'
+      ? '<div class="field"><label for="p2pChiaveXmr">Chiave della transazione (tx key)</label>'
+        + '<input type="text" id="p2pChiaveXmr" maxlength="1100" autocomplete="off" autocapitalize="off" spellcheck="false" '
+        + 'placeholder="64 caratteri, nei dettagli dell\'invio" value="' + esc(k) + '" oninput="p2pChiaveXmrBozza[' + id + ']=this.value">'
+        + '<div class="hint">Monero è privato: con questa chiave chi vende vede che gli XMR sono arrivati proprio a lui. Non apre il tuo wallet.</div></div>'
+      : '');
+}
+function coinInviatiP2P(o){
+  const r = reteCoinScambioP2P(o);
+  if (!r) return;
+  const inp = el('p2pTxidCoin');
+  const txid = txidCoinNormaleP2P((inp && inp.value) || p2pTxidBozza[o.id] || o.txidCoin || '', r);
+  const no = giudiceTxidCoinP2P(txid, r);
+  if (no) { toast(no, 7000); if (inp) inp.focus(); return; }
+  let chiave = '';
+  if (r.forma === 'monero') {
+    const ik = el('p2pChiaveXmr');
+    chiave = String((ik && ik.value) || p2pChiaveXmrBozza[o.id] || o.chiaveTxCoin || '').replace(/\s+/g, '');
+    const nk = giudiceChiaveTxXmrP2P(chiave);
+    if (nk) { toast(nk, 7000); if (ik) ik.focus(); return; }
+  }
+  o.txidCoin = txid;
+  if (chiave) o.chiaveTxCoin = chiave;
+  scriviOrdineP2P(o);
+  const uno = eurPerCoinP2P(r);
+  const q = importoCoinP2P(o.euro, uno);
+  const indirizzo = indirizzoCoinScambioP2P(o);
+  chiediConferma({
+    titolo: 'Hai inviato gli ' + r.coin + '?',
+    corpo: 'Dillo solo dopo aver davvero mandato ' + (q ? q.replace('.', ',') + ' ' + r.coin + ' (' + fmtEur(o.euro) + ' €)'
+      : 'l\'equivalente di ' + fmtEur(o.euro) + ' € in ' + r.coin) + ' sulla rete ' + r.nome
+      + ' all\'indirizzo di chi vende. ' + (chiave ? 'Id e chiave della transazione partono' : 'L\'id della transazione parte')
+      + ' nella chat dello scambio. Chi vende controlla e libera i sats. Da qui non potrai più annullare: se qualcosa va storto, resta la disputa.',
+    etichetta: 'Sì, li ho inviati',
+    /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
+    poi: async () => {
+      await mossaOrdineP2P(o.id, 'fiat-sent', 'Fatto ✅', 'Sto avvisando che hai pagato…');
+      if (typeof chatScInviaP2P === 'function') {
+        try { await chatScInviaP2P(o.id, testoCoinInviatiP2P(r, txid, chiave, indirizzo)); }
+        catch(e) { /* la chat non c'e' ancora: l'id resta sulla riga e nella pagina */ }
+      }
+    }
+  });
+}
+/* PURE, GEMELLE: il messaggio di «Ho inviato» e la sua lettura. Quel che
+   una scrive l'altra legge; il link all'explorer lo fa sempre la lettura,
+   da pezzi che passano i giudici — mai un link scritto dall'altra parte */
+function testoCoinInviatiP2P(r, txid, chiave, indirizzo){
+  return '🧾 ' + r.coin + ' inviati su ' + r.nome + '. Id della transazione: ' + txid
+    + (chiave ? '. Chiave della transazione: ' + chiave : '')
+    + (chiave && indirizzo ? '. Indirizzo: ' + indirizzo : '');
+}
+function coinInviatiDaChatP2P(testo){
+  const m = /^🧾 (ETH|XMR) inviati su (\S+)\. Id della transazione: ([0-9a-fA-Fx]+)(?:\. Chiave della transazione: ([0-9a-fA-F]+))?(?:\. Indirizzo: ([1-9A-HJ-NP-Za-km-z]+))?$/
+    .exec(String(testo || '').trim());
+  if (!m || typeof P2P_RETI_COIN === 'undefined') return null;
+  const r = P2P_RETI_COIN.find(x => x.coin === m[1] && x.nome === m[2]);
+  if (!r || giudiceTxidCoinP2P(m[3], r)) return null;
+  const chiave = m[4] && !giudiceChiaveTxXmrP2P(m[4]) ? m[4] : '';
+  return {rete: r, txid: m[3], chiave: chiave, indirizzo: chiave ? (m[5] || '') : ''};
+}
+/* sotto il messaggio in chat: il tasto dell'explorer e, con Monero, i due
+   «📋 Copia» che servono alla prova */
+function esploraCoinDaChatP2P(testo){
+  const d = coinInviatiDaChatP2P(testo);
+  if (!d) return '';
+  const copia = (v, nome) => '<button type="button" class="chatsc-copia" data-l="' + esc(v) + '" '
+    + 'onclick="copiaLink(this.dataset.l, \'Copiato 📋\')">📋 ' + nome + '</button>';
+  return tastoEsploraCoinP2P(d.rete, d.txid)
+    + (d.chiave ? '<div class="chatsc-copie">' + copia(d.chiave, 'Copia la chiave')
+      + (d.indirizzo ? copia(d.indirizzo, 'Copia l\'indirizzo') : '') + '</div>' : '');
+}
+/* nella pagina dello scambio, a chi ha pagato: l'id (e la chiave), coi
+   loro «📋 Copia», e il tasto dell'explorer */
+function riquadroTxCoinP2P(o){
+  const r = o && o.txidCoin ? reteCoinScambioP2P(o) : null;
+  if (!r) return '';
+  return '<div class="p2p-recapito">' + rigaDato('Id della transazione', o.txidCoin, {mono: true, copia: true})
+    + (o.chiaveTxCoin ? rigaDato('Chiave della transazione', o.chiaveTxCoin, {mono: true, copia: true}) : '')
+    + tastoEsploraCoinP2P(r, o.txidCoin) + '</div>';
+}
 function gestoPagoP2P(o){
   /* in USDT il gesto dice USDT (1 nov 2026, cantiere p2p-usdt) */
   if (typeof usdtP2P === 'function' && usdtP2P(o)) return 'Ho inviato gli USDT';
+  /* ...e con ETH o XMR la sua moneta (13 nov 2026, cantiere eth-xmr) */
+  const coin = typeof reteCoinScambioP2P === 'function' ? reteCoinScambioP2P(o) : null;
+  if (coin) return 'Ho inviato gli ' + coin.coin;
   return typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o)
     ? 'Ho consegnato i contanti' : 'Ho inviato gli euro';
 }
@@ -78139,6 +78349,8 @@ function euroInviatiP2P(){
   if (!o) return;
   /* in USDT il gesto ha la sua strada: l'id della transazione prima */
   if (typeof usdtInviatiP2P === 'function' && usdtP2P(o) && reteUsdtScambioP2P(o)) return usdtInviatiP2P(o);
+  /* ...e con ETH o XMR anche (13 nov 2026, cantiere eth-xmr) */
+  if (typeof coinInviatiP2P === 'function' && reteCoinScambioP2P(o)) return coinInviatiP2P(o);
   const tab = tabacchinoP2P(o.metodi);
   /* COL CONTANTI LA CONFERMA PORTA LA REGOLA INTERA (1 ott 2026): a
      incontro fatto il riquadro e' una riga, e questo e' il momento in
@@ -78458,7 +78670,11 @@ function valuteVisibiliP2P(oc){
    avrebbe il controllo della rete ne' il QR, quindi non si mostra. */
 function valutaVistaP2P(cod, metodi){
   const c = String(cod || '').toUpperCase();
-  if (c === P2P_VALUTA) return true;
+  /* ...e un ordine in euro che si paga in ETH o XMR (13 nov 2026,
+     cantiere eth-xmr) solo a chi quei metodi li vede: altrove non
+     avrebbe ne' il controllo dell'indirizzo ne' la cifra */
+  if (c === P2P_VALUTA)
+    return typeof metodiConCoinP2P !== 'function' || !metodiConCoinP2P(metodi) || coinVistoP2P();
   if (c !== 'USDT' || !usdtVistoP2P()) return false;
   if (metodi === undefined) return true;
   const m = Array.isArray(metodi) ? metodi : [];
@@ -78479,7 +78695,9 @@ function valutaOrdineP2P(o){
   return f || P2P_VALUTA;
 }
 function metodiValutaP2P(cod){
-  return String(cod || '').toUpperCase() === 'USDT' ? P2P_METODI_USDT : P2P_METODI;
+  if (String(cod || '').toUpperCase() === 'USDT') return P2P_METODI_USDT;
+  /* in euro anche ETH e XMR, a chi li vede (13 nov 2026, cantiere eth-xmr) */
+  return typeof coinVistoP2P === 'function' && coinVistoP2P() ? P2P_METODI.concat(P2P_METODI_COIN) : P2P_METODI;
 }
 function segnoValutaP2P(cod){
   const c = String(cod || P2P_VALUTA).toUpperCase();
@@ -78731,6 +78949,12 @@ function reteIndirizzoP2P(testo){
   if (/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(s)) return {forma: 'tron', valido: tronValidoP2P(s)};
   if (/^0x[0-9a-fA-F]{40}$/.test(s)) return {forma: 'evm', valido: evmValidoP2P(s)};
   if (/^0x[0-9a-fA-F]{64}$/.test(s) || /^[0-9a-fA-F]{64}$/.test(s)) return {forma: 'hash', valido: true};
+  /* MONERO (13 nov 2026, cantiere eth-xmr): 95 caratteri (106
+     l'integrato), e il prefisso della rete dentro, letto col suo Base58 */
+  if (/^[1-9A-HJ-NP-Za-km-z]{95}$/.test(s) || /^[1-9A-HJ-NP-Za-km-z]{106}$/.test(s)) {
+    const x = typeof moneroP2P === 'function' ? moneroP2P(s) : null;
+    if (x) return {forma: 'monero', valido: x.valido, rete: x.rete};
+  }
   if (/^(?:lightning:)?(?:lnbc|lntb|lntbs|lnbcrt|lnurl)[0-9a-z]+$/i.test(s)
       || /^[a-z0-9._-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) return {forma: 'lightning', valido: true};
   if (/^(?:lq1|ex1|tlq1|tex1)[0-9a-z]{20,}$/i.test(s) || /^VJL[1-9A-HJ-NP-Za-km-z]{60,}$/.test(s))
@@ -78739,7 +78963,7 @@ function reteIndirizzoP2P(testo){
       || /^[13mn2][1-9A-HJ-NP-Za-km-z]{25,34}$/.test(s)) return {forma: 'bitcoin', valido: true};
   return null;
 }
-const P2P_NOME_FORMA_USDT = {tron: 'Tron', evm: 'Ethereum'};
+const P2P_NOME_FORMA_USDT = {tron: 'Tron', evm: 'Ethereum', monero: 'Monero'};
 /* PURA: il giudice dell'indirizzo USDT di chi riceve, per la rete dello
    scambio (`r` = una voce di P2P_RETI_USDT). '' = va bene; sennò la
    frase da dire, che nomina la rete sbagliata e quella giusta. */
@@ -78796,6 +79020,252 @@ function qrUsdtP2P(r, indirizzo, importo){
   const n = Math.floor(Number(importo) || 0);
   return 'ethereum:' + r.contratto + '@' + r.catena + '/transfer?address=' + a
     + (n > 0 ? '&uint256=' + n + '000000' : '');
+}
+/* ═══ ETH E XMR COME METODI DI PAGAMENTO (13 nov 2026, cantiere eth-xmr,
+   richiesta di AndreAI: «in collaudo aggiungi nel P2P anche Ethereum e
+   Monero come altre coin, tanto l'escrow è sempre Bitcoin onchain o LN.
+   Quindi devi aggiungere la sua icona giusta, e avere sempre il
+   controllo sull'indirizzo e anche un link alla mempool di quella chain
+   durante la transazione») ═════════════════════════════════════════════
+   NON SONO VALUTE COME L'USDT, e il perche' e' il protocollo: Mostro
+   porta la cifra in `fiat_amount`, un INTERO, e un ordine «in ETH» si
+   scriverebbe solo a ETH interi (uno vale migliaia di euro) — e il nodo
+   dovrebbe saperli prezzare. Quindi l'ordine resta IN EURO, e
+   «ETH (Ethereum)» e «XMR (Monero)» sono due METODI, come Revolut: chi
+   paga manda l'equivalente al cambio di adesso, da persona a persona,
+   sulla catena del metodo. La garanzia resta la hold invoice in sats di
+   sempre; Barattolo ETH e XMR non li tocca mai. Il nome segue la grafia
+   «<CODICE> (<Rete>)» delle reti USDT, cosi' un altro client lo legge
+   per quel che e'.
+   I QUATTRO PEZZI che l'USDT ha gia' insegnato, uno per moneta:
+   1) L'INDIRIZZO di chi riceve passa dal giudice (`giudiceIndirizzoCoinP2P`):
+      Ethereum col controllo EIP-55 (lo stesso Keccak dell'USDT), Monero
+      col SUO controllo — Base58 a blocchi da 11 caratteri e i primi
+      quattro byte del Keccak-256 — e solo la rete principale: un
+      indirizzo di stagenet o testnet si ferma, i fondi si perderebbero.
+   2) LA CIFRA in ETH o XMR al cambio di adesso (`cambio_coin` di
+      /api/cambio, CoinGecko letto dal server), arrotondata IN SU alla
+      sesta cifra: chi riceve non resta mai corto. Senza cambio tace.
+   3) IL QR col formato di ogni catena: EIP-681 nativo con l'importo in
+      wei per Ethereum, `monero:` con `tx_amount` per Monero.
+   4) «HO INVIATO» vuole l'id della transazione, e sotto c'e' il link
+      all'explorer della catena (Etherscan, xmrchain), che costruiamo
+      NOI. MONERO E' PRIVATO: l'id da solo dice che una transazione
+      esiste, non a chi ne' quanto. Per questo con XMR si chiede anche la
+      CHIAVE DELLA TRANSAZIONE (tx key), che il wallet di chi manda
+      conserva: con id, chiave e indirizzo di chi riceve, la pagina della
+      transazione su xmrchain («Prove sending») dice quanti XMR sono
+      arrivati a QUELL'indirizzo. La chiave prova solo quell'invio e non
+      apre il wallet di nessuno. Il link non porta la chiave dentro: la
+      rotta GET che la metteva nell'indirizzo l'explorer l'ha tolta, e
+      la nostra CSP non lascia partire un modulo verso un altro sito —
+      quindi chiave e indirizzo si copiano col loro «📋 Copia».
+   IL CANCELLO e' `myP2PCoin` (`p2p_coin` di /api/me): oggi solo
+   l'istanza di prova. Senza, i due metodi non compaiono da nessuna parte
+   e un ordine che li porta non si mostra nel libro (`valutaVistaP2P`). */
+const P2P_RETI_COIN = [
+  {coin: 'ETH', chiave: 'eth', nome: 'Ethereum', metodo: 'ETH (Ethereum)', forma: 'evm', catena: 1,
+   esplora: 'https://etherscan.io', esploraNome: 'Etherscan'},
+  {coin: 'XMR', chiave: 'xmr', nome: 'Monero', metodo: 'XMR (Monero)', forma: 'monero',
+   esplora: 'https://xmrchain.net', esploraNome: 'xmrchain'}
+];
+const P2P_METODI_COIN = P2P_RETI_COIN.map(r => r.metodo);
+/* la moneta di un metodo, o null: il nome ESATTO, come per le reti USDT */
+function reteCoinDaMetodoP2P(m){
+  const t = String(m || '').trim().toLowerCase();
+  return P2P_RETI_COIN.find(r => r.metodo.toLowerCase() === t) || null;
+}
+function coinVistoP2P(){
+  return typeof myP2PCoin !== 'undefined' && !!myP2PCoin;
+}
+/* PURA: fra questi metodi c'e' ETH o XMR? */
+function metodiConCoinP2P(metodi){
+  return Array.isArray(metodi) && metodi.some(m => !!reteCoinDaMetodoP2P(m));
+}
+/* PURA: la moneta se TUTTI i metodi sono la stessa moneta, o null: e'
+   quando la card puo' vestirsi del suo logo senza dire il falso */
+function coinUnicaP2P(metodi){
+  const m = Array.isArray(metodi) ? metodi : [];
+  if (!m.length) return null;
+  const r = reteCoinDaMetodoP2P(m[0]);
+  return r && m.every(x => reteCoinDaMetodoP2P(x) === r) ? r : null;
+}
+/* ---- IL CONTROLLO DEGLI INDIRIZZI MONERO, PURO ----
+   Il Base58 di Monero NON e' quello di bitcoin: va a blocchi di 8 byte
+   scritti in 11 caratteri, e l'ultimo blocco corto ha una lunghezza
+   fissa per ogni numero di byte (la tabella qui sotto). Dentro: il
+   prefisso della rete (un byte), le due chiavi pubbliche (64 byte), per
+   l'integrato l'id del pagamento (8), e quattro byte di controllo = i
+   primi quattro del Keccak-256 di tutto il resto. */
+const P2P_XMR_BLOCCHI = [0, 2, 3, 5, 6, 7, 9, 10, 11];
+const P2P_XMR_PREFISSI = {18: ['mainnet', 'standard'], 19: ['mainnet', 'integrato'], 42: ['mainnet', 'sotto'],
+  53: ['testnet', 'standard'], 54: ['testnet', 'integrato'], 63: ['testnet', 'sotto'],
+  24: ['stagenet', 'standard'], 25: ['stagenet', 'integrato'], 36: ['stagenet', 'sotto']};
+function base58MoneroP2P(s){
+  const t = String(s || '');
+  if (!t) return null;
+  const out = [];
+  for (let i = 0; i < t.length; i += 11) {
+    const pezzo = t.slice(i, i + 11);
+    const nb = P2P_XMR_BLOCCHI.indexOf(pezzo.length);
+    if (nb <= 0) return null;
+    const n = [0];   // il numero del blocco, byte bassi prima
+    for (const ch of pezzo) {
+      let v = ALFABETO_B58_P2P.indexOf(ch);
+      if (v < 0) return null;
+      for (let j = 0; j < n.length; j++) { v += n[j] * 58; n[j] = v & 255; v >>= 8; }
+      while (v > 0) { n.push(v & 255); v >>= 8; }
+    }
+    while (n.length > nb && n[n.length - 1] === 0) n.pop();
+    if (n.length > nb) return null;           // non sta nei suoi byte: e' storto
+    while (n.length < nb) n.push(0);
+    for (let k = nb - 1; k >= 0; k--) out.push(n[k]);
+  }
+  return Uint8Array.from(out);
+}
+/* {rete, tipo, valido} o null se non e' nemmeno la forma di Monero */
+function moneroP2P(s){
+  const b = base58MoneroP2P(s);
+  if (!b || b.length < 5) return null;
+  const pre = P2P_XMR_PREFISSI[b[0]];
+  if (!pre) return null;
+  const lung = pre[1] === 'integrato' ? 77 : 69;
+  if (b.length !== lung) return {rete: pre[0], tipo: pre[1], valido: false};
+  const h = keccak256P2P(b.slice(0, lung - 4));
+  const ok = h[0] === b[lung - 4] && h[1] === b[lung - 3] && h[2] === b[lung - 2] && h[3] === b[lung - 1];
+  return {rete: pre[0], tipo: pre[1], valido: ok};
+}
+/* PURA: il giudice dell'indirizzo ETH o XMR di chi riceve (`r` = una
+   voce di P2P_RETI_COIN). '' = va bene; sennò la frase da dire. */
+function giudiceIndirizzoCoinP2P(testo, r){
+  if (!r) return '';
+  const s = String(testo || '').trim();
+  const serve = 'Serve il tuo indirizzo ' + r.nome + ' (' + r.coin + ')';
+  if (!s) return 'Scrivi il tuo indirizzo ' + r.nome + ' (' + r.coin + ')';
+  if (typeof P2P_RETI_USDT !== 'undefined' && P2P_RETI_USDT.some(x => x.contratto.toLowerCase() === s.toLowerCase()))
+    return 'Questo è l\'indirizzo del contratto USDT, non il tuo: copia dal wallet l\'indirizzo dove ricevi';
+  const d = reteIndirizzoP2P(s);
+  if (!d) return 'Questo non sembra un indirizzo ' + r.nome + ': copialo di nuovo dal tuo wallet';
+  if (d.forma === 'bitcoin')
+    return '⚠️ Questo è un indirizzo bitcoin, non ' + r.nome + ': con la rete sbagliata i fondi si perdono. ' + serve;
+  if (d.forma === 'lightning')
+    return '⚠️ Questa è una richiesta Lightning, non un indirizzo ' + r.nome + '. ' + serve;
+  if (d.forma === 'liquid')
+    return '⚠️ Questo è un indirizzo Liquid, non ' + r.nome + ': con la rete sbagliata i fondi si perdono. ' + serve;
+  if (d.forma === 'hash')
+    return 'Questo sembra l\'id di una transazione, non un indirizzo. ' + serve;
+  if (d.forma !== r.forma)
+    return '⚠️ Questo è un indirizzo ' + (P2P_NOME_FORMA_USDT[d.forma] || d.forma) + ', non ' + r.nome
+      + ': con la rete sbagliata i fondi si perdono. ' + serve;
+  if (!d.valido)
+    return 'In questo indirizzo c\'è un carattere sbagliato (il controllo non torna): copialo di nuovo dal tuo wallet';
+  if (d.forma === 'monero' && d.rete !== 'mainnet')
+    return '⚠️ Questo è un indirizzo Monero di prova (' + d.rete + '): qui viaggiano XMR veri. Copia l\'indirizzo del tuo wallet principale';
+  return '';
+}
+/* PURA: il giudice dell'id della transazione. Ethereum: 0x e 64 cifre
+   esadecimali (senza 0x lo rimette `txidCoinNormaleP2P`); Monero: 64
+   cifre, senza 0x. '' = va bene. */
+function giudiceTxidCoinP2P(testo, r){
+  if (!r) return '';
+  const s = String(testo || '').replace(/\s+/g, '');
+  if (!s) return 'Incolla l\'id della transazione: lo trovi nel tuo wallet, nei dettagli dell\'invio';
+  const evm = /^0x[0-9a-fA-F]{64}$/.test(s), nudo = /^[0-9a-fA-F]{64}$/.test(s);
+  if (r.forma === 'monero' && evm)
+    return '⚠️ Questo id ha la forma di Ethereum, ma lo scambio è in Monero: controlla da che wallet hai mandato';
+  if (r.forma === 'evm' ? (evm || nudo) : nudo) return '';
+  return 'Questo non sembra l\'id di una transazione ' + r.nome + ': copialo di nuovo dal wallet';
+}
+function txidCoinNormaleP2P(testo, r){
+  const s = String(testo || '').replace(/\s+/g, '');
+  return r && r.forma === 'evm' && /^[0-9a-fA-F]{64}$/.test(s) ? '0x' + s : s;
+}
+/* PURA: la chiave della transazione Monero (tx key). 64 cifre
+   esadecimali; chi manda anche a un sottoindirizzo ne ha qualcuna in
+   piu', tutte di fila (le «additional tx keys»), e valgono anche quelle. */
+function giudiceChiaveTxXmrP2P(testo){
+  const s = String(testo || '').replace(/\s+/g, '');
+  if (!s) return 'Incolla anche la chiave della transazione (tx key): è quella che dimostra a chi sono andati gli XMR. La trovi nei dettagli dell\'invio';
+  if (!/^(?:[0-9a-fA-F]{64}){1,17}$/.test(s))
+    return 'Questa non sembra la chiave di una transazione Monero (64 caratteri, cifre e lettere da a a f): copiala di nuovo dal wallet';
+  return '';
+}
+/* PURA: quanti ETH o XMR valgono `euro`, con `eurPerUno` euro per una
+   moneta. Testo con il PUNTO e sei decimali («0.012345»), arrotondato
+   IN SU: chi riceve non resta mai corto per un arrotondamento. '' =
+   non lo so (niente cambio, niente cifra). */
+function importoCoinP2P(euro, eurPerUno){
+  const e = Number(euro) || 0, c = Number(eurPerUno) || 0;
+  if (!(e > 0) || !(c > 0)) return '';
+  const micro = Math.max(1, Math.ceil(e / c * 1e6 - 1e-6));
+  const s = String(micro).padStart(7, '0');
+  return s.slice(0, -6) + '.' + s.slice(-6);
+}
+/* il cambio di adesso per una moneta (euro per UNA moneta), o 0 */
+let cambioCoinP2P = {eth: 0, xmr: 0};
+function impostaCambioCoinP2P(c){
+  if (!c || typeof c !== 'object') return;
+  for (const k of ['eth', 'xmr']) {
+    const v = Number(c[k]) || 0;
+    cambioCoinP2P[k] = v > 0 ? v : 0;
+  }
+}
+function eurPerCoinP2P(r){
+  return r ? (Number(cambioCoinP2P[r.chiave]) || 0) : 0;
+}
+/* PURA: quel che va nel QR. Ethereum: l'EIP-681 nativo con la catena e
+   l'importo in wei (sei decimali seguiti da dodici zeri); Monero: lo
+   schema `monero:` con `tx_amount`. Senza cifra, l'indirizzo e la catena. */
+function qrCoinP2P(r, indirizzo, importo){
+  const a = String(indirizzo || '').trim();
+  if (!r || !a) return '';
+  const q = /^\d+\.\d{6}$/.test(String(importo || '')) ? String(importo) : '';
+  if (r.forma === 'evm') {
+    const wei = q ? q.replace('.', '').replace(/^0+(?=\d)/, '') + '000000000000' : '';
+    return 'ethereum:' + a + '@' + r.catena + (wei ? '?value=' + wei : '');
+  }
+  return 'monero:' + a + (q ? '?tx_amount=' + q : '');
+}
+/* PURA: il link all'explorer. Su Ethereum la transazione e l'indirizzo;
+   su Monero solo la transazione: gli indirizzi sulla catena non si
+   vedono, ed e' il punto di Monero. '' = niente link. */
+function esploraCoinP2P(r, cosa, valore){
+  const v = encodeURIComponent(String(valore || '').trim());
+  if (!r || !v) return '';
+  if (r.forma === 'evm') return r.esplora + '/' + (cosa === 'tx' ? 'tx' : 'address') + '/' + v;
+  return cosa === 'tx' ? r.esplora + '/tx/' + v : '';
+}
+/* il tasto dell'explorer sotto un id che passa il giudice; con Monero,
+   sotto, il modo di provare a CHI e' andato */
+function tastoEsploraCoinP2P(r, txid){
+  const t = txidCoinNormaleP2P(txid, r);
+  if (!r || !t || giudiceTxidCoinP2P(t, r)) return '';
+  return '<a class="btn ghost" style="display:block;text-align:center;margin-top:6px" href="'
+    + esc(esploraCoinP2P(r, 'tx', t)) + '" target="_blank" rel="noopener">🔎 Controlla su ' + esc(r.esploraNome) + '</a>'
+    + (r.forma === 'monero'
+      ? '<div class="hint">Monero è privato: la pagina dice che la transazione c\'è. Per vedere quanti XMR sono arrivati, lì sotto «Prove sending» incolla l\'indirizzo di chi riceve e la chiave della transazione.</div>'
+      : '');
+}
+/* LE ICONE GIUSTE (13 nov 2026, AndreAI: «devi aggiungere la sua icona
+   giusta»): il rombo di Ethereum sul suo blu e la M di Monero sul suo
+   arancio, nella forma dei loghi ufficiali (i disegni CC0 di
+   cryptocurrency-icons, 32×32). Una riga sola per logo, senza apici
+   singoli dentro: i banchi delle prove tagliano al primo «;» di riga. */
+const P2P_LOGHI_COIN = {eth: '<svg class="p2p-coin-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#627EEA"/><g fill="#FFF"><path fill-opacity=".602" d="M16.498 4v8.87l7.497 3.35z"/><path d="M16.498 4L9 16.22l7.498-3.35z"/><path fill-opacity=".602" d="M16.498 21.968v6.027L24 17.616z"/><path d="M16.498 27.995v-6.028L9 17.616z"/><path fill-opacity=".2" d="M16.498 20.573l7.497-4.353-7.497-3.348z"/><path fill-opacity=".602" d="M9 16.22l7.498 4.353v-7.701z"/></g></svg>', xmr: '<svg class="p2p-coin-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#F60"/><path fill="#FFF" d="M15.97 5.235c5.985 0 10.825 4.84 10.825 10.824a11.07 11.07 0 0 1-.558 3.432h-3.226v-9.094l-7.04 7.04-7.04-7.04v9.094H5.704a11.07 11.07 0 0 1-.557-3.432c0-5.984 4.84-10.824 10.824-10.824zM14.358 19.02L16 20.635l1.613-1.614 3.051-3.08v5.72h4.547a10.806 10.806 0 0 1-9.24 5.192c-3.902 0-7.334-2.082-9.24-5.192h4.546v-5.72l3.08 3.08z"/></svg>'};
+function iconaCoinP2P(r){
+  return r && P2P_LOGHI_COIN[r.chiave]
+    ? '<span class="p2p-coin-ico" role="img" aria-label="' + esc(r.coin) + '">' + P2P_LOGHI_COIN[r.chiave] + '</span>' : '';
+}
+/* il metodo col suo logo davanti, per la card, la pillola e la tendina */
+function etichettaCoinP2P(m){
+  const r = reteCoinDaMetodoP2P(m);
+  return r ? iconaCoinP2P(r) + esc(m) : '';
+}
+/* la riga sotto il campo dell'indirizzo, come per le reti USDT */
+function notaReteCoinP2P(r){
+  return r.forma === 'evm'
+    ? 'Solo ETH sulla rete Ethereum: l\'indirizzo comincia con 0x.'
+    : 'Solo XMR sulla rete principale di Monero: l\'indirizzo comincia con 4 o con 8.';
 }
 /* ---- IL PERCORSO BARATTOZON (23 set 2026, decisione di Andrea) ----
    La struttura e' quella del bot di riferimento, non i testi: il
@@ -81233,7 +81703,9 @@ function marchioMetodoP2P(m, conTesto){
   /* IL CONTANTI DI PERSONA HA LA SUA ICONA (10 ott 2026): le banconote
      nella sua etichetta, in tutti i posti che passano di qua. Il
      giudice vive nel blocco del contanti: da qui il typeof */
-  if (!v) return (typeof etichettaContantiP2P === 'function' && etichettaContantiP2P(m)) || esc(m);
+  /* ...e ETH e XMR il loro logo (13 nov 2026, cantiere eth-xmr) */
+  if (!v) return (typeof etichettaContantiP2P === 'function' && etichettaContantiP2P(m))
+    || (typeof etichettaCoinP2P === 'function' && etichettaCoinP2P(m)) || esc(m);
   const img = '<span class="p2p-marca" title="' + esc(m) + '"><img src="'
     + v.logo + '" alt="' + esc(v.nome)
     + '" onerror="this.parentNode.replaceWith(this.parentNode.title)"></span>';
@@ -81270,13 +81742,17 @@ function iconaMetodiP2P(metodi){
      euro */
   const segnata = x => (vesteMetodoP2P(x) || {}).soloMarchio
     || (typeof etichettaContantiP2P === 'function' && !!etichettaContantiP2P(x))
-    || (typeof reteUsdtDaMetodoP2P === 'function' && !!reteUsdtDaMetodoP2P(x));
+    || (typeof reteUsdtDaMetodoP2P === 'function' && !!reteUsdtDaMetodoP2P(x))
+    /* ...e ETH e XMR col loro logo (13 nov 2026) */
+    || (typeof reteCoinDaMetodoP2P === 'function' && !!reteCoinDaMetodoP2P(x));
   return m.length && m.every(segnata) ? '' : '💳 ';
 }
 /* i metodi del FILTRO del libro: quelli dell'euro, e le reti USDT per
    chi gli ordini in USDT li vede (1 nov 2026, cantiere p2p-usdt) */
 function metodiFiltroP2P(){
-  return typeof usdtVistoP2P === 'function' && usdtVistoP2P() ? P2P_METODI.concat(P2P_METODI_USDT) : P2P_METODI;
+  const base = typeof usdtVistoP2P === 'function' && usdtVistoP2P() ? P2P_METODI.concat(P2P_METODI_USDT) : P2P_METODI;
+  /* ...e ETH e XMR a chi li vede (13 nov 2026, cantiere eth-xmr) */
+  return typeof coinVistoP2P === 'function' && coinVistoP2P() ? base.concat(P2P_METODI_COIN) : base;
 }
 /* i metodi che il foglio OFFRE (set 2026: il tabacchino solo a chi vende
    sats, perche' l'ordine Amazon lo genera lui).
@@ -81295,6 +81771,9 @@ function metodiPubblicabiliP2P(lato){
      foglio (`valutaFoglioP2P`; a rete on-chain solo con gli USDT on-chain) */
   if (typeof valutaFoglioP2P === 'function' && valutaFoglioP2P() === 'USDT'
       && typeof P2P_METODI_USDT !== 'undefined') return P2P_METODI_USDT;
+  /* ETH E XMR in fondo, a chi li vede (13 nov 2026, cantiere eth-xmr):
+     metodi di un ordine in euro, per tutti e due i lati */
+  if (typeof coinVistoP2P === 'function' && coinVistoP2P()) return P2P_METODI.concat(P2P_METODI_COIN);
   return P2P_METODI;
 }
 /* la riga d'aiuto sotto la fascia, nel foglio «Pubblica» in compra */
@@ -85876,6 +86355,18 @@ const P2P_FORME_RECAPITO = [
       + '\nRete: ' + r.nome + ' (' + r.standard + ')'
       + '\nIndirizzo: ' + c.indirizzo
       + '\nContratto USDT: ' + r.contratto})),
+  /* ETH E XMR (13 nov 2026, cantiere eth-xmr): una forma per moneta, la
+     stessa strada delle reti USDT — la rete detta prima dell'indirizzo,
+     e la riga «Rete: Ethereum (ETH)» che il riquadro di chi paga rilegge
+     (`reteCoinDaRecapitoP2P`). Il giudice e' `giudiceIndirizzoCoinP2P`,
+     chiamato dall'invio e a ogni lettera (`fr.coin`). */
+  ...(typeof P2P_RETI_COIN !== 'undefined' ? P2P_RETI_COIN : []).map(r => ({forma: 'coin-' + r.chiave, coin: r,
+    riconosce: new RegExp('^' + r.metodo.replace(/[()]/g, '\\$&') + '$', 'i'),
+    campi: [{k: 'indirizzo', et: 'Il tuo indirizzo ' + r.nome + ' (' + r.coin + ')',
+             ph: r.forma === 'evm' ? '0x… (42 caratteri)' : '4… o 8… (95 caratteri)', max: 120}],
+    componi: c => '⚠️ Manda solo ' + r.coin + ' sulla rete ' + r.nome
+      + '\nRete: ' + r.nome + ' (' + r.coin + ')'
+      + '\nIndirizzo: ' + c.indirizzo})),
   /* LA CAUSALE (9 ott 2026, richiesta di Andrea): facoltativa, al piu'
      140 caratteri — il limite del bonifico SEPA — e solo i caratteri che
      il circuito accetta (`giudiceCausaleSepaP2P`, chiamato dall'invio
@@ -86639,13 +87130,16 @@ function renderCampiP2P(){
         /* in USDT la riga del metodo non c'e' (2 nov 2026, «troppe
            scritte»): la rete la dicono gia' l'etichetta del campo e la
            riga sotto */
-        : (scelto && !fr.usdt ? '<div class="hint">💶 Il metodo dello scambio è <b>'
+        : (scelto && !fr.usdt && !fr.coin ? '<div class="hint">💶 Il metodo dello scambio è <b>'
                     + marchioMetodoP2P(scelto) + '</b>.</div>' : '')) +
       fr.campi.map(campoRecapitoP2P).join('') +
       /* la rete detta sotto il campo (1 nov 2026, cantiere p2p-usdt) */
       (fr.usdt ? '<div class="hint">' + esc(notaReteUsdtP2P(fr.usdt)) + '</div>'
         /* il giudizio mentre si scrive (2 nov 2026): col tasto spento,
            la frase del giudice sta qui invece che in un avviso */
+        + '<div class="hint" id="p2pUsdtGiudizio" style="color:var(--rosso-p2p-testo)" hidden></div>' : '') +
+      /* ...e con ETH o XMR la stessa riga e lo stesso giudizio (13 nov 2026) */
+      (fr.coin ? '<div class="hint">' + iconaCoinP2P(fr.coin) + ' ' + esc(notaReteCoinP2P(fr.coin)) + '</div>'
         + '<div class="hint" id="p2pUsdtGiudizio" style="color:var(--rosso-p2p-testo)" hidden></div>' : '') +
       (fr.appuntamento
         ? '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">📍 ' +
@@ -86673,7 +87167,7 @@ function renderCampiP2P(){
            compra doveva selezionare il dato col dito. Lo stesso
            riquadro, col titolo del contanti di persona dove serve */
         ? riquadroRecapitoP2P(loro.euro.testo,
-            typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o) ? '📍 Dove vedervi' : '')
+            typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o) ? '📍 Dove vedervi' : '', o)
         : (typeof usdtP2P === 'function' && usdtP2P(o)) ? '<div class="hint">💵 Chi vende non ha ancora detto dove ricevere gli USDT: appena lo fa lo leggi qui.</div>'
         : '<div class="hint">💶 Chi vende non ha ancora detto dove ricevere gli euro: appena lo fa lo leggi qui.</div>')
       : '') +
@@ -86715,11 +87209,14 @@ function renderCampiP2P(){
   /* IL TASTO SPENTO FINCHE' L'INDIRIZZO USDT NON E' GIUSTO (2 nov 2026,
      Andrea dalla prova dal vivo): si giudica a ogni lettera, senza
      ridisegnare (la tastiera non si chiude), col giudice dell'invio */
-  if (fr && fr.usdt) {
+  /* ...e lo stesso con ETH o XMR (13 nov 2026): `statoIndirizzoUsdtP2P`
+     sceglie il giudice dalla voce */
+  if (fr && (fr.usdt || fr.coin)) {
     const inp = el('p2pCampoEuro_indirizzo');
+    const r = fr.usdt || fr.coin;
     if (inp) {
-      inp.addEventListener('input', () => giudicaIndirizzoUsdtVivoP2P(inp.value, fr.usdt));
-      giudicaIndirizzoUsdtVivoP2P(inp.value, fr.usdt);
+      inp.addEventListener('input', () => giudicaIndirizzoUsdtVivoP2P(inp.value, r));
+      giudicaIndirizzoUsdtVivoP2P(inp.value, r);
     }
   }
 }
@@ -86728,7 +87225,9 @@ function renderCampiP2P(){
    e' scritto: il campo vuoto non e' un errore, e' un campo da riempire */
 function statoIndirizzoUsdtP2P(testo, r){
   const v = String(testo || '').replace(/\s+/g, '');
-  const no = giudiceIndirizzoUsdtP2P(v, r);
+  /* una voce di P2P_RETI_COIN ha il suo `coin` (13 nov 2026), una rete
+     USDT no */
+  const no = r && r.coin ? giudiceIndirizzoCoinP2P(v, r) : giudiceIndirizzoUsdtP2P(v, r);
   return {spento: !!no, frase: v ? no : ''};
 }
 function giudicaIndirizzoUsdtVivoP2P(testo, r){
@@ -86793,6 +87292,12 @@ async function inviaCampoP2P(tipo, btn){
     if (fr.usdt) {
       campi.indirizzo = String(campi.indirizzo || '').replace(/\s+/g, '');
       const no = giudiceIndirizzoUsdtP2P(campi.indirizzo, fr.usdt);
+      if (no) { toast(no, 7000); el('p2pCampoEuro_indirizzo')?.focus(); return; }
+    }
+    /* ...e l'indirizzo ETH o XMR col suo controllo (13 nov 2026) */
+    if (fr.coin) {
+      campi.indirizzo = String(campi.indirizzo || '').replace(/\s+/g, '');
+      const no = giudiceIndirizzoCoinP2P(campi.indirizzo, fr.coin);
       if (no) { toast(no, 7000); el('p2pCampoEuro_indirizzo')?.focus(); return; }
     }
     /* controllo LEGGERO, sulla sagoma e non sul contenuto: due lettere
@@ -95787,6 +96292,8 @@ function chatScMessaggiHTML(c, altro, o){
       /* l'id degli USDT inviati, coi NOSTRI link (2 nov 2026) */
       + (typeof txidUsdtDaChatP2P === 'function' && o && !o.mercatino
          ? esploraTxUsdtP2P(o, txidUsdtDaChatP2P(m.testo)) : '')
+      /* ...e degli ETH o degli XMR (13 nov 2026, cantiere eth-xmr) */
+      + (typeof esploraCoinDaChatP2P === 'function' && o && !o.mercatino ? esploraCoinDaChatP2P(m.testo) : '')
       + (li.altri.length ? '<div class="chatsc-copie">' + li.altri.map(x => '<button type="button" class="chatsc-copia" data-l="' + esc(x) + '" '
           + 'onclick="copiaLink(this.dataset.l, \'Link copiato 📋\')">📋 Copia link</button>').join('') + '</div>' : '')
       + (al.link ? '<div class="chatsc-allarme">⚠️ ' + esc(CHATSC_RIGA_LINK) + '</div>' : '')
@@ -97298,6 +97805,7 @@ async function avvia(){
     /* ...e gli ordini in USDT (1 nov 2026) */
     myP2PUsdt = !!me.p2p_usdt;
     myP2POnchainUsdt = !!me.p2p_onchain_usdt;
+    myP2PCoin = !!me.p2p_coin;
     myOnchainIncasso = me.onchain_incasso || '';
     myOnchainLn = me.onchain_ln || {attivo: false};
     /* le co-firme on-chain che aspettano me partono da sole (tappa 3) */

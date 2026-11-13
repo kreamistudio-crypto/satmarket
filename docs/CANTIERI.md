@@ -80238,3 +80238,54 @@ vetrine-canale.
 PROVATO. `prove_p2p_canale` (i quattro casi: vende −10 e +5, zero,
 compra +5) e `collaudo_freni` sul server vero (vende +3, compra +4,
 sats fissi −150).
+
+## ETH e XMR come metodi del P2P, solo sulla prova (13 nov 2026, cantiere eth-xmr)
+
+Andrea: «in collaudo aggiungi nel P2P anche Ethereum e Monero come altre
+coin, tanto l'escrow è sempre Bitcoin onchain o LN. Quindi devi
+aggiungere la sua icona giusta, e avere sempre il controllo
+sull'indirizzo e anche un link alla memepool di quella chain durante la
+transazione per dimostrare che la transazione è avvenuta correttamente».
+COME: Mostro ha `fiat_code` testuale ma `fiat_amount` intero, e il nodo
+non sa niente di ETH/XMR. Quindi niente valuta nuova: ETH e XMR sono due
+METODI di un ordine in euro («ETH (Ethereum)», «XMR (Monero)»), testo
+libero per il nodo (nessun gesto sul nodo). La cifra in coin la calcola il
+client di chi paga dal cambio CoinGecko (eth/xmr in euro, rinfrescato
+dall'orologio del cambio, valido 15 minuti), 6 decimali arrotondati in su.
+CANCELLO: `p2p_coin_acceso()` = istanza di prova (`PROVA_SOLO_IDS` piena)
+e P2P attivo; `/api/me` dice `p2p_coin`, `/api/cambio` porta
+`cambio_coin` solo lì. In produzione il codice c'è ma è muto, e il libro
+NASCONDE a chi non ha il cancello gli ordini in euro con metodi coin
+(`valutaVistaP2P`), così non compaiono metodi che non sa pagare.
+ICONE: i loghi SVG in linea (Ethereum su #627EEA, Monero su #F60) nella
+tessera della card, nel marchio del metodo e nel recapito.
+INDIRIZZO: ETH col giudice EVM già usato per l'USDT (EIP-55: un
+maiuscolo sbagliato è un refuso); Monero con base58 a blocchi da 11,
+prefisso di rete (4/8 mainnet; testnet e stagenet riconosciute e
+respinte con la loro parola) e i 4 byte di Keccak-256 (riusato
+`keccak256P2P`), 95 caratteri o 106 l'integrato. Il recapito si compone
+come quello USDT («⚠️ Manda solo XMR sulla rete Monero / Rete / Indirizzo»)
+e chi paga lo rilegge col giudice prima del QR (`ethereum:…@1?value=`,
+`monero:…?tx_amount=`).
+LA PROVA DELL'INVIO: chi paga incolla l'id della transazione (ETH 0x+64,
+XMR 64) e per Monero anche la CHIAVE della transazione, poi la domanda
+unica, `fiat-sent`, e un messaggio in chat che chi riceve apre col bottone
+«🔎 Controlla su Etherscan / xmrchain». Monero è privato: xmrchain.net/tx/
+dice che la transazione c'è, la cifra la mostra solo «Prove sending» con
+indirizzo e chiave, che si incollano lì (bottoni Copia): l'explorer ha tolto
+la vecchia GET con i parametri e la nostra CSP ha `form-action 'self'`.
+SCARTATO: lo scambio on-chain 2-di-3 per ETH/XMR (`metodiOnchainP2P` le
+esclude): vorrebbe recapito e id salvati sul server, è un passo a sé.
+PROVATO: `prove_eth_xmr` (42, controprove comprese: indirizzi Monero veri
+e il riferimento Python del base58/Keccak, EIP-55, il cancello, la cifra,
+i link); emendate le prove della firma di `riquadroRecapitoP2P` (ora con
+`o`), della domanda unica (110) e del giudizio mentre si scrive. Collaudo
+nuovo `collaudo_eth_xmr` (gabbia verde, righe in ci/collaudi.txt e
+compila.txt): cancello acceso sulla prova, spento senza, cambio di cartone.
+Dal vivo a 390 px chiaro e scuro: libro, Pubblica, scambi XMR ed ETH,
+recapito col refuso e giusto, chat. Foto in `/mnt/project-files/eth-xmr/`.
+DA GUARDARE: gli ordini fatti dalla prova finiscono sul nodo vero (il
+collaudo pubblica sul relay di produzione) e la produzione li nasconde
+solo quando questo filtro arriva su main; alcuni wallet Monero non
+mostrano la chiave della transazione; i testi generici dello stepper
+(«Euro inviati», «manda gli euro») restano anche per le coin.

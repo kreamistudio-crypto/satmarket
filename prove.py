@@ -44823,15 +44823,18 @@ def prove_fogli_di_casa():
     # CENTONOVE (2 nov 2026 sera, cantiere wallet-unico): nel Profilo
     # «Rendere principale questo wallet?» e «Fare nascere un wallet nuovo?»
     # (`walletRendiPrincipale`, `walletNuovoPrincipale`).
-    prova("i gesti che passano dalla domanda unica sono centonove (dal 30 ott "
+    # CENTODIECI (13 nov 2026, cantiere eth-xmr): «Hai inviato gli ETH?» /
+    # «Hai inviato gli XMR?» nello scambio P2P (`coinInviatiP2P`).
+    prova("i gesti che passano dalla domanda unica sono centodieci (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
           "cambio in Lightning; dal 2 nov «Hai inviato gli USDT?» on-chain "
           "e «Crei le parole dello swap?» e «Ricevi on-chain?» dello swap "
           "automatico; «Rendere principale questo wallet?» e «Fare nascere "
-          "un wallet nuovo?» del wallet unico)",
-          109, solo_codice(mini).count("chiediConferma({"))
+          "un wallet nuovo?» del wallet unico; dal 13 nov «Hai inviato gli "
+          "ETH/XMR?»)",
+          110, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -79030,7 +79033,7 @@ def prove_p2p_chat():
           # ⚠️ EMENDATA (1 ott 2026): il riquadro prende anche il titolo
           # («📍 Dove vedervi» col contanti di persona)
           and "riquadroRecapitoP2P(loro.euro.testo," in _rcp
-          and "rigaDato(r.et, r.v, {" in pezzo_js(mini, "function riquadroRecapitoP2P(testo, titolo){", "\n}\n")
+          and "rigaDato(r.et, r.v, {" in pezzo_js(mini, "function riquadroRecapitoP2P(testo, titolo, o){", "\n}\n")
           and "esc(o.vista || v)" in pezzo_js(mini, "function rigaDato(et, v, op){", "\n}\n")
           and "data-v=\"' + esc(v) + '\" '" in pezzo_js(mini, "function bottoneCopia(v, aria){", "\n}\n"))
 
@@ -128241,7 +128244,7 @@ def prove_ritocchi_scambio():
         fn("function rigaDato(et, v, op){"),
         fn("function bottoneCopia(v, aria){"),
         fn("function righeRecapitoP2P(testo){"),
-        fn("function riquadroRecapitoP2P(testo, titolo){"),
+        fn("function riquadroRecapitoP2P(testo, titolo, o){"),
         # (16 ott 2026, copia-recapito) il giudice dei dati da incollare
         re.search(r"const ETICHETTE_DA_INCOLLARE_P2P = [^\n]*;", mini).group(0),
         mini[mini.index("const FORME_DA_INCOLLARE_P2P = ["):
@@ -129242,7 +129245,7 @@ def prove_dati_spedizione_copia():
     # provato in prove_ritocchi_scambio); il 📋 PICCOLO e' delle
     # righe di chi vende (indirizzo, punto, email) e del tracciamento
     # di chi compra, e passa SOLO da `copiaDato`
-    riq = fn("function riquadroRecapitoP2P(testo, titolo){")
+    riq = fn("function riquadroRecapitoP2P(testo, titolo, o){")
     prova("un solo «📋 Copia» grande in tutto il client: quello del riquadro del recapito", (1, True, True),
           (mini.count("bottoneCopia(") - mini.count("function bottoneCopia("),
            "bottoneCopia(v, 'Copia ' + (et || v))" in fn("function rigaDato(et, v, op){"),
@@ -140537,8 +140540,8 @@ def prove_contanti_pagina_leggera():
     prova("la riga «✋ Aspetta» col contanti: consegnare e contare, non inviare e controllare", [True, True],
           ["'deve consegnarti i contanti'" in att, "'deve contare i contanti e liberare i sats'" in att])
     prova("il recapito arrivato a chi compra in contanti s'intitola «📍 Dove vedervi»; il titolo passa da esc()", [True, True],
-          ["riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : '')" in fn("function recapitoCompratoreP2P(o){"),
-           "esc(titolo || '💶 Dove mandare gli euro')" in fn("function riquadroRecapitoP2P(testo, titolo){")])
+          ["riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : '', o)" in fn("function recapitoCompratoreP2P(o){"),
+           "esc(titolo || '💶 Dove mandare gli euro')" in fn("function riquadroRecapitoP2P(testo, titolo, o){")])
     prova("«Libera i sats» col contanti chiede ancora del conteggio", True,
           "'Hai contato i contanti davanti a chi ti ha pagato?'" in fn("function rilasciaP2P(){"))
     css = mini[mini.index("<style>"):mini.index("</style>")]
@@ -150952,7 +150955,7 @@ def prove_causale_sepa():
     # `daIncollareP2P`, e causale e intestatario stanno nelle sue etichette
     prova("chi compra: «Copia» su causale e intestatario, riconosciuti per etichetta", True,
           "copia: daIncollareP2P(r)" in
-          pezzo_js(m, "function riquadroRecapitoP2P(testo, titolo){", "\n}\n")
+          pezzo_js(m, "function riquadroRecapitoP2P(testo, titolo, o){", "\n}\n")
           and bool(re.search(r"const ETICHETTE_DA_INCOLLARE_P2P = /\^\(intestatario\|causale\|", m)))
     rc = pezzo_js(m, "function renderCampiP2P(", "\n}\n")
     prova("il form toglie dal ricordo i campi nonRicordato e rilegge la causale dal testo partito",
@@ -151002,7 +151005,7 @@ def prove_causale_sepa():
         + pezzo_js(m, "function rigaDato(et, v, op){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function bottoneCopia(v, aria){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function righeRecapitoP2P(testo){", "\n}\n") + "\n}\n"
-        + pezzo_js(m, "function riquadroRecapitoP2P(testo, titolo){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function riquadroRecapitoP2P(testo, titolo, o){", "\n}\n") + "\n}\n"
         # (16 ott 2026, copia-recapito) il giudice dei dati da incollare
         + re.search(r"const ETICHETTE_DA_INCOLLARE_P2P = [^\n]*;", m).group(0) + "\n"
         + pezzo_js(m, "const FORME_DA_INCOLLARE_P2P = [", "\n];\n") + "\n];\n"
@@ -154251,6 +154254,332 @@ def _tron_riferimento(venti):
     return "1" * (len(pieno) - len(pieno.lstrip(b"\0"))) + s
 
 
+def _monero_riferimento(prefisso, corpo):
+    """UN INDIRIZZO MONERO SCRITTO A PARTE (13 nov 2026, cantiere eth-xmr):
+    il prefisso della rete, il corpo, i quattro byte del Keccak di
+    riferimento, e il Base58 a blocchi di Monero — otto byte in undici
+    caratteri, l'ultimo blocco corto con la sua taglia. Non e' una copia
+    del codice del telefono: il banco confronta i due."""
+    alfa = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    taglie = [0, 2, 3, 5, 6, 7, 9, 10, 11]
+    dati = bytes([prefisso]) + corpo
+    pieno = dati + _keccak_riferimento(dati)[:4]
+    out = ""
+    for i in range(0, len(pieno), 8):
+        b = pieno[i:i + 8]
+        n = int.from_bytes(b, "big")
+        s = ""
+        for _ in range(taglie[len(b)]):
+            n, r = divmod(n, 58)
+            s = alfa[r] + s
+        out += s
+    return out
+
+
+def prove_eth_xmr():
+    """ETH E XMR NEL P2P (13 nov 2026, cantiere eth-xmr, richiesta di
+    AndreAI: «in collaudo aggiungi nel P2P anche Ethereum e Monero come
+    altre coin, tanto l'escrow è sempre Bitcoin onchain o LN»). Non valute
+    ma METODI di un ordine in euro (il `fiat_amount` di Mostro e' intero).
+    Qui: il cancello (solo l'istanza di prova), il controllo degli
+    indirizzi Monero contro un riferimento scritto a parte (e due
+    indirizzi veri), il giudice della rete sbagliata, l'id e la chiave
+    della transazione, la cifra arrotondata in su, i QR, gli explorer, il
+    recapito che va e torna senza confondersi con l'USDT su Ethereum, il
+    messaggio di «Ho inviato» e la sua lettura, il libro e le liste. Ogni
+    giudice ha la sua controprova."""
+    print("\n🪙 ETH e XMR nel P2P")
+    import random as _rnd
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) il server: il cancello e il cambio ---
+    amb = {"PROVA_SOLO_IDS": {111}, "_p2p_leve": lambda: {"attivo": True},
+           "_p2p_per": lambda tg: {"attivo": tg in (111, 222)}}
+    exec(pezzo("p2p_coin_acceso"), amb)
+    exec(pezzo("p2p_coin_ammesso"), amb)
+    f = amb["p2p_coin_ammesso"]
+    prova_si = [f(111), f(222), f(333)]
+    amb["PROVA_SOLO_IDS"] = set()
+    produzione = [f(111), amb["p2p_coin_acceso"]()]
+    amb["PROVA_SOLO_IDS"] = {111}
+    amb["_p2p_leve"] = lambda: {"attivo": False}
+    senza_p2p = [f(111)]
+    prova("sull'istanza di prova chi ha il P2P vede ETH e XMR, gli altri no",
+          [True, True, False], prova_si)
+    prova("...in produzione (lista della prova vuota) nessuno, e il giro non parte",
+          [False, False], produzione)
+    prova("...e col P2P spento nessuno", [False], senza_p2p)
+    prova("/api/me lo dice al telefono", 1,
+          src.count('profilo["p2p_coin"] = p2p_coin_ammesso(user["id"])'))
+    cambio = pezzo("cambio_da_solo")
+    orologio = pezzo("orologio_cambio")
+    prova("il cambio di ETH e XMR viaggia in /api/cambio e si legge nell'orologio solo sulla prova",
+          (True, True, True),
+          ('if p2p_coin_acceso():\n        busta["cambio_coin"] = cambio_coin_noto_ora()' in cambio,
+           "if p2p_coin_acceso():\n            try:\n                await _rileggi_cambio_coin()" in orologio,
+           '"ids": "ethereum,monero"' in pezzo("_rileggi_cambio_coin")))
+    amb = {"time": __import__("time"), "CAMBIO_COIN_VALIDO_S": 900,
+           "_cambio_coin_cache": {"eth": 2800.0, "xmr": 300.0, "quando": 0.0, "tentato": 0.0}}
+    exec(pezzo("cambio_coin_noto_ora"), amb)
+    vecchio = amb["cambio_coin_noto_ora"]()
+    amb["_cambio_coin_cache"]["quando"] = amb["time"].time() - 60
+    fresco = amb["cambio_coin_noto_ora"]()
+    prova("un cambio di un minuto fa vale, uno di mai no (0, non inventato)",
+          [{"eth": 0.0, "xmr": 0.0}, {"eth": 2800.0, "xmr": 300.0}], [vecchio, fresco])
+
+    # --- 2) il banco del telefono ---
+    ini = mini.index("/* ═══ GLI ORDINI IN USDT (1 nov 2026")
+    fine = mini.index("/* ---- IL PERCORSO BARATTOZON (23 set 2026")
+    blocco = mini[ini:fine]
+    i = mini.index("const P2P_VALUTE = [")
+    valute = mini[i:mini.index("];", i) + 2]
+    forme = mini.index("const P2P_FORME_RECAPITO = [")
+    forme_cripto = mini[forme:mini.index("/* LA CAUSALE (9 ott 2026", forme)]
+    _rnd.seed(20261113)
+    corpi = [bytes(_rnd.randrange(256) for _ in range(64)) for _ in range(3)]
+    pid = bytes(_rnd.randrange(256) for _ in range(8))
+    xmr = {"std": _monero_riferimento(18, corpi[0]),
+           "sotto": _monero_riferimento(42, corpi[1]),
+           "integrato": _monero_riferimento(19, corpi[2] + pid),
+           "testnet": _monero_riferimento(53, corpi[0]),
+           "stagenet": _monero_riferimento(24, corpi[1])}
+    # un carattere cambiato nel mezzo: il refuso che solo il controllo vede
+    s = xmr["std"]
+    xmr["rotto"] = s[:40] + ("2" if s[40] != "2" else "3") + s[41:]
+    # due indirizzi veri, pubblici: la donazione del Monero General Fund
+    # (sottoindirizzo, «8…») e quella storica del progetto («4…»)
+    veri = ["888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H",
+            "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A"]
+    evm_vero = _eip55_riferimento(bytes(range(1, 21)).hex())
+    _k = next(j for j, d in enumerate(evm_vero) if j > 1 and d.isalpha())
+    evm_rotto = evm_vero[:_k] + evm_vero[_k].swapcase() + evm_vero[_k + 1:]
+    tron_vero = _tron_riferimento(bytes(range(1, 21)))
+    txe = "0x" + "ab" * 32
+    txx = "cd" * 32
+    chiave = "ef" * 32
+    js = ("var cambioVivo = true, eurPerSat = 0.001, usdPerSat = 0.00108;\n"
+          "var myP2PUsdt = false, myP2PCoin = true, TETTO = 250;\n"
+          "const P2P_VALUTA = 'EUR';\n"
+          "const P2P_METODI = ['SEPA', 'Revolut', 'Contanti', 'Contanti al tabacchino'];\n"
+          "const P2P_TABACCHINO = 'Contanti al tabacchino';\n"
+          "const maxEuroP2P = () => TETTO;\n"
+          "const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\"/g, '&quot;');\n"
+          "const fmtEur = n => Number(n).toFixed(2).replace('.', ',');\n"
+          "const fmt = n => String(n);\n"
+          "const rigaDato = (et, v, op) => '[' + et + '=' + v + (op && op.vista ? '|' + op.vista : '') + ']';\n"
+          "const vesteMetodoP2P = () => null;\n"
+          "const P2P_STELLE_EU = '<svg-eu>', P2P_TETHER_SEGNO = '<svg-t>';\n"
+          "var p2pTxidBozza = {};\n"
+          + valute + "\n" + blocco + "\n"
+          + forme_cripto.replace("const P2P_FORME_RECAPITO = [", "const FORME = [") + "];\n"
+          + _fn_js(mini, "function righeRecapitoP2P(testo){")
+          + _fn_js(mini, "function reteUsdtDaRecapitoP2P(righe){")
+          + _fn_js(mini, "function reteCoinDaRecapitoP2P(righe){")
+          + _fn_js(mini, "function riquadroCifraCoinP2P(r, indirizzo, euro){")
+          + _fn_js(mini, "function linkIndirizzoCoinP2P(r, indirizzo){")
+          + _fn_js(mini, "function statoIndirizzoUsdtP2P(testo, r){")
+          + _fn_js(mini, "function reteCoinScambioP2P(o){")
+          + _fn_js(mini, "function indirizzoCoinScambioP2P(o){")
+          + _fn_js(mini, "function testoCoinInviatiP2P(r, txid, chiave, indirizzo){")
+          + _fn_js(mini, "function coinInviatiDaChatP2P(testo){")
+          + _fn_js(mini, "function tesseraValutaP2P(cod, metodi){")
+          + _fn_js(mini, "function iconaMetodiP2P(metodi){")
+          + _fn_js(mini, "function metodiPubblicabiliP2P(lato){")
+          + _fn_js(mini, "function metodiOnchainP2P(lato){")
+          + "const metodoSceltoP2P = o => (o.metodi || []).indexOf(o.metodoScelto) >= 0 ? o.metodoScelto : '';\n"
+          + "const valutaFoglioP2P = () => 'EUR';\n"
+          + "const XMR = " + json.dumps(xmr) + ", VERI = " + json.dumps(veri) + ";\n"
+          + "const EVM = " + json.dumps([evm_vero, evm_rotto]) + ", TRON = " + json.dumps(tron_vero) + ";\n"
+          + "const TXE = " + json.dumps(txe) + ", TXX = " + json.dumps(txx) + ", CHIAVE = " + json.dumps(chiave) + ";\n"
+          + r"""
+const [E, X] = P2P_RETI_COIN;
+const out = {};
+out.metodi = [reteCoinDaMetodoP2P('ETH (Ethereum)') === E, reteCoinDaMetodoP2P('xmr (monero)') === X,
+  reteCoinDaMetodoP2P('ETH'), reteCoinDaMetodoP2P('USDT (Ethereum)')];
+out.monero = ['std', 'sotto', 'integrato', 'testnet', 'stagenet', 'rotto'].map(k => moneroP2P(XMR[k]));
+out.veri = VERI.map(moneroP2P);
+out.lunghezze = [XMR.std.length, XMR.integrato.length];
+out.forme = [XMR.std, XMR.integrato, EVM[0], TRON, 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq'].map(s => (reteIndirizzoP2P(s) || {}).forma || null);
+const gi = (s, r) => giudiceIndirizzoCoinP2P(s, r);
+out.giudiceX = [gi(XMR.std, X), gi(XMR.sotto, X), gi(XMR.integrato, X), gi(VERI[0], X), gi(' ' + VERI[1] + ' ', X)];
+out.noX = [gi('', X), gi(XMR.rotto, X), gi(XMR.testnet, X), gi(XMR.stagenet, X), gi(EVM[0], X),
+  gi('bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', X), gi('lnbc10u1pjxyz', X), gi(TXX, X), gi('ciao', X)];
+out.giudiceE = [gi(EVM[0], E), gi(EVM[0].toLowerCase(), E)];
+out.noE = [gi(EVM[1], E), gi(XMR.std, E), gi(TRON, E), gi('0xdAC17F958D2ee523a2206206994597C13D831ec7', E), gi('', E)];
+out.usdtVedeMonero = giudiceIndirizzoUsdtP2P(XMR.std, P2P_RETI_USDT[0]);
+const gt = (s, r) => giudiceTxidCoinP2P(s, r);
+out.txid = [gt(TXE, E), gt(TXE.slice(2), E), gt(TXX, X), gt(TXE, X), gt('', X), gt('0x12', E), gt(TXX + 'a', X)];
+out.txidNormale = [txidCoinNormaleP2P(TXE.slice(2), E), txidCoinNormaleP2P(TXX, X), txidCoinNormaleP2P(' ' + TXE + ' ', E)];
+out.chiave = [giudiceChiaveTxXmrP2P(CHIAVE), giudiceChiaveTxXmrP2P(CHIAVE + CHIAVE), giudiceChiaveTxXmrP2P(''),
+  giudiceChiaveTxXmrP2P(CHIAVE.slice(1)), giudiceChiaveTxXmrP2P('zz' + CHIAVE.slice(2))];
+out.importo = [importoCoinP2P(100, 3000), importoCoinP2P(35, 280.5), importoCoinP2P(30, 3000), importoCoinP2P(10, 0), importoCoinP2P(0, 3000)];
+out.qr = [qrCoinP2P(E, EVM[0], '0.033334'), qrCoinP2P(E, EVM[0], ''), qrCoinP2P(X, XMR.std, '0.124778'), qrCoinP2P(X, XMR.std, '1,5'), qrCoinP2P(E, '', '0.1')];
+out.esplora = [esploraCoinP2P(E, 'tx', TXE), esploraCoinP2P(E, 'address', EVM[0]), esploraCoinP2P(X, 'tx', TXX), esploraCoinP2P(X, 'address', XMR.std)];
+out.tasto = [tastoEsploraCoinP2P(X, TXX).includes('Prove sending'), tastoEsploraCoinP2P(E, TXE).includes('etherscan.io/tx/' + TXE), tastoEsploraCoinP2P(E, 'ciao')];
+// il recapito: la forma lo compone, il riquadro di chi paga lo rilegge
+const fe = FORME.find(f => f.riconosce.test('ETH (Ethereum)')), fx = FORME.find(f => f.riconosce.test('XMR (Monero)'));
+const fu = FORME.find(f => f.riconosce.test('USDT (Ethereum)'));
+const te = fe.componi({indirizzo: EVM[0]}), tx = fx.componi({indirizzo: XMR.std}), tu = fu.componi({indirizzo: EVM[0]});
+out.forma = [fe.coin === E, fx.coin === X, fe.forma, fx.forma, !!FORME.find(f => f.riconosce.test('ETH (Ethereum) ')) ];
+const rce = reteCoinDaRecapitoP2P(righeRecapitoP2P(te)), rcx = reteCoinDaRecapitoP2P(righeRecapitoP2P(tx));
+out.ritorno = [rce && rce.rete === E && rce.indirizzo === EVM[0], rcx && rcx.rete === X && rcx.indirizzo === XMR.std,
+  reteUsdtDaRecapitoP2P(righeRecapitoP2P(te)), reteCoinDaRecapitoP2P(righeRecapitoP2P(tu)),
+  !!reteUsdtDaRecapitoP2P(righeRecapitoP2P(tu)), righeRecapitoP2P(te)[0].testa || null];
+cambioCoinP2P = {eth: 2800, xmr: 300};
+out.cifra = riquadroCifraCoinP2P(X, XMR.std, 30);
+impostaCambioCoinP2P({eth: 0, xmr: 'x'});
+out.cifraSenza = riquadroCifraCoinP2P(E, EVM[0], 30);
+out.stato = [statoIndirizzoUsdtP2P(XMR.rotto, X).spento, statoIndirizzoUsdtP2P(XMR.std, X).spento, statoIndirizzoUsdtP2P('', E).frase];
+// la moneta dello scambio: dal recapito, dal metodo scelto, dall'ordine
+out.scambio = [
+  (reteCoinScambioP2P({metodi: ['SEPA', 'XMR (Monero)'], campiLoro: {euro: {testo: tx}}}) || {}).coin,
+  reteCoinScambioP2P({metodi: ['SEPA', 'XMR (Monero)'], campiLoro: {euro: {testo: 'Bonifico SEPA\nIntestatario: Mario\nIBAN: IT60X0542811101000000123456'}}}),
+  (reteCoinScambioP2P({metodi: ['SEPA', 'ETH (Ethereum)'], metodoScelto: 'ETH (Ethereum)'}) || {}).coin,
+  (reteCoinScambioP2P({metodi: ['ETH (Ethereum)']}) || {}).coin,
+  reteCoinScambioP2P({metodi: ['SEPA', 'ETH (Ethereum)']}),
+  indirizzoCoinScambioP2P({campiLoro: {euro: {testo: tx}}})];
+// il messaggio di «Ho inviato» e la sua lettura
+const me = testoCoinInviatiP2P(E, TXE, '', EVM[0]), mx = testoCoinInviatiP2P(X, TXX, CHIAVE, XMR.std);
+const le = coinInviatiDaChatP2P(me), lx = coinInviatiDaChatP2P(mx);
+out.chat = [me, le && le.rete === E && le.txid === TXE && le.chiave === '' && le.indirizzo === '',
+  lx && lx.rete === X && lx.txid === TXX && lx.chiave === CHIAVE && lx.indirizzo === XMR.std,
+  coinInviatiDaChatP2P('🧾 ETH inviati su Ethereum. Id della transazione: ciao'),
+  coinInviatiDaChatP2P('🧾 DOGE inviati su Ethereum. Id della transazione: ' + TXE),
+  coinInviatiDaChatP2P('ciao ' + me)];
+// il libro, le liste, la card
+out.libro = [valutaVistaP2P('EUR', ['SEPA', 'ETH (Ethereum)']), valutaVistaP2P('EUR', ['SEPA'])];
+myP2PCoin = false;
+out.libroSenza = [valutaVistaP2P('EUR', ['SEPA', 'ETH (Ethereum)']), valutaVistaP2P('EUR', ['XMR (Monero)']), valutaVistaP2P('EUR', ['SEPA']), valutaVistaP2P('EUR')];
+out.listeSenza = [metodiPubblicabiliP2P('vendo').length, metodiValutaP2P('EUR').length];
+myP2PCoin = true;
+out.liste = [metodiPubblicabiliP2P('vendo').slice(-2), metodiValutaP2P('EUR').slice(-2),
+  metodiOnchainP2P('vendo').filter(m => !!reteCoinDaMetodoP2P(m)), metodiValutaP2P('USDT').indexOf('ETH (Ethereum)')];
+out.tessera = [tesseraValutaP2P('EUR', ['XMR (Monero)']).includes('p2p-tessera-xmr'),
+  tesseraValutaP2P('EUR', ['ETH (Ethereum)']).includes('p2p-tessera-eth'),
+  tesseraValutaP2P('EUR', ['SEPA', 'ETH (Ethereum)']).includes('p2p-tessera-eur'),
+  tesseraValutaP2P('EUR', ['ETH (Ethereum)', 'XMR (Monero)']).includes('p2p-tessera-eur')];
+out.icona = [iconaMetodiP2P(['ETH (Ethereum)', 'XMR (Monero)']), iconaMetodiP2P(['SEPA', 'ETH (Ethereum)'])];
+console.log(JSON.stringify(out));
+""")
+    o = _node_banco(js)
+    if o is None:
+        salta("ETH e XMR nel telefono", "node non c'e'")
+        return
+    prova("i due metodi si riconoscono per nome esatto, non per somiglianza",
+          [True, True, None, None], o.get("metodi"))
+    prova("Monero: i tre tipi della rete principale fatti dal riferimento passano il controllo",
+          [{"rete": "mainnet", "tipo": "standard", "valido": True},
+           {"rete": "mainnet", "tipo": "sotto", "valido": True},
+           {"rete": "mainnet", "tipo": "integrato", "valido": True}], o.get("monero", [])[:3])
+    prova("...testnet e stagenet si riconoscono per quel che sono, e il refuso non torna",
+          [{"rete": "testnet", "tipo": "standard", "valido": True},
+           {"rete": "stagenet", "tipo": "standard", "valido": True},
+           {"rete": "mainnet", "tipo": "standard", "valido": False}], o.get("monero", [])[3:])
+    prova("...i due indirizzi veri del progetto Monero passano", [
+          {"rete": "mainnet", "tipo": "sotto", "valido": True},
+          {"rete": "mainnet", "tipo": "standard", "valido": True}], o.get("veri"))
+    prova("...95 caratteri lo standard, 106 l'integrato", [95, 106], o.get("lunghezze"))
+    prova("la forma di un indirizzo: Monero (anche integrato), Ethereum, Tron, bitcoin",
+          ["monero", "monero", "evm", "tron", "bitcoin"], o.get("forme"))
+    prova("il giudice di Monero promuove i tre tipi e i due veri (anche con gli spazi intorno)",
+          [""] * 5, o.get("giudiceX"))
+    no_x = o.get("noX") or [""] * 9
+    prova("...e ferma il vuoto, il refuso, testnet e stagenet, Ethereum, bitcoin, Lightning, un id, una parola",
+          [True] * 9, [bool(x) for x in no_x])
+    prova("...con la frase che dice cosa e' (refuso, rete di prova, rete sbagliata)",
+          (True, True, True, True),
+          ("carattere sbagliato" in no_x[1], "di prova (testnet)" in no_x[2],
+           "indirizzo Ethereum, non Monero" in no_x[4], "bitcoin, non Monero" in no_x[5]))
+    prova("il giudice di Ethereum promuove l'EIP-55 e il tutto-minuscolo", ["", ""], o.get("giudiceE"))
+    no_e = o.get("noE") or [""] * 5
+    prova("...e ferma la maiuscola sbagliata, Monero, Tron, il contratto USDT e il vuoto",
+          [True] * 5, [bool(x) for x in no_e])
+    prova("il giudice dell'USDT su Tron dice «Monero» davanti a un indirizzo Monero", True,
+          "indirizzo Monero, ma hai scelto Tron" in str(o.get("usdtVedeMonero")))
+    tx = o.get("txid") or [""] * 7
+    prova("l'id: 0x+64 e 64 nudo su Ethereum, 64 su Monero; l'id Ethereum su Monero si ferma col perche'",
+          (["", "", ""], True, True, True, True),
+          (tx[:3], "forma di Ethereum" in tx[3], bool(tx[4]), bool(tx[5]), bool(tx[6])))
+    prova("...e l'id Ethereum senza 0x se lo rimette", [txe, txx, txe], o.get("txidNormale"))
+    ch = o.get("chiave") or [""] * 5
+    prova("la chiave della transazione Monero: una o piu' da 64, il resto si ferma",
+          ["", "", True, True, True], ch[:2] + [bool(x) for x in ch[2:]])
+    prova("la cifra al cambio, arrotondata IN SU alla sesta cifra; senza cambio o senza euro tace",
+          ["0.033334", "0.124778", "0.010000", "", ""], o.get("importo"))
+    prova("i QR: EIP-681 nativo in wei con la catena, monero: con tx_amount; una cifra storta non entra",
+          ["ethereum:" + evm_vero + "@1?value=33334000000000000", "ethereum:" + evm_vero + "@1",
+           "monero:" + xmr["std"] + "?tx_amount=0.124778", "monero:" + xmr["std"], ""], o.get("qr"))
+    prova("gli explorer: Etherscan per transazione e indirizzo, xmrchain solo per la transazione",
+          ["https://etherscan.io/tx/" + txe, "https://etherscan.io/address/" + evm_vero,
+           "https://xmrchain.net/tx/" + txx, ""], o.get("esplora"))
+    prova("...il tasto c'e' solo con un id buono, e con Monero dice come provare a chi e' andato",
+          [True, True, ""], o.get("tasto"))
+    prova("una forma di recapito per moneta, col suo `coin`, solo a nome esatto",
+          [True, True, "coin-eth", "coin-xmr", False], o.get("forma"))
+    prova("il recapito va e torna (moneta e indirizzo), e «Ethereum (ETH)» non e' l'USDT su Ethereum",
+          [True, True, None, None, True, "⚠️ Manda solo ETH sulla rete Ethereum"], o.get("ritorno"))
+    cifra = str(o.get("cifra"))
+    prova("il riquadro della cifra: 30 € a 300 €/XMR = 0,100000 XMR da copiare, col cambio scritto",
+          (True, True, False), ("[Da mandare=0.100000 XMR|0,100000 XMR]" in cifra,
+                                "1 XMR ≈ 300 €" in cifra, "etherscan" in cifra))
+    prova("...senza cambio la cifra tace e lo dice, e su Ethereum resta il link all'indirizzo",
+          (False, True, True), ("Da mandare" in str(o.get("cifraSenza")),
+                                "non lo so" in str(o.get("cifraSenza")),
+                                "etherscan.io/address/" in str(o.get("cifraSenza"))))
+    prova("il tasto «Invia» del recapito: spento col refuso, acceso con l'indirizzo buono, muto sul vuoto",
+          [True, False, ""], o.get("stato"))
+    prova("la moneta dello scambio: dal recapito (che vince anche su un ordine misto), dal metodo scelto, dall'ordine solo-ETH",
+          ["XMR", None, "ETH", "ETH", None, xmr["std"]], o.get("scambio"))
+    ch = o.get("chat") or [None] * 6
+    prova("«Ho inviato»: il messaggio e la sua lettura sono gemelli, con Monero anche chiave e indirizzo",
+          ("🧾 ETH inviati su Ethereum. Id della transazione: " + txe, True, True, None, None, None), tuple(ch))
+    prova("il libro: un ordine con ETH o XMR si vede a chi li ha, e a chi non li ha solo se non li porta",
+          ([True, True], [False, False, True, True]), (o.get("libro"), o.get("libroSenza")))
+    prova("le liste: senza il cancello i metodi di ieri; col cancello ETH e XMR in fondo, mai on-chain ne' in USDT",
+          ([4, 4], [["ETH (Ethereum)", "XMR (Monero)"], ["ETH (Ethereum)", "XMR (Monero)"], [], -1]),
+          (o.get("listeSenza"), o.get("liste")))
+    prova("la card: logo della moneta solo se TUTTI i metodi sono quella moneta, senza 💳 se ognuno ha il suo segno",
+          ([True, True, True, True], ["", "💳 "]), (o.get("tessera"), o.get("icona")))
+
+    # --- 3) i fili ---
+    prova("i fili del telefono: /api/me, il cambio, il recapito, «Ho inviato», la chat, la pagina",
+          (True, True, True, True, True, True, True, True),
+          ("myP2PCoin = !!me.p2p_coin;" in mini,
+           "impostaCambioCoinP2P(j.cambio_coin)" in mini,
+           "riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : '', o)" in mini,
+           "if (typeof coinInviatiP2P === 'function' && reteCoinScambioP2P(o)) return coinInviatiP2P(o);" in mini,
+           "(typeof campoTxidCoinP2P === 'function' ? campoTxidCoinP2P(o) : '')" in mini,
+           "esploraCoinDaChatP2P(m.testo)" in mini,
+           "(typeof riquadroTxCoinP2P === 'function' ? riquadroTxCoinP2P(o) : '')" in mini,
+           "const no = giudiceIndirizzoCoinP2P(campi.indirizzo, fr.coin);" in mini))
+
+    # --- 4) le controprove: il codice rotto apposta fa diventare rossa la riga ---
+    def _rotto(vecchio, nuovo, domanda):
+        assert vecchio in js, vecchio
+        r = _node_banco(js.replace(vecchio, nuovo, 1).split("const out = {};")[0]
+                        + "console.log(JSON.stringify(" + domanda + "));\n")
+        return r
+    prova("controprova: senza i quattro byte del Keccak il refuso Monero passerebbe", True,
+          _rotto("const ok = h[0] === b[lung - 4]", "const ok = true || h[0] === b[lung - 4]",
+                 "moneroP2P(XMR.rotto).valido"))
+    prova("controprova: senza il controllo della rete un indirizzo di stagenet passerebbe", "",
+          _rotto("if (d.forma === 'monero' && d.rete !== 'mainnet')", "if (false)",
+                 "giudiceIndirizzoCoinP2P(XMR.stagenet, X)"))
+    prova("controprova: senza la rete sbagliata Monero passerebbe per Ethereum", True,
+          _rotto("if (d.forma !== r.forma)\n    return '⚠️ Questo è un indirizzo ' + (P2P_NOME_FORMA_USDT",
+                 "if (false)\n    return '⚠️ Questo è un indirizzo ' + (P2P_NOME_FORMA_USDT",
+                 "giudiceIndirizzoCoinP2P(XMR.std, E) === ''"))
+    prova("controprova: arrotondando in giu' chi riceve resterebbe corto", "0.033333",
+          _rotto("Math.ceil(e / c * 1e6 - 1e-6)", "Math.floor(e / c * 1e6)", "importoCoinP2P(100, 3000)"))
+    prova("controprova: senza la guardia nel recapito USDT, «Ethereum (ETH)» diventerebbe USDT su Ethereum", True,
+          _rotto("if (typeof reteCoinDaRecapitoP2P === 'function' && reteCoinDaRecapitoP2P(righe)) return null;", "",
+                 "!!reteUsdtDaRecapitoP2P(righeRecapitoP2P('⚠️ x\\nRete: Ethereum (ETH)\\nIndirizzo: ' + EVM[0]))"))
+    prova("controprova: senza il cancello nel libro un ordine con ETH si vedrebbe a tutti", True,
+          _rotto("return typeof metodiConCoinP2P !== 'function' || !metodiConCoinP2P(metodi) || coinVistoP2P();",
+                 "return true;", "(myP2PCoin = false, valutaVistaP2P('EUR', ['ETH (Ethereum)']))"))
+
+
 def prove_usdt_due_reti():
     """USDT SU DUE RETI E IL BOT CON LE SUE PAROLE (2 nov 2026, cantiere
     usdt-due-reti, richiesta di Andrea: «leviamo polygon [...] e sistemiamo
@@ -155107,7 +155436,10 @@ console.log(JSON.stringify(out));
     _rc = pezzo_js(mini, "function renderCampiP2P(){", "\n}\n")
     prova("...e il foglio lo giudica a ogni lettera, senza ridisegnare, col tasto e la riga "
           "che lo dicono", (True, True, True, True),
-          ("inp.addEventListener('input', () => giudicaIndirizzoUsdtVivoP2P(inp.value, fr.usdt));" in _rc,
+          # ⚠️ EMENDATA (13 nov 2026, cantiere eth-xmr): la voce e' `r`, la
+          # rete USDT o la moneta ETH/XMR (`fr.usdt || fr.coin`)
+          ("inp.addEventListener('input', () => giudicaIndirizzoUsdtVivoP2P(inp.value, r));" in _rc
+           and "const r = fr.usdt || fr.coin;" in _rc,
            'id="p2pInviaRecapitoBtn"' in _rc, 'id="p2pUsdtGiudizio"' in _rc,
            "if (bt) bt.disabled = st.spento;" in _fn_js(mini, "function giudicaIndirizzoUsdtVivoP2P(testo, r){")))
     prova("...un id di transazione al posto dell'indirizzo, e il campo vuoto, si dicono",
@@ -155296,7 +155628,8 @@ console.log(JSON.stringify(out));
               ["⚠️ Solo rete Ethereum: l'indirizzo comincia con 0x.",
                "⚠️ Solo rete Tron: l'indirizzo comincia con T."], o)
     prova("...e in USDT la riga «Il metodo dello scambio è» non c'e' (con l'euro resta)", True,
-          ": (scelto && !fr.usdt ? '<div class=\"hint\">💶 Il metodo dello scambio è <b>'"
+          # ⚠️ EMENDATA (13 nov 2026, cantiere eth-xmr): anche con ETH e XMR
+          ": (scelto && !fr.usdt && !fr.coin ? '<div class=\"hint\">💶 Il metodo dello scambio è <b>'"
           in pezzo_js(mini, "function renderCampiP2P(){", "\n}\n"))
 
 
@@ -160663,7 +160996,10 @@ def prove_contanti_zona():
     mar = fn("function marchioMetodoP2P(m, conTesto){")
     prova("il vestito del metodo chiede l'etichetta al blocco del contanti, e il 💵 non lo scrive a mano",
           [True, 0],
-          ["if (!v) return (typeof etichettaContantiP2P === 'function' && etichettaContantiP2P(m)) || esc(m);"
+          # ⚠️ EMENDATA (13 nov 2026, cantiere eth-xmr): dopo il contanti
+          # chiede anche l'etichetta di ETH e XMR, col loro logo
+          ["if (!v) return (typeof etichettaContantiP2P === 'function' && etichettaContantiP2P(m))\n"
+           "    || (typeof etichettaCoinP2P === 'function' && etichettaCoinP2P(m)) || esc(m);"
            in mar, mar.count(chr(0x1F4B5))])
     prova("l'icona delle banconote sta in UNA costante, e nessuna card la scrive a mano",
           ["const P2P_CONTANTI_ICO = '" + chr(0x1F4B5) + "';", 0, 0],
@@ -189710,7 +190046,7 @@ CATEGORIE = {
     p2p_stati p2p_chat p2p_pubblica p2p_velo_pubblica p2p_barattozon
     p2p_paycode premio_barattozon convenienza_vera barattozon_mercato
     scadenza_barattozon foglio_coperto passi_barattozon_fogli
-    importo_foglio pubblica_metodo_prima libro_vuoto_monete revolut_tre_modi
+    importo_foglio pubblica_metodo_prima libro_vuoto_monete revolut_tre_modi eth_xmr
     indietro_dal_libro ricarica_resta p2p_canale p2p_canonico p2p_bundle
     p2p_nuvola p2p_conto_dispositivo recensione_p2p ritocchi_scambio
     pagina_scambio_ridisegno foglio_tastiera_iphone chiavi_p2p_firmate
@@ -190400,6 +190736,7 @@ def main():
     prove_volto_porta_card,
     prove_lista_corta_metodi,
     prove_revolut_tre_modi,
+    prove_eth_xmr,
     prove_usdt_moderatori,
     prove_grafica_p2p_onchain,
     prove_novita_usdt_p2p,
