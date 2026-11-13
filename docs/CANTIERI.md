@@ -80520,3 +80520,84 @@ che torna anche con «BNB Chain», chat, card, libro, liste; quattro
 controprove), `prove_eth_xmr` e `collaudo_eth_xmr` allargati al cambio a
 tre. Da guardare: dal telefono vero un invio vero su una L2, e un wallet
 Solana che legga il QR Solana Pay col token.
+
+## Il metodo scelto da chi prende si vede di là, anche su Telegram (13 nov 2026, cantiere rete-scelta, Andrea in produzione: «ho scelto rete tron ma un utente mi ha scritto: non vedo quale chain hai scelto», «stessa cosa con euro: non vedo se ha scelto sepa o sepa instant», «nonostante avevo scelto tron lui ha potuto inserire un indirizzo ethereum»)
+
+PERCHÉ. Il coordinatore la scelta del metodo non la trasmette (il take
+porta `payment_method` solo per la cauzione, patch 0010, e non lo scrive
+da nessuna parte): viaggia fra i due telefoni sul filo dei recapiti
+(«IL METODO SCELTO VIAGGIA», set 2026). `pianificaMetodoP2P` la mandava
+UNA volta, e solo quando la controparte si scopriva da un messaggio di
+mostrod (`avanzaOrdineP2P` e l'eco). Ma la controparte arriva anche da
+altre due strade — l'archivio del server (`adottaScambiServerP2P`,
+`chiave_peer` della 0007) e la restore (`adottaOrdiniAltroveP2P`) — e
+da lì il metodo non partiva mai: basta l'app chiusa mentre l'altro paga
+la garanzia, e riaperta dopo. Un invio caduto, poi, non si riprovava.
+Senza la scelta, chi aveva pubblicato vedeva «Tron, Ethereum» sulla
+card, le pillole nel foglio del recapito, e sceglieva la rete da solo:
+il giudice dell'indirizzo seguiva la SUA pillola. Rischio soldi basso
+(un wallet Tron rifiuta un 0x), ma confusione, gas di Ethereum e
+dispute. Un secondo difetto, trovato strada facendo: se chi vende aveva
+toccato una pillola prima che la scelta arrivasse, la pillola vinceva
+sulla scelta (`metodoRecapitoScelto`), e il foglio restava sulla rete
+sbagliata senza più pillole per vederlo.
+
+COSA. (1) La scelta riparte finché non è partita davvero
+(`metodoDaDireP2P`, puro): dalla pagina dello scambio, e alla fine di
+ogni giro dell'archivio e della restore (`pianificaMetodiP2P`); un invio
+caduto si riprova dopo `P2P_METODO_RIPROVA_MS` (60 s). La regola dei
+campi «nessun rinvio automatico» resta per il recapito, dove un rinvio
+può scavalcare una correzione: il metodo è un fatto della presa e non
+cambia, e mandarlo due volte dice la stessa cosa. (2) Una riga sotto il
+conto (`rigaMetodoSceltoP2P`), solo sugli ordini con più metodi e a
+scambio vivo: chi ha preso legge «🔗 Hai scelto USDT su Tron», chi ha
+pubblicato «Luca ha scelto USDT su Tron. Indica dove ricevere su questa
+rete» (o «Paga con questo metodo»), e senza scelta arrivata «⏳ … non
+ha ancora detto quale rete ha scelto. Chiediglielo in chat prima di…».
+(3) La riga rossa del recapito di un'altra forma (`metodoDiversoP2P`):
+le forme del foglio sulla prima riga del recapito, gli USDT e le monete
+dalla riga «Rete». A chi paga «Non pagare: scrivilo in chat», a chi ha
+dato il recapito «Aggiornalo prima che ti paghi». SEPA e SEPA Instant
+sono la stessa forma (lo stesso IBAN), e un recapito che non si
+riconosce non dice niente. Non ferma bottoni: i due possono essersi
+accordati in chat. (4) La scelta arrivata batte la pillola toccata
+prima. (5) Nel foglio del recapito, finché la scelta non c'è, «⏳ …
+chiediglielo in chat prima di inviare». (6) In testa alla chat dello
+scambio, «🔗 Metodo scelto: …» (non nel mercatino). (7) L'avviso su
+Telegram (Andrea: «aggiungi anche la notifica del bot»): il telefono di
+chi ha preso dichiara il metodo a `POST /api/p2p/metodo` `{ordine,
+metodo}` (`avvisaMetodoP2P`), e il server (`_avviso_metodo_p2p`) lo
+scrive a chi ha pubblicato col bottone «Apri lo scambio». Passa il NOME
+di uno dei metodi già pubblici nell'elenco dell'ordine, nient'altro.
+Cinture: chi chiama non è chi ha pubblicato, è una delle due parti, lo
+scambio è vivo, l'ordine ha più metodi e il metodo è uno dei suoi, gli
+avvisi P2P accesi; una volta per giro (timbro in `p2p_avvisi`, momento
+'metodo', prima dell'invio). La rotta risponde sempre `ok`; aggiunge
+`riprova` solo sul «non ancora» (⏳: il server non sa ancora della
+presa, gli eventi della 0007 viaggiano per Tor), e il telefono allora
+non segna `metodoAvvisato` e riprova al giro dopo.
+
+SCARTATO. Fermare il bottone «Ho inviato» davanti al recapito diverso:
+chi paga può aver concordato l'altra rete in chat, e un bottone spento
+senza uscita blocca lo scambio. Far scrivere al coordinatore il metodo
+dichiarato (una patch in più al fork e un evento nuovo): il filo dei
+recapiti e il server bastano. Un messaggio automatico nella chat: la
+chat è delle persone, e la riga fissa in testa dice lo stesso senza
+parlare a nome di nessuno.
+
+PROVATO. `prove_rete_scelta_p2p` (nuova, 42 controlli): i pezzi veri in
+node — la controparte arrivata dall'archivio fa partire la scelta, una
+volta; l'invio caduto non si ripete a raffica e poi si riprova; senza
+chiavi aspetta; i cinque no; la riga ai due lati, col nome, in USDT e in
+euro; il rosso nei due versi, SEPA/Instant zitto, Revolut/SEPA diverso;
+la scelta che batte la pillola; la chat; l'avviso al server con
+«riprova» — più il giudice del server sul banco degli avvisi (chi ha
+pubblicato, fuori elenco, un terzo, una volta per giro, un metodo solo,
+prima della presa, avvisi spenti). Controprove: sei rotture (giro dei
+metodi spento, pillola di nuovo prima, invio caduto mai riprovato,
+giudice della forma zitto, server che lascia dichiarare chi ha
+pubblicato, server che accetta un metodo fuori elenco): ognuna fa
+diventare rossa la sua riga. NON provato dal vivo: lo scambio vero fra
+due telefoni; da guardare dopo la promozione con un ordine a due reti
+(USDT) e uno SEPA/SEPA Instant, app di chi prende chiusa durante la
+garanzia.

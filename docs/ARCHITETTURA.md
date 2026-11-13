@@ -30572,6 +30572,26 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   pillole (non c'è niente da scegliere) e l'invio automatico guarda
   la sola forma decisa: mandare l'IBAN a chi ha scelto Satispay vuol
   dire far ricominciare l'accordo a voce.
+  ⚠️ E RIPARTE FINCHÉ NON È ARRIVATO (13 nov 2026, CANTIERI, «Il
+  metodo scelto da chi prende si vede di là»): «appena si sa con chi»
+  vuol dire da QUALUNQUE strada porti la controparte — il messaggio di
+  mostrod, l'archivio del server, la restore — quindi la domanda «è
+  già partito?» (`metodoDaDireP2P`) si fa anche alla pagina dello
+  scambio e alla fine di ogni giro di `adottaScambiServerP2P` e
+  `adottaOrdiniAltroveP2P` (`pianificaMetodiP2P`), e un invio caduto si
+  riprova dopo `P2P_METODO_RIPROVA_MS`. La scelta arrivata batte anche
+  la pillola toccata prima. LA SCELTA SI VEDE: una riga sotto il conto
+  ai due lati (`rigaMetodoSceltoP2P`), rossa se il recapito viaggiato è
+  di un'altra forma (`metodoDiversoP2P`: le forme del foglio sulla
+  prima riga, gli USDT dalla riga «Rete»; SEPA e SEPA Instant sono una
+  forma), una riga in testa alla chat (`rigaChatMetodoP2P`). E SU
+  TELEGRAM: `POST /api/p2p/metodo` `{ordine, metodo}` dal telefono di
+  chi ha preso (`avvisaMetodoP2P`), giudice `_avviso_metodo_p2p` (non
+  chi ha pubblicato, una delle due parti, scambio vivo, più metodi e
+  quello fra i suoi, una volta per giro col timbro 'metodo' in
+  `p2p_avvisi`); risponde sempre `ok`, con `riprova` solo sul «non
+  ancora». Passa il nome di un metodo già pubblico nell'elenco
+  dell'ordine: il recapito resta fuori dal filo.
 - LE PARTI SI VEDONO (17 set 2026): a ordine PRESO, la pagina dello
   scambio porta il profilo dell'altra persona — il calco del riquadro
   venditore del mercatino (`.seller`: faccia, nome, titolo, e la riga

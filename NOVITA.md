@@ -110,3 +110,9 @@ frase: Negli ordini P2P in USDT con un intervallo, quando scegli quanto scambiar
 dove: la scheda «P2P», toccando un ordine in USDT con «scegli tu» nel libro.
 leva: P2P_USDT_ATTIVO (nessuna leva nuova)
 pubblico: no
+
+## 2026-11-13 · rete-scelta
+frase: Negli scambi P2P, quando prendi un ordine con più metodi o più reti, la tua scelta arriva davvero all'altra persona: nella pagina dello scambio e in cima alla chat legge «ha scelto USDT su Tron» (o «SEPA Instant»), e le arriva un avviso su Telegram. Il recapito si può dare solo sulla rete scelta, e se ne arriva uno di un'altra rete la pagina lo dice in rosso prima che paghi.
+dove: la scheda «P2P», la pagina dello scambio in «I miei scambi» (sotto il conto) e la chat dello scambio.
+leva: nessuna
+pubblico: sì

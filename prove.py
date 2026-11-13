@@ -68434,10 +68434,13 @@ def prove_p2p_dettaglio():
     prova("il metodo arrivato si valida contro quelli dell'ordine", True,
           "return (o.metodi || []).indexOf(m) >= 0 ? m : '';" in ms)
     pm = pezzo_js(mini, "function pianificaMetodoP2P(id){", "\n}\n")
-    prova("...e parte una volta sola, quando si sa con chi", True,
-          "if (p2pMetodoInviato[id]) return;" in pm
+    # (13 nov 2026, cantiere rete-scelta) non piu' «una volta sola»: un
+    # invio caduto si riprova, e la scelta riparte anche quando la
+    # controparte arriva dall'archivio — vedi prove_rete_scelta_p2p
+    prova("...e parte quando si sa con chi, una volta riuscita", True,
+          "if (st === 'in-corso' || st === 'fatto') return;" in pm
           and "if (!chiaviChatOrdine(o)) return;" in pm
-          and "campoInvia(o, 'metodo'" in pm)
+          and "campoInvia(o, 'metodo', m)" in pm)
     prova("...e prima del recapito, che chi vende non scelga da solo",
           True, 0 < mini.index("pianificaMetodoP2P(nuovo.id);")
           < mini.index("pianificaAutoRecapito(nuovo.id);"))
@@ -156947,6 +156950,301 @@ console.log(JSON.stringify(out));
            and "fiat:" not in r])
 
 
+def prove_rete_scelta_p2p():
+    """IL METODO SCELTO DA CHI PRENDE SI VEDE DI LA' (13 nov 2026, cantiere
+    rete-scelta, Andrea dal campo: prende un ordine in USDT scegliendo
+    Tron, e chi vende gli scrive «non vedo quale chain hai scelto» — e gli
+    manda un indirizzo Ethereum; con gli euro «non vedo se ha scelto SEPA
+    o SEPA Instant»). Il coordinatore la scelta non la trasmette: viaggia
+    sul filo dei recapiti, e partiva UNA volta sola, solo se la
+    controparte si scopriva da un messaggio di mostrod. Qui i pezzi VERI
+    girano in node: la scelta riparte quando la controparte arriva
+    dall'archivio del server, un invio caduto si riprova, la riga in cima
+    allo scambio la dice ai due lati, il recapito di un'altra forma si
+    dice in rosso, la scelta arrivata batte la pillola toccata prima, e la
+    chat e l'avviso al server la portano anche loro. Poi il giudice del
+    server (l'avviso su Telegram a chi ha pubblicato) sul banco degli
+    avvisi, coi suoi no."""
+    print("\n[il metodo scelto da chi prende si vede di la']")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    def _riga(nome):
+        return re.search(r"const " + nome + r" = [^\n]*;", mini).group(0)
+
+    pezzi = [_riga_js(mini, "const P2P_VALUTA = "), _riga_js(mini, "const P2P_VALUTE = "),
+             _riga_js(mini, "const P2P_FINALI = ")]
+    for testa in ("const P2P_RETI_USDT = [", "const P2P_RETI_COIN = ["):
+        i = mini.index(testa)
+        pezzi.append(mini[i:mini.index("];", i) + 2])
+    pezzi += [_riga(n) for n in ("P2P_METODI", "P2P_TABACCHINO", "P2P_TABACCHINO_PM",
+                                 "P2P_CONTANTI", "CAMPO_MAX_TESTO")]
+    i = mini.index("const P2P_FORME_RECAPITO = [")
+    pezzi.append(mini[i:mini.index("\n];", i) + 3])
+    pezzi.append(_riga_js(mini, "function usdtP2P(o){"))
+    pezzi.append(_riga_js(mini, "let P2P_METODO_RIPROVA_MS = "))
+    pezzi.append(_riga_js(mini, "let p2pMetodoInviato = "))
+    pezzi.append(_riga_js(mini, "let p2pMetodoAvvisoTentati = "))
+    for firma in ("function valutaOrdineP2P(o){", "function reteUsdtDaMetodoP2P(m){",
+                  "function formaRecapito(metodo){", "function righeRecapitoP2P(testo){",
+                  "function reteUsdtDaRecapitoP2P(righe){", "function reteCoinDaRecapitoP2P(righe){",
+                  "function testoRecapitoScambioP2P(o){", "function metodoSceltoP2P(o){",
+                  "function nomeControparteP2P(o, ripiego){",
+                  "function metodoDaDireP2P(o){", "function pianificaMetodoP2P(id){",
+                  "function pianificaMetodiP2P(){", "function nomeMetodoSceltoP2P(m){",
+                  "function formaDelRecapitoP2P(testo){", "function metodoDiversoP2P(o){",
+                  "function rigaMetodoSceltoP2P(o){", "function rigaChatMetodoP2P(o){",
+                  "function metodoRecapitoScelto(o){", "function avvisaMetodoP2P(id){"):
+        pezzi.append(_fn_js(mini, firma))
+    banco = "\n".join(pezzi) + r"""
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+let p2pControparti = {}, p2pCampoMetodo = '';
+let myTgId = 1, VETRINA = false, DEMO = false;
+const API_BASE = '/api', authHdr = () => 'x', idMostroVero = () => true;
+const recapitiMiei = () => ({});
+const RIGHE = {};
+const ordiniP2P = () => RIGHE;
+const scriviOrdineP2P = o => { RIGHE[o.id] = o; };
+let chiavi = true;
+const chiaviChatOrdine = o => (chiavi && o && o.peer) ? {} : null;
+const INVII = [];
+let cade = false;
+function campoInvia(o, tipo, testo){
+  INVII.push([o.id, tipo, testo]);
+  if (cade) return Promise.reject(new Error('relay muto'));
+  const agg = RIGHE[o.id];
+  agg.campiMiei = Object.assign({}, agg.campiMiei || {}, {[tipo]: {id: 'x', testo: testo, t: 1}});
+  return Promise.resolve(agg);
+}
+const FETCH = [];
+let rispostaServer = {ok: true};
+function fetch(url, opz){
+  FETCH.push([url, JSON.parse(opz.body)]);
+  return Promise.resolve({ok: true, json: () => Promise.resolve(rispostaServer)});
+}
+const aspetta = () => new Promise(r => setTimeout(r, 0));
+const USDT = ['USDT (Tron)', 'USDT (Ethereum)'];
+const PEER = 'b'.repeat(64);
+const tron = formaRecapito('USDT (Tron)').componi({indirizzo: 'TXYZ1234567890abcdefghijkLMNOPQRS'});
+const eth = formaRecapito('USDT (Ethereum)').componi({indirizzo: '0x' + '1'.repeat(40)});
+const sepa = formaRecapito('SEPA').componi({nome: 'Mario Rossi', iban: 'IT60X0542811101000000123456'}, 'SEPA');
+(async () => {
+const out = {};
+/* 1) LA CONTROPARTE ARRIVATA DALL'ARCHIVIO: nessun messaggio di mostrod,
+      la riga ha gia' `peer` — il difetto del campo. Il giro la manda. */
+RIGHE.a = {id: 'a', lato: 'compro', stato: 'attivo', metodi: USDT.slice(), metodoScelto: 'USDT (Tron)', peer: PEER};
+pianificaMetodiP2P(); await aspetta();
+out.archivio = INVII.slice();
+pianificaMetodiP2P(); pianificaMetodoP2P('a'); await aspetta();
+out.unaVolta = INVII.length;
+/* 2) L'INVIO CADUTO SI RIPROVA, ma non a raffica */
+RIGHE.b = {id: 'b', lato: 'vendo', stato: 'attivo', metodi: ['SEPA', 'SEPA Instant'], metodoScelto: 'SEPA Instant', peer: PEER};
+cade = true; INVII.length = 0;
+pianificaMetodoP2P('b'); await aspetta();
+pianificaMetodoP2P('b'); await aspetta();
+out.cadutoSubito = INVII.length;
+cade = false; P2P_METODO_RIPROVA_MS = 0; INVII.length = 0;
+pianificaMetodoP2P('b'); await aspetta();
+out.riprova = INVII.slice();
+/* 3) SENZA CHIAVI ASPETTA, e non si brucia il turno */
+RIGHE.c = {id: 'c', lato: 'compro', stato: 'attivo', metodi: USDT.slice(), metodoScelto: 'USDT (Ethereum)', peer: PEER};
+chiavi = false; INVII.length = 0;
+pianificaMetodoP2P('c'); await aspetta();
+out.senzaChiavi = INVII.length;
+chiavi = true;
+pianificaMetodoP2P('c'); await aspetta();
+out.conChiavi = INVII.slice();
+/* 4) I NO: senza controparte, a scambio finito, gia' partito da un altro
+      dispositivo, un metodo fuori elenco, la riga di chi ha pubblicato */
+const no = {
+  senzaPeer: {id: 'n1', stato: 'attivo', metodi: USDT, metodoScelto: 'USDT (Tron)', peer: ''},
+  finito: {id: 'n2', stato: 'concluso', metodi: USDT, metodoScelto: 'USDT (Tron)', peer: PEER},
+  giaPartito: {id: 'n3', stato: 'attivo', metodi: USDT, metodoScelto: 'USDT (Tron)', peer: PEER,
+               campiMiei: {metodo: {id: 'y', testo: 'USDT (Tron)', t: 1}}},
+  fuori: {id: 'n4', stato: 'attivo', metodi: USDT, metodoScelto: 'Revolut', peer: PEER},
+  maker: {id: 'n5', stato: 'attivo', metodi: USDT, mio: true, peer: PEER}};
+out.no = Object.keys(no).map(k => metodoDaDireP2P(no[k]));
+/* 5) LA RIGA IN CIMA ALLO SCAMBIO */
+const arrivato = (testo, extra) => Object.assign({id: 'm', lato: 'vendo', mio: true, stato: 'attivo',
+  metodi: USDT.slice(), peer: PEER, campiLoro: {metodo: {id: 'z', testo: testo, t: 1}}}, extra || {});
+out.makerArrivato = rigaMetodoSceltoP2P(arrivato('USDT (Tron)'));
+out.makerPaga = rigaMetodoSceltoP2P(arrivato('USDT (Tron)', {lato: 'compro'}));
+out.makerAspetta = rigaMetodoSceltoP2P(arrivato('', {campiLoro: {}}));
+out.makerFuoriElenco = rigaMetodoSceltoP2P(arrivato('USDT (Polygon)'));
+out.taker = rigaMetodoSceltoP2P(RIGHE.a);
+out.unSolo = rigaMetodoSceltoP2P(arrivato('USDT (Tron)', {metodi: ['USDT (Tron)']}));
+out.finito = rigaMetodoSceltoP2P(arrivato('USDT (Tron)', {stato: 'concluso'}));
+out.euro = rigaMetodoSceltoP2P(arrivato('SEPA Instant', {metodi: ['SEPA', 'SEPA Instant']}));
+p2pControparti.m = {nome: 'Luca Bianchi'};
+out.colNome = rigaMetodoSceltoP2P(arrivato('USDT (Tron)'));
+p2pControparti = {};
+/* 6) IL RECAPITO DI UN'ALTRA FORMA */
+out.mioDiverso = rigaMetodoSceltoP2P(arrivato('USDT (Tron)', {campiMiei: {euro: {id: 'e', testo: eth, t: 1}}}));
+out.mioGiusto = rigaMetodoSceltoP2P(arrivato('USDT (Tron)', {campiMiei: {euro: {id: 'e', testo: tron, t: 1}}}));
+out.pagoDiverso = rigaMetodoSceltoP2P(Object.assign({}, RIGHE.a, {campiLoro: {euro: {id: 'e', testo: eth, t: 1}}}));
+out.sepaInstant = metodoDiversoP2P(arrivato('SEPA Instant', {metodi: ['SEPA', 'SEPA Instant'],
+  campiMiei: {euro: {id: 'e', testo: sepa, t: 1}}}));
+out.revolutSepa = metodoDiversoP2P(arrivato('Revolut', {metodi: ['SEPA', 'Revolut'],
+  campiMiei: {euro: {id: 'e', testo: sepa, t: 1}}}));
+out.ignoto = metodoDiversoP2P(arrivato('USDT (Tron)', {campiMiei: {euro: {id: 'e', testo: 'scrivimi in chat', t: 1}}}));
+/* 7) LA SCELTA ARRIVATA BATTE LA PILLOLA TOCCATA PRIMA */
+p2pCampoMetodo = 'USDT (Ethereum)';
+out.pillola = [metodoRecapitoScelto(arrivato('USDT (Tron)')), metodoRecapitoScelto(arrivato('', {campiLoro: {}}))];
+p2pCampoMetodo = '';
+/* 8) LA CHAT */
+out.chat = [rigaChatMetodoP2P(arrivato('USDT (Tron)')), rigaChatMetodoP2P(arrivato('', {campiLoro: {}})),
+            rigaChatMetodoP2P(arrivato('USDT (Tron)', {metodi: ['USDT (Tron)']})),
+            rigaChatMetodoP2P(arrivato('USDT (Tron)', {mercatino: true}))];
+/* 9) L'AVVISO AL SERVER: una volta, col metodo; «riprova» non segna */
+FETCH.length = 0;
+RIGHE.s = {id: 's', lato: 'compro', stato: 'attivo', metodi: USDT.slice(), metodoScelto: 'USDT (Tron)', peer: PEER};
+rispostaServer = {ok: true, riprova: true};
+avvisaMetodoP2P('s'); await aspetta(); await aspetta();
+out.avvisoRiprova = [FETCH.slice(), RIGHE.s.metodoAvvisato || ''];
+p2pMetodoAvvisoTentati = {}; FETCH.length = 0;
+rispostaServer = {ok: true};
+avvisaMetodoP2P('s'); await aspetta(); await aspetta();
+p2pMetodoAvvisoTentati = {};
+avvisaMetodoP2P('s'); await aspetta(); await aspetta();
+out.avviso = [FETCH.length, RIGHE.s.metodoAvvisato || ''];
+FETCH.length = 0;
+RIGHE.t = {id: 't', lato: 'vendo', mio: true, stato: 'attivo', metodi: USDT.slice(), peer: PEER};
+RIGHE.u = {id: 'u', lato: 'compro', stato: 'attivo', metodi: ['SEPA'], metodoScelto: 'SEPA', peer: PEER};
+avvisaMetodoP2P('t'); avvisaMetodoP2P('u'); await aspetta();
+out.avvisoNo = FETCH.length;
+console.log(JSON.stringify(out));
+})();
+"""
+    out = _node_banco(banco)
+    if out is None:
+        salta("il metodo scelto in node", "node non c'e'")
+    else:
+        prova("la controparte arrivata dall'ARCHIVIO (senza messaggio di mostrod) fa partire la scelta",
+              [["a", "metodo", "USDT (Tron)"]], out.get("archivio"))
+        prova("...una volta sola: partita, non riparte", 1, out.get("unaVolta"))
+        prova("un invio caduto non si ripete a raffica...", 1, out.get("cadutoSubito"))
+        prova("...ma dopo l'attesa si riprova, e parte", [["b", "metodo", "SEPA Instant"]],
+              out.get("riprova"))
+        prova("senza le chiavi della chat aspetta, e appena ci sono parte",
+              [0, [["c", "metodo", "USDT (Ethereum)"]]], [out.get("senzaChiavi"), out.get("conChiavi")])
+        prova("i no: senza controparte, a scambio finito, gia' partita, fuori elenco, chi ha pubblicato",
+              ["", "", "", "", ""], out.get("no"))
+        prova("a chi ha pubblicato la riga dice la scelta arrivata, e cosa fare",
+              True, "Chi compra ha scelto <b>USDT su Tron</b>. Indica dove ricevere su questa rete."
+              in out.get("makerArrivato", ""))
+        prova("...e se paga lui, «Manda gli USDT su questa rete»", True,
+              "Chi vende ha scelto <b>USDT su Tron</b>. Manda gli USDT su questa rete." in out.get("makerPaga", ""))
+        prova("...col nome dell'altra persona, quando la pagina lo mostra", True,
+              "Luca ha scelto <b>USDT su Tron</b>" in out.get("colNome", ""))
+        prova("senza scelta arrivata: chiedila in chat prima di indicare dove ricevere", True,
+              "⏳" in out.get("makerAspetta", "")
+              and "non ha ancora detto quale rete ha scelto. Chiediglielo in chat prima di indicare dove ricevere."
+              in out.get("makerAspetta", ""))
+        prova("...e un metodo arrivato fuori dall'elenco vale «non ha scelto»", True,
+              "non ha ancora detto" in out.get("makerFuoriElenco", "")
+              and "Polygon" not in out.get("makerFuoriElenco", ""))
+        prova("chi ha preso legge la sua scelta", True,
+              "Hai scelto <b>USDT su Tron</b>: lo scambio si fa così." in out.get("taker", ""))
+        prova("con gli euro il metodo per nome (SEPA Instant)", True,
+              "ha scelto <b>SEPA Instant</b>. Indica dove ricevere con questo metodo." in out.get("euro", ""))
+        prova("un ordine con un metodo solo, o finito: nessuna riga", ["", ""],
+              [out.get("unSolo"), out.get("finito")])
+        prova("il MIO recapito su Ethereum con Tron scelto: rosso, «aggiornalo»", True,
+              "⛔" in out.get("mioDiverso", "")
+              and "il tuo recapito è per <b>USDT su Ethereum</b>. Aggiornalo prima che ti paghi." in out.get("mioDiverso", ""))
+        prova("...e col recapito giusto niente rosso", False, "⛔" in out.get("mioGiusto", ""))
+        prova("a chi paga, Tron scelto e indirizzo Ethereum arrivato: «Non pagare»", True,
+              "Hai scelto <b>USDT su Tron</b>, ma il recapito arrivato è per <b>USDT su Ethereum</b>. Non pagare"
+              in out.get("pagoDiverso", ""))
+        prova("SEPA Instant scelto e bonifico SEPA arrivato: lo stesso IBAN, niente rosso", None,
+              out.get("sepaInstant"))
+        prova("...Revolut scelto e bonifico SEPA: diverso", "sepa",
+              ((out.get("revolutSepa") or {}).get("recapito") or {}).get("forma"))
+        prova("...un recapito che non si riconosce non dice niente", None, out.get("ignoto"))
+        prova("la scelta arrivata batte la pillola toccata prima; senza scelta, la pillola",
+              ["USDT (Tron)", "USDT (Ethereum)"], out.get("pillola"))
+        ch = out.get("chat") or ["", "", "", ""]
+        prova("in testa alla chat: il metodo scelto, o «chiedilo qui»; mai con un metodo solo o nel mercatino",
+              [True, True, "", ""],
+              ["Metodo scelto: <b>USDT su Tron</b>" in ch[0], "La rete scelta non è ancora arrivata: chiedilo qui." in ch[1],
+               ch[2], ch[3]])
+        prova("l'avviso al server porta ordine e metodo; «riprova» non lo segna come detto",
+              [[["/api/p2p/metodo", {"ordine": "s", "metodo": "USDT (Tron)"}]], ""],
+              out.get("avvisoRiprova"))
+        prova("...detto una volta, poi tace", [1, "USDT (Tron)"], out.get("avviso"))
+        prova("...e non parte da chi ha pubblicato, ne' su un ordine con un metodo solo", 0,
+              out.get("avvisoNo"))
+    # i fili: le due strade da cui la controparte arriva senza mostrod, e la pagina
+    for firma in ("function adottaScambiServerP2P(locali){", "function adottaOrdiniAltroveP2P(locali){"):
+        prova("il giro dei metodi alla fine di " + firma.split("(")[0][9:], True,
+              "if (typeof pianificaMetodiP2P === 'function') pianificaMetodiP2P();\n  return nati;"
+              in _fn_js(mini, firma))
+    rend = _fn_js(mini, "function renderOrdineP2P(){")
+    prova("la pagina dello scambio riprova la scelta e mostra la riga sotto il conto", [True, True],
+          ["pianificaMetodoP2P(o.id);" in rend, "rigaMetodoSceltoP2P(o) +\n    riquadroCauzioneP2P(o) +" in rend])
+    prova("la chat porta la riga del metodo (non nel mercatino)", True,
+          "(!merc && typeof rigaChatMetodoP2P === 'function' ? rigaChatMetodoP2P(o) : '')"
+          in _fn_js(mini, "function chatScBloccoHTML(o, c, sa){"))
+    prova("il foglio del recapito, senza scelta arrivata, dice di chiederla in chat", True,
+          "ha scelto: chiediglielo in chat prima di inviare." in _fn_js(mini, "function renderCampiP2P(){"))
+    prova("l'avviso del metodo si toglie con la presa caduta", True,
+          "'metodoAvvisato'];" in mini[mini.index("const P2P_DELLA_PRESA = ["):])
+
+    # --- IL SERVER: l'avviso su Telegram a chi ha pubblicato -------------
+    con, amb = _banco_eventi_p2p()
+    for f in ("_testo_metodo_p2p", "_avviso_metodo_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    amb["_nome_altro_p2p"] = lambda con, o, per, adesso: ""
+    avviso = amb["_avviso_metodo_p2p"]
+    ORA = 1_790_000_000
+    MAKER, TAKER, TERZO = 222, 111, 333
+    ORD = "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc22"
+    ORD1 = "1f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc22"
+
+    def libro(ordine, metodi, stato="in-progress", lato="sell"):
+        con.execute(
+            "INSERT OR REPLACE INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+            "preso_da, euro, sats, metodi) VALUES(?,?,0,?,?,1,?,'50 USDT',70000,?)",
+            (ordine, MAKER, stato, lato, TAKER, json.dumps(metodi)))
+    libro(ORD, ["USDT (Tron)", "USDT (Ethereum)"])
+    prova("chi ha pubblicato non dichiara: il metodo lo sceglie chi prende", 0,
+          avviso(con, ORD, MAKER, "USDT (Tron)", ORA)[0])
+    prova("un metodo fuori elenco non e' una scelta", 0,
+          avviso(con, ORD, TAKER, "USDT (Polygon)", ORA)[0])
+    prova("...un terzo non e' una delle parti, e la rotta dice «riprova»", (0, True),
+          (lambda r: (r[0], r[1].startswith("⏳")))(avviso(con, ORD, TERZO, "USDT (Tron)", ORA)))
+    a_chi, testo = avviso(con, ORD, TAKER, "USDT (Tron)", ORA)
+    prova("chi ha preso dice Tron: lo legge chi ha pubblicato, con la rete e cosa fare",
+          (MAKER, "🔗 <b>Chi ti compra i sats ha scelto USDT su Tron.</b>\nIndica dove ricevere "
+                  "gli USDT solo su questa rete: un indirizzo di un'altra rete non gli serve."),
+          (a_chi, testo.split("\n\n")[0]))
+    prova("...una volta per giro", 0, avviso(con, ORD, TAKER, "USDT (Tron)", ORA + 5)[0])
+    libro(ORD1, ["SEPA", "SEPA Instant"], lato="buy")
+    a_chi, testo = avviso(con, ORD1, TAKER, "SEPA Instant", ORA)
+    prova("con gli euro, a chi ha pubblicato e paga: «Paga con questo metodo»",
+          (MAKER, "🔗 <b>Chi ti vende i sats ha scelto SEPA Instant.</b>\nPaga con questo metodo."),
+          (a_chi, testo.split("\n\n")[0]))
+    ORD2 = "2f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc22"
+    libro(ORD2, ["SEPA"])
+    prova("un ordine con un metodo solo non avvisa", 0, avviso(con, ORD2, TAKER, "SEPA", ORA)[0])
+    ORD3 = "3f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc22"
+    libro(ORD3, ["SEPA", "Revolut"], stato="pending")
+    prova("...e prima della presa non c'e' nessuno: «riprova»", (0, True),
+          (lambda r: (r[0], r[1].startswith("⏳")))(avviso(con, ORD3, TAKER, "SEPA", ORA)))
+    con.execute("INSERT INTO utenti(tg_id, avvisi_p2p) VALUES(?, 0)", (MAKER,))
+    ORD4 = "4f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc22"
+    libro(ORD4, ["SEPA", "Revolut"])
+    prova("chi ha spento gli avvisi P2P non riceve niente", 0,
+          avviso(con, ORD4, TAKER, "Revolut", ORA)[0])
+    con.close()
+    rotta = pezzo("metodo_p2p")
+    prova("la rotta risponde sempre ok, e «riprova» solo sul «non ancora»", True,
+          'return {"ok": True, "riprova": True} if testo.startswith("⏳") else {"ok": True}' in rotta)
+    prova("...e l'avviso porta il bottone che apre lo scambio", True,
+          "_bottone_scambio_p2p(o_avviso)" in rotta)
+
+
 def prove_grafica_p2p_onchain():
     """LA SEZIONE ON-CHAIN DEL P2P RIDISEGNATA (30 ott 2026, cantiere
     grafica-p2p-onchain, richieste di Andrea dalle schermate del
@@ -190553,7 +190851,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa
+    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p
     lista_corta_metodi
     """.split(),
     "mercatino": """
@@ -191231,6 +191529,7 @@ def main():
     prove_grafica_p2p_onchain,
     prove_novita_usdt_p2p,
     prove_usdt_foglio_presa,
+    prove_rete_scelta_p2p,
     prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,
     prove_parole_uniche,
