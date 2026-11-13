@@ -54617,15 +54617,17 @@ def p2p_coin_ammesso(tg_id) -> bool:
 # conta: oltre un quarto d'ora la cifra tace invece di inventare.
 CAMBIO_COIN_VALIDO_S = 15 * 60
 CAMBIO_COIN_RIPROVA_S = 60
-_cambio_coin_cache = {"eth": 0.0, "xmr": 0.0, "quando": 0.0, "tentato": 0.0}
+# USDe di Ethena (13 nov 2026, cantiere usde): un prezzo per tutte le sue
+# reti, la stessa domanda.
+_cambio_coin_cache = {"eth": 0.0, "xmr": 0.0, "usde": 0.0, "quando": 0.0, "tentato": 0.0}
 
 
 def cambio_coin_noto_ora() -> dict:
-    """Quanti euro vale UN ETH e UN XMR, adesso, dalla cache: 0 = non lo
+    """Quanti euro vale UN ETH, UN XMR e UN USDe, adesso, dalla cache: 0 = non lo
     so (mai letto, o piu' vecchio di un quarto d'ora). Mai la rete."""
     fresco = (time.time() - _cambio_coin_cache["quando"]) < CAMBIO_COIN_VALIDO_S
     return {k: (_cambio_coin_cache[k] if fresco and _cambio_coin_cache[k] > 0 else 0.0)
-            for k in ("eth", "xmr")}
+            for k in ("eth", "xmr", "usde")}
 
 
 async def _rileggi_cambio_coin() -> bool:
@@ -54638,12 +54640,13 @@ async def _rileggi_cambio_coin() -> bool:
     try:
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.get("https://api.coingecko.com/api/v3/simple/price",
-                            params={"ids": "ethereum,monero",
+                            params={"ids": "ethereum,monero,ethena-usde",
                                     "vs_currencies": "eur"})
             r.raise_for_status()
             j = r.json()
             letti = {"eth": float((j.get("ethereum") or {}).get("eur") or 0),
-                     "xmr": float((j.get("monero") or {}).get("eur") or 0)}
+                     "xmr": float((j.get("monero") or {}).get("eur") or 0),
+                     "usde": float((j.get("ethena-usde") or {}).get("eur") or 0)}
     except Exception:
         return False
     if not any(v > 0 for v in letti.values()):

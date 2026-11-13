@@ -154385,15 +154385,15 @@ def prove_eth_xmr():
           (True, True, True),
           ('if p2p_coin_acceso():\n        busta["cambio_coin"] = cambio_coin_noto_ora()' in cambio,
            "if p2p_coin_acceso():\n            try:\n                await _rileggi_cambio_coin()" in orologio,
-           '"ids": "ethereum,monero"' in pezzo("_rileggi_cambio_coin")))
+           '"ids": "ethereum,monero,ethena-usde"' in pezzo("_rileggi_cambio_coin")))
     amb = {"time": __import__("time"), "CAMBIO_COIN_VALIDO_S": 900,
-           "_cambio_coin_cache": {"eth": 2800.0, "xmr": 300.0, "quando": 0.0, "tentato": 0.0}}
+           "_cambio_coin_cache": {"eth": 2800.0, "xmr": 300.0, "usde": 0.86, "quando": 0.0, "tentato": 0.0}}
     exec(pezzo("cambio_coin_noto_ora"), amb)
     vecchio = amb["cambio_coin_noto_ora"]()
     amb["_cambio_coin_cache"]["quando"] = amb["time"].time() - 60
     fresco = amb["cambio_coin_noto_ora"]()
     prova("un cambio di un minuto fa vale, uno di mai no (0, non inventato)",
-          [{"eth": 0.0, "xmr": 0.0}, {"eth": 2800.0, "xmr": 300.0}], [vecchio, fresco])
+          [{"eth": 0.0, "xmr": 0.0, "usde": 0.0}, {"eth": 2800.0, "xmr": 300.0, "usde": 0.86}], [vecchio, fresco])
 
     # --- 2) il banco del telefono ---
     ini = mini.index("/* ═══ GLI ORDINI IN USDT (1 nov 2026")
@@ -154520,7 +154520,7 @@ myP2PCoin = false;
 out.libroSenza = [valutaVistaP2P('EUR', ['SEPA', 'ETH (Ethereum)']), valutaVistaP2P('EUR', ['XMR (Monero)']), valutaVistaP2P('EUR', ['SEPA']), valutaVistaP2P('EUR')];
 out.listeSenza = [metodiPubblicabiliP2P('vendo').length, metodiValutaP2P('EUR').length];
 myP2PCoin = true;
-out.liste = [metodiPubblicabiliP2P('vendo').slice(-2), metodiValutaP2P('EUR').slice(-2),
+out.liste = [metodiPubblicabiliP2P('vendo').slice(4, 6), metodiValutaP2P('EUR').slice(4, 6),
   metodiOnchainP2P('vendo').filter(m => !!reteCoinDaMetodoP2P(m)), metodiValutaP2P('USDT').indexOf('ETH (Ethereum)')];
 out.tessera = [tesseraValutaP2P('EUR', ['XMR (Monero)']).includes('p2p-tessera-xmr'),
   tesseraValutaP2P('EUR', ['ETH (Ethereum)']).includes('p2p-tessera-eth'),
@@ -154645,6 +154645,220 @@ console.log(JSON.stringify(out));
     prova("controprova: senza il cancello nel libro un ordine con ETH si vedrebbe a tutti", True,
           _rotto("return typeof metodiConCoinP2P !== 'function' || !metodiConCoinP2P(metodi) || coinVistoP2P();",
                  "return true;", "(myP2PCoin = false, valutaVistaP2P('EUR', ['ETH (Ethereum)']))"))
+
+
+def _b58_riferimento(dati):
+    """Base58 alla bitcoin (quello di Solana), scritto qui a parte"""
+    alfa = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    n = int.from_bytes(dati, "big")
+    s = ""
+    while n:
+        n, r = divmod(n, 58)
+        s = alfa[r] + s
+    return "1" * (len(dati) - len(dati.lstrip(b"\0"))) + s
+
+
+def prove_usde():
+    """USDe DI ETHENA NEL P2P (13 nov 2026, cantiere usde, AndreAI:
+    «aggiungi nel p2p USDE nelle reti principali tra cui ETH», col sito
+    ethena.fi per dire quale). La stessa strada di ETH e XMR — metodi di un
+    ordine in euro, solo sull'istanza di prova — con cinque reti: Ethereum,
+    Arbitrum, Base, BNB Chain e Solana. Qui: le reti e i contratti veri
+    (dalla documentazione di Ethena), Solana riconosciuta per i suoi 32
+    byte senza rubare Tron e bitcoin, il giudice della rete e del
+    contratto, l'id di Solana, i QR dei token (EIP-681 transfer, Solana
+    Pay), gli explorer di ogni rete, il cambio unico, il recapito col
+    contratto, la chat, la card col logo e la rete che non si indovina.
+    Ogni giudice ha la sua controprova."""
+    print("\n💲 USDe di Ethena nel P2P")
+    import random as _rnd
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) il server: il cambio chiede anche USDe ---
+    rl = pezzo("_rileggi_cambio_coin")
+    prova("il cambio chiede USDe di Ethena a CoinGecko (id «ethena-usde») e lo tiene accanto a ETH e XMR",
+          (True, True, True),
+          ('"ids": "ethereum,monero,ethena-usde"' in rl,
+           '"usde": float((j.get("ethena-usde") or {}).get("eur") or 0)' in rl,
+           'for k in ("eth", "xmr", "usde")}' in pezzo("cambio_coin_noto_ora")))
+
+    # --- 2) il banco del telefono ---
+    ini = mini.index("/* ═══ GLI ORDINI IN USDT (1 nov 2026")
+    fine = mini.index("/* ---- IL PERCORSO BARATTOZON (23 set 2026")
+    blocco = mini[ini:fine]
+    i = mini.index("const P2P_VALUTE = [")
+    valute = mini[i:mini.index("];", i) + 2]
+    forme = mini.index("const P2P_FORME_RECAPITO = [")
+    forme_cripto = mini[forme:mini.index("/* LA CAUSALE (9 ott 2026", forme)]
+    _rnd.seed(20261113)
+    sol = _b58_riferimento(bytes(_rnd.randrange(1, 256) for _ in range(32)))
+    firma = _b58_riferimento(bytes(_rnd.randrange(1, 256) for _ in range(64)))
+    evm_vero = _eip55_riferimento(bytes(range(1, 21)).hex())
+    tron_vero = _tron_riferimento(bytes(range(1, 21)))
+    txe = "0x" + "ab" * 32
+    reti_attese = [
+        ("Ethereum", "USDe (Ethereum)", "evm", 1, "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3", "https://etherscan.io"),
+        ("Arbitrum", "USDe (Arbitrum)", "evm", 42161, "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", "https://arbiscan.io"),
+        ("Base", "USDe (Base)", "evm", 8453, "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", "https://basescan.org"),
+        ("BNB Chain", "USDe (BNB Chain)", "evm", 56, "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", "https://bscscan.com"),
+        ("Solana", "USDe (Solana)", "solana", None, "DEkqHyPN7GMRJ5cArtQFAWefqbZb33Hyf6s5iCwjEonT", "https://solscan.io")]
+    js = ("var cambioVivo = true, eurPerSat = 0.001, usdPerSat = 0.00108;\n"
+          "var myP2PUsdt = false, myP2PCoin = true, TETTO = 250;\n"
+          "const P2P_VALUTA = 'EUR';\n"
+          "const P2P_METODI = ['SEPA', 'Revolut', 'Contanti', 'Contanti al tabacchino'];\n"
+          "const P2P_TABACCHINO = 'Contanti al tabacchino';\n"
+          "const maxEuroP2P = () => TETTO;\n"
+          "const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\"/g, '&quot;');\n"
+          "const fmtEur = n => Number(n).toFixed(2).replace('.', ',');\n"
+          "const fmt = n => String(n);\n"
+          "const rigaDato = (et, v, op) => '[' + et + '=' + v + (op && op.vista ? '|' + op.vista : '') + ']';\n"
+          "const vesteMetodoP2P = () => null;\n"
+          "const P2P_STELLE_EU = '<svg-eu>', P2P_TETHER_SEGNO = '<svg-t>';\n"
+          "var p2pTxidBozza = {};\n"
+          + valute + "\n" + blocco + "\n"
+          + forme_cripto.replace("const P2P_FORME_RECAPITO = [", "const FORME = [") + "];\n"
+          + _fn_js(mini, "function righeRecapitoP2P(testo){")
+          + _fn_js(mini, "function reteUsdtDaRecapitoP2P(righe){")
+          + _fn_js(mini, "function reteCoinDaRecapitoP2P(righe){")
+          + _fn_js(mini, "function riquadroCifraCoinP2P(r, indirizzo, euro){")
+          + _fn_js(mini, "function linkIndirizzoCoinP2P(r, indirizzo){")
+          + _fn_js(mini, "function reteCoinScambioP2P(o){")
+          + _fn_js(mini, "function testoCoinInviatiP2P(r, txid, chiave, indirizzo){")
+          + _fn_js(mini, "function coinInviatiDaChatP2P(testo){")
+          + _fn_js(mini, "function tesseraValutaP2P(cod, metodi){")
+          + _fn_js(mini, "function metodiPubblicabiliP2P(lato){")
+          + _fn_js(mini, "function metodiOnchainP2P(lato){")
+          + "const metodoSceltoP2P = o => (o.metodi || []).indexOf(o.metodoScelto) >= 0 ? o.metodoScelto : '';\n"
+          + "const valutaFoglioP2P = () => 'EUR';\n"
+          + "const SOL = " + json.dumps(sol) + ", FIRMA = " + json.dumps(firma) + ";\n"
+          + "const EVM = " + json.dumps(evm_vero) + ", TRON = " + json.dumps(tron_vero) + ", TXE = " + json.dumps(txe) + ";\n"
+          + r"""
+const U = P2P_RETI_COIN.filter(r => r.coin === 'USDe');
+const [UE, UA, UB, UN, US] = U;
+const out = {};
+out.reti = U.map(r => [r.nome, r.metodo, r.forma, r.catena || null, r.token, r.esplora]);
+out.unoPerTutte = U.map(r => [logoCoinP2P(r), prezzoCoinP2P(r)]);
+out.minuto = [(base58P2P(US.token) || []).length, U.slice(0, 4).every(r => evmValidoP2P(r.token) && r.token !== r.token.toLowerCase())];
+out.forme = [SOL, US.token, TRON, '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa', EVM, 'So11111111111111111111111111111111111111112']
+  .map(s => (reteIndirizzoP2P(s) || {}).forma || null);
+const gi = (s, r) => giudiceIndirizzoCoinP2P(s, r);
+out.si = [gi(EVM, UE), gi(EVM, UA), gi(EVM.toLowerCase(), UN), gi(SOL, US), gi(' ' + SOL + ' ', US)];
+out.no = [gi(SOL, UA), gi(EVM, US), gi(UA.token, UB), gi(UE.token, UE), gi(US.token, US), gi(TRON, US),
+  gi('0xdAC17F958D2ee523a2206206994597C13D831ec7', UA), gi('', US), gi('1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa', US)];
+const gt = (s, r) => giudiceTxidCoinP2P(s, r);
+out.txid = [gt(FIRMA, US), gt(TXE, UA), gt(TXE, US), gt(FIRMA.slice(0, 40), US), gt(FIRMA + '0', US), gt('', US)];
+out.qr = [qrCoinP2P(UA, EVM, '10.000000'), qrCoinP2P(UE, EVM, ''), qrCoinP2P(US, SOL, '34.883721'), qrCoinP2P(US, SOL, '')];
+out.esplora = [esploraCoinP2P(UA, 'tx', TXE), esploraCoinP2P(UB, 'address', EVM), esploraCoinP2P(UN, 'tx', TXE),
+  esploraCoinP2P(US, 'tx', FIRMA), esploraCoinP2P(US, 'address', SOL)];
+out.tasto = [tastoEsploraCoinP2P(US, FIRMA).includes('solscan.io/tx/' + FIRMA), tastoEsploraCoinP2P(UN, TXE).includes('BscScan'),
+  tastoEsploraCoinP2P(US, TXE)];
+impostaCambioCoinP2P({eth: 2800, xmr: 300, usde: 0.86});
+out.cambio = U.map(eurPerCoinP2P).concat([importoCoinP2P(30, 0.86)]);
+const cifra = riquadroCifraCoinP2P(UB, EVM, 30);
+out.cifra = [cifra.includes('[Da mandare=34.883721 USDe|34,883721 USDe]'), cifra.includes('1 USDe ≈ 0,86 €'), cifra.includes('basescan.org/address/' + EVM)];
+const fn = FORME.find(f => f.riconosce.test('USDe (BNB Chain)')), fs = FORME.find(f => f.riconosce.test('USDe (Solana)'));
+const tn = fn.componi({indirizzo: EVM}), ts = fs.componi({indirizzo: SOL});
+const rn = reteCoinDaRecapitoP2P(righeRecapitoP2P(tn)), rs = reteCoinDaRecapitoP2P(righeRecapitoP2P(ts));
+out.recapito = [fn.coin === UN, fs.forma, tn, rn && rn.rete === UN && rn.indirizzo === EVM, rs && rs.rete === US && rs.indirizzo === SOL,
+  reteUsdtDaRecapitoP2P(righeRecapitoP2P(tn)), fn.campi[0].et, notaReteCoinP2P(US), notaReteCoinP2P(UA)];
+const mn = testoCoinInviatiP2P(UN, TXE, '', ''), ms = testoCoinInviatiP2P(US, FIRMA, '', '');
+const ln = coinInviatiDaChatP2P(mn), ls = coinInviatiDaChatP2P(ms);
+out.chat = [mn, ln && ln.rete === UN && ln.txid === TXE, ls && ls.rete === US && ls.txid === FIRMA,
+  coinInviatiDaChatP2P('🧾 USDe inviati su Polygon. Id della transazione: ' + TXE),
+  coinInviatiDaChatP2P('🧾 USDe inviati su Solana. Id della transazione: ' + TXE)];
+out.card = [tesseraValutaP2P('EUR', ['USDe (Arbitrum)', 'USDe (Base)']).includes('p2p-tessera-usde'),
+  tesseraValutaP2P('EUR', ['USDe (Solana)']).includes('p2p-tessera-usde'),
+  tesseraValutaP2P('EUR', ['USDe (Base)', 'ETH (Ethereum)']).includes('p2p-tessera-eur'),
+  tesseraValutaP2P('EUR', ['USDe (Base)']).includes('<path d="M13.34 5.33A11 11')];
+out.scambio = [reteCoinScambioP2P({metodi: ['USDe (Arbitrum)', 'USDe (Base)']}),
+  (reteCoinScambioP2P({metodi: ['USDe (Arbitrum)', 'USDe (Base)'], metodoScelto: 'USDe (Base)'}) || {}).nome,
+  (reteCoinScambioP2P({metodi: ['USDe (Solana)']}) || {}).nome,
+  (reteCoinScambioP2P({metodi: ['USDe (Arbitrum)', 'USDe (Base)'], campiLoro: {euro: {testo: tn}}}) || {}).nome];
+out.libro = [valutaVistaP2P('EUR', ['USDe (Base)'])];
+myP2PCoin = false;
+out.libro.push(valutaVistaP2P('EUR', ['USDe (Base)']), valutaVistaP2P('EUR', ['SEPA', 'USDe (Solana)']), metodiValutaP2P('EUR').length);
+myP2PCoin = true;
+out.liste = [metodiValutaP2P('EUR').filter(m => m.indexOf('USDe') === 0), metodiOnchainP2P('vendo').filter(m => !!reteCoinDaMetodoP2P(m)),
+  metodiValutaP2P('USDT').indexOf('USDe (Ethereum)')];
+console.log(JSON.stringify(out));
+""")
+    o = _node_banco(js)
+    if o is None:
+        salta("USDe nel telefono", "node non c'e'")
+        return
+    prova("cinque reti coi contratti della documentazione di Ethena (Key Addresses): Ethereum il suo, le L2 EVM uno solo, Solana il suo mint",
+          [list(r) for r in reti_attese], o.get("reti"))
+    prova("...un logo e un cambio per tutte le reti", [["usde", "usde"]] * 5, o.get("unoPerTutte"))
+    prova("...il mint di Solana e' una chiave da 32 byte, i contratti EVM portano l'EIP-55 giusto",
+          [32, True], o.get("minuto"))
+    prova("la forma di un indirizzo: Solana per i suoi 32 byte (anche il mint e il SOL avvolto), Tron, bitcoin ed EVM restano loro",
+          ["solana", "solana", "tron", "bitcoin", "evm", "solana"], o.get("forme"))
+    prova("il giudice promuove lo 0x su ogni rete EVM (anche minuscolo) e l'indirizzo Solana (anche con gli spazi)",
+          [""] * 5, o.get("si"))
+    no = o.get("no") or [""] * 9
+    prova("...e ferma Solana su Arbitrum, lo 0x su Solana, i contratti USDe, Tron, il contratto USDT, il vuoto, bitcoin",
+          [True] * 9, [bool(x) for x in no])
+    prova("...con le frasi che dicono cosa e'",
+          (True, True, True, True, True),
+          ("indirizzo Solana, non Arbitrum (che usa gli indirizzi 0x)" in no[0],
+           "indirizzo Ethereum, non Solana" in no[1], "contratto USDe" in no[2],
+           "contratto USDe" in no[4], "contratto USDT" in no[6]))
+    tx = o.get("txid") or [""] * 6
+    prova("l'id: la firma di Solana (64 byte in Base58) passa, lo 0x passa su Arbitrum; lo 0x su Solana si ferma col perche', il resto si ferma",
+          (["", ""], True, True, True, True),
+          (tx[:2], "forma di una rete 0x" in tx[2], bool(tx[3]), bool(tx[4]), bool(tx[5])))
+    prova("i QR: EIP-681 transfer col contratto e la catena (18 decimali), Solana Pay col mint",
+          ["ethereum:0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34@42161/transfer?address=" + evm_vero
+           + "&uint256=10000000000000000000",
+           "ethereum:0x4c9EDD5852cd905f086C759E8383e09bff1E68B3@1/transfer?address=" + evm_vero,
+           "solana:" + sol + "?amount=34.883721&spl-token=DEkqHyPN7GMRJ5cArtQFAWefqbZb33Hyf6s5iCwjEonT",
+           "solana:" + sol + "?spl-token=DEkqHyPN7GMRJ5cArtQFAWefqbZb33Hyf6s5iCwjEonT"], o.get("qr"))
+    prova("gli explorer di ogni rete: Arbiscan, Basescan, BscScan, Solscan (transazione e conto)",
+          ["https://arbiscan.io/tx/" + txe, "https://basescan.org/address/" + evm_vero, "https://bscscan.com/tx/" + txe,
+           "https://solscan.io/tx/" + firma, "https://solscan.io/account/" + sol], o.get("esplora"))
+    prova("...il tasto c'e' solo con un id buono per quella rete", [True, True, ""], o.get("tasto"))
+    prova("il cambio e' uno per tutte le reti, e 30 € a 0,86 €/USDe sono 34,883721 USDe (in su)",
+          [0.86] * 5 + ["34.883721"], o.get("cambio"))
+    prova("il riquadro della cifra: da copiare, col cambio coi centesimi, e l'indirizzo sull'explorer della rete",
+          [True, True, True], o.get("cifra"))
+    rc = o.get("recapito") or [None] * 9
+    prova("il recapito: la forma per rete compone rete, indirizzo e CONTRATTO vero, e torna alla rete giusta (anche «BNB Chain»)",
+          (True, "coin-usde-solana", "⚠️ Manda solo USDe sulla rete BNB Chain\nRete: BNB Chain (USDe)\nIndirizzo: " + evm_vero
+           + "\nContratto USDe: 0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", True, True, None,
+           "Il tuo indirizzo USDe su BNB Chain"),
+          tuple(rc[:7]))
+    prova("...e la riga sotto il campo dice la rete e la forma",
+          ["Solo USDe sulla rete Solana: l'indirizzo del tuo wallet Solana (32-44 caratteri).",
+           "Solo USDe sulla rete Arbitrum: l'indirizzo comincia con 0x."], rc[7:])
+    prova("«Ho inviato»: il messaggio e la sua lettura, anche col nome di due parole e la firma di Solana; una rete non nostra o un id della forma sbagliata no",
+          ["🧾 USDe inviati su BNB Chain. Id della transazione: " + txe, True, True, None, None], o.get("chat"))
+    prova("la card: il logo di USDe se tutti i metodi sono USDe, anche su reti diverse; mescolato con ETH l'euro",
+          [True, True, True, True], o.get("card"))
+    prova("la rete dello scambio non si indovina: su due reti senza recapito ne' scelta nessuna; poi la scelta, la rete unica, il recapito",
+          [None, "Base", "Solana", "BNB Chain"], o.get("scambio"))
+    prova("il libro: USDe a chi ha il cancello, a nessun altro (nemmeno mescolato con SEPA)",
+          [True, False, False, 4], o.get("libro"))
+    prova("le liste: le cinque reti in euro, mai on-chain ne' in USDT",
+          [[r[1] for r in reti_attese], [], -1], o.get("liste"))
+
+    # --- 3) le controprove ---
+    def _rotto(vecchio, nuovo, domanda):
+        assert vecchio in js, vecchio
+        return _node_banco(js.replace(vecchio, nuovo, 1).split("const out = {};")[0]
+                           + "console.log(JSON.stringify(" + domanda + "));\n")
+    prova("controprova: senza il riconoscimento di Solana l'indirizzo non sarebbe nessuno, e il giudice lo fermerebbe", True,
+          bool(_rotto("if (b && b.length === 32) return {forma: 'solana', valido: true};", "",
+                      "giudiceIndirizzoCoinP2P(SOL, US)")))
+    prova("controprova: senza il token il QR manderebbe ether nativo invece di USDe", True,
+          "?value=" in str(_rotto("if (r.token) return 'ethereum:' + r.token", "if (false) return 'ethereum:' + r.token",
+                                  "qrCoinP2P(UA, EVM, '1.000000')")))
+    prova("controprova: senza il controllo del contratto il contratto USDe passerebbe per un indirizzo", "",
+          _rotto("const c = P2P_RETI_COIN.find(x => x.token && x.token.toLowerCase() === t);",
+                 "const c = null;", "giudiceIndirizzoCoinP2P(UA.token, UB)"))
+    prova("controprova: con la moneta unica che indovina la rete, due reti diventerebbero la prima", "Arbitrum",
+          (_rotto("return u && (o.metodi || []).every(x => reteCoinDaMetodoP2P(x) === u) ? u : null;", "return u;",
+                  "reteCoinScambioP2P({metodi: ['USDe (Arbitrum)', 'USDe (Base)']})") or {}).get("nome"))
 
 
 def prove_usdt_due_reti():
@@ -190321,7 +190535,7 @@ CATEGORIE = {
     p2p_stati p2p_chat p2p_pubblica p2p_velo_pubblica p2p_barattozon
     p2p_paycode premio_barattozon convenienza_vera barattozon_mercato
     scadenza_barattozon foglio_coperto passi_barattozon_fogli
-    importo_foglio pubblica_metodo_prima libro_vuoto_monete revolut_tre_modi eth_xmr
+    importo_foglio pubblica_metodo_prima libro_vuoto_monete revolut_tre_modi eth_xmr usde
     indietro_dal_libro ricarica_resta p2p_canale p2p_canonico p2p_bundle
     p2p_nuvola p2p_conto_dispositivo recensione_p2p ritocchi_scambio
     pagina_scambio_ridisegno foglio_tastiera_iphone chiavi_p2p_firmate
@@ -191012,6 +191226,7 @@ def main():
     prove_lista_corta_metodi,
     prove_revolut_tre_modi,
     prove_eth_xmr,
+    prove_usde,
     prove_usdt_moderatori,
     prove_grafica_p2p_onchain,
     prove_novita_usdt_p2p,
