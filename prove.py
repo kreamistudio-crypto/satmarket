@@ -68531,6 +68531,10 @@ def prove_p2p_dettaglio():
         # (7 ott 2026) l'intervallo si sceglie prima del conto
         "function contoAttesaP2P(o, frase){",
         "function rigaImportoSceltoP2P(o, scelto){",
+        # (13 nov 2026, usdt-foglio-presa) segno e nome della moneta del
+        # foglio «Quanto»: senza, il banco esplode su `quantoSegnoP2P`
+        "function quantoSegnoP2P(riga){",
+        "function quantoNomeP2P(riga){",
         "function quantoValeP2P(riga, valore){",
         "function interoP2P(testo){")]
     # le costanti e le due variabili del foglio: dal client, mai ribattute
@@ -79542,6 +79546,8 @@ def prove_p2p_pubblica():
         + "\n" + _intera("function nettoLatoP2P(o, sats){")
         + "\n" + _intera("function ordineDaCampiP2P(v, lato){")
         + "\n" + _intera("function valeNuovoOrdineP2P(v){")
+        # (13 nov 2026, usdt-foglio-presa) il segno della moneta del foglio
+        + "\n" + _intera("function quantoSegnoP2P(riga){")
         + "\n" + _intera("function quantoValeP2P(riga, valore){")
         + "\n" + _intera("function premioTestoP2P(n){")
         + "\nconst P2P_PREMIO_MAX = %d;\n" % P2P_PREMIO_MAX_da(mini)
@@ -156143,6 +156149,194 @@ console.log(JSON.stringify(out));
            "<b>deposito di garanzia</b>" in _tappe))
 
 
+def prove_usdt_foglio_presa():
+    """IL FOGLIO «QUANTO» E LE CARD DI UN ORDINE IN USDT (13 nov 2026,
+    cantiere usdt-foglio-presa, Andrea in produzione: «la card parla usdt,
+    poi mi fa inserire euro», «infatti il controvalore e' riferito a euro e
+    non usdt»). Su un intervallo in USDT la card diceva «Invia da 50,00 a
+    276,00 USDT» e il foglio della presa «da 50,00 € a 276,00 €», «Quanti
+    euro», «€50»; la riga dei metodi «come invii gli euro». E i sats: il
+    foglio e il capo alto della card chiamavano `satsMercatoP2P` con la
+    sola cifra e il premio, senza valuta ne' metodi, e il metro diventava
+    quello dell'euro — 50 USDT stimati come 50 € (74 745 sats invece di
+    67 464). Qui i pezzi VERI girano in node con finte minime: un ordine in
+    USDT, uno in euro con la stessa fascia (che non deve cambiare di una
+    lettera), e una riga che ha perso la valuta, che i metodi ritrovano."""
+    print("\n[il foglio «Quanto» e le card di un ordine in USDT]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    pezzi = [_riga_js(mini, "const P2P_VALUTA = "),
+             _riga_js(mini, "const P2P_VALUTE = ")]
+    i = mini.index("const P2P_RETI_USDT = [")
+    pezzi.append(mini[i:mini.index("];", i) + 2])
+    i = mini.index("const P2P_USDT_PAROLE = [")
+    pezzi.append(mini[i:mini.index("\n];", i) + 3])
+    pezzi.append(_riga_js(mini, "const P2P_CONTANTI = "))
+    # `usdtP2P` sta su una riga sola: si prende la riga, non fino alla graffa
+    pezzi.append(_riga_js(mini, "function usdtP2P(o){"))
+    for firma in ("function reteUsdtDaMetodoP2P(m){",
+                  "function valutaOrdineP2P(o){",
+                  "function perSatP2P(o){",
+                  "function satsMercatoP2P(o){",
+                  "function nettoLatoP2P(o, sats){",
+                  "function segnoValutaP2P(cod){",
+                  "function segnoMonetaP2P(o){",
+                  "function capiP2P(da, a){",
+                  "function interoP2P(testo){",
+                  "function rigaLibroP2P(id){",
+                  "function quantoSegnoP2P(riga){",
+                  "function quantoNomeP2P(riga){",
+                  "function quantoValeP2P(riga, valore){",
+                  "function renderQuantoP2P(){",
+                  "function titoloMetodiP2P(o){",
+                  "function rigaTassoContoP2P(o, detto){",
+                  "function passiScambioP2P(q){",
+                  "function paroleUsdtP2P(o, testo){",
+                  "function rigaOrdineP2P(o){",
+                  "function satsScambioP2P(o){"):
+        pezzi.append(_fn_js(mini, firma))
+    banco = "\n".join(pezzi) + r"""
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const fmt = n => String(n);
+const fmtEur = e => Number(e).toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+/* un euro vale 1,10 $: 1 sat = 0,001 € = 0,0011 $ */
+let cambioVivo = true, eurPerSat = 0.001, usdPerSat = 0.0011;
+const feeMiaP2P = () => 0;
+const tabacchinoP2P = () => false, euroFiloTabacchinoP2P = e => e;
+/* la card: quel che non riguarda i soldi, di cartone */
+const ordineTuoP2P = () => false, coppiaCardP2P = () => '', voltoCardP2P = () => '',
+      barraScadenzaP2P = () => '', affareP2P = () => false, badgePremioP2P = () => '',
+      affaroneP2P = () => '', repCortaP2P = () => '', metodiCardP2P = () => '',
+      soloMarchiP2P = () => false, iconaMetodiP2P = () => '', marchioMetodoP2P = m => m,
+      stellineP2P = () => '';
+let p2pFacce = {};
+const comeLibroP2P = o => o;
+const NODI = {};
+const el = id => NODI[id] || (NODI[id] = {innerHTML: '', textContent: ''});
+let p2pDettOrdine = '', p2pDettImporto = 0, p2pQuantoOrdine = '';
+const bzInCompraP2P = () => false;
+const stimaQuantoP2P = () => {};
+const USDT = {id: 'u', lato: 'sell', fiat: 'USDT', euro: 50, euroMax: 276, premium: 6, sats: 0,
+              metodi: ['USDT (Tron)', 'USDT (Ethereum)']};
+const EURO = {id: 'e', lato: 'sell', fiat: 'EUR', euro: 50, euroMax: 276, premium: 6, sats: 0,
+              metodi: ['SEPA', 'Revolut']};
+/* la riga che nasce dal server senza valuta: i metodi la dicono */
+const PERSA = Object.assign({}, USDT, {id: 'p', fiat: ''});
+const COMPRA = Object.assign({}, USDT, {id: 'c', lato: 'buy'});
+let p2pLibro = {ordini: [USDT, EURO, PERSA, COMPRA]};
+const out = {};
+const foglio = id => { p2pQuantoOrdine = id; renderQuantoP2P(); return el('p2pQuantoCorpo').innerHTML; };
+out.foglioUsdt = foglio('u');
+out.foglioEuro = foglio('e');
+out.foglioPersa = foglio('p');
+out.foglioCompra = foglio('c');
+out.stimaUsdt = [quantoValeP2P(USDT, '50').dillo, quantoValeP2P(USDT, '276').dillo];
+out.stimaEuro = [quantoValeP2P(EURO, '50').dillo, quantoValeP2P(EURO, '276').dillo];
+out.stimaPersa = quantoValeP2P(PERSA, '276').dillo;
+out.fuoriUsdt = quantoValeP2P(USDT, '300').dillo;
+out.fuoriEuro = quantoValeP2P(EURO, '300').dillo;
+out.titoli = [titoloMetodiP2P(USDT), titoloMetodiP2P(EURO), titoloMetodiP2P(PERSA), titoloMetodiP2P(COMPRA)];
+/* il cambio in chiaro del conto: l'euro lo dice il blocco del cambio */
+const tassoAdessoP2P = () => ({cifra: '1\u00a0BTC\u00a0≈\u00a0100.000\u00a0€', vecchio: false, messaggio: ''});
+out.tasso = [rigaTassoContoP2P(USDT, 0), rigaTassoContoP2P(EURO, 0), rigaTassoContoP2P(PERSA, 0)];
+usdPerSat = 0;
+out.tassoMuto = rigaTassoContoP2P(USDT, 0);
+usdPerSat = 0.0011;
+/* «Come funziona» del dettaglio, coi passi tradotti come li traduce lui */
+const passi = (o, q) => passiScambioP2P(q).map(p => paroleUsdtP2P(o, p));
+out.passi = [passi(USDT, {compro: true}), passi(EURO, {compro: true}),
+             passi(COMPRA, {compro: false}), passi(EURO, {compro: false})];
+out.cardUsdt = rigaOrdineP2P(USDT);
+out.cardEuro = rigaOrdineP2P(EURO);
+out.cardPersa = rigaOrdineP2P(PERSA);
+out.mieiUsdt = satsScambioP2P(USDT);
+out.mieiEuro = satsScambioP2P(EURO);
+console.log(JSON.stringify(out));
+"""
+    out = _node_banco(banco)
+    if out is None:
+        salta("il foglio «Quanto» degli USDT in node", "node non c'e'")
+        return
+    # `capiP2P` cuce «da» e «a» con lo spazio che non va a capo: qui si
+    # leggono le cifre, e lo spazio si riporta a quello di tutti
+    out = {k: (v.replace("\u00a0", " ") if isinstance(v, str)
+               else [x.replace("\u00a0", " ") if isinstance(x, str) else x for x in v]
+               if isinstance(v, list) else v)
+           for k, v in (out or {}).items()}
+    # i conti attesi, scritti qui: 50 USDT / 0,0011 $ * 0,94; 50 € / 0,001 € * 0,94
+    usdt50, usdt276 = round(50 / 0.0011 * 0.94), round(276 / 0.0011 * 0.94)
+    eur50, eur276 = round(50 / 0.001 * 0.94), round(276 / 0.001 * 0.94)
+    f = out.get("foglioUsdt", "")
+    prova("il foglio di un ordine in USDT dice la fascia in USDT", True,
+          "va da <b>50,00 USDT</b> a <b>276,00 USDT</b>" in f)
+    prova("...l'etichetta e' «Quanti USDT» e il segno nel campo e' USDT, mai €",
+          (True, True, False),
+          ('>Quanti USDT</label>' in f, '<span class="pre pre-parola">USDT</span>' in f,
+           "€" in f or "euro" in f.lower()))
+    prova("...anche sulla riga che ha perso la valuta (la dicono i metodi)", True,
+          '>Quanti USDT</label>' in out.get("foglioPersa", "")
+          and "€" not in out.get("foglioPersa", ""))
+    prova("...e nel verso «vuoi ricevere»", True,
+          '>Quanti USDT</label>' in out.get("foglioCompra", "")
+          and "vuoi ricevere" in out.get("foglioCompra", ""))
+    fe = out.get("foglioEuro", "")
+    prova("su un ordine in euro il foglio resta com'era: €, «Quanti euro»",
+          (True, True, True, False),
+          ("va da <b>50,00 €</b> a <b>276,00 €</b>" in fe,
+           '>Quanti euro</label>' in fe, '<span class="pre">€</span>' in fe,
+           "USDT" in fe))
+    prova("la stima del foglio in USDT usa il metro del dollaro",
+          ["Riceverai circa %d sats." % usdt50, "Riceverai circa %d sats." % usdt276],
+          out.get("stimaUsdt"))
+    prova("...anche quando la riga ha perso la valuta",
+          "Riceverai circa %d sats." % usdt276, out.get("stimaPersa"))
+    prova("...e in euro il metro dell'euro, come prima",
+          ["Riceverai circa %d sats." % eur50, "Riceverai circa %d sats." % eur276],
+          out.get("stimaEuro"))
+    prova("fuori fascia il messaggio dice la moneta dell'ordine",
+          ["Scegli una cifra fra 50,00 e 276,00 USDT.",
+           "Scegli una cifra fra 50,00 e 276,00 €."],
+          [out.get("fuoriUsdt"), out.get("fuoriEuro")])
+    prova("la riga dei metodi dice «gli USDT» sugli ordini in USDT, «gli euro» in euro",
+          ["Metodo di pagamento — come invii gli USDT",
+           "Metodo di pagamento — come invii gli euro",
+           "Metodo di pagamento — come invii gli USDT",
+           "Metodo di pagamento — come ricevi gli USDT"],
+          out.get("titoli"))
+    prova("il cambio nel conto: in USDT il dollaro, in euro l'euro di sempre",
+          [True, True, True],
+          ["1 BTC ≈ 110.000 USDT" in (out.get("tasso") or ["", "", ""])[0],
+           "1 BTC ≈ 100.000 €" in (out.get("tasso") or ["", "", ""])[1],
+           "1 BTC ≈ 110.000 USDT" in (out.get("tasso") or ["", "", ""])[2]])
+    prova("...e senza il dollaro la riga in USDT tace, mai l'euro al suo posto",
+          "", out.get("tassoMuto"))
+    pa = out.get("passi") or [[], [], [], []]
+    prova("«Come funziona» in USDT: «Invii gli USDT», «Ricevi gli USDT»; in euro com'era",
+          ["Invii gli USDT col metodo scelto", "Invii gli euro col metodo scelto",
+           "Ricevi gli USDT col metodo scelto", "Ricevi gli euro col metodo scelto"],
+          [pa[0][2] if len(pa[0]) > 2 else None, pa[1][2] if len(pa[1]) > 2 else None,
+           pa[2][1] if len(pa[2]) > 1 else None, pa[3][1] if len(pa[3]) > 1 else None])
+    prova("...e il dettaglio li passa davvero dal traduttore", True,
+          ".map(p => typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P(o, p) : p))"
+          in _fn_js(mini, "function renderDettaglioP2P(){"))
+    prova("la card in USDT stima i DUE capi col metro del dollaro", True,
+          ("da %d a %d sats" % (usdt50, usdt276)) in out.get("cardUsdt", ""))
+    prova("...anche sulla riga che ha perso la valuta", True,
+          ("da %d a %d sats" % (usdt50, usdt276)) in out.get("cardPersa", ""))
+    prova("...e la card in euro col metro dell'euro, come prima", True,
+          ("da %d a %d sats" % (eur50, eur276)) in out.get("cardEuro", ""))
+    prova("«I miei scambi»: i due capi di un intervallo in USDT col metro del dollaro",
+          ["≈ da %d a %d sats" % (usdt50, usdt276), "≈ da %d a %d sats" % (eur50, eur276)],
+          [out.get("mieiUsdt"), out.get("mieiEuro")])
+    # i due capi passano di qui con valuta E metodi: le altre strade che
+    # rifanno i sats su una cifra diversa da quella della riga
+    prova("nessuna chiamata a satsMercatoP2P con la cifra e senza valuta", [],
+          [r.strip() for r in mini.split("\n")
+           if re.search(r"satsMercatoP2P\(\{euro: (?!intero)", r)
+           and "fiat:" not in r])
+
+
 def prove_grafica_p2p_onchain():
     """LA SEZIONE ON-CHAIN DEL P2P RIDISEGNATA (30 ott 2026, cantiere
     grafica-p2p-onchain, richieste di Andrea dalle schermate del
@@ -189726,7 +189920,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori novita_usdt_p2p
+    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa
     lista_corta_metodi
     """.split(),
     "mercatino": """
@@ -190401,6 +190595,7 @@ def main():
     prove_usdt_moderatori,
     prove_grafica_p2p_onchain,
     prove_novita_usdt_p2p,
+    prove_usdt_foglio_presa,
     prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,
     prove_parole_uniche,

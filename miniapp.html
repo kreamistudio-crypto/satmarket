@@ -9615,6 +9615,9 @@
     border-radius:14px;padding:0 14px}
   .campo-pre:focus-within{border-color:var(--ink)}
   .campo-pre .pre{color:var(--muted);font-weight:700;flex:0 0 auto}
+  /* un segno di piu' lettere («USDT» del foglio «Quanto», 13 nov 2026)
+     vuole un respiro prima della cifra: «USDT50» si legge come una parola */
+  .campo-pre .pre.pre-parola{margin-right:.35em}
   .field .campo-pre input{flex:1 1 auto;min-width:0;width:auto;
     border:0;background:none;border-radius:0;padding:12px 0}
   .field .campo-pre input:focus{border:0}
@@ -66329,7 +66332,11 @@ function rigaOrdineP2P(o){
   /* il range stima i DUE capi collo stesso metro; a cambio muto
      niente cifre, mai un numero inventato */
   const stima2 = o.euroMax && stima
-    ? nettoLatoP2P(o, satsMercatoP2P({euro: o.euroMax, premium: o.premium}))
+    /* il capo alto collo STESSO metro del basso (13 nov 2026, cantiere
+       usdt-foglio-presa): senza valuta e metodi il capo alto di un
+       ordine in USDT si misurava in euro — «da 67 464 a 411 744 sats»,
+       dove 276 USDT ne valgono circa 372 000 */
+    ? nettoLatoP2P(o, satsMercatoP2P({euro: o.euroMax, premium: o.premium, fiat: o.fiat, metodi: o.metodi}))
     : 0;
   /* i due capi a parole, «da … a …», mai un trattino fra due numeri
      (vedi `capiP2P`) */
@@ -72246,7 +72253,7 @@ function satsBaseCauzioneP2P(o){
   if (o.satsNetti > 0) return o.satsNetti;
   if (o.sats > 0) return o.sats;
   const euro = o.euroMax > 0 ? o.euroMax : o.euro;
-  return euro > 0 ? satsMercatoP2P({euro: euro, premium: o.premium || 0, metodi: o.metodi}) : 0;
+  return euro > 0 ? satsMercatoP2P({euro: euro, premium: o.premium || 0, fiat: o.fiat, metodi: o.metodi}) : 0;
 }
 /* LA RICHIESTA E' ANCORA PAGABILE? Come `holdVivaP2P`, ma la scadenza
    qui e' quella VERA: la legge la bolt11 (`x`, in secondi), e senza
@@ -73595,12 +73602,19 @@ function renderQuantoP2P(){
     return;
   }
   const paghiEuro = riga.lato === 'sell';
+  /* LA MONETA DELL'ORDINE ANCHE QUI (13 nov 2026, cantiere usdt-foglio-
+     presa, Andrea: «la card parla usdt, poi mi fa inserire euro»): la
+     card dice «Invia da 50,00 a 276,00 USDT» e il foglio diceva «€» e
+     «Quanti euro». Il segno e il nome dal giudice della valuta, lo
+     stesso della riga «Importo scelto»; su un ordine in euro non cambia
+     una lettera. */
+  const segno = quantoSegnoP2P(riga);
   box.innerHTML =
-    '<div class="hint">Quest\'offerta va da <b>' + esc(fmtEur(riga.euro)) + ' \u20ac</b> a <b>' +
-      esc(fmtEur(riga.euroMax)) + ' \u20ac</b>: scegli tu quanto ' +
+    '<div class="hint">Quest\'offerta va da <b>' + esc(fmtEur(riga.euro)) + ' ' + segno + '</b> a <b>' +
+      esc(fmtEur(riga.euroMax)) + ' ' + segno + '</b>: scegli tu quanto ' +
       (paghiEuro ? 'vuoi inviare' : 'vuoi ricevere') + '.</div>' +
-    '<div class="field"><label for="p2pQuantoInp">Quanti euro</label>' +
-    '<div class="campo-pre"><span class="pre">\u20ac</span>' +
+    '<div class="field"><label for="p2pQuantoInp">Quanti ' + quantoNomeP2P(riga) + '</label>' +
+    '<div class="campo-pre"><span class="pre' + (segno.length > 1 ? ' pre-parola' : '') + '">' + segno + '</span>' +
     /* chi torna a cambiare la cifra ritrova la sua, non il minimo */
     '<input id="p2pQuantoInp" type="text" inputmode="numeric" value="' +
       esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || riga.euro)) +
@@ -73609,6 +73623,15 @@ function renderQuantoP2P(){
     '<div class="hint" id="p2pQuantoStima" aria-live="polite"></div>' +
     '<button class="btn orange" onclick="confermaQuantoP2P()">Continua</button>';
   stimaQuantoP2P();
+}
+/* il segno (gia' scappato) e il nome della moneta dell'ordine, per il
+   foglio «Quanto»: «€»/«euro» o «USDT»/«USDT». Senza il giudice della
+   valuta (un banco che non lo porta) resta l'euro di sempre. */
+function quantoSegnoP2P(riga){
+  return typeof segnoMonetaP2P === 'function' ? segnoMonetaP2P(riga) : '\u20ac';
+}
+function quantoNomeP2P(riga){
+  return (typeof usdtP2P === 'function' && usdtP2P(riga)) ? 'USDT' : 'euro';
 }
 /* PURO: dice se la cifra sta nella fascia, e quanto vale in sats. La
    stima passa dalla stessa formula delle card — mai un secondo conto
@@ -73621,11 +73644,17 @@ function quantoValeP2P(riga, valore){
   if (!riga || !riga.euroMax) return {ok: false, euro: 0, dillo: ''};
   if (!(euro >= riga.euro && euro <= riga.euroMax))
     return {ok: false, euro: 0,
-      dillo: 'Scegli una cifra fra ' + fmtEur(riga.euro) + ' e ' + fmtEur(riga.euroMax) + ' \u20ac.'};
+      dillo: 'Scegli una cifra fra ' + fmtEur(riga.euro) + ' e ' + fmtEur(riga.euroMax) + ' '
+        + quantoSegnoP2P(riga) + '.'};
   /* al netto di premio E commissione, dallo stesso giudice delle
      card: la cifra promessa qui e' quella che passera' di mano */
+  /* ⚠️ COI METODI E LA VALUTA DELL'ORDINE (13 nov 2026, cantiere usdt-
+     foglio-presa): senza, `satsMercatoP2P` non sapeva che l'ordine e'
+     in USDT e misurava col metro dell'euro — 50 USDT stimati come 50 €,
+     74 745 sats invece di 67 464. Il metro lo sceglie `perSatP2P`
+     dall'ordine intero, quindi l'ordine gli arriva intero. */
   const s = nettoLatoP2P(riga,
-    satsMercatoP2P({euro: euro, premium: riga.premium || 0}));
+    satsMercatoP2P({euro: euro, premium: riga.premium || 0, fiat: riga.fiat, metodi: riga.metodi}));
   return {ok: true, euro: euro,
     dillo: s ? ((riga.lato === 'sell' ? 'Riceverai circa ' : 'Invierai circa ') + fmt(s) + ' sats.') : ''};
 }
@@ -74231,7 +74260,7 @@ function contoDettP2P(o){
     const stimabile = metroVivo > 0;
     const merc = detto > 0 ? detto
                : fisso ? o.sats
-               : (stimabile ? satsMercatoP2P({euro: e, premium: o.premium, fiat: o.fiat}) : 0);
+               : (stimabile ? satsMercatoP2P({euro: e, premium: o.premium, fiat: o.fiat, metodi: o.metodi}) : 0);
     /* a sats fissi il Controvalore torna a essere il MERCATO — i sats
        pieni per quegli euro al METRO del conto, adesso o alla presa —
        e il Subtotale resta la cifra fissa: la differenza fra i due e'
@@ -74570,8 +74599,18 @@ function etichettaPremioP2P(mio, prem, affare){
 function rigaTassoContoP2P(o, detto){
   if (typeof tassoAdessoP2P !== 'function') return '';
   if ((o.sats > 0 && o.preso) || detto > 0) return '';
-  const t = tassoAdessoP2P();
+  let t = tassoAdessoP2P();
   if (!t) return '';
+  /* IN USDT IL CAMBIO E' QUELLO DEL DOLLARO (13 nov 2026, cantiere usdt-
+     foglio-presa): il conto di un ordine in USDT e' fatto col metro del
+     dollaro (`perSatP2P`), e sopra diceva «1 BTC ≈ 62.893 €». Il dollaro
+     viene dalla stessa lettura del server, quindi l'eta' (il ⚠️) e'
+     quella dell'euro; senza dollaro vero la riga tace, come le stime. */
+  if (typeof usdtP2P === 'function' && usdtP2P(o)) {
+    const usd = typeof usdPerSat !== 'undefined' ? Math.round(usdPerSat * 1e8) : 0;
+    if (!(usd > 0)) return '';
+    t = Object.assign({}, t, {cifra: '1\u00a0BTC\u00a0≈\u00a0' + usd.toLocaleString('it-IT') + '\u00a0USDT'});
+  }
   return '<div class="ctrl-tasso"><span class="tasso-riga"><span class="tasso-cifra">'
     + esc(t.cifra) + '</span>'
     + (t.vecchio
@@ -74661,8 +74700,11 @@ function rigaConvenienzaFissaP2P(o, conv){
    giudice del titolo del foglio e del conto, quindi le tre frasi
    della stessa pagina non possono dire due lati diversi. */
 function titoloMetodiP2P(o){
+  /* «gli USDT» su un ordine in USDT (13 nov 2026, cantiere usdt-foglio-
+     presa): la valuta dal suo giudice, che la legge anche dai metodi */
+  const soldi = (typeof usdtP2P === 'function' && usdtP2P(o)) ? 'gli USDT' : 'gli euro';
   return 'Metodo di pagamento — '
-    + (o.lato === 'sell' ? 'come invii gli euro' : 'come ricevi gli euro');
+    + (o.lato === 'sell' ? 'come invii ' : 'come ricevi ') + soldi;
 }
 function metodiDettP2P(o){
   const metodi = (o.metodi || []).slice();
@@ -74947,11 +74989,14 @@ function renderDettaglioP2P(){
        E DA FRASE E' DIVENTATA UN ELENCO (6 ott 2026, idea di Andrea):
        «Come funziona», quattro passi corti col pallino di Barattozon,
        al posto del riquadro grigio — vedi `passiScambioP2P`. */
+    /* in USDT «Invii gli USDT col metodo scelto» (13 nov 2026, cantiere
+       usdt-foglio-presa): il traduttore della pagina dello scambio, che
+       su un ordine in euro torna la frase lettera per lettera */
     passiDettP2P(passiScambioP2P({
       compro: compro, tuo: !!tuo,
       metodo: p2pDettMetodo || ((o.metodi || []).length === 1 ? o.metodi[0] : ''),
       cauzione: !tuo && cauzioneServeP2P(Object.assign({}, o, {mio: false, metodoScelto: p2pDettMetodo || ''}), p2pInfo, cauzioneAccesaP2P(), cauzioneSulMetodoP2P())
-    })) +
+    }).map(p => typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P(o, p) : p)) +
     /* col tabacchino, il rimando al passo per passo SUBITO SOTTO i quattro
        passi (7 ott 2026, sera: prima stava sopra, con la riga 🧾) */
     notaTabacchinoDettP2P(o) +
@@ -87319,7 +87364,8 @@ function satsScambioP2P(o){
   const da = nettoLatoP2P(l, satsMercatoP2P(l));
   if (!(da > 0)) return '';
   const a = l.euroMax
-    ? nettoLatoP2P(l, satsMercatoP2P({euro: l.euroMax, premium: l.premium}))
+    /* collo stesso metro del capo basso: valuta e metodi (13 nov 2026) */
+    ? nettoLatoP2P(l, satsMercatoP2P({euro: l.euroMax, premium: l.premium, fiat: l.fiat, metodi: l.metodi}))
     : 0;
   return '≈ ' + capiP2P(fmt(da), a ? fmt(a) : '') + ' sats';
 }
