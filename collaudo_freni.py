@@ -129,17 +129,17 @@ def main():
                                          "metodo": "Revolut", "premio": 3})
         prova("Telegram con @username: il post esce in casa, su Subito Crypto e su BitcoinPodcast, uguale",
               (200, True, ["@casa", "@subito_crypto_vetrina", "@podcast"]), (st, ok, dove))
-        prova("...con la convenienza dal lato di chi guarda (vende a +3: 3% meno conveniente)",
-              True, "🏷️ 3% meno conveniente" in cap
+        prova("...con la convenienza dal lato di chi guarda (vende a +3: 3% fee al compratore)",
+              True, "🏷️ 3% fee al compratore" in cap
               and mandati[0][1] == mandati[1][1] == mandati[2][1])
         st, ok, dove, cap = posta(4401, {"lato": "compro", "euro": 50,
                                          "metodo": "Revolut", "premio": 4})
-        prova("...e chi compra a +4 e' 4% più conveniente per chi legge", True,
-              "🏷️ 4% più conveniente" in cap)
+        prova("...e chi compra a +4: la fee e' sempre del compratore (4%)", True,
+              "🏷️ 4% fee al compratore" in cap)
         st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50,
                                          "metodo": "SEPA", "premio": -150})
-        prova("...a sats fissi la convenienza passa il 20 (−150: 150% più conveniente)", True,
-              "🏷️ 150% più conveniente" in cap)
+        prova("...a sats fissi la convenienza passa il 20 (−150: 150% fee al venditore)", True,
+              "🏷️ 150% fee al venditore" in cap)
         st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50,
                                          "metodo": "SEPA", "premio": 0})
         prova("...a zero «al prezzo di mercato»", True, "🏷️ al prezzo di mercato" in cap)

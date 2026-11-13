@@ -82780,8 +82780,10 @@ def prove_p2p_canale():
     tab = "Contanti al tabacchino"
     prova("il premio di Barattozon nel post, dal lato di chi guarda: −10, +5, 0 "
           "(vende) e +5 (compra)",
-          ["🏷️ 10% più conveniente", "🏷️ 5% meno conveniente",
-           "🏷️ al prezzo di mercato", "🏷️ 5% più conveniente"],
+          # (13 nov 2026) «fee al venditore / al compratore»: chi paga la
+          # differenza dal mercato, uguale da tutti e due i lati
+          ["🏷️ 10% fee al venditore", "🏷️ 5% fee al compratore",
+           "🏷️ al prezzo di mercato", "🏷️ 5% fee al compratore"],
           [next((r for r in cap(l, 23.47, tab, gino, p).split("\n") if r.startswith("🏷️")), "")
            for l, p in (("vendo", -10), ("vendo", 5), ("vendo", 0), ("compro", 5))])
     prova("...e sta fra l'euro e il metodo", True,

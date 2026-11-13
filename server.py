@@ -61575,18 +61575,30 @@ P2P_CONVENIENZA_CANALE_MAX = 1000
 
 
 def _premio_canale_p2p(lato: str, premio: int) -> str:
-    """Il premio di un ordine Barattozon come lo dice la card del libro
-    a chi GUARDA (26 set 2026): «10% più conveniente», «4% meno
-    conveniente», a zero «al prezzo di mercato». PURA.
+    """Il premio di un ordine P2P come lo dice il post nei canali: dal 13
+    nov 2026 «3% fee al compratore», «4% fee al venditore», a zero «al
+    prezzo di mercato» (fino ad allora «10% più conveniente» come la
+    card del libro, vedi sotto). PURA.
     IL GIUDICE E' QUELLO DEL CLIENT, `affareP2P`: la formula uniforme di
     mostro (`sats -= premium/100 * sats`) fa che un premio positivo
     assottigli sempre i sats, quindi conviene a chi legge solo se chi ha
     pubblicato COMPRA sats. Chi pubblica «vendo» mette nel libro un
     ordine `sell`, e chi lo legge dal canale e' chi compra."""
+    # «FEE AL VENDITORE / AL COMPRATORE» (13 nov 2026, Andrea: «nelle
+    # vetrine invece di scrivere piu conveniente o meno conveniente,
+    # scrivi fee al venditore, o fee al compratore»). Nei canali il
+    # post lo leggono tutti e due i lati, quindi non si dice piu'
+    # l'effetto su chi guarda ma CHI PAGA la differenza dal mercato. Il
+    # verso e' quello di mostro e non dipende dal lato: un premio
+    # positivo assottiglia sempre i sats (`sats -= premium/100 * sats`),
+    # cioe' il compratore riceve meno sats per gli stessi euro — la fee
+    # e' sua; negativo, il venditore ne consegna di piu' — e' sua.
+    # Le card dell'app restano col «piu'/meno conveniente» di `affareP2P`:
+    # la' chi guarda ha un lato solo. `lato` resta nella firma per i
+    # chiamanti, e qui non serve piu'.
     if not premio:
         return "al prezzo di mercato"
-    affare = (lato == "compro") == (premio > 0)
-    return f"{abs(premio)}% {'più' if affare else 'meno'} conveniente"
+    return f"{abs(premio)}% fee al {'compratore' if premio > 0 else 'venditore'}"
 
 
 def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
