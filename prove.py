@@ -34113,7 +34113,10 @@ def prove_cambio():
              "ORE_CAMBIO_VALIDO": ore, "CAMBIO_TTL": 120,
              "CAMBIO_RIPROVA_S": 60, "VALUTE_CAMBIO": ("eur", "usd"),
              "_cambio_cache": {"valori": {"eur": valore, "usd": usd},
-                               "quando": quando, "tentato": 0.0}}
+                               "quando": quando, "tentato": 0.0},
+             # l'andamento della card del libro (13 nov 2026, cantiere
+             # prezzo-btc-p2p) ha la sua sezione, `prove_prezzo_btc_libro`
+             "_segna_andamento": lambda eur, quando: None}
         for f in ("_cambio_valido", "_salva_cambio", "cambio_noto_ora",
                   "cambio_per_import", "carica_cambio_salvato"):
             exec(pezzo(f), a)
@@ -157088,6 +157091,218 @@ console.log(JSON.stringify(out));
            and "fiat:" not in r])
 
 
+def prove_prezzo_btc_libro():
+    """LA CARD DEL PREZZO IN CIMA AL LIBRO (13 nov 2026, cantiere
+    «prezzo-btc-p2p», richiesta di Andrea: «aggiungimi una card in cima alle
+    altre nel p2p: prezzo live di btc»). Sulle foto la «A»: «1 BTC adesso»,
+    la cifra in euro grande, «▲ 1,8% · 24 ore» e una linea a destra; poi
+    «sotto ai banner novità», «verde se sale rossa se scende», «più lineare,
+    più approssimativa», «se clicco cambia 24 ore, 1 settimana e un mese»,
+    «non mettere il controvalore in dollari», «sotto la linea non mettere
+    i numeri».
+    1) il SERVER: la serie dei tre periodi (`serie_andamento`, pura), la
+       storia corta che chiede il backfill, la scrittura nell'ora giusta
+       con la potatura, e la rotta che la porta dalla memoria;
+    2) le SENTINELLE del client: la card sta sotto i «Novità» e sopra le
+       card, la serie arriva da `rileggiCambio` col typeof dei banchi;
+    3) il BANCO node coi pezzi VERI: la curva, la serie storta che non
+       entra, il colore del verso, il giro del tocco, niente dollaro e
+       niente elenco dei periodi, nessuna card senza cambio vero.
+
+    Quel che qui si rompe in silenzio: una linea su un periodo senza
+    storia (una percentuale su mezza giornata), l'ultimo punto che non e'
+    il cambio di adesso (la linea dice un numero, la cifra un altro), una
+    riga in piu' a ogni minuto invece che una per ora, la rotta che legge
+    il database, il backfill che sovrascrive le letture vere."""
+    print("\n[la card del prezzo in cima al libro: la serie, la card, il tocco]")
+    import sqlite3 as _sq
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    # --- 1) IL SERVER ------------------------------------------------------
+    amb = {"time": __import__("time")}
+    for riga in ("ANDAMENTO_GIORNI", "ANDAMENTO_PERIODI", "ANDAMENTO_PASSI",
+                 "ANDAMENTO_BUCO_S"):
+        m = re.search(r"\n(%s = [^\n]+)\n" % riga, src)
+        exec(m.group(1), amb)
+    for f in ("serie_andamento", "storia_andamento_corta"):
+        exec(pezzo(f), amb)
+    serie, corta = amb["serie_andamento"], amb["storia_andamento_corta"]
+    ADESSO = 1_700_000_000 // 3600 * 3600 + 1800     # a meta' di un'ora
+    ore31 = {ADESSO // 3600 * 3600 - h * 3600: 80000.0 + h for h in range(31 * 24)}
+    tutto = serie(ore31, ADESSO, 90000.0)
+    prova("con 31 giorni di storia i tre periodi ci sono, coi punti promessi "
+          "(ogni 3 ore, ogni giorno, ogni 3 giorni) piu' quello di adesso",
+          {"24h": 9, "7g": 8, "30g": 11}, {k: len(v) for k, v in tutto.items()})
+    prova("...dal piu' vecchio a ADESSO: il primo e' l'ora di 24 ore fa, l'ultimo il "
+          "cambio di adesso, interi", [80024, 90000, True],
+          [tutto["24h"][0], tutto["24h"][-1], all(isinstance(x, int) for x in tutto["30g"])])
+    corte = {h: v for h, v in ore31.items() if h >= ADESSO - 2 * 86400}
+    prova("con due giorni di storia c'e' solo il periodo delle 24 ore: niente linea "
+          "inventata per i 7 e i 30 giorni", ["24h"], sorted(serie(corte, ADESSO, 90000.0)))
+    prova("senza cambio di adesso non c'e' niente", {}, serie(ore31, ADESSO, 0))
+    buco = {h: v for h, v in ore31.items()
+            if not (ADESSO - 14 * 3600 <= h <= ADESSO - 5 * 3600)}
+    prova("un buco in mezzo toglie i soli campioni che non trovano un'ora entro "
+          "ANDAMENTO_BUCO_S (la linea passa dritta), il periodo resta", 7,
+          len(serie(buco, ADESSO, 90000.0)["24h"]))
+    prova("...ma un'ora piu' vecchia di ANDAMENTO_BUCO_S non fa da campione", [],
+          sorted(serie({ADESSO // 3600 * 3600 - 28 * 3600: 1.0}, ADESSO, 2.0)))
+    prova("la storia corta chiede il backfill: vuota si', 31 giorni pieni no, "
+          "meta' si'", [True, False, True],
+          [corta({}, ADESSO), corta(ore31, ADESSO),
+           corta({h: v for h, v in ore31.items() if h % 7200 == 0}, ADESSO)])
+
+    # la scrittura vera, su un database di cartone
+    m = re.search(r"    CREATE TABLE IF NOT EXISTS cambio_ore\([\s\S]*?\n    \);", src)
+    vero = _sq.connect(":memory:")
+    vero.row_factory = _sq.Row
+    vero.executescript(m.group(0) if m else "")
+    class _Con:
+        def execute(self, *a): return vero.execute(*a)
+        def commit(self): vero.commit()
+        def close(self): pass
+    cache = {"serie": {}, "riempito": False, "tentato": 0.0}
+    amb.update({"db": _Con, "_andamento_cache": cache,
+                "cambio_noto_ora": lambda v="eur": 95000.0})
+    for f in ("_ore_salvate", "ricalcola_andamento", "_segna_andamento"):
+        exec(pezzo(f), amb)
+    segna = amb["_segna_andamento"]
+    for minuto in range(5):
+        segna(94000.0 + minuto, ADESSO + minuto * 60)
+    righe = vero.execute("SELECT ora, eur FROM cambio_ore").fetchall()
+    prova("cinque letture nella stessa ora: UNA riga, all'inizio dell'ora, con "
+          "l'ultima lettura", [(ADESSO // 3600 * 3600, 94004.0)],
+          [(r["ora"], r["eur"]) for r in righe])
+    vero.execute("INSERT INTO cambio_ore(ora, eur) VALUES(?, ?)",
+                 (ADESSO - 40 * 86400, 1.0))
+    segna(94100.0, ADESSO + 3600)
+    prova("...la riga piu' vecchia di ANDAMENTO_GIORNI si pota alla scrittura dopo", 0,
+          vero.execute("SELECT COUNT(*) FROM cambio_ore WHERE ora<?",
+                       (ADESSO - 31 * 86400,)).fetchone()[0])
+    prova("...e la serie in memoria si ricalcola: con due ore di storia nessun periodo", {},
+          cache["serie"])
+    for h in range(1, 26):
+        vero.execute("INSERT OR IGNORE INTO cambio_ore(ora, eur) VALUES(?, ?)",
+                     (ADESSO // 3600 * 3600 - h * 3600, 93000.0))
+    segna(94200.0, ADESSO + 3600)
+    prova("...con 25 ore il periodo delle 24 c'e', e finisce sul cambio di adesso",
+          [True, 95000], ["24h" in cache["serie"], (cache["serie"].get("24h") or [0])[-1]])
+    prova("una lettura a zero non scrive niente", 27,
+          (segna(0, ADESSO + 7200), vero.execute("SELECT COUNT(*) FROM cambio_ore").fetchone()[0])[1])
+
+    rm = codice(pezzo("riempi_andamento"))
+    prova("il backfill riempie le SOLE ore vuote (INSERT OR IGNORE: le letture vere "
+          "vincono), una volta, e riprova non prima di un'ora", [True, False, True, True],
+          ["INSERT OR IGNORE INTO cambio_ore" in rm, "INSERT OR REPLACE" in rm,
+           'if _andamento_cache["riempito"]:' in rm,
+           'adesso - _andamento_cache["tentato"] < ANDAMENTO_RIEMPI_RIPROVA_S' in rm])
+    oc = codice(pezzo("orologio_cambio"))
+    prova("...e parte dal giro del cambio solo dopo una lettura buona", True,
+          "if riuscito:\n            try:\n                await riempi_andamento()" in oc)
+    prova("la lettura buona scrive l'ora, dalla stessa lettura (nessuna GET in piu')", True,
+          '_salva_cambio(valori, adesso)\n    # ...e l\'ora di adesso nell\'andamento della card del libro P2P (13 nov\n'
+          '    # 2026, cantiere prezzo-btc-p2p): la stessa lettura, nessuna domanda in piu\'\n'
+          '    _segna_andamento(valori["eur"], adesso)' in pezzo("_rileggi_cambio"))
+    i = src.find('@app.get("/api/cambio")')
+    rotta = codice(_senza_prosa(src[i:src.index("\n\n\n", i)] if i >= 0 else ""))
+    prova("la rotta porta la serie dalla MEMORIA, solo con un cambio vero accanto; "
+          "mai il database", [True, False],
+          ['if busta["cambio_eur"] > 0 and _andamento_cache["serie"]:\n'
+           '        busta["andamento"] = _andamento_cache["serie"]' in rotta, "db(" in rotta])
+    prova("all'avvio la serie si rilegge dal database prima della prima pagina", True,
+          "ricalcola_andamento()\n    global _TASK_CAMBIO" in src)
+
+    # --- 2) LE SENTINELLE DEL CLIENT --------------------------------------
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("la card viaggia col rettangolo degli USDT: sotto i «Novità», sopra le card "
+          "on-chain e quelle di Mostro", True,
+          "+ (typeof cartaPrezzoP2P === 'function' ? cartaPrezzoP2P() : '');\n"
+          "  const onchainCarte = typeof carteOnchainLibroP2P === 'function' ? "
+          "carteOnchainLibroP2P(k, usdtNovita) : '';" in rp)
+    oc_js = pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto){", "\n}\n")
+    prova("...e il libro on-chain la mette dopo il suo «Novità» e prima delle sue righe",
+          True, "return porta + (sotto || '') + righe.map(rigaOnchainP2P).join('');" in oc_js)
+    ril = nudo(pezzo_js(mini, "function rileggiCambio(){", "\n}\n"))
+    prova("la serie arriva da `rileggiCambio`, solo con un cambio vero, col typeof per i "
+          "banchi del solo cambio, e conta come cambio per il battito", [True, True],
+          ["const andamento = !!(j && Number(j.cambio_eur) > 0)\n"
+           "        && typeof impostaAndamentoBtc === 'function' && impostaAndamentoBtc(j.andamento);"
+           in ril, "|| usdPerSat !== primaUsd || andamento;" in ril])
+    prova("niente dollaro e niente elenco dei periodi nella card (Andrea, 23:58)",
+          [0, 0], [mini.count("p2p-valore-usd"), mini.count("p2p-valore-periodi")])
+
+    # --- 3) IL BANCO NODE --------------------------------------------------
+    i0 = mini.index("let andamentoBtc = null;")
+    blocco = mini[i0:mini.index("/* ============ IL «NOVITÀ» DEGLI USDT", i0)]
+    fmt = re.search(r"\nconst fmt = [^\n]+\n", mini).group(0)
+    js = (r"""
+const out = {};
+let eurPerSat = 0, cambioVivo = false, chieste = 0, vibra = 0;
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function haptic(){ vibra++; }
+function rileggiCambio(){ chieste++; return Promise.resolve(false); }
+const DOM = {};
+const document = {body: {}, activeElement: null};
+function el(id){ return DOM[id] || null; }
+""" + fmt + nudo(blocco) + r"""
+out.senza = cartaPrezzoP2P();
+cambioVivo = true; eurPerSat = 86890 / 1e8;
+out.soloPrezzo = cartaPrezzoP2P();
+out.chieste = chieste; cartaPrezzoP2P(); out.chiesteDopo = chieste;
+out.storta = [impostaAndamentoBtc({"24h": [1, -2, 3], "7g": "x", "30g": [5]}), andamentoBtc];
+out.cambiata = [impostaAndamentoBtc({"24h": [85355, 86000, 86500], "7g": [89950, 88000, 87000]}),
+                impostaAndamentoBtc({"24h": [85355, 86000, 86500], "7g": [89950, 88000, 87000]})];
+out.giro = [];
+const card = () => cartaPrezzoP2P();
+out.giro.push(card());
+voltaPeriodoPrezzoP2P(); out.giro.push(card());
+voltaPeriodoPrezzoP2P(); out.giro.push(card());
+out.vibra = vibra;
+const l = lineaPrezzoP2P([1, 3, 2], 100, 50, 5);
+out.linea = [l.d.split(' C').length - 1, l.x, l.y, l.d.slice(0, 10)];
+const piatta = lineaPrezzoP2P([7, 7], 100, 50, 5);
+out.piatta = [piatta.y, /NaN/.test(piatta.d)];
+impostaAndamentoBtc({"24h": [85355, 86000, 86500]});
+out.uno = card();
+console.log(JSON.stringify(out));
+""")
+    r = _node_banco(js)
+    if r is None:
+        salta("il banco node della card del prezzo", "node non c'e'")
+        return
+    prova("senza cambio vero niente card: mai il valore di riserva in cima al libro",
+          "", r.get("senza"))
+    sp = r.get("soloPrezzo") or ""
+    prova("col cambio ma senza serie: il solo prezzo, non toccabile, e la serie si "
+          "chiede UNA volta", [True, True, False, False, 1, 1],
+          ['86 890 €' in sp, sp.startswith('<div class="p2p-valore"'),
+           "<svg" in sp, "onclick" in sp, r.get("chieste"), r.get("chiesteDopo")])
+    prova("una serie storta non entra (meno di due punti, negativi, non liste); la stessa "
+          "serie due volte non e' un cambio", [[True, {}], [True, False]],
+          [r.get("storta"), r.get("cambiata")])
+    g = r.get("giro") or ["", "", ""]
+    prova("il tocco gira i periodi che ci sono: 24 ore (sale, verde) → 7 giorni (scende, "
+          "rosso) → di nuovo 24 ore; l'ultimo punto e' il cambio di adesso",
+          [True, True, True, True, True, 2],
+          ['class="p2p-valore-var su">▲ 1,8% · 24 ore' in g[0],
+           'class="p2p-valore-dx su"' in g[0],
+           'class="p2p-valore-var giu">▼ 3,4% · 7 giorni' in g[1],
+           'class="p2p-valore-dx giu"' in g[1], g[2] == g[0], r.get("vibra")])
+    prova("...la card e' un bottone che dice tutto alla voce", True,
+          'aria-label="1 BTC vale 86 890 euro, più 1,8 per cento in 24 ore. Tocca per '
+          'cambiare periodo" onclick="voltaPeriodoPrezzoP2P()"' in g[0])
+    prova("niente dollaro e niente elenco dei periodi sotto la linea", [False, False],
+          ["$" in g[0], "7 giorni" in g[0]])
+    prova("la curva e' morbida (una C per tratto), dal margine sinistro al destro; una "
+          "serie piatta sta a meta' altezza, senza NaN",
+          [[2, 95, 25, "M5.0 45.0 "], [25, False]], [r.get("linea"), r.get("piatta")])
+    uno = r.get("uno") or ""
+    prova("con un periodo solo: la linea c'e', il tocco no", [True, False],
+          ["<svg" in uno, "onclick" in uno])
+
+
 def prove_rete_scelta_p2p():
     """IL METODO SCELTO DA CHI PRENDE SI VEDE DI LA' (13 nov 2026, cantiere
     rete-scelta, Andrea dal campo: prende un ordine in USDT scegliendo
@@ -190989,7 +191204,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p
+    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro
     lista_corta_metodi
     """.split(),
     "mercatino": """
@@ -191667,6 +191882,7 @@ def main():
     prove_usdt_moderatori,
     prove_grafica_p2p_onchain,
     prove_novita_usdt_p2p,
+    prove_prezzo_btc_libro,
     prove_usdt_foglio_presa,
     prove_rete_scelta_p2p,
     prove_scelta_rete_mercatino,

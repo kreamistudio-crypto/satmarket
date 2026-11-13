@@ -8227,6 +8227,16 @@ def init_db():
         valore REAL DEFAULT 0,        -- euro per BTC
         quando INTEGER DEFAULT 0      -- quando l'abbiamo letto (unix)
     );
+    CREATE TABLE IF NOT EXISTS cambio_ore(
+        -- L'ANDAMENTO DEL PREZZO (13 nov 2026, cantiere prezzo-btc-p2p):
+        -- un BTC/EUR per ORA, l'ultimo letto in quell'ora, per la card
+        -- del prezzo in cima al libro P2P (24 h, 7 giorni, 30 giorni).
+        -- Come 'cambio_noto' non e' un dato di denaro: nessun conto ci
+        -- poggia sopra. Tiene ANDAMENTO_GIORNI di storia, il resto si
+        -- pota a ogni scrittura.
+        ora INTEGER PRIMARY KEY,      -- unix dell'inizio dell'ora (UTC)
+        eur REAL DEFAULT 0            -- euro per BTC
+    );
     CREATE TABLE IF NOT EXISTS pagamenti(
         -- IL PRIMO INCASSO CHE BARATTOLO FA PER SE' (ago 2026, la
         -- tappa 2 del banner). Fino a ieri ogni invoice in entrata
@@ -15946,6 +15956,9 @@ async def _rileggi_cambio() -> bool:
             _cambio_cache["valori"][valuta] = valore
     _cambio_cache["quando"] = adesso
     _salva_cambio(valori, adesso)
+    # ...e l'ora di adesso nell'andamento della card del libro P2P (13 nov
+    # 2026, cantiere prezzo-btc-p2p): la stessa lettura, nessuna domanda in piu'
+    _segna_andamento(valori["eur"], adesso)
     return True
 
 
@@ -16005,6 +16018,14 @@ async def orologio_cambio():
                 print("⚠️ Cambio BTC/EUR: CoinGecko non risponde da dieci "
                       "minuti. Vale l'ultimo cambio noto finché non "
                       "invecchia; si continua a riprovare.", flush=True)
+        # ...e il backfill dell'andamento, una volta (13 nov 2026, cantiere
+        # prezzo-btc-p2p): solo dopo una lettura buona, se CoinGecko tace
+        # e' inutile chiedergli anche lo storico
+        if riuscito:
+            try:
+                await riempi_andamento()
+            except Exception:
+                pass
         # ...e ETH e XMR, SOLO sull'istanza di prova (13 nov 2026, cantiere
         # eth-xmr): in produzione il giro resta quello di ieri, una
         # domanda sola a CoinGecko. Vedi «ETH E XMR NEL P2P».
@@ -16044,8 +16065,169 @@ async def scalda_cambio():
     else:
         print("💱 Cambio BTC/EUR: nessun valore salvato (primo avvio, o "
               "database nuovo). Lo si chiede adesso.", flush=True)
+    # l'andamento della card del libro, dal database, prima della prima
+    # pagina (13 nov 2026, cantiere prezzo-btc-p2p)
+    ricalcola_andamento()
     global _TASK_CAMBIO
     _TASK_CAMBIO = asyncio.create_task(orologio_cambio())
+
+
+# ============ L'ANDAMENTO DEL PREZZO (13 nov 2026, cantiere prezzo-btc-p2p) ============
+# Andrea: «aggiungimi una card in cima alle altre nel p2p: prezzo live di
+# btc», poi «se clicco sopra al banner cambia da 24 ore, 1 settimana e un
+# mese», «la linea un po' piu' lineare, piu' approssimativa». La card sta
+# nel libro sotto i «Novita'» (miniapp.html, «LA CARD DEL PREZZO»): qui il
+# server tiene la SERIE da cui disegna la linea e la percentuale.
+# LA FONTE RESTA UNA: ogni lettura buona di `_rileggi_cambio` (quella che
+# fa gia' le invoice) scrive l'euro nella riga della SUA ORA in
+# `cambio_ore` — l'ultima lettura dell'ora vince — e ricalcola in memoria
+# i tre periodi. La rotta /api/cambio li porta dalla memoria: mai la rete,
+# mai il database, il patto di sempre.
+# POCHI PUNTI APPOSTA («piu' approssimativa»): un punto ogni ANDAMENTO_PASSI
+# secondi, piu' l'ultimo che e' il cambio di adesso. La curva morbida la fa
+# il telefono; qui solo i campioni.
+# IL PRIMO GIRO E' UN BACKFILL, una volta sola: senza, la card dei 30 giorni
+# si accenderebbe fra un mese. Se la storia ha buchi grossi si chiedono a
+# CoinGecko gli ultimi 30 giorni a ore (`market_chart`, una GET), e si
+# riempiono SOLO le ore mancanti. Fail-open: se non risponde ci si riprova
+# fra un'ora, e intanto vale quel che c'e'.
+# UN PERIODO SENZA STORIA NON SI MANDA: la card mostra il solo prezzo
+# (niente linea inventata, niente percentuale su mezza giornata).
+ANDAMENTO_GIORNI = 31
+ANDAMENTO_PERIODI = {"24h": 86400, "7g": 7 * 86400, "30g": 30 * 86400}
+ANDAMENTO_PASSI = {"24h": 3 * 3600, "7g": 86400, "30g": 3 * 86400}
+ANDAMENTO_BUCO_S = 3 * 3600      # un campione cerca la sua ora fin qui indietro
+ANDAMENTO_RIEMPI_RIPROVA_S = 3600
+_andamento_cache = {"serie": {}, "riempito": False, "tentato": 0.0}
+
+
+def serie_andamento(ore: dict, adesso: float, eur_ora: float) -> dict:
+    """PURA: i tre periodi della card, ognuno una lista di euro interi
+    dal piu' vecchio a ADESSO. `ore` e' {inizio_ora_unix: eur}. Ogni
+    campione prende l'ora piu' vicina all'indietro entro ANDAMENTO_BUCO_S;
+    un campione in mezzo che non la trova si salta (la linea passa
+    dritta), il PRIMO che non la trova toglie il periodo: la storia non
+    copre ancora quel tratto. L'ultimo punto e' sempre `eur_ora`."""
+    if eur_ora <= 0:
+        return {}
+    def vicina(t):
+        h = int(t) // 3600 * 3600
+        while h >= t - ANDAMENTO_BUCO_S:
+            v = ore.get(h, 0)
+            if v and v > 0:
+                return v
+            h -= 3600
+        return 0
+    fuori = {}
+    for nome, durata in ANDAMENTO_PERIODI.items():
+        passo = ANDAMENTO_PASSI[nome]
+        inizio = adesso - durata
+        primo = vicina(inizio)
+        if primo <= 0:
+            continue
+        punti = [primo]
+        t = inizio + passo
+        while t < adesso - passo / 2:
+            v = vicina(t)
+            if v > 0:
+                punti.append(v)
+            t += passo
+        punti.append(eur_ora)
+        fuori[nome] = [int(round(v)) for v in punti]
+    return fuori
+
+
+def _ore_salvate(con, adesso: float) -> dict:
+    return {int(r["ora"]): float(r["eur"] or 0) for r in con.execute(
+        "SELECT ora, eur FROM cambio_ore WHERE ora>=?",
+        (int(adesso) - ANDAMENTO_GIORNI * 86400,))}
+
+
+def ricalcola_andamento(adesso: float = None) -> None:
+    """La serie dei tre periodi in memoria, dal database e dal cambio di
+    adesso. Fail-open: un database che fa i capricci lascia quella di prima."""
+    adesso = time.time() if adesso is None else adesso
+    try:
+        con = db()
+        ore = _ore_salvate(con, adesso)
+        con.close()
+    except Exception:
+        return
+    _andamento_cache["serie"] = serie_andamento(ore, adesso, cambio_noto_ora())
+
+
+def _segna_andamento(eur: float, quando: float) -> None:
+    """L'euro di questa lettura nella riga della sua ora, la potatura
+    del troppo vecchio, il ricalcolo. Fail-open totale, come `_salva_cambio`."""
+    if eur <= 0:
+        return
+    try:
+        con = db()
+        con.execute("INSERT OR REPLACE INTO cambio_ore(ora, eur) VALUES(?, ?)",
+                    (int(quando) // 3600 * 3600, float(eur)))
+        con.execute("DELETE FROM cambio_ore WHERE ora<?",
+                    (int(quando) - ANDAMENTO_GIORNI * 86400,))
+        con.commit()
+        con.close()
+    except Exception:
+        return
+    ricalcola_andamento(quando)
+
+
+def storia_andamento_corta(ore: dict, adesso: float) -> bool:
+    """PURA: la storia degli ultimi 30 giorni ha buchi da riempire?
+    Meno dell'80% delle ore: c'e' da chiedere il backfill."""
+    da = adesso - ANDAMENTO_PERIODI["30g"]
+    piene = sum(1 for h, v in ore.items() if h >= da and v > 0)
+    return piene < 0.8 * ANDAMENTO_PERIODI["30g"] / 3600
+
+
+async def riempi_andamento() -> None:
+    """IL BACKFILL dei 30 giorni, una volta per processo se serve (vedi
+    sopra). Chiamato dal giro del cambio: al primo colpo, e dopo un buco
+    non prima di ANDAMENTO_RIEMPI_RIPROVA_S. Riempie solo le ore vuote
+    (INSERT OR IGNORE): le letture vere di questo server vincono."""
+    adesso = time.time()
+    if _andamento_cache["riempito"]:
+        return
+    if adesso - _andamento_cache["tentato"] < ANDAMENTO_RIEMPI_RIPROVA_S:
+        return
+    _andamento_cache["tentato"] = adesso
+    try:
+        con = db()
+        corta = storia_andamento_corta(_ore_salvate(con, adesso), adesso)
+        con.close()
+    except Exception:
+        return
+    if not corta:
+        _andamento_cache["riempito"] = True
+        return
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.get(
+                "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
+                params={"vs_currency": "eur", "days": 30})
+            r.raise_for_status()
+            prezzi = r.json().get("prices", [])
+    except Exception as e:
+        print(f"⚠️ Andamento del prezzo: storico a ore non scaricato: {e}",
+              flush=True)
+        return
+    try:
+        con = db()
+        for ts_ms, prezzo in prezzi:
+            if prezzo and float(prezzo) > 0:
+                con.execute("INSERT OR IGNORE INTO cambio_ore(ora, eur) "
+                            "VALUES(?, ?)",
+                            (int(ts_ms / 1000) // 3600 * 3600, float(prezzo)))
+        con.commit()
+        con.close()
+    except Exception:
+        return
+    _andamento_cache["riempito"] = True
+    ricalcola_andamento()
+    print(f"📈 Andamento del prezzo: storico a ore scaricato "
+          f"({len(prezzi)} punti)", flush=True)
 
 
 @app.get("/api/cambio")
@@ -16075,6 +16257,12 @@ def cambio_da_solo():
     # scambi pagati in ETH o in Monero. Sempre la cache, mai la rete.
     if p2p_coin_acceso():
         busta["cambio_coin"] = cambio_coin_noto_ora()
+    # ...e l'andamento per la card del prezzo in cima al libro (13 nov 2026,
+    # cantiere prezzo-btc-p2p): dalla memoria, solo coi periodi che hanno
+    # storia — e solo se il cambio di adesso c'e', o la linea finirebbe su
+    # un numero che la busta dice di non avere
+    if busta["cambio_eur"] > 0 and _andamento_cache["serie"]:
+        busta["andamento"] = _andamento_cache["serie"]
     return JSONResponse(busta, headers={"Cache-Control": "no-store"})
 
 

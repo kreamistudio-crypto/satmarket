@@ -80649,3 +80649,81 @@ disegno, «Fine» senza rimostra, niente attesa di /me): ognuna fa
 rosse le sue righe. NON provato dal vivo: da guardare sul collaudo
 con un account nuovo (tutorial, poi riapertura dell'app) e con uno
 che il tutorial l'ha già fatto.
+
+## La card del prezzo di bitcoin in cima al libro (13 nov 2026, cantiere prezzo-btc-p2p, Andrea: «aggiungimi una card in cima alle altre nel p2p: prezzo live di btc in una card P2P nel libro ordini»)
+
+LA RICHIESTA, IN TRE GIRI DI FOTO. Andrea ha mandato il suo disegno (una
+card scura: «1 BTC oggi», «86 890 €», «▲ 1,8% · 24 h», una linea a
+destra) chiedendolo «in stile di come è già adesso la pagina». Primo
+giro: tre varianti fatte sulla pagina VERA nel collaudo locale (libro e
+cambio di cartone dentro Playwright), A come la sua foto, B compatta su
+una riga, C grande col grafico pieno. Scelta la A, con quattro ritocchi:
+«deve stare sotto ai banner novità usdt onchain e cosa verrà dopo», la
+linea «verde se sale rossa se scende» (scartati l'arancio e la sfumatura
+viola→verde acqua della sua foto, mostrata accanto), «non così
+irregolare, un po' più lineare, più approssimativa», «se clicco sopra
+cambia da 24 ore, 1 settimana e un mese». Terzo giro, sulle foto: «non
+mettere il controvalore in dollari», «sotto la linea non mettere 24 h,
+7 g o 30 g: quel numero cambia già accanto alla percentuale». Le foto
+stanno in /mnt/project-files/prezzo-btc-p2p/.
+
+COM'È FATTA. Una card col vestito di `.p2p-ord`, nel `#p2pCorpo` sotto
+i «Novità» e sopra le card: viaggia dentro il rettangolo degli USDT
+(`usdtNovita`), quindi nel libro on-chain sta dopo il suo «Novità» e
+prima delle sue righe, e da sola non toglie il vuoto di Mostro. Non è
+appesa: se ne va col dito, i «Novità» restano. Il prezzo è `eurPerSat`,
+lo stesso delle stime delle card e del battito del libro (ogni minuto);
+senza un cambio vero (`cambioVivo`) la card non c'è. La serie viaggia
+in `/api/cambio` (`andamento`), dalla memoria del server: un punto ogni
+3 ore per le 24 ore, uno al giorno per i 7 giorni, uno ogni 3 giorni
+per i 30, più il cambio di adesso — pochi punti, ed è quello il
+«più approssimativa»; la curva morbida (Catmull-Rom, passa per ogni
+punto) la disegna il telefono. L'ultimo punto della serie si sostituisce
+col cambio di ADESSO, così linea, percentuale e cifra grande dicono lo
+stesso numero. Senza storia per un periodo quel periodo non si offre;
+con un periodo solo la card non è toccabile. La serie la scrive il
+server da ogni lettura buona del cambio (tabella `cambio_ore`, un euro
+per ora, 31 giorni) e la prima volta la riempie con un backfill a ore
+da CoinGecko, solo le ore vuote. I dettagli: Architettura, «LA CARD DEL
+PREZZO IN CIMA AL LIBRO».
+
+UNA DECISIONE CHE SEMBRA ROVESCIATA E NON LO È. Il 19 ott 2026
+(«tasso-in-chiaro») la riga «1 BTC ≈ X €» SOPRA il libro fu tolta da
+Andrea al secondo giro: resta solo nel dettaglio di un ordine
+(`prove_tasso_in_chiaro` vieta `p2pTasso`). Questa card la chiede
+Andrea stesso, con un altro disegno e un altro scopo (il mercato, non il
+conto di un ordine): la riga del dettaglio resta com'è, e la sentinella
+di allora resta verde.
+
+LE STRADE SCARTATE. Il dollaro accanto all'euro (c'era, tolto da
+Andrea). L'elenco «24 h · 7 g · 30 g» sotto la linea (c'era, tolto da
+Andrea: il periodo lo dice la riga della percentuale). La card appesa
+come i «Novità»: ruberebbe spazio alle card per tutta la visita. Una
+domanda nuova a CoinGecko per la variazione delle 24 ore
+(`include_24hr_change`): avrebbe dato il solo giorno, e la settimana e il
+mese vogliono comunque una serie — la serie nostra dà tutti e tre dallo
+stesso numero che fa le invoice. Leggere `prezzo_storico` della fee
+dinamica: un punto al giorno, troppo pochi per le 24 ore. Una leva:
+non tocca denaro, non chiede niente a nessuno e senza cambio si spegne
+da sola; il backfill è una GET sola per processo.
+
+PROVATO. `prove_prezzo_btc_libro` (nuova, 29 controlli): la serie pura
+(i punti promessi, il periodo senza storia che non c'è, il buco che
+toglie i soli campioni, l'ora troppo vecchia che non fa da campione), la
+storia corta che chiede il backfill, la scrittura vera su un database di
+cartone (cinque letture = una riga all'inizio dell'ora, la potatura, il
+ricalcolo, lo zero che non scrive), le sentinelle (backfill solo nelle
+ore vuote e solo dopo una lettura buona, la rotta dalla memoria, la card
+sotto i «Novità», la serie da `rileggiCambio` col typeof), e in node i
+pezzi veri della card (niente card senza cambio, il solo prezzo senza
+serie e la domanda una volta, la serie storta, il giro del tocco col
+verde e il rosso, la voce, niente dollaro e niente elenco, la curva).
+Controprove: cinque rotture (l'ora non arrotondata, il periodo senza
+storia che si inventa il primo punto, l'ultimo punto non sostituito, il
+verso sempre «su», la serie storta accettata): ognuna fa diventare rossa
+la sua riga. Dal browser, sul codice vero nel collaudo locale (cambio e
+serie di cartone, CoinGecko non raggiungibile dalla sessione cloud):
+chiaro e scuro, 390 e 320, il tocco che gira. NON provato dal vivo: il
+backfill vero da CoinGecko e la serie che cresce ora per ora; da
+guardare sul collaudo (la card deve avere i tre periodi entro un minuto
+dall'avvio, se CoinGecko risponde) e dopo la promozione.

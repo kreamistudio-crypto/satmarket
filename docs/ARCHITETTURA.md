@@ -18246,6 +18246,29 @@
   rilettura dei 60 secondi del libro dai relay NON parte da quel
   render — il cambio rifà i numeri, non decide quando si ribussa ai
   relay.
+  LA CARD DEL PREZZO IN CIMA AL LIBRO (13 nov 2026, Cantieri, «La card
+  del prezzo di bitcoin in cima al libro»): «1 BTC adesso», la cifra in
+  euro, «▲ 1,8% · 24 ore» e una linea morbida, verde se in quel periodo
+  sale e rossa se scende; il tocco passa 24 ore → 7 giorni → 30 giorni.
+  Sta in `#p2pCorpo` sotto i «Novità» (viaggia col rettangolo degli
+  USDT dentro `carteOnchainLibroP2P`) e sopra le card, NON appesa. Il
+  prezzo è `eurPerSat`, lo stesso delle stime; senza `cambioVivo` la
+  card non c'è. LA SERIE: la tabella `cambio_ore` (un euro per ORA,
+  l'ultima lettura dell'ora vince, 31 giorni, potata a ogni scrittura)
+  la scrive `_segna_andamento` da ogni lettura buona di
+  `_rileggi_cambio` — nessuna GET in più —, e `serie_andamento` (pura)
+  ne fa tre liste: un punto ogni 3 ore, ogni giorno, ogni 3 giorni, più
+  il cambio di adesso. Sta in memoria (`_andamento_cache`) e viaggia in
+  `/api/cambio` come `andamento`, solo con un cambio vero accanto: la
+  rotta resta senza rete e senza database. Un periodo la cui storia non
+  arriva al suo inizio (ANDAMENTO_BUCO_S) non si manda. IL BACKFILL:
+  `riempi_andamento`, dal giro del cambio dopo una lettura buona, se
+  negli ultimi 30 giorni c'è meno dell'80% delle ore chiede una volta a
+  CoinGecko `market_chart` a ore e riempie solo le ore vuote (INSERT OR
+  IGNORE); se fallisce riprova fra un'ora. Nel client `rileggiCambio`
+  passa la serie a `impostaAndamentoBtc` (e una serie cambiata conta
+  come cambio per il battito); all'ingresso la card la chiede subito,
+  una volta per sessione, perché la busta della vetrina non la porta.
   ...E OVUNQUE SI STIMA (10 ott 2026, sera, cantiere cambio-ovunque).
   Il battito chiede anche con davanti la fila «Scambi P2P» di Esplora
   (`filaDavantiP2P`: le condizioni del suo giro della fotografia più
