@@ -22147,6 +22147,22 @@ try:
     from config import ASSISTENTE_MAX_AL_GIORNO
 except ImportError:
     ASSISTENTE_MAX_AL_GIORNO = 30
+# I MODELLI DI TAPPO (13 nov 2026, cantiere tappo-economico, Andrea:
+# «sta consumando troppi crediti via API»). Tappo gira su n8n, non qui:
+# li rilegge a ogni domanda dalla rotta pubblica /api/assistente/numeri
+# (campo «tappo»), cosi' si cambiano dal pannello senza toccare n8n.
+# BASE risponde a tutto e scarta i commenti che non sono domande;
+# quando non e' sicuro passa la mano all'ESPERTO, con piu' sapere.
+# n8n accetta solo nomi della forma claude-...: un refuso qui fa
+# tornare Tappo ai valori di serie, non lo spegne.
+try:
+    from config import TAPPO_MODELLO_BASE
+except ImportError:
+    TAPPO_MODELLO_BASE = "claude-haiku-5-5"
+try:
+    from config import TAPPO_MODELLO_ESPERTO
+except ImportError:
+    TAPPO_MODELLO_ESPERTO = "claude-sonnet-5-5"
 try:
     from config import ASSISTENTE_TETTO_GIORNO
 except ImportError:
@@ -27325,8 +27341,25 @@ def assistente_numeri():
     gli occhi di un utente qualunque (tg 0), senza login, senza
     database, senza nomi. Un minuto di cache: il prezzo di una leva
     girata e' al piu' un minuto di ritardo."""
-    return JSONResponse({"numeri": numeri_assistente()},
+    return JSONResponse({"numeri": numeri_assistente(),
+                         "tappo": modelli_tappo()},
                         headers={"Cache-Control": "public, max-age=60"})
+
+
+_MODELLO_TAPPO_FORMA = re.compile(r"claude-[a-z0-9.-]{3,40}")
+
+
+def modelli_tappo() -> dict:
+    """I due modelli di Tappo per n8n (cantiere tappo-economico). Un
+    nome di modello non e' un segreto, ma qui esce SOLO se ha la forma
+    di un modello Claude: un testo qualunque scritto per sbaglio nella
+    leva resta dentro, e n8n usa i suoi valori di serie."""
+    def buono(v, serie):
+        v = str(v or "").strip()
+        return v if _MODELLO_TAPPO_FORMA.fullmatch(v) else serie
+    return {"modello_base": buono(TAPPO_MODELLO_BASE, "claude-haiku-5-5"),
+            "modello_esperto": buono(TAPPO_MODELLO_ESPERTO,
+                                     "claude-sonnet-5-5")}
 
 
 @app.get("/api/salute")
@@ -34992,6 +35025,20 @@ def _leve_stato():
                   "ASSISTENTE_TETTO_GIORNO", int(ASSISTENTE_TETTO_GIORNO or 0),
                   spento="a 0 non risponde a nessuno"),
         ]},
+        {"gruppo": "🫙 Tappo (il bot del canale, su n8n)", "voci": [
+            _leva("Tappo: modello di base", "TAPPO_MODELLO_BASE",
+                  str(TAPPO_MODELLO_BASE),
+                  acceso="risponde a ogni messaggio e scarta quelli che "
+                         "non sono domande: il più economico che regge "
+                         "(claude-haiku-5-5). n8n lo rilegge entro un "
+                         "minuto; un nome che non comincia con claude- "
+                         "lo fa tornare al valore di serie"),
+            _leva("Tappo: modello esperto", "TAPPO_MODELLO_ESPERTO",
+                  str(TAPPO_MODELLO_ESPERTO),
+                  acceso="risponde solo quando quello di base non è "
+                         "sicuro, con più pezzi del sapere "
+                         "(claude-sonnet-5-5)"),
+        ]},
     ]
 
 
@@ -35011,7 +35058,8 @@ def _leve_stato():
 # memoria: il pannello legge due leve dal database, e Tappo lo chiede a
 # ogni domanda.
 _TAPPO_GRUPPI_INTERNI = ("🚦 Sicurezza", "🔔 Avvisi ai moderatori",
-                         "🤖 Assistente del bot", "🐦 Cassa di risonanza su X",
+                         "🤖 Assistente del bot",
+                         "🫙 Tappo (il bot del canale, su n8n)", "🐦 Cassa di risonanza su X",
                          "⚡ Indirizzo Lightning di casa",
                          "🔄 Indirizzo della quota SATS Routing")
 _TAPPO_CHIAVE_INTERNA = re.compile(

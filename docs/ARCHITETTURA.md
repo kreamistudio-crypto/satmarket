@@ -35444,3 +35444,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   libro solo, due voci. Perché resti al passo, la regola 8 di CLAUDE.md
   vuole il ritocco del libro nello stesso cantiere di ogni novità
   visibile, accanto alla voce di `NOVITA.md`.
+  DAL 13 NOV 2026 (cantiere tappo-economico) NON MANDA PIÙ TUTTO: legge
+  da main anche `assistente/conoscenza.md` (libro, schermate e novità a
+  pezzi, scritto da `assistente/conoscenza.py` e tenuto giusto da
+  `prove_conoscenza_tappo`) e il sito barattolo.online (pagine
+  pubbliche, ogni sei ore), e a Claude manda solo i pezzi che c'entrano
+  (BM25 nel nodo «Prepara la domanda del gruppo»). Risponde il modello
+  di BASE (`TAPPO_MODELLO_BASE`, Haiku 5.5); se scrive PASSA risponde
+  l'ESPERTO (`TAPPO_MODELLO_ESPERTO`, Sonnet 5.5) con tutto il libro.
+  I due modelli sono leve del pannello e arrivano a n8n nel campo
+  `tappo` di `/api/assistente/numeri` (solo nomi `claude-...`).

@@ -111,6 +111,12 @@ ASSISTENTE_MODELLO = "claude-sonnet-5-5"
 ASSISTENTE_MAX_AL_GIORNO = 30    # domande al giorno per persona
 ASSISTENTE_TETTO_GIORNO = 300    # domande al giorno in tutto (RAM: un
                                  # riavvio li azzera, il limite di spesa no)
+# Tappo, il bot del canale su n8n (13 nov 2026, cantiere tappo-economico):
+# il modello di BASE risponde a tutto, l'ESPERTO solo quando quello di
+# base non e' sicuro. n8n li rilegge da /api/assistente/numeri; si
+# cambiano anche dal pannello «⚙️ Stato delle leve».
+TAPPO_MODELLO_BASE = "claude-haiku-5-5"
+TAPPO_MODELLO_ESPERTO = "claude-sonnet-5-5"
 
 # --- LNbits: la "cassaforte" escrow ----------------------------------
 # Usa un wallet DEDICATO a SatMarket, non quello personale!

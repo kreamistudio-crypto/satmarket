@@ -80312,3 +80312,99 @@ collaudo pubblica sul relay di produzione) e la produzione li nasconde
 solo quando questo filtro arriva su main; alcuni wallet Monero non
 mostrano la chiave della transazione; i testi generici dello stepper
 («Euro inviati», «manda gli euro») restano anche per le coin.
+
+## Tappo costa meno: Haiku di base, Sonnet quando serve, il sapere a pezzi e il sito barattolo.online (13 nov 2026, cantiere tappo-economico, Andrea: «sta consumando troppi crediti via API… ad ogni commit si devono salvare le info in file .md, una sorta di RAG»)
+
+PERCHÉ. Tappo (il bot di n8n, flusso «bozze e tasti») mandava a OGNI
+messaggio tutto quello che sa a `claude-opus-5-5`: istruzioni (7 KB),
+libro (38 KB), testo di tutte le schermate della Mini App (86 KB, la
+parte più grossa), novità, numeri: circa 50.000 token. La cache c'era,
+ma con 10-30 messaggi al giorno i cinque minuti scadono fra uno e
+l'altro, e quasi ogni chiamata era una SCRITTURA di cache (il 125% del
+prezzo). Anche un commento del canale che finiva in «NIENTE» pagava
+tutto. Stima (n8n non salva le esecuzioni riuscite, quindi niente
+consumi veri): circa 0,25 $ a messaggio con Opus, 0,13 con Sonnet 5.5 a
+contesto pieno, 0,007 con Haiku 5.5 a contesto pieno, 0,001 con Haiku e
+i soli pezzi che servono.
+
+COSA.
+1. IL SAPERE A PEZZI. `assistente/conoscenza.py` scrive
+   `assistente/conoscenza.md`: il libro a sezioni, le schermate di
+   `miniapp.html` (la stessa pulizia che faceva n8n in «Estrai le
+   pagine», ora in Python nel repo) a sottotitoli, le voci di
+   NOVITA.md; 72 pezzi da al più ~3.000 caratteri, ognuno con la riga
+   `<!-- pezzo id | fonte | sempre -->` che n8n legge. Tre pezzi del
+   libro vanno a ogni domanda (chi è Barattolo, sicurezza e truffe,
+   parlare con una persona). `prove_conoscenza_tappo` è ROSSA se il
+   file non è quello che uscirebbe adesso dalle fonti: chi ritocca
+   libro, Mini App o NOVITA.md rifà il file
+   (`python assistente/conoscenza.py`) nello stesso commit. Così il
+   file è giusto a ogni commit, e su main a ogni promozione.
+2. I DUE MODELLI, LEVE DEL PANNELLO. `TAPPO_MODELLO_BASE`
+   (`claude-haiku-5-5`) e `TAPPO_MODELLO_ESPERTO` (`claude-sonnet-5-5`),
+   gruppo «🫙 Tappo (il bot del canale, su n8n)», scrivibili dal
+   pannello come testo (il giudice generico). Escono dalla rotta
+   pubblica `/api/assistente/numeri` nel campo nuovo `tappo`, SOLO se
+   hanno la forma `claude-...` (`modelli_tappo`): un refuso fa tornare
+   n8n ai suoi valori di serie, non spegne Tappo. Il gruppo sta fra gli
+   interni dei numeri (e `MODELLO` era già una chiave interna): nel
+   testo dei numeri non entra.
+3. n8n (fuori dal repo, flusso «bozze e tasti»). Nodo nuovo «La
+   conoscenza» (conoscenza.md da main). «Prepara la domanda del gruppo»
+   sceglie i pezzi con un BM25 piccolo (parole senza accenti, radici
+   tagliate a 6 lettere, il titolo conta doppio), circa 16.000
+   caratteri più i pezzi «sempre», i numeri e il .onion; la domanda
+   pesa doppio, il messaggio sopra e l'ultima domanda di oggi una volta.
+   Il modello di base ha una regola in più: se nei pezzi la risposta
+   non c'è, o il caso è delicato, scrive solo PASSA. «Serve
+   l'esperto?» la vede e manda la domanda all'esperto, con TUTTO il
+   libro più i 30.000 caratteri migliori del resto. Il sito
+   barattolo.online lo legge n8n dal sito pubblico (mappa → pagine
+   italiane → pezzi «sito», riletto ogni sei ore): il repo
+   `barattolo-online` è un altro, e il sito è già la verità pubblicata.
+   Le schermate da 5 MB non si scaricano più ogni quarto d'ora quando
+   la conoscenza c'è. Senza conoscenza.md su main (prima della
+   promozione) Tappo va come prima, a contesto pieno, ma con Haiku.
+   Conti del giorno in `staticData.tappo_conti` (base, esperto, PASSA,
+   token). Copia del flusso di prima:
+   `/mnt/project-files/tappo-economico/`.
+
+SCARTATO. Un git hook che rifà il file: non viaggia con le copie del
+repo, e le sessioni sono tante; la prova sì. Una rotta del VPS che
+spezza il sapere al volo: Andrea ha chiesto file .md a ogni commit, e
+così il sapere di Tappo si legge e si confronta nel repo. Embeddings e
+database vettoriale: per 72 pezzi un BM25 in un nodo Code basta, senza
+un servizio in più né un'altra chiave. Sonnet per tutto: 20 volte
+Haiku, e il passaggio all'esperto copre le domande difficili. La cache
+di un'ora: con i pezzi che cambiano a ogni domanda il prefisso non si
+ripete, e a questi prezzi non conta più.
+
+PROVATO. `PROVE_SEVERE=1 python prove.py` sul ramo, ribasato su
+develop 942ac36f (eth-xmr, non mio): 27469 verdi, 0 rosse, 0 saltate; `prove_conoscenza_tappo`
+con la controprova (una riga in più nel libro → rossa), e la rotta dei
+numeri col campo `tappo`. Collaudi: `collaudo_leve_pannello`,
+`collaudo_assistente_bot`, `collaudo_eth_xmr` e `collaudo_freni` verdi
+nella gabbia. n8n: un flusso di prova a
+parte (stessi nodi, un webhook al posto di Telegram, conoscenza.md dal
+ramo del cantiere, poi cancellato), quattro domande vere: «quanto costa
+vendere» → Haiku, risposta giusta (nessuna commissione), ~20.000 token;
+un complimento nel canale → NIENTE; «ho pagato e non spedisce, ho perso
+i sats?» → Haiku scrive PASSA, risponde Sonnet (deposito, Ordini,
+disputa), ~41.500 token; «le guide di barattolo.online» → Haiku coi
+pezzi del sito; «WooCommerce tutto insieme» → Importa in blocco e il
+catalogo collegato. Costo stimato a messaggio: ~0,002 $ con la base,
+~0,09 $ quando passa all'esperto.
+IL CONTESTO PIENO MISURATO: col flusso di prova puntato a main (dove
+conoscenza.md non c'è ancora) la richiesta a contesto pieno, sito
+compreso, era di 89.603 token. Il prompt di Opus di prima, senza il
+sito, stava quindi intorno ai 70.000, non ai 50.000 della stima: circa
+0,35 $ a messaggio. A contesto pieno il sito resta fuori, perché sopra i
+100.000 token Haiku costa il doppio. Il flusso vero è cambiato il 13 nov
+alle 14:18 UTC (copia di prima in `/mnt/project-files/tappo-economico/`,
+coi nodi nuovi in .js accanto).
+Da guardare: dopo la promozione su main (Tappo legge conoscenza.md da
+main; fino ad allora va a contesto pieno con Haiku, ~0,009 $ a
+messaggio), i conti in
+`staticData.tappo_conti` di qualche giorno: quante PASSA, e se i pezzi
+scelti bastano. Se l'esperto costa troppo, il budget del suo resto
+(30.000 caratteri) si abbassa nel nodo.

@@ -55424,6 +55424,67 @@ def _voci_novita(testo, leve_note):
     return voci, errori
 
 
+def prove_conoscenza_tappo():
+    """LA BASE DI CONOSCENZA DI TAPPO E' QUELLA DI ADESSO (13 nov 2026,
+    cantiere tappo-economico).
+
+    Tappo (n8n) non manda piu' a Claude tutto il libro e tutte le
+    schermate a ogni messaggio: legge da main `assistente/conoscenza.md`,
+    il sapere spezzato in pezzi, e ne manda solo quelli che c'entrano.
+    Il file lo scrive `assistente/conoscenza.py` dalle fonti (libro,
+    miniapp.html, NOVITA.md): se una di queste cambia e il file no,
+    Tappo racconta la versione di prima. Qui si guarda che il file sia
+    proprio quello che uscirebbe adesso, e la forma che n8n legge.
+    Rossa? `python assistente/conoscenza.py`, e il file nel commit."""
+    print("\n🫙 Prove: la base di conoscenza di Tappo")
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "conoscenza_tappo", os.path.join(QUI, "assistente", "conoscenza.py"))
+    cz = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cz)
+    atteso = cz.genera()
+    try:
+        with open(os.path.join(QUI, "assistente", "conoscenza.md"),
+                  encoding="utf-8") as f:
+            scritto = f.read()
+    except OSError:
+        scritto = ""
+    prova("conoscenza.md e' aggiornato (sennò: python "
+              "assistente/conoscenza.py)", True, scritto == atteso)
+    pezzi = re.findall(r"<!-- pezzo ([a-z]+-\d{3}) \| (libro|schermata|novita)"
+                       r"( \| sempre)? -->\n## (.+)\n\n", atteso)
+    prova("ogni pezzo ha la riga che n8n legge", True,
+              len(pezzi) == atteso.count("<!-- pezzo ") and len(pezzi) > 30)
+    fonti = {p[1] for p in pezzi}
+    prova("ci sono le tre fonti (libro, schermate, novità)", True,
+              fonti == {"libro", "schermata", "novita"})
+    prova("gli id sono unici", True, len({p[0] for p in pezzi}) == len(pezzi))
+    prova("il libro c'è tutto (ogni sezione # diventa un pezzo)", True,
+              all(f"Libro · {t[2:].strip()}" in atteso
+                  for t in open(os.path.join(QUI, "assistente", "sapere.md"),
+                                encoding="utf-8").read().split("\n")
+                  if t.startswith("# ")))
+    prova("chi è Barattolo e le truffe vanno a ogni domanda", True,
+              any(p[2] and "Cos'è Barattolo" in p[3] for p in pezzi)
+              and any(p[2] and "Sicurezza e truffe" in p[3] for p in pezzi))
+    corpi = atteso.split("<!-- pezzo ")[1:]
+    prova("nessun pezzo enorme (si sceglie a pezzi, non a libri)", True,
+              max(len(c) for c in corpi) < 2 * cz.PEZZO_MAX)
+    prova("le schermate ci sono, bottoni compresi", True,
+              "Importa in blocco" in atteso)
+    prova("niente commenti del codice dalle schermate", True,
+              "<script" not in atteso and "function " not in atteso)
+    # CONTROPROVA: una riga cambiata nel libro deve cambiare il file
+    vero = cz._leggi
+    try:
+        cz._leggi = lambda nome: (vero(nome) + "\nRiga nuova della prova."
+                                  if nome.endswith("sapere.md") else vero(nome))
+        prova("controprova: un libro ritoccato vuole il file rifatto", True,
+                  cz.genera() != atteso)
+    finally:
+        cz._leggi = vero
+
+
 def prove_novita_md():
     """NOVITA.MD SI LEGGE A MACCHINA (10 nov 2026, cantiere novita).
 
@@ -189239,10 +189300,21 @@ def prove_assistente_bot():
     prova("la rotta pubblica dei numeri: GET, solo il testo dei numeri, "
           "niente database, niente utente, un minuto di cache", [True] * 4,
           ['@app.get("/api/assistente/numeri")' in _SORGENTE,
-           'JSONResponse({"numeri": numeri_assistente()}' in rotta,
+           'JSONResponse({"numeri": numeri_assistente(),' in rotta
+           and '"tappo": modelli_tappo()}' in rotta,
            all(x not in rotta.split('"""')[-1]
                for x in ("db()", "execute", "tg_id", "Request", "utente")),
            '"Cache-Control": "public, max-age=60"' in rotta])
+    # (13 nov 2026, cantiere tappo-economico) i modelli di Tappo per n8n:
+    # escono solo con la forma di un modello Claude, sennò quelli di serie
+    mt = codice(pezzo("modelli_tappo"))
+    forma = re.search(r'_MODELLO_TAPPO_FORMA = re.compile\(r"([^"]+)"\)', _SORGENTE)
+    prova("i modelli di Tappo: solo nomi claude-..., sennò Haiku e Sonnet di serie",
+          [True] * 5,
+          [bool(forma), bool(forma and re.fullmatch(forma.group(1), "claude-haiku-5-5")),
+           not (forma and re.fullmatch(forma.group(1), "https://x.y/claude-")),
+           '"claude-haiku-5-5"' in mt and '"claude-sonnet-5-5"' in mt,
+           "fullmatch" in mt])
 
     # --- 11) LE REGOLE, il PANNELLO, l'ARGOMENTO e la PRIVACY ------------
     regole = amb["ISTRUZIONI_ASSISTENTE"]
@@ -190151,7 +190223,7 @@ CATEGORIE = {
     collaudi_in_ci ci_leggera ci_solo_main elenco_dei_collaudi
     collaudi_senza_coincurve servizio_non_root guardiano_ponte
     guardia_liquidita canale_admin gruppo_admin_coda deploy_nel_gruppo
-    bussola tetto_claude_md novita_md annotazioni_negli_ambienti nwc_cifratura
+    bussola tetto_claude_md novita_md conoscenza_tappo annotazioni_negli_ambienti nwc_cifratura
     bundle_nostr relay_chiavi ronda_nodo semina_demo
     indietro_app_android esclusioni_relay letture_relay_collaudo
     telegram_simulato_collaudo leve_mai_doppie sintassi_client
@@ -190679,7 +190751,7 @@ def main():
               prove_guardia_liquidita, prove_canale_admin, prove_gruppo_admin_coda,
               prove_deploy_nel_gruppo,
               prove_bussola, prove_tetto_claude_md,
-              prove_novita_md,
+              prove_novita_md, prove_conoscenza_tappo,
               prove_canale_comunita,
               prove_podio_sfondo,
               prove_annotazioni_negli_ambienti,
