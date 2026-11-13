@@ -80236,3 +80236,71 @@ va deciso da Andrea. Tappo ne parla solo se glielo chiedono.
 
 PROVATO. Suite severa sul ramo. Da guardare: la prima domanda vera dopo
 la promozione su main (Tappo legge il libro da main).
+
+## Tappo costa meno: Haiku di base, Sonnet quando serve, il sapere a pezzi e il sito barattolo.online (13 nov 2026, cantiere tappo-economico, Andrea: «sta consumando troppi crediti via API… ad ogni commit si devono salvare le info in file .md, una sorta di RAG»)
+
+PERCHÉ. Tappo (il bot di n8n, flusso «bozze e tasti») mandava a OGNI
+messaggio tutto quello che sa a `claude-opus-5-5`: istruzioni (7 KB),
+libro (38 KB), testo di tutte le schermate della Mini App (86 KB, la
+parte più grossa), novità, numeri: circa 50.000 token. La cache c'era,
+ma con 10-30 messaggi al giorno i cinque minuti scadono fra uno e
+l'altro, e quasi ogni chiamata era una SCRITTURA di cache (il 125% del
+prezzo). Anche un commento del canale che finiva in «NIENTE» pagava
+tutto. Stima (n8n non salva le esecuzioni riuscite, quindi niente
+consumi veri): circa 0,25 $ a messaggio con Opus, 0,13 con Sonnet 5.5 a
+contesto pieno, 0,007 con Haiku 5.5 a contesto pieno, 0,001 con Haiku e
+i soli pezzi che servono.
+
+COSA.
+1. IL SAPERE A PEZZI. `assistente/conoscenza.py` scrive
+   `assistente/conoscenza.md`: il libro a sezioni, le schermate di
+   `miniapp.html` (la stessa pulizia che faceva n8n in «Estrai le
+   pagine», ora in Python nel repo) a sottotitoli, le voci di
+   NOVITA.md; 72 pezzi da al più ~3.000 caratteri, ognuno con la riga
+   `<!-- pezzo id | fonte | sempre -->` che n8n legge. Tre pezzi del
+   libro vanno a ogni domanda (chi è Barattolo, sicurezza e truffe,
+   parlare con una persona). `prove_conoscenza_tappo` è ROSSA se il
+   file non è quello che uscirebbe adesso dalle fonti: chi ritocca
+   libro, Mini App o NOVITA.md rifà il file
+   (`python assistente/conoscenza.py`) nello stesso commit. Così il
+   file è giusto a ogni commit, e su main a ogni promozione.
+2. I DUE MODELLI, LEVE DEL PANNELLO. `TAPPO_MODELLO_BASE`
+   (`claude-haiku-5-5`) e `TAPPO_MODELLO_ESPERTO` (`claude-sonnet-5-5`),
+   gruppo «🫙 Tappo (il bot del canale, su n8n)», scrivibili dal
+   pannello come testo (il giudice generico). Escono dalla rotta
+   pubblica `/api/assistente/numeri` nel campo nuovo `tappo`, SOLO se
+   hanno la forma `claude-...` (`modelli_tappo`): un refuso fa tornare
+   n8n ai suoi valori di serie, non spegne Tappo. Il gruppo sta fra gli
+   interni dei numeri (e `MODELLO` era già una chiave interna): nel
+   testo dei numeri non entra.
+3. n8n (fuori dal repo, flusso «bozze e tasti»). Nodo nuovo «La
+   conoscenza» (conoscenza.md da main). «Prepara la domanda del gruppo»
+   sceglie i pezzi con un BM25 piccolo (parole senza accenti, radici
+   tagliate a 6 lettere, il titolo conta doppio), circa 16.000
+   caratteri più i pezzi «sempre», i numeri e il .onion; la domanda
+   pesa doppio, il messaggio sopra e l'ultima domanda di oggi una volta.
+   Il modello di base ha una regola in più: se nei pezzi la risposta
+   non c'è, o il caso è delicato, scrive solo PASSA. «Serve
+   l'esperto?» la vede e manda la domanda all'esperto, con TUTTO il
+   libro più i 30.000 caratteri migliori del resto. Il sito
+   barattolo.online lo legge n8n dal sito pubblico (mappa → pagine
+   italiane → pezzi «sito», riletto ogni sei ore): il repo
+   `barattolo-online` è un altro, e il sito è già la verità pubblicata.
+   Le schermate da 5 MB non si scaricano più ogni quarto d'ora quando
+   la conoscenza c'è. Senza conoscenza.md su main (prima della
+   promozione) Tappo va come prima, a contesto pieno, ma con Haiku.
+   Conti del giorno in `staticData.tappo_conti` (base, esperto, PASSA,
+   token). Copia del flusso di prima:
+   `/mnt/project-files/tappo-economico/`.
+
+SCARTATO. Un git hook che rifà il file: non viaggia con le copie del
+repo, e le sessioni sono tante; la prova sì. Una rotta del VPS che
+spezza il sapere al volo: Andrea ha chiesto file .md a ogni commit, e
+così il sapere di Tappo si legge e si confronta nel repo. Embeddings e
+database vettoriale: per 72 pezzi un BM25 in un nodo Code basta, senza
+un servizio in più né un'altra chiave. Sonnet per tutto: 20 volte
+Haiku, e il passaggio all'esperto copre le domande difficili. La cache
+di un'ora: con i pezzi che cambiano a ogni domanda il prefisso non si
+ripete, e a questi prezzi non conta più.
+
+PROVATO. Vedi sotto, in coda alla voce.
