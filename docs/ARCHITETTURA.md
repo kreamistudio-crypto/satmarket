@@ -31525,6 +31525,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Da 768px in su (6 ott 2026, CANTIERI «Il P2P sugli schermi larghi»)
   e' largo 360 (`.p2p-fee-banner{width:360px}` nel blocco desktop):
   i cinque sesti della colonna da 608 facevano 507x132.
+  UNA VOLTA SOLA (13 nov 2026, CANTIERI «Il banner delle fee si vede
+  una volta sola»): `veritaBannerFeeP2P` chiede anche a
+  `bannerFeeViaP2P` (col typeof), che decide UNA volta per apertura, in
+  memoria (`feeUnaVoltaP2P`): si vede se mancano sia il timbro
+  `banner_p2p` sia `tour_p2p` (`bannerFeeGiaVistoP2P`, nessun timbro
+  nuovo). Si decide solo col libro davanti e, per chi e' dentro, a /me
+  arrivato (`p2pLeve`, come il tour); prima resta via. `fineGiroP2P`
+  con «Fine 🎉» lo rimette (`rimostraBannerFeeP2P`) prima
+  dell'animazione: e' anche l'unica porta di `#p2pFeeSheet`.
 - LE DISPUTE P2P (28 set 2026, perché in CANTIERI, «Le dispute P2P per
   i moderatori»). DUE META', e la terza da fare.
   L'ANNULLO INSIEME A DISPUTA APERTA (client). mostrod accetta

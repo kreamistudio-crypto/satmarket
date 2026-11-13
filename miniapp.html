@@ -13000,7 +13000,11 @@ document.getElementById('cartello')?.remove();</script>
            l'animazione da capo — nessun JS. Con gli effetti ridotti la
            regola universale la spegne e resta l'ombra ferma.
            Se il file non arriva il bottone se ne va: un bottone vuoto
-           in cima al libro sarebbe un buco. -->
+           in cima al libro sarebbe un buco.
+           DAL 13 NOV 2026 SI VEDE UNA VOLTA SOLA (decisione di Andrea,
+           «troppo invasivo»): nell'apertura del primo ingresso, e poi
+           solo alla fine di «Come funziona». Vedi IL BANNER SI VEDE UNA
+           VOLTA SOLA, accanto a `veritaBannerFeeP2P`. -->
       <button type="button" class="p2p-fee-banner" id="p2pFeeBanner" aria-haspopup="dialog" onclick="apriFeeP2P()"><img src="/assets/p2p-banner-fee.webp" width="1000" height="258"alt="Fee P2P: 2% barrato, in beta 1,5% per parte, in beta 1% per pionieri o livello 5" onerror="this.parentNode.remove()"><span class="fee-pz fee-pz1" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz2" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz3" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz3 fee-tag" aria-hidden="true"><i></i></span><span class="fee-barra" aria-hidden="true"></span></button>
       <!-- L'ORDINE CONDIVISO CHE NON C'E' PIU' (10 ott 2026): chi apre
            il link di un ordine preso, scaduto o ritirato atterra sul
@@ -90475,6 +90479,9 @@ function fineGiroP2P(finito){
   /* il banner che aspettava il «Fine» si rivela PRIMA della lenta (9 ott
      2026, sera): un elemento nascosto non anima */
   if (typeof liberaBannerP2P === 'function') liberaBannerP2P();
+  /* ...e un giro chiuso con «Fine 🎉» lo rimette, anche se in questa
+     apertura era gia' via (13 nov 2026, IL BANNER SI VEDE UNA VOLTA SOLA) */
+  if (finito === true && typeof rimostraBannerFeeP2P === 'function') rimostraBannerFeeP2P();
   if (typeof animaBannerFeeP2P === 'function') animaBannerFeeP2P(finito === true);
 }
 /* ============ fine del giro guidato del P2P ============ */
@@ -90676,6 +90683,53 @@ function primaVoltaFeeP2P(b, n){
 }
 /* ============ fine del banner personale ============ */
 
+/* ---- IL BANNER SI VEDE UNA VOLTA SOLA (13 nov 2026, decisione di
+   Andrea: «il banner delle fee e' troppo invasivo», «toglierlo del
+   tutto dopo averlo mostrato una volta, tanto si vede gia' nel tutorial
+   e la fee e' gia' indicata nel dettaglio di un ordine») ----
+   Il banner compare nell'apertura dell'app in cui uno entra nel libro
+   per la PRIMA volta (quella del tutorial, che lo anima alla fine con
+   «Fine 🎉»), resta li' per tutta quell'apertura — se ne va col primo
+   dito come sempre — e dalla volta dopo non c'e' piu'.
+   «GIA' VISTO» E' UN FATTO CHE ESISTE GIA', e non un timbro nuovo: il
+   timbro della prima animazione (`banner_p2p`) o il tutorial fatto
+   (`tour_p2p`, che le slide scrivono alla COMPARSA). Tutti e due stanno
+   sul profilo e arrivano con /me: visto in Telegram, non torna sul sito
+   ne' su un altro telefono. Chi il tutorial l'aveva gia' fatto non lo
+   rivede piu' dal giorno del deploy — ed e' la richiesta.
+   SI DECIDE UNA VOLTA PER APERTURA, e la decisione vive in memoria:
+   deciderlo a ogni disegno lo spegnerebbe a meta' della prima visita,
+   appena le slide timbrano `tour_p2p`. Si decide solo quando i fatti ci
+   sono: chi e' dentro aspetta /me (`p2pLeve`, lo stesso segnale del
+   tour), e solo col libro davanti (`renderP2P` e /me passano di qui
+   anche dal mercatino). Finche' non si sa, il banner resta via: per i
+   piu' e' la risposta giusta, e chi entra la prima volta ha le slide
+   davanti.
+   LA STRADA PER RIVEDERLO E' «COME FUNZIONA»: un giro chiuso con
+   «Fine 🎉» lo rimette per quell'apertura (`fineGiroP2P` →
+   `rimostraBannerFeeP2P`), con la sua animazione. E' anche l'unica porta
+   del foglio delle fee col dettaglio dello sconto: senza, quel foglio
+   non si aprirebbe piu' da nessuna parte. */
+let feeUnaVoltaP2P = null;   // null = non deciso; true = in questa apertura si vede
+function bannerFeeGiaVistoP2P(){
+  if (hintDismesso('banner_p2p')) return true;
+  return typeof tourP2PVisto === 'function' && tourP2PVisto();
+}
+/* il banner resta via in questa apertura? (e, la prima volta che i
+   fatti ci sono, lo decide) */
+function bannerFeeViaP2P(){
+  if (feeUnaVoltaP2P === null) {
+    if (myTgId && !p2pLeve) return true;
+    if (document.querySelector('.view.active')?.id !== 'view-p2p') return true;
+    feeUnaVoltaP2P = !bannerFeeGiaVistoP2P();
+  }
+  return !feeUnaVoltaP2P;
+}
+function rimostraBannerFeeP2P(){
+  feeUnaVoltaP2P = true;
+  veritaBannerFeeP2P();
+}
+
 /* ---- IL BANNER SI NASCONDE QUANDO NON DICE PIU' IL VERO (7 ott 2026,
    decisione di Andrea, «testi P2P che confondono») ----
    Le cifre del banner sono DISEGNATE (PRODUZIONE, «IL BANNER DELLE
@@ -90711,7 +90765,10 @@ function veritaBannerFeeP2P(){
      il giudice vive col blocco della porta, da qui il typeof */
   const aspetta = typeof bannerNascostoPrimoOrdineP2P === 'function'
     && bannerNascostoPrimoOrdineP2P();
-  b.hidden = aspetta || !bannerFeeVeroP2P(commissioneVivaP2P(),
+  /* ...e si vede una volta sola (13 nov 2026): il giudice vive
+     accanto, da qui il typeof */
+  const via = typeof bannerFeeViaP2P === 'function' && bannerFeeViaP2P();
+  b.hidden = aspetta || via || !bannerFeeVeroP2P(commissioneVivaP2P(),
     c ? Number(c.commissione) : null,
     p2pSconto ? Number(p2pSconto.punti) : null);
 }
