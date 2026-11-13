@@ -80472,3 +80472,51 @@ rossi. Due banchi vecchi (`prove_p2p_dettaglio`, `prove_p2p_pubblica`)
 ritagliano `quantoValeP2P` e ora si portano dietro anche il suo segno.
 Da guardare: dopo la promozione, dal telefono, lo stesso ordine USDT
 del libro (foglio, conto, «Come funziona»).
+
+## USDe di Ethena nel P2P, cinque reti, solo sulla prova (13 nov 2026, cantiere usde)
+
+AndreAI, la sera: «aggiungi nel p2p USDE nelle reti principali tra cui
+ETH», e subito dopo il link a ethena.fi «perché sia chiaro»: è il dollaro
+sintetico di Ethena, non un altro token che si chiama USDe.
+COME: la strada di ETH e XMR (cantiere eth-xmr, la voce qui sopra), non
+quella degli USDT. Gli USDT sono una VALUTA di Mostro (la 0.20.2 la
+conosce, col prezzo a 1 dollaro, e il nodo la deve avere fra le
+accettate); USDe come valuta vorrebbe un gesto sul nodo e un prezzo che
+Mostro non ha. Come METODO di un ordine in euro invece il nodo non vede
+niente di nuovo, e la cifra la conta il telefono dal cambio CoinGecko
+(`ethena-usde`, nella stessa domanda di ETH e XMR). Stesso cancello:
+solo l'istanza di prova col P2P acceso.
+LE RETI: Ethereum, Arbitrum, Base, BNB Chain e Solana, una voce per rete
+in `P2P_RETI_COIN` col nome del protocollo («USDe (Arbitrum)»). I
+contratti vengono dalla pagina «Key Addresses» della documentazione di
+Ethena (docs.ethena.fi/technical-design/key-addresses, letta il 13 nov):
+Ethereum 0x4c9EDD5852cd905f086C759E8383e09bff1E68B3, le L2 EVM uno solo
+(l'OFT di LayerZero) 0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34, Solana il
+mint DEkqHyPN7GMRJ5cArtQFAWefqbZb33Hyf6s5iCwjEonT. Stanno nel recapito
+(«Contratto USDe»), contro i token falsi, e un contratto incollato come
+indirizzo si ferma (`contrattoTokenP2P`, che vale anche per l'USDT).
+SOLANA è una forma nuova di `reteIndirizzoP2P`: 32 byte in Base58,
+guardata PRIMA di Tron e di bitcoin legacy, che hanno lo stesso alfabeto
+ma 25 byte. Non ha un controllo dentro: un refuso fa un altro indirizzo
+valido, ed è il limite di Solana stessa. L'id è la firma, 64 byte.
+QR: sulle reti EVM l'EIP-681 del trasferimento (contratto, catena,
+`transfer?address=…&uint256=…`, 18 decimali); su Solana Solana Pay con
+`spl-token`. Explorer: Etherscan, Arbiscan, Basescan, BscScan, Solscan.
+⚠️ IL LIMITE DETTO: le quattro reti EVM hanno la stessa forma
+d'indirizzo, e nessun controllo le distingue. È il motivo per cui dagli
+USDT è stato tolto Polygon (2 nov), ma qui le reti le ha chieste Andrea
+al plurale: la rete si dice nel recapito e nel QR, e la prova è l'id
+aperto sull'explorer DI QUELLA RETE (un invio da un'altra lì non c'è).
+Su due reti USDe senza recapito né scelta, la rete dello scambio non si
+indovina (`reteCoinScambioP2P` torna null); la card veste il logo di
+USDe (il dollaro nell'anello aperto, ridisegnato a mano) anche su reti
+diverse.
+SCARTATO: USDe come valuta di Mostro (gesto sul nodo, nessun prezzo);
+TON, Aptos, zkSync e le altre L2 della lista di Ethena (non «principali»,
+si aggiungono con una riga se servono).
+PROVATO: `prove_usde` (reti e contratti, Solana contro Tron e bitcoin,
+giudici con le frasi, firma Solana, QR, explorer, cambio unico, recapito
+che torna anche con «BNB Chain», chat, card, libro, liste; quattro
+controprove), `prove_eth_xmr` e `collaudo_eth_xmr` allargati al cambio a
+tre. Da guardare: dal telefono vero un invio vero su una L2, e un wallet
+Solana che legga il QR Solana Pay col token.

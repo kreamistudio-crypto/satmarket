@@ -99,14 +99,16 @@ def main():
         banco.come(111)
         prova("/api/me dice p2p_coin a chi ha il P2P", True, c.get("/api/me").json().get("p2p_coin"))
         prova("...prima della prima lettura il cambio e' 0, non inventato",
-              {"eth": 0.0, "xmr": 0.0}, c.get("/api/cambio").json().get("cambio_coin"))
+              {"eth": 0.0, "xmr": 0.0, "usde": 0.0}, c.get("/api/cambio").json().get("cambio_coin"))
 
         S.httpx = _HttpxFinto
-        _CoinGeckoDiCartone.risposta = {"ethereum": {"eur": 2834.5}, "monero": {"eur": 301.2}}
+        _CoinGeckoDiCartone.risposta = {"ethereum": {"eur": 2834.5}, "monero": {"eur": 301.2},
+                                       "ethena-usde": {"eur": 0.8612}}
         letto = asyncio.run(S._rileggi_cambio_coin())
-        prova("la lettura chiede ethereum e monero in euro, e va", (True, {"ids": "ethereum,monero", "vs_currencies": "eur"}),
+        prova("la lettura chiede ethereum, monero e USDe di Ethena in euro, e va",
+              (True, {"ids": "ethereum,monero,ethena-usde", "vs_currencies": "eur"}),
               (letto, _CoinGeckoDiCartone.chiamate[-1][1]))
-        prova("/api/cambio adesso porta i due cambi", {"eth": 2834.5, "xmr": 301.2},
+        prova("/api/cambio adesso porta i tre cambi", {"eth": 2834.5, "xmr": 301.2, "usde": 0.8612},
               c.get("/api/cambio").json().get("cambio_coin"))
         n = len(_CoinGeckoDiCartone.chiamate)
         prova("nello stesso minuto non si ribussa", (False, n),
@@ -114,15 +116,15 @@ def main():
         S._cambio_coin_cache["tentato"] = 0
         _CoinGeckoDiCartone.risposta = {"ethereum": {"eur": 0}, "monero": {}}
         prova("una risposta vuota non va, e non cancella il cambio di prima",
-              (False, {"eth": 2834.5, "xmr": 301.2}),
+              (False, {"eth": 2834.5, "xmr": 301.2, "usde": 0.8612}),
               (asyncio.run(S._rileggi_cambio_coin()), c.get("/api/cambio").json().get("cambio_coin")))
         S._cambio_coin_cache["tentato"] = 0
         _CoinGeckoDiCartone.risposta = {"ethereum": {"eur": 2900}}
         asyncio.run(S._rileggi_cambio_coin())
         prova("...una moneta sola aggiorna quella e lascia l'altra",
-              {"eth": 2900.0, "xmr": 301.2}, c.get("/api/cambio").json().get("cambio_coin"))
+              {"eth": 2900.0, "xmr": 301.2, "usde": 0.8612}, c.get("/api/cambio").json().get("cambio_coin"))
         S._cambio_coin_cache["quando"] -= S.CAMBIO_COIN_VALIDO_S + 1
-        prova("...e oltre un quarto d'ora il cambio tace", {"eth": 0.0, "xmr": 0.0},
+        prova("...e oltre un quarto d'ora il cambio tace", {"eth": 0.0, "xmr": 0.0, "usde": 0.0},
               c.get("/api/cambio").json().get("cambio_coin"))
 
         print("\n[sulla prova col P2P spento]")
