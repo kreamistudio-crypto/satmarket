@@ -190517,6 +190517,23 @@ def prove_assistente_bot():
           [True, True], ["zap@barattolo.store" in _libro,
                          "Le donazioni:" in _libro and "non danno vantaggi"
                          in _libro])
+    # (14 nov 2026, cantiere account-ufficiali) un account con la «I»
+    # maiuscola al posto della «l» si spacciava per Alan e chiedeva soldi
+    # per uno «scambio buoni»: Tappo non sapeva quali account sono veri.
+    # E il link ?direct a qualcuno apre il canale: il libro dice la riserva.
+    prova("il libro elenca gli account ufficiali e chi non c'e' non e' staff",
+          [True] * 4, ["https://t.me/aandreaiita" in _libro
+                       and "https://t.me/AlanBimbati" in _libro,
+                       "https://t.me/ilbarattolobot" in _libro
+                       and "https://t.me/TappoBarattoloBot" in _libro
+                       and "metti SEMPRE questi link, nascosti dietro il nome" in _libro,
+                       "sono SOLO questi" in _libro and "NON lo è" in _libro,
+                       "@aIanbarattoIo, che NON è Alan" in _libro
+                       and "il nome visualizzato e la bio li può scrivere "
+                       "chiunque" in _libro])
+    prova("...e la riserva se ?direct apre il canale invece della chat",
+          True, "ti apre il canale invece della chat" in _libro
+          and "passa lui il messaggio allo staff" in _libro)
     # (11 nov 2026, cantiere tappo-sa-tutto) i cataloghi grandi: Tappo
     # rispondeva «uno alla volta» con l'import da CSV e i negozi
     # collegati gia' aperti a tutti

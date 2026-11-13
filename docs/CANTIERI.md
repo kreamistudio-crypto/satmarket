@@ -80785,3 +80785,45 @@ senza la classe del fondo): ognuna fa diventare rossa la sua riga.
 viste Andrea dal telefono, renderizzate dalla card vera. NON provato
 dal vivo: la fila della home con un ordine USDT vero dopo la promozione
 (ETH, XMR e USDe esistono solo sulla prova).
+
+## Gli account veri dello staff nel libro di Tappo (14 nov 2026, cantiere account-ufficiali, Andrea: «fagli scrivere direttamente i nostri link così non si possono sbagliare quando cliccano», «specifica di guardare che il nome utente deve essere scritto nell'username e non nella bio»)
+
+Una persona ha chiesto a Tappo se @aIanbarattoIo (una «I» maiuscola al
+posto di ogni «l») fosse Alan: le aveva chiesto soldi per uno «scambio
+buoni». Tappo non aveva l'elenco degli account veri e poteva solo dire
+«non lo so». La stessa persona ha detto che «scrivi allo staff»
+(t.me/barattolostore?direct) le apriva il canale e non la chat.
+
+DECISO. Nel libro (`assistente/sapere.md`, «Sicurezza e truffe») c'è
+l'elenco CHIUSO: il bot, il canale (con la chat privata e i commenti),
+Tappo, Andrea t.me/aandreaiita e Alan t.me/AlanBimbati; chi non è lì
+non è dello staff. Tappo li mette sempre come nomi cliccabili («Andrea»
+con dentro il link), mai l'indirizzo nudo: è la regola delle sue
+risposte, e chi tocca un link non può sbagliare una lettera. Il
+controllo da fare è sul NOME UTENTE con la @, perché nome visualizzato
+e bio li scrive chiunque. Una frase in più: lo staff non chiede mai
+soldi in privato, nemmeno per «buoni», «sblocchi» o rimborsi. Per il
+link ?direct: le chat private dei canali esistono solo nelle versioni
+recenti di Telegram, quindi chi ha un'app vecchia (o apre da un
+browser) arriva al canale; il libro dice di aggiornare, di cercare il
+tasto per scrivere in fondo alla pagina del canale, e come ultima
+riserva di scriverlo a Tappo, che lo passa allo staff.
+`assistente/conoscenza.md` rifatto con `conoscenza.py`.
+
+FUORI DAL REPO, lo stesso giorno: i cinque link nelle istruzioni di
+Tappo su n8n (così lo sa già prima della promozione) e nella sua lista
+di link ammessi, e i due nomi dello staff fra quelli «di casa» del
+filtro antispam (un commento con t.me/AlanBimbati non è spam). Avviso
+sul canale (post 186, nomi cliccabili) e risposta in privato a chi
+aveva segnalato.
+
+SCARTATO. Un secondo tasto «scrivi a Tappo» nell'app accanto al ?direct:
+un caso solo, e il link funziona sulle app aggiornate; si rifà la
+domanda se ricapita. Mettere gli account dello staff come contatto di
+riserva per tutto: le persone vere non devono diventare l'assistenza.
+
+PROVATO. In `prove.py`, accanto alle donazioni: i cinque link, la regola
+«nascosti dietro il nome», «sono SOLO questi» e «NON lo è», l'esempio
+del falso, nome e bio che non provano niente, la riserva del ?direct.
+`prove_conoscenza_tappo` verde col file rifatto. NON provato: il ?direct
+sul telefono di quella persona (da qui t.me non si apre).
