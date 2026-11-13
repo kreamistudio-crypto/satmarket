@@ -191,3 +191,4 @@ collaudo_assistenza.py
 collaudo_unione_seme.py
 collaudo_domande_compratore.py
 collaudo_widget_prova.py
+collaudo_eth_xmr.py
