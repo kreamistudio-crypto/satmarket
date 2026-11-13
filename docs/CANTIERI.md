@@ -80727,3 +80727,61 @@ chiaro e scuro, 390 e 320, il tocco che gira. NON provato dal vivo: il
 backfill vero da CoinGecko e la serie che cresce ora per ora; da
 guardare sul collaudo (la card deve avere i tre periodi entro un minuto
 dall'avvio, se CoinGecko risponde) e dopo la promozione.
+
+## La card P2P della home con la sua coppia, e il banner con tutte le monete (13 nov 2026, cantiere card-p2p-monete, Andrea: «creare una card p2p nello stesso identico stile di btc euro nella home del mercatino ma tra btc e usdt», «poi fallo anche per ethereum, xmr e usde», «nel banner dei miei scambi la moneta btc deve stare al centro»)
+
+PERCHÉ. Nella fila «Scambi P2P» della home ogni card aveva la stessa
+foto, il ₿ con l'euro (`scambi-intestazione.webp`), e la cifra con «€»
+scritto nel codice: un ordine in USDT si presentava come un ordine in
+euro, «Invia 50 €» invece di «Invia 50 USDT».
+
+COSA. (1) `coppiaVetrinaP2P(o)` (PURA) sceglie la coppia: `usdt` per un
+ordine in USDT (`usdtP2P`, che ripiega sui metodi quando la riga ha
+perso la valuta), `eth`/`xmr`/`usde` quando TUTTI i metodi sono quella
+moneta (`coinUnicaP2P`, la stessa regola del logo: con metodi misti la
+card non sceglie per nessuno), `eur` per tutto il resto. La tabella
+`P2P_VT_COPPIE` ha gli URL scritti per esteso, così `_timbra_asset_pagina`
+mette il ?v=; l'euro resta la foto di sempre. (2) Ogni coppia ha il suo
+sfondo sfumato, sulla stessa forma della crema dell'euro: verde Tether,
+blu scuro ETH, grigio caldo XMR, nero USDe (`.p2p-vt-fondo.p2p-vt-<moneta>`);
+Barattozon resta col suo marchio. (3) Sugli ordini in USDT il cartellino
+dice «USDT» e l'etichetta letta ad alta voce «50 USDT». (4) In testa a
+«I miei scambi» e nei tre stati vuoti (libro, filtro, porta) il banner
+`scambi-monete.webp`: le sei monete a grappolo, ₿ al centro, l'euro dove
+stava, senza bordo. (5) Cinque rotte esplicite (`_asset_webp`), una per
+file, nessun nome dal client (regola 3).
+
+COME SONO NATE LE MONETE. In Flow (progetto «Barattolo», Nano Banana,
+gratis), partendo dalla foto della card vera perché lo stile fosse
+quello del ₿ («non è la card che si deve adattare, è il simbolo di
+Tether che si deve adattare alla card»): USDT è la GEMMA verde con la T
+(il logo nuovo), senza il bollino di Ethereum («rappresenta l'asset,
+non la rete»); USDe rifatta sul logo vero (cerchio nero, $ squadrato
+sottile, due archi quasi chiusi). Ritagliate in Python e ricomposte sul
+₿ dell'originale. I BORDI: uno solo, liscio e largo uguale (13 px,
+antialias a 4x), intorno alle due monete INSIEME, nel tono della coppia;
+dove le monete si incrociano niente bordo (Andrea, con la foto di
+riferimento), solo un filo scuro della moneta nuova, come il marrone del
+₿; l'incavo fra le due arrotondato. La moneta nuova è un filo più grande
+dell'euro, per coprire il morso che l'euro lasciava nel ₿.
+
+SCARTATO. Il banner generato intero da Flow: il fondo magenta falsava i
+colori (anello dorato sul USDT, Monero spento). I bordi di Flow
+ricolorati: «strani, deformati». Gli sfondi pieni: Andrea ha scelto gli
+sfumati. Il banner in fila: «troppo lineari», rifatto a grappolo
+(altezze e inclinazioni diverse). La card dell'euro rifatta senza la
+fascia crema fra le monete: provata (ricucendo il ₿ sotto la fascia),
+non convinceva, e Andrea ha detto di lasciarla com'era.
+
+PROVATO. `prove_card_p2p_monete` (nuova): il giudice puro sui casi
+(USDT con e senza valuta, ETH, XMR, USDe a due reti, SEPA, ETH+SEPA,
+ETH+XMR, niente metodi, Barattozon, null), la card vera in node (foto,
+misure, classe del fondo, «USDT» e mai «€», l'etichetta, l'euro identico
+a prima), gli sfondi nel CSS, il banner nei quattro posti, i file (WebP
+con alpha, niente ICC/EXIF, misure, peso), le rotte, e quattro
+controprove (senza il ramo USDT, il solo primo metodo, l'unità fissa,
+senza la classe del fondo): ognuna fa diventare rossa la sua riga.
+`prove_libro_vuoto_monete` segue il banner nuovo. Le anteprime le ha
+viste Andrea dal telefono, renderizzate dalla card vera. NON provato
+dal vivo: la fila della home con un ordine USDT vero dopo la promozione
+(ETH, XMR e USDe esistono solo sulla prova).

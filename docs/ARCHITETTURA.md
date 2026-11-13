@@ -31233,7 +31233,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    scambi», 22 set 2026: le due monete, bitcoin e un euro, al posto
    del titolo scritto e nello stato vuoto — WebP con trasparenza,
    682x459, 46 KB, servita come file e mai incorporata nella pagina;
-   vedi CANTIERI, «L'intestazione di I miei scambi»),
+   vedi CANTIERI, «L'intestazione di I miei scambi»; dal 13 nov 2026
+   resta solo lo sfondo della card P2P in euro della home),
+   `/assets/p2p-coppia-usdt.webp`, `/assets/p2p-coppia-eth.webp`,
+   `/assets/p2p-coppia-xmr.webp`, `/assets/p2p-coppia-usde.webp` (13 nov
+   2026: il ₿ con la moneta di destra, la card P2P della home di un
+   ordine in USDT o pagato tutto in ETH, XMR o USDe; 682x489, ~33 KB,
+   WebP con trasparenza; la sceglie `coppiaVetrinaP2P`, una rotta per
+   file via `_asset_webp`) e `/assets/scambi-monete.webp` (le sei
+   monete a grappolo, ₿ al centro: l'intestazione di «I miei scambi» e
+   i suoi stati vuoti dal 13 nov 2026, 846x300, 46 KB; vedi CANTIERI,
+   «La card P2P della home con la sua coppia»),
    `/assets/italia-punti.svg` (la sagoma dell'Italia della mappa del
    contanti, 31 ott 2026: un puntino per casella di griglia con almeno
    un comune, 29 KB, fatta da `genera_mappa_italia.py` su

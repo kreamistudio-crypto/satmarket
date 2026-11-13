@@ -195,6 +195,7 @@ Altre valute e reti (solo se nei NUMERI DI OGGI risultano disponibili): ordini P
 
 Ordini P2P in USDT (se nei NUMERI DI OGGI «Ordini P2P in USDT» è acceso): al posto degli euro si paga in USDT, il dollaro digitale di Tether (1 USDT vale 1 dollaro). I sats restano su Lightning con la garanzia di sempre (per gli USDT negli scambi on-chain vedi più sotto); gli USDT passano direttamente da una persona all'altra, e Barattolo non li tocca mai. Le reti sono solo due, Tron (TRC-20) ed Ethereum (ERC-20), mai altre: in un ordine in USDT le reti prendono il posto dei metodi di pagamento.
 - Nel libro un ordine in USDT si riconosce dalla T verde di Tether nei quadratini in alto a destra della card.
+- Nella home, nella fila «Scambi P2P», la card di un ordine in USDT è verde, con la moneta ₿ accanto alla T di Tether, e la cifra è scritta in USDT. Gli ordini in euro hanno la card di sempre, col ₿ e l'euro.
 - In cima al libro c'è il rettangolo verde «USDT · Novità»: toccandolo parte un breve tutorial che mostra come riconoscere un ordine in USDT, come pubblicarne uno e come si paga senza sbagliare rete. Si può rivedere toccandolo di nuovo.
 - Per pubblicarne uno: scheda «P2P», nuovo ordine, e in cima al foglio si sceglie la valuta, euro o USDT. Con USDT si scelgono le reti (Tron, Ethereum o tutte e due) e l'importo si scrive in USDT. Il tetto della fase beta è lo stesso degli euro, convertito in USDT.
 - Un ordine in USDT con un intervallo («da 50 a 276 USDT, scegli tu»): toccandolo, nel foglio «Quanto vuoi scambiare?» la cifra si scrive in USDT, e i sats si contano al cambio del dollaro (1 USDT = 1 $), non dell'euro. Per questo 276 USDT valgono meno sats di 276 €.
@@ -1283,4 +1284,12 @@ pubblico: no
 frase: In cima al libro del P2P, sotto i rettangoli «Novità», c'è il prezzo di bitcoin aggiornato ogni minuto: quanto vale 1 BTC in euro, quanto è salito o sceso e una piccola linea, verde se sale e rossa se scende. Toccandolo passi dalle ultime 24 ore agli ultimi 7 giorni e agli ultimi 30 giorni.
 dove: la scheda «P2P», in cima al libro degli ordini (Compra BTC e Vendi BTC).
 leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-016 | novita -->
+## Novità · 2026-11-13 · card-p2p-monete
+
+frase: Nella home, nella fila «Scambi P2P», ogni ordine ora ha la sua moneta: un ordine in USDT si presenta con la sua card verde, il ₿ accanto alla T di Tether, e la cifra scritta in USDT, non più in euro. E in testa a «I miei scambi» c'è un disegno nuovo con tutte le monete insieme, il ₿ al centro.
+dove: la home del mercatino (fila «Scambi P2P») e la pagina «I miei scambi».
+leva: P2P_IN_VETRINA e P2P_USDT_ATTIVO (nessuna leva nuova)
 pubblico: sì
