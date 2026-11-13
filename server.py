@@ -101680,6 +101680,44 @@ def asset_scambi_intestazione():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+# LE COPPIE DELLE CARD P2P E IL BANNER CON TUTTE LE MONETE (13 nov 2026,
+# cantiere card-p2p-monete). Una rotta per file, come le sorelle qui
+# sopra: mai un mount, e nessun nome che arrivi dal client (regola 3).
+# Il ₿ con la moneta di destra (USDT, ETH, XMR, USDe) per la card della
+# home — la sceglie `coppiaVetrinaP2P` nel client; l'euro resta
+# scambi-intestazione.webp — e le sei monete a grappolo, ₿ al centro,
+# in testa a «I miei scambi» e negli stati vuoti. WebP con trasparenza; il
+# timbro ?v= lo mette _timbra_asset_pagina, quindi il max-age e' innocuo.
+def _asset_webp(nome: str):
+    return FileResponse(os.path.join("assets", nome), media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/p2p-coppia-usdt.webp")
+def asset_p2p_coppia_usdt():
+    return _asset_webp("p2p-coppia-usdt.webp")
+
+
+@app.get("/assets/p2p-coppia-eth.webp")
+def asset_p2p_coppia_eth():
+    return _asset_webp("p2p-coppia-eth.webp")
+
+
+@app.get("/assets/p2p-coppia-xmr.webp")
+def asset_p2p_coppia_xmr():
+    return _asset_webp("p2p-coppia-xmr.webp")
+
+
+@app.get("/assets/p2p-coppia-usde.webp")
+def asset_p2p_coppia_usde():
+    return _asset_webp("p2p-coppia-usde.webp")
+
+
+@app.get("/assets/scambi-monete.webp")
+def asset_scambi_monete():
+    return _asset_webp("scambi-monete.webp")
+
+
 @app.get("/assets/italia-punti.svg")
 def asset_italia_punti():
     """LA SAGOMA DELL'ITALIA DELLA MAPPA DEL CONTANTI (31 ott 2026, cantiere

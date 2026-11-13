@@ -88196,8 +88196,12 @@ def prove_intestazione_scambi():
     import tempfile as _tf
     mini = open("miniapp.html", encoding="utf-8").read()
     css = mini[mini.index("<style>"):mini.index("</style>")]
-    FILE = "assets/scambi-intestazione.webp"
-    URL = "/assets/scambi-intestazione.webp"
+    # (13 nov 2026, cantiere card-p2p-monete) l'intestazione e' diventata
+    # il banner delle sei monete, ₿ al centro (Andrea: «nella pagina i
+    # miei scambi dobbiamo cambiare il banner in alto»): stesse regole,
+    # file nuovo. Le due monete di prima restano solo alla card dell'euro.
+    FILE = "assets/scambi-monete.webp"
+    URL = "/assets/scambi-monete.webp"
 
     def nudo(js):
         """via i commenti: il verbale nomina le stesse cose che queste
@@ -88221,7 +88225,7 @@ def prove_intestazione_scambi():
     prova("...e con la trasparenza dichiarata", True, bool(raw[20] & 0x10))
     larg = 1 + int.from_bytes(raw[24:27], "little")
     alt = 1 + int.from_bytes(raw[27:30], "little")
-    prova("...682x459, il disegno a piena risoluzione", (682, 459),
+    prova("...846x300, il disegno a piena risoluzione", (846, 300),
           (larg, alt))
     # BORDI NETTI A 3x: a schermo e' alta 80px (erano 120 fino al ritocco
     # della sera), cioe' 240 pixel veri su un telefono a 3x — il file ne
@@ -88241,13 +88245,14 @@ def prove_intestazione_scambi():
         salta("il ritaglio dell'intestazione", "serve Pillow")
     prova("...e non sta in assets/categorie/", False,
           _os.path.exists(_os.path.join("assets", "categorie",
-                                        "scambi-intestazione.webp")))
+                                        "scambi-monete.webp")))
 
     # --- 2) LA ROTTA: esplicita, come le sorelle --------------------
-    rotta = pezzo("asset_scambi_intestazione")
+    rotta = pezzo("_asset_webp")
     prova("la rotta e' esplicita, mai un mount", True,
-          '@app.get("/assets/scambi-intestazione.webp")' in _SORGENTE
-          and 'FileResponse("assets/scambi-intestazione.webp",' in rotta
+          '@app.get("/assets/scambi-monete.webp")' in _SORGENTE
+          and 'return _asset_webp("scambi-monete.webp")' in _SORGENTE
+          and 'FileResponse(os.path.join("assets", nome)' in rotta
           and 'media_type="image/webp"' in rotta)
     prova("...con la cache delle sorelle: il ?v= la rende innocua", True,
           '"Cache-Control": "public, max-age=86400"' in rotta)
@@ -88282,7 +88287,7 @@ def prove_intestazione_scambi():
           'id="p2pMieiCorpo"' in blocco)
     prova("...ed e' l'immagine e basta: nessun titolo scritto", True,
           "<h3" not in testa and "I miei scambi</" not in testa)
-    IMG = ('<img class="scambi-img" src="%s" width="682" height="459" '
+    IMG = ('<img class="scambi-img" src="%s" width="846" height="300" '
            'alt="I miei scambi" aria-label="I miei scambi" '
            'onerror="this.replaceWith(this.alt)">' % URL)
     # IL TITOLO RESTA UN TITOLO per chi legge con la voce: l'h2 prende
@@ -88521,8 +88526,8 @@ def prove_intestazione_scambi():
     # titolo della pagina lo porta l'intestazione, che li' sopra c'e'
     _striscia = nudo(pezzo_js(mini, "function scambiP2P(){", "\n}\n"))
     prova("nel filtro vuoto le monete in piccolo, al posto del logo P2P",
-          True, ('<img class="scambi-img scambi-mini" src="%s" width="682" '
-                 'height="459" alt="" onerror="this.remove()">' % URL) in _striscia
+          True, ('<img class="scambi-img scambi-mini" src="%s" width="846" '
+                 'height="300" alt="" onerror="this.remove()">' % URL) in _striscia
           and "p2p-logo" not in _striscia)
 
     # --- 8) IL TIMBRO: come i disegni del tour, e mai incorporata ----
@@ -88538,7 +88543,10 @@ def prove_intestazione_scambi():
     # scambi non la mostra piu' (ritocco di Andrea)
     # ...e CINQUE dal 9 ott 2026: la porta del primo ordine, al posto
     # del libro, nel vestito dello stato vuoto (`rigaPortaP2P`)
-    prova("i posti che la mostrano escono timbrati col suo hash", 5,
+    # ...e QUATTRO dal 13 nov 2026: la card in vetrina ha la sua coppia
+    # (cantiere card-p2p-monete), e il banner delle sei monete sta in
+    # testa, nel libro vuoto, nel filtro vuoto e alla porta
+    prova("i posti che la mostrano escono timbrati col suo hash", 4,
           timbrata.count(firma))
     # ⚠️ IL CONTENITORE ERA TROPPO GRANDE (22 set 2026, sera). Questa
     # riga diceva «la pagina non incorpora NESSUNA webp» e voleva dire
@@ -93807,8 +93815,10 @@ def prove_libro_vuoto_monete():
     css = mini[mini.index("<style>"):mini.index("</style>")]
     rp = re.sub(r"/\*[\s\S]*?\*/", "",
                 pezzo_js(mini, "function renderP2P(){", "\n}\n"))
-    MONETE = ('<img class="scambi-img scambi-libro" src="/assets/scambi-intestazione.webp" '
-              'width="682" height="459" alt="" onerror="this.remove()">')
+    # (13 nov 2026, cantiere card-p2p-monete) le monete sono diventate
+    # sei: il banner di «I miei scambi» con ₿ al centro
+    MONETE = ('<img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" '
+              'width="846" height="300" alt="" onerror="this.remove()">')
     # (12 ott 2026, notte, cantiere libro-vuoto) il ramo lo sceglie il
     # giudice dei tre vuoti: `logo` vero dove le offerte ci sono ma non si
     # vedono (il filtro, la pausa di chi pubblica), falso a libro vuoto
@@ -93839,7 +93849,7 @@ def prove_libro_vuoto_monete():
           "object-fit:contain" in pezzo_js(css, "  .scambi-img{", "}"))
     try:
         from PIL import Image as _Im
-        with _Im.open("assets/scambi-intestazione.webp") as _im:
+        with _Im.open("assets/scambi-monete.webp") as _im:
             _w, _h = _im.size
         _alto = int(_h_lib.group(1)) if _h_lib else 0
         _largo = _alto * _w / _h if _h else 0
@@ -152520,7 +152530,7 @@ const metodoBaseP2P = x => x;
 const affaroneP2P = () => '';
 const badgePremioP2P = () => '';
 const fmt = n => String(n);
-""" + pezzo_js(m, "function cardVetrinaP2P(o){", "\n}\n") + "\n}\n" + r"""
+""" + pezzo_js(m, "const P2P_VT_COPPIE = {", "};") + "};\n" + pezzo_js(m, "function coppiaVetrinaP2P(o){", "\n}\n") + "\n}\n" + pezzo_js(m, "function cardVetrinaP2P(o){", "\n}\n") + "\n}\n" + r"""
 const O = id => ({id, lato: 'sell', euro: 50, euroMax: 0, sats: 0, metodi: ['Revolut']});
 const nodo = k => ({attr: 'data-stella-di', k, hidden: true, innerHTML: '', aria: null,
   getAttribute(){ return this.k; },
@@ -157596,6 +157606,212 @@ console.log(JSON.stringify(out));
           'return {"ok": True, "riprova": True} if testo.startswith("⏳") else {"ok": True}' in rotta)
     prova("...e l'avviso porta il bottone che apre lo scambio", True,
           "_bottone_scambio_p2p(o_avviso)" in rotta)
+
+
+def _banco_coppie_p2p(mini):
+    """Il banco node delle card P2P con la coppia (cantiere
+    card-p2p-monete): le tabelle e i giudici veri della moneta, la card
+    vera, e finte piccole per volto, premio e cifre (qui non si provano)."""
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    node = _sh.which("node")
+    if not node:
+        return None, "serve node"
+    pezzi = [_riga_js(mini, "const P2P_VALUTA = "), _riga_js(mini, "const P2P_VALUTE = ")]
+    for testa in ("const P2P_RETI_USDT = [", "const P2P_RETI_COIN = [", "const P2P_VT_COPPIE = {"):
+        i = mini.index(testa)
+        chiude = "];" if testa.endswith("[") else "};"
+        pezzi.append(mini[i:mini.index(chiude, i) + 2])
+    pezzi.append(_riga_js(mini, "function usdtP2P(o){"))
+    pezzi.append(_riga_js(mini, "function logoCoinP2P(r){"))
+    for firma in ("function valutaOrdineP2P(o){", "function reteUsdtDaMetodoP2P(m){",
+                  "function reteCoinDaMetodoP2P(m){", "function coinUnicaP2P(metodi){",
+                  "function euroCartaP2P(n){", "function coppiaVetrinaP2P(o){",
+                  "function cardVetrinaP2P(o){"):
+        pezzi.append(_fn_js(mini, firma))
+    banco = r"""
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmt = n => String(n), fmtEur = n => String(n);
+const p2pFacce = {}, cacheVolti = {};
+const tabacchinoP2P = m => (m || []).some(x => /tabacchino/i.test(x));
+const capiP2P = (a, b) => b ? a + ' a ' + b : a;
+const satsMercatoP2P = () => 0, nettoLatoP2P = (o, l) => l;
+const metodoBaseP2P = m => m, affaroneP2P = () => '', badgePremioP2P = () => '';
+const chiaveVolto = k => k, codaVoceVolto = () => '';
+const voltoHTML = () => '', bollinoVolto = () => '', stellinaVolto = () => '';
+""" + "\n".join(pezzi) + r"""
+const O = (metodi, extra) => Object.assign({id: 'x', lato: 'sell', euro: 50, sats: 59000, metodi}, extra || {});
+const casi = {
+  usdt: O(['USDT (Tron)', 'USDT (Ethereum)'], {fiat: 'USDT'}),
+  usdtSenzaFiat: O(['USDT (Tron)']),
+  eth: O(['ETH (Ethereum)']), xmr: O(['XMR (Monero)']),
+  usde: O(['USDe (Ethereum)', 'USDe (Arbitrum)']),
+  sepa: O(['SEPA', 'Revolut']), misto: O(['ETH (Ethereum)', 'SEPA']),
+  dueMonete: O(['ETH (Ethereum)', 'XMR (Monero)']), vuoto: O([]), senzaMetodi: {id: 'y'},
+  bz: O(['Contanti al tabacchino 23.47']), bzUsdt: O(['Contanti al tabacchino 23.47'], {fiat: 'USDT'})
+};
+const out = {chiavi: {}, card: {}};
+for (const [k, o] of Object.entries(casi)) {
+  out.chiavi[k] = coppiaVetrinaP2P(o);
+  if (o.metodi) out.card[k] = cardVetrinaP2P(o);
+}
+out.nulla = coppiaVetrinaP2P(null);
+process.stdout.write(JSON.stringify(out));
+"""
+    d = _tf.mkdtemp()
+    try:
+        f = os.path.join(d, "coppie.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = _sp.run([node, f], capture_output=True, encoding="utf-8", timeout=60)
+        if r.returncode or not r.stdout.strip():
+            return None, (r.stderr or "")[-700:] or "niente in uscita"
+        return json.loads(r.stdout), ""
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+
+
+def prove_card_p2p_monete():
+    """LA CARD P2P CON LA SUA COPPIA E IL BANNER CON TUTTE LE MONETE (13
+    nov 2026, cantiere card-p2p-monete, Andrea: «creare una card p2p
+    nello stesso identico stile di btc euro ma tra btc e usdt», «fallo
+    anche per ethereum, xmr e usde», «nel banner dei miei scambi la
+    moneta btc deve stare al centro»). La card della home veste il ₿ con
+    la moneta di destra — USDT per un ordine in USDT, ETH/XMR/USDe quando
+    tutti i metodi sono quella moneta, l'euro di sempre per il resto — sul
+    suo sfondo sfumato; un ordine in USDT dice «USDT» e non «€». In testa
+    a «I miei scambi» e negli stati vuoti, le sei monete insieme. Ogni
+    file nuovo ha la sua rotta (regola 3). Poi le controprove: il banco
+    rotto apposta deve dire di no."""
+    print("\n[la card P2P con la sua coppia e il banner di tutte le monete]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+    MONETE = ("usdt", "eth", "xmr", "usde")
+
+    # --- 1) QUALE COPPIA: il giudice puro ------------------------------
+    o, err = _banco_coppie_p2p(mini)
+    if o is None:
+        if err == "serve node":
+            salta("il banco delle coppie P2P", "serve node")
+        else:
+            prova("il banco delle coppie P2P gira in node", "", err)
+        return
+    prova("la coppia: USDT, ETH, XMR, USDe; l'euro per SEPA, metodi misti, due monete, niente metodi",
+          {"usdt": "usdt", "usdtSenzaFiat": "usdt", "eth": "eth", "xmr": "xmr", "usde": "usde",
+           "sepa": "eur", "misto": "eur", "dueMonete": "eur", "vuoto": "eur", "senzaMetodi": "eur",
+           "bz": "eur", "bzUsdt": "usdt"},
+          o["chiavi"])
+    prova("...e un ordine che non c'e' resta sull'euro, senza esplodere", "eur", o["nulla"])
+
+    # --- 2) LA CARD: foto, fondo, unita' --------------------------------
+    c = o["card"]
+    prova("USDT: la coppia ₿+USDT alta 489, il fondo verde, «50 USDT» e mai l'euro",
+          [True, True, True, False, True, False],
+          ['src="/assets/p2p-coppia-usdt.webp" width="682" height="489"' in c["usdt"],
+           'class="ph p2p-vt-fondo p2p-vt-usdt"' in c["usdt"],
+           '50<span class="unit">USDT</span>' in c["usdt"], "€" in c["usdt"],
+           'data-voce="Compra BTC, invia 50 USDT' in c["usdt"], " euro" in c["usdt"]])
+    prova("...anche quando la riga ha perso la valuta e lo dicono i metodi", True,
+          'p2p-vt-usdt' in c["usdtSenzaFiat"] and '<span class="unit">USDT</span>' in c["usdtSenzaFiat"])
+    for k in ("eth", "xmr", "usde"):
+        prova("%s: la sua coppia e il suo fondo, e la cifra resta in euro" % k.upper(),
+              [True, True, True],
+              ['src="/assets/p2p-coppia-%s.webp" width="682" height="489"' % k in c[k],
+               'class="ph p2p-vt-fondo p2p-vt-%s"' % k in c[k],
+               '50<span class="unit eur">€</span>' in c[k]])
+    for k in ("sepa", "misto", "dueMonete"):
+        prova("%s: la card di sempre, lettera per lettera nella foto e nel fondo" % k,
+              [True, True, True, True],
+              ['src="/assets/scambi-intestazione.webp" width="682" height="459"' in c[k],
+               'class="ph p2p-vt-fondo">' in c[k], '<span class="unit eur">€</span>' in c[k],
+               " euro" in c[k].split('data-voce="')[1].split('"')[0]])
+    prova("BARATTOZON resta col suo marchio e il suo fondo, senza classe di moneta", [True, False, False],
+          ["barattozon.webp" in c["bz"], "p2p-vt-eur" in c["bz"], "p2p-coppia-" in c["bz"]])
+
+    # --- 3) GLI SFONDI SFUMATI, uno per moneta ---------------------------
+    for k in MONETE:
+        prova("lo sfondo sfumato di %s, sulla stessa forma di quello dell'euro" % k.upper(), True,
+              (".card-p2p .p2p-vt-fondo.p2p-vt-%s{background:radial-gradient(120%% 90%% at 50%% 38%%," % k)
+              in css)
+    prova("...e quello crema dell'euro e' rimasto com'era", True,
+          ".card-p2p .p2p-vt-fondo{background:radial-gradient(120% 90% at 50% 38%,\n"
+          "      #FFF3DC 0%,#F9D9A6 62%,#EDB86C 100%);position:relative}" in css)
+
+    # --- 4) IL BANNER: in testa e nei tre stati vuoti ----------------------
+    BANNER = 'src="/assets/scambi-monete.webp" width="846" height="300"'
+    prova("il banner delle sei monete in testa a «I miei scambi», col nome nell'alt", True,
+          '<h2 class="scambi-tit"><img class="scambi-img" ' + BANNER
+          + ' alt="I miei scambi"' in mini)
+    prova("...e negli stati vuoti: il libro, il filtro di «I miei scambi», la porta",
+          [2, 1], [mini.count('<img class="scambi-img scambi-libro" ' + BANNER),
+                   mini.count('<img class="scambi-img scambi-mini" ' + BANNER)])
+    prova("...la foto delle due monete resta solo alla card dell'euro", 1,
+          codice_js_senza_commenti(mini).count("/assets/scambi-intestazione.webp"))
+
+    # --- 5) I FILE: WebP con trasparenza, puliti, nitidi -----------------
+    import struct as _st
+
+    def pezzi_webp(raw):
+        out, i = [], 12
+        while i + 8 <= len(raw):
+            n = _st.unpack("<I", raw[i + 4:i + 8])[0]
+            out.append(raw[i:i + 4].decode("ascii", "replace"))
+            i += 8 + n + (n & 1)
+        return out
+    misure = {"p2p-coppia-%s.webp" % k: (682, 489, 50000) for k in MONETE}
+    misure["scambi-monete.webp"] = (846, 300, 50000)
+    for nome, (w, h, peso) in misure.items():
+        p = os.path.join("assets", nome)
+        if not os.path.exists(p):
+            prova("il file %s c'e'" % nome, True, False)
+            continue
+        raw = open(p, "rb").read()
+        prova("%s: WebP con l'alpha, niente ICC/EXIF/XMP, %dx%d, sotto i %d KB" % (nome, w, h, peso // 1000),
+              [(b"RIFF", b"WEBP"), ["VP8X", "ALPH", "VP8 "], True, (w, h), True],
+              [(raw[:4], raw[8:12]), pezzi_webp(raw), bool(raw[20] & 0x10),
+               (1 + int.from_bytes(raw[24:27], "little"), 1 + int.from_bytes(raw[27:30], "little")),
+               len(raw) < peso])
+    # nitido a 3x: il banner si vede alto 80px (lo stato vuoto del libro 76)
+    prova("il banner e' nitido a 3x negli 80px della testata", True, 300 >= 3 * 80)
+
+    # --- 6) LE ROTTE: una per file, mai un mount -------------------------
+    aiuto = pezzo("_asset_webp")
+    prova("l'aiutante delle rotte serve dalla cartella assets/, come WebP, con la cache delle sorelle",
+          [True, True, True], ['FileResponse(os.path.join("assets", nome)' in aiuto,
+                               'media_type="image/webp"' in aiuto,
+                               '"Cache-Control": "public, max-age=86400"' in aiuto])
+    for nome in misure:
+        prova("la rotta esplicita di %s, e il nome scritto dal server, mai dal client" % nome, True,
+              ('@app.get("/assets/%s")' % nome) in _SORGENTE
+              and ('return _asset_webp("%s")' % nome) in _SORGENTE)
+    urls = re.findall(r"'(/assets/[^']+)'", pezzo_js(mini, "const P2P_VT_COPPIE = {", "};"))
+    prova("ogni URL della tabella delle coppie ha la sua rotta", [],
+          [u for u in urls if '@app.get("%s")' % u not in _SORGENTE])
+    prova("...e la tabella le ha tutte e cinque, l'euro compreso", 5, len(urls))
+    prova("nessun mount ricompare con le rotte nuove", False, "app.mount(" in _SORGENTE)
+
+    # --- 7) LE CONTROPROVE: il banco rotto deve dire di no ----------------
+    def rotto(vecchio, nuovo):
+        assert mini.count(vecchio) == 1, vecchio
+        r, e = _banco_coppie_p2p(mini.replace(vecchio, nuovo))
+        return r
+    r = rotto("  if (typeof usdtP2P === 'function' && usdtP2P(o)) return 'usdt';\n", "")
+    prova("controprova: senza il ramo USDT l'ordine in USDT tornerebbe euro (e il banco se ne accorge)",
+          "eur", r and r["chiavi"]["usdt"])
+    r = rotto("  const r = typeof coinUnicaP2P === 'function' ? coinUnicaP2P(o && o.metodi) : null;",
+              "  const r = typeof reteCoinDaMetodoP2P === 'function' && o && o.metodi ? reteCoinDaMetodoP2P(o.metodi[0]) : null;")
+    prova("controprova: guardando solo il primo metodo, ETH+SEPA si vestirebbe da ETH",
+          "eth", r and r["chiavi"]["misto"])
+    r = rotto("${inUsdt ? '<span class=\"unit\">USDT</span>' : '<span class=\"unit eur\">€</span>'}",
+              "<span class=\"unit eur\">€</span>")
+    prova("controprova: con l'unita' fissa la card USDT direbbe «€»", True,
+          bool(r) and "€" in r["card"]["usdt"])
+    r = rotto("  const vesteFondo = tab || coppia === 'eur' ? '' : ' p2p-vt-' + coppia;",
+              "  const vesteFondo = '';")
+    prova("controprova: senza la classe del fondo la card USDT resterebbe crema", False,
+          bool(r) and "p2p-vt-usdt" in r["card"]["usdt"])
 
 
 def prove_grafica_p2p_onchain():
@@ -191204,7 +191420,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro
+    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete
     lista_corta_metodi
     """.split(),
     "mercatino": """
@@ -191885,6 +192101,7 @@ def main():
     prove_prezzo_btc_libro,
     prove_usdt_foglio_presa,
     prove_rete_scelta_p2p,
+    prove_card_p2p_monete,
     prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,
     prove_parole_uniche,

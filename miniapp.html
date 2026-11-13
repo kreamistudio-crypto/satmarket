@@ -2139,6 +2139,19 @@
      lato non deve coprire il ₿ */
   .card-p2p .ph .p2p-vt-monete{position:absolute;left:9%;top:24%;
     width:82%;height:auto;object-fit:contain}
+  /* OGNI COPPIA IL SUO FONDO (13 nov 2026, cantiere card-p2p-monete,
+     Andrea: «ogni card deve avere uno sfondo idoneo tipo la card usdt
+     verde», poi «mi piacciono le versioni sfumate»): lo stesso sfumato
+     della crema dell'euro, nei colori della moneta di destra. L'euro
+     resta sulla regola di sopra, senza classe sua. */
+  .card-p2p .p2p-vt-fondo.p2p-vt-usdt{background:radial-gradient(120% 90% at 50% 38%,
+      #4FD1A5 0%,#26A17B 62%,#17765A 100%)}
+  .card-p2p .p2p-vt-fondo.p2p-vt-eth{background:radial-gradient(120% 90% at 50% 38%,
+      #4A5FC1 0%,#27357A 62%,#161E4A 100%)}
+  .card-p2p .p2p-vt-fondo.p2p-vt-xmr{background:radial-gradient(120% 90% at 50% 38%,
+      #6A5A50 0%,#3E3632 62%,#1F1C1A 100%)}
+  .card-p2p .p2p-vt-fondo.p2p-vt-usde{background:radial-gradient(120% 90% at 50% 38%,
+      #404040 0%,#1A1A1A 62%,#050505 100%)}
   .card-p2p-bz .p2p-vt-fondo{background:radial-gradient(120% 90% at 50% 40%,
       #22304A 0%,#131A26 70%)}
   .card-p2p .ph .p2p-vt-marchio{position:absolute;left:12%;top:36%;
@@ -13133,7 +13146,7 @@ document.getElementById('cartello')?.remove();</script>
       <div class="p2p-sticky">
         <div class="scambi-testa" id="p2pMieiIntesta">
           <div class="scambi-cima">
-            <h2 class="scambi-tit"><img class="scambi-img" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="I miei scambi" aria-label="I miei scambi" onerror="this.replaceWith(this.alt)"></h2>
+            <h2 class="scambi-tit"><img class="scambi-img" src="/assets/scambi-monete.webp" width="846" height="300" alt="I miei scambi" aria-label="I miei scambi" onerror="this.replaceWith(this.alt)"></h2>
             <div class="scambi-conto" id="p2pMieiConto"></div>
           </div>
           <!-- IL DEPOSITO DELL'ORDINAMENTO, gemello di quello del
@@ -67164,7 +67177,7 @@ function renderP2P(){
        : vuotoInAttesa ? scheletroLibroP2P()
        : `<div class="empty">${vuoto.logo
            ? '<img class="p2p-simbolo" src="/assets/p2p-logo-grande.webp" alt="" onerror="this.remove()">'
-           : '<img class="scambi-img scambi-libro" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'
+           : '<img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" width="846" height="300" alt="" onerror="this.remove()">'
          }<span class="empty-title">${esc(vuoto.titolo)}</span>${esc(vuoto.frase)}${
            /* «Togli il filtro» SOLO SE UN FILTRO C'E': a filtro spento
               azzerava il niente, e il libro restava com'era */
@@ -89720,7 +89733,7 @@ function scambiP2P(){
      set 2026 lo stato vuoto non li nomina piu'). */
   if (!mostrati.length && !filtroAccesoMieiP2P(p2pMieiFiltro, p2pMieiVerso)) return '';
   if (!mostrati.length)
-    return '<div class="empty"><img class="scambi-img scambi-mini" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'
+    return '<div class="empty"><img class="scambi-img scambi-mini" src="/assets/scambi-monete.webp" width="846" height="300" alt="" onerror="this.remove()">'
       + vuotoFiltroMieiP2P(righe.length, p2pMieiFiltro, p2pMieiVerso)
       + '<button type="button" class="scopri-link" onclick="azzeraFiltroMieiP2P()">Togli il filtro</button></div>';
   const troppi = mostrati.length - P2P_SCAMBI_MAX;
@@ -90305,7 +90318,7 @@ function bannerNascostoPrimoOrdineP2P(){
    ordine» — lo stesso `vestitoInvioP2P` */
 function rigaPortaP2P(){
   const vestito = typeof vestitoInvioP2P === 'function' ? vestitoInvioP2P(false) : 'primary';
-  return '<div class="empty"><img class="scambi-img scambi-libro" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'
+  return '<div class="empty"><img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" width="846" height="300" alt="" onerror="this.remove()">'
     + '<span class="empty-title">Per entrare oggi pubblica il tuo primo ordine.</span>'
     + 'Dalle 10:00 di domani si prende. '
     + '<button type="button" class="btn ' + vestito + '" onclick="apriNuovoOrdineP2P()">Pubblica il tuo primo ordine</button></div>';
@@ -91041,6 +91054,33 @@ function ordiniVetrinaP2P(libro, adesso, mio){
 function euroCartaP2P(n){
   return Number.isInteger(n) ? n.toLocaleString('it-IT') : fmtEur(n);
 }
+/* LA COPPIA DELLA CARD (13 nov 2026, cantiere card-p2p-monete, Andrea:
+   «creare una card p2p nello stesso identico stile di btc euro ma tra
+   btc e usdt», poi «fallo anche per ethereum, xmr e usde»). Il ₿ a
+   sinistra e, a destra, la moneta con cui si paga: USDT per un ordine
+   in USDT, ETH/XMR/USDe quando TUTTI i metodi sono quella moneta (la
+   stessa regola del logo, `coinUnicaP2P`: con metodi misti la card non
+   sceglie per nessuno), l'euro per tutto il resto. Le monete nuove le ha
+   disegnate Flow nello stile del ₿; il bordo e' uno solo intorno alle
+   due, nel tono del fondo, e dove le monete si incrociano non c'e'
+   (Andrea). La coppia dell'euro resta la foto di sempre (Andrea:
+   «lasciala com'era prima»). Gli URL PER ESTESO, uno per riga: `_timbra_asset_pagina`
+   li trova solo cosi' e gli mette il ?v=. Ognuno ha la sua rotta in
+   server.py (regola 3). */
+const P2P_VT_COPPIE = {
+  eur: '/assets/scambi-intestazione.webp',
+  usdt: '/assets/p2p-coppia-usdt.webp',
+  eth: '/assets/p2p-coppia-eth.webp',
+  xmr: '/assets/p2p-coppia-xmr.webp',
+  usde: '/assets/p2p-coppia-usde.webp'
+};
+/* PURA: la chiave della coppia di un ordine, sempre una di quelle sopra */
+function coppiaVetrinaP2P(o){
+  if (typeof usdtP2P === 'function' && usdtP2P(o)) return 'usdt';
+  const r = typeof coinUnicaP2P === 'function' ? coinUnicaP2P(o && o.metodi) : null;
+  const k = r && typeof logoCoinP2P === 'function' ? logoCoinP2P(r) : '';
+  return k && k !== 'eur' && Object.prototype.hasOwnProperty.call(P2P_VT_COPPIE, k) ? k : 'eur';
+}
 /* ⚠️ LA CARD PARLA A CHI GUARDA (27 set 2026, ritocco di Andrea che
    ROVESCIA la prima stesura, dove la pillola diceva cosa fa chi ha
    pubblicato): come le schede del libro, dice cosa FA chi la tocca.
@@ -91057,9 +91097,14 @@ function cardVetrinaP2P(o){
   const f = p2pFacce[o.id] || {};
   /* lo sfondo: le due monete per tutti, il marchio per Barattozon (il
      file chiaro: il fondo e' scuro in tutt'e due i temi) */
+  const coppia = coppiaVetrinaP2P(o);
   const fondo = tab
     ? '<img class="p2p-vt-marchio" src="/assets/barattozon.webp" width="305" height="96" alt="" onerror="this.remove()">'
-    : '<img class="p2p-vt-monete" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">';
+    : '<img class="p2p-vt-monete" src="' + P2P_VT_COPPIE[coppia] + '" width="682" height="'
+      + (coppia === 'eur' ? 459 : 489) + '" alt="" onerror="this.remove()">';
+  const vesteFondo = tab || coppia === 'eur' ? '' : ' p2p-vt-' + coppia;
+  /* la cifra di un ordine in USDT e' in USDT: «Invia 50 USDT», non € */
+  const inUsdt = coppia === 'usdt';
   /* I DUE CAPI A PAROLE, «da 5 a 15 €» (6 ott 2026, ritocco di Andrea):
      il trattino fra due numeri si leggeva come una sottrazione, come nel
      libro (vedi `capiP2P`). Nel cartellino lo spazio e' poco, quindi
@@ -91107,7 +91152,7 @@ function cardVetrinaP2P(o){
      tacerebbe. La base sta in `data-voce`, la coda la scrive
      `codaVoceVolto` dalla cache, e `ridisegnaVolti` la riscrive quando
      il volto arriva in ritardo. */
-  const voce = lato + ', ' + verboEuro.toLowerCase() + ' ' + euro + ' euro'
+  const voce = lato + ', ' + verboEuro.toLowerCase() + ' ' + euro + (inUsdt ? ' USDT' : ' euro')
     + (metodi ? ', ' + (o.metodi || []).map(metodoBaseP2P).join(', ') : '')
     + (zona ? ', zona ' + zona : '');
   const chiave = chiaveVolto('p2p:' + o.id);
@@ -91116,10 +91161,10 @@ function cardVetrinaP2P(o){
       aria-label="${esc(voce + codaVoceVolto(cacheVolti[chiave]))}"
       onclick="apriCardP2P(this.dataset.p2p)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriCardP2P(this.dataset.p2p)}">
       <div class="ph-wrap">
-        <div class="ph p2p-vt-fondo">${fondo}</div>
+        <div class="ph p2p-vt-fondo${vesteFondo}">${fondo}</div>
         <span class="p2p-vt-lato ${compro ? 'compra' : 'vendi'}">${lato}</span>
         ${voltoHTML(f, 'p2p-vt-volto', {chiave: 'p2p:' + o.id})}${bollinoVolto('p2p:' + o.id, 'p2p-vt-bollino')}${stellinaVolto('p2p:' + o.id, 'p2p-vt-bollino')}
-        <div class="tag-price"><div class="price"><span class="p2p-vt-verbo">${verboEuro}</span>${euroCartello}<span class="unit eur">€</span></div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
+        <div class="tag-price"><div class="price"><span class="p2p-vt-verbo">${verboEuro}</span>${euroCartello}${inUsdt ? '<span class="unit">USDT</span>' : '<span class="unit eur">€</span>'}</div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
       </div>
       <div class="info">
         <div class="title">${metodi || 'Scambio P2P'}</div>

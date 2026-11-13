@@ -128,3 +128,9 @@ frase: In cima al libro del P2P, sotto i rettangoli «Novità», c'è il prezzo 
 dove: la scheda «P2P», in cima al libro degli ordini (Compra BTC e Vendi BTC).
 leva: nessuna
 pubblico: sì
+
+## 2026-11-13 · card-p2p-monete
+frase: Nella home, nella fila «Scambi P2P», ogni ordine ora ha la sua moneta: un ordine in USDT si presenta con la sua card verde, il ₿ accanto alla T di Tether, e la cifra scritta in USDT, non più in euro. E in testa a «I miei scambi» c'è un disegno nuovo con tutte le monete insieme, il ₿ al centro.
+dove: la home del mercatino (fila «Scambi P2P») e la pagina «I miei scambi».
+leva: P2P_IN_VETRINA e P2P_USDT_ATTIVO (nessuna leva nuova)
+pubblico: sì
