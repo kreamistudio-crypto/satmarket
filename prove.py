@@ -188834,6 +188834,15 @@ def prove_assistente_bot():
           {"p2p_onchain_usdt_ammesso", "p2p_altra_rete_per"},
           {n for n, _ in CHI_GUARDA} & {"p2p_onchain_usdt_ammesso",
                                         "p2p_altra_rete_per"})
+    # (13 nov 2026, cantiere sapere-donazioni) una persona chiede a Tappo
+    # dove donare i sats che non usa: il libro non lo diceva, e la domanda
+    # e' finita allo staff. L'indirizzo e' quello del profilo Nostr.
+    _libro = open(os.path.join(QUI, "assistente", "sapere.md"),
+                  encoding="utf-8").read()
+    prova("il libro dice dove si dona: zap@barattolo.store, regalo libero",
+          [True, True], ["zap@barattolo.store" in _libro,
+                         "Le donazioni:" in _libro and "non danno vantaggi"
+                         in _libro])
     # (11 nov 2026, cantiere tappo-sa-tutto) i cataloghi grandi: Tappo
     # rispondeva «uno alla volta» con l'import da CSV e i negozi
     # collegati gia' aperti a tutti

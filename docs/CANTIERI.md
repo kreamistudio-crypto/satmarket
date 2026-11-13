@@ -80213,3 +80213,26 @@ tutorial e poi il libro scorso di 900 px, ancora fermo; con `myP2POnchain`
 acceso a mano, l'arancio a 169 px e il verde a 231 px, prima e dopo il
 tutorial. Foto 8-10 in `/mnt/project-files/usdt-novita/`.
 Da guardare: dal telefono vero in Telegram.
+
+## Le donazioni nel libro di Tappo (13 nov 2026, cantiere sapere-donazioni, Andrea: «in realtà Barattolo ha un wallet per le donazioni»)
+
+PERCHÉ. Una persona ha scritto a Tappo in privato che aveva dei sats in
+più e chiedeva se Barattolo avesse un wallet per le donazioni. Il libro
+non ne parlava, quindi Tappo ha girato la domanda allo staff («💬 PER LO
+STAFF»). Andrea ha mostrato l'indirizzo: zap@barattolo.store, l'indirizzo
+Lightning del profilo Nostr «Barattolo» (che accetta anche on-chain e gli
+zap pubblici, privati o anonimi). Alla persona ha risposto Tappo, a mano,
+lo stesso giorno.
+
+COSA. Un paragrafo «Le donazioni» in `assistente/sapere.md`, subito dopo
+le commissioni del mercatino (dove si spiega che Barattolo non ne
+prende): l'indirizzo, come si usa, lo zap al profilo, e che è un regalo
+libero senza vantaggi nell'app. Una prova guarda indirizzo e regalo
+libero.
+
+SCARTATO. Una pagina o un bottone «Dona» nell'app: nessuno l'ha chiesto,
+e un invito a donare in vetrina accanto a un mercatino senza commissioni
+va deciso da Andrea. Tappo ne parla solo se glielo chiedono.
+
+PROVATO. Suite severa sul ramo. Da guardare: la prima domanda vera dopo
+la promozione su main (Tappo legge il libro da main).

@@ -99,6 +99,8 @@ Le commissioni del mercatino: Barattolo non prende commissioni, né a chi vende 
 
 Quando qualcuno chiede delle commissioni, tieni sempre separati il mercatino (zero commissioni di Barattolo, solo quelle della rete) e lo scambio P2P (la commissione del coordinatore, spiegata più sotto). Mescolarli confonde.
 
+Le donazioni: chi vuole sostenere Barattolo con qualche sats può mandarli all'indirizzo Lightning zap@barattolo.store (si incolla nel wallet come destinatario, si sceglie l'importo e si invia), oppure con uno zap al profilo Nostr «Barattolo», che accetta anche bitcoin on-chain. Sono un regalo libero: non danno vantaggi nell'app e non sono mai obbligatorie. Se qualcuno chiede come donare, dai questo indirizzo e ringrazia di cuore.
+
 Quando arriva un ordine il bot ti avvisa. Spedisci, segna il corriere e il codice di tracciamento nell'ordine, e aspetta la conferma di chi compra. L'indirizzo di chi compra lo vedi solo tu, per stampare l'etichetta: non usarlo per altro.
 
 Le prestazioni si possono vendere, ma devono essere definite: quanto durano, che cosa comprendono, a che prezzo. «Un'ora di lezione di inglese» sì; «ti faccio quello che ti serve» no.
