@@ -80213,3 +80213,28 @@ tutorial e poi il libro scorso di 900 px, ancora fermo; con `myP2POnchain`
 acceso a mano, l'arancio a 169 px e il verde a 231 px, prima e dopo il
 tutorial. Foto 8-10 in `/mnt/project-files/usdt-novita/`.
 Da guardare: dal telefono vero in Telegram.
+
+
+## «Fee al venditore / al compratore» nei post P2P delle vetrine (13 nov 2026, cantiere vetrina-p2p-convenienza, Andrea: «nelle vetrine invece di scrivere piu conveniente o meno conveniente, scrivi fee al venditore, o fee al compratore»)
+
+COSA SI È DECISO. La riga «🏷️» dei post P2P nei canali (Barattolo
+Vetrina, Subito Crypto, BitcoinPodcast) non dice più l'effetto su chi
+legge («3% più conveniente») ma CHI PAGA la differenza dal mercato:
+«3% fee al compratore», «4% fee al venditore», a zero «al prezzo di
+mercato». Il giudice è `_premio_canale_p2p`, e il verso non dipende dal
+lato: per la formula di mostro (`sats -= premium/100 * sats`) un premio
+positivo dà sempre meno sats a chi compra (fee al compratore), negativo
+ne fa consegnare di più a chi vende (fee al venditore). Vale anche per
+Barattozon e per la convenienza a sats fissi, che hanno lo stesso verso.
+
+PERCHÉ. Un post nel canale lo leggono tutti e due i lati, e «più
+conveniente» era vero solo per uno.
+
+NON TOCCATO. Le card dell'app (libro, «I miei scambi», card P2P in
+vetrina dentro l'app) restano col «più/meno conveniente» di
+`affareP2P`: lì chi guarda ha un lato solo, e Andrea ha parlato delle
+vetrine-canale.
+
+PROVATO. `prove_p2p_canale` (i quattro casi: vende −10 e +5, zero,
+compra +5) e `collaudo_freni` sul server vero (vende +3, compra +4,
+sats fissi −150).
