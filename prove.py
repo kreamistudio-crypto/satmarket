@@ -64900,6 +64900,142 @@ const out = {};
           [3000 <= durata_js <= 4000, passi_js == sorted(passi_js) and passi_js[-1] < durata_js])
 
 
+def prove_banner_fee_una_volta():
+    """IL BANNER DELLE COMMISSIONI SI VEDE UNA VOLTA SOLA (13 nov 2026,
+    decisione di Andrea: «troppo invasivo», «toglierlo del tutto dopo
+    averlo mostrato una volta»). Si vede nell'apertura del primo ingresso
+    nel libro (quella del tutorial) e per tutta quell'apertura; dalla
+    volta dopo no, se c'e' il timbro della prima animazione o il
+    tutorial fatto (stanno sul profilo: valgono su ogni dispositivo).
+    Chi e' dentro si decide solo a /me arrivato e col libro davanti; un
+    giro di «Come funziona» chiuso con «Fine 🎉» lo rimette. Le funzioni
+    vere girano in node."""
+    print("\n[il banner delle commissioni, una volta sola]")
+    m = open("miniapp.html", encoding="utf-8").read()
+    via = pezzo_js(m, "function bannerFeeViaP2P(){", "\n}\n")
+    ver = pezzo_js(m, "function veritaBannerFeeP2P(){", "\n}\n")
+    fine = pezzo_js(m, "function fineGiroP2P(finito){", "\n}\n")
+    tour = pezzo_js(m, "function apriTourP2PSePrimaVolta(){", "\n}\n")
+    _pers = m[m.index("/* ============ IL BANNER PERSONALE DELLE COMMISSIONI (26 set 2026)"):
+              m.index("/* ============ fine del banner personale ============ */")]
+    _blocco = m[m.index("/* ---- IL BANNER SI VEDE UNA VOLTA SOLA (13 nov 2026"):
+                m.index("/* ---- IL BANNER SI NASCONDE QUANDO NON DICE PIU' IL VERO")]
+
+    # --- 1) LE SENTINELLE ------------------------------------------------
+    prova("veritaBannerFeeP2P, l'unico che scrive `hidden`, chiede al giudice "
+          "dell'una volta (col typeof)", [True, True],
+          ["const via = typeof bannerFeeViaP2P === 'function' && bannerFeeViaP2P();" in ver,
+           "b.hidden = aspetta || via || !bannerFeeVeroP2P(" in ver])
+    prova("il giudice sta FUORI dal blocco del banner personale, e non scrive timbri",
+          [0, 1, 0, 0],
+          [_pers.count("bannerFeeViaP2P"), m.count("function bannerFeeViaP2P(){"),
+           _blocco.count("timbraVisto("), _blocco.count("ricordaVisto(")])
+    prova("...aspetta /me con lo stesso segnale del tour", [True, True],
+          ["if (myTgId && !p2pLeve) return;" in tour,
+           "if (myTgId && !p2pLeve) return true;" in via])
+    i_lib = fine.find("liberaBannerP2P();")
+    i_rim = fine.find("if (finito === true && typeof rimostraBannerFeeP2P === 'function') "
+                      "rimostraBannerFeeP2P();")
+    i_ani = fine.find("animaBannerFeeP2P(finito === true);")
+    prova("il «Fine 🎉» lo rimette DOPO la porta liberata e PRIMA dell'animazione "
+          "(un elemento nascosto non anima)", True, 0 <= i_lib < i_rim < i_ani)
+
+    # --- 2) IL BANCO: le funzioni vere, in node --------------------------
+    js = (
+        "let myTgId = 1, p2pLeve = null, VISTA = 'view-p2p', TIMBRI = {}, TOUR = false;\n"
+        "let VIVA = 0.03, COORD = {commissione: 4}, p2pSconto = {punti: 0.5};\n"
+        "let PORTA = false, LOG = [], giroP2PLato = null, p2pLato = 'compro';\n"
+        "const BANNER = {hidden: false};\n"
+        "const el = id => id === 'p2pFeeBanner' ? BANNER : null;\n"
+        "const document = {querySelector: () => ({id: VISTA}), querySelectorAll: () => []};\n"
+        "const hintDismesso = id => !!TIMBRI[id];\n"
+        "const tourP2PVisto = () => TOUR;\n"
+        "const commissioneVivaP2P = () => VIVA;\n"
+        "const p2pCoord = () => COORD;\n"
+        "const bannerNascostoPrimoOrdineP2P = () => PORTA;\n"
+        "const setLatoP2P = () => {};\n"
+        "const liberaBannerP2P = () => { LOG.push('libera'); };\n"
+        "const animaBannerFeeP2P = f => { LOG.push(['anima', f, BANNER.hidden]); };\n"
+        + pezzo_js(m, "let feeUnaVoltaP2P =", "\n") + "\n"
+        + pezzo_js(m, "function bannerFeeGiaVistoP2P(){", "\n}\n") + "\n}\n"
+        + via + "\n}\n"
+        + pezzo_js(m, "function rimostraBannerFeeP2P(){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "const P2P_BANNER_DISEGNO =", "\n") + "\n"
+        + pezzo_js(m, "function bannerFeeVeroP2P(", "\n}\n") + "\n}\n"
+        + ver + "\n}\n"
+        + fine + "\n}\n"
+        + r"""
+const out = {};
+const giudica = () => { veritaBannerFeeP2P(); return BANNER.hidden; };
+const apertura = () => { feeUnaVoltaP2P = null; };
+// il nuovo arrivato, in Telegram: prima di /me non si sa
+out.primaDiMe = [giudica(), feeUnaVoltaP2P];
+p2pLeve = {};
+out.aMeArrivato = giudica();
+// le slide timbrano il tutorial a meta' visita: il banner resta
+TOUR = true;
+out.dopoLeSlide = giudica();
+TIMBRI.banner_p2p = 1;
+out.dopoLAnimazione = giudica();
+// l'apertura dopo: via, e resta via
+apertura();
+out.aperturaDopo = [giudica(), giudica()];
+// «Come funziona» chiuso con «Fine 🎉»: torna, e resta per l'apertura
+LOG = [];
+fineGiroP2P(true);
+out.fineGiro = [LOG, giudica()];
+// ...un giro interrotto non lo rimette
+apertura(); giudica(); LOG = [];
+fineGiroP2P(false);
+out.giroInterrotto = [LOG, giudica()];
+// chi ha solo il timbro dell'animazione, o solo il tutorial fatto
+apertura(); TOUR = false; TIMBRI = {banner_p2p: 1};
+out.soloAnimazione = giudica();
+apertura(); TOUR = true; TIMBRI = {};
+out.soloTutorial = giudica();
+// dal mercatino (/me che arriva li') non si decide niente
+apertura(); TOUR = false; TIMBRI = {}; VISTA = 'view-esplora';
+out.dalMercatino = [giudica(), feeUnaVoltaP2P];
+VISTA = 'view-p2p';
+out.poiNelLibro = giudica();
+// l'anonimo (fuori da Telegram) decide subito coi suoi timbri
+apertura(); myTgId = 0; p2pLeve = null;
+out.anonimo = giudica();
+myTgId = 1; p2pLeve = {};
+// la porta del primo ordine: decide «si vede», e si vede al Fine
+apertura(); PORTA = true;
+out.porta = [giudica(), feeUnaVoltaP2P];
+PORTA = false;
+out.portaAperta = giudica();
+// e il banner che mente se ne va anche alla prima volta
+VIVA = 0.04;
+out.mente = giudica();
+console.log(JSON.stringify(out));
+""")
+    out = _node_banco(js)
+    if out is None:
+        salta("il banner una volta sola, in node", "node non c'e'")
+        return
+    prova("in Telegram, prima di /me il banner resta via e non si decide", [True, None],
+          out["primaDiMe"])
+    prova("...a /me arrivato, la prima volta si vede", False, out["aMeArrivato"])
+    prova("...e resta per tutta l'apertura, anche dopo le slide e l'animazione",
+          [False, False], [out["dopoLeSlide"], out["dopoLAnimazione"]])
+    prova("dall'apertura dopo non c'e' piu'", [True, True], out["aperturaDopo"])
+    prova("«Come funziona» chiuso con «Fine 🎉» lo rimette PRIMA dell'animazione",
+          [["libera", ["anima", True, False]], False], out["fineGiro"])
+    prova("...un giro interrotto no", [["libera", ["anima", False, True]], True],
+          out["giroInterrotto"])
+    prova("basta il timbro dell'animazione, o il tutorial fatto, per non rivederlo",
+          [True, True], [out["soloAnimazione"], out["soloTutorial"]])
+    prova("dal mercatino non si decide niente; nel libro si'", [[True, None], False],
+          [out["dalMercatino"], out["poiNelLibro"]])
+    prova("l'anonimo mai visto lo vede", False, out["anonimo"])
+    prova("la porta del primo ordine lo tiene via, ma la prima volta resta sua",
+          [[True, True], False], [out["porta"], out["portaAperta"]])
+    prova("...e se le cifre cambiano se ne va lo stesso", True, out["mente"])
+
+
 def prove_banner_fee_primo_ingresso():
     """IL BANNER DELLE COMMISSIONI, LA PRIMA VOLTA (9 ott 2026, richiesta
     di Andrea): la primissima animazione — subito dopo il giro guidato,
@@ -117013,7 +117149,9 @@ console.log(JSON.stringify(c));
     ver = pezzo_js(mini, "function veritaBannerFeeP2P(){", "\n}\n")
     prova("veritaBannerFeeP2P, l'unico che scrive `hidden`, chiede al giudice (col typeof)", True,
           "const aspetta = typeof bannerNascostoPrimoOrdineP2P === 'function'\n    && bannerNascostoPrimoOrdineP2P();" in ver
-          and "b.hidden = aspetta || !bannerFeeVeroP2P(" in ver)
+          # EMENDATA (13 nov 2026, fee-una-volta): fra la porta e la
+          # verita' c'e' il giudice dell'una volta (`via`)
+          and "b.hidden = aspetta || via || !bannerFeeVeroP2P(" in ver)
     prova("...e il banner si nasconde solo da li'", 1,
           len(re.findall(r"p2pFeeBanner'\)\.hidden|b\.hidden =", re.sub(r"/\*.*?\*/", "", mini, flags=re.S))))
     pub = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
@@ -190820,7 +190958,7 @@ CATEGORIE = {
     apri_wallet_p2p foglio_pagato_p2p conto_intervallo p2p_sconto
     livello_accanto_al_titolo p2p_server p2p_libro tour_p2p
     tour_p2p_finale libro_subito avviso_elenco_parziale giro_guidato_p2p
-    banner_fee_personale banner_fee_primo_ingresso card_p2p_vetrina
+    banner_fee_personale banner_fee_primo_ingresso banner_fee_una_volta card_p2p_vetrina
     ritocchi_prova_alan p2p_invii velo_p2p p2p_dettaglio nav_p2p
     tasto_barattozon timbro_asset volti_libro parti_si_vedono p2p_chiavi
     p2p_card_scambio p2p_vista_miei pallino_scambi intestazione_scambi
@@ -191473,6 +191611,7 @@ def main():
         prove_avviso_elenco_parziale,
         prove_giro_guidato_p2p, prove_banner_fee_personale,
         prove_banner_fee_primo_ingresso,
+        prove_banner_fee_una_volta,
         prove_card_p2p_vetrina,
         prove_ritocchi_prova_alan,
         prove_p2p_invii,

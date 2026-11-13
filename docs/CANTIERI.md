@@ -80601,3 +80601,51 @@ diventare rossa la sua riga. NON provato dal vivo: lo scambio vero fra
 due telefoni; da guardare dopo la promozione con un ordine a due reti
 (USDT) e uno SEPA/SEPA Instant, app di chi prende chiusa durante la
 garanzia.
+
+## Il banner delle fee si vede una volta sola (13 nov 2026, cantiere fee-una-volta, Andrea: «il banner delle fee è troppo invasivo», «toglierlo del tutto dopo averlo mostrato una volta, tanto si vede già nel tutorial e poi la fee è già indicata nel dettaglio di un ordine»)
+
+DECISO (card di Andrea, «Una volta, poi sparisce», fra tre strade). Il
+banner delle commissioni del libro P2P compare nell'apertura dell'app
+del PRIMO ingresso nel libro (quella del tutorial, che lo anima con
+«Fine 🎉»), resta per tutta quell'apertura — scorrendo se ne va come
+sempre — e dalla volta dopo non c'è più. «Già visto» è un fatto che
+c'era: il timbro della prima animazione (`banner_p2p`) o il tutorial
+fatto (`tour_p2p`, scritto dalle slide alla comparsa); tutti e due
+sul profilo, quindi valgono su ogni dispositivo, e chi il tutorial
+l'aveva già fatto non lo rivede dal giorno del deploy. La decisione
+si prende UNA volta per apertura e vive in memoria (`feeUnaVoltaP2P`,
+`bannerFeeViaP2P`): giudicando a ogni disegno il banner si sarebbe
+spento a metà della prima visita, appena le slide timbrano
+`tour_p2p`. Si decide solo col libro davanti (renderP2P e /me passano
+anche dal mercatino) e, per chi è dentro, a /me arrivato (`p2pLeve`,
+lo stesso segnale del tour); finché non si sa, resta via: per quasi
+tutti è la risposta giusta, e chi entra la prima volta ha le slide
+davanti. «Come funziona» chiuso con «Fine 🎉» lo rimette per
+quell'apertura (`rimostraBannerFeeP2P` in `fineGiroP2P`, dopo la
+porta liberata e prima dell'animazione): è anche l'unica porta rimasta
+del foglio con lo sconto di pionieri e livello 5. Il giudice sta fuori
+dal blocco del banner personale e non scrive timbri: `banner_p2p`
+resta il segno della prima animazione vista (la lenta).
+
+SCARTATO. Rifarlo più sobrio (la proposta A del 12 nov, velo giallo,
+una riga): un'immagine nuova da disegnare e il banner comunque lì per
+sempre. Farlo sfumare dopo 8 secondi: alla fine del tutorial
+l'animazione dura quasi 4 secondi ed è l'ultimo pezzo del giro, e chi
+lo vuole toccare per il dettaglio deve trovarlo. Un timbro nuovo
+«banner visto» (server, VISTI_NOTI): i due che c'erano dicono già
+tutto, e un timbro nuovo l'avrebbe rimostrato una volta a tutti.
+
+PROVATO. `prove_banner_fee_una_volta` (nuova, 15 controlli): le
+funzioni vere in node — prima di /me via e non deciso; a /me la prima
+volta si vede e resta dopo le slide e l'animazione; l'apertura dopo
+via; «Fine 🎉» lo rimette prima dell'animazione, un giro interrotto
+no; basta uno dei due timbri; dal mercatino non si decide; l'anonimo
+mai visto lo vede; la porta del primo ordine lo tiene per il Fine; il
+banner che mente se ne va lo stesso — più le sentinelle (typeof in
+`veritaBannerFeeP2P`, fuori dal blocco personale, niente timbri,
+l'attesa di /me come il tour, l'ordine in `fineGiroP2P`). Controprove:
+quattro rotture (via tolto da `veritaBannerFeeP2P`, decisione a ogni
+disegno, «Fine» senza rimostra, niente attesa di /me): ognuna fa
+rosse le sue righe. NON provato dal vivo: da guardare sul collaudo
+con un account nuovo (tutorial, poi riapertura dell'app) e con uno
+che il tutorial l'ha già fatto.

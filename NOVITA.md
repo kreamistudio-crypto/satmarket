@@ -116,3 +116,9 @@ frase: Negli scambi P2P, quando prendi un ordine con più metodi o più reti, la
 dove: la scheda «P2P», la pagina dello scambio in «I miei scambi» (sotto il conto) e la chat dello scambio.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-13 · fee-una-volta
+frase: Il riquadro colorato delle commissioni in cima al libro P2P ora compare solo la prima volta, alla fine del tutorial, e poi non occupa più spazio sopra gli ordini. Si rivede rifacendo «Come funziona» fino in fondo, e la commissione resta sempre scritta nel conto di ogni ordine prima di prenderlo.
+dove: la scheda «P2P», in cima al libro degli ordini; il bottone «Come funziona».
+leva: nessuna
+pubblico: no
