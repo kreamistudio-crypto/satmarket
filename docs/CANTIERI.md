@@ -83494,3 +83494,68 @@ senza le variabili del proxy.
 
 NON PROVATO, DA GUARDARE. Il webview vero del telefono. Il journal del
 VPS per il backfill del dollaro (vedi la voce qui sopra).
+
+## I tre ritocchi delle due mappe: l'icona colorata, il tocco che scende alle card, la riga corta (14 nov 2026 sera, cantiere mappa-ritocchi, Andrea provando la produzione: «l'icona della mappa della P2P e del mercatino mi piace di più come era prima nelle bozze e cioè colorata», «quando clicco su una regione in automatico l'app scorre in basso verso gli annunci del mercatino o del p2p», «il messaggio nella foto che ti ho mandato è troppo lungo semplifica con notifiche nuovi annunci col ritiro a mano»)
+
+L'ICONA. «Com'era nelle bozze» sono le prime anteprime del mercatino
+(`/mnt/project-files/mappa-mercatino/1-tondo-chiaro.png`, `testata-*`):
+il tondo portava l'emoji 🗺️, colorata. Poi il cantiere
+banner-mappa-contanti aveva disegnato la mappa piegata A TRATTO, grigia
+come la campana vuota, e il mercatino l'aveva presa da lì come pezzo
+comune. Adesso `iconaMappaTonda()` torna all'emoji, quindi cambiano
+insieme il P2P e il mercatino. È un'emoji come la luna accanto: colorata
+nei due temi, senza tinte da tenere in pari. TRAPPOLA EVITATA: la classe
+è `.mappa-tondo-ico` e NON `.tema-ico`, perché `applicaTema` riscrive in
+🌙/☀️ il `.tema-ico` di ogni `.tema-btn` che trova, e il tondo è un
+`.tema-btn` (sarebbe diventato una seconda luna). Da aperta resta il
+bordo arancio; il `color` arancio non tinge più niente, ed è innocuo.
+
+LO SCORRIMENTO. La mappa è alta quasi uno schermo: toccata una città, le
+sue card restavano sotto, fuori vista. P2P: `sceltaMappaP2P` con un
+comune chiama `scorriAlleOfferteMappaP2P`, che porta la prima card (quel
+che segue `#p2pMappa`) sotto la testata appesa `.p2p-sticky`, misurata
+con l'ALTEZZA (+8 di respiro), come fa `scorriSottoHeader` per
+l'Esplora. Mercatino: le card sono la griglia che arriva dal server,
+quindi si scorre QUANDO arriva (`ricaricaGrigliaMappaMerc(poi)`), con
+`scorriSottoHeader(el('grid'))`, il giudice di casa, e solo se nel
+frattempo non si è toccata un'altra città. Togliere il comune (✕ o
+secondo tocco) non sposta niente; con «meno movimento» lo scorrimento è
+secco (`tourRidotto`). Scartato: scorrere subito nel mercatino (si
+scorrerebbe sulla griglia vecchia, che poi cambia altezza sotto il dito).
+
+LA RIGA CORTA. La foto di Andrea non è arrivata a questo thread, ma
+dal testo («col ritiro a mano») si capisce: è l'interruttore in fondo
+alla mappa del mercatino. «Numerino sul tondo per i nuovi annunci col
+ritiro a mano» diventa «Notifiche nuovi annunci col ritiro a mano», le
+parole di Andrea. Quello del P2P («Numerino sul tondo per le nuove
+offerte in contanti») NON è stato toccato: non era chiesto, proposto a
+parte.
+
+PROVE. `prove_mappa_ritocchi` (categoria mercatino): l'icona è l'emoji
+in `.mappa-tondo-ico`, senza svg né `.tema-ico`, usata dal tondo delle
+due mappe; la riga corta; in node lo scorrimento del P2P (arrivo =
+scrollY + top della card − 178, morbido, secco con meno movimento, mai
+sotto zero, niente senza card o senza mappa, niente togliendo il comune)
+e del mercatino (solo DOPO la griglia nuova, due città di fila scorre
+solo la seconda, niente togliendo il comune, in demo subito).
+Controprove sul codice vero, tutte rosse e poi rimesse: l'icona di nuovo
+svg; lo scorrimento del P2P tolto; il mercatino che scorre prima della
+griglia; il mercatino senza la guardia della città cambiata. DAL VIVO:
+server vero in collaudo su database usa-e-getta (21 annunci col ritiro
+in 5 comuni), Chrome via Playwright a 390×844: il tocco su Roma porta le
+sue tre card subito sotto le pillole (griglia a 203 px dall'alto, prima
+a 785, fuori schermo); nel P2P, con un libro finto iniettato nella
+pagina, il tocco su Roma porta la prima card a 177 px, la testata
+appesa finisce a 169. Nessun errore di pagina. Tappo (`sapere.md`,
+rigenerato `conoscenza.md`) e NOVITA aggiornati. NON PROVATO: dal
+telefono vero dentro Telegram (lo scorrimento morbido dentro la WebView).
+COSA È GIRATO SU QUALE ALBERO. Sopra develop `2b1b75a2`, nel venv con le
+sole dipendenze della CI (senza coincurve): la suite severa intera,
+28.213 passate e 1 rossa mia (conoscenza.md da rigenerare dopo l'ultimo
+ritocco di NOVITA: rigenerato, giro mirato verde), i collaudi di
+`ci/collaudi.txt` nella gabbia, 133 su 133. Poi develop è corso a
+`1a64f4b9` (la card del prezzo scura, NON mio): rebase con un conflitto
+nella coda di questo file, nessun simbolo in comune, e sopra il giro
+mirato `--dai-file` (533 sezioni), 27.302 passate e 0 rosse, e
+`collaudo_mappa_ritiro` verde. Le saltate sono le prove di nostr-tools,
+che la CI installa. Sale con la prossima promozione.

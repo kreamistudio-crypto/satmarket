@@ -32269,8 +32269,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   della mappa sta DOPO la fine del motore dello scambio (chiede la
   sagoma con una fetch): `tondoMappaP2P` (dal 14 nov 2026 il bottone che
   apre e chiude e' un tondo `.tema-btn` nella testata appesa, davanti
-  alla campanella, `iconaMappaTonda()` e classi di casa `.mappa-tondo*`
-  riusate dalla mappa del mercatino; il numerino delle offerte NUOVE solo
+  alla campanella, `iconaMappaTonda()` — dalla sera del 14 nov l'emoji
+  colorata 🗺️ in `.mappa-tondo-ico`, mai `.tema-ico` che `applicaTema`
+  riscrive — e classi di casa `.mappa-tondo*` riusate dalla mappa del
+  mercatino; il tocco su un comune scorre alla prima card sotto la
+  testata appesa, `scorriAlleOfferteMappaP2P` (nel mercatino
+  `sceltaMappaMerc` → `scorriSottoHeader(el('grid'))` a griglia arrivata); il numerino delle offerte NUOVE solo
   a richiesta, interruttore `.mappa-numerino` in fondo alla mappa, spento
   di serie, memoria nel telefono `barattolo_mappa_<nome>_nuove`/`_viste` (pezzi comuni `tondoMappa`, `rigaNumerinoMappa`, `segnaVisteMappa`); prima la pillola
   «🗺️ Mappa» sopra le card), `sezioneMappaP2P` (la pillola del comune

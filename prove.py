@@ -164751,6 +164751,129 @@ console.log(JSON.stringify(out));
           and "aria-label=\"' + esc(titolo)" in merc)
 
 
+def prove_mappa_ritocchi():
+    """I TRE RITOCCHI DELLE DUE MAPPE (14 nov 2026 sera, cantiere
+    mappa-ritocchi, Andrea provando la produzione: «l'icona della mappa
+    della P2P e del mercatino mi piace di più come era prima nelle bozze
+    e cioè colorata», «quando clicco su una regione in automatico l'app
+    scorre in basso verso gli annunci del mercatino o del p2p», e la
+    riga dell'interruttore del mercatino «troppo lunga»).
+
+    QUEL CHE SI ROMPE IN SILENZIO: il tondo che torna alla mappa a tratto;
+    l'emoji messa con la classe `.tema-ico`, che `applicaTema` riscrive in
+    🌙/☀️ su ogni `.tema-btn` (il tondo diventerebbe una seconda luna); il
+    tocco su una citta' che non scorre piu'; lo scorrimento del mercatino
+    fatto PRIMA che la griglia nuova arrivi (si scorre sulla vecchia), o
+    dopo che si e' gia' toccata un'altra citta'; togliere il comune che
+    sposta la pagina; l'arrivo che finisce sotto la testata appesa."""
+    print("\n[mappa-ritocchi: l'icona colorata, lo scorrimento, la riga corta]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) L'ICONA ----------------------------------------------------------
+    ico = _fn_js(mini, "function iconaMappaTonda(){")
+    prova("l'icona del tondo e' la mappa colorata 🗺️ delle anteprime, non il tratto",
+          [True, False, False],
+          ["<span class=\"mappa-tondo-ico\" aria-hidden=\"true\">🗺️</span>" in ico,
+           "<svg" in ico, "tema-ico" in ico])
+    prova("...con la sua misura nel CSS, e la regola dell'svg non c'e' piu'", [True, False],
+          [".mappa-tondo-ico{display:block;font-size:17px;line-height:1}" in mini,
+           ".mappa-tondo svg{" in mini])
+    prova("il tondo la usa per tutt'e due le mappe (P2P e mercatino)", [1, True, True],
+          [_fn_js(mini, "function tondoMappa(nome, aperta, ids, quante, tocco){")
+               .count("iconaMappaTonda()"),
+           "tondoMappa('p2p', p2pMappaAperta, ids," in mini,
+           "tondoMappa('mercatino', mercMappaAperta, idsMappaMerc()," in mini])
+
+    # --- 2) LA RIGA CORTA ----------------------------------------------------
+    prova("l'interruttore del mercatino dice «Notifiche nuovi annunci col ritiro a mano»",
+          [True, False],
+          ["rigaNumerinoMappa('mercatino', 'Notifiche nuovi annunci col ritiro a mano'," in mini,
+           "Numerino sul tondo per i nuovi annunci col ritiro a mano" in mini])
+
+    # --- 3) LO SCORRIMENTO ---------------------------------------------------
+    banco = (r"""
+const giri = [];
+let scrollY = 1000;
+const window = { scrollTo: o => giri.push(o) };
+let ridotto = false;
+function tourRidotto(){ return ridotto; }
+let p2pMappaComune = '', disegni = 0, cardTop = 640;
+function renderP2P(){ disegni++; }
+let conCard = true;
+const MAPPA = { get nextElementSibling(){ return conCard ? { getBoundingClientRect: () => ({ top: cardTop }) } : null; } };
+let mappaInPagina = true;
+function el(id){ return id === 'p2pMappa' && mappaInPagina ? MAPPA : (id === 'grid' ? 'GRIGLIA' : null); }
+const document = { querySelector: s => s === '#view-p2p .p2p-sticky' ? { offsetHeight: 170 } : null };
+"""
+        + _fn_js(mini, "function sceltaMappaP2P(nome){")
+        + _fn_js(mini, "function scorriAlleOfferteMappaP2P(){")
+        + r"""
+function haptic(){}
+let DEMO = false, mercMappaComune = '', mappeMerc = 0, griglie = 0;
+const sotto = [];
+function scorriSottoHeader(x){ sotto.push([x, griglie]); }
+function renderMappaMerc(){ mappeMerc++; }
+function renderGrid(){ griglie++; }
+let arriva = [];
+function loadListings(){ return new Promise(ok => arriva.push(ok)); }
+"""
+        + _fn_js(mini, "function ricaricaGrigliaMappaMerc(poi){")
+        + _fn_js(mini, "function sceltaMappaMerc(nome){")
+        + r"""
+(async () => {
+const out = {};
+sceltaMappaP2P('Roma (RM)');
+out.p2p = [p2pMappaComune, disegni, giri.slice()];
+giri.length = 0; ridotto = true; sceltaMappaP2P('Milano (MI)');
+out.ridotto = giri[0] && giri[0].behavior;
+giri.length = 0; sceltaMappaP2P('');
+out.tolto = [p2pMappaComune, giri.length];
+cardTop = 10; scrollY = 50; sceltaMappaP2P('Roma (RM)');
+out.pavimento = giri[0] && giri[0].top;
+giri.length = 0; conCard = false; sceltaMappaP2P('Roma (RM)');
+mappaInPagina = false; sceltaMappaP2P('Roma (RM)');
+out.senzaCard = giri.length;
+// il mercatino: si scorre quando la griglia nuova e' arrivata
+sceltaMappaMerc('Napoli (NA)');
+out.prima = sotto.length;
+arriva.shift()(); await new Promise(r => setTimeout(r, 0));
+out.dopo = sotto.slice();
+// due citta' di fila: la prima risposta arriva dopo la seconda scelta
+sotto.length = 0;
+sceltaMappaMerc('Torino (TO)'); sceltaMappaMerc('Bari (BA)');
+arriva.shift()(); await new Promise(r => setTimeout(r, 0));
+out.vecchia = sotto.length;
+arriva.shift()(); await new Promise(r => setTimeout(r, 0));
+out.nuova = sotto.length;
+// togliere il comune non scorre
+sotto.length = 0; sceltaMappaMerc('');
+arriva.shift()(); await new Promise(r => setTimeout(r, 0));
+out.toltoMerc = [mercMappaComune, sotto.length];
+// in demo la griglia e' subito li'
+sotto.length = 0; DEMO = true; sceltaMappaMerc('Roma (RM)');
+out.demo = sotto.length;
+console.log(JSON.stringify(out));
+})();
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("mappa-ritocchi: il banco dello scorrimento", "node non c'e'")
+        return
+    prova("P2P: toccata una citta', il libro si ridisegna e la pagina scorre alla prima "
+          "card, sotto la testata appesa (170 px + 8 di respiro), morbida",
+          ["Roma (RM)", 1, [{"top": 1000 + 640 - 178, "behavior": "smooth"}]], r.get("p2p"))
+    prova("...secca a chi ha chiesto meno movimento", "auto", r.get("ridotto"))
+    prova("...togliere il comune non sposta la pagina", ["", 0], r.get("tolto"))
+    prova("...mai sopra l'inizio della pagina", 0, r.get("pavimento"))
+    prova("...e senza card dopo la mappa, o senza mappa, non scorre e non esplode",
+          0, r.get("senzaCard"))
+    prova("mercatino: si scorre alla griglia solo DOPO che e' arrivata quella nuova",
+          [0, [["GRIGLIA", 1]]], [r.get("prima"), r.get("dopo")])
+    prova("...due citta' di fila: la risposta della prima non scorre, quella della seconda si'",
+          [0, 1], [r.get("vecchia"), r.get("nuova")])
+    prova("...togliere il comune non scorre; in demo la griglia c'e' subito e si scorre",
+          [["", 0], 1], [r.get("toltoMerc"), r.get("demo")])
+
 def prove_contanti_zona():
     """LA ZONA DI SCAMBIO E IL VESTITO DEL CONTANTI (10 ott 2026, cantiere
     contanti-zona, richiesta di Andrea). Quattro cose: 1) la zona
@@ -196734,7 +196857,7 @@ CATEGORIE = {
     lista_corta_metodi
     """.split(),
     "mercatino": """
-    mappa_ritiro feedback_modificabile recensioni_ricevute mancia_venditore
+    mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     ricategorizza collaudo_ricategorizza asta proxy_asta annullo
@@ -197558,6 +197681,7 @@ def main():
               prove_contanti_zona,
               prove_mappa_contanti,
               prove_mappa_ritiro,
+              prove_mappa_ritocchi,
               prove_riquadro_contanti_sepa,
               prove_banner_ingresso, prove_tour_banner_p2p,
               prove_reputazione_p2p, prove_dati_reputazione_p2p,
