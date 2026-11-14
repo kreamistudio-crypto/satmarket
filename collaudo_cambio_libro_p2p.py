@@ -71,9 +71,12 @@ def main():
 
     # (1 nov 2026, p2p-usdt) accanto all'euro viaggia il dollaro, per gli
     # ordini in USDT: stessa cache, stessa eta', stesso «troppo vecchio»
-    def metti(valore, eta_s=0, usd=0.0):
+    # (14 nov 2026, p2p-chf) e accanto al dollaro il franco, per gli
+    # ordini in CHF: la stessa cache, lo stesso «troppo vecchio»
+    def metti(valore, eta_s=0, usd=0.0, chf=0.0):
         cache["valori"]["eur"] = float(valore)
         cache["valori"]["usd"] = float(usd)
+        cache["valori"]["chf"] = float(chf)
         cache["quando"] = time.time() - eta_s
         cache["tentato"] = 0.0     # nessuna scusa per non riprovare
 
@@ -82,13 +85,15 @@ def main():
     r = c.get(VIA)
     prova("senza cambio in mano risponde 200 con 0, «non disponibile», e "
           "nessuna eta'",
-          [200, {"cambio_eur": 0.0, "cambio_usd": 0.0, "cambio_eta_s": None}],
+          [200, {"cambio_eur": 0.0, "cambio_usd": 0.0, "cambio_chf": 0.0,
+                 "cambio_eta_s": None}],
           [r.status_code, r.json()])
-    metti(98765.5, usd=106666.0)
+    metti(98765.5, usd=106666.0, chf=88888.0)
     r = c.get(VIA)
     prova("col cambio in cache dice quello, a chi non ha una sessione, con "
           "la sua eta' (appena letto: zero secondi)",
-          [200, {"cambio_eur": 98765.5, "cambio_usd": 106666.0, "cambio_eta_s": 0}],
+          [200, {"cambio_eur": 98765.5, "cambio_usd": 106666.0,
+                 "cambio_chf": 88888.0, "cambio_eta_s": 0}],
           [r.status_code, r.json()])
     prova("...e non si tiene in nessuna cache", "no-store",
           r.headers.get("cache-control"))
@@ -152,9 +157,11 @@ def main():
 
     print("\n[troppo vecchio = non disponibile]")
     if S.ORE_CAMBIO_VALIDO:
-        metti(99000.0, eta_s=S.ORE_CAMBIO_VALIDO * 3600 + 60, usd=107000.0)
-        prova("oltre ORE_CAMBIO_VALIDO la rotta dice 0, anche il dollaro, e nessuna eta'",
-              {"cambio_eur": 0.0, "cambio_usd": 0.0, "cambio_eta_s": None}, c.get(VIA).json())
+        metti(99000.0, eta_s=S.ORE_CAMBIO_VALIDO * 3600 + 60, usd=107000.0,
+              chf=89000.0)
+        prova("oltre ORE_CAMBIO_VALIDO la rotta dice 0, anche il dollaro e il franco, e nessuna eta'",
+              {"cambio_eur": 0.0, "cambio_usd": 0.0, "cambio_chf": 0.0,
+               "cambio_eta_s": None}, c.get(VIA).json())
         busta = c.get("/api/listings?limit=20").json()
         prova("...come la busta", [0.0, None],
               [busta.get("cambio_eur"), busta.get("cambio_eta_s")])

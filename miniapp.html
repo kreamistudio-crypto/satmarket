@@ -2144,6 +2144,8 @@
      verde», poi «mi piacciono le versioni sfumate»): lo stesso sfumato
      della crema dell'euro, nei colori della moneta di destra. L'euro
      resta sulla regola di sopra, senza classe sua. */
+  .card-p2p .p2p-vt-fondo.p2p-vt-chf{background:radial-gradient(120% 90% at 50% 38%,
+      #F2594E 0%,#D52B1E 62%,#8E150D 100%)}
   .card-p2p .p2p-vt-fondo.p2p-vt-usdt{background:radial-gradient(120% 90% at 50% 38%,
       #4FD1A5 0%,#26A17B 62%,#17765A 100%)}
   .card-p2p .p2p-vt-fondo.p2p-vt-eth{background:radial-gradient(120% 90% at 50% 38%,
@@ -3150,6 +3152,7 @@
   .p2p-tessera{position:relative;flex:none;width:34px;height:34px;
     border-radius:10px;display:grid;place-items:center}
   .p2p-tessera-eur{background:#003399}
+  .p2p-tessera-chf{background:#D52B1E}
   .p2p-tessera-usdt{background:#26A17B}
   .p2p-tessera-eur .p2p-tessera-svg{width:34px;height:34px;display:block}
   .p2p-tessera-usdt .p2p-tessera-svg{width:26px;height:26px;display:block}
@@ -13158,7 +13161,7 @@ document.getElementById('cartello')?.remove();</script>
       <div class="p2p-sticky">
         <div class="scambi-testa" id="p2pMieiIntesta">
           <div class="scambi-cima">
-            <h2 class="scambi-tit"><img class="scambi-img" src="/assets/scambi-monete.webp" width="846" height="300" alt="I miei scambi" aria-label="I miei scambi" onerror="this.replaceWith(this.alt)"></h2>
+            <h2 class="scambi-tit"><img class="scambi-img" src="/assets/scambi-monete.webp" width="904" height="300" alt="I miei scambi" aria-label="I miei scambi" onerror="this.replaceWith(this.alt)"></h2>
             <div class="scambi-conto" id="p2pMieiConto"></div>
           </div>
           <!-- IL DEPOSITO DELL'ORDINAMENTO, gemello di quello del
@@ -18723,6 +18726,8 @@ async function loadListings(anonimo){
     impostaOraCambio(j.cambio_eur, j.cambio_eta_s);
   }
   if (j.cambio_usd !== undefined) impostaCambioUsd(j.cambio_usd);
+  /* ...e il franco (14 nov 2026, cantiere p2p-chf) */
+  if (j.cambio_chf !== undefined && typeof impostaCambioChf === 'function') impostaCambioChf(j.cambio_chf);
   /* il dominio di casa, che serve solo a chi arriva dall'onion: la
      riga la legge baseCondivisione, e senza (server di ieri) resta
      location.origin, cioe' il comportamento di sempre */
@@ -25944,6 +25949,14 @@ function impostaCambioUsd(usdPerBtc){
   const v = Number(usdPerBtc) || 0;
   if (v > 0) usdPerSat = v / 100000000;
 }
+/* IL FRANCO (14 nov 2026, cantiere p2p-chf): il calco del dollaro, per le
+   stime in sats e il tetto degli ordini P2P in CHF. Senza franco vero le
+   stime tacciono e il tetto in franchi ferma (vedi `tettoValutaP2P`). */
+let chfPerSat = 0;
+function impostaCambioChf(chfPerBtc){
+  const v = Number(chfPerBtc) || 0;
+  if (v > 0) chfPerSat = v / 100000000;
+}
 /* IL CAMBIO SUL LIBRO P2P (10 ott 2026, cantiere cambio-libro-p2p).
    La busta di /api/listings basta a chi sfoglia la vetrina, che la
    rilegge di continuo; chi RESTA sul libro del P2P quella busta non la
@@ -26122,6 +26135,9 @@ function rileggiCambio(){
       if (j) impostaOraCambio(j.cambio_eur, j.cambio_eta_s);
       const primaUsd = usdPerSat;
       if (j) impostaCambioUsd(j.cambio_usd);
+      /* ...e il franco (14 nov 2026, cantiere p2p-chf) */
+      const primaChf = typeof chfPerSat !== 'undefined' ? chfPerSat : 0;
+      if (j && typeof impostaCambioChf === 'function') impostaCambioChf(j.cambio_chf);
       /* ...e quanto vale un ETH e un XMR (13 nov 2026, cantiere eth-xmr):
          c'e' solo sull'istanza di prova */
       if (j && j.cambio_coin && typeof impostaCambioCoinP2P === 'function') impostaCambioCoinP2P(j.cambio_coin);
@@ -26130,7 +26146,8 @@ function rileggiCambio(){
          come la busta del server; il typeof per i banchi del solo cambio */
       const andamento = !!(j && Number(j.cambio_eur) > 0)
         && typeof impostaAndamentoBtc === 'function' && impostaAndamentoBtc(j.andamento);
-      return (cambioVivo && eurPerSat !== prima) || usdPerSat !== primaUsd || andamento;
+      return (cambioVivo && eurPerSat !== prima)
+        || (typeof chfPerSat !== 'undefined' && chfPerSat !== primaChf) || usdPerSat !== primaUsd || andamento;
     } catch(e) {
       return false;
     } finally { clearTimeout(t); cambioGiro = null; cambioDubbio = false; }
@@ -40750,7 +40767,7 @@ const P2P_AVVISI_RETI = [['', 'Tutte'], ['onchain', 'Solo on-chain'], ['ln', 'So
 /* LA VALUTA DEGLI AVVISI (2 nov 2026, Andrea: «nelle notifiche dare la
    possibilita' di scegliere usdt»): una scelta sola, e la sezione solo a
    chi gli USDT li vede (`usdtVistoP2P`). Gemelle di VALUTE_AVVISI_NUOVI_P2P */
-const P2P_AVVISI_VALUTE = [['', 'Tutte'], ['EUR', 'Solo euro'], ['USDT', 'Solo USDT']];
+const P2P_AVVISI_VALUTE = [['', 'Tutte'], ['EUR', 'Solo euro'], ['USDT', 'Solo USDT'], ['CHF', 'Solo franchi']];
 /* PURA: le preferenze come arrivano dal server, rimesse in forma — i
    tipi nell'ordine delle chip (vuoto = tutti), la soglia solo se e' una
    delle tre, spento se manca tutto (un server di ieri) */
@@ -40819,9 +40836,13 @@ function contenutoAvvisiNuoviP2P(){
               pill(r[1], p.rete === r[0], "scegliReteAvvisiNuoviP2P('" + r[0] + "')")).join('')
           + '</div>'
         : '')
-    + (typeof usdtVistoP2P === 'function' && usdtVistoP2P()
+    /* ...e i franchi (14 nov 2026, cantiere p2p-chf): ogni pillola a chi
+       quella valuta la vede, la scelta c'e' se ne vede almeno un'altra */
+    + ((typeof usdtVistoP2P === 'function' && usdtVistoP2P()) || (typeof chfVistoP2P === 'function' && chfVistoP2P())
         ? '<div class="section-label">Valuta</div>'
-          + '<div class="p2p-metodi">' + P2P_AVVISI_VALUTE.map(v =>
+          + '<div class="p2p-metodi">' + P2P_AVVISI_VALUTE.filter(v =>
+              v[0] === 'USDT' ? (typeof usdtVistoP2P === 'function' && usdtVistoP2P())
+              : v[0] === 'CHF' ? (typeof chfVistoP2P === 'function' && chfVistoP2P()) : true).map(v =>
               pill(v[1], p.valuta === v[0], "scegliValutaAvvisiNuoviP2P('" + v[0] + "')")).join('')
           + '</div>'
         : '')
@@ -40912,7 +40933,7 @@ function scegliReteAvvisiNuoviP2P(r){
 }
 function scegliValutaAvvisiNuoviP2P(v){
   if (!myAvvisiNuoviP2P.attivo) return;
-  setAvvisiNuoviP2P({valuta: v === 'EUR' || v === 'USDT' ? v : ''});
+  setAvvisiNuoviP2P({valuta: v === 'EUR' || v === 'USDT' || v === 'CHF' ? v : ''});
 }
 function scegliSogliaAvvisiNuoviP2P(s){
   if (!myAvvisiNuoviP2P.attivo) return;
@@ -60003,6 +60024,9 @@ let myP2POnchain = false;
 /* ...e gli ordini P2P in USDT (1 nov 2026, cantiere p2p-usdt): il cancello
    del server, `p2p_usdt` di /api/me. Vedi il blocco «GLI ORDINI IN USDT». */
 let myP2PUsdt = false;
+/* ...e gli ordini P2P in franchi svizzeri (14 nov 2026, cantiere p2p-chf):
+   `p2p_chf` di /api/me. Vedi il blocco «I FRANCHI SVIZZERI». */
+let myP2PChf = false;
 /* ...e gli USDT negli scambi on-chain col 2-di-3 (2 nov 2026, cantiere
    p2p-onchain-usdt): `p2p_onchain_usdt` di /api/me. La garanzia resta il
    2-di-3 bitcoin; chi compra paga in USDT invece che in euro. */
@@ -65884,6 +65908,10 @@ const P2P_STELLE_EU = '<svg class="p2p-tessera-svg" viewBox="0 0 32 32" aria-hid
    l'ordine e' tutte e due le reti basta solo il simbolo usdt») */
 function tesseraValutaP2P(cod, metodi){
   const c = String(cod || P2P_VALUTA).toUpperCase();
+  /* IL FRANCO (14 nov 2026, cantiere p2p-chf): la croce bianca sul rosso */
+  if (c === 'CHF')
+    return '<span class="p2p-tessera p2p-tessera-chf" role="img" aria-label="Franco svizzero">'
+      + P2P_CROCE_CH + '</span>';
   if (c === 'USDT') {
     const reti = Array.isArray(metodi) && typeof reteUsdtDaMetodoP2P === 'function'
       ? [...new Set(metodi.map(m => (reteUsdtDaMetodoP2P(m) || {}).rete).filter(Boolean))] : [];
@@ -65900,6 +65928,8 @@ function tesseraValutaP2P(cod, metodi){
   return '<span class="p2p-tessera p2p-tessera-eur" role="img" aria-label="Euro">'
     + P2P_STELLE_EU + '</span>';
 }
+/* la croce svizzera, senza il suo rosso: lo mette la tessera */
+const P2P_CROCE_CH = '<svg class="p2p-tessera-svg" viewBox="0 0 32 32" aria-hidden="true"><path fill="#FFF" d="M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z"/></svg>';
 /* il segno di Tether senza il suo cerchio: il verde lo mette la tessera */
 const P2P_TETHER_SEGNO = '<svg class="p2p-tessera-svg" viewBox="4 4 24 24" aria-hidden="true">'
   + '<path fill="#FFF" d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117"/></svg>';
@@ -65918,6 +65948,7 @@ function coppiaCardP2P(cod, metodi, rete, invii){
   const coin = typeof coinUnicaP2P === 'function' && String(cod || P2P_VALUTA).toUpperCase() === P2P_VALUTA
     ? coinUnicaP2P(metodi) : null;
   const nome = String(cod || P2P_VALUTA).toUpperCase() === 'USDT' ? 'USDT'
+    : String(cod || P2P_VALUTA).toUpperCase() === 'CHF' ? 'franchi'
     : coin ? coin.coin + ' (al valore in euro)' : 'euro';
   const sats = rete === 'btc' ? 'bitcoin on-chain' : 'sats su Lightning';
   const aria = invii ? 'Invia ' + nome + ', ricevi ' + sats : 'Invia ' + sats + ', ricevi ' + nome;
@@ -67238,7 +67269,7 @@ function renderP2P(){
        : vuotoInAttesa ? scheletroLibroP2P()
        : `<div class="empty">${vuoto.logo
            ? '<img class="p2p-simbolo" src="/assets/p2p-logo-grande.webp" alt="" onerror="this.remove()">'
-           : '<img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" width="846" height="300" alt="" onerror="this.remove()">'
+           : '<img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" width="904" height="300" alt="" onerror="this.remove()">'
          }<span class="empty-title">${esc(vuoto.titolo)}</span>${esc(vuoto.frase)}${
            /* «Togli il filtro» SOLO SE UN FILTRO C'E': a filtro spento
               azzerava il niente, e il libro restava com'era */
@@ -73492,6 +73523,7 @@ function applicaMessaggioP2P(ord, dentro){
      riscrive comunque). Una volta sola. */
   if (nuovo.sats > 0 && nuovo.satsMiei > 0 && !(ord.satsMiei > 0) && !(nuovo.cambioPresa > 0)
       && cambioVivo && eurPerSat > 0 && !(typeof usdtP2P === 'function' && usdtP2P(ord))
+      && !(typeof chfP2P === 'function' && chfP2P(ord))
       && quando > 0 && Math.abs(Math.floor(Date.now() / 1000) - quando) <= P2P_PRESA_FRESCA_S)
     nuovo.cambioPresa = eurPerSat * 1e8;
   diarioP2P('msg ' + String(ord.id).slice(0, 8) + ' ' + azione + ' t=' + quando
@@ -73902,6 +73934,7 @@ function quantoSegnoP2P(riga){
   return typeof segnoMonetaP2P === 'function' ? segnoMonetaP2P(riga) : '\u20ac';
 }
 function quantoNomeP2P(riga){
+  if (typeof chfP2P === 'function' && chfP2P(riga)) return 'franchi';
   return (typeof usdtP2P === 'function' && usdtP2P(riga)) ? 'USDT' : 'euro';
 }
 /* PURO: dice se la cifra sta nella fascia, e quanto vale in sats. La
@@ -73947,9 +73980,11 @@ function confermaQuantoP2P(){
   /* ...sul metodo SCELTO, o sull'unico (12 ott 2026, contanti-solo-
      scelti): con piu' metodi e nessuna scelta il tetto del contanti non
      parla — lo rifa' la conferma del dettaglio, col metodo in mano */
+  /* in franchi il tetto tradotto e il suo segno (14 nov 2026, p2p-chf) */
+  const codPresa = typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(riga) : 'EUR';
   const troppo = giudiceContantiP2P(g.euro, p2pDettMetodo ? [p2pDettMetodo]
                                       : ((riga.metodi || []).length === 1 ? riga.metodi : []),
-                                    maxEuroContantiP2P());
+                                    maxEuroContantiP2P(), codPresa);
   if (troppo) { toast(troppo); return; }
   const id = p2pQuantoOrdine;
   chiudiFoglioP2P('p2pQuantoSheet');
@@ -74904,6 +74939,12 @@ function rigaTassoContoP2P(o, detto){
     if (!(usd > 0)) return '';
     t = Object.assign({}, t, {cifra: '1\u00a0BTC\u00a0≈\u00a0' + usd.toLocaleString('it-IT') + '\u00a0USDT'});
   }
+  /* ...e in franchi col franco (14 nov 2026, cantiere p2p-chf) */
+  if (typeof chfP2P === 'function' && chfP2P(o)) {
+    const chf = typeof chfPerSat !== 'undefined' ? Math.round(chfPerSat * 1e8) : 0;
+    if (!(chf > 0)) return '';
+    t = Object.assign({}, t, {cifra: '1\u00a0BTC\u00a0≈\u00a0' + chf.toLocaleString('it-IT') + '\u00a0CHF'});
+  }
   return '<div class="ctrl-tasso"><span class="tasso-riga"><span class="tasso-cifra">'
     + esc(t.cifra) + '</span>'
     + (t.vecchio
@@ -74998,7 +75039,8 @@ function rigaConvenienzaFissaP2P(o, conv){
 function titoloMetodiP2P(o){
   /* «gli USDT» su un ordine in USDT (13 nov 2026, cantiere usdt-foglio-
      presa): la valuta dal suo giudice, che la legge anche dai metodi */
-  const soldi = (typeof usdtP2P === 'function' && usdtP2P(o)) ? 'gli USDT' : 'gli euro';
+  const soldi = (typeof usdtP2P === 'function' && usdtP2P(o)) ? 'gli USDT'
+    : (typeof chfP2P === 'function' && chfP2P(o)) ? 'i franchi' : 'gli euro';
   return 'Metodo di pagamento — '
     + (o.lato === 'sell' ? 'come invii ' : 'come ricevi ') + soldi;
 }
@@ -75538,7 +75580,9 @@ function confermaDettaglioP2P(){
      il metodo puo' essere cambiato DOPO la scelta */
   const g = o.euroMax ? quantoValeP2P(o, String(p2pDettImporto)) : null;
   if (g && !g.ok) { toast(g.dillo); p2pDettImporto = 0; renderDettaglioP2P(); return; }
-  const troppo = giudiceContantiP2P(g ? g.euro : o.euro, metPresa, maxEuroContantiP2P());
+  /* in franchi il tetto tradotto e il suo segno (14 nov 2026, p2p-chf) */
+  const codPresa = typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : 'EUR';
+  const troppo = giudiceContantiP2P(g ? g.euro : o.euro, metPresa, maxEuroContantiP2P(), codPresa);
   if (troppo) { toast(troppo); return; }
   /* il tetto del collaudo (20 ott 2026): vale anche per chi prende */
   const oltre = typeof giudiceTettoProvaP2P === 'function'
@@ -75854,7 +75898,8 @@ function payloadPresaP2P(riga, scelta, metodo, sulMetodo){
   if (!m || !sulMetodo) return cifra ? {amount: cifra} : null;
   /* la valuta e' quella della riga (gli USDT, 1 nov 2026): la 0010 legge
      solo metodo e cifra, ma sul filo non si scrive EUR per un USDT */
-  const valuta = String((riga && riga.fiat) || '').toUpperCase() === 'USDT' ? 'USDT' : 'EUR';
+  const valuta = String((riga && riga.fiat) || '').toUpperCase() === 'USDT' ? 'USDT'
+    : String((riga && riga.fiat) || '').toUpperCase() === 'CHF' ? 'CHF' : 'EUR';
   return {order: {kind: null, status: null, amount: 0, fiat_code: valuta,
     min_amount: null, max_amount: null,
     fiat_amount: cifra || Math.floor(Number(riga && riga.euro) || 0),
@@ -78662,6 +78707,9 @@ function riquadroTxCoinP2P(o){
 function gestoPagoP2P(o){
   /* in USDT il gesto dice USDT (1 nov 2026, cantiere p2p-usdt) */
   if (typeof usdtP2P === 'function' && usdtP2P(o)) return 'Ho inviato gli USDT';
+  /* ...e in franchi i franchi, se non e' un incontro (14 nov 2026) */
+  if (typeof chfP2P === 'function' && chfP2P(o) && !(typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o)))
+    return 'Ho inviato i franchi';
   /* ...e con ETH o XMR la sua moneta (13 nov 2026, cantiere eth-xmr) */
   const coin = typeof reteCoinScambioP2P === 'function' ? reteCoinScambioP2P(o) : null;
   if (coin) return 'Ho inviato gli ' + coin.coin;
@@ -78688,7 +78736,8 @@ function euroInviatiP2P(){
   const senzaPresenza = contanti && !(o.presenze && o.presenze.mia);
   chiediConferma({
     titolo: tab ? 'Hai pagato il PayCode al tabacchino?'
-      : contanti ? 'Hai consegnato i contanti?' : (typeof usdtP2P === 'function' && usdtP2P(o)) ? 'Hai inviato gli USDT?' : 'Hai inviato gli euro?',
+      : contanti ? 'Hai consegnato i contanti?' : (typeof usdtP2P === 'function' && usdtP2P(o)) ? 'Hai inviato gli USDT?'
+      : (typeof chfP2P === 'function' && chfP2P(o)) ? 'Hai inviato i franchi?' : 'Hai inviato gli euro?',
     corpo: tab
       /* IL BUONO REGALO, UNA RIGA (10 ott 2026, guida-paycode, col si' di
          Andrea): e' l'ultimo cancello prima di un gesto che non si
@@ -78777,9 +78826,9 @@ function rilasciaP2P(){
     corpo: tabacchinoP2P(o.metodi)
       ? 'Fallo solo se su Amazon il tuo ordine da ' + ((o.tabacchino && o.tabacchino.importo) || fmtEur(o.euro)) + ' € risulta pagato davvero. I sats partono verso chi compra e non tornano indietro.'
       : contanti
-      ? 'Libera i sats solo lì, davanti a chi ti ha dato ' + fmtEur(o.euro) + ' € in contanti, dopo averli contati insieme. I sats partono verso chi compra e non tornano indietro.'
+      ? 'Libera i sats solo lì, davanti a chi ti ha dato ' + fmtEur(o.euro) + ' ' + (typeof segnoMonetaP2P === 'function' ? segnoMonetaP2P(o) : '€') + ' in contanti, dopo averli contati insieme. I sats partono verso chi compra e non tornano indietro.'
       : (typeof usdtP2P === 'function' && usdtP2P(o)) ? 'Fallo solo se hai ricevuto ' + fmtEur(o.euro) + ' USDT davvero, sulla rete giusta, e la transazione è confermata. I sats partono verso chi compra e non tornano indietro.'
-      : 'Fallo solo se hai ricevuto ' + fmtEur(o.euro) + ' € davvero. I sats partono verso chi compra e non tornano indietro.',
+      : 'Fallo solo se hai ricevuto ' + fmtEur(o.euro) + ' ' + (typeof segnoMonetaP2P === 'function' ? segnoMonetaP2P(o) : '€') + ' davvero. I sats partono verso chi compra e non tornano indietro.',
     etichetta: contanti ? 'Sì, li ho contati: libero i sats' : 'Sì, libero i sats',
     /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
     poi: () => mossaOrdineP2P(o.id, 'release', 'Sats liberati ✅',
@@ -78872,7 +78921,7 @@ async function mossaOrdineP2P(id, azione, fatto, sto){
    T bianca, disegnato qui in SVG (nessun file in piu', nessuna rotta
    nuova), al posto del ₮ di testo di ieri. Sta su UNA riga e senza
    apici singoli: i banchi delle prove la ritagliano fino al primo «];». */
-const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺'}, {cod: 'USDT', nome: 'Tether USD', segno: 'USDT', bandiera: '<svg class="ico-usdt" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="1.15em" height="1.15em" style="vertical-align:-0.2em" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#26A17B"/><path fill="#FFF" d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117"/></svg>'}];
+const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺'}, {cod: 'USDT', nome: 'Tether USD', segno: 'USDT', bandiera: '<svg class="ico-usdt" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="1.15em" height="1.15em" style="vertical-align:-0.2em" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#26A17B"/><path fill="#FFF" d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117"/></svg>'}, {cod: 'CHF', nome: 'Franco svizzero', segno: 'CHF', bandiera: '🇨🇭'}];
 /* I METODI SONO UN VOCABOLARIO CHIUSO (set 2026, decisione di Andrea
    che ROVESCIA la scelta di prima, dove le pillole erano un
    suggerimento e sotto c'era un campo di testo libero).
@@ -78931,6 +78980,59 @@ function vociTendinaMetodiP2P(lista, scelti, aperti){
    altrui leggono il numero come parte del nome del metodo, e non si
    rompono. I giudici cercano il PREFISSO, mai l'uguaglianza. */
 const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
+/* ═══ I FRANCHI SVIZZERI (14 nov 2026, cantiere p2p-chf, Andrea:
+   «abbiamo stretto una collaborazione con Lugano») ══════════════════
+   Il CHF e' la VALUTA dell'ordine come l'USDT (il `f` del 38383 vale
+   «CHF»), ma si paga come l'euro: niente reti ne' indirizzi, il nodo lo
+   prezza con la sua fonte di sempre. Cambiano tre cose:
+   - I METODI sono quelli svizzeri: TWINT (un numero +41), il bonifico
+     svizzero (IBAN CH o LI, col suo controllo), e Revolut, Wise e i
+     contanti di persona, che stanno anche in euro. Per questo un ordine
+     in franchi NON si riconosce dai metodi, come l'USDT, ma solo dal
+     `fiat` della riga (`valutaOrdineP2P`).
+   - IL TETTO resta quello in euro di Barattolo, tradotto in franchi al
+     cambio di adesso (`tettoValutaP2P`), contanti compresi.
+   - LE PAROLE: «CHF» al posto di «€», «i franchi» al posto di «gli euro»,
+     dallo stesso traduttore degli USDT (`paroleUsdtP2P`).
+   Fuori, per ora: gli scambi on-chain (2-di-3) e Barattozon, che e'
+   italiano. DIETRO DUE CANCELLI: `myP2PChf` (la leva `P2P_CHF_ATTIVO`
+   del server, di serie solo per gli admin) e il nodo, che deve avere CHF
+   fra le valute accettate. */
+const P2P_METODI_CHF = ['TWINT', 'Bonifico CH', 'Revolut', 'Wise', 'Contanti'];
+function chfVistoP2P(){
+  return typeof myP2PChf !== 'undefined' && !!myP2PChf;
+}
+function chfP2P(o){ return typeof valutaOrdineP2P === 'function' && valutaOrdineP2P(o) === 'CHF'; }
+/* L'IBAN SVIZZERO, PURO: CH o LI, 21 caratteri, e il controllo del
+   modulo 97 (ISO 13616) — la stessa regola che usa la banca. Torna '' se
+   va bene, altrimenti la frase da dire. */
+function giudiceIbanSvizzeroP2P(iban){
+  const t = String(iban || '').replace(/\s+/g, '').toUpperCase();
+  if (!/^(CH|LI)[0-9]{2}[0-9A-Z]{17}$/.test(t))
+    return 'Un IBAN svizzero comincia con CH (o LI) e ha 21 caratteri: controllalo';
+  const giro = t.slice(4) + t.slice(0, 4);
+  let resto = 0;
+  for (const ch of giro) {
+    const n = /[0-9]/.test(ch) ? ch : String(ch.charCodeAt(0) - 55);
+    for (const d of n) resto = (resto * 10 + Number(d)) % 97;
+  }
+  return resto === 1 ? '' : 'Questo IBAN non torna: controlla di averlo copiato giusto';
+}
+/* IL NUMERO DI TWINT, PURO: un cellulare svizzero (+41 7x, o 07x),
+   spazi e trattini tollerati. Torna '' se va bene. */
+function giudiceTwintP2P(tel){
+  const t = String(tel || '').replace(/[\s\-.\/()]/g, '');
+  return /^(?:\+41|0041|0)7[5-9][0-9]{7}$/.test(t)
+    ? '' : 'Il numero di TWINT è un cellulare svizzero, come +41 79 123 45 67';
+}
+const P2P_CHF_PAROLE = [
+  ['💶', '🇨🇭'],
+  /* «gli euro» → «i franchi» vale anche dentro «degli», «agli», «dagli» */
+  ['Gli euro', 'I franchi'], ['gli euro', 'i franchi'],
+  ['Un euro', 'Un franco'], ['un euro', 'un franco'],
+  ['Euro inviati', 'Franchi inviati'],
+  [' €', ' CHF'], ['\u00a0€', '\u00a0CHF']
+];
 /* ═══ GLI ORDINI IN USDT (1 nov 2026, cantiere p2p-usdt, decisione di
    Andrea dopo lo studio «USDT e altre coin») ═════════════════════════
    COS'E' E COSA NON E'. Mostro dalla 0.20.2 accetta l'USDT come VALUTA
@@ -78984,7 +79086,9 @@ function usdtVistoP2P(){
    on-chain solo a chi ha anche gli USDT on-chain (2 nov 2026: il 2-di-3
    blocca bitcoin come sempre, e gli USDT prendono il posto degli euro) */
 function valuteVisibiliP2P(oc){
-  return P2P_VALUTE.filter(v => v.cod !== 'USDT'
+  /* il franco solo a chi lo vede, e mai a rete on-chain (14 nov 2026) */
+  return P2P_VALUTE.filter(v => v.cod === 'CHF' ? (!oc && typeof chfVistoP2P === 'function' && chfVistoP2P())
+    : v.cod !== 'USDT'
     || (usdtVistoP2P() && (!oc || (typeof myP2POnchainUsdt !== 'undefined' && !!myP2POnchainUsdt))));
 }
 /* una valuta del libro che chi guarda puo' vedere (PURA sul cancello) */
@@ -78999,6 +79103,15 @@ function valutaVistaP2P(cod, metodi){
      avrebbe ne' il controllo dell'indirizzo ne' la cifra */
   if (c === P2P_VALUTA)
     return typeof metodiConCoinP2P !== 'function' || !metodiConCoinP2P(metodi) || coinVistoP2P();
+  /* IN FRANCHI (14 nov 2026, cantiere p2p-chf): a chi li vede, e solo coi
+     metodi nostri — un altro client puo' scrivere «Postfinance» o
+     «Bonifico SEPA»: da noi non avrebbe il suo form ne' il suo controllo */
+  if (c === 'CHF') {
+    if (!(typeof chfVistoP2P === 'function' && chfVistoP2P())) return false;
+    if (metodi === undefined) return true;
+    const mc = Array.isArray(metodi) ? metodi : [];
+    return mc.length > 0 && mc.every(x => P2P_METODI_CHF.indexOf(String(x)) >= 0);
+  }
   if (c !== 'USDT' || !usdtVistoP2P()) return false;
   if (metodi === undefined) return true;
   const m = Array.isArray(metodi) ? metodi : [];
@@ -79016,10 +79129,17 @@ function valutaOrdineP2P(o){
   const m = (o && Array.isArray(o.metodi)) ? o.metodi : [];
   if (m.length && typeof reteUsdtDaMetodoP2P === 'function'
       && m.every(x => !!reteUsdtDaMetodoP2P(x))) return 'USDT';
+  /* ...e TWINT o il bonifico svizzero dicono i franchi (14 nov 2026,
+     cantiere p2p-chf): esistono solo in CHF. Revolut, Wise e i contanti
+     da soli non dicono niente, e allora vale il campo */
+  if (m.length && typeof P2P_METODI_CHF !== 'undefined'
+      && m.every(x => P2P_METODI_CHF.indexOf(String(x)) >= 0)
+      && m.some(x => x === 'TWINT' || x === 'Bonifico CH')) return 'CHF';
   return f || P2P_VALUTA;
 }
 function metodiValutaP2P(cod){
   if (String(cod || '').toUpperCase() === 'USDT') return P2P_METODI_USDT;
+  if (String(cod || '').toUpperCase() === 'CHF') return P2P_METODI_CHF;
   /* in euro anche ETH e XMR, a chi li vede (13 nov 2026, cantiere eth-xmr) */
   return typeof coinVistoP2P === 'function' && coinVistoP2P() ? P2P_METODI.concat(P2P_METODI_COIN) : P2P_METODI;
 }
@@ -79039,6 +79159,7 @@ function segnoValutaP2P(cod){
 const P2P_BADGE_RETI_USDT = {tron: '<svg class="p2p-rete-badge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#EF0027"/><path fill="#FFF" d="M21.932 9.913L7.5 7.257l7.595 19.112 10.583-12.894-3.746-3.562zm-.232 1.17l2.208 2.099-6.038 1.093 3.83-3.192zm-5.142 2.973l-6.364-5.278 10.402 1.914-4.038 3.364zm-.453.934l-1.038 8.58L9.472 9.487l6.633 5.502zm.96.455l6.687-1.21-7.67 9.343.983-8.133z"/></svg>', ethereum: '<svg class="p2p-rete-badge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#E9ECEF"/><g fill="#343434"><path fill-opacity=".6" d="M16.498 4v8.87l7.497 3.35z"/><path d="M16.498 4L9 16.22l7.498-3.35z"/><path fill-opacity=".6" d="M16.498 21.968v6.027L24 17.616z"/><path d="M16.498 27.995v-6.028L9 17.616z"/><path fill-opacity=".2" d="M16.498 20.573l7.497-4.353-7.497-3.348z"/><path fill-opacity=".6" d="M9 16.22l7.498 4.353v-7.701z"/></g></svg>'};
 /* «gli euro» / «gli USDT», per le frasi del gesto */
 function soldiValutaP2P(cod){
+  if (String(cod || '').toUpperCase() === 'CHF') return 'i franchi';
   return String(cod || '').toUpperCase() === 'USDT' ? 'gli USDT' : 'gli euro';
 }
 function usdtP2P(o){ return valutaOrdineP2P(o) === 'USDT'; }
@@ -79059,6 +79180,13 @@ const P2P_USDT_PAROLE = [
 ];
 function paroleUsdtP2P(o, testo){
   const t = String(testo == null ? '' : testo);
+  /* ...e IN FRANCHI le sue (14 nov 2026, cantiere p2p-chf): l'articolo
+     prima della parola nuda, «dei franchi» e non «degli franchi» */
+  if (typeof chfP2P === 'function' && chfP2P(o)) {
+    let c = t;
+    for (const [a, b] of P2P_CHF_PAROLE) c = c.split(a).join(b);
+    return c.replace(/\bEURO\b/g, 'FRANCHI').replace(/\bEuro\b/g, 'Franchi').replace(/\beuro\b/g, 'franchi');
+  }
   if (!usdtP2P(o)) return t;
   let s = t;
   for (const [a, b] of P2P_USDT_PAROLE) s = s.split(a).join(b);
@@ -79073,7 +79201,7 @@ function paroleUsdtP2P(o, testo){
    banco) torna l'HTML com'era. */
 const P2P_USDT_MAI = 'textarea, code, .mono, .chatmod, .chatmod-msg, .p2p-recapito';
 function paroleUsdtHtmlP2P(o, html, dove){
-  if (!usdtP2P(o)) return html;
+  if (!usdtP2P(o) && !(typeof chfP2P === 'function' && chfP2P(o))) return html;
   try {
     const t = document.createElement('template');
     t.innerHTML = html;
@@ -79097,6 +79225,8 @@ const P2P_USDT_DOVE = '.steps, .trust-note, button, .hint, .p2p-gesto-tempo, lab
    prezzo `pegged` del nodo), e senza dollaro vero non si inventa. */
 function perSatP2P(o){
   if (usdtP2P(o)) return usdPerSat > 0 ? usdPerSat : 0;
+  /* ...e il franco vale un franco (14 nov 2026, cantiere p2p-chf) */
+  if (typeof chfP2P === 'function' && chfP2P(o)) return typeof chfPerSat !== 'undefined' && chfPerSat > 0 ? chfPerSat : 0;
   return (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
 }
 /* IL TETTO NELLA VALUTA DEL FOGLIO (1 nov 2026, decisione di Andrea:
@@ -79106,10 +79236,17 @@ function perSatP2P(o){
    senza i due cambi non si sa, quindi 1: fermo, mai un via libera
    inventato (la regola del tetto del collaudo). */
 function tettoValutaP2P(cod){
-  const t = maxEuroP2P();
-  if (String(cod || '').toUpperCase() !== 'USDT' || !(t > 0)) return t;
-  if (!(cambioVivo && eurPerSat > 0 && usdPerSat > 0)) return 1;
-  return Math.max(1, Math.floor(t * usdPerSat / eurPerSat));
+  return tettoInValutaP2P(maxEuroP2P(), cod);
+}
+/* ...LO STESSO CONTO PER OGNI TETTO IN EURO (14 nov 2026, cantiere
+   p2p-chf): il generale e quello del contanti di persona, in USDT o in
+   franchi al cambio di adesso. PURA sui cambi di casa. */
+function tettoInValutaP2P(t, cod){
+  const c = String(cod || '').toUpperCase();
+  if ((c !== 'USDT' && c !== 'CHF') || !(t > 0)) return t;
+  const metro = c === 'USDT' ? usdPerSat : (typeof chfPerSat !== 'undefined' ? chfPerSat : 0);
+  if (!(cambioVivo && eurPerSat > 0 && metro > 0)) return 1;
+  return Math.max(1, Math.floor(t * metro / eurPerSat));
 }
 
 /* ---- I CONTI DEGLI INDIRIZZI, scritti qui e PURI ----
@@ -80104,7 +80241,8 @@ function metroFissoP2P(o){
      p2p-usdt): quello che il server timbra e' in EURO, e usato su un
      ordine in USDT direbbe una convenienza falsa. Dopo la presa la
      convenienza di un ordine in USDT tace — detto, non inventato. */
-  const usdt = typeof usdtP2P === 'function' && usdtP2P(o);
+  /* ...e un ordine in franchi come quello in USDT (14 nov 2026, p2p-chf) */
+  const usdt = (typeof usdtP2P === 'function' && usdtP2P(o)) || (typeof chfP2P === 'function' && chfP2P(o));
   if (usdt && o.preso) return 0;
   if (o && o.preso) return Number(o.cambioPresa) > 0 ? Number(o.cambioPresa) / 1e8 : 0;
   if (usdt) return perSatP2P(o);
@@ -81670,12 +81808,17 @@ function scambioInContantiP2P(o){
    dell'ordine o quello scelto. Lo chiedono in TRE: chi pubblica, chi
    prende a cifra fissa, chi prende su un intervallo — la stessa frase,
    dallo stesso giudice, con lo stesso numero. */
-function giudiceContantiP2P(euro, metodi, tetto){
-  const t = Math.floor(Number(tetto)) || 0;
+function giudiceContantiP2P(euro, metodi, tetto, cod){
+  /* IN FRANCHI (14 nov 2026, cantiere p2p-chf): `cod` e' la valuta
+     dell'ordine, e il tetto in euro si traduce al cambio di adesso col
+     suo segno; senza, l'euro di sempre */
+  const inChf = String(cod || '').toUpperCase() === 'CHF';
+  const t = Math.floor(Number(inChf && typeof tettoInValutaP2P === 'function'
+    ? tettoInValutaP2P(Number(tetto) || 0, 'CHF') : tetto)) || 0;
   if (!(t > 0) || !contantiAManoP2P(metodi)) return '';
   const n = Number(euro) || 0;
   if (n <= t) return '';
-  return 'In contanti di persona il massimo è ' + fmt(t) + ' € per scambio: sopra, si divide in più ordini';
+  return 'In contanti di persona il massimo è ' + fmt(t) + (inChf ? ' CHF' : ' €') + ' per scambio: sopra, si divide in più ordini';
 }
 /* LE TRE FRASI DELLA REGOLA, scritte una volta: le legge il foglio
    Pubblica sotto il metodo, il dettaglio di chi prende, la pagina dello
@@ -82175,6 +82318,9 @@ function metodiPubblicabiliP2P(lato){
      foglio (`valutaFoglioP2P`; a rete on-chain solo con gli USDT on-chain) */
   if (typeof valutaFoglioP2P === 'function' && valutaFoglioP2P() === 'USDT'
       && typeof P2P_METODI_USDT !== 'undefined') return P2P_METODI_USDT;
+  /* in franchi i metodi svizzeri (14 nov 2026, cantiere p2p-chf) */
+  if (typeof valutaFoglioP2P === 'function' && valutaFoglioP2P() === 'CHF'
+      && typeof P2P_METODI_CHF !== 'undefined') return P2P_METODI_CHF;
   /* ETH E XMR in fondo, a chi li vede (13 nov 2026, cantiere eth-xmr):
      metodi di un ordine in euro, per tutti e due i lati */
   if (typeof coinVistoP2P === 'function' && coinVistoP2P()) return P2P_METODI.concat(P2P_METODI_COIN);
@@ -83192,11 +83338,14 @@ function valeNuovoOrdineP2P(v){
   /* la valuta dell'ordine (1 nov 2026, cantiere p2p-usdt): le frasi la
      dicono, e di serie e' l'euro di sempre */
   const inUsdt = String(v.valuta || '').toUpperCase() === 'USDT';
-  const segno = inUsdt ? 'USDT' : '€';
+  /* ...e i franchi (14 nov 2026, cantiere p2p-chf) */
+  const inChf = String(v.valuta || '').toUpperCase() === 'CHF';
+  const segno = inUsdt ? 'USDT' : inChf ? 'CHF' : '€';
   const retiUsdt = typeof P2P_METODI_USDT !== 'undefined' ? P2P_METODI_USDT : [];
   if (!(euro > 0))
     return {ok: false, manca: tab ? 'Scrivi l\'importo dell\'ordine Amazon, coi centesimi se servono'
-                                  : inUsdt ? 'Scrivi l\'importo in USDT' : 'Scrivi l\'importo in euro', campo: 'p2pNuovoEuro'};
+                                  : inUsdt ? 'Scrivi l\'importo in USDT' : inChf ? 'Scrivi l\'importo in franchi'
+                                  : 'Scrivi l\'importo in euro', campo: 'p2pNuovoEuro'};
   if (!x.vuoto && !(max > euro))
     return {ok: false, manca: 'L\'importo massimo deve superare il primo',
             campo: 'p2pNuovoEuroMax'};
@@ -83225,14 +83374,26 @@ function valeNuovoOrdineP2P(v){
   if (inUsdt && v.oc)
     return {ok: false, manca: 'Gli scambi on-chain sono solo in euro',
             campo: 'p2pNuovoEuro'};
+  /* IN FRANCHI I METODI SVIZZERI (14 nov 2026, cantiere p2p-chf): TWINT e
+     il bonifico svizzero solo in franchi, e in franchi solo i cinque */
+  const metodiChf = typeof P2P_METODI_CHF !== 'undefined' ? P2P_METODI_CHF : [];
+  if (inChf && (v.metodi || []).some(m => metodiChf.indexOf(m) < 0))
+    return {ok: false, manca: 'In franchi si paga con TWINT, bonifico svizzero, Revolut, Wise o contanti',
+            campo: 'p2pNuovoMetodiBtn'};
+  if (!inChf && (v.metodi || []).some(m => m === 'TWINT' || m === 'Bonifico CH'))
+    return {ok: false, manca: 'TWINT e il bonifico svizzero valgono solo per un ordine in franchi',
+            campo: 'p2pNuovoMetodiBtn'};
+  if (inChf && v.oc)
+    return {ok: false, manca: 'Gli scambi on-chain non sono in franchi',
+            campo: 'p2pNuovoEuro'};
   /* IL TETTO DEL CONTANTI DI PERSONA (30 set 2026): la leva
      P2P_CONTANTI_MAX_EURO, per il solo metodo «Contanti», SOTTO quello
      generale — con piu' metodi e «Contanti» fra questi vale lo stesso,
      perche' chi prende puo' scegliere proprio quello. La frase e' del
      giudice `giudiceContantiP2P`, lo stesso della presa. */
-  const contantiEuro = giudiceContantiP2P(euro, v.metodi, v.maxEuroContanti);
+  const contantiEuro = giudiceContantiP2P(euro, v.metodi, v.maxEuroContanti, v.valuta);
   if (contantiEuro) return {ok: false, manca: contantiEuro, campo: 'p2pNuovoEuro'};
-  const contantiMax = giudiceContantiP2P(max, v.metodi, v.maxEuroContanti);
+  const contantiMax = giudiceContantiP2P(max, v.metodi, v.maxEuroContanti, v.valuta);
   if (contantiMax) return {ok: false, manca: contantiMax, campo: 'p2pNuovoEuroMax'};
   if (!(v.metodi || []).length)
     return {ok: false, manca: 'Scegli almeno un metodo di pagamento',
@@ -83490,7 +83651,9 @@ function ordineDaCampiP2P(v, lato){
     amount: satsFissi,
     /* la valuta del foglio (1 nov 2026, cantiere p2p-usdt): «USDT» solo
        quando e' scelta, e qualunque altra cosa resta l'euro di sempre */
-    fiat_code: String(v.valuta || '').toUpperCase() === 'USDT' ? 'USDT' : 'EUR',
+    /* ...e «CHF» coi franchi (14 nov 2026, cantiere p2p-chf) */
+    fiat_code: String(v.valuta || '').toUpperCase() === 'USDT' ? 'USDT'
+      : String(v.valuta || '').toUpperCase() === 'CHF' ? 'CHF' : 'EUR',
     min_amount: range ? euro : null,
     max_amount: range ? euroMax : null,
     fiat_amount: range ? 0 : euro,
@@ -83626,6 +83789,7 @@ function maxTestoP2P(){
   const cod = typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR';
   const eur = typeof tettoValutaP2P === 'function' ? tettoValutaP2P(cod) : maxEuroP2P();
   if (eur > 0 && cod === 'USDT') return fmt(eur) + ' USDT';
+  if (eur > 0 && cod === 'CHF') return fmt(eur) + ' CHF';
   if (eur > 0) return fmt(eur) + ' €';
   return maxSatsTestoP2P();
 }
@@ -83653,7 +83817,7 @@ function rigaTettoFeeP2P(){
   /* nella valuta del foglio (1 nov 2026, cantiere p2p-usdt) */
   const codT = typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR';
   const tettoEur = typeof tettoValutaP2P === 'function' ? tettoValutaP2P(codT) : maxEuroP2P();
-  const segT = codT === 'USDT' ? ' USDT' : ' €';
+  const segT = codT === 'USDT' ? ' USDT' : codT === 'CHF' ? ' CHF' : ' €';
   /* con TUTT'E DUE i tetti si dicono tutt'e due: quello in euro e'
      la regola di Barattolo, quello in sats resta valido sotto —
      tacerne uno lo farebbe scoprire al momento del rifiuto */
@@ -86007,7 +86171,9 @@ async function inviaNuovoOrdineP2P(confermato){
     /* ...e dal 10 nov 2026 la convenienza di OGNI ordine, positiva o
        negativa (richiesta di Andrea): `convenienzaCanaleP2P` */
     annunciaCanaleP2P(lato, euro, metodo, convenienzaCanaleP2P(ord),
-                      provvisorioP2P(agg.id) ? '' : agg.id);
+                      provvisorioP2P(agg.id) ? '' : agg.id,
+                      /* la valuta dei franchi (14 nov 2026, cantiere p2p-chf) */
+                      typeof chfP2P === 'function' && chfP2P(agg) ? 'CHF' : '');
     /* LA SPUNTA: il coordinatore ha risposto, l'ordine e' nel libro.
        Si ridisegna PRIMA la pagina sotto, cosi' quando il velo scende
        dice gia' «Ordine pubblicato» anche lei. */
@@ -86786,6 +86952,19 @@ const P2P_FORME_RECAPITO = [
      testo composto, cifrata fra le due chiavi, nel ricordo di questo
      dispositivo, precompilata al prossimo scambio; e se e' vuota la sua
      riga non esiste — ne' sul filo ne' da chi compra. */
+  /* I FRANCHI SVIZZERI (14 nov 2026, cantiere p2p-chf). STANNO PRIMA
+     DELLA SEPA, e non e' ordine di comparsa: la regex della `sepa` prende
+     anche «Bonifico CH», e `formaRecapito` tiene la PRIMA che riconosce.
+     TWINT riceve sul numero di cellulare (`giudiceTwintP2P`); il bonifico
+     svizzero vuole intestatario e IBAN CH o LI, col controllo del modulo
+     97 (`giudiceIbanSvizzeroP2P`), chiamati dall'invio. */
+  {forma: 'twint', riconosce: /^twint$/i,
+   campi: [{k: 'tel', et: 'Il numero di cellulare del tuo TWINT', ph: '+41 79 123 45 67'}],
+   componi: c => 'TWINT\nTelefono: ' + c.tel},
+  {forma: 'bonifico-ch', riconosce: /^bonifico ch$/i,
+   campi: [{k: 'nome', et: 'Intestatario (nome e cognome)', ph: 'Mario Rossi'},
+           {k: 'iban', et: 'IBAN svizzero', ph: 'CH93 0076 2011 6238 5295 7'}],
+   componi: c => 'Bonifico CH\nIntestatario: ' + c.nome + '\nIBAN: ' + c.iban},
   {forma: 'sepa', riconosce: /sepa|bonific|iban/i,
    campi: [{k: 'nome', et: 'Intestatario (nome e cognome)', ph: 'Mario Rossi'},
            {k: 'iban', et: 'IBAN', ph: 'IT60X0542811101000000123456'},
@@ -87856,6 +88035,16 @@ async function inviaCampoP2P(tipo, btn){
       campi.indirizzo = String(campi.indirizzo || '').replace(/\s+/g, '');
       const no = giudiceIndirizzoCoinP2P(campi.indirizzo, fr.coin);
       if (no) { toast(no, 7000); el('p2pCampoEuro_indirizzo')?.focus(); return; }
+    }
+    /* I FRANCHI COI LORO CONTROLLI (14 nov 2026, cantiere p2p-chf): il
+       cellulare svizzero di TWINT e l'IBAN CH o LI col modulo 97 */
+    if (fr.forma === 'twint') {
+      const no = giudiceTwintP2P(campi.tel);
+      if (no) { toast(no, 6000); el('p2pCampoEuro_tel')?.focus(); return; }
+    }
+    if (fr.forma === 'bonifico-ch') {
+      const no = giudiceIbanSvizzeroP2P(campi.iban);
+      if (no) { toast(no, 6000); el('p2pCampoEuro_iban')?.focus(); return; }
     }
     /* controllo LEGGERO, sulla sagoma e non sul contenuto: due lettere
        di paese, due cifre, e una lunghezza da IBAN */
@@ -89824,7 +90013,7 @@ function scambiP2P(){
      set 2026 lo stato vuoto non li nomina piu'). */
   if (!mostrati.length && !filtroAccesoMieiP2P(p2pMieiFiltro, p2pMieiVerso)) return '';
   if (!mostrati.length)
-    return '<div class="empty"><img class="scambi-img scambi-mini" src="/assets/scambi-monete.webp" width="846" height="300" alt="" onerror="this.remove()">'
+    return '<div class="empty"><img class="scambi-img scambi-mini" src="/assets/scambi-monete.webp" width="904" height="300" alt="" onerror="this.remove()">'
       + vuotoFiltroMieiP2P(righe.length, p2pMieiFiltro, p2pMieiVerso)
       + '<button type="button" class="scopri-link" onclick="azzeraFiltroMieiP2P()">Togli il filtro</button></div>';
   const troppi = mostrati.length - P2P_SCAMBI_MAX;
@@ -90409,7 +90598,7 @@ function bannerNascostoPrimoOrdineP2P(){
    ordine» — lo stesso `vestitoInvioP2P` */
 function rigaPortaP2P(){
   const vestito = typeof vestitoInvioP2P === 'function' ? vestitoInvioP2P(false) : 'primary';
-  return '<div class="empty"><img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" width="846" height="300" alt="" onerror="this.remove()">'
+  return '<div class="empty"><img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" width="904" height="300" alt="" onerror="this.remove()">'
     + '<span class="empty-title">Per entrare oggi pubblica il tuo primo ordine.</span>'
     + 'Dalle 10:00 di domani si prende. '
     + '<button type="button" class="btn ' + vestito + '" onclick="apriNuovoOrdineP2P()">Pubblica il tuo primo ordine</button></div>';
@@ -91163,11 +91352,14 @@ const P2P_VT_COPPIE = {
   usdt: '/assets/p2p-coppia-usdt.webp',
   eth: '/assets/p2p-coppia-eth.webp',
   xmr: '/assets/p2p-coppia-xmr.webp',
-  usde: '/assets/p2p-coppia-usde.webp'
+  usde: '/assets/p2p-coppia-usde.webp',
+  chf: '/assets/p2p-coppia-chf.webp'
 };
 /* PURA: la chiave della coppia di un ordine, sempre una di quelle sopra */
 function coppiaVetrinaP2P(o){
   if (typeof usdtP2P === 'function' && usdtP2P(o)) return 'usdt';
+  /* il franco (14 nov 2026, cantiere p2p-chf): sulla valuta dell'ordine */
+  if (typeof chfP2P === 'function' && chfP2P(o)) return 'chf';
   const r = typeof coinUnicaP2P === 'function' ? coinUnicaP2P(o && o.metodi) : null;
   const k = r && typeof logoCoinP2P === 'function' ? logoCoinP2P(r) : '';
   return k && k !== 'eur' && Object.prototype.hasOwnProperty.call(P2P_VT_COPPIE, k) ? k : 'eur';
@@ -91196,6 +91388,8 @@ function cardVetrinaP2P(o){
   const vesteFondo = tab || coppia === 'eur' ? '' : ' p2p-vt-' + coppia;
   /* la cifra di un ordine in USDT e' in USDT: «Invia 50 USDT», non € */
   const inUsdt = coppia === 'usdt';
+  /* ...e quella in franchi in franchi (14 nov 2026, cantiere p2p-chf) */
+  const inChf = coppia === 'chf';
   /* I DUE CAPI A PAROLE, «da 5 a 15 €» (6 ott 2026, ritocco di Andrea):
      il trattino fra due numeri si leggeva come una sottrazione, come nel
      libro (vedi `capiP2P`). Nel cartellino lo spazio e' poco, quindi
@@ -91243,7 +91437,7 @@ function cardVetrinaP2P(o){
      tacerebbe. La base sta in `data-voce`, la coda la scrive
      `codaVoceVolto` dalla cache, e `ridisegnaVolti` la riscrive quando
      il volto arriva in ritardo. */
-  const voce = lato + ', ' + verboEuro.toLowerCase() + ' ' + euro + (inUsdt ? ' USDT' : ' euro')
+  const voce = lato + ', ' + verboEuro.toLowerCase() + ' ' + euro + (inUsdt ? ' USDT' : inChf ? ' franchi' : ' euro')
     + (metodi ? ', ' + (o.metodi || []).map(metodoBaseP2P).join(', ') : '')
     + (zona ? ', zona ' + zona : '');
   const chiave = chiaveVolto('p2p:' + o.id);
@@ -91255,7 +91449,7 @@ function cardVetrinaP2P(o){
         <div class="ph p2p-vt-fondo${vesteFondo}">${fondo}</div>
         <span class="p2p-vt-lato ${compro ? 'compra' : 'vendi'}">${lato}</span>
         ${voltoHTML(f, 'p2p-vt-volto', {chiave: 'p2p:' + o.id})}${bollinoVolto('p2p:' + o.id, 'p2p-vt-bollino')}${stellinaVolto('p2p:' + o.id, 'p2p-vt-bollino')}
-        <div class="tag-price"><div class="price"><span class="p2p-vt-verbo">${verboEuro}</span>${euroCartello}${inUsdt ? '<span class="unit">USDT</span>' : '<span class="unit eur">€</span>'}</div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
+        <div class="tag-price"><div class="price"><span class="p2p-vt-verbo">${verboEuro}</span>${euroCartello}${inUsdt ? '<span class="unit">USDT</span>' : inChf ? '<span class="unit">CHF</span>' : '<span class="unit eur">€</span>'}</div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
       </div>
       <div class="info">
         <div class="title">${metodi || 'Scambio P2P'}</div>
@@ -94997,7 +95191,7 @@ function convenienzaCanaleP2P(ord){
   const p = Number(ord.premium);
   return Number.isFinite(p) ? Math.round(p) : null;
 }
-async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine){
+async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta){
   if (DEMO || VETRINA || !myTgId) return;
   /* `premio`: per Barattozon il premio scelto (26 set 2026), che a
      prezzo fisso non sta in nessun campo del libro; dal 10 nov 2026
@@ -95005,6 +95199,9 @@ async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine){
      Quando non si sa la chiave non c'e' e il post tace */
   const corpo = {lato: lato, euro: euro, metodo: metodo};
   if (Number.isInteger(premio)) corpo.premio = premio;
+  /* la valuta, solo per i franchi (14 nov 2026, cantiere p2p-chf): il
+     server scrive «CHF» invece di «€», e senza resta l'euro di sempre */
+  if (valuta === 'CHF') corpo.valuta = 'CHF';
   /* l'id del mio ordine (27 set 2026): il server rifa' la fotografia
      subito e sa quale aspettare — riprova solo se non c'e' ancora */
   if (ordine) corpo.ordine = String(ordine);
@@ -98496,6 +98693,8 @@ async function avvia(){
     myP2POnchain = !!me.p2p_onchain;
     /* ...e gli ordini in USDT (1 nov 2026) */
     myP2PUsdt = !!me.p2p_usdt;
+    /* ...e quelli in franchi (14 nov 2026, cantiere p2p-chf) */
+    myP2PChf = !!me.p2p_chf;
     myP2POnchainUsdt = !!me.p2p_onchain_usdt;
     myP2PCoin = !!me.p2p_coin;
     myOnchainIncasso = me.onchain_incasso || '';

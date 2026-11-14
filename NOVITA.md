@@ -134,3 +134,9 @@ frase: Nella home, nella fila «Scambi P2P», ogni ordine ora ha la sua moneta: 
 dove: la home del mercatino (fila «Scambi P2P») e la pagina «I miei scambi».
 leva: P2P_IN_VETRINA e P2P_USDT_ATTIVO (nessuna leva nuova)
 pubblico: sì
+
+## 2026-11-14 · p2p-chf
+frase: Nel P2P arriva il franco svizzero: si possono pubblicare e prendere ordini in CHF, pagati con TWINT, bonifico svizzero, Revolut, Wise o contanti di persona. La card dice CHF con la croce svizzera, il tetto della beta è quello degli euro convertito in franchi, e l'app controlla il numero TWINT e l'IBAN svizzero prima che partano.
+dove: la scheda «P2P», il foglio «Pubblica» (valuta CHF), le card del libro e della home.
+leva: P2P_CHF_ATTIVO (nuova, spenta) e P2P_CHF_SOLO_ADMIN
+pubblico: no

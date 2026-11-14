@@ -188,7 +188,7 @@ Se chi vende chiede di annullare uno scambio coi sats già in garanzia, chi comp
 
 Barattozon (nel libro «Contanti al tabacchino»): chi vende sats fa un ordine Amazon da pagare in contanti nel punto vendita, e chi compra lo paga alla cassa di un tabacchino abilitato col PayCode. Il PayCode vale almeno 25 € e Amazon lo accetta fino a 999 €. Si paga solo quando la pagina dice «Sats in garanzia», si tiene lo scontrino come prova, e poi si tocca «Ho pagato al tabacchino». Chi vende controlla su Amazon che l'ordine risulti pagato e libera i sats. Alla cassa bisogna dire «devo pagare un ordine Amazon in contanti con un PayCode»: non una ricarica e non un buono regalo. Barattozon c'è da tutti e due i lati del libro: anche chi COMPRA sats può pubblicare un ordine «al tabacchino», con una fascia di euro (per esempio da 30 a 80 €, il massimo è obbligatorio); chi vende lo prende scrivendo il PayCode (importo esatto, le nove cifre, la scadenza) e chi compra lo paga al tabacchino.
 
-Altre valute e reti (solo se nei NUMERI DI OGGI risultano disponibili): ordini P2P pagati in USDT al posto degli euro (qui sotto), e scambi P2P coi bitcoin on-chain, con la garanzia a firme multiple (due chiavi su tre).
+Altre valute e reti (solo se nei NUMERI DI OGGI risultano disponibili): ordini P2P pagati in USDT al posto degli euro (qui sotto), ordini P2P in franchi svizzeri (CHF), e scambi P2P coi bitcoin on-chain, con la garanzia a firme multiple (due chiavi su tre).
 
 <!-- pezzo libro-013 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (4/6)
@@ -203,24 +203,30 @@ Ordini P2P in USDT (se nei NUMERI DI OGGI «Ordini P2P in USDT» è acceso): al 
 - Chi paga vede la rete in grande, l'indirizzo col QR e il contratto del vero USDT, per non farsi ingannare da token falsi che si chiamano «USDT» anche loro. Manda gli USDT, incolla l'id della transazione (lo trova nei dettagli dell'invio, nel wallet) e tocca «💵 Ho inviato gli USDT».
 - Chi vende controlla che siano arrivati sulla rete giusta, anche col tasto «🔎 Controlla su Tronscan» (o Etherscan) sotto l'id, e libera i sats solo quando ci sono davvero. Se qualcosa non torna si apre una disputa: il moderatore legge l'id della transazione sulla rete giusta.
 
-Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è disponibile): si scambiano bitcoin sulla rete principale, non su Lightning. La garanzia non è quella di Lightning: chi vende blocca i bitcoin in un deposito a tre chiavi, una sua, una di chi compra e una di Barattolo, e per spostarli ne servono due. Barattolo da solo non li può muovere.
+Ordini P2P in franchi svizzeri (se nei NUMERI DI OGGI «Scambi P2P pagati in franchi svizzeri (CHF)» è disponibile): al posto degli euro l'ordine è in franchi svizzeri, CHF. I sats restano su Lightning con la garanzia di sempre; i franchi passano direttamente da una persona all'altra, e Barattolo non li tocca mai.
 
 <!-- pezzo libro-014 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (5/6)
 
+- Nel libro un ordine in franchi si riconosce dalla croce bianca su fondo rosso nei quadratini in alto a destra della card; nella home la sua card è rossa, col ₿ accanto al franco, e la cifra è scritta in CHF.
+- Per pubblicarne uno: scheda «P2P», nuovo ordine, e in cima al foglio si sceglie la valuta CHF. I metodi sono TWINT, bonifico svizzero («Bonifico CH»), Revolut, Wise e contanti di persona; TWINT e il bonifico svizzero esistono solo negli ordini in franchi. Il tetto della fase beta è lo stesso degli euro, convertito in franchi al cambio del momento, e vale anche per i contanti di persona. Gli scambi on-chain e Barattozon non sono in franchi.
+- Chi riceve i franchi scrive nello scambio dove riceverli: per TWINT il numero di cellulare svizzero (+41 7…), per il bonifico svizzero intestatario e IBAN svizzero (comincia con CH o LI, 21 caratteri). L'app controlla il numero e l'IBAN prima che partano, e ferma un numero non svizzero o un IBAN con una cifra sbagliata.
+- Chi paga manda i franchi e tocca «Ho inviato i franchi»; chi vende controlla di averli ricevuti e libera i sats.
+
+Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è disponibile): si scambiano bitcoin sulla rete principale, non su Lightning. La garanzia non è quella di Lightning: chi vende blocca i bitcoin in un deposito a tre chiavi, una sua, una di chi compra e una di Barattolo, e per spostarli ne servono due. Barattolo da solo non li può muovere.
 - Nel libro uno scambio on-chain si riconosce dalla moneta arancio ₿ (quelli di Lightning hanno il fulmine). Sopra le card c'è il rettangolo arancio «On-Chain» con la scritta «Novità», che apre la pagina «Scambi on-chain»: lì si pubblica («Pubblica uno scambio on-chain») e si seguono i propri.
 - Per pubblicare si può anche toccare il + di «Compra BTC» o «Vendi BTC» e scegliere «On-chain» invece di «Lightning». Serve aver preparato Profilo → «₿ On-chain» (le 12 parole e la loro copia: vedi «Bitcoin on-chain»). Un ordine resta nel libro 24 ore; il tetto per ordine è quello on-chain dei NUMERI DI OGGI e del paragrafo sui limiti.
 - Il giro, passo per passo: chi prende fa nascere l'indirizzo a tre chiavi. Chi vende ha 6 ore per depositare con «🔒 Blocca i sats»: i sats dello scambio più un piccolo margine per la commissione della rete. Con una conferma della rete (circa dieci minuti) lo scambio va avanti, e tutti e due ricevono l'avviso. Allora chi compra manda gli euro col metodo scritto e tocca «💶 Ho inviato gli euro». Chi vende li controlla sul suo conto e SOLO quando li vede tocca «🔓 Ricevuti: libera i sats»; la seconda firma la mette da solo il telefono di chi compra, e i bitcoin partono.
 - Chi compra deve dire dove ricevere: nello scambio c'è «Dove ricevi i bitcoin?», si incolla un proprio indirizzo e si tocca «✍️ Firma e usa questo indirizzo». Chi ha messo nel Profilo la chiave del conto del suo wallet non deve scriverlo ogni volta: ogni scambio arriva a un indirizzo nuovo.
+
+<!-- pezzo libro-015 | libro -->
+## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (6/6)
+
 - Se il deposito non arriva in tempo, chi compra può rinunciare («Rinuncia: il deposito non è arrivato»); chi deve depositare e non ha ancora mandato niente può annullare («Annulla (non deposito)»). Con i sats già nel deposito non si annulla da soli: si esce col rimborso d'accordo o con «⚖️ Apri una disputa». Decide un moderatore di Barattolo, Barattolo mette la sua firma e la seconda la mette il telefono di chi ha ragione.
 - A fine scambio la pagina dice «Concluso: i sats sono andati al wallet di chi ha comprato» oppure «Rimborsato: i sats sono tornati a chi li aveva depositati».
 - USDT negli scambi on-chain (se nei NUMERI DI OGGI «Scambi P2P on-chain pagati in USDT» è disponibile): la garanzia resta il deposito bitcoin a tre chiavi, e al posto degli euro chi compra paga in USDT su Tron o Ethereum, da persona a persona, con le stesse regole degli ordini in USDT qui sopra: chi vende scrive il suo indirizzo USDT, chi paga incolla l'id della transazione e tocca «Ho inviato gli USDT». Un ordine è in una valuta sola: o euro o USDT.
 
 Ricevere o pagare su un'altra rete (se nei NUMERI DI OGGI «P2P su un'altra rete» è disponibile): la rete di un ordine dice come paga chi l'ha pubblicato, ma chi lo prende può usare l'altra, con uno swap di SATS Routing fatto dal suo telefono (come la pagina «Swap»). Il costo dello swap si vede prima di confermare, e Barattolo non aggiunge commissioni.
-
-<!-- pezzo libro-015 | libro -->
-## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (6/6)
-
 - Ordine Lightning, ma vuoi ricevere bitcoin on-chain: nel foglio «Dove ricevere i sats» scegli «₿ On-chain», incolli un tuo indirizzo bitcoin e l'app ti dice quanti sats ti arrivano circa e quanto costa lo swap. Alla liberazione i sats diventano bitcoin al tuo indirizzo. Se il moderatore dà ragione a chi vende, lo swap scade senza costare niente.
 - Scambio on-chain, ma vuoi ricevere in Lightning: nello scambio tocchi «⚡ Ricevi in Lightning» e, quando chi vende ha confermato gli euro, incolli una tua richiesta Lightning (o «⚡ Prendila dal mio Lightning address») e tocchi «✅ Conferma lo swap». Ti arriva il prezzo meno il costo dello swap; se la richiesta non si riesce a pagare, i bitcoin tornano da soli al tuo wallet on-chain di Barattolo. Si torna indietro con «₿ Ricevi on-chain invece».
 - Scambio on-chain che hai preso tu per vendere, ma hai solo sats Lightning: nel foglio «🔒 Blocca i sats» scegli «⚡ Lightning» e tocchi «⚡ Crea la richiesta Lightning»; la paghi col tuo wallet e lo swap mette i bitcoin nel deposito a tre chiavi. Un annullo o un rimborso tornano però on-chain, al tuo wallet di Barattolo.
@@ -1295,3 +1301,11 @@ frase: Nella home, nella fila «Scambi P2P», ogni ordine ora ha la sua moneta: 
 dove: la home del mercatino (fila «Scambi P2P») e la pagina «I miei scambi».
 leva: P2P_IN_VETRINA e P2P_USDT_ATTIVO (nessuna leva nuova)
 pubblico: sì
+
+<!-- pezzo novita-017 | novita -->
+## Novità · 2026-11-14 · p2p-chf
+
+frase: Nel P2P arriva il franco svizzero: si possono pubblicare e prendere ordini in CHF, pagati con TWINT, bonifico svizzero, Revolut, Wise o contanti di persona. La card dice CHF con la croce svizzera, il tetto della beta è quello degli euro convertito in franchi, e l'app controlla il numero TWINT e l'IBAN svizzero prima che partano.
+dove: la scheda «P2P», il foglio «Pubblica» (valuta CHF), le card del libro e della home.
+leva: P2P_CHF_ATTIVO (nuova, spenta) e P2P_CHF_SOLO_ADMIN
+pubblico: no

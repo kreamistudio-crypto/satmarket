@@ -9051,7 +9051,10 @@ def init_db():
                     # la zona di scambio del contanti (10 ott 2026)
                     "zona TEXT DEFAULT ''",
                     # chi puo' prendere l'ordine (10 ott 2026, reputazione-p2p)
-                    "min_completati INTEGER DEFAULT 0"):
+                    "min_completati INTEGER DEFAULT 0",
+                    # la valuta dell'ordine, il `f` del 38383 (14 nov 2026,
+                    # p2p-chf): '' = mai letta, cioe' l'euro di sempre
+                    "fiat TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -15830,7 +15833,13 @@ CAMBIO_RIPROVA_S = 60     # dopo un buco si aspetta prima di ribussare:
 # resta l'euro. Serve SOLO all'import da Nostr, che incontra tag
 # `price` in USD e senza un cambio quegli annunci li salta (vedi
 # `cambio_per_import`).
-VALUTE_CAMBIO = ("eur", "usd")
+# IL FRANCO SVIZZERO (14 nov 2026, cantiere p2p-chf): la terza, dalla
+# stessa GET, per le stime in sats e il tetto degli ordini P2P in CHF.
+# Nemmeno lui entra nei percorsi del denaro, e l'import da Nostr resta
+# a euro e dollari (`VALUTE_IMPORT`): un annuncio in franchi da fuori
+# non e' una porta che questo cantiere apre.
+VALUTE_CAMBIO = ("eur", "usd", "chf")
+VALUTE_IMPORT = ("eur", "usd")
 _cambio_cache = {"valori": {v: 0.0 for v in VALUTE_CAMBIO},
                  "quando": 0.0, "tentato": 0.0}
 
@@ -15931,7 +15940,7 @@ def cambio_per_import() -> dict:
     il nostro rinfresco.
     Vuoto = «non disponibile», e l'import si comporta come ha sempre
     fatto in quel caso: salta gli annunci in EUR/USD e lo dice."""
-    return {v.upper(): c for v in VALUTE_CAMBIO
+    return {v.upper(): c for v in VALUTE_IMPORT
             if (c := cambio_noto_ora(v)) > 0}
 
 
@@ -16295,6 +16304,9 @@ def cambio_da_solo():
     # come il prezzo `pegged` del nodo). Mai nei percorsi del denaro.
     busta = {"cambio_eur": cambio_noto_ora(),
              "cambio_usd": cambio_noto_ora("usd"),
+             # ...e il franco (14 nov 2026, cantiere p2p-chf): le stime
+             # e il tetto degli ordini P2P in CHF; 0 = non lo so
+             "cambio_chf": cambio_noto_ora("chf"),
              "cambio_eta_s": cambio_eta_ora()}
     # ...e quanti euro vale un ETH e un XMR (13 nov 2026, cantiere
     # eth-xmr), solo sull'istanza di prova: la cifra da mandare negli
@@ -22527,6 +22539,8 @@ def numeri_assistente() -> str:
         f"«📥 Come ricevi», e la scelta annuncio per annuncio): "
         f"{si(swap_auto_per(0))}.",
         f"- Scambi P2P pagati in USDT: {si(p2p_usdt_ammesso(0))}.",
+        # (14 nov 2026, cantiere p2p-chf) i franchi svizzeri, col loro cancello
+        f"- Scambi P2P pagati in franchi svizzeri (CHF): {si(p2p_chf_ammesso(0))}.",
         f"- Scambi P2P in bitcoin on-chain: {si(p2p_onchain_ammesso(0))}.",
         # (12 nov 2026, cantiere sapere-onchain) le due leve del P2P che
         # il libro di Tappo spiega e che dal pannello arrivavano solo come
@@ -28267,6 +28281,8 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # ...e il dollaro (1 nov 2026, cantiere p2p-usdt): le stime in
         # sats degli ordini P2P in USDT, 1 USDT = 1 $; 0 = non lo so
         risposta["cambio_usd"] = cambio_noto_ora("usd")
+        # ...e il franco (14 nov 2026, cantiere p2p-chf): ordini P2P in CHF
+        risposta["cambio_chf"] = cambio_noto_ora("chf")
         # ...e la sua eta' in secondi (19 ott 2026, tasso-in-chiaro): il
         # libro P2P e il conto di un ordine dicono il cambio in chiaro,
         # con l'ora; None = non c'e' (vedi `cambio_eta_ora`)
@@ -35041,6 +35057,20 @@ def _leve_stato():
                   spento="gli scambi on-chain si pagano solo in euro",
                   allarme=bool(P2P_ONCHAIN_USDT_ATTIVO) and not (
                       P2P_ONCHAIN_ATTIVO and P2P_USDT_ATTIVO)),
+            # GLI ORDINI P2P IN FRANCHI (14 nov 2026, cantiere p2p-chf)
+            _leva("Ordini P2P in franchi svizzeri", "P2P_CHF_ATTIVO",
+                  bool(P2P_CHF_ATTIVO),
+                  acceso="nel foglio «Pubblica» c'è anche la valuta CHF "
+                         "(TWINT, bonifico svizzero, Revolut, Wise, contanti) "
+                         "e il libro mostra gli ordini in franchi; vale solo "
+                         "se il nodo ha CHF fra le valute accettate",
+                  spento="il P2P è solo in euro e USDT, come ieri"),
+            _leva("Franchi solo agli admin", "P2P_CHF_SOLO_ADMIN",
+                  bool(P2P_CHF_SOLO_ADMIN),
+                  acceso="gli ordini in franchi li vedono solo i moderatori "
+                         "(ADMIN_IDS)",
+                  spento="appena P2P_CHF_ATTIVO si accende li vede "
+                         "chiunque abbia il P2P"),
             _leva("USDT solo agli admin", "P2P_USDT_SOLO_ADMIN",
                   bool(P2P_USDT_SOLO_ADMIN),
                   acceso="gli ordini in USDT li vedono solo i moderatori "
@@ -48491,6 +48521,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # P2P_USDT_ATTIVO, la porticina degli admin e il P2P per me. Senza,
     # il libro non mostra gli ordini in USDT e il foglio offre l'euro solo.
     profilo["p2p_usdt"] = p2p_usdt_ammesso(user["id"])
+    # ...e gli ordini P2P in franchi svizzeri (14 nov 2026, cantiere
+    # p2p-chf): lo stesso cancello, con le sue due leve
+    profilo["p2p_chf"] = p2p_chf_ammesso(user["id"])
     # ...e gli USDT negli scambi on-chain col 2-di-3 (2 nov 2026, cantiere
     # p2p-onchain-usdt): la leva sua sotto i due cancelli di sopra
     profilo["p2p_onchain_usdt"] = p2p_onchain_usdt_ammesso(user["id"])
@@ -52384,7 +52417,7 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
         valuta = str(d.get("valuta") or "").strip().upper()
         if valuta not in ("",) + VALUTE_AVVISI_NUOVI_P2P:
             con.close()
-            raise HTTPException(400, "Valuta sconosciuta: tutte, euro o USDT")
+            raise HTTPException(400, "Valuta sconosciuta: tutte, euro, USDT o franchi")
     else:
         r = con.execute("SELECT avvisi_nuovi_valuta FROM utenti WHERE tg_id=?",
                         (user["id"],)).fetchone()
@@ -54221,6 +54254,30 @@ if not isinstance(P2P_USDT_SOLO_ADMIN, bool):
     print("[p2p] P2P_USDT_SOLO_ADMIN non e' True/False: gli USDT li "
           "vedono solo gli admin", flush=True)
     P2P_USDT_SOLO_ADMIN = True
+# GLI ORDINI P2P IN FRANCHI SVIZZERI (14 nov 2026, cantiere p2p-chf,
+# Andrea: «abbiamo stretto una collaborazione con Lugano», e la strada
+# dell'USDT: il CHF valuta VERA dell'ordine, il `f` del 38383). Il calco
+# delle due leve dell'USDT: `P2P_CHF_ATTIVO` dice se la funzione esiste,
+# `P2P_CHF_SOLO_ADMIN` per chi. Il franco e' una moneta come l'euro —
+# il nodo lo prezza con la sua fonte di sempre, niente `pegged` — e
+# accesa NON BASTA: il nodo deve avere «CHF» fra le valute accettate
+# (`fiat_currencies_accepted`), gesto di Andrea (DA-FARE). Storta: spenta.
+try:
+    from config import P2P_CHF_ATTIVO
+except ImportError:
+    P2P_CHF_ATTIVO = False
+if not isinstance(P2P_CHF_ATTIVO, bool):
+    print("[p2p] P2P_CHF_ATTIVO non e' True/False: gli ordini in franchi "
+          "restano spenti", flush=True)
+    P2P_CHF_ATTIVO = False
+try:
+    from config import P2P_CHF_SOLO_ADMIN
+except ImportError:
+    P2P_CHF_SOLO_ADMIN = True
+if not isinstance(P2P_CHF_SOLO_ADMIN, bool):
+    print("[p2p] P2P_CHF_SOLO_ADMIN non e' True/False: i franchi li "
+          "vedono solo gli admin", flush=True)
+    P2P_CHF_SOLO_ADMIN = True
 # IL TETTO DEL COLLAUDO (20 ott 2026, decisione di Andrea con Alan): sul
 # collaudo il P2P parla col coordinatore VERO, quindi ordini e sats sono
 # veri; un ordine dal collaudo non supera P2P_MAX_SATS_PROVA sats, di
@@ -54798,6 +54855,62 @@ def p2p_usdt_ordine(con, ordine) -> bool:
         return False
     return (isinstance(metodi, list) and len(metodi) > 0
             and all(str(m).startswith("USDT (") for m in metodi))
+
+
+# LE PAROLE DEL BOT IN FRANCHI (14 nov 2026, cantiere p2p-chf): il calco
+# di `P2P_USDT_FRASI`, piu' corto, perche' il franco si paga come l'euro
+# (bonifico, conto, contanti): cambiano solo i soldi. L'italiano vuole
+# l'articolo giusto, e «gli euro» → «i franchi» lo da' anche dentro le
+# preposizioni: «degli euro» diventa «dei franchi», «agli euro» «ai
+# franchi». Per questo la riga dell'articolo viene PRIMA della parola
+# nuda. `prove_p2p_chf` passa le famiglie degli avvisi di qui e vuole
+# zero «euro» e zero «€» nel risultato.
+P2P_CHF_FRASI = (
+    ("💶", "🇨🇭"),
+    ("Gli euro", "I franchi"), ("gli euro", "i franchi"),
+    ("Un euro", "Un franco"), ("un euro", "un franco"),
+    ("Euro inviati", "Franchi inviati"),
+    ("\u00a0€", "\u00a0CHF"),
+    (" €", " CHF"),
+)
+
+
+def p2p_chf_frase(testo: str) -> str:
+    """PURA: un avviso scritto per gli euro, detto per i franchi."""
+    t = str(testo or "")
+    for vecchio, nuovo in P2P_CHF_FRASI:
+        t = t.replace(vecchio, nuovo)
+    # e ogni «euro» rimasto («i tuoi euro», «in euro»), parola intera
+    t = re.sub(r"\bEURO\b", "FRANCHI", t)
+    t = re.sub(r"\bEuro\b", "Franchi", t)
+    return re.sub(r"\beuro\b", "franchi", t)
+
+
+def p2p_chf_ordine(con, ordine) -> bool:
+    """L'ordine e' in franchi? Lo dice la valuta del libro (`p2p_ordini.
+    fiat`, il `f` del 38383). Senza riga, senza colonna (un banco) o mai
+    letta, e' l'euro di sempre."""
+    try:
+        r = con.execute("SELECT fiat FROM p2p_ordini WHERE ordine=?",
+                        (str(ordine or ""),)).fetchone()
+    except Exception:
+        return False
+    try:
+        return bool(r) and str(r["fiat"] or "").upper() == "CHF"
+    except (IndexError, KeyError, TypeError):
+        return bool(r) and str(r[0] or "").upper() == "CHF"
+
+
+def p2p_chf_ammesso(tg_id) -> bool:
+    """CHI VEDE GLI ORDINI IN FRANCHI (14 nov 2026, cantiere p2p-chf): il
+    calco di `p2p_usdt_ammesso` — la leva madre spenta e' no per
+    chiunque, poi la porticina degli admin, poi il P2P per questa
+    persona."""
+    if not (P2P_CHF_ATTIVO and _p2p_leve()["attivo"]):
+        return False
+    if P2P_CHF_SOLO_ADMIN and not e_admin(tg_id):
+        return False
+    return bool(_p2p_per(tg_id)["attivo"])
 
 
 def p2p_usdt_ammesso(tg_id) -> bool:
@@ -59463,6 +59576,9 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
         # in USDT con le sue parole (2 nov 2026, usdt-due-reti)
         if a_chi and p2p_usdt_ordine(con, (d or {}).get("ordine")):
             testo = p2p_usdt_frase(testo)
+        # ...e in franchi con le sue (14 nov 2026, cantiere p2p-chf)
+        elif a_chi and p2p_chf_ordine(con, (d or {}).get("ordine")):
+            testo = p2p_chf_frase(testo)
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -62118,7 +62234,7 @@ def _premio_canale_p2p(lato: str, premio: int) -> str:
 
 
 def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
-                        premio=None, zona: str = "") -> str:
+                        premio=None, zona: str = "", valuta: str = "EUR") -> str:
     """La caption del post P2P nel canale «Barattolo Vetrina», gemella
     di `_caption_canale` ma per un ordine invece che per un annuncio
     (chiesto da Andrea, set 2026: il P2P deve vedersi in vetrina come
@@ -62138,7 +62254,12 @@ def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
     annunci normali, e ora anche qui."""
     verbo = "Compra" if lato == "compro" else "Vende"
     testo = f"🔁 <b>{verbo} BTC su Barattolo</b>"
-    testo += f"\n💶 {_fmt_eur(euro)} €"
+    # IN FRANCHI (14 nov 2026, cantiere p2p-chf): la cifra col suo segno;
+    # ogni altra valuta resta la riga di ieri, byte per byte
+    if valuta == "CHF":
+        testo += f"\n🇨🇭 {_fmt_eur(euro)} CHF"
+    else:
+        testo += f"\n💶 {_fmt_eur(euro)} €"
     # IL PREMIO DI BARATTOZON (26 set 2026): a prezzo fisso non sta in
     # nessun campo del libro, e chi legge il canale e' lo stesso che
     # legge la card — le stesse parole. Per gli altri ordini `None`, e
@@ -62276,6 +62397,12 @@ async def annuncia_ordine_p2p_canale(req: Request,
     # 400: il post esce senza, che la vetrina non deve fermare nessuno.
     zona = _zona_pulita_p2p(d.get("zona")) \
         if "Contanti" in _metodi_lista_p2p(metodo) else ""
+    # LA VALUTA (14 nov 2026, cantiere p2p-chf): «CHF» o l'euro di sempre.
+    # Un ordine in franchi esce nei canali solo coi franchi aperti a tutti
+    # (`P2P_CHF_SOLO_ADMIN` spenta): un post pubblico non annuncia quel che
+    # chi lo legge non puo' prendere
+    valuta = "CHF" if str(d.get("valuta") or "").upper() == "CHF" else "EUR"
+    chf_chiuso = valuta == "CHF" and (P2P_CHF_SOLO_ADMIN or not P2P_CHF_ATTIVO)
     postato = False
     # UN POST PER ORDINE, E UNO OGNI DIECI MINUTI PER PERSONA (cura 4, la
     # M3 del secondo audit): il doppione e il raffica NON sono un 429 —
@@ -62309,7 +62436,7 @@ async def annuncia_ordine_p2p_canale(req: Request,
     # senza il filtro dell'@username, perche' quel pubblico e' di
     # bitcoiner e la menzione Telegram non e' la maniglia che si aspetta.
     if (canale_id() or vetrina_ok or canale_bitcoin_podcast()) \
-            and not doppione and not raffica:
+            and not doppione and not raffica and not chf_chiuso:
         try:
             con = db()
             riga = con.execute(
@@ -62324,7 +62451,8 @@ async def annuncia_ordine_p2p_canale(req: Request,
                 "venditore_npub_accesso": (riga["npub_accesso"] if riga else "") or "",
                 "venditore_negozio": (riga["negozio"] if riga else "") or "",
             }
-            caption = _caption_canale_p2p(lato, euro, metodo, venditore, premio, zona)
+            caption = _caption_canale_p2p(lato, euro, metodo, venditore, premio, zona,
+                                          valuta)
             if canale_id():
                 try:
                     postato = bool(await _manda_post_canale(canale_id(), caption, []))
@@ -63845,6 +63973,10 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
         _usdt = globals().get("p2p_usdt_ordine")
         if _usdt and _usdt(con, r["ordine"]):
             testo = p2p_usdt_frase(testo)
+        # ...e in franchi (14 nov 2026, cantiere p2p-chf), stesso `globals()`
+        _chf = globals().get("p2p_chf_ordine")
+        if _chf and _chf(con, r["ordine"]):
+            testo = p2p_chf_frase(testo)
         if bottoni is not None:
             # (dal 10 ott 2026 anche i solleciti — a chi vende e a chi
             # compra — portano il bottone: dicono «dalla pagina dello
@@ -65142,6 +65274,10 @@ def _testo_garanzia_mod_p2p(livello: int, ore: int, d: dict, per: int = 0) -> st
     gesto = GESTO_PAGATO_P2P.get(d.get("modo") or "", GESTO_PAGATO_P2P[""])
     if d.get("usdt"):
         gesto = "Ho inviato gli USDT"
+    # IN FRANCHI (14 nov 2026, cantiere p2p-chf): cifra e gesto coi franchi
+    if d.get("chf") and not d.get("usdt"):
+        euro = euro.replace(" €", " CHF")
+        gesto = p2p_chf_frase(gesto)
     fiat = int(d.get("fiat_il") or 0)
     disp = int(d.get("disputa_il") or 0)
     if livello >= 88:
@@ -65268,6 +65404,9 @@ def _garanzie_lunghe_p2p(con, adesso: int, bottoni: dict = None) -> list:
                     _usdt = globals().get("p2p_usdt_ordine")
                     if _usdt and _usdt(con, ordine):
                         testo_g = p2p_usdt_frase(testo_g)
+                    _chf = globals().get("p2p_chf_ordine")
+                    if _chf and _chf(con, ordine):
+                        testo_g = p2p_chf_frase(testo_g)
                     fuori.append((chi, testo_g,
                         f"⏰ Garanzia lunga P2P: {corto} 48h → {chi} ({ruolo}; {stato})"))
 
@@ -65307,6 +65446,9 @@ def _garanzie_lunghe_p2p(con, adesso: int, bottoni: dict = None) -> list:
                 # in USDT (2 nov 2026, usdt-moderatori): cifra e gesto
                 _usdt = globals().get("p2p_usdt_ordine")
                 d["usdt"] = bool(_usdt and _usdt(con, ordine))
+                # ...e in franchi (14 nov 2026, cantiere p2p-chf)
+                _chf = globals().get("p2p_chf_ordine")
+                d["chf"] = bool(_chf and _chf(con, ordine))
             fuori.append((mod, _testo_garanzia_mod_p2p(livello, ore, d, mod),
                           f"⏰ Garanzia lunga P2P: {corto} {livello}h → {mod} "
                           f"(moderatore; {stato})"))
@@ -65375,7 +65517,7 @@ NOMI_TIPI_AVVISI_NUOVI_P2P = {"vendita": "vendita BTC", "acquisto": "acquisto BT
                               "barattozon": "Barattozon"}
 SOGLIE_AVVISI_NUOVI_P2P = ("0", "2", "5")   # le tre chip, gemelle di P2P_AVVISI_SOGLIE nel client
 RETI_AVVISI_NUOVI_P2P = ("onchain", "ln")   # '' = tutte; gemelle di P2P_AVVISI_RETI nel client
-VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT")   # '' = tutte; gemelle di P2P_AVVISI_VALUTE nel client
+VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT", "CHF")   # '' = tutte; gemelle di P2P_AVVISI_VALUTE nel client
 TIMBRO_NUOVI_P2P = "p2p_nuovi_ordini_visto"  # il segnalibro: il created_at piu' nuovo gia' guardato
 _P2P_NUOVI = {"noti": None}   # gli id che la fotografia conosceva al giro prima (None = mai guardata)
 
@@ -65613,8 +65755,20 @@ def _pref_rete_vista_p2p(riga) -> dict:
         pref["rete"] = ""
     # ...e la VALUTA (2 nov 2026) conta solo se gli USDT lei li vede: chi
     # aveva scelto «solo USDT» e li ha persi torna a sentire l'euro
-    if pref["valuta"] and not p2p_usdt_ammesso(int(riga["tg_id"])):
-        pref["valuta"] = ""
+    # (14 nov 2026, cantiere p2p-chf) ...e «solo franchi» conta solo se i
+    # franchi lei li vede; «solo euro» resta finche' vede almeno un'altra
+    # valuta, sennò e' gia' tutto quel che vede
+    valuta = pref["valuta"]
+    if valuta:
+        tg = int(riga["tg_id"])
+        if valuta == "USDT":
+            vista = p2p_usdt_ammesso(tg)
+        elif valuta == "CHF":
+            vista = p2p_chf_ammesso(tg)
+        else:
+            vista = p2p_usdt_ammesso(tg) or p2p_chf_ammesso(tg)
+        if not vista:
+            pref["valuta"] = ""
     return pref
 
 
@@ -65716,21 +65870,25 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
         # l'USDT solo per chi lo vede (`p2p_usdt_ammesso`, qui sotto), e
         # un'altra valuta per nessuno — il libro di Barattolo non la mostra
         fiat = o.get("fiat") or "EUR"
-        if fiat not in ("EUR", "USDT"):
+        if fiat not in ("EUR", "USDT", "CHF"):
             continue
         tipo = _tipo_nuovo_p2p(o["lato"], o["metodi"])
         if not tipo:
             continue
         euro = _euro_nuovo_p2p(o["euro"], o["metodi"])
         # in USDT il metro e' il dollaro (1 USDT = 1 $, come il nodo)
+        # ...e in franchi il franco (14 nov 2026, cantiere p2p-chf)
         conv = _convenienza_nuovo_p2p(o["lato"], o["premio"], o["sats"], euro,
-                                      cambio if fiat == "EUR" else cambio_noto_ora("usd"))
+                                      cambio if fiat == "EUR" else cambio_noto_ora(
+                                          "chf" if fiat == "CHF" else "usd"))
         autore = con.execute("SELECT tg_id FROM p2p_ordini WHERE ordine=?",
                              (o["id"],)).fetchone()
         autore = int(autore["tg_id"] or 0) if autore else 0
         euro_txt = _euro_libro(o["euro"], o["metodi"])
         if fiat == "USDT" and euro_txt.endswith(" €"):
             euro_txt = euro_txt[:-2] + " USDT"
+        if fiat == "CHF" and euro_txt.endswith(" €"):
+            euro_txt = euro_txt[:-2] + " CHF"
         metodi_txt = ", ".join(_metodi_libro(o["metodi"]))
         for p in persone:
             tg = int(p["tg_id"])
@@ -65741,6 +65899,8 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
             if not _p2p_per(tg)["attivo"] or not _avvisi_p2p_accesi(con, tg):
                 continue
             if fiat == "USDT" and not p2p_usdt_ammesso(tg):
+                continue
+            if fiat == "CHF" and not p2p_chf_ammesso(tg):
                 continue
             cur = con.execute(
                 "INSERT OR IGNORE INTO p2p_avvisi_nuovi(tg_id, ordine, tipo, conv, "
@@ -66943,6 +67103,9 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
     # e' la stessa del `fa`, cambia solo il segno
     if str(ev.get("fiat") or "EUR").upper() == "USDT" and euro.endswith(" €"):
         euro = euro[:-2] + " USDT"
+    # ...e in franchi CHF (14 nov 2026, cantiere p2p-chf)
+    if str(ev.get("fiat") or "EUR").upper() == "CHF" and euro.endswith(" €"):
+        euro = euro[:-2] + " CHF"
     metodi = ", ".join(html.escape(str(m)) for m in _metodi_libro(ev.get("metodi")))
     quanto = (f"{_fmt_sats(sats)} sats" if sats > 0 else "bitcoin") + \
         (f" per {euro}" if euro else "") + (f" via {metodi}" if metodi else "")
@@ -67168,6 +67331,17 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
              json.dumps([str(m) for m in (ev.get("metodi") or [])][:12],
                         ensure_ascii=False),
              tornati + (1 if torna else 0), float(ev.get("premio") or 0), ev["id"]))
+        # LA VALUTA DELL'ORDINE (14 nov 2026, cantiere p2p-chf): il `f` del
+        # 38383, perche' un ordine in franchi si riconosca anche dopo —
+        # nelle frasi del bot, nelle attese, nella garanzia lunga. I metodi
+        # non bastano come per l'USDT: Revolut e i contanti stanno sia in
+        # euro sia in franchi. Una riga di un banco senza la colonna tace.
+        if ev.get("fiat"):
+            try:
+                con.execute("UPDATE p2p_ordini SET fiat=? WHERE ordine=?",
+                            (str(ev.get("fiat") or "")[:8].upper(), ev["id"]))
+            except sqlite3.OperationalError:
+                pass
         # ...e con lui la presa DICHIARATA e non ancora confermata (23
         # set 2026, A1): in vetrina non c'e' nessuno che abbia preso
         if dopo == "pending":
@@ -68654,6 +68828,9 @@ def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
     # segno dell'euro, e qui si dice quello vero
     if d.get("usdt"):
         euro = euro.replace(" €", " USDT")
+    # ...e in franchi (14 nov 2026, cantiere p2p-chf)
+    elif d.get("chf"):
+        euro = euro.replace(" €", " CHF")
     importo = (f"{_fmt_sats(sats)} sats" if sats > 0 else "")
     if euro:
         importo += (" per " if importo else "") + euro
@@ -68834,6 +69011,9 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         # funzione il giudice non lo portano
         _usdt = globals().get("p2p_usdt_ordine")
         d["usdt"] = bool(_usdt and _usdt(con, ordine))
+        # ...e in franchi (14 nov 2026, cantiere p2p-chf)
+        _chf = globals().get("p2p_chf_ordine")
+        d["chf"] = bool(_chf and _chf(con, ordine))
         # la riapertura ha il SUO timbro: non e' il doppione della prima
         timbro = f"disputa_mod_r{riaperta}" if riaperta else "disputa_mod"
         for mod in _avvisati_mod_p2p():
@@ -69058,6 +69238,11 @@ def _riga_disputa_p2p(con, r, io: int) -> dict:
     if _usdt and _usdt(con, ordine):
         fuori.update(usdt=True, euro=fuori["euro"].replace(" €", " USDT"),
                      passo_euro="usdt")
+    # ...e in franchi la cifra col suo segno (14 nov 2026, cantiere p2p-chf)
+    else:
+        _chf = globals().get("p2p_chf_ordine")
+        if _chf and _chf(con, ordine):
+            fuori.update(chf=True, euro=fuori["euro"].replace(" €", " CHF"))
     if mia and not parte:
         s = con.execute("SELECT chiave_compratore, chiave_venditore FROM p2p_scambi "
                         "WHERE ordine=?", (ordine,)).fetchone()
@@ -69497,6 +69682,9 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
             try:
                 if p2p_usdt_ordine(con, ev["ordine"]):
                     avvisi = [(tg, p2p_usdt_frase(t)) for tg, t in avvisi]
+                # ...e in franchi (14 nov 2026, cantiere p2p-chf)
+                elif p2p_chf_ordine(con, ev["ordine"]):
+                    avvisi = [(tg, p2p_chf_frase(t)) for tg, t in avvisi]
             except Exception:
                 pass
             # ...e i MODERATORI, se l'evento apre o chiude una disputa
@@ -101803,6 +101991,12 @@ def asset_p2p_coppia_xmr():
 @app.get("/assets/p2p-coppia-usde.webp")
 def asset_p2p_coppia_usde():
     return _asset_webp("p2p-coppia-usde.webp")
+
+
+# il franco svizzero (14 nov 2026, cantiere p2p-chf)
+@app.get("/assets/p2p-coppia-chf.webp")
+def asset_p2p_coppia_chf():
+    return _asset_webp("p2p-coppia-chf.webp")
 
 
 @app.get("/assets/scambi-monete.webp")
