@@ -83157,3 +83157,98 @@ risposta, arrivata sul suo relay dei DM. Qui: la riga in
 DA GUARDARE. La prima nota pubblica vera e la prima conversazione con
 qualcuno fuori dallo staff; se il filtro dell'account nuovo scarta troppe
 persone vere (gli scarti sono nel registro).
+
+## La mancia al venditore, con lo zap a Barattolo nello stesso foglio (14 nov 2026, cantiere mancia-venditore, da un utente girato da Andrea: «11 € per il loro libro sono pochi … la app mi ha bloccato e non posso offrire più del prezzo pattuito»; Andrea: «magari dare la possibilità di fare zap a qualcuno?», sul piano «va bene così», e «non dopo la mancia ma prima di mandarla … se oltre all'utente vuole fare uno zap direttamente a Barattolo»)
+
+IL CASO. Un compratore voleva pagare un libro più del suo prezzo, per
+sostenere chi lo vende. L'app non glielo permetteva, e a ragione: un'offerta
+sopra il prezzo non esiste, perché l'offerta è una trattativa. Mancava la cosa
+giusta, cioè un regalo.
+
+COSA SI È DECISO (piano in 10 righe, ok di Andrea). La mancia è uno ZAP
+DIRETTO al Lightning address di chi vende. Il server chiede la fattura al suo
+wallet con `invoice_da_ln_address`, la stessa degli incassi automatici, con la
+guardia anti-SSRF su partenza e callback, niente redirect, il tetto sulla
+risposta e l'importo riletto. Chi compra la paga col suo wallet. Barattolo NON
+TOCCA I SATS: nessuna commissione (la regola 10 non entra nemmeno in gioco),
+nessun deposito, e quindi nessun rimborso. È un regalo fuori dal deposito di
+garanzia, e il foglio lo dice prima di pagare. Il bottone «🎁 Lascia una
+mancia» c'è solo nell'ordine PAGATO e mai finito male (locked → released) e
+solo se chi vende ha un Lightning address. A affare concluso è arancio,
+accanto al voto, perché lì chi compra è contento. Le cifre già pronte sono
+500, 1.000 e 2.100, più una libera, con un tetto di 100.000
+(`MANCIA_MAX_SATS`). LO ZAP A BARATTOLO, come l'ha chiesto Andrea, sta nello
+STESSO foglio, PRIMA di mandare: un secondo importo facoltativo, a «Niente» di
+serie (100, 210, 500). La sua fattura viene dal callback di casa
+`/api/lnurl/zap` (zap@), col suo freno e il suo orologio. I wallet sono due e
+quindi anche le fatture: si pagano una dopo l'altra («Passo 1 di 2») e lo zap
+si può saltare. Col wallet NWC partono da sole.
+
+COME SAPPIAMO CHE È ARRIVATA. Il server non può vedere un pagamento fra due
+wallet altrui, quindi non lo promette. La riga `mance` sale chiesta →
+dichiarata → arrivata e non scende mai. ARRIVATA vuol dire che la preimage
+apre il payment hash (la rende il wallet collegato pagando) oppure che il
+wallet di chi vende risponde «settled» a LUD-21: il `verify` del callback, che
+`invoice_da_ln_address` mette in `extra` solo se chi chiama lo passa (la sola
+mancia) e solo se passa la stessa guardia. Il foglio lo chiede ogni 5 s e va
+avanti da solo. DICHIARATA è la parola di chi l'ha mandata («L'ho pagata»).
+L'avviso a chi vende parte UNA volta: con «è già nel tuo wallet» se è
+arrivata, con «controlla il wallet» se è solo dichiarata.
+
+STRADE SCARTATE. La mancia DENTRO il deposito, al checkout, in un pagamento
+solo, era la prima idea dell'utente. Toccava una ventina di calcoli del netto
+del venditore (`netto_venditore(prezzo - protezione)`), l'invariante della
+testata dell'ordine, i rimborsi e le dispute: molta superficie sui soldi per un
+regalo. Le offerte sopra il prezzo restano vietate: sono una trattativa.
+Lo zap Nostr vero (NIP-57, con la richiesta 9734 firmata da chi compra) è
+rimandato, perché chiede la firma del compratore. Oggi è uno zap Lightning a
+tutti gli effetti. La fattura chiesta dal browser al wallet del venditore è
+scartata: il browser andrebbe a bussare a domini scelti da un venditore, e
+l'indirizzo uscirebbe dal server.
+
+LE LEVE. `MANCIA_ATTIVA` è accesa di serie, anche nel codice (regola di
+Andrea del 14 nov): con la promozione è già viva in produzione, e si spegne
+con una riga o dal pannello (gruppo «🎁 Mancia al venditore»).
+`MANCIA_MAX_SATS` = 100.000. Non serve nessun segreto sul VPS. Lo zap a
+Barattolo compare solo dove zap@ è vivo (`zap_vivo`).
+
+PROVATO. `collaudo_mancia` (nuovo, in `ci/collaudi.txt` e `ci/compila.txt`,
+verde anche nella gabbia `collaudi_ci.py`): 47 prove sulle funzioni vere del
+server, con un wallet di cartone al posto di httpx. Coprono la lista ordini
+alle due parti, la fattura vera dal citofono LUD-16, i no (chi vende, ordine
+da pagare, rimborsato, venditore senza indirizzo, cifre fuori misura, leva
+spenta, wallet che conia un'altra cifra, il nostro nodo che tace → 503), la
+salita della riga, l'avviso una volta sola, il verify verso casa scartato e la
+regressione degli incassi senza `extra`. `prove_mancia_venditore` (nuova)
+copre il giudice, la preimage, le parole, le sentinelle, e il pannello in node
+per compratore, venditore e moderatore. Le controprove: tolto il cancello
+`avvisato=0`, tolto il filtro sulle mance solo chieste e tolto il «non a se
+stessi», sono diventate rosse cinque prove del collaudo e una della suite;
+rimesso il codice, verdi. In più, il giro dal vivo nel Chromium locale col
+server vero (390x844): il riquadro accanto al voto, il foglio con 2.100 + 210,
+il passo 1 di 2 col QR, il passo 2 con «Salta lo zap a Barattolo», e
+dall'altra parte il venditore con «🎁 2 100 sats · 👀 controlla il wallet».
+Aggiornate le sentinelle che contano: i freni (`mancia`, `mancia_guarda`),
+le guardie di `invoice_da_ln_address` (tre: anche il verify), il quinto QR con
+`lightning:`, e le finte di `mance_di_ordini` nei banchi di `miei_ordini`.
+Il giro sull'albero del cantiere (da origin/develop d3a42ed8): suite severa
+27.978/0 nel venv delle sole dipendenze delle prove (senza httpx e senza
+coincurve). Le 2 saltate sono i due script di nostr-tools, che in questa
+macchina non c'è, e non toccano la mancia. Collaudi della CI 131/131 senza
+coincurve; `collaudo_mancia`, `collaudo_indirizzo_lightning` e
+`collaudo_nota` verdi anche senza le variabili del proxy.
+Dopo il rebase su origin/develop 7538b668 (arrivati audit-pagamenti,
+wise-tappo, paycode-dopo-garanzia, feedback-modificabile,
+recensioni-ricevute, codici-sconto-inviti e altri; i nomi in comune sono
+`miei_ordini`, `_leve_stato`, `FRENI` e un chiamante nuovo di
+`invoice_da_ln_address` senza `extra`): suite severa intera 28.135/0 (le
+stesse 2 saltate) e sette collaudi vicini verdi senza proxy (mancia,
+indirizzo Lightning, nota, i due del feedback, leve dal pannello, on-chain
+verso Lightning).
+
+NON PROVATO, DA GUARDARE. Un pagamento VERO: la fattura dal wallet di un
+venditore reale, la preimage da un wallet NWC vero e LUD-21 da un wallet che lo
+dà (Alby, Blink, Coinos e LNbits lo fanno, Wallet of Satoshi non ci
+risulta). Andrea (15:29Z): le prove si fanno dall'app in produzione dopo
+la promozione, con un ordine vero e pochi sats; se qualcosa non va si
+corregge lì. Resta da vedere anche come Tappo racconta la novità.

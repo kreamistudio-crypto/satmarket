@@ -33276,6 +33276,49 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `collaudo_indirizzo_lightning` (il server vero per HTTP con un LNbits
   di cartone, in CI nella gabbia). La procedura: PRODUZIONE,
   «L'INDIRIZZO LIGHTNING DI CASA».
+- LA MANCIA AL VENDITORE (14 nov 2026, cantiere mancia-venditore; il
+  perché in CANTIERI, «La mancia al venditore»). Un blocco suo in
+  server.py, subito DOPO quello degli zap (ne usa `zap_leggi_bolt11`
+  e `zap_vivo`). È uno ZAP DIRETTO al Lightning address di chi vende:
+  il server chiede la fattura con `invoice_da_ln_address` (la stessa
+  degli incassi: guardia anti-SSRF su partenza e callback, niente
+  redirect, tetto sulla risposta, importo riletto) e la passa a chi
+  compra, che la paga col suo wallet. Barattolo non tocca i sats:
+  nessuna fee, nessun deposito, nessun rimborso. LE ROTTE: `POST
+  /api/orders/{id}/mancia` {sats} → {id, invoice, sats, verificabile}
+  (`chiedi_mancia`) e `POST /api/orders/{id}/mancia/{mid}/esito`
+  {preimage | dichiarata | niente} → {stato} (`esito_mancia`); a leva
+  spenta 404. IL GIUDICE UNICO `mancia_ammessa`: leva accesa, chi
+  chiede è il COMPRATORE (e non anche chi vende), stato in
+  `MANCIA_STATI` (locked → released, mai creato/annullato/dispute/
+  refund/refunded/return_*), venditore con un Lightning address; lo
+  usano la rotta e `mance_di_ordini`, che attacca a `/api/orders` la
+  chiave `mancia` = {possibile, max, zap_barattolo, mance} SOLO alle
+  due parti (l'indirizzo di chi vende non esce; delle mance escono le
+  dichiarate e le arrivate, mai le solo chieste). LA TABELLA `mance`
+  (creata da chi arriva prima, come `zap`): stato chiesta →
+  dichiarata → arrivata, solo in salita (UPDATE condizionato allo
+  stato di prima); arrivata = preimage che apre il payment hash
+  (`preimage_giusta`: la rende il wallet NWC pagando) oppure LUD-21
+  (`mancia_verifica_lud21`: il `verify` del callback, che
+  `invoice_da_ln_address` mette in `extra` SOLO se chi chiama lo passa
+  — la mancia — e solo se passa la stessa guardia); dichiarata = la
+  parola di chi l'ha mandata. L'AVVISO a chi vende parte una volta per
+  mancia (`avvisato=0` è il cancello) con `testo_avviso_mancia`:
+  «è già nel tuo wallet» solo se arrivata, sennò «controlla il
+  wallet». I FRENI: `mancia` 20/ora (ogni colpo è una GET fuori di
+  casa) e `mancia_guarda` 240/ora (il battito del foglio, ogni 5 s,
+  solo dove c'è LUD-21). IL CLIENT: `pannelloMancia` nell'ordine
+  (accanto al voto; arancio a affare concluso), il foglio
+  `#manciaSheet` in due passi — la scelta (500/1.000/2.100 o libera,
+  e lo zap a Barattolo a «Niente» di serie: la sua fattura viene dal
+  callback di casa `/api/lnurl/zap`, col suo freno e il suo orologio)
+  e il pagamento, una fattura alla volta (QR, «Apri nel wallet»,
+  «L'ho pagata», «Salta lo zap a Barattolo»); col wallet NWC partono
+  da sole. LE LEVE: `MANCIA_ATTIVA` (accesa di serie, anche dal
+  pannello: gruppo «🎁 Mancia al venditore», `_mancia_leve`) e
+  `MANCIA_MAX_SATS` (100.000). LE PROVE: `prove_mancia_venditore` e
+  `collaudo_mancia` (in CI).
 - L'INDIRIZZO DELLA QUOTA: swap@barattolo.store (19 ott 2026, perché
   in CANTIERI, «L'indirizzo della quota: swap@barattolo.store»). Dove
   SATS Routing manda a fine mese la quota di Barattolo sugli swap. È lo

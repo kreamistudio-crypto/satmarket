@@ -13728,6 +13728,9 @@ def prove_nascondi_ordine():
                # la modifica dei feedback (14 nov 2026) ha le sue prove
                # in `prove_feedback_modificabile`: qui la leva di serie
                "FEEDBACK_MODIFICABILE": True, "FEEDBACK_MODIFICA_GIORNI": 7,
+               # la mancia al venditore (14 nov 2026) ha le sue prove
+               # in `collaudo_mancia` e `prove_mancia_venditore`
+               "mance_di_ordini": lambda con, righe, uid: None,
                "time": __import__("time"),
                "json": __import__("json"), **ambiente_in_pagamento()}
         exec(pezzo("_titolo_ordine"), amb)
@@ -36065,6 +36068,9 @@ def _censimento(acceso, dopo=None):
               "swap_rete",
               # i fornitori dello swap (20 ott 2026): la diciassettesima
               "swap_origine_api", "swap_mempool_api", "swap_fornitori",
+              # la mancia al venditore (14 nov 2026): `_mancia_leve()` e
+              # il suo giudice del tetto
+              "mancia_max_sats", "_mancia_leve",
               "_leve_stato"):
         exec(pezzo(f), amb)
     # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
@@ -61883,6 +61889,8 @@ def prove_card_parte_ordine():
     amb["_chat_mercatino_ferma"] = lambda *a: False
     amb["MERCATINO_CHAT_ORDINI"] = False
     amb["swap_auto_per"] = lambda t: False   # (9 nov 2026, incasso-annuncio)
+    # la mancia al venditore (14 nov 2026): la sua prova e' `prove_mancia_venditore`
+    amb["mance_di_ordini"] = lambda con, righe, uid: None
     # i gesti del feedback (14 nov 2026, feedback-modificabile): la loro
     # prova e' `prove_feedback_modificabile`; qui girano i giudici veri
     amb["FEEDBACK_MODIFICABILE"] = True
@@ -149474,7 +149482,9 @@ def prove_ssrf_ln_address():
     lna = pezzo("invoice_da_ln_address")
     prova("sentinella: follow_redirects=False, scritto", True,
           "follow_redirects=False" in lna and "follow_redirects=True" not in lna)
-    prova("sentinella: partenza E callback passano dalla guardia", 2,
+    # (14 nov 2026, la mancia al venditore) TRE: la partenza, il callback
+    # e il `verify` di LUD-21, che entra in `extra` solo se passa anche lui
+    prova("sentinella: partenza, callback e verify passano dalla guardia", 3,
           lna.count("await _url_lnurl_ammesso("))
     prova("sentinella: la guardia e' quella delle API dei negozi, in un thread",
           True, "asyncio.to_thread(url_api_ammesso, url)" in pezzo("_url_lnurl_ammesso"))
@@ -150247,7 +150257,11 @@ def prove_freni():
            "swap_auto": (10, 3600),
            # l'assistenza in app (3 nov 2026): 20 messaggi all'ora per
            # chi scrive, 120 risposte all'ora per un admin
-           "assistenza": (20, 3600), "assistenza_staff": (120, 3600)}, F)
+           "assistenza": (20, 3600), "assistenza_staff": (120, 3600),
+           # la mancia al venditore (14 nov 2026): 20 fatture all'ora per
+           # persona (ognuna e' una GET al wallet di chi vende), e il
+           # battito di LUD-21 (uno ogni 5 s) 240 all'ora
+           "mancia": (20, 3600), "mancia_guarda": (240, 3600)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------
@@ -166197,9 +166211,10 @@ def prove_apri_nel_wallet():
     # Lightning sono diventati QUATTRO — si aggiunge quello del deposito
     # on-chain pagato in Lightning (`renderDepositoOnchainP2P`) — e il suo
     # «Apri nel wallet» nasce con href `#`: lo schema lo scrive la porta.
-    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei quattro QR "
+    # (14 nov 2026) il quinto QR e' quello della mancia al venditore
+    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei cinque QR "
           "e nel Riprova, e in nessuna navigazione da script",
-          [0, 5],
+          [0, 6],
           [len([l for l in mini.splitlines()
                 if re.search(r"""location(\.href)?\s*=\s*['"`]lightning:""", l)]),
            mini.count("('lightning:' + ")])
@@ -189356,6 +189371,152 @@ const fetch = async (url, o) => { CHIAMATE.push(url); return {ok:true, json: asy
           out.get("riga"))
 
 
+def prove_mancia_venditore():
+    """LA MANCIA AL VENDITORE (14 nov 2026, cantiere mancia-venditore,
+    piano approvato da Andrea). Qui i pezzi veri, eseguiti; il giro sulle
+    rotte vere e' `collaudo_mancia`:
+     · il giudice unico `mancia_ammessa` (chi, quando, verso chi);
+     · la preimage che apre il payment hash, e nient'altro;
+     · le parole a chi vende: «arrivata» solo quando l'abbiamo vista;
+     · il pannello dell'ordine e il foglio, in node: chi compra vede il
+       bottone, chi vende solo le mance, il moderatore niente; lo zap a
+       Barattolo parte da «Niente»;
+     · le sentinelle: leva accesa di serie, l'avviso una volta sola,
+       l'`extra` di LUD-21 solo dalla mancia, nessun «escrow» nei testi."""
+    print("\n[la mancia al venditore: giudice, preimage, parole, pannello]")
+    import hashlib as _hl
+    srv = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    amb = {"MANCIA_ATTIVA": True, "MANCIA_STATI": (
+        "locked", "shipped", "delivered", "confirmed", "released")}
+    exec(pezzo("mancia_ammessa"), amb)
+    ok = amb["mancia_ammessa"]
+    prova("ordine pagato, compratore, venditore con indirizzo: si'", True,
+          ok("locked", 111, 111, 222, "v@w.example"))
+    prova("anche a affare concluso", True,
+          ok("released", 111, 111, 222, "v@w.example"))
+    prova("chi vende no", False, ok("locked", 222, 111, 222, "v@w.example"))
+    prova("un estraneo no", False, ok("locked", 333, 111, 222, "v@w.example"))
+    prova("a se stessi no (compratore = venditore)", False,
+          ok("locked", 111, 111, 111, "v@w.example"))
+    for stato in ("creato", "annullato", "dispute", "refund", "refunded",
+                  "return_pending", "return_shipped"):
+        prova(f"su «{stato}» no", False, ok(stato, 111, 111, 222, "v@w.example"))
+    prova("senza Lightning address no", False, ok("locked", 111, 111, 222, ""))
+    amb["MANCIA_ATTIVA"] = False
+    prova("a leva spenta no", False, ok("locked", 111, 111, 222, "v@w.example"))
+
+    amb = {"hashlib": _hl}
+    exec(pezzo("preimage_giusta"), amb)
+    pg = amb["preimage_giusta"]
+    pre = "ab" * 32
+    h = _hl.sha256(bytes.fromhex(pre)).hexdigest()
+    prova("la preimage giusta apre il suo hash", True, pg(pre, h))
+    prova("...anche in maiuscolo", True, pg(pre.upper(), h))
+    prova("una preimage sbagliata no", False, pg("cd" * 32, h))
+    prova("la preimage uguale all'hash no", False, pg(h, h))
+    prova("un testo che non e' esadecimale no", False, pg("zz" * 32, h))
+    prova("vuota no", False, pg("", h))
+    prova("senza hash no", False, pg(pre, ""))
+
+    amb = {"_fmt_sats": lambda n: f"{n:,}".replace(",", ".")}
+    exec(pezzo("testo_avviso_mancia"), amb)
+    t_si = amb["testo_avviso_mancia"](2100, 7, "Il libro", True)
+    t_no = amb["testo_avviso_mancia"](2100, 7, "", False)
+    prova("arrivata: «già nel tuo wallet», cifra e titolo", True,
+          "già nel tuo wallet" in t_si and "2.100" in t_si
+          and "Il libro" in t_si)
+    prova("dichiarata: non dice arrivata, dice di guardare", True,
+          "Controlla il wallet" in t_no and "già nel tuo wallet" not in t_no
+          and "#7" in t_no)
+    prova("lessico: mai «escrow» ne' «assicurat» a chi vende", True,
+          all("escrow" not in t.lower() and "assicurat" not in t.lower()
+              for t in (t_si, t_no)))
+
+    # --- le sentinelle sul server ---
+    prova("la leva nasce ACCESA (regola di Andrea del 14 nov)", True,
+          "    MANCIA_ATTIVA = True\n" in srv)
+    es = codice(pezzo("esito_mancia"))
+    prova("l'avviso parte dietro il cancello avvisato=0", True,
+          "AND avvisato=0" in es and "cur.rowcount == 1" in es
+          and "if avvisa:" in es)
+    prova("la riga sale con un UPDATE condizionato allo stato di prima",
+          True, "AND stato=?" in es)
+    chiamanti = [r for r in srv.split("\n")
+                 if "invoice_da_ln_address(" in r and "def " not in r
+                 and not r.lstrip().startswith("#")]
+    prova("l'extra di LUD-21 lo passa solo la mancia", True,
+          sum("extra" in r for r in chiamanti) == 1
+          and any("invoice_da_ln_address(ln, sats, extra)" in r
+                  for r in chiamanti))
+    inv = codice(pezzo("invoice_da_ln_address"))
+    prova("il verify passa dalla stessa guardia del callback", True,
+          "verify and await _url_lnurl_ammesso(verify)" in inv)
+    mo = codice(pezzo("miei_ordini"))
+    prova("/api/orders attacca la mancia con la connessione aperta", True,
+          mo.index("mance_di_ordini(con, righe") < mo.index("con.close()\n"))
+    md = codice(pezzo("mance_di_ordini"))
+    prova("l'indirizzo di chi vende non va nella riga", True,
+          "ln_address" in md and '"ln_address"]' not in md.split("r[\"mancia\"]")[-1])
+    prova("le mance solo chieste non escono", True,
+          "stato IN ('dichiarata','arrivata')" in md)
+    prova("i freni della mancia ci sono", True,
+          '"mancia": (' in srv and '"mancia_guarda": (' in srv)
+
+    # --- il client, in node ---
+    prova("il foglio si chiude con gli altri", True,
+          "el('manciaSheet').classList.remove('open');" in mini)
+    prova("la riga dell'ordine porta la mancia", True,
+          "mancia:o.mancia||null," in mini)
+    prova("il riquadro sta accanto al voto", True,
+          "${puoiLasciareFeedback(o) ? feedbackPanel(o) : ''}\n      ${pannelloMancia(o)}" in mini)
+    blocco = pezzo_js(mini, "/* ═══ LA MANCIA AL VENDITORE",
+                      "/* ---- feedback reciproco a affare concluso ---- */")
+    prova("il foglio non chiede mai il Lightning address", True,
+          "ln_address" not in blocco and "lnurlp" not in blocco)
+    prova("lo zap a Barattolo parte da «Niente»", True,
+          "const MANCIA_ZAP_PILLOLE = [0, " in blocco
+          and "manciaZap = 0" in blocco)
+    js = ("const fmt = n => String(n);\n"
+          "const esc = s => String(s).replace(/</g,'&lt;');\n"
+          "let FEED = false;\nconst puoiLasciareFeedback = o => FEED;\n"
+          + blocco +
+          "\nconst o = {role:'buyer', voltoVenditore:{nome:'Sato <b>Sats'},"
+          " mancia:{possibile:true, max:100000, zap_barattolo:true, mance:[]}};\n"
+          "const fuori = {};\n"
+          "fuori.compra = pannelloMancia(o);\n"
+          "FEED = true; fuori.concluso = pannelloMancia(o);\n"
+          "fuori.vende = pannelloMancia(Object.assign({}, o, {role:'seller',"
+          " mancia:{possibile:false, mance:[{sats:2100, stato:'dichiarata'}]}}));\n"
+          "fuori.vendeVuoto = pannelloMancia(Object.assign({}, o, {role:'seller',"
+          " mancia:{possibile:false, mance:[]}}));\n"
+          "fuori.admin = pannelloMancia(Object.assign({}, o, {role:'admin'}));\n"
+          "fuori.niente = pannelloMancia({role:'buyer', mancia:null});\n"
+          "fuori.grazie = pannelloMancia(Object.assign({}, o, {mancia:"
+          "{possibile:false, mance:[{sats:500, stato:'arrivata'}]}}));\n"
+          "console.log(JSON.stringify(fuori));\n")
+    r = _node_banco(js)
+    if r is None:
+        salta("il pannello della mancia in node", "node non c'e'")
+        return
+    prova("chi compra vede il bottone", True,
+          "apriMancia()" in r.get("compra", ""))
+    prova("...col nome del venditore, scappato", True,
+          "Sato" in r.get("compra", "") and "<b>Sats" not in r.get("compra", ""))
+    prova("a affare concluso il bottone e' arancio", True,
+          'btn orange' in r.get("concluso", "") and 'btn ghost' in r.get("compra", ""))
+    prova("chi vende vede la mancia e «controlla il wallet»", True,
+          "2100" in r.get("vende", "") and "controlla il wallet" in r.get("vende", "")
+          and "apriMancia" not in r.get("vende", ""))
+    prova("chi vende senza mance non vede niente", "", r.get("vendeVuoto"))
+    prova("il moderatore non vede niente", "", r.get("admin"))
+    prova("senza dati niente riquadro", "", r.get("niente"))
+    prova("dopo la mancia, a chi compra il grazie", True,
+          "Grazie per la mancia" in r.get("grazie", "")
+          and "arrivata" in r.get("grazie", ""))
+
+
 def prove_notifiche_telefono():
     """LE NOTIFICHE SUL TELEFONO (14 nov 2026, cantiere web-push, Andrea:
     «si puo' fare: notifiche web app» — l'app di Zapstore, il sito sulla
@@ -196084,7 +196245,7 @@ CATEGORIE = {
     lista_corta_metodi
     """.split(),
     "mercatino": """
-    mappa_ritiro feedback_modificabile recensioni_ricevute
+    mappa_ritiro feedback_modificabile recensioni_ricevute mancia_venditore
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     ricategorizza collaudo_ricategorizza asta proxy_asta annullo
@@ -196954,6 +197115,7 @@ def main():
               prove_collaudo_segue_develop,
               prove_avvisi_nostr_arrivano,
               prove_notifiche_telefono,
+              prove_mancia_venditore,
               prove_filtro_10050,
               prove_semina_collaudo, prove_leva_mercato_lavoro,
               prove_assistente_bot,

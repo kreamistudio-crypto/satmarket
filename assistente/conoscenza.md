@@ -62,12 +62,14 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 
 Si può anche fare un'offerta più bassa con «Fai un'offerta»: il venditore la accetta o la rifiuta, e se la accetta hai un tempo per pagare, scritto nell'ordine. Un'offerta senza risposta scade da sola.
 
-Tutti i tuoi acquisti e le tue vendite stanno nella scheda «Ordini», con lo stato di ogni ordine e i bottoni per il passo successivo. In fondo all'elenco c'è «📄 Esporta tutti gli ordini in CSV», che scarica un file con tutti i dettagli dei tuoi ordini (utile a chi vende per tenere i conti).
+La mancia al venditore (se nelle REGOLAZIONI del pannello «Mancia al venditore» è accesa): un'offerta può essere solo più bassa del prezzo, ma chi vuole dare di più al venditore può lasciargli una mancia. Nell'ordine già pagato, nella scheda «Ordini», c'è «🎁 Lascia una mancia»: si sceglie la cifra (500, 1.000, 2.100 sats o un'altra) e si paga col proprio wallet. Nello stesso foglio, se vuoi, puoi aggiungere anche uno zap a Barattolo (di serie è «Niente»): sono due fatture, una dopo l'altra. La mancia va DRITTA al Lightning address del venditore: Barattolo non la tocca e non prende commissioni. Per questo è un regalo fuori dal deposito di garanzia e NON si rimborsa, anche se poi l'ordine va male: chi ha dubbi la lascia dopo aver ricevuto l'oggetto. Il bottone c'è solo se il venditore ha impostato il suo Lightning address nel Profilo, e solo su un ordine pagato (non su uno annullato, in disputa o rimborsato). Il venditore riceve un avviso e vede la mancia nell'ordine: «arrivata» se Barattolo ha potuto verificarla, altrimenti «controlla il wallet».
 
-Il feedback: ad affare concluso, dalla pagina dell'ordine, compratore e venditore si lasciano a vicenda un voto da 1 a 5 stelle con un commento breve (chi compra può aggiungere fino a 3 foto). Lo stesso vale per la recensione a fine scambio P2P, che va nella stessa media del profilo. Chi l'ha lasciato può modificarlo una volta sola (stelle e commento; le foto restano) oppure cancellarlo, entro 7 giorni da quando l'ha scritto: sotto il voto ci sono «✏️ Modifica» e «🗑 Cancella», con la data fino a cui valgono. Dopo diventa definitivo. Chi ha ricevuto il feedback viene avvisato del cambio, e sul profilo la riga porta la scritta «modificato». Cancellato è per sempre: su quell'affare non se ne può lasciare un altro. Il feedback lasciato da un altro non si può cambiare: se è offensivo o falso, lo può togliere solo un moderatore (scrivi allo staff). Nessuno può chiederti di cambiare un voto in cambio di qualcosa: se succede, segnalalo allo staff. Le recensioni che hai ricevuto le trovi tutte in un posto: Profilo → «Livello e inviti» → «⭐ Recensioni ricevute» (oppure tocca le stelle sotto il tuo nome in cima al Profilo). Ci sono le ultime 50, del mercatino e degli scambi P2P insieme, come le vedono gli altri nel tuo negozio.
+Tutti i tuoi acquisti e le tue vendite stanno nella scheda «Ordini», con lo stato di ogni ordine e i bottoni per il passo successivo. In fondo all'elenco c'è «📄 Esporta tutti gli ordini in CSV», che scarica un file con tutti i dettagli dei tuoi ordini (utile a chi vende per tenere i conti).
 
 <!-- pezzo libro-006 | libro -->
 ## Libro · Comprare nel mercatino (2/2)
+
+Il feedback: ad affare concluso, dalla pagina dell'ordine, compratore e venditore si lasciano a vicenda un voto da 1 a 5 stelle con un commento breve (chi compra può aggiungere fino a 3 foto). Lo stesso vale per la recensione a fine scambio P2P, che va nella stessa media del profilo. Chi l'ha lasciato può modificarlo una volta sola (stelle e commento; le foto restano) oppure cancellarlo, entro 7 giorni da quando l'ha scritto: sotto il voto ci sono «✏️ Modifica» e «🗑 Cancella», con la data fino a cui valgono. Dopo diventa definitivo. Chi ha ricevuto il feedback viene avvisato del cambio, e sul profilo la riga porta la scritta «modificato». Cancellato è per sempre: su quell'affare non se ne può lasciare un altro. Il feedback lasciato da un altro non si può cambiare: se è offensivo o falso, lo può togliere solo un moderatore (scrivi allo staff). Nessuno può chiederti di cambiare un voto in cambio di qualcosa: se succede, segnalalo allo staff. Le recensioni che hai ricevuto le trovi tutte in un posto: Profilo → «Livello e inviti» → «⭐ Recensioni ricevute» (oppure tocca le stelle sotto il tuo nome in cima al Profilo). Ci sono le ultime 50, del mercatino e degli scambi P2P insieme, come le vedono gli altri nel tuo negozio.
 
 Per un contenuto digitale il venditore può chiederti qualche informazione prima di pagare (per esempio nome, cognome o email, una scelta da un elenco, un sì o un no): rispondi alla cassa. Le risposte viaggiano cifrate dentro l'ordine, le leggete solo tu e il venditore, e si cancellano come l'indirizzo. Il numero di telefono non si può chiedere.
 
@@ -1064,16 +1066,28 @@ Pubblica lo stesso
 ✕
  sats
 💰 Offri
+
+<!-- pezzo schermata-038 | schermata -->
+## Schermata «On-chain e finestre della Mini App» · 🎁 Lascia una mancia (2/3)
+
+## 🎁 Lascia una mancia
+✕
+ sats
+⚡ Vuoi mandare anche uno zap a Barattolo?
+Facoltativo: ci aiuta a tenere acceso il mercatino.
+💡 La mancia va dritta al wallet del venditore: Barattolo non la tocca e non prende commissioni. È un regalo fuori dal deposito di garanzia, quindi non si rimborsa.
+🎁 Manda la mancia
+## sats 
+inquadra il QR col wallet, o tocca la fattura per copiarla
+ ⚡ Apri nel wallet
+✓ L'ho pagata
+Salta lo zap a Barattolo
 ## 💰 Offri per tutto il carrello
 €
 ₿
 ✕
  sats
 💰 Offri
-
-<!-- pezzo schermata-038 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · 🔨 Fai la tua puntata (2/3)
-
 ## 🔨 Fai la tua puntata
  sats
 Puntare = pagare: i sats vanno subito nel deposito di garanzia. Se vinci sono già il pagamento; se non vinci tornano indietro alla chiusura (o quando ti ritiri).
@@ -1132,6 +1146,10 @@ Inquadralo col telefono: entra l'account aperto nel Telegram del telefono.
 Chiudi
 ## 🧪 Collaudo privato
 Un attimo…
+
+<!-- pezzo schermata-039 | schermata -->
+## Schermata «On-chain e finestre della Mini App» · Entra con Nostr (3/3)
+
 ## Entra con Nostr
  Dimostri di possedere la tua chiave firmando una sfida.
  La chiave privata non viene mai inviata a nessuno.
@@ -1154,10 +1172,6 @@ Scrivilo prima di entrare, in qualunque modo entri: si collega da solo.
  Non hai ancora un profilo Nostr?
 Creane uno
 Annulla
-
-<!-- pezzo schermata-039 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · 🌱 Crea il tuo profilo Nostr (3/3)
-
 ## 🌱 Crea il tuo profilo Nostr
  Su Nostr non c'è un account con email e password: c'è una
  chiave. La parte pubblica è il tuo nome (la npub), quella
@@ -1416,4 +1430,12 @@ pubblico: sì
 frase: Con Barattozon il PayCode arriva a chi compra solo quando i sats di chi vende sono in garanzia. Prima, nella pagina dello scambio c'è solo il tempo che resta, con la frase «Il PayCode compare qui quando i sats sono in garanzia»: così nessuno va al tabacchino a pagare prima che i sats siano al sicuro.
 dove: la pagina dello scambio in «I miei scambi», nel riquadro «🧾 Il PayCode».
 leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-028 | novita -->
+## Novità · 2026-11-14 · mancia-venditore
+
+frase: Ti è piaciuto un affare e vuoi dare qualcosa in più al venditore? Ora puoi lasciargli una mancia: nell'ordine pagato c'è «🎁 Lascia una mancia», scegli quanti sats e li mandi dritti al suo wallet, senza commissioni. Nello stesso foglio puoi aggiungere, se vuoi, anche uno zap a Barattolo.
+dove: la scheda «Ordini», dentro un ordine già pagato, accanto al voto.
+leva: MANCIA_ATTIVA (nuova, accesa)
 pubblico: sì

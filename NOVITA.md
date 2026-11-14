@@ -200,3 +200,9 @@ frase: Con Barattozon il PayCode arriva a chi compra solo quando i sats di chi v
 dove: la pagina dello scambio in «I miei scambi», nel riquadro «🧾 Il PayCode».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-14 · mancia-venditore
+frase: Ti è piaciuto un affare e vuoi dare qualcosa in più al venditore? Ora puoi lasciargli una mancia: nell'ordine pagato c'è «🎁 Lascia una mancia», scegli quanti sats e li mandi dritti al suo wallet, senza commissioni. Nello stesso foglio puoi aggiungere, se vuoi, anche uno zap a Barattolo.
+dove: la scheda «Ordini», dentro un ordine già pagato, accanto al voto.
+leva: MANCIA_ATTIVA (nuova, accesa)
+pubblico: sì
