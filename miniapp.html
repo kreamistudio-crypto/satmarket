@@ -4272,6 +4272,29 @@
     background:var(--card);border:1px solid var(--line-soft);border-radius:16px;
     padding:12px 16px;margin:10px 0 4px;color:var(--ink);font:inherit;position:relative;
     -webkit-tap-highlight-color:transparent}
+  /* IL VELO DELL'ANDAMENTO (14 nov 2026, Andrea: «fammi la card un po'
+     diversa da quelle sotto, magari un leggero gradiente colorato in base
+     all'andamento del mercato», e sulle anteprime la «A · Velo»): il
+     colore del periodo scelto — verde se sale, rosso se scende, lo stesso
+     della linea — sfuma da sinistra e si spegne nel fondo della card a
+     due terzi. Senza serie (solo il prezzo) la card resta quella di prima.
+     IL FILO DEL «NOVITÀ» (Andrea, 22:12: «il bordo riesci a farlo piu'
+     sottile? sottile come il banner novita'»): niente bordo vero, il
+     mezzo pixel interno al 30% del colore, come `.p2p-oc-faccia`; il
+     pixel del bordo tolto torna nel padding, cosi' la card non cambia
+     misura fra velo e niente velo. Il gradiente ha solo variabili e va
+     ovunque; il filo colorato e' un `color-mix`, quindi dietro
+     `@supports` come la card degli ordini: dove manca resta il filo del
+     colore delle card. */
+  .p2p-valore.p2p-valore-sale{--valore-tinta:var(--trust);--valore-velo:var(--trust-soft)}
+  .p2p-valore.p2p-valore-scende{--valore-tinta:var(--rosso-p2p-testo);--valore-velo:var(--rosso-p2p-tenue)}
+  .p2p-valore.p2p-valore-sale,.p2p-valore.p2p-valore-scende{
+    background:linear-gradient(110deg,var(--valore-velo) 0%,var(--card) 70%);
+    border:0;padding:13px 17px;box-shadow:inset 0 0 0 .5px var(--line-soft)}
+  @supports (box-shadow:inset 0 0 0 1px color-mix(in srgb,red 50%,blue)){
+    .p2p-valore.p2p-valore-sale,.p2p-valore.p2p-valore-scende{
+      box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--valore-tinta) 30%,transparent)}
+  }
   .p2p-valore-simbolo{font:inherit;color:inherit;background:none;border:0;padding:0 2px;
     margin:0 -2px;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .p2p-valore-simbolo:focus-visible{outline:2px solid var(--orange);outline-offset:2px;border-radius:4px}
@@ -4279,8 +4302,8 @@
   .p2p-valore.girabile{cursor:pointer}
   .p2p-valore-sx{flex:1;min-width:0;display:block}
   .p2p-valore-et{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--muted)}
-  .p2p-valore-vivo{width:7px;height:7px;border-radius:50%;background:var(--trust);
-    box-shadow:0 0 0 3px var(--trust-soft)}
+  /* (14 nov 2026, Andrea: «levami quel pallino verde affianco alla scritta
+     1 BTC adesso»): l'etichetta e' solo testo, senza il pallino */
   .p2p-valore-cifra{display:block;font-family:'Baloo 2',sans-serif;font-weight:800;font-size:30px;
     line-height:1.05;letter-spacing:-.3px;margin:2px 0 4px;white-space:nowrap}
   .p2p-valore-giu{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
@@ -4294,6 +4317,7 @@
   .p2p-valore-linea .alone{opacity:.2}
   @media (max-width:360px){
     .p2p-valore{padding:12px 12px;gap:10px}
+    .p2p-valore.p2p-valore-sale,.p2p-valore.p2p-valore-scende{padding:13px 13px}
     .p2p-valore-cifra{font-size:26px}
   }
   /* il tasto puro della pagina */
@@ -61334,9 +61358,27 @@ function cifraPrezzoP2P(val){
   if (val === 'usd') return typeof usdPerSat !== 'undefined' && usdPerSat > 0 ? Math.round(usdPerSat * 1e8) : 0;
   return cambioVivo && eurPerSat > 0 ? Math.round(eurPerSat * 1e8) : 0;
 }
+/* LA SERIE DI UN PERIODO NELLA VALUTA (14 nov 2026, Andrea in produzione:
+   «quando passo in dollari va via il grafico la percentuale e i giorni,
+   invece deve sempre rimanere quella e deve cambiare al tocco»). Il
+   dollaro ha la sua serie dal server, ma la sua storia puo' essere piu'
+   corta di quella dell'euro (il backfill e' una GET per valuta, e quella
+   del dollaro puo' mancare un giro): li' la card in dollari restava col
+   solo prezzo, senza linea, senza percentuale e senza tocco. Adesso un
+   periodo che il dollaro non ha ancora si disegna con la serie dell'euro
+   portata in dollari al cambio di ADESSO (la stessa lettura delle due
+   cifre grandi): la card in $ e' identica a quella in €, e il tocco gira
+   gli stessi periodi. La serie vera del dollaro, quando c'e', vince. */
+function seriePrezzoP2P(val, k){
+  const d = andamentoBtc && andamentoBtc[val];
+  if (d && d[k]) return d[k];
+  const e = andamentoBtc && andamentoBtc.eur;
+  if (val === 'eur' || !e || !e[k]) return null;
+  const r = cifraPrezzoP2P(val) / cifraPrezzoP2P('eur');
+  return r > 0 && isFinite(r) ? e[k].map(x => Math.round(x * r)) : null;
+}
 function periodiPrezzoP2P(){
-  const d = andamentoBtc && andamentoBtc[p2pPrezzoValuta];
-  return P2P_PREZZO_PERIODI.filter(([k]) => d && d[k]);
+  return P2P_PREZZO_PERIODI.filter(([k]) => seriePrezzoP2P(p2pPrezzoValuta, k));
 }
 /* PURA: i punti in una curva morbida dentro W×H (con `m` di margine),
    come path SVG; torna anche dove cade l'ultimo punto, per il pallino */
@@ -61369,14 +61411,16 @@ function cartaPrezzoP2P(){
   const periodi = periodiPrezzoP2P();
   if (periodi.length && !periodi.some(([k]) => k === p2pPrezzoPeriodo)) p2pPrezzoPeriodo = periodi[0][0];
   const scelto = periodi.find(([k]) => k === p2pPrezzoPeriodo);
-  let varHTML = '', lineaHTML = '', voce = '1 BTC vale ' + fmt(cifra) + ' ' + val.nome;
+  let varHTML = '', lineaHTML = '', velo = '', voce = '1 BTC vale ' + fmt(cifra) + ' ' + val.nome;
   if (scelto) {
     /* l'ultimo punto della serie e' il cambio di quando e' arrivata: si
        sostituisce con quello di ADESSO, cosi' linea, percentuale e cifra
        grande dicono lo stesso numero */
-    const punti = andamentoBtc[p2pPrezzoValuta][scelto[0]].slice(0, -1).concat([cifra]);
+    const punti = seriePrezzoP2P(p2pPrezzoValuta, scelto[0]).slice(0, -1).concat([cifra]);
     const perc = (punti[punti.length - 1] / punti[0] - 1) * 100;
     const verso = perc >= 0 ? 'su' : 'giu';
+    /* il velo colorato della card, lo stesso verso della linea */
+    velo = perc >= 0 ? ' p2p-valore-sale' : ' p2p-valore-scende';
     const pc = Math.abs(perc).toFixed(1).replace('.', ',');
     varHTML = '<span class="p2p-valore-var ' + verso + '">' + (perc >= 0 ? '▲' : '▼')
       + ' ' + pc + '% · ' + scelto[1] + '</span>';
@@ -61400,14 +61444,14 @@ function cartaPrezzoP2P(){
       + val.simbolo + '</button>'
     : val.simbolo;
   const sx = '<span class="p2p-valore-sx">'
-    + '<span class="p2p-valore-et"><span class="p2p-valore-vivo"></span>1 BTC adesso</span>'
+    + '<span class="p2p-valore-et">1 BTC adesso</span>'
     + '<span class="p2p-valore-cifra">' + fmt(cifra) + ' ' + simbolo + '</span>'
     + (varHTML ? '<span class="p2p-valore-giu">' + varHTML + '</span>' : '')
     + '</span>';
   const tocco = periodi.length > 1
     ? ' role="button" tabindex="0" onclick="voltaPeriodoPrezzoP2P()" onkeydown="tastoPrezzoP2P(event)"'
     : ' role="group"';
-  return '<div class="p2p-valore' + (periodi.length > 1 ? ' girabile' : '') + '" id="p2pPrezzo"'
+  return '<div class="p2p-valore' + velo + (periodi.length > 1 ? ' girabile' : '') + '" id="p2pPrezzo"'
     + tocco + ' aria-label="' + esc(voce) + '">' + sx + lineaHTML + '</div>';
 }
 /* Invio e spazio sulla card fanno quel che fa il dito */

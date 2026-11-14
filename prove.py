@@ -159525,6 +159525,17 @@ usdPerSat = 100720 / 1e8;
 impostaAndamentoBtc({eur: SERIE.eur, usd: {"24h": [98000, 99000, 100000]}});
 out.conDollaro = card();
 voltaValutaPrezzoP2P(); out.inDollari = [card(), p2pPrezzoValuta, p2pPrezzoPeriodo];
+/* in dollari il tocco sulla card gira ancora i periodi (14 nov 2026, la
+   card di produzione): 7 giorni (presi dall'euro) → 24 ore (la serie vera
+   del dollaro) → di nuovo 7 giorni */
+voltaPeriodoPrezzoP2P(); out.giroDollari = [card(), p2pPrezzoPeriodo];
+voltaPeriodoPrezzoP2P(); out.giroDollari.push(p2pPrezzoPeriodo);
+/* ...e senza NESSUNA serie del dollaro, il caso visto in produzione: la
+   card in $ e' identica a quella in €, linea, percentuale e tocco */
+impostaAndamentoBtc({eur: SERIE.eur}); p2pPrezzoPeriodo = '24h';
+out.dollaroSenzaSerie = card();
+voltaPeriodoPrezzoP2P(); out.dollaroSenzaSerie7 = [card(), p2pPrezzoPeriodo];
+impostaAndamentoBtc({eur: SERIE.eur, usd: {"24h": [98000, 99000, 100000]}});
 voltaValutaPrezzoP2P(); out.diNuovoEuro = [p2pPrezzoValuta, card().indexOf('86\u202f890'), p2pPrezzoPeriodo];
 voltaValutaPrezzoP2P(); usdPerSat = 0; out.dollaroSparito = [card().indexOf('€'), p2pPrezzoValuta];
 console.log(JSON.stringify(out));
@@ -159553,7 +159564,7 @@ console.log(JSON.stringify(out));
            'class="p2p-valore-dx giu"' in g[1], g[2] == g[0], r.get("vibra")])
     prova("...la card e' un role=button (dentro c'e' il bottone del simbolo) che dice "
           "tutto alla voce, e senza dollaro il simbolo e' solo un simbolo", [True, False],
-          ['class="p2p-valore girabile" id="p2pPrezzo" role="button" tabindex="0" '
+          ['class="p2p-valore p2p-valore-sale girabile" id="p2pPrezzo" role="button" tabindex="0" '
            'onclick="voltaPeriodoPrezzoP2P()" onkeydown="tastoPrezzoP2P(event)" '
            'aria-label="1 BTC vale 86 890 euro, più 1,8 per cento in 24 ore. Tocca per '
            'cambiare periodo"' in g[0], "<button" in g[0]])
@@ -159567,19 +159578,63 @@ console.log(JSON.stringify(out));
           '"Mostra in dollari" onclick="event.stopPropagation();voltaValutaPrezzoP2P()">€'
           '</button>' in cd)
     ind = r.get("inDollari") or ["", "", ""]
-    prova("il tocco sul simbolo passa ai dollari: la cifra, la linea e la percentuale "
-          "del dollaro; il periodo che in dollari non c'e' torna al primo che c'e'",
-          [True, True, True, "usd", "24h"],
+    prova("il tocco sul simbolo passa ai dollari restando sul periodo scelto: il periodo "
+          "che il dollaro non ha ancora si disegna con la serie dell'euro portata in "
+          "dollari (Andrea, 14 nov: «deve sempre rimanere quella»)",
+          [True, True, True, True, "usd", "7g"],
           ['100 720 <button type="button" class="p2p-valore-simbolo" '
            'aria-label="Mostra in euro"' in ind[0],
-           'class="p2p-valore-var su">▲ 2,8% · 24 ore' in ind[0],
-           "1 BTC vale 100 720 dollari" in ind[0], ind[1], ind[2]])
-    prova("...e ritocco torna all'euro; col dollaro sparito torna all'euro da solo, e "
-          "il simbolo smette di essere un bottone",
-          [["eur", True, "24h"], [True, "eur"]],
+           'class="p2p-valore-var giu">▼ 3,4% · 7 giorni' in ind[0],
+           "<svg" in ind[0], "1 BTC vale 100 720 dollari" in ind[0], ind[1], ind[2]])
+    gd = r.get("giroDollari") or ["", "", ""]
+    prova("in dollari il tocco sulla card gira ancora i periodi, e la serie VERA del "
+          "dollaro vince su quella presa dall'euro",
+          [True, True, True, "24h", "7g"],
+          ['class="p2p-valore-var su">▲ 2,8% · 24 ore' in gd[0], "<svg" in gd[0],
+           'role="button" tabindex="0" onclick="voltaPeriodoPrezzoP2P()"' in gd[0],
+           gd[1], gd[2]])
+    ds = r.get("dollaroSenzaSerie") or ""
+    ds7 = r.get("dollaroSenzaSerie7") or ["", ""]
+    prova("senza NESSUNA serie del dollaro (la card vista in produzione): in $ ci sono "
+          "lo stesso la linea, la percentuale, il periodo e il tocco",
+          [True, True, True, True, True, "7g"],
+          ['100 720 <button' in ds, "<svg" in ds,
+           'class="p2p-valore-var su">▲ 1,8% · 24 ore' in ds,
+           'class="p2p-valore p2p-valore-sale girabile" id="p2pPrezzo" role="button"' in ds,
+           'class="p2p-valore-var giu">▼ 3,4% · 7 giorni' in ds7[0], ds7[1]])
+    prova("...e ritocco torna all'euro, sullo stesso periodo; col dollaro sparito torna "
+          "all'euro da solo, e il simbolo smette di essere un bottone",
+          [["eur", True, "7g"], [True, "eur"]],
           [[(r.get("diNuovoEuro") or [0, -1, 0])[0], (r.get("diNuovoEuro") or [0, -1, 0])[1] > 0,
             (r.get("diNuovoEuro") or [0, -1, 0])[2]],
            [(r.get("dollaroSparito") or [-1, 0])[0] > 0, (r.get("dollaroSparito") or [-1, 0])[1]]])
+    # IL VELO E IL PALLINO (14 nov 2026, Andrea: «un leggero gradiente
+    # colorato in base all'andamento», la «A · Velo»; «levami quel pallino
+    # verde affianco alla scritta 1 BTC adesso»)
+    prova("il velo della card segue il verso del periodo scelto (sale → verde, scende → "
+          "rosso), anche in dollari; senza serie la card resta quella di prima",
+          [True, True, True, True, False],
+          ['<div class="p2p-valore p2p-valore-sale girabile"' in g[0],
+           '<div class="p2p-valore p2p-valore-scende girabile"' in g[1],
+           '<div class="p2p-valore p2p-valore-scende girabile"' in ind[0],
+           '<div class="p2p-valore p2p-valore-sale girabile"' in gd[0],
+           "p2p-valore-sale" in sp or "p2p-valore-scende" in sp])
+    prova("...il CSS: un gradiente di sole variabili dal colore dell'andamento alla card, "
+          "e il filo sottile del «Novità» (mezzo pixel al 30%, color-mix solo dentro "
+          "@supports) al posto del bordo, col pixel restituito al padding",
+          [True, True, True, True, True],
+          [".p2p-valore.p2p-valore-sale{--valore-tinta:var(--trust);--valore-velo:var(--trust-soft)}" in mini,
+           ".p2p-valore.p2p-valore-scende{--valore-tinta:var(--rosso-p2p-testo);"
+           "--valore-velo:var(--rosso-p2p-tenue)}" in mini,
+           "background:linear-gradient(110deg,var(--valore-velo) 0%,var(--card) 70%);" in mini,
+           "    border:0;padding:13px 17px;box-shadow:inset 0 0 0 .5px var(--line-soft)}" in mini,
+           "  @supports (box-shadow:inset 0 0 0 1px color-mix(in srgb,red 50%,blue)){\n"
+           "    .p2p-valore.p2p-valore-sale,.p2p-valore.p2p-valore-scende{\n"
+           "      box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--valore-tinta) 30%,transparent)}"
+           in mini])
+    prova("niente pallino verde accanto a «1 BTC adesso»", [True, 0],
+          ['<span class="p2p-valore-et">1 BTC adesso</span>' in g[0],
+           mini.count("p2p-valore-vivo")])
     prova("niente dollaro accanto all'euro e niente elenco dei periodi sotto la linea",
           [False, False], ["$" in g[0], "7 giorni" in g[0]])
     prova("la curva e' morbida (una C per tratto), dal margine sinistro al destro; una "

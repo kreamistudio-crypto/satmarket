@@ -206,3 +206,9 @@ frase: Ti è piaciuto un affare e vuoi dare qualcosa in più al venditore? Ora p
 dove: la scheda «Ordini», dentro un ordine già pagato, accanto al voto.
 leva: MANCIA_ATTIVA (nuova, accesa)
 pubblico: sì
+
+## 2026-11-14 · prezzo-btc-velo
+frase: La card del prezzo di bitcoin in cima al libro P2P ora si colora con il mercato: un velo verde leggero quando sale, rosso quando scende, con un filo sottile come i rettangoli «Novità». E in dollari è uguale a quella in euro: linea, percentuale e periodo restano, e il tocco cambia sempre fra 24 ore, 7 giorni e 30 giorni.
+dove: la scheda «P2P», in cima al libro degli ordini (Compra BTC e Vendi BTC).
+leva: nessuna
+pubblico: sì
