@@ -152106,6 +152106,19 @@ def prove_bollino_staff():
     prova("il suo blu nei due temi", (True, True),
           ("--staff-bg:" in giorno and "--staff-text:" in giorno,
            "--staff-bg:" in sera and "--staff-text:" in sera))
+    # LO SCUDO SCORRE SOTTO LE PARTI FISSE (14 nov 2026, cantiere
+    # badge-moderatore-z, Andrea: «quando scorri in basso il badge va
+    # sopra le altre cose»): il suo `z-index:3` vale solo dentro il volto,
+    # perche' i due contenitori che lo posano aprono un contesto loro —
+    # senza, gareggiava con la testata appiccicosa (3) e coi banner
+    # appesi (2) del libro, e con la testa del foglio dell'ordine (2).
+    # Misurato a 375 px nel browser: prima lo scudo sopra il banner USDT
+    # e il tab «Compra BTC», dopo sotto.
+    prova("lo scudo all'angolo resta dentro il volto: scorre sotto testata "
+          "e banner appesi", (True, True, True),
+          (".bollino-staff.mini{position:absolute;right:-4px;bottom:-4px;z-index:3;" in m,
+           ".p2p-volto{position:relative;isolation:isolate;" in m,
+           ".volto-cornice{position:relative;isolation:isolate;" in m))
 
     # --- 5) IL BANCO: il volto unico intero, coi pezzi veri --------------
     js = r"""
