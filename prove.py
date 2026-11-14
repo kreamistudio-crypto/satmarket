@@ -189820,6 +189820,10 @@ def prove_mancia_venditore():
           "apriMancia()" in r.get("compra", ""))
     prova("...col nome del venditore, scappato", True,
           "Sato" in r.get("compra", "") and "<b>Sats" not in r.get("compra", ""))
+    # (14 nov 2026, cantiere mancia-nome-intero) il nome INTERO: prima la
+    # prima parola, e «Un tempo per te» diventava «a Un»
+    prova("...e INTERO, non la prima parola", True,
+          "a <b>Sato &lt;b>Sats</b>" in r.get("compra", ""))
     prova("a affare concluso il bottone e' arancio", True,
           'btn orange' in r.get("concluso", "") and 'btn ghost' in r.get("compra", ""))
     prova("chi vende vede la mancia e «controlla il wallet»", True,

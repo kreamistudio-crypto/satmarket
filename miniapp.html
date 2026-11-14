@@ -38358,9 +38358,13 @@ let manciaOid = 0, manciaSats = 1000, manciaZap = 0;
    «passo 1 di 2» */
 let manciaCoda = [], manciaTotale = 0, manciaBattito = null;
 
+/* Il nome INTERO di chi vende (14 nov 2026, cantiere mancia-nome-intero):
+   prima era la prima parola, e un negozio di tre parole diventava «Un
+   grazie in sats a Un». Il nome di un negozio non e' un nome di
+   battesimo: si accorcia solo se e' lungo, e lo fa il CSS, non noi. */
 function nomeVenditoreMancia(o){
   const v = (o && o.voltoVenditore) || {};
-  return v.nome ? String(v.nome).split(' ')[0] : '';
+  return v.nome ? String(v.nome).trim() : '';
 }
 function fraseStatoMancia(m, vende){
   return m.stato === 'arrivata' ? '✅ arrivata'
@@ -38394,21 +38398,18 @@ function pannelloMancia(o){
       : '';
     return ricevute + aggiungi;
   }
-  const primo = nomeVenditoreMancia(o);
+  const chi = nomeVenditoreMancia(o);
   const concluso = puoiLasciareFeedback(o);
   if (!m.possibile && senza) {
-    /* qui il nome INTERO e non la prima parola: e' il soggetto della
-       frase, e un negozio di tre parole diventerebbe «Un non ha...» */
-    const intero = String(((o && o.voltoVenditore) || {}).nome || '');
     return `<div class="payout" id="ordMancia"><h4>🎁 ${concluso ? 'Ti è piaciuto l\'affare?' : 'Vuoi lasciare una mancia?'}</h4>
-      <div class="hint">${intero ? '<b>' + esc(intero) + '</b>' : 'Il venditore'} non ha ancora un <b>indirizzo Lightning</b> nel profilo: per ora la mancia non si può mandare.</div>${lista}</div>`;
+      <div class="hint">${chi ? '<b>' + esc(chi) + '</b>' : 'Il venditore'} non ha ancora un <b>indirizzo Lightning</b> nel profilo: per ora la mancia non si può mandare.</div>${lista}</div>`;
   }
   if (!m.possibile) {
     return mance.length
       ? `<div class="trust-note">🎁 <span><b>Grazie per la mancia!</b>${lista}</span></div>` : '';
   }
   return `<div class="payout" id="ordMancia"><h4>🎁 ${concluso ? 'Ti è piaciuto l\'affare?' : 'Vuoi lasciare una mancia?'}</h4>
-      <div class="hint">Un grazie in sats ${primo ? 'a <b>' + esc(primo) + '</b>' : 'al venditore'}: va dritto al suo wallet, Barattolo non prende niente.</div>${lista}
+      <div class="hint">Un grazie in sats ${chi ? 'a <b>' + esc(chi) + '</b>' : 'al venditore'}: va dritto al suo wallet, Barattolo non prende niente.</div>${lista}
       <button class="btn ${concluso ? 'orange' : 'ghost'}" onclick="apriMancia()">🎁 Lascia una mancia</button></div>`;
 }
 function apriMancia(){
@@ -38420,8 +38421,8 @@ function apriMancia(){
   manciaCoda = []; manciaTotale = 0;
   fermaBattitoMancia();
   el('manciaImporto').value = '';
-  const primo = nomeVenditoreMancia(o);
-  el('manciaPerChi').innerHTML = `Per ${primo ? '<b>' + esc(primo) + '</b>' : 'il venditore'}, da ${fmt(1)} a ${fmt(o.mancia.max)} sats.`;
+  const chi = nomeVenditoreMancia(o);
+  el('manciaPerChi').innerHTML = `Per ${chi ? '<b>' + esc(chi) + '</b>' : 'il venditore'}, da ${fmt(1)} a ${fmt(o.mancia.max)} sats.`;
   el('manciaBarattolo').style.display = o.mancia.zap_barattolo ? '' : 'none';
   el('manciaScelta').style.display = '';
   el('manciaPaga').style.display = 'none';
@@ -38534,9 +38535,9 @@ function passoMancia(){
   el('manciaPaga').style.display = '';
   el('manciaPasso').textContent = manciaTotale > 1 ? `Passo ${n} di ${manciaTotale}` : '';
   el('manciaCifra').textContent = fmt(p.sats);
-  const primo = nomeVenditoreMancia(currentOrder);
+  const chi = nomeVenditoreMancia(currentOrder);
   el('manciaA').textContent = p.tipo === 'venditore'
-    ? (primo ? 'di mancia a ' + primo : 'di mancia al venditore') : 'di zap a Barattolo ⚡';
+    ? (chi ? 'di mancia a ' + chi : 'di mancia al venditore') : 'di zap a Barattolo ⚡';
   el('manciaInvoice').textContent = p.invoice;
   portaWallet(el('manciaWallet'), p.invoice);
   el('manciaSalta').style.display = p.tipo === 'barattolo' ? '' : 'none';
