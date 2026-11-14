@@ -81776,3 +81776,65 @@ a mano sull'albero e sui commit non ancora su main: puliti. NON PROVATO
 dal vivo: uno swap automatico vero dopo questo cambio (voce 9 di
 `DA-FARE-ANDREA.md`, coi tempi nuovi), e sulla VM di collaudo la mossa
 nuova del cartone (COLLAUDO, «Il cambio libero»).
+
+## Lo scudo del moderatore scorre sotto le parti fisse (14 nov 2026, cantiere badge-moderatore-z, Andrea: «Bug sul badge moderatori ... Quando scorri in basso il badge va sopra le altre cose»)
+
+IL PROBLEMA. Nel libro del P2P, scorrendo in giù, lo scudo 🛡️ all'angolo
+del volto di un moderatore passava SOPRA i banner appesi «On-Chain» e
+«USDT» e sopra il tab «Compra BTC», mentre il resto della card spariva
+sotto come deve (tre foto di Andrea dal telefono). Non era il banner a
+grappolo né il cantiere delle card: lo scudo `.bollino-staff.mini` ha da
+sempre `z-index:3`, e né il volto (`.p2p-volto`) né la card (`.p2p-ord`,
+`position:relative` senza `z-index`) aprivano un contesto di
+sovrapposizione. Quel 3 valeva quindi per la pagina intera: pari alla
+testata appiccicosa (`.p2p-sticky`, 3, e lo scudo viene dopo nel
+documento, quindi vince) e sopra i banner appesi (`.p2p-oc-novita.appeso`,
+2). Sotto la testata il guasto c'era già prima dei banner appesi (il
+tab, provato sotto); i banner appesi sempre (12 nov sera) lo hanno solo
+messo dove si vede di più.
+
+COSA SI È FATTO. `isolation:isolate` sui due contenitori che posano lo
+scudo all'angolo di una faccia: `.p2p-volto` (la card del libro) e
+`.volto-cornice` (il riquadro «Chi ha pubblicato quest'ordine» nel
+foglio, dove la testa appiccicosa `#p2pDettSheet .foglio-testa` ha
+`z-index:2` e lo scudo da 3 le sarebbe scorso sopra allo stesso modo). Il
+3 adesso vale solo dentro il volto: sopra la faccia, come prima, e basta.
+È il rimedio già usato per la moneta del «Novità» on-chain (30 ott,
+`.p2p-oc-novita`). Nessun numero di `z-index` cambiato.
+
+STRADE SCARTATE. Abbassare lo `z-index` dello scudo (0 o 1): basta un
+ritocco futuro della faccia con un suo `z-index` e lo scudo finisce sotto
+la faccia; alzare quelli della testata e dei banner: rincorsa di numeri,
+e la prossima cosa con un 4 dentro una card rifà il guasto;
+`isolation` sull'intera `.p2p-ord`: funziona uguale per il libro, ma
+lascia scoperto il foglio dell'ordine, e il guasto sta nello scudo, non
+nella card. La card P2P della home (`.p2p-vt-bollino` nel `.ph-wrap`)
+non è toccata: lì sopra c'è solo l'header di casa, `z-index:20`.
+
+PROVATO. Nel browser (Chromium, 375 px, i CSS e le funzioni veri di
+`miniapp.html`, `voltoCardP2P` con la cache che dice staff, banner appesi
+e testata veri, scorrimento fino a mettere lo scudo sotto il banner USDT e
+poi sotto il tab): PRIMA `elementFromPoint` al centro dello scudo dava lo
+scudo stesso, in tutti e due i punti; DOPO il testo del banner e il tab.
+Foto prima/dopo in `/mnt/project-files/badge-moderatore-z/prima-dopo.png`.
+Sentinella nuova in `prove_bollino_staff` («lo scudo all'angolo resta
+dentro il volto»), controprove: tolto l'isolate da `.p2p-volto` (1
+rossa), poi da `.volto-cornice` (1 rossa), rimessi.
+
+COSA È GIRATO SU QUALE ALBERO. Sopra develop `b67e577`: la suite intera
+severa, 27.835 passate, 0 fallite, 2 saltate (lo script vero di
+nostr-tools, che in cloud non c'è: le stesse di ogni giro cloud); i
+collaudi di `ci/collaudi.txt` nella gabbia senza coincurve, 127 verdi e
+1 rosso (`collaudo_accesso_di_casa`, non mio, «coincurve non c'e'»).
+Dopo il rebase sopra `2da18ff` (non miei: `81d6227` euro-banner e
+`2da18ff` audit-swap-conferma, nessun simbolo in comune, conflitto solo
+in coda a questo file): la suite intera severa nel venv con le sole
+dipendenze del passo «Le prove» (senza httpx, senza coincurve), 27.846
+passate, 0 fallite, le stesse 2 saltate; i collaudi di
+`ci/collaudi.txt` senza coincurve e SENZA le variabili del proxy, 128
+verdi, 0 rossi (il rosso di prima l'ha curato `2da18ff`, che tocca
+proprio quel collaudo).
+
+NON PROVATO DAL VIVO: dentro Telegram sul telefono vero (le foto sono
+di Chromium a 375 px). Da guardare sul collaudo, scorrendo il libro con
+un ordine di un moderatore, e nel foglio dell'ordine. Nessuna leva.

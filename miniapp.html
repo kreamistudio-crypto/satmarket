@@ -3194,7 +3194,15 @@
      l'iniziale sotto la foto e' la rete di sempre — se l'immagine non
      arriva, `onerror` la toglie e resta la lettera. (Il flex della
      scatola sta nella sua regola, quella delle stelline, piu' sotto.) */
-  .p2p-volto{position:relative;flex:none;width:32px;height:32px;line-height:0}
+  /* ⚠️ `isolation:isolate` (14 nov 2026, cantiere badge-moderatore-z,
+     Andrea: «quando scorri in basso il badge va sopra le altre cose»): lo
+     scudo 🛡️ all'angolo ha `z-index:3`, e senza un contesto suo valeva
+     per la pagina intera — la card non ne apre uno, quindi lo scudo
+     gareggiava con la testata appiccicosa (3, e veniva dopo nel
+     documento) e coi banner appesi (2), e ci passava sopra. Adesso il
+     suo 3 vale solo dentro il volto, sopra la faccia e basta: e' il
+     rimedio della moneta del «Novita'» on-chain (vedi `.p2p-oc-novita`). */
+  .p2p-volto{position:relative;isolation:isolate;flex:none;width:32px;height:32px;line-height:0}
   .p2p-rep-testo{min-width:0}
   .p2p-faccia{position:absolute;inset:0;border-radius:50%;
     background:var(--ink);color:var(--on-ink);display:flex;
@@ -8402,7 +8410,10 @@
   .bollino-staff.grande{height:26px;padding:0 11px 0 9px;gap:5px;
     margin:0;font-size:14px;line-height:26px;cursor:default}
   .bollino-staff.grande svg{width:13px;height:15px}
-  .volto-cornice{position:relative;display:inline-flex;flex:none}
+  /* lo stesso recinto di `.p2p-volto` (14 nov 2026): nel foglio
+     dell'ordine la testa appiccicosa ha `z-index:2`, e lo scudo da 3 le
+     scorreva sopra */
+  .volto-cornice{position:relative;isolation:isolate;display:inline-flex;flex:none}
   /* nella card P2P della home il volto sta in alto a destra sopra la
      foto: il bollino gli si appoggia all'angolo basso */
   .bollino-staff.mini.p2p-vt-bollino{top:24px;right:2px;bottom:auto}
