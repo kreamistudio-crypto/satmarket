@@ -83663,3 +83663,23 @@ mancia e `collaudo_mancia`.
 
 NON PROVATO, DA GUARDARE. Il telefono vero. Sale con la prossima
 promozione.
+
+## Il nome intero di chi vende nella mancia (14 nov 2026, cantiere mancia-nome-intero, dalla coordinazione sul difetto segnalato a fine di mancia-senza-indirizzo: «è un difetto e si sistema subito»)
+
+IL DIFETTO. `nomeVenditoreMancia` teneva la prima parola del nome di chi
+vende, come un nome di battesimo: per un negozio di tre parole il
+riquadro diceva «Un grazie in sats a Un», il foglio «Per Un» e la
+fattura «di mancia a Un». Ora torna il nome intero (spazi ai bordi
+tolti): il nome di un negozio non si accorcia da noi. Il riquadro
+«senza indirizzo» di poco fa, che per questo aveva il suo nome intero a
+parte, ora usa la stessa funzione: una sola strada. La variabile `primo`
+si chiama `chi` nei tre posti che la usano.
+
+PROVATO. `prove_mancia_venditore`: il bottone porta il nome intero,
+scappato («a <b>Sato &lt;b>Sats</b>»). Controprova: rimessa la prima
+parola, 2 rosse (il bottone e il riquadro senza indirizzo). Il riquadro
+vero in Chromium col server in collaudo: «Un grazie in sats a Un tempo
+per te» (/mnt/project-files/mancia-senza-indirizzo/nome-intero.png).
+Suite severa sull'albero da origin/develop 97e13e79, nel venv delle sole
+dipendenze del workflow, senza proxy: 28.230/0, 2 saltate (nostr-tools);
+`collaudo_mancia` verde senza coincurve. Sale con la prossima promozione.
