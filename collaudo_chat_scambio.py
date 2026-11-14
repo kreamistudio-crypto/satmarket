@@ -526,11 +526,15 @@ async def giro():
               [e.get("ok") if isinstance(e, dict) else e[0] for e in esiti])
         SRV.P2P_CHAT_RAFFICA = 1000
         SRV.P2P_CHAT_MSG_MAX = 8
-        esiti = [await chiama(invia, C, {"ordine": r2, "tipo": "msg", "busta": busta(f"t-{k}")})
+        esiti = [await chiama(invia, V, {"ordine": r2, "tipo": "msg", "busta": busta(f"t-{k}")})
                  for k in range(5)]
         prova("il tetto di messaggi dello scambio: oltre, 409",
               [True, True, True, 409, 409],
               [e.get("ok") if isinstance(e, dict) else e[0] for e in esiti])
+        # (14 nov 2026, audit) il tetto e' di chi scrive: l'altra parte no
+        e = await chiama(invia, C, {"ordine": r2, "tipo": "msg", "busta": busta("c-1")})
+        prova("...e l'altra parte scrive ancora: il tetto e' di chi scrive",
+              True, e.get("ok") if isinstance(e, dict) else e[0])
         SRV.P2P_CHAT_MSG_MAX = 200
         SRV.P2P_CHAT_RAFFICA = 20
 

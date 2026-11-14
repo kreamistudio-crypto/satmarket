@@ -83252,3 +83252,132 @@ dà (Alby, Blink, Coinos e LNbits lo fanno, Wallet of Satoshi non ci
 risulta). Andrea (15:29Z): le prove si fanno dall'app in produzione dopo
 la promozione, con un ordine vero e pochi sats; se qualcosa non va si
 corregge lì. Resta da vedere anche come Tappo racconta la novità.
+
+## Il giro «correggi tutto»: le falle rimaste dell'audit chiuse dietro le quinte (14 nov 2026, cantiere audit-tornata-tutto, dal secondo giro dell'audit di sicurezza; Andrea: «Perché non correggi tutto quello che c'è da correggere?», «Soprattutto nel peer-to-peer … voglio che sia tutto in sicurezza», «Anche la parte dove si toccano i soldi», e la regola di sempre: «chiudimi le falle, ma non devi farmi modifiche alla funzionalità dell'app»)
+
+Il secondo giro dell'audit (sorgente di PRODUZIONE, main `4cc2fd7`;
+rapporto in `/mnt/project-files/audit-sicurezza/satmarket/run-2/`, mai
+su Telegram) aveva 57 sospetti, tutti verificati. Ventitré erano già
+nella tornata di prima (develop `bf084144`, voce «Il giro piccolo sui
+pagamenti» e quella prima). Qui gli altri, con la stessa regola: chi
+usa l'app non vede niente di diverso, ogni chiusura ferma solo una
+richiesta costruita apposta o un caso anomalo, e gli avvisi vanno ai
+moderatori (argomento «moderazione»). Restano fuori, per scelta, il 39
+(scartato dalla verifica), il 44 (già corretto su develop), l'1, il 20
+e il 21 (decisi da Andrea o funzionalità).
+
+DECISO, per zona (il numero è quello del rapporto del giro 2).
+- P2P MOSTRO. 19: una chiave che il coordinatore ha già nominato in uno
+  scambio entra in `chiavi_p2p` solo con la firma di possesso
+  (`_chiavi_nominate_p2p` in `_registra_chiavi_p2p`): niente più posto da
+  parte con una chiave altrui. 18: una riga di `p2p_scambi` con le chiavi
+  ma senza account è del coordinatore (`_parti_mostro_p2p` torna
+  `detto`), e chi si era dichiarato editore non ci resta. 30: «dimentica
+  il profilo» a scambio aperto non cancella più un esito in arrivo: le
+  chiavi degli scambi toccati negli ultimi sette giorni vanno in
+  `p2p_chiavi_sospese` prima del DELETE, e le legge SOLO chi scrive gli
+  esiti (`_parti_per_esiti_p2p`); gli avvisi e gli scambi no. 16 (nel
+  telefono): i campi dell'altra parte ricordano chi li ha scritti (`k`)
+  e cadono quando la controparte cambia; tornando nel libro la riga
+  perde `campiLoro` insieme a `preso`.
+- P2P ON-CHAIN. 14: il recapito (IBAN, indirizzo USDT) lo scrive solo
+  chi vende bitcoin. 15: dopo il deposito un recapito sostituito resta in
+  `p2p_onchain_recapiti_storia` e i moderatori lo vedono nella scheda
+  («⚠️ prima: …») e con un avviso; per le parti non cambia niente.
+- DEPOSITO ON-CHAIN DEL MERCATINO. 26: i pochi sats versati in più (sotto
+  la polvere) vanno in commissione invece di bloccare l'uscita verso chi
+  vende. 27: l'uscita decisa da un moderatore e firmata da Barattolo non
+  aspetta il wallet di rimborso di chi compra (era la regola scritta).
+  28: togliere lo swap non cancella una decisione già firmata. 36: la
+  fotografia dell'acquisto (`dettagli`) passa dalla stessa scopa
+  dell'indirizzo. 37: i checkout on-chain in attesa contano nel tetto
+  degli ordini aperti. 38: un acquisto pagato più di un'ora dopo la
+  scadenza del prezzo lo vedono i moderatori (il cambio resta quello,
+  come prima).
+- SOLDI. 13: «paga da un'altra cassaforte» timbra 'deviato' solo gli
+  hash che ha esaminato; se nel frattempo è partito un pagamento nuovo,
+  409 e si riesamina. 5: le leve che muovono i sats da sole hanno dal
+  pannello un pavimento e un soffitto (`LEVE_MISURE`), anche nel
+  ripristino. 40: il freno dei codici sconto vale anche nell'acquisto,
+  non solo nel preventivo. 41: alla chiusura di un'asta il proxy in
+  testa paga il minimo contro le puntate ANCORA in gara
+  (`prezzo_proxy_alla_chiusura`): un rivale ritirato col rimborso non gli
+  lascia il suo rialzo. L'esposto pubblico durante l'asta non scende
+  (resta la regola del motore); scende solo il conto finale, e la riga
+  vincitrice lo scrive.
+- NEGOZI E LINK. 33: il link a scelta non può essere il codice di un
+  altro negozio. 34: il codice si risolve prima dello username nei tre
+  posti, e un codice nuovo non è mai lo username di qualcuno. 35: le
+  chiavi salvate di un negozio online valgono per il loro sito; per un
+  sito nuovo si rimettono. 32: il link `/e/` lega la d al suo autore, e
+  la reputazione a una chiave provata.
+- ANNUNCI, FOTO, DATI. 42: nell'import da Nostr un gemello di titolo con
+  un'altra d non salta più la moderazione (la stessa clausola dello
+  scudo dell'import). 43: cancellando l'account se ne vanno solo le foto
+  nate per quell'annuncio. 45: avatar e insegna si decodificano con le
+  cinture delle foto (bomba fermata prima, JPEG piccolo, freno) e fuori
+  dal loop; miniatura e foto vuota passano dal freno. 46: nel barattolo
+  entra solo un annuncio visibile, e di uno non più in vista il cassetto
+  non mostra la descrizione; il carrello accetta un annuncio nascosto
+  solo se c'era già. 47: una modifica partita prima non rimette attivo
+  un annuncio rimosso nel frattempo (409, le foto nuove se ne vanno). 48:
+  l'export CSV mette l'apostrofo davanti a una cella che comincia con
+  = + - @. 49: il motivo dell'AI arriva ai moderatori scappato. 57: la
+  cancellazione dell'account toglie anche `wallet_unico`,
+  `swap_auto_preferenze`, `unioni_semi` e `unioni_registro`.
+- TETTI E SERVER. 50: niente `/docs`, `/redoc`, `/openapi.json`. 51: il
+  tetto dei messaggi della chat è di chi scrive (200 a testa), così una
+  parte non zittisce l'altra. 52: il link a scelta chiude la scrittura
+  prima di LNbits. 53: da un relay non si legge un frame oltre 8 MiB
+  (`_tetto_websocket` in `_apri_websocket`). 54: il LNURL (indirizzo
+  Lightning e verify della mancia) si legge a pezzi col tetto e un tempo
+  totale (`_get_lnurl`). 55: ogni corpo di richiesta oltre 128 MiB si
+  ferma col 413 (`TettoCorpo`, middleware ASGI sotto ogni rotta: conta i
+  byte veri, anche senza Content-Length). 56: al massimo tre ZIP
+  d'import in attesa a testa, un tetto totale, e lo ZIP col biglietto
+  scaduto se ne va subito.
+- DEPLOY E TELEFONO. 23: `deploy.sh` accetta solo una punta con firma
+  SSH, l'unica che `$FIRMATARI` sa giudicare. 31: lo swap BTC→LN non
+  parte se la scadenza del rimborso è oltre 4032 blocchi dalla cima
+  (`SWAP_SCADENZA_MAX`); `SWAP_TELEFONO_VER` rifatta.
+
+STRADE SCARTATE. Per il 55 il tetto dentro `leggi_json` più le 17
+letture dirette: copriva meno (le rotte a corpo grezzo e quelle future)
+e cambiava diciassette banchi di prova; il middleware copre tutto in un
+posto. Per il 41 abbassare l'esposto quando un rivale si ritira: è
+storia pubblica, e il motore è un punto fisso apposta. Per il 51
+dimezzare il tetto (100 a testa): avrebbe toccato chi scrive tanto.
+
+NON CHIUSI, e perché (una riga ciascuno). 17: la rotazione del seme P2P
+chiede un gesto nuovo all'utente. 12: «dichiara morto» resta di 24 ore
+con una decisione umana, come documentato (solo SaaS). 19 è chiuso a
+metà: prima della presa la chiave non è ancora nominata, e lì resta la
+firma di possesso facoltativa di oggi. 45: la regola dei byte per pixel
+conta ancora il file intero; il freno e il draft ne tolgono il danno.
+
+PROVATO. `prove_audit_tornata_tutto` (nuova, categoria mercatino): le
+funzioni pure girano davvero (le chiavi nominate, le chiavi sospese e la
+settimana, la storia dei recapiti, i sats in più, le misure delle leve,
+il prezzo del proxy con l'invariante dei conti, il dominio dei negozi,
+le foto per annuncio, la cella CSV, il tetto del websocket sui frame
+veri di websocket-client, il LNURL a pezzi, il middleware ASGI col 413
+dichiarato e contato, gli ZIP a testa col lavoro che protegge il suo
+file), e le sentinelle tengono le altre al loro posto. Aggiornate le
+prove che guardavano i pezzi cambiati: il censimento degli avvisi (+2
+nella moderazione, 104 punti), il tetto della chat per chi scrive, le
+finte del LNURL con `stream`, le ambientazioni di avatar, websocket,
+export e scopa.
+Aggiornati anche tre collaudi: `collaudo_turtle` (la d dell'importato
+cancellato resta «già decisa», una d nuova con lo stesso titolo si
+giudica), `collaudo_chat_scambio` (il tetto per chi scrive, e l'altra
+parte che scrive ancora) e `collaudo_mancia` (il wallet di cartone con
+`stream`). Il giro sull'albero del cantiere (da origin/develop
+`67590060`): suite severa 28.197/0 nel venv delle sole dipendenze delle
+prove (le 2 saltate sono i due script di nostr-tools, che qui non c'è);
+collaudi della CI 133/133 senza le variabili del proxy.
+
+NON PROVATO, DA GUARDARE. Niente dal vivo: nessuna di queste chiusure
+cambia uno schermo, e i casi che fermano sono richieste costruite
+apposta. Dopo la promozione si guarda solo che il server parta
+(`/api/salute`) e che una foto profilo e un'insegna si salvino come
+prima.

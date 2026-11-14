@@ -3127,6 +3127,34 @@ def _finto_lnbits(uscite, codice=200, muto=False, corpo=None):
     return types.SimpleNamespace(AsyncClient=C)
 
 
+class _FlussoFinto:
+    """(14 nov 2026, audit) Il `client.stream(...)` di httpx per i wallet
+    di cartone: il LNURL ora si legge a pezzi (`_get_lnurl`). Dentro
+    chiama la `get` della finta, cosi' i conti delle chiamate restano
+    quelli; il corpo e' il JSON della risposta, o il suo `content` se e'
+    grosso (la prova del tetto)."""
+
+    def __init__(self, attesa):
+        self._attesa = attesa
+
+    async def __aenter__(self):
+        self.r = await self._attesa
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    def raise_for_status(self):
+        return self.r.raise_for_status()
+
+    async def aiter_bytes(self):
+        c = getattr(self.r, "content", None)
+        if c is not None and len(c) > 65_536:
+            yield c
+            return
+        yield json.dumps(self.r.json()).encode()
+
+
 def _finto_lnurl(meta, fattura):
     """Il wallet del beneficiario, che nel LNURL-pay e' chi SCRIVE la
     fattura — qui lo facciamo mentire a comando."""
@@ -3154,6 +3182,9 @@ def _finto_lnurl(meta, fattura):
 
         async def get(self, url, **kw):
             return R(meta if ".well-known" in url else {"pr": fattura})
+
+        def stream(self, metodo, url, params=None, **kw):
+            return _FlussoFinto(self.get(url, params=params))
 
     return types.SimpleNamespace(AsyncClient=C)
 
@@ -9478,7 +9509,8 @@ def prove_chiusure_audit():
     def _apri_finto(relay, **k):
         visti_k.append(dict(k))
         return _Presa(302 if "gira" in relay else 101)
-    amb = {"ssl": _ssl, "_connessione_websocket": _apri_finto,
+    amb = {"ssl": _ssl, "_tetto_websocket": lambda ws: None,
+           "_connessione_websocket": _apri_finto,
            "_certificato_rifiutato": lambda *a: None}
     exec(pezzo("_apri_websocket"), amb)
     apri = amb["_apri_websocket"]
@@ -9537,7 +9569,8 @@ def prove_chiusure_audit():
         fuori = porta(lambda n: (
             "HTTP/1.1 302 Found\r\nLocation: ws://127.0.0.1:%d/dentro-casa"
             "\r\n\r\n" % dentro).encode())
-        amb_v = {"ssl": _ssl, "_connessione_websocket": _cc_vera,
+        amb_v = {"ssl": _ssl, "_tetto_websocket": lambda ws: None,
+           "_connessione_websocket": _cc_vera,
                  "_certificato_rifiutato": lambda *a: None}
         exec(pezzo("_apri_websocket"), amb_v)
         try:
@@ -12175,7 +12208,7 @@ def prove_indirizzo_casa():
 
     def scopa(leva=False):
         amb = {"db": Con, "time": _t_finto, "GIORNI_INDIRIZZO": 10,
-               "AUTO_SBLOCCO_ATTIVO": leva,
+               "AUTO_SBLOCCO_ATTIVO": leva, "sqlite3": __import__("sqlite3"),
                "print": lambda *a, **k: None}
         exec(pezzo("pulisci_indirizzi"), amb)
         amb["pulisci_indirizzi"]()
@@ -12710,7 +12743,8 @@ def prove_email_corriere():
     detto_s = []
     amb_s = {"db": Con, "time": _T, "print": lambda *a: detto_s.append(
                  " ".join(str(x) for x in a)),
-             "GIORNI_INDIRIZZO": 10, "AUTO_SBLOCCO_ATTIVO": False}
+             "GIORNI_INDIRIZZO": 10, "AUTO_SBLOCCO_ATTIVO": False,
+             "sqlite3": __import__("sqlite3")}
     exec(pezzo("pulisci_indirizzi"), amb_s)
     prima_agg = riga(2)["aggiornato"]
     amb_s["pulisci_indirizzi"]()
@@ -14036,6 +14070,9 @@ def prove_lista_ordini():
                "_onchain_di_ordine": lambda c, oid: c.execute(
                    "SELECT * FROM onchain_ordini WHERE ordine_id=?",
                    (oid,)).fetchone()}
+        # (14 nov 2026, audit) le celle passano dal giudice delle formule
+        exec(_SORGENTE[_SORGENTE.index("def cella_csv_sicura("):
+                       _SORGENTE.index('@app.get("/api/export/{biglietto}")')], amb)
         exec(pezzo("scarica_export"), amb)
         testo = amb["scarica_export"]("tik").lstrip("﻿")
         return list(csv_mod.reader(io_mod.StringIO(testo), delimiter=";"))
@@ -18010,6 +18047,7 @@ def prove_foto_telegram_fallita():
                "_foto_profilo_telegram": _foto_tg,
                "_foto_profilo_nostr": _foto_ns,
                "_scrivi_avatar": lambda tg_id, nome: scritture.append(nome),
+               "asyncio": __import__("asyncio"),
                "_salva_avatar": lambda negozio, raw:
                    ("av_ab12cd34_NUOVA.jpg" if raw else ""),
                "print": lambda *a, **k: None}
@@ -18144,6 +18182,7 @@ def prove_nome_da_nostr():
                # la foto che non si scarica (None) adesso si riprova
                # presto: vedi prove_foto_nostr_relay_muti
                "_riprova_avatar_presto": lambda tg_id: None,
+               "asyncio": __import__("asyncio"),
                "_salva_avatar": lambda negozio, raw: "",
                "print": lambda *a, **k: None}
         exec("async " + pezzo("aggiorna_profilo_social"), amb)
@@ -18324,6 +18363,7 @@ def prove_foto_nostr_relay_muti():
                "_foto_profilo_nostr": _foto_ns,
                "_scrivi_avatar": lambda t, nome: fatti.append(("avatar", nome)),
                "_riprova_avatar_presto": lambda t: fatti.append(("riprova", t)),
+               "asyncio": __import__("asyncio"),
                "_salva_avatar": lambda negozio, raw:
                    ("av_ab12cd34_NUOVA.jpg" if raw else ""),
                # un'eccezione qui la inghiottirebbe il fail-open: si segna,
@@ -75572,7 +75612,9 @@ def prove_p2p_chiavi():
     con = sqlite3.connect(":memory:")
     con.executescript(schema)
     forma = re.search(r'FORMA_PUBKEY_P2P = re\.compile\(r"([^"]+)"\)', src).group(1)
-    amb = {"MAX_CHIAVI_P2P": 3, "FORMA_PUBKEY_P2P": re.compile(forma)}
+    amb = {"MAX_CHIAVI_P2P": 3, "FORMA_PUBKEY_P2P": re.compile(forma),
+           "sqlite3": sqlite3}
+    exec(pezzo("_chiavi_nominate_p2p"), amb)
     exec(giudice, amb)
     reg = amb["_registra_chiavi_p2p"]
     A, B = "a" * 64, "b" * 64
@@ -99270,8 +99312,12 @@ def prove_chat_scambio():
     prova("LA RAFFICA: venti in un minuto passano, il ventunesimo e' un 429",
           [200] * 20 + [429, 429], raffica)
     amb["P2P_CHAT_MSG_MAX"] = 22
-    oltre = [posa(cc, o3, 1, A, "msg", ("z%03d" % k) * 20, "", ORA + 1000)[0] for k in range(4)]
+    oltre = [posa(cc, o3, 1, B, "msg", ("z%03d" % k) * 20, "", ORA + 1000)[0] for k in range(4)]
     prova("IL TETTO DI MESSAGGI dello scambio: oltre, 409", [200, 200, 409, 409], oltre)
+    # (14 nov 2026, audit) il tetto e' di chi scrive: B l'ha riempito,
+    # ma A scrive ancora
+    prova("...e il tetto e' di CHI SCRIVE: l'altra parte non resta zitta",
+          200, posa(cc, o3, 1, A, "msg", "y" * 80, "", ORA + 1100)[0])
     saluti = [posa(cc, o3, 1, B, "saluto", ("s%03d" % k) * 20, "", ORA + 2000)[0]
               for k in range(amb["P2P_CHAT_SALUTI_MAX"] + 1)]
     prova("...e una chat non si riapre all'infinito", 409, saluti[-1])
@@ -101307,7 +101353,7 @@ def prove_scambi_ovunque():
           "&& !!o.mio && !o.preso;" in pezzo_js(mini, "function p2pRitirato(o){", "\n}"))
     av = pezzo_js(mini, "function avanzaOrdineP2P(ordine, azione, payload){", "\n}\n")
     prova("...e il preso lo scrive la macchina a stati, e lo toglie il ritorno nel libro", True,
-          "if (nuovo === 'pubblicato') delete o.preso;" in av
+          "if (nuovo === 'pubblicato') { delete o.preso; delete o.campiLoro; }" in av
           and "else if (P2P_GIRO_APERTO.indexOf(nuovo) >= 0 || nuovo === 'attivo') o.preso = true;" in av)
     prova("il filtro spento nasconde gli annullati, che stanno sotto la loro pillola", True,
           "if (!f || !f.length) return gruppoScambioP2P(o) !== 'morti';"
@@ -129922,16 +129968,19 @@ def prove_nip89_handler():
 
     vero2 = sqlite3.connect(":memory:")
     vero2.row_factory = sqlite3.Row
+    # (14 nov 2026, audit) la d vale col suo autore (contatto_nostr o un
+    # account che ha provato la chiave), e la reputazione con una chiave
+    # provata: lo schema porta le colonne che il giudice legge
     vero2.execute("CREATE TABLE annunci(id INTEGER, titolo TEXT, "
-                 "nostr_origine_d TEXT)")
-    vero2.execute("CREATE TABLE utenti(npub TEXT, npub_accesso TEXT, "
-                 "username TEXT, negozio TEXT, nome TEXT)")
+                 "nostr_origine_d TEXT, contatto_nostr TEXT, venditore_id INTEGER)")
+    vero2.execute("CREATE TABLE utenti(tg_id INTEGER, npub TEXT, npub_accesso TEXT, "
+                 "username TEXT, negozio TEXT, nome TEXT, npub_verificata INTEGER)")
     vero2.execute("INSERT INTO annunci VALUES(193,'Bicicletta da "
-                 "corsa','barattolo-193')")
-    vero2.execute("INSERT INTO utenti VALUES(?,'','rosina','ab12cd34',"
-                 "'Rosina')", (npub_venditore,))
-    vero2.execute("INSERT INTO utenti VALUES(?,'','mariorossi','',"
-                 "'Mario')", (npub_senza_negozio,))
+                 "corsa','barattolo-193',?,0)", (npub_venditore,))
+    vero2.execute("INSERT INTO utenti VALUES(1,?,'','rosina','ab12cd34',"
+                 "'Rosina',1)", (npub_venditore,))
+    vero2.execute("INSERT INTO utenti VALUES(2,?,'','mariorossi','',"
+                 "'Mario',1)", (npub_senza_negozio,))
     vero2.commit()
 
     class _ConViva2:
@@ -129964,6 +130013,10 @@ def prove_nip89_handler():
           True, isinstance(r1, _FintaRedirect)
           and "/annuncio/193-slug" in r1.url and r1.status_code == 302)
 
+    r1b = apri(naddr_di_prova(30402, "ab" * 32, "barattolo-193"))
+    prova("...la stessa d firmata da un'ALTRA chiave non prende il link",
+          ("PAGINA_GENERICA",), r1b)
+
     r2 = apri(naddr_di_prova(30402, pk_venditore, "barattolo-mai-visto"))
     prova("annuncio mai importato: niente import al volo, pagina "
           "generica", ("PAGINA_GENERICA",), r2)
@@ -129978,6 +130031,13 @@ def prove_nip89_handler():
           "rimanda comunque, sullo username", True,
           isinstance(r4, _FintaRedirect)
           and r4.url == "https://barattolo.store/negozio/mariorossi")
+
+    pk_non_provata = "34" * 32
+    vero2.execute("INSERT INTO utenti VALUES(3,?,'','furbo','99887766',"
+                  "'Furbo',0)", (hex_to_npub_f(pk_non_provata),))
+    r4b = apri(naddr_di_prova(30382, pk_non_provata, pk_non_provata))
+    prova("...una npub scritta nel profilo senza prova non prende il link",
+          ("PAGINA_GENERICA",), r4b)
 
     pk_ignoto = "ee" * 32
     r5 = apri(naddr_di_prova(30382, pk_ignoto, pk_ignoto))
@@ -149428,6 +149488,9 @@ def prove_ssrf_ln_address():
                              primo_stato)
                 return R({"pr": "lnbc1-coniata"})
 
+            def stream(self, metodo, url, params=None, **kw):
+                return _FlussoFinto(self.get(url, params=params))
+
         async def _importo(_b):
             return fattura_vale
 
@@ -149943,7 +150006,9 @@ def prove_chiavi_p2p_firmate():
            "_sconto_p2p": lambda con, tg: {"attivo": tg == 111}}
     i = _SORGENTE.index("KIND_FIRMA_CHIAVE_P2P = ")
     exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
-    for f in ("_firma_chiave_p2p", "_registra_chiavi_p2p", "_sconti_per_chiavi_p2p"):
+    amb.setdefault("sqlite3", __import__("sqlite3"))
+    for f in ("_firma_chiave_p2p", "_chiavi_nominate_p2p", "_registra_chiavi_p2p",
+              "_sconti_per_chiavi_p2p"):
         exec(pezzo(f), amb)
     reg, sconti = amb["_registra_chiavi_p2p"], amb["_sconti_per_chiavi_p2p"]
     A, B, C = "a" * 64, "b" * 64, "c" * 64
@@ -150327,6 +150392,7 @@ def prove_freni():
     # --- gli ordini aperti --------------------------------------------------
     con = sqlite3.connect(":memory:")
     con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, compratore_id INT, stato TEXT)")
+    amb["sqlite3"] = sqlite3     # (14 nov 2026, audit) la tabella on-chain puo' mancare
     troppi = amb["_troppi_ordini_aperti"]
     for k in range(4):
         con.execute("INSERT INTO ordini(compratore_id, stato) VALUES(111, 'creato')")
@@ -150336,6 +150402,13 @@ def prove_freni():
     con.execute("INSERT INTO ordini(compratore_id, stato) VALUES(111, 'creato')")
     prova("col quinto no", True, troppi(con, 111))
     prova("...e un altro compratore non c'entra", False, troppi(con, 222))
+    # (14 nov 2026, audit) i checkout on-chain che aspettano i sats contano
+    con.execute("CREATE TABLE onchain_ordini(id INTEGER PRIMARY KEY, compratore_id INT, stato TEXT)")
+    for k in range(4):
+        con.execute("INSERT INTO onchain_ordini(compratore_id, stato) VALUES(222, 'attesa')")
+    con.execute("INSERT INTO onchain_ordini(compratore_id, stato) VALUES(222, 'pagato')")
+    prova("...e i checkout on-chain in attesa contano: uno «creato» e quattro on-chain",
+          True, troppi(con, 222))
 
     # --- dove sono appesi i freni --------------------------------------------
     for nome, rotta, freno in (("pubblica", "pubblica", '_frena("annunci", user["id"])'),
@@ -161328,7 +161401,7 @@ def prove_incasso_esterno_onchain():
                  "onchain_messaggio_destinazione", "onchain_firma_valida",
                  "onchain_firma_valida_testo",
                  "onchain_destinazione_motivo", "onchain_indirizzo_esterno",
-                 "_onchain_psbt_giudica"):
+                 "_onchain_sats_in_piu", "_onchain_psbt_giudica"):
         exec(pezzo(nome), srv)
 
     def radice(p, versione):
@@ -172103,7 +172176,8 @@ def prove_reputazione_p2p():
     rotta = rotta[:rotta.index("\n\n\n")]
     prova("la rotta degli eventi segna gli esiti DOPO la cronaca, solo su un evento nuovo, e mai un 500",
           True, 0 < rotta.index("fatto = _registra_evento_p2p(") < rotta.index("if fatto is not None:")
-          < rotta.index("for riga in _segna_esiti_p2p(con, ev, fatto, adesso):")
+          < rotta.index("for riga in _segna_esiti_p2p(\n                        con, ev, "
+                        "_parti_per_esiti_p2p(con, ev, fatto, adesso), adesso):")
           and "except Exception as e:" in rotta[rotta.index("_segna_esiti_p2p("):rotta.index("garanzia_morta = False")])
     for nome, fn in (("/api/p2p/tentativo", "tentativo_p2p"), ("/api/p2p/posso-prendere", "posso_prendere_p2p")):
         r = pezzo(fn)
@@ -174946,8 +175020,11 @@ def prove_canale_admin():
           # (14 nov 2026, audit-pagamenti-3) il pagamento uscito verso
           # l'altra parte e la fattura con due hash negli errori, la
           # chiave on-chain cambiata nella moderazione
+          # (14 nov 2026, audit-tornata-tutto) due nella moderazione: il
+          # recapito P2P on-chain cambiato dopo il deposito e l'acquisto
+          # on-chain pagato oltre un'ora dopo la scadenza del prezzo
           {"assistenza": 1, "dispute": 6, "dm": 1, "errori": 35,
-           "liquidita": 5, "moderazione": 18, "riepiloghi": 27}, per_stanza)
+           "liquidita": 5, "moderazione": 20, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -174982,7 +175059,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "102 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "104 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -174996,7 +175073,9 @@ def prove_canale_admin():
           "modificati il filtro del commento e il voto basso toccato; e la "
           "invoice di rimborso di uno sblocco scritta da un moderatore; dal "
           "14 nov sera il pagamento uscito verso l'altra parte, la fattura "
-          "con due hash e la chiave on-chain cambiata)", 102,
+          "con due hash e la chiave on-chain cambiata; e il recapito P2P "
+          "on-chain cambiato dopo il deposito e l'acquisto on-chain pagato "
+          "tardi)", 104,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -179312,7 +179391,9 @@ def prove_paracadute_p2p():
           [True, False],
           [0 < rotta.find("_registra_evento_p2p(con, ev, adesso, cambio_noto_ora())")
            < rotta.find("_segna_presa_paracadute_p2p(con, ev, fatto)")
-           < rotta.find("_segna_esiti_p2p(con, ev, fatto, adesso)"),
+           # (14 nov 2026, audit) le parti degli esiti contano anche le
+           # chiavi tolte a scambio aperto
+           < rotta.find("con, ev, _parti_per_esiti_p2p(con, ev, fatto, adesso), adesso)"),
            "paracadute" in pezzo("_registra_evento_p2p")])
     invio = codice(pezzo("_manda_evento_p2p"))
     prova("la riga sotto l'avviso della presa va alle sole PARTI: prima dei moderatori",
@@ -186096,7 +186177,7 @@ def prove_chat_mercatino():
     cc.execute("INSERT INTO buste(ordine, giro, da, tipo, per, busta, quando) VALUES('c4a7',0,1,'msg','','z',1)")
     prova("...il tetto dei messaggi, nei due mondi",
           ["Questo ordine ha raggiunto il limite di messaggi", "Questo scambio ha raggiunto il limite di messaggi"],
-          [amb["_chat_p2p_posa"](cc, o, 0, 2, "msg", "w" * 50, "", 5)[1] for o in ("m8", "c4a7")])
+          [amb["_chat_p2p_posa"](cc, o, 0, 1, "msg", "w" * 50, "", 5)[1] for o in ("m8", "c4a7")])
     prova("...la chat riaperta troppe volte, nei due mondi",
           ["La chat di questo ordine e' stata riaperta troppe volte",
            "La chat di questo scambio e' stata riaperta troppe volte"],
@@ -188769,6 +188850,7 @@ def prove_certificati_relay():
         return ("ws", relay, k)
     amb = {"ssl": _ssl, "threading": __import__("threading"),
            "time": _t.SimpleNamespace(time=lambda: adesso[0]),
+           "_tetto_websocket": lambda ws: None,
            "_connessione_websocket": _apri_vero, "CERT_RELAY_PAUSA_S": 3600,
            "_CERT_RIFIUTATI": {}, "_CERT_LUCCHETTO": __import__("threading").Lock(),
            "print": lambda *a, **k: righe.append(" ".join(str(x) for x in a))}
@@ -195717,6 +195799,362 @@ def prove_audit_pagamenti_3():
           "\nP2P_CHAT_PESO_PERSONA = 200 * 1024 * 1024\n" in sc)
 
 
+def prove_audit_tornata_tutto():
+    """IL GIRO «CORREGGI TUTTO» DELL'AUDIT (14 nov 2026, Andrea: «perche'
+    non correggi tutto quello che c'e' da correggere?»). Le falle rimaste
+    del secondo giro chiuse dietro le quinte, senza cambiare niente di
+    quel che l'utente vede: il P2P (chiavi provate, esiti che non si
+    cancellano, recapiti con la storia), il deposito on-chain, i soldi
+    (cassaforte, aste, codici sconto), i negozi, le foto, i tetti di
+    dimensione e la cancellazione dell'account."""
+    import asyncio
+    import sqlite3 as _sq
+    import struct as _st
+    import types
+    print("\n[audit, il giro «correggi tutto»: le falle chiuse dietro le quinte]")
+    sc = _SORGENTE
+
+    # ---- 1. il P2P: le chiavi e gli esiti --------------------------------
+    rc = codice(pezzo("_registra_chiavi_p2p"))
+    prova("una chiave gia' nominata dal coordinatore entra solo con la firma",
+          True, "nominate = _chiavi_nominate_p2p(con, [p for p in nuove if p not in firmate_qui])" in rc
+          and "nuove = [p for p in nuove if p not in nominate]" in rc)
+    c = _sq.connect(":memory:")
+    c.execute("CREATE TABLE p2p_scambi(ordine TEXT, chiave_compratore TEXT, "
+              "chiave_venditore TEXT, aggiornato INTEGER)")
+    c.execute("INSERT INTO p2p_scambi VALUES('o1','aa','bb',100)")
+    amb = {"sqlite3": _sq}
+    exec(pezzo("_chiavi_nominate_p2p"), amb)
+    prova("...e quali sono lo dice p2p_scambi", {"aa", "bb"},
+          set(amb["_chiavi_nominate_p2p"](c, ["aa", "bb", "cc"])))
+    prova("...senza la tabella nessuna (database di ieri)", set(),
+          set(amb["_chiavi_nominate_p2p"](_sq.connect(":memory:"), ["aa"])))
+    pm = codice(pezzo("_parti_mostro_p2p"))
+    prova("le chiavi senza account sono del coordinatore: la sua parola resta",
+          True, 'return {"maker": 0, "taker": 0, "detto": True}' in pm)
+    # le chiavi tolte a scambio aperto contano ancora per gli esiti
+    c.execute("CREATE TABLE chiavi_p2p(pubkey TEXT, tg_id INTEGER)")
+    c.execute("INSERT INTO chiavi_p2p VALUES('aa', 7)")
+    amb.update({"P2P_CHIAVI_SOSPESE_S": 7 * 86400})
+    exec(pezzo("_sospendi_chiavi_p2p"), amb)
+    exec(pezzo("_parti_per_esiti_p2p"), amb)
+    amb["_sospendi_chiavi_p2p"](c, 7, 200)
+    c.execute("DELETE FROM chiavi_p2p")
+    ev = {"compratore_key": "aa", "venditore_key": "bb"}
+    prova("«dimentica il profilo» a scambio aperto: l'esito trova ancora chi era",
+          {"compratore": 7, "venditore": 9},
+          amb["_parti_per_esiti_p2p"](c, ev, {"compratore": 0, "venditore": 9}, 300))
+    prova("...ma solo per gli esiti, e solo per una settimana",
+          {"compratore": 0, "venditore": 9},
+          amb["_parti_per_esiti_p2p"](c, ev, {"compratore": 0, "venditore": 9},
+                                      200 + 8 * 86400))
+    prova("...le chiavi si mettono da parte PRIMA di cancellarle", True,
+          codice(pezzo("dimentica_chiavi_p2p")).index("_sospendi_chiavi_p2p(")
+          < codice(pezzo("dimentica_chiavi_p2p")).index("DELETE FROM chiavi_p2p"))
+    prova("...e chi scrive gli esiti le legge", True,
+          "_parti_per_esiti_p2p(" in codice(sc[sc.index("async def evento_p2p("):
+                                              sc.index("\n\n\n", sc.index("async def evento_p2p("))]))
+
+    # ---- 2. il P2P on-chain: il recapito ---------------------------------
+    pr = codice(pezzo("p2p_onchain_pubblica_rotta"))
+    prova("il recapito lo scrive solo chi vende bitcoin", True,
+          'if lato != "sell":\n        recapito = ""' in pr)
+    amb = {"time": __import__("time")}
+    exec(pezzo("_p2p_onchain_recapito_storia"), amb)
+    exec(pezzo("_p2p_onchain_recapiti_prima"), amb)
+    amb["sqlite3"] = _sq
+    c = _sq.connect(":memory:")
+    prova("senza cambi, nessun recapito di prima", [],
+          amb["_p2p_onchain_recapiti_prima"](c, 5))
+    amb["_p2p_onchain_recapito_storia"](c, 5, "T-vecchio-1", 2)
+    amb["_p2p_onchain_recapito_storia"](c, 5, "T-vecchio-2", 2)
+    prova("dopo il deposito ogni recapito sostituito resta, in ordine",
+          ["T-vecchio-1", "T-vecchio-2"], amb["_p2p_onchain_recapiti_prima"](c, 5))
+    rr = codice(pezzo("p2p_onchain_recapito"))
+    prova("...si scrive solo DOPO il deposito, e i moderatori lo sanno", True,
+          "cambiato_dopo = (o[\"stato\"] == \"depositato\" and prima and prima != testo)" in rr
+          and 'argomento="moderazione"' in rr)
+
+    # ---- 3. il deposito on-chain -----------------------------------------
+    amb = {}
+    exec(pezzo("_onchain_sats_in_piu"), amb)
+    prova("i sats versati in piu' si contano", (7, 0, 0),
+          (amb["_onchain_sats_in_piu"]({"importo_sats": 1000}, [{"value": 1007}]),
+           amb["_onchain_sats_in_piu"]({"importo_sats": 1000}, [{"value": 900}]),
+           amb["_onchain_sats_in_piu"]({"importo_sats": 0}, [{"value": 5}])))
+    pg = codice(pezzo("_onchain_psbt_giudica"))
+    prova("...e sotto la polvere vanno in commissione: l'uscita non si blocca",
+          True, "min(_onchain_sats_in_piu(o, monete),\n" in pg
+          and "ONCHAIN_POLVERE - 1)" in pg)
+    prova("la decisione firmata da Barattolo non aspetta il wallet di rimborso",
+          (True, True), ('if not o["rimborso"] and not decisa:' in pg,
+                         "decisa=True)" in codice(pezzo("_onchain_psbt_barattolo"))))
+    prova("togliere lo swap non cancella una decisione firmata", True,
+          "COALESCE(decisione_da, 0)=0" in codice(pezzo("_onchain_cambio_togli")))
+    prova("i checkout on-chain in attesa contano nel tetto degli ordini aperti",
+          True, "FROM onchain_ordini WHERE compratore_id=?" in codice(pezzo("_troppi_ordini_aperti")))
+    prova("la pulizia degli indirizzi passa anche dalla fotografia on-chain",
+          True, "UPDATE onchain_ordini SET dettagli='{}'" in codice(pezzo("pulisci_indirizzi")))
+    oc = codice(sc[sc.index("async def onchain_controlla("):
+                   sc.index("\n\n\n", sc.index("async def onchain_controlla("))])
+    prova("un acquisto on-chain pagato tardi lo vedono i moderatori", True,
+          'if stato == "pagato" and tardi > 3600:' in oc)
+
+    # ---- 4. i soldi: cassaforte, leve, codici, aste ----------------------
+    pa = codice(sc[sc.index("async def paga_da_altra_cassaforte("):
+                   sc.index("\n\n\n", sc.index("async def paga_da_altra_cassaforte("))])
+    prova("«paga da un'altra cassaforte» timbra solo gli hash esaminati", True,
+          "if nuovi:\n        con.rollback()" in pa and "lower(hash)=?" in pa)
+    amb = {"LEVE_MISURE": {"ORE_CONFERMA": (24, 1440)},
+           "_giudice_per_tipo": lambda rif, v: (v, "")}
+    exec(pezzo("_giudice_generico"), amb)
+    prova("le leve che muovono i sats hanno un pavimento e un soffitto",
+          ("", True, True),
+          (amb["_giudice_generico"]("ORE_CONFERMA", 72, 72)[1],
+           bool(amb["_giudice_generico"]("ORE_CONFERMA", 72, 1)[1]),
+           bool(amb["_giudice_generico"]("ORE_CONFERMA", 72, 99999)[1])))
+    for f in ("compra", "_compra_set"):
+        prova(f"il freno dei codici sconto anche nell'acquisto ({f})", True,
+              "if cod_nome and not _codice_quota_libera(user[\"id\"]):"
+              in codice(sc[sc.index(f"def {f}("):sc.index("\n\n\n", sc.index(f"def {f}("))]))
+    amb = {}
+    for f in ("rilancio_minimo", "conto_chiusura", "prezzo_proxy_alla_chiusura"):
+        exec(pezzo(f), amb)
+    campo = [{"id": 1, "tg_id": 10, "stato": "attiva", "versato_sats": 10_000,
+              "offerto_sats": 6_000, "saldo_seq": 1, "proxy": 1},
+             {"id": 2, "tg_id": 20, "stato": "ritirata", "versato_sats": 5_700,
+              "offerto_sats": 5_700, "saldo_seq": 2, "proxy": 0},
+             {"id": 3, "tg_id": 30, "stato": "attiva", "versato_sats": 2_000,
+              "offerto_sats": 2_000, "saldo_seq": 3, "proxy": 0}]
+    giusto = amb["prezzo_proxy_alla_chiusura"](campo, 1_000, 5)
+    v, rimborsi = amb["conto_chiusura"](giusto)
+    prova("un rivale ritirato non lascia il suo rialzo sul conto del proxy",
+          (1, 2_100), (v["id"], v["offerto_sats"]))
+    prova("...e i conti tornano: versati = prezzo + rimborsi", 12_000,
+          v["offerto_sats"] + sum(r["importo_sats"] for r in rimborsi))
+    prova("...la storia pubblica non si tocca (la copia e' nuova)", 6_000,
+          campo[0]["offerto_sats"])
+    manuale = [dict(campo[0], proxy=0, offerto_sats=10_000), campo[2]]
+    prova("...una puntata manuale paga quel che ha offerto, come sempre", 10_000,
+          amb["prezzo_proxy_alla_chiusura"](manuale, 1_000, 5)[0]["offerto_sats"])
+    ca = codice(pezzo("_chiudi_una_asta"))
+    prova("...la chiusura ricalcola PRIMA del conto, e lo scrive", True,
+          ca.index("prezzo_proxy_alla_chiusura(") < ca.index("conto_chiusura(puntate)")
+          and "offerto_sats=?, " in ca)
+
+    # ---- 5. i negozi, i link, le chiavi dei siti -------------------------
+    prova("il link a scelta non copre il codice di un altro negozio", True,
+          'testa = (slug or "").split("-", 1)[0]' in codice(pezzo("_slug_negozio_libero")))
+    prova("un codice negozio nuovo non e' mai lo username di qualcuno", True,
+          "username=? COLLATE NOCASE" in codice(pezzo("nuovo_codice_negozio")))
+    amb = {"urlparse": __import__("urllib.parse").parse.urlparse}
+    exec(pezzo("_host_negozio"), amb)
+    prova("le chiavi salvate valgono per il loro sito", ("shop.it", "shop.it", "altro.it"),
+          tuple(amb["_host_negozio"](u) for u in
+                ("https://www.Shop.it/x", "https://shop.it", "https://altro.it")))
+    pe = codice(sc[sc.index("def pagina_evento_nostr("):
+                   sc.index("\n\n\n", sc.index("def pagina_evento_nostr("))])
+    prova("il link /e/ lega la d al suo autore, e la reputazione a una chiave provata",
+          True, "npub_autore = hex_to_npub(d[\"pubkey\"])" in pe
+          and "npub_accesso=? OR (npub=? AND npub_verificata=1)" in pe)
+
+    # ---- 6. annunci, foto, barattolo, export -----------------------------
+    prova("l'import da Nostr: un gemello con un'altra d non salta la moderazione",
+          True, "OR nostr_origine_d=?) " in codice(pezzo("_da_giudicare")))
+    amb = {"json": __import__("json"), "NOME_FOTO": re.compile(
+        r"^(a\d+_\d+(_\d+)?(_min)?\.(jpg|png|webp|gif)|av_[0-9a-f]+_\d+\.jpg)\Z")}
+    exec(pezzo("_foto_dell_annuncio"), amb)
+    prova("cancellando l'account se ne vanno solo le foto di QUEL annuncio",
+          ["a5_1.jpg", "a5_1_min.jpg"],
+          amb["_foto_dell_annuncio"]('["a5_1.jpg", "a6_1.jpg", "av_ab_1.jpg"]', 5))
+    prova("...e il pezzo dice a ogni annuncio il suo numero", True,
+          "_foto_dell_annuncio(a[\"foto\"], a[\"id\"])" in sc)
+    df = codice(pezzo("_decodifica_frenata"))
+    prova("avatar e insegna: bomba fermata prima, JPEG piccolo, freno", True,
+          "_foto_anomala(raw)" in df and "with _FRENO_DECODIFICA:" in df
+          and 'img.draft("RGB"' in df)
+    prova("...e decodificati fuori dal loop", 2,
+          sc.count("await asyncio.to_thread(\n            _salva_avatar,")
+          + sc.count("await asyncio.to_thread(_salva_banner,"))
+    prova("miniatura e foto vuota passano dal freno", (True, True),
+          ("with _FRENO_DECODIFICA:" in codice(pezzo("miniatura_jpeg")),
+           "with _FRENO_DECODIFICA:" in codice(pezzo("_foto_vuota"))))
+    tp = codice(sc[sc.index("async def toggle_preferito("):
+                   sc.index("\n\n\n", sc.index("async def toggle_preferito("))])
+    prova("nel barattolo entra solo un annuncio che si puo' vedere", True,
+          'if a["stato"] not in ("attivo", "venduto"):' in tp)
+    prova("...e il cassetto non mostra la descrizione di uno non in vista", True,
+          'r["descrizione"] = ""' in codice(pezzo("miei_preferiti")))
+    prova("il carrello non diventa la porta per un titolo nascosto", True,
+          "or k in gia_ids}" in codice(sc[sc.index("async def salva_carrello("):
+                                          sc.index("\n\n\n", sc.index("async def salva_carrello("))]))
+    ma = codice(sc[sc.index("async def modifica_annuncio("):
+                   sc.index("\n\n\n", sc.index("async def modifica_annuncio("))])
+    prova("una modifica partita prima non rimette attivo un annuncio rimosso",
+          True, "\"servizio_limite_ordine=? WHERE id=? AND stato=?\"" in ma
+          and "if cur_modifica.rowcount == 0:" in ma)
+    amb = {}
+    exec(pezzo("cella_csv_sicura"), amb)
+    prova("l'export non scrive formule vive", ["'=HYPERLINK(1)", "'+1", "'-x", "'@a",
+                                               "ciao", 12, ""],
+          [amb["cella_csv_sicura"](v) for v in
+           ("=HYPERLINK(1)", "+1", "-x", "@a", "ciao", 12, "")])
+    prova("...e l'export passa tutto da li'", True,
+          "_ScrittoreCsvSicuro(csv.writer(" in codice(pezzo("scarica_export")))
+    prova("il motivo dell'AI arriva ai moderatori scappato, in tre posti", 3,
+          sc.count("({html.escape(verdetto[1])})") + sc.count("({html.escape(motivo)})\\n"))
+
+    # ---- 7. i tetti di dimensione ----------------------------------------
+    prova("niente mappa pubblica delle rotte", True,
+          'FastAPI(title="Barattolo API", openapi_url=None, docs_url=None,' in sc)
+    rs = codice(sc[sc.index("async def richiedi_slug_negozio("):
+                   sc.index("\n\n\n", sc.index("async def richiedi_slug_negozio("))])
+    prova("il link a scelta non tiene il lucchetto del database durante LNbits",
+          True, rs.index("con.commit()") < rs.index("await crea_invoice_escrow("))
+    try:
+        import websocket as _wsl
+    except ImportError:
+        _wsl = None
+    if _wsl:
+        i, j = sc.index("WS_FRAME_MAX = "), sc.index("def _apri_websocket(")
+        amb = {}
+        exec(sc[i:j], amb)
+        amb["WS_FRAME_MAX"] = 1000
+
+        def frame(lung, corpo):
+            ws = _wsl.WebSocket()
+            buf = [bytes([0x81, 127]) + _st.pack("!Q", lung) + corpo]
+
+            def rcv(n):
+                d, buf[0] = buf[0][:n], buf[0][n:]
+                if not d:
+                    raise _wsl.WebSocketConnectionClosedException("fine")
+                return d
+            ws.frame_buffer = _wsl._abnf.frame_buffer(rcv, True)
+            amb["_tetto_websocket"](ws)
+            try:
+                return ws.recv_data_frame()[1].data
+            except OSError:
+                return "rifiutato"
+        prova("un relay non manda un frame oltre il tetto", (b"x" * 10, "rifiutato"),
+              (frame(10, b"x" * 10), frame(5000, b"x" * 10)))
+    prova("...e il tetto lo mette chi apre ogni websocket", True,
+          "_tetto_websocket(ws)" in codice(pezzo("_apri_websocket")))
+
+    class _Strm:
+        def __init__(self, pezzi, stato=200):
+            self.pezzi, self.stato = pezzi, stato
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        def raise_for_status(self):
+            if self.stato >= 300:
+                raise RuntimeError("HTTP")
+
+        async def aiter_bytes(self):
+            for p in self.pezzi:
+                yield p
+
+    class _Cli:
+        def __init__(self, pezzi):
+            self.pezzi = pezzi
+
+        def stream(self, metodo, url, params=None):
+            return _Strm(self.pezzi)
+    amb = {"asyncio": asyncio, "TETTO_RISPOSTA_LNURL": 100,
+           "LNURL_TEMPO_TOTALE_S": 5}
+    exec("async " + pezzo("_get_lnurl"), amb)
+    prova("il LNURL si legge a pezzi e si ferma oltre il tetto",
+          ({"tag": "payRequest"}, {}),
+          (asyncio.run(amb["_get_lnurl"](_Cli([b'{"tag":', b'"payRequest"}']), "u")),
+           asyncio.run(amb["_get_lnurl"](_Cli([b"x" * 60, b"y" * 60]), "u"))))
+    prova("...dall'indirizzo Lightning e dal verify della mancia", 3,
+          sc.count("await _get_lnurl(c, "))
+
+    class _H(Exception):
+        def __init__(self, status_code, detail=""):
+            self.status_code = status_code
+    i_t = sc.index("CORPO_MAX = ")
+    amb = {}
+    exec(sc[i_t:sc.index("app.add_middleware(TettoCorpo)", i_t)], amb)
+    amb["CORPO_MAX"] = 100
+
+    def corpo(pezzi, lung=None):
+        """Un giro ASGI col tetto: la rotta di cartone legge tutto il corpo
+        e risponde 200 con quanti byte ha letto."""
+        uscite, coda = [], [{"type": "http.request", "body": p, "more_body": True}
+                            for p in pezzi] + [{"type": "http.request", "body": b""}]
+
+        async def receive():
+            return coda.pop(0)
+
+        async def send(m):
+            uscite.append(m)
+
+        async def rotta(scope, rcv, snd):
+            n = 0
+            while True:
+                m = await rcv()
+                n += len(m.get("body") or b"")
+                if not m.get("more_body"):
+                    break
+            await snd({"type": "http.response.start", "status": 200, "headers": []})
+            await snd({"type": "http.response.body", "body": str(n).encode()})
+        intest = [(b"content-length", str(lung).encode())] if lung else []
+        asyncio.run(amb["TettoCorpo"](rotta)({"type": "http", "headers": intest},
+                                          receive, send))
+        return uscite[0]["status"]
+    prova("un corpo oltre il tetto si ferma col 413, dichiarato o no",
+          (200, 413, 413), (corpo([b"x" * 60]), corpo([b"x"], lung=10 ** 6),
+                            corpo([b"x" * 60, b"y" * 60])))
+    prova("...e il tetto sta sotto OGNI rotta", True,
+          "app.add_middleware(TettoCorpo)" in sc)
+    amb = {"IMPORT_ZIP": {}, "IMPORT_LAVORI": {}, "IMPORT_ZIP_PER_PERSONA": 3,
+           "IMPORT_ZIP_TOTALE_MAX": 10 ** 9, "os": os, "HTTPException": _H}
+    tolti = []
+    amb["_percorso_zip"] = lambda t: "/non/esiste/" + t
+    amb["_cancella_zip"] = tolti.append
+    exec(pezzo("_cancella_zip_libero"), amb)
+    exec(pezzo("_fai_posto_zip"), amb)
+    amb["IMPORT_ZIP"].update({"t1": (5, 10), "t2": (5, 20), "t3": (5, 30),
+                              "x": (6, 5)})
+    amb["IMPORT_LAVORI"]["l"] = {"zip_path": "/non/esiste/t2"}
+    amb["_fai_posto_zip"](5)
+    amb["IMPORT_ZIP"]["t4"] = (5, 40)
+    amb["_fai_posto_zip"](5)
+    prova("al massimo tre ZIP in attesa a testa: il nuovo manda via il piu' vecchio",
+          (["t3", "t4", "x"], ["/non/esiste/t1"]),
+          (sorted(amb["IMPORT_ZIP"]), tolti))
+
+    # ---- 8. la cancellazione dell'account --------------------------------
+    i = sc.index("CANCELLA_TOGLI = (")
+    lista = sc[i:sc.index("\n)\n", i)]
+    prova("cancellare l'account toglie anche le quattro tabelle pigre", [],
+          [t for t in ('("wallet_unico", "tg_id")', '("swap_auto_preferenze", "tg_id")',
+                       '("unioni_semi", "tg_id")', '("unioni_semi", "da_id")',
+                       '("unioni_registro", "tg_id")', '("unioni_registro", "da_id")')
+           if t not in lista])
+
+    # ---- 9. il deploy e il telefono --------------------------------------
+    dep = open("deploy.sh", encoding="utf-8").read()
+    prova("il deploy accetta solo una firma SSH, l'unica che i firmatari giudicano",
+          True, "grep -q '^gpgsig -----BEGIN SSH SIGNATURE-----$'" in dep
+          and dep.index("BEGIN SSH SIGNATURE") < dep.index("verify-commit \"$sha\""))
+    bz = open(os.path.join("swap", "boltz.js"), encoding="utf-8").read()
+    prova("lo swap BTC→LN non parte con un rimborso troppo lontano", True,
+          "const SWAP_SCADENZA_MAX = 4032;" in bz
+          and "Number(r.timeoutBlockHeight) - cima > SWAP_SCADENZA_MAX" in bz)
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("i dati di pagamento di chi ha preso prima non restano sulla riga",
+          (True, True),
+          ("if (nuovo === 'pubblicato') { delete o.preso; delete o.campiLoro; }" in mini,
+           "if (!(c && c.k && c.k !== o.peer)) tenuti[t] = c;" in mini))
+
+
 def prove_audit_pagamenti_2():
     """IL SECONDO AUDIT DI SICUREZZA, LE CHIUSURE SUI PAGAMENTI (14 nov
     2026, cantiere audit-pagamenti-2). Sette sospetti verificati sul
@@ -196308,7 +196746,7 @@ CATEGORIE = {
     venduto_canale chat_mercatino chat_dalla_notifica
     modifica_massiva_foto miniature_leggere leva_mercato_lavoro
     allegati_da_telegram domande_compratore incasso_annuncio
-    audit_pagamenti_2 audit_pagamenti_3
+    audit_pagamenti_2 audit_pagamenti_3 audit_tornata_tutto
     """.split(),
     "infrastruttura": """
     categorie_delle_prove widget_prova widget_ordini
@@ -197131,6 +197569,7 @@ def main():
               prove_seconda_firma_parla,
               prove_audit_pagamenti_2,
               prove_audit_pagamenti_3,
+              prove_audit_tornata_tutto,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:
