@@ -82031,3 +82031,90 @@ annuncio dai visti, il tondo dice 1. Nessun errore di pagina.
 NON PROVATO, DA GUARDARE. Sul telefono vero dentro Telegram il pizzico
 (la stessa incognita della mappa del libro: `touch-action:none` contro
 lo zoom di Telegram).
+
+## L'ordinamento del libro P2P si ricorda per la prossima visita (14 nov 2026, cantiere ordine-libro-ricordato, Andrea: «Se scelgo un ordinamento differente sarebbe bello lo salvasse per la mia prossima visita»)
+
+IL DIFETTO. Il foglio «Ordina il libro» (Più recenti, Convenienza,
+Importo dal più grande e dal più piccolo, cantiere della pillola del 13
+set) teneva la scelta nella `<select>` nascosta della vista, e la
+`<select>` rinasceva col suo `selected` a ogni apertura dell'app: chi
+leggeva il libro per convenienza doveva rifare i due tocchi a ogni
+visita.
+
+COSA SI È DECISO. La scelta si scrive in localStorage
+(`barattolo_p2p_ordine`) e all'avvio riempie la `<select>`. Tre scelte,
+coi perché:
+1. PER DISPOSITIVO, come la vista ₿/€ (`VALUTA_CHIAVE`): è una
+   preferenza di lettura, non un fatto della persona. Farla viaggiare
+   col profilo (`/me`, come i timbri del tour) vorrebbe dire server e
+   colonna per un ornamento: lo stesso ragionamento della festa delle
+   monete. Su un altro telefono si sceglie di nuovo.
+2. UNA SCELTA PER TUTT'E DUE I TAB, non una per Compra e una per Vendi:
+   la convenienza il verso lo rovescia già da sé col lato, le altre tre
+   col lato non c'entrano. Con due memorie lo stesso libro
+   cambierebbe ordine a seconda del tab da cui si torna.
+3. IL DEPOSITO RESTA LA `<select>`. La memoria la riempie all'avvio e
+   il `poi` del picker la riscrive (`ricordaOrdineLibroP2P`), ma il
+   valore vivo si legge sempre lì (`ordineLibroP2P`), come voleva il
+   cantiere della pillola: una verità sola. Un valore sconosciuto (una
+   voce tolta domani, un localStorage sporco o muto) vale il
+   predefinito, e una voce sconosciuta non si scrive nemmeno.
+
+NESSUNA LEVA: è un ritocco di lettura, e spegnerlo non proteggerebbe
+niente. «I miei scambi» hanno il loro ordinamento e restano com'erano
+(una sentinella lo tiene).
+
+DOVE STA, E PERCHÉ LÌ. Le due funzioni e la chiave stanno SUBITO PRIMA
+del blocco «LO SCAMBIO P2P: BARATTOLO COME CLIENT DI MOSTRO», non
+dentro: quel blocco giura di non nominare `localStorage` (la tappa 2
+legge e basta, `prove_p2p_libro` lo tiene) e la prima stesura, che ci
+stava dentro, l'ha fatta diventare rossa. Il gesto d'avvio invece sta
+DENTRO, subito dopo `ordineLibroP2P`: le costanti dell'ordinamento
+(`P2P_ORDINI_LIBRO`, `P2P_ORDINE_CASA`) nascono lì, e lette prima
+sarebbero un ReferenceError all'avvio (la TDZ dei `const`). La riga
+chiama una funzione e non nomina `localStorage`, quindi il giuramento
+regge.
+
+STRADE SCARTATE. Il profilo sul server (vedi sopra); il CloudStorage di
+Telegram (un secondo posto per una preferenza, e fuori da Telegram non
+c'è); una memoria per tab (vedi sopra); togliere la chiave quando si
+torna al predefinito (più pulito, ma «Più recenti» scelto apposta deve
+restare «Più recenti» anche il giorno che il predefinito cambiasse).
+
+LA SENTINELLA EMENDATA. «...e dopo la scelta ridisegna il libro, e
+basta» cercava `poi: () => renderP2P()}` in tutto il file, e la
+trovava anche nella gemella dei propri scambi: col `poi` del libro
+cambiato sarebbe rimasta verde senza provare niente. Adesso guarda la
+sola voce `p2pOrdinaSel` del picker. Nel banco node del libro, il
+ritaglio di `ordinaLibroP2P` arriva fino alla prima riga vuota e si
+porta dietro il gesto d'avvio: il banco ha ora un `el` che non trova
+niente, così il gesto resta fermo.
+
+PROVATO. `prove_p2p_libro`: sentinelle (il `poi` del libro scrive la
+memoria e ridisegna, il gesto d'avvio riempie la `<select>`, il libro
+legge la `<select>` e non la memoria, i propri scambi non la toccano) e
+nel banco node sul localStorage di cartone: prima visita = «Più
+recenti», la scelta torna, la nuova prende il posto della vecchia, una
+voce sconosciuta non si scrive, un valore sporco vale il predefinito,
+un localStorage che lancia non rompe niente. Controprove, una alla
+volta e ognuna ROSSA da sola: tolto il controllo della voce prima di
+scrivere, letto il valore senza controllo, tolto il try sulla lettura,
+rimesso il `poi` di ieri, tolto il gesto d'avvio. DAL VIVO (Chromium
+via Playwright, la pagina servita in locale senza rete): alla prima
+apertura la `<select>` dice «recenti»; scelto «Importo: dal più
+grande» col `poi` vero, la chiave dice `imp-giu`; ricaricata la pagina,
+`<select>`, `ordineLibroP2P()` e l'etichetta della pillola dicono
+`imp-giu` / «Più grandi»; nessun errore di pagina.
+Suite e collaudi (14 nov, albero ada2213 di develop + questo cantiere,
+venv con le sole dipendenze del workflow, senza coincurve):
+`PROVE_SEVERE=1 python prove.py` intera 27928 verdi e 1 rossa,
+`conoscenza.md` non rigenerato dopo il ritocco di `sapere.md` fatto a
+suite già partita; rigenerato (`python assistente/conoscenza.py`), il
+giro `--dai-file=origin/develop` (521 sezioni su 566) è 26903 verdi, 0
+rosse. `collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2`: 129
+verdi, 0 rossi.
+
+NON PROVATO, DA GUARDARE. Nel libro vero dentro Telegram, sul
+telefono: dove il localStorage non dura fra un avvio e l'altro
+(Telegram nel browser, cache svuotata) la scelta si perde come la
+vista ₿/€, e si torna a «Più recenti».

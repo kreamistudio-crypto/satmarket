@@ -35253,7 +35253,9 @@ const PICKER = {
     /* la pillola non e' un `.campo-scelta`: dentro il suo `.cs-val`
        va il TESTO NUDO, lo stesso che ci scrive renderP2P */
     campo: v => esc(etichettaOrdineP2P(v)),
-    poi: () => renderP2P()},
+    /* (14 nov 2026) la scelta si ricorda per la prossima visita:
+       vedi `ricordaOrdineLibroP2P` */
+    poi: v => { ricordaOrdineLibroP2P(v); renderP2P(); }},
   /* la gemella dei propri scambi: stesso foglio, stesso deposito,
      altro catalogo — le voci le legge dalla SUA `<select>`, che e'
      l'unico posto dove un criterio si aggiunge */
@@ -64992,6 +64994,42 @@ function scollegaWallet(){
 }
 
 
+/* L'ORDINAMENTO SI RICORDA (14 nov 2026, Andrea: «se scelgo un
+   ordinamento differente sarebbe bello lo salvasse per la mia
+   prossima visita»). La scelta del foglio si scrive in localStorage,
+   PER DISPOSITIVO come la vista ₿/€ (`VALUTA_CHIAVE`): e' una
+   preferenza di lettura, non un fatto della persona, e farla viaggiare
+   col profilo non vale un ornamento (il precedente della festa).
+   UNA scelta per tutt'e due i tab, e non una per Compra e una per
+   Vendi: la convenienza il verso lo rovescia gia' da se' col lato, e
+   le altre tre col lato non c'entrano — due memorie vorrebbero dire
+   che lo stesso libro cambia ordine a seconda del tab da cui si torna.
+   IL DEPOSITO RESTA LA `<select>`: la memoria la RIEMPIE all'avvio e
+   la scelta la riscrive, ma il valore vivo si legge sempre li'
+   (`ordineLibroP2P`), e una verita' sola resta una.
+   ⚠️ STA FUORI DAL BLOCCO DELLA LETTURA, ed e' voluto: quel blocco
+   giura di non nominare `localStorage` (la tappa 2 legge e basta, e
+   la sentinella lo tiene), e la memoria di una preferenza non e' un
+   motivo per rompere il giuramento. Qui ci sono le due funzioni e la
+   chiave; il gesto d'avvio che riempie la `<select>` sta DENTRO il
+   blocco, subito dopo `ordineLibroP2P`, perche' le costanti
+   dell'ordinamento nascono li' e prima non si possono leggere. Le
+   funzioni le leggono solo quando vengono chiamate.
+   Un valore che non conosciamo — una voce tolta domani, un
+   localStorage sporco, uno che non risponde — vale il predefinito:
+   la memoria non puo' lasciare il libro senza criterio. */
+const P2P_ORDINE_CHIAVE = 'barattolo_p2p_ordine';
+function ricordaOrdineLibroP2P(v){
+  if (P2P_ORDINI_LIBRO.indexOf(v) < 0) return;
+  try { localStorage.setItem(P2P_ORDINE_CHIAVE, v); } catch(e){}
+}
+function ordineRicordatoP2P(){
+  let v = null;
+  try { v = localStorage.getItem(P2P_ORDINE_CHIAVE); } catch(e){}
+  return P2P_ORDINI_LIBRO.indexOf(v) >= 0 ? v : P2P_ORDINE_CASA;
+}
+
+
 /* ================= LO SCAMBIO P2P: BARATTOLO COME CLIENT DI MOSTRO (set 2026) =================
    Barattolo diventa un CLIENT del coordinator Mostro — che gira su una
    macchina NOSTRA e non di terzi: il coordinatore e' Barattolo, e
@@ -65876,6 +65914,11 @@ function ordineLibroP2P(){
   const v = el('p2pOrdinaSel') ? el('p2pOrdinaSel').value : '';
   return P2P_ORDINI_LIBRO.indexOf(v) >= 0 ? v : P2P_ORDINE_CASA;
 }
+/* (14 nov 2026) all'avvio, una volta, la scelta della visita scorsa
+   riempie il deposito: la `<select>` sta nel markup sopra questo
+   blocco, quindi c'e' gia', e il primo renderP2P legge lei. La
+   memoria vive fuori dal blocco (vedi `ricordaOrdineLibroP2P`). */
+if (el('p2pOrdinaSel')) el('p2pOrdinaSel').value = ordineRicordatoP2P();
 /* l'etichetta della pillola: la scrivono in DUE — renderP2P quando
    ridisegna la testata, e aggiornaPicker subito dopo la scelta — e
    sono la stessa stringa perche' la fonte e' questa. Le voci del

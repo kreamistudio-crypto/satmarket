@@ -67714,8 +67714,30 @@ def prove_p2p_libro():
               mini, "  p2pOrdinaSel: {", "\n  },"))
     prova("la voce del picker c'e', col suo titolo", True,
           "p2pOrdinaSel: {titolo: 'Ordina il libro'," in mini)
-    prova("...e dopo la scelta ridisegna il libro, e basta", True,
-          "poi: () => renderP2P()}" in mini)
+    # EMENDATA (14 nov 2026, ordine-libro-ricordato): dopo la scelta il
+    # libro si ridisegna E la scelta si ricorda per la prossima visita.
+    # La vecchia riga cercava `poi: () => renderP2P()}` in tutto il
+    # file, e la trovava anche nella gemella dei propri scambi: non
+    # provava il libro. Adesso guarda la voce del LIBRO, e basta.
+    _poi_libro = pezzo_js(mini, "  p2pOrdinaSel: {", "\n  p2pMieiOrdinaSel: {")
+    prova("...e dopo la scelta ridisegna il libro e se la ricorda", True,
+          "poi: v => { ricordaOrdineLibroP2P(v); renderP2P(); }}"
+          in _poi_libro)
+    # ...e all'avvio la memoria riempie il DEPOSITO, che resta la
+    # `<select>`: il valore vivo si legge sempre li', mai dalla memoria
+    prova("...all'avvio la scelta ricordata riempie la select", True,
+          "\nif (el('p2pOrdinaSel')) el('p2pOrdinaSel').value = "
+          "ordineRicordatoP2P();\n" in mini)
+    prova("...e il libro legge sempre la select, non la memoria", True,
+          "el('p2pOrdinaSel').value" in pezzo_js(
+              mini, "function ordineLibroP2P(){", "\n}")
+          and "localStorage" not in pezzo_js(
+              mini, "function ordineLibroP2P(){", "\n}"))
+    # la memoria e' del LIBRO: «I miei scambi» hanno la loro voce e
+    # restano com'erano
+    prova("...e i propri scambi non la toccano", True,
+          "ricordaOrdineLibroP2P" not in pezzo_js(
+              mini, "  p2pMieiOrdinaSel: {", "\n};"))
     # L'ORDINAMENTO VALE SOLO PER IL LIBRO: «I miei scambi» sono i
     # propri, di tutt'e due i versi, e ordinarli per convenienza non
     # vorrebbe dire niente. La striscia la scrive scambiP2P, che di
@@ -68133,7 +68155,15 @@ def prove_p2p_libro():
     # scratchpad, che e' il caso che non fa rumore).
     i_ord = mini.index("const P2P_ORDINI_LIBRO = ")
     ord_js = mini[i_ord:mini.index("(o.euro || 0);", i_ord) + 14]
-    pezzi = [esc_js, val_js, pr_js, stella_js, ord_js] + [pezzo_js(mini, f) for f in (
+    # (14 nov 2026, ordine-libro-ricordato) la memoria della scelta: la
+    # chiave e le due funzioni, dal client, fino alla riga vuota. Il
+    # gesto d'avvio vive altrove (tocca il DOM, che qui non c'e')
+    mem_js = pezzo_js(mini, "const P2P_ORDINE_CHIAVE = ")
+    # ...e il ritaglio di `ordinaLibroP2P` arriva alla prima riga vuota,
+    # quindi si porta dietro anche quel gesto d'avvio: qui non c'e' una
+    # pagina, e `el` che non trova niente lo lascia fermo, com'e' giusto
+    el_js = "const el = id => null;"
+    pezzi = [el_js, esc_js, val_js, pr_js, stella_js, ord_js, mem_js] + [pezzo_js(mini, f) for f in (
         "function contaFeedback(n, persone){",
         "function tagValore(ev, nome){",
         "function ordineDaEvento(ev, adesso){",
@@ -68713,6 +68743,32 @@ out.tabConZona = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','tab-z'],['k','sel
   ['amt','46940'],['fa','23'],['pm','Contanti al tabacchino 23.47'],['expires_at', String(ora+3600)]]), ora));
 out.cashVeleno = rigaOrdineP2P(contante('cash-x', ['Contanti']));
 p2pZone = {};
+/* L'ORDINAMENTO SI RICORDA (14 nov 2026): la prima visita vale il
+   predefinito, una scelta torna alla visita dopo, e quel che non
+   conosciamo non arriva mai al libro */
+magazzino.delete(P2P_ORDINE_CHIAVE);
+out.memPrima = ordineRicordatoP2P();
+ricordaOrdineLibroP2P('imp-giu');
+out.memDopo = [ordineRicordatoP2P(), magazzino.get(P2P_ORDINE_CHIAVE)];
+ricordaOrdineLibroP2P('conv');
+out.memCambia = ordineRicordatoP2P();
+/* una voce sconosciuta NON si scrive: resta la scelta di prima */
+ricordaOrdineLibroP2P('pinco');
+out.memIgnotaNonScrive = ordineRicordatoP2P();
+/* un localStorage sporco (una voce tolta domani) vale il predefinito */
+magazzino.set(P2P_ORDINE_CHIAVE, '<b>vecchia</b>');
+out.memSporca = ordineRicordatoP2P();
+/* e uno che non risponde (navigazione privata, Telegram nel browser)
+   non rompe niente: niente memoria, il predefinito, nessun errore */
+{
+  const g = localStorage.getItem, st = localStorage.setItem;
+  localStorage.getItem = () => { throw new Error('muto'); };
+  localStorage.setItem = () => { throw new Error('muto'); };
+  try { ricordaOrdineLibroP2P('imp-su'); out.memMuta = ordineRicordatoP2P(); }
+  catch(e) { out.memMuta = 'esploso: ' + e.message; }
+  localStorage.getItem = g; localStorage.setItem = st;
+}
+magazzino.delete(P2P_ORDINE_CHIAVE);
 console.log(JSON.stringify(out));
 """
     d = _tf.mkdtemp()
@@ -69112,6 +69168,21 @@ console.log(JSON.stringify(out));
           "mpg", out["ordImpNonTocca"])
     prova("...e la lista in memoria non si tocca", "abcd",
           out["ordNonTocca"])
+    # --- L'ORDINAMENTO SI RICORDA (14 nov 2026, cantiere
+    # ordine-libro-ricordato, Andrea: «se scelgo un ordinamento
+    # differente sarebbe bello lo salvasse per la mia prossima visita»)
+    prova("alla prima visita il libro parte dal predefinito",
+          "recenti", out["memPrima"])
+    prova("...una scelta si scrive e torna alla visita dopo",
+          ["imp-giu", "imp-giu"], out["memDopo"])
+    prova("...e la scelta nuova prende il posto della vecchia",
+          "conv", out["memCambia"])
+    prova("...una voce sconosciuta non si scrive", "conv",
+          out["memIgnotaNonScrive"])
+    prova("...un valore sporco in memoria vale il predefinito",
+          "recenti", out["memSporca"])
+    prova("...e un localStorage muto non rompe niente", "recenti",
+          out["memMuta"])
     # --- BARATTOZON NON STA IN CIMA APPOSTA (20 ott 2026, cantiere
     # ordina-per-convenienza, decisione di Andrea): ordinando per
     # convenienza vale solo la convenienza, per tutti. Il metro e' quello

@@ -158,3 +158,9 @@ frase: Nel mercatino arriva la mappa del ritiro a mano: il tondo della mappa, ac
 dove: la home del mercatino (Esplora), il tondo della mappa accanto alla barra di ricerca.
 leva: MERCATINO_MAPPA_RITIRO (nuova, accesa di serie)
 pubblico: sì
+
+## 2026-11-14 · ordine-libro-ricordato
+frase: Nel libro P2P l'ordine che scegli ora resta: se metti «Convenienza» o «Importo: dal più grande», alla prossima visita il libro si apre già ordinato così, in «Compra» e in «Vendi». La scelta resta salvata sul telefono; per tornare come prima basta rimettere «Più recenti».
+dove: la scheda «P2P», la pillola con le tre righe in cima al libro («Ordina il libro»).
+leva: nessuna
+pubblico: sì
