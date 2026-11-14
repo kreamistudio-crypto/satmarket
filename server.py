@@ -12063,7 +12063,7 @@ def host_di_casa(host: str) -> str:
     Caddy, cioe' un file che non sta nel repository: la porta si chiude
     anche da questa parte. I nomi di casa sono quelli di `_dm_auth`, che
     lo stesso scontro lo conosce gia': il sito (`URL_PUBBLICO`) e il
-    servizio nascosto (`ONION_HOST`). Si confronta il NOME, senza la
+    servizio nascosto (`ONION_HOST`), piu' il `www.` del sito. Si confronta il NOME, senza la
     porta (la regola di `su_onion`: Tor inoltra su una porta
     qualunque), e l'Host dev'essere SOLO nome e porta: un
     `altro@barattolo.store` non e' un Host, e non passa. IN COLLAUDO il
@@ -12076,8 +12076,17 @@ def host_di_casa(host: str) -> str:
         u = urlparse("//" + h)
         nome = (u.hostname or "").lower()
         forma = nome if u.port is None else f"{nome}:{u.port}"
-        casa = {(urlparse(URL_PUBBLICO).hostname or "").lower(),
-                str(ONION_HOST or "").strip().lower()} - {""}
+        sito = (urlparse(URL_PUBBLICO).hostname or "").lower()
+        casa = {sito, str(ONION_HOST or "").strip().lower()} - {""}
+        # IL `www.` DEL SITO E' CASA (14 nov 2026, cantiere
+        # audit-parole-bot, riparazione di una cosa mia del cantiere
+        # audit-account, vista nella lettura di Andrea sul VPS PRIMA
+        # della promozione): Caddy serve l'app anche su
+        # www.barattolo.store, e chi entra con Nostr da li' firma con
+        # quell'origine. Senza questa riga sarebbe stato rifiutato.
+        # Solo il www del sito, mai quello dell'onion (non esiste).
+        if sito and not sito.startswith("www."):
+            casa.add("www." + sito)
     except ValueError:
         return ""
     return h if nome in casa and h.lower() == forma else ""
@@ -20723,11 +20732,25 @@ async def avvia_fusione(id_telegram: int, codice: str):
                                int(time.time()) + SECONDI_CODICE_FUSIONE)
     await bot_api("sendMessage", {
         "chat_id": id_telegram, "parse_mode": "HTML",
+        # LE PAROLE DICONO ANCHE L'ALTRA META' (14 nov 2026, cantiere
+        # audit-parole-bot, dal primo audit di sicurezza, scelta di
+        # Andrea: «Parole più chiare nel bot»). Prima il messaggio
+        # raccontava l'unione come un regalo — annunci, affari e chiave
+        # «diventeranno tuoi» — e taceva il rovescio: da li' in poi chi
+        # tiene quella chiave ENTRA in questo Telegram. Il link e' un
+        # link, e un link si inoltra: chi lo riceve da un altro e preme
+        # «Si'» gli consegna l'account. Nessun passo in piu' (scelta di
+        # Andrea): solo le parole, e a chi premere se il link non e' suo.
         "text": (f"🔗 Stai per collegare l'account Nostr "
                  f"<b>{_npub_breve(n['npub'])}</b> a QUESTO account "
                  "Telegram: i suoi annunci, i suoi affari e la sua "
-                 "chiave diventeranno tuoi, per sempre (non si puo' "
-                 "annullare). Sei tu?"),
+                 "chiave diventeranno tuoi, per sempre (non si può "
+                 "annullare).\n\n"
+                 "⚠️ Da quel momento <b>chi ha quella chiave Nostr potrà "
+                 "entrare in questo tuo account</b>. Se questo link te "
+                 "l'ha mandato un'altra persona, è una truffa: tocca "
+                 "«❌ No, annulla».\n\n"
+                 "Sei tu?"),
         "reply_markup": {"inline_keyboard": [[
             {"text": "✅ Si', collega", "callback_data": f"fondi:{token}"},
             {"text": "❌ No, annulla", "callback_data": f"annulla:{token}"},
@@ -20940,6 +20963,17 @@ async def avvia_ingresso_bot(mittente: dict, codice: str):
         "text": (f"🔑 <b>Entri su Barattolo come {chi}?</b>\n\n"
                  f"Te lo chiede {html.escape(i['dispositivo'])}. Tocca qui "
                  "sotto la figura che vedi sulla pagina di Barattolo.\n\n"
+                 # LA FIGURA SI GUARDA, NON SI SENTE DIRE (14 nov 2026,
+                 # cantiere audit-parole-bot, dal primo audit di
+                 # sicurezza, scelta di Andrea: «Avviso più forte nel
+                 # bot»). La figura giusta la vede chi ha CHIESTO
+                 # l'ingresso: se manda il link a un altro e gli dice
+                 # «tocca il miele», le tre figure non fermano piu'
+                 # niente. Resta la persona: glielo si dice chiaro.
+                 "⚠️ La figura la vedi solo TU, sulla tua pagina. Se "
+                 "te l'ha detta o scritta qualcun altro è una truffa: "
+                 "vuole entrare nel tuo account. Tocca «❌ Non sono "
+                 "stato io».\n\n"
                  "Non hai chiesto tu di entrare? Non toccare niente: il "
                  "link scade da solo fra due minuti."),
         "reply_markup": {"inline_keyboard": [
@@ -71820,8 +71854,14 @@ def decodifica_naddr(naddr: str) -> dict:
 @app.post("/api/me/npub/disabilita-accesso")
 def disabilita_accesso_nostr(x_tg_init_data: str = Header(""),
                              barattolo_sessione: str = Cookie("")):
-    """Il gesto contrario a collega_npub_firma: l'account torna
-    apribile solo da Telegram."""
+    """Il gesto contrario a collega_npub_firma: si spegne la chiave
+    d'accesso. NON e' un lucchetto contro chi ha la chiave (14 nov
+    2026, cantiere audit-parole-bot, dal primo audit di sicurezza): il
+    badge resta verificato, e `login_nostr` a quella firma ripropone il
+    collegamento — e' voluto (ARCHITETTURA: chiude solo la porta, il
+    badge resta). Per chiudere del tutto si TOGLIE la chiave dal
+    profilo, e la pagina adesso lo dice (scelta di Andrea: «Cambia solo
+    le parole»)."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if user["id"] < 0:
         # Doppia cintura col tg_id>0 nella WHERE qui sotto: un nativo

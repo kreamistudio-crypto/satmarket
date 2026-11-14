@@ -9405,7 +9405,10 @@
   nome nell'Host, e a fermarlo c'era solo Caddy, cioè un file fuori dal
   repository. `host_di_casa` passa l'Host alla verifica solo se il suo
   NOME (senza la porta, e niente altro che nome e porta) è quello di
-  `URL_PUBBLICO` o `ONION_HOST`, gli stessi di `_dm_auth`; sennò lo dà
+  `URL_PUBBLICO` o `ONION_HOST`, gli stessi di `_dm_auth`, più il `www.`
+  del sito (dallo stesso 14 nov, cantiere audit-parole-bot: Caddy serve
+  l'app anche su www.barattolo.store, letto sul VPS prima della
+  promozione); sennò lo dà
   vuoto, e la verifica un Host vuoto lo rifiuta. Vale per le due porte
   che verificano una firma (`login_nostr`, `collega_npub_firma`: le
   conta `prove_accesso_di_casa`). In collaudo passa com'è. DA SAPERE:
@@ -9809,7 +9812,13 @@
   tasto e sulla pagina («🍯 Miele», «🚲 Bici»…: dodici in
   `FIGURE_INGRESSO`, solo emoji di Unicode 11 o prima, dal 20 ott 2026);
   il tasto porta il POSTO della figura nella riga, non la figura; la
-  figura giusta rende l'ingresso pronto, una sbagliata o «Non sono stato io» lo annullano; il browser
+  figura giusta rende l'ingresso pronto, una sbagliata o «Non sono stato io» lo annullano
+  (dal 14 nov 2026, cantiere audit-parole-bot, scelta di Andrea dopo il
+  primo audit: il messaggio dice anche «La figura la vedi solo TU… Se
+  te l'ha detta o scritta qualcun altro è una truffa», col nome del
+  tasto del no — la figura la conosce chi ha CHIESTO l'ingresso, e
+  contro chi la detta a voce a un altro resta solo la persona;
+  `prove_parole_che_avvisano` guarda il messaggio vero); il browser
   bussa ogni due secondi (e subito al ritorno in primo piano) con
   `POST /api/login/bot/stato`, e solo lui, col legame, incassa la
   sessione — da `apri_sessione`, quindi portachiavi, TETTO (esce il più
@@ -10002,7 +10011,11 @@
   account Telegram il 409 lo dice e basta: due Telegram non diventano
   uno. `disabilita-accesso` è il
   contrario ma RIFIUTA i tg_id negativi (un nativo si chiuderebbe
-  fuori); `salva_npub` (oggi richiamato solo per RIMUOVERE la npub,
+  fuori), e NON è un lucchetto contro chi ha la chiave: il badge resta
+  verificato e `login_nostr` ripropone il collegamento a quella firma
+  (dal 14 nov 2026 la pagina lo dice, toast e riga sotto il bottone:
+  per chiudere del tutto si rimuove la npub — cantiere
+  audit-parole-bot, scelta di Andrea); `salva_npub` (oggi richiamato solo per RIMUOVERE la npub,
   da «🗑 Rimuovi la npub dal profilo») azzera anche `npub_accesso` se
   coincideva (solo su tg_id>0, stessa ragione). Nostr→Telegram: il
   bot per la prima volta ASCOLTA — webhook `POST /api/telegram/aggiornamenti`
@@ -10016,7 +10029,13 @@
   t.me/ilbarattolobot?start=CODICE, il bot risponde con la CONFERMA a
   tastiera inline (token in `CONFERME_FUSIONE`, valido solo per quel
   from.id: il codice è un bearer token, se il link trapela serve
-  comunque il tocco giusto), e `esegui_fusione` fonde l'account
+  comunque il tocco giusto; dal 14 nov 2026, cantiere audit-parole-bot,
+  scelta di Andrea dopo il primo audit, la conferma dice anche il
+  rovescio — «chi ha quella chiave Nostr potrà entrare in questo tuo
+  account. Se questo link te l'ha mandato un'altra persona, è una
+  truffa: tocca No, annulla» — perché il tocco giusto può darlo anche
+  chi il link l'ha RICEVUTO da un altro, e prima il messaggio gli
+  raccontava solo quel che guadagnava), e `esegui_fusione` fonde l'account
   nativo in quello Telegram in UNA transazione `BEGIN IMMEDIATE`:
   annunci+ordini+sessioni+feedback migrano (il browser Nostr resta
   loggato), la riga negativa MUORE PRIMA che `npub_accesso` si accenda
