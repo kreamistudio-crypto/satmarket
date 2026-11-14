@@ -81098,3 +81098,144 @@ giri prima); collaudi della CI 125 su 125 senza variabili proxy. NON PROVATO
 DAL VIVO: un ordine in franchi sul nodo (manca il gesto di Andrea,
 DA-FARE voce 14), il prezzo del franco dai provider del nodo, e la card
 sul telefono.
+
+## Le piccole chiusure del primo audit: dieci sospetti, nessun gesto cambiato (14 nov 2026, cantiere audit-chiusure, dal primo audit di sicurezza, Andrea: «tu cmq non mi cambi niente in app, me la rendi solo più sicura»)
+
+Il secondo dei quattro cantieri nati dal primo audit (rapporto in
+`/mnt/project-files/audit-sicurezza/satmarket/run-1/`, mai su Telegram).
+Dieci sospetti piccoli, tutti chiusi con un rifiuto in più nel caso
+storto e nessun cambio per chi usa l'app. Il patto con Andrea: se una
+correzione avesse cambiato qualcosa che si vede o si usa, ci si fermava
+su quella. Non è successo.
+
+RIPRODOTTI prima di toccare (in gabbia, coi pezzi veri o sul server
+vero): il redirect del saluto websocket (la libreria vera, 1.9.2, su due
+porte di cartone: il relay risponde 302 e il server bussa alla porta di
+casa indicata da lui), il relay di casa ammesso fuori dal collaudo, il
+titolo della pagina dell'ordine P2P che chiude `<title>`, il commento
+di un feedback recapitato come link vero, la rivelazione del contenuto
+digitale fatta partire da un link e la lettura in disputa senza
+ricevuta, il nome di file storto che entra in colonna dall'import Nostr
+e fa dire alla card se `../config.py` esiste, lo scaricatore dei media
+di X che gira verso casa, le tre leve scritte dalla porta del pannello.
+
+DECISO, un punto per sospetto.
+1. IL RELAY DI CASA ESISTE SOLO IN COLLAUDO. `_relay_cassetta_ammesso`,
+   `_orecchio_indirizzo_pubblico` e il ramo di casa di
+   `_cassetta_spedisci_a` ammettono un `ws://` di loopback solo con
+   `MODALITA_COLLAUDO`. In produzione il deposito anonimo della
+   cassetta NIP-46 non fa più bussare il server alle porte di casa sua.
+2. NIENTE REDIRECT NEL SALUTO, per nessuna connessione a un relay: sta
+   nell'unico involucro (`_apri_websocket`, `redirect_limit=0`), più
+   una cintura sullo stato 3xx per le versioni della libreria che
+   tornano la connessione invece di alzare. È la regola già presa per
+   urllib e httpx.
+3. IL TITOLO DELLA PAGINA DI UN ORDINE P2P esce da `_testo`, come
+   quello di ogni altra pagina; ai meta va il grezzo (li ripulisce
+   `_meta_anteprima`, due volte lo sporcherebbe).
+4. IL TESTO DI UN UTENTE NEGLI AVVISI AD ALTRI è scappato alla fonte:
+   il commento del feedback e della recensione P2P, i titoli negli
+   avvisi agli altri offerenti e ai moderatori, il nome di battesimo
+   negli avvisi ai moderatori (tredici titoli, undici nomi, due
+   commenti). Il DM Nostr e la campanella sciolgono le entità da soli,
+   quindi il testo che si legge resta quello scritto; anzi, prima un
+   `<…>` in un commento lì spariva, adesso si vede.
+5. LA RICEVUTA DEL CONTENUTO DIGITALE NON LA SCRIVE UN LINK. La GET che
+   rivela si rifiuta quando è una navigazione del browser
+   (`Sec-Fetch-Mode: navigate`, o l'`Accept` di una pagina dove
+   quell'intestazione manca) e scriverebbe la ricevuta. La pagina
+   rivela con una `fetch`, quindi il bottone «🔓 Rivela» fa quello che
+   faceva.
+6. OGNI LETTURA DI CHI COMPRA LASCIA LA RICEVUTA. Fuori da 'shipped',
+   la prima lettura timbra `consegnato` senza toccare lo stato (gli
+   orologi del digitale guardano 'delivered'), lo scrive nel journal e,
+   se l'ordine non è chiuso a favore di chi vende, lo dice ai
+   moderatori nell'argomento «dispute».
+7. LE FOTO DI UN EVENTO NOSTR SONO INDIRIZZI: `foto_evento` tiene solo
+   http(s) (un evento con soli valori storti è un evento senza foto, e
+   non nasce), `localizza_foto` non tiene percorsi, e i due
+   consumatori che toccano il disco (`_immagine_anteprima`,
+   `_foto_podio`) chiedono la whitelist `NOME_FOTO` prima di
+   `os.path.exists`, come `/foto/{nome}`.
+8. LO SCARICATORE DEI MEDIA DI X HA IL SUO GIUDICE: `url_foto_ammesso`
+   sulla partenza e su ogni salto (al più quattro), httpx non segue
+   niente da solo. Le foto di casa (`URL_PUBBLICO/foto/…`) passano
+   senza chiedere al DNS, perché il nostro nome visto dal VPS può
+   risolvere dentro casa e il riepilogo del giorno deve continuare a
+   uscire con le sue foto. Un indirizzo di loopback passa solo in
+   collaudo, come il relay di casa: lì i media delle note stanno su una
+   porta del banco (`collaudo_x_risonanza`, che senza questa riga è
+   diventato rosso al primo giro di tutti i collaudi, ed è lui che
+   l'ha detto).
+9. TRE LEVE RESTANO SUL VPS: `GUARDIANO_PONTE_AVVISA`, `BLOSSOM_SERVER`
+   e `LND_PONTE_CERT` entrano in `LEVE_MAI_DAL_PANNELLO`, e le loro
+   forme (SERVER, CERT, AVVISA in coda) nella rete dei nomi. È la
+   regola di Andrea del 27 ott («le "mai" restano sul VPS»), applicata
+   a tre che avevano la sostanza e non il nome. La pagina non le
+   mostrava già.
+
+SCARTATO. Fare della rivelazione una POST (la strada «da manuale»):
+cambia la chiamata della pagina, e una pagina rimasta in cache (PWA,
+APK) romperebbe il «Rivela» finché non si aggiorna; il rifiuto della
+navigazione chiude la stessa porta senza toccare il client. Rifiutare a chi compra la lettura fuori da
+'shipped': dopo lo sblocco per silenzio il codice è suo, e un rifiuto
+lì sarebbe un torto; la ricevuta scritta basta a far dire il vero alla
+piattaforma. Mettere l'escape dentro `notifica`: non si può, il
+messaggio porta i NOSTRI tag; si scappa dove nasce, che è la regola di
+`prove_titoli_scappati`. Giudicare il redirect del saluto invece di vietarlo: nessun
+relay che usiamo ne ha bisogno, e ogni salto giudicato è una corsa col
+DNS. Togliere il ripiego «tengo l'URL» dall'import: è una decisione
+presa (la vetrina mostra la foto remota), qui si chiude solo chi la va
+a prendere dal server.
+
+PROVATO. `prove_chiusure_audit` (nuova, 41 righe coi pezzi veri: i
+giudici dei relay nei due mondi, l'involucro con la libreria vera su
+due porte di cartone e la sua controprova, il censimento dei titoli
+negli avvisi, `_arriva_da_un_link`, le foto col file che ESISTE fuori
+da `foto/`, lo scaricatore di X con un httpx di cartone, le tre leve e
+il conto di cosa chiudono le forme nuove); due righe in più in
+`prove_condividi_ordine_p2p` per il titolo. Sul codice di prima 22 di
+quelle righe sono rosse. `collaudo_chiusure_audit` (nuovo, in
+`ci/collaudi.txt`): sul server vero la rivelazione da un link (400,
+niente ricevuta) e dall'ordine (come sempre), la disputa aperta prima
+di rivelare e il codice letto dopo (ricevuta e avviso ai moderatori,
+una volta sola), il commento col link che arriva come testo, le tre
+leve rifiutate con 404; 19 righe, 11 rosse togliendo le correzioni.
+Ritoccate, perché seguono il codice nuovo: il banco dei relay della
+cassetta (gira in collaudo), la riga dell'involucro (porta
+`redirect_limit`), gli esempi di `foto_evento` (indirizzi veri), i
+banchi delle anteprime e del podio (portano `NOME_FOTO`), la sentinella
+di `consegnato` (non più «un solo scrittore» ma «una rotta sola», con
+le sue due scritture contate) e il censimento degli avvisi ai
+moderatori (sei nelle dispute, 94 punti).
+COSA È GIRATO SU QUALE ALBERO. Sopra develop `d7fc9a0` (il cantiere
+delle dispute): la suite intera severa, 27.729 passate, 0 fallite, 0
+saltate; i collaudi di `ci/collaudi.txt` nella gabbia, 126 verdi su
+126. Il giro prima di quello aveva 125 collaudi verdi e uno rosso,
+`collaudo_x_risonanza`: lo scaricatore nuovo non bussava più alla porta
+di casa del banco. È il rosso che ha fatto nascere la riga «solo in
+collaudo» del punto 8. Poi develop è corso (un commit non mio:
+`c4da353`, gli ordini P2P in franchi svizzeri; conflitto solo in coda a
+questo file e a `DA-FARE-ANDREA.md`, dove la voce è diventata la 15).
+Rigirato tutto sull'albero ribasato, sopra `c4da353`: la suite intera
+severa, 27.771 passate, 0 fallite; i collaudi di `ci/collaudi.txt`
+nella gabbia, 126 verdi su 126.
+
+RESTA DA GUARDARE (di Andrea, sola lettura sul VPS, in
+`docs/DA-FARE-ANDREA.md`, voce 15): se in produzione esiste già un
+commento con dentro un `<`, una foto importata che non è né un nome né
+un indirizzo, una delle tre leve scritta nel database. Non provato dal
+vivo: come Telegram mostra un commento scappato (lo dice la sua
+documentazione, qui si è guardato il testo che parte), e il riepilogo
+di X con le foto di casa sul VPS vero.
+
+NOTATI E NON TOCCATI (una riga l'uno, aspettano un sì): sei avvisi
+portano ancora il titolo nudo, ma verso chi quel titolo l'ha scritto
+(nessun confine; un `<` lì fa solo ripiegare l'avviso sul testo
+semplice); chi compra un digitale e non lo rivela mai, dopo lo sblocco
+per silenzio delle 48 ore non ha un bottone per leggerlo (la pagina lo
+mostra solo da 'shipped' o a ricevuta scritta); `importa_nostr.py` e
+`censimento_nostr.py` aprono i relay scelti da noi senza passare
+dall'involucro (non sono relay scritti da utenti); il ramo
+`sicurezza/b01-titolo-p2p` del 3 nov (PR #30, mai entrata) si può
+chiudere e cancellare.

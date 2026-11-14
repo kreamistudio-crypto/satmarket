@@ -93,6 +93,7 @@ collaudo_punti_corrieri.py
 collaudo_indirizzo_confermato.py
 collaudo_rimborso_meno_spese.py
 collaudo_disputa_cambia_strada.py
+collaudo_chiusure_audit.py
 spoglia_foto_esistenti.py
 collaudo_verita_lnd.py
 collaudo_prova_hold.py

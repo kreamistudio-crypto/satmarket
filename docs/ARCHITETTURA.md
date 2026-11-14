@@ -2240,6 +2240,16 @@
   censimento non la pesca e chi legge vede subito che è un'altra cosa.
   Stessa ragione per cui i tag NIP-99 continuano a portare il titolo
   grezzo (lì è protocollo, non prosa).
+  IL CONFINE CHE CONTA È «SCRITTO DA UNO, LETTO DA UN ALTRO» (14 nov
+  2026, cantiere audit-chiusure, dal primo audit di sicurezza): lì un
+  `<a href>` non spegne l'avviso, ARRIVA come link vero col bot per
+  mittente. Scappati alla fonte il commento del feedback e della
+  recensione P2P, i titoli negli avvisi agli altri offerenti e ai
+  moderatori, il nome di battesimo negli avvisi ai moderatori. DM Nostr
+  e campanella sciolgono le entità da soli (`spoglia_html`), quindi lì
+  si legge quel che è stato scritto. Restano col titolo nudo sei avvisi
+  che vanno a chi quel titolo l'ha scritto: nessun confine, li tiene
+  l'ultima rete qui sotto.
   E IL RIPIEGO «or …» NON È COSMESI: in `sollecita_incassi` il titolo
   si assegnava senza, e quella riga sta FUORI dal `try` — un titolo
   NULL non avrebbe saltato un promemoria, avrebbe ammazzato il giro per
@@ -5661,6 +5671,13 @@
   `_immagine_anteprima` lo SALTA e ripiega sul brand, e il salto è un
   `continue` e non un `return`: se sotto c'è una foto nostra la prende
   lo stesso.
+  LE FOTO DI UN EVENTO NOSTR SONO INDIRIZZI (14 nov 2026, cantiere
+  audit-chiusure): `foto_evento` tiene solo http(s), `localizza_foto`
+  non tiene percorsi, e chi tocca il disco con un nome arrivato dalla
+  colonna (`_immagine_anteprima`, `_foto_podio`) chiede prima la
+  whitelist `NOME_FOTO`, come `/foto/{nome}`: un nome storto entrato
+  dall'import non fa più dire alla card se un file fuori da `foto/`
+  esiste.
   IL CLIENT IN VETRINA NON SI TOCCA, ed è una divergenza VOLUTA fra
   due superfici: lì `fotoMini` lascia passare l'URL intero (decisione
   già presa e dichiarata), perché quell'immagine la chiede il browser
@@ -9414,7 +9431,11 @@
   una `bunker://` li giudica `_relay_cassetta_ammesso` (solo wss con un
   nome, mai IP, credenziali o .onion) e `_orecchio_indirizzo_pubblico`
   (il nome risolto deve essere pubblico); in collaudo verso un relay
-  non di casa non si esce (`lettura_simulata`). Freno per IP del
+  non di casa non si esce (`lettura_simulata`). IL RELAY DI CASA ESISTE
+  SOLO IN COLLAUDO (14 nov 2026, cantiere audit-chiusure): i due giudici
+  e `_cassetta_spedisci_a` ammettono un `ws://` di loopback solo con
+  `MODALITA_COLLAUDO`, o in produzione un deposito anonimo farebbe
+  bussare il server alle porte di casa sua. Freno per IP del
   `login` sul POST e sulla chiusura, nessuno sul GET (lettura in
   memoria). I TETTI (la sera del 10 ott): una cassetta per chiave di
   client, `CASSETTA_PER_IP` 5 (429), `CASSETTA_TETTO` 300 (503),
@@ -11991,6 +12012,19 @@
   istante dopo trova rowcount 0 e si prende un 409, invece di
   riscrivere una prova già letta — e il file appena scritto se ne va
   col rifiuto, o resterebbe un orfano cifrato sul disco.
+  LA RICEVUTA NON LA SCRIVE UN LINK, E OGNI LETTURA DI CHI COMPRA NE
+  LASCIA UNA (14 nov 2026, cantiere audit-chiusure). La rotta è una GET
+  e scrive: `_arriva_da_un_link(req)` la rifiuta (400,
+  `MSG_RIVELA_DALL_ORDINE`) quando è una navigazione del browser
+  (`Sec-Fetch-Mode: navigate`, o l'`Accept` di una pagina dove
+  quell'intestazione manca) e scriverebbe la ricevuta; la pagina rivela
+  con una `fetch`, quindi il bottone non cambia. Farne una POST avrebbe
+  rotto il «Rivela» delle pagine in cache. E fuori da 'shipped' (in
+  disputa, dopo lo sblocco per silenzio) la prima lettura di chi compra
+  timbra `consegnato` SENZA toccare lo stato, lo scrive nel journal e,
+  se l'ordine non è chiuso a favore di chi vende, lo dice ai moderatori
+  nell'argomento «dispute»: `consegnato` resta scritto solo dal gesto
+  di chi compra (regola ferrea 5), in due punti della stessa rotta.
   ⚠️ E 'delivered' STA NELLA SELECT APPOSTA, che è la riga da non
   «pulire»: la rivelazione scrive `consegnato` e `stato='delivered'`
   nello STESSO UPDATE, quindi senza quello stato in porta la guardia
@@ -32705,7 +32739,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (`x_link_nota`, `note1` bech32 via `_x_bech32`) solo con
   `X_CON_LINK`, e stima il costo (`x_costo`: 0,200 $ con un URL nel
   testo, 0,015 $ senza). I media si scaricano (`_x_scarica`, tetti
-  `X_IMG_MAX` 5 MB, `X_GIF_MAX` 15 MB, `X_VIDEO_MAX` 256 MB) e si
+  `X_IMG_MAX` 5 MB, `X_GIF_MAX` 15 MB, `X_VIDEO_MAX` 256 MB; dal 14 nov
+  2026 col suo giudice, `_x_media_ammesso`: `url_foto_ammesso` sulla
+  partenza e su ogni salto, al più `X_MEDIA_SALTI` 4, httpx non segue
+  niente da solo, le foto di casa `URL_PUBBLICO/foto/…` passano senza
+  chiedere al DNS e un loopback passa solo con `MODALITA_COLLAUDO`) e si
   caricano con l'API media v2 a pezzi (`_x_carica_media`: initialize →
   append da `X_PEZZO` 4 MB → finalize → STATUS finché «succeeded»; un
   video esclude le foto), poi `_x_posta` (POST /2/tweets con
@@ -34989,7 +35027,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   col giudice del loro tipo: `_leva_generica(riga)` dice sì se il nome
   passa `_leva_apribile_di_nome` (fuori `LEVE_MAI_DAL_PANNELLO`, le 58
   dello studio più i segreti di testa, e chi ha la forma di un segreto
-  o di un indirizzo, `_LEVA_DI_NOME_CHIUSO`), se il server la chiede al
+  o di un indirizzo, `_LEVA_DI_NOME_CHIUSO`; dal 14 nov 2026 nell'elenco
+  stanno anche `GUARDIANO_PONTE_AVVISA`, `BLOSSOM_SERVER` e
+  `LND_PONTE_CERT`, e nella rete le forme SERVER, CERT e AVVISA in
+  coda), se il server la chiede al
   config, se `_tipo_leva` la sa giudicare (si_no, intero, decimale,
   testo, lista di scalari, dizionario a chiavi di testo) e se la riga
   del censimento mostra proprio quel valore (o il suo `_elenco`/conteggio).
@@ -35100,7 +35141,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   su `ssl.SSLCertVerificationError` chiama `_certificato_rifiutato` (la
   riga 🔐, una volta ogni `CERT_RELAY_PAUSA_S` per relay, sotto
   `_CERT_LUCCHETTO` perché chi bussa gira nei thread) e rialza: ogni
-  chiamante ha già il ripiego di un relay muto. Le chiamate restano
+  chiamante ha già il ripiego di un relay muto. NIENTE REDIRECT NEL
+  SALUTO (14 nov 2026, cantiere audit-chiusure): l'involucro passa
+  `redirect_limit=0` e rifiuta uno stato 3xx, o un relay scritto da un
+  utente rimanderebbe il server a una porta di casa; è la regola già
+  presa per urllib e httpx. Le chiamate restano
   `create_connection(` — il censimento delle connessioni di prove.py le
   conta per nome. `_presa_esterna` (i relay dell'utente) usa il contesto
   di serie e chiama `_certificato_rifiutato` da sé. La sentinella
