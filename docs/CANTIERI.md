@@ -81625,3 +81625,23 @@ NON PROVATO DAL VIVO: la copia dentro Telegram su un telefono vero e
 l'incolla nel wallet (TronLink, Trust): se un wallet volesse la virgola,
 si cambia `cifraUsdtDaCopiareP2P`. Nessuna leva nuova: vale dove gli
 USDT sono già accesi (Lightning per tutti, on-chain solo admin).
+
+## L'euro un filo più piccolo nel banner delle monete (14 nov 2026, cantiere euro-banner, Andrea: «la moneta euro però falla leggermente più piccola, non serve così grossa», «ma di poco proprio»)
+
+COSA. Nel banner a grappolo di «I miei scambi» l'euro passa da 1,10 a
+1,03 rispetto alla sua misura nella foto di partenza (circa il 6% in
+meno). Il ₿ resta fermo al suo posto, e XMR e USDe si accostano di 35
+px. Il file cambia misura da 904x300 a 883x300, quindi anche il markup
+nei quattro posti e le sentinelle che lo contano.
+COME. L'euro più piccolo lascerebbe scoperto il «morso» che l'euro
+della foto aveva sul ₿. Per questo l'euro si sposta di 30 px verso il ₿
+(dx −44 invece di −14), finché copre di nuovo il morso. Restano 137
+pixel di vuoto, chiusi col filo scuro del bordo dell'euro steso SOTTO
+le monete, come nelle coppie (`euro_piccolo.py` nello scratchpad).
+SCARTATO. La ricucitura del ₿ (ellisse ricavata dal suo contorno più
+inpaint): il morso più largo strisciava la fascia crema e sbavava la
+₿. La card della home BTC↔EUR non si tocca (Andrea, 13 nov: «lasciala
+com'era prima»).
+PROVATO: le sezioni del banner (intestazione, libro vuoto, card con le
+monete) più la suite severa e i collaudi. Anteprime in
+/mnt/project-files/card-p2p-usdt/chf/ (8 e 9).

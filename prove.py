@@ -89411,7 +89411,7 @@ def prove_intestazione_scambi():
     prova("...e con la trasparenza dichiarata", True, bool(raw[20] & 0x10))
     larg = 1 + int.from_bytes(raw[24:27], "little")
     alt = 1 + int.from_bytes(raw[27:30], "little")
-    prova("...904x300, il disegno a piena risoluzione (col franco dal 14 nov 2026)", (904, 300),
+    prova("...883x300, il disegno a piena risoluzione (col franco dal 14 nov 2026, euro un filo più piccolo)", (883, 300),
           (larg, alt))
     # BORDI NETTI A 3x: a schermo e' alta 80px (erano 120 fino al ritocco
     # della sera), cioe' 240 pixel veri su un telefono a 3x — il file ne
@@ -89473,7 +89473,7 @@ def prove_intestazione_scambi():
           'id="p2pMieiCorpo"' in blocco)
     prova("...ed e' l'immagine e basta: nessun titolo scritto", True,
           "<h3" not in testa and "I miei scambi</" not in testa)
-    IMG = ('<img class="scambi-img" src="%s" width="904" height="300" '
+    IMG = ('<img class="scambi-img" src="%s" width="883" height="300" '
            'alt="I miei scambi" aria-label="I miei scambi" '
            'onerror="this.replaceWith(this.alt)">' % URL)
     # IL TITOLO RESTA UN TITOLO per chi legge con la voce: l'h2 prende
@@ -89712,7 +89712,7 @@ def prove_intestazione_scambi():
     # titolo della pagina lo porta l'intestazione, che li' sopra c'e'
     _striscia = nudo(pezzo_js(mini, "function scambiP2P(){", "\n}\n"))
     prova("nel filtro vuoto le monete in piccolo, al posto del logo P2P",
-          True, ('<img class="scambi-img scambi-mini" src="%s" width="904" '
+          True, ('<img class="scambi-img scambi-mini" src="%s" width="883" '
                  'height="300" alt="" onerror="this.remove()">' % URL) in _striscia
           and "p2p-logo" not in _striscia)
 
@@ -95008,7 +95008,7 @@ def prove_libro_vuoto_monete():
     # (13 nov 2026, cantiere card-p2p-monete) le monete sono diventate
     # sei: il banner di «I miei scambi» con ₿ al centro
     MONETE = ('<img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" '
-              'width="904" height="300" alt="" onerror="this.remove()">')
+              'width="883" height="300" alt="" onerror="this.remove()">')
     # (12 ott 2026, notte, cantiere libro-vuoto) il ramo lo sceglie il
     # giudice dei tre vuoti: `logo` vero dove le offerte ci sono ma non si
     # vedono (il filtro, la pausa di chi pubblica), falso a libro vuoto
@@ -159406,7 +159406,7 @@ def prove_card_p2p_monete():
           "      #FFF3DC 0%,#F9D9A6 62%,#EDB86C 100%);position:relative}" in css)
 
     # --- 4) IL BANNER: in testa e nei tre stati vuoti ----------------------
-    BANNER = 'src="/assets/scambi-monete.webp" width="904" height="300"'
+    BANNER = 'src="/assets/scambi-monete.webp" width="883" height="300"'
     prova("il banner delle sei monete in testa a «I miei scambi», col nome nell'alt", True,
           '<h2 class="scambi-tit"><img class="scambi-img" ' + BANNER
           + ' alt="I miei scambi"' in mini)
@@ -159427,7 +159427,7 @@ def prove_card_p2p_monete():
             i += 8 + n + (n & 1)
         return out
     misure = {"p2p-coppia-%s.webp" % k: (682, 489, 50000) for k in MONETE}
-    misure["scambi-monete.webp"] = (904, 300, 50000)
+    misure["scambi-monete.webp"] = (883, 300, 50000)
     for nome, (w, h, peso) in misure.items():
         p = os.path.join("assets", nome)
         if not os.path.exists(p):
