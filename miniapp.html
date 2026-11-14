@@ -74488,7 +74488,17 @@ async function apriNegozioDettP2P(ev, chi){
    catalogo non c'e' porta la sua sigla e basta — mai una bandiera
    inventata. */
 function monetaP2P(o){
-  const cod = String(o.fiat || P2P_VALUTA).toUpperCase();
+  /* ⚠️ LA VALUTA DAL SUO GIUDICE, COME `segnoMonetaP2P` QUI SOTTO (14 nov
+     2026, cantiere usdt-totale-euro, Andrea: «quella pagina in euro sarò
+     che è uno scambio in usdt non deve esistere»). Questa leggeva il
+     campo nudo: su una riga che la valuta l'ha persa — quelle rifatte
+     dall'archivio del server o dal libro non la portano — il conto diceva
+     «Controvalore di 275,00 USDT» in testa e «Totale da inviare 275,00 €
+     🇪🇺» in fondo per qualche secondo, finche' la riga vera tornava. Il
+     giudice legge anche i metodi, e un ordine fatto di sole reti USDT e'
+     in USDT qualunque cosa dica il campo. */
+  const cod = typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o)
+    : String(o.fiat || P2P_VALUTA).toUpperCase();
   const val = P2P_VALUTE.find(v => v.cod === cod);
   return val ? esc(val.segno) + ' ' + val.bandiera : esc(cod);
 }

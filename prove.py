@@ -193617,6 +193617,73 @@ console.log(JSON.stringify(out));
           [False, ""], r.get("ocSenza"))
 
 
+def prove_usdt_totale_euro():
+    """IL TOTALE DA INVIARE NON DICE EURO A UNO SCAMBIO IN USDT (14 nov 2026,
+    cantiere usdt-totale-euro, Andrea: «per qualche secondo compare la pagina
+    dell importo in euro poi passa a usdt correttamente ma quella pagina in
+    euro sarò che è uno scambio in usdt non deve esistere»). Il conto diceva
+    «Controvalore di 275,00 USDT» in testa e «Totale da inviare 275,00 € 🇪🇺»
+    in fondo: l'etichetta chiedeva la valuta al giudice (`valutaOrdineP2P`,
+    che legge anche i metodi), la cifra in fondo al campo nudo `fiat` — e le
+    righe rifatte dall'archivio del server o dal libro il campo non lo
+    portano. Adesso tutt'e due chiedono al giudice: le due monete dello
+    stesso conto non si scollano piu'."""
+    print("\n[il totale da inviare di uno scambio in USDT non dice mai euro]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    i = mini.index("const P2P_RETI_USDT = [")
+    reti = mini[i:mini.index("\n];", i) + 3]
+    banco = ("const P2P_VALUTA = 'EUR';\n"
+             + mini[mini.index("const esc = s =>"):mini.index("const el = id =>")] + "\n"
+             + _riga_js(mini, "const P2P_VALUTE = [")
+             + _riga_js(mini, "const P2P_METODI_CHF = [")
+             + reti + "\n"
+             + _fn_js(mini, "function reteUsdtDaMetodoP2P(m){")
+             + _fn_js(mini, "function valutaOrdineP2P(o){")
+             + _fn_js(mini, "function monetaP2P(o){")
+             + _fn_js(mini, "function segnoMonetaP2P(o){")
+             + r"""
+const TRON = ['USDT (Tron)'];
+const righe = {
+  /* la riga che ha perso la valuta, e quella a cui la presa ha scritto 'EUR' */
+  senzaFiat: {metodi: TRON}, fiatVuoto: {fiat: '', metodi: TRON},
+  fiatEur: {fiat: 'EUR', metodi: TRON}, fiatUsdt: {fiat: 'USDT', metodi: TRON},
+  dueReti: {fiat: 'EUR', metodi: ['USDT (Tron)', 'USDT (Ethereum)']},
+  /* gli altri restano com'erano */
+  euro: {fiat: 'EUR', metodi: ['SEPA']}, euroNudo: {metodi: ['SEPA']},
+  misto: {fiat: 'EUR', metodi: ['SEPA', 'USDT (Tron)']},
+  chf: {fiat: 'CHF', metodi: ['Revolut']}, twint: {metodi: ['TWINT']},
+  ignota: {fiat: 'USD', metodi: ['SEPA']}
+};
+const out = {};
+for (const k of Object.keys(righe)) {
+  const m = monetaP2P(righe[k]);
+  out[k] = [m.indexOf('ico-usdt') >= 0 ? 'USDT' : m.indexOf('€') >= 0 ? '€'
+            : m.indexOf('CHF') >= 0 ? 'CHF' : m, segnoMonetaP2P(righe[k])];
+}
+console.log(JSON.stringify(out));
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("il totale da inviare in USDT: il banco", "node non c'e'")
+        return
+    prova("una riga in USDT senza valuta, vuota o con 'EUR' scritto dalla presa: "
+          "in fondo l'icona di Tether e mai l'euro, come l'etichetta",
+          [["USDT", "USDT"]] * 5,
+          [r.get(k) for k in ("senzaFiat", "fiatVuoto", "fiatEur", "fiatUsdt", "dueReti")])
+    prova("...e gli altri ordini dicono in fondo la stessa moneta dell'etichetta: euro, "
+          "metodi misti, franchi, TWINT, una valuta fuori catalogo con la sua sigla",
+          [["€", "€"], ["€", "€"], ["€", "€"], ["CHF", "CHF"], ["CHF", "CHF"], ["USD", "USD"]],
+          [r.get(k) for k in ("euro", "euroNudo", "misto", "chf", "twint", "ignota")])
+    # e nel conto le due monete escono dallo STESSO oggetto: l'etichetta
+    # in testa e la cifra in fondo
+    i = mini.index("function contoDettP2P(o){")
+    cd = mini[i:mini.index("\n}\n", i)]
+    prova("nel conto la cifra in fondo e l'etichetta in testa chiedono la moneta "
+          "alla stessa riga", [True, True],
+          [cd.count("euriTesto + ' ' + monetaP2P(o)") == 2, "+ segnoMonetaP2P(o) + '</b>'" in cd])
+
+
 def prove_cifra_btc():
     """LA CIFRA IN BTC DA COPIARE (11 nov 2026, cantiere cifra-btc, Andrea:
     «quando devo pagare un ordine onchain mi dice sats ma solitamente in un
@@ -194073,7 +194140,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     """.split(),
@@ -194765,6 +194832,7 @@ def main():
     prove_rete_scelta_p2p,
     prove_card_p2p_monete,
     prove_usdt_cifra_copia,
+    prove_usdt_totale_euro,
     prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,
     prove_parole_uniche,
