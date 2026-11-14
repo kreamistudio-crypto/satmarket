@@ -83,6 +83,7 @@ collaudo_busta_diretta
 collaudo_email_corriere
 collaudo_indirizzo_confermato
 collaudo_rimborso_meno_spese
+collaudo_disputa_cambia_strada
 collaudo_csp
 collaudo_freni
 collaudo_db_contesa

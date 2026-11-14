@@ -81156,11 +81156,20 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         if not ritenta:
             _segna_passo(con, "ordini", ordine_id, PASSO_SERVE,
                          motivo_no or ("fattura" if bolt11 else "metodo"))
+        # IL VERSO SI SCRIVE COL TIMBRO (14 nov 2026, cantiere
+        # audit-dispute). Qui si arriva anche SENZA aver preso la mano —
+        # la fattura scaduta non si tenta nemmeno — e allora nessuno
+        # aveva riscritto `payout_verso`: restava quello di IERI. Dopo
+        # un rimborso rimasto a meta' e un moderatore che ci ripensa, il
+        # giro leggeva «compratore» e rimborsava chi aveva perso
+        # (riprodotto: `prove_disputa_cambia_strada`). Chi lascia un
+        # 'da_riprovare' dice anche A CHI: e' il patto di
+        # `_sospendi_pagamento`, e ora vale anche qui.
         con.execute("UPDATE ordini SET invoice_venditore='', stato='confirmed', "
-                    "payout_stato=?, "
+                    "payout_stato=?, payout_verso=?, "
                     "sbloccato_auto_il=MAX(sbloccato_auto_il, ?), "
                     "aggiornato=? WHERE id=?",
-                    ("da_riprovare" if ritenta else "",
+                    ("da_riprovare" if ritenta else "", "venditore",
                      auto_il, int(time.time()), ordine_id))
         con.commit()
         con.close()
@@ -81300,6 +81309,10 @@ MSG_MENO_SPESE_DOVE = ("Il rimborso meno le spese di spedizione si decide "
 MSG_NIENTE_SPESE = ("Su questo ordine non c'è una spesa di spedizione da "
                     "trattenere: usa una delle altre decisioni")
 # (15 ott 2026) la guardia di risolvi_disputa sull'annullo del venditore
+MSG_RESO_PAGAMENTO_IN_CORSO = (
+    "Su questo ordine c'è un pagamento di cui non sappiamo ancora l'esito: "
+    "il reso si decide quando si sa com'è finito. Guardalo in «🧊 Pagamenti "
+    "da verificare» o riprova fra qualche minuto")
 MSG_ANNULLO_NON_DISPUTA = ("Questo ordine l'ha annullato il venditore: non "
                            "è una disputa e non si decide. I sats tornano "
                            "all'acquirente con il rimborso dell'annullo.")
@@ -81693,9 +81706,13 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         ritenta = bool(taccuino.get("ritentabile") and c_utente
                        and c_utente["ln_address"]
                        and (o["payout_tentativi"] or 0) < MAX_TENTATIVI_PAYOUT)
+        # ...e il verso col timbro, come di la' (14 nov 2026): senza,
+        # dopo un «al venditore» rimasto a meta' il giro ripassava da
+        # `_sblocca_sats`, che da 'refund' non parte, e spegneva il
+        # timbro — il rimborso non ripartiva piu' da solo.
         con.execute("UPDATE ordini SET invoice_rimborso='', stato='refund', "
-                    "payout_stato=?, aggiornato=? WHERE id=?",
-                    ("da_riprovare" if ritenta else "",
+                    "payout_stato=?, payout_verso=?, aggiornato=? WHERE id=?",
+                    ("da_riprovare" if ritenta else "", "compratore",
                      int(time.time()), ordine_id))
         con.commit()
         con.close()
@@ -81843,6 +81860,18 @@ async def risolvi_disputa(ordine_id: int, req: Request,
         if stato not in ("dispute", "return_pending", "return_shipped"):
             raise HTTPException(400, MSG_MENO_SPESE_DOVE)
         return await _poi_chat_mercatino(ordine_id, _rimborsa_meno_spese(ordine_id))
+    # IL RESO NON SCAVALCA UN PAGAMENTO (14 nov 2026, cantiere
+    # audit-dispute, dal primo audit di sicurezza). «Reso» era l'unico
+    # esito che non guardava il timbro del payout: «rimborso» e «al
+    # venditore» si fermano da soli nelle due uscite, «meno le spese»
+    # ha il suo UPDATE condizionato. Con un pagamento in volo, in
+    # verifica o gia' uscito i sats POSSONO essere partiti: dire a chi
+    # compra «rispedisci l'oggetto» vorrebbe dire rischiare che resti
+    # senza oggetto e senza sats. Sta PRIMA della riapertura: un caso
+    # che non si puo' ridecidere non si riapre nemmeno.
+    if esito == "reso" and (_campo(o, "payout_stato")
+                            in ("in_volo", "incerto", "uscito")):
+        raise HTTPException(409, MSG_RESO_PAGAMENTO_IN_CORSO)
     if stato in ("confirmed", "refund"):
         # Il caso era gia' stato deciso e il pagamento non era riuscito:
         # per cambiare strada lo si RIAPRE, invece di allentare le
@@ -81875,11 +81904,30 @@ async def risolvi_disputa(ordine_id: int, req: Request,
     if esito == "rimborso":
         return await _poi_chat_mercatino(ordine_id, _rimborsa_compratore(ordine_id))
     if esito == "reso" and stato == "dispute":
-        con = db()
-        con.execute("UPDATE ordini SET stato='return_pending', aggiornato=? "
-                    "WHERE id=?", (int(time.time()), ordine_id))
-        con.commit()
-        con.close()
+        # IL TIMBRO DI PRIMA SE NE VA CON LA DECISIONE DI PRIMA. Un «al
+        # venditore» che non era riuscito a pagare lascia sulla riga
+        # 'da_riprovare' verso il venditore, e i due giri dell'orologio
+        # seguono il timbro, non lo stato: a reso deciso pagavano chi
+        # vende lo stesso, mentre chi compra rispediva l'oggetto
+        # (riprodotto: `prove_disputa_cambia_strada`). 'da_riprovare'
+        # vuol dire «nessun sat si e' mosso», quindi toglierlo e'
+        # sicuro; gli altri tre timbri no, e l'UPDATE e' CONDIZIONATO.
+        # SOTTO IL LUCCHETTO DELL'ORDINE, come le due uscite: il giro
+        # che sta pagando in questo istante finisce prima, e qui si
+        # trova l'ordine com'e' davvero — chiuso, e allora e' un 409.
+        async with _lucchetti_ordine[ordine_id]:
+            con = db()
+            cur = con.execute(
+                "UPDATE ordini SET stato='return_pending', payout_stato='', "
+                "payout_verso='', aggiornato=? WHERE id=? AND stato='dispute' "
+                "AND COALESCE(payout_stato,'') "
+                "NOT IN ('incerto','in_volo','uscito')",
+                (int(time.time()), ordine_id))
+            con.commit()
+            con.close()
+        if cur.rowcount != 1:
+            raise HTTPException(409, "Questa disputa è cambiata nel "
+                                     "frattempo: riapri l'ordine e ricontrolla")
         await notifica(o["compratore_id"],
                        "⚖️ <b>Disputa decisa: rimborso previa restituzione.</b> "
                        "Rispedisci l'oggetto al venditore (accordatevi in chat "

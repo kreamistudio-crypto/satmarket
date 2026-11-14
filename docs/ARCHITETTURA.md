@@ -464,6 +464,19 @@
   NON si deduce dallo stato: un ordine in 'dispute' può essere sulla
   strada del venditore o su quella del compratore, e indovinare
   vorrebbe dire chiudere l'affare a favore della persona sbagliata.
+  CHI LASCIA UN TIMBRO DICE ANCHE A CHI (14 nov 2026, cantiere
+  audit-dispute): i due rami «non pagato» di `_sblocca_sats` e
+  `_rimborsa_compratore` scrivono `payout_verso` insieme a
+  `payout_stato` ('venditore' con 'confirmed', 'compratore' con
+  'refund'). Ci si arriva anche senza aver preso la mano (la fattura
+  scaduta non si tenta), e allora restava il verso di IERI: dopo un
+  ripensamento del moderatore il giro pagava la persona sbagliata. E
+  IL RESO PORTA VIA IL TIMBRO DI PRIMA: `risolvi_disputa`, esito
+  'reso', scrive 'return_pending' sotto il lucchetto dell'ordine con
+  un UPDATE condizionato che azzera 'da_riprovare' e il suo verso, e
+  risponde 409 se il payout è 'in_volo', 'incerto' o 'uscito' (prima
+  di riaprire il caso): i giri seguono il timbro, non lo stato, e a
+  reso deciso pagavano chi vende lo stesso.
   UNA DISPUTA DECISA RESTA IN MANO AL MODERATORE (ago 2026): quando
   lo sblocco non riesce a pagare, l'ordine passa a 'confirmed' — e
   spariva dalla query di `risolvi_disputa`, che guardava i soli stati

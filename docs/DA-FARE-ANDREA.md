@@ -542,3 +542,25 @@ Niente da scrivere sulla VM. Nella chat privata con
    ordine (per esempio segnalo spedito): entro una ventina di secondi
    l'etichetta deve cambiare da sola. Se non cambia, tocca 🔄: se cambia
    solo così, dillo alla sessione (le richieste da sole non passano).
+
+## 13. Dopo il primo audit di sicurezza: due letture sul VPS (14 nov 2026, cantiere audit-dispute)
+
+**Sola lettura**, niente cambia e niente segreti a schermo. Servono a
+sapere se in produzione c'è già un ordine nato PRIMA della correzione
+con addosso un timbro del pagamento che punta dalla parte sbagliata (la
+correzione chiude la strada da qui in avanti, non ripulisce il passato).
+Sul VPS, una riga alla volta, e incolla il risultato nella sessione:
+
+1. Un ordine in reso con un pagamento ancora puntato su chi vende, o un
+   ordine «deciso per chi vende» col verso rimasto su chi compra:
+```
+python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,stato,payout_stato,payout_verso,payout_tentativi,disputata FROM ordini WHERE (stato IN ('return_pending','return_shipped') AND COALESCE(payout_stato,'') IN ('da_riprovare','in_volo','incerto') AND COALESCE(payout_verso,'')<>'compratore') OR (stato='confirmed' AND COALESCE(payout_verso,'')='compratore') OR (stato='refund' AND COALESCE(payout_verso,'')='venditore' AND COALESCE(payout_stato,'')='da_riprovare')\")]"
+```
+   Atteso: nessuna riga. Se ne esce una, NON si tocca niente: si porta
+   il numero dell'ordine alla sessione e si decide insieme.
+2. Per il passato: ordini chiusi a favore di chi vende che portano un
+   reso spedito (sono quelli da riguardare a mano, se ce ne sono):
+```
+python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,datetime(aggiornato,'unixepoch'),prezzo_sats FROM ordini WHERE stato='released' AND disputata=1 AND (COALESCE(tracking_reso,'')<>'' OR COALESCE(corriere_reso,'')<>'')\")]"
+```
+   Atteso: nessuna riga.

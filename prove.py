@@ -8746,8 +8746,11 @@ def prove_pagamento_incerto():
     # il nodo risponde di no: il ramo di sempre, invariato
     sblocca, vero, tentativi, _, _d = mondo(esiti=("non_pagato",))
     gira(sblocca(1))
+    # (14 nov 2026, cantiere audit-dispute: il ramo ora scrive anche
+    # il VERSO, perche' un verso rimasto da ieri mandava il giro dalla
+    # persona sbagliata — `prove_disputa_cambia_strada`)
     prova("fallimento vero: si va in 'confirmed' come sempre",
-          ("confirmed", "", ""), riga(vero))
+          ("confirmed", "", "venditore"), riga(vero))
     vero.close()
 
     # il moderatore ha guardato su LNbits: era uscito
@@ -9127,6 +9130,243 @@ def prove_disputa_incagliata():
           'o["disputata"] and primo_giro' in pezzo("_rimborsa_compratore"))
     prova("l'avviso non si ripete a ogni ritentativo", 2,
           _SORGENTE.count("primo_giro = o[\"stato\"] !="))
+
+
+def prove_disputa_cambia_strada():
+    """IL MODERATORE CHE CAMBIA STRADA (14 nov 2026, cantiere
+    audit-dispute, dal primo audit di sicurezza: due sospetti).
+
+    Una disputa decisa e non ancora pagata resta in mano al moderatore
+    APPOSTA (vedi `prove_disputa_incagliata`): deve poterci ripensare.
+    Ma la decisione di prima lasciava sulla riga il suo timbro — «da
+    riprovare, verso il venditore» — e i due giri dell'orologio seguono
+    il timbro, non lo stato. Due strade portavano i sats alla persona
+    sbagliata, tutt'e due dopo un ripensamento:
+    1) «al venditore» che non riesce a pagare, poi «reso»: il giro
+       pagava il venditore mentre chi compra rispediva l'oggetto;
+    2) un rimborso rimasto a meta', poi «al venditore» rifiutato PRIMA
+       di prendere la mano (fattura scaduta): il timbro si riscriveva
+       senza il verso, e il giro rimborsava chi aveva perso.
+
+    IL MONDO E' QUELLO DEI PAGAMENTI IN VOLO (`attrezzi=True`), con le
+    funzioni tutte vere: `risolvi_disputa`, le due uscite, i due giri."""
+    print("\n[la disputa che cambia strada: il giro non paga la persona "
+          "sbagliata]")
+    a = prove_pagamenti_in_volo(attrezzi=True)
+    mondo0, gira, invecchia = a["mondo"], a["gira"], a["invecchia"]
+    adesso = int(time.time())
+    GIORNO = 86400
+
+    async def _niente(*x, **k):
+        return None
+
+    async def tenta(coro):
+        # una rotta che rifiuta torna come valore: la prova che la
+        # guarda diventa rossa per conto suo, il banco non esplode
+        try:
+            return await coro
+        except Exception as e:
+            return e
+
+    def mondo(stato="dispute", invoice="", address="chi@wallet.tld",
+              compra=""):
+        m = mondo0(invoice=invoice, address=address, stato=stato)
+        for col in ("invoice_rimborso TEXT DEFAULT ''",
+                    "spese_rese_sats INT DEFAULT 0",
+                    "annullato_venditore_il INT DEFAULT 0",
+                    "creato INT DEFAULT 0"):
+            m.vero.execute(f"ALTER TABLE ordini ADD COLUMN {col}")
+        m.vero.execute("UPDATE ordini SET disputata=1")
+        m.vero.execute("ALTER TABLE utenti ADD COLUMN nome TEXT DEFAULT ''")
+        m.vero.execute("INSERT INTO utenti VALUES(111,?,0,0,'Compra')",
+                       (compra,))
+        m.vero.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
+                       "titolo TEXT)")
+        m.vero.execute("INSERT INTO annunci VALUES(7,'una cosa')")
+        m.vero.commit()
+        m.sentite = []
+
+        async def _n(chi, testo, *x, **k):
+            m.sentite.append((chi, testo))
+        m.amb.update({
+            "notifica": _n, "TIMBRO_SOSPESI": "sospesi-prova",
+            "BACKOFF_PAYOUT": (300, 1800, 7200, 21600, 86400),
+            "registra_uscita_negozio": lambda *x, **k: None,
+            "annuncio_su_nostr": _niente, "promo_venduto": _niente,
+            "_coda_magazzino": lambda mag: "",
+            "MSG_ANNULLO_NON_DISPUTA": "annullo",
+            "MSG_RESO_PAGAMENTO_IN_CORSO": "in corso",
+            "MSG_MENO_SPESE_DECISO": "deciso",
+            "MSG_MENO_SPESE_DOVE": "dove"})
+        exec("async def _poi_chat_mercatino(i, gesto):\n"
+             "    return await gesto\n", m.amb)
+        for nome, asincrona in (
+                ("_campo", 0), ("importo_rimborso", 0),
+                ("_quando_ritentare", 0), ("_rimborsa_compratore", 1),
+                ("riprova_pagamenti_sospesi", 1), ("risolvi_disputa", 1)):
+            exec(("async " if asincrona else "") + pezzo(nome), m.amb)
+        m.decide = lambda esito: tenta(
+            m.amb["risolvi_disputa"](1, {"esito": esito}, "", ""))
+        m.giro = lambda: m.amb["riprova_pagamenti_sospesi"]()
+        return m
+
+    def riga(m):
+        return tuple(m.vero.execute(
+            "SELECT stato, payout_stato, payout_verso FROM ordini "
+            "WHERE id=1").fetchone())
+
+    def domani(m):
+        invecchia(m, 2 * GIORNO)
+        try:
+            m.vero.execute("UPDATE payout_passi SET quando=quando-?, "
+                           "ultimo=ultimo-?", (2 * GIORNO, 2 * GIORNO))
+            m.vero.commit()
+        except Exception:
+            pass
+
+    def http(r):
+        return getattr(r, "status_code", None)
+
+    # --- 1. «AL VENDITORE» NON PAGA, POI «RESO» ----------------------
+    m = mondo()
+    m.nodo.modi["lnbc-fattura-1"] = "fail"
+    gira(m.decide("venditore"))
+    prova("al venditore, e la rotta manca: deciso, in attesa del giro",
+          ("confirmed", "da_riprovare", "venditore"), riga(m))
+    r = gira(m.decide("reso"))
+    prova("il moderatore ci ripensa: «reso» si puo' ancora decidere",
+          "return_pending", r.get("stato") if isinstance(r, dict) else r)
+    prova("...e il timbro di prima se ne va con la decisione di prima",
+          ("return_pending", "", ""), riga(m))
+    domani(m)
+    gira(m.giro())
+    prova("il giro dell'orologio NON paga chi vende a reso deciso",
+          (1, ("return_pending", "", "")), (len(m.nodo.partiti), riga(m)))
+    prova("...e a chi compra nessuno ha detto «a favore del venditore» "
+          "dopo il reso", 0,
+          sum(1 for chi, t in m.sentite[m.sentite.index(
+              next(x for x in m.sentite if "previa restituzione" in x[1])):]
+              if "a favore del venditore" in t or "a tuo favore" in t))
+
+    # --- 2. LNBITS MUTA, POI «RESO»: lo stesso, dalla 'dispute' ------
+    m = mondo()
+    m.nodo.muto = True
+    gira(m.decide("venditore"))
+    prova("al venditore a LNbits muta: sospeso, la disputa resta aperta",
+          ("dispute", "da_riprovare", "venditore"), riga(m))
+    gira(m.decide("reso"))
+    m.nodo.muto = False
+    domani(m)
+    gira(m.giro())
+    prova("...poi «reso»: a LNbits tornata il giro non paga nessuno",
+          ([], ("return_pending", "", "")), (m.nodo.partiti, riga(m)))
+
+    # --- 3. UN PAGAMENTO IN VOLO: IL RESO ASPETTA --------------------
+    # i sats POSSONO essere usciti: dire «rispedisci l'oggetto» a chi
+    # compra, qui, vorrebbe dire rischiare che resti senza oggetto e
+    # senza sats. Si decide quando si sa com'e' finito.
+    m = mondo()
+    m.nodo.modi["lnbc-fattura-1"] = "hold"
+    gira(m.decide("venditore"))
+    prova("al venditore con una hold invoice: in volo",
+          ("dispute", "in_volo", "venditore"), riga(m))
+    r = gira(m.decide("reso"))
+    prova("...«reso» adesso e' un 409, e la riga non si muove",
+          (409, ("dispute", "in_volo", "venditore")), (http(r), riga(m)))
+    prova("...e nessuno ha sentito parlare di reso", 0,
+          sum(1 for chi, t in m.sentite if "reso" in t.lower()
+              or "restituzione" in t))
+    for da in ("confirmed", "refund"):
+        for timbro in ("in_volo", "incerto", "uscito"):
+            m = mondo(stato=da)
+            m.vero.execute("UPDATE ordini SET payout_stato=?, "
+                           "payout_verso='venditore'", (timbro,))
+            m.vero.commit()
+            r = gira(m.decide("reso"))
+            prova(f"da '{da}' col timbro '{timbro}': 409, e il caso NON "
+                  "si riapre", (409, (da, timbro, "venditore")),
+                  (http(r), riga(m)))
+
+    # --- 4. IL GIRO E IL MODERATORE NELLO STESSO ISTANTE --------------
+    # il giro ha gia' il lucchetto dell'ordine e sta pagando chi vende;
+    # il «reso» arriva in mezzo. Deve ASPETTARE il lucchetto: poi trova
+    # l'ordine chiuso e risponde 409, invece di dire «rispedisci» a chi
+    # compra un istante prima che i sats arrivino a chi vende.
+    m = mondo()
+    m.nodo.modi["lnbc-fattura-1"] = "fail"
+    gira(m.decide("venditore"))
+    domani(m)
+    m.vero.execute("UPDATE ordini SET stato='dispute'")   # riaperta
+    m.vero.commit()
+
+    async def insieme():
+        import asyncio
+        return await asyncio.gather(m.giro(), m.decide("reso"))
+    _, r = gira(insieme())
+    prova("giro e «reso» insieme: paga UNO, il reso trova il 409",
+          (409, "released", 0),
+          (http(r), riga(m)[0],
+           sum(1 for chi, t in m.sentite if "previa restituzione" in t)))
+
+    # --- 5. IL VERSO DI IERI NON DECIDE OGGI --------------------------
+    # un rimborso rimasto a meta' lascia `payout_verso='compratore'`; il
+    # moderatore ci ripensa e decide «al venditore», ma la fattura di
+    # chi vende e' scaduta e non si tenta nemmeno (niente mano presa,
+    # quindi niente verso riscritto). Il timbro 'da_riprovare' deve
+    # portare il verso di CHI DEVE ESSERE PAGATO ADESSO.
+    scaduta = bolt11_finta(1000, 3600, adesso - 4 * GIORNO)
+    m = mondo(stato="refund", invoice=scaduta, compra="compra@wallet.tld")
+    m.vero.execute("UPDATE ordini SET payout_verso='compratore', "
+                   "payout_tentativi=1")
+    m.vero.commit()
+    gira(m.decide("venditore"))
+    prova("rimborso a meta', poi «al venditore» con la fattura scaduta: "
+          "il timbro dice VENDITORE",
+          ([], ("confirmed", "da_riprovare", "venditore")),
+          (m.nodo.partiti, riga(m)))
+    domani(m)
+    gira(m.giro())
+    prova("...e il giro paga chi vende, dal SUO address: mai chi ha perso",
+          (["chi@wallet.tld"], ("released", "uscito", "venditore")),
+          (m.nodo.coniate, riga(m)))
+
+    # ...e lo specchio: «al venditore» rimasto a meta', poi «rimborso»
+    # con la fattura di chi compra scaduta. Qui non usciva un sat alla
+    # persona sbagliata (`_sblocca_sats` non parte da 'refund'), ma il
+    # giro spegneva il timbro e il rimborso non ripartiva piu' da solo.
+    m = mondo(stato="confirmed", compra="compra@wallet.tld")
+    m.vero.execute("UPDATE ordini SET payout_verso='venditore', "
+                   "payout_tentativi=1, invoice_rimborso=?", (scaduta,))
+    m.vero.commit()
+    gira(m.decide("rimborso"))
+    prova("lo specchio: «rimborso» con la fattura scaduta, il timbro dice "
+          "COMPRATORE", ([], ("refund", "da_riprovare", "compratore")),
+          (m.nodo.partiti, riga(m)))
+    domani(m)
+    gira(m.giro())
+    prova("...e il giro rimborsa chi compra, dal SUO address",
+          (["compra@wallet.tld"], ("refunded", "uscito", "compratore")),
+          (m.nodo.coniate, riga(m)))
+
+    # --- SENTINELLE ---------------------------------------------------
+    rd = codice(pezzo("risolvi_disputa"))
+    reso = rd[rd.index('if esito == "reso" and stato == "dispute"'):]
+    prova("il reso si scrive SOTTO il lucchetto dell'ordine, come le due "
+          "uscite", True,
+          "async with _lucchetti_ordine[ordine_id]:" in reso
+          and reso.index("async with _lucchetti_ordine[ordine_id]:")
+          < reso.index("stato='return_pending'"))
+    prova("...con un UPDATE condizionato, e il suo 409", True,
+          "AND stato='dispute'" in reso and "rowcount != 1" in reso
+          and "NOT IN ('incerto','in_volo','uscito')" in reso)
+    for nome, verso in (("_sblocca_sats", "venditore"),
+                        ("_rimborsa_compratore", "compratore")):
+        c = codice(pezzo(nome))
+        mite = c[c.rindex("UPDATE ordini SET invoice_"):]
+        mite = mite[:mite.index("con.commit()")]
+        prova(f"`{nome}`: il ramo «non pagato» scrive il verso insieme al "
+              "timbro", True,
+              "payout_verso=?" in mite and f'"{verso}"' in mite)
 
 
 def prove_idor_verifica():
@@ -105868,7 +106108,8 @@ def prove_porta_timer():
                     "DEFAULT 0, invoice_venditore TEXT DEFAULT '', "
                     "disputata INT DEFAULT 0, annuncio_id INT DEFAULT 0, "
                     "cambio_eur REAL DEFAULT 0, aggiornato INT DEFAULT 0, "
-                    "sbloccato_auto_il INT DEFAULT 0)")
+                    "sbloccato_auto_il INT DEFAULT 0, "
+                    "payout_verso TEXT DEFAULT '')")
         con.execute("INSERT INTO ordini (id, stato, venditore_id, "
                     "compratore_id, prezzo_sats) VALUES (7,'delivered',222,111,50000)")
         # il venditore SENZA metodo d'incasso: e' il caso del buco
@@ -191680,7 +191921,7 @@ CATEGORIE = {
     foto_telegram_fallita pagamento_incerto esito_pagamento
     pagamenti_in_volo fatture_scadute fattura_solo_incasso in_pagamento
     altra_cassaforte chiusura_saas doppio_wallet saas_senza_doveri
-    orfani capitale_cassa disputa_incagliata busta_ritiro
+    orfani capitale_cassa disputa_incagliata disputa_cambia_strada busta_ritiro
     contenuto_digitale_forma foto_contenuto indirizzo_casa
     email_corriere nota_compratore nascondi_ordine lista_ordini
     dettaglio_ordine card_ordini righe_ordine niente_ai_nella_ricerca
@@ -192166,7 +192407,7 @@ def main():
               prove_in_pagamento, prove_altra_cassaforte,
               prove_chiusura_saas,
               prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani, prove_capitale_cassa,
-              prove_disputa_incagliata,
+              prove_disputa_incagliata, prove_disputa_cambia_strada,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_contenuto_digitale_forma,
               prove_foto_contenuto,

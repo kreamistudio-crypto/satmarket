@@ -80922,3 +80922,103 @@ funzioni nuove). Suite intera severa su 57ac8da3 + questo cantiere:
 prima); collaudi della CI 124 su 124 in un venv senza coincurve. NON
 provato dal vivo: lo scambio di Andrea dopo la promozione (il cambio
 della presa è sul server, la pagina lo rilegge).
+
+## La disputa che cambia strada: il giro non paga la persona sbagliata (14 nov 2026, cantiere audit-dispute, dal primo audit di sicurezza, Andrea: «4 cantieri, si parte dalle dispute»)
+
+Il primo audit con la skill security-audit (13-14 nov, solo lettura del
+sorgente) ha lasciato 19 sospetti «da verificare». Andrea ha scelto di
+correggerli a gruppi, e questo è il primo: i due che toccano i sats in
+deposito. Tutti e due nascono dalla stessa cosa. Una disputa decisa e
+non ancora pagata resta in mano al moderatore APPOSTA («Una disputa
+decisa resta in mano al moderatore», ago 2026): deve poterci ripensare.
+Ma la prima decisione lasciava sulla riga il suo timbro (`payout_stato`
++ `payout_verso`), e i due giri dell'orologio seguono il timbro, non lo
+stato.
+
+RIPRODOTTI PRIMA DI TOCCARE UNA RIGA, col server vero e il nodo di
+cartone (nessun sat vero, nessuna rete):
+1. «Al venditore» che non riesce a pagare (rotta che manca, o nodo
+   muto), poi «reso». L'ordine andava in 'return_pending' con ancora
+   addosso 'da_riprovare' verso il venditore: al giro dopo il venditore
+   veniva pagato (36.000 sats nel collaudo) e l'ordine chiuso
+   'released', mentre a chi compra era appena stato detto di rispedire
+   l'oggetto. Con un pagamento IN VOLO il «reso» veniva accettato lo
+   stesso.
+2. Un rimborso rimasto a metà (verso 'compratore'), poi «al venditore»
+   con la fattura di chi vende scaduta. La scaduta non si tenta
+   nemmeno, quindi nessuno prende la mano e nessuno riscrive il verso:
+   il ramo «non pagato» timbrava 'da_riprovare' e il verso restava
+   'compratore'. Il giro rimborsava chi aveva perso la disputa. Lo
+   specchio (verso 'venditore' rimasto, poi «rimborso») non pagava la
+   persona sbagliata, ma spegneva il timbro e il rimborso non ripartiva
+   più da solo.
+Nessuna delle due strade la apre un utente: serve un moderatore che
+cambia decisione, più un pagamento che inciampa. Non è un doppio
+pagamento (lucchetto, registro degli hash e guardie reggono): è UNA
+uscita, alla persona sbagliata.
+
+DECISO.
+- CHI LASCIA UN TIMBRO DICE ANCHE A CHI. I due rami «non pagato» di
+  `_sblocca_sats` e `_rimborsa_compratore` scrivono `payout_verso`
+  insieme a `payout_stato`: è il patto che `_sospendi_pagamento` aveva
+  già. Lo scrivono sempre, anche quando il timbro resta vuoto: stato e
+  verso dicono la stessa cosa ('confirmed' e venditore, 'refund' e
+  compratore).
+- IL RESO NON SCAVALCA UN PAGAMENTO. `risolvi_disputa`, esito 'reso':
+  409 se il payout è 'in_volo', 'incerto' o 'uscito' (i sats possono
+  essere partiti), PRIMA di riaprire il caso; poi 'return_pending' si
+  scrive sotto il lucchetto dell'ordine, con un UPDATE condizionato che
+  azzera 'da_riprovare' e il suo verso. 'da_riprovare' vuol dire
+  «nessun sat si è mosso», quindi toglierlo è sicuro. Il lucchetto
+  serve per la finestra fra la riga letta dal giro e la mano presa (il
+  conio dal Lightning address è una chiamata di rete).
+- IL TESTO NUOVO è uno solo, per i moderatori
+  (`MSG_RESO_PAGAMENTO_IN_CORSO`). Per gli utenti non cambia niente:
+  niente voce in NOVITA.md, niente ritocco al libro di Tappo.
+
+SCARTATO.
+- Far rifiutare 'confirmed' a `_rimborsa_compratore` (lo proponeva il
+  verificatore dell'audit, per simmetria con `_sblocca_sats` che non
+  parte da 'refund'): il commento di `risolvi_disputa` dice che le
+  guardie delle due uscite restano come sono e che per cambiare strada
+  si RIAPRE. La causa era il verso vecchio, e si cura quello.
+- Azzerare timbro e verso alla riapertura ('confirmed'/'refund' →
+  'dispute'): con i due rami che scrivono il verso non serve, e la
+  riapertura sta FUORI dal lucchetto (le due uscite lo prendono da
+  sole, e un lucchetto asyncio non si riprende due volte).
+- Azzerare `payout_tentativi` col reso: il conto è relativo e lo
+  scrivono più strade (`_timbra_pagamento`); un rimborso dopo molti
+  tentativi falliti verso chi vende può chiedere prima la fattura a chi
+  compra, ed è il comportamento di sempre.
+- Far rifiutare a `_sblocca_sats` gli ordini in reso: «al venditore»
+  su un reso incagliato è un intervento d'ufficio voluto.
+
+PROVATO. `prove_disputa_cambia_strada` (nuova, 25 righe, col mondo dei
+pagamenti in volo e le funzioni vere): le quattro strade qui sopra, i
+sei 409 da 'confirmed'/'refund', giro e «reso» nello stesso istante,
+più tre sentinelle (lucchetto, UPDATE condizionato, verso nei due
+rami). Sul codice di prima 21 righe su 25 sono rosse.
+`collaudo_disputa_cambia_strada` (nuovo, in `ci/collaudi.txt`): la
+storia sul server vero, col reso che arriva in fondo e rimborsa chi
+compra con UNA uscita; sul codice di prima è rosso (il venditore
+pagato dopo il reso). Verdi anche `collaudo_in_pagamento`,
+`collaudo_rimborso_meno_spese`, `collaudo_porta_timer`. Una riga di
+`prove_pagamento_incerto` segue il verso nuovo ('confirmed', '',
+'venditore'), e il banco di `prove_porta_timer` ha la colonna
+`payout_verso` che gli mancava (in produzione c'è da set 2026).
+SULL'ALBERO FINALE, ribasato sopra develop `05d89d9` (due commit non
+miei nel frattempo: `c2fa37f` prezzo-btc-31 e `05d89d9`
+sconto-fisso-decimale; conflitto solo in coda a questo file): la suite
+intera severa, 27.686 passate, 0 fallite, 0 saltate; i collaudi di
+`ci/collaudi.txt` nella gabbia, 125 verdi su 125.
+
+RESTA DA GUARDARE (di Andrea, sola lettura sul VPS, in
+`docs/DA-FARE-ANDREA.md`): se in produzione esiste oggi un ordine in
+reso con un timbro verso il venditore, o un 'confirmed' col verso
+'compratore'. La correzione chiude la strada da qui in avanti, non
+ripulisce righe nate prima. Notati e NON toccati: un moderatore che,
+a «al venditore» sospeso su un ordine in reso, vede chi vende premere
+«reso ricevuto» (rimborsa chi compra: lo fa chi ci rimette, non è un
+attacco); un ordine in 'dispute' rimasto col timbro 'uscito' dopo un
+errore a metà chiusura si chiude dalla strada che si richiama, senza
+guardare il verso.
