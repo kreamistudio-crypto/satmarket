@@ -82279,3 +82279,58 @@ soglie e i raggruppati.
 
 DA GUARDARE. Sul telefono le sei chip vanno a capo su due o tre righe:
 visto solo nel banco, non dal vivo.
+
+## Il cerchio della guida torna sul barattolino (14 nov 2026, cantiere tour-barattolino, Andrea: «piccolo refuso estetico», con la foto del tablet al passo «2 di 4»)
+
+IL DIFETTO, DALLA FOTO. Guida di benvenuto, seconda tappa («Ti piace
+qualcosa? Tocca il barattolino per metterla via tra i preferiti»): il
+cerchio arancio stava mezzo sopra la pillola «Alimenti e bevande», e il
+barattolino della prima card non si vedeva; il fumetto copriva la card.
+
+LA CAUSA, RIPRODOTTA. Sul server locale (collaudo, semina del collaudo,
+Chromium a 1280x730): la vetrina sta sotto la striscia «Da scoprire»,
+quindi la prima tappa porta la card al centro dello schermo e la pagina
+scorre di ~700 px. Scorrendo compare la barra delle categorie appesa
+sotto la testata appiccicata (158 + 52 px). Il barattolino è in alto
+nella foto della card: finiva a 205 px, cioè sotto la barra. Il giudice
+di `mostraTappa` chiedeva solo «è dentro il vetro?» (`top >= 0`), e la
+risposta era sì: niente scroll, e il riflettore (z-index sopra la
+testata) si disegnava sopra la pillola. Sul tablet di Andrea, più basso,
+il barattolino era sotto la barra per intero.
+
+LA CORREZIONE. `portaInLuceTour(b)` al posto delle due righe di
+`mostraTappa`, col giudice `zonaLiberaTour(b)`: lo spazio che nessuno
+copre è sotto la testata della vista del bersaglio più le pillole (la
+stessa misura di `scorriSottoHeader`: le pillole contano anche spente,
+perché scorrendo compaiono) e sopra la `nav` fissa quando sta in fondo
+(il telefono). Se il bersaglio non ci sta tutto, lo `scrollIntoView` di
+sempre col `block:'center'`, ma coi margini di scroll grandi quanto
+testata e nav: il centro del riquadro allargato è il centro dello spazio
+libero. I margini si tolgono subito dopo (la meta lo scroll la fissa
+alla chiamata). Chi vive dentro un pezzo `fixed` o `sticky` (la riga del
+deposito e il tappo, che stanno nella testata; la nav; un foglio) scorre
+con lui: per lui il vetro intero, come prima. Il fumetto non è cambiato:
+va sotto il riflettore, e col barattolino in luce non lo copre più.
+
+STRADE SCARTATE. Un `elementsFromPoint` sul centro del bersaglio per
+sapere chi lo copre: dice CHI ma non QUANTO scorrere, e il velo del
+tour sta sopra a tutto. Spostare il barattolino in un'altra card o
+puntare la seconda: il bersaglio era giusto, era lo scroll a mentire.
+
+PROVATO. Dal vivo nel Chromium locale, le quattro tappe a 1280x730,
+1280x640, 1024x700, 820x1180, 390x844 e 360x640: il barattolino sta
+sempre sotto la barra delle pillole (prima a 205 px, ora a 290-550),
+la riga del deposito e il tappo non scorrono. `prove_tutorial` (blocco
+6): la riga in `mostraTappa`, poi il giudice vero in node su una pagina
+di cartone con le misure di 1280x730 — spazio libero 210-730, il
+barattolino a 205 scorre al centro coi margini 218/8 e poi i margini
+tornano vuoti, un bersaglio già libero non scorre, uno sopra il vetro
+sì, la riga dentro la testata no, la nav in fondo è il pavimento (660)
+e una nav in alto no. Controprove: rimesso il «dentro il vetro» nel
+giudice — rosse tre; rimessa la vecchia condizione in `mostraTappa` —
+rossa la sentinella; tolto lo `sticky` dall'esclusione — rossa la riga
+della testata; rimesso il codice, verdi.
+
+NON PROVATO, DA GUARDARE. Sul tablet di Andrea dopo la promozione
+(«Tutorial» dal profilo), e il giro guidato del P2P dal telefono: lì la
+sola differenza è che un bersaglio sotto la nav in fondo adesso sale.

@@ -122021,6 +122021,102 @@ def prove_tutorial():
           1, d["memTorna"])
     prova("...e si dice perche'", 1, d["detto"])
 
+    # --- 6) IL TETTO DELLA VETRINA (14 nov 2026, cantiere tour-barattolino,
+    # dalla foto di Andrea: «2 di 4», il cerchio sulla pillola «Alimenti e
+    # bevande» e il barattolino nascosto). Il banco fa GIRARE il giudice
+    # vero su una pagina di cartone misurata dal vivo a 1280x730: testata
+    # che finisce a 158, pillole alte 52 che le pendono sotto, il
+    # barattolino della prima card a 205 dopo che la prima tappa ha
+    # centrato la card. Prima «in vista» voleva dire top >= 0, e li' lo
+    # scroll non partiva.
+    mt = pezzo_js(mini, "function mostraTappa(){", "\n}\n")
+    prova("la tappa porta in luce col giudice del tetto, non piu' col solo vetro",
+          (True, False), ("if (!t.centro) portaInLuceTour(b);" in mt,
+                          "r.top < 0 || r.bottom > innerHeight" in mt))
+    import shutil, subprocess, tempfile
+    node = shutil.which("node")
+    if not node:
+        salta("il tetto della vetrina gira su un banco node", "node non c'e'")
+        return
+    js = (pezzo_js(mini, "function zonaLiberaTour(b){", "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function portaInLuceTour(b){", "\n}\n") + "\n}\n"
+          + r"""
+const innerHeight = 730;
+const tourRidotto = () => true;
+function finto(pos, r, cls, figli){
+  return {pos, r, cls: cls || [], figli: figli || {}, style: {}, parentElement: null, viste: [],
+    classList: {contains(c){ return this.el.cls.includes(c); }},
+    getBoundingClientRect(){ return this.r; },
+    get offsetHeight(){ return this.r.bottom - this.r.top; },
+    querySelector(s){ return this.figli[s] || null; },
+    scrollIntoView(o){ this.viste.push([o.block, this.style.scrollMarginTop, this.style.scrollMarginBottom]); }};
+}
+function tieni(n){ n.classList.el = n; return n; }
+const R = (top, bottom) => ({top, bottom, height: bottom - top});
+const body = tieni(finto('static', R(0, 0)));
+let NAV = null;
+const document = {body, querySelector: s => s === 'nav' ? NAV : null};
+const getComputedStyle = n => ({position: n.pos});
+const chips = tieni(finto('absolute', R(158, 210)));
+const header = tieni(finto('sticky', R(0, 158), [], {'.chips': chips}));
+const vista = tieni(finto('static', R(-700, 3000), ['view'], {header}));
+vista.parentElement = body;
+header.parentElement = vista;
+function dentro(padre, r, pos){ const n = tieni(finto(pos || 'static', r)); n.parentElement = padre; return n; }
+const out = {};
+const jar = dentro(vista, R(205, 239));
+out.zona = zonaLiberaTour(jar);
+portaInLuceTour(jar);
+out.sottoBarra = jar.viste;
+out.margini = [jar.style.scrollMarginTop, jar.style.scrollMarginBottom];
+const libero = dentro(vista, R(330, 364));
+portaInLuceTour(libero);
+out.libero = libero.viste.length;
+const fuori = dentro(vista, R(-40, -6));
+portaInLuceTour(fuori);
+out.fuori = fuori.viste.length;
+/* chi vive nella testata (la riga del deposito, il tappo) non ha tetto */
+const riga = dentro(header, R(119, 147));
+out.riga = [zonaLiberaTour(riga), (portaInLuceTour(riga), riga.viste.length)];
+/* il telefono: la nav fissa in fondo e' il pavimento */
+NAV = tieni(finto('fixed', R(660, 730)));
+const giu = dentro(vista, R(620, 690));
+out.pavimento = zonaLiberaTour(giu).giu;
+portaInLuceTour(giu);
+out.giu = giu.viste;
+/* ...e una nav che non sta in fondo (il desktop) non conta */
+NAV = tieni(finto('fixed', R(0, 60)));
+out.navInAlto = zonaLiberaTour(giu).giu;
+console.log(JSON.stringify(out));
+""")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js)
+    try:
+        r = subprocess.run([node, f.name], capture_output=True,
+                           encoding="utf-8", timeout=60)
+        t = json.loads(r.stdout or "{}") or {"errore": r.stderr[-400:]}
+    except Exception as e:
+        t = {"errore": f"node e' esploso: {e}"}
+    finally:
+        os.unlink(f.name)
+    prova("lo spazio libero comincia sotto testata e pillole (158 + 52)",
+          {"su": 210, "giu": 730}, t.get("zona", t))
+    prova("il barattolino sotto la barra delle pillole si porta al centro "
+          "dello spazio libero", [["center", "218px", "8px"]], t.get("sottoBarra", t))
+    prova("...e i margini dello scroll non restano addosso al bersaglio",
+          ["", ""], t.get("margini", t))
+    prova("un bersaglio gia' nello spazio libero non fa scorrere niente",
+          0, t.get("libero", t))
+    prova("uno sopra il vetro scorre come prima", 1, t.get("fuori", t))
+    prova("chi vive nella testata appiccicata non ha tetto e non scorre",
+          [{"su": 0, "giu": 730}, 0], t.get("riga", t))
+    prova("sul telefono la nav fissa in fondo e' il pavimento, e chi ci "
+          "finisce sotto sale", [660, [["center", "218px", "78px"]]],
+          [t.get("pavimento", t), t.get("giu", t)])
+    prova("...una nav fissa in alto (il desktop) non e' un pavimento",
+          730, t.get("navInAlto", t))
+
 
 def _banco_nip46_js(mini):
     """I PEZZI COMUNI AI BANCHI NIP-46 (10 ott 2026): le costanti, il
