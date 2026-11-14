@@ -82544,3 +82544,47 @@ NON PROVATO, DA GUARDARE. La recensione P2P dal vivo (la pagina dello
 scambio vuole la riga dello scambio nel telefono): provata dalle rotte
 nel collaudo e dal disegno in node, non a schermo. Il telefono vero
 dentro Telegram.
+
+## Le recensioni ricevute nel Profilo (14 nov 2026, cantiere recensioni-ricevute, una persona via Andrea: «non trovo il modo di vedere un elenco delle recensioni ricevute»; Andrea: «si fallo subito»)
+
+C'ERANO GIÀ, MA NASCOSTE. L'elenco delle recensioni ricevute esisteva
+solo dentro Profilo → «Negozio e spedizioni» → «👁 Guarda il tuo negozio
+come lo vedono tutti»: tre tocchi, e una voce che parla di negozio a chi
+magari non vende. Adesso c'è il cassetto «⭐ Recensioni ricevute (N)»,
+primo di «Livello e inviti» (sta con livello e distintivi: è la stessa
+reputazione), e le stelle della testata del Profilo sono una porta che
+apre sezione e cassetto e lo porta sotto gli occhi.
+
+NIENTE ROTTA NUOVA, ED È LA DECISIONE. L'elenco lo legge la rotta del
+negozio (`/api/negozio/{codice}?limit=1`: i feedback arrivano interi
+sulla prima pagina, degli annunci basta uno) col codice del negozio che
+OGNI utente prende entrando, e lo disegna lo stesso
+`feedbackNegozioHTML` con un terzo argomento `mio`: le parole del ruolo
+girate verso di te («ha comprato da te», «ti ha venduto»), niente
+titolo (lo fa il cassetto), niente «rimuovi» del moderatore nel proprio
+elenco, e un id suo per il blocco nascosto (`fbAltriMie`: il negozio può
+essere ancora nel DOM, e «Mostra tutti» avrebbe aperto quello). Per
+questo `toggleFeedbackAltri` ora segue `aria-controls`. Senza `vista=1`:
+guardarsi le recensioni non è una visita. Scartata una rotta
+`/api/me/recensioni`: avrebbe ricopiato la query del negozio, coi suoi
+confini (mai l'oggetto comprato, mai un recapito) da tenere in pari in
+due posti. L'elenco si chiede a ogni apertura del cassetto, così una
+recensione appena arrivata o modificata si vede subito. Spento in DEMO
+e in vetrina.
+
+PROVATO. `prove_recensioni_ricevute` (categoria mercatino, 18 righe):
+posto e accensione del cassetto, la porta delle stelle, la domanda
+(codice, limit=1, niente vista, intestazione, rete storta detta), e in
+node le parole, il titolo, «rimuovi», l'id e il tocco «Mostra tutti».
+Controprove: id uguale a quello del negozio, `vista=1`, «rimuovi» nel
+proprio elenco — rosse, poi verdi. Ritoccato il banco del negozio (il
+bottone finto ha `getAttribute`), l'àncora della firma nel censimento
+dei volti e il censimento dei cassetti del Profilo (`accRecensioni` in
+«Livello e inviti»). La scorsa verso il cassetto è secca: una morbida
+vorrebbe il giudice degli effetti ridotti. DAL VIVO: server vero in collaudo su database usa-e-getta,
+Chrome via Playwright a 390×844, chiaro e scuro: tocco sulle stelle →
+cassetto aperto con tre recensioni, «Mostra tutti (5)» → cinque,
+«modificato» e «da uno scambio P2P» al loro posto.
+
+NON PROVATO, DA GUARDARE. Il telefono vero dentro Telegram.
+

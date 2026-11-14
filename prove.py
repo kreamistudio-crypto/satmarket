@@ -61327,7 +61327,10 @@ caso('scudo', () => { const h = feedbackNegozioHTML(fb(1, {da_nome: '<b>x</b>',
 caso('tocco', () => {
   const box = {hidden: true}; let vista = null;
   const b = {dataset: {apri: 'Mostra tutti (7) ▾'}, attr: {}, textContent: 'Mostra tutti (7) ▾',
-    setAttribute(k, v){ this.attr[k] = v; }, scrollIntoView(o){ vista = o; }};
+    setAttribute(k, v){ this.attr[k] = v; }, scrollIntoView(o){ vista = o; },
+    /* (14 nov 2026) il blocco e' quello di aria-controls: qui non c'e',
+       e il bottone del negozio ricade su fbAltri */
+    getAttribute(k){ return this.attr[k] || null; }};
   DOM.fbAltri = box;
   toggleFeedbackAltri(b);
   const aperto = {hidden: box.hidden, aria: b.attr['aria-expanded'], testo: b.textContent, vista};
@@ -121785,7 +121788,8 @@ def prove_profilo_elegante():
         "grpCompri": ["accPreferiti", "accRicerche", "accPuntiRitiro",
                       "vocSicurezza"],
         "grpIncassi": ["accLnAddress", "accComeRicevi", "accOnchainIncasso", "accNwc", "vocEsporta"],
-        "grpLivello": ["accLivello", "accInviti", "accDistintivi"],
+        # (14 nov 2026) le recensioni ricevute, prima del livello
+        "grpLivello": ["accRecensioni", "accLivello", "accInviti", "accDistintivi"],
         "grpAspetto": ["accAvvisi", "accAspetto"],
         # l'assistenza in app (3 nov 2026) sta con «I tuoi dati»
         "grpPrivacy": ["accIdentita", "vocAssistenza", "vocPrivacy", "vocCancella", "accTor"],
@@ -139425,7 +139429,7 @@ def prove_volto_unico():
         "negozio": ("voltoHTML({nome: v.nome, avatar: v.avatar, negozio: v.negozio",
                     "function renderNegozio(v, annunci, feedback=[], esauriti=[]){"),
         "recensioni": ("voltoHTML({nome: chi, avatar: f.da_avatar",
-                       "function feedbackNegozioHTML(feedback, nFeedback){"),
+                       "function feedbackNegozioHTML(feedback, nFeedback, mio){"),
         "riquadro venditore": ("voltoHTML({nome: l.seller", None),
         "profilo": ("voltoHTML({nome: myNome || myUsername", "function renderProfilo(){"),
         # (16 ott 2026) le righe del foglio, la pastiglia e «Stai usando»
@@ -168611,6 +168615,123 @@ def gesti_feedback_js(mini):
         "function gestiFeedbackHTML(g, apri, cancella, genere){"))
 
 
+def prove_recensioni_ricevute():
+    """LE RECENSIONI RICEVUTE NEL PROFILO (14 nov 2026, cantiere
+    recensioni-ricevute, Andrea: «non trovo il modo di vedere un elenco
+    delle recensioni ricevute»). C'erano gia', ma solo dentro «Guarda il
+    tuo negozio come lo vedono tutti». Adesso c'e' il cassetto
+    «⭐ Recensioni ricevute (N)» in «Livello e inviti», e le stelle della
+    testata ci portano. Niente rotta nuova: la stessa del negozio, e lo
+    stesso `feedbackNegozioHTML` con le parole girate verso di te.
+
+    QUEL CHE SI ROMPE IN SILENZIO: il cassetto acceso in DEMO (dove non
+    c'e' un negozio vero); la domanda che conta una visita (`vista=1`);
+    l'id del blocco nascosto uguale a quello del negozio (il tocco
+    «Mostra tutti» del Profilo aprirebbe quello del negozio); «rimuovi»
+    del moderatore nel proprio elenco; le parole del negozio («ha
+    comprato qui») dove si parla a te."""
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) IL CASSETTO, DOVE STA E QUANDO SI VEDE --------------------
+    i_grp = mini.find('<div class="grp" id="grpLivello">')
+    i_acc = mini.find('<div class="acc" id="accRecensioni" style="display:none">')
+    i_liv = mini.find('<div class="acc" id="accLivello">')
+    prova("il cassetto sta in «Livello e inviti», per primo, e nasce spento",
+          True, 0 < i_grp < i_acc < i_liv)
+    prova("...si apre dalla sua funzione, che chiede l'elenco", True,
+          'onclick="toggleRecensioniRicevute()"' in mini[i_acc:i_liv]
+          and 'id="recensioniConta"' in mini[i_acc:i_liv]
+          and 'id="recensioniBlocco"' in mini[i_acc:i_liv])
+    rp = _fn_js(mini, "function renderProfilo(){")
+    prova("...si accende per chi ha il codice del negozio, mai in DEMO o "
+          "in vetrina", True,
+          "el('accRecensioni').style.display =\n    myNegozio&&!DEMO&&!VETRINA ? '' : 'none';" in rp)
+    prova("...e il conto e' quello delle stelle (n_feedback), vuoto a zero",
+          True, "(Number(myNFeedback) || 0) > 0 ? `(${Number(myNFeedback)})` : ''" in rp)
+    prova("le stelle della testata portano al cassetto", True,
+          'onclick="apriRecensioniRicevute()"' in rp
+          and ".rep-recensioni{cursor:pointer;" in mini)
+
+    # --- 2) LA DOMANDA AL SERVER --------------------------------------
+    car = _fn_js(mini, "async function caricaRecensioniRicevute(){")
+    prova("la domanda e' la rotta del negozio, col proprio codice e "
+          "limit=1", True,
+          "`${API_BASE}/negozio/${encodeURIComponent(myNegozio)}?limit=1`" in car)
+    prova("...senza vista=1: guardarsi le recensioni non e' una visita",
+          False, "vista" in car)
+    prova("...con l'intestazione di chi e', e mai in DEMO o in vetrina",
+          True, "'X-Tg-Init-Data': authHdr()" in car
+          and "DEMO || VETRINA) return;" in car)
+    prova("...e una rete storta lo dice, non lascia «Un attimo…»", True,
+          "Non riesco a leggere le recensioni adesso" in car)
+    # il server manda i feedback interi sulla PRIMA pagina, qualunque
+    # sia il limit: e' la premessa del limit=1
+    prova("il negozio manda i feedback alla prima pagina, con qualunque "
+          "limit", True,
+          "feedback = [] if cursore else [dict(r)" in pezzo("negozio"))
+
+    # --- 3) IN NODE: LE PAROLE, L'ID, IL MODERATORE -------------------
+    def fetta(inizio, fine):
+        i = mini.index(inizio)
+        return mini[i:mini.index(fine, i) + len(fine)]
+    js = ("let isAdmin = true; let aptiche = 0;\n"
+          "function haptic(){ aptiche++; }\n"
+          "function avatarImg(n){ return ''; }\n"
+          + volto_unico_js(mini)
+          + "const DOM = {};\nfunction el(id){ return DOM[id] || null; }\n"
+          + fetta("const esc = s =>", "}[c]));") + "\n"
+          + fetta("const FEEDBACK_VISIBILI = ", ";") + "\n"
+          + "".join(_fn_js(mini, f) for f in (
+              "function feedbackNegozioHTML(feedback, nFeedback, mio){",
+              "function toggleFeedbackAltri(b){",
+              "function fotoRecensioneHTML(",
+              "function bollinoStaff(",
+              "function recensioniRicevuteHTML(feedback, nFeedback){"))
+          + r"""
+const fb = n => Array.from({length: n}, (_, k) => ({id: k + 1, voto: 4, commento: 'c' + k,
+  creato: 1790000000 - k * 86400, ruolo: ['acquirente', 'venditore', 'scambio', 'utente'][k % 4],
+  da_nome: 'P' + k, da_negozio: 'n' + k, da_avatar: ''}));
+const c = {};
+const mio = recensioniRicevuteHTML(fb(5), 5), neg = feedbackNegozioHTML(fb(5), 5);
+c.vuoto = recensioniRicevuteHTML([], 0).indexOf('Ancora nessuna recensione') >= 0
+  && recensioniRicevuteHTML(null, 3).indexOf('Ancora nessuna recensione') >= 0;
+c.parole = [mio.includes('ha comprato da te'), mio.includes('ti ha venduto'),
+            mio.includes('da uno scambio P2P'), mio.includes('ha comprato qui'),
+            mio.includes('ha venduto qui')];
+c.negozio = [neg.includes('ha comprato qui'), neg.includes('ha venduto qui'),
+             neg.includes('ha comprato da te')];
+c.titolo = [mio.includes('Gli ultimi feedback'), neg.includes('Gli ultimi feedback')];
+c.rimuovi = [mio.includes('rimuoviFeedback'), neg.includes('rimuoviFeedback')];
+c.id = [mio.includes('<div id="fbAltriMie" hidden>'), mio.includes('aria-controls="fbAltriMie"'),
+        mio.includes('id="fbAltri"'), neg.includes('<div id="fbAltri" hidden>')];
+c.nota = mio.includes('Così le vedono tutti nel tuo negozio.');
+const mie = {hidden: true}, loro = {hidden: true};
+DOM.fbAltriMie = mie; DOM.fbAltri = loro;
+const b = {dataset: {apri: 'x'}, attr: {'aria-controls': 'fbAltriMie'}, textContent: 'x',
+  setAttribute(k, v){ this.attr[k] = v; }, getAttribute(k){ return this.attr[k] || null; },
+  scrollIntoView(){}};
+toggleFeedbackAltri(b);
+c.tocco = [mie.hidden, loro.hidden];
+console.log(JSON.stringify(c));
+""")
+    c = _node_banco(js)
+    if c is None:
+        salta("le recensioni ricevute in node", "node non c'e'")
+        return
+    prova("senza recensioni, la frase che dice da dove arrivano", True, c.get("vuoto"))
+    prova("le parole parlano a te: «ha comprato da te», «ti ha venduto», "
+          "e mai quelle del negozio", [True, True, True, False, False], c.get("parole"))
+    prova("...mentre il negozio resta com'era", [True, True, False], c.get("negozio"))
+    prova("nel Profilo niente titolo: lo fa il cassetto", [False, True], c.get("titolo"))
+    prova("«rimuovi» del moderatore solo nel negozio, mai nel proprio elenco",
+          [False, True], c.get("rimuovi"))
+    prova("il blocco nascosto ha un id suo (il negozio puo' essere nel DOM)",
+          [True, True, False, True], c.get("id"))
+    prova("...e sotto l'elenco si dice che e' quello pubblico", True, c.get("nota"))
+    prova("«Mostra tutti» del Profilo apre il SUO blocco, non quello del negozio",
+          [False, True], c.get("tocco"))
+
+
 def prove_feedback_modificabile():
     """IL FEEDBACK SI MODIFICA E SI CANCELLA, PER UN PO' (14 nov 2026,
     cantiere feedback-modificabile, richiesta di Andrea). Rovescia la
@@ -195198,7 +195319,7 @@ CATEGORIE = {
     lista_corta_metodi
     """.split(),
     "mercatino": """
-    mappa_ritiro feedback_modificabile
+    mappa_ritiro feedback_modificabile recensioni_ricevute
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     ricategorizza collaudo_ricategorizza asta proxy_asta annullo
@@ -196027,6 +196148,7 @@ def main():
               prove_malus_p2p,
               prove_feedback_p2p,
               prove_feedback_modificabile,
+              prove_recensioni_ricevute,
               prove_x_risonanza,
               prove_indirizzo_lightning,
               prove_indirizzo_swap,

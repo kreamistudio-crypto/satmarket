@@ -8948,6 +8948,8 @@
   .trust-note.nota-feedback{background:var(--card);color:var(--ink);
     border:1px solid var(--line);margin-left:var(--pad);margin-right:var(--pad)}
   .trust-note.nota-feedback .stars,.seller .stars{color:var(--sats-text)}
+  /* (14 nov 2026) le stelle della testata del Profilo aprono «Recensioni ricevute» */
+  .rep-recensioni{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
   /* Pillole informative del dettaglio: strade discrete e disponibilita' */
   .pills{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
   .pill{background:var(--card);border:1.5px solid var(--field-line);border-radius:999px;
@@ -14946,6 +14948,20 @@ document.getElementById('cartello')?.remove();</script>
         <button type="button" class="grp-h" onclick="toggleGrp('grpLivello')"
                 aria-expanded="false">Livello e inviti<span class="fr">▾</span></button>
         <div class="grp-b">
+      <!-- LE RECENSIONI RICEVUTE (14 nov 2026, cantiere recensioni-ricevute,
+           Andrea: «non trovo il modo di vedere un elenco delle recensioni
+           ricevute»). C'erano gia', ma solo dentro «Guarda il tuo negozio
+           come lo vedono tutti», tre cassetti piu' in la'. Qui l'elenco
+           lo legge la stessa rotta del negozio (gli ultimi
+           TETTO_FEEDBACK_NEGOZIO, mercatino e P2P insieme), e lo disegna
+           lo stesso `feedbackNegozioHTML` con le parole girate verso di
+           te. Ci si arriva anche toccando le stelle della testata. Nasce
+           SPENTO: in DEMO e in vetrina non c'e' un negozio vero. -->
+      <div class="acc" id="accRecensioni" style="display:none">
+        <button class="acc-h" onclick="toggleRecensioniRicevute()"><span class="em">⭐</span>Recensioni ricevute <span class="conta" id="recensioniConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="recensioniBlocco"></div></div>
+      </div>
+
       <div class="acc" id="accLivello">
         <button class="acc-h" onclick="toggleAcc('accLivello')"><span class="em">🎖</span>Livello e titolo <span class="conta" id="livelloConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="livelloBlocco"></div></div>
@@ -25705,8 +25721,16 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
    filtro-alfabeto, che finisce dentro un onclick.
    Pura (legge solo `isAdmin`): la fa girare il banco di prove.py. */
 const FEEDBACK_VISIBILI = 3;
-function feedbackNegozioHTML(feedback, nFeedback){
+function feedbackNegozioHTML(feedback, nFeedback, mio){
   if (!feedback || !feedback.length) return '';
+  /* `mio` (14 nov 2026, recensioni-ricevute): lo stesso elenco nel tuo
+     Profilo. Cambiano solo le parole del ruolo (scritte verso di te),
+     l'id del blocco nascosto (il negozio puo' essere ancora nel DOM)
+     e niente titolo (lo fa il cassetto) ne' «rimuovi» */
+  const idAltri = mio ? 'fbAltriMie' : 'fbAltri';
+  const ruolo = f => mio
+    ? (f.ruolo==='acquirente'?'ha comprato da te':f.ruolo==='venditore'?'ti ha venduto':f.ruolo==='scambio'?'da uno scambio P2P':'utente')
+    : (f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':f.ruolo==='scambio'?'da uno scambio P2P':'utente');
   const riga = f => {
     const cod = (f.da_negozio||'').replace(/[^A-Za-z0-9]/g,'');
     const chi = f.da_nome || '';
@@ -25722,8 +25746,8 @@ function feedbackNegozioHTML(feedback, nFeedback){
         <span>${nome}${f.da_staff ? bollinoStaff() : ''} ${faccia}<br>
           ${f.commento?`${esc(f.commento)}<br>`:''}
           ${fotoRecensioneHTML(f.foto)}
-          <small style="opacity:.65">${f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':f.ruolo==='scambio'?'da uno scambio P2P':'utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}${f.modificato?' · modificato':''}</small>
-          ${isAdmin?` <a href="#" onclick="rimuoviFeedback(${f.id});return false" style="color:var(--danger);font-size:12px">rimuovi</a>`:''}
+          <small style="opacity:.65">${ruolo(f)} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}${f.modificato?' · modificato':''}</small>
+          ${isAdmin && !mio?` <a href="#" onclick="rimuoviFeedback(${f.id});return false" style="color:var(--danger);font-size:12px">rimuovi</a>`:''}
         </span>
       </div>`;
   };
@@ -25732,11 +25756,11 @@ function feedbackNegozioHTML(feedback, nFeedback){
     ? `Mostra tutti (${feedback.length}) ▾`
     : `Mostra gli ultimi ${feedback.length} ▾`;
   return `
-    <div class="section-label" style="margin-top:16px">Gli ultimi feedback</div>
+    ${mio ? '' : '<div class="section-label" style="margin-top:16px">Gli ultimi feedback</div>'}
     ${feedback.slice(0, FEEDBACK_VISIBILI).map(riga).join('')}
-    ${altri.length ? `<div id="fbAltri" hidden>${altri.map(riga).join('')}</div>
+    ${altri.length ? `<div id="${idAltri}" hidden>${altri.map(riga).join('')}</div>
     <button type="button" class="fb-tutti" aria-expanded="false"
-      aria-controls="fbAltri" data-apri="${apri}"
+      aria-controls="${idAltri}" data-apri="${apri}"
       onclick="toggleFeedbackAltri(this)">${apri}</button>` : ''}`;
 }
 /* Il tocco sulla riga: apre o chiude gli altri, e la riga dice il
@@ -25745,7 +25769,9 @@ function feedbackNegozioHTML(feedback, nFeedback){
    vista — si riporta a portata, e 'nearest' non muove niente se si
    vede gia'. */
 function toggleFeedbackAltri(b){
-  const box = el('fbAltri');
+  /* il blocco e' quello che il bottone dice di comandare: nel negozio
+     `fbAltri`, nel Profilo `fbAltriMie` (14 nov 2026) */
+  const box = b && el(b.getAttribute('aria-controls') || 'fbAltri');
   if (!box || !b) return;
   haptic();
   const apre = box.hidden;
@@ -39296,8 +39322,10 @@ function renderProfilo(){
     : '';
   /* Stelle solo con un rating vero: "0 ★" farebbe solo danno
      (stessa regola della vista negozio) */
+  /* (14 nov 2026, recensioni-ricevute) le stelle sono una porta: il
+     tocco apre «Recensioni ricevute», dove c'e' il cassetto */
   const rep = (myRating>0
-    ? `<span class="stars">${'★'.repeat(Math.round(myRating))}</span> ${myRating}${contaFeedback(myNFeedback, myNRecensori)} · ` : '')
+    ? `<span class="rep-recensioni" role="button" tabindex="0" onclick="apriRecensioniRicevute()"><span class="stars">${'★'.repeat(Math.round(myRating))}</span> ${myRating}${contaFeedback(myNFeedback, myNRecensori)}</span> · ` : '')
     + `${myVenditeOk} vendite · ${myAcquistiOk} acquisti conclusi`
     /* GLI SCAMBI P2P ANCHE QUI (12 ott 2026, voto-dopo-concluso, dal
        campo: «nel mio profilo non compare lo scambio»): la stessa
@@ -39344,6 +39372,12 @@ function renderProfilo(){
      aggiornaGruppiProfilo che legge chi e' visibile. */
   if (el('vocMioNegozio')) el('vocMioNegozio').style.display =
     (myUsername||myNegozio)&&!DEMO&&!VETRINA ? '' : 'none';
+  /* (14 nov 2026) le recensioni ricevute: a tutti quelli che hanno il
+     codice del negozio, cioe' a ogni utente vero (lo prende entrando) */
+  if (el('accRecensioni')) el('accRecensioni').style.display =
+    myNegozio&&!DEMO&&!VETRINA ? '' : 'none';
+  if (el('recensioniConta')) el('recensioniConta').textContent =
+    (Number(myNFeedback) || 0) > 0 ? `(${Number(myNFeedback)})` : '';
   if (el('vocWidgetNegozio')) el('vocWidgetNegozio').style.display =
     (myNegozio)&&!DEMO&&!VETRINA ? '' : 'none';
   /* «Esci» dice cosa fa: con piu' account aperti esce da QUESTO e
@@ -40465,6 +40499,52 @@ function apriMioNegozio(){
   const chi = myNegozio || myUsername;
   if (!chi) { toast('Non hai ancora un negozio'); return; }
   apriNegozio(chi);
+}
+
+/* ---- LE RECENSIONI RICEVUTE (14 nov 2026, cantiere recensioni-ricevute) ----
+   Il cassetto del Profilo. L'elenco si chiede a OGNI apertura (una
+   recensione appena arrivata o appena modificata si vede subito) alla
+   rotta del negozio con limit=1: dei suoi annunci qui non serve niente,
+   i feedback arrivano gia' interi sulla prima pagina. Le visite al
+   proprio negozio il server non le conta. */
+function toggleRecensioniRicevute(){
+  toggleAcc('accRecensioni');
+  if (el('accRecensioni')?.classList.contains('open')) caricaRecensioniRicevute();
+}
+/* Il tocco sulle stelle della testata: apre la sezione e il cassetto, e
+   lo porta sotto gli occhi */
+function apriRecensioniRicevute(){
+  const g = el('grpLivello'), a = el('accRecensioni');
+  if (!g || !a || a.style.display === 'none') return;
+  if (!g.classList.contains('open')) toggleGrp('grpLivello');
+  if (!a.classList.contains('open')) toggleRecensioniRicevute();
+  a.scrollIntoView({block: 'start'});
+}
+/* PURA: l'elenco, o la frase quando non ce n'e' ancora nessuna. «Le
+   ultime N» quando il server ne manda meno di quante sono davvero
+   (`feedbackNegozioHTML` lo dice gia' sul bottone «Mostra») */
+function recensioniRicevuteHTML(feedback, nFeedback){
+  if (!feedback || !feedback.length)
+    return '<div class="hint">Ancora nessuna recensione. Arrivano quando chi ha comprato da te, '
+      + 'chi ti ha venduto qualcosa o chi ha scambiato sats con te lascia un voto.</div>';
+  return feedbackNegozioHTML(feedback, nFeedback, true)
+    + '<div class="hint" style="margin-top:8px">Così le vedono tutti nel tuo negozio.</div>';
+}
+async function caricaRecensioniRicevute(){
+  const box = el('recensioniBlocco');
+  if (!box || !myNegozio || DEMO || VETRINA) return;
+  if (!box.innerHTML) box.innerHTML = '<div class="hint">Un attimo…</div>';
+  try {
+    const r = await fetch(`${API_BASE}/negozio/${encodeURIComponent(myNegozio)}?limit=1`,
+                          {headers: {'X-Tg-Init-Data': authHdr()}});
+    if (!r.ok) throw new Error('negozio');
+    const d = await r.json();
+    const v = d.venditore || {};
+    box.innerHTML = recensioniRicevuteHTML(d.feedback || [],
+      Number(v.n_feedback) || Number(myNFeedback) || 0);
+  } catch (e) {
+    box.innerHTML = '<div class="hint">Non riesco a leggere le recensioni adesso: riprova tra poco.</div>';
+  }
 }
 
 /* ---------------- IL WIDGET DA INCORPORARE (ago 2026) ----------------
