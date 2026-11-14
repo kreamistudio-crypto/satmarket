@@ -164874,6 +164874,42 @@ console.log(JSON.stringify(out));
     prova("...togliere il comune non scorre; in demo la griglia c'e' subito e si scorre",
           [["", 0], 1], [r.get("toltoMerc"), r.get("demo")])
 
+    # --- 4) LA RIGA CORTA DEL P2P E L'ETICHETTA DEI TONDI (stessa sera, su
+    # richiesta della coordinazione: le due cose segnalate a fine cantiere)
+    prova("l'interruttore del P2P dice «Notifiche nuove offerte in contanti»",
+          [True, False],
+          ["rigaNumerinoMappa('p2p', 'Notifiche nuove offerte in contanti'," in mini,
+           "Numerino sul tondo per le nuove offerte in contanti" in mini])
+    banco2 = (r"""
+function el(){ return null; }
+function guscioInVista(){ return true; }
+const tg = null;
+let temaScelto = 'scuro';
+function temaEffettivo(){ return temaScelto; }
+function bottone(conIco){
+  const b = { title: 'Mappa: 3 annunci', att: {'aria-label': 'Mappa: 3 annunci'},
+    setAttribute(k, v){ this.att[k] = v; },
+    ico: conIco ? { textContent: '🌙' } : null,
+    querySelector(s){ return s === '.tema-ico' ? this.ico : null; } };
+  return b;
+}
+const levetta = bottone(true), tondo = bottone(false);
+const document = { documentElement: { dataset: {}, classList: { contains: () => false } },
+  getElementById: () => null, querySelectorAll: s => s === '.tema-btn' ? [levetta, tondo] : [] };
+""" + _fn_js(mini, "function applicaTema(){") + r"""
+applicaTema();
+console.log(JSON.stringify({ levetta: [levetta.ico.textContent, levetta.title, levetta.att['aria-label']],
+  tondo: [tondo.title, tondo.att['aria-label']] }));
+""")
+    r2 = _node_banco(banco2)
+    if r2 is None:
+        salta("mappa-ritocchi: il banco dell'etichetta", "node non c'e'")
+        return
+    prova("applicaTema ritocca la levetta (icona ed etichetta)...",
+          ["☀️", "Passa al tema chiaro", "Passa al tema chiaro"], r2.get("levetta"))
+    prova("...e NON il tondo della mappa, che resta «Mappa: …» per chi legge con la voce",
+          ["Mappa: 3 annunci", "Mappa: 3 annunci"], r2.get("tondo"))
+
 def prove_contanti_zona():
     """LA ZONA DI SCAMBIO E IL VESTITO DEL CONTANTI (10 ott 2026, cantiere
     contanti-zona, richiesta di Andrea). Quattro cose: 1) la zona
