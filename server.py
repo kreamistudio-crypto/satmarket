@@ -28077,6 +28077,91 @@ try:
 except ImportError:
     MERCATO_LAVORO = False
 
+# LA MAPPA DEL RITIRO A MANO, CON UNA LEVA PER SPEGNERLA (14 nov 2026,
+# cantiere mappa-mercatino, richiesta di Andrea): il tondo 🗺️ della
+# vetrina e la mappa dei comuni col ritiro a mano. ACCESA DI SERIE, ed e'
+# un'eccezione voluta alla regola delle leve nuove: Andrea, 14 nov, «non
+# metterlo con la leva spenta, fallo salire gia' con la leva accesa». La
+# leva resta per spegnerla senza un deploy: SOLO un False scritto nel
+# config la spegne (il server non manda `mappa_ritiro` e ignora `comune`,
+# cioe' la vetrina di ieri); un valore storto la lascia accesa, perche'
+# qui accesa e' lo stato di serie e non c'e' niente da proteggere.
+try:
+    from config import MERCATINO_MAPPA_RITIRO
+    if not isinstance(MERCATINO_MAPPA_RITIRO, bool):
+        print("[vetrina] MERCATINO_MAPPA_RITIRO non e' True/False: la "
+              "mappa del ritiro a mano resta accesa")
+    MERCATINO_MAPPA_RITIRO = MERCATINO_MAPPA_RITIRO is not False
+except ImportError:
+    MERCATINO_MAPPA_RITIRO = True
+
+_NOME_DA_PUNTO = None
+MAPPA_RITIRO_IDS_MAX = 300   # gli id per il numerino del tondo, i piu' recenti
+
+
+def _nome_da_punto(lat, lon) -> str:
+    """Il «Nome (SIGLA)» del comune che sta ESATTAMENTE in quel punto, ''
+    se nessuno. Il punto di un annuncio e' gia' il centro del suo comune
+    (lat/lon vengono da coordinate_da_zona, cioe' da COMUNI), quindi qui
+    basta rovesciare il dizionario: lo stesso nome che la mappa del
+    contanti mostra (`_comuni_nome`). Costruito pigro una volta."""
+    global _NOME_DA_PUNTO
+    if _NOME_DA_PUNTO is None:
+        rovescio = {}
+        for chiave, nome in _comuni_nome().items():
+            punto = COMUNI.get(chiave)
+            if punto and punto not in rovescio:
+                rovescio[punto] = nome
+        _NOME_DA_PUNTO = rovescio
+    return _NOME_DA_PUNTO.get((lat, lon), "")
+
+
+def _punto_del_comune(nome: str):
+    """Il gemello all'indietro: dal «Nome (SIGLA)» che il client rimanda
+    (quello che la mappa gli ha dato) al punto del comune, None se il
+    testo non nomina un comune riconosciuto."""
+    chiave = _chiave_comune(str(nome or "")[:80])
+    return COMUNI.get(chiave) if chiave else None
+
+
+def _mappa_ritiro(con, dove: str, par: list) -> dict:
+    """I PALLINI DELLA MAPPA DEL RITIRO A MANO: sulla STESSA WHERE della
+    vetrina (categoria, sezione, filtri, ricerca), piu' il ritiro
+    dichiarato — cosi' la mappa non dice mai piu' della griglia.
+    `{"comuni": [[lat, lon, «Nome (SIGLA)», quanti], ...], "senza": n}`:
+    il punto a due decimali come nel libro P2P, `senza` gli annunci col
+    ritiro la cui zona non ha un comune riconosciuto (restano in
+    griglia, e la nota sotto la mappa lo dice). Nessun dato di chi vende:
+    solo comuni e conteggi, cose che la vetrina mostra gia' card per
+    card."""
+    comuni, senza = [], 0
+    for r in con.execute(
+            "SELECT a.lat AS lat, a.lon AS lon, COUNT(*) AS n FROM annunci a "
+            f"WHERE {dove} AND a.consegna IN ('ritiro','entrambe') "
+            "GROUP BY a.lat, a.lon", par):
+        nome = (_nome_da_punto(r["lat"], r["lon"])
+                if (r["lat"] or r["lon"]) else "")
+        if not nome:
+            senza += r["n"]
+            continue
+        comuni.append([round(r["lat"], 2), round(r["lon"], 2), nome, r["n"]])
+    comuni.sort(key=lambda c: (-c[3], c[2]))
+    # GLI ID DEGLI ANNUNCI SULLA MAPPA, i piu' recenti, per il numerino
+    # del tondo («quanti nuovi da quando hai guardato»: il pezzo comune
+    # col tondo del P2P). Sono gli stessi id che le card portano gia'.
+    # Solo quelli con un pallino: un punto senza nome non sta sulla mappa.
+    ids = []
+    for r in con.execute(
+            "SELECT a.id, a.lat, a.lon FROM annunci a "
+            f"WHERE {dove} AND a.consegna IN ('ritiro','entrambe') "
+            "AND (a.lat<>0 OR a.lon<>0) ORDER BY a.creato DESC, a.id DESC",
+            par):
+        if _nome_da_punto(r[1], r[2]):
+            ids.append(r[0])
+            if len(ids) >= MAPPA_RITIRO_IDS_MAX:
+                break
+    return {"comuni": comuni, "senza": senza, "ids": ids}
+
 
 @app.get("/api/listings")
 async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
@@ -28089,6 +28174,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         solo_sconto: int = 0,
                         condizione: str = "", regione: str = "",
                         sezione: str = "", sottocategoria: str = "",
+                        comune: str = "",
                         x_tg_init_data: str = Header(""),
                         barattolo_sessione: str = Cookie("")):
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
@@ -28200,6 +28286,19 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
     if prezzo_max > 0:
         dove += " AND a.prezzo_sats <= ?"
         par.append(int(prezzo_max))
+    # LA MAPPA DEL RITIRO A MANO (14 nov 2026): la mappa si conta sulla
+    # vetrina com'e' ADESSO, ma senza il comune scelto — tocchi Milano e
+    # gli altri pallini restano li', per cambiare idea. Il comune
+    # restringe per PUNTO: quello di un annuncio e' gia' il centro del
+    # suo comune. Un nome che non e' un comune = vetrina vuota, mai un 400.
+    dove_mappa, par_mappa = dove, list(par)
+    if MERCATINO_MAPPA_RITIRO and comune.strip():
+        punto = _punto_del_comune(comune)
+        if punto:
+            dove += " AND a.lat=? AND a.lon=?"
+            par += [punto[0], punto[1]]
+        else:
+            dove += " AND 0"
     con = db()
     # LA RICERCA PER PAROLE (ago 2026): passa dall'indice full-text —
     # radici, sinonimi e categoria — e NON dal LIKE sulla frase
@@ -28218,12 +28317,18 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
             dove += (" AND (a.titolo LIKE ? OR a.descrizione LIKE ? "
                      "OR a.zona LIKE ?) AND " + SQL_CAPOFILA)
             par += [f"%{q.strip()}%"] * 3
+            dove_mappa += (" AND (a.titolo LIKE ? OR a.descrizione LIKE ? "
+                           "OR a.zona LIKE ?) AND " + SQL_CAPOFILA)
+            par_mappa += [f"%{q.strip()}%"] * 3
         else:
             # I FILTRI SI APPLICANO ALLA ROSA INTERA, non alla pagina,
             # o le pagine uscirebbero di lunghezze diverse e il totale
             # direbbe il falso. Una lettura in piu' per una ricerca, e
             # in cambio il conto e' esatto.
             segni = ",".join("?" * len(ids_q)) or "NULL"
+            # (la mappa conta la stessa rosa, una famiglia per uno)
+            dove_mappa += f" AND a.id IN ({segni}) AND {SQL_CAPOFILA}"
+            par_mappa += ids_q
             vivi = {r[0]: r[1] for r in con.execute(
                 f"SELECT a.id, a.famiglia FROM annunci a "
                 "JOIN utenti u ON u.tg_id = a.venditore_id "
@@ -28411,6 +28516,10 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # ...e la leva di Mercato e Lavoro (24 ott 2026), per la stessa
         # ragione: la vetrina la vede anche chi /api/me non ce l'ha
         risposta["mercato_lavoro"] = bool(MERCATO_LAVORO)
+        # ...e i pallini della mappa del ritiro a mano (14 nov 2026): solo
+        # a leva accesa — chiave assente = niente tondo nel client
+        if MERCATINO_MAPPA_RITIRO:
+            risposta["mappa_ritiro"] = _mappa_ritiro(con, dove_mappa, par_mappa)
         # QUANTI ASPETTANO LE FUNZIONI IN ARRIVO (ago 2026): il
         # numero che le due pagine «Qualcosa di nuovo e' in arrivo»
         # mostrano sotto il bottone. Viaggia qui e non in /api/me per
@@ -34749,6 +34858,13 @@ def _leve_stato():
                          "loro scaffali",
                   spento="la vetrina di sempre: niente schede, i servizi "
                          "in «Tutto» e nella loro categoria"),
+            # LA MAPPA DEL RITIRO A MANO (14 nov 2026): spenta di serie
+            _leva("Mappa del ritiro a mano", "MERCATINO_MAPPA_RITIRO",
+                  MERCATINO_MAPPA_RITIRO,
+                  acceso="in fondo alla barra di ricerca il tondo 🗺️: apre "
+                         "la mappa dei comuni con annunci col ritiro a mano, "
+                         "e un tocco su un comune mostra solo i suoi",
+                  spento="niente tondo e niente mappa: la vetrina di sempre"),
             # LA MODIFICA DI PIU' ANNUNCI INSIEME (16 ott 2026): spenta
             # di serie finche' Andrea non l'ha provata
             _leva("Modifica di più annunci insieme",

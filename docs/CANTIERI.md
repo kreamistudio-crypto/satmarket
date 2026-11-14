@@ -81941,3 +81941,93 @@ fallite, e i collaudi, 128 su 128. Le due saltate di ogni giro cloud
 sono le prove di nostr-tools, che la CI installa. NON PROVATO dal vivo:
 il tondo dal telefono vero dentro Telegram (Andrea, dopo la promozione)
 e il numerino con un'offerta in contanti nuova che arriva davvero.
+
+## La mappa del ritiro a mano nel mercatino (14 nov 2026, cantiere mappa-mercatino, Andrea: «conviene mettere una mappa anche nel mercatino per chi ha intenzione di ricevere di persona con lo scambio a mano»)
+
+LA RICHIESTA, e le tre scelte di Andrea per strada. Nel mercatino, come
+nel libro P2P, una mappa dell'Italia coi pallini degli annunci che si
+possono ritirare di persona («🤝 Ritiro in zona», anche insieme alla
+spedizione). Piano in dieci righe e anteprima con annunci finti; poi
+Andrea ha scelto DOVE sta il tondo (card: in fondo alla barra di
+ricerca, sotto il tappo — nella testata, coi quattro tondi, «il
+mercatino in sats» si tagliava in «IN SA…»), che l'icona sia QUELLA
+del tondo del P2P (thread «banner mappa contanti», che l'ha resa un
+pezzo comune) e — rovesciando il piano — che la leva salga ACCESA:
+«non metterlo con la leva spenta, fallo salire già con la leva accesa».
+
+DA DOVE VIENE IL PUNTO. Niente di nuovo da chiedere a chi vende: la
+colonna lat/lon degli annunci c'è da luglio, ed è il CENTRO DEL COMUNE
+della «Zona» (coordinate_da_zona, il dizionario ISTAT in RAM). È la
+stessa città che la card mostra già col 📍, quindi la mappa non dice
+niente di più della vetrina: il portone resta in chat. Un annuncio la
+cui zona non ha un comune riconosciuto resta in griglia e si conta a
+parte (`senza`), e la nota sotto la mappa lo dice.
+
+IL SERVER CONTA, NELLA BUSTA CHE C'ERA GIÀ. Nessuna rotta nuova: i
+pallini viaggiano in `/api/listings`, prima pagina, chiave
+`mappa_ritiro` = `{"comuni": [[lat, lon, «Nome (SIGLA)», quanti]],
+"senza": n}` (`_mappa_ritiro`). Si contano sulla STESSA WHERE della
+vetrina — categoria, Mercato/Lavoro, filtri, e con una ricerca la sua
+rosa — più il ritiro dichiarato: la mappa non mostra mai un annuncio
+che la griglia non mostrerebbe. Il nome esce rovesciando il
+dizionario (`_nome_da_punto`): lo stesso «Nome (SIGLA)» del libro.
+IL COMUNE SCELTO restringe la griglia per PUNTO (`comune` →
+`_punto_del_comune` → `a.lat=? AND a.lon=?`), ma la mappa si conta
+PRIMA di quel filtro: tocchi Milano e gli altri pallini restano, per
+cambiare idea. Un nome che non è un comune dà una griglia vuota, mai un
+400. SCARTATO: una rotta sua (una superficie pubblica in più per una
+cosa che la busta porta gratis), il conto fatto dal client sulle card
+caricate (la vetrina è paginata: la mappa avrebbe detto solo la prima
+pagina).
+
+LA LEVA, ACCESA DI SERIE. `MERCATINO_MAPPA_RITIRO`: eccezione voluta
+alla regola delle leve nuove, per parola di Andrea. Resta per
+spegnerla senza un deploy, e la spegne SOLO un False scritto nel config
+(un valore storto la lascia accesa: qui accesa è lo stato di serie).
+Spenta, la busta non porta `mappa_ritiro` e `comune` non conta: la
+vetrina di ieri. È nel pannello «⚙️ Stato delle leve».
+
+IL TONDO E' QUELLO DEL P2P. `tondoMappa('mercatino', …)` e
+`rigaNumerinoMappa('mercatino', …)`, i pezzi comuni del cantiere
+«banner-mappa-contanti» (f7b3eb2e): la stessa icona, lo stesso arancio
+da aperta, e lo stesso numerino a richiesta — spento di serie,
+l'interruttore in fondo alla mappa aperta («Numerino sul tondo per i
+nuovi annunci col ritiro a mano»), le chiavi nel telefono
+`barattolo_mappa_mercatino_*`. Per contare i nuovi la busta porta anche
+`ids`, gli id degli annunci coi pallini (i 300 più recenti, gli stessi
+che le card portano già), e aprire la mappa li segna visti.
+
+IL CLIENT. Il tondo in fondo alla barra di ricerca compare quando la
+mappa ha almeno un pallino; lo tocchi e la mappa si apre sopra la
+griglia (e la pagina ci scorre sopra), la griglia chiede `solo_ritiro`
+e, toccato un comune, `comune` — la pillola «📍 Milano (MI) ✕» lo
+toglie. IL MOTORE DELLE DITA È UNO: `armaMappaP2P` e `zoomQuiMappaP2P`
+prendono ora un motore (`vista`, `metti`, `ridisegna`, `tocca`); il P2P
+passa il suo di serie (`MOTORE_MAPPA_P2P`, comportamento identico), il
+mercatino `MOTORE_MAPPA_MERC`. Così pizzico, rotellina, trascinamento e
+doppio tocco sono gli stessi, invece di una copia da tenere in pari.
+Sagoma, proiezione, grappoli, pelle e nota sono quelli del libro.
+
+PROVATO. `prove_mappa_ritiro` (categoria mercatino): il conto sul
+dizionario vero e su un database a mano (solo attivi col ritiro, la
+zona senza comune in `senza`, la categoria che toglie i suoi), nome e
+punto andata e ritorno, la leva accesa e il False che spegne, la mappa
+contata prima del comune, la ricerca, il pannello; in node il client
+(la busta storta, il mare, il conto non intero, il nome sporco passato
+da esc(), chiusa/aperta, il tocco che sceglie e toglie, il comune
+sparito che si dimentica, il tondo che si spegne senza pallini), il
+tondo nella barra e il motore condiviso. Controprove: tolto il ritiro
+dal conto, accettato il conto zero, saltata la ricarica della griglia —
+rosse, poi verdi. `collaudo_mappa_ritiro` (nuovo, in `ci/collaudi.txt`
+e `ci/compila.txt`, verde nella gabbia senza coincurve): la rotta vera
+su un database usa-e-getta. DAL VIVO: server vero in modalità collaudo
+su database usa-e-getta (12 annunci col ritiro in 9 comuni, uno senza
+comune, uno solo-spedizione, un venduto), Chrome via Playwright a
+390×844 nei due temi: il tondo c'è, la mappa si apre, la rotellina
+avvicina, il trascinamento sposta, il grappolo del nord si apre e il
+tocco su Milano lascia le sue tre card; acceso il numerino e tolto un
+annuncio dai visti, il tondo dice 1. Nessun errore di pagina.
+
+NON PROVATO, DA GUARDARE. Sul telefono vero dentro Telegram il pizzico
+(la stessa incognita della mappa del libro: `touch-action:none` contro
+lo zoom di Telegram).

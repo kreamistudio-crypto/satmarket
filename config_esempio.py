@@ -368,6 +368,15 @@ MODIFICA_MASSIVA_ATTIVA = False
 # accende.
 MERCATO_LAVORO = False
 
+# LA MAPPA DEL RITIRO A MANO (14 nov 2026, decisione di Andrea): in fondo
+# alla barra di ricerca un tondo 🗺️ apre la mappa dell'Italia coi comuni
+# degli annunci col ritiro a mano (il centro del comune della «Zona», mai
+# l'indirizzo); un tocco su un comune mostra solo i suoi. Nasce ACCESA
+# (Andrea, 14 nov: «fallo salire gia' con la leva accesa»): la riga serve
+# per SPEGNERLA, e solo False spegne — spenta, niente tondo e la vetrina
+# di sempre.
+MERCATINO_MAPPA_RITIRO = True
+
 # --- Consegna digitale (buoni regalo, codici, licenze) ---------------
 # Il codice passa DENTRO Barattolo: il venditore lo consegna in un
 # campo dedicato dell'ordine, il compratore lo rivela con un tocco

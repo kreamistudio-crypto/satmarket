@@ -152,3 +152,9 @@ frase: La mappa dei contanti di persona ora è un tondo accanto alla campanella,
 dove: la scheda «P2P», la riga in alto con «Filtro», la campanella e il tema.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-14 · mappa-mercatino
+frase: Nel mercatino arriva la mappa del ritiro a mano: il tondo della mappa, accanto alla barra di ricerca, apre l'Italia coi pallini degli annunci da ritirare di persona. Ogni pallino sta al centro della città dell'annuncio, mai sull'indirizzo; tocchi una città e vedi solo i suoi annunci. Come nel P2P, il «Numerino» in fondo alla mappa conta i nuovi annunci.
+dove: la home del mercatino (Esplora), il tondo della mappa accanto alla barra di ricerca.
+leva: MERCATINO_MAPPA_RITIRO (nuova, accesa di serie)
+pubblico: sì
