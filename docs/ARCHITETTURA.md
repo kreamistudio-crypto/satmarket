@@ -18269,6 +18269,18 @@
   passa la serie a `impostaAndamentoBtc` (e una serie cambiata conta
   come cambio per il battito); all'ingresso la card la chiede subito,
   una volta per sessione, perché la busta della vetrina non la porta.
+  IL DOLLARO E IL MESE (14 nov 2026, Cantieri, «La card del prezzo: il
+  mese, il dollaro e il «Novità» mezzo tagliato»): `cambio_ore` ha anche
+  `usd` (colonna aggiunta da una migrazione), `_segna_andamento(eur,
+  usd, quando)`, e `andamento` è `{"eur": {...}, "usd": {...}}`, ogni
+  valuta coi suoi periodi. Il backfill chiede `market_chart` per la
+  sola valuta corta, a `days=ANDAMENTO_GIORNI` (31: a 30 la serie parte
+  dopo il confine dei 30 giorni e il mese non si offre), e scrive con un
+  upsert che tocca solo la sua colonna e solo dove è vuota. Nel client
+  il simbolo è un bottone (`voltaValutaPrezzoP2P`, `stopPropagation`:
+  non gira il periodo); senza il dollaro il simbolo è testo. La card non
+  porta `transform` né `z-index`: ci si scorre sopra col dito, sotto i
+  «Novità» appesi.
   ...E OVUNQUE SI STIMA (10 ott 2026, sera, cantiere cambio-ovunque).
   Il battito chiede anche con davanti la fila «Scambi P2P» di Esplora
   (`filaDavantiP2P`: le condizioni del suo giro della fotografia più

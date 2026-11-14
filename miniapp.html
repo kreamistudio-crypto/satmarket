@@ -4198,13 +4198,25 @@
      (fondo, filo, raggio), il prezzo nel Baloo dei titoli. Il colore della linea e della freccia dice il
      periodo: verde se in quel tratto sale, rosso se scende (Andrea:
      «verde se sale rossa se scende») — le leve di casa, nei due temi.
-     E' un bottone: il tocco passa 24 h → 7 g → 30 g. */
+     E' un bottone: il tocco passa 24 h → 7 g → 30 g.
+     ⚠️ NIENTE `transform` QUI, NEMMENO SUL TOCCO (14 nov 2026, Andrea:
+     «quando scorro in giu il banner onchain ora scompare per meta'», sul
+     collaudo e non in produzione): chi scorre appoggia il dito proprio su
+     questa card, e lo `scale(.99)` dell'`:active` la metteva su un piano
+     suo mentre i «Novità» appesi le scorrevano sopra — quelli col
+     `clip-path` che allarga il fondo. In Chromium non si vede; nel webview
+     del telefono il rettangolo appeso restava mezzo. Il resto della veste
+     e' quella delle card degli ordini, `position:relative` compreso, che
+     ai «Novità» passano sotto da un mese senza guai. */
   .p2p-valore{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
     background:var(--card);border:1px solid var(--line-soft);border-radius:16px;
-    padding:12px 16px;margin:10px 0 4px;color:var(--ink);font:inherit;cursor:pointer;
+    padding:12px 16px;margin:10px 0 4px;color:var(--ink);font:inherit;position:relative;
     -webkit-tap-highlight-color:transparent}
-  .p2p-valore:active{transform:scale(.99)}
+  .p2p-valore-simbolo{font:inherit;color:inherit;background:none;border:0;padding:0 2px;
+    margin:0 -2px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .p2p-valore-simbolo:focus-visible{outline:2px solid var(--orange);outline-offset:2px;border-radius:4px}
   .p2p-valore:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+  .p2p-valore.girabile{cursor:pointer}
   .p2p-valore-sx{flex:1;min-width:0;display:block}
   .p2p-valore-et{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--muted)}
   .p2p-valore-vivo{width:7px;height:7px;border-radius:50%;background:var(--trust);
@@ -60256,6 +60268,11 @@ function carteOnchainLibroP2P(k, sotto){
    «non mettere il controvalore in dollari», «sotto la linea non mettere
    24 h, 7 g o 30 g: quel numero cambia gia' accanto alla percentuale»):
    il periodo lo dice solo la riga della percentuale, e cambia al tocco.
+   E IL SIMBOLO GIRA LA VALUTA (14 nov 2026, Andrea: «quando clicco sul
+   simbolo euro deve switchare in usd»): € ↔ $, con la cifra, la linea e
+   la percentuale del dollaro (la serie in dollari arriva accanto a quella
+   in euro, dal server). Il dollaro e' `usdPerSat`, la stessa lettura; se
+   non c'e' il simbolo resta un simbolo e basta.
    SENZA CAMBIO VERO LA CARD NON C'E' (`cambioVivo`): mai il valore di
    riserva in cima al libro. Senza storia per un periodo, quel periodo non
    si offre; senza storia per nessuno, resta il solo prezzo e la card non
@@ -60263,25 +60280,39 @@ function carteOnchainLibroP2P(k, sotto){
    ALL'INGRESSO LA SERIE SI CHIEDE SUBITO, una volta per sessione: il
    cambio della busta della vetrina non la porta, e il battito arriverebbe
    solo dopo un minuto. Il periodo scelto vale per la sessione. */
-let andamentoBtc = null;        // {"24h":[...], ...}; null = mai arrivato
+let andamentoBtc = null;        // {eur: {"24h":[...], ...}, usd: {...}}; null = mai arrivato
 let andamentoChiesto = false;   // la domanda d'ingresso, una per sessione
 let p2pPrezzoPeriodo = '24h';
+let p2pPrezzoValuta = 'eur';    // il tocco sul simbolo la gira (14 nov 2026)
 const P2P_PREZZO_PERIODI = [['24h', '24 ore'], ['7g', '7 giorni'], ['30g', '30 giorni']];
-/* torna true se la serie e' CAMBIATA. Solo liste di almeno due euro
-   positivi: una risposta storta non disegna niente */
+const P2P_PREZZO_VALUTE = {eur: {simbolo: '€', nome: 'euro', altra: 'usd'},
+                           usd: {simbolo: '$', nome: 'dollari', altra: 'eur'}};
+/* torna true se la serie e' CAMBIATA. Per valuta, solo liste di almeno due
+   cifre positive: una risposta storta non disegna niente */
 function impostaAndamentoBtc(a){
   const buona = {};
-  if (a && typeof a === 'object')
-    for (const [k] of P2P_PREZZO_PERIODI) {
-      const v = Array.isArray(a[k]) ? a[k].map(Number) : [];
-      if (v.length >= 2 && v.every(x => x > 0)) buona[k] = v;
-    }
+  for (const val in P2P_PREZZO_VALUTE) {
+    const una = {}, d = a && typeof a === 'object' ? a[val] : null;
+    if (d && typeof d === 'object')
+      for (const [k] of P2P_PREZZO_PERIODI) {
+        const v = Array.isArray(d[k]) ? d[k].map(Number) : [];
+        if (v.length >= 2 && v.every(x => x > 0)) una[k] = v;
+      }
+    if (Object.keys(una).length) buona[val] = una;
+  }
   const prima = JSON.stringify(andamentoBtc);
   andamentoBtc = buona;
   return JSON.stringify(buona) !== prima;
 }
+/* quanto vale 1 BTC ADESSO nella valuta, 0 se non lo sappiamo: l'euro col
+   cambio vero, il dollaro dalla stessa lettura */
+function cifraPrezzoP2P(val){
+  if (val === 'usd') return typeof usdPerSat !== 'undefined' && usdPerSat > 0 ? Math.round(usdPerSat * 1e8) : 0;
+  return cambioVivo && eurPerSat > 0 ? Math.round(eurPerSat * 1e8) : 0;
+}
 function periodiPrezzoP2P(){
-  return P2P_PREZZO_PERIODI.filter(([k]) => andamentoBtc && andamentoBtc[k]);
+  const d = andamentoBtc && andamentoBtc[p2pPrezzoValuta];
+  return P2P_PREZZO_PERIODI.filter(([k]) => d && d[k]);
 }
 /* PURA: i punti in una curva morbida dentro W×H (con `m` di margine),
    come path SVG; torna anche dove cade l'ultimo punto, per il pallino */
@@ -60301,21 +60332,25 @@ function lineaPrezzoP2P(punti, W, H, m){
   return {d: d, x: p[n - 1][0], y: p[n - 1][1]};
 }
 function cartaPrezzoP2P(){
-  if (!cambioVivo || !(eurPerSat > 0)) return '';
+  if (!cifraPrezzoP2P('eur')) return '';
   if (andamentoBtc === null && !andamentoChiesto && typeof rileggiCambio === 'function') {
     andamentoChiesto = true;
     rileggiCambio().then(c => { if (c) ridisegnaPrezzoP2P(); }).catch(() => {});
   }
-  const euro = Math.round(eurPerSat * 1e8);
+  /* il dollaro scelto ma non (piu') noto: si torna all'euro */
+  if (!cifraPrezzoP2P(p2pPrezzoValuta)) p2pPrezzoValuta = 'eur';
+  const val = P2P_PREZZO_VALUTE[p2pPrezzoValuta];
+  const cifra = cifraPrezzoP2P(p2pPrezzoValuta);
+  const girabile = !!cifraPrezzoP2P(val.altra);
   const periodi = periodiPrezzoP2P();
   if (periodi.length && !periodi.some(([k]) => k === p2pPrezzoPeriodo)) p2pPrezzoPeriodo = periodi[0][0];
   const scelto = periodi.find(([k]) => k === p2pPrezzoPeriodo);
-  let varHTML = '', lineaHTML = '', voce = '1 BTC vale ' + fmt(euro) + ' euro';
+  let varHTML = '', lineaHTML = '', voce = '1 BTC vale ' + fmt(cifra) + ' ' + val.nome;
   if (scelto) {
     /* l'ultimo punto della serie e' il cambio di quando e' arrivata: si
        sostituisce con quello di ADESSO, cosi' linea, percentuale e cifra
        grande dicono lo stesso numero */
-    const punti = andamentoBtc[scelto[0]].slice(0, -1).concat([euro]);
+    const punti = andamentoBtc[p2pPrezzoValuta][scelto[0]].slice(0, -1).concat([cifra]);
     const perc = (punti[punti.length - 1] / punti[0] - 1) * 100;
     const verso = perc >= 0 ? 'su' : 'giu';
     const pc = Math.abs(perc).toFixed(1).replace('.', ',');
@@ -60331,14 +60366,30 @@ function cartaPrezzoP2P(){
     voce += ', ' + (perc >= 0 ? 'più ' : 'meno ') + pc + ' per cento in ' + scelto[1];
   }
   if (periodi.length > 1) voce += '. Tocca per cambiare periodo';
+  /* IL SIMBOLO E' UN BOTTONE SUO (14 nov 2026): dentro la card che gira i
+     periodi, quindi il suo tocco si ferma li' (`stopPropagation`), e la
+     card non puo' essere un <button> — due bottoni uno dentro l'altro il
+     parser li separa. La card e' un role="button" con la tastiera sua. */
+  const simbolo = girabile
+    ? '<button type="button" class="p2p-valore-simbolo" aria-label="Mostra in '
+      + P2P_PREZZO_VALUTE[val.altra].nome + '" onclick="event.stopPropagation();voltaValutaPrezzoP2P()">'
+      + val.simbolo + '</button>'
+    : val.simbolo;
   const sx = '<span class="p2p-valore-sx">'
     + '<span class="p2p-valore-et"><span class="p2p-valore-vivo"></span>1 BTC adesso</span>'
-    + '<span class="p2p-valore-cifra">' + fmt(euro) + ' €</span>'
+    + '<span class="p2p-valore-cifra">' + fmt(cifra) + ' ' + simbolo + '</span>'
     + (varHTML ? '<span class="p2p-valore-giu">' + varHTML + '</span>' : '')
     + '</span>';
-  return periodi.length > 1
-    ? '<button type="button" class="p2p-valore" id="p2pPrezzo" aria-label="' + esc(voce) + '" onclick="voltaPeriodoPrezzoP2P()">' + sx + lineaHTML + '</button>'
-    : '<div class="p2p-valore" id="p2pPrezzo" role="group" aria-label="' + esc(voce) + '">' + sx + lineaHTML + '</div>';
+  const tocco = periodi.length > 1
+    ? ' role="button" tabindex="0" onclick="voltaPeriodoPrezzoP2P()" onkeydown="tastoPrezzoP2P(event)"'
+    : ' role="group"';
+  return '<div class="p2p-valore' + (periodi.length > 1 ? ' girabile' : '') + '" id="p2pPrezzo"'
+    + tocco + ' aria-label="' + esc(voce) + '">' + sx + lineaHTML + '</div>';
+}
+/* Invio e spazio sulla card fanno quel che fa il dito */
+function tastoPrezzoP2P(e){
+  if (e.target !== e.currentTarget) return;
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); voltaPeriodoPrezzoP2P(); }
 }
 /* il tocco: il periodo dopo, in giro; si ridisegna la SOLA card */
 function voltaPeriodoPrezzoP2P(){
@@ -60347,17 +60398,27 @@ function voltaPeriodoPrezzoP2P(){
   const i = periodi.findIndex(([k]) => k === p2pPrezzoPeriodo);
   p2pPrezzoPeriodo = periodi[(i + 1) % periodi.length][0];
   if (typeof haptic === 'function') haptic();
-  ridisegnaPrezzoP2P();
+  ridisegnaPrezzoP2P('card');
 }
-function ridisegnaPrezzoP2P(){
+/* il tocco sul simbolo: euro ↔ dollaro, lo stesso periodo se c'e' */
+function voltaValutaPrezzoP2P(){
+  const altra = P2P_PREZZO_VALUTE[p2pPrezzoValuta].altra;
+  if (!cifraPrezzoP2P(altra)) return;
+  p2pPrezzoValuta = altra;
+  if (typeof haptic === 'function') haptic();
+  ridisegnaPrezzoP2P('simbolo');
+}
+function ridisegnaPrezzoP2P(chi){
   const v = el('p2pPrezzo');
   if (!v) return;
   const h = cartaPrezzoP2P();
   if (h) v.outerHTML = h; else v.remove();
-  /* il fuoco resta sulla card dopo il tocco: chi usa la tastiera o la voce
-     sente il periodo nuovo */
+  /* il fuoco resta dov'era dopo il tocco: chi usa la tastiera o la voce
+     sente il periodo o la valuta nuova */
   const n = el('p2pPrezzo');
-  if (n && document.activeElement === document.body && n.tagName === 'BUTTON') n.focus({preventScroll: true});
+  if (!n || !chi || document.activeElement !== document.body) return;
+  const dove = chi === 'simbolo' ? n.querySelector('.p2p-valore-simbolo') : (n.getAttribute('role') === 'button' ? n : null);
+  if (dove) dove.focus({preventScroll: true});
 }
 
 

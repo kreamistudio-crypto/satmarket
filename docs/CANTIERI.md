@@ -80827,3 +80827,48 @@ PROVATO. In `prove.py`, accanto alle donazioni: i cinque link, la regola
 del falso, nome e bio che non provano niente, la riserva del ?direct.
 `prove_conoscenza_tappo` verde col file rifatto. NON provato: il ?direct
 sul telefono di quella persona (da qui t.me non si apre).
+
+## La card del prezzo: il mese, il dollaro e il «Novità» mezzo tagliato (14 nov 2026, cantiere prezzo-btc-31, Andrea: «perché quando clicco c'è solo 24 ore e 7 giorni? manca 1 mese», «quando clicco sul simbolo euro deve switchare in usd», e dal collaudo «quando scorro in giù il banner onchain ora scompare per metà», «in produzione non si taglia»)
+
+IL MESE CHE MANCAVA. Il backfill chiedeva a CoinGecko `days=30`: la
+serie a ore che torna parte poco DOPO il confine dei 30 giorni, e
+`serie_andamento` non offre un periodo la cui storia non arriva al suo
+inizio (la regola giusta: niente primo punto inventato). Risultato: 24
+ore e 7 giorni sì, il mese no, finché la tabella non avesse avuto un
+mese suo. Ora `days=ANDAMENTO_GIORNI` (31), quanto la tabella tiene.
+
+IL DOLLARO. Il tocco sul simbolo € passa a $ e viceversa: cifra, linea e
+percentuale in dollari, lo stesso periodo se c'è (sennò il primo). Non
+contraddice il «non mettere il controvalore in dollari» del 13 nov:
+quello era il dollaro ACCANTO all'euro, questo è una vista sola alla
+volta, chiesta da Andrea. Il server tiene anche `usd` in `cambio_ore`
+(migrazione `ALTER TABLE`, la lettura del cambio lo aveva già) e la
+serie viaggia per valuta; il backfill riempie la sola valuta corta, con
+un upsert che non tocca l'altra colonna né le ore già piene. Il simbolo
+è un bottone dentro la card-bottone: `stopPropagation`, e la tastiera
+della card risponde solo se il tasto è suo. La scelta non si ricorda fra
+un'apertura e l'altra: l'app parla euro.
+
+IL «NOVITÀ» MEZZO TAGLIATO. Solo sul collaudo, solo nel webview del
+telefono: in Chromium (anche col dito simulato sulla card, chiaro e
+scuro, la versione di 41b43735 compresa) i due rettangoli restano interi.
+L'unica cosa nuova sotto di loro è la card, e l'unica sua regola che le
+card degli ordini non hanno era `:active{transform:scale(.99)}` — chi
+scorre appoggia il dito proprio lì, e il `transform` la mette su un piano
+suo mentre i «Novità» appesi, col `clip-path` che allarga il fondo, le
+scorrono sopra. Tolto, e la card ha `position:relative` come le card
+degli ordini. La causa è DEDOTTA, non vista: da guardare sul collaudo
+dal telefono. Se resta, serve una foto.
+
+PROVATO. `prove_prezzo_btc_libro` (40 controlli): la colonna `usd` e la
+migrazione, le serie per valuta, i 31 giorni, l'upsert vero su un
+database di cartone (non scrive sopra un'ora piena), il simbolo-bottone
+e il giro in dollari e ritorno in node, la sentinella del CSS (niente
+`transform`, `z-index` o `will-change` nelle regole della card).
+Controprove rosse: `days` a 30, l'upsert senza WHERE, il
+`stopPropagation` tolto, il ripiego della valuta tolto, il controllo del
+bersaglio del tasto tolto, il `transform` rimesso, il `position:relative`
+tolto. Dal browser sul codice vero (cambio e serie di cartone): chiaro
+390 e scuro 320, i tre periodi in euro e in dollari. NON provato: il
+backfill vero (CoinGecko dal cloud risponde 403) e il webview vero.
+
