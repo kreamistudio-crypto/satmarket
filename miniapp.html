@@ -40673,6 +40673,11 @@ function renderAvvisi(){
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">${stato}</div>${dentro}
     ${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaAvvisiNuoviP2P()}`;
+  /* ...IN CIMA le notifiche sul telefono (14 nov 2026, cantiere
+     web-push): la strada nuova di chi usa l'app fuori da Telegram, e la
+     prima cosa che cerca aprendo «Avvisi» */
+  box.insertAdjacentHTML('afterbegin', rigaPushTelefono());
+  aggiornaStatoPush();
   /* ...e il blocco «Mercatino» (9 ott 2026), ACCODATO e non infilato
      nella riga delle sorelle qui sopra: quella riga ha la sua
      sentinella intera e non si tocca */
@@ -41187,6 +41192,179 @@ async function setCanale(canale){
   toast(canale==='nostr' ? '💌 Avvisi via DM Nostr'
       : canale==='entrambi' ? '🔔 Avvisi su Telegram e Nostr'
       : '✈️ Avvisi su Telegram');
+}
+
+/* ---- 📲 LE NOTIFICHE SUL TELEFONO (14 nov 2026, cantiere web-push,
+   Andrea: «si puo' fare: notifiche web app»). Una riga in cima al
+   cassetto Avvisi: chi la accende riceve gli avvisi come notifica anche
+   ad app CHIUSA — l'app di Zapstore (la 1.5 ha gia' le notifiche
+   accese: escono col nome di Barattolo), il sito aggiunto alla Home, il
+   browser del PC. Vale PER QUESTO TELEFONO: l'iscrizione la tiene il
+   browser, e il server sa solo a quale account mandarla.
+   DOVE NON C'E': dentro Telegram (c'e' il bot), in demo, su Tor/onion,
+   dove il browser non ha il push. Sull'iPhone fuori dalla Home una
+   riga dice come fare (iOS da' il push solo al sito aggiunto alla
+   Home, dal 16.4). La chiave pubblica del timbro arriva da /api/me. ---- */
+let myWebPush = {attivo: false};   // da /api/me: {attivo, chiave}
+let pushTelefono = '';             // '' non so ancora · 'si' · 'no' · 'bloccate'
+const pushIOSFuoriHome = () => /iP(hone|ad|od)/.test(navigator.userAgent || '')
+  && !navigator.standalone
+  && !(window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+function pushPossibile(){
+  return !!(myWebPush && myWebPush.attivo && myWebPush.chiave) && !DEMO
+    && !tg?.initData && window.isSecureContext
+    && !/\.onion$/i.test(location.hostname)
+    && 'serviceWorker' in navigator && 'PushManager' in window
+    && 'Notification' in window;
+}
+function b64uInByte(s){
+  const t = String(s || '').replace(/-/g, '+').replace(/_/g, '/');
+  const b = atob(t + '='.repeat((4 - t.length % 4) % 4));
+  return Uint8Array.from(b, c => c.charCodeAt(0));
+}
+/* l'iscrizione e' stata fatta col timbro di adesso? (un timbro nuovo sul
+   server = iscrizioni vecchie che non si leggono piu': si rifa') */
+function stessaChiavePush(sub){
+  try {
+    const k = sub.options && sub.options.applicationServerKey;
+    if (!k) return true;
+    const a = new Uint8Array(k), b = b64uInByte(myWebPush.chiave);
+    return a.length === b.length && a.every((x, i) => x === b[i]);
+  } catch(e) { return true; }
+}
+async function subPushTelefono(){
+  if (!('serviceWorker' in navigator)) return null;
+  const reg = await navigator.serviceWorker.getRegistration();
+  return reg && reg.pushManager ? reg.pushManager.getSubscription() : null;
+}
+const rigaPushTelefono = () => {
+  if (!myWebPush || !myWebPush.attivo || DEMO || tg?.initData) return '';
+  const cornice = 'margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--line)';
+  if (!pushPossibile()) {
+    return !pushIOSFuoriHome() ? '' : `
+  <div id="rigaPush" style="${cornice}">
+    <div style="font-size:13.5px;font-weight:800">📲 Notifiche sul telefono</div>
+    <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
+      Su iPhone arrivano solo se Barattolo è sulla schermata Home: tocca
+      <b style="color:var(--ink)">Condividi → Aggiungi alla schermata Home</b>,
+      apri Barattolo da lì e accendile qui.</div>
+  </div>`;
+  }
+  const si = pushTelefono === 'si', bloccate = pushTelefono === 'bloccate';
+  const nota = si
+    ? 'Attive su questo telefono: ordini, scambi e messaggi ti arrivano anche ad app chiusa.'
+    : bloccate
+      ? 'Le hai bloccate per Barattolo: riaprile dalle impostazioni del telefono (Notifiche), poi torna qui.'
+      : 'Gli avvisi di ordini, scambi e messaggi come notifica, anche ad app chiusa. Vale per questo telefono.';
+  return `
+  <div id="rigaPush" style="${cornice}">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13.5px;font-weight:800">📲 Notifiche sul telefono</div>
+        <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">${nota}</div>
+      </div>
+      ${bloccate ? '' : `<button onclick="${si ? 'spegniPushTelefono()' : 'attivaPushTelefono()'}"
+        aria-pressed="${si ? 'true' : 'false'}"
+        style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${si?'var(--sats)':'var(--line)'};background:${si?'var(--sats)':'transparent'};color:${si?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">
+        ${si ? 'Attive' : 'Attiva'}</button>`}
+    </div>
+    ${si ? `<button onclick="provaPushTelefono()"
+      style="margin-top:8px;font:inherit;font-size:12.5px;font-weight:700;border:0;background:none;color:var(--sats);padding:0;cursor:pointer">🔔 Mandami una notifica di prova</button>`
+      : `<div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:6px">
+      Non arrivano su Tor né sui telefoni senza i servizi Google (per esempio GrapheneOS): lì restano Telegram e i DM Nostr.</div>`}
+  </div>`;
+};
+function ridisegnaRigaPush(){
+  const r = el('rigaPush');
+  if (r) r.outerHTML = rigaPushTelefono();
+}
+/* lo stato vero lo sa solo il browser, ed e' una domanda asincrona: la
+   riga nasce con «Attiva» e si corregge appena risponde */
+async function aggiornaStatoPush(){
+  if (!pushPossibile()) return;
+  let stato = 'no';
+  try {
+    if (Notification.permission === 'denied') stato = 'bloccate';
+    else if (Notification.permission === 'granted') {
+      const s = await subPushTelefono();
+      if (s && stessaChiavePush(s)) stato = 'si';
+    }
+  } catch(e) { stato = 'no'; }
+  if (stato !== pushTelefono) { pushTelefono = stato; ridisegnaRigaPush(); }
+}
+async function attivaPushTelefono(){
+  haptic();
+  if (!pushPossibile()) return;
+  try {
+    /* il permesso si chiede SOLO da un tocco: e' questo */
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      pushTelefono = perm === 'denied' ? 'bloccate' : 'no';
+      ridisegnaRigaPush();
+      toast(perm === 'denied' ? 'Notifiche bloccate: le riapri dalle impostazioni del telefono'
+                              : 'Va bene, niente notifiche per ora');
+      return;
+    }
+    const reg = await Promise.race([navigator.serviceWorker.ready,
+      new Promise((_, no) => setTimeout(() => no(new Error('service worker')), 8000))]);
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && !stessaChiavePush(sub)) { try { await sub.unsubscribe(); } catch(e){} sub = null; }
+    if (!sub) sub = await reg.pushManager.subscribe({userVisibleOnly: true,
+      applicationServerKey: b64uInByte(myWebPush.chiave)});
+    const j = sub.toJSON();
+    const r = await fetch(`${API_BASE}/push/iscrivi`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    pushTelefono = 'si';
+    ridisegnaRigaPush();
+    toast('📲 Notifiche attive su questo telefono');
+  } catch(e) {
+    toast('Il telefono non ha accettato le notifiche: riprova fra poco', 6000);
+  }
+}
+async function spegniPushTelefono(){
+  haptic();
+  try {
+    const sub = await subPushTelefono();
+    if (sub) {
+      await fetch(`${API_BASE}/push/togli`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+         body: JSON.stringify({endpoint: sub.endpoint})}).catch(() => {});
+      await sub.unsubscribe();
+    }
+    pushTelefono = 'no';
+    ridisegnaRigaPush();
+    toast('Notifiche spente su questo telefono');
+  } catch(e) { toast('Non ci sono riuscito, riprova'); }
+}
+async function provaPushTelefono(){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/push/prova`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    toast(/ [1-9]\d* consegnat/.test(d.esito || '') || /simulat/.test(d.esito || '')
+      ? '🔔 Partita: arriva fra qualche secondo'
+      : 'Il servizio delle notifiche non l\'ha presa: spegnile e riaccendile', 6000);
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+/* CHI ESCE LASCIA IL TELEFONO: le notifiche del suo account smettono di
+   arrivare qui. Il server toglie la riga solo se e' di QUESTO account;
+   se l'iscrizione era di un altro account aperto qui, resta sua.
+   `tutti` (Esci da tutti): il telefono si spegne comunque — non resta
+   nessuno a cui suonare, e la riga del server muore al primo invio. */
+async function scordaPushTelefono(tutti){
+  if (!('serviceWorker' in navigator) || tg?.initData) return;
+  const sub = await subPushTelefono();
+  if (!sub) return;
+  const r = await fetch(`${API_BASE}/push/togli`,
+    {method:'POST', headers:{'Content-Type':'application/json'},
+     body: JSON.stringify({endpoint: sub.endpoint})});
+  const d = await r.json().catch(()=>({}));
+  if (tutti || (r.ok && d.tolti > 0)) await sub.unsubscribe();
 }
 
 /* «📦 Come spedisci» (ago 2026, pagina d'acquisto; al PLURALE dal
@@ -55892,6 +56070,8 @@ function chiudiDopoCancella(){
 async function esciWeb(){
   /* chi esce lascia il dispositivo: la sua nsec non resta qui */
   try { await scordaNsecAccount(); } catch(e){}
+  /* ...e le notifiche del suo account smettono di arrivare qui */
+  try { await scordaPushTelefono(); } catch(e){}
   /* dentro Telegram (leva PIU_ACCOUNT_OVUNQUE) esce l'account scelto:
      la firma dice quale portachiavi, e si torna al Telegram */
   try { await fetch(`${API_BASE}/logout`, {method:'POST',
@@ -56419,6 +56599,7 @@ function esciDaTutti(){
     etichetta: 'Sì, esci da tutti',
     vestito: 'allarme',
     poi: async () => {
+      try { await scordaPushTelefono(true); } catch(e){}   // il telefono smette di suonare
       const r = await fetch(`${API_BASE}/logout/tutti`, {method:'POST',
         headers: tg?.initData ? {'X-Tg-Init-Data': authHdr()} : {}});
       if (!r.ok) {
@@ -99154,6 +99335,8 @@ async function avvia(){
     myRelayDmAvvisato = Number(me.relay_dm_avvisato) || 0;
     renderFasciaAvvisi();
     myCanaleNotifiche = me.canale_notifiche || '';
+    myWebPush = (me.web_push && me.web_push.attivo && me.web_push.chiave)
+      ? me.web_push : {attivo: false};
     mySuggerimenti = !!me.suggerimenti_annunci;
     /* un server di ieri non manda la chiave: vale «accesi», il default */
     myAvvisiP2P = me.avvisi_p2p === undefined ? true : !!me.avvisi_p2p;

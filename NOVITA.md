@@ -158,3 +158,9 @@ frase: Nel mercatino arriva la mappa del ritiro a mano: il tondo della mappa, ac
 dove: la home del mercatino (Esplora), il tondo della mappa accanto alla barra di ricerca.
 leva: MERCATINO_MAPPA_RITIRO (nuova, accesa di serie)
 pubblico: sì
+
+## 2026-11-14 · notifiche-telefono
+frase: Nell'app di Barattolo (quella di Zapstore), nel sito aggiunto alla schermata Home e nel browser del PC ora puoi ricevere le notifiche come quelle di WhatsApp, anche ad app chiusa: ordini pagati o spediti, scambi P2P presi, messaggi. Si accendono da Profilo → Avvisi → «📲 Notifiche sul telefono», e con «Mandami una notifica di prova» vedi subito se arrivano.
+dove: il Profilo, cassetto «🔔 Avvisi», la prima riga.
+leva: WEB_PUSH_ATTIVO (nuova, accesa)
+pubblico: sì

@@ -19244,7 +19244,7 @@ def prove_notifica_fail_open():
 
     amb = {"db": _db_in_affanno, "_manda_telegram": _trasporto_rotto,
            "_dm_nostr_con_ripiego": _niente, "asyncio": asyncio,
-           "MODALITA_COLLAUDO": False, "print": lambda s: stampe.append(s)}
+           "MODALITA_COLLAUDO": False, "WEB_PUSH_ATTIVO": False, "print": lambda s: stampe.append(s)}
     exec(pezzo_async("notifica"), amb)
     alzata = ""
     try:
@@ -19337,6 +19337,7 @@ def prove_notifica_fail_open():
               # (14 nov 2026, audit-offerte) qui nessun ordine nasce da
               # un'offerta: l'accordo sciolto ha la sua sezione
               "_offerte_dell_ordine": lambda o: [],
+              "WEB_PUSH_ATTIVO": False,
               "print": lambda s: None}
     exec(pezzo_async("notifica"), catena)
     gruppo_admin_spento(catena)
@@ -105266,7 +105267,7 @@ def prove_p2p_esito_notifiche():
 
         amb = {"db": lambda: Con(), "_manda_telegram": _tg,
                "_dm_nostr_con_ripiego": _dm, "asyncio": _aio,
-               "MODALITA_COLLAUDO": False, "print": lambda *a, **k: None}
+               "MODALITA_COLLAUDO": False, "WEB_PUSH_ATTIVO": False, "print": lambda *a, **k: None}
         exec("async " + pezzo("notifica"), amb)
 
         async def _giro():
@@ -118107,7 +118108,7 @@ def prove_avvisi_nuovi_ordini():
 
     async def _dm(npub, testo, ripiego):
         VIA.append(("nostr", npub))
-    amb4 = {"db": _Con, "MODALITA_COLLAUDO": False, "asyncio": asyncio,
+    amb4 = {"db": _Con, "MODALITA_COLLAUDO": False, "WEB_PUSH_ATTIVO": False, "asyncio": asyncio,
             "_manda_telegram": _tg, "_dm_nostr_con_ripiego": _dm, "print": lambda *a, **k: None}
     # `pezzo` cerca «def notifica(» e perde l'«async » davanti: si rimette
     exec("async " + _senza_prosa(pezzo("notifica")), amb4)
@@ -119050,7 +119051,7 @@ def prove_avvisi_mercatino():
 
     async def _dm(npub, testo, ripiego):
         VIA.append(("nostr", npub, testo.split("\n")[0]))
-    amb4 = dict(amb, db=_Con, MODALITA_COLLAUDO=False, asyncio=asyncio, _manda_telegram=_tg,
+    amb4 = dict(amb, db=_Con, MODALITA_COLLAUDO=False, WEB_PUSH_ATTIVO=False, asyncio=asyncio, _manda_telegram=_tg,
                 _dm_nostr_con_ripiego=_dm, print=lambda *a, **k: None,
                 time=types.SimpleNamespace(time=lambda: T))
     # `pezzo` cerca «def notifica(» e perde l'«async » davanti: si rimette
@@ -165080,7 +165081,7 @@ def prove_promemoria_gesto():
                    "npub_accesso": "npub1x"}
     amb_n = {"db": lambda: _Con(riga_utente), "_manda_telegram": _tele,
              "_dm_nostr_con_ripiego": _dm, "asyncio": _aio,
-             "MODALITA_COLLAUDO": False, "print": lambda *a: None}
+             "MODALITA_COLLAUDO": False, "WEB_PUSH_ATTIVO": False, "print": lambda *a: None}
     exec("async " + pezzo("notifica"), amb_n)
 
     async def _due():
@@ -188337,7 +188338,7 @@ def prove_avvisi_nostr_arrivano():
              "_dm_nostr_con_ripiego": _dm_nostr_con_ripiego,
              "_avviso_in_app_sottofondo": _avviso_in_app_sottofondo,
              "asyncio": types_ns(create_task=_crea),
-             "MODALITA_COLLAUDO": False, "print": lambda *a, **k: None}
+             "MODALITA_COLLAUDO": False, "WEB_PUSH_ATTIVO": False, "print": lambda *a, **k: None}
         exec("async " + pezzo("notifica"), a)
         _aio.run(a["notifica"](tg, "ciao"))
         return sorted(creati), list(telegram)
@@ -188466,6 +188467,519 @@ const fetch = async (url, o) => { CHIAMATE.push(url); return {ok:true, json: asy
     prova("...vuota dice che non c'e' niente", True, out.get("vuota"))
     prova("il cassetto: la riga 📬 e, senza 10050, la riga ferma", [True, True],
           out.get("riga"))
+
+
+def prove_notifiche_telefono():
+    """LE NOTIFICHE SUL TELEFONO (14 nov 2026, cantiere web-push, Andrea:
+    «si puo' fare: notifiche web app» — l'app di Zapstore, il sito sulla
+    Home, il browser del PC). Qui i pezzi veri, eseguiti; il giro col
+    server vero e' `collaudo_notifiche_telefono`:
+     · la cifratura (RFC 8291) byte per byte col vettore dell'appendice A;
+     · il timbro VAPID (RFC 8292): JWT ES256 che si verifica con la
+       chiave pubblica che porta, per l'origine del servizio;
+     · la lista dei servizi push (l'indirizzo arriva dal telefono: senza
+       la lista il server farebbe POST dove gli si dice);
+     · il carico: titolo, testo spoglio, il tocco solo verso casa;
+     · iscrizioni e timbro su un database vero;
+     · `notifica` e `_manda_push` con un servizio push di cartone;
+     · sw.js e la riga del cassetto in node;
+     · le sentinelle: leva accesa di serie, cancellazione, fusione."""
+    print("\n[le notifiche sul telefono: cifra, timbro, lista, iscrizioni]")
+    import asyncio as _aio
+    import base64 as _b64
+    import sqlite3 as _sq
+    import tempfile as _tf
+    import html as _html
+    from urllib.parse import urlparse as _urlparse
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec as _ec
+        from cryptography.hazmat.primitives.asymmetric.utils import \
+            decode_dss_signature as _dss, encode_dss_signature as _edss
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM as _gcm
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF as _hkdf
+        from cryptography.hazmat.primitives import hashes as _h, \
+            serialization as _ser
+    except ImportError:
+        salta("le notifiche sul telefono", "manca cryptography")
+        return
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    sw = open("sw.js", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+
+    def b64d(s):
+        return _b64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+    def b64e(b):
+        return _b64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+    adesso = [1_800_000_000]
+    amb = {"base64": _b64, "re": re, "json": json, "os": os, "html": _html,
+           "urlparse": _urlparse, "time": types_tempo(adesso),
+           "EcPush": _ec, "FirmaGrezzaPush": _dss, "AesGcmPush": _gcm,
+           "HkdfPush": _hkdf, "HashPush": _h, "SerialePush": _ser,
+           "print": lambda *a, **k: None}
+    # le costanti: dalla riga del nome alla prima riga che non continua
+    for nome in ("PUSH_SERVIZI", "PUSH_SERVIZI_SOTTO", "_PUSH_FORMA",
+                 "PUSH_MAX_PER_UTENTE", "PUSH_TTL", "PUSH_TESTO_MAX",
+                 "_PUSH_TIMBRO"):
+        i = src.index(f"\n{nome} = ") + 1
+        j = i
+        while True:
+            j = src.index("\n", j) + 1
+            try:
+                compile(src[i:j], "<costante>", "exec")
+                break
+            except SyntaxError:
+                continue
+        exec(src[i:j], amb)
+    for nome in ("_b64u_codifica", "_b64u_decodifica", "push_indirizzo_ammesso",
+                 "push_chiavi_valide", "push_chiave_da_testo", "push_pubblica_di",
+                 "push_cifra", "push_vapid", "spoglia_html", "_bottoni_avviso",
+                 "push_carico"):
+        exec(pezzo(nome), amb)
+
+    # --- 1) LA CIFRATURA, col vettore dell'RFC 8291 (appendice A) --------
+    as_priv = b64d("yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw")
+    eff = _ec.derive_private_key(int.from_bytes(as_priv, "big"), _ec.SECP256R1())
+    UA_PUB = ("BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyP"
+              "js7Vd8pZGH6SRpkNtoIAiw4")
+    AUTH = "BTBZMqHH6r4Tts7J_aSIgg"
+    corpo = amb["push_cifra"](UA_PUB, AUTH,
+                              b"When I grow up, I want to be a watermelon",
+                              _effimera=eff, _sale=b64d("DGv6ra1nlYgDCS1FRnbzlw"))
+    prova("la cifratura e' quella dell'RFC 8291, byte per byte (appendice A)",
+          "DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMo"
+          "ZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTpK4Mqgkf"
+          "1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN", b64e(corpo))
+    # ...e in servizio sale e chiave effimera nascono nuovi, e il telefono
+    # (la sua chiave privata dell'RFC) la legge
+    ua_priv = _ec.derive_private_key(int.from_bytes(
+        b64d("q1dXpw3UpT5VOmu_cf_v6ih07Aems3njxI-JWgLcM94"), "big"), _ec.SECP256R1())
+    c1 = amb["push_cifra"](UA_PUB, AUTH, b'{"titolo":"x"}')
+    c2 = amb["push_cifra"](UA_PUB, AUTH, b'{"titolo":"x"}')
+
+    def decifra(c):
+        sale, idlen = c[:16], c[20]
+        as_pub = c[21:21 + idlen]
+        com = ua_priv.exchange(_ec.ECDH(), _ec.EllipticCurvePublicKey
+                               .from_encoded_point(_ec.SECP256R1(), as_pub))
+        hk = lambda s, k, i, n: _hkdf(_h.SHA256(), n, s, i).derive(k)
+        ikm = hk(b64d(AUTH), com, b"WebPush: info\x00" + b64d(UA_PUB) + as_pub, 32)
+        testo = _gcm(hk(sale, ikm, b"Content-Encoding: aes128gcm\x00", 16)).decrypt(
+            hk(sale, ikm, b"Content-Encoding: nonce\x00", 12), c[21 + idlen:], None)
+        return testo
+    prova("in servizio sale e chiave nuove a ogni avviso, e il telefono lo "
+          "legge (col delimitatore 0x02 in coda)",
+          [True, b'{"titolo":"x"}\x02', 4096],
+          [c1[:16] != c2[:16] and c1[21:86] != c2[21:86], decifra(c1),
+           int.from_bytes(c1[16:20], "big")])
+
+    # --- 2) IL TIMBRO VAPID ----------------------------------------------
+    chiave = _ec.generate_private_key(_ec.SECP256R1())
+    ep = "https://fcm.googleapis.com/fcm/send/abc:def-1_2"
+    vap = amb["push_vapid"](ep, chiave, "https://barattolo.store", adesso[0])
+    m = re.fullmatch(r"vapid t=([\w-]+)\.([\w-]+)\.([\w-]+), k=([\w-]+)", vap)
+    testa, corpo_jwt, firma, k = m.groups() if m else ("", "e30", "", "")
+    rs = b64d(firma) if firma else b"\0" * 64
+    try:
+        _ec.EllipticCurvePublicKey.from_encoded_point(_ec.SECP256R1(), b64d(k)).verify(
+            _edss(int.from_bytes(rs[:32], "big"), int.from_bytes(rs[32:], "big")),
+            f"{testa}.{corpo_jwt}".encode(), _ec.ECDSA(_h.SHA256()))
+        verificata = True
+    except Exception:
+        verificata = False
+    prova("il timbro: JWT ES256 firmato con la chiave che dichiara (k=), "
+          "per l'ORIGINE del servizio, 12 ore, sub = il sito (mai un'email)",
+          [True, {"typ": "JWT", "alg": "ES256"},
+           {"aud": "https://fcm.googleapis.com", "exp": adesso[0] + 43200,
+            "sub": "https://barattolo.store"}, amb["push_pubblica_di"](chiave), 64],
+          [verificata, json.loads(b64d(testa)) if testa else None,
+           json.loads(b64d(corpo_jwt)), k, len(rs)])
+
+    # --- 3) LA LISTA DEI SERVIZI PUSH --------------------------------------
+    am = amb["push_indirizzo_ammesso"]
+    BUONI = [ep, "https://updates.push.services.mozilla.com/wpush/v2/gAAAAABk",
+             "https://web.push.apple.com/QGuQyavXutnMei4p1PYsAbcd",
+             "https://wns2-par02p.notify.windows.com/w/?token=BQYAAAB%2bX%3d",
+             "https://fcm.googleapis.com:443/fcm/send/x"]
+    CATTIVI = ["http://fcm.googleapis.com/fcm/send/x",
+               "https://fcm.googleapis.com.evil.example/x",
+               "https://evil.example/fcm.googleapis.com/x",
+               "https://user:pw@fcm.googleapis.com/x",
+               "https://evil.example\\@fcm.googleapis.com/x",
+               "https://fcm.googleapis.com@evil.example/x",
+               "https://fcm.googleapis.com:8443/x",
+               "https://fcm.googleapis.com./x",
+               "https://127.0.0.1/x", "https://localhost/x",
+               "https://push.apple.com/x", "https://notify.windows.com/x",
+               "https://FCM.googleapis.com/x",
+               "https://fcm.googleapis.com/x#frammento",
+               "https://fcm.googleapis.com/x y",
+               "https://fcm.googleapis.com/" + "a" * 1100, "", None]
+    prova("i servizi veri passano (Google, Mozilla, Apple, Microsoft)",
+          [True] * len(BUONI), [am(u) for u in BUONI])
+    prova("tutto il resto no: http, credenziali, porte, nomi travestiti, "
+          "casa nostra, frammenti, spazi, troppo lungo",
+          [False] * len(CATTIVI), [am(u) for u in CATTIVI])
+    cv = amb["push_chiavi_valide"]
+    prova("le chiavi del telefono: un punto VERO della curva e 16 byte",
+          [True, False, False, False, False],
+          [cv(UA_PUB, AUTH), cv(UA_PUB, AUTH[:-2]),
+           cv(b64e(b"\x04" + b"\0" * 64), AUTH), cv(UA_PUB[:-4], AUTH),
+           cv("non base64 !!", AUTH)])
+
+    # --- 4) LA CHIAVE DAL TESTO ---------------------------------------------
+    da = amb["push_chiave_da_testo"]
+    grezzo = b64e(chiave.private_numbers().private_value.to_bytes(32, "big"))
+    der = b64e(chiave.private_bytes(_ser.Encoding.DER, _ser.PrivateFormat.PKCS8,
+                                    _ser.NoEncryption()))
+    p384 = b64e(_ec.generate_private_key(_ec.SECP384R1()).private_bytes(
+        _ser.Encoding.DER, _ser.PrivateFormat.PKCS8, _ser.NoEncryption()))
+    pub = amb["push_pubblica_di"](chiave)
+    prova("la chiave: 32 byte o DER PKCS#8 danno la stessa; vuota, storta o "
+          "di un'altra curva = None",
+          [pub, pub, None, None, None],
+          [amb["push_pubblica_di"](da(grezzo)), amb["push_pubblica_di"](da(der)),
+           da(""), da("xx"), da(p384)])
+
+    # --- 5) IL CARICO --------------------------------------------------------
+    ca = lambda t, b=None: json.loads(amb["push_carico"](t, b, "https://barattolo.store/"))
+    prova("titolo = prima riga, testo = il resto spoglio dell'HTML, il tocco "
+          "apre il bottone di casa come percorso",
+          {"titolo": "📦 Ordine #7 spedito", "testo": "Il venditore ha spedito & "
+           "ti avvisa. Corriere: BRT", "url": "/?ordine=7"},
+          ca("📦 <b>Ordine #7 spedito</b>\nIl venditore ha spedito &amp; ti avvisa.\n\n"
+             "Corriere: <i>BRT</i>", ("Apri", "https://barattolo.store/?ordine=7")))
+    prova("una riga sola: il titolo e' Barattolo; il bottone d'altri, «//» o "
+          "javascript valgono la home; la lista di bottoni prende il primo di casa",
+          [{"titolo": "Barattolo", "testo": "ciao", "url": "/"},
+           "/", "/", "/", "/", "/p2p"],
+          [ca("ciao"), ca("x\ny", ("a", "https://evil.example/?x"))["url"],
+           ca("x\ny", ("a", "https://barattolo.store//evil.example"))["url"],
+           ca("x\ny", ("a", "javascript:alert(1)"))["url"],
+           ca("x\ny", ("a", "https://barattolo.store.evil.example/x"))["url"],
+           ca("x\ny", [("t", "tg://resolve?domain=b"),
+                       ("p", "https://barattolo.store/p2p")])["url"]])
+    lungo = ca("titolo\n" + "parola " * 200)
+    prova("il testo si tronca a PUSH_TESTO_MAX coi puntini, e il carico resta "
+          "ben sotto i 4 KB del servizio",
+          [300, True, True], [len(lungo["testo"]), lungo["testo"].endswith("…"),
+                              len(amb["push_carico"]("t\n" + "é" * 5000,
+                                  None, "https://barattolo.store")) < 3000])
+
+    # --- 6) ISCRIZIONI E TIMBRO, su un database vero ------------------------
+    cartella = _tf.mkdtemp(prefix="prove-push-")
+    percorso = os.path.join(cartella, "p.db")
+    schema = "".join(re.search(r"    CREATE TABLE IF NOT EXISTS %s\(.*?\n    \);" % t,
+                               src, re.S).group(0) + "\n"
+                     for t in ("push_iscrizioni", "push_timbro"))
+    c0 = _sq.connect(percorso)
+    c0.executescript(schema)
+    c0.close()
+
+    def _db():
+        c = _sq.connect(percorso)
+        c.row_factory = _sq.Row
+        return c
+    amb["db"] = _db
+    for nome in ("push_iscrivi", "push_togli", "_push_iscrizioni_di",
+                 "_push_togli_id", "_push_timbro"):
+        exec(pezzo(nome), amb)
+    isc, tog, di = amb["push_iscrivi"], amb["push_togli"], amb["_push_iscrizioni_di"]
+    E = lambda n: f"https://fcm.googleapis.com/fcm/send/t{n}"
+    isc(5, E(1), UA_PUB, AUTH)
+    prova("lo stesso indirizzo riattivato da un altro account passa a lui "
+          "(un telefono, un account alla volta)",
+          [[], [E(1)]], [(isc(6, E(1), UA_PUB, AUTH), [r["endpoint"] for r in di(5)])[1],
+                         [r["endpoint"] for r in di(6)]])
+    for n in range(2, 9):
+        adesso[0] += 1
+        isc(6, E(n), UA_PUB, AUTH)
+    prova("oltre cinque telefoni per account se ne vanno i piu' vecchi",
+          [E(8), E(7), E(6), E(5), E(4)], [r["endpoint"] for r in di(6)])
+    prova("togliere: solo il proprio (l'altro account non tocca niente)",
+          [0, 1, 4], [tog(5, E(8)), tog(6, E(8)), len(di(6))])
+    adesso[0] += 1
+    prova("l'indirizzo cambiato dal browser: il vecchio, se era suo, se ne va",
+          [E(9), E(7), E(6), E(5)],
+          (isc(6, E(9), UA_PUB, AUTH, vecchio=E(4)) and None) or
+          [r["endpoint"] for r in di(6)])
+    amb["WEB_PUSH_CHIAVE_PRIVATA"] = ""
+    t1 = amb["_push_timbro"]()
+    amb["_PUSH_TIMBRO"].update(chiave=None, pubblica="")
+    t2 = amb["_push_timbro"]()
+    prova("il timbro nasce UNA volta nel database e poi si rilegge, anche "
+          "dopo un riavvio (memoria svuotata)",
+          [1, amb["push_pubblica_di"](t1)],
+          [_db().execute("SELECT COUNT(*) FROM push_timbro").fetchone()[0],
+           amb["push_pubblica_di"](t2)])
+    amb["_PUSH_TIMBRO"].update(chiave=None, pubblica="")
+    amb["WEB_PUSH_CHIAVE_PRIVATA"] = grezzo
+    prova("una chiave scritta nel config vince sul database", pub,
+          amb["push_pubblica_di"](amb["_push_timbro"]()))
+    amb["_PUSH_TIMBRO"].update(chiave=None, pubblica="")
+    amb["WEB_PUSH_CHIAVE_PRIVATA"] = ""
+
+    # --- 7) _manda_push col servizio di cartone ------------------------------
+    spediti = []
+
+    class _Risp:
+        def __init__(self, codice):
+            self.status_code, self.text = codice, ""
+
+    class _Cliente:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, content=None, headers=None):
+            spediti.append((url, headers, content))
+            return _Risp(410 if url.endswith("morto") else 201)
+    amb.update(httpx=types_ns(AsyncClient=_Cliente), asyncio=_aio,
+               URL_PUBBLICO="https://barattolo.store", MODALITA_COLLAUDO=False,
+               WEB_PUSH_ATTIVO=True)
+    exec(pezzo("push_pronto"), amb)
+    exec("async " + pezzo("_manda_push"), amb)
+    con = _db()
+    con.execute("DELETE FROM push_iscrizioni")
+    con.execute("INSERT INTO push_iscrizioni(tg_id, endpoint, p256dh, auth, creato) "
+                "VALUES(7,?,?,?,1),(7,?,?,?,2),(7,?,?,?,3)",
+                (E("vivo"), UA_PUB, AUTH, E("morto"), UA_PUB, AUTH,
+                 "https://evil.example/x", UA_PUB, AUTH))
+    con.commit()
+    con.close()
+    esito = _aio.run(amb["_manda_push"](7, "🔔 <b>Ti hanno scritto</b>\nApri la chat",
+                                        ("Apri", "https://barattolo.store/?chat=1")))
+    h = spediti[0][1] if spediti else {}
+    prova("ai telefoni iscritti: cifrato, timbrato, con TTL e urgenza; il 410 "
+          "toglie la riga, e un indirizzo fuori lista non si chiama nemmeno",
+          [[E("vivo"), E("morto")], "aes128gcm", True, "86400", "high",
+           [E("vivo")], "push: 1 consegnati, 2 iscrizioni morte tolte",
+           b'{"titolo": "\xf0\x9f\x94\x94 Ti hanno scritto", "testo": "Apri la chat", '
+           b'"url": "/?chat=1"}\x02'],
+          [sorted(u for u, _, _ in spediti)[::-1] if len(spediti) == 2 else spediti,
+           h.get("Content-Encoding"), str(h.get("Authorization", "")).startswith("vapid t="),
+           h.get("TTL"), h.get("Urgency"),
+           [r["endpoint"] for r in di(7)], esito,
+           decifra(spediti[0][2]) if spediti else None])
+    del spediti[:]
+    amb["MODALITA_COLLAUDO"] = True
+    prova("in collaudo locale non esce niente (come Telegram)",
+          ["push simulato (collaudo)", []],
+          [_aio.run(amb["_manda_push"](7, "x")), spediti])
+    amb["MODALITA_COLLAUDO"] = False
+    amb["WEB_PUSH_ATTIVO"] = False
+    prova("a leva spenta niente, nemmeno una lettura", ["", []],
+          [_aio.run(amb["_manda_push"](7, "x")), spediti])
+    prova("senza iscrizioni niente", ["", []],
+          [(_aio.run(amb["_manda_push"](999, "x")) if not amb.update(WEB_PUSH_ATTIVO=True)
+            else None), spediti])
+
+    # --- 8) NOTIFICA LO CHIEDE (a leva accesa) ---------------------------------
+    creati = []
+
+    class _Con:
+        def execute(self, *a):
+            return self
+
+        def fetchone(self):
+            return {"canale_notifiche": "", "npub": "", "npub_verificata": 0,
+                    "npub_accesso": ""}
+
+        def close(self):
+            pass
+
+    def _crea(coro):
+        creati.append(coro.cr_code.co_name)
+        coro.close()
+
+    async def _tg(*a, **k):
+        return "ok"
+
+    async def _dm_nostr_con_ripiego(*a, **k):
+        return None
+
+    async def _avviso_in_app_sottofondo(*a, **k):
+        return None
+
+    async def _manda_push(*a, **k):
+        return None
+
+    def esegui(tg, leva):
+        del creati[:]
+        a = {"db": lambda: _Con(), "_manda_telegram": _tg,
+             "_dm_nostr_con_ripiego": _dm_nostr_con_ripiego,
+             "_avviso_in_app_sottofondo": _avviso_in_app_sottofondo,
+             "_manda_push": _manda_push, "asyncio": types_ns(create_task=_crea),
+             "MODALITA_COLLAUDO": False, "WEB_PUSH_ATTIVO": leva,
+             "print": lambda *a, **k: None}
+        exec("async " + pezzo("notifica"), a)
+        _aio.run(a["notifica"](tg, "ciao"))
+        return sorted(creati)
+    prova("notifica: il telefono a leva accesa, per tutti (Telegram o no), e "
+          "a leva spenta no; un account cancellato niente",
+          [["_manda_push"], ["_avviso_in_app_sottofondo", "_manda_push"], [], []],
+          [esegui(555, True), esegui(-5, True), esegui(555, False),
+           esegui(2 ** 52 + 3, True)])
+
+    # --- 9) LE SENTINELLE ---------------------------------------------------
+    prova("LA LEVA NASCE ACCESA (Andrea, 14 nov 2026), nel server e nel config "
+          "d'esempio; il timbro resta vuoto nel config (lo crea il server)",
+          [True, True, True],
+          ["    from config import WEB_PUSH_ATTIVO\nexcept ImportError:\n"
+           "    WEB_PUSH_ATTIVO = True\n" in src,
+           "\nWEB_PUSH_ATTIVO = True\n" in esempio,
+           '\nWEB_PUSH_CHIAVE_PRIVATA = ""\n' in esempio])
+    prova("cancellazione e fusione: i telefoni se ne vanno con l'account, e "
+          "nella fusione passano alla meta' viva",
+          [True, True],
+          ['("push_iscrizioni", "tg_id")' in src[src.index("CANCELLA_TOGLI = ("):],
+           'con.execute("UPDATE push_iscrizioni SET tg_id=? WHERE tg_id=?",\n'
+           '                    (id_telegram, id_nostr))' in pezzo("esegui_fusione")])
+    rotte = {r: src[src.index(f'@app.post("{r}")'):].split("\n\n\n")[0]
+             for r in ("/api/push/iscrivi", "/api/push/togli", "/api/push/prova")}
+    prova("le porte: iscriversi e la prova vogliono la leva e la lista, "
+          "togliersi solo l'account; tutte dietro verifica_utente",
+          [True, True, True, True, True],
+          [all("verifica_utente(" in t for t in rotte.values()),
+           "if not push_indirizzo_ammesso(endpoint):" in rotte["/api/push/iscrivi"],
+           "if not push_chiavi_valide(p256dh, auth):" in rotte["/api/push/iscrivi"],
+           "push_pronto()" in rotte["/api/push/prova"]
+           and "PUSH_PROVA_OGNI" in rotte["/api/push/prova"],
+           "push_pronto" not in rotte["/api/push/togli"]])
+    prova("/api/me dice se il tasto c'e' e la chiave pubblica, mai la privata",
+          True, 'profilo["web_push"] = ({"attivo": True, "chiave": _PUSH_TIMBRO["pubblica"]}'
+          in pezzo("mio_profilo"))
+    prova("_manda_push: database in un thread, mai un errore a chi chiama, "
+          "niente redirect", [True, True, True],
+          ["await asyncio.to_thread(_push_iscrizioni_di, tg_id)" in pezzo("_manda_push"),
+           "except Exception as e:\n        print(f\"⚠️ Push all'utente" in pezzo("_manda_push"),
+           "follow_redirects=False" in pezzo("_manda_push")])
+
+    # --- 10) IL SERVICE WORKER, in node ---------------------------------------
+    i_sw = sw.index("/* LE NOTIFICHE SUL TELEFONO")
+    js_sw = r"""
+const ASCOLTI = {}, MOSTRATE = [], APERTE = [], NAVIGATE = [];
+const self = {location: new URL('https://barattolo.store/sw.js'),
+  addEventListener: (t, f) => { ASCOLTI[t] = f; },
+  registration: {showNotification: async (t, o) => { MOSTRATE.push([t, o]); }},
+  clients: {matchAll: async () => FINESTRE, openWindow: async u => { APERTE.push(u); }}};
+let FINESTRE = [];
+const fetch = async () => ({ok: true});
+""" + sw[i_sw:] + r"""
+(async () => {
+  const evento = (dati) => { const ps = []; return {data: dati, ps,
+    waitUntil: p => ps.push(p), notification: {close(){}, data: dati}}; };
+  const dati = j => ({json: () => j, text: () => JSON.stringify(j)});
+  let e = evento(dati({titolo: '📦 Ordine', testo: 'spedito', url: '/?ordine=7'}));
+  ASCOLTI.push(e); await Promise.all(e.ps);
+  e = evento(dati({titolo: 'x', url: 'https://evil.example/x'}));
+  ASCOLTI.push(e); await Promise.all(e.ps);
+  e = evento({json: () => { throw new Error('no'); }, text: () => 'solo testo'});
+  ASCOLTI.push(e); await Promise.all(e.ps);
+  e = evento({url: 'https://barattolo.store/?ordine=7'});
+  ASCOLTI.notificationclick(e); await Promise.all(e.ps);
+  FINESTRE = [{url: 'https://barattolo.store/', focus: async () => {},
+               navigate: async u => { NAVIGATE.push(u); }}];
+  e = evento({url: 'https://barattolo.store/?chat=1'});
+  ASCOLTI.notificationclick(e); await Promise.all(e.ps);
+  console.log(JSON.stringify({m: MOSTRATE.map(([t, o]) => [t, o.body, o.data.url, o.icon]),
+                              aperte: APERTE, navigate: NAVIGATE,
+                              cambio: typeof ASCOLTI.pushsubscriptionchange}));
+})();
+"""
+    r = _node_banco(js_sw)
+    if r is None:
+        salta("sw.js delle notifiche", "manca node")
+    else:
+        prova("sw.js: la notifica col titolo e il testo; il tocco apre solo "
+              "casa nostra (un url d'altri vale la home); testo non JSON vale "
+              "lo stesso; con Barattolo aperto ci si va, sennò si apre",
+              {"m": [["📦 Ordine", "spedito", "https://barattolo.store/?ordine=7",
+                      "/assets/icona-192.png"],
+                     ["x", "Hai un avviso nuovo", "https://barattolo.store/",
+                      "/assets/icona-192.png"],
+                     ["Barattolo", "solo testo", "https://barattolo.store/",
+                      "/assets/icona-192.png"]],
+               "aperte": ["https://barattolo.store/?ordine=7"],
+               "navigate": ["https://barattolo.store/?chat=1"],
+               "cambio": "function"}, r)
+
+    # --- 11) LA RIGA DEL CASSETTO, in node -------------------------------------
+    blocco = pezzo_js(mini, "/* ---- 📲 LE NOTIFICHE SUL TELEFONO",
+                      "\n/* «📦 Come spedisci»")
+    js = r"""
+const NODI = {};
+const el = id => NODI[id] || null;
+let DEMO = false, tg = null;
+const API_BASE = '/api';
+const authHdr = () => '';
+const haptic = () => {}, toast = () => {};
+let TOLTI = 0, DISISCRITTO = 0, SUB = {endpoint: 'https://fcm.googleapis.com/fcm/send/x',
+  unsubscribe: async () => { DISISCRITTO++; return true; }};
+const CHIAMATE = [];
+const fetch = async (url, o) => { CHIAMATE.push(url); return {ok: true, json: async () => ({tolti: TOLTI})}; };
+const window = {isSecureContext: true, PushManager: function(){}, Notification: {}, matchMedia: () => ({matches: false})};
+const navigator = {userAgent: 'Android', serviceWorker: {getRegistration: async () => ({pushManager: {getSubscription: async () => SUB}})}};
+const location = {hostname: 'barattolo.store'};
+const matchMedia = window.matchMedia;
+globalThis.window = window; globalThis.PushManager = window.PushManager; globalThis.Notification = window.Notification;
+""" + blocco + r"""
+(async () => {
+  const fuori = {};
+  myWebPush = {attivo: true, chiave: 'BP4z'};
+  fuori.android = /📲 Notifiche sul telefono/.test(rigaPushTelefono()) && /attivaPushTelefono\(\)/.test(rigaPushTelefono());
+  fuori.limiti = /GrapheneOS/.test(rigaPushTelefono());
+  pushTelefono = 'si';
+  fuori.si = /spegniPushTelefono\(\)/.test(rigaPushTelefono()) && /provaPushTelefono\(\)/.test(rigaPushTelefono());
+  pushTelefono = 'bloccate';
+  fuori.bloccate = !/<button onclick="(attiva|spegni)PushTelefono/.test(rigaPushTelefono()) && /impostazioni del telefono/.test(rigaPushTelefono());
+  tg = {initData: 'x'}; fuori.telegram = rigaPushTelefono(); tg = null;
+  DEMO = true; fuori.demo = rigaPushTelefono(); DEMO = false;
+  myWebPush = {attivo: false}; fuori.spenta = rigaPushTelefono(); myWebPush = {attivo: true, chiave: 'BP4z'};
+  location.hostname = 'abc.onion'; fuori.onion = rigaPushTelefono(); location.hostname = 'barattolo.store';
+  navigator.userAgent = 'iPhone'; delete window.PushManager; delete globalThis.PushManager;
+  fuori.iphone = /schermata Home/.test(rigaPushTelefono());
+  navigator.standalone = true; fuori.iphoneHome = rigaPushTelefono();
+  window.PushManager = function(){}; globalThis.PushManager = window.PushManager; navigator.userAgent = 'Android';
+  TOLTI = 0; await scordaPushTelefono(); fuori.altroAccount = DISISCRITTO;
+  TOLTI = 1; await scordaPushTelefono(); fuori.mio = DISISCRITTO;
+  TOLTI = 0; await scordaPushTelefono(true); fuori.tutti = DISISCRITTO;
+  fuori.chiamate = CHIAMATE;
+  console.log(JSON.stringify(fuori));
+})();
+"""
+    r = _node_banco(js)
+    if r is None:
+        salta("la riga delle notifiche sul telefono", "manca node")
+    else:
+        prova("la riga: «Attiva» col perimetro scritto, «Attive» con la prova, "
+              "bloccate senza bottone; mai in Telegram, in demo, a leva spenta, "
+              "sull'onion; sull'iPhone fuori dalla Home dice come fare",
+              {"android": True, "limiti": True, "si": True, "bloccate": True,
+               "telegram": "", "demo": "", "spenta": "", "onion": "",
+               "iphone": True, "iphoneHome": ""},
+              {k: r.get(k) for k in ("android", "limiti", "si", "bloccate",
+                                     "telegram", "demo", "spenta", "onion",
+                                     "iphone", "iphoneHome")})
+        prova("chi esce: il telefono si spegne se l'iscrizione era sua (o con "
+              "«Esci da tutti»), resta se era di un altro account aperto qui",
+              [0, 1, 2, ["/api/push/togli"] * 3],
+              [r.get("altroAccount"), r.get("mio"), r.get("tutti"), r.get("chiamate")])
+    prova("la riga sta IN CIMA al cassetto e lo stato lo chiede al browser; "
+          "chi esce (uno o tutti) passa da scordaPushTelefono",
+          [True, True, True],
+          ["box.insertAdjacentHTML('afterbegin', rigaPushTelefono());\n  aggiornaStatoPush();"
+           in pezzo_js(mini, "function renderAvvisi(){", "\n}\n"),
+           "try { await scordaPushTelefono(); } catch(e){}"
+           in pezzo_js(mini, "async function esciWeb(){", "\n}\n"),
+           "try { await scordaPushTelefono(true); } catch(e){}" in mini])
 
 
 def types_tempo(adesso):
@@ -194253,7 +194767,7 @@ CATEGORIE = {
     csp_prova ssrf_ln_address foto_anomala quattro_piccole runner_fisso
     runner_vm node_fisso freni avviso_dm_nostr stampa_e_salti
     bundle_bitcoin journal_senza_buffer istanza_prova
-    collaudo_segue_develop avvisi_nostr_arrivano filtro_10050
+    collaudo_segue_develop avvisi_nostr_arrivano notifiche_telefono filtro_10050
     semina_collaudo relay_risolti certificati_relay config_esempio
     assistente_bot
     """.split(),
@@ -195032,6 +195546,7 @@ def main():
               prove_miniature_leggere,
               prove_collaudo_segue_develop,
               prove_avvisi_nostr_arrivano,
+              prove_notifiche_telefono,
               prove_filtro_10050,
               prove_semina_collaudo, prove_leva_mercato_lavoro,
               prove_assistente_bot,

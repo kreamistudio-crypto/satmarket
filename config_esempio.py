@@ -1954,6 +1954,18 @@ AVVISO_DM_NOSTR_RELAY = [
 # si muove. Nasce SPENTA: True e riavvia per accenderla.
 DM_NIP04_RISERVA = False
 
+# Le notifiche sul telefono (web push, 14 nov 2026): nel cassetto Avvisi
+# compare «📲 Notifiche sul telefono» (fuori da Telegram e da Tor), e chi
+# lo accende riceve gli avvisi anche ad app chiusa: l'app di Zapstore, il
+# sito aggiunto alla Home, il browser del PC. Nasce ACCESA (Andrea: quel
+# che si prova sul collaudo arriva in produzione gia' acceso); False e
+# riavvia (o il pannello) per spegnerla.
+WEB_PUSH_ATTIVO = True
+# Il timbro delle notifiche (chiave VAPID) lo crea il server da solo e lo
+# tiene nel database: questa riga resta VUOTA. Serve solo per imporne uno
+# (base64url della chiave privata P-256). E' un segreto: mai in chat.
+WEB_PUSH_CHIAVE_PRIVATA = ""
+
 # La ronda dei relay di Mostro (12 ott 2026): ogni dieci minuti il
 # server chiede ai relay che confermano (MOSTRO_RELAY_CONFERMA; senza,
 # a tutto MOSTRO_RELAY) se rispondono e se il coordinatore ci scrive

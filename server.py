@@ -185,6 +185,25 @@ try:
 except ImportError:
     AesDM = None
     CbcDM = None
+# Le NOTIFICHE SUL TELEFONO (Web Push, 14 nov 2026, cantiere web-push)
+# vogliono dallo stesso pacchetto la curva P-256 (il timbro VAPID e lo
+# scambio di chiavi col telefono), HKDF e AES-GCM (RFC 8291). Se manca,
+# le notifiche sul telefono restano spente da sole e il tasto non compare.
+try:
+    from cryptography.hazmat.primitives.asymmetric import ec as EcPush
+    from cryptography.hazmat.primitives.asymmetric.utils import \
+        decode_dss_signature as FirmaGrezzaPush
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM as AesGcmPush
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF as HkdfPush
+    from cryptography.hazmat.primitives import hashes as HashPush
+    from cryptography.hazmat.primitives import serialization as SerialePush
+except ImportError:
+    EcPush = None
+    FirmaGrezzaPush = None
+    AesGcmPush = None
+    HkdfPush = None
+    HashPush = None
+    SerialePush = None
 # Pillow serve a convertire in JPEG le foto nei formati che i browser
 # non sanno leggere (HEIC degli iPhone, e i PNG/WebP arrivati grezzi);
 # pillow-heif e' il suo occhio per HEIC/HEIF. Se mancano, le foto
@@ -6944,6 +6963,38 @@ def init_db():
         letto INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_avvisi_app_tg ON avvisi_app(tg_id, id);
+    CREATE TABLE IF NOT EXISTS push_iscrizioni(
+        -- LE NOTIFICHE SUL TELEFONO (14 nov 2026, cantiere web-push,
+        -- Andrea: «si puo' fare: notifiche web app»). Una riga per
+        -- TELEFONO (o browser) che ha detto si' al tasto «📲 Notifiche sul
+        -- telefono»: l'indirizzo che il suo servizio push gli ha dato
+        -- (Google, Mozilla, Apple, Microsoft: solo quelli, vedi
+        -- `push_indirizzo_ammesso`) e le sue due chiavi pubbliche, con cui
+        -- l'avviso si cifra perche' lo legga SOLO quel telefono (RFC 8291).
+        -- Un indirizzo vale per un account alla volta (UNIQUE): chi entra
+        -- con un altro account e riattiva, se lo porta dietro. Se ne va
+        -- da sola quando il servizio risponde 404/410 (il telefono ha
+        -- tolto il permesso o disinstallato), all'uscita dall'account e
+        -- alla cancellazione.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER NOT NULL,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        creato INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_push_iscrizioni_tg ON push_iscrizioni(tg_id);
+    CREATE TABLE IF NOT EXISTS push_timbro(
+        -- IL TIMBRO DELLE NOTIFICHE (la chiave VAPID, 14 nov 2026): la
+        -- crea il server da solo al primo bisogno e resta qui, UNA riga.
+        -- Andrea: «io porto in produzione dal mio PC, cosa c'entra?» —
+        -- niente gesti sul VPS: la chiave non passa da GitHub, dalla chat
+        -- o dal config, e viaggia coi backup cifrati del database come le
+        -- iscrizioni che firma. Persa, i telefoni vanno riattivati.
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        privata TEXT NOT NULL,
+        creato INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS assistenza(
         -- L'ASSISTENZA IN APP (3 nov 2026, richiesta di Andrea): UNA
         -- conversazione per utente, ed e' la colonna `utente` (il tg_id
@@ -18855,6 +18906,354 @@ async def _dm_nostr_con_ripiego(npub: str, testo: str, ripiego_tg_id: int,
             print(f"⚠️ Anche il ripiego Telegram e' fallito: {e}")
 
 
+# ═══ LE NOTIFICHE SUL TELEFONO (Web Push, 14 nov 2026, cantiere web-push) ═══
+# Andrea: «si puo' fare: notifiche web app» — l'app di Zapstore (l'involucro
+# TWA della 1.5, che ha gia' `enableNotifications` acceso: le notifiche
+# escono col nome e l'icona di Barattolo), il sito aggiunto alla Home, il
+# browser del PC. Chi tocca «📲 Notifiche sul telefono» nel cassetto Avvisi
+# riceve sul telefono, anche ad app CHIUSA, gli stessi avvisi che oggi
+# partono su Telegram o col DM Nostr: passano tutti da `notifica()`, e qui
+# c'e' la terza strada. Il bisogno vero e' di chi entra senza Telegram, che
+# fino a ieri gli avvisi li vedeva solo aprendo l'app.
+# COME VIAGGIA (RFC 8030/8291/8292): il telefono si iscrive al suo servizio
+# push (Google per Chrome e per l'app, Mozilla, Apple, Microsoft) e ci da'
+# un indirizzo e due chiavi pubbliche; noi cifriamo l'avviso per QUEL
+# telefono (aes128gcm: il servizio vede quando e quanto, mai cosa) e lo
+# firmiamo col timbro VAPID, cosi' nessun altro spedisce a nome nostro.
+# DOVE NON ARRIVA, ed e' scritto anche nel cassetto: i telefoni senza i
+# servizi Google (GrapheneOS e simili: Chrome li' non riceve), Tor Browser
+# e l'onion, l'iPhone se il sito non e' aggiunto alla Home (iOS 16.4+).
+# Dentro Telegram il tasto non c'e': c'e' il bot.
+# NIENTE LIBRERIE NUOVE: la cifratura e il timbro sono una trentina di
+# righe sopra `cryptography`, che il servizio ha gia' (i DM Nostr), e la
+# prova le confronta byte per byte col vettore dell'RFC 8291, appendice A.
+# LA LEVA NASCE ACCESA (Andrea, 14 nov 2026: «quello che proviamo sul
+# collaudo e poi portiamo in produzione e' di default sempre acceso»):
+# resta come interruttore d'emergenza, anche dal pannello.
+try:
+    from config import WEB_PUSH_ATTIVO
+except ImportError:
+    WEB_PUSH_ATTIVO = True
+# Il timbro lo crea il server da solo e lo tiene nel database
+# (`push_timbro`). Questa riga serve solo a chi volesse IMPORLO (per
+# esempio due istanze con le stesse iscrizioni): base64url dei 32 byte
+# della chiave privata P-256, o del suo DER PKCS#8. Vuota = quello del
+# database.
+try:
+    from config import WEB_PUSH_CHIAVE_PRIVATA
+except ImportError:
+    WEB_PUSH_CHIAVE_PRIVATA = ""
+
+# I SERVIZI PUSH CHE CONOSCIAMO, e solo loro. L'indirizzo arriva dal
+# telefono, cioe' da chiunque: senza questa lista il server farebbe una
+# POST verso qualunque indirizzo gli si scriva (la porta di casa, il nodo
+# dietro il WireGuard). Nomi esatti o i sottodomini di Apple e Microsoft
+# (i loro indirizzi cambiano macchina: web.push.apple.com,
+# wns2-par02p.notify.windows.com).
+PUSH_SERVIZI = ("fcm.googleapis.com", "updates.push.services.mozilla.com",
+                "push.services.mozilla.com", "web.push.apple.com")
+PUSH_SERVIZI_SOTTO = (".push.apple.com", ".notify.windows.com")
+_PUSH_FORMA = re.compile(
+    r"https://([a-z0-9-]+\.)+[a-z]{2,}(:443)?/[A-Za-z0-9._~:/?=&%+,!$'()*;-]*")
+PUSH_MAX_PER_UTENTE = 5      # telefoni e browser per account: oltre, via i piu' vecchi
+PUSH_TTL = 86400             # un telefono spento un giorno lo riceve alla riaccensione
+PUSH_TESTO_MAX = 300
+_PUSH_TIMBRO = {"chiave": None, "pubblica": ""}
+
+
+def _b64u_codifica(b: bytes) -> str:
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+def _b64u_decodifica(s: str) -> bytes:
+    s = str(s or "").strip()
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+def push_indirizzo_ammesso(url) -> bool:
+    """PURA: l'indirizzo di un'iscrizione e' di un servizio push vero?
+    https, niente credenziali ne' porte strane, nome in lista."""
+    url = str(url or "")
+    if len(url) > 1024 or not _PUSH_FORMA.fullmatch(url):
+        return False
+    host = (urlparse(url).hostname or "").lower()
+    return host in PUSH_SERVIZI or any(
+        host.endswith(s) and len(host) > len(s) for s in PUSH_SERVIZI_SOTTO)
+
+
+def push_chiavi_valide(p256dh: str, auth: str) -> bool:
+    """PURA: le due chiavi del telefono hanno la forma giusta? La
+    pubblica e' un punto VERO della curva (65 byte, 0x04), il segreto
+    sono 16 byte."""
+    if EcPush is None:
+        return False
+    try:
+        pub, seg = _b64u_decodifica(p256dh), _b64u_decodifica(auth)
+        if len(pub) != 65 or pub[0] != 4 or len(seg) != 16:
+            return False
+        EcPush.EllipticCurvePublicKey.from_encoded_point(EcPush.SECP256R1(), pub)
+        return True
+    except Exception:
+        return False
+
+
+def push_chiave_da_testo(testo: str):
+    """La chiave privata del timbro da base64url (32 byte o DER PKCS#8),
+    o None se e' vuota, storta o non e' P-256."""
+    if not testo or EcPush is None:
+        return None
+    try:
+        grezzo = _b64u_decodifica(testo)
+        if len(grezzo) == 32:
+            k = EcPush.derive_private_key(int.from_bytes(grezzo, "big"),
+                                          EcPush.SECP256R1())
+        else:
+            k = SerialePush.load_der_private_key(grezzo, password=None)
+        if (not isinstance(k, EcPush.EllipticCurvePrivateKey)
+                or k.curve.name != "secp256r1"):
+            return None
+        return k
+    except Exception:
+        return None
+
+
+def push_pubblica_di(chiave) -> str:
+    """La chiave pubblica del timbro come la vuole il browser: il punto
+    non compresso (65 byte) in base64url."""
+    return _b64u_codifica(chiave.public_key().public_bytes(
+        SerialePush.Encoding.X962, SerialePush.PublicFormat.UncompressedPoint))
+
+
+def _push_timbro():
+    """La chiave del timbro, con la sua memoria: dal config se c'e',
+    sennò dal database, e se il database non ce l'ha la crea e la
+    scrive (INSERT OR IGNORE e rilettura: vince la prima). None se
+    manca `cryptography` o il database non risponde."""
+    if _PUSH_TIMBRO["chiave"] is not None:
+        return _PUSH_TIMBRO["chiave"]
+    if EcPush is None:
+        return None
+    k = push_chiave_da_testo(WEB_PUSH_CHIAVE_PRIVATA)
+    if k is None and WEB_PUSH_CHIAVE_PRIVATA:
+        print("⚠️ Notifiche sul telefono: WEB_PUSH_CHIAVE_PRIVATA nel config "
+              "non e' una chiave P-256 valida, uso quella del database")
+    if k is None:
+        try:
+            con = db()
+            try:
+                r = con.execute("SELECT privata FROM push_timbro WHERE id=1").fetchone()
+                if r is None:
+                    nuova = EcPush.generate_private_key(EcPush.SECP256R1())
+                    grezzo = nuova.private_numbers().private_value.to_bytes(32, "big")
+                    con.execute("INSERT OR IGNORE INTO push_timbro(id, privata, creato) "
+                                "VALUES(1,?,?)", (_b64u_codifica(grezzo), int(time.time())))
+                    con.commit()
+                    r = con.execute("SELECT privata FROM push_timbro WHERE id=1").fetchone()
+                    print("📲 Notifiche sul telefono: timbro VAPID creato nel database")
+                k = push_chiave_da_testo(r["privata"]) if r else None
+            finally:
+                con.close()
+        except Exception as e:
+            print(f"⚠️ Notifiche sul telefono: timbro non letto ({e})")
+            return None
+    if k is not None:
+        _PUSH_TIMBRO.update(chiave=k, pubblica=push_pubblica_di(k))
+    return k
+
+
+def push_pronto() -> bool:
+    """Le notifiche sul telefono si possono offrire adesso? Leva accesa
+    E timbro pronto. Si chiede ogni volta: la leva si cambia dal pannello."""
+    return bool(WEB_PUSH_ATTIVO) and _push_timbro() is not None
+
+
+def push_cifra(p256dh: str, auth: str, carico: bytes,
+               _effimera=None, _sale: bytes = None) -> bytes:
+    """PURA: il corpo cifrato per UN telefono, aes128gcm dell'RFC 8291
+    (un record solo). `_effimera` e `_sale` esistono per la prova col
+    vettore dell'RFC: in servizio nascono nuovi a ogni avviso."""
+    ua_pub = _b64u_decodifica(p256dh)
+    segreto = _b64u_decodifica(auth)
+    eff = _effimera or EcPush.generate_private_key(EcPush.SECP256R1())
+    sale = _sale or os.urandom(16)
+    as_pub = eff.public_key().public_bytes(
+        SerialePush.Encoding.X962, SerialePush.PublicFormat.UncompressedPoint)
+    comune = eff.exchange(EcPush.ECDH(), EcPush.EllipticCurvePublicKey
+                          .from_encoded_point(EcPush.SECP256R1(), ua_pub))
+
+    def hkdf(sale_, ikm, info, n):
+        return HkdfPush(HashPush.SHA256(), n, sale_, info).derive(ikm)
+    ikm = hkdf(segreto, comune, b"WebPush: info\x00" + ua_pub + as_pub, 32)
+    cek = hkdf(sale, ikm, b"Content-Encoding: aes128gcm\x00", 16)
+    nonce = hkdf(sale, ikm, b"Content-Encoding: nonce\x00", 12)
+    cifrato = AesGcmPush(cek).encrypt(nonce, carico + b"\x02", None)
+    return sale + (4096).to_bytes(4, "big") + bytes([65]) + as_pub + cifrato
+
+
+def push_vapid(endpoint: str, chiave, sub: str, adesso: float) -> str:
+    """PURA: l'intestazione Authorization col timbro (RFC 8292): un JWT
+    ES256 per l'origine del servizio, che scade fra 12 ore, e la nostra
+    chiave pubblica. `sub` e' l'indirizzo del sito (mai un'email)."""
+    u = urlparse(endpoint)
+    testa = _b64u_codifica(b'{"typ":"JWT","alg":"ES256"}')
+    corpo = _b64u_codifica(json.dumps(
+        {"aud": f"{u.scheme}://{u.netloc}", "exp": int(adesso) + 12 * 3600,
+         "sub": sub}, separators=(",", ":")).encode())
+    der = chiave.sign(f"{testa}.{corpo}".encode(), EcPush.ECDSA(HashPush.SHA256()))
+    r, s = FirmaGrezzaPush(der)
+    firma = _b64u_codifica(r.to_bytes(32, "big") + s.to_bytes(32, "big"))
+    return f"vapid t={testa}.{corpo}.{firma}, k={push_pubblica_di(chiave)}"
+
+
+def push_carico(testo: str, bottone, base: str) -> bytes:
+    """PURA: dall'avviso di Telegram alla notifica. La prima riga e' il
+    titolo, il resto il testo (spoglio dell'HTML, una riga, al piu'
+    PUSH_TESTO_MAX caratteri). Il tocco apre il primo bottone che porta
+    a casa NOSTRA (`base`), come percorso; ogni altro indirizzo vale la
+    home: il service worker non apre mai niente fuori dal sito."""
+    righe = [r.strip() for r in spoglia_html(str(testo or "")).splitlines()
+             if r.strip()]
+    titolo, resto = (righe[0], righe[1:]) if righe else ("Barattolo", [])
+    corpo = " ".join(resto)
+    if not corpo:
+        titolo, corpo = "Barattolo", titolo
+    if len(corpo) > PUSH_TESTO_MAX:
+        corpo = corpo[:PUSH_TESTO_MAX - 1].rstrip() + "…"
+    url = "/"
+    base = str(base or "").rstrip("/")
+    for _etichetta, link in _bottoni_avviso(bottone):
+        if base and (link == base or link.startswith(base + "/")):
+            percorso = link[len(base):] or "/"
+            if percorso.startswith(("/?", "/#")) or (
+                    percorso.startswith("/") and not percorso.startswith("//")):
+                url = percorso[:500]
+                break
+    return json.dumps({"titolo": titolo[:80], "testo": corpo, "url": url},
+                      ensure_ascii=False).encode()
+
+
+def _push_iscrizioni_di(tg_id: int) -> list:
+    con = db()
+    try:
+        return [dict(r) for r in con.execute(
+            "SELECT id, endpoint, p256dh, auth FROM push_iscrizioni "
+            "WHERE tg_id=? ORDER BY id DESC LIMIT ?",
+            (int(tg_id), PUSH_MAX_PER_UTENTE))]
+    finally:
+        con.close()
+
+
+def _push_togli_id(ids: list):
+    con = db()
+    try:
+        con.executemany("DELETE FROM push_iscrizioni WHERE id=?",
+                        [(int(i),) for i in ids])
+        con.commit()
+    finally:
+        con.close()
+
+
+def push_iscrivi(tg_id: int, endpoint: str, p256dh: str, auth: str,
+                 vecchio: str = "") -> int:
+    """Iscrive (o riprende) un telefono per QUESTO account: lo stesso
+    indirizzo passa all'account che lo riattiva. `vecchio` e' l'indirizzo
+    che il browser ha appena cambiato (pushsubscriptionchange): se era
+    suo, se ne va. Oltre PUSH_MAX_PER_UTENTE, via i piu' vecchi. Rende
+    quanti telefoni ha adesso."""
+    adesso = int(time.time())
+    con = db()
+    try:
+        if vecchio and vecchio != endpoint:
+            con.execute("DELETE FROM push_iscrizioni WHERE endpoint=? AND tg_id=?",
+                        (vecchio, int(tg_id)))
+        con.execute(
+            "INSERT INTO push_iscrizioni(tg_id, endpoint, p256dh, auth, creato) "
+            "VALUES(?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET "
+            "tg_id=excluded.tg_id, p256dh=excluded.p256dh, auth=excluded.auth, "
+            "creato=excluded.creato",
+            (int(tg_id), endpoint, p256dh, auth, adesso))
+        con.execute(
+            "DELETE FROM push_iscrizioni WHERE tg_id=? AND id NOT IN (SELECT id "
+            "FROM push_iscrizioni WHERE tg_id=? ORDER BY creato DESC, id DESC "
+            "LIMIT ?)", (int(tg_id), int(tg_id), PUSH_MAX_PER_UTENTE))
+        con.commit()
+        return int(con.execute("SELECT COUNT(*) FROM push_iscrizioni WHERE tg_id=?",
+                               (int(tg_id),)).fetchone()[0])
+    finally:
+        con.close()
+
+
+def push_togli(tg_id: int, endpoint: str) -> int:
+    """Toglie un telefono, solo se e' di questo account."""
+    con = db()
+    try:
+        n = con.execute("DELETE FROM push_iscrizioni WHERE endpoint=? AND tg_id=?",
+                        (str(endpoint or ""), int(tg_id))).rowcount
+        con.commit()
+        return n
+    finally:
+        con.close()
+
+
+async def _manda_push(tg_id: int, testo: str, bottone=None) -> str:
+    """Il ramo telefono di notifica(), in sottofondo: l'avviso a ogni
+    telefono iscritto dell'account. Mai un errore a chi chiama. Le
+    letture e le scritture del database vanno in un thread (chi ha
+    chiamato `notifica` puo' tenere una transazione aperta). Un 404/410
+    vuol dire iscrizione morta, e la riga se ne va. In collaudo locale
+    non esce niente, come per Telegram (`MODALITA_COLLAUDO`): sulla
+    vm-2050 si', perche' un'iscrizione la crea solo un telefono vero
+    che si e' iscritto LI'."""
+    try:
+        if not push_pronto():
+            return ""
+        righe = await asyncio.to_thread(_push_iscrizioni_di, tg_id)
+        if not righe:
+            return ""
+        carico = push_carico(testo, bottone, URL_PUBBLICO)
+        if MODALITA_COLLAUDO:
+            print(f"📲 [push simulato per utente {tg_id}, {len(righe)} "
+                  f"telefoni] {carico.decode()}")
+            return "push simulato (collaudo)"
+        chiave = _push_timbro()
+        morte, ok, altri = [], 0, []
+        async with httpx.AsyncClient(timeout=10, follow_redirects=False) as c:
+            for r in righe:
+                if not push_indirizzo_ammesso(r["endpoint"]):
+                    morte.append(r["id"])
+                    continue
+                try:
+                    risp = await c.post(r["endpoint"], content=push_cifra(
+                        r["p256dh"], r["auth"], carico), headers={
+                        "Authorization": push_vapid(r["endpoint"], chiave,
+                                                    URL_PUBBLICO, time.time()),
+                        "Content-Encoding": "aes128gcm",
+                        "Content-Type": "application/octet-stream",
+                        "TTL": str(PUSH_TTL), "Urgency": "high"})
+                except Exception as e:
+                    altri.append(type(e).__name__)
+                    continue
+                if risp.status_code in (404, 410):
+                    morte.append(r["id"])
+                elif 200 <= risp.status_code < 300:
+                    ok += 1
+                else:
+                    altri.append(str(risp.status_code))
+                    print(f"⚠️ Push all'utente {tg_id}: {risp.status_code} "
+                          f"{risp.text[:150]}")
+        if morte:
+            await asyncio.to_thread(_push_togli_id, morte)
+        esito = f"push: {ok} consegnati"
+        if morte:
+            esito += f", {len(morte)} iscrizioni morte tolte"
+        if altri:
+            esito += f", non arrivati ({', '.join(altri)})"
+        return esito
+    except Exception as e:
+        print(f"⚠️ Push all'utente {tg_id} non partito: {e}")
+        return f"push NON partito ({type(e).__name__})"
+
+
 async def notifica(tg_id: int, testo: str, bottone: tuple = None):
     """Recapita un avviso sul canale che l'utente preferisce: Telegram,
     DM Nostr cifrato (NIP-17), o entrambi. Senza preferenza decide il
@@ -18906,6 +19305,16 @@ async def notifica(tg_id: int, testo: str, bottone: tuple = None):
             asyncio.create_task(_avviso_in_app_sottofondo(tg_id, testo, bottone))
         except Exception as e:
             print(f"⚠️ Avviso in app non salvato per l'utente {tg_id}: {e}")
+    # IL TELEFONO (14 nov 2026, cantiere web-push): a chi ha acceso «📲
+    # Notifiche sul telefono» l'avviso arriva ANCHE li', qualunque sia il
+    # canale scelto sopra — l'ha chiesto lui, telefono per telefono. In
+    # sottofondo e senza esito: chi non ha telefoni iscritti costa una
+    # lettura in un thread, e i servizi push possono metterci secondi.
+    if WEB_PUSH_ATTIVO:
+        try:
+            asyncio.create_task(_manda_push(tg_id, testo, bottone))
+        except Exception as e:
+            print(f"⚠️ Push non partito per l'utente {tg_id}: {e}")
     # L'ESITO, PER STRADA (17 set 2026): si restituisce e non si stampa
     # — i chiamanti sono decine e quasi nessuno lo guarda; il P2P si'.
     # ⚠️ La strada Nostr SENZA Telegram e' il caso che da fuori sembra
@@ -20213,6 +20622,10 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # aveva Telegram: da qui gli avvisi arrivano nel bot, e la lista
         # della meta' che muore se ne va con lei
         con.execute("DELETE FROM avvisi_app WHERE tg_id=?", (id_nostr,))
+        # I TELEFONI ISCRITTI (14 nov 2026, cantiere web-push) restano
+        # suoi: la stessa persona, e gli avvisi ora sono della meta' viva
+        con.execute("UPDATE push_iscrizioni SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
         # ...e L'ASSISTENZA IN APP (3 nov 2026): la conversazione della
         # meta' Nostr passa a quella Telegram (stessa persona, una
         # conversazione sola, in ordine di id); le righe che la meta'
@@ -35479,6 +35892,21 @@ def _leve_stato():
                   spento="nessuna chat negli ordini; quelle che ci sono "
                          "si cancellano come sempre, a ordine concluso"),
         ]},
+        {"gruppo": "📲 Notifiche sul telefono", "voci": [
+            # IL WEB PUSH (14 nov 2026, cantiere web-push): accesa di
+            # serie; il timbro lo crea il server nel database
+            _leva("Notifiche sul telefono (web push)", "WEB_PUSH_ATTIVO",
+                  bool(WEB_PUSH_ATTIVO),
+                  allarme=bool(WEB_PUSH_ATTIVO) and EcPush is None,
+                  acceso=("nel cassetto Avvisi c'è «📲 Notifiche sul "
+                          "telefono»: chi lo accende riceve gli avvisi "
+                          "anche ad app chiusa (app di Zapstore, sito "
+                          "sulla Home, browser del PC)" if EcPush is not None
+                          else "MA manca la libreria cryptography: il "
+                               "tasto non compare"),
+                  spento="nessuna notifica sul telefono e nessun tasto; "
+                         "le iscrizioni restano, e riaccesa si riparte"),
+        ]},
         {"gruppo": "🆕 Avvisi del mercatino", "voci": [
             # GLI AVVISI DEI NUOVI ANNUNCI E DEI VENDITORI SEGUITI (9 ott
             # 2026): la leva globale e le due finestre del raggruppamento;
@@ -49313,6 +49741,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # ...e quanti dei miei scambi aspettano un mio gesto: il pallino
     # all'apertura lo legge da qui, senza aprire i relay
     profilo["p2p_tocca"] = p2p_tocca
+    # LE NOTIFICHE SUL TELEFONO (14 nov 2026, cantiere web-push): se si
+    # possono offrire, e la chiave pubblica del timbro con cui il
+    # telefono si iscrive. Quale telefono e' iscritto lo sa il browser.
+    profilo["web_push"] = ({"attivo": True, "chiave": _PUSH_TIMBRO["pubblica"]}
+                           if push_pronto() else {"attivo": False})
     # «📬 I TUOI AVVISI» E IL 10050 (20 ott 2026): solo per chi entra
     # senza Telegram — il conto per la fascia dell'apertura, e lo sguardo
     # in sottofondo ai suoi relay dei messaggi (vedi `_guarda_relay_dm`)
@@ -50062,6 +50495,69 @@ async def scegli_canale_notifiche(req: Request,
     con.commit()
     con.close()
     return {"ok": True, "canale": canale}
+
+
+# LE NOTIFICHE SUL TELEFONO, le tre porte (14 nov 2026, cantiere
+# web-push). Iscriversi e la prova vogliono la leva accesa; togliersi no:
+# un telefono si toglie anche a leva spenta.
+_PUSH_PROVE = {}            # tg_id -> ultima prova (una ogni PUSH_PROVA_OGNI)
+PUSH_PROVA_OGNI = 30
+
+
+@app.post("/api/push/iscrivi")
+async def push_iscrivi_rotta(req: Request, x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """Il telefono ha detto si': indirizzo del suo servizio push e le sue
+    due chiavi. `vecchio` lo manda il service worker quando il browser
+    cambia l'indirizzo da solo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not push_pronto():
+        raise HTTPException(503, "Le notifiche sul telefono sono spente")
+    d = await leggi_json(req)
+    endpoint = str(d.get("endpoint") or "").strip()
+    p256dh = str(d.get("p256dh") or "").strip()
+    auth = str(d.get("auth") or "").strip()
+    vecchio = str(d.get("vecchio") or "").strip()[:1024]
+    if not push_indirizzo_ammesso(endpoint):
+        raise HTTPException(400, "Servizio di notifiche non riconosciuto")
+    if not push_chiavi_valide(p256dh, auth):
+        raise HTTPException(400, "Le chiavi del telefono non sono valide")
+    n = await asyncio.to_thread(push_iscrivi, user["id"], endpoint,
+                                p256dh, auth, vecchio)
+    return {"ok": True, "telefoni": n}
+
+
+@app.post("/api/push/togli")
+async def push_togli_rotta(req: Request, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Questo telefono non vuole piu' le notifiche (o esce dall'account)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    n = await asyncio.to_thread(push_togli, user["id"],
+                                str(d.get("endpoint") or "").strip()[:1024])
+    return {"ok": True, "tolti": n}
+
+
+@app.post("/api/push/prova")
+async def push_prova_rotta(x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """«Mandami una prova»: una notifica ai telefoni di questo account,
+    una ogni PUSH_PROVA_OGNI secondi."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not push_pronto():
+        raise HTTPException(503, "Le notifiche sul telefono sono spente")
+    adesso = time.time()
+    if adesso - _PUSH_PROVE.get(user["id"], 0) < PUSH_PROVA_OGNI:
+        raise HTTPException(429, "Una prova alla volta: riprova fra poco")
+    _PUSH_PROVE[user["id"]] = adesso
+    if not await asyncio.to_thread(_push_iscrizioni_di, user["id"]):
+        raise HTTPException(409, "Nessun telefono iscritto: prima attiva "
+                                 "le notifiche")
+    esito = await _manda_push(
+        user["id"], "🫙 <b>Le notifiche funzionano</b>\nDa qui ti arrivano "
+        "gli avvisi di Barattolo: ordini, scambi e messaggi.",
+        ("Apri Barattolo", f"{URL_PUBBLICO}/"))
+    return {"ok": True, "esito": esito}
 
 
 @app.post("/api/me/spedizioniere")
@@ -106045,6 +106541,7 @@ CANCELLA_ANONIMIZZA = (
 CANCELLA_TOGLI = (
     ("sessioni", "tg_id"), ("biglietti_collegamento", "tg_id"),
     ("avvisi_app", "tg_id"), ("avvisi_notificati", "tg_id"),
+    ("push_iscrizioni", "tg_id"),
     ("avvisi_ricerca", "tg_id"), ("badge_utente", "tg_id"),
     ("barattoli_condivisi", "tg_id"),
     ("carrello_salvato", "tg_id"), ("carrello_salvato", "venditore_id"),

@@ -130,3 +130,73 @@ self.addEventListener('fetch', (e) => {
   // testa: script che gestiscono l'auth — passa oltre senza essere
   // nemmeno sfiorato, come e' sempre stato.
 });
+
+/* LE NOTIFICHE SUL TELEFONO (14 nov 2026, cantiere web-push). Il server
+   cifra l'avviso per questo telefono e lo spedisce al suo servizio push
+   (Google, Mozilla, Apple, Microsoft); qui arriva anche ad app chiusa e
+   diventa una notifica. Nell'app di Zapstore Chrome la consegna all'app
+   (enableNotifications della 1.5): nome e icona sono di Barattolo.
+   Il carico e' {titolo, testo, url}; `url` e' un percorso di CASA:
+   `indirizzoDiCasa` non apre mai niente fuori da questa origine, anche se
+   un domani il carico dicesse altro. */
+function indirizzoDiCasa(u) {
+  try {
+    const x = new URL(u || '/', self.location.origin);
+    if (x.origin === self.location.origin) return x.href;
+  } catch (e) { /* storto: la home */ }
+  return self.location.origin + '/';
+}
+
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; }
+  catch (err) { d = {testo: e.data ? e.data.text() : ''}; }
+  const titolo = String(d.titolo || 'Barattolo').slice(0, 80);
+  e.waitUntil(self.registration.showNotification(titolo, {
+    body: String(d.testo || 'Hai un avviso nuovo').slice(0, 400),
+    icon: '/assets/icona-192.png',
+    lang: 'it',
+    data: {url: indirizzoDiCasa(d.url)},
+  }));
+});
+
+/* Il tocco: se Barattolo e' gia' aperto lo si porta davanti e lo si
+   manda alla pagina dell'avviso, se no lo si apre li'. */
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const dove = indirizzoDiCasa(e.notification.data && e.notification.data.url);
+  e.waitUntil((async () => {
+    const aperte = await self.clients.matchAll({type: 'window',
+                                                includeUncontrolled: true});
+    for (const c of aperte) {
+      if (new URL(c.url).origin !== self.location.origin) continue;
+      try { await c.focus(); } catch (err) { /* niente fuoco: si naviga lo stesso */ }
+      try { if ('navigate' in c) { await c.navigate(dove); return; } }
+      catch (err) { /* finestra non nostra: se ne apre una */ }
+      break;
+    }
+    await self.clients.openWindow(dove);
+  })());
+});
+
+/* Il browser puo' cambiare l'indirizzo da solo (raro, ma succede): ci si
+   riscrive con la stessa chiave del timbro e si dice al server qual era
+   il vecchio, che se ne va. Il cookie della sessione viaggia da solo
+   (stessa origine); se l'utente e' uscito, il server dice 401 e basta. */
+self.addEventListener('pushsubscriptionchange', (e) => {
+  e.waitUntil((async () => {
+    const vecchia = e.oldSubscription;
+    const chiave = vecchia && vecchia.options && vecchia.options.applicationServerKey;
+    const nuova = e.newSubscription || (chiave ? await self.registration.pushManager
+      .subscribe({userVisibleOnly: true, applicationServerKey: chiave}) : null);
+    if (!nuova) return;
+    const j = nuova.toJSON();
+    await fetch('/api/push/iscrivi', {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({endpoint: j.endpoint, p256dh: j.keys.p256dh,
+                            auth: j.keys.auth,
+                            vecchio: vecchia ? vecchia.endpoint : ''}),
+    });
+  })().catch(() => {}));
+});
