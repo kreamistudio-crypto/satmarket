@@ -45990,7 +45990,11 @@ def prove_fogli_di_casa():
     # (`walletRendiPrincipale`, `walletNuovoPrincipale`).
     # CENTODIECI (13 nov 2026, cantiere eth-xmr): «Hai inviato gli ETH?» /
     # «Hai inviato gli XMR?» nello scambio P2P (`coinInviatiP2P`).
-    prova("i gesti che passano dalla domanda unica sono centodieci (dal 30 ott "
+    # MENO UNO (14 nov 2026, cantiere fee-mercatino-info): via il
+    # CINQUANTASEI, il foglio «🔮 La fee dinamica di Barattolo» — le fee
+    # del mercatino restano a 0 (decisione di Andrea), la riga del conto
+    # non si tocca piu'. Il conto torna a centonove.
+    prova("i gesti che passano dalla domanda unica sono centonove (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -45998,8 +46002,15 @@ def prove_fogli_di_casa():
           "e «Crei le parole dello swap?» e «Ricevi on-chain?» dello swap "
           "automatico; «Rendere principale questo wallet?» e «Fare nascere "
           "un wallet nuovo?» del wallet unico; dal 13 nov «Hai inviato gli "
-          "ETH/XMR?»)",
-          110, solo_codice(mini).count("chiediConferma({"))
+          "ETH/XMR?»; dal 14 nov via il foglio della fee dinamica)",
+          109, solo_codice(mini).count("chiediConferma({"))
+    # ...e il foglio della fee dinamica non torna (14 nov 2026,
+    # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
+    # Barattolo» nel conto del mercatino.
+    prova("il conto del mercatino non apre piu' il foglio della fee dinamica",
+          [False, False],
+          ["apriDettaglioFeeDinamica" in solo_codice(mini),
+           "La fee dinamica di Barattolo" in mini])
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
