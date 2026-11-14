@@ -11688,6 +11688,21 @@ async def login_telegram_ritorno(req: Request,
     _frena("login", _ip_di(req))
     da = _dove_tornare(d.pop("da", ""))
     try:
+        # A PORTA DEL BOT APERTA IL WIDGET IN PAGINA NON C'E', E QUESTA
+        # ROTTA NON LA USA NESSUNO (14 nov 2026, cantiere audit-account,
+        # dal primo audit di sicurezza). Ma restava accesa, ed e' una
+        # GET che apre una sessione dai soli dati firmati nella query:
+        # niente la lega al browser che ha chiesto di entrare. Chi fa
+        # il SUO login si tiene l'indirizzo di ritorno e lo manda a un
+        # altro: quel browser, per cinque minuti, finisce dentro
+        # l'account del mittente senza accorgersene, e quel che ci
+        # pubblica o ci scrive e' roba sua. «Entra dal bot» e' nato
+        # proprio per questo (la figura, il cookie del browser): con
+        # lui acceso, il ritorno del widget si rifiuta con le parole
+        # di un login non riuscito. A leva spenta resta com'era, col
+        # suo limite scritto in ARCHITETTURA.
+        if porta_bot_aperta():
+            raise HTTPException(401, "Porta spenta")
         user = verifica_login_widget(d)
     except HTTPException:
         # con una query gia' nel ritorno il segno si accoda con `&`
@@ -12036,6 +12051,38 @@ def brucia_sfida_login(sfida: str) -> bool:
     return n == 1
 
 
+def host_di_casa(host: str) -> str:
+    """L'Host della richiesta SE E' UN NOME NOSTRO, altrimenti '' (14 nov
+    2026, cantiere audit-account, dal primo audit di sicurezza).
+    `verifica_evento_login` lega la firma al sito confrontando il tag
+    `relay` con l'Host — ma l'Host lo scrive chi manda la richiesta. Un
+    evento 22242 e' anche la forma dell'AUTH che un relay chiede ai suoi
+    client (NIP-42): un relay `wss://R/` puo' farsi firmare la NOSTRA
+    sfida da chi gli si collega, e ripresentarla qui con `Host: R`. Che
+    una richiesta con un Host forestiero non arrivi fin qui lo decide
+    Caddy, cioe' un file che non sta nel repository: la porta si chiude
+    anche da questa parte. I nomi di casa sono quelli di `_dm_auth`, che
+    lo stesso scontro lo conosce gia': il sito (`URL_PUBBLICO`) e il
+    servizio nascosto (`ONION_HOST`). Si confronta il NOME, senza la
+    porta (la regola di `su_onion`: Tor inoltra su una porta
+    qualunque), e l'Host dev'essere SOLO nome e porta: un
+    `altro@barattolo.store` non e' un Host, e non passa. IN COLLAUDO il
+    nome e' quello della macchina di chi prova (localhost, una porta,
+    la gabbia): li' passa com'e'."""
+    h = str(host or "").strip()
+    if not h or MODALITA_COLLAUDO:
+        return h
+    try:
+        u = urlparse("//" + h)
+        nome = (u.hostname or "").lower()
+        forma = nome if u.port is None else f"{nome}:{u.port}"
+        casa = {(urlparse(URL_PUBBLICO).hostname or "").lower(),
+                str(ONION_HOST or "").strip().lower()} - {""}
+    except ValueError:
+        return ""
+    return h if nome in casa and h.lower() == forma else ""
+
+
 def verifica_evento_login(evento, host: str) -> str:
     """Controlla l'evento di login firmato dal client, campo per campo,
     e ritorna la pubkey (esadecimale) di chi ha firmato. Qualsiasi cosa
@@ -12240,8 +12287,8 @@ async def login_nostr(req: Request, response: Response,
                                  "server manca il pacchetto coincurve")
     d = await leggi_json(req)
     _frena("login", _ip_di(req))
-    pubkey = verifica_evento_login(d.get("evento"),
-                                   req.headers.get("host", ""))
+    pubkey = verifica_evento_login(
+        d.get("evento"), host_di_casa(req.headers.get("host", "")))
     npub = hex_to_npub(pubkey)
     con = db()
     r = con.execute("SELECT tg_id FROM utenti WHERE npub_accesso=?",
@@ -12317,8 +12364,21 @@ async def login_nostr_collega(req: Request, response: Response,
     tg_id, npub = dati
     con = db()
     try:
-        con.execute("UPDATE utenti SET npub_accesso=? WHERE tg_id=? "
-                    "AND npub_accesso=''", (npub, tg_id))
+        # IL BIGLIETTO VALE SOLO SE L'ACCOUNT E' ANCORA QUELLO DI QUANDO
+        # E' NATO (14 nov 2026, cantiere audit-account, dal primo audit
+        # di sicurezza): la chiave e' ancora il SUO badge verificato, e
+        # l'accesso e' ancora libero. Prima si guardavano solo l'hash e
+        # la scadenza, e la sessione si apriva comunque: un biglietto
+        # preso dieci minuti fa entrava anche dopo che il titolare aveva
+        # TOLTO quella chiave dal profilo (e gliela rimetteva come
+        # chiave d'accesso, con la npub vuota: invisibile), o dopo che
+        # ne aveva collegata un'altra (la scrittura non toccava niente,
+        # e si entrava lo stesso). Ora decide la riga, nella stessa
+        # scrittura: se non cambia, non si entra.
+        cur = con.execute(
+            "UPDATE utenti SET npub_accesso=? WHERE tg_id=? "
+            "AND npub_accesso='' AND npub=? AND npub_verificata=1",
+            (npub, tg_id, npub))
         con.commit()
     except sqlite3.IntegrityError:
         # qualcun altro ha preso quella chiave nel frattempo: mai due
@@ -12326,6 +12386,8 @@ async def login_nostr_collega(req: Request, response: Response,
         con.close()
         raise HTTPException(401, "Riprova il login")
     con.close()
+    if cur.rowcount != 1:
+        raise HTTPException(401, "Invito scaduto: riprova il login")
     apri_sessione(response, tg_id, barattolo_portachiavi, barattolo_sessione)
     await premia_distintivi(tg_id)   # doppia cittadinanza appena nata
     return {"ok": True, "collegato": True}
@@ -71832,8 +71894,8 @@ async def collega_npub_firma(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(503, "Login Nostr non disponibile: sul "
                                  "server manca il pacchetto coincurve")
     d = await leggi_json(req)
-    pubkey = verifica_evento_login(d.get("evento"),
-                                   req.headers.get("host", ""))
+    pubkey = verifica_evento_login(
+        d.get("evento"), host_di_casa(req.headers.get("host", "")))
     npub = hex_to_npub(pubkey)
     con = db()
     u = con.execute("SELECT npub_accesso FROM utenti WHERE tg_id=?",

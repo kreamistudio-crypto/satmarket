@@ -9397,7 +9397,22 @@
   con `verifica_evento_login` (sfida bruciata PRIMA della firma, tag
   `relay` ≡ Host, id ricalcolato NIP-01, Schnorr con `PublicKeyXOnly`
   di coincurve — 503 se il pacchetto manca) e apre la STESSA sessione
-  cookie del login Telegram. Anagrafica: l'utente Nostr ha `tg_id`
+  cookie del login Telegram. L'HOST CHE LA VERIFICA CONFRONTA È UN NOME
+  DI CASA (14 nov 2026, cantiere audit-account, dal primo audit di
+  sicurezza): un 22242 è anche la forma dell'AUTH che un relay chiede ai
+  suoi client (NIP-42), e l'Host lo scrive chi manda la richiesta — un
+  relay poteva farsi firmare la NOSTRA sfida e ripresentarla qui col suo
+  nome nell'Host, e a fermarlo c'era solo Caddy, cioè un file fuori dal
+  repository. `host_di_casa` passa l'Host alla verifica solo se il suo
+  NOME (senza la porta, e niente altro che nome e porta) è quello di
+  `URL_PUBBLICO` o `ONION_HOST`, gli stessi di `_dm_auth`; sennò lo dà
+  vuoto, e la verifica un Host vuoto lo rifiuta. Vale per le due porte
+  che verificano una firma (`login_nostr`, `collega_npub_firma`: le
+  conta `prove_accesso_di_casa`). In collaudo passa com'è. DA SAPERE:
+  `URL_PUBBLICO` dev'essere il nome che la gente scrive nel browser, o
+  il login con Nostr si rifiuta a tutti (sul VPS la riga manca o dice
+  barattolo.store; è lo stesso nome su cui si registra il webhook).
+  Anagrafica: l'utente Nostr ha `tg_id`
   NEGATIVO derivato dalla pubkey (Telegram usa solo id positivi:
   tutto il resto funziona invariato; `notifica()` salta gli id
   negativi) e c'è la colonna `utenti.npub_accesso` = la chiave che
@@ -9810,7 +9825,22 @@
   così); dal computer c'è anche il QR, da inquadrare col telefono. Vale
   uguale nella PWA e nell'APK, dove il widget si rompeva (il popup
   usciva dalla TWA). Dentro la Mini App la porta non c'è: lì entra già
-  l'account attivo. SU ONION (dal 19 ott 2026, decisione di Andrea) la
+  l'account attivo. A PORTA APERTA IL RITORNO DEL WIDGET È SPENTO (14 nov
+  2026, cantiere audit-account, dal primo audit di sicurezza):
+  `GET /api/login/telegram/ritorno` apre una sessione dai soli dati
+  firmati nella query, e niente lo lega al browser che ha chiesto di
+  entrare — chi fa il SUO login può tenersi quell'indirizzo e mandarlo
+  a un altro, che per cinque minuti finisce dentro l'account del
+  mittente senza saperlo. Con `porta_bot_aperta()` la pagina il widget
+  non lo disegna, quindi la rotta risponde come a un login non riuscito
+  (303 con `accesso=no`) prima ancora di guardare la firma. DUE LIMITI
+  SCRITTI: a leva spenta il ritorno resta com'era (per chiuderlo lì
+  serve un legame col browser, che il widget vero non porta: cantiere
+  da fare se mai la leva si spegnesse); e se la pagina non riesce a
+  leggere `/api/login/bot` ripiega sul widget, che a leva accesa
+  risponde «Accesso non riuscito, riprova» — al secondo tentativo la
+  pagina rilegge la porta e mostra il bot.
+  SU ONION (dal 19 ott 2026, decisione di Andrea) la
   porta del bot c'è, dietro la stessa leva, e il widget MAI: il bot non
   vuole il dominio di BotFather e non carica niente da telegram.org. Da
   Tor il link t.me può non aprirsi, quindi lì il foglio mostra SEMPRE il
@@ -31143,6 +31173,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   tiene il tetto (`TETTO_BIGLIETTI_COLLEGAMENTO` = 10000) e scrive;
   `brucia_biglietto_collegamento` legge e cancella, e vince solo chi
   cancella (`rowcount == 1`). Dieci minuti (`SECONDI_SFIDA_LOGIN`).
+  IL BIGLIETTO VALE SOLO SE L'ACCOUNT È ANCORA QUELLO DI QUANDO È NATO
+  (14 nov 2026, cantiere audit-account, dal primo audit di sicurezza):
+  `login_nostr_collega` scrive `npub_accesso` con le stesse tre
+  condizioni con cui `login_nostr` lo emette (`npub=?`, `npub_verificata
+  =1`, `npub_accesso=''`) e apre la sessione solo se la riga è cambiata
+  (`rowcount == 1`), sennò 401 «Invito scaduto». Prima guardava solo
+  hash e scadenza: un biglietto in giro entrava anche dopo che il
+  titolare aveva tolto la chiave dal profilo (e gliela rimetteva come
+  chiave d'accesso con la `npub` vuota, invisibile), o dopo che ne
+  aveva collegata un'altra.
 - IL RINNOVO A OGNI USO (19 ott 2026, cantiere logout-apk, secondo
   giro, decisione di Andrea): `utente_da_sessione` rinnova `scade` con
   `nuova_scadenza_sessione(creato, scade, adesso)`: niente se l'ultimo
