@@ -61590,12 +61590,16 @@ function txidUsdtDaChatP2P(testo){
   return m ? m[1] : '';
 }
 /* il riquadro dell'indirizzo USDT per chi PAGA: la rete in grande, il
-   contratto del vero USDT, l'indirizzo e il QR (EIP-681 sulle EVM) */
+   contratto del vero USDT, l'indirizzo, la cifra da copiare e il QR
+   (EIP-681 sulle EVM) */
 function riquadroUsdtOcP2P(o){
   const r = reteOcUsdtP2P(o);
   if (!r || !o.recapito) return '';
   return '<div class="p2p-box"><b>💵 Manda gli USDT su ' + esc(r.nome) + ' (' + esc(r.standard) + ')</b>'
     + '<div class="mono" style="word-break:break-all">' + esc(o.recapito) + '</div>'
+    /* la cifra da mandare col suo «📋 Copia» (14 nov 2026, cantiere
+       usdt-cifra-copia): vedi `rigaCifraUsdtP2P` */
+    + rigaCifraUsdtP2P(o.euro)
     + '<div id="p2pOcUsdtQr" class="qr" data-qr="' + esc(qrUsdtP2P(r, o.recapito, o.euro)) + '"></div>'
     + '<div class="hint">⚠️ Solo sulla rete ' + esc(r.nome) + ': con un\'altra rete gli USDT si perdono. '
     + 'Contratto del vero USDT: <span class="mono">' + esc(r.contratto) + '</span></div>'
@@ -76170,6 +76174,7 @@ function riquadroRecapitoP2P(testo, titolo, o){
     setTimeout(() => { const b = typeof el === 'function' ? el('p2pQrUsdt') : null;
                        if (b) disegnaQr(b, qr); }, 0);
   if (!titolo && usdt) titolo = '💵 Dove mandare gli USDT';
+  const cifraUsdt = usdt && o && typeof usdtP2P === 'function' && usdtP2P(o) ? rigaCifraUsdtP2P(o.euro) : '';
   /* ETH E XMR (13 nov 2026, cantiere eth-xmr): il titolo con la moneta,
      la cifra al cambio di adesso (con lo scambio in mano, `o`), il QR
      col formato della catena e, su Ethereum, l'indirizzo sull'explorer */
@@ -76188,7 +76193,10 @@ function riquadroRecapitoP2P(testo, titolo, o){
         return FORMA_IBAN.test(nudo)
           ? rigaDato(r.et, nudo, {vista: nudo.replace(/(.{4})(?=.)/g, '$1 '),
                                   mono: true, copia: true})
-          : rigaDato(r.et, r.v, {mono: /^(iban|indirizzo|contratto usdt|contratto usde)$/i.test(r.et), copia: daIncollareP2P(r)});
+          : rigaDato(r.et, r.v, {mono: /^(iban|indirizzo|contratto usdt|contratto usde)$/i.test(r.et), copia: daIncollareP2P(r)})
+            /* la cifra da mandare, sotto l'indirizzo (14 nov 2026,
+               cantiere usdt-cifra-copia): vedi `rigaCifraUsdtP2P` */
+            + (cifraUsdt && String(r.et || '').toLowerCase() === 'indirizzo' ? cifraUsdt : '');
       }).join('')
     + (qr ? '<div class="qr p2p-qr-usdt" id="p2pQrUsdt" role="img" aria-label="QR dell\'indirizzo USDT su '
             + esc(usdt.rete.nome) + '"></div>'
@@ -76199,6 +76207,29 @@ function riquadroRecapitoP2P(testo, titolo, o){
         + esc(coin.rete.nome) + '"></div>'
         + '<div class="hint">Inquadralo col wallet ' + esc(coin.rete.nome) + ': dentro ci sono indirizzo e cifra.</div>' : '')
     + '</div>';
+}
+/* ---- LA CIFRA IN USDT DA COPIARE (14 nov 2026, cantiere
+   usdt-cifra-copia, Andrea: «quando uno deve mandare usdt sotto alla riga
+   dell'indirizzo da copiare aggiungi anche la cifra da inviare con il
+   tasto copia affianco come per l'indirizzo») ----
+   Chi compra sats e paga in USDT copiava l'indirizzo col suo «📋 Copia»
+   e la cifra la riscriveva a mano nel wallet. Adesso, subito sotto
+   l'indirizzo, la riga «Da mandare» con lo STESSO bottone e lo stesso
+   tocco sul valore (`rigaDato`), in tutti e due i riquadri di chi paga:
+   quello degli scambi su Lightning (`riquadroRecapitoP2P`) e quello on-chain
+   (`riquadroUsdtOcP2P`). La cifra e' quella dello scambio (`o.euro`, che in
+   un ordine in USDT e' gia' in USDT: 1 USDT = 1 $, niente cambio da fare).
+   NEGLI APPUNTI IL SOLO NUMERO, COL PUNTO E I CENTESIMI («25.00»): senza
+   «USDT» e senza migliaia, che e' la forma che i wallet crypto accettano
+   sempre (la stessa scelta della cifra in BTC, 11 nov 2026). Sullo schermo
+   la si legge all'italiana, «25,00 USDT». PURA: '' senza una cifra vera. */
+function cifraUsdtDaCopiareP2P(cifra){
+  const n = Number(cifra);
+  return isFinite(n) && n > 0 ? n.toFixed(2) : '';
+}
+function rigaCifraUsdtP2P(cifra){
+  const v = cifraUsdtDaCopiareP2P(cifra);
+  return v ? rigaDato('Da mandare', v, {vista: fmtEur(Number(v)) + ' USDT', mono: true, copia: true}) : '';
 }
 /* PURA: dalle righe di un recapito, la rete USDT e l'indirizzo, o null
    (1 nov 2026, cantiere p2p-usdt). La rete si legge dalla riga «Rete»

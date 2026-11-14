@@ -193012,6 +193012,93 @@ def prove_widget_ordini():
           "widget" in pezzo("notifica").lower())
 
 
+def prove_usdt_cifra_copia():
+    """LA CIFRA IN USDT DA COPIARE (14 nov 2026, cantiere usdt-cifra-copia,
+    Andrea: «quando uno deve mandare usdt sotto alla riga dell'indirizzo da
+    copiare aggiungi anche la cifra da inviare con il tasto copia affianco
+    come per l'indirizzo»). Il conto PURO (punto e centesimi, '' senza una
+    cifra vera), la riga «Da mandare» col «📋 Copia» SUBITO sotto
+    l'indirizzo nel riquadro degli scambi su Lightning, e lo stesso nel
+    riquadro on-chain, sotto l'indirizzo e prima del QR. Mai su un recapito
+    in euro, mai senza lo scambio in mano, mai su un ordine non in USDT."""
+    print("\n[la cifra in USDT da copiare, sotto l'indirizzo]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    i = mini.index("const P2P_RETI_USDT = [")
+    reti = mini[i:mini.index("\n];", i) + 3]
+    i = mini.index("const ETICHETTE_DA_INCOLLARE_P2P = ")
+    etichette = mini[i:mini.index("\n", i)]
+    i = mini.index("const FORME_DA_INCOLLARE_P2P = [")
+    forme = mini[i:mini.index("\n];", i) + 3]
+    banco = ("const P2P_VALUTA = 'EUR';\n"
+             + mini[mini.index("const esc = s =>"):mini.index("const el = id =>")] + "\n"
+             + _riga_js(mini, "const fmtEur = e =>") + _riga_js(mini, "  {minimumFractionDigits:2")
+             + reti + "\n" + etichette + "\n" + forme + "\n"
+             + _fn_js(mini, "function rigaDato(et, v, op){")
+             + _fn_js(mini, "function bottoneCopia(v, aria){")
+             + _fn_js(mini, "function daIncollareP2P(r){")
+             + _fn_js(mini, "function righeRecapitoP2P(testo){")
+             + _fn_js(mini, "function reteUsdtDaRecapitoP2P(righe){")
+             + _fn_js(mini, "function reteCoinDaRecapitoP2P(righe){")
+             + _fn_js(mini, "function reteUsdtDaMetodoP2P(m){")
+             + _fn_js(mini, "function valutaOrdineP2P(o){")
+             + _riga_js(mini, "function usdtP2P(o){")
+             + _fn_js(mini, "function cifraUsdtDaCopiareP2P(cifra){")
+             + _fn_js(mini, "function rigaCifraUsdtP2P(cifra){")
+             + _fn_js(mini, "function riquadroRecapitoP2P(testo, titolo, o){")
+             + _fn_js(mini, "function riquadroUsdtOcP2P(o){")
+             + r"""
+function qrUsdtP2P(r, a, n){ return 'QR'; }
+function reteOcUsdtP2P(o){ return usdtP2P(o) ? P2P_RETI_USDT[0] : null; }
+const TRON = 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf';
+const T = '⚠️ Solo rete Tron\nRete: Tron (TRC-20)\nIndirizzo: ' + TRON;
+const U = (x) => Object.assign({fiat: 'USDT', metodi: ['USDT (Tron)'], euro: 25}, x);
+const copie = h => (h.match(/data-v="[^"]*"/g) || []).map(x => x.slice(8, -1));
+const out = {};
+out.puri = [25, '25.5', 0.1, 1234.5, 0, -3, NaN, null, undefined, Infinity, 'ciao'].map(cifraUsdtDaCopiareP2P);
+const ln = riquadroRecapitoP2P(T, '', U());
+out.ln = [copie(ln), (ln.match(/<button/g) || []).length,
+  ln.includes('<span>Da mandare</span><b class="mono da-toccare" onpointerdown="this._giu=Date.now()" onclick="toccaDatoP2P(this)">25,00 USDT</b>'),
+  ln.includes('aria-label="Copia Da mandare">📋 Copia</button>'),
+  ln.indexOf('data-v="' + TRON + '"') < ln.indexOf('<span>Da mandare</span>'),
+  ln.indexOf('<span>Da mandare</span>') < ln.indexOf('id="p2pQrUsdt"')];
+out.migliaia = copie(riquadroRecapitoP2P(T, '', U({euro: 12345.5})));
+out.migliaiaVista = riquadroRecapitoP2P(T, '', U({euro: 12345.5})).includes('>12.345,50 USDT</b>');
+/* quando NON c'e': senza lo scambio, in euro, a cifra zero, su un IBAN */
+out.senza = [riquadroRecapitoP2P(T), riquadroRecapitoP2P(T, '', {fiat: 'EUR', metodi: ['SEPA'], euro: 25}),
+  riquadroRecapitoP2P(T, '', U({euro: 0})), riquadroRecapitoP2P(T, '', U({euro: null})),
+  riquadroRecapitoP2P('Bonifico SEPA\nIBAN: IT60X0542811101000000123456', '', U())]
+  .map(h => h.includes('Da mandare'));
+/* l'ordine dei pezzi on-chain: indirizzo, cifra, QR, poi il tasto dell'indirizzo */
+const oc = riquadroUsdtOcP2P(U({recapito: TRON, euro: 9}));
+const a = oc.indexOf('>' + TRON + '</div>'), c = oc.indexOf('<span>Da mandare</span>'),
+      q = oc.indexOf('id="p2pOcUsdtQr"'), b = oc.indexOf('📋 Copia l\'indirizzo');
+out.oc = [copie(oc), a >= 0 && a < c && c < q && q < b, oc.includes('>9,00 USDT</b>')];
+out.ocSenza = [riquadroUsdtOcP2P(U({recapito: TRON, euro: 0})).includes('Da mandare'),
+  riquadroUsdtOcP2P(U({recapito: '', euro: 9}))];
+console.log(JSON.stringify(out));
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("la cifra in USDT da copiare: il banco", "node non c'e'")
+        return
+    prova("il numero negli appunti: punto e centesimi, senza «USDT» ne' migliaia; "
+          "'' senza una cifra vera",
+          ["25.00", "25.50", "0.10", "1234.50", "", "", "", "", "", "", ""], r.get("puri"))
+    TRON = "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf"
+    prova("Lightning: due «📋 Copia» (indirizzo e cifra), la cifra a schermo all'italiana "
+          "e da toccare, sotto l'indirizzo e sopra il QR",
+          [[TRON, "25.00"], 2, True, True, True, True], r.get("ln"))
+    prova("...con le migliaia: «12.345,50 USDT» a schermo, «12345.50» negli appunti",
+          [[TRON, "12345.50"], True], [r.get("migliaia"), r.get("migliaiaVista")])
+    prova("niente riga senza lo scambio, in euro, a cifra zero o vuota, su un IBAN",
+          [False, False, False, False, False], r.get("senza"))
+    prova("on-chain: la cifra col suo «📋 Copia» fra l'indirizzo e il QR",
+          [["9.00"], True, True], r.get("oc"))
+    prova("...e senza cifra niente riga; senza indirizzo niente riquadro",
+          [False, ""], r.get("ocSenza"))
+
+
 def prove_cifra_btc():
     """LA CIFRA IN BTC DA COPIARE (11 nov 2026, cantiere cifra-btc, Andrea:
     «quando devo pagare un ordine onchain mi dice sats ma solitamente in un
@@ -193468,7 +193555,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia
     sconto_fisso_decimale
     lista_corta_metodi
     """.split(),
@@ -194158,6 +194245,7 @@ def main():
     prove_sconto_fisso_decimale,
     prove_rete_scelta_p2p,
     prove_card_p2p_monete,
+    prove_usdt_cifra_copia,
     prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,
     prove_parole_uniche,
