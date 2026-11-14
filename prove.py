@@ -5605,11 +5605,13 @@ def prove_pagamenti_in_volo(attrezzi=False):
                 ("_stato_lnd", 1), ("_voce_lnd", 0),
                 ("_verdetto_pagamento", 0),
                 ("_verita_pagamento", 1), ("_hash_tentati", 0),
+                ("_verso_tentato", 0),
                 ("_verita_riga", 1), ("_prendi_la_mano", 0),
                 ("paga_venditore", 1), ("_timbra_pagamento", 0),
                 ("_in_volo", 0), ("_sospendi_pagamento", 0),
                 ("_payment_hash", 1), ("_congela_pagamento", 1),
                 ("_msg_ritentiamo", 0), ("_sblocca_sats", 1),
+                ("_verso_della_verita", 1),
                 ("_riprendi_uscita", 1), ("_arrenditi_in_volo", 1),
                 ("risolvi_pagamenti_in_volo", 1), ("decidi_pagamento", 1),
                 ("deposita_invoice", 1)):
@@ -77159,7 +77161,6 @@ def prove_p2p_motore():
         pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
             "function chiaveNwcConto(){",
             "function walletNwc(){",
-            "function scordaWalletConto(tgId){",
             "function walletNwcPaga(){",
             "function walletNwcFattura(){",
             "function chiaveNwc(con){",
@@ -78162,27 +78163,18 @@ function reset(){
   await presaConWallet('buona', ['pay_invoice', 'get_info']);
   out.senzaMetodoNonChiede = walletRichieste.length === 0 && ricevuti.length === 1
     && (el('p2pIncassoAvviso').textContent || '') === '';
-  /* LA CUSTODIA PER CONTO. La riga di ieri senza conto NON si adotta
-     piu' (14 nov 2026, secondo audit): non si sa di chi sia, si toglie */
+  /* LA CUSTODIA PER CONTO, e la migrazione della riga di ieri */
   reset();
   localStorage.setItem('barattolo_nwc', JSON.stringify({stringa: 'x', pubkey: 'ab', relays: [], cifratura: 'nip04'}));
   {
     const w = walletNwc();
-    out.migraAlConto = w === null && localStorage.getItem('barattolo_nwc@111') === null
-      && localStorage.getItem('barattolo_nwc') === null && !walletNwcPaga();
-    /* una riga del conto con la forma di ieri (senza metodi) */
-    localStorage.setItem('barattolo_nwc@111', JSON.stringify({stringa: 'x', pubkey: 'ab', relays: [], cifratura: 'nip04'}));
+    out.migraAlConto = !!w && localStorage.getItem('barattolo_nwc@111') !== null
+      && localStorage.getItem('barattolo_nwc') === null;
     out.vecchiaPagaAncora = !!walletNwcPaga();
     out.vecchiaNonFattura = walletNwcFattura() === null;
     myTgId = 222;
     out.altroContoNonLoVede = walletNwc() === null;
     myTgId = 111;
-    /* chi esce si porta via il suo wallet, e solo il suo */
-    localStorage.setItem('barattolo_nwc@222', '{"stringa":"y"}');
-    scordaWalletConto(111);
-    out.chiEsceLoToglie = localStorage.getItem('barattolo_nwc@111') === null
-      && localStorage.getItem('barattolo_nwc@222') !== null;
-    localStorage.removeItem('barattolo_nwc@222');
   }
   /* ⚠️ E LA RIGA DI IERI — solo il lordo, senza `satsMiei` — ha il suo
      ripiego: la meta' si toglie come prima (99000 → 98010 al 2%), che e'
@@ -79350,11 +79342,10 @@ function reset(){
         "cortaLoDice": "...e la ragione dice che scade troppo presto",
         "walletSeiOreParte": "...mentre una da sei ore PARTE (24 set 2026), col toast che dice quanto vive",
         "senzaMetodoNonChiede": "senza make_invoice fra i metodi il wallet non si disturba",
-        "migraAlConto": "la riga NWC di ieri, senza conto, non si adotta: si toglie (secondo audit)",
+        "migraAlConto": "la riga NWC di ieri migra alla chiave del conto",
         "vecchiaPagaAncora": "...e per il mercatino vale ancora (era stata collegata con pay_invoice)",
         "vecchiaNonFattura": "...ma per il P2P no: senza metodi scritti non si chiede",
         "altroContoNonLoVede": "...e un altro conto sullo stesso telefono non la vede",
-        "chiEsceLoToglie": "chi esce si porta via il suo wallet NWC, e solo il suo (secondo audit)",
         "rigaDiIeriRipiega": "una riga di ieri, col solo lordo, ripiega sulla meta' come prima",
         "senzaFeeIlFattoResta": "senza il 38385 il mio lato si tiene e il lordo non si inventa",
         "senzaFeeDiceIlFatto": "...e il foglio dice la cifra detta, che non e' un conto",
@@ -150107,6 +150098,9 @@ def prove_freni():
            # l'indirizzo Lightning di casa (10 ott 2026): 20 fatture al
            # minuto per IP, 120 per tutti insieme
            "zap": (20, 60), "zap_tutti": (120, 60),
+           # (14 nov 2026, terzo giro dell'audit) gli annulli delle
+           # fatture di puntata: 10 all'ora per persona
+           "rilancio_annulla": (10, 3600),
            # l'on-chain della tappa 2 (20 ott 2026, numeri di Andrea):
            # la xpub dedicata 5 all'ora, un indirizzo di prova 20 all'ora
            "onchain_xpub": (5, 3600), "onchain_indirizzo": (20, 3600),
@@ -174794,8 +174788,11 @@ def prove_canale_admin():
           # (14 nov 2026, audit-pagamenti-2) la invoice di rimborso di uno
           # sblocco scritta da un moderatore: nella moderazione, perche'
           # e' un gesto di chi modera che gli altri devono vedere
-          {"assistenza": 1, "dispute": 6, "dm": 1, "errori": 33,
-           "liquidita": 5, "moderazione": 17, "riepiloghi": 27}, per_stanza)
+          # (14 nov 2026, audit-pagamenti-3) il pagamento uscito verso
+          # l'altra parte e la fattura con due hash negli errori, la
+          # chiave on-chain cambiata nella moderazione
+          {"assistenza": 1, "dispute": 6, "dm": 1, "errori": 35,
+           "liquidita": 5, "moderazione": 18, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -174830,7 +174827,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "99 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "102 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -174842,7 +174839,9 @@ def prove_canale_admin():
           "da 'shipped', e dello swap automatico il ritiro rifiutato a "
           "scadenza vicina e il lockup speso da un altro; dei feedback "
           "modificati il filtro del commento e il voto basso toccato; e la "
-          "invoice di rimborso di uno sblocco scritta da un moderatore)", 99,
+          "invoice di rimborso di uno sblocco scritta da un moderatore; dal "
+          "14 nov sera il pagamento uscito verso l'altra parte, la fattura "
+          "con due hash e la chiave on-chain cambiata)", 102,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -183890,7 +183889,7 @@ def prove_allegati_chat():
                                         f.filter(_R("/api/p2p/chat/allegato", 413))])
     # le funzioni pure del server, su un cassetto in memoria
     amb = {"re": re, "secrets": __import__("secrets"), "sqlite3": sqlite3}
-    for riga in re.findall(r"\n((?:P2P_CHAT_(?:FILE_MAX|ALLEGATO_MAX|ALLEGATO_MIN|ALLEGATI_PARTE|PESO_PARTE|ALLEGATI_CASSETTO)"
+    for riga in re.findall(r"\n((?:P2P_CHAT_(?:FILE_MAX|ALLEGATO_MAX|ALLEGATO_MIN|ALLEGATI_PARTE|PESO_PARTE|ALLEGATI_CASSETTO|PESO_PERSONA)"
                            r"|FORMA_ALLEGATO_CHAT) = [^\n]+)", blocco_srv):
         exec(riga.split("  #")[0], amb)
     # (19 ott 2026, chat-mercatino-2) i rifiuti dicono «questo ordine» o «questo scambio»
@@ -185934,7 +185933,8 @@ def prove_chat_mercatino():
     amb.update({"P2P_CHAT_MSG_MAX": 1, "P2P_CHAT_RAFFICA": 20, "P2P_CHAT_SALUTI_MAX": 0,
                 "P2P_CHAT_CHIAVI_MAX": 20, "P2P_CHAT_MOD_MAX": 40, "P2P_CHAT_ALLEGATO_MIN": 29,
                 "P2P_CHAT_ALLEGATO_MAX": 1000, "P2P_CHAT_ALLEGATI_PARTE": 0, "P2P_CHAT_PESO_PARTE": 10,
-                "P2P_CHAT_ALLEGATI_CASSETTO": 10 ** 9, "secrets": __import__("secrets"), "sqlite3": sqlite3})
+                "P2P_CHAT_ALLEGATI_CASSETTO": 10 ** 9, "P2P_CHAT_PESO_PERSONA": 10 ** 9,
+                "secrets": __import__("secrets"), "sqlite3": sqlite3})
     for f in ("_chat_p2p_posa", "_chat_p2p_allegato_posa"):
         exec(_senza_prosa(pezzo(f)), amb)
     cc.execute("INSERT INTO buste(ordine, giro, da, tipo, per, busta, quando) VALUES('m8',0,1,'msg','','z',1)")
@@ -195232,6 +195232,190 @@ console.log(JSON.stringify([
               [True, False, True, True, False, True], r)
 
 
+def prove_audit_pagamenti_3():
+    """IL TERZO GIRO DELL'AUDIT, I PAGAMENTI (14 nov 2026). Sette porte
+    chiuse dietro le quinte, senza cambiare niente di quel che l'utente
+    vede (regola di Andrea): l'hash che ricorda A CHI andava, la fattura
+    con due hash, il freno sugli annulli delle puntate, lo storico della
+    chiave on-chain, il telefono che rilegge la firma prima di
+    rilasciare, il timbro chiuso prima del cambio, il tetto per persona
+    nel cassetto degli allegati."""
+    import asyncio
+    import sqlite3 as _sq
+    import tempfile as _tf
+    import shutil as _sh
+    print("\n[terzo audit: i pagamenti dietro le quinte]")
+
+    # ---- 1. un hash ha una direzione ----------------------------------
+    sc = _SORGENTE
+    prova("la memoria degli hash ha la colonna del verso, anche sui "
+          "database di ieri", [True, True],
+          ["\"verso TEXT NOT NULL DEFAULT '', \"\n        \"PRIMARY KEY(tabella, riga_id, hash))\"" in sc,
+           "\"verso TEXT NOT NULL DEFAULT ''\"):" in sc])
+    pm = codice(pezzo("_prendi_la_mano"))
+    prova("_prendi_la_mano scrive a chi va il tentativo", True,
+          "verso=excluded.verso" in pm and "int(scade or 0), verso or \"\"))" in pm)
+    pv = codice(pezzo("paga_venditore"))
+    i_dir = pv.index("verso_vero = _verso_tentato(con, tabella, riga_id, passato[\"hash\"])")
+    i_pag = pv.index("if passato[\"verdetto\"] == USCITO:\n            print(f\"✅")
+    prova("un hash USCITO verso l'altra parte ferma la riga PRIMA del «pagato»",
+          True, i_dir < pv.index("return INCERTO", i_dir) < i_pag)
+    ru = codice(pezzo("_riprendi_uscita"))
+    prova("la ripresa dopo il volo guarda la direzione del pagamento vero",
+          True, ru.index("verso = await _verso_della_verita(riga_id, verso)")
+          < ru.index("if verso == \"compratore\":"))
+    prova("...ed e' attesa (l'avviso ai moderatori parte davvero)", True,
+          "verso = await _verso_della_verita(riga_id, verso)" in ru)
+
+    cart = _tf.mkdtemp()
+    try:
+        dbp = os.path.join(cart, "s.db")
+        c = _sq.connect(dbp)
+        c.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                  "payout_stato TEXT, payout_hash TEXT, payout_verso TEXT)")
+        c.execute("CREATE TABLE payout_tentati(tabella TEXT, riga_id INTEGER, "
+                  "hash TEXT, quando INTEGER, esito TEXT, cassaforte TEXT, "
+                  "scade INTEGER, verso TEXT, PRIMARY KEY(tabella, riga_id, hash))")
+        righe = [(1, "refund", "uscito", "h1", "compratore", "venditore"),
+                 (2, "refund", "uscito", "h2", "compratore", "compratore"),
+                 (3, "refund", "uscito", "h3", "compratore", ""),
+                 (4, "confirmed", "in_volo", "h4", "venditore", "compratore")]
+        for oid, st, ps, h, pvv, vv in righe:
+            c.execute("INSERT INTO ordini VALUES(?,?,?,?,?)", (oid, st, ps, h, pvv))
+            c.execute("INSERT INTO payout_tentati VALUES('ordini',?,?,0,'','',0,?)",
+                      (oid, h, vv))
+        c.commit()
+        c.close()
+
+        def apri():
+            k = _sq.connect(dbp)
+            k.row_factory = _sq.Row
+            return k
+        avvisi = []
+
+        async def avvisa(testo, argomento=""):
+            avvisi.append(argomento)
+        amb = {"db": apri, "sqlite3": _sq, "asyncio": asyncio,
+               "notifica_admin": avvisa}
+        exec(pezzo("_verso_tentato"), amb)
+        exec("async " + pezzo("_verso_della_verita"), amb)
+        vdv = amb["_verso_della_verita"]
+        prova("uscito verso chi vende, deciso poi per chi compra: si chiude "
+              "per chi vende (la verita'), e l'ordine torna sulla sua strada",
+              ("venditore", "confirmed", "venditore"),
+              (asyncio.run(vdv(1, "compratore")),) + tuple(apri().execute(
+                  "SELECT stato, payout_verso FROM ordini WHERE id=1").fetchone()))
+        prova("...stesso verso, o verso ignoto (le righe di ieri), o non "
+              "ancora uscito: tutto come prima",
+              ["compratore", "compratore", "venditore"],
+              [asyncio.run(vdv(2, "compratore")), asyncio.run(vdv(3, "compratore")),
+               asyncio.run(vdv(4, "venditore"))])
+        prova("...e i moderatori lo sanno, una volta sola", ["errori"], avvisi)
+        prova("...e le righe di ieri non si toccano", ("refund", "compratore"),
+              tuple(apri().execute("SELECT stato, payout_verso FROM ordini "
+                                   "WHERE id=3").fetchone()))
+    finally:
+        _sh.rmtree(cart, ignore_errors=True)
+
+    # ---- 2. la fattura con due hash -----------------------------------
+    amb = {"_BECH32_ALFABETO": "qpzry9x8gf2tvdw0s3jn54khce6mua7l",
+           "_BECH32_GEN": (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd,
+                           0x2a1462b3)}
+    exec(pezzo("leggi_bolt11"), amb)
+    lb = amb["leggi_bolt11"]
+    ALF = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    buona = bolt11_finta(1000, 3600, 1_700_000_000, phash=7)
+
+    def doppia(b11, h2):
+        """La stessa fattura con un SECONDO campo p subito dopo il primo."""
+        sep = b11.rfind("1")
+        hrp, d = b11[:sep], [ALF.index(x) for x in b11[sep + 1:]][:-6]
+        g = [((h2 << 4) >> (5 * k)) & 31 for k in range(51, -1, -1)]
+        d = d[:7 + 3 + 52] + [1, 1, 20] + g + d[7 + 3 + 52:]
+        chk = 1
+        for x in [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp] + d + [0] * 6:
+            alto = chk >> 25
+            chk = ((chk & 0x1ffffff) << 5) ^ x
+            for i, gg in enumerate(amb["_BECH32_GEN"]):
+                if (alto >> i) & 1:
+                    chk ^= gg
+        chk ^= 1
+        return hrp + "1" + "".join(ALF[x] for x in d + [(chk >> (5 * (5 - i))) & 31 for i in range(6)])
+    l1, l2 = lb(buona, con_hash=True), lb(doppia(buona, 9), con_hash=True)
+    prova("il lettore conta i campi hash: una fattura onesta ne ha uno, "
+          "quella costruita apposta due (e il primo resta quello di ieri)",
+          (1, 1, 2, f"{7:064x}"),
+          (l1["campi_p"], l1["campi_x"], l2["campi_p"], l2["hash"]))
+    prova("...e senza con_hash il dizionario e' quello di ieri (il gemello "
+          "del client lo confronta intero)", ["quando", "scadenza", "scade"],
+          list(lb(buona)))
+    i_cint = pv.index("locale = leggi_bolt11(invoice, con_hash=True)")
+    prova("la cintura dell'hash sta PRIMA di ogni domanda alla rete e di "
+          "ogni mano presa", True,
+          i_cint < pv.index("return NON_PAGATO", i_cint) < pv.index("_verita_riga(")
+          and i_cint < pv.index("_prendi_la_mano("))
+
+    # ---- 3. le puntate annullate hanno un freno -------------------------
+    ar = codice(pezzo("annulla_rilancio"))
+    prova("annullare la fattura di una puntata passa dal freno, per persona",
+          True, ar.index("_frena(\"rilancio_annulla\", user[\"id\"])")
+          < ar.index("invoice_pagata("))
+    prova("...dieci in un'ora", True,
+          "\"rilancio_annulla\": (10, 3600)," in sc)
+
+    # ---- 4. la chiave on-chain cambiata resta scritta ------------------
+    ox = codice(pezzo("onchain_xpub"))
+    prova("una xpub diversa da quella di prima: la vecchia nello storico, "
+          "il journal e i moderatori (nessun messaggio all'utente)",
+          [True, True, True, False],
+          ["INSERT INTO onchain_xpub_storia(" in ox,
+           ox.index("SELECT xpub FROM onchain_xpub WHERE tg_id=?")
+           < ox.index("INSERT INTO onchain_xpub(tg_id"),
+           "await _avvisa_xpub_cambiata(user[\"id\"])" in ox,
+           "await notifica(" in ox])
+    av = codice(pezzo("_avvisa_xpub_cambiata"))
+    prova("...e l'avviso riceve solo il numero dell'account, mai la xpub",
+          [True, True, False], ["argomento=\"moderazione\")" in av,
+                                "def _avvisa_xpub_cambiata(tg_id: int):" in av,
+                                "{xpub" in av or "cambiata[" in av])
+
+    # ---- 5. il telefono rilegge la firma prima di rilasciare ------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ca = pezzo_js(mini, "async function onchainCofirmeInAttesa(parole){", "\n}\n")
+    prova("il rilascio firmato da solo all'avvio rilegge la conferma col "
+          "MIO seme, come il P2P", True,
+          ca.index("if (!(await onchainRicevutoMio(await caricaBitcoin(), parole, o))) continue;")
+          < ca.index("await onchainFirmaProposta(o.id);"))
+
+    # ---- 6. il timbro si chiude prima del cambio -----------------------
+    for nome in ("_sblocca_sats", "_rimborsa_compratore"):
+        cs = codice(pezzo(nome))
+        i_p = cs.index("if esito == PAGATO:")
+        prova(f"{nome}: il timbro del pagamento si chiude prima di chiedere "
+              "il cambio", True,
+              i_p < cs.index("con.commit()", i_p) < cs.index("await cambio_btc_eur()", i_p))
+
+    # ---- 7. il cassetto degli allegati ha un tetto per persona ----------
+    exec_amb = {"P2P_CHAT_ALLEGATO_MIN": 1, "P2P_CHAT_ALLEGATO_MAX": 100,
+                "P2P_CHAT_ALLEGATI_PARTE": 10, "P2P_CHAT_PESO_PARTE": 100,
+                "P2P_CHAT_ALLEGATI_CASSETTO": 10_000, "P2P_CHAT_PESO_PERSONA": 150,
+                "sqlite3": _sq, "secrets": __import__("secrets"),
+                "_chat_questo": lambda o: "questo ordine"}
+    exec(pezzo("_chat_p2p_allegato_posa"), exec_amb)
+    posa = exec_amb["_chat_p2p_allegato_posa"]
+    cc = _sq.connect(":memory:")
+    cc.execute("CREATE TABLE allegati(id TEXT, ordine TEXT, giro INTEGER, "
+               "da INTEGER, dati BLOB, peso INTEGER, quando INTEGER)")
+    esiti = [posa(cc, f"o{k}", 0, 111, b"x" * 60, 0)[0] for k in range(3)]
+    prova("ordini diversi, stessa persona: oltre il suo tetto il «riprova "
+          "più tardi» di sempre, e l'altra parte non e' toccata",
+          ([200, 200, 507], 200),
+          (esiti, posa(cc, "o9", 0, 222, b"y" * 60, 0)[0]))
+    cc.close()
+    prova("...200 MB per persona", True,
+          "\nP2P_CHAT_PESO_PERSONA = 200 * 1024 * 1024\n" in sc)
+
+
 def prove_audit_pagamenti_2():
     """IL SECONDO AUDIT DI SICUREZZA, LE CHIUSURE SUI PAGAMENTI (14 nov
     2026, cantiere audit-pagamenti-2). Sette sospetti verificati sul
@@ -195397,17 +195581,16 @@ def prove_audit_pagamenti_2():
           "lnbc-del-moderatore", pagati[-1])
     db.close()
 
-    # ---- 4b. il cambio del Lightning address non e' piu' muto ---------
+    # ---- 4b. il cambio del Lightning address resta nel journal --------
     la = codice(pezzo("salva_ln_address"))
-    prova("il cambio dell'indirizzo legge quello di prima, lo scrive nel "
-          "journal e avvisa il titolare dal bot PRIMA di pagare", True,
-          la.index("SELECT ln_address FROM utenti WHERE tg_id=?")
-          < la.index("UPDATE utenti SET ln_address=?")
-          < la.index("cambiato: \"\n              f\"«{prima}»")
-          < la.index("await notifica(") < la.index(
-              "r = await _sblocca_sats(oid)"))
-    prova("...solo se c'era un indirizzo diverso: il primo non avvisa",
-          True, "cambiato = bool(prima) and prima != addr" in la)
+    prova("il cambio dell'indirizzo legge quello di prima e lo scrive nel "
+          "journal (senza messaggi nuovi all'utente)", [True, False],
+          [la.index("SELECT ln_address FROM utenti WHERE tg_id=?")
+           < la.index("UPDATE utenti SET ln_address=?")
+           < la.index("cambiato: \"\n              f\"«{prima}»"),
+           "await notifica(" in la])
+    prova("...solo se c'era un indirizzo diverso", True,
+          "cambiato = bool(prima) and prima != addr" in la)
 
     # ---- 4c. il pavimento dell'indice dello swap automatico ------------
     import tempfile as _tf
@@ -195473,23 +195656,6 @@ def prove_audit_pagamenti_2():
           "mai dentro l'onclick", [True, False],
           ["data-v=\"${esc(v)}\" onclick=\"toggleValutaSoglia('${quale}',"
            "this.dataset.v)\"" in pv, "'${v}')" in pv])
-
-    # ---- 4e. il wallet NWC non resta a chi viene dopo -----------------
-    for firma in ("async function esciWeb(){",
-                  "async function salutoCancellato(){"):
-        corpo = pezzo_js(mini, firma, "\n}\n")
-        prova(f"{firma.split('(')[0].split()[-1]}: chi esce si porta via "
-              "anche il suo wallet NWC", True,
-              "scordaWalletConto(myTgId);" in corpo)
-    edt = pezzo_js(mini, "function esciDaTutti(){", "\n}\n")
-    prova("esciDaTutti: i wallet degli account chiusi, con la regola della "
-          "nsec", True,
-          "accountAperti.filter(c => !c.telegram).forEach(c => "
-          "scordaWalletConto(c.tg_id));" in edt)
-    wn = pezzo_js(mini, "function walletNwc(){", "\n}\n")
-    prova("la riga NWC di ieri senza conto non si adotta piu': si toglie",
-          [True, False], ["localStorage.removeItem(NWC_CHIAVE)" in wn,
-                          "localStorage.setItem(k, v)" in wn])
 
     # ---- 4f. l'import da Nostr: la firma su OGNI evento ---------------
     imp = open("importa_nostr.py", encoding="utf-8").read()
@@ -195841,7 +196007,7 @@ CATEGORIE = {
     venduto_canale chat_mercatino chat_dalla_notifica
     modifica_massiva_foto miniature_leggere leva_mercato_lavoro
     allegati_da_telegram domande_compratore incasso_annuncio
-    audit_pagamenti_2
+    audit_pagamenti_2 audit_pagamenti_3
     """.split(),
     "infrastruttura": """
     categorie_delle_prove widget_prova widget_ordini
@@ -196662,6 +196828,7 @@ def main():
               prove_foglio_oc_visto,
               prove_seconda_firma_parla,
               prove_audit_pagamenti_2,
+              prove_audit_pagamenti_3,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:

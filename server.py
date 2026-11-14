@@ -2876,6 +2876,12 @@ async def csp_report(req: Request):
 # raffica, non un utente che sfoglia.
 FRENI = {
     "annunci": (60, 3600),      # pubblicare o modificare un annuncio, per persona
+    # (14 nov 2026, terzo giro dell'audit) annullare la fattura di una
+    # puntata e pagarla lo stesso torna indietro intero dal giro dei
+    # fuori-tempo, con la commissione di rete a carico di Barattolo:
+    # senza freno il giro si ripete quanto si vuole. Dieci in un'ora sono
+    # ben oltre chi ci ripensa davvero.
+    "rilancio_annulla": (10, 3600),  # annullare la fattura di una puntata, per persona
     "anteprima": (60, 3600),    # l'anteprima della foto sul server, per persona
     "pagamento": (30, 60),      # verifica-pagamento (LNbits a ogni colpo), per persona
     "ln_address": (30, 60),     # il Lightning address (HTTP esterno + LNbits), per persona
@@ -10758,6 +10764,7 @@ def init_db():
         "esito TEXT NOT NULL DEFAULT '', "
         "cassaforte TEXT NOT NULL DEFAULT '', "
         "scade INTEGER NOT NULL DEFAULT 0, "
+        "verso TEXT NOT NULL DEFAULT '', "
         "PRIMARY KEY(tabella, riga_id, hash))")
     # PAGA DA UN'ALTRA CASSAFORTE (21 set 2026, ordine #152). Un hash
     # vive nella LNbits che l'ha tentato, e da oggi una riga puo' averne
@@ -10765,8 +10772,14 @@ def init_db():
     # riga, cioe' tutte le righe di ieri) e quando SCADE la fattura di
     # quel tentativo — che e' l'unica cosa che si puo' sapere di un
     # pagamento appeso dove non c'e' un LND nostro da interrogare.
+    # `verso` (14 nov 2026, terzo giro dell'audit): A CHI andava quel
+    # tentativo, 'venditore' o 'compratore'. Sulla stessa riga d'ordine
+    # vivono le due uscite, e un hash partito verso uno non deve mai
+    # chiudere l'ordine come pagato all'altro (vedi `_verso_della_verita`).
+    # Vuoto = le righe di ieri: lì non si sa, e vale la regola di prima.
     for colonna in ("cassaforte TEXT NOT NULL DEFAULT ''",
-                    "scade INTEGER NOT NULL DEFAULT 0"):
+                    "scade INTEGER NOT NULL DEFAULT 0",
+                    "verso TEXT NOT NULL DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE payout_tentati ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -13843,6 +13856,21 @@ def _dove_tentati(con, tabella: str, riga_id: int) -> dict:
         return {}
 
 
+def _verso_tentato(con, tabella: str, riga_id: int, phash: str) -> str:
+    """A CHI andava il tentativo `phash` di questa riga (14 nov 2026,
+    terzo giro dell'audit): 'venditore', 'compratore' o '' se non si sa
+    (le righe di ieri, o uno schema senza la colonna)."""
+    if not phash:
+        return ""
+    try:
+        r = con.execute("SELECT verso FROM payout_tentati WHERE tabella=? "
+                        "AND riga_id=? AND hash=?",
+                        (tabella, riga_id, phash)).fetchone()
+    except sqlite3.OperationalError:
+        return ""
+    return (r[0] or "") if r else ""
+
+
 async def _verita_riga(tabella: str, riga_id: int, cassaforte: str,
                        salta: str = "") -> dict:
     """La verita' di una RIGA: il verdetto PEGGIORE fra tutti i suoi
@@ -13922,12 +13950,13 @@ def _prendi_la_mano(tabella: str, riga_id: int, verso: str,
     if cur.rowcount:
         con.execute(
             "INSERT INTO payout_tentati(tabella, riga_id, hash, quando, esito, "
-            "cassaforte, scade) "
-            "VALUES(?,?,?,?,'',?,?) ON CONFLICT(tabella, riga_id, hash) "
+            "cassaforte, scade, verso) "
+            "VALUES(?,?,?,?,'',?,?,?) ON CONFLICT(tabella, riga_id, hash) "
             "DO UPDATE SET quando=excluded.quando, esito='', "
-            "cassaforte=excluded.cassaforte, scade=excluded.scade",
+            "cassaforte=excluded.cassaforte, scade=excluded.scade, "
+            "verso=excluded.verso",
             (tabella, riga_id, payment_hash, adesso, cassaforte or "",
-             int(scade or 0)))
+             int(scade or 0), verso or ""))
     con.commit()
     con.close()
     return bool(cur.rowcount)
@@ -14465,6 +14494,35 @@ async def paga_venditore(invoice: str, atteso_sats: int,
             print(f"⚠️ Avviso ai moderatori non partito: {e}")
         return NON_PAGATO
     phash = str((dec or {}).get("payment_hash", ""))[:100]
+    # LA CINTURA DELL'HASH (14 nov 2026, terzo giro dell'audit). Il nome
+    # del pagamento lo dice LNbits, e da quel nome dipende tutto quel che
+    # segue (pagato, in volo, mai partito). La fattura la sceglie chi
+    # riceve, e una fattura con DUE campi hash (o due scadenze) puo' far
+    # leggere a LNbits un nome e pagare il nodo un altro: il server
+    # seguirebbe un pagamento che non esiste e ne farebbe partire un
+    # secondo. Una fattura onesta ha un campo solo, e il nostro lettore
+    # deve dire lo stesso hash di LNbits; se la fattura non si legge
+    # qui, non si afferma niente (come ieri). Non parte niente, e i
+    # moderatori lo sanno.
+    locale = leggi_bolt11(invoice, con_hash=True)
+    if locale is not None and (
+            locale["campi_p"] > 1 or locale["campi_x"] > 1
+            or (locale["hash"] and len(phash.strip()) == 64
+                and locale["hash"] != phash.strip().lower())):
+        print(f"⛔ Pagamento rifiutato: la invoice ha {locale['campi_p']} "
+              f"campi hash e {locale['campi_x']} scadenze, o un hash diverso "
+              f"da quello di LNbits. Niente e' uscito.", flush=True)
+        try:
+            await notifica_admin(
+                "⛔ <b>Pagamento rifiutato:</b> la invoice da pagare era "
+                "costruita in modo anomalo (campi ripetuti o un hash che "
+                "non torna). Il pagamento NON è partito e i sats sono al "
+                "sicuro nel deposito di garanzia. Se non è un wallet rotto, "
+                "qualcuno ha provato a farsi pagare due volte: vale "
+                "un'occhiata.", argomento="errori")
+        except Exception as e:
+            print(f"⚠️ Avviso ai moderatori non partito: {e}")
+        return NON_PAGATO
     taccuino["hash"] = phash
     # CON UN NOME, «non lo so» smette di essere una condanna: qualunque
     # cosa succeda da qui in poi — il nodo che tace, la POST che scade,
@@ -14520,6 +14578,26 @@ async def paga_venditore(invoice: str, atteso_sats: int,
         #    sulla riga e' il SUO, cosi' la ronda continua a seguire il
         #    pagamento vero e non la fattura che non abbiamo pagato.
         passato = await _verita_riga(tabella, riga_id, cf.nome, salta=phash)
+        # UN HASH HA UNA DIREZIONE (14 nov 2026, terzo giro dell'audit).
+        # Se il pagamento precedente che decide andava all'ALTRA parte
+        # (un moderatore ha ridecido dopo un «fallito» che poi fallito
+        # non era), la riga NON e' pagata per chi aspetta adesso: si
+        # ferma col nome di quell'hash, e quando la verita' arriva
+        # `_verso_della_verita` chiude l'ordine per chi i sats li ha
+        # avuti davvero. Mai PAGATO a chi non ha ricevuto niente.
+        if passato["verdetto"] == USCITO and verso:
+            con = db()
+            verso_vero = _verso_tentato(con, tabella, riga_id, passato["hash"])
+            con.close()
+            if verso_vero and verso_vero != verso:
+                taccuino["hash"] = passato["hash"]
+                taccuino["errore"] = (
+                    f"un pagamento precedente risulta USCITO verso "
+                    f"«{verso_vero}», non verso «{verso}»")
+                print(f"🧭 {tabella}#{riga_id}: {taccuino['errore']} — "
+                      f"{passato['hash'][:16]}…: NON si paga e la riga si "
+                      f"ferma.", flush=True)
+                return INCERTO
         if passato["verdetto"] == USCITO:
             print(f"✅ {tabella}#{riga_id}: un pagamento precedente "
                   f"({passato['hash'][:16]}…) risulta USCITO: la riga e' "
@@ -15779,10 +15857,13 @@ def leggi_bolt11(bolt11: str, con_hash: bool = False) -> dict | None:
 
     quando, scadenza, fine, i = num(d[:7]), 3600, len(d) - 104, 7
     phash = ""
+    campi_p = campi_x = 0
     while i + 3 <= fine:
         tipo, lung = d[i], d[i + 1] * 32 + d[i + 2]
         if i + 3 + lung > fine:
             break
+        campi_p += tipo == 1
+        campi_x += tipo == 6
         if tipo == 6:
             scadenza = num(d[i + 3:i + 3 + lung])
         if tipo == 1 and lung == 52 and not phash:
@@ -15793,6 +15874,12 @@ def leggi_bolt11(bolt11: str, con_hash: bool = False) -> dict | None:
              "scade": quando + scadenza}
     if con_hash:
         letta["hash"] = phash
+        # (14 nov 2026, terzo giro dell'audit) quante volte compaiono il
+        # campo dell'hash e quello della scadenza: una fattura onesta li
+        # ha al piu' una volta, e due letture che scelgono campi diversi
+        # sono il modo di far seguire al server un pagamento che non e'
+        # quello fatto (vedi la cintura dell'hash in `paga_venditore`)
+        letta["campi_p"], letta["campi_x"] = campi_p, campi_x
     return letta
 
 
@@ -39948,6 +40035,7 @@ async def annulla_rilancio(rilancio_id: int,
     annulla_ordine: pagamento controllato PRIMA, CAS sullo stato.
     NON e' un ritiro: la puntata resta in gara col suo versato."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("rilancio_annulla", user["id"])
     con = db()
     ril = con.execute("SELECT * FROM rilanci WHERE id=? AND tg_id=?",
                       (rilancio_id, user["id"])).fetchone()
@@ -50225,21 +50313,6 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
         "stato='da_riscuotere'", (user["id"],))] if addr else []
     con.commit()
     con.close()
-    if cambiato:
-        # PRIMA dei pagamenti qui sotto: se non e' stato lui, l'avviso
-        # deve arrivare anche quando un pagamento si incaglia
-        try:
-            await notifica(
-                user["id"],
-                "⚡ <b>Il tuo Lightning address è cambiato.</b>\n"
-                f"Prima: <code>{html.escape(prima)}</code>\n"
-                f"Adesso: <code>{html.escape(addr) if addr else 'nessuno'}"
-                "</code>\n\nD'ora in poi incassi e rimborsi vanno lì. "
-                "Se non sei stato tu, rimetti il tuo indirizzo dal "
-                "Profilo e scrivici subito.")
-        except Exception as e:
-            print(f"⚠️ Avviso cambio Lightning address non partito: {e}",
-                  flush=True)
     sbloccati = 0
     for oid in incassi:
         r = await _sblocca_sats(oid)
@@ -61570,6 +61643,12 @@ P2P_CHAT_ALLEGATO_MIN = 29
 P2P_CHAT_ALLEGATI_PARTE = 10                  # per parte e per scambio
 P2P_CHAT_PESO_PARTE = 40 * 1024 * 1024        # e in peso, per parte e per scambio
 P2P_CHAT_ALLEGATI_CASSETTO = 2 * 1024 * 1024 * 1024   # tutto il cassetto, tutti gli scambi
+# (14 nov 2026, terzo giro dell'audit) e per PERSONA, sommando tutti gli
+# scambi e gli ordini aperti: i tetti per ordine reggono un ordine, ma due
+# account d'accordo con una ventina di ordini pagati e mai chiusi
+# riempivano il cassetto di tutti. 200 MB sono dieci volte i file di chi
+# tratta davvero: chi ci arriva sente il «riprova più tardi» di sempre.
+P2P_CHAT_PESO_PERSONA = 200 * 1024 * 1024
 P2P_CHAT_CASSETTO_AVVISO = 0.8
 P2P_CHAT_CASSETTO_RIARMO = 0.6
 _CASSETTO_AVVISATO = {"su": False}
@@ -62694,6 +62773,10 @@ def _chat_p2p_allegato_posa(cc, ordine: str, giro: int, io: int, dati: bytes,
                      f"{P2P_CHAT_PESO_PARTE // (1024 * 1024)} MB di file")
     tutto = int(cc.execute("SELECT COALESCE(SUM(peso), 0) FROM allegati").fetchone()[0] or 0)
     if tutto + peso > P2P_CHAT_ALLEGATI_CASSETTO:
+        return (507, "Adesso non c'è spazio per i file: riprova più tardi")
+    persona = int(cc.execute("SELECT COALESCE(SUM(peso), 0) FROM allegati WHERE da=?",
+                             (int(io),)).fetchone()[0] or 0)
+    if persona + peso > P2P_CHAT_PESO_PERSONA:
         return (507, "Adesso non c'è spazio per i file: riprova più tardi")
     ident = secrets.token_hex(16)
     cc.execute("INSERT INTO allegati(id, ordine, giro, da, dati, peso, quando) "
@@ -83101,6 +83184,11 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             titolo = html.escape(_titolo_ordine(_righe_ordine(con, o)))
             if titolo == "?":
                 titolo = "il tuo acquisto"
+            # (14 nov 2026, terzo giro dell'audit) il timbro del pagamento
+            # si chiude QUI: il cambio puo' chiedere a CoinGecko fino a 10
+            # secondi, e con la scrittura aperta tutto il database
+            # aspetterebbe con lui
+            con.commit()
             cambio = await cambio_btc_eur()
             # `payout_stato='uscito'` sul ramo riuscito (set 2026): da
             # qui in poi il vuoto vuol dire «mai provato» e basta —
@@ -83674,6 +83762,11 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             return {"ok": False, "stato": o["stato"], "non_chiesto": True}
 
         if esito == PAGATO:
+            # (14 nov 2026, terzo giro dell'audit) il timbro del pagamento
+            # si chiude QUI: il cambio puo' chiedere a CoinGecko fino a 10
+            # secondi, e con la scrittura aperta tutto il database
+            # aspetterebbe con lui
+            con.commit()
             cambio = await cambio_btc_eur()
             con.execute("UPDATE ordini SET stato='refunded', cambio_eur=?, "
                         "payout_stato='uscito', "
@@ -90025,6 +90118,48 @@ except ImportError:
 TIMBRO_SOSPESI = "pagamenti_sospesi"   # il giorno dell'ultimo avviso
 
 
+async def _verso_della_verita(ordine_id: int, verso: str) -> str:
+    """LA VERITA' VINCE SULLA DECISIONE (14 nov 2026, terzo giro
+    dell'audit). Un ordine timbrato 'uscito' col nome di un hash che
+    andava all'ALTRA parte (un pagamento dato per fallito che poi e'
+    arrivato, e un moderatore che nel frattempo ha deciso il contrario)
+    non si chiude per chi dice `payout_verso`: i sats li ha avuti chi
+    dice l'hash. Si rimette l'ordine sulla strada giusta e lo si dice ai
+    moderatori. Senza memoria della direzione (righe di ieri) resta
+    tutto come prima."""
+    con = db()
+    try:
+        o = con.execute("SELECT stato, payout_stato, payout_hash FROM ordini "
+                        "WHERE id=?", (ordine_id,)).fetchone()
+        if not o or o["payout_stato"] != "uscito" or not o["payout_hash"]:
+            return verso
+        vero = _verso_tentato(con, "ordini", ordine_id, o["payout_hash"])
+        if vero not in ("venditore", "compratore") or vero == verso:
+            return verso
+        # la sola porta che l'altra uscita chiude: 'refund' per chi vende
+        nuovo = ("confirmed" if vero == "venditore" and o["stato"] == "refund"
+                 else o["stato"])
+        con.execute("UPDATE ordini SET stato=?, payout_verso=? WHERE id=? "
+                    "AND payout_stato='uscito'", (nuovo, vero, ordine_id))
+        con.commit()
+    finally:
+        con.close()
+    print(f"🧭 Ordine #{ordine_id}: il pagamento uscito andava a «{vero}», "
+          f"non a «{verso}»: l'ordine si chiude per chi l'ha ricevuto.",
+          flush=True)
+    try:
+        await notifica_admin(
+            f"🧭 <b>Ordine #{ordine_id}: il pagamento era già uscito verso "
+            f"l'altra parte.</b> I sats sono andati al "
+            f"<b>{vero}</b>, mentre l'ultima decisione diceva "
+            f"<b>{verso}</b>. L'ordine si chiude per chi li ha ricevuti "
+            f"davvero: nessun secondo pagamento è partito. Se serve un "
+            f"rimedio, va deciso a mano.", argomento="errori")
+    except Exception as e:
+        print(f"⚠️ Avviso ai moderatori non partito: {e}")
+    return vero
+
+
 async def _riprendi_uscita(tabella: str, riga_id: int, verso: str) -> dict:
     """Ripassa dalla strada d'uscita di quella riga. La usano i DUE
     giri — quello dei sospesi e quello dei pagamenti in volo — e sta in
@@ -90044,6 +90179,7 @@ async def _riprendi_uscita(tabella: str, riga_id: int, verso: str) -> dict:
         return await _paga_rimborso(riga_id)
     if tabella == "pagamenti":
         return await _rimborsa_sblocco(riga_id, 0)
+    verso = await _verso_della_verita(riga_id, verso)
     if verso == "compratore":
         return await _rimborsa_compratore(riga_id)
     con = db()
@@ -98556,6 +98692,24 @@ async def onchain_prova(x_tg_init_data: str = Header(""),
     }
 
 
+async def _avvisa_xpub_cambiata(tg_id: int):
+    """La chiave on-chain di un account e' cambiata (14 nov 2026, terzo
+    giro dell'audit): il journal e i moderatori lo sanno. Riceve solo il
+    numero dell'account, mai la xpub: quella non si scrive da nessuna
+    parte fuori dalla sua tabella (la regola della rotta)."""
+    print(f"🔑 On-chain: la chiave di #{tg_id} e' cambiata, la vecchia "
+          f"resta nello storico", flush=True)
+    try:
+        await notifica_admin(
+            f"🔑 <b>On-chain: l'account #{tg_id} ha cambiato la sua "
+            f"chiave.</b> Succede con un telefono nuovo o un ripristino; "
+            f"gli ordini già nati tengono la chiave di prima, i prossimi "
+            f"useranno la nuova. Se l'utente non ne sa niente, qualcuno ha "
+            f"usato la sua sessione.", argomento="moderazione")
+    except Exception as e:
+        print(f"⚠️ Avviso ai moderatori non partito: {e}")
+
+
 @app.post("/api/onchain/xpub")
 async def onchain_xpub(req: Request, x_tg_init_data: str = Header(""),
                        barattolo_sessione: str = Cookie("")):
@@ -98584,7 +98738,25 @@ async def onchain_xpub(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, motivo)
     adesso = int(time.time())
     con = _onchain_db()
+    cambiata = ""
     try:
+        # LO STORICO DELLA CHIAVE (14 nov 2026, terzo giro dell'audit):
+        # una xpub DIVERSA da quella di prima cambia la chiave di chi vende
+        # in tutti gli ordini on-chain che nasceranno. Per l'utente non
+        # cambia niente (un telefono nuovo, un ripristino); dietro le
+        # quinte la vecchia resta scritta, il journal lo dice e i
+        # moderatori lo sanno, cosi' una sessione rubata non sostituisce
+        # la chiave in silenzio.
+        prima = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                            (user["id"],)).fetchone()
+        if prima and prima[0] and prima[0] != xpub:
+            cambiata = prima[0]
+            con.execute("CREATE TABLE IF NOT EXISTS onchain_xpub_storia("
+                        "tg_id INTEGER NOT NULL, xpub TEXT NOT NULL, "
+                        "sostituita INTEGER NOT NULL)")
+            con.execute("INSERT INTO onchain_xpub_storia(tg_id, xpub, "
+                        "sostituita) VALUES (?,?,?)",
+                        (user["id"], cambiata, adesso))
         con.execute(
             "INSERT INTO onchain_xpub(tg_id, xpub, creato, aggiornato) "
             "VALUES (?,?,?,?) ON CONFLICT(tg_id) DO UPDATE SET "
@@ -98601,6 +98773,8 @@ async def onchain_xpub(req: Request, x_tg_init_data: str = Header(""),
         con.commit()
     finally:
         con.close()
+    if cambiata:
+        await _avvisa_xpub_cambiata(user["id"])
     return {"ok": True}
 
 

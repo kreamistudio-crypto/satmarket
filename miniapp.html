@@ -56536,8 +56536,6 @@ async function salutoCancellato(){
   haptic('success');
   /* chi se ne va lascia il dispositivo: la sua nsec non resta qui */
   try { await scordaNsecAccount(); } catch(e){}
-  /* ...e nemmeno il suo wallet NWC (14 nov 2026, secondo audit) */
-  try { scordaWalletConto(myTgId); } catch(e){}
   try { if (typeof miniAccount === 'function' && miniAccount()) { scriviContoMini(''); CONTO_MINI = ''; } } catch(e){}
   window.fetch = () => Promise.reject(new Error('account cancellato'));
   document.body.innerHTML =
@@ -56559,8 +56557,6 @@ async function esciWeb(){
   try { await scordaNsecAccount(); } catch(e){}
   /* ...e le notifiche del suo account smettono di arrivare qui */
   try { await scordaPushTelefono(); } catch(e){}
-  /* ...e nemmeno il suo wallet NWC (14 nov 2026, secondo audit) */
-  try { scordaWalletConto(myTgId); } catch(e){}
   /* dentro Telegram (leva PIU_ACCOUNT_OVUNQUE) esce l'account scelto:
      la firma dice quale portachiavi, e si torna al Telegram */
   try { await fetch(`${API_BASE}/logout`, {method:'POST',
@@ -57099,9 +57095,6 @@ function esciDaTutti(){
       /* le chiavi degli account chiusi: dentro Telegram si tiene solo
          quella del Telegram, se ce n'e' una sua */
       try { await scordaNsecConti(accountAperti.filter(c => !c.telegram)); } catch(e){}
-      /* ...e i loro wallet NWC (14 nov 2026, secondo audit): con la
-         stessa regola, dentro Telegram resta quello del Telegram */
-      try { accountAperti.filter(c => !c.telegram).forEach(c => scordaWalletConto(c.tg_id)); } catch(e){}
       scriviContoMini(''); CONTO_MINI = '';
       ricaricaPerConto();
     }
@@ -60582,6 +60575,11 @@ async function onchainCofirmeInAttesa(parole){
   for (const o of onchainOrdini) {
     if (!onchainRilascioDaFirmare(o)) continue;
     try {
+      /* (14 nov 2026, terzo giro dell'audit) il segno «rilascio chiesto»
+         lo scrive il server: questo telefono firma da solo SOLO se ci
+         trova accanto la conferma firmata col MIO seme, come gia' fa il
+         P2P. Una riga scritta da un server manomesso non rilascia niente. */
+      if (!(await onchainRicevutoMio(await caricaBitcoin(), parole, o))) continue;
       await onchainFirmaProposta(o.id);
       fatte.push(`🔓 #${o.id}: firmato il rilascio che avevi confermato`);
     } catch(e) { fatte.push(`⚠️ #${o.id}: ${e.message || 'errore'}`); }
@@ -65419,27 +65417,17 @@ function chiaveNwcConto(){
 function walletNwc(){
   try {
     const k = chiaveNwcConto();
-    /* LA RIGA DI IERI NON SI ADOTTA PIU' (14 nov 2026, cantiere
-       audit-pagamenti-2, dal secondo audit di sicurezza). Dal 16 set
-       la riga senza conto passava al PRIMO account che entrava: su un
-       telefono o un computer condiviso, il wallet di chi c'era prima
-       pagava gli acquisti di chi veniva dopo. Non si sa di chi sia,
-       quindi si toglie, e chi l'aveva lo ricollega dal Profilo (un
-       gesto). La scommessa di settembre sulle chiavi P2P era stata
-       corretta allo stesso modo. */
-    if (k !== NWC_CHIAVE) localStorage.removeItem(NWC_CHIAVE);
-    return JSON.parse(localStorage.getItem(k)) || null;
+    let v = localStorage.getItem(k);
+    if (v === null && k !== NWC_CHIAVE) {
+      /* LA MIGRAZIONE: la riga di ieri, senza conto, passa al PRIMO
+         conto che entra dopo l'aggiornamento e sparisce dal nome
+         vecchio — chi ha gia' NWC non lo perde, e l'altro account
+         dello stesso telefono, se c'e', lo ricollega. */
+      v = localStorage.getItem(NWC_CHIAVE);
+      if (v !== null) { localStorage.setItem(k, v); localStorage.removeItem(NWC_CHIAVE); }
+    }
+    return JSON.parse(v) || null;
   } catch(e){ return null; }        // dato corrotto = nessun wallet
-}
-/* IL WALLET NON RESTA A CHI VIENE DOPO (14 nov 2026, secondo audit):
-   la stringa NWC e' una delega a spendere, e uscire o cancellare
-   l'account la toglie da questo dispositivo, come la nsec. Si toglie
-   anche la riga di ieri senza conto, se c'e' ancora. */
-function scordaWalletConto(tgId){
-  try {
-    if (tgId) localStorage.removeItem(NWC_CHIAVE + '@' + tgId);
-    localStorage.removeItem(NWC_CHIAVE);
-  } catch(e){}
 }
 /* OGNI SUPERFICIE GUARDA IL SUO METODO (16 set 2026). La stretta di
    mano registra i `methods` che il wallet dichiara in `get_info`, e

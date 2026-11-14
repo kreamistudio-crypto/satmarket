@@ -82684,7 +82684,14 @@ La prima tornata: i nove sospetti «soldi e pagamenti» dei 29 verificati
 e sette dei più semplici (browser, swap dal telefono, import Nostr,
 foto), tutti ancora uguali su develop. Quasi nessun gesto cambia per chi
 usa l'app: cambiano le guardie dietro i bottoni (le eccezioni sono
-dette al loro punto).
+dette al loro punto). RITOCCO DELLO STESSO GIORNO, prima del passaggio
+su develop: Andrea ha fissato la regola «chiudimi le falle, ma non devi
+farmi modifiche alla funzionalità dell'app», e i tre punti che si
+vedevano sono stati rivisti. Via il messaggio del bot nell'8 (resta il
+journal) e via le due regole del wallet NWC (10 e 11: chi esce ritrova
+il suo wallet come prima). Resta lo swap dal telefono che aspetta la
+prima conferma (14): non è un gesto nuovo ma un tempo, ed è la stessa
+scelta che Andrea aveva fatto per lo swap automatico.
 
 DECISO, uno per sospetto.
 1. «MENO LE SPESE» SI FERMA ANCHE SU 'uscito' (`_scrivi_meno_spese`):
@@ -82734,10 +82741,9 @@ DECISO, uno per sospetto.
 8. IL CAMBIO DEL LIGHTNING ADDRESS NON È PIÙ MUTO (`salva_ln_address`):
    una sessione bastava a sostituire l'indirizzo che decide dove vanno
    incassi e rimborsi, senza avviso e senza traccia di quello di prima.
-   Ora quello di prima resta nel journal e il titolare riceve dal bot,
-   che una sessione rubata non legge, «Il tuo Lightning address è
-   cambiato» col prima e l'adesso, PRIMA dei pagamenti della stessa
-   richiesta. Il primo indirizzo (prima vuoto) non avvisa.
+   Ora quello di prima resta nel journal. (L'avviso al titolare dal
+   bot, scritto all'inizio, è stato tolto per la regola di Andrea: un
+   messaggio nuovo per l'utente.)
 9. IL PAVIMENTO DELL'INDICE DELLO SWAP AUTOMATICO FUORI DAL DATABASE
    (`swap_auto_prenota_indice`): l'indice veniva solo dal MAX della
    tabella, e un `satmarket.db` rimesso da una copia vecchia faceva
@@ -82747,14 +82753,16 @@ DECISO, uno per sospetto.
    più alto fra i due; un pavimento illeggibile ferma lo swap.
    `deploy/RIPRISTINO.md` dice cosa fare se torna indietro anche chiavi/.
 
-10. CHI ESCE SI PORTA VIA IL SUO WALLET NWC (`esciWeb`,
+10. TOLTO PER LA REGOLA DI ANDREA (chi esce ritrova il suo wallet come
+    prima). Era: CHI ESCE SI PORTA VIA IL SUO WALLET NWC (`esciWeb`,
     `salutoCancellato`, `esciDaTutti`): la regola scritta era «chi esce
     lascia il dispositivo: la sua nsec non resta qui», e valeva per la
     sola nsec. Ora vale anche per la stringa NWC, che è una delega a
     spendere: `scordaWalletConto` la toglie dal dispositivo (per Esci da
     tutti, quelle degli account chiusi, con la regola della nsec).
     Ricollegarlo è un gesto dal Profilo.
-11. LA RIGA NWC DI IERI NON SI ADOTTA PIÙ (`walletNwc`): dal 16 set la
+11. TOLTO PER LA REGOLA DI ANDREA (la migrazione di settembre resta
+    com'era). Era: LA RIGA NWC DI IERI NON SI ADOTTA PIÙ (`walletNwc`): dal 16 set la
     riga senza conto passava al PRIMO account che entrava, cioè su un
     dispositivo condiviso il wallet di uno pagava gli acquisti
     dell'altro. Non si sa di chi sia: si toglie, e chi l'aveva lo
@@ -82834,14 +82842,13 @@ assente), il rimborso dello sblocco coi pezzi veri (con indirizzo si
 paga il suo wallet e mai la invoice del moderatore; senza, la invoice
 depositata), e le sentinelle sull'ordine delle guardie (poll, parte
 prima di ogni esito, rilettura dell'offerta fra l'await e l'INSERT
-senza DML, avviso del cambio d'indirizzo prima dei pagamenti), e il
+senza DML, il cambio d'indirizzo nel journal), e il
 pavimento dello swap con un database rimesso indietro (indice 3 dopo
 0-1-2, non 0) e con un pavimento rotto (fermo), il giudice delle liste
 (sigle sì, codice no, anche a lista vuota), il filtro della firma
 dell'import, i formati d'immagine (JPEG/PNG/WEBP/GIF sì,
-TIFF/PPM/ICO/TGA no), e le sentinelle del browser (uscite, NWC di ieri,
-pillola) e dello swap (ordine dei controlli, ritrovati). Ritoccati il
-test JS della riga NWC di ieri (ora: non si adotta, si toglie) e il
+TIFF/PPM/ICO/TGA no), e le sentinelle del browser (pillola) e dello
+swap (ordine dei controlli, ritrovati). Ritoccati il
 censimento degli avvisi agli admin (97, il nuovo nella moderazione),
 più due sentinelle che fotografavano la riga di prima (il cancello di
 «meno le spese», la chiave dell'offerta).
@@ -82857,3 +82864,111 @@ leve degli admin, e quattro decisioni di Andrea, fra cui i pavimenti e
 i tetti delle leve dei tempi di sblocco). I 28 segnalati e non
 verificati restano ai giri del venerdì. NIENTE di questo è in
 produzione finché Andrea non promuove.
+
+## Il giro piccolo sui pagamenti: sette porte chiuse dietro le quinte (14 nov 2026, cantiere audit-pagamenti-3, dal terzo giro dell'audit di sicurezza; Andrea: «correggili tutti», e la regola: «chiudimi le falle, ma non devi farmi modifiche alla funzionalità dell'app»)
+
+Il terzo giro dell'audit (sorgente di PRODUZIONE, main `4cc2fd7`;
+rapporto in `/mnt/project-files/audit-sicurezza/satmarket/run-3/`, mai
+su Telegram) ha letto le cinque zone dei pagamenti che il critico del
+secondo giro aveva segnato come mancanti: sette sospetti, tutti retti
+dalla verifica indipendente, nessuno già corretto su develop. La
+regola di Andrea per questa tornata è scritta nel titolo: per chi usa
+l'app non cambia niente. Ogni correzione è un controllo dietro le
+quinte che ferma solo una richiesta costruita apposta o un caso
+anomalo, e gli avvisi vanno ai moderatori, mai agli utenti. La stessa
+regola ha fatto togliere, dalla tornata di prima (voce qui sopra), il
+messaggio del bot sul cambio d'indirizzo e le due regole del wallet NWC.
+
+DECISO, uno per sospetto.
+1. UN HASH HA UNA DIREZIONE (`payout_tentati.verso`, `_prendi_la_mano`,
+   `paga_venditore`, `_verso_della_verita`, `_riprendi_uscita`). Sulla
+   stessa riga d'ordine vivono le due uscite (a chi vende, a chi
+   compra), e la memoria degli hash non ricordava a CHI andava ogni
+   tentativo: un pagamento verso chi vende dato per «fallito» da LNbits
+   ma arrivato davvero, più un moderatore che nel frattempo ridecide
+   per chi compra, chiudeva l'ordine come rimborsato senza che a chi
+   compra fosse uscito niente. Ora la colonna `verso` (vuota sulle
+   righe di ieri, che restano come prima) si scrive a ogni mano presa;
+   un hash USCITO verso l'altra parte non vale «pagato» ma ferma la
+   riga, e quando la ronda timbra 'uscito' la ripresa chiude l'ordine
+   per chi i sats li ha avuti davvero (un ordine in 'refund' torna
+   'confirmed' per la strada di chi vende), con un avviso ai moderatori
+   nell'argomento errori. Nessun secondo pagamento parte da solo: se
+   serve un rimedio, lo decide una persona.
+2. LA CINTURA DELL'HASH (`leggi_bolt11` conta i campi `p` e `x`,
+   `paga_venditore` li guarda). La fattura la sceglie chi riceve, e una
+   fattura con due campi hash poteva far leggere a LNbits un nome e
+   pagare al nodo un altro: il server avrebbe seguito un pagamento
+   inesistente e ne avrebbe fatto partire un secondo. Ora una fattura
+   con più di un campo hash o scadenza, o con un hash diverso da quello
+   di LNbits (confrontato solo sui 64 caratteri pieni), si rifiuta
+   prima di ogni domanda alla rete, come la cintura dell'importo, e i
+   moderatori lo sanno. Una fattura che il nostro lettore non legge
+   tira dritto come ieri. Senza `con_hash` il dizionario del lettore è
+   quello di sempre (il gemello del client lo confronta intero).
+3. IL FRENO SUGLI ANNULLI DELLE PUNTATE (`annulla_rilancio`,
+   `FRENI["rilancio_annulla"]`, 10 l'ora per persona). Annullare la
+   fattura di una puntata e pagarla lo stesso torna indietro intero dal
+   giro dei fuori-tempo, con la commissione di rete a carico di
+   Barattolo, e niente fermava il giro. Dieci annulli l'ora sono ben
+   oltre chi ci ripensa davvero.
+4. LO STORICO DELLA CHIAVE ON-CHAIN (`onchain_xpub`, tabella
+   `onchain_xpub_storia`). Con la sola sessione si sostituiva la xpub
+   dell'account, e da lì la «destinazione firmata» si controllava con la
+   chiave appena messa. Chiuderla davvero vorrebbe un passo in più
+   (la firma del seme di prima), cioè un cambio per l'utente: per la
+   regola di Andrea si è fatta la parte invisibile. La xpub vecchia
+   resta nello storico, il journal lo dice (solo i primi 12 caratteri)
+   e i moderatori ricevono un avviso nell'argomento moderazione. Il
+   telefono nuovo e il ripristino funzionano come prima.
+5. IL TELEFONO RILEGGE LA FIRMA PRIMA DI RILASCIARE
+   (`onchainCofirmeInAttesa`). All'avvio il telefono di chi compra
+   firmava da solo il rilascio sul solo segno «rilascio chiesto» del
+   server, mentre la regola scritta (e il P2P, e il ramo della
+   co-firma) vuole prima la conferma firmata col seme di chi compra.
+   Ora anche quel giro chiama `onchainRicevutoMio`: una riga scritta da
+   un server manomesso non rilascia niente. Le righe vere hanno tutte
+   la firma, quindi per chi compra non cambia niente.
+6. IL TIMBRO SI CHIUDE PRIMA DEL CAMBIO (`_sblocca_sats`,
+   `_rimborsa_compratore`). Sul ramo riuscito il timbro del pagamento
+   restava una scrittura aperta mentre si chiedeva il cambio euro, e
+   col cambio vecchio quella domanda va a CoinGecko fino a 10 secondi:
+   tutto il database aspettava. Ora si fa commit prima, come già
+   `_segna_deciso`; un riavvio fra le due righe lascia una riga
+   'in_volo' col suo hash, che la ronda sa riprendere.
+7. UN TETTO PER PERSONA NEL CASSETTO DEGLI ALLEGATI
+   (`_chat_p2p_allegato_posa`, `P2P_CHAT_PESO_PERSONA` = 200 MB). I
+   tetti per ordine reggevano l'ordine, ma due account d'accordo con
+   una ventina di ordini pagati e mai chiusi riempivano i 2 GB di
+   tutti. Ora conta anche la somma per persona su tutti gli scambi e
+   gli ordini; chi ci arriva sente il «riprova più tardi» di sempre.
+
+SCARTATO. Per il 4, la firma del seme vecchio a ogni cambio di xpub
+(chi ha perso il telefono non potrebbe più cambiarla, ed è un passo in
+più per tutti) e l'avviso all'utente dal bot (un messaggio nuovo): la
+regola di Andrea li esclude. Per il 3, un tetto alle commissioni di
+tutti i rimborsi: toccherebbe ogni pagamento. Per l'1, rifiutare a un
+moderatore il cambio di parte finché c'è un hash aperto: cambierebbe
+il pannello, mentre fermare la riga e far vincere la verità no.
+
+PROVATO. `prove_audit_pagamenti_3`: la colonna del verso nello schema e
+nella migrazione, la mano che lo scrive, l'ordine delle guardie in
+`paga_venditore` (il verso prima del «pagato»; la cintura dell'hash
+prima di ogni domanda e di ogni mano), la verità che vince su un
+database vero (uscito verso chi vende e deciso per chi compra: si
+chiude per chi vende e l'ordine torna 'confirmed'; stesso verso, verso
+ignoto o non ancora uscito: niente cambia; un solo avviso ai
+moderatori), il lettore su una bolt11 finta con DUE campi `p` (conta
+2, il primo resta quello di ieri), il freno degli annulli, lo storico
+della xpub senza messaggi all'utente, il telefono che rilegge la firma
+prima di firmare, il commit prima del cambio nelle due uscite, e il
+cassetto con tre file della stessa persona su tre ordini (il terzo
+oltre il suo tetto, l'altra parte intatta).
+
+DA GUARDARE. Il 4 resta mezzo chiuso, ed è detto: la sostituzione
+della chiave con una sessione rubata ora si vede, ma non si impedisce.
+L'1 ha bisogno, per scattare, che LNbits dica «fallito» di un
+pagamento poi arrivato: è il dubbio che l'audit dei pagamenti di
+settembre segna come non verificato, e resta da guardare sul nodo.
+Sul VPS, in sola lettura: `ASTA_ABILITATA`, `MERCATINO_CHAT_ORDINI` e
+`CAMBIO_RINFRESCO_S` dicono quanto erano vive le porte 3, 7 e 6.
