@@ -14990,6 +14990,16 @@ def pezzo_js(mini, firma, fine="\n\n"):
     return mini[i:mini.index(fine, i)]
 
 
+def garanzia_js(mini):
+    """IL CANCELLO DELLA GARANZIA (14 nov 2026, cantiere paycode-dopo-
+    garanzia): la tabella `P2P_PROGRESSO` e il giudice puro
+    `garanziaBloccataP2P` che la legge, da infilare nei banchi node che
+    fanno girare l'invio del PayCode. Vuole dal banco `P2P_FINALI`."""
+    i = mini.index("const P2P_PROGRESSO = {")
+    j = mini.index("\n}\n", mini.index("function garanziaBloccataP2P(o){"))
+    return mini[i:j] + "\n}\n"
+
+
 def volto_unico_js(mini):
     """IL VOLTO UNICO (28 set 2026): il blocco intero di miniapp.html —
     la cache `cacheVolti`, l'iniziale, la scala dei tre gradini e il
@@ -80357,6 +80367,19 @@ delete mondo.a.ordini['X'].campiMiei;
 p2pAutoTentati = {};
 mondo.a.ordini['X'].tabacchino = {ordine: '123-4567890-1234567', importo: '10',
                                   scade: 1790000000, testo: 'Ordine Amazon: 123-4567890-1234567'};
+/* ...MA SOLO A SATS IN GARANZIA (14 nov 2026, paycode-dopo-garanzia):
+   preso e con la garanzia ancora da pagare non parte, e non conta come
+   tentativo — alla garanzia bloccata deve poter partire */
+out.primaGaranzia = [];
+for (const st of ['attesa_hold_venditore', 'attesa_mia_hold', 'attesa_fattura_compratore',
+                  'attesa_mia_cauzione', 'pubblicato', 'annullato']) {
+  mondo.a.ordini['X'].stato = st;
+  pianificaAutoRecapito('X');
+  await new Promise(r => setTimeout(r, 30));
+  out.primaGaranzia.push([st, pubblicati.length, !!p2pAutoTentati['X'],
+                          recapitoDaAutoInvio(mondo.a.ordini['X']) === null]);
+}
+mondo.a.ordini['X'].stato = 'attivo';
 pianificaAutoRecapito('X');
 await new Promise(r => setTimeout(r, 50));
 out.tabacchinoParte = pubblicati.length === 2
@@ -80726,6 +80749,7 @@ def prove_p2p_chat():
     # chiusura si rimette a mano, o la funzione dopo finisce dentro
     # il corpo di questa e node si ferma in fondo al file
     pezzi = (re.search(r"const MAZZO_INFO = [^\n]+", mini).group(0) + "\n"
+             + garanzia_js(mini)
              + pezzo_js(mini, "function chiaveScambio(", "\n}\n") + "\n}\n"
              + blocco)
     banco = BANCO_CHAT.replace("__PEZZI__", pezzi)
@@ -80828,6 +80852,13 @@ def prove_p2p_chat():
           True, o["colGestoParte"])
     prova("i dati del TABACCHINO — scritti per quest'ordine, non ricordati — partono ancora da soli",
           True, o["tabacchinoParte"])
+    # (14 nov 2026, cantiere paycode-dopo-garanzia) prima della garanzia
+    # il PayCode non parte e non brucia il suo tentativo
+    prova("...ma SOLO a sats in garanzia: prima non parte e non conta come tentativo",
+          [[st, 1, False, True] for st in ('attesa_hold_venditore', 'attesa_mia_hold',
+                                          'attesa_fattura_compratore', 'attesa_mia_cauzione',
+                                          'pubblicato', 'annullato')],
+          o["primaGaranzia"])
     prova("...una volta sola", True, o["autoNonRaddoppia"])
     prova("chi compra non manda niente da solo", True, o["compraNonParte"])
     prova("...e uno scambio finito nemmeno", True, o["finitoNonParte"])
@@ -100474,6 +100505,7 @@ def prove_paycode_riconosciuto():
     blocco = mini[mini.index("/* ---- I DUE RECAPITI CIFRATI"):
                   mini.index("/* ---- LA RIGA LOCALE NEL VOCABOLARIO DEL LIBRO ----")]
     pezzi = (re.search(r"const MAZZO_INFO = [^\n]+", mini).group(0) + "\n"
+             + garanzia_js(mini)
              + pezzo_js(mini, "function chiaveScambio(", "\n}\n") + "\n}\n"
              + blocco + "\n"
              + pezzo_js(mini, "async function parteRiconosciutaP2P(", "\n}\n") + "\n}\n")
@@ -100714,6 +100746,37 @@ out.passo = [passoDopoGaranziaP2P(v),
              passoDopoGaranziaP2P(Object.assign({}, v, {campiMiei: {euro: {testo: TAB.testo}}})),
              passoDopoGaranziaP2P(Object.assign({}, v, {metodi: ['SEPA']}))];
 
+/* 9) LA GARANZIA PRIMA DEL PAYCODE (14 nov 2026, cantiere
+   paycode-dopo-garanzia, Andrea: «mostrare il paycode solo dopo aver
+   fatto il deposito di garanzia»). Preso, controparte nota, garanzia
+   ancora da pagare: la controparte che arriva, la riapertura e
+   l'apertura della pagina NON lo mandano, e non chiedono nemmeno
+   «e' dei nostri?». Poi la garanzia si blocca — la riga che passa a
+   «attivo», da qualunque strada — e parte da solo, una volta. */
+apparecchia(false);
+mio().stato = 'attesa_hold_venditore';
+risposteParte = [si(), si(), si()];
+scriviOrdineP2P(Object.assign({}, mio(), {peer: tb.pub}));
+riprendiAutoRecapitiP2P();
+riprendiAutoRecapitoP2P('X', true);
+await attesa(60);
+out.primaGaranzia = [domandeParte.length, pubblicati.length, !!euroMio(), !!p2pAutoTentati['X']];
+scriviOrdineP2P(Object.assign({}, mio(), {stato: 'attivo'}));
+await attesa(60);
+out.allaGaranzia = [domandeParte.length, pubblicati.length, euroMio() === TAB.testo];
+/* ...e la riga che resta in garanzia (l'eco, «euro inviati») non lo rimanda */
+scriviOrdineP2P(Object.assign({}, mio()));
+scriviOrdineP2P(Object.assign({}, mio(), {stato: 'euro_inviati'}));
+await attesa(60);
+out.allaGaranziaMaiDue = [domandeParte.length, pubblicati.length];
+/* ...e una cauzione bloccata non e' la garanzia: niente */
+apparecchia(true);
+mio().stato = 'attesa_mia_cauzione';
+risposteParte = [si()];
+scriviOrdineP2P(Object.assign({}, mio(), {stato: 'attesa_mia_hold'}));
+await attesa(60);
+out.cauzioneNonBasta = [domandeParte.length, pubblicati.length];
+
 console.log(JSON.stringify(out));
 })().catch(e => { console.log('BANCO ROTTO: ' + (e && e.stack || e)); process.exit(1); });
 """
@@ -100821,6 +100884,7 @@ def prove_paycode_ripresa():
              + re.search(r"const P2P_TABACCHINO_PM = [^\n]+", mini).group(0) + "\n"
              + pezzo_js(mini, "function metodoBaseP2P(", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function tabacchinoP2P(", "\n}\n") + "\n}\n"
+             + garanzia_js(mini)
              + pezzo_js(mini, "function chiaveScambio(", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function scriviOrdineP2P(o){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function passoDopoGaranziaP2P(o){", "\n}\n") + "\n}\n"
@@ -100853,6 +100917,14 @@ def prove_paycode_ripresa():
     o = _json.loads(r.stdout.strip().splitlines()[-1])
     prova("la controparte arriva dall'archivio del server: una domanda, un invio, il PayCode",
           [1, 1, True], o["dalServer"])
+    # (14 nov 2026, cantiere paycode-dopo-garanzia)
+    prova("garanzia da pagare: controparte, riapertura e pagina non mandano il PayCode "
+          "(e non chiedono nemmeno chi c'e')", [0, 0, False, False], o["primaGaranzia"])
+    prova("...la garanzia si blocca e parte da solo: una domanda, un invio",
+          [1, 1, True], o["allaGaranzia"])
+    prova("...l'eco e i passi dopo, sempre in garanzia, non lo rimandano",
+          [1, 1], o["allaGaranziaMaiDue"])
+    prova("...e da cauzione a garanzia da pagare non parte niente", [0, 0], o["cauzioneNonBasta"])
     prova("...l'eco del relay, la riapertura e l'apertura della pagina non lo rimandano",
           [1, 1], o["dalServerMaiDue"])
     prova("...e chi compra lo apre: la busta di sempre", True, o["dalServerArriva"])
@@ -130041,6 +130113,10 @@ def prove_ritocchi_scambio():
         re.search(r"const P2P_TOCCO_LUNGO_MS = [^\n]*;", mini).group(0),
         fn("function toccaDatoP2P(el){"),
         fn("function recapitoCompratoreP2P(o){"),
+        # (14 nov 2026, paycode-dopo-garanzia) il riquadro del tempo VERO,
+        # con la frase che dice quando arriva il codice
+        re.search(r"const P2P_PAYCODE_DOPO_GARANZIA = [^\n]*;", mini).group(0),
+        fn("function riquadroScadenzaPayCodeP2P(o, adesso, primaGaranzia){"),
         re.search(r"const P2P_FINALI = [^\n]*;", mini).group(0),
         mini[mini.index("const P2P_PROGRESSO = {"):
              mini.index("\n};", mini.index("const P2P_PROGRESSO = {")) + 3],
@@ -130048,6 +130124,10 @@ def prove_ritocchi_scambio():
 function tabacchinoP2P(m){ return (m || []).some(x => /tabacch/i.test(x)); }
 function payCodeDaTestoP2P(t){ return /PayCode:/.test(t || '') ? '479-868-518' : ''; }
 function riquadroPayCodeP2P(o){ return '<div class="p2p-paycode">PAYCODE</div>'; }
+function scadenzaTabacchinoOrdineP2P(o){ return o.scadeFinto || 0; }
+function dataTabacchinoP2P(t){ return 'DATA'; }
+function contoRimastoP2P(s){ return 'RESTA'; }
+const P2P_TAB_ULTIMA_S = 3600;
 const out = {};
 const R = righeRecapitoP2P;
 out.sepa = R('Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: IT60X0542811101000000123456');
@@ -130100,6 +130180,21 @@ out.presto = recapitoCompratoreP2P(conIban('attesa_hold_venditore'));
 out.concluso = recapitoCompratoreP2P(conIban('concluso'));
 out.paycode = recapitoCompratoreP2P({lato: 'compro', stato: 'attivo', metodi: ['Contanti al tabacchino'],
   campiLoro: {euro: {testo: 'Contanti al tabacchino\nPayCode: 479-868-518'}}});
+/* IL PAYCODE SOLO A SATS IN GARANZIA (14 nov 2026, paycode-dopo-garanzia):
+   arrivato presto (un'app di ieri) non si mostra; poi si', e dopo pure */
+const conPc = (s, extra) => Object.assign({lato: 'compro', stato: s, metodi: ['Contanti al tabacchino'],
+  campiLoro: {euro: {testo: 'Contanti al tabacchino\nPayCode: 479-868-518'}}}, extra || {});
+const fra = Math.floor(Date.now() / 1000) + 86400;
+out.pcPresto = ['attesa_hold_venditore', 'attesa_mia_fattura', 'attesa_fattura_compratore',
+                'attesa_mia_cauzione', 'prendo']
+  .map(s => recapitoCompratoreP2P(conPc(s, {scadeFinto: fra})));
+out.pcPrestoSenzaScadenza = recapitoCompratoreP2P(conPc('attesa_hold_venditore'));
+out.pcPrestoSoloVista = recapitoCompratoreP2P(conPc('attesa_hold_venditore', {scadeFinto: fra, soloVista: true}));
+out.pcDopo = ['attivo', 'euro_inviati', 'in_disputa', 'annullo_proposto', 'rilasciato', 'concluso']
+  .map(s => recapitoCompratoreP2P(conPc(s, {scadeFinto: fra})));
+out.pcFiniti = ['annullato', 'rifiutato'].map(s => recapitoCompratoreP2P(conPc(s, {scadeFinto: fra})));
+/* ...e senza il codice ancora arrivato, a garanzia bloccata, il tempo di sempre */
+out.pcAttivoSenza = recapitoCompratoreP2P(conPc('attivo', {scadeFinto: fra, campiLoro: {}}));
 /* I DATI DA INCOLLARE (16 ott 2026, copia-recapito): un «Copia» per
    ogni dato che si incolla in un'altra app, coi valori che copia */
 const copie = t => (riquadroRecapitoP2P(t).match(/data-v="[^"]*"/g) || [])
@@ -130242,6 +130337,30 @@ const bott = () => ({dataset: {v: '@pseudolo'}, textContent: '📋 Copia', isCon
               and "Non inviare ancora" not in out.get("concluso", ""))
         prova("...e col PayCode il recapito e' il suo riquadro", '<div class="p2p-paycode">PAYCODE</div>',
               out.get("paycode"))
+        # (14 nov 2026, cantiere paycode-dopo-garanzia, Andrea: «mostrare il
+        # paycode solo dopo aver fatto il deposito di garanzia»)
+        _presto = out.get("pcPresto") or []
+        prova("il PayCode arrivato PRIMA della garanzia non si mostra: ne' il codice ne' il riquadro",
+              [5, False, False],
+              [len(_presto), any("479-868-518" in x or "PAYCODE" in x for x in _presto),
+               any("479-868-518" in x for x in [out.get("pcPrestoSenzaScadenza", ""),
+                                                out.get("pcPrestoSoloVista", "")])])
+        prova("...al suo posto il tempo, col titolo e la frase di quando arriva", [True] * 5,
+              ['🧾 Il PayCode arriva coi sats in garanzia</div>' in x
+               and "⚠️ Il PayCode compare qui quando i sats sono in garanzia: prima non andare al tabacchino." in x
+               and "RESTA" in x for x in _presto])
+        prova("...senza scadenza nota resta la frase, nel browser della sola vista dice dov'e'", [True, True],
+              [out.get("pcPrestoSenzaScadenza") == '<div class="hint">🧾 Il PayCode compare qui quando i sats '
+               'sono in garanzia: prima non andare al tabacchino.</div>',
+               "sta nel browser dove hai preso lo scambio" in out.get("pcPrestoSoloVista", "")
+               and "arriva coi sats" not in out.get("pcPrestoSoloVista", "")])
+        prova("...da sats in garanzia in poi il riquadro del PayCode c'e', fino a scambio concluso",
+              ['<div class="p2p-paycode">PAYCODE</div>'] * 6, out.get("pcDopo"))
+        prova("...a scambio annullato o rifiutato niente da pagare: niente riquadro", ["", ""],
+              out.get("pcFiniti"))
+        prova("...e a garanzia bloccata senza il codice, il tempo di sempre («non è ancora arrivato»)", True,
+              "🧾 Il PayCode non è ancora arrivato</div>" in out.get("pcAttivoSenza", "")
+              and "compare qui quando" not in out.get("pcAttivoSenza", ""))
         # (16 ott 2026, copia-recapito, richiesta di Andrea) «📋 Copia»
         # SOLO sui dati che si incollano in un'altra app: il valore senza
         # l'etichetta, l'IBAN senza spazi; mai sul nome del metodo ne'
@@ -152983,12 +153102,15 @@ def prove_testi_p2p_confondono():
           [True, False],
           ["arrivano all'indirizzo Lightning indicato da chi compra.</li>" in m,
            "indicato da chi compra all'inizio" in m])
-    prova("Info P2P (Barattozon, passo 4): il PayCode arriva quando l'ordine e' suo, "
-          "e si paga in garanzia", [True, False],
+    # ⚠️ EMENDATA (14 nov 2026, cantiere paycode-dopo-garanzia, Andrea:
+    # «mostrare il paycode solo dopo aver fatto il deposito di garanzia»):
+    # il PayCode non arriva piu' alla presa ma a sats in garanzia
+    prova("Info P2P (Barattozon, passo 4): il PayCode arriva SOLO a sats in garanzia",
+          [True, False, False],
           ["Il PayCode, l'importo e la scadenza gli arrivano <b>qui dentro e cifrati</b> "
-           "appena l'ordine è suo, in un riquadro col tempo che resta: si paga solo "
-           "quando la pagina dice «Sats in garanzia»." in m,
-           "A quel punto il PayCode" in m])
+           "solo quando la pagina dice «Sats in garanzia», in un riquadro col tempo che "
+           "resta: prima il codice non c'è, e al tabacchino non si va." in m,
+           "A quel punto il PayCode" in m, "appena l'ordine è suo" in m])
     stati = pezzo_js(m, "const STATI_P2P = {", "\n};\n")
     prova("«Dove vuoi i sats?» dice anche la fattura", True,
           "d: 'Indica il tuo indirizzo Lightning, o incolla una fattura: è lì che "
@@ -173511,8 +173633,8 @@ def prove_tor_chiavi_scambio():
           and "scadenzaPayCodeDaLibroP2P(o.libroScade, o.creato)" in fn("function scadenzaTabacchinoOrdineP2P(o){")
           and "return riquadroScadenzaPayCodeP2P(o);" in fn("function recapitoCompratoreP2P(o){"))
     prova("il riquadro del solo tempo batte col riquadro pieno (stesso id, stessa classe)", True,
-          'id="p2pTabPayResta"' in fn("function riquadroScadenzaPayCodeP2P(o, adesso){")
-          and "'<div class=\"p2p-paycode\" data-fine=\"' + scade + '\">'" in fn("function riquadroScadenzaPayCodeP2P(o, adesso){"))
+          'id="p2pTabPayResta"' in fn("function riquadroScadenzaPayCodeP2P(o, adesso, primaGaranzia){")
+          and "'<div class=\"p2p-paycode\" data-fine=\"' + scade + '\">'" in fn("function riquadroScadenzaPayCodeP2P(o, adesso, primaGaranzia){"))
     prova("fuori da Telegram il foglio del profilo non parla di Telegram, e avvisa su Tor", True,
           "const fuoriTelegram = !cloudTelegram();" in fn("function renderProfiloP2P(){")
           and "Tor Browser o la navigazione privata" in fn("function renderProfiloP2P(){"))

@@ -194,3 +194,9 @@ frase: Chi vende può mandare il suo codice sconto a chi ha già comprato da lui
 dove: Profilo → «🎟 Codici sconto» (il tasto «📣» sulla riga del codice) e Profilo → «🔔 Avvisi» (la riga «🎟️ Offerte dei negozi»).
 leva: CODICI_SCONTO_INVITI (nuova, accesa di serie), CODICI_SCONTO_INVITI_GIORNI, CODICI_SCONTO_INVITI_MAX
 pubblico: sì
+
+## 2026-11-14 · paycode-dopo-garanzia
+frase: Con Barattozon il PayCode arriva a chi compra solo quando i sats di chi vende sono in garanzia. Prima, nella pagina dello scambio c'è solo il tempo che resta, con la frase «Il PayCode compare qui quando i sats sono in garanzia»: così nessuno va al tabacchino a pagare prima che i sats siano al sicuro.
+dove: la pagina dello scambio in «I miei scambi», nel riquadro «🧾 Il PayCode».
+leva: nessuna
+pubblico: sì

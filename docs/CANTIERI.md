@@ -83017,3 +83017,81 @@ il giro mirato: le tre sezioni sopra e i collaudi vicini, verdi.
 
 NON PROVATO, DA GUARDARE. Tappo legge il libro da main: risponde su
 Wise solo dopo la promozione.
+
+## Il PayCode solo a sats in garanzia: l'invio aspetta la garanzia, e chi compra non lo vede prima (14 nov 2026, cantiere paycode-dopo-garanzia, Andrea: «in barattozon si potrebbe mostrare il paycode solo dopo aver fatto il deposito di garanzia? Così evito l'errore di pagare dal tabacchino senza i sat confermati»)
+
+IL BUCO. Il telefono di chi vende un Barattozon mandava PayCode,
+importo e scadenza DA SOLO alla presa (`pianificaAutoRecapito`, dal
+23 set 2026), cioè appena mostrod nominava la controparte, PRIMA che
+la garanzia fosse pagata. La patch 0007 (18 set) aveva già tolto
+l'invio automatico al recapito RICORDATO per lo stesso motivo, ma il
+tabacchino era rimasto fuori («i tre dati li ha scritti chi vende PER
+QUESTO ordine»). Così chi comprava aveva il codice in mano con la
+pagina ancora su «aspetta la garanzia», e un PayCode pagato non torna
+indietro: l'unica difesa era la riga «quando i sats sono in garanzia»
+dentro il quarto gesto del riquadro.
+
+IL SERVER NON C'ENTRA. Il PayCode viaggia solo come busta cifrata fra
+i due telefoni (kind 14); `/api/p2p/recapito` riceve la dichiarazione
+«l'ho mandato», mai il testo, e dal 19 set avvisa chi compra solo a
+garanzia bloccata. Le frasi della garanzia («Appena ti manda il
+PayCode, tocca a te») coprono già il caso del recapito che arriva
+dopo. Nessuna riga del server cambia.
+
+COSA SI È FATTO (solo `miniapp.html`).
+1) `garanziaBloccataP2P(o)`, giudice puro accanto a `P2P_PROGRESSO`:
+   dalla tacca `attivo` in su e mai a scambio finito. La cauzione non
+   conta (sta a 0, prima del primo passo).
+2) `recapitoDaAutoInvio` torna null finché la garanzia non c'è: il
+   cancello vale per tutte le strade che lo leggono — l'invio
+   automatico, la ripresa, l'avviso del PayCode fermo e il suo «Mandalo
+   da qui lo stesso». Prima della garanzia non si chiede nemmeno «è dei
+   nostri?» e il tentativo della sessione NON si brucia.
+3) `scriviOrdineP2P` riprende l'invio anche quando la riga ENTRA in
+   garanzia (oltre che quando arriva la controparte), da qualunque
+   strada: il messaggio del coordinatore, l'archivio alla riapertura,
+   la garanzia pagata da Phoenix (il caso 101e20d6 del 15 ott). Le
+   prudenze restano quelle della ripresa: un giro per sessione, la
+   domanda prima dello sparo, «è già partito?» al momento dello sparo.
+4) A chi compra, `recapitoCompratoreP2P`: prima della tacca «Sats in
+   garanzia» il PayCode NON si mostra anche se è già nella riga (un'app
+   di ieri, un altro client): niente numero, niente codice alla cassa.
+   Al suo posto `riquadroScadenzaPayCodeP2P` col nuovo titolo «Il
+   PayCode arriva coi sats in garanzia» e la frase
+   `P2P_PAYCODE_DOPO_GARANZIA`; senza scadenza nota resta la frase da
+   sola. A scambio annullato o rifiutato niente riquadro: non c'è
+   niente da pagare. Da `attivo` fino a `concluso` il riquadro di sempre.
+5) Info P2P (Barattozon, passo 4), il libro di Tappo (`sapere.md`,
+   `conoscenza.md` rigenerato) e NOVITA.md dicono che il codice arriva
+   a garanzia bloccata.
+
+STRADE SCARTATE. Toccare il server: non vede il codice, non c'era
+niente da chiudere. Nascondere il codice solo dal lato di chi compra:
+il codice sarebbe partito lo stesso verso un client esterno, che lo
+mostra. Una leva: è una correzione di sicurezza, non una funzione.
+
+PROVATO. `prove_p2p_chat` (il banco col bundle vero): in sei stati
+prima della garanzia (`attesa_hold_venditore`, `attesa_mia_hold`,
+`attesa_fattura_compratore`, `attesa_mia_cauzione`, `pubblicato`,
+`annullato`) non parte, il tentativo non si brucia, poi a `attivo`
+parte. `prove_paycode_ripresa`: controparte, riapertura e apertura
+della pagina a garanzia da pagare non mandano niente e non chiedono
+niente; la riga che passa ad `attivo` lo fa partire una volta sola;
+l'eco e «euro inviati» non lo rimandano; dalla cauzione alla garanzia
+da pagare niente. `prove_ritocchi_scambio`: il PayCode arrivato presto
+in cinque stati non compare, c'è il tempo con la frase; da `attivo` a
+`concluso` il riquadro; annullato e rifiutato vuoti. I banchi node del
+recapito prendono `P2P_PROGRESSO` e il giudice con `garanzia_js`.
+CONTROPROVE: tolto il cancello di `recapitoDaAutoInvio` → rosse le due
+del «prima non parte»; tolta la ripresa all'ingresso in garanzia →
+rosse «parte da solo» e «non lo rimandano»; tolto il cancello di chi
+compra → rosse quattro.
+
+DA GUARDARE (NON PROVATO DAL VIVO). Un Barattozon vero sul collaudo:
+chi vende pubblica, chi compra prende, la pagina di chi compra deve
+dire «Il PayCode arriva coi sats in garanzia» finché chi vende non
+paga la garanzia, e il codice deve comparire pochi secondi dopo (8 s
+di attesa più la domanda al server). Un'app di ieri sul telefono di chi
+vende manda ancora il codice alla presa: lo nasconde il telefono di
+chi compra, se è aggiornato. Il PDF del PayCode in chat resta un gesto
+a mano di chi vende, e la chat c'è già dalla presa: non è toccato.

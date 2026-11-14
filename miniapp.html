@@ -13365,7 +13365,7 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Chi vende fa l'ordine su Amazon</b> scegliendo «paga in contanti nel punto vendita». Amazon gli manda una mail con tre cose: il <b>PayCode</b> (nove cifre, come 479-868-518), l'<b>importo</b> esatto coi centesimi e una <b>scadenza</b>, settantadue ore dal checkout. Vale fino a <b>novecentonovantanove euro</b> per ordine, senza commissione; per Barattozon un PayCode vale almeno <b>venticinque euro</b>. <b>Non vale per Amazon Warehouse, contenuti digitali, oro, abbonamenti a Prime, buoni regalo e acquisti 1-Click</b>: se la mail di Amazon non offre il pagamento in contanti, l'ordine non è pagabile con Barattozon.</li>
         <li><b>Chi vende pubblica qui</b>, con Barattozon come unico metodo, e il foglio lo porta per mano in <b>quattro passi</b>: il PayCode, l'importo, la scadenza (con un selettore di data e ora, fra un'ora e settantadue ore) e il <b>premio</b>, con lo stesso cursore degli altri ordini, da meno venti a più venti per cento, a numeri interi. <b>Un PayCode vale almeno 25 €.</b> Prima dei quattro passi si sceglie il <b>tipo di prezzo</b>, come per ogni ordine: <b>a prezzo di mercato</b> i sats si calcolano quando qualcuno prende l'ordine, col premio, sull'importo arrotondato <b>per eccesso</b> all'euro intero (25,47 € diventano 26: chi paga riceve sempre almeno il valore di quel che paga, e la differenza la mette chi pubblica); <b>a prezzo fisso</b> i sats nascono adesso, sui centesimi esatti e al cambio di oggi, e la convenienza per chi prende si muove col bitcoin. <b>Il segno decide il verso:</b> col premio positivo chi paga al tabacchino riceve meno sats del cambio pieno e la differenza resta a chi vende; col premio negativo ne riceve di più, e quella differenza la paga chi vende per la comodità. A zero passa il cambio pieno. <b>Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo.</b> Prima di pubblicare c'è il riepilogo, che a prezzo di mercato dice anche l'arrotondamento. Il cambio si fissa lì a prezzo fisso, alla presa a mercato; l'ordine resta nel libro fino a <b>due ore prima</b> della scadenza del PayCode (mai oltre settantadue ore): poi esce da solo.</li>
         <li><b>Nel libro la card dice quanto conviene adesso</b>, come negli altri ordini: «più conveniente» o «meno conveniente» per chi guarda, e dal dieci per cento il cartellino dell'affare. I sats sono fissi dalla pubblicazione e il bitcoin no, quindi <b>la convenienza vera si muove col prezzo</b>, e il numero la segue, senza limiti. Nel dettaglio trovi i due numeri uno accanto all'altro: <b>il premio scelto</b> da chi vende e quello <b>al prezzo di adesso</b>. Dopo la presa il conto si ferma al prezzo di quel momento: i sats che ricevi sono quelli scritti, al satoshi.</li>
-        <li><b>Chi compra prende l'ordine</b>, indica dove ricevere i sats, e chi vende li blocca in garanzia. Il PayCode, l'importo e la scadenza gli arrivano <b>qui dentro e cifrati</b> appena l'ordine è suo, in un riquadro col tempo che resta: si paga solo quando la pagina dice «Sats in garanzia». Nel libro pubblico c'è solo l'importo: il PayCode non lo vede nessun altro, nemmeno Barattolo.</li>
+        <li><b>Chi compra prende l'ordine</b>, indica dove ricevere i sats, e chi vende li blocca in garanzia. Il PayCode, l'importo e la scadenza gli arrivano <b>qui dentro e cifrati</b> solo quando la pagina dice «Sats in garanzia», in un riquadro col tempo che resta: prima il codice non c'è, e al tabacchino non si va. Nel libro pubblico c'è solo l'importo: il PayCode non lo vede nessun altro, nemmeno Barattolo.</li>
         <li><b>Chi compra va a pagare</b> in un <b>punto abilitato al PayCode</b>: non tutte le tabaccherie lo sono. Si cercano sulla <button type="button" class="scopri-link" onclick="apriMappaPayCodeP2P()">mappa di Amazon</button>, che chiede un account Amazon (uno qualsiasi); <b>chi non ce l'ha</b> cerca per CAP su <button type="button" class="scopri-link" onclick="apriPuntoLisPayCodeP2P()">PuntoLis</button> spuntando «Amazon Paga in Contanti», o scrive il suo CAP a chi vende, che lo cerca per lui. Alla cassa mostra il codice e dice <b>«devo pagare un ordine Amazon in contanti con un PayCode»</b>: <b>non una ricarica, non un buono regalo</b>, che non pagano l'ordine. Paga l'importo esatto, senza commissione, e <b>controlla lo scontrino</b>: pagamento dell'ordine, non «codice acquisto» o buono. Poi <b>tiene lo scontrino</b>, la sua prova, e torna qui a toccare «Ho pagato al tabacchino».</li>
         <li><b>Chi vende controlla su Amazon</b> che l'ordine risulti saldato, e sceglie fra due bottoni: <b>«Risulta pagato: libera i sats»</b> oppure <b>«Non risulta pagato: apri una disputa»</b>. Ha <b>ventiquattro ore</b> a vista, e Barattolo glielo ricorda su Telegram dopo un'ora, sei ore e venti ore. <b>Non esiste una conferma automatica</b>: Amazon non parla con Barattolo, e i sats non si liberano da soli. Se chi vende non fa nulla, i sats restano in garanzia e chi ha pagato può aprire lui la disputa: decide un moderatore, e lo scontrino è quel che guarda.</li>
       </ol>
@@ -71270,6 +71270,13 @@ function scriviOrdineP2P(o){
      2026): il PayCode che deve partire da solo (vedi «LA RIPRESA») */
   if (o.peer && !(prima && prima.peer) && typeof riprendiAutoRecapitoP2P === 'function')
     riprendiAutoRecapitoP2P(o.id);
+  /* ...e la garanzia appena bloccata (14 nov 2026, paycode-dopo-
+     garanzia): e' il momento in cui il PayCode puo' partire, da
+     qualunque strada arrivi la notizia — il coordinatore, l'archivio
+     alla riapertura, la garanzia pagata da un wallet esterno */
+  else if (o.peer && typeof garanziaBloccataP2P === 'function' && garanziaBloccataP2P(o)
+           && !garanziaBloccataP2P(prima) && typeof riprendiAutoRecapitoP2P === 'function')
+    riprendiAutoRecapitoP2P(o.id);
   /* ...il foglio da pagare si chiude, da qualunque strada arrivi la
      notizia (15 ott 2026): vedi qui sotto. Col typeof: i banchi di casa
      estraggono la scrittura da sola */
@@ -73708,6 +73715,14 @@ const P2P_PROGRESSO = {
   concluso: 4,
   annullo_chiesto: 2, annullo_proposto: 2, in_disputa: 3, annullato: 0
 };
+/* PURA: i sats di chi vende sono in garanzia, adesso? Dalla tacca
+   «Sats in garanzia» in poi, e mai a scambio finito (14 nov 2026,
+   cantiere paycode-dopo-garanzia): e' il cancello del PayCode, che
+   prima non parte da chi vende e non si mostra a chi compra. */
+function garanziaBloccataP2P(o){
+  return !!o && (P2P_PROGRESSO[o.stato] || 0) >= P2P_PROGRESSO.attivo
+    && P2P_FINALI.indexOf(o.stato) < 0;
+}
 const STATI_P2P = {
   prendo: {t: 'Sto prendendo l\'ordine…', d: 'Chiedo di riservartelo.'},
   pubblico: {t: 'Sto pubblicando l\'ordine…', d: 'Lo metto nel libro degli ordini.'},
@@ -76868,6 +76883,21 @@ function campiOrdineP2P(o){
    ovunque. */
 function recapitoCompratoreP2P(o){
   const loro = (o && o.campiLoro) || {};
+  /* ⚠️ IL PAYCODE SOLO A SATS IN GARANZIA (14 nov 2026, cantiere
+     paycode-dopo-garanzia, Andrea: «così evito l'errore di pagare dal
+     tabacchino senza i sat confermati»). Il telefono di chi vende ora
+     lo manda solo a garanzia bloccata (`recapitoDaAutoInvio`), ma un
+     PayCode puo' arrivare prima lo stesso: un'app di ieri, o un altro
+     client. Prima della tacca «Sats in garanzia» qui il codice NON si
+     mostra — niente numero, niente codice alla cassa — e al suo posto
+     c'e' il tempo, con la frase che dice quando arriva. A scambio
+     annullato o rifiutato non c'e' niente da pagare: niente riquadro. */
+  if (o && o.lato === 'compro' && tabacchinoP2P(o.metodi)
+      && (P2P_PROGRESSO[o.stato] || 0) < P2P_PROGRESSO.attivo) {
+    if (P2P_FINALI.indexOf(o.stato) >= 0) return '';
+    return riquadroScadenzaPayCodeP2P(o, 0, true)
+      || '<div class="hint">🧾 ' + esc(P2P_PAYCODE_DOPO_GARANZIA) + '</div>';
+  }
   /* SENZA IL CODICE MA COL TEMPO (11 ott 2026): la riga senza chiavi, o
      col PayCode non ancora arrivato, mostra la scadenza letta dal libro */
   if (o && o.lato === 'compro' && !loro.euro && tabacchinoP2P(o.metodi)
@@ -77136,13 +77166,19 @@ function apriPuntoLisPayCodeP2P(){
    dal libro pubblico: solo il tempo, riscritto ogni secondo dallo
    stesso battito del riquadro pieno (`#p2pTabPayResta` dentro
    `.p2p-paycode`). */
-function riquadroScadenzaPayCodeP2P(o, adesso){
+/* `primaGaranzia` (14 nov 2026, paycode-dopo-garanzia): lo scambio non
+   e' ancora a sats in garanzia, e il codice arriva solo dopo — anche se
+   fosse gia' nella riga, qui non si mostra (`recapitoCompratoreP2P`) */
+const P2P_PAYCODE_DOPO_GARANZIA = 'Il PayCode compare qui quando i sats sono in garanzia: prima non andare al tabacchino.';
+function riquadroScadenzaPayCodeP2P(o, adesso, primaGaranzia){
   const ora = adesso || Math.floor(Date.now() / 1000);
   const scade = scadenzaTabacchinoOrdineP2P(o);
   if (!(scade > 0)) return '';
   const manca = Math.max(0, scade - ora);
   return '<div class="p2p-paycode" data-fine="' + scade + '">' +
-    '<div class="p2p-paycode-tit">🧾 Il PayCode ' + (o.soloVista ? 'sta nel browser dove hai preso lo scambio' : 'non è ancora arrivato') + '</div>' +
+    '<div class="p2p-paycode-tit">🧾 Il PayCode ' + (o.soloVista ? 'sta nel browser dove hai preso lo scambio'
+      : primaGaranzia ? 'arriva coi sats in garanzia' : 'non è ancora arrivato') + '</div>' +
+    (primaGaranzia && !o.soloVista ? '<div class="hint">⚠️ ' + esc(P2P_PAYCODE_DOPO_GARANZIA) + '</div>' : '') +
     '<div class="p2p-paycode-riga"><span>Scade il</span><b>' + esc(dataTabacchinoP2P(scade)) + '</b></div>' +
     '<div class="p2p-paycode-resta' + (manca <= 0 ? ' scaduto' : manca <= P2P_TAB_ULTIMA_S ? ' ultima' : '') + '">' +
       (manca > 0 ? 'Tempo che resta: <b id="p2pTabPayResta">' + esc(contoRimastoP2P(manca)) + '</b>'
@@ -88456,6 +88492,15 @@ let p2pAutoInCorso = {};         // per sessione: l'invio sta aspettando (vedi �
 function recapitoDaAutoInvio(o){
   if (!o || o.lato !== 'vendo' || !o.peer) return null;
   if (P2P_FINALI.indexOf(o.stato) >= 0) return null;
+  /* ⚠️ SOLO A SATS IN GARANZIA (14 nov 2026, cantiere
+     paycode-dopo-garanzia, Andrea: «mostrare il paycode solo dopo aver
+     fatto il deposito di garanzia? Così evito l'errore di pagare dal
+     tabacchino senza i sat confermati»). Partiva alla presa: chi
+     comprava aveva il codice in mano prima che chi vende avesse
+     bloccato i sats, e un PayCode pagato non torna indietro. Adesso
+     l'invio aspetta la tacca «Sats in garanzia» (`garanziaBloccataP2P`)
+     e, quando la riga ci arriva, lo riprende `scriviOrdineP2P`. */
+  if (!garanziaBloccataP2P(o)) return null;
   if ((o.campiMiei || {}).euro) return null;
   /* IL TABACCHINO PARTE DALLA RIGA (set 2026): i tre dati sono di
      questo ordine e non di un ricordo per forma, e sono gia' composti */
