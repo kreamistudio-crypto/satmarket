@@ -644,3 +644,32 @@ ordini P2P in franchi svizzeri», «NON PROVATO»). In produzione la leva
 resta spenta fino alla promozione e a un sì di Andrea; poi
 `P2P_CHF_ATTIVO = True` (solo admin) e, più avanti,
 `P2P_CHF_SOLO_ADMIN = False` per tutti.
+
+## 15. Dopo il primo audit di sicurezza: tre letture sul VPS per le piccole chiusure (14 nov 2026, cantiere audit-chiusure)
+
+**Sola lettura**, niente cambia e niente segreti a schermo. Le
+correzioni chiudono le strade da qui in avanti; queste tre righe dicono
+se in produzione c'è già qualcosa nato PRIMA. Sul VPS, una riga alla
+volta, e incolla il risultato nella sessione:
+
+1. Un commento di feedback con dentro un `<` (escono solo i numeri, mai
+   il testo):
+```
+python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,ordine_id,da_tg_id FROM feedback WHERE commento LIKE '%<%'\")]"
+```
+   Atteso: nessuna riga. Una riga non è un danno fatto: dice solo che
+   qualcuno ci ha provato, e si guarda insieme chi.
+2. Un annuncio con una foto che non è né un nome di file né un
+   indirizzo http(s):
+```
+python3 -c "import sqlite3,json; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(i, repr(f)[:80], sep='|') for i,t in c.execute(\"SELECT id,foto FROM annunci WHERE foto NOT IN ('','[]')\") for f in (json.loads(t) if t.startswith('[') else [t]) if not (isinstance(f,str) and (f.startswith(('http://','https://')) or (f and '/' not in f and chr(92) not in f and not f.startswith('.'))))]"
+```
+   Atteso: nessuna riga. Se ne esce una, NON si cancella niente: si
+   porta il numero dell'annuncio alla sessione.
+3. Una delle tre leve che restano sul VPS scritta dal pannello:
+```
+python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print([r[0] for r in c.execute(\"SELECT chiave FROM leve_pannello WHERE chiave IN ('GUARDIANO_PONTE_AVVISA','BLOSSOM_SERVER','LND_PONTE_CERT')\")])"
+```
+   Atteso: `[]`. (Se dice «no such table» va bene uguale: dal pannello
+   non è mai stata scritta nessuna leva.) Se ne esce una, il codice
+   nuovo smette comunque di ascoltarla: la riga si toglie insieme.

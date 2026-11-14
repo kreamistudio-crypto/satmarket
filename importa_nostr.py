@@ -441,8 +441,13 @@ def localizza_foto(annuncio_id: int, foto_json: str, scarica=None,
         return foto_json
     nuove = []
     for i, f in enumerate(lista):
-        if not isinstance(f, str) or not f.startswith("http"):
-            nuove.append(f)                    # gia' un file locale
+        if not isinstance(f, str):
+            continue                           # non e' ne' nome ne' URL
+        if not f.startswith("http"):
+            # gia' un file locale: SOLO un nome nudo, mai un percorso
+            # (la cintura di `foto_evento`: vedi la sua voce)
+            if f and f == os.path.basename(f) and not f.startswith("."):
+                nuove.append(f)
             continue
         nome = scarica_foto(f, annuncio_id, i, scarica, pulisci)
         nuove.append(nome or f)
@@ -625,17 +630,27 @@ def foto_evento(e) -> list:
     lettura di `estrai_annuncio`, messa in un posto solo l'11 ott 2026
     (cantiere foto-obbligatorie) perche' adesso la fanno in due: chi
     scrive l'annuncio e chi decide se un evento mai visto puo' nascere
-    (qui in `importa_venditore`, e nel server prima di pagare l'AI)."""
+    (qui in `importa_venditore`, e nel server prima di pagare l'AI).
+    SOLO INDIRIZZI http(s) (14 nov 2026, cantiere audit-chiusure, dal
+    primo audit di sicurezza): quei valori li scrive chi firma
+    l'evento, e uno che non e' un indirizzo — `../config.py`, un
+    percorso assoluto — passava per «un file nostro» ed entrava in
+    colonna cosi' com'era. Una foto che non e' un URL non e' una foto:
+    l'evento che ha solo quelle e' un evento SENZA foto."""
+    def _url_di_foto(u) -> bool:
+        return isinstance(u, str) and u.startswith(("http://", "https://"))
+
     if e.get("kind") == 30402:                 # NIP-99 classified
         return [t[1] for t in e.get("tags", [])
-                if t and t[0] == "image" and len(t) > 1][:5]
+                if t and t[0] == "image" and len(t) > 1
+                and _url_di_foto(t[1])][:5]
     try:                                       # NIP-15 prodotto (30018)
         c = json.loads(e.get("content", "{}"))
     except Exception:
         return []
     if not isinstance(c, dict):
         return []
-    return [u for u in (c.get("images") or []) if isinstance(u, str)][:5]
+    return [u for u in (c.get("images") or []) if _url_di_foto(u)][:5]
 
 
 def estrai_annuncio(e, valute_stall, cambio):

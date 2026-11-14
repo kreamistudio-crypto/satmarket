@@ -3021,10 +3021,18 @@ def prove_niente_passo_intermedio():
     # --- 2) IL CENSIMENTO: non rinasce da un'altra porta ---------
     # Non un elenco di funzioni, che invecchia al primo cantiere: si
     # CONTA chi scrive quella data, e dev'essere uno solo.
-    prova("`consegnato` ha un solo scrittore", 1,
-          _SORGENTE.count("consegnato=?"))
-    prova("...ed e' la rivelazione del contenuto digitale", True,
-          "consegnato=?" in corpo("leggi_contenuto_digitale"))
+    # (14 nov 2026, cantiere audit-chiusure, dal primo audit di
+    # sicurezza: le scritture sono DUE, la rivelazione e la lettura
+    # tarda di chi compra fuori da 'shipped', e stanno tutte e due
+    # nella stessa rotta. La regola non cambia: quella data la scrive
+    # solo il gesto di chi compra. Si conta quindi che FUORI da quella
+    # rotta non ne esista nessuna.)
+    prova("`consegnato` lo scrive una rotta sola", 0,
+          _SORGENTE.count("consegnato=?")
+          - corpo("leggi_contenuto_digitale").count("consegnato=?"))
+    prova("...ed e' la lettura del contenuto digitale: la rivelazione e "
+          "la ricevuta della lettura tarda", 2,
+          corpo("leggi_contenuto_digitale").count("consegnato=?"))
 
     # --- 3) LA STANZA RESTA: da 'delivered' si esce ancora -------
     # Il censimento NOMINA invece di contare (ago 2026): il numero
@@ -9367,6 +9375,447 @@ def prove_disputa_cambia_strada():
         prova(f"`{nome}`: il ramo «non pagato» scrive il verso insieme al "
               "timbro", True,
               "payout_verso=?" in mite and f'"{verso}"' in mite)
+
+
+def prove_chiusure_audit():
+    """LE PICCOLE CHIUSURE DEL PRIMO AUDIT DI SICUREZZA (14 nov 2026,
+    cantiere audit-chiusure: dieci sospetti, nessuno cambia un gesto di
+    chi usa l'app). Qui coi pezzi VERI di server.py e di importa_nostr:
+    1) il relay di casa della cassetta esiste solo in collaudo;
+    2) nessuna connessione a un relay segue un redirect del saluto;
+    3) (il titolo della pagina di un ordine P2P: in
+       `prove_condividi_ordine_p2p`, accanto ai suoi gemelli);
+    4) il testo di un utente esce scappato negli avvisi ad ALTRI;
+    5) la ricevuta del contenuto digitale non la scrive un link, e ogni
+       lettura di chi compra la lascia;
+    6) le foto di un evento Nostr sono indirizzi, i nomi in colonna
+       passano dalla whitelist prima del disco, e lo scaricatore dei
+       media di X ha il suo giudice a ogni salto;
+    7) tre leve con la sostanza delle «mai» restano sul VPS.
+    Il giro col server vero lo fa `collaudo_chiusure_audit.py`."""
+    print("\n[le piccole chiusure del primo audit di sicurezza]")
+    import asyncio as _aio
+    import ipaddress as _ip
+    import sqlite3
+    import tempfile as _tmp
+    import types as _ty
+    from urllib.parse import urlparse as _up
+
+    # --- 1) IL RELAY DI CASA SOLO IN COLLAUDO ------------------------
+    DNS = {"nrs.primal.net": "8.8.8.8", "dentro.example": "127.0.0.1",
+           "lan.example": "10.0.0.7"}
+
+    def giudici(collaudo):
+        amb = {"urlparse": _up, "ipaddress": _ip, "re": re,
+               "MODALITA_COLLAUDO": collaudo,
+               "socket": _ty.SimpleNamespace(getaddrinfo=lambda h, p: [
+                   (0, 0, 0, "", (DNS.get(h, h), 0))])}
+        for f in ("relay_di_casa", "_relay_cassetta_ammesso",
+                  "_orecchio_indirizzo_pubblico"):
+            exec(pezzo(f), amb)
+        return amb
+    P, C = giudici(False), giudici(True)
+    DI_CASA = ["ws://127.0.0.1:5001/api/v1/wallet", "ws://localhost:8080/",
+               "ws://[::1]:5001/", "ws://127.9.9.9:22/"]
+    prova("in PRODUZIONE il deposito non ammette nessun relay di casa: "
+          "ne' loopback, ne' porta, ne' percorso", [False] * 4,
+          [P["_relay_cassetta_ammesso"](u) for u in DI_CASA])
+    prova("...e nemmeno il giudice del thread, che e' l'ultimo prima "
+          "della rete", [False] * 4,
+          [P["_orecchio_indirizzo_pubblico"](u) for u in DI_CASA])
+    prova("...un wss con un nome pubblico passa come ieri, e un nome che "
+          "risolve dentro casa o in LAN no", [True, True, False, False],
+          [P["_relay_cassetta_ammesso"]("wss://nrs.primal.net"),
+           P["_orecchio_indirizzo_pubblico"]("wss://nrs.primal.net"),
+           P["_orecchio_indirizzo_pubblico"]("wss://dentro.example"),
+           P["_orecchio_indirizzo_pubblico"]("wss://lan.example")])
+    prova("in COLLAUDO il relay di cartone resta raggiungibile (i giri "
+          "dal vivo e la gabbia della CI)", [True, True],
+          [C["_relay_cassetta_ammesso"]("ws://127.0.0.1:7790"),
+           C["_orecchio_indirizzo_pubblico"]("ws://127.0.0.1:7790")])
+    prova("...e un ws:// che non e' di casa non passa da nessuna parte",
+          [False, False],
+          [P["_relay_cassetta_ammesso"]("ws://relay.example"),
+           C["_relay_cassetta_ammesso"]("ws://relay.example")])
+
+    def spedisce(collaudo, relay):
+        bussate = []
+
+        class _Ws:
+            def settimeout(self, s): pass
+            def send(self, t): pass
+            def recv(self): return json.dumps(["OK", "e" * 64, True])
+            def close(self): pass
+
+        def connetti(r, **k):
+            bussate.append(r)
+            return _Ws()
+        amb = {**giudici(collaudo), "_SPEDIZIONI_SIMULATE": set(),
+               "_presa_esterna": lambda r: None, "_cassetta_connetti": connetti,
+               "CASSETTA_SPEDISCI_OK_S": 1, "json": json, "time": time,
+               "print": lambda *a, **k: None}
+        exec(pezzo("_cassetta_spedisci_a"), amb)
+        return amb["_cassetta_spedisci_a"](relay, {"id": "e" * 64}), bussate
+    prova("la consegna di un 24133 a un relay di casa: in produzione non "
+          "si bussa nemmeno, in collaudo si'",
+          [(False, []), (True, ["ws://127.0.0.1:7790"])],
+          [spedisce(False, "ws://127.0.0.1:7790"),
+           spedisce(True, "ws://127.0.0.1:7790")])
+
+    # --- 2) NIENTE REDIRECT NEL SALUTO -------------------------------
+    import ssl as _ssl
+    chiuse, visti_k = [], []
+
+    class _Presa:
+        def __init__(self, stato):
+            self.status = stato
+
+        def close(self):
+            chiuse.append(self.status)
+
+    def _apri_finto(relay, **k):
+        visti_k.append(dict(k))
+        return _Presa(302 if "gira" in relay else 101)
+    amb = {"ssl": _ssl, "_connessione_websocket": _apri_finto,
+           "_certificato_rifiutato": lambda *a: None}
+    exec(pezzo("_apri_websocket"), amb)
+    apri = amb["_apri_websocket"]
+    sana = apri("wss://sano.example", timeout=5, redirect_limit=3)
+    prova("ogni connessione parte col divieto di seguire un redirect, "
+          "anche se chi chiama chiedesse il contrario", (101, 0),
+          (sana.status, visti_k[-1].get("redirect_limit")))
+    try:
+        apri("wss://gira.example", timeout=5)
+        esito = "aperta"
+    except OSError as e:
+        esito = "OSError" if "redirect" in str(e) else str(e)
+    prova("la cintura per le versioni che tornano la connessione su un "
+          "3xx: e' un relay che non risponde, e la presa si chiude",
+          ("OSError", [302]), (esito, chiuse))
+    # ...e la libreria VERA, con due porte di cartone sul loopback: la
+    # prima risponde 302 verso la seconda, che e' «dentro casa»
+    try:
+        from websocket import create_connection as _cc_vera
+    except ImportError:
+        _cc_vera = None
+    if _cc_vera is None:
+        salta("il redirect con la libreria vera", "websocket-client non c'e'")
+    else:
+        import socket as _sk
+        import threading as _th
+        bussate, prese = [], []
+
+        def porta(risposta):
+            s = _sk.socket()
+            s.setsockopt(_sk.SOL_SOCKET, _sk.SO_REUSEADDR, 1)
+            s.bind(("127.0.0.1", 0))
+            s.listen(5)
+            s.settimeout(5)
+            prese.append(s)
+            n = s.getsockname()[1]
+
+            def giro():
+                while True:
+                    try:
+                        c, _ = s.accept()
+                    except OSError:
+                        return
+                    try:
+                        c.settimeout(2)
+                        bussate.append((n, c.recv(4096).split(b"\r\n")[0]))
+                        c.sendall(risposta(n))
+                    except OSError:
+                        pass
+                    finally:
+                        c.close()
+            _th.Thread(target=giro, daemon=True).start()
+            return n
+        dentro = porta(lambda n: b"HTTP/1.1 404 Not Found\r\n"
+                                 b"Content-Length: 0\r\n\r\n")
+        fuori = porta(lambda n: (
+            "HTTP/1.1 302 Found\r\nLocation: ws://127.0.0.1:%d/dentro-casa"
+            "\r\n\r\n" % dentro).encode())
+        amb_v = {"ssl": _ssl, "_connessione_websocket": _cc_vera,
+                 "_certificato_rifiutato": lambda *a: None}
+        exec(pezzo("_apri_websocket"), amb_v)
+        try:
+            amb_v["_apri_websocket"](f"ws://127.0.0.1:{fuori}/", timeout=3)
+            esito = "aperta"
+        except Exception as e:
+            esito = type(e).__name__
+        prova("la libreria vera: il relay risponde 302 verso una porta di "
+              "casa, e quella porta NON viene bussata",
+              (True, [fuori]), (esito != "aperta", [b[0] for b in bussate]))
+        bussate.clear()
+        try:
+            _cc_vera(f"ws://127.0.0.1:{fuori}/", timeout=3)
+        except Exception:
+            pass
+        prova("...controprova: senza l'involucro la libreria il salto lo "
+              "fa da sola (e' il difetto che l'involucro chiude)",
+              [fuori, dentro], [b[0] for b in bussate])
+        for s in prese:
+            s.close()
+    prova("tutte le connessioni passano dall'involucro (una sola porta "
+          "verso la libreria)", (1, True),
+          (codice(_SORGENTE).count("_connessione_websocket(relay"),
+           "create_connection = _apri_websocket if _connessione_websocket "
+           "else None" in _SORGENTE))
+
+    # --- 4) IL TESTO DI UN UTENTE NEGLI AVVISI AD ALTRI ---------------
+    src = codice(_SORGENTE)
+    prova("i due commenti (feedback e recensione P2P) escono scappati",
+          (0, 2), (src.count("«{commento}»"),
+                   src.count("«{html.escape(commento)}»")))
+    prova("nessun nome di battesimo nudo dentro un messaggio", 0,
+          src.count("{user['first_name']}") + src.count("{lavoro['nome']}"))
+    # IL CENSIMENTO: dentro una chiamata a notifica/notifica_admin un
+    # titolo affettato a mano (`x['titolo'][:60]`) esce nudo SOLO verso
+    # chi quel titolo l'ha scritto (`a["venditore_id"]`): li' non c'e'
+    # nessun confine. Verso chiunque altro, e verso i moderatori, e'
+    # scappato. (I `titolo = html.escape(...)` li censisce
+    # `prove_titoli_scappati`.)
+    nudi, visti = [], 0
+    for m in re.finditer(r"\bnotifica(_admin)?\(", _SORGENTE):
+        j, fondo = m.end(), 1
+        while fondo and j < len(_SORGENTE):
+            fondo += {"(": 1, ")": -1}.get(_SORGENTE[j], 0)
+            j += 1
+        blocco = _SORGENTE[m.start():j]
+        if not re.search(r"\['titolo'\]\[:\d+\]", blocco):
+            continue
+        visti += 1
+        if re.search(r"\{\w+\['titolo'\]\[:\d+\]\}", blocco) \
+                and not blocco.startswith('notifica(a["venditore_id"],'):
+            nudi.append(blocco[:60])
+    prova("il censimento: un titolo nudo va solo a chi l'ha scritto", [],
+          nudi)
+    prova("...e il censimento guarda davvero (almeno i tredici siti "
+          "chiusi oggi)", True, visti >= 13)
+    for f, spia in (("_avvisa_aste_in_scadenza",
+                     "html.escape(a['titolo'][:60])"),
+                    ("_incassa_ordine", "html.escape(riga['titolo'][:60])")):
+        prova(f"{f}: il titolo agli ALTRI offerenti e' scappato", True,
+              spia in pezzo(f))
+
+    # --- 5) IL CONTENUTO DIGITALE ------------------------------------
+    amb = {}
+    exec(pezzo("_arriva_da_un_link"), amb)
+    link = amb["_arriva_da_un_link"]
+
+    def R(**h):
+        return _ty.SimpleNamespace(headers={k.replace("_", "-"): v
+                                            for k, v in h.items()})
+    prova("una navigazione (link, redirect, finestra) si riconosce; la "
+          "fetch della pagina no", [True, True, False, False, False],
+          [link(R(sec_fetch_mode="navigate", sec_fetch_site="cross-site")),
+           link(R(sec_fetch_mode="NAVIGATE")),
+           link(R(sec_fetch_mode="cors", sec_fetch_site="same-origin")),
+           link(R(sec_fetch_mode="cors", sec_fetch_site="cross-site",
+                  accept="text/html")),      # l'APK: fetch da altra origine
+           link(R(sec_fetch_mode="same-origin"))])
+    prova("...un browser vecchio, senza Sec-Fetch: decide l'Accept",
+          [True, False, False],
+          [link(R(accept="text/html,application/xhtml+xml,*/*;q=0.8")),
+           link(R(accept="*/*")), link(R())])
+    prova("...e senza richiesta in mano (prove, collaudi) non e' un link",
+          False, link(None))
+    rotta = codice(pezzo("leggi_contenuto_digitale"))
+    prova("la rotta rifiuta la navigazione PRIMA di scrivere la ricevuta",
+          True, 0 < rotta.find("_arriva_da_un_link(req)")
+          < rotta.find("UPDATE ordini SET consegnato=?")
+          < rotta.find("UPDATE ordini SET stato='delivered'"))
+    prova("...la lettura tarda timbra una volta sola e non tocca lo "
+          "stato", True,
+          '"UPDATE ordini SET consegnato=? WHERE id=? "' in rotta
+          and '"AND consegnato=0"' in rotta)
+    prova("...e ai moderatori lo dice quando l'ordine non e' concluso a "
+          "favore di chi vende", True,
+          'if o["stato"] not in ("confirmed", "released"):' in rotta
+          and 'argomento="dispute"' in rotta)
+
+    # --- 6) LE FOTO DI UN EVENTO NOSTR --------------------------------
+    nostr = open("importa_nostr.py", encoding="utf-8").read()
+    amb_n = {"json": json, "os": os}
+    i = nostr.index("def foto_evento(e)")
+    exec(nostr[i:nostr.index("\n\n\n", i)], amb_n)
+    fe = amb_n["foto_evento"]
+    STORTE = ["../config.py", "/etc/passwd", "a1_0.jpg", "ftp://x/y.jpg",
+              "data:image/png;base64,AAAA", "javascript:alert(1)"]
+    prova("foto_evento tiene solo gli indirizzi http(s): un percorso, un "
+          "nome, un altro schema non sono foto",
+          (["https://f.test/a.jpg"], ["http://f.test/b.jpg"], []),
+          (fe({"kind": 30402, "tags": [["image", s] for s in STORTE]
+               + [["image", "https://f.test/a.jpg"]]}),
+           fe({"kind": 30018, "content": json.dumps(
+               {"images": STORTE + ["http://f.test/b.jpg", 7]})}),
+           fe({"kind": 30402, "tags": [["image", s] for s in STORTE]})))
+    i = nostr.index("def localizza_foto(")
+    amb_n["scarica_foto"] = lambda u, aid, k, s, p: None    # download fallito
+    exec(nostr[i:nostr.index("\n\n\n", i)], amb_n)
+    loc = amb_n["localizza_foto"]
+    prova("...la cintura di localizza_foto: un percorso non resta in "
+          "colonna, un nome nudo e un URL non scaricato si'",
+          ["a1_0.jpg", "https://f.test/a.jpg"],
+          json.loads(loc(1, json.dumps(
+              ["../config.py", "/etc/passwd", "a1_0.jpg", 7, ".nascosto",
+               "https://f.test/a.jpg"])) or "[]"))
+
+    # i due consumatori che toccano il disco, col file che ESISTE: a
+    # tenerlo fuori puo' essere solo la whitelist delle forme
+    amb = _amb_seo()
+    img = amb["_immagine_anteprima"]
+    with _tmp.TemporaryDirectory() as radice:
+        foto = os.path.join(radice, "foto")
+        os.mkdir(foto)
+        segreto = os.path.join(radice, "config.py")
+        for p in (segreto, os.path.join(foto, "a5_0.jpg"),
+                  os.path.join(foto, "appunti.txt")):
+            open(p, "w").close()
+        amb["FOTO_DIR"] = foto
+        prova("la card di un annuncio non dice se un file fuori da foto/ "
+              "esiste: percorso relativo, assoluto, nome fuori forma",
+              [amb["IMMAGINE_BRAND"]] * 3,
+              [img(json.dumps(["../config.py"])), img(json.dumps([segreto])),
+               img(json.dumps(["appunti.txt"]))])
+        prova("...e la foto vera dell'annuncio si vede come ieri",
+              "https://barattolo.store/foto/a5_0.jpg",
+              img(json.dumps(["a5_0.jpg"]))[0])
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, foto TEXT)")
+        for k, f in enumerate((["../config.py"], [segreto], ["appunti.txt"],
+                               ["a5_0.jpg"]), 1):
+            con.execute("INSERT INTO annunci VALUES(?,?)", (k, json.dumps(f)))
+        amb2 = {"json": json, "os": os, "FOTO_DIR": foto,
+                "NOME_FOTO": amb["NOME_FOTO"]}
+        exec(pezzo("_foto_podio"), amb2)
+        prova("...lo stesso per la figura del podio: solo la foto vera",
+              [None, None, None, os.path.join(foto, "a5_0.jpg")],
+              amb2["_foto_podio"](con, [{"annuncio_id": k}
+                                        for k in (1, 2, 3, 4)]))
+        con.close()
+
+    # lo scaricatore dei media di X, con un httpx di cartone
+    RETE = {"https://buono.test/a.jpg": (200, b"JPEG", "image/jpeg", ""),
+            "https://gira.test/a.jpg": (302, b"", "", "http://127.0.0.1:5001/x"),
+            "https://gira2.test/a.jpg": (302, b"", "", "/b.jpg"),
+            "https://gira2.test/b.jpg": (200, b"DUE", "image/png", ""),
+            "https://giostra.test/a": (302, b"", "", "https://giostra.test/a"),
+            "https://barattolo.store/foto/a5_0.jpg": (200, b"CASA",
+                                                      "image/jpeg", "")}
+    chieste, giudicate = [], []
+
+    class _Risposta:
+        def __init__(self, url):
+            self.status_code, self._corpo, tipo, dove = RETE.get(
+                url, (404, b"", "", ""))
+            self.headers = {"content-type": tipo, "location": dove}
+
+        async def aiter_bytes(self):
+            yield self._corpo
+
+    class _Flusso:
+        def __init__(self, url):
+            self.url = url
+
+        async def __aenter__(self):
+            chieste.append(self.url)
+            return _Risposta(self.url)
+
+        async def __aexit__(self, *a):
+            return False
+
+    class _Client:
+        def __init__(self, **k):
+            self.k = k
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        def stream(self, metodo, url):
+            return _Flusso(url)
+
+    def ammesso(url):
+        giudicate.append(url)
+        return "127.0.0.1" not in url and "10.0.0." not in url
+    import urllib.parse as _upa
+    amb = {"httpx": _ty.SimpleNamespace(AsyncClient=_Client),
+           "asyncio": _aio, "urllib": _ty.SimpleNamespace(parse=_upa),
+           "url_foto_ammesso": ammesso, "X_EST_VIDEO": (".mp4",),
+           "URL_PUBBLICO": "https://barattolo.store",
+           "MODALITA_COLLAUDO": False,
+           "urlparse": _upa.urlparse, "ipaddress": __import__("ipaddress"),
+           "print": lambda *a, **k: None}
+    exec(pezzo("relay_di_casa"), amb)
+    i = _SORGENTE.index("X_MEDIA_SALTI = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    exec("async " + pezzo("_x_media_ammesso"), amb)
+    exec("async " + pezzo("_x_scarica"), amb)
+
+    def scarica(url):
+        chieste.clear()
+        giudicate.clear()
+        return _aio.run(amb["_x_scarica"](url, 1000)), list(chieste)
+    prova("un indirizzo di casa non si chiede nemmeno",
+          ((b"", ""), []), scarica("http://127.0.0.1:5001/api/v1/wallet"))
+    # in collaudo i media delle note stanno su una porta di casa del
+    # banco (`collaudo_x_risonanza`): li' si bussa, e solo li'
+    amb["MODALITA_COLLAUDO"] = True
+    prova("...in COLLAUDO si' (il banco serve i media dal loopback), e "
+          "senza passare dal giudice del DNS",
+          (["http://127.0.0.1:5001/img/1.jpg"], []),
+          (scarica("http://127.0.0.1:5001/img/1.jpg")[1], list(giudicate)))
+    amb["MODALITA_COLLAUDO"] = False
+    prova("un indirizzo pubblico che gira verso casa: si chiede solo il "
+          "primo, e non torna niente",
+          ((b"", ""), ["https://gira.test/a.jpg"]),
+          scarica("https://gira.test/a.jpg"))
+    prova("un redirect onesto (anche relativo) si segue, giudicato a "
+          "ogni salto",
+          ((b"DUE", "image/png"),
+           ["https://gira2.test/a.jpg", "https://gira2.test/b.jpg"]),
+          scarica("https://gira2.test/a.jpg"))
+    prova("...e il giudice ha visto tutti e due gli indirizzi",
+          ["https://gira2.test/a.jpg", "https://gira2.test/b.jpg"], giudicate)
+    prova("una giostra di redirect finisce: al piu' X_MEDIA_SALTI salti",
+          ((b"", ""), amb["X_MEDIA_SALTI"] + 1),
+          (lambda r: (r[0], len(r[1])))(scarica("https://giostra.test/a")))
+    prova("la foto di casa nostra passa senza chiedere al DNS",
+          (((b"CASA", "image/jpeg"),
+            ["https://barattolo.store/foto/a5_0.jpg"]), []),
+          (scarica("https://barattolo.store/foto/a5_0.jpg"), giudicate))
+    prova("una foto buona si scarica come ieri",
+          ((b"JPEG", "image/jpeg"), ["https://buono.test/a.jpg"]),
+          scarica("https://buono.test/a.jpg"))
+    prova("httpx non segue piu' niente da solo", (True, False),
+          ("follow_redirects=False" in pezzo("_x_scarica"),
+           "follow_redirects=True" in pezzo("_x_scarica")))
+
+    # --- 7) LE TRE LEVE CHE RESTANO SUL VPS ---------------------------
+    TRE = ("GUARDIANO_PONTE_AVVISA", "BLOSSOM_SERVER", "LND_PONTE_CERT")
+    prova("le tre leve non si aprono dal pannello", [False] * 3,
+          [_leva_apribile_di_nome_vera(k) for k in TRE])
+    prova("...le leve di tutti i giorni si' (il pannello non ha perso "
+          "niente)", [True] * 4,
+          [_leva_apribile_di_nome_vera(k) for k in
+           ("MAX_PREFERITI", "P2P_MAX_EURO", "ORE_CONFERMA", "SWAP_AUTO")])
+    importate = set()
+    for m in re.finditer(r"from config import\s*(\(([^)]*)\)|([^\n]+))",
+                         _SORGENTE):
+        importate |= set(re.findall(r"[A-Z][A-Z0-9_]*",
+                                    m.group(2) or m.group(3)))
+    prova("...e le forme nuove della rete (SERVER, CERT, AVVISA in coda) "
+          "oggi chiudono quelle tre e nessun'altra", sorted(TRE),
+          sorted(k for k in importate
+                 if re.search(r"SERVER|CERT|AVVISA$", k)))
+    mai = _SORGENTE[_SORGENTE.index("LEVE_MAI_DAL_PANNELLO = frozenset({"):]
+    mai = mai[:mai.index("})")]
+    prova("...stanno scritte nell'elenco delle «mai», non solo nella "
+          "rete", [True] * 3, [f'"{k}"' in mai for k in TRE])
 
 
 def prove_idor_verifica():
@@ -15968,11 +16417,12 @@ def prove_foto_obbligatorie():
     fe = amb_n["foto_evento"]
     prova("foto_evento: i tag `image` del NIP-99 e le `images` del "
           "NIP-15, e niente dove non ce n'e'",
-          (["u1", "u2"], [], ["u3"], [], []),
-          (fe({"kind": 30402, "tags": [["image", "u1"], ["d", "x"],
-                                       ["image", "u2"], ["image"]]}),
+          (["https://u/1", "https://u/2"], [], ["https://u/3"], [], []),
+          (fe({"kind": 30402, "tags": [["image", "https://u/1"], ["d", "x"],
+                                       ["image", "https://u/2"], ["image"]]}),
            fe({"kind": 30402, "tags": [["title", "t"]]}),
-           fe({"kind": 30018, "content": json.dumps({"images": ["u3", 5]})}),
+           fe({"kind": 30018,
+               "content": json.dumps({"images": ["https://u/3", 5]})}),
            fe({"kind": 30018, "content": "{storto"}),
            fe({"kind": 30018, "content": "[]"})))
     prova("...ed e' la stessa lettura di chi scrive l'annuncio (un posto "
@@ -35947,6 +36397,12 @@ def prove_podio_riepilogo():
         # e' della misura dichiarata» e' diventata rossa il giorno che
         # il PNG e' entrato: l'ha detto la CI, non la rilettura).
         amb["SFONDO_RIEPILOGO"] = "non-esiste-apposta.webp"
+        # la whitelist vera dei nomi: `_foto_podio` la chiede prima del
+        # disco (14 nov 2026, audit-chiusure)
+        i = _SORGENTE.index("NOME_FOTO = re.compile(")
+        nf = {"re": re}
+        exec(_SORGENTE[i:_SORGENTE.index("\nTIPI_FOTO", i)], nf)
+        amb["NOME_FOTO"] = nf["NOME_FOTO"]
         for f in ("_foto_podio", "_barattolo", "disegna_figura",
                   "_podio_su_sfondo", "_salva_podio"):
             exec(pezzo(f), amb)
@@ -38880,6 +39336,10 @@ def _amb_seo():
                    "SEGNO_TG = ("):
         i = _SORGENTE.index(blocco)
         exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    # la whitelist VERA delle forme dei nomi: `_immagine_anteprima` la
+    # chiede prima di toccare il disco (14 nov 2026, audit-chiusure)
+    i = _SORGENTE.index("NOME_FOTO = re.compile(")
+    exec(_SORGENTE[i:_SORGENTE.index("\nTIPI_FOTO", i)], amb)
     for f in ("normalizza", "slug_categoria", "senza_condizione",
               "condizione_da_mostrare", "in_ferie", "_fmt_sats", "_fmt_eur",
               "_prezzo_promo", "_pare_recapito", "_slug",
@@ -57107,6 +57567,20 @@ def prove_condividi_ordine_p2p():
            meta(T, "og:image:width"), meta(T, "og:image:height")])
     prova("...e quella del libro nella testa dell'ordine non c'e'", False,
           IMG_LIBRO in T)
+    # (14 nov 2026, cantiere audit-chiusure, dal primo audit di
+    # sicurezza) I METODI SONO PAROLE DI SCONOSCIUTI: il coordinatore
+    # firma l'evento, il testo del `pm` lo scrive chi pubblica l'ordine,
+    # e `_monta_pagina` scrive il titolo com'e' dentro <title>
+    F["eventi"] = [ev(ID, "sell", [50], ["</title><script>x()</script>",
+                                         "A&B"])]
+    Tx, tx = seo(ID)
+    prova("un metodo che prova a chiudere il <title> esce ripulito, e una "
+          "«&» resta una e commerciale", (False, True, True),
+          ("<" in tx, "&lt;/title&gt;&lt;script&gt;" in tx, "A&amp;B" in tx))
+    prova("...nei meta lo stesso titolo si ripulisce UNA volta sola",
+          (False, False, True),
+          ("<script>" in Tx, "&amp;lt;" in Tx, "&lt;/title&gt;" in Tx))
+    F["eventi"] = [ev(ID, "sell", [50], ["SEPA", "Revolut"])]
     # (10 ott 2026, sera) quadrate da 400: la scheda e' «summary», il
     # quadratino accanto al testo — la grande le ritaglierebbe
     prova("...la scheda dell'ordine e' «summary», e quella del libro pure",
@@ -122247,7 +122721,10 @@ def prove_cassetta_nip46():
     # --- il giudice dei relay, fatto girare ---
     import ipaddress as _ip
     from urllib.parse import urlparse as _up
-    amb = {"urlparse": _up, "ipaddress": _ip, "re": re}
+    # in COLLAUDO: fuori dal collaudo il ws:// di casa non passa piu'
+    # (14 nov 2026, vedi `prove_chiusure_audit`)
+    amb = {"urlparse": _up, "ipaddress": _ip, "re": re,
+           "MODALITA_COLLAUDO": True}
     exec(pezzo("relay_di_casa"), amb)
     exec(pezzo("_relay_cassetta_ammesso"), amb)
     g = amb["_relay_cassetta_ammesso"]
@@ -172786,7 +173263,10 @@ def prove_canale_admin():
           # nella stanza sua, l'assistenza
           # (2 nov 2026, swap-auto) la nascita delle parole dello swap
           # automatico nella liquidita', come la chiave on-chain
-          {"assistenza": 1, "dispute": 5, "dm": 1, "errori": 33,
+          # (14 nov 2026, audit-chiusure) il contenuto digitale letto
+          # da chi compra fuori da 'shipped' (in disputa, per dire):
+          # nelle dispute, perche' e' un fatto per chi la decide
+          {"assistenza": 1, "dispute": 6, "dm": 1, "errori": 33,
            "liquidita": 3, "moderazione": 14, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -172822,7 +173302,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "93 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "94 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -172830,7 +173310,8 @@ def prove_canale_admin():
           "e la nascita della sua chiave, e chi chiede una persona "
           "all'assistente del bot, e le dispute P2P on-chain: aperta e "
           "decisa, 30 ott 2026; dal 2 nov la nascita delle parole dello "
-          "swap automatico)", 93,
+          "swap automatico; dal 14 nov il contenuto digitale letto fuori "
+          "da 'shipped')", 94,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -186264,8 +186745,9 @@ def prove_certificati_relay():
             return apri(relay, timeout=5, sslopt={"cert_reqs": _ssl.CERT_REQUIRED})
         except Exception as e:
             return type(e).__name__
-    prova("un relay sano: la connessione passa com'e', argomenti compresi",
-          ("ws", "wss://sano.example", {"timeout": 5,
+    prova("un relay sano: la connessione passa com'e', argomenti compresi "
+          "(piu' il divieto di seguire un redirect: 14 nov 2026)",
+          ("ws", "wss://sano.example", {"timeout": 5, "redirect_limit": 0,
                                          "sslopt": {"cert_reqs": _ssl.CERT_REQUIRED}}),
           tenta("wss://sano.example"))
     prova("un certificato rifiutato: l'errore risale com'e' (il chiamante ha il "
@@ -192192,7 +192674,8 @@ CATEGORIE = {
     foto_telegram_fallita pagamento_incerto esito_pagamento
     pagamenti_in_volo fatture_scadute fattura_solo_incasso in_pagamento
     altra_cassaforte chiusura_saas doppio_wallet saas_senza_doveri
-    orfani capitale_cassa disputa_incagliata disputa_cambia_strada busta_ritiro
+    orfani capitale_cassa disputa_incagliata disputa_cambia_strada
+    chiusure_audit busta_ritiro
     contenuto_digitale_forma foto_contenuto indirizzo_casa
     email_corriere nota_compratore nascondi_ordine lista_ordini
     dettaglio_ordine card_ordini righe_ordine niente_ai_nella_ricerca
@@ -192679,6 +193162,7 @@ def main():
               prove_chiusura_saas,
               prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani, prove_capitale_cassa,
               prove_disputa_incagliata, prove_disputa_cambia_strada,
+              prove_chiusure_audit,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_contenuto_digitale_forma,
               prove_foto_contenuto,

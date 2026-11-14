@@ -114,12 +114,34 @@ def _certificato_rifiutato(relay: str, errore) -> None:
 def _apri_websocket(relay, *a, **k):
     """`create_connection` di websocket-client, con la riga 🔐 quando il
     certificato non regge. L'errore risale com'e': chi chiama ha gia' il
-    suo ripiego per un relay che non risponde."""
+    suo ripiego per un relay che non risponde.
+    NIENTE REDIRECT NEL SALUTO (14 nov 2026, cantiere audit-chiusure, dal
+    primo audit di sicurezza): di serie la libreria SEGUE un 301/302/303
+    del relay, e il salto lo apre lei — nome risolto di nuovo, nessuno
+    dei nostri giudici, anche da wss:// a un ws:// di casa o della rete
+    privata (riprodotto: un relay che risponde 302 fa bussare il server a
+    una porta di loopback scelta da lui). I giudici guardano l'indirizzo
+    SCRITTO, e la presa gia' controllata di `_presa_esterna` copre solo
+    il primo salto: quindi il salto non si fa, per NESSUNA connessione
+    (e' la regola gia' presa per urllib, `_RedirectControllato`, e per
+    httpx). Un relay che risponde 3xx e' un relay che non risponde: la
+    cintura sullo stato serve alle versioni della libreria che con
+    `redirect_limit=0` tornano la connessione invece di alzare."""
+    k["redirect_limit"] = 0
     try:
-        return _connessione_websocket(relay, *a, **k)
+        ws = _connessione_websocket(relay, *a, **k)
     except ssl.SSLCertVerificationError as e:
         _certificato_rifiutato(relay, e)
         raise
+    stato = getattr(ws, "status", None)
+    if isinstance(stato, int) and 300 <= stato < 400:
+        try:
+            ws.close()                  # stesso thread che l'ha aperta
+        except Exception:
+            pass
+        raise OSError(f"il relay risponde {stato} al saluto: un redirect "
+                      "non si segue")
+    return ws
 
 
 create_connection = _apri_websocket if _connessione_websocket else None
@@ -254,10 +276,23 @@ LEVE_MAI_DAL_PANNELLO = frozenset({
     # quelle che il server legge prima di tutto, e il freno a mano stesso
     "BOT_TOKEN", "ANTHROPIC_API_KEY", "LNBITS_URL", "LNBITS_INVOICE_KEY",
     "LNBITS_ADMIN_KEY", "MODELLO_RICERCA", "DB", "LEVE_PANNELLO_SPENTE",
+    # TRE CHE AVEVANO LA SOSTANZA DELLE «MAI» E NON IL NOME (14 nov 2026,
+    # cantiere audit-chiusure, dal primo audit di sicurezza; la regola e'
+    # quella di Andrea del 27 ott, qui solo applicata): la lista di chi
+    # riceve gli allarmi del ponte e della liquidita' (una lista di
+    # persone), l'indirizzo del server delle foto delle recensioni (un
+    # indirizzo, a cui il server manda una firma della piattaforma) e il
+    # file del certificato del ponte verso LND (una serratura). La
+    # pagina non le mostrava, ma la porta di scrittura le accettava da
+    # un telefono admin: restano sul VPS come le altre.
+    "GUARDIANO_PONTE_AVVISA", "BLOSSOM_SERVER", "LND_PONTE_CERT",
 })
+# ...e le loro FORME entrano nella rete (SERVER, CERT, AVVISA in coda):
+# la prossima leva fatta cosi' resta fuori anche se nessuno la elenca.
 _LEVA_DI_NOME_CHIUSO = re.compile(
     r"TOKEN|SEGRET|SECRET|NSEC|MACAROON|_KEY$|PASSWORD|CHIAVE|URL|RELAY"
-    r"|NPUB|XPUB|_API|LINK|_IDS?$|ONION|WEBHOOK|DB$")
+    r"|NPUB|XPUB|_API|LINK|_IDS?$|ONION|WEBHOOK|DB$"
+    r"|SERVER|CERT|AVVISA$")
 # le due nate prima, col giudice loro (LEVE_SCRIVIBILI): non passano di qui
 _LEVE_COL_GIUDICE_LORO = frozenset({"ONCHAIN_SOLO_ADMIN",
                                     "ONCHAIN_QUOTA_FISSA_SATS"})
@@ -12375,7 +12410,13 @@ def _relay_cassetta_ammesso(url: str) -> bool:
     IP, niente credenziali, niente percorso strano); oppure ws:// di
     casa, che e' il relay dei collaudi. La risoluzione del nome e il
     rifiuto degli indirizzi privati stanno nel thread
-    (`_orecchio_indirizzo_pubblico`), che e' l'unico a fare rete."""
+    (`_orecchio_indirizzo_pubblico`), che e' l'unico a fare rete.
+    IL RELAY DI CASA ESISTE SOLO IN COLLAUDO (14 nov 2026, cantiere
+    audit-chiusure, dal primo audit di sicurezza): senza questa
+    condizione chiunque, da fuori e senza account, depositava una
+    cassetta su `ws://127.0.0.1:<porta>/<percorso>` e il server bussava
+    a quella porta di casa sua, dicendogli pure com'era andata. In
+    produzione un loopback non e' il relay di nessun firmatario."""
     try:
         u = urlparse(str(url or "").strip())
     except ValueError:
@@ -12386,7 +12427,7 @@ def _relay_cassetta_ammesso(url: str) -> bool:
     if not host:
         return False
     if u.scheme == "ws":
-        return relay_di_casa(url)
+        return bool(MODALITA_COLLAUDO) and relay_di_casa(url)
     if u.scheme != "wss":
         return False
     try:
@@ -12401,9 +12442,11 @@ def _relay_cassetta_ammesso(url: str) -> bool:
 def _orecchio_indirizzo_pubblico(url: str) -> bool:
     """Risolve il nome e rifiuta tutto quel che non e' un indirizzo
     pubblico (privato, loopback, link-local, riservato). Di casa
-    (loopback letterale) passa: e' il relay dei collaudi."""
+    (loopback letterale) passa SOLO in collaudo: e' il relay dei
+    collaudi, e in produzione un loopback si rifiuta come ogni altro
+    indirizzo che non e' di internet (vedi `_relay_cassetta_ammesso`)."""
     if relay_di_casa(url):
-        return True
+        return bool(MODALITA_COLLAUDO)
     host = urlparse(url).hostname or ""
     try:
         indirizzi = socket.getaddrinfo(host, None)
@@ -12783,6 +12826,8 @@ def _cassetta_spedisci_a(relay: str, evento: dict) -> bool:
             if presa is not None:
                 presa.close()
             return False
+    elif not MODALITA_COLLAUDO:
+        return False               # di casa, fuori dal collaudo: mai
     else:
         try:
             ws = _cassetta_connetti(relay, timeout=5)
@@ -28421,7 +28466,8 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         await notifica_admin(
             f"🚫 <b>Annuncio bloccato dal filtro</b> "
             f"({motivo_parole(categoria, parola)})\n"
-            f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})",
+            f"«{html.escape(d['titolo'][:80])}» — "
+            f"{html.escape(user['first_name'] or '')} (id {user['id']})",
             argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(divieto=categoria,
                                                    parola=parola))
@@ -28435,7 +28481,8 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
                              d["titolo"], venditore_id=user["id"])
         await notifica_admin(
             f"🚫 <b>Annuncio bloccato dall'AI</b> ({verdetto[1]})\n"
-            f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})",
+            f"«{html.escape(d['titolo'][:80])}» — "
+            f"{html.escape(user['first_name'] or '')} (id {user['id']})",
             argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(verdetto[1]))
     in_revisione = bool(verdetto and verdetto[0] == "dubbio")
@@ -28622,9 +28669,9 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     marca_asta = " · 🔨 all'asta" if asta_secondi else ""
     await notifica_admin(
         f"🆕 <b>Nuovo annuncio #{annuncio_id}</b>\n"
-        f"«{d['titolo'][:80]}» — "
+        f"«{html.escape(d['titolo'][:80])}» — "
         f"{testo_prezzo(valuta, prezzo_sats, prezzo_eur)}{marca_asta}\n"
-        f"Venditore: {user['first_name']} (id {user['id']})"
+        f"Venditore: {html.escape(user['first_name'] or '')} (id {user['id']})"
         + riga_link_moderazione(d.get("descrizione", "")),
         argomento="moderazione")
     if not asta_secondi:
@@ -30481,8 +30528,9 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         await notifica_admin(
             f"🚫 <b>Modifica bloccata dal filtro</b> "
             f"({motivo_parole(categoria, parola)})\n"
-            f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
-            f"{user['first_name']} (id {user['id']})", argomento="moderazione")
+            f"Annuncio #{annuncio_id} «{html.escape(d['titolo'][:80])}» — "
+            f"{html.escape(user['first_name'] or '')} (id {user['id']})",
+            argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(divieto=categoria,
                                                    parola=parola))
     verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
@@ -30491,8 +30539,9 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                              annuncio_id, user["id"])
         await notifica_admin(
             f"🚫 <b>Modifica bloccata dall'AI</b> ({verdetto[1]})\n"
-            f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
-            f"{user['first_name']} (id {user['id']})", argomento="moderazione")
+            f"Annuncio #{annuncio_id} «{html.escape(d['titolo'][:80])}» — "
+            f"{html.escape(user['first_name'] or '')} (id {user['id']})",
+            argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(verdetto[1]))
     # Il DUBBIO sulla modifica: le modifiche si applicano ma l'annuncio
     # esce dalla vetrina finche' un moderatore non decide. Le offerte
@@ -30633,13 +30682,13 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     for riga in decadute_prezzo:
         await notifica(riga["compratore_id"],
             f"✏️ Il venditore ha ritoccato il prezzo di "
-            f"«{d['titolo'][:60]}»: la tua offerta decade. Se ti "
+            f"«{html.escape(d['titolo'][:60])}»: la tua offerta decade. Se ti "
             f"interessa ancora, riproponi sul prezzo nuovo."
             f"\n{link_telegram('annuncio', annuncio_id)}")
     for riga in decadute_carrello:
         await notifica(riga["compratore_id"],
             f"✏️ Il venditore ha ritoccato il prezzo di "
-            f"«{d['titolo'][:60]}», che è dentro la tua offerta sul "
+            f"«{html.escape(d['titolo'][:60])}», che è dentro la tua offerta sul "
             f"carrello: l'offerta decade. Se ti interessa ancora, "
             f"riproponi sul listino nuovo."
             f"\n{link_telegram('annuncio', annuncio_id)}")
@@ -30823,8 +30872,9 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
         await notifica_admin(
             f"🚫 <b>Modifica firmata bloccata dal filtro</b> "
             f"({motivo_parole(cat_vietata, parola)})\n"
-            f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
-            f"{user['first_name']} (id {user['id']})", argomento="moderazione")
+            f"Annuncio #{annuncio_id} «{html.escape(d['titolo'][:80])}» — "
+            f"{html.escape(user['first_name'] or '')} (id {user['id']})",
+            argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(divieto=cat_vietata,
                                                    parola=parola))
     verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
@@ -30834,8 +30884,9 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
                              annuncio_id, user["id"])
         await notifica_admin(
             f"🚫 <b>Modifica firmata bloccata dall'AI</b> ({motivo})\n"
-            f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
-            f"{user['first_name']} (id {user['id']})", argomento="moderazione")
+            f"Annuncio #{annuncio_id} «{html.escape(d['titolo'][:80])}» — "
+            f"{html.escape(user['first_name'] or '')} (id {user['id']})",
+            argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(motivo))
 
     categoria = categoria_valida(d.get("categoria"))
@@ -31042,9 +31093,9 @@ async def modifica_firmata(annuncio_id: int, req: Request,
     await notifica_admin(
         f"✏️🟣 <b>Annuncio importato #{annuncio_id} modificato</b> "
         f"(firmato dal venditore su Nostr)\n"
-        f"«{b['titolo'][:80]}» — "
+        f"«{html.escape(b['titolo'][:80])}» — "
         f"{testo_prezzo(b['valuta'], b['prezzo_sats'], b['prezzo_eur'])}\n"
-        f"Venditore: {user['first_name']} (id {user['id']})",
+        f"Venditore: {html.escape(user['first_name'] or '')} (id {user['id']})",
         argomento="moderazione")
     return {"ok": True, "id": annuncio_id}
 
@@ -39843,7 +39894,7 @@ async def _avvisa_aste_in_scadenza():
     for tg, a in avvisi:
         try:
             await notifica(tg,
-                f"⏳ <b>L'asta «{a['titolo'][:60]}» si chiude tra circa "
+                f"⏳ <b>L'asta «{html.escape(a['titolo'][:60])}» si chiude tra circa "
                 f"un'ora.</b> Controlla la tua posizione: un rilancio "
                 f"all'ultimo prolunga la gara di {ASTA_PROROGA_MINUTI} "
                 f"minuti.\n{link_telegram('annuncio', a['id'])}")
@@ -45178,7 +45229,7 @@ async def _incassa_ordine(ordine_id: int) -> dict:
         if riga["compratore_id"] == o["compratore_id"]:
             continue
         await notifica(riga["compratore_id"],
-            f"🕊 «{riga['titolo'][:60]}» è appena stato venduto a "
+            f"🕊 «{html.escape(riga['titolo'][:60])}» è appena stato venduto a "
             f"qualcun altro: la tua offerta decade. In vetrina ci "
             f"sono altre occasioni che aspettano!")
     con.close()
@@ -47248,15 +47299,54 @@ async def consegna_digitale(ordine_id: int, req: Request,
             "documento": bool(file_nome)}
 
 
+def _arriva_da_un_link(req) -> bool:
+    """PURA: questa GET e' una NAVIGAZIONE del browser — un link
+    toccato, un redirect, una finestra aperta da un'altra pagina — e
+    non la `fetch` della nostra pagina? Lo dice il browser stesso
+    (`Sec-Fetch-Mode: navigate`); dove quell'intestazione non c'e'
+    (browser vecchi) lo dice l'`Accept`, che in una navigazione chiede
+    una pagina (`text/html`) e nella fetch della Mini App no. Senza
+    richiesta in mano (le prove, i collaudi) non e' un link."""
+    if req is None:
+        return False
+    modo = (req.headers.get("sec-fetch-mode") or "").strip().lower()
+    if modo:
+        return modo == "navigate"
+    return "text/html" in (req.headers.get("accept") or "").lower()
+
+
+MSG_RIVELA_DALL_ORDINE = (
+    "Il contenuto si rivela dall'ordine, col bottone «🔓 Rivela»: apri "
+    "l'ordine in Barattolo e fallo da lì")
+
+
 @app.get("/api/orders/{ordine_id}/contenuto")
 async def leggi_contenuto_digitale(ordine_id: int,
                                    x_tg_init_data: str = Header(""),
-                                   barattolo_sessione: str = Cookie("")):
+                                   barattolo_sessione: str = Cookie(""),
+                                   req: Request = None):
     """Il contenuto digitale si legge SOLO da qui, mai da /api/orders:
     per il compratore la PRIMA lettura e' la rivelazione — la ricevuta
     che apre la finestra di conferma (shipped -> delivered). Il
     venditore rilegge cio' che ha consegnato senza far scattare nulla;
-    il moderatore legge negli stati di disputa."""
+    il moderatore legge negli stati di disputa.
+    DUE CHIUSURE DAL PRIMO AUDIT DI SICUREZZA (14 nov 2026, cantiere
+    audit-chiusure), e nessuna cambia il gesto di chi compra:
+    1) LA RICEVUTA NON SI FA SCRIVERE DA UN LINK. Questa e' una GET che
+    cambia stato, e il cookie di sessione (SameSite=Lax) viaggia in una
+    navigazione nata altrove: bastava far seguire un link a chi compra
+    perche' partisse la sua rivelazione, col suo orologio, senza che lo
+    avesse scelto. La pagina rivela con una `fetch`, mai navigando:
+    quindi una navigazione che scriverebbe la ricevuta si rifiuta
+    (`_arriva_da_un_link`), e non rivela niente.
+    2) OGNI LETTURA DI CHI COMPRA LASCIA LA RICEVUTA. Fuori da 'shipped'
+    il contenuto usciva lo stesso e non si scriveva NIENTE: disputa
+    aperta prima di rivelare, codice letto dopo, e la sola prova in
+    mano al moderatore diceva «non ancora rivelato». Ora la prima
+    lettura timbra `consegnato` in qualunque stato (lo stato NON si
+    tocca: gli orologi del digitale guardano 'delivered'), lo scrive
+    nel journal e, se l'ordine e' in disputa o gia' rimborsato, lo dice
+    ai moderatori."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=?",
@@ -47273,6 +47363,18 @@ async def leggi_contenuto_digitale(ordine_id: int,
     rivelato = o["consegnato"]
     prima_volta = (user["id"] == o["compratore_id"]
                    and o["stato"] == "shipped")
+    lettura_tarda = (user["id"] == o["compratore_id"] and not prima_volta
+                     and not o["consegnato"])
+    if (prima_volta or lettura_tarda) and _arriva_da_un_link(req):
+        con.close()
+        raise HTTPException(400, MSG_RIVELA_DALL_ORDINE)
+    if lettura_tarda:
+        # la ricevuta di una lettura fuori da 'shipped': il solo timbro,
+        # una volta (`AND consegnato=0`), senza toccare stato e orologi
+        rivelato = int(time.time())
+        con.execute("UPDATE ordini SET consegnato=? WHERE id=? "
+                    "AND consegnato=0", (rivelato, ordine_id))
+        con.commit()
     if prima_volta:
         # La rivelazione: da qui la finestra di ORE_CONFERMA_DIGITALE.
         # Le letture successive ri-servono il contenuto senza toccare
@@ -47283,6 +47385,17 @@ async def leggi_contenuto_digitale(ordine_id: int,
                     (rivelato, rivelato, ordine_id))
         con.commit()
     con.close()
+    if lettura_tarda:
+        print(f"👁 Ordine #{ordine_id}: contenuto digitale letto dal "
+              f"compratore in stato '{o['stato']}', mai rivelato prima: "
+              f"la ricevuta si scrive adesso")
+        if o["stato"] not in ("confirmed", "released"):
+            await notifica_admin(
+                f"👁 <b>Ordine #{ordine_id}: chi compra ha letto ADESSO il "
+                f"contenuto digitale</b>, con l'ordine in stato "
+                f"«{o['stato']}» e senza averlo mai rivelato prima. Se la "
+                f"nota della disputa diceva «non ancora rivelato», da "
+                f"questo momento non è più vero.", argomento="dispute")
     if prima_volta:
         print(f"👁 Ordine #{ordine_id}: contenuto digitale rivelato "
               f"dal compratore")
@@ -58995,7 +59108,7 @@ async def recensione_p2p(req: Request, x_tg_init_data: str = Header(""),
             await notifica_admin(
                 f"🚫 <b>Commento di recensione bloccato dal filtro</b> "
                 f"({categoria})\nScambio P2P — "
-                f"{user['first_name']} (id {user['id']})",
+                f"{html.escape(user['first_name'] or '')} (id {user['id']})",
                 argomento="moderazione")
             raise HTTPException(400, "Il commento contiene termini non "
                                      "ammessi sul mercatino")
@@ -59050,7 +59163,8 @@ async def recensione_p2p(req: Request, x_tg_init_data: str = Header(""),
     await notifica(per,
                    f"⭐ <b>Hai ricevuto una recensione:</b> {stelle} "
                    f"({voto}/5) per uno scambio di sats."
-                   + (f"\n«{commento}»" if commento else ""))
+                   # scappato: vedi il feedback del mercatino
+                   + (f"\n«{html.escape(commento)}»" if commento else ""))
     # Una recensione puo' premiare entrambi, come nel mercatino: chi la
     # lascia e chi la riceve.
     await premia_distintivi(user["id"])
@@ -76490,25 +76604,74 @@ def _x_perche(status: int, corpo: dict) -> str:
     return "; ".join(v for v in voci if v)
 
 
+X_MEDIA_SALTI = 4       # i redirect che si seguono, ognuno giudicato
+
+
+async def _x_media_ammesso(url: str) -> bool:
+    """Il giudice di OGNI indirizzo a cui `_x_scarica` bussa. Le foto di
+    casa (`URL_PUBBLICO/foto/...`) passano senza chiedere al DNS: le
+    serve la nostra rotta, e il nostro nome visto dal VPS puo' anche
+    risolvere dentro casa. Tutto il resto lo giudica `url_foto_ammesso`,
+    il guardiano di ogni URL scritto da un utente (nel suo thread: fa
+    una risoluzione DNS).
+    UN INDIRIZZO DI CASA VALE SOLO IN COLLAUDO, come il relay di casa:
+    li' i media delle note stanno su una porta di loopback del banco
+    (`collaudo_x_risonanza`), in produzione e' proprio la porta che
+    questo giudice chiude."""
+    if url.startswith(f"{URL_PUBBLICO}/foto/"):
+        return True
+    if MODALITA_COLLAUDO and relay_di_casa(url):
+        return True
+    return await asyncio.to_thread(url_foto_ammesso, url)
+
+
 async def _x_scarica(url: str, tetto: int) -> tuple:
     """(byte, mime) di un media della nota, entro il tetto. Oltre, o se
     non e' un'immagine/un video, si torna (b'', '') e il post esce
-    senza."""
+    senza.
+    NON E' PIU' UNA PORTA SENZA GUARDIA (14 nov 2026, cantiere
+    audit-chiusure, dal primo audit di sicurezza). Nasceva per i media
+    delle NOSTRE note, ma il riepilogo del giorno gli passa le foto
+    degli annunci, e quelle di un annuncio importato da Nostr sono
+    indirizzi scritti da chi firma l'evento — proprio quelli che il
+    guardiano dell'import ha rifiutato restano in colonna grezzi. Senza
+    giudice e coi redirect seguiti da httpx, il server bussava a un
+    indirizzo di casa o della rete privata scelto da uno sconosciuto, e
+    il corpo partiva verso X. Ora ogni indirizzo — la partenza e ogni
+    salto, al piu' X_MEDIA_SALTI — passa da `_x_media_ammesso`, e
+    httpx non segue niente da solo."""
+    partenza = url
     try:
-        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as c:
-            async with c.stream("GET", url) as r:
-                if r.status_code != 200:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=False) as c:
+            for _ in range(X_MEDIA_SALTI + 1):
+                if not await _x_media_ammesso(url):
+                    print(f"🐦 X: media non scaricato, indirizzo non "
+                          f"ammesso: {url[:80]}", flush=True)
                     return b"", ""
-                mime = (r.headers.get("content-type") or "").split(";")[0].strip()
-                pezzi, totale = [], 0
-                async for pezzo in r.aiter_bytes():
-                    totale += len(pezzo)
-                    if totale > tetto:
+                async with c.stream("GET", url) as r:
+                    if r.status_code in (301, 302, 303, 307, 308):
+                        dove = r.headers.get("location") or ""
+                        if not dove:
+                            return b"", ""
+                        url = urllib.parse.urljoin(url, dove)
+                        continue
+                    if r.status_code != 200:
                         return b"", ""
-                    pezzi.append(pezzo)
+                    mime = (r.headers.get("content-type")
+                            or "").split(";")[0].strip()
+                    pezzi, totale = [], 0
+                    async for pezzo in r.aiter_bytes():
+                        totale += len(pezzo)
+                        if totale > tetto:
+                            return b"", ""
+                        pezzi.append(pezzo)
+                    break
+            else:
+                return b"", ""          # troppi salti: non e' una foto
         raw = b"".join(pezzi)
     except Exception:
         return b"", ""
+    url = partenza          # l'estensione si legge dall'indirizzo scritto
     if not mime.startswith(("image/", "video/")):
         basso = url.split("?", 1)[0].lower()
         if basso.endswith(X_EST_VIDEO):
@@ -86023,7 +86186,8 @@ async def _lavoro_import(biglietto: str):
         # Strato 3 in versione riassunto: UNA notifica ai moderatori
         # con l'intervallo di id (per le stats e le rimozioni) e i
         # titoli bocciati dall'AI
-        riassunto = (f"📥 <b>Import in blocco</b> di {lavoro['nome']} "
+        riassunto = (f"📥 <b>Import in blocco</b> di "
+                     f"{html.escape(str(lavoro['nome'] or ''))} "
                      f"(id {lavoro['tg_id']})\n"
                      f"✅ {creati} annunci creati")
         if lavoro["ok"]:
@@ -86032,7 +86196,8 @@ async def _lavoro_import(biglietto: str):
                        if f["motivo"].startswith("moderazione AI")]
         if bocciati_ai:
             riassunto += f"\n🚫 {len(bocciati_ai)} bloccati dall'AI: " + \
-                "; ".join(f"«{f['titolo'][:40]}»" for f in bocciati_ai[:10])
+                "; ".join(f"«{html.escape(f['titolo'][:40])}»"
+                          for f in bocciati_ai[:10])
         if in_rev:
             # niente tastiera per riga (sarebbe spam): si decide dalla
             # sezione «In revisione» del Profilo
@@ -86355,7 +86520,7 @@ async def lascia_feedback(ordine_id: int, req: Request,
             await notifica_admin(
                 f"🚫 <b>Commento di feedback bloccato dal filtro</b> "
                 f"({categoria})\nOrdine #{ordine_id} — "
-                f"{user['first_name']} (id {user['id']})",
+                f"{html.escape(user['first_name'] or '')} (id {user['id']})",
                 argomento="moderazione")
             raise HTTPException(400, "Il commento contiene termini non "
                                      "ammessi sul mercatino")
@@ -86460,10 +86625,19 @@ async def lascia_feedback(ordine_id: int, req: Request,
         con.close()
     annota_insieme(user["id"], per, "feedback", f"ordine #{ordine_id}, {voto}★")
     stelle = "★" * voto
+    # IL COMMENTO ESCE SCAPPATO (14 nov 2026, cantiere audit-chiusure,
+    # dal primo audit di sicurezza): le notifiche sono HTML di Telegram,
+    # e un commento e' testo libero dell'ALTRA parte — con un `<a href>`
+    # ben fatto il bot avrebbe recapitato un link dal testo travestito,
+    # a nome di Barattolo. Si scappa QUI, dove nasce il messaggio (la
+    # regola di sempre); il DM Nostr e la campanella sciolgono le
+    # entita' da soli (`spoglia_html`), quindi il testo resta quello
+    # scritto. Stessa cosa per la recensione P2P, i titoli e i nomi
+    # negli avvisi ad altri e ai moderatori.
     await notifica(per,
                    f"⭐ <b>Hai ricevuto un feedback:</b> {stelle} ({voto}/5) "
                    f"per l'affare #{ordine_id}."
-                   + (f"\n«{commento}»" if commento else ""))
+                   + (f"\n«{html.escape(commento)}»" if commento else ""))
     # Un feedback puo' premiare entrambi: chi lo lascia (buon vicino)
     # e chi lo riceve (stimato)
     await premia_distintivi(user["id"])
@@ -92180,6 +92354,9 @@ def _foto_podio(con, top: list) -> list:
                 continue           # mai la foto di casa d'altri
             base, _, est = n.rpartition(".")
             for c in (f"{base}_min.{est}", n):
+                if not NOME_FOTO.match(c):
+                    continue       # la forma prima del disco, come
+                                   # in `_immagine_anteprima`
                 p = os.path.join(FOTO_DIR, c)
                 if os.path.exists(p):
                     percorso = p
@@ -94247,7 +94424,14 @@ def _immagine_anteprima(foto_json: str):
             continue
         mini = n[:-4] + "_min.jpg" if n.endswith(".jpg") else ""
         for nome in (mini, n):
-            if nome and os.path.exists(os.path.join(FOTO_DIR, nome)):
+            # LA FORMA PRIMA DEL DISCO (14 nov 2026, cantiere
+            # audit-chiusure, dal primo audit di sicurezza): un nome in
+            # colonna puo' averlo scritto un evento Nostr, e senza la
+            # whitelist delle FORME `os.path.exists` rispondeva a
+            # chiunque se `../config.py` o un percorso assoluto esiste.
+            # E' la stessa regola di `/foto/{nome}` (regola ferrea 3).
+            if nome and NOME_FOTO.match(nome) \
+                    and os.path.exists(os.path.join(FOTO_DIR, nome)):
                 return f"{URL_PUBBLICO}/foto/{nome}", 0, 0
     return IMMAGINE_BRAND
 
@@ -94493,9 +94677,17 @@ def _seo_ordine_p2p(oid: str):
     if not frase:
         return TESTA_P2P, TITOLO_P2P
     titolo = f"{_taglia_meta(frase, 80)} — Barattolo P2P"
+    # IL TITOLO ESCE RIPULITO, come quello di ogni altra pagina (14 nov
+    # 2026, cantiere audit-chiusure, dal primo audit di sicurezza): la
+    # frase porta i METODI di pagamento, che sono parole di sconosciuti
+    # (il tag `pm` di un evento del coordinatore: lui firma, il testo
+    # lo scrive chi pubblica l'ordine), e `_monta_pagina` scrive il
+    # titolo com'e' dentro <title>. Ai meta va quello GREZZO: li
+    # ripulisce `_meta_anteprima`, e ripulirlo due volte lo sporcherebbe.
     return _testa_seo(titolo, META_TESTO_ORDINE_P2P,
                       f"{URL_PUBBLICO}/p2p?ordine={oid}",
-                      immagine=IMMAGINE_ORDINE_P2P, indicizza=False), titolo
+                      immagine=IMMAGINE_ORDINE_P2P,
+                      indicizza=False), _testo(titolo)
 
 
 # E NEMMENO LA QUARTA, e per una ragione sua: la pagina dei Consigliati
