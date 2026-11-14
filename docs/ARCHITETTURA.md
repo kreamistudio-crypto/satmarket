@@ -1151,7 +1151,14 @@
   sonda il 13 ott: due ordini pagati per un pezzo, «Hai venduto!» due
   volte. ORA quel saldo NON È UNA VENDITA: se il pezzo non c'è più
   (venduto, rimosso, in revisione, prenotato da una fattura viva; nei
-  set ne basta uno) o se ad annullare era stato CHI VENDE (sempre, anche col
+  set ne basta uno), se l'ACCORDO da cui la lapide è nata è già in mano
+  a un altro ordine (14 nov 2026, cantiere audit-offerte: l'ordine
+  ricorda le sue offerte in `ordini.da_offerte` anche dopo che il
+  legame `offerte.ordine_id` si è sciolto, e `_accordo_gia_speso` dice
+  se l'offerta è legata alla fattura nuova o già conclusa da lei —
+  l'accordo è UNO, anche con lo stock per due; il saldo tardivo che
+  invece diventa vendita CONCLUDE l'offerta sciolta, in
+  `_incassa_ordine`) o se ad annullare era stato CHI VENDE (sempre, anche col
   pezzo in vetrina: il suo no resta un no), l'ordine va 'annullato' →
   'refund' col timbro `pagata_da_annullata_il` e il rimborso già
   timbrato 'da_riprovare' verso il compratore, nella stessa scrittura;
@@ -20021,6 +20028,17 @@
   SUA strada col motivo (`cambio_assente`), mai un 503 che spegne
   anche il ritiro — quello resta solo per l'articolo EUR. Annuncio
   storico (consegna '') = pseudo-via '' e il body non porta consegna.
+  L'ACCORDO PARLA LA SUA VALUTA (14 nov 2026, cantiere audit-offerte,
+  dal primo audit di sicurezza): un'offerta accettata sopravvive a un
+  cambio di valuta dell'annuncio, e `_unitario_effettivo` converte
+  ogni cifra dalla valuta in cui è NATA — l'accordo dalla sua colonna
+  viva, la lampo dal listino — e fa il MIN in sats. Prima sceglieva la
+  colonna guardando il listino di oggi: un accordo in sats su un
+  annuncio passato agli euro faceva 1 sat, all'inverso zero. Il cambio
+  per un accordo in euro su un annuncio in sats lo chiede
+  `_cambio_dell_accordo`, in una variabile sua (`cambio_accordo`: il
+  metro del listino non si sporca), e se manca è 503 nei due acquisti
+  e nei due preventivi, come per l'articolo EUR.
   Errore del preventivo = pagina col messaggio, «Riprova» e «← Torna»,
   mai muta (il «Riprova» è dell'ago 2026: senza, sulla rete caduta
   l'unica uscita sarebbe uscire e rientrare — vedi la voce della

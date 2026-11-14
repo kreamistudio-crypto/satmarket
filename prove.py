@@ -9379,7 +9379,7 @@ def prove_disputa_cambia_strada():
 
 def prove_chiusure_audit():
     """LE PICCOLE CHIUSURE DEL PRIMO AUDIT DI SICUREZZA (14 nov 2026,
-    cantiere audit-chiusure: dieci sospetti, nessuno cambia un gesto di
+    cantiere audit-chiusure: nove sospetti, nessuno cambia un gesto di
     chi usa l'app). Qui coi pezzi VERI di server.py e di importa_nostr:
     1) il relay di casa della cassetta esiste solo in collaudo;
     2) nessuna connessione a un relay segue un redirect del saluto;
@@ -19334,6 +19334,9 @@ def prove_notifica_fail_open():
               "stima_taglia_set": lambda t: "",
               "registra_uscita_negozio": lambda *a: "",
               "annuncio_su_nostr": _niente, "promo_venduto": _niente,
+              # (14 nov 2026, audit-offerte) qui nessun ordine nasce da
+              # un'offerta: l'accordo sciolto ha la sua sezione
+              "_offerte_dell_ordine": lambda o: [],
               "print": lambda s: None}
     exec(pezzo_async("notifica"), catena)
     gruppo_admin_spento(catena)
@@ -23617,7 +23620,12 @@ def prove_supplemento_spedizione():
     # ...ed e' cresciuta ANCORA con l'anteprima della fee dinamica (set
     # 2026, letta PRIMA del con.close() che sta piu' sopra nella
     # funzione): a 26_000 il bersaglio cadeva a 26_009, nove byte fuori
-    corpo_pset = src[src.index("async def _preventivo_set("):][:27_000]
+    # ...e una TERZA volta col cambio dell'accordo (14 nov 2026, cantiere
+    # audit-offerte): a 27_000 il bersaglio cadeva a 27_403. Tre volte
+    # bastano: la fetta e' la FUNZIONE, fino alle sue tre righe vuote,
+    # e non un numero di byte da rincorrere.
+    corpo_pset = src[src.index("async def _preventivo_set("):]
+    corpo_pset = corpo_pset[:corpo_pset.index("\n\n\n")]
     prova("preventivo set: le quantita' si prendono da `richieste`",
           True, "[(tutti[aid], q) for aid, q" in corpo_pset)
     prova("...e MAI zippando due dizionari diversi", False,
@@ -25536,8 +25544,13 @@ def prove_sped_gratis():
           src.count("def _sconto_vuole_cambio("))
     # ...e a cambio muto NON nasce un 503 nuovo: si rinuncia alla
     # promessa, non all'acquisto. Il 503 resta dei due casi di sempre.
-    prova("compra: i 503 restano due (listino EUR, tariffa ancorata)",
-          2, corpo_mono.count("raise HTTPException(503"))
+    # (14 nov 2026, cantiere audit-offerte, dal primo audit di
+    # sicurezza: il TERZO e' l'accordo nato in euro su un annuncio
+    # passato ai sats. Anche li' si CONVERTE un prezzo, non si valuta
+    # una promessa: senza cambio l'ordine non puo' nascere.)
+    prova("compra: i 503 sono tre (listino EUR, tariffa ancorata, "
+          "accordo in euro su un annuncio passato ai sats)",
+          3, corpo_mono.count("raise HTTPException(503"))
     prova("_compra_set: il 503 scatta solo sul bisogno DURO", True,
           "if serve_cambio_duro and cambio_misura <= 0:" in corpo_set
           or "if serve_cambio_duro:" in corpo_set)
@@ -38799,6 +38812,9 @@ def prove_ricevuta_compratore():
                "_righe_ordine": reale("_righe_ordine"),
                "_titolo_ordine": reale("_titolo_ordine"),
                "_coda_ricevuta": coda, "_fmt_sats": reale("_fmt_sats"),
+               # (14 nov 2026, audit-offerte) nessun ordine di questo
+               # banco nasce da un'offerta
+               "_offerte_dell_ordine": lambda o: [],
                # il registro dei negozi collegati (tappa 4) passa dal
                # funnel: `reale()` non basta da solo, che questa
                # funzione ha delle dipendenze sue — chi estrae un
@@ -179317,7 +179333,10 @@ def prove_annullata_pagata():
         return vero
 
     amb = {"time": _t}
+    # (14 nov 2026, audit-offerte) il giudice chiede anche se
+    # l'accordo e' gia' speso: i due pezzi nuovi, veri
     for nome in ("_campo", "_righe_ordine", "_riservati",
+                 "_offerte_dell_ordine", "_accordo_gia_speso",
                  "_perche_niente_vendita"):
         exec(pezzo(nome), amb)
     ora = int(_t.time())
@@ -179700,6 +179719,352 @@ console.log(JSON.stringify({
            "Hai pagato una fattura annullata" in e["con"]
            and "anna@wallet.tld" in e["con"],
            "isputa" in e["senza"] + e["con"]])
+
+
+def prove_accordo_una_volta():
+    """L'ACCORDO VALE UNA VOLTA, E NELLA SUA VALUTA (14 nov 2026,
+    cantiere audit-offerte, dal primo audit di sicurezza: due sospetti).
+
+    1) LA VALUTA. Un'offerta accettata sopravvive a un cambio di valuta
+       dell'annuncio (decisione scritta), e delle sue due colonne ne
+       vive una. `_unitario_effettivo` sceglieva la colonna guardando
+       il LISTINO di oggi: accordo in sats su un annuncio passato agli
+       euro = 1 sat al pezzo; accordo in euro su un annuncio passato ai
+       sats = zero. Ora ogni cifra si converte dalla valuta in cui e'
+       nata, e a valute uguali il numero e' quello di sempre.
+    2) UNA VOLTA. Chi compra annulla l'ordine nato dall'accordo, e la
+       fattura resta pagabile un quarto d'ora. Pagandola, il riacciuffo
+       ne faceva una vendita alla cifra pattuita senza chiudere
+       l'offerta (il legame era gia' sciolto): con lo stock per
+       entrambe, la stessa offerta dava DUE ordini a quel prezzo. Ora
+       l'ordine ricorda da quali offerte e' nato (`da_offerte`), il
+       saldo tardivo conclude l'offerta, e una lapide il cui accordo e'
+       gia' in mano a un altro ordine si rimborsa.
+    Il giro sul server vero sta in collaudo_accordo_una_volta.py."""
+    print("\n[l'accordo vale una volta, e nella sua valuta]")
+    import asyncio as _aio
+    import sqlite3
+    import time as _t
+
+    # ============ 1. LA VALUTA DELL'ACCORDO =============================
+    amb = {}
+    for f in ("_importo_accordo", "_prezzo_lampo", "_unitario_effettivo",
+              "_eur_effettivo", "_accordo_vuole_cambio"):
+        exec(pezzo(f), amb)
+    unit, eurn = amb["_unitario_effettivo"], amb["_eur_effettivo"]
+    vuole = amb["_accordo_vuole_cambio"]
+    CAMBIO = 100_000.0          # 1 euro = 1000 sats: i conti a mente
+
+    def a(**kw):
+        base = {"prezzo_sats": 100_000, "prezzo_eur": 0.0, "valuta": "sats",
+                "lampo_percento": 0, "lampo_scadenza": 0}
+        base.update(kw)
+        return base
+
+    def off(sats=0, eur=0.0, c_sats=0, c_eur=0.0):
+        return {"importo_sats": sats, "importo_eur": eur,
+                "contro_sats": c_sats, "contro_eur": c_eur}
+    IN_EURO = a(valuta="eur", prezzo_eur=80.0)     # era in sats, ieri
+    IN_SATS = a()                                  # era in euro, ieri
+
+    def lampo(base, pct, viva=True):
+        return dict(base, lampo_percento=pct,
+                    lampo_scadenza=2000 if viva else 500)
+    prova("accordo in SATS, annuncio passato agli EURO: vale la cifra "
+          "pattuita (era 1 sat al pezzo)", 90_000,
+          unit(IN_EURO, off(sats=90_000), 1000, CAMBIO))
+    prova("accordo in EURO, annuncio passato ai SATS: la cifra pattuita "
+          "al cambio (era zero)", 45_000,
+          unit(IN_SATS, off(eur=45.0), 1000, CAMBIO))
+    prova("...anche quando l'accordo e' la CONTROPROPOSTA", (60_000, 70_000),
+          (unit(IN_SATS, off(eur=45.0, c_eur=60.0), 1000, CAMBIO),
+           unit(IN_EURO, off(sats=90_000, c_sats=70_000), 1000, CAMBIO)))
+    prova("valute diverse e lampo viva: vince il MINIMO, contato in sats "
+          "(la lampo non peggiora mai l'accordo, e viceversa)",
+          (60_000, 40_000, 45_000, 40_000),
+          (unit(lampo(IN_EURO, 10), off(sats=60_000), 1000, CAMBIO),
+           unit(lampo(IN_EURO, 50), off(sats=60_000), 1000, CAMBIO),
+           unit(lampo(IN_SATS, 50), off(eur=45.0), 1000, CAMBIO),
+           unit(lampo(IN_SATS, 60), off(eur=45.0), 1000, CAMBIO)))
+    prova("...lampo scaduta: torna l'accordo", (60_000, 45_000),
+          (unit(lampo(IN_EURO, 50, False), off(sats=60_000), 1000, CAMBIO),
+           unit(lampo(IN_SATS, 60, False), off(eur=45.0), 1000, CAMBIO)))
+
+    def di_ieri(a, off, adesso, cambio):
+        """La formula di prima, parola per parola: il metro del «a
+        valute uguali non cambia niente»."""
+        p_sats, p_eur = a["prezzo_sats"], a["prezzo_eur"]
+        if off:
+            p_sats, p_eur = amb["_importo_accordo"](off)
+        if a["lampo_percento"] > 0 and a["lampo_scadenza"] > adesso:
+            l_sats, l_eur = amb["_prezzo_lampo"](a, a["lampo_percento"])
+            if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
+                p_eur = min(p_eur, l_eur) if p_eur > 0 else l_eur
+            else:
+                p_sats = min(p_sats, l_sats)
+        if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
+            return max(1, round(p_eur / cambio * 100_000_000))
+        return p_sats
+    diversi, contati = [], 0
+    for listino, accordi in (
+            (a(prezzo_sats=123_457), (None, off(sats=99_991),
+                                      off(sats=99_991, c_sats=110_003))),
+            (a(valuta="eur", prezzo_eur=79.99, prezzo_sats=0),
+             (None, off(eur=61.37), off(eur=61.37, c_eur=70.01)))):
+        for o in accordi:
+            for pct, viva in ((0, True), (20, True), (20, False), (70, True),
+                              (99, True)):
+                for cambio in (100_000.0, 61_234.5, 97_531.17):
+                    riga = lampo(listino, pct, viva)
+                    contati += 1
+                    if unit(riga, o, 1000, cambio) != di_ieri(riga, o, 1000,
+                                                              cambio):
+                        diversi.append((riga, o, cambio))
+    prova("A VALUTE UGUALI IL NUMERO E' QUELLO DI SEMPRE: listino, "
+          "accordo, controproposta, lampo viva e scaduta, tre cambi "
+          "(90 casi contro la formula di ieri)", (90, []),
+          (contati, diversi))
+    prova("chi vuole il cambio: solo l'accordo nato in euro (anche in "
+          "mezzo agli altri, anche da controproposta)",
+          [False, False, True, True, True, False],
+          [vuole(), vuole(None, off(sats=5)), vuole(off(eur=5.0)),
+           vuole(off(sats=5), None, off(eur=5.0)),
+           vuole(off(sats=0, eur=4.0, c_eur=6.0)),
+           vuole(off(sats=5, c_sats=7))])
+    prova("l'euro NATIVO: un accordo in sats su un listino in euro non "
+          "ne ha (prima usciva l'euro del listino accanto ai sats "
+          "dell'accordo)", 0.0, eurn(IN_EURO, off(sats=90_000), 1000))
+    prova("...a valute uguali resta l'euro dell'accordo, e senza accordo "
+          "quello del listino", (70.0, 80.0),
+          (eurn(IN_EURO, off(eur=70.0), 1000), eurn(IN_EURO, None, 1000)))
+
+    # il cambio dell'accordo: lo stesso numero se c'e', quello di adesso
+    # solo se serve
+    chiesto = []
+
+    async def _cambio_finto():
+        chiesto.append(1)
+        return amb2["_adesso"]
+    amb2 = dict(amb, cambio_btc_eur=_cambio_finto, _adesso=CAMBIO)
+    exec("async " + pezzo("_cambio_dell_accordo"), amb2)
+
+    def dell_accordo(cambio, *accordi, adesso=CAMBIO):
+        chiesto.clear()
+        amb2["_adesso"] = adesso
+        return (_aio.run(amb2["_cambio_dell_accordo"](cambio, *accordi)),
+                len(chiesto))
+    prova("il cambio c'e' gia' (il listino in euro l'ha chiesto): e' "
+          "quello, senza richiederlo", (61_000.0, 0),
+          dell_accordo(61_000.0, off(eur=45.0)))
+    prova("nessun accordo in euro: il cambio non si chiede, e resta zero",
+          [(0.0, 0), (0.0, 0)],
+          [dell_accordo(0.0, off(sats=90_000)), dell_accordo(0.0, None)])
+    prova("accordo in euro e cambio che manca: si chiede adesso",
+          (CAMBIO, 1), dell_accordo(0.0, off(eur=45.0)))
+    prova("...e se non risponde torna zero: il chiamante da' il suo 503",
+          (0.0, 1), dell_accordo(0.0, off(eur=45.0), adesso=0.0))
+
+    # I QUATTRO CHIAMANTI: ognuno passa il cambio dell'accordo, e da' il
+    # 503 quando serve e non c'e'
+    chiamate = [m.start() for m in re.finditer(r"(?<!def )_unitario_effettivo\(",
+                                               _SORGENTE)]
+    prova("ogni chiamata a `_unitario_effettivo` passa `cambio_accordo` "
+          "(sono quattro: i due acquisti e i due preventivi)", [True] * 4,
+          ["cambio_accordo" in _SORGENTE[i:_SORGENTE.index(")\n", i)]
+           for i in chiamate])
+    for nome in ("compra", "_compra_set", "preventivo_ordine",
+                 "_preventivo_set"):
+        c = codice(pezzo(nome))
+        i = c.find("_cambio_dell_accordo(")
+        j = c.find("_accordo_vuole_cambio(", i)
+        k = c.find("raise HTTPException(503", j)
+        u = c.find("_unitario_effettivo(", i)
+        prova(f"{nome}: chiede il cambio dell'accordo, e senza si ferma "
+              f"col 503 PRIMA di fare il conto", True,
+              0 <= i < j < k < u)
+
+    # ============ 2. L'ACCORDO E' UNO ===================================
+    def mondo():
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.executescript("""
+          CREATE TABLE annunci(id INTEGER PRIMARY KEY, stato TEXT,
+            quantita INT, titolo TEXT DEFAULT 'Cosa');
+          CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+            compratore_id INT, venditore_id INT DEFAULT 222, stato TEXT,
+            quantita INT DEFAULT 1, creato INT, aggiornato INT DEFAULT 0,
+            prezzo_sats INT DEFAULT 50000, spedizione_sats INT DEFAULT 0,
+            protezione_sats INT DEFAULT 0, sconto_sats INT DEFAULT 0,
+            annullato_venditore_il INT DEFAULT 0,
+            pagata_da_annullata_il INT DEFAULT 0,
+            payout_stato TEXT DEFAULT '', payout_verso TEXT DEFAULT '',
+            da_offerte TEXT DEFAULT '');
+          CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
+            annuncio_id INT, quantita INT, unitario_sats INT DEFAULT 0,
+            titolo TEXT DEFAULT 'Cosa');
+          CREATE TABLE offerte(id INTEGER PRIMARY KEY, stato TEXT,
+            ordine_id INT DEFAULT 0, aggiornato INT DEFAULT 0);
+          INSERT INTO annunci(id,stato,quantita) VALUES(7,'attivo',3);
+          INSERT INTO annunci(id,stato,quantita) VALUES(8,'attivo',3);
+        """)
+        return vero
+    amb3 = {"time": _t}
+    for nome in ("_campo", "_righe_ordine", "_riservati",
+                 "_offerte_dell_ordine", "_accordo_gia_speso",
+                 "_perche_niente_vendita", "_perche_annullata_pagata"):
+        exec(pezzo(nome), amb3)
+    ora = int(_t.time())
+    nate = amb3["_offerte_dell_ordine"]
+    prova("da quali offerte e' nato un ordine: gli id in colonna, e una "
+          "riga di ieri (o un banco senza la colonna) non ne ha",
+          [[12, 15], [7], [], [], []],
+          [nate({"da_offerte": "12,15"}), nate({"da_offerte": " 7 , x,,"}),
+           nate({"da_offerte": ""}), nate({"da_offerte": None}),
+           nate({"id": 1})])
+
+    def lapide(vero, da="5", annuncio=7):
+        vero.execute("INSERT INTO ordini(id,annuncio_id,compratore_id,stato,"
+                     "creato,da_offerte) VALUES(1,?,111,'annullato',?,?)",
+                     (annuncio, ora, da))
+
+    def altro(vero, oid=2, stato="creato", chi=111):
+        vero.execute("INSERT INTO ordini(id,annuncio_id,compratore_id,stato,"
+                     "creato) VALUES(?,7,?,?,?)", (oid, chi, stato, ora))
+
+    def offerta(vero, oid=5, stato="accettata", ordine=0):
+        vero.execute("INSERT INTO offerte(id,stato,ordine_id) VALUES(?,?,?)",
+                     (oid, stato, ordine))
+
+    def giudica(*passi):
+        vero = mondo()
+        for p in passi:
+            p(vero)
+        o = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+        return (amb3["_perche_niente_vendita"](vero, o),
+                amb3["_accordo_gia_speso"](vero, o))
+    prova("la lapide nata da un'offerta ancora LIBERA (sciolta, accettata), "
+          "col pezzo in vetrina: si puo' vendere, come sempre", ("", False),
+          giudica(lapide, offerta))
+    prova("...l'offerta e' legata alla FATTURA NUOVA di chi compra: "
+          "niente seconda vendita, anche con tre pezzi in vetrina",
+          ("esaurito", True),
+          giudica(lapide, altro, lambda v: offerta(v, ordine=2)))
+    prova("...l'offerta e' gia' CONCLUSA dall'altro ordine, pagato per "
+          "primo: niente seconda vendita", ("esaurito", True),
+          giudica(lapide, lambda v: altro(v, stato="locked"),
+                  lambda v: offerta(v, stato="conclusa", ordine=2)))
+    prova("...per le PAROLE e' «rifatta»: «è già nella tua fattura più "
+          "recente»", "rifatta",
+          (lambda v: (lapide(v), altro(v), offerta(v, ordine=2),
+                      amb3["_perche_annullata_pagata"](
+                          v, v.execute("SELECT * FROM ordini WHERE id=1")
+                          .fetchone()))[3])(mondo()))
+    prova("un'offerta legata a QUESTO ordine non e' spesa", ("", False),
+          giudica(lapide, lambda v: offerta(v, ordine=1)))
+    prova("un'offerta decaduta, scaduta o ritirata non cambia niente: "
+          "decide lo stock, come ieri", [("", False)] * 3,
+          [giudica(lapide, lambda v, s=s: offerta(v, stato=s))
+           for s in ("decaduta", "scaduta", "ritirata")])
+    prova("un ordine nato SENZA offerta non guarda le offerte di nessuno: "
+          "con lo stock per entrambe, la fattura nuova e la vecchia "
+          "restano due acquisti (la regola del 15 ott non si tocca)",
+          ("", False),
+          giudica(lambda v: lapide(v, da=""), altro,
+                  lambda v: offerta(v, ordine=2)))
+    prova("un'offerta che non esiste piu' non ferma niente", ("", False),
+          giudica(lambda v: lapide(v, da="77")))
+
+    def un_set(vero):
+        lapide(vero, da="5,6", annuncio=0)
+        vero.executemany("INSERT INTO ordine_righe(ordine_id,annuncio_id,"
+                         "quantita) VALUES(1,?,1)", [(7,), (8,)])
+    prova("il SET nato da due accordi, tutti e due liberi: si vende",
+          ("", False),
+          giudica(un_set, offerta, lambda v: offerta(v, oid=6)))
+    prova("...ne basta UNO speso: torna tutto (mai una vendita a meta')",
+          ("esaurito", True),
+          giudica(un_set, offerta, altro,
+                  lambda v: offerta(v, oid=6, stato="conclusa", ordine=2)))
+
+    # LA DECISIONE, eseguita: la lapide col suo accordo gia' speso
+    vero = mondo()
+    lapide(vero)
+    altro(vero)
+    offerta(vero, ordine=2)
+
+    class Con:
+        def execute(self, *a):
+            return vero.execute(*a)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+    amb4 = dict(amb3, db=Con)
+    exec(pezzo("_decidi_annullata_pagata"), amb4)
+    primo = amb4["_decidi_annullata_pagata"](1)
+    secondo = amb4["_decidi_annullata_pagata"](1)
+    o = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("la lapide pagata con l'accordo gia' speso: 'refund', col "
+          "timbro e il rimborso da riprovare verso chi ha pagato; un "
+          "rimborso solo",
+          ("esaurito", "", "refund", True, "da_riprovare", "compratore"),
+          (primo, secondo, o["stato"], o["pagata_da_annullata_il"] > 0,
+           o["payout_stato"], o["payout_verso"]))
+    prova("...e l'altro ordine e l'offerta non si sono mossi",
+          ("creato", ("accettata", 2)),
+          (vero.execute("SELECT stato FROM ordini WHERE id=2").fetchone()[0],
+           tuple(vero.execute("SELECT stato, ordine_id FROM offerte "
+                              "WHERE id=5").fetchone())))
+
+    # IL SALDO TARDIVO CONCLUDE L'OFFERTA SCIOLTA: la scrittura vera di
+    # `_incassa_ordine`, eseguita sul mondo
+    inc = pezzo("_incassa_ordine")
+    i = inc.index("for off_id in _offerte_dell_ordine(o):")
+    prova("l'incasso conclude prima l'offerta LEGATA, poi quella sciolta "
+          "da cui l'ordine e' nato", True,
+          0 < inc.index("WHERE ordine_id=? AND stato='accettata'") < i)
+    blocco = inc[i:inc.index("\n    decadute = []", i)]
+
+    def concludi(*passi, ordine=1):
+        vero = mondo()
+        for p in passi:
+            p(vero)
+        o = vero.execute("SELECT * FROM ordini WHERE id=?",
+                         (ordine,)).fetchone()
+        exec(blocco, dict(amb3, con=vero, o=o, ordine_id=ordine,
+                          adesso=ora))
+        return [tuple(r) for r in vero.execute(
+            "SELECT id, stato, ordine_id FROM offerte ORDER BY id")]
+    prova("l'ordine riacciuffato nato da un'offerta sciolta: l'offerta "
+          "si CONCLUDE, legata a lui (prima restava 'accettata', buona "
+          "per un secondo ordine)", [(5, "conclusa", 1)],
+          concludi(lapide, offerta))
+    prova("...un'offerta in mano a un altro ordine non si tocca",
+          [(5, "accettata", 2)],
+          concludi(lapide, altro, lambda v: offerta(v, ordine=2)))
+    prova("...ne' una decaduta, ne' quella di un altro ordine",
+          [(5, "decaduta", 0), (6, "accettata", 0)],
+          concludi(lapide, lambda v: offerta(v, stato="decaduta"),
+                   lambda v: offerta(v, oid=6)))
+
+    # IL RICORDO NASCE COL LEGAME, nella stessa transazione
+    for nome in ("compra", "_compra_set"):
+        c = pezzo(nome)
+        i = c.rindex("UPDATE offerte SET ordine_id=?, aggiornato=?")
+        j = c.index("UPDATE ordini SET da_offerte=? WHERE id=?", i)
+        prova(f"{nome}: l'ordine ricorda le sue offerte nella stessa "
+              f"transazione del legame (nessun commit in mezzo)", True,
+              "con.commit()" not in c[i:j] and "await " not in c[i:j])
+    prova("...e le scritture di quella colonna sono solo quelle due", 2,
+          _SORGENTE.count("UPDATE ordini SET da_offerte=?"))
+    prova("la colonna nasce nella migrazione di sempre", True,
+          '"da_offerte TEXT DEFAULT \'\'"' in _SORGENTE)
+    prova("chi compra che annulla o rinnova scioglie il legame e lascia "
+          "l'offerta accettata, come sempre: si puo' ripagare", [True] * 2,
+          ["UPDATE offerte SET ordine_id=0 WHERE ordine_id=?" in pezzo(n)
+           for n in ("annulla_ordine", "compra")])
 
 
 def prove_notifica_porta_allo_scambio():
@@ -192722,7 +193087,8 @@ CATEGORIE = {
     carrello_salvato bollino_staff anello_ovunque avvisi_mercatino
     x_risonanza indirizzo_lightning foto_obbligatorie vibrazione
     servizio_senza_corriere gesti_ordine backfill_annullo_venditore
-    annullata_pagata allegati_chat pdf_allegati modifica_massiva
+    annullata_pagata accordo_una_volta allegati_chat pdf_allegati
+    modifica_massiva
     venduto_canale chat_mercatino chat_dalla_notifica
     modifica_massiva_foto miniature_leggere leva_mercato_lavoro
     allegati_da_telegram domande_compratore incasso_annuncio
@@ -193507,6 +193873,7 @@ def main():
               prove_backfill_annullo_venditore,
               prove_notifica_porta_allo_scambio,
               prove_annullata_pagata,
+              prove_accordo_una_volta,
               prove_barre_paycode,
               prove_allegati_chat,
               prove_pdf_allegati,

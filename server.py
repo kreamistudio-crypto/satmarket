@@ -10514,7 +10514,16 @@ def init_db():
                     # una disputa (`disputata` resta 0) e dall'annullo
                     # del venditore a ordine pagato. Vedi
                     # `_decidi_annullata_pagata`.
-                    "pagata_da_annullata_il INTEGER DEFAULT 0"):
+                    "pagata_da_annullata_il INTEGER DEFAULT 0",
+                    # DA QUALI OFFERTE E' NATO L'ORDINE (14 nov 2026,
+                    # cantiere audit-offerte, dal primo audit di
+                    # sicurezza): gli id separati da virgola, '' = da
+                    # nessuna. Il legame vivo sta in `offerte.ordine_id`
+                    # e si SCIOGLIE quando chi compra annulla o rinnova;
+                    # questa colonna invece resta, ed e' quel che fa
+                    # ritrovare l'accordo a una lapide pagata in
+                    # ritardo. Vedi `_offerte_dell_ordine`.
+                    "da_offerte TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -36858,19 +36867,57 @@ def _unitario_effettivo(a, off, adesso: int, cambio: float) -> int:
     EUR converte al cambio dato (che il chiamante garantisce >0 quando
     serve), max(1, round(...)): si arrotonda l'UNITARIO prima di
     moltiplicare, cosi' la divisione a ritroso di chi legge l'ordine
-    e' esatta."""
-    p_sats, p_eur = a["prezzo_sats"], a["prezzo_eur"]
+    e' esatta.
+    L'ACCORDO PARLA LA SUA VALUTA, NON QUELLA DEL LISTINO DI OGGI (14
+    nov 2026, cantiere audit-offerte, dal primo audit di sicurezza).
+    Un'offerta accettata sopravvive a un cambio di valuta dell'annuncio
+    (decisione scritta), e delle sue due colonne ne vive una sola. Fino
+    a ieri la colonna si sceglieva guardando il LISTINO: un accordo in
+    sats su un annuncio passato agli euro leggeva la colonna euro, che
+    e' zero, e faceva 1 sat al pezzo; all'inverso faceva zero. Ora ogni
+    cifra si converte dalla valuta in cui E' NATA (l'accordo dalla sua
+    colonna viva, la lampo dal listino) e il MIN si fa in sats. A
+    valute uguali il numero e' quello di prima, perche' la conversione
+    e' monotona: il minimo dei convertiti e' il convertito del minimo.
+    Il cambio >0 il chiamante lo garantisce anche per un accordo in
+    euro su un listino in sats (`_accordo_vuole_cambio`)."""
+    listino_eur = a["valuta"] == "eur" and a["prezzo_eur"] > 0
+
+    def in_sats(sats, eur, nata_in_eur):
+        if nata_in_eur:
+            return max(1, round(eur / cambio * 100_000_000))
+        return sats
+
     if off:
-        p_sats, p_eur = _importo_accordo(off)
+        o_sats, o_eur = _importo_accordo(off)
+        prezzo = in_sats(o_sats, o_eur, o_eur > 0)
+    else:
+        prezzo = in_sats(a["prezzo_sats"], a["prezzo_eur"], listino_eur)
     if a["lampo_percento"] > 0 and a["lampo_scadenza"] > adesso:
         l_sats, l_eur = _prezzo_lampo(a, a["lampo_percento"])
-        if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
-            p_eur = min(p_eur, l_eur) if p_eur > 0 else l_eur
-        else:
-            p_sats = min(p_sats, l_sats)
-    if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
-        return max(1, round(p_eur / cambio * 100_000_000))
-    return p_sats
+        prezzo = min(prezzo, in_sats(l_sats, l_eur, listino_eur))
+    return prezzo
+
+
+def _accordo_vuole_cambio(*accordi) -> bool:
+    """Uno di questi accordi e' nato in EURO: per farne sats serve il
+    cambio, anche se l'annuncio oggi e' in sats e di suo non lo
+    chiederebbe (14 nov 2026, cantiere audit-offerte). PURA: guarda la
+    colonna viva dell'accordo, come `_unitario_effettivo`."""
+    return any(_importo_accordo(o)[1] > 0 for o in accordi if o)
+
+
+async def _cambio_dell_accordo(cambio: float, *accordi) -> float:
+    """Il cambio con cui `_unitario_effettivo` converte: quello che il
+    chiamante ha gia' (il listino in euro l'ha chiesto, ed e' lo stesso
+    numero: la funzione ha una cache), oppure, se manca e un accordo e'
+    nato in euro, quello di adesso. In una variabile SUA e mai in
+    quella del chiamante: il metro della conversione del listino resta
+    zero finche' il listino non si converte davvero. 0.0 con un accordo
+    in euro = il cambio non risponde, e il chiamante da' il suo 503."""
+    if cambio > 0 or not _accordo_vuole_cambio(*accordi):
+        return cambio
+    return await cambio_btc_eur()
 
 
 def _eur_effettivo(a, off, adesso: int) -> float:
@@ -36883,7 +36930,14 @@ def _eur_effettivo(a, off, adesso: int) -> float:
         return 0.0
     p_eur = a["prezzo_eur"]
     if off:
-        p_eur = _importo_accordo(off)[1] or p_eur
+        o_sats, o_eur = _importo_accordo(off)
+        if o_eur <= 0 and o_sats > 0:
+            # un accordo nato in SATS su un listino passato agli euro:
+            # il suo nativo sono i sats, e un euro esatto da mostrare
+            # non c'e' (14 nov 2026, audit-offerte). Prima usciva
+            # l'euro del LISTINO accanto ai sats dell'accordo.
+            return 0.0
+        p_eur = o_eur or p_eur
     if a["lampo_percento"] > 0 and a["lampo_scadenza"] > adesso:
         l_eur = _prezzo_lampo(a, a["lampo_percento"])[1]
         p_eur = min(p_eur, l_eur) if p_eur > 0 else l_eur
@@ -42205,6 +42259,17 @@ async def _compra_set(user: dict, d: dict) -> dict:
                                          "in questo momento: riprova tra "
                                          "qualche minuto")
             cambio_ordine = cambio_misura
+    # Un accordo di riga nato in EURO su un annuncio passato ai sats
+    # (14 nov 2026, cantiere audit-offerte): per farne sats serve il
+    # cambio anche se nessun listino lo chiede. Senza, 503 come sopra:
+    # un accordo non si converte a occhio.
+    cambio_accordo = await _cambio_dell_accordo(cambio_ordine,
+                                                *offerte.values())
+    if cambio_accordo <= 0 and _accordo_vuole_cambio(*offerte.values()):
+        con.close()
+        raise HTTPException(503, "Il cambio euro non è disponibile in "
+                                 "questo momento: riprova tra qualche "
+                                 "minuto")
 
     # --- Il conto, riga per riga: unitario gia' col MIN tra lampo e
     # accordo (il patto del mono: si arrotonda PRIMA di moltiplicare,
@@ -42221,7 +42286,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
         # mono): unitario col MIN tra lampo e accordo, arrotondato
         # PRIMA di moltiplicare.
         unitario = _unitario_effettivo(a, offerte.get(aid), adesso,
-                                       cambio_ordine)
+                                       cambio_accordo)
         listino += _unitario_listino(a, cambio_ordine) * qta
         if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
             # Il tetto di rodaggio con +20% di tolleranza, sull'unitario
@@ -42425,6 +42490,14 @@ async def _compra_set(user: dict, d: dict) -> dict:
         con.execute("UPDATE offerte SET ordine_id=?, aggiornato=? "
                     "WHERE id=?",
                     (ordine_id, adesso, accordo_carrello["id"]))
+    # ...e l'ordine ricorda da quali accordi e' nato, anche dopo che il
+    # legame si scioglie (14 nov 2026, audit-offerte): stessa transazione
+    nate_da = [off["id"] for off in offerte.values()]
+    if accordo_carrello:
+        nate_da.append(accordo_carrello["id"])
+    if nate_da:
+        con.execute("UPDATE ordini SET da_offerte=? WHERE id=?",
+                    (",".join(str(i) for i in nate_da), ordine_id))
     con.commit()
     con.close()
     # La taglia stimata del pacco unico: informativa, solo con la
@@ -42861,7 +42934,14 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
                                      "questo momento: riprova tra qualche "
                                      "minuto")
     adesso = int(time.time())
-    unitario = _unitario_effettivo(a, off, adesso, cambio)
+    # l'accordo nato in euro su un annuncio passato ai sats: come in
+    # compra (14 nov 2026, cantiere audit-offerte)
+    cambio_accordo = await _cambio_dell_accordo(cambio, off)
+    if cambio_accordo <= 0 and _accordo_vuole_cambio(off):
+        raise HTTPException(503, "Il cambio euro non è disponibile in "
+                                 "questo momento: riprova tra qualche "
+                                 "minuto")
+    unitario = _unitario_effettivo(a, off, adesso, cambio_accordo)
     if (listino_eur and TETTO_SATS_ANNUNCIO
             and unitario > TETTO_SATS_ANNUNCIO * 1.2):
         # Il tetto di rodaggio, col 409 di compra ma SENZA la notifica
@@ -43410,12 +43490,20 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                                      "questo momento: riprova tra qualche "
                                      "minuto")
     adesso = int(time.time())
+    # l'accordo di riga nato in euro su un annuncio passato ai sats:
+    # come in _compra_set (14 nov 2026, cantiere audit-offerte)
+    cambio_accordo = await _cambio_dell_accordo(cambio, *offerte.values())
+    if cambio_accordo <= 0 and _accordo_vuole_cambio(*offerte.values()):
+        raise HTTPException(503, "Il cambio euro non è disponibile in "
+                                 "questo momento: riprova tra qualche "
+                                 "minuto")
     righe, articolo = [], 0
     pezzi = 0
     listino = 0       # prima di lampo e accordo: il buono NON cumulabile
     for aid, qta in richieste.items():
         a = tutti[aid]
-        unitario = _unitario_effettivo(a, offerte.get(aid), adesso, cambio)
+        unitario = _unitario_effettivo(a, offerte.get(aid), adesso,
+                                       cambio_accordo)
         listino += _unitario_listino(a, cambio) * qta
         if (a["valuta"] == "eur" and a["prezzo_eur"] > 0
                 and TETTO_SATS_ANNUNCIO
@@ -44356,7 +44444,19 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # del singolo pezzo, come il listino) e moltiplica alla fine:
     # arrotondare PRIMA di moltiplicare rende esatta la divisione a
     # ritroso di chi legge l'ordine (unitario = articolo / quantita).
-    unitario = _unitario_effettivo(a, off, adesso, cambio_ordine)
+    # L'ACCORDO NATO IN EURO SU UN ANNUNCIO PASSATO AI SATS (14 nov
+    # 2026, cantiere audit-offerte, dal primo audit di sicurezza): la
+    # cifra pattuita si converte dalla SUA valuta, quindi il cambio
+    # serve anche se il listino di oggi non lo chiede. In una variabile
+    # sua: `cambio_ordine` resta il metro del listino. Senza cambio,
+    # 503 come per un listino in euro.
+    cambio_accordo = await _cambio_dell_accordo(cambio_ordine, off)
+    if cambio_accordo <= 0 and _accordo_vuole_cambio(off):
+        con.close()
+        raise HTTPException(503, "Il cambio euro non è disponibile in "
+                                 "questo momento: riprova tra qualche "
+                                 "minuto")
+    unitario = _unitario_effettivo(a, off, adesso, cambio_accordo)
     if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
         # Il tetto di rodaggio con +20% di tolleranza: la volatilita'
         # ordinaria passa, un crollo del cambio no — e il venditore
@@ -44582,6 +44682,10 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         # finestra in cui l'uno esiste senza l'altro.
         con.execute("UPDATE offerte SET ordine_id=?, aggiornato=? "
                     "WHERE id=?", (ordine_id, int(time.time()), off["id"]))
+        # ...e l'ordine ricorda da quale accordo e' nato, anche dopo
+        # che il legame si scioglie (14 nov 2026, audit-offerte)
+        con.execute("UPDATE ordini SET da_offerte=? WHERE id=?",
+                    (str(off["id"]), ordine_id))
     con.commit()
     con.close()
     # prezzo_sats resta il TOTALE (i client di ieri leggono quello);
@@ -45047,6 +45151,19 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     con.execute("UPDATE offerte SET stato='conclusa', aggiornato=? "
                 "WHERE ordine_id=? AND stato='accettata'",
                 (adesso, ordine_id))
+    # ...E QUELLA SCIOLTA DAL LEGAME (14 nov 2026, cantiere
+    # audit-offerte, dal primo audit di sicurezza). Chi compra annulla
+    # l'ordine (o lo rinnova) e poi paga la fattura VECCHIA: il
+    # riacciuffo ne fa una vendita alla cifra pattuita, ma il legame
+    # non c'e' piu' — la UPDATE qui sopra non trova nessuno — e
+    # l'offerta restava 'accettata', buona per un SECONDO ordine allo
+    # stesso prezzo. L'accordo e' UNO: se quest'ordine e' nato da
+    # un'offerta ancora accettata e senza un altro ordine in mano, si
+    # conclude qui, legata a lui.
+    for off_id in _offerte_dell_ordine(o):
+        con.execute("UPDATE offerte SET stato='conclusa', ordine_id=?, "
+                    "aggiornato=? WHERE id=? AND stato='accettata' "
+                    "AND ordine_id=0", (ordine_id, adesso, off_id))
     decadute = []
     for e in esauriti:
         vive = con.execute(
@@ -83940,6 +84057,36 @@ async def segnala_fatture_scadute(fonte: str, rifs: list):
 # unici pesa) e spegnere la fattura sul nodo (non sappiamo se LNbits lo
 # permette).
 
+def _offerte_dell_ordine(o) -> list:
+    """Gli id delle offerte da cui l'ordine e' NATO (`ordini.da_offerte`,
+    14 nov 2026): restano scritti anche quando il legame vivo
+    (`offerte.ordine_id`) si scioglie. Una riga di ieri, o un banco
+    senza la colonna, non ne ha nessuna."""
+    return [int(x) for x in str(_campo(o, "da_offerte", "") or "").split(",")
+            if x.strip().isdigit()]
+
+
+def _accordo_gia_speso(con, o) -> bool:
+    """PURA SULLA CONNESSIONE: la lapide `o` e' nata da un'offerta che
+    oggi e' in mano a UN ALTRO ordine — legata alla sua fattura viva, o
+    gia' conclusa da lui (14 nov 2026, cantiere audit-offerte, dal
+    primo audit di sicurezza). L'ACCORDO E' UNO: chi vende ha accettato
+    una vendita a quella cifra, non due. Prima, con lo stock per
+    entrambe, annullare, ricomprare con la stessa offerta e pagare
+    TUTTE E DUE le fatture dava due ordini al prezzo pattuito: la
+    regola del 15 ott (la fattura nuova tiene il pezzo, la vecchia si
+    rimborsa) valeva solo quando il pezzo era l'ultimo.
+    Un'offerta sciolta e ancora libera (legame 0) NON e' spesa: quella
+    lapide resta una vendita, come sempre, e l'incasso la conclude."""
+    for off_id in _offerte_dell_ordine(o):
+        f = con.execute("SELECT stato, ordine_id FROM offerte WHERE id=?",
+                        (off_id,)).fetchone()
+        if (f and f["stato"] in ("accettata", "conclusa")
+                and f["ordine_id"] not in (0, o["id"])):
+            return True
+    return False
+
+
 def _perche_niente_vendita(con, o) -> str:
     """PURA SULLA CONNESSIONE: perche' il saldo su questa lapide NON puo'
     diventare una vendita — 'venditore' (aveva annullato lui), 'esaurito'
@@ -83954,11 +84101,18 @@ def _perche_niente_vendita(con, o) -> str:
     dopo, una seconda: due ordini pagati per un pezzo. Ora la fattura
     nuova tiene il pezzo e la vecchia si rimborsa come le altre; e se
     paga prima la nuova, la vecchia trova l'annuncio venduto.
+    E L'ACCORDO E' UNO (14 nov 2026): una lapide nata da un'offerta
+    che oggi e' in mano a un altro ordine non diventa una seconda
+    vendita alla cifra pattuita, nemmeno con lo stock per entrambe
+    (`_accordo_gia_speso`). Esce 'esaurito': per le parole decide
+    `_perche_annullata_pagata`, che li' trova la fattura piu' recente.
     NEI SET SI GUARDA RIGA PER RIGA E NE BASTA UNA: la fattura era una
     e il rimborso e' sempre intero, quindi un pezzo che manca rimborsa
     tutto l'ordine — mai una vendita a meta' che nessuno ha chiesto."""
     if _campo(o, "annullato_venditore_il", 0):
         return "venditore"
+    if _accordo_gia_speso(con, o):
+        return "esaurito"
     for r in _righe_ordine(con, o):
         a = con.execute("SELECT stato, quantita FROM annunci WHERE id=?",
                         (r["annuncio_id"],)).fetchone()

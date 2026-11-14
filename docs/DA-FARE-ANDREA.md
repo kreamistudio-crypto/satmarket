@@ -673,3 +673,18 @@ python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?
    Atteso: `[]`. (Se dice «no such table» va bene uguale: dal pannello
    non è mai stata scritta nessuna leva.) Se ne esce una, il codice
    nuovo smette comunque di ascoltarla: la riga si toglie insieme.
+
+## 16. Dopo il primo audit di sicurezza: una lettura sul VPS per le offerte accettate (14 nov 2026, cantiere audit-offerte)
+
+**Sola lettura**, niente cambia e niente segreti a schermo. La
+correzione fa parlare a ogni accordo la sua valuta da qui in avanti;
+questa riga dice se in produzione c'è già un'offerta accettata o
+conclusa in una valuta diversa da quella del suo annuncio. Sul VPS, e
+incolla il risultato nella sessione:
+```
+python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT o.id,o.stato,o.ordine_id,o.valuta,a.valuta,o.importo_sats,o.importo_eur,o.contro_sats,o.contro_eur FROM offerte o JOIN annunci a ON a.id=o.annuncio_id WHERE o.stato IN ('accettata','conclusa') AND o.annuncio_id>0 AND o.valuta<>a.valuta\")]"
+```
+Atteso: nessuna riga. Se ne esce una con `ordine_id` diverso da 0, si
+guarda insieme il prezzo di quell'ordine (può essere nato storto col
+codice di prima); con `ordine_id` 0 non è successo niente, e col codice
+nuovo l'acquisto prende la cifra giusta.

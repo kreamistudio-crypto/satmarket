@@ -81099,12 +81099,15 @@ DAL VIVO: un ordine in franchi sul nodo (manca il gesto di Andrea,
 DA-FARE voce 14), il prezzo del franco dai provider del nodo, e la card
 sul telefono.
 
-## Le piccole chiusure del primo audit: dieci sospetti, nessun gesto cambiato (14 nov 2026, cantiere audit-chiusure, dal primo audit di sicurezza, Andrea: «tu cmq non mi cambi niente in app, me la rendi solo più sicura»)
+## Le piccole chiusure del primo audit: nove sospetti, nessun gesto cambiato (14 nov 2026, cantiere audit-chiusure, dal primo audit di sicurezza, Andrea: «tu cmq non mi cambi niente in app, me la rendi solo più sicura»)
 
 Il secondo dei quattro cantieri nati dal primo audit (rapporto in
 `/mnt/project-files/audit-sicurezza/satmarket/run-1/`, mai su Telegram).
-Dieci sospetti piccoli, tutti chiusi con un rifiuto in più nel caso
-storto e nessun cambio per chi usa l'app. Il patto con Andrea: se una
+Nove sospetti piccoli, tutti chiusi con un rifiuto in più nel caso
+storto e nessun cambio per chi usa l'app. (Il titolo del commit
+`83b62ed` e la prima stesura di questa voce dicevano «dieci»: un conto
+sbagliato di uno, corretto qui col cantiere audit-offerte. I sospetti
+sono i nove del DECISO.) Il patto con Andrea: se una
 correzione avesse cambiato qualcosa che si vede o si usa, ci si fermava
 su quella. Non è successo.
 
@@ -81239,3 +81242,106 @@ mostra solo da 'shipped' o a ricevuta scritta); `importa_nostr.py` e
 dall'involucro (non sono relay scritti da utenti); il ramo
 `sicurezza/b01-titolo-p2p` del 3 nov (PR #30, mai entrata) si può
 chiudere e cancellare.
+
+## L'accordo vale una volta, e nella sua valuta (14 nov 2026, cantiere audit-offerte, dal primo audit di sicurezza, Andrea: «tu cmq non mi cambi niente in app, me la rendi solo più sicura»)
+
+Il terzo dei quattro cantieri nati dal primo audit (rapporto in
+`/mnt/project-files/audit-sicurezza/satmarket/run-1/`, mai su Telegram).
+Due sospetti sulle offerte accettate, tutti e due fra chi compra e chi
+vende: la cassa di Barattolo non c'entrava. Nessun gesto cambia.
+
+RIPRODOTTI prima di toccare, coi pezzi veri e sul server vero
+(`collaudo_accordo_una_volta` sul codice di prima: 13 righe rosse).
+1. LA VALUTA. Un'offerta accettata sopravvive a un cambio di valuta
+   dell'annuncio (decisione scritta: «le accettate sopravvivono ai
+   ritocchi»), e delle sue due colonne ne vive una. `_unitario_effettivo`
+   sceglieva la colonna guardando il LISTINO di oggi: accordo a 90.000
+   sats su un annuncio passato agli euro = 1 sat al pezzo; accordo in
+   euro su un annuncio passato ai sats = zero. Preventivo e fattura
+   dicevano la stessa cifra sbagliata, e l'avviso «Hai venduto!» non
+   porta l'importo. Serve un gesto di chi vende (cambiare valuta entro
+   le 24 ore dell'accordo), e la modifica firmata e la sincronizzazione
+   dell'import Nostr cambiano valuta senza guardare le offerte.
+2. UNA VOLTA. Chi compra annulla l'ordine nato dall'accordo (o lo
+   rinnova): il legame `offerte.ordine_id` si scioglie, l'offerta resta
+   accettata, la fattura resta pagabile un quarto d'ora. Pagandola, il
+   riacciuffo ne faceva una vendita alla cifra pattuita senza chiudere
+   l'offerta. Con lo stock per entrambe: annulla, ricompra con la stessa
+   offerta, paga tutte e due = due ordini al prezzo pattuito dove chi
+   vende ne aveva accettato uno. La regola del 15 ott (la fattura nuova
+   tiene il pezzo, la vecchia si rimborsa) valeva solo sull'ultimo pezzo.
+
+DECISO.
+1. L'ACCORDO PARLA LA SUA VALUTA. `_unitario_effettivo` converte ogni
+   cifra dalla valuta in cui è nata (l'accordo dalla sua colonna viva,
+   la lampo dal listino) e fa il MIN in sats. A valute uguali il numero
+   è quello di prima, byte per byte: la conversione è monotona, il
+   minimo dei convertiti è il convertito del minimo (90 casi contro la
+   formula di ieri, in prova). Il cambio per un accordo in euro su un
+   annuncio in sats lo chiede `_cambio_dell_accordo`, in una variabile
+   SUA: `cambio_ordine` resta il metro del listino e non si sporca. Se
+   non risponde, 503 con le parole di sempre, nei due acquisti e nei
+   due preventivi. `_eur_effettivo` non dà più l'euro del listino a un
+   accordo nato in sats.
+2. L'ORDINE RICORDA DA QUALI OFFERTE È NATO: `ordini.da_offerte` (gli
+   id separati da virgola), scritta nella stessa transazione del
+   legame, nel mono e nel set, e mai sciolta. `_incassa_ordine`
+   conclude, oltre all'offerta legata, quella sciolta da cui l'ordine è
+   nato se è ancora accettata e libera, e la lega a sé: dopo un saldo
+   tardivo l'offerta non è più buona per un secondo ordine.
+3. UNA LAPIDE IL CUI ACCORDO È GIÀ DI UN ALTRO ORDINE SI RIMBORSA
+   (`_accordo_gia_speso`, dentro `_perche_niente_vendita`): l'offerta è
+   legata alla fattura nuova, o è già conclusa da lei. Le parole sono
+   quelle del 15 ott («è già nella tua fattura più recente»), il
+   rimborso è quello di sempre.
+
+SCARTATO. Far decadere l'offerta accettata quando l'annuncio cambia
+valuta: rovescia una decisione scritta, e il carrello la conversione la
+fa già dalla valuta dell'offerta. Rifiutare l'acquisto quando le valute
+non combaciano: stessa cosa, detta a chi compra. Spegnere la fattura al
+wallet quando si annulla: è la strada «pulita», ma LNbits non lo
+garantisce su ogni cassaforte e la lapide esiste proprio perché un
+saldo deve sempre avere una riga su cui atterrare. Bloccare il
+riacquisto con la stessa offerta finché la fattura vecchia può essere
+pagata: cambierebbe un gesto (annulla e ricompra subito) per un quarto
+d'ora. Una tabella ordine↔offerte invece della colonna: i banchi con lo
+schema fatto a mano la colonna la tollerano (`_campo`), una tabella no.
+Rimborsare la lapide anche quando l'offerta è decaduta o scaduta:
+quella non può più dare un secondo ordine, e l'ordine nato nei tempi
+resta un acquisto come ieri.
+
+PROVATO. `prove_accordo_una_volta` (nuova, 40 righe coi pezzi veri: le
+due valute, la lampo, i 90 casi a valute uguali, il cambio
+dell'accordo, i quattro chiamanti, il giudice della lapide, la
+decisione e la scrittura dell'incasso eseguite). Sul codice di prima la
+sezione non parte nemmeno (mancano i pezzi), e i due numeri storti si
+vedono col pezzo vero di ieri: 1 e 0. `collaudo_accordo_una_volta`
+(nuovo, in `ci/collaudi.txt`): sette scene sul server vero, 24 righe,
+13 rosse sul codice di prima. Seguono il codice nuovo: i due banchi che
+eseguono `_incassa_ordine` e quello di `_perche_niente_vendita`
+(portano i pezzi nuovi), e la sentinella dei 503 di `compra` (sono tre).
+Ritoccata anche una sentinella di `prove_supplemento_spedizione` che
+guardava i primi 27.000 byte di `_preventivo_set`: la funzione è
+cresciuta e il suo bersaglio cadeva a 27.403. Ora guarda la funzione
+intera.
+COSA È GIRATO SU QUALE ALBERO. Sopra develop `83b62ed` (il cantiere
+audit-chiusure, che sta sopra `c4da353`, non mio: gli ordini P2P in
+franchi svizzeri): la suite intera severa una prima volta con 27.810
+passate e 1 fallita (la sentinella dei 27.000 byte qui sopra), e dopo
+il ritocco 27.811 passate, 0 fallite; i collaudi di `ci/collaudi.txt`
+nella gabbia, 127 verdi su 127.
+
+RESTA DA GUARDARE (di Andrea, sola lettura sul VPS, in
+`docs/DA-FARE-ANDREA.md`, voce 16): se in produzione c'è un'offerta
+accettata o conclusa in una valuta diversa da quella del suo annuncio,
+e se un ordine nato così ha un prezzo storto. La colonna `da_offerte`
+nasce da sola al primo avvio (la migrazione di sempre); gli ordini di
+ieri non ce l'hanno e si comportano come ieri.
+
+NOTATI E NON TOCCATI (una riga l'uno, aspettano un sì): l'accordo sul
+CARRELLO nato in euro, se tutti i suoi annunci passano ai sats, oggi
+finisce in un errore 500 al posto del 503 (divide per un cambio che
+nessuno ha chiesto: nessun prezzo sbagliato, solo parole brutte); la
+modifica firmata e l'import Nostr cambiano valuta senza far decadere
+le offerte ancora in trattativa, che `modifica_annuncio` invece fa
+decadere; l'avviso «Hai venduto!» non dice l'importo.
