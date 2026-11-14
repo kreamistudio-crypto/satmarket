@@ -776,6 +776,16 @@
      nella topbar vincerebbe `nav button{color:var(--muted)}` — le due
      istanze direbbero due colori diversi. */
   .podio-testa{display:none;position:relative;color:var(--ink)}
+  /* LA MAPPA DEL RITIRO A MANO (14 nov 2026, cantiere mappa-mercatino):
+     il posto del tondo comune (`.tema-btn.mappa-tondo`, lo stesso del
+     P2P) in fondo alla barra di ricerca — `contents`, cosi' il tondo e'
+     lui il figlio della barra —, a meta' altezza; la scatola sopra la
+     griglia ha i margini della griglia */
+  .merc-mappa-posto{display:contents}
+  .searchbar .mappa-tondo{align-self:center;margin:0}
+  #mercMappaBox:not(:empty){padding:12px var(--pad) 0}
+  .merc-mappa-titolo{margin:2px 0 8px;font-weight:800;font-size:15px}
+  .merc-mappa-titolo em{font-style:normal;font-weight:700;color:var(--muted);font-size:13px}
   header .brand .podio-testa.on{display:inline-flex}
   /* il bersaglio largo quanto il pollice, senza occupare layout: la
      ricetta di .card-jar e dei pallini della galleria */
@@ -12536,6 +12546,12 @@ document.getElementById('cartello')?.remove();</script>
             <button type="button" id="curSats" data-cur="sats" onclick="setValuta('sats')">₿</button>
           </div>
         </div>
+        <!-- LA MAPPA DEL RITIRO A MANO (14 nov 2026, mappa-mercatino): il
+             tondo in fondo alla barra, sotto il tappo (scelta di Andrea:
+             la testata resta coi suoi tre tondi). E' lo STESSO tondo del
+             P2P (`tondoMappa`): lo disegna renderTondoMappaMerc quando
+             la busta del server porta almeno un pallino. -->
+        <span class="merc-mappa-posto" id="mercMappaTondo"></span>
       </form>
       <!-- La riga di fiducia e' anche la porta alla pagina che la
            spiega: stesso testo di sempre, col › che dice che si tocca
@@ -12799,6 +12815,7 @@ document.getElementById('cartello')?.remove();</script>
         <button class="btn ghost" onclick="azzeraFiltri()">Azzera</button>
       </div>
     </div>
+    <div id="mercMappaBox"></div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="gridEmpty" style="display:none">
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
@@ -18510,7 +18527,8 @@ function paramsVetrina(){
     p.set('valuta_filtro', filtroPrezzo.valuta);
   }
   if (filtroSped) p.set('solo_spedizione', '1');
-  if (filtroRitiro) p.set('solo_ritiro', '1');
+  if (filtroRitiro || mercMappaAperta) p.set('solo_ritiro', '1');
+  if (mercMappaAperta && mercMappaComune) p.set('comune', mercMappaComune);
   if (filtroDig) p.set('solo_digitale', '1');
   if (filtroLampo) p.set('solo_lampo', '1');
   if (filtroAsta) p.set('solo_asta', '1');
@@ -18852,6 +18870,13 @@ async function loadListings(anonimo){
   }
   /* ...e quella di Mercato e Lavoro: chiave assente = spenta */
   if (j.mercato_lavoro !== undefined) aggiornaMercatoLavoro(j.mercato_lavoro === true);
+  /* ...e la mappa del ritiro a mano (14 nov 2026): chiave assente = leva
+     spenta = niente tondo; se la mappa era aperta si richiude */
+  if (typeof prendiMappaRitiro === 'function') {
+    mercMappaDati = prendiMappaRitiro(j.mappa_ritiro);
+    if (!mercMappaDati) { mercMappaAperta = false; mercMappaComune = ''; }
+    renderMappaMerc();
+  }
   ultimaRicercaAI = false;
   renderChips();   // le pillole seguono i dati: conteggi e ordine freschi
 }
@@ -23897,6 +23922,7 @@ function renderGrid(items){
   /* `items` e' la LISTA CHIUSA (il barattolo in vetrina): quando c'e'
      si disegna quella e lo scroll infinito resta spento. */
   ultimaRicercaAI = !!items;
+  if (typeof renderTondoMappaMerc === 'function') renderTondoMappaMerc();
   /* LA RICERCA LA FA IL SERVER (ago 2026), e questa riga e' quella da
      non ammorbidire: la risposta arriva GIA' filtrata dall'indice, e
      riapplicare qui un `includes` butterebbe via proprio i risultati
@@ -90549,14 +90575,14 @@ function puntoMappaP2P(svg, v, px, py){
    fotogramma dopo (i pallini si rifondono alla scala nuova): tanti
    eventi di rotellina o di pizzico in fila costano UN disegno */
 let p2pMappaFotogramma = 0;
-function zoomQuiMappaP2P(svg, px, py, f){
-  const v = p2pMappaVista;
+function zoomQuiMappaP2P(svg, px, py, f, m = MOTORE_MAPPA_P2P){
+  const v = m.vista();
   if (!v) return;
   const r = svg.getBoundingClientRect();
   const [ux, uy] = puntoMappaP2P(svg, v, px, py);
-  p2pMappaVista = zoomFissoMappaP2P(v, ux, uy, f, vistaInteraMappaP2P(r.width || 320, r.height || 360));
+  m.metti(zoomFissoMappaP2P(v, ux, uy, f, vistaInteraMappaP2P(r.width || 320, r.height || 360)));
   if (p2pMappaFotogramma) return;
-  p2pMappaFotogramma = requestAnimationFrame(() => { p2pMappaFotogramma = 0; ridisegnaMappaP2P(); });
+  p2pMappaFotogramma = requestAnimationFrame(() => { p2pMappaFotogramma = 0; m.ridisegna(); });
 }
 /* IL DITO E LE DUE DITA: un dito trascina, un tocco fermo (meno di 6 px)
    e' un tocco sul pallino, DUE DITA pizzicano e lo zoom segue la loro
@@ -90574,35 +90600,46 @@ function distanzaDitaMappaP2P(){
   const [a, b] = [...p2pMappaDita.values()];
   return [Math.hypot(a[0] - b[0], a[1] - b[1]), (a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 }
-function armaMappaP2P(svg){
+/* IL MOTORE DI UNA MAPPA (14 nov 2026, mappa-mercatino): le dita, la
+   rotellina e il doppio tocco sono gli stessi per le due mappe — quella
+   del contanti nel libro e quella del ritiro a mano nel mercatino —, e
+   cambia solo DI CHI e' la vista, chi la ridisegna e cosa fa il tocco
+   su un pallino. Il motore lo dice; il P2P passa il suo di serie. */
+const MOTORE_MAPPA_P2P = {
+  vista: () => p2pMappaVista,
+  metti: v => { p2pMappaVista = v; },
+  ridisegna: () => ridisegnaMappaP2P(),
+  tocca: i => toccaGrappoloMappaP2P(i),
+};
+function armaMappaP2P(svg, m = MOTORE_MAPPA_P2P){
   svg.addEventListener('pointerdown', ev => {
-    if (!p2pMappaVista) return;
+    if (!m.vista()) return;
     p2pMappaDita.set(ev.pointerId, [ev.clientX, ev.clientY]);
     if (p2pMappaDita.size === 2) {
       /* la seconda dita: niente piu' trascinamento ne' tocco, si pizzica */
       p2pMappaGiu = null;
-      p2pMappaPizzico = { d: distanzaDitaMappaP2P()[0], svg };
+      p2pMappaPizzico = { d: distanzaDitaMappaP2P()[0], svg, m };
       return;
     }
     if (p2pMappaDita.size > 2) return;
-    p2pMappaGiu = { svg, x: ev.clientX, y: ev.clientY, v: { ...p2pMappaVista }, mosso: false,
+    p2pMappaGiu = { svg, m, x: ev.clientX, y: ev.clientY, v: { ...m.vista() }, mosso: false,
                     pin: ev.target.closest && ev.target.closest('.p2p-mappa-pin') };
   });
   svg.addEventListener('wheel', ev => {
-    if (!p2pMappaVista) return;
+    if (!m.vista()) return;
     ev.preventDefault();
     /* deltaY in righe (Firefox) vale ~16 pixel: il passo e' lo stesso */
     const passo = ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaY;
-    zoomQuiMappaP2P(svg, ev.clientX, ev.clientY, Math.exp(-passo / 300));
+    zoomQuiMappaP2P(svg, ev.clientX, ev.clientY, Math.exp(-passo / 300), m);
   }, { passive: false });
   svg.addEventListener('dblclick', ev => {
-    if (!p2pMappaVista) return;
+    if (!m.vista()) return;
     ev.preventDefault();
-    zoomQuiMappaP2P(svg, ev.clientX, ev.clientY, MAPPA_P2P_ZOOM);
+    zoomQuiMappaP2P(svg, ev.clientX, ev.clientY, MAPPA_P2P_ZOOM, m);
   });
   svg.addEventListener('keydown', ev => {
     const pin = ev.target.closest && ev.target.closest('.p2p-mappa-pin');
-    if (pin && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); toccaGrappoloMappaP2P(+pin.dataset.i); }
+    if (pin && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); m.tocca(+pin.dataset.i); }
   });
   if (p2pMappaFinestra) return;
   p2pMappaFinestra = true;
@@ -90612,7 +90649,7 @@ function armaMappaP2P(svg){
     if (pz && p2pMappaDita.size === 2) {
       if (!pz.svg.isConnected) { p2pMappaPizzico = null; return; }
       const [d, mx, my] = distanzaDitaMappaP2P();
-      if (pz.d > 0 && d > 0) zoomQuiMappaP2P(pz.svg, mx, my, d / pz.d);
+      if (pz.d > 0 && d > 0) zoomQuiMappaP2P(pz.svg, mx, my, d / pz.d, pz.m);
       pz.d = d;
       return;
     }
@@ -90623,9 +90660,9 @@ function armaMappaP2P(svg){
     giu.mosso = true;
     const r = giu.svg.getBoundingClientRect();
     const upp = Math.max(giu.v.w / (r.width || 1), giu.v.h / (r.height || 1));
-    p2pMappaVista = { ...giu.v, x: giu.v.x - dx * upp, y: giu.v.y - dy * upp };
-    giu.svg.setAttribute('viewBox', [p2pMappaVista.x, p2pMappaVista.y, p2pMappaVista.w, p2pMappaVista.h]
-      .map(n => n.toFixed(1)).join(' '));
+    const nv = { ...giu.v, x: giu.v.x - dx * upp, y: giu.v.y - dy * upp };
+    giu.m.metti(nv);
+    giu.svg.setAttribute('viewBox', [nv.x, nv.y, nv.w, nv.h].map(n => n.toFixed(1)).join(' '));
   });
   const su = ev => {
     p2pMappaDita.delete(ev.pointerId);
@@ -90638,11 +90675,204 @@ function armaMappaP2P(svg){
     const giu = p2pMappaGiu;
     p2pMappaGiu = null;
     if (!giu || !giu.svg.isConnected) return;
-    if (giu.mosso) { ridisegnaMappaP2P(); return; }
-    if (giu.pin) toccaGrappoloMappaP2P(+giu.pin.dataset.i);
+    if (giu.mosso) { giu.m.ridisegna(); return; }
+    if (giu.pin) giu.m.tocca(+giu.pin.dataset.i);
   };
   window.addEventListener('pointerup', su);
   window.addEventListener('pointercancel', su);
+}
+
+/* ═══ LA MAPPA DEL RITIRO A MANO NEL MERCATINO (14 nov 2026, cantiere
+   mappa-mercatino, richiesta di Andrea: «conviene mettere una mappa anche
+   nel mercatino per chi ha intenzione di ricevere di persona con lo
+   scambio a mano»). La gemella della mappa del contanti qui sopra: stessa
+   sagoma nostra (nessun tassello chiesto a terzi), stessa proiezione,
+   stessi grappoli, stessa pelle e STESSO MOTORE delle dita
+   (`armaMappaP2P` col motore del mercatino).
+   IL PUNTO E' IL CENTRO DEL COMUNE della «Zona» dell'annuncio: la
+   colonna lat/lon c'e' da luglio (coordinate_da_zona), ed e' la stessa
+   citta' che la card mostra gia' col 📍 — mai il portone, che si decide
+   in chat. I punti li conta il SERVER (`mappa_ritiro` nella busta di
+   prima pagina, solo a leva accesa), sulla stessa WHERE della vetrina:
+   la mappa non dice mai piu' della griglia. Chiave assente = leva
+   spenta o server di ieri = niente tondo, niente mappa.
+   COME SI USA: il tondo 🗺️ in fondo alla barra di ricerca (scelta di
+   Andrea, 14 nov: la testata coi suoi tre tondi resta com'e') apre la
+   mappa sopra la griglia; a mappa aperta la griglia tiene i soli
+   annunci col ritiro a mano, e il tocco su un comune la restringe a
+   quello (`comune` in /api/listings), con la pillola che lo toglie. */
+let mercMappaAperta = false;
+let mercMappaComune = '';            // «Nome (SIGLA)»: restringe la griglia
+let mercMappaVista = null;
+let mercMappaGrappoli = [];
+let mercMappaDati = null;            // {comuni: [{nome, x, y, ids}], senza}, o null
+let mercMappaRiprova = 0;            // i giri d'attesa della sagoma
+/* PURA: la busta del server -> i comuni pronti per i grappoli. Ogni voce
+   e' [lat, lon, «Nome (SIGLA)», quanti]: si tiene solo dentro l'Italia,
+   col nome pulito e un conto intero (testo che arriva da fuori, come i
+   punti del libro). `ids` porta tanti segni quanti annunci, perche' i
+   grappoli pesano per `ids.length`. */
+function prendiMappaRitiro(m){
+  if (!m || typeof m !== 'object' || !Array.isArray(m.comuni)) return null;
+  const comuni = [];
+  for (const v of m.comuni.slice(0, 2000)) {
+    const p = postoPulitoP2P(v);
+    const n = Array.isArray(v) ? Number(v[3]) : 0;
+    if (!p || !Number.isInteger(n) || n < 1 || n > 9999) continue;
+    const [x, y] = proiettaMappaP2P(p[0], p[1]);
+    comuni.push({ nome: p[2], x, y, ids: new Array(n).fill(p[2]) });
+  }
+  const senza = Number(m.senza);
+  /* gli id degli annunci sulla mappa, per il numerino del tondo: solo
+     interi positivi, al piu' 300 (quanti ne manda il server) */
+  const ids = Array.isArray(m.ids)
+    ? m.ids.filter(i => Number.isInteger(i) && i > 0).slice(0, 300) : [];
+  return { comuni, ids, senza: Number.isInteger(senza) && senza >= 0 && senza <= 99999 ? senza : 0 };
+}
+function contaMappaMerc(){
+  return mercMappaDati ? mercMappaDati.comuni.reduce((t, c) => t + c.ids.length, 0) : 0;
+}
+/* IL TONDO E' QUELLO DEL P2P (`tondoMappa`, Andrea: «l'icona della
+   mappa fallo uguale»), col nome «mercatino» per le sue chiavi nel
+   telefono: c'e' se la mappa ha almeno un pallino, o se e' aperta (cosi'
+   si puo' sempre chiudere). Gli id del numerino come stringhe, la forma
+   delle viste. */
+function idsMappaMerc(){
+  return mercMappaDati ? mercMappaDati.ids.map(String) : [];
+}
+function renderTondoMappaMerc(){
+  const posto = el('mercMappaTondo');
+  if (!posto) return;
+  const n = contaMappaMerc();
+  posto.innerHTML = (n > 0 || mercMappaAperta)
+    ? tondoMappa('mercatino', mercMappaAperta, idsMappaMerc(),
+        n + (n === 1 ? ' annuncio' : ' annunci') + ' col ritiro a mano', 'apriChiudiMappaMerc')
+    : '';
+}
+/* l'interruttore del numerino, in fondo alla mappa aperta */
+function numerinoMappaMerc(){ alternaNumerinoMappa('mercatino'); renderMappaMerc(); }
+function renderMappaMerc(){
+  renderTondoMappaMerc();
+  const box = el('mercMappaBox');
+  if (!box) return;
+  if (!mercMappaAperta || !mercMappaDati) { box.innerHTML = ''; return; }
+  const { comuni, senza } = mercMappaDati;
+  /* la mappa la si sta guardando: quel che c'e' adesso e' visto */
+  segnaVisteMappa('mercatino', idsMappaMerc());
+  if (mercMappaComune && !comuni.some(c => c.nome === mercMappaComune)) mercMappaComune = '';
+  const n = contaMappaMerc();
+  let h = '<div class="merc-mappa-titolo">🤝 Ritiro a mano <em>' + n
+    + (n === 1 ? ' annuncio' : ' annunci') + ' sulla mappa</em></div>';
+  if (mercMappaComune) h += '<div class="p2p-mappa-testa"><button type="button" class="p2p-mappa-scelto"'
+    + ' onclick="sceltaMappaMerc(\'\')" title="Mostra tutti">📍 ' + esc(mercMappaComune)
+    + ' <span aria-hidden="true">✕</span></button></div>';
+  h += '<div class="p2p-mappa">'
+    + '<svg id="mercMappaSvg" role="img" aria-label="Mappa degli annunci col ritiro a mano"'
+    + ' preserveAspectRatio="xMidYMid meet"></svg>'
+    + '<div class="p2p-mappa-tasti">'
+    + '<button type="button" onclick="zoomMappaMerc(1)" aria-label="Avvicina">＋</button>'
+    + '<button type="button" onclick="zoomMappaMerc(-1)" aria-label="Allontana">−</button>'
+    + '<button type="button" onclick="zoomMappaMerc(0)" aria-label="Tutta Italia">⟲</button></div>'
+    + '<div class="p2p-mappa-nota">Il pallino sta al centro del comune scritto da chi vende, mai sull\'indirizzo: '
+    + 'il posto esatto lo decidete in chat.' + (senza ? ' ' + senza + (senza === 1
+      ? ' annuncio col ritiro ha una zona che la mappa non riconosce: lo trovi qui sotto.'
+      : ' annunci col ritiro hanno una zona che la mappa non riconosce: li trovi qui sotto.') : '')
+    + '</div>' + rigaNumerinoMappa('mercatino', 'Numerino sul tondo per i nuovi annunci col ritiro a mano',
+      'numerinoMappaMerc') + '</div>';
+  box.innerHTML = h;
+  disegnaMappaMerc();
+}
+/* IL DISEGNO: quello del libro, coi conti del mercatino. Nomi dal
+   dizionario del server, passati da esc() lo stesso. */
+function disegnaMappaMerc(){
+  const svg = el('mercMappaSvg');
+  if (!svg || !mercMappaDati) return;
+  const r = svg.getBoundingClientRect();
+  const W = r.width || 320, H = r.height || 360;
+  if (!mercMappaVista) mercMappaVista = vistaInteraMappaP2P(W, H);
+  const v = mercMappaVista, P = MAPPA_P2P_PROIEZIONE;
+  const upp = Math.max(v.w / W, v.h / H);
+  mercMappaGrappoli = grappoliMappaP2P(mercMappaDati.comuni, upp);
+  const vicino = v.w < P.largo / 3;
+  const sagoma = sagomaMappaP2P();
+  /* la sagoma arriva dopo, e il suo ridisegno e' quello del libro: qui
+     si riguarda fra un attimo (pochi giri, poi restano i soli pallini) */
+  if (!sagoma && mercMappaRiprova < 20) { mercMappaRiprova++; setTimeout(disegnaMappaMerc, 250); }
+  let dentro = sagoma ? '<path class="p2p-mappa-sagoma" fill="none" stroke-linecap="round" stroke-width="'
+    + Math.min(6, 6 * upp).toFixed(2) + '" d="' + sagoma + '"/>' : '';
+  mercMappaGrappoli.forEach((g, i) => {
+    const n = g.ids.length;
+    const rg = (MAPPA_P2P_RAGGIO_PX + Math.min(n - 1, 8) * 1.5) * upp;
+    const scelto = g.comuni.length === 1 && g.comuni[0] === mercMappaComune;
+    const titolo = g.comuni.length === 1
+      ? g.comuni[0] + ': ' + n + (n === 1 ? ' annuncio' : ' annunci')
+      : g.comuni.length + ' comuni, ' + n + ' annunci: tocca per avvicinarti';
+    dentro += '<g class="p2p-mappa-pin' + (scelto ? ' scelto' : '') + (g.comuni.length > 1 ? ' grappolo' : '')
+      + '" data-i="' + i + '" role="button" tabindex="0" aria-label="' + esc(titolo) + '">'
+      + '<circle cx="' + g.x.toFixed(1) + '" cy="' + g.y.toFixed(1) + '" r="' + rg.toFixed(2)
+      + '" stroke-width="' + (2.5 * upp).toFixed(2) + '"/>'
+      + '<text x="' + g.x.toFixed(1) + '" y="' + g.y.toFixed(1) + '" font-size="' + (13 * upp).toFixed(2)
+      + '" dy=".35em">' + n + '</text>'
+      + ((vicino || g.comuni.length === 1 && mercMappaGrappoli.length <= 6)
+        ? '<text class="p2p-mappa-nome" x="' + g.x.toFixed(1) + '" y="' + (g.y + rg + 13 * upp).toFixed(1)
+          + '" font-size="' + (12 * upp).toFixed(2) + '" stroke-width="' + (3 * upp).toFixed(2) + '">'
+          + esc(g.comuni.length === 1 ? nomeCortoMappaP2P(g.comuni[0])
+                : nomeCortoMappaP2P(g.comuni[0]) + ' e ' + (g.comuni.length - 1) + ' vicin' + (g.comuni.length === 2 ? 'o' : 'i'))
+          + '</text>' : '')
+      + '</g>';
+  });
+  svg.setAttribute('viewBox', [v.x, v.y, v.w, v.h].map(n => n.toFixed(1)).join(' '));
+  svg.innerHTML = dentro;
+  if (!svg.dataset.armata) { svg.dataset.armata = '1'; armaMappaP2P(svg, MOTORE_MAPPA_MERC); }
+}
+const MOTORE_MAPPA_MERC = {
+  vista: () => mercMappaVista,
+  metti: v => { mercMappaVista = v; },
+  ridisegna: () => disegnaMappaMerc(),
+  tocca: i => toccaGrappoloMappaMerc(i),
+};
+/* il tocco su un pallino: il grappolo si avvicina, il comune solo
+   restringe la griglia (un secondo tocco lo toglie) */
+function toccaGrappoloMappaMerc(i){
+  const g = mercMappaGrappoli[i];
+  if (!g) return;
+  if (g.comuni.length > 1) {
+    mercMappaVista = zoomVistaMappaP2P(mercMappaVista, g.x, g.y, MAPPA_P2P_ZOOM) || mercMappaVista;
+    disegnaMappaMerc();
+    return;
+  }
+  sceltaMappaMerc(g.comuni[0] === mercMappaComune ? '' : g.comuni[0]);
+}
+/* la griglia la decide il server (solo_ritiro e comune nella richiesta):
+   si ricarica la prima pagina, e la mappa resta quella che c'e' */
+function ricaricaGrigliaMappaMerc(){
+  renderMappaMerc();
+  if (DEMO) { renderGrid(); return; }
+  loadListings().then(() => { renderGrid(); renderMappaMerc(); })
+    .catch(() => renderGrid());
+}
+function sceltaMappaMerc(nome){
+  haptic();
+  mercMappaComune = nome || '';
+  ricaricaGrigliaMappaMerc();
+}
+function apriChiudiMappaMerc(){
+  haptic();
+  mercMappaAperta = !mercMappaAperta;
+  mercMappaComune = '';
+  mercMappaVista = null;
+  ricaricaGrigliaMappaMerc();
+  /* la mappa nasce sotto le strisce: la si porta sotto gli occhi */
+  const svg = mercMappaAperta && el('mercMappaSvg');
+  if (svg) svg.scrollIntoView({block: 'center', behavior: tourRidotto() ? 'auto' : 'smooth'});
+}
+/* ＋ (1), − (-1), ⟲ (0): attorno al centro della vista */
+function zoomMappaMerc(verso){
+  const v = mercMappaVista;
+  if (!v || !verso) { mercMappaVista = null; disegnaMappaMerc(); return; }
+  const f = verso > 0 ? MAPPA_P2P_ZOOM : 1 / MAPPA_P2P_ZOOM;
+  mercMappaVista = zoomVistaMappaP2P(v, v.x + v.w / 2, v.y + v.h / 2, f);
+  disegnaMappaMerc();
 }
 
 /* ═══ IL CONTROLLO DELLA FATTURA PRIMA DEL COORDINATORE (10 ott 2026,

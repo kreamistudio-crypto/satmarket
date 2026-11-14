@@ -163911,6 +163911,196 @@ console.log(JSON.stringify(out));
           mini.count("prendiPostiP2P(d && d.posti)"))
 
 
+def prove_mappa_ritiro():
+    """LA MAPPA DEL RITIRO A MANO NEL MERCATINO (14 nov 2026, cantiere
+    mappa-mercatino, richiesta di Andrea). La gemella della mappa del
+    contanti: il server conta per COMUNE gli annunci col ritiro a mano
+    sulla stessa WHERE della vetrina e li manda nella busta di prima
+    pagina (`mappa_ritiro`, solo a leva accesa); il client mette i
+    pallini col motore del libro, e il tocco su un comune restringe la
+    griglia (`comune` in /api/listings).
+
+    QUEL CHE SI ROMPE IN SILENZIO: un annuncio solo-spedizione, o non
+    attivo, che finisce sulla mappa (un pallino dove non si ritira
+    niente); una zona senza comune che diventa un pallino inventato; la
+    mappa contata DOPO il filtro del comune (tocchi Milano e gli altri
+    pallini spariscono); la leva (accesa di serie, per scelta di Andrea)
+    che non si spegne col False, o che lascia passare `comune` a leva
+    spenta; un numero storto
+    dal server che disegna un pallino nel mare o un conto negativo; il
+    nome di un comune che entra senza esc(); il motore delle dita del
+    libro che non e' piu' quello del P2P quando nessuno gli passa un
+    motore."""
+    import csv as _csv, unicodedata, sqlite3
+    print("\n[mappa-mercatino: la mappa del ritiro a mano]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    es = open("config_esempio.py", encoding="utf-8").read()
+    src = _SORGENTE
+
+    # --- 1) IL SERVER: i pallini, sulla WHERE della vetrina ----------------
+    amb = {"re": re, "unicodedata": unicodedata, "csv": _csv, "os": os,
+           "COMUNI": {}, "COMUNI_LISTA": [], "_COMUNI_NOME": None,
+           "_NOME_DA_PUNTO": None, "MAPPA_RITIRO_IDS_MAX": 300}
+    for _c in ("COMUNI_PAROLA = ", "PREPOSIZIONI_COMUNI = "):
+        i = src.index("\n" + _c) + 1
+        exec(src[i:src.index("}", i) + 1], amb)
+    for f in ("normalizza", "carica_comuni", "_chiave_comune", "_comuni_nome",
+              "_nome_da_punto", "_punto_del_comune", "_mappa_ritiro"):
+        exec(pezzo(f), amb)
+    amb["carica_comuni"]()
+    mi, rm = amb["COMUNI"]["milano"], amb["COMUNI"]["roma"]
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE annunci (id INTEGER, stato TEXT, consegna TEXT, "
+                "categoria TEXT, lat REAL, lon REAL, creato INTEGER DEFAULT 0)")
+    righe = [(1, "attivo", "ritiro", "Casa", mi), (2, "attivo", "entrambe", "Casa", mi),
+             (3, "attivo", "ritiro", "Sport", mi), (4, "attivo", "spedizione", "Casa", mi),
+             (5, "venduto", "ritiro", "Casa", mi), (6, "attivo", "ritiro", "Casa", rm),
+             (7, "attivo", "ritiro", "Casa", (0.0, 0.0)), (8, "attivo", "digitale", "Casa", rm),
+             (9, "attivo", "ritiro", "Casa", (45.123456, 9.654321))]
+    con.executemany("INSERT INTO annunci VALUES (?,?,?,?,?,?,?)",
+                    [(a, b, c, d, p[0], p[1], a) for a, b, c, d, p in righe])
+    tutti = amb["_mappa_ritiro"](con, "a.stato='attivo'", [])
+    prova("i pallini: solo gli attivi col ritiro, per comune, a due decimali, il piu' pieno in testa",
+          [[round(mi[0], 2), round(mi[1], 2), "Milano (MI)", 3],
+           [round(rm[0], 2), round(rm[1], 2), "Roma (RM)", 1]], tutti["comuni"])
+    prova("...e chi non ha un comune riconosciuto si conta in `senza` (nessun pallino inventato)",
+          2, tutti["senza"])
+    prova("gli id per il numerino: solo quelli coi pallini, i piu' recenti in testa",
+          [6, 3, 2, 1], tutti["ids"])
+    prova("la WHERE della vetrina vale anche qui (la categoria toglie i suoi)",
+          [["Milano (MI)", 2], ["Roma (RM)", 1]],
+          [[c[2], c[3]] for c in amb["_mappa_ritiro"](
+              con, "a.stato='attivo' AND a.categoria=?", ["Casa"])["comuni"]])
+    prova("dal nome della mappa al punto, e ritorno; un testo che non e' un comune non ha punto",
+          [mi, "Milano (MI)", None, None],
+          [amb["_punto_del_comune"]("Milano (MI)"), amb["_nome_da_punto"](*mi),
+           amb["_punto_del_comune"]("dietro la stazione"), amb["_punto_del_comune"](None)])
+
+    # --- 2) LA LEVA E LA ROTTA ---------------------------------------------
+    corpo = pezzo("lista_annunci")
+    prova("la leva nasce ACCESA (decisione di Andrea, 14 nov) e solo False la spegne",
+          [True, True, True],
+          ["except ImportError:\n    MERCATINO_MAPPA_RITIRO = True" in src,
+           "\nMERCATINO_MAPPA_RITIRO = True\n" in es,
+           "MERCATINO_MAPPA_RITIRO = MERCATINO_MAPPA_RITIRO is not False" in src])
+    prova("i pallini viaggiano solo a leva accesa, e il comune si ascolta solo a leva accesa",
+          [True, True],
+          ["if MERCATINO_MAPPA_RITIRO:\n            risposta[\"mappa_ritiro\"] = "
+           "_mappa_ritiro(con, dove_mappa, par_mappa)" in corpo,
+           "if MERCATINO_MAPPA_RITIRO and comune.strip():" in corpo])
+    prova("la mappa si conta PRIMA del filtro del comune (gli altri pallini restano)", True,
+          corpo.index("dove_mappa, par_mappa = dove, list(par)")
+          < corpo.index('dove += " AND a.lat=? AND a.lon=?"'))
+    prova("...e con una ricerca conta la stessa rosa della griglia", [True, True],
+          ['dove_mappa += f" AND a.id IN ({segni}) AND {SQL_CAPOFILA}"' in corpo,
+           "dove_mappa += (\" AND (a.titolo LIKE ?" in corpo])
+    prova("la leva e' nel pannello «Stato delle leve»", True,
+          '_leva("Mappa del ritiro a mano", "MERCATINO_MAPPA_RITIRO",' in src)
+
+    # --- 3) IL CLIENT -------------------------------------------------------
+    blocco = mini[mini.index("const MAPPA_P2P_PROIEZIONE"):mini.index("let p2pMappaGiu = null;")]
+    merc = mini[mini.index("/* ═══ LA MAPPA DEL RITIRO A MANO NEL MERCATINO"):
+                mini.index("/* ═══ IL CONTROLLO DELLA FATTURA PRIMA DEL COORDINATORE")]
+    banco = (zone_ricevute_js(mini)
+        + "function idMostroVero(id){ return /^[0-9a-zA-Z-]{8,64}$/.test(id); }\n"
+        + "function contantiAManoP2P(m){ return (m||[]).includes('Contanti'); }\n"
+        + _fn_js(mini, "function zonaOrdineP2P(o){")
+        + "function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')"
+          ".replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;'); }\n"
+        + "function renderP2P(){}\nfunction haptic(){}\nlet DEMO = false;\n"
+        + "let caricate = 0, griglie = 0;\n"
+        + "function loadListings(){ caricate++; return Promise.resolve(); }\n"
+        + "function renderGrid(){ griglie++; }\n"
+        + "const FINTI = {mercMappaBox: {innerHTML: ''}, mercMappaTondo: {innerHTML: ''}};\n"
+        + "function el(id){ return FINTI[id] || null; }\n"
+        + blocco + merc + r"""
+const out = {};
+out.nulla = [prendiMappaRitiro(undefined), prendiMappaRitiro({}), prendiMappaRitiro({comuni: 3})];
+const d = prendiMappaRitiro({comuni: [[45.47, 9.19, 'Milano (MI)', 3], [41.89, 12.48, 'Roma (RM)', 1],
+  [10, 10, 'Mare', 2], [45, 9, 'Zero', 0], [45, 9, 'Meno', -4], [45, 9, 'Mezzo', 1.5],
+  [45, 9, '<b>x</b>', 2], 'storto'], senza: -3, ids: [7, -1, 2.5, 'x', 9]});
+out.ids = d.ids;
+out.comuni = d.comuni.map(c => [c.nome, c.ids.length]);
+out.senza = [d.senza, prendiMappaRitiro({comuni: [], senza: 2}).senza];
+out.milano = d.comuni[0] ? [Math.round(d.comuni[0].x), Math.round(d.comuni[0].y)] : null;
+mercMappaDati = d;
+out.conta = contaMappaMerc();
+mercMappaComune = '<b>x</b>'; mercMappaAperta = true; renderMappaMerc();
+out.pulito = FINTI.mercMappaBox.innerHTML.includes('📍 &lt;b&gt;x&lt;/b&gt;')
+  && !FINTI.mercMappaBox.innerHTML.includes('<b>x');
+mercMappaComune = ''; mercMappaAperta = false;
+renderMappaMerc();
+const T = () => FINTI.mercMappaTondo.innerHTML;
+out.chiusa = [FINTI.mercMappaBox.innerHTML, T().includes('class="tema-btn mappa-tondo"'),
+  T().includes('onclick="apriChiudiMappaMerc()"'), T().includes('6 annunci col ritiro a mano')];
+apriChiudiMappaMerc();
+const aperta = FINTI.mercMappaBox.innerHTML;
+out.aperta = [aperta.includes('id="mercMappaSvg"'), aperta.includes('6 annunci sulla mappa'),
+  aperta.includes('mai sull\'indirizzo'), aperta.includes('onclick="zoomMappaMerc(0)"'),
+  T().includes('mappa-tondo acceso'), aperta.includes('class="mappa-numerino"')
+  && aperta.includes('onclick="numerinoMappaMerc()"'), caricate];
+mercMappaGrappoli = grappoliMappaP2P(d.comuni, 1);
+toccaGrappoloMappaMerc(mercMappaGrappoli.findIndex(g => g.comuni[0] === 'Roma (RM)'));
+out.scelto = [mercMappaComune, FINTI.mercMappaBox.innerHTML.includes('📍 Roma (RM)'), caricate];
+toccaGrappoloMappaMerc(mercMappaGrappoli.findIndex(g => g.comuni[0] === 'Roma (RM)'));
+out.tolto = mercMappaComune;
+mercMappaComune = 'Torino (TO)'; renderMappaMerc();
+out.dimenticato = mercMappaComune;
+mercMappaDati = prendiMappaRitiro({comuni: [], senza: 0}); mercMappaAperta = false; renderMappaMerc();
+out.vuota = [T(), FINTI.mercMappaBox.innerHTML];
+mercMappaAperta = true; mercMappaDati = null; renderMappaMerc();
+out.spenta = FINTI.mercMappaBox.innerHTML;
+console.log(JSON.stringify(out));
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("mappa-mercatino: il banco del client", "node non c'e'")
+        return
+    prova("senza la chiave (leva spenta) o con una busta storta: niente mappa",
+          [None, None, None], r.get("nulla"))
+    prova("si tengono solo i comuni dentro l'Italia e con un conto intero da 1 in su",
+          [["Milano (MI)", 3], ["Roma (RM)", 1], ["<b>x</b>", 2]], r.get("comuni"))
+    prova("...e un nome che arriva sporco esce passato da esc()", True, r.get("pulito"))
+    prova("gli id del numerino: solo interi positivi", [7, 9], r.get("ids"))
+    prova("...`senza` storto vale zero, e la proiezione e' quella del libro",
+          [[0, 2], [200, 173]], [r.get("senza"), r.get("milano")])
+    prova("chiusa: il tondo comune del P2P (c'e' un pallino), col suo tocco, e niente scatola",
+          [6, ["", True, True, True]],
+          [r.get("conta"), r.get("chiusa")])
+    prova("aperta: la scatola, il conto, la nota sulla privacy, i tasti, il tondo arancio, "
+          "l'interruttore del numerino, e la griglia si ricarica",
+          [True, True, True, True, True, True, 1], r.get("aperta"))
+    prova("il tocco su un comune lo sceglie, lo dice e ricarica; un secondo tocco lo toglie",
+          [["Roma (RM)", True, 2], ""], [r.get("scelto"), r.get("tolto")])
+    prova("un comune che non c'e' piu' si dimentica", "", r.get("dimenticato"))
+    prova("senza pallini il tondo sparisce; a leva spenta la scatola e' vuota",
+          [["", ""], ""], [r.get("vuota"), r.get("spenta")])
+    prova("il tondo e il numerino sono i pezzi comuni, col nome «mercatino»", [True, True, True],
+          ["tondoMappa('mercatino', mercMappaAperta, idsMappaMerc()," in merc,
+           "segnaVisteMappa('mercatino', idsMappaMerc());" in merc,
+           "rigaNumerinoMappa('mercatino'," in merc])
+    prova("la griglia chiede il ritiro e il comune quando la mappa e' aperta", [True, True],
+          ["if (filtroRitiro || mercMappaAperta) p.set('solo_ritiro', '1');" in mini,
+           "if (mercMappaAperta && mercMappaComune) p.set('comune', mercMappaComune);" in mini])
+    prova("la busta di prima pagina accende la mappa (chiave assente = spenta)", True,
+          "mercMappaDati = prendiMappaRitiro(j.mappa_ritiro);" in mini)
+    prova("il tondo sta in fondo alla barra di ricerca (scelta di Andrea), non in testata",
+          [True, False],
+          ['</div>\n        </div>\n        <!-- LA MAPPA DEL RITIRO A MANO' in mini,
+           mini[mini.index('<div class="view active" id="view-esplora">'):
+                mini.index('<form class="searchbar"')].count('mercMappaTondo') > 0])
+    prova("le dita sono quelle del libro: lo stesso motore, il P2P di serie, il mercatino col suo",
+          [True, True, True, True],
+          ["function armaMappaP2P(svg, m = MOTORE_MAPPA_P2P){" in mini,
+           "function zoomQuiMappaP2P(svg, px, py, f, m = MOTORE_MAPPA_P2P){" in mini,
+           "armaMappaP2P(svg, MOTORE_MAPPA_MERC);" in mini,
+           "if (!svg.dataset.armata) { svg.dataset.armata = '1'; armaMappaP2P(svg); }" in mini])
+    prova("il nome nel disegno passa da esc()", True,
+          merc.count("esc(g.comuni.length === 1 ? nomeCortoMappaP2P(g.comuni[0])") == 1
+          and "aria-label=\"' + esc(titolo)" in merc)
+
+
 def prove_contanti_zona():
     """LA ZONA DI SCAMBIO E IL VESTITO DEL CONTANTI (10 ott 2026, cantiere
     contanti-zona, richiesta di Andrea). Quattro cose: 1) la zona
@@ -193888,6 +194078,7 @@ CATEGORIE = {
     lista_corta_metodi
     """.split(),
     "mercatino": """
+    mappa_ritiro
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     ricategorizza collaudo_ricategorizza asta proxy_asta annullo
@@ -194708,6 +194899,7 @@ def main():
               prove_prendi_metodo,
               prove_contanti_zona,
               prove_mappa_contanti,
+              prove_mappa_ritiro,
               prove_riquadro_contanti_sepa,
               prove_banner_ingresso, prove_tour_banner_p2p,
               prove_reputazione_p2p, prove_dati_reputazione_p2p,
