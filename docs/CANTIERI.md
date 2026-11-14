@@ -81838,3 +81838,24 @@ proprio quel collaudo).
 NON PROVATO DAL VIVO: dentro Telegram sul telefono vero (le foto sono
 di Chromium a 375 px). Da guardare sul collaudo, scorrendo il libro con
 un ordine di un moderatore, e nel foglio dell'ordine. Nessuna leva.
+## Via la «i» della fee dinamica dal conto del mercatino (14 nov 2026, cantiere fee-mercatino-info)
+
+LA DECISIONE (Andrea, 14 nov): le fee del mercatino restano a 0, e il
+foglio «🔮 La fee dinamica di Barattolo» — che si apriva toccando la ⓘ
+accanto a «Fee Barattolo 0% in promo» nel conto dell'ordine — mostrava
+l'anteprima di una fee che nessuno paga: confondeva. Via la ⓘ, via il
+tocco sulla riga, via il foglio (`apriDettaglioFeeDinamica`). La riga
+resta «Fee Barattolo 0% [in promo]», come prima, solo non cliccabile;
+via anche il parametro `onclick` del vestito delle righe in
+`contoRighe`, che serviva solo a lei.
+COSA NON SI È TOCCATO: il calcolo lato server (`fee_dinamica_oggi`,
+`orologio_fee_dinamica`, la tabella `fee_dinamica_stato`, la chiave
+`fee_dinamica` del preventivo) resta com'è e semplicemente non lo legge
+più nessuno nel client; il P2P non c'entra. Se un giorno la fee
+dinamica torna, il foglio sta nella storia di git (commit di questo
+cantiere) e la sentinella nuova di `prove.py` va tolta con lei.
+PROVE: la domanda unica passa da 110 a 109 gesti (era il
+CINQUANTASEI); una sentinella dice che né la funzione né il titolo del
+foglio tornano nel codice. Controprova: rimessa la funzione, la
+sentinella è diventata rossa. Tappo (`assistente/sapere.md`) non citava
+quel foglio: niente da cambiare. NOVITA: no, è una cosa tolta.

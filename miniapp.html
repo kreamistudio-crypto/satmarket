@@ -28762,11 +28762,7 @@ function contoChiuso(frase){
   return `<div class="acq-nota conto-chiuso" role="status">${esc(frase)}</div>`;
 }
 function contoRighe(c){
-  /* `onclick` (set 2026, la fee dinamica): facoltativo, e quando c'e'
-     porta anche il cursore a mano — l'unico segno che invita al
-     tocco, la riga resta quella di sempre finche' nessuno ci clicca. */
-  const r = (t, v, cls, onclick) => `<div class="ctrl-riga${cls?' '+cls:''}"`
-    + (onclick ? ` style="cursor:pointer" onclick="${onclick}"` : '')
+  const r = (t, v, cls) => `<div class="ctrl-riga${cls?' '+cls:''}"`
     + `><span>${t}</span><span class="mono">${v}</span></div>`;
   return r('Prezzo', cifraCtrl(c.art, c.circa, c.artEur))
     /* Lo sconto del negozio: c'e' SOLO quando scatta — una riga a zero
@@ -28847,19 +28843,18 @@ function contoRighe(c){
        LO ZERO PERO' NON E' ROSSO: il rosso dell'aliquota dice «questo
        e' un costo», e un costo che non c'e' non lo e'. Sopra lo zero
        torna rosso da se'. */
-    /* CLICCABILE (set 2026): la riga apre il dettaglio della fee
-       dinamica — quanto varrebbe OGGI per questo compratore e questo
-       venditore, sconti compresi, se la beta non azzerasse tutto.
-       Il ⓘ e' l'unico segno che invita al tocco: nessun altro colore,
-       la riga resta quella di sempre finche' non ci si clicca. */
+    /* NON PIU' CLICCABILE (14 nov 2026, decisione di Andrea, cantiere
+       fee-mercatino-info): la ⓘ e il foglio «🔮 La fee dinamica di
+       Barattolo» sono andati via — le fee del mercatino restano a 0, e
+       un'anteprima di una fee che non si paga confondeva. La riga dice
+       solo «Fee Barattolo 0% in promo». Il calcolo lato server
+       (`fee_dinamica` nel preventivo) resta com'e', non letto qui. */
     + r('Fee Barattolo'
         + ` <b class="${c.commissionePct > 0 ? 'ctrl-costo' : ''}">`
         + `${fmt(c.commissionePct || 0)}%</b>`
         + (c.commissionePct > 0
-            ? '' : '<span class="promo-tag dopo">in promo</span>')
-        + ' <span class="ctrl-nota" style="color:var(--muted)">ⓘ</span>',
-        cifraCtrl(c.commissione || 0, c.circa, c.commissioneEur),
-        '', 'apriDettaglioFeeDinamica()')
+            ? '' : '<span class="promo-tag dopo">in promo</span>'),
+        cifraCtrl(c.commissione || 0, c.circa, c.commissioneEur))
     /* La spedizione a zero su una via che SPEDISCE si dice a parole:
        «0 sats» e' vero ma non e' una notizia, «gratuita» sì. E' la
        stessa regola delle pillole delle vie, e vale per tutti e due i
@@ -28886,46 +28881,6 @@ function contoRighe(c){
     + '<div class="ctrl-chiusa">'
     + r('Totale da pagare', cifraCtrl(c.tot, c.circa, c.totEur), 'tot')
     + '</div>';
-}
-/* Il dettaglio della fee dinamica (set 2026, beta): si tocca la riga
-   «Fee Barattolo» del conto e si apre — riusa il foglio di
-   chiediConferma in modalita' avviso (nessuna azione, solo un «Ho
-   capito»), la stessa strada di avvisoBarattoloMio. Legge
-   acqDati.preventivo invece di ricevere un parametro: e' lo stesso
-   oggetto che contoRighe ha appena disegnato, e passarlo per due
-   strade diverse (l'onclick incollato nell'HTML, la chiamata diretta)
-   vorrebbe dire tenerle in pari a mano. */
-function apriDettaglioFeeDinamica(){
-  const fd = acqDati && acqDati.preventivo && acqDati.preventivo.fee_dinamica;
-  if (!fd) return;
-  haptic();
-  const lato = (nome, o) => {
-    const perche = [];
-    if (o.pioniere) perche.push('sconto pioniere');
-    if (o.livello_max) perche.push('sconto livello massimo');
-    return `<div style="flex:1;min-width:0;text-align:center">
-      <div class="hint" style="margin:0">${esc(nome)}</div>
-      <div style="font:800 22px 'Baloo 2',sans-serif;margin-top:2px">${fmt(o.percento)}<span style="font-size:13px">%</span></div>
-      <div class="hint" style="margin-top:2px">${fmt(o.sats)} sats</div>
-      <div class="hint" style="margin-top:4px;font-size:10.5px;line-height:1.3">${perche.length ? esc(perche.join(' + ')) : 'nessuno sconto oggi'}</div>
-    </div>`;
-  };
-  const testata = `<div style="width:100%">
-    <div style="display:flex;gap:14px">
-      ${lato('Tu (compratore)', fd.compratore)}
-      ${lato('Il venditore', fd.venditore)}
-    </div>
-    <div class="hint" style="margin-top:12px;text-align:left;line-height:1.4">
-      Il totale è <b>${fmt(fd.totale_percento)}%</b>, diviso secondo il sentiment del mercato Bitcoin di oggi (punteggio ${fmt(Math.round(fd.punteggio))}/100 — sopra 50 pesa di più su chi compra, sotto 50 su chi vende): base ${fmt(fd.compratore.base_percento)}% / ${fmt(fd.venditore.base_percento)}%, poi lo sconto fedeltà di ciascuno.
-    </div>
-  </div>`;
-  chiediConferma({
-    titolo: '🔮 La fee dinamica di Barattolo',
-    testata,
-    corpo: 'Siamo in fase beta: oggi non paga né tu né il venditore, questi numeri sono solo l\'anteprima di quanto varrebbe adesso.',
-    etichetta: 'Ho capito',
-    avviso: true
-  });
 }
 /* «Chiedi info» → la pagina del venditore, coi ponti di contatto che
    vivono gia' la'. Il codice negozio arriva dagli annunci del pacco.
