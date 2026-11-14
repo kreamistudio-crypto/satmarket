@@ -13161,7 +13161,7 @@ document.getElementById('cartello')?.remove();</script>
       <div class="p2p-sticky">
         <div class="scambi-testa" id="p2pMieiIntesta">
           <div class="scambi-cima">
-            <h2 class="scambi-tit"><img class="scambi-img" src="/assets/scambi-monete.webp" width="904" height="300" alt="I miei scambi" aria-label="I miei scambi" onerror="this.replaceWith(this.alt)"></h2>
+            <h2 class="scambi-tit"><img class="scambi-img" src="/assets/scambi-monete.webp" width="883" height="300" alt="I miei scambi" aria-label="I miei scambi" onerror="this.replaceWith(this.alt)"></h2>
             <div class="scambi-conto" id="p2pMieiConto"></div>
           </div>
           <!-- IL DEPOSITO DELL'ORDINAMENTO, gemello di quello del
@@ -67281,7 +67281,7 @@ function renderP2P(){
        : vuotoInAttesa ? scheletroLibroP2P()
        : `<div class="empty">${vuoto.logo
            ? '<img class="p2p-simbolo" src="/assets/p2p-logo-grande.webp" alt="" onerror="this.remove()">'
-           : '<img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" width="904" height="300" alt="" onerror="this.remove()">'
+           : '<img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" width="883" height="300" alt="" onerror="this.remove()">'
          }<span class="empty-title">${esc(vuoto.titolo)}</span>${esc(vuoto.frase)}${
            /* «Togli il filtro» SOLO SE UN FILTRO C'E': a filtro spento
               azzerava il niente, e il libro restava com'era */
@@ -90052,7 +90052,7 @@ function scambiP2P(){
      set 2026 lo stato vuoto non li nomina piu'). */
   if (!mostrati.length && !filtroAccesoMieiP2P(p2pMieiFiltro, p2pMieiVerso)) return '';
   if (!mostrati.length)
-    return '<div class="empty"><img class="scambi-img scambi-mini" src="/assets/scambi-monete.webp" width="904" height="300" alt="" onerror="this.remove()">'
+    return '<div class="empty"><img class="scambi-img scambi-mini" src="/assets/scambi-monete.webp" width="883" height="300" alt="" onerror="this.remove()">'
       + vuotoFiltroMieiP2P(righe.length, p2pMieiFiltro, p2pMieiVerso)
       + '<button type="button" class="scopri-link" onclick="azzeraFiltroMieiP2P()">Togli il filtro</button></div>';
   const troppi = mostrati.length - P2P_SCAMBI_MAX;
@@ -90637,7 +90637,7 @@ function bannerNascostoPrimoOrdineP2P(){
    ordine» — lo stesso `vestitoInvioP2P` */
 function rigaPortaP2P(){
   const vestito = typeof vestitoInvioP2P === 'function' ? vestitoInvioP2P(false) : 'primary';
-  return '<div class="empty"><img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" width="904" height="300" alt="" onerror="this.remove()">'
+  return '<div class="empty"><img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" width="883" height="300" alt="" onerror="this.remove()">'
     + '<span class="empty-title">Per entrare oggi pubblica il tuo primo ordine.</span>'
     + 'Dalle 10:00 di domani si prende. '
     + '<button type="button" class="btn ' + vestito + '" onclick="apriNuovoOrdineP2P()">Pubblica il tuo primo ordine</button></div>';
