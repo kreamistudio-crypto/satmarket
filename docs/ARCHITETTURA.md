@@ -32162,8 +32162,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   tiene in `p2pPosti` (`prendiPostiP2P`, dalle stesse tre letture) e
   `postoOrdineP2P` li mostra solo dove la card mostra il «📍». Il blocco
   della mappa sta DOPO la fine del motore dello scambio (chiede la
-  sagoma con una fetch): `sezioneMappaP2P` (la pillola «🗺️ Mappa», la
-  pillola del comune scelto, la scatola), `elencoMappaP2P` (il comune
+  sagoma con una fetch): `tondoMappaP2P` (dal 14 nov 2026 il bottone che
+  apre e chiude e' un tondo `.tema-btn` nella testata appesa, davanti
+  alla campanella, `iconaMappaTonda()` e classi di casa `.mappa-tondo*`
+  riusate dalla mappa del mercatino; il numerino delle offerte NUOVE solo
+  a richiesta, interruttore `.mappa-numerino` in fondo alla mappa, spento
+  di serie, memoria nel telefono `barattolo_mappa_<nome>_nuove`/`_viste` (pezzi comuni `tondoMappa`, `rigaNumerinoMappa`, `segnaVisteMappa`); prima la pillola
+  «🗺️ Mappa» sopra le card), `sezioneMappaP2P` (la pillola del comune
+  scelto, la scatola), `elencoMappaP2P` (il comune
   scelto restringe l'elenco e il conto della pillola Filtro),
   `disegnaMappaP2P` (dopo l'innerHTML del libro: grappoli in pixel con
   `grappoliMappaP2P`, sagoma come tratto con lo spessore per zoom),

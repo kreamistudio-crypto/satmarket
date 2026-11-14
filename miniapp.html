@@ -3015,6 +3015,26 @@
   @media (max-width:339px){
     .p2p-testa-riga .p2p-ordina .p2p-ico{display:none}
   }
+  /* COL TONDO DELLA MAPPA I CERCHIETTI SONO TRE (14 nov 2026,
+     banner-mappa-contanti, Andrea: «quando filtro per convenienza non
+     spostare nessun toggle nella riga in basso [...] stanno un po'
+     stretti, ma ci stanno tutti»). La riga resta una (il nowrap di qui
+     sopra), e i 40 px in piu' li cedono di nuovo le pillole, nello
+     stesso ordine: sotto i 430 il Filtro dice gia' solo il numero e i
+     respiri calano di un altro poco; sotto i 360 calano ancora, e
+     «Ordina» lascia l'icona come a 320. Misurato con «Convenienza» a
+     320, 360 e 390: tutto in fila, il numero del Filtro intero. */
+  @media (max-width:429px){
+    .p2p-testa-riga.con-mappa{gap:3px}
+    .p2p-testa-riga.con-mappa .p2p-filtro{padding:8px 6px;gap:3px}
+    .p2p-testa-riga.con-mappa .p2p-filtro-parola{display:none}
+    .p2p-testa-riga.con-mappa .p2p-testa-cerchi{gap:3px}
+  }
+  @media (max-width:359px){
+    .p2p-testa-riga.con-mappa .p2p-filtro{padding:7px 5px;font-size:12px}
+    .p2p-testa-riga.con-mappa .p2p-ordina .p2p-ico{display:none}
+    .p2p-testa-riga.con-mappa .tema-btn{width:32px;height:32px}
+  }
   /* LE DUE PILLOLE HANNO LA STESSA PELLE e cambiano solo il dentro:
      `.p2p-filtro` porta bordo, raggio, respiro e i due stati accesi
      (che vestono il lato), `.p2p-ordina` gli toglie la griglia e mette
@@ -3868,7 +3888,26 @@
      e non fa scorrere la pagina. */
   .p2p-mappa-testa{display:flex;flex-wrap:wrap;justify-content:center;
     align-items:center;gap:8px;margin:0 0 10px}
-  .p2p-mappa-testa .p2p-filtro{margin:0}
+  /* il tondo nella testata (14 nov 2026, banner-mappa-contanti): il
+     cerchietto della campanella, spento grigio e acceso arancio come
+     lei. Classi DI CASA (senza p2p): le usa anche la mappa del mercatino */
+  .mappa-tondo{position:relative;color:var(--muted)}
+  .mappa-tondo svg{display:block}
+  .mappa-tondo.acceso{color:var(--sats);border-color:var(--sats)}
+  /* ...e il numerino A RICHIESTA (spento di serie, l'interruttore sta in
+     fondo alla mappa): un bollino arancio sul bordo in alto a destra, col
+     filo del fondo intorno perche' si stacchi dal cerchio */
+  .mappa-tondo-conto{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;
+    padding:0 5px;border-radius:999px;background:var(--sats);color:#fff;
+    font:800 11px/18px 'Nunito',sans-serif;text-align:center;pointer-events:none;
+    box-shadow:0 0 0 2px var(--bg)}
+  .mappa-numerino{display:flex;align-items:center;gap:10px;padding:10px 12px;
+    border-top:1px solid var(--line);font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .mappa-numerino span{flex:1;min-width:0}
+  .mappa-interr{flex:none;font:inherit;font-size:13px;font-weight:800;cursor:pointer;
+    border:1px solid var(--line);background:transparent;color:var(--muted);
+    border-radius:99px;padding:6px 14px}
+  .mappa-interr.acceso{border-color:var(--sats);background:var(--sats);color:#fff}
   .p2p-mappa-scelto{border:1.5px solid var(--sats);border-radius:999px;
     background:var(--sats-soft);color:var(--ink);font:inherit;font-weight:800;
     font-size:13px;padding:7px 12px;cursor:pointer;overflow-wrap:anywhere}
@@ -67194,9 +67233,18 @@ function renderP2P(){
      levetta andava a capo da sola e la campana restava sopra di lei.
      Insieme non si separano mai: se la riga non basta (sotto i 360)
      scendono tutt'e due, appoggiati a destra. */
+  /* ...e davanti a loro il tondo della mappa del contanti (14 nov
+     2026, banner-mappa-contanti): vive fuori dal motore, da qui il
+     typeof, come la sezione sopra le card. Col tondo la riga porta
+     `con-mappa`: tre cerchietti e due pillole stanno IN UNA RIGA anche
+     con «Convenienza» (Andrea: «non spostare nessun toggle nella riga in
+     basso»), e a stringersi sono ancora le pillole (vedi il CSS) */
+  const tondoTesta = conMappa && typeof tondoMappaP2P === 'function' ? tondoMappaP2P(mostrati) : '';
   if (testaBox) testaBox.innerHTML =
-    '<div class="p2p-testa-riga">' + pillOrdina + pillola
-    + '<span class="p2p-testa-cerchi">' + campanellaP2P()
+    '<div class="p2p-testa-riga' + (tondoTesta ? ' con-mappa' : '') + '">' + pillOrdina + pillola
+    + '<span class="p2p-testa-cerchi">'
+    + tondoTesta
+    + campanellaP2P()
     + '<button type="button" class="tema-btn" onclick="alternaTema()">'
     + '<span class="tema-ico" aria-hidden="true">'
     + (temaEffettivo() === 'scuro' ? '☀️' : '🌙') + '</span></button></span></div>';
@@ -67260,6 +67308,9 @@ function renderP2P(){
   /* la mappa si disegna DOPO, nella scatola gia' in pagina: le serve
      la sua misura */
   if (conMappa && p2pMappaAperta) { p2pMappaUltimi = mostrati; disegnaMappaP2P(mostrati); }
+  /* ...e da aperta le offerte che mostra sono viste: il numerino del
+     tondo (se acceso) riparte da zero (14 nov 2026, banner-mappa-contanti) */
+  if (conMappa && p2pMappaAperta && typeof segnaVisteMappaP2P === 'function') segnaVisteMappaP2P(mostrati);
   /* ...E LA STESSA RIGA DI STRUMENTI ANCHE DI LA' (set 2026, ridisegno
      di Andrea): «Ordina» a sinistra, «Filtro» in mezzo, la levetta del
      tema a destra. Le classi sono LE STESSE del libro — `.p2p-filtro`,
@@ -90213,22 +90264,140 @@ function vistaInteraMappaP2P(W, H){
 function nomeCortoMappaP2P(nome){
   return String(nome || '').replace(/\s*\([A-Z]{2}\)$/, '');
 }
-/* L'INTESTAZIONE: il bottone che apre e chiude, e la pillola del comune
-   scelto. Niente se nel libro di adesso non c'e' nessuna offerta col
-   punto — e il comune scelto in quel caso si dimentica. */
+/* IL TONDO DELLA MAPPA NELLA TESTATA (14 nov 2026, cantiere
+   banner-mappa-contanti, Andrea: «mettere un toggle affianco alla
+   campanella di una mappa cosi la gente lo vede li»). Al posto della
+   pillola grigia sopra le card: lo stesso cerchietto della campanella e
+   della levetta (`.tema-btn`), nel loro gruppo, quindi sta nella testata
+   appesa e si vede anche scorrendo. Dentro, una mappa piegata disegnata
+   a tratto come la campana vuota; aperta, si veste d'arancio come la
+   campanella accesa.
+   ⚠️ NIENTE NUMERINO FISSO SUL TONDO (Andrea, sull'anteprima: «perche
+   dovrebbe rimanere sempre acceso un numerino affianco? sembra una
+   notifica»): un bollino fisso su un cerchietto e' la lingua delle cose
+   da leggere. Il conto delle offerte sulla mappa sta nell'etichetta
+   (title e aria-label), per chi usa il lettore vocale.
+   SOLO LA GRAFICA E' NUOVA: il tocco e' `apriChiudiMappaP2P`, il conto
+   e' `comuniMappaP2P` sui `mostrati` del libro, e senza offerte col
+   punto il tondo non c'e' (come non c'era la pillola). */
+/* IL NUMERINO A RICHIESTA (subito dopo, Andrea: «ognuno deve poter
+   decidere se avere queste notifiche o no [...] di default e' spenta,
+   l'impostazione per accenderla sta proprio dentro la mappa» e «vedo 5
+   notifiche e poi ci entro, quando esco quelle notifiche non devo
+   vederle piu', rimane solo il toggle normale»). Un interruttore in
+   fondo alla mappa aperta, SPENTO di serie: acceso, il tondo porta il
+   numero delle offerte in contanti sulla mappa che non c'erano l'ultima
+   volta che la mappa era aperta. Aprirla le segna viste (e acceso
+   l'interruttore, lo sono gia' tutte: sei dentro). VIVE NEL TELEFONO
+   (localStorage, sempre dentro un try): e' una comodita' di chi guarda,
+   e se il browser la perde si torna al tondo pulito, mai a un errore.
+   Le viste si tengono per id, al massimo MAPPA_VISTE_MAX: un id
+   uscito dal libro non conta piu' niente. */
+/* I PEZZI COMUNI, per ogni mappa (oggi «p2p», domani «mercatino»): il
+   `nome` sceglie le due chiavi nel telefono, `barattolo_mappa_<nome>_nuove`
+   ('1' = numerino acceso) e `barattolo_mappa_<nome>_viste` (gli id gia'
+   visti, JSON). Ogni lettura e scrittura dentro un try. */
+const MAPPA_VISTE_MAX = 300;
+function chiaveMappa(nome, cosa){ return 'barattolo_mappa_' + nome + '_' + cosa; }
+function numerinoMappaAcceso(nome){
+  try { return localStorage.getItem(chiaveMappa(nome, 'nuove')) === '1'; } catch (e) { return false; }
+}
+function visteMappa(nome){
+  try {
+    const v = JSON.parse(localStorage.getItem(chiaveMappa(nome, 'viste')) || '[]');
+    return new Set(Array.isArray(v) ? v.filter(x => typeof x === 'string') : []);
+  } catch (e) { return new Set(); }
+}
+/* PURA: quanti id non sono fra i visti */
+function nuoveMappa(ids, viste){
+  return (ids || []).filter(id => !viste.has(id)).length;
+}
+/* segna visti gli id di adesso: gli ultimi in fondo, e i piu' vecchi
+   escono quando si supera il tetto */
+function segnaVisteMappa(nome, ids){
+  if (!ids || !ids.length) return;
+  const viste = visteMappa(nome);
+  if (!nuoveMappa(ids, viste)) return;
+  const tutte = [...viste].filter(id => !ids.includes(id)).concat(ids).slice(-MAPPA_VISTE_MAX);
+  try { localStorage.setItem(chiaveMappa(nome, 'viste'), JSON.stringify(tutte)); } catch (e) {}
+}
+/* l'interruttore: lo gira, e chi chiama ridisegna */
+function alternaNumerinoMappa(nome){
+  const acceso = !numerinoMappaAcceso(nome);
+  try {
+    if (acceso) localStorage.setItem(chiaveMappa(nome, 'nuove'), '1');
+    else localStorage.removeItem(chiaveMappa(nome, 'nuove'));
+  } catch (e) {}
+  if (typeof haptic === 'function') haptic();
+}
+/* L'ICONA E IL TONDO SONO DI CASA, non del P2P (14 nov 2026, Andrea:
+   «l'icona della mappa fallo uguale all'icona del mercatino» e «anche la
+   funzionalita' delle notifiche lo farei uguale»): la mappa del mercatino
+   porta lo STESSO tondo e lo stesso numerino, quindi i nomi sono senza
+   p2p — `iconaMappaTonda()`, `tondoMappa()`, `rigaNumerinoMappa()`, i
+   pezzi qui sopra e le classi `.mappa-tondo`, `.mappa-tondo-conto`,
+   `.mappa-numerino`, `.mappa-interr` — e chi la usa li richiama, non li
+   copia. */
+function iconaMappaTonda(){
+  return '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"'
+    + ' stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round">'
+    + '<path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Z"/><path d="M9 4v14M15 6v14"/></svg>';
+}
+/* IL TONDO: `aperta` lo veste d'arancio e spegne il numerino (la mappa
+   la si sta guardando); `ids` sono quelli sulla mappa adesso, `quante`
+   la frase dell'etichetta («3 offerte in contanti di persona»), `tocco`
+   il nome della funzione che apre e chiude (scritto da noi, mai dal
+   client). Il numerino solo se acceso dall'interruttore. */
+function tondoMappa(nome, aperta, ids, quante, tocco){
+  const nuove = !aperta && numerinoMappaAcceso(nome) ? nuoveMappa(ids, visteMappa(nome)) : 0;
+  const detto = esc(quante + (nuove ? ', ' + nuove + (nuove === 1 ? ' nuova' : ' nuove') : ''));
+  return '<button type="button" class="tema-btn mappa-tondo' + (aperta ? ' acceso' : '')
+    + '" aria-expanded="' + (aperta ? 'true' : 'false') + '" title="Mappa: ' + detto
+    + '" aria-label="Mappa: ' + detto + '" onclick="' + tocco + '()">'
+    + iconaMappaTonda() + (nuove ? '<span class="mappa-tondo-conto" aria-hidden="true">'
+      + (nuove > 99 ? '99+' : nuove) + '</span>' : '') + '</button>';
+}
+/* L'INTERRUTTORE in fondo alla mappa aperta: la pelle del «Spenti/Attivi»
+   degli avvisi dei nuovi ordini; `tocco` come sopra */
+function rigaNumerinoMappa(nome, testo, tocco){
+  const on = numerinoMappaAcceso(nome);
+  return '<div class="mappa-numerino">'
+    + '<span>🔢 ' + esc(testo) + '</span>'
+    + '<button type="button" class="mappa-interr' + (on ? ' acceso' : '') + '" aria-pressed="'
+    + (on ? 'true' : 'false') + '" onclick="' + tocco + '()">' + (on ? 'Acceso' : 'Spento')
+    + '</button></div>';
+}
+/* ...e il P2P li usa cosi' */
+/* PURA: gli id sulla mappa adesso */
+function idsMappaP2P(mostrati){
+  return comuniMappaP2P(mostrati).reduce((t, c) => t.concat(c.ids), []);
+}
+function segnaVisteMappaP2P(mostrati){ segnaVisteMappa('p2p', idsMappaP2P(mostrati)); }
+function numerinoMappaP2P(){ alternaNumerinoMappa('p2p'); renderP2P(); }
+function rigaNumerinoMappaP2P(){
+  return rigaNumerinoMappa('p2p', 'Numerino sul tondo per le nuove offerte in contanti', 'numerinoMappaP2P');
+}
+function tondoMappaP2P(mostrati){
+  const ids = idsMappaP2P(mostrati);
+  if (!ids.length) return '';
+  return tondoMappa('p2p', p2pMappaAperta, ids,
+    ids.length + (ids.length === 1 ? ' offerta' : ' offerte') + ' in contanti di persona',
+    'apriChiudiMappaP2P');
+}
+/* L'INTESTAZIONE sopra le card: la sola pillola del comune scelto (il
+   bottone che apre e chiude e' salito nella testata, vedi qui sopra).
+   Niente se nel libro di adesso non c'e' nessuna offerta col punto — e
+   il comune scelto in quel caso si dimentica. */
 function sezioneMappaP2P(mostrati){
   const comuni = comuniMappaP2P(mostrati);
   if (!comuni.length) { p2pMappaComune = ''; return ''; }
   if (p2pMappaComune && !comuni.some(c => c.nome === p2pMappaComune)) p2pMappaComune = '';
-  const n = comuni.reduce((t, c) => t + c.ids.length, 0);
   const senza = (mostrati || []).filter(o => zonaOrdineP2P(o) && !postoOrdineP2P(o)).length;
-  let h = '<div class="p2p-mappa-testa">'
-    + '<button type="button" class="p2p-filtro p2p-mappa-btn' + (p2pMappaAperta ? ' acceso' : '')
-    + '" aria-expanded="' + (p2pMappaAperta ? 'true' : 'false') + '" onclick="apriChiudiMappaP2P()">'
-    + '🗺️ <b>Mappa</b> <em>' + n + ' in contanti di persona</em></button>';
-  if (p2pMappaComune) h += '<button type="button" class="p2p-mappa-scelto" onclick="sceltaMappaP2P(\'\')"'
-    + ' title="Mostra tutte le offerte">📍 ' + esc(p2pMappaComune) + ' <span aria-hidden="true">✕</span></button>';
-  h += '</div>';
+  let h = '';
+  if (p2pMappaComune) h += '<div class="p2p-mappa-testa">'
+    + '<button type="button" class="p2p-mappa-scelto" onclick="sceltaMappaP2P(\'\')"'
+    + ' title="Mostra tutte le offerte">📍 ' + esc(p2pMappaComune) + ' <span aria-hidden="true">✕</span></button>'
+    + '</div>';
   if (p2pMappaAperta) {
     h += '<div class="p2p-mappa" id="p2pMappa">'
       + '<svg id="p2pMappaSvg" role="img" aria-label="Mappa delle offerte in contanti di persona"'
@@ -90241,7 +90410,7 @@ function sezioneMappaP2P(mostrati){
       + 'quello lo decidete in chat.' + (senza ? ' ' + senza + (senza === 1
         ? ' offerta in contanti ha una zona che la mappa non riconosce: la trovi nell\'elenco.'
         : ' offerte in contanti hanno una zona che la mappa non riconosce: le trovi nell\'elenco.') : '')
-      + '</div></div>';
+      + '</div>' + rigaNumerinoMappaP2P() + '</div>';
   }
   return h;
 }

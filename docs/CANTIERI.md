@@ -81859,3 +81859,85 @@ CINQUANTASEI); una sentinella dice che né la funzione né il titolo del
 foglio tornano nel codice. Controprova: rimessa la funzione, la
 sentinella è diventata rossa. Tappo (`assistente/sapere.md`) non citava
 quel foglio: niente da cambiare. NOVITA: no, è una cosa tolta.
+## Il tondo della mappa accanto alla campanella, col numerino a richiesta (14 nov 2026, cantiere banner-mappa-contanti, Andrea: «correggiamo un attimo anche il banner mostrato nel p2p che indica la mappa i contanti? mi piacerebbe mostrarla in maniera più carina», «forse conviene mettere un toggle affianco alla campanella», poi sulla card la A)
+
+COSA. La pillola grigia «🗺️ Mappa · N in contanti di persona», sopra le
+card del libro P2P, è salita nella testata appesa: un tondo `.tema-btn`
+nel gruppo dei cerchietti, DAVANTI alla campanella, con una mappa
+piegata disegnata a tratto come la campana vuota. Si vede anche
+scorrendo; aperta la mappa si veste d'arancio come la campanella
+accesa. La funzione è quella di prima: il tocco è `apriChiudiMappaP2P`,
+il conto `comuniMappaP2P` sui `mostrati`, senza offerte col punto il
+tondo non c'è. Sopra le card resta solo la pillola del comune scelto.
+
+LE TRE ANTEPRIME (dall'app vera di develop, server locale in collaudo,
+relay morti, libro finto iniettato nella pagina): A il tondo, B una
+striscia verde con la piccola Italia e i pallini, C tutte e due. Scelta
+la A («la a mi piace»). La B era più vistosa ma scorre via con le card.
+
+IL NUMERINO, IN DUE TEMPI. La prima A aveva un bollino arancio fisso col
+conto delle offerte: Andrea, «perché dovrebbe rimanere sempre acceso un
+numerino? sembra una notifica». Tolto, e subito dopo rimesso come
+SCELTA: «ognuno deve poter decidere se avere queste notifiche o no [...]
+di default è spenta, l'impostazione sta proprio dentro la mappa» e «vedo
+5 notifiche, ci entro, quando esco non devo vederle più». Quindi:
+interruttore «🔢 Numerino sul tondo per le nuove offerte in contanti» in
+fondo alla mappa aperta, SPENTO di serie; acceso, il tondo conta le
+offerte sulla mappa che non c'erano l'ultima volta che la mappa era
+aperta; da aperta il numerino non c'è e le offerte si segnano viste
+(dopo il disegno, nel `renderP2P`). VIVE NEL TELEFONO (localStorage,
+`barattolo_mappa_<nome>_nuove` e `_viste`, al massimo 300 id, ogni
+accesso dentro un try): è una comodità di chi guarda, e una memoria
+persa o rotta torna al tondo pulito, mai a un errore. Scartato: la
+preferenza sul server (un'altra rotta e un'altra riga nel database per
+una cosa che vale su un telefono), e il conto «nuove da quando ho
+acceso» fuori dalla mappa (l'interruttore sta dentro: chi lo accende
+le sta già guardando).
+
+PEZZI DI CASA, NON DEL P2P (Andrea: «l'icona della mappa fallo uguale
+all'icona del mercatino» e «anche la funzionalità delle notifiche lo
+farei uguale»): `iconaMappaTonda()`, `tondoMappa(nome, aperta, ids,
+quante, tocco)`, `rigaNumerinoMappa(nome, testo, tocco)`,
+`alternaNumerinoMappa`, `segnaVisteMappa`, `numerinoMappaAcceso`,
+`visteMappa`, `nuoveMappa`, classi `.mappa-tondo`, `.mappa-tondo-conto`,
+`.mappa-numerino`, `.mappa-interr`. Il P2P li usa coi suoi wrapper
+(`tondoMappaP2P`, `rigaNumerinoMappaP2P`, `numerinoMappaP2P`,
+`segnaVisteMappaP2P`); la mappa del mercatino (thread a parte) li
+richiama col nome «mercatino».
+
+UNA RIGA SOLA ANCHE CON «CONVENIENZA» (Andrea: «non spostare nessun
+toggle nella riga in basso [...] stanno un po' stretti, ma ci stanno
+tutti»). Il nowrap del 6 nov resta; col tondo la riga porta `con-mappa`
+e i 40 px in più li cedono di nuovo le pillole: sotto i 430 il Filtro
+dice solo il numero e i respiri calano, sotto i 360 calano ancora,
+«Ordina» lascia l'icona e i cerchietti passano da 34 a 32. Misurato con
+«Convenienza» a 320, 360 e 390: tutto in fila, il numero intero (prima
+del ritocco a 320 il «5» del Filtro usciva tagliato).
+
+PROVE. `prove_mappa_contanti` porta il tondo (cerchietto di casa,
+etichetta al singolare e al plurale, acceso solo da aperta, niente
+tondo senza offerte col punto, la pillola grigia sparita) e il
+numerino con un localStorage finto (spento di serie, la chiave,
+«Acceso», tre mai viste, due dopo una vista, niente da aperta, tutte
+viste dopo l'apertura, memoria storta o che lancia: niente esplosione);
+`prove_avvisi_nuovi_ordini` e `prove_p2p_libro` riconoscono la riga con
+`con-mappa`. Controprove sul codice vero: tolto il tondo dalla testata,
+tre rosse; il numerino anche a mappa aperta, una rossa; la memoria che
+non scrive le viste, il banco rosso. Foto dal codice vero in
+`/mnt/project-files/banner-mappa-contanti/` (finale-1/2/3 e
+«Convenienza» a 320, 360, 390).
+COSA È GIRATO SU QUALE ALBERO. Sopra develop `2da18fff`, nelle
+condizioni della CI: la suite severa intera nel venv minimo, 27.853
+passate, 4 rosse mie (la frase di NOVITA oltre i 400 caratteri,
+conoscenza.md da rigenerare, la riga della testata scritta in due
+prove, l'interruttore a 12,5 px in --muted: ora 13 px), curate e
+rifatte le loro sezioni, 512 su 512; i collaudi di `ci/collaudi.txt`
+nella gabbia, senza coincurve e senza proxy, 128 verdi su 128. Poi
+develop è corso a `169a3e93` con due commit NON miei (`1a6282ec` lo
+scudo del moderatore, `169a3e93` la «i» della fee del mercatino):
+rebase (un conflitto, la coda di questo file), nessun simbolo in
+comune, e sopra di nuovo la suite severa intera, 27.859 passate, 0
+fallite, e i collaudi, 128 su 128. Le due saltate di ogni giro cloud
+sono le prove di nostr-tools, che la CI installa. NON PROVATO dal vivo:
+il tondo dal telefono vero dentro Telegram (Andrea, dopo la promozione)
+e il numerino con un'offerta in contanti nuova che arriva davvero.
