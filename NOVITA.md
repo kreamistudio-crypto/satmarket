@@ -140,3 +140,9 @@ frase: Nel P2P arriva il franco svizzero: si possono pubblicare e prendere ordin
 dove: la scheda «P2P», il foglio «Pubblica» (valuta CHF), le card del libro e della home.
 leva: P2P_CHF_ATTIVO (nuova, spenta) e P2P_CHF_SOLO_ADMIN
 pubblico: no
+
+## 2026-11-14 · usdt-cifra-copia
+frase: Negli scambi P2P in USDT, chi deve mandare gli USDT ora trova sotto l'indirizzo anche la cifra esatta da inviare, con il suo tasto «📋 Copia» accanto, come per l'indirizzo. Copia solo il numero, pronto da incollare nel wallet: niente più cifre riscritte a mano.
+dove: la pagina dello scambio in «I miei scambi», nel riquadro «💵 Dove mandare gli USDT».
+leva: nessuna
+pubblico: sì

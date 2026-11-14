@@ -81562,3 +81562,66 @@ e preme lo stesso consegna l'account, come ieri. È la scelta di Andrea
 (nessun passo in più), e i due sospetti restano «attenuati», non
 chiusi. Non provato dal vivo: come Telegram mostra i due messaggi (qui
 si guarda il testo che parte e che l'HTML sia in pari).
+
+## La cifra in USDT da copiare, sotto l'indirizzo (14 nov 2026, cantiere usdt-cifra-copia, Andrea: «in un ordine sats usdt quando uno deve mandare usdt sotto alla riga dell'indirizzo da copiare aggiungi anche la cifra da inviare con il tasto copia affianco come per l'indirizzo»)
+
+IL PROBLEMA. Chi compra sats e paga in USDT aveva l'indirizzo col suo
+«📋 Copia», ma la cifra la leggeva nel conto e la riscriveva a mano nel
+wallet. Su Tron il QR è solo l'indirizzo (un formato comune con la cifra
+non c'è), quindi la cifra a mano toccava anche a chi inquadra.
+
+COSA SI È FATTO (ok di Andrea al piano in cinque punti, 14 nov 10:40).
+Una riga sola, `rigaCifraUsdtP2P`, fatta con la `rigaDato` dei recapiti:
+etichetta «Da mandare», la cifra a schermo all'italiana («42,00 USDT»,
+monospazio come l'indirizzo), il «📋 Copia» grande accanto e il tocco sul
+valore che fa lo stesso gesto. Sta in tutti e due i riquadri di chi paga:
+- scambi su Lightning (Mostro), `riquadroRecapitoP2P`: SUBITO SOTTO la
+  riga «Indirizzo», sopra il QR. Solo se il recapito è USDT (la riga
+  «Rete»), se c'è lo scambio in mano (`o`) e se lo scambio è in USDT
+  (`usdtP2P`): un IBAN, un ordine in euro o una cifra zero non la hanno;
+- scambi on-chain, `riquadroUsdtOcP2P`: fra l'indirizzo e il QR. Il tasto
+  grande «📋 Copia l'indirizzo» in fondo resta com'era.
+La cifra è `o.euro`, che in un ordine in USDT è già in USDT (1 USDT = 1
+$, niente cambio): è la stessa che il conto e la presa scrivono.
+
+NEGLI APPUNTI IL SOLO NUMERO, COL PUNTO E I CENTESIMI («42.00»), senza
+«USDT» e senza migliaia (`cifraUsdtDaCopiareP2P`, PURA): la forma che i
+wallet crypto prendono sempre, la stessa scelta della cifra in BTC
+dell'11 nov. L'importo P2P in euro si copia invece con la virgola
+(`attrImportoP2P`, 19 ott): quello va nel campo di una banca.
+
+STRADE SCARTATE. Il «📋» piccolo accanto alla cifra (Andrea ha chiesto
+«come per l'indirizzo», e l'indirizzo ha il bottone grande); la cifra
+nel tasto grande on-chain come secondo bottone a tutta larghezza (due
+bottoni uguali in colonna confondono, la lezione del 23 set); copiare
+«42,00 USDT» intero come fa la riga di ETH e XMR (Andrea: solo il
+numero).
+
+PROVATO. `prove_usdt_cifra_copia` (nuova, categoria p2p, 6 righe coi
+pezzi veri in node: il conto puro con zero, negativi, NaN, Infinity e
+testo; i due «📋 Copia» con i loro valori e l'ordine indirizzo → cifra →
+QR; le migliaia; i cinque casi senza riga; il riquadro on-chain).
+Controprove, una alla volta e poi rimesse: tolta la riga su Lightning
+(2 rosse), copiato senza centesimi (4 rosse), tolto il cancello della
+valuta (1 rossa), tolta la riga on-chain (1 rossa). Foto dei due
+riquadri a 375 px coi CSS veri in
+`/mnt/project-files/usdt-cifra-copia/riquadri-usdt-cifra.png`.
+
+COSA È GIRATO SU QUALE ALBERO. Sopra develop `778d5d5`: la suite intera
+severa nel venv con le sole dipendenze del passo «Le prove» (senza httpx,
+senza coincurve), 27.811 passate, 0 fallite, 2 saltate (lo script vero
+di nostr-tools, che qui non c'è: le stesse di ogni giro cloud); i
+collaudi di `ci/collaudi.txt` nella gabbia senza proxy e senza
+coincurve, 127 verdi e 1 rosso. Dopo il rebase sopra `3f8d22b` (non mio,
+cantiere audit-parole-bot: nessun simbolo in comune, conflitto solo in
+coda a questo file) la suite intera rigirata nello stesso venv, 27.834
+passate, 0 fallite, le stesse 2 saltate, e i collaudi vicini
+(p2p_onchain_usdt, eth_xmr, presa_ln_p2p) verdi. Il rosso è `collaudo_accesso_di_casa`, NON MIO
+(cantiere audit-account), che dice «coincurve non c'e': questo collaudo
+non si puo' saltare» — sul runner della CI, che coincurve non ce l'ha,
+sarebbe rosso uguale (vedi la nota in fondo al rapporto).
+
+NON PROVATO DAL VIVO: la copia dentro Telegram su un telefono vero e
+l'incolla nel wallet (TronLink, Trust): se un wallet volesse la virgola,
+si cambia `cifraUsdtDaCopiareP2P`. Nessuna leva nuova: vale dove gli
+USDT sono già accesi (Lightning per tutti, on-chain solo admin).
