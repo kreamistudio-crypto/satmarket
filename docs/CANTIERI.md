@@ -83252,3 +83252,73 @@ dà (Alby, Blink, Coinos e LNbits lo fanno, Wallet of Satoshi non ci
 risulta). Andrea (15:29Z): le prove si fanno dall'app in produzione dopo
 la promozione, con un ordine vero e pochi sats; se qualcosa non va si
 corregge lì. Resta da vedere anche come Tappo racconta la novità.
+
+## La card del prezzo in dollari uguale a quella in euro, e il velo dell'andamento (14 nov 2026, cantiere prezzo-btc-dollari, Andrea provando la produzione: «quando passo in dollari va via il grafico la percentuale e i giorni, invece deve sempre rimanere quella e deve cambiare al tocco»)
+
+IL DIFETTO. La card «1 BTC adesso» (cantiere prezzo-btc-p2p, salita con
+91cf13ef) in dollari cercava SOLO la serie del dollaro. Il server la
+tiene a parte (`cambio_ore.usd`, backfill CoinGecko una GET per valuta),
+e in produzione, appena salita, il dollaro non aveva ancora la storia di
+nessun periodo: `periodiPrezzoP2P` in dollari tornava vuoto, e la card
+restava col solo prezzo, senza linea, senza percentuale, senza tocco.
+In euro invece la storia c'era. PERCHÉ al dollaro manchi la storia è
+DEDOTTO, non visto (il VPS non si guarda da qui): il backfill del
+dollaro parte un attimo dopo quello dell'euro, e se CoinGecko risponde
+male a quella seconda GET ci si riprova fra un'ora; nel frattempo la
+storia del dollaro è fatta delle sole letture vere dal deploy. Il
+journal lo dice: `journalctl -u barattolo --since today | grep
+"Andamento del prezzo"` (riga 📈 o ⚠️ per valuta).
+
+LA CORREZIONE, tutta nel telefono (`seriePrezzoP2P` in miniapp.html,
+«LA CARD DEL PREZZO»): un periodo che il dollaro non ha ancora si
+disegna con la serie dell'euro portata in dollari al cambio di ADESSO
+(il rapporto fra le due cifre grandi, la stessa lettura). La serie vera
+del dollaro, quando c'è, vince sempre. Così in $ la card è identica a
+quella in €, il periodo scelto resta quando si gira la valuta, e il
+tocco gira gli stessi periodi.
+
+IL VELO E IL FILO (stessa sera, Andrea: «fammi la card un po' diversa da
+quelle sotto, magari un leggero gradiente colorato in base all'andamento
+del mercato», tre anteprime e la scelta della «A · Velo»; poi «levami
+quel pallino verde affianco alla scritta 1 BTC adesso» e «il bordo più
+sottile, come il banner novità»). Classe `p2p-valore-sale` o
+`p2p-valore-scende` sulla card, lo stesso verso della linea del periodo
+scelto: un gradiente da `--trust-soft` (o `--rosso-p2p-tenue`) al fondo
+delle card a due terzi; niente bordo vero ma il mezzo pixel interno al
+30% del colore, come `.p2p-oc-faccia`, col pixel del bordo restituito al
+padding (la card non cambia misura). Il colore del filo è un
+`color-mix`, dietro `@supports` come la card degli ordini. Senza serie la
+card resta quella di prima. Il pallino «vivo» è sparito, CSS compreso.
+
+STRADE SCARTATE. Correggere il server perché il dollaro abbia sempre la
+sua storia (una pausa fra le due GET, riprova più svelta): la causa non è
+vista, e la card deve stare in piedi lo stesso anche con un dollaro che
+arriva tardi; resta da guardare col journal. Calcolare la serie del
+dollaro sul server dall'euro: due verità della stessa serie. Le varianti
+«Bagliore» (luce dietro la linea) e «Pieno» (card tutta verde o rossa,
+scritte bianche): scelta di Andrea.
+
+QUEL CHE VUOL DIRE. Finché il dollaro non ha la sua storia, la
+percentuale in dollari è quella dell'euro: il cambio euro/dollaro del
+periodo non c'è dentro (qualche decimo di punto su un mese). Quando la
+serie vera arriva, vince da sola.
+
+PROVATO. `prove_prezzo_btc_libro`: in dollari si resta sul periodo
+scelto con la serie presa dall'euro (▼ 3,4% · 7 giorni), il tocco gira
+ancora i periodi e la serie VERA del dollaro vince (▲ 2,8% · 24 ore),
+senza NESSUNA serie del dollaro (il caso di produzione) ci sono linea,
+percentuale, periodo e tocco; il velo segue il verso, anche in dollari,
+e senza serie non c'è; il CSS del gradiente e del filo; niente pallino.
+Controprove: tolto il ripiego sull'euro, 4 rosse; con l'euro che vince
+sul dollaro, 1 rossa; velo fisso «sale» e pallino rimesso, 2 rosse.
+Suite severa sull'albero da origin/develop 8f4fab2c, nel venv delle sole
+dipendenze del workflow (niente coincurve): 28.202/0, 2 saltate (i due
+script di nostr-tools, che qui non c'è). Collaudi della CI 133/133 nello
+stesso venv, senza le variabili del proxy. La card vera, disegnata dal
+codice della miniapp in Chromium nei due temi:
+/mnt/project-files/prezzo-btc-dollari/card-velo-vera.png (anteprime:
+anteprime-card-prezzo.png).
+
+NON PROVATO, DA GUARDARE. Il webview vero del telefono (il gradiente e il
+mezzo pixel). Il journal del VPS per sapere se il backfill del dollaro è
+fallito davvero. Sale con la prossima promozione.
