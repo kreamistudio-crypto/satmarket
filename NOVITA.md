@@ -170,3 +170,9 @@ frase: Gli avvisi dei nuovi ordini P2P ora si possono allargare anche agli ordin
 dove: la scheda «P2P», la campanella 🔔 in alto (e il cassetto «🔔 Avvisi» del Profilo).
 leva: P2P_AVVISI_NUOVI_ORDINI (nessuna leva nuova)
 pubblico: sì
+
+## 2026-11-14 · ordine-libro-ricordato
+frase: Nel libro P2P l'ordine che scegli ora resta: se metti «Convenienza» o «Importo: dal più grande», alla prossima visita il libro si apre già ordinato così, in «Compra» e in «Vendi». La scelta resta salvata sul telefono; per tornare come prima basta rimettere «Più recenti».
+dove: la scheda «P2P», la pillola con le tre righe in cima al libro («Ordina il libro»).
+leva: nessuna
+pubblico: sì
