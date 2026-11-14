@@ -218,3 +218,9 @@ frase: Il tondo delle mappe, nel P2P e nel mercatino, ora ha l'icona colorata �
 dove: la scheda «P2P» (il tondo 🗺️ accanto alla campanella) e l'Esplora del mercatino (il tondo 🗺️ in fondo alla barra di ricerca); un tocco su un pallino della mappa.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-14 · mancia-senza-indirizzo
+frase: Se il venditore non ha ancora un indirizzo Lightning, il riquadro della mancia ora c'è lo stesso e te lo dice, invece di sparire: «non ha ancora un indirizzo Lightning nel profilo: per ora la mancia non si può mandare». E chi vende, nello stesso ordine, vede l'invito ad aggiungerlo dal Profilo: così può ricevere le mance e incassare da solo.
+dove: la scheda «Ordini», dentro un ordine già pagato, accanto al voto.
+leva: MANCIA_ATTIVA (la stessa della mancia)
+pubblico: sì

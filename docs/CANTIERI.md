@@ -83591,3 +83591,75 @@ CI senza coincurve: il giro mirato `--dai-file` (531 sezioni: p2p,
 mercatino, infrastruttura), 27.224 passate e 0 rosse; i collaudi di
 `ci/collaudi.txt`, 133 su 133. La saltata è nostr-tools, che la CI
 installa. Sale con la prossima promozione.
+
+## La mancia anche senza indirizzo Lightning: il riquadro lo dice invece di sparire (14 nov 2026, cantiere mancia-senza-indirizzo, Andrea: «Perché in alcuni ordini vedo lascia una mancia e in altri no?»)
+
+LA CAUSA. Andrea in produzione: due ordini conclusi, col riquadro «🎁 Ti
+è piaciuto l'affare?» in quello con Bubble e senza in quello con «Un
+tempo per te» (22 set, sats arrivati). Nel codice il giudice unico
+`mancia_ammessa` aveva quattro condizioni: la leva, chi guarda è il
+compratore (e non anche chi vende), l'ordine in `MANCIA_STATI` (pagato e
+mai finito male: un `released` ci sta), e un Lightning address con la
+@ nel profilo di chi vende. Le prime tre i due ordini le passano
+entrambi; l'unica che li separa è l'indirizzo. Nessun'altra condizione:
+né l'età dell'ordine, né come è stato pagato, né come ha incassato chi
+vende. «I sats sono arrivati a @…» nella seconda schermata è lo
+username Telegram (`frasePagamento`), non l'indirizzo: chi vende può
+aver incassato con una fattura incollata nell'ordine
+(`invoice_venditore`), o aver tolto l'indirizzo dopo. Il dato di
+produzione lo conferma un comando di sola lettura che stampa solo
+numeri (nel rapporto ad Andrea).
+
+COSA SI È DECISO. Il giudice diventa `mancia_esito`, PURA, con tre
+risposte: «si» (il bottone), «senza_indirizzo» (tutto in regola ma
+l'indirizzo manca), «no». `mancia_ammessa` resta e vuol dire «si»: la
+rotta `/api/orders/{id}/mancia` non cambia, senza indirizzo continua a
+dire 400. `mance_di_ordini` attacca `senza_indirizzo` alla riga:
+  · a CHI COMPRA, il riquadro di sempre, senza bottone, con «<nome>
+    non ha ancora un indirizzo Lightning nel profilo: per ora la mancia
+    non si può mandare». Il nome è INTERO e non la prima parola come nel
+    bottone: qui è il soggetto della frase, e «Un tempo per te»
+    diventava «Un non ha...». Le mance già lasciate restano sotto;
+  · a CHI VENDE senza indirizzo (il facoltativo gradito del brief), su
+    ogni ordine da mancia, la riga «Chi compra da te può lasciarti una
+    mancia in sats, ma senza un Lightning address non ha dove mandarla.
+    Aggiungilo dal Profilo»: il link apre il cassetto «⚡ Lightning
+    address» (`apriCassettoProfilo`). Esce il SE, a lui stesso; mai
+    l'indirizzo, a nessuno.
+Stessa leva `MANCIA_ATTIVA`: spenta, niente riquadro in nessun caso.
+
+STRADE SCARTATE. Il bottone spento: un bottone grigio invita a toccarlo,
+la frase basta. L'avviso dal bot al venditore («qualcuno vorrebbe
+lasciarti una mancia»): è un messaggio a un utente, con un tetto e un
+timbro da inventare; resta una proposta. Accorciare anche il nome del
+bottone esistente («Un grazie in sats a Un»): fuori da questo cantiere,
+segnalato.
+
+PROVATO. `prove_mancia_venditore`: i tre esiti di `mancia_esito`
+(senza indirizzo «senza_indirizzo», anche con un indirizzo senza @; chi
+vende, ordine annullato, a se stessi, leva spenta: «no»); in node, a chi
+compra la frase col nome intero e scappato e senza `apriMancia`, a chi
+vende il link al Profilo, con le mance ricevute che restano.
+`collaudo_mancia` sulle rotte vere: l'ordine col venditore senza
+indirizzo porta `senza_indirizzo` e non è «possibile», quello con
+l'indirizzo no, e chi vende senza indirizzo vede il promemoria. Il giro
+dal vivo in Chromium col server in collaudo (le due schermate in
+/mnt/project-files/mancia-senza-indirizzo/), e il link che apre il
+cassetto col campo in vista. Controprove: il giudice a due esiti, 2 rosse
+in prove e 2 nel collaudo; il client che ignora `senza_indirizzo`, 4
+rosse; il promemoria al venditore spento, 2 rosse nel collaudo. Suite
+severa sull'albero da origin/develop 2b1b75a2, nel venv delle sole
+dipendenze del workflow (niente coincurve), senza le variabili del
+proxy: 28.214/0, 2 saltate (i due script di nostr-tools). Collaudi della
+CI 133/133 nel venv di requirements.txt senza coincurve, senza proxy.
+Dopo i rebase su 1a64f4b9 (la card del prezzo scura) e su de3bdb54 (i
+ritocchi delle due mappe), commit di altre sessioni senza simboli della
+mancia in comune: su 1a64f4b9 suite severa 28.214/0 (2 saltate, le
+stesse) e `collaudo_mancia` + `collaudo_racconti_bozza` verdi; su
+de3bdb54 suite severa 28.226/0 (2 saltate, le stesse) e `collaudo_mancia`
+verde; su a1354a6c (seconda passata delle mappe, solo miniapp delle
+mappe e documenti) il giro mirato: le sezioni dei documenti e della
+mancia e `collaudo_mancia`.
+
+NON PROVATO, DA GUARDARE. Il telefono vero. Sale con la prossima
+promozione.

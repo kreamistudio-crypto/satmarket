@@ -43,6 +43,7 @@ BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
 COMPRA = {"id": 111, "nome": "Compra", "username": "compra", "admin": False}
 VENDE = {"id": 222, "nome": "Vende", "username": "vende", "admin": False}
+SENZA = {"id": 333, "nome": "Senza", "username": "senza", "admin": False}
 
 # lo stato del wallet di cartone del venditore
 WALLET = {"verify": "https://wallet.esempio/verify/{h}", "pagate": set(),
@@ -294,7 +295,19 @@ def main():
     prova("l'indirizzo del venditore NON esce", False,
           "vende@wallet.esempio" in repr(o[1]))
     prova("ordine da pagare: niente mancia", None, o[2].get("mancia"))
-    prova("venditore senza indirizzo: niente mancia", None, o[3].get("mancia"))
+    # (14 nov 2026, mancia-senza-indirizzo) il riquadro non sparisce
+    # piu': dice che chi vende non ha l'indirizzo, e il bottone non c'e'
+    prova("venditore senza indirizzo: il riquadro lo dice", True,
+          (o[3].get("mancia") or {}).get("senza_indirizzo"))
+    prova("...ma la mancia non e' «possibile»", False,
+          (o[3].get("mancia") or {}).get("possibile"))
+    prova("col bottone l'indirizzo c'e': niente «senza»", False,
+          o[1]["mancia"]["senza_indirizzo"])
+    os_ = ordini(SENZA)
+    prova("a chi vende senza indirizzo, il promemoria", True,
+          (os_[3].get("mancia") or {}).get("senza_indirizzo"))
+    prova("...e per lui niente bottone", False,
+          (os_[3].get("mancia") or {}).get("possibile"))
     prova("ordine rimborsato: niente mancia", None, o[4].get("mancia"))
     prova("a chi vende, senza mance, niente riquadro", None,
           ordini(VENDE)[1].get("mancia"))
