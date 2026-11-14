@@ -19692,11 +19692,13 @@ function pannelloSwapAuto(o){
         Arrivano con la prima conferma della rete bitcoin.</div>
       ${c.txid ? `<div class="hint mono" style="word-break:break-all;font-size:11px">${esc(c.txid)}</div>` : ''}${link}`;
   }
-  /* un cambio fallito non ha mosso niente: sotto c'e' il preventivo nuovo */
+  /* un cambio fallito non ha mosso niente: sotto c'e' il preventivo nuovo.
+     (14 nov 2026, audit-swap-conferma) Il server ritira solo a lockup
+     CONFERMATO: l'attesa e' quella di un blocco, e le parole lo dicono */
   if (c.pagamento && c.pagamento !== 'fallito') return `<h4>${P2P_OC_MONETA} Swap in corso</h4>
-      <div class="hint">Abbiamo pagato lo swap: appena SATS Routing blocca i bitcoin li mandiamo a
+      <div class="hint">Abbiamo pagato lo swap: appena SATS Routing blocca i bitcoin e la rete li conferma li mandiamo a
         <span class="mono" style="word-break:break-all">${esc(c.indirizzo)}</span>
-        (<b>${fmt(c.ricevi)} sats</b> circa). Ci vogliono alcuni minuti: ti avvisiamo noi, puoi chiudere.</div>`;
+        (<b>${fmt(c.ricevi)} sats</b> circa). Di solito basta una decina di minuti, a volte di più: ti avvisiamo noi, puoi chiudere.</div>`;
   const p = d.preventivo || {};
   const fallito = c.pagamento === 'fallito'
     ? `<div class="swap-rifiuto" role="status">Lo swap di prima non è andato e non è uscito niente: puoi riprovare.</div>` : '';

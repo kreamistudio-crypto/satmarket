@@ -24,6 +24,15 @@ Le domande a cui risponde:
     SESSIONI, nemmeno con dati firmati bene: e' un indirizzo che si
     puo' mandare a un altro. A porta spenta e' il login di ieri.
 
+LE FIRME (14 nov 2026, riparazione): il runner della CI non ha
+coincurve, e la prima stesura lo pretendeva — in CI sarebbe uscita
+rossa senza aver girato. Adesso fa come `collaudo_fusione_da_telegram`:
+firma con la ricetta BIP-340 del repo (`schnorr_puro`), e il server
+verifica col suo giudice VERO, coincurve dove c'e' e, dove non c'e',
+`schnorr_puro.ChiaveXOnly` montato al posto di `ChiavePubblicaNostr`
+(dopo aver guardato che da solo, senza, la porta Nostr risponde 503).
+Nessun salto.
+
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server. Nessuna chiave vera, nessuna rete, nessun relay.
 
@@ -39,9 +48,12 @@ import tempfile
 import time
 import types
 
+import schnorr_puro
+
 QUI = os.path.dirname(os.path.abspath(__file__))
 PASSATE = FALLITE = 0
 GETTONE = "0:collaudo"
+PARTITI = []        # quel che sarebbe andato a Telegram (non ci va niente)
 
 
 def prova(nome, atteso, avuto):
@@ -76,26 +88,60 @@ def avvio():
                  ("ORE_CONFERMA", 72),
                  ("GIORNI_AUTO_SBLOCCO", 10),
                  ("MODELLO_RICERCA", "claude-haiku-4-5-20251001"),
+                 ("MOSTRO_RELAY", "ws://127.0.0.1:9"),
+                 ("MOSTRO_RELAY_SPECCHIO", "ws://127.0.0.1:9"),
                  ("DB", db)):
         setattr(cfg, k, v)
     sys.modules["config"] = cfg
     sys.path.insert(0, QUI)
     os.chdir(QUI)
     import server
+
+    # (14 nov 2026, riparazione) QUESTO COLLAUDO, in due scene, fa credere
+    # al server di essere in PRODUZIONE (`MODALITA_COLLAUDO = False`: e' il
+    # solo modo di provare la porta col nome vero). Li' un avviso a una
+    # persona non e' piu' simulato: `_manda_telegram` bussava davvero a
+    # Telegram (col gettone finto non arrivava a nessuno, ma la
+    # gabbia della CI lo vede e ha ragione: da un collaudo non esce
+    # niente). Nel cloud non si vedeva, perche' col proxy acceso la
+    # gabbia non vede il DNS. Le due strade verso Telegram qui sono finte
+    # per tutta la durata, e i relay vanno a quello morto.
+    async def telegram_finto(tg_id, testo, bottone=None):
+        PARTITI.append((tg_id, testo))
+        return "simulata (collaudo)"
+
+    async def bot_finto(metodo, dati):
+        PARTITI.append((metodo, dati))
+        return {"ok": True}
+    server._manda_telegram = telegram_finto
+    server.bot_api = bot_finto
     return server
+
+
+def nuova_chiave() -> bytes:
+    """Una chiave privata usa-e-getta, 32 byte nella misura del BIP-340."""
+    while True:
+        sk = os.urandom(32)
+        if 1 <= int.from_bytes(sk, "big") < schnorr_puro.N:
+            return sk
+
+
+def pubblica_hex(sk: bytes) -> str:
+    return schnorr_puro.pubblica(sk).hex()
 
 
 def firma_login(sk, sfida, origine):
     """L'evento 22242 firmato davvero (Schnorr), col tag `relay` che si
     vuole: e' lo stesso che compone la pagina, ed e' lo stesso che un
     relay chiede per la sua AUTH (NIP-42)."""
-    pub = sk.public_key_xonly.format().hex()
+    pub = pubblica_hex(sk)
     ev = {"pubkey": pub, "created_at": int(time.time()), "kind": 22242,
           "tags": [["relay", origine], ["challenge", sfida]], "content": ""}
     ser = json.dumps([0, pub, ev["created_at"], 22242, ev["tags"], ""],
                      separators=(",", ":"), ensure_ascii=False)
     ev["id"] = hashlib.sha256(ser.encode()).hexdigest()
-    ev["sig"] = sk.sign_schnorr(bytes.fromhex(ev["id"])).hex()
+    ev["sig"] = schnorr_puro.firma(sk, bytes.fromhex(ev["id"]),
+                                   os.urandom(32)).hex()
     return ev
 
 
@@ -113,15 +159,19 @@ def dati_widget(tg_id, quando=None):
 def main():
     server = avvio()
     from fastapi.testclient import TestClient
-    try:
-        from coincurve import PrivateKey
-    except ImportError:
-        print("  ✗ coincurve non c'e': questo collaudo non si puo' saltare")
-        return 1
 
     print("=" * 58)
     print("  IL COLLAUDO DELL'ACCESSO DI CASA")
     print("=" * 58)
+
+    print("\n[0) le firme: il patto del server, e il calco dove coincurve non c'e']")
+    if server.ChiavePubblicaNostr is None:
+        prova("senza coincurve il server non apre la porta Nostr (503)", 503,
+              TestClient(server.app).get("/api/login/nostr/sfida").status_code)
+        server.ChiavePubblicaNostr = schnorr_puro.ChiaveXOnly
+        print("   (coincurve assente: monto schnorr_puro.ChiaveXOnly, come in CI)")
+    else:
+        print("   (coincurve presente: il server verifica con libsecp256k1)")
 
     def riga(tg_id):
         con = server.db()
@@ -141,8 +191,8 @@ def main():
     # 1) LA FIRMA DEL LOGIN VALE SOLO A CASA
     # ------------------------------------------------------------------
     print("\n[la firma del login vale solo a casa]")
-    vittima = PrivateKey()
-    npub_v = server.hex_to_npub(vittima.public_key_xonly.format().hex())
+    vittima = nuova_chiave()
+    npub_v = server.hex_to_npub(pubblica_hex(vittima))
     c = TestClient(server.app)
     sfida = c.get("/api/login/nostr/sfida").json()["sfida"]
     r = c.post("/api/login/nostr",
@@ -190,7 +240,7 @@ def main():
         tg.post("/api/login/telegram",
                 json={"collaudo": True, "id": 851, "first_name": "Telegram"})
         server.MODALITA_COLLAUDO = False
-        altra = PrivateKey()
+        altra = nuova_chiave()
         sfida = tg.get("/api/login/nostr/sfida",
                        headers={"host": "barattolo.store"}).json()["sfida"]
         ev = firma_login(altra, sfida, "wss://relay.cattivo.example/")
@@ -229,7 +279,7 @@ def main():
               401, r.status_code)
         sfida = tg.get("/api/login/nostr/sfida",
                        headers={"host": "barattolo.store"}).json()["sfida"]
-        npub_a = server.hex_to_npub(altra.public_key_xonly.format().hex())
+        npub_a = server.hex_to_npub(pubblica_hex(altra))
         tg_casa = TestClient(server.app, base_url="https://barattolo.store")
         tg_casa.cookies.update(dict(tg.cookies))
         r = tg_casa.post("/api/me/npub/collega-firma", json={
@@ -252,7 +302,7 @@ def main():
         b = TestClient(server.app)
         b.post("/api/login/telegram",
                json={"collaudo": True, "id": tg_id, "first_name": "Badge"})
-        sk = PrivateKey()
+        sk = nuova_chiave()
         s = b.get("/api/login/nostr/sfida").json()["sfida"]
         b.post("/api/me/npub/collega-firma",
                json={"evento": firma_login(sk, s, "http://testserver")})
@@ -270,7 +320,7 @@ def main():
 
     # il gesto di sempre
     titolare, sk1 = account_col_badge(861)
-    npub1 = server.hex_to_npub(sk1.public_key_xonly.format().hex())
+    npub1 = server.hex_to_npub(pubblica_hex(sk1))
     prova("il banco: badge verificato, accesso libero", (npub1, 1, ""),
           riga(861))
     altro, biglietto = chiedi_biglietto(sk1)
@@ -305,8 +355,8 @@ def main():
     # il titolare collega UN'ALTRA chiave mentre il biglietto e' in giro
     titolare, sk3 = account_col_badge(863)
     estraneo, biglietto = chiedi_biglietto(sk3)
-    sk4 = PrivateKey()
-    npub4 = server.hex_to_npub(sk4.public_key_xonly.format().hex())
+    sk4 = nuova_chiave()
+    npub4 = server.hex_to_npub(pubblica_hex(sk4))
     s = titolare.get("/api/login/nostr/sfida").json()["sfida"]
     r = titolare.post("/api/me/npub/collega-firma", json={
         "evento": firma_login(sk4, s, "http://testserver")})

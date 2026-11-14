@@ -242,7 +242,37 @@ def giro(c, ids):
     prova("...e il battito si sveglia per lui", True, SRV._swap_auto_da_guardare())
     sid = righe[0]["swap_id"]
     cart.sposta(CARTONE.cartone, sid, "transaction.mempool")
-    prova("col lockup il giro ritira", 1, asyncio.run(SRV.swap_auto_giro()))
+    # (14 nov 2026, audit-swap-conferma; Andrea: «Aspetta una conferma»)
+    # il lockup IN CODA si puo' ancora sostituire: il giro aspetta, il
+    # segreto non esce, nessuno viene avvisato e il battito resta sveglio
+    prova("col lockup solo in coda il giro NON ritira: niente al fornitore, niente "
+          "a chi vende, e il battito resta sveglio",
+          (0, 0, [], True),
+          (asyncio.run(SRV.swap_auto_giro()), len(CARTONE.cartone["stato"]["trasmesse"]),
+           list(banco.DETTO), SRV._swap_auto_da_guardare()))
+    d = c.get(f"/api/swap/auto/ordine/{oid}", headers=TESTE[999]).json()
+    prova("...e la carta resta «in corso»", ("in_volo", False),
+          ((d.get("corso") or {}).get("pagamento"), bool((d.get("corso") or {}).get("ritirato"))))
+    # a ridosso della scadenza, anche confermato, il segreto resta a casa
+    # e gli admin lo sanno UNA volta
+    cart.sposta(CARTONE.cartone, sid, "transaction.confirmed")
+    cima_vera = CARTONE.cartone["stato"]["cima"]
+    CARTONE.cartone["stato"]["cima"] = (CARTONE.cartone["swap"][sid]["timeoutBlockHeight"]
+                                        - SRV.SWAP_AUTO_MARGINE_RITIRO + 1)
+    SRV._SWAP_AUTO_DETTO_TARDI.clear()
+    banco.AVVISI.clear()
+    giri = (asyncio.run(SRV.swap_auto_giro()), asyncio.run(SRV.swap_auto_giro()))
+    tardi = [t for t in banco.AVVISI if "non ritiro i bitcoin" in t]
+    prova("confermato ma a 11 blocchi dalla scadenza: niente ritiro, niente al "
+          "fornitore, niente a chi vende, e gli admin lo sanno una volta sola (due "
+          "giri, un avviso)",
+          ((0, 0), 0, [], 1, True),
+          (giri, len(CARTONE.cartone["stato"]["trasmesse"]), list(banco.DETTO),
+           len(tardi), bool(tardi) and f"#{oid}" in tardi[0]))
+    CARTONE.cartone["stato"]["cima"] = cima_vera
+    banco.DETTO.clear()
+    prova("col lockup confermato, e la scadenza lontana, il giro ritira", 1,
+          asyncio.run(SRV.swap_auto_giro()))
     swap = CARTONE.cartone["swap"][sid]
     prova("...il cartone l'ha preso e chiude la fattura", "invoice.settled",
           swap.get("stato"))
@@ -293,6 +323,41 @@ def giro(c, ids):
     SRV._SWAP_AUTO_GUARDATO.clear()
     prova("confermato: la riga lo ricorda e il battito torna a dormire", (1, False),
           (conf, SRV._swap_auto_da_guardare()))
+    # (14 nov 2026, audit-swap-conferma) «CONFERMATO» E' IL NOSTRO RITIRO.
+    # La stessa riga, rimessa «da guardare», col lockup speso e confermato
+    # da UN'ALTRA transazione (il rimborso del fornitore, per dire): non e'
+    # «fatto», prende il 2, e gli admin lo sanno una volta. Poi tutto torna
+    # com'era, per le scene dopo.
+    nostra_spesa = dict(ctx["spese"][lk])
+    cart.spendi(ctx, swap, "cd" * 32, [{"sats": swap["onchainAmount"] - 300,
+                                        "script": "0014" + "22" * 20}])
+    ctx["spese"][lk]["confermata"] = True
+    con = SRV.db()
+    con.execute("UPDATE swap_auto SET confermato=0 WHERE ordine_id=?", (oid,))
+    con.commit()
+    con.close()
+    banco.AVVISI.clear()
+    banco.DETTO.clear()
+    for _ in range(2):
+        SRV._SWAP_AUTO_GUARDATO.clear()
+        asyncio.run(SRV.swap_auto_giro())
+    con = SRV.db()
+    conf = con.execute("SELECT confermato FROM swap_auto WHERE ordine_id=?",
+                       (oid,)).fetchone()[0]
+    con.close()
+    SRV._SWAP_AUTO_GUARDATO.clear()
+    altro = [t for t in banco.AVVISI if "NON è il nostro ritiro" in t]
+    prova("il lockup speso e confermato da un altro: la riga prende il 2, gli admin lo "
+          "sanno UNA volta (con l'ordine e l'id di chi ha speso), a chi vende non si "
+          "scrive niente di falso, e il battito non la riguarda",
+          (2, 1, True, [], False),
+          (conf, len(altro), bool(altro) and f"#{oid}" in altro[0] and "cd" * 32 in altro[0],
+           list(banco.DETTO), SRV._swap_auto_da_guardare()))
+    ctx["spese"][lk] = nostra_spesa
+    con = SRV.db()
+    con.execute("UPDATE swap_auto SET confermato=1 WHERE ordine_id=?", (oid,))
+    con.commit()
+    con.close()
     ctx["stato"]["tariffe"].update(halfHourFee=2)
     con = SRV._swap_pag_db()
     h = con.execute("SELECT hash FROM swap_pagamenti WHERE ordine_id=?",

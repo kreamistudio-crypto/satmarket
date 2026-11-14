@@ -81645,3 +81645,134 @@ com'era prima»).
 PROVATO: le sezioni del banner (intestazione, libro vuoto, card con le
 monete) più la suite severa e i collaudi. Anteprime in
 /mnt/project-files/card-p2p-usdt/chf/ (8 e 9).
+
+## Lo swap automatico aspetta una conferma: il segreto esce solo su un lockup confermato e lontano dalla scadenza (14 nov 2026, cantiere audit-swap-conferma, dal primo audit di sicurezza; Andrea sulla card: «Aspetta una conferma»)
+
+DA DOVE VIENE. Il sospetto 17 del primo audit (rapporto in
+`/mnt/project-files/audit-sicurezza/satmarket/run-1/`, i dettagli
+stanno solo lì). In due righe: nello swap automatico il server paga la
+fattura del fornitore coi sats di chi vende, e poi ritira i bitcoin
+con una transazione che porta dentro il SEGRETO; chi ha il segreto
+incassa la fattura. Fino a ieri il ritiro partiva appena il lockup si
+VEDEVA in rete, anche in coda, e la distanza dalla scadenza serviva
+solo a scegliere la tariffa. Un lockup in coda si può ancora
+sostituire, e a scadenza vicina il rimborso del fornitore può finire
+in un blocco prima del nostro ritiro: in tutt'e due i casi un
+fornitore disonesto avrebbe avuto i sats della fattura E i bitcoin. Chi
+può farlo è il fornitore (SATS Routing, o chi ne comanda l'API), non
+un utente; la leva in produzione è accesa solo per gli admin, coi
+tetti del cambio. Andrea, fra le tre strade della card (aspettare una
+conferma; conferma solo sopra una cifra; lasciare com'è), ha scelto la
+prima, sapendo che il cambio diventa più lento: circa dieci minuti in
+media. Con quella entrava, scritto nel resoconto, anche il rifiuto di
+ritirare a scadenza troppo vicina.
+
+COSA. In `swap_auto_ritira`, per il PRIMO ritiro soltanto (la riga non
+ha ancora un `ritiro_txid`: il segreto non è mai uscito):
+1. il lockup deve stare in un blocco: dall'elenco
+   `/address/<lockup>/utxo` si tengono solo le uscite con
+   `status.confirmed` vero (un True vero, non una scritta), lo stesso
+   campo che legge l'on-chain del mercatino. In coda: «aspetta», col
+   perché «lockup senza conferma», e si riprova a ogni battito;
+2. alla scadenza devono restare almeno `SWAP_AUTO_MARGINE_RITIRO`
+   blocchi (12, circa due ore). Meno, o scadenza passata: «no»,
+   «scadenza troppo vicina», e gli admin lo sanno in «liquidita» una
+   volta per swap. Se la rete tace sull'altezza si aspetta.
+Il no non marchia la riga: decide la scadenza, giro per giro. Quando
+il segreto non esce nessuno incassa la fattura: alla scadenza il
+fornitore la annulla, i sats tornano e chi vende rifà il cambio, la
+strada del cambio fallito che c'era già. A SEGRETO USCITO i due
+cancelli non valgono più: lì resta la regola del 6 nov («o si ritira
+in tempo o si perde tutto») e il rilancio a scalini com'era.
+Nel rilancio (`swap_auto_rilancia`) «confermato» adesso vuol dire
+confermato il NOSTRO ritiro: la spesa confermata del lockup deve avere
+un'uscita sola verso l'indirizzo di chi vende. La spesa di un altro
+prende `confermato=2` (la riga non si guarda più, non c'è niente da
+rilanciare), stato «altro», e un avviso agli admin con l'ordine e l'id
+di chi ha speso. Prima quella riga diceva «fatto».
+LE PAROLE. La carta di chi vende, mentre il cambio è in corso, non
+dice più «Ci vogliono alcuni minuti»: dice «appena SATS Routing blocca
+i bitcoin e la rete li conferma li mandiamo a… Di solito basta una
+decina di minuti, a volte di più». È il solo testo che si vede
+cambiato, ed è la conseguenza della scelta. Niente NOVITA (la funzione
+è solo per gli admin) e niente da ritoccare nel libro di Tappo, che
+dei tempi dello swap automatico non parla.
+
+PERCHÉ 12 BLOCCHI. Sotto i 36 il ritiro parte già alla tariffa più
+veloce, e il rilancio lo riguarda dopo venti minuti e poi ogni dieci:
+due ore bastano per un paio di rilanci. Più largo avrebbe rifiutato
+ritiri buoni; la porta dei pagamenti ne chiede già 36 alla partenza
+(`SWAP_MARGINE_BLOCCHI`), quindi il margine morde solo se il lockup
+resta ore senza conferma.
+
+STRADE SCARTATE. La conferma solo sopra una cifra e il lasciare com'è
+(le altre due della card). Un margine anche dopo il primo ritiro: a segreto uscito
+fermarsi vuol dire regalare i bitcoin. Dire a chi vende del ritiro
+rifiutato o della spesa di un altro: sono guasti da guardare a mano,
+e una frase automatica direbbe cose che non sappiamo ancora; lo sanno
+gli admin. Controllare la conferma su un secondo esploratore: sarebbe
+una dipendenza nuova, e resta scritto come limite.
+
+I LIMITI, SCRITTI. La conferma la dice lo STESSO esploratore che dice
+il lockup (`SWAP_MEMPOOL_API`, quello del fornitore se è lui a darlo):
+il controllo vale quanto quell'esploratore. Una conferma sola non
+copre una riorganizzazione della catena. Gli scambi P2P che usano lo
+swap dal TELEFONO non sono toccati: lì ritira il telefono, non il
+server. Il «già detto» dell'avviso per la scadenza vive in memoria:
+dopo un riavvio, se la condizione dura, l'avviso torna una volta.
+
+PROVATO. `prove_swap_auto_scalini` (nella suite, senza httpx): i due
+cancelli sulla funzione vera con la rete finta (in coda in quattro
+forme, senza lockup, a 11 blocchi, alla scadenza, oltre, rete muta, il
+bordo dei 12, a segreto uscito), tre controprove rosse (senza la
+conferma, senza il margine, coi cancelli anche a segreto uscito), i
+fili del rilancio e dei due avvisi, le parole della carta.
+`prove_swap_auto_ritiro` (nei collaudi, col cartone per HTTP vero, 35):
+su due reti il lockup in coda fa aspettare e niente parte, confermato
+si ritira; il margine coi suoi bordi; a segreto uscito si ritrasmette
+anche in coda e a 5 blocchi; la spesa di un altro è «altro» col 2.
+`collaudo_swap_auto` (server vero, 54): il battito non ritira in coda
+e resta sveglio, la carta resta «in corso», a 11 blocchi niente ritiro
+e un avviso solo in due giri, poi il ritiro; la spesa di un altro, un
+avviso solo, niente di falso a chi vende. Controprove sul codice vero,
+una guardia tolta alla volta: dieci su dieci rosse.
+
+DUE RIPARAZIONI MIE, NELLO STESSO COMMIT (segnalate il 14 nov dalle
+sessioni dei cantieri delle card e della cifra USDT, che le hanno viste
+rosse nei loro giri). `collaudo_accesso_di_casa`, nato stanotte con
+`778d5d5`, sul runner della CI sarebbe stato rosso due volte, e avrebbe
+fermato la promozione:
+1. in due scene fa credere al server di essere in produzione, e lì un
+   avviso a una persona bussava davvero ad api.telegram.org (col
+   gettone finto non arrivava a nessuno): nella gabbia è «bussata
+   fuori». Nel cloud era verde perché col proxy acceso la gabbia non
+   vede il DNS. Adesso il collaudo tiene finte le due strade verso
+   Telegram per tutta la durata e manda i relay a quello morto;
+2. pretendeva coincurve, che il runner non ha («non si può saltare», e
+   usciva con 1 senza aver girato). Adesso firma con `schnorr_puro` e,
+   dove coincurve manca, monta `schnorr_puro.ChiaveXOnly` sul server
+   dopo aver visto il 503 della porta Nostr: il calco di
+   `collaudo_fusione_da_telegram`. 33 righe senza coincurve, 32 con.
+Sono le due lezioni del 2 nov (CANTIERI, «La promozione rossa del 2
+nov»), che stanotte non ho applicato: i miei giri erano col proxy
+acceso e nel venv con coincurve e httpx. LA REGOLA per le sessioni
+cloud, da qui: la suite nel venv del passo «Le prove» (websocket-client
+pillow cryptography snowballstemmer embit, e basta), i collaudi nel
+venv del loro passo (in più fastapi httpx anthropic, SENZA coincurve) e
+SENZA le variabili del proxy (`env -u HTTPS_PROXY -u https_proxy -u
+HTTP_PROXY -u http_proxy -u ALL_PROXY -u all_proxy`). Un verde girato
+altrimenti non dice niente della CI.
+COSA È GIRATO SU QUALE ALBERO. Prima sopra develop `3f8d22b9`
+(audit-parole-bot, mio), nelle condizioni della CI: la suite intera
+severa nel venv minimo, 27.874 passate, 0 fallite; i collaudi di
+`ci/collaudi.txt` nella gabbia, nel venv senza coincurve e senza
+proxy, 128 verdi su 128. Poi develop è corso a `81d62271` con tre
+commit NON miei (`9d2d6d04` DA-FARE dei franchi, `b67e5774` la cifra
+in USDT da copiare, `81d62271` l'euro del banner più piccolo): rebase
+(un solo conflitto, la coda di questo file), e tutto rifatto sopra,
+nelle stesse condizioni: la suite intera, 27.880 passate, 0 fallite;
+i collaudi, 128 verdi su 128. I due passi del job dei segreti rifatti
+a mano sull'albero e sui commit non ancora su main: puliti. NON PROVATO
+dal vivo: uno swap automatico vero dopo questo cambio (voce 9 di
+`DA-FARE-ANDREA.md`, coi tempi nuovi), e sulla VM di collaudo la mossa
+nuova del cartone (COLLAUDO, «Il cambio libero»).

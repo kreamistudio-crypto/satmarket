@@ -470,9 +470,11 @@ la moneta ₿ arancione, e il dettaglio «Preferisce ricevere on-chain».
 Mette in vendita un oggetto da 30.000 sats; Andrea compra e conferma la
 ricezione; Alan riceve in chat «premi «Conferma»» (NON i sats sul
 Lightning address), apre l'ordine, controlla l'indirizzo (quello del suo
-wallet on-chain, o lo scrive) e preme «Conferma». Entro qualche minuto
-deve arrivargli in chat «i tuoi bitcoin sono partiti» col txid; si guarda
-su mempool.space. Quel che si vede (tempi, costo, frasi storte) va nel
+wallet on-chain, o lo scrive) e preme «Conferma». Dal 14 nov 2026 il
+server ritira solo quando i bitcoin bloccati da SATS Routing hanno la
+PRIMA CONFERMA della rete (cantiere audit-swap-conferma): di solito una
+decina di minuti, a volte di più. Poi deve arrivargli in chat «i tuoi
+bitcoin sono partiti» col txid; si guarda su mempool.space. Quel che si vede (tempi, costo, frasi storte) va nel
 verbale (CANTIERI, «NON PROVATO»). Per tornare indietro:
 `SWAP_AUTO_ATTIVO = False` e riavvio (uno swap già confermato il battito
 lo finisce lo stesso: la leva ferma solo i «Conferma» nuovi).

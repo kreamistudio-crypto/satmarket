@@ -35545,7 +35545,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   ritiro dallo SCRIPT con embit (`swap_auto_tx_ritiro`: firma BIP-341 a
   foglia, witness [firma, segreto, foglia, control block]; il cooperativo
   MuSig2 embit non lo sa), `swap_auto_ritira` (scrive il txid PRIMA di
-  trasmettere, riconosce un ritiro gia' fatto). IL GIRO: a ordine
+  trasmettere, riconosce un ritiro gia' fatto). I DUE CANCELLI DEL PRIMO
+  RITIRO (14 nov 2026, cantiere audit-swap-conferma; CANTIERI, «Lo swap
+  automatico aspetta una conferma»): finche' la riga non ha un
+  `ritiro_txid`, cioe' finche' il segreto non e' mai uscito, il lockup
+  deve stare in un blocco (`status.confirmed` dell'elenco
+  `/address/<lockup>/utxo`: in coda si aspetta, «lockup senza conferma»)
+  e alla scadenza devono restare almeno `SWAP_AUTO_MARGINE_RITIRO`
+  blocchi (12; sotto, o a scadenza passata, «scadenza troppo vicina» e
+  un avviso agli admin in «liquidita», uno per swap; se la rete tace
+  sull'altezza si aspetta). A segreto uscito non valgono piu': li' c'e'
+  solo il rilancio a scalini (`swap_auto_rilancia`, 6 nov), che segna
+  `confermato=1` SOLO se la spesa confermata del lockup ha un'uscita
+  sola verso l'indirizzo di chi vende; la spesa di un altro prende
+  `confermato=2`, stato «altro», e un avviso agli admin. IL GIRO: a ordine
   confermato `_sblocca_sats` salta il Lightning address se
   `swap_auto_aspetta` (scelta + cifra nei tetti del cambio) e dice a chi
   vende di premere «Conferma»; `GET/POST /api/swap/auto/ordine/{id}`
@@ -35564,8 +35577,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   accanto a `selettoreIncassoSwap` (`renderSwapAutoProfilo` in
   «Lightning address», `selettoreIncassoAuto`, `pannelloSwapAuto`,
   `confermaSwapAuto`), e in `payoutPanel` il ramo `autoQui`. Prove:
-  `prove_swap_auto`, `prove_swap_auto_ritiro`, `prove_swap_auto_schermate`;
-  collaudo: `collaudo_swap_auto`.
+  `prove_swap_auto`, `prove_swap_auto_ritiro`, `prove_swap_auto_schermate`,
+  `prove_swap_auto_scalini` (anche i due cancelli, sulla funzione vera con
+  la rete finta); collaudo: `collaudo_swap_auto`.
 - COME VUOI RICEVERE, ANNUNCIO PER ANNUNCIO (9 nov 2026, cantiere
   incasso-annuncio; CANTIERI, «Come vuoi ricevere, annuncio per
   annuncio»). DUE SCELTE NEL PROFILO, una per come paga chi compra, con

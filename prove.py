@@ -173725,8 +173725,11 @@ def prove_canale_admin():
           # (14 nov 2026, audit-chiusure) il contenuto digitale letto
           # da chi compra fuori da 'shipped' (in disputa, per dire):
           # nelle dispute, perche' e' un fatto per chi la decide
+          # (14 nov 2026, audit-swap-conferma) lo swap automatico: il
+          # ritiro rifiutato a scadenza vicina e il lockup speso da un
+          # altro, nella liquidita' come le sue parole
           {"assistenza": 1, "dispute": 6, "dm": 1, "errori": 33,
-           "liquidita": 3, "moderazione": 14, "riepiloghi": 27}, per_stanza)
+           "liquidita": 5, "moderazione": 14, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -173761,7 +173764,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "94 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "96 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -173770,7 +173773,8 @@ def prove_canale_admin():
           "all'assistente del bot, e le dispute P2P on-chain: aperta e "
           "decisa, 30 ott 2026; dal 2 nov la nascita delle parole dello "
           "swap automatico; dal 14 nov il contenuto digitale letto fuori "
-          "da 'shipped')", 94,
+          "da 'shipped', e dello swap automatico il ritiro rifiutato a "
+          "scadenza vicina e il lockup speso da un altro)", 96,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -189339,6 +189343,121 @@ def prove_swap_auto_scalini():
           (True, True), ("_swap_auto_tariffa(base, swap_auto_scalino(" in
                          pezzo("swap_auto_ritira"),
                          "esito.get('sats') or r['ricevi']" in giro))
+    # --- (14 nov 2026, cantiere audit-swap-conferma, dal primo audit di
+    # sicurezza; Andrea sulla card: «Aspetta una conferma») I DUE CANCELLI
+    # DEL PRIMO RITIRO, sulla funzione vera con la rete finta: il segreto
+    # non esce su un lockup in coda ne' a ridosso della scadenza. Qui
+    # senza httpx; il giro intero, col cartone, sta nei collaudi
+    # (`prove_swap_auto_ritiro`). «Passato i cancelli» si riconosce dal
+    # passo DOPO: la lettura dei byte del lockup, che la rete finta nega.
+    import asyncio as _aio, sqlite3 as _sq, tempfile as _tf, shutil as _sh
+    cartella = _tf.mkdtemp()
+    dbf = os.path.join(cartella, "swap.db")
+
+    def _db():
+        c = _sq.connect(dbf)
+        c.row_factory = _sq.Row
+        return c
+    i = _SORGENTE.index("\nSWAP_AUTO_MARGINE_RITIRO = ")
+    canc = {"json": json, "re": re, "time": __import__("time"), "db": _db,
+            "SWAP_AUTO_NATO": "nato", "SWAP_AUTO_RITIRATO": "ritirato",
+            "swap_fornitore": lambda fid: {"mempool": "http://rete", "rete": "bitcoin"},
+            "swap_rete": lambda: "bitcoin", "print": lambda *a, **k: None,
+            "_swap_auto_parole_vps": lambda: None}
+    exec(_SORGENTE[i + 1:_SORGENTE.index("\n\n", i + 1)], canc)
+    exec(pezzo("_swap_auto_prepara"), canc)
+    for n in ("_swap_auto_restano", "swap_auto_ritira"):
+        exec("async " + pezzo(n), canc)
+    RETE = {}
+    chieste = []
+
+    async def _leggi(base, percorso):
+        chieste.append(percorso)
+        return RETE.get(percorso.rsplit("/", 1)[-1] if "/address/" in percorso
+                        or percorso.endswith("/height") else "altro")
+    canc["_swap_mempool_leggi"] = _leggi
+    con = _db()
+    canc["_swap_auto_prepara"](con)
+    con.execute("INSERT INTO swap_auto(indice, ordine_id, fornitore, swap_id, stato, "
+                "risposta, creato) VALUES (1, 7, 'satsrouting', 'abc', 'nato', ?, 0)",
+                (json.dumps({"lockupAddress": "bc1plock", "onchainAmount": 49000,
+                             "timeoutBlockHeight": 1000}),))
+    con.commit()
+    con.close()
+    margine = canc["SWAP_AUTO_MARGINE_RITIRO"]
+
+    def ritira(confermato, cima, gia=""):
+        con = _db()
+        con.execute("UPDATE swap_auto SET ritiro_txid=? WHERE indice=1", (gia,))
+        con.commit()
+        con.close()
+        RETE.clear()
+        if confermato is not None:
+            RETE["utxo"] = json.dumps([{"txid": "aa" * 32, "vout": 0, "value": 49000,
+                                        "status": confermato}])
+        if cima is not None:
+            RETE["height"] = str(cima)
+        chieste.clear()
+        e = _aio.run(canc["swap_auto_ritira"](1, "bc1qdove", 48600))
+        return e["stato"], e["perche"], any(x.endswith("/hex") for x in chieste)
+    SI, NO = {"confirmed": True}, {"confirmed": False}
+    prova("cancelli: un lockup che non sta in un blocco (in coda, senza `status`, o con "
+          "un «si'» che non e' un vero True) fa ASPETTARE, e i suoi byte nemmeno si leggono",
+          [("aspetta", "lockup senza conferma", False)] * 4,
+          [ritira(NO, 800), ritira({}, 800), ritira("confirmed", 800),
+           ritira({"confirmed": "true"}, 800)])
+    prova("cancelli: senza nessun lockup si aspetta come sempre", ("aspetta", "lockup non visto", False),
+          ritira(None, 800))
+    prova("cancelli: lockup confermato, ma la scadenza a meno del margine (o gia' "
+          "passata): NO, e i byte non si leggono; se la rete tace sull'altezza, si aspetta",
+          [("no", "scadenza troppo vicina", False)] * 3
+          + [("aspetta", "la rete non dice l'altezza", False)],
+          [ritira(SI, 1000 - margine + 1), ritira(SI, 1000), ritira(SI, 1040),
+           ritira(SI, None)])
+    prova("cancelli: confermato e col margine giusto (il bordo e' compreso) si va avanti "
+          "al passo dopo",
+          [("aspetta", "lockup illeggibile", True)] * 2,
+          [ritira(SI, 1000 - margine), ritira(SI, 800)])
+    prova("cancelli: a segreto GIA' uscito (la riga ha un ritiro scritto) non valgono "
+          "piu': in coda e a scadenza passata si va avanti lo stesso (regola del 6 nov)",
+          [("aspetta", "lockup illeggibile", True)] * 2,
+          [ritira(NO, 1040, "bb" * 32), ritira(NO, None, "bb" * 32)])
+    prova("cancelli: il margine sta fra un'ora e lo scalino urgente",
+          True, 6 <= margine < amb["SWAP_AUTO_BLOCCHI_URGENTE"])
+    # controprove: senza un cancello la tabella diventa rossa
+    for nome, via, messo in (
+            ("senza la conferma", "            uscite = ferme\n", ""),
+            ("senza il margine", "        if restano < SWAP_AUTO_MARGINE_RITIRO:\n",
+             "        if False:\n"),
+            ("coi cancelli anche a segreto uscito", '    primo = not r["ritiro_txid"]\n',
+             "    primo = True\n")):
+        buono = pezzo("swap_auto_ritira")
+        exec("async " + buono.replace(via, messo), canc)
+        esiti = [ritira(NO, 800), ritira(SI, 1000 - margine + 1), ritira(NO, 1040, "bb" * 32)]
+        exec("async " + buono, canc)
+        prova(f"...controprova, {nome}: la tabella non torna", (1, True),
+              (buono.count(via),
+               esiti != [("aspetta", "lockup senza conferma", False),
+                         ("no", "scadenza troppo vicina", False),
+                         ("aspetta", "lockup illeggibile", True)]))
+    _sh.rmtree(cartella, ignore_errors=True)
+    ril = pezzo("swap_auto_rilancia")
+    prova("cancelli: nel rilancio «confermato» e' solo il NOSTRO ritiro (un'uscita sola, "
+          "all'indirizzo di chi vende); la spesa di un altro prende il 2 e lo sanno gli "
+          "admin; e il ritiro rifiutato per la scadenza lo sanno gli admin, una volta",
+          (True, True, True, True, True),
+          ('pagate[0].get("scriptpubkey") == arrivo' in ril and "len(pagate) == 1" in ril,
+           "(1 if nostra else 2, int(indice))" in ril,
+           'esito["stato"] == "altro"' in fermi and "notifica_admin(" in
+           fermi[fermi.index('esito["stato"] == "altro"'):fermi.index('esito["stato"] != "rilanciato"')],
+           'esito.get("perche") == SWAP_AUTO_TARDI' in giro and "notifica_admin(" in giro,
+           "_SWAP_AUTO_DETTO_TARDI.add(" in giro))
+    pagina = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                  encoding="utf-8").read()
+    prova("cancelli: la carta di chi vende dice che si aspetta la conferma della rete, "
+          "e non promette piu' «alcuni minuti»", (True, False),
+          ("appena SATS Routing blocca i bitcoin e la rete li conferma" in pagina,
+           "Ci vogliono alcuni minuti: ti avvisiamo noi" in pagina))
     try:
         from embit.transaction import Transaction as _Tx, TransactionInput as _TI, \
             TransactionOutput as _TO
@@ -189372,7 +189491,15 @@ def prove_swap_auto_ritiro():
     2. il giro dopo riconosce il ritiro gia' fatto (niente doppioni);
     3. i lockup che mentono (meno sats, un altro script) e le cifre
        storte fermano il ritiro PRIMA che il segreto esca;
-    4. la rete della destinazione: solo indirizzi di questa rete."""
+    4. la rete della destinazione: solo indirizzi di questa rete.
+    (14 nov 2026, cantiere audit-swap-conferma, dal primo audit di
+    sicurezza; Andrea sulla card: «Aspetta una conferma») Il segreto esce
+    solo su un lockup CONFERMATO e con almeno SWAP_AUTO_MARGINE_RITIRO
+    blocchi alla scadenza: un lockup in coda si puo' ancora sostituire, e
+    a scadenza vicina il rimborso del fornitore puo' arrivare prima del
+    nostro ritiro. Vale per il PRIMO ritiro: a segreto uscito si ritira
+    comunque (la regola del 6 nov). E «confermato», nel rilancio, vuol
+    dire confermato il NOSTRO ritiro, non la spesa di un altro."""
     print("\n[lo swap automatico, tappa 2: il ritiro]")
     import asyncio as _aio, shutil as _sh, sqlite3 as _sq, tempfile as _tf
     from urllib.parse import urlparse as _up
@@ -189410,14 +189537,16 @@ def prove_swap_auto_ritiro():
         exec("async " + pezzo(n), amb)
     for n in ("SWAP_AUTO_CHIESTO", "SWAP_AUTO_NATO", "SWAP_AUTO_MENTE",
               "SWAP_AUTO_GIU", "SWAP_AUTO_CAMPI", "SWAP_AUTO_RITIRATO",
-              "SWAP_AUTO_TARIFFA_MAX"):
+              "SWAP_AUTO_TARIFFA_MAX", "SWAP_AUTO_MARGINE_RITIRO"):
         i = _SORGENTE.index(f"\n{n} = ")
         exec(_SORGENTE[i + 1:_SORGENTE.index("\n\n", i + 1)].split("\n#")[0], amb)
     from embit import ec as _ec, script as _esc
     from embit.networks import NETWORKS as _NET
     from embit.transaction import Transaction as _Tx
 
-    def giro(rete, ordine, modo="normale", tariffe=None):
+    CODA = {}      # ordine -> (l'esito a lockup in coda, trasmesse, riga)
+
+    def giro(rete, ordine, modo="normale", tariffe=None, cima=None):
         srv, porta = _cart.avvia(0, rete)
         c = srv.cartone
         c["stato"]["tariffe"].update(tariffe or {})
@@ -189440,6 +189569,20 @@ def prove_swap_auto_ritiro():
         sid = nato["swap_id"]
         _cart.sposta(c, sid, "transaction.mempool")
         c["stato"]["modo"] = "normale"
+        # (14 nov 2026) il lockup IN CODA: si vede, ma si puo' ancora
+        # sostituire — il ritiro aspetta e il segreto non esce
+        coda = _aio.run(amb["swap_auto_ritira"](nato["indice"], dest,
+                                                nato["onchain"] - 400))
+        con = _db()
+        scritto = con.execute("SELECT stato, ritiro_txid FROM swap_auto WHERE "
+                              "indice=?", (nato["indice"],)).fetchone()
+        con.close()
+        CODA[ordine] = (coda["stato"], coda["perche"], coda["txid"],
+                        len(c["stato"]["trasmesse"]), tuple(scritto))
+        _cart.sposta(c, sid, "transaction.confirmed")
+        if cima is not None:
+            c["stato"]["cima"] = c["swap"][sid]["timeoutBlockHeight"] - cima \
+                if isinstance(cima, int) else cima
         dopo = _aio.run(amb["swap_auto_ritira"](nato["indice"], dest,
                                                 nato["onchain"] - 400))
         return srv, c, nato, dest, prima, dopo
@@ -189453,6 +189596,9 @@ def prove_swap_auto_ritiro():
         prova(f"swap auto ({rete}): nato, e senza lockup il ritiro aspetta",
               ("nato", "aspetta", "lockup non visto"),
               (nato["stato"], prima["stato"], prima["perche"]))
+        prova(f"swap auto ({rete}): col lockup solo IN CODA il ritiro aspetta, e il "
+              "segreto non esce (niente trasmesso, niente scritto nella riga)",
+              ("aspetta", "lockup senza conferma", "", 0, ("nato", "")), CODA[ordine])
         prova(f"swap auto ({rete}): il ritiro dallo script, preso dal cartone col bundle",
               ("ritirato", 1, "script", "invoice.settled", True),
               (dopo["stato"], len(tr), tr[0]["via"] if tr else None,
@@ -189472,6 +189618,74 @@ def prove_swap_auto_ritiro():
               ("ritirato", dopo["txid"], 1), (ancora["stato"], ancora["txid"],
                                               len(c["stato"]["trasmesse"])))
         srv.shutdown()
+
+    # --- (14 nov 2026) IL MARGINE ALLA SCADENZA, al primo ritiro: sotto
+    # i dodici blocchi (e a scadenza passata) il segreto resta a casa;
+    # se la rete non dice l'altezza si aspetta ---
+    margine = amb["SWAP_AUTO_MARGINE_RITIRO"]
+    esiti = []
+    for n, (ordine, cima) in enumerate(((7, margine - 1), (8, 0), (9, -3),
+                                        (10, "muta"), (11, margine))):
+        srv, c, nato, dest, prima, dopo = giro("bitcoin", ordine, cima=cima)
+        con = _db()
+        scritto = con.execute("SELECT ritiro_txid FROM swap_auto WHERE indice=?",
+                              (nato["indice"],)).fetchone()[0]
+        con.close()
+        esiti.append((dopo["stato"], dopo["perche"], len(c["stato"]["trasmesse"]),
+                      bool(scritto)))
+        if n == 0:
+            # ...e il no non e' per sempre nel codice: e' la scadenza che
+            # non torna indietro. Con la cima rimessa lontana si ritira
+            # (la riga non ha preso nessun marchio)
+            c["stato"]["cima"] = c["swap"][nato["swap_id"]]["timeoutBlockHeight"] - 100
+            poi = _aio.run(amb["swap_auto_ritira"](nato["indice"], dest,
+                                                   nato["onchain"] - 400))
+        srv.shutdown()
+    prova("margine: a 11 blocchi dalla scadenza, alla scadenza e oltre, il primo ritiro "
+          "NON parte e il segreto non esce; con la rete muta sull'altezza si aspetta; "
+          "a 12 blocchi giusti si ritira",
+          [("no", "scadenza troppo vicina", 0, False)] * 3
+          + [("aspetta", "la rete non dice l'altezza", 0, False),
+             ("ritirato", "", 1, True)], esiti)
+    prova("...e il rifiuto non marchia la riga: e' la scadenza a decidere, giro per giro",
+          "ritirato", poi["stato"])
+    # A SEGRETO USCITO i due cancelli non valgono piu' (la regola del 6
+    # nov: o si ritira in tempo o si perde tutto). La rete «dimentica» il
+    # ritiro, il lockup non risulta in un blocco (il cartone, a fattura
+    # chiusa, lo dice senza conferma) e la scadenza e' a 5 blocchi: si
+    # ritrasmette lo stesso.
+    srv, c, nato, dest, prima, dopo = giro("bitcoin", 12)
+    lk = c["swap"][nato["swap_id"]]["lockup"]["id"]
+    del c["spese"][lk]
+    c["stato"]["trasmesse"].clear()
+    c["stato"]["cima"] = c["swap"][nato["swap_id"]]["timeoutBlockHeight"] - 5
+    import urllib.request as _ur
+    visto = json.loads(_ur.urlopen(
+        f"http://127.0.0.1:{srv.server_address[1]}/esplora/address/"
+        f"{c['swap'][nato['swap_id']]['lockupAddress']}/utxo").read())
+    ancora = _aio.run(amb["swap_auto_ritira"](nato["indice"], dest, nato["onchain"] - 400))
+    prova("...a segreto uscito i cancelli non valgono: ritiro perso dalla rete, lockup "
+          "detto senza conferma, 5 blocchi alla scadenza, e si ritrasmette lo stesso",
+          ([False], "ritirato", 1),
+          ([u["status"]["confirmed"] for u in visto], ancora["stato"],
+           len(c["stato"]["trasmesse"])))
+    # «CONFERMATO» E' IL NOSTRO RITIRO, NON LA SPESA DI UN ALTRO: il
+    # lockup lo spende un'altra transazione (il rimborso del fornitore,
+    # per dire) e finisce in un blocco — la riga non dice «fatto»
+    s_altro = c["swap"][nato["swap_id"]]
+    _cart.spendi(c, s_altro, "ab" * 32, [{"sats": s_altro["onchainAmount"] - 300,
+                                          "script": "0014" + "11" * 20}])
+    c["spese"][lk]["confermata"] = True
+    e_altro = _aio.run(amb["swap_auto_rilancia"](nato["indice"]))
+    con = _db()
+    segno = con.execute("SELECT confermato FROM swap_auto WHERE indice=?",
+                        (nato["indice"],)).fetchone()[0]
+    con.close()
+    prova("rilancio: il lockup speso e confermato da UN ALTRO non e' «confermato»: "
+          "stato «altro», con l'id di chi l'ha speso, e la riga prende il 2",
+          ("altro", "ab" * 32, "il lockup l'ha speso un altro", 2),
+          (e_altro["stato"], e_altro["txid"], e_altro.get("perche"), segno))
+    srv.shutdown()
 
     # --- (6 nov 2026) IL RITIRO A SCALINI: la coda di adesso al ritiro,
     # e il rilancio RBF di un ritiro fermo, contro il cartone che
@@ -189573,11 +189787,15 @@ def prove_swap_auto_ritiro():
     esiti = {}
     for modo in ("lockup_meno", "lockup_altro_script"):
         srv, c, nato, dest, prima, dopo = giro("bitcoin", 3, modo)
-        esiti[modo] = (dopo["stato"], dopo["perche"], len(c["stato"]["trasmesse"]))
+        esiti[modo] = (dopo["stato"], dopo["perche"], len(c["stato"]["trasmesse"]),
+                       CODA[3][1])
         srv.shutdown()
-    prova("swap auto: un lockup che porta meno, o con un altro script: niente ritiro",
-          {"lockup_meno": ("no", "il lockup porta meno di quanto promesso", 0),
-           "lockup_altro_script": ("aspetta", "lockup non visto", 0)}, esiti)
+    prova("swap auto: un lockup che porta meno, o con un altro script: niente ritiro "
+          "(e in coda, prima della conferma, nemmeno si giudica: si aspetta)",
+          {"lockup_meno": ("no", "il lockup porta meno di quanto promesso", 0,
+                           "lockup senza conferma"),
+           "lockup_altro_script": ("aspetta", "lockup non visto", 0,
+                                   "lockup non visto")}, esiti)
     srv, porta = _cart.avvia(0, "bitcoin")
     c = srv.cartone
     k = amb["swap_auto_chiavi"](M, 40)
