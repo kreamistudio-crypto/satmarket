@@ -1347,6 +1347,18 @@ P2P_USDT_SOLO_ADMIN = True
 # Vale solo per chi ha P2P_ONCHAIN_ATTIVO e gli USDT (P2P_USDT_ATTIVO,
 # con P2P_USDT_SOLO_ADMIN). Spento di serie; sul collaudo si accende.
 P2P_ONCHAIN_USDT_ATTIVO = False
+# GLI ORDINI P2P IN FRANCHI SVIZZERI (14 nov 2026, cantiere p2p-chf,
+# Andrea: «abbiamo stretto una collaborazione con Lugano»). Accanto agli
+# ordini in euro e in USDT, ordini Mostro in CHF: la garanzia resta la
+# hold invoice Lightning di sempre, i franchi viaggiano fuori da Mostro
+# (TWINT, bonifico svizzero, Revolut, Wise, contanti). Il tetto resta
+# quello in euro, tradotto in franchi al cambio. Serve anche il gesto sul
+# nodo («CHF» fra le valute accettate): sta in DA-FARE-ANDREA. Spento di
+# serie; sul collaudo si accende.
+P2P_CHF_ATTIVO = False
+# Con la leva accesa, i franchi li vedono solo gli admin finche' questa
+# resta True. False = tutti gli ammessi al P2P.
+P2P_CHF_SOLO_ADMIN = True
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
 # RGB_ATTIVO si accende; una riga storta vale «chiusa a tutti» e lo dice.

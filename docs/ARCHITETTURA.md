@@ -35337,6 +35337,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   di «I miei scambi» card per card; i fogli e i toast lo chiamano sulla
   loro frase. Senza DOM (un banco) torna l'HTML com'era. Le prove:
   `prove_p2p_usdt`, `prove_usdt_due_reti`, `prove_usdt_moderatori`.
+- GLI ORDINI P2P IN FRANCHI SVIZZERI (14 nov 2026, cantiere p2p-chf; il
+  perché in CANTIERI, «Gli ordini P2P in franchi svizzeri»). Il calco
+  dell'USDT, ma il franco si paga come l'euro: `f` = `CHF` nel 38383, il
+  nodo lo prezza coi provider di sempre (niente `pegged`), e serve solo
+  «CHF» in `fiat_currencies_accepted`. SERVER: le leve `P2P_CHF_ATTIVO`
+  (spenta) e `P2P_CHF_SOLO_ADMIN` (accesa), il giudice `p2p_chf_ammesso`
+  (/api/me `p2p_chf`); `VALUTE_CAMBIO` col franco e le buste con
+  `cambio_chf`, l'import da Nostr fermo a `VALUTE_IMPORT` (euro, dollaro);
+  la colonna `p2p_ordini.fiat` scritta a ogni 38383 e letta da
+  `p2p_chf_ordine` (i metodi non bastano: Revolut, Wise e contanti stanno
+  in due valute); il traduttore `p2p_chf_frase` accanto a quello degli
+  USDT negli stessi cinque punti; avvisi «ordine nuovo» e post dei canali
+  in CHF (il post tace coi franchi solo agli admin). APP: il blocco «I
+  FRANCHI SVIZZERI» — `P2P_METODI_CHF`, `chfVistoP2P`/`chfP2P`, i giudici
+  `giudiceTwintP2P` e `giudiceIbanSvizzeroP2P`, i form `twint` e
+  `bonifico-ch` prima della `sepa`, `chfPerSat`, `tettoInValutaP2P` per
+  il tetto generale e quello del contanti; le parole dei soldi dal ramo
+  dei franchi di `paroleUsdtP2P`; la coppia `chf` della card della home.
+  Fuori: on-chain e Barattozon in franchi. Le prove: `prove_p2p_chf`.
 - GLI USDT NEGLI SCAMBI P2P ON-CHAIN (2 nov 2026, cantiere
   p2p-onchain-usdt; il perché in CANTIERI, «Gli USDT negli scambi P2P
   on-chain»). La GARANZIA NON CAMBIA: i sats nel 2-di-3 bitcoin di

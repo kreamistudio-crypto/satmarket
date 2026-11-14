@@ -34352,6 +34352,9 @@ def prove_cambio():
              "httpx": _finto_coingecko(chiamate, muto=muto),
              "ORE_CAMBIO_VALIDO": ore, "CAMBIO_TTL": 120,
              "CAMBIO_RIPROVA_S": 60, "VALUTE_CAMBIO": ("eur", "usd"),
+             # l'import resta a euro e dollari anche col franco (14 nov
+             # 2026, cantiere p2p-chf)
+             "VALUTE_IMPORT": ("eur", "usd"),
              "_cambio_cache": {"valori": {"eur": valore, "usd": usd},
                                "quando": quando, "tentato": 0.0},
              # l'andamento della card del libro (13 nov 2026, cantiere
@@ -63846,7 +63849,7 @@ def prove_card_p2p_vetrina():
           can.index("raise HTTPException(\n            400, \"Amazon")
           < can.index('_foto_subito_p2p(ordine if buono else "")')
           # (cura 4) il post si salta anche sul doppione e sulla raffica
-          < can.index("if (canale_id() or vetrina_ok or canale_bitcoin_podcast()) \\\n            and not doppione and not raffica:"))
+          < can.index("if (canale_id() or vetrina_ok or canale_bitcoin_podcast()) \\\n            and not doppione and not raffica and not chf_chiuso:"))
     prova("la fotografia dell'orologio tiene fuori gli usciti, e la loro lista invecchia",
           True, "eventi=_senza_i_via_p2p(_vetrina_foto_p2p(ultimi, info, adesso), via))"
           in pezzo("_fotografa_libro_p2p")
@@ -63919,8 +63922,9 @@ def prove_card_p2p_vetrina():
     _aio.run(uno())
     prova("...senza un ordine atteso il giro e' uno", 1, len(giri))
     prova("il client manda l'id del suo ordine al canale, mai un nome provvisorio", True,
+          # (14 nov 2026, cantiere p2p-chf) con la valuta dei franchi in coda
           "annunciaCanaleP2P(lato, euro, metodo, convenienzaCanaleP2P(ord),\n"
-          "                      provvisorioP2P(agg.id) ? '' : agg.id);" in mini)
+          "                      provvisorioP2P(agg.id) ? '' : agg.id," in mini)
     prova("il ritorno nel libro aspetta il suo ordine, presa annullo e scadenza no", [True, True],
           ['_foto_subito_p2p(ev["ordine"])' in pezzo("_foto_dopo_evento_p2p"),
            "    if ev.get(\"momento\") in P2P_MOMENTI_FUORI_FOTO:\n        _foto_subito_p2p()\n"
@@ -68954,7 +68958,7 @@ def prove_p2p_dettaglio():
         # il contanti di persona (30 set 2026): la riga della regola e il
         # giudice del tetto, che il dettaglio e la conferma chiamano
         "function contantiAManoP2P(metodi){",
-        "function giudiceContantiP2P(euro, metodi, tetto){",
+        "function giudiceContantiP2P(euro, metodi, tetto, cod){",
         "function regolaContantiFoglioP2P(metodi, tetto, lato){",
         "function maxEuroContantiP2P(){",
         # (12 ott 2026, contanti-solo-scelti) la zona nel dettaglio, coi suoi giudici veri
@@ -79744,7 +79748,9 @@ def prove_p2p_pubblica():
     # (1 nov 2026, cantiere p2p-usdt) la valuta e' quella del foglio: USDT
     # solo se scelta, e qualunque altra cosa resta l'EUR di sempre
     prova("...nella valuta del foglio: EUR di serie, USDT solo se scelta", True,
-          "fiat_code: String(v.valuta || '').toUpperCase() === 'USDT' ? 'USDT' : 'EUR'," in puro)
+          # (14 nov 2026, cantiere p2p-chf) ...e CHF coi franchi
+          "fiat_code: String(v.valuta || '').toUpperCase() === 'USDT' ? 'USDT'\n"
+          "      : String(v.valuta || '').toUpperCase() === 'CHF' ? 'CHF' : 'EUR'," in puro)
     prova("il lato lo dice la scheda in cui si sta", True,
           "kind: lato === 'compro' ? 'buy' : 'sell'," in puro)
     prova("l'ordine nasce 'pending': lo prende chi vuole", True,
@@ -80034,7 +80040,7 @@ def prove_p2p_pubblica():
         # leva, che `valeNuovoOrdineP2P` chiede a ogni cifra
         + "\n" + re.search(r"const P2P_CONTANTI = [^\n]*;", mini).group(0)
         + "\n" + _intera("function contantiAManoP2P(metodi){")
-        + "\n" + _intera("function giudiceContantiP2P(euro, metodi, tetto){")
+        + "\n" + _intera("function giudiceContantiP2P(euro, metodi, tetto, cod){")
         + "\n" + _intera("function maxEuroContantiP2P(){")
         + "\n" + _intera("function metodoBaseP2P(m){")
         + "\n" + _intera("function euroTabacchinoP2P(metodi){")
@@ -80910,9 +80916,11 @@ def prove_p2p_pubblica():
     _cat = _cat[:_cat.index("];")]
     import re as _re_cat
     _codici = _re_cat.findall(r"cod: '([A-Z]+)'", _cat)
+    # (14 nov 2026, cantiere p2p-chf) il franco ha la sua strada: il
+    # payload va a capo, e si legge fino al campo dopo
     prova("il catalogo delle valute e il payload dicono gli stessi codici",
-          ["EUR", "USDT"], [c for c in _codici
-                            if ("'%s'" % c) in puro.split("fiat_code:")[1].split("\n")[0]])
+          ["EUR", "USDT", "CHF"], [c for c in _codici
+                                   if ("'%s'" % c) in puro.split("fiat_code:")[1].split("min_amount:")[0]])
 
     # --- 10) I SEI RITOCCHI (set 2026, guardati dal vivo da Andrea) --
     stile = mini[mini.index("<style>"):mini.index("</style>")]
@@ -83282,7 +83290,7 @@ def prove_p2p_canale():
           and "abs(premio) > P2P_PREMIO_CANALE_MAX" in rotta
           and 'raise HTTPException(400, "Premio storto")' in rotta
           # (10 ott 2026) ...e in coda la zona di scambio del contanti
-          and "_caption_canale_p2p(lato, euro, metodo, venditore, premio, zona)" in rotta)
+          and "_caption_canale_p2p(lato, euro, metodo, venditore, premio, zona,\n                                          valuta)" in rotta)
     prova("...e la scala e' quella del cursore del client", True,
           "P2P_PREMIO_CANALE_MAX = 20\n" in _SORGENTE
           and "const P2P_PREMIO_TAB_MAX = 20;" in open("miniapp.html", encoding="utf-8").read())
@@ -83290,7 +83298,7 @@ def prove_p2p_canale():
     # --- 3) FAIL-OPEN: un canale spento o un post fallito non rompono
     prova("canale spento: nessun post, mai un errore", True,
           # (cura 4) il post si salta anche sul doppione e sulla raffica
-          "if (canale_id() or vetrina_ok or canale_bitcoin_podcast()) \\\n            and not doppione and not raffica:" in rotta
+          "if (canale_id() or vetrina_ok or canale_bitcoin_podcast()) \\\n            and not doppione and not raffica and not chf_chiuso:" in rotta
           and 'return {"ok": True' in rotta)
     prova("un post fallito si logga e non esplode", True,
           "except Exception as e:" in rotta
@@ -83298,7 +83306,7 @@ def prove_p2p_canale():
 
     # --- 4) IL CLIENT: CHI CHIAMA, E CON COSA -------------------------
     mini = open("miniapp.html", encoding="utf-8").read()
-    ann = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine){",
+    ann = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta){",
                    "\n}\n")
     # (26 set 2026) piu' il premio di Barattozon, e solo se e' un intero:
     # per gli altri ordini la chiave non c'e' e il corpo e' quello di ieri
@@ -88470,7 +88478,7 @@ def prove_intestazione_scambi():
     prova("...e con la trasparenza dichiarata", True, bool(raw[20] & 0x10))
     larg = 1 + int.from_bytes(raw[24:27], "little")
     alt = 1 + int.from_bytes(raw[27:30], "little")
-    prova("...846x300, il disegno a piena risoluzione", (846, 300),
+    prova("...904x300, il disegno a piena risoluzione (col franco dal 14 nov 2026)", (904, 300),
           (larg, alt))
     # BORDI NETTI A 3x: a schermo e' alta 80px (erano 120 fino al ritocco
     # della sera), cioe' 240 pixel veri su un telefono a 3x — il file ne
@@ -88532,7 +88540,7 @@ def prove_intestazione_scambi():
           'id="p2pMieiCorpo"' in blocco)
     prova("...ed e' l'immagine e basta: nessun titolo scritto", True,
           "<h3" not in testa and "I miei scambi</" not in testa)
-    IMG = ('<img class="scambi-img" src="%s" width="846" height="300" '
+    IMG = ('<img class="scambi-img" src="%s" width="904" height="300" '
            'alt="I miei scambi" aria-label="I miei scambi" '
            'onerror="this.replaceWith(this.alt)">' % URL)
     # IL TITOLO RESTA UN TITOLO per chi legge con la voce: l'h2 prende
@@ -88771,7 +88779,7 @@ def prove_intestazione_scambi():
     # titolo della pagina lo porta l'intestazione, che li' sopra c'e'
     _striscia = nudo(pezzo_js(mini, "function scambiP2P(){", "\n}\n"))
     prova("nel filtro vuoto le monete in piccolo, al posto del logo P2P",
-          True, ('<img class="scambi-img scambi-mini" src="%s" width="846" '
+          True, ('<img class="scambi-img scambi-mini" src="%s" width="904" '
                  'height="300" alt="" onerror="this.remove()">' % URL) in _striscia
           and "p2p-logo" not in _striscia)
 
@@ -90946,7 +90954,7 @@ def prove_importo_foglio():
         + "\n" + "\n".join(_intera(f) for f in (
             "function interoP2P(testo){", "function centesimiP2P(testo){", "function centesimiTestoP2P(n){",
             "function metodoBaseP2P(m){", "function tabacchinoP2P(metodi){",
-            "function contantiAManoP2P(metodi){", "function giudiceContantiP2P(euro, metodi, tetto){",
+            "function contantiAManoP2P(metodi){", "function giudiceContantiP2P(euro, metodi, tetto, cod){",
             "function giudiceImportoPayCodeP2P(euro){", "function giudiceMinimoPayCodeP2P(euro, minimo){",
             "function giudizioTappaTabP2P(n, v){", "function valeNuovoOrdineP2P(v){",
             "function etichettaEuroTabP2P(euro, segno){", "function tastoEuroTabP2P(bozza, tasto, interi){",
@@ -91613,7 +91621,7 @@ def prove_barattozon_in_compra():
             "function centesimiTestoP2P(n){", "function senzaEuroP2P(t){",
             "function metodoBaseP2P(m){", "function tabacchinoP2P(metodi){",
             "function contantiAManoP2P(metodi){",
-            "function giudiceContantiP2P(euro, metodi, tetto){",
+            "function giudiceContantiP2P(euro, metodi, tetto, cod){",
             "function giudiceImportoPayCodeP2P(euro){",
             "function giudiceMinimoPayCodeP2P(euro, minimo){",
             "function euroFiloTabacchinoP2P(esatto, fisso){",
@@ -91913,7 +91921,7 @@ def prove_barattozon_mercato():
             "function minEuroBzP2P(){", "function payCodeP2P(testo){", "function giudizioPayCodeP2P(testo){",
             # il contanti di persona (30 set 2026): il giudice del tetto che
             # `valeNuovoOrdineP2P` chiama a ogni cifra
-            "function contantiAManoP2P(metodi){", "function giudiceContantiP2P(euro, metodi, tetto){",
+            "function contantiAManoP2P(metodi){", "function giudiceContantiP2P(euro, metodi, tetto, cod){",
             "function vitaLibroTabacchinoP2P(scade, adesso){",
             "function premioTabacchinoP2P(testo){", "function premioTestoP2P(n){",
             "function premioTestoTabP2P(n){", "function premioImplicitoTabacchinoP2P(euro, sats, cambio){",
@@ -93134,7 +93142,7 @@ DOM = null;
     # (26 set 2026) la firma ha il premio di Barattozon in piu': un
     # intero, che dal libro si ricava comunque — non un dato Amazon
     # (27 set 2026) e l'id dell'ordine, gia' pubblico nel libro
-    _can = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine){", "\n}\n")
+    _can = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta){", "\n}\n")
     prova("il canale riceve importo e metodo per nome: niente PayCode, niente scadenza", True,
           "PayCode" not in _can and "tab" not in re.sub(r"/\*[\s\S]*?\*/", "", _can).lower()
           .replace("tabacchino", "").replace("metabase", ""))
@@ -93368,7 +93376,7 @@ def prove_pubblica_metodo_prima():
         # il bottone che pubblica veste il lato o Barattozon (24 set 2026)
         "function vestitoInvioP2P(tab){",
         # il contanti di persona (30 set 2026): la riga sotto il metodo
-        "function contantiAManoP2P(metodi){", "function giudiceContantiP2P(euro, metodi, tetto){",
+        "function contantiAManoP2P(metodi){", "function giudiceContantiP2P(euro, metodi, tetto, cod){",
         "function regolaContantiFoglioP2P(metodi, tetto, lato){", "function maxEuroContantiP2P(){",
         # la riga della scadenza (9 ott 2026): il passo 3 la scrive per esteso
         "function etichettaScadeTabP2P(scade){", "function scadeInParoleP2P(epoch){",
@@ -93774,7 +93782,7 @@ def prove_spia_passi_barattozon():
             "function interoP2P(testo){", "function centesimiP2P(testo){",
             "function tabacchinoP2P(metodi){", "function metodoBaseP2P(m){",
             "function contantiAManoP2P(metodi){",
-            "function giudiceContantiP2P(euro, metodi, tetto){",
+            "function giudiceContantiP2P(euro, metodi, tetto, cod){",
             "function payCodeP2P(testo){", "function giudizioPayCodeP2P(testo){", "function scadeDaCampoP2P(s){",
             "function campoDaScadeP2P(epoch){", "function leggiDataTabacchinoP2P(testo){",
             "function premioTabacchinoP2P(testo){",
@@ -94067,7 +94075,7 @@ def prove_libro_vuoto_monete():
     # (13 nov 2026, cantiere card-p2p-monete) le monete sono diventate
     # sei: il banner di «I miei scambi» con ₿ al centro
     MONETE = ('<img class="scambi-img scambi-libro" src="/assets/scambi-monete.webp" '
-              'width="846" height="300" alt="" onerror="this.remove()">')
+              'width="904" height="300" alt="" onerror="this.remove()">')
     # (12 ott 2026, notte, cantiere libro-vuoto) il ramo lo sceglie il
     # giudice dei tre vuoti: `logo` vero dove le offerte ci sono ma non si
     # vedono (il filtro, la pausa di chi pubblica), falso a libro vuoto
@@ -117327,8 +117335,8 @@ console.log(JSON.stringify(out));
           "valuta: voluto.valuta || ''})});" in m
           and re.findall(r"\['(\w*)', '[^']+'\]", m[m.index("const P2P_AVVISI_VALUTE = ["):
                                                  m.index("];", m.index("const P2P_AVVISI_VALUTE = ["))])
-          == ["", "EUR", "USDT"]
-          and 'VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT")' in src
+          == ["", "EUR", "USDT", "CHF"]
+          and 'VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT", "CHF")' in src
           and '"avvisi_nuovi_valuta TEXT DEFAULT \'\'",' in src
           and "avvisi_nuovi_rete=?, avvisi_nuovi_valuta=? " in src)
     prova("...e i due giri la passano al giudice: la valuta dell'ordine Lightning, "
@@ -117336,7 +117344,9 @@ console.log(JSON.stringify(out));
           (True, True, True),
           ('_passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat)' in src,
            '"USDT" if usdt else "EUR"):' in pezzo("_accoda_onchain_nuovo_p2p"),
-           'if pref["valuta"] and not p2p_usdt_ammesso(int(riga["tg_id"])):' in pezzo("_pref_rete_vista_p2p")))
+           # (14 nov 2026, cantiere p2p-chf) ...e «solo franchi» a chi i franchi li vede
+           'vista = p2p_usdt_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")
+           and 'vista = p2p_chf_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")))
     prova("a leva globale spenta, in demo e da anonimi: niente campana e niente riga",
           [["", ""], ["", ""], ["", ""]], [out["fuoriCasa"], out["demo"], out["anonimo"]])
 
@@ -141219,8 +141229,9 @@ def prove_contanti_a_mano():
           ["'Contanti'," in riga_js("const P2P_METODI = "), riga_js("const P2P_CONTANTI = ")])
     vale = nudo(fn("function valeNuovoOrdineP2P(v){"))
     prova("il foglio Pubblica giudica il contanti su TUTT'E DUE le cifre, prima dei metodi", True,
-          0 < vale.find("giudiceContantiP2P(euro, v.metodi, v.maxEuroContanti)")
-          < vale.find("giudiceContantiP2P(max, v.metodi, v.maxEuroContanti)")
+          # (14 nov 2026, cantiere p2p-chf) con la valuta del foglio
+          0 < vale.find("giudiceContantiP2P(euro, v.metodi, v.maxEuroContanti, v.valuta)")
+          < vale.find("giudiceContantiP2P(max, v.metodi, v.maxEuroContanti, v.valuta)")
           < vale.find("'Scegli almeno un metodo di pagamento'"))
     prova("...e i campi del foglio portano la leva", True,
           "maxEuroContanti: maxEuroContantiP2P()," in fn("function campiNuovoP2P(){"))
@@ -141240,7 +141251,8 @@ def prove_contanti_a_mano():
     prova("alla presa il tetto si giudica PRIMA di chiudere il foglio e di prendere, "
           "sulla cifra scelta se c'e'", True,
           0 < cd.find("if (o.euroMax && !p2pDettImporto) { haptic(); apriQuantoP2P(id); return; }")
-          < cd.find("giudiceContantiP2P(g ? g.euro : o.euro, metPresa, maxEuroContantiP2P())")
+          # (14 nov 2026, cantiere p2p-chf) con la valuta dell'ordine
+          < cd.find("giudiceContantiP2P(g ? g.euro : o.euro, metPresa, maxEuroContantiP2P(), codPresa)")
           < cd.find("chiudiFoglioP2P('p2pDettSheet')")
           < cd.find("eseguiPresaP2P(id, g ? g.euro : 0, p2pDettMetodo)"))
     cq = nudo(fn("function confermaQuantoP2P(){"))
@@ -141823,7 +141835,7 @@ def prove_contanti_a_mano():
         fn("function contantiAManoP2P(metodi){"), fn("function scambioInContantiP2P(o){"),
         # (10 ott 2026, riquadro-contanti-sepa) il recapito viaggiato, letto dal giudice
         fn("function testoRecapitoScambioP2P(o){"), fn("function recapitoInContantiP2P(o){"),
-        fn("function giudiceContantiP2P(euro, metodi, tetto){"),
+        fn("function giudiceContantiP2P(euro, metodi, tetto, cod){"),
         riga_js("const REGOLA_CONTANTI_COMPRA = "), riga_js("const REGOLA_CONTANTI_VENDE = "),
         riga_js("const CONSIGLI_CONTANTI = "), riga_js("const REGOLA_BREVE_CONTANTI_COMPRA = "),
         riga_js("const REGOLA_BREVE_CONTANTI_VENDE = "), riga_js("const SPIEGA_SONO_QUI = "),
@@ -148914,7 +148926,7 @@ def prove_freni():
     prova("canale: doppione e raffica saltano il post senza un 429", True,
           "_CANALE_POSTATI.get(ordine, 0) < 86400" in c
           and '_secchio_passa(f"canale:{user[\'id\']}", *FRENI["canale"], adesso_canale)' in c
-          and "if (canale_id() or vetrina_ok or canale_bitcoin_podcast()) \\\n            and not doppione and not raffica:" in c
+          and "if (canale_id() or vetrina_ok or canale_bitcoin_podcast()) \\\n            and not doppione and not raffica and not chf_chiuso:" in c
           and "429" not in codice(c))
     prova("...e l'ordine si segna postato solo a post uscito", True,
           "if postato and buono:" in c and "_CANALE_POSTATI[ordine] = adesso_canale" in c)
@@ -156436,6 +156448,254 @@ console.log(JSON.stringify(out));
            pezzo_js(mini, "function chatScMessaggiHTML(c, altro, o){", "\n}\n")))
 
 
+def prove_p2p_chf():
+    """GLI ORDINI P2P IN FRANCHI SVIZZERI (14 nov 2026, cantiere p2p-chf,
+    Andrea: «abbiamo stretto una collaborazione con Lugano»). Il CHF e' la
+    valuta vera dell'ordine come l'USDT, ma si paga come l'euro: due leve
+    spente, il cambio del franco dalla stessa lettura, il tetto in euro
+    tradotto, i metodi svizzeri coi loro giudici (TWINT, IBAN CH/LI col
+    modulo 97), le parole dei soldi nell'app e nel bot. Le controprove
+    rompono apposta un pezzo e guardano la riga diventare rossa."""
+    print("\n🇨🇭 Gli ordini P2P in franchi svizzeri")
+    import re as _re
+    import sqlite3 as _sq
+    src = _SORGENTE
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) i cancelli del server ---
+    prova("le due leve nascono spente e solo agli admin, nel config d'esempio e nel codice",
+          (True, True, True, True),
+          ("\nP2P_CHF_ATTIVO = False" in esempio, "\nP2P_CHF_SOLO_ADMIN = True" in esempio,
+           "    P2P_CHF_ATTIVO = False" in src.split("def p2p_chf_ammesso(")[0],
+           "    P2P_CHF_SOLO_ADMIN = True" in src.split("def p2p_chf_ammesso(")[0]))
+    amb = {"P2P_CHF_ATTIVO": True, "P2P_CHF_SOLO_ADMIN": True,
+           "_p2p_leve": lambda: {"attivo": True},
+           "e_admin": lambda tg: tg == 999,
+           "_p2p_per": lambda tg: {"attivo": tg in (111, 999)}}
+    exec(pezzo("p2p_chf_ammesso"), amb)
+    f = amb["p2p_chf_ammesso"]
+    accesa = [f(999), f(111), f(222)]
+    amb["P2P_CHF_SOLO_ADMIN"] = False
+    aperta = [f(999), f(111), f(222)]
+    amb["P2P_CHF_ATTIVO"] = False
+    spenta = [f(999), f(111)]
+    amb["P2P_CHF_ATTIVO"] = True
+    amb["_p2p_leve"] = lambda: {"attivo": False}
+    prova("accesa e solo-admin: l'admin si'; aperta: chi ha il P2P; spenta o "
+          "col P2P spento: nessuno",
+          [[True, False, False], [True, True, False], [False, False], [False]],
+          [accesa, aperta, spenta, [f(999)]])
+    prova("/api/me lo dice al telefono, e il pannello mostra le due leve",
+          (1, True, True),
+          (src.count('profilo["p2p_chf"] = p2p_chf_ammesso(user["id"])'),
+           '_leva("Ordini P2P in franchi svizzeri", "P2P_CHF_ATTIVO",' in src,
+           '_leva("Franchi solo agli admin", "P2P_CHF_SOLO_ADMIN",' in src))
+    # il cambio: la terza valuta della stessa GET, l'import resta com'era
+    prova("il franco arriva dalla stessa lettura del cambio, l'import da Nostr "
+          "resta a euro e dollari, e le due buste lo portano al telefono",
+          (True, True, True, 2),
+          ('VALUTE_CAMBIO = ("eur", "usd", "chf")' in src,
+           'VALUTE_IMPORT = ("eur", "usd")' in src,
+           "for v in VALUTE_IMPORT" in pezzo("cambio_per_import"),
+           src.count('"cambio_chf": cambio_noto_ora("chf")')
+           + src.count('risposta["cambio_chf"] = cambio_noto_ora("chf")')))
+
+    # --- 2) il traduttore del bot ---
+    amb = {"re": _re}
+    i = src.index("P2P_CHF_FRASI = (")
+    exec(src[i:src.index("\n\n\n", i)], amb)
+    exec(pezzo("p2p_chf_frase"), amb)
+    exec(pezzo("p2p_chf_ordine"), amb)
+    tr = amb["p2p_chf_frase"]
+    famiglie = {}
+    for nome in ("SOLLECITO_EURO_TESTI", "SOLLECITO_RILASCIO_TESTI", "SOLLECITO_RECAPITO_TESTI"):
+        j = src.index(nome + " = {")
+        d = {}
+        exec(src[j:src.index("\n}\n", j) + 3], {}, d)
+        famiglie[nome] = d[nome]
+    sciolte = [
+        "🔒 <b>Garanzia bloccata ✓:</b> aspetta gli euro.",
+        "💶 <b>Mario dice di aver inviato 50,00 €:</b> controlla il conto e "
+        "rilascia i sats.\n\n<i>Rilascia solo quando gli euro sono arrivati davvero.</i>",
+        "Ti mancano ancora degli euro? Scrivi nella chat.",
+        "Non hai ancora ricevuto i tuoi euro?",
+        "Un euro di differenza conta.",
+    ]
+    tradotte = [tr(t) for fm in famiglie.values() for t in fm.values()] + [tr(t) for t in sciolte]
+    prova("tradotti, gli avvisi non dicono piu' euro, € ne' 💶", [],
+          [t for t in tradotte if _re.search(r"\beuro\b|€|💶", t, _re.I)])
+    prova("...con l'articolo giusto: «dei franchi», mai «degli franchi», e le cifre "
+          "restano quelle", (True, False, True, True, True),
+          (tr(sciolte[2]).startswith("Ti mancano ancora dei franchi"),
+           any("degli franchi" in t or "gli franchi" in t for t in tradotte),
+           "50,00 CHF" in tr(sciolte[1]), tr(sciolte[3]) == "Non hai ancora ricevuto i tuoi franchi?",
+           tr(sciolte[4]).startswith("Un franco")))
+    prova("...e i bottoni che nomina sono quelli veri dell'app", (True, True),
+          ("«Ho inviato i franchi»" in tr(famiglie["SOLLECITO_EURO_TESTI"][1])
+           and "return 'Ho inviato i franchi';" in mini,
+           "Indica dove ricevere i franchi" in tr(famiglie["SOLLECITO_RECAPITO_TESTI"][1])))
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.execute("CREATE TABLE p2p_ordini (ordine TEXT, fiat TEXT)")
+    con.executemany("INSERT INTO p2p_ordini VALUES (?, ?)",
+                    [("a", "CHF"), ("b", "chf"), ("c", "EUR"), ("d", ""), ("e", None)])
+    chi = amb["p2p_chf_ordine"]
+    senza = _sq.connect(":memory:")
+    senza.execute("CREATE TABLE p2p_ordini (ordine TEXT, metodi TEXT)")
+    prova("l'ordine e' in franchi se la valuta del libro e' CHF; l'euro, la riga "
+          "vuota, quella che manca e il banco senza colonna sono euro",
+          [True, True, False, False, False, False, False],
+          [chi(con, x) for x in "abcde"] + [chi(con, "zz"), chi(senza, "a")])
+    prova("la valuta del libro si scrive nella riga a ogni 38383, e la colonna "
+          "nasce per i database di ieri", (True, True),
+          ('con.execute("UPDATE p2p_ordini SET fiat=? WHERE ordine=?",' in pezzo("_avvisi_libro_p2p")
+           if "def _avvisi_libro_p2p(" in src else
+           'con.execute("UPDATE p2p_ordini SET fiat=? WHERE ordine=?",' in src,
+           "\"fiat TEXT DEFAULT ''\"" in src))
+    prova("il traduttore e' chiamato dove partono gli avvisi: eventi, recapito, "
+          "attese, garanzia lunga, e le cifre ai moderatori",
+          (True, 1, 2, 2, 2),
+          ("avvisi = [(tg, p2p_chf_frase(t)) for tg, t in avvisi]" in src,
+           src.count("elif a_chi and p2p_chf_ordine(con, (d or {}).get(\"ordine\")):"),
+           src.count('_chf = globals().get("p2p_chf_ordine")\n        if _chf and _chf(con, r["ordine"]):')
+           + src.count('_chf = globals().get("p2p_chf_ordine")\n                    if _chf and _chf(con, ordine):'),
+           src.count('d["chf"] = bool(_chf and _chf(con, ordine))'),
+           src.count('euro = euro.replace(" €", " CHF")')))
+    # gli avvisi «ordine nuovo» e il canale
+    acc = pezzo("_accoda_nuovi_p2p")
+    prova("gli avvisi «ordine nuovo» in franchi: solo a chi li vede, misurati sul "
+          "franco, con la cifra in CHF", (True, True, True, True),
+          ('if fiat not in ("EUR", "USDT", "CHF"):' in acc,
+           'if fiat == "CHF" and not p2p_chf_ammesso(tg):' in acc,
+           '"chf" if fiat == "CHF" else "usd"' in acc,
+           'euro_txt = euro_txt[:-2] + " CHF"' in acc))
+    amb = {"_fmt_eur": lambda e: f"{e:.2f}".replace(".", ","), "html": __import__("html"),
+           "_premio_canale_p2p": lambda l, p: "", "_link_casa_telegram": lambda: "https://t.me/x",
+           "_firma_venditore": lambda v: "da Mario"}
+    exec(pezzo("_caption_canale_p2p"), amb)
+    cap = amb["_caption_canale_p2p"]
+    prova("il post nel canale dice CHF per i franchi e resta quello di ieri per l'euro",
+          (True, True, False),
+          ("🇨🇭 50,00 CHF" in cap("vendo", 50, "TWINT", {}, valuta="CHF"),
+           "💶 50,00 €" in cap("vendo", 50, "SEPA", {}),
+           "€" in cap("vendo", 50, "TWINT", {}, valuta="CHF")))
+    rotta = pezzo("annuncia_ordine_p2p_canale")
+    prova("...e coi franchi solo agli admin il post non esce: non si annuncia quel "
+          "che chi legge non puo' prendere", (True, True),
+          ('chf_chiuso = valuta == "CHF" and (P2P_CHF_SOLO_ADMIN or not P2P_CHF_ATTIVO)' in rotta,
+           "and not doppione and not raffica and not chf_chiuso:" in rotta))
+
+    # --- 3) il banco del telefono ---
+    def banco(blocco_chf, usdt_blocco):
+        return ("var cambioVivo = true, eurPerSat = 0.001, usdPerSat = 0.00108, chfPerSat = 0.00096;\n"
+                "var myP2PUsdt = false, myP2PChf = true, TETTO = 250;\n"
+                "const P2P_VALUTA = 'EUR';\n"
+                "const P2P_METODI = ['SEPA', 'Revolut', 'Contanti'];\n"
+                "const maxEuroP2P = () => TETTO;\n"
+                + _riga_js(mini, "const P2P_VALUTE = [") + blocco_chf + "\n" + usdt_blocco + "\n"
+                + _fn_js(mini, "function coppiaVetrinaP2P(o){").replace("P2P_VT_COPPIE", "COPPIE")
+                + "const COPPIE = {eur: 1, usdt: 1, chf: 1};\n"
+                + r"""
+const out = {};
+out.visto = [valutaVistaP2P('CHF', ['TWINT']), valutaVistaP2P('CHF', ['Bonifico CH', 'Revolut', 'Contanti']),
+  valutaVistaP2P('CHF', ['Postfinance']), valutaVistaP2P('CHF', ['TWINT', 'SEPA']), valutaVistaP2P('CHF', []),
+  valutaVistaP2P('CHF')];
+myP2PChf = false;
+out.chiuso = [valutaVistaP2P('CHF', ['TWINT']), valuteVisibiliP2P(false).map(v => v.cod)];
+myP2PChf = true;
+out.valute = [valuteVisibiliP2P(false).map(v => v.cod), valuteVisibiliP2P(true).map(v => v.cod)];
+out.valuta = [valutaOrdineP2P({fiat: 'CHF', metodi: ['Revolut']}), valutaOrdineP2P({fiat: '', metodi: ['TWINT']}),
+  valutaOrdineP2P({fiat: '', metodi: ['Revolut', 'Contanti']}), valutaOrdineP2P({fiat: '', metodi: ['Bonifico CH', 'SEPA']})];
+out.metro = [perSatP2P({fiat: 'CHF'}), perSatP2P({fiat: 'EUR'})];
+out.tetto = [tettoValutaP2P('CHF'), tettoValutaP2P('EUR'), tettoInValutaP2P(250, 'CHF'), tettoInValutaP2P(0, 'CHF')];
+chfPerSat = 0;
+out.tettoMuto = tettoValutaP2P('CHF');
+chfPerSat = 0.00096;
+out.metodi = metodiValutaP2P('CHF');
+out.soldi = soldiValutaP2P('CHF');
+out.iban = ['CH93 0076 2011 6238 5295 7', 'CH9300762011623852957', 'LI21 0881 0000 2324 013A A',
+  'CH93 0076 2011 6238 5295 8', 'IT60X0542811101000000123456', 'CH93007620116238529'].map(giudiceIbanSvizzeroP2P);
+out.twint = ['+41 79 123 45 67', '079 123 45 67', '0041791234567', '+39 333 1234567', '+41 44 123 45 67', '']
+  .map(giudiceTwintP2P);
+const O = {fiat: 'CHF', metodi: ['TWINT']};
+out.parole = [paroleUsdtP2P(O, 'Hai ricevuto gli euro? 50 € degli euro'), paroleUsdtP2P({fiat: 'EUR', metodi: ['SEPA']}, 'gli euro 50 €'),
+  paroleUsdtP2P(O, '💶 Euro inviati')];
+out.coppia = [coppiaVetrinaP2P(O), coppiaVetrinaP2P({fiat: 'EUR', metodi: ['SEPA']})];
+console.log(JSON.stringify(out));""")
+    i = mini.index("/* ═══ I FRANCHI SVIZZERI (14 nov 2026")
+    blocco_chf = mini[i:mini.index("/* ═══ GLI ORDINI IN USDT (1 nov 2026")]
+    j = mini.index("/* ═══ GLI ORDINI IN USDT (1 nov 2026")
+    usdt = mini[j:mini.index("\n}\n", mini.index("function tettoInValutaP2P(")) + 3]
+    attesi = {
+        "visto": [True, True, False, False, False, True],
+        "chiuso": [False, ["EUR"]],
+        "valute": [["EUR", "CHF"], ["EUR"]],
+        "valuta": ["CHF", "CHF", "EUR", "EUR"],
+        "metro": [0.00096, 0.001],
+        "tetto": [240, 250, 240, 0],
+        "tettoMuto": 1,
+        "metodi": ["TWINT", "Bonifico CH", "Revolut", "Wise", "Contanti"],
+        "soldi": "i franchi",
+        "iban": ["", "", "", "Questo IBAN non torna: controlla di averlo copiato giusto",
+                 "Un IBAN svizzero comincia con CH (o LI) e ha 21 caratteri: controllalo",
+                 "Un IBAN svizzero comincia con CH (o LI) e ha 21 caratteri: controllalo"],
+        "twint": ["", "", "",
+                  "Il numero di TWINT è un cellulare svizzero, come +41 79 123 45 67",
+                  "Il numero di TWINT è un cellulare svizzero, come +41 79 123 45 67",
+                  "Il numero di TWINT è un cellulare svizzero, come +41 79 123 45 67"],
+        "parole": ["Hai ricevuto i franchi? 50 CHF dei franchi", "gli euro 50 €", "🇨🇭 Franchi inviati"],
+        "coppia": ["chf", "eur"],
+    }
+    o = _node_banco(banco(blocco_chf, usdt))
+    if o is None:
+        salta("il banco dei franchi nel telefono", "node non c'e'")
+    else:
+        for k, v in attesi.items():
+            prova("telefono, %s" % k, v, o.get(k))
+        # CONTROPROVE: un pezzo rotto apposta deve far diventare rossa la sua riga
+        rotti = [
+            ("visto", blocco_chf, usdt.replace("mc.every(x => P2P_METODI_CHF", "mc.some(x => P2P_METODI_CHF")),
+            ("iban", blocco_chf.replace("return resto === 1 ?", "return resto >= 0 ?"), usdt),
+            ("twint", blocco_chf.replace("7[5-9][0-9]{7}", "[0-9]{9}"), usdt),
+            ("parole", blocco_chf.replace("['Gli euro', 'I franchi'], ['gli euro', 'i franchi'],", ""), usdt),
+            ("tetto", blocco_chf, usdt.replace("const metro = c === 'USDT' ? usdPerSat :", "const metro = c === 'USDT' ? usdPerSat : eurPerSat ||")),
+            ("valute", blocco_chf, usdt.replace("v.cod === 'CHF' ? (!oc &&", "v.cod === 'CHF' ? (")),
+        ]
+        for chiave, b1, b2 in rotti:
+            r = _node_banco(banco(b1, b2)) or {}
+            prova("controprova: rotto il pezzo «%s», la sua riga diventa rossa" % chiave,
+                  True, r.get(chiave) != attesi[chiave])
+
+    # --- 4) il foglio, la presa, il recapito, la card ---
+    prova("il foglio manda «CHF» nel 38383, e la cauzione pure", (True, True),
+          ("      : String(v.valuta || '').toUpperCase() === 'CHF' ? 'CHF' : 'EUR'," in mini,
+           ": String((riga && riga.fiat) || '').toUpperCase() === 'CHF' ? 'CHF' : 'EUR';" in mini))
+    prova("in franchi solo i metodi svizzeri, TWINT e bonifico CH solo in franchi, "
+          "niente on-chain", (True, True, True),
+          ("if (inChf && (v.metodi || []).some(m => metodiChf.indexOf(m) < 0))" in mini,
+           "if (!inChf && (v.metodi || []).some(m => m === 'TWINT' || m === 'Bonifico CH'))" in mini,
+           "if (inChf && v.oc)" in mini))
+    forme = mini[mini.index("const P2P_FORME_RECAPITO = ["):]
+    prova("TWINT e il bonifico svizzero hanno il loro form, PRIMA della SEPA che "
+          "li prenderebbe", True,
+          -1 < forme.find("forma: 'twint'") < forme.find("forma: 'bonifico-ch'") < forme.find("forma: 'sepa'"))
+    prova("...e l'invio li fa passare dai loro giudici", (True, True),
+          ("const no = giudiceTwintP2P(campi.tel);" in mini,
+           "const no = giudiceIbanSvizzeroP2P(campi.iban);" in mini))
+    prova("il tetto del contanti di persona si traduce in franchi, nel foglio e alla presa",
+          (True, 2, 2),
+          ("tettoInValutaP2P(Number(tetto) || 0, 'CHF')" in mini,
+           mini.count("v.maxEuroContanti, v.valuta)"),
+           mini.count("maxEuroContantiP2P(), codPresa)")))
+    prova("la card della home: la coppia col franco, il suo fondo rosso, «CHF» "
+          "accanto alla cifra, e la sua rotta", (True, True, True, True),
+          ("chf: '/assets/p2p-coppia-chf.webp'" in mini,
+           ".card-p2p .p2p-vt-fondo.p2p-vt-chf{background:radial-gradient(" in mini,
+           "inChf ? '<span class=\"unit\">CHF</span>'" in mini,
+           '@app.get("/assets/p2p-coppia-chf.webp")' in src))
+
+
 def prove_p2p_onchain():
     """GLI SCAMBI P2P CON LA GARANZIA 2-DI-3 (30 ott 2026, cantiere
     p2p-onchain-2di3, decisione di Andrea con Alan). Il giro vero — server,
@@ -158158,7 +158418,7 @@ def prove_card_p2p_monete():
     print("\n[la card P2P con la sua coppia e il banner di tutte le monete]")
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     css = mini[mini.index("<style>"):mini.index("</style>")]
-    MONETE = ("usdt", "eth", "xmr", "usde")
+    MONETE = ("usdt", "eth", "xmr", "usde", "chf")
 
     # --- 1) QUALE COPPIA: il giudice puro ------------------------------
     o, err = _banco_coppie_p2p(mini)
@@ -158210,7 +158470,7 @@ def prove_card_p2p_monete():
           "      #FFF3DC 0%,#F9D9A6 62%,#EDB86C 100%);position:relative}" in css)
 
     # --- 4) IL BANNER: in testa e nei tre stati vuoti ----------------------
-    BANNER = 'src="/assets/scambi-monete.webp" width="846" height="300"'
+    BANNER = 'src="/assets/scambi-monete.webp" width="904" height="300"'
     prova("il banner delle sei monete in testa a «I miei scambi», col nome nell'alt", True,
           '<h2 class="scambi-tit"><img class="scambi-img" ' + BANNER
           + ' alt="I miei scambi"' in mini)
@@ -158231,7 +158491,7 @@ def prove_card_p2p_monete():
             i += 8 + n + (n & 1)
         return out
     misure = {"p2p-coppia-%s.webp" % k: (682, 489, 50000) for k in MONETE}
-    misure["scambi-monete.webp"] = (846, 300, 50000)
+    misure["scambi-monete.webp"] = (904, 300, 50000)
     for nome, (w, h, peso) in misure.items():
         p = os.path.join("assets", nome)
         if not os.path.exists(p):
@@ -158259,7 +158519,7 @@ def prove_card_p2p_monete():
     urls = re.findall(r"'(/assets/[^']+)'", pezzo_js(mini, "const P2P_VT_COPPIE = {", "};"))
     prova("ogni URL della tabella delle coppie ha la sua rotta", [],
           [u for u in urls if '@app.get("%s")' % u not in _SORGENTE])
-    prova("...e la tabella le ha tutte e cinque, l'euro compreso", 5, len(urls))
+    prova("...e la tabella le ha tutte e sei, l'euro compreso (il franco dal 14 nov 2026)", 6, len(urls))
     prova("nessun mount ricompare con le rotte nuove", False, "app.mount(" in _SORGENTE)
 
     # --- 7) LE CONTROPROVE: il banco rotto deve dire di no ----------------
@@ -158274,7 +158534,7 @@ def prove_card_p2p_monete():
               "  const r = typeof reteCoinDaMetodoP2P === 'function' && o && o.metodi ? reteCoinDaMetodoP2P(o.metodi[0]) : null;")
     prova("controprova: guardando solo il primo metodo, ETH+SEPA si vestirebbe da ETH",
           "eth", r and r["chiavi"]["misto"])
-    r = rotto("${inUsdt ? '<span class=\"unit\">USDT</span>' : '<span class=\"unit eur\">€</span>'}",
+    r = rotto("${inUsdt ? '<span class=\"unit\">USDT</span>' : inChf ? '<span class=\"unit\">CHF</span>' : '<span class=\"unit eur\">€</span>'}",
               "<span class=\"unit eur\">€</span>")
     prova("controprova: con l'unita' fissa la card USDT direbbe «€»", True,
           bool(r) and "€" in r["card"]["usdt"])
@@ -162868,7 +163128,7 @@ def prove_contanti_zona():
         fn("function soloMarchiP2P(metodi){"), fn("function iconaMetodiP2P(metodi){"),
         fn("function idMostroVero(id){"), fn("function prendiZoneP2P(m){"),
         fn("function interoP2P(testo){"), fn("function centesimiP2P(testo){"),
-        fn("function giudiceContantiP2P(euro, metodi, tetto){"),
+        fn("function giudiceContantiP2P(euro, metodi, tetto, cod){"),
         fn("function valeNuovoOrdineP2P(v){"),
         # i ritocchi: la riga della regola e la domanda al server
         _riga_js(mini, "const REGOLA_CONTANTI_COMPRA = "), _riga_js(mini, "const REGOLA_CONTANTI_VENDE = "),
@@ -163096,7 +163356,7 @@ def prove_contanti_zona():
           [True, True, False],
           # il terzo: fra la lettura della zona e il post non c'e' nessun 400 che la nomini
           ['zona = _zona_pulita_p2p(d.get("zona")) \\\n        if "Contanti" in _metodi_lista_p2p(metodo) else ""' in rc,
-           "_caption_canale_p2p(lato, euro, metodo, venditore, premio, zona)" in rc,
+           "_caption_canale_p2p(lato, euro, metodo, venditore, premio, zona,\n                                          valuta)" in rc,
            "HTTPException" in rc[rc.index("zona = _zona_pulita_p2p"):rc.index("postato = False")]])
 
     def _zona_rotta(metodo, zona):
@@ -163106,7 +163366,7 @@ def prove_contanti_zona():
           [_zona_rotta("Contanti", " Milano  centro "), _zona_rotta("SEPA, Contanti", "Milano centro"),
            _zona_rotta("SEPA", "Milano centro"), _zona_rotta("Contanti al tabacchino", "Milano centro"),
            _zona_rotta("contanti", "Milano centro"), _zona_rotta("Contanti", QQ)])
-    ann = fn("async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine){")
+    ann = fn("async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta){")
     prova("il client la mette nel corpo dalla riga del suo ordine, e solo se c'e'; la firma non e' cambiata", True,
           "const zona = typeof zonaCanaleP2P === 'function' ? zonaCanaleP2P(ordine) : '';" in ann
           and "if (zona) corpo.zona = zona;" in ann
@@ -190649,7 +190909,8 @@ def _banco_assistente(**leve):
     CHI_GUARDA = []
     for nome in ("cambio_libero_per", "swap_per", "onchain_ammesso",
                  "swap_auto_per", "p2p_usdt_ammesso", "p2p_onchain_ammesso",
-                 "p2p_onchain_usdt_ammesso", "p2p_altra_rete_per"):
+                 "p2p_onchain_usdt_ammesso", "p2p_altra_rete_per",
+                 "p2p_chf_ammesso"):
         amb[nome] = (lambda n: lambda t: CHI_GUARDA.append((n, t)) or False)(nome)
     exec(src[k:src.index("\n", k)], amb)
     for nome in ("_riga_webapp", "tastiera_bot", "_secchio_passa"):
@@ -190978,6 +191239,16 @@ def prove_assistente_bot():
           {"p2p_onchain_usdt_ammesso", "p2p_altra_rete_per"},
           {n for n, _ in CHI_GUARDA} & {"p2p_onchain_usdt_ammesso",
                                         "p2p_altra_rete_per"})
+    # (14 nov 2026, cantiere p2p-chf) i franchi: la riga che il libro usa
+    # come condizione, spenta a leve spente, con gli occhi di chiunque
+    prova("i numeri dicono anche i franchi, spenti a leve spente, col nome "
+          "che usa il libro, guardati con gli occhi di chiunque",
+          [True, True, True],
+          ["Scambi P2P pagati in franchi svizzeri (CHF): SPENTO" in n0,
+           "«Scambi P2P pagati in franchi svizzeri (CHF)»" in open(
+               os.path.join(QUI, "assistente", "sapere.md"),
+               encoding="utf-8").read(),
+           "p2p_chf_ammesso" in {n for n, _ in CHI_GUARDA}])
     # (13 nov 2026, cantiere sapere-donazioni) una persona chiede a Tappo
     # dove donare i sats che non usa: il libro non lo diceva, e la domanda
     # e' finita allo staff. L'indirizzo e' quello del profilo Nostr.
@@ -191907,7 +192178,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete
     sconto_fisso_decimale
     lista_corta_metodi
     """.split(),
@@ -192575,6 +192846,7 @@ def main():
     prove_onchain_verso_lightning,
     prove_p2p_onchain,
     prove_p2p_usdt,
+    prove_p2p_chf,
     prove_usdt_due_reti,
     prove_p2p_onchain_usdt,
     prove_p2p_onchain_tetto,

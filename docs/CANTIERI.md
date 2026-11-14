@@ -81022,3 +81022,79 @@ a «al venditore» sospeso su un ordine in reso, vede chi vende premere
 attacco); un ordine in 'dispute' rimasto col timbro 'uscito' dopo un
 errore a metà chiusura si chiude dalla strada che si richiama, senza
 guardare il verso.
+
+## Gli ordini P2P in franchi svizzeri (14 nov 2026, cantiere p2p-chf, Andrea: «abbiamo stretto una collaborazione con Lugano», «ok allora via al cantiere 1»)
+
+PERCHÉ. Barattolo ha una collaborazione con Lugano e Andrea vuole il P2P
+in CHF come valuta VERA dell'ordine, sulla strada dell'USDT (la «1» fra
+le proposte: il `f` del 38383 vale «CHF», non un metodo dentro un ordine
+in euro come ETH e XMR). Prima il franco era chiuso in tre punti: il
+nodo (`fiat_currencies_accepted = ['EUR', 'USDT']`), l'app
+(`P2P_VALUTE` solo euro e USDT) e il server (il libro e gli avvisi
+scartavano ogni altra valuta). Lugano è in Ticino: si parla italiano,
+nessuna traduzione.
+
+COSA. SERVER: due leve, il calco dell'USDT, `P2P_CHF_ATTIVO` (spenta) e
+`P2P_CHF_SOLO_ADMIN` (accesa), giudicate da `p2p_chf_ammesso`, in
+`/api/me` (`p2p_chf`) e nel pannello delle leve. Il franco entra nella
+stessa GET del cambio (`VALUTE_CAMBIO = ("eur", "usd", "chf")`) e nelle
+due buste (`cambio_chf`); l'import da Nostr resta a euro e dollari
+(`VALUTE_IMPORT`), perché un annuncio in franchi da fuori non è una
+porta che questo cantiere apre. La riga di `p2p_ordini` impara la
+valuta del libro (colonna `fiat`, scritta a ogni 38383 in
+`_avvisi_libro_p2p`), e `p2p_chf_ordine` la legge: i metodi non bastano
+come per l'USDT, perché Revolut, Wise e i contanti stanno sia in euro
+sia in franchi. Il traduttore del bot `p2p_chf_frase` (€ → CHF, «gli
+euro» → «i franchi», 💶 → 🇨🇭) è chiamato negli stessi cinque posti di
+quello degli USDT (eventi, recapito, attese e solleciti, garanzia lunga,
+cifre ai moderatori). Gli avvisi «ordine nuovo» accettano CHF (solo a
+chi lo vede, convenienza sul franco, cifra in CHF) e la scelta «Solo
+franchi». Il post nei canali dice «🇨🇭 50,00 CHF», e coi franchi solo
+agli admin NON esce: un post pubblico non annuncia quel che chi legge
+non può prendere.
+APP: «CHF» in `P2P_VALUTE`, il cancello `myP2PChf`, il blocco «I
+FRANCHI SVIZZERI» coi metodi `P2P_METODI_CHF` (TWINT, Bonifico CH,
+Revolut, Wise, Contanti), i due giudici PURI `giudiceTwintP2P`
+(cellulare svizzero +41 7x) e `giudiceIbanSvizzeroP2P` (CH o LI, 21
+caratteri, modulo 97), i due form di recapito PRIMA della SEPA (la sua
+regex prenderebbe «Bonifico CH»). `valutaVistaP2P` mostra un ordine in
+CHF solo a chi li vede e solo coi metodi nostri; `valutaOrdineP2P`
+riconosce i franchi anche da TWINT o dal bonifico CH quando la riga ha
+perso la valuta. Il tetto in euro si traduce con `tettoInValutaP2P`
+(generale e contanti di persona, 250 € ≈ 233 CHF); `fiat_code` «CHF»
+nel 38383 e nella cauzione; il foglio rifiuta TWINT in euro, l'euro in
+franchi e il franco on-chain. Le parole dei soldi passano dallo stesso
+traduttore degli USDT (`paroleUsdtP2P`, col ramo dei franchi). La card
+della home ha la coppia col franco (`p2p-coppia-chf.webp`, fondo rosso
+sfumato, «CHF» accanto alla cifra) e il banner di «I miei scambi» il
+franco (904×300): la grafica l'ha fatta e fatta approvare il thread
+delle card, qui solo gli agganci.
+
+SCARTATO. «degli euro» → «dei franchi» come regole a parte: «gli euro»
+→ «i franchi» lo fa già dentro le preposizioni (de-gli → de-i), e la
+controprova l'ha mostrato. Il franco on-chain e Barattozon in franchi:
+fuori per ora (il tabacchino è italiano). La USDT nel post del canale,
+che oggi esce con «€»: notato, non toccato.
+
+PROVATO. `prove_p2p_chf` (nuova, 38 controlli): leve e cancello, cambio
+e import, il traduttore sulle famiglie vere dei solleciti (zero «euro»,
+«€», «💶»; l'articolo giusto), `p2p_chf_ordine` anche senza colonna, i
+cinque punti di chiamata, gli avvisi nuovi e il post del canale, e in
+node il blocco vero: libro, valute offerte, valuta dai metodi, metro,
+tetto (anche a cambio muto), IBAN (veri, sbagliati di una cifra,
+italiani), TWINT, parole, coppia della card. Sei controprove (libro con
+`some`, modulo 97 spento, TWINT largo, traduttore senza l'articolo,
+tetto sul metro sbagliato, franco on-chain): ognuna fa diventare rossa
+la sua riga. Le prove che leggevano il codice di prima del tetto del
+contanti e del banner (846 → 904) seguono il codice nuovo; il banner è
+ricompresso a 48 KB per stare sotto i 50 della sua prova. Il collaudo
+del cambio (`collaudo_cambio_libro_p2p`) vuole anche `cambio_chf` nella
+risposta, e il banco di Tappo guarda la riga dei franchi coi suoi occhi
+di chiunque (la riga nuova dei NUMERI DI OGGI chiamava una funzione che
+il banco non aveva: zero risposte, rosso preso dalla suite). Giro
+finale sull'albero d7fc9a09 (audit-dispute) + questo cantiere: suite
+severa 27.688 verdi, 0 rosse, 2 saltate d'ambiente (nostr-tools, come i
+giri prima); collaudi della CI 125 su 125 senza variabili proxy. NON PROVATO
+DAL VIVO: un ordine in franchi sul nodo (manca il gesto di Andrea,
+DA-FARE voce 14), il prezzo del franco dai provider del nodo, e la card
+sul telefono.
