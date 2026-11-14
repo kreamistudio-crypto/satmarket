@@ -81345,3 +81345,132 @@ nessuno ha chiesto: nessun prezzo sbagliato, solo parole brutte); la
 modifica firmata e l'import Nostr cambiano valuta senza far decadere
 le offerte ancora in trattativa, che `modifica_annuncio` invece fa
 decadere; l'avviso «Hai venduto!» non dice l'importo.
+
+## L'accesso di casa: la firma del login, il biglietto e il ritorno del widget (14 nov 2026, cantiere audit-account, dal primo audit di sicurezza, Andrea: «tu cmq non mi cambi niente in app, me la rendi solo più sicura»)
+
+Il quarto dei quattro cantieri nati dal primo audit (rapporto in
+`/mnt/project-files/audit-sicurezza/satmarket/run-1/`, mai su Telegram).
+Quattro sospetti sull'entrare in un account: tre chiusi qui con un
+rifiuto in più nel caso storto, il quarto NON chiuso e portato ad
+Andrea come scelta, perché chiuderlo cambia un gesto. Nessun gesto di
+oggi cambia.
+
+RIPRODOTTI prima di toccare, sul server vero
+(`collaudo_accesso_di_casa` sul codice di prima: 14 righe rosse).
+1. LA FIRMA DEL LOGIN E L'HOST. `verifica_evento_login` lega la firma
+   al sito confrontando il tag `relay` con l'Host della richiesta, e
+   l'Host lo scrive chi la manda. Un evento 22242 è anche la forma
+   dell'AUTH che un relay chiede ai suoi client (NIP-42): un relay
+   prende una NOSTRA sfida (è pubblica), se la fa firmare come AUTH da
+   chi gli si collega e la ripresenta qui con `Host: <il suo nome>`.
+   Fatto con una firma Schnorr vera: 200, cookie di sessione, dentro
+   l'account della vittima; e da «Entra anche con Nostr» la chiave di
+   un altro collegata al proprio account. A fermarlo in produzione c'è
+   Caddy, se una richiesta con un Host forestiero non arriva fino a
+   uvicorn: un file che non sta nel repository.
+2. IL BIGLIETTO DEL COLLEGAMENTO. Chi entra con una chiave che è il
+   badge verificato di un account Telegram riceve la proposta
+   «collegarla?» e un biglietto da dieci minuti. `login_nostr_collega`
+   guardava solo hash e scadenza: col biglietto in mano si entrava
+   anche dopo che il titolare aveva TOLTO la chiave dal profilo (e la
+   chiave tornava come chiave d'accesso con la `npub` vuota, cioè
+   invisibile nel profilo), o dopo che ne aveva collegata un'altra (la
+   scrittura non toccava niente e la sessione si apriva lo stesso).
+3. IL RITORNO DEL WIDGET TELEGRAM. `GET /api/login/telegram/ritorno`
+   apre una sessione dai soli dati firmati nella query: chi fa il SUO
+   login si tiene quell'indirizzo e lo manda a un altro, che per cinque
+   minuti finisce dentro l'account del mittente senza saperlo (e quel
+   che ci scrive o ci pubblica è nell'account di un altro). In
+   produzione «Entra dal bot» è acceso e la pagina il widget non lo
+   disegna, ma la rotta rispondeva lo stesso.
+
+DECISO.
+1. L'HOST CHE LA VERIFICA CONFRONTA È UN NOME DI CASA. `host_di_casa`
+   dà alla verifica l'Host solo se il suo nome (senza porta, e niente
+   altro che nome e porta) è quello di `URL_PUBBLICO` o di
+   `ONION_HOST`, gli stessi di `_dm_auth`; sennò vuoto, e la verifica
+   un Host vuoto lo rifiutava già. Sta nelle due porte che verificano
+   una firma (`login_nostr`, `collega_npub_firma`); in collaudo passa
+   com'è (localhost, la gabbia).
+2. IL BIGLIETTO VALE SOLO SE L'ACCOUNT È ANCORA QUELLO DI QUANDO È
+   NATO: la scrittura di `login_nostr_collega` porta le stesse tre
+   condizioni con cui `login_nostr` lo emette (quella chiave, badge
+   verificato, accesso libero) e la sessione si apre solo se la riga è
+   cambiata. Sennò 401 con le parole di sempre («Invito scaduto:
+   riprova il login»).
+3. A PORTA DEL BOT APERTA IL RITORNO DEL WIDGET NON APRE SESSIONI:
+   risponde come a un login non riuscito (303 con `accesso=no`) prima
+   di guardare la firma. A leva spenta è il login di ieri.
+
+SCARTATO. Fidarsi di Caddy per l'Host: è vero che oggi probabilmente
+basta, ma è una difesa scritta in un file che il repository non vede e
+che nessuna prova guarda. Confrontare il tag `relay` con `URL_PUBBLICO`
+intero, schema compreso: rompe il servizio nascosto (http) e il
+collaudo. Legare il ritorno del widget al browser con un cookie di
+stato: è la strada giusta anche a leva spenta, ma il cookie lo deve
+posare la pagina prima che parta il widget di Telegram, e qui il widget
+vero non si può far girare (telegram.org è fuori dalla gabbia, e vuole
+il dominio di BotFather); non si pusha un login non provato. Togliere
+la rotta del ritorno: a leva spenta è l'unica porta Telegram del sito.
+Rifiutare il biglietto se la chiave d'accesso è già QUELLA (doppio
+tocco): lo fa già il biglietto monouso, e il secondo tocco riceve le
+parole di sempre.
+
+IL QUARTO, NON CHIUSO (scelta di Andrea). L'unione di un account Nostr
+a un Telegram dal link del bot: chi ha un account nato con Nostr chiede
+il link, lo manda a un ALTRO, e se quello preme Avvia e poi «Sì,
+collega» entro cinque minuti i due account diventano uno, con dentro
+tutti e due. Il bot oggi chiede «Sei tu?» e dice che non si torna
+indietro, ma non dice che chi tiene quella chiave potrà entrare in
+QUESTO Telegram. Chiuderlo vuol dire cambiare parole del bot o
+aggiungere un passo (una figura come in «Entra dal bot», o la firma
+dentro Telegram come fa già la porta web): tutte cose che si vedono.
+Le opzioni stanno nel messaggio ad Andrea.
+
+PROVATO. `prove_accesso_di_casa` (nuova, 34 righe coi pezzi veri: i
+nomi di casa nei due mondi e coi trucchi di forma, il censimento delle
+chiamate alla verifica, il biglietto su un database vero nei cinque
+casi, il ritorno del widget eseguito con la firma vera del widget a
+porta aperta e spenta, la pagina che il widget lo disegna solo senza la
+porta del bot). `collaudo_accesso_di_casa` (nuovo, in
+`ci/collaudi.txt`): sul server vero, con firme Schnorr vere, il relay
+che ripresenta la nostra sfida col suo nome (401, nessuna sessione), il
+login e «Entra anche con Nostr» col nome di casa (come sempre), il
+biglietto dopo la chiave tolta e dopo un'altra chiave collegata (401,
+nessuna sessione, nessuna chiave rimessa), il sì di sempre, il ritorno
+del widget a leva accesa e spenta; 30 righe, 14 rosse sul codice di
+prima. Ritoccati perché seguono il codice nuovo: i due banchi che
+eseguono `login_nostr` e `collega_npub_firma` (portano il giudice).
+COSA È GIRATO SU QUALE ALBERO. Sopra develop `d213774` (il cantiere
+audit-offerte, che sta sopra audit-chiusure `83b62ed` e sopra
+`c4da353`, non mio: gli ordini P2P in franchi svizzeri): la suite
+intera severa, 27.845 passate, 0 fallite; i collaudi di
+`ci/collaudi.txt` nella gabbia, 128 verdi su 128.
+
+DA FARE PRIMA DELLA PROMOZIONE (di Andrea, sola lettura sul VPS, in
+`docs/DA-FARE-ANDREA.md`, voce 17): guardare che `URL_PUBBLICO` nel
+config del VPS manchi o dica `https://barattolo.store`, che `ONION_HOST`
+sia il nome dell'onion vero, e che Caddy non serva l'app anche sotto un
+altro nome (un `www.`). Se un nome con cui la gente entra non fosse fra
+quei due, col codice nuovo il login con Nostr DA QUEL NOME si
+rifiuterebbe: è l'unica riga di questo cantiere che può rompere
+qualcosa, e si guarda prima. Lo stesso vale per la VM di collaudo, che
+gira da non-collaudo col suo `URL_PUBBLICO`: lì develop sale da solo, e
+se dopo questo push il login con Nostr sul collaudo dicesse «non
+valido», è quella riga.
+NON PROVATO DAL VIVO: il widget vero di Telegram (non c'è in gabbia) e
+Caddy davanti (se già oggi rifiuta un Host forestiero, il punto 1 è una
+seconda cintura).
+
+I LIMITI, SCRITTI. Il punto 3 chiude il sospetto solo finché «Entra dal
+bot» resta acceso (in produzione lo è): a leva spenta il ritorno è
+quello di ieri. E se la pagina non riesce a leggere `/api/login/bot`
+ripiega sul widget, che a leva accesa risponde «Accesso non riuscito,
+riprova»; al ricaricamento la pagina rilegge la porta e mostra il bot.
+
+NOTATI E NON TOCCATI (una riga l'uno, aspettano un sì): «disabilita
+l'accesso con Nostr» lascia il badge verificato, quindi chi ha la
+chiave può rifare il collegamento col sì del foglio (è scritto così, ma
+il messaggio a schermo promette di più); togliere la chiave dal profilo
+non chiude le sessioni già aperte con quella chiave; la sessione aperta
+sul browser di un altro non ha un bottone «chiudi le altre sessioni».

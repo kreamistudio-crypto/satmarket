@@ -124,6 +124,7 @@ collaudo_piu_account
 collaudo_istanza_prova
 collaudo_semina_collaudo
 collaudo_login_bot
+collaudo_accesso_di_casa
 collaudo_swap_preventivo
 collaudo_fusione_da_telegram
 collaudo_turtle

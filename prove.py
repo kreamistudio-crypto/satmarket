@@ -22013,6 +22013,10 @@ def prove_collega_npub_firma():
 
     esito_verifica = {"pubkey": ""}
     amb["verifica_evento_login"] = lambda evento, host: esito_verifica["pubkey"]
+    # (14 nov 2026, audit-account) l'Host passa dal giudice dei nomi di
+    # casa prima della verifica: qui la verifica e' di cartone, e il
+    # giudice vero ha la sua sezione (prove_accesso_di_casa)
+    amb["host_di_casa"] = lambda h: h
     utente_attivo = {"id": 0}
     amb["verifica_utente"] = lambda *a: utente_attivo
     premiati = []
@@ -22225,6 +22229,284 @@ def prove_collega_npub_firma():
            "if (d.unione_fatta) setTimeout(() => ricaricaPerConto(true), 3000);" in ecf))
 
 
+def prove_accesso_di_casa():
+    """L'ACCESSO DI CASA (14 nov 2026, cantiere audit-account, dal primo
+    audit di sicurezza, Andrea: «tu cmq non mi cambi niente in app, me
+    la rendi solo più sicura»). Tre porte dell'accesso, coi pezzi veri:
+    (1) la firma del login Nostr vale solo per i NOMI DI CASA, e l'Host
+    non lo decide piu' chi manda la richiesta; (2) il biglietto del
+    collegamento entra solo se l'account e' ancora quello di quando il
+    biglietto e' nato; (3) a porta del bot aperta il ritorno del widget
+    Telegram non apre sessioni."""
+    import asyncio
+    import hashlib
+    import hmac
+    import sqlite3
+    import time
+    from urllib.parse import urlparse
+    print("\n[l'accesso di casa]")
+
+    # ---------------- (1) I NOMI DI CASA -----------------------------
+    cipolla = "barattolo" + "a" * 47 + ".onion"
+
+    def giudice(collaudo, url="https://barattolo.store", onion=cipolla):
+        amb = {"urlparse": urlparse, "MODALITA_COLLAUDO": collaudo,
+               "URL_PUBBLICO": url, "ONION_HOST": onion}
+        exec(pezzo("host_di_casa"), amb)
+        return amb["host_di_casa"]
+    casa = giudice(False)
+    prova("il sito e' un nome di casa, con e senza porta",
+          ["barattolo.store", "barattolo.store:443", "barattolo.store:8443"],
+          [casa("barattolo.store"), casa("barattolo.store:443"),
+           casa("barattolo.store:8443")])
+    prova("...e il servizio nascosto pure (Tor inoltra su una porta qualunque)",
+          [cipolla, cipolla + ":80"], [casa(cipolla), casa(cipolla + ":80")])
+    prova("un Host forestiero diventa vuoto: il relay che si fa firmare la "
+          "nostra sfida non la ripresenta col suo nome",
+          ["", "", "", ""],
+          [casa("relay.cattivo.example"), casa("relay.cattivo.example:443"),
+           casa("barattolo.store.cattivo.example"),
+           casa("cattivo-barattolo.store")])
+    prova("...e nemmeno coi trucchi di forma: chiocciola, barra, porta "
+          "storta, spazi, niente",
+          ["", "", "", "", "", "", ""],
+          [casa("cattivo.example@barattolo.store"),
+           casa("barattolo.store@cattivo.example"),
+           casa("barattolo.store/@cattivo.example"),
+           casa("barattolo.store:abc"), casa("barattolo.store:"),
+           casa("   "), casa("")])
+    prova("le maiuscole dell'Host non lo fanno forestiero (resta com'e' "
+          "arrivato: il confronto col tag lo fa la verifica)",
+          "Barattolo.Store", casa("Barattolo.Store"))
+    prova("senza servizio nascosto il nome vuoto NON diventa di casa", "",
+          giudice(False, onion="")(".onion"))
+    prova("un'istanza di prova ha il SUO nome, e barattolo.store li' e' "
+          "forestiero",
+          ["prova.example", ""],
+          [giudice(False, url="https://prova.example")("prova.example"),
+           giudice(False, url="https://prova.example")("barattolo.store")])
+    prova("IN COLLAUDO passa com'e': localhost, una porta, la gabbia",
+          ["127.0.0.1:8000", "localhost:8123", "testserver"],
+          [giudice(True)("127.0.0.1:8000"), giudice(True)("localhost:8123"),
+           giudice(True)("testserver")])
+    # la verifica vera, con l'Host passato dal giudice: un Host vuoto
+    # e' un rifiuto PRIMA di guardare la firma
+    ver = pezzo("verifica_evento_login")
+    prova("la verifica rifiuta un Host vuoto (e' li' che il forestiero muore)",
+          True, "if not host or urlparse(origine).netloc != host:" in ver)
+    # IL CENSIMENTO: ogni chiamata della verifica passa dal giudice. Si
+    # CONTANO le chiamate nel codice (non la definizione): una porta
+    # nuova che legge l'Host nudo fa diventare rossa questa riga.
+    sorgente = codice(_SORGENTE)
+    chiamate = re.findall(r"(?<!def )verifica_evento_login\(\s*[^,]+,\s*([^\n]+)",
+                          sorgente)
+    prova("le porte che verificano una firma di login sono due", 2,
+          len(chiamate))
+    prova("...e tutte e due danno alla verifica l'Host passato dal giudice",
+          [True, True],
+          [c.startswith('host_di_casa(req.headers.get("host", ""))')
+           for c in chiamate])
+    prova("...e l'Host nudo alla verifica non lo da' piu' nessuno", 0,
+          len(re.findall(r"verifica_evento_login\([^)]*\n?[^)]*,\s*req\.headers",
+                         sorgente)))
+
+    # ---------------- (2) IL BIGLIETTO DEL COLLEGAMENTO --------------
+    class _HTTP(Exception):
+        def __init__(self, codice_http, detail=""):
+            self.status_code, self.detail = codice_http, detail
+
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT DEFAULT '',
+            npub TEXT DEFAULT '', npub_verificata INTEGER DEFAULT 0,
+            npub_accesso TEXT DEFAULT '');
+        CREATE UNIQUE INDEX idx_utenti_npub_accesso
+            ON utenti(npub_accesso) WHERE npub_accesso != '';
+        CREATE TABLE biglietti_collegamento(biglietto_hash TEXT PRIMARY KEY,
+            tg_id INTEGER, npub TEXT, scade INTEGER);
+    """)
+
+    class Finta:
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass
+    sessioni, premi, corpo = [], [], {}
+
+    async def json_finto(req):
+        return dict(corpo)
+
+    async def premia(tg_id):
+        premi.append(tg_id)
+    amb = {"Request": object, "Response": object, "Cookie": lambda d="": d,
+           "HTTPException": _HTTP, "sqlite3": sqlite3, "hashlib": hashlib,
+           "time": time, "secrets": __import__("secrets"),
+           "db": lambda: Finta(), "leggi_json": json_finto,
+           "premia_distintivi": premia, "SECONDI_SFIDA_LOGIN": 600,
+           "TETTO_BIGLIETTI_COLLEGAMENTO": 10000,
+           "apri_sessione": lambda resp, tg_id, *a: sessioni.append(tg_id)}
+    exec(pezzo("nuovo_biglietto_collegamento"), amb)
+    exec(pezzo("brucia_biglietto_collegamento"), amb)
+    exec("async " + pezzo("login_nostr_collega"), amb)
+
+    def tocca(biglietto):
+        corpo.clear()
+        corpo["biglietto"] = biglietto
+        try:
+            return ("ok", asyncio.run(amb["login_nostr_collega"](None, None)))
+        except _HTTP as e:
+            return (e.status_code, e.detail)
+
+    def riga(tg_id):
+        r = con.execute("SELECT npub, npub_verificata, npub_accesso FROM "
+                        "utenti WHERE tg_id=?", (tg_id,)).fetchone()
+        return (r["npub"], r["npub_verificata"], r["npub_accesso"])
+
+    def semina(tg_id, npub="", verificata=0, accesso=""):
+        con.execute("INSERT OR REPLACE INTO utenti(tg_id, nome, npub, "
+                    "npub_verificata, npub_accesso) VALUES(?,?,?,?,?)",
+                    (tg_id, "A", npub, verificata, accesso))
+        con.commit()
+    X, Y = "npub1" + "x" * 58, "npub1" + "y" * 58
+
+    # il gesto di sempre: badge verificato, accesso libero, si' al foglio
+    semina(1, X, 1)
+    b = amb["nuovo_biglietto_collegamento"](1, X)
+    prova("IL GESTO DI SEMPRE: il si' collega la chiave ed entra",
+          ("ok", {"ok": True, "collegato": True}), tocca(b))
+    prova("...la chiave e' diventata la chiave d'accesso, la sessione e' "
+          "aperta, i distintivi guardati",
+          ((X, 1, X), [1], [1]), (riga(1), sessioni, premi))
+    prova("...e il biglietto e' monouso, come sempre",
+          (401, "Invito scaduto: riprova il login"), tocca(b))
+
+    # il caso dell'audit: il titolare TOGLIE la chiave col biglietto in giro
+    sessioni.clear()
+    premi.clear()
+    semina(2, X.replace("x", "z"), 1)
+    Z = X.replace("x", "z")
+    b = amb["nuovo_biglietto_collegamento"](2, Z)
+    con.execute("UPDATE utenti SET npub='', npub_verificata=0 WHERE tg_id=2")
+    con.commit()
+    prova("CHIAVE TOLTA DAL PROFILO: il biglietto di prima non entra piu'",
+          (401, "Invito scaduto: riprova il login"), tocca(b))
+    prova("...non apre sessioni e non rimette la chiave di nascosto",
+          (("", 0, ""), [], []), (riga(2), sessioni, premi))
+    prova("...ed e' bruciato lo stesso: un secondo tocco trova il niente",
+          0, con.execute("SELECT COUNT(*) FROM biglietti_collegamento"
+                         ).fetchone()[0])
+
+    # il badge spento (una chiave, una casa: l'ha presa un altro account)
+    semina(3, Y, 1)
+    b = amb["nuovo_biglietto_collegamento"](3, Y)
+    con.execute("UPDATE utenti SET npub_verificata=0 WHERE tg_id=3")
+    con.commit()
+    prova("BADGE SPENTO nel frattempo: non entra", 401, tocca(b)[0])
+    prova("...e la riga resta com'era", (Y, 0, ""), riga(3))
+
+    # un'ALTRA chiave collegata nel frattempo (l'accesso non e' piu' libero)
+    W = "npub1" + "w" * 58
+    semina(4, W, 1)
+    b = amb["nuovo_biglietto_collegamento"](4, W)
+    V = "npub1" + "v" * 58
+    con.execute("UPDATE utenti SET npub=?, npub_accesso=? WHERE tg_id=4",
+                (V, V))
+    con.commit()
+    prova("UN'ALTRA CHIAVE collegata nel frattempo: non entra (prima la "
+          "scrittura non toccava niente, e si entrava lo stesso)",
+          401, tocca(b)[0])
+    prova("...e la chiave d'accesso resta quella nuova", (V, 1, V), riga(4))
+    prova("...nessuna sessione aperta dai tre rifiuti", [], sessioni)
+
+    # la corsa di sempre: la chiave presa da un altro account (indice unico)
+    U = "npub1" + "u" * 58
+    semina(5, U, 1)
+    semina(6, U, 1, U)
+    b = amb["nuovo_biglietto_collegamento"](5, U)
+    prova("la chiave gia' d'accesso altrove resta il 401 di sempre",
+          (401, "Riprova il login"), tocca(b))
+    lc = codice(pezzo("login_nostr_collega"))
+    prova("la sessione si apre DOPO aver guardato la riga",
+          True, lc.index("cur.rowcount != 1") < lc.index("apri_sessione("))
+    prova("...e le condizioni del biglietto sono quelle di chi lo emette",
+          True,
+          'WHERE npub=? AND npub_verificata=1 AND npub_accesso=\'\'"'
+          in pezzo("login_nostr")
+          and "AND npub_accesso='' AND npub=? AND npub_verificata=1" in lc)
+
+    # ---------------- (3) IL RITORNO DEL WIDGET ----------------------
+    class _Rimando:
+        def __init__(self, url, status_code=0):
+            self.url, self.status_code = url, status_code
+
+    class _Req:
+        def __init__(self, q):
+            self.query_params = q
+    token = "123456:" + "A" * 35
+    porta = {"aperta": True}
+    entrati, verifiche = [], []
+    amb_w = {"Request": object, "Cookie": lambda d="": d,
+             "HTTPException": _HTTP, "RedirectResponse": _Rimando,
+             "hashlib": hashlib, "hmac": hmac, "time": time,
+             "BOT_TOKEN": token, "_frena": lambda *a: None,
+             "_ip_di": lambda req: "127.0.0.1",
+             "_dove_tornare": lambda da: da or "/",
+             "porta_bot_aperta": lambda: porta["aperta"],
+             "upsert_utente": lambda u: None,
+             "apri_sessione": lambda resp, tg_id, *a: entrati.append(tg_id)}
+    exec(pezzo("verifica_login_widget"), amb_w)
+    vera = amb_w["verifica_login_widget"]
+
+    def spia(d):
+        verifiche.append(1)
+        return vera(d)
+    amb_w["verifica_login_widget"] = spia
+    exec("async " + pezzo("login_telegram_ritorno"), amb_w)
+
+    def firmati(tg_id, quando=None):
+        d = {"id": str(tg_id), "first_name": "Mario",
+             "auth_date": str(int(quando or time.time()))}
+        controllo = "\n".join(f"{k}={d[k]}" for k in sorted(d))
+        d["hash"] = hmac.new(hashlib.sha256(token.encode()).digest(),
+                             controllo.encode(), hashlib.sha256).hexdigest()
+        return d
+
+    def ritorno(q):
+        r = asyncio.run(amb_w["login_telegram_ritorno"](_Req(q)))
+        return (r.url, r.status_code)
+    prova("A PORTA DEL BOT APERTA un ritorno del widget FIRMATO BENE non "
+          "apre niente: torna col segno del login non riuscito",
+          (("/?accesso=no", 303), [], []),
+          (ritorno(firmati(111)), entrati, verifiche))
+    prova("...anche con la pagina di partenza nella query",
+          ("/negozio/ab12cd34?accesso=no", 303),
+          ritorno({**firmati(111), "da": "/negozio/ab12cd34"}))
+    porta["aperta"] = False
+    prova("A PORTA SPENTA il widget e' la porta di ieri: si entra",
+          (("/", 303), [111]), (ritorno(firmati(111)), entrati))
+    prova("...e la firma storta e il login vecchio restano rifiutati",
+          [("/?accesso=no", 303), ("/?accesso=no", 303)],
+          [ritorno({**firmati(111), "id": "222"}),
+           ritorno(firmati(111, time.time() - 301))])
+    prova("...senza aprire altre sessioni", [111], entrati)
+    rl = codice(pezzo("login_telegram_ritorno"))
+    prova("il rifiuto sta PRIMA della verifica, dentro il try (cosi' "
+          "torna col suo 303)", True,
+          rl.index("try:") < rl.index("if porta_bot_aperta():")
+          < rl.index("verifica_login_widget(d)"))
+    # la pagina: il widget si disegna solo dove la porta del bot manca
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la pagina disegna il widget solo se la porta del bot non c'e' "
+          "(banner della vetrina)", 2,
+          mini.count("leggiPortaBot().then(si => si ? bottoneLoginBot(posto)"))
+    prova("...e nel foglio dell'account la porta del bot viene prima del "
+          "widget", True,
+          mini.index("} else if (portaBotSi) {\n    porte.appendChild(portaBot(")
+          < mini.index("    porte.appendChild(portaTelegram());"))
+
+
 def prove_npub_una_casa():
     """UNA CHIAVE, UNA CASA (20 ott 2026, cantiere npub-una-casa, ok di
     Andrea). Il caso vero: A collega X, disabilita l'accesso (il badge
@@ -22270,6 +22552,10 @@ def prove_npub_una_casa():
 
     firma = {"pubkey": ""}
     amb["verifica_evento_login"] = lambda evento, host: firma["pubkey"]
+    # (14 nov 2026, audit-account) l'Host passa dal giudice dei nomi di
+    # casa prima della verifica: qui la verifica e' di cartone, e il
+    # giudice vero ha la sua sezione (prove_accesso_di_casa)
+    amb["host_di_casa"] = lambda h: h
     utente = {"id": 0}
     amb["verifica_utente"] = lambda *a: utente
     sessioni, biglietti = [], []
@@ -193100,7 +193386,7 @@ CATEGORIE = {
     dizionari_nel_loop logout_apk logout_apk_due nome_da_nostr
     foto_nostr_relay_muti idor_verifica contenuti_cifrati ssrf_redirect
     firme_nostr firme_nsec trasloco_nostr collega_npub_firma
-    npub_una_casa leve relay_leva relay_di_barattolo posta_relay
+    npub_una_casa accesso_di_casa leve relay_leva relay_di_barattolo posta_relay
     backup_prima_del_deploy backup_database_occupato sbirciata anteprime
     seo onion cookie_onion script_nel_workflow deploy giudice_deploy
     collaudi_in_ci ci_leggera ci_solo_main elenco_dei_collaudi
@@ -193554,6 +193840,7 @@ def main():
               prove_forma_tracking, prove_bip353, prove_firme_nostr, prove_firme_nsec,
               prove_trasloco_nostr, prove_collega_npub_firma,
               prove_npub_una_casa,
+              prove_accesso_di_casa,
               prove_conta_feedback,
               prove_classifica, prove_classifica_nascosta,
               prove_classifica_recensioni_tutte,

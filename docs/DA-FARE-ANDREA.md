@@ -688,3 +688,39 @@ Atteso: nessuna riga. Se ne esce una con `ordine_id` diverso da 0, si
 guarda insieme il prezzo di quell'ordine (può essere nato storto col
 codice di prima); con `ordine_id` 0 non è successo niente, e col codice
 nuovo l'acquisto prende la cifra giusta.
+
+## 17. Dopo il primo audit di sicurezza: due letture sul VPS PRIMA di promuovere il cantiere dell'accesso (14 nov 2026, cantiere audit-account)
+
+**Sola lettura**, niente cambia e niente segreti a schermo. **Queste si
+fanno PRIMA della promozione su main**, non dopo: dal codice nuovo la
+firma del login con Nostr vale solo per i nomi di casa, cioè quello di
+`URL_PUBBLICO` e quello di `ONION_HOST`. Se la gente entra da un nome
+che non è fra quei due, da quel nome il login con Nostr direbbe «Login
+Nostr non valido». Sul VPS, una riga alla volta, e incolla il risultato
+nella sessione:
+
+1. I due nomi di casa nel config:
+```
+grep -n "^URL_PUBBLICO\|^ONION_HOST" /srv/barattolo/config.py
+```
+   Atteso: `URL_PUBBLICO` non c'è (vale `https://barattolo.store`) o
+   dice proprio `https://barattolo.store`; `ONION_HOST` è il nome
+   `.onion` del sito, tutto minuscolo, senza `http://` e senza porta.
+   Se `ONION_HOST` manca ma l'onion è in uso, si aggiunge PRIMA di
+   promuovere (lo si guarda insieme).
+2. Sotto quali nomi Caddy serve l'app:
+```
+grep -nE '^[^[:space:]#].*\{|reverse_proxy' /etc/caddy/Caddyfile
+```
+   Atteso: ogni blocco che porta a `127.0.0.1:8080` si apre con
+   `barattolo.store` o col nome onion. Se ce n'è uno con un altro nome
+   (un `www.`, un secondo dominio) o senza nome (`:443`, `:80`,
+   `:8081`), si porta la riga alla sessione prima di promuovere.
+
+Sulla VM di collaudo develop sale da solo: se dopo il 14 nov il login
+con Nostr lì dicesse «non valido», è la stessa cosa (`URL_PUBBLICO`
+della VM dev'essere il nome con cui la si apre). Si guarda con:
+`sudo grep -n "^URL_PUBBLICO" /srv/collaudo/barattolo/config.py`.
+
+Dopo la promozione, una prova a mano dal telefono: uscire e rientrare
+con Nostr dal sito (e, se la usi, dall'onion). Deve entrare come sempre.
