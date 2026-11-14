@@ -83322,3 +83322,46 @@ anteprime-card-prezzo.png).
 NON PROVATO, DA GUARDARE. Il webview vero del telefono (il gradiente e il
 mezzo pixel). Il journal del VPS per sapere se il backfill del dollaro è
 fallito davvero. Sale con la prossima promozione.
+
+## La card del prezzo scura, al posto del velo (14 nov 2026, cantiere prezzo-btc-scura, Andrea sul velo appena salito su develop: «no niente non mi piace col gradiente, puoi farmi altri esempi»; poi «io farei la scura», fra sei scuri la «A», e «mandalo subito in produzione»)
+
+Segue il cantiere qui sopra (prezzo-btc-dollari, 2b1b75a): il dollaro
+corretto e il pallino tolto restano; il velo colorato se ne va tutto,
+classi `p2p-valore-sale`/`-scende`, gradiente e filo di mezzo pixel.
+
+LA SCELTA. Due giri di anteprime col codice vero della card (font
+compresi: nel primo giro le foto avevano il carattere di sistema, e
+Andrea credeva cambiati i numeri; nel codice non erano mai cambiati).
+Primo giro senza gradiente: filo colorato, striscia, tinta piatta,
+pillola, senza riquadro, carta scura; Andrea: la scura. Secondo giro di
+sei scuri (grafite, nero, caffè, blu notte, filo arancio, cifra
+arancio): la A, GRAFITE. Le foto in /mnt/project-files/prezzo-btc-dollari/
+(esempi-2-card-prezzo.png, esempi-3-card-scura.png, card-grafite-vera.png).
+
+COM'È. La card è `--valore-carta` #23282C anche di giorno (stacca dalle
+card bianche degli ordini), #16120B di sera (quasi nero caldo, sotto le
+card brune #2C2517). Scritte, grigio dell'etichetta e i due colori della
+linea sono quelli del tema scuro in TUTTI E DUE i temi, perché stanno
+sempre sul fondo scuro: crema 13:1, grigio caldo 6:1, verde e rosso oltre
+il 5:1 sul grafite. Il bordo prende il colore del fondo (nessun filo
+chiaro). Variabili sue (`--valore-*`), così nessun altro pezzo dell'app
+cambia. Il colore non segue più il mercato: il verso lo dicono la linea e
+la percentuale, come prima del velo.
+
+STRADE SCARTATE. Il velo «A» (gradiente verde/rosso, salito su develop
+con 2b1b75a e mai in produzione): non è piaciuto. Le altre cinque
+varianti senza gradiente e gli altri cinque scuri: scelta di Andrea.
+
+PROVATO. `prove_prezzo_btc_libro` riscritta sul pezzo del velo: nessuna
+classe di verso sulla card (euro e dollari, sale e scende), nessun resto
+del velo nel file, la carta e i suoi colori nei due temi, la regola
+della carta DOPO quella base. Controprova: tolta la regola della carta,
+la prova del CSS è rossa (e non esplode). Il resto del giro di
+prezzo-btc-dollari (dollaro, tocco, pallino) gira com'era.
+Suite severa sull'albero da origin/develop 2b1b75a, nel venv delle sole
+dipendenze del workflow (niente coincurve): 28.202/0, 2 saltate (i due
+script di nostr-tools). Collaudi della CI 133/133 nello stesso venv,
+senza le variabili del proxy.
+
+NON PROVATO, DA GUARDARE. Il webview vero del telefono. Il journal del
+VPS per il backfill del dollaro (vedi la voce qui sopra).

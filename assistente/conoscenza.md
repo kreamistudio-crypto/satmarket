@@ -166,7 +166,7 @@ Come si legge una card del libro: in alto a destra due quadratini con una frecci
 <!-- pezzo libro-013 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (2/8)
 
-Il prezzo di bitcoin nel libro: in cima al libro P2P, sotto i rettangoli «Novità», c'è la card «1 BTC adesso» col prezzo in euro (lo stesso che l'app usa per i conti, aggiornato ogni minuto), quanto è salito o sceso e una piccola linea, verde se sale e rossa se scende. Toccandola si passa dalle ultime 24 ore ai 7 giorni e ai 30 giorni; toccando il simbolo € si passa ai dollari (prezzo, linea e percentuale in dollari) e un altro tocco torna agli euro. La card ha un velo verde leggero quando il prezzo sale e rosso quando scende; in dollari è identica a quella in euro (linea, percentuale e periodo, e il tocco cambia periodo anche lì). Subito dopo un aggiornamento può mostrare solo il prezzo, finché non ha la storia del periodo.
+Il prezzo di bitcoin nel libro: in cima al libro P2P, sotto i rettangoli «Novità», c'è la card «1 BTC adesso» col prezzo in euro (lo stesso che l'app usa per i conti, aggiornato ogni minuto), quanto è salito o sceso e una piccola linea, verde se sale e rossa se scende. Toccandola si passa dalle ultime 24 ore ai 7 giorni e ai 30 giorni; toccando il simbolo € si passa ai dollari (prezzo, linea e percentuale in dollari) e un altro tocco torna agli euro. La card è scura, sia di giorno sia di sera, per staccarsi dagli ordini; in dollari è identica a quella in euro (linea, percentuale e periodo, e il tocco cambia periodo anche lì). Subito dopo un aggiornamento può mostrare solo il prezzo, finché non ha la storia del periodo.
 
 Quanto si può per ordine nel P2P, per ora (fase beta): fino a 250 € negli scambi in Lightning e fino a 500 € in quelli on-chain (dal 12 novembre 2026; prima anche l'on-chain si fermava a 250 €). Il foglio «Pubblica» lo scrive sotto la cifra e non lascia andare oltre.
 
@@ -1441,9 +1441,9 @@ leva: MANCIA_ATTIVA (nuova, accesa)
 pubblico: sì
 
 <!-- pezzo novita-029 | novita -->
-## Novità · 2026-11-14 · prezzo-btc-velo
+## Novità · 2026-11-14 · prezzo-btc-scura
 
-frase: La card del prezzo di bitcoin in cima al libro P2P ora si colora con il mercato: un velo verde leggero quando sale, rosso quando scende, con un filo sottile come i rettangoli «Novità». E in dollari è uguale a quella in euro: linea, percentuale e periodo restano, e il tocco cambia sempre fra 24 ore, 7 giorni e 30 giorni.
+frase: La card del prezzo di bitcoin in cima al libro P2P ha una veste nuova, scura, che si stacca dagli ordini sotto. E in dollari ora è uguale a quella in euro: linea, percentuale e periodo restano, e il tocco cambia sempre fra 24 ore, 7 giorni e 30 giorni.
 dove: la scheda «P2P», in cima al libro degli ordini (Compra BTC e Vendi BTC).
 leva: nessuna
 pubblico: sì

@@ -159491,7 +159491,7 @@ console.log(JSON.stringify(out));
            'class="p2p-valore-dx giu"' in g[1], g[2] == g[0], r.get("vibra")])
     prova("...la card e' un role=button (dentro c'e' il bottone del simbolo) che dice "
           "tutto alla voce, e senza dollaro il simbolo e' solo un simbolo", [True, False],
-          ['class="p2p-valore p2p-valore-sale girabile" id="p2pPrezzo" role="button" tabindex="0" '
+          ['class="p2p-valore girabile" id="p2pPrezzo" role="button" tabindex="0" '
            'onclick="voltaPeriodoPrezzoP2P()" onkeydown="tastoPrezzoP2P(event)" '
            'aria-label="1 BTC vale 86 890 euro, più 1,8 per cento in 24 ore. Tocca per '
            'cambiare periodo"' in g[0], "<button" in g[0]])
@@ -159527,7 +159527,7 @@ console.log(JSON.stringify(out));
           [True, True, True, True, True, "7g"],
           ['100 720 <button' in ds, "<svg" in ds,
            'class="p2p-valore-var su">▲ 1,8% · 24 ore' in ds,
-           'class="p2p-valore p2p-valore-sale girabile" id="p2pPrezzo" role="button"' in ds,
+           'class="p2p-valore girabile" id="p2pPrezzo" role="button"' in ds,
            'class="p2p-valore-var giu">▼ 3,4% · 7 giorni' in ds7[0], ds7[1]])
     prova("...e ritocco torna all'euro, sullo stesso periodo; col dollaro sparito torna "
           "all'euro da solo, e il simbolo smette di essere un bottone",
@@ -159535,30 +159535,26 @@ console.log(JSON.stringify(out));
           [[(r.get("diNuovoEuro") or [0, -1, 0])[0], (r.get("diNuovoEuro") or [0, -1, 0])[1] > 0,
             (r.get("diNuovoEuro") or [0, -1, 0])[2]],
            [(r.get("dollaroSparito") or [-1, 0])[0] > 0, (r.get("dollaroSparito") or [-1, 0])[1]]])
-    # IL VELO E IL PALLINO (14 nov 2026, Andrea: «un leggero gradiente
-    # colorato in base all'andamento», la «A · Velo»; «levami quel pallino
-    # verde affianco alla scritta 1 BTC adesso»)
-    prova("il velo della card segue il verso del periodo scelto (sale → verde, scende → "
-          "rosso), anche in dollari; senza serie la card resta quella di prima",
-          [True, True, True, True, False],
-          ['<div class="p2p-valore p2p-valore-sale girabile"' in g[0],
-           '<div class="p2p-valore p2p-valore-scende girabile"' in g[1],
-           '<div class="p2p-valore p2p-valore-scende girabile"' in ind[0],
-           '<div class="p2p-valore p2p-valore-sale girabile"' in gd[0],
-           "p2p-valore-sale" in sp or "p2p-valore-scende" in sp])
-    prova("...il CSS: un gradiente di sole variabili dal colore dell'andamento alla card, "
-          "e il filo sottile del «Novità» (mezzo pixel al 30%, color-mix solo dentro "
-          "@supports) al posto del bordo, col pixel restituito al padding",
-          [True, True, True, True, True],
-          [".p2p-valore.p2p-valore-sale{--valore-tinta:var(--trust);--valore-velo:var(--trust-soft)}" in mini,
-           ".p2p-valore.p2p-valore-scende{--valore-tinta:var(--rosso-p2p-testo);"
-           "--valore-velo:var(--rosso-p2p-tenue)}" in mini,
-           "background:linear-gradient(110deg,var(--valore-velo) 0%,var(--card) 70%);" in mini,
-           "    border:0;padding:13px 17px;box-shadow:inset 0 0 0 .5px var(--line-soft)}" in mini,
-           "  @supports (box-shadow:inset 0 0 0 1px color-mix(in srgb,red 50%,blue)){\n"
-           "    .p2p-valore.p2p-valore-sale,.p2p-valore.p2p-valore-scende{\n"
-           "      box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--valore-tinta) 30%,transparent)}"
-           in mini])
+    # LA CARTA SCURA E IL PALLINO (14 nov 2026, Andrea: «fammi la card un
+    # po' diversa da quelle sotto», il velo colorato scartato — «il gradiente
+    # colorato non mi piace» —, fra sei scuri la «A · Grafite»; «levami quel
+    # pallino verde affianco alla scritta 1 BTC adesso»)
+    prova("niente velo che cambia col mercato: la card ha la sua classe e basta, in "
+          "euro e in dollari, che salga o che scenda", [True, True, True, 0, 0],
+          ['<div class="p2p-valore girabile"' in g[0], '<div class="p2p-valore girabile"' in g[1],
+           '<div class="p2p-valore girabile"' in ind[0],
+           mini.count("p2p-valore-sale"), mini.count("valore-velo")])
+    prova("...il CSS: la carta grafite anche di giorno, quasi nera calda di sera, con "
+          "inchiostro, grigio e i due colori della linea del tema scuro in tutti e due i temi",
+          [True, True, True, True, True, True],
+          [":root{--valore-carta:#23282C;--valore-inchiostro:#F1E8D5;--valore-muto:#A99F87;\n"
+           "    --valore-su:#34B47A;--valore-giu:#F37456}" in mini,
+           'html[data-tema="scuro"]{--valore-carta:#16120B}' in mini,
+           ".p2p-valore{background:var(--valore-carta);border-color:var(--valore-carta);"
+           "color:var(--valore-inchiostro)}" in mini,
+           "color:var(--valore-muto)}" in mini,
+           "  .p2p-valore .su{color:var(--valore-su)}\n  .p2p-valore .giu{color:var(--valore-giu)}" in mini,
+           mini.find(".p2p-valore{background:var(--valore-carta)") > mini.find("  .p2p-valore{display:flex;") > 0])
     prova("niente pallino verde accanto a «1 BTC adesso»", [True, 0],
           ['<span class="p2p-valore-et">1 BTC adesso</span>' in g[0],
            mini.count("p2p-valore-vivo")])
