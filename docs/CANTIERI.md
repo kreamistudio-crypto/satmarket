@@ -82972,3 +82972,48 @@ pagamento poi arrivato: è il dubbio che l'audit dei pagamenti di
 settembre segna come non verificato, e resta da guardare sul nodo.
 Sul VPS, in sola lettura: `ASTA_ABILITATA`, `MERCATINO_CHAT_ORDINI` e
 `CAMBIO_RINFRESCO_S` dicono quanto erano vive le porte 3, 7 e 6.
+
+## Wise c'era già: lo sa anche Tappo (14 nov 2026, cantiere wise-tappo, un utente girato da Andrea: «come mai non mettete anche piattaforma Wise, tra i metodi di pagamento accettati P2P!? É accettata anche su Mostro»)
+
+COSA C'ERA. Wise è nel vocabolario dei metodi P2P dal 2 nov 2026
+(«L'ottava è Wise», chiesta da Sideral), è in produzione da allora, ha
+il suo form di recapito (Wisetag, email o IBAN del conto Wise), sta nel
+filtro del libro, nella pagina Info P2P e fra i metodi in franchi. Nel
+foglio «Pubblica» però sta sotto «Altri metodi ▾» (la lista corta dello
+stesso giorno), e il libro di Tappo diceva solo «un elenco chiuso, che
+vedi quando pubblichi»: la riga della pagina Info P2P che li nomina
+(`data-p2pinfo="metodi"`) la scrive JS, e nella base di conoscenza
+arriva vuota («I metodi sono un elenco chiuso: .»). Chi chiedeva a
+Tappo di Wise non riceveva risposta, e chi pubblicava senza aprire gli
+altri non lo vedeva. Il nome del metodo viaggia libero nel tag `pm`
+del libro pubblico, e «Wise» è la stessa parola che usano i client
+Mostro: nessun cambio di stringa.
+
+LA CORREZIONE. Una riga del libro (`assistente/sapere.md`): gli otto
+metodi degli euro per nome, quali si vedono subito e quali si aprono da
+«Altri metodi ▾», e il recapito di Wise. `conoscenza.md` rigenerato.
+`prove_lista_corta_metodi` tiene il libro allineato al vocabolario:
+ogni voce di `P2P_METODI` deve stare nella frase dell'elenco, e ogni
+voce di `P2P_METODI_ALTRI` nella frase degli «Altri metodi ▾» (il
+tabacchino col nome corto).
+
+STRADE SCARTATE. Tirare Wise fuori dagli «Altri metodi»: la lista corta
+è una scelta di Andrea del 2 nov, si propone e non si rovescia qui.
+Insegnare a `conoscenza.py` a riempire i `data-p2pinfo`: è il rimedio
+alla radice (vuoto anche «fino a ±%» del premio), ma tocca il
+generatore di tutta la base e resta una proposta.
+
+PROVATO. `prove_lista_corta_metodi`, `prove_conoscenza_tappo`,
+`prove_novita_md` verdi. Controprove: tolto Wise dall'elenco del libro
+— rossa la prima; tolto Wise dalla frase degli altri — rossa la
+seconda; aggiunto un metodo finto al vocabolario — rossa la prima;
+rimesso tutto, verdi. Suite severa (`PROVE_SEVERE=1`) in un venv con le
+sole dipendenze del passo «Le prove», senza coincurve né httpx, e
+nostr-tools fuori dal repo: 27969 passate, 0 fallite, 0 saltate. I
+collaudi della CI nel venv senza coincurve e senza le variabili del
+proxy: 130 verdi, 0 rossi. Tutto sull'albero di origin/develop d3a42ed8;
+dopo il rebase su bf084144 (audit-pagamenti-3, nessun simbolo in comune)
+il giro mirato: le tre sezioni sopra e i collaudi vicini, verdi.
+
+NON PROVATO, DA GUARDARE. Tappo legge il libro da main: risponde su
+Wise solo dopo la promozione.

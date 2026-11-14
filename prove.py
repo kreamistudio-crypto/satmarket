@@ -156908,6 +156908,24 @@ def prove_lista_corta_metodi():
            "  p2pNuovoAperta = false;\n  p2pNuovoAltri = false;\n" in mini))
     prova("la riga «Wise:» si copia", True,
           "|paypal|wise|" in re.search(r"const ETICHETTE_DA_INCOLLARE_P2P = [^\n]*", mini).group(0))
+    # IL LIBRO DI TAPPO LI NOMINA TUTTI (14 nov 2026, cantiere wise-tappo:
+    # un utente chiede «perché non c'è Wise?», e c'era dal 2 nov). La
+    # pagina Info P2P scrive l'elenco a mano di JS (`data-p2pinfo`), e
+    # nella base di Tappo arrivava vuoto («elenco chiuso: .»): l'elenco
+    # vive nel libro, e una voce nuova del vocabolario lo fa rosso finche'
+    # non c'e' anche li', con la strada degli «Altri metodi ▾».
+    voci = re.findall(r"'([^']+)'", lista)
+    nascosti = re.findall(r"'([^']+)'", altri)
+    libro = open(os.path.join("assistente", "sapere.md"), encoding="utf-8").read()
+    par = next((p for p in libro.split("\n\n")
+                if p.startswith("I metodi di pagamento degli euro sono un elenco chiuso")), "")
+    elenco = par.split(". ")[0]
+    prova("il libro di Tappo nomina ogni metodo degli euro del vocabolario, Wise compreso",
+          [], [m for m in voci if m not in elenco] + ([] if "Wise" in voci else ["Wise?"]))
+    frase = next((f for f in par.split(". ") if "«Altri metodi ▾»" in f), "")
+    prova("...e dice quali si aprono da «Altri metodi ▾» (il tabacchino col suo nome corto)",
+          [], [m for m in nascosti
+               if (m.replace("Contanti al ", "il ") if m == "Contanti al tabacchino" else m) not in frase])
     # CON GLI USDT LA TENDINA CHIEDE LA RETE (2 nov 2026, Andrea): «Seleziona
     # la rete» e l'icona della rete al posto della carta di pagamento; con
     # l'euro tutto come prima. Il giudice e' la valuta del foglio (`val`).
