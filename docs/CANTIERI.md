@@ -82082,3 +82082,47 @@ NON PROVATO, DA GUARDARE. Dal telefono, al prossimo ordine in USDT
 preso: al recapito di chi vende la pagina non deve mai dire €. Resta
 possibile che per un attimo manchi la riga del premio (la stessa riga
 senza `fiat` e coi sats del libro): non è stata toccata.
+
+## Col premio i sats non sono mai fissi: la riga del premio non sparisce più (14 nov 2026, cantiere usdt-premio-attimo, seguito di usdt-totale-euro; Andrea vuole sparita del tutto la pagina sbagliata di mezzo)
+
+IL RESTO DEL DIFETTO. Nella pagina sbagliata dello scambio in USDT
+(voce qui sopra) mancavano anche la riga «Premio che hai offerto 4%» e
+il Subtotale, eppure le cifre erano giuste (Controvalore 410.006, Ricevi
+389.670). I numeri dicono da soli la strada: il conto aveva preso
+l'ordine per uno a SATS FISSI (`o.sats` > 0). A sats fissi la riga del
+premio è la convenienza «della presa», e su uno scambio in USDT preso
+`metroFissoP2P` tace apposta (il cambio della presa è in euro): niente
+riga, niente Subtotale, e il Controvalore scorporato dalla cifra di
+mostrod.
+
+PERCHÉ C'ERANO SATS FISSI. Alla presa mostrod ripubblica l'ordine (il
+38383) con `amt` = i sats calcolati, e il libro li tiene: nel server
+`p2p_ordini.sats` è riscritto a ogni evento, nel telefono la riga del
+libro li porta da `amt`. Una riga rifatta da lì (`rigaDaServerP2P`, il
+ritrovamento dei miei ordini dal libro) se li porta dietro come se
+fossero quelli della pubblicazione. Quale strada sul telefono di Andrea
+non è provato dal vivo.
+
+LA CORREZIONE, UNA RIGA IN TESTA A `contoDettP2P`. È la regola del
+coordinatore (`check_zero_amount_with_premium`, Architettura, «LE TRE
+REGOLE DI UN ORDINE NUOVO»): con `amount` > 0 il premio deve essere
+zero, quindi un ordine col premio è nato a mercato, e dei suoi sats si
+fa a meno — il conto diventa identico a quello della riga vera, e la
+cifra di mostrod resta in `satsDetti`. Lo stesso giudice che
+`campiRipubblicaP2P` usa già. Barattozon e il prezzo fisso hanno premio
+zero sul filo e restano fissi.
+
+STRADE SCARTATE. Azzerare i sats nei costruttori delle righe (server,
+libro, ripresa): tre punti, e la riga del libro i sats li deve portare
+per le card della vetrina. Mandare dal server i sats della
+pubblicazione: il libro non li tiene, e servirebbe una colonna.
+
+PROVATO. In `prove_p2p_dettaglio` (il banco del conto vero): uno scambio
+a mercato col 4% preso, con e senza i sats della presa, dà lo stesso
+conto con la riga del premio e il Subtotale, nei due versi. Controprove:
+tolta la riga — rossa; tolta la condizione del premio (tutti i sats via)
+— rosse cinque prove di Barattozon e del prezzo fisso; rimessa, verdi.
+
+NON PROVATO, DA GUARDARE. Dal telefono, al prossimo ordine in USDT
+preso: al recapito di chi vende la pagina resta quella giusta, senza un
+attimo di conto diverso.

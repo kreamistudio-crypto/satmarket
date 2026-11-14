@@ -70106,6 +70106,17 @@ out.contoPresoSenza = contoDettP2P(Object.assign(ordine({sats: 11400, metodi: TA
   {satsDetti: 11400, preso: true}));
 out.contoFissoAdesso = contoDettP2P(ordine({sats: 11400, metodi: ['Revolut']}));
 out.contoMercatoIntatto = contoDettP2P(ordine({premium: 4}));
+/* ---- COL PREMIO I SATS NON SONO FISSI (14 nov 2026, usdt-premio-attimo) ----
+   Uno scambio preso a mercato col 4%: la riga vera ha sats 0, quella rifatta
+   dal libro o dall'archivio porta i sats che mostrod ha ripubblicato alla
+   presa. Il conto deve essere LO STESSO, riga del premio e Subtotale
+   compresi; e un ordine a sats fissi senza premio resta fisso. */
+const presoMerc = (x) => Object.assign(ordine(Object.assign({premium: 4}, x)),
+  {satsDetti: 11520, preso: true});
+out.contoPremioVero = contoDettP2P(presoMerc({}));
+out.contoPremioLibro = contoDettP2P(presoMerc({sats: 11520}));
+out.contoPremioLibroVendi = [contoDettP2P(presoMerc({lato: 'buy'})),
+  contoDettP2P(presoMerc({lato: 'buy', sats: 11520}))];
 eurPerSat = 0.0005;
 /* l'intervallo: DUE COLONNE, una per capo (6 ott 2026) */
 out.contoRange = contoDettP2P(ordine({euro: 20, euroMax: 100}));
@@ -70969,6 +70980,16 @@ console.log(JSON.stringify(out));
     prova("...e l'ordine a MERCATO resta com'era: nessuna frase, il suo premio",
           True, "ctrl-conv" not in o["contoMercatoIntatto"]
           and 'p2p-avviso">4%<' in o["contoMercatoIntatto"])
+    # COL PREMIO I SATS NON SONO MAI FISSI (14 nov 2026, cantiere
+    # usdt-premio-attimo): la riga rifatta dal libro porta i sats della
+    # presa, e per qualche secondo il conto perdeva premio e Subtotale
+    prova("uno scambio a mercato col premio, rifatto dal libro coi sats della presa: "
+          "lo stesso conto della riga vera, premio e Subtotale compresi",
+          [True, True, True, True],
+          [o["contoPremioLibro"] == o["contoPremioVero"],
+           'p2p-avviso">4%<' in o["contoPremioLibro"] or 'p2p-affare">4%<' in o["contoPremioLibro"],
+           "<span>Subtotale</span>" in o["contoPremioLibro"],
+           o["contoPremioLibroVendi"][0] == o["contoPremioLibroVendi"][1]])
     # ⚠️ (7 ott 2026, decisione di Andrea) LE DUE COLONNE SE NE SONO
     # ANDATE: dal 6 ott qui si provava un intervallo in due colonne.
     # Adesso nessuna pagina passa un intervallo al conto (il libro chiede
