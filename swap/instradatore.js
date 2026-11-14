@@ -2151,6 +2151,10 @@ async function swapRitrovaCambi(){
     prossimo = Math.max(prossimo, Number(trovati.prossimo) || 0);
     for (const s of trovati.swap) {
       if (swapLista().some(r => r.id === s.id)) continue;
+      /* UN INDICE, UNO SWAP (14 nov 2026, secondo audit di sicurezza):
+         un ritrovato con l'indice di uno swap che c'e' gia' su questa
+         serie di parole avrebbe lo stesso segreto sotto un altro nome */
+      if (swapLista().some(r => r.seme === 'onchain' && Number(r.indice) === Number(s.indice))) continue;
       swapSalvaRecord(Object.assign(s, {fornitore: f.id, ordine: null, indirizzo: '', seme: 'onchain'}));
       quanti++;
     }
@@ -2187,6 +2191,9 @@ async function swapRecupera(fid){
   let quanti = 0;
   for (const s of trovati.swap) {
     if (swapLista().some(r => r.id === s.id)) continue;
+    /* un indice, uno swap, anche sulle parole di prima (secondo audit) */
+    if (swapLista().some(r => r.seme !== 'onchain' && swapDiChi(r) === f.id
+                              && Number(r.indice) === Number(s.indice))) continue;
     swapSalvaRecord(Object.assign(s, {fornitore: f.id, ordine: null, indirizzo: ''}));
     quanti++;
   }

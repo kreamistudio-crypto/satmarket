@@ -238,7 +238,7 @@ const O = D.ordini;
   const carta = A.run(`pannelloSwapTelefono({id: ${o1}})`);
   html.push(carta);
   out.carta = carta.includes('Lo swap lo fa Cartone Due');
-  await stato(B2, r1.id, 'transaction.mempool');
+  await stato(B2, r1.id, 'transaction.confirmed');
   await A.run('swapGiro()');
   await A.run('swapGiro()');
   const r1b = lista(mem).find(r => r.ordine === o1) || {};

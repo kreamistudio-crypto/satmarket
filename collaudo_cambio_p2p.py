@@ -408,7 +408,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
                     fuori: chiamate.filter(c => !c.url.startsWith(BASE)).map(c => c.url)};
   /* il rilascio: Mostro paga, il cartone blocca i bitcoin, la sorveglianza li ritira */
   run('swapScrivi(swapCasaLista(), swapLista().map(r => Object.assign(r, {p2p: r.p2p === ID + "-vecchio" ? ID : r.p2p})))');
-  await stato(out.swapId, 'transaction.mempool');
+  await stato(out.swapId, 'transaction.confirmed');  // il telefono ritira dalla prima conferma (14 nov 2026, secondo audit)
   await run('swapGiro()');
   /* il giro partito alla nascita puo' essere ancora in volo e ritirare
      lui: si aspetta l'esito, chiunque l'abbia fatto */

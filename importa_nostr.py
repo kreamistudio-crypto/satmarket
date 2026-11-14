@@ -814,7 +814,7 @@ def e_riflesso(riga, pubkey: str) -> bool:
 
 def importa_venditore(npub_venditore: str, venditore_id: int,
                       db: str = DB, vaglio=None, scarica=None,
-                      cambio=None, pulisci=None, relays=None):
+                      cambio=None, pulisci=None, relays=None, firma=None):
     """Il cuore dell'import, in forma riusabile: lo chiama lo script
     manuale (main, qui sotto) e ogni ora l'orologio del server.
     Ritorna la terna (importati, aggiornati, saltati).
@@ -855,6 +855,12 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
     server.py. Senza (script a mano) valgono i RELAYS di qui, come
     sempre: e lo script a mano NON e' per i collaudi, legge dai relay
     veri qualunque cosa dica il config.
+
+    `firma` (14 nov 2026, secondo audit di sicurezza) e' il giudice
+    della firma del server (`verifica_firma_nostr`): se c'e', OGNI
+    evento passa da lui prima di tutto il resto — anche le cancellazioni
+    (kind 5) e gli «status sold», che il vaglio non vede. Senza (script
+    a mano) come sempre.
     """
     hexkey = npub_to_hex(npub_venditore)
     os.makedirs(FOTO_DIR, exist_ok=True)
@@ -884,6 +890,23 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
               f"scartati (il relay ha ignorato il filtro authors)")
         eventi = [e for e in eventi
                   if (e.get("pubkey") or "").lower() == hexkey]
+
+    # ...E FIRMATI DAVVERO, TUTTI (14 nov 2026, cantiere
+    # audit-pagamenti-2, dal secondo audit di sicurezza). La `pubkey`
+    # qui sopra e' una stringa che chiunque puo' scrivere: la firma la
+    # guardava solo il vaglio del server, e il vaglio riceve i soli
+    # annunci da scrivere — non le cancellazioni (kind 5) ne' gli
+    # «status sold», che spengono una riga e la seppelliscono per
+    # sempre (lapide). Un relay qualunque poteva spegnere gli annunci
+    # importati di un altro. Ora, col giudice del server, ogni evento
+    # passa dalla firma PRIMA del dedup: anche una versione «piu'
+    # recente» falsa non nasconde piu' quella vera.
+    if firma is not None:
+        firmati = [e for e in eventi if firma(e)]
+        if len(firmati) < len(eventi):
+            print(f"  ✍️ {len(eventi) - len(firmati)} eventi con firma non "
+                  f"verificabile: scartati (cancellazioni comprese)")
+        eventi = firmati
 
     # dedup: tieni la versione piu' recente di ogni annuncio
     unici = {}

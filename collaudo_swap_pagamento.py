@@ -447,7 +447,7 @@ const setInterval = () => 1, clearInterval = () => {};
                 uscite: (await ctl(`uscite?h=${r1.impronta}`)).per,
                 impronta: r1.impronta, fattura: r1.invoice,
                 creazione: v0.creazione && v0.creazione.preimageHash === r1.impronta};
-  await stato(r1.id, 'transaction.mempool');
+  await stato(r1.id, 'transaction.confirmed');  // il telefono ritira dalla prima conferma (14 nov 2026, secondo audit)
   await A.run('swapGiro()');
   const r1b = ultimo(O.intero);
   const v1 = await visto();

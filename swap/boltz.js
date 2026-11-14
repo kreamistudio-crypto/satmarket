@@ -134,6 +134,36 @@ function swapVerifica(S, rete, r, chiavi, attesa){
   if (!(Number(r.onchainAmount) >= Number(attesa.onchainMin))) return 'meno';
   return null;
 }
+/* LA VERIFICA DI UNO SWAP RITROVATO (14 nov 2026, cantiere
+   audit-pagamenti-2, dal secondo audit di sicurezza). «Ritrova i miei
+   cambi» prendeva dal fornitore albero, indirizzo, chiave e indice e li
+   riscattava senza nessuno dei controlli della nascita: un fornitore
+   bugiardo poteva farsi dare il segreto di un indice vivo contro un
+   lockup disegnato da lui. Qui si rifanno i controlli che si possono
+   rifare senza la fattura (che dopo un recupero non abbiamo): l'impronta
+   del NOSTRO segreto se il fornitore la dice, l'albero rifatto coi
+   nostri pezzi, l'indirizzo che ne viene, e un importo vero. null =
+   torna, altrimenti la ragione. */
+function swapVerificaRitrovato(S, rete, d, chiavi, impronta){
+  if (!d || typeof d !== 'object') return 'risposta';
+  if (impronta && String(impronta).toLowerCase() !== S.hex.encode(chiavi.impronta)) return 'impronta';
+  const scadenza = Number(d.timeoutBlockHeight);
+  if (!(scadenza > 0)) return 'albero';
+  let loro, albero, atteso, agg;
+  try {
+    loro = S.hex.decode(String(d.serverPublicKey || ''));
+    albero = S.SwapTreeSerializer.deserializeSwapTree(d.tree);
+    atteso = S.reverseSwapTree(false, chiavi.impronta, chiavi.pubblica, loro, scadenza);
+  } catch(e){ return 'albero'; }
+  if (!S.compareTrees(albero, atteso)) return 'albero';
+  try {
+    agg = S.TaprootUtils.tweakMusig(S.Musig.create(chiavi.privata, [loro, chiavi.pubblica]), albero.tree);
+  } catch(e){ return 'indirizzo'; }
+  if (!swapUguali(S.Scripts.p2trOutput(agg.aggPubkey),
+                  swapScriptIndirizzo(S, rete, d.lockupAddress))) return 'indirizzo';
+  if (!(Number(d.amount) > 0)) return 'importo';
+  return null;
+}
 /* IL RITIRO: la transazione che porta i bitcoin bloccati dal fornitore
    all'indirizzo di chi vende. `ricevi` e' quel che il preventivo ha
    promesso: la differenza col lockup e' la fee del ritiro (il calco di
@@ -155,7 +185,7 @@ function swapVerifica(S, rete, r, chiavi, attesa){
    di quello promesso alla nascita (`rec.onchainAmount`). Il terzo
    controllo — il lockup esiste davvero sulla rete — lo fa `ritira`,
    prima di arrivare qui. */
-async function swapRitiro(S, rete, rec, chiavi, lockupHex, destinazione, ricevi, chiediFirma, cooperativo){
+async function swapRitiro(S, rete, rec, chiavi, lockupHex, destinazione, ricevi, chiediFirma, cooperativo, attendi){
   if (cooperativo === undefined) cooperativo = true;
   const loro = S.hex.decode(String(rec.refundPublicKey || ''));
   const albero = S.SwapTreeSerializer.deserializeSwapTree(rec.swapTree);
@@ -173,6 +203,10 @@ async function swapRitiro(S, rete, rec, chiavi, lockupHex, destinazione, ricevi,
   if (!(budget > 0)) throw new Error('il lockup non copre quel che il preventivo promette');
   const script = swapScriptIndirizzo(S, rete, destinazione);
   if (!script) throw new Error('indirizzo di destinazione non valido');
+  /* (14 nov 2026, secondo audit) la conferma e il margine, DOPO i due
+     controlli sul lockup e PRIMA che il segreto entri in una transazione:
+     li porta `ritira`, che sa leggere la rete */
+  if (attendi) await attendi();
   const dettagli = [Object.assign({}, uscita, {
     cooperative: cooperativo, swapTree: albero, privateKey: chiavi.privata,
     type: S.OutputType.Taproot, transactionId: lockup.id,
@@ -201,6 +235,10 @@ const SWAP_FASI_BOLTZ = {
   'transaction.confirmed': 'confermato', 'invoice.settled': 'fatto',
   'swap.expired': 'scaduto', 'invoice.expired': 'scaduto',
   'transaction.failed': 'fallito', 'transaction.refunded': 'ripreso'};
+/* IL MARGINE DEL RITIRO (14 nov 2026, secondo audit): come il server
+   (SWAP_AUTO_MARGINE_RITIRO), un paio d'ore di blocchi prima della
+   scadenza dello swap; sotto, il segreto non esce piu'. */
+const SWAP_MARGINE_RITIRO = 12;
 /* (tappa 3) gli stati del submarine: «creato» aspetta i bitcoin
    dell'utente; «pagata» e' la fattura pagata, il fornitore chiede la
    nostra meta' per ritirare; «fatto» quando ha ritirato */
@@ -621,11 +659,48 @@ window.SWAP_TIPI.boltz = function(cfg){
       if (S.Transaction.fromRaw(S.hex.decode(lockHex),
             {allowUnknownOutputs: true, allowUnknownInputs: true}).id !== txid)
         throw new Error('la rete risponde con un altro lockup');
+      /* UNA CONFERMA E UN MARGINE PRIMA DEL SEGRETO (14 nov 2026, cantiere
+         audit-pagamenti-2, dal secondo audit di sicurezza): il gemello di
+         quel che fa il server dal primo audit. Il segreto partiva appena
+         il lockup era in mempool, e senza guardare quanto mancava alla
+         scadenza: un lockup mai confermato (sostituito, o scaduto) e il
+         segreto in mano al fornitore = Lightning incassato da lui e
+         bitcoin mai arrivati. Ora il lockup dev'essere CONFERMATO e la
+         scadenza lontana almeno SWAP_MARGINE_RITIRO blocchi; se no si
+         aspetta il giro dopo (un errore che non e' un guasto). Vicino
+         alla scadenza non si ritira piu': la fattura Lightning, mai
+         incassata, torna indietro da sola. */
+      const attendi = async () => {
+        let conferma = null;
+        try { conferma = (JSON.parse(await swapMempool(base, `/tx/${txid}`)) || {}).status; }
+        catch(e){ conferma = null; }
+        if (!conferma || conferma.confirmed !== true) {
+          const e = new Error('aspetto la prima conferma del blocco del fornitore');
+          e.tipo = 'attesa';
+          throw e;
+        }
+        const scade = Number(rec.timeoutBlockHeight) || 0;
+        if (scade > 0) {
+          let cima = 0;
+          try { cima = Number(await swapMempool(base, '/blocks/tip/height')); } catch(e){ cima = 0; }
+          if (!(cima > 0)) {
+            const e = new Error('la rete non dice l\'altezza: riprovo fra poco');
+            e.tipo = 'attesa';
+            throw e;
+          }
+          if (scade - cima < SWAP_MARGINE_RITIRO) {
+            const e = new Error('troppo vicino alla scadenza: il ritiro non parte, '
+                                + 'i sats Lightning tornano da soli');
+            e.tipo = 'scadenza';
+            throw e;
+          }
+        }
+      };
       const chiediFirma = (txHex, nonce) => api(
         `/v2/swap/reverse/${id(rec.id)}/claim`,
         {index: 0, preimage: S.hex.encode(chiavi.segreto), pubNonce: nonce, transaction: txHex});
       const fatto = await swapRitiro(S, rete, rec, chiavi, lockHex, rec.indirizzo, ricevi,
-                                     chiediFirma, !rec.coopRifiutato);
+                                     chiediFirma, !rec.coopRifiutato, attendi);
       /* le transazioni firmate qui si ricordano PRIMA di trasmetterle: se
          la risposta si perde, il giro dopo le riconosce nella spesa */
       rec.firmati = (rec.firmati || []).filter(x => x !== fatto.id).concat(fatto.id).slice(-4);
@@ -643,6 +718,7 @@ window.SWAP_TIPI.boltz = function(cfg){
        l'indice piu' alto trovato: mai un segreto riusato */
     async recupera(parole){
       const S = await caricaBundleSwap();
+      const rete = swapRete(S, cfg.rete);
       const trovati = await api('/v2/swap/restore', {xpub: swapXpub(S, parole)});
       let prossimo = 0;
       const swap = [];
@@ -662,6 +738,14 @@ window.SWAP_TIPI.boltz = function(cfg){
         const d = s && s.claimDetails;
         if (!d || s.type !== 'reverse' || s.from !== 'BTC' || s.to !== 'BTC') continue;
         prossimo = Math.max(prossimo, Number(d.keyIndex) + 1);
+        /* il contatore sale comunque (mai un segreto riusato), ma uno
+           swap che non torna coi NOSTRI pezzi non diventa riscattabile */
+        let perche;
+        try {
+          perche = swapVerificaRitrovato(S, rete, d, swapChiavi(S, parole, Number(d.keyIndex)),
+                                         s.preimageHash);
+        } catch(e){ perche = 'chiavi'; }
+        if (perche) continue;
         swap.push({id: String(s.id), indice: Number(d.keyIndex),
           lockupAddress: d.lockupAddress, refundPublicKey: d.serverPublicKey,
           swapTree: d.tree, timeoutBlockHeight: Number(d.timeoutBlockHeight),

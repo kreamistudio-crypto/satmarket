@@ -82674,3 +82674,186 @@ questo codice»), riga «Offerte dei negozi» e lo zittito.
 NON PROVATO, DA GUARDARE. Il messaggio vero sul bot e nel DM Nostr (il
 cartone non rende l'HTML); il venditore della richiesta, a promozione
 fatta.
+
+## La prima tornata del secondo audit: sedici porte che non guardavano abbastanza (14 nov 2026, cantiere audit-pagamenti-2, dal secondo audit di sicurezza sul codice di produzione; Andrea: «Dimmi tu», e sul piano «Ok, va bene così»)
+
+Il primo dei cantieri nati dal secondo audit (giro sul codice di
+PRODUZIONE, main `4cc2fd7`; rapporto in
+`/mnt/project-files/audit-sicurezza/satmarket/run-2/`, mai su Telegram).
+La prima tornata: i nove sospetti «soldi e pagamenti» dei 29 verificati
+e sette dei più semplici (browser, swap dal telefono, import Nostr,
+foto), tutti ancora uguali su develop. Quasi nessun gesto cambia per chi
+usa l'app: cambiano le guardie dietro i bottoni (le eccezioni sono
+dette al loro punto).
+
+DECISO, uno per sospetto.
+1. «MENO LE SPESE» SI FERMA ANCHE SU 'uscito' (`_scrivi_meno_spese`):
+   la penna guardava solo 'incerto' e 'in_volo', e su un ordine ancora
+   in disputa col timbro di un payout già uscito aggiungeva la quota di
+   chi vende a sats già partiti. Una parola nella WHERE, la stessa
+   famiglia degli altri due (il reso la guarda già dal primo audit).
+2. IL POLL DELLO SBLOCCO SMISTA PER MOTIVO (`verifica_pagamento_sblocco`):
+   passava ogni riga a `_incassa_sblocco`, e il link del negozio (5.000)
+   pagato e tirato da quella rotta apriva la porta del banner (20.000).
+   Ora chiede la cassa a `_incasso_del_motivo`, come i due giri
+   dell'orologio dal 15 set; un motivo ignoto è un 409 e non incassa.
+3. UN MODERATORE NON DECIDE UN ORDINE IN CUI È PARTE, SU OGNI ORDINE
+   (`risolvi_disputa`): la guardia c'era solo sull'on-chain. Ora sta
+   prima di ogni esito, con la frase on-chain di sempre e, sul
+   Lightning, quella che il pannello già usa per «prendi» («Sei una
+   delle due parti: questa disputa la decide un altro moderatore»). E
+   chi decide resta scritto nel journal (l'ordine non ha una colonna).
+4. L'OFFERTA SENZA LA CHIAVE `quantita` VALE UN PEZZO (`fai_offerta`):
+   lo 0 «non dichiarata» si leggeva al venditore come un pezzo e al
+   pagamento lasciava la quantità libera fino allo stock, al prezzo
+   trattato. Il client di oggi la manda sempre; le righe di ieri con lo
+   0 restano lette come allora.
+5. L'UNIONE DEGLI ACCOUNT ASPETTA LA FINE DELL'ASTA (`_guardie_fusione`):
+   l'unione sposta i rimborsi della puntata che muore su quella che
+   vive, e la chiave dei rimborsi di chiusura è la sola puntata. Un
+   rimborso vecchio (primo giro d'asta, già pagato) finiva sulla
+   puntata ancora in gara, e alla chiusura l'INSERT OR IGNORE perdeva
+   quello giusto in silenzio. Ora, con una puntata 'attiva' di una
+   delle due metà, l'unione dice di aspettare. La tabella nasce pigra:
+   `_colonne_di` come per l'on-chain.
+6. IL RIMBORSO DELLO SBLOCCO VA PRIMA ALL'INDIRIZZO DI CHI HA PAGATO
+   (`_rimborsa_sblocco`, `rimborsa_sblocco_admin`): la invoice scritta
+   dal moderatore vinceva sul Lightning address del pagante, cioè un
+   moderatore da solo nominava dove andavano i sats di un altro. Ora con
+   un indirizzo i sats vanno solo lì (wallet muto = si riprova, mai la
+   invoice altrui), la rotta non deposita nemmeno una invoice per chi ha
+   l'indirizzo (409), e quando la deposita lo sa il gruppo dei
+   moderatori. Era già quel che diceva la docstring della rotta.
+7. L'OFFERTA SI RILEGGE DOPO L'ATTESA DELLA INVOICE (`compra`): la
+   guardia «c'è già una invoice per questa offerta» stava solo prima
+   dell'await, e due richieste mandate insieme facevano due ordini al
+   prezzo trattato. Ora nel blocco atomico, accanto allo stock e al
+   codice sconto: ancora accettata e col legame com'era, o 409. Una
+   lettura, niente DML: il patto del ricontrollo resta.
+
+8. IL CAMBIO DEL LIGHTNING ADDRESS NON È PIÙ MUTO (`salva_ln_address`):
+   una sessione bastava a sostituire l'indirizzo che decide dove vanno
+   incassi e rimborsi, senza avviso e senza traccia di quello di prima.
+   Ora quello di prima resta nel journal e il titolare riceve dal bot,
+   che una sessione rubata non legge, «Il tuo Lightning address è
+   cambiato» col prima e l'adesso, PRIMA dei pagamenti della stessa
+   richiesta. Il primo indirizzo (prima vuoto) non avvisa.
+9. IL PAVIMENTO DELL'INDICE DELLO SWAP AUTOMATICO FUORI DAL DATABASE
+   (`swap_auto_prenota_indice`): l'indice veniva solo dal MAX della
+   tabella, e un `satmarket.db` rimesso da una copia vecchia faceva
+   riusare un indice già speso, cioè un segreto già rivelato. Ora
+   l'ultimo indice si scrive anche in `chiavi/swap-barattolo-indice.json`
+   (sincronizzato, prima che il fornitore lo veda) e il prossimo è il
+   più alto fra i due; un pavimento illeggibile ferma lo swap.
+   `deploy/RIPRISTINO.md` dice cosa fare se torna indietro anche chiavi/.
+
+10. CHI ESCE SI PORTA VIA IL SUO WALLET NWC (`esciWeb`,
+    `salutoCancellato`, `esciDaTutti`): la regola scritta era «chi esce
+    lascia il dispositivo: la sua nsec non resta qui», e valeva per la
+    sola nsec. Ora vale anche per la stringa NWC, che è una delega a
+    spendere: `scordaWalletConto` la toglie dal dispositivo (per Esci da
+    tutti, quelle degli account chiusi, con la regola della nsec).
+    Ricollegarlo è un gesto dal Profilo.
+11. LA RIGA NWC DI IERI NON SI ADOTTA PIÙ (`walletNwc`): dal 16 set la
+    riga senza conto passava al PRIMO account che entrava, cioè su un
+    dispositivo condiviso il wallet di uno pagava gli acquisti
+    dell'altro. Non si sa di chi sia: si toglie, e chi l'aveva lo
+    ricollega (è il solo gesto in più, e tocca chi non apre l'app dal
+    16 set).
+12. LE LISTE DEL PANNELLO: LE VOCI DI TESTO SONO PAROLE CORTE
+    (`_giudice_per_tipo`, `pillValuta`): una lista come VALUTE_SOGLIA
+    scritta dal pannello arrivava a ogni utente da /api/me e finiva
+    nuda dentro un onclick, cioè codice nel browser di tutti da una
+    sola sessione admin. Ora il giudice ammette solo lettere, cifre,
+    «_ . -» fino a 32 (le liste di relay sono già chiuse al pannello),
+    anche a lista vuota, e la pillola della valuta passa la voce dal
+    `data-v` scappato.
+13. I SOLI DECODIFICATORI D'IMMAGINE AMMESSI (`FORMATI_IMMAGINE_AMMESSI`):
+    Pillow apriva qualunque formato riconosciuto dai byte (EPS con
+    Ghostscript, TIFF, JPEG 2000, PSD...), da una foto o da un URL
+    scritto da un utente. Ora, una volta all'avvio, restano JPEG, MPO,
+    PNG, WEBP, GIF, HEIF, AVIF e BMP: vale per ogni apertura del
+    processo, import compresi, senza toccarle a una a una.
+14. L'IMPORT DA NOSTR GUARDA LA FIRMA DI OGNI EVENTO (`importa_venditore`,
+    parametro `firma`): la firma la guardava solo il vaglio, che vede i
+    soli annunci da scrivere; le cancellazioni (kind 5) e gli «status
+    sold» passavano sulla parola della `pubkey`, e un relay qualunque
+    spegneva (e seppelliva con la lapide) gli annunci importati di un
+    altro. Ora il server passa `verifica_firma_nostr` e ogni evento
+    passa dalla firma prima del dedup. Lo script a mano resta com'era.
+15. LO SWAP DAL TELEFONO DÀ IL SEGRETO SOLO SU UN BLOCCO CONFERMATO E
+    LONTANO DALLA SCADENZA (`swap/boltz.js`, `ritira`/`swapRitiro`): il
+    gemello di quel che il primo audit ha messo sul server. Il segreto
+    partiva col lockup in mempool e senza guardare la scadenza. Ora,
+    dopo i due controlli sul lockup e prima che il segreto entri in una
+    transazione, `attendi` vuole il lockup confermato e almeno
+    `SWAP_MARGINE_RITIRO` (12) blocchi alla scadenza; se no si riprova
+    al giro dopo (la scheda dice «aspetto la prima conferma»), e vicino
+    alla scadenza non si ritira più: la fattura Lightning mai incassata
+    torna da sola. Chi cambia dal telefono aspetta una conferma in più
+    (una decina di minuti): è l'unico cambiamento che si vede.
+16. GLI SWAP RITROVATI SI RICONTROLLANO (`recupera`,
+    `swapVerificaRitrovato`, `swapRitrovaCambi`, `swapRecupera`):
+    «Ritrova i miei cambi» prendeva dal fornitore albero, indirizzo,
+    chiave e indice e li riscattava senza i controlli della nascita.
+    Ora uno swap ritrovato entra solo se torna coi nostri pezzi
+    (impronta, albero rifatto, indirizzo, importo vero) e se il suo
+    indice non è già di un altro swap sulla stessa serie di parole.
+
+SCARTATO. Per l'8, fermare la spazzata immediata o una quarantena
+dell'indirizzo nuovo: cambia il gesto di chi vende (il testo «cambia il
+Lightning address nel Profilo e ci riproviamo» la usa come rimedio), ed
+è una scelta di Andrea; resta nell'elenco delle decisioni. Per il 9,
+rendere il segreto non deterministico: romperebbe il ritiro dalle sole
+parole (la pagina «Rescue»). Per il 6, una seconda approvazione di un altro moderatore:
+oggi i moderatori sono pochi e il caso (pagante senza indirizzo) è raro;
+l'avviso al gruppo basta a non lasciarlo muto. Per il 5, una chiave dei
+rimborsi con il giro d'asta dentro: tocca due indici unici e la
+chiusura; aspettare la fine dell'asta chiude il caso senza migrazioni.
+Per il 2, rifiutare secco ogni motivo diverso dal banner: smistare dà a
+chi ha pagato il link proprio il link, ed è la stessa cassa dei giri.
+Per il 10, togliere all'uscita anche le dodici parole on-chain, la
+chiave P2P e quella del moderatore: sono chiavi la cui perdita costa
+sats o un ruolo (un ordine on-chain in corso non si firmerebbe più), e
+la scelta è di Andrea; restano nell'elenco. Per il 13, passare
+`formats=` a ognuna delle quindici aperture: una sola riga all'avvio
+copre anche quelle di domani. Per il 16, il controllo dell'importo
+contro la fattura: dopo un recupero la fattura non la sappiamo più,
+quindi resta il controllo che l'importo ci sia e il lockup lo porti.
+
+PROVATO. I collaudi dello swap dal telefono girati sul cartone col
+lockup prima in mempool (niente segreto, «aspetto la prima conferma») e
+poi confermato (ritiro cooperativo, dallo script, ripresa, API spenta,
+spesa del lockup, recupero: verdi), e con loro i tre collaudi che
+passano dallo stesso motore del telefono (`collaudo_swap_pagamento`,
+`collaudo_cambio_p2p`, `collaudo_deposito_ln_p2p`): il loro cartone ora
+conferma il lockup prima del giro, come la rete vera. L'impronta dei due file del
+telefono (`SWAP_TELEFONO_VER`) rifatta. `prove_audit_pagamenti_2`: l'unione col database in memoria
+(niente in gara, puntata chiusa, puntata viva di ciascuna metà, tabella
+assente), il rimborso dello sblocco coi pezzi veri (con indirizzo si
+paga il suo wallet e mai la invoice del moderatore; senza, la invoice
+depositata), e le sentinelle sull'ordine delle guardie (poll, parte
+prima di ogni esito, rilettura dell'offerta fra l'await e l'INSERT
+senza DML, avviso del cambio d'indirizzo prima dei pagamenti), e il
+pavimento dello swap con un database rimesso indietro (indice 3 dopo
+0-1-2, non 0) e con un pavimento rotto (fermo), il giudice delle liste
+(sigle sì, codice no, anche a lista vuota), il filtro della firma
+dell'import, i formati d'immagine (JPEG/PNG/WEBP/GIF sì,
+TIFF/PPM/ICO/TGA no), e le sentinelle del browser (uscite, NWC di ieri,
+pillola) e dello swap (ordine dei controlli, ritrovati). Ritoccati il
+test JS della riga NWC di ieri (ora: non si adotta, si toglie) e il
+censimento degli avvisi agli admin (97, il nuovo nella moderazione),
+più due sentinelle che fotografavano la riga di prima (il cancello di
+«meno le spese», la chiave dell'offerta).
+
+DA GUARDARE (anche). L'avviso del server «i bitcoin del tuo scambio
+P2P sono pronti» parte ancora al lockup in mempool: chi apre subito
+Barattolo legge «aspetto la prima conferma» e il ritiro parte al blocco
+dopo. Non è sbagliato, è presto: se dà fastidio, l'avviso si sposta
+alla conferma (scelta di Andrea).
+
+DA GUARDARE. La seconda tornata (13 sospetti: P2P e on-chain dietro le
+leve degli admin, e quattro decisioni di Andrea, fra cui i pavimenti e
+i tetti delle leve dei tempi di sblocco). I 28 segnalati e non
+verificati restano ai giri del venerdì. NIENTE di questo è in
+produzione finché Andrea non promuove.

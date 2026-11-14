@@ -226,6 +226,22 @@ try:
     pillow_heif.register_heif_opener()
 except ImportError:
     pillow_heif = None
+# I SOLI DECODIFICATORI AMMESSI (14 nov 2026, cantiere audit-pagamenti-2,
+# dal secondo audit di sicurezza). Pillow apre qualunque formato che uno
+# dei suoi plugin riconosca dai byte, non dall'etichetta: un «PNG» che
+# era un EPS faceva partire Ghostscript, e TIFF, JPEG 2000, PSD e gli
+# altri decodificatori nativi erano tutti raggiungibili da una foto o
+# da un URL scritto da un utente. Le foto vere sono questi formati e
+# basta (MPO e' il JPEG multiplo degli iPhone, HEIF arriva da
+# pillow-heif). Si toglie tutto il resto UNA volta, dopo che i plugin
+# sono stati caricati: vale per ogni `ImmaginePillow.open` del processo,
+# anche quelli dell'import, senza toccarli a uno a uno.
+FORMATI_IMMAGINE_AMMESSI = ("JPEG", "MPO", "PNG", "WEBP", "GIF", "HEIF",
+                            "AVIF", "BMP")
+if ImmaginePillow is not None:
+    ImmaginePillow.init()
+    ImmaginePillow.ID[:] = [f for f in ImmaginePillow.ID
+                            if f in FORMATI_IMMAGINE_AMMESSI]
 from fastapi.middleware.cors import CORSMiddleware
 
 # Le stampe del server contengono emoji (⚠️ 📨 ⏰): sulle console
@@ -20435,6 +20451,23 @@ def _guardie_fusione(con, n, p) -> str | None:
                     + voci[0] + "): aspetta che si chiuda, poi unisci "
                     "i due account. Il wallet on-chain deve restare uno "
                     "solo, e quello in corso va firmato con le sue parole.")
+    # UN'ASTA IN GARA, di una qualunque delle due meta' (14 nov 2026,
+    # cantiere audit-pagamenti-2, dal secondo audit di sicurezza). L'unione
+    # sposta i rimborsi della puntata che muore su quella che vive, e la
+    # chiave dei rimborsi di chiusura e' la sola puntata: un rimborso
+    # VECCHIO (un primo giro d'asta, gia' pagato) finiva sulla puntata
+    # ancora in gara, e alla chiusura il rimborso giusto si perdeva in
+    # silenzio (INSERT OR IGNORE). Finche' una puntata e' viva non si
+    # unisce: si aspetta che l'asta chiuda. La tabella nasce pigra: chi
+    # non l'ha mai aperta non ha niente in gara.
+    if "stato" in _colonne_di(con, "puntate"):
+        in_gara = con.execute(
+            "SELECT COUNT(*) FROM puntate WHERE tg_id IN (?,?) "
+            "AND stato='attiva'", (n["tg_id"], p["tg_id"])).fetchone()[0]
+        if in_gara:
+            return ("🔨 Uno dei due account ha un'offerta in un'asta ancora "
+                    "aperta: aspetta che l'asta si chiuda, poi unisci i due "
+                    "account.")
     return None
 
 
@@ -33609,7 +33642,22 @@ async def rimborsa_sblocco_admin(pagamento_id: int, req: Request,
     d = await leggi_json(req)
     bolt11 = (d.get("invoice") or "").strip()
     if bolt11:
+        # LA INVOICE DEL MODERATORE SOLO A CHI NON HA UN INDIRIZZO (14 nov
+        # 2026, cantiere audit-pagamenti-2, dal secondo audit di
+        # sicurezza): se il pagante ha un Lightning address il rimborso va
+        # li', e una invoice scritta da chi modera non si deposita
+        # nemmeno. Quando si deposita, lo sa il gruppo dei moderatori:
+        # nominare dove vanno i sats di un altro non resta un gesto muto.
         con = db()
+        chi = con.execute(
+            "SELECT p.tg_id, p.importo_sats, COALESCE(u.ln_address,'') AS ln "
+            "FROM pagamenti p LEFT JOIN utenti u ON u.tg_id=p.tg_id "
+            "WHERE p.id=?", (pagamento_id,)).fetchone()
+        if chi and chi["ln"]:
+            con.close()
+            raise HTTPException(409, "Ha già un Lightning address sul "
+                                     "profilo: il rimborso va lì, senza "
+                                     "invoice")
         cur = con.execute(
             "UPDATE pagamenti SET invoice_rimborso=? WHERE id=? "
             "AND stato='pagato'", (bolt11, pagamento_id))
@@ -33618,6 +33666,18 @@ async def rimborsa_sblocco_admin(pagamento_id: int, req: Request,
         if cur.rowcount == 0:
             raise HTTPException(400, "Questo pagamento non è in "
                                      "stato «pagato»")
+        print(f"🧾 Rimborso sblocco #{pagamento_id}: invoice depositata dal "
+              f"moderatore #{user['id']}", flush=True)
+        try:
+            await notifica_admin(
+                f"🧾 <b>Invoice di rimborso scritta da un moderatore</b> "
+                f"(#{user['id']}) per il pagamento #{pagamento_id} di "
+                f"#{chi['tg_id']}, {_fmt_sats(chi['importo_sats'])} sats: "
+                "il pagante non ha un Lightning address.",
+                argomento="moderazione")
+        except Exception as e:
+            print(f"⚠️ Avviso invoice di rimborso non partito: {e}",
+                  flush=True)
     esito = await _rimborsa_sblocco(pagamento_id, user["id"])
     if not esito.get("ok"):
         if esito.get("motivo_ignoto") is not None:
@@ -36668,6 +36728,19 @@ def _giudice_per_tipo(rif, valore):
                      float in generi and type(x) is int)]
         if fuori:
             return None, f"voce di un tipo diverso: {fuori[0]!r}"
+        # LE VOCI DI TESTO SONO PAROLE CORTE (14 nov 2026, cantiere
+        # audit-pagamenti-2, dal secondo audit di sicurezza): le liste del
+        # pannello arrivano a ogni utente da /api/me e la pagina le scrive
+        # dentro bottoni e onclick. Un testo qualunque (virgolette,
+        # parentesi, «<») diventava codice nel browser di tutti. Le liste
+        # di testo che esistono sono sigle («eur», «sats»): lettere,
+        # cifre, «_», «.», «-», al massimo 32. Vale anche quando la lista
+        # di oggi e' vuota e il genere non si sa.
+        brutte = [x for x in valore if isinstance(x, str)
+                  and not re.fullmatch(r"[A-Za-z0-9_.\-]{1,32}", x)]
+        if brutte:
+            return None, ("le voci di testo sono parole corte (lettere, "
+                          f"cifre, _ . -): {brutte[0][:40]!r}")
         return type(rif)(valore), ""
     if tipo == "dizionario":
         if not isinstance(valore, dict) or len(valore) > 200:
@@ -41020,7 +41093,14 @@ async def fai_offerta(annuncio_id: int, req: Request,
     # e' il giudice della quantita' dell'ANNUNCIO e solleva 400 sopra
     # MAX_QUANTITA_ANNUNCIO, mentre il tetto vero e' lo stock, che e'
     # piu' stretto.
-    pezzi = 0
+    # CHIAVE ASSENTE = 1 PEZZO (14 nov 2026, cantiere audit-pagamenti-2,
+    # dal secondo audit di sicurezza): lo 0 «non dichiarata» si leggeva
+    # al venditore come un'offerta per un pezzo, e al pagamento lasciava
+    # la quantita' libera fino allo stock, al prezzo trattato. Il client
+    # di oggi manda sempre la chiave; chi non la manda tratta UN pezzo,
+    # che e' quel che il venditore vede. Lo 0 resta solo sulle righe di
+    # ieri, che `compra` continua a leggere come allora.
+    pezzi = 1
     if d.get("quantita") not in (None, ""):
         try:
             pezzi = max(1, int(d["quantita"]))
@@ -45389,6 +45469,24 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         con.close()
         raise HTTPException(409, "Il codice sconto è appena finito: "
                                  "togli il codice e riprova")
+    # E L'OFFERTA, nello stesso blocco atomico (14 nov 2026, cantiere
+    # audit-pagamenti-2, dal secondo audit di sicurezza): la guardia
+    # «c'e' gia' una invoice per questa offerta» stava solo PRIMA
+    # dell'await, e due richieste mandate insieme la passavano tutt'e
+    # due — un accordo, piu' ordini al prezzo trattato. Qui si rilegge
+    # la riga: ancora accettata e col legame com'era quando l'abbiamo
+    # guardata, o 409. Una LETTURA, niente DML: il patto resta intatto.
+    if off:
+        off_ora = con.execute(
+            "SELECT stato, ordine_id FROM offerte WHERE id=?",
+            (off["id"],)).fetchone()
+        if (not off_ora or off_ora["stato"] != "accettata"
+                or int(off_ora["ordine_id"] or 0)
+                != int(off["ordine_id"] or 0)):
+            con.close()
+            raise HTTPException(409, "C'è già una invoice in corso per "
+                                     "questa offerta: pagala, oppure "
+                                     "annulla quell'ordine e riprova")
     # IL CAMBIO DEL GIORNO SI CONGELA QUI (ago 2026): quanto valeva in
     # euro questo affare e' un FATTO dell'affare, come il prezzo, e va
     # fissato adesso — domani il cambio sara' un altro e la ricevuta
@@ -50095,8 +50193,23 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
                 f"averlo scritto giusto. {CONSIGLIO_LNURL}")
 
     con = db()
+    # IL CAMBIO NON E' PIU' MUTO (14 nov 2026, cantiere audit-pagamenti-2,
+    # dal secondo audit di sicurezza): questo indirizzo decide dove vanno
+    # incassi e rimborsi, e chi aveva in mano una sessione poteva
+    # sostituirlo senza che il titolare ne sapesse niente, e senza che
+    # restasse scritto quello di prima. Ora il vecchio resta nel journal e
+    # il titolare riceve un avviso dal bot, che una sessione rubata non
+    # legge. Il primo indirizzo (prima vuoto) non avvisa: e' il gesto di
+    # sempre di chi comincia a vendere.
+    r_prima = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                          (user["id"],)).fetchone()
+    prima = ((r_prima["ln_address"] if r_prima else "") or "").strip().lower()
+    cambiato = bool(prima) and prima != addr
     con.execute("UPDATE utenti SET ln_address=? WHERE tg_id=?",
                 (addr, user["id"]))
+    if cambiato:
+        print(f"⚡ Lightning address di #{user['id']} cambiato: "
+              f"«{prima}» → «{addr or '(tolto)'}»", flush=True)
     # Ci sono incassi o rimborsi rimasti in sospeso? Ora possiamo sbloccarli.
     incassi = [r["id"] for r in con.execute(
         "SELECT id FROM ordini WHERE venditore_id=? AND stato='confirmed'",
@@ -50112,6 +50225,21 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
         "stato='da_riscuotere'", (user["id"],))] if addr else []
     con.commit()
     con.close()
+    if cambiato:
+        # PRIMA dei pagamenti qui sotto: se non e' stato lui, l'avviso
+        # deve arrivare anche quando un pagamento si incaglia
+        try:
+            await notifica(
+                user["id"],
+                "⚡ <b>Il tuo Lightning address è cambiato.</b>\n"
+                f"Prima: <code>{html.escape(prima)}</code>\n"
+                f"Adesso: <code>{html.escape(addr) if addr else 'nessuno'}"
+                "</code>\n\nD'ora in poi incassi e rimborsi vanno lì. "
+                "Se non sei stato tu, rimetti il tuo indirizzo dal "
+                "Profilo e scrivici subito.")
+        except Exception as e:
+            print(f"⚠️ Avviso cambio Lightning address non partito: {e}",
+                  flush=True)
     sbloccati = 0
     for oid in incassi:
         r = await _sblocca_sats(oid)
@@ -52608,17 +52736,28 @@ async def verifica_pagamento_sblocco(pagamento_id: int,
     impara niente — «non e' tuo» e «non esiste» rispondono uguale."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
-    p = con.execute("SELECT id, stato, payment_hash, cassaforte FROM pagamenti "
-                    "WHERE id=? AND tg_id=?",
+    p = con.execute("SELECT id, stato, payment_hash, cassaforte, motivo "
+                    "FROM pagamenti WHERE id=? AND tg_id=?",
                     (pagamento_id, user["id"])).fetchone()
     con.close()          # niente transazione aperta durante l'await
     if not p:
         raise HTTPException(400, "Operazione non permessa")
     if p["stato"] != "creato":
         return {"stato": p["stato"]}
+    # A CHI VA L'INCASSO LO DICE IL MOTIVO, anche qui (14 nov 2026,
+    # cantiere audit-pagamenti-2, dal secondo audit di sicurezza): il poll
+    # passava OGNI riga a `_incassa_sblocco`, come i due giri dell'orologio
+    # prima del 15 set 2026 — e chi pagava il link del negozio (5.000) e
+    # tirava questa rotta si vedeva aprire la porta del BANNER (20.000).
+    # Stessa cassa dei giri: `_incasso_del_motivo`, e un motivo che
+    # nessuno sa incassare non incassa.
+    incassa = _incasso_del_motivo(p["motivo"])
+    if incassa is None:
+        raise HTTPException(409, "Questo pagamento è per un motivo che "
+                                 "non so incassare: scrivici")
     if not await invoice_pagata(p["payment_hash"], p["cassaforte"]):
         return {"stato": "in_attesa"}
-    return await _incassa_sblocco(pagamento_id)
+    return await incassa(pagamento_id)
 
 
 @app.post("/api/pagamenti/{pagamento_id}/annulla")
@@ -52822,11 +52961,21 @@ async def _rimborsa_sblocco(pagamento_id: int,
         taccuino = {"etichetta": f"Rimborso {nome} "
                                  f"#{pagamento_id}"}
         try:
+            # PRIMA L'INDIRIZZO DI CHI HA PAGATO (14 nov 2026, cantiere
+            # audit-pagamenti-2, dal secondo audit di sicurezza): la
+            # invoice depositata da un moderatore vinceva sul Lightning
+            # address del pagante, cioe' un moderatore da solo poteva
+            # nominare dove andavano i sats. Ora, se il pagante ha un
+            # indirizzo, i sats vanno SOLO li' (e se il suo wallet non
+            # risponde si riprova, mai si ripiega sulla invoice altrui);
+            # la invoice del moderatore serve solo a chi un indirizzo non
+            # ce l'ha, ed e' quel che diceva la docstring della rotta.
             if p["payout_stato"] != "uscito":
-                bolt11 = p["invoice_rimborso"]
-                if not bolt11 and u and u["ln_address"]:
+                if u and u["ln_address"]:
                     bolt11 = await invoice_da_ln_address(u["ln_address"],
                                                          importo)
+                else:
+                    bolt11 = p["invoice_rimborso"]
             esito = (PAGATO if p["payout_stato"] == "uscito"
                      else await paga_venditore(bolt11, importo, taccuino,
                                                cassaforte=p["cassaforte"],
@@ -80572,18 +80721,47 @@ def _swap_auto_prepara(con):
 def swap_auto_prenota_indice(con, ordine_id: int, fornitore: str,
                              sats: int, onchain_min: int) -> int:
     """Il prossimo indice libero, preso in UNA istruzione (due richieste
-    insieme non prendono lo stesso: lo vieta anche l'UNIQUE)."""
+    insieme non prendono lo stesso: lo vieta anche l'UNIQUE).
+
+    IL PAVIMENTO FUORI DAL DATABASE (14 nov 2026, cantiere
+    audit-pagamenti-2, dal secondo audit di sicurezza): l'UNIQUE vale
+    dentro UN file di database, mentre le parole stanno in chiavi/. Un
+    `satmarket.db` rimesso da una copia vecchia (un ripristino sul posto,
+    con chiavi/ intatta) faceva ripartire il contatore da un indice gia'
+    usato: stesso indice = stessa chiave = stesso segreto, gia' rivelato.
+    Ora l'ultimo indice preso si scrive anche accanto alle parole
+    (`swap-barattolo-indice.json`, PRIMA che il fornitore lo veda) e il
+    prossimo e' il piu' alto fra i due. Un file del pavimento che c'e' e
+    non si legge ALZA, come quello delle parole: meglio nessuno swap che
+    un segreto riusato."""
     _swap_auto_prepara(con)
+    fp = _swap_auto_file()[:-len(".json")] + "-indice.json"
+    pavimento = -1
+    if os.path.exists(fp):
+        with open(fp, encoding="utf-8") as h:
+            pavimento = int(json.load(h)["ultimo"])
     adesso = int(time.time())
     cur = con.execute(
         "INSERT INTO swap_auto(indice, ordine_id, fornitore, sats, "
-        "onchain_min, creato, aggiornato) SELECT COALESCE(MAX(indice), -1) "
-        "+ 1, ?, ?, ?, ?, ?, ? FROM swap_auto",
-        (int(ordine_id), str(fornitore), int(sats), int(onchain_min),
-         adesso, adesso))
+        "onchain_min, creato, aggiornato) SELECT MAX(COALESCE(MAX(indice), "
+        "-1) + 1, ?), ?, ?, ?, ?, ?, ? FROM swap_auto",
+        (pavimento + 1, int(ordine_id), str(fornitore), int(sats),
+         int(onchain_min), adesso, adesso))
     con.commit()
-    return int(con.execute("SELECT indice FROM swap_auto WHERE id=?",
-                           (cur.lastrowid,)).fetchone()[0])
+    indice = int(con.execute("SELECT indice FROM swap_auto WHERE id=?",
+                             (cur.lastrowid,)).fetchone()[0])
+    # scritto e sincronizzato prima di tornare: il fornitore lo vede solo
+    # dopo. Un crash fra la commit e qui non fa danni: l'indice sta nel
+    # database, e il MAX lo ritrova.
+    os.makedirs(os.path.dirname(fp), mode=0o700, exist_ok=True)
+    tmp = fp + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as h:
+        json.dump({"ultimo": max(indice, pavimento)}, h)
+        h.flush()
+        os.fsync(h.fileno())
+    os.replace(tmp, fp)
+    return indice
 
 
 # i soli campi della risposta che il ritiro (tappa 2) vorra' rileggere
@@ -83363,12 +83541,19 @@ def _scrivi_meno_spese(ordine_id: int):
         con.close()
         raise HTTPException(400, MSG_NIENTE_SPESE)
     adesso = int(time.time())
+    # ANCHE 'uscito' FERMA LA PENNA (14 nov 2026, cantiere
+    # audit-pagamenti-2, dal secondo audit di sicurezza): un ordine
+    # ancora in disputa puo' portare il timbro di un payout gia' USCITO
+    # (un rimborso partito e non ancora chiuso dal giro). Scriverci
+    # sopra «meno le spese» aggiungerebbe la quota di chi vende a sats
+    # gia' andati: piu' di quanti ne sono entrati. Stessa famiglia di
+    # 'incerto' e 'in_volo': sats che si sono mossi non si ridecidono.
     cur = con.execute(
         "UPDATE ordini SET spese_rese_sats=?, payout_stato='da_riprovare', "
         "payout_verso='compratore' WHERE id=? "
         "AND COALESCE(spese_rese_sats,0)=0 "
         "AND stato IN ('dispute','return_pending','return_shipped') "
-        "AND COALESCE(payout_stato,'') NOT IN ('incerto','in_volo')",
+        "AND COALESCE(payout_stato,'') NOT IN ('incerto','in_volo','uscito')",
         (spese, ordine_id))
     if cur.rowcount != 1:
         con.rollback()
@@ -83748,10 +83933,22 @@ async def risolvi_disputa(ordine_id: int, req: Request,
     # admin possiamo gia' dare 2 firme e vincere ogni causa»): la sua
     # chiave di parte e quella di Barattolo, decisa da lui, sarebbero
     # proprio le due firme. Decide un altro moderatore.
-    if (_campo(o, "cassaforte") or "") == "onchain":
-        if int(user["id"]) in (int(o["compratore_id"]), int(o["venditore_id"])):
+    # E VALE PER OGNI ORDINE (14 nov 2026, cantiere audit-pagamenti-2, dal
+    # secondo audit di sicurezza): sul Lightning custodial la guardia non
+    # c'era, e un moderatore poteva decidere a proprio favore la disputa
+    # di un ordine in cui era compratore o venditore. Sta PRIMA del ramo
+    # on-chain; la frase on-chain resta la sua.
+    if int(user["id"]) in (int(o["compratore_id"]), int(o["venditore_id"])):
+        if (_campo(o, "cassaforte") or "") == "onchain":
             raise HTTPException(403, "Su un ordine on-chain in cui sei una "
                                      "delle parti decide un altro moderatore")
+        raise HTTPException(403, "Sei una delle due parti: questa disputa "
+                                 "la decide un altro moderatore")
+    # CHI HA DECISO resta scritto nel journal: l'ordine non ha una colonna
+    # per il moderatore, e la decisione non deve restare anonima.
+    print(f"⚖️ Disputa #{ordine_id}: esito «{esito}» deciso dal "
+          f"moderatore #{user['id']}", flush=True)
+    if (_campo(o, "cassaforte") or "") == "onchain":
         if esito == "meno_spese":
             raise HTTPException(409, "Ordine on-chain: «meno le spese» non "
                                      "c'è ancora. Scegli il rimborso, il reso "
@@ -91324,7 +91521,10 @@ async def importa_nostr_periodico():
             i, a, s = await asyncio.to_thread(
                 importa_nostr.importa_venditore, npub, venditore_id, DB,
                 vaglio, scarica_foto_url, cambio_import,
-                pulisci=spoglia_metadati, relays=relays)
+                pulisci=spoglia_metadati, relays=relays,
+                # la firma su OGNI evento, kind 5 e «sold» compresi
+                # (14 nov 2026, secondo audit di sicurezza)
+                firma=verifica_firma_nostr)
             importati, aggiornati, saltati = (importati + i, aggiornati + a,
                                               saltati + s)
             await _apri_revisioni(npub, venditore_id)

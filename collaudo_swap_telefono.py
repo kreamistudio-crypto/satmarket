@@ -238,6 +238,14 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   await A.run('swapGiro()');
   out.giroCreato = lista(memA)[0].stato;
   await stato(l1[0].id, 'transaction.mempool');
+  /* (14 nov 2026, secondo audit) col lockup solo in mempool il segreto
+     NON esce: si aspetta la prima conferma, come il server */
+  await A.run('swapGiro()');
+  const r0 = lista(memA)[0];
+  const v1b = await visto();
+  out.mempoolAspetta = {ritirato: !!(r0.ritiro && r0.ritiro.txid), errore: r0.errore || '',
+                        firme: (v1b.firme || []).length, trasmesse: v1b.trasmesse.length};
+  await stato(l1[0].id, 'transaction.confirmed');
   await A.run('swapGiro()');
   const r1 = lista(memA)[0];
   const v2 = await visto();
@@ -279,7 +287,7 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   A.run(`elementi.swapIndirizzo_9 = {value: '${D.indirizzo}'}`);
   await A.run('swapAvanti(9)');
   const r9 = lista(memA).find(r => r.ordine === 9);
-  await stato(r9.id, 'transaction.mempool');
+  await stato(r9.id, 'transaction.confirmed');
   const B = pagina(memA);
   let r9b = null;
   for (let i = 0; i < 100; i++) {
@@ -358,7 +366,7 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   await A.run('swapAvanti(10)');
   const r10 = lista(memA).find(r => r.ordine === 10);
   await modo('rifiuta_cooperativo');
-  await stato(r10.id, 'transaction.mempool');
+  await stato(r10.id, 'transaction.confirmed');
   await A.run('swapGiro()');
   const r10a = lista(memA).find(r => r.ordine === 10);
   await A.run('swapGiro()');
@@ -379,7 +387,7 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
     const rL = lista(memA).find(r => r.ordine === ord);
     await modo(m);
     const vPrima = await visto();
-    await stato(rL.id, 'transaction.mempool');
+    await stato(rL.id, 'transaction.confirmed');
     await A.run('swapGiro()');
     await A.run('swapGiro()');
     const rL2 = lista(memA).find(r => r.ordine === ord);
@@ -417,14 +425,14 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   };
   out.spentaDopoSegreto = await spenta(14, async rS => {
     await modo('giu_dopo_firma');
-    await stato(rS.id, 'transaction.mempool');
+    await stato(rS.id, 'transaction.confirmed');
   });
   /* Poi: spenta PRIMA che i bitcoin si blocchino. Lo stato non arriva piu',
      ma la rete vede il lockup: il giro ritira lo stesso. Lo swap e' come
      uno recuperato (senza «ricevi»): la fee viene dalla rete. */
   out.spentaPrima = await spenta(15, async rS => {
     await modo('giu');
-    await stato(rS.id, 'transaction.mempool');
+    await stato(rS.id, 'transaction.confirmed');
     const l = lista(memA);
     delete l.find(r => r.id === rS.id).ricevi;
     memA.set('barattolo_swap_lista_222', JSON.stringify(l));
@@ -449,7 +457,7 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   await A.run('swapAvanti(17)');
   const r17 = lista(memA).find(r => r.ordine === 17);
   await modo('giu_rete_muta');
-  await stato(r17.id, 'transaction.mempool');
+  await stato(r17.id, 'transaction.confirmed');
   await A.run('swapGiro()');
   const r17a = lista(memA).find(r => r.ordine === 17);
   const presa = (await visto()).trasmesse.find(x => x.swap === r17.id) || {};
@@ -482,7 +490,7 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   await A.run('swapAvanti(18)');
   const r18 = lista(memA).find(r => r.ordine === 18);
   await modo('giu');
-  await stato(r18.id, 'transaction.mempool');
+  await stato(r18.id, 'transaction.confirmed');
   await fetchVero(`${BASE}/cartone/spendi_altro?id=${r18.id}`);
   const g18 = chiamate.length;
   await A.run('swapGiro()');
@@ -674,8 +682,12 @@ def il_telefono(base):
     prova("la sorveglianza legge lo stato da SATS Routing", "swap.created", r["giroCreato"])
 
     print("\n[il ritiro]")
+    prova("col lockup solo in mempool il segreto non esce: si aspetta la prima "
+          "conferma (14 nov 2026, secondo audit)",
+          {"ritirato": False, "errore": "aspetto la prima conferma del blocco del fornitore",
+           "firme": 0, "trasmesse": 0}, r.get("mempoolAspetta"))
     co = r["coop"]
-    prova("a bitcoin bloccati il telefono ritira da solo, cooperativo",
+    prova("a bitcoin bloccati e confermati il telefono ritira da solo, cooperativo",
           (True, True, "", "cooperativo"), (co.get("txid"), co.get("coop"), co.get("errore"), co.get("via")))
     prova("...un'uscita sola, all'indirizzo di chi vende, coi sats del preventivo",
           (1, 47_154, True, True), (co.get("uscite"), co.get("sats"), co.get("dest"), co.get("uguale")))

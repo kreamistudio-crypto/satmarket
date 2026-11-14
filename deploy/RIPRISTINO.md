@@ -50,6 +50,15 @@ foglio esiste.
    `contenuti/` nella cartella dell'app; `sistema/Caddyfile` e le unit
    in `/etc`; `foto/` dal PC (`BarattoloBackup\foto\`).
 
+   **Il pavimento dello swap automatico (14 nov 2026, secondo audit).**
+   Se esiste `chiavi/swap-barattolo-indice.json`, il server non riusa mai
+   un indice più basso di quello scritto lì, anche se il database torna
+   indietro. Ripristinando SOLO il database sul posto, quel file resta
+   com'è e basta. Ripristinando ANCHE `chiavi/` da un archivio vecchio,
+   prima di riaccendere si alza il numero di mille (un indice riusato è
+   un segreto già rivelato):
+   `python3 -c "import json;f='chiavi/swap-barattolo-indice.json';d=json.load(open(f));d['ultimo']+=1000;json.dump(d,open(f,'w'))"`.
+
    **La chiave dell'onion ha una liturgia sua, e l'ordine conta.**
    `sistema/tor-hidden-service/` è la cartella che il torrc chiama
    `HiddenServiceDir`, e quella chiave *è* l'indirizzo: se non torna al

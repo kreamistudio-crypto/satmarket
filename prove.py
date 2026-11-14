@@ -15201,9 +15201,11 @@ def prove_ssrf_redirect():
     # 2026 anche il ripulitore (vedi piu' sotto, «la QUARTA porta»). Dal
     # 23 set 2026 in coda c'e' anche la lista dei relay da cui leggere,
     # gia' passata dal giudice delle letture: prove_letture_relay_collaudo
+    # (dal 14 nov 2026, secondo audit, in coda c'e' anche il giudice
+    # della firma per OGNI evento: prove_audit_pagamenti_2)
     prova("sentinella: l'import orario riceve lo scaricatore del server",
           True, "vaglio, scarica_foto_url, cambio_import,\n"
-          "                pulisci=spoglia_metadati, relays=relays)"
+          "                pulisci=spoglia_metadati, relays=relays,"
           in _SORGENTE)
     imp = open("importa_nostr.py", encoding="utf-8").read()
     prova("sentinella: e l'import lo usa quando ce l'ha", True,
@@ -27655,12 +27657,13 @@ def prove_rimborso_meno_spese():
           "a un ordine deciso «meno le spese» — riga fresca, sotto il "
           "lucchetto, prima di ogni cifra", True, 0 < i_l < i_k < i_n)
     prova("il cancello: una decisione sola, solo dai tre stati, mai su un "
-          "pagamento in volo", [True] * 3,
+          "pagamento in volo o gia' uscito (14 nov 2026, secondo audit)",
+          [True] * 3,
           ['"AND COALESCE(spese_rese_sats,0)=0 "' in ms[i_u:i_i],
            "\"AND stato IN ('dispute','return_pending',"
            "'return_shipped') \"" in ms[i_u:i_i],
-           "\"AND COALESCE(payout_stato,'') NOT IN ('incerto','in_volo')\""
-           in ms[i_u:i_i]])
+           "\"AND COALESCE(payout_stato,'') NOT IN ('incerto','in_volo',"
+           "'uscito')\"" in ms[i_u:i_i]])
     prova("chi perde la corsa non scrive niente", True,
           "if cur.rowcount != 1:\n        con.rollback()" in ms[i_u:i_i])
     prova("tutte e due le meta' nascono 'da_riprovare': un crash dopo la "
@@ -43548,6 +43551,13 @@ def prove_offerta_quantita():
           'd.get("quantita") not in (None, "")' in fai)
     prova("fai_offerta: il numero si LIMA allo stock, mai uno scarto",
           True, 'min(pezzi, max(1, a["quantita"]))' in fai)
+    # CHIAVE ASSENTE = 1 PEZZO (14 nov 2026, secondo audit): lo 0 «non
+    # dichiarata» lasciava libera la quantita' al pagamento, al prezzo
+    # trattato, mentre il venditore vedeva un'offerta per un pezzo
+    prova("fai_offerta: senza la chiave si tratta UN pezzo, mai lo 0 "
+          "che lascia libera la quantita' (secondo audit)", [True, False],
+          ["    pezzi = 1\n    if d.get(\"quantita\") not in (None, \"\"):"
+           in fai, "    pezzi = 0\n" in fai])
     # il giudice della quantita' dell'ANNUNCIO qui non c'entra: quello
     # solleva 400 sopra MAX_QUANTITA_ANNUNCIO, e il tetto vero e' lo
     # stock, che e' piu' stretto
@@ -77149,6 +77159,7 @@ def prove_p2p_motore():
         pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
             "function chiaveNwcConto(){",
             "function walletNwc(){",
+            "function scordaWalletConto(tgId){",
             "function walletNwcPaga(){",
             "function walletNwcFattura(){",
             "function chiaveNwc(con){",
@@ -78151,18 +78162,27 @@ function reset(){
   await presaConWallet('buona', ['pay_invoice', 'get_info']);
   out.senzaMetodoNonChiede = walletRichieste.length === 0 && ricevuti.length === 1
     && (el('p2pIncassoAvviso').textContent || '') === '';
-  /* LA CUSTODIA PER CONTO, e la migrazione della riga di ieri */
+  /* LA CUSTODIA PER CONTO. La riga di ieri senza conto NON si adotta
+     piu' (14 nov 2026, secondo audit): non si sa di chi sia, si toglie */
   reset();
   localStorage.setItem('barattolo_nwc', JSON.stringify({stringa: 'x', pubkey: 'ab', relays: [], cifratura: 'nip04'}));
   {
     const w = walletNwc();
-    out.migraAlConto = !!w && localStorage.getItem('barattolo_nwc@111') !== null
-      && localStorage.getItem('barattolo_nwc') === null;
+    out.migraAlConto = w === null && localStorage.getItem('barattolo_nwc@111') === null
+      && localStorage.getItem('barattolo_nwc') === null && !walletNwcPaga();
+    /* una riga del conto con la forma di ieri (senza metodi) */
+    localStorage.setItem('barattolo_nwc@111', JSON.stringify({stringa: 'x', pubkey: 'ab', relays: [], cifratura: 'nip04'}));
     out.vecchiaPagaAncora = !!walletNwcPaga();
     out.vecchiaNonFattura = walletNwcFattura() === null;
     myTgId = 222;
     out.altroContoNonLoVede = walletNwc() === null;
     myTgId = 111;
+    /* chi esce si porta via il suo wallet, e solo il suo */
+    localStorage.setItem('barattolo_nwc@222', '{"stringa":"y"}');
+    scordaWalletConto(111);
+    out.chiEsceLoToglie = localStorage.getItem('barattolo_nwc@111') === null
+      && localStorage.getItem('barattolo_nwc@222') !== null;
+    localStorage.removeItem('barattolo_nwc@222');
   }
   /* ⚠️ E LA RIGA DI IERI — solo il lordo, senza `satsMiei` — ha il suo
      ripiego: la meta' si toglie come prima (99000 → 98010 al 2%), che e'
@@ -79330,10 +79350,11 @@ function reset(){
         "cortaLoDice": "...e la ragione dice che scade troppo presto",
         "walletSeiOreParte": "...mentre una da sei ore PARTE (24 set 2026), col toast che dice quanto vive",
         "senzaMetodoNonChiede": "senza make_invoice fra i metodi il wallet non si disturba",
-        "migraAlConto": "la riga NWC di ieri migra alla chiave del conto",
+        "migraAlConto": "la riga NWC di ieri, senza conto, non si adotta: si toglie (secondo audit)",
         "vecchiaPagaAncora": "...e per il mercatino vale ancora (era stata collegata con pay_invoice)",
         "vecchiaNonFattura": "...ma per il P2P no: senza metodi scritti non si chiede",
         "altroContoNonLoVede": "...e un altro conto sullo stesso telefono non la vede",
+        "chiEsceLoToglie": "chi esce si porta via il suo wallet NWC, e solo il suo (secondo audit)",
         "rigaDiIeriRipiega": "una riga di ieri, col solo lordo, ripiega sulla meta' come prima",
         "senzaFeeIlFattoResta": "senza il 38385 il mio lato si tiene e il lordo non si inventa",
         "senzaFeeDiceIlFatto": "...e il foglio dice la cifra detta, che non e' un conto",
@@ -105160,7 +105181,7 @@ def prove_letture_relay_collaudo():
     imp = open("importa_nostr.py", encoding="utf-8").read()
     prova("lo script legge dalla lista che gli si passa, e senza dai suoi "
           "RELAYS: lo script a mano resta identico", True,
-          "cambio=None, pulisci=None, relays=None):" in imp
+          "cambio=None, pulisci=None, relays=None, firma=None):" in imp
           and "for r in (RELAYS if relays is None else relays):" in imp)
 
     # --- 2) IL GIUDICE -------------------------------------------------
@@ -105299,7 +105320,7 @@ def prove_letture_relay_collaudo():
             return []
 
         def _importa(npub, venditore_id, db, vaglio=None, scarica=None,
-                     cambio=None, pulisci=None, relays=None):
+                     cambio=None, pulisci=None, relays=None, firma=None):
             chiesti["import"].append(relays)
             return 0, 0, 0
         finto.interroga_aperto, finto.importa_venditore = _spazza, _importa
@@ -105322,6 +105343,8 @@ def prove_letture_relay_collaudo():
                "venditori_nostr_attivi": lambda: [("npub1banco", -5)],
                "_vaglio_nostr": lambda loop, npub, venditore_id: None,
                "scarica_foto_url": None, "spoglia_metadati": None,
+               # (14 nov 2026, secondo audit) il giudice della firma
+               "verifica_firma_nostr": lambda e: True,
                "DB": "banco.db", "_apri_revisioni": _niente,
                "_chiedi_completamento": _niente,
                "ricategorizza_automatico": _niente}
@@ -174768,8 +174791,11 @@ def prove_canale_admin():
           # (14 nov 2026, feedback-modificabile) due nella moderazione: il
           # filtro sul commento di una modifica, e il voto basso alzato o
           # cancellato (l'impronta del «cambia il feedback o…»)
+          # (14 nov 2026, audit-pagamenti-2) la invoice di rimborso di uno
+          # sblocco scritta da un moderatore: nella moderazione, perche'
+          # e' un gesto di chi modera che gli altri devono vedere
           {"assistenza": 1, "dispute": 6, "dm": 1, "errori": 33,
-           "liquidita": 5, "moderazione": 16, "riepiloghi": 27}, per_stanza)
+           "liquidita": 5, "moderazione": 17, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -174804,7 +174830,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "98 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "99 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -174814,8 +174840,9 @@ def prove_canale_admin():
           "decisa, 30 ott 2026; dal 2 nov la nascita delle parole dello "
           "swap automatico; dal 14 nov il contenuto digitale letto fuori "
           "da 'shipped', e dello swap automatico il ritiro rifiutato a "
-          "scadenza vicina e il lockup speso da un altro; e dei feedback "
-          "modificati il filtro del commento e il voto basso toccato)", 98,
+          "scadenza vicina e il lockup speso da un altro; dei feedback "
+          "modificati il filtro del commento e il voto basso toccato; e la "
+          "invoice di rimborso di uno sblocco scritta da un moderatore)", 99,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -195205,6 +195232,357 @@ console.log(JSON.stringify([
               [True, False, True, True, False, True], r)
 
 
+def prove_audit_pagamenti_2():
+    """IL SECONDO AUDIT DI SICUREZZA, LE CHIUSURE SUI PAGAMENTI (14 nov
+    2026, cantiere audit-pagamenti-2). Sette sospetti verificati sul
+    codice di produzione, ognuno con la sua prova: la penna di «meno le
+    spese» che si ferma anche su 'uscito', il poll dello sblocco che
+    smista per motivo, la guardia di parte su OGNI disputa, l'offerta
+    senza quantita' che vale un pezzo, l'unione che aspetta la fine
+    dell'asta, il rimborso dello sblocco che va prima all'indirizzo di
+    chi ha pagato, e l'offerta riletta dopo l'attesa della invoice."""
+    import asyncio as _aio
+    import sqlite3 as _sq
+    print("\n[secondo audit: le chiusure sui pagamenti]")
+
+    # ---- 1. il poll dello sblocco smista per motivo ------------------
+    vp = codice(pezzo("verifica_pagamento_sblocco"))
+    prova("il poll dello sblocco legge il motivo e chiede la cassa giusta",
+          [True, True, False],
+          ["cassaforte, motivo" in vp,
+           "_incasso_del_motivo(p[\"motivo\"])" in vp,
+           "return await _incassa_sblocco(pagamento_id)" in vp])
+    prova("...e un motivo che nessuno sa incassare non incassa", True,
+          vp.index("if incassa is None:") < vp.index("invoice_pagata("))
+
+    # ---- 2. un moderatore non decide un ordine in cui e' parte --------
+    rd = codice(pezzo("risolvi_disputa"))
+    i_g = rd.index("if int(user[\"id\"]) in (int(o[\"compratore_id\"]), "
+                   "int(o[\"venditore_id\"])):")
+    i_on = rd.index("    if (_campo(o, \"cassaforte\") or \"\") == "
+                    "\"onchain\":\n        if esito == \"meno_spese\":")
+    prova("la guardia di parte sta PRIMA del ramo on-chain: vale per "
+          "ogni ordine, anche il Lightning custodial", True,
+          i_g < i_on and rd.index("MSG_MENO_SPESE_DECISO") < i_g)
+    prova("...e chi decide resta scritto nel journal", True,
+          "deciso dal \"\n          f\"moderatore #{user['id']}\"" in rd)
+    prova("...prima di ogni esito che muove sats", True,
+          i_g < rd.index("_rimborsa_meno_spese(ordine_id)")
+          and i_g < rd.index("_onchain_decide("))
+
+    # ---- 3. l'unione aspetta che l'asta chiuda ------------------------
+    amb = {"time": time, "sqlite3": _sq}
+    exec(pezzo("_colonne_di"), amb)
+    exec(pezzo("_impegni_onchain"), amb)
+    exec(pezzo("_guardie_fusione"), amb)
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.executescript("""
+        CREATE TABLE ordini(id INTEGER PRIMARY KEY, compratore_id INTEGER,
+            venditore_id INTEGER, stato TEXT);
+        CREATE TABLE puntate(id INTEGER PRIMARY KEY, annuncio_id INTEGER,
+            tg_id INTEGER, stato TEXT);
+    """)
+    n = {"tg_id": -5, "npub_accesso": "npub1x", "npub": "npub1x"}
+    p = {"tg_id": 7, "npub_accesso": "", "npub": "", "npub_verificata": 0}
+    prova("niente in gara: l'unione passa", None,
+          amb["_guardie_fusione"](con, n, p))
+    con.execute("INSERT INTO puntate(annuncio_id, tg_id, stato) "
+                "VALUES(3, 7, 'chiusa')")
+    prova("una puntata chiusa (storia) non ferma l'unione", None,
+          amb["_guardie_fusione"](con, n, p))
+    con.execute("INSERT INTO puntate(annuncio_id, tg_id, stato) "
+                "VALUES(4, -5, 'attiva')")
+    prova("una puntata ancora in gara della meta' Nostr la ferma", True,
+          "asta ancora aperta" in (amb["_guardie_fusione"](con, n, p) or ""))
+    con.execute("UPDATE puntate SET stato='chiusa'")
+    con.execute("INSERT INTO puntate(annuncio_id, tg_id, stato) "
+                "VALUES(5, 7, 'attiva')")
+    prova("...e anche quella della meta' Telegram", True,
+          "asta ancora aperta" in (amb["_guardie_fusione"](con, n, p) or ""))
+    con.close()
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
+                "compratore_id INTEGER, venditore_id INTEGER, stato TEXT)")
+    prova("senza la tabella delle puntate (nasce pigra) non esplode", None,
+          amb["_guardie_fusione"](con, n, p))
+    con.close()
+
+    # ---- 4. il rimborso dello sblocco: prima l'indirizzo del pagante ---
+    rs = codice(pezzo("_rimborsa_sblocco"))
+    prova("con un Lightning address i sats vanno SOLO li', la invoice "
+          "depositata solo a chi non ce l'ha", True,
+          "if u and u[\"ln_address\"]:\n                    bolt11 = "
+          "await invoice_da_ln_address(u[\"ln_address\"]," in rs
+          and "else:\n                    bolt11 = p[\"invoice_rimborso\"]"
+          in rs)
+    ep = codice(pezzo("rimborsa_sblocco_admin"))
+    prova("la rotta non deposita una invoice per chi ha un indirizzo, e "
+          "quando la deposita lo sa il gruppo dei moderatori", True,
+          ep.index("if chi and chi[\"ln\"]:") < ep.index(
+              "UPDATE pagamenti SET invoice_rimborso=?")
+          < ep.index("await notifica_admin(") < ep.index(
+              "_rimborsa_sblocco(pagamento_id, user[\"id\"])"))
+    prova("...e il 403 resta prima del body", True,
+          ep.index("e_admin") < ep.index("leggi_json"))
+
+    # il giro vero, coi pezzi del server e il resto di cartone
+    pagati, chiesti = [], []
+    amb = {"time": time, "asyncio": _aio, "defaultdict": __import__(
+        "collections").defaultdict}
+    for nome in ("_rimborsa_sblocco",):
+        exec("async " + pezzo(nome), amb)
+    amb["_lucchetti_sblocco"] = __import__("collections").defaultdict(
+        _aio.Lock)
+    PAG, NON = object(), object()
+    amb.update({"PAGATO": PAG, "NON_PAGATO": NON, "NON_CHIESTO": object(),
+                "OCCUPATO": object(), "INCERTO": object(),
+                "LnbitsMuto": RuntimeError, "MAX_TENTATIVI_PAYOUT": 3})
+
+    async def ln_finto(indirizzo, sats):
+        chiesti.append(indirizzo)
+        return "lnbc-dal-suo-wallet" if indirizzo else None
+
+    async def paga_finto(bolt11, importo, taccuino, cassaforte="", riga=()):
+        pagati.append(bolt11)
+        return PAG
+
+    async def zitto(*a, **k):
+        return None
+    amb.update({"invoice_da_ln_address": ln_finto,
+                "paga_venditore": paga_finto, "notifica": zitto,
+                "notifica_admin": zitto,
+                "_rimborso_del_motivo": lambda m: ("banner",
+                                                   lambda con, p: ""),
+                "_timbra_pagamento": lambda *a: None,
+                "registra_moderazione": lambda *a, **k: None,
+                "_fmt_sats": str})
+    db = _sq.connect(":memory:", check_same_thread=False)
+    db.row_factory = _sq.Row
+    db.executescript("""
+        CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, tg_id INTEGER,
+            motivo TEXT, stato TEXT, importo_sats INTEGER,
+            payout_stato TEXT DEFAULT '', payout_tentativi INTEGER DEFAULT 0,
+            invoice_rimborso TEXT DEFAULT '', cassaforte TEXT DEFAULT '',
+            rimborso_il INTEGER, rimborso_da INTEGER, aggiornato INTEGER);
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, ln_address TEXT);
+        INSERT INTO utenti VALUES(222, 'mario@wallet.example');
+        INSERT INTO utenti VALUES(333, '');
+        INSERT INTO pagamenti(id, tg_id, motivo, stato, importo_sats,
+            invoice_rimborso) VALUES(1, 222, 'banner', 'pagato', 20000,
+            'lnbc-del-moderatore');
+        INSERT INTO pagamenti(id, tg_id, motivo, stato, importo_sats,
+            invoice_rimborso) VALUES(2, 333, 'banner', 'pagato', 20000,
+            'lnbc-del-moderatore');
+    """)
+
+    class Senza:
+        def __init__(s, c):
+            s.c = c
+
+        def __getattr__(s, k):
+            return getattr(s.c, k)
+
+        def close(s):
+            pass
+    amb["db"] = lambda: Senza(db)
+    _aio.run(amb["_rimborsa_sblocco"](1, 999))
+    prova("chi ha un indirizzo: si paga la invoice del SUO wallet, mai "
+          "quella scritta dal moderatore", (["lnbc-dal-suo-wallet"],
+                                            ["mario@wallet.example"]),
+          (pagati[:], chiesti[:]))
+    _aio.run(amb["_rimborsa_sblocco"](2, 999))
+    prova("chi non ce l'ha: la invoice depositata e' l'unica strada",
+          "lnbc-del-moderatore", pagati[-1])
+    db.close()
+
+    # ---- 4b. il cambio del Lightning address non e' piu' muto ---------
+    la = codice(pezzo("salva_ln_address"))
+    prova("il cambio dell'indirizzo legge quello di prima, lo scrive nel "
+          "journal e avvisa il titolare dal bot PRIMA di pagare", True,
+          la.index("SELECT ln_address FROM utenti WHERE tg_id=?")
+          < la.index("UPDATE utenti SET ln_address=?")
+          < la.index("cambiato: \"\n              f\"«{prima}»")
+          < la.index("await notifica(") < la.index(
+              "r = await _sblocca_sats(oid)"))
+    prova("...solo se c'era un indirizzo diverso: il primo non avvisa",
+          True, "cambiato = bool(prima) and prima != addr" in la)
+
+    # ---- 4c. il pavimento dell'indice dello swap automatico ------------
+    import tempfile as _tf
+    import shutil as _sh
+    cart = _tf.mkdtemp()
+    os.makedirs(os.path.join(cart, "chiavi"))
+    amb = {"os": os, "json": json, "time": time,
+           "DB": os.path.join(cart, "satmarket.db")}
+    for nome in ("_swap_auto_file", "_swap_auto_prepara",
+                 "swap_auto_prenota_indice"):
+        exec(pezzo(nome), amb)
+
+    def apri(nome):
+        c = _sq.connect(os.path.join(cart, nome))
+        c.row_factory = _sq.Row
+        return c
+    con = apri("satmarket.db")
+    presi = [amb["swap_auto_prenota_indice"](con, 70 + j, "sr", 50000, 49000)
+             for j in range(3)]
+    con.close()
+    fp = os.path.join(cart, "chiavi", "swap-barattolo-indice.json")
+    prova("swap auto: l'ultimo indice preso si scrive accanto alle parole, 600",
+          ([0, 1, 2], {"ultimo": 2}, 0o600),
+          (presi, json.load(open(fp, encoding="utf-8")),
+           os.stat(fp).st_mode & 0o777))
+    # il ripristino: un database vecchio (vuoto), chiavi/ intatta
+    con = apri("ripristinato.db")
+    dopo = amb["swap_auto_prenota_indice"](con, 80, "sr", 50000, 49000)
+    con.close()
+    prova("...un database rimesso indietro NON riusa un indice gia' preso",
+          (3, {"ultimo": 3}), (dopo, json.load(open(fp, encoding="utf-8"))))
+    open(fp, "w").write("rotto")
+    con = apri("ripristinato.db")
+    try:
+        amb["swap_auto_prenota_indice"](con, 81, "sr", 50000, 49000)
+        rotto = "partito"
+    except ValueError:
+        rotto = "fermo"
+    con.close()
+    prova("...e un pavimento che non si legge ferma lo swap", "fermo", rotto)
+    _sh.rmtree(cart, ignore_errors=True)
+    rip = open(os.path.join("deploy", "RIPRISTINO.md"), encoding="utf-8").read()
+    prova("...e il ripristino dice cosa fare del pavimento", True,
+          "chiavi/swap-barattolo-indice.json" in rip and "+=1000" in rip)
+
+    # ---- 4d. le liste del pannello: le voci di testo sono parole corte --
+    amb = {"re": re}
+    for nome in ("_tipo_leva", "_giudice_si_no", "_giudice_per_tipo"):
+        exec(pezzo(nome), amb)
+    g = amb["_giudice_per_tipo"]
+    prova("le liste del pannello: le sigle passano, un testo che diventa "
+          "codice nel browser di tutti no (anche a lista vuota)",
+          [(("eur", "sats", "chf"), ""), True, True, True, ([15, 25], "")],
+          [g(("eur", "sats"), ["eur", "sats", "chf"]),
+           g(("eur", "sats"), ["eur", "x\"><img src=x onerror=alert(1)>"])[0]
+           is None,
+           g([], ["alert(1)"])[0] is None,
+           g(("eur", "sats"), ["e" * 33])[0] is None,
+           g([10, 20], [15, 25])])
+    mini = open("miniapp.html", encoding="utf-8").read()
+    pv = pezzo_js(mini, "function pillValuta(quale, attiva, valute){", "\n}\n")
+    prova("...e la pillola della valuta passa la voce dal data-v scappato, "
+          "mai dentro l'onclick", [True, False],
+          ["data-v=\"${esc(v)}\" onclick=\"toggleValutaSoglia('${quale}',"
+           "this.dataset.v)\"" in pv, "'${v}')" in pv])
+
+    # ---- 4e. il wallet NWC non resta a chi viene dopo -----------------
+    for firma in ("async function esciWeb(){",
+                  "async function salutoCancellato(){"):
+        corpo = pezzo_js(mini, firma, "\n}\n")
+        prova(f"{firma.split('(')[0].split()[-1]}: chi esce si porta via "
+              "anche il suo wallet NWC", True,
+              "scordaWalletConto(myTgId);" in corpo)
+    edt = pezzo_js(mini, "function esciDaTutti(){", "\n}\n")
+    prova("esciDaTutti: i wallet degli account chiusi, con la regola della "
+          "nsec", True,
+          "accountAperti.filter(c => !c.telegram).forEach(c => "
+          "scordaWalletConto(c.tg_id));" in edt)
+    wn = pezzo_js(mini, "function walletNwc(){", "\n}\n")
+    prova("la riga NWC di ieri senza conto non si adotta piu': si toglie",
+          [True, False], ["localStorage.removeItem(NWC_CHIAVE)" in wn,
+                          "localStorage.setItem(k, v)" in wn])
+
+    # ---- 4f. l'import da Nostr: la firma su OGNI evento ---------------
+    imp = open("importa_nostr.py", encoding="utf-8").read()
+    i = imp.index("def importa_venditore(")
+    iv = imp[i:imp.index("\n\n\ndef ", i)]
+    prova("l'import da Nostr: col giudice del server ogni evento passa "
+          "dalla firma, PRIMA del dedup e delle cancellazioni", True,
+          "relays=None, firma=None):" in iv
+          and iv.index("firmati = [e for e in eventi if firma(e)]")
+          < iv.index("# dedup: tieni la versione piu' recente")
+          < iv.index("if e.get(\"kind\") != 5:"))
+    prova("...e il server glielo passa", True,
+          "firma=verifica_firma_nostr)" in _SORGENTE)
+    # e il filtro vero, con un giudice di cartone e un database finto
+    # no: basta il pezzo, che e' una list comprehension sola
+    finti = [{"id": "a", "ok": True}, {"id": "b", "ok": False}]
+    amb_f = {"eventi": finti, "firma": lambda e: e["ok"], "print": lambda *a: None}
+    blocco = iv[iv.index("    if firma is not None:"):
+                iv.index("        eventi = firmati\n") + len("        eventi = firmati\n")]
+    exec(textwrap.dedent(blocco), amb_f)
+    prova("...una cancellazione senza firma buona non arriva piu' in fondo",
+          ["a"], [e["id"] for e in amb_f["eventi"]])
+
+    # ---- 4g. i soli decodificatori d'immagine ammessi ------------------
+    try:
+        from PIL import Image as _Im
+    except ImportError:
+        _Im = None
+    if _Im is None:
+        salta("i decodificatori ammessi", "Pillow non c'e'")
+    else:
+        import io as _io
+        prima = list(_Im.ID)
+        i = _SORGENTE.index("FORMATI_IMMAGINE_AMMESSI = (")
+        f = _SORGENTE.index("from fastapi.middleware.cors", i)
+        exec(_SORGENTE[i:f], {"ImmaginePillow": _Im})
+
+        def apre(fmt):
+            b = _io.BytesIO()
+            _Im.new("RGB", (8, 8)).save(b, fmt)
+            try:
+                with _Im.open(_io.BytesIO(b.getvalue())) as im:
+                    im.load()
+                return True
+            except Exception:
+                return False
+        prova("le foto vere si aprono, TIFF/PPM/ICO/TGA no (il formato lo "
+              "dicono i byte, e i plugin rari non si raggiungono)",
+              [True, True, True, True, False, False, False, False],
+              [apre(x) for x in ("JPEG", "PNG", "WEBP", "GIF",
+                                 "TIFF", "PPM", "ICO", "TGA")])
+        _Im.ID[:] = prima
+
+    # ---- 4h. lo swap dal telefono: conferma, margine, ritrovati -------
+    bz = open(os.path.join("swap", "boltz.js"), encoding="utf-8").read()
+    ins = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read()
+    rit = bz[bz.index("async function swapRitiro("):]
+    prova("swap dal telefono: il segreto entra in una transazione solo DOPO "
+          "i controlli sul lockup e dopo l'attesa (conferma e margine)", True,
+          rit.index("il lockup porta meno di quanto promesso")
+          < rit.index("if (attendi) await attendi();")
+          < rit.index("preimage: chiavi.segreto"))
+    att = bz[bz.index("const attendi = async () => {"):]
+    att = att[:att.index("      };\n")]
+    prova("...l'attesa vuole il lockup CONFERMATO e la scadenza lontana "
+          "almeno 12 blocchi, come il server", [True, True, True],
+          ["conferma.confirmed !== true" in att,
+           "scade - cima < SWAP_MARGINE_RITIRO" in att,
+           "const SWAP_MARGINE_RITIRO = 12;" in bz])
+    rec = bz[bz.index("    async recupera(parole){"):]
+    prova("...uno swap ritrovato si riscatta solo se torna coi NOSTRI pezzi "
+          "(albero, indirizzo, impronta, importo)", True,
+          "swapVerificaRitrovato(S, rete, d, swapChiavi(S, parole, Number(d.keyIndex))"
+          in rec and "if (perche) continue;" in rec)
+    prova("...e un ritrovato con l'indice di uno swap che c'e' gia' non entra",
+          2, ins.count("Number(r.indice) === Number(s.indice)"))
+
+    # ---- 5. l'offerta riletta dopo l'attesa della invoice --------------
+    cp = codice(pezzo("compra", "\n\n\n@app"))
+    i_inv = cp.index("inv = await crea_invoice_escrow(")
+    i_ri = cp.index("SELECT stato, ordine_id FROM offerte WHERE id=?")
+    i_ins = cp.index("INSERT INTO ordini(cassaforte,annuncio_id,")
+    prova("l'offerta si rilegge DOPO l'await e prima dell'INSERT: due "
+          "richieste insieme non fanno due ordini", True,
+          i_inv < i_ri < i_ins)
+    blocco = cp[i_ri:i_ins]
+    prova("...ancora accettata e col legame com'era, o 409; nessun await "
+          "e nessun DML in mezzo", [True, True, False, False],
+          ["off_ora[\"stato\"] != \"accettata\"" in blocco,
+           "!= int(off[\"ordine_id\"] or 0)" in blocco,
+           "await " in blocco, "UPDATE " in blocco])
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -195463,6 +195841,7 @@ CATEGORIE = {
     venduto_canale chat_mercatino chat_dalla_notifica
     modifica_massiva_foto miniature_leggere leva_mercato_lavoro
     allegati_da_telegram domande_compratore incasso_annuncio
+    audit_pagamenti_2
     """.split(),
     "infrastruttura": """
     categorie_delle_prove widget_prova widget_ordini
@@ -196282,6 +196661,7 @@ def main():
               prove_cifra_btc,
               prove_foglio_oc_visto,
               prove_seconda_firma_parla,
+              prove_audit_pagamenti_2,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:

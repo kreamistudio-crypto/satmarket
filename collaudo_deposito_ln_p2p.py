@@ -244,7 +244,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   out.avverte = corpo().includes('Hai una richiesta Lightning aperta per questo deposito');
   run(`scegliReteDepositoOnchainP2P(${O.id}, 'ln')`);
   /* pagata: il cartone blocca i bitcoin, la sorveglianza ritira nel deposito */
-  await stato(out.swapId, 'transaction.mempool');
+  await stato(out.swapId, 'transaction.confirmed');  // il telefono ritira dalla prima conferma (14 nov 2026, secondo audit)
   await run('swapGiro()');
   const quello = () => lista().find(r => r.id === out.swapId) || {};
   await finche(() => (quello().ritiro || {}).txid || quello().errore);
