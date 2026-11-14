@@ -83095,3 +83095,65 @@ di attesa più la domanda al server). Un'app di ieri sul telefono di chi
 vende manda ancora il codice alla presa: lo nasconde il telefono di
 chi compra, se è aggiornato. Il PDF del PayCode in chat resta un gesto
 a mano di chi vende, e la chat c'è già dalla presa: non è toccato.
+
+## Tappo risponde anche su Nostr: la riga nel libro (14 nov 2026, cantiere tappo-nostr, Andrea: «ha senso mettere anche tappo su nostr?», «Sì, e anche i DM», «solo se però sa distinguere i bot su nostr»; per il libro: «si»)
+
+LA RICHIESTA. Tappo, che su Telegram risponde in privato e nei commenti
+del canale, risponde da oggi anche su Nostr: sotto le note del profilo
+«Barattolo» e nei DM a quel profilo (NIP-17 e i vecchi NIP-04). Il
+lavoro vero NON sta in questo repo: è il flusso n8n «Barattolo News —
+Tappo su Nostr» sul RELAY, coi suoi file in
+`marketing-n8n/tappo-nostr/` della cartella del progetto (generatore,
+prove, e il nodo n8n che apre i DM). Qui entra solo la riga del libro,
+perché Tappo sappia dirlo a chi gli scrive su Telegram.
+
+COSA SI È DECISO, e perché.
+1) LA CHIAVE NON SI COPIA. I DM NIP-17 vanno aperti con la chiave della
+piattaforma, che n8n ha già nella credenziale dei post Nostr. Un piccolo
+nodo n8n (`NostrDmBarattolo.node.js`, in `~/.n8n/custom` del container)
+usa QUELLA credenziale: nessuna nsec in un file o in un servizio in più.
+Sa fare due cose sole: aprire una busta per Barattolo e preparare le
+buste della risposta a chi ha scritto nelle ultime 48 ore. Non firma
+note pubbliche e non scrive a sconosciuti, così anche usato male non
+parla a nome di Barattolo in giro.
+2) IL FILTRO DEI BOT, la condizione di Andrea. Si salta: chi si dichiara
+bot (campo `bot` del NIP-24, «bot» nel nome o nella bio), chi non ha
+profilo o nome, chi scrive come una macchina (più di 20 note in un'ora,
+risposta a un nostro post in meno di 15 secondi), l'account nuovo fuori
+dalla rete di fiducia (meno di 10 note, nessuna più vecchia di 7 giorni),
+i DM «link + poche parole», chi nomina più di 5 persone, i silenziati di
+Barattolo (kind 10000). Niente ping-pong: 2 risposte al massimo alla
+stessa persona nello stesso filo. Tetti: 50 al giorno, 5 a persona se
+seguita da Barattolo o dai suoi seguiti, 2 agli altri. Gli scarti
+finiscono nel registro di Tappo col motivo.
+3) LO STAFF PRIMA DI TAPPO. Se il profilo di Barattolo ha scritto in DM
+a una persona nelle ultime 24 ore un messaggio che non è di Tappo, Tappo
+non si intromette. Nato guardando la posta: 161 DM NIP-04 in 30 giorni,
+134 di spam «tre parole e un link» da 58 account, e 27 tutti di IR
+Eyewear, a cui il profilo di Barattolo aveva risposto 21 volte.
+4) LA SCELTA DI OTTOBRE. Il server avvisa dei DM senza leggerli (voce
+«L'avviso dei DM a Barattolo su Nostr», 11 ott): resta così. Ora i DM li
+legge n8n, come Tappo legge già i messaggi privati di Telegram, per
+scelta di Andrea («Sì, e anche i DM»).
+
+STRADE SCARTATE. Un programma a parte sul RELAY con la sua copia della
+nsec in un `.env`: una chiave in più da custodire, quando n8n ce l'ha già.
+Solo le risposte pubbliche, coi DM dopo: era la proposta, Andrea ha
+scelto tutte e due.
+
+PROVATO. Nella cartella del progetto: `prova_nodo_dm.js` (18: busta
+aperta e risposta riaperta dal lato di chi scrive, busta toccata, voce e
+sigillo di persone diverse, mai a chi non ha scritto, permesso che scade;
+anche con nostr-tools 2.10.4) e `prova_tappo_nostr.js` (45: filtri, tetti,
+visti, filo NIP-10, relay, registro). Controprove rotte apposta, rosse.
+Dal vivo in n8n con le risposte al relay finto: DM e nota finti risposti
+e firmati da Barattolo, account senza profilo scartato. Acceso alle 15:53
+UTC+1; il primo DM vero di Andrea è stato scartato («senza profilo»: il
+suo profilo stava su nostr.mom) e ha portato i profili a cercarsi anche
+su purplepag.es, user.kindpag.es e nostr.mom; il secondo ha avuto la
+risposta, arrivata sul suo relay dei DM. Qui: la riga in
+`assistente/sapere.md` (sezione «Nostr»), la suite severa.
+
+DA GUARDARE. La prima nota pubblica vera e la prima conversazione con
+qualcuno fuori dallo staff; se il filtro dell'account nuovo scarta troppe
+persone vere (gli scarti sono nel registro).
