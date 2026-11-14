@@ -164,3 +164,9 @@ frase: Nell'app di Barattolo (quella di Zapstore), nel sito aggiunto alla scherm
 dove: il Profilo, cassetto «🔔 Avvisi», la prima riga.
 leva: WEB_PUSH_ATTIVO (nuova, accesa)
 pubblico: sì
+
+## 2026-11-14 · avvisi-sconvenienti
+frase: Gli avvisi dei nuovi ordini P2P ora si possono allargare anche agli ordini un po' meno convenienti del mercato: nella campanella, sotto «Convenienza», tocchi «Con un limite» e scegli fin dove ti va bene, da «Fino a 10% peggio» ad «Almeno 5% meglio». Così ti arrivano anche gli ordini quasi a mercato, ma non quelli troppo cari.
+dove: la scheda «P2P», la campanella 🔔 in alto (e il cassetto «🔔 Avvisi» del Profilo).
+leva: P2P_AVVISI_NUOVI_ORDINI (nessuna leva nuova)
+pubblico: sì

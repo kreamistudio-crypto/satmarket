@@ -82235,3 +82235,47 @@ tocco che apre l'ordine. Si guarda sul collaudo prima della promozione
 prova»). L'iPhone dalla Home e Firefox non li ho in mano. Il
 `pushsubscriptionchange` è scritto e provato solo in node (Chrome lo
 manda di rado).
+
+## Gli avvisi dei nuovi ordini anche un po' peggio del mercato: «Con un limite» e le tre soglie sotto zero (14 nov 2026, cantiere avvisi-sconvenienti, Andrea: «se io voglio ad esempio vedere anche gli ordini sconvenienti ma solo fino ad un 5% di sconvenienza?»)
+
+LA RICHIESTA. Andrea, dal foglio della campanella, voleva un filtro sulla
+percentuale. Il filtro c'era già (9 ott 2026: «Solo se conveniente» e le
+tre chip 0 / 2 / 5), ma si fermava al prezzo di mercato: un ordine anche
+solo un punto peggio non avvisava mai. Lui voleva il contrario, il
+limite dalla parte sfavorevole.
+
+COSA SI È FATTO. Tre soglie in più, SOTTO ZERO: `SOGLIE_AVVISI_NUOVI_P2P`
+nel server e `P2P_AVVISI_SOGLIE` nel client passano da tre a sei,
+`-10 / -5 / -2 / 0 / 2 / 5`, chip «Fino a 10% peggio», «Fino a 5%
+peggio», «Fino a 2% peggio» davanti alle tre di prima. Il giudice
+(`_passa_avviso_nuovo_p2p`, `conv >= soglia`) NON cambia: «fino a 5%
+peggio» è «almeno −5», e la convenienza era già col segno di chi legge
+(`_convenienza_nuovo_p2p`, il verso di `affareP2P`), quindi vale per i
+due lati senza una casella per lato. La pill «Solo se conveniente»
+diventa «Con un limite» (con «peggio» dentro, «conveniente» mentiva), e
+toccandola da «Tutti» si parte da «A prezzo di mercato o meglio»
+(`P2P_AVVISI_SOGLIA_DI_SERIE = '0'`), non dalla prima chip, che ora è il
+−10: chi la toccava ieri ritrova lo stesso gesto. Le scelte già salvate
+(0, 2, 5) restano valide, nessuna colonna nuova.
+
+PERCHÉ IL −10 (consiglio dato ad Andrea, approvato). Chi compra BTC nel
+P2P trova spesso ordini dal 5 all'8% sopra il mercato: con −5 come
+fondo ne perderebbe parecchi. Sotto il −10 tanto vale «Tutti».
+
+STRADE SCARTATE. La casella libera con la percentuale scritta a mano
+(proposta per prima): Andrea ha preferito le chip, «la versione apposta
+di come è adesso». Una leva nuova: è un ritocco a un filtro già acceso
+(`P2P_AVVISI_NUOVI_ORDINI`), non una funzione.
+
+PROVATO (sezione `prove_avvisi_nuovi_ordini`). Le sei gemelle server e
+client; la rilettura delle tre nuove e il «tutti» per −7 e −1; il
+giudice nei due lati passando dalla convenienza vera (chi pubblica VENDE
+a +4 passa con −5, a +6 no; chi pubblica COMPRA a −4 passa, a −6 no; il
+−10 prende −10 e non −11; l'ignota non passa); nel foglio in node le sei
+chip in fila e «Con un limite» che parte dallo 0. CONTROPROVE: tolto il
+−5 dal server → rosse le gemelle e la rilettura; «Con un limite» dalla
+prima chip → rossa la sua; `>` al posto di `>=` → rosse le due delle
+soglie e i raggruppati.
+
+DA GUARDARE. Sul telefono le sei chip vanno a capo su due o tre righe:
+visto solo nel banco, non dal vivo.

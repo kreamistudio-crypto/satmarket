@@ -53336,7 +53336,7 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
             raise HTTPException(400, "Scegli almeno un tipo di ordine")
     soglia = str(d.get("soglia") if d.get("soglia") is not None else "").strip()
     if soglia not in ("",) + SOGLIE_AVVISI_NUOVI_P2P:
-        raise HTTPException(400, "Soglia sconosciuta: tutti, 0, 2 o 5")
+        raise HTTPException(400, "Soglia sconosciuta: tutti, -10, -5, -2, 0, 2 o 5")
     con = db()
     # LA RETE (30 ott 2026): '' = tutte, 'onchain', 'ln'. Un telefono di
     # ieri non la manda, e allora resta quella scritta
@@ -66454,7 +66454,11 @@ async def _giro_garanzie_p2p():
 TIPI_AVVISI_NUOVI_P2P = ("vendita", "acquisto", "barattozon")
 NOMI_TIPI_AVVISI_NUOVI_P2P = {"vendita": "vendita BTC", "acquisto": "acquisto BTC",
                               "barattozon": "Barattozon"}
-SOGLIE_AVVISI_NUOVI_P2P = ("0", "2", "5")   # le tre chip, gemelle di P2P_AVVISI_SOGLIE nel client
+# (14 nov 2026, cantiere avvisi-sconvenienti, Andrea: «se io voglio vedere
+# anche gli ordini sconvenienti ma solo fino ad un 5% di sconvenienza?»)
+# le soglie SOTTO ZERO: «fino a X% peggio» e' la stessa domanda di «almeno
+# X% meglio» col segno girato — il giudice resta `conv >= soglia`
+SOGLIE_AVVISI_NUOVI_P2P = ("-10", "-5", "-2", "0", "2", "5")   # le sei chip, gemelle di P2P_AVVISI_SOGLIE nel client
 RETI_AVVISI_NUOVI_P2P = ("onchain", "ln")   # '' = tutte; gemelle di P2P_AVVISI_RETI nel client
 VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT", "CHF")   # '' = tutte; gemelle di P2P_AVVISI_VALUTE nel client
 TIMBRO_NUOVI_P2P = "p2p_nuovi_ordini_visto"  # il segnalibro: il created_at piu' nuovo gia' guardato

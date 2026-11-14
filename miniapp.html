@@ -40783,7 +40783,8 @@ async function setAvvisiP2P(attivi){
    vero — in demo e in vetrina anonima non c'e' niente da accendere.
    LA CONVENIENZA E' QUELLA DELLA CARD, dal suo punto di vista: «almeno
    2% meglio» vuol dire che la card gli direbbe «2% piu' conveniente»
-   o piu'. Le tre chip sono le gemelle di SOGLIE_AVVISI_NUOVI_P2P nel
+   o piu' (e «fino a 5% peggio» che non direbbe piu' di «5% meno
+   conveniente»). Le sei chip sono le gemelle di SOGLIE_AVVISI_NUOVI_P2P nel
    server, e una prova le tiene uguali.
    DOVE ARRIVA lo dice la riga in fondo, con lo stesso giudice del
    cassetto (`doveArrivanoAvvisi`): bot Telegram a chi entra da
@@ -40795,8 +40796,18 @@ const P2P_AVVISI_TIPI = [['vendita', 'Vendita BTC'], ['acquisto', 'Acquisto BTC'
                          ['barattozon', '']];
 const nomeTipoAvvisiP2P = t =>
   t[1] || (vesteMetodoP2P(P2P_TABACCHINO) || {}).nome || t[0];
-const P2P_AVVISI_SOGLIE = [['0', 'A prezzo di mercato o meglio'],
+/* (14 nov 2026, cantiere avvisi-sconvenienti, Andrea: «vedere anche gli
+   ordini sconvenienti ma solo fino ad un 5% di sconvenienza») le tre
+   SOTTO ZERO, da sinistra la piu' larga: «fino a 10% peggio» avvisa di
+   tutto tranne quel che la card direbbe «piu' di 10% meno conveniente».
+   Il −10 perche' chi compra BTC trova spesso ordini 5-8% sopra il
+   mercato; piu' in basso tanto vale «Tutti». Toccando «Con un limite»
+   si parte da «A prezzo di mercato o meglio» (P2P_AVVISI_SOGLIA_DI_SERIE),
+   non dalla prima chip. */
+const P2P_AVVISI_SOGLIE = [['-10', 'Fino a 10% peggio'], ['-5', 'Fino a 5% peggio'],
+                           ['-2', 'Fino a 2% peggio'], ['0', 'A prezzo di mercato o meglio'],
                            ['2', 'Almeno 2% meglio'], ['5', 'Almeno 5% meglio']];
+const P2P_AVVISI_SOGLIA_DI_SERIE = '0';
 /* LA RETE DEGLI AVVISI (30 ott 2026, Andrea: «la possibilità di ricevere
    notifiche solo per onchain, solo lightning o tutto»): gemelle di
    RETI_AVVISI_NUOVI_P2P nel server; la sezione la vede solo chi
@@ -40808,7 +40819,7 @@ const P2P_AVVISI_RETI = [['', 'Tutte'], ['onchain', 'Solo on-chain'], ['ln', 'So
 const P2P_AVVISI_VALUTE = [['', 'Tutte'], ['EUR', 'Solo euro'], ['USDT', 'Solo USDT'], ['CHF', 'Solo franchi']];
 /* PURA: le preferenze come arrivano dal server, rimesse in forma — i
    tipi nell'ordine delle chip (vuoto = tutti), la soglia solo se e' una
-   delle tre, spento se manca tutto (un server di ieri) */
+   delle sei, spento se manca tutto (un server di ieri) */
 function normalizzaAvvisiNuoviP2P(p){
   const tutti = P2P_AVVISI_TIPI.map(t => t[0]);
   const tipi = (p && Array.isArray(p.tipi)) ? tutti.filter(t => p.tipi.indexOf(t) >= 0) : [];
@@ -40892,8 +40903,8 @@ function contenutoAvvisiNuoviP2P(){
     + '<div class="section-label">Convenienza</div>'
     + '<div class="p2p-metodi">'
     + pill('Tutti', p.soglia === '', "scegliSogliaAvvisiNuoviP2P('')")
-    + pill('Solo se conveniente', p.soglia !== '',
-           "scegliSogliaAvvisiNuoviP2P('" + (p.soglia || P2P_AVVISI_SOGLIE[0][0]) + "')")
+    + pill('Con un limite', p.soglia !== '',
+           "scegliSogliaAvvisiNuoviP2P('" + (p.soglia || P2P_AVVISI_SOGLIA_DI_SERIE) + "')")
     + '</div>'
     + (p.soglia === '' ? '' : '<div class="p2p-metodi avn-soglie">' + P2P_AVVISI_SOGLIE.map(s =>
         pill(s[1], p.soglia === s[0], "scegliSogliaAvvisiNuoviP2P('" + s[0] + "')")).join('')
