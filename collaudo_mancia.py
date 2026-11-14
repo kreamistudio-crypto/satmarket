@@ -28,6 +28,7 @@ USO:  python collaudo_mancia.py
 
 import asyncio
 import hashlib
+import json
 import os
 import sqlite3
 import sys
@@ -118,6 +119,27 @@ class _Risposta:
         return self._corpo
 
 
+class _Flusso:
+    """(14 nov 2026, audit) Il `client.stream(...)` di httpx: il server
+    il LNURL ora lo legge a pezzi, col tetto. Dentro chiama la `get`."""
+
+    def __init__(self, attesa):
+        self._attesa = attesa
+
+    async def __aenter__(self):
+        self.r = await self._attesa
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    def raise_for_status(self):
+        return self.r.raise_for_status()
+
+    async def aiter_bytes(self):
+        yield json.dumps(self.r.json()).encode()
+
+
 class HttpxDiCartone:
     """Al posto di `httpx` dentro il server: il citofono LNURL del
     wallet del venditore, il suo callback e il suo verify (LUD-21)."""
@@ -157,6 +179,9 @@ class HttpxDiCartone:
                                        "preimage": PREIMAGE[h] if pagata else None,
                                        "pr": ""})
             return _Risposta(404, {})
+
+        def stream(self, metodo, url, params=None, **k):
+            return _Flusso(self.get(url, params=params))
 
 
 def avvio():

@@ -229,11 +229,19 @@ def main():
 
     print("\n[la moderazione guarda prima la riga importata]")
     semina(con_importato_cancellato=True)
-    nuovi, noti = SRV._da_giudicare([evento("barattolo-999", quando=ieri)],
+    nuovi, noti = SRV._da_giudicare([evento("barattolo-250", quando=ieri)],
                                     NPUB, VENDITORE)
     prova("con l'importato cancellato l'evento e' «gia' deciso»: niente AI "
           "a ogni giro per un annuncio che lo scudo salta", (0, 1),
           (len(nuovi), len(noti)))
+    # (14 nov 2026, audit) ...ma un evento con un'ALTRA coordinata e lo
+    # stesso titolo lo scudo NON lo ferma (la sua clausola guarda la d):
+    # l'import lo farebbe nascere attivo, quindi si giudica
+    semina(con_importato_cancellato=True)
+    nuovi, noti = SRV._da_giudicare([evento("barattolo-999", quando=ieri)],
+                                    NPUB, VENDITORE)
+    prova("...una d nuova con lo stesso titolo non salta la moderazione",
+          (1, 0), (len(nuovi), len(noti)))
 
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

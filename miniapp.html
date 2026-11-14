@@ -19517,7 +19517,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = 'c4c6b6b130';
+const SWAP_TELEFONO_VER = 'cc01ccf7b3';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -62611,8 +62611,14 @@ function modUsdtOcP2P(o){
   const r = reteOcUsdtP2P(o);
   const a = o.usdt && o.usdt.indirizzo;
   if (!r || !a) return '';
+  /* (14 nov 2026, audit) gli indirizzi che chi vende ha sostituito dopo il
+     deposito: chi compra puo' aver pagato a uno di quelli. Solo il moderatore
+     li riceve, e solo quando ci sono */
+  const prima = (o.usdt && Array.isArray(o.usdt.indirizzi_prima)) ? o.usdt.indirizzi_prima : [];
+  const righe = prima.map(x => '<div>⚠️ prima: <a href="' + esc(esploraUsdtP2P(r, 'address', String(x)))
+    + '" target="_blank" rel="noopener" class="mono" style="word-break:break-all">' + esc(String(x)) + '</a></div>').join('');
   return '<div class="p2p-box">💵 USDT su <b>' + esc(r.nome) + '</b> verso <a href="' + esc(esploraUsdtP2P(r, 'address', a))
-    + '" target="_blank" rel="noopener" class="mono" style="word-break:break-all">' + esc(a) + '</a></div>';
+    + '" target="_blank" rel="noopener" class="mono" style="word-break:break-all">' + esc(a) + '</a>' + righe + '</div>';
 }
 let p2pOcTxidBozza = {};   // per scambio, quel che si sta scrivendo nel campo dell'id
 function campoTxidOcP2P(o){
@@ -71547,6 +71553,18 @@ function rinominaOrdineP2P(o, nuovoId){
 }
 function scriviOrdineP2P(o){
   const tutti = ordiniP2P();
+  /* (14 nov 2026, audit) I CAMPI DELL'ALTRA PARTE VALGONO PER QUELLA PARTE:
+     ognuno ricorda chi l'ha firmato (`k`), e se la controparte della riga
+     e' cambiata (una presa nuova sullo stesso ordine) quel che aveva
+     scritto la vecchia cade. I campi di ieri, senza `k`, restano */
+  if (o && o.campiLoro && o.peer) {
+    const tenuti = {};
+    Object.keys(o.campiLoro).forEach(t => {
+      const c = o.campiLoro[t];
+      if (!(c && c.k && c.k !== o.peer)) tenuti[t] = c;
+    });
+    o.campiLoro = tenuti;
+  }
   const prima = tutti[o.id];
   tutti[o.id] = o;
   try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
@@ -73440,7 +73458,10 @@ function avanzaOrdineP2P(ordine, azione, payload){
        tornando nel libro. Lo legge `p2pRitirato`: un annullato di un
        ordine MAI preso e' un ritiro (sparisce), uno di un ordine preso
        e' uno scambio abortito (resta nello storico). */
-    if (nuovo === 'pubblicato') delete o.preso;
+    /* (14 nov 2026, audit) ...e tornando nel libro perde anche quel che
+       aveva scritto l'altra parte (IBAN, PayCode, indirizzo): e' di chi
+       aveva preso, e alla presa dopo non deve comparire come recapito */
+    if (nuovo === 'pubblicato') { delete o.preso; delete o.campiLoro; }
     else if (P2P_GIRO_APERTO.indexOf(nuovo) >= 0 || nuovo === 'attivo') o.preso = true;
     /* una mossa vera del coordinatore chiude anche lo stato grezzo */
     delete o.statoGrezzo;
@@ -87880,7 +87901,9 @@ function campoArriva(o, ev){
   const agg = ordiniP2P()[o.id] || o;
   campoScrivi(agg, tipo, {id: dentro.id,
                           testo: String(dentro.content || '').slice(0, CAMPO_MAX_TESTO),
-                          t: dentro.created_at || adesso},
+                          t: dentro.created_at || adesso,
+                          /* chi l'ha firmato (14 nov 2026, audit): vedi scriviOrdineP2P */
+                          k: dentro.pubkey},
               dentro.pubkey === mia);
 }
 

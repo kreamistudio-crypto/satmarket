@@ -316,6 +316,15 @@ giudica() {
     MOTIVO="manca il file dei firmatari ($FIRMATARI): senza, nessuna punta si tira"
     return 10
   fi
+  # (14 nov 2026, audit) SOLO LA FIRMA SSH: il file dei firmatari vale solo
+  # per quella forma, e una firma OpenPGP o X.509 verrebbe giudicata dal
+  # portachiavi di root, non da $FIRMATARI. Le punte di Andrea sono tutte
+  # SSH: una punta firmata in un'altra forma non si tira
+  if ! git cat-file commit "$sha" 2>/dev/null \
+       | grep -q '^gpgsig -----BEGIN SSH SIGNATURE-----$'; then
+    MOTIVO="${sha:0:8} non porta una firma SSH, l'unica che $FIRMATARI sa giudicare"
+    return 10
+  fi
   if ! git -c gpg.ssh.allowedSignersFile="$FIRMATARI" \
          verify-commit "$sha" >/dev/null 2>&1; then
     MOTIVO="${sha:0:8} non porta la firma di una chiave di $FIRMATARI"

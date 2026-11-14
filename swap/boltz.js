@@ -239,6 +239,9 @@ const SWAP_FASI_BOLTZ = {
    (SWAP_AUTO_MARGINE_RITIRO), un paio d'ore di blocchi prima della
    scadenza dello swap; sotto, il segreto non esce piu'. */
 const SWAP_MARGINE_RITIRO = 12;
+/* (14 nov 2026, audit) quanti blocchi al massimo fra adesso e la scadenza
+   del rimborso di un submarine: quattro settimane, ben oltre quelle vere */
+const SWAP_SCADENZA_MAX = 4032;
 /* (tappa 3) gli stati del submarine: «creato» aspetta i bitcoin
    dell'utente; «pagata» e' la fattura pagata, il fornitore chiede la
    nostra meta' per ritirare; «fatto» quando ha ritirato */
@@ -460,6 +463,18 @@ window.SWAP_TIPI.boltz = function(cfg){
       catch(e){ throw swapErrore('giu', e.message); }
       const perche = swapVerificaSub(S, rete, r, chiavi, S.hex.decode(b.hash), preventivo.mandi);
       if (perche) throw swapErrore('mente', perche);
+      /* (14 nov 2026, audit) LA SCADENZA DEL RIMBORSO NON PUO' ESSERE
+         LONTANA A PIACERE: e' il blocco dopo cui i bitcoin dell'utente
+         tornano indietro da soli, e la sceglie il fornitore. Oltre
+         SWAP_SCADENZA_MAX blocchi dalla cima della rete lo swap non
+         parte. Se la rete non risponde si va come ieri */
+      let cima = 0;
+      const baseRete = String(cfg.mempool || '').replace(/\/+$/, '');
+      if (baseRete) {
+        try { cima = Number(await swapMempool(baseRete, '/blocks/tip/height')) || 0; } catch(e){ cima = 0; }
+      }
+      if (cima > 0 && Number(r.timeoutBlockHeight) - cima > SWAP_SCADENZA_MAX)
+        throw swapErrore('mente', 'scadenza');
       return {id: String(r.id), tipo: 'sub', fattura: String(fattura).trim(),
         lockupAddress: r.address, claimPublicKey: r.claimPublicKey,
         swapTree: r.swapTree, timeoutBlockHeight: Number(r.timeoutBlockHeight),
