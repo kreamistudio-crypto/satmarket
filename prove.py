@@ -67536,7 +67536,8 @@ def prove_p2p_libro():
            _css.count("  .scambi-testa,.libro-testa{")))
     prova("le pillole vivono nella testata, fuori dal corpo che scorre",
           True, "if (testaBox) testaBox.innerHTML =" in _rp
-          and "'<div class=\"p2p-testa-riga\">' + pillOrdina + pillola" in _rp
+          # (14 nov 2026) la riga porta `con-mappa` quando c'e' il tondo della mappa
+          and "'<div class=\"p2p-testa-riga' + (tondoTesta ? ' con-mappa' : '') + '\">' + pillOrdina + pillola" in _rp
           and "box.innerHTML = avvisi" in _rp)
     # ⚠️ LA LEVETTA DEL TEMA E' QUELLA DI CASA (set 2026, richiesta di
     # Andrea): `.tema-btn` + `alternaTema()`, che scrive la preferenza
@@ -118105,8 +118106,11 @@ def prove_avvisi_nuovi_ordini():
     # andava a capo da sola. Il gruppo li tiene insieme, e la stretta sotto
     # i 400 li fa stare in fila con le due pillole (misurato dal vivo a
     # 360, 375 e 390, anche con «128 offerte»).
+    # (14 nov 2026, banner-mappa-contanti) davanti alla campana, nello
+    # stesso gruppo, ora c'e' anche il tondo della mappa del contanti
     prova("la testata del libro porta la campana accanto alla levetta, nello stesso gruppo", True,
-          "+ pillOrdina + pillola\n    + '<span class=\"p2p-testa-cerchi\">' + campanellaP2P()\n"
+          "+ pillOrdina + pillola\n    + '<span class=\"p2p-testa-cerchi\">'\n" in m
+          and "    + tondoTesta\n    + campanellaP2P()\n"
           "    + '<button type=\"button\" class=\"tema-btn\" onclick=\"alternaTema()\">'" in m
           and "'</span></button></span></div>';" in m)
     prova("...il gruppo e' un flex che non si spezza", True,
@@ -163758,9 +163762,39 @@ out.tracciato = [tracciatoSagomaP2P('<svg><path fill="none" d="M8 16h0M24 16h0"/
   tracciatoSagomaP2P('<path d="M0 0h0"/><script>'), tracciatoSagomaP2P('<path d="M0 0<b>x</b>"/>'),
   tracciatoSagomaP2P(null)];
 out.chiusa = sezioneMappaP2P(libro);
+out.tondo = tondoMappaP2P(libro);
+out.tondoUno = tondoMappaP2P([libro[2]]);
 p2pMappaAperta = true;
 out.aperta = sezioneMappaP2P(libro);
+out.tondoAperto = tondoMappaP2P(libro);
 out.nessuna = sezioneMappaP2P([libro[3]]);
+out.tondoNessuno = tondoMappaP2P([libro[3], libro[4]]);
+// IL NUMERINO A RICHIESTA: un localStorage finto, che si puo' anche rompere
+const mem = {};
+globalThis.localStorage = { getItem: k => (k in mem ? mem[k] : null),
+  setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } };
+p2pMappaAperta = false;
+out.numSpento = tondoMappaP2P(libro);
+out.rigaSpenta = rigaNumerinoMappaP2P();
+numerinoMappaP2P();
+out.chiave = mem['barattolo_mappa_p2p_nuove'];
+out.rigaAccesa = rigaNumerinoMappaP2P();
+out.numTutte = tondoMappaP2P(libro);
+segnaVisteMappaP2P([libro[0]]);
+out.numDue = tondoMappaP2P(libro);
+p2pMappaAperta = true;
+out.numAperta = tondoMappaP2P(libro);
+segnaVisteMappaP2P(libro);
+p2pMappaAperta = false;
+out.numViste = tondoMappaP2P(libro);
+out.viste = JSON.parse(mem['barattolo_mappa_p2p_viste']).sort();
+mem['barattolo_mappa_p2p_viste'] = '{storto';
+out.numStorto = tondoMappaP2P(libro).includes('mappa-tondo-conto');
+numerinoMappaP2P();
+out.spentoDiNuovo = [mem['barattolo_mappa_p2p_nuove'], tondoMappaP2P(libro).includes('mappa-tondo-conto')];
+globalThis.localStorage = { getItem(){ throw new Error('no'); }, setItem(){ throw new Error('no'); },
+  removeItem(){ throw new Error('no'); } };
+out.rotto = tondoMappaP2P(libro).includes('mappa-tondo-conto');
 p2pMappaComune = 'Roma (RM)';
 out.elenco = elencoMappaP2P(libro).map(o => o.id);
 out.pillola = sezioneMappaP2P(libro).includes('📍 Roma (RM)');
@@ -163802,12 +163836,64 @@ console.log(JSON.stringify(out));
     prova("...e il file vero passa da quel giudice (non un tracciato vuoto)", True,
           bool(re.search(r'\sd="([Mh0-9 .\-]+)"', svg)))
     chiusa, aperta = r.get("chiusa") or "", r.get("aperta") or ""
-    prova("chiusa: la pillola col conto e niente scatola; aperta: la scatola, i tasti e la nota",
-          [True, False, True, True, True, True],
-          ["3 in contanti di persona" in chiusa, 'id="p2pMappa"' in chiusa,
+    prova("chiusa: niente scatola; aperta: la scatola, i tasti e la nota",
+          [False, True, True, True, True],
+          ['id="p2pMappa"' in chiusa,
            'id="p2pMappaSvg"' in aperta, 'onclick="zoomMappaP2P(0)"' in aperta,
            "mai sul luogo esatto" in aperta,
            "1 offerta in contanti ha una zona che la mappa non riconosce" in aperta])
+    # (14 nov 2026, cantiere banner-mappa-contanti) il bottone che apre e
+    # chiude e' salito nella testata: un tondo accanto alla campanella
+    tondo, aperto = r.get("tondo") or "", r.get("tondoAperto") or ""
+    # ...SENZA NUMERINO (Andrea: «sembra una notifica»): il conto sta
+    # solo nell'etichetta
+    prova("il tondo della mappa: il cerchietto di casa, niente numerino, il conto "
+          "nell'etichetta, il tocco di sempre; acceso solo da aperta",
+          [True, False, True, True, False, True, True],
+          ['class="tema-btn mappa-tondo"' in tondo,
+           "mappa-tondo-conto" in tondo,
+           'aria-label="Mappa: 3 offerte in contanti di persona"' in tondo,
+           'onclick="apriChiudiMappaP2P()"' in tondo, 'aria-expanded="true"' in tondo,
+           'class="tema-btn mappa-tondo acceso"' in aperto, 'aria-expanded="true"' in aperto])
+    prova("...al singolare con un'offerta, e senza offerte col punto il tondo non c'e'",
+          [True, ""], ['aria-label="Mappa: 1 offerta in contanti di persona"'
+                       in (r.get("tondoUno") or ""), r.get("tondoNessuno")])
+    prova("...e la pillola grigia sopra le card non c'e' piu' (la sezione chiusa e' vuota)",
+          ["", False], [chiusa, "p2p-mappa-btn" in mini])
+    # IL NUMERINO A RICHIESTA (Andrea: spento di serie, l'interruttore
+    # dentro la mappa, aprendola i numeri se ne vanno)
+    prova("il numerino e' spento di serie: tondo pulito, e l'interruttore dice «Spento»",
+          [False, True], ["mappa-tondo-conto" in (r.get("numSpento") or ""),
+                          'aria-pressed="false" onclick="numerinoMappaP2P()">Spento<' in (r.get("rigaSpenta") or "")])
+    prova("acceso: la chiave nel telefono, «Acceso», e le offerte mai viste contano tutte",
+          ["1", True, True], [r.get("chiave"),
+           'aria-pressed="true" onclick="numerinoMappaP2P()">Acceso<' in (r.get("rigaAccesa") or ""),
+           '<span class="mappa-tondo-conto" aria-hidden="true">3</span>' in (r.get("numTutte") or "")])
+    prova("...una vista: ne contano due, e l'etichetta lo dice", [True, True],
+          ['<span class="mappa-tondo-conto" aria-hidden="true">2</span>' in (r.get("numDue") or ""),
+           'aria-label="Mappa: 3 offerte in contanti di persona, 2 nuove"' in (r.get("numDue") or "")])
+    prova("a mappa aperta niente numerino; aperta le segna viste, e chiusa resta il tondo pulito",
+          [False, False, ["ord-aaaa-1",
+                          "ord-bbbb-2", "ord-cccc-3"]],
+          ["mappa-tondo-conto" in (r.get("numAperta") or ""),
+           "mappa-tondo-conto" in (r.get("numViste") or ""), r.get("viste")])
+    prova("un telefono con la memoria storta o rotta non esplode: le viste storte "
+          "valgono niente, la memoria rotta spegne il numerino; rispento, sparisce",
+          [True, [None, False], False],
+          [r.get("numStorto"), r.get("spentoDiNuovo"), r.get("rotto")])
+    prova("da aperta la mappa segna viste le offerte che mostra, dopo il disegno",
+          True, "if (conMappa && p2pMappaAperta && typeof segnaVisteMappaP2P === 'function') "
+                "segnaVisteMappaP2P(mostrati);" in mini)
+    prova("l'interruttore sta in fondo alla scatola della mappa aperta", True,
+          "+ '</div>' + rigaNumerinoMappaP2P() + '</div>';" in mini)
+    prova("il tondo sta nel gruppo dei cerchietti, davanti alla campanella, dietro un typeof",
+          [True, True], ["const tondoTesta = conMappa && typeof tondoMappaP2P === 'function' ? "
+                         "tondoMappaP2P(mostrati) : '';" in mini,
+                         "    + tondoTesta\n    + campanellaP2P()" in mini])
+    prova("...e coi tre cerchietti la riga resta una: `con-mappa`, e a cedere sono le pillole",
+          [True, True, True], ["'<div class=\"p2p-testa-riga' + (tondoTesta ? ' con-mappa' : '') + '\">'" in mini,
+           ".p2p-testa-riga.con-mappa .p2p-filtro-parola{display:none}" in mini,
+           "  .p2p-testa-riga{flex-wrap:nowrap}" in mini])
     prova("senza offerte col punto la mappa non c'e'", "", r.get("nessuna"))
     prova("il comune scelto restringe l'elenco e si dice; uno che non c'e' piu' si dimentica",
           [["ord-cccc-3"], True, ""],

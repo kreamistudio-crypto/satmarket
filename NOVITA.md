@@ -146,3 +146,9 @@ frase: Negli scambi P2P in USDT, chi deve mandare gli USDT ora trova sotto l'ind
 dove: la pagina dello scambio in «I miei scambi», nel riquadro «💵 Dove mandare gli USDT».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-14 · banner-mappa-contanti
+frase: La mappa dei contanti di persona ora è un tondo accanto alla campanella, in alto nel libro P2P: resta lì anche mentre scorri, e toccandolo si apre l'Italia coi pallini. In fondo alla mappa c'è «Numerino», spento di serie: acceso, il tondo mostra quante offerte in contanti nuove sono arrivate dall'ultima volta, e aprendo la mappa il numero sparisce.
+dove: la scheda «P2P», la riga in alto con «Filtro», la campanella e il tema.
+leva: nessuna
+pubblico: sì

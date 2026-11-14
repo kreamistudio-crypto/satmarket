@@ -180,7 +180,7 @@ Contanti di persona (metodo «Contanti»): ci si incontra, chi compra sats porta
 - all'arrivo ognuno può toccare «📍 Sono qui»: registra ora e, se il telefono la dà, la posizione. È facoltativo ma aiuta nelle dispute;
 - c'è un tetto in euro per scambio (vedi i NUMERI DI OGGI); sopra si divide in più ordini. Chi prende un ordine in contanti può dover bloccare una piccola cauzione.
 
-La mappa del contanti: nel libro P2P, sopra le card, la pillola «🗺️ Mappa» apre l'Italia coi pallini delle offerte in contanti di persona. Ogni pallino sta sul centro del comune dove la persona propone di vedersi, mai su un indirizzo. Si avvicina con due dita, con la rotellina o con un doppio tocco; toccando un comune l'elenco mostra solo le sue offerte.
+La mappa del contanti: nel libro P2P, in alto accanto alla campanella, il tondo con la mappa apre l'Italia coi pallini delle offerte in contanti di persona (c'è solo quando ce n'è almeno una). In fondo alla mappa c'è l'interruttore «Numerino», spento di serie: acceso, sul tondo compare quante offerte in contanti nuove sono arrivate dall'ultima volta che hai aperto la mappa, e aprendola il numero sparisce. La scelta resta su quel telefono; si vede anche mentre scorri le card. Ogni pallino sta sul centro del comune dove la persona propone di vedersi, mai su un indirizzo. Si avvicina con due dita, con la rotellina o con un doppio tocco; toccando un comune l'elenco mostra solo le sue offerte.
 
 Revolut: chi riceve gli euro su Revolut sceglie come, con tre bottoni nel modulo del recapito: RevTag (di serie), numero di telefono, oppure IBAN con l'intestatario.
 
@@ -1314,5 +1314,13 @@ pubblico: no
 
 frase: Negli scambi P2P in USDT, chi deve mandare gli USDT ora trova sotto l'indirizzo anche la cifra esatta da inviare, con il suo tasto «📋 Copia» accanto, come per l'indirizzo. Copia solo il numero, pronto da incollare nel wallet: niente più cifre riscritte a mano.
 dove: la pagina dello scambio in «I miei scambi», nel riquadro «💵 Dove mandare gli USDT».
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-019 | novita -->
+## Novità · 2026-11-14 · banner-mappa-contanti
+
+frase: La mappa dei contanti di persona ora è un tondo accanto alla campanella, in alto nel libro P2P: resta lì anche mentre scorri, e toccandolo si apre l'Italia coi pallini. In fondo alla mappa c'è «Numerino», spento di serie: acceso, il tondo mostra quante offerte in contanti nuove sono arrivate dall'ultima volta, e aprendo la mappa il numero sparisce.
+dove: la scheda «P2P», la riga in alto con «Filtro», la campanella e il tema.
 leva: nessuna
 pubblico: sì
