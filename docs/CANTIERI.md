@@ -82031,3 +82031,54 @@ annuncio dai visti, il tondo dice 1. Nessun errore di pagina.
 NON PROVATO, DA GUARDARE. Sul telefono vero dentro Telegram il pizzico
 (la stessa incognita della mappa del libro: `touch-action:none` contro
 lo zoom di Telegram).
+
+## Il totale da inviare di uno scambio in USDT non dice più euro (14 nov 2026, cantiere usdt-totale-euro, Andrea: «quando una persona indica dove ricevere gli usdt per qualche secondo compare la pagina dell importo in euro poi passa a usdt correttamente ma quella pagina in euro sarò che è uno scambio in usdt non deve esistere»)
+
+IL DIFETTO, DAL TELEFONO DI ANDREA. Su un suo ordine in USDT preso
+(275 USDT, premio 4%), al «Chi vende ti ha indicato dove inviare gli
+USDT» la pagina dello scambio ha mostrato per qualche secondo un conto
+che in testa diceva «Controvalore di 275,00 USDT» e in fondo «Totale da
+inviare 275,00 € 🇪🇺», senza la riga del premio; poi è tornato il conto
+giusto, «275,00 USDT» con l'icona di Tether. Le due monete dello STESSO
+conto non erano d'accordo, e questo dice dove guardare.
+
+LA CAUSA, LETTA NEL CODICE. In `contoDettP2P` l'etichetta chiede la
+moneta a `segnoMonetaP2P`, che dal 2 nov la prende dal giudice
+(`valutaOrdineP2P`: anche quando la riga ha perso la valuta, metodi
+fatti di sole reti USDT dicono USDT, e TWINT o il bonifico svizzero
+dicono CHF). La cifra in fondo la chiedeva invece a `monetaP2P`, che
+leggeva ancora il campo nudo `o.fiat || 'EUR'`. Le righe rifatte
+dall'archivio del server (`rigaDaServerP2P`) o ritrovate dal libro non
+portano il campo `fiat`: per il tempo in cui la pagina disegna una di
+quelle, la cifra in fondo diceva euro. Quale delle due strade abbia
+disegnato quei secondi sul telefono di Andrea NON è provato dal vivo
+(la riga senza premio fa pensare a una riga con i sats del libro); la
+correzione non dipende da quale.
+
+LA CORREZIONE. `monetaP2P` chiede la valuta allo stesso giudice di
+`segnoMonetaP2P` (col `typeof`, come lei: i banchi che ritagliano la
+funzione da sola restano quelli di ieri). Nient'altro cambia: un
+ordine in euro resta €, uno misto SEPA+USDT resta € (il giudice vuole
+TUTTI i metodi in USDT), una valuta fuori catalogo porta la sua sigla.
+L'unica differenza oltre agli USDT: una riga di soli TWINT senza
+valuta adesso dice CHF in fondo, come già diceva l'etichetta.
+
+STRADA SCARTATA. Mettere `fiat` sulle righe che nascono dal server e
+dal libro: serviva toccare il server (l'archivio non manda la valuta)
+e due costruttori, e lasciava `monetaP2P` pronta a sbagliare alla
+prossima riga senza campo. Il giudice è uno solo, e ora lo usano tutt'e
+due le monete del conto.
+
+PROVATO. `prove_usdt_totale_euro` (categoria p2p), in node sul codice
+vero: cinque righe in USDT (senza valuta, vuota, 'EUR' scritto dalla
+presa, 'USDT', due reti) dicono USDT in fondo e in testa; euro, metodi
+misti, franchi, TWINT e una valuta ignota dicono in fondo la stessa
+moneta dell'etichetta; nel conto le due monete escono dallo stesso
+oggetto. Controprove: rimesso il campo nudo in `monetaP2P` — rosse le
+prime due; passato al totale un oggetto senza i metodi, e poi
+all'etichetta — rossa la terza; rimesso il codice, verdi.
+
+NON PROVATO, DA GUARDARE. Dal telefono, al prossimo ordine in USDT
+preso: al recapito di chi vende la pagina non deve mai dire €. Resta
+possibile che per un attimo manchi la riga del premio (la stessa riga
+senza `fiat` e coi sats del libro): non è stata toccata.
