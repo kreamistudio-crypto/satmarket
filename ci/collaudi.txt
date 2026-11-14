@@ -59,6 +59,7 @@ collaudo_racconti_bozza
 collaudo_sponsor
 collaudo_numeri_negozio
 collaudo_inviti
+collaudo_invito_codice
 collaudo_letture_relay
 collaudo_foto_scartate
 collaudo_foto_obbligatorie

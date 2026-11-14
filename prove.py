@@ -31982,6 +31982,83 @@ def prove_buoni_cumulabili():
            "cumulabile: b.cum !== '0'," in mini))
 
 
+def prove_invito_codice():
+    """L'INVITO DEL CODICE AI CLIENTI (14 nov 2026, cantiere
+    invito-codice-sconto): i giudici puri GIRATI — chi si puo' invitare,
+    la cifra e il messaggio, la busta del cliente spogliata — piu' le
+    poche sentinelle sui patti che un giro non vede (la transazione
+    dell'Invia, la leva gemella, il tasto solo sul codice che vale). Il
+    flusso intero, sul server vero, e' collaudo_invito_codice.py."""
+    print("\n[l'invito del codice ai clienti]")
+    import html as _html, re as _re, time as _time
+    amb = {"CODICI_SCONTO_INVITI_GIORNI": 7, "VALUTE_SOGLIA": ("eur", "sats"),
+           "URL_PUBBLICO": "https://barattolo.store", "html": _html,
+           "re": _re, "time": _time}
+    for f in ("_fmt_sats", "_tipo_codice", "_valuta_soglia", "_stato_invito",
+              "_cifra_codice_testo", "_testo_invito_codice", "_cliente_pubblico"):
+        exec(pezzo(f), amb)
+    st = amb["_stato_invito"]
+    ADESSO = 1_800_000_000
+    prova("mai invitato: si puo'", "ok", st(False, 0, ADESSO))
+    prova("questo codice gli e' gia' arrivato: mai due volte", "gia_invitato",
+          st(True, 0, ADESSO))
+    prova("...e «gia' invitato» vince anche su «da poco»", "gia_invitato",
+          st(True, ADESSO - 3600, ADESSO))
+    prova("un altro codice tre giorni fa: aspetta", "da_poco",
+          st(False, ADESSO - 3 * 86400, ADESSO))
+    prova("al filo dei sette giorni si riparte", "ok",
+          st(False, ADESSO - 7 * 86400, ADESSO))
+    amb["CODICI_SCONTO_INVITI_GIORNI"] = 0
+    prova("GIORNI a zero: nessuna cintura di tempo", "ok",
+          st(False, ADESSO - 60, ADESSO))
+    amb["CODICI_SCONTO_INVITI_GIORNI"] = 7
+
+    cifra = amb["_cifra_codice_testo"]
+    prova("la cifra in percentuale", "−15%", cifra("percento", 15, 0, 0, "eur"))
+    prova("...il tipo vuoto di ieri e' percentuale", "−10%", cifra("", 10, 0, 0, ""))
+    prova("a valore in euro", "−10 €", cifra("valore", 0, 0, 10, "eur"))
+    prova("a valore in sats, coi puntini", "−5.000 sats",
+          cifra("valore", 0, 5000, 0, "sats"))
+
+    t = amb["_testo_invito_codice"]("Bottega <Rosa>", "rosa_1", "AMICI15", "−15%",
+                                    _time.mktime((2026, 12, 14, 12, 0, 0, 0, 0, -1)))
+    prova("il messaggio: il nome ESCAPATO, mai HTML del venditore", True,
+          "<b>Bottega &lt;Rosa&gt;</b>" in t)
+    prova("...il codice da copiare, la cifra e la scadenza", True,
+          all(p in t for p in ("<code>AMICI15</code>", "−15% sugli articoli",
+                               "Valido fino al 14/12/2026")))
+    prova("...il negozio a un tocco e come si dice basta", True,
+          "/negozio/rosa_1" in t and "Profilo → «🔔 Avvisi»" in t)
+    t0 = amb["_testo_invito_codice"]("", "", "X1", "−5%", 0)
+    prova("senza scadenza lo dice, senza negozio niente link", True,
+          "Senza scadenza" in t0 and "/negozio/" not in t0 and "Un negozio" in t0)
+    prova("il codice negozio si ripulisce prima di finire nel link", True,
+          "/negozio/abc\"" in amb["_testo_invito_codice"]("A", 'a"b<c', "X", "−5%", 0))
+
+    pub = amb["_cliente_pubblico"]({"tg_id": 123456, "ordine": 9, "nome": "",
+                                    "ultimo": 5, "ordini": 2, "stato": "ok",
+                                    "invitato_il": 77})
+    prova("la busta del cliente NON porta il tg_id", False, "tg_id" in pub)
+    prova("...senza nome dice «Cliente», e la data d'invito solo se conta",
+          ("Cliente", 0), (pub["nome"], pub["invitato_il"]))
+
+    invita = pezzo("invita_codice_sconto", fine="\n\n\ndef ")
+    prova("l'Invia gira in BEGIN IMMEDIATE (due Invia insieme non scavalcano i giorni)",
+          True, 'con.execute("BEGIN IMMEDIATE")' in invita)
+    prova("...e la regola «una volta per codice» la fa la chiave (INSERT OR IGNORE)",
+          True, "INSERT OR IGNORE INTO inviti_codice" in invita)
+    prova("...e rifa' l'elenco dal server, mai dalla lista del telefono", True,
+          "_clienti_del_codice(con, user[\"id\"]" in invita)
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    prova("le tre leve gemelle in config_esempio, accesa di serie", True,
+          all(r in cfg for r in ("CODICI_SCONTO_INVITI = True",
+                                 "CODICI_SCONTO_INVITI_GIORNI = 7",
+                                 "CODICI_SCONTO_INVITI_MAX = 200")))
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il tasto 📣 solo con la leva e su un codice che vale", True,
+          "!!(codiciLeve && codiciLeve.inviti) && !!c.attivo && !!c.vale" in mini)
+
+
 def prove_codice_a_valore():
     """IL CODICE SCONTO A CIFRA FISSA (ago 2026): «−10 €» invece di
     «−10%», e la percentuale che sale fino a 100. Le due meta' del
@@ -118912,7 +118989,11 @@ def prove_avvisi_mercatino():
     # il client
     prova("il cassetto Avvisi accoda il blocco DOPO le righe del P2P senza toccare la loro riga", True,
           "${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaAvvisiNuoviP2P()}`;\n" in m
-          and "  box.insertAdjacentHTML('beforeend', rigaAvvisiMercatino());\n}\n" in m)
+          # (14 nov 2026) ...e dopo il Mercatino, accodata allo stesso
+          # modo, la riga «🎟️ Offerte dei negozi» (cantiere
+          # invito-codice-sconto): l'ultima del cassetto
+          and "  box.insertAdjacentHTML('beforeend', rigaAvvisiMercatino());\n" in m
+          and "  box.insertAdjacentHTML('beforeend', rigaOfferteNegozi());\n}\n" in m)
     # LA CAMPANELLA TONDA (9 ott 2026, sera, ritocco di Andrea): non piu'
     # una pillola sotto la riga delle vendite, ma il primo tondo della fila
     prova("il riquadro del venditore porta la campanella nella fila dei tondi, non sotto le vendite", (True, False),
@@ -195342,7 +195423,7 @@ CATEGORIE = {
     classifica classifica_nascosta classifica_recensioni_tutte ferie
     stock_raccontato pausa xp inviti coorti_titoli pionieri_congelati
     conto_acquisto zone_spedizione supplemento_spedizione sconto_pacco
-    forma_sconto_pacco codice_a_valore divisione_a_ritroso sped_gratis
+    forma_sconto_pacco codice_a_valore invito_codice divisione_a_ritroso sped_gratis
     valuta_soglia suggerimenti libro_mastro canale_bot podio_riepilogo
     vetrina_negozio vetrina_canale cambio consegna_payload_punto
     reti_corriere punti_corrieri indirizzo_giusto rimborso_meno_spese
@@ -195856,7 +195937,7 @@ def main():
               prove_zone_spedizione,
               prove_supplemento_spedizione,
               prove_sconto_pacco, prove_forma_sconto_pacco,
-              prove_codice_a_valore,
+              prove_codice_a_valore, prove_invito_codice,
               prove_divisione_a_ritroso,
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_canale_bot,

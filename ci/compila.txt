@@ -87,6 +87,7 @@ marca_prove.py
 recupera_xp_ordini.py
 livelli_prova.py
 collaudo_inviti.py
+collaudo_invito_codice.py
 collaudo_offerta_carrello.py
 collaudo_punti_barattolo.py
 collaudo_punti_corrieri.py

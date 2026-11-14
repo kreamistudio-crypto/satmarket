@@ -82588,3 +82588,89 @@ cassetto aperto con tre recensioni, «Mostra tutti (5)» → cinque,
 
 NON PROVATO, DA GUARDARE. Il telefono vero dentro Telegram.
 
+## Il codice sconto mandato ai propri clienti (14 nov 2026, cantiere invito-codice-sconto, un venditore via Andrea: «Ho creato un codice sconto della durata di 30gg, mi piacerebbe mandarlo a tutti i miei clienti di barattolo, ovvero chi ha già ordinato qualcosa da me», «un pulsante condividi e una selezione dei clienti e con pulsante invia invito sconto il messaggio viene mandato direttamente da barattolo»; piano ok di Andrea)
+
+COSA FA. Sulla riga di un codice che OGGI vale c'è «📣». Apre, dentro il
+cassetto «Codici sconto» e sotto la lista (come la modifica, non in un
+foglio nuovo), l'elenco dei clienti tutti spuntati; «📣 Invia invito
+sconto (N)» mette in coda e Barattolo recapita con `notifica()`: bot,
+DM Nostr o avviso in app, la strada che ha scelto il CLIENTE. Il
+messaggio dice chi, il codice in `<code>`, la cifra (gemello server di
+`cifraCodice`, `_cifra_codice_testo`), la scadenza, il negozio a un
+tocco e in fondo come si dice basta. Leve: `CODICI_SCONTO_INVITI`
+(accesa di serie, la regola del 14 nov), `CODICI_SCONTO_INVITI_GIORNI`
+= 7, `CODICI_SCONTO_INVITI_MAX` = 200.
+
+IL CLIENTE è chi ha almeno un ordine PAGATO da quel negozio: stato fuori
+da `('creato','annullato')`, mai se stesso, mai un fantasma
+([2^52, 2^53)). Si scrive come «non questi» e non come elenco dei
+pagati: uno stato nuovo domani conta da solo, e i due esclusi sono
+quelli che non hanno mai visto un sat.
+
+LA PRIVACY, LA PARTE CHE DECIDE LA FORMA. Il venditore non riceve mai un
+tg_id, uno username o una npub: ogni cliente esce col NUMERO DEL SUO
+ULTIMO ORDINE, che il venditore legge già nei suoi Ordini, e quel numero
+torna con la scelta. Il server rifà l'elenco con la proprietà nella
+WHERE e incrocia: un numero d'ordine altrui, uno non pagato o inventato
+non porta a nessuno (finisce nei `saltati`). Chi ha detto no NON
+COMPARE NEMMENO: una riga «non vuole le tue offerte» direbbe al
+venditore una cosa detta a Barattolo.
+
+LE CINTURE ANTI-SPAM, ognuna nel suo posto. Una volta per codice: la
+CHIAVE di `inviti_codice` (codice, cliente), con INSERT OR IGNORE. Un
+invito ogni 7 giorni dallo stesso negozio: `_stato_invito`, puro, sulle
+righe non consumate (mandato ≠ 1). Duecento per volta: il resto torna
+come `rimasti`, ancora invitabile. Solo un codice che vale: lo stesso
+`_codice_vale` della cassa, all'Invia (409) e di nuovo a ogni riga
+della coda. L'Invia gira in BEGIN IMMEDIATE: due Invia insieme su due
+codici non passano entrambi la cintura dei giorni.
+
+LA CODA È LA TABELLA STESSA (`mandato` 0 = in attesa, l'ora dell'invio,
+1 = consumata senza messaggio), segnata PRIMA del messaggio come quella
+del mercatino: un riavvio perde un invito, non ne raddoppia nessuno.
+L'Invia la svuota subito, l'orologio al minuto degli avvisi del
+mercatino la riprende; un giro solo alla volta, 0,3 s fra due messaggi.
+
+IL NO DEL CLIENTE, due misure: «🎟️ Offerte dei negozi» nel cassetto
+🔔 Avvisi (colonna `utenti.offerte_negozi`, accesa di serie) e sotto i
+negozi che ti hanno già scritto, ognuno con «Ricevo / Zittito»
+(`inviti_codice_no`). Il negozio esce col numero del suo ultimo invito
+come maniglia, mai col tg_id; un numero altrui è un 404. La rotta del
+no NON guarda la leva: dire basta funziona sempre.
+
+STRADE SCARTATE. Un foglio a parte per la scelta (la modifica vive già
+dentro il cassetto, e un foglio nuovo vuole il suo velo e la sua
+chiusura). Mostrare al venditore anche chi ha detto no, grigio: vedi la
+privacy. Un tg_id cifrato come maniglia: il numero d'ordine il venditore
+lo ha già, una maniglia nuova sarebbe un segreto in più da tenere. Il
+bottone del no dentro il messaggio: `notifica()` porta un bottone solo,
+e quello è il negozio; la riga di testo dice dove.
+
+LA STRANEZZA DELLA FOTO («scade il 03/11/2026» il 14 nov su un codice
+«da 30 giorni»): NON è un bug. La data è it-IT, quindi il 3 novembre, e
+la scadenza la scrive il server (creazione + giorni × 86400): codice
+creato verso il 4 ottobre. La foto ha i testi del cassetto di prima del
+6 ottobre («Se il tuo sconto del negozio è più alto vince quello») e
+niente «· scaduto» rosso, che il server avrebbe acceso dopo il 3
+novembre: è stata scattata prima. Oggi il codice è scaduto e si rianima
+con ✏️ scegliendo di nuovo 30 giorni. Visto a schermo nel giro: un
+codice scaduto dice «scade il 03/11/2026 · scaduto» in rosso.
+
+PROVATO. `collaudo_invito_codice.py` (34, server vero, cartone per
+Telegram e DM, in `ci/collaudi.txt`): foglio con i soli clienti veri e
+senza tg_id, 404 sul codice altrui, invio sulla strada del cliente (bot
+e DM), mai due volte, la cintura dei giorni prima e dopo, i numeri
+inventati, il codice in pausa (409) e quello morto in coda, il no a un
+negozio e a tutti (anche su una riga già in coda), il tetto per volta,
+la leva spenta. `prove_invito_codice` (22): i giudici puri girati e i
+patti (BEGIN IMMEDIATE, INSERT OR IGNORE, elenco rifatto dal server,
+leve gemelle, tasto solo su codice che vale). Controprove: tolto
+«già invitato» da `_stato_invito`, messo il tg_id nella busta, tolto il
+BEGIN IMMEDIATE, tolto lo zitto dalla coda — tutte rosse, rimesse verdi.
+A schermo (Chromium, 390 px, collaudo locale): lista col 📣, foglio,
+invio (il messaggio uscito nel journal), foglio dopo («ha già ricevuto
+questo codice»), riga «Offerte dei negozi» e lo zittito.
+
+NON PROVATO, DA GUARDARE. Il messaggio vero sul bot e nel DM Nostr (il
+cartone non rende l'HTML); il venditore della richiesta, a promozione
+fatta.

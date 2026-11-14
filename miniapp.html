@@ -40970,7 +40970,62 @@ function renderAvvisi(){
      nella riga delle sorelle qui sopra: quella riga ha la sua
      sentinella intera e non si tocca */
   box.insertAdjacentHTML('beforeend', rigaAvvisiMercatino());
+  /* ...e «🎟️ Offerte dei negozi» (14 nov 2026), accodata allo stesso
+     modo: la riga delle sorelle ha la sua sentinella e non si tocca */
+  box.insertAdjacentHTML('beforeend', rigaOfferteNegozi());
 }
+
+/* «🎟️ OFFERTE DEI NEGOZI» (14 nov 2026, cantiere invito-codice-sconto):
+   i codici sconto che ti mandano i negozi da cui hai comprato. ACCESE
+   di serie, e a tenerle gentili ci pensa il server (solo chi ti ha
+   venduto qualcosa, una volta per codice, al piu' una ogni tot giorni
+   per negozio). Qui si dice basta: a tutti con l'interruttore, o a un
+   negozio solo col 🔕 sulla sua riga. I negozi escono col numero del
+   loro ultimo invito come maniglia. */
+let myOfferteNegozi = true, myOfferteNegoziLista = [];
+function rigaOfferteNegozi(){
+  const on = myOfferteNegozi;
+  const pillola = (attiva, testo, azione) => `<button onclick="${azione}" aria-pressed="${attiva ? 'true' : 'false'}"
+      style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${attiva?'var(--sats)':'var(--line)'};background:${attiva?'var(--sats)':'transparent'};color:${attiva?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">${testo}</button>`;
+  const negozi = on ? myOfferteNegoziLista.map(n => `
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 0">
+      <div style="min-width:0;flex:1;font-size:12.5px;font-weight:700;color:${n.zitto ? 'var(--muted)' : 'var(--ink)'}">${n.zitto ? '🔕 ' : ''}${esc(n.nome)}</div>
+      ${pillola(!n.zitto, n.zitto ? 'Zittito' : 'Ricevo', `zittisciNegozio(${Number(n.invito)}, ${n.zitto ? 'false' : 'true'})`)}
+    </div>`).join('') : '';
+  return `
+  <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13.5px;font-weight:800">🎟️ Offerte dei negozi</div>
+        <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
+          I codici sconto che ti mandano i negozi da cui hai già comprato.
+          Il negozio non vede mai i tuoi contatti.</div>
+      </div>
+      ${pillola(on, on ? 'Attive' : 'Spente', `setOfferteNegozi(${on ? 'false' : 'true'})`)}
+    </div>
+    ${negozi ? `<div style="margin-top:6px">${negozi}</div>` : ''}
+  </div>`;
+}
+
+async function scegliOfferteNegozi(corpo, conferma){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono avvisi veri 🙂'); return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/offerte-negozi`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify(corpo)});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    myOfferteNegozi = d.offerte_negozi !== false;
+    myOfferteNegoziLista = Array.isArray(d.offerte_negozi_lista) ? d.offerte_negozi_lista : [];
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderAvvisi();
+  toast(conferma(), 5000);
+}
+const setOfferteNegozi = attive => scegliOfferteNegozi({attive},
+  () => attive ? '🎟️ Offerte dei negozi attive' : '🔕 Niente più offerte dai negozi');
+const zittisciNegozio = (invito, zitto) => scegliOfferteNegozi({invito, zitto},
+  () => zitto ? '🔕 Niente più offerte da questo negozio' : '🎟️ Di nuovo le offerte di questo negozio');
 
 /* «💡 Suggerimenti sui miei annunci»: l'interruttore dei consigli che
    il bot manda al venditore — cosa manca a un annuncio, e le leve del
@@ -42776,6 +42831,7 @@ async function renderCodici(){
         · ${c.cumulabile === false ? 'non si somma' : 'si somma'}
         ${morto ? `<span style="color:var(--danger);font-weight:800"> · ${perche}</span>` : ''}
       </div>
+      ${codiceCondivisibile(c) ? `<button style="${azCod}" title="Condividi con i tuoi clienti" onclick="condividiCodice(${c.id})">📣</button>` : ''}
       <button style="${azCod}" title="Modifica" onclick="modificaCodice(${c.id})">✏️</button>
       <button style="${azCod}" title="${c.attivo?'Metti in pausa':'Riattiva'}" onclick="pausaCodice(${c.id})">${c.attivo?'⏸':'▶️'}</button>
       <button style="${azCod}" title="Elimina" onclick="eliminaCodice(${c.id})">🗑</button>
@@ -42792,6 +42848,7 @@ async function renderCodici(){
       scatta, non consuma un uso.</div>
     <div id="codiciErrore"></div>
     ${myCodici.map(riga).join('') || '<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:10px 0">Nessun codice, per ora.</div>'}
+    ${bloccoCondividiCodice()}
     ${pieno ? `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:12px">Hai già ${tetto} codici: eliminane uno per farne di nuovi.</div>` : `
     <div class="section-label" style="margin-top:14px">${codiceInModifica ? 'Modifica il codice' : 'Nuovo codice'}</div>
     <div class="field"><input id="codCodice" maxlength="24"
@@ -42889,6 +42946,132 @@ function codicePill(campo, v){
     b[campo] = String(v);
   }
   renderCodici();
+}
+
+/* ══ «📣 CONDIVIDI» UN CODICE CON I CLIENTI (14 nov 2026) ══════════
+   Richiesta di un venditore, via Andrea: mandare il proprio codice a
+   chi ha gia' comprato da lui, e che il messaggio lo porti Barattolo.
+   Il foglio si apre DENTRO il cassetto, sotto la lista — come la
+   modifica — e non in un foglio nuovo: e' un gesto su una riga di
+   questa lista. I clienti li decide il SERVER (chi ha pagato almeno un
+   ordine, chi non ha detto basta) e arrivano col numero del loro
+   ultimo ordine come maniglia: qui non passa mai un contatto. Il tasto
+   compare solo su un codice che OGGI vale e con la leva accesa
+   (`codiciLeve.inviti`, dal server). */
+let codiceInCondivisione = null;   /* {id, codice, clienti, scelti, giorni, max} */
+const codiceCondivisibile = c =>
+  !!(codiciLeve && codiciLeve.inviti) && !!c.attivo && !!c.vale;
+
+async function condividiCodice(id){
+  haptic();
+  if (DEMO || VETRINA) { toast('In demo non ci sono clienti veri 🙂'); return; }
+  if (codiceInCondivisione && codiceInCondivisione.id === id) {
+    codiceInCondivisione = null; renderCodici(); return;
+  }
+  try {
+    const r = await fetch(`${API_BASE}/me/codici-sconto/${id}/clienti`,
+                          {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    const clienti = Array.isArray(d.clienti) ? d.clienti : [];
+    /* TUTTI SPUNTATI, come ha chiesto il venditore: chi si puo'
+       invitare adesso parte gia' scelto, e si toglie la spunta a chi
+       non si vuole */
+    codiceInCondivisione = {id, codice: d.codice || '', clienti,
+      scelti: new Set(clienti.filter(c => c.stato === 'ok').map(c => c.ordine)),
+      giorni: d.inviti_giorni || 0, max: d.inviti_max || 0};
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  await renderCodici();
+  el('codiciCondividi')?.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block:'nearest'});
+}
+
+function bloccoCondividiCodice(){
+  const cc = codiceInCondivisione;
+  if (!cc || !(myCodici || []).some(c => c.id === cc.id)) return '';
+  const data = ts => new Date(ts * 1000).toLocaleDateString('it-IT');
+  const righe = cc.clienti.map(c => {
+    const ok = c.stato === 'ok';
+    const nota = c.stato === 'gia_invitato' ? 'ha già ricevuto questo codice'
+      : c.stato === 'da_poco'
+        ? `invitato il ${data(c.invitato_il)}: il prossimo invito dal ${data(c.invitato_il + cc.giorni * 86400)}`
+        : `${fmt(c.ordini)} ${c.ordini === 1 ? 'ordine' : 'ordini'} · l'ultimo il ${data(c.ultimo)}`;
+    return `<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);cursor:${ok ? 'pointer' : 'default'};opacity:${ok ? 1 : .55}">
+      <input type="checkbox" ${ok && cc.scelti.has(c.ordine) ? 'checked' : ''} ${ok ? '' : 'disabled'}
+        onchange="spuntaClienteCodice(${c.ordine}, this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--sats)">
+      <span style="min-width:0;line-height:1.35"><b style="font-size:13px">${esc(c.nome)}</b><br>
+        <span style="font-size:11.5px;color:var(--muted);font-weight:600">${nota}</span></span></label>`;
+  }).join('');
+  const n = cc.scelti.size;
+  const invitabili = cc.clienti.filter(c => c.stato === 'ok').length;
+  const link = 'font:inherit;background:none;border:none;color:var(--sats);font-weight:800;cursor:pointer;padding:0;font-size:12.5px';
+  return `<div id="codiciCondividi" style="margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:14px">
+    <div class="section-label" style="margin-top:0">📣 Invita i tuoi clienti</div>
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin:6px 0 4px">
+      Il codice <b class="mono" style="color:var(--ink)">${esc(cc.codice)}</b>
+      lo mandiamo noi, da Barattolo, a chi ha già comprato da te: ognuno lo
+      riceve dove ha scelto (bot Telegram, DM Nostr o avviso in app). Non
+      vedi i loro contatti, e chi ha detto «basta offerte» qui non compare.
+      Ogni cliente riceve questo codice <b style="color:var(--ink)">una volta sola</b>${cc.giorni
+        ? `, e al massimo un tuo invito ogni <b style="color:var(--ink)">${cc.giorni} giorni</b>` : ''}.</div>
+    ${cc.clienti.length ? `
+      ${invitabili > 1 ? `<div style="display:flex;gap:14px;margin:6px 0 2px">
+        <button style="${link}" onclick="spuntaTuttiClientiCodice(true)">Tutti</button>
+        <button style="${link}" onclick="spuntaTuttiClientiCodice(false)">Nessuno</button></div>` : ''}
+      ${righe}
+      ${cc.max && invitabili > cc.max ? `<div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:8px">Ne partono ${fmt(cc.max)} per volta: gli altri restano da invitare al giro dopo.</div>` : ''}
+      <button id="codInvitaBtn" class="btn orange" style="margin-top:12px" ${n ? '' : 'disabled'}
+        onclick="inviaInvitoCodice(this)">📣 Invia invito sconto (${fmt(n)})</button>`
+    : `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin:10px 0">
+        Nessun cliente da invitare, per ora: qui compaiono le persone che
+        hanno pagato almeno un ordine nel tuo negozio.</div>`}
+    <button style="${link};display:block;margin:12px auto 0;color:var(--muted)" onclick="chiudiCondividiCodice()">Chiudi</button>
+  </div>`;
+}
+
+/* LA SPUNTA NON RIDISEGNA IL CASSETTO: la casella si e' gia' girata da
+   sola, qui si tiene in pari l'insieme e il numero sul bottone */
+function spuntaClienteCodice(ordine, on){
+  const cc = codiceInCondivisione;
+  if (!cc) return;
+  haptic();
+  if (on) cc.scelti.add(ordine); else cc.scelti.delete(ordine);
+  const b = el('codInvitaBtn');
+  if (b) { b.textContent = `📣 Invia invito sconto (${fmt(cc.scelti.size)})`; b.disabled = !cc.scelti.size; }
+}
+
+function spuntaTuttiClientiCodice(tutti){
+  const cc = codiceInCondivisione;
+  if (!cc) return;
+  haptic();
+  cc.scelti = new Set(tutti ? cc.clienti.filter(c => c.stato === 'ok').map(c => c.ordine) : []);
+  renderCodici();
+}
+
+function chiudiCondividiCodice(){
+  haptic();
+  codiceInCondivisione = null;
+  renderCodici();
+}
+
+async function inviaInvitoCodice(btn){
+  const cc = codiceInCondivisione;
+  if (!cc || !cc.scelti.size) return;
+  haptic();
+  const ripristina = bottoneInAttesa(btn, 'Invio…');
+  try {
+    const r = await fetch(`${API_BASE}/me/codici-sconto/${cc.id}/invita`, {method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({ordini: [...cc.scelti]})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 7000); return; }
+    codiceInCondivisione = null;
+    await renderCodici();
+    const n = d.accodati || 0;
+    toast(n ? `📣 Invito in viaggio verso ${fmt(n)} ${n === 1 ? 'cliente' : 'clienti'}`
+              + (d.rimasti ? `: ne restano ${fmt(d.rimasti)}, rimandalo fra poco` : '')
+            : 'Nessun invito da mandare: questi clienti l\'hanno già ricevuto', 7000);
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
 }
 
 function modificaCodice(id){
@@ -99801,6 +99984,10 @@ async function avvia(){
     myWebPush = (me.web_push && me.web_push.attivo && me.web_push.chiave)
       ? me.web_push : {attivo: false};
     mySuggerimenti = !!me.suggerimenti_annunci;
+    /* le offerte dei negozi (14 nov 2026): la chiave assente (un server
+       di ieri) vale «attive», il default, e nessun negozio */
+    myOfferteNegozi = me.offerte_negozi !== false;
+    myOfferteNegoziLista = Array.isArray(me.offerte_negozi_lista) ? me.offerte_negozi_lista : [];
     /* un server di ieri non manda la chiave: vale «accesi», il default */
     myAvvisiP2P = me.avvisi_p2p === undefined ? true : !!me.avvisi_p2p;
     /* gli avvisi dei nuovi ordini (9 ott 2026): dal giudice del server;

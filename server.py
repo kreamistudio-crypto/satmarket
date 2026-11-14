@@ -876,6 +876,32 @@ try:
 except ImportError:
     CODICI_SCONTO_TENTATIVI_ORA = 20
 
+# L'INVITO AI CLIENTI (14 nov 2026, richiesta di un venditore via
+# Andrea): «📣 Condividi» sul codice, la scelta fra chi ha GIA' comprato
+# da lui, e Barattolo che recapita con `notifica()` — bot, DM Nostr o
+# avviso in app, la strada che ha scelto il cliente. Il venditore non
+# vede mai un contatto: vede il nome che gia' legge negli Ordini.
+# ACCESA di serie (decisione di Andrea, 14 nov 2026: le leve nuove
+# nascono accese): resta l'interruttore d'emergenza, False = sparisce
+# il tasto e la rotta risponde 409.
+try:
+    from config import CODICI_SCONTO_INVITI
+except ImportError:
+    CODICI_SCONTO_INVITI = True
+# ...e le due cinture contro lo spam. GIORNI: un cliente riceve al piu'
+# UN invito ogni N giorni dallo STESSO negozio, qualunque codice sia
+# (che lo stesso codice arrivi una volta sola lo dice la chiave della
+# tabella, non una leva). MAX: quanti inviti parte per volta — quelli
+# in piu' restano invitabili per il giro dopo, niente si perde.
+try:
+    from config import CODICI_SCONTO_INVITI_GIORNI
+except ImportError:
+    CODICI_SCONTO_INVITI_GIORNI = 7
+try:
+    from config import CODICI_SCONTO_INVITI_MAX
+except ImportError:
+    CODICI_SCONTO_INVITI_MAX = 200
+
 # I SUGGERIMENTI DAL BOT (ago 2026, decisione di Andrea che ROVESCIA
 # l'opt-in di luglio): «💡 Suggerimenti sui miei annunci» nasce ACCESO.
 # Il motivo del rovesciamento e' che l'opt-in, in pratica, non lo
@@ -6941,6 +6967,31 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_codici_venditore
         ON codici_sconto(venditore_id);
+    CREATE TABLE IF NOT EXISTS inviti_codice(
+        -- L'INVITO DI UN CODICE A UN CLIENTE (14 nov 2026): una riga per
+        -- (codice, cliente), e la CHIAVE e' la regola «lo stesso codice
+        -- arriva una volta sola» — un secondo «Invia» la trova e passa
+        -- oltre (INSERT OR IGNORE), senza una SELECT prima.
+        -- E' ANCHE LA CODA: `mandato` 0 = in attesa, poi l'ora
+        -- dell'invio; 1 = consumato SENZA messaggio (il cliente ha
+        -- detto basta, o il codice e' morto prima del suo turno).
+        -- `venditore_id` e' fotografato: un codice eliminato lascia la
+        -- riga, e la cintura dei giorni deve continuare a contarla.
+        codice_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        tg_id INTEGER NOT NULL,
+        accodato INTEGER NOT NULL DEFAULT 0,
+        mandato INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(codice_id, tg_id));
+    CREATE INDEX IF NOT EXISTS idx_inviti_codice_cliente
+        ON inviti_codice(tg_id, venditore_id, accodato);
+    CREATE TABLE IF NOT EXISTS inviti_codice_no(
+        -- «🔕 Niente piu' offerte da questo negozio»: il NO del cliente
+        -- a UN venditore. Il no a tutti sta in utenti.offerte_negozi.
+        tg_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        creato INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(tg_id, venditore_id));
     CREATE TABLE IF NOT EXISTS avvisi_notificati(
         -- dedup: lo stesso annuncio non suona MAI due volte per lo
         -- stesso utente (modifiche, re-import). Nel DB e non in
@@ -9088,6 +9139,14 @@ def init_db():
                     "avvisi_mercatino_categorie TEXT DEFAULT ''",
                     "avvisi_mercatino_prezzo REAL DEFAULT 0",
                     "avvisi_mercatino_valuta TEXT DEFAULT ''",
+                    # LE OFFERTE DEI NEGOZI (14 nov 2026, cantiere
+                    # invito-codice-sconto): 1 = ricevo i codici sconto
+                    # che mi mandano i negozi da cui ho comprato. ACCESO
+                    # di serie — li manda solo chi ti ha gia' venduto
+                    # qualcosa, una volta per codice, al piu' uno ogni
+                    # CODICI_SCONTO_INVITI_GIORNI — e si spegne dal
+                    # cassetto Avvisi (`/api/me/offerte-negozi`).
+                    "offerte_negozi INTEGER DEFAULT 1",
                     "spedizione_standard TEXT DEFAULT ''",
                     # HA PREMUTO AVVIA PER ENTRARE (19 ott 2026, cantiere
                     # account-doppio-bot): l'ora dell'ultimo Avvia di un
@@ -20695,6 +20754,18 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM mercatino_avvisi_coda WHERE tg_id=?",
                     (id_nostr,))
+        # ...e gli inviti dei codici sconto (14 nov 2026): quelli
+        # RICEVUTI e i no ai negozi passano alla meta' Telegram, in
+        # unione (lo stesso codice resta «gia' arrivato»); quelli
+        # MANDATI come negozio seguono il venditore, cosi' la cintura
+        # dei giorni continua a contarli
+        for tab in ("inviti_codice", "inviti_codice_no"):
+            con.execute(f"UPDATE OR IGNORE {tab} SET tg_id=? WHERE tg_id=?",
+                        (id_telegram, id_nostr))
+            con.execute(f"UPDATE OR IGNORE {tab} SET venditore_id=? "
+                        "WHERE venditore_id=?", (id_telegram, id_nostr))
+            con.execute(f"DELETE FROM {tab} WHERE tg_id=? OR venditore_id=?",
+                        (id_nostr, id_nostr))
         # Il barattolo dei preferiti segue l'utente, in unione come i
         # distintivi (stesso annuncio salvato da entrambe le meta':
         # una riga basta)
@@ -35082,6 +35153,15 @@ def _leve_stato():
                   "CODICI_SCONTO_TENTATIVI_ORA", CODICI_SCONTO_TENTATIVI_ORA,
                   spento="nessun freno a chi prova a indovinare i codici "
                          "altrui"),
+            _leva("Invito del codice ai clienti", "CODICI_SCONTO_INVITI",
+                  CODICI_SCONTO_INVITI,
+                  acceso="«📣 Condividi»: il venditore manda il codice a "
+                         "chi ha gia' comprato da lui, una volta per codice",
+                  spento="niente tasto «📣 Condividi», e la rotta dice 409"),
+            _leva("Un invito per cliente ogni (giorni)",
+                  "CODICI_SCONTO_INVITI_GIORNI", CODICI_SCONTO_INVITI_GIORNI),
+            _leva("Inviti per volta", "CODICI_SCONTO_INVITI_MAX",
+                  CODICI_SCONTO_INVITI_MAX),
         ]},
         {"gruppo": "💰 Offerte e 🌴 ferie", "voci": [
             _leva("Offerta minima (% del listino)",
@@ -49712,7 +49792,14 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "max_valore_eur": CODICI_SCONTO_MAX_VALORE_EUR,
         "max_valore_sats": CODICI_SCONTO_MAX_VALORE_SATS,
         "valute": list(VALUTE_SOGLIA),
-        "max_usi": CODICI_SCONTO_MAX_USI}
+        "max_usi": CODICI_SCONTO_MAX_USI,
+        # L'INVITO AI CLIENTI (14 nov 2026): il tasto «📣 Condividi»
+        # compare solo con la leva accesa, e i due numeri del foglio
+        # vengono da qui, mai scritti nel client
+        **_leve_inviti_codice()}
+    # LE OFFERTE DEI NEGOZI (14 nov 2026): l'interruttore del cassetto
+    # Avvisi e i negozi che ti hanno gia' mandato un codice
+    profilo.update(_offerte_negozi_di(user["id"]))
     # I SUGGERIMENTI escono come STATO EFFETTIVO e non come valore
     # grezzo: `suggerimenti_annunci` esce dal SELECT * ed e' 0 anche
     # per chi non ha mai toccato niente — cioe' per chi li riceve. Un
@@ -54384,7 +54471,8 @@ async def lista_codici_sconto(x_tg_init_data: str = Header(""),
             "max_valore_eur": CODICI_SCONTO_MAX_VALORE_EUR,
             "max_valore_sats": CODICI_SCONTO_MAX_VALORE_SATS,
             "valute": list(VALUTE_SOGLIA),
-            "max_usi": CODICI_SCONTO_MAX_USI}
+            "max_usi": CODICI_SCONTO_MAX_USI,
+            **_leve_inviti_codice()}
 
 
 @app.post("/api/me/codici-sconto")
@@ -54583,6 +54671,390 @@ async def elimina_codice_sconto(codice_id: int,
     con.commit()
     con.close()
     return {"ok": True}
+
+
+# --- L'invito del codice ai clienti (14 nov 2026) ---------------------
+# La richiesta di un venditore, via Andrea: «Ho creato un codice sconto
+# della durata di 30gg, mi piacerebbe mandarlo a tutti i miei clienti di
+# Barattolo, ovvero chi ha gia' ordinato qualcosa da me». Il tasto
+# «📣 Condividi» sulla riga del codice apre l'elenco dei clienti, tutti
+# spuntati, e «Invia invito sconto» mette in coda: il messaggio lo
+# recapita Barattolo con `notifica()`, sulla strada che il CLIENTE ha
+# scelto (bot, DM Nostr, avviso in app).
+# IL CLIENTE e' chi ha almeno un ordine PAGATO da questo negozio: uno
+# stato oltre 'creato' e diverso da 'annullato' (l'ordine abbandonato
+# prima di pagare non fa di nessuno un cliente). Mai se stesso, mai un
+# account cancellato (il fantasma vive in [2^52, 2^53), FANTASMA_BASE).
+# LA PRIVACY: il venditore non riceve MAI un tg_id, uno username o una
+# npub. Ogni cliente esce col NUMERO DEL SUO ULTIMO ORDINE — che il
+# venditore legge gia' nei suoi Ordini — ed e' quel numero che torna
+# indietro con la scelta: il server lo ritraduce rifacendo l'elenco
+# con la proprieta' nella WHERE, quindi un numero d'ordine altrui non
+# porta da nessuna parte.
+# CHI HA DETTO NO NON COMPARE NEMMENO: ne' il no a tutti i negozi
+# (utenti.offerte_negozi) ne' quello a questo (inviti_codice_no). Una
+# riga «non vuole le tue offerte» direbbe al venditore una cosa che il
+# cliente ha detto a Barattolo, non a lui.
+# LE CINTURE ANTI-SPAM: lo stesso codice una volta sola per cliente (la
+# chiave di inviti_codice), al piu' un invito ogni
+# CODICI_SCONTO_INVITI_GIORNI dallo stesso negozio, al piu'
+# CODICI_SCONTO_INVITI_MAX per volta, e solo un codice che OGGI vale. Il
+# server rifa' SEMPRE l'elenco da se': la scelta che arriva dal telefono
+# e' un filtro, mai una fonte.
+
+STATI_NON_CLIENTE = ("creato", "annullato")
+PAUSA_INVITI = 0.3        # secondi fra due inviti: mai raffiche sul bot
+LOTTO_INVITI = 50         # righe per giro della coda
+_INVITI_IN_GIRO = False   # un giro solo alla volta (vedi _giro_inviti_codice)
+
+
+def _leve_inviti_codice() -> dict:
+    """La parte delle leve che serve al foglio «📣 Condividi»: la busta
+    di /api/me e quella della lista dei codici si tengono in pari da
+    qui, o il cassetto direbbe due cose secondo la strada."""
+    return {"inviti": bool(CODICI_SCONTO_INVITI and CODICI_SCONTO_ATTIVI),
+            "inviti_giorni": int(CODICI_SCONTO_INVITI_GIORNI or 0),
+            "inviti_max": int(CODICI_SCONTO_INVITI_MAX or 0)}
+
+
+def _stato_invito(gia_questo: bool, ultimo_invito: int, adesso: int) -> str:
+    """PURA: se questo cliente si puo' invitare adesso. 'ok', oppure
+    'gia_invitato' (questo codice gli e' gia' arrivato, o e' in coda),
+    oppure 'da_poco' (un codice dello stesso negozio negli ultimi
+    CODICI_SCONTO_INVITI_GIORNI). L'ordine conta: «gia' invitato» e' la
+    cosa piu' definitiva, e vince. GIORNI a zero = nessuna cintura di
+    tempo (la chiave della tabella resta)."""
+    if gia_questo:
+        return "gia_invitato"
+    giorni = int(CODICI_SCONTO_INVITI_GIORNI or 0)
+    if giorni > 0 and ultimo_invito and adesso - int(ultimo_invito) < giorni * 86400:
+        return "da_poco"
+    return "ok"
+
+
+def _clienti_del_codice(con, venditore_id: int, codice_id: int, adesso: int) -> list:
+    """I clienti veri di un negozio, visti dal foglio di UN codice, dal
+    piu' recente. Ogni voce porta il tg_id SOLO per il server: chi la
+    manda al client la spoglia (`_cliente_pubblico`)."""
+    segni = ",".join("?" * len(STATI_NON_CLIENTE))
+    righe = con.execute(
+        "SELECT o.compratore_id AS tg_id, MAX(o.id) AS ordine, "
+        "MAX(o.creato) AS ultimo, COUNT(*) AS ordini, "
+        "COALESCE(u.nome,'') AS nome "
+        "FROM ordini o JOIN utenti u ON u.tg_id=o.compratore_id "
+        "WHERE o.venditore_id=? AND o.compratore_id<>? "
+        f"AND o.stato NOT IN ({segni}) "
+        "AND NOT (o.compratore_id >= ? AND o.compratore_id < ?) "
+        "AND COALESCE(u.offerte_negozi, 1) <> 0 "
+        "AND NOT EXISTS (SELECT 1 FROM inviti_codice_no n "
+        "  WHERE n.tg_id=o.compratore_id AND n.venditore_id=o.venditore_id) "
+        "GROUP BY o.compratore_id ORDER BY ultimo DESC, ordine DESC",
+        (venditore_id, venditore_id, *STATI_NON_CLIENTE,
+         2 ** 52, 2 ** 53)).fetchall()
+    if not righe:
+        return []
+    gia = {int(r["tg_id"]) for r in con.execute(
+        "SELECT tg_id FROM inviti_codice WHERE codice_id=?", (codice_id,))}
+    # L'ULTIMO INVITO DI QUESTO NEGOZIO a ogni cliente: le righe
+    # consumate senza messaggio (mandato=1) non contano, nessuno le ha
+    # ricevute. Quelle in coda si' — stanno per arrivare.
+    ultimi = {int(r["tg_id"]): int(r["quando"] or 0) for r in con.execute(
+        "SELECT tg_id, MAX(accodato) AS quando FROM inviti_codice "
+        "WHERE venditore_id=? AND mandato<>1 GROUP BY tg_id",
+        (venditore_id,))}
+    fuori = []
+    for r in righe:
+        tg = int(r["tg_id"])
+        fuori.append({"tg_id": tg, "ordine": int(r["ordine"]),
+                      "nome": r["nome"] or "", "ultimo": int(r["ultimo"] or 0),
+                      "ordini": int(r["ordini"] or 0),
+                      "stato": _stato_invito(tg in gia, ultimi.get(tg, 0), adesso),
+                      "invitato_il": ultimi.get(tg, 0)})
+    return fuori
+
+
+def _cliente_pubblico(c: dict) -> dict:
+    """Il cliente come lo legge il venditore: il nome che vede gia'
+    negli Ordini, quando ha comprato l'ultima volta, quante volte, e il
+    numero dell'ordine come maniglia. MAI il tg_id."""
+    return {"ordine": c["ordine"], "nome": c["nome"] or "Cliente",
+            "ultimo": c["ultimo"], "ordini": c["ordini"], "stato": c["stato"],
+            "invitato_il": c["invitato_il"] if c["stato"] != "ok" else 0}
+
+
+def _codice_vale_ora(con, r, adesso: int) -> bool:
+    """Il codice vale OGGI, per lo stesso giudice della cassa."""
+    return bool(_codice_vale(r["tipo"], r["percento"], r["valore_sats"],
+                             r["valore_eur"], r["valore_valuta"], r["scadenza"],
+                             r["usi_max"], r["attivo"], r["venditore_id"],
+                             r["venditore_id"], adesso, _usi_codice(con, r["id"])))
+
+
+def _cifra_codice_testo(tipo, percento, valore_sats, valore_eur, valuta) -> str:
+    """PURA: «−15%», «−10 €», «−5.000 sats» — il gemello di
+    `cifraCodice` del client, per il messaggio dell'invito."""
+    if (_tipo_codice(tipo) or "percento") != "valore":
+        return f"−{int(percento or 0)}%"
+    if (_valuta_soglia(valuta) or "eur") == "sats":
+        return f"−{_fmt_sats(int(valore_sats or 0))} sats"
+    return f"−{_fmt_sats(int(valore_eur or 0))} €"
+
+
+def _testo_invito_codice(nome: str, negozio: str, codice: str, cifra: str,
+                         scadenza: int) -> str:
+    """PURA: il messaggio dell'invito. Chi lo manda, il codice da
+    copiare, cosa toglie, fino a quando, il negozio a un tocco — e in
+    fondo come si dice basta, sempre."""
+    chi = html.escape(str(nome or "")) or "Un negozio"
+    testo = (f"🎟️ <b>{chi}</b> ti manda un codice sconto: hai già "
+             f"comprato nel suo negozio su Barattolo.\n\n"
+             f"Codice: <code>{html.escape(str(codice or ''))}</code> — "
+             f"{cifra} sugli articoli\n")
+    testo += (f"Valido fino al "
+              f"{time.strftime('%d/%m/%Y', time.localtime(int(scadenza)))}"
+              if scadenza else "Senza scadenza")
+    testo += "\nScrivilo alla cassa del negozio."
+    cod = re.sub(r"[^A-Za-z0-9_]", "", str(negozio or ""))
+    if cod:
+        testo += (f"\n\n<a href=\"{URL_PUBBLICO}/negozio/{cod}\">"
+                  f"🫙 Apri il suo negozio</a>")
+    testo += ("\n\n🔕 Non vuoi più offerte dai negozi? In Barattolo: "
+              "Profilo → «🔔 Avvisi».")
+    return testo
+
+
+@app.get("/api/me/codici-sconto/{codice_id}/clienti")
+async def clienti_codice_sconto(codice_id: int,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """Il foglio «📣 Condividi»: i clienti veri di chi chiede, visti da
+    UN suo codice. Proprieta' nella WHERE: il codice di un altro e' un
+    404, come se non esistesse."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    leve = _leve_inviti_codice()
+    if not leve["inviti"]:
+        raise HTTPException(409, "L'invito ai clienti è spento")
+    adesso = int(time.time())
+    con = db()
+    try:
+        r = con.execute("SELECT * FROM codici_sconto WHERE id=? AND venditore_id=?",
+                        (codice_id, user["id"])).fetchone()
+        if not r:
+            raise HTTPException(404, "Codice sconto non trovato")
+        vale = _codice_vale_ora(con, r, adesso)
+        clienti = _clienti_del_codice(con, user["id"], codice_id, adesso)
+    finally:
+        con.close()
+    return {"codice": r["codice"], "vale": vale,
+            "clienti": [_cliente_pubblico(c) for c in clienti], **leve}
+
+
+@app.post("/api/me/codici-sconto/{codice_id}/invita")
+async def invita_codice_sconto(codice_id: int, req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """«Invia invito sconto»: il payload porta i NUMERI D'ORDINE dei
+    clienti scelti ({"ordini": [...]}) e il server li incrocia con
+    l'elenco che rifa' da se'. Chi non e' invitabile adesso (gia'
+    invitato, invitato da poco, non cliente, numero inventato) si conta
+    fra i `saltati`; oltre CODICI_SCONTO_INVITI_MAX restano i `rimasti`,
+    invitabili al giro dopo. BEGIN IMMEDIATE: due «Invia» insieme su
+    due codici diversi non passano entrambi la cintura dei giorni."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    leve = _leve_inviti_codice()
+    if not leve["inviti"]:
+        raise HTTPException(409, "L'invito ai clienti è spento")
+    d = await leggi_json(req)
+    grezzi = d.get("ordini")
+    if not isinstance(grezzi, list) or not grezzi:
+        raise HTTPException(400, "Scegli almeno un cliente")
+    try:
+        scelti = {int(x) for x in grezzi}
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Clienti in formato sbagliato")
+    adesso = int(time.time())
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        r = con.execute("SELECT * FROM codici_sconto WHERE id=? AND venditore_id=?",
+                        (codice_id, user["id"])).fetchone()
+        if not r:
+            raise HTTPException(404, "Codice sconto non trovato")
+        if not _codice_vale_ora(con, r, adesso):
+            raise HTTPException(409, "Oggi questo codice non vale (scaduto, "
+                                     "finito o in pausa): rianimalo con ✏️ "
+                                     "prima di condividerlo.")
+        clienti = _clienti_del_codice(con, user["id"], codice_id, adesso)
+        buoni = [c for c in clienti if c["ordine"] in scelti and c["stato"] == "ok"]
+        tetto = leve["inviti_max"]
+        via = buoni[:tetto] if tetto > 0 else buoni
+        accodati = 0
+        for c in via:
+            accodati += con.execute(
+                "INSERT OR IGNORE INTO inviti_codice(codice_id, venditore_id, "
+                "tg_id, accodato, mandato) VALUES(?,?,?,?,0)",
+                (codice_id, user["id"], c["tg_id"], adesso)).rowcount
+        con.commit()
+    finally:
+        con.close()
+    if accodati:
+        print(f"📣 Invito del codice {codice_id}: {accodati} in coda "
+              f"(negozio {user['id']})", flush=True)
+        try:
+            asyncio.create_task(_giro_inviti_codice())
+        except Exception as e:
+            print(f"⚠️ Invito del codice {codice_id}: la coda partirà "
+                  f"col prossimo battito ({e})", flush=True)
+    return {"ok": True, "accodati": accodati,
+            "saltati": len(scelti) - len(buoni),
+            "rimasti": len(buoni) - len(via)}
+
+
+def _scarica_inviti_codice(con, adesso: int) -> list:
+    """Un lotto della coda, gia' SEGNATO come mandato prima del
+    messaggio: al piu' una volta, come la coda del mercatino — un
+    riavvio a meta' perde un invito, non ne raddoppia nessuno. Ogni
+    riga si RIGIUDICA qui: il cliente puo' aver detto basta e il codice
+    puo' essere morto (pausa, scadenza, eliminato) dopo l'«Invia».
+    Torna [(tg_id, testo, riga_del_journal)]. Committa."""
+    righe = con.execute(
+        "SELECT i.codice_id, i.tg_id, i.venditore_id, "
+        "COALESCE(u.offerte_negozi, 1) AS offerte, "
+        "EXISTS(SELECT 1 FROM inviti_codice_no n WHERE n.tg_id=i.tg_id "
+        "       AND n.venditore_id=i.venditore_id) AS zitto "
+        "FROM inviti_codice i LEFT JOIN utenti u ON u.tg_id=i.tg_id "
+        "WHERE i.mandato=0 ORDER BY i.accodato, i.codice_id, i.tg_id LIMIT ?",
+        (LOTTO_INVITI,)).fetchall()
+    fuori, codici, venditori = [], {}, {}
+    for x in righe:
+        cid, tg, vid = int(x["codice_id"]), int(x["tg_id"]), int(x["venditore_id"])
+        if cid not in codici:
+            c = con.execute("SELECT * FROM codici_sconto WHERE id=?", (cid,)).fetchone()
+            codici[cid] = (c, bool(c) and _codice_vale_ora(con, c, adesso))
+        c, vale = codici[cid]
+        if not vale or not int(x["offerte"]) or x["zitto"]:
+            con.execute("UPDATE inviti_codice SET mandato=1 WHERE codice_id=? "
+                        "AND tg_id=? AND mandato=0", (cid, tg))
+            continue
+        if vid not in venditori:
+            venditori[vid] = con.execute("SELECT nome, negozio FROM utenti "
+                                         "WHERE tg_id=?", (vid,)).fetchone()
+        v = venditori[vid]
+        testo = _testo_invito_codice(
+            v["nome"] if v else "", v["negozio"] if v else "", c["codice"],
+            _cifra_codice_testo(c["tipo"], c["percento"], c["valore_sats"],
+                                c["valore_eur"], c["valore_valuta"]),
+            int(c["scadenza"] or 0))
+        con.execute("UPDATE inviti_codice SET mandato=? WHERE codice_id=? "
+                    "AND tg_id=? AND mandato=0", (max(adesso, 2), cid, tg))
+        fuori.append((tg, testo, f"📣 Invito del codice {cid} a {tg}"))
+    con.commit()
+    return fuori
+
+
+async def _giro_inviti_codice():
+    """Svuota la coda degli inviti, un lotto alla volta, con
+    PAUSA_INVITI fra due messaggi. UN GIRO SOLO ALLA VOLTA: lo chiamano
+    l'«Invia» e l'orologio al minuto, e due giri insieme leggerebbero
+    lo stesso lotto (la segnatura prima del messaggio lo renderebbe
+    innocuo, ma il secondo giro romperebbe la pausa). A leva spenta non
+    parte niente: le righe aspettano in coda, e al giro dopo si
+    rigiudicano. Fail-open: ogni invio ha il suo try."""
+    global _INVITI_IN_GIRO
+    if _INVITI_IN_GIRO or not _leve_inviti_codice()["inviti"]:
+        return
+    _INVITI_IN_GIRO = True
+    try:
+        while True:
+            con = db()
+            try:
+                lotto = _scarica_inviti_codice(con, int(time.time()))
+            finally:
+                con.close()
+            if not lotto:
+                break
+            for tg_id, testo, riga in lotto:
+                try:
+                    esito = await notifica(tg_id, testo)
+                    print(f"{riga}: mandato ({esito})" if esito
+                          else f"{riga}: mandato", flush=True)
+                except Exception as e:
+                    print(f"⚠️ {riga}: SALTATO ({type(e).__name__}: {e})",
+                          flush=True)
+                await asyncio.sleep(PAUSA_INVITI)
+    finally:
+        _INVITI_IN_GIRO = False
+
+
+def _offerte_negozi_di(tg_id) -> dict:
+    """Per il cassetto Avvisi: l'interruttore «🎟️ Offerte dei negozi» e
+    i negozi che ti hanno GIA' mandato un codice (al massimo 50, dal
+    piu' recente), ognuno col suo 🔕. Il negozio esce col numero del
+    suo ultimo invito come maniglia, mai col tg_id. Fail-open: un
+    elenco che non si legge e' vuoto e l'interruttore resta acceso,
+    che e' lo stato di serie."""
+    try:
+        con = db()
+        try:
+            u = con.execute("SELECT offerte_negozi FROM utenti WHERE tg_id=?",
+                            (tg_id,)).fetchone()
+            righe = con.execute(
+                "SELECT MAX(i.codice_id) AS invito, MAX(i.mandato) AS quando, "
+                "COALESCE(v.nome,'') AS nome, "
+                "EXISTS(SELECT 1 FROM inviti_codice_no n WHERE n.tg_id=i.tg_id "
+                "       AND n.venditore_id=i.venditore_id) AS zitto "
+                "FROM inviti_codice i LEFT JOIN utenti v ON v.tg_id=i.venditore_id "
+                "WHERE i.tg_id=? AND i.mandato>1 GROUP BY i.venditore_id "
+                "ORDER BY quando DESC LIMIT 50", (tg_id,)).fetchall()
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Offerte dei negozi di {tg_id} illeggibili ({e}): elenco vuoto")
+        return {"offerte_negozi": True, "offerte_negozi_lista": []}
+    attive = True if (not u or u["offerte_negozi"] is None) else bool(u["offerte_negozi"])
+    return {"offerte_negozi": attive,
+            "offerte_negozi_lista": [{"invito": int(r["invito"]),
+                                      "nome": r["nome"] or "Un negozio",
+                                      "zitto": bool(r["zitto"])} for r in righe]}
+
+
+@app.post("/api/me/offerte-negozi")
+async def scegli_offerte_negozi(req: Request, x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """Il NO del cliente, in due misure: {"attive": false} spegne le
+    offerte di TUTTI i negozi; {"invito": <numero>, "zitto": true}
+    zittisce il negozio che ha mandato quell'invito (false lo
+    riaccende). NON dipende dalla leva: dire basta funziona sempre,
+    anche a invito spento. Il negozio si ritrova SOLO fra gli inviti
+    ricevuti da chi chiede: un numero altrui e' un 404."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        if "attive" in d:
+            con.execute("UPDATE utenti SET offerte_negozi=? WHERE tg_id=?",
+                        (1 if d.get("attive") else 0, user["id"]))
+        if d.get("invito") is not None:
+            try:
+                invito = int(d.get("invito"))
+            except (TypeError, ValueError):
+                raise HTTPException(400, "Negozio in formato sbagliato")
+            v = con.execute("SELECT venditore_id FROM inviti_codice "
+                            "WHERE codice_id=? AND tg_id=?",
+                            (invito, user["id"])).fetchone()
+            if not v:
+                raise HTTPException(404, "Negozio non trovato fra le tue offerte")
+            if d.get("zitto"):
+                con.execute("INSERT OR IGNORE INTO inviti_codice_no(tg_id, "
+                            "venditore_id, creato) VALUES(?,?,?)",
+                            (user["id"], v["venditore_id"], int(time.time())))
+            else:
+                con.execute("DELETE FROM inviti_codice_no WHERE tg_id=? AND "
+                            "venditore_id=?", (user["id"], v["venditore_id"]))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True, **_offerte_negozi_di(user["id"])}
 
 
 # --- Verifica della npub con una nota pubblica -----------------------
@@ -78794,6 +79266,14 @@ async def orologio_avvisi_mercatino():
             await _giro_avvisi_mercatino()
         except Exception as e:
             print(f"⚠️ Avvisi del mercatino: battito saltato "
+                  f"({type(e).__name__}: {e})", flush=True)
+        # GLI INVITI DEI CODICI SCONTO (14 nov 2026): l'«Invia» parte
+        # subito da solo; qui si riprende una coda rimasta a meta' (un
+        # riavvio, un giro saltato)
+        try:
+            await _giro_inviti_codice()
+        except Exception as e:
+            print(f"⚠️ Inviti dei codici sconto: battito saltato "
                   f"({type(e).__name__}: {e})", flush=True)
         # LA SCOPA DELLA CHAT DEGLI ORDINI (16 ott 2026): al minuto, e a
         # leva spenta pure — un ordine concluso da una strada che non

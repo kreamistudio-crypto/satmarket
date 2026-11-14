@@ -16974,6 +16974,34 @@
   girare la cifra) e UNA era una mutazione INERTE (`None or 0` dà lo
   stesso 0 del ramo che toglie).
 
+  L'INVITO DEL CODICE AI CLIENTI (14 nov 2026, cantiere
+  invito-codice-sconto): il SEGRETO resta un segreto, cambia solo chi lo
+  consegna — il venditore lo dà a chi vuole, e adesso «chi vuole» può
+  essere la lista dei suoi clienti, recapitata da Barattolo con
+  `notifica()`. «📣» sulla riga di un codice che oggi vale (e con
+  `codiciLeve.inviti`), il foglio dentro il cassetto, «Invia invito
+  sconto». ROTTE: `GET /api/me/codici-sconto/{id}/clienti`, `POST
+  …/{id}/invita` ({"ordini": [...]}), `POST /api/me/offerte-negozi`
+  ({"attive"} o {"invito", "zitto"}). TABELLE: `inviti_codice`
+  (chiave codice+cliente = una volta per codice, ed è anche la CODA:
+  `mandato` 0 / ora dell'invio / 1 consumata senza messaggio) e
+  `inviti_codice_no` (il no a un negozio); colonna
+  `utenti.offerte_negozi` (il no a tutti, 1 di serie).
+  I TRE PATTI DA NON ROMPERE. 1) Il venditore non vede MAI un contatto:
+  la maniglia del cliente è il numero del suo ultimo ordine, e il server
+  rifà sempre l'elenco (`_clienti_del_codice`) con la proprietà nella
+  WHERE — la scelta del telefono è un filtro, mai una fonte. Chi ha detto
+  no non compare nemmeno. 2) Cliente = almeno un ordine fuori da
+  `STATI_NON_CLIENTE` (`creato`, `annullato`). 3) Il codice si rigiudica
+  con `_codice_vale` della cassa all'Invia e a ogni riga della coda: un
+  codice in pausa o scaduto non parte. Le cinture: una volta per codice
+  (la chiave), un invito ogni `CODICI_SCONTO_INVITI_GIORNI` dallo stesso
+  negozio (`_stato_invito`), `CODICI_SCONTO_INVITI_MAX` per volta
+  (`rimasti`), Invia in BEGIN IMMEDIATE. La coda si svuota subito
+  (`_giro_inviti_codice`, un giro alla volta, `PAUSA_INVITI`) e la
+  riprende l'orologio al minuto degli avvisi del mercatino. Il no del
+  cliente non guarda la leva.
+
   LE PROMESSE DIVENTANO BADGE (ago 2026, decisione di Andrea): le due
   righe di prosa grigia passano a PILLOLE su tre superfici — scheda
   annuncio, «Altri oggetti», carrello. Erano righe che si leggono una

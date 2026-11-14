@@ -688,6 +688,14 @@ CODICI_SCONTO_MAX_USI = 100_000        # cintura contro il numero
 CODICI_SCONTO_TENTATIVI_ORA = 20  # il freno a chi prova a indovinare i
                                 # codici altrui: si consuma SOLO sui
                                 # tentativi sbagliati (0 = nessun freno)
+# L'invito del codice ai clienti (14 nov 2026): «📣 Condividi» sulla riga
+# del codice, il venditore sceglie fra chi ha gia' comprato da lui e
+# Barattolo recapita (bot, DM Nostr o avviso in app). ACCESO di serie.
+CODICI_SCONTO_INVITI = True       # False = niente tasto, la rotta dice 409
+CODICI_SCONTO_INVITI_GIORNI = 7   # al piu' un invito ogni N giorni dallo
+                                  # stesso negozio (0 = nessuna cintura)
+CODICI_SCONTO_INVITI_MAX = 200    # inviti per volta: gli altri restano
+                                  # invitabili al giro dopo
 
 # --- Suggerimenti dal bot --------------------------------------------
 # I consigli che il bot manda al venditore: cosa manca a un annuncio, e
