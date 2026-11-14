@@ -27547,9 +27547,15 @@ function applicaTema(){
   el('temaScuro')?.classList.toggle('active', temaScelto==='scuro');
   /* la levetta in testata mostra la destinazione: 🌙 quando il
      tocco porta al buio, ☀️ quando riporta alla luce */
+  /* ...SOLO LE LEVETTE, cioe' i `.tema-btn` con la `.tema-ico` dentro
+     (14 nov 2026 sera, cantiere mappa-ritocchi): anche i tondi delle
+     mappe sono `.tema-btn` (ne prendono la pelle), e senza questo filtro
+     il tondo del mercatino si chiamava «Passa al tema scuro» per chi
+     legge con la voce, e quello del P2P dopo ogni cambio di tema */
   document.querySelectorAll('.tema-btn').forEach(b=>{
     const ico = b.querySelector('.tema-ico');
-    if (ico) ico.textContent = scuro ? '☀️' : '🌙';
+    if (!ico) return;
+    ico.textContent = scuro ? '☀️' : '🌙';
     const dove = scuro ? 'Passa al tema chiaro' : 'Passa al tema scuro';
     b.title = dove; b.setAttribute('aria-label', dove);
   });
@@ -91558,7 +91564,7 @@ function idsMappaP2P(mostrati){
 function segnaVisteMappaP2P(mostrati){ segnaVisteMappa('p2p', idsMappaP2P(mostrati)); }
 function numerinoMappaP2P(){ alternaNumerinoMappa('p2p'); renderP2P(); }
 function rigaNumerinoMappaP2P(){
-  return rigaNumerinoMappa('p2p', 'Numerino sul tondo per le nuove offerte in contanti', 'numerinoMappaP2P');
+  return rigaNumerinoMappa('p2p', 'Notifiche nuove offerte in contanti', 'numerinoMappaP2P');
 }
 function tondoMappaP2P(mostrati){
   const ids = idsMappaP2P(mostrati);

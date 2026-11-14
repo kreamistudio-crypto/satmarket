@@ -83559,3 +83559,35 @@ nella coda di questo file, nessun simbolo in comune, e sopra il giro
 mirato `--dai-file` (533 sezioni), 27.302 passate e 0 rosse, e
 `collaudo_mappa_ritiro` verde. Le saltate sono le prove di nostr-tools,
 che la CI installa. Sale con la prossima promozione.
+
+## Gli altri due ritocchi delle mappe: la riga corta del P2P e l'etichetta dei tondi (14 nov 2026 sera, cantiere mappa-ritocchi, seconda passata, chiesta dalla coordinazione del progetto sulle due cose segnalate a fine della prima: «è lo stesso spirito della richiesta di Andrea», «le regole del progetto dicono di non rimandare i difetti»)
+
+LA RIGA CORTA DEL P2P. Come quella del mercatino: «Numerino sul tondo
+per le nuove offerte in contanti» diventa «Notifiche nuove offerte in
+contanti». Tappo (`sapere.md`) chiama l'interruttore col nome nuovo.
+
+L'ETICHETTA DEI TONDI, un difetto vecchio. `applicaTema` scriveva
+title e aria-label «Passa al tema scuro/chiaro» su OGNI `.tema-btn`, e i
+tondi delle mappe sono `.tema-btn` (ne prendono la pelle): il tondo del
+mercatino, che nasce nel markup prima dell'avvio, si chiamava «Passa al
+tema scuro» per chi legge con la voce; quello del P2P lo diventava dopo
+ogni cambio di tema (fino al ridisegno del libro). Adesso la funzione
+ritocca solo i `.tema-btn` con la `.tema-ico` dentro, cioè le levette.
+Scartato: togliere `.tema-btn` dai tondi (si perdeva la pelle comune, e
+le regole che le misurano nella riga del P2P).
+
+PROVE. In `prove_mappa_ritocchi`: la riga corta del P2P, e in node
+`applicaTema` vero con una levetta e un tondo finti (la levetta prende
+☀️ e la sua etichetta, il tondo resta «Mappa: …»). Controprove: rimesso
+il testo lungo e tolto il filtro, rosse tutt'e due; rimesso il codice,
+verdi. DAL VIVO (server in collaudo, Playwright 390×844): il tondo del
+mercatino si chiama «Mappa: 21 annunci col ritiro a mano» all'avvio e
+dopo il cambio di tema, le due lune diventano soli; quello del P2P resta
+«Mappa: 2 offerte in contanti di persona» dopo il cambio di tema, e la
+riga in fondo dice «🔢 Notifiche nuove offerte in contanti». Foto:
+`/mnt/project-files/mappa-ritocchi/6-p2p-riga-corta.png`.
+COSA È GIRATO SU QUALE ALBERO. Sopra develop `de3bdb54`, nel venv della
+CI senza coincurve: il giro mirato `--dai-file` (531 sezioni: p2p,
+mercatino, infrastruttura), 27.224 passate e 0 rosse; i collaudi di
+`ci/collaudi.txt`, 133 su 133. La saltata è nostr-tools, che la CI
+installa. Sale con la prossima promozione.
