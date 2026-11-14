@@ -315,8 +315,10 @@ avvisi sono accesi, vuota se spenti): apre un foglio dal basso con, in
 cima, il solo interruttore «🔔 Avvisami dei nuovi ordini P2P»
 (Spenti/Attivi, spento di serie); sotto «Tipo di ordini» («Vendita BTC»
 / «Acquisto BTC» / «Barattozon», a scelta multipla) e «Convenienza»
-(«Tutti» / «Solo se conveniente», e con la seconda le chip «A prezzo di
-mercato o meglio» / «Almeno 2% meglio» / «Almeno 5% meglio») — grigie e
+(«Tutti» / «Con un limite», e con la seconda le chip «Fino a 10%
+peggio» / «Fino a 5% peggio» / «Fino a 2% peggio» / «A prezzo di
+mercato o meglio» / «Almeno 2% meglio» / «Almeno 5% meglio»; dal 14 nov
+2026, prima era «Solo se conveniente» con le ultime tre) — grigie e
 non toccabili finché l'interruttore è spento —; in fondo una riga sola,
 «Arriva nella chat del bot Telegram» (chi entra da Telegram) o «Arriva
 come messaggio Nostr» (chi entra con Nostr). Lo stesso blocco sta nel

@@ -158,3 +158,9 @@ frase: Nel mercatino arriva la mappa del ritiro a mano: il tondo della mappa, ac
 dove: la home del mercatino (Esplora), il tondo della mappa accanto alla barra di ricerca.
 leva: MERCATINO_MAPPA_RITIRO (nuova, accesa di serie)
 pubblico: sì
+
+## 2026-11-14 · avvisi-sconvenienti
+frase: Gli avvisi dei nuovi ordini P2P ora si possono allargare anche agli ordini un po' meno convenienti del mercato: nella campanella, sotto «Convenienza», tocchi «Con un limite» e scegli fin dove ti va bene, da «Fino a 10% peggio» ad «Almeno 5% meglio». Così ti arrivano anche gli ordini quasi a mercato, ma non quelli troppo cari.
+dove: la scheda «P2P», la campanella 🔔 in alto (e il cassetto «🔔 Avvisi» del Profilo).
+leva: P2P_AVVISI_NUOVI_ORDINI (nessuna leva nuova)
+pubblico: sì

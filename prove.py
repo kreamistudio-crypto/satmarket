@@ -117787,10 +117787,11 @@ def prove_avvisi_nuovi_ordini():
     prova("la busta delle leve porta la leva e la finestra", (True, 15),
           (amb_l["_p2p_leve"]()["avvisiNuovi"], amb_l["_p2p_leve"]()["avvisiNuoviMinuti"]))
     soglie_srv = eval(re.search(r"\nSOGLIE_AVVISI_NUOVI_P2P = (\([^)]*\))", src).group(1))
-    soglie_cli = re.findall(r"\['(\d+)', '[^']+'\]",
+    soglie_cli = re.findall(r"\['(-?\d+)', '[^']+'\]",
                             m[m.index("const P2P_AVVISI_SOGLIE = ["):m.index("];", m.index("const P2P_AVVISI_SOGLIE = ["))])
-    prova("le tre chip della soglia sono le stesse nel server e nel client",
-          [("0", "2", "5"), ("0", "2", "5")], [soglie_srv, tuple(soglie_cli)])
+    # (14 nov 2026, cantiere avvisi-sconvenienti) le sei: tre sotto zero
+    prova("le sei chip della soglia sono le stesse nel server e nel client, dalla piu' larga",
+          [("-10", "-5", "-2", "0", "2", "5")] * 2, [soglie_srv, tuple(soglie_cli)])
     prova("il config d'esempio dichiara le due leve", True,
           "\nP2P_AVVISI_NUOVI_ORDINI = True\n" in cfg and "\nP2P_AVVISI_NUOVI_MINUTI = 15\n" in cfg)
     frasi = _senza_prosa(pezzo("_testo_avviso_nuovi_p2p"))
@@ -117819,11 +117820,15 @@ def prove_avvisi_nuovi_ordini():
           [SPENTO, SPENTO, SPENTO],
           [pref(None), pref({"tg_id": 1}),
            pref({"avvisi_nuovi_p2p": 0, "avvisi_nuovi_tipi": "", "avvisi_nuovi_soglia": ""})])
-    prova("le preferenze scritte si rileggono: tipi nell'ordine delle chip, soglia solo se e' una delle tre",
+    prova("le preferenze scritte si rileggono: tipi nell'ordine delle chip, soglia solo se e' una delle sei",
           [{"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "2", "rete": "", "valuta": ""},
            {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": ""}],
           [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_tipi": "|barattozon|vendita|", "avvisi_nuovi_soglia": "2"}),
            pref({"avvisi_nuovi_p2p": "1", "avvisi_nuovi_tipi": "|x|", "avvisi_nuovi_soglia": "7"})])
+    prova("...le tre sotto zero si rileggono, una sconosciuta (−7, −1) torna «tutti»",
+          ["-10", "-5", "-2", "", ""],
+          [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_soglia": v})["soglia"]
+           for v in ("-10", "-5", "-2", "-7", "-1")])
     # LA RETE (30 ott 2026, Andrea: «ricevere notifiche solo per onchain,
     # solo lightning o tutto»)
     prova("...la rete si rilegge se e' una delle due, sennò tutte",
@@ -117883,6 +117888,21 @@ def prove_avvisi_nuovi_ordini():
            passa(P(True, T3, "2"), "vendita", 2), passa(P(True, T3, "2"), "vendita", 1.9),
            passa(P(True, T3, "2"), "vendita", None), passa(P(True, T3, "0"), "vendita", 0),
            passa(P(True, T3, "0"), "vendita", -1)])
+    # (14 nov 2026, cantiere avvisi-sconvenienti, Andrea: «vedere anche gli
+    # ordini sconvenienti ma solo fino ad un 5% di sconvenienza») — la
+    # convenienza passa dal suo giudice, cosi' il verso del lato e' quello vero
+    prova("FINO A X% PEGGIO, nei due lati: con «−5» il −4 e il −5 passano, il −6 no; chi pubblica VENDE "
+          "a +4/+6 sul mercato (sfavorevole a chi compra), chi pubblica COMPRA a −4/−6; «−10» "
+          "prende il −10 e non il −11; l'ignota non passa nemmeno sotto zero",
+          [True, True, False, True, False, True, False, False],
+          [passa(P(True, T3, "-5"), "vendita", conv("sell", 4, 0, 0, 0)),
+           passa(P(True, T3, "-5"), "vendita", conv("sell", 5, 0, 0, 0)),
+           passa(P(True, T3, "-5"), "vendita", conv("sell", 6, 0, 0, 0)),
+           passa(P(True, T3, "-5"), "acquisto", conv("buy", -4, 0, 0, 0)),
+           passa(P(True, T3, "-5"), "acquisto", conv("buy", -6, 0, 0, 0)),
+           passa(P(True, T3, "-10"), "vendita", conv("sell", 10, 0, 0, 0)),
+           passa(P(True, T3, "-10"), "vendita", conv("sell", 11, 0, 0, 0)),
+           passa(P(True, T3, "-2"), "vendita", None)])
     testo = amb["_testo_avviso_nuovi_p2p"]
     LINK = '\n\n<a href="https://barattolo.store/p2p">🫙 Apri il libro ordini</a>'
     righe = [{"tipo": "vendita", "conv": 3.0, "euro": "50,00 €", "metodi": "SEPA"},
@@ -118193,6 +118213,15 @@ out.spentoChip = [chip.length, chip.filter(c => / disabled>$/.test(c)).length,
 INVII = []; scegliTipoAvvisiNuoviP2P('acquisto'); scegliSogliaAvvisiNuoviP2P('5');
 out.inviiSpento = INVII.length;
 out.normalizza = normalizzaAvvisiNuoviP2P({attivo: 1, tipi: ['barattozon', 'vendita', 'x'], soglia: '7'});
+// (14 nov 2026, cantiere avvisi-sconvenienti) le sei chip con «fino a 5%
+// peggio», e «Con un limite» che da «Tutti» parte dal mercato, non dal −10
+myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, soglia: '-5'});
+const peggio = contenutoAvvisiNuoviP2P();
+out.peggio = [attive(peggio).filter(a => a.indexOf('Soglia') >= 0),
+              ((peggio.split('avn-soglie')[1] || '').match(/>([^<]+)<\/button>/g) || [])
+                .map(x => x.slice(1, -9))];
+myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, soglia: ''});
+out.limiteParte = (contenutoAvvisiNuoviP2P().match(/onclick="(scegliSogliaAvvisiNuoviP2P\('[^']*'\))"[^>]*>Con un limite</) || [])[1];
 // LA RETE (30 ott 2026): la sezione solo a chi l'on-chain lo vede, una
 // scelta sola, e il gesto manda la rete al server
 myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, soglia: '', rete: 'onchain'});
@@ -118229,7 +118258,7 @@ console.log(JSON.stringify(out));
         return
     prova("LE DUE PORTE MOSTRANO LE STESSE PREFERENZE: la riga del cassetto e' il corpo del foglio", True,
           out["stessi"])
-    prova("«solo vendita, almeno 2% meglio»: accese la chip Vendita BTC, «Solo se conveniente» e «Almeno 2% meglio»",
+    prova("«solo vendita, almeno 2% meglio»: accese la chip Vendita BTC, «Con un limite» e «Almeno 2% meglio»",
           ["scegliTipoAvvisiNuoviP2P('vendita')", "scegliSogliaAvvisiNuoviP2P('2')", "scegliSogliaAvvisiNuoviP2P('2')"],
           out["attive"])
     prova("...l'interruttore dice «Attivi», la campana e' PIENA e arancio", (True, [True, True, True]),
@@ -118256,12 +118285,18 @@ console.log(JSON.stringify(out));
     prova("SPENTO DI SERIE: il corpo si spegne a vista, «Spenti», la campana VUOTA", [True, True, True, True],
           out["spento"])
     # (lo stato di serie ha la soglia «tutti»: le chip visibili sono le tre
-    # dei tipi, «Tutti» e «Solo se conveniente» — le tre della soglia
+    # dei tipi, «Tutti» e «Con un limite» — le sei della soglia
     # compaiono solo con la seconda; dal vivo, a soglia scelta, 8 su 8)
     prova("...e da spento le scelte NON si toccano: cinque chip, cinque `disabled`, il corpo "
           "aria-disabled, l'interruttore no", [5, 5, True, True], out["spentoChip"])
     prova("...e un gesto che arrivasse lo stesso non chiama il server", 0, out["inviiSpento"])
-    prova("il normalizzatore: tipi nell'ordine delle chip, soglia fuori dalle tre = «tutti»",
+    prova("FINO A 5% PEGGIO: accese «Con un limite» e «Fino a 5% peggio», e le sei chip in fila dalla piu' larga",
+          [["scegliSogliaAvvisiNuoviP2P('-5')", "scegliSogliaAvvisiNuoviP2P('-5')"],
+           ["Fino a 10% peggio", "Fino a 5% peggio", "Fino a 2% peggio", "A prezzo di mercato o meglio",
+            "Almeno 2% meglio", "Almeno 5% meglio"]], out["peggio"])
+    prova("...e da «Tutti» il tocco su «Con un limite» parte da «A prezzo di mercato o meglio», non dal −10",
+          "scegliSogliaAvvisiNuoviP2P('0')", out["limiteParte"])
+    prova("il normalizzatore: tipi nell'ordine delle chip, soglia fuori dalle sei = «tutti»",
           {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "", "rete": "", "valuta": ""},
           out["normalizza"])
     prova("LA RETE: la sezione solo a chi l'on-chain lo vede, accesa la scelta salvata, il "
