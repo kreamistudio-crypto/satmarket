@@ -27922,14 +27922,56 @@ function mostraTappa(){
   /* se il bersaglio non e' tutto in vista lo si porta al centro; il
      riflettore lo segue durante lo scroll (l'ascoltatore scroll
      chiama posizionaTour a ogni passo) */
-  const r = b.getBoundingClientRect();
-  if (!t.centro && (r.top < 0 || r.bottom > innerHeight))
-    b.scrollIntoView({block: 'center', behavior: tourRidotto() ? 'auto' : 'smooth'});
+  if (!t.centro) portaInLuceTour(b);
   /* posizionamento SUBITO, in sincrono: i rAF non battono nelle
      pagine in secondo piano, e il tour deve trovarsi pronto anche
      li'. Il doppio rAF resta come assestamento dopo lo scroll. */
   posizionaTour();
   requestAnimationFrame(() => requestAnimationFrame(posizionaTour));
+}
+/* IL TETTO DELLA VETRINA (14 nov 2026, cantiere tour-barattolino, dalla
+   foto di Andrea: «2 di 4», il cerchio arancio mezzo sopra la pillola
+   «Alimenti e bevande» e il barattolino nascosto). «In vista» non vuol
+   dire «dentro il vetro»: la testata e' appiccicata in cima e la barra
+   delle categorie le pende sotto, quindi un bersaglio puo' avere il
+   `top` positivo e stare SOTTO di loro. Succedeva alla seconda tappa:
+   la prima porta la card al centro dello schermo, il suo barattolino
+   (in alto nella foto) restava sotto la barra comparsa scorrendo, e il
+   «gia' in vista» di prima non scorreva. Qui si misura il pezzo di
+   schermo che nessuno copre — sotto testata e pillole della vista del
+   bersaglio (la stessa misura di scorriSottoHeader: l'altezza delle
+   pillole conta anche spente, perche' scorrendo compaiono), sopra la
+   nav del telefono — e se il bersaglio non ci sta tutto lo si porta al
+   centro DI QUEL PEZZO: i margini di scroll li legge lo scrollIntoView,
+   e il centro del riquadro allargato e' il centro dello spazio libero.
+   CHI VIVE DENTRO UN PEZZO FISSO (la testata stessa con la riga del
+   deposito e il tappo, la nav, un foglio) scorre con lui e nessuno gli
+   passa sopra: per lui il vetro intero, come prima. */
+function zonaLiberaTour(b){
+  let su = 0, giu = innerHeight, vista = null;
+  for (let n = b; n && n !== document.body; n = n.parentElement) {
+    const p = getComputedStyle(n).position;
+    if (p === 'fixed' || p === 'sticky') return {su, giu};
+    if (!vista && n.classList.contains('view')) vista = n;
+  }
+  const hdr = vista?.querySelector('header');
+  if (hdr) su = Math.max(0, hdr.getBoundingClientRect().bottom)
+              + (hdr.querySelector('.chips')?.offsetHeight || 0);
+  const nav = document.querySelector('nav');
+  if (nav && getComputedStyle(nav).position === 'fixed') {
+    const nr = nav.getBoundingClientRect();
+    if (nr.height && nr.top > innerHeight / 2) giu = Math.min(giu, nr.top);
+  }
+  return {su, giu};
+}
+function portaInLuceTour(b){
+  const r = b.getBoundingClientRect(), z = zonaLiberaTour(b);
+  if (r.top >= z.su && r.bottom <= z.giu) return;
+  b.style.scrollMarginTop = (z.su + 8) + 'px';
+  b.style.scrollMarginBottom = (innerHeight - z.giu + 8) + 'px';
+  b.scrollIntoView({block: 'center', behavior: tourRidotto() ? 'auto' : 'smooth'});
+  /* la meta lo scroll la fissa alla chiamata: i margini non servono piu' */
+  b.style.scrollMarginTop = b.style.scrollMarginBottom = '';
 }
 function posizionaTour(){
   if (!tourInCorso) return;

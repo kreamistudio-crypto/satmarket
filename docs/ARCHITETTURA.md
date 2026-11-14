@@ -7626,7 +7626,13 @@
   dopo)` tiene le tappe col bersaglio presente e risponde se e'
   partito; una tappa puo' avere `prima` (il giro passa da solo a
   «Vendi BTC»), `rett` e `raggio` (piu' elementi in un riflettore), e
-  il riflettore resta dentro lo schermo. Parte a pagina a fuoco:
+  il riflettore resta dentro lo schermo. IL TETTO (14 nov 2026): una
+  tappa porta il bersaglio dentro lo SPAZIO LIBERO, non dentro il vetro
+  (`portaInLuceTour` col giudice `zonaLiberaTour`): sotto la testata
+  appiccicata e le pillole che le pendono sotto (della vista del
+  bersaglio, le pillole contate anche spente), sopra la nav fissa del
+  telefono; chi vive in un pezzo fisso o appiccicato (la riga del
+  deposito, il tappo, un foglio) ha il vetro intero. Parte a pagina a fuoco:
   `chiudiTourP2P(poi)` passa il giro a `sfocaPaginaTourP2P`, che lo
   chiama a corsa finita (subito coi ridotti; un tour riaperto lo
   cancella). In automatico una volta (timbro `giro_p2p` in
