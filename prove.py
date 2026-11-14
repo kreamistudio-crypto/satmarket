@@ -189682,8 +189682,23 @@ def prove_mancia_venditore():
 
     amb = {"MANCIA_ATTIVA": True, "MANCIA_STATI": (
         "locked", "shipped", "delivered", "confirmed", "released")}
+    exec(pezzo("mancia_esito"), amb)
     exec(pezzo("mancia_ammessa"), amb)
     ok = amb["mancia_ammessa"]
+    es_ = amb["mancia_esito"]
+    # (14 nov 2026, mancia-senza-indirizzo) il terzo esito: tutto in
+    # regola ma chi vende non ha l'indirizzo → il riquadro lo dice
+    prova("senza indirizzo, tutto il resto in regola: «senza_indirizzo»",
+          "senza_indirizzo", es_("released", 111, 111, 222, ""))
+    prova("...anche con un indirizzo storto (senza @)", "senza_indirizzo",
+          es_("locked", 111, 111, 222, "lnurl1abc"))
+    prova("con l'indirizzo: «si»", "si", es_("locked", 111, 111, 222, "v@w.example"))
+    prova("chi vende senza indirizzo non diventa «senza»: «no»", "no",
+          es_("locked", 222, 111, 222, ""))
+    prova("un ordine annullato senza indirizzo: «no»", "no",
+          es_("annullato", 111, 111, 222, ""))
+    prova("a se stessi senza indirizzo: «no»", "no",
+          es_("locked", 111, 111, 111, ""))
     prova("ordine pagato, compratore, venditore con indirizzo: si'", True,
           ok("locked", 111, 111, 222, "v@w.example"))
     prova("anche a affare concluso", True,
@@ -189698,6 +189713,8 @@ def prove_mancia_venditore():
     prova("senza Lightning address no", False, ok("locked", 111, 111, 222, ""))
     amb["MANCIA_ATTIVA"] = False
     prova("a leva spenta no", False, ok("locked", 111, 111, 222, "v@w.example"))
+    prova("a leva spenta niente riquadro neanche senza indirizzo", "no",
+          es_("locked", 111, 111, 222, ""))
 
     amb = {"hashlib": _hl}
     exec(pezzo("preimage_giusta"), amb)
@@ -189784,6 +189801,13 @@ def prove_mancia_venditore():
           "fuori.vendeVuoto = pannelloMancia(Object.assign({}, o, {role:'seller',"
           " mancia:{possibile:false, mance:[]}}));\n"
           "fuori.admin = pannelloMancia(Object.assign({}, o, {role:'admin'}));\n"
+          "fuori.senza = pannelloMancia(Object.assign({}, o, {mancia:"
+          "{possibile:false, senza_indirizzo:true, mance:[]}}));\n"
+          "fuori.vendeSenza = pannelloMancia(Object.assign({}, o, {role:'seller',"
+          " mancia:{possibile:false, senza_indirizzo:true, mance:[]}}));\n"
+          "fuori.vendeSenzaMance = pannelloMancia(Object.assign({}, o, {role:'seller',"
+          " mancia:{possibile:false, senza_indirizzo:true,"
+          " mance:[{sats:700, stato:'arrivata'}]}}));\n"
           "fuori.niente = pannelloMancia({role:'buyer', mancia:null});\n"
           "fuori.grazie = pannelloMancia(Object.assign({}, o, {mancia:"
           "{possibile:false, mance:[{sats:500, stato:'arrivata'}]}}));\n"
@@ -189807,6 +189831,19 @@ def prove_mancia_venditore():
     prova("dopo la mancia, a chi compra il grazie", True,
           "Grazie per la mancia" in r.get("grazie", "")
           and "arrivata" in r.get("grazie", ""))
+    # (14 nov 2026, mancia-senza-indirizzo)
+    prova("venditore senza indirizzo: a chi compra il riquadro lo dice", True,
+          "non ha ancora un <b>indirizzo Lightning</b>" in r.get("senza", "")
+          and "Sato" in r.get("senza", "") and "<b>Sats" not in r.get("senza", ""))
+    prova("...col nome INTERO (soggetto della frase, non la prima parola)", True,
+          "Sato &lt;b>Sats</b> non ha" in r.get("senza", ""))
+    prova("...e il bottone non c'e'", False, "apriMancia" in r.get("senza", ""))
+    prova("a chi vende senza indirizzo: aggiungilo dal Profilo", True,
+          "apriCassettoProfilo('accLnAddress')" in r.get("vendeSenza", "")
+          and "apriMancia" not in r.get("vendeSenza", ""))
+    prova("...e le mance gia' ricevute restano", True,
+          "700" in r.get("vendeSenzaMance", "")
+          and "Aggiungilo dal Profilo" in r.get("vendeSenzaMance", ""))
 
 
 def prove_notifiche_telefono():

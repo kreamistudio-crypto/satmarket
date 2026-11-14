@@ -38379,17 +38379,34 @@ function pannelloMancia(o){
     ? `<div class="hint" style="margin:6px 0 0">${mance.map(x =>
         `🎁 <b class="mono">${fmt(x.sats)}</b> sats · ${fraseStatoMancia(x, vende)}`).join('<br>')}</div>`
     : '';
+  /* SENZA INDIRIZZO (14 nov 2026, mancia-senza-indirizzo): chi vende
+     non ha un Lightning address, e la mancia non avrebbe dove andare.
+     Il riquadro NON sparisce piu' (Andrea: «perché in alcuni ordini
+     vedo lascia una mancia e in altri no?»): a chi compra lo dice, a
+     chi vende ricorda che basta aggiungerlo dal Profilo. */
+  const senza = !!m.senza_indirizzo;
   if (vende) {
-    return mance.length
+    const ricevute = mance.length
       ? `<div class="trust-note">🎁 <span><b>${mance.length === 1 ? 'Hai ricevuto una mancia' : 'Hai ricevuto delle mance'}</b> per quest'ordine. Vanno dritte al tuo Lightning address: Barattolo non le tocca.${lista}</span></div>`
       : '';
+    const aggiungi = senza
+      ? `<div class="trust-note">🎁 <span>Chi compra da te può lasciarti una <b>mancia in sats</b>, ma senza un Lightning address non ha dove mandarla. <a href="#" style="color:inherit;font-weight:800" onclick="apriCassettoProfilo('accLnAddress');return false">Aggiungilo dal Profilo</a>: ti serve anche per incassare da solo.</span></div>`
+      : '';
+    return ricevute + aggiungi;
+  }
+  const primo = nomeVenditoreMancia(o);
+  const concluso = puoiLasciareFeedback(o);
+  if (!m.possibile && senza) {
+    /* qui il nome INTERO e non la prima parola: e' il soggetto della
+       frase, e un negozio di tre parole diventerebbe «Un non ha...» */
+    const intero = String(((o && o.voltoVenditore) || {}).nome || '');
+    return `<div class="payout" id="ordMancia"><h4>🎁 ${concluso ? 'Ti è piaciuto l\'affare?' : 'Vuoi lasciare una mancia?'}</h4>
+      <div class="hint">${intero ? '<b>' + esc(intero) + '</b>' : 'Il venditore'} non ha ancora un <b>indirizzo Lightning</b> nel profilo: per ora la mancia non si può mandare.</div>${lista}</div>`;
   }
   if (!m.possibile) {
     return mance.length
       ? `<div class="trust-note">🎁 <span><b>Grazie per la mancia!</b>${lista}</span></div>` : '';
   }
-  const primo = nomeVenditoreMancia(o);
-  const concluso = puoiLasciareFeedback(o);
   return `<div class="payout" id="ordMancia"><h4>🎁 ${concluso ? 'Ti è piaciuto l\'affare?' : 'Vuoi lasciare una mancia?'}</h4>
       <div class="hint">Un grazie in sats ${primo ? 'a <b>' + esc(primo) + '</b>' : 'al venditore'}: va dritto al suo wallet, Barattolo non prende niente.</div>${lista}
       <button class="btn ${concluso ? 'orange' : 'ghost'}" onclick="apriMancia()">🎁 Lascia una mancia</button></div>`;

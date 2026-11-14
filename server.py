@@ -107555,17 +107555,32 @@ def mancia_max_sats() -> int:
     return n if n >= MANCIA_MIN_SATS else MANCIA_MAX_SATS_SERIE
 
 
+def mancia_esito(stato: str, chi: int, compratore: int,
+                 venditore: int, ln_address: str) -> str:
+    """PURA, il giudice unico del riquadro, del bottone e della rotta:
+    la leva accesa, chi chiede e' il COMPRATORE di quell'ordine (e non
+    anche chi vende: un regalo a se stessi non e' un regalo), l'ordine e'
+    pagato e mai finito male → poi decide l'indirizzo di chi vende.
+      «si»               c'e' il Lightning address: il bottone compare;
+      «senza_indirizzo»  tutto in regola ma chi vende non ha l'indirizzo:
+                         non c'e' niente a cui chiedere la fattura, e il
+                         riquadro lo DICE invece di sparire (14 nov 2026,
+                         Andrea: «perché in alcuni ordini vedo lascia una
+                         mancia e in altri no?» — un riquadro che manca
+                         sembra un difetto, uno che spiega no);
+      «no»               tutto il resto: niente riquadro."""
+    if not (bool(MANCIA_ATTIVA)
+            and int(chi or 0) == int(compratore or 0) != int(venditore or 0)
+            and stato in MANCIA_STATI):
+        return "no"
+    return "si" if "@" in str(ln_address or "") else "senza_indirizzo"
+
+
 def mancia_ammessa(stato: str, chi: int, compratore: int,
                    venditore: int, ln_address: str) -> bool:
-    """PURA, il giudice unico del bottone e della rotta: la leva accesa,
-    chi chiede e' il COMPRATORE di quell'ordine (e non anche chi vende:
-    un regalo a se stessi non e' un regalo), l'ordine e' pagato e mai
-    finito male, e chi vende ha un Lightning address. Senza indirizzo
-    non c'e' niente a cui chiedere la fattura: il bottone non compare."""
-    return (bool(MANCIA_ATTIVA)
-            and int(chi or 0) == int(compratore or 0) != int(venditore or 0)
-            and stato in MANCIA_STATI
-            and "@" in str(ln_address or ""))
+    """La mancia si puo' chiedere davvero: il bottone e la rotta. Il
+    giudice e' `mancia_esito`; qui solo il suo «si»."""
+    return mancia_esito(stato, chi, compratore, venditore, ln_address) == "si"
 
 
 def _mance_prepara_tabella(con):
@@ -107620,6 +107635,11 @@ def mance_di_ordini(con, righe: list, user_id: int) -> None:
                  "il": m["pagata_il"] or m["creato"]})
     venditori = {r["venditore_id"] for r in righe
                  if r["compratore_id"] == user_id}
+    # (14 nov 2026, mancia-senza-indirizzo) anche il PROPRIO indirizzo di
+    # chi vende: senza, a lui un promemoria che chi compra potrebbe
+    # lasciargli una mancia. Esce il SE (a lui stesso), mai l'indirizzo.
+    if MANCIA_ATTIVA and any(r["venditore_id"] == user_id for r in righe):
+        venditori.add(user_id)
     indirizzi = {}
     if venditori and MANCIA_ATTIVA:
         lista = list(venditori)
@@ -107632,14 +107652,26 @@ def mance_di_ordini(con, righe: list, user_id: int) -> None:
         if user_id not in (r["compratore_id"], r["venditore_id"]):
             continue
         mance = per_ordine.get(r["id"], [])
-        possibile = (mancia_ammessa(r["stato"], user_id, r["compratore_id"],
-                                    r["venditore_id"],
-                                    indirizzi.get(r["venditore_id"], ""))
-                     and len(mance) < MANCIA_MAX_PER_ORDINE)
-        if not mance and not possibile:
+        indirizzo = indirizzi.get(r["venditore_id"], "")
+        if r["venditore_id"] == user_id:
+            # chi vende: il riquadro di chi compra visto dall'altro lato,
+            # cioe' «senza indirizzo» se l'ordine e' da mancia ma il suo
+            # Lightning address manca (per sapere SE, non per chiederla)
+            senza = (bool(MANCIA_ATTIVA) and r["stato"] in MANCIA_STATI
+                     and r["compratore_id"] != user_id
+                     and "@" not in str(indirizzo or ""))
+            possibile = False
+        else:
+            esito = mancia_esito(r["stato"], user_id, r["compratore_id"],
+                                 r["venditore_id"], indirizzo)
+            possibile = (esito == "si"
+                         and len(mance) < MANCIA_MAX_PER_ORDINE)
+            senza = esito == "senza_indirizzo"
+        if not mance and not possibile and not senza:
             continue
         r["mancia"] = {"possibile": possibile, "max": mancia_max_sats(),
                        "zap_barattolo": bool(possibile and zap_casa),
+                       "senza_indirizzo": senza,
                        "mance": mance}
 
 
