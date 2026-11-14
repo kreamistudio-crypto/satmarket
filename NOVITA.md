@@ -212,3 +212,9 @@ frase: La card del prezzo di bitcoin in cima al libro P2P ha una veste nuova, sc
 dove: la scheda «P2P», in cima al libro degli ordini (Compra BTC e Vendi BTC).
 leva: nessuna
 pubblico: sì
+
+## 2026-11-14 · mappa-ritocchi
+frase: Il tondo delle mappe, nel P2P e nel mercatino, ora ha l'icona colorata 🗺️. E quando tocchi una città sulla mappa, la pagina scende da sola alle sue offerte o ai suoi annunci, senza doverli cercare sotto la mappa.
+dove: la scheda «P2P» (il tondo 🗺️ accanto alla campanella) e l'Esplora del mercatino (il tondo 🗺️ in fondo alla barra di ricerca); un tocco su un pallino della mappa.
+leva: nessuna
+pubblico: sì

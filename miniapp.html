@@ -3902,7 +3902,7 @@
      cerchietto della campanella, spento grigio e acceso arancio come
      lei. Classi DI CASA (senza p2p): le usa anche la mappa del mercatino */
   .mappa-tondo{position:relative;color:var(--muted)}
-  .mappa-tondo svg{display:block}
+  .mappa-tondo-ico{display:block;font-size:17px;line-height:1}
   .mappa-tondo.acceso{color:var(--sats);border-color:var(--sats)}
   /* ...e il numerino A RICHIESTA (spento di serie, l'interruttore sta in
      fondo alla mappa): un bollino arancio sul bordo in alto a destra, col
@@ -91515,10 +91515,16 @@ function alternaNumerinoMappa(nome){
    pezzi qui sopra e le classi `.mappa-tondo`, `.mappa-tondo-conto`,
    `.mappa-numerino`, `.mappa-interr` — e chi la usa li richiama, non li
    copia. */
+/* L'ICONA E' LA MAPPA COLORATA 🗺️ (14 nov 2026 sera, cantiere
+   mappa-ritocchi, Andrea provando la produzione: «l'icona della mappa
+   della P2P e del mercatino mi piace di più come era prima nelle bozze e
+   cioè colorata»): quella delle prime anteprime del mercatino, al posto
+   della mappa piegata a tratto. Un'emoji come la luna accanto, quindi
+   colorata nei due temi senza tinte da tenere in pari; la classe e' sua
+   e NON `.tema-ico`, che `applicaTema` riscrive in 🌙/☀️ su ogni
+   `.tema-btn` che trova. */
 function iconaMappaTonda(){
-  return '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"'
-    + ' stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round">'
-    + '<path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Z"/><path d="M9 4v14M15 6v14"/></svg>';
+  return '<span class="mappa-tondo-ico" aria-hidden="true">🗺️</span>';
 }
 /* IL TONDO: `aperta` lo veste d'arancio e spegne il numerino (la mappa
    la si sta guardando); `ids` sono quelli sulla mappa adesso, `quante`
@@ -91676,6 +91682,26 @@ function toccaGrappoloMappaP2P(i){
 function sceltaMappaP2P(nome){
   p2pMappaComune = nome || '';
   renderP2P();
+  if (p2pMappaComune) scorriAlleOfferteMappaP2P();
+}
+/* IL TOCCO SU UNA CITTA' PORTA ALLE SUE CARD (14 nov 2026 sera, cantiere
+   mappa-ritocchi, Andrea: «quando clicco su una regione in automatico
+   l'app scorre in basso verso gli annunci del mercatino o del p2p»): la
+   mappa e' alta quasi uno schermo, e le offerte del comune scelto
+   restavano sotto, fuori vista. La prima card e' quel che segue la
+   scatola della mappa; arriva SOTTO la testata appesa (tab, pillole e
+   tondi), misurata con l'ALTEZZA e non col bottom, come fa
+   `scorriSottoHeader` per l'Esplora. Togliere il comune (la pillola ✕,
+   o il secondo tocco) non sposta niente. */
+function scorriAlleOfferteMappaP2P(){
+  const mappa = el('p2pMappa');
+  const card = mappa && mappa.nextElementSibling;
+  if (!card) return;
+  const appesa = document.querySelector('#view-p2p .p2p-sticky');
+  const sotto = (appesa ? appesa.offsetHeight : 0) + 8;
+  window.scrollTo({
+    top: Math.max(0, scrollY + card.getBoundingClientRect().top - sotto),
+    behavior: tourRidotto() ? 'auto' : 'smooth'});
 }
 function apriChiudiMappaP2P(){
   p2pMappaAperta = !p2pMappaAperta;
@@ -91928,7 +91954,7 @@ function renderMappaMerc(){
     + 'il posto esatto lo decidete in chat.' + (senza ? ' ' + senza + (senza === 1
       ? ' annuncio col ritiro ha una zona che la mappa non riconosce: lo trovi qui sotto.'
       : ' annunci col ritiro hanno una zona che la mappa non riconosce: li trovi qui sotto.') : '')
-    + '</div>' + rigaNumerinoMappa('mercatino', 'Numerino sul tondo per i nuovi annunci col ritiro a mano',
+    + '</div>' + rigaNumerinoMappa('mercatino', 'Notifiche nuovi annunci col ritiro a mano',
       'numerinoMappaMerc') + '</div>';
   box.innerHTML = h;
   disegnaMappaMerc();
@@ -91996,16 +92022,23 @@ function toccaGrappoloMappaMerc(i){
 }
 /* la griglia la decide il server (solo_ritiro e comune nella richiesta):
    si ricarica la prima pagina, e la mappa resta quella che c'e' */
-function ricaricaGrigliaMappaMerc(){
+function ricaricaGrigliaMappaMerc(poi){
   renderMappaMerc();
-  if (DEMO) { renderGrid(); return; }
-  loadListings().then(() => { renderGrid(); renderMappaMerc(); })
+  if (DEMO) { renderGrid(); if (poi) poi(); return; }
+  loadListings().then(() => { renderGrid(); renderMappaMerc(); if (poi) poi(); })
     .catch(() => renderGrid());
 }
+/* ...e qui le card sono la griglia, che arriva dal server: si scorre
+   QUANDO c'e' (prima sarebbe la griglia di prima), sotto l'header e le
+   pillole appese (`scorriSottoHeader`, il giudice dell'Esplora), e solo
+   se nel frattempo non si e' toccata un'altra citta' (14 nov 2026 sera,
+   mappa-ritocchi: vedi `scorriAlleOfferteMappaP2P`) */
 function sceltaMappaMerc(nome){
   haptic();
   mercMappaComune = nome || '';
-  ricaricaGrigliaMappaMerc();
+  const scelto = mercMappaComune;
+  ricaricaGrigliaMappaMerc(scelto
+    ? () => { if (mercMappaComune === scelto) scorriSottoHeader(el('grid')); } : null);
 }
 function apriChiudiMappaMerc(){
   haptic();
