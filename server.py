@@ -8235,7 +8235,9 @@ def init_db():
         -- poggia sopra. Tiene ANDAMENTO_GIORNI di storia, il resto si
         -- pota a ogni scrittura.
         ora INTEGER PRIMARY KEY,      -- unix dell'inizio dell'ora (UTC)
-        eur REAL DEFAULT 0            -- euro per BTC
+        eur REAL DEFAULT 0,           -- euro per BTC
+        usd REAL DEFAULT 0            -- dollari per BTC (14 nov 2026: il
+                                      -- tocco sul simbolo passa a $)
     );
     CREATE TABLE IF NOT EXISTS pagamenti(
         -- IL PRIMO INCASSO CHE BARATTOLO FA PER SE' (ago 2026, la
@@ -9054,6 +9056,12 @@ def init_db():
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # il dollaro dell'andamento (14 nov 2026, cantiere prezzo-btc-p2p): la
+    # tabella e' nata il 13 col solo euro, sul collaudo
+    try:
+        con.execute("ALTER TABLE cambio_ore ADD COLUMN usd REAL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # la firma delle chiavi P2P (1 ott 2026, M5): vedi lo schema
     for colonna in ("firmata INTEGER DEFAULT 0", "firmata_il INTEGER DEFAULT 0"):
         try:
@@ -15958,7 +15966,7 @@ async def _rileggi_cambio() -> bool:
     _salva_cambio(valori, adesso)
     # ...e l'ora di adesso nell'andamento della card del libro P2P (13 nov
     # 2026, cantiere prezzo-btc-p2p): la stessa lettura, nessuna domanda in piu'
-    _segna_andamento(valori["eur"], adesso)
+    _segna_andamento(valori["eur"], valori.get("usd", 0.0), adesso)
     return True
 
 
@@ -16093,7 +16101,14 @@ async def scalda_cambio():
 # fra un'ora, e intanto vale quel che c'e'.
 # UN PERIODO SENZA STORIA NON SI MANDA: la card mostra il solo prezzo
 # (niente linea inventata, niente percentuale su mezza giornata).
+# E IN DOLLARI (14 nov 2026, Andrea: «quando clicco sul simbolo euro deve
+# switchare in usd»): la stessa riga dell'ora tiene anche il dollaro della
+# stessa lettura, e la serie va in due, `{"eur": {...}, "usd": {...}}`:
+# la percentuale in dollari e' quella del dollaro, non l'euro riconvertito
+# (il cambio euro/dollaro si muove anche lui). Il backfill chiede le
+# valute che hanno la storia corta, una GET ciascuna.
 ANDAMENTO_GIORNI = 31
+ANDAMENTO_VALUTE = ("eur", "usd")
 ANDAMENTO_PERIODI = {"24h": 86400, "7g": 7 * 86400, "30g": 30 * 86400}
 ANDAMENTO_PASSI = {"24h": 3 * 3600, "7g": 86400, "30g": 3 * 86400}
 ANDAMENTO_BUCO_S = 3 * 3600      # un campione cerca la sua ora fin qui indietro
@@ -16138,9 +16153,13 @@ def serie_andamento(ore: dict, adesso: float, eur_ora: float) -> dict:
 
 
 def _ore_salvate(con, adesso: float) -> dict:
-    return {int(r["ora"]): float(r["eur"] or 0) for r in con.execute(
-        "SELECT ora, eur FROM cambio_ore WHERE ora>=?",
-        (int(adesso) - ANDAMENTO_GIORNI * 86400,))}
+    """{valuta: {inizio_ora: valore}} degli ultimi ANDAMENTO_GIORNI."""
+    fuori = {v: {} for v in ANDAMENTO_VALUTE}
+    for r in con.execute("SELECT ora, eur, usd FROM cambio_ore WHERE ora>=?",
+                         (int(adesso) - ANDAMENTO_GIORNI * 86400,)):
+        for v in ANDAMENTO_VALUTE:
+            fuori[v][int(r["ora"])] = float(r[v] or 0)
+    return fuori
 
 
 def ricalcola_andamento(adesso: float = None) -> None:
@@ -16153,18 +16172,27 @@ def ricalcola_andamento(adesso: float = None) -> None:
         con.close()
     except Exception:
         return
-    _andamento_cache["serie"] = serie_andamento(ore, adesso, cambio_noto_ora())
+    serie = {}
+    for v in ANDAMENTO_VALUTE:
+        una = serie_andamento(ore[v], adesso, cambio_noto_ora(v))
+        if una:
+            serie[v] = una
+    _andamento_cache["serie"] = serie
 
 
-def _segna_andamento(eur: float, quando: float) -> None:
-    """L'euro di questa lettura nella riga della sua ora, la potatura
-    del troppo vecchio, il ricalcolo. Fail-open totale, come `_salva_cambio`."""
+def _segna_andamento(eur: float, usd: float, quando: float) -> None:
+    """L'euro e il dollaro di questa lettura nella riga della sua ora, la
+    potatura del troppo vecchio, il ricalcolo. Fail-open totale, come
+    `_salva_cambio`. Senza euro non si scrive niente (e' l'euro che
+    comanda la lettura); un dollaro mancante resta 0, cioe' un buco."""
     if eur <= 0:
         return
     try:
         con = db()
-        con.execute("INSERT OR REPLACE INTO cambio_ore(ora, eur) VALUES(?, ?)",
-                    (int(quando) // 3600 * 3600, float(eur)))
+        con.execute("INSERT OR REPLACE INTO cambio_ore(ora, eur, usd) "
+                    "VALUES(?, ?, ?)",
+                    (int(quando) // 3600 * 3600, float(eur),
+                     float(usd) if usd and usd > 0 else 0.0))
         con.execute("DELETE FROM cambio_ore WHERE ora<?",
                     (int(quando) - ANDAMENTO_GIORNI * 86400,))
         con.commit()
@@ -16185,8 +16213,10 @@ def storia_andamento_corta(ore: dict, adesso: float) -> bool:
 async def riempi_andamento() -> None:
     """IL BACKFILL dei 30 giorni, una volta per processo se serve (vedi
     sopra). Chiamato dal giro del cambio: al primo colpo, e dopo un buco
-    non prima di ANDAMENTO_RIEMPI_RIPROVA_S. Riempie solo le ore vuote
-    (INSERT OR IGNORE): le letture vere di questo server vincono."""
+    non prima di ANDAMENTO_RIEMPI_RIPROVA_S. Per ogni valuta con la storia
+    corta una GET a ore, e si riempiono solo le ore VUOTE di quella valuta
+    (l'upsert tocca la colonna solo se e' a zero): le letture vere di
+    questo server vincono."""
     adesso = time.time()
     if _andamento_cache["riempito"]:
         return
@@ -16195,39 +16225,53 @@ async def riempi_andamento() -> None:
     _andamento_cache["tentato"] = adesso
     try:
         con = db()
-        corta = storia_andamento_corta(_ore_salvate(con, adesso), adesso)
+        ore = _ore_salvate(con, adesso)
         con.close()
     except Exception:
         return
-    if not corta:
+    corte = [v for v in ANDAMENTO_VALUTE if storia_andamento_corta(ore[v], adesso)]
+    riuscite = 0
+    for valuta in corte:
+        try:
+            async with httpx.AsyncClient(timeout=20) as c:
+                r = await c.get(
+                    "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
+                    # 31 giorni e non 30 (14 nov 2026, Andrea sul collaudo:
+                    # «quando clicco c'e' solo 24 ore e 7 giorni, manca 1
+                    # mese»): CoinGecko parte ESATTAMENTE da 30 giorni fa,
+                    # qualche minuto dopo l'inizio dell'ora, e il primo
+                    # campione dei 30 giorni cerca un'ora a o PRIMA di quel
+                    # momento: per la prima ora dopo il backfill non la
+                    # trovava, e il periodo non si offriva. Un giorno di
+                    # margine, a ore come gli altri (CoinGecko da' le ore
+                    # fino a 90 giorni).
+                    params={"vs_currency": valuta, "days": ANDAMENTO_GIORNI})
+                r.raise_for_status()
+                prezzi = r.json().get("prices", [])
+        except Exception as e:
+            print(f"⚠️ Andamento del prezzo: storico a ore in {valuta} non "
+                  f"scaricato: {e}", flush=True)
+            continue
+        try:
+            con = db()
+            for ts_ms, prezzo in prezzi:
+                if prezzo and float(prezzo) > 0:
+                    con.execute(
+                        f"INSERT INTO cambio_ore(ora, {valuta}) VALUES(?, ?) "
+                        f"ON CONFLICT(ora) DO UPDATE SET {valuta}=excluded.{valuta} "
+                        f"WHERE COALESCE(cambio_ore.{valuta}, 0) <= 0",
+                        (int(ts_ms / 1000) // 3600 * 3600, float(prezzo)))
+            con.commit()
+            con.close()
+        except Exception:
+            continue
+        riuscite += 1
+        print(f"📈 Andamento del prezzo: storico a ore in {valuta} scaricato "
+              f"({len(prezzi)} punti)", flush=True)
+    if riuscite == len(corte):
         _andamento_cache["riempito"] = True
-        return
-    try:
-        async with httpx.AsyncClient(timeout=20) as c:
-            r = await c.get(
-                "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
-                params={"vs_currency": "eur", "days": 30})
-            r.raise_for_status()
-            prezzi = r.json().get("prices", [])
-    except Exception as e:
-        print(f"⚠️ Andamento del prezzo: storico a ore non scaricato: {e}",
-              flush=True)
-        return
-    try:
-        con = db()
-        for ts_ms, prezzo in prezzi:
-            if prezzo and float(prezzo) > 0:
-                con.execute("INSERT OR IGNORE INTO cambio_ore(ora, eur) "
-                            "VALUES(?, ?)",
-                            (int(ts_ms / 1000) // 3600 * 3600, float(prezzo)))
-        con.commit()
-        con.close()
-    except Exception:
-        return
-    _andamento_cache["riempito"] = True
-    ricalcola_andamento()
-    print(f"📈 Andamento del prezzo: storico a ore scaricato "
-          f"({len(prezzi)} punti)", flush=True)
+    if riuscite:
+        ricalcola_andamento()
 
 
 @app.get("/api/cambio")

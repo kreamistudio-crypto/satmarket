@@ -34116,7 +34116,7 @@ def prove_cambio():
                                "quando": quando, "tentato": 0.0},
              # l'andamento della card del libro (13 nov 2026, cantiere
              # prezzo-btc-p2p) ha la sua sezione, `prove_prezzo_btc_libro`
-             "_segna_andamento": lambda eur, quando: None}
+             "_segna_andamento": lambda *a: None}
         for f in ("_cambio_valido", "_salva_cambio", "cambio_noto_ora",
                   "cambio_per_import", "carica_cambio_salvato"):
             exec(pezzo(f), a)
@@ -157132,8 +157132,8 @@ def prove_prezzo_btc_libro():
 
     # --- 1) IL SERVER ------------------------------------------------------
     amb = {"time": __import__("time")}
-    for riga in ("ANDAMENTO_GIORNI", "ANDAMENTO_PERIODI", "ANDAMENTO_PASSI",
-                 "ANDAMENTO_BUCO_S"):
+    for riga in ("ANDAMENTO_GIORNI", "ANDAMENTO_VALUTE", "ANDAMENTO_PERIODI",
+                 "ANDAMENTO_PASSI", "ANDAMENTO_BUCO_S"):
         m = re.search(r"\n(%s = [^\n]+)\n" % riga, src)
         exec(m.group(1), amb)
     for f in ("serie_andamento", "storia_andamento_corta"):
@@ -157175,46 +157175,90 @@ def prove_prezzo_btc_libro():
         def close(self): pass
     cache = {"serie": {}, "riempito": False, "tentato": 0.0}
     amb.update({"db": _Con, "_andamento_cache": cache,
-                "cambio_noto_ora": lambda v="eur": 95000.0})
+                "cambio_noto_ora": lambda v="eur": {"eur": 95000.0, "usd": 110000.0}[v]})
     for f in ("_ore_salvate", "ricalcola_andamento", "_segna_andamento"):
         exec(pezzo(f), amb)
     segna = amb["_segna_andamento"]
     for minuto in range(5):
-        segna(94000.0 + minuto, ADESSO + minuto * 60)
-    righe = vero.execute("SELECT ora, eur FROM cambio_ore").fetchall()
+        segna(94000.0 + minuto, 109000.0 + minuto, ADESSO + minuto * 60)
+    righe = vero.execute("SELECT ora, eur, usd FROM cambio_ore").fetchall()
     prova("cinque letture nella stessa ora: UNA riga, all'inizio dell'ora, con "
-          "l'ultima lettura", [(ADESSO // 3600 * 3600, 94004.0)],
-          [(r["ora"], r["eur"]) for r in righe])
+          "l'ultima lettura, euro e dollaro", [(ADESSO // 3600 * 3600, 94004.0, 109004.0)],
+          [(r["ora"], r["eur"], r["usd"]) for r in righe])
     vero.execute("INSERT INTO cambio_ore(ora, eur) VALUES(?, ?)",
                  (ADESSO - 40 * 86400, 1.0))
-    segna(94100.0, ADESSO + 3600)
+    segna(94100.0, 0, ADESSO + 3600)
+    prova("...un dollaro mancante resta un buco (0), l'euro si scrive lo stesso",
+          (94100.0, 0.0), tuple(vero.execute(
+              "SELECT eur, usd FROM cambio_ore WHERE ora=?",
+              (ADESSO // 3600 * 3600 + 3600,)).fetchone()))
     prova("...la riga piu' vecchia di ANDAMENTO_GIORNI si pota alla scrittura dopo", 0,
           vero.execute("SELECT COUNT(*) FROM cambio_ore WHERE ora<?",
                        (ADESSO - 31 * 86400,)).fetchone()[0])
     prova("...e la serie in memoria si ricalcola: con due ore di storia nessun periodo", {},
           cache["serie"])
     for h in range(1, 26):
-        vero.execute("INSERT OR IGNORE INTO cambio_ore(ora, eur) VALUES(?, ?)",
-                     (ADESSO // 3600 * 3600 - h * 3600, 93000.0))
-    segna(94200.0, ADESSO + 3600)
-    prova("...con 25 ore il periodo delle 24 c'e', e finisce sul cambio di adesso",
-          [True, 95000], ["24h" in cache["serie"], (cache["serie"].get("24h") or [0])[-1]])
+        vero.execute("INSERT OR IGNORE INTO cambio_ore(ora, eur, usd) VALUES(?, ?, ?)",
+                     (ADESSO // 3600 * 3600 - h * 3600, 93000.0, 108000.0))
+    segna(94200.0, 109200.0, ADESSO + 3600)
+    eu, us = cache["serie"].get("eur") or {}, cache["serie"].get("usd") or {}
+    prova("...con 25 ore il periodo delle 24 c'e' in euro e in dollari, e ognuno finisce "
+          "sul SUO cambio di adesso", [True, 95000, True, 110000, 93000, 108000],
+          ["24h" in eu, (eu.get("24h") or [0])[-1], "24h" in us, (us.get("24h") or [0])[-1],
+           (eu.get("24h") or [0])[0], (us.get("24h") or [0])[0]])
     prova("una lettura a zero non scrive niente", 27,
-          (segna(0, ADESSO + 7200), vero.execute("SELECT COUNT(*) FROM cambio_ore").fetchone()[0])[1])
+          (segna(0, 0, ADESSO + 7200), vero.execute("SELECT COUNT(*) FROM cambio_ore").fetchone()[0])[1])
+    prova("il dollaro arriva anche ai database nati il 13 col solo euro "
+          "(ALTER TABLE nelle migrazioni)", 1,
+          src.count('con.execute("ALTER TABLE cambio_ore ADD COLUMN usd REAL DEFAULT 0")'))
 
+    # IL MESE CHE MANCAVA (14 nov 2026, Andrea sul collaudo: «c'e' solo 24
+    # ore e 7 giorni, manca 1 mese»): lo storico di CoinGecko a 30 giorni
+    # parte da 30 giorni fa piu' qualche minuto, e il primo campione dei 30
+    # giorni cerca un'ora a o prima di quel momento — senza margine il
+    # periodo non c'era. Con 31 giorni c'e'.
+    T0 = ADESSO // 3600 * 3600 + 3540          # un minuto prima dell'ora dopo
+    def da_coingecko(giorni):
+        prima = T0 - giorni * 86400 + 300      # il primo punto: 5 minuti dopo
+        return {int(t) // 3600 * 3600: 70000.0
+                for t in range(prima, T0, 3600)}
+    prova("lo storico a 30 giorni appena scaricato lascia fuori il mese (il difetto); "
+          "a ANDAMENTO_GIORNI (31) no", [False, True],
+          ["30g" in serie(da_coingecko(30), T0 + 5, 71000.0),
+           "30g" in serie(da_coingecko(amb["ANDAMENTO_GIORNI"]), T0 + 5, 71000.0)])
     rm = codice(pezzo("riempi_andamento"))
-    prova("il backfill riempie le SOLE ore vuote (INSERT OR IGNORE: le letture vere "
-          "vincono), una volta, e riprova non prima di un'ora", [True, False, True, True],
-          ["INSERT OR IGNORE INTO cambio_ore" in rm, "INSERT OR REPLACE" in rm,
+    prova("...e il backfill chiede ANDAMENTO_GIORNI, non 30, per ogni valuta con la "
+          "storia corta", [True, False, True],
+          ['params={"vs_currency": valuta, "days": ANDAMENTO_GIORNI})' in rm,
+           '"days": 30' in rm,
+           "corte = [v for v in ANDAMENTO_VALUTE if storia_andamento_corta(ore[v], adesso)]" in rm])
+    prova("il backfill riempie le SOLE ore vuote della sua valuta (l'upsert tocca la "
+          "colonna solo se e' a zero: le letture vere vincono), una volta, e riprova non "
+          "prima di un'ora", [True, False, True, True],
+          ['f"WHERE COALESCE(cambio_ore.{valuta}, 0) <= 0",' in rm, "INSERT OR REPLACE" in rm,
            'if _andamento_cache["riempito"]:' in rm,
            'adesso - _andamento_cache["tentato"] < ANDAMENTO_RIEMPI_RIPROVA_S' in rm])
+    # l'upsert vero, su un database di cartone: l'ora con l'euro gia' letto
+    # riceve il solo dollaro, l'euro resta quello vero
+    vero.execute("DELETE FROM cambio_ore")
+    vero.execute("INSERT INTO cambio_ore(ora, eur, usd) VALUES(3600, 90000, 0)")
+    upsert = re.search(r'f"INSERT INTO cambio_ore\(ora, \{valuta\}\) VALUES\(\?, \?\) "\n\s*'
+                       r'f"(ON CONFLICT[^"]*) "\n\s*f"(WHERE[^"]*)",', pezzo("riempi_andamento"))
+    if upsert:
+        for valuta, ora, valore in (("usd", 3600, 104000.0), ("eur", 3600, 1.0), ("eur", 7200, 91000.0)):
+            vero.execute(("INSERT INTO cambio_ore(ora, {v}) VALUES(?, ?) " + upsert.group(1)
+                          + " " + upsert.group(2)).replace("{valuta}", valuta).replace("{v}", valuta),
+                         (ora, valore))
+    prova("...l'upsert vero: all'ora che aveva l'euro arriva il solo dollaro, l'euro "
+          "letto non si tocca, un'ora nuova nasce", [(3600, 90000.0, 104000.0), (7200, 91000.0, 0.0)],
+          [tuple(r) for r in vero.execute("SELECT ora, eur, usd FROM cambio_ore ORDER BY ora")])
     oc = codice(pezzo("orologio_cambio"))
     prova("...e parte dal giro del cambio solo dopo una lettura buona", True,
           "if riuscito:\n            try:\n                await riempi_andamento()" in oc)
     prova("la lettura buona scrive l'ora, dalla stessa lettura (nessuna GET in piu')", True,
           '_salva_cambio(valori, adesso)\n    # ...e l\'ora di adesso nell\'andamento della card del libro P2P (13 nov\n'
           '    # 2026, cantiere prezzo-btc-p2p): la stessa lettura, nessuna domanda in piu\'\n'
-          '    _segna_andamento(valori["eur"], adesso)' in pezzo("_rileggi_cambio"))
+          '    _segna_andamento(valori["eur"], valori.get("usd", 0.0), adesso)' in pezzo("_rileggi_cambio"))
     i = src.find('@app.get("/api/cambio")')
     rotta = codice(_senza_prosa(src[i:src.index("\n\n\n", i)] if i >= 0 else ""))
     prova("la rotta porta la serie dalla MEMORIA, solo con un cambio vero accanto; "
@@ -157249,7 +157293,7 @@ def prove_prezzo_btc_libro():
     fmt = re.search(r"\nconst fmt = [^\n]+\n", mini).group(0)
     js = (r"""
 const out = {};
-let eurPerSat = 0, cambioVivo = false, chieste = 0, vibra = 0;
+let eurPerSat = 0, usdPerSat = 0, cambioVivo = false, chieste = 0, vibra = 0;
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 function haptic(){ vibra++; }
 function rileggiCambio(){ chieste++; return Promise.resolve(false); }
@@ -157261,9 +157305,9 @@ out.senza = cartaPrezzoP2P();
 cambioVivo = true; eurPerSat = 86890 / 1e8;
 out.soloPrezzo = cartaPrezzoP2P();
 out.chieste = chieste; cartaPrezzoP2P(); out.chiesteDopo = chieste;
-out.storta = [impostaAndamentoBtc({"24h": [1, -2, 3], "7g": "x", "30g": [5]}), andamentoBtc];
-out.cambiata = [impostaAndamentoBtc({"24h": [85355, 86000, 86500], "7g": [89950, 88000, 87000]}),
-                impostaAndamentoBtc({"24h": [85355, 86000, 86500], "7g": [89950, 88000, 87000]})];
+out.storta = [impostaAndamentoBtc({eur: {"24h": [1, -2, 3], "7g": "x", "30g": [5]}, usd: "x"}), andamentoBtc];
+const SERIE = {eur: {"24h": [85355, 86000, 86500], "7g": [89950, 88000, 87000]}};
+out.cambiata = [impostaAndamentoBtc(SERIE), impostaAndamentoBtc(SERIE)];
 out.giro = [];
 const card = () => cartaPrezzoP2P();
 out.giro.push(card());
@@ -157274,8 +157318,20 @@ const l = lineaPrezzoP2P([1, 3, 2], 100, 50, 5);
 out.linea = [l.d.split(' C').length - 1, l.x, l.y, l.d.slice(0, 10)];
 const piatta = lineaPrezzoP2P([7, 7], 100, 50, 5);
 out.piatta = [piatta.y, /NaN/.test(piatta.d)];
-impostaAndamentoBtc({"24h": [85355, 86000, 86500]});
+impostaAndamentoBtc({eur: {"24h": [85355, 86000, 86500]}});
 out.uno = card();
+/* il tasto: Invio e spazio sulla card, niente dal simbolo */
+impostaAndamentoBtc(SERIE); p2pPrezzoPeriodo = '24h';
+const ev = (key, fuori) => { const e = {key: key, target: 1, currentTarget: fuori ? 2 : 1, preventDefault(){ e.fermo = true; }}; tastoPrezzoP2P(e); return [p2pPrezzoPeriodo, !!e.fermo]; };
+out.tasti = [ev('Enter'), ev(' '), ev('a'), ev('Enter', true)];
+/* LA VALUTA (14 nov 2026): col dollaro noto il simbolo e' un bottone */
+p2pPrezzoPeriodo = '7g';
+usdPerSat = 100720 / 1e8;
+impostaAndamentoBtc({eur: SERIE.eur, usd: {"24h": [98000, 99000, 100000]}});
+out.conDollaro = card();
+voltaValutaPrezzoP2P(); out.inDollari = [card(), p2pPrezzoValuta, p2pPrezzoPeriodo];
+voltaValutaPrezzoP2P(); out.diNuovoEuro = [p2pPrezzoValuta, card().indexOf('86\u202f890'), p2pPrezzoPeriodo];
+voltaValutaPrezzoP2P(); usdPerSat = 0; out.dollaroSparito = [card().indexOf('€'), p2pPrezzoValuta];
 console.log(JSON.stringify(out));
 """)
     r = _node_banco(js)
@@ -157300,17 +157356,59 @@ console.log(JSON.stringify(out));
            'class="p2p-valore-dx su"' in g[0],
            'class="p2p-valore-var giu">▼ 3,4% · 7 giorni' in g[1],
            'class="p2p-valore-dx giu"' in g[1], g[2] == g[0], r.get("vibra")])
-    prova("...la card e' un bottone che dice tutto alla voce", True,
-          'aria-label="1 BTC vale 86 890 euro, più 1,8 per cento in 24 ore. Tocca per '
-          'cambiare periodo" onclick="voltaPeriodoPrezzoP2P()"' in g[0])
-    prova("niente dollaro e niente elenco dei periodi sotto la linea", [False, False],
-          ["$" in g[0], "7 giorni" in g[0]])
+    prova("...la card e' un role=button (dentro c'e' il bottone del simbolo) che dice "
+          "tutto alla voce, e senza dollaro il simbolo e' solo un simbolo", [True, False],
+          ['class="p2p-valore girabile" id="p2pPrezzo" role="button" tabindex="0" '
+           'onclick="voltaPeriodoPrezzoP2P()" onkeydown="tastoPrezzoP2P(event)" '
+           'aria-label="1 BTC vale 86 890 euro, più 1,8 per cento in 24 ore. Tocca per '
+           'cambiare periodo"' in g[0], "<button" in g[0]])
+    prova("Invio e spazio sulla card girano il periodo; un altro tasto no; un tasto "
+          "partito dal simbolo non e' della card",
+          [["7g", True], ["24h", True], ["24h", False], ["24h", False]], r.get("tasti"))
+    cd = r.get("conDollaro") or ""
+    prova("col dollaro noto il simbolo € e' un bottone suo, che ferma il tocco prima "
+          "della card", True,
+          '86 890 <button type="button" class="p2p-valore-simbolo" aria-label='
+          '"Mostra in dollari" onclick="event.stopPropagation();voltaValutaPrezzoP2P()">€'
+          '</button>' in cd)
+    ind = r.get("inDollari") or ["", "", ""]
+    prova("il tocco sul simbolo passa ai dollari: la cifra, la linea e la percentuale "
+          "del dollaro; il periodo che in dollari non c'e' torna al primo che c'e'",
+          [True, True, True, "usd", "24h"],
+          ['100 720 <button type="button" class="p2p-valore-simbolo" '
+           'aria-label="Mostra in euro"' in ind[0],
+           'class="p2p-valore-var su">▲ 2,8% · 24 ore' in ind[0],
+           "1 BTC vale 100 720 dollari" in ind[0], ind[1], ind[2]])
+    prova("...e ritocco torna all'euro; col dollaro sparito torna all'euro da solo, e "
+          "il simbolo smette di essere un bottone",
+          [["eur", True, "24h"], [True, "eur"]],
+          [[(r.get("diNuovoEuro") or [0, -1, 0])[0], (r.get("diNuovoEuro") or [0, -1, 0])[1] > 0,
+            (r.get("diNuovoEuro") or [0, -1, 0])[2]],
+           [(r.get("dollaroSparito") or [-1, 0])[0] > 0, (r.get("dollaroSparito") or [-1, 0])[1]]])
+    prova("niente dollaro accanto all'euro e niente elenco dei periodi sotto la linea",
+          [False, False], ["$" in g[0], "7 giorni" in g[0]])
     prova("la curva e' morbida (una C per tratto), dal margine sinistro al destro; una "
           "serie piatta sta a meta' altezza, senza NaN",
           [[2, 95, 25, "M5.0 45.0 "], [25, False]], [r.get("linea"), r.get("piatta")])
     uno = r.get("uno") or ""
     prova("con un periodo solo: la linea c'e', il tocco no", [True, False],
           ["<svg" in uno, "onclick" in uno])
+    prova("il CSS: il simbolo veste come la cifra (nessun fondo, nessun bordo)", True,
+          ".p2p-valore-simbolo{font:inherit;color:inherit;background:none;border:0;" in mini)
+    # IL «NOVITÀ» APPESO MEZZO TAGLIATO (14 nov 2026, Andrea sul collaudo:
+    # «quando scorro in giu il banner onchain ora scompare per meta'»): chi
+    # scorre appoggia il dito sulla card, e un `transform` sul tocco la
+    # metteva su un piano suo sotto i rettangoli appesi. Nessuna regola
+    # della card (o dei suoi pezzi) ne porta uno, e la card sta come quelle
+    # degli ordini: `position:relative`, nessuno `z-index`
+    regole_card = re.findall(r"\.p2p-valore[^{}]*\{[^}]*\}", mini)
+    prova("la card del prezzo non ha `transform` (neanche sul tocco) ne' `z-index`, e "
+          "sta `position:relative` come le card degli ordini",
+          [True, [], [], True],
+          [len(regole_card) > 10,
+           [r for r in regole_card if "transform" in r],
+           [r for r in regole_card if "z-index" in r or "will-change" in r],
+           any(r.startswith(".p2p-valore{") and "position:relative" in r for r in regole_card)])
 
 
 def prove_rete_scelta_p2p():
