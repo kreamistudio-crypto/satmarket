@@ -3023,6 +3023,27 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `git -C C:\Users\Andrea\Documents\GitHub\satmarket worktree remove --force $env:TEMP\prova-pronto`
   (rimettere `pronto` sulla punta di main non è un rischio: da oggi il
   VPS la CI la chiede da sé, e una punta non ancora verde aspetta.)
+- LE NOTIFICHE SUL TELEFONO (web push, 14 nov 2026, cantiere
+  web-push): NIENTE DA FARE SUL VPS. La leva `WEB_PUSH_ATTIVO` nel
+  codice è accesa, e il timbro (la chiave VAPID) lo crea il server da
+  solo nel database al primo /api/me dopo il riavvio: nel journal una
+  riga sola, «📲 Notifiche sul telefono: timbro VAPID creato nel
+  database». Niente pip: basta `cryptography`, già lì per i DM Nostr
+  (senza, il tasto non compare e il pannello è in allarme). Nessuna
+  release dell'app: la 1.5 ha già `enableNotifications: true`.
+  SPEGNERLE: dal pannello «⚙️ Stato delle leve» → «📲 Notifiche sul
+  telefono», o `WEB_PUSH_ATTIVO = False` nel config e riavvio. Le
+  iscrizioni restano, e riaccesa si riparte.
+  QUANTI TELEFONI, in sola lettura: `sqlite3 -readonly
+  /srv/barattolo/dati/satmarket.db "SELECT COUNT(*), COUNT(DISTINCT
+  tg_id) FROM push_iscrizioni"`. MAI stampare `push_timbro`: è la
+  chiave privata. Se si perde (database rifatto da zero) se ne crea
+  una nuova da sola e i telefoni vanno riattivati dal cassetto.
+  I servizi push chiamati dal VPS: fcm.googleapis.com (Android/Chrome),
+  updates.push.services.mozilla.com, web.push.apple.com,
+  *.notify.windows.com, in https: se un giorno il firewall in uscita
+  si stringe, sono questi. Un invio non riuscito lo dice il journal
+  con «⚠️ Push all'utente…».
 - L'APP ANDROID (TWA, ZAPSTORE) — la procedura viveva solo in
   `ARCHITETTURA.md`, che racconta com'è fatta; qui c'è cosa si BATTE, e
   in che ordine. L'app è un **involucro** (Trusted Web Activity) fatto

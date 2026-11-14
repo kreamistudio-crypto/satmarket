@@ -25953,6 +25953,48 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   GET che riusa `verifica_login_widget`), solo se il collaudo vero lo
   esige. Lighthouse: dalla v12 la categoria PWA non esiste più — il
   criterio è «installabile senza avvisi» nel pannello Application.
+  LE NOTIFICHE SUL TELEFONO (web push, 14 nov 2026, cantiere
+  web-push; il perché in CANTIERI, «Le notifiche sul telefono»). Chi
+  tocca «📲 Notifiche sul telefono» (la PRIMA riga del cassetto 🔔
+  Avvisi, `rigaPushTelefono`) riceve gli avvisi anche ad app chiusa:
+  APK di Zapstore (la 1.5 ha `enableNotifications: true`: Chrome
+  consegna all'app, nome e icona di Barattolo), sito sulla Home,
+  browser del PC. I PEZZI: `/api/me` dà `web_push` = {attivo, chiave
+  pubblica del timbro}; la pagina chiede il permesso SOLO dal tocco,
+  si iscrive col `pushManager` del service worker e manda indirizzo e
+  chiavi a `POST /api/push/iscrivi`; `notifica()` lancia in
+  sottofondo `_manda_push` per OGNI avviso, qualunque canale
+  (Telegram/Nostr) sia scelto, a tutti i telefoni dell'account
+  (tabella `push_iscrizioni`, endpoint UNIQUE = un telefono, un
+  account alla volta; al più `PUSH_MAX_PER_UTENTE` = 5). Il corpo è
+  cifrato per quel telefono (aes128gcm, RFC 8291, `push_cifra`, una
+  trentina di righe su `cryptography`, provata col vettore
+  dell'appendice A) e timbrato VAPID (RFC 8292, `push_vapid`: JWT
+  ES256, aud = origine del servizio, sub = URL_PUBBLICO, mai
+  un'email); TTL 24 h, Urgency high; 404/410 = riga tolta. Il carico
+  è {titolo, testo, url}: prima riga, resto spoglio, e il percorso
+  del primo bottone che porta a casa (`push_carico`); `sw.js`
+  (`push`, `notificationclick`, `pushsubscriptionchange`) apre solo
+  indirizzi della sua origine (`indirizzoDiCasa`). IL TIMBRO (chiave
+  privata P-256) NON È NEL CONFIG: lo crea il server al primo bisogno
+  nella tabella `push_timbro` (una riga) e viaggia coi backup cifrati
+  del database; `WEB_PUSH_CHIAVE_PRIVATA` serve solo a imporne uno.
+  Perso = i telefoni vanno riattivati (la pagina se ne accorge da
+  sola: `stessaChiavePush`). LA LISTA DEI SERVIZI
+  (`push_indirizzo_ammesso`): l'indirizzo arriva dal telefono, quindi
+  il server fa POST solo verso fcm.googleapis.com, (updates.)push.
+  services.mozilla.com, web.push.apple.com e i sottodomini di
+  .push.apple.com e .notify.windows.com, https, porta 443, senza
+  credenziali, follow_redirects=False. Le tre porte: iscrivi e
+  `prova` (una ogni 30 s) vogliono la leva, `togli` solo l'account
+  (il proprio telefono). Chi esce (`esciWeb`, «Esci da tutti»)
+  passa da `scordaPushTelefono`; la fusione sposta le righe, la
+  cancellazione le toglie (`CANCELLA_TOGLI`). In MODALITA_COLLAUDO
+  non esce niente (riga «📲 [push simulato…]»); sulla vm-2050 sì.
+  La leva `WEB_PUSH_ATTIVO` nasce ACCESA (regola di Andrea del 14
+  nov) e si cambia anche dal pannello. NON ARRIVA: telefoni senza i
+  servizi Google, Tor/onion, iPhone fuori dalla Home (la riga lo
+  dice), dentro Telegram (niente riga: c'è il bot).
   Icona adattiva dell'APK (lug 2026, TWA): Bubblewrap (1.24.1) NON sa
   fare i due livelli — il suo ic_launcher.xml mette l'INTERA maskable
   nel background su bianco, foreground trasparente: niente parallasse

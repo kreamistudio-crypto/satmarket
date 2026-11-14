@@ -184,6 +184,7 @@ collaudo_leve_pannello.py
 cartone_satsrouting.py
 collaudo_fusione_da_telegram.py
 collaudo_avvisi_nostr_arrivano.py
+collaudo_notifiche_telefono.py
 semina_collaudo.py
 collaudo_semina_collaudo.py
 collaudo_certificati_relay.py

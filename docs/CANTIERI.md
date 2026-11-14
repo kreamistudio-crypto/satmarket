@@ -82126,3 +82126,112 @@ tolta la riga — rossa; tolta la condizione del premio (tutti i sats via)
 NON PROVATO, DA GUARDARE. Dal telefono, al prossimo ordine in USDT
 preso: al recapito di chi vende la pagina resta quella giusta, senza un
 attimo di conto diverso.
+
+## Le notifiche sul telefono, anche ad app chiusa (14 nov 2026, cantiere web-push, Andrea: «si puo fare questo: Notifiche web app», «la webapp intendo quella di zapstore», «arriverebbero notifiche normali simile a watsupp?», poi sulla card «Sì, piano intero»)
+
+COSA. Nel cassetto 🔔 Avvisi, in CIMA, la riga «📲 Notifiche sul
+telefono»: «Attiva», il telefono chiede il permesso, e da lì gli avvisi
+che oggi partono su Telegram o col DM Nostr arrivano anche come
+notifica di sistema, ad app chiusa. Con «Attive» compare «🔔 Mandami
+una notifica di prova». Vale per l'APK di Zapstore, il sito aggiunto
+alla Home e il browser del PC. Il come è in ARCHITETTURA, «LE NOTIFICHE
+SUL TELEFONO»; per il VPS non c'è niente da fare (PRODUZIONE, stessa
+voce).
+
+LE DECISIONI, coi perché.
+- UNA STRADA DENTRO `notifica()`, non avviso per avviso: tutti gli
+  avvisi degli utenti passano da lì (ordini, scambi, chat, assistenza),
+  quindi il telefono li prende tutti e anche quelli scritti domani. Il
+  push parte IN PIÙ rispetto al canale scelto (Telegram, Nostr): l'ha
+  chiesto la persona, telefono per telefono. Le preferenze («Avvisi P2P»
+  spenti, ecc.) restano a monte e valgono anche qui.
+- L'APP NON SI RIFÀ. Letto sul PC di Andrea (cartella del progetto TWA,
+  solo `twa-manifest.json`, `app/build.gradle` e il manifest Android;
+  il keystore non toccato): la 1.5 ha già `enableNotifications: true`,
+  il permesso `POST_NOTIFICATIONS`, la `DelegationService` con
+  `ic_notification_icon` e androidbrowserhelper 2.6.2 col
+  `NotificationPermissionRequestActivity`. Quindi Chrome consegna le
+  notifiche all'app, col nome e l'icona di Barattolo. Andrea: «se
+  arriva già con la 1.5, lasciamo quella».
+- IL TIMBRO SE LO FA IL SERVER. Il primo piano diceva «la chiave VAPID
+  la crei tu sul VPS»; Andrea: «io porto in produzione dal mio PC, cosa
+  c'entra?». Ora la chiave nasce da sola nella tabella `push_timbro` al
+  primo bisogno e viaggia coi backup cifrati del database, insieme alle
+  iscrizioni che firma: zero gesti, niente segreti in chat, nel config
+  o su GitHub. `WEB_PUSH_CHIAVE_PRIVATA` resta solo per imporne uno.
+- LA LEVA NASCE ACCESA. Andrea, 14 nov: «quello che proviamo sul
+  collaudo e poi portiamo in produzione è di default sempre acceso» (le
+  leve spente servivano al lancio di on-chain, USDT e swap automatico).
+  Resta l'interruttore d'emergenza, anche dal pannello. La regola nuova
+  l'ha presa il coordinatore per tutti i cantieri.
+- NIENTE LIBRERIE NUOVE. pywebpush porterebbe con sé http-ece, py-vapid
+  e una pip sul VPS; la cifratura e il timbro sono una trentina di righe
+  su `cryptography`, che c'è già. Il rischio del fatto-in-casa è
+  coperto dal vettore dell'RFC 8291 (appendice A) byte per byte.
+- LA LISTA DEI SERVIZI. L'indirizzo dell'iscrizione arriva dal
+  telefono, cioè da chiunque: senza lista il server farebbe POST verso
+  qualunque indirizzo (casa sua, il nodo dietro il WireGuard). Passano
+  solo Google, Mozilla, Apple e Microsoft, in https, porta 443, senza
+  credenziali né frammenti, e niente redirect.
+- CHI ESCE LASCIA IL TELEFONO: all'uscita l'iscrizione si toglie se
+  era di quell'account (con «Esci da tutti» sempre), così un telefono
+  passato di mano non suona per l'account di prima. Un indirizzo vale
+  per un account alla volta: riattivando da un altro account, passa a
+  lui (mai in silenzio: solo col tocco).
+- IL TESTO SUL BLOCCO SCHERMO è quello dell'avviso Telegram, spoglio:
+  la chat non ci mette mai il messaggio (solo «hai un messaggio»), come
+  già oggi nel bot. Il servizio push vede quando e quanto, mai cosa
+  (il corpo è cifrato per quel telefono).
+
+STRADE SCARTATE. Un tasto per OGNI tipo di avviso (troppe righe: le
+preferenze esistono già); il push al posto di Telegram per chi lo
+accende (chi l'ha acceso su un telefono solo resterebbe senza avvisi
+sugli altri); UnifiedPush/ntfy (Chrome e la TWA non lo parlano; per i
+telefoni senza Google resta il DM Nostr con Amethyst, già scritto nel
+cassetto Tor); `skipWaiting` nel service worker per avere i gestori
+subito (rovescerebbe la regola del SW prudente: il nuovo SW arriva alla
+visita dopo, come sempre); il pallino «attiva le notifiche» nella
+fascia dell'apertura (non chiesto: in fondo alla risposta come idea).
+
+PROVATO. `prove_notifiche_telefono` (30 controlli): la cifratura
+uguale all'RFC 8291 byte per byte, e un corpo nuovo che il telefono
+dell'RFC decifra; il timbro che si verifica con la chiave che dichiara,
+aud = origine, 12 ore, sub = il sito; i servizi veri dentro e diciotto
+indirizzi cattivi fuori (http, credenziali, porte, nomi travestiti,
+casa nostra, frammenti, spazi, troppo lungo); le chiavi del telefono
+(un punto vero della curva); la chiave da 32 byte o DER, il resto
+None; il carico (titolo, testo spoglio troncato coi puntini, il tocco
+solo verso casa); iscrizioni e timbro su un database vero (passaggio
+fra account, tetto di cinque, togliere solo il proprio, il vecchio
+indirizzo tolto, il timbro una volta e riletto, il config che vince);
+`_manda_push` col servizio di cartone (cifrato, timbrato, TTL, urgenza,
+410 = riga tolta, indirizzo fuori lista mai chiamato, collaudo locale
+simulato, leva spenta muta); `notifica` che lo lancia a leva accesa per
+tutti e mai a un account cancellato; sw.js e la riga del cassetto in
+node; le sentinelle (leva accesa nel server e nel config d'esempio,
+cancellazione, fusione, le tre porte, /api/me senza la privata). Le
+cinque sezioni che eseguono `notifica` a pezzi hanno avuto la leva
+spenta nel loro banco. `collaudo_notifiche_telefono` (18 controlli,
+server vero, telefono di cartone con chiavi vere): timbro nato una
+volta e uguale dopo un «riavvio», iscrizioni buone e cattive, 503 a
+leva spenta, la `notifica()` vera simulata in collaudo e spedita fuori,
+decifrata dal telefono e timbrata con la chiave di /api/me, 410, la
+prova (409, poi parte, poi 429), togliere, fusione, cancellazione, la
+leva nel pannello e scrivibile da lì; nella gabbia senza coincurve.
+LA TORTURA: tredici rotture sulla suite (lista che accetta tutto,
+info HKDF scambiata, tocco verso fuori, push a leva spenta, 410 che non
+toglie, aud col percorso, tetto ignorato, il vecchio che resta, leva
+spenta di serie, SW che apre fuori, il telefono che si disiscrive per
+l'account d'altri, la riga sull'onion): dodici rosse; la tredicesima,
+la riga dentro Telegram, resta verde perché la guardia è doppia
+(`pushPossibile` la ripete). Cinque sul collaudo (fusione, cancellazione,
+freno della prova, timbro che non resta, collaudo locale che spedisce):
+cinque rosse.
+
+DA GUARDARE (NON PROVATO DAL VIVO). Il telefono vero: l'APK 1.5 col
+permesso Android 13 chiesto dall'app, la notifica col nome Barattolo, il
+tocco che apre l'ordine. Si guarda sul collaudo prima della promozione
+(«📲 Notifiche sul telefono» → «Attiva» → «Mandami una notifica di
+prova»). L'iPhone dalla Home e Firefox non li ho in mano. Il
+`pushsubscriptionchange` è scritto e provato solo in node (Chrome lo
+manda di rado).

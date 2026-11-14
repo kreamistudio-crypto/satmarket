@@ -130,6 +130,7 @@ collaudo_fusione_da_telegram
 collaudo_turtle
 collaudo_swap_telefono
 collaudo_avvisi_nostr_arrivano
+collaudo_notifiche_telefono
 collaudo_swap_instradatore
 collaudo_swap_pagamento
 collaudo_swap_auto
