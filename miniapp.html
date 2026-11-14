@@ -74561,6 +74561,19 @@ function scorporaPremioP2P(sats, premio){
    a quel che si blocca, il premio si toglie, e le due righe in
    evidenza diventano «Paghi» (i sats) e «Ricevi» (gli euro). */
 function contoDettP2P(o){
+  /* ⚠️ COL PREMIO I SATS NON SONO MAI FISSI (14 nov 2026, cantiere
+     usdt-premio-attimo, Andrea: la pagina sbagliata «non deve esistere»).
+     E' la regola del coordinatore (`check_zero_amount_with_premium`, vedi
+     Architettura, «LE TRE REGOLE DI UN ORDINE NUOVO»): con `amount` > 0 il
+     premio DEVE essere zero, quindi un ordine col premio e' nato a
+     mercato. Ma dopo la presa mostrod ripubblica l'ordine con `amt` = i
+     sats calcolati, e una riga rifatta dal libro o dall'archivio del
+     server se li porta dietro come se fossero fissi: per qualche secondo
+     il conto perdeva la riga del premio e il Subtotale (a sats fissi la
+     convenienza di uno scambio in USDT preso tace). Qui quei sats si
+     tolgono, e il conto e' lo stesso della riga vera; la cifra di mostrod
+     resta in `satsDetti`. Lo stesso giudice di `campiRipubblicaP2P`. */
+  if (Number(o.sats) > 0 && Math.round(Number(o.premium) || 0)) o = Object.assign({}, o, {sats: 0});
   const compro = o.lato === 'sell';
   const fisso = o.sats > 0;
   /* ⚠️ LA CIFRA CHE IL COORDINATORE HA GIA' DETTO VINCE SU OGNI
