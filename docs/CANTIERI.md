@@ -80872,3 +80872,53 @@ tolto. Dal browser sul codice vero (cambio e serie di cartone): chiaro
 390 e scuro 320, i tre periodi in euro e in dollari. NON provato: il
 backfill vero (CoinGecko dal cloud risponde 403) e il webview vero.
 
+## Lo sconto di un ordine a prezzo fisso, al decimo (14 nov 2026, cantiere sconto-fisso-decimale, Andrea: «Sconto che hai offerto non è 1% ma qualcosa meno altrimenti sarebbero 3217 sats», «si tratta di ordine in cui si fissa un prezzo»)
+
+IL CASO. Uno scambio P2P preso, ordine di Andrea a prezzo fisso (200 €
+per 321.675 sats). Il conto della pagina dello scambio diceva
+«Rispetto al mercato della presa: −1%», «Controvalore di 200,00 € ≈
+319.693», «Sconto che hai offerto 1% ≈ +1.982», «Subtotale 321.675».
+I sats erano giusti al satoshi; la percentuale no: 1.982 su 319.693 è
+lo 0,62%, e chi fa il conto a mano (l'1% sarebbe 3.197) vede un conto
+che non somma. Andrea pensava all'ultima promozione: NON c'entra. La
+percentuale esce da `convenienzaFissaP2P` → `premioImplicitoTabacchinoP2P`,
+che arrotonda all'INTERO dal giorno della convenienza vera (27 set,
+voce «La convenienza vera negli ordini a sats fissi»: «senza tetto e
+all'intero»), e i sats della riga escono invece dalle due cifre vere
+(Controvalore al metro meno sats fissi). Le due righe in cima e la riga
+dello sconto avevano lo stesso difetto.
+
+DECISO. Nel SOLO conto (`contoDettP2P`: dettaglio dal libro e pagina
+dello scambio) la percentuale si ricava dalle STESSE due cifre della
+riga — `convFine = (1 − sats / Controvalore) × 100` — e si scrive al
+decimo, con la virgola e senza «,0» (`decimoP2P`,
+`premioDecimoTestoP2P`): «0,6%», «3%», «+2,5%». La passano sia
+l'etichetta dello sconto (`etichettaPremioP2P`, che per gli ordini a
+mercato riceve il premio intero e scrive come prima) sia la riga in
+cima (`rigaConvenienzaFissaP2P`). Il GIUDIZIO resta quello intero:
+se la riga c'è o no, e il suo colore, li decide ancora `premioTab`
+(una convenienza sotto lo 0,5% resta «al prezzo di mercato», come
+prima). Badge, cartellino e card del libro e di «I miei scambi»
+restano all'intero: lì il numero non sta accanto a una cifra in sats
+da far tornare.
+
+SCARTATO. Cambiare `premioImplicitoTabacchinoP2P` o
+`convenienzaFissaP2P` al decimo: avrebbe spostato badge, cartellini
+(le soglie del 10 e del 20%), il premio scelto di Barattozon (che è
+intero per costruzione) e gli avvisi dei nuovi ordini — un cantiere
+più largo di quel che Andrea ha chiesto.
+
+PROVATO. `prove_sconto_fisso_decimale` (nuova, 11 controlli): il conto
+VERO in node col caso del telefono (−0,6%, «Sconto che hai offerto
+0,6%» con 1.982 sats, Subtotale 321.675), lo stesso scambio letto da
+chi ha comprato («0,6% più conveniente»), uno sconto tondo senza «,0»,
+un premio al decimo, l'ordine a mercato identico a prima, i pezzi puri.
+Due controprove: con `convFine = convFissa` diventano rosse cinque
+righe, con l'etichetta di nuovo all'intero tre. Emendate le due prove
+che leggevano la riga col vecchio argomento (`prove_convenienza_vera`,
+`prove_tasso_in_chiaro`) e i banchi che ritagliano il conto (le due
+funzioni nuove). Suite intera severa su 57ac8da3 + questo cantiere:
+27.613 verdi, 0 rosse, 2 saltate d'ambiente (nostr-tools, come i giri
+prima); collaudi della CI 124 su 124 in un venv senza coincurve. NON
+provato dal vivo: lo scambio di Andrea dopo la promozione (il cambio
+della presa è sul server, la pagina lo rilegge).

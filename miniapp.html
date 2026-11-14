@@ -74498,7 +74498,22 @@ function contoDettP2P(o){
   const metro = fisso ? metroFissoP2P(o) : 0;
   const convFissa = fisso ? convenienzaFissaP2P(o, metro) : null;
   const premioTab = convFissa || 0;
-  const prem = premioTab || Number(o.premium) || 0;
+  /* ⚠️ A SATS FISSI LA PERCENTUALE DEL CONTO HA UN DECIMALE (14 nov
+     2026, cantiere sconto-fisso-decimale, Andrea: «Sconto che hai
+     offerto non è 1% ma qualcosa meno altrimenti sarebbero 3217
+     sats»). `convenienzaFissaP2P` arrotonda all'INTERO — e' il numero
+     dei badge e del giudizio, e resta quello —, ma nel conto la
+     percentuale sta accanto ai sats della sua riga: uno sconto vero
+     dello 0,62% scritto «1%» accanto a 1.982 sats non somma, e chi fa
+     il conto a mano (l'1% di 319.693 e' 3.197) smette di fidarsi.
+     Qui la si ricava dalle STESSE due cifre della riga — il
+     Controvalore al metro e i sats fissi —, quindi percentuale e sats
+     dicono la stessa cosa al decimo. La riga c'e' o non c'e' col
+     giudizio di sempre (`premioTab`), che e' quello che decide anche
+     il colore. */
+  const ctrlFisso = (fisso && premioTab && metro > 0) ? Math.round(Number(o.euro) / metro) : 0;
+  const convFine = ctrlFisso > 0 ? (1 - o.sats / ctrlFisso) * 100 : convFissa;
+  const prem = (premioTab && convFine) || Number(o.premium) || 0;
   const ricavato = (detto > 0 && !!Math.round(Number(o.premium) || 0)) || !!premioTab;
   /* ⚠️ UN EURO CHE NON SI SA NON E' ZERO (27 set 2026, dal campo: il
      dettaglio di un annullato diceva «Invia 0 · Ricevi 0»). Senza la cifra
@@ -74763,7 +74778,7 @@ function contoDettP2P(o){
      da `compro` e mai dal tab del libro (vedi il CSS di `.conto-p2p`) */
   return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo')
     + '">'
-    + rigaConvenienzaFissaP2P(o, convFissa)
+    + rigaConvenienzaFissaP2P(o, convFine)
     + rigaTassoContoP2P(o, detto)
     + r(etichettaCtrl, cifra('ctrl'))
     + premio
@@ -74843,9 +74858,16 @@ function conNotaPremioP2P(riga, nota){
   return riga.slice(0, -'</div>'.length)
     + '<span class="premio-nota">' + nota + '</span></div>';
 }
+/* PURA: una percentuale al DECIMO, con la virgola, e senza «,0» (14 nov
+   2026, cantiere sconto-fisso-decimale): un premio scelto e' intero e
+   resta «4», la convenienza di un prezzo fisso diventa «0,6». */
+function decimoP2P(n){
+  const v = Math.round((Number(n) || 0) * 10) / 10;
+  return String(v === 0 ? 0 : v).replace('.', ',');
+}
 function etichettaPremioP2P(mio, prem, affare){
   const num = '<b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
-    + Math.abs(Math.round(prem)) + '%</b>';
+    + decimoP2P(Math.abs(prem)) + '%</b>';
   if (mio) return (prem > 0 ? 'Premio' : 'Sconto')
     + (affare ? ' che hai richiesto ' : ' che hai offerto ') + num;
   return num + (affare ? ' più' : ' meno') + ' conveniente';
@@ -74925,9 +74947,12 @@ function infoTassoP2P(btn){
    della pubblicazione, `premioBzP2P`); la convenienza solo col metro. */
 function rigaConvenienzaFissaP2P(o, conv){
   if (!(o && o.sats > 0)) return '';
-  const num = p => '<b' + (!Math.round(p) ? ''
+  /* AL DECIMO (14 nov 2026, cantiere sconto-fisso-decimale): la
+     convenienza arriva dal conto ricavata dai sats, come la riga dello
+     sconto sotto; il premio scelto e' intero e si scrive come prima */
+  const num = p => '<b' + (!Math.round(p * 10) ? ''
       : ' class="' + (affareP2P({lato: o.lato, premium: p}) ? 'p2p-affare' : 'p2p-avviso') + '"')
-    + '>' + premioTestoP2P(p) + '</b>';
+    + '>' + premioDecimoTestoP2P(p) + '</b>';
   const quando = o.preso ? 'della presa' : 'di adesso';
   const pezzi = [];
   if (tabacchinoP2P(o.metodi)) {
@@ -83133,6 +83158,11 @@ function sezioneNuovoP2P(o){
 }
 /* il premio si scrive col segno, sempre: «0» da solo non si legge
    come «al prezzo di mercato senza aggiunte» */
+/* ...e la stessa al decimo, per il conto a sats fissi (14 nov 2026) */
+function premioDecimoTestoP2P(n){
+  const v = Math.round((Number(n) || 0) * 10) / 10;
+  return (v > 0 ? '+' : v < 0 ? '−' : '') + decimoP2P(Math.abs(v)) + '%';
+}
 function premioTestoP2P(n){
   const v = Math.round(Number(n) || 0);
   return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + '%';
