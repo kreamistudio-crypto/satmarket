@@ -63228,6 +63228,8 @@ def prove_ritocchi_prova_alan():
         "function provvisorioDelLibroP2P(o){", "function ordineTuoP2P(id, o){",
         "function prendiOrdineP2P(id){", "function affareP2P(o){",
         "function etichettaPremioP2P(mio, prem, affare){", "function notaPremioP2P(mio, affare){",
+        # (14 nov 2026, sconto-fisso-decimale) l'etichetta scrive al decimo
+        "function decimoP2P(n){",
         "function articoloPercentoP2P(testo){", "function articoloDetPercentoP2P(testo){")) + r"""
 let DEMO = false, VETRINA = false, myTgId = 111;
 const INVITO_ONION = {p2p: ''};
@@ -68671,6 +68673,9 @@ def prove_p2p_dettaglio():
         # (28 set 2026) l'etichetta del premio: l'effetto per chi guarda,
         # e sotto il perche'
         "function etichettaPremioP2P(mio, prem, affare){",
+        # (14 nov 2026, sconto-fisso-decimale) la percentuale al decimo,
+        # nell'etichetta e nella riga in cima: senza, il banco esplode
+        "function decimoP2P(n){", "function premioDecimoTestoP2P(n){",
         "function notaPremioP2P(mio, affare){",
         "function conNotaPremioP2P(riga, nota){",
         "function articoloPercentoP2P(testo){",
@@ -90451,7 +90456,9 @@ def prove_convenienza_vera():
           and "const convFissa = fisso ? convenienzaFissaP2P(o, metro) : null;" in _cd
           and "const ctrl = (fisso && premioTab) ? Math.round(e / metro)" in _cd
           # (19 ott 2026) dentro la testa del conto, col cambio in chiaro
-          and _cd.index("rigaConvenienzaFissaP2P(o, convFissa)") < _cd.index("+ r(etichettaCtrl, cifra('ctrl'))"))
+          # (14 nov 2026, sconto-fisso-decimale) la riga riceve la
+          # convenienza al decimo, ricavata dai sats (`convFine`)
+          and _cd.index("rigaConvenienzaFissaP2P(o, convFine)") < _cd.index("+ r(etichettaCtrl, cifra('ctrl'))"))
     _am = pezzo_js(mini, "function applicaMessaggioP2P(", "\n}\n")
     prova("il telefono timbra il cambio della presa quando arrivano i MIEI sats, solo se il messaggio e' fresco",
           True, "nuovo.cambioPresa = eurPerSat * 1e8;" in _am
@@ -90521,6 +90528,8 @@ def prove_convenienza_vera():
         "function premioCardP2P(o){", "function affareP2P(o){",
         "function badgePremioP2P(o){", "function affaroneP2P(o){",
         "function premioTestoP2P(n){", "function premioMioP2P(o){", "function comeLibroP2P(o){",
+        # (14 nov 2026, sconto-fisso-decimale) la riga scrive al decimo
+        "function decimoP2P(n){", "function premioDecimoTestoP2P(n){",
         "function rigaConvenienzaFissaP2P(o, conv){")]
     banco = "\n".join(pezzi) + r"""
 let cambioVivo = true, eurPerSat = 0.0005, p2pCambiPub = {};
@@ -156913,6 +156922,128 @@ console.log(JSON.stringify(out));
            "<b>deposito di garanzia</b>" in _tappe))
 
 
+def prove_sconto_fisso_decimale():
+    """LO SCONTO DI UN ORDINE A PREZZO FISSO, AL DECIMO (14 nov 2026,
+    cantiere sconto-fisso-decimale, Andrea in produzione: «Sconto che hai
+    offerto non è 1% ma qualcosa meno altrimenti sarebbero 3217 sats»,
+    «si tratta di ordine in cui si fissa un prezzo»). Il conto di uno
+    scambio preso diceva «Rispetto al mercato della presa: −1%» e «Sconto
+    che hai offerto 1% ≈ +1 982 sats» su un Controvalore di 319 693: lo
+    sconto vero era lo 0,62%, e la percentuale arrotondata all'intero non
+    sommava coi sats della sua riga. Qui il conto VERO gira in node col caso
+    del telefono di Andrea (200 € per 321 675 sats, cambio della presa che
+    fa 319 693 sats pieni) e con gli ordini a mercato, che non devono
+    cambiare di una lettera; badge e card restano all'intero."""
+    print("\n[lo sconto di un ordine a prezzo fisso, al decimo]")
+    import json as _js
+    import shutil
+    import subprocess
+    import tempfile
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    _cd = pezzo_js(mini, "function contoDettP2P(o){", "\n}\n")
+    prova("il conto ricava la percentuale dalle due cifre della riga, al metro",
+          True, "const ctrlFisso = (fisso && premioTab && metro > 0) ? Math.round(Number(o.euro) / metro) : 0;" in _cd
+          and "const convFine = ctrlFisso > 0 ? (1 - o.sats / ctrlFisso) * 100 : convFissa;" in _cd
+          and "+ rigaConvenienzaFissaP2P(o, convFine)" in _cd)
+    prova("...e il giudizio dei badge resta all'intero", True,
+          "const p = Math.round((1 - sats / pieno) * 100);" in _fn_js(
+              mini, "function premioImplicitoTabacchinoP2P(euro, sats, cambio){"))
+    node = shutil.which("node")
+    if not node:
+        salta("il banco dello sconto al decimo gira in node", "node non c'e'")
+        return
+    pezzi = [_riga_js(mini, "const fmt = "), _riga_js(mini, "const P2P_TABACCHINO = "),
+             _riga_js(mini, "const P2P_TABACCHINO_PM = ")]
+    for firma in ("function metodoBaseP2P(m){", "function tabacchinoP2P(metodi){",
+                  "function premioImplicitoTabacchinoP2P(euro, sats, cambio){",
+                  "function premioBarattozonP2P(o, pub, adesso){", "function premioBzP2P(o){",
+                  "function convenienzaFissaP2P(o, metro){", "function metroFissoP2P(o){",
+                  "function affareP2P(o){", "function scorporaPremioP2P(sats, premio){",
+                  "function decimoP2P(n){", "function premioDecimoTestoP2P(n){",
+                  "function premioTestoP2P(n){",
+                  "function etichettaPremioP2P(mio, prem, affare){",
+                  "function notaPremioP2P(mio, affare){", "function conNotaPremioP2P(riga, nota){",
+                  "function rigaConvenienzaFissaP2P(o, conv){", "function rigaTassoContoP2P(o, detto){",
+                  "function contoDettP2P(o){"):
+        pezzi.append(_fn_js(mini, firma))
+    banco = "\n".join(pezzi) + r"""
+const P2P_PREMIO_TAB_MAX = 20;
+const esc = s => String(s == null ? '' : s);
+const fmtEur = e => Number(e).toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+let cambioVivo = true, eurPerSat = 0.001, p2pCambiPub = {};
+const perSatP2P = () => eurPerSat;
+const satsMercatoP2P = o => Math.round(o.euro / eurPerSat * (1 - (o.premium || 0) / 100));
+const feeMiaP2P = () => 0.02, cartelloFeeP2P = () => '', mezzaCommissioneP2P = f => String(f * 50);
+const monetaP2P = () => '€', segnoMonetaP2P = () => '€', attrImportoP2P = (e, d) => d;
+const nudo = h => String(h).replace(/<span class="solo-voce">[^<]*<\/span>/g, '')
+  .replace(/<[^>]+>/g, '').replace(/ /g, '.');
+/* il caso del telefono: Andrea VENDE sats (il suo «vendo»), 200 € per
+   321.675 sats fissi; alla presa 200 € valevano 319.693 sats */
+const presa = 200 / 319693 * 1e8;
+const fisso = x => Object.assign({id: 'f', lato: 'buy', mio: true, preso: true, cambioPresa: presa,
+  euro: 200, sats: 321675, premium: 0, metodi: ['Revolut']}, x || {});
+const pezziConto = h => {
+  const out = {};
+  const conv = h.match(/<div class="ctrl-conv">(.*?)<\/div>/);
+  out.conv = conv ? nudo(conv[1]) : '';
+  const r = [...h.matchAll(/<div class="ctrl-riga[^"]*"><span>(.*?)<\/span><span class="mono">(.*?)<\/span><\/div>/g)];
+  out.righe = r.map(m => nudo(m[1]).trim() + ' | ' + nudo(m[2]).trim());
+  return out;
+};
+const out = {};
+out.andrea = pezziConto(contoDettP2P(fisso()));
+/* lo stesso scambio letto da chi ha comprato quei sats (non mio, il suo
+   lato): la frase del badge */
+out.altro = pezziConto(contoDettP2P(fisso({mio: false, lato: 'sell'})));
+/* uno sconto vero e tondo resta senza «,0» */
+out.tondo = pezziConto(contoDettP2P(fisso({sats: Math.round(200 / presa * 1e8 * 1.03)})));
+/* un premio (meno sats per gli stessi euro): +2,5% */
+out.premio = pezziConto(contoDettP2P(fisso({sats: Math.round(200 / presa * 1e8 * 0.975)})));
+/* a mercato: il premio intero di sempre, nessuna virgola */
+out.mercato = pezziConto(contoDettP2P({id: 'm', lato: 'buy', mio: true, euro: 20, sats: 0,
+  premium: 4, metodi: ['SEPA']}));
+/* i pezzi puri */
+out.decimo = [decimoP2P(0.616), decimoP2P(1), decimoP2P(4), decimoP2P(0.04), decimoP2P(12.35),
+              premioDecimoTestoP2P(-0.616), premioDecimoTestoP2P(2.5), premioDecimoTestoP2P(0.01),
+              premioDecimoTestoP2P(-3)];
+process.stdout.write(JSON.stringify(out));
+"""
+    d = tempfile.mkdtemp()
+    try:
+        fn = os.path.join(d, "sconto.js")
+        with open(fn, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = subprocess.run([node, fn], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco dello sconto al decimo gira in node", "", (r.stderr or "")[-700:])
+        o = _js.loads(r.stdout) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if not o:
+        return
+    a = o["andrea"]
+    prova("IL CASO DEL TELEFONO: «Rispetto al mercato della presa: −0,6%», non piu' −1%",
+          "Rispetto al mercato della presa: −0,6%", a["conv"])
+    prova("...Controvalore 319.693, «Sconto che hai offerto 0,6%» con i suoi 1.982 sats, Subtotale 321.675",
+          ["Controvalore di 200,00 € | ≈ 319.693 sats",
+           "Sconto che hai offerto 0,6% | ≈ +1.982 sats",
+           "Subtotale | 321.675 sats"], a["righe"][:3])
+    prova("...e la percentuale e' davvero quella dei sats: 1.982 su 319.693 fa 0,6",
+          "0,6", str(round(1982 / 319693 * 100, 1)).replace(".", ","))
+    prova("chi lo prende legge la stessa cifra, con la frase del badge",
+          "0,6% più conveniente", o["altro"]["righe"][1].split(" | ")[0].replace("Sconto offerto dall'utente", "").strip())
+    prova("uno sconto tondo resta senza «,0»: 3%",
+          ["Rispetto al mercato della presa: −3%", "Sconto che hai offerto 3%"],
+          [o["tondo"]["conv"], o["tondo"]["righe"][1].split(" | ")[0]])
+    prova("un premio al decimo: +2,5%",
+          ["Rispetto al mercato della presa: +2,5%", "Premio che hai richiesto 2,5%"],
+          [o["premio"]["conv"], o["premio"]["righe"][1].split(" | ")[0]])
+    prova("GLI ORDINI A MERCATO non cambiano: «Premio che hai richiesto 4%», nessuna riga in cima",
+          ["", "Premio che hai richiesto 4%"],
+          [o["mercato"]["conv"], o["mercato"]["righe"][1].split(" | ")[0]])
+    prova("i pezzi puri: il decimo con la virgola, senza «,0», e il segno",
+          ["0,6", "1", "4", "0", "12,4", "−0,6%", "+2,5%", "0%", "−3%"], o["decimo"])
+
+
 def prove_usdt_foglio_presa():
     """IL FOGLIO «QUANTO» E LE CARD DI UN ORDINE IN USDT (13 nov 2026,
     cantiere usdt-foglio-presa, Andrea in produzione: «la card parla usdt,
@@ -164754,7 +164885,7 @@ def prove_tasso_in_chiaro():
     prova("nel conto la riga sta in una casella SUA, subito sotto la convenienza e prima del "
           "Controvalore; la scatola comune del secondo giro non c'e' piu'",
           [True, 0],
-          ["    + rigaConvenienzaFissaP2P(o, convFissa)\n"
+          ["    + rigaConvenienzaFissaP2P(o, convFine)\n"
            "    + rigaTassoContoP2P(o, detto)\n"
            "    + r(etichettaCtrl, cifra('ctrl'))" in cd,
            mini.count("ctrl-testa") + mini.count("testaContoP2P")])
@@ -191536,6 +191667,7 @@ CATEGORIE = {
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
     presa_ln_p2p mappa_contanti p2p_usdt usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete
+    sconto_fisso_decimale
     lista_corta_metodi
     """.split(),
     "mercatino": """
@@ -192215,6 +192347,7 @@ def main():
     prove_novita_usdt_p2p,
     prove_prezzo_btc_libro,
     prove_usdt_foglio_presa,
+    prove_sconto_fisso_decimale,
     prove_rete_scelta_p2p,
     prove_card_p2p_monete,
     prove_scelta_rete_mercatino,
