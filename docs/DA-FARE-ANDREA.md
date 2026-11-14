@@ -615,9 +615,12 @@ Atteso: il nodo riparte, i provider dicono «ok (N currencies)», nessun
 errore.
 
 **C. La prova a due account sul collaudo**, cifre piccole (10 CHF):
-Andrea pubblica «vendo sats per 10 CHF via TWINT», Alan prende, mette il
-suo numero TWINT, Andrea paga e segna «Ho inviato i franchi», Alan
-controlla e libera. Quel che si vede va nel verbale (CANTIERI, «Gli
+Andrea pubblica «compro sats per 10 CHF via TWINT» (chi paga in franchi
+è chi compra i sats), Alan prende, mette il suo numero TWINT, Andrea
+paga e segna «Ho inviato i franchi», Alan controlla e libera. A e B
+FATTE il 14 nov 2026 verso le 11 (collaudo: salute 200, CHF e i metodi
+svizzeri visti da admin; nodo: libro con soli `pending` e stati finali,
+riga 111 a `['EUR', 'USDT', 'CHF']`, prezzi pubblicati per 162 valute). Quel che si vede va nel verbale (CANTIERI, «Gli
 ordini P2P in franchi svizzeri», «NON PROVATO»). In produzione la leva
 resta spenta fino alla promozione e a un sì di Andrea; poi
 `P2P_CHF_ATTIVO = True` (solo admin) e, più avanti,
