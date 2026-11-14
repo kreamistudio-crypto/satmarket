@@ -259,7 +259,10 @@ aggiunge, si toglie la vecchia da GitHub.
   dentro Telegram (strada rovesciata). Col cartone nessun sat si muove:
   la fattura del cartone non è pagabile da un wallet vero, e i bitcoin
   «mandati» si simulano con `/cartone/stato?id=&s=transaction.mempool`
-  (la lista delle mosse in `cartone_satsrouting.py`, in cima). La
+  (la lista delle mosse in `cartone_satsrouting.py`, in cima). Lo swap
+  AUTOMATICO del mercatino, dal 14 nov 2026, ritira solo a lockup
+  CONFERMATO: per lui la mossa è `s=transaction.confirmed` (con
+  `transaction.mempool` la carta resta «Swap in corso», ed è giusto). La
   procedura coi comandi: DA-FARE-ANDREA, voce 3.
 
 ## 7. Accendere da zero (i gesti, uno alla volta col sì di Andrea)

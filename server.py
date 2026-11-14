@@ -79631,6 +79631,31 @@ SWAP_AUTO_BLOCCHI_MEZZORA = 72        # circa mezza giornata
 SWAP_AUTO_BLOCCHI_URGENTE = 36        # circa sei ore
 _SWAP_AUTO_GUARDATO = {}              # indice -> quando l'ho guardato
 
+# IL SEGRETO ESCE SOLO SU UN LOCKUP CONFERMATO, E MAI A RIDOSSO DELLA
+# SCADENZA (14 nov 2026, cantiere audit-swap-conferma, dal primo audit di
+# sicurezza; scelta di Andrea sulla card: «Aspetta una conferma»). Il
+# ritiro porta dentro il segreto, e chi ha il segreto incassa la fattura
+# che abbiamo pagato coi sats di chi vende. Fino a ieri bastava che il
+# lockup si VEDESSE in rete: ma una transazione in coda si puo' ancora
+# sostituire, e un fornitore disonesto poteva prendersi il segreto e
+# riprendersi i bitcoin. E a scadenza vicina (o passata) il suo rimborso
+# puo' arrivare in un blocco prima del nostro ritiro. Adesso, al PRIMO
+# ritiro (finche' la riga non ha un `ritiro_txid`, cioe' finche' il
+# segreto non e' mai uscito):
+#   1. il lockup deve stare in un blocco (`status.confirmed` del mempool,
+#      lo stesso campo che legge l'on-chain del mercatino);
+#   2. alla scadenza devono restare almeno SWAP_AUTO_MARGINE_RITIRO
+#      blocchi, e se la rete non dice l'altezza si aspetta.
+# Senza una delle due il segreto resta a casa: la fattura non la incassa
+# nessuno, alla scadenza il fornitore la annulla, i sats tornano e chi
+# vende puo' rifare il cambio (la strada del cambio fallito, che c'era
+# gia'). Dopo il primo ritiro NIENTE di tutto questo: il segreto e' gia'
+# fuori, e li' vale la regola del 6 nov, o si ritira in tempo o si perde.
+SWAP_AUTO_MARGINE_RITIRO = 12         # blocchi: un paio d'ore
+SWAP_AUTO_SENZA_CONFERMA = "lockup senza conferma"
+SWAP_AUTO_TARDI = "scadenza troppo vicina"
+_SWAP_AUTO_DETTO_TARDI = set()        # indici gia' detti agli admin
+
 
 def swap_auto_scalino(restano, fermo_da: int) -> str:
     """PURA: la tariffa di mempool da usare. `restano` = blocchi alla
@@ -79683,7 +79708,10 @@ async def swap_auto_ritira(indice: int, destinazione: str,
     risposta si perde, il giro dopo lo riconosce), la trasmissione.
     Torna {"stato", "txid", "perche"}: «ritirato», oppure «aspetta» (il
     lockup non c'e' ancora, o la rete non risponde: si riprova) o «no»
-    (un controllo non torna: niente segreto a nessuno)."""
+    (un controllo non torna: niente segreto a nessuno).
+    (14 nov 2026) Al PRIMO ritiro il lockup deve essere CONFERMATO e la
+    scadenza lontana almeno SWAP_AUTO_MARGINE_RITIRO blocchi: vedi il
+    commento sopra la costante."""
     con = db()
     try:
         _swap_auto_prepara(con)
@@ -79718,20 +79746,40 @@ async def swap_auto_ritira(indice: int, destinazione: str,
                     con.close()
             return {"stato": SWAP_AUTO_RITIRATO, "txid": r["ritiro_txid"],
                     "perche": ""}
+    # (14 nov 2026) il segreto non e' mai uscito finche' la riga non ha
+    # un ritiro scritto: solo li' valgono la conferma e il margine
+    primo = not r["ritiro_txid"]
     testo = await _swap_mempool_leggi(
         base, f"/address/{rec.get('lockupAddress', '')}/utxo")
     txid = ""
+    in_coda = False
     try:
         uscite = [u for u in json.loads(testo or "[]")
                   if isinstance(u, dict)
                   and re.fullmatch(r"[0-9a-f]{64}", str(u.get("txid") or ""))]
+        if primo:
+            ferme = [u for u in uscite if isinstance(u.get("status"), dict)
+                     and u["status"].get("confirmed") is True]
+            in_coda = len(ferme) < len(uscite)
+            uscite = ferme
         piena = next((u for u in uscite if int(u.get("value") or 0)
                       >= int(rec.get("onchainAmount") or 0)), None)
         txid = str((piena or (uscite[0] if uscite else {})).get("txid") or "")
     except (ValueError, TypeError):
         txid = ""
     if not txid:
-        return {"stato": "aspetta", "txid": "", "perche": "lockup non visto"}
+        return {"stato": "aspetta", "txid": "", "perche":
+                SWAP_AUTO_SENZA_CONFERMA if in_coda else "lockup non visto"}
+    if primo:
+        restano = await _swap_auto_restano(base, rec)
+        if restano is None:
+            return {"stato": "aspetta", "txid": "", "perche": "la rete non "
+                    "dice l'altezza"}
+        if restano < SWAP_AUTO_MARGINE_RITIRO:
+            print(f"⚠️ Swap automatico {int(indice)}: niente ritiro, alla "
+                  f"scadenza restano {restano} blocchi (ne servono "
+                  f"{SWAP_AUTO_MARGINE_RITIRO})", flush=True)
+            return {"stato": "no", "txid": "", "perche": SWAP_AUTO_TARDI}
     lockup_hex = (await _swap_mempool_leggi(base, f"/tx/{txid}/hex") or "").strip()
     try:
         from embit.transaction import Transaction
@@ -79794,7 +79842,14 @@ async def swap_auto_rilancia(indice: int) -> dict:
     cambia SOLO se una strada l'ha presa (una risposta persa si
     ritrova al giro dopo: la firma e' la stessa, la transazione anche).
     Torna {"stato": «confermato» | «rilanciato» | «fermo» | «aspetta» |
-    «no», "txid", "sats", "prima", "perche"}."""
+    «no» | «altro», "txid", "sats", "prima", "perche"}.
+    (14 nov 2026, cantiere audit-swap-conferma) «Confermato» vuol dire
+    che e' confermato il NOSTRO ritiro: la spesa deve avere un'uscita
+    sola, verso l'indirizzo di chi vende. Se in un blocco c'e' la spesa
+    di un altro (il rimborso del fornitore, per dire) i bitcoin a chi
+    vende NON sono arrivati: la riga prende `confermato=2`, non si
+    guarda piu' (non c'e' piu' niente da rilanciare) e lo stato «altro»
+    lo fa dire agli admin, una volta. Prima quella riga diceva «fatto»."""
     con = db()
     try:
         _swap_auto_prepara(con)
@@ -79823,13 +79878,25 @@ async def swap_auto_rilancia(indice: int) -> dict:
         and i["prevout"].get("scriptpubkey_address") == indirizzo
         for i in x.get("vin") or [])), None)
     if spesa and (spesa.get("status") or {}).get("confirmed"):
+        arrivo = (_swap_script_destinazione(r["destinazione"], rete)
+                  or b"").hex()
+        pagate = [o for o in spesa.get("vout") or [] if isinstance(o, dict)]
+        nostra = bool(arrivo) and len(pagate) == 1 \
+            and pagate[0].get("scriptpubkey") == arrivo
         con = db()
         try:
-            con.execute("UPDATE swap_auto SET confermato=1 WHERE indice=?",
-                        (int(indice),))
+            con.execute("UPDATE swap_auto SET confermato=? WHERE indice=?",
+                        (1 if nostra else 2, int(indice)))
             con.commit()
         finally:
             con.close()
+        if not nostra:
+            print(f"🚨 Swap automatico {int(indice)}: il lockup l'ha speso "
+                  f"un'altra transazione ({spesa.get('txid')}), non il "
+                  "nostro ritiro", flush=True)
+            return dict(vuoto, stato="altro", txid=str(spesa.get("txid")
+                                                       or ""),
+                        perche="il lockup l'ha speso un altro")
         return dict(vuoto, stato="confermato", txid=str(spesa.get("txid")
                                                          or ""))
     if spesa:
@@ -79945,6 +80012,17 @@ async def swap_auto_rilancia_fermi() -> int:
         except Exception as e:
             print(f"⚠️ Swap automatico {r['indice']}: il rilancio salta "
                   f"({type(e).__name__})", flush=True)
+            continue
+        if esito["stato"] == "altro":
+            # (14 nov 2026) una volta sola: la riga ha gia' `confermato=2`
+            # e il giro dopo non la guarda piu'
+            await notifica_admin(argomento="liquidita", testo=
+                f"🚨 <b>Swap automatico dell'ordine #{int(r['ordine_id'])}:"
+                "</b> i bitcoin bloccati dal fornitore li ha spesi una "
+                "transazione che NON è il nostro ritiro (<code>"
+                f"{html.escape(esito['txid'])}</code>). A chi vende non sono "
+                "arrivati, anche se gli abbiamo scritto che erano partiti: "
+                "va guardato a mano, col fornitore.")
             continue
         if esito["stato"] != "rilanciato":
             continue
@@ -80283,6 +80361,20 @@ async def swap_auto_giro() -> int:
                   f"({type(e).__name__})", flush=True)
             continue
         if esito["stato"] != SWAP_AUTO_RITIRATO:
+            # (14 nov 2026) il ritiro rifiutato perche' la scadenza e'
+            # troppo vicina: lo sanno gli admin, una volta per swap
+            if esito.get("perche") == SWAP_AUTO_TARDI \
+                    and r["indice"] not in _SWAP_AUTO_DETTO_TARDI:
+                _SWAP_AUTO_DETTO_TARDI.add(r["indice"])
+                await notifica_admin(argomento="liquidita", testo=
+                    f"⚠️ <b>Swap automatico dell'ordine #{int(r['ordine_id'])}"
+                    ":</b> non ritiro i bitcoin, perché alla scadenza dello "
+                    f"swap mancano meno di {SWAP_AUTO_MARGINE_RITIRO} blocchi "
+                    "e il segreto non deve uscire così tardi. Non si è perso "
+                    "niente: la fattura resta non incassata, quando il "
+                    "fornitore la annulla i sats tornano e chi vende può "
+                    "rifare il cambio. Se fra qualche ora l'ordine dice "
+                    "ancora «Swap in corso», va guardato a mano.")
             continue
         partiti += 1
         print(f"₿ Swap automatico dell'ordine #{r['ordine_id']}: ritiro "
