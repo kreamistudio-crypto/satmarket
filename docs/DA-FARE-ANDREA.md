@@ -543,28 +543,6 @@ Niente da scrivere sulla VM. Nella chat privata con
    l'etichetta deve cambiare da sola. Se non cambia, tocca 🔄: se cambia
    solo così, dillo alla sessione (le richieste da sole non passano).
 
-## 13. Dopo il primo audit di sicurezza: due letture sul VPS (14 nov 2026, cantiere audit-dispute)
-
-**Sola lettura**, niente cambia e niente segreti a schermo. Servono a
-sapere se in produzione c'è già un ordine nato PRIMA della correzione
-con addosso un timbro del pagamento che punta dalla parte sbagliata (la
-correzione chiude la strada da qui in avanti, non ripulisce il passato).
-Sul VPS, una riga alla volta, e incolla il risultato nella sessione:
-
-1. Un ordine in reso con un pagamento ancora puntato su chi vende, o un
-   ordine «deciso per chi vende» col verso rimasto su chi compra:
-```
-python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,stato,payout_stato,payout_verso,payout_tentativi,disputata FROM ordini WHERE (stato IN ('return_pending','return_shipped') AND COALESCE(payout_stato,'') IN ('da_riprovare','in_volo','incerto') AND COALESCE(payout_verso,'')<>'compratore') OR (stato='confirmed' AND COALESCE(payout_verso,'')='compratore') OR (stato='refund' AND COALESCE(payout_verso,'')='venditore' AND COALESCE(payout_stato,'')='da_riprovare')\")]"
-```
-   Atteso: nessuna riga. Se ne esce una, NON si tocca niente: si porta
-   il numero dell'ordine alla sessione e si decide insieme.
-2. Per il passato: ordini chiusi a favore di chi vende che portano un
-   reso spedito (sono quelli da riguardare a mano, se ce ne sono):
-```
-python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,datetime(aggiornato,'unixepoch'),prezzo_sats FROM ordini WHERE stato='released' AND disputata=1 AND (COALESCE(tracking_reso,'')<>'' OR COALESCE(corriere_reso,'')<>'')\")]"
-```
-   Atteso: nessuna riga.
-
 ## 14. Gli ordini P2P in franchi svizzeri: la leva sul collaudo, poi il nodo (14 nov 2026, cantiere p2p-chf; Andrea: «abbiamo stretto una collaborazione con Lugano»)
 
 **Perché.** L'app sa pubblicare, prendere e pagare ordini in CHF (TWINT,
@@ -645,82 +623,24 @@ resta spenta fino alla promozione e a un sì di Andrea; poi
 `P2P_CHF_ATTIVO = True` (solo admin) e, più avanti,
 `P2P_CHF_SOLO_ADMIN = False` per tutti.
 
-## 15. Dopo il primo audit di sicurezza: tre letture sul VPS per le piccole chiusure (14 nov 2026, cantiere audit-chiusure)
+## 17. Dopo la promozione del cantiere dell'accesso: rientrare con Nostr, a mano (14 nov 2026, cantieri audit-account e audit-parole-bot)
 
-**Sola lettura**, niente cambia e niente segreti a schermo. Le
-correzioni chiudono le strade da qui in avanti; queste tre righe dicono
-se in produzione c'è già qualcosa nato PRIMA. Sul VPS, una riga alla
-volta, e incolla il risultato nella sessione:
+**Perché.** Dal cantiere audit-account la firma del login con Nostr vale
+solo per i nomi di casa: barattolo.store, il suo `www.` e l'onion. Le
+letture sul VPS le hai già fatte il 14 nov ed erano giuste (stanno in
+CANTIERI, «Le parole che avvisano»). Resta la prova col telefono, che
+dalla gabbia non si può fare. Va fatta DOPO la promozione su main.
 
-1. Un commento di feedback con dentro un `<` (escono solo i numeri, mai
-   il testo):
+1. Dal telefono, su barattolo.store: esci, e rientra con Nostr come fai
+   di solito. Deve entrare come sempre.
+2. Se usi l'onion, lo stesso da lì.
+3. Sul collaudo (collaudo.barattolo.store) develop è già salito: se lì
+   il login con Nostr dicesse «Login Nostr non valido», il nome nel
+   config della VM non è quello con cui la apri. Si guarda con:
 ```
-python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,ordine_id,da_tg_id FROM feedback WHERE commento LIKE '%<%'\")]"
+sudo grep -n "^URL_PUBBLICO" /srv/collaudo/barattolo/config.py
 ```
-   Atteso: nessuna riga. Una riga non è un danno fatto: dice solo che
-   qualcuno ci ha provato, e si guarda insieme chi.
-2. Un annuncio con una foto che non è né un nome di file né un
-   indirizzo http(s):
-```
-python3 -c "import sqlite3,json; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(i, repr(f)[:80], sep='|') for i,t in c.execute(\"SELECT id,foto FROM annunci WHERE foto NOT IN ('','[]')\") for f in (json.loads(t) if t.startswith('[') else [t]) if not (isinstance(f,str) and (f.startswith(('http://','https://')) or (f and '/' not in f and chr(92) not in f and not f.startswith('.'))))]"
-```
-   Atteso: nessuna riga. Se ne esce una, NON si cancella niente: si
-   porta il numero dell'annuncio alla sessione.
-3. Una delle tre leve che restano sul VPS scritta dal pannello:
-```
-python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print([r[0] for r in c.execute(\"SELECT chiave FROM leve_pannello WHERE chiave IN ('GUARDIANO_PONTE_AVVISA','BLOSSOM_SERVER','LND_PONTE_CERT')\")])"
-```
-   Atteso: `[]`. (Se dice «no such table» va bene uguale: dal pannello
-   non è mai stata scritta nessuna leva.) Se ne esce una, il codice
-   nuovo smette comunque di ascoltarla: la riga si toglie insieme.
+   Atteso: `https://collaudo.barattolo.store`.
 
-## 16. Dopo il primo audit di sicurezza: una lettura sul VPS per le offerte accettate (14 nov 2026, cantiere audit-offerte)
-
-**Sola lettura**, niente cambia e niente segreti a schermo. La
-correzione fa parlare a ogni accordo la sua valuta da qui in avanti;
-questa riga dice se in produzione c'è già un'offerta accettata o
-conclusa in una valuta diversa da quella del suo annuncio. Sul VPS, e
-incolla il risultato nella sessione:
-```
-python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT o.id,o.stato,o.ordine_id,o.valuta,a.valuta,o.importo_sats,o.importo_eur,o.contro_sats,o.contro_eur FROM offerte o JOIN annunci a ON a.id=o.annuncio_id WHERE o.stato IN ('accettata','conclusa') AND o.annuncio_id>0 AND o.valuta<>a.valuta\")]"
-```
-Atteso: nessuna riga. Se ne esce una con `ordine_id` diverso da 0, si
-guarda insieme il prezzo di quell'ordine (può essere nato storto col
-codice di prima); con `ordine_id` 0 non è successo niente, e col codice
-nuovo l'acquisto prende la cifra giusta.
-
-## 17. Dopo il primo audit di sicurezza: due letture sul VPS PRIMA di promuovere il cantiere dell'accesso (14 nov 2026, cantiere audit-account)
-
-**Sola lettura**, niente cambia e niente segreti a schermo. **Queste si
-fanno PRIMA della promozione su main**, non dopo: dal codice nuovo la
-firma del login con Nostr vale solo per i nomi di casa, cioè quello di
-`URL_PUBBLICO` e quello di `ONION_HOST`. Se la gente entra da un nome
-che non è fra quei due, da quel nome il login con Nostr direbbe «Login
-Nostr non valido». Sul VPS, una riga alla volta, e incolla il risultato
-nella sessione:
-
-1. I due nomi di casa nel config:
-```
-grep -n "^URL_PUBBLICO\|^ONION_HOST" /srv/barattolo/config.py
-```
-   Atteso: `URL_PUBBLICO` non c'è (vale `https://barattolo.store`) o
-   dice proprio `https://barattolo.store`; `ONION_HOST` è il nome
-   `.onion` del sito, tutto minuscolo, senza `http://` e senza porta.
-   Se `ONION_HOST` manca ma l'onion è in uso, si aggiunge PRIMA di
-   promuovere (lo si guarda insieme).
-2. Sotto quali nomi Caddy serve l'app:
-```
-grep -nE '^[^[:space:]#].*\{|reverse_proxy' /etc/caddy/Caddyfile
-```
-   Atteso: ogni blocco che porta a `127.0.0.1:8080` si apre con
-   `barattolo.store` o col nome onion. Se ce n'è uno con un altro nome
-   (un `www.`, un secondo dominio) o senza nome (`:443`, `:80`,
-   `:8081`), si porta la riga alla sessione prima di promuovere.
-
-Sulla VM di collaudo develop sale da solo: se dopo il 14 nov il login
-con Nostr lì dicesse «non valido», è la stessa cosa (`URL_PUBBLICO`
-della VM dev'essere il nome con cui la si apre). Si guarda con:
-`sudo grep -n "^URL_PUBBLICO" /srv/collaudo/barattolo/config.py`.
-
-Dopo la promozione, una prova a mano dal telefono: uscire e rientrare
-con Nostr dal sito (e, se la usi, dall'onion). Deve entrare come sempre.
+Se uno dei tre non entra, non si tocca niente: si porta la frase
+dell'errore alla sessione.

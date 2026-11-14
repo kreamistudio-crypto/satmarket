@@ -81474,3 +81474,91 @@ chiave può rifare il collegamento col sì del foglio (è scritto così, ma
 il messaggio a schermo promette di più); togliere la chiave dal profilo
 non chiude le sessioni già aperte con quella chiave; la sessione aperta
 sul browser di un altro non ha un bottone «chiudi le altre sessioni».
+
+## Le parole che avvisano: l'unione dal bot, la figura detta a voce, l'accesso spento, e il www di casa (14 nov 2026, cantiere audit-parole-bot, dal primo audit di sicurezza, tre scelte di Andrea sulle card: «Parole più chiare nel bot», «Avviso più forte nel bot», «Cambia solo le parole»)
+
+Tre sospetti del primo audit non si chiudevano con un rifiuto in più,
+perché a premere è la persona: chiuderli voleva dire cambiare qualcosa
+che si vede, e il patto con Andrea era di fermarsi e chiedere. Gli sono
+state messe davanti le opzioni (card nel thread, dettagli in
+`/mnt/project-files/audit-sicurezza/satmarket/run-1/CORREZIONI-2026-11-14.md`)
+e per tutti e tre ha scelto LE PAROLE, senza passi in più. In coda, una
+riparazione a una cosa mia del cantiere audit-account, trovata nella sua
+lettura sul VPS prima della promozione.
+
+DECISO (da Andrea), e fatto.
+1. L'UNIONE DI UN ACCOUNT NOSTR A UN TELEGRAM DAL LINK DEL BOT. La
+   conferma del bot raccontava l'unione come un guadagno («i suoi
+   annunci, i suoi affari e la sua chiave diventeranno tuoi») e taceva
+   il rovescio. Ora dice anche: «⚠️ Da quel momento chi ha quella chiave
+   Nostr potrà entrare in questo tuo account. Se questo link te l'ha
+   mandato un'altra persona, è una truffa: tocca «❌ No, annulla»»,
+   prima del «Sei tu?». Stessi due tasti, stesso giro.
+2. LA FIGURA DI «ENTRA DAL BOT». La figura giusta la vede chi ha CHIESTO
+   l'ingresso: se manda il link a un altro e gli dice quale toccare, le
+   tre figure non fermano niente. Il messaggio ora dice: «⚠️ La figura
+   la vedi solo TU, sulla tua pagina. Se te l'ha detta o scritta qualcun
+   altro è una truffa: vuole entrare nel tuo account. Tocca «❌ Non sono
+   stato io»», fra «tocca la figura» e «non hai chiesto tu di entrare?».
+   Lo sa anche Tappo (`assistente/sapere.md`, e `conoscenza.md`
+   rigenerato).
+3. «DISABILITA L'ACCESSO CON NOSTR». Il gesto resta quello (spegne la
+   sola chiave d'accesso, il badge resta: è scritto in ARCHITETTURA).
+   Cambiano le parole della pagina, che promettevano «si entra solo da
+   Telegram»: il toast e la riga sotto il bottone dicono che chi ha
+   quella chiave può ricollegarla, e che per chiudere del tutto si
+   rimuove la npub dal profilo (il bottone è lì sotto).
+
+LA RIPARAZIONE (mia). `host_di_casa`, nato ieri notte in audit-account,
+accettava il nome di `URL_PUBBLICO` e quello di `ONION_HOST`. La lettura
+di Andrea sul VPS (voce 17 di `DA-FARE-ANDREA.md`, fatta PRIMA di
+promuovere, come scritto) ha mostrato che Caddy serve l'app anche su
+`www.barattolo.store`: chi entra con Nostr da lì firma con quell'origine
+e sarebbe stato rifiutato. Ora il `www.` del sito è casa (solo quello:
+non un www doppio, non il www dell'onion, non un altro terzo livello).
+Non è mai arrivato in produzione. La stessa lettura ha detto la cosa
+buona: Caddy apre solo blocchi col nome (il sito, il www, l'onion sulla
+8081), quindi il sospetto della firma ripresentata con un Host
+forestiero in produzione era già chiuso da fuori, e `host_di_casa` è la
+seconda cintura. `URL_PUBBLICO` sul VPS non è dichiarato (vale
+barattolo.store) e `ONION_HOST` è il nome dell'onion, scritto giusto.
+
+SCARTATO (da Andrea, sulle card). Per l'unione: un passo in più con la
+figura. Per «Entra dal bot»: tenere gli admin fuori dalla porta del
+bot. Per l'accesso spento: spegnere anche il badge. E «lasciare com'è»
+per tutti e tre. Da me: mettere l'avviso DOPO il «Sei tu?» (chi legge in
+fretta si ferma alla domanda); scrivere l'avviso della figura sulla
+pagina del sito invece che nel bot (la pagina la vede chi attacca, il
+bot chi è attaccato); una voce in `NOVITA.md` (non è una funzione nuova,
+e da lì nasce un post).
+
+PROVATO. `prove_parole_che_avvisano` (nuova, 20 righe): i due messaggi
+del bot ESEGUITI coi pezzi veri e guardati così come partono (le parole
+nuove, il nome del tasto che c'è davvero sotto, l'ordine nel testo,
+l'HTML in pari, un messaggio solo, il giro di prima), le parole della
+pagina, il gesto del server rimasto com'era, il libro di Tappo.
+`prove_accesso_di_casa`: tre righe in più per il www (37).
+`collaudo_accesso_di_casa`: due righe in più sul server vero, il login
+dal www e la firma del www rifiutata sull'altro nome (32).
+COSA È GIRATO SU QUALE ALBERO. Sopra develop `778d5d5` (audit-account,
+tutto mio da `83b62ed` in su; sotto c'è `c4da353`, non mio, i franchi
+svizzeri): la suite intera severa, 27.868 passate, 0 fallite; i
+collaudi di `ci/collaudi.txt` nella gabbia, 128 verdi su 128.
+
+LE LETTURE SUL VPS, FATTE da Andrea il 14 nov (sola lettura, risultati
+incollati nel thread): voce 17 (i due nomi di casa e i blocchi di
+Caddy, qui sopra), voce 13 (dispute: nessuna riga, tutte e due),
+voce 15 (un commento col `<`: nessuna riga; una foto che non è né nome
+né indirizzo: nessuna riga; le tre leve scritte dal pannello: `[]`),
+voce 16 (un'offerta accettata in una valuta diversa dal suo annuncio:
+nessuna riga). In produzione non c'è niente nato storto prima delle
+correzioni. Le quattro voci escono da `DA-FARE-ANDREA.md`, come vuole
+la sua regola; della 17 resta la sola prova a mano dopo la promozione
+(rientrare con Nostr dal telefono, e il nome nel config della VM di
+collaudo).
+
+I LIMITI, SCRITTI. Le parole non sono un lucchetto: chi legge l'avviso
+e preme lo stesso consegna l'account, come ieri. È la scelta di Andrea
+(nessun passo in più), e i due sospetti restano «attenuati», non
+chiusi. Non provato dal vivo: come Telegram mostra i due messaggi (qui
+si guarda il testo che parte e che l'HTML sia in pari).

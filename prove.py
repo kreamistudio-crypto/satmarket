@@ -22261,6 +22261,21 @@ def prove_accesso_di_casa():
            casa("barattolo.store:8443")])
     prova("...e il servizio nascosto pure (Tor inoltra su una porta qualunque)",
           [cipolla, cipolla + ":80"], [casa(cipolla), casa(cipolla + ":80")])
+    # (14 nov 2026, audit-parole-bot) Caddy serve l'app anche sul www
+    # del sito: letto sul VPS da Andrea prima della promozione
+    prova("il `www.` del sito e' casa (Caddy lo serve), con e senza porta",
+          ["www.barattolo.store", "www.barattolo.store:443"],
+          [casa("www.barattolo.store"), casa("www.barattolo.store:443")])
+    prova("...ma solo quello: non un www doppio, non il www dell'onion, "
+          "non un altro terzo livello",
+          ["", "", "", ""],
+          [casa("www.www.barattolo.store"), casa("www." + cipolla),
+           casa("api.barattolo.store"), casa("wwwbarattolo.store")])
+    prova("...e se il nome del sito ha gia' il www non se ne inventa un altro",
+          ["www.prova.example", "", ""],
+          [giudice(False, url="https://www.prova.example")("www.prova.example"),
+           giudice(False, url="https://www.prova.example")("www.www.prova.example"),
+           giudice(False, url="https://www.prova.example")("prova.example")])
     prova("un Host forestiero diventa vuoto: il relay che si fa firmare la "
           "nostra sfida non la ripresenta col suo nome",
           ["", "", "", ""],
@@ -22505,6 +22520,148 @@ def prove_accesso_di_casa():
           "widget", True,
           mini.index("} else if (portaBotSi) {\n    porte.appendChild(portaBot(")
           < mini.index("    porte.appendChild(portaTelegram());"))
+
+
+def prove_parole_che_avvisano():
+    """LE PAROLE CHE AVVISANO (14 nov 2026, cantiere audit-parole-bot,
+    dal primo audit di sicurezza, tre scelte di Andrea sulle card:
+    «Parole più chiare nel bot», «Avviso più forte nel bot», «Cambia
+    solo le parole»). Tre sospetti che non si chiudono con un rifiuto,
+    perche' a premere e' la persona: l'unione degli account da un link
+    ricevuto da un altro, la figura di «Entra dal bot» detta a voce, e
+    «Disabilita l'accesso con Nostr» che prometteva piu' di quel che
+    fa. Nessun gesto in piu': si guarda che i messaggi VERI, cosi' come
+    partono, dicano la cosa che mancava e nominino il tasto giusto."""
+    import asyncio
+    import html
+    import secrets
+    import sqlite3
+    import time
+    print("\n[le parole che avvisano]")
+    spediti = []
+
+    async def bot_finto(metodo, corpo):
+        spediti.append((metodo, corpo))
+
+    def tasti(corpo):
+        return [t["text"] for riga in corpo["reply_markup"]["inline_keyboard"]
+                for t in riga]
+
+    # ---------------- (1) L'UNIONE DAL LINK DEL BOT ------------------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, npub TEXT)")
+    con.executemany("INSERT INTO utenti VALUES(?,?)",
+                    [(-5, "npub1" + "q" * 58), (777, "")])
+
+    class Finta:
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass
+    amb = {"CODICI_FUSIONE": {"abc": (-5, int(time.time()) + 60)},
+           "CONFERME_FUSIONE": {}, "SECONDI_CODICE_FUSIONE": 300,
+           "time": time, "secrets": secrets, "db": lambda: Finta(),
+           "bot_api": bot_finto, "_guardie_fusione": lambda c, n, p: "",
+           "_pulisci_fusioni": lambda: None,
+           "_npub_breve": lambda npub: npub[:12] + "…"}
+    exec("async " + pezzo("avvia_fusione"), amb)
+    asyncio.run(amb["avvia_fusione"](777, "abc"))
+    metodo, corpo = spediti[-1]
+    testo = corpo["text"]
+    prova("l'unione: il messaggio parte, in HTML, coi due tasti di sempre",
+          ("sendMessage", "HTML", ["✅ Si', collega", "❌ No, annulla"]),
+          (metodo, corpo.get("parse_mode"), tasti(corpo)))
+    prova("...dice quel che dava e resta vero (annunci, affari, chiave, "
+          "per sempre)", True,
+          "i suoi annunci, i suoi affari e la sua chiave diventeranno tuoi, "
+          "per sempre" in testo and "Sei tu?" in testo)
+    prova("...e ADESSO dice il rovescio: chi ha quella chiave entra in "
+          "questo account", True,
+          "chi ha quella chiave Nostr potrà entrare in questo tuo account"
+          in testo)
+    prova("...e cosa fare se il link viene da un altro, col NOME del tasto "
+          "che c'e' sotto", True,
+          "Se questo link te l'ha mandato un'altra persona, è una truffa: "
+          "tocca «❌ No, annulla»" in testo and "❌ No, annulla" in tasti(corpo))
+    prova("...l'avviso sta PRIMA della domanda (chi legge in fretta arriva "
+          "al «Sei tu?» dopo averlo passato)", True,
+          testo.index("potrà entrare") < testo.index("Sei tu?"))
+    prova("...e l'HTML e' in pari (un tag aperto e non chiuso e Telegram "
+          "rifiuta il messaggio intero)", (2, 2),
+          (testo.count("<b>"), testo.count("</b>")))
+    prova("...nessun passo in piu': un solo messaggio, e il token della "
+          "conferma nasce come prima", (1, 1),
+          (len(spediti), len(amb["CONFERME_FUSIONE"])))
+
+    # ---------------- (2) LA FIGURA DI «ENTRA DAL BOT» ---------------
+    spediti.clear()
+    con.execute("ALTER TABLE utenti ADD COLUMN bot_avviato INTEGER DEFAULT 0")
+    ingresso = {"scade": int(time.time()) + 60, "stato": "attesa",
+                "token": "tok", "dispositivo": "Chrome su <Android>",
+                "scelte": [("🍯", "Miele"), ("🚲", "Bici"), ("📚", "Libri")]}
+    amb2 = {"CODICI_INGRESSO": {"C" * 20: "lh"}, "INGRESSI_BOT": {"lh": ingresso},
+            "FORMA_CODICE_INGRESSO": re.compile(r"[A-Za-z0-9_\-]{16,40}"),
+            "time": time, "html": html, "db": lambda: Finta(),
+            "bot_api": bot_finto}
+    exec("async " + pezzo("avvia_ingresso_bot"), amb2)
+    asyncio.run(amb2["avvia_ingresso_bot"](
+        {"id": 777, "first_name": "Ma<rio", "username": "mario"}, "C" * 20))
+    metodo, corpo = spediti[-1]
+    testo = corpo["text"]
+    prova("l'ingresso: il messaggio parte con le tre figure e il tasto del "
+          "no, come sempre",
+          ("sendMessage", ["🍯 Miele", "🚲 Bici", "📚 Libri",
+                           "❌ Non sono stato io"]),
+          (metodo, tasti(corpo)))
+    prova("...chiede ancora chi entra e da dove, col testo scappato", True,
+          "Entri su Barattolo come Ma&lt;rio (@mario)?" in testo
+          and "Chrome su &lt;Android&gt;" in testo)
+    prova("...e ADESSO dice che la figura detta da un altro e' una truffa",
+          True,
+          "La figura la vedi solo TU, sulla tua pagina. Se te l'ha detta o "
+          "scritta qualcun altro è una truffa: vuole entrare nel tuo account"
+          in testo)
+    prova("...col NOME del tasto da toccare, che e' quello che c'e' sotto",
+          True, "Tocca «❌ Non sono stato io»" in testo
+          and "❌ Non sono stato io" in tasti(corpo))
+    prova("...l'avviso sta fra «tocca la figura» e «non hai chiesto tu»: "
+          "chi sta per toccare lo passa", True,
+          testo.index("la figura che vedi sulla pagina")
+          < testo.index("è una truffa")
+          < testo.index("Non hai chiesto tu di entrare?"))
+    prova("...l'HTML e' in pari, e il messaggio resta uno", ((1, 1), 1),
+          ((testo.count("<b>"), testo.count("</b>")), len(spediti)))
+    prova("...e l'ingresso e' legato a chi ha premuto Avvia, come prima",
+          ("in_chat", 777), (ingresso["stato"], ingresso["tg_id"]))
+
+    # ---------------- (3) «DISABILITA L'ACCESSO CON NOSTR» -----------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    dis = pezzo_js(mini, "async function disabilitaAccessoNostr(){", "\n}\n")
+    prova("la pagina non promette piu' «si entra solo da Telegram»", 0,
+          codice_js_senza_commenti(mini).count("si entra solo da Telegram"))
+    prova("...il toast dice che chi ha la chiave puo' ricollegarla, e il "
+          "gesto che chiude del tutto", True,
+          "Chi ha quella chiave può ricollegarla" in dis
+          and "per chiudere del tutto, rimuovi la npub dal profilo" in dis)
+    prova("...e sta a schermo il tempo di leggerlo", True, ", 9000);" in dis)
+    prova("...la riga sotto il bottone dice la stessa cosa, e il bottone "
+          "per rimuovere e' li' sotto", True,
+          "chi ha quella chiave può ricollegarla. Per chiudere del tutto, "
+          "rimuovila qui sotto." in mini
+          and mini.index("rimuovila qui sotto.")
+          < mini.index("per rimuoverla collega prima Telegram.`)) + btnRimuovi);"))
+    prova("...il gesto del server e' quello di ieri: spegne la sola chiave "
+          "d'accesso", True,
+          "UPDATE utenti SET npub_accesso='' WHERE tg_id=? AND tg_id>0"
+          in pezzo("disabilita_accesso_nostr"))
+
+    # ---------------- TAPPO LO SA ------------------------------------
+    libro = open(os.path.join("assistente", "sapere.md"), encoding="utf-8").read()
+    prova("Tappo sa dire che la figura detta da un altro e' una truffa", True,
+          "ti dice o ti scrive quale figura toccare, vuole entrare nel tuo "
+          "account" in libro)
 
 
 def prove_npub_una_casa():
@@ -193386,7 +193543,7 @@ CATEGORIE = {
     dizionari_nel_loop logout_apk logout_apk_due nome_da_nostr
     foto_nostr_relay_muti idor_verifica contenuti_cifrati ssrf_redirect
     firme_nostr firme_nsec trasloco_nostr collega_npub_firma
-    npub_una_casa accesso_di_casa leve relay_leva relay_di_barattolo posta_relay
+    npub_una_casa accesso_di_casa parole_che_avvisano leve relay_leva relay_di_barattolo posta_relay
     backup_prima_del_deploy backup_database_occupato sbirciata anteprime
     seo onion cookie_onion script_nel_workflow deploy giudice_deploy
     collaudi_in_ci ci_leggera ci_solo_main elenco_dei_collaudi
@@ -193841,6 +193998,7 @@ def main():
               prove_trasloco_nostr, prove_collega_npub_firma,
               prove_npub_una_casa,
               prove_accesso_di_casa,
+              prove_parole_che_avvisano,
               prove_conta_feedback,
               prove_classifica, prove_classifica_nascosta,
               prove_classifica_recensioni_tutte,

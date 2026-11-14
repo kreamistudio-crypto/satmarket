@@ -210,6 +210,23 @@ def main():
               (r.status_code, r.json().get("ok")))
         prova("...nell'account di chi ha firmato", id_v,
               casa.get("/api/me").json()["tg_id"])
+        # IL WWW DEL SITO (14 nov 2026, audit-parole-bot): Caddy serve
+        # l'app anche li', e chi entra da li' firma con quell'origine
+        www = TestClient(server.app, base_url="https://www.barattolo.store")
+        sfida = www.get("/api/login/nostr/sfida").json()["sfida"]
+        r = www.post("/api/login/nostr", json={
+            "evento": firma_login(vittima, sfida,
+                                  "https://www.barattolo.store")})
+        prova("...e anche dal www del sito, nello stesso account",
+              (200, id_v), (r.status_code, www.get("/api/me").json()["tg_id"]))
+        sfida = www.get("/api/login/nostr/sfida").json()["sfida"]
+        r = www.post("/api/login/nostr", json={
+            "evento": firma_login(vittima, sfida,
+                                  "https://www.barattolo.store")},
+            headers={"host": "barattolo.store"})
+        prova("...ma la firma fatta sul www non vale presentata sull'altro "
+              "nome (il tag e l'Host devono combaciare, come sempre)",
+              401, r.status_code)
         sfida = tg.get("/api/login/nostr/sfida",
                        headers={"host": "barattolo.store"}).json()["sfida"]
         npub_a = server.hex_to_npub(altra.public_key_xonly.format().hex())

@@ -40385,7 +40385,7 @@ function renderIdentita(){
     nsRiga = riga('🟣','Nostr',`${npubBreve} — verificata 🔑 puoi entrare dal web con Nostr.`,
       btnCoda + (myTgId > 0
         ? `<button class="btn ghost" style="margin:0 0 8px" onclick="disabilitaAccessoNostr()">Disabilita l'accesso con Nostr</button>
-           ${sub(`Chiude solo l'ingresso via Nostr: la npub nel profilo resta.`)}`
+           ${sub(`Chiude solo l'ingresso via Nostr: la npub nel profilo resta, e chi ha quella chiave può ricollegarla. Per chiudere del tutto, rimuovila qui sotto.`)}`
         : sub(`È il tuo unico ingresso: per rimuoverla collega prima Telegram.`)) + btnRimuovi);
   }
   /* — riga foto profilo (avatar lug 2026) — il selettore «La tua
@@ -44296,7 +44296,15 @@ async function disabilitaAccessoNostr(){
   if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
   myNpubAccesso = '';
   renderIdentita();
-  toast('Accesso con Nostr spento: si entra solo da Telegram');
+  /* LE PAROLE NON PROMETTONO PIU' DI QUEL CHE IL GESTO FA (14 nov 2026,
+     cantiere audit-parole-bot, dal primo audit di sicurezza, scelta di
+     Andrea: «Cambia solo le parole»). Diceva «si entra solo da
+     Telegram», ma il badge resta verificato e chi ha quella chiave la
+     ricollega da solo con un si' (e' voluto: chiude la porta, non
+     toglie la chiave). Chi la spegne perche' la chiave e' finita in
+     mani altrui deve sapere qual e' il gesto giusto. */
+  toast('Accesso con Nostr spento. Chi ha quella chiave può ricollegarla: '
+        + 'per chiudere del tutto, rimuovi la npub dal profilo', 9000);
 }
 
 /* L'utente nato su Nostr chiede il lasciapassare e vola dal bot:
