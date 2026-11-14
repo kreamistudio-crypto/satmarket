@@ -1966,6 +1966,15 @@ WEB_PUSH_ATTIVO = True
 # (base64url della chiave privata P-256). E' un segreto: mai in chat.
 WEB_PUSH_CHIAVE_PRIVATA = ""
 
+# La mancia al venditore (14 nov 2026): nell'ordine pagato chi compra
+# vede «🎁 Lascia una mancia», uno zap DIRETTO al Lightning address di
+# chi vende (Barattolo non tocca i sats: niente fee, niente rimborso),
+# con l'invito facoltativo a uno zap anche a Barattolo (zap@). Nasce
+# ACCESA; False e riavvia (o il pannello) per spegnerla.
+MANCIA_ATTIVA = True
+# Il tetto di UNA mancia, in sats.
+MANCIA_MAX_SATS = 100_000
+
 # La ronda dei relay di Mostro (12 ott 2026): ogni dieci minuti il
 # server chiede ai relay che confermano (MOSTRO_RELAY_CONFERMA; senza,
 # a tutto MOSTRO_RELAY) se rispondono e se il coordinatore ci scrive

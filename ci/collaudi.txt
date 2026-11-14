@@ -183,3 +183,4 @@ fuori: collaudo_servizio_dove
 collaudo_widget_prova
 collaudo_eth_xmr
 collaudo_mappa_ritiro
+collaudo_mancia

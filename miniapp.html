@@ -16016,6 +16016,50 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn orange" style="margin-top:12px" onclick="inviaOfferta(this)">💰 Offri</button>
   </div>
 
+  <!-- ============ SHEET MANCIA AL VENDITORE (14 nov 2026) ============
+       Due passi in un foglio solo. LA SCELTA: quanto al venditore
+       (pillole + cifra libera) e, sotto, lo zap facoltativo a Barattolo,
+       a «Niente» di serie (Andrea: la proposta arriva PRIMA di mandare,
+       non dopo). IL PAGAMENTO: una fattura alla volta — prima quella
+       del venditore, poi quella di Barattolo — col QR, «Apri nel wallet»
+       e «L'ho pagata». Col wallet collegato le due partono da sole.
+       Chiude con navIndietro(), il patto del motore di navigazione. -->
+  <div class="sheet" id="manciaSheet" role="dialog" aria-modal="true"
+       aria-labelledby="manciaTitolo">
+    <div class="grab"></div>
+    <div class="sheet-testa">
+      <h3 id="manciaTitolo">🎁 Lascia una mancia</h3>
+      <button type="button" class="pacco-x" onclick="navIndietro()"
+              title="Chiudi" aria-label="Chiudi">✕</button>
+    </div>
+    <div id="manciaScelta">
+      <div class="hint" id="manciaPerChi" style="margin:0 0 10px"></div>
+      <div class="consegna-scelta" id="manciaChips" style="margin:0 0 10px"></div>
+      <div class="field" style="display:flex;gap:10px;align-items:center">
+        <input id="manciaImporto" inputmode="numeric" autocomplete="off" placeholder="Un'altra cifra" style="flex:1" oninput="manciaScritta()">
+        <span style="font-weight:800;color:var(--muted)">sats</span>
+      </div>
+      <div id="manciaBarattolo" style="display:none;margin-top:14px">
+        <div style="font-size:13.5px;font-weight:800;margin-bottom:6px">⚡ Vuoi mandare anche uno zap a Barattolo?</div>
+        <div class="hint" style="margin:0 0 8px">Facoltativo: ci aiuta a tenere acceso il mercatino.</div>
+        <div class="consegna-scelta" id="manciaZapChips" style="margin:0"></div>
+      </div>
+      <div id="manciaRiga" style="font-size:13px;font-weight:700;margin-top:10px;min-height:18px"></div>
+      <div class="hint" style="margin-top:6px">💡 La mancia va <b>dritta al wallet del venditore</b>: Barattolo non la tocca e non prende commissioni. È un regalo fuori dal deposito di garanzia, quindi <b>non si rimborsa</b>.</div>
+      <button class="btn orange" style="margin-top:12px" id="manciaManda" onclick="mandaMancia(this)">🎁 Manda la mancia</button>
+    </div>
+    <div id="manciaPaga" style="display:none">
+      <div style="font-size:12px;font-weight:800;color:var(--muted)" id="manciaPasso"></div>
+      <h3 style="margin:4px 0 8px"><span class="mono" id="manciaCifra" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span> <span id="manciaA"></span></h3>
+      <div class="qr" id="manciaQr"></div>
+      <div class="invoice" id="manciaInvoice" onclick="copiaFatturaMancia()" style="cursor:pointer" title="Tocca per copiare"></div>
+      <div style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">inquadra il QR col wallet, o tocca la fattura per copiarla</div>
+      <a class="btn ghost" id="manciaWallet" href="#" style="display:block;text-align:center;text-decoration:none">⚡ Apri nel wallet</a>
+      <button class="btn primary" id="manciaFatto" onclick="manciaPagata(this)">✓ L'ho pagata</button>
+      <button class="btn ghost" id="manciaSalta" style="display:none" onclick="manciaSaltaZap()">Salta lo zap a Barattolo</button>
+    </div>
+  </div>
+
   <!-- ============ SHEET OFFERTA SUL CARRELLO (ago 2026) ============ -->
   <!-- Il gemello SEMPLIFICATO di #offertaSheet: UNA cifra sul TOTALE
        del carrello. NIENTE toggle €/₿ e niente ancora, deliberato:
@@ -18136,6 +18180,10 @@ function mapOrder(o){
        dice se e' gia' stata rigenerata (si puo' una volta sola). */
     fattura:(role==='buyer' && o.stato==='creato') ? (o.invoice||'') : '',
     fatturaRinnovataIl:o.fattura_rinnovata_il||0,
+    /* LA MANCIA AL VENDITORE (14 nov 2026): {possibile, max,
+       zap_barattolo, mance} dal server (`mance_di_ordini`), solo alle
+       due parti; null = niente da mostrare */
+    mancia:o.mancia||null,
     /* LO STADIO «IN PAGAMENTO» (set 2026): lo decide il server
        (`stadio_pagamento`), qui arriva gia' giudicato — null dove non
        c'e', e allora la pagina e' quella di sempre */
@@ -35175,6 +35223,7 @@ function closeSheet(){
   el('installSheet').classList.remove('open');
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
+  el('manciaSheet').classList.remove('open');
   el('offertaCarrelloSheet').classList.remove('open');
   el('confermaSheet').classList.remove('open');
   el('jarShareSheet').classList.remove('open');
@@ -38172,6 +38221,7 @@ function openOrder(id){
       ${notaFermo(o)}
       ${bottoneSollecito(o)}
       ${puoiLasciareFeedback(o) ? feedbackPanel(o) : ''}
+      ${pannelloMancia(o)}
       ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) && !inPagamento(o) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
       ${/* LA CHAT DELL'ORDINE (16 ott 2026, cantiere chat-mercatino): il
            riquadro della chat dello scambio, dal pagamento alla
@@ -38220,6 +38270,244 @@ function openOrder(id){
       o.role!=='seller'), 250);
   }
 }
+/* ═══ LA MANCIA AL VENDITORE (14 nov 2026, cantiere mancia-venditore) ═══
+   IL CASO: chi compra un libro a 11 € voleva lasciare di piu', e l'app
+   non glielo permetteva (un'offerta sopra il prezzo non esiste, ed e'
+   giusto). La mancia e' uno ZAP DIRETTO al Lightning address di chi
+   vende: la fattura la chiede il server al suo wallet
+   (`/orders/{id}/mancia`), chi compra la paga col suo, e Barattolo non
+   tocca un sat — niente fee, niente deposito, niente rimborso. Nello
+   stesso foglio, PRIMA di mandare (Andrea), lo zap facoltativo a
+   Barattolo: un secondo importo, a «Niente» di serie, la cui fattura
+   viene dal callback di casa (`/lnurl/zap`, il suo freno e il suo
+   orologio). Due wallet, due fatture, una alla volta.
+   COME SAPPIAMO CHE E' ARRIVATA: la preimage che rende il wallet
+   collegato, o LUD-21 dove il wallet di chi vende lo da' (il battito
+   del foglio lo chiede ogni 5 s); senza, la parola di chi l'ha mandata
+   («L'ho pagata»), e chi vende legge «controlla il wallet». Il giudice
+   e' il server (`esito_mancia`), qui si riferisce e basta. */
+const MANCIA_PILLOLE = [500, 1000, 2100];
+const MANCIA_ZAP_PILLOLE = [0, 100, 210, 500];
+const MANCIA_BATTITO_MS = 5000;
+let manciaOid = 0, manciaSats = 1000, manciaZap = 0;
+/* i pagamenti che restano, in ordine: {tipo:'venditore'|'barattolo',
+   id, invoice, sats, verificabile} — e quanti erano all'inizio, per il
+   «passo 1 di 2» */
+let manciaCoda = [], manciaTotale = 0, manciaBattito = null;
+
+function nomeVenditoreMancia(o){
+  const v = (o && o.voltoVenditore) || {};
+  return v.nome ? String(v.nome).split(' ')[0] : '';
+}
+function fraseStatoMancia(m, vende){
+  return m.stato === 'arrivata' ? '✅ arrivata'
+       : (vende ? '👀 controlla il wallet' : '📨 mandata');
+}
+/* Il riquadro nell'ordine. A CHI COMPRA: il bottone (piu' acceso a
+   affare concluso, accanto al voto: e' il momento in cui e' contento) e
+   le mance gia' lasciate. A CHI VENDE: solo quelle ricevute. Il
+   moderatore non lo vede: non e' un fatto della disputa. */
+function pannelloMancia(o){
+  const m = o && o.mancia;
+  if (!m || o.role === 'admin') return '';
+  const mance = m.mance || [];
+  const vende = o.role === 'seller';
+  const lista = mance.length
+    ? `<div class="hint" style="margin:6px 0 0">${mance.map(x =>
+        `🎁 <b class="mono">${fmt(x.sats)}</b> sats · ${fraseStatoMancia(x, vende)}`).join('<br>')}</div>`
+    : '';
+  if (vende) {
+    return mance.length
+      ? `<div class="trust-note">🎁 <span><b>${mance.length === 1 ? 'Hai ricevuto una mancia' : 'Hai ricevuto delle mance'}</b> per quest'ordine. Vanno dritte al tuo Lightning address: Barattolo non le tocca.${lista}</span></div>`
+      : '';
+  }
+  if (!m.possibile) {
+    return mance.length
+      ? `<div class="trust-note">🎁 <span><b>Grazie per la mancia!</b>${lista}</span></div>` : '';
+  }
+  const primo = nomeVenditoreMancia(o);
+  const concluso = puoiLasciareFeedback(o);
+  return `<div class="payout" id="ordMancia"><h4>🎁 ${concluso ? 'Ti è piaciuto l\'affare?' : 'Vuoi lasciare una mancia?'}</h4>
+      <div class="hint">Un grazie in sats ${primo ? 'a <b>' + esc(primo) + '</b>' : 'al venditore'}: va dritto al suo wallet, Barattolo non prende niente.</div>${lista}
+      <button class="btn ${concluso ? 'orange' : 'ghost'}" onclick="apriMancia()">🎁 Lascia una mancia</button></div>`;
+}
+function apriMancia(){
+  haptic();
+  if (DEMO || VETRINA) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  const o = currentOrder;
+  if (!o || !o.mancia || !o.mancia.possibile) return;
+  manciaOid = o.id; manciaSats = 1000; manciaZap = 0;
+  manciaCoda = []; manciaTotale = 0;
+  fermaBattitoMancia();
+  el('manciaImporto').value = '';
+  const primo = nomeVenditoreMancia(o);
+  el('manciaPerChi').innerHTML = `Per ${primo ? '<b>' + esc(primo) + '</b>' : 'il venditore'}, da ${fmt(1)} a ${fmt(o.mancia.max)} sats.`;
+  el('manciaBarattolo').style.display = o.mancia.zap_barattolo ? '' : 'none';
+  el('manciaScelta').style.display = '';
+  el('manciaPaga').style.display = 'none';
+  disegnaMancia();
+  el('sheetBg').classList.add('open');
+  el('manciaSheet').classList.add('open');
+}
+/* le pillole, la riga del conto e il bottone: un render solo, letto
+   dalle tre variabili */
+function disegnaMancia(){
+  const o = currentOrder, max = (o && o.mancia && o.mancia.max) || 0;
+  const scritta = !!el('manciaImporto').value.trim();
+  el('manciaChips').innerHTML = MANCIA_PILLOLE.map(v =>
+    `<button type="button" class="consegna-pill${!scritta && manciaSats === v ? ' attiva' : ''}" onclick="manciaChip(${v})">${fmt(v)}</button>`).join('');
+  el('manciaZapChips').innerHTML = MANCIA_ZAP_PILLOLE.map(v =>
+    `<button type="button" class="consegna-pill${manciaZap === v ? ' attiva' : ''}" onclick="manciaZapChip(${v})">${v ? fmt(v) : 'Niente'}</button>`).join('');
+  const zap = (o && o.mancia && o.mancia.zap_barattolo) ? manciaZap : 0;
+  const riga = el('manciaRiga'), btn = el('manciaManda');
+  if (!(manciaSats >= 1)) {
+    riga.textContent = 'Scegli quanti sats lasciare';
+    btn.disabled = true; return;
+  }
+  if (max && manciaSats > max) {
+    riga.innerHTML = `<span style="color:var(--sats-text)">Al massimo ${fmt(max)} sats per una mancia</span>`;
+    btn.disabled = true; return;
+  }
+  btn.disabled = false;
+  riga.innerHTML = `Al venditore <b class="mono">${fmt(manciaSats)}</b> sats`
+    + (zap ? ` · a Barattolo <b class="mono">${fmt(zap)}</b> sats · totale <b class="mono">${fmt(manciaSats + zap)}</b>` : '');
+}
+function manciaChip(v){ haptic(); manciaSats = v; el('manciaImporto').value = ''; disegnaMancia(); }
+function manciaZapChip(v){ haptic(); manciaZap = v; disegnaMancia(); }
+function manciaScritta(){
+  const cifre = el('manciaImporto').value.replace(/\D/g, '');
+  manciaSats = cifre ? parseInt(cifre, 10) : 0;
+  disegnaMancia();
+}
+async function mandaMancia(btn){
+  haptic();
+  const o = currentOrder;
+  if (!o || o.id !== manciaOid || !(manciaSats >= 1)) return;
+  const ripristina = bottoneInAttesa(btn, 'Chiedo la fattura…');
+  try {
+    const r = await fetch(`${API_BASE}/orders/${manciaOid}/mancia`, {method:'POST',
+      headers:{'Content-Type':'application/json', 'X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({sats: manciaSats})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Fattura non arrivata: riprova', 7000); return; }
+    manciaCoda = [{tipo:'venditore', id:d.id, invoice:d.invoice, sats:d.sats,
+                   verificabile:!!d.verificabile}];
+    const zap = (o.mancia && o.mancia.zap_barattolo) ? manciaZap : 0;
+    if (zap > 0) {
+      const pr = await fatturaZapBarattolo(zap);
+      if (pr) manciaCoda.push({tipo:'barattolo', invoice:pr, sats:zap});
+      else toast('Lo zap a Barattolo non è partito, la mancia sì: grazie lo stesso!', 5000);
+    }
+    manciaTotale = manciaCoda.length;
+    if (walletNwcPaga()) { await pagaManciaNwc(); return; }
+    passoMancia();
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+/* la fattura dello zap a Barattolo, dal callback dell'indirizzo di casa
+   (lo stesso che usa un wallet qualunque per zap@): '' se non arriva */
+async function fatturaZapBarattolo(sats){
+  try {
+    const r = await fetch(`${API_BASE}/lnurl/zap?amount=${sats * 1000}&comment=`
+      + encodeURIComponent('Zap insieme a una mancia'));
+    const d = await r.json().catch(()=>({}));
+    return (r.ok && d.pr) ? String(d.pr) : '';
+  } catch(e) { return ''; }
+}
+/* col wallet collegato le fatture partono da sole, una dopo l'altra; la
+   preimage di quella del venditore va al server, che cosi' la sa
+   arrivata. Al primo intoppo si ripiega sul QR da dove si era rimasti. */
+async function pagaManciaNwc(){
+  let cliente = null;
+  try {
+    cliente = await clientNwc(walletNwcPaga());
+    while (manciaCoda.length) {
+      const p = manciaCoda[0];
+      const res = await cliente.paga(p.invoice);
+      manciaCoda.shift();
+      if (p.tipo === 'venditore')
+        await esitoMancia(p, {preimage: (res && res.preimage) || ''}).catch(()=>{});
+    }
+    await fineMancia();
+  } catch(e) {
+    toast(`Il wallet non ha pagato (${(e && e.message) || 'non risponde'}): puoi pagare a mano da qui`, 6000);
+    passoMancia();
+  } finally { if (cliente) cliente.chiudi(); }
+}
+async function esitoMancia(p, corpo){
+  const r = await fetch(`${API_BASE}/orders/${manciaOid}/mancia/${p.id}/esito`, {method:'POST',
+    headers:{'Content-Type':'application/json', 'X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify(corpo || {})});
+  const d = await r.json().catch(()=>({}));
+  return r.ok ? (d.stato || '') : '';
+}
+function fermaBattitoMancia(){
+  if (manciaBattito) { clearInterval(manciaBattito); manciaBattito = null; }
+}
+/* il passo del pagamento: la fattura in testa alla coda */
+function passoMancia(){
+  fermaBattitoMancia();
+  const p = manciaCoda[0];
+  if (!p) { fineMancia(); return; }
+  const n = manciaTotale - manciaCoda.length + 1;
+  el('manciaScelta').style.display = 'none';
+  el('manciaPaga').style.display = '';
+  el('manciaPasso').textContent = manciaTotale > 1 ? `Passo ${n} di ${manciaTotale}` : '';
+  el('manciaCifra').textContent = fmt(p.sats);
+  const primo = nomeVenditoreMancia(currentOrder);
+  el('manciaA').textContent = p.tipo === 'venditore'
+    ? (primo ? 'di mancia a ' + primo : 'di mancia al venditore') : 'di zap a Barattolo ⚡';
+  el('manciaInvoice').textContent = p.invoice;
+  portaWallet(el('manciaWallet'), p.invoice);
+  el('manciaSalta').style.display = p.tipo === 'barattolo' ? '' : 'none';
+  disegnaQr(el('manciaQr'), ('lightning:' + p.invoice).toUpperCase(), 'Alphanumeric');
+  /* dove il wallet di chi vende risponde a LUD-21, il foglio va avanti
+     da solo appena la mancia arriva */
+  if (p.tipo === 'venditore' && p.verificabile) {
+    manciaBattito = setInterval(async () => {
+      if (!el('manciaSheet').classList.contains('open') || manciaCoda[0] !== p) {
+        fermaBattitoMancia(); return;
+      }
+      const stato = await esitoMancia(p, {}).catch(()=>'');
+      if (stato === 'arrivata' && manciaCoda[0] === p) {
+        toast('🎁 Mancia arrivata!', 3000);
+        manciaCoda.shift(); passoMancia();
+      }
+    }, MANCIA_BATTITO_MS);
+  }
+}
+function copiaFatturaMancia(){
+  const p = manciaCoda[0]; if (!p) return;
+  haptic();
+  copiaLink(p.invoice, 'Fattura copiata 📋');
+}
+async function manciaPagata(btn){
+  haptic();
+  const p = manciaCoda[0]; if (!p) return;
+  if (p.tipo === 'venditore') {
+    const ripristina = bottoneInAttesa(btn, 'Lo dico al venditore…');
+    try { await esitoMancia(p, {dichiarata: true}); }
+    catch(e) { /* la mancia e' partita comunque: il foglio va avanti */ }
+    finally { ripristina(); }
+  }
+  if (manciaCoda[0] === p) manciaCoda.shift();
+  passoMancia();
+}
+function manciaSaltaZap(){
+  haptic();
+  manciaCoda = manciaCoda.filter(p => p.tipo !== 'barattolo');
+  passoMancia();
+}
+async function fineMancia(){
+  fermaBattitoMancia();
+  const oid = manciaOid;
+  if (el('manciaSheet').classList.contains('open')) navIndietro();
+  toast('🎁 Grazie! Il venditore riceve la tua mancia', 4000);
+  await loadOrders(); renderOrders();
+  if (currentOrder && currentOrder.id === oid
+      && el('view-ordine').classList.contains('active')) openOrder(oid);
+}
+
 /* ---- feedback reciproco a affare concluso ---- */
 let stellaScelta = 0;   // il voto scelto ma non ancora inviato
 

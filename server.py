@@ -2881,6 +2881,10 @@ FRENI = {
     # che risponde — un dito non ci arriva, una raffica si'
     "assistenza": (20, 3600),         # messaggi allo staff, per persona
     "assistenza_staff": (120, 3600),  # risposte di un admin, per admin
+    # la mancia al venditore (14 nov 2026): ogni fattura e' una GET al
+    # wallet di chi vende; il battito del foglio chiede a LUD-21 ogni 5 s
+    "mancia": (20, 3600),             # fatture di mancia chieste, per persona
+    "mancia_guarda": (240, 3600),     # «e' arrivata?» al wallet di chi vende, per persona
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
 MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
@@ -15897,7 +15901,8 @@ def _json_lnurl(r) -> dict:
     return letto if isinstance(letto, dict) else {}
 
 
-async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
+async def invoice_da_ln_address(ln_address: str, sats: int,
+                                extra: dict | None = None) -> str | None:
     """INCASSO AUTOMATICO: dato il Lightning address del venditore
     (es. mario@walletofsatoshi.com), chiede al suo wallet una invoice
     dell'importo giusto, senza che il venditore debba fare nulla.
@@ -15908,7 +15913,11 @@ async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
     passano TUTT'E DUE da `_url_lnurl_ammesso`, i redirect non si
     seguono (un 3xx e' un no), e la risposta ha un tetto. Un wallet
     onesto non se ne accorge: risponde in https sulla 443 da un
-    indirizzo pubblico, che e' quel che LUD-06 gli chiede."""
+    indirizzo pubblico, che e' quel che LUD-06 gli chiede.
+    `extra` (14 nov 2026, la mancia al venditore): un dizionario che chi
+    chiama passa SOLO se vuole il `verify` di LUD-21 — ci finisce dentro
+    se il wallet lo da' e se passa la stessa guardia del callback. Gli
+    incassi non lo passano, e per loro non cambia una virgola."""
     try:
         nome, dominio = ln_address.strip().lower().split("@")
         if not FORMA_LN_NOME.fullmatch(nome) or not FORMA_LN_DOMINIO.fullmatch(dominio):
@@ -15933,7 +15942,8 @@ async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
                 return None
             r = await c.get(callback, params={"amount": msat})
             r.raise_for_status()
-            pr = _json_lnurl(r).get("pr") or None
+            risposta = _json_lnurl(r)
+            pr = risposta.get("pr") or None
             if not pr:
                 return None
             # LA FATTURA LA SCRIVE IL BENEFICIARIO, quindi si rilegge
@@ -15947,6 +15957,10 @@ async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
                 print(f"⛔ Lightning address «{ln_address}»: chiesti {sats} "
                       f"sats, la invoice ne vale {chiesto}. Scartata.")
                 return None
+            if extra is not None:
+                verify = str(risposta.get("verify") or "")
+                if verify and await _url_lnurl_ammesso(verify):
+                    extra["verify"] = verify
             return pr
     except LnbitsMuto:
         # LA RIGA DA NON AMMORBIDIRE (ago 2026): l'`except` qui sotto e'
@@ -35907,6 +35921,8 @@ def _leve_stato():
                   spento="nessuna notifica sul telefono e nessun tasto; "
                          "le iscrizioni restano, e riaccesa si riparte"),
         ]},
+        # LA MANCIA AL VENDITORE (14 nov 2026): accesa di serie
+        {"gruppo": "🎁 Mancia al venditore", "voci": _mancia_leve()},
         {"gruppo": "🆕 Avvisi del mercatino", "voci": [
             # GLI AVVISI DEI NUOVI ANNUNCI E DEI VENDITORI SEGUITI (9 ott
             # 2026): la leva globale e le due finestre del raggruppamento;
@@ -85989,6 +86005,9 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
     for r in righe:
         if r["venditore_id"] == user["id"] and swap_auto_per(user["id"]):
             r["incasso_atteso"] = incasso_ln_ordine(con, r)
+    # LA MANCIA AL VENDITORE (14 nov 2026): se si puo' lasciare, e quelle
+    # gia' lasciate — solo alle due parti, mai l'indirizzo di chi vende
+    mance_di_ordini(con, righe, user["id"])
     con.close()
     for r in righe:
         if r["id"] in stadi:
@@ -105525,6 +105544,374 @@ def _zap_leve() -> list:
 # (Qui finisce il blocco dell'indirizzo Lightning di casa. La riga non e'
 # un vezzo: le prove ritagliano una funzione fino alle due righe vuote
 # che la seguono, e l'ultima del file senza niente dopo non si ritaglia.)
+
+
+# ---------- LA MANCIA AL VENDITORE (14 nov 2026, cantiere mancia-venditore) ----------
+# IL CASO VERO: un compratore voleva pagare il libro di un venditore PIU'
+# del prezzo («11 € sono pochi»), e l'app non lo lasciava: un'offerta
+# sopra il prezzo non esiste, ed e' giusto — l'offerta e' una trattativa.
+# La mancia e' un'ALTRA cosa, e il piano approvato da Andrea (sulla
+# thread, «va bene cosi'») la fa cosi':
+#
+#   · E' UNO ZAP DIRETTO al Lightning address del venditore (LNURL-pay):
+#     i sats vanno dal wallet di chi compra a quello di chi vende, e
+#     Barattolo NON LI TOCCA. Niente custodia, niente fee (la regola 10
+#     non c'entra nemmeno: non c'e' una tariffa da mettere da nessuna
+#     parte), niente deposito di garanzia.
+#   · QUINDI NON SI RIMBORSA: e' un regalo, e parte DOPO il pagamento
+#     dell'ordine, fuori dal deposito. Il foglio lo dice prima di pagare.
+#   · LA FATTURA LA CHIEDE IL SERVER al wallet del venditore con
+#     `invoice_da_ln_address`, la stessa degli incassi automatici: la
+#     guardia anti-SSRF sulla partenza e sul callback, niente redirect,
+#     la risposta col tetto, l'importo riletto. Il browser non bussa a
+#     domini scelti da un venditore.
+#   · LA STRADA SCARTATA: la mancia DENTRO il deposito, al checkout, in
+#     un pagamento solo. Toccava una ventina di calcoli del netto del
+#     venditore (`netto_venditore(prezzo - protezione)`), le regole dei
+#     rimborsi e delle dispute, e l'invariante della testata
+#     dell'ordine: tanta superficie sui soldi per un regalo.
+#   · SE ARRIVA DAVVERO: la prova forte e' la PREIMAGE (il wallet
+#     collegato la rende pagando: sha256(preimage) = payment hash), poi
+#     LUD-21 (il `verify` che alcuni wallet danno col callback). Senza
+#     nessuna delle due la mancia e' «dichiarata» da chi l'ha mandata, e
+#     il venditore legge «controlla il wallet»: non si promette quel che
+#     non si puo' sapere.
+#   · ACCANTO, LO ZAP A BARATTOLO (Andrea: «quando uno clicca sul tasto
+#     zap l'app gli propone se oltre all'utente vuole fare uno zap
+#     direttamente a Barattolo»): lo stesso foglio propone un secondo
+#     importo, facoltativo e a zero di serie, che va a zap@ — il client
+#     chiede la fattura al callback di casa (`/api/lnurl/zap`), col suo
+#     freno e il suo orologio. Due wallet diversi, due fatture.
+#
+# LE LEVE (accese di serie, la regola di Andrea del 14 nov 2026):
+#   MANCIA_ATTIVA    il bottone e le due rotte; spenta = 404 e niente
+#                    bottone. Le mance gia' mandate restano nell'ordine.
+#   MANCIA_MAX_SATS  il tetto di UNA mancia (100.000 sats di serie).
+try:
+    from config import MANCIA_ATTIVA
+except ImportError:
+    MANCIA_ATTIVA = True
+try:
+    from config import MANCIA_MAX_SATS
+except ImportError:
+    MANCIA_MAX_SATS = 100_000
+
+MANCIA_MIN_SATS = 1
+MANCIA_MAX_SATS_SERIE = 100_000
+# Gli stati in cui una mancia si puo' mandare: l'ordine PAGATO e mai
+# finito male. Da 'locked' (chi vuole la lascia subito, come chi l'ha
+# chiesta) a 'released'; mai su un ordine da pagare, annullato, in
+# disputa o in rimborso — la' un regalo al venditore sarebbe un errore.
+MANCIA_STATI = ("locked", "shipped", "delivered", "confirmed", "released")
+# Quante mance «arrivate o dichiarate» per ordine: un tetto di forma,
+# non di soldi (i soldi li tiene MANCIA_MAX_SATS), perche' la lista
+# dentro l'ordine resti una lista.
+MANCIA_MAX_PER_ORDINE = 10
+
+
+def mancia_max_sats() -> int:
+    """Il tetto di una mancia, letto vivo; una riga storta nel config
+    vale il default, non zero (come `zap_max_sats`)."""
+    try:
+        n = int(MANCIA_MAX_SATS)
+    except (TypeError, ValueError):
+        return MANCIA_MAX_SATS_SERIE
+    return n if n >= MANCIA_MIN_SATS else MANCIA_MAX_SATS_SERIE
+
+
+def mancia_ammessa(stato: str, chi: int, compratore: int,
+                   venditore: int, ln_address: str) -> bool:
+    """PURA, il giudice unico del bottone e della rotta: la leva accesa,
+    chi chiede e' il COMPRATORE di quell'ordine (e non anche chi vende:
+    un regalo a se stessi non e' un regalo), l'ordine e' pagato e mai
+    finito male, e chi vende ha un Lightning address. Senza indirizzo
+    non c'e' niente a cui chiedere la fattura: il bottone non compare."""
+    return (bool(MANCIA_ATTIVA)
+            and int(chi or 0) == int(compratore or 0) != int(venditore or 0)
+            and stato in MANCIA_STATI
+            and "@" in str(ln_address or ""))
+
+
+def _mance_prepara_tabella(con):
+    """`mance`: una riga per fattura chiesta al wallet del venditore.
+    `stato`: chiesta (la fattura c'e', di pagata non sappiamo niente) |
+    dichiarata (chi compra dice di averla pagata) | arrivata (preimage
+    o LUD-21). `verify` e' l'URL di LUD-21 se il wallet l'ha dato (gia'
+    passato dalla guardia), `avvisato` il timbro dell'avviso a chi
+    vende: uno solo per mancia."""
+    con.execute("""CREATE TABLE IF NOT EXISTS mance(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ordine_id INTEGER NOT NULL,
+        compratore_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        sats INTEGER NOT NULL,
+        bolt11 TEXT DEFAULT '',
+        payment_hash TEXT DEFAULT '',
+        verify TEXT DEFAULT '',
+        stato TEXT DEFAULT 'chiesta',
+        creato INTEGER DEFAULT 0,
+        pagata_il INTEGER DEFAULT 0,
+        avvisato INTEGER DEFAULT 0)""")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_mance_ordine "
+                "ON mance(ordine_id)")
+
+
+def _mance_db():
+    con = db()
+    _mance_prepara_tabella(con)
+    return con
+
+
+def mance_di_ordini(con, righe: list, user_id: int) -> None:
+    """Attacca a ogni riga della lista ordini la chiave `mancia`, SOLO
+    per le due parti: {possibile, max, zap_barattolo, mance: [{sats,
+    stato, il}]}. Escono le mance arrivate e dichiarate, mai quelle solo
+    chieste (una fattura chiesta e mai pagata non e' un fatto per chi
+    vende). Il Lightning address del venditore NON esce: esce il SE."""
+    if not righe:
+        return
+    _mance_prepara_tabella(con)
+    ids = [r["id"] for r in righe]
+    per_ordine: dict = {}
+    for i in range(0, len(ids), 500):
+        pezzo = ids[i:i + 500]
+        for m in con.execute(
+                "SELECT ordine_id, sats, stato, pagata_il, creato FROM mance "
+                f"WHERE ordine_id IN ({','.join('?' * len(pezzo))}) "
+                "AND stato IN ('dichiarata','arrivata') ORDER BY id", pezzo):
+            per_ordine.setdefault(m["ordine_id"], []).append(
+                {"sats": m["sats"], "stato": m["stato"],
+                 "il": m["pagata_il"] or m["creato"]})
+    venditori = {r["venditore_id"] for r in righe
+                 if r["compratore_id"] == user_id}
+    indirizzi = {}
+    if venditori and MANCIA_ATTIVA:
+        lista = list(venditori)
+        for v in con.execute(
+                "SELECT tg_id, ln_address FROM utenti WHERE tg_id IN "
+                f"({','.join('?' * len(lista))})", lista):
+            indirizzi[v["tg_id"]] = v["ln_address"] or ""
+    zap_casa = zap_vivo()
+    for r in righe:
+        if user_id not in (r["compratore_id"], r["venditore_id"]):
+            continue
+        mance = per_ordine.get(r["id"], [])
+        possibile = (mancia_ammessa(r["stato"], user_id, r["compratore_id"],
+                                    r["venditore_id"],
+                                    indirizzi.get(r["venditore_id"], ""))
+                     and len(mance) < MANCIA_MAX_PER_ORDINE)
+        if not mance and not possibile:
+            continue
+        r["mancia"] = {"possibile": possibile, "max": mancia_max_sats(),
+                       "zap_barattolo": bool(possibile and zap_casa),
+                       "mance": mance}
+
+
+def testo_avviso_mancia(sats: int, ordine_id: int, titolo: str,
+                        arrivata: bool) -> str:
+    """PURA: le parole per chi vende. Arrivata = l'abbiamo VISTA (la
+    preimage o il suo wallet); dichiarata = ce lo dice chi l'ha mandata,
+    e allora si dice di guardare il wallet, non che e' arrivata."""
+    cosa = f"«{titolo}»" if titolo else f"l'ordine #{ordine_id}"
+    if arrivata:
+        return (f"🎁 Ti hanno lasciato una mancia di {_fmt_sats(sats)} sats "
+                f"per {cosa}! È già nel tuo wallet: va dritta al tuo "
+                "Lightning address, Barattolo non la tocca.")
+    return (f"🎁 Chi ha comprato {cosa} dice di averti mandato una mancia "
+            f"di {_fmt_sats(sats)} sats al tuo Lightning address. "
+            "Controlla il wallet: va dritta a te, Barattolo non la tocca.")
+
+
+async def mancia_verifica_lud21(verify: str, payment_hash: str):
+    """LUD-21: chiede al wallet del venditore se la fattura e' pagata.
+    True = pagata (con la preimage giusta, se la dice), False = non
+    ancora, None = non lo so (URL non ammesso, wallet muto, risposta
+    storta). Stessa guardia del LNURL: niente redirect, tetto sulla
+    risposta, URL giudicato prima di bussare."""
+    if not verify:
+        return None
+    try:
+        if not await _url_lnurl_ammesso(verify):
+            return None
+        async with httpx.AsyncClient(timeout=10, follow_redirects=False) as c:
+            r = await c.get(verify)
+        if r.status_code != 200:
+            return None
+        d = _json_lnurl(r)
+        if str(d.get("status") or "").upper() == "ERROR":
+            return None
+        if not d.get("settled"):
+            return False
+        pre = str(d.get("preimage") or "").strip().lower()
+        if pre:
+            try:
+                return hashlib.sha256(bytes.fromhex(pre)).hexdigest() == payment_hash
+            except ValueError:
+                return None
+        return True
+    except Exception:
+        return None
+
+
+def preimage_giusta(preimage: str, payment_hash: str) -> bool:
+    """PURA: la preimage apre quel payment hash."""
+    try:
+        p = str(preimage or "").strip().lower()
+        return (len(p) == 64 and bool(payment_hash)
+                and hashlib.sha256(bytes.fromhex(p)).hexdigest() == payment_hash)
+    except ValueError:
+        return False
+
+
+@app.post("/api/orders/{ordine_id}/mancia")
+async def chiedi_mancia(ordine_id: int, req: Request,
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Il COMPRATORE chiede la fattura di una mancia: la conia il wallet
+    del venditore, dal suo Lightning address. Torna {id, invoice, sats,
+    verificabile}. 404 a leva spenta; 400 opaco se l'ordine non e' suo o
+    non e' nello stato giusto (non si distingue «non tuo» da «non
+    esiste»); il freno per persona, perche' ogni colpo e' una GET fuori
+    di casa e una lettura sul nostro nodo."""
+    if not MANCIA_ATTIVA:
+        raise HTTPException(404, "La mancia qui non c'è")
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    try:
+        sats = int(d.get("sats"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Scrivi quanti sats vuoi lasciare")
+    if not MANCIA_MIN_SATS <= sats <= mancia_max_sats():
+        raise HTTPException(400, f"La mancia va da {MANCIA_MIN_SATS} a "
+                                 f"{_fmt_sats(mancia_max_sats())} sats")
+    _frena("mancia", user["id"])
+    con = _mance_db()
+    try:
+        o = con.execute("SELECT id, stato, compratore_id, venditore_id "
+                        "FROM ordini WHERE id=?", (ordine_id,)).fetchone()
+        v = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                        (o["venditore_id"] if o else 0,)).fetchone()
+        ln = (v["ln_address"] if v else "") or ""
+        if not o or not mancia_ammessa(o["stato"], user["id"],
+                                       o["compratore_id"], o["venditore_id"],
+                                       ln):
+            raise HTTPException(400, "Qui una mancia non si può lasciare")
+        gia = con.execute("SELECT COUNT(*) AS n FROM mance WHERE ordine_id=? "
+                          "AND stato IN ('dichiarata','arrivata')",
+                          (ordine_id,)).fetchone()["n"]
+        if gia >= MANCIA_MAX_PER_ORDINE:
+            raise HTTPException(400, "Su questo ordine hai già lasciato "
+                                     "abbastanza mance: grazie!")
+    finally:
+        con.close()
+    extra: dict = {}
+    try:
+        bolt11 = await invoice_da_ln_address(ln, sats, extra)
+    except LnbitsMuto:
+        raise HTTPException(503, MSG_LNBITS_MUTO)
+    if not bolt11:
+        raise HTTPException(400, "Il wallet del venditore non ci ha dato una "
+                                 "fattura per questa cifra: prova un'altra "
+                                 "cifra, o riprova più tardi")
+    ph = zap_leggi_bolt11(bolt11).get("payment_hash") or ""
+    adesso = int(time.time())
+    con = _mance_db()
+    try:
+        cur = con.execute(
+            "INSERT INTO mance(ordine_id,compratore_id,venditore_id,sats,"
+            "bolt11,payment_hash,verify,stato,creato) "
+            "VALUES(?,?,?,?,?,?,?,'chiesta',?)",
+            (ordine_id, o["compratore_id"], o["venditore_id"], sats, bolt11,
+             ph, extra.get("verify", ""), adesso))
+        con.commit()
+        mid = cur.lastrowid
+    finally:
+        con.close()
+    # il journal dice il fatto e la cifra, mai l'indirizzo ne' la fattura
+    print(f"🎁 Mancia chiesta: ordine #{ordine_id}, {_fmt_sats(sats)} sats "
+          f"(riga {mid}{', LUD-21' if extra.get('verify') else ''})",
+          flush=True)
+    return {"id": mid, "invoice": bolt11, "sats": sats,
+            "verificabile": bool(extra.get("verify"))}
+
+
+@app.post("/api/orders/{ordine_id}/mancia/{mancia_id}/esito")
+async def esito_mancia(ordine_id: int, mancia_id: int, req: Request,
+                       x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Com'e' andata una mancia, detto da chi l'ha mandata. Il corpo
+    porta `preimage` (il wallet collegato l'ha resa pagando), o
+    `dichiarata: true` («l'ho pagata» col QR), o niente (il battito del
+    foglio, che chiede solo a LUD-21). La prova piu' forte vince: la
+    preimage, poi LUD-21, poi la parola. La riga sale e non scende mai
+    (chiesta → dichiarata → arrivata), e l'avviso a chi vende parte UNA
+    volta sola: l'UPDATE condizionato su `avvisato=0` e' il cancello.
+    Torna {stato}."""
+    if not MANCIA_ATTIVA:
+        raise HTTPException(404, "La mancia qui non c'è")
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = _mance_db()
+    try:
+        m = con.execute("SELECT * FROM mance WHERE id=? AND ordine_id=? "
+                        "AND compratore_id=?",
+                        (mancia_id, ordine_id, user["id"])).fetchone()
+        m = dict(m) if m else None
+    finally:
+        con.close()
+    if not m:
+        raise HTTPException(400, "Operazione non permessa")
+    nuovo = m["stato"]
+    if nuovo != "arrivata":
+        if preimage_giusta(d.get("preimage"), m["payment_hash"]):
+            nuovo = "arrivata"
+        elif m["verify"]:
+            _frena("mancia_guarda", user["id"])
+            if await mancia_verifica_lud21(m["verify"], m["payment_hash"]):
+                nuovo = "arrivata"
+        if nuovo == "chiesta" and d.get("dichiarata") is True:
+            nuovo = "dichiarata"
+    if nuovo == m["stato"]:
+        return {"stato": nuovo}
+    adesso = int(time.time())
+    con = _mance_db()
+    try:
+        con.execute("UPDATE mance SET stato=?, pagata_il=? WHERE id=? "
+                    "AND stato=?", (nuovo, adesso, m["id"], m["stato"]))
+        cur = con.execute("UPDATE mance SET avvisato=? WHERE id=? "
+                          "AND avvisato=0", (adesso, m["id"]))
+        con.commit()
+        avvisa = cur.rowcount == 1
+        t = con.execute("SELECT a.titolo FROM ordini o LEFT JOIN annunci a "
+                        "ON a.id=o.annuncio_id WHERE o.id=?",
+                        (ordine_id,)).fetchone()
+        titolo = (t["titolo"] if t else "") or ""
+    finally:
+        con.close()
+    print(f"🎁 Mancia {nuovo}: ordine #{ordine_id}, "
+          f"{_fmt_sats(m['sats'])} sats (riga {m['id']})", flush=True)
+    if avvisa:
+        await notifica(m["venditore_id"],
+                       testo_avviso_mancia(m["sats"], ordine_id, titolo,
+                                           nuovo == "arrivata"))
+    return {"stato": nuovo}
+
+
+def _mancia_leve() -> list:
+    """Le voci del pannello «Stato delle leve»."""
+    return [
+        _leva("Mancia al venditore", "MANCIA_ATTIVA", bool(MANCIA_ATTIVA),
+              acceso="nell'ordine pagato chi compra vede «🎁 Lascia una "
+                     "mancia»: uno zap diretto al Lightning address di chi "
+                     "vende, con l'invito a uno zap anche a Barattolo",
+              spento="nessun bottone e le due rotte rispondono 404; le "
+                     "mance già mandate restano negli ordini"),
+        _leva("Importo massimo di una mancia (sats)", "MANCIA_MAX_SATS",
+              mancia_max_sats()),
+    ]
+
+
+# (Qui finisce il blocco della mancia al venditore.)
 
 
 # ---------- L'INDIRIZZO DELLA QUOTA: swap@barattolo.store ----------

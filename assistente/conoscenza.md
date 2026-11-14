@@ -62,6 +62,8 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 
 Si può anche fare un'offerta più bassa con «Fai un'offerta»: il venditore la accetta o la rifiuta, e se la accetta hai un tempo per pagare, scritto nell'ordine. Un'offerta senza risposta scade da sola.
 
+La mancia al venditore (se nelle REGOLAZIONI del pannello «Mancia al venditore» è accesa): un'offerta può essere solo più bassa del prezzo, ma chi vuole dare di più al venditore può lasciargli una mancia. Nell'ordine già pagato, nella scheda «Ordini», c'è «🎁 Lascia una mancia»: si sceglie la cifra (500, 1.000, 2.100 sats o un'altra) e si paga col proprio wallet. Nello stesso foglio, se vuoi, puoi aggiungere anche uno zap a Barattolo (di serie è «Niente»): sono due fatture, una dopo l'altra. La mancia va DRITTA al Lightning address del venditore: Barattolo non la tocca e non prende commissioni. Per questo è un regalo fuori dal deposito di garanzia e NON si rimborsa, anche se poi l'ordine va male: chi ha dubbi la lascia dopo aver ricevuto l'oggetto. Il bottone c'è solo se il venditore ha impostato il suo Lightning address nel Profilo, e solo su un ordine pagato (non su uno annullato, in disputa o rimborsato). Il venditore riceve un avviso e vede la mancia nell'ordine: «arrivata» se Barattolo ha potuto verificarla, altrimenti «controlla il wallet».
+
 Tutti i tuoi acquisti e le tue vendite stanno nella scheda «Ordini», con lo stato di ogni ordine e i bottoni per il passo successivo. In fondo all'elenco c'è «📄 Esporta tutti gli ordini in CSV», che scarica un file con tutti i dettagli dei tuoi ordini (utile a chi vende per tenere i conti).
 
 Per un contenuto digitale il venditore può chiederti qualche informazione prima di pagare (per esempio nome, cognome o email, una scelta da un elenco, un sì o un no): rispondi alla cassa. Le risposte viaggiano cifrate dentro l'ordine, le leggete solo tu e il venditore, e si cancellano come l'indirizzo. Il numero di telefono non si può chiedere.
@@ -1047,16 +1049,28 @@ Pubblica lo stesso
 ✕
  sats
 💰 Offri
+
+<!-- pezzo schermata-038 | schermata -->
+## Schermata «On-chain e finestre della Mini App» · 🎁 Lascia una mancia (2/3)
+
+## 🎁 Lascia una mancia
+✕
+ sats
+⚡ Vuoi mandare anche uno zap a Barattolo?
+Facoltativo: ci aiuta a tenere acceso il mercatino.
+💡 La mancia va dritta al wallet del venditore: Barattolo non la tocca e non prende commissioni. È un regalo fuori dal deposito di garanzia, quindi non si rimborsa.
+🎁 Manda la mancia
+## sats 
+inquadra il QR col wallet, o tocca la fattura per copiarla
+ ⚡ Apri nel wallet
+✓ L'ho pagata
+Salta lo zap a Barattolo
 ## 💰 Offri per tutto il carrello
 €
 ₿
 ✕
  sats
 💰 Offri
-
-<!-- pezzo schermata-038 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · 🔨 Fai la tua puntata (2/3)
-
 ## 🔨 Fai la tua puntata
  sats
 Puntare = pagare: i sats vanno subito nel deposito di garanzia. Se vinci sono già il pagamento; se non vinci tornano indietro alla chiusura (o quando ti ritiri).
@@ -1115,6 +1129,10 @@ Inquadralo col telefono: entra l'account aperto nel Telegram del telefono.
 Chiudi
 ## 🧪 Collaudo privato
 Un attimo…
+
+<!-- pezzo schermata-039 | schermata -->
+## Schermata «On-chain e finestre della Mini App» · Entra con Nostr (3/3)
+
 ## Entra con Nostr
  Dimostri di possedere la tua chiave firmando una sfida.
  La chiave privata non viene mai inviata a nessuno.
@@ -1137,10 +1155,6 @@ Scrivilo prima di entrare, in qualunque modo entri: si collega da solo.
  Non hai ancora un profilo Nostr?
 Creane uno
 Annulla
-
-<!-- pezzo schermata-039 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · 🌱 Crea il tuo profilo Nostr (3/3)
-
 ## 🌱 Crea il tuo profilo Nostr
  Su Nostr non c'è un account con email e password: c'è una
  chiave. La parte pubblica è il tuo nome (la npub), quella
@@ -1359,4 +1373,12 @@ pubblico: sì
 frase: Gli avvisi dei nuovi ordini P2P ora si possono allargare anche agli ordini un po' meno convenienti del mercato: nella campanella, sotto «Convenienza», tocchi «Con un limite» e scegli fin dove ti va bene, da «Fino a 10% peggio» ad «Almeno 5% meglio». Così ti arrivano anche gli ordini quasi a mercato, ma non quelli troppo cari.
 dove: la scheda «P2P», la campanella 🔔 in alto (e il cassetto «🔔 Avvisi» del Profilo).
 leva: P2P_AVVISI_NUOVI_ORDINI (nessuna leva nuova)
+pubblico: sì
+
+<!-- pezzo novita-023 | novita -->
+## Novità · 2026-11-14 · mancia-venditore
+
+frase: Ti è piaciuto un affare e vuoi dare qualcosa in più al venditore? Ora puoi lasciargli una mancia: nell'ordine pagato c'è «🎁 Lascia una mancia», scegli quanti sats e li mandi dritti al suo wallet, senza commissioni. Nello stesso foglio puoi aggiungere, se vuoi, anche uno zap a Barattolo.
+dove: la scheda «Ordini», dentro un ordine già pagato, accanto al voto.
+leva: MANCIA_ATTIVA (nuova, accesa)
 pubblico: sì
