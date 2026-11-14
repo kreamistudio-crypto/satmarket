@@ -13602,7 +13602,10 @@ def prove_nascondi_ordine():
         username TEXT DEFAULT '', npub TEXT DEFAULT '',
         npub_accesso TEXT DEFAULT '', npub_verificata INT DEFAULT 0);
       CREATE TABLE feedback(ordine_id INT, da_tg_id INT, per_tg_id INT,
-        voto INT, commento TEXT);
+        voto INT, commento TEXT, creato INT DEFAULT 0,
+        modificato INT DEFAULT 0);
+      CREATE TABLE feedback_ritirati(ordine_id INT, da_tg_id INT,
+        per_tg_id INT, scambio TEXT DEFAULT '', ritirato INT);
       CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
         annuncio_id INT, quantita INT DEFAULT 1, unitario_sats INT,
         titolo TEXT DEFAULT '');
@@ -13720,9 +13723,14 @@ def prove_nascondi_ordine():
                # `prove_chat_mercatino`: qui la leva e' spenta
                "_chat_mercatino_vista": lambda *a: "", "MERCATINO_CHAT_ORDINI": False,
                "_chat_mercatino_ferma": lambda *a: False,
+               # la modifica dei feedback (14 nov 2026) ha le sue prove
+               # in `prove_feedback_modificabile`: qui la leva di serie
+               "FEEDBACK_MODIFICABILE": True, "FEEDBACK_MODIFICA_GIORNI": 7,
                "time": __import__("time"),
                "json": __import__("json"), **ambiente_in_pagamento()}
         exec(pezzo("_titolo_ordine"), amb)
+        exec(pezzo("_motivo_no_gesto_feedback"), amb)
+        exec(pezzo("_gesti_feedback"), amb)
         exec(pezzo("miei_ordini"), amb)
         return {r["id"]: r for r in amb["miei_ordini"](0, "", "")}
 
@@ -45995,7 +46003,12 @@ def prove_fogli_di_casa():
     # CINQUANTASEI, il foglio «🔮 La fee dinamica di Barattolo» — le fee
     # del mercatino restano a 0 (decisione di Andrea), la riga del conto
     # non si tocca piu'. Il conto torna a centonove.
-    prova("i gesti che passano dalla domanda unica sono centonove (dal 30 ott "
+    # CENTOTREDICI (14 nov 2026, cantiere feedback-modificabile): «Salvi
+    # la modifica?» e «Cancelli il tuo feedback?» nell'ordine del
+    # mercatino (`salvaModificaFeedback`, `cancellaFeedback`), e le due
+    # gemelle della recensione P2P (`salvaModificaRecensioneP2P`,
+    # `cancellaRecensioneP2P`).
+    prova("i gesti che passano dalla domanda unica sono centotredici (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -46003,8 +46016,9 @@ def prove_fogli_di_casa():
           "e «Crei le parole dello swap?» e «Ricevi on-chain?» dello swap "
           "automatico; «Rendere principale questo wallet?» e «Fare nascere "
           "un wallet nuovo?» del wallet unico; dal 13 nov «Hai inviato gli "
-          "ETH/XMR?»; dal 14 nov via il foglio della fee dinamica)",
-          109, solo_codice(mini).count("chiediConferma({"))
+          "ETH/XMR?»; dal 14 nov via il foglio della fee dinamica, e le "
+          "quattro della modifica e cancellazione dei feedback)",
+          113, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -61688,7 +61702,12 @@ def prove_card_parte_ordine():
         " zona TEXT DEFAULT '', foto TEXT DEFAULT '[]',"
         " asta_base_sats INTEGER DEFAULT 0);"
         "CREATE TABLE feedback(ordine_id INTEGER, da_tg_id INTEGER,"
-        " per_tg_id INTEGER, voto INTEGER, commento TEXT);"
+        " per_tg_id INTEGER, voto INTEGER, commento TEXT,"
+        " creato INTEGER DEFAULT 0, modificato INTEGER DEFAULT 0);"
+        # (14 nov 2026, feedback-modificabile) la lapide di chi ha
+        # cancellato il suo feedback: `miei_ordini` la legge
+        "CREATE TABLE feedback_ritirati(ordine_id INTEGER, da_tg_id INTEGER,"
+        " per_tg_id INTEGER, scambio TEXT DEFAULT '', ritirato INTEGER);"
         "CREATE TABLE tracking_storico(id INTEGER PRIMARY KEY,"
         " ordine_id INTEGER, reso INTEGER, corriere TEXT, tracking TEXT,"
         " sostituito_il INTEGER, da TEXT);"
@@ -61762,7 +61781,12 @@ def prove_card_parte_ordine():
     amb["_chat_mercatino_ferma"] = lambda *a: False
     amb["MERCATINO_CHAT_ORDINI"] = False
     amb["swap_auto_per"] = lambda t: False   # (9 nov 2026, incasso-annuncio)
-    for f in ("livello_utente", "_volti_persone", "miei_ordini"):
+    # i gesti del feedback (14 nov 2026, feedback-modificabile): la loro
+    # prova e' `prove_feedback_modificabile`; qui girano i giudici veri
+    amb["FEEDBACK_MODIFICABILE"] = True
+    amb["FEEDBACK_MODIFICA_GIORNI"] = 7
+    for f in ("_motivo_no_gesto_feedback", "_gesti_feedback",
+              "livello_utente", "_volti_persone", "miei_ordini"):
         exec(pezzo(f), amb)
     # la SPIA sul costruttore: chi gli si chiede, a ogni giro
     chiesti = []
@@ -74731,14 +74755,16 @@ def prove_volti_libro():
     # volti — «questi ordini sono miei» e «di chi sono questi» — piu'
     # le due della recensione, che vivono qui per la stessa ragione (il
     # motore dello scambio non ha dentro nessuna `fetch`).
-    prova("le fetch del blocco sono QUATTRO: due volti, due recensione", 4,
+    # SEI DAL 14 NOV 2026 (cantiere feedback-modificabile): la modifica e
+    # la cancellazione della recensione, sorelle delle due di sopra.
+    prova("le fetch del blocco sono SEI: due volti, quattro recensione", 6,
           cod.count("fetch("))
     corpi = set(re.findall(r"JSON\.stringify\(\{(\w+):", cod))
     prova("...e nei corpi vanno SOLO gli id degli ordini",
           {"ordini", "ordine"}, corpi)
     # NIENTE ID NELL'URL: una GET li metterebbe nei log del web server,
     # e un log e' un posto dove le cose restano
-    prova("gli id viaggiano in POST, mai nell'indirizzo", 4,
+    prova("gli id viaggiano in POST, mai nell'indirizzo", 6,
           cod.count("method: 'POST'"))
     # I PROVVISORI NON SI REGISTRANO: cambiano nome quando il
     # coordinatore risponde, e occuperebbero una PK per sempre
@@ -74748,8 +74774,8 @@ def prove_volti_libro():
     # OGNI FUNZIONE DI QUESTO BLOCCO CE L'HA, ed e' la forma che rende
     # la regola leggibile: quel che parla col nostro server passa dal
     # cancello dell'anonimo, senza eccezioni da ricordare.
-    prova("la vetrina anonima non chiede niente, da nessuna delle quattro",
-          4, cod.count("if (DEMO || VETRINA || !myTgId) return false;"))
+    prova("la vetrina anonima non chiede niente, da nessuna delle sei",
+          6, cod.count("if (DEMO || VETRINA || !myTgId) return false;"))
     # IL TOCCO SUL VOLTO APRE IL NEGOZIO (set 2026, richiesta di
     # Andrea): la porta vive nel blocco dei volti, ferma il tocco
     # prima che cada sulla card, e la card la lega SOLO quando un
@@ -108664,6 +108690,11 @@ def prove_feedback_confermato():
                   + "\n}\n"
                   + pezzo_js(mini, "function fbScelteHTML(", "\n}\n")
                   + "\n}\n"
+                  # la modifica dei feedback (14 nov 2026): lo stato del
+                  # modulo di modifica, le stelle comuni e le tre pure
+                  + "let fbModifica=0,stellaScelta=0;\n"
+                  + _fn_js(mini, "function moduloStelleFeedback(){")
+                  + gesti_feedback_js(mini)
                   + "const esc=s=>s;const o={state:'confirmed',disputata:0,"
                   "sbloccatoAuto:0,role:'buyer',mioVoto:0,suoVoto:0};"
                   "const h=puoiLasciareFeedback(o)?feedbackPanel(o):'';"
@@ -130549,7 +130580,7 @@ const flush = () => new Promise(r => setImmediate(r));
 
     # --- 5) IL RIQUADRO DELLA RECENSIONE E' QUELLO DEL MERCATINO ---------
     fb = fn("function feedbackPanel(o){")
-    mod = fn("function moduloRecensioneP2P(o){")
+    mod = fn("function moduloRecensioneP2P(o, rec){")
     riq = fn("function riquadroRecensioneP2P(o, rec){")
     stl = fn("function stelleSceltaP2P(){")
     prova("5) le classi del modulo stanno nel foglio di stile, una volta ciascuna",
@@ -130560,10 +130591,17 @@ const flush = () => new Promise(r => setImmediate(r));
               css.count(".payout .fb-commento{min-height:52px}"),
               css.count(".payout .fb-invia{margin-top:10px}"),
               css.count(".payout .fb-dopo{margin-top:8px}")])
+    # (14 nov 2026, feedback-modificabile) le stelle sono passate in
+    # `moduloStelleFeedback`, che serve il modulo nuovo e quello della
+    # modifica; e la riga «Feedback ricevuto» e' una sola, comune ai rami
+    _stelle_fb = fn("function moduloStelleFeedback(){")
     prova("...il mercatino le porta al posto dei suoi stili in linea", True,
-          '<div class="fb-stelle">' in fb and 'class="fb-commento"' in fb
+          '<div class="fb-stelle">' in _stelle_fb
+          and fb.count("${moduloStelleFeedback()}") == 2
+          and 'class="fb-commento"' in fb
           and 'class="btn primary fb-invia"' in fb
-          and fb.count('class="hint fb-dopo"') == 2 and "style=" not in fb)
+          and fb.count('class="hint fb-dopo"') == 1
+          and "style=" not in fb + _stelle_fb)
     prova("...e la recensione degli scambi le RIUSA, senza uno stile suo", True,
           "stelleSceltaP2P()" in mod and 'class="fb-commento"' in mod
           and 'class="btn primary fb-invia"' in mod and 'class="hint fb-dopo"' in mod
@@ -131899,9 +131937,12 @@ def prove_recensione_p2p():
           "o.recensione = 'senza'" in _chiedi
           and "esito.motivo !== 'muto'" in _chiedi)
     _invia = pezzo_js(mini, "async function inviaRecensioneP2P(btn){", "\n}\n")
-    prova("l'invio chiede prima, che e' definitiva", True,
+    # ⚠️ EMENDATA (14 nov 2026, feedback-modificabile): «definitiva»
+    # vale solo a finestra chiusa; la frase la scrive
+    # `testoFinestraFeedback` coi giorni che manda il server
+    prova("l'invio chiede prima, e dice fino a quando si cambia", True,
           "chiediConferma({" in _invia
-          and "non potrà essere modificata" in _invia)
+          and "testoFinestraFeedback(" in _invia)
     prova("...e parla con la rotta giusta", True,
           "/p2p/recensione`" in _invia)
     prova("...e le STESSE stelle vanno anche al circuito", True,
@@ -131929,11 +131970,12 @@ def prove_recensione_p2p():
     # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P»): la
     # recensione non ha piu' un foglio suo — e' il riquadro del
     # mercatino, nella pagina — e le parole stanno in `moduloRecensioneP2P`
-    _rr = pezzo_js(mini, "function moduloRecensioneP2P(o){", "\n}\n")
+    _rr = pezzo_js(mini, "function moduloRecensioneP2P(o, rec){", "\n}\n")
     prova("il riquadro dice dove va la recensione", True,
           "profilo di Barattolo" in _rr
           and "stessa media del mercatino" in _rr)
-    prova("...e che e' definitiva", True, "definitiva" in _rr)
+    prova("...e fino a quando si cambia (14 nov 2026)", True,
+          "testoFinestraFeedback(rec && rec.giorni, 'f')" in _rr)
     prova("...e che le stelle viaggiano anche di la', quando e' vero",
           True, "circuito degli scambi" in _rr and "o.votato" in _rr)
     _rv = pezzo_js(mini, "function renderVotoP2P(){", "\n}\n")
@@ -132033,12 +132075,16 @@ console.log(JSON.stringify(out));
         pezzo_js(mini, "function riquadroRecensioneP2P(o, rec){", "\n}\n") + "\n}",
         # (12 ott 2026) la frase per motivo di chi non ha un posto
         pezzo_js(mini, "function testoRecensioneMancanteP2P(motivo){", "\n}\n") + "\n}",
-        pezzo_js(mini, "function moduloRecensioneP2P(o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function moduloRecensioneP2P(o, rec){", "\n}\n") + "\n}",
         pezzo_js(mini, "function gestoRecensioneP2P(o, rec){", "\n}\n") + "\n}",
         pezzo_js(mini, "function stelleSceltaP2P(){", "\n}\n") + "\n}",
         pezzo_js(mini, "function sceltaStellaP2P(n){", "\n}\n") + "\n}",
+        # (14 nov 2026, feedback-modificabile) la frase della finestra e
+        # i due bottoni, che il riquadro e il modulo chiamano
+        gesti_feedback_js(mini),
     ]) + r"""
 let p2pStellaScelta = 0;
+let p2pRecModifica = '';
 function nomeControparteP2P(o, ripiego){ return (o && o.nome) || ripiego; }
 const nodi = {};
 function el(id){
@@ -168216,10 +168262,12 @@ def prove_feedback_p2p():
            "            bottoni[len(fuori)] = (P2P_BOTTONE_SCAMBIO," in att])
     fermo = codice(_senza_prosa(pezzo("_promemoria_recensione_p2p_fermo")))
     prova("i giudici del promemoria sono quelli della rotta che la recensione la scrive",
-          [True, True, True],
+          [True, True, True, True],
           ['_scambio_concluso_p2p(con, ordine, o["stato"])' in fermo,
            '_parti_recensione_p2p(o["tg_id"], o["preso_da"], io)' in fermo,
-           "_mia_recensione_p2p(con, ordine, io)" in fermo])
+           "_mia_recensione_p2p(con, ordine, io)" in fermo,
+           # (14 nov 2026) e la lapide di chi l'ha cancellata
+           "_ritirato_feedback(con, _numero_scambio_p2p(ordine), io)" in fermo])
     for nome, chiave in (
             ("_facce_ordini_p2p", 'fatti = _completati_p2p(con, [r["autore"] for r in righe])'),
             ("_facce_ordini_p2p", 'if fatti.get(int(r["autore"] or 0)):\n            '
@@ -168252,10 +168300,15 @@ def prove_feedback_p2p():
               "_ammette_recensione_p2p", "_scambio_concluso_p2p", "_chiusa_da_moderatore_p2p",
               "_mia_recensione_p2p", "_testo_promemoria_recensione_p2p",
               "_promemoria_recensione_p2p_fermo", "_completati_p2p",
-              "_sollecito_recapito_p2p_fermo"):
+              "_sollecito_recapito_p2p_fermo",
+              # (14 nov 2026, feedback-modificabile) la lapide della
+              # recensione cancellata: anche lei ferma il promemoria
+              "_ritirato_feedback", "_numero_scambio_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
+    amb.setdefault("hashlib", __import__("hashlib"))
     schema = ""
-    for tabella, fine in (("feedback", "\n    );"), ("p2p_dispute", "\n    );"),
+    for tabella, fine in (("feedback", "\n    );"), ("feedback_ritirati", "\n    );"),
+                          ("p2p_dispute", "\n    );"),
                           ("p2p_dispute_registro", "ON p2p_dispute_registro(ordine);")):
         i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
         schema += src[i:src.index(fine, i) + len(fine)] + "\n"
@@ -168263,12 +168316,16 @@ def prove_feedback_p2p():
     prova("il promemoria aspetta un giorno", 24 * 3600, amb["P2P_RECENSIONE_PROMEMORIA_S"])
     testo = amb["_testo_promemoria_recensione_p2p"]
     pulito = _re.sub(r"</?[bi]>", "", testo("Anna"))
-    prova("la frase: col nome dell'altra persona, dice dove sta la recensione e che e' "
-          "definitiva; senza nome «chi ha scambiato con te»", [True, True, True, None],
+    # EMENDATA (14 nov 2026, feedback-modificabile): non dice piu' «È
+    # definitiva» — per qualche giorno la recensione si modifica o si
+    # cancella
+    prova("la frase: col nome dell'altra persona, dice dove sta la recensione e a "
+          "cosa serve; senza nome «chi ha scambiato con te»", [True, True, True, None],
           [pulito.startswith("⭐ Com'è andata con Anna? Ieri avete chiuso uno scambio e non "
                              "hai ancora lasciato la recensione: la trovi nella pagina dello "
                              "scambio."),
-           pulito.endswith("È definitiva, e aiuta chi scambierà dopo di te."),
+           pulito.endswith("\n\nAiuta chi scambierà dopo di te.")
+           and "definitiva" not in pulito,
            "Com'è andata con chi ha scambiato con te?" in testo(""),
            _re.search(r"[\d€]", pulito)])
 
@@ -168482,12 +168539,13 @@ function stellaP2P(media){ return '[stella ' + media + ']'; }
 function icoPersonaP2P(){ return '[omino]'; }
 function stelleSceltaP2P(){ return '[stelle]'; }
 function nomeControparteP2P(o, altrimenti){ return altrimenti; }
-""" + "".join(_fn_js(m, f) for f in (
+let p2pRecModifica = '';
+""" + gesti_feedback_js(m) + "".join(_fn_js(m, f) for f in (
         "function paroleCompletatiP2P(n){", "function completatiP2P(n, inRiga){",
         "function scambiCortiP2P(n){",
         "function stellineP2P(f){",
         "function gestoRecensioneP2P(o, rec){",
-        "function riquadroRecensioneP2P(o, rec){", "function moduloRecensioneP2P(o){",
+        "function riquadroRecensioneP2P(o, rec){", "function moduloRecensioneP2P(o, rec){",
         "function testoRecensioneMancanteP2P(motivo){")) + r"""
 const c = {};
 c.riga = [0, 1, 2, 12, 'x', -3].map(n => completatiP2P(n, true));
@@ -168539,6 +168597,259 @@ console.log(JSON.stringify(c));
               c["gesto"])
         prova("client: il riquadro sull'annullato — da compilare col si', «lasciata» se c'e' "
               "gia', niente negli altri casi", [True, True, "", ""], c["riquadro"])
+
+
+def gesti_feedback_js(mini):
+    """LE TRE PURE DELLA MODIFICA DEI FEEDBACK (14 nov 2026): la frase
+    della finestra, la data «fino al» e i due bottoni. Per i banchi che
+    disegnano il riquadro del mercatino o della recensione P2P: da
+    quel giorno li chiamano tutti e due. Vuole `esc` solo se il banco
+    lo chiede per altro (queste non lo usano)."""
+    return "".join(_fn_js(mini, f) for f in (
+        "function testoFinestraFeedback(giorni, genere){",
+        "function fineFinestraFeedback(fino){",
+        "function gestiFeedbackHTML(g, apri, cancella, genere){"))
+
+
+def prove_feedback_modificabile():
+    """IL FEEDBACK SI MODIFICA E SI CANCELLA, PER UN PO' (14 nov 2026,
+    cantiere feedback-modificabile, richiesta di Andrea). Rovescia la
+    decisione di luglio («definitivo: chiude il ricatto "cambia il
+    feedback o…"») coi paletti approvati da Andrea: solo chi l'ha
+    scritto, FEEDBACK_MODIFICA_GIORNI giorni da `creato`, UNA modifica,
+    cancellazione PER SEMPRE (la lapide in `feedback_ritirati`), e il
+    voto basso alzato o cancellato detto ai moderatori.
+
+    QUEL CHE SI ROMPE IN SILENZIO: l'orologio che riparte dalla modifica
+    (e la finestra non si chiude mai); la seconda modifica che passa; la
+    lapide letta FUORI dal lock o scritta DOPO il DELETE (e togli-e-
+    rimetti torna una modifica senza tetto); il cartello del ricatto che
+    suona per un 4 diventato 5, o tace per un 1 sparito; la leva che non
+    si spegne col False; l'id dello scambio che esce in un avviso; il
+    client che conta da se' i giorni invece di leggere i gesti dal
+    server; il commento di prima incollato nella casella senza esc()."""
+    import sqlite3 as _sq
+    import json as _js
+    import shutil as _sh
+    import subprocess as _sp
+    print("\n[feedback-modificabile: modifica e cancella, per un po']")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    es = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) IL GIUDICE, sui casi che decidono ---------------------------
+    amb = {}
+    for f in ("_motivo_no_gesto_feedback", "_gesti_feedback",
+              "_voto_basso_toccato"):
+        exec(pezzo(f), amb)
+    no, gesti, basso = (amb["_motivo_no_gesto_feedback"],
+                        amb["_gesti_feedback"], amb["_voto_basso_toccato"])
+    T, G = 1_800_000_000, 86400
+    prova("1) appena lasciato: si modifica e si cancella", ["", ""],
+          [no("modifica", T, 0, T + 60, True, 7),
+           no("cancella", T, 0, T + 60, True, 7)])
+    prova("...fino all'ultimo secondo della finestra, e non oltre",
+          [True, False],
+          [no("cancella", T, 0, T + 7 * G - 1, True, 7) == "",
+           no("cancella", T, 0, T + 7 * G, True, 7) == ""])
+    prova("UNA modifica: dopo, si modifica no e si cancella si'",
+          [False, True],
+          [no("modifica", T, T + 10, T + 20, True, 7) == "",
+           no("cancella", T, T + 10, T + 20, True, 7) == ""])
+    prova("L'OROLOGIO PARTE DA `creato`: la modifica non lo riapre", False,
+          no("cancella", T, T + 6 * G, T + 8 * G, True, 7) == "")
+    prova("leva spenta, o zero giorni: niente gesti", [False, False],
+          [no("cancella", T, 0, T, False, 7) == "",
+           no("cancella", T, 0, T, True, 0) == ""])
+    prova("una riga senza `creato` e' definitiva (la regola di prima)",
+          False, no("cancella", 0, 0, T, True, 7) == "")
+    prova("le frasi dicono il perche'", [True, True, True],
+          ["spenta" in no("modifica", T, 0, T, False, 7),
+           "7 giorni" in no("modifica", T, 0, T + 9 * G, True, 7),
+           "una volta sola" in no("modifica", T, 1, T + 1, True, 7)])
+    prova("i gesti DERIVANO dal giudice, col «fino a» giusto",
+          [{"modifica": True, "cancella": True, "fino": T + 7 * G},
+           {"modifica": False, "cancella": True, "fino": T + 7 * G},
+           {"modifica": False, "cancella": False, "fino": 0}],
+          [gesti(T, 0, T, True, 7), gesti(T, T + 1, T + 2, True, 7),
+           gesti(T, 0, T + 8 * G, True, 7)])
+    prova("il cartello del ricatto: 1-2★ alzati o cancellati, e basta",
+          [True, True, True, False, False, False, False],
+          [basso(1, 5), basso(2, 3), basso(2, None), basso(2, 2),
+           basso(2, 1), basso(4, 5), basso(3, None)])
+    prova("il giudice non tocca una riga di database", False,
+          any(x in codice(pezzo("_motivo_no_gesto_feedback"))
+              for x in ("con.", "SELECT", 'f["')))
+
+    # --- 2) LA LEVA -----------------------------------------------------
+    prova("2) la leva nasce ACCESA e solo False la spegne; 7 giorni di serie",
+          [True, True, True, True, True],
+          ["except ImportError:\n    FEEDBACK_MODIFICABILE = True" in src,
+           "FEEDBACK_MODIFICABILE = FEEDBACK_MODIFICABILE is not False" in src,
+           "except ImportError:\n    FEEDBACK_MODIFICA_GIORNI = 7" in src,
+           "\nFEEDBACK_MODIFICABILE = True\n" in es,
+           "\nFEEDBACK_MODIFICA_GIORNI = 7\n" in es])
+    prova("...i giorni hanno un tetto (un refuso non apre gli anni)", True,
+          "if not 0 <= FEEDBACK_MODIFICA_GIORNI <= 90:" in src)
+    prova("...e tutte e due stanno nel pannello «Stato delle leve»",
+          [True, True],
+          ['"FEEDBACK_MODIFICABILE", FEEDBACK_MODIFICABILE,' in src,
+           '"FEEDBACK_MODIFICA_GIORNI", FEEDBACK_MODIFICA_GIORNI,' in src])
+
+    # --- 3) LO SCHEMA, fatto girare -------------------------------------
+    m1 = re.search(r"CREATE TABLE IF NOT EXISTS feedback\(.*?\n    \);",
+                   src, re.S)
+    m2 = re.search(r"CREATE TABLE IF NOT EXISTS feedback_ritirati\(.*?\n"
+                   r"    \);", src, re.S)
+    con = _sq.connect(":memory:")
+    con.execute(m1.group(0))
+    con.execute(m2.group(0))
+    cols = [r[1] for r in con.execute("PRAGMA table_info(feedback)")]
+    prova("3) `feedback` ha la colonna `modificato`, 0 di serie", True,
+          "modificato" in cols)
+    con.execute("INSERT INTO feedback_ritirati VALUES(5, 1, 2, '', 1)")
+    try:
+        con.execute("INSERT INTO feedback_ritirati VALUES(5, 1, 2, '', 2)")
+        doppia = "passata"
+    except _sq.IntegrityError:
+        doppia = "rifiutata"
+    prova("...e la lapide e' una per affare per persona", "rifiutata",
+          doppia)
+    rit_cols = [r[1] for r in con.execute(
+        "PRAGMA table_info(feedback_ritirati)")]
+    prova("...e non tiene ne' il voto ne' le parole", [False, False],
+          ["voto" in rit_cols, "commento" in rit_cols])
+    con.close()
+    prova("la colonna arriva anche sui database di ieri (migrazione)", True,
+          '"ALTER TABLE feedback ADD COLUMN modificato INTEGER "' in src)
+
+    # --- 4) LE ROTTE ----------------------------------------------------
+    rotte = re.findall(r'@app\.post\("(/api/(?:orders/\{ordine_id\}/feedback'
+                       r'|p2p/recensione)/(?:modifica|cancella))"\)', src)
+    prova("4) le quattro rotte, due per posto", 4, len(rotte))
+    for nome, cerca in (("modifica_feedback", "_mio_feedback_ordine("),
+                        ("cancella_feedback", "_mio_feedback_ordine("),
+                        ("modifica_recensione_p2p", "_mia_recensione_riga_p2p("),
+                        ("cancella_recensione_p2p", "_mia_recensione_riga_p2p(")):
+        c = codice(pezzo(nome))
+        prova(f"{nome}: la riga si rilegge DENTRO il lock, e il gesto "
+              "passa dal giudice", True,
+              c.index('con.execute("BEGIN IMMEDIATE")')
+              < c.index(cerca) and
+              ("_cambia_feedback(con, f" in c or "_ritira_feedback(con, f" in c)
+              and "_avvisi_gesto_feedback(f, user" in c
+              and c.index("con.commit()") < c.index("_avvisi_gesto_feedback"))
+    prova("la riga del mercatino si cerca SOLO fra quelle del mercatino",
+          True, "da_tg_id=? AND scambio=''" in pezzo("_mio_feedback_ordine"))
+    rit = codice(pezzo("_ritira_feedback"))
+    prova("la LAPIDE PRIMA DEL DELETE, nella stessa transazione", True,
+          rit.index("INSERT OR IGNORE INTO feedback_ritirati")
+          < rit.index('DELETE FROM feedback WHERE id=?')
+          < rit.index("_ricalcola_rating(con"))
+    cam = codice(pezzo("_cambia_feedback"))
+    prova("la modifica timbra `modificato` e rifa' i conti (mai somme)",
+          True, "modificato=?" in cam and "_ricalcola_rating(con" in cam)
+    lf = codice(pezzo("lascia_feedback"))
+    rp = codice(pezzo("recensione_p2p"))
+    prova("chi ha cancellato non riscrive: la lapide si legge nel lock, "
+          "prima dell'INSERT, nei due posti", [True, True],
+          [lf.index('con.execute("BEGIN IMMEDIATE")')
+           < lf.index("if _ritirato_feedback(con, ordine_id, user[\"id\"]):")
+           < lf.index('con.execute("INSERT INTO feedback'),
+           rp.index('con.execute("BEGIN IMMEDIATE")')
+           < rp.index("_ritirato_feedback(con, _numero_scambio_p2p(ordine)")
+           < rp.index('con.execute("INSERT INTO feedback')])
+    av = codice(pezzo("_avvisi_gesto_feedback"))
+    prova("l'id dello scambio non esce dagli avvisi: sugli scambi si dice "
+          "«uno scambio di sats» / «Scambio P2P»", [False, True, True],
+          ["{f['scambio']}" in av or '{f["scambio"]}' in av,
+           '("uno scambio di sats" if f["scambio"]' in av,
+           '("Scambio P2P" if f["scambio"]' in av])
+    prova("...e il cartello va in «moderazione»", True,
+          'argomento="moderazione"' in av and "_voto_basso_toccato(" in av)
+    fus = codice(pezzo("esegui_fusione"))
+    prova("la fusione porta le lapidi alla meta' viva", True,
+          "UPDATE OR IGNORE feedback_ritirati SET da_tg_id=?" in fus
+          and "DELETE FROM feedback_ritirati WHERE da_tg_id=?" in fus)
+    mo = codice(pezzo("miei_ordini"))
+    prova("la lista degli ordini manda i gesti DECISI dal giudice", True,
+          "r[\"mio_fb_gesti\"] = (_gesti_feedback(" in mo
+          and "AS mio_fb_ritirato FROM ordini o" in mo)
+    _q = mo[mo.index('q = ("SELECT o.*'):mo.index('par = [user["id"]]')]
+    prova("...e i parametri contano i quattro punti di domanda nuovi",
+          [12, True], ["".join(re.findall(r'"([^"]*)"', _q)).count("?"),
+                       'par = [user["id"]] * 10 + [user["id"], user["id"]]' in mo])
+
+    # --- 5) IL CLIENT, fatto girare -------------------------------------
+    pan = _fn_js(mini, "function feedbackPanel(o){")
+    riq = _fn_js(mini, "function riquadroRecensioneP2P(o, rec){")
+    mrp = _fn_js(mini, "function moduloModificaRecensioneP2P(o, mia){")
+    prova("5) i gesti li dice il server: nessun conto di giorni nel client",
+          [False, False],
+          ["86400" in gesti_feedback_js(mini) + pan + riq,
+           "Date.now()" in gesti_feedback_js(mini)])
+    prova("il commento di prima entra nella casella passando da esc()",
+          [True, True],
+          ["${esc(o.mioCommento||'')}</textarea>" in pan,
+           "esc(mia.commento || '') + '</textarea>'" in mrp])
+    prova("i due riquadri usano le stesse pure", [True, True],
+          ["gestiFeedbackHTML(g, 'apriModificaFeedback()', "
+           "'cancellaFeedback(this)', 'm')" in pan,
+           "gestiFeedbackHTML(gesti, 'apriModificaRecensioneP2P()', "
+           "'cancellaRecensioneP2P(this)', 'f')" in riq])
+    prova("le quattro chiamate vanno alle quattro rotte", [1, 1, 1, 1],
+          [mini.count("/orders/${o.id}/feedback/modifica`"),
+           mini.count("/orders/${o.id}/feedback/cancella`"),
+           mini.count("${API_BASE}/p2p/recensione/modifica`"),
+           mini.count("${API_BASE}/p2p/recensione/cancella`")])
+    node = _sh.which("node")
+    if not node:
+        salta("le pure del client girate", "node non installato")
+        return
+    js = gesti_feedback_js(mini) + _fn_js(
+        mini, "function gestoRecensioneP2P(o, rec){") + r"""
+const out = {};
+out.frasi = [testoFinestraFeedback(7, 'm'), testoFinestraFeedback(1, 'f'),
+             testoFinestraFeedback(0, 'm'), testoFinestraFeedback(undefined, 'f')];
+const F = 1800000000 + 7 * 86400;
+out.niente = [gestiFeedbackHTML(null, 'a()', 'c()', 'm'),
+              gestiFeedbackHTML({modifica: false, cancella: false, fino: 0}, 'a()', 'c()', 'm'),
+              gestiFeedbackHTML({modifica: true, cancella: true, fino: 0}, 'a()', 'c()', 'm')];
+const due = gestiFeedbackHTML({modifica: true, cancella: true, fino: F}, 'a()', 'c()', 'm');
+const una = gestiFeedbackHTML({modifica: false, cancella: true, fino: F}, 'a()', 'c()', 'f');
+out.due = [due.indexOf('✏️ Modifica') >= 0, due.indexOf('🗑 Cancella') >= 0,
+           due.indexOf('Puoi modificarlo una volta o cancellarlo fino al') >= 0];
+out.una = [una.indexOf('✏️ Modifica') >= 0, una.indexOf('🗑 Cancella') >= 0,
+           una.indexOf("L'hai già modificata: puoi ancora cancellarla") >= 0];
+const K = {id: 'k', stato: 'concluso', votabile: true, votato: false};
+out.gesto = [gestoRecensioneP2P(Object.assign({}, K, {recensione: 'ritirata'}), {si: false, motivo: 'ignota'}),
+             gestoRecensioneP2P(K, {si: false, motivo: 'ritirata'}),
+             gestoRecensioneP2P(K, {si: false, motivo: 'ignota'}),
+             gestoRecensioneP2P(K, {si: true})];
+console.log(JSON.stringify(out));
+"""
+    r = _sp.run([node, "-e", js], capture_output=True, text=True,
+                encoding="utf-8")
+    try:
+        out = _js.loads((r.stdout or "").strip())
+    except Exception:
+        out = {"errore": r.stderr[-400:]}
+    prova("le frasi della finestra: giorni veri, il genere giusto, il "
+          "definitivo di prima a zero",
+          ["Potrai modificarlo una volta o cancellarlo entro 7 giorni, poi "
+           "resta definitivo.",
+           "Potrai modificarla una volta o cancellarla entro un giorno, poi "
+           "resta definitiva.",
+           "Il voto è definitivo e resta legato a questo affare.",
+           "È definitiva: non potrà essere modificata."], out.get("frasi"))
+    prova("senza gesti (o senza data) nessun bottone", ["", "", ""],
+          out.get("niente"))
+    prova("con tutti e due: i due bottoni e la frase", [True, True, True],
+          out.get("due"))
+    prova("dopo la modifica: solo «Cancella», e lo dice", [False, True, True],
+          out.get("una"))
+    prova("la recensione cancellata non riapre niente, nemmeno il voto del "
+          "circuito", ["", "", "vota", "recensisci"], out.get("gesto"))
 
 
 def prove_malus_p2p():
@@ -174252,8 +174563,11 @@ def prove_canale_admin():
           # (14 nov 2026, audit-swap-conferma) lo swap automatico: il
           # ritiro rifiutato a scadenza vicina e il lockup speso da un
           # altro, nella liquidita' come le sue parole
+          # (14 nov 2026, feedback-modificabile) due nella moderazione: il
+          # filtro sul commento di una modifica, e il voto basso alzato o
+          # cancellato (l'impronta del «cambia il feedback o…»)
           {"assistenza": 1, "dispute": 6, "dm": 1, "errori": 33,
-           "liquidita": 5, "moderazione": 14, "riepiloghi": 27}, per_stanza)
+           "liquidita": 5, "moderazione": 16, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -174288,7 +174602,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "96 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "98 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -174298,7 +174612,8 @@ def prove_canale_admin():
           "decisa, 30 ott 2026; dal 2 nov la nascita delle parole dello "
           "swap automatico; dal 14 nov il contenuto digitale letto fuori "
           "da 'shipped', e dello swap automatico il ritiro rifiutato a "
-          "scadenza vicina e il lockup speso da un altro)", 96,
+          "scadenza vicina e il lockup speso da un altro; e dei feedback "
+          "modificati il filtro del commento e il voto basso toccato)", 98,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -176874,7 +177189,8 @@ globalThis.fetch = async (url, opz) => {
 """ + _fn_js(m, "function segnaOrdine(o, campi){") \
         + "".join(_fn_js(m, f) for f in ("function segnaOrdineAperto(campi){",
                                          "function ridisegnaOrdine(o){") if f in m) \
-        + "".join(testi[f] for f in GESTI) + r"""
+        + "".join(testi[f] for f in GESTI) \
+        + gesti_feedback_js(m) + r"""
 const si = corpo => ({ok: true, status: 200, json: async () => Object.assign({ok: true}, corpo || {})});
 const NO = {ok: false, status: 400, json: async () => ({detail: 'il server dice no'})};
 /* UN GESTO, QUATTRO VOLTE: con l'ordine aperto che E' la riga della lista, con
@@ -194882,7 +195198,7 @@ CATEGORIE = {
     lista_corta_metodi
     """.split(),
     "mercatino": """
-    mappa_ritiro
+    mappa_ritiro feedback_modificabile
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     ricategorizza collaudo_ricategorizza asta proxy_asta annullo
@@ -195710,6 +196026,7 @@ def main():
               prove_reputazione_p2p, prove_dati_reputazione_p2p,
               prove_malus_p2p,
               prove_feedback_p2p,
+              prove_feedback_modificabile,
               prove_x_risonanza,
               prove_indirizzo_lightning,
               prove_indirizzo_swap,

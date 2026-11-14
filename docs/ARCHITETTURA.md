@@ -10640,8 +10640,35 @@
   `POST /api/orders/{id}/feedback`: solo le due parti, solo su
   `STATI_FEEDBACK = (released, refunded)` — anche gli affari finiti
   male sono affari veri, escluderli gonfierebbe i profili —
-  definitivo (niente modifica: chiude il ricatto «cambia il
-  feedback o…»; la valvola è `POST /api/admin/feedback/{id}/rimuovi`).
+  definitivo fino al 14 nov 2026 (niente modifica: chiudeva il ricatto
+  «cambia il feedback o…»; la valvola è `POST
+  /api/admin/feedback/{id}/rimuovi`). DAL 14 NOV 2026 SI MODIFICA E SI
+  CANCELLA, PER UN PO' (decisione di Andrea, cantiere
+  feedback-modificabile), coi paletti contro quel ricatto: solo CHI L'HA
+  SCRITTO, per `FEEDBACK_MODIFICA_GIORNI` (7) da `creato` — una modifica
+  non riapre l'orologio —, UNA modifica sola (stelle e commento; le foto
+  restano), la cancellazione PER SEMPRE (lapide in `feedback_ritirati`,
+  letta nel lock prima di ogni INSERT: su quell'affare o scambio non se
+  ne lascia un altro). Il giudice unico è
+  `_motivo_no_gesto_feedback(gesto, creato, modificato, adesso, leva,
+  giorni)` (PURO); `_gesti_feedback` ne deriva cosa offrire al client
+  (`mio_fb_gesti` in /api/orders, `gesti` in /api/p2p/recensibile: il
+  client non conta giorni). Rotte: `POST
+  /api/orders/{id}/feedback/modifica|cancella` e `POST
+  /api/p2p/recensione/modifica|cancella` (body `{ordine}` come le
+  sorelle: l'id dello scambio mai nell'URL); il cuore comune è
+  `_cambia_feedback` / `_ritira_feedback`, dentro il lock del chiamante,
+  con `_ricalcola_rating` (mai somme). Dopo il commit
+  `_avvisi_gesto_feedback`: chi riceveva lo sa (★★ → ★★★★, commento
+  scappato; sugli scambi «uno scambio di sats», mai l'id), e
+  `_voto_basso_toccato` (un 1-2★ alzato o cancellato) lo dice ai
+  moderatori in «moderazione» — l'impronta del ricatto. Sul profilo la
+  riga porta `modificato` («· modificato»). La lapide tiene solo chi,
+  dove e verso chi, mai il voto né le parole; la rimozione del
+  MODERATORE non ne lascia. Leva `FEEDBACK_MODIFICABILE`, accesa di
+  serie, solo False la spegne: spenta, i feedback tornano definitivi e
+  le quattro rotte rispondono 409. Il distintivo già dato resta (la
+  regola append-only dei distintivi).
   IL FEEDBACK RIGUARDA L'AFFARE, NON L'INCASSO (ago 2026, decisione di
   Andrea da un caso vero): chi ha comprato vota appena dichiara di aver
   ricevuto l'oggetto, senza aspettare che il venditore abbia messo un
@@ -10663,7 +10690,9 @@
   perde — **il feedback si lascia solo dove lo stato non può più
   cambiare** — e la domanda «e se dopo finisce in disputa?» non si
   pone: quei casi restano fuori, e non serve né un ritiro automatico né
-  una modifica (che è la regola contro il ricatto, e non si tocca).
+  una modifica di STATO. (La modifica di chi l'ha scritto, dal 14 nov
+  2026, è un'altra cosa: non guarda lo stato, perché qui lo stato non
+  cambia più — vedi sopra.)
   CHI RESTA FUORI: il confirmed chiuso da un TIMER (nessuno ha
   confermato niente, è scaduto il tempo — e la porta del moderatore è
   aperta) e quello da DISPUTA decisa (c'è stata una lite, ed è ancora

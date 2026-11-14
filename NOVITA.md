@@ -176,3 +176,9 @@ frase: Nel libro P2P l'ordine che scegli ora resta: se metti «Convenienza» o �
 dove: la scheda «P2P», la pillola con le tre righe in cima al libro («Ordina il libro»).
 leva: nessuna
 pubblico: sì
+
+## 2026-11-14 · feedback-modificabile
+frase: Un feedback scritto di getto si può correggere: chi l'ha lasciato può modificarlo una volta (stelle e commento) o cancellarlo, entro 7 giorni da quando l'ha scritto; dopo resta definitivo. Vale nel mercatino e per le recensioni degli scambi P2P. Chi lo ha ricevuto viene avvisato, e sul profilo la riga dice «modificato». Cancellato è per sempre: su quell'affare non se ne lascia un altro.
+dove: la pagina dell'ordine (scheda «Ordini») o dello scambio P2P, sotto il voto che hai lasciato: «✏️ Modifica» e «🗑 Cancella».
+leva: FEEDBACK_MODIFICABILE (nuova, accesa di serie) e FEEDBACK_MODIFICA_GIORNI (7)
+pubblico: sì

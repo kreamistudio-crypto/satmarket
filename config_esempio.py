@@ -377,6 +377,18 @@ MERCATO_LAVORO = False
 # di sempre.
 MERCATINO_MAPPA_RITIRO = True
 
+# IL FEEDBACK SI MODIFICA E SI CANCELLA, PER UN PO' (14 nov 2026,
+# decisione di Andrea): chi ha lasciato un feedback (o una recensione di
+# uno scambio P2P) puo' modificarlo UNA volta o cancellarlo entro
+# FEEDBACK_MODIFICA_GIORNI giorni da quando l'ha lasciato; poi e'
+# definitivo. Cancellato, su quell'affare non se ne lascia un altro. Un
+# voto da 1-2 stelle alzato o cancellato arriva ai moderatori
+# (argomento «moderazione»). Nasce ACCESA (le leve nuove sono accese di
+# serie): la riga serve per SPEGNERLA, e solo False spegne. I giorni:
+# da 0 (nessuna finestra = definitivi) a 90.
+FEEDBACK_MODIFICABILE = True
+FEEDBACK_MODIFICA_GIORNI = 7
+
 # --- Consegna digitale (buoni regalo, codici, licenze) ---------------
 # Il codice passa DENTRO Barattolo: il venditore lo consegna in un
 # campo dedicato dell'ordine, il compratore lo rivela con un tocco

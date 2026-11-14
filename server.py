@@ -6662,10 +6662,30 @@ def init_db():
         -- Solo gli affari del mercatino ne hanno (vedi «LE FOTO DELLE
         -- RECENSIONI», e chi le legge passa da `foto_recensione`).
         foto TEXT DEFAULT '',
+        -- LA MODIFICA (14 nov 2026): quando chi l'ha scritto l'ha
+        -- cambiato, 0 = mai. Una volta sola, e dentro la finestra di
+        -- FEEDBACK_MODIFICA_GIORNI da `creato`, e lo decide
+        -- `_motivo_no_gesto_feedback`. Sul profilo diventa «modificato».
+        modificato INTEGER DEFAULT 0,
         UNIQUE(ordine_id, da_tg_id)  -- uno per ordine per parte
     );
     CREATE INDEX IF NOT EXISTS idx_feedback_per
         ON feedback(per_tg_id, creato DESC);
+    CREATE TABLE IF NOT EXISTS feedback_ritirati(
+        -- LE LAPIDI DEI FEEDBACK CANCELLATI DA CHI LI AVEVA SCRITTI
+        -- (14 nov 2026): su quell'affare (o scambio: `ordine_id` porta
+        -- la stessa firma negativa di `feedback`) non se ne lascia un
+        -- altro, o togli-e-rimetti diventerebbe una modifica senza
+        -- tetto. Solo CHI e DOVE: del voto e delle parole non resta
+        -- niente. La rimozione del MODERATORE non lascia lapide: la'
+        -- non ha deciso chi l'aveva scritto.
+        ordine_id INTEGER NOT NULL,
+        da_tg_id INTEGER NOT NULL,
+        per_tg_id INTEGER NOT NULL,
+        scambio TEXT DEFAULT '',
+        ritirato INTEGER NOT NULL,
+        PRIMARY KEY(ordine_id, da_tg_id)
+    );
     CREATE TABLE IF NOT EXISTS coda_vetrina(
         -- LA CODA DEL CANALE (ott 2026, decisione di Andrea): gli
         -- annunci che il freno «uno per venditore» ha lasciato fuori
@@ -9791,6 +9811,12 @@ def init_db():
     # LE FOTO DELLE RECENSIONI (ott 2026): additiva, '' = nessuna foto
     try:
         con.execute("ALTER TABLE feedback ADD COLUMN foto TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    # LA MODIFICA DEI FEEDBACK (14 nov 2026): additiva, 0 = mai modificato
+    try:
+        con.execute("ALTER TABLE feedback ADD COLUMN modificato INTEGER "
+                    "DEFAULT 0")
     except sqlite3.OperationalError:
         pass
     try:
@@ -20583,6 +20609,17 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                     (id_telegram, id_nostr))
         con.execute("UPDATE feedback SET per_tg_id=? WHERE per_tg_id=?",
                     (id_telegram, id_nostr))
+        # ...e le LAPIDI dei feedback cancellati (14 nov 2026), o la
+        # meta' che sopravvive potrebbe riscrivere un feedback che
+        # l'altra meta' aveva tolto. OR IGNORE: se le due meta' avevano
+        # la lapide sullo stesso affare ne basta una, e quella rimasta
+        # col tg_id morto se ne va.
+        con.execute("UPDATE OR IGNORE feedback_ritirati SET da_tg_id=? "
+                    "WHERE da_tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM feedback_ritirati WHERE da_tg_id=?",
+                    (id_nostr,))
+        con.execute("UPDATE feedback_ritirati SET per_tg_id=? "
+                    "WHERE per_tg_id=?", (id_telegram, id_nostr))
         # Il browser dell'utente Nostr resta loggato: le sue sessioni
         # migrano vive e al prossimo /api/me si risveglia qui.
         con.execute("UPDATE sessioni SET tg_id=? WHERE tg_id=?",
@@ -30437,6 +30474,8 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
         # prima di partire: chi ha scritto esce col nome e col codice
         # del negozio, come sempre, mai col tg_id
         "SELECT f.id, f.voto, f.commento, f.creato, f.foto, f.da_tg_id, "
+        # (14 nov 2026) «modificato» accanto alla data, quando lo e'
+        "f.modificato, "
         # LA PROVENIENZA SI VEDE, IL CONTEGGIO NO (set 2026, le
         # recensioni degli scambi P2P): una recensione nata da uno
         # scambio di sats lo dice nella sua riga — «una reputazione
@@ -35278,6 +35317,18 @@ def _leve_stato():
                          "la mappa dei comuni con annunci col ritiro a mano, "
                          "e un tocco su un comune mostra solo i suoi",
                   spento="niente tondo e niente mappa: la vetrina di sempre"),
+            # IL FEEDBACK SI MODIFICA E SI CANCELLA (14 nov 2026): acceso
+            # di serie, la leva e' l'interruttore d'emergenza
+            _leva("Modifica e cancellazione dei feedback",
+                  "FEEDBACK_MODIFICABILE", FEEDBACK_MODIFICABILE,
+                  acceso=f"chi ha lasciato un feedback (o una recensione "
+                         f"P2P) può modificarlo una volta o cancellarlo "
+                         f"entro {FEEDBACK_MODIFICA_GIORNI} giorni",
+                  spento="i feedback sono definitivi, come prima: resta "
+                         "solo la rimozione del moderatore"),
+            _leva("Giorni per modificare un feedback",
+                  "FEEDBACK_MODIFICA_GIORNI", FEEDBACK_MODIFICA_GIORNI,
+                  spento="nessuna finestra: i feedback sono definitivi"),
             # LA MODIFICA DI PIU' ANNUNCI INSIEME (16 ott 2026): spenta
             # di serie finche' Andrea non l'ha provata
             _leva("Modifica di più annunci insieme",
@@ -59823,8 +59874,8 @@ def _mia_recensione_p2p(con, ordine: str, chi: int):
     dello scambio vive in localStorage, quindi da un altro dispositivo
     l'invito ricomparirebbe — e uno si troverebbe a riscrivere una
     recensione per poi sentirsi dire che c'e' gia'."""
-    return con.execute("SELECT voto, commento FROM feedback "
-                       "WHERE scambio=? AND da_tg_id=?",
+    return con.execute("SELECT voto, commento, creato, modificato "
+                       "FROM feedback WHERE scambio=? AND da_tg_id=?",
                        (ordine, chi)).fetchone()
 
 
@@ -59855,6 +59906,9 @@ async def recensibile_p2p(req: Request, x_tg_init_data: str = Header(""),
                         "WHERE ordine=?", (ordine,)).fetchone()
         mia = _mia_recensione_p2p(con, ordine, user["id"])
         concluso = bool(r) and _scambio_concluso_p2p(con, ordine, r["stato"])
+        # (14 nov 2026) la recensione che ho cancellato io: la lapide
+        ritirata = _ritirato_feedback(con, _numero_scambio_p2p(ordine),
+                                      user["id"])
     finally:
         con.close()
     # UNA RIGA CHE NON C'E' NON E' UN ERRORE: e' lo scambio di un altro
@@ -59881,13 +59935,29 @@ async def recensibile_p2p(req: Request, x_tg_init_data: str = Header(""),
     # di un altro client resta dov'era.
     if motivo == "estraneo":
         return {"si": False, "motivo": "ignota", "gia": False}
+    # LA RECENSIONE CANCELLATA (14 nov 2026): niente invito a rifarla e
+    # niente voto del circuito offerto al suo posto — chi l'ha tolta ha
+    # deciso. Dopo la riga dell'estraneo apposta: la lapide esiste solo
+    # per chi aveva scritto, ma l'ordine delle guardie resta quello.
+    if ritirata and not mia:
+        return {"si": False, "motivo": "ritirata", "gia": False}
     if not concluso and not mia:
         motivo = motivo or "non_conclusa"
     fuori = {"si": bool(per) and not motivo and not mia,
              "motivo": motivo, "gia": bool(mia)}
+    if fuori["si"]:
+        # (14 nov 2026) la finestra per la frase del modulo: solo dove
+        # il modulo si apre, le altre risposte restano quelle di prima
+        fuori["giorni"] = (FEEDBACK_MODIFICA_GIORNI if FEEDBACK_MODIFICABILE
+                           else 0)
     if mia:
         fuori["voto"] = mia["voto"]
         fuori["commento"] = mia["commento"] or ""
+        # (14 nov 2026) cosa posso ancora farci, e fino a quando
+        fuori["modificato"] = int(mia["modificato"] or 0)
+        fuori["gesti"] = _gesti_feedback(
+            mia["creato"], mia["modificato"], int(time.time()),
+            FEEDBACK_MODIFICABILE, FEEDBACK_MODIFICA_GIORNI)
     return fuori
 
 
@@ -59962,6 +60032,13 @@ async def recensione_p2p(req: Request, x_tg_init_data: str = Header(""),
         if motivo:
             con.rollback()
             raise HTTPException(400, "Operazione non permessa")
+        # (14 nov 2026) la lapide di una recensione cancellata da chi
+        # l'aveva scritta: su questo scambio non se ne lascia un'altra
+        if _ritirato_feedback(con, _numero_scambio_p2p(ordine), user["id"]):
+            con.rollback()
+            raise HTTPException(400, "Hai cancellato la tua recensione su "
+                                     "questo scambio: non se ne può "
+                                     "lasciare un'altra")
         try:
             con.execute("INSERT INTO feedback(ordine_id, da_tg_id, "
                         "per_tg_id, voto, commento, creato, scambio) "
@@ -59996,6 +60073,74 @@ async def recensione_p2p(req: Request, x_tg_init_data: str = Header(""),
     await premia_distintivi(per)
     return {"ok": True, "voto": voto}
 
+
+# LE GEMELLE DEGLI SCAMBI (14 nov 2026): la recensione P2P sta nella
+# stessa tabella, quindi stesso giudice, stesse regole, stessi avvisi
+# (`_cambia_feedback`, `_ritira_feedback`). La riga si cerca per
+# `scambio` e per chi l'ha scritta: chi non ne ha una prende 404, e a
+# un estraneo non si dice nient'altro (la lezione di Q3). NESSUN GATE
+# SULLA LEVA DEL P2P, per la ragione della sorella: la recensione e'
+# del mercatino, e la leva che conta e' FEEDBACK_MODIFICABILE.
+def _mia_recensione_riga_p2p(con, ordine: str, chi: int):
+    return con.execute("SELECT * FROM feedback WHERE scambio=? AND "
+                       "da_tg_id=?", (ordine, chi)).fetchone()
+
+
+@app.post("/api/p2p/recensione/modifica")
+async def modifica_recensione_p2p(req: Request,
+                                  x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    ordine = str(d.get("ordine") or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        raise HTTPException(400, "Ordine in una forma sconosciuta")
+    voto, commento = await _voto_commento_gesto(d, user, "Scambio P2P")
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        f = _mia_recensione_riga_p2p(con, ordine, user["id"])
+        if not f:
+            con.rollback()
+            raise HTTPException(404, "Su questo scambio non hai una "
+                                     "recensione da modificare")
+        _cambia_feedback(con, f, voto, commento, int(time.time()))
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    await _avvisi_gesto_feedback(f, user, voto, commento)
+    return {"ok": True, "voto": voto}
+
+
+@app.post("/api/p2p/recensione/cancella")
+async def cancella_recensione_p2p(req: Request,
+                                  x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    ordine = str(d.get("ordine") or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        raise HTTPException(400, "Ordine in una forma sconosciuta")
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        f = _mia_recensione_riga_p2p(con, ordine, user["id"])
+        if not f:
+            con.rollback()
+            raise HTTPException(404, "Su questo scambio non hai una "
+                                     "recensione da cancellare")
+        _ritira_feedback(con, f, int(time.time()))
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    await _avvisi_gesto_feedback(f, user, None, "")
+    return {"ok": True}
 
 @app.post("/api/p2p/chiavi")
 async def registra_chiavi_p2p(req: Request, x_tg_init_data: str = Header(""),
@@ -64490,7 +64635,9 @@ def _testo_promemoria_recensione_p2p(nome: str) -> str:
     chi = nome or "chi ha scambiato con te"
     return (f"⭐ <b>Com'è andata con {chi}?</b> Ieri avete chiuso uno scambio e "
             "non hai ancora lasciato la recensione: la trovi nella pagina dello "
-            "scambio.\n\n<i>È definitiva, e aiuta chi scambierà dopo di te.</i>")
+            # (14 nov 2026) non piu' «È definitiva»: per qualche giorno si
+            # modifica o si cancella (FEEDBACK_MODIFICABILE)
+            "scambio.\n\n<i>Aiuta chi scambierà dopo di te.</i>")
 
 
 def _promemoria_recensione_p2p_fermo(con, r) -> str:
@@ -64512,6 +64659,10 @@ def _promemoria_recensione_p2p_fermo(con, r) -> str:
         return f"non c'e' un posto per la sua recensione ({motivo})"
     if _mia_recensione_p2p(con, ordine, io):
         return "la recensione l'ha gia' lasciata"
+    # (14 nov 2026) ...o l'ha lasciata e poi cancellata: non se ne
+    # lascia un'altra, e il promemoria porterebbe a un muro
+    if _ritirato_feedback(con, _numero_scambio_p2p(ordine), io):
+        return "la recensione l'ha cancellata"
     return ""
 
 
@@ -85858,14 +86009,26 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
          "(SELECT foto FROM feedback WHERE ordine_id=o.id "
          " AND da_tg_id=?) AS mio_foto, "
          "(SELECT foto FROM feedback WHERE ordine_id=o.id "
-         " AND per_tg_id=?) AS suo_foto FROM ordini o "
+         " AND per_tg_id=?) AS suo_foto, "
+         # LA MODIFICA DEI FEEDBACK (14 nov 2026): quando e' nato il mio
+         # e se l'ho gia' cambiato (per i due bottoni, decisi qui sotto
+         # dal giudice), se l'altro ha cambiato il suo (la scritta
+         # «modificato»), e la lapide del mio se l'ho cancellato
+         "(SELECT creato FROM feedback WHERE ordine_id=o.id "
+         " AND da_tg_id=?) AS mio_fb_creato, "
+         "(SELECT modificato FROM feedback WHERE ordine_id=o.id "
+         " AND da_tg_id=?) AS mio_fb_modificato, "
+         "(SELECT modificato FROM feedback WHERE ordine_id=o.id "
+         " AND per_tg_id=?) AS suo_fb_modificato, "
+         "EXISTS(SELECT 1 FROM feedback_ritirati WHERE ordine_id=o.id "
+         " AND da_tg_id=?) AS mio_fb_ritirato FROM ordini o "
          # LEFT: i SET hanno annuncio_id=0 e con l'INNER sparirebbero
          # dalla lista (il compratore pagherebbe senza vedere l'ordine)
          "LEFT JOIN annunci a ON a.id=o.annuncio_id "
          "JOIN utenti uc ON uc.tg_id=o.compratore_id "
          "JOIN utenti uv ON uv.tg_id=o.venditore_id "
          "WHERE o.compratore_id=? OR o.venditore_id=?")
-    par = [user["id"]] * 6 + [user["id"], user["id"]]
+    par = [user["id"]] * 10 + [user["id"], user["id"]]
     if e_admin(user["id"]):
         # I moderatori vedono dispute e resi in corso
         q += (" OR o.stato IN ('dispute','return_pending',"
@@ -85898,9 +86061,21 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         righe = [r for r in righe
                  if not (r.get("pagata_da_annullata_il")
                          and r["compratore_id"] != user["id"])]
+    adesso_fb = int(time.time())
     for r in righe:
         r["mio_foto"] = foto_recensione(r["mio_foto"])
         r["suo_foto"] = foto_recensione(r["suo_foto"])
+        # i due gesti sul mio feedback li decide il GIUDICE, qui: il
+        # client mostra i bottoni che il server firmerebbe, e la data
+        # «fino a» che il server applicherebbe (14 nov 2026)
+        r["mio_fb_gesti"] = (_gesti_feedback(
+            r["mio_fb_creato"], r["mio_fb_modificato"], adesso_fb,
+            FEEDBACK_MODIFICABILE, FEEDBACK_MODIFICA_GIORNI)
+            if r["mio_voto"] else None)
+        # ...e i giorni della finestra, per la frase del modulo prima
+        # del voto (0 = definitivo, come prima)
+        r["fb_giorni"] = (FEEDBACK_MODIFICA_GIORNI if FEEDBACK_MODIFICABILE
+                          else 0)
     # LA FILA DEI TRACCIAMENTI SOSTITUITI (ott 2026), UNA query per
     # tutti, dal piu' vecchio: la chiave esce SOLO sugli ordini che ne
     # hanno una, gli altri restano byte per byte quelli di ieri.
@@ -87277,6 +87452,213 @@ def _ricalcola_rating(con, tg_id: int):
                 (round(r["media"] or 0, 1), r["n"], r["persone"], tg_id))
 
 
+
+# ------- IL FEEDBACK SI MODIFICA E SI CANCELLA, PER UN PO' (14 nov 2026) -------
+# Richiesta di Andrea: «possibilita' di modificare o cancellare un
+# feedback». ROVESCIA una decisione di luglio — il feedback era
+# definitivo perche' «chiude il ricatto "cambia il feedback o…"» — e la
+# rovescia SAPENDOLO: il ricatto resta il nemico, e i paletti qui sotto
+# sono quelli che Andrea ha approvato sul piano (14 nov, «ok»):
+#   · solo CHI L'HA SCRITTO, mercatino e scambi P2P, una tabella sola;
+#   · per FEEDBACK_MODIFICA_GIORNI giorni da quando l'ha lasciato, poi
+#     torna definitivo e resta la valvola di sempre, il moderatore;
+#   · UNA modifica sola: chi vende non puo' insistere all'infinito, e
+#     chi ha gia' cambiato idea una volta ha detto la sua;
+#   · la cancellazione e' PER SEMPRE: su quell'affare non se ne lascia
+#     un altro (`feedback_ritirati`), o togli-e-rimetti diventerebbe una
+#     modifica senza tetto;
+#   · un voto basso (1-2★) alzato o cancellato si dice ai moderatori
+#     (argomento «moderazione»): e' l'impronta del ricatto, e chi
+#     modera vuole vederla, non indovinarla.
+# LA LEVA NASCE ACCESA (regola di Andrea del 14 nov: le leve nuove sono
+# accese di serie, e restano un interruttore d'emergenza). Solo un False
+# scritto nel config la spegne; spenta, i feedback tornano definitivi e
+# le due rotte rispondono 409 — quel che c'e' resta com'e'.
+try:
+    from config import FEEDBACK_MODIFICABILE
+    if not isinstance(FEEDBACK_MODIFICABILE, bool):
+        print("[feedback] FEEDBACK_MODIFICABILE non e' True/False: la "
+              "modifica dei feedback resta accesa")
+    FEEDBACK_MODIFICABILE = FEEDBACK_MODIFICABILE is not False
+except ImportError:
+    FEEDBACK_MODIFICABILE = True
+# I GIORNI DELLA FINESTRA, contati da quando il feedback e' nato (non
+# dall'ultima modifica: una modifica non riapre l'orologio). Un valore
+# storto torna ai 7 di serie; 0 vuol dire «nessuna finestra», cioe' i
+# feedback definitivi come prima, e il tetto a 90 tiene un refuso nel
+# config (700 al posto di 7) lontano da una reputazione riscrivibile
+# per anni.
+try:
+    from config import FEEDBACK_MODIFICA_GIORNI
+    FEEDBACK_MODIFICA_GIORNI = int(FEEDBACK_MODIFICA_GIORNI)
+    if not 0 <= FEEDBACK_MODIFICA_GIORNI <= 90:
+        raise ValueError
+except ImportError:
+    FEEDBACK_MODIFICA_GIORNI = 7
+except (TypeError, ValueError):
+    print("[feedback] FEEDBACK_MODIFICA_GIORNI fuori da 0-90: torno a 7")
+    FEEDBACK_MODIFICA_GIORNI = 7
+
+
+def _motivo_no_gesto_feedback(gesto, creato, modificato, adesso, leva,
+                              giorni) -> str:
+    """IL GIUDICE UNICO dei due gesti sul proprio feedback: '' se il
+    gesto (`modifica` | `cancella`) e' ammesso, altrimenti la frase da
+    dire a chi l'ha chiesto. PURA, prende i CAMPI (il patto di
+    `in_ferie`): la usano le rotte, la lista degli ordini (che manda al
+    client cosa offrire) e la prova.
+    L'orologio parte da `creato` e NON da `modificato`: una modifica non
+    riapre la finestra, o modificare diventerebbe un modo per tenerla
+    aperta per sempre. Una riga senza `creato` (non ne esistono, ma il
+    database non lo vieta) e' definitiva: nel dubbio vale la regola di
+    prima."""
+    if not leva or giorni <= 0:
+        return "La modifica dei feedback in questo momento è spenta"
+    if not creato or adesso >= int(creato) + int(giorni) * 86400:
+        return (f"Sono passati più di {giorni} giorni: il feedback "
+                "ormai è definitivo")
+    if gesto == "modifica" and modificato:
+        return ("Il feedback si può modificare una volta sola, e l'hai "
+                "già fatto: puoi ancora cancellarlo")
+    return ""
+
+
+def _gesti_feedback(creato, modificato, adesso, leva, giorni) -> dict:
+    """PURA: cosa offrire al client sul MIO feedback — i due gesti e fin
+    quando (`fino`, epoch; 0 se nessuno dei due). Derivata dal giudice,
+    mai scritta a parte: il bottone e la rotta non possono dire due
+    cose diverse."""
+    mod = not _motivo_no_gesto_feedback("modifica", creato, modificato,
+                                        adesso, leva, giorni)
+    canc = not _motivo_no_gesto_feedback("cancella", creato, modificato,
+                                         adesso, leva, giorni)
+    return {"modifica": mod, "cancella": canc,
+            "fino": int(creato) + int(giorni) * 86400
+            if (mod or canc) else 0}
+
+
+def _voto_basso_toccato(prima, dopo) -> bool:
+    """PURA: l'impronta del ricatto, da dire ai moderatori. Un voto da
+    1 o 2 stelle che sale, o che sparisce (`dopo` None = cancellato).
+    Scendere non e' un ricatto di chi riceve, e un 4 che diventa 5 non
+    dice niente a nessuno."""
+    if prima is None or int(prima) > 2:
+        return False
+    return dopo is None or int(dopo) > int(prima)
+
+
+def _cambia_feedback(con, f, voto: int, commento: str, adesso: int):
+    """La modifica, dentro la transazione del chiamante (che ha gia'
+    preso il lock e riletto la riga). Il giudice decide; poi UNA riga
+    cambia e la media di chi riceve si rifa' i conti, come per ogni
+    altra strada (mai per incremento). Le foto restano com'erano: la
+    modifica e' delle stelle e delle parole."""
+    no = _motivo_no_gesto_feedback("modifica", f["creato"], f["modificato"],
+                                   adesso, FEEDBACK_MODIFICABILE,
+                                   FEEDBACK_MODIFICA_GIORNI)
+    if no:
+        raise HTTPException(409 if "spenta" in no else 400, no)
+    con.execute("UPDATE feedback SET voto=?, commento=?, modificato=? "
+                "WHERE id=?", (voto, commento, adesso, f["id"]))
+    _ricalcola_rating(con, f["per_tg_id"])
+
+
+def _ritira_feedback(con, f, adesso: int):
+    """La cancellazione, dentro la transazione del chiamante. LA LAPIDE
+    PRIMA DEL DELETE, nella stessa transazione: `feedback_ritirati` e'
+    quel che impedisce di lasciarne un altro sullo stesso affare, e un
+    DELETE senza lapide riaprirebbe la porta. Della riga tolta la lapide
+    tiene solo CHI e DOVE, mai il voto ne' il commento: chi cancella le
+    sue parole le vuole via davvero."""
+    no = _motivo_no_gesto_feedback("cancella", f["creato"], f["modificato"],
+                                   adesso, FEEDBACK_MODIFICABILE,
+                                   FEEDBACK_MODIFICA_GIORNI)
+    if no:
+        raise HTTPException(409 if "spenta" in no else 400, no)
+    con.execute("INSERT OR IGNORE INTO feedback_ritirati(ordine_id, "
+                "da_tg_id, per_tg_id, scambio, ritirato) VALUES(?,?,?,?,?)",
+                (f["ordine_id"], f["da_tg_id"], f["per_tg_id"],
+                 f["scambio"] or "", adesso))
+    con.execute("DELETE FROM feedback WHERE id=?", (f["id"],))
+    _ricalcola_rating(con, f["per_tg_id"])
+
+
+def _ritirato_feedback(con, ordine_id: int, chi: int) -> bool:
+    """Questa persona ha gia' cancellato il suo feedback su quest'affare
+    (o scambio: la firma negativa sta nella stessa colonna)?"""
+    return con.execute("SELECT 1 FROM feedback_ritirati WHERE ordine_id=? "
+                       "AND da_tg_id=?", (ordine_id, chi)).fetchone() \
+        is not None
+
+
+MSG_FEEDBACK_RITIRATO = ("Hai cancellato il tuo feedback su quest'affare: "
+                         "non se ne può lasciare un altro")
+
+
+async def _voto_commento_gesto(d, user, dove: str):
+    """Voto e commento di una MODIFICA, con le regole della prima volta:
+    1-5 stelle, 200 caratteri, il filtro delle parole vietate (che lo
+    dice ai moderatori). `dove` e' la riga per l'avviso, senza id di
+    scambio (la regola di `recensione_p2p`)."""
+    try:
+        voto = int(d.get("voto", 0))
+    except (TypeError, ValueError):
+        voto = 0
+    if not 1 <= voto <= 5:
+        raise HTTPException(400, "Il voto va da 1 a 5 stelle")
+    commento = str(d.get("commento", "")).strip()
+    if len(commento) > 200:
+        raise HTTPException(400, "Commento troppo lungo (max 200 caratteri)")
+    if commento:
+        categoria = controlla_vietato(commento, "")
+        if categoria:
+            await notifica_admin(
+                f"🚫 <b>Commento di feedback modificato bloccato dal "
+                f"filtro</b> ({categoria})\n{dove} — "
+                f"{html.escape(user['first_name'] or '')} (id {user['id']})",
+                argomento="moderazione")
+            raise HTTPException(400, "Il commento contiene termini non "
+                                     "ammessi sul mercatino")
+    return voto, commento
+
+
+async def _avvisi_gesto_feedback(f, user, voto_dopo, commento_dopo):
+    """Dopo il commit: chi riceveva il feedback lo sa, e se un voto
+    basso e' salito o sparito lo sanno i moderatori. `voto_dopo` None =
+    cancellato. Su uno scambio P2P il numero non si dice (la firma
+    negativa non dice niente a nessuno, e l'id dello scambio non esce:
+    la regola di `recensione_p2p`)."""
+    dove = ("uno scambio di sats" if f["scambio"]
+            else f"l'affare #{f['ordine_id']}")
+    prima = "★" * int(f["voto"])
+    if voto_dopo is None:
+        await notifica(f["per_tg_id"],
+                       f"🗑 Il feedback che avevi ricevuto per {dove} "
+                       f"({prima}) è stato cancellato da chi l'aveva "
+                       "lasciato.")
+    else:
+        await notifica(f["per_tg_id"],
+                       f"✏️ <b>Il feedback per {dove} è stato modificato:</b>"
+                       f" {prima} → {'★' * int(voto_dopo)} ({voto_dopo}/5)"
+                       # il testo di un utente verso un altro: scappato,
+                       # come nella sorella del primo feedback
+                       + (f"\n«{html.escape(commento_dopo)}»"
+                          if commento_dopo else ""))
+    if _voto_basso_toccato(f["voto"], voto_dopo):
+        cosa = ("cancellato" if voto_dopo is None
+                else f"alzato a {'★' * int(voto_dopo)}")
+        await notifica_admin(
+            f"🔎 <b>Un voto basso è stato {cosa}</b> ({prima} prima)\n"
+            + ("Scambio P2P" if f["scambio"]
+               else f"Affare #{f['ordine_id']}")
+            + f" — da {html.escape(user['first_name'] or '')} "
+            f"(id {user['id']}) verso id "
+            f"{f['per_tg_id']}.\nPuò essere un ripensamento onesto, o un "
+            "«cambia il feedback o…»: se serve, sentite chi l'aveva "
+            "lasciato.", argomento="moderazione")
+    if voto_dopo is None and f["foto"]:
+        asyncio.create_task(togli_da_blossom(foto_recensione(f["foto"])))
+
 # ------------- LE FOTO DELLE RECENSIONI, SU BLOSSOM (ott 2026) -------------
 # Richiesta di Andrea: nel feedback degli affari del MERCATINO (non degli
 # scambi P2P) si possono mettere fino a MAX_FOTO_RECENSIONE foto — l'oggetto
@@ -87509,6 +87891,8 @@ async def lascia_feedback(ordine_id: int, req: Request,
             gia = o and con.execute(
                 "SELECT 1 FROM feedback WHERE ordine_id=? AND da_tg_id=?",
                 (ordine_id, user["id"])).fetchone()
+            ritirato = bool(o) and _ritirato_feedback(con, ordine_id,
+                                                      user["id"])
         finally:
             con.close()
         if not o:
@@ -87525,6 +87909,8 @@ async def lascia_feedback(ordine_id: int, req: Request,
         if gia:
             raise HTTPException(400, "Hai già lasciato il feedback "
                                      "per questo ordine")
+        if ritirato:
+            raise HTTPException(400, MSG_FEEDBACK_RITIRATO)
         pronte = []
         for i, f in enumerate(foto):
             raw, tipo, motivo = await asyncio.to_thread(
@@ -87567,6 +87953,11 @@ async def lascia_feedback(ordine_id: int, req: Request,
             # auto-ordine (puo' nascere da una fusione): niente auto-voti
             con.rollback()
             raise HTTPException(400, "Operazione non permessa")
+        # (14 nov 2026) chi l'ha cancellato non ne lascia un altro: la
+        # lapide si legge DENTRO il lock, come la UNIQUE
+        if _ritirato_feedback(con, ordine_id, user["id"]):
+            con.rollback()
+            raise HTTPException(400, MSG_FEEDBACK_RITIRATO)
         try:
             con.execute("INSERT INTO feedback(ordine_id, da_tg_id, "
                         "per_tg_id, voto, commento, creato, foto) "
@@ -87608,6 +87999,74 @@ async def lascia_feedback(ordine_id: int, req: Request,
     await premia_distintivi(per)
     return {"ok": True, "voto": voto, "foto": urls}
 
+
+# IL MIO FEEDBACK, MODIFICATO O CANCELLATO (14 nov 2026, vedi «IL
+# FEEDBACK SI MODIFICA E SI CANCELLA, PER UN PO'»). Due rotte sorelle,
+# e due gemelle per gli scambi P2P: la riga si rilegge DENTRO il lock
+# (una fusione potrebbe spostarla proprio ora), il giudice e' uno solo
+# (`_motivo_no_gesto_feedback`), e gli avvisi partono dopo il commit.
+# Lo STATO dell'ordine non si riguarda: il feedback esiste solo dove lo
+# stato non puo' piu' cambiare (`_ammette_feedback`), quindi «e se nel
+# frattempo e' finito in disputa?» non si pone nemmeno qui.
+def _mio_feedback_ordine(con, ordine_id: int, chi: int):
+    return con.execute("SELECT * FROM feedback WHERE ordine_id=? AND "
+                       "da_tg_id=? AND scambio=''",
+                       (ordine_id, chi)).fetchone()
+
+
+@app.post("/api/orders/{ordine_id}/feedback/modifica")
+async def modifica_feedback(ordine_id: int, req: Request,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Chi ha lasciato il feedback lo cambia: stelle e commento, una
+    volta, dentro la finestra. Le foto restano com'erano."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    voto, commento = await _voto_commento_gesto(d, user,
+                                                f"Ordine #{ordine_id}")
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        f = _mio_feedback_ordine(con, ordine_id, user["id"])
+        if not f:
+            con.rollback()
+            raise HTTPException(404, "Su quest'affare non hai un feedback "
+                                     "da modificare")
+        _cambia_feedback(con, f, voto, commento, int(time.time()))
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    await _avvisi_gesto_feedback(f, user, voto, commento)
+    return {"ok": True, "voto": voto}
+
+
+@app.post("/api/orders/{ordine_id}/feedback/cancella")
+async def cancella_feedback(ordine_id: int,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Chi ha lasciato il feedback lo toglie, dentro la finestra. Per
+    sempre: su quest'affare non se ne lascia un altro."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        f = _mio_feedback_ordine(con, ordine_id, user["id"])
+        if not f:
+            con.rollback()
+            raise HTTPException(404, "Su quest'affare non hai un feedback "
+                                     "da cancellare")
+        _ritira_feedback(con, f, int(time.time()))
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    await _avvisi_gesto_feedback(f, user, None, "")
+    return {"ok": True}
 
 @app.post("/api/admin/feedback/{feedback_id}/rimuovi")
 async def rimuovi_feedback_admin(feedback_id: int,

@@ -10526,6 +10526,12 @@
   .payout .fb-commento{min-height:52px}
   .payout .fb-invia{margin-top:10px}
   .payout .fb-dopo{margin-top:8px}
+  /* MODIFICA E CANCELLA (14 nov 2026): i due gesti sul mio feedback,
+     affiancati sotto il voto; «· modificato» accanto a una riga cambiata,
+     piccolo e grigio come una data */
+  .fb-gesti{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .fb-gesti .btn{flex:1 1 0;width:auto;min-width:0;margin-top:0}
+  .fb-modificato{color:var(--muted);font-size:12px;white-space:nowrap}
   /* LE FOTO DELLE RECENSIONI (ott 2026): le miniature sotto il
      commento — nel profilo e nell'ordine — e quelle scelte nel modulo,
      con la ✕ per toglierle prima dell'invio */
@@ -18309,6 +18315,15 @@ function mapOrder(o){
     /* il feedback che ho lasciato io e quello che ho ricevuto */
     mioVoto:o.mio_voto||0, mioCommento:o.mio_commento||'',
     suoVoto:o.suo_voto||0, suoCommento:o.suo_commento||'',
+    /* LA MODIFICA DEI FEEDBACK (14 nov 2026): i due gesti sul mio li
+       decide il server (`mio_fb_gesti`: modifica, cancella, fino), qui
+       si leggono e basta; «modificato» per le due righe, la lapide del
+       mio se l'ho cancellato, e i giorni della finestra per la frase
+       del modulo (0 = definitivo, come prima). Un server di ieri non
+       manda niente, e tutto resta com'era. */
+    mioGesti:o.mio_fb_gesti||null,
+    mioModificato:o.mio_fb_modificato||0, suoModificato:o.suo_fb_modificato||0,
+    mioRitirato:!!o.mio_fb_ritirato, fbGiorni:o.fb_giorni||0,
     /* e le loro foto su Blossom (ott 2026): URL gia' passati dalla
        forma ammessa del server */
     mioFoto:Array.isArray(o.mio_foto)?o.mio_foto:[],
@@ -25707,7 +25722,7 @@ function feedbackNegozioHTML(feedback, nFeedback){
         <span>${nome}${f.da_staff ? bollinoStaff() : ''} ${faccia}<br>
           ${f.commento?`${esc(f.commento)}<br>`:''}
           ${fotoRecensioneHTML(f.foto)}
-          <small style="opacity:.65">${f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':f.ruolo==='scambio'?'da uno scambio P2P':'utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}</small>
+          <small style="opacity:.65">${f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':f.ruolo==='scambio'?'da uno scambio P2P':'utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}${f.modificato?' · modificato':''}</small>
           ${isAdmin?` <a href="#" onclick="rimuoviFeedback(${f.id});return false" style="color:var(--danger);font-size:12px">rimuovi</a>`:''}
         </span>
       </div>`;
@@ -38233,27 +38248,174 @@ function feedbackPanel(o){
   const chi = o.role==='buyer' ? 'il venditore' : "l'acquirente";
   /* le foto scelte sono di QUESTO ordine: aprendone un altro si riparte */
   if (fbFotoOrdine !== o.id) { fbFoto = []; fbFotoOrdine = o.id; }
+  /* ...e cosi' la modifica aperta su un altro ordine (14 nov 2026) */
+  if (fbModifica && fbModifica !== o.id) { fbModifica = 0; stellaScelta = 0; }
+  const ricevuto = o.suoVoto?`<div class="hint fb-dopo"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}${o.suoModificato?' <span class="fb-modificato">· modificato</span>':''}</div>${fotoRecensioneHTML(o.suoFoto)}`:'';
+  /* (14 nov 2026) l'ho cancellato io: per sempre, e lo si dice */
+  if (o.mioRitirato && !o.mioVoto) return `
+    <div class="payout">
+      <h4>⭐ Feedback cancellato</h4>
+      <div class="hint">Hai cancellato il tuo feedback su quest'affare: non se ne può lasciare un altro.</div>
+      ${ricevuto}
+    </div>`;
+  const g = o.mioGesti || {};
+  /* nella modifica si parte dal voto di prima: `openOrder` azzera la
+     scelta a ogni disegno, quindi la si rimette qui finche' non se ne
+     sceglie un'altra */
+  if (o.mioVoto && fbModifica === o.id && g.modifica && !stellaScelta) stellaScelta = o.mioVoto;
+  if (o.mioVoto && fbModifica === o.id && g.modifica) return `
+    <div class="payout">
+      <h4>✏️ Modifica il feedback</h4>
+      <div class="hint">Puoi cambiare stelle e commento <b>una volta sola</b>: dopo resta così. Le foto restano come sono.</div>
+      ${moduloStelleFeedback()}
+      <textarea id="fbCommento" class="fb-commento" maxlength="200" placeholder="Commento (facoltativo, max 200 caratteri)">${esc(o.mioCommento||'')}</textarea>
+      <button class="btn primary fb-invia" onclick="salvaModificaFeedback(this)">✏️ Salva la modifica</button>
+      <button class="btn ghost fb-invia" onclick="chiudiModificaFeedback()">Lascia com'è</button>
+      ${ricevuto}
+    </div>`;
   if (o.mioVoto) return `
     <div class="payout">
       <h4>⭐ Feedback lasciato</h4>
-      <div class="hint"><span class="stars">${'★'.repeat(o.mioVoto)}</span>${o.mioCommento?` — ${esc(o.mioCommento)}`:''}</div>
+      <div class="hint"><span class="stars">${'★'.repeat(o.mioVoto)}</span>${o.mioCommento?` — ${esc(o.mioCommento)}`:''}${o.mioModificato?' <span class="fb-modificato">· modificato</span>':''}</div>
       ${fotoRecensioneHTML(o.mioFoto)}
-      ${o.suoVoto?`<div class="hint fb-dopo"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>${fotoRecensioneHTML(o.suoFoto)}`:''}
+      ${gestiFeedbackHTML(g, 'apriModificaFeedback()', 'cancellaFeedback(this)', 'm')}
+      ${ricevuto}
     </div>`;
   return `
     <div class="payout">
       <h4>⭐ Lascia un feedback</h4>
-      <div class="hint">Com'è andata con ${chi}? Il voto è definitivo e resta legato a questo affare.</div>
-      <div class="fb-stelle">
-        ${[1,2,3,4,5].map(n=>`<span id="fbStella${n}" onclick="setStella(${n})">☆</span>`).join('')}
-      </div>
+      <div class="hint">Com'è andata con ${chi}? ${testoFinestraFeedback(o.fbGiorni, 'm')}</div>
+      ${moduloStelleFeedback()}
       <textarea id="fbCommento" class="fb-commento" maxlength="200" placeholder="Commento (facoltativo, max 200 caratteri)"></textarea>
       <input type="file" id="fbFotoFile" accept="image/*" multiple hidden onchange="fbFotoScelte(this)">
       <div class="fb-scelte" id="fbScelte">${fbScelteHTML()}</div>
       <div class="hint">Chi apre il profilo di ${chi} vedrà le foto accanto al voto: se mostrano l'oggetto, si saprà cosa ${o.role==='buyer'?'hai comprato':'hai venduto'}.</div>
       <button class="btn primary fb-invia" onclick="inviaFeedback(this)">⭐ Invia il feedback</button>
-      ${o.suoVoto?`<div class="hint fb-dopo"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>${fotoRecensioneHTML(o.suoFoto)}`:''}
+      ${ricevuto}
     </div>`;
+}
+/* le cinque stelle da scegliere: col voto gia' scelto acceso (nella
+   modifica si parte da quello di prima, vedi `feedbackPanel`) */
+function moduloStelleFeedback(){
+  return `<div class="fb-stelle">
+        ${[1,2,3,4,5].map(n=>`<span id="fbStella${n}" onclick="setStella(${n})">${n<=stellaScelta?'★':'☆'}</span>`).join('')}
+      </div>`;
+}
+
+/* ---- IL FEEDBACK SI MODIFICA E SI CANCELLA, PER UN PO' (14 nov 2026) ----
+   Richiesta di Andrea. Fino a ieri il feedback era definitivo («chiude il
+   ricatto "cambia il feedback o…"»); adesso chi l'ha scritto puo'
+   cambiarlo UNA volta o cancellarlo, per FEEDBACK_MODIFICA_GIORNI giorni.
+   Quali gesti offrire e fino a quando lo dice SEMPRE il server (`gesti`:
+   modifica, cancella, fino): qui non si conta niente, si mostra e basta.
+   Le tre funzioni pure sotto servono i due posti — l'ordine del mercatino
+   e la pagina dello scambio P2P — e `genere` dice la desinenza:
+   'm' il feedback, 'f' la recensione. */
+let fbModifica = 0;   // l'ordine il cui feedback sto modificando
+
+function testoFinestraFeedback(giorni, genere){
+  const o = genere === 'f' ? 'a' : 'o', lo = genere === 'f' ? 'la' : 'lo';
+  const n = Number(giorni) || 0;
+  if (n <= 0) return genere === 'f' ? 'È definitiva: non potrà essere modificata.'
+                                    : 'Il voto è definitivo e resta legato a questo affare.';
+  return `Potrai modificar${lo} una volta o cancellar${lo} entro ${n === 1 ? 'un giorno' : n + ' giorni'}, poi resta definitiv${o}.`;
+}
+function fineFinestraFeedback(fino){
+  const t = Number(fino) || 0;
+  return t ? new Date(t * 1000).toLocaleString('it-IT', {day: 'numeric', month: 'long',
+    hour: '2-digit', minute: '2-digit'}) : '';
+}
+function gestiFeedbackHTML(g, apri, cancella, genere){
+  if (!g || !(g.modifica || g.cancella) || !g.fino) return '';
+  const lo = genere === 'f' ? 'la' : 'lo';
+  const quando = fineFinestraFeedback(g.fino);
+  const frase = g.modifica
+    ? `Puoi modificar${lo} una volta o cancellar${lo} fino al ${quando}.`
+    : `L'hai già modificat${genere === 'f' ? 'a' : 'o'}: puoi ancora cancellar${lo} fino al ${quando}.`;
+  return `<div class="fb-gesti">`
+    + (g.modifica ? `<button class="btn ghost" onclick="${apri}">✏️ Modifica</button>` : '')
+    + (g.cancella ? `<button class="btn piano" onclick="${cancella}">🗑 Cancella</button>` : '')
+    + `</div><div class="hint">${frase}</div>`;
+}
+
+function apriModificaFeedback(){
+  haptic();
+  const o = currentOrder;
+  if (!o || !o.mioVoto) return;
+  fbModifica = o.id;
+  stellaScelta = o.mioVoto;
+  ridisegnaOrdine(o);
+}
+function chiudiModificaFeedback(){
+  fbModifica = 0;
+  stellaScelta = 0;
+  if (currentOrder) ridisegnaOrdine(currentOrder);
+}
+async function salvaModificaFeedback(btn){
+  haptic();
+  const o = currentOrder;
+  if (!o) return;
+  if (!stellaScelta) { toast('Scegli da 1 a 5 stelle'); return; }
+  const voto = stellaScelta;
+  const commento = ((el('fbCommento') || {}).value || '').trim();
+  chiediConferma({
+    titolo: 'Salvi la modifica?',
+    corpo: 'Il feedback si modifica una volta sola: dopo resta così.',
+    etichetta: '✏️ Salva',
+    poi: async () => {
+      if (DEMO) {
+        segnaOrdine(o, {mioVoto: voto, mioCommento: commento,
+          mioModificato: Math.floor(Date.now()/1000),
+          mioGesti: Object.assign({}, o.mioGesti || {}, {modifica: false})});
+        fbModifica = 0; stellaScelta = 0;
+        toast('✏️ Feedback modificato'); ridisegnaOrdine(o); return;
+      }
+      const ripristina = bottoneInAttesa(btn, '✏️ Salvo…');
+      let r, d = {};
+      try {
+        r = await fetch(`${API_BASE}/orders/${o.id}/feedback/modifica`, {
+          method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+          body: JSON.stringify({voto, commento})});
+        d = await r.json().catch(()=>({}));
+      } catch(e) { r = null; }
+      ripristina();
+      if (!r || !r.ok) { toast((d && d.detail) || 'Operazione non riuscita, riprova', 7000); return; }
+      segnaOrdine(o, {mioVoto: voto, mioCommento: commento,
+        mioModificato: Math.floor(Date.now()/1000),
+        mioGesti: Object.assign({}, o.mioGesti || {}, {modifica: false})});
+      fbModifica = 0; stellaScelta = 0;
+      toast('✏️ Feedback modificato');
+      ridisegnaOrdine(o);
+    }});
+}
+async function cancellaFeedback(btn){
+  haptic();
+  const o = currentOrder;
+  if (!o || !o.mioVoto) return;
+  chiediConferma({
+    titolo: 'Cancelli il tuo feedback?',
+    corpo: 'Sparisce dal profilo e dalla media, per sempre: su quest\'affare non potrai lasciarne un altro.',
+    etichetta: '🗑 Cancella',
+    vestito: 'allarme',
+    poi: async () => {
+      if (DEMO) {
+        segnaOrdine(o, {mioVoto: 0, mioCommento: '', mioFoto: [], mioGesti: null, mioRitirato: true});
+        fbModifica = 0; toast('🗑 Feedback cancellato'); ridisegnaOrdine(o); return;
+      }
+      const ripristina = bottoneInAttesa(btn, '🗑 Cancello…');
+      let r, d = {};
+      try {
+        r = await fetch(`${API_BASE}/orders/${o.id}/feedback/cancella`, {
+          method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()}});
+        d = await r.json().catch(()=>({}));
+      } catch(e) { r = null; }
+      ripristina();
+      if (!r || !r.ok) { toast((d && d.detail) || 'Operazione non riuscita, riprova', 7000); return; }
+      segnaOrdine(o, {mioVoto: 0, mioCommento: '', mioFoto: [], mioGesti: null, mioRitirato: true});
+      fbModifica = 0;
+      toast('🗑 Feedback cancellato');
+      ridisegnaOrdine(o);
+    }});
 }
 
 /* ---- LE FOTO DELLE RECENSIONI (ott 2026) ----
@@ -38340,9 +38502,11 @@ async function inviaFeedback(btn){
   const foto = fbFoto.slice();
   chiediConferma({
     titolo: 'Invii questo feedback?',
-    corpo: foto.length
-      ? `È definitivo: non potrà essere modificato, e ${foto.length===1?'la foto sarà pubblica':`le ${foto.length} foto saranno pubbliche`}.`
-      : 'È definitivo: non potrà essere modificato.',
+    /* (14 nov 2026) la frase dice la finestra vera, o il definitivo di
+       prima se il server non ne manda una */
+    corpo: testoFinestraFeedback(o.fbGiorni, 'm') + (foto.length
+      ? ` ${foto.length===1?'La foto sarà pubblica':`Le ${foto.length} foto saranno pubbliche`}.`
+      : ''),
     etichetta: '⭐ Invia',
     poi: async () => {
   if (DEMO) {
@@ -73244,6 +73408,9 @@ function gestoRecensioneP2P(o, rec){
   if (!o || (o.stato !== 'concluso' && !(o.stato === 'annullato' && rec
                                          && (rec.si === true || rec.gia === true)))) return '';
   if (o.recensione === 'fatta' || (rec && rec.gia)) return '';
+  /* (14 nov 2026) l'ho cancellata io: niente invito a rifarla, e niente
+     voto del circuito al suo posto — chi l'ha tolta ha deciso */
+  if (o.recensione === 'ritirata' || (rec && rec.motivo === 'ritirata')) return '';
   if (!rec) return '';
   if (rec.si) return 'recensisci';
   /* UNA RISPOSTA PROVVISORIA NON APRE IL SOLO VOTO (12 ott 2026, voto-
@@ -77499,14 +77666,24 @@ function riquadroRecensioneP2P(o, rec){
      -1 dentro repeat() non stampa niente di storto: solleva, e porta
      via la pagina intera. */
   const stelle = Math.max(0, Math.min(5, (mia && mia.voto) | 0));
+  /* LA MODIFICA E LA CANCELLAZIONE (14 nov 2026): i gesti e il «fino a»
+     li manda il server (`rec.gesti`), come nel mercatino; la riga del
+     dispositivo da sola non li offre mai */
+  const gesti = (rec && rec.gia && rec.gesti) || null;
+  if (mia && gesti && gesti.modifica && p2pRecModifica === o.id) return moduloModificaRecensioneP2P(o, mia);
   if (mia)
     return '<div class="payout"><h4>⭐ Recensione lasciata</h4>'
       + (stelle || mia.commento
          ? '<div class="hint">' + (stelle ? '<span class="stars">' + '★'.repeat(stelle) + '</span>' : '')
-           + (mia.commento ? (stelle ? ' — ' : '') + esc(mia.commento) : '') + '</div>'
+           + (mia.commento ? (stelle ? ' — ' : '') + esc(mia.commento) : '')
+           + (mia.modificato ? ' <span class="fb-modificato">· modificata</span>' : '') + '</div>'
          : '')
+      + gestiFeedbackHTML(gesti, 'apriModificaRecensioneP2P()', 'cancellaRecensioneP2P(this)', 'f')
       + '</div>';
-  if (gestoRecensioneP2P(o, rec) === 'recensisci') return moduloRecensioneP2P(o);
+  if (o.recensione === 'ritirata' || (rec && rec.motivo === 'ritirata'))
+    return '<div class="payout"><h4>⭐ Recensione cancellata</h4>'
+      + '<div class="hint">Hai cancellato la tua recensione su questo scambio: non se ne può lasciare un\'altra.</div></div>';
+  if (gestoRecensioneP2P(o, rec) === 'recensisci') return moduloRecensioneP2P(o, rec);
   /* IL VOTO GIA' DATO SI DICE (12 ott 2026, voto-dopo-concluso): dove
      non c'e' il riquadro della recensione, chi ha votato lo legge qui
      invece di cercare un bottone che non c'e' piu' */
@@ -77531,17 +77708,32 @@ function testoRecensioneMancanteP2P(motivo){
    e' definitiva, e — quando e' vero — che le stelle partono anche verso
    il circuito degli scambi. Il nome dell'altra persona, se la pagina lo
    mostra gia' (`LE PARTI SI VEDONO`); se no «chi ha scambiato con te». */
-function moduloRecensioneP2P(o){
+function moduloRecensioneP2P(o, rec){
   const anche = o.votabile && !o.votato;
   return '<div class="payout">'
     + '<h4>⭐ Lascia una recensione</h4>'
     + '<div class="hint">Com\'è andata con ' + esc(nomeControparteP2P(o, 'chi ha scambiato con te'))
-    + '? Le stelle e il commento vanno sul suo profilo di Barattolo, nella stessa media del mercatino. È definitiva: non potrà essere modificata.</div>'
+    + '? Le stelle e il commento vanno sul suo profilo di Barattolo, nella stessa media del mercatino. '
+    + testoFinestraFeedback(rec && rec.giorni, 'f') + '</div>'
     + stelleSceltaP2P()
     + '<textarea id="p2pRecCommento" class="fb-commento" maxlength="200" data-id="' + esc(o.id) + '" '
     + 'placeholder="Commento (facoltativo, max 200 caratteri)"></textarea>'
     + '<button class="btn primary fb-invia" onclick="inviaRecensioneP2P(this)">⭐ Invia la recensione</button>'
     + (anche ? '<div class="hint fb-dopo">Le stelle viaggiano anche sul circuito degli scambi, che è la reputazione di chi scambia fuori da Barattolo; il commento resta qui.</div>' : '')
+    + '</div>';
+}
+/* LA MODIFICA DELLA RECENSIONE (14 nov 2026): stesse stelle e stessa
+   casella del modulo qui sopra, col commento di prima dentro e un altro
+   bottone. PURA come la sorella. */
+function moduloModificaRecensioneP2P(o, mia){
+  return '<div class="payout">'
+    + '<h4>✏️ Modifica la recensione</h4>'
+    + '<div class="hint">Puoi cambiare stelle e commento <b>una volta sola</b>: dopo resta così.</div>'
+    + stelleSceltaP2P()
+    + '<textarea id="p2pRecCommento" class="fb-commento" maxlength="200" data-id="' + esc(o.id) + '" '
+    + 'placeholder="Commento (facoltativo, max 200 caratteri)">' + esc(mia.commento || '') + '</textarea>'
+    + '<button class="btn primary fb-invia" onclick="salvaModificaRecensioneP2P(this)">✏️ Salva la modifica</button>'
+    + '<button class="btn ghost fb-invia" onclick="chiudiModificaRecensioneP2P()">Lascia com\'è</button>'
     + '</div>';
 }
 /* LA BOZZA SOPRAVVIVE AL RIDISEGNO (23 set 2026): il riquadro sta nella
@@ -92947,6 +93139,7 @@ async function chiediRecensibileP2P(id){
   if (o) {
     const prima = o.recensione;
     if (esito.gia) { o.recensione = 'fatta'; o.recVoto = esito.voto || 0; }
+    else if (esito.motivo === 'ritirata') o.recensione = 'ritirata';   // (14 nov 2026)
     else if (!esito.si && esito.motivo && esito.motivo !== 'muto'
              && esito.motivo !== 'non_conclusa') o.recensione = 'senza';
     if (o.recensione !== prima) scriviOrdineP2P(o);
@@ -92985,7 +93178,7 @@ async function inviaRecensioneP2P(btn){
   const commento = ((el('p2pRecCommento') || {}).value || '').trim();
   chiediConferma({
     titolo: 'Invii questa recensione?',
-    corpo: 'È definitiva: non potrà essere modificata.',
+    corpo: testoFinestraFeedback((p2pRecensioni[id] || {}).giorni, 'f'),
     etichetta: '⭐ Invia',
     poi: async () => {
       const ripristina = bottoneInAttesa(btn, '⭐ Invio la recensione…');
@@ -93016,13 +93209,107 @@ async function inviaRecensioneP2P(btn){
       agg.recensione = 'fatta';
       agg.recVoto = voto;
       scriviOrdineP2P(agg);
+      /* (14 nov 2026) i gesti della recensione appena nata li dice il
+         server: la domanda si rifa' una volta, in sottofondo */
       p2pRecensioni[id] = {si: false, gia: true, voto, commento, motivo: ''};
+      p2pRecChieste.delete(id);
+      chiediRecensibileP2P(id);
       p2pStellaScelta = 0;
       toast('⭐ Grazie per la recensione!');
       /* le stesse stelle al circuito, in sottofondo: e' un di piu' —
          se non parte, la recensione che conta e' gia' al sicuro */
       if (agg.votabile && !agg.votato)
         stelleCircuitoP2P(agg, voto).catch(() => {});
+      if (p2pOrdineAperto === id) renderOrdineP2P();
+    }
+  });
+}
+
+/* ---- LA RECENSIONE SI MODIFICA E SI CANCELLA (14 nov 2026) ----
+   Le gemelle di `salvaModificaFeedback` e `cancellaFeedback` del
+   mercatino: stessa tabella sul server, stesso giudice, stesse frasi
+   (`gestiFeedbackHTML`). Dopo il gesto la risposta del server si
+   aggiorna qui, e la domanda «recensibile» si rifa' per avere i gesti
+   veri (dopo una modifica resta solo «Cancella»). */
+let p2pRecModifica = '';   // lo scambio la cui recensione sto modificando
+function apriModificaRecensioneP2P(){
+  if (DEMO || VETRINA || !myTgId) return;
+  haptic();
+  const id = p2pOrdineAperto, rec = p2pRecensioni[id];
+  if (!rec || !rec.gia) return;
+  p2pRecModifica = id;
+  p2pStellaScelta = Math.max(0, Math.min(5, rec.voto | 0));
+  renderOrdineP2P();
+}
+function chiudiModificaRecensioneP2P(){
+  p2pRecModifica = '';
+  p2pStellaScelta = 0;
+  renderOrdineP2P();
+}
+async function salvaModificaRecensioneP2P(btn){
+  if (DEMO || VETRINA || !myTgId) return false;
+  haptic();
+  const id = p2pOrdineAperto;
+  if (!id || p2pRecModifica !== id) return;
+  if (!p2pStellaScelta) { toast('Scegli da 1 a 5 stelle'); return; }
+  const voto = p2pStellaScelta;
+  const commento = ((el('p2pRecCommento') || {}).value || '').trim();
+  chiediConferma({
+    titolo: 'Salvi la modifica?',
+    corpo: 'La recensione si modifica una volta sola: dopo resta così.',
+    etichetta: '✏️ Salva',
+    poi: async () => {
+      const ripristina = bottoneInAttesa(btn, '✏️ Salvo…');
+      let d = {}, ok = false;
+      try {
+        const r = await fetch(`${API_BASE}/p2p/recensione/modifica`, {method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+          body: JSON.stringify({ordine: id, voto, commento})});
+        d = await r.json().catch(() => ({}));
+        ok = r.ok;
+      } catch(e) { d = {}; }
+      ripristina();
+      if (!ok) { toast(d.detail || 'Operazione non riuscita, riprova', 7000); return; }
+      const o = ordiniP2P()[id];
+      if (o) { o.recVoto = voto; scriviOrdineP2P(o); }
+      const prima = p2pRecensioni[id] || {};
+      p2pRecensioni[id] = Object.assign({}, prima, {gia: true, voto, commento,
+        modificato: Math.floor(Date.now() / 1000),
+        gesti: Object.assign({}, prima.gesti || {}, {modifica: false})});
+      p2pRecModifica = '';
+      p2pStellaScelta = 0;
+      toast('✏️ Recensione modificata');
+      if (p2pOrdineAperto === id) renderOrdineP2P();
+    }
+  });
+}
+async function cancellaRecensioneP2P(btn){
+  if (DEMO || VETRINA || !myTgId) return false;
+  haptic();
+  const id = p2pOrdineAperto;
+  if (!id) return;
+  chiediConferma({
+    titolo: 'Cancelli la tua recensione?',
+    corpo: 'Sparisce dal profilo e dalla media, per sempre: su questo scambio non potrai lasciarne un\'altra.',
+    etichetta: '🗑 Cancella',
+    vestito: 'allarme',
+    poi: async () => {
+      const ripristina = bottoneInAttesa(btn, '🗑 Cancello…');
+      let d = {}, ok = false;
+      try {
+        const r = await fetch(`${API_BASE}/p2p/recensione/cancella`, {method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+          body: JSON.stringify({ordine: id})});
+        d = await r.json().catch(() => ({}));
+        ok = r.ok;
+      } catch(e) { d = {}; }
+      ripristina();
+      if (!ok) { toast(d.detail || 'Operazione non riuscita, riprova', 7000); return; }
+      const o = ordiniP2P()[id];
+      if (o) { o.recensione = 'ritirata'; o.recVoto = 0; scriviOrdineP2P(o); }
+      p2pRecensioni[id] = {si: false, gia: false, motivo: 'ritirata'};
+      p2pRecModifica = '';
+      toast('🗑 Recensione cancellata');
       if (p2pOrdineAperto === id) renderOrdineP2P();
     }
   });

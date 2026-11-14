@@ -198,3 +198,4 @@ collaudo_domande_compratore.py
 collaudo_widget_prova.py
 collaudo_eth_xmr.py
 collaudo_mappa_ritiro.py
+collaudo_feedback_modificabile.py

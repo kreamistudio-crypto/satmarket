@@ -52,6 +52,8 @@ Si può anche fare un'offerta più bassa con «Fai un'offerta»: il venditore la
 
 Tutti i tuoi acquisti e le tue vendite stanno nella scheda «Ordini», con lo stato di ogni ordine e i bottoni per il passo successivo. In fondo all'elenco c'è «📄 Esporta tutti gli ordini in CSV», che scarica un file con tutti i dettagli dei tuoi ordini (utile a chi vende per tenere i conti).
 
+Il feedback: ad affare concluso, dalla pagina dell'ordine, compratore e venditore si lasciano a vicenda un voto da 1 a 5 stelle con un commento breve (chi compra può aggiungere fino a 3 foto). Lo stesso vale per la recensione a fine scambio P2P, che va nella stessa media del profilo. Chi l'ha lasciato può modificarlo una volta sola (stelle e commento; le foto restano) oppure cancellarlo, entro 7 giorni da quando l'ha scritto: sotto il voto ci sono «✏️ Modifica» e «🗑 Cancella», con la data fino a cui valgono. Dopo diventa definitivo. Chi ha ricevuto il feedback viene avvisato del cambio, e sul profilo la riga porta la scritta «modificato». Cancellato è per sempre: su quell'affare non se ne può lasciare un altro. Il feedback lasciato da un altro non si può cambiare: se è offensivo o falso, lo può togliere solo un moderatore (scrivi allo staff). Nessuno può chiederti di cambiare un voto in cambio di qualcosa: se succede, segnalalo allo staff.
+
 Per un contenuto digitale il venditore può chiederti qualche informazione prima di pagare (per esempio nome, cognome o email, una scelta da un elenco, un sì o un no): rispondi alla cassa. Le risposte viaggiano cifrate dentro l'ordine, le leggete solo tu e il venditore, e si cancellano come l'indirizzo. Il numero di telefono non si può chiedere.
 
 # Il deposito di garanzia

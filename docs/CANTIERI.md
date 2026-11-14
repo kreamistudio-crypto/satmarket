@@ -82430,3 +82430,117 @@ NON PROVATO, DA GUARDARE. Nel libro vero dentro Telegram, sul
 telefono: dove il localStorage non dura fra un avvio e l'altro
 (Telegram nel browser, cache svuotata) la scelta si perde come la
 vista ₿/€, e si torna a «Più recenti».
+
+## Il feedback si modifica e si cancella, per un po' (14 nov 2026, cantiere feedback-modificabile, Andrea: «facciamo questo: possibilità di modificare o cancellare un feedback»)
+
+ROVESCIA UNA DECISIONE DI LUGLIO, E LO SA. Il feedback era definitivo
+perché «chiude il ricatto *cambia il feedback o…*» (Architettura, la
+voce di `POST /api/orders/{id}/feedback`; qui sopra, «Le recensioni
+degli scambi», «NON SI MODIFICA, E LA DOMANDA ERA GIUSTA»). Il piano
+mandato ad Andrea prima del codice lo diceva in testa, coi paletti che
+tengono il ricatto fuori; Andrea: «ok». I paletti:
+- solo CHI L'HA SCRITTO, nel mercatino e negli scambi P2P (una tabella
+  sola, un giudice solo);
+- per `FEEDBACK_MODIFICA_GIORNI` (7) da `creato`, poi definitivo e resta
+  la valvola di sempre, il moderatore. L'orologio NON riparte dalla
+  modifica: se ripartisse, modificare sarebbe il modo di tenere aperta
+  la finestra per sempre;
+- UNA modifica sola, stelle e commento (le foto restano: su Blossom un
+  caricamento non si ritira davvero, e la modifica è delle parole). Chi
+  vende non può insistere all'infinito, e chi ha cambiato idea una
+  volta ha detto la sua;
+- la cancellazione è PER SEMPRE: una lapide in `feedback_ritirati`
+  (solo chi, dove e verso chi — mai il voto né le parole), letta DENTRO
+  il lock prima di ogni INSERT, nei due posti. Senza, togli-e-rimetti
+  sarebbe una modifica senza tetto. La rimozione del MODERATORE non
+  lascia lapide: lì non ha deciso chi l'aveva scritto;
+- l'impronta del ricatto ai moderatori: un voto da 1-2★ alzato o
+  cancellato manda un avviso in «moderazione» (`_voto_basso_toccato`).
+  Scendere no (non è il ricatto di chi riceve), un 4 che diventa 5
+  nemmeno.
+
+COME È FATTO. Il giudice unico è `_motivo_no_gesto_feedback(gesto,
+creato, modificato, adesso, leva, giorni)`, PURO: '' o la frase da dire.
+`_gesti_feedback` ne DERIVA cosa offrire (modifica, cancella, fino) e
+viaggia al client in `/api/orders` (`mio_fb_gesti`, più
+`mio_fb_modificato`, `suo_fb_modificato`, `mio_fb_ritirato`,
+`fb_giorni`) e in `/api/p2p/recensibile` (`gesti`, `modificato`,
+`giorni`, e `motivo: 'ritirata'` dopo una cancellazione): il client non
+conta giorni, mostra quel che il server firmerebbe. Quattro rotte, due
+per posto: `/api/orders/{id}/feedback/modifica|cancella` e
+`/api/p2p/recensione/modifica|cancella` (l'id dello scambio nel body,
+come le sorelle); la riga si rilegge nel lock, il cuore è
+`_cambia_feedback` / `_ritira_feedback` con `_ricalcola_rating` (mai
+somme), e gli avvisi partono dopo il commit (`_avvisi_gesto_feedback`:
+chi riceveva lo sa con «★★ → ★★★★», commento scappato con
+`html.escape`; sugli scambi «uno scambio di sats», mai l'id). La riga
+del mercatino si cerca con `scambio=''`, così un numero negativo
+nell'URL non pesca una recensione P2P. Colonna nuova
+`feedback.modificato` (additiva); sul profilo «· modificato». La
+fusione porta le lapidi alla metà viva (OR IGNORE: due lapidi sullo
+stesso affare diventano una). I distintivi già dati restano (la regola
+append-only di sempre).
+
+LA LEVA, ACCESA DI SERIE (la regola di Andrea del 14 nov):
+`FEEDBACK_MODIFICABILE`, solo un False la spegne; spenta, i feedback
+tornano definitivi, nessun gesto offerto, le rotte rispondono 409, la
+frase del modulo torna «Il voto è definitivo». `FEEDBACK_MODIFICA_GIORNI`
+da 0 (= definitivi) a 90: un refuso nel config (700) non apre anni.
+Tutte e due nel pannello «⚙️ Stato delle leve».
+
+IL CLIENT. Nell'ordine: sotto «⭐ Feedback lasciato» i due bottoni
+«✏️ Modifica» e «🗑 Cancella» affiancati, con «Puoi modificarlo una
+volta o cancellarlo fino al …»; la modifica riapre stelle e casella col
+voto e il commento di prima (passato da esc()); dopo la modifica resta
+solo «Cancella» («L'hai già modificato…»); dopo la cancellazione
+«⭐ Feedback cancellato». La frase del modulo nuovo dice la finestra
+vera (`testoFinestraFeedback`), e la conferma dell'invio pure. Le stesse
+tre pure servono la recensione P2P (`gestiFeedbackHTML`,
+`moduloModificaRecensioneP2P`, `salvaModificaRecensioneP2P`,
+`cancellaRecensioneP2P`); una recensione cancellata non riapre l'invito
+e nemmeno il voto del circuito (`gestoRecensioneP2P`). Cancellare veste
+il rosso dell'uscita (`vestito: 'allarme'`).
+
+STRADE SCARTATE. Modifica illimitata nella finestra (è la strada del
+ricatto a rate); cancellazione con possibilità di rifarlo (togli e
+rimetti = modifica senza tetto); finestra dall'ultima modifica (non si
+chiude mai); modificare anche le foto (Blossom non dimentica davvero);
+una colonna `ritirato` sulla riga di `feedback` invece della lapide (ogni
+query della media e del profilo avrebbe dovuto ricordarsi di filtrarla:
+cento posti da tenere in pari contro una tabella in più).
+
+PROVATO. `prove_feedback_modificabile` (categoria mercatino, 40 righe):
+il giudice sui casi che decidono (l'ultimo secondo della finestra,
+l'orologio da `creato`, la seconda modifica, la riga senza `creato`),
+il cartello del ricatto, la leva e il tetto dei giorni, lo schema fatto
+girare (colonna, lapide una per affare, niente voto nella lapide), le
+quattro rotte (lock, giudice, avvisi dopo il commit), la lapide prima
+del DELETE e letta prima dell'INSERT nei due posti, l'id dello scambio
+fuori dagli avvisi, la fusione, i dodici punti di domanda di
+/api/orders; in node le pure del client. Controprove: orologio dalla
+modifica, lapide tolta da `lascia_feedback`, cartello a >4, seconda
+modifica ammessa — rosse, poi verdi. `collaudo_feedback_modificabile`
+(nuovo, in `ci/collaudi.txt` e `ci/compila.txt`, verde nella gabbia
+senza coincurve): 57 righe sul server vero, mercatino e P2P, la
+finestra, la leva spenta, il commento scappato, la fusione vera con la
+lapide doppia. Ritoccate le prove che contavano: la domanda unica (da
+109 a 113), gli avvisi admin (moderazione 16, totale 98), le fetch del
+blocco dei volti (da 4 a 6), il banco di `miei_ordini` di
+`prove_nascondi_ordine` e di `prove_card_parte_ordine` (le colonne
+nuove e la lapide), la firma `moduloRecensioneP2P(o, rec)` e le tre
+pure nuove nei banchi che disegnano il riquadro, «definitiva» diventata
+la frase della finestra, una sola riga «Feedback ricevuto». Il
+promemoria della recensione P2P non dice più «è definitiva» e tace
+davanti alla lapide. Lezione piccola: un commento con «`);`» dentro il
+DDL di `feedback` spezzava la prova che lo estrae fino al primo «);»
+— riscritto il commento. DAL VIVO: server vero in
+collaudo su database usa-e-getta, Chrome via Playwright a 390×844:
+modifica (stelle di prima accese — la prima versione le mostrava
+spente, perché `openOrder` azzera la scelta: sistemato), salvataggio,
+«· modificato» nell'ordine e sul profilo del venditore, cancellazione,
+il feedback di 9 giorni senza bottoni, la frase del modulo nuovo.
+
+NON PROVATO, DA GUARDARE. La recensione P2P dal vivo (la pagina dello
+scambio vuole la riga dello scambio nel telefono): provata dalle rotte
+nel collaudo e dal disegno in node, non a schermo. Il telefono vero
+dentro Telegram.

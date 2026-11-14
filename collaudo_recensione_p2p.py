@@ -275,7 +275,9 @@ def main():
     come(111)
     r = chiama(SRV.recensibile_p2p, {"ordine": SCAMBIO})
     prova("a chi ha pubblicato la rotta dice si'",
-          {"si": True, "motivo": "", "gia": False}, r)
+          {"si": True, "motivo": "", "gia": False,
+           # (14 nov 2026) i giorni della finestra, per la frase
+           "giorni": 7}, r)
     chiama(SRV.recensione_p2p,
            {"ordine": SCAMBIO, "voto": 5, "commento": "Puntuale e gentile"})
     come(222)
@@ -446,7 +448,8 @@ def main():
     concludi(DA_NOSTR2)
     r = chiama(SRV.recensibile_p2p, {"ordine": DA_NOSTR2})
     prova("...e la recensione si apre", {"si": True, "motivo": "",
-                                         "gia": False}, r)
+                                         "gia": False,
+                                         "giorni": 7}, r)
     chiama(SRV.recensione_p2p, {"ordine": DA_NOSTR2, "voto": 5})
     come(111)
     chiama(SRV.recensione_p2p, {"ordine": DA_NOSTR2, "voto": 4,
