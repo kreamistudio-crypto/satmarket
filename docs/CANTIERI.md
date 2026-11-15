@@ -83683,3 +83683,81 @@ per te» (/mnt/project-files/mancia-senza-indirizzo/nome-intero.png).
 Suite severa sull'albero da origin/develop 97e13e79, nel venv delle sole
 dipendenze del workflow, senza proxy: 28.230/0, 2 saltate (nostr-tools);
 `collaudo_mancia` verde senza coincurve. Sale con la prossima promozione.
+
+## La cassa in negozio (15 nov 2026, cantiere cassa-negozio, Andrea: «crea una modalità locale per i negozi [...] senza escrow [...] funge da Pos [...] si può vendere anche senza che il compratore abbia un account»)
+
+LA DECISIONE. Un servizio a sé, non un ordine (Barattolo aggregatore,
+13 nov): nel Profilo, «Negozio e spedizioni», la voce «🏪 Cassa in
+negozio» apre un foglio. Chi vende scrive un importo (in € o in sats,
+la cifra scritta si converte al cambio) e/o tocca i suoi annunci come in
+un carrello; il server fa il totale coi prezzi e lo stock di adesso ed
+esce un QR con la scelta Lightning / on-chain, come al foglio del
+pagamento. Il cliente inquadra con un wallet qualunque: niente account,
+niente Telegram, non bussa mai a noi. Niente deposito di garanzia,
+niente spedizione né conferma, niente «Ordini»: le vendite stanno nello
+storico della cassa, col totale di oggi. Commissione zero (regola 10).
+
+I SATS NON PASSANO DA BARATTOLO. Lightning: la fattura la conia il
+Lightning address di chi vende, la strada della mancia del giorno prima
+(`invoice_da_ln_address` con la guardia anti-SSRF); «pagata» si sa da
+LUD-21 dove il wallet lo dà, sennò chi vende guarda il SUO wallet e
+tocca «✓ Ricevuto». On-chain: il prossimo `/0/i` della xpub che chi vende
+ha firmato nel Profilo (o il suo indirizzo fisso), MAI il 2-di-3 né il
+seme di Barattolo: senza escrow non c'è niente da co-firmare. La fila
+degli indici è la stessa degli ordini (`_onchain_prossimo_esterno` conta
+anche la cassa), così un indirizzo non si dà due volte. Visto in mempool
+= «in arrivo» con il consiglio (cifra piccola consegna, cifra grande
+aspetta il blocco) e il bottone «✓ Consegna adesso»; una conferma =
+pagata. Il tocco sull'altra porta conia il QR che manca e lascia buono
+il primo: la sorveglianza guarda tutti e due, e lo storico scrive il
+metodo con cui i sats sono ARRIVATI, non l'ultima porta toccata.
+
+LA STRADA SCARTATA (proposta ad Andrea su un biglietto, consigliata la
+prima): la fattura sul nodo di Barattolo girata subito al Lightning
+address di chi vende. Un «pagato» sempre certo, ma Barattolo custodisce
+i sats per un attimo, e senza escrow non c'è un motivo per farlo (e per
+MiCA è la differenza fra passare e tenere). Andrea ha scelto la prima,
+«Dritti al wallet di chi vende» (15 nov 2026, 10:03).
+
+LO STOCK («si riduce lo stoccaggio», letto come: i pezzi venduti al
+banco escono dalla vetrina) scala quando la vendita si chiude, una volta
+sola (il timbro `stock`), coi gesti dell'esaurito di `_incassa_ordine`:
+venduto, offerte vive decadute (anche quelle sul carrello), Nostr
+«sold», ✅ sul canale. Prima del pagamento non si prenota niente: chi
+compra è davanti al banco.
+
+UNA TRAPPOLA PRESA IN TEMPO. La funzione del client si chiamava
+`statoCassa`, e una con quel nome c'era già (la cassa del foglio del
+pagamento): in JavaScript vince l'ultima, e il pagamento degli ordini si
+sarebbe rotto. L'ha presa la sentinella dei nomi doppi del 30 ott; ora è
+`statoVenditaCassa`.
+
+PROVATO. `collaudo_cassa_negozio` (nuovo, in `ci/collaudi.txt`) sulle
+rotte vere, database usa-e-getta, il wallet di cartone della mancia,
+mempool di cartone, embit vero su signet: 54/54 (apertura e prezzi in
+euro, totale fatto dal server, LUD-21 che chiude, lo stock che scala una
+volta, la xpub /0/0 → /0/1 e la fila degli ordini che conta la cassa,
+mempool → in arrivo → blocco → pagata, l'esaurito con Nostr e canale e
+l'offerta decaduta, il tocco ⚡/₿ sullo stesso conto, il pagamento col
+QR di prima, l'indirizzo fisso con la transazione vecchia e quella già
+contata, i no, la leva spenta, lo storico). Le sentinelle aggiornate: il
+freno `cassa`, la voce `vocCassa` nel cassetto, il bottone €/sats nel
+censimento delle valute («converte»), il sesto QR Lightning, l'extra di
+LUD-21 che ora passano mancia e cassa, le leve nel pannello e nel config
+d'esempio, `conoscenza.md` rigenerata, nessuna ⛓️ nei testi. DAL VIVO:
+server in collaudo su database usa-e-getta (wallet, cambio e mempool
+finti, relay morti), Chromium a 390×844, chiaro e scuro: conto con due
+caffè, il miele e 2,50 €, QR Lightning, QR on-chain, «✅ Pagato!»,
+storico (le schermate in /mnt/project-files/pos-negozio/). Suite severa
+sull'albero da origin/develop 493702ef: 28.235/0, 2 saltate (i due
+script di nostr-tools, le stesse di develop pulito, che fa 28.235/0 con
+le stesse 2). Collaudi della CI 134/134.
+
+NON PROVATO, DA GUARDARE. Un wallet vero su Lightning (quale dà LUD-21 e
+quale no) e un pagamento on-chain vero su signet dalla VM di collaudo.
+Non fatti, e restano fuori finché Andrea non dice sì: lo stock dei
+negozi collegati (`registra_uscita_negozio` vuole un ordine: la vendita
+al banco di un articolo importato da un negozio esterno non si scrive
+nel loro registro, e il sync può rialzarla) e l'avviso a chi aveva
+un'offerta sull'articolo esaurito al banco (decade, ma senza il
+messaggio).

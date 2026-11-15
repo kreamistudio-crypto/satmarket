@@ -3047,6 +3047,9 @@ FRENI = {
     # wallet di chi vende; il battito del foglio chiede a LUD-21 ogni 5 s
     "mancia": (20, 3600),             # fatture di mancia chieste, per persona
     "mancia_guarda": (240, 3600),     # «e' arrivata?» al wallet di chi vende, per persona
+    # la cassa in negozio (15 nov 2026): ogni conto battuto e ogni
+    # tocco ⚡/⛓️ chiede una fattura al wallet di chi vende o un indirizzo
+    "cassa": (300, 3600),             # conti e QR coniati alla cassa, per persona
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
 MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
@@ -36428,6 +36431,8 @@ def _leve_stato():
         ]},
         # LA MANCIA AL VENDITORE (14 nov 2026): accesa di serie
         {"gruppo": "🎁 Mancia al venditore", "voci": _mancia_leve()},
+        # LA CASSA IN NEGOZIO (15 nov 2026): accesa di serie
+        {"gruppo": "🏪 Cassa in negozio", "voci": _cassa_leve()},
         {"gruppo": "🆕 Avvisi del mercatino", "voci": [
             # GLI AVVISI DEI NUOVI ANNUNCI E DEI VENDITORI SEGUITI (9 ott
             # 2026): la leva globale e le due finestre del raggruppamento;
@@ -50458,6 +50463,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # selettore vive anche dentro Telegram, le conferme col volto e
     # «Esci da tutti». Il FATTO, dalla leva viva.
     profilo["piu_account"] = bool(PIU_ACCOUNT_OVUNQUE)
+    # LA CASSA IN NEGOZIO (15 nov 2026): la voce nel Profilo solo a leva
+    # accesa. Il FATTO, dalla leva viva.
+    profilo["cassa_attiva"] = bool(CASSA_ATTIVA)
     # LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026): il client mostra la voce
     # nel Profilo solo a leva accesa. Il FATTO, dalla leva viva.
     profilo["account_cancellabile"] = bool(ACCOUNT_CANCELLABILE)
@@ -99851,6 +99859,17 @@ def _onchain_prossimo_esterno(con, venditore_id: int, valore: str) -> int:
     # persona compra: una fila sola, o due ordini avrebbero lo stesso
     # indirizzo
     nostro = max(nostro, _onchain_rimborsi_usati(con, venditore_id, valore))
+    # (15 nov 2026, cassa-negozio) ...e gli indirizzi dati alla CASSA IN
+    # NEGOZIO: stessa chiave, stessa fila. La tabella nasce col primo
+    # conto battuto: dove non c'e', non c'e' niente da contare.
+    try:
+        r = con.execute("SELECT MAX(oc_indice) FROM cassa_vendite WHERE "
+                        "venditore_id=? AND oc_tipo='xpub' AND oc_valore=?",
+                        (int(venditore_id), valore)).fetchone()
+        if r and r[0] is not None and int(r[0]) >= 0:
+            nostro = max(nostro, int(r[0]) + 1)
+    except sqlite3.OperationalError:
+        pass
     # ...e mai sotto l'ultimo indirizzo che la RETE ha gia' visto usato
     # (3 nov 2026, `onchain_xpub_base`)
     return max(nostro, _onchain_xpub_base(con, valore))
@@ -107879,6 +107898,664 @@ def _mancia_leve() -> list:
 
 
 # (Qui finisce il blocco della mancia al venditore.)
+
+
+# ---------- LA CASSA IN NEGOZIO (15 nov 2026, cantiere cassa-negozio) ----------
+# IL CASO: Andrea, 15 nov 2026: «crea una modalità locale per i negozi
+# [...] i prodotti si comprano in presenza fisica e quindi senza escrow
+# [...] funge da POS, ma non serve tutta la procedura di consegna,
+# conferma eccetera e si può vendere anche senza che il compratore abbia
+# un account». E' un SERVIZIO A SE' (Barattolo aggregatore, 13 nov):
+# non nasce un ordine, non c'e' deposito di garanzia, non c'e' «Ordini».
+#
+#   · CHI VENDE apre la Cassa dal Profilo, scrive un importo (sats o €)
+#     e/o tocca i suoi annunci come in un carrello. Esce un QR con la
+#     scelta ⚡ / ⛓️ (come il foglio del pagamento: il QR al tocco).
+#   · CHI COMPRA inquadra con un wallet qualunque: niente account,
+#     niente Telegram. Non bussa mai al nostro server.
+#   · ⚡ E' LA MANCIA RIUSATA: la fattura la conia il wallet di chi vende
+#     dal suo Lightning address (`invoice_da_ln_address`, con la sua
+#     guardia anti-SSRF), e Barattolo non tocca un sat. «Pagato» si sa
+#     da LUD-21 dove il wallet lo da'; sennò chi vende guarda il SUO
+#     wallet e chiude a mano («✓ Ricevuto»). Proposta ad Andrea con la
+#     strada scartata accanto (la fattura sul nostro nodo girata subito:
+#     un «pagato» sempre certo, ma custodia per un attimo).
+#   · ⛓️ VA DRITTO AL WALLET DI CHI VENDE: l'indirizzo e' il prossimo
+#     `/0/i` della sua destinazione firmata (Profilo → Incassi on-chain),
+#     o il suo indirizzo fisso. MAI il 2-di-3, mai il seme di Barattolo:
+#     senza escrow non c'e' niente da co-firmare. La fila degli indici e'
+#     la stessa degli ordini (`_onchain_prossimo_esterno` conta anche la
+#     cassa), cosi' un indirizzo non si da' due volte.
+#     Visto nel mempool = «in arrivo» (chi vende decide se consegnare:
+#     per un caffe' basta, per un televisore aspetta il blocco); una
+#     conferma = «pagata».
+#   · LO STOCK scala quando la vendita si chiude: sono i pezzi usciti dal
+#     negozio («si riduce lo stoccaggio»), coi gesti di `_incassa_ordine`
+#     per l'esaurito (venduto, offerte decadute, Nostr «sold», ✅ sul
+#     canale). Prima del pagamento non si prenota niente: chi compra e'
+#     davanti al banco.
+#   · COMMISSIONE ZERO (regola 10: nessuna tariffa a chi vende) e nessun
+#     tetto di serie: i sats non passano da noi.
+#
+# LE LEVE (accese di serie, la regola di Andrea del 14 nov 2026):
+#   CASSA_ATTIVA     la voce nel Profilo e le rotte; spenta = 404
+#   CASSA_MAX_SATS   il tetto di UNA vendita (0 = nessuno)
+try:
+    from config import CASSA_ATTIVA
+except ImportError:
+    CASSA_ATTIVA = True
+try:
+    from config import CASSA_MAX_SATS
+except ImportError:
+    CASSA_MAX_SATS = 0
+# Quanto vive una vendita non pagata prima di dirsi scaduta: un
+# bonifico on-chain da un wallet freddo puo' metterci, e la riga non
+# prenota niente, quindi un giorno non costa nulla a nessuno.
+CASSA_ORE_ATTESA = 24
+# Una domanda alla rete ogni tanti secondi per vendita, qualunque sia il
+# battito del client: il mempool e il wallet di chi vende non sono nostri.
+CASSA_SECONDI_TRA_CONTROLLI = 6
+CASSA_MAX_RIGHE = 30            # articoli diversi in un conto
+CASSA_NOTA_MAX = 120
+CASSA_STATI = ("attesa", "in_arrivo", "pagata", "annullata", "scaduta")
+
+
+def cassa_max_sats() -> int:
+    """Il tetto di una vendita, letto vivo; 0 o una riga storta = nessuno."""
+    try:
+        n = int(CASSA_MAX_SATS or 0)
+    except (TypeError, ValueError):
+        return 0
+    return max(n, 0)
+
+
+def _cassa_prepara_tabella(con):
+    """`cassa_vendite`: una riga per conto battuto alla cassa.
+    `stato`: attesa | in_arrivo (on-chain visto nel mempool) | pagata |
+    annullata | scaduta. `come`: chi l'ha detto pagata — 'lud21' (il
+    wallet di chi vende), 'blocco' (una conferma), 'mempool' (chi vende
+    ha chiuso col pagamento ancora in mempool), 'a_mano' (chi vende:
+    «✓ Ricevuto»). `righe` e' il JSON degli articoli [{id, titolo, q,
+    sats}], `stock` il timbro dello scalo (uno solo per vendita)."""
+    con.execute("""CREATE TABLE IF NOT EXISTS cassa_vendite(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        venditore_id INTEGER NOT NULL,
+        sats INTEGER NOT NULL,
+        euro REAL DEFAULT 0,
+        nota TEXT DEFAULT '',
+        righe TEXT DEFAULT '[]',
+        metodo TEXT DEFAULT 'ln',
+        ln_bolt11 TEXT DEFAULT '',
+        ln_hash TEXT DEFAULT '',
+        ln_verify TEXT DEFAULT '',
+        oc_indirizzo TEXT DEFAULT '',
+        oc_tipo TEXT DEFAULT '',
+        oc_valore TEXT DEFAULT '',
+        oc_indice INTEGER DEFAULT -1,
+        oc_txid TEXT DEFAULT '',
+        stato TEXT DEFAULT 'attesa',
+        come TEXT DEFAULT '',
+        creato INTEGER DEFAULT 0,
+        controllato INTEGER DEFAULT 0,
+        pagata_il INTEGER DEFAULT 0,
+        stock INTEGER DEFAULT 0)""")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_cassa_venditore "
+                "ON cassa_vendite(venditore_id, creato)")
+
+
+def _cassa_db():
+    con = db()
+    _cassa_prepara_tabella(con)
+    return con
+
+
+def _cassa_accesa():
+    if not CASSA_ATTIVA:
+        raise HTTPException(404, "La cassa qui non c'è")
+
+
+def cassa_sats_annuncio(a, cambio: float) -> int:
+    """PURA: il prezzo di un annuncio in sats ADESSO. In euro si
+    converte al cambio di adesso (0 se il cambio manca: l'articolo non
+    si batte, si scrive l'importo a mano)."""
+    if (a["valuta"] or "sats") == "eur":
+        eur = float(a["prezzo_eur"] or 0)
+        return max(1, round(eur / cambio * 100_000_000)) if cambio > 0 and eur > 0 else 0
+    return int(a["prezzo_sats"] or 0)
+
+
+def cassa_bip21(indirizzo: str, sats: int, etichetta: str = "") -> str:
+    """PURA: l'URI che il wallet di chi compra legge dal QR, con la
+    cifra in BTC (8 decimali, senza zeri in coda)."""
+    btc = f"{int(sats) / 100_000_000:.8f}".rstrip("0").rstrip(".")
+    uri = f"bitcoin:{indirizzo}?amount={btc}"
+    if etichetta:
+        uri += "&label=" + urllib.parse.quote(etichetta[:60])
+    return uri
+
+
+def cassa_pagamento_in_txs(txs: list, indirizzo: str, sats: int,
+                           da: int, usati: set) -> dict | None:
+    """PURA: fra le transazioni di un indirizzo (la forma di mempool:
+    vout[].scriptpubkey_address/value, status.confirmed/block_time),
+    quella che paga ALMENO `sats` a `indirizzo`, non gia' contata per
+    un'altra vendita (`usati`) e non piu' vecchia della vendita (`da`,
+    con dieci minuti di tolleranza sugli orologi). Le confermate vincono
+    sulle viste. {txid, valore, confermata} o None.
+    Il «non piu' vecchia» e il «non gia' usata» servono all'indirizzo
+    FISSO, che riceve tutte le vendite: con la xpub ogni vendita ha il
+    suo indirizzo e i due filtri non scartano mai niente."""
+    trovate = []
+    for t in txs or []:
+        try:
+            txid = str(t["txid"])
+            st = t.get("status") or {}
+            if txid in usati:
+                continue
+            quando = int(st.get("block_time") or 0)
+            if st.get("confirmed") and quando and quando < da - 600:
+                continue
+            valore = sum(int(v.get("value") or 0) for v in t.get("vout") or []
+                         if v.get("scriptpubkey_address") == indirizzo)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            continue
+        if valore >= int(sats):
+            trovate.append({"txid": txid, "valore": valore,
+                            "confermata": bool(st.get("confirmed"))})
+    trovate.sort(key=lambda x: not x["confermata"])
+    return trovate[0] if trovate else None
+
+
+async def _cassa_mempool_txs(indirizzo: str) -> list:
+    """Le transazioni di un indirizzo (mempool + ultime confermate).
+    Solleva se la rete non risponde: chi chiama decide."""
+    async with httpx.AsyncClient(timeout=10) as cl:
+        r = await cl.get(f"{onchain_mempool_api()}/address/{indirizzo}/txs")
+        r.raise_for_status()
+        d = r.json()
+        return d if isinstance(d, list) else []
+
+
+def _cassa_ln_di(con, tg_id: int) -> str:
+    r = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                    (int(tg_id),)).fetchone()
+    return ((r["ln_address"] if r else "") or "").strip()
+
+
+def _cassa_dest_onchain(con, tg_id: int):
+    """La destinazione on-chain viva di chi vende (firmata dal seme di
+    adesso), o None: on-chain spento per lui, embit assente, nessuna
+    scelta nel Profilo."""
+    if not EMBIT or not onchain_ammesso(tg_id):
+        return None
+    try:
+        _onchain_prepara_tabelle(con)
+        r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                        (int(tg_id),)).fetchone()
+        return _onchain_destinazione_viva(con, tg_id, r["xpub"]) if r else None
+    except Exception:
+        return None
+
+
+def _cassa_vista(v) -> dict:
+    """La vendita come la legge il client di chi vende."""
+    v = dict(v)
+    try:
+        righe = json.loads(v.get("righe") or "[]")
+    except ValueError:
+        righe = []
+    etichetta = "Barattolo #" + str(v["id"])
+    return {"id": v["id"], "sats": v["sats"], "euro": v["euro"] or 0,
+            "nota": v["nota"] or "", "righe": righe,
+            "metodo": v["metodo"], "stato": v["stato"], "come": v["come"] or "",
+            "creato": v["creato"], "pagata_il": v["pagata_il"] or 0,
+            "ln": {"invoice": v["ln_bolt11"],
+                   "verificabile": bool(v["ln_verify"])} if v["ln_bolt11"] else None,
+            "onchain": {"indirizzo": v["oc_indirizzo"],
+                        "uri": cassa_bip21(v["oc_indirizzo"], v["sats"], etichetta),
+                        "txid": v["oc_txid"] or ""} if v["oc_indirizzo"] else None}
+
+
+def _cassa_scala_stock(con, v) -> list:
+    """Lo stock dei pezzi usciti dal negozio, UNA volta per vendita (il
+    timbro `stock` e' il cancello, nella stessa transazione). Torna gli
+    annunci esauriti, per Nostr e il canale (li lancia chi chiama dopo
+    il commit). Per l'esaurito, i gesti di `_incassa_ordine`: venduto,
+    offerte vive decadute (anche quelle sul carrello col pezzo)."""
+    if not con.execute("UPDATE cassa_vendite SET stock=? WHERE id=? AND stock=0",
+                       (int(time.time()), v["id"])).rowcount:
+        return []
+    try:
+        righe = json.loads(v["righe"] or "[]")
+    except ValueError:
+        righe = []
+    adesso = int(time.time())
+    esauriti = []
+    for r in righe:
+        try:
+            aid, q = int(r["id"]), max(1, int(r["q"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        con.execute("UPDATE annunci SET quantita=MAX(quantita-?,0) WHERE id=? "
+                    "AND venditore_id=?", (q, aid, v["venditore_id"]))
+        a = con.execute("SELECT quantita, stato FROM annunci WHERE id=? AND "
+                        "venditore_id=?", (aid, v["venditore_id"])).fetchone()
+        if not a or a["quantita"] > 0 or a["stato"] != "attivo":
+            continue
+        con.execute("UPDATE annunci SET stato='venduto' WHERE id=?", (aid,))
+        con.execute("UPDATE offerte SET stato='decaduta', aggiornato=? "
+                    "WHERE annuncio_id=? AND stato IN "
+                    "('proposta','controproposta','accettata')", (adesso, aid))
+        con.execute("UPDATE offerte SET stato='decaduta', aggiornato=? "
+                    "WHERE annuncio_id=0 AND stato IN "
+                    "('proposta','controproposta','accettata') AND id IN "
+                    "(SELECT offerta_id FROM offerte_righe WHERE annuncio_id=?)",
+                    (adesso, aid))
+        esauriti.append(aid)
+    return esauriti
+
+
+def _cassa_dopo_esauriti(esauriti: list) -> None:
+    for aid in esauriti:
+        asyncio.create_task(annuncio_su_nostr(aid, "sold", solo_aggiornamento=True))
+        asyncio.create_task(promo_venduto(aid))
+
+
+def _cassa_chiudi(v, come: str, metodo: str = "") -> bool:
+    """La vendita diventa pagata (da attesa o in_arrivo), e lo stock
+    scala nella stessa transazione. True se l'ha chiusa questa chiamata.
+    `metodo` e' quello con cui il pagamento e' ARRIVATO (lud21 = ⚡,
+    blocco = on-chain): chi compra puo' aver pagato col QR di prima, e lo
+    storico deve dire il vero, non l'ultima porta toccata."""
+    adesso = int(time.time())
+    con = _cassa_db()
+    try:
+        cur = con.execute("UPDATE cassa_vendite SET stato='pagata', come=?, "
+                          "pagata_il=?, metodo=COALESCE(NULLIF(?,''),metodo) "
+                          "WHERE id=? AND stato IN ('attesa','in_arrivo')",
+                          (come, adesso, metodo, v["id"]))
+        esauriti = _cassa_scala_stock(con, v) if cur.rowcount else []
+        con.commit()
+    finally:
+        con.close()
+    if cur.rowcount:
+        print(f"🏪 Cassa: vendita #{v['id']} pagata ({come}), "
+              f"{_fmt_sats(v['sats'])} sats", flush=True)
+        _cassa_dopo_esauriti(esauriti)
+    return bool(cur.rowcount)
+
+
+def _cassa_mia(con, vid: int, tg_id: int):
+    v = con.execute("SELECT * FROM cassa_vendite WHERE id=? AND venditore_id=?",
+                    (int(vid), int(tg_id))).fetchone()
+    if not v:
+        raise HTTPException(404, "Vendita non trovata")
+    return v
+
+
+async def _cassa_conia(v, metodo: str) -> dict:
+    """Conia il QR del metodo se la vendita non ce l'ha ancora: la
+    fattura dal Lightning address di chi vende, o il suo prossimo
+    indirizzo on-chain. Torna le colonne da scrivere."""
+    if metodo == "ln":
+        if v["ln_bolt11"]:
+            return {}
+        con = _cassa_db()
+        try:
+            ln = _cassa_ln_di(con, v["venditore_id"])
+        finally:
+            con.close()
+        if not ln:
+            raise HTTPException(400, "Per incassare in Lightning aggiungi il tuo "
+                                     "Lightning address dal Profilo")
+        extra: dict = {}
+        try:
+            bolt11 = await invoice_da_ln_address(ln, int(v["sats"]), extra)
+        except LnbitsMuto:
+            raise HTTPException(503, MSG_LNBITS_MUTO)
+        if not bolt11:
+            raise HTTPException(400, "Il tuo wallet non ci ha dato una fattura per "
+                                     "questa cifra: controlla il Lightning address "
+                                     "nel Profilo, o incassa on-chain")
+        return {"ln_bolt11": bolt11,
+                "ln_hash": zap_leggi_bolt11(bolt11).get("payment_hash") or "",
+                "ln_verify": extra.get("verify", "")}
+    if v["oc_indirizzo"]:
+        return {}
+    if int(v["sats"]) < ONCHAIN_POLVERE:
+        raise HTTPException(400, f"On-chain si incassa da {_fmt_sats(ONCHAIN_POLVERE)} sats "
+                                 "in su: sotto, la rete costa più del pagamento")
+    # le tabelle dell'on-chain nascono qui se chi vende non ha mai
+    # venduto on-chain: la fila degli indici le legge tutte
+    con = _onchain_db_ordini()
+    _cassa_prepara_tabella(con)
+    try:
+        dest = _cassa_dest_onchain(con, v["venditore_id"])
+        if not dest:
+            raise HTTPException(400, "Per incassare on-chain scegli dove ricevere: "
+                                     "Profilo → «Incassi on-chain»")
+        indice = (_onchain_prossimo_esterno(con, v["venditore_id"], dest["valore"])
+                  if dest["tipo"] == "xpub" else -1)
+        indirizzo = onchain_indirizzo_esterno(dest["tipo"], dest["valore"],
+                                              max(indice, 0))
+        # l'indice si scrive SUBITO, nella stessa connessione: due conti
+        # battuti di fila non devono prendere lo stesso indirizzo
+        con.execute("UPDATE cassa_vendite SET oc_indirizzo=?, oc_tipo=?, "
+                    "oc_valore=?, oc_indice=? WHERE id=? AND oc_indirizzo=''",
+                    (indirizzo, dest["tipo"], dest["valore"], indice, v["id"]))
+        con.commit()
+    finally:
+        con.close()
+    return {}
+
+
+async def _cassa_controlla(v) -> None:
+    """Chiede alla rete se la vendita e' pagata, al massimo una volta
+    ogni CASSA_SECONDI_TRA_CONTROLLI (il timbro `controllato` e' il
+    cancello: due schede aperte non raddoppiano le domande). Le due
+    strade insieme: chi compra puo' aver pagato con l'altro QR."""
+    if v["stato"] not in ("attesa", "in_arrivo"):
+        return
+    adesso = int(time.time())
+    con = _cassa_db()
+    try:
+        if adesso - int(v["creato"] or 0) > CASSA_ORE_ATTESA * 3600 \
+                and v["stato"] == "attesa":
+            con.execute("UPDATE cassa_vendite SET stato='scaduta' WHERE id=? "
+                        "AND stato='attesa'", (v["id"],))
+            con.commit()
+            return
+        if not con.execute("UPDATE cassa_vendite SET controllato=? WHERE id=? "
+                           "AND controllato<=?",
+                           (adesso, v["id"],
+                            adesso - CASSA_SECONDI_TRA_CONTROLLI)).rowcount:
+            return
+        con.commit()
+    finally:
+        con.close()
+    if v["ln_verify"] and await mancia_verifica_lud21(v["ln_verify"], v["ln_hash"]):
+        _cassa_chiudi(v, "lud21", "ln")
+        return
+    if not v["oc_indirizzo"]:
+        return
+    try:
+        txs = await _cassa_mempool_txs(v["oc_indirizzo"])
+    except Exception:
+        return                         # la rete tace: si richiede al giro dopo
+    con = _cassa_db()
+    try:
+        usati = {r["oc_txid"] for r in con.execute(
+            "SELECT oc_txid FROM cassa_vendite WHERE oc_indirizzo=? AND id<>? "
+            "AND oc_txid<>''", (v["oc_indirizzo"], v["id"])).fetchall()}
+    finally:
+        con.close()
+    t = cassa_pagamento_in_txs(txs, v["oc_indirizzo"], v["sats"],
+                               int(v["creato"] or 0), usati)
+    if not t:
+        return
+    con = _cassa_db()
+    try:
+        con.execute("UPDATE cassa_vendite SET oc_txid=?, metodo='onchain', "
+                    "stato=CASE WHEN stato='attesa' THEN 'in_arrivo' ELSE stato END "
+                    "WHERE id=? AND stato IN ('attesa','in_arrivo')",
+                    (t["txid"], v["id"]))
+        con.commit()
+    finally:
+        con.close()
+    if t["confermata"]:
+        _cassa_chiudi(v, "blocco", "onchain")
+
+
+@app.get("/api/cassa")
+async def cassa_apri(x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """La cassa di chi vende: cosa puo' incassare (ln, onchain), i suoi
+    annunci battibili col prezzo in sats di adesso, e il conto di oggi."""
+    _cassa_accesa()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    cambio = await cambio_btc_eur()
+    inizio = int(time.time()) - int(time.time()) % 86400
+    con = _cassa_db()
+    try:
+        ln = bool(_cassa_ln_di(con, user["id"]))
+        dest = _cassa_dest_onchain(con, user["id"])
+        annunci = []
+        for a in con.execute(
+                "SELECT id, titolo, valuta, prezzo_sats, prezzo_eur, quantita, "
+                "foto FROM annunci WHERE venditore_id=? AND stato='attivo' AND "
+                "quantita>0 ORDER BY id DESC LIMIT 200", (user["id"],)).fetchall():
+            try:
+                foto = (json.loads(a["foto"] or "[]") or [""])[0]
+            except (ValueError, TypeError, IndexError):
+                foto = ""
+            annunci.append({"id": a["id"], "titolo": a["titolo"],
+                            "sats": cassa_sats_annuncio(a, cambio),
+                            "euro": round(float(a["prezzo_eur"] or 0), 2)
+                            if (a["valuta"] or "sats") == "eur" else 0,
+                            "quantita": a["quantita"], "foto": foto})
+        oggi = con.execute("SELECT COUNT(*) AS n, COALESCE(SUM(sats),0) AS s "
+                           "FROM cassa_vendite WHERE venditore_id=? AND "
+                           "stato='pagata' AND pagata_il>=?",
+                           (user["id"], inizio)).fetchone()
+    finally:
+        con.close()
+    return {"ln": ln, "onchain": bool(dest), "onchain_ammesso":
+            bool(EMBIT and onchain_ammesso(user["id"])),
+            "cambio": cambio, "max_sats": cassa_max_sats(),
+            "polvere": ONCHAIN_POLVERE, "annunci": annunci,
+            "oggi": {"n": oggi["n"], "sats": oggi["s"]}}
+
+
+@app.post("/api/cassa/vendite")
+async def cassa_nuova(req: Request, x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """Batte un conto: {righe: [{id, q}], extra_sats | extra_euro, nota,
+    metodo}. Il totale lo fa il SERVER (i prezzi di adesso, lo stock di
+    adesso); conia subito il QR del metodo scelto."""
+    _cassa_accesa()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    _frena("cassa", user["id"])
+    metodo = "onchain" if d.get("metodo") == "onchain" else "ln"
+    nota = re.sub(r"[\x00-\x1f\x7f]", " ", str(d.get("nota") or ""))[:CASSA_NOTA_MAX].strip()
+    cambio = await cambio_btc_eur()
+    try:
+        extra_sats = int(d.get("extra_sats") or 0)
+        extra_euro = round(float(d.get("extra_euro") or 0), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Importo non leggibile")
+    if extra_sats < 0 or extra_euro < 0:
+        raise HTTPException(400, "Importo non leggibile")
+    euro_tot = extra_euro
+    if extra_euro:
+        if cambio <= 0:
+            raise HTTPException(503, "Il cambio euro non è disponibile adesso: "
+                                     "scrivi l'importo in sats")
+        extra_sats += max(1, round(extra_euro / cambio * 100_000_000))
+    righe_in = d.get("righe") or []
+    if not isinstance(righe_in, list) or len(righe_in) > CASSA_MAX_RIGHE:
+        raise HTTPException(400, "Troppi articoli in un conto")
+    righe, totale = [], extra_sats
+    con = _cassa_db()
+    try:
+        for r in righe_in:
+            try:
+                aid, q = int(r["id"]), int(r["q"])
+            except (KeyError, TypeError, ValueError):
+                raise HTTPException(400, "Articolo non leggibile")
+            if q < 1:
+                continue
+            a = con.execute("SELECT id, titolo, valuta, prezzo_sats, prezzo_eur, "
+                            "quantita FROM annunci WHERE id=? AND venditore_id=? "
+                            "AND stato='attivo'", (aid, user["id"])).fetchone()
+            if not a:
+                raise HTTPException(400, "Un articolo non è più in vetrina")
+            if q > int(a["quantita"] or 0):
+                raise HTTPException(400, f"«{a['titolo'][:40]}»: ne restano "
+                                         f"{a['quantita']}")
+            prezzo = cassa_sats_annuncio(a, cambio)
+            if prezzo <= 0:
+                raise HTTPException(503, "Il cambio euro non è disponibile adesso: "
+                                         "scrivi l'importo a mano")
+            if (a["valuta"] or "sats") == "eur":
+                euro_tot += round(float(a["prezzo_eur"] or 0) * q, 2)
+            righe.append({"id": aid, "titolo": a["titolo"][:80], "q": q,
+                          "sats": prezzo * q})
+            totale += prezzo * q
+        if totale < 1:
+            raise HTTPException(400, "Scrivi un importo o scegli un articolo")
+        if cassa_max_sats() and totale > cassa_max_sats():
+            raise HTTPException(400, f"Alla cassa al massimo "
+                                     f"{_fmt_sats(cassa_max_sats())} sats per vendita")
+        cur = con.execute(
+            "INSERT INTO cassa_vendite(venditore_id,sats,euro,nota,righe,metodo,"
+            "creato) VALUES(?,?,?,?,?,?,?)",
+            (user["id"], totale, round(euro_tot, 2), nota,
+             json.dumps(righe, ensure_ascii=False), metodo, int(time.time())))
+        con.commit()
+        v = con.execute("SELECT * FROM cassa_vendite WHERE id=?",
+                        (cur.lastrowid,)).fetchone()
+    finally:
+        con.close()
+    return await _cassa_metodo_e_vista(v, metodo)
+
+
+async def _cassa_metodo_e_vista(v, metodo: str) -> dict:
+    nuove = await _cassa_conia(v, metodo)
+    con = _cassa_db()
+    try:
+        campi = dict(nuove, metodo=metodo)
+        con.execute(f"UPDATE cassa_vendite SET {', '.join(k + '=?' for k in campi)} "
+                    f"WHERE id=?", (*campi.values(), v["id"]))
+        con.commit()
+        v = con.execute("SELECT * FROM cassa_vendite WHERE id=?",
+                        (v["id"],)).fetchone()
+    finally:
+        con.close()
+    return _cassa_vista(v)
+
+
+@app.post("/api/cassa/vendite/{vid}/metodo")
+async def cassa_metodo(vid: int, req: Request, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Il tocco Lightning / on-chain: conia il QR dell'altro metodo se manca (la
+    fattura o l'indirizzo di prima restano buoni: chi compra puo' aver
+    gia' pagato col primo, e la sorveglianza guarda tutti e due)."""
+    _cassa_accesa()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    metodo = "onchain" if d.get("metodo") == "onchain" else "ln"
+    con = _cassa_db()
+    try:
+        v = _cassa_mia(con, vid, user["id"])
+    finally:
+        con.close()
+    if v["stato"] not in ("attesa",):
+        return _cassa_vista(v)
+    _frena("cassa", user["id"])
+    return await _cassa_metodo_e_vista(v, metodo)
+
+
+@app.get("/api/cassa/vendite/{vid}")
+async def cassa_guarda(vid: int, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Il battito della schermata col QR: chiede alla rete (col suo
+    cancello di secondi) e torna la vendita."""
+    _cassa_accesa()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = _cassa_db()
+    try:
+        v = _cassa_mia(con, vid, user["id"])
+    finally:
+        con.close()
+    await _cassa_controlla(v)
+    con = _cassa_db()
+    try:
+        return _cassa_vista(_cassa_mia(con, vid, user["id"]))
+    finally:
+        con.close()
+
+
+@app.post("/api/cassa/vendite/{vid}/chiudi")
+async def cassa_chiudi_a_mano(vid: int, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """«✓ Ricevuto»: chi vende ha visto i sats nel SUO wallet (il
+    Lightning senza LUD-21) o accetta un on-chain ancora in mempool. E'
+    la sua parola sul suo incasso: non tocca nessun altro."""
+    _cassa_accesa()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = _cassa_db()
+    try:
+        v = _cassa_mia(con, vid, user["id"])
+    finally:
+        con.close()
+    _cassa_chiudi(v, "mempool" if v["stato"] == "in_arrivo" else "a_mano")
+    con = _cassa_db()
+    try:
+        return _cassa_vista(_cassa_mia(con, vid, user["id"]))
+    finally:
+        con.close()
+
+
+@app.post("/api/cassa/vendite/{vid}/annulla")
+async def cassa_annulla(vid: int, x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Il conto sbagliato o il cliente andato via. Solo da 'attesa':
+    una vendita gia' vista in arrivo o pagata non si cancella (i sats
+    ci sono, e lo storico deve dirlo)."""
+    _cassa_accesa()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = _cassa_db()
+    try:
+        _cassa_mia(con, vid, user["id"])
+        con.execute("UPDATE cassa_vendite SET stato='annullata' WHERE id=? "
+                    "AND stato='attesa'", (vid,))
+        con.commit()
+        return _cassa_vista(_cassa_mia(con, vid, user["id"]))
+    finally:
+        con.close()
+
+
+@app.get("/api/cassa/storico")
+async def cassa_storico(x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Le ultime vendite della cassa (pagate e in arrivo), piu' recenti
+    prima, col totale di oggi."""
+    _cassa_accesa()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    inizio = int(time.time()) - int(time.time()) % 86400
+    con = _cassa_db()
+    try:
+        righe = con.execute(
+            "SELECT * FROM cassa_vendite WHERE venditore_id=? AND stato IN "
+            "('pagata','in_arrivo') ORDER BY id DESC LIMIT 100",
+            (user["id"],)).fetchall()
+        oggi = con.execute("SELECT COUNT(*) AS n, COALESCE(SUM(sats),0) AS s "
+                           "FROM cassa_vendite WHERE venditore_id=? AND "
+                           "stato='pagata' AND pagata_il>=?",
+                           (user["id"], inizio)).fetchone()
+    finally:
+        con.close()
+    return {"vendite": [_cassa_vista(v) for v in righe],
+            "oggi": {"n": oggi["n"], "sats": oggi["s"]}}
+
+
+def _cassa_leve() -> list:
+    """Le voci del pannello «Stato delle leve»."""
+    return [
+        _leva("Cassa in negozio", "CASSA_ATTIVA", bool(CASSA_ATTIVA),
+              acceso="nel Profilo chi vende trova «🏪 Cassa in negozio»: batte "
+                     "un conto e mostra un QR Lightning o on-chain che va dritto al suo wallet, "
+                     "senza deposito né ordine",
+              spento="nessuna voce nel Profilo e le rotte /api/cassa rispondono "
+                     "404; lo storico resta nel database"),
+        _leva("Importo massimo di una vendita alla cassa (sats)",
+              "CASSA_MAX_SATS", cassa_max_sats(),
+              spento="nessun tetto: i sats non passano da Barattolo"),
+    ]
+
+
+# (Qui finisce il blocco della cassa in negozio.)
 
 
 # ---------- L'INDIRIZZO DELLA QUOTA: swap@barattolo.store ----------

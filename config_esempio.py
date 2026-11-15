@@ -1995,6 +1995,16 @@ MANCIA_ATTIVA = True
 # Il tetto di UNA mancia, in sats.
 MANCIA_MAX_SATS = 100_000
 
+# La cassa in negozio (15 nov 2026): nel Profilo chi vende trova «🏪 Cassa
+# in negozio», batte un conto (importo e/o i suoi annunci) e mostra un QR
+# Lightning o on-chain che va DRITTO al suo wallet: niente ordine, niente
+# deposito, nessun account per chi compra. Nasce ACCESA; False e riavvia
+# (o il pannello) per spegnerla.
+CASSA_ATTIVA = True
+# Il tetto di UNA vendita alla cassa, in sats (0 = nessuno: i sats non
+# passano da Barattolo).
+CASSA_MAX_SATS = 0
+
 # La ronda dei relay di Mostro (12 ott 2026): ogni dieci minuti il
 # server chiede ai relay che confermano (MOSTRO_RELAY_CONFERMA; senza,
 # a tutto MOSTRO_RELAY) se rispondono e se il coordinatore ci scrive

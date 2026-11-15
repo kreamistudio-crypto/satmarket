@@ -224,3 +224,9 @@ frase: Se il venditore non ha ancora un indirizzo Lightning, il riquadro della m
 dove: la scheda «Ordini», dentro un ordine già pagato, accanto al voto.
 leva: MANCIA_ATTIVA (la stessa della mancia)
 pubblico: sì
+
+## 2026-11-15 · cassa-negozio
+frase: Hai un negozio, un banco al mercato o un bar? Nel Profilo c'è la «🏪 Cassa in negozio»: scrivi l'importo (in euro o in sats) o tocca i tuoi articoli, e Barattolo mostra un QR Lightning o on-chain. Il cliente lo inquadra con qualsiasi wallet, senza account. I sats vanno dritti al tuo wallet, senza commissioni, e i pezzi venduti escono da soli dalla vetrina.
+dove: il Profilo, nel gruppo «Negozio e spedizioni», la voce «🏪 Cassa in negozio».
+leva: CASSA_ATTIVA (nuova, accesa)
+pubblico: sì

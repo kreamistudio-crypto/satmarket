@@ -186,3 +186,4 @@ collaudo_eth_xmr
 collaudo_mappa_ritiro
 collaudo_feedback_modificabile
 collaudo_mancia
+collaudo_cassa_negozio

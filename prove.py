@@ -36111,6 +36111,9 @@ def _censimento(acceso, dopo=None):
               # la mancia al venditore (14 nov 2026): `_mancia_leve()` e
               # il suo giudice del tetto
               "mancia_max_sats", "_mancia_leve",
+              # la cassa in negozio (15 nov 2026): `_cassa_leve()` e il
+              # suo giudice del tetto — la trappola, un'altra volta
+              "cassa_max_sats", "_cassa_leve",
               "_leve_stato"):
         exec(pezzo(f), amb)
     # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
@@ -122003,7 +122006,8 @@ def prove_profilo_elegante():
     # e le porte che erano bottoni a tutta larghezza ---
     CASSETTI = {
         "grpCatalogo": ["accAnnunci", "accImport", "accPunto", "accDoppioni"],
-        "grpNegozio": ["accNumeriNegozio", "vocMioNegozio", "vocWidgetNegozio",
+        # (15 nov 2026) la cassa in negozio, prima della vetrina
+        "grpNegozio": ["accNumeriNegozio", "vocCassa", "vocMioNegozio", "vocWidgetNegozio",
                        "accSpedizioniere", "accSpedGratis", "accScontoPacco",
                        "accCodici", "accBanner", "accSlugNegozio", "accFerie"],
         "grpCompri": ["accPreferiti", "accRicerche", "accPuntiRitiro",
@@ -135941,6 +135945,10 @@ def prove_cambio_converte():
         # scritto resta com'e' — convertirlo direbbe un'equivalenza che
         # il venditore non ha chiesto
         "mmValuta": "conserva",
+        # la cassa in negozio (15 nov 2026): l'importo del conto passa da
+        # € a sats e la cifra scritta si CONVERTE — e' lo stesso conto,
+        # detto nell'altra valuta, non un'altra cifra
+        "cassaCambiaValuta": "converte",
     }
     prova("il censimento dei bottoni di valuta e' completo (uno nuovo "
           "decide qui cosa fa ai numeri gia' scritti)", set(CENSIMENTO),
@@ -150326,7 +150334,10 @@ def prove_freni():
            # la mancia al venditore (14 nov 2026): 20 fatture all'ora per
            # persona (ognuna e' una GET al wallet di chi vende), e il
            # battito di LUD-21 (uno ogni 5 s) 240 all'ora
-           "mancia": (20, 3600), "mancia_guarda": (240, 3600)}, F)
+           "mancia": (20, 3600), "mancia_guarda": (240, 3600),
+           # la cassa in negozio (15 nov 2026): 300 conti e QR all'ora
+           # per persona — un bar ne batte tanti, una raffica no
+           "cassa": (300, 3600)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------
@@ -166495,9 +166506,10 @@ def prove_apri_nel_wallet():
     # on-chain pagato in Lightning (`renderDepositoOnchainP2P`) — e il suo
     # «Apri nel wallet» nasce con href `#`: lo schema lo scrive la porta.
     # (14 nov 2026) il quinto QR e' quello della mancia al venditore
-    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei cinque QR "
+    # (15 nov 2026) il sesto e' quello della cassa in negozio
+    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei sei QR "
           "e nel Riprova, e in nessuna navigazione da script",
-          [0, 6],
+          [0, 7],
           [len([l for l in mini.splitlines()
                 if re.search(r"""location(\.href)?\s*=\s*['"`]lightning:""", l)]),
            mini.count("('lightning:' + ")])
@@ -189755,9 +189767,13 @@ def prove_mancia_venditore():
     chiamanti = [r for r in srv.split("\n")
                  if "invoice_da_ln_address(" in r and "def " not in r
                  and not r.lstrip().startswith("#")]
-    prova("l'extra di LUD-21 lo passa solo la mancia", True,
-          sum("extra" in r for r in chiamanti) == 1
+    # (15 nov 2026) ...e la cassa in negozio, che sa «pagato» allo
+    # stesso modo: gli incassi restano senza
+    prova("l'extra di LUD-21 lo passano solo la mancia e la cassa", True,
+          sum("extra" in r for r in chiamanti) == 2
           and any("invoice_da_ln_address(ln, sats, extra)" in r
+                  for r in chiamanti)
+          and any("invoice_da_ln_address(ln, int(v[\"sats\"]), extra)" in r
                   for r in chiamanti))
     inv = codice(pezzo("invoice_da_ln_address"))
     prova("il verify passa dalla stessa guardia del callback", True,
