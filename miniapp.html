@@ -8342,6 +8342,7 @@
   .cassa-cifra small{font-size:14px;color:var(--muted);font-weight:700}
   .cassa-stato{text-align:center;font-weight:800;font-size:15px;margin:10px 0;min-height:22px}
   .cassa-stato.ok{color:#1F9D55;font-size:22px}
+  .cassa-stato .hint{font-size:13px;font-weight:600;color:var(--muted);margin-top:4px}
   .cassa-riga{display:flex;justify-content:space-between;gap:10px;padding:10px 0;
     border-bottom:1px solid var(--line);font-size:14px}
   .cassa-riga small{display:block;color:var(--muted);font-size:12px}
@@ -14577,6 +14578,8 @@ document.getElementById('cartello')?.remove();</script>
         <button class="consegna-pill attiva" data-ruolo="" onclick="setOrdiniRuolo('')">Tutti</button>
         <button class="consegna-pill" data-ruolo="buyer" onclick="setOrdiniRuolo('buyer')">Acquisti</button>
         <button class="consegna-pill" data-ruolo="seller" onclick="setOrdiniRuolo('seller')">Vendite</button>
+        <!-- la cassa in negozio (15 nov 2026): compare solo a chi ha venduto alla cassa -->
+        <button class="consegna-pill" data-ruolo="cassa" id="ordiniPillCassa" style="display:none" onclick="setOrdiniRuolo('cassa')">🏪 Cassa</button>
       </div>
     </div>
     <div id="ordersList" style="margin-top:12px"></div>
@@ -16170,7 +16173,7 @@ document.getElementById('cartello')?.remove();</script>
       <div class="field" style="margin:10px 0 0"><input id="cassaNota" maxlength="120" autocomplete="off" placeholder="Nota per te (facoltativa), es. tavolo 4"></div>
       <div id="cassaTotale" class="cassa-totale"></div>
       <button class="btn orange" id="cassaIncassa" onclick="cassaIncassa(this)" disabled>Incassa</button>
-      <button class="btn ghost" onclick="apriStoricoCassa()">🧾 Vendite della cassa</button>
+      <button class="btn ghost" onclick="apriOrdiniCassa()">🧾 Le vendite della cassa, in «Ordini»</button>
       <div class="hint" style="margin-top:8px">💡 Chi compra inquadra il QR con <b>qualsiasi wallet</b>: non serve un account. I sats vanno <b>dritti al tuo wallet</b>, senza deposito di garanzia e senza commissioni: è un pagamento di persona, come al banco.</div>
     </div>
     <div id="cassaQrVista" style="display:none">
@@ -16183,11 +16186,6 @@ document.getElementById('cartello')?.remove();</script>
       <button class="btn primary" id="cassaRicevuto" style="display:none" onclick="cassaRicevuto(this)">✓ Ricevuto</button>
       <button class="btn orange" id="cassaNuovo" style="display:none" onclick="cassaNuovoConto()">Nuovo conto</button>
       <button class="btn ghost" id="cassaAnnulla" onclick="cassaAnnulla(this)">Annulla il conto</button>
-    </div>
-    <div id="cassaStoricoVista" style="display:none">
-      <div class="hint" id="cassaStoricoOggi" style="margin:0 0 10px"></div>
-      <div id="cassaStoricoLista"></div>
-      <button class="btn ghost" onclick="cassaTornaAlConto()">← Torna alla cassa</button>
     </div>
   </div>
 
@@ -19106,6 +19104,7 @@ async function loadOrders(ordine){
     {headers:{'X-Tg-Init-Data': authHdr()}});
   orders = (await r.json()).map(mapOrder);
   await caricaOnchainDaPagare();
+  await caricaCassaOrdini();
 }
 
 /* GLI ORDINI ON-CHAIN DA PAGARE STANNO IN «ORDINI» (27 ott 2026, Andrea:
@@ -19148,6 +19147,82 @@ function cardOnchainDaPagare(o){
         <div class="ord-foto-data">${new Date(o.creato * 1000).toLocaleDateString('it-IT')}</div>
       </div>
     </div>`;
+}
+
+/* LA CASSA IN «ORDINI» (15 nov 2026, Andrea: «tutto questo deve comunque
+   finire negli ordini, semplicemente avranno altri attributi e sono
+   filtrabili per cassa in negozio»). Le vendite battute alla cassa in
+   negozio non sono righe di `orders` — niente deposito, niente stati
+   dell'ordine, niente gesti: openOrder e le sue guardie contano su righe
+   di sempre — ma stanno nella STESSA lista, in ordine di tempo, con il
+   loro segno 🏪 e il filtro «🏪 Cassa in negozio». Il tocco riapre la
+   vendita nel foglio della cassa (la ricevuta, o il QR se e' ancora in
+   arrivo). Le legge /cassa/storico (pagate e in arrivo, le ultime 100).
+   Muta sui guasti: la lista di sempre non aspetta la cassa. */
+let ordiniCassa = [];
+async function caricaCassaOrdini(){
+  if (!cassaAttiva || DEMO || VETRINA) { ordiniCassa = []; return; }
+  try {
+    const r = await fetch(`${API_BASE}/cassa/storico`, {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = r.ok ? await r.json() : {};
+    ordiniCassa = Array.isArray(d.vendite) ? d.vendite : [];
+  } catch(e) { ordiniCassa = []; }
+}
+function ordiniCassaFiltrate(){
+  if (ordiniRuolo && ordiniRuolo !== 'seller' && ordiniRuolo !== 'cassa') return [];
+  return ordiniCassa.filter(v => !ordiniSoloAttivi || v.stato === 'in_arrivo');
+}
+/* PURA: le righe degli ordini e le vendite della cassa, fuse per data in
+   una lista sola (le due arrivano gia' dalla piu' recente); una vendita
+   entra come {cassa: v}, e la card di «Ordini» la passa a cardCassaOrdine */
+function unisciCassaOrdini(vista, cassa){
+  const quando = v => v.pagata_il || v.creato || 0;
+  const fuori = [];
+  let i = 0, j = 0;
+  while (i < vista.length || j < cassa.length) {
+    if (j >= cassa.length || (i < vista.length && (vista[i].creato || 0) >= quando(cassa[j])))
+      fuori.push(vista[i++]);
+    else fuori.push({cassa: cassa[j++]});
+  }
+  return fuori;
+}
+function titoloVenditaCassa(v){
+  return (v.righe || []).map(r => r.q > 1 ? `${r.titolo} × ${r.q}` : r.titolo).join(', ')
+    || v.nota || 'Importo libero';
+}
+function cardCassaOrdine(v){
+  const foto = v.foto0
+    ? `<span class="order-ic ord-foto"><img src="${esc(fotoUrl(fotoMini(v.foto0)))}" data-full="${esc(fotoUrl(v.foto0))}" loading="lazy" decoding="async" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="if(!this.dataset.p){this.dataset.p=1;this.src=this.dataset.full}else{this.replaceWith('🏪')}"></span>`
+    : '<span class="order-ic ord-foto">🏪</span>';
+  const metodo = v.metodo === 'onchain' ? 'on-chain' : 'Lightning';
+  const quando = new Date((v.pagata_il || v.creato) * 1000).toLocaleDateString('it-IT', {day:'numeric', month:'short'});
+  const arrivo = v.stato === 'in_arrivo';
+  return `<div class="order" onclick="apriVenditaCassa(${Number(v.id)})">
+      <div class="ord-card">
+        ${foto}
+        <div class="order-main">
+          <b class="ord-titolo">${esc(titoloVenditaCassa(v))}</b>
+          <div class="ord-verbo">🏪 Cassa in negozio · ${metodo} · ${fmt(v.sats)} sats</div>
+        </div>
+        <span class="badge ${arrivo ? 'attesa' : 'released'}">${arrivo ? 'In arrivo' : 'Pagata'}</span>
+        <div class="ord-foto-data">${quando}</div>
+      </div>
+    </div>`;
+}
+/* la vendita riaperta da «Ordini»: il foglio della cassa, sulla sua
+   ricevuta (o sul QR, se aspetta ancora la conferma) */
+async function apriVenditaCassa(id){
+  haptic();
+  const v = ordiniCassa.find(x => x.id === id);
+  if (!v) return;
+  closeSheet();
+  el('sheetBg').classList.add('open');
+  el('cassaSheet').classList.add('open');
+  try {
+    const r = await fetch(`${API_BASE}/cassa`, {headers:{'X-Tg-Init-Data':authHdr()}});
+    if (r.ok) cassaDati = await r.json();
+  } catch(e) { /* la ricevuta si legge lo stesso */ }
+  mostraQrCassa(v);
 }
 
 /* I FATTI CHE IL SERVER HA APPENA DETTO, SCRITTI DOVE LA PAGINA LI
@@ -37379,7 +37454,7 @@ const STATES = {
    assorbenti — la parita' col gate del server e' sorvegliata da
    prove.py. */
 let ordiniSoloAttivi = false;     // spento all'apertura (deciso da Andrea)
-let ordiniRuolo = '';             // '' = Tutti | 'buyer' | 'seller'
+let ordiniRuolo = '';             // '' = Tutti | 'buyer' | 'seller' | 'cassa' (15 nov 2026)
 let ordiniMostraNascosti = false; // il velo dei nascosti, per sessione
 const CONCLUSI = ['released','refunded','annullato'];
 const NASCONDIBILI = ['released','refunded'];
@@ -37636,6 +37711,8 @@ function renderOrders(){
   const filtri = o =>
     (!ordiniRuolo || o.role === ordiniRuolo) &&
     (!ordiniSoloAttivi || !CONCLUSI.includes(o.state));
+  /* (con «🏪 Cassa in negozio» nessun ordine di sempre ha quel ruolo,
+     quindi restano solo le vendite della cassa) */
   /* GLI ANNULLATI NON SI VEDONO (ago 2026): la lapide ha un mestiere,
      ma e' della MACCHINA — un saldo atterrato nella corsa
      annulla-vs-saldo deve avere una riga su cui posarsi — e vive al
@@ -37655,6 +37732,11 @@ function renderOrders(){
      e solo dove si vedono gli acquisti */
   const daPagareOc = (!ordiniRuolo || ordiniRuolo === 'buyer')
     ? ordiniOnchainDaPagare.map(cardOnchainDaPagare).join('') : '';
+  /* LE VENDITE DELLA CASSA (15 nov 2026): sono vendite, quindi stanno
+     in «Tutti», in «Vendite» e nel loro filtro; «solo attivi» tiene
+     quelle ancora in arrivo. La pillola compare a chi ne ha. */
+  const cassaVista = ordiniCassaFiltrate();
+  if (el('ordiniPillCassa')) el('ordiniPillCassa').style.display = ordiniCassa.length ? '' : 'none';
   /* il conteggio dice i nascosti che i filtri correnti coprirebbero:
      con «solo attivi» acceso i nascosti (tutti conclusi) non ci sono
      e la riga non compare */
@@ -37666,18 +37748,20 @@ function renderOrders(){
            : `${nNascosti} ordin${nNascosti===1?'e nascosto':'i nascosti'} — mostrali`}</button>
        </div>`
     : '';
-  if (!vivi.length && !ordiniOnchainDaPagare.length) {
+  if (!vivi.length && !ordiniOnchainDaPagare.length && !ordiniCassa.length) {
     el('ordersList').innerHTML = `<div class="empty"><div class="big">🤝</div>Ancora nessun ordine.<br>Quando compri o vendi, <b>lo seguirai da qui</b>.</div>`;
     return;
   }
-  if (!vista.length && !daPagareOc) {
+  if (!vista.length && !daPagareOc && !cassaVista.length) {
     /* c'e' qualcosa ma i filtri non lasciano passare niente: un
        messaggio SUO, distinto dall'«ancora nessun ordine» */
     el('ordersList').innerHTML =
       `<div class="empty"><div class="big">🔍</div>Niente qui con questi filtri.</div>` + rigaNascosti;
     return;
   }
-  el('ordersList').innerHTML = daPagareOc + vista.map(o=>{
+  const righe = cassaVista.length ? unisciCassaOrdini(vista, cassaVista) : vista;
+  el('ordersList').innerHTML = daPagareOc + righe.map(o=>{
+    if (o.cassa) return cardCassaOrdine(o.cassa);
     const puoNascondere = !DEMO && o.role!=='admin' && NASCONDIBILI.includes(o.state);
     const x = !puoNascondere ? ''
       : o.nascosto
@@ -38748,7 +38832,6 @@ function cassaTornaAlConto(){
   fermaBattitoCassa();
   el('cassaConto').style.display = '';
   el('cassaQrVista').style.display = 'none';
-  el('cassaStoricoVista').style.display = 'none';
   if (cassaDati) disegnaCassa();
 }
 function cassaOggiTesto(o){
@@ -38867,7 +38950,6 @@ function disegnaMetodoCassa(v){
 function mostraQrCassa(v){
   cassaVendita = v;
   el('cassaConto').style.display = 'none';
-  el('cassaStoricoVista').style.display = 'none';
   el('cassaQrVista').style.display = '';
   el('cassaQrSats').textContent = fmt(v.sats);
   const cosa = (v.righe || []).map(r => r.q > 1 ? `${r.titolo} × ${r.q}` : r.titolo).join(', ');
@@ -38887,13 +38969,19 @@ function statoVenditaCassa(v){
   const s = el('cassaStato'), ric = el('cassaRicevuto');
   const fine = v.stato === 'pagata' || v.stato === 'annullata' || v.stato === 'scaduta';
   s.classList.toggle('ok', v.stato === 'pagata');
-  el('cassaQr').style.opacity = fine ? '.25' : '';
+  /* a vendita chiusa il QR e la fattura non servono piu' (e la ricevuta
+     riaperta da «Ordini» non deve sembrare un conto da pagare) */
+  el('cassaQr').style.display = fine ? 'none' : '';
+  el('cassaTesto').style.display = fine ? 'none' : '';
   el('cassaNuovo').style.display = fine ? '' : 'none';
   el('cassaAnnulla').style.display = v.stato === 'attesa' ? '' : 'none';
   ric.style.display = 'none';
   if (v.stato === 'pagata') {
-    s.innerHTML = '✅ Pagato!' + (v.come === 'a_mano' ? '<div class="hint">Segnato da te come ricevuto</div>'
-                : v.come === 'mempool' ? '<div class="hint">Chiuso col pagamento ancora in arrivo</div>' : '');
+    const il = v.pagata_il ? new Date(v.pagata_il * 1000).toLocaleString('it-IT',
+      {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
+    const come = v.come === 'a_mano' ? 'segnato da te come ricevuto'
+               : v.come === 'mempool' ? 'chiuso col pagamento ancora in arrivo' : '';
+    s.innerHTML = '✅ Pagato!' + ((il || come) ? `<div class="hint">${esc([il, come].filter(Boolean).join(' · '))}</div>` : '');
   } else if (v.stato === 'in_arrivo') {
     s.innerHTML = '₿ Pagamento visto in rete: in arrivo<div class="hint">La conferma arriva di solito fra 10 e 60 minuti. Per una cifra piccola puoi consegnare adesso; per una grande, aspetta il blocco.</div>';
     ric.textContent = '✓ Consegna adesso'; ric.style.display = '';
@@ -38990,31 +39078,15 @@ function cassaNuovoConto(){
   el('cassaImporto').value = ''; el('cassaNota').value = '';
   cassaTornaAlConto();
 }
-async function apriStoricoCassa(){
+/* «Le vendite della cassa» stanno in «Ordini» (15 nov 2026, Andrea), col
+   loro filtro: il foglio si chiude e la lista si apre gia' filtrata */
+function apriOrdiniCassa(){
   haptic();
-  fermaBattitoCassa();
-  el('cassaConto').style.display = 'none';
-  el('cassaQrVista').style.display = 'none';
-  el('cassaStoricoVista').style.display = '';
-  el('cassaStoricoOggi').textContent = 'Leggo le vendite…';
-  el('cassaStoricoLista').innerHTML = '';
-  try {
-    const r = await fetch(`${API_BASE}/cassa/storico`, {headers:{'X-Tg-Init-Data':authHdr()}});
-    const d = await r.json().catch(()=>({}));
-    if (!r.ok) { el('cassaStoricoOggi').textContent = d.detail || 'Non si legge: riprova'; return; }
-    el('cassaStoricoOggi').innerHTML = cassaOggiTesto(d.oggi);
-    const oggi = new Date().toDateString();
-    el('cassaStoricoLista').innerHTML = (d.vendite || []).map(v => {
-      const t = new Date((v.pagata_il || v.creato) * 1000);
-      const quando = (t.toDateString() === oggi ? '' : t.toLocaleDateString('it-IT', {day:'numeric', month:'short'}) + ' ')
-        + t.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
-      const cosa = (v.righe || []).map(r => r.q > 1 ? `${r.titolo} × ${r.q}` : r.titolo).join(', ') || v.nota || 'Importo libero';
-      const icona = v.metodo === 'onchain' ? P2P_OC_MONETA : '⚡';
-      const stato = v.stato === 'in_arrivo' ? ' · in arrivo' : (v.come === 'a_mano' ? ' · segnata da te' : '');
-      return `<div class="cassa-riga"><div>${icona} ${esc(cosa)}<small>${esc(quando)}${stato}${v.righe && v.righe.length && v.nota ? ' · ' + esc(v.nota) : ''}</small></div>
-        <div style="text-align:right"><b class="mono">${fmt(v.sats)}</b><small>sats</small></div></div>`;
-    }).join('') || '<div class="hint">Ancora nessuna vendita alla cassa.</div>';
-  } catch(e) { el('cassaStoricoOggi').textContent = 'Rete assente: riprova'; }
+  closeSheet();
+  ordiniRuolo = 'cassa';
+  document.querySelectorAll('#ordiniRuoloPills .consegna-pill').forEach(b =>
+    b.classList.toggle('attiva', (b.dataset.ruolo||'') === 'cassa'));
+  go('affari');
 }
 
 /* ---- feedback reciproco a affare concluso ---- */

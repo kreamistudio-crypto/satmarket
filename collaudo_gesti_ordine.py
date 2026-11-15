@@ -330,9 +330,13 @@ function trackingDaControllare(){ return true; }
 let stellaScelta = 0, fbFoto = [], myLnAddress = '', bustaDoc = null, bustaLetta = {}, bustaDocVisto = {};
 /* gli on-chain da pagare (27 ott 2026): qui l'on-chain e' spento */
 let myOnchain = false;
+/* le vendite della cassa in negozio (15 nov 2026): qui la cassa e' spenta */
+let cassaAttiva = false;
 """ + js("function mapOrder(o){") + js("async function loadOrders(ordine){") \
         + riga_js("let ordiniOnchainDaPagare = [];") \
         + js("async function caricaOnchainDaPagare(){") \
+        + riga_js("let ordiniCassa = [];") \
+        + js("async function caricaCassaOrdini(){") \
         + js("function segnaOrdine(o, campi){") + js("function ridisegnaOrdine(o){") \
         + riga_js("let appuntamentoCambiato = ") + js("function dataAppuntamento(ts){") \
         + js("function pannelloServizioCompratore(o){") + "".join(js(f) for f in GESTI) \

@@ -33358,8 +33358,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `CASSA_MAX_SATS` (0 = nessun tetto), nel pannello sotto «🏪 Cassa in
   negozio»; /api/me dice `cassa_attiva`. Il freno `cassa`: 300 conti e
   QR all'ora per persona. IL CLIENT: la voce-porta `vocCassa` in
-  «Negozio e spedizioni» apre `#cassaSheet`, tre viste (il conto, il
-  QR, lo storico), battito ogni 3 secondi.
+  «Negozio e spedizioni» apre `#cassaSheet`, due viste (il conto, il
+  QR/la ricevuta), battito ogni 3 secondi. IN «ORDINI» (15 nov 2026,
+  cantiere cassa-negli-ordini): le vendite pagate e in arrivo
+  (`/api/cassa/storico`, col `foto0` del primo articolo) stanno in
+  `ordiniCassa`, NON in `orders`; `unisciCassaOrdini` le fonde per data
+  con le card di sempre, il filtro `ordiniRuolo = 'cassa'` (pillola
+  «🏪 Cassa») le mostra da sole, «Vendite» e «Tutti» le includono, e il
+  tocco (`apriVenditaCassa`) riapre il foglio sulla ricevuta.
 - L'INDIRIZZO DELLA QUOTA: swap@barattolo.store (19 ott 2026, perché
   in CANTIERI, «L'indirizzo della quota: swap@barattolo.store»). Dove
   SATS Routing manda a fine mese la quota di Barattolo sugli swap. È lo

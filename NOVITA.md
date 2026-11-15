@@ -230,3 +230,9 @@ frase: Hai un negozio, un banco al mercato o un bar? Nel Profilo c'è la «🏪 
 dove: il Profilo, nel gruppo «Negozio e spedizioni», la voce «🏪 Cassa in negozio».
 leva: CASSA_ATTIVA (nuova, accesa)
 pubblico: sì
+
+## 2026-11-15 · cassa-negli-ordini
+frase: Le vendite della «🏪 Cassa in negozio» ora stanno in «Ordini», insieme a tutto il resto, con il loro segno. Il filtro «🏪 Cassa» in cima mostra solo quelle, e un tocco riapre la ricevuta.
+dove: la scheda «Ordini», il filtro «🏪 Cassa» accanto a «Vendite».
+leva: CASSA_ATTIVA (la stessa della cassa)
+pubblico: sì
