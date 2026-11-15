@@ -108534,9 +108534,26 @@ async def cassa_storico(x_tg_init_data: str = Header(""),
                            "FROM cassa_vendite WHERE venditore_id=? AND "
                            "stato='pagata' AND pagata_il>=?",
                            (user["id"], inizio)).fetchone()
+        # LA CASSA IN «ORDINI» (15 nov 2026, Andrea: «tutto questo deve
+        # comunque finire negli ordini [...] filtrabili per cassa in
+        # negozio»): la card della lista vuole la foto del primo articolo,
+        # come quella di un ordine (`foto0`); importo libero = ''
+        vendite = [_cassa_vista(v) for v in righe]
+        primi = {x["righe"][0]["id"] for x in vendite if x["righe"]}
+        foto = {}
+        if primi:
+            for a in con.execute(
+                    "SELECT id, foto FROM annunci WHERE id IN (%s)"
+                    % ",".join("?" * len(primi)), tuple(primi)).fetchall():
+                try:
+                    foto[a["id"]] = (json.loads(a["foto"] or "[]") or [""])[0]
+                except (ValueError, TypeError, IndexError):
+                    foto[a["id"]] = ""
+        for x in vendite:
+            x["foto0"] = foto.get(x["righe"][0]["id"], "") if x["righe"] else ""
     finally:
         con.close()
-    return {"vendite": [_cassa_vista(v) for v in righe],
+    return {"vendite": vendite,
             "oggi": {"n": oggi["n"], "sats": oggi["s"]}}
 
 

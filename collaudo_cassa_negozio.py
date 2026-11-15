@@ -292,6 +292,15 @@ def main():
     prova("oggi: 5 vendite, 11.200 + 4.500 + 2.000 + 3.000 + 1.000", (5, 21700),
           (s["oggi"]["n"], s["oggi"]["sats"]))
     prova("la nota resta", "tavolo 4", s["vendite"][-1]["nota"])
+    # (15 nov 2026, cassa-negli-ordini) la card di «Ordini» vuole la foto
+    # del primo articolo; l'importo libero non ne ha
+    vero.execute("UPDATE annunci SET foto='[\"a1_0.jpg\"]' WHERE id=1")
+    vero.commit()
+    s = chiama(SRV.cassa_storico, "", "")
+    prova("in «Ordini» la foto del primo articolo", "a1_0.jpg",
+          s["vendite"][-1]["foto0"])
+    prova("...e niente foto per l'importo libero", "",
+          next(x for x in s["vendite"] if x["id"] == f1["id"])["foto0"])
 
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

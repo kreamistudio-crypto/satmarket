@@ -83761,3 +83761,52 @@ al banco di un articolo importato da un negozio esterno non si scrive
 nel loro registro, e il sync può rialzarla) e l'avviso a chi aveva
 un'offerta sull'articolo esaurito al banco (decade, ma senza il
 messaggio).
+
+## La cassa in «Ordini» (15 nov 2026, cantiere cassa-negli-ordini, Andrea, poco dopo la cassa: «tutto questo deve comunque finire negli ordini, semplicemente avranno altri attributi e sono filtrabili per cassa in negozio»)
+
+LA DECISIONE. «Ordini» resta unico, come per l'on-chain del 27 ott: le
+vendite della cassa compaiono nella stessa lista, in ordine di tempo
+con gli ordini di sempre, con il loro segno («🏪 Cassa in negozio ·
+Lightning · cifra», badge «Pagata» o «In arrivo», la foto del primo
+articolo) e un filtro nuovo, «🏪 Cassa», accanto a Tutti / Acquisti /
+Vendite (compare a chi ha venduto alla cassa). Sono vendite: stanno anche
+in «Tutti» e in «Vendite»; «Solo attivi» tiene quelle in arrivo. Il tocco
+riapre la vendita nel foglio della cassa: la ricevuta (cifra, articoli,
+metodo, «✅ Pagato!» con data, ora e come) o il QR se aspetta ancora il
+blocco. La vista «Vendite della cassa» dentro il foglio non c'è più: il
+bottone porta a «Ordini» già filtrato. A vendita chiusa il QR e la
+fattura spariscono dal foglio (una ricevuta non deve sembrare un conto
+da pagare).
+
+PERCHÉ NON RIGHE DI `ordini`. «Altri attributi», non un altro flusso:
+una riga di `ordini` si porta dietro i dodici stati (regola ferrea 4),
+le ronde dei pagamenti, il reaper, le dispute, i gesti e `openOrder`
+con le sue guardie, tutte cose che alla cassa non esistono e che
+andrebbero spente una per una. È la strada degli on-chain da pagare
+(`caricaOnchainDaPagare`): una lista sua (`ordiniCassa`, da
+`/api/cassa/storico`, che ora dà anche `foto0`) con le sue card, fusa
+nella lista per data da `unisciCassaOrdini`.
+
+LA LEZIONE: LA FORMA DI `renderOrders` È UN CONTRATTO. La prima stesura
+avvolgeva le card in `unisciCassaOrdini(vista, cassa, o=>{…})`: undici
+sentinelle di prove.py (le card degli ordini, i bersagli, il banco dei
+due lati) tagliano la card fra `const puoNascondere` e `` `;}).join('') ``,
+e `collaudo_gesti_ordine` monta `loadOrders` pezzo per pezzo. Ora la
+fusione dà un ARRAY (una vendita entra come `{cassa: v}`), la card
+resta `righe.map(o=>{ if (o.cassa) return cardCassaOrdine(o.cassa); …
+}).join('')`, e senza vendite `righe` è `vista`, identica a prima; il
+collaudo dei gesti ha la sua riga `ordiniCassa` e `caricaCassaOrdini`
+(con la cassa spenta), come per gli on-chain da pagare.
+
+PROVATO. `PROVE_SEVERE=1 python prove.py` 28.235 passate, 0 fallite (le 2
+saltate di sempre, nostr-tools assente nella sessione cloud); collaudi
+della CI 134/134 (133 al primo giro, più `collaudo_gesti_ordine` rifatto
+dopo la lezione qui sopra); `collaudo_cassa_negozio` 56/56 (più la foto
+del primo articolo e nessuna foto per l'importo libero). DAL VIVO: server in collaudo,
+Chromium 390×844, chiaro e scuro: due vendite battute e chiuse, «Ordini»
+con le due vendite sopra un ordine concluso di due giorni prima, il
+filtro «🏪 Cassa», la ricevuta riaperta da «Ordini»
+(/mnt/project-files/pos-negozio/6-…, 7-…, 8-…).
+
+NON FATTO, IN ATTESA DI UN SÌ. Il CSV «Esporta tutti gli ordini» non
+contiene le vendite della cassa.
