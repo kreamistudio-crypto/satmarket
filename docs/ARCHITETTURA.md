@@ -33323,6 +33323,43 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   pannello: gruppo «🎁 Mancia al venditore», `_mancia_leve`) e
   `MANCIA_MAX_SATS` (100.000). LE PROVE: `prove_mancia_venditore` e
   `collaudo_mancia` (in CI).
+- LA CASSA IN NEGOZIO (15 nov 2026, cantiere cassa-negozio; il perché
+  in CANTIERI, «La cassa in negozio»). Un servizio a sé, non un ordine:
+  il blocco sta in server.py subito DOPO quello della mancia, di cui
+  riusa `invoice_da_ln_address` (con l'`extra` di LUD-21) e
+  `mancia_verifica_lud21`. LA TABELLA `cassa_vendite`: una riga per
+  conto battuto (sats, euro, nota, righe JSON degli articoli, la
+  fattura e il suo `verify`, l'indirizzo on-chain con tipo/valore/
+  indice, il txid visto), `stato` attesa | in_arrivo | pagata |
+  annullata | scaduta e `come` lud21 | blocco | mempool | a_mano. LE
+  ROTTE, tutte di chi vende e tutte 404 a leva spenta: `GET /api/cassa`
+  (cosa può incassare, i suoi annunci col prezzo in sats di adesso, il
+  conto di oggi), `POST /api/cassa/vendite` (il totale lo fa il server
+  dai prezzi e dallo stock di adesso; conia subito il QR del metodo),
+  `POST /api/cassa/vendite/{id}/metodo` (il tocco Lightning/on-chain:
+  conia quello che manca, il primo resta buono), `GET
+  /api/cassa/vendite/{id}` (il battito: chiede alla rete al massimo
+  ogni `CASSA_SECONDI_TRA_CONTROLLI`, col timbro `controllato` come
+  cancello, e guarda TUTTE E DUE le strade), `POST .../chiudi` (il
+  «✓ Ricevuto» di chi vende), `POST .../annulla` (solo da attesa) e
+  `GET /api/cassa/storico`. Chi compra non bussa mai al server. IL
+  LIGHTNING: la fattura la conia il Lightning address di chi vende;
+  «pagata» da LUD-21, sennò a mano. L'ON-CHAIN: la destinazione firmata
+  di chi vende (`_onchain_destinazione_viva`), il prossimo `/0/i` della
+  sua xpub o il suo indirizzo fisso; MAI il 2-di-3. La fila degli
+  indici è una sola: `_onchain_prossimo_esterno` conta anche
+  `cassa_vendite`. Con l'indirizzo fisso `cassa_pagamento_in_txs`
+  scarta le transazioni già contate per un'altra vendita e quelle
+  confermate prima del conto. Una conferma = pagata; visto in mempool =
+  in_arrivo, e chi vende decide. LO STOCK scala alla chiusura, una volta
+  sola (timbro `stock`), coi gesti dell'esaurito di `_incassa_ordine`
+  (venduto, offerte decadute, Nostr «sold», ✅ sul canale); prima non
+  si prenota niente. LE LEVE: `CASSA_ATTIVA` (accesa) e
+  `CASSA_MAX_SATS` (0 = nessun tetto), nel pannello sotto «🏪 Cassa in
+  negozio»; /api/me dice `cassa_attiva`. Il freno `cassa`: 300 conti e
+  QR all'ora per persona. IL CLIENT: la voce-porta `vocCassa` in
+  «Negozio e spedizioni» apre `#cassaSheet`, tre viste (il conto, il
+  QR, lo storico), battito ogni 3 secondi.
 - L'INDIRIZZO DELLA QUOTA: swap@barattolo.store (19 ott 2026, perché
   in CANTIERI, «L'indirizzo della quota: swap@barattolo.store»). Dove
   SATS Routing manda a fine mese la quota di Barattolo sugli swap. È lo

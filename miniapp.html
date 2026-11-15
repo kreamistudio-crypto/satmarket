@@ -8309,6 +8309,42 @@
   .pay-metodo button.oc.attiva small{color:var(--card);opacity:.8}
   .pay-metodo button.spento{opacity:.55}
   .pay-metodo button[aria-busy="true"]{cursor:progress}
+  /* LA CASSA IN NEGOZIO (15 nov 2026): la cifra grande da banco, gli
+     articoli a griglia da toccare col pollice, lo stato sotto il QR */
+  .cassa-importo{display:flex;gap:8px;align-items:center}
+  .cassa-importo input{flex:1;min-width:0;font-size:30px;font-weight:800;text-align:right;
+    padding:10px 12px;font-variant-numeric:tabular-nums}
+  .cassa-importo .consegna-pill{min-width:58px;font-size:18px;padding:12px 10px}
+  .cassa-cerca{margin:0 0 8px}
+  /* la moneta bitcoin dell'on-chain (niente catenine, 9 nov) in riga col
+     testo, alta come il fulmine: nella porta e nello storico */
+  #cassaSheet .cambio-moneta.p2p-oc-moneta{display:inline-flex;align-items:center;
+    justify-content:center;width:20px;height:20px;vertical-align:-4px;margin-right:4px}
+  #cassaSheet .cambio-moneta.p2p-oc-moneta .cambio-svg{width:12px;height:12px}
+  #cassaSheet{overflow-x:hidden}
+  .cassa-articoli{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+    gap:8px;max-height:46vh;overflow-y:auto}
+  .cassa-art{position:relative;text-align:left;border:1.5px solid var(--line);
+    background:var(--card);color:var(--ink);border-radius:12px;padding:8px;
+    cursor:pointer;font:inherit;min-width:0}
+  .cassa-art.su{border-color:var(--sats);box-shadow:0 0 0 1px var(--sats) inset}
+  .cassa-art b{display:block;font-size:13px;line-height:1.25;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .cassa-art span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+  .cassa-art .n{position:absolute;top:-7px;right:-7px;min-width:22px;height:22px;
+    border-radius:11px;background:var(--sats);color:#fff;font-size:12px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;padding:0 5px}
+  .cassa-art .meno{position:absolute;bottom:6px;right:6px;width:26px;height:26px;
+    border-radius:13px;border:1px solid var(--line);background:var(--bg);color:var(--ink);
+    font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center}
+  .cassa-totale{font-size:15px;font-weight:800;margin:12px 0 8px;min-height:20px}
+  .cassa-cifra{text-align:center;font-size:34px;font-weight:900;color:var(--sats);margin:2px 0}
+  .cassa-cifra small{font-size:14px;color:var(--muted);font-weight:700}
+  .cassa-stato{text-align:center;font-weight:800;font-size:15px;margin:10px 0;min-height:22px}
+  .cassa-stato.ok{color:#1F9D55;font-size:22px}
+  .cassa-riga{display:flex;justify-content:space-between;gap:10px;padding:10px 0;
+    border-bottom:1px solid var(--line);font-size:14px}
+  .cassa-riga small{display:block;color:var(--muted);font-size:12px}
   /* la scelta della rete al «Paga» e l'interruttore in cima al foglio
      (2 nov 2026): quelli del P2P; sbiadito On-chain dove non si paga */
   .pay-rete{margin:4px 0 10px}
@@ -14737,6 +14773,13 @@ document.getElementById('cartello')?.remove();</script>
            VOCI-PORTA — la veste del cassetto, ma la freccia › dice che
            si va altrove invece di aprire qui. Stesse condizioni di
            prima, decise da renderProfilo; nascono spente. -->
+      <!-- 🏪 LA CASSA IN NEGOZIO (15 nov 2026, cantiere cassa-negozio):
+           una VOCE-PORTA che apre il foglio della cassa. Compare a ogni
+           utente vero, a leva accesa (`cassaAttiva` da /api/me); in DEMO
+           e in vetrina sparisce, il patto del wallet. -->
+      <div class="acc voce-porta" id="vocCassa" style="display:none">
+        <button type="button" class="acc-h" onclick="apriCassa()"><span class="em">🏪</span>Cassa in negozio<span class="fr">›</span></button>
+      </div>
       <div class="acc voce-porta" id="vocMioNegozio" style="display:none">
         <button type="button" class="acc-h" onclick="apriMioNegozio()"><span class="em">👁</span>Guarda il tuo negozio come lo vedono tutti<span class="fr">›</span></button>
       </div>
@@ -16093,6 +16136,58 @@ document.getElementById('cartello')?.remove();</script>
       <a class="btn ghost" id="manciaWallet" href="#" style="display:block;text-align:center;text-decoration:none">⚡ Apri nel wallet</a>
       <button class="btn primary" id="manciaFatto" onclick="manciaPagata(this)">✓ L'ho pagata</button>
       <button class="btn ghost" id="manciaSalta" style="display:none" onclick="manciaSaltaZap()">Salta lo zap a Barattolo</button>
+    </div>
+  </div>
+
+  <!-- ============ SHEET CASSA IN NEGOZIO (15 nov 2026) ============
+       Tre viste in un foglio solo. IL CONTO: l'importo (sats o €) e gli
+       annunci da toccare, col totale. IL QR: ⚡ / ⛓️ come al foglio del
+       pagamento, il QR grande per il cliente e lo stato che si muove da
+       solo. LO STORICO: le vendite della cassa, col totale di oggi.
+       Niente ordine, niente deposito: i sats vanno dritti al wallet di
+       chi vende. Chiude con navIndietro(), il patto del motore. -->
+  <div class="sheet" id="cassaSheet" role="dialog" aria-modal="true"
+       aria-labelledby="cassaTitolo">
+    <div class="grab"></div>
+    <div class="sheet-testa">
+      <h3 id="cassaTitolo">🏪 Cassa in negozio</h3>
+      <button type="button" class="pacco-x" onclick="navIndietro()"
+              title="Chiudi" aria-label="Chiudi">✕</button>
+    </div>
+    <div id="cassaConto">
+      <div class="hint" id="cassaOggi" style="margin:0 0 10px"></div>
+      <div id="cassaManca" class="trust-note" style="display:none"></div>
+      <div class="cassa-importo field" style="margin:0">
+        <input id="cassaImporto" inputmode="decimal" autocomplete="off" placeholder="0" oninput="cassaScritta()" aria-label="Importo">
+        <button type="button" class="consegna-pill attiva" id="cassaValuta" onclick="cassaCambiaValuta()">€</button>
+      </div>
+      <div class="hint" id="cassaImportoSotto" style="margin:4px 0 10px;min-height:16px"></div>
+      <div id="cassaArticoliBox" style="display:none">
+        <div style="font-size:12px;font-weight:800;color:var(--muted);margin:0 0 6px">I tuoi articoli</div>
+        <div class="field cassa-cerca" id="cassaCercaBox" style="display:none"><input id="cassaCerca" type="search" autocomplete="off" placeholder="🔎 Cerca fra i tuoi annunci" oninput="disegnaArticoliCassa()"></div>
+        <div id="cassaArticoli" class="cassa-articoli"></div>
+      </div>
+      <div class="field" style="margin:10px 0 0"><input id="cassaNota" maxlength="120" autocomplete="off" placeholder="Nota per te (facoltativa), es. tavolo 4"></div>
+      <div id="cassaTotale" class="cassa-totale"></div>
+      <button class="btn orange" id="cassaIncassa" onclick="cassaIncassa(this)" disabled>Incassa</button>
+      <button class="btn ghost" onclick="apriStoricoCassa()">🧾 Vendite della cassa</button>
+      <div class="hint" style="margin-top:8px">💡 Chi compra inquadra il QR con <b>qualsiasi wallet</b>: non serve un account. I sats vanno <b>dritti al tuo wallet</b>, senza deposito di garanzia e senza commissioni: è un pagamento di persona, come al banco.</div>
+    </div>
+    <div id="cassaQrVista" style="display:none">
+      <div class="cassa-cifra"><span class="mono" id="cassaQrSats"></span> <small>sats</small></div>
+      <div class="hint" id="cassaQrSotto" style="text-align:center;margin:0 0 8px"></div>
+      <div class="pay-metodo" id="cassaMetodo" role="tablist" aria-label="Come paga il cliente"></div>
+      <div class="qr" id="cassaQr"></div>
+      <div class="invoice" id="cassaTesto" onclick="copiaCassa()" style="cursor:pointer" title="Tocca per copiare"></div>
+      <div id="cassaStato" class="cassa-stato"></div>
+      <button class="btn primary" id="cassaRicevuto" style="display:none" onclick="cassaRicevuto(this)">✓ Ricevuto</button>
+      <button class="btn orange" id="cassaNuovo" style="display:none" onclick="cassaNuovoConto()">Nuovo conto</button>
+      <button class="btn ghost" id="cassaAnnulla" onclick="cassaAnnulla(this)">Annulla il conto</button>
+    </div>
+    <div id="cassaStoricoVista" style="display:none">
+      <div class="hint" id="cassaStoricoOggi" style="margin:0 0 10px"></div>
+      <div id="cassaStoricoLista"></div>
+      <button class="btn ghost" onclick="cassaTornaAlConto()">← Torna alla cassa</button>
     </div>
   </div>
 
@@ -35285,6 +35380,8 @@ function closeSheet(){
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
   el('manciaSheet').classList.remove('open');
+  el('cassaSheet').classList.remove('open');
+  fermaBattitoCassa();
   el('offertaCarrelloSheet').classList.remove('open');
   el('confermaSheet').classList.remove('open');
   el('jarShareSheet').classList.remove('open');
@@ -38589,6 +38686,337 @@ async function fineMancia(){
       && el('view-ordine').classList.contains('active')) openOrder(oid);
 }
 
+/* ═══ LA CASSA IN NEGOZIO (15 nov 2026, cantiere cassa-negozio) ═══
+   Andrea: «una modalità locale per i negozi [...] senza escrow [...]
+   funge da POS [...] si può vendere anche senza che il compratore abbia
+   un account». Chi vende batte un conto (importo e/o i suoi annunci),
+   la cassa mostra un QR ⚡/⛓️ e il cliente paga con un wallet
+   qualunque. I sats vanno DRITTI al wallet di chi vende: la fattura la
+   conia il suo Lightning address, l'indirizzo on-chain viene dalla sua
+   destinazione del Profilo. Niente ordine, niente deposito, niente
+   «Ordini». Il giudice del «pagato» e' il server (`/cassa/vendite/{id}`,
+   LUD-21 o il mempool): qui si riferisce, e dove il wallet non lo dice
+   chi vende chiude a mano col suo «✓ Ricevuto». */
+const CASSA_BATTITO_MS = 3000;
+let cassaDati = null, cassaEur = true, cassaCarrello = {}, cassaVendita = null;
+let cassaBattito = null;
+
+function cassaSatsDaEuro(e){
+  const c = cassaDati && cassaDati.cambio;
+  return c > 0 && e > 0 ? Math.max(1, Math.round(e / c * 1e8)) : 0;
+}
+function cassaEuroDaSats(s){
+  const c = cassaDati && cassaDati.cambio;
+  return c > 0 ? s * c / 1e8 : 0;
+}
+function cassaEuroTesto(s){
+  const e = cassaEuroDaSats(s);
+  return e > 0 ? '≈ ' + fmtEur(e) + ' €' : '';
+}
+/* l'importo scritto a mano, in sats */
+function cassaExtraSats(){
+  const t = el('cassaImporto').value.replace(',', '.').replace(/[^\d.]/g, '');
+  const n = parseFloat(t) || 0;
+  return cassaEur ? cassaSatsDaEuro(Math.round(n * 100) / 100) : Math.round(n);
+}
+function cassaTotaleSats(){
+  let tot = cassaExtraSats();
+  for (const a of (cassaDati && cassaDati.annunci) || [])
+    tot += (cassaCarrello[a.id] || 0) * (a.sats || 0);
+  return tot;
+}
+async function apriCassa(){
+  haptic();
+  if (DEMO || VETRINA) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  closeSheet();
+  cassaCarrello = {}; cassaVendita = null;
+  el('cassaImporto').value = ''; el('cassaNota').value = ''; el('cassaCerca').value = '';
+  cassaTornaAlConto();
+  el('sheetBg').classList.add('open');
+  el('cassaSheet').classList.add('open');
+  el('cassaOggi').textContent = 'Apro la cassa…';
+  try {
+    const r = await fetch(`${API_BASE}/cassa`, {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { el('cassaOggi').textContent = d.detail || 'La cassa non si apre: riprova'; return; }
+    cassaDati = d;
+    cassaEur = d.cambio > 0;
+  } catch(e) { el('cassaOggi').textContent = 'Rete assente: riprova'; return; }
+  disegnaCassa();
+}
+function cassaTornaAlConto(){
+  fermaBattitoCassa();
+  el('cassaConto').style.display = '';
+  el('cassaQrVista').style.display = 'none';
+  el('cassaStoricoVista').style.display = 'none';
+  if (cassaDati) disegnaCassa();
+}
+function cassaOggiTesto(o){
+  return o && o.n ? `Oggi: <b>${o.n}</b> ${o.n === 1 ? 'vendita' : 'vendite'} · <b class="mono">${fmt(o.sats)}</b> sats ${esc(cassaEuroTesto(o.sats))}`
+                  : 'Oggi nessuna vendita, per ora.';
+}
+function disegnaCassa(){
+  const d = cassaDati; if (!d) return;
+  el('cassaOggi').innerHTML = cassaOggiTesto(d.oggi);
+  /* senza un posto dove ricevere la cassa non incassa: lo dice, e porta
+     al cassetto giusto del Profilo */
+  const manca = el('cassaManca');
+  if (!d.ln && !d.onchain) {
+    manca.innerHTML = `🏪 <span>Per incassare serve un posto dove ricevere: <a href="#" style="color:inherit;font-weight:800" onclick="apriCassettoProfilo('accLnAddress');return false">aggiungi il tuo Lightning address</a>${d.onchain_ammesso ? ` o <a href="#" style="color:inherit;font-weight:800" onclick="apriCassettoProfilo('accOnchainIncasso');return false">scegli dove ricevere on-chain</a>` : ''}. I sats andranno lì, dritti.</span>`;
+    manca.style.display = '';
+  } else manca.style.display = 'none';
+  el('cassaValuta').textContent = cassaEur ? '€' : 'sats';
+  el('cassaValuta').disabled = !(d.cambio > 0);
+  el('cassaArticoliBox').style.display = (d.annunci || []).length ? '' : 'none';
+  el('cassaCercaBox').style.display = (d.annunci || []).length > 8 ? '' : 'none';
+  disegnaArticoliCassa();
+  cassaScritta();
+}
+function disegnaArticoliCassa(){
+  const d = cassaDati; if (!d) return;
+  const q = el('cassaCerca').value.trim().toLowerCase();
+  const lista = (d.annunci || []).filter(a => !q || String(a.titolo).toLowerCase().includes(q));
+  el('cassaArticoli').innerHTML = lista.map(a => {
+    const n = cassaCarrello[a.id] || 0;
+    const prezzo = a.euro ? fmtEur(a.euro) + ' €' : (a.sats ? fmt(a.sats) + ' sats' : '—');
+    return `<button type="button" class="cassa-art${n ? ' su' : ''}" onclick="cassaPiu(${a.id})"${a.sats ? '' : ' disabled'}>
+      <b>${esc(a.titolo)}</b><span>${prezzo} · ${a.quantita} ${a.quantita === 1 ? 'pezzo' : 'pezzi'}</span>
+      ${n ? `<i class="n">${n}</i><i class="meno" role="button" aria-label="Togli uno" onclick="event.stopPropagation();cassaMeno(${a.id})">−</i>` : ''}
+    </button>`;
+  }).join('') || '<div class="hint">Nessun articolo con questo nome.</div>';
+}
+function cassaPiu(id){
+  const a = ((cassaDati && cassaDati.annunci) || []).find(x => x.id === id);
+  if (!a) return;
+  haptic();
+  const n = cassaCarrello[id] || 0;
+  if (n >= a.quantita) { toast(`Ne hai ${a.quantita} in vetrina`); return; }
+  cassaCarrello[id] = n + 1;
+  disegnaArticoliCassa(); cassaScritta();
+}
+function cassaMeno(id){
+  haptic();
+  const n = (cassaCarrello[id] || 0) - 1;
+  if (n > 0) cassaCarrello[id] = n; else delete cassaCarrello[id];
+  disegnaArticoliCassa(); cassaScritta();
+}
+function cassaCambiaValuta(){
+  if (!(cassaDati && cassaDati.cambio > 0)) return;
+  haptic();
+  /* la cifra scritta si converte, non si perde */
+  const s = cassaExtraSats();
+  cassaEur = !cassaEur;
+  el('cassaImporto').value = s ? (cassaEur ? (Math.round(cassaEuroDaSats(s) * 100) / 100).toFixed(2).replace('.', ',') : String(s)) : '';
+  el('cassaValuta').textContent = cassaEur ? '€' : 'sats';
+  cassaScritta();
+}
+function cassaScritta(){
+  const d = cassaDati; if (!d) return;
+  const extra = cassaExtraSats();
+  el('cassaImportoSotto').textContent = extra
+    ? (cassaEur ? fmt(extra) + ' sats' : cassaEuroTesto(extra)) : '';
+  const tot = cassaTotaleSats(), btn = el('cassaIncassa');
+  const pezzi = Object.values(cassaCarrello).reduce((a, b) => a + b, 0);
+  if (!tot) {
+    el('cassaTotale').textContent = d.annunci && d.annunci.length
+      ? 'Scrivi un importo o tocca un articolo' : 'Scrivi un importo';
+    btn.disabled = true; btn.textContent = 'Incassa'; return;
+  }
+  if (d.max_sats && tot > d.max_sats) {
+    el('cassaTotale').innerHTML = `<span style="color:var(--sats-text)">Alla cassa al massimo ${fmt(d.max_sats)} sats per vendita</span>`;
+    btn.disabled = true; return;
+  }
+  el('cassaTotale').innerHTML = `Totale <b class="mono" style="color:var(--sats)">${fmt(tot)}</b> sats ${esc(cassaEuroTesto(tot))}`
+    + (pezzi ? ` · ${pezzi} ${pezzi === 1 ? 'articolo' : 'articoli'}` : '');
+  btn.disabled = !(d.ln || d.onchain);
+  btn.textContent = `Incassa ${fmt(tot)} sats`;
+}
+async function cassaIncassa(btn){
+  haptic();
+  const d = cassaDati; if (!d) return;
+  const righe = Object.entries(cassaCarrello).map(([id, q]) => ({id: Number(id), q}));
+  const t = el('cassaImporto').value.replace(',', '.').replace(/[^\d.]/g, '');
+  const n = parseFloat(t) || 0;
+  const corpo = {righe, nota: el('cassaNota').value.trim(),
+                 metodo: d.ln ? 'ln' : 'onchain'};
+  if (n > 0) { if (cassaEur) corpo.extra_euro = Math.round(n * 100) / 100; else corpo.extra_sats = Math.round(n); }
+  const ripristina = bottoneInAttesa(btn, 'Preparo il QR…');
+  try {
+    const r = await fetch(`${API_BASE}/cassa/vendite`, {method:'POST',
+      headers:{'Content-Type':'application/json', 'X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify(corpo)});
+    const v = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(v.detail || 'Il conto non è partito: riprova', 7000); return; }
+    mostraQrCassa(v);
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+function fermaBattitoCassa(){
+  if (cassaBattito) { clearInterval(cassaBattito); cassaBattito = null; }
+}
+function disegnaMetodoCassa(v){
+  const d = cassaDati || {};
+  const ocSi = d.onchain && v.sats >= (d.polvere || 546);
+  const porta = (m, cls, titolo, sotto, spento) =>
+    `<button type="button" role="tab" class="${cls}${v.metodo === m ? ' attiva' : ''}${spento ? ' spento' : ''}"
+       aria-selected="${v.metodo === m}" onclick="cassaPassaA('${m}')"${v.stato !== 'attesa' ? ' disabled' : ''}>${titolo}<small>${sotto}</small></button>`;
+  el('cassaMetodo').innerHTML =
+      porta('ln', 'ln', '⚡ Lightning', d.ln ? 'subito, in un secondo' : 'manca il Lightning address', !d.ln)
+    + porta('onchain', 'oc', P2P_OC_MONETA + 'On-chain', ocSi ? 'dritto al tuo wallet' : (d.onchain ? 'cifra troppo piccola' : 'manca il wallet on-chain'), !ocSi);
+}
+function mostraQrCassa(v){
+  cassaVendita = v;
+  el('cassaConto').style.display = 'none';
+  el('cassaStoricoVista').style.display = 'none';
+  el('cassaQrVista').style.display = '';
+  el('cassaQrSats').textContent = fmt(v.sats);
+  const cosa = (v.righe || []).map(r => r.q > 1 ? `${r.titolo} × ${r.q}` : r.titolo).join(', ');
+  el('cassaQrSotto').textContent = [cassaEuroTesto(v.sats), cosa, v.nota].filter(Boolean).join(' · ');
+  disegnaMetodoCassa(v);
+  const ln = v.metodo === 'ln' && v.ln, oc = v.metodo === 'onchain' && v.onchain;
+  const testo = ln ? v.ln.invoice : (oc ? v.onchain.indirizzo : '');
+  el('cassaTesto').textContent = testo;
+  if (ln) disegnaQr(el('cassaQr'), ('lightning:' + v.ln.invoice).toUpperCase(), 'Alphanumeric');
+  else if (oc) disegnaQr(el('cassaQr'), v.onchain.uri);
+  statoVenditaCassa(v);
+  fermaBattitoCassa();
+  if (v.stato === 'attesa' || v.stato === 'in_arrivo')
+    cassaBattito = setInterval(battitoCassa, CASSA_BATTITO_MS);
+}
+function statoVenditaCassa(v){
+  const s = el('cassaStato'), ric = el('cassaRicevuto');
+  const fine = v.stato === 'pagata' || v.stato === 'annullata' || v.stato === 'scaduta';
+  s.classList.toggle('ok', v.stato === 'pagata');
+  el('cassaQr').style.opacity = fine ? '.25' : '';
+  el('cassaNuovo').style.display = fine ? '' : 'none';
+  el('cassaAnnulla').style.display = v.stato === 'attesa' ? '' : 'none';
+  ric.style.display = 'none';
+  if (v.stato === 'pagata') {
+    s.innerHTML = '✅ Pagato!' + (v.come === 'a_mano' ? '<div class="hint">Segnato da te come ricevuto</div>'
+                : v.come === 'mempool' ? '<div class="hint">Chiuso col pagamento ancora in arrivo</div>' : '');
+  } else if (v.stato === 'in_arrivo') {
+    s.innerHTML = '₿ Pagamento visto in rete: in arrivo<div class="hint">La conferma arriva di solito fra 10 e 60 minuti. Per una cifra piccola puoi consegnare adesso; per una grande, aspetta il blocco.</div>';
+    ric.textContent = '✓ Consegna adesso'; ric.style.display = '';
+  } else if (v.stato === 'annullata') {
+    s.textContent = 'Conto annullato';
+  } else if (v.stato === 'scaduta') {
+    s.textContent = 'Conto scaduto senza pagamento';
+  } else if (v.metodo === 'ln' && v.ln && !v.ln.verificabile) {
+    s.innerHTML = '⏳ Aspetto il pagamento…<div class="hint">Il tuo wallet non ci dice quando arriva: guardalo tu, e quando vedi i sats tocca «Ricevuto».</div>';
+    ric.textContent = '✓ Ricevuto'; ric.style.display = '';
+  } else {
+    s.textContent = '⏳ Aspetto il pagamento…';
+  }
+}
+async function battitoCassa(){
+  const v = cassaVendita;
+  if (!v || !el('cassaSheet').classList.contains('open')
+      || el('cassaQrVista').style.display === 'none') { fermaBattitoCassa(); return; }
+  try {
+    const r = await fetch(`${API_BASE}/cassa/vendite/${v.id}`, {headers:{'X-Tg-Init-Data':authHdr()}});
+    const n = await r.json().catch(()=>null);
+    if (!r.ok || !n || cassaVendita !== v) return;
+    if (n.stato !== v.stato || n.metodo !== v.metodo) {
+      if (n.stato === 'pagata') { haptic('success'); cassaContaOggi(n); }
+      if (n.metodo !== v.metodo) mostraQrCassa(n);
+      else { cassaVendita = n; statoVenditaCassa(n); if (n.stato === 'pagata') fermaBattitoCassa(); }
+    }
+  } catch(e) { /* la rete torna: si richiede al battito dopo */ }
+}
+/* il conto di oggi in testa alla cassa sale senza rileggere tutto */
+function cassaContaOggi(v){
+  if (!cassaDati) return;
+  const o = cassaDati.oggi || (cassaDati.oggi = {n:0, sats:0});
+  o.n += 1; o.sats += v.sats;
+  for (const r of v.righe || []) {
+    const a = (cassaDati.annunci || []).find(x => x.id === r.id);
+    if (a) a.quantita = Math.max(0, a.quantita - r.q);
+  }
+  cassaDati.annunci = (cassaDati.annunci || []).filter(a => a.quantita > 0);
+}
+async function cassaPassaA(m){
+  const v = cassaVendita;
+  if (!v || v.metodo === m || v.stato !== 'attesa') return;
+  const d = cassaDati || {};
+  if (m === 'ln' && !d.ln) { toast('Aggiungi il tuo Lightning address dal Profilo per incassare in Lightning', 5000); return; }
+  if (m === 'onchain' && !d.onchain) { toast('Scegli dove ricevere on-chain: Profilo → «Incassi on-chain»', 5000); return; }
+  if (m === 'onchain' && v.sats < (d.polvere || 546)) { toast(`On-chain si incassa da ${fmt(d.polvere || 546)} sats in su`, 5000); return; }
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/cassa/vendite/${v.id}/metodo`, {method:'POST',
+      headers:{'Content-Type':'application/json', 'X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({metodo: m})});
+    const n = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(n.detail || 'Il QR non è arrivato: riprova', 6000); return; }
+    mostraQrCassa(n);
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+function copiaCassa(){
+  const t = el('cassaTesto').textContent; if (!t) return;
+  haptic();
+  copiaLink(t, cassaVendita && cassaVendita.metodo === 'onchain' ? 'Indirizzo copiato 📋' : 'Fattura copiata 📋');
+}
+async function cassaRicevuto(btn){
+  const v = cassaVendita; if (!v) return;
+  haptic();
+  const ripristina = bottoneInAttesa(btn, 'Chiudo la vendita…');
+  try {
+    const r = await fetch(`${API_BASE}/cassa/vendite/${v.id}/chiudi`, {method:'POST',
+      headers:{'X-Tg-Init-Data':authHdr()}});
+    const n = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(n.detail || 'Non si chiude: riprova'); return; }
+    if (n.stato === 'pagata' && v.stato !== 'pagata') { haptic('success'); cassaContaOggi(n); }
+    cassaVendita = n; statoVenditaCassa(n); fermaBattitoCassa();
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+async function cassaAnnulla(btn){
+  const v = cassaVendita; if (!v) return;
+  haptic();
+  const ripristina = bottoneInAttesa(btn, 'Annullo…');
+  try {
+    const r = await fetch(`${API_BASE}/cassa/vendite/${v.id}/annulla`, {method:'POST',
+      headers:{'X-Tg-Init-Data':authHdr()}});
+    const n = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(n.detail || 'Non si annulla: riprova'); return; }
+    if (n.stato === 'annullata') { cassaNuovoConto(); toast('Conto annullato'); }
+    else { cassaVendita = n; statoVenditaCassa(n); }
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+function cassaNuovoConto(){
+  haptic();
+  cassaCarrello = {}; cassaVendita = null;
+  el('cassaImporto').value = ''; el('cassaNota').value = '';
+  cassaTornaAlConto();
+}
+async function apriStoricoCassa(){
+  haptic();
+  fermaBattitoCassa();
+  el('cassaConto').style.display = 'none';
+  el('cassaQrVista').style.display = 'none';
+  el('cassaStoricoVista').style.display = '';
+  el('cassaStoricoOggi').textContent = 'Leggo le vendite…';
+  el('cassaStoricoLista').innerHTML = '';
+  try {
+    const r = await fetch(`${API_BASE}/cassa/storico`, {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { el('cassaStoricoOggi').textContent = d.detail || 'Non si legge: riprova'; return; }
+    el('cassaStoricoOggi').innerHTML = cassaOggiTesto(d.oggi);
+    const oggi = new Date().toDateString();
+    el('cassaStoricoLista').innerHTML = (d.vendite || []).map(v => {
+      const t = new Date((v.pagata_il || v.creato) * 1000);
+      const quando = (t.toDateString() === oggi ? '' : t.toLocaleDateString('it-IT', {day:'numeric', month:'short'}) + ' ')
+        + t.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+      const cosa = (v.righe || []).map(r => r.q > 1 ? `${r.titolo} × ${r.q}` : r.titolo).join(', ') || v.nota || 'Importo libero';
+      const icona = v.metodo === 'onchain' ? P2P_OC_MONETA : '⚡';
+      const stato = v.stato === 'in_arrivo' ? ' · in arrivo' : (v.come === 'a_mano' ? ' · segnata da te' : '');
+      return `<div class="cassa-riga"><div>${icona} ${esc(cosa)}<small>${esc(quando)}${stato}${v.righe && v.righe.length && v.nota ? ' · ' + esc(v.nota) : ''}</small></div>
+        <div style="text-align:right"><b class="mono">${fmt(v.sats)}</b><small>sats</small></div></div>`;
+    }).join('') || '<div class="hint">Ancora nessuna vendita alla cassa.</div>';
+  } catch(e) { el('cassaStoricoOggi').textContent = 'Rete assente: riprova'; }
+}
+
 /* ---- feedback reciproco a affare concluso ---- */
 let stellaScelta = 0;   // il voto scelto ma non ancora inviato
 
@@ -39704,6 +40132,8 @@ function renderProfilo(){
     myNegozio&&!DEMO&&!VETRINA ? '' : 'none';
   if (el('recensioniConta')) el('recensioniConta').textContent =
     (Number(myNFeedback) || 0) > 0 ? `(${Number(myNFeedback)})` : '';
+  if (el('vocCassa')) el('vocCassa').style.display =
+    cassaAttiva&&!DEMO&&!VETRINA ? '' : 'none';
   if (el('vocWidgetNegozio')) el('vocWidgetNegozio').style.display =
     (myNegozio)&&!DEMO&&!VETRINA ? '' : 'none';
   /* «Esci» dice cosa fa: con piu' account aperti esce da QUESTO e
@@ -56915,6 +57345,7 @@ let accountAperti = [], accountAttivo = null, accountMax = 0;
 let accountAttivoId = '', accountTelegramId = '';
 /* la leva viva, da /api/me (un server di ieri non la manda: spenta) */
 let piuAccount = false;
+let cassaAttiva = false;   /* la cassa in negozio (15 nov 2026), da /api/me */
 /* ============ L'ASSISTENZA IN APP (3 nov 2026) =====================
    La richiesta di Andrea: una chat con lo staff dentro Barattolo, nelle
    impostazioni; gli admin vedono TUTTE le conversazioni, una per
@@ -100546,6 +100977,9 @@ async function avvia(){
     /* PIU' ACCOUNT OVUNQUE: la leva viva (un server di ieri non la
        manda, e resta spenta) */
     piuAccount = !!me.piu_account;
+    /* LA CASSA IN NEGOZIO (15 nov 2026): la leva viva (un server di ieri
+       non la manda, e la voce resta spenta) */
+    cassaAttiva = !!me.cassa_attiva;
     /* LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026): la leva viva — un
        server di ieri non la manda, e la voce resta spenta */
     myCancellabile = !!me.account_cancellabile && !DEMO && !VETRINA;

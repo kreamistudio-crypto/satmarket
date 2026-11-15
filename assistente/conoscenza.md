@@ -140,6 +140,8 @@ I codici sconto: nel Profilo, alla voce «🎟 Codici sconto», chi vende crea i
 
 Chi vende contenuti digitali può aggiungere all'annuncio le domande da fare a chi compra (testo breve, elenco a tendina, email, sì/no), obbligatorie o facoltative; nome, cognome ed email si aggiungono con un tocco. Il numero di telefono non si può chiedere.
 
+La cassa in negozio (se nelle REGOLAZIONI del pannello «Cassa in negozio» è accesa): chi vende di persona, in un negozio, a un banco del mercato o a un evento, può usare Barattolo come cassa. Nel Profilo, nel gruppo «Negozio e spedizioni», c'è «🏪 Cassa in negozio»: si scrive l'importo (in euro o in sats, il tasto accanto cambia valuta) e/o si toccano i propri annunci (ogni tocco aggiunge un pezzo, il «−» lo toglie), si può aggiungere una nota per sé (es. «tavolo 4») e si tocca «Incassa». Compare un QR grande con due porte, «⚡ Lightning» e «On-chain»: il cliente lo inquadra con qualsiasi wallet, e non gli serve un account su Barattolo né Telegram. I sats vanno DRITTI al wallet di chi vende: in Lightning al suo Lightning address del Profilo, on-chain a un indirizzo nuovo del suo wallet (quello scelto in Profilo → «Incassi on-chain»), mai al deposito di garanzia. Per questo non c'è deposito, né spedizione, né conferma, né disputa, e Barattolo non prende commissioni: è un pagamento di persona, come al banco, e la vendita non compare in «Ordini» ma in «🧾 Vendite della cassa», col totale di oggi. Quando il pagamento arriva la cassa dice «✅ Pagato!». Se il wallet di chi vende non comunica i pagamenti, la cassa dice di guardare il proprio wallet e di toccare «✓ Ricevuto». On-chain, appena il pagamento si vede in rete la cassa dice «in arrivo»: per una cifra piccola si può consegnare subito («✓ Consegna adesso»), per una grande è meglio aspettare la conferma (di solito fra 10 e 60 minuti). On-chain si incassa da 546 sats in su. I pezzi venduti alla cassa escono da soli dalla vetrina, e l'annuncio finito diventa venduto. Per usare la cassa serve almeno uno fra il Lightning address e il wallet on-chain nel Profilo: se mancano, la cassa lo dice e porta al campo giusto.
+
 <!-- pezzo libro-011 | libro -->
 ## Libro · Spedizione, indirizzo e ritiro
 
@@ -888,6 +890,7 @@ ZIP delle foto (se nel file hai scritto i nomi)
 🔁Doppioni su Nostr ▾
 Negozio e spedizioni▾
 📊Il tuo negozio ▾
+🏪Cassa in negozio›
 👁Guarda il tuo negozio come lo vedono tutti›
 </>Widget per il web›
 📦Come spedisci ▾
@@ -1082,6 +1085,18 @@ inquadra il QR col wallet, o tocca la fattura per copiarla
  ⚡ Apri nel wallet
 ✓ L'ho pagata
 Salta lo zap a Barattolo
+## 🏪 Cassa in negozio
+✕
+€
+I tuoi articoli
+Incassa
+🧾 Vendite della cassa
+💡 Chi compra inquadra il QR con qualsiasi wallet: non serve un account. I sats vanno dritti al tuo wallet, senza deposito di garanzia e senza commissioni: è un pagamento di persona, come al banco.
+ sats
+✓ Ricevuto
+Nuovo conto
+Annulla il conto
+← Torna alla cassa
 ## 💰 Offri per tutto il carrello
 €
 ₿
@@ -1462,4 +1477,12 @@ pubblico: sì
 frase: Se il venditore non ha ancora un indirizzo Lightning, il riquadro della mancia ora c'è lo stesso e te lo dice, invece di sparire: «non ha ancora un indirizzo Lightning nel profilo: per ora la mancia non si può mandare». E chi vende, nello stesso ordine, vede l'invito ad aggiungerlo dal Profilo: così può ricevere le mance e incassare da solo.
 dove: la scheda «Ordini», dentro un ordine già pagato, accanto al voto.
 leva: MANCIA_ATTIVA (la stessa della mancia)
+pubblico: sì
+
+<!-- pezzo novita-032 | novita -->
+## Novità · 2026-11-15 · cassa-negozio
+
+frase: Hai un negozio, un banco al mercato o un bar? Nel Profilo c'è la «🏪 Cassa in negozio»: scrivi l'importo (in euro o in sats) o tocca i tuoi articoli, e Barattolo mostra un QR Lightning o on-chain. Il cliente lo inquadra con qualsiasi wallet, senza account. I sats vanno dritti al tuo wallet, senza commissioni, e i pezzi venduti escono da soli dalla vetrina.
+dove: il Profilo, nel gruppo «Negozio e spedizioni», la voce «🏪 Cassa in negozio».
+leva: CASSA_ATTIVA (nuova, accesa)
 pubblico: sì
