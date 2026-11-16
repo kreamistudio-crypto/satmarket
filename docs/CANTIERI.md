@@ -84553,3 +84553,18 @@ l'alone, ogni colore col gemello serale) adeguate; `prove_logo_p2p_nitido`
 (il conto del logo) segue il padding nuovo. Dal vivo nel Chromium locale (390 e 320,
 chiaro e scuro, compra e vendi, gabbia con relay morti).
 DA GUARDARE: nel webview vero del telefono.
+
+## I tasti «Compra BTC» e «Vendi BTC» rettangolari, col logo un po' più piccolo (16 nov 2026, cantiere tasti-lato-p2p, giro 2, Andrea guardando le pillole: «fammeli rettangolari con i bordi arrotondati e rimpicciolisci leggermente il logo centrale in modo tale che riesci ad allungare leggermente il colore dei tasti», «Mandami una foto prima»)
+
+Le pillole del giro di stamattina diventano rettangoli con gli angoli a
+12px (erano 20 su 47 di altezza, cioè quasi un tondo). Il logo in mezzo
+scende: `--logo-p2p` passa da `clamp(76px, calc(100vw - 265px), 120px)`
+a `clamp(68px, calc(100vw - 285px), 102px)`. Dove il logo cresce, al
+tab restano sempre 118,5px invece di 108,5: a 390 il logo è 102 e ogni
+tasto prende dieci pixel di colore in più. Col minimo a 68 la scritta a
+19px sta su una riga fino a 330px, quindi la scritta a 17px resta solo
+sotto quella misura (era sotto i 352).
+PROVATO: `prove_logo_p2p_nitido` (la misura da 68 a 102, i 118,5px, il
+conto sulle larghezze dei telefoni veri) e `prove_nav_p2p` (gli angoli
+a 12px) adeguate. Foto mandata ad Andrea prima del push (390, chiaro e
+scuro, compra e vendi, gabbia con relay morti).

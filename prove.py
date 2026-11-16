@@ -72421,10 +72421,12 @@ def prove_nav_p2p():
     prova("niente striscia continua sotto il logo", True,
           "border-bottom" not in pezzo_js(mini, ".p2p-lati{", "}"))
     _tab = pezzo_js(mini, ".p2p-lati .p2p-lato{", "}")
-    prova("...e i tab sono pillole: niente linea, fondo grigio, angoli tondi",
+    # ...e lo stesso giorno RETTANGOLI ad angoli tondi, non pillole
+    # (Andrea: «fammeli rettangolari con i bordi arrotondati»): 12px.
+    prova("...e i tab sono rettangoli tondi: niente linea, fondo grigio, angoli a 12px",
           True, "border-bottom" not in _tab and "border:none" in _tab
           and "background:var(--lato-quieto)" in _tab
-          and "border-radius:20px" in _tab)
+          and "border-radius:12px" in _tab)
     prova("...l'attiva e' piena, sfumata, con l'alone del suo colore", True,
           all(f"linear-gradient(180deg,var(--lato-{c}-da),var(--lato-{c}-a))"
               in pezzo_js(mini, f".p2p-lati .p2p-lato.{l}.attiva{{", "}")
@@ -91031,8 +91033,10 @@ def prove_logo_p2p_nitido():
     if not m:
         return
     minimo, meno, massimo = (int(x) for x in m.groups())
-    prova("...da 76 a 120px, e sotto la soglia resta quella di prima",
-          (76, 120), (minimo, massimo))
+    # EMENDATA (16 nov 2026, Andrea: «rimpicciolisci leggermente il logo
+    # centrale» per allungare i tasti): da 68 a 102, costante 285.
+    prova("...da 68 a 102px: il logo piu' piccolo, i tasti piu' lunghi",
+          (68, 102), (minimo, massimo))
     prova("il logo la legge, e il margine negativo la segue", True,
           "width:var(--logo-p2p,76px);height:var(--logo-p2p,76px)"
           in pezzo_js(css, "  .p2p-logo{", "}")
@@ -91069,8 +91073,8 @@ def prove_logo_p2p_nitido():
     prova("...e nella fascia in cui cresce lo spazio del tab non cambia", 1,
           len({round(spazio(vw, vw - meno), 3)
                for vw in range(minimo + meno, massimo + meno + 1)}))
-    prova("...ed e' 108,5px: sei e mezzo piu' della scritta piu' lunga",
-          108.5, spazio(375, 375 - meno))
+    prova("...ed e' 118,5px: sedici e mezzo piu' della scritta piu' lunga",
+          118.5, spazio(375, 375 - meno))
     prova("...e il tab e' quello che il conto suppone", True,
           "flex:1;padding:13px 4px"
           in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}")

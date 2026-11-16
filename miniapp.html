@@ -2429,8 +2429,14 @@
      la riga era larga quanto la colonna, esattamente com'e' adesso che
      il velo non c'e' piu'. I dodici pixel del logo e uno e mezzo per
      tab sono tutto quello che c'era da spostare. */
+  /* ⚠️ EMENDATA ANCORA (16 nov 2026, Andrea coi tasti a pillola: «rimpicciolisci
+     leggermente il logo centrale in modo tale che riesci ad allungare
+     leggermente il colore dei tasti»): il tetto scende da 120 a 102 e il
+     minimo da 76 a 68, la costante sale da 265 a 285. Al tab restano
+     SEMPRE 118,5px dove il logo cresce (erano 108,5), e a 390 il logo
+     e' 102: dieci pixel di colore in piu' per tasto. */
   .p2p-lati{display:flex;align-items:flex-end;margin:0 0 12px;
-    --logo-p2p:clamp(76px, calc(100vw - 265px), 120px)}
+    --logo-p2p:clamp(68px, calc(100vw - 285px), 102px)}
   /* ---- LA TESTATA RESTA IN ALTO (set 2026, ritocco di Andrea:
      «tab, logo e pillola attaccati in alto; scorrono solo le card»).
      UN SOLO STICKY per tutt'e due, e non due impilati: con due
@@ -2858,7 +2864,9 @@
      questi due tasti e di nessun altro.
      ⚠️ IL PADDING ORIZZONTALE RESTA 4px e la scritta 19px: la formula
      del logo che cresce (sopra) conta su quei numeri per tenere
-     «Compra BTC» su una riga; in altezza si e' preso 2px per lato. */
+     «Compra BTC» su una riga; in altezza si e' preso 2px per lato.
+     RETTANGOLI E NON PILLOLE (16 nov 2026, lo stesso giorno, Andrea:
+     «fammeli rettangolari con i bordi arrotondati»): angoli a 12px. */
   .p2p-lati{--lato-quieto:#EEEAE2;--lato-quieto-testo:#77705F;
     --lato-quieto-ombra:0 2px 6px rgba(60,45,10,.08);
     --lato-verde-da:#3FE0A6;--lato-verde-a:#16BD82;--lato-verde-testo:#0D2E21;
@@ -2873,7 +2881,7 @@
     --lato-rosso-alone:rgba(240,110,80,.30)}
   .p2p-lati .p2p-lato{flex:1;padding:13px 4px;border:none;cursor:pointer;
     font-family:'Baloo 2',sans-serif;font-weight:700;font-size:19px;
-    line-height:1.1;color:var(--lato-quieto-testo);border-radius:20px;
+    line-height:1.1;color:var(--lato-quieto-testo);border-radius:12px;
     background:var(--lato-quieto);box-shadow:var(--lato-quieto-ombra);
     -webkit-tap-highlight-color:transparent;
     transition:background .2s ease,box-shadow .2s ease,color .2s ease}
@@ -2885,11 +2893,12 @@
     box-shadow:0 6px 16px var(--lato-rosso-alone),inset 0 1px 0 rgba(255,255,255,.45)}
   .p2p-lati .p2p-lato:focus-visible{outline:2.5px solid var(--sats);outline-offset:2px}
   @media (prefers-reduced-motion:reduce){.p2p-lati .p2p-lato{transition:none}}
-  /* SOTTO I 352px il logo resta a 76 e al tab avanzano 98px per i 102
-     di «Compra BTC»: andava a capo anche prima, ma una pillola su due
-     righe e' un mattone. Due pixel di meno alla scritta (91px) e resta
-     su una riga, come sopra quella misura. */
-  @media (max-width:351px){.p2p-lati .p2p-lato{font-size:17px}}
+  /* SOTTO I 330px il logo resta al minimo (68) e al tab avanzano meno
+     dei 102 di «Compra BTC» (a 320 sono 102 esatti, senza un filo
+     d'aria): un tasto su due righe e' un mattone. Due pixel di meno
+     alla scritta (91px) e resta su una riga, come sopra quella misura.
+     (La prima stesura diceva 352px, col logo che aveva il minimo a 76.) */
+  @media (max-width:329px){.p2p-lati .p2p-lato{font-size:17px}}
   /* ---- LA PILLOLA DEL FILTRO (set 2026, richiesta di Andrea) ----
      Ha preso il posto della riga «N offerte di chi vende sats»: quella
      diceva un numero e basta, questa dice lo stesso numero E che si
