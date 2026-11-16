@@ -84505,3 +84505,32 @@ censimento di `prove_pagina_acquisto` conta ora due «Fee P2P» (Lightning
 e on-chain). Dal vivo (gabbia, relay morti, preventivi finti perché SATS
 Routing è fuori): i tasti nel foglio on-chain e in quello Lightning con la
 nota del costo, il banner a 390 scuro e 320 chiaro.
+
+## I tasti «Compra BTC» e «Vendi BTC» diventano pillole (16 nov 2026, cantiere tasti-lato-p2p, Andrea con una foto: «I tasti compra BTC e vendi BTC nel peer-to-peer, me li puoi mettere così?», «Ovviamente anche nella versione scura», «Non c'è bisogno che mi mandi le foto. Falle così e mandale subito in produzione»)
+
+I due tab in cima al libro erano scritte con la linea sotto (grigia sulla
+quieta, colorata sull'attiva) e un fondo tenue. Ora sono due PILLOLE
+grandi ai lati del logo, come nella foto di Andrea: l'attiva è PIENA, una
+sfumatura dall'alto in basso con un alone morbido del suo colore e la
+scritta SCURA in grassetto; la quieta è grigio chiaro con la scritta
+grigia e un'ombra leggera. Verde menta a «Compra BTC»; a «Vendi BTC»
+corallo, il rosso delle frecce del logo (la foto mostrava solo il lato
+compra: il libro dice compra verde e vendi rosso ovunque, e il logo
+cambia freccia col lato). Di sera la quieta si scurisce (#3A3224) e le
+piene restano accese con l'alone più basso.
+COM'È FATTA: i colori sono variabili del solo `.p2p-lati` (`--lato-*`),
+ridichiarate sotto `html[data-tema="scuro"] .p2p-lati`: sono di quei due
+tasti e di nessun altro. Padding orizzontale e scritta (4px, 19px)
+invariati, perché la formula del logo che cresce conta su quei numeri;
+in altezza 13px invece di 11. Sotto i 352px «Compra BTC» andava a capo
+anche prima (98px per 102): una pillola su due righe era un mattone,
+quindi lì la scritta scende a 17px.
+STRADE SCARTATE: le foto prima del push (Andrea: non servono); la
+pillola verde anche a «Vendi BTC» (avrebbe detto il lato sbagliato
+accanto alla freccia rossa del logo).
+PROVATO: `prove_p2p_libro` (l'attiva veste il suo colore) e
+`prove_nav_p2p` (niente linea, pillole grigie e tonde, attiva sfumata con
+l'alone, ogni colore col gemello serale) adeguate; `prove_logo_p2p_nitido`
+(il conto del logo) segue il padding nuovo. Dal vivo nel Chromium locale (390 e 320,
+chiaro e scuro, compra e vendi, gabbia con relay morti).
+DA GUARDARE: nel webview vero del telefono.

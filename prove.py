@@ -67630,8 +67630,8 @@ def prove_p2p_libro():
           and "consegna-pill" not in senza_commenti
           and "tema-pill" not in senza_commenti)
     prova("...e l'attivo veste il suo colore: compra verde, vendi rosso",
-          True, ".p2p-lati .p2p-lato.compra.attiva{color:var(--trust);" in mini
-          and ".p2p-lati .p2p-lato.vendi.attiva{color:var(--rosso-p2p-testo);" in mini)
+          True, ".p2p-lati .p2p-lato.compra.attiva{color:var(--lato-verde-testo);" in mini
+          and ".p2p-lati .p2p-lato.vendi.attiva{color:var(--lato-rosso-testo);" in mini)
     prova("view-p2p sta DOPO il coming soon e PRIMA del pacco", True,
           mini.index('id="view-p2ppresto"') < j
           < mini.index("VISTA: LA PAGINA DEL PACCO"))
@@ -72400,10 +72400,28 @@ def prove_nav_p2p():
     # non porta piu' la striscia continua, i tab si' — grigia sul
     # quieto, colorata sull'attivo (le regole .attiva gia' sorvegliate
     # da prove_p2p_libro).
+    # EMENDATA (16 nov 2026, richiesta di Andrea con la foto): la linea
+    # sotto i tab non c'e' piu' nemmeno lei — i tab sono PILLOLE, la
+    # quieta grigia e l'attiva piena col suo alone, di giorno e di sera.
     prova("niente striscia continua sotto il logo", True,
-          "border-bottom" not in pezzo_js(mini, ".p2p-lati{", "}")
-          and "border-bottom:3px solid var(--line)"
-              in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}"))
+          "border-bottom" not in pezzo_js(mini, ".p2p-lati{", "}"))
+    _tab = pezzo_js(mini, ".p2p-lati .p2p-lato{", "}")
+    prova("...e i tab sono pillole: niente linea, fondo grigio, angoli tondi",
+          True, "border-bottom" not in _tab and "border:none" in _tab
+          and "background:var(--lato-quieto)" in _tab
+          and "border-radius:20px" in _tab)
+    prova("...l'attiva e' piena, sfumata, con l'alone del suo colore", True,
+          all(f"linear-gradient(180deg,var(--lato-{c}-da),var(--lato-{c}-a))"
+              in pezzo_js(mini, f".p2p-lati .p2p-lato.{l}.attiva{{", "}")
+              and f"0 6px 16px var(--lato-{c}-alone)"
+              in pezzo_js(mini, f".p2p-lati .p2p-lato.{l}.attiva{{", "}")
+              for l, c in (("compra", "verde"), ("vendi", "rosso"))))
+    _sera = pezzo_js(mini, 'html[data-tema="scuro"] .p2p-lati{', "}")
+    prova("...e di sera ogni colore delle pillole ha il suo gemello", True,
+          all(f"--lato-{v}:" in _sera for v in (
+              "quieto", "quieto-testo", "quieto-ombra",
+              "verde-da", "verde-a", "verde-testo", "verde-alone",
+              "rosso-da", "rosso-a", "rosso-testo", "rosso-alone")))
     # SETTECENTO E NON OTTOCENTO (ritocco di Andrea): i due tab sono la
     # cosa piu' grande della testata, e a peso pieno spingevano piu' del
     # logo che gli sta in mezzo. E' un peso VERO e non un grassetto
@@ -91039,7 +91057,7 @@ def prove_logo_p2p_nitido():
     prova("...ed e' 108,5px: sei e mezzo piu' della scritta piu' lunga",
           108.5, spazio(375, 375 - meno))
     prova("...e il tab e' quello che il conto suppone", True,
-          "flex:1;padding:11px 4px"
+          "flex:1;padding:13px 4px"
           in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}")
           and "font-size:19px" in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}")
           and "margin:0 0 calc(var(--logo-p2p)"

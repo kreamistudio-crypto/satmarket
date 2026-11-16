@@ -2845,14 +2845,51 @@
      logo che gli sta in mezzo. Un gradino sotto e' un peso VERO — Baloo
      2 ha il file del 700 come quello dell'800, quindi non e' un
      grassetto finto tirato dal browser. */
-  .p2p-lati .p2p-lato{flex:1;padding:11px 4px;background:none;border:none;
-    border-bottom:3px solid var(--line);cursor:pointer;
+  /* ---- I DUE TAB SONO PILLOLE (16 nov 2026, richiesta di Andrea con
+     la foto: «i tasti compra BTC e vendi BTC me li puoi mettere
+     cosi'?», «ovviamente anche nella versione scura») ----
+     Via la linea sotto e il fondo tenue: due pillole grandi ai lati
+     del logo. L'ATTIVA e' PIENA, con un alone morbido del suo colore
+     e la scritta SCURA in grassetto — verde menta a «Compra BTC»,
+     corallo a «Vendi BTC» (il rosso delle frecce del logo); la
+     QUIETA e' grigio chiaro con la scritta grigia. Di sera la quieta
+     si scurisce e le piene restano accese, con l'alone piu' basso.
+     I colori vivono qui, in variabili del solo .p2p-lati: sono di
+     questi due tasti e di nessun altro.
+     ⚠️ IL PADDING ORIZZONTALE RESTA 4px e la scritta 19px: la formula
+     del logo che cresce (sopra) conta su quei numeri per tenere
+     «Compra BTC» su una riga; in altezza si e' preso 2px per lato. */
+  .p2p-lati{--lato-quieto:#EEEAE2;--lato-quieto-testo:#77705F;
+    --lato-quieto-ombra:0 2px 6px rgba(60,45,10,.08);
+    --lato-verde-da:#3FE0A6;--lato-verde-a:#16BD82;--lato-verde-testo:#0D2E21;
+    --lato-verde-alone:rgba(22,189,130,.42);
+    --lato-rosso-da:#FF8E72;--lato-rosso-a:#EE5A3C;--lato-rosso-testo:#3B0E04;
+    --lato-rosso-alone:rgba(238,90,60,.40)}
+  html[data-tema="scuro"] .p2p-lati{--lato-quieto:#3A3224;--lato-quieto-testo:#B3A88E;
+    --lato-quieto-ombra:0 2px 6px rgba(0,0,0,.35);
+    --lato-verde-da:#36D69C;--lato-verde-a:#12A873;--lato-verde-testo:#0A2419;
+    --lato-verde-alone:rgba(52,214,156,.30);
+    --lato-rosso-da:#F7876B;--lato-rosso-a:#E0553A;--lato-rosso-testo:#2E0A03;
+    --lato-rosso-alone:rgba(240,110,80,.30)}
+  .p2p-lati .p2p-lato{flex:1;padding:13px 4px;border:none;cursor:pointer;
     font-family:'Baloo 2',sans-serif;font-weight:700;font-size:19px;
-    line-height:1.1;color:var(--muted);border-radius:10px 10px 0 0}
-  .p2p-lati .p2p-lato.compra.attiva{color:var(--trust);
-    border-bottom-color:var(--trust);background:var(--trust-soft)}
-  .p2p-lati .p2p-lato.vendi.attiva{color:var(--rosso-p2p-testo);
-    border-bottom-color:var(--rosso-p2p);background:var(--rosso-p2p-tenue)}
+    line-height:1.1;color:var(--lato-quieto-testo);border-radius:20px;
+    background:var(--lato-quieto);box-shadow:var(--lato-quieto-ombra);
+    -webkit-tap-highlight-color:transparent;
+    transition:background .2s ease,box-shadow .2s ease,color .2s ease}
+  .p2p-lati .p2p-lato.compra.attiva{color:var(--lato-verde-testo);
+    background:linear-gradient(180deg,var(--lato-verde-da),var(--lato-verde-a));
+    box-shadow:0 6px 16px var(--lato-verde-alone),inset 0 1px 0 rgba(255,255,255,.45)}
+  .p2p-lati .p2p-lato.vendi.attiva{color:var(--lato-rosso-testo);
+    background:linear-gradient(180deg,var(--lato-rosso-da),var(--lato-rosso-a));
+    box-shadow:0 6px 16px var(--lato-rosso-alone),inset 0 1px 0 rgba(255,255,255,.45)}
+  .p2p-lati .p2p-lato:focus-visible{outline:2.5px solid var(--sats);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){.p2p-lati .p2p-lato{transition:none}}
+  /* SOTTO I 352px il logo resta a 76 e al tab avanzano 98px per i 102
+     di «Compra BTC»: andava a capo anche prima, ma una pillola su due
+     righe e' un mattone. Due pixel di meno alla scritta (91px) e resta
+     su una riga, come sopra quella misura. */
+  @media (max-width:351px){.p2p-lati .p2p-lato{font-size:17px}}
   /* ---- LA PILLOLA DEL FILTRO (set 2026, richiesta di Andrea) ----
      Ha preso il posto della riga «N offerte di chi vende sats»: quella
      diceva un numero e basta, questa dice lo stesso numero E che si
