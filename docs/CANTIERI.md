@@ -84165,3 +84165,74 @@ suite severa 28313 passate, 0 fallite, 2 saltate (nostr-tools, le
 solite), collaudi 134/0 senza variabili del proxy; poi develop e' corso
 (427c5bae bottone «Chiedi a Tappo» e a82e1e1c rotellina col bunker, non
 miei): ribasati, sull'albero c43f8f42 di nuovo tutto, 28324/0/2 e 134/0.
+
+## La cella «Swap» anche a chi non è entrato (16 nov 2026, cantiere nav-nostr, da un utente girato da Andrea: «entrando con Nostr non vede l'icona swap, ma vede ancora l'icona aste»; Andrea, sulla scelta: «Sì, Swap per tutti»)
+IL SINTOMO. Due persone, Andrea dall'APK Tor e un utente dal sito, hanno
+detto che «entrando con Nostr» nella barra c'era «Aste», spente, e lo swap
+mancava, mentre da Telegram lo swap c'era.
+LA CAUSA, trovata per esclusione e scritta perché non si ricerchi. Non era
+la leva: sul VPS `SWAP_ATTIVO = True` (riga 166), `SWAP_SOLO_MODERATORI =
+False` (188), `CAMBIO_LIBERO_SOLO_MODERATORI = False` (189), letto da Andrea
+col grep. Non era il login Nostr: `/api/me` di un account Nostr nativo in
+produzione dà `swap_leve.attivo: true`, e dal PC, una volta entrato, Andrea
+vede «Swap». Non era il service worker: navigazioni e `/api` passano sempre
+dalla rete. In locale, sulla versione di produzione 91cf13e e su develop, col
+login web, un account nativo (id negativo) e lo script vero di Telegram
+caricato, la cella diceva «Swap». Era la scelta della prima tappa dello
+swap (16 ott, «Lo swap del venditore, prima tappa»): la leva arrivava SOLO
+da `/api/me`, perché «l'anonimo non incassa». Così chi apriva il link e
+non era ancora entrato vedeva il martelletto delle aste. Andrea l'ha
+confermato: «appena avevo cliccato sul link, prima ancora di fare il login,
+c'era scritto aste».
+COSA SI È DECISO (Andrea, sulla card: «Sì, Swap per tutti»). La cella
+«Swap» si vede anche prima del login. ROVESCIA la riga del 16 ott «la leva
+solo da /api/me», e il perché di allora resta vero per tutto il resto: le
+cifre, il fornitore, la pagina e il telefono dello swap restano a chi ha un
+account.
+COME. Server: nella busta di prima pagina di `/api/listings`, accanto ad
+`asta_abilitata`, `risposta["swap"] = swap_per(user["id"] if user else 0)`,
+cioè solo il sì o il no, dallo stesso giudice per persona (0 = nessuno: a
+solo-moderatori acceso è no). Client: `swapLevaPubblica` dalla busta, e il
+giudice della cella `cellaSwap()`, il calco di `asteAccese`: `/api/me`
+vince quando c'è, sennò la busta. Lo usano `vestiCellaAste`, `toccaCellaAste`
+e `voceNav`. Tutto il resto resta su `swapAcceso()`. Toccata da fuori
+(VETRINA), la cella apre il foglio d'invito con la chiave nuova `swap`
+(testo suo anche su onion, in `INVITO_ONION`) e lascia sul dispositivo il
+segno `barattolo_swap_dopo_entra`. Il ricarico del login svuota la
+cronologia (`navDaCapo`), quindi serviva un segno a parte.
+`apriSwapDopoEntra()`, in coda all'avvio da dentro dopo i link d'arrivo, lo
+consuma una volta sola e apre la pagina se lo swap c'è per lui, entro 10
+minuti. Un segno vecchio o uno swap spento per lui lo buttano senza muovere
+niente.
+SCARTATO: nascondere la cella delle aste (la regola della barra: mai una
+cella accesa e spenta a runtime, è il posto dove il + si scentrava); far
+entrare l'anonimo nella pagina «Swap» con un tasto «Entra» dentro (una
+pagina in più da tenere per chi non può usarla, quando il foglio d'invito
+esiste già ed è la porta di tutti gli altri gesti); mandare all'anonimo
+tutto `swap_leve` (cifre e fornitore a chi non può usarli).
+PROVATO. `prove_swap_cella` (39): sentinelle sulla busta, sul client che ci
+riveste la cella e sulla chiamata in coda all'avvio; nel banco node,
+eseguito sul blocco vero: fuori a busta sì la cella è «Swap», la porta
+delle aste accesa, il tocco chiama l'invito con la chiave `swap` senza
+muoversi e lascia il segno; la nav accende Esplora sulle aste; dentro vince
+`/api/me` (per persona), fuori il no della busta lascia il martelletto;
+entrato dopo il tocco si arriva alla pagina, una volta sola; un segno
+vecchio e uno swap spento per lui non portano da nessuna parte e si
+buttano. `prove_onion`: gli inviti sono undici (era dieci) e la chiave
+nuova è dichiarata. CONTROPROVE ROSSE, cinque: vestito di nuovo da
+`swapAcceso()` (1 rossa), invito tolto (2), segno senza scadenza (1),
+busta senza `swap` (1), `/api/me` che non vince più sulla busta (1). DAL
+VIVO, server del worktree in collaudo sulla 8193 col config di cartone
+(swap acceso per tutti, relay del P2P al relay morto) e Playwright a 375
+px. Le identità finte del collaudo sono state respinte come fa la
+produzione, per avere un vero visitatore. Visitatore: «Swap» nella barra;
+il tocco vero apre «Ti aspettiamo su Telegram» col testo dello swap; poi il
+cookie di sessione di un account Nostr nativo e il ricarico, come fa il
+login: la pagina «Swap» aperta e la cella accesa.
+DA GUARDARE. Dal telefono vero, dopo la promozione: sul sito e sull'onion
+da visitatore, la cella e il foglio (su onion «Entra nel Barattolo»); il
+login Telegram dal sito (widget a redirect) che arriva alla pagina «Swap».
+Fuori dal cantiere, visti strada facendo: la porta «🔨 Aste ›» in Esplora
+adesso la vedono anche i visitatori, e ad aste spente porta all'«in
+arrivo», come già succedeva a chi era dentro. Gli id degli account Nostr
+nativi superano i 2^53 e nel JavaScript arrivano arrotondati (`myTgId`).

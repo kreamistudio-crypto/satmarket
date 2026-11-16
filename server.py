@@ -29365,6 +29365,14 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # ACCESE — cioe' una bugia. Era l'imperfezione dichiarata di
         # aggiornaAstaVisibilita, e questa e' la riga che la chiude.
         risposta["asta_abilitata"] = bool(ASTA_ABILITATA)
+        # ...e quella dello SWAP (16 nov 2026, cantiere nav-nostr, Andrea:
+        # «Sì, Swap per tutti»): decide il vestito della quarta cella anche
+        # per chi non e' ancora entrato, che prima vedeva il martelletto
+        # delle aste spente al posto dello swap. Solo il SI' o il NO, dallo
+        # stesso giudice di /api/me (`swap_per`, 0 = nessuno, quindi a
+        # solo-moderatori acceso e' no): le cifre, il fornitore e il resto
+        # restano in `swap_leve`, che arriva solo a chi e' dentro.
+        risposta["swap"] = swap_per(user["id"] if user else 0)
         # ...e la leva di Mercato e Lavoro (24 ott 2026), per la stessa
         # ragione: la vetrina la vede anche chi /api/me non ce l'ha
         risposta["mercato_lavoro"] = bool(MERCATO_LAVORO)

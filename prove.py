@@ -40546,7 +40546,8 @@ def prove_onion():
               and ",\n" not in c.split(");")[0]
               and ", view)" not in c.split(");")[0]]
     prova("...e ogni chiamante porta la sua chiave", [], _senza)
-    prova("...e i chiamanti sono i dieci di sempre", 10, len(_ch))
+    # (16 nov 2026, cantiere nav-nostr: l'undicesimo, la cella «Swap»)
+    prova("...e i chiamanti sono gli undici di sempre", 11, len(_ch))
     # ⚠️ E LA CHIAVE DEV'ESSERE UNA DI QUELLE DICHIARATE, o un refuso
     # («carrelli» per «carrello») passa il censimento e su onion quel
     # gesto cade sul generico — perdendo IN SILENZIO il testo scritto
@@ -186117,6 +186118,17 @@ def prove_swap_cella():
     # per lui non esiste
     prova("...e solo da li' (niente busta di vetrina)", 1,
           src.count('"swap_leve"'))
+    # (16 nov 2026, cantiere nav-nostr, Andrea: «Sì, Swap per tutti») LA
+    # CELLA anche a chi non e' entrato: nella busta di prima pagina va
+    # SOLO il si' o il no, dallo stesso giudice per persona — le cifre e
+    # il fornitore restano in `swap_leve`, qui sopra contato una volta
+    prova("la busta di vetrina porta il solo si' della cella", True,
+          'risposta["swap"] = swap_per(user["id"] if user else 0)' in src)
+    prova("...e il client ci riveste la cella", True,
+          "swapLevaPubblica = j.swap === true;\n    vestiCellaAste();" in mini)
+    prova("...e chi entra dopo aver toccato «Swap» ci arriva", True,
+          "apriBozzaDaUrl();\n    /* chi ha toccato «Swap» da fuori ed e' "
+          "appena entrato (16 nov 2026) */\n    apriSwapDopoEntra();" in mini)
     prova("il pannello «Stato delle leve» la mostra", True,
           '_leva("Swap degli incassi (on-chain)", "SWAP_ATTIVO",' in src)
     # IL CODICE PARTNER (19 ott 2026, risposte di Massimo): vuoto di
@@ -186218,6 +186230,13 @@ let swapAttiva = false;
 ELS['view-swap'] = {classList: {contains: () => swapAttiva}};
 for (const k of ['swapTitolo','swapTesto','swapVuoto']) ELS[k] = {textContent: ''};
 let viste = [], aste = 0, ramoVetrina = 'esplora';
+let VETRINA = false;
+const INVITI = [];
+function invitoTelegram(testo, chiave){ INVITI.push(chiave); }
+const LS = {};
+const localStorage = {getItem: k => (k in LS ? LS[k] : null),
+                      setItem: (k, v) => { LS[k] = String(v); },
+                      removeItem: k => { delete LS[k]; }};
 function go(v){ viste.push(v); }
 function haptic(){}
 function navRiflette(){}
@@ -186267,6 +186286,37 @@ out.it = ELS['swapVuoto'].textContent;
 tg = undefined;
 renderSwap();
 out.senza = ELS['swapVuoto'].textContent;
+// (16 nov 2026, nav-nostr) CHI NON E' ENTRATO: /api/me non c'e', la busta
+// dice si' — la cella si veste da Swap, e il tocco invita a entrare
+swapLeve = null; swapLevaPubblica = true; VETRINA = true;
+viste = []; aste = 0;
+vestiCellaAste();
+toccaCellaAste();
+out.fuori = [ELS['nav-aste'].dataset.vestito, ELS['portaAste'].style.display,
+             INVITI.slice(), viste.length, aste, !!LS[SWAP_DOPO_ENTRA]];
+out.voceFuori = [voceNav('astepresto'), (ramoVetrina = 'aste', voceNav('esplora'))];
+ramoVetrina = 'esplora';
+// ...ma chi e' dentro ha /api/me, che vince sulla busta (e' per persona)
+swapLeve = {attivo: false}; VETRINA = false;
+vestiCellaAste();
+out.dentroNo = ELS['nav-aste'].dataset.vestito;
+// ...e la busta che dice no lascia il martelletto anche fuori
+swapLeve = null; swapLevaPubblica = false;
+vestiCellaAste();
+out.fuoriNo = ELS['nav-aste'].dataset.vestito;
+// IL LOGIN DOPO IL TOCCO: entrato, si arriva alla pagina, una volta sola
+swapLeve = {attivo: true}; viste = [];
+apriSwapDopoEntra();
+apriSwapDopoEntra();
+out.dopo = [viste.slice(), LS[SWAP_DOPO_ENTRA] === undefined];
+// ...un segno vecchio non porta da nessuna parte, e si butta
+LS[SWAP_DOPO_ENTRA] = String(Date.now() - SWAP_DOPO_ENTRA_MS - 1000); viste = [];
+apriSwapDopoEntra();
+out.vecchio = [viste.length, LS[SWAP_DOPO_ENTRA] === undefined];
+// ...e senza swap per lui (non moderatore) nemmeno, e si butta lo stesso
+swapLeve = {attivo: false}; LS[SWAP_DOPO_ENTRA] = String(Date.now()); viste = [];
+apriSwapDopoEntra();
+out.senzaSwap = [viste.length, LS[SWAP_DOPO_ENTRA] === undefined];
 console.log(JSON.stringify(out));
 """ % (json.dumps(cella0), voce, blocco)
     r = _node_banco(js)
@@ -186295,6 +186345,17 @@ console.log(JSON.stringify(out));
           ["Per ora nessuno swap e nessun incasso al tuo indirizzo bitcoin.",
            "Per ora nessuno swap e nessun incasso al tuo indirizzo bitcoin."],
           [r.get("it"), r.get("senza")])
+    # (16 nov 2026, cantiere nav-nostr) chi non e' ancora entrato
+    prova("fuori, a busta che dice si', la cella e' «Swap» e il tocco invita a entrare",
+          ["swap", "", ["swap"], 0, 0, True], r.get("fuori"))
+    prova("...e la nav accende Esplora sulle aste, come da dentro",
+          ["esplora", "esplora"], r.get("voceFuori"))
+    prova("dentro vince /api/me (per persona), fuori il no della busta",
+          ["aste", "aste"], [r.get("dentroNo"), r.get("fuoriNo")])
+    prova("entrato dopo il tocco si arriva alla pagina, una volta sola",
+          [["swap"], True], r.get("dopo"))
+    prova("...ma non con un segno vecchio, e non senza swap per lui",
+          ([0, True], [0, True]), (r.get("vecchio"), r.get("senzaSwap")))
 
 
 def prove_modifica_massiva():

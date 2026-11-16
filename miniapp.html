@@ -19162,6 +19162,13 @@ async function loadListings(anonimo){
     astaLevaPubblica = !!j.asta_abilitata;
     aggiornaAstaVisibilita();
   }
+  /* ...e quella dello swap (16 nov 2026, cantiere nav-nostr): veste la
+     quarta cella anche a chi non e' ancora entrato. Chiave assente =
+     server di ieri = il martelletto di sempre */
+  if (j.swap !== undefined) {
+    swapLevaPubblica = j.swap === true;
+    vestiCellaAste();
+  }
   /* ...e quella di Mercato e Lavoro: chiave assente = spenta */
   if (j.mercato_lavoro !== undefined) aggiornaMercatoLavoro(j.mercato_lavoro === true);
   /* ...e la mappa del ritiro a mano (14 nov 2026): chiave assente = leva
@@ -19755,7 +19762,7 @@ function voceNav(view){
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
-  else if (view === 'astepresto') view = swapAcceso() ? 'esplora' : 'aste';
+  else if (view === 'astepresto') view = cellaSwap() ? 'esplora' : 'aste';
   /* LA PAGINA «SWAP» (16 ott 2026) accende la quarta cella, che a leva
      accesa e' vestita da Swap — l'id resta nav-aste, la cella e' la
      stessa (vestiCellaAste) */
@@ -19780,7 +19787,7 @@ function voceNav(view){
      filtrata c'e' la pillola accesa, appiccicata in cima. */
   /* ...ma a leva dello swap accesa la quarta cella dice «Swap»: le aste
      ci si arrivano dalla porta in Esplora, e la voce giusta e' Esplora */
-  return (view === 'esplora' && ramoVetrina === 'aste' && !swapAcceso())
+  return (view === 'esplora' && ramoVetrina === 'aste' && !cellaSwap())
     ? ramoVetrina : view;
 }
 
@@ -19798,6 +19805,33 @@ function voceNav(view){
    martelletto. */
 let swapLeve = null;          // da /api/me.swap_leve: {attivo}
 const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
+/* LA CELLA «SWAP» ANCHE PRIMA DEL LOGIN (16 nov 2026, cantiere
+   nav-nostr; dal campo: chi apriva il link vedeva «Aste», spente, al
+   posto dello swap, e lo leggeva come «da Nostr lo swap non c'e'»).
+   Andrea: «Sì, Swap per tutti». Il VESTITO della cella ha due fonti,
+   il calco di asteAccese: /api/me per chi e' dentro (vince lui, ed e'
+   per persona) e la busta di prima pagina (`swap`, solo il si') per chi
+   non e' ancora entrato. Tutto il resto dello swap — la pagina, il
+   telefono, i riquadri dell'incasso — resta su swapAcceso(), cioe'
+   solo a chi ha un account. */
+let swapLevaPubblica = null;   // dalla busta di /api/listings
+const cellaSwap = () => swapLeve ? !!swapLeve.attivo : swapLevaPubblica === true;
+/* ...e chi la tocca da fuori entra e ci arriva: il segno resta sul
+   dispositivo il tempo di un login (il ricarico del login svuota la
+   cronologia, vedi navDaCapo), e lo consuma il primo avvio da dentro */
+const SWAP_DOPO_ENTRA = 'barattolo_swap_dopo_entra';
+const SWAP_DOPO_ENTRA_MS = 10 * 60 * 1000;
+function ricordaSwapDopoEntra(){
+  try { localStorage.setItem(SWAP_DOPO_ENTRA, String(Date.now())); } catch(e){}
+}
+function apriSwapDopoEntra(){
+  let t = 0;
+  try {
+    t = Number(localStorage.getItem(SWAP_DOPO_ENTRA)) || 0;
+    localStorage.removeItem(SWAP_DOPO_ENTRA);
+  } catch(e){}
+  if (t && Date.now() - t < SWAP_DOPO_ENTRA_MS && swapAcceso()) vaiSwap();
+}
 /* LO SWAP DAL TELEFONO (20 ott 2026, tappa 3; diviso lo stesso giorno,
    cantiere swap-instradatore): le chiavi, la creazione, la verifica, la
    sorveglianza e il ritiro stanno in FILE LORO — `swap/<tipo>.js`, uno
@@ -19856,7 +19890,7 @@ function vestiCellaAste(){
   const b = el('nav-aste');
   if (!b) return;
   if (cellaAsteMarkup === null) cellaAsteMarkup = b.innerHTML;
-  const vestito = swapAcceso() ? 'swap' : 'aste';
+  const vestito = cellaSwap() ? 'swap' : 'aste';
   if (b.dataset.vestito !== vestito) {
     b.innerHTML = vestito === 'swap' ? CELLA_SWAP : cellaAsteMarkup;
     b.dataset.vestito = vestito;
@@ -19873,6 +19907,16 @@ function vestiCellaAste(){
 }
 function toccaCellaAste(){
   if (swapAcceso()) { vaiSwap(); return; }
+  /* la cella dice «Swap» ma l'account non c'e' (la vetrina): si entra,
+     e dopo il login si arriva alla pagina (apriSwapDopoEntra) */
+  if (cellaSwap()) {
+    if (VETRINA) {
+      ricordaSwapDopoEntra();
+      invitoTelegram('Lo swap si fa col tuo account: apri Barattolo dentro '
+        + 'Telegram, o entra con Nostr.', 'swap');
+    }
+    return;
+  }
   vaiAste();
 }
 function vaiSwap(){
@@ -35448,6 +35492,8 @@ const INVITO_ONION = {
          + 'e identità.',
   trattativa:'La tua trattativa ti aspetta dentro Barattolo: entra e '
          + 'la trovi nella scheda Ordini.',
+  swap: 'Lo swap si fa col tuo account: entra e sposti i tuoi sats fra '
+      + 'Lightning e bitcoin.',
   p2p: 'Per scambiare sats in euro con altre persone serve un account: il tuo '
      + 'profilo di scambio nasce qui dentro, e i sats restano custoditi '
      + 'in garanzia fino alla fine dello scambio.'
@@ -101604,6 +101650,8 @@ async function avvia(){
     apriAssistenzaDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();
+    /* chi ha toccato «Swap» da fuori ed e' appena entrato (16 nov 2026) */
+    apriSwapDopoEntra();
     /* Il cartello del rodaggio ha la precedenza su tutti: il tour
        one-shot (e poi il banner installa) partono alla sua chiusura */
     modaleTest(() => { tourBenvenuto(); bannerInstallaPwa(); });

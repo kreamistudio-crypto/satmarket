@@ -34237,6 +34237,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   !swapLeve.attivo`); se si scopre dopo, `vestiCellaAste` porta fuori
   chi è sulla pagina. Nessuna chiamata a SATS Routing in questa tappa
   (sentinella in `prove_swap_cella`).
+  LA CELLA ANCHE PRIMA DEL LOGIN (16 nov 2026, cantiere nav-nostr; perché
+  in CANTIERI, «La cella "Swap" anche a chi non è entrato»). Il VESTITO
+  ha due fonti, il calco di `asteAccese`: `swap_leve.attivo` di
+  `/api/me` per chi è dentro (vince, è per persona) e `swap` nella
+  busta di prima pagina di `/api/listings` (solo il sì, da
+  `swap_per(user["id"] if user else 0)`) per chi non lo è. Giudice della
+  cella: `cellaSwap()`; tutto il resto dello swap resta su
+  `swapAcceso()`. Fuori, il tocco apre `invitoTelegram(…, 'swap')` e
+  lascia il segno `barattolo_swap_dopo_entra` (10 minuti, localStorage);
+  `apriSwapDopoEntra()`, in coda all'avvio da dentro, lo consuma e apre
+  la pagina se lo swap c'è per lui.
 - LO SWAP, TAPPA 2: IL PREVENTIVO (19 ott 2026, cantiere swap-preventivo;
   perché in CANTIERI, «Lo swap del venditore, tappa 2: il preventivo»).
   IL GIUDICE PER PERSONA è `swap_per(tg_id)`: `SWAP_ATTIVO`, e a

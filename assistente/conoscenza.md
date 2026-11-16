@@ -298,16 +298,17 @@ La pagina «Swap» (la scheda in basso; fino al 12 novembre 2026 si chiamava «C
 - Bitcoin → Lightning: scrivi quanto vuoi ricevere (o quanto mandi), incolli una tua fattura Lightning di quella cifra esatta e mandi i bitcoin all'indirizzo che l'app ti mostra; quando arrivano, la tua fattura viene pagata. La cifra esatta nella frase «crea una richiesta di … sats esatti» si tocca e si copia, pronta da incollare nel wallet. Al posto della fattura puoi incollare il tuo Lightning address (nome@wallet): la fattura della cifra giusta la chiede Barattolo al tuo wallet quando premi «Conferma».
 - Lo swap lo fa un servizio esterno (SATS Routing). Barattolo non prende commissioni: prima di confermare vedi quanto ricevi, con dentro la commissione del servizio e quella della rete.
 - I sats non passano mai da Barattolo: partono dal tuo wallet e arrivano al tuo wallet.
+- Lo swap si fa col proprio account: la scheda «Swap» in basso la vede anche chi non è ancora entrato (dal 16 novembre 2026, prima al suo posto c'era «Aste»), e toccandola si apre il foglio per entrare con Telegram o con Nostr; appena entrato, l'app porta alla pagina «Swap». Chi vede ancora «Aste» nella barra non ha fatto il login, o lo swap per lui è spento.
 - Limiti: da 25.000 sats a 0,01 BTC (1.000.000 sats) a swap, al massimo 5 swap al giorno. Da bitcoin verso Lightning il minimo è 50.000 sats RICEVUTI in Lightning (è il minimo del servizio): chi scrive la cifra in «Mandi» deve mandarne un po' di più, perché dai bitcoin mandati si tolgono la commissione del servizio e la rete. Se la cifra è sotto, l'app dice il minimo dal lato dove l'hai scritta (per esempio «Lo swap parte da 50.568 sats da mandare»). Se il servizio cambia i suoi limiti, vale il più stretto.
 
 La privacy dello Swap, cioè chi vede cosa:
 - Barattolo si segna, legati al tuo account, la direzione, la cifra, il numero dello swap e l'indirizzo del servizio dove passano i bitcoin. Non si segna il tuo indirizzo bitcoin né la tua fattura Lightning. Però dal numero dello swap, sulla blockchain pubblica, si può seguire dove sono andati i bitcoin.
 - SATS Routing vede quel che serve a fare lo swap: la fattura Lightning e il tuo indirizzo bitcoin. Non sa chi sei su Barattolo.
-- La pagina parla con SATS Routing e con mempool.space (da lì legge la rete e trasmette la transazione) direttamente dal tuo telefono o computer, quindi loro vedono il tuo IP. Se entri dal sito .onion con Tor Browser, non lo vede nessuno dei tre.
 
 <!-- pezzo libro-024 | libro -->
 ## Libro · Lo Swap: spostare i tuoi sats fra Lightning e bitcoin on-chain (2/2)
 
+- La pagina parla con SATS Routing e con mempool.space (da lì legge la rete e trasmette la transazione) direttamente dal tuo telefono o computer, quindi loro vedono il tuo IP. Se entri dal sito .onion con Tor Browser, non lo vede nessuno dei tre.
 - Sulla blockchain, da Lightning a bitcoin: al tuo indirizzo arriva una transazione con un solo ingresso, l'indirizzo del servizio, e una sola uscita, il tuo indirizzo; di solito ha l'aspetto di un pagamento qualunque. Da bitcoin a Lightning: si vede la transazione che parte dal tuo wallet verso l'indirizzo del servizio, come ogni pagamento on-chain.
 - Payjoin: nello Swap non si usa. Da Lightning a bitcoin la transazione verso il tuo indirizzo la prepara il tuo telefono per lo swap, e non sa fare Payjoin: se incolli un link Payjoin («bitcoin:…?pj=…») l'app tiene solo l'indirizzo e i bitcoin arrivano lì con una transazione normale. Da bitcoin a Lightning l'indirizzo del servizio non accetta Payjoin, quindi anche il tuo wallet manda una transazione normale.
 - Il consiglio di sempre: un indirizzo nuovo per ogni swap, in un wallet di cui solo tu hai le chiavi.
@@ -1528,4 +1529,11 @@ pubblico: sì
 frase: Nel bot di Barattolo c'è il bottone «💬 Chiedi a Tappo»: un tocco e sei nella chat di Tappo, che risponde alle domande su come funziona Barattolo. Il bot di Barattolo resta quello degli avvisi su ordini e pagamenti.
 dove: il bot @ilbarattolobot, nel messaggio di benvenuto (/start) e nella risposta a chi gli scrive una frase.
 leva: TAPPO_LINK (accesa di serie)
+
+<!-- pezzo novita-036 | novita -->
+## Novità · 2026-11-16 · nav-nostr
+
+frase: La scheda «Swap» in basso adesso la vede anche chi apre Barattolo dal sito e non è ancora entrato: al suo posto prima c'era «Aste», che sono spente. Toccandola si entra con Telegram o con Nostr, e subito dopo si arriva alla pagina «Swap».
+dove: la barra in basso del sito, prima del login; il foglio «Ti aspettiamo su Telegram» (su Tor «Entra nel Barattolo»).
+leva: SWAP_ATTIVO (nessuna leva nuova)
 pubblico: sì
