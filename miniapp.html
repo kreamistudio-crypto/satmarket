@@ -63246,9 +63246,11 @@ function apriOnchainP2P(id, modo){
         + reteOcPresaHtmlP2P(o, vendeLui) + '</div>' : '')
       + '<div class="p2p-onchain-riass"><b>' + esc(satsCardOnchainP2P(o)) + '</b> per <b>'
       + esc(cifraOc(o)) + '</b>' + (metodi ? '<br><small>' + esc(metodi) + '</small>' : '')
-      + (o.mercato ? '<br><small>A prezzo di mercato: i sats si contano quando prendi</small>' : '')
+      /* «quando prendi L'ORDINE» (16 nov 2026, mappa-recenti): la frase
+         finiva su «prendi» e la riga sotto, «di Jj», la continuava */
+      + (o.mercato ? '<br><small>A prezzo di mercato: i sats si contano quando prendi l\'ordine.</small>' : '')
       + (Number(o.filtro) > 0 ? '<br><small>🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '</small>' : '')
-      + (o.nome ? '<br><small>di ' + esc(o.nome) + '</small>' : '') + '</div>'
+      + (o.nome ? '<br><small>Pubblicato da ' + esc(o.nome) + '</small>' : '') + '</div>'
       /* IL TEMPO CHE SCORRE, come nel dettaglio Lightning (16 nov 2026,
          Andrea: «se prendo un ordine on-chain non c'è più il riquadro del
          tempo che scorre. Puoi metterlo anche lì?») */
@@ -63423,7 +63425,9 @@ function satsOcPresaP2P(o, vendeLui){
 function reteOcPresaHtmlP2P(o, vendeLui){
   const st = p2pOcPresaRete[o.id] || {};
   const ln = st.rete === 'ln';
-  let nota = '';
+  /* lo swap che non si puo' fare lascia la sua frase sotto i tasti,
+     tornati su «₿ On-chain» (vedi `scegliReteOcPresaP2P`) */
+  let nota = !ln && st.nota ? esc(st.nota) : '';
   if (ln) {
     const d = st.dati;
     if (st.stato !== 'pronto' || !d) nota = 'Chiedo a SATS Routing quanto costa lo swap…';
@@ -63511,7 +63515,23 @@ async function scegliReteOcPresaP2P(id, rete){
     d = vendeLui ? await leggiPreventivoPresaP2P(sats, '', '') : await leggiPreventivoCambioP2P(sats, '', '');
   } catch(e){ d = null; }
   if ((p2pOcPresaRete[id] || {}).rete !== 'ln') return;
-  p2pOcPresaRete[id] = {rete: 'ln', stato: 'pronto', sats, dati: d || {ok: false, motivo: 'non_risponde'}};
+  /* LO SWAP CHE NON SI PUO' FARE RIMETTE «₿ ON-CHAIN» (16 nov 2026,
+     cantiere mappa-recenti, dalla foto di Andrea in produzione: un ordine
+     da 750 € ≈ 1.106.000 sats col tasto «⚡ Lightning» acceso, «Lo swap
+     arriva al massimo a 1.000.000 sats» sotto, il «Ricevi» senza costo
+     dello swap e «Compra» col fulmine che avrebbe preso l'ordine on-chain
+     e poi chiesto al server uno swap impossibile). Sopra il tetto, sotto
+     il minimo, spento o muto: la rete torna quella dell'ordine, e la
+     frase resta a dire perche'. */
+  if (!d || !d.ok) {
+    const dd = d || {ok: false, motivo: 'non_risponde'};
+    haptic('warning');
+    p2pOcPresaRete[id] = {rete: 'oc', nota: vendeLui
+      ? perchePresaOcP2P(dd) + ' Per quest\'ordine ricevi on-chain.'
+      : percheDepositoLnOnchainP2P(dd)};
+    return ridisegnaReteOcPresaP2P(id);
+  }
+  p2pOcPresaRete[id] = {rete: 'ln', stato: 'pronto', sats, dati: d};
   ridisegnaReteOcPresaP2P(id);
 }
 /* DOPO LA PRESA la scelta passa al foglio giusto: a chi deposita il foglio
