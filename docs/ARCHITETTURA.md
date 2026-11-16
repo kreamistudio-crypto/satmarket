@@ -33442,6 +33442,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   leggono. Porte: la voce del Profilo (`entraAppNegozio`) e
   `/?app=negozio` (`apriAppNegozioDaUrl`, solo nell'avvio da entrati);
   all'uscita il parametro si toglie dall'indirizzo.
+  LA CASSA È IL CARRELLO (16 nov 2026, cantiere cassa-carrello): la
+  griglia è `#cassaArticoli.grid` di celle `cellaPacco(x, true)` →
+  `cellaCassa` (card vera da `myListings`, il tocco sulla card che
+  aggiunge invece di aprire, stepper di casa), filtrate su
+  `cassaDati.annunci` (il server decide cosa si batte, prezzi e stock);
+  in fondo la stessa #barraPacco, accesa da `body.con-cassa` (go()
+  governa solo `con-pacco`), col bottone riscritto da `barraCassa` in
+  «Incassa» → `cassaIncassa` e rimesso a «Controlla e paga» uscendo.
+  Accesa sul conto della scheda Cassa, spenta sul QR e fuori.
 - L'INDIRIZZO DELLA QUOTA: swap@barattolo.store (19 ott 2026, perché
   in CANTIERI, «L'indirizzo della quota: swap@barattolo.store»). Dove
   SATS Routing manda a fine mese la quota di Barattolo sugli swap. È lo

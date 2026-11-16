@@ -290,3 +290,9 @@ frase: La cassa in negozio diventa «Barattolo Negozio»: una pagina tutta per c
 dove: Profilo → «Negozio e spedizioni» → «🏪 Cassa in negozio»; si torna a Barattolo con «↩ Barattolo» in alto a destra.
 leva: CASSA_ATTIVA (accesa di serie)
 pubblico: sì
+
+## 2026-11-16 · cassa-carrello
+frase: La cassa di Barattolo Negozio adesso è fatta come il carrello: le card dei tuoi annunci con le foto, «Aggiungi» e poi − e +, e in fondo la barra col totale. Cambia solo il bottone: «Incassa», e i sats vanno dritti al tuo wallet, senza deposito di garanzia.
+dove: Profilo → «Negozio e spedizioni» → «🏪 Cassa in negozio», scheda «🧾 Cassa».
+leva: CASSA_ATTIVA (accesa di serie)
+pubblico: sì

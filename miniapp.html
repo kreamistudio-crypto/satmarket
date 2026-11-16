@@ -8413,6 +8413,13 @@
      ✕ — si esce da «↩ Barattolo»). Gli !important battono la regola
      centrata dei fogli da 768px in su, che vive piu' sotto. */
   body.app-negozio nav{display:none}
+  /* la barra del carrello alla cassa (cantiere cassa-carrello): stessa
+     #barraPacco, accesa da `con-cassa`; il totale e «Incassa» stanno lì,
+     quindi le loro copie nel conto si spengono */
+  body.con-cassa #barraPacco{display:flex}
+  body.con-cassa #app{padding-bottom:150px}
+  body.con-cassa #cassaTotale, body.con-cassa #cassaIncassa{display:none}
+  #view-esercente #cassaArticoli.grid{padding:10px 0 0}
   #view-esercente{padding:14px var(--pad) 40px;max-width:560px;margin:0 auto}
   .eser-testa{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
   .eser-titolo{flex:1;min-width:0;white-space:nowrap;font-size:19px;font-weight:900;letter-spacing:-.2px}
@@ -8465,21 +8472,6 @@
     justify-content:center;width:20px;height:20px;vertical-align:-4px;margin-right:4px}
   #cassaSheet .cambio-moneta.p2p-oc-moneta .cambio-svg{width:12px;height:12px}
   #cassaSheet{overflow-x:hidden}
-  .cassa-articoli{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
-    gap:8px;max-height:46vh;overflow-y:auto}
-  .cassa-art{position:relative;text-align:left;border:1.5px solid var(--line);
-    background:var(--card);color:var(--ink);border-radius:12px;padding:8px;
-    cursor:pointer;font:inherit;min-width:0}
-  .cassa-art.su{border-color:var(--sats);box-shadow:0 0 0 1px var(--sats) inset}
-  .cassa-art b{display:block;font-size:13px;line-height:1.25;overflow:hidden;
-    text-overflow:ellipsis;white-space:nowrap}
-  .cassa-art span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
-  .cassa-art .n{position:absolute;top:-7px;right:-7px;min-width:22px;height:22px;
-    border-radius:11px;background:var(--sats);color:#fff;font-size:12px;font-weight:800;
-    display:flex;align-items:center;justify-content:center;padding:0 5px}
-  .cassa-art .meno{position:absolute;bottom:6px;right:6px;width:26px;height:26px;
-    border-radius:13px;border:1px solid var(--line);background:var(--bg);color:var(--ink);
-    font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center}
   .cassa-totale{font-size:15px;font-weight:800;margin:12px 0 8px;min-height:20px}
   .cassa-cifra{text-align:center;font-size:34px;font-weight:900;color:var(--sats);margin:2px 0}
   .cassa-cifra small{font-size:14px;color:var(--muted);font-weight:700}
@@ -16398,9 +16390,9 @@ document.getElementById('cartello')?.remove();</script>
       </div>
       <div class="hint" id="cassaImportoSotto" style="margin:4px 0 10px;min-height:16px"></div>
       <div id="cassaArticoliBox" style="display:none">
-        <div style="font-size:12px;font-weight:800;color:var(--muted);margin:0 0 6px">I tuoi articoli</div>
+        <div style="font-size:12px;font-weight:800;color:var(--muted);margin:10px 0 0">I tuoi articoli</div>
         <div class="field cassa-cerca" id="cassaCercaBox" style="display:none"><input id="cassaCerca" type="search" autocomplete="off" placeholder="🔎 Cerca fra i tuoi annunci" oninput="disegnaArticoliCassa()"></div>
-        <div id="cassaArticoli" class="cassa-articoli"></div>
+        <div id="cassaArticoli" class="grid"></div>
       </div>
       <div class="field" style="margin:10px 0 0"><input id="cassaNota" maxlength="120" autocomplete="off" placeholder="Nota per te (facoltativa), es. tavolo 4"></div>
       <div id="cassaTotale" class="cassa-totale"></div>
@@ -32805,7 +32797,14 @@ function annunciPacco(){
    non un <button>: dentro ci vivono due comandi, e un bottone che non
    fa nulla se toccato in mezzo sarebbe una bugia — il div tiene forma
    e altezza identiche, cosi' la cella non salta cambiando faccia. */
-function cellaPacco(x){
+/* `cassa` (16 nov 2026, cantiere cassa-carrello, Andrea: «l'interfaccia
+   dovrebbe essere [...] la stessa [del carrello], devi riciclare codice.
+   Cambia solo la finalizzazione»): la STESSA cella per la cassa in
+   negozio, coi pezzi di `cassaCarrello`, i prezzi e lo stock del server
+   (`cassaDati.annunci`), e il tocco sulla card che aggiunge un pezzo
+   invece di aprire la scheda (al banco si batte, non si sfoglia). */
+function cellaPacco(x, cassa){
+  if (cassa) return cellaCassa(x);
   const qta = setScelte.get(x.id) || 0;
   /* col carrello pieno le righe NUOVE si spengono col perche' scritto:
      meglio del tocco che risponde con un toast (il campo non mente) */
@@ -32839,6 +32838,28 @@ function cellaPacco(x){
      taglia, niente «129 varianti»): quel che si aggiunge e' lei */
   return `<div class="pacco-cella" data-id="${x.id}">
     ${cardHTML(Object.assign({}, x, {famigliaN: 0}))}${segno}${comando}
+    ${dis ? `<div class="pacco-motivo">${esc(dis)}</div>` : ''}
+  </div>`;
+}
+function cellaCassa(x){
+  const a = ((cassaDati && cassaDati.annunci) || []).find(t => t.id === x.id) || {};
+  const qta = cassaCarrello[x.id] || 0;
+  const dis = !a.sats ? 'manca il cambio: scrivi l’importo a mano' : '';
+  const segno = !qta ? ''
+    : `<span class="pacco-spunta${qta>1?' conta':''}" aria-hidden="true">${qta>1?fmt(qta):'✓'}</span>`;
+  const comando = qta
+    ? `<div class="btn ghost pacco-btn dentro">${stepperMini(qta,
+         `cassaMeno(${x.id})`, `cassaPiu(${x.id})`,
+         false, qta >= (a.quantita||1),
+         qta>1 ? 'Un pezzo in meno' : 'Togli dal conto')}</div>`
+    : `<button type="button" class="btn ghost pacco-btn"${dis?' disabled':''}
+        onclick="cassaPiu(${x.id})">Aggiungi</button>`;
+  const card = cardHTML(Object.assign({}, x, {famigliaN: 0}))
+    .replace(`onclick="apriCard(event,${x.id})"`,
+             dis ? 'onclick="event.preventDefault()"'
+                 : `onclick="event.preventDefault();cassaPiu(${x.id})"`);
+  return `<div class="pacco-cella" data-id="${x.id}">
+    ${card}${segno}${comando}
     ${dis ? `<div class="pacco-motivo">${esc(dis)}</div>` : ''}
   </div>`;
 }
@@ -39179,6 +39200,9 @@ async function apriCassa(){
     if (!r.ok) { el('cassaOggi').textContent = d.detail || 'La cassa non si apre: riprova'; return; }
     cassaDati = d;
     cassaEur = d.cambio > 0;
+    /* le card della griglia: la lista del Profilo, letta adesso (un
+       annuncio appena pubblicato deve esserci) */
+    if ((d.annunci || []).length) await loadMyListings().catch(() => {});
   } catch(e) { el('cassaOggi').textContent = 'Rete assente: riprova'; return; }
   disegnaCassa();
 }
@@ -39186,6 +39210,7 @@ function cassaTornaAlConto(){
   fermaBattitoCassa();
   el('cassaConto').style.display = '';
   el('cassaQrVista').style.display = 'none';
+  barraCassa(appNegozio && eserScheda === 'cassa');
   if (cassaDati) disegnaCassa();
 }
 function cassaOggiTesto(o){
@@ -39204,23 +39229,26 @@ function disegnaCassa(){
   } else manca.style.display = 'none';
   el('cassaValuta').textContent = cassaEur ? '€' : 'sats';
   el('cassaValuta').disabled = !(d.cambio > 0);
-  el('cassaArticoliBox').style.display = (d.annunci || []).length ? '' : 'none';
+  el('cassaArticoliBox').style.display = '';
   el('cassaCercaBox').style.display = (d.annunci || []).length > 8 ? '' : 'none';
   disegnaArticoliCassa();
   cassaScritta();
 }
+/* LA GRIGLIA E' QUELLA DEL CARRELLO (16 nov 2026): le card vere dei
+   propri annunci (`myListings`, la lista del Profilo, mappata come la
+   vetrina), una cella `cellaPacco(x, true)` ciascuna. Il server resta il
+   giudice di cosa si batte: entra solo chi e' in `cassaDati.annunci`
+   (attivo e con pezzi), coi suoi prezzi di adesso e il suo stock. */
 function disegnaArticoliCassa(){
   const d = cassaDati; if (!d) return;
   const q = el('cassaCerca').value.trim().toLowerCase();
-  const lista = (d.annunci || []).filter(a => !q || String(a.titolo).toLowerCase().includes(q));
-  el('cassaArticoli').innerHTML = lista.map(a => {
-    const n = cassaCarrello[a.id] || 0;
-    const prezzo = a.euro ? fmtEur(a.euro) + ' €' : (a.sats ? fmt(a.sats) + ' sats' : '—');
-    return `<button type="button" class="cassa-art${n ? ' su' : ''}" onclick="cassaPiu(${a.id})"${a.sats ? '' : ' disabled'}>
-      <b>${esc(a.titolo)}</b><span>${prezzo} · ${a.quantita} ${a.quantita === 1 ? 'pezzo' : 'pezzi'}</span>
-      ${n ? `<i class="n">${n}</i><i class="meno" role="button" aria-label="Togli uno" onclick="event.stopPropagation();cassaMeno(${a.id})">−</i>` : ''}
-    </button>`;
-  }).join('') || '<div class="hint">Nessun articolo con questo nome.</div>';
+  const battibili = new Set((d.annunci || []).map(a => a.id));
+  const lista = (myListings || []).filter(x => battibili.has(x.id)
+    && (!q || String(x.title).toLowerCase().includes(q)));
+  el('cassaArticoli').innerHTML = lista.map(x => cellaPacco(x, true)).join('')
+    || `<div class="eur-hint" style="grid-column:1/-1">${q ? 'Nessun articolo con questo nome.'
+        : 'Qui compaiono i tuoi annunci attivi con almeno un pezzo: per ora non ce ne sono. Puoi comunque scrivere un importo qui sopra.'}</div>`;
+  armaViste();
 }
 function cassaPiu(id){
   const a = ((cassaDati && cassaDati.annunci) || []).find(x => x.id === id);
@@ -39267,6 +39295,50 @@ function cassaScritta(){
     + (pezzi ? ` · ${pezzi} ${pezzi === 1 ? 'articolo' : 'articoli'}` : '');
   btn.disabled = !(d.ln || d.onchain);
   btn.textContent = `Incassa ${fmt(tot)} sats`;
+  aggiornaBarraCassa();
+}
+/* LA BARRA DEL CARRELLO, ALLA CASSA (16 nov 2026): in Barattolo Negozio il
+   totale e il bottone stanno nella stessa barra in fondo del carrello
+   (#barraPacco), accesa da `con-cassa` (go() governa `con-pacco` dalla
+   vista, quindi la cassa ha la sua classe). Cambia solo il bottone:
+   «Incassa», che fa il conto col QR dritto al wallet di chi vende,
+   invece di «Controlla e paga» verso il deposito di garanzia. */
+let barraCassaOrig = null;
+function barraCassa(accesa){
+  const b = el('paccoControlla');
+  if (accesa) {
+    if (!b.dataset.cassa) {
+      b.dataset.cassa = '1';
+      barraCassaOrig = b.onclick;
+      b.onclick = () => cassaIncassa(b);
+    }
+    document.body.classList.add('con-cassa');
+    aggiornaBarraCassa();
+  } else {
+    if (b.dataset.cassa) {
+      delete b.dataset.cassa;
+      b.onclick = barraCassaOrig;
+      b.textContent = 'Controlla e paga';
+      b.disabled = false;
+    }
+    document.body.classList.remove('con-cassa');
+  }
+}
+function aggiornaBarraCassa(){
+  const b = el('paccoControlla');
+  if (!b.dataset.cassa || !cassaDati) return;
+  const d = cassaDati, tot = cassaTotaleSats();
+  const pezzi = Object.values(cassaCarrello).reduce((a, n) => a + n, 0);
+  const t = el('paccoTot');
+  t.textContent = valutaVista === 'eur' && d.cambio > 0
+    ? `≈ ${fmtEur(tot * d.cambio / 1e8)} €` : `${fmt(tot)} sats`;
+  t.classList.toggle('lungo', t.textContent.length > 12);
+  el('paccoPieno').textContent = ''; el('paccoTag').textContent = '';
+  el('paccoConta').textContent = pezzi
+    ? `${pezzi} pezz${pezzi === 1 ? 'o' : 'i'}${cassaExtraSats() ? ' + importo' : ''}`
+    : cassaExtraSats() ? 'importo libero' : 'il conto è vuoto';
+  b.textContent = 'Incassa';
+  b.disabled = !tot || !(d.ln || d.onchain) || !!(d.max_sats && tot > d.max_sats);
 }
 async function cassaIncassa(btn){
   haptic();
@@ -39303,6 +39375,7 @@ function disegnaMetodoCassa(v){
 }
 function mostraQrCassa(v){
   cassaVendita = v;
+  barraCassa(false);   /* sul QR si aspetta, non si compone */
   el('cassaConto').style.display = 'none';
   el('cassaQrVista').style.display = '';
   el('cassaQrSats').textContent = fmt(v.sats);
@@ -39506,6 +39579,7 @@ function modoNegozio(acceso){
   } else {
     appNegozio = false;
     document.body.classList.remove('app-negozio');
+    barraCassa(false);
     fermaBattitoCassa();
     cassa.classList.remove('in-pagina', 'open');
     el('cassaVaiVendite').textContent = '🧾 Le vendite della cassa, in «Ordini»';
@@ -39542,6 +39616,8 @@ async function schedaNegozio(k, soloVista){
   el('eserCassa').style.display = k === 'cassa' ? '' : 'none';
   el('eserVendite').style.display = k === 'vendite' ? '' : 'none';
   el('eserBanco').style.display = k === 'banco' ? '' : 'none';
+  /* la barra del conto vive sulla scheda Cassa, e solo sul conto */
+  barraCassa(k === 'cassa' && el('cassaConto').style.display !== 'none');
   if (k === 'cassa' && !soloVista && !cassaVendita) apriCassa();
   else if (k === 'vendite') {
     el('eserVendite').innerHTML = '<div class="eser-vuoto">Carico le vendite…</div>';

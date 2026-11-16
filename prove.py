@@ -191847,6 +191847,24 @@ def prove_app_negozio():
           < mini.find("function go(view){"))
     prova("la voce del Profilo apre il negozio, non piu' il foglio", True,
           'onclick="entraAppNegozio()"><span class="em">🏪</span>Cassa in negozio' in mini)
+    # (16 nov 2026, cassa-carrello) LA CASSA E' IL CARRELLO: la stessa cella,
+    # la stessa barra; cambia solo il bottone
+    da = pezzo_js(mini, "function disegnaArticoliCassa(){", "\n}\n")
+    prova("la griglia della cassa e' quella del carrello: cellaPacco(x, true)", True,
+          "cellaPacco(x, true)" in da and 'id="cassaArticoli" class="grid"' in mini)
+    cc = pezzo_js(mini, "function cellaCassa(x){", "\n}\n")
+    prova("...il tocco sulla card aggiunge un pezzo, non apre la scheda", True,
+          "cassaPiu(${x.id})" in cc and 'onclick="apriCard(event,${x.id})"' in cc
+          and ".replace(" in cc)
+    prova("...e i pezzi, i prezzi e lo stock sono quelli del server (cassaDati)", True,
+          "cassaDati.annunci" in cc and "cassaCarrello[x.id]" in cc
+          and "battibili.has(x.id)" in da)
+    bc = pezzo_js(mini, "function barraCassa(accesa){", "\n}\n")
+    prova("la barra in fondo e' #barraPacco con «Incassa», e all'uscita torna «Controlla e paga»",
+          True, "cassaIncassa(b)" in bc and "b.textContent = 'Controlla e paga';" in bc
+          and "con-cassa" in bc and "body.con-cassa #barraPacco{display:flex}" in mini)
+    prova("...go() non la tocca: la sua classe non e' con-pacco", 0,
+          pezzo_js(mini, "function go(view){", "\n}\n").count("con-cassa"))
 
     node = _sh.which("node")
     if not node:
@@ -191864,7 +191882,7 @@ function nodo(id){ return {id, parentNode:null, figli:[], style:{}, textContent:
   insertBefore(n, rif){ if(n.parentNode) n.parentNode.figli.splice(n.parentNode.figli.indexOf(n),1);
     n.parentNode=this; const i = rif ? this.figli.indexOf(rif) : -1; if (i<0) this.figli.push(n); else this.figli.splice(i,0,n); }}; }
 const N = {};
-['app','cassaSheet','dopoCassa','profiloBox','puntoBlocco','eserCassa','eserVendite','eserBanco','eserSchedaBanco','sheetBg','cassaVaiVendite'].forEach(i => N[i]=nodo(i));
+['app','cassaSheet','dopoCassa','profiloBox','puntoBlocco','eserCassa','eserVendite','eserBanco','eserSchedaBanco','sheetBg','cassaVaiVendite','cassaConto'].forEach(i => N[i]=nodo(i));
 N.app.append(N.cassaSheet); N.app.append(N.dopoCassa); N.profiloBox.append(N.puntoBlocco);
 const el = id => N[id] || null;
 const document = {body: nodo('body'), querySelectorAll: () => []};
@@ -191875,6 +191893,7 @@ const conta = {apriCassa:0, battito:0, go:[]};
 const apriCassa = () => conta.apriCassa++, fermaBattitoCassa = () => conta.battito++;
 const renderPuntoPacchi = async () => {}, caricaCassaOrdini = async () => {}, disegnaVenditeNegozio = () => {};
 const go = v => conta.go.push(v);
+const barre = []; const barraCassa = on => barre.push(on);
 let location = {pathname:'/', search:'?app=negozio&x=1', hash:''};
 const history = {state:null, replaceState(st, t, u){ const i=u.indexOf('?'); location.search = i<0 ? '' : u.slice(i); }};
 __PEZZI__
@@ -191886,6 +191905,7 @@ __PEZZI__
               N.puntoBlocco.parentNode.id, conta.apriCassa, N.eserSchedaBanco.style.display];
   modoNegozio(true); R.dueVolte = conta.apriCassa;
   modoNegozio(false);
+  R.barre = barre.slice();
   R.fuori = [appNegozio, document.body.classList.contains('app-negozio'),
              N.app.figli.map(n => n.id).join(','), N.cassaSheet.classList.s.size,
              N.puntoBlocco.parentNode.id, conta.battito, location.search];
@@ -191910,6 +191930,8 @@ __PEZZI__
     prova("uscendo: la cassa torna AL SUO POSTO (prima del vicino), senza classi; il battito si ferma; "
           "la porta esce dall'indirizzo e il resto resta",
           [False, False, "cassaSheet,dopoCassa", 0, "profiloBox", 1, "?x=1"], e["fuori"])
+    prova("la barra del conto: accesa sulla scheda Cassa, spenta all'uscita",
+          [True, False], [e["barre"][0], e["barre"][-1]] if e["barre"] else [])
     prova("in DEMO la faccia non si accende", [False, "app"], e["demo"])
     prova("la porta diretta apre una volta sola", ["esercente"], e["porta"])
     prova("...e a cassa spenta non apre", 0, e["spenta"])

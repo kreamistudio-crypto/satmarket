@@ -84715,3 +84715,48 @@ RESTA DA GUARDARE. Dentro Telegram l'indietro dalla porta diretta va
 all'Esplora (la radice madre) invece di chiudere la Mini App. Per una
 Mini App sua in BotFather (URL `https://barattolo.store/?app=negozio`)
 serve il gesto di Andrea, ed è facoltativa.
+
+## La cassa è il carrello (16 nov 2026, cantiere cassa-carrello, Andrea, provando sul collaudo: «intanto non vedo gli articoli, l'interfaccia dovrebbe essere simile a quella di quando sto aprendo il carrello, anzi la stessa devi riciclare codice. Cambia solo la finalizzazione che va diretta all'utente senza passare per escrow»)
+
+GLI ARTICOLI CHE NON SI VEDEVANO. La cassa mostra gli annunci che il
+server dice battibili (`/api/cassa`: di chi vende, `stato='attivo'`,
+`quantita>0`), e a lista vuota il riquadro «I tuoi articoli» spariva
+SENZA DIRE NIENTE: chi apre la cassa sul collaudo con un account che lì
+non ha annunci attivi vede solo il campo dell'importo, e non sa perché.
+Non ho guardato il database del collaudo (un gesto sulla VM vuole il
+suo ok): la causa più probabile è quella, e adesso la pagina la dice —
+il riquadro resta, e a lista vuota scrive «Qui compaiono i tuoi annunci
+attivi con almeno un pezzo: per ora non ce ne sono».
+
+LA CASSA RIUSA IL CARRELLO. `cellaPacco(x, cassa)`: con `cassa` passa a
+`cellaCassa`, la STESSA cella (cardHTML, spunta, «Aggiungi», stepper di
+casa) coi pezzi di `cassaCarrello` e prezzi/stock da `cassaDati.annunci`;
+il tocco sulla card aggiunge un pezzo invece di aprire la scheda (al
+banco si batte; aprire la scheda porterebbe fuori dal negozio). Le card
+vengono da `myListings` (la lista del Profilo, letta a ogni apertura);
+il server resta il giudice di cosa entra. LA BARRA in fondo è
+#barraPacco: totale, pezzi e il bottone, che `barraCassa` fa diventare
+«Incassa» (→ `cassaIncassa`) e rimette a «Controlla e paga» uscendo. La
+classe è sua, `con-cassa`, perché `con-pacco` la scrive go() dalla vista
+e la spegnerebbe all'istante. Il totale e l'«Incassa» del conto si
+spengono quando c'è la barra. SCARTATO: aprire davvero la pagina del
+carrello coi propri annunci (`paccoDati` col proprio id) — il carrello
+porta con sé il salvataggio, gli sconti del negozio, le esclusioni e
+«Controlla e paga» verso il deposito, tutte cose da spegnere una per
+una; la cella e la barra sono il pezzo che si vede, ed è quello che
+Andrea ha chiesto uguale. Le vecchie classi `.cassa-art*` sono uscite.
+
+PROVATO. `prove_app_negozio` con cinque sentinelle nuove (la griglia è
+`cellaPacco(x, true)` su `#cassaArticoli.grid`; il tocco sulla card
+aggiunge; pezzi, prezzi e stock dal server; la barra è #barraPacco con
+«Incassa» e torna «Controlla e paga»; go() non tocca `con-cassa`) e il
+banco in node che ora controlla la barra (accesa sulla scheda Cassa,
+spenta all'uscita). `PROVE_SEVERE=1 python prove.py` 28.497 passate, 0
+fallite dopo aver rigenerato conoscenza.md (le 2 saltate di sempre);
+collaudi della CI 135/135. DAL VIVO, Chromium 390×844, chiaro e scuro:
+tocco su una card (+1), «Aggiungi» e «+» su un'altra, la barra dice
+«≈ 22,85 € · 3 pezzi · Incassa»; «Incassa» dalla barra porta al QR e la
+barra si spegne; «Annulla il conto» la riaccende; «↩ Barattolo» la
+spegne e il bottone torna «Controlla e paga». Nessun errore di pagina.
+(Nel giro il cambio del client manca, quindi le card dicono «≈ 0 sats»
+sotto l'euro: è il giro, non la cassa.)
