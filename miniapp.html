@@ -77013,7 +77013,10 @@ function renderDettaglioP2P(){
       compro: compro, tuo: !!tuo,
       metodo: p2pDettMetodo || ((o.metodi || []).length === 1 ? o.metodi[0] : ''),
       cauzione: !tuo && cauzioneServeP2P(Object.assign({}, o, {mio: false, metodoScelto: p2pDettMetodo || ''}), p2pInfo, cauzioneAccesaP2P(), cauzioneSulMetodoP2P())
-    }).map(p => typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P(o, p) : p)) +
+    /* ...e con ETH, Monero o USDe la moneta scelta nel foglio (16 nov 2026,
+       p2p-monete-ritocchi): «Invii gli ETH col metodo scelto» */
+    }).map(p => typeof paroleUsdtP2P === 'function'
+      ? paroleUsdtP2P(p2pDettMetodo ? Object.assign({}, o, {metodoScelto: p2pDettMetodo}) : o, p) : p)) +
     /* col tabacchino, il rimando al passo per passo SUBITO SOTTO i quattro
        passi (7 ott 2026, sera: prima stava sopra, con la riga 🧾) */
     notaTabacchinoDettP2P(o) +
@@ -80718,7 +80721,14 @@ const P2P_TABACCHINO = 'Contanti al tabacchino';
 const P2P_METODI_ALTRI = ['SEPA Instant', 'PayPal', 'Wise', 'Contanti al tabacchino'];
 function vociTendinaMetodiP2P(lista, scelti, aperti){
   const s = scelti || [];
-  const voci = (lista || []).filter(m => aperti || P2P_METODI_ALTRI.indexOf(m) < 0 || s.indexOf(m) >= 0);
+  /* ...e ETH, Monero e USDe (16 nov 2026, cantiere p2p-monete-ritocchi:
+     accese per tutti, sette voci in piu' in prima vista erano troppe):
+     stanno anche loro sotto «Altri metodi ▾». Non sono scritte in
+     `P2P_METODI_ALTRI` per la regola qui sopra (una lista che ne chiama
+     un'altra rompe i banchi): le riconosce il loro giudice, col typeof
+     perche' i banchi ritagliano questa funzione da sola. */
+  const coin = m => typeof reteCoinDaMetodoP2P === 'function' && !!reteCoinDaMetodoP2P(m);
+  const voci = (lista || []).filter(m => aperti || (P2P_METODI_ALTRI.indexOf(m) < 0 && !coin(m)) || s.indexOf(m) >= 0);
   return {voci: voci, nascosti: (lista || []).length - voci.length};
 }
 /* L'IMPORTO ESATTO VIAGGIA NEL `pm` (22 set 2026, Barattozon coi
@@ -80930,6 +80940,34 @@ const P2P_USDT_PAROLE = [
   ['Gli euro', 'Gli USDT'], ['gli euro', 'gli USDT'], ['in euro', 'in USDT'],
   [' €', ' USDT'], ['\u00a0€', '\u00a0USDT']
 ];
+/* LE PAROLE DI ETH, MONERO E USDe (16 nov 2026, cantiere
+   p2p-monete-ritocchi, dalla coordinazione: «la tappa "Euro inviati" con
+   la moneta giusta»). L'ordine resta IN EURO — il conto, la cifra in €,
+   il tetto — ma i soldi che viaggiano sono la moneta: quindi cambiano
+   le parole dei soldi che viaggiano, «Euro inviati» → «ETH inviati»,
+   «gli euro» → «gli XMR», «controlla il conto» → «il tuo wallet» (Andrea:
+   «tutto deve corrispondere», col caso dell'USDT che diceva ancora «invia
+   euro»). La cifra resta in €, perche' l'importo e' davvero in euro, e
+   le si aggiunge la moneta: «50,00 €» → «50,00 € in ETH». La moneta e' quella dello scambio (`reteCoinScambioP2P`: il
+   recapito, poi la scelta); senza recapito ne' scelta, quella dell'ordine
+   che si paga solo in una moneta (USDe su piu' reti e' una moneta sola).
+   Un ordine che offre anche un metodo in euro e non ha ancora scelto
+   resta in euro: '' e le parole di sempre. */
+function coinParoleP2P(o){
+  if (!o || typeof reteCoinScambioP2P !== 'function') return '';
+  if (usdtP2P(o) || (typeof chfP2P === 'function' && chfP2P(o))) return '';
+  const recapito = ((o.campiLoro || {}).euro || {}).testo || '';
+  const r = reteCoinScambioP2P(o)
+    || (!recapito && typeof coinUnicaP2P === 'function' ? coinUnicaP2P(o.metodi) : null);
+  return r ? r.coin : '';
+}
+function paroleCoinP2P(coin){
+  return [['Euro inviati', coin + ' inviati'],
+          ['Controlla il conto', 'Controlla il tuo wallet'],
+          ['controlla il conto', 'controlla il tuo wallet'],
+          ['💶', '🪙'],
+          ['Gli euro', 'Gli ' + coin], ['gli euro', 'gli ' + coin]];
+}
 function paroleUsdtP2P(o, testo){
   const t = String(testo == null ? '' : testo);
   /* ...e IN FRANCHI le sue (14 nov 2026, cantiere p2p-chf): l'articolo
@@ -80939,7 +80977,17 @@ function paroleUsdtP2P(o, testo){
     for (const [a, b] of P2P_CHF_PAROLE) c = c.split(a).join(b);
     return c.replace(/\bEURO\b/g, 'FRANCHI').replace(/\bEuro\b/g, 'Franchi').replace(/\beuro\b/g, 'franchi');
   }
-  if (!usdtP2P(o)) return t;
+  if (!usdtP2P(o)) {
+    /* ...e con ETH, Monero o USDe le loro (16 nov 2026) */
+    const coin = typeof coinParoleP2P === 'function' ? coinParoleP2P(o) : '';
+    if (!coin) return t;
+    let c = t;
+    for (const [a, b] of paroleCoinP2P(coin)) c = c.split(a).join(b);
+    /* la cifra resta in euro, e dice in che cosa si paga (una volta);
+       poi ogni «euro» rimasto, parola intera, e' la moneta */
+    c = c.replace(/(\d)([ \u00a0])€(?! in )/g, (x, a, b) => a + b + '€ in ' + coin);
+    return c.replace(/\bEURO\b/g, coin.toUpperCase()).replace(/\b[Ee]uro\b/g, coin);
+  }
   let s = t;
   for (const [a, b] of P2P_USDT_PAROLE) s = s.split(a).join(b);
   /* e ogni «euro» rimasto («i tuoi euro»), parola intera */
@@ -80953,7 +81001,8 @@ function paroleUsdtP2P(o, testo){
    banco) torna l'HTML com'era. */
 const P2P_USDT_MAI = 'textarea, code, .mono, .chatmod, .chatmod-msg, .p2p-recapito';
 function paroleUsdtHtmlP2P(o, html, dove){
-  if (!usdtP2P(o) && !(typeof chfP2P === 'function' && chfP2P(o))) return html;
+  if (!usdtP2P(o) && !(typeof chfP2P === 'function' && chfP2P(o))
+      && !(typeof coinParoleP2P === 'function' && coinParoleP2P(o))) return html;
   try {
     const t = document.createElement('template');
     t.innerHTML = html;
@@ -90533,6 +90582,8 @@ function nomePassoEuroModP2P(d){
   const k = d && d.passo_euro;
   /* in USDT (2 nov 2026, usdt-moderatori) */
   if (k === 'usdt') return 'USDT inviati';
+  /* ...e con ETH, Monero o USDe la sua moneta (16 nov 2026, p2p-monete-ritocchi) */
+  if (k === 'coin') return (d.coin ? String(d.coin) : 'Moneta') + ' inviati';
   return k === 'paycode' ? 'PayCode pagato' : k === 'contanti' ? 'Contanti consegnati' : 'Euro inviati';
 }
 /* PURA: COSA GUARDARE IN UNA DISPUTA IN USDT (2 nov 2026, cantiere

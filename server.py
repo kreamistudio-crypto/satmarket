@@ -56967,6 +56967,71 @@ def p2p_chf_ordine(con, ordine) -> bool:
         return bool(r) and str(r[0] or "").upper() == "CHF"
 
 
+# LE PAROLE DEL BOT CON ETH, MONERO E USDe (16 nov 2026, cantiere
+# p2p-monete-ritocchi, Andrea: «tutto deve corrispondere, perché quando
+# avevamo acceso USDT nel dettaglio di un ordine diceva invia ancora euro»).
+# Il calco di `P2P_USDT_FRASI`, con una differenza che conta: qui l'ordine
+# resta IN EURO (la moneta e' un METODO, come Revolut), quindi la cifra
+# resta in € e ci si aggiunge la moneta in cui si paga — «50,00 €» diventa
+# «50,00 € in ETH» — mentre le parole dei soldi che viaggiano diventano
+# la moneta: «gli euro» → «gli XMR», «Euro inviati» → «USDe inviati», il
+# conto → il wallet, i bonifici → l'id della transazione. La moneta la
+# dice `p2p_coin_ordine`: SOLO un ordine che si paga in una moneta sola
+# (tutti i metodi suoi), perche' il server il metodo scelto da chi prende
+# non lo sa; un ordine misto («SEPA, ETH») resta con le parole dell'euro.
+# `prove_p2p_monete_ritocchi` passa le famiglie degli avvisi di qui e vuole
+# zero «euro», «bonifico», «conto», «💶» e nessun € senza la moneta.
+P2P_COIN_METODI = {
+    "ETH (Ethereum)": "ETH", "XMR (Monero)": "XMR",
+    "USDe (Ethereum)": "USDe", "USDe (Arbitrum)": "USDe", "USDe (Base)": "USDe",
+    "USDe (BNB Chain)": "USDe", "USDe (Solana)": "USDe",
+}
+P2P_COIN_FRASI = (
+    (P2P_USDT_FRASI[0][0], P2P_USDT_FRASI[0][1]),
+    (P2P_USDT_FRASI[1][0], P2P_USDT_FRASI[1][1]),
+    ("sul tuo conto", "sul tuo wallet"),
+    ("il tuo conto", "il tuo wallet"),
+    ("Controlla il conto", "Controlla il tuo wallet"),
+    ("controlla il conto", "controlla il tuo wallet"),
+    ("💶", "🪙"),
+)
+
+
+def p2p_coin_frase(testo: str, coin: str) -> str:
+    """PURA: un avviso scritto per gli euro, detto per uno scambio pagato
+    in `coin` (ETH, XMR, USDe). Senza moneta torna com'era."""
+    t = str(testo or "")
+    c = str(coin or "")
+    if not c:
+        return t
+    for vecchio, nuovo in P2P_COIN_FRASI:
+        t = t.replace(vecchio, nuovo)
+    t = t.replace("Euro inviati", c + " inviati")
+    t = t.replace("Gli euro", "Gli " + c).replace("gli euro", "gli " + c)
+    # la cifra resta in euro, e si dice in che cosa si paga (una volta)
+    t = re.sub(r"(\d)([ \u00a0])€(?! in )", lambda m: m.group(1) + m.group(2) + "€ in " + c, t)
+    # e ogni «euro» rimasto («i tuoi euro», «in euro»), parola intera
+    t = re.sub(r"\bEURO\b", c.upper(), t)
+    t = re.sub(r"\bEuro\b", c, t)
+    return re.sub(r"\beuro\b", c, t)
+
+
+def p2p_coin_ordine(con, ordine) -> str:
+    """In che moneta si paga l'ordine: 'ETH', 'XMR', 'USDe', o '' (euro,
+    misto, riga che manca o storta). Lo dicono i METODI del libro: tutti
+    della stessa moneta (USDe su piu' reti e' una moneta sola)."""
+    try:
+        r = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=?",
+                        (str(ordine or ""),)).fetchone()
+        metodi = json.loads((r["metodi"] if r else "") or "[]")
+    except Exception:
+        return ""
+    if not isinstance(metodi, list) or not metodi:
+        return ""
+    monete = {P2P_COIN_METODI.get(str(m).strip()) for m in metodi}
+    return monete.pop() if len(monete) == 1 and None not in monete else ""
+
+
 def p2p_chf_ammesso(tg_id) -> bool:
     """CHI VEDE GLI ORDINI IN FRANCHI (14 nov 2026, cantiere p2p-chf): il
     calco di `p2p_usdt_ammesso` — la leva madre spenta e' no per
@@ -61786,6 +61851,9 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
         # ...e in franchi con le sue (14 nov 2026, cantiere p2p-chf)
         elif a_chi and p2p_chf_ordine(con, (d or {}).get("ordine")):
             testo = p2p_chf_frase(testo)
+        # ...e con ETH, Monero o USDe le loro (16 nov 2026, p2p-monete-ritocchi)
+        elif a_chi and p2p_coin_ordine(con, (d or {}).get("ordine")):
+            testo = p2p_coin_frase(testo, p2p_coin_ordine(con, (d or {}).get("ordine")))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -66203,6 +66271,11 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
         _chf = globals().get("p2p_chf_ordine")
         if _chf and _chf(con, r["ordine"]):
             testo = p2p_chf_frase(testo)
+        # ...e con ETH, Monero o USDe (16 nov 2026, p2p-monete-ritocchi)
+        _coin = globals().get("p2p_coin_ordine")
+        _moneta = _coin(con, r["ordine"]) if _coin else ""
+        if _moneta:
+            testo = p2p_coin_frase(testo, _moneta)
         if bottoni is not None:
             # (dal 10 ott 2026 anche i solleciti — a chi vende e a chi
             # compra — portano il bottone: dicono «dalla pagina dello
@@ -67504,6 +67577,12 @@ def _testo_garanzia_mod_p2p(livello: int, ore: int, d: dict, per: int = 0) -> st
     if d.get("chf") and not d.get("usdt"):
         euro = euro.replace(" €", " CHF")
         gesto = p2p_chf_frase(gesto)
+    # CON ETH, MONERO O USDe (16 nov 2026, p2p-monete-ritocchi): la cifra
+    # resta in euro (l'ordine e' in euro) e dice in che cosa si paga; il
+    # gesto e' quello vero dell'app, «Ho inviato gli ETH»
+    if d.get("coin") and not d.get("usdt") and not d.get("chf"):
+        euro = p2p_coin_frase(euro, d["coin"])
+        gesto = "Ho inviato gli " + str(d["coin"])
     fiat = int(d.get("fiat_il") or 0)
     disp = int(d.get("disputa_il") or 0)
     if livello >= 88:
@@ -67633,6 +67712,11 @@ def _garanzie_lunghe_p2p(con, adesso: int, bottoni: dict = None) -> list:
                     _chf = globals().get("p2p_chf_ordine")
                     if _chf and _chf(con, ordine):
                         testo_g = p2p_chf_frase(testo_g)
+                    # ...e con ETH, Monero o USDe (16 nov 2026)
+                    _coin = globals().get("p2p_coin_ordine")
+                    _moneta = _coin(con, ordine) if _coin else ""
+                    if _moneta:
+                        testo_g = p2p_coin_frase(testo_g, _moneta)
                     fuori.append((chi, testo_g,
                         f"⏰ Garanzia lunga P2P: {corto} 48h → {chi} ({ruolo}; {stato})"))
 
@@ -67675,6 +67759,9 @@ def _garanzie_lunghe_p2p(con, adesso: int, bottoni: dict = None) -> list:
                 # ...e in franchi (14 nov 2026, cantiere p2p-chf)
                 _chf = globals().get("p2p_chf_ordine")
                 d["chf"] = bool(_chf and _chf(con, ordine))
+                # ...e la moneta con cui si paga (16 nov 2026)
+                _coin = globals().get("p2p_coin_ordine")
+                d["coin"] = (_coin(con, ordine) if _coin else "") or ""
             fuori.append((mod, _testo_garanzia_mod_p2p(livello, ore, d, mod),
                           f"⏰ Garanzia lunga P2P: {corto} {livello}h → {mod} "
                           f"(moderatore; {stato})"))
@@ -71108,6 +71195,9 @@ def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
     # ...e in franchi (14 nov 2026, cantiere p2p-chf)
     elif d.get("chf"):
         euro = euro.replace(" €", " CHF")
+    # ...e con ETH, Monero o USDe la moneta accanto (16 nov 2026)
+    elif d.get("coin"):
+        euro = p2p_coin_frase(euro, d["coin"])
     importo = (f"{_fmt_sats(sats)} sats" if sats > 0 else "")
     if euro:
         importo += (" per " if importo else "") + euro
@@ -71135,6 +71225,15 @@ def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
                      "vero, che arrivi all'indirizzo dato da chi vende, l'importo "
                      "e che sia confermata. La guida intera è nell'app, nella "
                      "card della disputa.")
+    # ...e con ETH, Monero o USDe (16 nov 2026, p2p-monete-ritocchi): la
+    # prova e' la transazione sulla catena del metodo
+    elif d.get("coin"):
+        righe.append(f"• 🪙 Pagato in {html.escape(str(d['coin']))}: l'id della "
+                     "transazione sta nella chat dello scambio, col tasto che lo "
+                     "apre sull'explorer della rete scritta nel metodo (con Monero "
+                     "anche la chiave della transazione). Controlla che arrivi "
+                     "all'indirizzo dato da chi vende, l'importo al cambio e che "
+                     "sia confermata.")
     if d.get("automatica"):
         righe += ["", "⏳ <b>L'ha aperta il coordinatore da solo:</b> chi compra "
                   "ha segnato il pagamento, i sats non sono stati liberati e la "
@@ -71291,6 +71390,9 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         # ...e in franchi (14 nov 2026, cantiere p2p-chf)
         _chf = globals().get("p2p_chf_ordine")
         d["chf"] = bool(_chf and _chf(con, ordine))
+        # ...e la moneta con cui si paga (16 nov 2026, p2p-monete-ritocchi)
+        _coin = globals().get("p2p_coin_ordine")
+        d["coin"] = (_coin(con, ordine) if _coin else "") or ""
         # la riapertura ha il SUO timbro: non e' il doppione della prima
         timbro = f"disputa_mod_r{riaperta}" if riaperta else "disputa_mod"
         for mod in _avvisati_mod_p2p():
@@ -71520,6 +71622,14 @@ def _riga_disputa_p2p(con, r, io: int) -> dict:
         _chf = globals().get("p2p_chf_ordine")
         if _chf and _chf(con, ordine):
             fuori.update(chf=True, euro=fuori["euro"].replace(" €", " CHF"))
+        else:
+            # ...e con ETH, Monero o USDe (16 nov 2026, p2p-monete-ritocchi):
+            # il terzo passo «ETH inviati», la cifra «50,00 € in ETH»
+            _coin = globals().get("p2p_coin_ordine")
+            _moneta = (_coin(con, ordine) if _coin else "") or ""
+            if _moneta:
+                fuori.update(coin=_moneta, passo_euro="coin",
+                             euro=p2p_coin_frase(fuori["euro"], _moneta))
     if mia and not parte:
         s = con.execute("SELECT chiave_compratore, chiave_venditore FROM p2p_scambi "
                         "WHERE ordine=?", (ordine,)).fetchone()
@@ -71962,6 +72072,10 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
                 # ...e in franchi (14 nov 2026, cantiere p2p-chf)
                 elif p2p_chf_ordine(con, ev["ordine"]):
                     avvisi = [(tg, p2p_chf_frase(t)) for tg, t in avvisi]
+                # ...e con ETH, Monero o USDe (16 nov 2026, p2p-monete-ritocchi)
+                elif p2p_coin_ordine(con, ev["ordine"]):
+                    _moneta = p2p_coin_ordine(con, ev["ordine"])
+                    avvisi = [(tg, p2p_coin_frase(t, _moneta)) for tg, t in avvisi]
             except Exception:
                 pass
             # ...e i MODERATORI, se l'evento apre o chiude una disputa
