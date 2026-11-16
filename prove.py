@@ -68557,6 +68557,8 @@ def prove_p2p_libro():
         # i QUATTRO ordini del libro (set 2026): convenienza (il
         # predefinito), piu' recenti, importo nei due versi
         "function ordinaLibroP2P(righe, lato, criterio){",
+        # (16 nov 2026, ricevi-mercato) la card on-chain vista dall'ordinamento
+        "function vistaOrdinamentoOcP2P(o){",
         "function satsMercatoP2P(o){",
         # la commissione del coordinatore (set 2026): la card mostra il
         # NETTO di tutto, e questi due sono i giudici che lo fanno
@@ -68918,6 +68920,21 @@ out.fissoVendi = ordinaLibroP2P(libroVendi, 'vendo', 'conv').map(x => x.id).join
    data lo mette */
 out.bzRecenti = ordinaLibroP2P([merc('x', 'sell', 2, 300), fisso('B', 'sell', 92000, 200),
   merc('y', 'sell', 5, 400)], 'compro', 'recenti').map(x => x.id).join('');
+/* LE CARD ON-CHAIN NELLO STESSO ORDINAMENTO (16 nov 2026, cantiere
+   ricevi-mercato, Andrea: «Quando ordino per convenienza non ordina per
+   convenienza»): un on-chain a mercato al 15% stava sopra un Lightning al
+   6%. Il metro e' il premio che la card on-chain mostra; a prezzo fisso
+   (niente badge) in fondo; per importo l'euro unico dell'ordine */
+const oc = (d, lato, prem, mercato, euro, creato) => vistaOrdinamentoOcP2P({id: d, lato: lato,
+  premio: prem, mercato: mercato, euro: euro || 50, creato: creato || 100});
+const misto = [oc(1, 'sell', 15, true), merc('x', 'sell', 6), oc(2, 'sell', 0, false),
+               merc('y', 'sell', 20), oc(3, 'sell', -3, true)];
+out.ocConv = ordinaLibroP2P(misto, 'compro', 'conv').map(x => x.id).join(' ');
+out.ocConvVendi = ordinaLibroP2P([oc(1, 'buy', 15, true), merc('x', 'buy', 6),
+  oc(3, 'buy', -3, true)], 'vendo', 'conv').map(x => x.id).join(' ');
+out.ocImp = ordinaLibroP2P([oc(1, 'sell', 0, true, 250), imp('m', 50), oc(2, 'sell', 0, true, 10)],
+  'compro', 'imp-su').map(x => x.id).join(' ');
+out.ocVista = oc(7, 'sell', 4, true, 250, 900);
 /* A CAMBIO MUTO il prezzo fisso non ha un numero: va in fondo, coi suoi
    pari per data, e i prezzi a mercato restano in ordine */
 {
@@ -69570,9 +69587,29 @@ console.log(JSON.stringify(out));
           "nei due versi", ["xzCB", "prF"],
           [out["bzMuto"], out["bzMutoVendi"]])
     prova("...e il filtro per premio non lo scarta", True, out["filtroMuto"])
+    # --- LE CARD ON-CHAIN NELLO STESSO ORDINAMENTO (16 nov 2026, cantiere
+    # ricevi-mercato, Andrea: «Quando ordino per convenienza non ordina per
+    # convenienza»): stavano sempre in cima, sopra il libro ordinato
+    prova("a convenienza l'on-chain al 15% scende sotto il Lightning al 6%, il −3 "
+          "sale in cima, il prezzo fisso on-chain (senza badge) va in fondo; nel "
+          "tab Vendi il verso si rovescia",
+          ["oc-3 x oc-1 y oc-2", "oc-1 x oc-3"], [out["ocConv"], out["ocConvVendi"]])
+    prova("...per importo conta l'euro dell'ordine on-chain", "oc-2 m oc-1", out["ocImp"])
+    prova("...e la vista porta l'ordine vero, che la card on-chain disegna",
+          {"oc": {"id": 7, "lato": "sell", "premio": 4, "mercato": True, "euro": 250,
+                  "creato": 900}, "id": "oc-7", "lato": "sell", "premioOc": 4,
+           "creato": 900, "euro": 250, "euroMax": 0}, out["ocVista"])
+    _rp_oc = pezzo_js(mini, "function renderP2P(", "\n}\n")
+    prova("...e renderP2P le mescola solo fuori da «Piu' recenti», dove restano in "
+          "cima sotto il loro rettangolo", (True, True, True),
+          ("const misti = critLibro !== 'recenti'" in _rp_oc,
+           "carteOnchainLibroP2P(k, usdtNovita, misti)" in _rp_oc,
+           ".map(x => x.oc ? rigaOnchainP2P(x.oc) : rigaOrdineP2P(x))" in _rp_oc))
     _ord_js = pezzo_js(mini, "function ordinaLibroP2P(righe, lato, criterio){", "\n}\n")
     prova("il metro della convenienza e' `premioCardP2P`, mai `premium` nudo",
-          [True, False], ["premioCardP2P(a)" in _ord_js, ".premium" in _ord_js])
+          # (16 nov 2026, ricevi-mercato) dentro `metroCard`, che alla card
+          # on-chain fa portare il suo (`premioOc`)
+          [True, False], ["premioCardP2P(x)" in _ord_js, ".premium" in _ord_js])
 
     # --- 7b) L'ANELLO DELLA SCADENZA (set 2026) ---------------------
     # Il testo «scade fra 7 g» esce dalla card e diventa un anello che
@@ -82395,7 +82432,8 @@ def prove_p2p_pubblica():
     # (14 nov 2026, cantiere p2p-chf) il franco ha la sua strada: il
     # payload va a capo, e si legge fino al campo dopo
     prova("il catalogo delle valute e il payload dicono gli stessi codici",
-          ["EUR", "USDT", "CHF"], [c for c in _codici
+          # (16 nov 2026, ricevi-mercato) il franco subito sotto l'euro
+          ["EUR", "CHF", "USDT"], [c for c in _codici
                                    if ("'%s'" % c) in puro.split("fiat_code:")[1].split("min_amount:")[0]])
 
     # --- 10) I SEI RITOCCHI (set 2026, guardati dal vivo da Andrea) --
@@ -118946,7 +118984,7 @@ console.log(JSON.stringify(out));
           "valuta: voluto.valuta || ''})});" in m
           and re.findall(r"\['(\w*)', '[^']+'\]", m[m.index("const P2P_AVVISI_VALUTE = ["):
                                                  m.index("];", m.index("const P2P_AVVISI_VALUTE = ["))])
-          == ["", "EUR", "USDT", "CHF"]
+          == ["", "EUR", "CHF", "USDT"]  # (16 nov 2026) il franco dopo l'euro
           and 'VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT", "CHF")' in src
           and '"avvisi_nuovi_valuta TEXT DEFAULT \'\'",' in src
           and "avvisi_nuovi_rete=?, avvisi_nuovi_valuta=? " in src)
@@ -159248,7 +159286,9 @@ def prove_p2p_onchain():
            # Mostro la mappa del contanti, e l'elenco ristretto al comune scelto
            # (12 nov 2026, usdt-banner) col «Novità» degli USDT, che sta
            # dentro il blocco on-chain o da solo quando quello non c'e'
-           "+ (onchainCarte || usdtNovita)\n    + mappa\n    + (elenco.length ? elenco.map(rigaOrdineP2P).join('')" in mini))
+           # (16 nov 2026, ricevi-mercato) l'elenco e' `carteLibro`: le card di
+           # Mostro, o a convenienza/importo quelle di Mostro e on-chain mescolate
+           "+ (onchainCarte || usdtNovita)\n    + mappa\n    + (carteLibro.length ? carteLibro.join('')" in mini))
     # il giudice della firma che aspetta me, in node
     # (EMENDATA 1 nov 2026, presa-altra-rete: il giudice chiama anche quello
     # del cambio di chi compra, che entra nel banco con lui)
@@ -159652,7 +159692,7 @@ const MEMORIA = {}, localStorage = {rotto: false,
   getItem(k){ if (this.rotto) throw new Error('chiusa'); return k in MEMORIA ? MEMORIA[k] : null; },
   setItem(k, v){ if (this.rotto) throw new Error('chiusa'); MEMORIA[k] = String(v); }};
 function novitaOcApertaP2P(){ return 'oc' in MEMORIA; }
-""" + blocco + "\n" + pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto){", "\n}\n") + "\n}\n" + """
+""" + blocco + "\n" + pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto, senzaCarte){", "\n}\n") + "\n}\n" + """
 const P2P_OC_MONETA = '<oc-moneta>';
 const out = {};
 out.spento = novitaUsdtLibroP2P();
@@ -159752,7 +159792,7 @@ console.log(JSON.stringify(out));
     prova("le sentinelle: il banner sotto quello on-chain nel libro, il verde di Tether "
           "sfumato e pieno da acceso, le reti nel testo, il «deposito di garanzia»",
           (True, True, True, True, True),
-          ("carteOnchainLibroP2P(k, usdtNovita)" in _libro
+          ("carteOnchainLibroP2P(k, usdtNovita, misti)" in _libro
            and "+ (onchainCarte || usdtNovita)" in _libro,
            "background:linear-gradient(90deg,rgba(38,161,123,.42) 0%,rgba(38,161,123,.10) 100%),var(--card);" in mini,
            ".p2p-oc-novita.p2p-usdt-novita.acceso .p2p-oc-faccia{background:#26A17B;" in mini,
@@ -160007,6 +160047,14 @@ out.swapRiceve = righe(contoOnchainP2P(P({ruolo: '', parte: 'compro', preso_il: 
   quota_ricevente_sats: 0, swap: {sats: 900, nome: 'SATS Routing'}})));
 out.swapDeposita = righe(contoOnchainP2P(P({ruolo: '', parte: 'vendo', preso_il: 0, quota_sats: 0,
   quota_ricevente_sats: 0, swap: {sats: 700, nome: 'SATS Routing'}})));
+/* A MERCATO prima della presa (16 nov 2026, Andrea: «Ricevi ≈ -3.633 sats»):
+   `sats` e' 0 e la base del totale e' la stima, non lo zero */
+const M = x => P(Object.assign({ruolo: '', preso_il: 0, quota_sats: 0, quota_ricevente_sats: 0,
+  mercato: true, sats: 0, stima: 100000}, x));
+out.mercatoRiceve = righe(contoOnchainP2P(M({parte: 'compro'})));
+out.mercatoSwap = righe(contoOnchainP2P(M({parte: 'compro', swap: {sats: 900, nome: 'SATS Routing'}})));
+out.mercatoDeposita = righe(contoOnchainP2P(M({parte: 'vendo'})));
+out.mercatoSenzaStima = righe(contoOnchainP2P(M({parte: 'compro', stima: 0})));
 out.piccolo = commissioneOnchainP2P(P({preso_il: 0, quota_sats: 0, quota_ricevente_sats: 0,
   sats: 12000}), false);
 fee = null;
@@ -160056,6 +160104,18 @@ process.stdout.write(JSON.stringify(out));
                ["Sats dello scambio | 100.000 sats", "Fee P2P 1%beta | ≈ +1.000 sats",
                 "Swap SATS Routing | ≈ +700 sats", "Deposita | ≈ 101.700 sats"]],
               [o["swapRiceve"][:4], o["swapDeposita"][:4]])
+        prova("A PREZZO DI MERCATO, prima della presa, il totale parte dalla STIMA dei sats "
+              "(Andrea, 16 nov: «Ricevi ≈ -3.633 sats»): a chi riceve la stima meno la fee "
+              "(e meno lo swap), a chi deposita la stima piu' la fee; senza stima il «—»",
+              [["Sats dello scambio | ≈ 100.000 sats", "Fee P2P 1%beta | ≈ −1.000 sats",
+                "Ricevi | ≈ 99.000 sats"],
+               ["Sats dello scambio | ≈ 100.000 sats", "Fee P2P 1%beta | ≈ −1.000 sats",
+                "Swap SATS Routing | ≈ −900 sats", "Ricevi | ≈ 98.100 sats"],
+               ["Sats dello scambio | ≈ 100.000 sats", "Fee P2P 1%beta | ≈ +1.000 sats",
+                "Deposita | ≈ 101.000 sats"],
+               ["Sats dello scambio | — sats", "Ricevi | — sats"]],
+              [o["mercatoRiceve"][:3], o["mercatoSwap"][:4], o["mercatoDeposita"][:3],
+               o["mercatoSenzaStima"][:2]])
         prova("...sotto la polvere niente commissione, e senza fee viva niente riga",
               [{"sats": 0, "stima": True}, None], [o["piccolo"], o["senzaFee"]])
     prova("I FILI DEL SERVER: la presa conta le due meta' dalla fee viva (503 se non c'e'), "
@@ -161095,12 +161155,14 @@ def prove_prezzo_btc_libro():
     rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
     prova("la card viaggia col rettangolo degli USDT: sotto i «Novità», sopra le card "
           "on-chain e quelle di Mostro", True,
-          "+ (typeof cartaPrezzoP2P === 'function' ? cartaPrezzoP2P() : '');\n"
-          "  const onchainCarte = typeof carteOnchainLibroP2P === 'function' ? "
-          "carteOnchainLibroP2P(k, usdtNovita) : '';" in rp)
-    oc_js = pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto){", "\n}\n")
+          # dal 16 nov (cantiere ricevi-mercato) fra le due righe sta la
+          # scelta dell'ordinamento: si guarda l'ORDINE, non l'adiacenza
+          0 <= rp.find("+ (typeof cartaPrezzoP2P === 'function' ? cartaPrezzoP2P() : '');\n")
+          < rp.find("  const onchainCarte = typeof carteOnchainLibroP2P === 'function' ? "
+                    "carteOnchainLibroP2P(k, usdtNovita, misti) : '';"))
+    oc_js = pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto, senzaCarte){", "\n}\n")
     prova("...e il libro on-chain la mette dopo il suo «Novità» e prima delle sue righe",
-          True, "return porta + (sotto || '') + righe.map(rigaOnchainP2P).join('');" in oc_js)
+          True, "return porta + (sotto || '') + (senzaCarte ? '' : righe.map(rigaOnchainP2P).join(''));" in oc_js)
     ril = nudo(pezzo_js(mini, "function rileggiCambio(){", "\n}\n"))
     prova("la serie arriva da `rileggiCambio`, solo con un cambio vero, col typeof per i "
           "banchi del solo cambio, e conta come cambio per il battito", [True, True],
@@ -161841,8 +161903,8 @@ const MEMORIA = {}, localStorage = {rotto: false,
   getItem(k){ if (this.rotto) throw new Error('chiusa'); return k in MEMORIA ? MEMORIA[k] : null; },
   setItem(k, v){ if (this.rotto) throw new Error('chiusa'); MEMORIA[k] = String(v); }};
 """ + monete + "\n" + pezzo_js(mini, "function segnoReteP2P(rete){", "\n}\n") + "\n}\n" \
-        + mini[mini.index("let p2pOcTutorialTimer = null;"):mini.index("function carteOnchainLibroP2P(k, sotto){")] \
-        + pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto){", "\n}\n") + "\n}\n" \
+        + mini[mini.index("let p2pOcTutorialTimer = null;"):mini.index("function carteOnchainLibroP2P(k, sotto, senzaCarte){")] \
+        + pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto, senzaCarte){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function apriSceltaPubblicaP2P(){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function sceltaReteP2P(rete){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function interruttoreReteP2P(attiva, soloLn){", "\n}\n") + "\n}\n" \
@@ -162172,7 +162234,7 @@ console.log(JSON.stringify(out));
            "accendiNovitaOcP2P(true);" in _acc,
            "accendiNovitaOcP2P(false);" in pezzo_js(mini, "function fineTutorialOcP2P(){", "\n}\n"),
            "if (tutorialOcLato === null) accendiNovitaOcP2P(false);" in pezzo_js(mini, "function tutorialOnchainP2P(){", "\n}\n"),
-           "(tutorialOcLato !== null || p2pOcTutorialTimer ? ' acceso' : '')" in pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto){", "\n}\n")))
+           "(tutorialOcLato !== null || p2pOcTutorialTimer ? ' acceso' : '')" in pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto, senzaCarte){", "\n}\n")))
     # LA RETE NEL FOGLIO DEL FILTRO (30 ott 2026, Andrea: «aggiungi anche la
     # possibilita' di filtrare per onchain e lightning»): in cima, una
     # scelta sola, solo a chi l'on-chain lo vede
@@ -162381,7 +162443,7 @@ console.log(JSON.stringify(out));
     # il «Novità» apre il foglio, e ogni strada verso uno scambio passa
     # dalla porta unica del dettaglio, che la lista di «I miei scambi»
     # chiama anche lei; nel dettaglio niente rimando a un elenco a parte
-    porta = pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto){", "\n}\n")
+    porta = pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto, senzaCarte){", "\n}\n")
     dett = pezzo_js(mini, "function apriDettaglioOnchainP2P(id){", "\n}\n")
     pubb = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
     prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")

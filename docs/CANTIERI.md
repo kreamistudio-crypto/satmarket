@@ -84760,3 +84760,72 @@ barra si spegne; «Annulla il conto» la riaccende; «↩ Barattolo» la
 spegne e il bottone torna «Controlla e paga». Nessun errore di pagina.
 (Nel giro il cambio del client manca, quindi le card dicono «≈ 0 sats»
 sotto l'euro: è il giro, non la cassa.)
+
+## «Ricevi» negativo nel conto on-chain a mercato, l'ordine per convenienza con le card on-chain, il franco sotto l'euro e la tessera «Aste» dorata (16 nov 2026, cantiere ricevi-mercato, hotfix dopo la promozione; Andrea con le foto: «Ricevi ≈ -3.633 sats» e «≈ -5.599 sats» su un ordine da 250 € Revolut a prezzo di mercato, «Quando ordino per convenienza non ordina per convenienza», «CHF mettimelo sotto a euro dato che è una valuta tradizionale», «Non mi piace che il banner aste sia diverso metti la card per categoria con il disegno della card da scoprire», «Perché onchain non si vedono le altre valute?»)
+
+IL DIFETTO. Nel foglio di chi prende un ordine P2P on-chain a prezzo di
+mercato, `contoOnchainP2P` scriveva bene «Sats dello scambio ≈ 363.310»
+(la stima) e bene la «Fee P2P ≈ −3.633», ma il totale partiva da
+`Number(o.sats) || 0`: a mercato, prima della presa, `o.sats` è 0 (i sats
+nascono alla presa), e «Ricevi» diventava −fee (−3.633), o −fee−swap
+(−5.599) col tasto ⚡. La frase sopra il conto («ti arrivano circa
+357.711 sats») era giusta perché leggeva la stima. Lo stesso buco, dal
+lato di chi deposita, dava «Deposita ≈ 1.000» invece di 101.000. Nato
+col cantiere p2p-onchain-commissione (stamattina), che ha aggiunto la
+riga della fee e il totale che la conta: prima il totale a mercato era
+la stessa stima della riga sopra.
+LA CURA. La base del totale è la stima quando l'ordine è a mercato e
+non ancora preso (`base`), altrimenti i sats; senza stima il totale
+mostra il «—» come la riga sopra, mai un numero inventato. Il ramo di
+chi deposita dopo la presa (`importo_sats`) non cambia.
+L'ORDINE PER CONVENIENZA. `ordinaLibroP2P` ordinava bene le card di
+Mostro, ma le card on-chain le disegnava `carteOnchainLibroP2P` in un
+blocco SOPRA il libro, sempre: un on-chain «15% meno conveniente» stava
+davanti a un Lightning «6%». Ora, a «Convenienza» e a importo, le card
+on-chain entrano NELLO STESSO ordinamento: `vistaOrdinamentoOcP2P` veste
+l'ordine on-chain coi campi che l'ordinamento legge, col metro che la card
+mostra (`premioOc`: il premio a mercato; a prezzo fisso la card on-chain
+non ha badge, quindi null e in fondo, mai un numero inventato), e
+renderP2P disegna ogni voce con la sua funzione. A «Più recenti» (il
+predefinito) le card on-chain restano in cima sotto il loro rettangolo,
+come prima: Andrea non l'ha chiesto, e cambierebbe il libro di chi non
+tocca niente. Annotato in fondo al rapporto.
+IL FRANCO SOTTO L'EURO. `P2P_VALUTE` ora è EUR, CHF, USDT (poi le
+monete, aggiunte in coda da `P2P_VALUTE_COIN`); lo stesso ordine nelle
+chip degli avvisi (`P2P_AVVISI_VALUTE`). `P2P_VALUTE[0]` resta l'euro.
+LE VALUTE ON-CHAIN: NON in questa hotfix. Andrea: «Le altre valute
+servono solo per pagare», e ha ragione nel merito (si scambia sempre
+bitcoin). Il blocco non è solo `valuteVisibiliP2P(oc)`: il server dello
+scambio on-chain conosce due valute, EUR e USDT, e la ricava perfino dai
+metodi (`p2p_onchain_valuta`), con cifra, cambio, recapito, tetto e
+avvisi per quelle due (24 punti nel server, 38 nel telefono). I perché
+di allora: ETH/XMR scartati nel cantiere eth-xmr (13 nov, «vorrebbe
+recapito e id salvati sul server, è un passo a sé»), il franco on-chain
+«fuori per ora» (p2p-chf, 14 nov), USDe ha copiato ETH/XMR. È un
+cantiere suo, come gli USDT on-chain del 2 nov.
+LA TESSERA «ASTE». In «Esplora per categorie» la tessera aveva il suo
+disegno a matita (`aste-tessera.webp`, la «tessera-1» di nav-nostr),
+diverso dal martelletto dorato della card «Aste · In arrivo» di «Da
+scoprire» (`aste.webp`, la «card-4»). Ora la tessera è RICAVATA dalla
+card: lo stesso disegno, ritagliato quadrato sul martelletto (780 px dal
+1024, a 480×480 per il 3x del telefono) e col fondo grigio-nero del
+disegno portato al bruno delle sorelle (lo stesso #241C11 della tessera
+di prima: lo scarto si pesa sulla distanza dal fondo, così il bagliore
+arancio resta). Nessun cambio di codice: stesso nome, stessa whitelist.
+SCARTATO: la card intera dentro la tessera (il martelletto piccolo in
+mezzo al nero, e il nero stona fra le tessere brune); un disegno nuovo
+da Flow (Andrea vuole QUELLO della card).
+PROVATO: `prove_p2p_onchain_commissione` col caso a mercato (chi riceve,
+chi riceve con lo swap, chi deposita, senza stima): CONTROPROVA col
+`miniapp.html` di develop, rossa con proprio «Ricevi ≈ -1.000», «≈
+-1.900», «Deposita ≈ 1.000»; verde con la cura. `prove_p2p_libro` con le
+card on-chain mescolate (convenienza nei due tab, prezzo fisso in fondo,
+importo, la vista, il filo in renderP2P): CONTROPROVA col metro nudo
+(`premioCardP2P` anche sulla vista), rossa con «oc-1 oc-2 oc-3 x y».
+Emendate tre sentinelle che leggevano il codice di prima: l'elenco ora è
+`carteLibro`, il metro sta in `metroCard`, i codici del catalogo e delle
+chip degli avvisi col franco secondo. La tessera passa la sua prova
+(quadrata, ≥ 320 px). Suite severa e collaudi della CI nel
+worktree, senza coincurve.
+DA GUARDARE: il foglio vero sul telefono a mercato dopo la promozione
+(Andrea); la tessera dorata in tema chiaro accanto alle sorelle.

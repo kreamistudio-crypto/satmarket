@@ -42534,7 +42534,8 @@ const P2P_AVVISI_RETI = [['', 'Tutte'], ['onchain', 'Solo on-chain'], ['ln', 'So
 /* LA VALUTA DEGLI AVVISI (2 nov 2026, Andrea: «nelle notifiche dare la
    possibilita' di scegliere usdt»): una scelta sola, e la sezione solo a
    chi gli USDT li vede (`usdtVistoP2P`). Gemelle di VALUTE_AVVISI_NUOVI_P2P */
-const P2P_AVVISI_VALUTE = [['', 'Tutte'], ['EUR', 'Solo euro'], ['USDT', 'Solo USDT'], ['CHF', 'Solo franchi']];
+/* il franco subito dopo l'euro, come nel catalogo (16 nov 2026) */
+const P2P_AVVISI_VALUTE = [['', 'Tutte'], ['EUR', 'Solo euro'], ['CHF', 'Solo franchi'], ['USDT', 'Solo USDT']];
 /* PURA: le preferenze come arrivano dal server, rimesse in forma — i
    tipi nell'ordine delle chip (vuoto = tutti), la soglia solo se e' una
    delle sei, spento se manca tutto (un server di ieri) */
@@ -62397,9 +62398,18 @@ function testaAltaP2P(){
 /* `sotto` (12 nov 2026, cantiere usdt-banner) e' quel che sta fra il
    rettangolo e le card: il «Novità» degli USDT, che Andrea vuole SOTTO
    quello on-chain («il banner usdt starà sotto al banner onchain») */
-function carteOnchainLibroP2P(k, sotto){
-  /* il filtro «solo Lightning» lascia fuori le card on-chain, non il
-     rettangolo (30 ott 2026) */
+/* le card on-chain del tab: il filtro «solo Lightning» lascia fuori le
+   card on-chain, non il rettangolo (30 ott 2026) */
+function righeOnchainLibroP2P(k){
+  return p2pFiltro && p2pFiltro.rete === 'ln' ? []
+    : p2pOnchainLibro.eventi.filter(o => o.lato === k);
+}
+/* `senzaCarte` (16 nov 2026, cantiere ricevi-mercato): il rettangolo e i
+   «Novità» si', le card no — le mescola renderP2P con quelle di Lightning
+   quando il libro e' ordinato per convenienza o per importo */
+function carteOnchainLibroP2P(k, sotto, senzaCarte){
+  /* lo stesso filtro di righeOnchainLibroP2P, scritto qui perche' i banchi
+     di prove.py ritagliano questa funzione da sola */
   const righe = p2pFiltro && p2pFiltro.rete === 'ln' ? []
     : p2pOnchainLibro.eventi.filter(o => o.lato === k);
   if (!righe.length && !myP2POnchain) return '';
@@ -62418,7 +62428,21 @@ function carteOnchainLibroP2P(k, sotto){
       + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
       + '</div>'
     : '';
-  return porta + (sotto || '') + righe.map(rigaOnchainP2P).join('');
+  return porta + (sotto || '') + (senzaCarte ? '' : righe.map(rigaOnchainP2P).join(''));
+}
+/* LA CARD ON-CHAIN VISTA DALL'ORDINAMENTO (16 nov 2026, cantiere
+   ricevi-mercato, Andrea: «Quando ordino per convenienza non ordina per
+   convenienza»): le card on-chain stavano SEMPRE in cima, sopra un libro
+   ordinato, e un «15% meno conveniente» on-chain passava davanti a un
+   «6%» di Lightning. Qui l'ordine on-chain si traveste coi campi che
+   `ordinaLibroP2P` legge: il metro e' QUELLO CHE LA CARD MOSTRA
+   (`premioOc`), cioe' il premio a mercato; a prezzo fisso la card on-chain
+   non scrive un badge, quindi null (in fondo, coi pari per data), mai un
+   numero inventato. L'importo e' quello unico dell'ordine. PURA. */
+function vistaOrdinamentoOcP2P(o){
+  return {oc: o, id: 'oc-' + Number(o.id), lato: o.lato,
+          premioOc: o.mercato ? (Number(o.premio) || 0) : null,
+          creato: Number(o.creato) || 0, euro: Number(o.euro) || 0, euroMax: 0};
 }
 
 
@@ -64595,10 +64619,15 @@ function contoOnchainP2P(o){
   const sw = o.swap && Number(o.swap.sats) > 0 ? Math.round(Number(o.swap.sats)) : 0;
   const rigaSwap = sw ? r('Swap ' + esc(o.swap.nome || 'SATS Routing'), '<span class="num">≈ '
     + (versa ? '+' : '−') + fmt(sw) + '<span class="unita-sats"> sats</span></span>') : '';
+  /* A MERCATO, prima della presa, la base del totale e' la STIMA (16 nov
+     2026, Andrea: «Ricevi ≈ -3.633 sats»): `o.sats` e' ancora 0, e il
+     totale contava solo la fee e lo swap. Senza stima, il «—» di sopra. */
+  const base = stima ? (Number(o.stima) || 0) : (Number(o.sats) || 0);
   const totale = (versa
-    ? (deposito ? (o.importo_sats || o.sats) : (Number(o.sats) || 0) + cs)
-    : (Number(o.sats) || 0) - cs) + (versa ? sw : -sw);
-  const totSats = n => ((cs && circa) || sw) ? '<span class="num">≈ ' + fmt(n) + '<span class="unita-sats"> sats</span></span>' : sats(n);
+    ? (deposito ? (o.importo_sats || o.sats) : base + cs)
+    : base - cs) + (versa ? sw : -sw);
+  const totSats = n => stima && !(base > 0) ? sats(n)
+    : ((cs && circa) || sw) ? '<span class="num">≈ ' + fmt(n) + '<span class="unita-sats"> sats</span></span>' : sats(n);
   return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo') + '">'
     + r('Sats dello scambio', sats(o.sats))
     + (deposito && o.margine_sats ? r('Margine per la rete', sats(o.margine_sats)) : '')
@@ -68554,7 +68583,9 @@ function ordinaLibroP2P(righe, lato, criterio){
     : c === 'imp-giu' ? (a, b) => capoImportoP2P(b, true) - capoImportoP2P(a, true)
     : c === 'imp-su' ? (a, b) => capoImportoP2P(a, false) - capoImportoP2P(b, false)
     : (a, b) => {
-      const pa = premioCardP2P(a), pb = premioCardP2P(b);
+      /* la card on-chain porta il suo metro (`vistaOrdinamentoOcP2P`) */
+      const metroCard = x => x && 'premioOc' in x ? x.premioOc : premioCardP2P(x);
+      const pa = metroCard(a), pb = metroCard(b);
       if (pa === null || pb === null) return (pa === null) - (pb === null);
       return (pa - pb) * verso;
     };
@@ -70034,14 +70065,24 @@ function renderP2P(){
   const usdtNovita = (typeof novitaUsdtLibroP2P === 'function' ? novitaUsdtLibroP2P() : '')
     + (typeof novitaCoinLibroP2P === 'function' ? novitaCoinLibroP2P() : '')
     + (typeof cartaPrezzoP2P === 'function' ? cartaPrezzoP2P() : '');
-  const onchainCarte = typeof carteOnchainLibroP2P === 'function' ? carteOnchainLibroP2P(k, usdtNovita) : '';
+  /* ORDINATO PER CONVENIENZA O PER IMPORTO, le card on-chain entrano
+     NELLO STESSO ordinamento di quelle di Lightning (16 nov 2026,
+     cantiere ricevi-mercato, vedi `vistaOrdinamentoOcP2P`); a «Piu'
+     recenti» restano in cima, sotto il loro rettangolo, come prima */
+  const critLibro = ordineLibroP2P();
+  const misti = critLibro !== 'recenti' && typeof vistaOrdinamentoOcP2P === 'function';
+  const onchainCarte = typeof carteOnchainLibroP2P === 'function' ? carteOnchainLibroP2P(k, usdtNovita, misti) : '';
+  const carteLibro = misti
+    ? ordinaLibroP2P(elenco.concat(righeOnchainLibroP2P(k).map(vistaOrdinamentoOcP2P)), p2pLato, critLibro)
+        .map(x => x.oc ? rigaOnchainP2P(x.oc) : rigaOrdineP2P(x))
+    : elenco.map(rigaOrdineP2P);
   if (typeof rinfrescaOnchainP2P === 'function') rinfrescaOnchainP2P();
   box.innerHTML = avvisi
     /* l'avviso di chi e' su Tor (11 ott 2026): una riga, sopra il libro */
     + (typeof avvisoMemoriaBrowserP2P === 'function' ? avvisoMemoriaBrowserP2P(typeof suOnion === 'function' && suOnion()) : '')
     + (onchainCarte || usdtNovita)
     + mappa
-    + (elenco.length ? elenco.map(rigaOrdineP2P).join('')
+    + (carteLibro.length ? carteLibro.join('')
        : onchainCarte ? ''
        : vuotoInAttesa ? scheletroLibroP2P()
        : `<div class="empty">${vuoto.logo
@@ -81887,7 +81928,10 @@ async function mossaOrdineP2P(id, azione, fatto, sto){
    T bianca, disegnato qui in SVG (nessun file in piu', nessuna rotta
    nuova), al posto del ₮ di testo di ieri. Sta su UNA riga e senza
    apici singoli: i banchi delle prove la ritagliano fino al primo «];». */
-const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺'}, {cod: 'USDT', nome: 'Tether USD', segno: 'USDT', bandiera: '<svg class="ico-usdt" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="1.15em" height="1.15em" style="vertical-align:-0.2em" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#26A17B"/><path fill="#FFF" d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117"/></svg>'}, {cod: 'CHF', nome: 'Franco svizzero', segno: 'CHF', bandiera: '🇨🇭'}];
+/* IL FRANCO SUBITO SOTTO L'EURO (16 nov 2026, cantiere ricevi-mercato,
+   Andrea: «CHF mettimelo sotto a euro dato che è una valuta tradizionale»):
+   prima le valute tradizionali, poi l'USDT e in coda le monete. */
+const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺'}, {cod: 'CHF', nome: 'Franco svizzero', segno: 'CHF', bandiera: '🇨🇭'}, {cod: 'USDT', nome: 'Tether USD', segno: 'USDT', bandiera: '<svg class="ico-usdt" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="1.15em" height="1.15em" style="vertical-align:-0.2em" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#26A17B"/><path fill="#FFF" d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117"/></svg>'}];
 /* I METODI SONO UN VOCABOLARIO CHIUSO (set 2026, decisione di Andrea
    che ROVESCIA la scelta di prima, dove le pillole erano un
    suggerimento e sotto c'era un campo di testo libero).
