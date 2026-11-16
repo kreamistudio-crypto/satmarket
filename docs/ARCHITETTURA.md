@@ -20496,6 +20496,22 @@
   sottolineato e non si trovava. NOTA_LOCKER resta in coda, com'era;
   il pannello ordine eredita tutto per costruzione (secondo chiamante
   del giudice unico).
+  DAL 16 NOV 2026 (cantiere punto-ritiro-ui) la NOTA_LOCKER esce da
+  `mappePunti` solo di serie (`conNota = true`, l'ordine): la cassa la
+  dice da sé SOTTO le due opzioni del tipo, e a locker scelto tace. Le
+  domande del cassetto portano un numero (`passo`: contano solo i passi
+  presenti), e la riga compatta va su due righe (`.due-righe`:
+  `.punto-cosa` sopra, `.punto-dove` sotto, intero). Nell'ordine il punto del compratore è
+  `pannelloPuntoOrdine(o)`: CHIUSO (cosa, dove, «Cambia il punto») col
+  punto già scritto, APERTO senza punto o con l'obiezione del
+  venditore; lo stato è `puntoOrdineAperto` (l'id dell'ordine) e il
+  testo in corso `puntoOrdineBozza` ({id, testo}). Tipo, Cambia e
+  Annulla ridisegnano il SOLO `#puntoOrdinePannello`
+  (`ridisegnaPuntoOrdine`), mai `openOrder`; il Salva, che aspetta il
+  server, passa da `ridisegnaOrdine(o)` come tutti i gesti. In Vendi il costo verso
+  il punto è una riga `.sped-zona` dentro `#sellSpedField`, subito
+  sotto quella di casa; nel Profilo le pillole dei corrieri in
+  `RETE_DEL_CORRIERE` portano ICO_LOCKER.
   L'INVITO È UN FOGLIO, E DALL'AGO 2026 SENZA TETTO (decisione di
   Andrea che ROVESCIA i 3 inviti — il perché di ieri va tenuto perché
   resta vero: «un cartello che compare sempre uguale si impara a

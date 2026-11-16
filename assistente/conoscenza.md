@@ -884,13 +884,13 @@ Costo di spedizione
 Paese di casa
 Italia
 sats ⇄
+Locker / punto
+sats
+Facoltativo, spesso costa meno. Vuoto = come a casa; 0 = gratis al punto.
  🌍 Spedizione internazionale 
 Dogana ed eventuale IVA sono a carico di chi riceve: non le incassi tu e non le anticipa Barattolo.
  Non spedisco in Italia
 Lo paga chi compra, tu lo incassi per intero. Nel tuo paese vuoto o 0 = gratis. Nelle zone estere 0 = gratis e casella vuota = lì non spedisci. San Marino e Città del Vaticano contano come Italia.
-Costo verso un punto di ritiro (facoltativo)
-sats
-Spesso costa meno che a un indirizzo. Vuoto = vale il costo qui sopra; 0 = gratis al punto.
 
 <!-- pezzo schermata-035 | schermata -->
 ## Schermata «Vendi (pubblicare un annuncio)» (2/2)
