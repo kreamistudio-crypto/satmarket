@@ -395,7 +395,13 @@ jobs:
       # (p2p-usdt T1, 1 nov), entrato intero nella storia di main con la
       # promozione del 2 nov. Pubblico come gli altri: per VALORE, col
       # prefisso di 16; in prove.py ora sta spezzato in due.
-      CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g;s/\bf91e9d7c30894cb0[0-9a-f]{48}\b//g;s/\b85d68c6972360099[0-9a-f]{48}\b//g;s/\b3501454135014541[0-9a-f]{48}\b//g;s/\be8e936915bc05165[0-9a-f]{48}\b//g;s/\bc5d2460186f7233c[0-9a-f]{48}\b//g'
+      # E LA CHIAVE PUBBLICA DI BARATTOLO (17 nov 2026, promozione rossa):
+      # la npub di ZAP_NPUB convertita in esadecimale per il NIP-05 di
+      # casa (NIP05_DI_CASA, cantiere nip05-casa del 16 nov), entrata
+      # intera nella storia di main con la promozione del 16 nov. E' una
+      # chiave PUBBLICA, il contrario di un segreto: per VALORE, col
+      # prefisso di 16; in server.py e in prove.py ora sta spezzata in due.
+      CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g;s/\bf91e9d7c30894cb0[0-9a-f]{48}\b//g;s/\b85d68c6972360099[0-9a-f]{48}\b//g;s/\b3501454135014541[0-9a-f]{48}\b//g;s/\be8e936915bc05165[0-9a-f]{48}\b//g;s/\bc5d2460186f7233c[0-9a-f]{48}\b//g;s/\b2e7afe3f9af8c3dc[0-9a-f]{48}\b//g'
       FORMA_HEX: '\b[0-9a-f]{64}\b'
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5

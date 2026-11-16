@@ -166492,7 +166492,10 @@ def prove_leva_rgb():
     prova("i nomi della casa sono «_» e «barattolo», con la hex di ZAP_NPUB",
           {"_": hex_zap, "barattolo": hex_zap}, CASA)
     prova("...che e' la npub dell'account ufficiale (16 nov 2026)",
-          "2e7afe3f9af8c3dc90d6e8acaf5d7aa926a54f0c22f1c555707309c059fe831b", hex_zap)
+          # spezzata in due (17 nov 2026): sessantaquattro esadecimali
+          # di fila sono la forma che il job «segreti» della CI ferma
+          "2e7afe3f9af8c3dc90d6e8acaf5d7aa9"
+          "26a54f0c22f1c555707309c059fe831b", hex_zap)
     prova("...e il convertitore del server e' quello giusto: CHARSET_BECH32 combacia",
           True, 'CHARSET_BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"' in src)
     prova("...e rgb_ammesso dice no a chiunque, anche a 999", False,

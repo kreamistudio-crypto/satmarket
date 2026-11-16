@@ -85909,3 +85909,33 @@ DA GUARDARE. Su Tor vero: chiudere e riaprire il browser e vedere il
 foglio tornare al primo gesto on-chain (le ricevute se ne vanno con le
 parole). Gli scambi aperti PRIMA del deploy non passano dalla porta. Le
 cure 1-3 della verifica restano da decidere.
+
+## La promozione rossa del 16 nov: la chiave pubblica di casa intera nel codice (17 nov 2026, cantiere promozione-16-nov)
+
+COSA. La promozione 031be30b (11 commit, develop intero) ha fatto rosso
+il job «segreti» della CI su main: «Sembra esserci una chiave privata in
+esadecimale» in `server.py` e `prove.py`. Era la chiave PUBBLICA di
+Barattolo (la npub di ZAP_NPUB convertita) che il cantiere nip05-casa ha
+scritto intera, sessantaquattro esadecimali di fila, in `NIP05_DI_CASA` e
+nella sua prova. Le prove erano verdi; «pronto» non e' avanzato e il VPS
+e' rimasto su 419526e6: in produzione non e' arrivato niente di rotto.
+
+LA CURA, la stessa del 2 nov. In `server.py` la hex sta spezzata in due in
+`_NIP05_HEX_CASA` (stesso valore, stessi nomi «_» e «barattolo»); in
+`prove.py` il confronto con l'account ufficiale ha la hex spezzata in due.
+Nel workflow `CARTONE_HEX` ha il suo valore col prefisso di 16, perche'
+intera e' gia' nella storia di main (fcab10ef) e la storia non si
+riscrive. La regola dello scanner non cambia.
+
+PROVATO. Sull'albero corretto: nessun file fuori dalle esclusioni con 64
+esadecimali di fila (il passo dell'albero, rifatto in locale); il passo
+della cronologia rifatto in locale con il nuovo `CARTONE_HEX` dice zero,
+senza l'eccezione trova le righe della chiave (controprova). Le sezioni
+`prove_leva_rgb` (il NIP-05 di casa), quelle che leggono il workflow e
+il collaudo degli annunci sul profilo verdi; controprova: un carattere
+della hex cambiato in `server.py` fa rossa «i nomi della casa ... con la
+hex di ZAP_NPUB».
+
+LA LEZIONE. Su develop la CI non gira, quindi il job «segreti» lo vede
+per la prima volta la promozione. Un cantiere che scrive una hex di 64
+(chiave pubblica, sha256, vettore di prova) la spezza in due da subito.

@@ -57027,9 +57027,16 @@ except (TypeError, ValueError, AttributeError):
 # e i nomi di casa passano dal setaccio qui sotto come tutti gli altri.
 # La hex e' la npub convertita, mai la npub (lo vuole il NIP); una
 # prova pretende che combaci con ZAP_NPUB.
+# SPEZZATA IN DUE (17 nov 2026, promozione rossa): sessantaquattro
+# esadecimali di fila sono la forma che il job «segreti» della CI
+# prende per una chiave privata (FORMA_HEX), e a cedere e' il
+# codice, mai la regola. E' la chiave PUBBLICA di ZAP_NPUB; intera
+# e' gia' nella storia, e li' ha l'eccezione per VALORE in CARTONE_HEX.
+_NIP05_HEX_CASA = ("2e7afe3f9af8c3dc90d6e8acaf5d7aa9"
+                   "26a54f0c22f1c555707309c059fe831b")
 NIP05_DI_CASA = {
-    "_": "2e7afe3f9af8c3dc90d6e8acaf5d7aa926a54f0c22f1c555707309c059fe831b",
-    "barattolo": "2e7afe3f9af8c3dc90d6e8acaf5d7aa926a54f0c22f1c555707309c059fe831b",
+    "_": _NIP05_HEX_CASA,
+    "barattolo": _NIP05_HEX_CASA,
 }
 NIP05_NOMI = {**NIP05_DI_CASA, **NIP05_NOMI}
 # il nome ha l'alfabeto del NIP-05 (a-z0-9-_.), la chiave 64 esadecimali
