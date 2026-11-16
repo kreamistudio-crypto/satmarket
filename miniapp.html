@@ -37645,7 +37645,8 @@ function chiediConferma(c){
      (`p2p-ico-3d`) */
   if (c.vestito === 'compro-oc' || c.vestito === 'vendo-oc') {
     ok.className = 'btn ' + (c.vestito === 'compro-oc' ? 'primary' : 'rosso') + ' p2p-ico-3d';
-    ok.insertAdjacentHTML('afterbegin', '<span class="p2p-invia-oc">' + P2P_OC_MONETA + '</span>');
+    ok.insertAdjacentHTML('afterbegin', typeof iconaPresaOcP2P === 'function'
+      ? iconaPresaOcP2P(c.reteLn) : '<span class="p2p-invia-oc">' + P2P_OC_MONETA + '</span>');
   }
   el('confNo').style.display = c.avviso ? 'none' : '';
   /* LA SECONDA STRADA (12 ott 2026, notte, cantiere libro-vuoto): chi
@@ -63190,6 +63191,7 @@ function apriOnchainP2P(id, modo){
        a sinistra (`vestito: 'compro-oc'` / `'vendo-oc'`, vedi chiediConferma) */
     etichetta: vendeLui ? 'Compra' : 'Vendi',
     vestito: vendeLui ? 'compro-oc' : 'vendo-oc',
+    reteLn: conTasti && (p2pOcPresaRete[o.id] || {}).rete === 'ln',
     poi: () => prendiOnchainP2P(Number(o.id))});
 }
 
@@ -63392,10 +63394,23 @@ function corpoPresaOcP2P(o, vendeLui){
     + (usdtOc(o) ? ' ⚠️ Gli USDT viaggiano solo su ' + (o.metodi || []).map(m => (reteUsdtDaMetodoP2P(m) || {}).nome).filter(Boolean).join(' o ')
       + (vendeLui ? '.' : ': dopo la presa scrivi nello scambio il tuo indirizzo USDT.') : '');
 }
+/* L'ICONA DEL «COMPRA» / «VENDI» SEGUE IL TASTO DELLA RETE (16 nov 2026,
+   cantiere ricevi-mercato, Andrea: «Quando decido di ricevere lighting da
+   un ordine onchain deve cambiare anche l'icona in basso affianco a
+   compra»): col tasto «⚡ Lightning» il fulmine della presa Lightning,
+   con «₿ On-chain» la moneta di sempre. PURA. */
+function iconaPresaOcP2P(ln){
+  return ln ? '<span class="p2p-invia-ico">⚡</span>'
+    : '<span class="p2p-invia-oc">' + P2P_OC_MONETA + '</span>';
+}
 function ridisegnaReteOcPresaP2P(id){
   const box = el('p2pOcPresaRete');
   const o = (p2pOnchainLibro.eventi || []).find(x => +x.id === +id);
   if (box && o) box.innerHTML = reteOcPresaHtmlP2P(o, o.lato === 'sell');
+  /* ...e l'icona del bottone del foglio, al posto di quella che c'era */
+  const ok = el('confOk');
+  const vecchia = box && o && ok ? ok.querySelector(':scope > .p2p-invia-oc, :scope > .p2p-invia-ico') : null;
+  if (vecchia) vecchia.outerHTML = iconaPresaOcP2P((p2pOcPresaRete[o.id] || {}).rete === 'ln');
   const corpo = el('confCorpo');
   if (box && o && corpo) corpo.textContent = corpoPresaOcP2P(o, o.lato === 'sell');
   const conto = el('p2pOcPresaConto');

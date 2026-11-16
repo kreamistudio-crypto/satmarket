@@ -160197,6 +160197,7 @@ let p2pOnchainLibro = {eventi: [{id: 7, lato: 'sell', sats: 100000}, {id: 8, lat
 let FETCH = []; const fetch = async (u, o) => { FETCH.push([u, o && o.body]); return {ok: true, json: async () => ({})}; };
 const satsCardOnchainP2P = o => fmt(o.sats) + ' sats', fmtSoldiP2P = e => String(e);
 const contoOnchainP2P = o => 'CONTO ' + JSON.stringify(o.swap);
+const P2P_OC_MONETA = '<i>MONETA</i>';
 """ + mini[a:b] + r"""
 const out = {};
 const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed="(true|false)"[^>]*>([^<]+)</g)].map(m => m[3] + ':' + m[2]);
@@ -160240,6 +160241,15 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
   await applicaReteOcPresaP2P(7, 'venditore');
   out.dopo = [p2pOcDepositoRete[8], FETCH.map(f => f[0] + ' ' + f[1]), p2pOcPresaRete[7] === undefined];
   out.log = LOG.filter(x => /^(rev|sub|presa)/.test(x));
+  /* L'ICONA DEL «COMPRA» segue il tasto (16 nov 2026, cantiere
+     ricevi-mercato): il bottone finto tiene solo la sua icona */
+  const bottone = icona => { const bt = {icona, querySelector: () => ({set outerHTML(v){ bt.icona = v; }})}; return bt; };
+  NODI.confOk = bottone(iconaPresaOcP2P(false));
+  out.iconaPrima = NODI.confOk.icona;
+  await scegliReteOcPresaP2P(7, 'ln');
+  out.iconaLn = NODI.confOk.icona;
+  await scegliReteOcPresaP2P(7, 'oc');
+  out.iconaOc = NODI.confOk.icona;
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e && e.stack || e)); });
 """
@@ -160308,6 +160318,13 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
         prova("...coi preventivi giusti: lo swap inverso per ricevere on-chain e per "
               "depositare, il submarine per ricevere in Lightning",
               ["rev:98500", "presa:L2", "sub:98500", "rev:101000"], o["log"])
+        prova("L'ICONA DEL «COMPRA» SEGUE IL TASTO (Andrea: «quando decido di ricevere "
+              "lighting da un ordine onchain deve cambiare anche l'icona in basso affianco a "
+              "compra»): la moneta on-chain, il fulmine col «⚡ Lightning», la moneta di nuovo",
+              ['<span class="p2p-invia-oc"><i>MONETA</i></span>',
+               '<span class="p2p-invia-ico">⚡</span>',
+               '<span class="p2p-invia-oc"><i>MONETA</i></span>'],
+              [o["iconaPrima"], o["iconaLn"], o["iconaOc"]])
     presa = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
     prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
     dett = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
@@ -160326,7 +160343,9 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
           ['fuori["lnPossibile"] = bool(p2p_onchain_ln_per(chi))' in src,
            'fuori["depositoLnPossibile"] = bool(p2p_onchain_deposito_ln_per(chi))' in src,
            "lnPossibile: !!busta.lnPossibile, depositoLnPossibile: !!busta.depositoLnPossibile" in mini,
-           "via: conTasti ? '' : 'via on-chain'," in presa,
+           "via: conTasti ? '' : 'via on-chain'," in presa
+           # ...e il bottone nasce col fulmine se «⚡ Lightning» era gia' scelto
+           and "reteLn: conTasti && (p2pOcPresaRete[o.id] || {}).rete === 'ln'," in presa,
            "await applicaReteOcPresaP2P(id, d.ruolo);" in prendi,
            "if (tit && !reteTasti) tit.insertAdjacentHTML('beforeend', '<small class=\"p2p-via\">via Lightning</small>');" in dett,
            "box.innerHTML =\n    reteTasti +" in dett])
@@ -162211,10 +162230,13 @@ console.log(JSON.stringify(out));
           ("(daScegliere ? (bz ? '🧾 Il tuo PayCode' : 'Scegli') : '<span class=\"p2p-invia-ico\">⚡</span>' + (compro ? 'Compra' : 'Vendi'))" in mini,
            "etichetta: vendeLui ? 'Compra' : 'Vendi',\n    vestito: vendeLui ? 'compro-oc' : 'vendo-oc'," in _oc_presa,
            "ok.className = 'btn ' + (c.vestito === 'compro-oc' ? 'primary' : 'rosso') + ' p2p-ico-3d';" in _conf,
-           "ok.insertAdjacentHTML('afterbegin', '<span class=\"p2p-invia-oc\">' + P2P_OC_MONETA + '</span>');" in _conf
+           # dal 16 nov (cantiere ricevi-mercato) l'icona la sceglie
+           # iconaPresaOcP2P, che col tasto «⚡ Lightning» mette il fulmine
+           "ok.insertAdjacentHTML('afterbegin', typeof iconaPresaOcP2P === 'function'\n"
+           "      ? iconaPresaOcP2P(c.reteLn) : '<span class=\"p2p-invia-oc\">' + P2P_OC_MONETA + '</span>');" in _conf
            # l'etichetta resta scritta col textContent PRIMA della moneta
            and _conf.index("el('confOk').textContent = c.etichetta || 'Conferma';")
-               < _conf.index("ok.insertAdjacentHTML('afterbegin', '<span class=\"p2p-invia-oc\">'"),
+               < _conf.index("ok.insertAdjacentHTML('afterbegin', typeof iconaPresaOcP2P"),
            "etichetta: 'Prendi lo scambio'" in _oc_presa))
     prova("...e «Scegli» resta senza", False, "'orange p2p-ico-3d'" in mini)
     # BARATTOZON (19:40, «stesso effetto quando pubblichi un ordine
