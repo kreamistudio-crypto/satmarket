@@ -4252,6 +4252,54 @@
   .p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-usdt-novita.appeso{
     top:calc(var(--p2p-testa-alta,0px) + 62px);height:52px}
   .p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-usdt-novita.appeso .p2p-oc-faccia{top:0}
+  /* IL «NOVITÀ» DI ETH, MONERO E USDe (16 nov 2026, cantiere
+     p2p-monete-banner, Andrea: «voglio che mi crei un banner novità
+     dedicato a queste ultime monete che portiamo in produzione.
+     Similmente deve essere un banner come abbiamo creato per l'onchain e
+     per USDT, quindi quando uno ci clicca parte un tutorial»): lo stesso
+     rettangolo — misure, appeso, colpo di partenza e acceso sono le regole
+     qui sopra — vestito del viola-blu di Ethereum (#627EEA, il fondo della
+     tessera ETH). Lo sfumato e' il disegno degli altri due: 42% dietro le
+     monete, 10% dietro la freccia; acceso, il colore pieno con le scritte
+     bianche. Davanti, al posto della moneta sola, i TRE LOGHI accavallati
+     (`P2P_LOGHI_COIN`, gli stessi delle card), ognuno col suo filo del
+     colore del fondo, cosi' si staccano l'uno dall'altro. */
+  .p2p-oc-novita.p2p-coin-novita .p2p-oc-faccia{
+    background:linear-gradient(90deg,rgba(98,126,234,.42) 0%,rgba(98,126,234,.10) 100%),var(--card);
+    box-shadow:inset 0 0 0 .5px rgba(98,126,234,.30)}
+  .p2p-coin-novita .p2p-oc-novita-tag{color:#4F6BD8}
+  html[data-tema="scuro"] .p2p-coin-novita .p2p-oc-novita-tag{color:#93A6F3}
+  .p2p-oc-novita.p2p-coin-novita.acceso .p2p-oc-faccia{background:#627EEA;box-shadow:inset 0 0 0 1px #4A63C4}
+  .p2p-oc-novita.p2p-coin-novita.acceso .p2p-oc-novita-tag{color:#fff}
+  .p2p-coin-trio{flex:0 0 auto;display:inline-flex;align-items:center;position:relative;z-index:1}
+  .p2p-coin-trio .p2p-coin-svg{width:26px;height:26px;display:block;border-radius:50%;
+    box-shadow:0 0 0 2px var(--card)}
+  .p2p-coin-trio .p2p-coin-svg + .p2p-coin-svg{margin-left:-9px}
+  /* acceso, il filo diventa bianco come la moneta on-chain sul suo arancio:
+     col filo blu il cerchio di ETH spariva nel fondo (giro dal vivo) */
+  .p2p-oc-novita.p2p-coin-novita.acceso .p2p-coin-trio .p2p-coin-svg{box-shadow:0 0 0 2px rgba(255,255,255,.9)}
+  .p2p-oc-novita.urto .p2p-oc-faccia .p2p-coin-trio{animation:p2pOcUrto .42s ease-out .08s}
+  /* il nome su UNA riga anche a 320 px (giro dal vivo: andava a capo
+     dopo «XMR ·»): sotto i 360 px loghi e scritta un filo piu' piccoli */
+  .p2p-coin-novita .p2p-oc-novita-testo{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  @media (max-width:360px){
+    .p2p-coin-novita .p2p-oc-novita-testo{font-size:14px}
+    .p2p-coin-trio .p2p-coin-svg{width:22px;height:22px}
+    .p2p-coin-trio .p2p-coin-svg + .p2p-coin-svg{margin-left:-8px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .p2p-oc-novita.urto .p2p-oc-faccia .p2p-coin-trio{animation:none}
+  }
+  /* APPESO SEMPRE ANCHE LUI, IN FONDO ALLA PILA: sotto quello on-chain o
+     sotto quello degli USDT si appende 62 px piu' giu' (la regola degli
+     USDT); sotto TUTTI E DUE, 114 px (62 dell'on-chain + 52 degli USDT
+     appeso sotto di lui). Il `~` doppio pesa di piu' e vince sul singolo.
+     Da solo, in cima, e' il rettangolo di sempre. */
+  .p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-coin-novita.appeso{
+    top:calc(var(--p2p-testa-alta,0px) + 62px);height:52px}
+  .p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-coin-novita.appeso .p2p-oc-faccia{top:0}
+  .p2p-oc-novita.appeso ~ .p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-coin-novita.appeso{
+    top:calc(var(--p2p-testa-alta,0px) + 114px)}
   /* LA CARD DEL PREZZO (13 nov 2026, cantiere prezzo-btc-p2p, la «A» scelta
      da Andrea sulle foto): sotto i «Novità», sopra gli ordini, NON appesa —
      se ne va col dito come le card. La veste e' quella di `.p2p-ord`
@@ -10814,6 +10862,8 @@
   .tour-reti{display:flex;align-items:center;justify-content:center;gap:12px;margin:2px 0 12px}
   .tour-reti .cambio-moneta.p2p-oc-moneta{width:52px;height:52px}
   .tour-reti .cambio-moneta.p2p-oc-moneta .cambio-svg{width:30px;height:30px}
+  /* ...e i tre loghi del «Novità» di ETH, Monero e USDe (16 nov 2026), in fila */
+  .tour-reti.tour-coin .p2p-coin-svg{width:46px;height:46px;display:block}
   .tour-reti-frecce svg{display:block;width:56px;height:30px;fill:none;stroke:#F7931A;
     stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
   .tour-arrivo{display:table;margin:0 auto 8px;padding:2px 10px;border-radius:999px;
@@ -62234,6 +62284,162 @@ function fineTutorialUsdtP2P(){
 }
 /* ============ fine del «Novità» degli USDT ============ */
 
+
+/* ============ IL «NOVITÀ» DI ETH, MONERO E USDe E IL SUO TUTORIAL (16 nov 2026) ============
+   Cantiere p2p-monete-banner. Andrea, il giorno in cui ETH, Monero e USDe
+   si accendono per tutti (leva `P2P_COIN_ATTIVO`): «voglio che mi crei un
+   banner novità dedicato a queste ultime monete che portiamo in
+   produzione. Similmente deve essere un banner come abbiamo creato per
+   l'onchain e per USDT, quindi quando uno ci clicca parte un tutorial».
+   E' IL TERZO GEMELLO, pezzo per pezzo quello degli USDT: lo stesso
+   rettangolo (le classi `p2p-oc-*`, piu' `p2p-coin-novita` che lo veste
+   del viola-blu di Ethereum), appeso sempre sotto la testata, il colpo di
+   partenza, acceso durante il giro, e il giro sul motore di sempre
+   (`avviaTour`). Lo vede chi vede le monete (`coinVistoP2P`, la busta del
+   server che segue la leva): a leva spenta il libro e' quello di ieri.
+   Sta SOTTO quello degli USDT (che sta sotto quello on-chain): l'ultimo
+   arrivato in fondo alla pila, e la regola `~` del CSS lo appende sotto
+   quelli che ha sopra, cosi' nessuno copre l'altro.
+   LA DIFFERENZA CON GLI USDT, che il tutorial deve dire: qui l'ordine
+   resta IN EURO. ETH, Monero e USDe sono METODI («Altri metodi ▾» del
+   foglio), e chi paga manda il controvalore al cambio del momento. */
+function trioCoinP2P(){
+  return '<span class="p2p-coin-trio" aria-hidden="true">'
+    + P2P_LOGHI_COIN.eth + P2P_LOGHI_COIN.xmr + P2P_LOGHI_COIN.usde + '</span>';
+}
+function novitaCoinVistaP2P(){
+  return typeof coinVistoP2P === 'function' && coinVistoP2P() && !DEMO && !VETRINA;
+}
+let tutorialCoinLato = null;   // il lato da rimettere alla fine; null = nessun tutorial
+let p2pCoinTutorialTimer = null;
+function novitaCoinLibroP2P(){
+  if (!novitaCoinVistaP2P()) return '';
+  if (typeof testaAltaP2P === 'function') testaAltaP2P();
+  return '<div class="p2p-oc-novita p2p-coin-novita appeso'
+    + (tutorialCoinLato !== null || p2pCoinTutorialTimer ? ' acceso' : '') + '" id="p2pCoinNovita">'
+    + '<button type="button" class="p2p-oc-faccia" onclick="apriNovitaCoinP2P()">'
+    + trioCoinP2P() + '<span class="p2p-oc-novita-testo">ETH · XMR · USDe</span>'
+    + '<span class="p2p-oc-novita-tag">Novità</span>'
+    + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
+    + '</div>';
+}
+function accendiNovitaCoinP2P(si){
+  const r = el('p2pCoinNovita');
+  if (r) r.classList[si ? 'add' : 'remove']('acceso');
+}
+/* il tocco: il colpo del rimbalzo, e a colpo finito il giro */
+function apriNovitaCoinP2P(){
+  if (tourInCorso || p2pCoinTutorialTimer) return;
+  haptic();
+  accendiNovitaCoinP2P(true);
+  const r = el('p2pCoinNovita');
+  if (!r || effettiRidotti()) { tutorialCoinP2P(); return; }
+  r.classList.remove('urto');
+  void r.offsetWidth;            // l'animazione riparte anche al secondo tocco
+  r.classList.add('urto');
+  p2pCoinTutorialTimer = setTimeout(() => {
+    p2pCoinTutorialTimer = null;
+    r.classList.remove('urto');
+    tutorialCoinP2P();
+  }, 480);
+}
+/* LE TAPPE: la novita' e la regola (ordine in euro, sats in garanzia, la
+   moneta da persona a persona) sul banner; il logo di Ethereum su una
+   card finta che si paga solo in ETH, e su una card «SEPA, XMR» la moneta
+   fra i metodi; il +, il foglio «Pubblica» in euro con gli «Altri metodi»
+   aperti, e al centro come si paga senza sbagliare: indirizzo controllato,
+   cifra al cambio, id della transazione (con Monero anche la chiave) e il
+   controllo sull'explorer. Testi in due righe a 320 px, la regola del giro
+   guidato; le tappe del foglio col ripiego (`p2pNuovoCorpo`), come negli
+   USDT. */
+const TAPPE_TUTORIAL_COIN_P2P = [
+  { trova: () => el('p2pCoinNovita'),
+    testo: `<b>Novità!</b> Da oggi gli scambi P2P si possono pagare anche in <b>ETH</b>, <b>Monero</b> (XMR) o <b>USDe</b>.` },
+  { trova: () => el('p2pCoinNovita'),
+    testo: `L'ordine resta in <b>euro</b> e i sats nel <b>deposito di garanzia</b>; la moneta passa direttamente da una persona all'altra, al cambio del momento.` },
+  { trova: () => esempioTutorialCoinP2P(0), tondo: true,
+    testo: `Un ordine che si paga solo in una moneta veste il suo <b>logo</b>: questo si paga in ETH.` },
+  { trova: () => esempioTutorialCoinP2P(1),
+    testo: `Se ha anche altri metodi, la moneta la trovi qui, <b>fra i metodi</b>, col suo logo.` },
+  { trova: () => piuGiroP2P(), tondo: true,
+    testo: `Vuoi pubblicarne uno tu? Tocca il <b>+</b>…` },
+  { prima: () => foglioTutorialCoinP2P(), trova: () => el('p2pNuovoMetodiBtn')?.closest('.p2p-sez') || el('p2pNuovoMetodiBtn') || el('p2pNuovoCorpo'),
+    testo: `…lascia gli euro e fra gli <b>Altri metodi</b> scegli ETH, Monero o USDe, sulla rete che vuoi.` },
+  /* AL CENTRO, a foglio chiuso: come si paga senza sbagliare. Il testo
+     e' un GETTER: i tre loghi (`P2P_LOGHI_COIN`) nascono molto piu' giu'
+     nel file, e un template scritto qui li cercherebbe al caricamento —
+     «Cannot access before initialization», e la pagina intera si ferma
+     (l'ha detto il giro dal vivo, non le prove) */
+  { prima: () => { if (el('p2pNuovoSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pNuovoSheet'); },
+    trova: () => el('p2pCorpo'), centro: true,
+    get testo(){ return `<span class="tour-reti tour-coin" aria-hidden="true">${P2P_LOGHI_COIN.eth}${P2P_LOGHI_COIN.xmr}${P2P_LOGHI_COIN.usde}</span>`
+      + `Chi riceve scrive il suo indirizzo e l'app controlla che sia giusto. `
+      + `Chi paga vede quanto mandare e incolla l'id della transazione (con Monero anche la chiave): un tocco, e lo controllate sull'<b>explorer</b>.`; },
+  },
+];
+function tutorialCoinP2P(){
+  if (tourInCorso || !novitaCoinVistaP2P() || document.querySelector('.view.active')?.id !== 'view-p2p') {
+    if (tutorialCoinLato === null) accendiNovitaCoinP2P(false);
+    return;
+  }
+  tutorialCoinLato = p2pLato;
+  if (p2pLato !== 'compro') setLatoP2P('compro', true);
+  if (!avviaTour(TAPPE_TUTORIAL_COIN_P2P, fineTutorialCoinP2P)) fineTutorialCoinP2P();
+}
+/* LE DUE CARD FINTE, subito sotto il «Novità»: una che si paga solo in
+   ETH (la tessera col logo, `coinUnicaP2P`) e una «SEPA, XMR (Monero)»
+   (le stelle, e il logo di Monero nella scatola dei metodi). La card
+   d'esempio del giro guidato (`rigaOrdineP2P` con `esempio`), senza id e
+   senza tocco; si chiedono a ogni riposizionamento, quindi un libro
+   ridisegnato le rimette. Torna la tessera della prima, la scatola dei
+   metodi della seconda. */
+function esempioTutorialCoinP2P(quale){
+  const box = el('p2pCorpo');
+  if (!box) return null;
+  let t = box.querySelector('.p2p-coin-esempi');
+  if (!t) {
+    const adesso = Math.floor(Date.now() / 1000);
+    const carta = metodi => rigaOrdineP2P({id: '', esempio: p2pLato,
+      lato: p2pLato === 'compro' ? 'sell' : 'buy', fiat: 'EUR', euro: 50, euroMax: 0, sats: 0, premium: 0,
+      metodi, creato: adesso - 86400, scade: adesso + 6 * 86400,
+      faccia: {nome: 'Esempio', voti: 24, media: 4.9}});
+    t = document.createElement('div');
+    t.className = 'p2p-coin-esempi';
+    t.setAttribute('aria-hidden', 'true');
+    t.innerHTML = carta(['ETH (Ethereum)']) + carta(['SEPA', 'XMR (Monero)']);
+    const nov = el('p2pCoinNovita');
+    if (nov && nov.parentNode === box) nov.after(t); else box.prepend(t);
+  }
+  const card = t.querySelectorAll('.p2p-ord')[quale ? 1 : 0];
+  return card ? card.querySelector(quale ? '.p2p-paga' : '.p2p-tessera-coin') : null;
+}
+/* il + «toccato» dal tutorial: il foglio «Pubblica» di Lightning si apre
+   sotto il velo, in euro, con la tendina dei metodi e gli «Altri metodi»
+   aperti, cosi' le sette voci delle monete si vedono */
+function foglioTutorialCoinP2P(){
+  if (!el('p2pNuovoSheet')?.classList.contains('open')) {
+    if (typeof p2pNuovoReteChiesta !== 'undefined') p2pNuovoReteChiesta = '';
+    apriNuovoOrdineP2P();
+  }
+  if (!el('p2pNuovoSheet')?.classList.contains('open')) return;
+  p2pNuovoValuta = 'EUR';
+  p2pNuovoMetodi = [];
+  p2pNuovoAperta = true;
+  p2pNuovoAltri = true;
+  renderNuovoOrdineP2P();
+}
+/* la fine, qualunque strada la porti: via le card finte e il foglio, il
+   lato di partenza, e si torna al libro (il «Novità» resta appeso) */
+function fineTutorialCoinP2P(){
+  const lato = tutorialCoinLato;
+  tutorialCoinLato = null;
+  document.querySelectorAll('.p2p-coin-esempi').forEach(n => n.remove());
+  if (el('p2pNuovoSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pNuovoSheet');
+  if (lato && lato !== p2pLato) setLatoP2P(lato, true);
+  accendiNovitaCoinP2P(false);
+}
+/* ============ fine del «Novità» di ETH, Monero e USDe ============ */
+
 /* LA RETE SU OGNI CARD (30 ott 2026, Andrea: «l'icona lightning e
    l'icona onchain dovrebbero essere visibili in ogni card nel libro
    ordini, così la gente capisce subito su quale rete bisogna
@@ -68971,7 +69177,11 @@ function renderP2P(){
   /* ...e LA CARD DEL PREZZO (13 nov 2026, cantiere prezzo-btc-p2p) sotto
      tutti i «Novità», sopra le card degli ordini: viaggia col rettangolo
      degli USDT, quindi sta dove sta lui. Anche lei da sola non e' un libro */
+  /* ...e IL «NOVITÀ» DI ETH, MONERO E USDe (16 nov 2026, cantiere
+     p2p-monete-banner) sotto quello degli USDT, sopra la card del prezzo:
+     l'ultimo arrivato in fondo alla pila, e viaggia con lui */
   const usdtNovita = (typeof novitaUsdtLibroP2P === 'function' ? novitaUsdtLibroP2P() : '')
+    + (typeof novitaCoinLibroP2P === 'function' ? novitaCoinLibroP2P() : '')
     + (typeof cartaPrezzoP2P === 'function' ? cartaPrezzoP2P() : '');
   const onchainCarte = typeof carteOnchainLibroP2P === 'function' ? carteOnchainLibroP2P(k, usdtNovita) : '';
   if (typeof rinfrescaOnchainP2P === 'function') rinfrescaOnchainP2P();

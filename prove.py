@@ -159526,6 +159526,158 @@ console.log(JSON.stringify(out));
            "<b>deposito di garanzia</b>" in _tappe))
 
 
+def prove_novita_coin_p2p():
+    """IL «NOVITÀ» DI ETH, MONERO E USDe E IL SUO TUTORIAL (16 nov 2026,
+    cantiere p2p-monete-banner, Andrea: «voglio che mi crei un banner
+    novità dedicato a queste ultime monete ... similmente deve essere un
+    banner come abbiamo creato per l'onchain e per USDT, quindi quando uno
+    ci clicca parte un tutorial»). Il terzo gemello: solo a chi vede le
+    monete (la leva `P2P_COIN_ATTIVO`, via `coinVistoP2P`), appeso sempre
+    in fondo alla pila dei «Novità», il tutorial di sette tappe sul motore
+    dei giri, il foglio «Pubblica» in euro con gli «Altri metodi» aperti,
+    e alla fine tutto come prima. I pezzi girano in node con finte minime."""
+    print("\n[il «Novità» di ETH, Monero e USDe e il suo tutorial]")
+    import subprocess
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    blocco = mini[mini.index("function trioCoinP2P(){"):
+                  mini.index("/* ============ fine del «Novità» di ETH, Monero e USDe")]
+    banco = """
+const NODI = {};
+function el(id){ return NODI[id] || (NODI[id] = {innerHTML: '', textContent: '', parentNode: null,
+  classList: {s: new Set(), add(c){ this.s.add(c); }, remove(c){ this.s.delete(c); }, contains(c){ return this.s.has(c); }}}); }
+const LOG = [];
+const haptic = () => {}, effettiRidotti = () => true, testaAltaP2P = () => LOG.push('testa');
+let COIN = false, DEMO = false, VETRINA = false, tourInCorso = false, TOUR = null, p2pLato = 'vendo';
+const coinVistoP2P = () => COIN;
+const piuGiroP2P = () => ({}), rigaOrdineP2P = o => '<card ' + o.fiat + ':' + o.metodi.join('|') + '>';
+function setLatoP2P(l){ p2pLato = l; LOG.push('lato:' + l); }
+function avviaTour(tappe, dopo){ TOUR = {tappe, dopo}; LOG.push('tour:' + tappe.length); return true; }
+function chiudiFoglioP2P(id){ el(id).classList.remove('open'); LOG.push('chiudi:' + id); }
+let p2pNuovoValuta = 'USDT', p2pNuovoMetodi = ['USDT (Tron)'], p2pNuovoAperta = false, p2pNuovoAltri = false, p2pNuovoReteChiesta = 'onchain';
+function apriNuovoOrdineP2P(){ LOG.push('apri:' + (p2pNuovoReteChiesta || 'ln')); el('p2pNuovoSheet').classList.add('open'); }
+function renderNuovoOrdineP2P(){ LOG.push('disegno:' + p2pNuovoValuta + ':' + p2pNuovoAperta + ':' + p2pNuovoAltri); }
+const ESEMPI = [];
+const document = {querySelector: () => ({id: 'view-p2p'}), querySelectorAll: () => [],
+  createElement: () => { const n = {className: '', innerHTML: '', setAttribute(){}, querySelectorAll: () => []}; ESEMPI.push(n); return n; }};
+""" + blocco + """
+// I LOGHI NASCONO DOPO, come nella pagina (`P2P_LOGHI_COIN` sta ventimila
+// righe piu' giu'): un blocco che li legge al caricamento esplode qui col
+// «Cannot access before initialization» che fermava la pagina intera
+const P2P_LOGHI_COIN = {eth: '<eth>', xmr: '<xmr>', usde: '<usde>'};
+const out = {};
+out.spento = novitaCoinLibroP2P();
+COIN = true; DEMO = true; out.demo = novitaCoinLibroP2P(); DEMO = false;
+VETRINA = true; out.vetrina = novitaCoinLibroP2P(); VETRINA = false;
+LOG.length = 0;
+const b = novitaCoinLibroP2P();
+out.banner = [/class="p2p-oc-novita p2p-coin-novita appeso" id="p2pCoinNovita"/.test(b),
+  /<span class="p2p-coin-trio" aria-hidden="true"><eth><xmr><usde><\\/span>/.test(b),
+  /p2p-oc-novita-testo">ETH · XMR · USDe<\\/span><span class="p2p-oc-novita-tag">Novità<\\/span>/.test(b),
+  /onclick="apriNovitaCoinP2P\\(\\)"/.test(b), LOG.slice()];
+LOG.length = 0;
+apriNovitaCoinP2P();
+out.tutorial = [LOG.slice(), el('p2pCoinNovita').classList.contains('acceso'),
+  TOUR.tappe.map(t => !!t.prima), TOUR.tappe.map(t => !!t.tondo), TOUR.tappe.map(t => !!t.centro)];
+out.acceso = /acceso/.test(novitaCoinLibroP2P());
+// le card finte: una solo ETH, una SEPA + XMR, subito dopo il banner
+const corpo = el('p2pCorpo'), nov = el('p2pCoinNovita');
+nov.parentNode = corpo; let dopo = null; nov.after = n => { dopo = n; };
+const trovati = [];
+corpo.querySelector = s => s === '.p2p-coin-esempi' ? (dopo || null) : null;
+const carta = (sel) => ({querySelector: q => { trovati.push(q); return {q}; }});
+const t0 = TOUR.tappe[2].trova();
+out.esempi = [ESEMPI.length, ESEMPI[0] && ESEMPI[0].className, ESEMPI[0] && ESEMPI[0].innerHTML, dopo === ESEMPI[0]];
+ESEMPI[0].querySelectorAll = () => [carta(), carta()];
+out.bersagli = [TOUR.tappe[2].trova(), TOUR.tappe[3].trova(), ESEMPI.length];
+// il foglio: aperto sotto il velo, sulla rete Lightning, in euro, altri metodi aperti
+LOG.length = 0; TOUR.tappe[5].prima();
+out.foglio = [LOG.slice(), p2pNuovoValuta, p2pNuovoMetodi.length, p2pNuovoAperta, p2pNuovoAltri];
+LOG.length = 0; TOUR.tappe[6].prima();
+out.centro = LOG.slice();
+out.testi = TOUR.tappe.map(t => t.testo);
+// il secondo tocco a giro aperto non fa niente
+tourInCorso = true; LOG.length = 0; apriNovitaCoinP2P(); out.dueVolte = LOG.slice(); tourInCorso = false;
+el('p2pNuovoSheet').classList.add('open');
+LOG.length = 0; TOUR.dopo(true);
+out.fine = [LOG.slice(), p2pLato, el('p2pCoinNovita').classList.contains('acceso'),
+  /appeso/.test(novitaCoinLibroP2P()), /acceso/.test(novitaCoinLibroP2P())];
+// fuori dal libro (leva spenta) il tutorial non parte, e il banner si spegne
+COIN = false; el('p2pCoinNovita').classList.add('acceso'); LOG.length = 0; tutorialCoinP2P();
+out.chiuso = [LOG.slice(), el('p2pCoinNovita').classList.contains('acceso')];
+console.log(JSON.stringify(out));
+"""
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+        out = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else None
+    except (OSError, subprocess.TimeoutExpired):
+        salta("il banco del «Novità» delle monete", "node assente")
+        return
+    if out is None:
+        prova("il banco del «Novità» delle monete gira", "", (locals().get("r") and r.stderr or "")[-600:])
+        return
+    prova("il «Novità» delle monete solo a chi le vede (leva accesa), mai nel demo "
+          "ne' in vetrina", ["", "", ""], [out["spento"], out["demo"], out["vetrina"]])
+    prova("...coi tre loghi, «ETH · XMR · USDe» e «Novità» accanto alla freccia, appeso, "
+          "misura la testata, e il tocco apre il tutorial",
+          [True, True, True, True, ["testa"]], out["banner"])
+    prova("...toccato: acceso, tutorial dal lato «Compra BTC» in sette tappe; il foglio "
+          "prepara una tappa e la chiusura una; tonde la tessera e il +; l'ultima al centro",
+          [["lato:compro", "tour:7"], True,
+           [False, False, False, False, False, True, True],
+           [False, False, True, False, True, False, False],
+           [False, False, False, False, False, False, True]], out["tutorial"])
+    prova("...e un libro ridisegnato durante il giro lo rimette acceso", True, out["acceso"])
+    prova("le card finte nascono una volta, subito dopo il banner: una che si paga solo "
+          "in ETH e una «SEPA, XMR (Monero)», in euro",
+          [1, "p2p-coin-esempi", "<card EUR:ETH (Ethereum)><card EUR:SEPA|XMR (Monero)>", True],
+          out["esempi"])
+    prova("...e il giro illumina la tessera col logo della prima e i metodi della seconda",
+          [{"q": ".p2p-tessera-coin"}, {"q": ".p2p-paga"}, 1], out["bersagli"])
+    prova("la tappa del foglio apre quello di Lightning (non on-chain), IN EURO, senza "
+          "metodi, con la tendina e gli «Altri metodi» aperti; l'ultima lo chiude",
+          [[["apri:ln", "disegno:EUR:true:true"], "EUR", 0, True, True], ["chiudi:p2pNuovoSheet"]],
+          [out["foglio"], out["centro"]])
+    _t = out["testi"]
+    prova("i testi dicono la regola: le tre monete, l'ordine in euro, il «deposito di "
+          "garanzia», il cambio del momento, gli Altri metodi, la chiave di Monero, "
+          "l'explorer; mai «escrow» ne' «assicurato»",
+          [True] * 8,
+          ["<b>ETH</b>" in _t[0] and "<b>Monero</b>" in _t[0] and "<b>USDe</b>" in _t[0],
+           "resta in <b>euro</b>" in _t[1], "<b>deposito di garanzia</b>" in _t[1],
+           "al cambio del momento" in _t[1], "<b>Altri metodi</b>" in _t[5],
+           "con Monero anche la chiave" in _t[6] and "<eth><xmr><usde>" in _t[6],
+           "<b>explorer</b>" in _t[6],
+           not any(("escrow" in x.lower() or "assicurat" in x.lower()) for x in _t)])
+    prova("il secondo tocco a giro aperto non fa niente", [], out["dueVolte"])
+    prova("la fine: foglio chiuso, lato di partenza, spento, e resta appeso nel "
+          "prossimo disegno", [["chiudi:p2pNuovoSheet", "lato:vendo"], "vendo", False, True, False],
+          out["fine"])
+    prova("leva spenta a giro chiesto: il tutorial non parte e il colore si spegne",
+          [[], False], out["chiuso"])
+    _libro = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("le sentinelle: nel libro sotto quello degli USDT e sopra la card del prezzo; "
+          "il viola-blu di Ethereum sfumato e pieno da acceso; i tre loghi grandi "
+          "nell'ultima tappa",
+          (True, True, True, True),
+          ("(typeof novitaUsdtLibroP2P === 'function' ? novitaUsdtLibroP2P() : '')\n"
+           "    + (typeof novitaCoinLibroP2P === 'function' ? novitaCoinLibroP2P() : '')\n"
+           "    + (typeof cartaPrezzoP2P === 'function' ? cartaPrezzoP2P() : '')" in _libro,
+           "background:linear-gradient(90deg,rgba(98,126,234,.42) 0%,rgba(98,126,234,.10) 100%),var(--card);" in mini,
+           ".p2p-oc-novita.p2p-coin-novita.acceso .p2p-oc-faccia{background:#627EEA;" in mini,
+           ".tour-reti.tour-coin .p2p-coin-svg{" in mini))
+    # LA PILA (il CSS): sotto uno dei due 62 px piu' giu', sotto tutti e due
+    # 114; il `~` doppio deve venire DOPO il singolo e pesare di piu'
+    _s1 = (".p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-coin-novita.appeso{\n"
+           "    top:calc(var(--p2p-testa-alta,0px) + 62px);height:52px}")
+    _s2 = (".p2p-oc-novita.appeso ~ .p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-coin-novita.appeso{\n"
+           "    top:calc(var(--p2p-testa-alta,0px) + 114px)}")
+    prova("...e nel CSS si appende in fondo alla pila: 62 px sotto uno dei due, 114 "
+          "sotto tutti e due, senza l'aria di sopra",
+          (True, True, True, True),
+          (_s1 in mini, _s2 in mini, _s1 in mini and _s2 in mini and mini.index(_s1) < mini.index(_s2),
+           ".p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-coin-novita.appeso .p2p-oc-faccia{top:0}" in mini))
+
+
 def prove_sconto_fisso_decimale():
     """LO SCONTO DI UN ORDINE A PREZZO FISSO, AL DECIMO (14 nov 2026,
     cantiere sconto-fisso-decimale, Andrea in produzione: «Sconto che hai
@@ -197487,7 +197639,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     """.split(),
@@ -198176,6 +198328,7 @@ def main():
     prove_usdt_moderatori,
     prove_grafica_p2p_onchain,
     prove_novita_usdt_p2p,
+    prove_novita_coin_p2p,
     prove_prezzo_btc_libro,
     prove_usdt_foglio_presa,
     prove_sconto_fisso_decimale,

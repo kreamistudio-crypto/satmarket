@@ -84107,3 +84107,61 @@ mancava nella fusione (il censimento delle tabelle figlie l'ha vista), in
 due banchi dello schema copiato (orologio, tutti i relay: la pulizia la
 cerca) e conoscenza.md non rigenerato dopo la frase della privacy.
 Riparati; il secondo giro sotto, nella voce del banner.
+
+## Il «Novità» di ETH, Monero e USDe e il suo tutorial (16 nov 2026, cantiere p2p-monete-banner, Andrea: «voglio che mi crei un banner novità dedicato a queste ultime monete che portiamo in produzione. Similmente deve essere un banner come abbiamo creato per l'onchain e per USDT, quindi quando uno ci clicca parte un tutorial», poi «Comunque sì, facciamo sto banner»)
+
+COM'È. Il terzo gemello, pezzo per pezzo quello degli USDT (classi
+`p2p-oc-*` più `p2p-coin-novita`): il viola-blu di Ethereum (#627EEA,
+il fondo della tessera ETH) sfumato 42→10% sopra il fondo delle card, e
+pieno con le scritte bianche durante il giro; davanti i TRE LOGHI
+accavallati (`P2P_LOGHI_COIN`, gli stessi delle card), «ETH · XMR ·
+USDe» su una riga anche a 320 px (sotto i 360 loghi e scritta più
+piccoli), «Novità» accanto alla freccia. Lo vede chi vede le monete
+(`coinVistoP2P`, cioè la leva `P2P_COIN_ATTIVO`), mai nel demo né in
+vetrina. APPESO SEMPRE, IN FONDO ALLA PILA: sotto quello degli USDT
+(che sta sotto quello on-chain), sopra la card del prezzo; nel CSS 62 px
+sotto uno dei due e 114 sotto tutti e due (il `~` doppio pesa di più).
+IL TUTORIAL, sette tappe sul motore di sempre (`avviaTour`), dal lato
+«Compra BTC»: la novità; la regola che lo distingue dagli USDT (l'ordine
+resta in EURO, i sats nel deposito di garanzia, la moneta da persona a
+persona al cambio del momento); una card finta che si paga solo in ETH
+(la tessera col logo); una «SEPA, XMR (Monero)» (il logo fra i metodi);
+il +; il foglio «Pubblica» di Lightning in euro con la tendina e gli
+«Altri metodi» aperti, dove si vedono le sette voci; al centro i tre
+loghi grandi e come si paga (indirizzo controllato, cifra, id della
+transazione, con Monero anche la chiave, l'explorer). Alla fine via le
+card finte e il foglio, il lato di partenza, il colore spento.
+LA TRAPPOLA CHE HA TROVATO IL GIRO DAL VIVO, NON LE PROVE: il testo
+dell'ultima tappa scriveva `${P2P_LOGHI_COIN.eth}` in un template
+dell'array delle tappe, valutato al caricamento; i loghi nascono
+ventimila righe più giù (`const`), e «Cannot access 'P2P_LOGHI_COIN'
+before initialization» fermava lo script INTERO (libro vuoto, giro
+P2P rotto). Ora quel testo è un getter, letto quando la tappa si
+mostra; e il banco della prova mette i loghi DOPO il blocco, come la
+pagina, così la trappola torna rossa (controprova: il banco esplode).
+Anche: acceso, il filo dei loghi diventa bianco (col filo blu il cerchio
+di ETH spariva nel fondo).
+PROVATO: `prove_novita_coin_p2p` (13) in node con finte minime: solo a
+chi vede le monete (né demo né vetrina), il disegno, il tocco, le sette
+tappe e le loro forme, le card finte una volta e dove, i bersagli, il
+foglio in euro con gli Altri metodi, i testi (mai «escrow» né
+«assicurato»), il secondo tocco, la fine, la leva spenta, le
+sentinelle del libro, dei colori e della pila. Controprove rosse: senza
+`!DEMO`, senza il banner nel libro, senza `p2pNuovoAltri`, la pila a
+62 invece di 114, le card finte scambiate, la fine senza il lato, il
+template di prima (sei rosse più il banco esploso). Dal vivo (Chromium
+390×844 chiaro e 320×844 chiaro e scuro, server nella gabbia, relay
+morti, Compratore 111 non admin con USDT e monete accese, sei ordini
+finti nel libro): il banner sotto quello verde, le sette tappe una per
+una, il libro dopo con tutto in ordine; con `myP2POnchain` acceso a mano
+i tre banner appesi uno sotto l'altro scorrendo. Foto in
+`/mnt/project-files/p2p-monete-banner/`. Una riga per Tappo in
+sapere.md, conoscenza.md rigenerato.
+Da guardare: il tutorial dal telefono vero in Telegram dopo la
+promozione; tre rettangoli appesi sono 166 px fissi sotto la testata su
+un telefono piccolo, se pesano si decide quale smette di essere appeso.
+GIRI (tutti e due i cantieri): su develop c11b674b (albero 1c559870)
+suite severa 28313 passate, 0 fallite, 2 saltate (nostr-tools, le
+solite), collaudi 134/0 senza variabili del proxy; poi develop e' corso
+(427c5bae bottone «Chiedi a Tappo» e a82e1e1c rotellina col bunker, non
+miei): ribasati, sull'albero c43f8f42 di nuovo tutto, 28324/0/2 e 134/0.
