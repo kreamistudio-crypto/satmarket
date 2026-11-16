@@ -7776,6 +7776,21 @@ def init_db():
         PRIMARY KEY(ordine, momento, giro, tg_id)
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_avvisi_tg ON p2p_avvisi(tg_id);
+    CREATE TABLE IF NOT EXISTS p2p_metodi_scelti(
+        -- IL METODO SCELTO DA CHI PRENDE (16 nov 2026, cantiere
+        -- p2p-monete-scelta): il NOME che il suo telefono manda a
+        -- /api/p2p/metodo su un ordine con piu' metodi («SEPA», «ETH
+        -- (Ethereum)»). Una riga per giro, la prima vince. Serve agli
+        -- avvisi del bot per parlare della moneta giusta su un ordine
+        -- misto (`p2p_coin_ordine`). Mai il recapito. Se ne va con la
+        -- cronaca (`_pulisci_memoria_p2p`).
+        ordine TEXT NOT NULL,
+        giro INTEGER NOT NULL DEFAULT 0,
+        metodo TEXT NOT NULL,
+        tg_id INTEGER NOT NULL DEFAULT 0,
+        quando INTEGER DEFAULT 0,
+        PRIMARY KEY(ordine, giro)
+    );
     CREATE TABLE IF NOT EXISTS p2p_recapiti_versioni(
         -- LE VERSIONI DEL RECAPITO GIA' DICHIARATE (16 ott 2026, cantiere
         -- copia-recapito): il numero che il telefono di chi vende manda
@@ -21117,6 +21132,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM p2p_avvisi WHERE tg_id=?", (id_nostr,))
         con.execute("UPDATE p2p_attese SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        # ...e IL METODO SCELTO da chi ha preso (16 nov 2026, cantiere
+        # p2p-monete-scelta): la PK e' (ordine, giro), il tg_id solo chi
+        # l'ha detto — un UPDATE semplice, come le attese
+        con.execute("UPDATE p2p_metodi_scelti SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         # ...e gli SCAMBI TOLTI CON LA ✕ (7 ott 2026): la PK ha il tg_id,
         # e le due meta' possono aver tolto lo stesso scambio — `OR
@@ -57034,8 +57054,24 @@ def p2p_coin_frase(testo: str, coin: str) -> str:
 
 def p2p_coin_ordine(con, ordine) -> str:
     """In che moneta si paga l'ordine: 'ETH', 'XMR', 'USDe', o '' (euro,
-    misto, riga che manca o storta). Lo dicono i METODI del libro: tutti
-    della stessa moneta (USDe su piu' reti e' una moneta sola)."""
+    riga che manca o storta). PRIMA la scelta di chi ha preso, nel giro in
+    corso (`p2p_metodi_scelti`, 16 nov 2026, cantiere p2p-monete-scelta):
+    su un ordine misto «SEPA, ETH» decide lei — ETH → 'ETH', SEPA → ''.
+    Senza scelta, i METODI del libro: tutti della stessa moneta (USDe su
+    piu' reti e' una moneta sola); un misto senza scelta resta in euro."""
+    # il giro in corso lo dice `_parti_scambio_p2p` (coordinatore, o il
+    # libro di riserva): una scelta di un giro di prima non vale. Il
+    # `globals()` e' quello delle sorelle, per i banchi che non lo portano
+    _parti = globals().get("_parti_scambio_p2p")
+    try:
+        giro = int(_parti(con, str(ordine or ""))["giro"]) if _parti else None
+        sc = con.execute(
+            "SELECT metodo FROM p2p_metodi_scelti WHERE ordine=? AND giro=?",
+            (str(ordine or ""), giro)).fetchone() if giro is not None else None
+    except Exception:
+        sc = None
+    if sc:
+        return P2P_COIN_METODI.get(str(sc[0] or "").strip(), "")
     try:
         r = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=?",
                         (str(ordine or ""),)).fetchone()
@@ -61964,6 +62000,14 @@ def _avviso_metodo_p2p(con, ordine, io: int, metodo, adesso: int) -> tuple:
         return 0, "⏳ non e' (ancora) una delle due parti"
     if not parti["vivo"]:
         return 0, "⏳ lo scambio non e' in corso (non ancora preso, o gia' chiuso)"
+    # IL METODO SI RICORDA (16 nov 2026, cantiere p2p-monete-scelta): prima
+    # di tutto il resto — anche se l'altra parte non e' dei nostri o ha gli
+    # avvisi spenti — perche' serve agli avvisi di dopo per parlare della
+    # moneta giusta (`p2p_coin_ordine`). La prima scelta del giro vince.
+    con.execute("INSERT OR IGNORE INTO p2p_metodi_scelti(ordine, giro, metodo, "
+                "tg_id, quando) VALUES(?,?,?,?,?)",
+                (ordine, int(parti["giro"] or 0), m, int(io), adesso))
+    con.commit()
     altro = compra if io == vende else vende
     if not altro:
         return 0, "l'altra parte non e' dei nostri (un altro client, o non annotata)"
@@ -61987,16 +62031,21 @@ def _testo_metodo_p2p(chi: str, metodo: str, riceve: bool) -> str:
     (vende i sats: deve dare il recapito su quel metodo), altrimenti li
     manda. Gli USDT si dicono con la loro rete («USDT su Tron»)."""
     usdt = re.fullmatch(r"USDT \((\w+)\)", metodo)
-    nome = f"USDT su {usdt.group(1)}" if usdt else metodo
+    # ...e ETH, Monero o USDe con la loro rete (16 nov 2026, p2p-monete-scelta)
+    coin = globals().get("P2P_COIN_METODI", {}).get(metodo, "")
+    rete = (re.fullmatch(r"\S+ \((.+)\)", metodo) or [None, ""])[1] if coin else ""
+    nome = (f"USDT su {usdt.group(1)}" if usdt
+            else f"{coin} su {rete}" if coin and rete else metodo)
     nome = html.escape(nome)
+    soldi = "gli USDT" if usdt else f"gli {coin}" if coin else ""
     if riceve:
         di_chi = chi or "Chi ti compra i sats"
-        dopo = ("Indica dove ricevere gli USDT solo su questa rete: un "
-                "indirizzo di un'altra rete non gli serve." if usdt else
+        dopo = (f"Indica dove ricevere {soldi} solo su questa rete: un "
+                "indirizzo di un'altra rete non gli serve." if soldi else
                 "Indica dove ricevere con questo metodo.")
     else:
         di_chi = chi or "Chi ti vende i sats"
-        dopo = ("Manda gli USDT solo su questa rete." if usdt else
+        dopo = (f"Manda {soldi} solo su questa rete." if soldi else
                 "Paga con questo metodo.")
     return (f"🔗 <b>{di_chi} ha scelto {nome}.</b>\n{dopo}\n\n"
             "Apri Barattolo → P2P → I miei scambi: lo vedi anche lì.")
@@ -67363,6 +67412,8 @@ def _pulisci_memoria_p2p(con, adesso: int) -> int:
                              ("p2p_avvisi", "quando"),
                              # le versioni del recapito (16 ott 2026)
                              ("p2p_recapiti_versioni", "quando"),
+                             # il metodo scelto (16 nov 2026, p2p-monete-scelta)
+                             ("p2p_metodi_scelti", "quando"),
                              ("p2p_scambi", "aggiornato"),
                              ("p2p_tolti", "quando"),
                              # i tentativi (10 ott 2026) vivono quanto la cronaca

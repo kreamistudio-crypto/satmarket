@@ -84070,3 +84070,40 @@ PROVATO: in `prove_login_qr` la sentinella sulla funzione (acceso dopo
 controprove rosse, 2 su 2 (anello acceso tolto, anello spento tolto).
 Suite severa nel venv senza coincurve; server non toccato, quindi i
 collaudi non rigirati. NON provato dal vivo.
+
+## Il metodo scelto arriva al server: anche sull'ordine misto il bot parla della moneta (16 nov 2026, cantiere p2p-monete-scelta, dalla coordinazione: Andrea vuole «tutto corretto», il limite detto nella voce di p2p-monete-ritocchi non si tiene)
+
+PERCHÉ. Con p2p-monete-ritocchi il bot parlava della moneta solo sugli
+ordini di una moneta sola: su un ordine «SEPA, ETH» il server non sapeva
+che cosa aveva scelto chi prende, e gli avvisi restavano in euro.
+COME. Il telefono di chi prende il metodo lo mandava già a /api/p2p/metodo
+(cantiere rete-scelta, 13 nov), che avvisava chi ha pubblicato e lo
+buttava. Adesso `_avviso_metodo_p2p` lo SCRIVE in `p2p_metodi_scelti`
+(ordine, giro, metodo, tg_id, quando; una riga per giro, la prima vince)
+appena sa che chi chiama è chi ha preso e che lo scambio è vivo — PRIMA
+dei controlli sull'altra parte, così vale anche se lei ha gli avvisi
+spenti o usa un altro client. `p2p_coin_ordine` guarda prima la scelta del
+giro in corso (`_parti_scambio_p2p`, coordinatore o libro di riserva: una
+scelta di un giro di prima non vale): ETH → gli avvisi in ETH, SEPA → in
+euro; senza scelta, la regola di prima. La frase a chi ha pubblicato dice
+moneta e rete come per USDT («ha scelto ETH su Ethereum. Indica dove
+ricevere gli ETH solo su questa rete»). La riga se ne va con la cronaca
+(`_pulisci_memoria_p2p`), e la pagina della privacy lo dice (il nome del
+metodo, mai il recapito). Nella fusione degli account il tg_id segue la
+persona (UPDATE semplice: la PK e' ordine+giro). Nessuna modifica al telefono.
+NON COPERTO, DETTO: gli avvisi che partono PRIMA che il telefono di chi
+prende abbia mandato la scelta (la presa stessa, a volte la garanzia
+chiesta) parlano ancora con le parole dell'euro su un ordine misto: il
+telefono la manda appena conosce la controparte, con le sue riprove.
+PROVATO: `prove_p2p_monete_scelta` (14) sul banco degli avvisi con lo
+schema vero (la tabella nuova aggiunta ai due banchi che lo copiano):
+scrittura, moneta dopo la scelta, frase con la rete, prima scelta che
+vince, SEPA scelto = euro, avvisi spenti ma scelta scritta, giro di prima
+che non vale, metodo fuori elenco, ordine di una moneta sola, pulizia,
+privacy. Controprove rosse: senza scrittura (5), INSERT OR REPLACE (2),
+scelta senza giro (1).
+GIRI: il primo giro severo ha trovato 4 rossi, tutti miei: la tabella
+mancava nella fusione (il censimento delle tabelle figlie l'ha vista), in
+due banchi dello schema copiato (orologio, tutti i relay: la pulizia la
+cerca) e conoscenza.md non rigenerato dopo la frase della privacy.
+Riparati; il secondo giro sotto, nella voce del banner.

@@ -97373,6 +97373,8 @@ def _banco_eventi_p2p(eventi_attivi=True):
                           ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
                           # (16 ott 2026, copia-recapito) le versioni del recapito
                           ("p2p_recapiti_versioni", "\n    );"),
+                          # (16 nov 2026, p2p-monete-scelta) il metodo scelto
+                          ("p2p_metodi_scelti", "\n    );"),
                           ("p2p_attese", "ON p2p_attese(scade);"),
                           # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
                           ("p2p_tolti", "\n    );"),
@@ -103456,7 +103458,9 @@ def prove_p2p_orologio():
                         ("p2p_recapiti_versioni", "\n    );"),
                         # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
                         ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
-                        ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
+                        ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);"),
+                        # (16 nov 2026, p2p-monete-scelta) il metodo scelto: la pulizia lo porta via
+                        ("p2p_metodi_scelti", "\n    );")):
         _i = src.index(f"CREATE TABLE IF NOT EXISTS {_tab}(")
         schema += "\n" + src[_i:src.index(_fine, _i) + len(_fine)]
     con0 = sqlite3.connect(percorso)
@@ -103754,7 +103758,9 @@ def prove_p2p_tutti_i_relay():
                         ("p2p_recapiti_versioni", "\n    );"),
                         # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
                         ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
-                        ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
+                        ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);"),
+                        # (16 nov 2026, p2p-monete-scelta) il metodo scelto: la pulizia lo porta via
+                        ("p2p_metodi_scelti", "\n    );")):
         _i = src.index(f"CREATE TABLE IF NOT EXISTS {_tab}(")
         schema += src[_i:src.index(_fine, _i) + len(_fine)] + "\n"
     schema += "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1);"
@@ -104397,7 +104403,9 @@ def prove_p2p_ascolto():
                         ("p2p_recapiti_versioni", "\n    );"),
                         # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
                         ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
-                        ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
+                        ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);"),
+                        # (16 nov 2026, p2p-monete-scelta) il metodo scelto: la pulizia lo porta via
+                        ("p2p_metodi_scelti", "\n    );")):
         _i = src.index(f"CREATE TABLE IF NOT EXISTS {_tab}(")
         schema += src[_i:src.index(_fine, _i) + len(_fine)] + "\n"
     schema += "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1);"
@@ -105763,6 +105771,8 @@ def _schema_p2p_pieno(src):
                           ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
                           # (16 ott 2026, copia-recapito) le versioni del recapito
                           ("p2p_recapiti_versioni", "\n    );"),
+                          # (16 nov 2026, p2p-monete-scelta) il metodo scelto
+                          ("p2p_metodi_scelti", "\n    );"),
                           ("p2p_attese", "ON p2p_attese(scade);"),
                           # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
                           ("p2p_tolti", "\n    );"),
@@ -157495,6 +157505,85 @@ console.log(JSON.stringify(out));
            'fuori.update(coin=_moneta, passo_euro="coin",' in src))
 
 
+
+def prove_p2p_monete_scelta():
+    """IL METODO SCELTO ARRIVA AL SERVER, E IL BOT PARLA DI QUELLA MONETA
+    (16 nov 2026, cantiere p2p-monete-scelta; Andrea vuole «tutto
+    corretto», anche sull'ordine misto). Su un ordine «SEPA, ETH» il
+    telefono di chi prende manda gia' il metodo scelto a /api/p2p/metodo:
+    adesso il server lo SCRIVE (`p2p_metodi_scelti`, una riga per giro, la
+    prima vince) e `p2p_coin_ordine` lo legge prima dei metodi del libro —
+    ETH scelto → gli avvisi in ETH, SEPA scelto → in euro. Si scrive anche
+    se l'altra parte ha gli avvisi spenti, mai da chi ha pubblicato, e una
+    scelta di un giro di prima non vale."""
+    print("\n🪙 Il metodo scelto arriva al server, e il bot parla di quella moneta")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    con, amb = _banco_eventi_p2p()
+    i = src.index("P2P_USDT_FRASI = (")
+    exec(src[i:src.index("\n\n\n", i)], amb)
+    i = src.index("P2P_COIN_METODI = {")
+    exec(src[i:src.index("\n\n\n", i)], amb)
+    for f in ("p2p_coin_frase", "p2p_coin_ordine", "_testo_metodo_p2p", "_avviso_metodo_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    amb["_nome_altro_p2p"] = lambda con, o, per, adesso: ""
+    avviso, moneta = amb["_avviso_metodo_p2p"], amb["p2p_coin_ordine"]
+    ORA = 1_790_000_000
+    MAKER, TAKER = 222, 111
+    O = ["%df3a5c1e-7b2d-4c6a-9e11-aa00bb11cc22" % k for k in range(6)]
+
+    def libro(ordine, metodi, lato="sell", tornati=0):
+        con.execute(
+            "INSERT OR REPLACE INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+            "preso_da, euro, sats, metodi, tornati) VALUES(?,?,0,'in-progress',?,1,?,'50 €',70000,?,?)",
+            (ordine, MAKER, lato, TAKER, json.dumps(metodi), tornati))
+
+    def scelto(ordine):
+        return [tuple(r) for r in con.execute(
+            "SELECT giro, metodo, tg_id FROM p2p_metodi_scelti WHERE ordine=?", (ordine,))]
+
+    libro(O[0], ["SEPA", "ETH (Ethereum)"])
+    prova("ordine misto senza scelta: in euro", "", moneta(con, O[0]))
+    prova("chi ha pubblicato non sceglie, e non si scrive niente", (0, []),
+          (avviso(con, O[0], MAKER, "ETH (Ethereum)", ORA)[0], scelto(O[0])))
+    a_chi, testo = avviso(con, O[0], TAKER, "ETH (Ethereum)", ORA)
+    prova("chi prende sceglie ETH: si scrive, giro e persona", [(1, "ETH (Ethereum)", TAKER)], scelto(O[0]))
+    prova("...e da li' la moneta dell'ordine e' ETH", "ETH", moneta(con, O[0]))
+    prova("...l'avviso a chi ha pubblicato dice moneta, rete e cosa fare",
+          (MAKER, "🔗 <b>Chi ti compra i sats ha scelto ETH su Ethereum.</b>\nIndica dove ricevere "
+                  "gli ETH solo su questa rete: un indirizzo di un'altra rete non gli serve."),
+          (a_chi, testo.split("\n\n")[0]))
+    avviso(con, O[0], TAKER, "SEPA", ORA + 5)
+    prova("la prima scelta del giro vince", "ETH", moneta(con, O[0]))
+    prova("...e gli avvisi del bot di quell'ordine parlano di ETH",
+          "🪙 Mario dice di aver inviato 50,00 € in ETH: controlla il tuo wallet.",
+          amb["p2p_coin_frase"]("💶 Mario dice di aver inviato 50,00 €: controlla il conto.",
+                                moneta(con, O[0])))
+    libro(O[1], ["SEPA", "XMR (Monero)"], lato="buy")
+    avviso(con, O[1], TAKER, "SEPA", ORA)
+    prova("SEPA scelto su un ordine misto: in euro", "", moneta(con, O[1]))
+    libro(O[2], ["Revolut", "USDe (Base)"])
+    con.execute("INSERT OR REPLACE INTO utenti(tg_id, avvisi_p2p) VALUES(?, 0)", (MAKER,))
+    prova("chi ha pubblicato ha gli avvisi spenti: niente avviso, ma la scelta si scrive",
+          (0, "USDe"), (avviso(con, O[2], TAKER, "USDe (Base)", ORA)[0], moneta(con, O[2])))
+    con.execute("DELETE FROM utenti WHERE tg_id=?", (MAKER,))
+    libro(O[3], ["SEPA", "ETH (Ethereum)"])
+    avviso(con, O[3], TAKER, "ETH (Ethereum)", ORA)
+    libro(O[3], ["SEPA", "ETH (Ethereum)"], tornati=1)
+    prova("l'ordine torna nel libro e lo riprendono: la scelta del giro di prima non vale",
+          "", moneta(con, O[3]))
+    libro(O[4], ["SEPA", "ETH (Ethereum)"])
+    prova("un metodo fuori elenco non si scrive", (0, []),
+          (avviso(con, O[4], TAKER, "XMR (Monero)", ORA)[0], scelto(O[4])))
+    libro(O[5], ["ETH (Ethereum)"])
+    prova("un ordine di una moneta sola resta della sua moneta, senza scelta", "ETH", moneta(con, O[5]))
+    con.close()
+    prova("la scelta se ne va con la cronaca", True,
+          '("p2p_metodi_scelti", "quando"),' in pezzo("_pulisci_memoria_p2p"))
+    prova("la privacy lo dice", True,
+          "il telefono di chi lo <b>prende</b> ci dice <b>quale ha scelto</b>" in mini)
+
+
 def prove_lista_corta_metodi():
     """LA LISTA CORTA DEI METODI, E WISE (2 nov 2026, Andrea: «se l'utente
     vuole Wise può farlo [...] Solo che dobbiamo aggiungere il tastino, e
@@ -197380,7 +197469,7 @@ CATEGORIE = {
     p2p_stati p2p_chat p2p_pubblica p2p_velo_pubblica p2p_barattozon
     p2p_paycode premio_barattozon convenienza_vera barattozon_mercato
     scadenza_barattozon foglio_coperto passi_barattozon_fogli
-    importo_foglio pubblica_metodo_prima libro_vuoto_monete revolut_tre_modi eth_xmr usde p2p_monete_ritocchi
+    importo_foglio pubblica_metodo_prima libro_vuoto_monete revolut_tre_modi eth_xmr usde p2p_monete_ritocchi p2p_monete_scelta
     indietro_dal_libro ricarica_resta p2p_canale p2p_canonico p2p_bundle
     p2p_nuvola p2p_conto_dispositivo recensione_p2p ritocchi_scambio
     pagina_scambio_ridisegno foglio_tastiera_iphone chiavi_p2p_firmate
@@ -198082,6 +198171,7 @@ def main():
     prove_revolut_tre_modi,
     prove_eth_xmr,
     prove_p2p_monete_ritocchi,
+    prove_p2p_monete_scelta,
     prove_usde,
     prove_usdt_moderatori,
     prove_grafica_p2p_onchain,
