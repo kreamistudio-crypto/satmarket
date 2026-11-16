@@ -85697,3 +85697,57 @@ DA GUARDARE dopo la promozione: `curl -s
 "https://barattolo.store/.well-known/nostr.json?name=_"` deve dare la
 hex; poi la spunta nel profilo su Primal/Damus/nostr.band dopo che
 Andrea ha messo `_@barattolo.store` nel campo nip05.
+
+## La posta senza tracciamento e la consegna a mano che era una spedizione (16 nov 2026, cantiere posta-senza-tracciamento; due feedback di un venditore girati da Andrea: «spedizioni non tracciate, se le potessi aggiungere sarebbe comodo, per ora ho dovuto fingere una consegna a mano», e «Ho già inviato il tracking corretto alla controparte […] fatemi sapere se è possibile modificarlo»; proposta in quattro punti, «ok» delle 20:20)
+PRIMA LA REGOLA, POI IL CODICE: lo stesso giorno Andrea aveva proposto che
+la spedizione non tracciata scelta da chi compra fosse a rischio di chi
+compra (niente rimborso dopo un certo tempo, un segno «pacco perso» e la
+percentuale sul profilo). La valutazione ha trovato il buco: senza codice
+nessuno prova che il pacco è partito, e la regola nuda premia chi segna
+«spedito» senza spedire — la stessa lezione del disarmo dell'auto-sblocco
+(la parola del venditore non deve muovere sats); più il Codice del consumo
+per i negozi, da far vedere a un legale. Proposti i paletti (soglia
+d'ingresso, tetto 50 €, 10/20 giorni, spegnimento oltre il 5%); Andrea ha
+scelto «Lasciare com'è»: il pacco perso resta rischio di chi spedisce, e
+questo cantiere non lo cambia. COSA MANCAVA DAVVERO: spedire senza codice
+si poteva già dal 9 ott (corriere vero, campo vuoto, la domanda unica),
+ma il campo e due cartelli lo facevano sembrare obbligatorio; correggere il
+codice si poteva già (ott 2026), ma da una riga chiusa che non si notava;
+e chi aveva segnato «Consegna a mano» per sbaglio non poteva più
+rimediare. FATTO: (1) `CORRIERE_SENZA_TRACCIA` = «Posta senza
+tracciamento», gemella nel client, NON una sentinella e NON dentro
+`CORRIERI` (i link di @trackbot e la rete del punto non la devono vedere):
+la offre `selettoreCorriere(…, senzaTraccia)` prima di «Altro corriere»
+alla spedizione e alla correzione senza codice; sceglierla nasconde campo
+e cartelli e mostra una riga sola (`NOTA_SENZA_TRACCIA`: non si segue, in
+disputa conta la tua parola, se si perde il rischio è tuo), niente domanda
+unica; il server rifiuta un codice accanto a lei (spedizione e
+correzione) e non la accetta dove un codice c'è già. Avviso a chi compra e
+passo «Oggetto spedito» la dicono una volta sola («con la posta senza
+tracciamento (non si può seguire)»). (2) La consegna a mano si raddrizza
+in spedizione SOLO se chi compra aveva scelto la spedizione e l'ordine è
+shipped o delivered: «Consegna a mano» va in `tracking_storico` col codice
+vuoto e l'avviso dice «Non era una consegna a mano». Il verso contrario, il
+ritiro in zona, il digitale, gli ordini confermati o in disputa restano
+chiusi. (3) Il sommario della correzione ha la veste di un bottone
+(`.tracking-correggi`, col triangolino di Safari tolto) e alla correzione
+«Consegna a mano» non è più fra le voci (`soloPacchi`: il server la
+rifiutava comunque). (4) Testi: «Il pagamento protetto» (la riga sul
+tracciamento dice la posta senza tracciamento e di chi è il rischio), il
+libro di Tappo (due punti), la voce di NOVITA. SCARTATO: una voce nuova
+nell'annuncio («tracciata / non tracciata» con due prezzi): non serviva
+per il caso vero, e senza la regola del rischio a chi compra non cambia
+niente per nessuno. PROVATO: `prove_posta_senza_traccia` (nuova: la rotta
+vera di `segna_spedito` e di `correggi_tracking_venditore` su cartone, otto
+casi, e il client in node — selettore, campo che sparisce, markShipped
+senza domanda col codice rimasto che non parte, il pannello nei suoi
+stati, la correzione verso la posta); `prove_tracking_venditore`
+(la vecchia «una consegna a mano non diventa una spedizione» ora prende
+gli ordini senza spedizione scelta, confermati e in disputa) e
+`prove_tracking_facoltativo` adattate; i banchi che eseguono le due rotte
+prendono la costante dalla riga vera (`riga_senza_traccia`). Controprove:
+tolto il confine sugli stati, il 400 del codice accanto alla posta, il
+salto della domanda e la riga in fila: rosse tutte e quattro. DA GUARDARE:
+il bottone-sommario su iPhone (Safari) e in tema scuro; il caso vero di
+quel venditore, se il suo ordine è ancora shipped (la correzione da «a
+mano» ora gliela permette).

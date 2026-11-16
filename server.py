@@ -48560,6 +48560,15 @@ async def segna_spedito(ordine_id: int, req: Request,
     # «➕ Aggiungi il tracciamento» (`correggi_tracking_venditore`). Il
     # server non lo esige: una regola che costringe a mentire non
     # protegge nessuno.
+    if corriere == CORRIERE_SENZA_TRACCIA and tracking:
+        # LA POSTA SENZA TRACCIAMENTO NON PORTA UN CODICE (16 nov 2026):
+        # un codice accanto a lei sarebbe due cose che non possono
+        # essere vere insieme, e la prova di dopo non saprebbe a quale
+        # credere. Chi il codice ce l'ha sceglie il corriere che l'ha
+        # stampato.
+        raise HTTPException(400, "Con la posta senza tracciamento non "
+                                 "c'è un codice: se ce l'hai, scegli il "
+                                 "corriere che l'ha stampato")
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
                     "AND stato='locked'", (ordine_id, user["id"])).fetchone()
@@ -48707,6 +48716,12 @@ async def segna_spedito(ordine_id: int, req: Request,
     # corriere, non il vuoto.
     if tracking:
         viaggio = f" con <b>{corr_e}</b>, tracciamento {track_e}"
+    elif corriere == CORRIERE_SENZA_TRACCIA:
+        # LA POSTA SENZA TRACCIAMENTO (16 nov 2026) ha un nome che dice
+        # gia' la mancanza: «con Posta senza tracciamento, senza numero
+        # di tracciamento» la direbbe due volte.
+        viaggio = (" con la <b>posta senza tracciamento</b> (non si può "
+                   "seguire)")
     elif corriere and corriere != "Consegna a mano":
         viaggio = f" con <b>{corr_e}</b>, senza numero di tracciamento"
     else:
@@ -85818,6 +85833,15 @@ async def risolvi_disputa(ordine_id: int, req: Request,
 CORRIERI_SENTINELLA = ("Consegna a mano", "Ritiro in zona",
                        "Consegna digitale")
 
+# LA POSTA SENZA TRACCIAMENTO (16 nov 2026, dal feedback di un venditore
+# che per spedire una busta senza codice aveva finto la consegna a mano):
+# NON e' una sentinella — un pacco c'e', e viaggia — ma e' la spedizione
+# che un codice non l'avra' mai. Il nome dice la mancanza da solo, quindi
+# il client nasconde il campo del codice e il server rifiuta un codice
+# accanto a lei. Il rischio di un pacco perso resta di chi spedisce
+# (decisione di Andrea, stesso giorno: «lasciare com'e'»).
+CORRIERE_SENZA_TRACCIA = "Posta senza tracciamento"
+
 
 # GLI STATI IN CUI IL PACCO DEL VENDITORE E' GIA' PARTITO: da qui in poi
 # un tracciamento c'e', e il venditore lo puo' correggere SEMPRE (ott
@@ -85874,8 +85898,17 @@ async def correggi_tracking_venditore(ordine_id: int, req: Request,
     d = await leggi_json(req)
     corriere = (d.get("corriere") or "").strip()[:40]
     tracking = (d.get("tracking") or "").strip()[:60]
-    if not corriere or not tracking:
+    # LA POSTA SENZA TRACCIAMENTO (16 nov 2026) e' l'unico corriere che
+    # passa di qui SENZA codice, ed e' l'unico che un codice non lo
+    # accetta: e' la spedizione che non si puo' seguire, detta col suo
+    # nome invece che con un vuoto.
+    senza = corriere == CORRIERE_SENZA_TRACCIA
+    if not corriere or (not tracking and not senza):
         raise HTTPException(400, "Servono corriere e numero di tracciamento")
+    if senza and tracking:
+        raise HTTPException(400, "Con la posta senza tracciamento non "
+                                 "c'è un codice: se ce l'hai, scegli il "
+                                 "corriere che l'ha stampato")
     if corriere in CORRIERI_SENTINELLA:
         raise HTTPException(400, "«" + corriere + "» non è un corriere: "
                                  "questa correzione cambierebbe la storia "
@@ -85894,19 +85927,49 @@ async def correggi_tracking_venditore(ordine_id: int, req: Request,
         if not o:
             raise HTTPException(400, "Questo ordine non ha un tracciamento "
                                      "che puoi correggere")
-        if o["corriere"] in CORRIERI_SENTINELLA or o["consegna_scelta"] in (
-                "ritiro", "digitale"):
+        # LA CONSEGNA A MANO CHE ERA UNA SPEDIZIONE (16 nov 2026, dal
+        # feedback di un venditore: aveva spedito una busta senza codice
+        # e, credendo il codice obbligatorio, aveva segnato «Consegna a
+        # mano»). E' L'UNICA SENTINELLA CHE SI RADDRIZZA, e in un verso
+        # solo: chi ha comprato aveva SCELTO la spedizione, quindi «a
+        # mano» era la riga sbagliata e la spedizione e' la verita' che
+        # l'ordine aspettava. Mai il contrario (una spedizione non
+        # diventa una consegna a mano: toglierebbe il pacco a chi lo
+        # aspetta), mai sugli altri due (il ritiro in zona e il digitale
+        # sono strade scelte da chi compra), e solo finche' l'ordine
+        # non e' confermato ne' in disputa: a quel punto la storia la
+        # stanno gia' leggendo un compratore che ha deciso o un
+        # moderatore. «Consegna a mano» non sparisce: va in fila, come
+        # un codice di prima.
+        da_mano = (o["corriere"] == "Consegna a mano"
+                   and o["consegna_scelta"] == "spedizione"
+                   and o["stato"] in ("shipped", "delivered"))
+        if not da_mano and (o["corriere"] in CORRIERI_SENTINELLA
+                            or o["consegna_scelta"] in ("ritiro",
+                                                        "digitale")):
             raise HTTPException(400, "Questo ordine non è una spedizione: "
                                      "non c'è un tracciamento da correggere")
+        if senza and o["tracking"]:
+            # il codice c'e' gia': tornare alla posta senza tracciamento
+            # vorrebbe dire dire a chi compra che non puo' piu' seguire
+            # un pacco che invece si segue
+            raise HTTPException(400, "Questo ordine ha già un codice di "
+                                     "tracciamento: se è sbagliato, "
+                                     "correggilo con quello giusto")
         if corriere == o["corriere"] and tracking == o["tracking"]:
             raise HTTPException(400, "È già questo il tracciamento "
                                      "dell'ordine")
         ora = int(time.time())
         # IL CODICE AGGIUNTO DOPO: niente da mettere in fila — un
         # «Codici di prima: Poste Italiane  (cambiato dal venditore…)»
-        # col codice vuoto direbbe che un codice c'era.
-        aggiunto = not o["tracking"]
-        if not aggiunto:
+        # col codice vuoto direbbe che un codice c'era. La consegna a
+        # mano invece si', ed e' la sola riga della fila senza codice:
+        # il suo nome e' tutto quel che c'era scritto.
+        aggiunto = not o["tracking"] and not da_mano and not senza
+        if da_mano:
+            archivia_tracking(con, ordine_id, False, "Consegna a mano",
+                              "", ora, "venditore")
+        elif o["tracking"]:
             archivia_tracking(con, ordine_id, False, o["corriere"],
                               o["tracking"], ora, "venditore")
         con.execute("UPDATE ordini SET corriere=?, tracking=?, "
@@ -85915,7 +85978,25 @@ async def correggi_tracking_venditore(ordine_id: int, req: Request,
         con.commit()
     finally:
         con.close()
-    if aggiunto:
+    if da_mano or senza:
+        # LE DUE PRECISAZIONI SENZA CODICE NUOVO (16 nov 2026): la
+        # consegna a mano che era una spedizione, e il corriere senza
+        # codice che diventa «posta senza tracciamento». Chi aspetta
+        # deve sapere com'e' partito davvero, e se lo puo' seguire.
+        if senza:
+            come = ("con la <b>posta senza tracciamento</b>, quindi non "
+                    "si può seguire")
+        else:
+            come = (f"con <b>{html.escape(corriere)}</b>, tracciamento "
+                    f"{codice_tracking_bot(tracking)}")
+        prima = (" Non era una consegna a mano: «Consegna a mano» resta "
+                 "scritto nella storia dell'ordine." if da_mano else "")
+        await notifica(
+            o["compratore_id"],
+            f"📦 <b>Il venditore ha corretto la spedizione</b> "
+            f"dell'ordine #{ordine_id}: il pacco è partito {come}."
+            f"{prima}")
+    elif aggiunto:
         # AVVISA CHI ASPETTA IL PACCO che adesso lo puo' seguire: la
         # spedizione gli era arrivata «senza numero di tracciamento».
         await notifica(
@@ -85937,7 +86018,8 @@ async def correggi_tracking_venditore(ordine_id: int, req: Request,
             f"<b>{html.escape(o['tracking'] or '')}</b>: il codice di prima "
             f"resta scritto nell'ordine.")
     return {"ok": True, "corriere": corriere, "tracking": tracking,
-            "corretto_il": ora, "aggiunto": aggiunto}
+            "corretto_il": ora, "aggiunto": aggiunto, "da_mano": da_mano,
+            "senza": senza}
 
 
 @app.post("/api/admin/orders/{ordine_id}/tracking")

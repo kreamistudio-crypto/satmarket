@@ -1751,6 +1751,29 @@
   dice «Corriere — senza numero di tracciamento». Il reso del compratore
   esige ancora il codice. Cantieri, «Il tracciamento del venditore è
   facoltativo».
+  LA POSTA SENZA TRACCIAMENTO (16 nov 2026): `CORRIERE_SENZA_TRACCIA`
+  («Posta senza tracciamento», gemella nel client) NON è una sentinella
+  e NON sta in `CORRIERI` del client (che leggono i link di @trackbot e
+  la rete del punto): la aggiunge `selettoreCorriere(…, senzaTraccia)`
+  alla spedizione e alla correzione del venditore senza codice. Il
+  client nasconde il campo (`aggiornaCampoTracking`) e non fa la domanda
+  unica; il server rifiuta un codice accanto a lei, in `segna_spedito` e
+  nella correzione, e la correzione non la accetta dove un codice c'è
+  già. Sulla via punto la ferma `corriere_compatibile` come ogni
+  corriere che la rete non conosce. Il rischio di un pacco perso resta
+  di chi spedisce (decisione di Andrea, lo stesso giorno: la regola «a
+  rischio di chi compra» proposta e scartata).
+  LA CONSEGNA A MANO CHE ERA UNA SPEDIZIONE (16 nov 2026, ROVESCIA IN
+  PARTE «una consegna a mano non diventa una spedizione»): la sola
+  sentinella che `correggi_tracking_venditore` raddrizza, in un verso
+  solo e solo se `consegna_scelta='spedizione'` e lo stato è shipped o
+  delivered (`da_mano`). «Consegna a mano» va in `tracking_storico` col
+  codice vuoto (l'unica riga della fila senza codice) e l'avviso dice
+  «ha corretto la spedizione… Non era una consegna a mano». Il resto
+  resta chiuso: spedizione → a mano, ritiro in zona, digitale, ordini
+  confermati o in disputa. Il pannello del venditore ha il sommario con
+  la veste di un bottone (`.tracking-correggi`) e alla correzione
+  «Consegna a mano» non è fra le voci (`soloPacchi`).
   Stati del moderatore shipped/delivered
   (return_shipped per il reso). NON SI TOCCA `spedito_il`, che è
   l'ANCORA del promemoria di `sollecita_conferme_ferme`: riscriverla

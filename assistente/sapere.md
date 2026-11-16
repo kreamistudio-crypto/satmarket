@@ -84,7 +84,7 @@ Dove il deposito non può proteggerti, ed è meglio saperlo prima:
 - un posto in un abbonamento condiviso può sparire dopo: il piano resta di chi te l'ha venduto;
 - nel ritiro a mano il controllo è tuo: guarda e prova l'oggetto prima di confermare, perché con la conferma i sats partono e non tornano indietro;
 - un punto di ritiro di Barattolo è una persona che si è offerta, non un'azienda: se segna di aver ricevuto il pacco, per noi chi ha spedito ha consegnato. Vai a ritirare presto;
-- un pacco perso o rovinato dal corriere è una cosa fra chi spedisce e il corriere: Barattolo garantisce la transazione, non il viaggio. Spedite sempre col tracciamento, e le cose di valore con la copertura del corriere;
+- un pacco perso o rovinato dal corriere è una cosa fra chi spedisce e il corriere: Barattolo garantisce la transazione, non il viaggio. Spedite sempre col tracciamento, e le cose di valore con la copertura del corriere. Chi vende può anche spedire con la posta senza tracciamento (la sceglie fra i corrieri quando segna la spedizione): costa meno, ma il pacco non si può seguire, e se si perde il rischio resta di chi l'ha spedito;
 - il deposito garantisce l'oggetto promesso, non i gusti: «non mi piace più» non è un difetto, un oggetto diverso dalla descrizione sì;
 - un indirizzo sbagliato lo paga chi l'ha scritto: se il pacco torna indietro, le spese di spedizione restano a te. Per questo prima di pagare ti chiediamo di ricontrollarlo.
 
@@ -113,7 +113,7 @@ Quando qualcuno chiede delle commissioni, tieni sempre separati il mercatino (ze
 
 Le donazioni: chi vuole sostenere Barattolo con qualche sats può mandarli all'indirizzo Lightning zap@barattolo.store (si incolla nel wallet come destinatario, si sceglie l'importo e si invia), oppure con uno zap al profilo Nostr «Barattolo», che accetta anche bitcoin on-chain. Sono un regalo libero: non danno vantaggi nell'app e non sono mai obbligatorie. Se qualcuno chiede come donare, dai questo indirizzo e ringrazia di cuore.
 
-Quando arriva un ordine il bot ti avvisa. Spedisci, segna il corriere e il codice di tracciamento nell'ordine, e aspetta la conferma di chi compra. L'indirizzo di chi compra lo vedi solo tu, per stampare l'etichetta: non usarlo per altro.
+Quando arriva un ordine il bot ti avvisa. Spedisci, segna il corriere e il codice di tracciamento nell'ordine, e aspetta la conferma di chi compra. Se spedisci una busta senza codice scegli «✉️ Posta senza tracciamento» fra i corrieri: non serve fingere una consegna a mano. Hai scritto un codice sbagliato, o hai segnato «Consegna a mano» su un ordine che invece hai spedito? Nell'ordine c'è il bottone per correggerlo, e chi compra viene avvisato. L'indirizzo di chi compra lo vedi solo tu, per stampare l'etichetta: non usarlo per altro.
 
 Le prestazioni si possono vendere, ma devono essere definite: quanto durano, che cosa comprendono, a che prezzo. «Un'ora di lezione di inglese» sì; «ti faccio quello che ti serve» no.
 

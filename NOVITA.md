@@ -350,3 +350,9 @@ frase: Se colleghi un negozio Shopify o WooCommerce adesso puoi scegliere la cat
 dove: Profilo → «Il tuo catalogo» → «📥 Importa in blocco / catalogo esterno», ✏️ sul negozio collegato, casella «Categoria dei prodotti».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-16 · posta-senza-tracciamento
+frase: Chi vende può spedire con la posta senza tracciamento senza fingere una consegna a mano: la sceglie fra i corrieri quando segna la spedizione, e chi compra legge che il pacco non si può seguire. Se hai segnato «Consegna a mano» su un ordine che invece hai spedito, o hai scritto un codice sbagliato, nell'ordine c'è il bottone per correggerlo, e chi compra viene avvisato.
+dove: l'ordine del venditore: «📦 Segna come spedito», la voce «✉️ Posta senza tracciamento»; sotto, il bottone «✏️ Correggi il tracciamento» (o «🚚 Era una spedizione?»).
+leva: nessuna
+pubblico: sì

@@ -10715,6 +10715,10 @@
   /* (2 nov 2026, swap-auto) le voci del cambio fatto dal server: un
      <details> nativo, senza l'ascoltatore dell'instradatore */
   .swap-auto-voci>summary{list-style:none;cursor:pointer}
+  /* la correzione del tracciamento (16 nov 2026): il sommario ha la
+     veste di un bottone, e il triangolino di Safari non ci va */
+  .tracking-correggi>summary{list-style:none;text-align:center}
+  .tracking-correggi>summary::-webkit-details-marker{display:none}
   .swap-auto-voci>summary::-webkit-details-marker{display:none}
   .swap-auto-voci[open]>summary .cambio-dettagli{opacity:.7}
   .swap-auto-voci .swap-riga{font-size:13px;margin:0 14px}
@@ -14017,7 +14021,7 @@ document.getElementById('cartello')?.remove();</script>
              nessuno ha mai letto. -->
         <li><b>Un punto di ritiro di Barattolo è una persona, non un'azienda.</b> Dietro un locker o una tabaccheria c'è un contratto con un corriere; dietro un punto nostro c'è qualcuno che si è offerto, e con noi non ha firmato niente. Quello che ti diamo è <b>un fatto con una data</b>: quando il punto riceve il pacco lo segna qui dentro, e quel momento resta scritto. Dal banco alla tua mano, invece, non c'è più niente che possiamo verificare — è lo stesso buco del ritiro a mano.<br>Se il pacco non arriva, <b>apri la disputa</b>: i sats sono ancora fermi e decide un moderatore. Ma sappi cosa gli risulta: se il punto ha segnato di aver ricevuto il pacco, per noi <b>chi ha spedito ha consegnato</b>. E se un punto sbaglia, l'unica cosa che possiamo fare è <b>toglierlo dalla mappa</b>: non abbiamo un contratto da fargli valere. Vai a ritirare presto, e scegli un punto di cui ti fidi.</li>
         <li><b>Il pacco perso o rovinato è una cosa fra chi spedisce e il corriere.</b> Barattolo garantisce la <b>transazione</b>: che il venditore non incassi senza aver consegnato e che tu non paghi senza ricevere. L'oggetto in viaggio no — se il corriere lo perde o lo rompe, il reclamo si apre con lui.</li>
-        <li><b>Spedite sempre col tracciamento</b>, e per le cose di valore con la <b>copertura del corriere</b>. Il tracciamento è la prova che l'oggetto è partito ed è arrivato, ed è la prima cosa che guarda un moderatore; la copertura di base, verso i punti di ritiro, è quasi sempre molto bassa.</li>
+        <li><b>Spedite sempre col tracciamento</b>, e per le cose di valore con la <b>copertura del corriere</b>. Il tracciamento è la prova che l'oggetto è partito ed è arrivato, ed è la prima cosa che guarda un moderatore; la copertura di base, verso i punti di ritiro, è quasi sempre molto bassa.<br>Chi vende può anche scegliere la <b>posta senza tracciamento</b>: costa meno, ma il pacco non si può seguire, chi compra lo vede scritto nell'ordine, e se si perde il rischio resta di chi l'ha spedito.</li>
         <li><b>Il deposito garantisce l'oggetto promesso, non i gusti.</b> «Non mi piace più» non è un difetto; un oggetto diverso da com'era descritto sì.</li>
         <!-- L'INDIRIZZO SBAGLIATO (13 ott 2026, cantiere
              indirizzo-giusto): la regola sta QUI, fra le cose che il
@@ -38491,8 +38495,14 @@ function openOrder(id){
                facoltativo): il corriere c'e' e si nomina, e chi compra
                legge che il pacco non si puo' seguire; «ha consegnato al
                corriere» resta per gli ordini senza corriere */
+            /* LA POSTA SENZA TRACCIAMENTO (16 nov 2026) ha un nome
+               che dice gia' la mancanza: si dice cosa vuol dire, e la
+               fila dei «di prima» la segue (una consegna a mano
+               raddrizzata resta scritta li') */
+            :o.corriere===CORRIERE_SENZA_TRACCIA
+                ? `Posta senza tracciamento: il pacco non si può seguire${filaTracking(o, false)}`
             :(o.corriere && o.corriere!=='Consegna a mano'
-                ? `${esc(o.corriere)} — senza numero di tracciamento`
+                ? `${esc(o.corriere)} — senza numero di tracciamento${filaTracking(o, false)}`
                 : (o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere'))},
       {t:(s==='delivered' && !inPagamento(o)) ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')
                          : (digitale?'Rivelato e confermato':'Ricevuto e confermato'),
@@ -38870,13 +38880,20 @@ function openOrder(id){
                 'Altro' no, e li' il selettore resta com'era. */''}
           ${selettoreCorriere('shipCorriere',
               CORRIERI.includes(o.retePunto) ? o.retePunto : '',
-              'aggiornaAvvisoCorriere()')}
+              "aggiornaAvvisoCorriere();aggiornaCampoTracking('ship')", true)}
           ${/* IL CORRIERE SBAGLIATO SI FERMA QUI (12 ott 2026, dal caso
                 dell'ordine 213): l'avviso nasce sotto il selettore
                 appena si sceglie un corriere che a quel punto non
                 consegna, con le due uscite. Vuoto finche' va bene. */''}
           <div id="shipCorriereAvviso">${htmlAvvisoCorriere(o,
               CORRIERI.includes(o.retePunto) ? o.retePunto : CORRIERI[0])}</div>
+          ${/* LA POSTA SENZA TRACCIAMENTO (16 nov 2026): sceglierla
+                nasconde il campo del codice e i due cartelli, e al loro
+                posto resta una riga sola che dice il rischio — chi
+                spedisce una busta senza codice non deve piu' fingere
+                una consegna a mano per riuscirci. */''}
+          <div class="hint" id="shipSenzaNota" style="display:none;margin-top:6px">${NOTA_SENZA_TRACCIA}</div>
+          <div id="shipTrackingBox">
           <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento (consigliato)"></textarea>
           ${/* IL TRACCIAMENTO E' FACOLTATIVO MA SI CONSIGLIA CALDAMENTE
                 (9 ott 2026, decisione di Andrea): il cartello sta sotto
@@ -38886,6 +38903,7 @@ function openOrder(id){
           <div class="hint" style="margin-top:6px">⚠️ <b>Metti il tracciamento</b>: non è obbligatorio, ma in caso di disputa è la prova che il pacco è partito. Senza, i moderatori hanno solo la tua parola.</div>
           <div class="hint" style="margin-top:6px">💡 ${AVVISO_INTERMEDIARIO}</div>
           <div class="hint avviso-tracking" id="shipAvviso" style="display:none"></div>
+          </div>
           <button class="btn orange" onclick="markShipped()">📦 Segna come spedito</button>
         </div>`):''}
       ${busteOrdine(o)}
@@ -47624,12 +47642,40 @@ async function inviaAnnullaVendita(id, corpo){
 
 const CORRIERI = ['Poste Italiane','BRT','GLS','SDA','DHL','UPS','InPost',
                   'Altro corriere','Consegna a mano'];
+/* LA POSTA SENZA TRACCIAMENTO (16 nov 2026, dal feedback di un venditore
+   che per spedire una busta senza codice aveva finto la consegna a
+   mano): non sta in CORRIERI perche' non e' un corriere da tracciare —
+   le liste che leggono CORRIERI (i link di @trackbot, la rete del
+   punto) non la devono vedere. La aggiunge il selettore, e solo dove
+   ha senso: la spedizione e la correzione del venditore senza codice.
+   Gemella di CORRIERE_SENZA_TRACCIA del server: lo stesso nome, o il
+   server non la riconosce. */
+const CORRIERE_SENZA_TRACCIA = 'Posta senza tracciamento';
+const NOTA_SENZA_TRACCIA = '✉️ <b>Senza tracciamento il pacco non si può seguire</b>: chi compra lo saprà, e in caso di disputa i moderatori hanno solo la tua parola. Se si perde, il rischio è tuo.';
 /* `scelto` preseleziona un corriere: serve alla correzione del
    moderatore, che parte da quello che c'e' gia' (nove volte su dieci
-   e' giusto il corriere e sbagliato il codice). */
-function selettoreCorriere(id, scelto, cambia = ''){
+   e' giusto il corriere e sbagliato il codice). `senzaTraccia` aggiunge
+   la posta senza tracciamento prima di «Altro corriere»; `soloPacchi`
+   toglie «Consegna a mano», che alla correzione del venditore il server
+   rifiuta comunque (una spedizione non diventa una consegna a mano). */
+function selettoreCorriere(id, scelto, cambia = '', senzaTraccia = false,
+                           soloPacchi = false){
+  let voci = senzaTraccia
+    ? [...CORRIERI.slice(0, -2), CORRIERE_SENZA_TRACCIA, ...CORRIERI.slice(-2)]
+    : CORRIERI;
+  if (soloPacchi) voci = voci.filter(c => c !== 'Consegna a mano');
   return `<select id="${id}"${cambia ? ` onchange="${cambia}"` : ''} style="width:100%;border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-weight:600;background:var(--bg);margin:12px 0 8px;outline:none">
-    ${CORRIERI.map(c=>`<option${c===scelto?' selected':''}>${c}</option>`).join('')}</select>`;
+    ${voci.map(c=>`<option value="${c}"${c===scelto?' selected':''}>${c===CORRIERE_SENZA_TRACCIA?'✉️ ':''}${c}</option>`).join('')}</select>`;
+}
+/* Il campo del codice segue il selettore: con la posta senza
+   tracciamento sparisce (col suo cartello) e resta la riga del rischio.
+   `p` e' il prefisso dei nodi: 'ship' alla spedizione, 'ven' alla
+   correzione del venditore. */
+function aggiornaCampoTracking(p){
+  const senza = el(p + 'Corriere')?.value === CORRIERE_SENZA_TRACCIA;
+  const box = el(p + 'TrackingBox'), nota = el(p + 'SenzaNota');
+  if (box) box.style.display = senza ? 'none' : '';
+  if (nota) nota.style.display = senza ? '' : 'none';
 }
 
 /* ---- IL CODICE DELL'INTERMEDIARIO (ago 2026, caso vero dal campo) ----
@@ -47928,7 +47974,10 @@ async function attivaNotifichePacco(){
 async function markShipped(){
   haptic();
   const corriere = el('shipCorriere')?.value || '';
-  const tracking = el('shipTracking')?.value.trim() || '';
+  /* con la posta senza tracciamento il campo e' nascosto: quel che ci
+     fosse rimasto scritto non parte (il server lo rifiuterebbe) */
+  const tracking = corriere === CORRIERE_SENZA_TRACCIA ? ''
+    : (el('shipTracking')?.value.trim() || '');
   /* il corriere che a quel punto non consegna: ferma, e porta gli
      occhi sull'avviso con le due uscite (vedi htmlAvvisoCorriere) */
   if (aggiornaAvvisoCorriere()) {
@@ -47952,7 +48001,10 @@ async function markShipped(){
      e senza i moderatori hanno solo la parola di chi vende — e il
      ripensamento riporta al campo. Il si' spedisce senza, e il
      pannello «➕ Aggiungi il tracciamento» resta aperto nell'ordine. */
-  if (corriere !== 'Consegna a mano' && !tracking) {
+  /* ...e chi ha scelto la posta senza tracciamento la mancanza l'ha
+     gia' detta col nome: la domanda non gli si rifa' */
+  if (corriere !== 'Consegna a mano' && corriere !== CORRIERE_SENZA_TRACCIA
+      && !tracking) {
     chiediConferma({
       titolo: 'Spedisci senza numero di tracciamento?',
       corpo: 'Te lo consigliamo caldamente: in caso di disputa il tracciamento è la prova che il pacco è partito e dove si trova. Senza, i moderatori hanno solo la tua parola. Puoi aggiungerlo anche dopo, dall\'ordine.',
@@ -50850,33 +50902,60 @@ const STATI_CON_SPEDIZIONE = ['shipped','delivered','confirmed','released',
 function pannelloTrackingVenditore(o, s){
   if (o.role !== 'seller') return '';
   if (!STATI_CON_SPEDIZIONE.includes(s)) return '';
-  if (['Consegna a mano','Ritiro in zona','Consegna digitale'].includes(o.corriere)
-      || ['ritiro','digitale'].includes(o.consegnaScelta)) return '';
+  /* LA CONSEGNA A MANO CHE ERA UNA SPEDIZIONE (16 nov 2026): chi ha
+     comprato aveva scelto la spedizione, e finche' l'ordine non e'
+     confermato ne' in disputa il venditore la raddrizza da qui. Le
+     regole sono del server (correggi_tracking_venditore): qui si
+     decide solo se il pannello si disegna. */
+  const daMano = o.corriere === 'Consegna a mano'
+    && o.consegnaScelta === 'spedizione' && ['shipped','delivered'].includes(s);
+  if (!daMano && (['Consegna a mano','Ritiro in zona','Consegna digitale'].includes(o.corriere)
+      || ['ritiro','digitale'].includes(o.consegnaScelta))) return '';
+  /* la posta senza tracciamento un codice non l'avra' mai: il pannello
+     non la invita aperto, le offre di correggere se il codice c'e' */
+  const senza = o.corriere === CORRIERE_SENZA_TRACCIA;
   /* SENZA CODICE IL PANNELLO E' UN INVITO, non un rimedio (9 ott 2026,
      col tracciamento facoltativo): chi ha spedito senza lo trova
      APERTO, con le parole dell'aggiunta — e' la terza volta che gli si
      consiglia il codice, e qui costa un incolla. La rotta e' la stessa:
      il server, trovando il vuoto, non mette niente in fila e avvisa chi
      compra che ora il pacco si segue. */
-  const manca = !o.tracking;
+  const manca = !o.tracking && !senza && !daMano;
+  const titolo = daMano ? '🚚 Era una spedizione? Correggi «Consegna a mano»'
+    : senza ? '✏️ Hai un codice? Correggi la spedizione'
+    : manca ? '➕ Aggiungi il tracciamento' : '✏️ Correggi il tracciamento';
+  const spiega = daMano
+    ? 'Chi ha comprato aveva scelto la spedizione. Se il pacco è partito con un corriere, o con la posta senza tracciamento, correggilo qui: avvisiamo chi ha comprato, e «Consegna a mano» resta scritto nella storia dell\'ordine.'
+    : senza ? 'Hai spedito con la posta senza tracciamento. Se invece il pacco ha un codice, scegli il corriere e scrivilo qui: avvisiamo chi ha comprato.'
+    : manca ? 'Hai spedito senza codice: appena lo hai, mettilo qui. In caso di disputa è la prova che il pacco è partito, e chi ha comprato potrà seguirlo. Se è partito con la posta senza tracciamento, sceglila qui.'
+    : 'Hai inserito il codice sbagliato? Correggilo qui: avvisiamo chi ha comprato, e il codice di prima resta scritto nell\'ordine.';
+  /* il corriere preselezionato: quello di adesso — tranne la consegna a
+     mano, che fra le voci della correzione non c'e' (e' proprio lei che
+     si sta correggendo) */
+  const scelto = daMano ? '' : o.corriere;
+  /* LA RIGA SI VEDE (16 nov 2026): chiusa era una riga di testo, e un
+     venditore col codice sbagliato non l'ha trovata — ha mandato quello
+     giusto in chat. Adesso il sommario ha la veste di un bottone. */
   return `
-    <details class="payout" style="margin-top:10px"${manca ? ' open' : ''}>
-      <summary style="cursor:pointer;font-weight:700;font-size:14px">${manca ? '➕ Aggiungi il tracciamento' : '✏️ Correggi il tracciamento'}</summary>
-      <div class="hint">${manca
-        ? 'Hai spedito senza codice: appena lo hai, mettilo qui. In caso di disputa è la prova che il pacco è partito, e chi ha comprato potrà seguirlo.'
-        : 'Hai inserito il codice sbagliato? Correggilo qui: avvisiamo chi ha comprato, e il codice di prima resta scritto nell\'ordine.'}</div>
-      ${selettoreCorriere('venCorriere', o.corriere)}
-      <textarea id="venTracking" style="min-height:38px" placeholder="${manca ? 'Numero di tracciamento' : 'Numero di tracciamento corretto'}">${esc(o.tracking)}</textarea>
+    <details class="payout tracking-correggi" style="margin-top:10px"${manca ? ' open' : ''}>
+      <summary class="btn ghost" style="margin:0">${titolo}</summary>
+      <div class="hint" style="margin-top:10px">${spiega}</div>
+      ${selettoreCorriere('venCorriere', scelto, "aggiornaCampoTracking('ven')", !o.tracking, true)}
+      <div class="hint" id="venSenzaNota" style="${senza ? '' : 'display:none;'}margin-bottom:8px">${NOTA_SENZA_TRACCIA}</div>
+      <div id="venTrackingBox"${senza ? ' style="display:none"' : ''}>
+      <textarea id="venTracking" style="min-height:38px" placeholder="${o.tracking ? 'Numero di tracciamento corretto' : 'Numero di tracciamento'}">${esc(o.tracking)}</textarea>
       <div class="hint avviso-tracking" id="venAvviso" style="display:none"></div>
-      <button class="btn ghost" onclick="correggiTrackingVenditore(this)">${manca ? '➕ Salva il tracciamento' : '✏️ Salva il tracciamento corretto'}</button>
+      </div>
+      <button class="btn ghost" onclick="correggiTrackingVenditore(this)">${(daMano || senza) ? '🚚 Salva la spedizione' : manca ? '➕ Salva il tracciamento' : '✏️ Salva il tracciamento corretto'}</button>
     </details>`;
 }
 async function correggiTrackingVenditore(btn){
   haptic();
   const corriere = el('venCorriere')?.value || '';
-  const tracking = el('venTracking')?.value.trim() || '';
-  if (!tracking) { toast('Inserisci il tracciamento corretto'); return; }
-  if (!trackingDaControllare(corriere, tracking, 'venAvviso')) return;
+  const senza = corriere === CORRIERE_SENZA_TRACCIA;
+  const tracking = senza ? '' : (el('venTracking')?.value.trim() || '');
+  if (!tracking && !senza) { toast('Inserisci il tracciamento corretto'); return; }
+  if (!senza && !trackingDaControllare(corriere, tracking, 'venAvviso')) return;
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
   const ripristina = bottoneInAttesa(btn, '✏️ Correggo il tracciamento…');
   try {
@@ -50890,7 +50969,8 @@ async function correggiTrackingVenditore(btn){
     const id = currentOrder.id;
     await loadOrders(id); renderOrders();
     toast(d.aggiunto ? '➕ Tracciamento aggiunto: abbiamo avvisato chi ha comprato'
-                     : '✏️ Tracciamento corretto: abbiamo avvisato chi ha comprato');
+          : (d.da_mano || d.senza) ? '🚚 Spedizione corretta: abbiamo avvisato chi ha comprato'
+          : '✏️ Tracciamento corretto: abbiamo avvisato chi ha comprato');
     openOrder(id);
   } finally { ripristina(); }
 }
