@@ -59403,6 +59403,9 @@ def prove_link_dentro_telegram():
   R.rilegge = PAR.map(percorsoDaStartapp);
   R.esplora = ESP.map(percorsoDaStartapp);
   R.esploraNo = ESP_NO.map(percorsoDaStartapp);
+  R.annunci = ['annuncio_7', 'offerta_12', 'annuncio_123456789012', 'annuncio_0',
+               'annuncio_07', 'annuncio_abc', 'annuncio_1234567890123', 'Annuncio_7',
+               'annuncio_7_x', 'offerta_', 'annuncio-7', 'annuncio_7/..'].map(percorsoDaStartapp);
   /* IL GIRO INTERO: quel che il server scrive, la pagina lo rilegge nell'indirizzo di partenza */
   R.giro = LINK.slice(0, 4).map(u => baseCondivisione() + percorsoDaStartapp(startappDaLink(u, baseCondivisione())));
   /* la leva nel client */
@@ -59423,7 +59426,14 @@ def prove_link_dentro_telegram():
     initData: arrivo('/', '?v=2', '#h', 'ordine_' + ID),
     urlVince: arrivo('/', '?tgWebAppStartParam=p2p', '', 'ordine_' + ID),
     miniapp: arrivo('/miniapp.html', '?tgWebAppStartParam=p2p', ''),
-    storto: arrivo('/', '?tgWebAppStartParam=annuncio_7', '', 'boh'),
+    storto: arrivo('/', '?tgWebAppStartParam=invito_7', '', 'boh'),
+    /* (16 nov 2026, notifica-apre-annuncio) la parola di `link_telegram`, e la
+       stessa portata da una notifica del telefono come `?startapp=` */
+    annuncio: arrivo('/', '?v=2&tgWebAppStartParam=annuncio_42', '#h'),
+    offerta: arrivo('/', '', '', 'offerta_9'),
+    telefono: arrivo('/', '?startapp=annuncio_42', ''),
+    telefonoStorto: arrivo('/', '?startapp=annuncio_042', ''),
+    telegramVince: arrivo('/', '?tgWebAppStartParam=p2p&startapp=annuncio_42', ''),
     codificato: arrivo('/', '?tgWebAppStartParam=ordine_' + ID + '%2F..', ''),
     rotto: arrivo('/', '?tgWebAppStartParam=%E0%A4%A', ''),
     giaAltrove: arrivo('/annuncio/7', '?tgWebAppStartParam=ordine_' + ID, ''),
@@ -59458,7 +59468,14 @@ def prove_link_dentro_telegram():
           ATTESI, R.get("scrive"))
     prova("...e la pagina rilegge SOLO il vocabolario chiuso",
           ["/p2p", "/p2p?scambio=" + ID, "/p2p?ordine=" + ID, "/p2p?ordine=" + "b" * 57]
-          + [""] * 12 + ["/", ""], R.get("rilegge"))
+          + [""] * 7 + ["/annuncio/7"] + [""] * 4 + ["/", ""], R.get("rilegge"))
+    # (16 nov 2026, cantiere notifica-apre-annuncio) `link_telegram` scrive
+    # `annuncio_<id>` e `offerta_<id>` da ottobre, e la pagina non li leggeva:
+    # il tocco sulla notifica di un annuncio apriva la home
+    prova("UN ANNUNCIO O UNA TRATTATIVA: la parola di `link_telegram` si rilegge "
+          "nella loro pagina, e una forma storta resta niente",
+          ["/annuncio/7", "/offerta/12", "/annuncio/123456789012"] + [""] * 9,
+          R.get("annunci"))
     prova("IL GIRO INTERO: quel che si scrive si rilegge nell'indirizzo di partenza",
           LINK[:4], R.get("giro"))
     prova("la leva nel client: i link P2P diventano t.me, un annuncio resta com'e'",
@@ -59487,6 +59504,16 @@ def prove_link_dentro_telegram():
     prova("...chi e' gia' su un indirizzo suo non si sposta", ["", []],
           A.get("giaAltrove"))
     prova("...e senza parametro non succede niente", ["", []], A.get("niente"))
+    prova("...`annuncio_42` dall'indirizzo e `offerta_9` dall'initData finiscono "
+          "nella barra, dove le porte dell'annuncio e della trattativa li leggono",
+          [["/annuncio/42", [["replace", None, "/annuncio/42#h"]]],
+           ["/offerta/9", [["replace", None, "/offerta/9"]]]],
+          [A.get("annuncio"), A.get("offerta")])
+    prova("...la notifica del telefono porta la parola come `?startapp=`: stessa "
+          "traduzione, una forma storta niente, e il parametro di Telegram vince",
+          [["/annuncio/42", [["replace", None, "/annuncio/42"]]], ["", []], "/p2p"],
+          [A.get("telefono"), A.get("telefonoStorto"),
+           (A.get("telegramVince") or [None])[0]])
     prova("...`casa` (la riga delle tastiere, il post nel canale) resta sulla home, e "
           "ripulisce l'indirizzo dal parametro", ["/", [["replace", None, "/#h"]]],
           A.get("casa"))
@@ -193178,6 +193205,26 @@ def prove_notifiche_telefono():
            ca("x\ny", ("a", "https://barattolo.store.evil.example/x"))["url"],
            ca("x\ny", [("t", "tg://resolve?domain=b"),
                        ("p", "https://barattolo.store/p2p")])["url"]])
+    # (16 nov 2026, cantiere notifica-apre-annuncio) senza bottone di casa il
+    # tocco prende il PRIMO link del testo: gli avvisi degli annunci non
+    # hanno bottoni, e sul telefono aprivano sempre la home
+    prova("SENZA BOTTONE, IL PRIMO LINK DEL TESTO: il deep link del bot diventa "
+          "`/?startapp=`, quello del sito il suo percorso; il bottone vince; "
+          "un link d'altri o una parola storta valgono la home",
+          ["/?startapp=annuncio_42", "/?startapp=annuncio_42", "/annuncio/7",
+           "/categoria/motori?max=50&valuta=eur", "/?startapp=cat_motori_max5000e",
+           "/?ordine=7", "/", "/", "/", "/?startapp=offerta_3"],
+          [ca("🔎 Un annuncio fa per te!\n<b>Bici</b>\nhttps://t.me/ilbarattolobot?startapp=annuncio_42")["url"],
+           ca("x\nBici (https://t.me/ilbarattolobot?startapp=annuncio_42).")["url"],
+           ca('🔔 <b>Gino</b> ha pubblicato\n\n<a href="https://barattolo.store/annuncio/7">🫙 Apri</a>')["url"],
+           ca('🆕 2 nuovi\n<a href="https://barattolo.store/categoria/motori?max=50&amp;valuta=eur">🫙 Apri Esplora</a>')["url"],
+           ca('🆕 2 nuovi\n<a href="https://t.me/ilbarattolobot/app?startapp=cat_motori_max5000e">x</a>')["url"],
+           ca("x\nhttps://t.me/ilbarattolobot?startapp=annuncio_42",
+              ("Apri", "https://barattolo.store/?ordine=7"))["url"],
+           ca("x\nhttps://evil.example/annuncio/7")["url"],
+           ca("x\nhttps://t.me/ilbarattolobot?startapp=annuncio_42%2F..")["url"],
+           ca("x\nhttps://t.me.evil.example/b?startapp=annuncio_42")["url"],
+           ca("x\nhttps://evil.example/x https://t.me/ilbarattolobot?startapp=offerta_3")["url"]])
     lungo = ca("titolo\n" + "parola " * 200)
     prova("il testo si tronca a PUSH_TESTO_MAX coi puntini, e il carico resta "
           "ben sotto i 4 KB del servizio",

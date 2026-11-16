@@ -85027,3 +85027,67 @@ fissa di Barattolo», ✏️); finché è 0 non nasce nessuna moneta e il link
 resta quello di ieri. La porta sul .onion non c'è (`URL_PUBBLICO` è il
 dominio in chiaro): si aggiunge se serve. Sull'istanza di prova privata
 (`PROVA_SOLO_IDS`) la porta risponde 403 a un wallet senza sessione.
+
+## Il tocco sulla notifica di un annuncio apre l'annuncio, non la home (16 nov 2026, cantiere notifica-apre-annuncio; un utente in privato: «Se clicco su una notifica di un annuncio inserito in Barattolo vengo portato nella home non alla pagina dell'annuncio. Non dovrebbe funzionare diversamente?»; diagnosi in dieci righe, «Ok, correggi» delle 19:02)
+
+**I CANALI, uno per uno.** Non si sapeva da dove arrivasse la notifica,
+quindi si sono guardati tutti quelli che parlano di annunci nuovi.
+Funzionavano: «🔔 <venditore> ha pubblicato» (link del sito
+`/annuncio/<id>`) e «🆕 N nuovi annunci» (Esplora coi filtri di chi lo
+riceve, voluto). ROTTI DUE:
+- **Il bot e il canale.** «🔎 Un annuncio fa per te!», il post del
+  canale, le vetrine e gli avvisi delle offerte usano `link_telegram`,
+  che scrive `t.me/ilbarattolobot?startapp=annuncio_<id>` (o
+  `offerta_<id>`) da quando Andrea ha scelto di tenere quel deep link
+  (voce «LA DECISIONE (di Andrea, a bivio posto)»). La Mini App si
+  apriva, ma `percorsoDaStartapp` conosceva solo P2P, ordini, assistenza
+  ed Esplora: parola ignota = si resta sulla home. E una prova lo
+  CODIFICAVA (`annuncio_7` fra i parametri «non nostri» di
+  `prove_link_dentro_telegram`): la scelta di ottobre ha cambiato chi
+  scrive, nessuno ha insegnato a chi legge.
+- **La notifica del telefono** (web push, APK Zapstore e sito):
+  `push_carico` prendeva l'indirizzo SOLO dal bottone, e gli avvisi
+  degli annunci il link ce l'hanno nel testo. Tocco = sempre la home.
+
+**COSA SI È FATTO.** Nella pagina, `percorsoDaStartapp` impara
+`annuncio_<id>` → `/annuncio/<id>` e `offerta_<id>` → `/offerta/<id>`
+(id di sole cifre, senza zeri davanti, al più 12), che
+`apriAnnuncioDaUrl` e `apriOffertaDaUrl` sapevano già aprire. Nel
+server, `push_carico` senza un bottone di casa prende il PRIMO link del
+testo: uno del sito vale il suo percorso, un `https://t.me/<bot>
+?startapp=<parola>` vale `/?startapp=<parola>`, e `arrivoDaStartapp`
+legge anche `?startapp=` (dopo `tgWebAppStartParam`, che vince). Il
+bottone, se c'è, vince sempre sul testo; la punteggiatura che chiude la
+frase non è del link; un link d'altri o una parola storta valgono la
+home come prima.
+
+**STRADE SCARTATE.** Una tabella delle parole anche nel server, per
+scrivere nel push `/annuncio/<id>` direttamente: due tabelle da tenere
+in pari invece di una, e il vocabolario vive già nel client. Tornare
+dal deep link al link del sito: rovescerebbe una decisione di Andrea.
+
+**COSA È STATO PROVATO.** `prove_link_dentro_telegram` (le parole
+nuove, le forme storte, l'arrivo dall'indirizzo, dall'initData e da
+`?startapp=`, e il parametro di Telegram che vince) e
+`prove_notifiche_telefono` (il primo link del testo, il bottone che
+vince, link d'altri e parole storte). CONTROPROVE: tolta la traduzione
+nella pagina e il ripiego nel push, cinque prove rosse; rimesse, verdi.
+GIRO NEL BROWSER (server vero in locale, config finto, Chromium a misura
+di telefono): un annuncio seminato, il carico del push di «🔎 Un annuncio
+fa per te!» dice `/?startapp=annuncio_1`, e aprendo quello la barra
+diventa `/annuncio/1` con la scheda dell'annuncio aperta; lo stesso con
+`?tgWebAppStartParam=annuncio_1` (l'arrivo da Telegram); una parola
+ignota resta sulla home, com'era prima per `annuncio_`. Sull'albero
+sopra 7d49bbbb: suite severa in un venv come il passo «Le prove» della
+CI (niente httpx, fastapi né coincurve, nostr-tools fuori dal repo):
+28.606 passate, 1 fallita — `conoscenza.md` non rigenerato dopo il
+ritocco di `sapere.md`, fatto a suite in corso; rigenerato, le cinque
+sezioni che leggono NOVITA e sapere verdi (146/0). Collaudi dell'elenco
+nel venv della CI senza coincurve e SENZA le variabili del proxy: 136
+verdi, 0 rossi.
+
+**DA GUARDARE.** Non provato su un telefono vero né dentro Telegram:
+la prova la fa Andrea sul collaudo (un avviso «🔎 Un annuncio
+fa per te!» toccato dal bot, e lo stesso dalla notifica del telefono).
+Notato e non toccato: chi entra solo con Nostr riceve nel DM gli stessi
+link `t.me`, che fuori da Telegram portano al bot.

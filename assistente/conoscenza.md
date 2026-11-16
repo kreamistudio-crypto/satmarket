@@ -38,7 +38,7 @@ Nel Profilo si impostano le cose che servono a vendere e a scambiare: soprattutt
 <!-- pezzo libro-003 | libro -->
 ## Libro · Entrare e il profilo (2/2)
 
-Le notifiche sul telefono (se nelle REGOLAZIONI del pannello «Notifiche sul telefono» è accesa): nell'app di Barattolo per Android (quella di Zapstore), nel sito aggiunto alla schermata Home e nel browser del computer, gli avvisi degli ordini, degli scambi P2P e dei messaggi possono arrivare come notifica normale, tipo WhatsApp, anche con l'app chiusa. Si accendono dal Profilo → «🔔 Avvisi» → «📲 Notifiche sul telefono» → «Attiva», e il telefono chiede il permesso: va detto sì. Poi «🔔 Mandami una notifica di prova» fa vedere subito se arrivano. Vale per quel telefono (su un altro si accende di nuovo), e arrivano in più rispetto a Telegram o ai messaggi Nostr, che restano come sono. Si spengono dallo stesso tasto; uscendo dall'account smettono di arrivare su quel telefono. Dentro Telegram il tasto non c'è, perché gli avvisi arrivano già dal bot. NON arrivano: sui telefoni senza i servizi Google (per esempio GrapheneOS), con Tor Browser o sul sito .onion; sull'iPhone solo se Barattolo è aggiunto alla schermata Home (Condividi → «Aggiungi alla schermata Home», da iOS 16.4) e aperto da lì. Se le hai bloccate per sbaglio, si riaprono dalle impostazioni del telefono, alla voce Notifiche.
+Le notifiche sul telefono (se nelle REGOLAZIONI del pannello «Notifiche sul telefono» è accesa): nell'app di Barattolo per Android (quella di Zapstore), nel sito aggiunto alla schermata Home e nel browser del computer, gli avvisi degli ordini, degli scambi P2P e dei messaggi possono arrivare come notifica normale, tipo WhatsApp, anche con l'app chiusa. Si accendono dal Profilo → «🔔 Avvisi» → «📲 Notifiche sul telefono» → «Attiva», e il telefono chiede il permesso: va detto sì. Poi «🔔 Mandami una notifica di prova» fa vedere subito se arrivano. Vale per quel telefono (su un altro si accende di nuovo), e arrivano in più rispetto a Telegram o ai messaggi Nostr, che restano come sono. Si spengono dallo stesso tasto; uscendo dall'account smettono di arrivare su quel telefono. Dentro Telegram il tasto non c'è, perché gli avvisi arrivano già dal bot. NON arrivano: sui telefoni senza i servizi Google (per esempio GrapheneOS), con Tor Browser o sul sito .onion; sull'iPhone solo se Barattolo è aggiunto alla schermata Home (Condividi → «Aggiungi alla schermata Home», da iOS 16.4) e aperto da lì. Se le hai bloccate per sbaglio, si riaprono dalle impostazioni del telefono, alla voce Notifiche. Toccando una notifica si apre la pagina di cui parla: l'ordine, lo scambio o l'annuncio (dal 16 nov 2026 anche gli avvisi degli annunci aprono l'annuncio e non la home); lo stesso vale per i link degli avvisi del bot.
 
 <!-- pezzo libro-004 | libro -->
 ## Libro · Il wallet Lightning
@@ -1653,4 +1653,12 @@ pubblico: sì
 frase: Negli acquisti on-chain del mercatino arriva il PayJoin: se il tuo wallet lo sa fare (Sparrow, BlueWallet, Wasabi, Bull Bitcoin, Cake Wallet), mentre paghi Barattolo aggiunge una sua moneta alla transazione. Più privacy per te, stessa cifra, e il deposito di garanzia riceve gli stessi sats. Se il wallet non lo sa fare, si paga come sempre.
 dove: Il pagamento on-chain di un ordine: il QR e «₿ Apri nel wallet»; la riga «🔀 PayJoin» nel foglio dice quando c'è.
 leva: PAYJOIN_ATTIVO (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-048 | novita -->
+## Novità · 2026-11-16 · notifica-apre-annuncio
+
+frase: Toccando l'avviso di un annuncio, che arrivi dal bot, dal canale o come notifica sul telefono, adesso si apre la pagina di quell'annuncio, non più la home.
+dove: gli avvisi «🔎 Un annuncio fa per te!», i post del canale, gli avvisi delle offerte e dei nuovi annunci, nel bot e nelle notifiche del telefono.
+leva: nessuna
 pubblico: sì
