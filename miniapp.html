@@ -76715,9 +76715,13 @@ function contoDettP2P(o){
      cifra col suo ≈ e la sua unita' e' un gruppo indivisibile»)
      portata dentro una riga che adesso ha il permesso di andare a
      capo. */
+  /* (16 nov 2026, cantiere coin-quasi) il totale NON e' ricavato: e'
+     `merc` ± `meta`, e `merc` e' la cifra fissa o quella detta dal
+     coordinatore — senza commissione e' esatto quanto il Subtotale, e il
+     ≈ davanti a «Invia 97 000 sats» di un ordine a sats fissi mentiva */
   const circaDi = campo => !esatto || campo === 'meta'
     || (campo === 'netto' && conti[0].meta > 0)
-    || (ricavato && campo !== 'merc');
+    || (ricavato && campo !== 'merc' && campo !== 'netto');
   /* una cella e' la cifra senza unita': «sats» lo aggiunge `conSats` */
   const cella = (c, campo, segno) => vivo
     ? (circaDi(campo) ? '≈ ' : '') + (segno || '') + fmt(c[campo]) : '—';

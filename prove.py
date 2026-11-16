@@ -160136,7 +160136,8 @@ const fmtSoldiP2P = (n, o) => fmtEur(n);  /* la cifra nella valuta dell'ordine (
 let cambioVivo = true, eurPerSat = 0.001, p2pCambiPub = {};
 const perSatP2P = () => eurPerSat;
 const satsMercatoP2P = o => Math.round(o.euro / eurPerSat * (1 - (o.premium || 0) / 100));
-const feeMiaP2P = () => 0.02, cartelloFeeP2P = () => '', mezzaCommissioneP2P = f => String(f * 50);
+let feeMia = 0.02;
+const feeMiaP2P = () => feeMia, cartelloFeeP2P = () => '', mezzaCommissioneP2P = f => String(f * 50);
 const monetaP2P = () => '€', segnoMonetaP2P = () => '€', attrImportoP2P = (e, d) => d;
 const nudo = h => String(h).replace(/<span class="solo-voce">[^<]*<\/span>/g, '')
   .replace(/<[^>]+>/g, '').replace(/ /g, '.');
@@ -160165,6 +160166,9 @@ out.premio = pezziConto(contoDettP2P(fisso({sats: Math.round(200 / presa * 1e8 *
 /* a mercato: il premio intero di sempre, nessuna virgola */
 out.mercato = pezziConto(contoDettP2P({id: 'm', lato: 'buy', mio: true, euro: 20, sats: 0,
   premium: 4, metodi: ['SEPA']}));
+/* (16 nov 2026, coin-quasi) senza commissione il totale di un ordine a
+   sats fissi e' la cifra fissa: nessun ≈ */
+feeMia = 0; out.senzaFee = pezziConto(contoDettP2P(fisso({preso: false}))); feeMia = 0.02;
 /* i pezzi puri */
 out.decimo = [decimoP2P(0.616), decimoP2P(1), decimoP2P(4), decimoP2P(0.04), decimoP2P(12.35),
               premioDecimoTestoP2P(-0.616), premioDecimoTestoP2P(2.5), premioDecimoTestoP2P(0.01),
@@ -160203,6 +160207,15 @@ process.stdout.write(JSON.stringify(out));
     prova("GLI ORDINI A MERCATO non cambiano: «Premio che hai richiesto 4%», nessuna riga in cima",
           ["", "Premio che hai richiesto 4%"],
           [o["mercato"]["conv"], o["mercato"]["righe"][1].split(" | ")[0]])
+    prova("SENZA COMMISSIONE IL TOTALE DI UN ORDINE A SATS FISSI NON HA IL ≈ (16 nov 2026, "
+          "coin-quasi: «Invia ≈ 97 000 sats» su un ordine in XMR): il Controvalore resta "
+          "una stima, il Subtotale e il totale no",
+          [True, False, False],
+          [any(x.startswith("Controvalore") and "≈" in x for x in o["senzaFee"]["righe"]),
+           any(x.startswith("Subtotale") and "≈" in x for x in o["senzaFee"]["righe"]),
+           any(x.startswith(("Invia", "Ricevi")) and "≈" in x for x in o["senzaFee"]["righe"])])
+    prova("...e il totale c'e' davvero, coi suoi 321.675 sats", True,
+          any(x.startswith(("Invia", "Ricevi")) and "321.675 sats" in x for x in o["senzaFee"]["righe"]))
     prova("i pezzi puri: il decimo con la virgola, senza «,0», e il segno",
           ["0,6", "1", "4", "0", "12,4", "−0,6%", "+2,5%", "0%", "−3%"], o["decimo"])
 

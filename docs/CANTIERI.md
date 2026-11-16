@@ -84337,3 +84337,20 @@ verdi da sole. Poi develop è corso (b3344d37 e b68b850c, nav-nostr, non
 miei): ribasato, conflitto solo in coda a CANTIERI; sull'albero 7abae3ce
 le 25 sezioni toccate dai due cantieri verdi e collaudi 134/0 senza
 variabili del proxy.
+
+## Il «≈» che mentiva sul totale di un ordine a sats fissi (16 nov 2026, cantiere coin-quasi, notato nel giro dal vivo di p2p-monete-valute; la coordinazione: «togli pure il ≈ adesso»)
+
+Il dettaglio di un ordine in XMR (sats fissati alla pubblicazione) diceva
+«Invia ≈ 97 000 sats» accanto a «Subtotale 97 000 sats», senza ≈. La causa
+in `contoDettP2P`: con la riga di convenienza (`ricavato`) il ≈ andava su
+OGNI voce tranne `merc`, totale compreso. Ma il totale non è ricavato: è
+`merc` ± `meta`, e `merc` è la cifra fissa (o quella detta dal
+coordinatore); con la commissione il ≈ glielo mette già la sua regola
+(`netto` con `meta` > 0). Ora `ricavato` non tocca più `netto`. Vale per
+ogni ordine a sats fissi (anche Barattozon e gli euro a prezzo fisso), non
+solo per le monete: lì la commissione c'è quasi sempre, quindi il ≈ resta.
+PROVATO: due controlli nuovi in `prove_sconto_fisso_decimale` (13 verdi):
+senza commissione il Controvalore resta ≈, Subtotale e totale no, e il
+totale dice i suoi 321.675 sats; controprova con la regola di prima: rosso.
+Verdi anche dettaglio, card dello scambio, libro, PayCode, conto a
+intervallo, le prove delle monete e degli USDT.
