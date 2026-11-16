@@ -85803,3 +85803,39 @@ quattro domande nuove della domanda unica). DA GUARDARE: il primo ordine
 vero da più codici, dal telefono, coi due lati; la disputa divisa con
 l'incasso della quota da parte di chi vende (la riga «da riscuotere»
 parla di «codici confermati»); un ordine on-chain a riquadri.
+
+## I «Novità» che scorrendo saltavano invece di infilarsi sotto quello unico (16 nov 2026 sera, cantiere novita-scorrimento; Andrea dal telefono, in produzione appena dopo la promozione 419526e6, con un video: «C'è un problema di animazione quando scorri in giù»)
+IL DIFETTO, LETTO NEL VIDEO fotogramma per fotogramma (8,6 s, libro P2P,
+tab «Compra BTC», tema scuro): scendendo, appena la pila dei tre «Novità»
+diventava una (il ritocco della sera, «I «NOVITÀ» IN UNO SOLO»), USDT ed
+ETH·XMR saltavano su di colpo di una quarantina di pixel — USDT finiva
+proprio al posto di quello on-chain — e poi scorrevano col dito PASSANDO
+SOPRA la faccia unica, che compariva solo quando se n'erano andati. La
+causa: a pila chiusa gli altri tornavano `position:relative`, cioè al loro
+posto nel flusso, che con la pagina già scesa (la pila si chiude solo
+sopra i 40 px) sta più in alto di dove erano appesi; e venendo dopo nel
+DOM allo stesso `z-index:2` del capo, gli si dipingevano sopra. Il
+commento di allora diceva «nessuna misura cambia, quindi niente salta»:
+vero per il flusso, non per dove si vede uno sticky che smette di esserlo.
+Riprodotto identico in un banco con il CSS e le quattro funzioni veri
+(Chromium, 360 px, scorrimento a passi di 12 px). GRAVITÀ: solo estetica,
+nessun dato, nessun pagamento, nessun tocco perso (sopra restava il
+banner on-chain o quello USDT, che aprono comunque i loro tutorial).
+LA CURA, solo CSS: a pila chiusa gli altri RESTANO appesi ma col `top`
+del capo e `z-index:1`, così gli scivolano SOTTO (il capo è alto 62 px,
+loro 52: coperti per intero); il `top` degli appesi corre in .22 s,
+fermo con «meno movimento». Scendendo si infilano sotto, risalendo
+riscendono dal capo invece di comparire di colpo. Le card passano sotto
+come prima; il tocco va sempre al capo, che sta sopra.
+SCARTATE: il solo `z-index` più alto al capo (il salto di 40 px restava,
+solo nascosto a metà); un `transform` di FLIP sugli appesi (vedi il
+divieto di `transform` nel commento della card del prezzo, 14 nov: nel
+webview il rettangolo appeso col `clip-path` restava mezzo).
+PROVATO: nel banco, prima e dopo, 36 fotogrammi ciascuno — prima il salto
+e il passaggio sopra, dopo la faccia unica subito in cima e ETH che le
+scivola sotto; `prove_ritocchi_sera_p2p` aggiornata (la regola nuova, mai
+più `position:relative` sotto `novita-compatte`, la corsa del `top` e il
+«meno movimento»), con controprova: rimessa la regola vecchia, rossa.
+DA GUARDARE: dal telefono di Andrea dopo la promozione (webview Android
+di Telegram, dove il 14 nov si era visto quel che Chromium non
+mostrava).

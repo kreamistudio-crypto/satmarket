@@ -161991,12 +161991,23 @@ process.stdout.write(JSON.stringify(out));
     rp = _fn_js(mini, "function renderP2P(){")
     prova("il libro segna la pila dei Novità dopo ogni disegno",
           True, "segnaPilaNovitaP2P(box);" in rp)
-    prova("la pila chiusa: gli altri smettono di essere appesi, il capo cambia faccia "
-          "(niente misure che cambiano, quindi niente salti)",
+    prova("la pila chiusa: gli altri restano appesi col `top` del capo e gli scivolano "
+          "SOTTO (z-index piu' basso), il capo cambia faccia",
           [True, True, True],
-          ["#view-p2p.novita-compatte .p2p-oc-novita.appeso:not(.capo-pila){position:relative;top:auto}" in mini,
+          ["#view-p2p.novita-compatte .p2p-oc-novita.appeso:not(.capo-pila){top:var(--p2p-testa-alta,0px);z-index:1}" in mini,
            "#view-p2p.novita-compatte .p2p-oc-novita.capo-pila > .p2p-oc-faccia:not(.p2p-novita-unica){visibility:hidden}" in mini,
            "window.addEventListener('scroll', scorriPilaNovitaP2P, {passive: true});" in mini])
+    # IL SALTO DEL 16 NOV SERA (Andrea, col video: «c'è un problema di
+    # animazione quando scorri in giù»): tornando `relative` gli altri
+    # saltavano al loro posto nel flusso, gia' scappato in su, e passavano
+    # SOPRA la faccia unica. Mai piu' fuori dall'appeso, e la corsa del
+    # `top` addolcita (ferma per chi chiede meno movimento).
+    prova("...e non tornano mai nel flusso (il salto del video), la corsa del `top` "
+          "e' addolcita e si ferma con «meno movimento»",
+          [False, True, True],
+          [bool(re.search(r"novita-compatte[^{]*\{[^}]*position:\s*relative", mini)),
+           "  .p2p-oc-novita.appeso{transition:top .22s ease-out}" in mini,
+           "@media (prefers-reduced-motion: reduce){ .p2p-oc-novita.appeso{transition:none} }" in mini])
     rso = _fn_js(mini, "function rigaScambioOnchainP2P(o){")
     prova("«I miei scambi»: a mercato prima della presa i sats della card del libro "
           "(«≈ X sats»), mai lo zero di `o.sats` (dal canale Todo: «Vuoi ricevere 0 sats»)",

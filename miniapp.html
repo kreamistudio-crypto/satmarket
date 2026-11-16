@@ -4389,12 +4389,24 @@
   /* I «NOVITÀ» IN UNO SOLO, SCORRENDO (16 nov 2026, Andrea: «quando scorro
      rimanga in alto solamente un banner novità con dentro tutte le monete»,
      «senza scritte dentro, a parte novità»): a pila chiusa il primo resta
-     appeso con la faccia unica, gli altri tornano nel flusso e se ne vanno
-     col dito. Nessuna misura cambia, quindi niente salta. La faccia unica
+     appeso con la faccia unica, gli altri gli scivolano sotto (qui sotto,
+     «SI INFILANO SOTTO»). Nessuna misura cambia, quindi niente salta. La faccia unica
      e' quella delle card (`--card` col filo), le monete accavallate col
      filo del fondo, «Novità» in arancio accanto alla freccia. */
   .p2p-novita-unica{display:none}
-  #view-p2p.novita-compatte .p2p-oc-novita.appeso:not(.capo-pila){position:relative;top:auto}
+  /* SI INFILANO SOTTO, NON SALTANO (16 nov 2026 sera, Andrea col video:
+     «c'è un problema di animazione quando scorri in giù»): fino a qui gli
+     altri tornavano `relative`, cioe' al loro posto nel flusso, che a
+     pagina scesa sta gia' 40 px e piu' sopra — saltavano su di colpo e,
+     venendo dopo nel DOM allo stesso z-index, passavano SOPRA la faccia
+     unica, che si vedeva solo quando se n'erano andati. Adesso restano
+     appesi ma col `top` del capo, cosi' scivolano SOTTO di lui (z-index
+     piu' basso, e il capo e' alto 62 px contro i loro 52): la stessa
+     corsa in su e in giu', senza salti. Le card ci passano sotto come
+     prima. */
+  .p2p-oc-novita.appeso{transition:top .22s ease-out}
+  #view-p2p.novita-compatte .p2p-oc-novita.appeso:not(.capo-pila){top:var(--p2p-testa-alta,0px);z-index:1}
+  @media (prefers-reduced-motion: reduce){ .p2p-oc-novita.appeso{transition:none} }
   #view-p2p.novita-compatte .p2p-oc-novita.capo-pila > .p2p-oc-faccia:not(.p2p-novita-unica){visibility:hidden}
   #view-p2p.novita-compatte .p2p-oc-novita.capo-pila > .p2p-novita-unica{display:flex;
     background:var(--card);box-shadow:inset 0 0 0 1px var(--line-soft);color:var(--ink)}
@@ -63617,9 +63629,9 @@ function novitaCoinLibroP2P(){
    NIENTE SI SPOSTA NEL FLUSSO: gli appesi sono `sticky`, e un sticky non
    occupa posto diverso da appeso o no. Scorrendo in giu' il PRIMO della
    pila (`capo-pila`) resta appeso e cambia faccia — le monete di tutti,
-   accavallate, e «Novità» —, gli altri smettono di essere appesi e se ne
-   vanno col dito come le card. In su, o in cima alla pagina, tornano i
-   tre. Il tocco sulla faccia unica li riapre. Durante un tutorial (un
+   accavallate, e «Novità» —, gli altri gli scivolano sotto (dal 16 nov
+   sera: prima tornavano nel flusso e saltavano, vedi il CSS). In su, o in
+   cima alla pagina, riscendono i tre. Il tocco sulla faccia unica li riapre. Durante un tutorial (un
    «Novità» acceso) la pila resta aperta: il giro guarda il suo banner.
    La classe vive sulla vista (`novita-compatte`), cosi' un ridisegno del
    libro a pila chiusa nasce gia' chiuso. */
