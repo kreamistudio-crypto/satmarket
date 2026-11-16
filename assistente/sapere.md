@@ -97,6 +97,10 @@ Pagare fuori da Barattolo (un bonifico, un pagamento diretto al venditore) vuol 
 3. Scegli come consegni: spedizione (con i corrieri che usi), punto di ritiro o locker, ritiro a mano in zona, o consegna digitale per codici e buoni.
 4. Pubblica. Ogni annuncio passa dalla moderazione, anche quando lo modifichi: se qualcosa non convince resta in attesa di un moderatore, e se viene fermato il messaggio spiega perché e come rimediare.
 
+La «Zona» di un annuncio nuovo parte già scritta con quella del tuo ultimo annuncio (per esempio «Dro (TN)»): se vendi da un altro posto la cambi come ogni altro campo (dal 16 novembre 2026).
+
+Gli annunci esauriti: quando vendi l'ultimo pezzo l'annuncio diventa «Esaurito», resta in fondo al tuo negozio e con «🔄 Rifornisci» torna in vendita appena hai altri pezzi. Se era un pezzo unico che non tornerà (un oggetto usato, per esempio), in «I tuoi annunci» o nella sua pagina tocca «🗑 Elimina»: sparisce dal negozio, da Nostr e dal canale, ma gli ordini e le recensioni restano (dal 16 novembre 2026). Si può fare quando l'ordine di quel pezzo è concluso: con una spedizione, un reso o un rimborso ancora aperti l'app dice di aspettare.
+
 Hai un catalogo grande? Nel Profilo c'è «📥 Importa in blocco»: scarichi il modello CSV, una riga per annuncio, fino a 500 annunci per volta. Ogni riga vuole almeno una foto, con un link nella colonna «foto» (più d'uno separati da |) oppure coi nomi dei file dentro uno ZIP che carichi insieme; una riga senza foto viene scartata. Prima di pubblicare tocchi «🔎 Controlla il file» e vedi cosa va e cosa no. Se hai un negozio Shopify o WooCommerce, nella stessa sezione lo puoi collegare: i prodotti entrano da soli e restano in pari (se la sezione non la vedi, guarda i NUMERI DI OGGI o chiedi allo staff). Gli annunci importati passano dalla moderazione come gli altri.
 
 Per incassare da solo imposta il tuo indirizzo Lightning nel Profilo: quando chi compra conferma, i sats ti arrivano lì.

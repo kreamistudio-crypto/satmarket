@@ -10495,7 +10495,15 @@
   «Ho scritto Milano (MI)…» se n'è andata anche `avvisoComune`, e con
   lei la proposta ricavata dagli ultimi annunci (`comune_suggerito` in
   /api/me). Il posto dove si dice da dove si vende è uno solo, ed è
-  quel campo lì. MOTORE: gemello della coda
+  quel campo lì. ROVESCIATA IL 16 NOV 2026 su richiesta di Andrea
+  («sarebbe bello che mi proponesse già compilato il comune»): il
+  campo parte con la zona dell'ultimo annuncio nato QUI
+  (`_zona_ultima_vendi`, chiave `zona_ultima_vendi` in /api/me, ogni
+  stato, importati esclusi) e resta un campo. La fonte è il campo
+  stesso, non `utenti.comune` (che resta inerte), e niente avviso a
+  parte: il posto resta uno solo. Nel client `precompilaZonaVendi`,
+  con la regola del costo standard (scrive solo una casella che dice
+  ancora quel che aveva scritto lui, mai in Modifica né nel Duplica). MOTORE: gemello della coda
   promo — `accoda_match` in pubblica() accanto ad accoda_promo, nel
   loop finale dell'import CSV (accodati insieme = UN aggregato) e nel
   dopo-import Nostr (`creato>=t0`: gli importati CONTANO, «un
@@ -14917,6 +14925,22 @@
   rovesciare la sua decisione, il secondo non è mai stato pubblico e
   servirlo aprirebbe a chiunque abbia un id una finestra sulla coda di
   moderazione.
+  E L'ESAURITO CHE NON TORNA SI ARCHIVIA (16 nov 2026, richiesta di
+  Andrea): lo scaffale vuoto vale per il miso, non per il range
+  extender usato venduto una volta. `rimuovi_annuncio` accetta anche
+  'venduto' e lo porta a 'rimosso', la stessa cancellazione morbida
+  dell'attivo: la riga resta, ordini, recensioni e dispute ci si
+  appoggiano come prima, esce da «Esauriti di recente», da «I tuoi
+  annunci», da Nostr (kind 5) e dal canale. LA GUARDIA È QUELLA LARGA
+  DELLA MODIFICA (`_ordini_vivi_annuncio` con released, refunded,
+  annullato e creato esclusi): `_rimborsa_compratore` rimette i pezzi
+  con stato='attivo' senza guardare da dove parte, e su un archiviato
+  a reso in corso lo riaccenderebbe. Sull'attivo la guardia stretta di
+  sempre non è cambiata. Nel client «🗑 Elimina» compare anche sulla
+  riga esaurita di «I tuoi annunci» e sotto «Rifornisci» nella scheda
+  (`bloccoMioEsaurito`), e il foglio dell'esaurito ha la sua frase
+  («Non lo rifornirai più?»). NON fatto, e proposto ad Andrea a parte:
+  il «pezzo unico» scelto alla pubblicazione che si archivia da solo.
   DOVE SI VEDE (decisione di Andrea): SOLO nella pagina del negozio,
   in fondo, sezione «Esauriti di recente» — chiave `esauriti` nel dict
   di `/api/negozio` (tetto `TETTO_ESAURITI` 12, `creato DESC`, una

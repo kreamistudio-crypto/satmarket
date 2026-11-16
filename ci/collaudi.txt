@@ -189,3 +189,4 @@ collaudo_feedback_modificabile
 collaudo_mancia
 collaudo_cassa_negozio
 collaudo_payjoin
+collaudo_elimina_esauriti

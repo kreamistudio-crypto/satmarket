@@ -332,3 +332,9 @@ frase: Nella home gli scambi P2P mostrano anche gli ordini on-chain (USDe, ETH, 
 dove: la home, fila «Scambi P2P»; la scheda «P2P», in alto accanto alla campanella; la pillola «Ordina» con «Più recenti».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-16 · esauriti-elimina-zona
+frase: Un annuncio esaurito che non tornerà, come un oggetto usato venduto una volta, adesso si può eliminare: sparisce dal tuo negozio, mentre ordini e recensioni restano. E quando pubblichi un annuncio nuovo la «Zona» è già scritta con quella dell'ultimo, e la cambi quando vuoi.
+dove: «I tuoi annunci» nel Profilo, il tasto «🗑 Elimina» accanto a «🔄 Rifornisci»; la pagina dell'annuncio esaurito, «🗑 Elimina l'annuncio»; il form «Vendi», campo «Zona».
+leva: nessuna
+pubblico: sì

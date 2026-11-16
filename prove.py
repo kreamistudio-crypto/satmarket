@@ -167745,6 +167745,260 @@ console.log(JSON.stringify({ levetta: [levetta.ico.textContent, levetta.title, l
     prova("...e NON il tondo della mappa, che resta «Mappa: …» per chi legge con la voce",
           ["Mappa: 3 annunci", "Mappa: 3 annunci"], r2.get("tondo"))
 
+def prove_esauriti_eliminabili():
+    """GLI ESAURITI CHE NON TORNANO SI ELIMINANO, E IL COMUNE SI RICORDA
+    (16 nov 2026, richiesta di Andrea). Due cose del venditore: 1) il
+    pezzo unico venduto — il range extender usato — aveva solo
+    «Rifornisci»: adesso ha anche «🗑 Elimina», in «I tuoi annunci» e
+    nella scheda, e il server lo archivia ('rimosso', la stessa
+    cancellazione morbida dell'attivo: ordini e recensioni restano);
+    2) un annuncio NUOVO parte con la zona dell'ultimo («Dro (TN)»).
+
+    QUEL CHE SI ROMPE IN SILENZIO: un esaurito con un reso o un rimborso
+    ancora in giro archiviato lo stesso — e il rimborso lo riaccenderebbe
+    in vetrina (`_rimborsa_compratore` scrive stato='attivo'); l'annuncio
+    di un altro eliminabile; la guardia dell'attivo cambiata di nascosto;
+    la zona di un importato proposta come la sua; la proposta che scrive
+    sopra quel che il venditore ha cambiato o svuotato apposta, o che
+    entra in una Modifica o in un Duplica."""
+    import sqlite3, asyncio, time
+    print("\n[esauriti eliminabili e la zona dell'ultimo annuncio]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+    fn = lambda firma: _fn_js(mini, firma)
+
+    class _Err(Exception):
+        def __init__(self, codice, detail=""):
+            self.codice, self.detail = codice, detail
+
+    class _SenzaClose:
+        def __init__(self, c): self._c = c
+        def __getattr__(self, n): return getattr(self._c, n)
+        def close(self): pass
+
+    SCHEMA = """
+    CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
+      stato TEXT, asta_base_sats INT DEFAULT 0, zona TEXT DEFAULT '',
+      contatto_nostr TEXT DEFAULT '', fonte TEXT DEFAULT '', creato INT);
+    CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+      stato TEXT, aggiornato INT, pagata_da_annullata_il INT DEFAULT 0);
+    CREATE TABLE ordine_righe(ordine_id INT, annuncio_id INT);
+    """
+
+    # --- 1) IL SERVER: la rotta VERA su un database di cartone -----------
+    def rimuovi(stato, ordini=(), chi=955, righe=(), tardiva=None):
+        c = sqlite3.connect(":memory:")
+        c.row_factory = sqlite3.Row
+        c.executescript(SCHEMA)
+        c.execute("INSERT INTO annunci(id, venditore_id, stato) "
+                  "VALUES(7, 955, ?)", (stato,))
+        for i, st in enumerate(ordini, 1):
+            c.execute("INSERT INTO ordini(id, annuncio_id, stato) "
+                      "VALUES(?, 7, ?)", (i, st))
+        for i, st in enumerate(righe, 100):     # un SET che lo contiene
+            c.execute("INSERT INTO ordini(id, annuncio_id, stato) "
+                      "VALUES(?, 0, ?)", (i, st))
+            c.execute("INSERT INTO ordine_righe VALUES(?, 7)", (i,))
+        if tardiva:                     # la fattura annullata e pagata
+            c.execute("INSERT INTO ordini(id, annuncio_id, stato, "
+                      "pagata_da_annullata_il) VALUES(200, 7, ?, 1)", (tardiva,))
+        ritirati = []
+
+        async def _ritira(aid, *a):
+            ritirati.append(aid)
+
+        amb = {"Header": lambda d: d, "Cookie": lambda d: d,
+               "HTTPException": _Err, "db": lambda: _SenzaClose(c),
+               "verifica_utente": lambda *a: {"id": chi},
+               "SQL_NON_ANNULLATA_PAGATA": "COALESCE(pagata_da_annullata_il,0)=0",
+               "_puntate_attive_salde": lambda *a: 0,
+               "ritira_da_nostr": _ritira, "promo_rimuovi": _ritira,
+               "asyncio": asyncio, "time": time}
+        exec(pezzo("_ordini_vivi_annuncio"), amb)
+        exec("async " + pezzo("rimuovi_annuncio"), amb)
+
+        async def giro():
+            r = await amb["rimuovi_annuncio"](7)
+            await asyncio.sleep(0)       # le due create_task
+            return r
+        try:
+            esito = asyncio.run(giro())
+        except _Err as e:
+            esito = e.codice
+        st = c.execute("SELECT stato FROM annunci WHERE id=7").fetchone()[0]
+        ords = [r[0] for r in c.execute("SELECT stato FROM ordini ORDER BY id")]
+        return esito, st, ords, len(ritirati)
+
+    prova("L'ESAURITO SI ELIMINA: diventa 'rimosso' (archivio, la riga resta) "
+          "e si ritira da Nostr e dal canale",
+          [{"ok": True}, "rimosso", [], 2], list(rimuovi("venduto")))
+    prova("...con la storia conclusa intatta: venduti, rimborsati e annullati "
+          "restano come sono",
+          [{"ok": True}, "rimosso", ["released", "refunded", "annullato"], 2],
+          list(rimuovi("venduto", ("released", "refunded", "annullato"))))
+    prova("...e una fattura mai pagata si annulla, come sull'attivo",
+          [{"ok": True}, "rimosso", ["released", "annullato"]],
+          list(rimuovi("venduto", ("released", "creato")))[:3])
+    vivi = ("locked", "shipped", "delivered", "confirmed", "dispute",
+            "return_pending", "return_shipped", "refund")
+    prova("SULL'ESAURITO OGNI ORDINE NON CONCLUSO FERMA IL GESTO, resi e "
+          "rimborsi in attesa compresi (il rimborso lo riaccenderebbe)",
+          [[400, "venduto"]] * len(vivi),
+          [list(rimuovi("venduto", ("released", st)))[:2] for st in vivi])
+    prova("...anche quando l'ordine e' un SET che lo contiene",
+          [400, "venduto"], list(rimuovi("venduto", righe=("return_pending",)))[:2])
+    prova("...ma la fattura annullata e pagata non e' sua e non lo ferma",
+          [{"ok": True}, "rimosso"], list(rimuovi("venduto", tardiva="refund"))[:2])
+    prova("L'ATTIVO RESTA COM'ERA: la guardia stretta di sempre "
+          "(un reso in attesa non lo ferma, un ordine bloccato si')",
+          [[{"ok": True}, "rimosso"], [400, "attivo"]],
+          [list(rimuovi("attivo", ("return_pending",)))[:2],
+           list(rimuovi("attivo", ("locked",)))[:2]])
+    prova("l'annuncio di un altro, un rimosso e uno di stato ignoto no",
+          [[400, "venduto"], [400, "rimosso"], [400, "x"]],
+          [list(rimuovi("venduto", chi=222))[:2],
+           list(rimuovi("rimosso"))[:2], list(rimuovi("x"))[:2]])
+
+    # --- 2) IL SERVER: la zona dell'ultimo annuncio -----------------------
+    amb_z = {"SQL_ORIGINE_ESTERNA":
+             next(r for r in src.split("\n")
+                  if r.startswith("SQL_ORIGINE_ESTERNA = ")).split(" = ", 1)[1].strip('"')}
+    exec(pezzo("_zona_ultima_vendi"), amb_z)
+    ultima = amb_z["_zona_ultima_vendi"]
+    c = sqlite3.connect(":memory:")
+    c.row_factory = sqlite3.Row
+    c.executescript(SCHEMA)
+    for riga in ((1, 955, "attivo", "Pavia (PV)", "", "", 1000),
+                 (2, 955, "rimosso", "Dro (TN)", "", "", 3000),
+                 (3, 955, "attivo", "", "", "", 5000),            # senza zona
+                 (4, 955, "attivo", "Roma", "npub1lui", "", 9000),  # da Nostr
+                 (5, 955, "attivo", "Milano", "", "shopify", 9500), # dal negozio
+                 (6, 222, "attivo", "Napoli (NA)", "", "", 9900),   # di un altro
+                 (7, 955, "attivo", None, "", "", 9990)):           # zona NULL
+        c.execute("INSERT INTO annunci(id, venditore_id, stato, zona, "
+                  "contatto_nostr, fonte, creato) VALUES(?,?,?,?,?,?,?)", riga)
+    prova("LA ZONA PROPOSTA e' quella del suo annuncio PIU' RECENTE nato qui, "
+          "anche archiviato: non di un altro, non di un importato, e un "
+          "annuncio senza zona in mezzo non la cancella",
+          ["Dro (TN)", "Napoli (NA)", ""], [ultima(c, 955), ultima(c, 222), ultima(c, 333)])
+    c.execute("INSERT INTO annunci(id, venditore_id, stato, zona, creato) "
+              "VALUES(8, 955, 'venduto', '  Arco (TN) ', 3000)")
+    prova("...nello stesso secondo vince l'ultima scritta, e pulita", "Arco (TN)",
+          ultima(c, 955))
+    c.close()
+    me = pezzo("mio_profilo")
+    prova("/api/me la manda, letta a database aperto", [True, True, True],
+          ['_zona_vendi = _zona_ultima_vendi(con, user["id"])' in me,
+           me.index("_zona_ultima_vendi(con,") < me.index("    con.close()\n    profilo = dict(u)"),
+           'profilo["zona_ultima_vendi"] = _zona_vendi' in me])
+
+    # --- 3) IL CLIENT: la riga di «I tuoi annunci» e la scheda ------------
+    riga = mini[mini.index("const rigaMioAnnuncio = l =>"):]
+    riga = riga[:riga.index("</div>`; };")]
+    prova("in «I tuoi annunci» il 🗑 Elimina c'e' anche sull'esaurito "
+          "(non sta piu' dietro a `esa?'':`)", [True, False],
+          ['<span class="badge az-btn" onclick="deleteListing(${l.id})"' in riga,
+           "${esa?'':`<span class=\"badge az-btn\" onclick=\"deleteListing(" in riga])
+    blocco = mini[mini.index("const bloccoMioEsaurito = l =>"):]
+    blocco = blocco[:blocco.index("`;\n") + 3]
+    del_js = fn("async function deleteListing(id, dalDettaglio){")
+    prog = ("const esc = s => String(s);\n"
+            + "function astaE(l){ return !!(l && l.asta); }\n"
+            + fn("function esaurito(l){") + blocco
+            + "let myListings = [], listings = [], DEMO = true, chiesto = null;\n"
+            + "function haptic(){}\nfunction chiediConferma(o){ chiesto = o; }\n"
+            + del_js + r"""
+const quante = h => (h.match(/deleteListing\(/g) || []).length;
+const fuori = {};
+fuori.blocco = [quante(bloccoMioEsaurito({id: 7})),
+  quante(bloccoMioEsaurito({id: 7, nostr: true})),
+  quante(bloccoMioEsaurito({id: 7, consegna: 'servizio'})),
+  bloccoMioEsaurito({id: 7}).indexOf('apriRifornisci(7)')
+    < bloccoMioEsaurito({id: 7}).indexOf('deleteListing(7, true)')];
+myListings = [{id: 7, stato: 'venduto'}, {id: 8, stato: 'attivo'},
+              {id: 9, stato: 'venduto', asta: true}];
+deleteListing(7, true); fuori.esa = [chiesto.titolo, chiesto.corpo];
+deleteListing(8); fuori.att = chiesto.titolo;
+deleteListing(9); fuori.asta = chiesto.titolo;
+deleteListing(99); fuori.ignoto = chiesto.titolo;
+console.log(JSON.stringify(fuori));
+""")
+    out = _node_banco(prog)
+    if out is None:
+        salta("la scheda dell'esaurito e il foglio dell'Elimina", "node non installato")
+    else:
+        prova("NELLA SCHEDA DELL'ESAURITO c'e' «🗑 Elimina l'annuncio», sotto "
+              "«Rifornisci»; anche sugli importati e sui servizi",
+              [1, 1, 1, True], out.get("blocco"))
+        prova("il foglio dell'esaurito ha la sua domanda e dice che la storia resta",
+              ["Non lo rifornirai più?", True],
+              [(out.get("esa") or ["", ""])[0],
+               "Gli ordini e le recensioni restano" in (out.get("esa") or ["", ""])[1]])
+        prova("...l'attivo, l'asta conclusa e lo sconosciuto tengono la frase di sempre",
+              ["Elimini questo annuncio?"] * 3,
+              [out.get("att"), out.get("asta"), out.get("ignoto")])
+
+    # --- 4) IL CLIENT: la zona proposta nel form di Vendi -----------------
+    pz = mini[mini.index("let myZonaVendi = '';"):]
+    pz = pz[:pz.index("\n}\n") + 3]
+    prog = (r"""
+const campi = {sellZone: {value: ''}, zonaHint: {style: {display: 'block'}, innerHTML: 'x'}};
+const el = id => campi[id];
+let DEMO = false, VETRINA = false, editandoId = null, duplicaDaId = null, zonaStorta = true;
+""" + pz + r"""
+const f = {}; const z = () => campi.sellZone.value;
+precompilaZonaVendi(false); f.vuota = z();
+myZonaVendi = 'Dro (TN)'; precompilaZonaVendi(false);
+f.nota = [z(), zonaStorta, campi.zonaHint.style.display];
+myZonaVendi = 'Arco (TN)'; precompilaZonaVendi(false); f.aggiornata = z();
+campi.sellZone.value = 'Riva del Garda (TN)'; myZonaVendi = 'Dro (TN)';
+precompilaZonaVendi(false); f.cambiata = z();
+campi.sellZone.value = ''; precompilaZonaVendi(false); f.svuotata = z();
+campi.sellZone.value = ''; precompilaZonaVendi(true); f.forza = z();
+editandoId = 5; campi.sellZone.value = 'Pavia (PV)'; precompilaZonaVendi(true);
+f.modifica = z(); editandoId = null;
+duplicaDaId = 6; campi.sellZone.value = 'Pavia (PV)'; precompilaZonaVendi(true);
+f.duplica = z(); duplicaDaId = null;
+campi.sellZone.value = ''; precompilaZonaVendi(true); myZonaVendi = '';
+precompilaZonaVendi(false); f.identitaNuova = z();
+DEMO = true; myZonaVendi = 'Dro (TN)'; campi.sellZone.value = '';
+precompilaZonaVendi(true); f.demo = z();
+console.log(JSON.stringify(f));
+""")
+    out = _node_banco(prog)
+    if out is None:
+        salta("la zona proposta nel form di Vendi", "node non installato")
+    else:
+        prova("chi non ha mai scritto una zona parte col campo vuoto", "", out.get("vuota"))
+        prova("IL CAMPO PARTE GIA' COMPILATO con la zona dell'ultimo annuncio "
+              "(e spegne il cartello del comune storto)",
+              ["Dro (TN)", False, "none"], out.get("nota"))
+        prova("...e la segue finche' nessuno l'ha toccata", "Arco (TN)", out.get("aggiornata"))
+        prova("MA QUEL CHE SCRIVE LUI RESTA, e anche il campo svuotato apposta",
+              ["Riva del Garda (TN)", ""], [out.get("cambiata"), out.get("svuotata")])
+        prova("il form che rinasce (pubblicato o annullato) la ripropone", "Dro (TN)",
+              out.get("forza"))
+        prova("...mai in Modifica ne' nel Duplica: li' vale la zona dell'annuncio",
+              ["Pavia (PV)", "Pavia (PV)"], [out.get("modifica"), out.get("duplica")])
+        prova("...un'identita' senza zona porta via cio' che il form aveva scritto",
+              "", out.get("identitaNuova"))
+        prova("...e in DEMO niente", "", out.get("demo"))
+    me_js = mini[mini.index("mySpedStd = me.spedizione_standard || null;"):]
+    me_js = me_js[:me_js.index("precompilaZonaVendi(false);") + 30]
+    prova("la zona arriva da /api/me (un server di ieri = campo vuoto)", True,
+          "myZonaVendi = typeof me.zona_ultima_vendi === 'string'" in me_js)
+    annulla = fn("function annullaModifica(){")
+    prova("annullare una modifica ripropone la zona dopo aver svuotato il form", True,
+          annulla.index("'sellZone'") < annulla.index("precompilaZonaVendi(true);"))
+    pub = mini[mini.index("  corrieriChiesto = false;\n  /* la zona appena pubblicata"):]
+    pub = pub[:pub.index("precompilaZonaVendi(true);") + 30]
+    prova("pubblicare ricorda la zona PRIMA di svuotare, e un campo vuoto non la "
+          "cancella; poi il form rinasce con lei", [True, True, True],
+          ["if (zPub) myZonaVendi = zPub;" in pub,
+           pub.index("myZonaVendi = zPub") < pub.index("'sellZone','sellDesc'"),
+           pub.index("duplicaDaId = null;") < pub.index("precompilaZonaVendi(true);")])
+
+
 def prove_contanti_zona():
     """LA ZONA DI SCAMBIO E IL VESTITO DEL CONTANTI (10 ott 2026, cantiere
     contanti-zona, richiesta di Andrea). Quattro cose: 1) la zona
@@ -200758,7 +201012,7 @@ CATEGORIE = {
     servizio_senza_corriere gesti_ordine backfill_annullo_venditore
     annullata_pagata accordo_una_volta allegati_chat pdf_allegati
     modifica_massiva
-    venduto_canale chat_mercatino chat_dalla_notifica
+    venduto_canale esauriti_eliminabili chat_mercatino chat_dalla_notifica
     modifica_massiva_foto miniature_leggere leva_mercato_lavoro
     allegati_da_telegram domande_compratore incasso_annuncio
     audit_pagamenti_2 audit_pagamenti_3 audit_tornata_tutto
@@ -201531,6 +201785,7 @@ def main():
               prove_prese_dalle_10, prove_campagna_p2p_tutti,
               prove_prendi_metodo,
               prove_contanti_zona,
+              prove_esauriti_eliminabili,
               prove_mappa_contanti,
               prove_mappa_ritiro,
               prove_mappa_ritocchi,

@@ -115,6 +115,10 @@ Pagare fuori da Barattolo (un bonifico, un pagamento diretto al venditore) vuol 
 3. Scegli come consegni: spedizione (con i corrieri che usi), punto di ritiro o locker, ritiro a mano in zona, o consegna digitale per codici e buoni.
 4. Pubblica. Ogni annuncio passa dalla moderazione, anche quando lo modifichi: se qualcosa non convince resta in attesa di un moderatore, e se viene fermato il messaggio spiega perché e come rimediare.
 
+La «Zona» di un annuncio nuovo parte già scritta con quella del tuo ultimo annuncio (per esempio «Dro (TN)»): se vendi da un altro posto la cambi come ogni altro campo (dal 16 novembre 2026).
+
+Gli annunci esauriti: quando vendi l'ultimo pezzo l'annuncio diventa «Esaurito», resta in fondo al tuo negozio e con «🔄 Rifornisci» torna in vendita appena hai altri pezzi. Se era un pezzo unico che non tornerà (un oggetto usato, per esempio), in «I tuoi annunci» o nella sua pagina tocca «🗑 Elimina»: sparisce dal negozio, da Nostr e dal canale, ma gli ordini e le recensioni restano (dal 16 novembre 2026). Si può fare quando l'ordine di quel pezzo è concluso: con una spedizione, un reso o un rimborso ancora aperti l'app dice di aspettare.
+
 Hai un catalogo grande? Nel Profilo c'è «📥 Importa in blocco»: scarichi il modello CSV, una riga per annuncio, fino a 500 annunci per volta. Ogni riga vuole almeno una foto, con un link nella colonna «foto» (più d'uno separati da |) oppure coi nomi dei file dentro uno ZIP che carichi insieme; una riga senza foto viene scartata. Prima di pubblicare tocchi «🔎 Controlla il file» e vedi cosa va e cosa no. Se hai un negozio Shopify o WooCommerce, nella stessa sezione lo puoi collegare: i prodotti entrano da soli e restano in pari (se la sezione non la vedi, guarda i NUMERI DI OGGI o chiedi allo staff). Gli annunci importati passano dalla moderazione come gli altri.
 
 Per incassare da solo imposta il tuo indirizzo Lightning nel Profilo: quando chi compra conferma, i sats ti arrivano lì.
@@ -123,6 +127,9 @@ Le commissioni del mercatino: Barattolo non prende commissioni, né a chi vende 
 
 Quando qualcuno chiede delle commissioni, tieni sempre separati il mercatino (zero commissioni di Barattolo, solo quelle della rete) e lo scambio P2P (la commissione del coordinatore, spiegata più sotto). Mescolarli confonde.
 
+<!-- pezzo libro-010 | libro -->
+## Libro · Vendere nel mercatino (2/3)
+
 Le donazioni: chi vuole sostenere Barattolo con qualche sats può mandarli all'indirizzo Lightning zap@barattolo.store (si incolla nel wallet come destinatario, si sceglie l'importo e si invia), oppure con uno zap al profilo Nostr «Barattolo», che accetta anche bitcoin on-chain. Sono un regalo libero: non danno vantaggi nell'app e non sono mai obbligatorie. Se qualcuno chiede come donare, dai questo indirizzo e ringrazia di cuore.
 
 Quando arriva un ordine il bot ti avvisa. Spedisci, segna il corriere e il codice di tracciamento nell'ordine, e aspetta la conferma di chi compra. L'indirizzo di chi compra lo vedi solo tu, per stampare l'etichetta: non usarlo per altro.
@@ -130,9 +137,6 @@ Quando arriva un ordine il bot ti avvisa. Spedisci, segna il corriere e il codic
 Le prestazioni si possono vendere, ma devono essere definite: quanto durano, che cosa comprendono, a che prezzo. «Un'ora di lezione di inglese» sì; «ti faccio quello che ti serve» no.
 
 Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraffazioni, documenti, dati personali, farmaci, animali protetti.
-
-<!-- pezzo libro-010 | libro -->
-## Libro · Vendere nel mercatino (2/3)
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere.
 
@@ -1670,5 +1674,13 @@ pubblico: sì
 
 frase: Nella home gli scambi P2P mostrano anche gli ordini on-chain (USDe, ETH, Monero compresi), col fulmine ⚡ o la ₿ in fondo alla card per dire subito la rete. Nel libro la mappa 🗺️ c'è sempre, «Più recenti» mescola on-chain e Lightning, scorrendo i rettangoli «Novità» diventano uno solo, e «🔁 Ripubblica» c'è anche in «Compra BTC» con Barattozon.
 dove: la home, fila «Scambi P2P»; la scheda «P2P», in alto accanto alla campanella; la pillola «Ordina» con «Più recenti».
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-050 | novita -->
+## Novità · 2026-11-16 · esauriti-elimina-zona
+
+frase: Un annuncio esaurito che non tornerà, come un oggetto usato venduto una volta, adesso si può eliminare: sparisce dal tuo negozio, mentre ordini e recensioni restano. E quando pubblichi un annuncio nuovo la «Zona» è già scritta con quella dell'ultimo, e la cambi quando vuoi.
+dove: «I tuoi annunci» nel Profilo, il tasto «🗑 Elimina» accanto a «🔄 Rifornisci»; la pagina dell'annuncio esaurito, «🗑 Elimina l'annuncio»; il form «Vendi», campo «Zona».
 leva: nessuna
 pubblico: sì

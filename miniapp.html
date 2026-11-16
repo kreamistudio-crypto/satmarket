@@ -27347,9 +27347,8 @@ function esaurito(l){
 const ultimoPezzo = l => !!(l && l.ultimo) && (l.quantita || 1) === 1
   && ((l.stato || 'attivo') === 'attivo');
 /* Il recinto del PROPRIETARIO su un annuncio esaurito: al posto di
-   Modifica ed Elimina — che il server rifiuta tutti e due sui
-   'venduto', vogliono lo stato attivo — c'e' l'unica cosa che li' si
-   puo' fare davvero. Il bottone e' ARANCIO e non ghost: su questa
+   Modifica — che il server rifiuta sui 'venduto', vuole lo stato
+   attivo — c'e' la cosa che li' si fa davvero. Il bottone e' ARANCIO e non ghost: su questa
    pagina il posto della CTA e' vuoto (niente recinto, niente
    Acquista) ed e' l'azione per cui la pagina esiste.
    Sugli IMPORTATI non c'e' bottone ma una riga che dice perche': la
@@ -27366,7 +27365,13 @@ const bloccoMioEsaurito = l => `
        bottone che porta a un 400. */
     : l.consegna === 'servizio'
     ? `<div class="trust-note">📅 <span>I servizi non hanno scorte: modifica l'annuncio per riattivarlo.</span></div>`
-    : `<button class="btn orange" onclick="apriRifornisci(${l.id})">🔄 Rifornisci</button>`}`;
+    : `<button class="btn orange" onclick="apriRifornisci(${l.id})">🔄 Rifornisci</button>`}
+  ${/* E L'USCITA PER CHI NON RIFORNIRA' (16 nov 2026, richiesta di
+       Andrea): il pezzo unico venduto non ha niente da rimettere.
+       Stesso vestito velato dell'«Elimina» dell'annuncio attivo, e
+       sotto la CTA: il gesto per cui la pagina esiste resta il primo.
+       Vale anche per importati e servizi — il server archivia tutti. */''}
+  <button class="btn allarme" onclick="deleteListing(${l.id}, true)">🗑 Elimina l'annuncio</button>`;
 /* Il battito della lampo: UN solo interval per tutta l'app. Il
    contatore «Scade tra 2h 14m» vive SOLO nella scheda (in griglia il
    badge dice la sola percentuale), quindi qui si aggiorna in-place
@@ -50983,7 +50988,12 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
              guarda da fuori uno scaffale vuoto. */
           :esa?`<span class="badge" style="background:var(--off-bg);color:var(--muted)">Venduto</span><span class="badge az-btn" onclick="apriRifornisci(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Hai altri pezzi? L'annuncio torna in vetrina">🔄 Rifornisci</span>`
           :`<span class="badge az-btn" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>`}
-        ${esa?'':`<span class="badge az-btn" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>`}
+        ${/* 🗑 ANCHE SULL'ESAURITO (16 nov 2026, richiesta di Andrea):
+             c'e' quello che si rifornisce, il miso, e quello che non
+             tornera', il pezzo usato venduto una volta. Il secondo
+             restava qui per sempre col solo «Rifornisci». Il server lo
+             archivia ('rimosso'): ordini e recensioni restano. */''}
+        <span class="badge az-btn" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>
       </div>
       ${/* fuori da .mio-azioni e su una riga sua: quella e' flex-wrap
             e a 320px i due badge la riempiono gia' tutta — un terzo
@@ -54681,10 +54691,21 @@ async function trattamiDaNuovo(){
 
 async function deleteListing(id, dalDettaglio){
   haptic();
+  /* L'ESAURITO HA LA SUA FRASE (16 nov 2026): dal mercatino e' gia'
+     fuori, quindi «sparisce dal mercatino» non direbbe niente. Dice
+     dove si vede ancora (il negozio, «Esauriti di recente») e che la
+     storia resta — e' la paura di chi ha venduto. */
+  const l = (myListings || []).find(x => x.id === id)
+    || (listings || []).find(x => x.id === id);
+  const esa = !!l && esaurito(l);
   chiediConferma({
-    titolo: 'Elimini questo annuncio?',
-    corpo: 'Sparisce dal mercatino, da Nostr e dal canale. Per '
-         + 'rimetterlo in vendita dovrai ripubblicarlo.',
+    titolo: esa ? 'Non lo rifornirai più?' : 'Elimini questo annuncio?',
+    corpo: esa
+      ? 'Sparisce dal tuo negozio e dai tuoi annunci, anche da Nostr e '
+        + 'dal canale. Gli ordini e le recensioni restano. Se un giorno '
+        + 'ne avessi un altro, dovrai ripubblicarlo.'
+      : 'Sparisce dal mercatino, da Nostr e dal canale. Per '
+        + 'rimetterlo in vendita dovrai ripubblicarlo.',
     etichetta: '🗑 Elimina',
     poi: async () => {
       if (DEMO) {
@@ -54946,6 +54967,39 @@ function aggiornaSupplHint(){
   h.textContent = inEur
     ? `${q} pezzi = ${fmtEur(tot)} € di spedizione`
     : `${q} pezzi = ${fmt(tot)} sats di spedizione`;
+}
+/* LA ZONA DELL'ULTIMO ANNUNCIO (16 nov 2026, richiesta di Andrea): un
+   articolo NUOVO nasce con la zona che il venditore ha scritto l'ultima
+   volta («Dro (TN)»), e la si cambia come ogni altro campo. La dice il
+   SERVER in /api/me (`zona_ultima_vendi`), cosi' vale anche sul
+   telefono nuovo; ogni pubblicazione riuscita la aggiorna qui.
+   Rovescia, sapendolo, il «la zona di Vendi non si precompila» di lug
+   2026: li' la fonte era il comune di chi guarda, qui e' il campo
+   stesso — vedi `_zona_ultima_vendi` in server.py.
+   LA REGOLA DEL COSTO STANDARD, la stessa: il form ricorda cio' che ha
+   scritto da se' (`zonaVendiPosata`) e riscrive solo una casella che
+   dice ancora quello. Chi la cambia o la SVUOTA apposta la ritrova
+   com'e'. Mai in Modifica (l'annuncio ha la sua zona) ne' nel Duplica
+   (la copia dalla scheda di partenza): `forza` e' dei due momenti in
+   cui il form rinasce vuoto, l'annullo e la pubblicazione riuscita. */
+let myZonaVendi = '';
+let zonaVendiPosata = null;
+function precompilaZonaVendi(forza){
+  const c = el('sellZone');
+  if (DEMO || VETRINA || editandoId || duplicaDaId || !c) return;
+  if (!forza && c.value !== (zonaVendiPosata ?? '')) return;
+  if (!myZonaVendi){
+    /* nessuna zona da proporre (l'identita' nuova non ne ha mai
+       scritta una): cio' che il form aveva scritto da se' se ne va */
+    if (zonaVendiPosata !== null && c.value === zonaVendiPosata) c.value = '';
+    zonaVendiPosata = null;
+    return;
+  }
+  c.value = myZonaVendi;
+  zonaVendiPosata = myZonaVendi;
+  const h = el('zonaHint');
+  if (h) { h.style.display = 'none'; h.innerHTML = ''; }
+  zonaStorta = false;
 }
 /* LA PRECOMPILAZIONE DEL COSTO STANDARD (set 2026): un articolo NUOVO —
    e il Duplica, chiesto da Andrea — nasce col costo di spedizione del
@@ -55999,6 +56053,7 @@ function annullaModifica(){
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
   precompilaSpedStd(true);   // il form rinasce: col costo standard, se c'e'
+  precompilaZonaVendi(true); // ...e con la zona dell'ultimo annuncio
 }
 
 /* Il form di Vendi ha due facce: "pubblica" (di default) e "modifica"
@@ -57090,6 +57145,12 @@ async function publish(){
      2026). Su un errore resta alzato: la RIPROVA dello stesso
      annuncio non deve richiedere quel che ha appena chiesto. */
   corrieriChiesto = false;
+  /* la zona appena pubblicata diventa la proposta del prossimo
+     articolo (16 nov 2026): si legge PRIMA che il form si svuoti, e un
+     campo lasciato vuoto non cancella quella di prima — come il server,
+     che guarda l'ultimo annuncio CON una zona */
+  { const zPub = (el('sellZone')?.value || '').trim();
+    if (zPub) myZonaVendi = zPub; }
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
    'sellSpedPunto','sellSpedExtra','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
   svuotaZoneIntl();
@@ -57108,6 +57169,7 @@ async function publish(){
   duplicaDaId = null; duplicaTitolo = ''; fotoAttuali = [];
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
   precompilaSpedStd(true);   // il prossimo articolo nasce col costo standard
+  precompilaZonaVendi(true); // ...e con la zona di quello appena pubblicato
   if (inRevisione) {
     /* La terza via: l'annuncio esiste ma aspetta un moderatore. La
        verità subito, e il badge ⏳ nel cassetto dei tuoi annunci. */
@@ -103945,6 +104007,11 @@ async function avvia(){
     mySpedStd = me.spedizione_standard || null;
     spedStdBozza = null;
     precompilaSpedStd(false);
+    /* la zona dell'ultimo annuncio (16 nov 2026): '' da un server di
+       ieri, che la chiave non la manda — e il campo resta vuoto */
+    myZonaVendi = typeof me.zona_ultima_vendi === 'string'
+      ? me.zona_ultima_vendi : '';
+    precompilaZonaVendi(false);
     /* i punti di ritiro salvati da chi COMPRA: qui arrivano TUTTI,
        anche quelli su una rete che nessun venditore dichiara piu' —
        questo e' il cassetto in cui si tolgono, e una riga che non si

@@ -85316,3 +85316,73 @@ Barattolo solo dentro Telegram e apre il sito dal computer deve avere lì la
 stessa identità P2P; la pubblicazione sugli store (account a nome di
 Barattolo, pagina privacy, schermate) e la voce in NOVITA e per Tappo,
 quando l'estensione sarà scaricabile.
+
+GLI ESAURITI CHE NON TORNANO SI ELIMINANO, E LA ZONA SI RICORDA (16 nov
+2026, cantiere elimina-esauriti, due richieste di Andrea dalla sua
+vetrina: «ci sono due tipologie di prodotti esauriti, quelli che verranno
+riforniti e quelli che una volta venduti non torneranno più… ci vorrebbe
+una sorta di eliminazione articolo», «per un articolo presente posso
+farlo di eliminarlo, per uno esaurito pare di no»; e «quando inserisco
+un nuovo articolo sarebbe bello che mi proponesse già compilato il
+comune (zona), ad esempio Dro (TN)»).
+1. L'ELIMINA SULL'ESAURITO. Il range extender usato, venduto una volta,
+restava per sempre in «Esauriti di recente» e in «I tuoi annunci» col
+solo «Rifornisci»: il client nascondeva «🗑 Elimina» sui 'venduto' e il
+server lo rifiutava (`rimuovi_annuncio` voleva 'attivo' o 'revisione').
+Ora `rimuovi_annuncio` accetta anche 'venduto' e lo porta a 'rimosso':
+la cancellazione morbida di sempre, cioè un ARCHIVIO (la riga resta,
+ordini, recensioni e dispute ci si appoggiano come prima), più il kind 5
+su Nostr e il ritiro del post dal canale. NIENTE STATO NUOVO. LA GUARDIA
+SULL'ESAURITO È LARGA, quella della Modifica (ogni ordine non concluso
+ferma il gesto, resi e rimborsi in attesa compresi; la fattura annullata
+e pagata no): `_rimborsa_compratore` rimette i pezzi con stato='attivo'
+senza guardare da dove parte, quindi un archiviato a reso in corso
+tornerebbe in vetrina da solo, e l'ultimo ordine di un esaurito è
+proprio quello ancora in giro. L'attivo tiene la sua guardia stretta, non
+toccata (vedi la nota in fondo). Nel client: «🗑 Elimina» sulla riga
+esaurita di «I tuoi annunci» accanto a «🔄 Rifornisci», «🗑 Elimina
+l'annuncio» sotto «Rifornisci» nella scheda (`bloccoMioEsaurito`, anche
+per importati e servizi), e il foglio di conferma dell'esaurito con la
+sua frase: «Non lo rifornirai più?», «Sparisce dal tuo negozio e dai tuoi
+annunci, anche da Nostr e dal canale. Gli ordini e le recensioni
+restano». NON FATTO, proposto ad Andrea a parte: il «pezzo unico» scelto
+alla pubblicazione, che all'esaurimento si archivia da solo.
+2. LA ZONA DELL'ULTIMO ANNUNCIO. ROVESCIA, SAPENDOLO, la riga di lug 2026
+«la zona di Vendi non si precompila» (Architettura, «📍 VICINO A ME»): lì
+la proposta veniva dal comune di chi guarda, morto col filtro, e da un
+avviso a parte. Qui la fonte è il campo stesso: `_zona_ultima_vendi` (la
+zona dell'annuncio più recente nato QUI, ogni stato compreso il
+rimosso, importati Nostr e negozi esclusi) esce in /api/me come
+`zona_ultima_vendi`, quindi vale anche sul telefono nuovo. Nel client
+`precompilaZonaVendi` segue la regola del costo standard: scrive solo una
+casella che dice ancora quel che aveva scritto lui (`zonaVendiPosata`),
+quindi chi la cambia o la svuota apposta la ritrova com'è; mai in
+Modifica né nel Duplica; `forza` all'annullo e alla pubblicazione
+riuscita, che prima ricorda la zona appena pubblicata (un campo vuoto
+non cancella quella di prima). SCARTATA una rotta a parte come
+`/api/p2p/zona`: il P2P l'aveva tenuta fuori da /api/me per non mettere
+un dato del P2P in ogni pagina del mercatino, qui è un dato del
+mercatino e sta accanto a `spedizione_standard`.
+PROVATO: `prove_esauriti_eliminabili` (nuova, 26 righe): la rotta VERA
+su un database di cartone (esaurito archiviato con la storia intatta,
+fattura mai pagata annullata, otto stati vivi che fermano, il SET, la
+fattura annullata e pagata che non ferma, l'attivo con la guardia di
+ieri, l'annuncio altrui), la zona sul database (più recente, pari
+merito, importati, NULL, di un altro), la scheda e il foglio in node, la
+proposta della zona in node (nota, seguita, cambiata, svuotata, forza,
+Modifica, Duplica, identità nuova, DEMO). NOVE MUTAZIONI una per riga
+sorvegliata, ognuna rossa da sola. `collaudo_elimina_esauriti` (nuovo,
+12 righe, server vero, nella CI): archiviato con ordine e recensione
+intatti, fuori dallo scaffale e dal link, il reso che ferma, la zona in
+/api/me; rosso col filtro di ieri. Sull'albero di develop 59e89ef6 più
+questo commit: suite severa nel venv del passo «Le prove» (senza httpx
+né coincurve) 28.637 verdi, 0 rosse, le 2 saltate per nostr-tools rifatte
+con IDENTITA_NODE_MODULES (97 verdi); collaudi della CI nel venv senza
+coincurve e senza le variabili del proxy, 137 verdi, 0 rossi.
+DA GUARDARE: il primo venditore vero che elimina un esaurito (che il
+post del canale e l'evento Nostr se ne vadano); la zona proposta sul
+telefono di Andrea al primo annuncio dopo il deploy.
+NOTATO E NON TOCCATO: sull'ATTIVO la guardia di `rimuovi_annuncio`
+guarda solo locked/shipped/confirmed/dispute, quindi un attivo con un
+reso in corso si archivia e il rimborso lo riaccende (lo stesso buco,
+più raro); e la Modifica di più annunci non elimina gli esauriti.

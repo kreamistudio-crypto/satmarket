@@ -31332,14 +31332,34 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     con = db()
     # anche 'revisione': il venditore puo' sempre ritirare cio' che
     # aspetta una decisione (mai stato online: nessun ordine possibile)
+    # E ANCHE 'venduto' (16 nov 2026, richiesta di Andrea): l'esaurito
+    # che non tornera' — il range extender usato, venduto una volta e
+    # basta — restava per sempre in «Esauriti di recente» e in «I tuoi
+    # annunci» col solo «Rifornisci». Lo stato d'arrivo e' lo stesso
+    # 'rimosso' di sempre, cioe' un ARCHIVIO e non una cancellazione:
+    # la riga resta, e ordini, recensioni e dispute ci si appoggiano
+    # come prima.
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
-                    "AND stato IN ('attivo','revisione')",
+                    "AND stato IN ('attivo','revisione','venduto')",
                     (annuncio_id, user["id"])).fetchone()
     if not a:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
-    in_corso = _ordini_vivi_annuncio(
-        con, annuncio_id, ("locked", "shipped", "confirmed", "dispute"))
+    # SULL'ESAURITO LA GUARDIA E' QUELLA LARGA DELLA MODIFICA: ogni
+    # ordine non concluso ferma il gesto, resi e rimborsi in attesa
+    # compresi. Il motivo e' il rimborso (`_rimborsa_compratore`), che
+    # rimette i pezzi con stato='attivo' senza guardare da dove parte:
+    # su un annuncio archiviato a reso in corso lo riaccenderebbe in
+    # vetrina, rovesciando la decisione di chi vende. E l'ultimo ordine
+    # di un esaurito e' proprio quello che e' ancora in giro. 'creato'
+    # non conta: l'annullo qui sotto lo chiude comunque.
+    if a["stato"] == "venduto":
+        in_corso = _ordini_vivi_annuncio(
+            con, annuncio_id, ("released", "refunded", "annullato", "creato"),
+            esclusi=True)
+    else:
+        in_corso = _ordini_vivi_annuncio(
+            con, annuncio_id, ("locked", "shipped", "confirmed", "dispute"))
     if in_corso:
         con.close()
         raise HTTPException(400, "C'è un affare in corso su questo annuncio: "
@@ -50039,6 +50059,30 @@ async def rinfresca_profili_nostr():
         await aggiorna_profilo_social(r["tg_id"])
 
 
+def _zona_ultima_vendi(con, tg_id: int) -> str:
+    """LA ZONA DELL'ULTIMO ANNUNCIO (16 nov 2026, richiesta di Andrea):
+    quella dell'annuncio piu' recente che questo venditore ha pubblicato
+    QUI, o '' se non ne ha mai scritta una. Serve a far partire il campo
+    «Zona» di Vendi gia' compilato — chi vende da Dro vende da Dro anche
+    domani — e resta un campo: lo cambia quando vuole.
+    ROVESCIA, SAPENDOLO, la riga di lug 2026 «la zona di Vendi non si
+    precompila» (Architettura, «📍 VICINO A ME»): li' la proposta veniva
+    dal comune di chi GUARDA (`utenti.comune`, morto col filtro) e da
+    un avviso a parte. Qui la fonte e' il campo stesso, cioe' quel che
+    lui ha gia' scritto l'ultima volta: «il posto dove si dice da dove
+    si vende e' uno solo» resta vero.
+    Ogni stato conta, anche il rimosso e l'esaurito: e' la sua ultima
+    PAROLA sul luogo, non un annuncio da mostrare. Gli importati no
+    (Nostr e negozi collegati): la loro zona l'ha scritta un altro
+    posto. Gemello di `_zona_ultima_p2p`, dal SERVER e non dal telefono,
+    cosi' vale anche sul telefono nuovo."""
+    r = con.execute(
+        "SELECT a.zona FROM annunci a WHERE a.venditore_id=? AND "
+        f"TRIM(a.zona) <> '' AND NOT {SQL_ORIGINE_ESTERNA} "
+        "ORDER BY a.creato DESC, a.id DESC LIMIT 1", (int(tg_id),)).fetchone()
+    return (r[0] or "").strip()[:80] if r else ""
+
+
 @app.get("/api/me")
 async def mio_profilo(x_tg_init_data: str = Header(""),
                       barattolo_sessione: str = Cookie("")):
@@ -50154,8 +50198,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # scheda Profilo li scrive accanto a vendite e acquisti — lo stesso
     # conto del negozio e del volto, da uno in su
     _scambi_p2p = _completati_p2p(con, [user["id"]]).get(int(user["id"]), 0)
+    # la zona dell'ultimo annuncio, per il form di Vendi (16 nov 2026):
+    # letta qui perche' e' qui che il database e' ancora aperto
+    _zona_vendi = _zona_ultima_vendi(con, user["id"])
     con.close()
     profilo = dict(u) if u else {}
+    profilo["zona_ultima_vendi"] = _zona_vendi
     profilo["scambi_completati"] = _scambi_p2p
     # IL RICONOSCIMENTO LO DICE IL GIUDICE (12 ott 2026, chi-e-l-altro):
     # acceso per tutti (l'anonimato e' una chiave Nostr nuova) — la
