@@ -165921,8 +165921,22 @@ def prove_leva_rgb():
         return amb
 
     a = esegui()
-    prova("senza config: leva spenta, fase aperta, nessun nome",
-          (False, set(), {}), (a["RGB_ATTIVO"], a["RGB_PROVA_IDS"], a["NIP05_NOMI"]))
+    CASA = a["NIP05_DI_CASA"]
+    prova("senza config: leva spenta, fase aperta, solo i nomi della casa",
+          (False, set(), CASA), (a["RGB_ATTIVO"], a["RGB_PROVA_IDS"], a["NIP05_NOMI"]))
+    # LA CASA STESSA (16 nov 2026): l'account ufficiale si riconosce come
+    # barattolo.store («_») e barattolo@, con la chiave di ZAP_NPUB — la
+    # stessa npub, convertita col convertitore vero del server
+    m = re.search(r'ZAP_NPUB = "(npub1[0-9a-z]+)"', src)
+    amb_npub = {"CHARSET_BECH32": "qpzry9x8gf2tvdw0s3jn54khce6mua7l"}
+    exec(pezzo("npub_to_hex"), amb_npub)
+    hex_zap = amb_npub["npub_to_hex"](m.group(1)) if m else None
+    prova("i nomi della casa sono «_» e «barattolo», con la hex di ZAP_NPUB",
+          {"_": hex_zap, "barattolo": hex_zap}, CASA)
+    prova("...che e' la npub dell'account ufficiale (16 nov 2026)",
+          "2e7afe3f9af8c3dc90d6e8acaf5d7aa926a54f0c22f1c555707309c059fe831b", hex_zap)
+    prova("...e il convertitore del server e' quello giusto: CHARSET_BECH32 combacia",
+          True, 'CHARSET_BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"' in src)
     prova("...e rgb_ammesso dice no a chiunque, anche a 999", False,
           any(a["rgb_ammesso"](x) for x in (111, 222, 999, "111", None)))
     prova("...e il giudice del pannello dice spento", {"attivo": False},
@@ -165941,16 +165955,19 @@ def prove_leva_rgb():
           (a["RGB_PROVA_IDS"], a["rgb_ammesso"](111),
            any("CHIUSA" in s for s in a["_stampe"])))
     a = esegui(NIP05_NOMI={"usdb": HEX_A.upper(), "tothemooon": HEX_B})
-    prova("NIP05_NOMI: le chiavi si tengono in minuscolo",
-          {"usdb": HEX_A, "tothemooon": HEX_B}, a["NIP05_NOMI"])
+    prova("NIP05_NOMI: le chiavi si tengono in minuscolo, accanto a quelli di casa",
+          {"usdb": HEX_A, "tothemooon": HEX_B, **CASA}, a["NIP05_NOMI"])
+    a = esegui(NIP05_NOMI={"_": HEX_A})
+    prova("...e il config vince sul nome di casa, l'altro resta",
+          {"_": HEX_A, "barattolo": CASA["barattolo"]}, a["NIP05_NOMI"])
     a = esegui(NIP05_NOMI={"usdb": HEX_A, "Storto": HEX_B, "corta": "abc",
                            "npub": "npub1" + "q" * 58})
     prova("...e scarta nome maiuscolo, chiave corta e npub, dicendolo",
-          ({"usdb": HEX_A}, 3),
+          ({"usdb": HEX_A, **CASA}, 3),
           (a["NIP05_NOMI"], sum("scartato" in s for s in a["_stampe"])))
     a = esegui(NIP05_NOMI="usdb")
-    prova("...e un NIP05_NOMI che non e' un dizionario vale vuoto, e lo dice",
-          ({}, True), (a["NIP05_NOMI"], any("dizionario" in s for s in a["_stampe"])))
+    prova("...e un NIP05_NOMI che non e' un dizionario vale i soli nomi di casa, e lo dice",
+          (CASA, True), (a["NIP05_NOMI"], any("dizionario" in s for s in a["_stampe"])))
 
     # --- 3) la rotta, eseguita con una JSONResponse di cartone --------
     prova("la rotta /.well-known/nostr.json c'e' una volta, GET e HEAD",
@@ -165985,6 +166002,9 @@ def prove_leva_rgb():
     amb["NIP05_NOMI"] = {}
     prova("config vuoto: {\"names\": {}}", {"names": {}},
           amb["nip05_nostr_json"]().corpo)
+    amb["NIP05_NOMI"] = dict(CASA)
+    prova("?name=_ risponde la chiave dell'account ufficiale (barattolo.store)",
+          {"names": {"_": CASA["_"]}}, amb["nip05_nostr_json"]("_").corpo)
 
     # --- 4) il pannello chiede al giudice, e il cancello di domani ----
     ls = codice(pezzo("_leve_stato"))

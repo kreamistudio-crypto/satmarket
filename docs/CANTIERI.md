@@ -85661,3 +85661,39 @@ Collaudi della CI 137/137 in un venv con le sole dipendenze del workflow
 venditore che l'ha chiesto): quanti combaciano da soli e quanti restano
 in «Altro» — se restano quasi tutti, la strada è la dichiarazione, non
 allargare il giudice. Shopify vero non è passato.
+
+## L'account Nostr di Barattolo verificato come barattolo.store (16 nov 2026, cantiere nip05-casa; Andrea: «Verifica account Barattolo npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy tramite nip-05 su barattolo.store»)
+
+La rotta `/.well-known/nostr.json` c'era già dall'8 ott (hackathon:
+`NIP05_NOMI` dal config, `?name=`, CORS aperto, mai un redirect), ma
+sul VPS `NIP05_NOMI` non era mai entrata e la rotta rispondeva «qui
+nessuno». DECISO: i nomi della casa stanno nel CODICE,
+`NIP05_DI_CASA = {"_": <hex>, "barattolo": <hex>}`, fusi PRIMA di
+`NIP05_NOMI` del config (il config vince sullo stesso nome) e passati
+dal setaccio come gli altri. «_» è il nome che il NIP-05 riserva al
+dominio nudo: nel profilo si scrive `_@barattolo.store` e i client
+mostrano «barattolo.store»; «barattolo» è la stessa chiave per chi
+scrive `barattolo@barattolo.store`. La hex `2e7afe3f…59fe831b` è la
+npub convertita (checksum bech32 controllato), la stessa di
+`ZAP_NPUB` e di `NOSTR_NSEC_PIATTAFORMA`. PERCHÉ NEL CODICE e non una
+riga nel config del VPS: è un fatto pubblico e fisso (la npub stava
+già nel codice in `ZAP_NPUB`), la spunta non deve dipendere da una
+riga a mano che un trasloco del config può perdere, e arriva con la
+promozione senza gesti in produzione. SCARTATO: derivarla da
+`_NOSTR` (la nsec della piattaforma) — il blocco NIP-05 viene molto
+prima nel file, e senza la nsec (collaudo, nsec spenta) la verifica
+sparirebbe per un motivo che non c'entra. Il pannello «Stato delle
+leve» ora mostra sempre `_, barattolo` nella riga «Nomi NIP-05 di
+casa»: è vero. NON TOCCATO: il profilo kind 0 dell'account (il server
+non lo pubblica: il campo nip05 lo scrive Andrea dal suo client).
+PROVATO: `prove_leva_rgb` (i nomi di casa = la hex di `ZAP_NPUB`
+convertita col `npub_to_hex` vero del server, il config che vince sul
+nome di casa, i nomi storti scartati accanto a quelli di casa,
+`?name=_`); controprova: un carattere cambiato nella hex → rosso.
+Dal vivo sul server locale in collaudo (relay morto): GET 200 coi due
+nomi, `Access-Control-Allow-Origin: *`, cache di un'ora, `?name=_` la
+sola chiave, `?name=chiunque` `{"names": {}}`, HEAD 200.
+DA GUARDARE dopo la promozione: `curl -s
+"https://barattolo.store/.well-known/nostr.json?name=_"` deve dare la
+hex; poi la spunta nel profilo su Primal/Damus/nostr.band dopo che
+Andrea ha messo `_@barattolo.store` nel campo nip05.

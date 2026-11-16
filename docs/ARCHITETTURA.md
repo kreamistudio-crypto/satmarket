@@ -31509,7 +31509,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    `NIP05_NOMI` del config con le chiavi PUBBLICHE in hex, `?name=`
    che filtra, CORS aperto, mai un redirect; nato per gli emittenti
    degli asset RGB dell'hackathon di Torino, non dipende da
-   `RGB_ATTIVO` — vedi HACKATHON-SETUP, §11),
+   `RGB_ATTIVO` — vedi HACKATHON-SETUP, §11; dal 16 nov 2026 porta
+   anche i nomi della casa, `_` e `barattolo`, scritti nel CODICE
+   (`NIP05_DI_CASA`, la chiave di `ZAP_NPUB`): l'account Nostr
+   ufficiale si verifica come `_@barattolo.store` senza righe nel
+   config — vedi CANTIERI, «L'account Nostr di Barattolo verificato»),
    `/.well-known/lnurlp/zap` e `/api/lnurl/zap` (10 ott 2026,
    l'indirizzo Lightning di casa `zap@barattolo.store`: il citofono
    LUD-16 e il callback che conia la fattura; JSON, CORS aperto, mai un

@@ -56459,7 +56459,25 @@ except ImportError:
 except (TypeError, ValueError, AttributeError):
     NIP05_NOMI = {}
     print("[nip05] NIP05_NOMI non e' un dizionario nome → chiave hex: "
-          "la rotta risponde vuota")
+          "valgono i soli nomi della casa")
+# LA CASA STESSA (16 nov 2026, richiesta di Andrea): l'account Nostr
+# ufficiale di Barattolo — la chiave della piattaforma, la stessa npub
+# di ZAP_NPUB — si fa riconoscere come barattolo.store. Il nome «_» e'
+# quello che il NIP-05 riserva al dominio nudo: un client che legge
+# `_@barattolo.store` nel profilo mostra «barattolo.store» e basta;
+# «barattolo» e' la stessa chiave per chi scrive barattolo@... Sta nel
+# CODICE e non solo nel config del VPS perche' e' un fatto pubblico e
+# fisso (la npub gia' sta qui, in ZAP_NPUB), e cosi' la spunta non
+# dipende da una riga a mano: arriva con la promozione. Il config
+# vince sullo stesso nome (una riga `"_": "<altra hex>"` la cambia),
+# e i nomi di casa passano dal setaccio qui sotto come tutti gli altri.
+# La hex e' la npub convertita, mai la npub (lo vuole il NIP); una
+# prova pretende che combaci con ZAP_NPUB.
+NIP05_DI_CASA = {
+    "_": "2e7afe3f9af8c3dc90d6e8acaf5d7aa926a54f0c22f1c555707309c059fe831b",
+    "barattolo": "2e7afe3f9af8c3dc90d6e8acaf5d7aa926a54f0c22f1c555707309c059fe831b",
+}
+NIP05_NOMI = {**NIP05_DI_CASA, **NIP05_NOMI}
 # il nome ha l'alfabeto del NIP-05 (a-z0-9-_.), la chiave 64 esadecimali
 _nip05_storti = sorted(n for n, k in NIP05_NOMI.items()
                        if not re.fullmatch(r"[a-z0-9._-]+", n)

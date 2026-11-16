@@ -410,7 +410,12 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   di usdb, `Access-Control-Allow-Origin: *`, nessun Location) e nel
   pannello «⚙️ Stato delle leve», gruppo «🪙 Punti e dollari su RGB
   (hackathon)». Il verbale: CANTIERI, «Hackathon: la chiusura della
-  preparazione»; la lista: HACKATHON-SETUP §10-11.
+  preparazione»; la lista: HACKATHON-SETUP §10-11. DAL 16 NOV 2026 la
+  rotta non risponde più vuota anche senza la riga: i nomi `_` e
+  `barattolo` (l'account ufficiale, `_@barattolo.store` nel suo campo
+  nip05) stanno nel codice, `NIP05_DI_CASA`; una `NIP05_NOMI` nel
+  config si AGGIUNGE a quelli e vince solo sullo stesso nome. Si guarda
+  con `curl -s "https://barattolo.store/.well-known/nostr.json?name=_"`.
 - LA CASSA DI RISONANZA SU X (9 ott 2026): i post di Barattolo su Nostr
   — le note kind 1 ORIGINALI della npub ufficiale, niente risposte né
   repost, mai le promo degli annunci che firma il server, mai i
