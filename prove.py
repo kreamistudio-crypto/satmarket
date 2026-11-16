@@ -157099,6 +157099,224 @@ console.log(JSON.stringify({
            'passo_euro="usdt"' in riga and "usdt=True" in riga))
 
 
+
+def prove_p2p_monete_ritocchi():
+    """ETH, MONERO E USDe: TUTTO LO SCAMBIO PARLA DELLA MONETA (16 nov 2026,
+    cantiere p2p-monete-ritocchi; Andrea: «tutto deve corrispondere, perché
+    quando avevamo acceso USDT nel dettaglio di un ordine diceva invia
+    ancora euro»). Nello scambio pagato in una moneta: la tappa «ETH
+    inviati», le frasi degli stati, il «Come funziona» del foglio, i
+    bottoni e gli avvisi del bot (anche ai moderatori) dicono la moneta, e
+    NESSUNA frase lascia «euro», «💶», il conto o il bonifico; la cifra resta
+    in € — l'ordine e' in euro — e dice in che cosa si paga, «50,00 € in
+    ETH». In euro tutto resta lettera per lettera. E nel foglio «Pubblica»
+    le sette voci delle monete stanno sotto «Altri metodi ▾»."""
+    print("\n🪙 ETH, Monero e USDe: lo scambio parla della moneta, e la lista corta")
+    import re as _re
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    # LO SPORCO: una parola dell'euro, il conto, il bonifico, o un € senza
+    # la moneta accanto
+    def sporca(t, coin):
+        senza = t.replace("€ in " + coin, "")
+        return bool(_re.search(r"\beuro\b|€|💶|bonific|\bconto\b", senza, _re.I))
+
+    # --- 1) il telefono ---
+    ini = mini.index("/* ═══ GLI ORDINI IN USDT (1 nov 2026")
+    fine = mini.index("/* ---- IL PERCORSO BARATTOZON (23 set 2026")
+    blocco = mini[ini:fine]
+    i = mini.index("const P2P_VALUTE = [")
+    valute = mini[i:mini.index("];", i) + 2]
+    forme = mini.index("const P2P_FORME_RECAPITO = [")
+    forme_cripto = mini[forme:mini.index("/* LA CAUSALE (9 ott 2026", forme)]
+    i = mini.index("const STATI_P2P = {")
+    stati = mini[i:mini.index("\n};\n", i) + 4]
+    lista = _re.search(r"const P2P_METODI = \[[^\n]*\];", mini).group(0)
+    altri = _re.search(r"const P2P_METODI_ALTRI = \[[^\n]*\];", mini).group(0)
+    js = ("var cambioVivo = true, eurPerSat = 0.001, usdPerSat = 0.00108;\n"
+          "var myP2PUsdt = false, myP2PCoin = true, TETTO = 250;\n"
+          "const P2P_VALUTA = 'EUR', P2P_CONTANTI = 'Contanti';\n"
+          + lista + "\n" + altri + "\n"
+          "const P2P_TABACCHINO = 'Contanti al tabacchino';\n"
+          "const tabacchinoP2P = m => (m || []).some(x => String(x).indexOf('Contanti al tabacchino') === 0);\n"
+          "const maxEuroP2P = () => TETTO;\n"
+          "const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\"/g, '&quot;');\n"
+          "const fmtEur = n => Number(n).toFixed(2).replace('.', ',');\n"
+          "const fmt = n => String(n);\n"
+          "const rigaDato = (et, v, op) => '[' + et + '=' + v + ']';\n"
+          "const vesteMetodoP2P = () => null;\n"
+          "const P2P_STELLE_EU = '<svg-eu>', P2P_TETHER_SEGNO = '<svg-t>';\n"
+          "var p2pTxidBozza = {};\n"
+          + valute + "\n" + blocco + "\n" + stati + "\n"
+          + forme_cripto.replace("const P2P_FORME_RECAPITO = [", "const FORME = [") + "];\n"
+          + _fn_js(mini, "function righeRecapitoP2P(testo){")
+          + _fn_js(mini, "function reteUsdtDaRecapitoP2P(righe){")
+          + _fn_js(mini, "function reteCoinDaRecapitoP2P(righe){")
+          + _fn_js(mini, "function reteCoinScambioP2P(o){")
+          + _fn_js(mini, "function gestoPagoP2P(o){")
+          + _fn_js(mini, "function passoDopoGaranziaP2P(o){")
+          + _fn_js(mini, "function corpoAnnulloDisputaP2P(o, modo){")
+          + _fn_js(mini, "function passiScambioP2P(q){")
+          + _fn_js(mini, "function nomePassoEuroModP2P(d){")
+          + _fn_js(mini, "function vociTendinaMetodiP2P(lista, scelti, aperti){")
+          + "const metodoSceltoP2P = o => (o.metodi || []).indexOf(o.metodoScelto) >= 0 ? o.metodoScelto : '';\n"
+          + "const valutaFoglioP2P = () => 'EUR';\n"
+          + r"""
+const P = (o, t) => paroleUsdtP2P(o, t);
+const ETH = {metodi: ['ETH (Ethereum)'], fiat: 'EUR'};
+const XMR = {metodi: ['XMR (Monero)'], fiat: 'EUR'};
+const USDE = {metodi: ['USDe (Arbitrum)', 'USDe (Base)'], fiat: 'EUR'};
+const MISTO = {metodi: ['SEPA', 'ETH (Ethereum)'], fiat: 'EUR'};
+const MISTO_SCELTO = {metodi: ['SEPA', 'XMR (Monero)'], metodoScelto: 'XMR (Monero)', fiat: 'EUR'};
+const MISTO_SEPA = {metodi: ['SEPA', 'ETH (Ethereum)'], metodoScelto: 'SEPA', fiat: 'EUR'};
+const EURO = {metodi: ['SEPA', 'Revolut'], fiat: 'EUR'};
+const USDT = {metodi: ['USDT (Tron)'], fiat: 'USDT'};
+/* tutte le frasi del flusso: gli stati, i quattro passi della pagina
+   (scritti dentro renderOrdine, qui per esteso), il «Come funziona» del
+   foglio di presa, il passo dopo la garanzia, l'annullo in disputa */
+const frasi = [];
+for (const s of Object.values(STATI_P2P))
+  for (const k of Object.keys(s)) if (typeof s[k] === 'string') frasi.push(s[k]);
+frasi.push('Euro inviati', 'Al recapito che ti dà chi vende', 'Al recapito che hai indicato',
+           'Hai detto di aver mandato 50,00 €', 'Ti ha indicato dove inviare 50,00 €',
+           'Se hai già inviato i tuoi euro, Euro e EURO non accettare');
+const come = q => [].concat(passiScambioP2P(Object.assign({compro: true}, q)), passiScambioP2P(Object.assign({compro: false}, q)),
+                            passiScambioP2P(Object.assign({compro: true, tuo: true}, q)), passiScambioP2P(Object.assign({compro: false, tuo: true}, q)));
+const conMoneta = o => frasi.map(f => P(o, f))
+  .concat(come({metodo: o.metodi[0]}).map(f => P(o, f)))
+  .concat([passoDopoGaranziaP2P(Object.assign({lato: 'vendo', stato: 'attivo'}, o)),
+           passoDopoGaranziaP2P(Object.assign({lato: 'vendo', stato: 'attivo', campiMiei: {euro: 1}}, o)),
+           corpoAnnulloDisputaP2P(Object.assign({lato: 'compro'}, o), 'chiedi'),
+           corpoAnnulloDisputaP2P(Object.assign({lato: 'compro'}, o), 'accetta')]);
+const out = {};
+out.tradotte = {ETH: conMoneta(ETH), XMR: conMoneta(XMR), USDe: conMoneta(USDE)};
+out.uguali = [EURO, MISTO, MISTO_SEPA, {}].map(o => frasi.every(f => P(o, f) === f));
+out.passo = [ETH, XMR, USDE, MISTO_SCELTO, MISTO, MISTO_SEPA, EURO].map(o => P(o, 'Euro inviati'));
+out.gesto = [P(ETH, 'Chi compra dice di aver mandato gli euro. Controlla il conto: poi libera i sats.'),
+             P(XMR, 'Hai detto di aver mandato 50,00 €'), P(ETH, P(ETH, 'inviato 50,00 €'))];
+out.usdt = P(USDT, 'Euro inviati');
+out.classi = P(ETH, 'euroInviatiP2P p2p-euro');
+out.coin = [ETH, XMR, USDE, MISTO_SCELTO, MISTO, EURO, USDT, null].map(coinParoleP2P);
+out.bottone = [gestoPagoP2P(Object.assign({lato: 'compro'}, MISTO_SCELTO)), gestoPagoP2P(Object.assign({lato: 'compro'}, EURO))];
+out.come = P(Object.assign({}, MISTO, {metodoScelto: 'ETH (Ethereum)'}), 'Invii gli euro col metodo scelto');
+out.mod = [nomePassoEuroModP2P({passo_euro: 'coin', coin: 'XMR'}), nomePassoEuroModP2P({passo_euro: ''})];
+const tutte = P2P_METODI.concat(P2P_METODI_COIN);
+const chiusa = vociTendinaMetodiP2P(tutte, [], false);
+out.chiusa = [chiusa.voci, chiusa.nascosti];
+out.aperta = vociTendinaMetodiP2P(tutte, [], true).voci.length;
+out.scelta = vociTendinaMetodiP2P(tutte, ['USDe (Solana)'], false).voci;
+out.solo = [P2P_METODI_COIN.length, tutte.length];
+console.log(JSON.stringify(out));
+""")
+    o = _node_banco(js)
+    if o is None:
+        salta("lo scambio che parla della moneta, sul banco", "node non c'e'")
+    else:
+        prova("il banco gira", True, bool(o))
+        o = o or {}
+        tr = o.get("tradotte") or {}
+        for coin in ("ETH", "XMR", "USDe"):
+            frasi = tr.get(coin) or []
+            prova(f"in {coin} nessuna frase del flusso lascia «euro», «💶», il conto, il "
+                  "bonifico o un € senza la moneta", [], [f for f in frasi if sporca(f, coin)])
+            prova(f"...e le frasi tradotte sono tante, e dicono {coin}", (True, True),
+                  (len(frasi) > 40, sum(coin in f for f in frasi) > 5))
+        prova("in euro (anche un ordine misto senza scelta, o con SEPA scelto) ogni frase "
+              "resta lettera per lettera", [True] * 4, o.get("uguali"))
+        prova("la tappa dice la moneta dello scambio: ETH, XMR, USDe (anche su due reti), "
+              "la moneta scelta in un ordine misto; un misto senza scelta, SEPA scelto "
+              "e l'euro restano «Euro inviati»",
+              ["ETH inviati", "XMR inviati", "USDe inviati", "XMR inviati",
+               "Euro inviati", "Euro inviati", "Euro inviati"], o.get("passo"))
+        prova("...le frasi del gesto: «gli ETH», il wallet, «50,00 € in XMR», e la moneta "
+              "si aggiunge una volta sola",
+              ["Chi compra dice di aver mandato gli ETH. Controlla il tuo wallet: poi libera i sats.",
+               "Hai detto di aver mandato 50,00 € in XMR", "inviato 50,00 € in ETH"],
+              o.get("gesto"))
+        prova("...l'USDT ha le sue parole di sempre", "USDT inviati", o.get("usdt"))
+        prova("...le parole attaccate (classi, nomi) non si toccano",
+              "euroInviatiP2P p2p-ETH", o.get("classi"))
+        prova("la moneta delle parole, ordine per ordine", ["ETH", "XMR", "USDe", "XMR", "", "", "", ""],
+              o.get("coin"))
+        prova("il bottone del gesto e la tappa dicono la stessa moneta",
+              ["Ho inviato gli XMR", "Ho inviato gli euro"], o.get("bottone"))
+        prova("il «Come funziona» del foglio dice la moneta scelta nel foglio",
+              "Invii gli ETH col metodo scelto", o.get("come"))
+        prova("ai moderatori il terzo passo dice la moneta", ["XMR inviati", "Euro inviati"], o.get("mod"))
+        prova("lista corta: le sette voci delle monete stanno sotto «Altri metodi ▾»",
+              [["SEPA", "Revolut", "Satispay", "Contanti"], 4 + 7], o.get("chiusa"))
+        prova("...aperta ci sono tutte, euro e monete", 8 + 7, o.get("aperta"))
+        prova("...e una moneta gia' scelta resta in vista, al suo posto",
+              ["SEPA", "Revolut", "Satispay", "Contanti", "USDe (Solana)"], o.get("scelta"))
+        prova("le voci delle monete sono sette (ETH, XMR, cinque reti di USDe)", [7, 15], o.get("solo"))
+    rn = pezzo_js(mini, "function paroleUsdtHtmlP2P(o, html, dove){", "\n}\n")
+    prova("anche l'HTML della pagina e delle card passa dal traduttore con una moneta",
+          True, "coinParoleP2P(o)" in rn)
+
+    # --- 2) il bot ---
+    import sqlite3 as _sq
+    amb = {"json": json, "re": _re}
+    i = src.index("P2P_USDT_FRASI = (")
+    exec(src[i:src.index("\n\n\n", i)], amb)
+    i = src.index("P2P_COIN_METODI = {")
+    exec(src[i:src.index("\n\n\n", i)], amb)
+    exec(pezzo("p2p_coin_frase"), amb)
+    exec(pezzo("p2p_coin_ordine"), amb)
+    tr = amb["p2p_coin_frase"]
+    famiglie = []
+    for nome in ("SOLLECITO_EURO_TESTI", "SOLLECITO_RILASCIO_TESTI", "SOLLECITO_RECAPITO_TESTI"):
+        j = src.index(nome + " = {")
+        d = {}
+        exec(src[j:src.index("\n}\n", j) + 3], {}, d)
+        famiglie += list(d[nome].values())
+    famiglie += [
+        "🔒 <b>Garanzia bloccata ✓:</b> aspetta gli euro.",
+        "🔒 <b>Garanzia bloccata ✓:</b> ora indica dove ricevere gli euro.",
+        "💶 <b>Mario dice di aver inviato 50,00 €:</b> controlla il conto e "
+        "rilascia i sats.\n\n<i>Rilascia solo quando gli euro sono arrivati davvero.</i>",
+        "💶 <b>Mario ti ha indicato dove inviare 50,00 €: tocca a te.</b>",
+        "📮 <b>Mario ha aggiornato il recapito.</b> Controlla il nuovo prima di inviare gli euro.",
+    ]
+    for coin in ("ETH", "XMR", "USDe"):
+        tradotte = [tr(t, coin) for t in famiglie]
+        prova(f"bot in {coin}: nessun avviso lascia «euro», «💶», il conto, il bonifico "
+              "o un € senza la moneta", [], [t for t in tradotte if sporca(t, coin)])
+    prova("...la cifra resta in euro e dice la moneta, una volta (tradurre due volte "
+          "non la ripete)", [True, True],
+          ["50,00 € in XMR:" in tr(famiglie[-3], "XMR"),
+           tr(tr(famiglie[-3], "XMR"), "XMR") == tr(famiglie[-3], "XMR")])
+    prova("...e senza moneta l'avviso torna com'era", famiglie[-3], tr(famiglie[-3], ""))
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.execute("CREATE TABLE p2p_ordini (ordine TEXT, metodi TEXT)")
+    con.executemany("INSERT INTO p2p_ordini VALUES (?, ?)", [
+        ("a", '["ETH (Ethereum)"]'), ("b", '["USDe (Arbitrum)", "USDe (Solana)"]'),
+        ("c", '["XMR (Monero)"]'), ("d", '["SEPA", "ETH (Ethereum)"]'),
+        ("e", '["ETH (Ethereum)", "XMR (Monero)"]'), ("f", '["USDT (Tron)"]'),
+        ("g", ""), ("h", "storto")])
+    chi = amb["p2p_coin_ordine"]
+    prova("la moneta dell'ordine: una sola per tutti i metodi; misto, due monete, USDT, "
+          "riga vuota, storta o che manca = euro",
+          ["ETH", "USDe", "XMR", "", "", "", "", "", ""],
+          [chi(con, x) for x in "abcdefgh"] + [chi(con, "zz")])
+    prova("le voci del server sono le stesse del telefono", True,
+          all(f"metodo: '{m}'" in mini for m in amb["P2P_COIN_METODI"]))
+    # --- dove parte ---
+    prova("il traduttore e' chiamato dove gli avvisi partono: eventi del coordinatore, "
+          "recapito, attese e solleciti, garanzia lunga",
+          (1, 1, 1, 1),
+          (src.count("avvisi = [(tg, p2p_coin_frase(t, _moneta)) for tg, t in avvisi]"),
+           src.count('testo = p2p_coin_frase(testo, p2p_coin_ordine(con, (d or {}).get("ordine")))'),
+           src.count("            testo = p2p_coin_frase(testo, _moneta)\n"),
+           src.count("testo_g = p2p_coin_frase(testo_g, _moneta)")))
+    prova("...e ai moderatori: garanzia lunga, disputa, card dell'app",
+          (2, True, True, True),
+          (src.count('d["coin"] = (_coin(con, ordine) if _coin else "") or ""'),
+           'gesto = "Ho inviato gli " + str(d["coin"])' in pezzo("_testo_garanzia_mod_p2p"),
+           "Pagato in {html.escape(str(d['coin']))}" in src,
+           'fuori.update(coin=_moneta, passo_euro="coin",' in src))
+
+
 def prove_lista_corta_metodi():
     """LA LISTA CORTA DEI METODI, E WISE (2 nov 2026, Andrea: «se l'utente
     vuole Wise può farlo [...] Solo che dobbiamo aggiungere il tastino, e
@@ -159332,7 +159550,9 @@ console.log(JSON.stringify(out));
           [pa[0][2] if len(pa[0]) > 2 else None, pa[1][2] if len(pa[1]) > 2 else None,
            pa[2][1] if len(pa[2]) > 1 else None, pa[3][1] if len(pa[3]) > 1 else None])
     prova("...e il dettaglio li passa davvero dal traduttore", True,
-          ".map(p => typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P(o, p) : p))"
+          # (16 nov 2026, p2p-monete-ritocchi) col metodo scelto nel
+          # foglio accanto, per le monete
+          "? paroleUsdtP2P(p2pDettMetodo ? Object.assign({}, o, {metodoScelto: p2pDettMetodo}) : o, p) : p))"
           in _fn_js(mini, "function renderDettaglioP2P(){"))
     prova("la card in USDT stima i DUE capi col metro del dollaro", True,
           ("da %d a %d sats" % (usdt50, usdt276)) in out.get("cardUsdt", ""))
@@ -196981,7 +197201,7 @@ CATEGORIE = {
     p2p_stati p2p_chat p2p_pubblica p2p_velo_pubblica p2p_barattozon
     p2p_paycode premio_barattozon convenienza_vera barattozon_mercato
     scadenza_barattozon foglio_coperto passi_barattozon_fogli
-    importo_foglio pubblica_metodo_prima libro_vuoto_monete revolut_tre_modi eth_xmr usde
+    importo_foglio pubblica_metodo_prima libro_vuoto_monete revolut_tre_modi eth_xmr usde p2p_monete_ritocchi
     indietro_dal_libro ricarica_resta p2p_canale p2p_canonico p2p_bundle
     p2p_nuvola p2p_conto_dispositivo recensione_p2p ritocchi_scambio
     pagina_scambio_ridisegno foglio_tastiera_iphone chiavi_p2p_firmate
@@ -197682,6 +197902,7 @@ def main():
     prove_lista_corta_metodi,
     prove_revolut_tre_modi,
     prove_eth_xmr,
+    prove_p2p_monete_ritocchi,
     prove_usde,
     prove_usdt_moderatori,
     prove_grafica_p2p_onchain,

@@ -83879,3 +83879,60 @@ in quelli on-chain»: ora dice 999 €, e aggiunge che lo stesso tetto vale
 per gli acquisti on-chain del mercatino e per l'altra rete. Solo testo,
 nessun codice. Il tetto in euro dei NUMERI DI OGGI resta la fonte viva:
 il libro lo ripete solo per chi lo chiede a parole.
+
+## ETH, Monero e USDe: lo scambio parla della moneta, e le voci sotto «Altri metodi» (16 nov 2026, cantiere p2p-monete-ritocchi, dai due punti notati a fine di p2p-monete; Andrea: «tutto deve corrispondere, perché quando avevamo acceso USDT nel dettaglio di un ordine diceva invia ancora euro»)
+
+PERCHÉ. Accese le monete per tutti (cantiere p2p-monete, due voci più su), uno scambio pagato
+in ETH leggeva ancora «Euro inviati» nella linea dei passi, «manda gli
+euro» negli stati, «Invii gli euro» nel «Come funziona» e negli avvisi
+del bot; e nel foglio «Pubblica» le sette voci nuove (ETH, XMR, cinque
+reti di USDe) stavano in prima vista, accanto ai quattro metodi di tutti
+i giorni.
+COME, IL TELEFONO. Il traduttore di sempre (`paroleUsdtP2P`, quello di
+USDT e franchi, e il suo fratello sull'HTML `paroleUsdtHtmlP2P`) ha un
+terzo ramo: `coinParoleP2P(o)` dice la moneta dello scambio (il recapito,
+poi la scelta, poi l'ordine che si paga in una moneta sola: USDe su più
+reti è una moneta sola) e `paroleCoinP2P` le parole. DIFFERENZA DA USDT E
+FRANCHI: l'ordine resta IN EURO, quindi la cifra resta in € e le si
+aggiunge la moneta — «50,00 €» diventa «50,00 € in ETH», una volta sola —
+mentre i soldi che viaggiano diventano la moneta («Euro inviati» → «ETH
+inviati», «gli euro» → «gli XMR», il conto → il wallet, 💶 → 🪙, ogni
+«euro» rimasto, parola intera). Un ordine misto senza scelta, o con SEPA
+scelto, resta con le parole dell'euro. Il «Come funziona» del foglio di
+presa passa anche il metodo scelto nel foglio (`p2pDettMetodo`).
+COME, IL BOT. `p2p_coin_frase(testo, coin)` è il calco di `p2p_usdt_frase`
+(i bonifici diventano l'id della transazione, come per USDT), con la
+stessa regola della cifra; `p2p_coin_ordine` dice la moneta dai metodi del
+libro (`P2P_COIN_METODI`, le stesse sette voci del telefono). Si applica
+negli stessi quattro posti di USDT e franchi (eventi del coordinatore,
+recapito, attese e solleciti, garanzia lunga). Ai moderatori: `d["coin"]`
+nella garanzia lunga (il gesto «Ho inviato gli ETH») e nella disputa (la
+cifra con la moneta e una riga su cosa guardare: l'id sull'explorer, con
+Monero la chiave), e nella card dell'app `passo_euro="coin"` → «XMR inviati».
+IL LIMITE, DETTO. Il server il metodo scelto da chi prende non lo sa
+(`/api/p2p/metodo` avvisa ma non lo scrive), quindi su un ordine MISTO
+(«SEPA, ETH») il bot parla con le parole dell'euro anche se si paga in ETH;
+il telefono invece lo sa e traduce.
+LA LISTA CORTA. `vociTendinaMetodiP2P` nasconde anche le monete (le
+riconosce `reteCoinDaMetodoP2P`, col typeof per i banchi): non scritte in
+`P2P_METODI_ALTRI`, perché una lista che ne chiama un'altra rompe i banchi.
+Una moneta già scelta resta in vista.
+PROVATO: `prove_p2p_monete_ritocchi` (30): ogni frase degli stati, i passi,
+il «Come funziona» nei quattro versi, il passo dopo la garanzia e
+l'annullo in disputa, in ETH, XMR e USDe, senza «euro», «💶», conto,
+bonifico né un € senza la moneta; in euro lettera per lettera; gli avvisi
+del bot (le tre famiglie dei solleciti e le frasi degli eventi) idem; la
+moneta dell'ordine dal libro; i posti dove parte; la lista corta.
+Controprove rosse: senza la regola della parola nuda (4), senza il € con
+la moneta (4), monete di nuovo in prima vista (2), bot senza le frasi dei
+bonifici (3), moneta ripetuta a tradurre due volte (1 sul telefono, 1 sul
+bot). Emendata la prova del dettaglio in `prove_usdt_foglio_presa` (il
+traduttore riceve il metodo scelto).
+GIRI, sull'albero del cantiere da develop 32c209e0: suite severa nel venv
+del passo «Le prove» 28266 passate, 1 fallita (la sezione nuova mancava
+nella mappa delle categorie: aggiunta a «p2p», poi `prove_categorie_delle_prove`
+e la sezione rigirate verdi, 56/0), 2 saltate d'ambiente (nostr-tools);
+collaudi della CI senza coincurve e senza proxy 134/0. Dopo il rebase su
+90080455 (sapere-999, non mio: solo sapere, conoscenza e CANTIERI) la suite
+severa intera di nuovo: 28267 passate, 0 fallite, 2 saltate d'ambiente.
+NON provato dal vivo su un telefono.
