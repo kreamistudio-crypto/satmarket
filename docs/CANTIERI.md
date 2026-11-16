@@ -85199,6 +85199,14 @@ Provato dal vivo: nessun salto della pagina.
 inviando 1099,00 USDT»). La riga on-chain leggeva `o.sats`, che a mercato
 è zero finché nessuno prende: ora usa la stima della card
 (`satsCardOnchainP2P`).
+IL BOLLINO MOZZATO (stesso giro, foto di Andrea alle 19:24: in Pubblica,
+«Seleziona la valuta con cui invierai», il bollino Ethereum sopra il logo
+di Tether tagliato in alto e sopra la U di «USDT»). La riga della tendina
+taglia quel che esce (`overflow:hidden`, per i puntini) e il bollino
+sporge di 5px: ora lo span allarga il margine di taglio
+(`padding-block:6px;margin-block:-6px`, la riga resta di 33px, misurato)
+e la bandierina ha 6px di margine a destra. Provato su una pagina
+ridotta in Chromium, prima e dopo.
 GUARDATI E LASCIATI: i due avvisi del bot alle 18:47 e 19:02 («5% più
 conveniente», poi «meno») erano due ordini diversi, uno di qua e uno di
 là dal mercato; ognuno avvisa una volta e il segno è giusto.

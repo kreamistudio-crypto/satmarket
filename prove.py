@@ -161114,6 +161114,12 @@ process.stdout.write(JSON.stringify(out));
           [True, False, True],
           ['<span class="p2p-oc-novita-tag">Novità</span>' in spn, "p2p-oc-novita-testo" in spn,
            "apriPilaNovitaP2P()" in spn])
+    prova("il bollino della rete nella tendina della valuta non si mozza (Andrea: "
+          "«Simbolino mozzato»): la riga allarga il margine di taglio senza crescere, "
+          "e il bollino si stacca dalla sigla",
+          [True, True],
+          [".p2p-tendina > span{padding-block:6px;margin-block:-6px}" in mini,
+           ".p2p-tendina > span .p2p-band-rete{margin-right:6px}" in mini])
 
 
 def prove_tasti_rete_foglio():
