@@ -199657,6 +199657,121 @@ console.log(JSON.stringify(out));
           [False, ""], r.get("ocSenza"))
 
 
+def prove_indirizzo_resta_dove_sta():
+    """«MOSTRA L'INDIRIZZO» NON RIPORTA IN CIMA (16 nov 2026, cantiere
+    indirizzo-resta, Andrea: «se premo mostra indirizzo in un ordine il
+    refresh mi porta in cima all'ordine e devo scrollare di nuovo fino alla
+    sezione dell'indirizzo»). Era il salto della busta del ritiro, uguale:
+    `mostraIndirizzo` chiamava `openOrder`, che rifa' la vista e finisce in
+    `go()` -> `window.scrollTo(0, 0)`. Adesso si riscrive il SOLO pannello
+    (`ridisegnaIndirizzo`, il pattern di `ridisegnaBusta`): niente openOrder,
+    niente scrollTo, e l'indirizzo compare dove stava il bottone. Dati FINTI:
+    nessun indirizzo vero entra nel repo."""
+    print("\n[«Mostra l'indirizzo» resta dove sta]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    pic = _fn_js(mini, "function pannelloIndirizzoCasa(o){")
+    # L'ANCORA SU OGNI PANNELLO che il costruttore sa restituire: senza, il
+    # ridisegno non trova casa e il tocco diventa muto sul ramo nuovo
+    prova("ogni pannello dell'indirizzo porta la sua ancora, nessuno senza",
+          (6, 0), (pic.count('<div class="payout" id="indirizzoPannello">'),
+                   pic.count('<div class="payout">')))
+    mi = _fn_js(mini, "async function mostraIndirizzo(btn){")
+    prova("«Mostra l'indirizzo» non passa piu' da openOrder", (False, True),
+          ("openOrder" in mi, "ridisegnaIndirizzo()" in mi))
+    ri = _fn_js(mini, "function ridisegnaIndirizzo(){")
+    prova("...e il ridisegno riscrive UN nodo, mai la vista", True,
+          "el('indirizzoPannello')" in ri and "outerHTML" in ri
+          and "openOrder" not in ri and "go(" not in ri and "scrollTo" not in ri)
+    banco = (mini[mini.index("const esc = s =>"):mini.index("const el = id =>")] + "\n"
+             + mini[mini.index("const CAMPI_IND = ["):mini.index("\n];", mini.index("const CAMPI_IND = [")) + 3] + "\n"
+             + mini[mini.index("const SEGNAPOSTO_IND = "):mini.index("};", mini.index("const SEGNAPOSTO_IND = ")) + 2] + "\n"
+             + mini[mini.index("const CONFERMA_INDIRIZZO = "):mini.index(";", mini.index("const CONFERMA_INDIRIZZO = ")) + 1] + "\n"
+             + _riga_js(mini, "const COPIA_PICCOLA = ")
+             + _fn_js(mini, "function rigaDato(et, v, op){")
+             + _fn_js(mini, "function bottoneCopia(v, aria){")
+             + _fn_js(mini, "function bottoneCopiaPiccolo(v, aria, classe){")
+             + _fn_js(mini, "function righeIndirizzo(i, estero){")
+             + _fn_js(mini, "function spedEstero(o){")
+             + _fn_js(mini, "function serveSpedisciA(o){")
+             + _fn_js(mini, "function casellaIndirizzo(id, spuntata, gesto){")
+             + pic
+             + _fn_js(mini, "async function caricaIndirizzo(){")
+             + mi + ri
+             + r"""
+const API_BASE = '/api', authHdr = () => 'x', haptic = () => {};
+let indirizzoLetto = {}, currentOrder = null, toasti = [], aperti = [], salti = [];
+const toast = t => toasti.push(t);
+const attesaRitardata = () => () => {};
+const openOrder = id => aperti.push(id);
+const go = v => salti.push(['go', v]);
+const window = {scrollTo: (x, y) => salti.push([x, y])};
+/* LA PAGINA FINTA: sopra, il pannello, sotto. Il nodo del pannello lo
+   trova solo chi cerca la sua ancora, e outerHTML riscrive lui solo */
+const pagina = {sopra: '<h3>stepper e chat</h3>', pannello: '', sotto: '<div>recensione</div>'};
+const nodo = {set outerHTML(v){ pagina.pannello = v; }, get outerHTML(){ return pagina.pannello; }};
+const el = id => (id === 'indirizzoPannello' && pagina.pannello.includes('id="indirizzoPannello"')) ? nodo : null;
+/* DATI FINTI: nessun indirizzo vero */
+const FINTO = {nome: 'Ada Finta', via: 'Via dei Test 9', cap: '00000', citta: 'Provalandia', provincia: 'XX'};
+let risposta = {ok: true, campi: FINTO}, prima = null;
+const fetch = async (url) => { if (prima) await prima(); return {ok: risposta.ok,
+  json: async () => risposta.ok ? {campi: risposta.campi} : {detail: 'no'}}; };
+const VENDE = {id: 7, role: 'seller', state: 'delivered', indirizzoIl: 1763300000};
+const COMPRA = {id: 8, role: 'buyer', state: 'locked', indirizzoIl: 1763300000};
+function prepara(o){ indirizzoLetto = {}; currentOrder = o; toasti = []; aperti = []; salti = [];
+  prima = null; risposta = {ok: true, campi: FINTO}; pagina.pannello = pannelloIndirizzoCasa(o); }
+const ancore = () => (pagina.pannello.match(/id="indirizzoPannello"/g) || []).length;
+(async () => {
+  const out = {};
+  prepara(VENDE);
+  const bottone = pagina.pannello.includes('onclick="mostraIndirizzo(this)">👁 Mostra l\'indirizzo</button>');
+  await mostraIndirizzo(null);
+  out.venditore = {bottone, aperti, salti, toasti, ancore: ancore(),
+    nome: pagina.pannello.includes('<b>Ada Finta</b>'),
+    tutto: pagina.pannello.includes('onclick="copiaIndirizzo()"'),
+    senzaBottone: !pagina.pannello.includes('mostraIndirizzo('),
+    resto: [pagina.sopra, pagina.sotto]};
+  prepara(COMPRA);
+  const correggi = pagina.pannello.includes('onclick="mostraIndirizzo(this)">✏️ Mostra e correggi</button>');
+  await mostraIndirizzo(null);
+  out.compratore = {correggi, aperti, salti, ancore: ancore(),
+    campo: /id="ordInd_nome"[^>]*value="Ada Finta"/.test(pagina.pannello)};
+  /* l'ordine cambia mentre la risposta viaggia: il pannello non si tocca */
+  prepara(VENDE);
+  const fermo = pagina.pannello;
+  prima = async () => { currentOrder = COMPRA; };
+  await mostraIndirizzo(null);
+  out.cambiato = {uguale: pagina.pannello === fermo, aperti, salti, letto: !!indirizzoLetto[7]};
+  /* il server dice di no: il toast, e il pannello resta */
+  prepara(VENDE);
+  const fermo2 = pagina.pannello;
+  risposta = {ok: false};
+  await mostraIndirizzo(null);
+  out.rifiuto = {uguale: pagina.pannello === fermo2, aperti, salti, toasti};
+  console.log(JSON.stringify(out));
+})();
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("«Mostra l'indirizzo» resta dove sta: il banco", "node non c'e'")
+        return
+    v = r.get("venditore") or {}
+    prova("chi vende: il bottone c'e', e dopo il tocco nessun openOrder ne' salto in cima",
+          (True, [], [], []), (v.get("bottone"), v.get("aperti"), v.get("salti"), v.get("toasti")))
+    prova("...l'indirizzo compare nel pannello, a righe con «Copia tutto», e l'ancora resta",
+          (True, True, True, 1), (v.get("nome"), v.get("tutto"), v.get("senzaBottone"), v.get("ancore")))
+    prova("...e quel che sta sopra e sotto non si tocca",
+          ["<h3>stepper e chat</h3>", "<div>recensione</div>"], v.get("resto"))
+    c = r.get("compratore") or {}
+    prova("chi compra: «Mostra e correggi» apre il modulo pieno, sul posto",
+          (True, [], [], 1, True),
+          (c.get("correggi"), c.get("aperti"), c.get("salti"), c.get("ancore"), c.get("campo")))
+    prova("ordine cambiato mentre la risposta viaggia: il pannello in pagina non si tocca",
+          {"uguale": True, "aperti": [], "salti": [], "letto": True}, r.get("cambiato"))
+    prova("il server dice di no: il suo toast, e il pannello resta com'era",
+          {"uguale": True, "aperti": [], "salti": [], "toasti": ["no"]}, r.get("rifiuto"))
+
+
 def prove_usdt_totale_euro():
     """IL TOTALE DA INVIARE NON DICE EURO A UNO SCAMBIO IN USDT (14 nov 2026,
     cantiere usdt-totale-euro, Andrea: «per qualche secondo compare la pagina
@@ -201105,7 +201220,7 @@ CATEGORIE = {
     podio_sfondo introduzioni_leggibili filtri_prezzo_convertono
     anteprima_prezzo_condiviso pagina_dati note_piccole
     feedback_tre_e_tondi loghi_tondi card_parte_ordine font porta_timer
-    feedback_confermato dati_spedizione_copia servizi quantita_servizi
+    feedback_confermato dati_spedizione_copia indirizzo_resta_dove_sta servizi quantita_servizi
     banner_negozio paracadute_motivo rimborso_motivo slug_negozio
     link_descrizione foto_vuota foto_metadati connettori connettori_sync
     connettori_woo connettori_registro connettori_ingresso
@@ -201758,6 +201873,7 @@ def main():
     prove_card_p2p_monete,
     prove_usdt_cifra_copia,
     prove_usdt_totale_euro,
+    prove_indirizzo_resta_dove_sta,
     prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,
     prove_parole_uniche,

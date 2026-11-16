@@ -85445,3 +85445,40 @@ DA GUARDARE: una fattura vera di Muun e una della Swiss card, che Andrea
 non ha ancora incollato (scadenza e importo letti dal vivo); il ramo
 dell'importo zero sulla porta dei rimborsi non ha una prova sua
 (è la stessa riga della porta degli ordini, che ce l'ha).
+
+## «Mostra l'indirizzo» non riporta più in cima all'ordine (16 nov 2026, cantiere indirizzo-resta; Andrea, con un video dal telefono: «se premo mostra indirizzo in un ordine il refresh mi porta in cima all'ordine e devo scrollare di nuovo fino alla sezione dell'indirizzo per vederlo, un po scomodo e controintuitivo»)
+LA CAUSA era la stessa del salto della busta del ritiro (ago 2026, «Il
+codice dentro il bottone»): `mostraIndirizzo` dopo la lettura chiamava
+`openOrder`, che rifà la vista intera e finisce in `go()` →
+`window.scrollTo(0, posizioneDaRendere(view))`, cioè 0 fuori dalla
+vetrina. La busta, il contenuto e l'email per il corriere erano già
+passati al ridisegno in place; l'indirizzo di casa era rimasto l'ultimo.
+LA CURA è il pattern di `ridisegnaBusta`: `ridisegnaIndirizzo` riscrive
+il SOLO pannello (`outerHTML` del nodo `indirizzoPannello`), quindi
+quel che sta sopra non si muove e l'indirizzo compare dove stava il
+bottone. L'ancora `id="indirizzoPannello"` sta su TUTTI e sei i
+`payout` di `pannelloIndirizzoCasa` (anche quelli senza bottone: il
+ridisegno deve sempre trovare casa). Vale per i due bottoni che
+chiamano `mostraIndirizzo`: «👁 Mostra l'indirizzo» di chi vende (dopo
+la consegna, quando il riquadro «📦 Spedisci a» non c'è più) e «✏️
+Mostra e correggi» di chi compra su `locked`. In più l'id dell'ordine si
+fissa alla partenza: se mentre la risposta viaggia si apre un altro
+ordine, il pannello in pagina non si tocca (prima `openOrder` ridisegnava
+l'ordine nuovo, innocuo ma a vuoto). SCARTATI: ricordare `scrollY` e
+rimetterlo dopo `openOrder` (un salto e un ritorno, cioè un lampo, e la
+pagina rifatta può avere un'altra altezza) e `scrollIntoView` sul
+pannello dopo il ridisegno (sposta la pagina anche a chi non si era
+mosso). Niente leva: è una correzione.
+PROVATO: `prove_indirizzo_resta_dove_sta` (nuova, categoria mercatino):
+le ancore su ogni ramo, niente `openOrder` in `mostraIndirizzo`, e un
+banco node coi pezzi veri (pannello, carico, tocco, ridisegno) su una
+pagina finta sopra/pannello/sotto: chi vende vede le righe e «Copia
+tutto» senza `openOrder` né `scrollTo`, chi compra il modulo pieno,
+ordine cambiato a metà e server che dice di no lasciano il pannello
+com'era. Controprove rosse: `openOrder` rimesso (5), un'ancora tolta
+(2), la guardia dell'ordine tolta (1), `innerHTML` al posto di
+`outerHTML` (3). Dal vivo in Chromium a misura di iPhone 13, coi pezzi
+del client veri e le risposte del server finte (dati finti, nessun
+indirizzo vero): su develop prima della cura da y=1148 a y=0; dopo, y
+resta 1148 e il nome è a schermo.
+DA GUARDARE: il tocco dentro Telegram sul telefono vero, sul collaudo.

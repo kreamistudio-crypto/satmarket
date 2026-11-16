@@ -49856,7 +49856,7 @@ function pannelloIndirizzoCasa(o){
   const data = ts => new Date(ts*1000).toLocaleString('it-IT',
     {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
   if (o.indirizzoPurgatoIl) return `
-    <div class="payout">
+    <div class="payout" id="indirizzoPannello">
       <h4>📦 Indirizzo di spedizione</h4>
       <div class="hint">Cancellato il ${data(o.indirizzoPurgatoIl)}, dopo la chiusura dell'ordine: l'indirizzo vive quanto l'affare, poi sparisce da Barattolo.</div>
     </div>`;
@@ -49869,14 +49869,14 @@ function pannelloIndirizzoCasa(o){
          questa sessione; altrimenti si chiede, per non ricominciare
          da capo (la lezione del «Cambia» in pagina d'acquisto) */
       if (o.indirizzoIl && !i) return `
-        <div class="payout">
+        <div class="payout" id="indirizzoPannello">
           <h4>📦 Il tuo indirizzo di spedizione</h4>
           <div class="hint">Indicato il ${data(o.indirizzoIl)}${corr}. Puoi correggerlo finché il venditore non spedisce.</div>
           <button class="btn ghost" style="margin-top:10px" onclick="mostraIndirizzo(this)">✏️ Mostra e correggi</button>
         </div>`;
       const v = i || {};
       return `
-        <div class="payout">
+        <div class="payout" id="indirizzoPannello">
           <h4>📦 ${o.indirizzoIl?'Il tuo indirizzo di spedizione':'Indica l\'indirizzo di spedizione'}</h4>
           <div class="hint">${o.indirizzoIl
             ? `Indicato il ${data(o.indirizzoIl)}${corr}. Se correggi, il venditore riceve un avviso.`
@@ -49898,7 +49898,7 @@ function pannelloIndirizzoCasa(o){
     }
     if (!o.indirizzoIl) return '';
     return `
-      <div class="payout">
+      <div class="payout" id="indirizzoPannello">
         <h4>📦 Il tuo indirizzo di spedizione</h4>
         <div class="hint">Indicato il ${data(o.indirizzoIl)}${corr}. Il pacco è partito: da qui non si cambia più.</div>
       </div>`;
@@ -49917,14 +49917,14 @@ function pannelloIndirizzoCasa(o){
   if (!o.indirizzoIl) return `
     <div class="trust-note">📦 <span><b>In attesa dell'indirizzo.</b> L'acquirente ha scelto la spedizione a un indirizzo e lo scriverà qui nell'ordine: ti avviseremo appena lo fa.</span></div>`;
   if (i) return `
-    <div class="payout">
+    <div class="payout" id="indirizzoPannello">
       <h4>📦 Indirizzo di spedizione</h4>
       <div class="hint">Indicato dall'acquirente il ${data(o.indirizzoIl)}${corr}:</div>
       ${righeIndirizzo(i, spedEstero(o))}
       <button class="btn ghost" style="margin-top:10px" onclick="copiaIndirizzo()">📋 Copia tutto l'indirizzo</button>
     </div>`;
   return `
-    <div class="payout">
+    <div class="payout" id="indirizzoPannello">
       <h4>📦 Indirizzo di spedizione</h4>
       <div class="hint">L'acquirente l'ha indicato il ${data(o.indirizzoIl)}${corr}. Lo leggi solo tu, e sparisce appena lui conferma di aver ricevuto l'oggetto: se ti serve per un reclamo al corriere, tienilo da parte prima.</div>
       <button class="btn orange" style="margin-top:10px" onclick="mostraIndirizzo(this)">👁 Mostra l'indirizzo</button>
@@ -49997,13 +49997,34 @@ async function caricaIndirizzo(){
 }
 
 /* nessun confirm: leggere un indirizzo non muove niente — la stessa
-   ragione per cui non ne chiede uno mostraBusta */
+   ragione per cui non ne chiede uno mostraBusta.
+   E NON PASSA PIU' DA openOrder (16 nov 2026, dal campo, Andrea:
+   «se premo mostra indirizzo il refresh mi porta in cima all'ordine e
+   devo scrollare di nuovo fino all'indirizzo»): era il salto della
+   busta, uguale — openOrder rifa' la vista e finisce in go(), che
+   riporta in cima. Si ridisegna il solo pannello, e l'indirizzo
+   compare dove stava il bottone. */
 async function mostraIndirizzo(btn){
   haptic();
+  const id = currentOrder.id;
   const ripristina = attesaRitardata(btn, 'Apro l\'indirizzo…');
   const d = await caricaIndirizzo();
   ripristina();
-  if (d) openOrder(currentOrder.id);
+  if (d && currentOrder && currentOrder.id === id) ridisegnaIndirizzo();
+}
+
+/* IL RIDISEGNO E' DEL SOLO PANNELLO, come `ridisegnaBusta`: quel che
+   sta sopra non si muove, quindi la pagina resta dov'era — anche sul
+   telefono, dove la pagina e' la finestra intera. Un pannello che il
+   costruttore non sa piu' disegnare non si cancella (meglio un tocco
+   muto che un buco). Un ordine cambiato mentre la risposta viaggiava
+   lo ferma gia' `mostraIndirizzo`: il pannello in pagina sarebbe di
+   un altro. */
+function ridisegnaIndirizzo(){
+  const p = el('indirizzoPannello');
+  if (!p || !currentOrder) return;
+  const html = pannelloIndirizzoCasa(currentOrder);
+  if (html) p.outerHTML = html;
 }
 
 async function salvaIndirizzo(btn){
