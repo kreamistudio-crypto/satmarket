@@ -177,6 +177,8 @@ Quanto si può per ordine nel P2P, per ora (fase beta): fino a 250 € negli sca
 
 Il prezzo: gli ordini si scrivono in euro e i sats si contano al cambio del momento, per questo finché l'ordine è nel libro la cifra in sats ha il segno ≈. La cifra esatta si fissa quando l'ordine viene preso. Alcuni ordini hanno un intervallo («da 20 a 100 €»): lì scegli tu quanto.
 
+I tasti «Compra BTC» e «Vendi BTC» in cima al libro P2P sono due pillole (dal 16 novembre 2026, di giorno e di sera): quella accesa, verde per «Compra BTC» e corallo per «Vendi BTC», dice quale lato del libro stai guardando.
+
 L'ordine del libro: in cima al libro P2P la pillola con le tre righe (di serie dice «Recenti») apre «Ordina il libro», con quattro scelte: Più recenti, Convenienza, Importo dal più grande, Importo dal più piccolo. La pillola diventa arancio quando l'ordine non è quello di serie. Dal 14 novembre 2026 la scelta resta salvata su quel telefono o computer: alla visita dopo il libro si apre già ordinato così, sia in «Compra» sia in «Vendi». Su un altro dispositivo si sceglie di nuovo.
 
 Premio e sconto: chi pubblica può chiedere fino al 20% sopra o sotto il prezzo di mercato. Sopra si chiama premio e conviene a chi vende, sotto si chiama sconto e conviene a chi compra. La riga c'è sempre nel conto.
@@ -269,13 +271,13 @@ Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è
 - Se il deposito non arriva in tempo, chi compra può rinunciare («Rinuncia: il deposito non è arrivato»); chi deve depositare e non ha ancora mandato niente può annullare («Annulla (non deposito)»). Con i sats già nel deposito non si annulla da soli: si esce col rimborso d'accordo o con «⚖️ Apri una disputa». Decide un moderatore di Barattolo, Barattolo mette la sua firma e la seconda la mette il telefono di chi ha ragione.
 - La commissione (dal 16 novembre 2026) è quella degli scambi Lightning, metà a testa e con gli stessi sconti: chi vende deposita la sua metà insieme ai sats, chi compra riceve i sats meno la sua metà. Nel conto dello scambio, e già nel foglio prima di prendere, c'è la riga «Fee P2P» con la percentuale, come negli scambi Lightning. Se lo scambio finisce col rimborso a chi vende, torna tutto, commissione compresa. Sotto i 546 sats di commissione in tutto non si paga niente.
 - A fine scambio la pagina dice «Concluso: i sats sono andati al wallet di chi ha comprato» oppure «Rimborsato: i sats sono tornati a chi li aveva depositati».
+- La barra del tempo sotto un ordine on-chain del libro conta le sue 24 ore (dal 16 novembre 2026): diventa arancio nelle ultime 10 ore circa e rossa nelle ultime 3. Prima nasceva rossa e lampeggiante anche appena pubblicato, perché misurava come un ordine Lightning da 7 giorni.
 - USDT negli scambi on-chain (se nei NUMERI DI OGGI «Scambi P2P on-chain pagati in USDT» è disponibile): la garanzia resta il deposito bitcoin a tre chiavi, e al posto degli euro chi compra paga in USDT su Tron o Ethereum, da persona a persona, con le stesse regole degli ordini in USDT qui sopra: chi vende scrive il suo indirizzo USDT, chi paga incolla l'id della transazione e tocca «Ho inviato gli USDT». Un ordine è in una valuta sola: o euro o USDT.
-
-Ricevere o pagare su un'altra rete (se nei NUMERI DI OGGI «P2P su un'altra rete» è disponibile): la rete di un ordine dice come paga chi l'ha pubblicato, ma chi lo prende può usare l'altra, con uno swap di SATS Routing fatto dal suo telefono (come la pagina «Swap»). Il costo dello swap si vede prima di confermare, e Barattolo non aggiunge commissioni.
 
 <!-- pezzo libro-022 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (10/10)
 
+Ricevere o pagare su un'altra rete (se nei NUMERI DI OGGI «P2P su un'altra rete» è disponibile): la rete di un ordine dice come paga chi l'ha pubblicato, ma chi lo prende può usare l'altra, con uno swap di SATS Routing fatto dal suo telefono (come la pagina «Swap»). Il costo dello swap si vede prima di confermare, e Barattolo non aggiunge commissioni.
 - La scelta si fa già nel foglio che si apre toccando l'ordine (dal 16 novembre 2026): sotto «Stai comprando sats» / «Stai vendendo sats» ci sono i due tasti «⚡ Lightning» e «₿ On-chain», già accesi sulla rete dell'ordine. Toccando l'altra rete compare subito quanto costa lo swap di SATS Routing e quanto arriva (o quanto si paga), e nel dettaglio sotto c'è la riga «Swap SATS Routing» che il totale conta; la scelta resta, e dopo aver preso il foglio giusto si apre già su quella rete. I tasti ci sono solo dove l'altra rete si può davvero usare.
 - Ordine Lightning, ma vuoi ricevere bitcoin on-chain: nel foglio «Dove ricevere i sats» scegli «₿ On-chain», incolli un tuo indirizzo bitcoin e l'app ti dice quanti sats ti arrivano circa e quanto costa lo swap. Alla liberazione i sats diventano bitcoin al tuo indirizzo. Se il moderatore dà ragione a chi vende, lo swap scade senza costare niente.
 - Scambio on-chain, ma vuoi ricevere in Lightning: nello scambio tocchi «⚡ Ricevi in Lightning» e, quando chi vende ha confermato gli euro, incolli una tua richiesta Lightning (o «⚡ Prendila dal mio Lightning address») e tocchi «✅ Conferma lo swap». Ti arriva il prezzo meno il costo dello swap; se la richiesta non si riesce a pagare, i bitcoin tornano da soli al tuo wallet on-chain di Barattolo. Si torna indietro con «₿ Ricevi on-chain invece».
@@ -283,7 +285,7 @@ Ricevere o pagare su un'altra rete (se nei NUMERI DI OGGI «P2P su un'altra rete
 - Lo swap ha i suoi limiti di cifra (quelli di SATS Routing): fuori dai limiti l'app lo dice e lo scambio si fa sulla rete dell'ordine.
 
 <!-- pezzo libro-023 | libro -->
-## Libro · Bitcoin on-chain
+## Libro · Bitcoin on-chain (1/2)
 
 Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla rete principale di Bitcoin: la moneta arancione ₿ le indica in tutta l'app. Quali sono accese, e per chi, lo dicono i NUMERI DI OGGI: una funzione spenta lì non c'è.
 
@@ -291,13 +293,18 @@ Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla ret
 - Quando paghi on-chain (un ordine, il deposito di uno scambio P2P, lo Swap) l'app scrive i sats da mandare e, sotto, la riga «In BTC» con la stessa cifra in bitcoin (per esempio 0,00008128 BTC): molti wallet on-chain la chiedono così. Un tocco la copia, col punto (0.00008128), pronta da incollare nel wallet. Se invece inquadri il QR, la cifra il wallet la compila da solo; anche «₿ Apri nel wallet» apre il wallet con indirizzo e cifra già scritti.
 - Profilo → «📥 Come ricevi»: due righe, «Quando ti pagano in Lightning, ricevi in» e «Quando ti pagano on-chain, ricevi in». Lì scegli se i sats ti arrivano in Lightning, on-chain, oppure «Ogni volta» (decidi tu ordine per ordine).
 - Chi ha queste scelte trova anche, nel modulo dell'annuncio sotto il prezzo, «Come vuoi ricevere per questo oggetto?»: la scelta dell'annuncio vale più di quella del Profilo.
+- Nel mercatino, quando chi vende riceve su una rete diversa da quella con cui paga chi compra, lo swap di SATS Routing lo paga chi vende: esce dai suoi sats quando li riceve, e chi lo fa vede il costo prima di confermare. Chi compra paga solo il prezzo del conto, senza righe in più.
 - Profilo → «₿ On-chain»: «Dove ricevi i bitcoin» (l'unica cosa da compilare: il tuo indirizzo o il tuo wallet), poi la chiave e le 12 parole. Le 12 parole servono solo a FIRMARE i tuoi scambi on-chain: i sats non arrivano lì. Non darle mai a nessuno.
 - Le 12 parole hanno bisogno di una copia fuori dal telefono: Barattolo la salva cifrata nel cloud di Telegram e/o sui relay Nostr, e senza una copia non si apre un ordine on-chain nuovo. Se manca la copia sui relay, nel Profilo c'è «Salva sui relay Nostr».
 - Il wallet è uno solo, fra la Mini App in Telegram e il sito: se apri Barattolo da un altro posto, ti chiede di incollare le stesse 12 parole invece di crearne di nuove.
 - Se non hai ancora scelto dove ricevere, la consegna dei bitcoin a te aspetta: l'app ti manda a Profilo → «₿ On-chain» per sceglierlo.
-- La seconda firma: i sats on-chain escono con due firme su tre. Di solito il tuo telefono mette la sua da solo quando apri Barattolo; nell'ordine c'è anche il tasto «✍️ Metti la seconda firma», che mostra l'anello mentre firma e poi dice com'è andata, o perché non ha firmato (per esempio: la tua chiave sta solo sul telefono con cui hai pagato o venduto). Quando i sats sono partiti l'ordine lo dice, con il link «Vedi la transazione», e il tasto sparisce.
 
 <!-- pezzo libro-024 | libro -->
+## Libro · Bitcoin on-chain (2/2)
+
+- La seconda firma: i sats on-chain escono con due firme su tre. Di solito il tuo telefono mette la sua da solo quando apri Barattolo; nell'ordine c'è anche il tasto «✍️ Metti la seconda firma», che mostra l'anello mentre firma e poi dice com'è andata, o perché non ha firmato (per esempio: la tua chiave sta solo sul telefono con cui hai pagato o venduto). Quando i sats sono partiti l'ordine lo dice, con il link «Vedi la transazione», e il tasto sparisce.
+
+<!-- pezzo libro-025 | libro -->
 ## Libro · Lo Swap: spostare i tuoi sats fra Lightning e bitcoin on-chain (1/2)
 
 La pagina «Swap» (la scheda in basso; fino al 12 novembre 2026 si chiamava «Cambio») sposta i TUOI sats fra Lightning e un tuo indirizzo bitcoin on-chain, nelle due direzioni, senza un ordine di mezzo. Se è accesa lo dicono i NUMERI DI OGGI.
@@ -311,7 +318,7 @@ La pagina «Swap» (la scheda in basso; fino al 12 novembre 2026 si chiamava «C
 
 La privacy dello Swap, cioè chi vede cosa:
 
-<!-- pezzo libro-025 | libro -->
+<!-- pezzo libro-026 | libro -->
 ## Libro · Lo Swap: spostare i tuoi sats fra Lightning e bitcoin on-chain (2/2)
 
 - Barattolo si segna, legati al tuo account, la direzione, la cifra, il numero dello swap e l'indirizzo del servizio dove passano i bitcoin. Non si segna il tuo indirizzo bitcoin né la tua fattura Lightning. Però dal numero dello swap, sulla blockchain pubblica, si può seguire dove sono andati i bitcoin.
@@ -321,14 +328,14 @@ La privacy dello Swap, cioè chi vede cosa:
 - Payjoin: nello Swap non si usa. Da Lightning a bitcoin la transazione verso il tuo indirizzo la prepara il tuo telefono per lo swap, e non sa fare Payjoin: se incolli un link Payjoin («bitcoin:…?pj=…») l'app tiene solo l'indirizzo e i bitcoin arrivano lì con una transazione normale. Da bitcoin a Lightning l'indirizzo del servizio non accetta Payjoin, quindi anche il tuo wallet manda una transazione normale.
 - Il consiglio di sempre: un indirizzo nuovo per ogni swap, in un wallet di cui solo tu hai le chiavi.
 
-<!-- pezzo libro-026 | libro -->
+<!-- pezzo libro-027 | libro -->
 ## Libro · Nostr
 
 Gli annunci di Barattolo vengono pubblicati anche su Nostr, una rete aperta: esistono sui relay anche indipendentemente da Barattolo. Se colleghi una tua chiave Nostr dal Profilo, i tuoi annunci escono firmati da te (la firma la fa il tuo browser) e restano tuoi. Gli avvisi possono arrivarti anche su Nostr, oltre che su Telegram. La chiave privata (nsec) non va mai data a nessuno, nemmeno a Barattolo.
 
 Su Nostr risponde anche Tappo: si può scrivere un DM al profilo «Barattolo» (npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy) oppure rispondere sotto le sue note, e Tappo risponde come su Telegram. Ai bot e allo spam non risponde, e se qualcuno dello staff sta già seguendo quella conversazione lascia parlare lui. Per un problema con un ordine, in pubblico Tappo invita a scrivergli in privato.
 
-<!-- pezzo libro-027 | libro -->
+<!-- pezzo libro-028 | libro -->
 ## Libro · I tuoi dati, in breve
 
 Barattolo sa di te pochissimo: niente email, password o telefono. Da Telegram riceve il numero identificativo, il nome e lo username; da Nostr solo la chiave pubblica. L'indirizzo di spedizione è cifrato e si cancella quando confermi di aver ricevuto. Niente tracciamento, niente pubblicità, niente cookie di terzi. Tutto è spiegato nella pagina «I tuoi dati» (barattolo.store/privacy).
@@ -344,12 +351,12 @@ Cancellare l'account: nel Profilo, nella parte della privacy accanto a «🔐 I 
 
 Questo assistente: la tua domanda e le ultime battute arrivano ad Anthropic, l'azienda dell'intelligenza artificiale che risponde, ma mai il tuo nome, il tuo account o i tuoi ordini. Le conversazioni non vengono conservate: in chat privata l'assistente ricorda le domande e le risposte della giornata, per seguire il filo del discorso, e a mezzanotte spariscono.
 
-<!-- pezzo libro-028 | libro -->
+<!-- pezzo libro-029 | libro -->
 ## Libro · Se Barattolo sparisse
 
 Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma i sats del deposito stanno su un nodo Lightning separato, con la seed custodita offline; gli annunci restano su Nostr; lo storico è salvato ogni giorno con copie cifrate anche fuori dal server.
 
-<!-- pezzo libro-029 | libro | sempre -->
+<!-- pezzo libro-030 | libro | sempre -->
 ## Libro · Sicurezza e truffe
 
 - Nessuno di Barattolo ti chiederà mai la seed, le parole di recupero, la nsec, una chiave privata o una password. Chi le chiede è un truffatore. Se le hai date a qualcuno, considerale esposte e sposta subito i fondi su un wallet nuovo.
@@ -359,7 +366,7 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 - Paga sempre dentro Barattolo: un pagamento fuori dal deposito di garanzia non è protetto.
 - Nel P2P, libera i sats solo quando gli euro sono arrivati davvero sul tuo conto, non prima e non sulla fiducia di una ricevuta.
 
-<!-- pezzo libro-030 | libro | sempre -->
+<!-- pezzo libro-031 | libro | sempre -->
 ## Libro · Parlare con una persona
 
 Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Supporto → «💬 Assistenza» (fino al 16 novembre 2026 stava in Profilo → Privacy). Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta.
@@ -1571,4 +1578,12 @@ pubblico: sì
 frase: Quando tocchi un ordine P2P, sotto «Stai comprando sats» o «Stai vendendo sats» ci sono già i due tasti «⚡ Lightning» e «₿ On-chain», accesi sulla rete dell'ordine. Se scegli l'altra rete vedi subito quanto costa lo swap e quanto ti arriva, prima ancora di prendere l'ordine, e il costo dello swap è una riga del dettaglio.
 dove: la scheda «P2P», il foglio che si apre toccando un ordine del libro, Lightning o on-chain.
 leva: P2P_ALTRA_RETE_ATTIVO spenta di serie (accesa per tutti in produzione dal 16 nov)
+pubblico: sì
+
+<!-- pezzo novita-040 | novita -->
+## Novità · 2026-11-16 · p2p-tasti-lato
+
+frase: In cima al libro P2P «Compra BTC» e «Vendi BTC» sono due pillole grandi: quella accesa, verde o corallo, dice da che parte del libro sei. Anche nel tema scuro.
+dove: la scheda «P2P», in cima al libro.
+leva: nessuna
 pubblico: sì

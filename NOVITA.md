@@ -272,3 +272,9 @@ frase: Quando tocchi un ordine P2P, sotto «Stai comprando sats» o «Stai vende
 dove: la scheda «P2P», il foglio che si apre toccando un ordine del libro, Lightning o on-chain.
 leva: P2P_ALTRA_RETE_ATTIVO spenta di serie (accesa per tutti in produzione dal 16 nov)
 pubblico: sì
+
+## 2026-11-16 · p2p-tasti-lato
+frase: In cima al libro P2P «Compra BTC» e «Vendi BTC» sono due pillole grandi: quella accesa, verde o corallo, dice da che parte del libro sei. Anche nel tema scuro.
+dove: la scheda «P2P», in cima al libro.
+leva: nessuna
+pubblico: sì
