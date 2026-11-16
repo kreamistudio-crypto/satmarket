@@ -2222,6 +2222,14 @@
   .card-p2p .tag-price .price-sub .p2p-vt-verbo{margin-right:0}
   .card-p2p .p2p-vt-cifra{white-space:nowrap}
   .card-p2p .p2p-vt-premio{justify-content:flex-start}
+  /* la rete in fondo a destra (16 nov 2026, `reteVetrinaP2P`): la moneta
+     della pagina Cambio, piccola, che non si schiaccia mai; il cartellino
+     del premio le lascia il suo posto */
+  .card-p2p .p2p-vt-premio{gap:6px;align-items:center}
+  .card-p2p .p2p-vt-rete{margin-left:auto;flex:0 0 auto;display:inline-flex}
+  .card-p2p .p2p-vt-rete .cambio-moneta.p2p-oc-moneta{width:22px;height:22px}
+  .card-p2p .p2p-vt-rete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:13px;height:13px}
+  .card-p2p .p2p-vt-premio .p2p-affarone,.card-p2p .p2p-vt-premio .p2p-badge{min-width:0}
   /* la zona di scambio del contanti (10 ott 2026): una riga sola coi
      puntini — `.luogo` e' quella del comune nelle card del mercatino */
   .card-p2p .p2p-vt-zona{justify-content:flex-start;font-weight:700}
@@ -2229,7 +2237,7 @@
   /* il cartellino dell'affare piu' grande (ritocco di Andrea), fino a
      riempire la riga: a 320 px la card e' larga 138 e dentro ne restano 114 */
   .card-p2p .p2p-vt-premio .p2p-affarone{font-size:clamp(11px, 3.35vw, 12.5px);
-    line-height:1.25;padding:3px clamp(7px, 2.6vw, 10px) 4px;max-width:100%}
+    line-height:1.25;padding:3px clamp(7px, 2.6vw, 10px) 4px;max-width:calc(100% - 28px)}
   /* la fila, se vince lei: card larghe come quelle della griglia */
   .p2p-vt-fila{display:flex;gap:12px;overflow-x:auto;
     overscroll-behavior-x:contain;scrollbar-width:none;
@@ -4378,6 +4386,24 @@
   .p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-coin-novita.appeso .p2p-oc-faccia{top:0}
   .p2p-oc-novita.appeso ~ .p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-coin-novita.appeso{
     top:calc(var(--p2p-testa-alta,0px) + 114px)}
+  /* I «NOVITÀ» IN UNO SOLO, SCORRENDO (16 nov 2026, Andrea: «quando scorro
+     rimanga in alto solamente un banner novità con dentro tutte le monete»,
+     «senza scritte dentro, a parte novità»): a pila chiusa il primo resta
+     appeso con la faccia unica, gli altri tornano nel flusso e se ne vanno
+     col dito. Nessuna misura cambia, quindi niente salta. La faccia unica
+     e' quella delle card (`--card` col filo), le monete accavallate col
+     filo del fondo, «Novità» in arancio accanto alla freccia. */
+  .p2p-novita-unica{display:none}
+  #view-p2p.novita-compatte .p2p-oc-novita.appeso:not(.capo-pila){position:relative;top:auto}
+  #view-p2p.novita-compatte .p2p-oc-novita.capo-pila > .p2p-oc-faccia:not(.p2p-novita-unica){visibility:hidden}
+  #view-p2p.novita-compatte .p2p-oc-novita.capo-pila > .p2p-novita-unica{display:flex;
+    background:var(--card);box-shadow:inset 0 0 0 1px var(--line-soft);color:var(--ink)}
+  .p2p-novita-unica .p2p-novita-monete{flex:1;min-width:0}
+  .p2p-novita-monete .p2p-coin-svg,.p2p-novita-monete .cambio-moneta.p2p-oc-moneta{width:26px;height:26px;
+    flex:0 0 auto;border-radius:50%;box-shadow:0 0 0 2px var(--card)}
+  .p2p-novita-monete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:15px;height:15px}
+  .p2p-novita-monete > * + *{margin-left:-5px}
+  .p2p-novita-unica .p2p-oc-novita-tag{color:#E8870F}
   /* LA CARD DEL PREZZO (13 nov 2026, cantiere prezzo-btc-p2p, la «A» scelta
      da Andrea sulle foto): sotto i «Novità», sopra gli ordini, NON appesa —
      se ne va col dito come le card. La veste e' quella di `.p2p-ord`
@@ -4413,11 +4439,25 @@
      una carta scura in tutti e due i temi, ma fredda, cosi' si stacca dal
      crema di giorno e dal bruno di sera. Scritte chiare tendenti al blu,
      grigio-blu per l'etichetta, un verde piu' acceso che regge sul blu
-     (crema 14:1, grigio-blu 7:1, verde e rosso oltre il 5:1). */
-  :root{--valore-carta:#13243B;--valore-inchiostro:#EEF3FA;--valore-muto:#9FB2CC;
-    --valore-su:#3DD68C;--valore-giu:#F37456}
-  html[data-tema="scuro"]{--valore-carta:#0E1A2B}
-  .p2p-valore{background:var(--valore-carta);border-color:var(--valore-carta);color:var(--valore-inchiostro)}
+     (crema 14:1, grigio-blu 7:1, verde e rosso oltre il 5:1).
+     LA GRAFITE LUCIDA (16 nov 2026 sera, cantiere mappa-recenti, Andrea dal
+     vivo: «Banner blu notte non mi piace», poi fra quattro giri di esempi
+     scattati dall'app vera — verde bosco, viola, terracotta, sabbia;
+     petrolio, bordeaux, giallo, nero e arancio; grigio perla, menta,
+     celeste, arancio bruciato; bordo arancio, striscia arancio, grafite
+     lucida, ₿ in filigrana — la «T · Grafite lucida»): torna la grafite,
+     ma con un riflesso chiaro nell'angolo in alto a sinistra e una
+     discesa verso il quasi nero, e un filo bianco al 12% come bordo. Il
+     gradiente e' NEUTRO, bianco su grafite: il «gradiente colorato» del 14
+     nov resta bocciato. Scritte e linea come sul blu (crema 14:1, grigio
+     caldo 7:1, verde e rosso oltre il 5:1 sul punto piu' chiaro). */
+  :root{--valore-carta:#1C1F24;--valore-inchiostro:#F4F1EA;--valore-muto:#A9A39A;
+    --valore-su:#3DD68C;--valore-giu:#F37456;
+    --valore-lucido:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 55%),
+      linear-gradient(160deg,#2A2E35 0%,#121417 100%)}
+  html[data-tema="scuro"]{--valore-carta:#121417}
+  .p2p-valore{background:var(--valore-lucido),var(--valore-carta);border-color:rgba(255,255,255,.12);
+    color:var(--valore-inchiostro)}
   .p2p-valore-simbolo{font:inherit;color:inherit;background:none;border:0;padding:0 2px;
     margin:0 -2px;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .p2p-valore-simbolo:focus-visible{outline:2px solid var(--orange);outline-offset:2px;border-radius:4px}
@@ -62932,6 +62972,75 @@ function novitaCoinLibroP2P(){
     + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
     + '</div>';
 }
+/* ============ I «NOVITÀ» IN UNO SOLO, SCORRENDO (16 nov 2026) ============
+   Andrea: «Quando scorri le carte verso il basso, i tre banner novità sono
+   troppi lì su in cima ... quando scorro rimanga in alto solamente un
+   banner novità con dentro tutte le monete ... quando invece scorri verso
+   l'alto compaiono subito», e «senza scritte dentro, a parte novità».
+   NIENTE SI SPOSTA NEL FLUSSO: gli appesi sono `sticky`, e un sticky non
+   occupa posto diverso da appeso o no. Scorrendo in giu' il PRIMO della
+   pila (`capo-pila`) resta appeso e cambia faccia — le monete di tutti,
+   accavallate, e «Novità» —, gli altri smettono di essere appesi e se ne
+   vanno col dito come le card. In su, o in cima alla pagina, tornano i
+   tre. Il tocco sulla faccia unica li riapre. Durante un tutorial (un
+   «Novità» acceso) la pila resta aperta: il giro guarda il suo banner.
+   La classe vive sulla vista (`novita-compatte`), cosi' un ridisegno del
+   libro a pila chiusa nasce gia' chiuso. */
+let p2pNovitaUltimoY = 0;
+/* dopo ogni disegno del libro: con due o piu' «Novità» appesi, il primo
+   prende la faccia unica (nascosta finche' la pila e' aperta) */
+function segnaPilaNovitaP2P(box){
+  if (!box || !box.querySelectorAll) return;
+  const appesi = [...box.querySelectorAll('.p2p-oc-novita.appeso')];
+  if (appesi.length < 2) return;
+  const capo = appesi[0];
+  capo.classList.add('capo-pila');
+  const monete = appesi.map(a => {
+    const f = a.querySelector('.p2p-oc-faccia');
+    if (!f) return '';
+    const trio = f.querySelector('.p2p-coin-trio');
+    if (trio) return [...trio.querySelectorAll('svg')].map(x => x.outerHTML).join('');
+    const m = f.querySelector('.cambio-moneta');
+    return m ? m.outerHTML : '';
+  }).join('');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'p2p-oc-faccia p2p-novita-unica';
+  b.setAttribute('aria-label', 'Novità: tocca per vederle tutte');
+  b.setAttribute('onclick', 'apriPilaNovitaP2P()');
+  b.innerHTML = '<span class="p2p-coin-trio p2p-novita-monete" aria-hidden="true">' + monete + '</span>'
+    + '<span class="p2p-oc-novita-tag">Novità</span>'
+    + '<span class="p2p-oc-freccia" aria-hidden="true"></span>';
+  capo.appendChild(b);
+}
+function apriPilaNovitaP2P(){
+  const v = el('view-p2p');
+  if (v) v.classList.remove('novita-compatte');
+}
+/* PURA: la pila si chiude, si apre o resta com'e' (null)? `dy` lo
+   spostamento dall'ultima volta, `y` dove sta la pagina, `appeso` se il
+   capo della pila e' gia' fermo in alto, `tutorial` se un «Novità» e' acceso */
+function versoPilaNovitaP2P(dy, y, appeso, tutorial){
+  if (tutorial || y < 40) return false;
+  if (Math.abs(dy) < 8) return null;
+  if (dy < 0) return false;
+  return appeso ? true : null;
+}
+function scorriPilaNovitaP2P(){
+  const v = el('view-p2p');
+  if (!v || !v.classList.contains('active')) return;
+  const y = window.scrollY || 0, dy = y - p2pNovitaUltimoY;
+  const capo = v.querySelector('.p2p-oc-novita.appeso.capo-pila');
+  if (!capo) { v.classList.remove('novita-compatte'); p2pNovitaUltimoY = y; return; }
+  const alta = parseFloat(getComputedStyle(v).getPropertyValue('--p2p-testa-alta')) || 0;
+  const tutorial = !!v.querySelector('.p2p-oc-novita.acceso');
+  const verso = versoPilaNovitaP2P(dy, y, capo.getBoundingClientRect().top <= alta + 1, tutorial);
+  if (verso === null && Math.abs(dy) < 8) return;
+  p2pNovitaUltimoY = y;
+  if (verso !== null) v.classList[verso ? 'add' : 'remove']('novita-compatte');
+}
+if (typeof window !== 'undefined' && window.addEventListener)
+  window.addEventListener('scroll', scorriPilaNovitaP2P, {passive: true});
 function accendiNovitaCoinP2P(si){
   const r = el('p2pCoinNovita');
   if (r) r.classList[si ? 'add' : 'remove']('acceso');
@@ -63110,6 +63219,9 @@ function ordineVoltoOnchainP2P(o){
      e non l'utente»): il server lo manda con la sessione, accanto al nome */
   const faccia = {nome: o.nome || ''};
   if (o.negozio) faccia.negozio = String(o.negozio);
+  /* ...e lo scudo 🛡️ Staff (16 nov 2026, Andrea: «non ho più il badge da
+     moderatore»): lo dice il server, come per il volto di Lightning */
+  if (o.staff === true) faccia.staff = true;
   return {id: 'oc-' + Number(o.id), scade: Number(o.scade) || 0,
           creato: Number(o.creato) || 0, faccia};
 }
@@ -63392,6 +63504,34 @@ function notaPresaDettP2P(id){
    il conto porta «Swap SATS Routing» e il totale lo conta, cosi' torna
    con la frase sotto i tasti. Lo stesso preventivo della frase, mai un
    secondo numero. null finche' non c'e' (e allora niente riga). */
+/* LE DUE PARTI DELLO SWAP (16 nov 2026, Andrea: «La fee dello swap non era
+   allo 0,6%?» davanti a «Swap SATS Routing ≈ −724 sats»): la riga diceva
+   il costo INTERO — la percentuale di SATS Routing (0,6%) PIU' la rete
+   delle loro transazioni (invio e ritiro, o il ritiro del submarine) —, e
+   su 72.000 sats quel totale faceva proprio l'1%, come la Fee P2P. Adesso
+   il conto le scrive separate: «Swap SATS Routing 0,6%» con la sua parte,
+   e «Rete dello swap» col resto. Le parti le dice il preventivo (`righe`,
+   la voce `commissione` con la sua percentuale); senza, la riga unica di
+   prima. PURA: torna {percento, comm} o null. */
+function partiSwapP2P(d, totale){
+  const righe = d && Array.isArray(d.righe) ? d.righe : [];
+  const c = righe.find(x => x && x.voce === 'commissione');
+  if (!c) return null;
+  const comm = Math.abs(Math.round(Number(c.sats) || 0));
+  const pc = Number(c.percento);
+  if (!(comm > 0) || !(comm < totale) || !Number.isFinite(pc) || !(pc > 0)) return null;
+  return {percento: pc, comm};
+}
+/* le righe dello swap in un conto: una o due (vedi sopra). `r` e' il
+   pittore delle righe del conto, `cifra(n)` scrive il numero col segno */
+function righeSwapContoP2P(r, sw, swap, cifra){
+  const nome = 'Swap ' + esc((swap && swap.nome) || 'SATS Routing');
+  const parti = swap && swap.parti;
+  if (!parti) return r(nome, cifra(sw));
+  const pc = parti.percento.toLocaleString('it-IT', {maximumFractionDigits: 2});
+  return r(nome + ' <b class="p2p-avviso">' + esc(pc) + '%</b>', cifra(parti.comm))
+    + r('Rete dello swap', cifra(sw - parti.comm));
+}
 function swapContoDettP2P(id, compro){
   if (compro) {
     if (p2pIncassoRete[id] !== 'oc') return null;
@@ -63399,12 +63539,12 @@ function swapContoDettP2P(id, compro){
     const d = st && st.stato === 'pronto' ? st.dati : null;
     if (!d || !d.ok) return null;
     const costo = Math.max(0, Number(st.sats) - Number(d.ricevi || 0));
-    return costo > 0 ? {sats: costo, nome: d.fornitore_nome || 'SATS Routing'} : null;
+    return costo > 0 ? {sats: costo, nome: d.fornitore_nome || 'SATS Routing', parti: partiSwapP2P(d, costo)} : null;
   }
   const st = p2pPresaOc[id] || {};
   const d = st.aperto && st.stato === 'pronto' ? st.dati : null;
   if (!d || !d.ok || !(Number(d.costo) > 0)) return null;
-  return {sats: Number(d.costo), nome: d.fornitore_nome || 'SATS Routing'};
+  return {sats: Number(d.costo), nome: d.fornitore_nome || 'SATS Routing', parti: partiSwapP2P(d, Number(d.costo))};
 }
 /* -- il foglio di un ordine ON-CHAIN (apriOnchainP2P) -- */
 const p2pOcPresaRete = {};   // ordine -> {rete, stato, dati, sats}
@@ -63453,7 +63593,7 @@ function swapOcPresaP2P(id, vendeLui){
   if (!d || !d.ok) return null;
   const costo = vendeLui ? Math.max(0, Number(d.costo) || 0)
                          : Math.max(0, Number(st.sats) - (Number(d.ricevi) || 0));
-  return costo > 0 ? {sats: costo, nome: d.fornitore_nome || 'SATS Routing'} : null;
+  return costo > 0 ? {sats: costo, nome: d.fornitore_nome || 'SATS Routing', parti: partiSwapP2P(d, costo)} : null;
 }
 /* LA FRASE DELLA DOMANDA DI PRESA ON-CHAIN, che segue il tasto scelto
    (16 nov 2026, ritocco: con «⚡ Lightning» diceva ancora «arrivano sul
@@ -64081,7 +64221,14 @@ function rigaScambioOnchainP2P(o){
   const cifraOc = typeof cifraOcP2P === 'function' ? cifraOcP2P : x => fmtEur(x.euro) + ' €';
   const paroleOc = typeof paroleOcP2P === 'function' ? paroleOcP2P : (x, t) => t;
   const ricevoSats = o.parte === 'compro';
-  const sats = fmt(Number(o.sats) || 0) + ' sats';
+  /* A MERCATO, PRIMA DELLA PRESA, LA STIMA (16 nov 2026, cantiere
+     mappa-recenti, dal canale Todo: «Vuoi ricevere 0 sats inviando
+     1099,00 USDT»): i sats nascono alla presa, e fino ad allora la card
+     diceva lo zero di `o.sats`. Adesso la stessa cifra della card del
+     libro (`satsCardOnchainP2P`): «≈ X sats» al cambio di adesso, o la
+     frase se il cambio non c'e'. Preso lo scambio, i sats veri. */
+  const sats = typeof satsCardOnchainP2P === 'function' ? satsCardOnchainP2P(o)
+    : fmt(Number(o.sats) || 0) + ' sats';
   const cifraSats = '<span class="p2p-sats ' + (ricevoSats ? 'riceve' : 'invia') + '">' + esc(sats) + '</span>';
   const cifraEuro = '<span class="p2p-euro">' + esc(cifraOc(o)) + '</span>';
   const g = gruppoOnchainP2P(o);
@@ -64846,8 +64993,11 @@ function contoOnchainP2P(o){
   /* lo swap dell'altra rete scelto prima della presa (`swapOcPresaP2P`,
      16 nov 2026): una riga sua, e il totale lo conta */
   const sw = o.swap && Number(o.swap.sats) > 0 ? Math.round(Number(o.swap.sats)) : 0;
-  const rigaSwap = sw ? r('Swap ' + esc(o.swap.nome || 'SATS Routing'), '<span class="num">≈ '
-    + (versa ? '+' : '−') + fmt(sw) + '<span class="unita-sats"> sats</span></span>') : '';
+  const rigaSwap = sw ? (typeof righeSwapContoP2P === 'function'
+    ? righeSwapContoP2P(r, sw, o.swap, n => '<span class="num">≈ ' + (versa ? '+' : '−') + fmt(n)
+        + '<span class="unita-sats"> sats</span></span>')
+    : r('Swap ' + esc(o.swap.nome || 'SATS Routing'), '<span class="num">≈ '
+    + (versa ? '+' : '−') + fmt(sw) + '<span class="unita-sats"> sats</span></span>')) : '';
   /* A MERCATO, prima della presa, la base del totale e' la STIMA (16 nov
      2026, Andrea: «Ricevi ≈ -3.633 sats»): `o.sats` e' ancora 0, e il
      totale contava solo la fee e lo swap. Senza stima, il «—» di sopra. */
@@ -68998,8 +69148,12 @@ function voltoCardP2P(o){
       : ' onclick="voltoSenzaNegozioP2P(event)"'});
   /* il bollino 🛡️ Staff all'angolo del volto: sul libro il nome non si
      vede, la faccia si' */
-  return '<span class="p2p-volto">' + dentro
-    + (o.faccia ? '' : bollinoVolto('p2p:' + o.id)) + '</span>';
+  /* ...e la card on-chain, che il volto se lo porta, lo scudo lo porta
+     scritto dentro: niente cache da aspettare, il si' e' gia' li' */
+  const scudo = o.faccia
+    ? (o.faccia.staff === true ? '<span class="bollino-staff mini"' + attrStaff() + '>' + ICO_STAFF + '</span>' : '')
+    : bollinoVolto('p2p:' + o.id);
+  return '<span class="p2p-volto">' + dentro + scudo + '</span>';
 }
 /* LA BARRA DEL TEMPO: PURA (l'orologio si passa). Senza una scadenza
    onesta (vedi `frazioneVitaP2P`) non c'e' barra: una riga piena
@@ -70335,6 +70489,8 @@ function renderP2P(){
              ? ' <button type="button" class="scopri-link" onclick="azzeraFiltroP2P()">Togli il filtro</button>'
              : ''}</div>`)
     + comeFunziona;
+  /* i «Novità» in uno solo scorrendo (16 nov 2026): la faccia unica */
+  if (typeof segnaPilaNovitaP2P === 'function') segnaPilaNovitaP2P(box);
   /* la mappa si disegna DOPO, nella scatola gia' in pagina: le serve
      la sua misura */
   if (conMappa && p2pMappaAperta) { p2pMappaUltimi = mostrati; disegnaMappaP2P(mostrati); }
@@ -77987,7 +78143,9 @@ function contoDettP2P(o){
        (pillola «in promo» + percentuale + cifra a intervallo) sta.
        Misurato a 320, non stimato. */
     + r(etichettaFee, commissione)
-    + (sw && vivo ? r('Swap ' + esc(o.swap.nome || 'SATS Routing'), cifra('swap', compro ? '−' : '+')) : '')
+    + (sw && vivo ? (typeof righeSwapContoP2P === 'function'
+        ? righeSwapContoP2P(r, sw, o.swap, n => num(conSats('≈ ' + (compro ? '−' : '+') + fmt(n)), compro ? '−' : '+'))
+        : r('Swap ' + esc(o.swap.nome || 'SATS Routing'), cifra('swap', compro ? '−' : '+'))) : '')
     /* LE DUE RIGHE IN EVIDENZA NON PESANO UGUALE (set 2026, ritocco
        di Andrea): quella in SATS porta l'arancio di casa — e' la
        cifra che parla di bitcoin, ed e' quella che si va a cercare —
@@ -95847,10 +96005,13 @@ function coppiaVetrinaP2P(o){
    commissione, lo stesso `nettoLatoP2P` del libro.
    I MIEI ORDINI in fila non ci sono (vedi `mioInVetrinaP2P`): la card e'
    sempre di un altro, e chi guarda e' sempre chi prende. */
-function cardVetrinaP2P(o){
+function cardVetrinaP2P(o, opz){
   const compro = o.lato === 'sell';        // chi guarda compra i sats
   const tab = tabacchinoP2P(o.metodi);
-  const f = p2pFacce[o.id] || {};
+  /* `opz` (16 nov 2026) e' della card on-chain: il volto se lo porta, e
+     i sats sono quelli della sua card del libro, gia' detti */
+  const z = opz || {};
+  const f = z.faccia || p2pFacce[o.id] || {};
   /* lo sfondo: le due monete per tutti, il marchio per Barattozon (il
      file chiaro: il fondo e' scuro in tutt'e due i temi) */
   const coppia = coppiaVetrinaP2P(o);
@@ -95886,7 +96047,7 @@ function cardVetrinaP2P(o){
       + '<span class="p2p-vt-verbo"> a</span>' + euroCartaP2P(o.euroMax)
     : euroCartaP2P(o.euro);
   const lordo = o.sats > 0 ? o.sats : satsMercatoP2P(o);
-  const sats = nettoLatoP2P(o, lordo);
+  const sats = z.sats !== undefined ? z.sats : nettoLatoP2P(o, lordo);
   const verboEuro = compro ? 'Invia' : 'Ricevi';
   const verboSats = compro ? 'Ricevi' : 'Invia';
   /* sull'intervallo la cifra la sceglie chi prende: niente sats */
@@ -95931,13 +96092,54 @@ function cardVetrinaP2P(o){
       <div class="info">
         <div class="title">${metodi || 'Scambio P2P'}</div>
         ${zona ? `<div class="meta p2p-vt-zona" title="Zona di scambio indicativa"><span class="luogo">📍 ${esc(zona)}</span></div>` : ''}
-        <div class="meta p2p-vt-premio">${premio}</div>
+        <div class="meta p2p-vt-premio">${premio}${typeof reteVetrinaP2P === 'function' ? reteVetrinaP2P(z.rete === 'btc' ? 'btc' : 'ln') : ''}</div>
       </div>
     </div>`;
 }
 /* LA FILA: una striscia sua sopra la griglia, «Scambi P2P», con le card
    larghe come quelle della griglia e «Vedi tutti» che porta al libro.
    Senza card la sezione sparisce tutta, titolo compreso. */
+/* LA RETE IN FONDO ALLA CARD DELLA FILA (16 nov 2026, Andrea: «nelle card
+   nella home del mercatino metti in basso il simbolo nostro della B di
+   Bitcoin on-chain o del fulmine per il Lightning, così la gente capisce
+   già subito se si tratta di un ordine on-chain o Lightning»): le monete
+   della pagina Cambio, le stesse del libro (`P2P_OC_MONETA`,
+   `P2P_LN_MONETA`), in fondo a destra sulla riga del premio. Sempre,
+   anche a on-chain spento: il fulmine dice comunque com'e' l'ordine. */
+function reteVetrinaP2P(rete){
+  const oc = rete === 'btc';
+  const m = oc ? (typeof P2P_OC_MONETA !== 'undefined' ? P2P_OC_MONETA : '')
+               : (typeof P2P_LN_MONETA !== 'undefined' ? P2P_LN_MONETA : '');
+  return m ? '<span class="p2p-vt-rete" role="img" aria-label="'
+    + (oc ? 'Si scambia on-chain' : 'Si scambia su Lightning') + '">' + m + '</span>' : '';
+}
+/* GLI ORDINI ON-CHAIN NELLA FILA (16 nov 2026, Andrea: «ho pubblicato un
+   ordine USDe, ma non c'è nessuna card nella home»): fin qui la fila
+   prendeva solo il libro di Mostro, e gli ordini on-chain — USDe, USDT,
+   ETH, XMR, CHF o euro — restavano nel libro P2P. La fotografia della
+   fila li porta gia' (`onchain`, che `accogliLibroOnchainP2P` mette in
+   `p2pOnchainLibro`), e le regole sono quelle della fila: vivi, non
+   scaduti, non in pausa, e MAI I MIEI (27 set 2026, `mioInVetrinaP2P`:
+   la fila mostra solo quel che chi guarda puo' prendere). PURA. */
+function ordiniOnchainVetrinaP2P(lib, adesso){
+  adesso = adesso || Math.floor(Date.now() / 1000);
+  const miei = new Set(((lib && lib.miei) || []).map(String));
+  return ((lib && Array.isArray(lib.eventi)) ? lib.eventi : [])
+    .filter(o => o && o.id && o.stato === 'pending' && !(Number(o.scade) && Number(o.scade) <= adesso)
+                 && !miei.has(String(o.ordine)) && !pausaOnchainP2P(o, adesso));
+}
+/* la card on-chain della fila: e' `cardVetrinaP2P`, con l'id «oc-N» (il
+   tocco lo riconosce, `apriCardP2P`), il volto e lo scudo che porta la
+   riga del server, e i sats della sua card del libro (a mercato la
+   stima, `satsCardOnchainP2P`) */
+function cardVetrinaOnchainP2P(o){
+  const faccia = {nome: o.nome || ''};
+  if (o.negozio) faccia.negozio = String(o.negozio);
+  if (o.staff === true) faccia.staff = true;
+  const sats = Number(o.sats) > 0 ? Number(o.sats) : (o.mercato ? Number(o.stima) || 0 : 0);
+  return cardVetrinaP2P(Object.assign({}, o, {id: 'oc-' + Number(o.id), premium: Number(o.premio) || 0,
+                                              euroMax: 0, sats}), {faccia, sats, rete: 'btc'});
+}
 function filaCardP2P(html){
   const sez = el('p2pVetrinaSez'), fila = el('p2pVetrinaFila');
   if (!sez || !fila) return;
@@ -95959,8 +96161,24 @@ function renderVetrinaP2P(){
   renderLevaFilaP2P();
   const vede = qui && !via;
   if (vede) armaFotoVetrinaP2P();
-  const ordini = vede ? ordiniVetrinaP2P(p2pVetrinaFoto, 0, mioInVetrinaP2P) : [];
-  const html = ordini.map(cardVetrinaP2P);
+  /* I CANCELLI DELLE VALUTE A OGNI DISEGNO (16 nov 2026, cantiere
+     mappa-recenti, Andrea: «i nuovi annunci tipo USDE, Ethereum, XMR non
+     si vedono nelle card nella home»): la fotografia filtrava le valute
+     una volta sola, quando arrivava — e se arrivava PRIMA di /api/me, coi
+     cancelli di USDT, franchi e monete ancora spenti (`valutaVistaP2P`),
+     quegli ordini restavano fuori fino alla fotografia dopo. Adesso il
+     libro della fila si rifa' dagli eventi a ogni disegno, coi cancelli di
+     adesso; la fotografia senza eventi resta quella che e'. */
+  const foto = p2pVetrinaFoto && Array.isArray(p2pVetrinaFoto.eventi) && p2pVetrinaFoto.eventi.length
+      && typeof libroDaEventi === 'function'
+    ? Object.assign({}, p2pVetrinaFoto, {ordini: libroDaEventi(p2pVetrinaFoto.eventi).ordini})
+    : p2pVetrinaFoto;
+  const ordini = vede ? ordiniVetrinaP2P(foto, 0, mioInVetrinaP2P) : [];
+  /* ...e quelli on-chain (16 nov 2026), mescolati dal piu' nuovo */
+  const oc = vede && typeof p2pOnchainLibro !== 'undefined' ? ordiniOnchainVetrinaP2P(p2pOnchainLibro) : [];
+  const html = ordini.map(o => [Number(o.creato) || 0, cardVetrinaP2P(o)])
+    .concat(oc.map(o => [Number(o.creato) || 0, cardVetrinaOnchainP2P(o)]))
+    .sort((a, b) => b[0] - a[0]).slice(0, P2P_VETRINA_MAX).map(x => x[1]);
   /* SI RIDISEGNA SOLO SE CAMBIA QUALCOSA: riscrivere la fila la riporta
      all'inizio, e chi la sta scorrendo di lato perderebbe il segno a
      ogni pagina di annunci che arriva */
@@ -96065,6 +96283,8 @@ document.addEventListener('visibilitychange', () => {
    prova, chi guarda da fuori Telegram — legge prima cos'e'. */
 function apriCardP2P(id){
   if (DEMO || VETRINA || !myTgId || !p2pAcceso()) { apriCosaP2P(); return; }
+  /* la card on-chain della fila (16 nov 2026): il suo foglio, quello del libro */
+  if (/^oc-\d+$/.test(String(id))) { apriOnchainP2P(Number(String(id).slice(3))); return; }
   /* IL DETTAGLIO LEGGE `p2pLibro`, che da Esplora puo' non esserci o
      essere piu' vecchio della fotografia della fila: in quei casi la
      fotografia diventa il libro in pagina, col segno della COPIA — cosi'
@@ -103490,6 +103710,10 @@ async function avvia(){
     myP2PChf = !!me.p2p_chf;
     myP2POnchainUsdt = !!me.p2p_onchain_usdt;
     myP2PCoin = !!me.p2p_coin;
+    /* ...e la fila della home si ridisegna coi cancelli appena letti (16 nov
+       2026, Andrea: «i nuovi annunci tipo USDE, Ethereum, XMR non si vedono
+       nelle card nella home»): la fotografia poteva arrivare prima di /api/me */
+    if (typeof renderVetrinaP2P === 'function') setTimeout(renderVetrinaP2P, 0);
     myOnchainIncasso = me.onchain_incasso || '';
     myOnchainLn = me.onchain_ln || {attivo: false};
     /* le co-firme on-chain che aspettano me partono da sole (tappa 3) */

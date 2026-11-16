@@ -85147,6 +85147,102 @@ mercato: i sats si contano quando prendi» finiva su «prendi» e la riga
 sotto, «di Jj», sembrava continuarla: ora «…quando prendi l'ordine.» e
 «Pubblicato da Jj». Prova in `prove_tasti_rete_foglio` (il preventivo che
 dice di no, per chi riceve e per chi deposita, e il ritorno).
+I RITOCCHI DELLA SERA (stesso giro, dal telefono di Andrea dopo la
+promozione). Otto pezzi, ognuno chiesto:
+1. LO SWAP IN DUE RIGHE («La fee dello swap non era allo 0,6%?», sotto un
+ordine USDT con «Swap SATS Routing −724» accanto a «Fee P2P 1% −724»). Non
+era un errore: lo 0,6% di SATS Routing più la rete (lockup e claim nel
+reverse, rete nel submarine) faceva per caso la stessa cifra dell'1%. Il
+conto ora le separa: `partiSwapP2P` legge dal preventivo la riga
+`commissione` col suo `percento`, `righeSwapContoP2P` scrive «Swap SATS
+Routing 0,6%» e «Rete dello swap»; senza le parti (preventivo vecchio)
+resta la riga unica di prima. Vale nel foglio on-chain e nel conto
+Lightning.
+2. LA CARTA DEL PREZZO IN GRAFITE LUCIDA («Banner blu notte non mi
+piace»). Sette giri di esempi (F–I, J–M, N–Q, R–U, poi due giri di
+lucidi colorati: blu, viola, bronzo, smeraldo; arancio, rubino, petrolio,
+argento): scelta «T · Grafite lucida», confermata alle 19:15 («Rimaniamo
+sulla scelta di prima»). Un riflesso radiale in alto a sinistra su un
+gradiente #2A2E35→#121417, bordo bianco al 12%, uguale giorno e sera. NON
+riproporre il blu notte né i colori dei giri scartati.
+3. LO SCUDO STAFF SULLE CARD ON-CHAIN («Non ho più il badge da
+moderatore»). Il libro on-chain non diceva chi fosse staff: ora
+`_p2p_onchain_libro` mette `staff: True` (solo coi dati di chi guarda,
+come il negozio), `ordineVoltoOnchainP2P` lo porta nella faccia e
+`voltoCardP2P` disegna lo scudo dalla faccia invece che dalla cache Nostr.
+4. LE CARD ON-CHAIN NELLA FILA DELLA HOME («Come mai i nuovi annunci tipo
+USDE, Ethereum, XMR non si vedono nelle card»). La fila P2P della home
+leggeva solo il libro Lightning della fotografia: ora
+`ordiniOnchainVetrinaP2P` aggiunge gli on-chain aperti, non scaduti, non
+in pausa e non propri (la regola del 27 set: i propri ordini non stanno
+in vetrina, ed è per questo che il suo USDe non c'era), mescolati per
+`creato` dentro il tetto `P2P_VETRINA_MAX`; il tocco su `oc-N` apre il
+foglio on-chain. Una corsa trovata strada facendo: la fila si disegnava
+prima di `/api/me`, coi cancelli delle monete ancora chiusi, e le card
+USDT/ETH/XMR/USDe sparivano; ora la risposta di `/api/me` la ridisegna,
+e la fotografia si ricalcola dagli eventi.
+5. ₿/⚡ IN FONDO ALLE CARD DELLA HOME («metti un toggle in basso con il
+simbolo ... della B di Bitcoin on chain o del fulmine»). Non un tasto ma
+il bollino della rete (le stesse icone del foglio), a destra nella riga
+del premio: `reteVetrinaP2P`. L'etichetta «Affarone» si accorcia di 28 px
+per fargli posto.
+6. UN SOLO BANNER «NOVITÀ» SCORRENDO («i tre banner novità sono troppi ...
+rimanga in alto solamente un banner novità con dentro tutte le monete ...
+quando scorri verso l'alto compaiono subito»; «senza scritte dentro, a
+parte novità»). Con due o più banner appesi, scorrendo in giù il primo
+mostra una faccia sola con le icone di tutte le monete e la parola
+«Novità», gli altri tornano nel flusso; scorrendo in su (8 px bastano) o
+in cima tornano i tre. Il tocco sulla faccia unica riapre i tre. La
+decisione è pura (`versoPilaNovitaP2P`), e il tutorial aperto la blocca.
+Provato dal vivo: nessun salto della pagina.
+7. «I MIEI SCAMBI» A MERCATO («Qualche bug»: «Vuoi ricevere 0 sats
+inviando 1099,00 USDT»). La riga on-chain leggeva `o.sats`, che a mercato
+è zero finché nessuno prende: ora usa la stima della card
+(`satsCardOnchainP2P`).
+GUARDATI E LASCIATI: i due avvisi del bot alle 18:47 e 19:02 («5% più
+conveniente», poi «meno») erano due ordini diversi, uno di qua e uno di
+là dal mercato; ognuno avvisa una volta e il segno è giusto.
+8. L'ON-CHAIN NEI CONTI DEL P2P DI `/admin` (domanda di Andrea alle 19:13,
+poi «Sì», «gli scambi devono mostrare il complessivo tra lighting e
+on-chain. Poi ovviamente io posso scegliere se filtrarli o meno, però nei
+completati si devono vedere tutti insieme», «devo vedere complessivamente
+quanto sto guadagnando», «se è già passato qualche ordine, riesci a
+individuarlo»). Le statistiche contavano solo Mostro (`p2p_conti`): il
+2-di-3 non passa dal coordinatore e i suoi scambi stanno in
+`p2p_onchain_ordini`, nel database dell'on-chain. SCARTATA una sezione a
+parte (la prima proposta): Andrea vuole un pannello solo. Ora
+`_conti_onchain_p2p` traduce ogni riga on-chain in una riga del registro
+(rilasciato = completato; annullato o scaduto dopo la presa = annullato,
+«a mano» o «tempo scaduto»; rimborsato = annullato col motivo suo;
+prima della presa = ritirato o scaduto) e lo STESSO giudice
+`_statistiche_p2p` conta tutto, col filtro `rete` (tutti di serie, ln,
+oc). La commissione è `quota_sats`, rifatta nei tre importi di Mostro
+(chi deposita prezzo + la sua metà, chi riceve prezzo − la sua), così
+lorde, fette e percentuali sono la stessa aritmetica; lo sconto della
+metà è DEDOTTO dalla persona di adesso; il routing per l'on-chain è 0
+(l'uscita la paga la transazione) e non fa «parziale»; gli euro solo
+dove lo scambio è in euro (USDT e franchi fra i «senza cifra»). Gli
+scambi già passati compaiono da soli (si legge la tabella intera); quelli
+chiusi prima del 16 nov non avevano commissione e contano a zero, senza
+abbassare la percentuale della fee. La pagina ha la riga di filtri
+«Tutti / ⚡ Lightning / ₿ On-chain», la divisione per rete sotto
+«Completati» e «Incassate», la colonna «Rete» negli ultimi scambi e la
+frase sul wallet (la chiave di Barattolo, un indirizzo per scambio); la
+cache tiene (periodo, rete). La carta «sats di commissioni P2P» della
+settimana, che non passa il filtro, ora somma i due mondi. NON toccato:
+il grafico ordini/prezzo (conta ancora solo Mostro: non chiesto).
+PROVATO: `prove_ritocchi_sera_p2p` (nuova: le parti dello swap in node,
+la pila delle novità, la scelta degli on-chain per la vetrina, e le
+sentinelle dei sette pezzi), `prove_statistiche_p2p` (sette scambi
+on-chain di cartone di ogni esito sommati, filtrati e disegnati per
+davvero in node), più `prove_bollino_staff`,
+`prove_tasti_rete_foglio`, `prove_prezzo_btc_libro`, `prove_card_p2p_monete`,
+`prove_stellina_card_p2p`; dal vivo sul server locale (relay morto) la
+fila della home in chiaro e scuro, la pila delle novità, la carta.
 DA GUARDARE: la testata in «Vendi BTC» sul telefono stretto, coi tre
 cerchietti; la prima scadenza vera di un Barattozon in compra con
-l'intervallo; il foglio di quell'ordine da 750 € dopo il deploy.
+l'intervallo; il foglio di quell'ordine da 750 € dopo il deploy; lo
+scudo Staff sulla card USDe di Andrea e la sua card che resta fuori dalla
+SUA home ma compare in quella degli altri; la pila delle novità su iPhone
+(lo scroll con l'inerzia); i conti on-chain di `/admin` sui dati veri
+(nessuno scambio on-chain concluso è passato dal vivo da qui).

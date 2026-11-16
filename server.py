@@ -67012,7 +67012,7 @@ P2P_MOMENTI_CON_GARANZIA = ("garanzia_pagata", "fiat", "disputa",
 # fallito). L'importo deve combaciare AL SAT.
 P2P_ROUTING_PRIMA_S = 300
 P2P_ROUTING_DOPO_S = 86400
-_p2p_conti_cache = {}           # periodo -> (quando, dati)
+_p2p_conti_cache = {}           # (periodo, rete) -> (quando, dati)
 
 
 def vede_statistiche_p2p(tg_id) -> bool:
@@ -67351,7 +67351,113 @@ def _iniziali_p2p(nome, tg_id) -> str:
     return f"#{chi % 1000:03d}" if chi else ""
 
 
-def _statistiche_p2p(con, da: int, adesso: int, in_corso: list) -> dict:
+# GLI SCAMBI ON-CHAIN NEI CONTI DEL P2P (16 nov 2026, cantiere
+# mappa-recenti, Andrea: «gli scambi devono mostrare il complessivo tra
+# lighting e on-chain. Poi ovviamente io posso scegliere se filtrarli o
+# meno, però nei completati si devono vedere tutti insieme», «devo vedere
+# complessivamente quanto sto guadagnando nel peer-to-peer»). Il 2-di-3
+# Mostro non lo vede: gli scambi stanno in `p2p_onchain_ordini`, nel
+# database dell'on-chain. `_conti_onchain_p2p` li traduce nelle STESSE
+# righe di `p2p_conti`, cosi' un giudice solo (`_statistiche_p2p`) conta
+# tutto e i due mondi non hanno due aritmetiche. LA TRADUZIONE:
+# rilasciato = completato (chiuso_il), annullato o scaduto DOPO la presa
+# = annullato (scaduto senza deposito = «tempo scaduto», a mano =
+# «annullato a mano»), rimborsato = annullato «sats tornati a chi li
+# aveva messi»; annullato PRIMA della presa = ritirato, scaduto = scaduto.
+# LA COMMISSIONE e' `quota_sats`, l'uscita verso Barattolo sulla SUA
+# xpub: le due meta' rifanno i tre importi di Mostro (chi deposita la
+# mette sopra il prezzo, chi riceve la trova tolta), quindi `v - c` e'
+# la quota e le fette si dividono come su Lightning. Lo sconto di una
+# meta' e' DEDOTTO dalla persona di adesso (`_sconto_p2p`), come dice la
+# pagina. IL ROUTING non c'e' (0, noto): l'uscita la paga la rete dentro
+# la transazione. GLI EURO solo dove lo scambio e' in euro (anche in
+# moneta, il cui `euro_cent` e' il controvalore): USDT e franchi stanno
+# fra i «senza cifra in euro». Le commissioni nate prima del 16 nov sono
+# 0: allora l'on-chain del P2P non ne prendeva.
+P2P_RETI_CONTI = ("tutti", "ln", "oc")
+
+
+def _conti_onchain_p2p(con, ordini: list) -> dict:
+    """Le righe di `p2p_onchain_ordini` (tutte, di ogni tempo) come righe
+    di `p2p_conti` per `_statistiche_p2p`. PURA sulla connessione (che
+    serve solo allo sconto dedotto). Torna {righe: chiusi, in_corso,
+    pubblicati: [(creato, euro o None, a mercato)], conclusi: [(quando,
+    chi pubblica, chi prende)]}."""
+    righe, in_corso, pubblicati, conclusi = [], [], [], []
+    for o in ordini:
+        o = dict(o)
+        stato = o.get("stato") or ""
+        preso = int(o.get("preso_il") or 0)
+        valuta = p2p_onchain_valuta(o)
+        mercato = (o.get("prezzo_tipo") or "fisso") == "mercato"
+        euro_pub = (int(o.get("euro_cent") or 0) / 100
+                    if valuta == "EUR" and not mercato else None)
+        pubblicati.append((int(o.get("creato") or 0), euro_pub, mercato))
+        if stato in STATI_P2P_ONCHAIN_VIVI:
+            if stato != "pending":
+                in_corso.append({"preso": preso, "disputa": stato == "disputa"})
+            continue
+        prezzo = int(o.get("prezzo_sats") or 0)
+        quota = int(o.get("quota_sats") or 0)
+        q_ric = max(0, min(quota, int(o.get("quota_ricevente_sats") or 0)))
+        q_dep = quota - q_ric
+        if stato == "rilasciato":
+            esito, motivo = "completato", ""
+        elif stato == "rimborsato":
+            esito, motivo = "annullato", "rimborsato"
+        elif stato in ("annullato", "scaduto") and preso:
+            esito, motivo = "annullato", ("a_mano" if stato == "annullato"
+                                          else "tempo_scaduto")
+        elif stato == "scaduto":
+            esito, motivo = "scaduto", ""
+        else:
+            esito, motivo = "ritirato", ""
+        chiuso = int(o.get("chiuso_il") or o.get("aggiornato") or 0)
+        euro = (int(o.get("euro_cent") or 0) / 100) if valuta == "EUR" else 0
+
+        def sconto(tg, meta):
+            if not meta or not tg:
+                return ""
+            m = _sconto_p2p(con, int(tg)).get("motivo") or ""
+            return m if m in ("pioniere", "livello") else ""
+        dep, ric = int(o.get("depositante_id") or 0), int(o.get("ricevente_id") or 0)
+        # i tre importi di Mostro: chi VENDE i sats blocca prezzo + la sua
+        # meta', chi COMPRA riceve prezzo - la sua (la quota a zero li fa
+        # uguali, e lo scambio conta senza commissione)
+        righe.append({
+            "ordine": f"oc-{int(o.get('id') or 0)}", "esito": esito,
+            "motivo": motivo, "pagato": 1, "chiuso": chiuso, "preso": preso,
+            "lato": o.get("lato") or "", "metodi": o.get("metodi") or "[]",
+            "euro": round(euro, 2), "sats": prezzo,
+            "sats_venditore": prezzo + q_dep if esito == "completato" and prezzo else 0,
+            "sats_compratore": prezzo - q_ric if esito == "completato" and prezzo else 0,
+            "sconto_v": sconto(dep, q_dep), "sconto_c": sconto(ric, q_ric),
+            "cambio": 0, "routing_msat": 0, "parti_note": 2, "rete": "oc",
+            "chi": (int(o.get("maker_id") or 0), int(o.get("taker_id") or 0))})
+        if esito == "completato":
+            conclusi.append((chiuso, int(o.get("maker_id") or 0),
+                             int(o.get("taker_id") or 0)))
+    return {"righe": righe, "in_corso": in_corso, "pubblicati": pubblicati,
+            "conclusi": conclusi}
+
+
+def _leggi_onchain_conti_p2p():
+    """Le righe del P2P on-chain dal SUO database, o [] se l'on-chain non
+    c'e' ancora (la tabella nasce col primo gesto)."""
+    try:
+        con = _p2p_onchain_db()
+    except Exception:
+        return []
+    try:
+        return [dict(r) for r in con.execute("SELECT * FROM p2p_onchain_ordini")]
+    except sqlite3.OperationalError:
+        return []
+    finally:
+        con.close()
+
+
+def _statistiche_p2p(con, da: int, adesso: int, in_corso: list,
+                    oc: dict = None, rete: str = "tutti") -> dict:
     """I CONTI DEL PERIODO, dal registro. Pura sulla connessione: `da`
     e' l'inizio (`_inizio_periodo_p2p`), `in_corso` gli scambi aperti
     adesso (`_consolida_conti_p2p`), che non hanno un periodo.
@@ -67365,11 +67471,18 @@ def _statistiche_p2p(con, da: int, adesso: int, in_corso: list) -> dict:
     LE PERSONE si contano sugli ordini conclusi che il server ha gia'
     intestati (`p2p_ordini`: chi ha pubblicato, chi ha preso): chi
     prende da Nostr senza farsi riconoscere non e' annotato, e non si
-    conta — per scelta sua."""
+    conta — per scelta sua.
+    GLI SCAMBI ON-CHAIN (16 nov 2026): `oc` e' `_conti_onchain_p2p`, e
+    `rete` il filtro della pagina — «tutti» (di serie: i due mondi
+    sommati), «ln» (solo Mostro) o «oc» (solo il 2-di-3)."""
     da = int(da)
-    righe = [dict(r) for r in con.execute(
+    ln, oc = rete != "oc", (oc or {}) if rete != "ln" else {}
+    righe = [dict(r, rete="ln") for r in con.execute(
         "SELECT * FROM p2p_conti WHERE chiuso>=? ORDER BY chiuso DESC, ordine",
-        (da,))]
+        (da,))] if ln else []
+    righe += [r for r in oc.get("righe") or [] if int(r["chiuso"] or 0) >= da]
+    righe.sort(key=lambda r: -int(r["chiuso"] or 0))
+    in_corso = (list(in_corso) if ln else []) + list(oc.get("in_corso") or [])
     fatti = [r for r in righe if r["esito"] == "completato"]
     rotti = [r for r in righe if r["esito"] in ("annullato", "tornato")]
     motivi = {}
@@ -67409,13 +67522,18 @@ def _statistiche_p2p(con, da: int, adesso: int, in_corso: list) -> dict:
              for k in ("piena", "pioniere", "livello")}
     lorde = non_divise = senza_importi = senza_cambio = 0
     in_euro = 0.0
+    per_rete = {"ln": {"scambi": 0, "sats": 0}, "oc": {"scambi": 0, "sats": 0}}
     for r in fatti:
+        per_rete[r.get("rete") or "ln"]["scambi"] += 1
         v, c, s = (int(r[k] or 0) for k in
                    ("sats_venditore", "sats_compratore", "sats"))
         if v <= 0 or c <= 0 or v < c:
             senza_importi += 1
             continue
         lorde += v - c
+        per_rete[r.get("rete") or "ln"]["sats"] += v - c
+        if v == c and r.get("rete") == "oc":
+            continue    # on-chain di prima del 16 nov: nessuna commissione
         if c <= s <= v:
             for meta, sconto in ((v - s, r["sconto_v"]), (s - c, r["sconto_c"])):
                 f = fette[sconto if sconto in ("pioniere", "livello") else "piena"]
@@ -67435,14 +67553,16 @@ def _statistiche_p2p(con, da: int, adesso: int, in_corso: list) -> dict:
     for f in fette.values():
         f["percento"] = round(f["sats"] * 100 / f["base"], 2) if f["base"] else None
         del f["base"]
-    noti = [int(r["routing_msat"]) for r in fatti
+    # il routing e' dei soli payout Lightning: l'on-chain non ne ha
+    fatti_ln = [r for r in fatti if r.get("rete") != "oc"]
+    noti = [int(r["routing_msat"]) for r in fatti_ln
             if r["routing_msat"] is not None and int(r["routing_msat"]) >= 0]
-    mancanti = len(fatti) - len(noti)
+    mancanti = len(fatti_ln) - len(noti)
     routing_sats = int(round(sum(noti) / 1000))
     commissioni = {
         "lorde_sats": lorde, "euro": round(in_euro, 2),
         "senza_cambio": senza_cambio, "senza_importi": senza_importi,
-        "fette": fette, "non_divise": non_divise,
+        "fette": fette, "non_divise": non_divise, "per_rete": per_rete,
         "routing": {"stato": ("ok" if not mancanti else
                               ("parziale" if noti else "assente")),
                     "sats": routing_sats, "abbinati": len(noti),
@@ -67451,8 +67571,8 @@ def _statistiche_p2p(con, da: int, adesso: int, in_corso: list) -> dict:
     # --- gli ordini e le persone: una passata sola sul libro intestato
     pubblicati = a_intervallo = 0
     cifre, primo, ultimo = [], {}, {}
-    for o in con.execute("SELECT tg_id, preso_da, stato, visto, maker, creato, "
-                         "euro FROM p2p_ordini"):
+    for o in (con.execute("SELECT tg_id, preso_da, stato, visto, maker, creato, "
+                          "euro FROM p2p_ordini") if ln else []):
         if int(o["maker"] or 0) == 1 and (o["stato"] or "") \
                 and int(o["creato"] or 0) >= da:
             pubblicati += 1
@@ -67467,6 +67587,18 @@ def _statistiche_p2p(con, da: int, adesso: int, in_corso: list) -> dict:
                 if chi:
                     primo[chi] = min(primo.get(chi, quando), quando)
                     ultimo[chi] = max(ultimo.get(chi, quando), quando)
+    for creato, euro, mercato in oc.get("pubblicati") or []:
+        if creato >= da:
+            pubblicati += 1
+            if mercato:
+                a_intervallo += 1
+            elif euro:
+                cifre.append(euro)
+    for quando, *parti in oc.get("conclusi") or []:
+        for chi in parti:
+            if chi:
+                primo[chi] = min(primo.get(chi, quando), quando)
+                ultimo[chi] = max(ultimo.get(chi, quando), quando)
     ordini = {"pubblicati": pubblicati, "a_intervallo": a_intervallo,
               "presi": sum(1 for r in fatti + rotti + list(in_corso)
                            if int(r.get("preso") or r.get("chiuso") or adesso) >= da),
@@ -67481,11 +67613,13 @@ def _statistiche_p2p(con, da: int, adesso: int, in_corso: list) -> dict:
     for r in sorted(fatti + rotti,
                     key=lambda r: -int(r["chiuso"] or 0))[:P2P_ULTIMI_CONTI]:
         o = con.execute("SELECT tg_id, preso_da FROM p2p_ordini WHERE ordine=?",
-                        (r["ordine"],)).fetchone()
+                        (r["ordine"],)).fetchone() if r.get("rete") != "oc" else None
         chi = []
         # chi ha preso si dice solo dove la riga e' dell'ULTIMO giro: di
         # un ordine tornato in vetrina il libro ricorda la presa nuova
-        for tg in ((o["tg_id"], o["preso_da"] if r["esito"] != "tornato" else 0)
+        # (l'on-chain porta le sue due parti nella riga)
+        for tg in (r["chi"] if r.get("rete") == "oc" else
+                   (o["tg_id"], o["preso_da"] if r["esito"] != "tornato" else 0)
                    if o else (0, 0)):
             u = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
                             (int(tg or 0),)).fetchone() if tg else None
@@ -67501,14 +67635,14 @@ def _statistiche_p2p(con, da: int, adesso: int, in_corso: list) -> dict:
             "routing": (int(round(int(r["routing_msat"]) / 1000))
                         if r["esito"] == "completato" and r["routing_msat"] is not None
                         and int(r["routing_msat"]) >= 0 else None),
-            "pubblica": chi[0], "prende": chi[1]})
+            "pubblica": chi[0], "prende": chi[1], "rete": r.get("rete") or "ln"})
     return {"da": da, "scambi": scambi, "volume": volume,
             "commissioni": commissioni, "ordini": ordini, "persone": persone,
             "ultimi": ultimi}
 
 
 @app.get("/api/admin/p2p-statistiche")
-async def statistiche_p2p_admin(periodo: str = "oggi",
+async def statistiche_p2p_admin(periodo: str = "oggi", rete: str = "tutti",
                                 x_tg_init_data: str = Header(""),
                                 barattolo_sessione: str = Cookie("")):
     """SOLO AMMINISTRATORI: i conti del P2P per la sezione «Scambi P2P»
@@ -67522,8 +67656,10 @@ async def statistiche_p2p_admin(periodo: str = "oggi",
         raise HTTPException(403, "Riservato agli amministratori")
     if periodo not in P2P_PERIODI_CONTI:
         raise HTTPException(400, "Periodo sconosciuto")
+    if rete not in P2P_RETI_CONTI:
+        raise HTTPException(400, "Rete sconosciuta")
     adesso = int(time.time())
-    in_cache = _p2p_conti_cache.get(periodo)
+    in_cache = _p2p_conti_cache.get((periodo, rete))
     if in_cache and adesso - in_cache[0] < P2P_CONTI_CACHE_S:
         return JSONResponse(in_cache[1], headers={"Cache-Control": "no-store"})
     con = db()
@@ -67532,20 +67668,22 @@ async def statistiche_p2p_admin(periodo: str = "oggi",
     finally:
         con.close()
     lnd = await dati_lnd_cruscotto(nostri, rimborsi)
+    ordini_oc = _leggi_onchain_conti_p2p() if rete != "ln" else []
     con = db()
     try:
         in_corso = _consolida_conti_p2p(con, adesso)
         if lnd.get("stato") == "ok":
             _abbina_routing_p2p(con, _cruscotto_lnd.get("uscite") or [], adesso)
         dati = _statistiche_p2p(con, _inizio_periodo_p2p(periodo, adesso),
-                                adesso, in_corso)
+                                adesso, in_corso,
+                                oc=_conti_onchain_p2p(con, ordini_oc), rete=rete)
     finally:
         con.close()
-    dati.update(periodo=periodo, generato=adesso,
+    dati.update(periodo=periodo, rete=rete, generato=adesso,
                 eur_per_btc=cambio_noto_ora(),
                 lnd={"stato": lnd.get("stato") or "assente",
                      "motivo": lnd.get("motivo") or ""})
-    _p2p_conti_cache[periodo] = (adesso, dati)
+    _p2p_conti_cache[(periodo, rete)] = (adesso, dati)
     return JSONResponse(dati, headers={"Cache-Control": "no-store"})
 
 
@@ -104361,6 +104499,12 @@ def _p2p_onchain_libro(chi: int) -> dict:
         # la porta del volto, con la sessione come il nome (12 nov 2026)
         if chi and o.get("_negozio"):
             riga["negozio"] = o["_negozio"]
+        # lo scudo 🛡️ Staff all'angolo del volto, come sulla card di
+        # Lightning (16 nov 2026, Andrea: «non ho più il badge da
+        # moderatore» sul suo ordine USDe on-chain): il si', mai il tg_id,
+        # con la sessione come il nome
+        if chi and e_staff(maker):
+            riga["staff"] = True
         # in pausa fino a quell'ora: la card grigia, e da qui non si prende
         if int(o.get("_pausa_fino") or 0) > adesso:
             riga["pausa_fino"] = int(o["_pausa_fino"])

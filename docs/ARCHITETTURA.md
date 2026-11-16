@@ -11114,6 +11114,18 @@
   routing di tutti gli scambi del periodo si conosce. La risposta si
   tiene un minuto in memoria (`P2P_CONTI_CACHE_S`); gli ultimi scambi
   portano le iniziali (`_iniziali_p2p`), mai nomi ne' id.
+  GLI SCAMBI ON-CHAIN NEGLI STESSI CONTI (16 nov 2026, cantiere
+  mappa-recenti): il 2-di-3 non passa da mostrod, quindi la rotta legge
+  anche `p2p_onchain_ordini` (database dell'on-chain,
+  `_leggi_onchain_conti_p2p`) e `_conti_onchain_p2p` ne fa righe con le
+  STESSE colonne di `p2p_conti` (piu' `rete: 'oc'` e le due parti, che
+  la riga del libro non ha): la commissione e' `quota_sats` rifatta nei
+  tre importi, routing 0. Un giudice solo: `_statistiche_p2p(...,
+  oc=, rete=)`, `rete` = tutti (di serie, i due mondi sommati) | ln |
+  oc, parametro della rotta e chiave della cache insieme al periodo.
+  `commissioni.per_rete` divide scambi e sats; il routing conta solo i
+  payout Lightning. Le righe on-chain NON si scrivono in `p2p_conti`:
+  la tabella dell'on-chain non si pota, e si legge intera ogni volta.
   LE DISPUTE NEL CRUSCOTTO (12 ott 2026, cantiere dispute-nel-cruscotto):
   la card «⚖️ Dispute P2P», l'ultima del cruscotto di TUTTI i moderatori
   (`dati_cruscotto` porta `dispute_p2p`; non passa da
