@@ -3019,6 +3019,9 @@ FRENI = {
     # e una proposta firmata e' un PSBT da leggere con embit
     "onchain_controlla": (60, 3600),  # «ho pagato, guarda» di un ordine on-chain, per persona
     "onchain_firma": (30, 3600),      # proposte e co-firme on-chain, per persona
+    # (16 nov 2026) la porta del PayJoin: la bussa il wallet, senza
+    # sessione, quindi il secchio e' il gettone dell'ordine
+    "payjoin": (10, 3600),            # originali mandati al PayJoin, per ordine
     # l'incasso su un wallet proprio e le leve dal pannello (27 ott 2026)
     "onchain_incasso": (10, 3600),    # «Dove ricevi i sats», per persona
     "onchain_incasso_guarda": (40, 3600),  # il controllo di un indirizzo incollato (mempool), per persona
@@ -23552,6 +23555,15 @@ def numeri_assistente() -> str:
         f"{si(cambio_libero_per(0))}.",
         f"- Swap degli incassi verso bitcoin on-chain: {si(swap_per(0))}.",
         f"- Pagare un ordine in bitcoin on-chain: {si(onchain_ammesso(0))}.",
+        # (16 nov 2026, cantiere payjoin) la quota fissa la decide il
+        # pannello: Tappo non la deve indovinare dal libro
+        "- Quota fissa a Barattolo negli acquisti on-chain del mercatino "
+        "(per le spese di rete; la paga chi compra e la vede nel conto prima "
+        "di pagare, e col rimborso gli torna): "
+        + (f"{_fmt_sats(onchain_quota_sats())} sats"
+           if int(onchain_quota_sats() or 0) else "nessuna") + ".",
+        f"- PayJoin negli acquisti on-chain del mercatino (link pj=, per i "
+        f"wallet che lo sanno fare): {si(PAYJOIN_ATTIVO)}.",
         f"- Schede «Mercato» e «Lavoro» in vetrina: {si(MERCATO_LAVORO)}.",
         # (10 nov 2026, cantiere tappo-aggiornato) le funzioni nate dopo il
         # 2 novembre, sempre con gli occhi di chiunque: accese solo per gli
@@ -36424,6 +36436,16 @@ def _leve_stato():
                        "vengono liberati, torna a lui col rimborso",
                 spento="nessuna quota: chi compra paga il prezzo più il "
                        "solo margine per la rete")),
+            # IL PAYJOIN (16 nov 2026): acceso di serie; la riga dice le
+            # monete pronte, perche' senza monete il link non porta `pj=`
+            _leva("PayJoin negli acquisti on-chain", "PAYJOIN_ATTIVO",
+                  PAYJOIN_ATTIVO,
+                  acceso="il link di pagamento del mercatino porta pj=: "
+                         "il wallet di chi compra che lo sa fare aggiunge "
+                         "una moneta di Barattolo (" + _payjoin_a_parole()
+                         + ")",
+                  spento="il link di pagamento è quello di ieri, senza "
+                         "pj=: nessuna moneta di Barattolo si muove"),
             # (28 ott 2026, cantiere onchain-verso-lightning) chi vende
             # riceve in Lightning con un cambio di SATS Routing; la riga
             # dice il fatto (la rete), non la sola costante
@@ -56172,6 +56194,23 @@ except (TypeError, ValueError):
     ONCHAIN_MAX_EURO = 250
     print("[onchain] ONCHAIN_MAX_EURO non e' un numero intero: il tetto "
           "resta 250 €")
+# IL PAYJOIN DEGLI ACQUISTI ON-CHAIN (16 nov 2026, cantiere payjoin,
+# Andrea: «potremo davvero sfruttarlo come PayJoin»): il link di
+# pagamento del mercatino porta `pj=`, e il wallet di chi compra che lo
+# sa fare (BIP78) lascia aggiungere a Barattolo una sua moneta. ACCESA DI
+# SERIE (regola del 14 nov: leve nuove accese nel codice); il link nasce
+# solo se la chiave di Barattolo firma su questo server e c'e' una sua
+# moneta pronta. Interruttore d'emergenza: `PAYJOIN_ATTIVO = False` nel
+# config, e il link torna quello di ieri. Il perche' e i conti stanno
+# sotto, a «IL PAYJOIN DEGLI ACQUISTI ON-CHAIN».
+try:
+    from config import PAYJOIN_ATTIVO
+    if not isinstance(PAYJOIN_ATTIVO, bool):
+        print("[onchain] PAYJOIN_ATTIVO non e' True/False: il PayJoin "
+              "resta ACCESO come di serie")
+        PAYJOIN_ATTIVO = True
+except ImportError:
+    PAYJOIN_ATTIVO = True
 
 
 def onchain_sopra_il_tetto(prezzo_sats: int, cambio_eur: float) -> str:
@@ -100941,7 +100980,12 @@ def _onchain_prepara_ordini(con):
                       ("rimborso_tipo", "TEXT DEFAULT ''"),
                       ("rimborso_valore", "TEXT DEFAULT ''"),
                       ("rimborso_firma", "TEXT DEFAULT ''"),
-                      ("rimborso_indice", "INTEGER DEFAULT 0")):
+                      ("rimborso_indice", "INTEGER DEFAULT 0"),
+                      # 16 nov 2026, cantiere payjoin: la porta del
+                      # PayJoin di questo ordine (`/api/payjoin/<gettone>`),
+                      # a caso e una per ordine — il numero dell'ordine
+                      # si indovina, questa no. Vuota = un ordine di prima
+                      ("payjoin_gettone", "TEXT DEFAULT ''")):
         if col not in gia:
             con.execute(f"ALTER TABLE onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -101040,6 +101084,7 @@ def _onchain_uscita_fatta(con, o, verso: str):
 def _onchain_db_ordini():
     con = _onchain_db()
     _onchain_prepara_ordini(con)
+    _payjoin_prepara(con)      # 16 nov 2026: le tabelle del PayJoin
     return con
 
 
@@ -101134,15 +101179,19 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
             " margine_sats, importo_sats, incasso, rimborso, dettagli,"
             " scade, creato, aggiornato, incasso_tipo, incasso_valore,"
             " incasso_firma, incasso_indice, quota_sats, quota_indirizzo,"
-            " rimborso_tipo, rimborso_valore, rimborso_firma, rimborso_indice)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " rimborso_tipo, rimborso_valore, rimborso_firma, rimborso_indice,"
+            " payjoin_gettone)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ind_id, a["id"], user["id"], venditore, richiesti,
              r["titolo"] or "", prezzo, margine, prezzo + quota + margine,
              incasso, rimborso,
              json.dumps(dettagli, ensure_ascii=False),
              adesso + ONCHAIN_ORE_ATTESA * 3600, adesso, adesso,
              d_tipo, d_valore, d_firma, d_indice, quota, quota_dove,
-             r_tipo, r_valore, r_firma, r_indice))
+             r_tipo, r_valore, r_firma, r_indice,
+             # la porta del PayJoin (16 nov 2026): nasce sempre, anche a
+             # leva spenta, cosi' riaccenderla vale per gli ordini aperti
+             secrets.token_urlsafe(18)))
         con.execute("UPDATE onchain_indirizzi SET ordine_id=? WHERE id=?",
                     (cur.lastrowid, ind_id))
         con.commit()
@@ -101219,6 +101268,9 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
         "pagato_il": o["pagato_il"], "chiuso_il": o["chiuso_il"],
         "tariffa": _ONCHAIN_TARIFFA["sat_vb"] or 2.0,
         "esploratore": onchain_mempool_api().rsplit("/api", 1)[0],
+        # (16 nov 2026, cantiere payjoin) la porta del PayJoin, solo a chi
+        # paga e solo finche' serve: '' = il link di ieri, senza `pj=`
+        "payjoin": _payjoin_link(con, o) if da_compratore else "",
     }
 
 
@@ -102623,6 +102675,751 @@ async def _onchain_riprendi_incassi():
             print(f"⚠️ On-chain: ordine #{oid} non incassato: {e}", flush=True)
 
 
+# ============ IL PAYJOIN DEGLI ACQUISTI ON-CHAIN (16 nov 2026, cantiere
+# payjoin, Andrea: «potremo davvero sfruttarlo come PayJoin, però metterei
+# una fee di 1k sats… a favore di più privacy per gli utenti») ============
+# CHE COSA. Chi compra on-chain paga dal SUO wallet verso il 2-di-3
+# dell'ordine. Se quel wallet sa fare PayJoin (BIP78: Sparrow, BlueWallet,
+# Wasabi, BTCPay, Bull Bitcoin, Cake Wallet), legge `pj=` nel link,
+# manda qui la sua transazione firmata (l'«originale»), e Barattolo ci
+# aggiunge UNA moneta sua e un'uscita nuova verso un suo indirizzo. Chi
+# guarda la catena non puo' piu' dire «tutti gli ingressi sono di chi
+# paga»: la cifra pagata e il resto di chi compra non si leggono piu' a
+# occhio. Il 2-di-3 riceve ESATTAMENTE la stessa cifra: l'uscita
+# dell'ordine non si tocca mai (e il link dice `pjos=0`, cosi' il wallet
+# di chi compra rifiuta qualunque proposta che la cambi).
+# LE MONETE DI BARATTOLO sono le quote fisse (`ONCHAIN_QUOTA_FISSA_SATS`,
+# mercatino e P2P), che arrivano su `/1/n` della sua chiave a una firma
+# (`onchain_incasso`), e i resti dei PayJoin di prima, su `/3/n` della
+# stessa chiave (`PAYJOIN_CATENA_RESTI`: `/0` sono le chiavi dei 2-di-3,
+# `/1` le quote, `/2/0` per le persone firma le destinazioni). Finche' la
+# quota e' 0 non ne nasce nessuna, e il link non porta `pj=`.
+# LA FIRMA. La chiave di Barattolo sta sul VPS dal 27 ott (vedi sopra):
+# fino a oggi firmava solo dopo una decisione scritta di un moderatore.
+# Qui firma DA SOLA, a richiesta di un wallet, e allora firma il meno
+# possibile: UN ingresso, quello che ha scelto lei, con la chiave
+# derivata per quella moneta e ricontrollata contro il suo indirizzo,
+# col calcolo della firma fatto a mano su quell'indice (mai
+# `sign_with`, che firma tutto quel che riconosce). Un ingresso di un
+# 2-di-3 non e' mai fra le monete del PayJoin: non c'e' strada per
+# firmarlo da qui.
+# IL SONDAGGIO DELLE MONETE (il rischio del BIP78): chi manda originali
+# finti impara le monete di Barattolo, cioe' quanto incassa. Gli argini:
+# la porta e' un gettone a caso per ordine (solo chi ha comprato lo
+# conosce); UN tentativo per ordine (lo stesso originale riavuto riprende
+# la stessa proposta); ingressi mai visti prima; l'originale deve pagare
+# l'ordine per intero, con firme che tornano e monete che esistono e non
+# sono spese; e se il PayJoin non arriva in rete entro tre minuti ci va
+# l'originale, trasmesso da qui (chi sonda paga davvero).
+# CHI PAGA LA RETE. La commissione dell'ingresso in piu' la paga, se lo
+# permette (`maxadditionalfeecontribution`), il wallet di chi compra,
+# come vuole il BIP78; quella della nostra uscita la paga Barattolo dalla
+# sua moneta, e mai piu' di `PAYJOIN_SPESA_MAX_SATS`: oltre, niente
+# PayJoin e il wallet trasmette l'originale da se'.
+PAYJOIN_CORPO_MAX = 100_000        # byte di un originale in base64
+PAYJOIN_INGRESSI_MAX = 10          # piu' di cosi' non e' un acquisto da telefono
+PAYJOIN_USCITE_MAX = 20
+PAYJOIN_VB_INGRESSO = 68           # p2wpkh: 41 byte fuori dal witness, 108 dentro
+PAYJOIN_VB_USCITA = 31             # p2wpkh
+PAYJOIN_POLVERE = 330              # sotto, la nostra uscita p2wpkh non vale la rete
+PAYJOIN_SPESA_MAX_SATS = 500       # di tasca di Barattolo, per PayJoin
+PAYJOIN_ATTESA_ORIGINALE_S = 180   # poi l'originale va in rete da qui
+PAYJOIN_CATENA_QUOTE = 1
+PAYJOIN_CATENA_RESTI = 3
+PAYJOIN_MONETE_PER_GIRO = 20       # indirizzi riletti da mempool a ogni ronda
+PAYJOIN_RILEGGI_S = 600
+PAYJOIN_ABBANDONA_S = 3 * 86400    # un indirizzo che non si e' mai riempito
+PAYJOIN_ERRORI = {
+    # i soli codici che il BIP78 fa dire ai wallet: il motivo vero resta
+    # nel journal (un messaggio nostro mostrato da un wallet e' una porta
+    # aperta al phishing, dice il BIP)
+    "unavailable": "The payjoin endpoint is not available for now.",
+    "not-enough-money": "The receiver added some inputs but could not "
+                        "bump the fee of the payjoin proposal.",
+    "version-unsupported": "This version of payjoin is not supported.",
+    "original-psbt-rejected": "The receiver rejected the original PSBT.",
+}
+
+
+class PayjoinNo(Exception):
+    """Un no del PayJoin: il codice del BIP78 per il wallet, il perche'
+    per il journal."""
+
+    def __init__(self, codice: str, perche: str):
+        super().__init__(perche)
+        self.codice = codice if codice in PAYJOIN_ERRORI else "unavailable"
+        self.perche = perche
+
+
+def _payjoin_prepara(con):
+    """Le tre tabelle del PayJoin. `payjoin_tentativi`: UNO per ordine
+    (il vincolo e' la serratura), con l'originale intero per poterlo
+    trasmettere. `payjoin_visti`: ogni ingresso mai arrivato in un
+    originale, che non torna. `payjoin_monete`: gli indirizzi di
+    Barattolo che portano (o porteranno) una moneta, con la strada per
+    rifarne la chiave; stato 'da_guardare' | 'viva' | 'attesa' (un resto
+    non ancora confermato) | 'spesa' | 'mai' (un resto di un PayJoin che
+    non e' andato in rete)."""
+    con.execute("""CREATE TABLE IF NOT EXISTS payjoin_tentativi(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        onchain_id INTEGER NOT NULL UNIQUE,
+        originale_txid TEXT NOT NULL,
+        originale_hex TEXT NOT NULL,
+        proposta TEXT NOT NULL,
+        proposta_txid TEXT NOT NULL,
+        moneta TEXT NOT NULL,
+        resto TEXT NOT NULL,
+        spesa_sats INTEGER NOT NULL DEFAULT 0,
+        esito TEXT NOT NULL DEFAULT 'proposta',
+        -- proposta | payjoin | originale | rifiutata | altro
+        creato INTEGER NOT NULL,
+        chiuso_il INTEGER DEFAULT 0)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS payjoin_visti(
+        punto TEXT PRIMARY KEY,
+        creato INTEGER NOT NULL)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS payjoin_monete(
+        indirizzo TEXT PRIMARY KEY,
+        xpub TEXT NOT NULL,
+        catena INTEGER NOT NULL,
+        indice INTEGER NOT NULL,
+        stato TEXT NOT NULL DEFAULT 'da_guardare',
+        txid TEXT DEFAULT '',
+        vout INTEGER DEFAULT 0,
+        sats INTEGER DEFAULT 0,
+        controllata_il INTEGER DEFAULT 0,
+        creato INTEGER NOT NULL,
+        UNIQUE(xpub, catena, indice))""")
+
+
+def _payjoin_vsize(tx) -> int:
+    """I vbyte di una transazione col suo witness (BIP141)."""
+    from embit.transaction import Transaction, TransactionInput
+    nuda = Transaction(version=tx.version, locktime=tx.locktime,
+                       vin=[TransactionInput(i.txid, i.vout,
+                                             sequence=i.sequence)
+                            for i in tx.vin], vout=tx.vout)
+    peso = len(nuda.serialize()) * 3 + len(tx.serialize())
+    return -(-peso // 4)
+
+
+def payjoin_leggi_originale(b64: str, script_pagamento: bytes,
+                            importo: int) -> dict:
+    """PURA (embit a parte): l'originale di un wallet, giudicato. Torna
+    i pezzi che servono a costruire la proposta, o PayjoinNo. Si accetta
+    solo quel che sappiamo verificare per intero: PSBT v0 finalizzato,
+    ingressi tutti p2wpkh (anche il nostro lo e': niente ingressi misti,
+    che il BIP78 sconsiglia) con la loro firma SIGHASH_ALL che torna
+    davvero, la stessa sequenza per tutti (diversa da 0), e UNA uscita
+    sola che paga l'ordine, almeno per l'importo."""
+    from embit import script as _sc
+    from embit.ec import PublicKey, Signature
+    from embit.psbt import PSBT
+    from embit.transaction import Transaction, TransactionInput
+
+    def no(perche):
+        raise PayjoinNo("original-psbt-rejected", perche)
+
+    testo = (b64 or "").strip()
+    if not testo or len(testo) > PAYJOIN_CORPO_MAX:
+        no("originale vuoto o troppo grande")
+    if not re.fullmatch(r"[A-Za-z0-9+/=\s]+", testo):
+        no("l'originale non e' base64")
+    try:
+        p = PSBT.from_string(testo)
+    except Exception:
+        no("l'originale non si legge")
+    if p.version not in (None, 0):
+        no("solo PSBT v0")
+    if p.xpubs:
+        no("chiavi estese nel PSBT (leaking-data)")
+    if not 1 <= len(p.inputs) <= PAYJOIN_INGRESSI_MAX:
+        no("ingressi fuori misura")
+    if not 1 <= len(p.outputs) <= PAYJOIN_USCITE_MAX:
+        no("uscite fuori misura")
+    sequenze = {i.sequence for i in p.inputs}
+    if len(sequenze) != 1 or None in sequenze or 0 in sequenze:
+        no("sequenze diverse fra gli ingressi, o nulle")
+    sequenza = sequenze.pop()
+    punti, valori, pubs, vin = [], [], [], []
+    for i in p.inputs:
+        if i.final_scriptsig is not None and i.final_scriptsig.data:
+            no("un ingresso non segwit nativo")
+        w = i.final_scriptwitness
+        if w is None or len(w.items) != 2:
+            no("un ingresso non finalizzato, o non p2wpkh")
+        if i.non_witness_utxo is not None and (
+                i.non_witness_utxo.txid() != i.txid
+                or i.vout >= len(i.non_witness_utxo.vout)):
+            no("la transazione di un ingresso non e' la sua")
+        u = i.witness_utxo or (i.non_witness_utxo.vout[i.vout]
+                               if i.non_witness_utxo is not None else None)
+        if u is None:
+            no("un ingresso senza la sua moneta (witness_utxo)")
+        if u.script_pubkey.script_type() != "p2wpkh":
+            no("un ingresso non p2wpkh")
+        try:
+            pub = PublicKey.parse(w.items[1])
+        except Exception:
+            no("una chiave che non si legge")
+        if len(w.items[1]) != 33 or _sc.p2wpkh(pub).data != u.script_pubkey.data:
+            no("la chiave di un ingresso non e' la sua")
+        if not w.items[0] or w.items[0][-1] != 0x01:
+            no("una firma non SIGHASH_ALL")
+        punto = i.txid.hex() + ":" + str(int(i.vout))
+        if punto in punti:
+            no("lo stesso ingresso due volte")
+        punti.append(punto)
+        valori.append(int(u.value))
+        pubs.append((pub, w.items[0]))
+        vin.append(TransactionInput(i.txid, i.vout, sequence=sequenza,
+                                    witness=w))
+    tx = Transaction(version=p.tx_version if p.tx_version is not None else 2,
+                     locktime=p.locktime or 0, vin=vin,
+                     vout=[o.vout for o in p.outputs])
+    for n, (pub, firma) in enumerate(pubs):
+        h = tx.sighash_segwit(n, _sc.p2pkh(pub), valori[n])
+        try:
+            buona = pub.verify(Signature.parse(firma[:-1]), h)
+        except Exception:
+            buona = False
+        if not buona:
+            no("una firma dell'originale non torna")
+    pagano = [n for n, o in enumerate(tx.vout)
+              if o.script_pubkey.data == script_pagamento]
+    if len(pagano) != 1:
+        no("l'originale non paga l'ordine con una uscita sola")
+    if int(tx.vout[pagano[0]].value) < int(importo):
+        no("l'originale paga meno dell'importo dell'ordine")
+    rete = sum(valori) - sum(int(o.value) for o in tx.vout)
+    vsize = _payjoin_vsize(tx)
+    if rete < vsize:
+        no("commissione sotto 1 sat/vB")
+    return {"psbt": p, "tx": tx, "txid": tx.txid().hex(),
+            "hex": tx.serialize().hex(), "punti": punti, "valori": valori,
+            "rete": rete, "vsize": vsize, "tasso": rete / vsize,
+            "sequenza": sequenza, "pagamento": pagano[0]}
+
+
+def payjoin_costruisci(orig: dict, moneta: dict, chiave, script_resto,
+                       parametri: dict, a_caso) -> dict:
+    """PURA (embit a parte): la proposta. `moneta` {txid, vout, sats} e'
+    di Barattolo, `chiave` la sua privata (embit), `script_resto` la
+    nostra uscita nuova, `parametri` quelli del wallet (BIP78),
+    `a_caso(n)` un intero in [0, n) — il posto del nostro ingresso e
+    della nostra uscita, a caso come vuole il BIP. Le uscite del wallet
+    restano tutte, nel loro ordine, con la loro cifra (meno, al piu',
+    il contributo concesso sull'uscita indicata); l'uscita dell'ordine
+    non cambia mai. Firma SOLO il nostro ingresso. PayjoinNo se la rete
+    costerebbe troppo a Barattolo o la moneta non basta."""
+    from embit import script as _sc
+    from embit.psbt import PSBT
+    from embit.script import Witness
+    from embit.transaction import (Transaction, TransactionInput,
+                                   TransactionOutput)
+    tx0 = orig["tx"]
+    piu_vb = PAYJOIN_VB_INGRESSO + PAYJOIN_VB_USCITA
+    nuovo_vsize = orig["vsize"] + piu_vb
+    minimo = max(0.0, float(parametri.get("minfeerate") or 0))
+    # la stessa tariffa dell'originale (e mai sotto 1 sat/vB sul pezzo
+    # nuovo, ne' sotto `minfeerate` sul tutto)
+    rete = max(orig["rete"] + piu_vb,
+               math.ceil(orig["tasso"] * nuovo_vsize),
+               math.ceil(minimo * nuovo_vsize))
+    in_piu = rete - orig["rete"]
+    # il contributo del wallet: solo se ha detto quale uscita e quanto,
+    # solo per il peso del nostro ingresso, e mai l'uscita dell'ordine
+    contributo = 0
+    idx = parametri.get("additionalfeeoutputindex")
+    tetto = parametri.get("maxadditionalfeecontribution")
+    if (isinstance(idx, int) and isinstance(tetto, int) and tetto > 0
+            and 0 <= idx < len(tx0.vout) and idx != orig["pagamento"]):
+        contributo = max(0, min(tetto, in_piu,
+                                math.floor(orig["tasso"] * PAYJOIN_VB_INGRESSO),
+                                int(tx0.vout[idx].value) - ONCHAIN_POLVERE))
+    spesa = in_piu - contributo
+    if spesa > PAYJOIN_SPESA_MAX_SATS:
+        raise PayjoinNo("not-enough-money", f"la rete costerebbe {_fmt_sats(spesa)} "
+                        "sats a Barattolo")
+    resto = int(moneta["sats"]) - spesa
+    if resto < PAYJOIN_POLVERE:
+        raise PayjoinNo("not-enough-money", "la moneta di Barattolo non basta")
+    vin = [TransactionInput(i.txid, i.vout, sequence=orig["sequenza"])
+           for i in tx0.vin]
+    k = a_caso(len(vin) + 1)
+    vin.insert(k, TransactionInput(bytes.fromhex(moneta["txid"]),
+                                   int(moneta["vout"]),
+                                   sequence=orig["sequenza"]))
+    vout = [TransactionOutput(int(o.value) - (contributo if n == idx else 0),
+                              o.script_pubkey)
+            for n, o in enumerate(tx0.vout)]
+    j = a_caso(len(vout) + 1)
+    vout.insert(j, TransactionOutput(resto, script_resto))
+    tx = Transaction(version=tx0.version, locktime=tx0.locktime,
+                     vin=vin, vout=vout)
+    pub = chiave.get_public_key()
+    h = tx.sighash_segwit(k, _sc.p2pkh(pub), int(moneta["sats"]))
+    p = PSBT(tx)
+    p.inputs[k].witness_utxo = TransactionOutput(int(moneta["sats"]),
+                                                 _sc.p2wpkh(pub))
+    p.inputs[k].final_scriptwitness = Witness(
+        [chiave.sign(h).serialize() + b"\x01", pub.sec()])
+    b64 = p.to_string()
+    # la cintura: la transazione dentro il PSBT e' quella firmata
+    if PSBT.from_string(b64).tx.txid() != tx.txid():
+        raise PayjoinNo("unavailable", "la proposta non e' quella firmata")
+    return {"psbt": b64, "txid": tx.txid().hex(), "rete": rete,
+            "contributo": contributo, "spesa": spesa, "resto": resto,
+            "ingresso": k, "uscita": j}
+
+
+def payjoin_parametri(query) -> dict:
+    """PURA: i parametri facoltativi del wallet (BIP78), letti con
+    pazienza: uno storto si ignora, come dice il BIP. `v` diverso da 1
+    e' l'unico no."""
+    def intero(nome):
+        try:
+            v = int(str(query.get(nome, "")).strip())
+        except (TypeError, ValueError):
+            return None
+        return v if v >= 0 else None
+    v = str(query.get("v", "1") or "1").strip()
+    if v != "1":
+        raise PayjoinNo("version-unsupported", f"versione {v[:8]}")
+    try:
+        minimo = float(str(query.get("minfeerate", "0") or "0"))
+    except ValueError:
+        minimo = 0.0
+    if not (0 <= minimo <= 1000):
+        minimo = 0.0
+    return {"additionalfeeoutputindex": intero("additionalfeeoutputindex"),
+            "maxadditionalfeecontribution": intero("maxadditionalfeecontribution"),
+            "minfeerate": minimo}
+
+
+def _payjoin_chiave_qui() -> bool:
+    """La chiave di Barattolo firma su QUESTO server? Si', se sta sul VPS,
+    o se e' quella di cartone su una rete di prova; no se nel config c'e'
+    solo la parte pubblica (o se mainnet aspetta ancora la sua). Senza
+    leggere le dodici parole: questa domanda se la fa ogni foglio."""
+    try:
+        xb, cartone = onchain_xpub_barattolo()
+        if cartone:
+            return True
+        vps = _onchain_chiave_vps()
+        return bool(vps) and vps["xpub"] == xb
+    except Exception:
+        return False
+
+
+def _payjoin_monete_libere(con, xpub: str) -> list:
+    """Le monete di Barattolo pronte: vive, sulla chiave di adesso, e non
+    impegnate in un tentativo aperto o gia' andato in rete."""
+    impegnate = {r["moneta"] for r in con.execute(
+        "SELECT moneta FROM payjoin_tentativi WHERE esito IN "
+        "('proposta','payjoin')")}
+    return [m for m in con.execute(
+        "SELECT * FROM payjoin_monete WHERE stato='viva' AND xpub=? "
+        "AND sats>=?", (xpub, PAYJOIN_POLVERE + PAYJOIN_VB_USCITA))
+            if f"{m['txid']}:{m['vout']}" not in impegnate]
+
+
+def _payjoin_link(con, o) -> str:
+    """La porta del PayJoin di un ordine per il link di chi paga, o ''
+    (il link di ieri): leva accesa, embit, ordine ancora da pagare e mai
+    visto in rete, nessun tentativo fatto, la chiave che firma qui, e
+    almeno una moneta di Barattolo pronta."""
+    gettone = _p2p_onchain_campo(o, "payjoin_gettone", "")
+    if (not PAYJOIN_ATTIVO or not EMBIT or not gettone
+            or o["stato"] != "attesa" or int(o["visti_sats"] or 0)
+            or int(o["scade"] or 0) <= time.time()):
+        return ""
+    if not _payjoin_chiave_qui():
+        return ""
+    try:
+        if con.execute("SELECT 1 FROM payjoin_tentativi WHERE onchain_id=?",
+                       (int(o["id"]),)).fetchone():
+            return ""
+        if not _payjoin_monete_libere(con, onchain_xpub_barattolo()[0]):
+            return ""
+    except Exception:
+        return ""
+    return f"{URL_PUBBLICO}/api/payjoin/{gettone}"
+
+
+def _payjoin_a_parole() -> str:
+    """La riga del pannello: quante monete pronte, e quanto portano."""
+    if not EMBIT:
+        return "manca embit"
+    if not _payjoin_chiave_qui():
+        return "la chiave di Barattolo non firma su questo server: nessun PayJoin"
+    con = db()
+    try:
+        _payjoin_prepara(con)
+        libere = _payjoin_monete_libere(con, onchain_xpub_barattolo()[0])
+        fatti = con.execute("SELECT COUNT(*) FROM payjoin_tentativi WHERE "
+                            "esito='payjoin'").fetchone()[0]
+    except Exception:
+        return "monete illeggibili"
+    finally:
+        con.close()
+    return (f"monete pronte: {len(libere)}, "
+            f"{_fmt_sats(sum(int(m['sats']) for m in libere))} sats; "
+            f"PayJoin andati in rete: {fatti}")
+
+
+async def onchain_mempool_moneta(txid: str, vout: int) -> dict:
+    """Una moneta come la dice mempool: {"c_e", "speso", "sats",
+    "script"}. Solleva se la rete non risponde (chi chiama dice
+    'unavailable')."""
+    async with httpx.AsyncClient(timeout=10) as cl:
+        r = await cl.get(f"{onchain_mempool_api()}/tx/{txid}")
+        if r.status_code == 404 or r.status_code == 400:
+            return {"c_e": False, "speso": False, "sats": 0, "script": ""}
+        r.raise_for_status()
+        uscite = r.json().get("vout") or []
+        if not 0 <= int(vout) < len(uscite):
+            return {"c_e": False, "speso": False, "sats": 0, "script": ""}
+        s = await cl.get(f"{onchain_mempool_api()}/tx/{txid}/outspend/{int(vout)}")
+        s.raise_for_status()
+        return {"c_e": True, "speso": bool(s.json().get("spent")),
+                "sats": int(uscite[int(vout)].get("value") or 0),
+                "script": str(uscite[int(vout)].get("scriptpubkey") or "")}
+
+
+async def onchain_mempool_tx_c_e(txid: str) -> bool:
+    """La transazione `txid` e' in rete (mempool o blocco)? Solleva se la
+    rete non risponde."""
+    async with httpx.AsyncClient(timeout=10) as cl:
+        r = await cl.get(f"{onchain_mempool_api()}/tx/{txid}")
+        if r.status_code in (400, 404):
+            return False
+        r.raise_for_status()
+        return True
+
+
+async def payjoin_ricevi(gettone: str, corpo: str, parametri: dict) -> str:
+    """Il PayJoin di un ordine: dall'originale del wallet alla proposta
+    firmata (base64). Ogni no e' un PayjoinNo; dopo un no il wallet
+    trasmette l'originale da se', e l'ordine va avanti come ieri."""
+    from embit import script as _sc
+    if not PAYJOIN_ATTIVO or not EMBIT:
+        raise PayjoinNo("unavailable", "leva spenta o embit assente")
+    con = _onchain_db_ordini()
+    try:
+        _payjoin_prepara(con)
+        o = con.execute(
+            "SELECT o.*, i.indirizzo AS dove FROM onchain_ordini o"
+            " JOIN onchain_indirizzi i ON i.id=o.indirizzo_id"
+            " WHERE o.payjoin_gettone=? AND o.payjoin_gettone!=''",
+            (gettone,)).fetchone()
+        if not o:
+            raise PayjoinNo("unavailable", "gettone sconosciuto")
+        if (o["stato"] != "attesa" or int(o["visti_sats"] or 0)
+                or int(o["scade"]) <= time.time()):
+            raise PayjoinNo("unavailable", f"ordine {o['id']} non piu' da pagare")
+        gia = con.execute("SELECT * FROM payjoin_tentativi WHERE onchain_id=?",
+                          (int(o["id"]),)).fetchone()
+    finally:
+        con.close()
+    orig = payjoin_leggi_originale(
+        corpo, _sc.address_to_scriptpubkey(o["dove"]).data,
+        int(o["importo_sats"]))
+    if gia:
+        # il wallet che riprova con lo STESSO originale riprende la stessa
+        # proposta (il BIP lo chiede); un originale diverso no
+        if gia["originale_txid"] == orig["txid"] and gia["esito"] == "proposta":
+            return gia["proposta"]
+        raise PayjoinNo("original-psbt-rejected",
+                        f"ordine {o['id']}: un tentativo solo")
+    con = _onchain_db_ordini()
+    try:
+        visto = con.execute(
+            "SELECT punto FROM payjoin_visti WHERE punto IN (%s)"
+            % ",".join("?" * len(orig["punti"])), orig["punti"]).fetchone()
+    finally:
+        con.close()
+    if visto:
+        raise PayjoinNo("original-psbt-rejected", f"ingresso gia' visto {visto[0]}")
+    # la rete: ogni ingresso esiste con la cifra e lo script detti, e
+    # nessuno l'ha speso (l'originale si puo' trasmettere davvero)
+    for punto, sats, i in zip(orig["punti"], orig["valori"], orig["psbt"].inputs):
+        txid, vout = punto.split(":")
+        try:
+            m = await onchain_mempool_moneta(txid, int(vout))
+        except Exception:
+            raise PayjoinNo("unavailable", "mempool non risponde")
+        if (not m["c_e"] or m["speso"] or m["sats"] != sats
+                or m["script"] != i.utxo.script_pubkey.data.hex()):
+            raise PayjoinNo("original-psbt-rejected",
+                            f"ingresso {punto} assente, speso o diverso")
+    try:
+        xb, _ = onchain_xpub_barattolo()
+        conto = _onchain_privata_barattolo(xb)
+    except Exception as e:
+        raise PayjoinNo("unavailable", f"la chiave non firma qui: {e}")
+    # LE NOSTRE MONETE, RILETTE IN RETE PRIMA DI OFFRIRLE: la ronda le
+    # guarda ogni dieci minuti, e una moneta spesa da poco (un PayJoin
+    # arrivato dopo l'originale trasmessa da qui) darebbe al wallet una
+    # proposta che la rete rifiuta. A caso fra le pronte (la stessa
+    # sempre in testa sarebbe un segno riconoscibile), al piu' tre letture
+    con = _onchain_db_ordini()
+    try:
+        libere = sorted(_payjoin_monete_libere(con, xb),
+                        key=lambda _: secrets.randbelow(1 << 30))
+    finally:
+        con.close()
+    buone = []
+    for m in libere[:3]:
+        try:
+            st = await onchain_mempool_moneta(m["txid"], int(m["vout"]))
+        except Exception:
+            raise PayjoinNo("unavailable", "mempool non risponde")
+        if st["c_e"] and not st["speso"] and st["sats"] == int(m["sats"]):
+            buone.append(f"{m['txid']}:{m['vout']}")
+        elif st["c_e"] and st["speso"]:
+            con = _onchain_db_ordini()
+            try:
+                con.execute("UPDATE payjoin_monete SET stato='spesa' WHERE "
+                            "indirizzo=?", (m["indirizzo"],))
+                con.commit()
+            finally:
+                con.close()
+    if not buone:
+        raise PayjoinNo("unavailable", "nessuna moneta di Barattolo pronta")
+    adesso = int(time.time())
+    con = _onchain_db_ordini()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            if con.execute("SELECT 1 FROM payjoin_tentativi WHERE onchain_id=?",
+                           (int(o["id"]),)).fetchone():
+                raise PayjoinNo("original-psbt-rejected",
+                                f"ordine {o['id']}: un tentativo solo")
+            # dentro la transazione: ancora libere (un altro ordine nello
+            # stesso istante puo' averne appena presa una)
+            libere = [m for m in _payjoin_monete_libere(con, xb)
+                      if f"{m['txid']}:{m['vout']}" in buone]
+            if not libere:
+                raise PayjoinNo("unavailable", "nessuna moneta di Barattolo pronta")
+            r = con.execute("SELECT MAX(indice) FROM payjoin_monete WHERE "
+                            "xpub=? AND catena=?",
+                            (xb, PAYJOIN_CATENA_RESTI)).fetchone()
+            n_resto = 0 if r[0] is None else int(r[0]) + 1
+            figlia_resto = conto.derive([PAYJOIN_CATENA_RESTI, n_resto])
+            resto_sc = _sc.p2wpkh(figlia_resto.key.get_public_key())
+            fatta, motivo = None, "nessuna moneta basta"
+            for m in sorted(libere, key=lambda m: buone.index(
+                    f"{m['txid']}:{m['vout']}")):
+                figlia = conto.derive([int(m["catena"]), int(m["indice"])])
+                if _sc.p2wpkh(figlia.key.get_public_key()).address(
+                        _onchain_rete()) != m["indirizzo"]:
+                    motivo = f"la chiave non rifa' {m['indirizzo']}"
+                    continue
+                try:
+                    fatta = payjoin_costruisci(
+                        orig, {"txid": m["txid"], "vout": m["vout"],
+                               "sats": m["sats"]},
+                        figlia.key, resto_sc, parametri, secrets.randbelow)
+                    moneta = f"{m['txid']}:{m['vout']}"
+                    break
+                except PayjoinNo as e:
+                    motivo = e.perche
+            if not fatta:
+                raise PayjoinNo("not-enough-money", motivo)
+            con.execute(
+                "INSERT INTO payjoin_tentativi(onchain_id, originale_txid,"
+                " originale_hex, proposta, proposta_txid, moneta, resto,"
+                " spesa_sats, creato) VALUES (?,?,?,?,?,?,?,?,?)",
+                (int(o["id"]), orig["txid"], orig["hex"], fatta["psbt"],
+                 fatta["txid"], moneta, resto_sc.address(_onchain_rete()),
+                 fatta["spesa"], adesso))
+            con.executemany("INSERT OR IGNORE INTO payjoin_visti(punto, creato)"
+                            " VALUES (?,?)", [(p, adesso) for p in orig["punti"]])
+            con.execute(
+                "INSERT INTO payjoin_monete(indirizzo, xpub, catena, indice,"
+                " stato, creato) VALUES (?,?,?,?,'attesa',?)",
+                (resto_sc.address(_onchain_rete()), xb, PAYJOIN_CATENA_RESTI,
+                 n_resto, adesso))
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+    finally:
+        con.close()
+    print(f"🔀 PayJoin: ordine on-chain #{o['id']}, proposta {fatta['txid'][:12]}… "
+          f"(Barattolo mette {_fmt_sats(fatta['spesa'])} sats di rete, il wallet "
+          f"{fatta['contributo']})", flush=True)
+    return fatta["psbt"]
+
+
+def _payjoin_registra_quote(con, xb: str, adesso: int) -> None:
+    """Gli indirizzi delle quote di Barattolo gia' uscite (mercatino e
+    P2P) entrano fra le monete da guardare, una volta sola."""
+    for tab in ("onchain_ordini", "p2p_onchain_ordini"):
+        try:
+            con.execute(
+                "INSERT OR IGNORE INTO payjoin_monete(indirizzo, xpub, catena,"
+                " indice, stato, creato) SELECT o.quota_indirizzo,"
+                " i.xpub_barattolo, ?, i.numero_barattolo, 'da_guardare', ?"
+                f" FROM {tab} o JOIN onchain_indirizzi i ON i.id=o.indirizzo_id"
+                " WHERE o.quota_sats>0 AND o.quota_indirizzo!=''"
+                " AND COALESCE(o.txid_uscita,'')!='' AND i.xpub_barattolo=?",
+                (PAYJOIN_CATENA_QUOTE, adesso, xb))
+        except sqlite3.OperationalError:
+            pass   # la tabella nasce col primo gesto: dove non c'e', niente
+
+
+async def _payjoin_ronda() -> None:
+    """Il battito del PayJoin, nella ronda on-chain: 1) le quote nuove fra
+    le monete; 2) i tentativi di piu' di tre minuti — andato in rete il
+    PayJoin, o l'originale, o niente: e allora l'originale lo trasmette
+    Barattolo; 3) venti indirizzi riletti da mempool."""
+    if not PAYJOIN_ATTIVO or not EMBIT:
+        return
+    try:
+        xb, _ = onchain_xpub_barattolo()
+    except ValueError:
+        return
+    adesso = int(time.time())
+    con = _onchain_db_ordini()
+    try:
+        _payjoin_prepara(con)
+        _payjoin_registra_quote(con, xb, adesso)
+        con.commit()
+        aperti = con.execute(
+            "SELECT t.*, o.stato AS stato_ordine, o.visti_sats, o.scade"
+            " FROM payjoin_tentativi t JOIN onchain_ordini o"
+            " ON o.id=t.onchain_id WHERE t.esito='proposta' AND t.creato<=?",
+            (adesso - PAYJOIN_ATTESA_ORIGINALE_S,)).fetchall()
+    finally:
+        con.close()
+    for t in aperti:
+        try:
+            if await onchain_mempool_tx_c_e(t["proposta_txid"]):
+                esito = "payjoin"
+            elif await onchain_mempool_tx_c_e(t["originale_txid"]):
+                esito = "originale"
+            elif (t["stato_ordine"] == "attesa" and not int(t["visti_sats"] or 0)
+                  and int(t["scade"]) > adesso):
+                try:
+                    await onchain_mempool_invia(t["originale_hex"])
+                    esito = "originale"
+                    print(f"🔀 PayJoin: ordine on-chain #{t['onchain_id']}, "
+                          "il PayJoin non e' arrivato: trasmessa l'originale",
+                          flush=True)
+                except ValueError:
+                    esito = "rifiutata"
+            else:
+                esito = "altro"
+        except Exception as e:
+            print(f"⚠️ PayJoin: tentativo {t['id']} non guardato: {e}", flush=True)
+            continue
+        con = _onchain_db_ordini()
+        try:
+            con.execute("UPDATE payjoin_tentativi SET esito=?, chiuso_il=? "
+                        "WHERE id=? AND esito='proposta'",
+                        (esito, int(time.time()), t["id"]))
+            if esito == "payjoin":
+                txid, vout = t["moneta"].split(":")
+                con.execute("UPDATE payjoin_monete SET stato='spesa' WHERE "
+                            "txid=? AND vout=?", (txid, int(vout)))
+            else:
+                # il resto di un PayJoin mai andato in rete non nascera'
+                con.execute("UPDATE payjoin_monete SET stato='mai' WHERE "
+                            "indirizzo=? AND stato='attesa'", (t["resto"],))
+            con.commit()
+        finally:
+            con.close()
+    con = _onchain_db_ordini()
+    try:
+        da_leggere = con.execute(
+            "SELECT * FROM payjoin_monete WHERE xpub=? AND stato IN"
+            " ('da_guardare','viva','attesa') AND controllata_il<=?"
+            " ORDER BY controllata_il, creato LIMIT ?",
+            (xb, adesso - PAYJOIN_RILEGGI_S, PAYJOIN_MONETE_PER_GIRO)).fetchall()
+    finally:
+        con.close()
+    for m in da_leggere:
+        try:
+            utxo = await onchain_mempool_utxo(m["indirizzo"])
+        except Exception as e:
+            print(f"⚠️ PayJoin: monete non rilette: {e}", flush=True)
+            return
+        buone = [u for u in utxo if (u.get("status") or {}).get("confirmed")]
+        con = _onchain_db_ordini()
+        try:
+            if buone:
+                u = max(buone, key=lambda x: int(x["value"]))
+                con.execute("UPDATE payjoin_monete SET stato='viva', txid=?,"
+                            " vout=?, sats=?, controllata_il=? WHERE indirizzo=?"
+                            " AND stato!='spesa'",
+                            (str(u["txid"]), int(u["vout"]), int(u["value"]),
+                             adesso, m["indirizzo"]))
+            elif not utxo and (m["stato"] == "viva"
+                               or int(m["creato"]) < adesso - PAYJOIN_ABBANDONA_S):
+                con.execute("UPDATE payjoin_monete SET stato='spesa',"
+                            " controllata_il=? WHERE indirizzo=?",
+                            (adesso, m["indirizzo"]))
+            else:
+                con.execute("UPDATE payjoin_monete SET controllata_il=? "
+                            "WHERE indirizzo=?", (adesso, m["indirizzo"]))
+            con.commit()
+        finally:
+            con.close()
+
+
+def _payjoin_risposta_no(e: "PayjoinNo"):
+    """Il no come lo vuole il BIP78: JSON col codice noto e la sua frase,
+    mai il nostro perche'; CORS aperto, come vuole il BIP."""
+    corpo = {"errorCode": e.codice, "message": PAYJOIN_ERRORI[e.codice]}
+    if e.codice == "version-unsupported":
+        corpo["supported"] = [1]
+    return JSONResponse(corpo, status_code=503 if e.codice == "unavailable" else 400,
+                        headers={"Access-Control-Allow-Origin": "*"})
+
+
+@app.options("/api/payjoin/{gettone}")
+async def payjoin_porta_cors(gettone: str):
+    """Il permesso del browser, per i wallet che vivono in una pagina."""
+    return Response(status_code=204, headers={
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"})
+
+
+@app.post("/api/payjoin/{gettone}")
+async def payjoin_porta(gettone: str, request: Request):
+    """LA PORTA DEL PAYJOIN (BIP78 v1): senza sessione per forza — chi
+    bussa e' il wallet di chi compra, non la Mini App —, quindi il
+    gettone dell'ordine e' la chiave, con un freno suo. Il corpo e' il
+    PSBT originale in base64 (letto a pezzi, col tetto), la risposta la
+    proposta in base64."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", gettone or ""):
+        return _payjoin_risposta_no(PayjoinNo("unavailable", "gettone storto"))
+    try:
+        _frena("payjoin", gettone)
+    except HTTPException:
+        return _payjoin_risposta_no(PayjoinNo("unavailable", "freno"))
+    corpo = b""
+    async for pezzo in request.stream():
+        corpo += pezzo
+        if len(corpo) > PAYJOIN_CORPO_MAX:
+            return _payjoin_risposta_no(PayjoinNo("original-psbt-rejected",
+                                                  "corpo troppo grande"))
+    try:
+        parametri = payjoin_parametri(request.query_params)
+        b64 = await payjoin_ricevi(gettone, corpo.decode("ascii", "replace"),
+                                   parametri)
+    except PayjoinNo as e:
+        print(f"🔀 PayJoin rifiutato ({e.codice}): {e.perche}", flush=True)
+        return _payjoin_risposta_no(e)
+    except Exception as e:
+        print(f"⚠️ PayJoin: errore inatteso: {e}", flush=True)
+        return _payjoin_risposta_no(PayjoinNo("unavailable", "errore"))
+    return Response(b64, media_type="text/plain",
+                    headers={"Access-Control-Allow-Origin": "*"})
+
+
 _TASK_ONCHAIN = None   # stesso patto di _TASK_CAMBIO: il riferimento tiene vivo il task
 
 
@@ -102656,6 +103453,12 @@ async def orologio_onchain():
             await _p2p_onchain_ronda()
         except Exception as e:
             print(f"⚠️ P2P on-chain: ronda saltata: {e}", flush=True)
+        # il PayJoin (16 nov 2026): le monete di Barattolo, e l'originale
+        # trasmessa se il PayJoin non e' arrivato
+        try:
+            await _payjoin_ronda()
+        except Exception as e:
+            print(f"⚠️ PayJoin: ronda saltata: {e}", flush=True)
         # le chiavi di conto rilette sulla rete (3 nov 2026)
         try:
             await _onchain_xpub_rileggi_tutte()

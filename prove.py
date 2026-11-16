@@ -36125,6 +36125,10 @@ def _censimento(acceso, dopo=None):
     # la rete trattenuta su mainnet al riavvio (30 ott 2026, cantiere
     # onchain-rete-pannello): una frase, vuota quando non c'e'
     amb["ONCHAIN_RETE_TRATTENUTA"] = ""
+    # il PayJoin (16 nov 2026): la riga del pannello CHIAMA
+    # `_payjoin_a_parole()`, che aprirebbe il database e leggerebbe la
+    # chiave di Barattolo — la trappola, un'altra volta: una frase finta
+    amb["_payjoin_a_parole"] = lambda: "monete pronte: 0, 0 sats"
     # la campagna a tutti (9 ott 2026): l'ottava volta, la riga del
     # pannello CHIAMA `timbro_letto` — che aprirebbe il database — e
     # nomina il timbro; a leve accese il timbro c'e', a spente no
@@ -150778,6 +150782,8 @@ def prove_freni():
            # la tappa 3 (23 ott 2026): «controlla adesso» 60 all'ora,
            # proposte e co-firme 30 all'ora
            "onchain_controlla": (60, 3600), "onchain_firma": (30, 3600),
+           # il PayJoin (16 nov 2026): dieci proposte all'ora per indirizzo
+           "payjoin": (10, 3600),
            # 27 ott 2026: «Dove ricevi i sats» 10 all'ora, una leva
            # cambiata dal pannello 20 all'ora per admin
            "onchain_incasso": (10, 3600), "onchain_incasso_guarda": (40, 3600), "leva_pannello": (20, 3600),
@@ -156526,6 +156532,380 @@ def prove_onchain_disputa():
     prova("la chiave entra nel backup fuori sede, e fuori da git", [True, True],
           ['cp -a "$DIR_APP/chiavi" "$TMP/chiavi"' in bk,
            "\nchiavi/\n" in open(".gitignore", encoding="utf-8").read()])
+
+
+def prove_payjoin():
+    """IL PAYJOIN DEGLI ACQUISTI ON-CHAIN (16 nov 2026, cantiere payjoin,
+    Andrea: «potremo davvero sfruttarlo come PayJoin»). Il ricevitore
+    BIP78 del server, eseguito coi pezzi VERI e embit: un wallet di
+    cartone firma l'originale, il server lo giudica e ci aggiunge una
+    moneta di Barattolo, e la proposta passa i controlli che il BIP78
+    chiede al wallet (scritti qui, sul calco dell'implementazione di
+    riferimento del BIP); poi il wallet rifirma e la transazione finale
+    si rilegge col giudice stesso, che verifica TUTTE le firme — anche
+    quella di Barattolo. In mezzo i no, e le controprove: il ricevitore
+    rotto apposta (l'uscita dell'ordine toccata, il controllo delle firme
+    tolto) deve far diventare rossa la prova. Il giro col server vero sta
+    in collaudo_payjoin."""
+    import math as _m
+    import secrets as _se
+    print("\n🔀 Il PayJoin degli acquisti on-chain")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    try:
+        from embit import bip32, script
+        from embit.finalizer import finalize_psbt
+        from embit.psbt import PSBT
+        from embit.transaction import (Transaction, TransactionInput,
+                                       TransactionOutput)
+    except ImportError:
+        salta("il PayJoin con embit", "manca embit (requirements.txt)")
+        return
+    i = src.index("# ============ IL PAYJOIN DEGLI ACQUISTI ON-CHAIN (16 nov 2026")
+    testa = src[i:src.index("def _payjoin_prepara(", i)]
+    nomi = ("_payjoin_vsize", "payjoin_leggi_originale", "payjoin_costruisci",
+            "payjoin_parametri")
+
+    def ricevitore(sostituzioni=()):
+        amb = {"re": re, "math": _m, "secrets": _se, "ONCHAIN_POLVERE": 546,
+               "_fmt_sats": lambda n: f"{int(n):,}".replace(",", ".")}
+        exec(testa, amb)
+        for n in nomi:
+            p = pezzo(n)
+            for vecchio, nuovo in sostituzioni:
+                p = p.replace(vecchio, nuovo)
+            exec(p, amb)
+        return amb
+
+    R = ricevitore()
+    No = R["PayjoinNo"]
+    radice = bip32.HDKey.from_seed(bytes(range(16)))
+    k_paga = radice.derive("m/84h/1h/0h/0/0").key
+    k_resto_wallet = radice.derive("m/84h/1h/0h/1/0").key
+    barattolo = bip32.HDKey.from_seed(bytes(range(1, 17)))
+    k_moneta = barattolo.derive("m/1/7").key
+    resto_nostro = script.p2wpkh(barattolo.derive("m/3/0").key.get_public_key())
+    ordine = script.p2wsh(script.multisig(2, [radice.derive(f"m/0/{n}").key.get_public_key()
+                                              for n in range(3)]))
+    IMPORTO = 51_080
+    moneta_prima = TransactionOutput(80_000, script.p2wpkh(k_paga.get_public_key()))
+
+    def originale(tasso=2.0, importo=IMPORTO, seq=0xFFFFFFFD, sighash=1,
+                  ingresso_script=None, firma_storta=False, xpub=False):
+        tx = Transaction(vin=[TransactionInput(bytes.fromhex("11" * 32), 1,
+                                               sequence=seq)],
+                         vout=[TransactionOutput(importo, ordine),
+                               TransactionOutput(0, script.p2wpkh(
+                                   k_resto_wallet.get_public_key()))])
+        tx.vout[1].value = 80_000 - importo - _m.ceil(tasso * 153)
+        u = moneta_prima if ingresso_script is None else TransactionOutput(
+            80_000, ingresso_script)
+        p = PSBT(tx)
+        p.inputs[0].witness_utxo = u
+        p.sign_with(k_paga, sighash=sighash)
+        w = finalize_psbt(p).vin[0].witness if not ingresso_script else \
+            script.Witness([b"\x30" * 70 + bytes([sighash]),
+                            k_paga.get_public_key().sec()])
+        q = PSBT(tx)
+        q.inputs[0].witness_utxo = u
+        q.inputs[0].final_scriptwitness = w
+        if firma_storta:
+            f = bytearray(w.items[0])
+            f[10] ^= 1
+            q.inputs[0].final_scriptwitness = script.Witness([bytes(f), w.items[1]])
+        if xpub:
+            from embit.psbt import DerivationPath
+            q.xpubs[radice.to_public()] = DerivationPath(b"\0\0\0\0", [])
+        return q
+
+    def motivo(fn):
+        try:
+            fn()
+            return "passa"
+        except No as e:
+            return e.codice
+
+    def leggi(q, importo=IMPORTO, amb=None):
+        return (amb or R)["payjoin_leggi_originale"](q.to_string(), ordine.data,
+                                                     importo)
+
+    MONETA = {"txid": "22" * 32, "vout": 0, "sats": 1000}
+
+    def costruisci(orig, parametri=None, moneta=MONETA, amb=None, a_caso=None):
+        return (amb or R)["payjoin_costruisci"](
+            orig, moneta, k_moneta, resto_nostro, parametri or {},
+            a_caso or _se.randbelow)
+
+    def controlli_del_wallet(q_orig, proposta_b64, parametri):
+        """I controlli che il BIP78 chiede al wallet (e che i wallet veri
+        fanno), sul calco dell'implementazione di riferimento: '' se la
+        proposta e' buona, sennò il primo che fallisce."""
+        o = q_orig
+        p = PSBT.from_string(proposta_b64)
+        to, tp = o.tx, p.tx
+        if p.xpubs:
+            return "xpub nella proposta"
+        if (tp.version, tp.locktime) != (to.version, to.locktime):
+            return "versione o locktime cambiati"
+        miei = [(i.txid, i.vout) for i in o.inputs]
+        visti, sequenze = [], set()
+        for inp in p.inputs:
+            if inp.bip32_derivations or inp.partial_sigs:
+                return "chiavi o firme parziali in un ingresso"
+            sequenze.add(inp.sequence)
+            if (inp.txid, inp.vout) in miei:
+                visti.append((inp.txid, inp.vout))
+                if inp.final_scriptwitness is not None or inp.final_scriptsig is not None:
+                    return "un mio ingresso finalizzato dal ricevitore"
+                if inp.sequence != o.inputs[0].sequence:
+                    return "la sequenza di un mio ingresso cambiata"
+            else:
+                if inp.final_scriptwitness is None:
+                    return "un ingresso del ricevitore non finalizzato"
+                if inp.witness_utxo is None and inp.non_witness_utxo is None:
+                    return "un ingresso del ricevitore senza utxo"
+        if visti != miei:
+            return "manca un mio ingresso, o fuori ordine"
+        if len(sequenze) != 1:
+            return "sequenze miste"
+        valore = {(i.txid, i.vout): i.witness_utxo.value for i in o.inputs}
+        for inp in p.inputs:
+            if (inp.txid, inp.vout) not in valore:
+                valore[(inp.txid, inp.vout)] = inp.witness_utxo.value
+        rete_o = sum(i.witness_utxo.value for i in o.inputs) - sum(x.value for x in to.vout)
+        rete_p = sum(valore.values()) - sum(x.value for x in tp.vout)
+        if rete_p < rete_o:
+            return "commissione diminuita"
+        idx = parametri.get("additionalfeeoutputindex")
+        tetto = parametri.get("maxadditionalfeecontribution") or 0
+        coda = list(enumerate(to.vout))
+        for out in tp.vout:
+            if not coda:
+                break
+            n, x = coda[0]
+            if out.script_pubkey.data == x.script_pubkey.data:
+                coda.pop(0)
+                if n == idx:
+                    contr = x.value - out.value
+                    if contr > tetto or contr > rete_p - rete_o:
+                        return "contributo oltre il permesso"
+                    tasso_o = rete_o / R["_payjoin_vsize"](leggi(o)["tx"])
+                    if contr > tasso_o * 110 * (len(tp.vin) - len(to.vin)):
+                        return "contributo non solo per gli ingressi"
+                elif out.value < x.value:
+                    # pjos=0: niente sostituzione, nemmeno sull'ordine
+                    return "un'uscita diminuita"
+        if coda:
+            return "manca una mia uscita (pjos=0: anche quella dell'ordine)"
+        return ""
+
+    def firma_del_wallet(q_orig, proposta_b64):
+        p = PSBT.from_string(proposta_b64)
+        for inp in p.inputs:
+            if inp.final_scriptwitness is None:
+                inp.witness_utxo = q_orig.inputs[0].witness_utxo
+        p.sign_with(k_paga)
+        for inp in p.inputs:
+            if inp.partial_sigs:
+                pub, sig = list(inp.partial_sigs.items())[0]
+                inp.final_scriptwitness = script.Witness([sig, pub.sec()])
+                inp.partial_sigs.clear()
+        return p
+
+    # --- 1) il giro buono ----------------------------------------------
+    q = originale()
+    o = leggi(q)
+    prova("l'originale buono si legge: un ingresso, l'uscita dell'ordine, "
+          "2 sat/vB circa", (1, 0, True),
+          (len(o["punti"]), o["pagamento"], 1.9 < o["tasso"] < 2.1))
+    par = {"additionalfeeoutputindex": 1, "maxadditionalfeecontribution": 300}
+    tutti_buoni, firmate, posti = True, True, set()
+    for giro in range(12):
+        r = costruisci(o, par)
+        posti.add((r["ingresso"], r["uscita"]))
+        if controlli_del_wallet(q, r["psbt"], par):
+            tutti_buoni = False
+        f = firma_del_wallet(q, r["psbt"])
+        try:
+            fin = leggi(f)
+            firmate = firmate and len(fin["punti"]) == 2 and fin["txid"] == r["txid"]
+        except No:
+            firmate = False
+    prova("dodici proposte: tutte passano i controlli del wallet (BIP78)",
+          True, tutti_buoni)
+    prova("...rifirmate dal wallet, la transazione finale ha DUE ingressi con "
+          "firme che tornano tutte (anche quella di Barattolo), e il txid "
+          "e' quello che il server ha scritto", True, firmate)
+    prova("...il nostro ingresso e la nostra uscita stanno a caso (BIP78)",
+          True, len(posti) > 1)
+    r = costruisci(o, par, a_caso=lambda n: 0)
+    p = PSBT.from_string(r["psbt"])
+    usc = {x.script_pubkey.data: x.value for x in p.tx.vout}
+    prova("l'ordine riceve ESATTAMENTE l'importo, il resto del wallet perde "
+          "al piu' il contributo concesso, la nostra uscita e' la moneta meno "
+          "la nostra spesa", (IMPORTO, True, 1000 - r["spesa"]),
+          (usc[ordine.data],
+           q.tx.vout[1].value - usc[q.tx.vout[1].script_pubkey.data]
+           == r["contributo"] <= 300, usc[resto_nostro.data]))
+    prova("...il contributo del wallet paga solo il nostro ingresso "
+          "(tasso x 68 vB), e la tariffa non scende", (True, True),
+          (r["contributo"] <= _m.floor(o["tasso"] * 68),
+           r["rete"] / (o["vsize"] + 99) >= o["tasso"] - 1e-9))
+    p = PSBT.from_string(r["psbt"])
+    nostro = p.inputs[r["ingresso"]]
+    prova("firmato SOLO il nostro ingresso, con la sua moneta; nessuna "
+          "chiave e nessun utxo sugli ingressi del wallet",
+          (True, True, [None], [None]),
+          (nostro.final_scriptwitness is not None,
+           nostro.witness_utxo.value == 1000,
+           [x.final_scriptwitness for k, x in enumerate(p.inputs) if k != r["ingresso"]],
+           [x.witness_utxo for k, x in enumerate(p.inputs) if k != r["ingresso"]]))
+    r0 = costruisci(o, {})
+    prova("senza permesso del wallet la rete in piu' la paga tutta "
+          "Barattolo, e l'uscita del wallet non si tocca", (0, True),
+          (r0["contributo"], PSBT.from_string(r0["psbt"]).tx.vout[
+              1 if r0["uscita"] > 1 else 2].value >= 0))
+    prova("...ed e' buona lo stesso per il wallet", "",
+          controlli_del_wallet(q, r0["psbt"], {}))
+    r1 = costruisci(o, {"additionalfeeoutputindex": 0,
+                        "maxadditionalfeecontribution": 300})
+    prova("un contributo chiesto sull'uscita DELL'ORDINE si ignora", 0,
+          r1["contributo"])
+
+    # --- 2) i no dell'originale ------------------------------------------
+    print("  [i no dell'originale]")
+    prova("una firma storta: no", "original-psbt-rejected",
+          motivo(lambda: leggi(originale(firma_storta=True))))
+    prova("paga meno dell'importo: no", "original-psbt-rejected",
+          motivo(lambda: leggi(originale(importo=IMPORTO - 1))))
+    prova("...ma una cifra in piu' va bene", "passa",
+          motivo(lambda: leggi(originale(importo=IMPORTO + 5), IMPORTO)))
+    prova("un ingresso taproot (tipi misti): no", "original-psbt-rejected",
+          motivo(lambda: leggi(originale(ingresso_script=script.Script(
+              b"\x51\x20" + b"\x02" * 32)))))
+    prova("una firma non SIGHASH_ALL: no", "original-psbt-rejected",
+          motivo(lambda: leggi(originale(sighash=0x81))))
+    # embit scrive una sequenza 0 come 0xFFFFFFFF: la si mette a mano nei
+    # byte, come la scriverebbe un wallet qualsiasi
+    import base64 as _b64
+    grezzo = _b64.b64decode(originale().to_string())
+    assert grezzo.count(b"\xfd\xff\xff\xff") == 1
+    seq0 = _b64.b64encode(grezzo.replace(b"\xfd\xff\xff\xff",
+                                         b"\x00\x00\x00\x00")).decode()
+
+    def perche(fn):
+        try:
+            fn()
+            return "passa"
+        except No as e:
+            return e.perche
+    # embit legge una sequenza 0 come 0xFFFFFFFF (`PSBT.tx`): la firma del
+    # wallet, fatta sulla sequenza vera, allora non torna — e il no arriva
+    # da li'. Una proposta costruita sulla sequenza riscritta non sarebbe
+    # quella che il wallet ha firmato: questa prova dice che non nasce
+    prova("sequenza 0 (scritta a mano nei byte): no",
+          "una firma dell'originale non torna",
+          perche(lambda: R["payjoin_leggi_originale"](seq0, ordine.data, IMPORTO)))
+    prova("chiavi estese nel PSBT (leaking-data): no", "original-psbt-rejected",
+          motivo(lambda: leggi(originale(xpub=True))))
+    prova("non base64, o enorme: no", ["original-psbt-rejected"] * 2,
+          [motivo(lambda: R["payjoin_leggi_originale"]("<script>", ordine.data, 1)),
+           motivo(lambda: R["payjoin_leggi_originale"]("A" * 100_001, ordine.data, 1))])
+    altra = script.p2wsh(script.Script(b"\x52"))
+    prova("non paga l'indirizzo di QUESTO ordine: no", "original-psbt-rejected",
+          motivo(lambda: R["payjoin_leggi_originale"](originale().to_string(),
+                                                      altra.data, IMPORTO)))
+
+    # --- 3) i conti di Barattolo -----------------------------------------
+    print("  [i conti di Barattolo]")
+    caro = leggi(originale(tasso=12.0))
+    prova("a 12 sat/vB senza contributo la nostra uscita costerebbe troppo: "
+          "no (not-enough-money), il wallet trasmette l'originale",
+          "not-enough-money", motivo(lambda: costruisci(caro, {})))
+    prova("...col contributo del wallet ci si sta",
+          "passa", motivo(lambda: costruisci(caro, {
+              "additionalfeeoutputindex": 1, "maxadditionalfeecontribution": 5000})))
+    prova("una moneta troppo piccola: no", "not-enough-money",
+          motivo(lambda: costruisci(o, {}, moneta=dict(MONETA, sats=400))))
+    prova("i parametri: v=2 no; numeri storti si ignorano",
+          ("version-unsupported", None, 0.0),
+          (motivo(lambda: R["payjoin_parametri"]({"v": "2"})),
+           R["payjoin_parametri"]({"maxadditionalfeecontribution": "-5"})
+           ["maxadditionalfeecontribution"],
+           R["payjoin_parametri"]({"minfeerate": "x"})["minfeerate"]))
+
+    # --- 4) le controprove: il ricevitore rotto apposta -------------------
+    print("  [le controprove: il ricevitore rotto apposta]")
+    rotto = ricevitore([("int(o.value) - (contributo if n == idx else 0)",
+                         "int(o.value) - (contributo if n in (idx, orig['pagamento']) else 0)")])
+    rb = costruisci(leggi(q, amb=rotto), par, amb=rotto)
+    prova("CONTROPROVA: un ricevitore che toglie il contributo anche "
+          "dall'uscita dell'ordine e' fermato dai controlli del wallet",
+          True, controlli_del_wallet(q, rb["psbt"], par) != "")
+    senza = ricevitore([("if not buona:", "if False:")])
+    prova("CONTROPROVA: senza il controllo delle firme, la firma storta "
+          "passerebbe (la prova delle firme ha i denti)", "passa",
+          motivo(lambda: leggi(originale(firma_storta=True), amb=senza)))
+    tutto = ricevitore([("contributo = max(0, min(tetto, in_piu,",
+                         "contributo = max(0, min(tetto * 10, in_piu * 10,"),
+                        ("math.floor(orig[\"tasso\"] * PAYJOIN_VB_INGRESSO),",
+                         "10 ** 9,")])
+    rt = costruisci(leggi(q, amb=tutto), {"additionalfeeoutputindex": 1,
+                                         "maxadditionalfeecontribution": 300},
+                    amb=tutto)
+    prova("CONTROPROVA: un contributo preso oltre il permesso e' fermato "
+          "dai controlli del wallet", True,
+          controlli_del_wallet(q, rt["psbt"], par) != "")
+
+    # --- 5) la forma -------------------------------------------------------
+    cod = codice(pezzo("payjoin_costruisci"))
+    prova("si firma a mano UN indice, mai sign_with (che firma tutto quel che "
+          "riconosce)", (False, True),
+          ("sign_with" in cod, "chiave.sign(h)" in cod))
+    ric = codice(pezzo("payjoin_ricevi"))
+    prova("la porta: un tentativo per ordine (UNIQUE e ricontrollo nella "
+          "transazione), ingressi mai visti, monete che esistono e non sono "
+          "spese, la chiave ricontrollata contro l'indirizzo della moneta",
+          [True] * 4,
+          ['"BEGIN IMMEDIATE"' in ric, "payjoin_visti WHERE punto IN" in ric,
+           'm["speso"]' in ric and 'not m["c_e"]' in ric,
+           '!= m["indirizzo"]' in ric])
+    prova("tentativi: onchain_id UNIQUE", True,
+          "onchain_id INTEGER NOT NULL UNIQUE" in pezzo("_payjoin_prepara"))
+    porta = src[src.index('@app.post("/api/payjoin/{gettone}")'):]
+    porta = porta[:porta.index("\n\n\n")]
+    prova("la porta risponde col CORS aperto (BIP78), legge il corpo a pezzi "
+          "col tetto, e ha il suo freno", [True, True, True],
+          ['"Access-Control-Allow-Origin": "*"' in porta,
+           "request.stream()" in porta and "PAYJOIN_CORPO_MAX" in porta,
+           '_frena("payjoin", gettone)' in porta])
+    prova("i no ai wallet dicono solo i codici noti del BIP, mai il perche'",
+          True, 'PAYJOIN_ERRORI[e.codice]' in pezzo("_payjoin_risposta_no")
+          and "e.perche" not in pezzo("_payjoin_risposta_no"))
+    link = codice(pezzo("_payjoin_link"))
+    prova("il link nasce solo a leva accesa, ordine da pagare e mai visto, "
+          "nessun tentativo, chiave che firma qui e una moneta pronta",
+          [True] * 5,
+          ["not PAYJOIN_ATTIVO" in link, 'o["stato"] != "attesa"' in link,
+           "payjoin_tentativi WHERE onchain_id" in link,
+           "_payjoin_chiave_qui()" in link, "_payjoin_monete_libere(" in link])
+    prova("...e solo a chi paga", True,
+          '"payjoin": _payjoin_link(con, o) if da_compratore else ""'
+          in pezzo("_onchain_ordine_per"))
+    uri = pezzo_js(mini, "function onchainUriPagamento(o){", "\n}\n")
+    prova("il telefono aggiunge pj= (codificato) e pjos=0 solo con la porta "
+          "dal server", (True, True),
+          ("o.payjoin ?" in uri,
+           "&pj=${encodeURIComponent(o.payjoin)}&pjos=0" in uri))
+    prova("leva PAYJOIN_ATTIVO accesa di serie, nel pannello", (True, True),
+          ("except ImportError:\n    PAYJOIN_ATTIVO = True" in src,
+           '_leva("PayJoin negli acquisti on-chain", "PAYJOIN_ATTIVO"' in src))
+    oro = pezzo("orologio_onchain")
+    prova("la ronda on-chain fa anche quella del PayJoin (l'originale "
+          "trasmessa se il PayJoin non arriva)", (True, True),
+          ("await _payjoin_ronda()" in oro,
+           'await onchain_mempool_invia(t["originale_hex"])'
+           in pezzo("_payjoin_ronda")))
 
 
 def prove_onchain_tetto():
@@ -197385,7 +197765,9 @@ def _banco_assistente(**leve):
            "P2P_CONTANTI_MAX_EURO": 250, "ASTA_ABILITATA": True,
            "MERCATO_LAVORO": False, "ASSISTENZA_ATTIVA": False,
            "CONNETTORI_NEGOZIO_APERTI": False, "CONNETTORI_NEGOZIO_PER_TUTTI": False,
-           "_p2p_leve": lambda: {"attivo": True}}
+           "_p2p_leve": lambda: {"attivo": True},
+           # (16 nov 2026, cantiere payjoin) la quota fissa e il PayJoin
+           "onchain_quota_sats": lambda: 0, "PAYJOIN_ATTIVO": True}
     CHI_GUARDA = []
     for nome in ("cambio_libero_per", "swap_per", "onchain_ammesso",
                  "swap_auto_per", "p2p_usdt_ammesso", "p2p_onchain_ammesso",
@@ -199806,7 +200188,7 @@ CATEGORIE = {
     ordine_onchain ripristino_visibile chiave_che_nasce_da_sola
     checksum_descrittore leva_rgb annuncio_identita mutinynet_prep
     deposito_p2p_onchain grafica_p2p_onchain incasso_esterno_onchain
-    onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto
+    onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto payjoin
     p2p_onchain p2p_onchain_usdt p2p_onchain_tetto volto_porta_card rete_onchain_dal_pannello
     scelta_rete_mercatino cifra_btc foglio_oc_visto seconda_firma_parla
     """.split(),
@@ -200407,6 +200789,7 @@ def main():
     prove_onchain_pagina,
     prove_onchain_nell_ordine,
     prove_onchain_disputa,
+    prove_payjoin,
     prove_onchain_tetto,
     prove_chiave_che_nasce_da_sola,
     prove_checksum_descrittore,

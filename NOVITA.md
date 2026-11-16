@@ -314,3 +314,9 @@ frase: In cima al libro P2P ora ci sono tre rettangoli «Novità», ognuno col s
 dove: la scheda «P2P», in cima al libro; il foglio che si apre toccando un ordine, alla riga «Tempo rimasto».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-16 · payjoin
+frase: Negli acquisti on-chain del mercatino arriva il PayJoin: se il tuo wallet lo sa fare (Sparrow, BlueWallet, Wasabi, Bull Bitcoin, Cake Wallet), mentre paghi Barattolo aggiunge una sua moneta alla transazione. Più privacy per te, stessa cifra, e il deposito di garanzia riceve gli stessi sats. Se il wallet non lo sa fare, si paga come sempre.
+dove: Il pagamento on-chain di un ordine: il QR e «₿ Apri nel wallet»; la riga «🔀 PayJoin» nel foglio dice quando c'è.
+leva: PAYJOIN_ATTIVO (accesa di serie)
+pubblico: sì

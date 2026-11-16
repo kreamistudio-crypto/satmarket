@@ -84912,3 +84912,118 @@ scambio on-chain pagato in franchi o in moneta, la barra del tempo nel
 foglio on-chain, la carta blu sul telefono. Restano come prima, non
 chiesti: a «Più recenti» le card on-chain stanno in cima; l'icona della
 mappa solo in «Compra BTC».
+
+## Il PayJoin negli acquisti on-chain (16 nov 2026, cantiere payjoin, Andrea: «potremo invece davvero sfruttarlo come PayJoin, però metterei una fee di 1k sats, perché innanzitutto noi dobbiamo pagare fee onchain, e così guadagniamo una piccolissima fee anche nel mercatino a favore di più privacy per gli utenti»; piano in dieci righe, «ok» delle 16:50)
+
+PERCHÉ. Le quote on-chain di Barattolo arrivano su indirizzi a una firma
+della sua chiave (`/1/n`, `onchain_incasso`), e quella chiave sta sul VPS
+dal 27 ott: il server sa firmare quelle monete. Andrea vuole usarle per
+il PayJoin negli acquisti del mercatino, cioè più privacy per chi compra:
+con una moneta di Barattolo fra gli ingressi, chi guarda la catena non
+può più dire «tutti gli ingressi sono di chi paga», né leggere a occhio
+la cifra e il resto.
+
+LA FEE NON ERA DA SCRIVERE. Il codice l'aveva già dal 27 ott:
+`ONCHAIN_QUOTA_FISSA_SATS`, scrivibile dal pannello (tetto 5.000), sul
+compratore (regola ferrea 10), nel conto prima di pagare come «Quota
+fissa a Barattolo (spese di rete)», a Barattolo nella transazione che
+libera i sats, indietro col rimborso. Per i 1.000 sats basta il pannello,
+gesto di Andrea. Vale per TUTTI gli ordini on-chain del mercatino: legarla
+al solo PayJoin non si può, perché la cifra va nel link prima di sapere
+se il wallet lo sa fare. Il P2P resta com'è (ha la sua commissione). Detto
+nel piano: le fee di rete del rilascio le copre già il margine di chi
+compra; Barattolo paga la rete solo spendendo le sue monete, e nel
+PayJoin il peso del suo ingresso lo paga, per regola, il wallet.
+
+COSA. Un ricevitore BIP78 v1 scritto in casa con embit (già fra le
+dipendenze: niente pip nuovo sul VPS), solo nel mercatino. Il link di chi
+paga porta `pj=<URL_PUBBLICO>/api/payjoin/<gettone>&pjos=0` quando c'è
+qualcosa da offrire (leva, ordine da pagare, chiave che firma qui, una
+moneta pronta); il wallet manda l'originale firmato, il server lo giudica
+fino alle firme, ci aggiunge una sua moneta e un'uscita nuova su `/3/n`
+(catena dei resti), firma il suo solo ingresso e risponde. L'uscita
+dell'ordine non si tocca mai, e `pjos=0` lo fa pretendere al wallet.
+Leva `PAYJOIN_ATTIVO`, accesa di serie (regola del 14 nov), interruttore
+d'emergenza. Il disegno pezzo per pezzo: ARCHITETTURA, «IL PAYJOIN DEGLI
+ACQUISTI ON-CHAIN».
+
+LE DECISIONI, COI PERCHÉ.
+- BIP78 v1 e non BIP77 (v2, quello col directory e OHTTP): il server è
+  sempre in linea con un dominio HTTPS, che è quel che v1 chiede; i
+  mittenti v2 (Bull Bitcoin, Cake) parlano anche coi ricevitori v1. Una
+  libreria (payjoin-dev-kit) avrebbe voluto un pacchetto nativo nuovo sul
+  VPS per un protocollo che con embit sono poche centinaia di righe.
+- SOLO INGRESSI p2wpkh, firme VERIFICATE. Il nostro ingresso è p2wpkh, e
+  il BIP sconsiglia i tipi misti; e cosa verificare per intero lo
+  sappiamo solo su p2wpkh. Un wallet taproot riceve un no e paga come
+  sempre. Le firme dell'originale si verificano davvero (sighash BIP143,
+  SIGHASH_ALL): è la nostra «prova che si può trasmettere» senza un nodo.
+- IL SONDAGGIO DELLE MONETE è il rischio del BIP78 per chi riceve senza
+  essere presente. Argini: gettone a caso per ordine; UN tentativo per
+  ordine (lo stesso originale riprende la stessa proposta, uno diverso
+  no); ingressi mai visti; monete che esistono, con la cifra e lo script
+  detti, e non spese (mempool, `/tx` e `/outspend`); e l'originale
+  trasmessa da Barattolo se il PayJoin non va in rete entro tre minuti.
+- LA CHIAVE FIRMA DA SOLA, quindi il meno possibile: un indice, a mano
+  (`sighash_segwit` + `chiave.sign`), mai `sign_with` che firma quel che
+  riconosce; la chiave per la moneta derivata e ricontrollata contro il
+  suo indirizzo; un ingresso di un 2-di-3 non è mai fra le monete.
+- CHI PAGA LA RETE: la stessa tariffa dell'originale sul peso nuovo (99
+  vB). Il wallet contribuisce solo se lo dice (`additionalfeeoutputindex`
+  + `maxadditionalfeecontribution`), solo per il nostro ingresso, mai
+  sull'uscita dell'ordine; il resto da Barattolo, al più 500 sats
+  (`PAYJOIN_SPESA_MAX_SATS`), sennò niente PayJoin. Con le quote da 1.000
+  e la rete sopra i 15 sat/vB circa il PayJoin non si fa: va bene così.
+- LE MONETE: le quote già uscite (mercatino e P2P) e i resti dei PayJoin,
+  in `payjoin_monete`, rilette da mempool dalla ronda on-chain. Una
+  moneta a caso fra le pronte (la stessa sempre in testa sarebbe un
+  segno). Una sola per PayJoin: niente consolidamenti. La ronda passa
+  ogni dieci minuti, e una moneta spesa nel frattempo (un PayJoin
+  trasmesso dal wallet dopo che l'originale era già partita da qui, o
+  sostituita con RBF) darebbe una proposta che la rete rifiuta: la porta
+  rilegge in rete al più tre monete prima di offrirne una.
+- SCARTATO: aggiungere la nostra moneta all'uscita DELL'ORDINE (i sats di
+  Barattolo chiusi in un 2-di-3 altrui, e il conto dell'uscita da rifare);
+  la fee solo col PayJoin (vedi sopra); il PayJoin nel P2P e nello Swap
+  (non richiesti; lo Swap lo prepara il telefono).
+- IL LIMITE, DETTO AD ANDREA: le nostre monete nascono come uscite fisse
+  da 1.000 sats nei rilasci dei 2-di-3, riconoscibili da un analista
+  attento; per lui quel PayJoin si vede. Rompe l'euristica per chi guarda
+  in generale, non per chi ci studia.
+
+PROVATO. `prove_payjoin` (sezione nuova, categoria onchain): un wallet di
+cartone firma l'originale, il ricevitore vero (pezzi del server ed embit)
+costruisce dodici proposte che passano i controlli che il BIP78 chiede al
+wallet (scritti nella prova sul calco dell'implementazione di
+riferimento), rifirmate dal wallet danno una transazione in cui il
+giudice stesso verifica TUTTE le firme, anche la nostra; l'ordine riceve
+l'importo esatto; i no (firma storta, meno dell'importo, taproot, non
+SIGHASH_ALL, sequenza 0 scritta nei byte, xpub, non base64, indirizzo di
+un altro ordine, rete troppo cara, moneta piccola, v=2); tre controprove
+nella suite (il ricevitore rotto apposta: contributo tolto all'ordine,
+firme non verificate, contributo oltre il permesso) e tre a mano sul
+server (tolto il no sull'uscita dell'ordine, tolto il controllo
+dell'importo, sequenza diversa sul nostro ingresso: ognuna fa rossa la
+sua prova). `collaudo_payjoin` (server vero, mempool di cartone, venv
+senza coincurve): la quota di un ordine rilasciato diventa moneta, il
+link del prossimo ordine porta pj= e chi vende non lo vede, la porta
+risponde col CORS, la proposta rifirmata è buona, lo stesso originale
+riprende la stessa proposta, quello diverso no, gettoni storti, OPTIONS,
+v=2, l'originale trasmessa dopo tre minuti e la moneta che torna libera,
+gli ingressi visti e le monete spese, la nostra moneta spesa da poco
+che la ronda non ha visto (riletta: unavailable, segnata 'spesa', nessun
+tentativo scritto), il PayJoin in rete che spende la
+moneta e il suo resto che diventa la moneta dopo (con la chiave che lo
+rifà), l'ordine pagato come sempre, la leva spenta. I NUMERI DI OGGI di
+Tappo dicono quota e PayJoin (banco in `prove_assistente_bot`).
+Numeri: `prove_payjoin` 36 passate, `collaudo_payjoin` 32; la suite
+severa intera e i 136 collaudi della CI (venv senza coincurve) verdi
+nel worktree, sull'albero del commit.
+
+RESTA DA GUARDARE. Nessun wallet vero l'ha ancora provato: in collaudo
+(testnet4) con Sparrow e BlueWallet, prima di dirlo nel canale. La quota a
+1.000 è un gesto di Andrea dal pannello («⚙️ Stato delle leve» → «Quota
+fissa di Barattolo», ✏️); finché è 0 non nasce nessuna moneta e il link
+resta quello di ieri. La porta sul .onion non c'è (`URL_PUBBLICO` è il
+dominio in chiaro): si aggiunge se serve. Sull'istanza di prova privata
+(`PROVA_SOLO_IDS`) la porta risponde 403 a un wallet senza sessione.

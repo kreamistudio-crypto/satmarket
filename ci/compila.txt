@@ -203,3 +203,4 @@ collaudo_mappa_ritiro.py
 collaudo_feedback_modificabile.py
 collaudo_mancia.py
 collaudo_cassa_negozio.py
+collaudo_payjoin.py

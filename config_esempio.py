@@ -1343,6 +1343,13 @@ ONCHAIN_QUOTA_FISSA_SATS = 0
 # la rete) non si paga on-chain, resta il Lightning. 0 = nessun tetto.
 # Il valore del codice e' gia' 250: la riga serve il giorno che sale.
 ONCHAIN_MAX_EURO = 250
+# IL PAYJOIN DEGLI ACQUISTI ON-CHAIN (16 nov 2026, cantiere payjoin): il
+# link di pagamento del mercatino porta `pj=` (BIP78), e il wallet di chi
+# compra che lo sa fare lascia aggiungere a Barattolo una sua moneta (le
+# quote fisse qui sopra). Acceso di serie; il link nasce solo se la
+# chiave di Barattolo firma su questo server e c'e' una sua moneta
+# pronta. False = interruttore d'emergenza: il link torna quello di ieri.
+PAYJOIN_ATTIVO = True
 # LA SCELTA DELLA RETE AL «PAGA» DEL MERCATINO (2 nov 2026, Andrea: «quando
 # uno compra un oggetto e clicca su paga deve comparire esattamente come
 # nel P2P il banner grosso on-chain o Lightning, e poi in alto nella

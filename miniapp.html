@@ -61457,6 +61457,9 @@ async function payDisegnaOnchain(){
   el('payEurNota').style.display = 'block';
   el('payEurNota').textContent = `${onchainRete().prova ? nomeReteProva() + ', rete di prova.' : 'Rete Bitcoin: sats veri.'} L'indirizzo vale fino a ${new Date(o.scade * 1000).toLocaleString('it-IT')}.`;
   el('payPatto').innerHTML = 'Paga con un wallet Bitcoin. I sats vanno in un <b style="color:var(--trust)">2-di-3</b> fra te, chi vende e Barattolo: escono solo con due firme, e al venditore arrivano quando confermi di aver ricevuto l\'oggetto. Serve una conferma, circa dieci minuti.'
+    /* (16 nov 2026, cantiere payjoin) la riga c'e' solo quando il link
+       porta `pj=`: chi non ha un wallet che lo sa fare paga come sempre */
+    + (o.payjoin ? '<br>🔀 <b>PayJoin</b>: se il tuo wallet lo sa fare (Sparrow, BlueWallet, Wasabi, Bull Bitcoin, Cake Wallet), Barattolo aggiunge una sua moneta al pagamento. Più privacy, stessa cifra.' : '')
     /* (foglio-oc-visto) con la cifra intera vista il foglio si chiude da
        solo: qui resta solo il caso di una parte, e si dice quanto manca */
     + (o.visti_sats ? `<br><b>Visti in rete: ${fmt(o.visti_sats)} sats</b>`
@@ -62151,8 +62154,14 @@ function copiaCifraSats(sats){
   copiaLink(String(n), '📋 Copiato: ' + fmt(n) + ' sats');
 }
 
+/* (16 nov 2026, cantiere payjoin) con la porta del PayJoin dal server
+   il link porta anche `pj=` (BIP78) e `pjos=0`: il wallet che lo sa fare
+   lascia aggiungere a Barattolo una sua moneta, e con pjos=0 rifiuta
+   qualunque proposta che tocchi l'uscita dell'ordine. Senza (`o.payjoin`
+   vuoto, e sempre negli scambi P2P) e' il link di ieri. */
 function onchainUriPagamento(o){
-  return `bitcoin:${o.indirizzo.indirizzo}?amount=${(o.importo_sats / 1e8).toFixed(8)}`;
+  const base = `bitcoin:${o.indirizzo.indirizzo}?amount=${(o.importo_sats / 1e8).toFixed(8)}`;
+  return o.payjoin ? `${base}&pj=${encodeURIComponent(o.payjoin)}&pjos=0` : base;
 }
 
 /* ============ GLI SCAMBI P2P ON-CHAIN: LA GARANZIA 2-DI-3 (30 ott 2026,
