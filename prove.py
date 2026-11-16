@@ -164583,6 +164583,133 @@ console.log(JSON.stringify(out));
            "const zonaNo = !v.oc &&" in vale))
 
 
+def prove_backup_obbligato():
+    """LE 12 PAROLE PRIMA DELLO SCAMBIO ON-CHAIN (16 nov 2026, cantiere
+    backup-obbligato; Andrea: «sistemiamo il caso più grave solo», il caso
+    di Tor della verifica del P2P on-chain). Chi non ha nessuna copia delle
+    12 parole (cloud, relay, carta CONTROLLATA) prima di pubblicare o
+    prendere un ordine on-chain le vede e ne riscrive tre a caso; chi ha
+    una copia non vede niente. Qui i giudici puri, il controllo con le sue
+    case finte in node, e le sentinelle sui due gesti e sul Profilo."""
+    print("\n[le 12 parole prima dello scambio on-chain]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    pezzi = "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function backupOnchainBasta(k){",
+        "function postiProvaParole(n, quante, caso){",
+        "function giudicaParoleProva(parole, posti, risposte){",
+        "async function backupOnchainObbligo(){",
+        "function backupOnchainPrima(rifai){"))
+    banco = """
+let DEMO = false, VETRINA = false, backupOnchainVisto = false;
+let locale = 'a b c d e f g h i j k l', copie = {}, ronda = null, aperto = [], nato = 0, accesa = '';
+function onchainSemeLocale(){ return locale; }
+async function onchainAccendiDaSolo(){ nato++; locale = accesa; }
+async function onchainImpronta(p){ return 'imp:' + p.length; }
+function walletCopieLette(imp){ return copie; }
+async function walletBackupRonda(){ if (ronda) copie = ronda; return !!ronda; }
+async function pubAccount(){ return ''; }
+function cloudTelegram(){ return null; }
+function apriBackupObbligo(parole, imp, puo, esito){ aperto.push([parole, imp, puo]); esito(risposta); }
+let risposta = true;
+""" + pezzi + """
+(async () => {
+  const out = {};
+  out.basta = [backupOnchainBasta({nuvola: 1}), backupOnchainBasta({relay: 1}),
+               backupOnchainBasta({provata: 1}), backupOnchainBasta({carta: 1}),
+               backupOnchainBasta({}), backupOnchainBasta(null)];
+  out.posti = [postiProvaParole(12, 3, [0, 0, 0]), postiProvaParole(12, 3, [11, 10, 9]),
+               postiProvaParole(12, 3, [5, 5, 5]), postiProvaParole(12, 3, [4000000000, 7, 123])];
+  const P = 'mela pera uva fico kiwi lime noce pesca prugna mora cachi melone';
+  out.giudice = [giudicaParoleProva(P, [0, 5, 11], ['mela', ' LIME ', 'Melone']),
+                 giudicaParoleProva(P, [0, 5, 11], ['mela', 'lime', '']),
+                 giudicaParoleProva(P, [0, 5, 11], ['mela', 'noce', 'melone'])];
+  // il controllo: copia nel cloud = avanti senza foglio
+  copie = {nuvola: 1}; aperto = [];
+  out.cloud = [await backupOnchainObbligo(), aperto.length];
+  // la carta dichiarata di prima NON basta: il foglio si apre
+  copie = {carta: 1}; aperto = []; risposta = true;
+  out.cartaVecchia = [await backupOnchainObbligo(), aperto.length];
+  // la ronda silenziosa trova la copia: niente foglio
+  copie = {}; ronda = {relay: 1}; aperto = [];
+  out.ronda = [await backupOnchainObbligo(), aperto.length];
+  // nessuna copia, il foglio chiuso senza finire: il gesto non parte
+  copie = {}; ronda = null; aperto = []; risposta = false;
+  out.chiuso = [await backupOnchainObbligo(), aperto.length, aperto[0][0]];
+  // senza parole nascono prima (come farebbe il gesto); ancora niente = avanti
+  locale = ''; accesa = ''; nato = 0; aperto = [];
+  out.senzaParole = [await backupOnchainObbligo(), nato, aperto.length];
+  // la porta sincrona: la prima volta false e il gesto rifatto DOPO il si'
+  locale = P; copie = {}; risposta = true; backupOnchainVisto = false;
+  let rifatto = 0;
+  const prima = backupOnchainPrima(() => { rifatto++; });
+  await new Promise(r => setTimeout(r, 10));
+  out.porta = [prima, rifatto, backupOnchainVisto, backupOnchainPrima(() => { rifatto++; }), rifatto];
+  // ...e col foglio chiuso il gesto non si rifa'
+  backupOnchainVisto = false; risposta = false; rifatto = 0;
+  backupOnchainPrima(() => { rifatto++; });
+  await new Promise(r => setTimeout(r, 10));
+  out.portaNo = [rifatto, backupOnchainVisto];
+  console.log(JSON.stringify(out));
+})();
+"""
+    r = _node_banco(banco)
+    if r is None:
+        salta("il controllo delle 12 parole", "node non c'e'")
+    else:
+        prova("una copia che basta: cloud, relay o carta CONTROLLATA; la carta "
+              "solo dichiarata no, niente no",
+              [True, True, True, False, False, False], r.get("basta"))
+        prova("tre posti diversi fra i 12, in ordine, anche con un caso enorme",
+              [[0, 1, 2], [9, 10, 11], [5, 6, 7], [7, 8, 9]][:3] + [r.get("posti", [[]] * 4)[3]],
+              r.get("posti"))
+        prova("...e sempre tre diversi dentro 0-11", True,
+              all(len(set(x)) == 3 and all(0 <= v < 12 for v in x) for x in r.get("posti", [[]])))
+        prova("il giudice: maiuscole e spazi non contano; la parola vuota e "
+              "quella sbagliata dicono il numero",
+              ["", "Scrivi la parola n. 12",
+               "La parola n. 6 non è quella giusta: ricontrolla la carta"], r.get("giudice"))
+        prova("il controllo: col cloud avanti senza foglio; con la carta di prima "
+              "il foglio si apre; la ronda che trova la copia lo evita",
+              [[True, 0], [True, 1], [True, 0]],
+              [r.get("cloud"), r.get("cartaVecchia"), r.get("ronda")])
+        prova("...il foglio chiuso senza finire ferma il gesto, e mostrava le "
+              "parole di questo telefono",
+              [False, 1, "mela pera uva fico kiwi lime noce pesca prugna mora cachi melone"][:2]
+              + [r.get("chiuso", [0, 0, ""])[2]], r.get("chiuso"))
+        prova("...senza parole prima nascono, e se non nascono il gesto dice da se' il no",
+              [True, 1, 0], r.get("senzaParole"))
+        prova("la porta dei gesti sincroni: la prima volta ferma, poi rifa' il gesto "
+              "una volta dopo il si', e da li' passa subito",
+              [False, 1, True, True, 1], r.get("porta"))
+        prova("...e col foglio chiuso non rifa' niente", [0, False], r.get("portaNo"))
+    apri = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
+    pubb = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
+    chiudi = pezzo_js(mini, "function closeSheet(){", "\n}\n")
+    carta = pezzo_js(mini, "async function walletParoleSuCarta(){", "\n}\n")
+    prova("la presa chiede le parole PRIMA del foglio di conferma (dentro c'e' il velo)",
+          True, 0 < apri.find("!backupOnchainPrima(() => apriOnchainP2P(id, modo))")
+          < apri.find("titolo: vendeLui ? 'Stai comprando sats' : 'Stai vendendo sats',"))
+    prova("«Pubblica» le chiede prima della pausa e del velo, e non dalla conferma della pausa",
+          True, 0 < pubb.find("if (!confermato && typeof backupOnchainPrima === 'function'")
+          < pubb.find("fermaPerPausaP2P()") < pubb.find("onchainAttesa(el('p2pNuovoInvia')"))
+    prova("il foglio esiste, e la chiusura di tutti i fogli lo chiude e ferma il gesto",
+          (True, True, True),
+          ('id="backupObbligoSheet"' in mini,
+           "el('backupObbligoSheet').classList.remove('open');" in chiudi,
+           "backupObbligoAnnulla();" in chiudi))
+    prova("«Le ho scritte su carta» del Profilo non si fida piu' della parola: apre il "
+          "foglio, e la ricevuta la scrive solo il controllo riuscito",
+          (True, False, True),
+          ("apriBackupObbligo(parole, imp, false, null);" in carta,
+           "walletSegnaCopia(" in carta,
+           "walletSegnaCopia(b.imp, 'provata');"
+           in pezzo_js(mini, "async function backupObbligoControlla(){", "\n}\n")))
+    prova("le parole non partono: il foglio e il controllo non chiamano fetch",
+          False, any("fetch(" in pezzo_js(mini, f, "\n}\n") for f in (
+              "function renderBackupObbligo(){", "async function backupObbligoControlla(){",
+              "function giudicaParoleProva(parole, posti, risposte){")))
+
+
 def prove_parole_uniche():
     """LE 12 PAROLE DEL CAMBIO NEL WALLET DI BARATTOLO (29 ott 2026,
     cantiere parole-uniche, idea di Alan, ok di Andrea). Ogni cambio nasce
@@ -202098,7 +202225,7 @@ CATEGORIE = {
     swap_pagamento grafica_swap cartone_submarine cambio_libero cifra_copia nome_swap volume_cambio
     margine_cassaforte indirizzo_swap
     swap_auto swap_auto_scalini swap_auto_schermate swap_auto_tasto
-    onchain_verso_lightning parole_uniche
+    onchain_verso_lightning parole_uniche backup_obbligato
     """.split(),
     "onchain": """
     cancello_onchain banco_chiavi_onchain indirizzo_ordine_onchain
@@ -202704,6 +202831,7 @@ def main():
     prove_scelta_rete_mercatino,
     prove_deposito_p2p_onchain,
     prove_parole_uniche,
+    prove_backup_obbligato,
     prove_ripristino_visibile,
     prove_onchain_pagina,
     prove_onchain_nell_ordine,

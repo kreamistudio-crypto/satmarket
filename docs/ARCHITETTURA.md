@@ -36306,3 +36306,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   bastano a tutto (card, filtro, foglio, dettaglio, cifra da mandare,
   testi). Lato server `_coin_pm_libro`/`_coin_ordine_libro` fanno la
   stessa lettura per il libro, il canale e gli avvisi del bot.
+- LE 12 PAROLE PRIMA DELLO SCAMBIO ON-CHAIN (16 nov 2026, cantiere
+  backup-obbligato; il perché in CANTIERI, «Le 12 parole obbligatorie
+  prima di uno scambio on-chain»). Solo telefono, il server non sa niente.
+  La porta `backupOnchainPrima(rifai)` sta in `apriOnchainP2P` (prima del
+  foglio di conferma della presa) e in `pubblicaOnchainDalFoglioP2P`
+  (prima della pausa e del velo, mai dalla conferma della pausa): torna
+  true se in questa pagina il controllo è già passato
+  (`backupOnchainVisto`), sennò lancia `backupOnchainObbligo()` e, al sì,
+  rifà il gesto. Il controllo: parole (fatte nascere con
+  `onchainAccendiDaSolo` se mancano), impronta, ricevute del dispositivo
+  (`walletCopieLette`) giudicate da `backupOnchainBasta` — `nuvola`,
+  `relay` o `provata`, MAI la `carta` dichiarata di prima —, poi
+  `walletBackupRonda`, poi il foglio `backupObbligoSheet` (ultimo dei
+  fogli nel DOM, sopra a «Pubblica»): `apriBackupObbligo(parole, imp,
+  puo, esito)`, lo stato in `backupObbligo` ({passo 'mostra' | 'prova',
+  posti}), `renderBackupObbligo`, i gesti `backupObbligoScritte`
+  (`postiProvaParole(12, BACKUP_PROVA_QUANTE, caso)`),
+  `backupObbligoControlla` (`giudicaParoleProva`; riuscito scrive le
+  ricevute `carta` e `provata` e chiude con `backupObbligoFatto`),
+  `backupObbligoRivedi`, `backupObbligoSalva` (cloud/relay, solo con
+  `puo`), `backupObbligoNo` («Non adesso»: chiude solo questo foglio). In
+  `closeSheet` il foglio si chiude e `backupObbligoAnnulla` ferma il
+  gesto. «Le ho scritte su carta» del Profilo (`walletParoleSuCarta`)
+  apre lo stesso foglio senza gesto dietro. Le prove:
+  `prove_backup_obbligato`.

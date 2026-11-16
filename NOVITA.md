@@ -362,3 +362,9 @@ frase: Se compri più codici digitali nello stesso ordine (per esempio 10 buoni)
 dove: l'ordine di un codice online da 2 pezzi in su: per chi vende il form «Consegna i codici», per chi compra il pannello «🔓 Apri il codice 1».
 leva: CODICI_UNO_ALLA_VOLTA (accesa di serie)
 pubblico: sì
+
+## 2026-11-16 · backup-obbligato
+frase: Prima del tuo primo scambio P2P on-chain, se le tue 12 parole non hanno ancora una copia (nel cloud di Telegram o sui relay Nostr), Barattolo te le mostra e te ne fa riscrivere tre: così i sats nel deposito di garanzia non restano mai chiusi da una chiave persa. Chi entra da Telegram o con Nostr di solito non vede niente di nuovo.
+dove: Il P2P, quando pubblichi o prendi un ordine on-chain; Profilo → «₿ On-chain» → «Le ho scritte su carta».
+leva: nessuna
+pubblico: sì

@@ -85839,3 +85839,73 @@ più `position:relative` sotto `novita-compatte`, la corsa del `top` e il
 DA GUARDARE: dal telefono di Andrea dopo la promozione (webview Android
 di Telegram, dove il 14 nov si era visto quel che Chromium non
 mostrava).
+
+## Le 12 parole obbligatorie prima di uno scambio on-chain (16 nov 2026, cantiere backup-obbligato; dalla verifica del P2P on-chain chiesta da Andrea: «Non vorrei che ci fosse qualche bug e che qualcuno non riesca a completare un acquisto e che quei soldi rimangono bloccati», «Controlla anche chi entra da Nostr, con Tor, quando perde il profilo»; poi «sistemiamo il caso più grave solo», «Solo quello di Tor?» → sì)
+
+LA VERIFICA, prima del cantiere (thread «Verificare il flusso P2P
+on-chain», solo lettura: develop 7d49bbbb, otto collaudi on-chain/P2P
+verdi e uno script di casi limite col server vero e mempool di cartone,
+non committato; il DB di produzione letto da Andrea alle 19:51: 5 ordini
+nel libro, 3 annullati a zero sats, NESSUN sats fermo). Nessun furto
+possibile (due firme, giudice delle uscite nel server, conti rifatti nel
+telefono). Quattro strade in cui i sats restano nel 2-di-3 senza bottone:
+(1) deposito confermato ma sotto `importo_sats` (stato `preso`): niente
+annullo, niente disputa, fuori dalla coda dei moderatori, `decidi` 409;
+esce col rabbocco + disputa o col rimborso proposto da chi compra;
+(2) la seconda firma sulla firma di Barattolo la mette solo chi vince
+(«Questa uscita non va a te»), anche se Barattolo + l'altra parte
+basterebbero: chi deve ricevere e ha perso le 12 parole resta chiuso,
+salvo a mano con Sparrow; (3) il rimborso proposto dal telefono
+(`onchainFirmaProposta`, verso compratore) non tiene la commissione di
+rete dentro il margine: rifiutato se la tariffa sale oltre ~3,6 volte
+quella della presa (~2,1 con due monete), uscita con la disputa; vale
+anche per il mercatino (stessa funzione); (4) chi entra dal web o da Tor
+col login dal bot ha le 12 parole SOLO nel browser (niente cloud di
+Telegram fuori dalla Mini App, niente relay senza chiave Nostr) e Tor
+Browser le cancella a ogni chiusura; l'avviso si chiudeva con la ✕ e «Le
+ho scritte su carta» si toccava senza averle scritte. Perdita per sempre
+solo con una chiave persa E l'altra parte che non aiuta (o lo swap in
+Lightning fallito con le parole perse). Andrea sceglie di curare SOLO la 4.
+
+COSA FA. Prima di pubblicare (`pubblicaOnchainDalFoglioP2P`, prima della
+pausa e del velo) e prima di prendere (`apriOnchainP2P`, prima del foglio
+di conferma, che dentro ha il velo di `eseguiConferma`) un ordine
+on-chain, `backupOnchainPrima(rifai)` chiede `backupOnchainObbligo()`:
+le parole nascono se mancano (come farebbe il gesto), poi basta una
+copia (`backupOnchainBasta`: ricevuta `nuvola`, `relay` o la nuova
+`provata`), sennò la ronda silenziosa di sempre (`walletBackupRonda`), e
+solo se manca ancora il foglio `backupObbligoSheet`: le 12 parole, «Le ho
+scritte», poi TRE a caso da riscrivere (`postiProvaParole` col caso di
+`crypto.getRandomValues`, giudice puro `giudicaParoleProva`: maiuscole e
+spazi non contano). Riuscito: ricevute `carta` + `provata`, il gesto
+riparte da capo (`backupOnchainVisto` per il resto della pagina). «Non
+adesso» chiude solo il foglio (sotto può esserci «Pubblica» col modulo
+pieno); `closeSheet` lo chiude e ferma il gesto (`backupObbligoAnnulla`).
+Con cloud o Nostr c'è anche «Salva il backup» (`onchainMettiAlSicuro`).
+«Le ho scritte su carta» del Profilo apre lo stesso foglio: la ricevuta
+`carta` la scrive solo il controllo. Le parole non lasciano il telefono.
+
+SCARTATO. Fermare chi ha la «carta» dichiarata prima di oggi senza
+chiedergli niente (le ricevute vecchie non erano controllate: per questo
+`provata` è una chiave nuova, e quelle persone fanno il controllo una
+volta); il controllo anche all'apertura del foglio del deposito
+(`apriDepositoOnchainP2P` è sincrona e la provano i banchi così: la
+porta sta già sulla presa e sulla pubblica, dove nasce il 2-di-3);
+le parole sul server per ritrovarle dal web (regola ferrea 2).
+
+PROVATO. `prove_backup_obbligato` (nuova, categoria swap accanto a
+`parole_uniche`): i tre giudici puri, il controllo in node con le case
+finte (cloud sì, carta di prima no, ronda che trova la copia, foglio
+chiuso che ferma, parole che nascono), la porta sincrona (ferma, rifà una
+volta dopo il sì, poi passa), le sentinelle sui due gesti, su `closeSheet`
+e sul Profilo, nessun `fetch` nel foglio; quattro controprove rosse (la
+carta dichiarata che basta, la presa senza porta, il giudice che guarda
+le maiuscole, il gesto rifatto col foglio chiuso). Dal vivo in Chromium
+(Playwright, pagina vera da file, rete spenta): il foglio a 390 px, la
+parola sbagliata che dice il numero, il tocco su una card on-chain che
+apre il foglio e, controllato, il «Stai comprando sats». Suite severa e
+collaudi della CI (venv senza coincurve) sull'albero del commit.
+DA GUARDARE. Su Tor vero: chiudere e riaprire il browser e vedere il
+foglio tornare al primo gesto on-chain (le ricevute se ne vanno con le
+parole). Gli scambi aperti PRIMA del deploy non passano dalla porta. Le
+cure 1-3 della verifica restano da decidere.

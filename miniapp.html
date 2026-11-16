@@ -16981,6 +16981,14 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
+  <!-- LE 12 PAROLE PRIMA DELLO SCAMBIO ON-CHAIN (16 nov 2026, backup-obbligato):
+       mostrate, poi tre riscritte a caso; ultimo dei fogli, sta sopra a «Pubblica» -->
+  <div class="sheet" id="backupObbligoSheet" role="dialog" aria-modal="true" aria-labelledby="backupObbligoTit">
+    <div class="grab"></div>
+    <h3 id="backupObbligoTit">✍️ Prima scrivi le 12 parole</h3>
+    <div id="backupObbligoCorpo"></div>
+  </div>
+
   <!-- ============ SHEET DISTINTIVI DEL VENDITORE ============ -->
   <div class="sheet" id="distintiviSheet">
     <div class="grab"></div>
@@ -35958,6 +35966,8 @@ function closeSheet(){
   el('p2pVotoSheet').classList.remove('open');
   el('p2pHoldSheet').classList.remove('open');
   el('p2pOcDepositoSheet').classList.remove('open');
+  el('backupObbligoSheet').classList.remove('open');
+  backupObbligoAnnulla();   // il gesto che aspettava le parole non parte
   el('p2pIncassoSheet').classList.remove('open');
   el('p2pCampiSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
@@ -61629,9 +61639,11 @@ async function walletParoleSuCarta(){
   haptic();
   const parole = onchainSemeLocale();
   if (!parole) return;
-  try { walletSegnaCopia(await onchainImpronta(parole), 'carta'); } catch(e){}
-  toast('Bene: tienile al sicuro, lontano dal telefono', 5000);
-  renderWalletBarattolo();
+  /* (16 nov 2026, backup-obbligato) non piu' sulla parola: il foglio
+     mostra le 12 parole e ne fa riscrivere tre a caso */
+  let imp;
+  try { imp = await onchainImpronta(parole); } catch(e){ return; }
+  apriBackupObbligo(parole, imp, false, null);
 }
 async function walletIncollaParole(btn){
   haptic();
@@ -61687,6 +61699,174 @@ async function walletMostraParole(btn){
   rip();
   walletParoleViste = true;
   renderWalletBarattolo();
+}
+
+/* ══ LE 12 PAROLE PRIMA DELLO SCAMBIO ON-CHAIN (16 nov 2026, cantiere
+   backup-obbligato; Andrea, dopo la verifica del P2P on-chain: «sistemiamo
+   il caso più grave solo», cioè quello di Tor). Le 12 parole sono la
+   chiave di ognuno nel deposito di garanzia 2-di-3: chi le perde mentre
+   i sats sono dentro li lascia chiusi, e se l'altra parte non aiuta sono
+   persi. Dentro Telegram la copia nel cloud si fa da sola, con Nostr
+   quella cifrata sui relay; ma chi entra dal web o da Tor col login dal
+   bot le ha SOLO nel browser, e Tor Browser le cancella a ogni chiusura.
+   Fino a ieri c'era l'avviso, chiudibile, e «Le ho scritte su carta» si
+   toccava senza averle scritte. Adesso, PRIMA di pubblicare o prendere un
+   ordine on-chain, chi non ha nessuna copia (`backupOnchainBasta`: cloud,
+   relay, o la carta CONTROLLATA) le vede e ne riscrive TRE a caso. Tutto
+   nel telefono: le parole non partono verso nessuno. Chi ha gia' una
+   copia non vede niente. La ricevuta `provata` e' nuova apposta: le
+   «carta» di prima erano dichiarate, non controllate. */
+const BACKUP_PROVA_QUANTE = 3;
+let backupOnchainVisto = false;   // in questa pagina il controllo e' gia' passato
+let backupObbligo = null;         // il foglio aperto: {parole, imp, passo, posti, puo, esito}
+/* PURA: una copia che ridà le parole c'e'? */
+function backupOnchainBasta(k){
+  return !!(k && (k.nuvola || k.relay || k.provata));
+}
+/* PURA (col caso dato da fuori): TRE posti diversi fra i 12, in ordine */
+function postiProvaParole(n, quante, caso){
+  const tutti = Array.from({length: n}, (_, i) => i);
+  const fuori = [];
+  for (let i = 0; i < quante && tutti.length; i++)
+    fuori.push(tutti.splice((caso[i] >>> 0) % tutti.length, 1)[0]);
+  return fuori.sort((a, b) => a - b);
+}
+/* PURA: '' se le parole scritte sono quelle dei posti, sennò il perché */
+function giudicaParoleProva(parole, posti, risposte){
+  const w = String(parole || '').trim().split(/\s+/);
+  for (let i = 0; i < posti.length; i++) {
+    const giusta = String(w[posti[i]] || '').toLowerCase();
+    const scritta = String((risposte || [])[i] || '').trim().toLowerCase();
+    if (!scritta) return `Scrivi la parola n. ${posti[i] + 1}`;
+    if (scritta !== giusta) return `La parola n. ${posti[i] + 1} non è quella giusta: ricontrolla la carta`;
+  }
+  return '';
+}
+/* IL CONTROLLO: true = si puo' andare avanti. Le parole nascono qui se
+   non ci sono ancora (come farebbe il gesto); senza parole il gesto
+   dira' da se' il suo no. Prima la ronda silenziosa (cloud, nsec nel
+   browser), poi, se manca ancora una copia, il foglio. */
+async function backupOnchainObbligo(){
+  if ((typeof DEMO !== 'undefined' && DEMO) || (typeof VETRINA !== 'undefined' && VETRINA)) return true;
+  if (!onchainSemeLocale()) { try { await onchainAccendiDaSolo(); } catch(e){} }
+  const parole = onchainSemeLocale();
+  if (!parole) return true;
+  let imp;
+  try { imp = await onchainImpronta(parole); } catch(e){ return true; }
+  if (backupOnchainBasta(walletCopieLette(imp))) return true;
+  try { await walletBackupRonda(); } catch(e){}
+  if (backupOnchainBasta(walletCopieLette(imp))) return true;
+  let nostr = false;
+  try { nostr = !!(await pubAccount()); } catch(e){ nostr = false; }
+  return await new Promise(esito => apriBackupObbligo(parole, imp, !!cloudTelegram() || nostr, esito));
+}
+/* LA PORTA PER I GESTI SINCRONI (la presa e' un foglio di conferma, e
+   dentro la conferma c'e' il velo): gia' controllato = avanti subito
+   (true); sennò il controllo parte, e se passa rifa' il gesto da capo */
+function backupOnchainPrima(rifai){
+  if (backupOnchainVisto) return true;
+  backupOnchainObbligo().then(ok => {
+    if (!ok) return;
+    backupOnchainVisto = true;
+    rifai();
+  }).catch(() => {});
+  return false;
+}
+function apriBackupObbligo(parole, imp, puo, esito){
+  backupObbligo = {parole, imp, puo, esito: esito || null, passo: 'mostra', posti: []};
+  renderBackupObbligo();
+  el('sheetBg').classList.add('open');
+  el('backupObbligoSheet').classList.add('open');
+}
+/* chiuso senza finire (closeSheet, la ✕ del telefono): il gesto non parte */
+function backupObbligoAnnulla(){
+  const b = backupObbligo;
+  backupObbligo = null;
+  if (b && b.esito) b.esito(false);
+}
+/* «Non adesso»: chiude SOLO questo foglio (sotto puo' esserci «Pubblica»
+   col suo modulo pieno), e il gesto non parte */
+function backupObbligoNo(){
+  backupObbligoChiudi();
+  backupObbligoAnnulla();
+}
+function backupObbligoChiudi(){
+  el('backupObbligoSheet').classList.remove('open');
+  if (!document.querySelector('.sheet.open')) el('sheetBg').classList.remove('open');
+}
+function renderBackupObbligo(){
+  const box = el('backupObbligoCorpo');
+  const b = backupObbligo;
+  if (!box || !b) return;
+  if (b.passo === 'prova') {
+    box.innerHTML = `<div class="hint">Scrivi le parole che hai segnato a questi numeri:</div>`
+      + b.posti.map((p, i) => `<div class="field" style="margin-top:12px"><label for="backupProva${i}">Parola n. ${p + 1}</label>
+        <input id="backupProva${i}" class="mono" type="text" autocomplete="off" autocapitalize="off"
+          autocorrect="off" spellcheck="false"></div>`).join('')
+      + `<button class="btn orange" style="margin-top:14px" onclick="backupObbligoControlla()">Controlla</button>
+        <button class="btn link" onclick="backupObbligoRivedi()">Rivedi le 12 parole</button>`;
+    const primo = el('backupProva0');
+    if (primo) primo.focus();
+    return;
+  }
+  box.innerHTML = `<div class="hint">Sono la tua chiave del deposito di garanzia 2-di-3:
+      servono a firmare quando i sats escono. Su questo dispositivo non ne vediamo
+      nessuna copia (né nel cloud di Telegram né sui relay Nostr), e alcuni browser,
+      come Tor, le cancellano quando li chiudi. Senza, i sats di uno scambio aperto
+      possono restare chiusi per sempre.</div>
+    <div class="hint" style="margin-top:8px"><b>Scrivile su carta, in ordine</b>, e tienile
+      lontano dal telefono. Non le chiediamo mai: restano qui.</div>
+    <ol class="swap-parole">${b.parole.split(' ').map(p => `<li>${esc(p)}</li>`).join('')}</ol>
+    <button class="btn orange" onclick="backupObbligoScritte()">Le ho scritte</button>
+    ${b.puo ? '<button class="btn ghost" onclick="backupObbligoSalva(this)">Salva il backup (cloud o relay)</button>' : ''}
+    <button class="btn link" onclick="backupObbligoNo()">Non adesso</button>`;
+}
+function backupObbligoScritte(){
+  const b = backupObbligo;
+  if (!b) return;
+  haptic();
+  const caso = new Uint32Array(BACKUP_PROVA_QUANTE);
+  crypto.getRandomValues(caso);
+  b.posti = postiProvaParole(b.parole.split(' ').length, BACKUP_PROVA_QUANTE, caso);
+  b.passo = 'prova';
+  renderBackupObbligo();
+}
+function backupObbligoRivedi(){
+  if (!backupObbligo) return;
+  backupObbligo.passo = 'mostra';
+  renderBackupObbligo();
+}
+function backupObbligoFatto(){
+  const b = backupObbligo;
+  backupObbligo = null;
+  backupOnchainVisto = true;
+  backupObbligoChiudi();
+  if (b && b.esito) b.esito(true);
+}
+async function backupObbligoControlla(){
+  const b = backupObbligo;
+  if (!b) return;
+  const risposte = b.posti.map((_, i) => (el('backupProva' + i) || {}).value || '');
+  const no = giudicaParoleProva(b.parole, b.posti, risposte);
+  if (no) { haptic('warning'); return toast('⚠️ ' + no, 5000); }
+  haptic('success');
+  walletSegnaCopia(b.imp, 'carta');
+  walletSegnaCopia(b.imp, 'provata');
+  toast('✅ Bene: tienile al sicuro, lontano dal telefono', 5000);
+  backupObbligoFatto();
+  if (typeof renderWalletBarattolo === 'function' && el('walletBarattolo')) renderWalletBarattolo();
+}
+async function backupObbligoSalva(btn){
+  const b = backupObbligo;
+  if (!b) return;
+  const rip = onchainAttesa(btn, 'Salvo la copia…');
+  try { await onchainMettiAlSicuro(b.parole); } catch(e){}
+  finally { rip(); }
+  if (backupOnchainBasta(walletCopieLette(b.imp))) {
+    toast('✅ Copia salvata', 4000);
+    return backupObbligoFatto();
+  }
+  toast('⚠️ La copia non è riuscita: scrivi le parole su carta', 6000);
 }
 
 /* TOGLIERE DOVE SI RICEVE (30 ott 2026, Andrea e Alan durante la prova:
@@ -63995,6 +64175,9 @@ function apriOnchainP2P(id, modo){
   }
   const vendeLui = o.lato === 'sell';
   const metodi = (o.metodi || []).join(', ');
+  /* LE 12 PAROLE PRIMA (16 nov 2026, backup-obbligato): senza una copia
+     non si prende; scritte e controllate, la presa riparte da qui */
+  if (typeof backupOnchainPrima === 'function' && !backupOnchainPrima(() => apriOnchainP2P(id, modo))) return;
   const conTasti = typeof reteOcPresaPossibileP2P === 'function' && reteOcPresaPossibileP2P(vendeLui);
   chiediConferma({
     /* lo stesso cappello del dettaglio Lightning, con la rete sotto
@@ -65326,6 +65509,10 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
   if (!g.ok) { avvisaMancaP2P(g); return; }
   const noRip = typeof erroreRipubblicaP2P === 'function' ? erroreRipubblicaP2P(campi) : '';
   if (noRip) { toast(noRip, 6000); const i = el('p2pNuovoRipMin'); if (i) i.focus(); return; }
+  /* LE 12 PAROLE PRIMA (16 nov 2026, backup-obbligato), prima della
+     pausa: dalla conferma della pausa si torna qui col velo addosso */
+  if (!confermato && typeof backupOnchainPrima === 'function'
+      && !backupOnchainPrima(() => pubblicaOnchainDalFoglioP2P(false))) return;
   if (!confermato && typeof fermaPerPausaP2P === 'function' && fermaPerPausaP2P()) return;
   const vendo = campi.lato === 'vendo';
   /* in USDT l'indirizzo di chi vende passa dal giudice della rete prima
