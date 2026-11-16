@@ -159862,6 +159862,76 @@ console.log(JSON.stringify(out));
            ".p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-coin-novita.appeso .p2p-oc-faccia{top:0}" in mini))
 
 
+def prove_icone_valute_filtro():
+    """LE ICONE DELLE VALUTE NEL FILTRO E DELLE RETI USDT (16 nov 2026,
+    cantiere coin-quasi, Andrea: «manca l'icona a fianco a USDT come quando
+    scegli come vuoi ricevere, su quale rete, e anche nel filtro»). Nel
+    filtro del libro ogni valuta ha la sua icona davanti (bandierina, T di
+    Tether, logo della moneta, come nella scelta della valuta del foglio), e
+    «USDT (Tron)» / «USDT (Ethereum)» hanno la T come le reti di USDe il
+    loro logo: in tendina, nel filtro e nella card, dallo stesso
+    `marchioMetodoP2P`."""
+    print("\n[le icone delle valute nel filtro e delle reti USDT]")
+    import json as _js, shutil, subprocess, tempfile
+    node = shutil.which("node")
+    if not node:
+        salta("il banco delle icone", "node non c'e'")
+        return
+    mini = open("miniapp.html", encoding="utf-8").read()
+    riga = lambda nome: next(l for l in mini.split("\n") if l.startswith("const " + nome + " = "))
+    reti = pezzo_js(mini, "const P2P_RETI_USDT = [", "\n];\n") + "\n];\n"
+    banco = "\n".join([
+        riga("P2P_VALUTE"), "const P2P_RETI_USDT = [" + reti[len("const P2P_RETI_USDT = ["):],
+        _fn_js(mini, "function reteUsdtDaMetodoP2P(m){"),
+        _fn_js(mini, "function etichettaUsdtP2P(m){"),
+        _fn_js(mini, "function iconaValutaFiltroP2P(v){"),
+    ]) + r"""
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const valutaCoinP2P = c => c === 'USDE' ? {cod: 'USDE'} : null;
+const out = {};
+const v = c => P2P_VALUTE.find(x => x.cod === c);
+out.eur = iconaValutaFiltroP2P(v('EUR'));
+out.chf = iconaValutaFiltroP2P(v('CHF'));
+out.usdt = iconaValutaFiltroP2P(v('USDT'));
+out.usde = iconaValutaFiltroP2P({cod: 'USDE', segno: 'USDe', bandiera: '<span class="p2p-coin-ico">L</span>'});
+out.tron = etichettaUsdtP2P('USDT (Tron)');
+out.eth = etichettaUsdtP2P('USDT (Ethereum)');
+out.altre = [etichettaUsdtP2P('USDT (Polygon)'), etichettaUsdtP2P('SEPA'), etichettaUsdtP2P('')];
+process.stdout.write(JSON.stringify(out));
+"""
+    d = tempfile.mkdtemp()
+    try:
+        fn = os.path.join(d, "icone.js")
+        with open(fn, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = subprocess.run([node, fn], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco delle icone gira in node", "", (r.stderr or "")[-700:])
+        o = _js.loads(r.stdout) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if not o:
+        return
+    prova("nel filtro ogni valuta ha la sua icona: la bandierina con uno spazio, la T di Tether, "
+          "il logo della moneta col suo margine e il suo nome", [True, True, True, True],
+          [o["eur"] == "🇪🇺 EUR", o["chf"] == "🇨🇭 CHF",
+           o["usdt"].startswith("<svg class=\"ico-usdt\"") and o["usdt"].endswith("</svg> USDT"),
+           o["usde"] == '<span class="p2p-coin-ico">L</span>USDe'])
+    prova("le due reti USDT con la T davanti, dentro la scatolina dei loghi, e il nome dopo",
+          [True, True],
+          [o["tron"].startswith('<span class="p2p-coin-ico" role="img" aria-label="USDT"><svg class="ico-usdt"')
+           and o["tron"].endswith("</span>USDT (Tron)"),
+           o["eth"].endswith("</span>USDT (Ethereum)") and "ico-usdt" in o["eth"]])
+    prova("...e una rete che non e' nostra, un metodo dell'euro o niente non prendono la T",
+          ["", "", ""], o["altre"])
+    prova("i fili: il filtro chiede l'icona per ogni valuta, il vestito del metodo l'etichetta "
+          "USDT, il CSS stende la T nella scatolina", [True, True, True],
+          ["      pill(v.cod, b.valute.indexOf(v.cod) >= 0, 'scegliValutaFiltroP2P',\n"
+           "           iconaValutaFiltroP2P(v))).join('') +" in mini,
+           "|| (typeof etichettaUsdtP2P === 'function' && etichettaUsdtP2P(m)) || esc(m);"
+           in pezzo_js(mini, "function marchioMetodoP2P(m, conTesto){", "\n}\n"),
+           ".p2p-coin-ico .ico-usdt{width:100%;height:100%;display:block}" in mini])
+
+
 def prove_p2p_monete_valute():
     """ETH, MONERO E USDe COME VALUTE (16 nov 2026, cantiere
     p2p-monete-valute, Andrea: «ETH, XMR, USDe si devono comportare come
@@ -166257,10 +166327,12 @@ def prove_contanti_zona():
     prova("il vestito del metodo chiede l'etichetta al blocco del contanti, e il 💵 non lo scrive a mano",
           [True, 0],
           # ⚠️ EMENDATA (13 nov 2026, cantiere eth-xmr): dopo il contanti
-          # chiede anche l'etichetta di ETH e XMR, col loro logo
+          # chiede anche l'etichetta di ETH e XMR, col loro logo; e (16 nov
+          # 2026, coin-quasi) quella delle reti USDT, con la T di Tether
           ["if (!v) return (typeof etichettaContantiP2P === 'function' && etichettaContantiP2P(m))\n"
-           "    || (typeof etichettaCoinP2P === 'function' && etichettaCoinP2P(m)) || esc(m);"
-           in mar, mar.count(chr(0x1F4B5))])
+           "    || (typeof etichettaCoinP2P === 'function' && etichettaCoinP2P(m))\n" in mar
+           and "    || (typeof etichettaUsdtP2P === 'function' && etichettaUsdtP2P(m)) || esc(m);" in mar,
+           mar.count(chr(0x1F4B5))])
     prova("l'icona delle banconote sta in UNA costante, e nessuna card la scrive a mano",
           ["const P2P_CONTANTI_ICO = '" + chr(0x1F4B5) + "';", 0, 0],
           [_riga_js(mini, "const P2P_CONTANTI_ICO = ").strip(), riga.count(chr(0x1F4B5)),
@@ -198155,7 +198227,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     """.split(),
@@ -198847,6 +198919,7 @@ def main():
     prove_novita_usdt_p2p,
     prove_novita_coin_p2p,
     prove_p2p_monete_valute,
+    prove_icone_valute_filtro,
     prove_prezzo_btc_libro,
     prove_usdt_foglio_presa,
     prove_sconto_fisso_decimale,

@@ -3212,6 +3212,7 @@
   /* il logo piccolo davanti al nome del metodo: card, pillole, tendina */
   .p2p-coin-ico{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.22em;margin-right:5px}
   .p2p-coin-ico .p2p-coin-svg{width:100%;height:100%;display:block}
+  .p2p-coin-ico .ico-usdt{width:100%;height:100%;display:block}
   .p2p-tessera-rete .cambio-moneta.p2p-oc-moneta{width:34px;height:34px;
     border-radius:inherit}
   .p2p-tessera-rete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:20px;height:20px}
@@ -69582,6 +69583,14 @@ function scegliMetodoFiltroP2P(m){
   else b.metodi = metodiFiltroP2P().filter(x => x === m || b.metodi.indexOf(x) >= 0);
   renderFiltroP2P();
 }
+/* la pillola di una valuta nel filtro: icona e nome. Il logo delle monete
+   ha gia' il suo margine (`.p2p-coin-ico`), la bandierina e la T no */
+function iconaValutaFiltroP2P(v){
+  const coin = typeof valutaCoinP2P === 'function' && valutaCoinP2P(v.cod);
+  const ico = v.bandiera || '';
+  const sep = !ico || ico.indexOf('p2p-coin-ico') >= 0 ? '' : ' ';
+  return ico + sep + esc(coin ? v.segno : v.cod);
+}
 function renderFiltroP2P(){
   const box = el('p2pFiltroCorpo');
   const b = p2pFiltroBozza;
@@ -69613,9 +69622,12 @@ function renderFiltroP2P(){
   box.innerHTML = rete +
     '<div class="section-label">Valute</div>' +
     '<div class="p2p-metodi">' + (typeof valuteVisibiliP2P === 'function' ? valuteVisibiliP2P() : P2P_VALUTE).map(v =>
-      /* le monete col loro nome, «USDe» (16 nov 2026, p2p-monete-valute) */
+      /* le monete col loro nome, «USDe» (16 nov 2026, p2p-monete-valute),
+         e OGNI valuta con la sua icona davanti, come nella scelta della
+         valuta del foglio (16 nov 2026, Andrea: «manca l'icona … anche nel
+         filtro»): la bandierina, la T di Tether, il logo della moneta */
       pill(v.cod, b.valute.indexOf(v.cod) >= 0, 'scegliValutaFiltroP2P',
-           typeof valutaCoinP2P === 'function' && valutaCoinP2P(v.cod) ? esc(v.segno) : '')).join('') +
+           iconaValutaFiltroP2P(v))).join('') +
     '</div>' +
     '<div class="section-label">Metodi di pagamento</div>' +
     '<div class="p2p-metodi">' + metodiFiltroP2P().map(m =>
@@ -82297,6 +82309,13 @@ function etichettaCoinP2P(m){
   const r = reteCoinDaMetodoP2P(m);
   return r ? iconaCoinP2P(r) + esc(m) : '';
 }
+/* una rete USDT col logo di Tether davanti, come le reti di USDe: la T
+   e' quella della valuta (`P2P_VALUTE`), dentro la stessa scatolina */
+function etichettaUsdtP2P(m){
+  const r = typeof reteUsdtDaMetodoP2P === 'function' ? reteUsdtDaMetodoP2P(m) : null;
+  const v = r && P2P_VALUTE.find(x => x.cod === 'USDT');
+  return v ? '<span class="p2p-coin-ico" role="img" aria-label="USDT">' + v.bandiera + '</span>' + esc(m) : '';
+}
 /* la riga sotto il campo dell'indirizzo, come per le reti USDT */
 function notaReteCoinP2P(r){
   if (r.token) return r.forma === 'solana'
@@ -84752,7 +84771,10 @@ function marchioMetodoP2P(m, conTesto){
      giudice vive nel blocco del contanti: da qui il typeof */
   /* ...e ETH e XMR il loro logo (13 nov 2026, cantiere eth-xmr) */
   if (!v) return (typeof etichettaContantiP2P === 'function' && etichettaContantiP2P(m))
-    || (typeof etichettaCoinP2P === 'function' && etichettaCoinP2P(m)) || esc(m);
+    || (typeof etichettaCoinP2P === 'function' && etichettaCoinP2P(m))
+    /* ...e le reti USDT la T di Tether (16 nov 2026, Andrea: «manca
+       l'icona a fianco a USDT come quando scegli … su quale rete») */
+    || (typeof etichettaUsdtP2P === 'function' && etichettaUsdtP2P(m)) || esc(m);
   const img = '<span class="p2p-marca" title="' + esc(m) + '"><img src="'
     + v.logo + '" alt="' + esc(v.nome)
     + '" onerror="this.parentNode.replaceWith(this.parentNode.title)"></span>';

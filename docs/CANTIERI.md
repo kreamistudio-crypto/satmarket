@@ -84380,3 +84380,26 @@ PROVATO: `prove_profilo_elegante` (ordine dei cassetti, censimento delle
 voci, gesti), `prove_canale_bot` 4 bis (api/me, voce spenta di serie,
 accensione, `linkTappoValido` in node), libro di Tappo aggiornato
 (Profilo → Supporto → Assistenza). Da guardare dal telefono.
+
+## Le icone delle valute nel filtro e la T accanto alle reti USDT (16 nov 2026, cantiere coin-quasi, Andrea guardando le foto di p2p-monete-valute: «Ma anche il franco svizzero nelle opzioni della valuta. Manca l'icona a fianco a USDT come quando scegli come vuoi ricevere, su quale rete, e anche nel filtro»)
+
+Nel filtro del libro le pillole «Valute» erano solo testo (EUR, USDT,
+CHF), mentre la scelta della valuta del foglio aveva bandierina, T e
+loghi; e «USDT (Tron)» / «USDT (Ethereum)» erano le sole reti senza logo,
+in tendina, nel filtro e nella card, accanto a «USDe (Base)» col suo.
+Ora `iconaValutaFiltroP2P(v)` mette l'icona della valuta (la stessa
+`bandiera` di `P2P_VALUTE`) davanti al nome in ogni pillola del filtro, ed
+`etichettaUsdtP2P(m)` dà alle due reti la T di Tether nella scatolina dei
+loghi (`.p2p-coin-ico`), chiamata da `marchioMetodoP2P` dopo contanti e
+monete: un posto solo, quindi tendina, filtro e card insieme. Il franco
+fra le valute del foglio c'era già a leva accesa (`P2P_CHF_ATTIVO` e non
+solo admin, come in produzione dal 16 nov): nel giro di prima la gabbia
+lo aveva spento; rifatto con la leva accesa, c'è.
+PROVATO: `prove_icone_valute_filtro` (5) in node: le quattro pillole
+(🇪🇺 EUR, 🇨🇭 CHF, la T, il logo di USDe senza spazio doppio), le due reti
+con la T, una rete non nostra / un metodo dell'euro / niente senza, i
+fili; controprova (le due funzioni svuotate): due rosse. Adeguata la
+sentinella di `prove_contanti_zona` sul vestito del metodo. Dal vivo
+(390 chiaro, gabbia, relay morti, CHF accesa): il filtro con le sette
+valute iconate, la scelta della valuta con CHF, la tendina delle reti
+USDT con la T, la card «USDT (Tron)» con la T.
