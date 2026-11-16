@@ -614,8 +614,14 @@ def main():
     prova("la consegna viene dal CASSETTO, non dal negozio",
           ("spedizione", 5.0, "Carmagnola (TO)"),
           (miele["consegna"], miele["spedizione_eur"], miele["zona"]))
-    prova("la categoria nasce «Altro» (la sceglie la coda, non il "
-          "product_type)", "Altro", miele["categoria"])
+    # EMENDATA (16 nov 2026, cantiere categoria-connettori): era «la
+    # categoria nasce Altro, la sceglie la coda, non il product_type».
+    # Adesso il nome del negozio vale quando combacia PER INTERO con una
+    # nostra categoria o un sinonimo intero («Alimenti» lo e'); il dubbio
+    # resta in «Altro» per la coda (vedi Architettura, «LA CATEGORIA DEI
+    # NEGOZI COLLEGATI»)
+    prova("la categoria nasce da quella del negozio, quando combacia per "
+          "intero", "Alimenti e bevande", miele["categoria"])
     prova("la descrizione e' spogliata dell'HTML", "Buono",
           miele["descrizione"])
     birra = uno(cid, 4)

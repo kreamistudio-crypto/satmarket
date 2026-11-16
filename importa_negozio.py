@@ -325,8 +325,8 @@ def traduci_shopify(p: dict, cambio: dict) -> dict:
     riga = {"origine_chiave": str(p.get("id") or ""),
             "saltato_perche": "", "titolo": "", "descrizione": "",
             "prezzo_eur": 0.0, "prezzo_sats": 0, "quantita": None,
-            "foto": [], "categoria_grezza": "", "attivo": True,
-            "digitale": False}
+            "foto": [], "categoria_grezza": "", "categorie_grezze": [],
+            "attivo": True, "digitale": False}
     titolo, descrizione = testo_negozio(p, "shopify")
     riga["titolo"], riga["descrizione"] = titolo, descrizione
     if not riga["origine_chiave"] or not titolo:
@@ -372,6 +372,19 @@ def traduci_shopify(p: dict, cambio: dict) -> dict:
                     if i.get("src")][:MAX_FOTO]
     riga["categoria_grezza"] = (p.get("product_type") or "").strip() or \
         (p.get("tags") or "").split(",")[0].strip()
+    # TUTTI i nomi con cui il negozio classifica il prodotto (16 nov
+    # 2026, cantiere categoria-connettori), nell'ordine in cui contano:
+    # il «tipo di prodotto» prima, poi i tag. Li legge il server
+    # (`categoria_dal_negozio`), che tiene solo il primo che combacia
+    # PER INTERO con una nostra categoria: un tag a caso non sposta
+    # niente, e chi non combacia resta in «Altro» come ieri.
+    tag = p.get("tags") or ""
+    if isinstance(tag, list):
+        tag = ",".join(str(t) for t in tag)
+    riga["categorie_grezze"] = [n for n in
+                                [(p.get("product_type") or "").strip()]
+                                + [t.strip() for t in str(tag).split(",")]
+                                if n]
     # draft e archived non sono in vetrina sul suo negozio: non devono
     # esserlo nemmeno qui
     riga["attivo"] = (p.get("status") or "active") == "active"
@@ -415,8 +428,8 @@ def traduci_woo(p: dict, cambio: dict) -> dict:
     riga = {"origine_chiave": str(p.get("id") or ""),
             "saltato_perche": "", "titolo": "", "descrizione": "",
             "prezzo_eur": 0.0, "prezzo_sats": 0, "quantita": None,
-            "foto": [], "categoria_grezza": "", "attivo": True,
-            "digitale": False}
+            "foto": [], "categoria_grezza": "", "categorie_grezze": [],
+            "attivo": True, "digitale": False}
     titolo, descrizione = testo_negozio(p, "woo")
     riga["titolo"], riga["descrizione"] = titolo, descrizione
     if not riga["origine_chiave"] or not titolo:
@@ -478,6 +491,11 @@ def traduci_woo(p: dict, cambio: dict) -> dict:
     categorie = [c.get("name") for c in (p.get("categories") or [])
                  if isinstance(c, dict) and c.get("name")]
     riga["categoria_grezza"] = (categorie[0] if categorie else "").strip()
+    # tutte, e non solo la prima (16 nov 2026): un prodotto Woo sta
+    # spesso in «Senza categoria» E in quella vera, o nella madre e
+    # nella figlia — il server tiene la prima che combacia
+    riga["categorie_grezze"] = [str(c).strip() for c in categorie
+                                if str(c).strip()]
     # DUE DOMANDE E NON UNA: `status` dice se e' pubblicato (draft,
     # pending e private non sono in vetrina da lui), `catalog_
     # visibility` se si vede nel negozio — un prodotto 'publish' ma
@@ -1476,7 +1494,7 @@ def _riga_locale(con, connettore_id: int, chiave: str):
     return con.execute(
         "SELECT id, stato, foto, origine_foto, quantita, quantita_max, "
         "origine_stock_visto, consegna, titolo, descrizione, prezzo_eur, "
-        "valuta, famiglia, famiglia_titolo, opzioni FROM annunci "
+        "valuta, famiglia, famiglia_titolo, opzioni, categoria FROM annunci "
         "WHERE connettore_id=? AND origine_chiave=?",
         (connettore_id, chiave)).fetchone()
 
@@ -1581,6 +1599,10 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
     gia' scelte (una scelta fatta a mano qui non si cancella ogni ora
     col silenzio di un e-commerce), e la consegna, che viene dal
     CASSETTO del collegamento e non dal negozio.
+    «ALTRO» NON E' UNA SCELTA (16 nov 2026): e' la casella vuota. Una
+    riga ferma li' prende la categoria che il server le ha dato
+    (`r["categoria"]`: quella dichiarata nel cassetto, o quella del
+    negozio quando combacia), e chi sta gia' in un'altra non si muove.
 
     `revisioni` e' il marchio della moderazione: `{chiave: motivo}`.
     Una riga marchiata nasce — o torna — in `stato='revisione'`, cioe'
@@ -1989,6 +2011,19 @@ def _aggiorna(con, gia, r: dict, connettore: dict, foto: str, marchio,
             gia["famiglia"] or "", gia["famiglia_titolo"] or "",
             gia["opzioni"] or ""):
         _scrivi_famiglia(con, gia["id"], connettore["id"], r)
+    # --- la categoria (16 nov 2026) -----------------------------------
+    # SI RIEMPIE SOLO LA CASELLA VUOTA: una riga in «Altro» (cioe' nata
+    # quando nessuno sapeva dove metterla) prende quella che il server
+    # ha deciso per lei; una riga che sta gia' altrove — spostata da un
+    # moderatore, o dal cassetto — resta dov'e'. Senza `modificato`:
+    # il compratore non legge niente di nuovo nella scheda.
+    cat = r.get("categoria") or ""
+    if (gia["categoria"] or "Altro") == "Altro" and cat and cat != "Altro":
+        # (la sottocategoria di «Altro» e' gia' vuota: non c'e' niente
+        # da azzerare, e un nuovo reparto la trova vuota come alla
+        # nascita)
+        con.execute("UPDATE annunci SET categoria=? WHERE id=?",
+                    (cat, gia["id"]))
     # --- la consegna (set 2026) ---------------------------------------
     # LA RIGA CHE CORREGGE IL PREGRESSO: un corso online importato
     # ieri con «🚚 Spedizione» e «🤝 Ritiro» torna digitale al primo

@@ -36037,6 +36037,15 @@ const PICKER = {
   /* la gemella dei propri scambi: stesso foglio, stesso deposito,
      altro catalogo — le voci le legge dalla SUA `<select>`, che e'
      l'unico posto dove un criterio si aggiunge */
+  /* LA CATEGORIA DI UN NEGOZIO COLLEGATO (16 nov 2026): le voci le da'
+     `connVociCategoria`, e la scelta va nella bozza del modulo, che e'
+     da dove `salvaConnettore` la legge */
+  connCat: {titolo: 'Categoria dei prodotti',
+    voci: () => connVociCategoria().map(c => ({val: c,
+      resa: c ? `${icoCategoria(c)}<span><b>${esc(c)}</b></span>`
+              : '<span>🏪</span><span><b>Decide il negozio</b><span class="p-desc">La categoria del tuo e-commerce, se è una delle nostre</span></span>'})),
+    campo: v => connCampoCategoria(v),
+    poi: v => { bozzaCon().categoria = v || ''; }},
   p2pMieiOrdinaSel: {titolo: 'Ordina i tuoi scambi',
     voci: () => [...el('p2pMieiOrdinaSel').options].map(o => ({val: o.value,
       resa: `<span>${esc(o.text)}</span>`})),
@@ -45089,6 +45098,20 @@ async function renderConnettori(){
       <input id="connZona" list="zonaList" autocomplete="off"
         placeholder="Es. Pavia (PV)" oninput="suggerisciZona(this.value)"
         value="${esc(b.zona || '')}"></div>
+    ${/* LA CATEGORIA DEI PRODOTTI (16 nov 2026, richiesta di Andrea):
+          prima tutto l'importato nasceva in «Altro». Si dichiara qui
+          come la consegna, e vale anche per gli annunci gia' entrati.
+          Il foglio-picker di casa (quello di Categoria nel Vendi), con
+          la <select> nascosta come deposito del valore. */''}
+    <div class="section-label" style="margin-top:12px">Categoria dei prodotti</div>
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:4px">
+      Se vendi tutto dello stesso tipo, sceglilo qui: vale per
+      <b style="color:var(--ink)">tutti</b> i prodotti di questo negozio,
+      anche quelli già entrati. Con «Decide il negozio» uso la categoria
+      del tuo e-commerce quando è una delle nostre, e il resto va in «Altro».</div>
+    <div class="field" style="margin-top:8px">
+      <select id="connCat" hidden>${connOpzioniCategoria(b.categoria || '')}</select>
+      <button type="button" class="campo-scelta" id="connCatBtn" onclick="apriPicker('connCat')" aria-haspopup="dialog"><span class="cs-val">${connCampoCategoria(b.categoria || '')}</span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
     ${/* I COSTI DI SPEDIZIONE COMPAIONO SOLO SU UN NEGOZIO GIA'
           COLLEGATO (set 2026, dalla segnalazione di un venditore): nel
           modulo per un negozio nuovo sembravano i costi del venditore,
@@ -45120,6 +45143,22 @@ async function renderConnettori(){
       ${connCampoCosto('connExtra', b.extra || '', '0 = niente supplemento', false)}</div></div>`}
     <button class="btn orange" onclick="salvaConnettore(this)">${inMod ? (inMod.tariffe_da_dire ? '💾 Salva e leggi il catalogo' : '💾 Salva le modifiche') : '🏪 Collega il negozio'}</button>
     ${inMod ? `<button class="btn ghost" onclick="annullaModificaConnettore()">Annulla la modifica</button>` : ''}`}`;
+}
+
+/* Le voci della categoria del negozio (16 nov 2026): «Decide il
+   negozio» in testa e poi il catalogo di casa SENZA «Altro», che e'
+   dove si finisce quando non decide nessuno, non una scelta. */
+function connVociCategoria(){
+  return [''].concat(CATS.filter(c => c !== 'Tutto' && c !== 'Altro'));
+}
+/* la resa nel campo-bottone: la usa il disegno del modulo e il foglio */
+function connCampoCategoria(v){
+  return v ? `${icoCategoria(v)}<span>${esc(v)}</span>`
+           : '<span>🏪</span><span>Decide il negozio</span>';
+}
+function connOpzioniCategoria(scelta){
+  return connVociCategoria().map(c =>
+    `<option value="${esc(c)}"${c === scelta ? ' selected' : ''}>${esc(c || 'Decide il negozio')}</option>`).join('');
 }
 
 /* I nomi delle strade e le pillole del modulo, fuori dal disegno
@@ -45240,7 +45279,8 @@ function modificaConnettore(id){
   const inSats = c.tariffe_valuta === 'sats';
   const cifra = (sats, eur) => { const v = inSats ? sats : eur; return v ? String(v) : ''; };
   bozzaConn = {fonte: c.fonte, url: c.url_negozio, consegna: c.consegna,
-               zona: c.zona, tvaluta: inSats ? 'sats' : 'eur',
+               zona: c.zona, categoria: c.categoria || '',
+               tvaluta: inSats ? 'sats' : 'eur',
                sped: cifra(c.spedizione_sats, c.spedizione_eur),
                punto: c.spedizione_punto_dichiarata
                       ? String((inSats ? c.spedizione_punto_sats
@@ -45260,7 +45300,9 @@ async function salvaConnettore(btn){
   haptic();
   const b = connLeggiCampi();
   const corpo = {fonte: b.fonte, url_negozio: b.url || '',
-                 consegna: b.consegna, zona: b.zona || ''};
+                 consegna: b.consegna, zona: b.zona || '',
+                 /* '' = decide il negozio (16 nov 2026) */
+                 categoria: b.categoria || ''};
   /* LE TARIFFE PARTONO SOLO DAL MODULO CHE LE MOSTRA (set 2026): nel
      collegamento nuovo i campi non ci sono, e mandare uno zero vorrebbe
      dire «spedisco gratis» detto da noi — senza la chiave il server
@@ -45316,6 +45358,7 @@ async function salvaConnettore(btn){
       connInModifica = nuovo.id;
       bozzaConn = {fonte: nuovo.fonte, url: nuovo.url_negozio,
                    consegna: nuovo.consegna, zona: nuovo.zona,
+                   categoria: nuovo.categoria || '',
                    tvaluta: 'eur', sped: '', punto: '', extra: ''};
       await renderConnettori();
       connNotaIndirizzo(d);
@@ -45327,8 +45370,11 @@ async function salvaConnettore(btn){
     bozzaConn = null;
     await renderConnettori();
     connNotaIndirizzo(d);
+    /* quanti annunci hanno appena cambiato categoria (16 nov 2026) */
+    const sp = d.categoria_spostati || 0;
     toast(d.primo_giro ? 'Collegato: sto leggendo il catalogo 🏪'
-                       : 'Collegamento aggiornato', 6000);
+          : sp ? `Collegamento aggiornato: ${fmt(sp)} ${sp === 1 ? 'annuncio ha' : 'annunci hanno'} cambiato categoria`
+          : 'Collegamento aggiornato', 6000);
   } catch(e) { toast('Rete assente: riprova'); }
   finally { ripristina(); }
 }

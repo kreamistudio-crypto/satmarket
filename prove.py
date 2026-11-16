@@ -112064,6 +112064,8 @@ def prove_connettore_interrompibile():
                   "MAX_PRODOTTI_CONNETTORE": 10**6,
                   "_connettore_in_errore": in_errore,
                   "_righe_da_giudicare": lambda righe, c, tetto=0: ([], []),
+                  # la categoria delle righe (16 nov 2026): qui non conta
+                  "categorie_righe_negozio": lambda righe, c: None,
                   "db": lambda: Con(),
                   "MSG_RIGA_NON_GIUDICATA": "x",
                   "MAX_NUOVI_CONNETTORE_GIRO": 30,
@@ -116970,6 +116972,278 @@ def prove_rimborso_motivo():
     prova("la rotta risponde al motivo ignoto con un 409 che lo nomina",
           True, 'esito.get("motivo_ignoto") is not None' in ep
           and "non so come disfare" in ep)
+
+
+def prove_connettori_categoria():
+    """LA CATEGORIA DI UN NEGOZIO COLLEGATO (16 nov 2026, richiesta di
+    Andrea): fino a ieri ogni prodotto importato da WooCommerce o da
+    Shopify nasceva in «Altro» — il traduttore leggeva la categoria del
+    negozio (`categoria_grezza`) e nessuno la usava. Adesso:
+     1. il venditore la DICHIARA nel cassetto, come la consegna, e vale
+        per tutti i prodotti di quel negozio, anche quelli gia' entrati;
+     2. senza dichiarazione decide il NEGOZIO, ma solo quando il suo
+        nome combacia PER INTERO con una nostra categoria (o con un
+        sinonimo intero): niente prima parola, niente titolo — la
+        lezione di `categoria_automatica`, che indovinava e sbagliava
+        in silenzio;
+     3. il giro dell'ora riempie solo la casella vuota: chi sta gia' in
+        una categoria vera (un moderatore l'ha spostato) non si muove;
+        a spostare tutto il negozio e' solo il gesto del venditore,
+        quando cambia la dichiarazione.
+    I giudici si GIRANO; la riconciliazione e lo spostamento girano su
+    un database di cartone; il server e il client si leggono per forma."""
+    print("\n[i connettori: la categoria dei prodotti]")
+    import sqlite3
+    import html as _html
+
+    class _Http(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+            super().__init__(detail)
+
+    amb = {"html": _html, "re": re, "HTTPException": _Http}
+    i = _SORGENTE.index("CATEGORIE = (")
+    exec(_SORGENTE[i:_SORGENTE.index(")", i) + 1], amb)
+    i = _SORGENTE.index("SINONIMI_CATEGORIA = {")
+    exec(_SORGENTE[i:_SORGENTE.index("\n}", i) + 2], amb)
+    for nome in ("_nome_categoria_negozio", "categoria_dal_negozio",
+                 "categorie_righe_negozio", "_categoria_negozio",
+                 "_sposta_categoria_negozio"):
+        exec(pezzo(nome), amb)
+    dal = amb["categoria_dal_negozio"]
+
+    # --- 1) il nome del negozio, STRETTO ---------------------------
+    prova("il nome intero di una nostra categoria combacia",
+          "Abbigliamento", dal(["Abbigliamento"]))
+    prova("...senza badare alle maiuscole", "Casa e giardino",
+          dal(["CASA E GIARDINO"]))
+    prova("...ne' all'«&» e alle entita' di WooCommerce", "Casa e giardino",
+          dal(["Casa &amp; Giardino"]))
+    prova("un sinonimo INTERO della tabella di casa combacia",
+          "Alimenti e bevande", dal(["Vino"]))
+    prova("vince il primo che combacia, nell'ordine del negozio",
+          "Bitcoin", dal(["Senza categoria", "Bitcoin", "Abbigliamento"]))
+    # LA RIGA CHE SEPARA QUESTO GIUDICE DA `categoria_tollerante`: alla
+    # prima parola «Accessori Bitcoin» finirebbe in «Scarpe e accessori»
+    prova("la prima parola NON basta: il dubbio resta in «Altro»",
+          "Altro", dal(["Accessori Bitcoin"]))
+    prova("«Altro» e «varie» del negozio non sono una scelta",
+          "Altro", dal(["Varie", "Altro"]))
+    prova("senza nomi: «Altro»", ["Altro", "Altro"], [dal([]), dal(None)])
+
+    # --- 2) chi decide la riga: il cassetto, poi il negozio --------
+    def righe():
+        return [{"categorie_grezze": ["Bitcoin"]},
+                {"categorie_grezze": ["Uncategorized"]},
+                {"categoria_grezza": "Libri"}]
+
+    rr = righe()
+    amb["categorie_righe_negozio"](rr, {"categoria": ""})
+    prova("senza dichiarazione decide il negozio (e la vecchia grezza)",
+          ["Bitcoin", "Altro", "Libri e media"],
+          [r["categoria"] for r in rr])
+    rr = righe()
+    amb["categorie_righe_negozio"](rr, {"categoria": "Collezionismo"})
+    prova("la categoria dichiarata vale per TUTTE le righe",
+          ["Collezionismo"] * 3, [r["categoria"] for r in rr])
+    rr = righe()
+    amb["categorie_righe_negozio"](rr, {"categoria": "Inventata"})
+    prova("una dichiarazione storta nel database vale «decide il negozio»",
+          ["Bitcoin", "Altro", "Libri e media"],
+          [r["categoria"] for r in rr])
+    rr = righe()
+    amb["categorie_righe_negozio"](rr, {"id": 1})
+    prova("...e cosi' un collegamento senza la colonna",
+          "Bitcoin", rr[0]["categoria"])
+
+    # --- 3) il cassetto: cosa si puo' dichiarare -------------------
+    cn = amb["_categoria_negozio"]
+    vecchio = {"categoria": "Bitcoin"}
+
+    def _cod(d, v):
+        try:
+            return cn(d, v)
+        except _Http as e:
+            return e.code
+    prova("chiave assente = conserva quella di ieri (client in cache)",
+          ["Bitcoin", ""], [_cod({}, vecchio), _cod({}, None)])
+    prova("vuoto e «Altro» valgono «decide il negozio»", ["", ""],
+          [_cod({"categoria": ""}, vecchio),
+           _cod({"categoria": "Altro"}, vecchio)])
+    prova("una categoria del catalogo si dichiara", "Elettronica",
+          _cod({"categoria": " Elettronica "}, vecchio))
+    prova("un nome fuori catalogo si rifiuta, non finisce in «Altro»", 400,
+          _cod({"categoria": "Cose belle"}, vecchio))
+
+    # --- 4) i traduttori portano TUTTI i nomi del negozio ----------
+    src = open("importa_negozio.py", encoding="utf-8").read()
+    m = {}
+    exec(compile(src, "importa_negozio.py", "exec"), m)
+    CAMBIO = {"EUR": 100_000.0}
+    woo = m["traduci_woo"]({"id": 5, "name": "Jade", "type": "simple",
+                            "status": "publish", "price": "50",
+                            "regular_price": "50",
+                            "categories": [{"name": "Uncategorized"},
+                                           {"name": "Bitcoin"}],
+                            "images": [{"src": "https://n.test/a.jpg"}]},
+                           CAMBIO)
+    prova("Woo: tutte le categorie del prodotto, in ordine",
+          ["Uncategorized", "Bitcoin"], woo["categorie_grezze"])
+    shop = m["traduci_shopify"]({"id": 7, "title": "Maglia",
+                                 "status": "active", "product_type": "",
+                                 "tags": "regalo, Abbigliamento",
+                                 "variants": [{"price": "9"}],
+                                 "images": [{"src": "https://c/x.jpg"}]},
+                                CAMBIO)
+    prova("Shopify: il tipo di prodotto e poi i tag",
+          ["regalo", "Abbigliamento"], shop["categorie_grezze"])
+    prova("...e da li' il server trova la categoria", "Abbigliamento",
+          dal(shop["categorie_grezze"]))
+
+    # --- 5) la riconciliazione: nascita e casella vuota ------------
+    riconcilia = m["riconcilia_connettore"]
+    CONN = {"id": 7, "fonte": "woo", "tg_id": 111, "zona": "",
+            "consegna": "spedizione", "spedizione_eur": 0.0,
+            "spedizione_punto_eur": 0.0, "spedizione_punto_dichiarata": 0,
+            "spedizione_extra_eur": 0.0}
+
+    def banco():
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+            CREATE TABLE annunci(id INTEGER PRIMARY KEY AUTOINCREMENT,
+              venditore_id INT, titolo TEXT, descrizione TEXT,
+              categoria TEXT, sottocategoria TEXT DEFAULT '',
+              prezzo_sats INT, zona TEXT, foto TEXT,
+              valuta TEXT, prezzo_eur REAL, quantita INT, quantita_max INT,
+              consegna TEXT, spedizione_eur REAL, spedizione_punto_eur REAL,
+              spedizione_punto_dichiarata INT, spedizione_extra_eur REAL,
+              spedizione_sats INT, spedizione_punto_sats INT,
+              spedizione_extra_sats INT,
+              fonte TEXT, connettore_id INT, origine_chiave TEXT,
+              origine_foto TEXT, origine_stock_visto INT,
+              famiglia TEXT DEFAULT '', famiglia_titolo TEXT DEFAULT '',
+              opzioni TEXT DEFAULT '',
+              creato INT, modificato INT, stato TEXT);
+            CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+              stato TEXT, aggiornato INT);
+            CREATE TABLE ordine_righe(ordine_id INT, annuncio_id INT);
+        """)
+        return con
+
+    def riga(chiave, categoria=None):
+        r = {"origine_chiave": chiave, "titolo": "Pezzo " + chiave,
+             "descrizione": "Buono", "prezzo_sats": 1000,
+             "prezzo_eur": 7.5, "quantita": 5,
+             "foto": [f"https://negozio.test/{chiave}.jpg"], "attivo": True}
+        if categoria is not None:
+            r["categoria"] = categoria
+        return r
+
+    def cats(con):
+        return {r["origine_chiave"]: r["categoria"] for r in con.execute(
+            "SELECT origine_chiave, categoria FROM annunci ORDER BY id")}
+
+    def gira(con, rr):
+        return riconcilia(con, CONN, rr, lambda *a: None, {}, completo=True)
+
+    con = banco()
+    gira(con, [riga("a", "Bitcoin"), riga("b")])
+    prova("la riga nasce nella categoria che il server le ha dato",
+          {"a": "Bitcoin", "b": "Altro"}, cats(con))
+    con.execute("UPDATE annunci SET categoria='Collezionismo' "
+                "WHERE origine_chiave='a'")         # un moderatore
+    con.commit()
+    esito = gira(con, [riga("a", "Bitcoin"), riga("b", "Bitcoin")])
+    prova("la casella vuota si riempie, la scelta di un umano resta",
+          {"a": "Collezionismo", "b": "Bitcoin"}, cats(con))
+    prova("...e il riempimento conta come un aggiornamento", 1,
+          esito["aggiornati"])
+    esito = gira(con, [riga("a", "Bitcoin"), riga("b", "Bitcoin")])
+    prova("al giro dopo non c'e' piu' niente da scrivere", (0, 2),
+          (esito["aggiornati"], esito["invariati"]))
+    gira(con, [riga("a", "Altro"), riga("b", "Altro")])
+    prova("«Altro» dal server non svuota una casella piena",
+          {"a": "Collezionismo", "b": "Bitcoin"}, cats(con))
+
+    # --- 6) la dichiarazione scende sulle righe gia' entrate -------
+    amb["sottocategoria_indovina"] = lambda c, t, d: (c + ":" + t
+                                                     if c != "Altro" else "")
+    sposta = amb["_sposta_categoria_negozio"]
+    con = banco()
+    for k, c, st in (("a", "Altro", "attivo"), ("b", "Altro", "venduto"),
+                     ("c", "Musica e film", "attivo"),   # un moderatore
+                     ("d", "Altro", "rimosso")):
+        con.execute("INSERT INTO annunci(connettore_id, origine_chiave, "
+                    "titolo, descrizione, categoria, stato) "
+                    "VALUES(7,?,?,'',?,?)", (k, "T" + k, c, st))
+    con.execute("INSERT INTO annunci(connettore_id, origine_chiave, titolo, "
+                "descrizione, categoria, stato) "
+                "VALUES(8,'z','Tz','','Altro','attivo')")  # altro negozio
+    # DICHIARARLA E' IL GESTO DEL VENDITORE SUI SUOI ANNUNCI: vale per
+    # tutto il negozio, anche per chi stava gia' in una categoria vera
+    # (la promessa scritta nel cassetto), mai per i rimossi ne' per un
+    # altro negozio
+    prova("dichiararla sposta TUTTE le righe vive del negozio", 3,
+          sposta(con, 7, "", "Bitcoin"))
+    prova("...ma non i rimossi, ne' un altro negozio",
+          {"a": "Bitcoin", "b": "Bitcoin", "c": "Bitcoin",
+           "d": "Altro", "z": "Altro"}, cats(con))
+    prova("...e la sottocategoria si ricalcola nella categoria nuova",
+          "Bitcoin:Ta", con.execute("SELECT sottocategoria FROM annunci "
+                                    "WHERE origine_chiave='a'").fetchone()[0])
+    prova("la stessa dichiarazione non sposta niente", 0,
+          sposta(con, 7, "Bitcoin", "Bitcoin"))
+    # un moderatore, DOPO la dichiarazione, porta «c» altrove
+    con.execute("UPDATE annunci SET categoria='Musica e film' "
+                "WHERE origine_chiave='c'")
+    prova("tornare a «decide il negozio» rimette in «Altro» le sole righe "
+          "della dichiarazione", 2, sposta(con, 7, "Bitcoin", ""))
+    prova("...e chi stava altrove resta dov'e'",
+          {"a": "Altro", "b": "Altro", "c": "Musica e film",
+           "d": "Altro", "z": "Altro"}, cats(con))
+    prova("...con la sottocategoria vuota", ["", ""],
+          [r[0] for r in con.execute(
+              "SELECT sottocategoria FROM annunci WHERE connettore_id=7 "
+              "AND origine_chiave IN ('a','b')")])
+
+    # --- 7) il server, per forma ------------------------------------
+    salva = codice(pezzo("salva_connettore"))
+    prova("il cassetto passa dal giudice della categoria", True,
+          "_categoria_negozio(d, vecchio)" in salva)
+    prova("...la scrive alla nascita e nei ritocchi", True,
+          "tariffe_da_dire,categoria,creato" in salva
+          and "categoria=? WHERE id=? AND tg_id=?" in salva)
+    prova("...e la fa scendere sulle righe PRIMA del commit", True,
+          0 <= salva.find("_sposta_categoria_negozio(")
+          < salva.find("con.commit()", salva.find("_sposta_categoria_negozio(")))
+    unc = codice(pezzo("_un_connettore"))
+    prova("il giro scrive la categoria dopo la traduzione e prima di "
+          "giudicare", True,
+          0 <= unc.find("importa_negozio.traduci(")
+          < unc.find("categorie_righe_negozio(righe, c)")
+          < unc.find("_righe_da_giudicare("))
+    pub = codice(pezzo("_connettore_pubblico"))
+    prova("la categoria esce verso il suo venditore", True,
+          '"categoria": c["categoria"]' in pub)
+    prova("la colonna nasce anche sui database di ieri", True,
+          "\"categoria TEXT DEFAULT ''\")" in codice(_SORGENTE))
+
+    # --- 8) il client -----------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    voci = pezzo_js(mini, "function connVociCategoria(){")
+    prova("le voci: «decide il negozio» in testa, niente Tutto e Altro",
+          True, "[''].concat(CATS.filter(c => c !== 'Tutto' && "
+                "c !== 'Altro'))" in voci)
+    prova("il foglio-picker conosce la casella", True,
+          "  connCat: {titolo: 'Categoria dei prodotti'," in mini)
+    salva_js = pezzo_js(mini, "async function salvaConnettore(btn){",
+                        "\n}\n")
+    prova("il salvataggio la manda sempre", True,
+          "categoria: b.categoria || ''" in salva_js)
+    mod_js = pezzo_js(mini, "function modificaConnettore(id){", "\n}\n")
+    prova("...e la modifica riparte da quella salvata", True,
+          "categoria: c.categoria || ''" in mod_js)
 
 
 def prove_slug_negozio():
@@ -135244,12 +135518,15 @@ def prove_catalogo_esterno():
           '_dice_tariffa_casa(d):' in salva
           and 'da_dire = vecchio["tariffe_da_dire"] if vecchio else 1'
           in salva)
+    # EMENDATA (16 nov 2026, categoria-connettori): dopo `tariffe_da_dire`
+    # le due scritture portano anche la categoria del negozio
     prova("...e si scrivono in tutt'e due le strade", True,
-          "zona=?, tariffe_da_dire=? " in salva
-          and "tariffe_da_dire,creato)" in salva
+          "zona=?, tariffe_da_dire=?, " in salva
+          and "tariffe_da_dire,categoria,creato)" in salva
           # e il ritocco scrive il VALUE giudicato, non uno zero: un
           # aggiornamento senza costi lascerebbe entrare il catalogo
-          and "*tariffe, zona, da_dire, cid," in salva)
+          and "*tariffe, zona, da_dire,\n                 categoria, cid,"
+          in salva)
     prova("il primo giro parte solo a costi detti", True,
           'parte = (riga["stato"] == "attivo" and not riga["tariffe_da_dire"]'
           in salva and "if parte:" in salva
@@ -135335,7 +135612,13 @@ def prove_catalogo_esterno():
               + "\n}\n")
 
     # ---- 4) il modulo, caso per caso ----------------------------------
-    banco = _fmt + "\n" + _es + "\n" + r"""
+    # (16 nov 2026) la casella della categoria vuole il catalogo VERO e
+    # l'icona del reparto: il catalogo si prende dalla pagina, l'icona e'
+    # di cartone (e' un disegno, qui non si guarda)
+    _cats = mini[mini.index("const CATS = ["):]
+    _cats = _cats[:_cats.index("];") + 2]
+    banco = _fmt + "\n" + _es + "\n" + _cats + "\n" + r"""
+const icoCategoria = c => "";
 let DEMO = false, VETRINA = false;
 let NODI = {};
 const el = id => NODI[id] || null;
@@ -135802,7 +136085,11 @@ def prove_modulo_negozio():
     _conv = "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function costoStdIn(", "function convertiCifraCampo(",
         "function convertiCampiValuta("))
-    banco = _fmt + "\n" + _es + "\n" + r"""
+    # (16 nov 2026) il catalogo vero e l'icona di cartone, come sopra
+    _cats = mini[mini.index("const CATS = ["):]
+    _cats = _cats[:_cats.index("];") + 2]
+    banco = _fmt + "\n" + _es + "\n" + _cats + "\n" + r"""
+const icoCategoria = c => "";
 let DEMO = false, VETRINA = false, cambioVivo = true, eurPerSat = 0.001;
 let NODI = {};
 const el = id => NODI[id] || null;
@@ -151834,7 +152121,10 @@ def prove_negozi_grandi():
              "moderazione_ai_lotto": lotto,
              "_connettore_in_errore": in_errore,
              "_chiudi_giro_connettore": chiudi,
-             "_salva_foto_connettore": lambda *a: None}
+             "_salva_foto_connettore": lambda *a: None,
+             # la categoria delle righe (16 nov 2026): qui si contano
+             # nascite e giudizi, la categoria ha la sua sezione
+             "categorie_righe_negozio": lambda righe, c: None}
         g.update(leve)
         exec(blocco_msg, g)
         # LA PAROLA DEL REGISTRO (25 ott 2026, cantiere
@@ -201303,7 +201593,7 @@ CATEGORIE = {
     link_descrizione foto_vuota foto_metadati connettori connettori_sync
     connettori_woo connettori_registro connettori_ingresso
     titoli_importati connettori_varianti connettore_interrompibile
-    famiglie connettori_cassetto finestra ordini_prova tutorial
+    famiglie connettori_cassetto connettori_categoria finestra ordini_prova tutorial
     timbri_visti effetti_ridotti morfosi_vendi copertura_home
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
     db_contesa_negozi negozi_grandi pc_tema_e_ricerca schermo_largo
@@ -202156,6 +202446,7 @@ def main():
               prove_audit_pagamenti_3,
               prove_audit_tornata_tutto,
               prove_ripubblica_p2p,
+              prove_connettori_categoria,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:
