@@ -1619,6 +1619,7 @@ pubblico: sì
 frase: La cassa di Barattolo Negozio adesso è fatta come il carrello: le card dei tuoi annunci con le foto, «Aggiungi» e poi − e +, e in fondo la barra col totale. Cambia solo il bottone: «Incassa», e i sats vanno dritti al tuo wallet, senza deposito di garanzia.
 dove: Profilo → «Negozio e spedizioni» → «🏪 Cassa in negozio», scheda «🧾 Cassa».
 leva: CASSA_ATTIVA (accesa di serie)
+pubblico: sì
 
 <!-- pezzo novita-044 | novita -->
 ## Novità · 2026-11-16 · p2p-onchain-valute
