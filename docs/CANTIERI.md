@@ -85132,6 +85132,21 @@ cambia (non chiesto).
 PROVATO anche: `prove_ripubblica_p2p` (la dichiarazione di un Barattozon
 in compra sul server, i campi col lato «compro», la sentinella del
 rifacimento), `prove_barattozon_in_compra`.
+LO SWAP IMPOSSIBILE NEL FOGLIO ON-CHAIN (stesso giro, dalla foto di Andrea
+in produzione, 18:40: un ordine on-chain da 750 € ≈ 1.106.000 sats in
+«Compra», col tasto «⚡ Lightning» acceso, «Lo swap arriva al massimo a
+1.000.000 sats» sotto, il «Ricevi» senza costo dello swap — che il testo
+citava — e «Compra» col fulmine). Il preventivo diceva di no, ma la scelta
+restava «ln»: la presa sarebbe partita on-chain e poi avrebbe chiesto al
+server uno swap impossibile. Ora `scegliReteOcPresaP2P`, a preventivo
+negativo (sopra il tetto, sotto il minimo, spento, muto), rimette «₿
+On-chain» e tiene il perché sotto i tasti («… Per quest'ordine ricevi
+on-chain.»; per chi deposita la frase sua): tasto, icona, frase e conto
+tornano on-chain insieme. Nello stesso foglio la riga «A prezzo di
+mercato: i sats si contano quando prendi» finiva su «prendi» e la riga
+sotto, «di Jj», sembrava continuarla: ora «…quando prendi l'ordine.» e
+«Pubblicato da Jj». Prova in `prove_tasti_rete_foglio` (il preventivo che
+dice di no, per chi riceve e per chi deposita, e il ritorno).
 DA GUARDARE: la testata in «Vendi BTC» sul telefono stretto, coi tre
 cerchietti; la prima scadenza vera di un Barattozon in compra con
-l'intervallo.
+l'intervallo; il foglio di quell'ordine da 750 € dopo il deploy.

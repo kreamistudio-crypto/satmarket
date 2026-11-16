@@ -160876,8 +160876,9 @@ const rigaLibroP2P = id => RIGHE[id];
 const nettoLatoP2P = (o, sats) => o.lato === 'sell' ? sats - 1500 : sats + 1500;
 const satsMercatoP2P = () => 0;
 const renderDettaglioP2P = () => LOG.push('disegno');
-const leggiPreventivoCambioP2P = async (sats) => (LOG.push('rev:' + sats), {ok: true, ricevi: sats - 700, fornitore_nome: 'SATS Routing'});
-const leggiPreventivoPresaP2P = async (sats) => (LOG.push('sub:' + sats), {ok: true, mandi: sats + 900, costo: 900, fornitore_nome: 'SATS Routing'});
+let PREV_NO = null;   // un preventivo che dice di no (16 nov 2026, mappa-recenti)
+const leggiPreventivoCambioP2P = async (sats) => (LOG.push('rev:' + sats), PREV_NO || {ok: true, ricevi: sats - 700, fornitore_nome: 'SATS Routing'});
+const leggiPreventivoPresaP2P = async (sats) => (LOG.push('sub:' + sats), PREV_NO || {ok: true, mandi: sats + 900, costo: 900, fornitore_nome: 'SATS Routing'});
 const percheCambioP2P = d => 'no rev', perchePresaOcP2P = d => 'no sub', percheDepositoLnOnchainP2P = d => 'no dep';
 const presaOcOrdineP2P = id => RIGHE[id], garanziaVendoP2P = o => ({sats: 101500, stima: false});
 const apriPresaOcP2P = id => { p2pPresaOc[id] = {aperto: true, stato: 'pronto', dati: {ok: true, mandi: 102400, costo: 900}}; LOG.push('presa:' + id); };
@@ -160941,6 +160942,19 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
   out.iconaLn = NODI.confOk.icona;
   await scegliReteOcPresaP2P(7, 'oc');
   out.iconaOc = NODI.confOk.icona;
+  /* LO SWAP CHE NON SI PUO' FARE (16 nov 2026, cantiere mappa-recenti,
+     dalla foto di Andrea: 1.106.000 sats e il tetto a 1.000.000): la rete
+     torna «₿ On-chain», col bottone e la frase, e il perche' resta sotto */
+  PREV_NO = {ok: false, motivo: 'sopra_tetto', massimo: 1000000};
+  await scegliReteOcPresaP2P(7, 'ln');
+  out.swapNo = [p2pOcPresaRete[7], premuto(NODI.p2pOcPresaRete.innerHTML),
+                NODI.p2pOcPresaRete.innerHTML.replace(/<[^>]+>/g, '').replace(/.*Lightning₿ On-chain/, ''),
+                NODI.confOk.icona === iconaPresaOcP2P(false), NODI.confCorpo.textContent.indexOf('TUO wallet on-chain') > 0];
+  await scegliReteOcPresaP2P(8, 'ln');
+  out.swapNoDep = p2pOcPresaRete[8];
+  PREV_NO = null;
+  await scegliReteOcPresaP2P(7, 'ln');
+  out.swapDiNuovo = p2pOcPresaRete[7].rete;
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e && e.stack || e)); });
 """
@@ -161016,6 +161030,13 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
                '<span class="p2p-invia-ico">⚡</span>',
                '<span class="p2p-invia-oc"><i>MONETA</i></span>'],
               [o["iconaPrima"], o["iconaLn"], o["iconaOc"]])
+        prova("LO SWAP CHE NON SI PUO' FARE rimette «₿ On-chain»: tasto, frase e bottone "
+              "on-chain, e il perche' resta sotto i tasti; per chi deposita la sua frase; "
+              "a swap di nuovo possibile «⚡» torna buono",
+              [[{"rete": "oc", "nota": "no sub Per quest'ordine ricevi on-chain."},
+                ["⚡ Lightning:false", "₿ On-chain:true"], "no sub Per quest'ordine ricevi on-chain.",
+                True, True], {"rete": "oc", "nota": "no dep"}, "ln"],
+              [o.get("swapNo"), o.get("swapNoDep"), o.get("swapDiNuovo")])
     presa = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
     prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
     dett = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
