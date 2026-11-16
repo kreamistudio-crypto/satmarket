@@ -68711,11 +68711,21 @@ def _accoda_onchain_nuovo_p2p(o, cambio: float, adesso: int) -> int:
     # in USDT (2 nov 2026) la convenienza si misura sul dollaro, la cifra
     # dice USDT, e l'avviso va solo a chi gli USDT on-chain li puo' usare
     usdt = p2p_onchain_usdt(o)
+    # ...e in franchi o in moneta (16 nov 2026): il franco col suo cambio
+    # (quello della pubblicazione), la moneta col controvalore in euro;
+    # la cifra nella valuta, i metodi senza la cifra
+    chf, coin = p2p_onchain_chf(o), p2p_onchain_coin(o)
     conv = _convenienza_nuovo_p2p(o["lato"], o["premio"], o["prezzo_sats"], euro,
-                                  cambio_noto_ora("usd") if usdt else cambio)
+                                  cambio_noto_ora("usd") if usdt
+                                  else cambio_noto_ora("chf") if chf else cambio)
     euro_txt = _euro_libro([euro])
     if usdt and euro_txt.endswith(" €"):
         euro_txt = euro_txt[:-2] + " USDT"
+    if chf and euro_txt.endswith(" €"):
+        euro_txt = euro_txt[:-2] + " CHF"
+    if coin:
+        euro_txt = f"{coin['cifra']} {coin['moneta']}"
+        metodi = coin["metodi"]
     metodi_txt = ", ".join(_metodi_libro(metodi))
     autore = int(o["maker_id"] or 0)
     con = db()
@@ -68729,8 +68739,10 @@ def _accoda_onchain_nuovo_p2p(o, cambio: float, adesso: int) -> int:
                 continue
             if usdt and not p2p_onchain_usdt_ammesso(tg):
                 continue
+            if (chf and not p2p_chf_ammesso(tg)) or (coin and not p2p_coin_ammesso(tg)):
+                continue
             if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "onchain",
-                                           "USDT" if usdt else "EUR"):
+                                           p2p_onchain_valuta(o)):
                 continue
             if not _avvisi_p2p_accesi(con, tg):
                 continue
@@ -102775,7 +102787,13 @@ P2P_ONCHAIN_RETI_USDT = {
 }
 
 P2P_ONCHAIN_PREFISSO = "bar-onchain-"   # il `d` del 38383: nostro, riconoscibile
-P2P_ONCHAIN_ORE_LIBRO = 24      # quanto resta nel libro un ordine non preso
+# quanto resta nel libro un ordine non preso: sette giorni come quelli di
+# Lightning (16 nov 2026, cantiere ricevi-mercato, Andrea: «perché gli
+# ordini on-chain durano solo 24 ore e non 7 giorni come gli altri?»). Le
+# 24 ore erano la prudenza del primo giorno, prese dal mercatino dove un
+# indirizzo on-chain vive 24 ore; ma nel libro non e' bloccato niente: il
+# 2-di-3 nasce alla presa
+P2P_ONCHAIN_ORE_LIBRO = 168
 P2P_ONCHAIN_ORE_DEPOSITO = 6    # dalla presa: entro quando il deposito va confermato
 P2P_ONCHAIN_MIN_SATS = 10_000   # sotto, la commissione di rete mangia lo scambio
 P2P_ONCHAIN_METODI_MAX = 5
@@ -102844,15 +102862,91 @@ def p2p_onchain_usdt(o) -> bool:
     return p2p_onchain_metodi_usdt(_p2p_onchain_metodi(o))
 
 
+# LE ALTRE VALUTE NEGLI SCAMBI ON-CHAIN (16 nov 2026, cantiere
+# ricevi-mercato, Andrea: «alla fine si scambia sempre Bitcoin on-chain o
+# Lightning, non le altre valute… Le altre valute servono solo per
+# pagare»). Il 2-di-3 blocca bitcoin come sempre; cambia solo con che cosa
+# paga chi compra. IL FRANCO e' una colonna (`fiat` 'CHF'): i suoi metodi
+# (Revolut, Wise, i contanti) esistono anche in euro e da soli non lo
+# dicono. LE MONETE (ETH, XMR, USDe) stanno invece DENTRO I METODI, con la
+# cifra, come sul filo di Mostro («ETH (Ethereum) 0.0153»: `_coin_ordine_libro`),
+# e il `f` resta EUR come la' — il telefono veste la riga con
+# `vestiCoinOrdineP2P`, la stessa del libro di Lightning. In moneta
+# `euro_cent` e' il controvalore in euro di quando si e' pubblicato (il
+# tetto, la convenienza degli avvisi): a mercato i sats li fa la cifra
+# nella moneta al cambio della presa (`p2p_onchain_cent_mercato`), mai lui.
+def p2p_onchain_coin(o) -> dict:
+    """PURA: la moneta di uno scambio pagato in ETH, XMR o USDe —
+    `{moneta, cifra (come si legge), quanto (numero), metodi (nudi)}` —
+    o {} se si paga in euro, franchi o USDT."""
+    metodi = _p2p_onchain_metodi(o)
+    c = _coin_ordine_libro(metodi)
+    if not c:
+        return {}
+    return {"moneta": c[0], "cifra": c[1],
+            "quanto": float(_coin_pm_libro(metodi[0])[1]), "metodi": c[2]}
+
+
+def p2p_onchain_chf(o) -> bool:
+    """PURA: lo scambio si paga in franchi (la colonna `fiat`)."""
+    return str(_p2p_onchain_campo(o, "fiat", "") or "").upper() == "CHF"
+
+
 def p2p_onchain_valuta(o) -> str:
-    """PURA: 'USDT' o 'EUR', il `f` del 38383 e il `fiat` del telefono."""
-    return "USDT" if p2p_onchain_usdt(o) else "EUR"
+    """PURA: 'USDT', 'CHF' o 'EUR', il `f` del 38383 e il `fiat` del
+    telefono (una moneta resta EUR, come sul filo di Mostro)."""
+    if p2p_onchain_usdt(o):
+        return "USDT"
+    return "CHF" if p2p_onchain_chf(o) else "EUR"
+
+
+def _p2p_onchain_metro(o) -> str:
+    """PURA: la valuta del cambio che misura lo scambio: il dollaro per
+    gli USDT, il franco per i franchi, l'euro per l'euro e per le monete
+    (il loro cambio e' in euro)."""
+    return {"USDT": "usd", "CHF": "chf"}.get(p2p_onchain_valuta(o), "eur")
+
+
+def p2p_onchain_cent_mercato(o, cambi_coin: dict = None) -> int:
+    """I centesimi che a mercato diventano sats: `euro_cent`, e in moneta
+    la cifra nella moneta per il suo cambio in euro di ADESSO (0 = il
+    cambio non c'e', e allora i sats tacciono)."""
+    c = p2p_onchain_coin(o)
+    if not c:
+        return int(_p2p_onchain_campo(o, "euro_cent", 0) or 0)
+    cambi = cambi_coin if cambi_coin is not None else cambio_coin_noto_ora()
+    e = float((cambi or {}).get(c["moneta"].lower()) or 0)
+    return int(round(c["quanto"] * e * 100)) if e > 0 else 0
+
+
+def p2p_onchain_cifra(o) -> str:
+    """PURA: quel che manda chi paga, nella sua valuta: «0,0153 ETH»,
+    «50,00 CHF», «50,00 USDT», «50,00 €». Vale per una riga e per i
+    dizionari degli avvisi che portano `euro_cent`, `metodi` e `fiat`."""
+    c = p2p_onchain_coin(o)
+    if c:
+        return f"{c['cifra']} {c['moneta']}"
+    segno = {"USDT": "USDT", "CHF": "CHF"}.get(p2p_onchain_valuta(o), "€")
+    return f"{_fmt_eur(int(_p2p_onchain_campo(o, 'euro_cent', 0) or 0) / 100)} {segno}"
 
 
 def _p2p_onchain_parole(o, testo: str) -> str:
     """PURA: un avviso scritto per gli euro, detto nella valuta dello
-    scambio — per gli USDT il traduttore unico degli avvisi del P2P."""
-    return p2p_usdt_frase(testo) if p2p_onchain_usdt(o) else testo
+    scambio — per gli USDT il traduttore unico degli avvisi del P2P, per i
+    franchi e le monete i loro (16 nov 2026). In moneta la cifra in euro
+    che l'avviso ha scritto diventa prima la cifra nella moneta."""
+    if p2p_onchain_usdt(o):
+        return p2p_usdt_frase(testo)
+    if p2p_onchain_chf(o):
+        return p2p_chf_frase(testo)
+    c = p2p_onchain_coin(o)
+    if not c:
+        return testo
+    euro = _fmt_eur(int(_p2p_onchain_campo(o, "euro_cent", 0) or 0) / 100)
+    t = str(testo or "")
+    for spazio in (" ", "\u00a0"):
+        t = t.replace(euro + spazio + "€", f"{c['cifra']} {c['moneta']}")
+    return p2p_coin_frase(t, c["moneta"])
 
 
 async def _notifica_p2p_onchain(o, chi, testo: str, bottone=None):
@@ -102985,8 +103079,8 @@ def p2p_onchain_tetto_usdt(tetto_euro, eur_btc, usd_btc) -> int:
 
 def _p2p_onchain_cambio(o) -> float:
     """Il cambio che misura QUESTO scambio: dollari per bitcoin se e' in
-    USDT, euro sennò."""
-    return cambio_noto_ora("usd" if p2p_onchain_usdt(o) else "eur")
+    USDT, franchi in franchi, euro sennò (anche in moneta)."""
+    return cambio_noto_ora(_p2p_onchain_metro(o))
 
 
 def _p2p_onchain_prepara(con):
@@ -103094,7 +103188,11 @@ def _p2p_onchain_prepara(con):
                       # rimesso nel libro
                       ("rip_minimo", "INTEGER DEFAULT 0"),
                       ("rip_massimo", "INTEGER DEFAULT 0"),
-                      ("rip_giri", "INTEGER DEFAULT 0")):
+                      ("rip_giri", "INTEGER DEFAULT 0"),
+                      # 16 nov 2026, cantiere ricevi-mercato: 'CHF' per
+                      # uno scambio in franchi, '' per tutto il resto (gli
+                      # USDT e le monete li dicono i metodi)
+                      ("fiat", "TEXT DEFAULT ''")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -103172,13 +103270,16 @@ def _p2p_onchain_bottone(o) -> tuple:
 
 def _p2p_onchain_quanto(o) -> str:
     """PURA: «10.000 sats per 9,00 € via Revolut», come `quanto` negli
-    avvisi del Lightning."""
+    avvisi del Lightning; in moneta «per 0,0153 ETH via ETH (Ethereum)»,
+    coi nomi senza la cifra (16 nov 2026)."""
+    c = p2p_onchain_coin(o)
     try:
-        metodi = ", ".join(html.escape(str(m)) for m in json.loads(o["metodi"] or "[]"))
+        metodi = ", ".join(html.escape(str(m)) for m in
+                           (c["metodi"] if c else json.loads(o["metodi"] or "[]")))
     except Exception:
         metodi = ""
     return (f"{_fmt_sats(int(o['prezzo_sats']))} sats per "
-            f"{_fmt_eur(int(o['euro_cent']) / 100)} €"
+            + (f"{c['cifra']} {c['moneta']}" if c else f"{_fmt_eur(int(o['euro_cent']) / 100)} €")
             + (f" via {metodi}" if metodi else ""))
 
 
@@ -103328,7 +103429,7 @@ def _p2p_onchain_foglio(o, pubblico: bool = False) -> dict:
     d = {"mercato": mercato, "premio": int(_p2p_onchain_campo(o, "premio", 0) or 0),
          "filtro": _soglia_filtro_p2p(_p2p_onchain_campo(o, "filtro", 0))}
     if mercato and not int(o["prezzo_sats"] or 0):
-        d["stima"] = p2p_onchain_sats_mercato(o["euro_cent"], d["premio"],
+        d["stima"] = p2p_onchain_sats_mercato(p2p_onchain_cent_mercato(o), d["premio"],
                                               _p2p_onchain_cambio(o))
     if not pubblico:
         d["paracadute"] = int(_p2p_onchain_campo(o, "paracadute", 0) or 0)
@@ -103336,7 +103437,7 @@ def _p2p_onchain_foglio(o, pubblico: bool = False) -> dict:
         if int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0) > 0:
             d["ripubblica"] = {"minimo": int(_p2p_onchain_campo(o, "rip_minimo", 0) or 0),
                                "massimo": int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0),
-                               "valuta": "usd" if p2p_onchain_usdt(o) else "eur"}
+                               "valuta": _p2p_onchain_metro(o)}
         d["chiuso_perche"] = str(_p2p_onchain_campo(o, "chiuso_perche", "") or "")
     return d
 
@@ -103399,9 +103500,14 @@ def _p2p_onchain_libro(chi: int) -> dict:
     eventi, miei = [], []
     adesso = int(time.time())
     usdt_si = bool(chi) and p2p_onchain_usdt_ammesso(chi)
+    chf_si = bool(chi) and p2p_chf_ammesso(chi)
+    coin_si = bool(chi) and p2p_coin_ammesso(chi)
     for o, maker, nome in F["righe"]:
         # gli scambi pagati in USDT solo a chi li puo' prendere (2 nov 2026)
         if p2p_onchain_usdt(o) and not usdt_si:
+            continue
+        # ...e quelli in franchi o in moneta a chi li vede (16 nov 2026)
+        if (p2p_onchain_chf(o) and not chf_si) or (p2p_onchain_coin(o) and not coin_si):
             continue
         riga = _p2p_onchain_riga_pubblica(o, nome if chi else "")
         # la porta del volto, con la sessione come il nome (12 nov 2026)
@@ -103740,7 +103846,13 @@ def p2p_onchain_giudica_nuovo(lato, sats, euro_cent, metodi, recapito,
     e i metodi sono SOLO le nostre reti: un «USDT» scritto a mano, o
     mescolato coi metodi dell'euro, non passa."""
     usdt = valuta == "USDT"
-    soldi = "USDT" if usdt else "euro"
+    # (16 nov 2026) i franchi e le monete: le parole, e in moneta
+    # `euro_cent` e' il controvalore in euro gia' fatto dal server. Le
+    # sorelle col `globals()`, per i banchi che estraggono il giudice solo
+    _col = globals().get("_coin_ordine_libro")
+    _cpm = globals().get("_coin_pm_libro") or (lambda m: None)
+    coin = _col(metodi) if _col and isinstance(metodi, list) else None
+    soldi = "USDT" if usdt else "franchi" if valuta == "CHF" else coin[0] if coin else "euro"
     if lato not in ("sell", "buy"):
         return "Di' se vendi o compri bitcoin"
     if tipo not in ("fisso", "mercato"):
@@ -103775,7 +103887,9 @@ def p2p_onchain_giudica_nuovo(lato, sats, euro_cent, metodi, recapito,
         return f"Scrivi quanti {soldi}"
     if tetto_euro and euro_cent > tetto_euro * 100:
         return (f"In questa fase gli ordini P2P arrivano fino a {tetto_euro} "
-                + ("USDT (250 € al cambio di adesso)" if usdt else "€"))
+                + ("USDT (250 € al cambio di adesso)" if usdt
+                   else "CHF" if valuta == "CHF"
+                   else f"€ (in {coin[0]} al cambio di adesso)" if coin else "€"))
     if tetto_sats and sats > tetto_sats:
         return f"Dal collaudo non si va oltre {_fmt_sats(tetto_sats)} sats"
     if not isinstance(metodi, list) or not metodi:
@@ -103790,6 +103904,16 @@ def p2p_onchain_giudica_nuovo(lato, sats, euro_cent, metodi, recapito,
             not usdt and any("usdt" in m.lower() for m in metodi)):
         return ("Gli USDT si scambiano solo su Tron o Ethereum, e senza i "
                 "metodi dell'euro: scegli la valuta USDT nel foglio")
+    # IN MONETA (16 nov 2026) una rete sola: e' li' che chi paga manda, con
+    # l'indirizzo e il QR di QUELLA catena (le reti 0x di USDe hanno la
+    # stessa forma, e un indirizzo non direbbe quale)
+    if coin and len(metodi) != 1:
+        return f"Negli scambi on-chain in {coin[0]} scegli una rete sola"
+    if not coin and any(_cpm(m) for m in metodi):
+        return ("ETH, Monero e USDe si scelgono come valuta nel foglio, "
+                "non mescolati agli altri metodi")
+    if coin and valuta != "EUR":
+        return "Un ordine in moneta non è anche in franchi o in USDT"
     if recapito is not None and len(str(recapito)) > P2P_ONCHAIN_RECAPITO_MAX:
         return f"Il recapito per gli {soldi} è troppo lungo"
     return ""
@@ -103893,17 +104017,36 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     usdt = p2p_onchain_metodi_usdt(metodi if isinstance(metodi, list) else [])
     if usdt and not p2p_onchain_usdt_ammesso(user["id"]):
         raise HTTPException(400, "Gli scambi on-chain in USDT non sono accesi per te")
-    cambio = cambio_noto_ora("usd" if usdt else "eur")
+    # I FRANCHI E LE MONETE (16 nov 2026, cantiere ricevi-mercato): i
+    # franchi li dice `valuta`, le monete i metodi con la cifra; ognuno
+    # col cancello che ha gia' su Lightning
+    chf = str(d.get("valuta") or "").upper() == "CHF" and not usdt
+    if chf and not p2p_chf_ammesso(user["id"]):
+        raise HTTPException(400, "Gli scambi in franchi non sono accesi per te")
+    coin = _coin_ordine_libro(metodi) if isinstance(metodi, list) else None
+    if coin and not p2p_coin_ammesso(user["id"]):
+        raise HTTPException(400, f"Gli scambi in {coin[0]} non sono accesi per te")
+    cambio = cambio_noto_ora("usd" if usdt else "chf" if chf else "eur")
+    euro_cent = d.get("euro_cent")
+    if coin:
+        # il controvalore in euro lo fa il SERVER, dalla cifra nella moneta
+        # al cambio di adesso: misura il tetto e la stima, e senza cambio
+        # della moneta non si pubblica (il telefono non decide il tetto)
+        euro_cent = p2p_onchain_cent_mercato({"metodi": json.dumps(metodi)})
+        if not euro_cent > 0:
+            raise HTTPException(503, f"Il cambio di {coin[0]} adesso non c'è: "
+                                     "riprova fra un minuto")
     # IL TETTO DEGLI SCAMBI ON-CHAIN (12 nov 2026, Andrea: «p2p onchain
     # metti 500»): lo stesso dell'on-chain del mercatino, non quello del
     # P2P Lightning; sul VPS e' gia' 500, nessuna riga nuova
     tetto = int(ONCHAIN_MAX_EURO or 0)
-    if usdt:
+    if usdt or chf:
+        # in franchi lo stesso conto dei dollari: il tetto in euro al cambio
         tetto = p2p_onchain_tetto_usdt(tetto, cambio_noto_ora("eur"), cambio)
-    perche = p2p_onchain_giudica_nuovo(lato, d.get("sats"), d.get("euro_cent"),
+    perche = p2p_onchain_giudica_nuovo(lato, d.get("sats"), euro_cent,
                                        metodi, recapito, tetto,
                                        tetto_sats_prova(), tipo, premio, cambio,
-                                       "USDT" if usdt else "EUR")
+                                       "USDT" if usdt else "CHF" if chf else "EUR")
     if not perche and usdt and lato == "sell":
         # chi vende bitcoin scrive dove vuole gli USDT: la rete giusta
         perche = p2p_onchain_giudica_recapito_usdt(recapito, metodi)
@@ -103943,14 +104086,14 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             "INSERT INTO p2p_onchain_ordini(ordine, lato, maker_id, prezzo_sats,"
             " euro_cent, metodi, recapito, scade, creato, aggiornato,"
             " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura,"
-            " rip_minimo, rip_massimo)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (ordine, lato, user["id"], sats, int(d["euro_cent"]),
+            " rip_minimo, rip_massimo, fiat)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (ordine, lato, user["id"], sats, int(euro_cent),
              json.dumps(metodi, ensure_ascii=False), recapito,
              adesso + P2P_ONCHAIN_ORE_LIBRO * 3600, adesso, adesso,
              "mercato" if tipo == "mercato" else "fisso", premio, filtro,
              para, para_da, para_letto,
-             rip[0] if rip else 0, rip[1] if rip else 0))
+             rip[0] if rip else 0, rip[1] if rip else 0, "CHF" if chf else ""))
         con.commit()
         oid = cur.lastrowid
         riga = _p2p_onchain_carica(con, oid)
@@ -104109,6 +104252,14 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
         if usdt and not p2p_onchain_usdt_ammesso(o["maker_id"]):
             raise HTTPException(409, "Chi ha pubblicato non può più scambiare "
                                      "in USDT adesso")
+        # in franchi o in moneta (16 nov 2026): li prende chi li vede
+        if p2p_onchain_chf(o) and not p2p_chf_ammesso(user["id"]):
+            raise HTTPException(409, "Quest'ordine si paga in franchi, che per te "
+                                     "non sono accesi")
+        coin_o = p2p_onchain_coin(o)
+        if coin_o and not p2p_coin_ammesso(user["id"]):
+            raise HTTPException(409, f"Quest'ordine si paga in {coin_o['moneta']}, che "
+                                     "per te non sono accesi")
         if usdt and o["lato"] == "buy" and recapito:
             # chi prende vendendo bitcoin scrive dove vuole gli USDT
             perche = p2p_onchain_giudica_recapito_usdt(recapito, _p2p_onchain_metodi(o))
@@ -104124,14 +104275,19 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
             raise HTTPException(409, perche)
         prezzo, cambio_presa = int(o["prezzo_sats"]), 0.0
         if _p2p_onchain_mercato(o):
-            # in USDT il metro e' il dollaro (1 USDT = 1 $)
-            valuta = "usd" if usdt else "eur"
+            # in USDT il metro e' il dollaro (1 USDT = 1 $), in franchi il
+            # franco, in moneta l'euro con la cifra al cambio di ADESSO
+            valuta = _p2p_onchain_metro(o)
             cambio_presa = cambio_noto_ora(valuta)
             eta = cambio_eta_ora(valuta)
             if not cambio_presa > 0 or eta is None or eta > P2P_ONCHAIN_CAMBIO_FRESCO_S:
                 raise HTTPException(503, "Il cambio di adesso non c'è: è un ordine "
                                          "a prezzo di mercato, riprova fra un minuto")
-            prezzo = p2p_onchain_sats_mercato(o["euro_cent"], o["premio"], cambio_presa)
+            cent = p2p_onchain_cent_mercato(o)
+            if not cent > 0:
+                raise HTTPException(503, f"Il cambio di {coin_o.get('moneta', '')} adesso "
+                                         "non c'è: riprova fra un minuto")
+            prezzo = p2p_onchain_sats_mercato(cent, o["premio"], cambio_presa)
             if prezzo < P2P_ONCHAIN_MIN_SATS:
                 raise HTTPException(409, f"Al cambio di adesso sarebbero "
                                          f"{_fmt_sats(prezzo)} sats: sotto il minimo "
@@ -105574,7 +105730,8 @@ def _p2p_onchain_passata_paracadute(con, prezzo, letto, adesso: int) -> list:
                                "soglia": int(o["paracadute"]), "partenza": p["partenza"],
                                "arrivo": float(prezzo), "lato": o["lato"],
                                "euro_cent": int(o["euro_cent"]),
-                               "metodi": o["metodi"]})
+                               "metodi": o["metodi"],
+                               "fiat": _p2p_onchain_campo(o, "fiat", "") or ""})
             toccati += cur.rowcount
             continue
         toccati += con.execute(
@@ -105593,8 +105750,7 @@ def _p2p_onchain_testo_paracadute(a: dict) -> str:
     scarto = _scarto_paracadute_p2p(a.get("partenza"), a.get("arrivo"))
     perc = f"{abs(scarto):.1f}".replace(".", ",")
     cosa = {"sell": " di vendita", "buy": " di acquisto"}.get(a.get("lato") or "", "")
-    segno = "USDT" if p2p_onchain_usdt(a) else "€"
-    euro = f" da {_fmt_eur(int(a['euro_cent']) / 100)} {segno}" if a.get("euro_cent") else ""
+    euro = f" da {p2p_onchain_cifra(a)}" if a.get("euro_cent") else ""
     return (f"{P2P_ONCHAIN_SEGNO} 🪂 <b>Il paracadute si è aperto</b>: BTC è passato da "
             f"{_euro_btc_p2p(a.get('partenza'))} a {_euro_btc_p2p(a.get('arrivo'))} "
             f"({'+' if scarto > 0 else '−'}{perc}%), il tuo ordine on-chain{cosa}{euro} "
@@ -105624,14 +105780,15 @@ def _p2p_onchain_passata_ripubblica(con, scaduti: list, prezzi, letto,
             continue
         minimo = int(_p2p_onchain_campo(o, "rip_minimo", 0) or 0)
         massimo = int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0)
-        valuta = "usd" if p2p_onchain_usdt(o) else "eur"
+        valuta = _p2p_onchain_metro(o)
         prezzo = _prezzo_ripubblica_p2p(prezzi, letto, valuta, adesso)
         if not prezzo > 0:
             continue
         a = {"id": int(o["id"]), "ordine": o["ordine"], "maker_id": int(o["maker_id"]),
              "prezzo": prezzo, "minimo": minimo, "massimo": massimo,
              "valuta": valuta, "lato": o["lato"], "euro_cent": int(o["euro_cent"]),
-             "metodi": o["metodi"], "esito": "fuori"}
+             "metodi": o["metodi"], "fiat": _p2p_onchain_campo(o, "fiat", "") or "",
+             "esito": "fuori"}
         if _dentro_ripubblica_p2p(minimo, massimo, prezzo):
             cur = con.execute(
                 "UPDATE p2p_onchain_ordini SET scade=?, aggiornato=?,"
@@ -105648,17 +105805,19 @@ def _p2p_onchain_testo_ripubblica(a: dict) -> str:
     """PURA: l'avviso della ripubblica di un ordine on-chain, rimesso nel
     libro dalla ronda o lasciato scadere. In USDT i soldi si dicono in
     USDT, e anche BTC si misura in dollari."""
-    segno = "USDT" if a.get("valuta") == "usd" else "€"
+    segno = {"usd": "USDT", "chf": "CHF"}.get(a.get("valuta"), "€")
     cosa = {"sell": " di vendita", "buy": " di acquisto"}.get(a.get("lato") or "", "")
-    euro = f" da {_fmt_eur(int(a['euro_cent']) / 100)} {segno}" if a.get("euro_cent") else ""
+    # la cifra dell'ordine nella SUA valuta (16 nov 2026: «0,0153 ETH»)
+    euro = f" da {p2p_onchain_cifra(a)}" if a.get("euro_cent") else ""
     btc = f"{_cifra_ripubblica_p2p(a.get('prezzo'))} {segno}"
     tra = (f"{_cifra_ripubblica_p2p(a.get('minimo'))}–"
            f"{_cifra_ripubblica_p2p(a.get('massimo'))} {segno}")
     if a.get("esito") == "rifatto":
         return (f"{P2P_ONCHAIN_SEGNO} 🔁 <b>Ho ripubblicato il tuo ordine on-chain"
                 f"{cosa}{euro}</b>: era scaduto e BTC è a {btc}, dentro il tuo "
-                f"intervallo ({tra}). Resta nel libro altre "
-                f"{P2P_ONCHAIN_ORE_LIBRO} ore, uguale.")
+                f"intervallo ({tra}). Resta nel libro altri "
+                + (f"{P2P_ONCHAIN_ORE_LIBRO // 24} giorni" if P2P_ONCHAIN_ORE_LIBRO % 24 == 0
+                   else f"{P2P_ONCHAIN_ORE_LIBRO} ore") + ", uguale.")
     return (f"{P2P_ONCHAIN_SEGNO} ⏰ <b>Il tuo ordine on-chain{cosa}{euro} è "
             f"scaduto</b> e non l'ho ripubblicato: BTC è a {btc}, fuori dal tuo "
             f"intervallo ({tra}). Puoi ripubblicarlo quando vuoi dal libro "

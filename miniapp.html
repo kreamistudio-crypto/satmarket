@@ -62196,7 +62196,8 @@ function accogliLibroOnchainP2P(busta){
     return false;
   }
   p2pOnchainLibro = {
-    eventi: Array.isArray(busta.eventi) ? busta.eventi : [],
+    /* in moneta la riga si veste come quelle di Lightning (16 nov 2026) */
+    eventi: Array.isArray(busta.eventi) ? busta.eventi.map(vestiOcP2P) : [],
     miei: Array.isArray(busta.miei) ? busta.miei.map(String) : [],
     quando: Number(busta.quando) || 0,
     rete: busta.rete || onchainRete().nome,
@@ -62403,7 +62404,14 @@ function testaAltaP2P(){
    card on-chain, non il rettangolo (30 ott 2026) */
 function righeOnchainLibroP2P(k){
   return p2pFiltro && p2pFiltro.rete === 'ln' ? []
-    : p2pOnchainLibro.eventi.filter(o => o.lato === k);
+    : p2pOnchainLibro.eventi.filter(o => o.lato === k && valutaPassaOcP2P(o));
+}
+/* PURA sul filtro: LA VALUTA DEL FILTRO VALE ANCHE ON-CHAIN (16 nov 2026,
+   cantiere ricevi-mercato): da quando l'on-chain ha i franchi e le monete,
+   «Solo franchi» non lascia passare una card on-chain in euro */
+function valutaPassaOcP2P(o){
+  const v = p2pFiltro && Array.isArray(p2pFiltro.valute) ? p2pFiltro.valute : [];
+  return !v.length || v.indexOf(typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : 'EUR') >= 0;
 }
 /* `senzaCarte` (16 nov 2026, cantiere ricevi-mercato): il rettangolo e i
    «Novità» si', le card no — le mescola renderP2P con quelle di Lightning
@@ -62412,7 +62420,8 @@ function carteOnchainLibroP2P(k, sotto, senzaCarte){
   /* lo stesso filtro di righeOnchainLibroP2P, scritto qui perche' i banchi
      di prove.py ritagliano questa funzione da sola */
   const righe = p2pFiltro && p2pFiltro.rete === 'ln' ? []
-    : p2pOnchainLibro.eventi.filter(o => o.lato === k);
+    : p2pOnchainLibro.eventi.filter(o => o.lato === k
+      && (typeof valutaPassaOcP2P !== 'function' || valutaPassaOcP2P(o)));
   if (!righe.length && !myP2POnchain) return '';
   /* APPESO SEMPRE (12 nov 2026, sera, Andrea: «stessa cosa quando
      accenderemo onchain, quel banner deve stare incollato»): non piu'
@@ -62443,7 +62452,8 @@ function carteOnchainLibroP2P(k, sotto, senzaCarte){
 function vistaOrdinamentoOcP2P(o){
   return {oc: o, id: 'oc-' + Number(o.id), lato: o.lato,
           premioOc: o.mercato ? (Number(o.premio) || 0) : null,
-          creato: Number(o.creato) || 0, euro: Number(o.euro) || 0, euroMax: 0};
+          /* in moneta l'importo e' il controvalore in euro (`euroNodo`) */
+          creato: Number(o.creato) || 0, euro: Number(o.euroNodo || o.euro) || 0, euroMax: 0};
 }
 
 
@@ -63069,7 +63079,8 @@ function rigaOnchainP2P(o){
   const rigaSats = '<span class="p2p-piccola p2p-sats"><span class="p2p-verbo">'
     + (paghiEuro ? 'Ricevi ' : 'Invia ') + '</span>' + esc(satsCardOnchainP2P(o)) + '</span>';
   const coppia = typeof coppiaCardP2P === 'function'
-    ? coppiaCardP2P(usdtOc(o) ? 'USDT' : 'EUR', Array.isArray(o.metodi) ? o.metodi : [], 'btc', paghiEuro) : '';
+    ? coppiaCardP2P(typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : usdtOc(o) ? 'USDT' : 'EUR',
+                    Array.isArray(o.metodi) ? o.metodi : [], 'btc', paghiEuro) : '';
   const ov = ordineVoltoOnchainP2P(o);
   const volto = typeof voltoCardP2P === 'function' ? voltoCardP2P(ov) : '';
   const barra = typeof barraScadenzaP2P === 'function' ? barraScadenzaP2P(ov) : '';
@@ -63845,7 +63856,7 @@ async function leggiMieiOnchainP2P(){
   if (!myP2POnchain || DEMO || VETRINA) { p2pOnchainMiei = []; return p2pOnchainMiei; }
   try {
     const r = await fetch(`${API_BASE}/p2p/onchain/miei`, {headers: {'X-Tg-Init-Data': authHdr()}});
-    p2pOnchainMiei = r.ok ? ((await r.json()).ordini || []) : [];
+    p2pOnchainMiei = r.ok ? ((await r.json()).ordini || []).map(vestiOcP2P) : [];
   } catch(e) { /* resta quel che c'era */ }
   return p2pOnchainMiei;
 }
@@ -64051,7 +64062,7 @@ async function renderP2POnchain(){
     if (!o) {
       try {
         const r = await fetch(`${API_BASE}/p2p/onchain/${p2pOnchainAperto}`, {headers: {'X-Tg-Init-Data': authHdr()}});
-        if (r.ok) o = await r.json();
+        if (r.ok) o = vestiOcP2P(await r.json());
       } catch(e) {}
     }
     if (!o) { p2pOnchainAperto = 0; return renderP2POnchain(); }
@@ -64059,6 +64070,7 @@ async function renderP2POnchain(){
     if (tit) tit.innerHTML = P2P_OC_MONETA + 'Nel dettaglio';
     box.innerHTML = schedaOnchainP2P(o);
     /* il QR dell'indirizzo USDT di chi vende, a chi paga (2 nov 2026) */
+    /* ...e quello dell'indirizzo della moneta (16 nov 2026), stesso posto */
     const qu = el('p2pOcUsdtQr');
     if (qu && qu.dataset.qr) disegnaQr(qu, qu.dataset.qr, 'Byte');
     /* il foglio del deposito: si apre da solo la prima volta che chi
@@ -64154,11 +64166,11 @@ function apriPubblicaOnchainP2P(lato){
 
 /* i metodi che l'on-chain pubblica: quelli del lato, senza il tabacchino */
 function metodiOnchainP2P(lato){
-  /* ETH e XMR non ancora sugli scambi on-chain (13 nov 2026, cantiere
-     eth-xmr): li' il recapito e l'id vivono nel server, e la loro strada
-     e' un passo a parte. Per ora solo su Lightning */
-  return metodiPubblicabiliP2P(lato).filter(m => m !== P2P_TABACCHINO
-    && !(typeof reteCoinDaMetodoP2P === 'function' && reteCoinDaMetodoP2P(m)));
+  /* ETH, XMR e USDe ci sono anche on-chain (16 nov 2026, cantiere
+     ricevi-mercato, Andrea: «le altre valute servono solo per pagare»):
+     dal 13 nov stavano fuori, e la loro strada e' arrivata — la valuta del
+     foglio da' le sue reti, come su Lightning */
+  return metodiPubblicabiliP2P(lato).filter(m => m !== P2P_TABACCHINO);
 }
 
 /* ═══ GLI USDT NEGLI SCAMBI ON-CHAIN (2 nov 2026, cantiere
@@ -64171,13 +64183,22 @@ function metodiOnchainP2P(lato){
    (`P2P_RETI_USDT`, `giudiceIndirizzoUsdtP2P`, `giudiceTxidUsdtP2P`,
    `qrUsdtP2P`). Il cancello e' `myP2POnchainUsdt`. */
 function usdtOcP2P(o){ return typeof usdtP2P === 'function' && usdtP2P(o); }
-/* PURA: la cifra con la sua valuta, «9,00 €» o «9,00 USDT» */
-function cifraOcP2P(o){ return fmtSoldiP2P(o.euro, o) + (usdtOcP2P(o) ? ' USDT' : ' €'); }
+/* PURA: la cifra con la sua valuta, «9,00 €» o «9,00 USDT»; dal 16 nov
+   2026 anche «9,00 CHF» e «0,0153 ETH» (il segno del catalogo) */
+function cifraOcP2P(o){
+  const cod = typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : (usdtOcP2P(o) ? 'USDT' : 'EUR');
+  return fmtSoldiP2P(o.euro, o) + ' ' + (typeof segnoValutaP2P === 'function' ? segnoValutaP2P(cod)
+    : usdtOcP2P(o) ? 'USDT' : '€');
+}
 /* PURA: una FRASE scritta per gli euro, detta nella valuta dello
    scambio. Solo sulle frasi, MAI sull'HTML dei bottoni: li' c'e'
    'euro-inviati' (il lookahead lo salva comunque) e le classi `euro`. */
 function paroleOcP2P(o, t){
-  if (!usdtOcP2P(o)) return t;
+  /* in franchi e in moneta (16 nov 2026) il traduttore della pagina
+     dello scambio di Lightning, che le loro parole le sa gia' */
+  if (!usdtOcP2P(o)) return (typeof paroleUsdtP2P === 'function' && o
+    && ((typeof chfP2P === 'function' && chfP2P(o)) || (typeof coinP2P === 'function' && coinP2P(o))))
+    ? paroleUsdtP2P(o, t) : t;
   return String(t).replace(/💶/g, '💵').replace(/sul tuo conto/g, 'sul tuo wallet')
     .replace(/il tuo conto/g, 'il tuo wallet').replace(/ €/g, ' USDT')
     .replace(/\b[Ee]uro\b(?![-_])/g, 'USDT');
@@ -64295,6 +64316,50 @@ function usdtInviatiOcP2P(btn, id){
     poi: () => eseguiGestoOnchainP2P(id, 'euro-inviati', {txid}, btn)});
 }
 
+/* ═══ IL FRANCO E LE MONETE NEGLI SCAMBI ON-CHAIN (16 nov 2026, cantiere
+   ricevi-mercato, Andrea: «alla fine si scambia sempre Bitcoin on-chain o
+   Lightning, non le altre valute… Le altre valute servono solo per
+   pagare»). Il 2-di-3 blocca bitcoin come sempre; cambia con che cosa
+   paga chi compra. Il franco viaggia col `fiat` 'CHF' del server; ETH,
+   XMR e USDe con la cifra DENTRO il metodo, come sul filo di Mostro, e la
+   riga si veste qui come quelle del libro di Lightning
+   (`vestiCoinOrdineP2P`: `fiat` la moneta, `euro` la cifra nella moneta,
+   `euroNodo` il controvalore in euro di quando e' stato pubblicato). Una
+   rete sola per ordine in moneta: e' quella dell'indirizzo e del QR. Chi
+   paga in moneta tocca «Ho inviato gli ETH» senza l'id: l'id resta nel
+   suo wallet, e in disputa lo mostra al moderatore. ═══ */
+function vestiOcP2P(o){
+  return o && typeof vestiCoinOrdineP2P === 'function' ? vestiCoinOrdineP2P(o) : o;
+}
+/* la rete della moneta dello scambio (una voce di P2P_RETI_COIN), o null */
+function reteOcCoinP2P(o){
+  if (!(typeof coinP2P === 'function' && coinP2P(o))) return null;
+  return (o.metodi || []).map(reteCoinDaMetodoP2P).filter(Boolean)[0] || null;
+}
+/* PURA: il giudice dell'indirizzo di chi vende bitcoin in moneta, sulla
+   rete dell'ordine. '' = va bene, anche vuoto (si scrive dopo). */
+function giudiceRecapitoOcCoinP2P(testo, metodi){
+  const r = (metodi || []).map(reteCoinDaMetodoP2P).filter(Boolean)[0];
+  const s = String(testo || '').trim();
+  return r && s ? giudiceIndirizzoCoinP2P(s, r) : '';
+}
+/* il riquadro dell'indirizzo per chi PAGA in moneta: la rete in grande,
+   l'indirizzo, la cifra da copiare (col punto, come la vogliono i
+   wallet) e il QR della catena giusta */
+function riquadroCoinOcP2P(o){
+  const r = reteOcCoinP2P(o), vc = coinP2P(o);
+  if (!r || !vc || !o.recapito) return '';
+  const q = testoQuantoCoinP2P(o.euro, vc.cod);
+  return '<div class="p2p-box"><b>🪙 Manda ' + esc(vc.segno) + ' su ' + esc(r.nome) + '</b>'
+    + '<div class="mono" style="word-break:break-all">' + esc(o.recapito) + '</div>'
+    + (q ? rigaDato('Da mandare', q, {vista: fmtQuantoCoinP2P(o.euro, vc.cod) + ' ' + vc.segno, mono: true, copia: true}) : '')
+    + '<div id="p2pOcUsdtQr" class="qr" data-qr="' + esc(qrCoinP2P(r, o.recapito, (Number(o.euro) || 0).toFixed(6))) + '"></div>'
+    + '<div class="hint">⚠️ Solo sulla rete ' + esc(r.nome) + ': con un\'altra rete i fondi si perdono.'
+    + (r.token ? ' Contratto del vero ' + esc(vc.segno) + ': <span class="mono">' + esc(r.token) + '</span>' : '')
+    + ' Conserva l\'id della transazione: in una disputa lo chiede il moderatore.</div>'
+    + '<button type="button" class="btn ghost" onclick="copiaOnchainP2P(' + esc(JSON.stringify(o.recapito)) + ')">📋 Copia l\'indirizzo</button></div>';
+}
+
 /* «Dove vuoi gli euro»: la sezione in piu' di chi vende on-chain (in
    USDT, dal 2 nov 2026, «Dove vuoi gli USDT»: l'indirizzo, col giudice
    della rete mentre si scrive) */
@@ -64311,6 +64376,29 @@ function sezioneRecapitoOnchainP2P(){
       sotto: (no ? '<div class="hint"><b>' + esc(no) + '</b></div>' : '')
         + '<div class="hint">Copialo dal tuo wallet. Lo legge solo chi prende il tuo scambio. Puoi scriverlo anche dopo.</div>'});
   }
+  /* in moneta l'indirizzo della sua rete, in franchi il conto svizzero
+     (16 nov 2026, cantiere ricevi-mercato) */
+  const vcF = typeof valutaCoinP2P === 'function' && typeof valutaFoglioP2P === 'function'
+    ? valutaCoinP2P(valutaFoglioP2P()) : null;
+  if (vcF) {
+    const rF = p2pNuovoMetodi.map(reteCoinDaMetodoP2P).filter(Boolean)[0];
+    const noF = giudiceRecapitoOcCoinP2P(p2pOcRecapito, p2pNuovoMetodi);
+    return sezioneNuovoP2P({
+      ico: 'scontrino', titolo: 'Dove vuoi ' + soldiValutaP2P(vcF.cod),
+      corpo: '<input type="text" id="p2pOcRecapito" maxlength="120" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" '
+        + 'placeholder="Il tuo indirizzo ' + esc(vcF.segno) + (rF ? ' (' + esc(rF.nome) + ')' : '') + '" '
+        + 'aria-label="Dove vuoi ' + esc(soldiValutaP2P(vcF.cod)) + '" value="' + esc(p2pOcRecapito) + '" '
+        + 'oninput="p2pOcRecapito=this.value" onchange="renderNuovoOrdineP2P()">',
+      sotto: (noF ? '<div class="hint"><b>' + esc(noF) + '</b></div>' : '')
+        + '<div class="hint">Copialo dal tuo wallet. Lo legge solo chi prende il tuo scambio. Puoi scriverlo anche dopo.</div>'});
+  }
+  if (typeof valutaFoglioP2P === 'function' && valutaFoglioP2P() === 'CHF')
+    return sezioneNuovoP2P({
+      ico: 'scontrino', titolo: 'Dove vuoi i franchi',
+      corpo: '<input type="text" id="p2pOcRecapito" maxlength="300" autocomplete="off" enterkeyhint="done" '
+        + 'placeholder="IBAN svizzero, numero TWINT, nome Revolut…" aria-label="Dove vuoi i franchi" '
+        + 'value="' + esc(p2pOcRecapito) + '" oninput="p2pOcRecapito=this.value">',
+      sotto: '<div class="hint">Lo legge solo chi prende il tuo scambio. Puoi scriverlo anche dopo.</div>'});
   return sezioneNuovoP2P({
     ico: 'scontrino', titolo: 'Dove vuoi gli euro',
     corpo: '<input type="text" id="p2pOcRecapito" maxlength="300" autocomplete="off" enterkeyhint="done" '
@@ -64324,12 +64412,14 @@ function sezioneRecapitoOnchainP2P(){
 function riquadroOnchainP2P(){
   const rete = String(p2pOnchainLibro.rete || '');
   /* in USDT il tetto e' quello in euro tradotto (2 nov 2026) */
-  const usdt = typeof valutaFoglioP2P === 'function' && valutaFoglioP2P() === 'USDT';
-  const tetto = usdt && typeof tettoValutaP2P === 'function' ? tettoValutaP2P('USDT')
+  /* ...e nelle altre valute (16 nov 2026): lo stesso tetto in euro, al cambio */
+  const codF = typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR';
+  const tetto = codF !== 'EUR' && typeof tettoValutaP2P === 'function' ? tettoValutaP2P(codF)
     : typeof maxEuroP2P === 'function' ? maxEuroP2P() : 0;
   return sezioneNuovoP2P({ico: '', titolo: 'Quanto si può, e quanto costa',
     corpo: 'Minimo ' + fmt(p2pOnchainLibro.minSats || 0) + ' sats'
-      + (tetto > 0 ? ' · fase beta: max ' + fmt(tetto) + (usdt ? ' USDT' : ' €') : '')
+      + (tetto > 0 ? ' · fase beta: max ' + (typeof valutaCoinP2P === 'function' && valutaCoinP2P(codF) ? fmtQuantoCoinP2P(tetto, codF) : fmt(tetto))
+        + ' ' + (typeof segnoValutaP2P === 'function' ? segnoValutaP2P(codF) : '€') : '')
       + '. La commissione è quella degli scambi Lightning, metà a testa: chi vende la deposita insieme al margine per la rete, chi compra la trova tolta dai sats che riceve.'
       + (rete && rete !== 'mainnet'
          ? '<div class="hint">Rete di prova (' + esc(rete) + '): i sats non hanno valore.</div>' : '')});
@@ -64353,8 +64443,20 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
     const no = giudiceRecapitoOcUsdtP2P(p2pOcRecapito, campi.metodi);
     if (no) { toast(no, 7000); const i = el('p2pOcRecapito'); if (i) i.focus(); return; }
   }
+  /* IN MONETA (16 nov 2026): l'indirizzo della sua rete passa dal giudice,
+     la cifra va DENTRO il metodo come sul filo di Mostro, e il
+     controvalore in euro lo rifa' il server al suo cambio */
+  const vcP = typeof valutaCoinP2P === 'function' ? valutaCoinP2P(campi.valuta) : null;
+  if (vcP && vendo) {
+    const no = giudiceRecapitoOcCoinP2P(p2pOcRecapito, campi.metodi);
+    if (no) { toast(no, 7000); const i = el('p2pOcRecapito'); if (i) i.focus(); return; }
+  }
+  const qP = vcP ? quantoCoinP2P(campi.euro, vcP.cod).n : 0;
   const corpo = {lato: vendo ? 'sell' : 'buy', tipo: campi.fisso ? 'fisso' : 'mercato',
-    euro_cent: interoP2P(campi.euro).n * 100, metodi: campi.metodi.slice(),
+    euro_cent: vcP ? Math.round(euroDaCoinP2P(qP, vcP.cod) * 100) : interoP2P(campi.euro).n * 100,
+    metodi: vcP ? campi.metodi.map(m => metodoPmCoinP2P(m, qP, vcP.cod)) : campi.metodi.slice(),
+    /* i franchi li dice la valuta: i loro metodi esistono anche in euro */
+    valuta: String(campi.valuta || 'EUR').toUpperCase() === 'CHF' ? 'CHF' : '',
     recapito: vendo ? String(p2pOcRecapito).trim() : '',
     filtro: campi.filtro || 0, paracadute: campi.paracadute || 0};
   /* la ripubblica (16 nov 2026): qui la rifa' la ronda del server */
@@ -64434,13 +64536,26 @@ function schedaOnchainP2P(o){
           + g('disputa', '⚖️ Apri una disputa');
         break;
       }
+      /* in moneta (16 nov 2026): la rete, l'indirizzo nel riquadro col QR */
+      const rCoin = typeof reteOcCoinP2P === 'function' ? reteOcCoinP2P(o) : null;
+      if (ricevo && rCoin) {
+        testo = `I <b>${fmt(o.sats)} sats</b> sono nel 2-di-3. Manda <b>${esc(cifraOc(o))}</b> su <b>${esc(rCoin.nome)}</b>`
+          + (o.recapito ? ' all\'indirizzo qui sotto' : ': chi vende sta per scrivere il suo indirizzo')
+          + ', poi tocca «Ho inviato gli euro».';
+        gesti = (o.recapito ? g('euro-inviati', paroleOc(o, '💶 Ho inviato gli euro'), 'orange') : '')
+          + bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende')
+          + g('disputa', '⚖️ Apri una disputa');
+        break;
+      }
       testo = ricevo
         ? `I <b>${fmt(o.sats)} sats</b> sono nel 2-di-3. Manda <b>${esc(fmtSoldiP2P(o.euro, o))} €</b> a chi vende `
           + `(${esc((o.metodi || []).join(', '))})` + (o.recapito ? ` a: <b>${esc(o.recapito)}</b>` : ', col recapito che ti scrive')
           + ', poi tocca «Ho inviato gli euro».'
         : `Deposito confermato. Chi compra ti manda <b>${esc(fmtSoldiP2P(o.euro, o))} €</b>: quando li VEDI sul tuo conto, `
           + 'libera i sats. Mai prima.';
-      gesti = (ricevo ? g('euro-inviati', '💶 Ho inviato gli euro', 'orange') : bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'))
+      /* l'etichetta nella valuta dello scambio (16 nov 2026): solo la
+         scritta, mai il `cosa` del gesto */
+      gesti = (ricevo ? g('euro-inviati', paroleOc(o, '💶 Ho inviato gli euro'), 'orange') : bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'))
         + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
         + g('disputa', '⚖️ Apri una disputa');
       break;
@@ -64496,18 +64611,29 @@ function schedaOnchainP2P(o){
   /* il recapito per gli euro: lo scrive chi vende bitcoin, finche' gli euro non partono */
   const recapito = deposito || (o.ruolo === 'maker' && o.lato === 'sell');
   const usdt = usdtOc(o);
-  const recapitoBox = recapito && ['pending', 'preso', 'depositato'].includes(o.stato)
+  /* in moneta l'indirizzo della sua rete, in franchi il conto (16 nov 2026) */
+  const rCoinR = typeof reteOcCoinP2P === 'function' ? reteOcCoinP2P(o) : null;
+  const recapitoBox = recapito && ['pending', 'preso', 'depositato'].includes(o.stato) && rCoinR
+    ? '<div class="p2p-box"><label>Il tuo indirizzo ' + esc(rCoinR.coin) + ' (' + esc(rCoinR.nome) + ')</label>'
+      + '<input id="p2pOcRecapitoVivo" maxlength="120" autocapitalize="off" spellcheck="false" value="' + esc(o.recapito || '')
+      + '" placeholder="Copialo dal tuo wallet"> ' + bott('ghost', `recapitoOnchainP2P(this, ${o.id})`, 'Salva') + '</div>'
+    : rCoinR && ricevo && o.stato === 'depositato' ? riquadroCoinOcP2P(o)
+    : rCoinR && o.recapito && (ricevo || deposito)
+      ? '<div class="p2p-box">🪙 Indirizzo per ' + esc(soldiValutaP2P(coinP2P(o).cod)) + ' (' + esc(rCoinR.nome)
+        + '): <b class="mono" style="word-break:break-all">' + esc(o.recapito) + '</b></div>'
+    : recapito && ['pending', 'preso', 'depositato'].includes(o.stato)
     ? (usdt
       /* in USDT e' l'indirizzo, sulla rete dell'ordine (2 nov 2026) */
       ? '<div class="p2p-box"><label>Il tuo indirizzo USDT (' + esc((o.metodi || []).map(m => (reteUsdtDaMetodoP2P(m) || {}).nome).filter(Boolean).join(' o '))
         + ')</label><input id="p2pOcRecapitoVivo" maxlength="80" autocapitalize="off" spellcheck="false" value="' + esc(o.recapito || '')
         + '" placeholder="Copialo dal tuo wallet"> ' + bott('ghost', `recapitoOnchainP2P(this, ${o.id})`, 'Salva') + '</div>'
-      : '<div class="p2p-box"><label>Dove vuoi gli euro</label><input id="p2pOcRecapitoVivo" maxlength="300" value="' + esc(o.recapito || '')
-        + '" placeholder="IBAN, nome Revolut…"> ' + bott('ghost', `recapitoOnchainP2P(this, ${o.id})`, 'Salva') + '</div>')
+      : '<div class="p2p-box"><label>' + esc(paroleOc(o, 'Dove vuoi gli euro')) + '</label><input id="p2pOcRecapitoVivo" maxlength="300" value="' + esc(o.recapito || '')
+        + '" placeholder="' + (typeof chfP2P === 'function' && chfP2P(o) ? 'IBAN svizzero, numero TWINT…' : 'IBAN, nome Revolut…') + '"> '
+        + bott('ghost', `recapitoOnchainP2P(this, ${o.id})`, 'Salva') + '</div>')
     : (usdt && ricevo && o.stato === 'depositato' ? riquadroUsdtOcP2P(o)
       : o.recapito && (ricevo || deposito)
         ? '<div class="p2p-box">' + (usdt ? '💵 Indirizzo per gli USDT: <b class="mono" style="word-break:break-all">'
-          : '💶 Recapito per gli euro: <b>') + esc(o.recapito) + '</b></div>' : '');
+          : esc(paroleOc(o, '💶 Recapito per gli euro:')) + ' <b>') + esc(o.recapito) + '</b></div>' : '');
   /* COME LA PAGINA «NEL DETTAGLIO» DI LIGHTNING (30 ott 2026, Andrea:
      «non deve neanche esserci scritto "com'è fatto questo 2-di-3", non
      importa a nessuno. Quella pagina deve essere simile alle altre
@@ -64610,7 +64736,7 @@ function contoOnchainP2P(o){
   const euro = '<span class="num">' + esc(cifraOc(o)) + '</span>';
   /* il moderatore non sta da nessun lato: le due cifre e basta */
   if (o.ruolo === 'moderatore') return '<div class="ctrl-conto conto-p2p lato-vendo"><div class="ctrl-chiusa">'
-    + r('Sats', sats(o.sats), 'tot sats') + r(usdtOc(o) ? 'USDT' : 'Euro', euro, 'tot euro') + '</div></div>';
+    + r('Sats', sats(o.sats), 'tot sats') + r(usdtOc(o) ? 'USDT' : paroleOc(o, 'Euro'), euro, 'tot euro') + '</div></div>';
   /* LA RIGA DELLA COMMISSIONE, come «Fee P2P» nel conto di Lightning
      (16 nov 2026, p2p-onchain-commissione): la MIA meta', «+» a chi
      deposita e «−» a chi riceve, e il totale la conta */
@@ -64687,7 +64813,9 @@ function passiOnchainP2P(o){
   if (o.stato === 'rimborsato') fermo = euroPartiti ? 3 : 2;
   if (fermo >= 0) passi[fermo] = {t: P2P_ONCHAIN_STATI[o.stato] || o.stato, d: ''};
   /* in USDT «USDT inviati» (2 nov 2026) */
-  if (usdtOc(o)) passi.forEach(p => { p.t = paroleOc(o, p.t); p.d = paroleOc(o, p.d); });
+  /* ...e in franchi e in moneta (16 nov 2026): paroleOc su un ordine in
+     euro torna il testo com'era */
+  passi.forEach(p => { p.t = paroleOc(o, p.t); p.d = paroleOc(o, p.d); });
   return {passi, prog: PROG[o.stato] != null ? PROG[o.stato] : 0, fermo};
 }
 
@@ -65184,6 +65312,11 @@ async function recapitoOnchainP2P(btn, id){
   const oo = p2pOnchainMiei.find(x => x.id === id);
   if (oo && usdtOc(oo)) {
     const no = giudiceRecapitoOcUsdtP2P(v, oo.metodi);
+    if (no) return toast(no, 7000);
+  }
+  /* ...e in moneta quello della sua rete (16 nov 2026) */
+  if (oo && typeof reteOcCoinP2P === 'function' && reteOcCoinP2P(oo)) {
+    const no = giudiceRecapitoOcCoinP2P(v, oo.metodi);
     if (no) return toast(no, 7000);
   }
   const rip = onchainAttesa(btn, '…');
@@ -82118,10 +82251,12 @@ function usdtVistoP2P(){
    on-chain solo a chi ha anche gli USDT on-chain (2 nov 2026: il 2-di-3
    blocca bitcoin come sempre, e gli USDT prendono il posto degli euro) */
 function valuteVisibiliP2P(oc){
-  /* il franco solo a chi lo vede, e mai a rete on-chain (14 nov 2026) */
-  return P2P_VALUTE.filter(v => v.cod === 'CHF' ? (!oc && typeof chfVistoP2P === 'function' && chfVistoP2P())
-    /* ETH, Monero e USDe (16 nov 2026): a chi li vede, mai a rete on-chain */
-    : (typeof valutaCoinP2P === 'function' && valutaCoinP2P(v.cod)) ? (!oc && typeof coinVistoP2P === 'function' && coinVistoP2P())
+  /* il franco solo a chi lo vede (14 nov 2026); dal 16 nov 2026 anche a
+     rete on-chain (cantiere ricevi-mercato, Andrea: «le altre valute
+     servono solo per pagare»: il 2-di-3 blocca bitcoin, e basta) */
+  return P2P_VALUTE.filter(v => v.cod === 'CHF' ? (typeof chfVistoP2P === 'function' && chfVistoP2P())
+    /* ETH, Monero e USDe (16 nov 2026): a chi li vede, anche on-chain */
+    : (typeof valutaCoinP2P === 'function' && valutaCoinP2P(v.cod)) ? (typeof coinVistoP2P === 'function' && coinVistoP2P())
     : v.cod !== 'USDT'
     || (usdtVistoP2P() && (!oc || (typeof myP2POnchainUsdt !== 'undefined' && !!myP2POnchainUsdt))));
 }
@@ -86831,8 +86966,6 @@ function valeCoinOrdineP2P(v, vc){
   if (tetto > 0 && q.n > tetto)
     return {ok: false, manca: 'Troppi: il massimo è ' + fmtQuantoCoinP2P(tetto, vc.cod) + ' ' + vc.segno,
             campo: 'p2pNuovoEuro'};
-  if (v.oc)
-    return {ok: false, manca: 'Gli scambi on-chain sono solo in euro', campo: 'p2pNuovoEuro'};
   /* i sats PRIMA delle reti: non dipendono da loro, e il foglio
      dell'importo deve poter dire «troppo pochi» anche a reti ancora vuote */
   const sats = v.fisso ? interoP2P(v.sats).n : satsCoinP2P(q.n, Number(v.cambioCoin), v.cambio, v.premio);
@@ -86850,6 +86983,12 @@ function valeCoinOrdineP2P(v, vc){
             campo: 'p2pNuovoMetodiBtn'};
   if ((v.metodi || []).some(m => reti.indexOf(m) < 0))
     return {ok: false, manca: 'In ' + vc.segno + ' si paga solo con ' + reti.join(', '),
+            campo: 'p2pNuovoMetodiBtn'};
+  /* ON-CHAIN UNA RETE SOLA (16 nov 2026, cantiere ricevi-mercato): e'
+     quella dell'indirizzo e del QR di chi paga; le reti 0x di USDe hanno la
+     stessa forma, e un indirizzo non direbbe quale */
+  if (v.oc && (v.metodi || []).length > 1)
+    return {ok: false, manca: 'Negli scambi on-chain in ' + vc.segno + ' scegli una rete sola',
             campo: 'p2pNuovoMetodiBtn'};
   return {ok: true, manca: '', campo: ''};
 }
@@ -86910,9 +87049,6 @@ function valeNuovoOrdineP2P(v){
   if (!inUsdt && (v.metodi || []).some(m => retiUsdt.indexOf(m) >= 0))
     return {ok: false, manca: 'Le reti USDT valgono solo per un ordine in USDT',
             campo: 'p2pNuovoMetodiBtn'};
-  if (inUsdt && v.oc)
-    return {ok: false, manca: 'Gli scambi on-chain sono solo in euro',
-            campo: 'p2pNuovoEuro'};
   /* IN FRANCHI I METODI SVIZZERI (14 nov 2026, cantiere p2p-chf): TWINT e
      il bonifico svizzero solo in franchi, e in franchi solo i cinque */
   const metodiChf = typeof P2P_METODI_CHF !== 'undefined' ? P2P_METODI_CHF : [];
@@ -86922,9 +87058,6 @@ function valeNuovoOrdineP2P(v){
   if (!inChf && (v.metodi || []).some(m => m === 'TWINT' || m === 'Bonifico CH'))
     return {ok: false, manca: 'TWINT e il bonifico svizzero valgono solo per un ordine in franchi',
             campo: 'p2pNuovoMetodiBtn'};
-  if (inChf && v.oc)
-    return {ok: false, manca: 'Gli scambi on-chain non sono in franchi',
-            campo: 'p2pNuovoEuro'};
   /* IL TETTO DEL CONTANTI DI PERSONA (30 set 2026): la leva
      P2P_CONTANTI_MAX_EURO, per il solo metodo «Contanti», SOTTO quello
      generale — con piu' metodi e «Contanti» fra questi vale lo stesso,

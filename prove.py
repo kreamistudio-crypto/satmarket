@@ -118711,8 +118711,12 @@ def prove_avvisi_nuovi_ordini():
                json=json, db=lambda: _Tieni())
     # (2 nov 2026, p2p-onchain-usdt) la valuta dello scambio: i pezzi veri
     amb["P2P_ONCHAIN_RETI_USDT"] = {"USDT (Tron)": {}, "USDT (Ethereum)": {}}
+    # (16 nov 2026, ricevi-mercato) ...e i franchi e le monete on-chain
+    amb.update(P2P_COIN_METODI={"ETH (Ethereum)": "ETH"}, p2p_chf_ammesso=lambda tg: True,
+               p2p_coin_ammesso=lambda tg: True)
     for _n in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
-               "p2p_onchain_usdt"):
+               "p2p_onchain_usdt", "_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin",
+               "p2p_onchain_chf", "p2p_onchain_valuta"):
         exec(pezzo(_n), amb)
     exec(_senza_prosa(pezzo("_accoda_onchain_nuovo_p2p")), amb)
     accoda(con2, [ev("m1", T, amt="51500")], CAMBIO, T)
@@ -118992,7 +118996,8 @@ console.log(JSON.stringify(out));
           "USDT o EUR per l'on-chain; e a chi gli USDT non li vede la scelta vale «tutte»",
           (True, True, True),
           ('_passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat)' in src,
-           '"USDT" if usdt else "EUR"):' in pezzo("_accoda_onchain_nuovo_p2p"),
+           # (16 nov 2026) USDT, CHF o EUR: il giudice unico della valuta on-chain
+           'p2p_onchain_valuta(o)):' in pezzo("_accoda_onchain_nuovo_p2p"),
            # (14 nov 2026, cantiere p2p-chf) ...e «solo franchi» a chi i franchi li vede
            'vista = p2p_usdt_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")
            and 'vista = p2p_chf_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")))
@@ -158069,13 +158074,22 @@ def prove_p2p_onchain_usdt():
     prova("a mercato in USDT i sats si contano col dollaro, la stima del libro "
           "anche; il paracadute resta in euro (la ronda legge l'euro)",
           (True, True, True),
-          ('valuta = "usd" if usdt else "eur"' in pre and "cambio_noto_ora(valuta)" in pre,
+          # (16 nov 2026, ricevi-mercato) il metro lo dice `_p2p_onchain_metro`
+          ('valuta = _p2p_onchain_metro(o)' in pre and "cambio_noto_ora(valuta)" in pre
+           and '{"USDT": "usd", "CHF": "chf"}.get(p2p_onchain_valuta(o), "eur")' in pezzo("_p2p_onchain_metro"),
            "_p2p_onchain_cambio(o))" in pezzo("_p2p_onchain_foglio"),
            "para_da = cambio_eur if para and cambio_eur > 0 else 0.0" in pub))
     # --- 2) i pezzi puri del server ---
     amb = {"json": json, "re": _re, "hashlib": _h, "html": __import__("html")}
     i = src.index("P2P_ONCHAIN_RETI_USDT = {")
     exec(src[i:src.index("\n}\n", i) + 3], amb)
+    # (16 nov 2026, ricevi-mercato) i franchi e le monete on-chain
+    amb["P2P_COIN_METODI"] = {"ETH (Ethereum)": "ETH", "XMR (Monero)": "XMR", "USDe (Base)": "USDe"}
+    amb["_fmt_eur"] = lambda e: f"{e:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    for nome in ("_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin", "p2p_onchain_chf", "_p2p_onchain_metro", "p2p_onchain_cifra", "p2p_chf_frase", "p2p_coin_frase"):
+        exec(pezzo(nome), amb)
+    amb["P2P_COIN_FRASI"] = ()
+    amb["P2P_CHF_FRASI"] = ((" €", " CHF"),)
     for nome in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
                  "p2p_onchain_usdt", "p2p_onchain_valuta", "_tron_valido",
                  "p2p_onchain_rete_indirizzo", "p2p_onchain_rete_scambio",
@@ -158200,7 +158214,8 @@ def prove_p2p_onchain_usdt():
           "la cifra dell'ordine con la sua valuta",
           (True, True),
           ("await notifica(a[\"maker_id\"], _p2p_onchain_testo_paracadute(a)," in para,
-           'segno = "USDT" if p2p_onchain_usdt(a) else "€"' in pezzo("_p2p_onchain_testo_paracadute")))
+           # (16 nov 2026) la cifra nella sua valuta: «0,0153 ETH», «50,00 CHF»
+           'euro = f" da {p2p_onchain_cifra(a)}"' in pezzo("_p2p_onchain_testo_paracadute")))
     prova("la colonna dell'id e' una migrazione, come le altre", True,
           '("txid_usdt", "TEXT DEFAULT \'\'")' in pezzo("_p2p_onchain_prepara"))
     # --- 5) il telefono ---
@@ -158581,8 +158596,9 @@ console.log(JSON.stringify(out));
           "tettoValutaP2P(typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR')" in
           pezzo_js(mini, "function campiNuovoP2P(){", "\n}\n"))
     vale = pezzo_js(mini, "function valeNuovoOrdineP2P(v){", "\n}\n")
-    prova("il giudice del foglio: in USDT solo le reti, le reti solo in USDT, mai on-chain",
-          (True, True, True),
+    prova("il giudice del foglio: in USDT solo le reti, le reti solo in USDT; e dal 16 nov "
+          "2026 gli USDT passano anche on-chain (il blocco «solo in euro» fermava il foglio)",
+          (True, True, False),
           ("'In USDT si sceglie la rete: Tron o Ethereum'" in vale,
            "'Le reti USDT valgono solo per un ordine in USDT'" in vale,
            "'Gli scambi on-chain sono solo in euro'" in vale))
@@ -159005,7 +159021,8 @@ console.log(JSON.stringify(out));""")
     attesi = {
         "visto": [True, True, False, False, False, True],
         "chiuso": [False, ["EUR"]],
-        "valute": [["EUR", "CHF"], ["EUR"]],
+        # (16 nov 2026, ricevi-mercato) il franco anche a rete on-chain
+        "valute": [["EUR", "CHF"], ["EUR", "CHF"]],
         "valuta": ["CHF", "CHF", "EUR", "EUR"],
         "metro": [0.00096, 0.001],
         "tetto": [240, 250, 240, 0],
@@ -159035,7 +159052,7 @@ console.log(JSON.stringify(out));""")
             ("twint", blocco_chf.replace("7[5-9][0-9]{7}", "[0-9]{9}"), usdt),
             ("parole", blocco_chf.replace("['Gli euro', 'I franchi'], ['gli euro', 'i franchi'],", ""), usdt),
             ("tetto", blocco_chf, usdt.replace("const metro = c === 'USDT' ? usdPerSat :", "const metro = c === 'USDT' ? usdPerSat : eurPerSat ||")),
-            ("valute", blocco_chf, usdt.replace("v.cod === 'CHF' ? (!oc &&", "v.cod === 'CHF' ? (")),
+            ("valute", blocco_chf, usdt.replace("v.cod === 'CHF' ? (typeof chfVistoP2P", "v.cod === 'CHF' ? (!oc && typeof chfVistoP2P")),
         ]
         for chiave, b1, b2 in rotti:
             r = _node_banco(banco(b1, b2)) or {}
@@ -159047,7 +159064,8 @@ console.log(JSON.stringify(out));""")
           ("      : String(v.valuta || '').toUpperCase() === 'CHF' ? 'CHF' : 'EUR'," in mini,
            ": String((riga && riga.fiat) || '').toUpperCase() === 'CHF' ? 'CHF' : 'EUR';" in mini))
     prova("in franchi solo i metodi svizzeri, TWINT e bonifico CH solo in franchi, "
-          "niente on-chain", (True, True, True),
+          "e dal 16 nov 2026 anche on-chain (Andrea: «le altre valute servono solo per pagare»)",
+          (True, True, False),
           ("if (inChf && (v.metodi || []).some(m => metodiChf.indexOf(m) < 0))" in mini,
            "if (!inChf && (v.metodi || []).some(m => m === 'TWINT' || m === 'Bonifico CH'))" in mini,
            "if (inChf && v.oc)" in mini))
@@ -159138,7 +159156,7 @@ def prove_p2p_onchain():
     # (2 nov 2026, p2p-onchain-usdt) il `f` dice la valuta dello scambio
     amb["P2P_ONCHAIN_RETI_USDT"] = {"USDT (Tron)": {}, "USDT (Ethereum)": {}}
     for _n in ("_p2p_onchain_metodi", "p2p_onchain_metodi_usdt", "p2p_onchain_usdt",
-               "p2p_onchain_valuta"):
+               "p2p_onchain_chf", "p2p_onchain_valuta"):
         exec(pezzo(_n), amb)
     exec(pezzo("p2p_onchain_tags"), amb)
     o = {"ordine": "bar-onchain-abc", "lato": "sell", "stato": "pending",
@@ -160150,6 +160168,202 @@ process.stdout.write(JSON.stringify(out));
 
 
 
+def prove_p2p_onchain_valute():
+    """LE ALTRE VALUTE NEGLI SCAMBI ON-CHAIN (16 nov 2026, cantiere
+    ricevi-mercato, Andrea: «alla fine si scambia sempre Bitcoin on-chain o
+    Lightning, non le altre valute… Le altre valute servono solo per
+    pagare», scelta «Tutto insieme»). Il 2-di-3 blocca bitcoin come
+    sempre; chi compra paga in franchi (colonna `fiat` 'CHF') o in ETH, XMR
+    e USDe (la cifra DENTRO il metodo, come sul filo di Mostro). Qui i
+    pezzi veri: del server in Python (la moneta, la valuta, il metro, i
+    centesimi a mercato al cambio della moneta, la cifra, le parole degli
+    avvisi, il giudice) e del telefono in node (la riga vestita, la cifra,
+    le parole, il riquadro di chi paga, il filtro), con le controprove."""
+    print("\n[le altre valute negli scambi on-chain]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    # --- 1) il server ---
+    amb = {"json": json, "re": __import__("re"), "html": __import__("html")}
+    i = src.index("P2P_COIN_METODI = {")
+    exec(src[i:src.index("\n}\n", i) + 3], amb)
+    i = src.index("P2P_ONCHAIN_RETI_USDT = {")
+    exec(src[i:src.index("\n}\n", i) + 3], amb)
+    j = src.index("P2P_USDT_FRASI = (")
+    exec(src[j:src.index("\n\n\n", j)], amb)
+    j = src.index("P2P_CHF_FRASI = (")
+    exec(src[j:src.index("\n)\n", j) + 3], amb)
+    j = src.index("P2P_COIN_FRASI = (")
+    exec(src[j:src.index("\n)\n", j) + 3], amb)
+    CAMBI = {"eth": 3000.0, "xmr": 300.0, "usde": 0.86}
+    amb["cambio_coin_noto_ora"] = lambda: dict(CAMBI)
+    amb["_fmt_eur"] = lambda e: f"{e:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    amb["_fmt_sats"] = lambda n: f"{int(n):,}".replace(",", ".")
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
+              "p2p_onchain_usdt", "_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin",
+              "p2p_onchain_chf", "p2p_onchain_valuta", "_p2p_onchain_metro",
+              "p2p_onchain_cent_mercato", "p2p_onchain_cifra", "p2p_usdt_frase",
+              "p2p_chf_frase", "p2p_coin_frase", "_p2p_onchain_parole", "_p2p_onchain_quanto",
+              "p2p_onchain_sats_mercato"):
+        exec(pezzo(f), amb)
+    eth = {"metodi": '["ETH (Ethereum) 0.0153"]', "euro_cent": 4590, "prezzo_sats": 45900}
+    usde = {"metodi": '["USDe (Base) 50"]', "euro_cent": 4300, "prezzo_sats": 43000}
+    chf = {"metodi": '["TWINT"]', "euro_cent": 5000, "fiat": "CHF", "prezzo_sats": 52000}
+    eur = {"metodi": '["SEPA"]', "euro_cent": 5000, "prezzo_sats": 50000}
+    usdt = {"metodi": '["USDT (Tron)"]', "euro_cent": 5000, "prezzo_sats": 46000}
+    C = amb["p2p_onchain_coin"]
+    prova("la moneta dai metodi con la cifra; un metodo dell'euro, due monete o un metodo "
+          "senza cifra restano fuori",
+          [{"moneta": "ETH", "cifra": "0,0153", "quanto": 0.0153, "metodi": ["ETH (Ethereum)"]},
+           "USDe", {}, {}, {}],
+          [C(eth), C(usde)["moneta"], C({"metodi": '["ETH (Ethereum) 0.0153", "SEPA"]'}),
+           C({"metodi": '["ETH (Ethereum)"]'}), C(eur)])
+    V, M = amb["p2p_onchain_valuta"], amb["_p2p_onchain_metro"]
+    prova("la valuta del `f` (la moneta resta EUR come sul filo) e il metro del cambio",
+          [["EUR", "EUR", "CHF", "EUR", "USDT"], ["eur", "eur", "chf", "eur", "usd"]],
+          [[V(x) for x in (eth, usde, chf, eur, usdt)], [M(x) for x in (eth, usde, chf, eur, usdt)]])
+    K = amb["p2p_onchain_cent_mercato"]
+    prova("A MERCATO in moneta i centesimi li fa la cifra al cambio di ADESSO (0,0153 × 3000 € = "
+          "45,90 €; 50 USDe × 0,86 = 43,00 €), non l'euro_cent della pubblicazione; senza cambio 0; "
+          "in euro e franchi l'euro_cent",
+          [4590, 4300, 0, 5000, 5000, 6120],
+          [K(eth), K(usde), K(eth, {}), K(eur), K(chf),
+           K({"metodi": '["ETH (Ethereum) 0.0153"]', "euro_cent": 4590}, {"eth": 4000.0})])
+    Q = amb["p2p_onchain_cifra"]
+    prova("la cifra nella sua valuta", ["0,0153 ETH", "50,00 USDe", "50,00 CHF", "50,00 €", "50,00 USDT"],
+          [Q(x) for x in (eth, usde, chf, eur, usdt)])
+    P = amb["_p2p_onchain_parole"]
+    t = "💶 Chi compra dice di averti inviato 45,90 €. Controlla il tuo conto, poi libera: gli euro"
+    prova("LE PAROLE DEGLI AVVISI: in moneta la cifra in euro diventa quella nella moneta e il conto "
+          "il wallet; in franchi CHF e franchi; in euro com'era",
+          [True, True, False, True, True],
+          ["0,0153 ETH" in P(eth, t), "tuo wallet" in P(eth, t), "€" in P(eth, t),
+           "franchi" in P(chf, "Chi compra ti manda gli euro: 50,00 €") and "CHF" in P(chf, "50,00 €"),
+           P(eur, t) == t])
+    prova("«quanto» in moneta: la cifra nella moneta e i metodi senza la cifra",
+          "45.900 sats per 0,0153 ETH via ETH (Ethereum)", amb["_p2p_onchain_quanto"](eth))
+    # il giudice dell'ordine nuovo
+    amb.update(P2P_ONCHAIN_PREMIO_MAX=20, P2P_ONCHAIN_MIN_SATS=10000, P2P_ONCHAIN_METODI_MAX=5,
+               P2P_ONCHAIN_METODO_MAX=40, P2P_ONCHAIN_RECAPITO_MAX=300)
+    exec(pezzo("p2p_onchain_giudica_nuovo"), amb)
+    G = lambda metodi, valuta="EUR", cent=4590: amb["p2p_onchain_giudica_nuovo"](
+        "sell", 45900, cent, metodi, "", 999, 0, "fisso", 0, 0, valuta)
+    prova("IL GIUDICE: una moneta su una rete va; due reti on-chain no; una moneta mescolata "
+          "all'euro no; una moneta che dice anche franchi no; i franchi coi loro metodi vanno",
+          ["", "Negli scambi on-chain in USDe scegli una rete sola",
+           "ETH, Monero e USDe si scelgono come valuta nel foglio, non mescolati agli altri metodi",
+           "Un ordine in moneta non è anche in franchi o in USDT", ""],
+          [G(["ETH (Ethereum) 0.0153"]), G(["USDe (Ethereum) 50", "USDe (Base) 50"]),
+           G(["ETH (Ethereum) 0.0153", "SEPA"]), G(["ETH (Ethereum) 0.0153"], "CHF"),
+           G(["TWINT", "Revolut"], "CHF", 5000)])
+    prova("...e il tetto in franchi lo dice in CHF", True,
+          G(["TWINT"], "CHF", 120000).endswith("fino a 999 CHF"))
+    # i fili del server
+    pub = pezzo("p2p_onchain_pubblica_rotta")
+    pre = pezzo("p2p_onchain_prendi")
+    prova("I FILI: pubblicare coi cancelli dei franchi e delle monete, il controvalore della moneta "
+          "fatto dal server, la colonna `fiat`; prendere coi cancelli e i sats dalla cifra al cambio; "
+          "il libro e gli avvisi a chi li vede",
+          [True] * 7,
+          ['if chf and not p2p_chf_ammesso(user["id"]):' in pub
+           and 'if coin and not p2p_coin_ammesso(user["id"]):' in pub,
+           'euro_cent = p2p_onchain_cent_mercato({"metodi": json.dumps(metodi)})' in pub,
+           '"CHF" if chf else ""))' in pub and '("fiat", "TEXT DEFAULT \'\'")' in pezzo("_p2p_onchain_prepara"),
+           'if coin_o and not p2p_coin_ammesso(user["id"]):' in pre
+           and 'if p2p_onchain_chf(o) and not p2p_chf_ammesso(user["id"]):' in pre,
+           "prezzo = p2p_onchain_sats_mercato(cent, o[\"premio\"], cambio_presa)" in pre,
+           "if (p2p_onchain_chf(o) and not chf_si) or (p2p_onchain_coin(o) and not coin_si):"
+           in pezzo("_p2p_onchain_libro"),
+           "if (chf and not p2p_chf_ammesso(tg)) or (coin and not p2p_coin_ammesso(tg)):"
+           in pezzo("_accoda_onchain_nuovo_p2p")])
+    # --- 2) il telefono ---
+    ini = mini.index("/* ═══ I FRANCHI SVIZZERI (14 nov 2026")
+    blocco = mini[ini:mini.index("/* ---- IL PERCORSO BARATTOZON (23 set 2026")]
+    i = mini.index("const P2P_VALUTE = [")
+    valute = mini[i:mini.index("];", i) + 2]
+    oc = mini[mini.index("/* ═══ IL FRANCO E LE MONETE NEGLI SCAMBI ON-CHAIN"):
+              mini.index("/* «Dove vuoi gli euro»: la sezione in piu' di chi vende on-chain")]
+    fns = "".join(_fn_js(mini, f) for f in (
+        "function usdtOcP2P(o){", "function cifraOcP2P(o){", "function paroleOcP2P(o, t){",
+        "function righeOnchainLibroP2P(k){", "function valutaPassaOcP2P(o){"))
+
+    def banco(m_oc):
+        return ("var cambioVivo = true, eurPerSat = 0.001, usdPerSat = 0.0011, chfPerSat = 0.00096;\n"
+                "var myP2PUsdt = true, myP2PCoin = true, myP2PChf = true, p2pFiltro = null;\n"
+                "const P2P_VALUTA = 'EUR';\n"
+                "const P2P_METODI = ['SEPA', 'Revolut', 'Contanti'];\n"
+                "const esc = s => String(s);\n"
+                "const fmt = n => String(n);\n"
+                "const fmtEur = e => Number(e).toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});\n"
+                "const reteCoinScambioP2P = () => null;\n"
+                "const rigaDato = (et, v, op) => '[' + et + ':' + v + ':' + op.vista + ']';\n"
+                "const vesteMetodoP2P = () => null;\n"
+                "const P2P_STELLE_EU = '<eu>', P2P_TETHER_SEGNO = '<t>';\n"
+                + valute + "\n" + blocco + "\n" + m_oc + "\n" + fns + r"""
+impostaCambioCoinP2P({eth: 3000, xmr: 300, usde: 0.86});
+const out = {};
+let p2pOnchainLibro = {eventi: []};
+const riga = x => Object.assign({id: 1, lato: 'sell', fiat: 'EUR', euro: 45.9, sats: 45900}, x);
+const eth = vestiOcP2P(riga({metodi: ['ETH (Ethereum) 0.0153'], recapito: '0x52908400098527886E0F7030069857D2E4169EE7'}));
+const chf = vestiOcP2P(riga({id: 2, fiat: 'CHF', euro: 50, metodi: ['TWINT']}));
+const eur = vestiOcP2P(riga({id: 3, euro: 50, metodi: ['SEPA']}));
+out.vesti = [eth.fiat, eth.euro, eth.euroNodo, eth.metodi, chf.fiat, eur.fiat];
+out.cifra = [cifraOcP2P(eth), cifraOcP2P(chf), cifraOcP2P(eur)];
+out.parole = [paroleOcP2P(eth, 'Manda 0,0153 € a chi vende, poi tocca «Ho inviato gli euro»'),
+  paroleOcP2P(chf, 'Dove vuoi gli euro'), paroleOcP2P(eur, 'Dove vuoi gli euro'),
+  paroleOcP2P(eth, '💶 Ho inviato gli euro')];
+out.rete = [(reteOcCoinP2P(eth) || {}).nome, reteOcCoinP2P(chf)];
+const q = riquadroCoinOcP2P(eth);
+out.riquadro = [/Manda ETH su Ethereum/.test(q), /\[Da mandare:0\.0153:0,0153 ETH\]/.test(q),
+  /ethereum:0x52908400098527886E0F7030069857D2E4169EE7@1\?value=15300000000000000/.test(q),
+  riquadroCoinOcP2P(riga({metodi: ['ETH (Ethereum) 0.0153']})) === ''];
+out.recapito = [giudiceRecapitoOcCoinP2P('', ['ETH (Ethereum)']),
+  /bitcoin/.test(giudiceRecapitoOcCoinP2P('bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', ['ETH (Ethereum)'])),
+  giudiceRecapitoOcCoinP2P('qualcosa', ['SEPA'])];
+p2pOnchainLibro.eventi = [eth, chf, eur];
+p2pFiltro = {valute: ['CHF'], rete: ''}; out.filtro = [righeOnchainLibroP2P('sell').map(o => o.id)];
+p2pFiltro = {valute: ['ETH', 'EUR'], rete: ''}; out.filtro.push(righeOnchainLibroP2P('sell').map(o => o.id));
+p2pFiltro = {valute: [], rete: 'ln'}; out.filtro.push(righeOnchainLibroP2P('sell').map(o => o.id));
+p2pFiltro = null; out.filtro.push(righeOnchainLibroP2P('sell').map(o => o.id));
+console.log(JSON.stringify(out));
+""")
+    o = _node_banco(banco(oc))
+    if o is None:
+        salta("il banco del telefono delle valute on-chain", "node assente")
+        return
+    if "vesti" not in o:
+        prova("il banco del telefono delle valute on-chain gira", True, False)
+        return
+    prova("LA RIGA ON-CHAIN SI VESTE come quella del libro: ETH da 0,0153 col controvalore in "
+          "euroNodo e i nomi nudi; i franchi e l'euro restano quel che sono",
+          ["ETH", 0.0153, 45.9, ["ETH (Ethereum)"], "CHF", "EUR"], o["vesti"])
+    prova("la cifra nella sua valuta", ["0,0153 ETH", "50,00 CHF", "50,00 €"], o["cifra"])
+    prova("le parole: in moneta la cifra e «gli ETH», in franchi «i franchi», in euro com'era",
+          ["Manda 0,0153 ETH a chi vende, poi tocca «Ho inviato gli ETH»", "Dove vuoi i franchi",
+           "Dove vuoi gli euro", "🪙 Ho inviato gli ETH"], o["parole"])
+    prova("la rete della moneta dello scambio, e niente in franchi", ["Ethereum", None], o["rete"])
+    prova("IL RIQUADRO DI CHI PAGA: la rete, la cifra da copiare col punto, il QR EIP-681 con la "
+          "catena e i wei; senza indirizzo niente", [True, True, True, True], o["riquadro"])
+    prova("il giudice dell'indirizzo di chi vende: vuoto va (si scrive dopo), un bitcoin no, "
+          "fuori moneta tace", ["", True, ""], o["recapito"])
+    prova("IL FILTRO DELLA VALUTA VALE ANCHE ON-CHAIN: «solo franchi», «ETH ed euro», solo "
+          "Lightning, nessun filtro", [[2], [1, 3], [], [1, 2, 3]], o["filtro"])
+    rotto = oc.replace("return o && typeof vestiCoinOrdineP2P === 'function' ? vestiCoinOrdineP2P(o) : o;",
+                       "return o;")
+    r = _node_banco(banco(rotto)) or {}
+    prova("controprova: senza la veste la riga in moneta resta in euro", True,
+          (r.get("vesti") or [None])[0] != "ETH")
+    pub = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
+    prova("I FILI DEL TELEFONO: si pubblica con la cifra nel metodo e il franco in `valuta`; le "
+          "righe del libro, dei miei e della scheda si vestono; i metodi on-chain tengono le monete",
+          [True] * 4,
+          ["metodi: vcP ? campi.metodi.map(m => metodoPmCoinP2P(m, qP, vcP.cod)) : campi.metodi.slice()," in pub
+           and "valuta: String(campi.valuta || 'EUR').toUpperCase() === 'CHF' ? 'CHF' : ''," in pub,
+           "busta.eventi.map(vestiOcP2P)" in mini and "((await r.json()).ordini || []).map(vestiOcP2P)" in mini
+           and "o = vestiOcP2P(await r.json());" in mini,
+           "return metodiPubblicabiliP2P(lato).filter(m => m !== P2P_TABACCHINO);" in mini,
+           "if (ricevo && rCoin) {" in pezzo_js(mini, "function schedaOnchainP2P(o){", "\n}\n")])
+
+
 def prove_tasti_rete_foglio():
     """I DUE TASTI DELLA RETE IN CIMA AL FOGLIO DELL'ORDINE (16 nov 2026,
     cantiere coin-quasi, Andrea: «sotto ci devono essere già i due tasti per
@@ -160475,6 +160689,7 @@ impostaCambioCoinP2P({eth: 3000, xmr: 300, usde: 0.86});
 const out = {};
 // 1) il catalogo e le liste
 out.catalogo = [valuteVisibiliP2P(false).map(v => v.cod), valuteVisibiliP2P(true).map(v => v.cod)];
+myP2PCoin = false; out.spenteOc = valuteVisibiliP2P(true).map(v => v.cod); myP2PCoin = true;
 myP2PCoin = false; out.spente = valuteVisibiliP2P(false).map(v => v.cod); myP2PCoin = true;
 out.liste = [metodiValutaP2P('ETH'), metodiValutaP2P('XMR'), metodiValutaP2P('USDE').length,
   metodiValutaP2P('EUR').some(m => !!reteCoinDaMetodoP2P(m))];
@@ -160515,10 +160730,13 @@ const g = x => valeNuovoOrdineP2P(Object.assign({valuta: 'ETH', euro: '0,0153', 
 const gg = x => { const r = g(x); return r.ok ? 'ok' : r.manca + ' @' + r.campo; };
 out.giudice = [gg({}), gg({euro: ''}), gg({euro: '0,1234567'}), gg({valuta: 'USDE', euro: '10,123',
   metodi: ['USDe (Base)'], cambioCoin: 0.86, maxEuro: tettoInValutaP2P(250, 'USDE')}),
-  gg({euroMax: '1'}), gg({cambioCoin: 0}), gg({cambio: 0}), gg({euro: '0,1'}), gg({oc: true}),
+  gg({euroMax: '1'}), gg({cambioCoin: 0}), gg({cambio: 0}), gg({euro: '0,1'}),
+  /* on-chain (16 nov 2026): una rete sola */
+  gg({oc: true, valuta: 'USDE', euro: '50', metodi: ['USDe (Ethereum)', 'USDe (Base)'], cambioCoin: 0.86,
+    maxEuro: tettoInValutaP2P(250, 'USDE')}),
   gg({metodi: []}), gg({metodi: ['SEPA']}), gg({valuta: 'USDE', euro: '50', metodi: [], cambioCoin: 0.86,
   maxEuro: tettoInValutaP2P(250, 'USDE')}), gg({fisso: true}), gg({minSats: 50000}),
-  gg({fisso: true, sats: '20000', maxSats: 10000})];
+  gg({fisso: true, sats: '20000', maxSats: 10000}), gg({oc: true})];
 // 5) il tetto nella moneta
 cambioCoinP2P.eth = 0;
 out.tetto = [0, 0, 0, 0];
@@ -160547,9 +160765,10 @@ console.log(JSON.stringify(out));
     if "catalogo" not in o:
         prova("il banco delle valute-moneta gira", True, False)
         return
-    prova("il catalogo: ETH, XMR e USDe fra le valute a chi le vede, mai a rete on-chain ne' a leva spenta",
-          [["EUR", "USDT", "ETH", "XMR", "USDE"], ["EUR"], ["EUR", "USDT"]],
-          [o["catalogo"][0], o["catalogo"][1], o["spente"]])
+    prova("il catalogo: ETH, XMR e USDe fra le valute a chi le vede, anche a rete on-chain dal 16 nov "
+          "2026 (gli USDT on-chain hanno la loro leva); mai a leva spenta",
+          [["EUR", "USDT", "ETH", "XMR", "USDE"], ["EUR", "ETH", "XMR", "USDE"], ["EUR", "USDT"], ["EUR"]],
+          [o["catalogo"][0], o["catalogo"][1], o["spente"], o["spenteOc"]])
     prova("OGNUNA LA SUA LISTA: ETH → «ETH (Ethereum)», XMR → «XMR (Monero)», USDe le sue cinque reti; "
           "l'euro coi suoi metodi e basta, anche nel foglio",
           [["ETH (Ethereum)"], ["XMR (Monero)"], 5, False, 5, False],
@@ -160575,7 +160794,8 @@ console.log(JSON.stringify(out));
           "moneta tiene il controvalore della riga", [True, True, True, 0, None, 46],
           o["giro"] + [o["giroMuto"]])
     prova("IL GIUDICE: buono; poi ogni frase col suo campo — vuoto, sei decimali (due in USDe), niente "
-          "massimo, cambio della moneta o dei sats che manca, il tetto in ETH, on-chain, le reti, i sats",
+          "massimo, cambio della moneta o dei sats che manca, il tetto in ETH, on-chain una rete sola, "
+          "le reti, i sats; e on-chain con una rete va",
           ["ok",
            "Scrivi l'importo in ETH @p2pNuovoEuro",
            "In ETH al massimo sei decimali @p2pNuovoEuro",
@@ -160584,13 +160804,14 @@ console.log(JSON.stringify(out));
            "Aspetta un attimo: sto leggendo il cambio di ETH @p2pNuovoEuro",
            "Aspetta un attimo: sto leggendo il cambio di ETH @p2pNuovoEuro",
            "Troppi: il massimo è 0,083333 ETH @p2pNuovoEuro",
-           "Gli scambi on-chain sono solo in euro @p2pNuovoEuro",
+           "Negli scambi on-chain in USDe scegli una rete sola @p2pNuovoMetodiBtn",
            "Scegli «ETH (Ethereum)» @p2pNuovoMetodiBtn",
            "In ETH si paga solo con ETH (Ethereum) @p2pNuovoMetodiBtn",
            "Scegli almeno una rete @p2pNuovoMetodiBtn",
            "Scrivi quanti sats @p2pNuovoSats",
            "Troppo pochi: il minimo è 50000 sats @p2pNuovoEuro",
-           "Troppi: il massimo è 10000 sats @p2pNuovoSats"], o["giudice"])
+           "Troppi: il massimo è 10000 sats @p2pNuovoSats",
+           "ok"], o["giudice"])
     prova("il tetto nella moneta, per difetto ai suoi decimali: 250 € = 0,083333 ETH, 290,69 USDe; "
           "senza cambio 1 (fermo), spento resta 0", [0.083333, 290.69, 1, 0], o["tetto"])
     prova("il tastierino: sei decimali in ETH, due in USDe, due di serie; il campo e le righe nella moneta",
@@ -182058,16 +182279,18 @@ def prove_ripubblica_p2p():
     exec(src[j:src.index("\n", j)].split("  #")[0], amb)
     amb["P2P_ONCHAIN_SEGNO"] = "🟠"
     amb["P2P_ONCHAIN_RETI_USDT"] = {"USDT (Tron)": {}, "USDT (Ethereum)": {}}
+    amb["P2P_COIN_METODI"] = {}
     for f in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
               "p2p_onchain_usdt", "_p2p_onchain_passata_ripubblica",
-              "_p2p_onchain_testo_ripubblica", "_fmt_eur"):
+              "_p2p_onchain_testo_ripubblica", "_fmt_eur", "_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin", "p2p_onchain_chf", "_p2p_onchain_metro", "p2p_onchain_cifra", "p2p_onchain_valuta"):
         exec(_senza_prosa(pezzo(f)), amb)
     scaduti = [1, 2, 3, 4]
     rif = amb["_p2p_onchain_passata_ripubblica"](oc, scaduti, PREZZI, ORA - 60, ORA)
     prova("la ronda: dentro resta nel libro con la vita intera e un giro in piu', fuori e "
           "senza intervallo scadono; gli USDT si misurano sul dollaro",
           [[2, 3], {1: "rifatto", 2: "fuori", 4: "rifatto"},
-           [(1, ORA + 24 * 3600, 1), (2, ORA - 1, 0), (3, ORA - 1, 0), (4, ORA + 24 * 3600, 1)]],
+           [(1, ORA + amb["P2P_ONCHAIN_ORE_LIBRO"] * 3600, 1), (2, ORA - 1, 0), (3, ORA - 1, 0),
+            (4, ORA + amb["P2P_ONCHAIN_ORE_LIBRO"] * 3600, 1)]],
           [scaduti, {a["id"]: a["esito"] for a in rif},
            [tuple(r) for r in oc.execute("SELECT id, scade, rip_giri FROM p2p_onchain_ordini")]])
     prova("...senza un prezzo fresco non rifa' niente e non dice niente", [[], [7]],
@@ -199998,6 +200221,7 @@ def main():
     prove_icone_valute_filtro,
     prove_p2p_onchain_commissione,
     prove_tasti_rete_foglio,
+    prove_p2p_onchain_valute,
     prove_prezzo_btc_libro,
     prove_usdt_foglio_presa,
     prove_sconto_fisso_decimale,
