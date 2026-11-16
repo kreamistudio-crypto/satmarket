@@ -356,3 +356,9 @@ frase: Chi vende può spedire con la posta senza tracciamento senza fingere una 
 dove: l'ordine del venditore: «📦 Segna come spedito», la voce «✉️ Posta senza tracciamento»; sotto, il bottone «✏️ Correggi il tracciamento» (o «🚚 Era una spedizione?»).
 leva: nessuna
 pubblico: sì
+
+## 2026-11-16 · codici-uno-alla-volta
+frase: Se compri più codici digitali nello stesso ordine (per esempio 10 buoni), adesso si aprono uno alla volta: provi il primo, tocchi «✅ Funziona» e vedi il successivo. Se un codice non funziona la disputa riguarda solo quello, e i codici mai aperti ti tornano: chi prova a imbrogliare rischia un codice, non tutto l'ordine. Chi vende scrive ogni codice nel suo riquadro.
+dove: l'ordine di un codice online da 2 pezzi in su: per chi vende il form «Consegna i codici», per chi compra il pannello «🔓 Apri il codice 1».
+leva: CODICI_UNO_ALLA_VOLTA (accesa di serie)
+pubblico: sì

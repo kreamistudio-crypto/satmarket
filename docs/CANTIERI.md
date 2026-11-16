@@ -85751,3 +85751,55 @@ salto della domanda e la riga in fila: rosse tutte e quattro. DA GUARDARE:
 il bottone-sommario su iPhone (Safari) e in tema scuro; il caso vero di
 quel venditore, se il suo ordine è ancora shipped (la correzione da «a
 mano» ora gliela permette).
+
+## Più codici digitali, uno alla volta (16 nov 2026, cantiere codici-uno-alla-volta; Andrea: «nel caso di invio multiplo di codici digitali ad esempio 10 buoni da 50€ il mittente dovrá inserire i codici in 10 slot differenti. Il destinatario vede il codice successivo solo dopo aver confermato la validitá del codice precedente. Con questo meccanismo verrebbero scammati codici per un valore di solo 50€ e non 500€»; proposta in otto punti, sulla card «Pagamento unico, divisione in disputa», poi «ok»)
+Il buco: un ordine digitale da N pezzi aveva UN campo di testo, rivelato
+tutto insieme, quindi chi compra poteva riscattare i dieci buoni e aprire
+la disputa sull'ordine intero. DECISO: da due pezzi in su (leva
+`CODICI_UNO_ALLA_VOLTA`, accesa di serie; solo ordini di un annuncio
+solo, un set resta al campo unico perché un riquadro non saprebbe di
+quale annuncio è) chi vende riempie un riquadro per pezzo, e chi compra
+apre il primo (la ricevuta di sempre, `consegnato`), lo prova e con
+«✅ Funziona, mostrami il prossimo» apre il successivo; «⚠️ Non
+funziona» apre la disputa sul SOLO codice di turno. I SOLDI NON SI
+SPEZZANO (scelta di Andrea sulla card, contro i pagamenti a rate): tutto
+resta nel deposito e parte alla conferma dell'ultimo. Si dividono solo in
+disputa, e a dividere sono i contatori, non il moderatore: confermati a
+chi vende, mai aperti a chi compra, e il moderatore decide il codice
+contestato («venditore» = funzionava, «rimborso» = no). La strada dei
+due pagamenti è quella che esisteva già, `_rimborsa_meno_spese`: la
+colonna `spese_rese_sats` dice «quanto non torna a chi compra», la riga
+di chi vende nasce nel registro «da riscuotere» col motivo di sempre (il
+libro mastro e le sue ronde non cambiano), e la colonna nuova
+`codici_venditore` cambia solo le parole. La quota è
+`quota_codici_venditore`: i suoi pezzi sul netto degli articoli, meno la
+commissione, e tutto il resto (protezione compresa) torna a chi compra:
+su un affare spezzato Barattolo non trattiene niente (oggi la
+commissione del mercatino è comunque 0). I TEMPI: ogni codice ha
+`ORE_CONFERMA_DIGITALE` da quando si apre, con un'ancora sua
+(`codice_aperto_il`, non `consegnato`: l'ancora mobile è la trappola già
+pagata); passate quelle conta come buono e la disputa si rifiuta, poi
+`ORE_SILENZIO_DIGITALE` per aprire il successivo, altrimenti il giro
+dell'orologio sblocca tutto a chi vende. Il caso peggiore per chi vende
+è quindi N volte 72 ore: è il prezzo della protezione. LA CORREZIONE riquadro per riquadro, finché quel codice non è
+aperto (un riquadro vuoto vale «lascialo com'è»); il moderatore vede solo
+i codici aperti. SCARTATE: i pagamenti a rate a ogni conferma (Andrea
+sulla card: un pagamento solo); una disputa che riapre i codici già
+confermati (la conferma è definitiva, come «libera i sats»); la foto nei
+riquadri (una foto coi dieci codici a barre rifarebbe il buco: con i
+riquadri l'immagine non si allega, e il server lo dice). FUORI,
+dichiarato: on-chain la disputa resta tutto-o-niente al primo giro (la
+divisione vorrebbe una firma a due uscite; la nota al moderatore lo
+dice), e l'ultimo «Funziona» on-chain passa dalla firma del telefono
+come sempre. PROVATO: `collaudo_codici_uno_alla_volta` (nuovo, nella CI,
+58 prove sul banco del nodo muto con il server vero: consegna a riquadri
+e i suoi rifiuti, lettura e ricevuta, correzione dei soli chiusi,
+«Funziona» col CAS, disputa sul codice con divisione in tutti e due i
+versi e sul codice 1 integrale, l'ultimo «Funziona» che sblocca, i due
+orologi, il campo unico a leva spenta); la suite severa coi censimenti
+aggiornati (le letture di `attesaRitardata`, le ancore del pannello, la
+ricevuta che scrive `consegnato` contata con il ramo dei codici, le
+quattro domande nuove della domanda unica). DA GUARDARE: il primo ordine
+vero da più codici, dal telefono, coi due lati; la disputa divisa con
+l'incasso della quota da parte di chi vende (la riga «da riscuotere»
+parla di «codici confermati»); un ordine on-chain a riquadri.

@@ -18797,6 +18797,13 @@ function mapOrder(o){
        file e' la maniglia sul disco — non serve a nessun client */
     contenutoDocumento:!!o.contenuto_documento,
     contenutoCorrezioni:o.contenuto_correzioni||0,
+    /* UN CODICE ALLA VOLTA (16 nov 2026): i contatori dei riquadri,
+       mai i codici (quelli li serve /contenuto, e a chi compra solo gli
+       aperti). `codiciRiquadri` = chi vende consegna a riquadri. */
+    codiciRiquadri:!!o.codici_riquadri, codiciN:o.codici_n||0,
+    codiciAperti:o.codici_aperti||0, codiciConfermati:o.codici_confermati||0,
+    codiceApertoIl:o.codice_aperto_il||0, codiceDisputa:o.codice_disputa||0,
+    codiciVenditore:o.codici_venditore||0,
     /* l'indirizzo di casa (ago 2026): il testo non esce da qui — si
        legge solo da /indirizzo, e solo le due parti. Qui arrivano i
        FATTI: se e' atteso, se e quando e' stato scritto, quante volte
@@ -38379,12 +38386,14 @@ function openOrder(id){
         : {t:'Decisione del moderatore', d:s==='dispute'?'Il moderatore sta esaminando il caso'
             /* la quarta decisione non e' «a favore» di nessuno dei
                due: si dice col suo nome, uguale per chi legge */
-            : o.speseReseSats ? 'Rimborso meno le spese di spedizione'
+            : o.speseReseSats ? (o.codiciVenditore ? 'Divisa sui codici' : 'Rimborso meno le spese di spedizione')
             : (o.role==='buyer' ? 'Disputa risolta a tuo favore'
                                 : 'Disputa risolta a favore dell\'acquirente')},
-      passoRimborso(o, s, o.speseReseSats ? 'Meno le spese di spedizione, nessuna commissione'
+      passoRimborso(o, s, o.speseReseSats ? (o.codiciVenditore ? `Meno ${nomeQuotaVenditore(o)}`
+                                                               : 'Meno le spese di spedizione, nessuna commissione')
                                           : 'Rimborso integrale, nessuna commissione',
-                          o.speseReseSats ? 'Meno le spese di spedizione, rese al venditore'
+                          o.speseReseSats ? (o.codiciVenditore ? `Meno ${nomeQuotaVenditore(o)}, pagati al venditore`
+                                                               : 'Meno le spese di spedizione, rese al venditore')
                                           : 'Rimborso integrale, l\'annuncio torna in vetrina'),
     ];
     /* `progress` e' un INDICE dentro `steps` (vedi il render piu'
@@ -38448,8 +38457,11 @@ function openOrder(id){
        (ago 2026) e un countdown prometterebbe una cosa che non
        succede — al suo posto si dice che il deposito aspetta. */
     const digitale = o.consegnaScelta==='digitale';
-    const oreRestanti = (digitale && o.consegnato)
-      ? Math.max(0, Math.ceil((o.consegnato + TEMPI.confermaDig*3600 - Date.now()/1000)/3600)) : 0;
+    /* (16 nov 2026) a riquadri il conto e' del codice DI TURNO: la sua
+       ancora e' quando si e' aperto, non la prima rivelazione */
+    const ancoraDig = o.codiciN ? o.codiceApertoIl : o.consegnato;
+    const oreRestanti = (digitale && ancoraDig)
+      ? Math.max(0, Math.ceil((ancoraDig + TEMPI.confermaDig*3600 - Date.now()/1000)/3600)) : 0;
     const ritiro = o.consegnaScelta==='ritiro';
     /* IL SERVIZIO (ago 2026): il passo di mezzo racconta
        l'appuntamento, che e' l'unico fatto che quella strada ha. Tre
@@ -38514,7 +38526,11 @@ function openOrder(id){
           riga sotto: a chi compra si da' del tu, a tutti gli altri
           (venditore e moderatore) la terza persona. */
        d:s==='delivered'
-         ? (digitale
+         ? (digitale && o.codiciN
+             /* a riquadri: a che codice si e' arrivati, e il tempo del
+                codice di turno (16 nov 2026) */
+             ? rigaCodiciStepper(o, oreRestanti)
+           : digitale
              ? (o.role==='buyer'
                  ? `Restano ~${oreRestanti} ore per confermare o aprire disputa`
                  : `L'acquirente ha ~${oreRestanti} ore per confermare o aprire disputa`)
@@ -38541,8 +38557,8 @@ function openOrder(id){
                           : 'I sats sono stati consegnati al venditore'}
     : s==='refunded'            ? {ic:'↩️', b:'Deposito rimborsato',
       d:o.speseReseSats
-        ? (o.role==='buyer' ? `Ti abbiamo rimborsato ${cifraOrdine(o, importoRimborso(o))} (meno le spese di spedizione)`
-                            : 'I sats sono tornati all\'acquirente, meno le spese di spedizione')
+        ? (o.role==='buyer' ? `Ti abbiamo rimborsato ${cifraOrdine(o, importoRimborso(o))} (meno ${nomeQuotaVenditore(o)})`
+                            : `I sats sono tornati all'acquirente, meno ${nomeQuotaVenditore(o)}`)
        :o.role==='buyer'  ? `Ti abbiamo rimborsato ${cifraOrdine(o, o.listing.price)} (integrale)`
        :annulloVenditore(o) ? 'Hai annullato l\'ordine: i sats sono tornati all\'acquirente'
                           : 'I sats sono tornati all\'acquirente'}
@@ -38559,8 +38575,8 @@ function openOrder(id){
         ? (o.role==='buyer' ? 'Il venditore ha annullato: scegli qui sotto come ricevere i tuoi sats'
                             : 'Hai annullato l\'ordine: i sats tornano all\'acquirente')
         : o.speseReseSats
-        ? (o.role==='buyer' ? 'Disputa decisa: rimborso meno le spese di spedizione. Scegli qui sotto come riceverlo'
-                            : 'Disputa decisa: i sats tornano all\'acquirente, meno le spese di spedizione')
+        ? (o.role==='buyer' ? `Disputa decisa: rimborso meno ${nomeQuotaVenditore(o)}. Scegli qui sotto come riceverlo`
+                            : `Disputa decisa: i sats tornano all'acquirente, meno ${nomeQuotaVenditore(o)}`)
         : (o.role==='buyer' ? 'Disputa vinta! Scegli qui sotto come ricevere i tuoi sats'
                             : 'Disputa decisa: i sats tornano all\'acquirente')}
     : ['return_pending','return_shipped'].includes(s)
@@ -38758,15 +38774,16 @@ function openOrder(id){
             : chiusoDalTimer(s, o.sbloccatoAuto) && !o.disputata
             ? "Nessuno ha disputato: è scaduto il tempo per confermare e l'affare si è chiuso da solo, ma il venditore non ha un modo per incassare — i sats sono ancora nel deposito. Decidi tu dove vanno."
             : 'Questa disputa era stata decisa, ma il pagamento non è riuscito: i sats sono ancora nel deposito. Puoi confermare la stessa strada o cambiarla.'}</div>
-          <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso', this)">↩️ Rimborsa subito l'acquirente (100%)</button>
+          ${etichettaCodiciAdmin(o, 'nota')}
+          <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso', this)">${etichettaCodiciAdmin(o, 'rimborso') || '↩️ Rimborsa subito l\'acquirente (100%)'}</button>
           <button class="btn ghost" onclick="adminResolve('reso', this)">📦 Rimborso previa restituzione dell'oggetto</button>
-          <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">⚡ Dai i sats al venditore</button>
+          <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">${etichettaCodiciAdmin(o, 'venditore') || '⚡ Dai i sats al venditore'}</button>
           ${bottoneMenoSpese(o, s)}
         </div>`:''}
       ${isAdmin ? pannelloResoAdmin(o, s) + pannelloSpeseReseAdmin(o, s) : ''}
       ${pannelloSpeseVenditore(o)}
       ${o.role==='buyer' && s==='refund' && !o.onchain ? refundPanel(o) : ''}
-      ${o.role==='buyer' && s==='refunded' && o.speseReseSats ? `<div class="trust-note">↩️ <span>Disputa decisa: il <b>rimborso meno le spese di spedizione</b> è stato inviato al tuo wallet.</span></div>`:''}
+      ${o.role==='buyer' && s==='refunded' && o.speseReseSats ? `<div class="trust-note">↩️ <span>Disputa decisa: il <b>rimborso meno ${nomeQuotaVenditore(o)}</b> è stato inviato al tuo wallet.</span></div>`:''}
       ${o.role==='buyer' && s==='refunded' && !o.speseReseSats ? `<div class="trust-note">↩️ <span>${annullataPagata(o) ? 'Hai pagato una fattura annullata' : annulloVenditore(o) ? 'Il venditore ha annullato l\'ordine' : 'Disputa risolta a tuo favore'}: il <b>rimborso integrale</b> è stato inviato al tuo wallet.</span></div>`:''}
       ${o.role==='buyer' && s==='return_pending' ? `
         <div class="payout">
@@ -38804,7 +38821,7 @@ function openOrder(id){
           <h4>🔨 In attesa della scelta del vincitore</h4>
           <div class="hint">L'asta è conclusa e i sats sono al sicuro in cassaforte. Il vincitore sta scegliendo come riceverlo: ti avviso appena decide — fino ad allora non c'è nulla da spedire, e nessun timer parte.</div>
         </div>`:''}
-      ${o.role==='seller' && s==='locked' && !(o.asta && !o.consegnaScelta) ? (o.consegnaScelta==='digitale' ? `
+      ${o.role==='seller' && s==='locked' && !(o.asta && !o.consegnaScelta) ? (o.consegnaScelta==='digitale' ? (o.codiciRiquadri ? formCodiciVenditore(o) : `
         <div class="payout" id="digForm">
           <h4>💾 Consegna il contenuto</h4>
           <div class="hint">I sats sono al sicuro in cassaforte. Scrivi qui il contenuto (codice, istruzioni, link di riscatto): l'acquirente lo rivelerà con un tocco, che fa da ricevuta. 💡 Tieni uno screenshot datato del saldo o della validità: in disputa, le prove decidono.</div>
@@ -38812,7 +38829,7 @@ function openOrder(id){
           ${campoFotoContenuto(o, null)}
           <div class="hint" style="margin-top:10px">✏️ Se sbagli, puoi correggerlo da qui finché l'acquirente non lo rivela.</div>
           <button class="btn orange" onclick="consegnaContenuto(this)">💾 Consegna il contenuto</button>
-        </div>` : o.consegnaScelta==='ritiro' ? `
+        </div>`) : o.consegnaScelta==='ritiro' ? `
         <div class="payout">
           <h4>🤝 Consegna in zona</h4>
           <div class="hint">L'acquirente ha scelto il <b>ritiro in zona</b>: i sats sono al sicuro in cassaforte. Accordatevi per l'incontro e, quando l'oggetto è passato di mano, segnalo qui — da lì l'acquirente conferma la ricezione, e se tace lo sollecitiamo noi.</div>
@@ -38920,7 +38937,10 @@ function openOrder(id){
       ${o.role==='seller' && ['creato','locked'].includes(s) && !inPagamento(o) ? `<button class="btn piano" onclick="apriAnnullaVendita()">✖️ Annulla l'ordine</button>` : ''}
       ${!inPagamento(o) && o.role==='seller' && s==='shipped' ? `<button class="btn ghost" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${pannelloTrackingVenditore(o, s)}
-      ${o.role==='buyer' && s==='delivered' && !inPagamento(o) ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
+      ${/* a codici uno alla volta (16 nov 2026) la nota la porta il
+            pannello dei codici, codice per codice: questa diceva
+            «conferma qui sotto» a un bottone che li' non c'e' */''}
+      ${o.role==='buyer' && s==='delivered' && !inPagamento(o) && !o.codiciN ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
       ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' && !inPagamento(o) ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
       ${/* L'ORDINE DEI BOTTONI del compratore (ago 2026, decisione di
             Andrea): prima il gesto PRINCIPALE — libera i sats, che e'
@@ -38941,7 +38961,7 @@ function openOrder(id){
             davanti a chi aveva gia' confermato. Il server li rifiuta
             comunque (409): qui semplicemente non si offrono. */''}
       ${pannelloOnchainOrdine(o, s)}
-      ${o.role==='buyer' && !inPagamento(o) && !(o.onchain && o.onchain.proposta && o.onchain.proposta.mia) && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && (o.consegnaScelta==='ritiro' || (o.consegnaScelta==='servizio' && o.appuntamentoIl && o.appuntamentoIl < Date.now()/1000)))) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='servizio'?'C\'è stata':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
+      ${o.role==='buyer' && !inPagamento(o) && !(o.onchain && o.onchain.proposta && o.onchain.proposta.mia) && (['delivered'].includes(s) && !codiciInCorso(o) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && (o.consegnaScelta==='ritiro' || (o.consegnaScelta==='servizio' && o.appuntamentoIl && o.appuntamentoIl < Date.now()/1000)))) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='servizio'?'C\'è stata':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${/* A 'confirmed' ci si arriva in TRE modi, e la riga ne
             raccontava uno solo: «Hai confermato… per te e' tutto
             fatto!», che a chi l'affare l'ha chiuso un TIMER dice
@@ -38961,7 +38981,10 @@ function openOrder(id){
       ${bottoneSollecito(o)}
       ${puoiLasciareFeedback(o) ? feedbackPanel(o) : ''}
       ${pannelloMancia(o)}
-      ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) && !inPagamento(o) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
+      ${/* UN CODICE ALLA VOLTA (16 nov 2026): a codici aperti la
+            disputa e' il «⚠️ Non funziona» del codice di turno, nel
+            pannello dei codici: qui il bottone generico non c'e' */''}
+      ${o.role==='buyer' && !(s==='delivered' && codiciInCorso(o)) && ['locked','shipped','delivered'].includes(s) && !inPagamento(o) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
       ${/* LA CHAT DELL'ORDINE (16 ott 2026, cantiere chat-mercatino): il
            riquadro della chat dello scambio, dal pagamento alla
            decisione; a ordine concluso la riga «chat chiusa»; al
@@ -46610,6 +46633,14 @@ async function rimuoviNpub(){
    di zero e MENO del totale — a spedizione inclusa non c'e' una cifra
    da trattenere, e a spedizione che copre tutto il rimborso sarebbe
    zero. Il bottone compare solo dove il giudice dice una cifra. */
+/* UN CODICE ALLA VOLTA (16 nov 2026): la divisione dei codici viaggia
+   sulla stessa strada (`speseReseSats` = quel che NON torna a chi
+   compra), e `codiciVenditore` dice di che si tratta. Le parole: */
+function nomeQuotaVenditore(o){
+  const n = o.codiciVenditore || 0;
+  if (!n) return 'le spese di spedizione';
+  return n === 1 ? 'il codice confermato' : `i ${n} codici confermati`;
+}
 function speseTrattenibili(o){
   if (o.consegnaScelta !== 'spedizione') return 0;
   const sped = Number(o.spedSats) || 0;
@@ -46637,6 +46668,36 @@ function bottoneMenoSpese(o, s){
       : 'Rimborso meno le spese: non si può, la spedizione è inclusa nel prezzo e non c\'è una cifra da trattenere.'}</div>`;
   return `<button class="btn ghost" style="margin-top:10px" onclick="adminResolve('meno_spese', this)">📦 Rimborso meno le spese di spedizione</button>`;
 }
+/* PURA (16 nov 2026): il corpo del foglio di conferma su una disputa
+   di UN CODICE, o '' se la disputa e' sull'ordine intero. Le cifre le
+   ha la nota del moderatore (il netto lo fa il server, con la
+   commissione): qui si dice chi prende quali codici. */
+/* PURA: sulla disputa di UN codice (16 nov 2026) i due bottoni di
+   sempre non dicono il vero — «100%» non lo e' se un codice era gia'
+   confermato. Qui le loro parole, e la riga che spiega cosa si decide;
+   '' fuori da quel caso, e restano le parole di sempre. */
+function etichettaCodiciAdmin(o, cosa){
+  const k = o.codiceDisputa || 0, n = o.codiciN || 0;
+  if (!k || !n || o.onchain || o.state !== 'dispute') return '';
+  if (cosa === 'nota') {
+    const prima = k === 2 ? 'Il codice 1 è confermato e resta pagato al venditore. '
+      : k > 2 ? `I codici 1-${k-1} sono confermati e restano pagati al venditore. ` : '';
+    const dopo = k < n ? `I codici dopo il ${k} non sono mai stati aperti: i loro sats tornano all'acquirente.` : '';
+    return `<div class="hint" style="margin-top:8px">💾 La disputa è sul <b>codice ${k} di ${n}</b>: decidi solo se funzionava. ${prima}${dopo}</div>`;
+  }
+  if (cosa === 'rimborso') return k === 1 ? '↩️ Il codice 1 non funziona: rimborso integrale' : `↩️ Il codice ${k} non funziona: rimborso dei codici non pagati`;
+  if (cosa === 'venditore') return k === n ? `⚡ Il codice ${k} funzionava: tutti i sats al venditore` : `⚡ Il codice ${k} funzionava: al venditore ${k === 1 ? 'il codice 1' : `i codici 1-${k}`}`;
+  return '';
+}
+function corpoCodiciAdmin(o, esito){
+  const k = o.codiceDisputa || 0, n = o.codiciN || 0;
+  if (!k || !n || o.onchain || !['venditore','rimborso'].includes(esito)) return '';
+  const suoi = esito === 'venditore' ? k : k - 1;
+  const fino = c => c === 1 ? 'il codice 1' : `i codici 1-${c}`;
+  if (suoi <= 0) return `Il codice ${k} non funzionava, e nessun codice era confermato: tutti i sats tornano all'acquirente.\n\nLa decisione è definitiva.`;
+  if (suoi >= n) return `Il codice ${k} funzionava: tutti i ${n} codici sono pagati al venditore.\n\nLa decisione è definitiva.`;
+  return `Il codice ${k} ${esito === 'venditore' ? 'funzionava' : 'non funzionava'}: al venditore ${fino(suoi)}, all'acquirente tornano i sats degli altri ${n - suoi} (${esito === 'venditore' ? 'mai aperti' : 'il codice contestato e quelli mai aperti'}).\n\nLa decisione è definitiva.`;
+}
 /* PURA: il corpo del foglio di conferma, con le due cifre. */
 function corpoMenoSpese(o){
   const spese = speseTrattenibili(o);
@@ -46663,8 +46724,8 @@ function pannelloSpeseReseAdmin(o, s){
   const fermi = 'in attesa, non sono ancora usciti';
   return `
         <div class="payout">
-          <h4>⚖️ Deciso: rimborso meno le spese di spedizione</h4>
-          <div class="hint">All'acquirente <b>${fmt(importoRimborso(o))} sats</b>: ${s==='refunded' ? 'inviati' : fermi}.<br>Al venditore <b>${fmt(o.speseReseSats)} sats</b> di spese di spedizione: ${o.speseRigaStato==='riscosso' ? 'inviati' : fermi}.<br>La decisione è definitiva.</div>
+          <h4>⚖️ Deciso: rimborso meno ${nomeQuotaVenditore(o)}</h4>
+          <div class="hint">All'acquirente <b>${fmt(importoRimborso(o))} sats</b>: ${s==='refunded' ? 'inviati' : fermi}.<br>Al venditore <b>${fmt(o.speseReseSats)} sats</b> ${o.codiciVenditore ? 'per ' + nomeQuotaVenditore(o) : 'di spese di spedizione'}: ${o.speseRigaStato==='riscosso' ? 'inviati' : fermi}.<br>La decisione è definitiva.</div>
         </div>`;
 }
 /* PURA: la meta' di chi vende, nel SUO ordine. Ha un campo suo e non
@@ -46674,6 +46735,19 @@ function pannelloSpeseReseAdmin(o, s){
 function pannelloSpeseVenditore(o){
   if (o.role !== 'seller' || !o.speseReseSats) return '';
   const sats = fmt(o.speseReseSats);
+  /* (16 nov 2026) la divisione dei codici: stessa riga, altre parole */
+  if (o.codiciVenditore) {
+    const quali = nomeQuotaVenditore(o);
+    if (o.speseRigaStato === 'riscosso')
+      return `<div class="trust-note">💾 <span>Disputa decisa sui codici: ${quali}, <b>${sats} sats</b>, inviati al tuo wallet. I sats degli altri codici tornano all'acquirente.</span></div>`;
+    return `
+        <div class="payout">
+          <h4>💾 Incassa i codici confermati</h4>
+          <div class="hint">Disputa decisa sui codici: a te vanno ${quali}, <b class="net">${sats}<span class="unit">sats</span></b>. I sats degli altri codici tornano all'acquirente. Incolla qui una invoice di <b>esattamente ${sats} sats</b>.</div>
+          <textarea id="speseInvoice" placeholder="lnbc… (invoice di ${sats} sats)"></textarea>
+          <button class="btn orange" onclick="incassaSpese(this)">⚡ Incassa i codici</button>
+        </div>`;
+  }
   if (o.speseRigaStato === 'riscosso')
     return `<div class="trust-note">📦 <span>Disputa decisa: <b>rimborso meno le spese di spedizione</b>. Le spese, <b>${sats} sats</b>, sono state inviate al tuo wallet.</span></div>`;
   return `
@@ -46698,7 +46772,7 @@ async function incassaSpese(btn){
   const d = await r.json().catch(()=>({}));
   ripristina();
   if (!r.ok) { toast(d.detail || 'Invoice non accettata, riprova'); return; }
-  if (d.stato==='riscosso') { segnaOrdine(o, {speseRigaStato:'riscosso'}); toast('⚡ Spese di spedizione incassate'); }
+  if (d.stato==='riscosso') { segnaOrdine(o, {speseRigaStato:'riscosso'}); toast(o.codiciVenditore ? '⚡ Codici incassati' : '⚡ Spese di spedizione incassate'); }
   else if (d.non_chiesto) { toast('✓ Fattura ricevuta. Il pagamento non è potuto partire ora — il nostro nodo non risponde — e ci riproviamo da soli', 7000); }
   else if (d.in_volo || d.incerto) { toast('⏳ Pagamento partito: lo stiamo verificando, non devi fare altro'); }
   else { toast('Il pagamento non è riuscito: riprova con una invoice nuova', 7000); }
@@ -46719,7 +46793,7 @@ function refundPanel(o){
     /* LA QUARTA DECISIONE (13 ott 2026): non e' una disputa vinta, e la
        cifra non e' il totale. `importoRimborso` e' il totale su ogni
        altro ordine, quindi qui sotto vale per tutte le storie. */
-    : o.speseReseSats ? 'Disputa decisa: rimborso meno le spese di spedizione'
+    : o.speseReseSats ? `Disputa decisa: rimborso meno ${nomeQuotaVenditore(o)}`
     : 'Hai vinto la disputa';
   const sats = fmt(importoRimborso(o));
   if (myLnAddress) return `
@@ -46732,7 +46806,7 @@ function refundPanel(o){
   return `
     <div class="payout">
       <h4>↩️ Ricevi il tuo rimborso</h4>
-      <div class="hint">${(annulloVenditore(o) || annullataPagata(o)) ? `${perche}` : o.speseReseSats ? 'Il moderatore ha deciso il <b>rimborso meno le spese di spedizione</b>' : 'La disputa è stata risolta <b>a tuo favore</b>'}: ti aspettano <b class="net">${sats}<span class="unit">sats</span></b> (${o.speseReseSats ? `il totale meno ${fmt(o.speseReseSats)} sats di spedizione, che restano al venditore` : `rimborso integrale${annulloVenditore(o) ? ', spedizione compresa' : ''}`}).
+      <div class="hint">${(annulloVenditore(o) || annullataPagata(o)) ? `${perche}` : o.speseReseSats ? `Il moderatore ha deciso il <b>rimborso meno ${nomeQuotaVenditore(o)}</b>` : 'La disputa è stata risolta <b>a tuo favore</b>'}: ti aspettano <b class="net">${sats}<span class="unit">sats</span></b> (${o.codiciVenditore ? `il totale meno ${fmt(o.speseReseSats)} sats per ${nomeQuotaVenditore(o)}, che restano al venditore` : o.speseReseSats ? `il totale meno ${fmt(o.speseReseSats)} sats di spedizione, che restano al venditore` : `rimborso integrale${annulloVenditore(o) ? ', spedizione compresa' : ''}`}).
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address per riceverli subito (e per tutti gli incassi futuri).</div>
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
       <button class="btn orange" onclick="saveLnAddress(this)">⚡ Ricevi con Lightning address</button>
@@ -46876,11 +46950,14 @@ async function adminResolve(esito, btn){
     : esito==='meno_spese'
     ? ['Rimborso meno le spese di spedizione?', corpoMenoSpese(o)]
     : ['Consegni i sats al venditore?', 'La decisione è definitiva.'];
+  /* UN CODICE ALLA VOLTA (16 nov 2026): sulla disputa di un codice i
+     due esiti decidono QUEL codice, e i sats li dividono i contatori */
+  const corpoCod = corpoCodiciAdmin(o, esito);
   /* on-chain la decisione E' la firma di Barattolo: chi vince la finisce
      col suo telefono, e una firma data non si ritira */
   const corpoOc = o.onchain && esito !== 'reso'
     ? corpo.split('\n\nLa decisione è definitiva.')[0] + '\n\n₿ Ordine on-chain: Barattolo firma adesso, e i sats partono quando chi vince apre l\'app. La firma non si ritira.'
-    : corpo;
+    : corpoCod || corpo;
   chiediConferma({titolo, corpo: corpoOc, etichetta: 'Decidi così',
     poi: async () => {
       if (DEMO) { toast('Le dispute si decidono col backend attivo'); return; }
@@ -46897,6 +46974,7 @@ async function adminResolve(esito, btn){
          della decisione nel ridisegno qui sotto */
       segnaOrdine(o, Object.assign({state: d.stato || 'dispute'},
         d.meno_spese ? {speseReseSats: d.spese_sats || 0,
+          codiciVenditore: d.codici_venditore || 0,
           speseRigaStato: d.venditore_pagato ? 'riscosso' : 'da_riscuotere'} : {},
         /* on-chain la firma di Barattolo va nel riassunto dell'ordine:
            il riquadro la dice e i bottoni spariscono */
@@ -46905,6 +46983,8 @@ async function adminResolve(esito, btn){
             ? (d.attesa_firma === 'venditore'
                 ? '₿ Firmato da Barattolo: i sats partono quando il venditore apre l\'app'
                 : '₿ Firmato da Barattolo: il rimborso parte quando l\'acquirente apre l\'app')
+          : d.meno_spese && d.codici_venditore
+            ? '⚖️ Deciso sui codici: qui sotto vedi a che punto sono i due pagamenti'
           : d.meno_spese
             ? (d.compratore_pagato && d.venditore_pagato
                 ? '⚖️ Deciso: acquirente rimborsato, spese rese al venditore'
@@ -48629,6 +48709,8 @@ let contenutoRivelato = {};   // ordineId -> testo gia' caricato
 
 function pannelloContenutoDigitale(o){
   if (o.consegnaScelta!=='digitale' || !o.contenutoPresente) return '';
+  /* UN CODICE ALLA VOLTA (16 nov 2026): i riquadri hanno il loro */
+  if (o.codiciN) return pannelloCodici(o);
   const testo = contenutoRivelato[o.id];
   const quando = o.consegnato
     ? new Date(o.consegnato*1000).toLocaleString('it-IT',
@@ -48704,6 +48786,316 @@ function pannelloContenutoDigitale(o){
       ${correggibile ? `<button class="btn ghost" onclick="apriCorrezioneContenuto(this)">✏️ Correggi</button>` : ''}
     </div>`;
   return '';
+}
+
+/* ---- UN CODICE ALLA VOLTA (16 nov 2026, idea e ok di Andrea) ----
+   Da due pezzi in su chi vende scrive un codice per riquadro, e chi
+   compra vede il successivo solo dopo aver detto che il precedente
+   funziona: se qualcuno usa i codici e poi dice «non funzionano», in
+   ballo ce n'e' uno solo. I sats restano nel deposito e partono in un
+   pagamento solo, con l'ultimo «Funziona»; in disputa li dividono i
+   contatori del server. I codici NON viaggiano in /api/orders (li
+   serve /contenuto, e a chi compra solo gli aperti): qui vive la copia
+   di pagina, come `contenutoRivelato` per il campo unico. */
+let codiciCaricati = {};   // ordineId -> {istruzioni, codici:[{n,testo,aperto_il,confermato_il}]}
+let codiciCorreggo = 0;    // l'ordine di cui chi vende sta correggendo i codici
+
+/* PURA: chi compra sta ancora provando i codici? E' la guardia dei due
+   bottoni generici (conferma e disputa): a codici in corso li fanno
+   «Funziona» e «Non funziona» del codice di turno. */
+function codiciInCorso(o){
+  return !!(o && o.codiciN && o.codiciConfermati < o.codiciN);
+}
+/* PURA: le ore che restano al codice di turno (0 = passate) */
+function oreCodiceDiTurno(o){
+  if (!o.codiceApertoIl) return 0;
+  return Math.max(0, Math.ceil((o.codiceApertoIl + TEMPI.confermaDig*3600 - Date.now()/1000)/3600));
+}
+/* PURA: la riga dello stepper a codici aperti. A chi compra del tu,
+   agli altri la terza persona (la regola della riga sopra). */
+function rigaCodiciStepper(o, ore){
+  const k = o.codiciAperti, n = o.codiciN;
+  if (o.role==='buyer')
+    return ore > 0 ? `Codice ${k} di ${n}: restano ~${ore} ore per dire se funziona`
+                   : `Codice ${k} di ${n}: conta come buono, puoi aprire il successivo`;
+  return ore > 0 ? `L'acquirente prova il codice ${k} di ${n} (~${ore} ore)`
+                 : `L'acquirente è al codice ${k} di ${n}: conta come buono`;
+}
+
+/* il form di chi vende: un riquadro per pezzo, e le istruzioni comuni
+   facoltative (il vecchio campo unico). Niente immagine: una foto con
+   dieci codici a barre li mostrerebbe tutti insieme. */
+function riquadroCodice(k, testo){
+  return `
+      <label class="hint" for="digCodice${k}" style="display:block;margin-top:8px"><b>Codice ${k}</b></label>
+      <textarea id="digCodice${k}" class="mono" maxlength="1000" style="min-height:38px" autocomplete="off" placeholder="Es. XXXX-YYYY-ZZZZ">${esc(testo||'')}</textarea>`;
+}
+function formCodiciVenditore(o){
+  const n = o.qta || 2;
+  let riquadri = '';
+  for (let k = 1; k <= n; k++) riquadri += riquadroCodice(k, '');
+  return `
+        <div class="payout" id="digForm">
+          <h4>💾 Consegna i ${n} codici</h4>
+          <div class="hint">I sats sono al sicuro in cassaforte. Scrivi <b>un codice per riquadro</b>: l'acquirente apre il primo, lo prova e vede il successivo solo dopo aver detto che funziona. Se qualcosa va storto, in ballo c'è un codice solo. 💡 Tieni uno screenshot datato di ogni saldo: in disputa, le prove decidono.</div>
+          ${riquadri}
+          <label class="hint" for="digContenuto" style="display:block;margin-top:12px">Istruzioni per tutti i codici (facoltative)</label>
+          <textarea id="digContenuto" maxlength="4000" style="min-height:56px" placeholder="Es. Si riscattano su esempio.it/riscatta"></textarea>
+          <div class="hint" style="margin-top:10px">✏️ Puoi correggere un codice finché l'acquirente non l'ha aperto.</div>
+          <button class="btn orange" onclick="consegnaCodici(this)">💾 Consegna i ${n} codici</button>
+        </div>`;
+}
+function formCorrezioneCodici(o, c){
+  const righe = c.codici.map(x => x.aperto_il
+    ? `<div class="hint" style="margin-top:8px"><b>Codice ${x.n}</b> · già aperto: non si cambia più</div>`
+    : riquadroCodice(x.n, x.testo)).join('');
+  const istr = o.codiciAperti ? '' : `
+      <label class="hint" for="digContenuto" style="display:block;margin-top:12px">Istruzioni per tutti i codici (facoltative)</label>
+      <textarea id="digContenuto" maxlength="4000" style="min-height:56px">${esc(c.istruzioni||'')}</textarea>`;
+  return `
+    <div class="payout" id="digPannello">
+      <h4>✏️ Correggi i codici non aperti</h4>
+      <div class="hint">Un codice si corregge finché l'acquirente non l'ha aperto: quelli già aperti restano come sono. Lo avvisiamo del cambio.</div>
+      ${righe}${istr}
+      <button class="btn orange" style="margin-top:10px" onclick="consegnaCodici(this)">💾 Aggiorna i codici</button>
+      <button class="btn ghost" onclick="annullaCorrezioneCodici()">Annulla</button>
+    </div>`;
+}
+
+/* il pannello dell'ordine a riquadri: il ramo di
+   `pannelloContenutoDigitale` quando i riquadri ci sono */
+function pannelloCodici(o){
+  const n = o.codiciN, c = codiciCaricati[o.id];
+  if (!c && o.role==='buyer' && o.state==='shipped') return `
+    <div class="payout" id="digPannello">
+      <h4>🔓 Apri il primo codice</h4>
+      <div class="hint">Il venditore ha consegnato <b>${n} codici</b>. Si aprono <b>uno alla volta</b>: apri il primo, provalo e tocca «Funziona» per vedere il successivo. Aprirlo fa da ricevuta, e un codice aperto non torna indietro: per ognuno hai ${TEMPI.confermaDig} ore per dire che non funziona.</div>
+      <button class="btn orange" style="margin-top:10px" onclick="apriPrimoCodice(this)">🔓 Apri il codice 1 di ${n}</button>
+    </div>`;
+  if (!c) {
+    if (!(o.role==='seller' || o.consegnato || o.role==='admin')) return '';
+    const testa = o.role==='seller'
+      ? `Hai consegnato ${n} codici, uno per riquadro. L'acquirente ne ha aperti ${o.codiciAperti} e confermati ${o.codiciConfermati}.`
+      : o.role==='admin' ? 'I codici sono custoditi dalla piattaforma: vedi solo quelli già aperti.'
+      : `Hai aperto ${o.codiciAperti} codici di ${n}.`;
+    return `
+    <div class="payout" id="digPannello">
+      <h4>💾 ${n} codici, uno alla volta</h4>
+      <div class="hint">${testa}</div>
+      <button class="btn ghost" style="margin-top:10px" onclick="mostraCodici(this)">👁 Mostra i codici</button>
+    </div>`;
+  }
+  if (codiciCorreggo === o.id && o.role==='seller') return formCorrezioneCodici(o, c);
+  const k = o.codiciAperti, ore = oreCodiceDiTurno(o);
+  const vivo = o.state==='delivered';
+  const righe = c.codici.map(x => {
+    if (x.testo === null || x.testo === undefined) return `
+      <div class="hint" style="margin-top:12px"><b>Codice ${x.n}</b> · 🔒 ${o.role==='buyer' ? (o.state==='delivered' || o.state==='shipped' ? `si apre quando confermi il codice ${x.n-1}` : 'mai aperto') : 'mai aperto'}</div>`;
+    const stato = x.confermato_il ? '✅ funziona'
+      : o.codiceDisputa===x.n ? '⚖️ contestato'
+      : !x.aperto_il ? '🔒 non ancora aperto'
+      : (vivo && x.n===k) ? (ore > 0 ? `⏳ in prova, ~${ore} ore` : '✔ conta come buono')
+      : 'aperto';
+    return `
+      <div class="hint" style="margin-top:12px"><b>Codice ${x.n}</b> · ${stato}</div>
+      ${resaCodice(x.testo, {copia: `copiaCodice(${x.n})`, aria: `Copia il codice ${x.n}`})}`;
+  }).join('');
+  let azioni = '';
+  if (o.role==='buyer' && vivo && !inPagamento(o) && o.codiciConfermati === k-1 && k >= 1) {
+    if (ore > 0) azioni = `
+      <button class="btn orange" style="margin-top:12px" onclick="codiceFunziona(this, ${k})">${k < n ? `✅ Funziona, mostrami il codice ${k+1}` : '✅ Funziona: concludo l\'ordine'}</button>
+      <button class="btn allarme" onclick="codiceNonFunziona(${k})">⚠️ Il codice ${k} non funziona</button>`;
+    else if (k < n) azioni = `
+      <div class="hint" style="margin-top:12px">Sono passate ${TEMPI.confermaDig} ore: il codice ${k} conta come buono. Apri il successivo entro ${TEMPI.silenzioDig} ore, poi l'ordine si chiude da solo.</div>
+      <button class="btn orange" style="margin-top:8px" onclick="codiceFunziona(this, ${k})">🔓 Mostra il codice ${k+1}</button>`;
+  }
+  const correggibile = o.role==='seller' && ['shipped','delivered'].includes(o.state) && o.codiciAperti < n;
+  return `
+    <div class="payout" id="digPannello">
+      <h4>💾 ${n} codici, uno alla volta</h4>
+      ${c.istruzioni ? `<div class="hint">📝 ${esc(c.istruzioni)}</div>` : ''}
+      ${righe}
+      ${azioni}
+      ${correggibile ? `<button class="btn ghost" style="margin-top:10px" onclick="apriCorrezioneCodici(this)">✏️ Correggi i codici non aperti</button>` : ''}
+    </div>`;
+}
+
+/* le due copie allineate (currentOrder e la riga viva di `orders`):
+   `openOrder` rilegge da `orders.find`, la lezione di rivelaContenuto */
+function allineaCodici(campi){
+  Object.assign(currentOrder, campi);
+  const viva = orders.find(x=>x.id===currentOrder.id);
+  if (viva && viva !== currentOrder) Object.assign(viva, campi);
+}
+async function caricaCodici(){
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/contenuto`,
+    {headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return null; }
+  codiciCaricati[currentOrder.id] = {istruzioni: d.contenuto || '', codici: d.codici || []};
+  allineaCodici({codiciAperti: d.codici_aperti || 0,
+                 codiciConfermati: d.codici_confermati || 0,
+                 codiceApertoIl: d.codice_aperto_il || 0});
+  return d;
+}
+async function apriPrimoCodice(btn){
+  haptic();
+  chiediConferma({
+    titolo: 'Apri il primo codice?',
+    corpo: `Un codice aperto non torna indietro. Provalo subito: hai `
+         + `${TEMPI.confermaDig} ore per dire se funziona. Il successivo `
+         + `si apre quando confermi questo.`,
+    etichetta: '🔓 Apri',
+    poi: async () => {
+  const ripristina = bottoneInAttesa(btn, '🔓 Apro il codice…');
+  const d = await caricaCodici();
+  ripristina();
+  if (!d) return;
+  allineaCodici({state: 'delivered', consegnato: d.rivelato || Math.floor(Date.now()/1000)});
+  /* cambia lo stato, quindi lo stepper: si riapre, ancorati al pannello */
+  riapriOrdineFermo(currentOrder.id, '#digPannello');
+  toast(`👁 Codice 1 aperto: hai ${TEMPI.confermaDig} ore per provarlo`);
+    }});
+}
+async function mostraCodici(btn){
+  haptic();
+  const ripristina = attesaRitardata(btn, 'Apro i codici…');
+  const d = await caricaCodici();
+  ripristina();
+  if (d) ridisegnaContenuto();
+}
+function copiaCodice(k){
+  haptic();
+  const c = codiciCaricati[currentOrder?.id];
+  const x = c && c.codici.find(y => y.n === k);
+  if (!x || !x.testo) return;
+  navigator.clipboard?.writeText(x.testo)
+    .then(()=>toast(`📋 Codice ${k} copiato`))
+    .catch(()=>toast('Tieni premuto sul codice per copiarlo'));
+}
+async function codiceFunziona(btn, k){
+  haptic();
+  const o = currentOrder, n = o.codiciN, ultimo = k >= n;
+  const scaduto = !oreCodiceDiTurno(o);
+  chiediConferma({
+    titolo: ultimo ? `Il codice ${k} funziona?` : scaduto ? `Apri il codice ${k+1}?` : `Il codice ${k} funziona?`,
+    soldi: ultimo,
+    corpo: ultimo
+      ? 'È l\'ultimo: confermando, i sats vengono sbloccati DEFINITIVAMENTE al venditore.'
+      : `${scaduto ? `Il codice ${k} conta già come buono.` : `Confermi che il codice ${k} è valido: da qui non si contesta più.`} Si apre il codice ${k+1}, con le sue ${TEMPI.confermaDig} ore.`,
+    etichetta: ultimo ? 'Libera i sats' : `🔓 Mostrami il ${k+1}`,
+    poi: async () => {
+  const ripristina = bottoneInAttesa(btn, ultimo ? '✅ Concludo…' : '🔓 Apro il codice…');
+  const r = await fetch(`${API_BASE}/orders/${o.id}/codici/funziona`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({n: k})});
+  const d = await r.json().catch(()=>({}));
+  ripristina();
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return; }
+  const adesso = Math.floor(Date.now()/1000);
+  const c = codiciCaricati[o.id];
+  if (c) c.codici.forEach(x => {
+    if (x.n === k) x.confermato_il = adesso;
+    if (d.aperto && x.n === d.aperto) { x.testo = d.testo || ''; x.aperto_il = d.codice_aperto_il || adesso; }
+  });
+  allineaCodici({codiciConfermati: d.codici_confermati || k,
+                 codiciAperti: d.codici_aperti || k,
+                 codiceApertoIl: d.codice_aperto_il || o.codiceApertoIl});
+  if (d.tutti) {
+    /* ON-CHAIN i sats li libera la firma di questo telefono: il
+       server ha segnato i codici, la firma la mette il gesto di sempre */
+    if (o.onchain) return onchainLiberaDallOrdine(btn, o);
+    /* a ordine concluso chi compra vede TUTTI i codici: si rileggono */
+    delete codiciCaricati[o.id];
+    segnaOrdine(o, {state: d.stato || 'confirmed'});
+    toast('✅ Tutti i codici confermati: i sats vanno al venditore');
+    try { await loadOrders(); renderOrders(); } catch(e) {}
+    ridisegnaOrdine(o);
+    return;
+  }
+  riapriOrdineFermo(o.id, '#digPannello');
+  toast(`🔓 Codice ${d.aperto} aperto: hai ${TEMPI.confermaDig} ore per provarlo`);
+    }});
+}
+async function codiceNonFunziona(k){
+  haptic();
+  const o = currentOrder;
+  chiediConferma({
+    titolo: `Il codice ${k} non funziona?`,
+    corpo: `Si apre una disputa sul solo codice ${k}: i sats restano bloccati `
+         + `finché un moderatore non decide. I codici che hai confermato restano `
+         + `pagati al venditore; quelli che non hai aperto ti tornano comunque.`,
+    etichetta: '⚠️ Apri la disputa',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/orders/${o.id}/disputa`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
+      segnaOrdine(o, {state:'dispute', codiceDisputa:k});
+      toast(`⚠️ Disputa aperta sul codice ${k}: ti contatterà un moderatore`);
+      ridisegnaOrdine(o);
+    }});
+}
+async function apriCorrezioneCodici(btn){
+  haptic();
+  const ripristina = attesaRitardata(btn, 'Apro i codici…');
+  const d = await caricaCodici();
+  ripristina();
+  if (!d) return;
+  codiciCorreggo = currentOrder.id;
+  ridisegnaContenuto();
+}
+function annullaCorrezioneCodici(){ codiciCorreggo = 0; ridisegnaContenuto(); }
+
+/* la stessa funzione consegna e CORREGGE, come `consegnaContenuto`: il
+   server distingue dallo stato. Un riquadro che non c'e' (codice gia'
+   aperto) parte vuoto, e vuoto vuol dire «lascialo com'e'». */
+async function consegnaCodici(btn){
+  haptic();
+  const o = currentOrder;
+  const correzione = codiciCorreggo === o.id;
+  const n = o.codiciN || o.qta;
+  const codici = [];
+  for (let k = 1; k <= n; k++) {
+    const e = el('digCodice' + k);
+    codici.push(e ? (e.value || '').trim() : '');
+  }
+  if (!correzione) {
+    const vuoto = codici.findIndex(c => !c);
+    if (vuoto >= 0) { toast(`Manca il codice nel riquadro ${vuoto+1}`); return; }
+  }
+  const istr = el('digContenuto') ? (el('digContenuto').value || '').trim() : null;
+  chiediConferma({
+    titolo: correzione ? 'Aggiorni i codici non aperti?' : `Consegni i ${n} codici?`,
+    corpo: correzione
+      ? 'L\'acquirente riceve un avviso. Un codice già aperto non cambia.'
+      : 'La piattaforma li registra come prova della consegna; l\'acquirente li aprirà uno alla volta.',
+    etichetta: correzione ? 'Aggiorna' : 'Consegna',
+    poi: async () => {
+  const ripristina = bottoneInAttesa(btn, correzione ? '💾 Aggiorno i codici…' : '💾 Consegno i codici…');
+  const corpo = {codici};
+  if (istr !== null) corpo.contenuto = istr;
+  const r = await fetch(`${API_BASE}/orders/${o.id}/consegna-digitale`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify(corpo)});
+  const d = await r.json().catch(()=>({}));
+  ripristina();
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return; }
+  allineaCodici({state: d.stato || 'shipped', contenutoPresente: true,
+                 corriere: 'Consegna digitale', codiciN: d.codici_n || n,
+                 contenutoCorrezioni: d.correzioni || 0});
+  codiciCorreggo = 0;
+  delete codiciCaricati[o.id];
+  if (correzione) {
+    ridisegnaContenuto();
+    toast(d.invariato ? 'Nessun cambio da salvare' : '💾 Codici aggiornati: l\'acquirente è stato avvisato');
+    return;
+  }
+  /* il form sparisce, come nel campo unico: l'ancora e' la cassaforte */
+  riapriOrdineFermo(o.id, '#orderContent .vault');
+  toast(`💾 ${n} codici consegnati: l'acquirente è stato avvisato`);
+    }});
 }
 
 /* IL RIDISEGNO E' DEL SOLO PANNELLO, ed e' il gemello di

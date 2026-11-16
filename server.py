@@ -1338,6 +1338,22 @@ try:
     from config import ORE_SILENZIO_DIGITALE
 except ImportError:
     ORE_SILENZIO_DIGITALE = 48     # consegnato ma mai rivelato: poi sblocco
+# UN CODICE ALLA VOLTA (16 nov 2026, cantiere codici-uno-alla-volta,
+# idea e ok di Andrea): un ordine digitale da DUE PEZZI IN SU si
+# consegna in un riquadro per pezzo, e chi compra vede il codice
+# successivo solo dopo aver detto che il precedente funziona. Il
+# danno di chi usa tutti i codici e poi dice «non funzionano» scende
+# da N codici a uno. Acceso di serie (regola delle leve del 14 nov);
+# False = interruttore d'emergenza: si torna al campo unico di ieri
+# per gli ordini che il venditore non ha ancora consegnato.
+try:
+    from config import CODICI_UNO_ALLA_VOLTA
+    if not isinstance(CODICI_UNO_ALLA_VOLTA, bool):
+        print("[digitale] CODICI_UNO_ALLA_VOLTA non e' True/False: resta "
+              "acceso")
+        CODICI_UNO_ALLA_VOLTA = True
+except ImportError:
+    CODICI_UNO_ALLA_VOLTA = True
 try:
     from config import CHIAVE_CONTENUTI_DIGITALI
 except ImportError:
@@ -10256,6 +10272,30 @@ def init_db():
                     # Fatti, mai il contenuto.
                     "contenuto_correzioni INTEGER DEFAULT 0",
                     "contenuto_corretto_il INTEGER DEFAULT 0",
+                    # UN CODICE ALLA VOLTA (16 nov 2026): i contatori
+                    # dei riquadri, sull'ordine perche' li leggono la
+                    # lista ordini, l'orologio e la disputa senza
+                    # scendere nella tabella dei codici. I codici si
+                    # aprono IN FILA, quindi bastano dei numeri:
+                    # · codici_n — quanti riquadri ha consegnato chi
+                    #   vende (0 = ordine al campo unico di sempre);
+                    # · codici_aperti — fin dove chi compra ha visto
+                    #   (il codice «di turno» e' codici_aperti);
+                    # · codici_confermati — fin dove ha detto «funziona»;
+                    # · codice_aperto_il — quando si e' aperto il codice
+                    #   di turno: e' l'ancora delle sue 24 ore. NON e'
+                    #   `consegnato`, che resta la PRIMA rivelazione (la
+                    #   ricevuta) e non si sposta mai;
+                    # · codice_disputa — il codice contestato (0 = la
+                    #   disputa, se c'e', e' sull'ordine intero);
+                    # · codici_venditore — i pezzi pagati a chi vende
+                    #   quando il moderatore ha diviso i sats (0 = mai).
+                    "codici_n INTEGER DEFAULT 0",
+                    "codici_aperti INTEGER DEFAULT 0",
+                    "codici_confermati INTEGER DEFAULT 0",
+                    "codice_aperto_il INTEGER DEFAULT 0",
+                    "codice_disputa INTEGER DEFAULT 0",
+                    "codici_venditore INTEGER DEFAULT 0",
                     # quantita (lug 2026): i pezzi dell'ordine.
                     # prezzo_sats resta il TOTALE in cassaforte (invoice,
                     # rimborso integrale e CSV non cambiano semantica);
@@ -10936,6 +10976,21 @@ def init_db():
                     "ordine_id INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    # UN CODICE ALLA VOLTA (16 nov 2026): un riquadro per pezzo. Il
+    # testo e' cifrato come `contenuto_digitale` (stessa chiave, stessi
+    # prefissi, `_cifra_contenuto`), e come lui NON esce mai da
+    # /api/orders: si legge solo da /contenuto, e chi compra ne vede
+    # solo i codici gia' aperti. I timbri sono FATTI per il moderatore:
+    # quando si e' aperto, quando ha detto «funziona», quante volte chi
+    # vende l'ha corretto prima che qualcuno lo vedesse.
+    con.execute("CREATE TABLE IF NOT EXISTS codici_digitali ("
+                "ordine_id INTEGER NOT NULL, n INTEGER NOT NULL, "
+                "contenuto TEXT NOT NULL DEFAULT '', "
+                "aperto_il INTEGER DEFAULT 0, "
+                "confermato_il INTEGER DEFAULT 0, "
+                "correzioni INTEGER DEFAULT 0, "
+                "corretto_il INTEGER DEFAULT 0, "
+                "PRIMARY KEY (ordine_id, n))")
     con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_spese "
                 "ON rimborsi_asta(ordine_id) "
                 "WHERE motivo = 'spese_spedizione'")
@@ -23610,6 +23665,16 @@ def numeri_assistente() -> str:
         f"riveli per segnalare che non funziona, {ORE_SILENZIO_DIGITALE} ore "
         "se è stato consegnato e non l'hai ancora aperto; poi i sats vanno "
         "a chi vende.",
+        # (16 nov 2026, cantiere codici-uno-alla-volta)
+        "- Più codici nello stesso ordine (es. 10 buoni), un codice alla "
+        f"volta: {si(CODICI_UNO_ALLA_VOLTA)}. Chi vende scrive un codice "
+        "per riquadro; chi compra apre il primo, lo prova e tocca «Funziona» "
+        f"per vedere il successivo. Ogni codice ha {ORE_CONFERMA_DIGITALE} "
+        "ore per una disputa; passate quelle conta come buono, e se il "
+        f"successivo non si apre entro altre {ORE_SILENZIO_DIGITALE} ore i "
+        "sats vanno a chi vende. In disputa i codici confermati sono pagati "
+        "a chi vende, quelli mai aperti tornano a chi compra, e il moderatore "
+        "decide solo sul codice contestato.",
         f"- Scambio P2P (bitcoin per euro con altre persone): "
         f"{si(_p2p_leve()['attivo'])}."
         + (f" Massimo {p2p_max} € per ordine durante la beta." if p2p_max
@@ -32728,7 +32793,11 @@ def coda_pagamenti(x_tg_init_data: str = Header(""),
         # annuncio: il titolo dice cos'e' e di quale ordine, come fa
         # lo sblocco qui sotto
         "  CASE WHEN r.motivo='spese_spedizione' THEN "
-        "    'spese di spedizione, ordine #' || r.ordine_id "
+        # (16 nov 2026) la divisione dei codici sulla stessa riga
+        "    CASE WHEN (SELECT COALESCE(x.codici_venditore,0) FROM ordini x "
+        "               WHERE x.id=r.ordine_id) > 0 "
+        "      THEN 'codici confermati, ordine #' || r.ordine_id "
+        "    ELSE 'spese di spedizione, ordine #' || r.ordine_id END "
         "  ELSE COALESCE(a.titolo, '') END AS titolo "
         "FROM rimborsi_asta r LEFT JOIN annunci a ON a.id=r.annuncio_id "
         "WHERE r.payout_stato='incerto' "
@@ -35809,6 +35878,15 @@ def _leve_stato():
                          "testo"),
         ]},
         {"gruppo": "💾 Consegna digitale", "voci": [
+            # UN CODICE ALLA VOLTA (16 nov 2026): acceso di serie
+            _leva("Più codici: uno alla volta", "CODICI_UNO_ALLA_VOLTA",
+                  CODICI_UNO_ALLA_VOLTA,
+                  acceso="da due pezzi in su chi vende scrive un codice per "
+                         "riquadro, e chi compra vede il successivo solo "
+                         "dopo aver detto che il precedente funziona",
+                  spento="gli ordini nuovi tornano al campo unico: tutti i "
+                         "codici si vedono insieme (quelli già consegnati "
+                         "a riquadri restano così)"),
             _leva("Tetto per compratori nuovi (sats)",
                   "TETTO_DIGITALE_NUOVI", TETTO_DIGITALE_NUOVI,
                   spento="chi non ha mai concluso un acquisto compra "
@@ -40931,8 +41009,13 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
         # e' un venditore a cui tornano le spese di un pacco.
         spese = _campo(r, "motivo") == MOTIVO_SPESE_RESE
         oid_spese = int(_campo(r, "ordine_id", 0) or 0)
+        # LA DIVISIONE DEI CODICI (16 nov 2026) viaggia sulla stessa
+        # riga delle spese, e le parole lo sanno dall'ordine
+        codici = spese and _quota_e_codici(con, oid_spese)
         bolt11 = ""
         taccuino = {"etichetta": (
+            f"Codici confermati pagati a chi vende, ordine #{oid_spese}"
+            if codici else
             f"Spese di spedizione rese a chi vende, ordine #{oid_spese}"
             if spese else
             f"Riscossione del rimborso d'asta #{rimborso_id}")}
@@ -40963,6 +41046,9 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
                 return {"ok": False, "stato": r["stato"], "in_volo": True}
             await _congela_pagamento(
                 con, "rimborsi_asta", rimborso_id, bolt11, "puntatore",
+                f"Codici confermati pagati a chi vende sull'ordine "
+                f"#{oid_spese}: <b>{_fmt_sats(importo)} sats</b>."
+                if codici else
                 f"Spese di spedizione rese a chi vende sull'ordine "
                 f"#{oid_spese}: <b>{_fmt_sats(importo)} sats</b>."
                 if spese else
@@ -40987,6 +41073,11 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
             con.commit()
             con.close()
             await notifica(r["tg_id"],
+                           f"💾 <b>Codici incassati:</b> "
+                           f"{_fmt_sats(importo)} sats dei codici confermati "
+                           f"dell'ordine #{oid_spese} sono in arrivo sul tuo "
+                           f"wallet. ⚡"
+                           if codici else
                            f"📦 <b>Spese di spedizione incassate:</b> "
                            f"{_fmt_sats(importo)} sats dell'ordine "
                            f"#{oid_spese} sono in arrivo sul tuo wallet. ⚡"
@@ -41005,6 +41096,11 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
         con.close()
         await notifica(
             r["tg_id"], _msg_ritentiamo(importo) if ritenta else
+            f"💾 <b>Hai {_fmt_sats(importo)} sats dei codici confermati "
+            f"da incassare</b> sull'ordine #{oid_spese}. Imposta il tuo "
+            f"Lightning address nel Profilo, oppure apri l'ordine nella "
+            f"Mini App e incolla una invoice di esattamente quell'importo."
+            if codici else
             f"📦 <b>Hai {_fmt_sats(importo)} sats di spese di spedizione "
             f"da incassare</b> sull'ordine #{oid_spese}. Imposta il tuo "
             f"Lightning address nel Profilo, oppure apri l'ordine nella "
@@ -41191,7 +41287,9 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
         raise HTTPException(400,
             f"Importo sbagliato: la invoice è di {_fmt_sats(importo_sats)} sats, "
             f"deve essere esattamente {_fmt_sats(r['importo_sats'])} sats "
-            + ("(le spese di spedizione)"
+            + (("(i codici confermati)"
+                if _quota_e_codici(con, int(_campo(r, "ordine_id", 0) or 0))
+                else "(le spese di spedizione)")
                if _campo(r, "motivo") == MOTIVO_SPESE_RESE
                else "(rimborso integrale)"))
     no = rifiuto_scadenza(bolt11)   # qui si paga all'istante
@@ -48776,6 +48874,437 @@ async def segna_spedito(ordine_id: int, req: Request,
     return {"ok": True}
 
 
+# ------------- UN CODICE ALLA VOLTA (16 nov 2026) --------------------
+# L'idea e' di Andrea, e l'ok sulla proposta in otto punti pure: dieci
+# buoni da 50 € in un ordine solo erano UN campo di testo, rivelato
+# tutto insieme — chi compra poteva usarli tutti e poi dire «non
+# funzionano», e in ballo c'erano 500 €. Da due pezzi in su chi vende
+# riempie un riquadro per pezzo, e chi compra apre il codice
+# successivo solo dicendo che il precedente funziona: il danno
+# possibile scende a UN codice.
+# I SOLDI NON SI SPEZZANO (la scelta di Andrea sulla card): restano
+# tutti nel deposito e partono in un pagamento solo alla fine. Si
+# dividono solo in DISPUTA, e la divisione la fanno i contatori, non
+# il moderatore: i codici confermati sono di chi vende, quelli mai
+# aperti tornano a chi compra, e il moderatore decide il SOLO codice
+# contestato. La strada dei due pagamenti e' quella che esisteva gia'
+# per «meno le spese» (`_rimborsa_meno_spese`): la quota di chi vende
+# va nel registro «da riscuotere», il resto torna a chi compra.
+# I TEMPI (punto 5): il codice di turno ha le sue ORE_CONFERMA_DIGITALE
+# da quando si apre; passate quelle conta come buono, e se chi compra
+# non apre il successivo entro altre ORE_SILENZIO_DIGITALE l'ordine si
+# sblocca tutto a chi vende. A ordine concluso chi compra vede tutti i
+# codici: sono suoi, e i sats sono gia' partiti.
+MAX_CARATTERI_CODICE = 1000
+
+MSG_CODICI_RIQUADRI = ("Questo ordine è di {n} pezzi: si consegna un "
+                       "codice per riquadro. Aggiorna la pagina se non "
+                       "vedi i riquadri.")
+MSG_CODICI_SENZA_FILE = ("Con più codici l'immagine non si allega: scrivi "
+                         "ogni codice nel suo riquadro.")
+MSG_CODICE_DI_TURNO = ("Questo codice è già confermato, o non è quello di "
+                       "turno: riapri l'ordine.")
+MSG_CODICE_SCADUTO = ("Sono passate {ore} ore da quando hai aperto il "
+                      "codice {k}: conta come buono e la disputa non si "
+                      "apre più. Puoi aprire il successivo.")
+
+
+def codici_uno_alla_volta(o) -> bool:
+    """PURA: questo ordine si consegna un codice per riquadro?
+    Se i riquadri ci sono gia', SI' per sempre: spegnere la leva dopo
+    non rifa' campo unico un ordine consegnato cosi'. Altrimenti solo
+    se la leva e' accesa, la strada e' il codice online, i pezzi sono
+    almeno due, l'oggetto e' UNO (un set ha righe di annunci diversi,
+    e un riquadro per pezzo non saprebbe di quale) e il contenuto non
+    c'e' ancora: un ordine consegnato ieri al campo unico resta com'e'."""
+    if int(_campo(o, "codici_n", 0) or 0) > 0:
+        return True
+    return bool(CODICI_UNO_ALLA_VOLTA
+                and (_campo(o, "consegna_scelta") or "") == "digitale"
+                and int(_campo(o, "quantita", 1) or 1) >= 2
+                and int(_campo(o, "annuncio_id", 0) or 0) > 0
+                and not (_campo(o, "contenuto_digitale") or ""))
+
+
+def quota_codici_venditore(o, pezzi: int) -> int:
+    """QUANTO VA A CHI VENDE quando il moderatore divide i sats di un
+    ordine a riquadri: i suoi `pezzi` al prezzo PAGATO (lo sconto e'
+    gia' dentro `prezzo_sats`: qui si divide il netto, non l'unitario
+    di listino), meno la commissione come su ogni vendita. Tutto il
+    resto torna a chi compra, protezione compresa: su un affare
+    spezzato Barattolo non trattiene niente. Due uscite che sommate
+    fanno il totale entrato, per costruzione."""
+    n = int(_campo(o, "quantita", 1) or 1)
+    pezzi = max(0, min(int(pezzi), n))
+    articoli = (int(_campo(o, "prezzo_sats", 0) or 0)
+                - int(_campo(o, "protezione_sats", 0) or 0)
+                - int(_campo(o, "spedizione_sats", 0) or 0))
+    return netto_venditore(articoli * pezzi // n)
+
+
+def pezzi_al_venditore(o, esito: str) -> int:
+    """PURA: quanti codici paga la decisione del moderatore su un
+    ordine a riquadri con la disputa sul codice k. «venditore» = il
+    codice contestato funzionava: sono suoi i codici fino a k;
+    «rimborso» = non funzionava: sono suoi quelli fino a k-1. Quelli
+    dopo k nessuno li ha mai visti, e tornano a chi compra comunque.
+    -1 = non e' una disputa su un codice: decide la strada di sempre."""
+    k = int(_campo(o, "codice_disputa", 0) or 0)
+    if not k or not int(_campo(o, "codici_n", 0) or 0):
+        return -1
+    if esito == "venditore":
+        return k
+    if esito == "rimborso":
+        return k - 1
+    return -1
+
+
+def _scadenza_codici(o) -> int:
+    """PURA: quando l'orologio sblocca un ordine a riquadri aperto
+    ('delivered'): l'ultimo codice ha le sue ORE_CONFERMA_DIGITALE, un
+    codice che non e' l'ultimo quelle PIU' le ORE_SILENZIO_DIGITALE per
+    aprire il successivo. L'ancora e' l'apertura del codice di turno."""
+    ancora = int(_campo(o, "codice_aperto_il", 0) or 0)
+    ore = ORE_CONFERMA_DIGITALE
+    if int(_campo(o, "codici_aperti", 0) or 0) < int(_campo(o, "codici_n", 0) or 0):
+        ore += ORE_SILENZIO_DIGITALE
+    return ancora + ore * 3600
+
+
+def _impronta(testo: str) -> str:
+    return hashlib.sha256(testo.encode("utf-8")).hexdigest()[:16]
+
+
+async def _consegna_codici(con, o, d: dict) -> dict:
+    """La consegna (e la correzione) di un ordine a riquadri: il ramo
+    di `consegna_digitale` quando `codici_uno_alla_volta` dice si'.
+    Chiude lei `con`, in ogni uscita.
+    LE REGOLE SONO QUELLE DEL CAMPO UNICO, riquadro per riquadro: si
+    corregge finche' nessuno l'ha visto — cioe' i codici dopo l'ultimo
+    aperto — e un codice aperto non si riscrive piu', nemmeno in
+    disputa. Le istruzioni comuni (dove si riscattano) sono il vecchio
+    `contenuto_digitale`, facoltative, e si correggono finche' chi
+    compra non ha aperto il primo codice. Niente immagine: una foto con
+    dieci codici a barre li mostrerebbe tutti insieme."""
+    ordine_id = o["id"]
+    n = int(o["quantita"] or 1)
+    codici = d.get("codici")
+    if not isinstance(codici, list):
+        con.close()
+        raise HTTPException(400, MSG_CODICI_RIQUADRI.format(n=n))
+    if d.get("file") or d.get("file_togli"):
+        con.close()
+        raise HTTPException(400, MSG_CODICI_SENZA_FILE)
+    codici = [str(c).strip() if isinstance(c, (str, int)) else ""
+              for c in codici]
+    if len(codici) != n:
+        con.close()
+        raise HTTPException(400, f"Servono esattamente {n} codici, uno "
+                                 f"per riquadro")
+    for k, c in enumerate(codici, 1):
+        if len(c) > MAX_CARATTERI_CODICE:
+            con.close()
+            raise HTTPException(400, f"Il codice {k} è troppo lungo "
+                                     f"(massimo {MAX_CARATTERI_CODICE} "
+                                     f"caratteri)")
+    istruzioni = (d.get("contenuto") or "").strip()
+    adesso = int(time.time())
+    correzione = o["stato"] != "locked"
+    if not correzione:
+        vuoto = next((k for k, c in enumerate(codici, 1) if not c), 0)
+        if vuoto:
+            con.close()
+            raise HTTPException(400, f"Manca il codice nel riquadro {vuoto}")
+        finali = codici
+    else:
+        aperti = int(o["codici_aperti"] or 0)
+        if not int(o["codici_n"] or 0):
+            con.close()
+            raise HTTPException(400, "Operazione non permessa")
+        if aperti >= n:
+            con.close()
+            raise HTTPException(400, "L'acquirente ha già aperto tutti i "
+                                     "codici: da qui non si corregge più.")
+        vecchi = {r["n"]: _decifra_contenuto(r["contenuto"]) for r in
+                  con.execute("SELECT n, contenuto FROM codici_digitali "
+                              "WHERE ordine_id=?", (ordine_id,))}
+        # un riquadro aperto resta quello che era, qualunque cosa porti
+        # la richiesta; uno vuoto vale «lascialo com'e'»
+        finali = [vecchi.get(k, "") if (k <= aperti or not c) else c
+                  for k, c in enumerate(codici, 1)]
+        if aperti or "contenuto" not in d:
+            istruzioni = _decifra_contenuto(o["contenuto_digitale"] or "")
+    # DUE RIQUADRI UGUALI sono quasi sempre un incolla sbagliato, e
+    # chi compra lo scoprirebbe al codice dopo, con le sue 24 ore
+    visti = {}
+    for k, c in enumerate(finali, 1):
+        if c in visti:
+            con.close()
+            raise HTTPException(400, f"Il codice {k} è uguale al codice "
+                                     f"{visti[c]}: ogni riquadro vuole il "
+                                     f"suo")
+        visti[c] = k
+    if not correzione:
+        cur = con.execute(
+            "UPDATE ordini SET stato='shipped', corriere='Consegna digitale', "
+            "tracking='', spedito_il=?, contenuto_digitale=?, "
+            "contenuto_file='', contenuto_file_tipo='', "
+            "contenuto_file_nome='', codici_n=?, codici_aperti=0, "
+            "codici_confermati=0, codice_aperto_il=0, aggiornato=? "
+            "WHERE id=? AND stato='locked'",
+            (adesso, _cifra_contenuto(istruzioni), n, adesso, ordine_id))
+        if cur.rowcount != 1:
+            con.rollback()
+            con.close()
+            raise HTTPException(409, "L'ordine è cambiato nel frattempo: "
+                                     "riaprilo e riprova")
+        con.execute("DELETE FROM codici_digitali WHERE ordine_id=?",
+                    (ordine_id,))
+        con.executemany(
+            "INSERT INTO codici_digitali(ordine_id, n, contenuto) "
+            "VALUES(?,?,?)",
+            [(ordine_id, k, _cifra_contenuto(c))
+             for k, c in enumerate(finali, 1)])
+        con.commit()
+        con.close()
+        print(f"💾 Ordine #{ordine_id}: {n} codici consegnati uno per "
+              f"riquadro (impronte "
+              f"{', '.join(_impronta(c) for c in finali)})")
+        await notifica(o["compratore_id"],
+                       f"💾 <b>Il venditore ha consegnato i {n} codici</b> "
+                       f"del tuo acquisto digitale! Si aprono <b>uno alla "
+                       f"volta</b>: apri il primo nella Mini App, provalo e "
+                       f"tocca «Funziona» per vedere il successivo. Ogni "
+                       f"codice ha {ORE_CONFERMA_DIGITALE} ore per una "
+                       f"disputa se non va. ⚠️ Un codice aperto non torna "
+                       f"indietro.")
+        return {"ok": True, "stato": "shipped", "codici_n": n,
+                "correzioni": 0, "documento": False}
+    cambiati = [k for k in range(1, n + 1) if finali[k - 1] != vecchi.get(k, "")]
+    istr_prima = _decifra_contenuto(o["contenuto_digitale"] or "")
+    if not cambiati and istruzioni == istr_prima:
+        con.close()
+        return {"ok": True, "stato": o["stato"], "codici_n": n,
+                "invariato": True,
+                "correzioni": o["contenuto_correzioni"], "documento": False}
+    # LA CINTURA DELLA RICEVUTA, come nel campo unico: l'UPDATE ripete
+    # fin dove chi compra ha aperto, e un'apertura arrivata nel
+    # frattempo lo fa fallire invece di riscrivere un codice gia' visto
+    cur = con.execute(
+        "UPDATE ordini SET contenuto_digitale=?, "
+        "contenuto_correzioni=contenuto_correzioni+1, "
+        "contenuto_corretto_il=?, aggiornato=? WHERE id=? "
+        "AND codici_aperti=? AND stato IN ('shipped','delivered')",
+        (_cifra_contenuto(istruzioni), adesso, adesso, ordine_id,
+         int(o["codici_aperti"] or 0)))
+    if cur.rowcount != 1:
+        con.rollback()
+        con.close()
+        raise HTTPException(409, "L'acquirente ha aperto un codice proprio "
+                                 "adesso: la correzione non è stata "
+                                 "applicata. Riapri l'ordine.")
+    for k in cambiati:
+        con.execute("UPDATE codici_digitali SET contenuto=?, "
+                    "correzioni=correzioni+1, corretto_il=? "
+                    "WHERE ordine_id=? AND n=? AND aperto_il=0",
+                    (_cifra_contenuto(finali[k - 1]), adesso, ordine_id, k))
+    con.commit()
+    correzioni = o["contenuto_correzioni"] + 1
+    con.close()
+    print(f"💾 Ordine #{ordine_id}: codici corretti prima dell'apertura "
+          f"({', '.join(f'{k}: {_impronta(finali[k - 1])}' for k in cambiati) or 'solo le istruzioni'})")
+    await notifica(o["compratore_id"],
+                   "💾 <b>Il venditore ha aggiornato i codici non ancora "
+                   "aperti</b> del tuo acquisto digitale: li trovi "
+                   "nell'ordine, nella Mini App.")
+    return {"ok": True, "stato": o["stato"], "codici_n": n,
+            "corretti": cambiati, "correzioni": correzioni,
+            "documento": False}
+
+
+async def _leggi_codici(con, o, user, admin_disputa: bool, req) -> dict:
+    """La lettura di un ordine a riquadri: il ramo di
+    `leggi_contenuto_digitale`. Chiude lei `con`.
+    CHI COMPRA vede solo i codici aperti, finche' l'affare non e'
+    concluso ('confirmed'/'released'): da li' sono tutti suoi. La sua
+    PRIMA lettura apre il codice 1, ed e' la ricevuta di sempre
+    (shipped -> delivered, `consegnato`). Gli altri si aprono solo da
+    «Funziona» (`codice_funziona`), mai da qui: una lettura non apre
+    niente, nemmeno in disputa — un codice mai visto e' proprio quel
+    che torna a chi vende se la disputa divide i sats.
+    CHI VENDE li rilegge tutti, senza effetti. IL MODERATORE, negli
+    stati di disputa, vede solo quelli aperti: decide su quelli."""
+    ordine_id = o["id"]
+    n = int(o["codici_n"] or 0)
+    compratore = user["id"] == o["compratore_id"]
+    venditore = user["id"] == o["venditore_id"]
+    concluso = o["stato"] in ("confirmed", "released")
+    prima_volta = (compratore and o["stato"] == "shipped"
+                   and not int(o["codici_aperti"] or 0))
+    lettura_tarda = (compratore and not prima_volta and concluso
+                     and not o["consegnato"])
+    if (prima_volta or lettura_tarda) and _arriva_da_un_link(req):
+        con.close()
+        raise HTTPException(400, MSG_RIVELA_DALL_ORDINE)
+    adesso = int(time.time())
+    if prima_volta:
+        cur = con.execute(
+            "UPDATE ordini SET stato='delivered', consegnato=?, "
+            "codici_aperti=1, codice_aperto_il=?, aggiornato=? "
+            "WHERE id=? AND stato='shipped' AND codici_aperti=0",
+            (adesso, adesso, adesso, ordine_id))
+        if cur.rowcount:
+            con.execute("UPDATE codici_digitali SET aperto_il=? "
+                        "WHERE ordine_id=? AND n=1", (adesso, ordine_id))
+        con.commit()
+    if lettura_tarda:
+        con.execute("UPDATE ordini SET consegnato=? WHERE id=? "
+                    "AND consegnato=0", (adesso, ordine_id))
+        con.commit()
+    o = con.execute("SELECT * FROM ordini WHERE id=?",
+                    (ordine_id,)).fetchone()
+    aperti = int(o["codici_aperti"] or 0)
+    righe = con.execute("SELECT * FROM codici_digitali WHERE ordine_id=? "
+                        "ORDER BY n", (ordine_id,)).fetchall()
+    con.close()
+
+    def si_vede(k):
+        if venditore:
+            return True
+        if compratore:
+            return concluso or k <= aperti
+        return admin_disputa and k <= aperti
+
+    codici = [{"n": r["n"],
+               "testo": _decifra_contenuto(r["contenuto"]) if si_vede(r["n"])
+               else None,
+               "aperto_il": r["aperto_il"], "confermato_il": r["confermato_il"],
+               "correzioni": r["correzioni"]} for r in righe]
+    if prima_volta:
+        print(f"👁 Ordine #{ordine_id}: aperto il codice 1 di {n}")
+        await notifica(o["venditore_id"],
+                       f"👁 L'acquirente ha <b>aperto il primo dei {n} "
+                       f"codici</b>: gli altri si aprono uno alla volta, "
+                       f"man mano che conferma che funzionano. I sats ti "
+                       f"arrivano a codici confermati.")
+    return {"ok": True,
+            "contenuto": _decifra_contenuto(o["contenuto_digitale"] or ""),
+            "rivelato": o["consegnato"], "codici": codici, "codici_n": n,
+            "codici_aperti": aperti,
+            "codici_confermati": int(o["codici_confermati"] or 0),
+            "codice_aperto_il": int(o["codice_aperto_il"] or 0),
+            "documento": False, "documento_nome": "", "documento_tipo": "",
+            "correzioni": o["contenuto_correzioni"]}
+
+
+def _nota_codici_moderatore(o, codice_k: int) -> str:
+    """La riga dei riquadri nella nota al moderatore: i FATTI dei
+    contatori e quel che vuol dire ogni decisione, in sats. Sull'on-chain
+    la divisione non c'e' ancora (manca anche «meno le spese»): la
+    decisione vale per l'ordine intero, e lo si dice."""
+    n = int(o["codici_n"] or 0)
+    conf = int(o["codici_confermati"] or 0)
+    aperti = int(o["codici_aperti"] or 0)
+    if not codice_k:
+        return (f"\n🔢 UN CODICE ALLA VOLTA: {n} codici consegnati in "
+                f"riquadri, aperti {aperti}. La disputa è sull'ordine "
+                f"intero.")
+    riga = (f"\n🔢 UN CODICE ALLA VOLTA: {n} codici; confermati "
+            f"{conf}, contestato il codice {codice_k}, mai aperti "
+            f"{n - aperti}. Decidi solo sul codice {codice_k}: lo vedi "
+            f"dal dettaglio, gli altri mai aperti no.")
+    if (_campo(o, "cassaforte") or "") == "onchain":
+        return riga + (" Ordine ON-CHAIN: la divisione dei sats qui non "
+                       "c'è ancora, la decisione vale per tutto l'ordine.")
+    a_lui = quota_codici_venditore(o, codice_k)
+    a_lui_meno = quota_codici_venditore(o, codice_k - 1)
+    tot = int(o["prezzo_sats"] or 0)
+    return riga + (
+        f" «Sats al venditore» = il codice funzionava: {codice_k} codici "
+        f"pagati a lui ({_fmt_sats(a_lui)} sats netti), "
+        f"{_fmt_sats(tot - a_lui)} sats tornano a chi compra. «Rimborso» "
+        f"= non funzionava: {codice_k - 1} codici a lui "
+        f"({_fmt_sats(a_lui_meno)} sats), {_fmt_sats(tot - a_lui_meno)} a "
+        f"chi compra. I codici mai aperti restano a chi vende.")
+
+
+@app.post("/api/orders/{ordine_id}/codici/funziona")
+async def codice_funziona(ordine_id: int, req: Request,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """«✅ Funziona»: chi compra dice che il codice di turno e' buono, e
+    nello stesso gesto si apre il successivo (il tasto dice «mostrami
+    il prossimo»). Sull'ULTIMO codice e' la conferma dell'ordine, e da
+    li' la strada e' quella di `conferma_ricezione`: un pagamento solo.
+    LA CORSA NON C'E': l'UPDATE ripete i due contatori letti, quindi
+    due tocchi ravvicinati non confermano due codici."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    try:
+        k = int(d.get("n") or 0)
+    except (TypeError, ValueError):
+        k = 0
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=?",
+                    (ordine_id, user["id"])).fetchone()
+    if not o or not int(o["codici_n"] or 0):
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if o["stato"] != "delivered":
+        con.close()
+        raise HTTPException(400, "Questo ordine non aspetta più la "
+                                 "conferma dei codici")
+    if _in_pagamento(o):
+        con.close()
+        raise HTTPException(409, _rifiuto_in_pagamento(o, "conferma"))
+    n = int(o["codici_n"])
+    aperti = int(o["codici_aperti"] or 0)
+    if k != aperti or int(o["codici_confermati"] or 0) != k - 1 or k < 1:
+        con.close()
+        raise HTTPException(409, MSG_CODICE_DI_TURNO)
+    adesso = int(time.time())
+    if k < n:
+        cur = con.execute(
+            "UPDATE ordini SET codici_confermati=?, codici_aperti=?, "
+            "codice_aperto_il=?, aggiornato=? WHERE id=? "
+            "AND stato='delivered' AND codici_aperti=? "
+            "AND codici_confermati=?",
+            (k, k + 1, adesso, adesso, ordine_id, k, k - 1))
+    else:
+        cur = con.execute(
+            "UPDATE ordini SET codici_confermati=?, aggiornato=? WHERE id=? "
+            "AND stato='delivered' AND codici_aperti=? "
+            "AND codici_confermati=?",
+            (k, adesso, ordine_id, k, k - 1))
+    if cur.rowcount != 1:
+        con.rollback()
+        con.close()
+        raise HTTPException(409, MSG_CODICE_DI_TURNO)
+    con.execute("UPDATE codici_digitali SET confermato_il=? "
+                "WHERE ordine_id=? AND n=?", (adesso, ordine_id, k))
+    testo = None
+    if k < n:
+        con.execute("UPDATE codici_digitali SET aperto_il=? "
+                    "WHERE ordine_id=? AND n=?", (adesso, ordine_id, k + 1))
+        r = con.execute("SELECT contenuto FROM codici_digitali "
+                        "WHERE ordine_id=? AND n=?",
+                        (ordine_id, k + 1)).fetchone()
+        testo = _decifra_contenuto(r["contenuto"]) if r else ""
+    con.commit()
+    con.close()
+    print(f"✅ Ordine #{ordine_id}: codice {k} di {n} confermato"
+          + (f", aperto il {k + 1}" if k < n else ", tutti confermati"))
+    if k < n:
+        return {"ok": True, "confermato": k, "aperto": k + 1, "testo": testo,
+                "codici_aperti": k + 1, "codici_confermati": k,
+                "codice_aperto_il": adesso}
+    esito = await _poi_chat_mercatino(ordine_id, _sblocca_sats(ordine_id))
+    esito = dict(esito or {})
+    esito.update(confermato=k, codici_aperti=k, codici_confermati=k,
+                 tutti=True)
+    return esito
+
+
 # ------------------- CONSEGNA DIGITALE (lug 2026) --------------------
 # Il principio cardine: il codice passa DENTRO Barattolo, mai fuori.
 # Il venditore lo consegna in un campo dedicato (locked -> shipped,
@@ -48858,6 +49387,12 @@ async def consegna_digitale(ordine_id: int, req: Request,
     if o["consegna_scelta"] != "digitale":
         con.close()
         raise HTTPException(400, "Questo ordine non è a consegna digitale")
+    # UN CODICE ALLA VOLTA (16 nov 2026): da due pezzi in su un riquadro
+    # per pezzo, col suo ramo — la ricevuta qui sotto (`consegnato`)
+    # guarda il campo unico, e sui riquadri il confine e' l'ultimo
+    # codice aperto, non la prima apertura
+    if codici_uno_alla_volta(o):
+        return await _consegna_codici(con, o, d)
     correzione = o["stato"] != "locked"
     # il caso che il gate 'shipped' fa entrare e che va fermato qui:
     # rivelato = fotografato, e da li' non si riscrive piu'
@@ -49045,6 +49580,10 @@ async def leggi_contenuto_digitale(ordine_id: int,
             and not admin_disputa:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
+    # UN CODICE ALLA VOLTA (16 nov 2026): i riquadri hanno la loro
+    # lettura, che apre al piu' il primo codice e mostra solo gli aperti
+    if int(_campo(o, "codici_n", 0) or 0) > 0:
+        return await _leggi_codici(con, o, user, admin_disputa, req)
     rivelato = o["consegnato"]
     prima_volta = (user["id"] == o["compratore_id"]
                    and o["stato"] == "shipped")
@@ -84598,7 +85137,10 @@ async def deposita_invoice(ordine_id: int, req: Request,
         # col numero giusto invece che pagata
         ruolo, atteso, colonna = ("compratore", importo_rimborso(o),
                                   "invoice_rimborso")
-        spiegazione = (f"{_fmt_sats(atteso)} sats (rimborso meno le spese "
+        spiegazione = (f"{_fmt_sats(atteso)} sats (rimborso dei codici "
+                       f"non pagati)"
+                       if int(_campo(o, "codici_venditore", 0) or 0) else
+                       f"{_fmt_sats(atteso)} sats (rimborso meno le spese "
                        f"di spedizione)"
                        if int(_campo(o, "spese_rese_sats", 0) or 0)
                        else f"{_fmt_sats(atteso)} sats (rimborso integrale)")
@@ -85157,6 +85699,21 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
 # tentativi e il suo stato. Una che fallisce non ferma l'altra.
 MOTIVO_SPESE_RESE = "spese_spedizione"
 
+
+def _quota_e_codici(con, ordine_id: int) -> bool:
+    """La riga «da riscuotere» di chi vende con il motivo delle spese e'
+    la sua quota di una DIVISIONE DEI CODICI (16 nov 2026)? Lo dice
+    l'ordine (`codici_venditore`), e serve solo alle parole: il denaro
+    fa la stessa strada. Fail-safe: nel dubbio, le parole di ieri."""
+    if not ordine_id:
+        return False
+    try:
+        r = con.execute("SELECT codici_venditore FROM ordini WHERE id=?",
+                        (ordine_id,)).fetchone()
+    except sqlite3.Error:
+        return False
+    return bool(r and int(r[0] or 0) > 0)
+
 MSG_MENO_SPESE_DECISO = ("Questa disputa è già decisa: rimborso meno le "
                          "spese di spedizione. La decisione è definitiva.")
 MSG_MENO_SPESE_DOVE = ("Il rimborso meno le spese di spedizione si decide "
@@ -85222,6 +85779,44 @@ def _msg_meno_spese_compratore(importo: int, spese: int, pagato: bool) -> str:
             f"quell'importo." + coda)
 
 
+def _msg_codici_compratore(importo: int, pezzi_v: int, n: int,
+                           pagato: bool) -> str:
+    """LA DIVISIONE DEI CODICI (16 nov 2026), le parole di chi compra:
+    quanto gli torna e perche'. Mai «a tuo favore»: e' una divisione."""
+    testa = "⚖️ <b>Disputa decisa sui codici.</b> "
+    resto = n - pezzi_v
+    coda = (" Sono i sats "
+            + ("del codice non pagato" if resto == 1
+               else f"dei {resto} codici non pagati")
+            + "; "
+            + ("il codice confermato resta pagato" if pezzi_v == 1
+               else f"i {pezzi_v} codici confermati restano pagati")
+            + " a chi vende.")
+    if pagato:
+        return (testa + f"<b>{_fmt_sats(importo)} sats</b> sono in arrivo "
+                f"nel tuo wallet." + coda + " ⭐ Com'è andata? Apri "
+                "l'ordine nella Mini App e lascia un feedback.")
+    return (testa + f"Per ricevere <b>{_fmt_sats(importo)} sats</b>: apri "
+            f"l'ordine nella Mini App e imposta il tuo Lightning "
+            f"address, oppure incolla una invoice di esattamente "
+            f"quell'importo." + coda)
+
+
+def _msg_codici_venditore(quota: int, pezzi_v: int, n: int,
+                          pagato: bool) -> str:
+    resto = n - pezzi_v
+    return ("⚖️ <b>Disputa decisa sui codici.</b> Ti "
+            + ("è pagato 1 codice" if pezzi_v == 1
+               else f"sono pagati {pezzi_v} codici")
+            + f" su {n}: <b>{_fmt_sats(quota)} sats</b>, da incassare "
+            f"nell'ordine, nella Mini App. I sats "
+            + ("dell'altro codice tornano" if resto == 1
+               else f"degli altri {resto} tornano")
+            + " a chi compra."
+            + (" Quei pezzi sono tornati disponibili nell'annuncio."
+               if pagato else ""))
+
+
 def _msg_meno_spese_venditore(spese: int, pagato: bool) -> str:
     return ("⚖️ <b>Disputa decisa: rimborso meno le spese di "
             "spedizione.</b> All'acquirente "
@@ -85232,8 +85827,17 @@ def _msg_meno_spese_venditore(spese: int, pagato: bool) -> str:
             + (" L'annuncio è tornato in vetrina." if pagato else ""))
 
 
-async def _rimborsa_meno_spese(ordine_id: int) -> dict:
+async def _rimborsa_meno_spese(ordine_id: int,
+                               pezzi_venditore: int = 0) -> dict:
     """IL QUARTO ESITO: rimborso meno le spese di spedizione.
+
+    E LA DIVISIONE DEI CODICI (16 nov 2026, cantiere
+    codici-uno-alla-volta): con `pezzi_venditore` la quota di chi vende
+    non sono le spese ma i suoi codici confermati
+    (`quota_codici_venditore`). Le due uscite, i lucchetti, il timbro e
+    la ronda del libro mastro sono gli stessi parola per parola: la
+    colonna `spese_rese_sats` dice sempre «quanto NON torna a chi
+    compra», e `codici_venditore` dice di che si tratta, per le parole.
 
     LA DECISIONE SI SCRIVE IN UNA TRANSAZIONE, i pagamenti partono
     DOPO. Nella transazione: la cifra sull'ordine (col CAS su
@@ -85267,7 +85871,7 @@ async def _rimborsa_meno_spese(ordine_id: int) -> dict:
     dei tre stati, o il suo pagamento e' in volo, e il cancello della
     transazione risponde 409."""
     async with _lucchetti_ordine[ordine_id]:
-        o, spese, rid = _scrivi_meno_spese(ordine_id)
+        o, spese, rid = _scrivi_meno_spese(ordine_id, pezzi_venditore)
     esiti = {}
     for chi, strada, arg in (("compratore", _rimborsa_compratore, ordine_id),
                              ("venditore", _paga_rimborso, rid)):
@@ -85286,13 +85890,13 @@ async def _rimborsa_meno_spese(ordine_id: int) -> dict:
                         (ordine_id,)).fetchone()["stato"]
     con.close()
     return {"ok": True, "stato": stato, "meno_spese": True,
-            "spese_sats": spese,
+            "spese_sats": spese, "codici_venditore": int(pezzi_venditore or 0),
             "compratore_pagato": bool(esiti["compratore"].get("ok")),
             "venditore_pagato": bool(esiti["venditore"].get("ok")),
             "non_chiesto": bool(esiti["compratore"].get("non_chiesto"))}
 
 
-def _scrivi_meno_spese(ordine_id: int):
+def _scrivi_meno_spese(ordine_id: int, pezzi_venditore: int = 0):
     """LA SCRITTURA del quarto esito: la cifra sull'ordine e la riga di
     chi vende, in UNA transazione. E' una `def` e non una `async def`
     APPOSTA: qui dentro non puo' entrarci un await, cioe' niente puo'
@@ -85304,10 +85908,20 @@ def _scrivi_meno_spese(ordine_id: int):
     if not o:
         con.close()
         raise HTTPException(400, "Questa disputa non esiste o è già chiusa")
-    spese = spese_trattenibili(o)
-    if not spese:
-        con.close()
-        raise HTTPException(400, MSG_NIENTE_SPESE)
+    if pezzi_venditore:
+        # la divisione dei codici: la quota e' quella dei contatori, e
+        # la cintura e' la stessa delle spese — mai zero, mai il totale
+        spese = quota_codici_venditore(o, pezzi_venditore)
+        if not 0 < spese < int(o["prezzo_sats"] or 0):
+            con.close()
+            raise HTTPException(400, "La divisione dei codici non torna su "
+                                     "questo ordine: usa il rimborso o i "
+                                     "sats al venditore")
+    else:
+        spese = spese_trattenibili(o)
+        if not spese:
+            con.close()
+            raise HTTPException(400, MSG_NIENTE_SPESE)
     adesso = int(time.time())
     # ANCHE 'uscito' FERMA LA PENNA (14 nov 2026, cantiere
     # audit-pagamenti-2, dal secondo audit di sicurezza): un ordine
@@ -85318,11 +85932,11 @@ def _scrivi_meno_spese(ordine_id: int):
     # 'incerto' e 'in_volo': sats che si sono mossi non si ridecidono.
     cur = con.execute(
         "UPDATE ordini SET spese_rese_sats=?, payout_stato='da_riprovare', "
-        "payout_verso='compratore' WHERE id=? "
+        "payout_verso='compratore', codici_venditore=? WHERE id=? "
         "AND COALESCE(spese_rese_sats,0)=0 "
         "AND stato IN ('dispute','return_pending','return_shipped') "
         "AND COALESCE(payout_stato,'') NOT IN ('incerto','in_volo','uscito')",
-        (spese, ordine_id))
+        (spese, int(pezzi_venditore or 0), ordine_id))
     if cur.rowcount != 1:
         con.rollback()
         con.close()
@@ -85339,8 +85953,10 @@ def _scrivi_meno_spese(ordine_id: int):
     rid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
-    print(f"⚖️ Ordine #{ordine_id}: deciso il rimborso meno le spese di "
-          f"spedizione — {_fmt_sats(spese)} sats a chi vende (riga "
+    print(f"⚖️ Ordine #{ordine_id}: deciso il rimborso meno "
+          + (f"i codici pagati ({pezzi_venditore})" if pezzi_venditore
+             else "le spese di spedizione")
+          + f" — {_fmt_sats(spese)} sats a chi vende (riga "
           f"#{rid}), {_fmt_sats(int(o['prezzo_sats']) - spese)} a chi "
           f"compra", flush=True)
     return o, spese, rid
@@ -85401,6 +86017,10 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         # incollata e della pagina.
         spese_rese = int(_campo(o, "spese_rese_sats", 0) or 0)
         importo = importo_rimborso(o)
+        # LA DIVISIONE DEI CODICI (16 nov 2026): `spese_rese` qui sono i
+        # codici pagati a chi vende, e le parole e lo stock lo sanno
+        pezzi_v = int(_campo(o, "codici_venditore", 0) or 0)
+        codici_n = int(_campo(o, "codici_n", 0) or 0)
 
         bolt11 = ""
         taccuino = {"etichetta": f"Rimborso al compratore sull'ordine "
@@ -85489,6 +86109,12 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             # il massimo di ieri. Chiudere la falla dove nasce vale piu'
             # che aspettare la scopa del riavvio.
             righe = _righe_ordine(con, o)
+            # i codici pagati a chi vende NON tornano nello stock: sono
+            # di chi li ha comprati. Tornano solo quelli mai pagati
+            # (l'ordine a riquadri e' sempre di un annuncio solo)
+            if pezzi_v and len(righe) == 1:
+                righe = [dict(righe[0], quantita=max(
+                    0, int(righe[0]["quantita"]) - pezzi_v))]
             magazzino = []
             # SU UN ORDINE ANNULLATO DAL VENDITORE LO STOCK NON SI TOCCA
             # (1 ott 2026): la merce non e' mai partita e chi vende l'ha
@@ -85535,6 +86161,15 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                 await notifica(o["venditore_id"],
                                "↩️ Ordine annullato: i sats sono tornati per "
                                "intero all'acquirente.")
+            elif pezzi_v:
+                await notifica(o["compratore_id"],
+                               _msg_codici_compratore(importo, pezzi_v,
+                                                      codici_n, True))
+                await notifica(o["venditore_id"],
+                               _msg_codici_venditore(spese_rese, pezzi_v,
+                                                     codici_n, True)
+                               + ("\n\n" + _coda_magazzino(magazzino)
+                                  if magazzino else ""))
             elif spese_rese:
                 # IL QUARTO ESITO: non e' «a tuo favore» per nessuno dei
                 # due, e le parole lo dicono — a chi compra la cifra
@@ -85599,6 +86234,8 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         else:
             await notifica(
                 o["compratore_id"], _msg_ritentiamo(importo) if ritenta else
+                _msg_codici_compratore(importo, pezzi_v, codici_n, False)
+                if pezzi_v else
                 _msg_meno_spese_compratore(importo, spese_rese, False)
                 if spese_rese else
                 f"⚖️ <b>Disputa risolta a tuo favore!</b> Per ricevere il "
@@ -85610,6 +86247,8 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         if o["disputata"] and primo_giro:
             await notifica(
                 o["venditore_id"],
+                _msg_codici_venditore(spese_rese, pezzi_v, codici_n, False)
+                if pezzi_v else
                 _msg_meno_spese_venditore(spese_rese, False) if spese_rese
                 else
                 "⚖️ <b>La disputa è stata decisa a favore dell'acquirente.</b> "
@@ -85732,6 +86371,18 @@ async def risolvi_disputa(ordine_id: int, req: Request,
             return await _onchain_decide(
                 ordine_id, "venditore" if esito == "venditore" else "compratore",
                 user["id"], "disputa")
+    # UN CODICE ALLA VOLTA (16 nov 2026): la disputa sul codice k si
+    # decide su quel codice soltanto, e i sats li dividono i contatori
+    # (`pezzi_al_venditore`). Zero codici a chi vende e' il rimborso di
+    # sempre, tutti e' lo sblocco di sempre: la divisione serve solo in
+    # mezzo, e solo sulla disputa aperta (come «meno le spese»).
+    pezzi_v = pezzi_al_venditore(o, esito)
+    if 0 < pezzi_v < int(_campo(o, "codici_n", 0) or 0):
+        if stato != "dispute":
+            raise HTTPException(400, "La divisione dei codici si decide "
+                                     "sulla disputa aperta")
+        return await _poi_chat_mercatino(
+            ordine_id, _rimborsa_meno_spese(ordine_id, pezzi_v))
     # ...e si prende solo dalla disputa aperta o dal reso in corso
     # (decisione di Andrea): non da un caso gia' deciso e incagliato,
     # che il ramo qui sotto riaprirebbe.
@@ -86222,11 +86873,27 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
     if _in_pagamento(o):
         con.close()
         raise HTTPException(409, _rifiuto_in_pagamento(o, "disputa"))
+    # UN CODICE ALLA VOLTA (16 nov 2026): a codici aperti la disputa e'
+    # sul codice DI TURNO, e solo nelle sue ore — passate quelle conta
+    # come buono (punto 5 della proposta). Prima di aprire il primo
+    # (o su un ordine al campo unico) resta sull'ordine intero.
+    codice_k = 0
+    if int(_campo(o, "codici_n", 0) or 0) > 0 and o["stato"] == "delivered":
+        codice_k = int(o["codici_aperti"] or 0)
+        if (time.time() - int(o["codice_aperto_il"] or 0)
+                > ORE_CONFERMA_DIGITALE * 3600):
+            con.close()
+            raise HTTPException(400, MSG_CODICE_SCADUTO.format(
+                ore=ORE_CONFERMA_DIGITALE, k=codice_k))
     # disputata resta 1 per sempre, anche a disputa risolta: e' la
     # memoria su cui si giudica il distintivo Specchiato
     con.execute("UPDATE ordini SET stato='dispute', disputata=1, "
                 "aggiornato=? WHERE id=?",
                 (int(time.time()), ordine_id))
+    if codice_k:
+        # nella stessa transazione: il moderatore decide QUEL codice
+        con.execute("UPDATE ordini SET codice_disputa=? WHERE id=?",
+                    (codice_k, ordine_id))
     con.commit()
     # La memoria che scoraggia le dispute-fotocopia: sui beni digitali
     # il caso «riscattato e negato» e' irrisolvibile, quindi si rende
@@ -86269,6 +86936,8 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
             f"stato riscattato."
             f"\n📊 Dispute aperte da questo compratore, in totale: "
             f"{gia_aperte}.")
+        if int(_campo(o, "codici_n", 0) or 0) > 0:
+            nota_digitale += _nota_codici_moderatore(o, codice_k)
     # Il gemello per la via del punto di ritiro (mutuamente esclusivo
     # col digitale: via_punto implica consegna 'spedizione'): SOLO
     # fatti — SE e QUANDO la busta e' stata depositata, e se e' stata
@@ -88699,6 +89368,10 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # /contenuto, dove la prima lettura del compratore fa da
         # ricevuta. Resta il flag: il client sa se c'e' qualcosa da
         # rivelare senza poterlo sbirciare.
+        # UN CODICE ALLA VOLTA (16 nov 2026): il client sa se chi vende
+        # deve consegnare a riquadri (prima che i riquadri esistano, a
+        # dirlo e' la leva coi pezzi: `codici_uno_alla_volta`)
+        r["codici_riquadri"] = codici_uno_alla_volta(r)
         r["contenuto_presente"] = bool(r.pop("contenuto_digitale", ""))
         # I PUNTI PROPOSTI escono come LISTA e non come stringa JSON:
         # in colonna sono JSON perche' SQLite non ha un tipo lista, ma
@@ -90769,8 +91442,19 @@ async def controlla_scadenze():
     # (la ricevuta di lettura), spedito_il = la consegna del codice.
     scaduti_digitale = [r["id"] for r in con.execute(
         "SELECT id FROM ordini WHERE stato='delivered' AND consegnato>0 "
-        "AND consegnato < ? AND consegna_scelta='digitale'",
+        "AND consegnato < ? AND consegna_scelta='digitale' "
+        "AND COALESCE(codici_n,0)=0",
         (adesso - ORE_CONFERMA_DIGITALE * 3600,))]
+    # UN CODICE ALLA VOLTA (16 nov 2026): l'ancora e' il codice di
+    # turno, non la prima apertura (`consegnato`), e un codice che non e'
+    # l'ultimo ha anche le ore per aprire il successivo (`_scadenza_codici`).
+    # La query prende il minimo comune, il giudice decide riga per riga.
+    scaduti_digitale += [r["id"] for r in con.execute(
+        "SELECT * FROM ordini WHERE stato='delivered' "
+        "AND consegna_scelta='digitale' AND COALESCE(codici_n,0)>0 "
+        "AND codice_aperto_il>0 AND codice_aperto_il < ?",
+        (adesso - ORE_CONFERMA_DIGITALE * 3600,))
+        if _scadenza_codici(r) <= adesso]
     scaduti_digitale += [r["id"] for r in con.execute(
         "SELECT id FROM ordini WHERE stato='shipped' AND spedito_il>0 "
         "AND spedito_il < ? AND consegna_scelta='digitale'",
@@ -91892,6 +92576,9 @@ async def sollecita_rimborsi_puntate():
     for r in righe:
         con.execute("UPDATE rimborsi_asta SET sollecito_il=?, "
                     "solleciti=solleciti+1 WHERE id=?", (adesso, r["id"]))
+        # la divisione dei codici (16 nov 2026) sulla riga delle spese
+        r["codici"] = (r["motivo"] == MOTIVO_SPESE_RESE
+                       and _quota_e_codici(con, r["ordine_id"]))
     con.commit()
     con.close()
     for r in righe:
@@ -91900,11 +92587,15 @@ async def sollecita_rimborsi_puntate():
         # promemoria e' lo stesso — stesse leve, stesso binario — ma
         # non parla di un'asta, ne' al venditore ne' ai moderatori
         if r["motivo"] == MOTIVO_SPESE_RESE:
+            cosa = ("dei codici confermati" if r["codici"]
+                    else "di spese di spedizione")
+            ferme = ("Codici pagati fermi" if r["codici"]
+                     else "Spese di spedizione ferme")
             try:
                 if r["solleciti"] < SOLLECITO_INCASSO_MAX:
                     await notifica(r["tg_id"],
-                        f"📦 <b>Hai {_fmt_sats(r['importo_sats'])} sats di "
-                        f"spese di spedizione da incassare</b> "
+                        f"📦 <b>Hai {_fmt_sats(r['importo_sats'])} sats "
+                        f"{cosa} da incassare</b> "
                         f"sull'ordine #{r['ordine_id']}: ti aspettano nel "
                         f"deposito di garanzia. Imposta il tuo Lightning "
                         f"address nel Profilo, oppure apri l'ordine nella "
@@ -91912,7 +92603,7 @@ async def sollecita_rimborsi_puntate():
                         f"quell'importo. ⚡")
                 else:
                     await notifica_admin(
-                        f"🧊 <b>Spese di spedizione ferme:</b> ordine "
+                        f"🧊 <b>{ferme}:</b> ordine "
                         f"#{r['ordine_id']}, "
                         f"<b>{_fmt_sats(r['importo_sats'])} sats</b> da "
                         f"rendere a chi vende, in cassaforte. Ha ignorato "

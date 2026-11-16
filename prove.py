@@ -3037,9 +3037,19 @@ def prove_niente_passo_intermedio():
     # nella stessa rotta. La regola non cambia: quella data la scrive
     # solo il gesto di chi compra. Si conta quindi che FUORI da quella
     # rotta non ne esista nessuna.)
+    # (16 nov 2026, cantiere codici-uno-alla-volta: la rotta ha un ramo
+    # in una funzione sua, `_leggi_codici`, che SOLO lei chiama — il
+    # primo codice aperto da chi compra e' la stessa rivelazione, la
+    # stessa ricevuta. Si conta con lei, e si guarda che la chiami solo
+    # la rotta.)
     prova("`consegnato` lo scrive una rotta sola", 0,
           _SORGENTE.count("consegnato=?")
-          - corpo("leggi_contenuto_digitale").count("consegnato=?"))
+          - corpo("leggi_contenuto_digitale").count("consegnato=?")
+          - corpo("_leggi_codici").count("consegnato=?"))
+    prova("...e il ramo dei codici lo chiama solo la rotta", 1,
+          _SORGENTE.count("await _leggi_codici("))
+    prova("...dentro la rotta", True,
+          "await _leggi_codici(" in corpo("leggi_contenuto_digitale"))
     prova("...ed e' la lettura del contenuto digitale: la rivelazione e "
           "la ricevuta della lettura tarda", 2,
           corpo("leggi_contenuto_digitale").count("consegnato=?"))
@@ -3696,7 +3706,10 @@ def prove_chiusura_saas():
         m.orologio, m.F, m.detto_a = orologio, F, []
         for col in ("cassaforte_payout TEXT DEFAULT ''",
                     "payout_nota TEXT DEFAULT ''",
-                    "invoice_rimborso TEXT DEFAULT ''"):
+                    "invoice_rimborso TEXT DEFAULT ''",
+                    # la coda del pannello dice «codici» o «spese» sulla
+                    # quota di chi vende (16 nov 2026, codici uno alla volta)
+                    "codici_venditore INTEGER DEFAULT 0"):
             m.vero.execute(f"ALTER TABLE ordini ADD COLUMN {col}")
         m.vero.execute("ALTER TABLE utenti ADD COLUMN nome TEXT DEFAULT ''")
         m.vero.execute("UPDATE utenti SET nome='Vende'")
@@ -9351,6 +9364,9 @@ def prove_disputa_cambia_strada():
         for nome, asincrona in (
                 ("_campo", 0), ("importo_rimborso", 0),
                 ("_quando_ritentare", 0), ("_rimborsa_compratore", 1),
+                # la divisione dei codici (16 nov 2026): qui non ci
+                # sono riquadri, e il giudice vero dice «nessuna»
+                ("pezzi_al_venditore", 0),
                 ("riprova_pagamenti_sospesi", 1), ("risolvi_disputa", 1)):
             exec(("async " if asincrona else "") + pezzo(nome), m.amb)
         m.decide = lambda esito: tenta(
@@ -10562,7 +10578,7 @@ def prove_busta_ritiro():
     # passaggio di profilo si puo' fare. E' una lettura, e la cosa che
     # non torna indietro sta dietro la conferma — e' li' che il secondo
     # tocco trova la sua guardia, non qui.
-    prova("l'attesa ritardata la chiamano solo le undici LETTURE",
+    prova("l'attesa ritardata la chiamano solo le tredici LETTURE",
           {"mostraBusta", "mostraContenuto", "mostraIndirizzo",
            "apriDocBusta", "mostraAccesso", "passaAlContoDalFoglioP2P",
            "allegatoDaTelegram",
@@ -10575,7 +10591,12 @@ def prove_busta_ritiro():
            "apriEmailCorriere", "mostraEmailCorriere",
            # le risposte alle domande del venditore (6 nov 2026): una
            # LETTURA, come l'indirizzo e l'email
-           "mostraRisposte"},
+           "mostraRisposte",
+           # i codici uno alla volta (16 nov 2026): aprire il pannello
+           # e aprirlo per correggere sono le due LETTURE gemelle di
+           # mostraContenuto/apriCorrezioneContenuto; la ricevuta del
+           # codice di turno sta nel «Funziona», che e' un POST a parte
+           "mostraCodici", "apriCorrezioneCodici"},
           _chi_chiama("attesaRitardata(btn,"))
     # ⚠️ con find() e non index(): una prova che ESPLODE invece di
     # farsi rossa si porta dietro tutte le sorelle dopo di lei — la
@@ -11654,7 +11675,11 @@ def prove_contenuto_digitale_forma():
     # --- 1) L'ANCORA SU OGNI RAMO ---------------------------------
     # la lezione della busta: senza, il ridisegno non trova casa
     # proprio sul ramo che qualcuno aggiungera' domani
-    prova("ogni ramo del pannello digitale porta la sua ancora", 4,
+    # OTTO dal 16 nov 2026: i quattro rami del pannello dei codici uno
+    # alla volta (il primo da aprire, i codici da mostrare, la
+    # correzione, i codici in chiaro) usano la STESSA ancora, perche'
+    # li ridisegna la stessa ridisegnaContenuto
+    prova("ogni ramo del pannello digitale porta la sua ancora", 8,
           mini.count('<div class="payout" id="digPannello">'))
 
     # --- 2) CHI RIDISEGNA IN PLACE --------------------------------
@@ -11994,7 +12019,9 @@ def prove_foto_contenuto():
     prova("...e il testo digitato sopravvive al ridisegno", True,
           "el('digContenuto').value" in _rd
           and "scritto" in _rd)
-    prova("...e l'ancora del form di consegna esiste", 1,
+    # DUE dal 16 nov 2026: il form a riquadri dei codici uno alla volta
+    # porta la stessa ancora, cosi' la foto/ridisegno atterra uguale
+    prova("...e l'ancora del form di consegna esiste", 2,
           mini.count('<div class="payout" id="digForm">'))
     # il file scelto e la correzione aperta non passano da un ordine
     # all'altro
@@ -13932,6 +13959,9 @@ def prove_nascondi_ordine():
                # la mancia al venditore (14 nov 2026) ha le sue prove
                # in `collaudo_mancia` e `prove_mancia_venditore`
                "mance_di_ordini": lambda con, righe, uid: None,
+               # i codici uno alla volta (16 nov 2026) hanno le loro
+               # prove in `collaudo_codici_uno_alla_volta`
+               "codici_uno_alla_volta": lambda o: False,
                "time": __import__("time"),
                "json": __import__("json"), **ambiente_in_pagamento()}
         exec(pezzo("_titolo_ordine"), amb)
@@ -28214,7 +28244,8 @@ def prove_rimborso_meno_spese():
     prova("...con una sola commit", 1, ms.count("con.commit()"))
     prova("...in una funzione che NON e' async: un await li' dentro non "
           "puo' entrarci", (True, False, False),
-          ("\ndef _scrivi_meno_spese(ordine_id: int):" in src,
+          ("\ndef _scrivi_meno_spese(ordine_id: int, pezzi_venditore: int = 0):"
+           in src,
            "async def _scrivi_meno_spese(" in src, "await " in ms))
     # IL LUCCHETTO: chi paga l'ordine legge la cifra all'inizio del suo
     # giro e lo tiene fino in fondo; la decisione lo aspetta, cosi' un
@@ -28222,7 +28253,8 @@ def prove_rimborso_meno_spese():
     prova("la decisione scrive sotto il lucchetto dell'ordine, e i due "
           "pagamenti partono dopo averlo lasciato", True,
           "    async with _lucchetti_ordine[ordine_id]:\n"
-          "        o, spese, rid = _scrivi_meno_spese(ordine_id)\n"
+          "        o, spese, rid = _scrivi_meno_spese(ordine_id, "
+          "pezzi_venditore)\n"
           "    esiti = {}\n" in dec)
     sb = codice(pezzo("_sblocca_sats"))
     i_l = sb.find("async with _lucchetti_ordine[ordine_id]:")
@@ -28247,14 +28279,21 @@ def prove_rimborso_meno_spese():
     prova("tutte e due le meta' nascono 'da_riprovare': un crash dopo la "
           "commit lo recupera il giro dei pagamenti", [True] * 2,
           ["payout_stato='da_riprovare', \"\n        "
-           "\"payout_verso='compratore' WHERE id=? \"" in ms,
+           "\"payout_verso='compratore', codici_venditore=? WHERE id=? \""
+           in ms,
            "\"VALUES(0, ?, 0, ?, ?, 'da_riscuotere', ?, ?, "
            "'da_riprovare', \"\n        \"'puntatore', ?, ?)\"" in ms])
     prova("senza una cifra da trattenere la rotta non decide (il bottone "
           "non compare, e chi la chiama a mano se lo sente dire)", True,
-          "spese = spese_trattenibili(o)\n    if not spese:\n"
-          "        con.close()\n"
-          "        raise HTTPException(400, MSG_NIENTE_SPESE)" in ms)
+          "        spese = spese_trattenibili(o)\n        if not spese:\n"
+          "            con.close()\n"
+          "            raise HTTPException(400, MSG_NIENTE_SPESE)" in ms)
+    # LA DIVISIONE DEI CODICI (16 nov 2026) ha la sua cintura gemella:
+    # la quota di chi vende mai zero e mai il totale
+    prova("...e la divisione dei codici non decide fuori da 0 < quota < "
+          "prezzo", True,
+          "spese = quota_codici_venditore(o, pezzi_venditore)\n"
+          "        if not 0 < spese < int(o[\"prezzo_sats\"] or 0):" in ms)
     prova("i due pagamenti sono indipendenti: uno che esplode non ferma "
           "l'altro", True,
           "        try:\n            esiti[chi] = await strada(arg)\n"
@@ -28293,11 +28332,13 @@ def prove_rimborso_meno_spese():
         prova(f"...e in quel ramo «{parola}» non si dice", False,
               parola in ramo)
     prova("...dice cosa sono e dove si incassano", [True] * 3,
-          ["spese di spedizione da incassare</b>" in ramo,
+          ['else "di spese di spedizione")' in ramo
+           and "{cosa} da incassare</b>" in ramo,
            "sull'ordine #{r['ordine_id']}" in ramo,
            "apri l'ordine nella" in ramo])
     prova("...e ai moderatori, a solleciti finiti, dice «spese» e l'ordine",
-          True, "<b>Spese di spedizione ferme:</b> ordine" in ramo)
+          True, 'else "Spese di spedizione ferme")' in ramo
+          and "<b>{ferme}:</b> ordine" in ramo)
     pr = codice(pezzo("_paga_rimborso"))
     prova("chi paga la riga sa che e' una spesa resa", True,
           'spese = _campo(r, "motivo") == MOTIVO_SPESE_RESE' in pr)
@@ -28458,23 +28499,31 @@ def prove_rimborso_meno_spese():
           [1, 1],
           [mini.count("${o.role==='buyer' && s==='refunded' && "
                       "o.speseReseSats ? `<div class=\"trust-note\">↩️ "
-                      "<span>Disputa decisa: il <b>rimborso meno le spese "
-                      "di spedizione</b> è stato inviato al tuo wallet."),
+                      "<span>Disputa decisa: il <b>rimborso meno "
+                      "${nomeQuotaVenditore(o)}</b> è stato inviato al tuo "
+                      "wallet."),
            mini.count("${o.role==='buyer' && s==='refunded' && "
                       "!o.speseReseSats ? `<div class=\"trust-note\">")])
     prova("la testa dell'ordine non dice «integrale» ne' «vinta» su un "
           "rimborso meno le spese", [True] * 2,
           ["? (o.role==='buyer' ? `Ti abbiamo rimborsato "
-           "${cifraOrdine(o, importoRimborso(o))} (meno le spese di "
-           "spedizione)`" in mini,
-           "? (o.role==='buyer' ? 'Disputa decisa: rimborso meno le spese "
-           "di spedizione. Scegli qui sotto come riceverlo'" in mini])
+           "${cifraOrdine(o, importoRimborso(o))} (meno "
+           "${nomeQuotaVenditore(o)})`" in mini,
+           "? (o.role==='buyer' ? `Disputa decisa: rimborso meno "
+           "${nomeQuotaVenditore(o)}. Scegli qui sotto come riceverlo`"
+           in mini])
+    # «LE SPESE» O «I CODICI» (16 nov 2026): senza codici il nome della
+    # quota e' quello di ieri, parola per parola
+    prova("...e il nome della quota, senza codici, sono le spese di "
+          "spedizione", True,
+          "  if (!n) return 'le spese di spedizione';\n" in mini)
     prova("i passi: la decisione col suo nome, e il rimborso che non si "
           "dice integrale", [True] * 2,
-          ["            : o.speseReseSats ? 'Rimborso meno le spese di "
-           "spedizione'\n" in mini,
-           "      passoRimborso(o, s, o.speseReseSats ? 'Meno le spese di "
-           "spedizione, nessuna commissione'\n" in mini])
+          ["            : o.speseReseSats ? (o.codiciVenditore ? 'Divisa "
+           "sui codici' : 'Rimborso meno le spese di spedizione')\n" in mini,
+           "                                                               "
+           ": 'Meno le spese di spedizione, nessuna commissione')\n"
+           in mini])
     prova("«Come funziona»: le strade sono tre, e la terza si spiega",
           [0, 1],
           [mini.count("Le strade sono due"),
@@ -28511,6 +28560,10 @@ const fetch = async (u, o) => { chiamate.push([u, o.method, o.body]);
             + "".join(_fn_js(mini, f) for f in (
                 "function speseTrattenibili(o){",
                 "function importoRimborso(o){",
+                # il nome della quota e il foglio della divisione dei
+                # codici (16 nov 2026): li chiamano i pannelli e la rotta
+                "function nomeQuotaVenditore(o){",
+                "function corpoCodiciAdmin(o, esito){",
                 "function bottoneMenoSpese(o, s){",
                 "function corpoMenoSpese(o){",
                 "function pannelloResoAdmin(o, s){",
@@ -46760,7 +46813,12 @@ def prove_fogli_di_casa():
     # mercatino (`salvaModificaFeedback`, `cancellaFeedback`), e le due
     # gemelle della recensione P2P (`salvaModificaRecensioneP2P`,
     # `cancellaRecensioneP2P`).
-    prova("i gesti che passano dalla domanda unica sono centotredici (dal 30 ott "
+    # CENTODICIASSETTE (16 nov 2026, cantiere codici-uno-alla-volta):
+    # «Apri il primo codice?» (`apriPrimoCodice`, aprirlo fa da ricevuta),
+    # «Il codice k funziona?» (`codiceFunziona`, l'ultimo libera i sats),
+    # «Il codice k non funziona?» (`codiceNonFunziona`, la disputa sul
+    # solo codice) e «Consegni gli N codici?» (`consegnaCodici`).
+    prova("i gesti che passano dalla domanda unica sono centodiciassette (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -46769,8 +46827,9 @@ def prove_fogli_di_casa():
           "automatico; «Rendere principale questo wallet?» e «Fare nascere "
           "un wallet nuovo?» del wallet unico; dal 13 nov «Hai inviato gli "
           "ETH/XMR?»; dal 14 nov via il foglio della fee dinamica, e le "
-          "quattro della modifica e cancellazione dei feedback)",
-          113, solo_codice(mini).count("chiediConferma({"))
+          "quattro della modifica e cancellazione dei feedback; dal 16 nov "
+          "le quattro dei codici uno alla volta)",
+          117, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -62682,6 +62741,8 @@ def prove_card_parte_ordine():
     amb["swap_auto_per"] = lambda t: False   # (9 nov 2026, incasso-annuncio)
     # la mancia al venditore (14 nov 2026): la sua prova e' `prove_mancia_venditore`
     amb["mance_di_ordini"] = lambda con, righe, uid: None
+    # i codici uno alla volta (16 nov 2026): la loro prova e' `collaudo_codici_uno_alla_volta`
+    amb["codici_uno_alla_volta"] = lambda o: False
     # i gesti del feedback (14 nov 2026, feedback-modificabile): la loro
     # prova e' `prove_feedback_modificabile`; qui girano i giudici veri
     amb["FEEDBACK_MODIFICABILE"] = True
@@ -181806,7 +181867,12 @@ globalThis.fetch = async (url, opz) => {
 };
 """ + _fn_js(m, "function segnaOrdine(o, campi){") \
         + "".join(_fn_js(m, f) for f in ("function segnaOrdineAperto(campi){",
-                                         "function ridisegnaOrdine(o){") if f in m) \
+                                         "function ridisegnaOrdine(o){",
+                                         # il foglio della disputa su un
+                                         # codice (16 nov 2026): qui
+                                         # l'ordine non ha riquadri, e
+                                         # il giudice vero dice «niente»
+                                         "function corpoCodiciAdmin(o, esito){") if f in m) \
         + "".join(testi[f] for f in GESTI) \
         + gesti_feedback_js(m) + r"""
 const si = corpo => ({ok: true, status: 200, json: async () => Object.assign({ok: true}, corpo || {})});
@@ -199489,7 +199555,9 @@ def _banco_assistente(**leve):
            "CONNETTORI_NEGOZIO_APERTI": False, "CONNETTORI_NEGOZIO_PER_TUTTI": False,
            "_p2p_leve": lambda: {"attivo": True},
            # (16 nov 2026, cantiere payjoin) la quota fissa e il PayJoin
-           "onchain_quota_sats": lambda: 0, "PAYJOIN_ATTIVO": True}
+           "onchain_quota_sats": lambda: 0, "PAYJOIN_ATTIVO": True,
+           # (16 nov 2026, cantiere codici-uno-alla-volta) i codici a riquadri
+           "CODICI_UNO_ALLA_VOLTA": True}
     CHI_GUARDA = []
     for nome in ("cambio_libero_per", "swap_per", "onchain_ammesso",
                  "swap_auto_per", "p2p_usdt_ammesso", "p2p_onchain_ammesso",

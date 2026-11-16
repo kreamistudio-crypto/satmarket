@@ -65,6 +65,7 @@ Quando compri, i sats non vanno subito al venditore: si fermano in un deposito d
 I tempi (le cifre esatte sono nei NUMERI DI OGGI):
 - dopo la consegna hai un certo numero di ore per controllare l'oggetto e confermare. Oggi i sats non partono da soli: allo scadere arriva un promemoria, e se il silenzio continua interviene un moderatore. Nessuno incassa mentre tu non hai confermato;
 - per un codice o un buono digitale le finestre sono più corte, e lì allo scadere i sats vanno al venditore: provalo subito.
+- se compri più codici nello stesso ordine (per esempio 10 buoni), si aprono uno alla volta: apri il primo, lo provi e tocchi «✅ Funziona» per vedere il successivo. Ogni codice ha le sue ore per dire «⚠️ Non funziona»: la disputa riguarda solo quel codice, i codici che hai confermato restano pagati al venditore e quelli che non hai mai aperto ti tornano. I sats partono tutti insieme alla fine, quando confermi l'ultimo (se ti fermi e non apri il successivo, dopo un po' vanno al venditore). Chi vende scrive ogni codice nel suo riquadro, e può correggerne uno finché non l'hai aperto.
 
 I sats restano in un conto Lightning della piattaforma solo per il tempo dell'affare: non sono un investimento e non vengono messi a rendere. Quando l'affare si chiude escono, al venditore o a te.
 

@@ -206,3 +206,4 @@ collaudo_mancia.py
 collaudo_cassa_negozio.py
 collaudo_payjoin.py
 collaudo_elimina_esauriti.py
+collaudo_codici_uno_alla_volta.py

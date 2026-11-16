@@ -432,6 +432,13 @@ TETTO_DIGITALE_NUOVI = 0     # es. 50_000: un compratore senza acquisti
                              # cifra (sats, sul solo articolo)
 DIGITALE_MIN_VENDITE = 0     # es. 1: per pubblicare annunci digitali
                              # servono almeno N vendite concluse
+# UN CODICE ALLA VOLTA (16 nov 2026): da due pezzi in su (es. 10 buoni)
+# chi vende scrive un codice per riquadro e chi compra vede il successivo
+# solo dopo aver detto che il precedente funziona. In disputa i codici
+# confermati sono pagati a chi vende, quelli mai aperti tornano a chi
+# compra. Acceso di serie; False = interruttore d'emergenza: gli ordini
+# nuovi tornano al campo unico (quelli gia' a riquadri restano cosi').
+CODICI_UNO_ALLA_VOLTA = True
 
 # --- Offerte (contrattazione sul prezzo) -----------------------------
 # Il compratore propone una cifra, il venditore accetta, rifiuta o fa

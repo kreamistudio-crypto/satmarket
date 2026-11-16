@@ -338,6 +338,7 @@ let cassaAttiva = false;
         + riga_js("let ordiniCassa = [];") \
         + js("async function caricaCassaOrdini(){") \
         + js("function segnaOrdine(o, campi){") + js("function ridisegnaOrdine(o){") \
+        + js("function corpoCodiciAdmin(o, esito){") \
         + riga_js("let appuntamentoCambiato = ") + js("function dataAppuntamento(ts){") \
         + js("function pannelloServizioCompratore(o){") + "".join(js(f) for f in GESTI) \
         + js("function testoFinestraFeedback(giorni, genere){") \

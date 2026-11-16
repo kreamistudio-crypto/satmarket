@@ -12198,6 +12198,39 @@
   riscrive da solo (la pagina non si muove di un pixel), alla consegna
   sta nel corpo dell'ordine — che solo `openOrder` sa rifare — e lì si
   passa da `riapriOrdineFermo` con l'ancora `#digForm`.
+  PIÙ CODICI, UNO ALLA VOLTA (16 nov 2026, cantiere
+  codici-uno-alla-volta, idea e ok di Andrea): dieci buoni in un ordine
+  erano UN campo rivelato tutto insieme, e chi compra poteva usarli
+  tutti e dire «non funzionano». Da due pezzi in su
+  (`codici_uno_alla_volta(o)`: leva `CODICI_UNO_ALLA_VOLTA`, strada
+  digitale, `quantita >= 2`, un annuncio solo, campo unico ancora
+  vuoto; a riquadri scritti è SÌ per sempre) la stessa rotta
+  `consegna-digitale` vuole `codici: [..]` lunga esattamente N, niente
+  foto, niente doppioni; i testi stanno CIFRATI nella tabella
+  `codici_digitali (ordine_id, n)` e `contenuto_digitale` tiene solo le
+  istruzioni comuni. I contatori sull'ordine: `codici_n`,
+  `codici_aperti`, `codici_confermati`, `codice_aperto_il` (l'ANCORA del
+  codice di turno: `consegnato` resta la ricevuta del PRIMO, scritta
+  dalla stessa GET `/contenuto`, ramo `_leggi_codici`), `codice_disputa`,
+  `codici_venditore`. Chi compra vede solo gli aperti; il successivo lo
+  apre `POST /api/orders/{id}/codici/funziona {n:k}`, col CAS sui due
+  contatori; l'ultimo chiama `_sblocca_sats` (on-chain la firma resta
+  del telefono). I TEMPI: `ORE_CONFERMA_DIGITALE` dal momento in cui il
+  codice si apre (dopo, la disputa si rifiuta e il codice conta come
+  buono), poi `ORE_SILENZIO_DIGITALE` per aprire il successivo, e il
+  giro dell'orologio sblocca tutto a chi vende (`_scadenza_codici`); il
+  ramo classico del digitale salta gli ordini a riquadri. I SOLDI NON SI
+  SPEZZANO fino alla disputa: `apri_disputa` timbra `codice_disputa = k`
+  e il moderatore decide quel codice soltanto; `pezzi_al_venditore`
+  (venditore → k, rimborso → k-1) e, se sta fra 0 e N, la strada è
+  `_rimborsa_meno_spese(id, pezzi)`: la colonna `spese_rese_sats` dice
+  sempre «quanto NON torna a chi compra», la quota è
+  `quota_codici_venditore` (i suoi pezzi sul netto degli articoli, meno
+  la commissione, che con la divisione torna a chi compra) e
+  `codici_venditore` cambia solo le parole. 0 e N sono il rimborso e lo
+  sblocco di sempre. FUORI, dichiarato: on-chain la decisione resta
+  tutto-o-niente (la nota al moderatore lo dice), e un set di annunci
+  diversi resta al campo unico.
   LA VIA SI CORREGGE A MANO, MA SOLO SUGLI IMPORTATI (ago 2026, caso
   vero dal campo: un annuncio da Nostr la cui descrizione dice «invio
   codice di licenza» e che in colonna ha `consegna=''` — quel campo il
