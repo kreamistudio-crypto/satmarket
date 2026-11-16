@@ -123356,6 +123356,14 @@ def prove_login_qr():
           ["anelloNostr(true);\n    bunkerDice('Collegato: entro…');" in _lq,
            "if (giro !== nostrQrGiro) return;   // il fallimento e' di un giro morto\n"
            "    anelloNostr(false);" in _lq])
+    # ...e lo stesso nella strada del bunker:// (16 nov 2026, stesso
+    # cantiere, sì di Andrea): acceso a bunker collegato, spento all'errore
+    _lb = pezzo_js(mini, "async function loginNostrBunker(){", "\n}\n")
+    prova("col bunker:// l'anello si accende a bunker collegato, prima di "
+          "«entro…», e si spegne all'errore", [True, True, True],
+          ["anelloNostr(true);\n    bunkerDice('Bunker collegato: entro…');" in _lb,
+           "const motivo = e?.message || 'non risponde';\n    anelloNostr(false);" in _lb,
+           0 <= _lb.find("ricordaBunker(") < _lb.find("anelloNostr(true);")])
     prova("un codice nuovo a schermo spegne l'anello", True,
           "if (anello) anello.style.display = 'none';"
           in pezzo_js(mini, "async function mostraQrConnessione(uri){", "\n}\n"))

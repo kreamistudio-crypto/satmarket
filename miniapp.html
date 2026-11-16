@@ -66186,10 +66186,15 @@ async function loginNostrBunker(){
     /* connessione riuscita: la sessione si conserva sul dispositivo,
        le prossime firme non rifaranno il rituale */
     ricordaBunker(f.sessione, await Promise.resolve(f.pubkey()).catch(() => ''));
+    /* L'ANELLO ANCHE QUI (16 nov 2026, cantiere accesso-rotellina, la
+       strada del bunker): collegato il bunker, firma e ricaricamento su
+       Tor durano secondi, e il foglio fermo sembrava un blocco */
+    anelloNostr(true);
     bunkerDice('Bunker collegato: entro…');
     await consegnaFirmatario(f);
   } catch(e){
     const motivo = e?.message || 'non risponde';
+    anelloNostr(false);                 // l'attesa e' finita, male: via l'anello
     if (chiusoApposta(motivo)) return;  // il foglio chiuso da chi lo ha chiuso: niente da dire
     /* IL MOTIVO STA NEL FOGLIO E NON SOLO NEL TOAST: dice quale relay
        e cosa ha risposto, ed è l'unica cosa con cui si può decidere

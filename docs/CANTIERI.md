@@ -84055,3 +84055,18 @@ PROVATO:
   prove;
 - `prove_assistente_bot` verde; suite severa intera 28276 passate, collaudi 134/134 (collaudo_assistente_bot rifatto verde dopo lo spostamento della riga).
 Libro di Tappo e NOVITA aggiornati.
+
+## La rotellina anche col bunker:// (16 nov 2026, cantiere accesso-rotellina, Andrea: «si mi piace»)
+
+Seguito della voce di sopra. Nella strada del bunker:// il QR non c'è,
+ma dopo «Bunker collegato: entro…» la firma e il ricaricamento su Tor
+duravano secondi a foglio fermo. Ora `loginNostrBunker` accende lo stesso
+anello (`anelloNostr(true)`, «Sto entrando…» o «Preparo la firma…») appena
+il bunker è collegato e la sessione è conservata, e lo spegne all'errore,
+prima di guardare se il foglio è stato chiuso apposta. Il ricaricamento
+con l'anello c'era già (passa da `entraConNostr`).
+PROVATO: in `prove_login_qr` la sentinella sulla funzione (acceso dopo
+`ricordaBunker` e prima di «entro…», spento nel ramo dell'errore);
+controprove rosse, 2 su 2 (anello acceso tolto, anello spento tolto).
+Suite severa nel venv senza coincurve; server non toccato, quindi i
+collaudi non rigirati. NON provato dal vivo.
