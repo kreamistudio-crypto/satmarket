@@ -115,7 +115,7 @@ Pagare fuori da Barattolo (un bonifico, un pagamento diretto al venditore) vuol 
 3. Scegli come consegni: spedizione (con i corrieri che usi), punto di ritiro o locker, ritiro a mano in zona, o consegna digitale per codici e buoni.
 4. Pubblica. Ogni annuncio passa dalla moderazione, anche quando lo modifichi: se qualcosa non convince resta in attesa di un moderatore, e se viene fermato il messaggio spiega perché e come rimediare.
 
-Hai un catalogo grande? Nel Profilo c'è «📥 Importa in blocco»: scarichi il modello CSV, una riga per annuncio, fino a 500 annunci per volta. Ogni riga vuole almeno una foto, con un link nella colonna «foto» (più d'uno separati da |) oppure coi nomi dei file dentro uno ZIP che carichi insieme; una riga senza foto viene scartata. Prima di pubblicare tocchi «🔎 Controlla il file» e vedi cosa va e cosa no. Se hai un negozio Shopify o WooCommerce, nella stessa sezione lo puoi collegare: i prodotti entrano da soli e restano in pari (se la sezione non la vedi, guarda i NUMERI DI OGGI o chiedi allo staff). Gli annunci importati passano dalla moderazione come gli altri.
+Hai un catalogo grande? Nel Profilo c'è «📥 Importa in blocco»: scarichi il modello CSV, una riga per annuncio, fino a 500 annunci per volta. Ogni riga vuole almeno una foto, con un link nella colonna «foto» (più d'uno separati da |) oppure coi nomi dei file dentro uno ZIP che carichi insieme; una riga senza foto viene scartata. Prima di pubblicare tocchi «🔎 Controlla il file» e vedi cosa va e cosa no. Se hai un negozio Shopify o WooCommerce, nella stessa sezione lo puoi collegare: i prodotti entrano da soli e restano in pari (se la sezione non la vedi, guarda i NUMERI DI OGGI o chiedi allo staff). Nel collegamento (✏️ sul negozio) c'è anche «Categoria dei prodotti»: se vende tutto dello stesso tipo la sceglie lì e vale per tutti, anche per quelli già entrati; con «Decide il negozio» Barattolo usa la categoria del suo e-commerce quando corrisponde a una delle nostre, e il resto va in «Altro». Gli annunci importati passano dalla moderazione come gli altri.
 
 Per incassare da solo imposta il tuo indirizzo Lightning nel Profilo: quando chi compra conferma, i sats ti arrivano lì.
 
@@ -127,12 +127,12 @@ Le donazioni: chi vuole sostenere Barattolo con qualche sats può mandarli all'i
 
 Quando arriva un ordine il bot ti avvisa. Spedisci, segna il corriere e il codice di tracciamento nell'ordine, e aspetta la conferma di chi compra. L'indirizzo di chi compra lo vedi solo tu, per stampare l'etichetta: non usarlo per altro.
 
+<!-- pezzo libro-010 | libro -->
+## Libro · Vendere nel mercatino (2/3)
+
 Le prestazioni si possono vendere, ma devono essere definite: quanto durano, che cosa comprendono, a che prezzo. «Un'ora di lezione di inglese» sì; «ti faccio quello che ti serve» no.
 
 Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraffazioni, documenti, dati personali, farmaci, animali protetti.
-
-<!-- pezzo libro-010 | libro -->
-## Libro · Vendere nel mercatino (2/3)
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere.
 
@@ -1670,5 +1670,13 @@ pubblico: sì
 
 frase: Nella home gli scambi P2P mostrano anche gli ordini on-chain (USDe, ETH, Monero compresi), col fulmine ⚡ o la ₿ in fondo alla card per dire subito la rete. Nel libro la mappa 🗺️ c'è sempre, «Più recenti» mescola on-chain e Lightning, scorrendo i rettangoli «Novità» diventano uno solo, e «🔁 Ripubblica» c'è anche in «Compra BTC» con Barattozon.
 dove: la home, fila «Scambi P2P»; la scheda «P2P», in alto accanto alla campanella; la pillola «Ordina» con «Più recenti».
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-050 | novita -->
+## Novità · 2026-11-16 · categoria-connettori
+
+frase: Se colleghi un negozio Shopify o WooCommerce adesso puoi scegliere la categoria dei suoi prodotti: se vendi tutto dello stesso tipo la dichiari una volta e vale per tutti, anche per quelli già entrati. Se non la scegli, Barattolo usa la categoria del tuo negozio quando è una delle sue, invece di mettere tutto in «Altro».
+dove: Profilo → «Il tuo catalogo» → «📥 Importa in blocco / catalogo esterno», ✏️ sul negozio collegato, casella «Categoria dei prodotti».
 leva: nessuna
 pubblico: sì

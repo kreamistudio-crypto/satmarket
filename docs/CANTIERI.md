@@ -85254,3 +85254,104 @@ scudo Staff sulla card USDe di Andrea e la sua card che resta fuori dalla
 SUA home ma compare in quella degli altri; la pila delle novità su iPhone
 (lo scroll con l'inerzia); i conti on-chain di `/admin` sui dati veri
 (nessuno scambio on-chain concluso è passato dal vivo da qui).
+
+## La categoria dei prodotti di un negozio collegato (16 nov 2026, cantiere categoria-connettori; Andrea: «importazione woocommerce inserisce di default nella categoria altro, nel caso che tutti gli articoli del woocommerce siano di una unica categoria sarebbe utile poterla dichiarare nella configurazione del collegamento al negozio (anche per shopify ovviamente)»)
+
+**LA DIAGNOSI.** Nessuno scriveva `r["categoria"]`: i due traduttori
+leggevano la categoria del negozio in `categoria_grezza` (Woo la prima
+delle `categories`, Shopify il `product_type` o il primo tag) e la
+lasciavano lì, e l'INSERT di `_una_riga` ripiegava su «Altro». A
+spostarli restava la sola coda «🗂 Categorie da sistemare», che vive
+della ricategorizzazione AI — e col credito Anthropic finito (16 nov)
+non propone più niente: tutto l'importato restava in «Altro».
+
+**COSA SI È FATTO.** Un giudice solo nel server,
+`categorie_righe_negozio`, chiamato in `_un_connettore` subito dopo
+`traduci` (prima di giudicare e di riconciliare): la categoria
+DICHIARATA nel cassetto vale per tutte le righe; senza, decide il
+negozio con `categoria_dal_negozio`. Nel cassetto (✏️ sul negozio, e
+anche nel modulo del collegamento nuovo) la casella «Categoria dei
+prodotti», col foglio-picker di casa: «🏪 Decide il negozio» in testa e
+poi il catalogo senza «Tutto» e senza «Altro». La colonna è
+`connettori.categoria` ('' = decide il negozio), con la migrazione; esce
+da `_connettore_pubblico`. Il salvataggio la valida
+(`_categoria_negozio`: chiave assente = conserva, «Altro» = '', nome
+fuori catalogo = 400) e, se CAMBIA, `_sposta_categoria_negozio` la fa
+scendere subito sulle righe già entrate; il toast dice quante. I
+traduttori portano ora `categorie_grezze`, cioè TUTTI i nomi (Woo tutte
+le categorie; Shopify il tipo e poi i tag). `_aggiorna` riempie la sola
+casella vuota: una riga in «Altro» prende la categoria del giudice al
+giro dopo, una riga altrove non si muove.
+
+**LE DECISIONI, coi perché.**
+- LA DICHIARAZIONE VINCE SULLA CATEGORIA DEL NEGOZIO, e non il
+  contrario (il thread proponeva la dichiarata come ripiego): Andrea
+  la chiede proprio per il negozio «di una categoria sola», e un nome
+  del negozio che combacia male non deve batterla.
+- IL NOME DEL NEGOZIO COMBACIA SOLO INTERO (il «bonus»): una nostra
+  categoria o un sinonimo intero della tabella di casa, maiuscole, «&»
+  ed entità HTML a parte. Scartata `categoria_tollerante` così com'è:
+  si fida della prima parola, e «Accessori Bitcoin» finirebbe in
+  «Scarpe e accessori». Non è la `categoria_automatica` tolta a luglio
+  (indovinava dal titolo, «Sparkling Sake» fra gli arredi): qui il nome
+  è quello con cui il venditore ha già classificato il prodotto. Il
+  dubbio resta in «Altro». Nessun sinonimo nuovo nella tabella: tocca
+  anche il CSV e la ricerca, e non è stato chiesto.
+- DICHIARARLA SPOSTA TUTTO IL NEGOZIO, anche le righe già in una
+  categoria vera (del negozio o di un moderatore): è il gesto del
+  venditore sui suoi annunci, la Modifica che sugli annunci collegati
+  è chiusa, e il cassetto lo promette a lettere. Solo quando la
+  dichiarazione cambia: risalvare per una tariffa non disfa lo
+  spostamento che un moderatore ha fatto dopo. Tornare a «decide il
+  negozio» rimette in «Altro» le sole righe della dichiarazione di ieri.
+  Scartata la versione «solo le righe in Altro»: un negozio già
+  mappato in parte sarebbe rimasto a metà, contro il testo del cassetto.
+- NIENTE GIRO AL SALVATAGGIO: cambiare categoria non rilegge il
+  negozio (sarebbe un modo di bussare a raffica a un e-commerce); le
+  righe tornate in «Altro» si sistemano all'ora, o con «Aggiorna ora».
+- La sottocategoria: ricalcolata (`sottocategoria_indovina`) solo
+  nello spostamento dal cassetto; alla nascita e nel riempimento resta
+  vuota come prima (le righe di `annunci` dei banchi di cartone non
+  hanno la colonna, e non è stato chiesto).
+
+**PROVATO.** `prove_connettori_categoria` (nuova, 41): il giudice
+stretto (nome intero, maiuscole, «&amp;», sinonimo intero, primo che
+combacia, prima parola che NON basta), chi decide la riga, il
+conserva e il 400 del cassetto, i due traduttori con tutte le
+categorie, la riconciliazione su un database di cartone (nascita,
+casella vuota riempita, scelta di un umano che resta, «Altro» che non
+svuota, il giro dopo invariato), lo spostamento (tutto il negozio,
+non i rimossi né un altro negozio, sottocategoria ricalcolata, la
+stessa dichiarazione che non sposta, il ritorno che rimette in «Altro»
+le sole righe di ieri), il server e il client per forma. Emendato il
+banco di `prove_connettore_interrompibile` (la finta di
+`categorie_righe_negozio`, che il giro ora chiama). CONTROPROVE:
+nove rotture apposta (prima parola, casella piena ricoperta, priorità
+rovesciata, conserva tolto, rimossi spostati, chiamata nel giro tolta,
+«&» non sciolto, Woo con la sola prima categoria, spostamento senza la
+dichiarazione di ieri): tutte rosse, rimesso il codice verdi.
+`collaudo_categoria_negozio` (nuovo, in `ci/collaudi.txt` e
+`ci/compila.txt`, 11): il server vero, la rotta del cassetto, la
+migrazione su un negozio di ieri, `_un_connettore` con traduzione e
+riconciliazione vere su un Woo di cartone — tolte la chiamata nel giro
+e lo spostamento, sei rosse. Il giro dal vivo nel Chromium locale col
+server vero (390x844, rete chiusa fuori da 127.0.0.1): la casella nel
+cassetto, il foglio con 29 voci (niente Tutto né Altro), la scelta,
+«Collegamento aggiornato: 3 annunci hanno cambiato categoria», la
+modifica riaperta che riparte da quella salvata.
+EMENDATI per la casella nuova: la sentinella di `prove_catalogo_esterno`
+sulle due scritture del cassetto (ora portano anche `categoria`), i
+banchi node di `prove_catalogo_esterno` e `prove_modulo_negozio` (il
+catalogo vero `CATS` e un'icona di cartone), e il banco di
+`prove_negozi_grandi` (la finta di `categorie_righe_negozio`): il primo
+giro della suite li aveva rossi (31), tutti per quel motivo.
+IL GIRO, sull'albero del cantiere (da origin/develop 59e89ef6): suite
+severa 28.657 passate, 0 fallite; le 2 saltate sono i due script di
+nostr-tools, che in questa macchina non c'è, e non toccano i negozi.
+Collaudi della CI 137/137 in un venv con le sole dipendenze del workflow
+(coincurve assente, verificato).
+
+**DA GUARDARE.** Un Woo vero coi nomi di categoria veri (quelli del
+venditore che l'ha chiesto): quanti combaciano da soli e quanti restano
+in «Altro» — se restano quasi tutti, la strada è la dichiarazione, non
+allargare il giudice. Shopify vero non è passato.

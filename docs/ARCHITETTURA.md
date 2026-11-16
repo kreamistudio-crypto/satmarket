@@ -26921,6 +26921,42 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   varianti scelte e una sola per famiglia senza scelte, e la cella
   parla della SUA variante. «Altri oggetti» non ripropone la stessa
   famiglia. Il perché in CANTIERI, «Le famiglie di varianti».
+- LA CATEGORIA DEI NEGOZI COLLEGATI (16 nov 2026, cantiere
+  categoria-connettori, richiesta di Andrea): fino a ieri ogni prodotto
+  importato da Shopify o WooCommerce nasceva in «Altro» — i traduttori
+  leggevano la categoria del negozio (`categoria_grezza`) e nessuno la
+  usava. ADESSO DECIDE UN GIUDICE SOLO, `categorie_righe_negozio` nel
+  server, che scrive `r["categoria"]` su ogni riga tradotta subito dopo
+  `traduci` (il modulo resta cieco del nostro catalogo):
+  · la categoria DICHIARATA nel cassetto (`connettori.categoria`, ''
+    = «decide il negozio», «Altro» si legge come '') vale per TUTTE le
+    righe di quel negozio, come la consegna;
+  · senza dichiarazione decide il NEGOZIO con `categoria_dal_negozio`,
+    STRETTA APPOSTA: combacia solo il nome INTERO — una nostra
+    categoria o un sinonimo intero di `SINONIMI_CATEGORIA`, maiuscole,
+    «&» ed entità HTML a parte — e vince il primo nell'ordine del
+    negozio (`categorie_grezze`: tutte le categorie Woo; per Shopify il
+    tipo di prodotto e poi i tag). NON è `categoria_tollerante` (quella
+    del CSV si fida della prima parola: «Accessori Bitcoin» finirebbe in
+    «Scarpe e accessori») e NON è `categoria_automatica`, che indovinava
+    dal TITOLO e sbagliava in silenzio: qui il nome è quello con cui il
+    venditore ha già classificato il prodotto sul suo negozio.
+  DOVE SCENDE. Alla nascita (`_una_riga`, come sempre `r.get("categoria")
+  or "Altro"`); al giro dell'ora `_aggiorna` RIEMPIE SOLO LA CASELLA
+  VUOTA — una riga in «Altro» prende la categoria del giudice, una
+  riga altrove (un moderatore, o il cassetto) non si muove: la regola
+  «la categoria già scelta non si ricopre» resta, e «Altro» non è una
+  scelta. Al salvataggio del cassetto, SOLO QUANDO LA DICHIARAZIONE
+  CAMBIA, `_sposta_categoria_negozio` porta nella nuova TUTTE le righe
+  vive del negozio (è il gesto del venditore sui suoi annunci, la
+  Modifica che sugli annunci collegati è chiusa), con la sottocategoria
+  ricalcolata; tornando a «decide il negozio» rimette in «Altro» le sole
+  righe della dichiarazione di ieri, e il giro dopo le porta dove dice
+  il negozio. I 'rimosso' non si toccano. CHIAVE ASSENTE = CONSERVA (un
+  client in cache non svuota la scelta), nome fuori catalogo = 400.
+  La ricerca segue da sola (il trigger su `categoria` invalida l'indice),
+  e le proposte della coda «🗂 Categorie da sistemare» su una riga che si
+  è spostata spariscono da sole (la coda legge `a.categoria=p.categoria_ora`).
 - I CONNETTORI DEL NEGOZIO (ago 2026, cantiere in corso — oggi ci sono
   le TAPPE 1 e 2: schema, giudice, censimento, il modulo col
   traduttore Shopify e il giro orario a leva spenta. Il resto è

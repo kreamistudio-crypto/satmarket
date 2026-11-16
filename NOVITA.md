@@ -332,3 +332,9 @@ frase: Nella home gli scambi P2P mostrano anche gli ordini on-chain (USDe, ETH, 
 dove: la home, fila «Scambi P2P»; la scheda «P2P», in alto accanto alla campanella; la pillola «Ordina» con «Più recenti».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-16 · categoria-connettori
+frase: Se colleghi un negozio Shopify o WooCommerce adesso puoi scegliere la categoria dei suoi prodotti: se vendi tutto dello stesso tipo la dichiari una volta e vale per tutti, anche per quelli già entrati. Se non la scegli, Barattolo usa la categoria del tuo negozio quando è una delle sue, invece di mettere tutto in «Altro».
+dove: Profilo → «Il tuo catalogo» → «📥 Importa in blocco / catalogo esterno», ✏️ sul negozio collegato, casella «Categoria dei prodotti».
+leva: nessuna
+pubblico: sì

@@ -8728,6 +8728,10 @@ def init_db():
         spedizione_extra_eur REAL DEFAULT 0,
         spedizione_extra_sats INTEGER DEFAULT 0,
         zona TEXT DEFAULT '',             -- la zona di tutte le righe
+        -- LA CATEGORIA DI TUTTE LE RIGHE (16 nov 2026), detta dal
+        -- venditore come la consegna: '' = decide il negozio (la sua
+        -- categoria, se combacia con una nostra, sennò «Altro»)
+        categoria TEXT DEFAULT '',
         ultimo_giro INTEGER DEFAULT 0,
         ultimo_esito TEXT DEFAULT '',     -- JSON del report dell'ultimo giro
         ultimo_errore TEXT DEFAULT '',
@@ -9388,6 +9392,14 @@ def init_db():
     try:
         con.execute("ALTER TABLE connettori ADD COLUMN "
                     "tariffe_da_dire INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    # LA CATEGORIA DI UN NEGOZIO COLLEGATO (16 nov 2026): '' = decide
+    # il negozio. Le righe di ieri nascono '' e restano esattamente
+    # com'erano: nessun annuncio cambia casella col deploy.
+    try:
+        con.execute("ALTER TABLE connettori ADD COLUMN "
+                    "categoria TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
     # LE TARIFFE IN SATS DI UN NEGOZIO COLLEGATO (set 2026): la valuta
@@ -94234,6 +94246,9 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
             # a scrivere adesso, il giro dopo rilegge e riconcilia
             return
         righe = importa_negozio.traduci(prodotti, c["fonte"], cambio)
+        # LA CATEGORIA DI OGNI RIGA (16 nov 2026): quella del cassetto,
+        # o quella del negozio quando combacia con una nostra
+        categorie_righe_negozio(righe, c)
         # I POSTI DI QUESTO GIRO, un conto solo per chi giudica e per chi
         # fa nascere (1 ott 2026): il secchio del rodaggio o il regime —
         # None = nessun tetto, 0 = l'ora del rodaggio e' piena
@@ -94500,6 +94515,8 @@ def _connettore_pubblico(con, c) -> dict:
         "spedizione_extra_eur": c["spedizione_extra_eur"],
         "spedizione_extra_sats": c["spedizione_extra_sats"] or 0,
         "zona": c["zona"],
+        # la categoria dichiarata (16 nov 2026): '' = decide il negozio
+        "categoria": c["categoria"] or "",
         # il catalogo aspetta i costi di spedizione (set 2026): il
         # cassetto li chiede su questa riga, e il giro non la legge
         "tariffe_da_dire": bool(c["tariffe_da_dire"]),
@@ -94707,6 +94724,119 @@ def _zona_negozio(zona: str, consegna: str) -> str:
     # arricchita della sigla come in pubblica(): il dato e' pulito
     # ovunque senza rimedi in visualizzazione
     return arricchisci_zona(zona)
+
+
+def _categoria_negozio(d: dict, vecchio) -> str:
+    """La categoria dichiarata nel cassetto (16 nov 2026): '' vuol dire
+    «decide il negozio», un nome del catalogo vuol dire «tutti i
+    prodotti di questo negozio stanno qui».
+
+    CHIAVE ASSENTE = CONSERVA, il patto dello stock e delle tariffe: un
+    client rimasto in cache, che di questa casella non sa niente, non
+    deve rimettere in «Altro» un catalogo intero.
+    «ALTRO» SI LEGGE COME «DECIDE IL NEGOZIO»: dichiararlo vorrebbe dire
+    rinunciare anche alla categoria del negozio quando combacia, e
+    nessuno sceglie apposta la casella dove non cerca nessuno.
+    Il client non decide il catalogo, come sempre: un nome che non c'e'
+    si rifiuta invece di finire in «Altro» in silenzio."""
+    if "categoria" not in d:
+        return (vecchio["categoria"] or "") if vecchio else ""
+    v = str(d.get("categoria") or "").strip()
+    if v in ("", "Altro"):
+        return ""
+    if v not in CATEGORIE:
+        raise HTTPException(400, "Categoria sconosciuta: scegline una "
+                                 "dall'elenco")
+    return v
+
+
+def _nome_categoria_negozio(nome: str) -> str:
+    """Un nome di categoria del negozio, pronto per il confronto:
+    WooCommerce lo manda con le entita' HTML («Casa &amp; giardino») e
+    i negozi scrivono «&» dove noi scriviamo «e»."""
+    t = html.unescape(str(nome or "")).strip().lower()
+    t = re.sub(r"\s*&\s*", " e ", t)
+    return re.sub(r"\s+", " ", t)
+
+
+def categoria_dal_negozio(nomi) -> str:
+    """La nostra categoria per i nomi con cui il NEGOZIO classifica un
+    prodotto (16 nov 2026), o «Altro».
+
+    STRETTA APPOSTA, e la differenza con `categoria_tollerante` e' il
+    punto: quella legge la colonna di un CSV scritto per noi e si fida
+    della prima parola; qui i nomi sono la tassonomia di un altro
+    negozio, e «Accessori Bitcoin» letto alla prima parola finirebbe in
+    «Scarpe e accessori». Quindi combacia solo il nome INTERO — una
+    nostra categoria, o un sinonimo intero della tabella di casa — e
+    vince il primo nell'ordine del negozio. Il dubbio resta in «Altro»,
+    dove la coda «🗂 Categorie da sistemare» lo va a cercare."""
+    for n in nomi or ():
+        t = _nome_categoria_negozio(n)
+        if not t:
+            continue
+        for cat in CATEGORIE:
+            if t == cat.lower() and cat != "Altro":
+                return cat
+        cat = SINONIMI_CATEGORIA.get(t)
+        if cat and cat != "Altro":
+            return cat
+    return "Altro"
+
+
+def categorie_righe_negozio(righe: list, connettore) -> None:
+    """Scrive `r["categoria"]` su ogni riga tradotta (16 nov 2026): la
+    categoria dichiarata nel cassetto vale per tutte, e senza
+    dichiarazione decide il negozio (`categoria_dal_negozio`).
+    E' L'UNICO POSTO che la decide: la nascita e il riempimento della
+    casella «Altro» in `importa_negozio` leggono quel che c'e' scritto
+    qui, e il modulo resta cieco del nostro catalogo."""
+    detta = dict(connettore).get("categoria") or ""
+    detta = detta if detta in CATEGORIE and detta != "Altro" else ""
+    for r in righe:
+        r["categoria"] = detta or categoria_dal_negozio(
+            r.get("categorie_grezze") or [r.get("categoria_grezza") or ""])
+
+
+def _sposta_categoria_negozio(con, cid: int, prima: str, dopo: str) -> int:
+    """La categoria dichiarata scende sulle righe GIA' ENTRATE (16 nov
+    2026), come la consegna in `_applica_dichiarazione`: chi la sceglie
+    oggi vuole vedere il suo catalogo spostarsi adesso, non solo i
+    prodotti che arriveranno — la Modifica sugli annunci di un negozio
+    collegato e' chiusa, e questa e' la sola strada.
+
+    DICHIARARLA SPOSTA TUTTO IL NEGOZIO, anche cio' che stava gia' in una
+    categoria vera (quella del negozio, o di un moderatore): e' il gesto
+    del VENDITORE sui suoi annunci, lo stesso che per un annuncio nato
+    qui farebbe con la Modifica — e il cassetto lo promette a lettere
+    («vale per tutti i prodotti, anche quelli già entrati»). Vale solo
+    quando la dichiarazione CAMBIA: risalvare il cassetto per una tariffa
+    non disfa lo spostamento che un moderatore ha fatto dopo.
+    TORNANDO A «DECIDE IL NEGOZIO» si rimettono in «Altro» le sole righe
+    della dichiarazione di ieri, e il giro dopo le porta dove dice il
+    negozio (`_aggiorna` riempie la casella vuota); chi stava altrove
+    resta dov'e'. I 'rimosso' non si toccano: sono storia.
+    Torna quante righe ha spostato."""
+    if prima == dopo:
+        return 0
+    if dopo:
+        righe = con.execute(
+            "SELECT id, titolo, descrizione FROM annunci WHERE "
+            "connettore_id=? AND stato<>'rimosso' AND categoria<>?",
+            (cid, dopo)).fetchall()
+    else:
+        righe = con.execute(
+            "SELECT id, titolo, descrizione FROM annunci WHERE "
+            "connettore_id=? AND stato<>'rimosso' AND categoria=?",
+            (cid, prima)).fetchall()
+    a = dopo or "Altro"
+    for r in righe:
+        con.execute("UPDATE annunci SET categoria=?, sottocategoria=? "
+                    "WHERE id=?",
+                    (a, sottocategoria_indovina(a, r["titolo"] or "",
+                                                r["descrizione"] or ""),
+                     r["id"]))
+    return len(righe)
 
 
 async def _prova_negozio(fonte: str, url: str, credenziali: dict):
@@ -94944,6 +95074,13 @@ async def salva_connettore(req: Request,
     # LE OTTO COLONNE DELLE TARIFFE, nella valuta che il modulo dice
     # (set 2026: anche sats fissi): il giudice e' `_tariffe_negozio`
     tariffe = _tariffe_negozio(d, vecchio)
+    # LA CATEGORIA DI TUTTI I PRODOTTI (16 nov 2026), o '' = decide il
+    # negozio; senza la chiave resta quella di ieri
+    try:
+        categoria = _categoria_negozio(d, vecchio)
+    except HTTPException:
+        con.close()
+        raise
     # I COSTI SI DICONO DOPO IL COLLEGAMENTO (set 2026): il modulo per
     # un negozio NUOVO non li chiede piu' — i campi di spedizione in
     # quel cassetto sembravano quelli del venditore, ed era il guasto —
@@ -95005,10 +95142,10 @@ async def salva_connettore(req: Request,
                 "spedizione_sats=?, spedizione_punto_eur=?, "
                 "spedizione_punto_sats=?, spedizione_punto_dichiarata=?, "
                 "spedizione_extra_eur=?, spedizione_extra_sats=?, "
-                "tariffe_valuta=?, zona=?, tariffe_da_dire=? "
-                "WHERE id=? AND tg_id=?",
-                (fonte, url, blob, consegna, *tariffe, zona, da_dire, cid,
-                 user["id"]))
+                "tariffe_valuta=?, zona=?, tariffe_da_dire=?, "
+                "categoria=? WHERE id=? AND tg_id=?",
+                (fonte, url, blob, consegna, *tariffe, zona, da_dire,
+                 categoria, cid, user["id"]))
         else:
             cur = con.execute(
                 "INSERT INTO connettori(tg_id,fonte,url_negozio,"
@@ -95016,10 +95153,10 @@ async def salva_connettore(req: Request,
                 "spedizione_punto_eur,spedizione_punto_sats,"
                 "spedizione_punto_dichiarata,spedizione_extra_eur,"
                 "spedizione_extra_sats,tariffe_valuta,zona,"
-                "tariffe_da_dire,creato) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "tariffe_da_dire,categoria,creato) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (user["id"], fonte, url, blob, consegna, *tariffe, zona,
-                 da_dire, adesso))
+                 da_dire, categoria, adesso))
             cid = cur.lastrowid
     except sqlite3.IntegrityError:
         con.close()
@@ -95038,6 +95175,10 @@ async def salva_connettore(req: Request,
                                       "spedizione_extra_eur": tariffe[5],
                                       "spedizione_extra_sats": tariffe[6],
                                       "zona": zona})
+    # e la categoria scende sulle righe gia' entrate (16 nov 2026)
+    spostati = _sposta_categoria_negozio(
+        con, cid, (vecchio["categoria"] or "") if vecchio else "",
+        categoria)
     con.commit()
     riga = con.execute("SELECT * FROM connettori WHERE id=?",
                        (cid,)).fetchone()
@@ -95056,6 +95197,9 @@ async def salva_connettore(req: Request,
     if parte:
         asyncio.create_task(_sync_uno(cid))
     fuori_json = {"ok": True, "connettore": fuori, "primo_giro": parte}
+    if spostati:
+        # quanti annunci hanno cambiato categoria adesso: il toast lo dice
+        fuori_json["categoria_spostati"] = spostati
     if nota_indirizzo:
         # l'indirizzo salvato non e' quello scritto: si DICE (set 2026)
         fuori_json["indirizzo_nota"] = nota_indirizzo
