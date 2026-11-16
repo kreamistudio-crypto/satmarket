@@ -21975,6 +21975,24 @@
   sarebbe una busta finta. Il sollecito stesso NOMINA la porta
   («dillo dall'ordine: smettiamo di chiedertelo»), ed è così che i
   distratti la scoprono.
+  SOLO CON L'EMAIL (16 nov 2026, dal campo, decisione di Andrea:
+  l'email resta facoltativa e si chiude il buco): la dichiarazione
+  vale solo dove il compratore ha lasciato l'email per il corriere —
+  senza, i suoi recapiti sull'etichetta non ci possono essere, e la
+  spunta su ogni ordine via punto aveva prodotto il caso vero del
+  codice che non arriva a nessuno. Giudice unico
+  `_email_corriere_presente(o)` (la COLONNA non vuota e non purgata,
+  mai il timbro `_il`, che resta a email tolta): `segna_spedito` e la
+  porta tardiva rispondono 400 senza, il client non disegna né la
+  spunta né il link (flag `email_corriere_presente` da `miei_ordini`,
+  il SE e mai il valore) e al loro posto dice «il codice di ritiro
+  arriverà a te». Alla spedizione normale via punto il venditore
+  riceve SUBITO `MSG_CODICE_A_TE` (tace sulla rete di casa); il
+  sollecito senza email non nomina più la porta. E per chi compra il
+  pannello «📦 Istruzioni per il ritiro», a busta depositata e ordine
+  vivo, sale in cima sotto il prezzo (`bustaInCima`): lo stesso
+  pannello, un altro posto. La voce: Cantieri, «Il codice di ritiro
+  del locker che non arrivava a nessuno».
   UNA COLONNA SOLA, `ordini.busta_diretta_il` (il pattern di
   `busta_il`: il quando E il flag), e NESSUN bottone «annulla»: IL
   DEPOSITO DELLA BUSTA LA AZZERA nello stesso unico UPDATE — la busta

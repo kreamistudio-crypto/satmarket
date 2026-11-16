@@ -85482,3 +85482,76 @@ del client veri e le risposte del server finte (dati finti, nessun
 indirizzo vero): su develop prima della cura da y=1148 a y=0; dopo, y
 resta 1148 e il nome è a schermo.
 DA GUARDARE: il tocco dentro Telegram sul telefono vero, sul collaudo.
+
+## Il codice di ritiro del locker che non arrivava a nessuno: la busta diretta solo con l'email, «arriverà a te» al venditore e il codice in cima all'ordine (16 nov 2026, cantiere codice-ritiro; Andrea, dopo un pacco a un locker: «Secondo me o barattolo riceve il codice e lo mostra in maniera chiara a chi deve ritirare il pacco (cosa non successa) o è meglio non mettere la mail come opzionale ma come obbligatoria»; proposta in un messaggio, scelta sulla card: «Chiudere il buco, email facoltativa»)
+
+IL BUCO. Sulla spedizione a un punto il codice di ritiro arriva per una
+di due strade: all'email del compratore, se l'ha lasciata e il venditore
+la mette sull'etichetta (la busta diretta, cantiere 45, e l'email per il
+corriere, tappa B), oppure al venditore, che lo incolla nell'ordine
+(«📦 Istruzioni di ritiro»). La spunta «Ho messo i recapiti
+dell'acquirente come destinatario: il codice di ritiro arriva
+direttamente a lui» compariva PERO' SU OGNI ORDINE VIA PUNTO, anche dove
+l'email il compratore non l'aveva lasciata, e il server la accettava.
+Lì il venditore dichiarava una cosa impossibile (quei recapiti non li
+ha), i suoi promemoria tacevano (`sollecita_buste_ferme` esclude il
+dichiarato), il compratore leggeva «controlla la posta, anche nello
+spam» — e il codice non arrivava a nessuno dei due posti.
+
+LA DECISIONE DI ANDREA: L'EMAIL RESTA FACOLTATIVA. L'obbligo da solo non
+chiudeva niente — il venditore può comunque non metterla sull'etichetta,
+la busta diretta è una sua scelta — e rovesciava la decisione 2 della
+tappa B (mai una condizione per comprare) col rischio già scritto là:
+un'email sbagliata atterra su uno sconosciuto che può ritirare il pacco.
+La strada «Barattolo riceve il codice da solo» (un indirizzo
+ritiro-xxxx@barattolo.store per ordine, da mettere sull'etichetta) è
+restata una proposta: vuole un server di posta e un lettore per ogni
+corriere, ed è un cantiere suo.
+
+COSA CAMBIA, quattro pezzi.
+1) IL GIUDICE UNICO `_email_corriere_presente(o)`: la COLONNA non vuota
+e non purgata. Non il timbro `email_corriere_il`, che resta anche a
+email TOLTA (è il fatto del moderatore) e direbbe di sì a chi ci ha
+ripensato. Funziona senza decifrare perché il vuoto si scrive '' (mai un
+`plain:` di niente) e la cassa senza chiave scrive '' anche lei.
+`segna_spedito` con `busta_diretta` e senza email risponde 400 e NON
+spedisce (un silenzio farebbe credere al venditore di aver detto una
+cosa che non vale); la porta tardiva `dichiara_busta_diretta` idem.
+`miei_ordini` manda il SE (`email_corriere_presente`), mai il valore.
+2) IL FORM «📦 Spedisci»: la spunta solo con l'email (e mai sulla rete di
+casa); senza, la riga «L'acquirente non ha lasciato un'email: il codice
+di ritiro arriverà a te. Appena ce l'hai, incollalo qui nell'ordine».
+Il cartello «📧 L'acquirente ha lasciato un'email» e il link della
+porta tardiva passano allo stesso flag; la testa del pannello della
+busta del venditore lo dice in grassetto.
+3) «ARRIVERÀ A TE» SUBITO: alla spedizione via punto senza busta e senza
+dichiarazione il venditore riceve `MSG_CODICE_A_TE` dal bot (statico,
+niente titoli). Prima lo sapeva solo dal promemoria al giorno 3, cioè
+spesso a giacenza iniziata; il messaggio resta nella chat e lo ritrova
+quando il codice arriva. Sulla rete di casa tace: lì il codice lo
+scrive il server. E il promemoria della busta, senza email, non manda
+più «dillo dall'ordine» contro una porta chiusa: dice «il codice arriva
+solo a te, e solo tu puoi passarglielo».
+4) IL CODICE IN CIMA: per chi compra, quando la busta c'è e l'ordine è
+vivo (`bustaInCima`: via punto, `bustaIl`, fuori da `CONCLUSI`), il
+pannello «📦 Istruzioni per il ritiro» sale sotto il prezzo, prima di
+«📦 Spedisci a», e non si ripete giù fra le buste. Prima stava sotto il
+recinto e i pannelli dei pagamenti: davanti al locker non si trovava.
+Il pannello è lo stesso (ancora `bustaPannello`, ridisegno in place,
+il codice nasce dove stava il bottone), cambia solo il posto.
+
+STRADE SCARTATE: ignorare la spunta in silenzio (il venditore la
+crederebbe valida); toglierla del tutto (chi ha l'email del compratore
+la usa davvero); un braccio nuovo del libro mastro sugli ordini già
+dichiarati senza email (non chiesto: gli ordini di prima restano come
+sono, e il deposito della busta resta il loro annulla).
+
+PROVATO: `collaudo_busta_diretta.py` 49/0 col giro vero (sezione 9
+nuova: spunta senza email 400 e l'ordine resta 'locked', «arriverà a
+te» al solo venditore, porta tardiva chiusa, sollecito senza «dillo
+dall'ordine», email TOLTA che vale come mai lasciata, e il controllo
+con l'email che passa e non manda «a te»); gli ordini dichiarati del
+giro hanno adesso l'email lasciata dalla rotta vera. `prove_busta_ritiro`
+col giudice vero nel banco di cartone. DA GUARDARE dal vivo sul
+collaudo: il form «Spedisci» con e senza email, il codice in cima su
+telefono stretto, il messaggio «arriverà a te» nella chat del bot.

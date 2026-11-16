@@ -18771,6 +18771,11 @@ function mapOrder(o){
     emailCorriereIl:o.email_corriere_il||0,
     emailCorriereCorrezioni:o.email_corriere_correzioni||0,
     emailCorrierePurgataIl:o.email_corriere_purgata_il||0,
+    /* il SE di adesso (16 nov 2026): il timbro resta anche a email
+       tolta, quindi non basta a dire se il corriere ha dove scrivere.
+       Decide la spunta della busta diretta (il giudice e' il server,
+       `_email_corriere_presente`). */
+    emailCorrierePresente:!!o.email_corriere_presente,
     /* del documento arriva il solo FLAG: il nome del file e' la
        maniglia sul disco e non esce mai, i byte men che meno */
     bustaDocumento:!!o.busta_documento,
@@ -38609,6 +38614,12 @@ function openOrder(id){
            deve tornare al LORDO del listino — e' la copia n.3 della
            divisione, in pari con _righe_ordine per il censimento */
         (o.qta>1 && !o.righe.length) ? `<div class="eur-hint" style="margin-top:-6px">${fmt(o.qta)} pezzi × ${cifraOrdine(o, (o.listing.price-(o.spedSats||0)-(o.protSats||0)+(o.scontoSats||0))/o.qta)}</div>` : ''}
+      ${/* IL CODICE DI RITIRO STA IN CIMA (16 nov 2026, dal campo):
+            in fondo, sotto il recinto e i pannelli dei pagamenti, chi
+            sta davanti al locker non lo trovava. Quando c'e', per chi
+            compra e' la cosa piu' importante della pagina: sale qui,
+            sotto il prezzo, e non si ripete giu' fra le buste. */''}
+      ${bustaInCima(o) ? pannelloBustaRitiro(o) : ''}
       ${riquadroSpedisciA(o)}
       ${/* IL PUNTO NON SI DICE DUE VOLTE (ago 2026): qui sotto il
             prezzo c'era anche il punto GIA' scelto, che pero' vive
@@ -38823,15 +38834,22 @@ function openOrder(id){
                 del compratore cambia testo e i promemoria tacciono.
                 Chi dimentica ha la porta tardiva nel pannello della
                 busta, che il sollecito stesso nomina. */''}
-          ${o.viaPunto ? `<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:700;margin-top:6px;cursor:pointer">
+          ${/* SENZA EMAIL LA SPUNTA NON C'E' (16 nov 2026, dal campo):
+                i recapiti dell'acquirente il venditore non li ha, quindi
+                «arriva direttamente a lui» era una dichiarazione
+                impossibile — e chi la faceva zittiva i promemoria mentre
+                il compratore aspettava una mail che non sarebbe
+                arrivata. Al suo posto la riga che dice a chi tocca. */''}
+          ${(o.viaPunto && !o.puntoBarattolo && o.emailCorrierePresente) ? `<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:700;margin-top:6px;cursor:pointer">
             <input type="checkbox" id="shipBustaDiretta" style="margin-top:2px"> <span>Ho messo i recapiti dell'acquirente come destinatario: il codice di ritiro arriva direttamente a lui</span></label>` : ''}
+          ${(o.viaPunto && !o.puntoBarattolo && !o.emailCorrierePresente) ? `<div class="hint" style="margin-top:6px">📮 <b>L'acquirente non ha lasciato un'email: il codice di ritiro arriverà a te.</b> Appena ce l'hai, incollalo qui nell'ordine, in «📦 Istruzioni di ritiro per l'acquirente»: è l'unico modo in cui l'acquirente lo riceve.</div>` : ''}
           ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">📦 L'acquirente ha scelto la <b>spedizione a un indirizzo</b>: lo trovi in cima, in <b>«📦 Spedisci a»</b>.</div>` : ''}
           ${/* IL CARTELLO, MAI IL DATO: la nota si legge nel suo
                 riquadro qui sotto, e ripeterla qui sarebbe il dato
                 accanto al posto in cui si tocca — il peccato che il
                 punto ha gia' commesso e per cui e' stato corretto.
                 Stessa forma della riga dell'indirizzo, due sopra. */''}
-          ${(o.viaPunto && o.emailCorriereIl && !o.emailCorrierePurgataIl) ? `<div class="hint">📧 L'acquirente ha lasciato un'<b>email per il corriere</b>: ${serveSpedisciA(o) ? 'la trovi in cima, in <b>«📦 Spedisci a»</b>' : 'la leggi nel riquadro qui sotto'}, e mettendola come destinatario il codice di ritiro arriva direttamente a lui.</div>` : ''}
+          ${(o.viaPunto && o.emailCorrierePresente) ? `<div class="hint">📧 L'acquirente ha lasciato un'<b>email per il corriere</b>: ${serveSpedisciA(o) ? 'la trovi in cima, in <b>«📦 Spedisci a»</b>' : 'la leggi nel riquadro qui sotto'}, e mettendola come destinatario il codice di ritiro arriva direttamente a lui.</div>` : ''}
           ${o.notaCompratore ? `<div class="hint">📝 L'acquirente ha lasciato una <b>nota</b>: la leggi nel riquadro qui sotto.</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${/* IL CORRIERE ARRIVA GIA' SCELTO quando chi compra ha detto
@@ -49273,7 +49291,8 @@ function pannelloBustaRitiro(o){
         ? `✓ Hai indicato che il codice di ritiro arriva direttamente all'acquirente (il ${quandoDiretta}). Se invece arriva a te, depositalo qui: la dichiarazione si annulla da sola.`
         : o.state==='locked'
         ? 'Se hai già il codice di ritiro (capita spedendo da un punto: arriva subito), puoi depositarlo ora; altrimenti torna qui quando ti arriva.'
-        : 'Appena hai il codice, depositalo qui: per l\'acquirente è il segnale «il tuo pacco ti aspetta», e senza non può ritirare.');
+        : (o.emailCorrierePresente ? '' : '<b>L\'acquirente non ha lasciato un\'email: il codice arriva solo a te.</b> ')
+          + 'Appena hai il codice, depositalo qui: per l\'acquirente è il segnale «il tuo pacco ti aspetta», e senza non può ritirare.');
     return `
       <div class="payout" id="bustaPannello">
         <h4>📦 Istruzioni di ritiro per l'acquirente</h4>
@@ -49289,9 +49308,11 @@ function pannelloBustaRitiro(o){
               spunta resta sotto sollecito, e l'unica uscita sarebbe
               una busta finta — da qui dichiara che il codice va
               direttamente all'acquirente. Solo su 'shipped' (il
-              server rifiuta altrove) e solo finche' non c'e' ne'
-              busta ne' dichiarazione. */''}
-        ${(o.state==='shipped' && !o.bustaIl && !o.bustaDirettaIl) ? `
+              server rifiuta altrove), solo finche' non c'e' ne'
+              busta ne' dichiarazione, e solo se l'acquirente ha
+              lasciato l'email (16 nov 2026): senza, i suoi recapiti
+              sull'etichetta non ci possono essere. */''}
+        ${(o.state==='shipped' && !o.bustaIl && !o.bustaDirettaIl && o.emailCorrierePresente) ? `
         <div class="hint" style="margin-top:8px">Hai messo i recapiti dell'acquirente come destinatario? <button type="button" class="scopri-link" onclick="dichiaraBustaDiretta()">Il codice arriva direttamente a lui</button></div>` : ''}
       </div>`;
   }
@@ -49744,10 +49765,17 @@ function pannelloNota(o){
    nel DOM, quindi tutto quel che gira DOPO il disegno (le cifre,
    l'anello della busta, i campi che si aprono gia' pronti) li trova
    dove li cerca — e riaprirli e' una riga, non un secondo giro. */
+/* il giudice unico del posto del codice: in cima per chi compra,
+   quando c'e' e l'ordine e' vivo — altrimenti fra le buste, dove a
+   ordine finito si chiude con le altre */
+function bustaInCima(o){
+  return o.role==='buyer' && !!o.viaPunto && o.bustaIl > 0
+    && !CONCLUSI.includes(o.state);
+}
 function busteOrdine(o){
   const buste = [pannelloContenutoDigitale(o), pannelloNota(o),
                  pannelloRisposte(o), pannelloIndirizzoCasa(o), pannelloEmailCorriere(o),
-                 pannelloBustaRitiro(o)].join('');
+                 bustaInCima(o) ? '' : pannelloBustaRitiro(o)].join('');
   if (!buste || !CONCLUSI.includes(o.state)) return buste;
   return `<div id="ordBuste" style="display:none">${buste}</div>
     <div class="ord-buste-link"><button class="btn link"

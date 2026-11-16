@@ -338,3 +338,9 @@ frase: Un annuncio esaurito che non tornerà, come un oggetto usato venduto una 
 dove: «I tuoi annunci» nel Profilo, il tasto «🗑 Elimina» accanto a «🔄 Rifornisci»; la pagina dell'annuncio esaurito, «🗑 Elimina l'annuncio»; il form «Vendi», campo «Zona».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-16 · codice-ritiro
+frase: Spedizioni a un locker o a un punto di ritiro: quando il codice per ritirare il pacco è pronto, chi ha comprato lo trova in cima all'ordine, subito sotto il prezzo. E chi vende sa fin dalla spedizione se il codice arriverà a lui, da incollare nell'ordine, o direttamente a chi compra.
+dove: l'ordine, riquadro «📦 Istruzioni per il ritiro»; per chi vende il riquadro «📦 Spedisci» e il messaggio del bot alla spedizione.
+leva: nessuna
+pubblico: sì

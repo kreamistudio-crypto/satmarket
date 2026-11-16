@@ -38850,6 +38850,28 @@ def _coda_email_corriere(prima: bool, dopo: bool) -> str:
     return ""
 
 
+def _email_corriere_presente(o) -> bool:
+    """C'E' UN'EMAIL DOVE IL CORRIERE PUO' MANDARE IL CODICE? (16 nov
+    2026, dal campo, decisione di Andrea: l'email resta facoltativa,
+    si chiude il buco). E' il giudice unico della BUSTA DIRETTA: la
+    spunta «ho messo i recapiti dell'acquirente, il codice arriva
+    direttamente a lui» si accettava anche su un ordine dove l'email
+    il compratore NON l'aveva lasciata. Il venditore dichiarava una
+    cosa impossibile, il compratore leggeva «controlla la posta», i
+    promemoria del venditore tacevano — e il codice non arrivava a
+    nessuno dei due posti. Successo davvero.
+
+    SI GUARDA LA COLONNA E NON IL TIMBRO: `email_corriere_il` resta
+    anche a email TOLTA (e' il fatto che il moderatore legge), quindi
+    direbbe di si' a chi ci ha ripensato. La colonna invece e' VUOTA
+    sia mai lasciata sia tolta: `_email_corriere_da_payload` sul vuoto
+    torna il blob '' (mai un `plain:` di niente), e senza chiave anche
+    la cassa scrive ''. La scopa la svuota e timbra `_purgata_il`, che
+    si guarda lo stesso per non fidarsi di una sola delle due. Niente
+    decifratura: qui serve il SE, e il valore non esce mai."""
+    return bool(o["email_corriere"]) and not o["email_corriere_purgata_il"]
+
+
 def _email_corriere_letta(blob: str) -> str:
     """L'email in chiaro, o '' se non si legge.
 
@@ -47680,6 +47702,16 @@ def _etichetta_documento(grezzo, estensione: str) -> str:
     return nome or f"ritiro.{estensione}"
 
 
+# Al venditore che spedisce a un punto senza busta diretta (16 nov
+# 2026): il codice arriva a LUI, ed e' l'unica strada per cui arriva
+# al compratore. Statico: niente titoli, niente valori.
+MSG_CODICE_A_TE = (
+    "📮 <b>Il codice di ritiro arriverà a te</b>, ai recapiti che hai "
+    "messo come destinatario, quando il pacco arriva al punto. Appena "
+    "ce l'hai, apri l'ordine e incollalo in <b>«📦 Istruzioni di "
+    "ritiro per l'acquirente»</b>: è l'unico modo in cui l'acquirente "
+    "lo riceve, e la giacenza dura pochi giorni.")
+
 MSG_BUSTA_PRONTA = (
     "📦 <b>Il tuo pacco ti aspetta al punto di ritiro!</b> Nell'ordine "
     "trovi il <b>nome del destinatario</b> e il <b>codice</b> per "
@@ -47913,6 +47945,14 @@ async def dichiara_busta_diretta(ordine_id: int,
                                  "ritiro non passa dal corriere: lo "
                                  "scriviamo noi quando il punto segna di "
                                  "aver ricevuto il pacco")
+    if not _email_corriere_presente(o):
+        # NEMMENO SENZA EMAIL (16 nov 2026): la stessa regola della
+        # spunta in segna_spedito, col giudice unico.
+        con.close()
+        raise HTTPException(400, "L'acquirente non ha lasciato un'email "
+                                 "per il corriere: il codice di ritiro "
+                                 "arriva a te. Incollalo qui nell'ordine "
+                                 "appena ce l'hai")
     adesso = int(time.time())
     cur = con.execute("UPDATE ordini SET busta_diretta_il=? "
                       "WHERE id=? AND busta_diretta_il=0",
@@ -48610,6 +48650,21 @@ async def segna_spedito(ordine_id: int, req: Request,
     # La dichiarazione della busta diretta viaggia nello stesso unico
     # UPDATE: fuori dalla via punto si scrive 0, che su una riga
     # appena uscita da 'locked' e' il valore che aveva gia'.
+    # LA BUSTA DIRETTA SENZA EMAIL NON ESISTE (16 nov 2026): se il
+    # compratore non ha lasciato un'email, i suoi recapiti
+    # sull'etichetta il venditore non li ha — e la dichiarazione
+    # zittirebbe i promemoria e direbbe al compratore «controlla la
+    # posta» per un codice che arriva invece al venditore. Il client
+    # la spunta non la mostra nemmeno; qui si rifiuta per chi arriva
+    # da una pagina vecchia o dopo che il compratore l'ha tolta. Un
+    # 400 e non un silenzio: chi ha spuntato crede di aver detto una
+    # cosa, e deve sapere che non vale.
+    if busta_diretta and o["via_punto"] and not _email_corriere_presente(o):
+        con.close()
+        raise HTTPException(400, "L'acquirente non ha lasciato un'email "
+                                 "per il corriere: il codice di ritiro "
+                                 "arriverà a te. Togli la spunta, spedisci "
+                                 "e poi incolla il codice nell'ordine")
     adesso = int(time.time())
     diretta_ts = adesso if (busta_diretta and o["via_punto"]) else 0
     con.execute("UPDATE ordini SET stato='shipped', corriere=?, tracking=?, "
@@ -48676,6 +48731,15 @@ async def segna_spedito(ordine_id: int, req: Request,
                 f"📦 <b>Il tuo oggetto è in viaggio verso il punto di "
                 f"ritiro</b>{viaggio}! Ti avviseremo quando il nome "
                 f"e il codice per ritirarlo saranno nell'ordine.")
+            # E AL VENDITORE SI DICE SUBITO CHE TOCCA A LUI (16 nov
+            # 2026, dal campo): fino a ieri lo sapeva solo dal
+            # promemoria a PROMEMORIA_BUSTA_GIORNI, cioe' spesso a
+            # giacenza gia' iniziata. Il messaggio resta nella chat del
+            # bot e lo ritrova quando il codice arriva, giorni dopo.
+            # Sulla rete di casa il codice lo scrive il server alla
+            # presa in carico: li' al venditore non si chiede niente.
+            if not o["punto_barattolo"]:
+                await notifica(o["venditore_id"], MSG_CODICE_A_TE)
         return {"ok": True}
     dettaglio = viaggio.strip() or "in consegna a mano"
     await notifica(o["compratore_id"],
@@ -88564,7 +88628,14 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # disputa — li' gli arriva il FATTO con la data). Escono i
         # fatti: il quando, le correzioni, il timbro della
         # cancellazione. Servono al client per disegnare il cassetto
-        # senza poter sbirciare.
+        # senza poter sbirciare. E il SE (16 nov 2026): c'e' adesso,
+        # o no — la spunta della busta diretta compare solo li'.
+        # (le `.get` come i pop qui intorno: i banchi minimi delle
+        # prove non hanno queste colonne, la produzione si')
+        r["email_corriere_presente"] = _email_corriere_presente({
+            "email_corriere": r.get("email_corriere", ""),
+            "email_corriere_purgata_il":
+                r.get("email_corriere_purgata_il", 0)})
         r.pop("email_corriere", "")
         # E le risposte alle domande del venditore idem (6 nov 2026):
         # si leggono solo da /risposte, e solo le due parti. Escono
@@ -91179,7 +91250,8 @@ async def sollecita_buste_ferme():
     con = db()
     righe = [dict(r) for r in con.execute(
         "SELECT o.id, o.venditore_id, o.annuncio_id, o.prezzo_sats, "
-        "o.solleciti_busta, a.titolo FROM ordini o "
+        "o.solleciti_busta, o.email_corriere, o.email_corriere_purgata_il, "
+        "a.titolo FROM ordini o "
         # LEFT: anche i SET (annuncio_id=0) meritano il promemoria
         "LEFT JOIN annunci a ON a.id = o.annuncio_id "
         "WHERE o.stato='shipped' AND o.via_punto=1 AND o.busta_il=0 "
@@ -91221,6 +91293,20 @@ async def sollecita_buste_ferme():
         titolo = html.escape((r["titolo"] or "il tuo affare")[:60])
         try:
             if r["solleciti_busta"] < PROMEMORIA_CONFERMA_MAX:
+                # LA PORTA TARDIVA SI NOMINA SOLO DOVE SI APRE (16 nov
+                # 2026): senza un'email del compratore la busta
+                # diretta non esiste, e mandarlo a dichiararla sarebbe
+                # mandarlo contro un 400 — al suo posto si dice perche'
+                # tocca proprio a lui.
+                if _email_corriere_presente(r):
+                    coda = (f"Se invece il codice arriva direttamente "
+                            f"all'acquirente (hai messo i suoi recapiti "
+                            f"sull'etichetta), dillo dall'ordine: "
+                            f"smettiamo di chiedertelo.")
+                else:
+                    coda = ("L'acquirente non ha lasciato un'email: il "
+                            "codice arriva solo a te, e solo tu puoi "
+                            "passarglielo.")
                 await notifica(r["venditore_id"],
                     f"📦 <b>«{titolo}» aspetta le istruzioni di "
                     f"ritiro.</b> Appena il corriere ti manda il "
@@ -91228,10 +91314,7 @@ async def sollecita_buste_ferme():
                     f"apri l'ordine e deposita il nome del "
                     f"destinatario e il codice: senza, il compratore "
                     f"non può ritirare il pacco, e la giacenza scade "
-                    f"in pochi giorni. Se invece il codice arriva "
-                    f"direttamente all'acquirente (hai messo i suoi "
-                    f"recapiti sull'etichetta), dillo dall'ordine: "
-                    f"smettiamo di chiedertelo.")
+                    f"in pochi giorni. {coda}")
             else:
                 # Il tetto e' passato: tocca a un umano, poi silenzio.
                 await notifica_admin(

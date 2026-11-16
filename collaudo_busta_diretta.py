@@ -196,9 +196,17 @@ def semina():
     return ids
 
 
-def ordine_al_punto(annuncio_id, punto="Locker InPost Via Verdi 3"):
+def ordine_al_punto(annuncio_id, punto="Locker InPost Via Verdi 3",
+                    email="compratore@esempio.it"):
     """Compra via punto e porta l'ordine a 'locked' coi percorsi veri:
-    il pagamento e' l'unico pezzo simulato."""
+    il pagamento e' l'unico pezzo simulato.
+
+    L'EMAIL PER IL CORRIERE c'e' di serie (16 nov 2026): la busta
+    diretta esiste solo dove il compratore l'ha lasciata — senza, i
+    suoi recapiti sull'etichetta non ci possono essere — e quasi tutto
+    questo giro parla di ordini dichiarati. La lascia il compratore
+    dalla sua rotta vera, sull'ordine pagato. `email=""` e' l'ordine
+    senza, quello della sezione 9."""
     come(111)
     c = chiama(SRV.compra, None, corpo={
         "annuncio_id": annuncio_id, "consegna": "spedizione",
@@ -206,6 +214,10 @@ def ordine_al_punto(annuncio_id, punto="Locker InPost Via Verdi 3"):
         "tipo_punto": "locker"})
     oid = c["ordine_id"]
     tocca(oid, stato="locked")
+    if email:
+        come(111)
+        chiama(SRV.indica_email_corriere, oid, None,
+               corpo={"email_corriere": email})
     return oid
 
 
@@ -261,9 +273,12 @@ def main():
     DETTO.clear()
     spedisci(o_ieri)
     o = riga(o_ieri)
+    # la riga di sempre e' quella del COMPRATORE: dal 16 nov 2026
+    # dopo di lei parte anche «arriverà a te» al venditore, quindi
+    # l'ultimo detto non e' piu' il suo
     prova("senza spunta niente timbro, e la riga di sempre", True,
           o["busta_diretta_il"] == 0
-          and "Ti avviseremo" in (DETTO[-1][1] if DETTO else ""))
+          and any(chi == 111 and "Ti avviseremo" in t for chi, t in DETTO))
     # a 4 giorni il sollecito squilla, e NOMINA la porta tardiva
     tocca(o_ieri, spedito_il=ora - 4 * G)
     detto, ghiaccio = giro_buste()
@@ -497,6 +512,71 @@ def main():
     come(111)
     cod, _ = rifiuto(SRV.sollecita_venditore, o_out)
     prova("...e la pausa di famiglia regge", 400, cod)
+
+    # ---- 9) SENZA EMAIL LA BUSTA DIRETTA NON ESISTE (16 nov 2026) ---
+    # Dal campo: la spunta «il codice arriva direttamente a lui» si
+    # accettava anche dove il compratore l'email non l'aveva lasciata.
+    # Il venditore dichiarava una cosa impossibile, i promemoria
+    # tacevano, il compratore leggeva «controlla la posta» — e il
+    # codice non arrivava a nessuno dei due posti.
+    print("\n[9] senza email la busta diretta non esiste")
+    o_senza = ordine_al_punto(a2, email="")
+    come(222)
+    cod, msg = rifiuto(SRV.segna_spedito, o_senza, None,
+                       corpo={"corriere": "InPost",
+                              "tracking": "616555400308780213",
+                              "busta_diretta": True})
+    prova("la spunta senza email si rifiuta", True,
+          cod == 400 and "non ha lasciato un'email" in msg)
+    prova("...e l'ordine NON parte a meta': resta da spedire, senza "
+          "timbro", ("locked", 0),
+          (riga(o_senza)["stato"], riga(o_senza)["busta_diretta_il"]))
+    DETTO.clear()
+    spedisci(o_senza)
+    prova("senza spunta si spedisce come sempre", "shipped",
+          riga(o_senza)["stato"])
+    al_vend = [t for chi, t in DETTO if chi == 222]
+    prova("...e il venditore sa SUBITO che il codice arriva a lui",
+          True, len(al_vend) == 1 and "arriverà a te" in al_vend[0]
+          and "Istruzioni di ritiro per l'acquirente" in al_vend[0])
+    prova("...mentre al compratore la riga di sempre", True,
+          any(chi == 111 and "Ti avviseremo" in t for chi, t in DETTO))
+    come(222)
+    cod, msg = rifiuto(SRV.dichiara_busta_diretta, o_senza)
+    prova("la porta tardiva senza email e' chiusa", True,
+          cod == 400 and "non ha lasciato un'email" in msg)
+    prova("...e non timbra niente", 0, riga(o_senza)["busta_diretta_il"])
+    tocca(o_senza, spedito_il=ora - 4 * G)
+    detto, _ = giro_buste()
+    mio = [t for chi, t in detto if chi == 222 and "Cosa 1" in t]
+    prova("il sollecito squilla, e NON manda contro la porta chiusa",
+          (1, False, True),
+          (len(mio), bool(mio) and "dillo dall'ordine" in mio[0],
+           bool(mio) and "solo tu puoi passarglielo" in mio[0]))
+    # L'EMAIL TOLTA vale come mai lasciata: il timbro resta (e' il
+    # fatto del moderatore), la colonna no — e la colonna decide.
+    o_tolta = ordine_al_punto(a3)
+    come(111)
+    chiama(SRV.indica_email_corriere, o_tolta, None,
+           corpo={"email_corriere": ""})
+    prova("tolta: il timbro resta, la colonna e' vuota", (True, ""),
+          (riga(o_tolta)["email_corriere_il"] > 0,
+           riga(o_tolta)["email_corriere"]))
+    come(222)
+    cod, _ = rifiuto(SRV.segna_spedito, o_tolta, None,
+                     corpo={"corriere": "InPost", "tracking": "1",
+                            "busta_diretta": True})
+    prova("...e la spunta si rifiuta lo stesso", 400, cod)
+    # IL CONTROLLO: con l'email la stessa spunta passa (sezione 1), e
+    # con la busta diretta il venditore NON riceve «arriverà a te»
+    DETTO.clear()
+    o_con = ordine_al_punto(a4)
+    DETTO.clear()
+    spedisci(o_con, diretta=True)
+    prova("con l'email la spunta passa, e al venditore niente «a te»",
+          (True, []),
+          (riga(o_con)["busta_diretta_il"] > 0,
+           [t for chi, t in DETTO if chi == 222]))
 
     print("\n" + "=" * 60)
     print(f"  {PASSATE} verdi, {FALLITE} rosse")
