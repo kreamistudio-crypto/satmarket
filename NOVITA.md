@@ -236,3 +236,9 @@ frase: Le vendite della «🏪 Cassa in negozio» ora stanno in «Ordini», insi
 dove: la scheda «Ordini», il filtro «🏪 Cassa» accanto a «Vendite».
 leva: CASSA_ATTIVA (la stessa della cassa)
 pubblico: sì
+
+## 2026-11-16 · p2p-monete
+frase: Nel P2P ora puoi pagare anche in ETH, Monero o USDe. L'ordine resta in euro e la garanzia in sats come sempre: chi paga manda l'equivalente al cambio del momento, con indirizzo controllato, QR, cifra esatta e il link all'explorer per vedere che la transazione è arrivata. USDe su Ethereum, Arbitrum, Base, BNB Chain e Solana.
+dove: la scheda «P2P», nel foglio «Pubblica» di un ordine in euro (fra i metodi) e nel libro, col logo di ogni moneta.
+leva: P2P_COIN_ATTIVO (nuova, accesa)
+pubblico: sì

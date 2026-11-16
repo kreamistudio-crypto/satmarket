@@ -83810,3 +83810,60 @@ filtro «🏪 Cassa», la ricevuta riaperta da «Ordini»
 
 NON FATTO, IN ATTESA DI UN SÌ. Il CSV «Esporta tutti gli ordini» non
 contiene le vendite della cassa.
+
+## ETH, Monero e USDe accesi per tutti: la leva P2P_COIN_ATTIVO (16 nov 2026, cantiere p2p-monete, Andrea: «Voglio accenderli tutti», poi «Attiva tutto, manda tutto in produzione»)
+
+PERCHÉ. I tre metodi del P2P nati il 13 nov (cantieri eth-xmr e usde, le
+due voci qui sopra) avevano per cancello l'istanza di prova:
+`p2p_coin_acceso()` era `bool(PROVA_SOLO_IDS)` col P2P acceso, e sul VPS
+`PROVA_SOLO_IDS` non c'è (set vuoto). In produzione il codice c'era ma era
+muto, e il libro nascondeva perfino gli ordini che li portavano. Il
+commento del cancello lo aveva promesso: «il giorno della produzione si
+mette una leva qui, e il resto non cambia».
+COME. La leva `P2P_COIN_ATTIVO` (accanto alle leve dei franchi) prende il
+posto di `PROVA_SOLO_IDS` in `p2p_coin_acceso()`, e il resto non è cambiato:
+`/api/me` (`p2p_coin`), `/api/cambio` (`cambio_coin`), l'orologio del
+cambio e il telefono (`myP2PCoin`) chiedono sempre alle stesse due funzioni.
+ACCESA DI SERIE, la regola di Andrea del 14 nov: la promozione la porta in
+produzione senza toccare il config, e resta l'interruttore d'emergenza
+(`P2P_COIN_ATTIVO = False`, una riga). STORTA = SPENTA, e lo dice nel
+journal: un interruttore d'emergenza scritto male deve chiudere. Nessun
+gesto sul nodo (sono metodi di ordini in euro, testo libero per mostrod).
+Niente porticina degli admin: Andrea li vuole per tutti, e la prova a due
+mani c'è già stata sul collaudo il 13 nov. Cosa cambia sul VPS: il server
+chiede a CoinGecko anche ETH, XMR e USDe, nella stessa domanda e al più una
+volta al minuto, dentro l'orologio del cambio di sempre.
+INTORNO: la leva nel pannello «⚙️ Stato delle leve» e in
+`config_esempio.py`; Tappo ha la riga «Scambi P2P pagati in ETH, Monero
+(XMR) o USDe» nei NUMERI DI OGGI (con gli occhi di chiunque, tg 0) e un
+paragrafo in `sapere.md` che vale solo se quella riga è accesa; voce in
+NOVITA (pubblico: sì).
+SCARTATO: tenere `PROVA_SOLO_IDS` in OR con la leva (una leva spenta deve
+spegnere anche il collaudo, o l'interruttore non è un interruttore); la
+coppia di leve ATTIVO/SOLO_ADMIN come USDT e CHF (non chiesta).
+PROVATO: `prove_eth_xmr` riscritta sul cancello nuovo (leva accesa a lista
+della prova vuota = la produzione: sì; leva spenta anche con la lista
+piena: no; P2P spento: no; il cancello non legge più `PROVA_SOLO_IDS`; la
+leva assente/True/False/storta eseguita dal blocco vero; pannello, numeri
+di Tappo, config d'esempio). Controprove rosse: cancello rimesso su
+`PROVA_SOLO_IDS` (3 rosse), di serie False (1), storta che apre (1).
+`collaudo_eth_xmr` sul server vero: leva di serie accesa, spenta sulla
+prova = muto, accesa a lista vuota = `p2p_coin` e i tre cambi, P2P spento =
+muto; controprova col cancello vecchio 8 rosse. Numeri di Tappo:
+`prove_assistente` col banco che conosce `p2p_coin_ammesso`;
+`conoscenza.md` rigenerato (`python assistente/conoscenza.py`).
+GIRI, sull'albero del cantiere da develop 6c3f94dc: suite severa nel venv
+del passo «Le prove» (websocket-client pillow cryptography snowballstemmer
+embit, niente httpx né coincurve) 28237 passate, 0 fallite, 2 saltate
+d'ambiente (nostr-tools, le solite del cloud); collaudi della CI nel venv
+del workflow senza coincurve e senza le variabili del proxy: 134 verdi, 0
+rossi. NON provato dal vivo su un telefono.
+DA GUARDARE. Dopo la promozione: dal telefono vero, in produzione, che
+nel foglio «Pubblica» di un ordine in euro compaiano le sette voci e che
+la cifra in ETH/XMR/USDe arrivi (la prima lettura di CoinGecko parte
+all'avvio). Restano i limiti già scritti nelle voci del 13 nov: lo stepper
+dice «Euro inviati» anche quando si paga in coin, le quattro reti EVM di
+USDe hanno indirizzi uguali, alcuni wallet Monero non mostrano la tx key.
+I franchi svizzeri non sono passati di qui (li accende il thread della
+promozione: per «tutti» servono `P2P_CHF_ATTIVO = True` e
+`P2P_CHF_SOLO_ADMIN = False` nel config del VPS; il nodo ha CHF dal 14 nov).

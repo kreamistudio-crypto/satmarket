@@ -5,15 +5,18 @@ richiesta di AndreAI: «in collaudo aggiungi nel P2P anche Ethereum e
 Monero come altre coin»).
 
 `prove.py` (`prove_eth_xmr`) prova i giudici del telefono e i pezzi puri;
-qui risponde il SERVER VERO:
-  - a lista della prova vuota (la produzione) /api/me dice `p2p_coin`
-    falso a chiunque, e /api/cambio non porta `cambio_coin`;
-  - sull'istanza di prova chi ha il P2P lo vede, e /api/cambio porta il
-    cambio di ETH e XMR dalla cache (0 finche' non c'e', mai inventato);
+qui risponde il SERVER VERO.
+IL CANCELLO E' LA LEVA `P2P_COIN_ATTIVO` (16 nov 2026, cantiere
+p2p-monete; prima era l'istanza di prova, `PROVA_SOLO_IDS` piena):
+  - con la leva spenta /api/me dice `p2p_coin` falso a chiunque, anche
+    sull'istanza di prova, e /api/cambio non porta `cambio_coin`;
+  - con la leva accesa, anche a lista della prova vuota (la produzione),
+    chi ha il P2P lo vede, e /api/cambio porta il cambio di ETH, XMR e
+    USDe dalla cache (0 finche' non c'e', mai inventato);
   - la lettura del cambio prende ETH e XMR da una risposta di CoinGecko,
     non bussa due volte nello stesso minuto, e una risposta storta non
     cancella il cambio di prima;
-  - col P2P spento, anche sulla prova, nessuno.
+  - col P2P spento, anche con la leva accesa, nessuno.
 
 NON TOCCA NIENTE DI VERO: il config finto lo installa `avvio()` del banco
 (MODALITA_COLLAUDO), i relay del coordinator sono quello morto
@@ -80,22 +83,28 @@ def main():
     S.MOSTRO_HEX = "ab" * 32
     S.PROVA_APERTA = True        # le porte della prova aperte: qui si prova il cancello
     httpx_prima = S.httpx
+    leva_prima = S.P2P_COIN_ATTIVO
     con = S.db()
     con.execute("INSERT INTO utenti(tg_id, nome, registrato) VALUES(?,?,?)",
                 (111, "Compratore", 1_700_000_000))
     con.commit()
     con.close()
     try:
-        print("\n[in produzione: la lista della prova e' vuota]")
-        S.PROVA_SOLO_IDS = set()
+        print("\n[la leva di serie]")
+        prova("P2P_COIN_ATTIVO e' accesa di serie (regola del 14 nov 2026)", True, leva_prima)
+
+        print("\n[leva spenta, anche sull'istanza di prova]")
+        S.P2P_COIN_ATTIVO = False
+        S.PROVA_SOLO_IDS = {111, 222, 999}
         banco.come(111)
         me = c.get("/api/me").json()
         prova("/api/me dice p2p_coin falso", False, me.get("p2p_coin"))
         cam = c.get("/api/cambio").json()
-        prova("/api/cambio non porta il cambio di ETH e XMR", False, "cambio_coin" in cam)
+        prova("/api/cambio non porta il cambio di ETH, XMR e USDe", False, "cambio_coin" in cam)
 
-        print("\n[sull'istanza di prova]")
-        S.PROVA_SOLO_IDS = {111, 222, 999}
+        print("\n[leva accesa, in produzione: la lista della prova e' vuota]")
+        S.P2P_COIN_ATTIVO = True
+        S.PROVA_SOLO_IDS = set()
         banco.come(111)
         prova("/api/me dice p2p_coin a chi ha il P2P", True, c.get("/api/me").json().get("p2p_coin"))
         prova("...prima della prima lettura il cambio e' 0, non inventato",
@@ -127,12 +136,13 @@ def main():
         prova("...e oltre un quarto d'ora il cambio tace", {"eth": 0.0, "xmr": 0.0, "usde": 0.0},
               c.get("/api/cambio").json().get("cambio_coin"))
 
-        print("\n[sulla prova col P2P spento]")
+        print("\n[leva accesa col P2P spento]")
         S.P2P_ATTIVO = False
         prova("/api/me dice p2p_coin falso", False, c.get("/api/me").json().get("p2p_coin"))
         prova("...e /api/cambio non lo porta", False, "cambio_coin" in c.get("/api/cambio").json())
     finally:
         S.httpx = httpx_prima
+        S.P2P_COIN_ATTIVO = leva_prima
         S.PROVA_SOLO_IDS = set()
         S.PROVA_APERTA = False
 
