@@ -59285,7 +59285,7 @@ def _dichiara_ripubblica_p2p(con, tg_id: int, mappa, adesso: int) -> int:
     """Scrive le ripubbliche dichiarate, `{ordine: {minimo, massimo}}`, e
     torna quante ne ha scritte. La porta del paracadute: SOLO sulla riga
     di chi l'ordine l'ha PUBBLICATO (`maker`), LA PRIMA RESTA, mai
-    Barattozon ne' un ordine in moneta. La valuta la dice il libro. A
+    Barattozon (in moneta si', dal 16 nov 2026). La valuta la dice il libro. A
     leva spenta non scrive; una mappa storta e' una mappa vuota."""
     if not P2P_RIPUBBLICA or not isinstance(mappa, dict):
         return 0
@@ -59298,8 +59298,9 @@ def _dichiara_ripubblica_p2p(con, tg_id: int, mappa, adesso: int) -> int:
             continue
         r = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=? AND tg_id=? "
                         "AND maker=1", (ordine, int(tg_id))).fetchone()
-        if not r or _tabacchino_libro(_metodi_lista_p2p(r[0])) \
-                or p2p_coin_ordine(con, ordine):
+        # in moneta si' dal 16 nov 2026 (cantiere ricevi-mercato): BTC si
+        # misura in euro, la valuta del filo (`_valuta_ordine_ripubblica_p2p`)
+        if not r or _tabacchino_libro(_metodi_lista_p2p(r[0])):
             continue
         scritti += con.execute(
             "INSERT OR IGNORE INTO p2p_ripubblica(ordine, tg_id, minimo, massimo, "
@@ -59376,6 +59377,14 @@ def _frase_ripubblica_p2p(r: dict) -> str:
                 f"({tra}). Parte appena apri Barattolo, non devi fare niente.")
     return (f"🔁 <b>Lo ripubblico uguale</b> appena apri Barattolo, se BTC è "
             f"ancora dentro il tuo intervallo ({tra}).")
+
+
+def _p2p_coin_frase_rip(testo: str, coin: str) -> str:
+    """PURA: `p2p_coin_frase` su un avviso, ma non sulla riga della
+    ripubblica in coda («\\n\\n🔁 ...»): li' il prezzo di BTC e' in euro anche
+    per un ordine in moneta, e «95.000 € in ETH» sarebbe una bugia."""
+    testa, sep, coda = str(testo or "").partition("\n\n🔁 ")
+    return p2p_coin_frase(testa, coin) + sep + coda
 
 
 def _riga_ripubblica_scadenza_p2p(avvisi: list, fatto: dict) -> list:
@@ -72702,7 +72711,9 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
                 # ...e con ETH, Monero o USDe (16 nov 2026, p2p-monete-ritocchi)
                 elif p2p_coin_ordine(con, ev["ordine"]):
                     _moneta = p2p_coin_ordine(con, ev["ordine"])
-                    avvisi = [(tg, p2p_coin_frase(t, _moneta)) for tg, t in avvisi]
+                    # la riga della ripubblica resta in euro: BTC in moneta
+                    # si misura in euro (16 nov 2026, ricevi-mercato)
+                    avvisi = [(tg, _p2p_coin_frase_rip(t, _moneta)) for tg, t in avvisi]
             except Exception:
                 pass
             # ...e i MODERATORI, se l'evento apre o chiude una disputa

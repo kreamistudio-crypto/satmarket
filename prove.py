@@ -68419,7 +68419,7 @@ def prove_p2p_libro():
     # take come `Payload::Order`, con la cifra dell'intervallo dentro
     prova("la cifra scelta e il metodo viaggiano col payload della presa (`payloadPresaP2P`)", True,
           "payload: payloadPresaP2P(riga, scelta, met, cauzioneSulMetodoP2P())});" in _ep
-          and "const scelta = riga.euroMax ? Math.floor(Number(scelto) || 0) : 0;" in _ep)
+          and "let scelta = riga.euroMax ? Math.floor(Number(scelto) || 0) : 0;" in _ep)
     # senza, un «Riprova» su un intervallo ripartirebbe SENZA la
     # scelta e si prenderebbe un `OutOfRangeSatsAmount` che nessuno
     # collegherebbe al gesto
@@ -70143,7 +70143,7 @@ def prove_p2p_dettaglio():
            and "const r = el('p2pDettScelto');" in cq_ and "r.focus({preventScroll: true});" in cq_,
            "eseguiPresaP2P(" in _senza_commenti_js(cq_)])
     prova("...e la presa parte dal foglio con la chiamata di sempre", True,
-          "eseguiPresaP2P(id, g ? g.euro : 0, p2pDettMetodo);" in cd
+          "eseguiPresaP2P(id, g ? g.euro : (gc ? gc.euro : 0), p2pDettMetodo);" in cd
           and "const g = o.euroMax ? quantoValeP2P(o, String(p2pDettImporto)) : null;" in cd)
     prova("...e chi torna a cambiare la cifra ritrova la sua", True,
           "esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || riga.euro))"
@@ -93282,7 +93282,7 @@ console.log(JSON.stringify(out));
     prova("«Vendi» senza i dati apre il foglio, e coi dati li rigiudica", True,
           "if (bzOrd && !bzPresa) { haptic(); apriQuantoP2P(id); return; }" in _cd
           and "valePresaBzP2P(" in _cd
-          and _cd.index("valePresaBzP2P(") < _cd.index("eseguiPresaP2P(id, g ? g.euro : 0, p2pDettMetodo);"))
+          and _cd.index("valePresaBzP2P(") < _cd.index("eseguiPresaP2P(id, g ? g.euro : (gc ? gc.euro : 0), p2pDettMetodo);"))
     prova("l'avviso del tempo alla presa tace su un ordine d'acquisto", True,
           "bzInCompraP2P(o))) return '';" in pezzo_js(mini, "function avvisoPresaTabacchinoP2P(o, adesso){", "\n}\n"))
     prova("aprendo un altro dettaglio i dati della presa ripartono da zero", True,
@@ -142998,7 +142998,7 @@ def prove_contanti_pagina_leggera():
     prova("il conto: «Totale da consegnare» col contanti, «Totale da inviare» altrimenti; lo accende la sola pagina",
           [True, True, True],
           ["r(compro ? (o.consegna ? 'Totale da consegnare' : 'Totale da inviare') : 'Ricevi', cifreEuro, 'tot euro')" in cdp,
-           "consegna: typeof pagaInContantiP2P === 'function'\n                                              && pagaInContantiP2P(o)}));" in ren,
+           "consegna: typeof pagaInContantiP2P === 'function'\n                                              && pagaInContantiP2P(o)}))\n" in ren,
            mini.count("contoDettP2P(") == 3
            and "+ contoDettP2P(Object.assign({}, o, scelto ? {euro: scelto, euroMax: 0} : {}," in fn("function renderDettaglioP2P(){")])
     prova("il CSS: la regola scura, il passo col filo verde, i numeri, il cassetto senza il triangolo di serie", [True] * 4,
@@ -143220,7 +143220,7 @@ def prove_contanti_a_mano():
           # (14 nov 2026, cantiere p2p-chf) con la valuta dell'ordine
           < cd.find("giudiceContantiP2P(g ? g.euro : o.euro, metPresa, maxEuroContantiP2P(), codPresa)")
           < cd.find("chiudiFoglioP2P('p2pDettSheet')")
-          < cd.find("eseguiPresaP2P(id, g ? g.euro : 0, p2pDettMetodo)"))
+          < cd.find("eseguiPresaP2P(id, g ? g.euro : (gc ? gc.euro : 0), p2pDettMetodo)"))
     cq = nudo(fn("function confermaQuantoP2P(){"))
     prova("...e in «Quanto» il tetto passa PRIMA che la cifra diventi quella scelta", True,
           0 < cq.find("giudiceContantiP2P(g.euro,") < cq.find("p2pDettImporto = g.euro;"))
@@ -157727,6 +157727,16 @@ console.log(JSON.stringify(out));
     exec(pezzo("p2p_coin_frase"), amb)
     exec(pezzo("p2p_coin_ordine"), amb)
     tr = amb["p2p_coin_frase"]
+    # la riga della ripubblica in coda resta in euro (16 nov 2026, ricevi-mercato)
+    exec(pezzo("_p2p_coin_frase_rip"), amb)
+    _rip = ("⏳ Il tuo ordine da 46,00 € è scaduto.\n\n🔁 <b>Lo ripubblico uguale</b>: BTC è a "
+            "95.000 €, dentro il tuo intervallo (90.000–100.000 €).")
+    _fr = amb["_p2p_coin_frase_rip"](_rip, "ETH")
+    prova("in moneta l'avviso della scadenza dice la moneta, ma la riga della ripubblica tiene BTC in "
+          "euro; senza la riga e' il traduttore di sempre",
+          [True, True, tr("Hai inviato 50,00 €.", "ETH")],
+          ["46,00 € in ETH" in _fr, _fr.endswith("95.000 €, dentro il tuo intervallo (90.000–100.000 €)."),
+           amb["_p2p_coin_frase_rip"]("Hai inviato 50,00 €.", "ETH")])
     famiglie = []
     for nome in ("SOLLECITO_EURO_TESTI", "SOLLECITO_RILASCIO_TESTI", "SOLLECITO_RECAPITO_TESTI"):
         j = src.index(nome + " = {")
@@ -157769,7 +157779,7 @@ console.log(JSON.stringify(out));
     prova("il traduttore e' chiamato dove gli avvisi partono: eventi del coordinatore, "
           "recapito, attese e solleciti, garanzia lunga",
           (1, 1, 1, 1),
-          (src.count("avvisi = [(tg, p2p_coin_frase(t, _moneta)) for tg, t in avvisi]"),
+          (src.count("avvisi = [(tg, _p2p_coin_frase_rip(t, _moneta)) for tg, t in avvisi]"),
            src.count('testo = p2p_coin_frase(testo, p2p_coin_ordine(con, (d or {}).get("ordine")))'),
            src.count("            testo = p2p_coin_frase(testo, _moneta)\n"),
            src.count("testo_g = p2p_coin_frase(testo_g, _moneta)")))
@@ -160715,14 +160725,42 @@ const f1 = ordineDaCampiP2P(campi(), 'vendo');
 const f2 = ordineDaCampiP2P(campi({fisso: true, sats: '50000'}), 'compro');
 const f3 = ordineDaCampiP2P(campi({valuta: 'USDE', euro: '50', metodi: ['USDe (Ethereum)', 'USDe (Base)'], premio: 0,
   cambioCoin: 0.86}), 'vendo');
-out.filo = [f1, f2.amount, f2.kind, f2.premium, f3.fiat_code, f3.fiat_amount, f3.amount, f3.payment_method];
-const pubblicata = vestiCoinOrdineP2P({lato: 'vendo', fiat: f1.fiat_code, euro: f1.fiat_amount, euroMax: 0,
-  sats: f1.amount, metodi: f1.payment_method.split(',')});
+out.filo = [f1, f2.amount, f2.kind, f2.premium, f2.min_amount, f2.fiat_amount, f3.fiat_code, f3.min_amount,
+  f3.max_amount, f3.amount, f3.payment_method];
+const pubblicata = vestiCoinOrdineP2P({lato: 'vendo', fiat: f1.fiat_code, euro: f1.min_amount,
+  euroMax: f1.max_amount, sats: f1.amount, premium: f1.premium, metodi: f1.payment_method.split(',')});
 const rif = ordineDaRigaP2P(pubblicata);
-out.giro = [rif.payment_method === f1.payment_method, rif.amount === f1.amount, rif.fiat_amount === f1.fiat_amount,
-  rif.premium, rif.min_amount];
-// senza cambio della moneta il «Riprova» tiene il controvalore della riga
-cambioCoinP2P.eth = 0; out.giroMuto = ordineDaRigaP2P(pubblicata).fiat_amount; cambioCoinP2P.eth = 3000;
+out.giro = [rif.payment_method === f1.payment_method, rif.amount === f1.amount, rif.min_amount === f1.min_amount,
+  rif.max_amount === f1.max_amount, rif.premium, pubblicata.coinMercato === true, pubblicata.euroMax,
+  pubblicata.euroNodo, pubblicata.euroNodoMax, pubblicata.euro];
+// a prezzo fisso il «Riprova» rifa' gli stessi byte; senza cambio della
+// moneta tiene il controvalore della riga e i sats scritti
+const fissa = vestiCoinOrdineP2P({lato: 'compro', fiat: f2.fiat_code, euro: f2.fiat_amount, euroMax: 0,
+  sats: f2.amount, metodi: f2.payment_method.split(',')});
+const rif2 = ordineDaRigaP2P(fissa);
+cambioCoinP2P.eth = 0;
+const muta = ordineDaRigaP2P(fissa), mutaMercato = ordineDaRigaP2P(pubblicata);
+cambioCoinP2P.eth = 3000;
+out.giroMuto = [rif2.amount, rif2.fiat_amount, rif2.min_amount, muta.amount, muta.fiat_amount,
+  mutaMercato.amount, mutaMercato.max_amount];
+// L'INTERVALLO DEL MERCATO (16 nov 2026, ricevi-mercato): la fascia ±30%,
+// il tetto in euro, i tetti del nodo col premio, il massimo sotto il doppio
+// del minimo; dove non ci sta, null (e allora i sats fissi)
+out.fascia = [intervalloCoinP2P(45.9, 0, 0.001, 0, 0, 2), intervalloCoinP2P(45.9, 50, 0.001, 0, 0, 0),
+  intervalloCoinP2P(45.9, 40, 0.001, 0, 0, 0), intervalloCoinP2P(100, 0, 0.001, 0, 120000, 0),
+  intervalloCoinP2P(100, 0, 0.001, 80000, 0, 0), intervalloCoinP2P(3, 0, 0.001, 0, 0, 0),
+  intervalloCoinP2P(1, 0, 0.001, 0, 0, 0), intervalloCoinP2P(0.4, 0, 0.001, 0, 0, 0)];
+const ripiego = ordineDaCampiP2P(campi({euro: '0,0002', cambioCoin: 3000}), 'vendo');   // 0,6 €
+out.ripiego = [ripiego.min_amount, ripiego.fiat_amount, ripiego.premium, ripiego.amount > 0];
+// CHI PRENDE: la cifra al cambio di adesso, dentro la fascia
+const sc = (q, c) => { const r = sceltaCoinMercatoP2P(Object.assign({}, pubblicata, {euro: q}), c);
+  return r.ok ? r.euro : r.dillo; };
+out.scelta = [sc(0.0153, 3000), sc(0.0153, 3500), sc(0.0153, 1500), sc(0.0153, 0), sceltaCoinMercatoP2P(pubblicata).euro];
+// CHI HA PUBBLICATO guarda la cifra di chi ha preso: oltre il 5% lo dice
+const presa = n => Object.assign({}, pubblicata, {mio: true, euroNodo: n, euroNodoMax: 0});
+out.scarto = [avvisoCambioCoinP2P(presa(46)), avvisoCambioCoinP2P(presa(48)), avvisoCambioCoinP2P(presa(55)),
+  avvisoCambioCoinP2P(presa(40)), avvisoCambioCoinP2P(Object.assign(presa(55), {mio: false})),
+  avvisoCambioCoinP2P(pubblicata), avvisoCambioCoinP2P(presa(55), 0)];
 // 4) il giudice
 const g = x => valeNuovoOrdineP2P(Object.assign({valuta: 'ETH', euro: '0,0153', euroMax: '', metodi: ['ETH (Ethereum)'],
   premio: 0, fisso: false, sats: '', cambio: 0.001, cambioCoin: 3000, maxEuro: tettoInValutaP2P(250, 'ETH'),
@@ -160783,16 +160821,38 @@ console.log(JSON.stringify(out));
     prova("la riga vestita parla la sua moneta: valuta ETH, «0,0153», «50,00», il metro in ETH per sat, «USDe»",
           ["ETH", "0,0153", "50,00", round(0.001 / 3000, 12), "USDe"], o["valuta"])
     f1 = o["filo"][0]
-    prova("IL FILO: EUR col controvalore intero (0,0153 × 3000 = 45,9 → 46), sats fissi col premio cotto "
-          "(45,9 € / 0,001 × 0,98), premio 0, niente intervallo, la cifra nel metodo",
-          {"kind": "sell", "status": "pending", "amount": 44982, "fiat_code": "EUR", "min_amount": None,
-           "max_amount": None, "fiat_amount": 46, "payment_method": "ETH (Ethereum) 0.0153",
-           "premium": 0, "created_at": 0}, f1)
-    prova("...a prezzo fisso i sats scritti (in compra), e in USDe la cifra su ogni rete",
-          [50000, "buy", 0, "EUR", 43, 43000, "USDe (Ethereum) 50,USDe (Base) 50"], o["filo"][1:])
-    prova("il «Riprova» rifa' lo stesso ordine dalla riga vestita, byte per byte, e senza cambio della "
-          "moneta tiene il controvalore della riga", [True, True, True, 0, None, 46],
-          o["giro"] + [o["giroMuto"]])
+    prova("IL FILO A MERCATO (16 nov 2026, ricevi-mercato: «la funzione deve essere identica a euro»): "
+          "EUR a INTERVALLO attorno al controvalore (45,9 € → 32–60), amount 0, il premio sul filo, "
+          "la cifra nel metodo",
+          {"kind": "sell", "status": "pending", "amount": 0, "fiat_code": "EUR", "min_amount": 32,
+           "max_amount": 60, "fiat_amount": 0, "payment_method": "ETH (Ethereum) 0.0153",
+           "premium": 2, "created_at": 0}, f1)
+    prova("...a prezzo fisso i sats scritti (in compra) col controvalore intero e niente intervallo; in "
+          "USDe a mercato la fascia di 43 € (30–56) e la cifra su ogni rete",
+          [50000, "buy", 0, None, 46, "EUR", 30, 56, 0, "USDe (Ethereum) 50,USDe (Base) 50"], o["filo"][1:])
+    prova("il «Riprova» rifa' lo stesso intervallo dalla riga vestita col cambio di adesso; la riga e' "
+          "«a mercato», un importo solo in ETH, coi capi del filo da parte",
+          [True, True, True, True, 2, True, 0, 32, 60, 0.0153], o["giro"])
+    prova("...a prezzo fisso gli stessi sats e controvalore; senza cambio della moneta i sats scritti col "
+          "controvalore della riga, e a mercato NIENTE (ne' sats ne' intervallo: il «Riprova» si ferma)",
+          [50000, 46, None, 50000, 46, 0, None], o["giroMuto"])
+    prova("LA FASCIA ±30%: 32–60; col tetto di 50 € 32–50; un tetto sotto il controvalore → null; i tetti "
+          "del nodo in sats (120 000 → max 120, 80 000 → min 80 e il max sotto il doppio); 3 € → 2–3; "
+          "1 € e 0,4 € → null",
+          [{"min": 32, "max": 60}, {"min": 32, "max": 50}, None, {"min": 70, "max": 120},
+           {"min": 80, "max": 130}, {"min": 2, "max": 3}, None, None], o["fascia"])
+    prova("...dove la fascia non ci sta (0,0002 ETH = 0,6 €) l'ordine parte come a prezzo fisso: sats "
+          "fatti adesso, controvalore 1, premio 0", [None, 1, 0, True], o["ripiego"])
+    prova("CHI PRENDE manda l'euro intero al cambio di adesso (0,0153 × 3000 = 46, × 3500 = 54); fuori "
+          "dalla fascia o senza cambio non si prende",
+          [46, 54, "Il prezzo di ETH si è mosso troppo da quando l'ordine è nato: per adesso non si può prendere",
+           "Aspetta un attimo: sto leggendo il cambio di ETH", 46], o["scelta"])
+    sc = o["scarto"]
+    prova("CHI HA PUBBLICATO vede la cifra di chi ha preso solo oltre il 5% (46 e 48 no, 55 +20%, 40 −13%); "
+          "mai a chi ha preso, mai prima della presa, mai senza cambio",
+          ["", "", True, True, "", "", ""],
+          [sc[0], sc[1], "55 € per 0,0153 ETH" in sc[2] and "(+20%)" in sc[2], "(−13%)" in sc[3],
+           sc[4], sc[5], sc[6]])
     prova("IL GIUDICE: buono; poi ogni frase col suo campo — vuoto, sei decimali (due in USDe), niente "
           "massimo, cambio della moneta o dei sats che manca, il tetto in ETH, on-chain una rete sola, "
           "le reti, i sats; e on-chain con una rete va",
@@ -160819,6 +160879,28 @@ console.log(JSON.stringify(out));
     prova("la cifra da mandare: in un ordine in moneta quella dell'ordine; in uno in euro al cambio, in su; "
           "il post dice le reti in breve",
           ["0.0153", "0.010000", "ETH (Ethereum)", "USDe su Ethereum, Base"], o["manda"])
+    # LE STRADE DEL MERCATO (16 nov 2026, ricevi-mercato), lette sul sorgente:
+    # il lettore veste anche l'intervallo, la presa rifa' la cifra al cambio
+    # di adesso, la risposta del nodo non sveste la moneta, chi ha pubblicato
+    # vede lo scarto, la ripubblica rifa' l'ordine in moneta e il «Riprova»
+    # senza cambio si ferma
+    ev = _fn_js(mini, "function ordineDaEvento(ev, adesso){")
+    ep = _fn_js(mini, "async function eseguiPresaP2P(id, scelto, metodo){")
+    cd = _fn_js(mini, "function confermaDettaglioP2P(){")
+    ps = _fn_js(mini, "async function pubblicaDaSoloP2P(o){")
+    rp = _fn_js(mini, "async function riprovaPubblicazioneP2P(){")
+    rn = _fn_js(mini, "function renderOrdineP2P(){")
+    prova("le strade del mercato in moneta: lettore, presa, risposta del nodo, scarto, ripubblica, Riprova",
+          [True] * 9,
+          ["(fa.length === 1 && typeof vestiCoinOrdineP2P" not in ev and "vestiCoinOrdineP2P(o)" in ev,
+           "sceltaCoinMercatoP2P(riga)" in ep and "euro: riga.coinMercato ? riga.euro" in ep,
+           "sceltaCoinMercatoP2P(o)" in cd and "gc ? gc.euro : 0" in cd,
+           "o.euro = cc ? cc.quanto : quantoCoin;" in mini and "o.euroNodo = Number(ord.fiat_amount)" in mini,
+           "avvisoCambioCoinP2P(o)" in rn,
+           "return false;\n  if (!valeNuovoOrdineP2P" not in ps and "valutaCoinP2P(campi.valuta)) return false" not in ps,
+           "vestiCoinOrdineP2P(ord)" in ps and "cambioCoin: campi.cambioCoin || 0" in ps,
+           "Sto ancora leggendo il cambio di" in rp,
+           "minSats: campi.minSats, maxSats: campi.maxSats}, lato);" in mini])
 
     # --- il server ---
     amb = {"P2P_COIN_METODI": {"ETH (Ethereum)": "ETH", "XMR (Monero)": "XMR", "USDe (Ethereum)": "USDe",
@@ -160879,8 +160961,21 @@ console.log(JSON.stringify(out));
           (r.get("vesti") or [0, 0, 0])[2])
     r = rotto("amount: v.fisso ? interoP2P(v.sats).n : satsCoinP2P(q, Number(v.cambioCoin), v.cambio, v.premio),",
               "amount: v.fisso ? interoP2P(v.sats).n : satsCoinP2P(q, Number(v.cambioCoin), v.cambio, 0),", "fns")
-    prova("controprova: senza il premio cotto i sats sarebbero quelli pieni (45 900)", 45900,
-          ((r.get("filo") or [{}])[0] or {}).get("amount"))
+    prova("controprova: dove la fascia non ci sta, senza il premio cotto i sats sarebbero quelli pieni "
+          "(0,6 € → 600 invece di 588)", 600,
+          (lambda f: f.get("amount") if isinstance(f, dict) else None)(
+              _node_banco(banco(blocco, fns.replace(
+                  "amount: v.fisso ? interoP2P(v.sats).n : satsCoinP2P(q, Number(v.cambioCoin), v.cambio, v.premio),",
+                  "amount: v.fisso ? interoP2P(v.sats).n : satsCoinP2P(q, Number(v.cambioCoin), v.cambio, 0),")
+              ).replace("console.log(JSON.stringify(out));",
+                        "console.log(JSON.stringify({amount: ripiego.amount}));")) or {}))
+    r = rotto("    premium: Math.round(Number(v.premio) || 0),\n    created_at: 0\n  };\n  return {",
+              "    premium: 0,\n    created_at: 0\n  };\n  return {", "fns")
+    prova("controprova: senza il premio sul filo l'intervallo partirebbe al cambio pieno", 0,
+          ((r.get("filo") or [{}])[0] or {}).get("premium"))
+    r = rotto("  max = Math.min(max, 2 * min - 1);\n", "")
+    prova("controprova: senza il massimo sotto il doppio del minimo, 3 € farebbero 2–4 (e il nodo "
+          "spezzerebbe l'ordine)", {"min": 2, "max": 4}, (r.get("fascia") or [0] * 6)[5])
     r = rotto("return e > 0 ? Math.max(1 / k, Math.floor(t / e * k) / k) : 1;",
               "return e > 0 ? Math.max(1, Math.floor(t / e)) : 1;")
     prova("controprova: col tetto intero di ieri 250 € in ETH farebbero «1 ETH», cioe' 3000 €", 1,
@@ -182171,9 +182266,10 @@ def prove_ripubblica_p2p():
                         E: {"minimo": 5, "massimo": 1}, F: iv1, "storto": iv1}, ORA)
     righe = {r[0]: (r[1], r[2], r[3], r[4]) for r in con.execute(
         "SELECT ordine, minimo, massimo, valuta, stato FROM p2p_ripubblica")}
-    prova("la dichiarazione: solo da chi l'ha PUBBLICATO, mai Barattozon ne' in moneta, mai "
-          "un intervallo storto; la valuta la dice il libro (franchi)",
-          [2, {A: (90000, 100000, "eur", "armato"), D: (80000, 90000, "chf", "armato")}], [n, righe])
+    prova("la dichiarazione: solo da chi l'ha PUBBLICATO, mai Barattozon, mai un intervallo storto; "
+          "la valuta la dice il libro (franchi); IN MONETA SI' dal 16 nov 2026 (ricevi-mercato), in euro",
+          [3, {A: (90000, 100000, "eur", "armato"), D: (80000, 90000, "chf", "armato"),
+               F: (90000, 100000, "eur", "armato")}], [n, righe])
     prova("...e LA PRIMA RESTA: una seconda dichiarazione non sposta i capi", [0, (90000, 100000)],
           [dich(con, 111, {A: {"minimo": 1, "massimo": 2}}, ORA),
            tuple(con.execute("SELECT minimo, massimo FROM p2p_ripubblica WHERE ordine=?", (A,)).fetchone())])
@@ -182259,7 +182355,7 @@ def prove_ripubblica_p2p():
     con.execute("INSERT INTO p2p_ripubblica(ordine, tg_id, minimo, massimo, creato) "
                 "VALUES(?,?,?,?,?)", (B, 111, 1, 2, ORA))
     prova("togli su un armato", {"ok": True, "stato": "tolto"}, g(B, "togli"))
-    prova("le mie per la card: niente fatti ne' tolti", sorted([D, E]),
+    prova("le mie per la card: niente fatti ne' tolti", sorted([D, E, F]),
           sorted(amb["_miei_ripubblica_p2p"](con, 111)))
 
     # --- 3) L'ON-CHAIN: la ronda rimette nel libro ------------------------
@@ -182395,7 +182491,9 @@ c.sezione = [sez.split('§')[0], (sez.match(/<input/g) || []).length, sez.indexO
 const conTab = sezioneRipubblicaNuovoP2P(true);
 VALUTA_FOGLIO = 'ETH'; const inMoneta = sezioneRipubblicaNuovoP2P(false); VALUTA_FOGLIO = 'EUR';
 LEVE = {ripubblica: false}; const spenta = sezioneRipubblicaNuovoP2P(false); LEVE = {ripubblica: true};
-c.fuori = [conTab, inMoneta, spenta];
+/* in moneta si' dal 16 nov 2026 (ricevi-mercato), e BTC si misura in euro */
+c.fuori = [conTab, inMoneta.indexOf('🔁 Ripubblica') === 0 && inMoneta.indexOf('>€<') > 0
+  && inMoneta.indexOf('BTC adesso: 95.000 €') > 0, spenta];
 c.daCampi = [ripubblicaDaCampiP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '90000', ripMax: '100000'}),
              ripubblicaDaCampiP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '', ripMax: ''}),
              ripubblicaDaCampiP2P({metodi: ['Contanti al tabacchino'], valuta: 'EUR', ripMin: '1', ripMax: '2'}),
@@ -182463,8 +182561,9 @@ console.log(JSON.stringify(c));
            "⚠️ Scrivi tutti e due i prezzi di BTC, il minimo e il massimo, o lasciali vuoti.",
            "Alla scadenza, se BTC è fra 80.000 e 90.000 CHF, l'ordine si ripubblica uguale, ogni "
            "volta che scade. Parte appena apri Barattolo. BTC adesso: 88.000 CHF."], c.get("frasi"))
-    prova("la sezione: «🔁 Ripubblica», due campi e il simbolo; mai con Barattozon, in moneta "
-          "o a leva spenta", [["🔁 Ripubblica", 2, True], ["", "", ""]],
+    prova("la sezione: «🔁 Ripubblica», due campi e il simbolo; mai con Barattozon o a leva spenta; "
+          "in moneta SI' (16 nov 2026, ricevi-mercato), coi prezzi di BTC in euro",
+          [["🔁 Ripubblica", 2, True], ["", True, ""]],
           [c.get("sezione"), c.get("fuori")])
     prova("dai campi all'ordine: solo un intervallo buono, mai Barattozon; l'errore si dice",
           [{"minimo": 90000, "massimo": 100000}, None, None, None,

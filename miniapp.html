@@ -3841,6 +3841,8 @@
      card (il patto di `.acq-art .qta-mini`), e segue il tema. */
   .p2p-box{margin-top:8px;background:var(--chip-bg);border-radius:10px;
     padding:8px 10px;font-size:12.5px;color:var(--muted);font-weight:600}
+  /* il cambio della moneta che non torna (16 nov 2026, ricevi-mercato) */
+  .p2p-box.p2p-avviso-coin{color:var(--ink);border:1.5px solid var(--sats)}
   /* IL CONTANTI DI PERSONA (30 set 2026): il riquadro nella pagina dello
      scambio — la regola, i consigli, «📍 Sono qui» (1 ott 2026, al posto
      del QR). I paragrafi respirano poco, i gesti hanno l'area di tocco
@@ -67998,8 +68000,9 @@ function ordineDaEvento(ev, adesso){
   const esatto = euroTabacchinoP2P(metodi);
   /* ...e UN ORDINE IN MONETA (16 nov 2026, cantiere p2p-monete-valute)
      porta la sua cifra dentro i metodi: la riga si veste da ETH, XMR o
-     USDe (`vestiCoinOrdineP2P`). Solo a importo unico: e' un prezzo fisso */
-  const vesti = (o) => (fa.length === 1 && typeof vestiCoinOrdineP2P === 'function') ? vestiCoinOrdineP2P(o) : o;
+     USDe (`vestiCoinOrdineP2P`): a importo unico e' un prezzo fisso, a
+     intervallo e' il mercato (16 nov 2026, cantiere ricevi-mercato) */
+  const vesti = (o) => (typeof vestiCoinOrdineP2P === 'function') ? vestiCoinOrdineP2P(o) : o;
   return vesti({
     id: String(id), lato,
     stato: String(tagValore(ev, 's') || ''),
@@ -75243,11 +75246,24 @@ function avanzaOrdineP2P(ordine, azione, payload){
        sceglie, e quella la dice il coordinatore col `fiat_amount`
        della sua risposta. Senza questa riga la pagina dello scambio
        continuerebbe a mostrare «20–100 €» su uno scambio che vale 30. */
+    const quantoCoin = (typeof valutaCoinP2P === 'function' && valutaCoinP2P(o.fiat)) ? o.euro : null;
     if (Number(ord.fiat_amount) > 0) { o.euro = Number(ord.fiat_amount); o.euroMax = 0; }
     const pm = ord.payment_method;
     if (Array.isArray(pm)) o.metodi = pm.map(String).filter(Boolean);
     else if (typeof pm === 'string' && pm.trim())
       o.metodi = pm.split(',').map(s => s.trim()).filter(Boolean);
+    /* ⚠️ IN MONETA LA RIGA RESTA NELLA MONETA (16 nov 2026, ricevi-mercato):
+       il `fiat_amount` del nodo e' il controvalore in euro, e i metodi
+       tornano con la cifra dentro. Senza queste righe uno scambio da
+       0,0153 ETH si leggeva «46 ETH». Il controvalore va in `euroNodo`
+       (e' quel che guarda `avvisoCambioCoinP2P`), la cifra torna dai
+       metodi — o resta quella di prima — e i metodi tornano nudi */
+    if (quantoCoin !== null) {
+      if (Number(ord.fiat_amount) > 0) { o.euroNodo = Number(ord.fiat_amount); o.euroNodoMax = 0; }
+      const cc = ordineCoinDaPmP2P(o.metodi || []);
+      o.euro = cc ? cc.quanto : quantoCoin;
+      o.metodi = cc ? cc.metodi : (o.metodi || []).map(m => { const x = pmCoinP2P(m); return x ? x.metodo : m; });
+    }
     /* i centesimi del tabacchino tornano dal `pm` (22 set 2026), con la
        stessa regola del lettore del libro: solo se combaciano — per
        difetto o per eccesso (30 set 2026, `combaciaEsattoP2P`) */
@@ -78641,6 +78657,10 @@ function confermaDettaglioP2P(){
      il metodo puo' essere cambiato DOPO la scelta */
   const g = o.euroMax ? quantoValeP2P(o, String(p2pDettImporto)) : null;
   if (g && !g.ok) { toast(g.dillo); p2pDettImporto = 0; renderDettaglioP2P(); return; }
+  /* IN MONETA A MERCATO (16 nov 2026, ricevi-mercato) la cifra in euro la
+     fa il cambio di adesso, e fuori dalla fascia non si parte */
+  const gc = o.coinMercato && typeof sceltaCoinMercatoP2P === 'function' ? sceltaCoinMercatoP2P(o) : null;
+  if (gc && !gc.ok) { toast(gc.dillo, 6000); return; }
   /* in franchi il tetto tradotto e il suo segno (14 nov 2026, p2p-chf) */
   const codPresa = typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : 'EUR';
   const troppo = giudiceContantiP2P(g ? g.euro : o.euro, metPresa, maxEuroContantiP2P(), codPresa);
@@ -78655,7 +78675,7 @@ function confermaDettaglioP2P(){
      Mostro: su un intervallo `(id, euro scelti, metodo)` — e' quella
      che fino al 7 ott 2026 partiva da `confermaQuantoP2P` —, sugli
      altri `(id, 0, metodo)`. */
-  eseguiPresaP2P(id, g ? g.euro : 0, p2pDettMetodo);
+  eseguiPresaP2P(id, g ? g.euro : (gc ? gc.euro : 0), p2pDettMetodo);
 }
 
 /* ---- prendere un ordine del libro ---- */
@@ -78748,7 +78768,15 @@ async function eseguiPresaP2P(id, scelto, metodo){
      prenderebbe un `OutOfRangeSatsAmount` che nessuno capirebbe.
      `euroMax` a zero: questa riga non e' piu' un intervallo, e' lo
      scambio che ne e' nato. */
-  const scelta = riga.euroMax ? Math.floor(Number(scelto) || 0) : 0;
+  let scelta = riga.euroMax ? Math.floor(Number(scelto) || 0) : 0;
+  /* IN MONETA A MERCATO (16 nov 2026, ricevi-mercato) la scelta si rifa'
+     QUI col cambio di adesso, da qualunque strada si arrivi: e' la cifra in
+     euro che il nodo trasforma in sats, e la riga resta nella moneta */
+  if (riga.coinMercato) {
+    const gc = sceltaCoinMercatoP2P(riga);
+    if (!gc.ok) { toast(gc.dillo, 6000); return; }
+    scelta = gc.euro;
+  }
   /* IL METODO SCELTO SI SCRIVE SULLA RIGA, e si valida contro quelli
      dell'ordine: qui arriva dal dettaglio, ma un metodo fuori
      dall'elenco non e' una scelta — e' un errore, e vale come
@@ -78757,7 +78785,7 @@ async function eseguiPresaP2P(id, scelto, metodo){
   let rip = null;
   let ord = {
     id: id, lato: riga.lato === 'sell' ? 'compro' : 'vendo', indice: 0, pubTrade: '',
-    stato: 'prendo', euro: scelta || riga.euro, euroMax: 0, importoScelto: scelta,
+    stato: 'prendo', euro: riga.coinMercato ? riga.euro : (scelta || riga.euro), euroMax: 0, importoScelto: scelta,
     sats: riga.sats, satsNetti: 0, metodoScelto: met,
     metodi: (riga.metodi || []).slice(), premium: riga.premium || 0, peer: '',
     /* la valuta della riga viaggia con lo scambio (gli USDT, 1 nov 2026):
@@ -78766,6 +78794,10 @@ async function eseguiPresaP2P(id, scelto, metodo){
     hold: null, contattato: false, cantDo: '', errore: '', votabile: false,
     creato: adesso, aggiornato: adesso
   };
+  /* in moneta il controvalore del filo viaggia con lo scambio */
+  if (typeof valutaCoinP2P === 'function' && valutaCoinP2P(riga.fiat))
+    ord.euroNodo = scelta || Number(riga.euroNodo) || 0;
+  if (riga.coinMercato) ord.coinMercato = true;
   /* BARATTOZON IN COMPRA (31 ott 2026): chi vende prendendo ha scritto
      il SUO PayCode — sta sulla riga come quello di chi pubblica, gia'
      composto, e parte da solo verso chi compra appena si sa chi e'
@@ -78908,6 +78940,13 @@ async function riprovaPubblicazioneP2P(){
     const NT = window.NostrTools;
     const reput = !!(NT && NT.schnorr) && (o.indice | 0) > 0;
     const ordine = ordineDaRigaP2P(o);
+    /* IN MONETA SENZA IL SUO CAMBIO non parte niente (16 nov 2026,
+       ricevi-mercato): ne' i sats fissi ne' l'intervallo si sanno fare, e
+       un ordine in euro a mercato con la cifra della moneta nel metodo
+       sarebbe un'altra cosa */
+    const vcR = typeof coinP2P === 'function' ? coinP2P(o) : null;
+    if (vcR && !(ordine.amount > 0) && !(ordine.max_amount > 0))
+      throw new Error('Sto ancora leggendo il cambio di ' + vcR.segno + ': riprova fra un attimo');
     /* BARATTOZON RIFA' I SATS AL CAMBIO DI ADESSO (26 set 2026): e' un
        ordine nuovo, e la riga prende i sats e il cambio con cui partono
        — o il premio si rileggerebbe dai sats vecchi col metro nuovo */
@@ -79946,7 +79985,10 @@ function renderOrdineP2P(){
                                             /* (19 ott 2026) la cifra da pagare si tocca */
                                             toccaImporto: o.lato === 'compro',
                                             consegna: typeof pagaInContantiP2P === 'function'
-                                              && pagaInContantiP2P(o)}));
+                                              && pagaInContantiP2P(o)}))
+    /* in moneta a mercato, il cambio di chi ha preso guardato col mio
+       (16 nov 2026, ricevi-mercato): '' quasi sempre */
+    + (typeof avvisoCambioCoinP2P === 'function' ? avvisoCambioCoinP2P(o) : '');
   const azione = azioniDisponibili(o);
   /* chi vende e riapre l'app a scambio attivo: se l'avviso del
      recapito non era partito, parte adesso (le condizioni le guarda
@@ -83131,12 +83173,20 @@ function ordineCoinDaPmP2P(metodi){
 /* LA RIGA SI VESTE DELLA SUA MONETA una volta sola, dove entra (il
    libro, l'archivio del server, l'adozione): `fiat` la moneta, `euro`
    la cifra nella moneta, i metodi coi nomi nudi, e il controvalore del
-   filo in `euroNodo`. Su una riga gia' vestita, o non in moneta, niente */
+   filo in `euroNodo`. Su una riga gia' vestita, o non in moneta, niente.
+   A MERCATO (16 nov 2026, cantiere ricevi-mercato) sul filo c'e' un
+   INTERVALLO in euro attorno al controvalore (`intervalloCoinP2P`): i
+   due capi restano in `euroNodo`/`euroNodoMax` e la riga diventa
+   `coinMercato` — per chi guarda e' un importo solo, nella moneta, al
+   prezzo di mercato col premio; la cifra in euro la fa chi prende al
+   cambio di quel momento (`sceltaCoinMercatoP2P`) */
 function vestiCoinOrdineP2P(o){
   if (!o || valutaCoinP2P(o.fiat)) return o;
   const c = ordineCoinDaPmP2P(o.metodi);
   if (!c) return o;
   o.euroNodo = Number(o.euro) || 0;
+  const capo = Number(o.euroMax) || 0;
+  if (capo > o.euroNodo) { o.euroNodoMax = capo; o.coinMercato = true; }
   o.fiat = c.cod;
   o.euro = c.quanto;
   o.euroMax = 0;
@@ -83167,6 +83217,75 @@ function eurPerValutaCoinP2P(cod){
 function euroDaCoinP2P(quanto, cod){
   const c = eurPerValutaCoinP2P(cod);
   return c > 0 && Number(quanto) > 0 ? Number(quanto) * c : 0;
+}
+/* IN MONETA A PREZZO DI MERCATO (16 nov 2026, cantiere ricevi-mercato,
+   Andrea: «deve essere anche lì a prezzo di mercato… la funzione deve
+   essere identica a euro», e la scelta «Esatto, con l'intervallo»). Il
+   nodo non conosce il prezzo di ETH, XMR o USDe, quindi la moneta resta
+   nei metodi e sul filo va un INTERVALLO IN EURO attorno al controvalore
+   di adesso, `amount` 0 e il premio: chi prende manda la cifra in euro
+   al cambio del SUO momento (`sceltaCoinMercatoP2P`), e il nodo fa i
+   sats su quella col premio — come un ordine in euro a mercato.
+   LA FASCIA E' ±30%: piu' stretta, una moneta che si muove in sette
+   giorni lascerebbe l'ordine impossibile da prendere; il furbo che manda
+   un cambio gonfiato dentro la fascia lo vede chi ha pubblicato
+   (`avvisoCambioCoinP2P`), e la disputa c'e'. Il MASSIMO sta sotto il
+   doppio del minimo: il nodo, preso un pezzo, rimette nel libro il resto
+   se resta almeno il minimo, e un ordine in moneta non si spezza mai.
+   Il limite: la cifra sul filo e' l'euro INTERO, quindi i sats si fanno
+   sull'intero piu' vicino al controvalore (pochi centesimi). */
+const P2P_COIN_FASCIA = 0.3;
+/* PURA: {min, max} in euro interi, o null (allora l'ordine parte coi
+   sats fissi, come a prezzo fisso): i capi della fascia, il tetto di
+   Barattolo in euro e quelli del nodo in sats (col premio), e il massimo
+   sotto il doppio del minimo; dentro deve starci il controvalore intero */
+function intervalloCoinP2P(eur, tettoEur, cambio, minSats, maxSats, premio){
+  const e = Number(eur) || 0, c = Math.round(e);
+  if (!(c >= 1)) return null;
+  let min = Math.max(1, Math.floor(e * (1 - P2P_COIN_FASCIA)));
+  let max = Math.ceil(e * (1 + P2P_COIN_FASCIA));
+  if (Number(tettoEur) > 0) max = Math.min(max, Math.floor(Number(tettoEur)));
+  const k = 1 - Math.round(Number(premio) || 0) / 100;
+  if (cambio > 0 && k > 0 && maxSats > 0) max = Math.min(max, Math.floor(maxSats * cambio / k));
+  if (cambio > 0 && k > 0 && minSats > 0) min = Math.max(min, Math.ceil(minSats * cambio / k));
+  max = Math.min(max, 2 * min - 1);
+  return (min < max && min <= c && c <= max) ? {min: min, max: max} : null;
+}
+/* PURA sul cambio che le si da' (o quello di adesso): la cifra in euro
+   che chi prende manda per un ordine in moneta a mercato → {ok, euro,
+   dillo}. Fuori dalla fascia non si prende: la moneta si e' mossa troppo
+   da quando l'ordine e' nato (alla scadenza la ripubblica lo rifa' col
+   cambio nuovo) */
+function sceltaCoinMercatoP2P(o, eurPerUno){
+  const vc = coinP2P(o);
+  const c = eurPerUno !== undefined ? (Number(eurPerUno) || 0) : (vc ? eurPerValutaCoinP2P(vc.cod) : 0);
+  if (!vc || !(c > 0))
+    return {ok: false, euro: 0, dillo: 'Aspetta un attimo: sto leggendo il cambio di ' + (vc ? vc.segno : 'questa moneta')};
+  const euro = Math.round((Number(o.euro) || 0) * c);
+  const min = Number(o.euroNodo) || 0, max = Number(o.euroNodoMax) || 0;
+  if (!(euro >= min && euro <= max))
+    return {ok: false, euro: euro, dillo: 'Il prezzo di ' + vc.segno
+      + ' si è mosso troppo da quando l\'ordine è nato: per adesso non si può prendere'};
+  return {ok: true, euro: euro, dillo: ''};
+}
+/* LA CIFRA DI CHI HA PRESO, GUARDATA DA CHI HA PUBBLICATO: su un ordine in
+   moneta a mercato il cambio lo ha messo il telefono dell'altro. Se dice
+   piu' del 5% di scarto dal mio, la pagina del mio scambio lo dice prima
+   di ogni gesto. '' = niente da dire (o niente cambio da confrontare) */
+const P2P_COIN_SCARTO = 0.05;
+function avvisoCambioCoinP2P(o, eurPerUno){
+  const vc = o && o.coinMercato && o.mio ? coinP2P(o) : null;
+  const nodo = Number(o && o.euroNodo) || 0;
+  if (!vc || !(nodo > 0) || Number(o.euroNodoMax) > 0) return '';
+  const c = eurPerUno !== undefined ? (Number(eurPerUno) || 0) : eurPerValutaCoinP2P(vc.cod);
+  const giusto = (Number(o.euro) || 0) * c;
+  if (!(giusto > 0)) return '';
+  const scarto = (nodo - giusto) / giusto;
+  if (Math.abs(scarto) <= P2P_COIN_SCARTO) return '';
+  return '<div class="p2p-box p2p-avviso-coin">⚠️ Chi ha preso ha contato ' + fmt(nodo) + ' € per '
+    + esc(fmtQuantoCoinP2P(o.euro, vc.cod)) + ' ' + esc(vc.segno) + ', ma al cambio di adesso valgono circa '
+    + fmt(Math.round(giusto)) + ' € (' + (scarto > 0 ? '+' : '−') + Math.round(Math.abs(scarto) * 100)
+    + '%). Controlla la cifra prima di andare avanti: se non torna, apri una disputa.</div>';
 }
 /* PURA: la cifra in moneta come la scrive il campo → {vuoto, storto, n}:
    la virgola o il punto, al piu' i decimali della moneta (sei per ETH e
@@ -84689,9 +84808,11 @@ function ripubblicaParacaduteP2P(){
    tiene lui.
    VUOTO = SPENTA, e il foglio riparte sempre vuoto dal +: una ripubblica
    che nessuno ha scritto rimetterebbe in vetrina un ordine. Mai con
-   Barattozon (il PayCode scade da se') e mai in moneta (ETH, XMR, USDe).
+   Barattozon (il PayCode scade da se'). In moneta (ETH, XMR, USDe) si'
+   dal 16 nov 2026 (cantiere ricevi-mercato), col cambio di quel momento.
    L'intervallo e' nella valuta dell'ordine (euro, franchi, USDT sul
-   dollaro): e' quella che la persona ha davanti.
+   dollaro): e' quella che la persona ha davanti; per una moneta l'euro,
+   che e' la valuta del filo (`valutaRipubblicaP2P`).
    QUI DENTRO ZERO `fetch`: le rotte stanno fuori, accanto a quelle del
    paracadute. */
 const P2P_RIPUBBLICA_MAX = 100000000;   // come il server: piu' di cosi' e' un errore di battitura
@@ -84741,13 +84862,21 @@ function prezzoBtcRipubblicaP2P(cod){
   return per > 0 ? Math.round(per * 1e8) : 0;
 }
 /* PURA sulle leve: la ripubblica c'entra con questo foglio? Mai a leva
-   spenta, mai con Barattozon, mai in moneta */
+   spenta, mai con Barattozon. IN MONETA SI' dal 16 nov 2026 (cantiere
+   ricevi-mercato, Andrea: ETH, XMR e USDe a mercato «con Ripubblica»):
+   l'ordine si rifa' col cambio della moneta di quel momento */
 function ripubblicaPossibileP2P(tab, cod){
-  if (!ripubblicaAttivaP2P() || tab) return false;
-  return !(typeof valutaCoinP2P === 'function' && valutaCoinP2P(cod));
+  return ripubblicaAttivaP2P() && !tab;
+}
+/* PURA: la valuta in cui si misura BTC per la ripubblica: quella
+   dell'ordine, e per una moneta l'euro — sul filo un ordine in ETH e' in
+   euro, e il server lo misura cosi' (`_valuta_ordine_ripubblica_p2p`) */
+function valutaRipubblicaP2P(cod){
+  return (typeof valutaCoinP2P === 'function' && valutaCoinP2P(cod)) ? 'EUR' : cod;
 }
 /* PURA: la riga sotto i due campi */
 function fraseRipubblicaNuovoP2P(a, b, cod){
+  cod = valutaRipubblicaP2P(cod);
   const segno = segnoValutaP2P(cod), ora = prezzoBtcRipubblicaP2P(cod);
   const adesso = ora ? ' BTC adesso: ' + cifraRipubblicaP2P(ora) + ' ' + segno + '.' : '';
   const r = intervalloRipubblicaP2P(a, b);
@@ -84769,7 +84898,7 @@ function sezioneRipubblicaNuovoP2P(tab){
       + campo('p2pNuovoRipMin', p2pNuovoRipMin, 'da', 'Prezzo minimo di BTC')
       + '<span aria-hidden="true">–</span>'
       + campo('p2pNuovoRipMax', p2pNuovoRipMax, 'a', 'Prezzo massimo di BTC')
-      + '<span class="p2p-rip-segno">' + esc(segnoValutaP2P(cod)) + '</span></div>',
+      + '<span class="p2p-rip-segno">' + esc(segnoValutaP2P(valutaRipubblicaP2P(cod))) + '</span></div>',
     sotto: '<div class="hint" id="p2pNuovoRipFrase">'
       + esc(fraseRipubblicaNuovoP2P(p2pNuovoRipMin, p2pNuovoRipMax, cod)) + '</div>'
   });
@@ -84827,7 +84956,7 @@ function segnoRipubblicaP2P(o){
   const r = miaRipubblicaP2P(riga);
   if (!r || r.stato !== 'armato' || !riga || (riga.stato !== 'pubblicato' && riga.stato !== 'pending')) return '';
   return '<div class="p2p-box p2p-paracadute">🔁 Ripubblica '
-    + esc(traRipubblicaP2P(r, segnoValutaP2P(valutaOrdineP2P(riga)))) + '</div>';
+    + esc(traRipubblicaP2P(r, segnoValutaP2P(valutaRipubblicaP2P(valutaOrdineP2P(riga))))) + '</div>';
 }
 /* il riquadro nella pagina del MIO ordine: la frase intera e il tasto
    per dire basta */
@@ -84835,7 +84964,7 @@ function riquadroRipubblicaP2P(o){
   if (!o || !o.mio || !ripubblicaAttivaP2P()) return '';
   const r = miaRipubblicaP2P(o);
   if (!r) return '';
-  const segno = segnoValutaP2P(valutaOrdineP2P(o));
+  const segno = segnoValutaP2P(valutaRipubblicaP2P(valutaOrdineP2P(o)));
   let testo = '';
   if (r.stato === 'armato' && (o.stato === 'pubblicato' || o.stato === 'pending'))
     testo = '🔁 Ripubblica: quando scade, se BTC è ' + traRipubblicaP2P(r, segno)
@@ -84856,7 +84985,9 @@ function campiRipubblicaUgualeP2P(o, adesso){
   const r = miaRipubblicaP2P(o);
   return {euro: c.euro, euroMax: c.euroMax, sats: c.fisso ? c.sats : '', fisso: c.fisso,
     metodi: c.metodi, zona: c.zona, filtro: c.filtro, paracadute: c.paracadute,
-    premio: c.premio, premioTab: '', valuta: valuta, cambioCoin: 0,
+    premio: c.premio, premioTab: '', valuta: valuta,
+    /* in moneta il cambio di adesso (16 nov 2026, ricevi-mercato) */
+    cambioCoin: typeof eurPerValutaCoinP2P === 'function' ? eurPerValutaCoinP2P(valuta) : 0,
     ripMin: r ? String(r.minimo) : '', ripMax: r ? String(r.massimo) : '',
     cambio: (typeof cambioVivo !== 'undefined' && cambioVivo && eurPerSat > 0) ? eurPerSat : 0,
     oc: false,
@@ -86942,10 +87073,10 @@ function premioTestoP2P(n){
    e' la lezione dell'annullo. Prende un oggetto e non il DOM, cosi' si
    prova senza un browser. */
 /* PURO: IL GIUDICE DI UN ORDINE IN MONETA (16 nov 2026, cantiere
-   p2p-monete-valute). Le stesse regole del filo del tabacchino a prezzo
-   fisso: una cifra sola nella moneta (niente intervallo, che vorrebbe
-   `amount` a zero), i sats fissi — a mercato li fa il foglio adesso col
-   premio, a prezzo fisso li scrive chi pubblica —, quindi senza i due
+   p2p-monete-valute). Una cifra sola nella moneta (l'intervallo in euro
+   del mercato lo fa il costruttore, non chi scrive); a prezzo fisso i
+   sats li scrive chi pubblica, a mercato li stima il foglio col premio
+   (dal giro ricevi-mercato li fa il nodo alla presa) — quindi senza i due
    cambi non si pubblica; il tetto di Barattolo tradotto nella moneta;
    solo le reti di quella moneta; mai on-chain. Ogni frase porta il suo
    campo, come nel giudice di tutti. */
@@ -87292,7 +87423,10 @@ function campiNuovoP2P(){
    • `create_fiat_amt_array` scrive il tag `fa` coi due capi quando
      ci sono, e allora `fiat_amount` vale 0. */
 /* PURA: L'ORDINE IN MONETA SUL FILO (16 nov 2026, cantiere
-   p2p-monete-valute; il perche' sta sopra `P2P_VALUTE_COIN`): `fiat_code`
+   p2p-monete-valute; il perche' sta sopra `P2P_VALUTE_COIN`). A MERCATO,
+   dal giro ricevi-mercato, un intervallo in euro col premio
+   (`intervalloCoinP2P`); dove l'intervallo non ci sta, e a prezzo fisso,
+   come prima: `fiat_code`
    EUR col controvalore INTERO al cambio della moneta (almeno 1: il nodo
    un ordine da zero non lo prende), i sats FISSI — a mercato fatti qui
    col premio cotto dentro, a prezzo fisso quelli scritti —, `premium` 0
@@ -87302,6 +87436,26 @@ function ordineCoinDaCampiP2P(v, lato, vc){
   const q = quantoCoinP2P(v.euro, vc.cod).n;
   const eur = Number(v.cambioCoin) > 0 ? q * Number(v.cambioCoin) : 0;
   const fa = Math.max(1, eur > 0 ? Math.round(eur) : interoP2P(String(Math.round(Number(v.euroNodo) || 0))).n);
+  const pm = (v.metodi || []).map(m => {
+    const p = pmCoinP2P(m);
+    return metodoPmCoinP2P(p ? p.metodo : m, q, vc.cod);
+  }).join(',');
+  const tettoEur = v.tettoEur !== undefined ? (Number(v.tettoEur) || 0)
+    : (typeof maxEuroP2P === 'function' ? maxEuroP2P() : 0);
+  const rg = !v.fisso && eur > 0
+    ? intervalloCoinP2P(eur, tettoEur, v.cambio, Number(v.minSats) || 0, Number(v.maxSats) || 0, v.premio) : null;
+  if (rg) return {
+    kind: lato === 'compro' ? 'buy' : 'sell',
+    status: 'pending',
+    amount: 0,
+    fiat_code: 'EUR',
+    min_amount: rg.min,
+    max_amount: rg.max,
+    fiat_amount: 0,
+    payment_method: pm,
+    premium: Math.round(Number(v.premio) || 0),
+    created_at: 0
+  };
   return {
     kind: lato === 'compro' ? 'buy' : 'sell',
     status: 'pending',
@@ -87311,10 +87465,7 @@ function ordineCoinDaCampiP2P(v, lato, vc){
     max_amount: null,
     fiat_amount: fa,
     /* da una riga che porta gia' la cifra non si raddoppia */
-    payment_method: (v.metodi || []).map(m => {
-      const p = pmCoinP2P(m);
-      return metodoPmCoinP2P(p ? p.metodo : m, q, vc.cod);
-    }).join(','),
+    payment_method: pm,
     premium: 0,
     created_at: 0
   };
@@ -87423,7 +87574,9 @@ function ordineDaRigaP2P(o){
     /* in moneta (16 nov 2026): il cambio della moneta di adesso, e il
        controvalore della riga per quando manca */
     cambioCoin: typeof eurPerValutaCoinP2P === 'function' ? eurPerValutaCoinP2P(o.fiat) : 0,
-    euroNodo: o.euroNodo || 0
+    euroNodo: o.euroNodo || 0,
+    maxSats: (typeof p2pInfo !== 'undefined' && p2pInfo && p2pInfo.maxSats) || 0,
+    minSats: (typeof p2pInfo !== 'undefined' && p2pInfo && p2pInfo.minSats) || 0
   }, o.lato);
 }
 /* IL TETTO SOTTO IL CAMPO (17 set 2026, ritocco di Andrea): la
@@ -88409,12 +88562,13 @@ function aggiornaPercorsoTabP2P(){
 function premioNotaP2P(compro, premio){
   const p = Math.round(Number(premio) || 0);
   const verbo = compro ? 'comprare' : 'vendere';
-  /* IN UNA MONETA il prezzo si fissa quando si pubblica, e i soldi sono
-     la moneta (16 nov 2026, p2p-monete-valute) */
+  /* IN UNA MONETA i soldi sono la moneta (16 nov 2026, p2p-monete-valute),
+     e dal giro ricevi-mercato il prezzo e' quello della presa come per
+     l'euro: la stessa frase */
   const vc = typeof valutaCoinP2P === 'function' && typeof valutaFoglioP2P === 'function'
     ? valutaCoinP2P(valutaFoglioP2P()) : null;
   if (!p) return 'Vuoi ' + verbo + ' Bitcoin al prezzo di mercato: quello '
-    + (vc ? 'del momento in cui pubblichi.' : 'del momento in cui qualcuno prende l\'offerta.');
+    + 'del momento in cui qualcuno prende l\'offerta.';
   const su = p > 0;
   const apre = 'Vuoi ' + verbo + ' Bitcoin ' + (su ? 'sopra' : 'sotto')
     + ' al prezzo di mercato: ';
@@ -89823,8 +89977,9 @@ async function inviaNuovoOrdineP2P(confermato){
      scade: campi.scade, adesso: campi.adesso, cambio: campi.cambio,
      /* la valuta del foglio (1 nov 2026, cantiere p2p-usdt) */
      valuta: campi.valuta,
-     /* ...e il cambio della sua moneta (16 nov 2026, p2p-monete-valute) */
-     cambioCoin: campi.cambioCoin}, lato);
+     /* ...e il cambio della sua moneta (16 nov 2026, p2p-monete-valute),
+        coi tetti del nodo per l'intervallo a mercato (ricevi-mercato) */
+     cambioCoin: campi.cambioCoin, minSats: campi.minSats, maxSats: campi.maxSats}, lato);
   /* i centesimi del tabacchino: sulla riga e nel canale sta l'esatto,
      sul filo l'intero (22 set 2026) */
   const esattoTab = campi.scade > 0 ? centesimiP2P(campi.euro).n : 0;
@@ -89925,7 +90080,9 @@ async function inviaNuovoOrdineP2P(confermato){
      parte; le cinque reti di USDe si dicono in breve, che il metodo del
      post ha un tetto di sessanta caratteri */
   const coinOrd = typeof coinP2P === 'function' ? coinP2P(ord) : null;
-  const euro = coinOrd ? (ord.euroNodo || 1) : ord.euro;
+  /* (a mercato il filo porta un intervallo: il controvalore di adesso) */
+  const euro = coinOrd ? ((ord.coinMercato && Math.round(euroDaCoinP2P(ord.euro, coinOrd.cod))) || ord.euroNodo || 1)
+                       : ord.euro;
   /* nel canale il metodo si dice per nome, senza l'importo dentro */
   const metodo = coinOrd ? metodoCanaleCoinP2P(ord.metodi) : metodi.map(metodoBaseP2P).join(', ');
   /* IL VELO DELLA PUBBLICAZIONE (18 set 2026, richiesta di Andrea): dal
@@ -97929,12 +98086,15 @@ async function pubblicaDaSoloP2P(o){
   if (!o || !o.mio || o.soloVista || o.tabacchino || tabacchinoP2P(o.metodi || [])) return false;
   const adesso = Math.floor(Date.now() / 1000);
   const campi = campiRipubblicaUgualeP2P(o, adesso);
-  if (typeof valutaCoinP2P === 'function' && valutaCoinP2P(campi.valuta)) return false;
   if (!valeNuovoOrdineP2P(campi).ok) return false;
   const lato = campi.lato;
+  /* in moneta col cambio di adesso e i tetti del nodo (16 nov 2026,
+     ricevi-mercato): a mercato l'intervallo si rifa' attorno al
+     controvalore di oggi */
   const ordine = ordineDaCampiP2P({euro: campi.euro, euroMax: campi.euroMax, sats: campi.sats,
     fisso: campi.fisso, metodi: campi.metodi.slice(), premio: campi.premio, premioTab: '',
-    scade: 0, adesso: adesso, cambio: campi.cambio, valuta: campi.valuta, cambioCoin: 0}, lato);
+    scade: 0, adesso: adesso, cambio: campi.cambio, valuta: campi.valuta,
+    cambioCoin: campi.cambioCoin || 0, minSats: campi.minSats, maxSats: campi.maxSats}, lato);
   const ord = {
     id: '', lato: lato, indice: 0, pubTrade: '', mio: true, stato: 'pubblico',
     euro: ordine.max_amount ? ordine.min_amount : ordine.fiat_amount,
@@ -97943,6 +98103,11 @@ async function pubblicaDaSoloP2P(o){
     hold: null, contattato: false, cantDo: '', errore: '', votabile: false,
     creato: adesso, aggiornato: adesso, ripubblicatoDa: o.id
   };
+  /* in moneta la riga si veste dai metodi del filo, come nel foglio */
+  if (typeof valutaCoinP2P === 'function' && valutaCoinP2P(campi.valuta)) {
+    ord.metodi = String(ordine.payment_method || '').split(',').filter(Boolean);
+    vestiCoinOrdineP2P(ord);
+  }
   if (campi.zona) ord.zona = campi.zona;
   if (campi.filtro) ord.filtro = campi.filtro;
   const para = paracaduteDaCampiP2P(campi);
