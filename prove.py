@@ -3724,7 +3724,7 @@ def prove_chiusura_saas():
             "_coda_magazzino": lambda mag: ""})
         for nome in ("leggi_bolt11", "vita_fattura", "giorno_scadenza",
                      "rifiuto_scadenza", "_durata_a_parole",
-                     "_cassaforte_riga"):
+                     "_cassaforte_riga", "pulisci_fattura"):
             exec(pezzo(nome), amb)
         leggi = amb["leggi_bolt11"]
         m.nodo.hash_di = lambda bolt: (
@@ -5354,7 +5354,7 @@ def ambiente_scadenza():
            "_ponte": {"stato": "ok"}, "_lnd_motivi": {},
            "_fmt_sats": reale("_fmt_sats")}
     for inizio in ("MARGINE_SCADENZA_PAYOUT_S = ", "_BECH32_ALFABETO = ",
-                   "MSG_FATTURA_PRESTO = (",
+                   "MSG_FATTURA_PRESTO = (", "MSG_FATTURA_SENZA_IMPORTO = (",
                    "MESI_IT = (", "MOTIVO_SCADUTA, MOTIVO_STRADA, ",
                    "PAROLE_MOTIVO = {", "_MOTIVI_LND = {"):
         i = _SORGENTE.index("\n" + inizio) + 1
@@ -5362,7 +5362,7 @@ def ambiente_scadenza():
     for nome in ("leggi_bolt11", "vita_fattura", "giorno_scadenza",
                  "rifiuto_scadenza", "_durata_a_parole", "_motivo_payout",
                  "_annota_motivo", "_ricorda_motivo_lnd",
-                 "_msg_fattura_nuova"):
+                 "_msg_fattura_nuova", "pulisci_fattura"):
         exec(pezzo(nome), amb)
     amb.pop("__builtins__", None)
     # ...e dal cantiere dopo, quelli dello stadio «in pagamento»: chi
@@ -6495,6 +6495,29 @@ def prove_fatture_scadute():
            "Importo sbagliato" in str(getattr(e, "detail", ""))
            and "999" in str(getattr(e, "detail", ""))))
 
+    # 5d-bis. LA FATTURA SENZA IMPORTO e LO SCHEMA DAVANTI (16 nov 2026,
+    # cantiere fattura-lightning, le fatture di Muun e della Swiss card).
+    # Senza importo il giudice unico dice 0: la porta dice cosa manca e
+    # quanto scrivere, non «la invoice e' di 0 sats».
+    async def _vuota(bolt11, dec=None, cassaforte=""):
+        return 0
+    m = orecchie(mondo(address="", stato="confirmed"))
+    m.amb["importo_invoice"] = _vuota
+    e = incolla(m, nuova)
+    d = str(getattr(e, "detail", ""))
+    prova("senza importo: 400, si dice che manca e QUANTO scrivere, mai "
+          "«0 sats», e niente parte", (400, True, False, []),
+          (getattr(e, "status_code", None),
+           "non ha l'importo" in d and "(il tuo incasso)" in d,
+           "di 0 sats" in d or "Importo sbagliato" in d, m.nodo.partiti))
+    # ...e la fattura buona con `lightning:` davanti (MAIUSCOLO, dal QR):
+    # si paga LEI, senza lo schema
+    m = orecchie(mondo(address="", stato="confirmed"))
+    e = incolla(m, " LIGHTNING:" + nuova)
+    prova("schema `lightning:` davanti: si paga la fattura, senza lo "
+          "schema", ("released", [H(nuova)]),
+          (e.get("stato") if isinstance(e, dict) else e, m.nodo.partiti))
+
     # 5e. IL 520 COL SUO PERCHE': il numero non e' il motivo
     for detail, spia_admin, spia_venditore, vietata in (
             ("Payment failed: invoice expired. Valid until 16 set",
@@ -6832,6 +6855,80 @@ def prove_fattura_solo_incasso():
     prova("...e se a 'confirmed' i sats non sono partiti, la fattura "
           "resta la sua uscita", True,
           'id="sellerInvoice"' in out.get("conAddressConfermato", ""))
+
+
+def prove_fattura_lightning():
+    """LO SCHEMA `lightning:` E LA FATTURA SENZA IMPORTO (16 nov 2026,
+    cantiere fattura-lightning, dalla verifica delle fatture di Muun e
+    della Swiss card). Molti wallet copiano la fattura come
+    `lightning:lnbc…` (a «Condividi», o dal QR, anche MAIUSCOLA): le tre
+    porte del mercatino e il foglio P2P la rifiutavano con «non sembra
+    una invoice». E la fattura SENZA importo — Muun la fa cosi' se non
+    scrivi la cifra — usciva con «la invoice e' di 0 sats».
+    Qui: i due gemelli (`pulisci_fattura` del server, `pulisciFattura`
+    del client) puliscono gli stessi testi nello stesso modo, e i fogli
+    VERI li usano. Le porte del server le prova `prove_fatture_scadute`
+    (5d-bis) e la rotta P2P `prove_controllo_fattura_p2p`."""
+    print("\n[lo schema `lightning:` e la fattura senza importo]")
+    import shutil
+    import subprocess
+
+    amb = {}
+    exec(pezzo("pulisci_fattura"), amb)
+    pulisci = amb["pulisci_fattura"]
+    casi = [
+        ("lnbc10n1abc", "lnbc10n1abc"),
+        ("  lnbc10n1abc \n", "lnbc10n1abc"),
+        ("lightning:lnbc10n1abc", "lnbc10n1abc"),
+        ("LIGHTNING:LNBC10N1ABC", "LNBC10N1ABC"),
+        (" Lightning: lnbc10n1abc", "lnbc10n1abc"),
+        ("lightning:nome@wallet.com", "nome@wallet.com"),
+        # una volta sola, e solo in testa
+        ("lightning:lightning:lnbc1", "lightning:lnbc1"),
+        ("lnbc1lightning:", "lnbc1lightning:"),
+        ("lightning", "lightning"), ("", ""), (None, ""),
+    ]
+    prova("il server: spazi e schema in testa, una volta sola",
+          [b for _, b in casi], [pulisci(a) for a, _ in casi])
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+    # i fogli che leggono il campo passano dal gemello
+    for firma, spia in (
+            ("async function saveSellerInvoice(btn){",
+             "pulisciFattura(el('sellerInvoice').value)"),
+            ("async function incassaSpese(btn){",
+             "pulisciFattura(el('speseInvoice').value)"),
+            ("async function inviaIncassoP2P(){", "pulisciFattura(inp.value)"),
+            ("async function inviaFatturaCauzioneP2P(){",
+             "pulisciFattura(inp.value)"),
+            ("function usaComunqueFatturaP2P(){", "pulisciFattura(inp.value)"),
+            ("function usaComunqueFatturaCauzioneP2P(){",
+             "pulisciFattura(inp.value)")):
+        prova(f"il foglio pulisce il campo: {firma.split('(')[0]}", True,
+              spia in nudo(pezzo_js(mini, firma, "\n}\n")))
+    cauz = nudo(pezzo_js(mini, "async function inviaFatturaCauzioneP2P(){",
+                         "\n}\n"))
+    prova("cauzione: la fattura senza importo si dice, PRIMA del conto "
+          "«questa e' di»", True,
+          0 < cauz.find("if (!b.sats)") < cauz.find("b.sats !== o.incasso.sats")
+          and "non ha l\\'importo" in cauz)
+
+    node = shutil.which("node")
+    if not node:
+        salta("il gemello del client", "node non c'e'")
+        return
+    js = (pezzo_js(mini, "function pulisciFattura(t){", "\n}\n") + "\n}\n"
+          + "const casi = " + json.dumps([a for a, _ in casi]) + ";\n"
+          + "console.log(JSON.stringify(casi.map(pulisciFattura)));\n")
+    out = subprocess.run([node, "-e", js], capture_output=True, text=True,
+                         timeout=60)
+    try:
+        avuto = json.loads(out.stdout or "null")
+    except ValueError:
+        avuto = out.stderr[-300:]
+    prova("il client pulisce gli stessi testi come il server",
+          [pulisci(a) for a, _ in casi], avuto)
 
 
 def prove_in_pagamento():
@@ -7703,7 +7800,7 @@ def prove_altra_cassaforte():
         # il lettore delle fatture DENTRO il mondo: legge l'ora di qui
         for nome in ("leggi_bolt11", "vita_fattura", "giorno_scadenza",
                      "rifiuto_scadenza", "_durata_a_parole",
-                     "_cassaforte_riga"):
+                     "_cassaforte_riga", "pulisci_fattura"):
             exec(pezzo(nome), amb)
         leggi = amb["leggi_bolt11"]
         m.nodo.hash_di = lambda bolt: (
@@ -27994,6 +28091,8 @@ const fetch = async (u, o) => { chiamate.push([u, o.method, o.body]);
                 "function pannelloSpeseReseAdmin(o, s){",
                 "function pannelloSpeseVenditore(o){",
                 "async function incassaSpese(btn){",
+                # (16 nov 2026) il pulitore della fattura, che incassaSpese chiama
+                "function pulisciFattura(t){",
                 "function refundPanel(o){",
                 "async function adminResolve(esito, btn){"))
             + "const CASI = " + json.dumps([c[1:4] for c in CASI]) + ";\n"
@@ -145539,7 +145638,7 @@ def prove_controllo_fattura_p2p():
                  "_controllo_locale_fattura_p2p", "_risposta_fattura_p2p",
                  "_controllo_fattura_concesso", "_fee_rotta_msat",
                  "_pezzo_lnd", "_fattura_si_divide", "_uscita_utilizzabile",
-                 "_sats_canale"):
+                 "_sats_canale", "pulisci_fattura"):
         exec(pezzo(nome), S)
     for nome in ("_controllo_rete_fattura_p2p", "_controllo_indirizzo_p2p",
                  "controlla_fattura_p2p"):
@@ -146041,6 +146140,12 @@ def prove_controllo_fattura_p2p():
     r = chiama({"testo": " " + buona + " ", "sats": -5, "finestra": 10, "ordine": "abc"})
     prova("il giudice riceve il testo ripulito, la cifra mai negativa, la finestra mai sotto il minuto",
           [(buona, 0, 60)], giudicate)
+    # (16 nov 2026, cantiere fattura-lightning) lo schema `lightning:`
+    # davanti, anche MAIUSCOLO come dal QR: al giudice arriva la fattura
+    giudicate.clear()
+    chiama({"testo": " LIGHTNING:" + buona, "sats": 1000})
+    prova("...e senza lo schema `lightning:` davanti (il «Condividi» di "
+          "molti wallet, il QR)", [buona], [g[0] for g in giudicate])
     prova("...e la risposta e' quella di `_risposta_fattura_p2p`",
           {"ok": True, "esito": "ok", "comunque": False, "messaggio": ""}, r)
     chiama({"testo": buona, "sats": "1000", "finestra": 10 ** 9})
@@ -146148,7 +146253,7 @@ def prove_controllo_fattura_p2p():
     prova("...il foglio della cauzione dimentica l'«usa comunque» alla riapertura, come l'altro", True,
           "p2pFatturaComunque = '';" in nudo(pezzo_js(mini, "function apriIncassoCauzioneP2P(){", "\n}\n")))
     prova("...e l'«usa comunque» della cauzione rimanda dal suo campo al suo gesto", True,
-          "p2pFatturaComunque = String(inp.value || '').trim();" in nudo(pezzo_js(mini, "function usaComunqueFatturaCauzioneP2P(){", "\n}\n"))
+          "p2pFatturaComunque = (typeof pulisciFattura === 'function' ? pulisciFattura(inp.value)" in nudo(pezzo_js(mini, "function usaComunqueFatturaCauzioneP2P(){", "\n}\n"))
           and "'p2pCauzioneAvviso'" in mini and "usaComunqueFatturaCauzioneP2P()" in mini)
     avviso = nudo(pezzo_js(mini, "function avvisoReteBolt11(pr){", "\n}\n"))
     prova("...con la frase della rete, la stessa del server — e SENZA il custode, che a schermo non si nomina", True,
@@ -180908,7 +181013,9 @@ def prove_gesti_ordine():
            ["ridisegnaOrdine(o)" in tutti[f] for f in GESTI + APPUNTAMENTO]])
 
     # --- 2) OGNI GESTO VERO, in node -------------------------------------
-    banco = r"""
+    # (16 nov 2026, cantiere fattura-lightning) il pulitore VERO della
+    # fattura incollata, che `saveSellerInvoice` chiama
+    banco = _fn_js(m, "function pulisciFattura(t){") + r"""
 let DEMO = false, VETRINA = false;
 const API_BASE = '/api';
 function authHdr(){ return 'h'; }
@@ -200960,7 +201067,7 @@ CATEGORIE = {
     ritiro disarmo importo_uscita foto foto_scarti fotocamera_pagina
     tela_bugiarda duplica_annuncio avatar foto_spenta
     foto_telegram_fallita pagamento_incerto esito_pagamento
-    pagamenti_in_volo fatture_scadute fattura_solo_incasso in_pagamento
+    pagamenti_in_volo fatture_scadute fattura_solo_incasso fattura_lightning in_pagamento
     altra_cassaforte chiusura_saas doppio_wallet saas_senza_doveri
     orfani capitale_cassa disputa_incagliata disputa_cambia_strada
     chiusure_audit busta_ritiro
@@ -201447,7 +201554,7 @@ def main():
               prove_nome_da_nostr, prove_foto_nostr_relay_muti,
               prove_pagamento_incerto, prove_esito_pagamento,
               prove_pagamenti_in_volo, prove_fatture_scadute,
-              prove_fattura_solo_incasso,
+              prove_fattura_solo_incasso, prove_fattura_lightning,
               prove_in_pagamento, prove_altra_cassaforte,
               prove_chiusura_saas,
               prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani, prove_capitale_cassa,

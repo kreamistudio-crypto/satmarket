@@ -341,6 +341,7 @@ let cassaAttiva = false;
         + riga_js("let appuntamentoCambiato = ") + js("function dataAppuntamento(ts){") \
         + js("function pannelloServizioCompratore(o){") + "".join(js(f) for f in GESTI) \
         + js("function testoFinestraFeedback(giorni, genere){") \
+        + js("function pulisciFattura(t){") \
         + "const GESTI = {" + ", ".join(nomi) + "};\n" + r"""
 const copia = x => (x === undefined ? null : JSON.parse(JSON.stringify(x)));
 (async () => {

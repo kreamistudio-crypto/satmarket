@@ -85386,3 +85386,62 @@ NOTATO E NON TOCCATO: sull'ATTIVO la guardia di `rimuovi_annuncio`
 guarda solo locked/shipped/confirmed/dispute, quindi un attivo con un
 reso in corso si archivia e il rimborso lo riaccende (lo stesso buco,
 più raro); e la Modifica di più annunci non elimina gli esauriti.
+
+## Le fatture di Muun e della Swiss card: lo schema `lightning:` davanti e la fattura senza importo (16 nov 2026, cantiere fattura-lightning; Andrea: «verificare gli invoice di muun wallet e swiss card», poi «ok» alla proposta delle 20:26)
+
+**LA VERIFICA, sul codice e senza fatture vere.** Nessun limite di
+lunghezza, di route hint o di campi esclude le fatture di Muun o di
+Swiss Bitcoin Pay: i lettori (`leggi_bolt11`, `importo_bolt11`, il
+gemello del client) sono BOLT-11 pieno, i campi `textarea` non hanno
+`maxlength`, il tetto della rotta P2P è 4096 caratteri. Muun mette un
+salto privato obbligato (~0,15 %, dato RoboSats 2022): sotto l'1 % di
+LNbits e di `P2P_TETTO_ROTTA`. Due difetti NOSTRI, curati qui; due
+limiti già noti, lasciati come sono.
+
+**1) LO SCHEMA `lightning:` DAVANTI.** Molti wallet, a «Condividi» o
+dal QR, copiano `lightning:lnbc…` (dal QR anche MAIUSCOLO). Le porte
+del mercatino (`deposita_invoice`, `deposita_invoice_rimborso`, i fogli
+`saveSellerInvoice` e `incassaSpese`) e il foglio P2P «Dove ricevere i
+sats» la rifiutavano con «non sembra una invoice» / «Non sembra un
+indirizzo Lightning né una richiesta di pagamento». Solo i due fogli
+dello swap on-chain lo toglievano. Adesso c'è UN pulitore per lato,
+gemelli: `pulisci_fattura` (server) e `pulisciFattura` (client) — spazi
+ai lati e lo schema in testa, UNA volta sola, senza badare alle
+maiuscole. Lo usano le due porte del mercatino, la rotta
+`/api/p2p/fattura`, e nel client i due fogli del mercatino, il foglio
+dell'incasso P2P, quello della cauzione e i loro due «Usa comunque»
+(nel P2P dietro un `typeof`, come ogni chiamata fuori dal motore). La
+fattura che parte verso il coordinatore è quella pulita.
+
+**2) LA FATTURA SENZA IMPORTO.** Il giudice unico la legge 0 (fail-closed,
+voluto) e la porta diceva «Importo sbagliato: la invoice è di 0 sats».
+Adesso: «Questa fattura non ha l'importo: rifalla nel tuo wallet
+scrivendo esattamente <cifra>.» (`MSG_FATTURA_SENZA_IMPORTO`, nelle due
+porte), e lo stesso nel foglio della cauzione P2P (prima «questa è di
+0»). Il foglio dello scambio P2P la accetta già, e resta così.
+
+**LASCIATI COME SONO.** Gli indirizzi `@sbpc.ch` nel P2P: li rifiuta
+Mostro (ordine 44c46ddf, 10 ott); entrano in `P2P_INDIRIZZI_NON_PASSANO`
+solo dopo la prova dal nodo (PRODUZIONE, «I WALLET IL CUI INDIRIZZO NON
+PASSA»). La scadenza: il P2P vuole più della finestra del coordinatore
+(3600 s), il mercatino 10 minuti; se Muun o la Swiss card fanno fatture
+da un'ora o meno, nel P2P si fermano con la frase che lo dice.
+
+**STRADE SCARTATE.** Accettare la fattura senza importo nel mercatino
+(il fail-closed dell'importo è la cintura di `paga_venditore`: non si
+allenta per una frase). Togliere lo schema anche in mezzo al testo (una
+fattura non lo porta mai: si toglie solo in testa).
+
+PROVATO: `prove_fattura_lightning` (nuova: i due gemelli sugli stessi
+undici testi, il client in node; i sei fogli che passano dal pulitore;
+la frase della cauzione prima del conto), `prove_fatture_scadute`
+(5d-bis: la porta vera con la fattura senza importo, e la fattura con
+`LIGHTNING:` davanti pagata senza lo schema), `prove_controllo_fattura_p2p`
+(la rotta vera: al giudice arriva la fattura pulita). Controprove: cinque
+mutazioni (il pulitore del server, il ramo dell'importo zero, il
+pulitore del client, la rotta P2P, la frase della cauzione), cinque
+rosse.
+DA GUARDARE: una fattura vera di Muun e una della Swiss card, che Andrea
+non ha ancora incollato (scadenza e importo letti dal vivo); il ramo
+dell'importo zero sulla porta dei rimborsi non ha una prova sua
+(è la stessa riga della porta degli ordini, che ce l'ha).

@@ -15988,6 +15988,23 @@ _BECH32_ALFABETO = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 _BECH32_GEN = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
 
 
+def pulisci_fattura(testo) -> str:
+    """Quel che una persona incolla, ripulito come lo intende: gli spazi
+    ai lati e lo schema `lightning:` davanti (16 nov 2026, cantiere
+    fattura-lightning, verifica delle fatture di Muun e della Swiss
+    card). Molti wallet, a «Condividi» o dal QR, copiano la fattura come
+    `lightning:lnbc…` (anche MAIUSCOLA, dal QR): e' lo schema del link,
+    non un'altra fattura, e fino a ieri tre porte del mercatino e il
+    foglio P2P la rifiutavano con «non sembra una invoice». Si toglie
+    UNA volta sola e solo in testa: dentro, una fattura non lo porta
+    mai. Il gemello del client e' `pulisciFattura` (miniapp.html), e
+    c'e' una prova che li fa pulire gli stessi testi."""
+    t = str(testo or "").strip()
+    if t[:10].lower() == "lightning:":
+        t = t[10:].strip()
+    return t
+
+
 def leggi_bolt11(bolt11: str, con_hash: bool = False) -> dict | None:
     """Quando e' NATA e quando SCADE una bolt11, letto dalla bolt11.
     Con `con_hash` dice anche il PAYMENT HASH (il campo `p`, 52 gruppi =
@@ -16152,6 +16169,16 @@ def rifiuto_scadenza(bolt11: str, adesso: int | None = None) -> str:
                 "troppo poco per pagarla con sicurezza. Fanne una nuova "
                 "e incollala subito.")
     return ""
+
+
+# LA FATTURA SENZA IMPORTO (16 nov 2026, cantiere fattura-lightning). Il
+# giudice unico la legge «0 sats» (`importo_invoice`, fail-closed: non
+# combacia mai), e la porta diceva «la invoice e' di 0 sats»: vero per il
+# conto, oscuro per chi legge. Muun e altri wallet la fanno COSI' di serie,
+# se non scrivi la cifra: si dice cosa manca e quanto scrivere.
+MSG_FATTURA_SENZA_IMPORTO = (
+    "Questa fattura non ha l'importo: rifalla nel tuo wallet scrivendo "
+    "esattamente {cifra}.")
 
 
 # LA FATTURA SI INCOLLA SOLO ALL'INCASSO (21 set 2026). Le parole di chi
@@ -41103,7 +41130,7 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
     una invoice dell'importo ESATTO e la riscossione riparte subito."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    bolt11 = (d.get("invoice") or "").strip()
+    bolt11 = pulisci_fattura(d.get("invoice"))
     if not bolt11.lower().startswith("ln"):
         raise HTTPException(400, "Questa non sembra una invoice Lightning")
     con = db()
@@ -41121,6 +41148,10 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
     if importo_sats is None:
         con.close()
         raise HTTPException(400, "Invoice non valida o illeggibile")
+    if importo_sats == 0:
+        con.close()
+        raise HTTPException(400, MSG_FATTURA_SENZA_IMPORTO.format(
+            cifra=_fmt_sats(r["importo_sats"]) + " sats"))
     if importo_sats != r["importo_sats"]:
         con.close()
         raise HTTPException(400,
@@ -64916,7 +64947,7 @@ async def fattura_p2p(req: Request, x_tg_init_data: str = Header(""),
     except Exception:
         raise HTTPException(400, "Richiesta illeggibile")
     d = d if isinstance(d, dict) else {}
-    testo = str(d.get("testo") or "").strip()
+    testo = pulisci_fattura(d.get("testo"))
     if not testo or len(testo) > 4096:
         raise HTTPException(400, "Serve una fattura o un indirizzo")
     try:
@@ -84417,7 +84448,7 @@ async def deposita_invoice(ordine_id: int, req: Request,
     ancore che difendono (mai `aggiornato`) restano giuste lo stesso."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    bolt11 = (d.get("invoice") or "").strip()
+    bolt11 = pulisci_fattura(d.get("invoice"))
     if not bolt11.lower().startswith("ln"):
         raise HTTPException(400, "Questa non sembra una invoice Lightning")
 
@@ -84476,6 +84507,10 @@ async def deposita_invoice(ordine_id: int, req: Request,
     if importo_sats is None:
         con.close()
         raise HTTPException(400, "Invoice non valida o illeggibile")
+    if importo_sats == 0:
+        con.close()
+        raise HTTPException(400, MSG_FATTURA_SENZA_IMPORTO.format(
+            cifra=spiegazione))
     if importo_sats != atteso:
         con.close()
         raise HTTPException(400,

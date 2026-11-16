@@ -46605,7 +46605,7 @@ function pannelloSpeseVenditore(o){
 async function incassaSpese(btn){
   haptic();
   const o = currentOrder;
-  const inv = (el('speseInvoice').value || '').trim();
+  const inv = pulisciFattura(el('speseInvoice').value);
   if (!inv.toLowerCase().startsWith('ln')) { toast('Incolla una invoice Lightning valida (inizia con "ln…")'); return; }
   if (DEMO) { toast('Le spese si incassano col backend attivo'); return; }
   const ripristina = bottoneInAttesa(btn, 'Invio sats in corso…');
@@ -46842,7 +46842,7 @@ async function adminResolve(esito, btn){
 async function saveSellerInvoice(btn){
   haptic();
   const o = currentOrder;
-  const inv = el('sellerInvoice').value.trim();
+  const inv = pulisciFattura(el('sellerInvoice').value);
   if (!inv.toLowerCase().startsWith('ln')) { toast('Incolla una invoice Lightning valida (inizia con "ln…")'); return; }
   if (DEMO) {
     /* il campo c'e' solo quando si paga subito: a 'confirmed' (chi
@@ -76639,6 +76639,17 @@ function avvisoReteBolt11(pr){
    la firma (65 byte = 104 gruppi). `x` (6) e' la scadenza in secondi,
    default 3600; `c` (24) il cltv finale, default 18.
    null = non si legge (e allora non si afferma niente). */
+/* PURA: quel che una persona incolla, ripulito come lo intende (16 nov
+   2026, cantiere fattura-lightning, verifica delle fatture di Muun e
+   della Swiss card): gli spazi ai lati e lo schema `lightning:` davanti,
+   che molti wallet copiano a «Condividi» o dal QR (anche MAIUSCOLO). E'
+   lo schema del link, non un'altra fattura: si toglie UNA volta, solo in
+   testa. Gemello di `pulisci_fattura` del server. */
+function pulisciFattura(t){
+  let s = String(t || '').trim();
+  if (s.slice(0, 10).toLowerCase() === 'lightning:') s = s.slice(10).trim();
+  return s;
+}
 function leggiBolt11(pr){
   const s = String(pr || '').trim().toLowerCase();
   const sats = importoBolt11(s);
@@ -81096,12 +81107,18 @@ async function inviaFatturaCauzioneP2P(){
   const o = ordiniP2P()[id];
   const inp = el('p2pCauzioneInp');
   if (!o || !o.incasso || !inp) return;
-  const bolt = String(inp.value || '').trim();
+  const bolt = (typeof pulisciFattura === 'function' ? pulisciFattura(inp.value) : String(inp.value || '').trim());
   const b = leggiBolt11(bolt);
   if (!b) { toast('Questa non sembra una fattura Lightning'); return; }
   /* la rete subito, con le sue parole, nel foglio (10 ott 2026, terza tappa) */
   const altraReteC = avvisoReteBolt11(bolt);
   if (altraReteC) { mostraFermoFatturaP2P({messaggio: altraReteC, comunque: false}, FERMO_CAUZIONE_P2P); return; }
+  /* la fattura SENZA importo (16 nov 2026): «questa è di 0» era vero per
+     il conto e oscuro per chi legge */
+  if (!b.sats) {
+    toast('Questa fattura non ha l\'importo: rifalla nel tuo wallet scrivendo esattamente ' + fmt(o.incasso.sats) + ' sats');
+    return;
+  }
   if (b.sats !== o.incasso.sats) {
     toast('La fattura deve essere di ' + fmt(o.incasso.sats) + ' sats esatti: questa è di ' + fmt(b.sats));
     return;
@@ -81869,7 +81886,7 @@ async function inviaIncassoP2P(){
   const o = ordiniP2P()[p2pIncassoOrdine];
   const inp = el('p2pIncassoInp');
   if (!o || !inp) return;
-  const testo = String(inp.value || '').trim();
+  const testo = (typeof pulisciFattura === 'function' ? pulisciFattura(inp.value) : String(inp.value || '').trim());
   const av = el('p2pIncassoAvviso');
   const dillo = m => { if (av) { av.textContent = m; av.style.display = ''; } };
   if (!testo) { dillo('Serve un indirizzo o una richiesta di pagamento.'); return; }
@@ -95303,7 +95320,7 @@ function mostraFermoFatturaP2P(fermo, dove){
 function usaComunqueFatturaP2P(){
   const inp = el('p2pIncassoInp');
   if (!inp) return;
-  p2pFatturaComunque = String(inp.value || '').trim();
+  p2pFatturaComunque = (typeof pulisciFattura === 'function' ? pulisciFattura(inp.value) : String(inp.value || '').trim());
   haptic();
   inviaIncassoP2P();
 }
@@ -95312,7 +95329,7 @@ const FERMO_CAUZIONE_P2P = {avviso: 'p2pCauzioneAvviso', comunque: 'usaComunqueF
 function usaComunqueFatturaCauzioneP2P(){
   const inp = el('p2pCauzioneInp');
   if (!inp) return;
-  p2pFatturaComunque = String(inp.value || '').trim();
+  p2pFatturaComunque = (typeof pulisciFattura === 'function' ? pulisciFattura(inp.value) : String(inp.value || '').trim());
   haptic();
   inviaFatturaCauzioneP2P();
 }
