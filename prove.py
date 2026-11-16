@@ -68966,6 +68966,12 @@ out.ocConvVendi = ordinaLibroP2P([oc(1, 'buy', 15, true), merc('x', 'buy', 6),
 out.ocImp = ordinaLibroP2P([oc(1, 'sell', 0, true, 250), imp('m', 50), oc(2, 'sell', 0, true, 10)],
   'compro', 'imp-su').map(x => x.id).join(' ');
 out.ocVista = oc(7, 'sell', 4, true, 250, 900);
+/* ...E A «PIU' RECENTI» (16 nov 2026, cantiere mappa-recenti, Andrea: «se
+   io seleziono più recenti, comunque le card devono essere ordinate più
+   recenti, indipendentemente se siano on-chain o lighting») */
+out.ocRecenti = ordinaLibroP2P([oc(1, 'sell', 15, true, 50, 200), merc('x', 'sell', 6, 300),
+  oc(2, 'sell', 0, false, 50, 500), merc('y', 'sell', 20, 100)], 'compro', 'recenti')
+  .map(x => x.id).join(' ');
 /* A CAMBIO MUTO il prezzo fisso non ha un numero: va in fondo, coi suoi
    pari per data, e i prezzi a mercato restano in ordine */
 {
@@ -69630,10 +69636,11 @@ console.log(JSON.stringify(out));
           {"oc": {"id": 7, "lato": "sell", "premio": 4, "mercato": True, "euro": 250,
                   "creato": 900}, "id": "oc-7", "lato": "sell", "premioOc": 4,
            "creato": 900, "euro": 250, "euroMax": 0}, out["ocVista"])
+    prova("...e a «Piu' recenti» conta solo la data, on-chain o Lightning",
+          "oc-2 x oc-1 y", out["ocRecenti"])
     _rp_oc = pezzo_js(mini, "function renderP2P(", "\n}\n")
-    prova("...e renderP2P le mescola solo fuori da «Piu' recenti», dove restano in "
-          "cima sotto il loro rettangolo", (True, True, True),
-          ("const misti = critLibro !== 'recenti'" in _rp_oc,
+    prova("...e renderP2P le mescola con qualunque criterio, anche «Piu' recenti»", (True, True, True),
+          ("const misti = typeof vistaOrdinamentoOcP2P === 'function';" in _rp_oc,
            "carteOnchainLibroP2P(k, usdtNovita, misti)" in _rp_oc,
            ".map(x => x.oc ? rigaOnchainP2P(x.oc) : rigaOrdineP2P(x))" in _rp_oc))
     _ord_js = pezzo_js(mini, "function ordinaLibroP2P(righe, lato, criterio){", "\n}\n")
@@ -167013,9 +167020,15 @@ console.log(JSON.stringify(out));
            'aria-label="Mappa: 3 offerte in contanti di persona"' in tondo,
            'onclick="apriChiudiMappaP2P()"' in tondo, 'aria-expanded="true"' in tondo,
            'class="tema-btn mappa-tondo acceso"' in aperto, 'aria-expanded="true"' in aperto])
-    prova("...al singolare con un'offerta, e senza offerte col punto il tondo non c'e'",
-          [True, ""], ['aria-label="Mappa: 1 offerta in contanti di persona"'
-                       in (r.get("tondoUno") or ""), r.get("tondoNessuno")])
+    # (16 nov 2026, cantiere mappa-recenti, Andrea: «Come mai la mappa
+    # c'è solo in compra BTC e non in vendi BTC?») il tondo c'e' SEMPRE,
+    # anche senza offerte col punto, e lo dice
+    prova("...al singolare con un'offerta, e senza offerte col punto il tondo c'e' lo stesso e lo dice",
+          [True, True, True], ['aria-label="Mappa: 1 offerta in contanti di persona"'
+                       in (r.get("tondoUno") or ""),
+                       'aria-label="Mappa: nessuna offerta in contanti di persona"'
+                       in (r.get("tondoNessuno") or ""),
+                       'onclick="apriChiudiMappaP2P()"' in (r.get("tondoNessuno") or "")])
     prova("...e la pillola grigia sopra le card non c'e' piu' (la sezione chiusa e' vuota)",
           ["", False], [chiusa, "p2p-mappa-btn" in mini])
     # IL NUMERINO A RICHIESTA (Andrea: spento di serie, l'interruttore
@@ -167052,7 +167065,11 @@ console.log(JSON.stringify(out));
           [True, True, True], ["'<div class=\"p2p-testa-riga' + (tondoTesta ? ' con-mappa' : '') + '\">'" in mini,
            ".p2p-testa-riga.con-mappa .p2p-filtro-parola{display:none}" in mini,
            "  .p2p-testa-riga{flex-wrap:nowrap}" in mini])
-    prova("senza offerte col punto la mappa non c'e'", "", r.get("nessuna"))
+    # ...e aperta senza offerte col punto la mappa c'e', vuota, con la frase
+    prova("senza offerte col punto la mappa aperta resta, vuota, e lo dice", [True, True, False],
+          ['id="p2pMappaSvg"' in (r.get("nessuna") or ""),
+           "Qui per ora non ci sono offerte in contanti di persona." in (r.get("nessuna") or ""),
+           "p2p-mappa-scelto" in (r.get("nessuna") or "")])
     prova("il comune scelto restringe l'elenco e si dice; uno che non c'e' piu' si dimentica",
           [["ord-cccc-3"], True, ""],
           [r.get("elenco"), r.get("pillola"), r.get("dimenticato")])

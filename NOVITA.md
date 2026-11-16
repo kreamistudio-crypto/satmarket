@@ -326,3 +326,9 @@ frase: Toccando l'avviso di un annuncio, che arrivi dal bot, dal canale o come n
 dove: gli avvisi «🔎 Un annuncio fa per te!», i post del canale, gli avvisi delle offerte e dei nuovi annunci, nel bot e nelle notifiche del telefono.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-16 · p2p-mappa-recenti
+frase: Nel libro P2P il tondo della mappa 🗺️ c'è sempre, anche in «Vendi BTC» e anche quando non ci sono offerte in contanti. E con «Più recenti» le card on-chain e Lightning stanno nello stesso ordine: in cima la più nuova.
+dove: la scheda «P2P», in alto accanto alla campanella; la pillola «Ordina» con «Più recenti».
+leva: nessuna
+pubblico: sì
