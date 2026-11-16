@@ -159710,6 +159710,10 @@ let USDT = false, DEMO = false, VETRINA = false, tourInCorso = false, TOUR = nul
 let myP2POnchain = false, p2pFiltro = null, tutorialOcLato = null, p2pOcTutorialTimer = null;
 let p2pOnchainLibro = {eventi: []};
 const usdtVistoP2P = () => USDT;
+/* USDe si accende con le monete (16 nov 2026, ricevi-mercato) */
+let USDE = false;
+function novitaCoinVistaP2P(){ return USDE; }
+const P2P_USDT_LOGO_TRIO = '<usdt-logo>', P2P_LOGHI_COIN = {usde: '<usde>'};
 const piuGiroP2P = () => ({}), rigaOrdineP2P = o => '<card ' + o.fiat + '>', rigaOnchainP2P = o => '<oc>';
 function setLatoP2P(l){ p2pLato = l; LOG.push('lato:' + l); }
 function avviaTour(tappe, dopo){ TOUR = {tappe, dopo}; LOG.push('tour:' + tappe.length); return true; }
@@ -159750,12 +159754,14 @@ out.tutorial = [LOG.slice(), Object.keys(MEMORIA).filter(k => k !== 'oc'), el('p
 out.ocAppeso = /appeso/.test(carteOnchainLibroP2P('sell'));
 out.acceso = /acceso/.test(novitaUsdtLibroP2P());
 // il foglio: aperto sotto il velo, sulla rete Lightning, gia' in USDT
-LOG.length = 0; TOUR.tappe[5].prima();
-out.valuta = [LOG.slice(), p2pNuovoValuta, p2pNuovoMetodi.length, p2pNuovoAperta];
 LOG.length = 0; TOUR.tappe[6].prima();
-out.reti = [LOG.slice(), p2pNuovoAperta];
+out.valuta = [LOG.slice(), p2pNuovoValuta, p2pNuovoMetodi.length, p2pNuovoAperta];
 LOG.length = 0; TOUR.tappe[7].prima();
+out.reti = [LOG.slice(), p2pNuovoAperta];
+LOG.length = 0; TOUR.tappe[8].prima();
 out.centro = LOG.slice();
+// solo USDT: la tappa di USDe non ha bersaglio, i testi dicono gli USDT
+out.soloUsdtTappe = [TOUR.tappe[3].trova(), TOUR.tappe[0].testo.indexOf('USDe') < 0, TOUR.tappe[7].testo];
 // il secondo tocco a giro aperto non fa niente
 tourInCorso = true; LOG.length = 0; apriNovitaUsdtP2P(); out.dueVolte = LOG.slice(); tourInCorso = false;
 el('p2pUsdtNovita').classList.add('appeso'); el('p2pNuovoSheet').classList.add('open');
@@ -159765,6 +159771,23 @@ out.fine = [LOG.slice(), p2pLato, el('p2pUsdtNovita').classList.contains('acceso
 // senza memoria del browser non resta mai appeso
 delete MEMORIA.p2pUsdtNovitaAperta; localStorage.rotto = true;
 out.rotto = /appeso/.test(novitaUsdtLibroP2P()); localStorage.rotto = false;
+// LE STABLECOIN INSIEME (16 nov 2026, ricevi-mercato): con USDe il verde
+// porta i due loghi e «USDT · USDe», i testi le dicono tutt'e due; con la
+// sola USDe, «USDe» e il foglio in USDe
+USDE = true;
+const bs = novitaUsdtLibroP2P();
+out.stable = [/<span class="p2p-coin-trio" aria-hidden="true"><usdt-logo><usde><\\/span>/.test(bs),
+  /p2p-oc-novita-testo">USDT · USDe<\\/span>/.test(bs), TOUR.tappe[0].testo, TOUR.tappe[1].testo.indexOf('le stablecoin') > 0,
+  TOUR.tappe[6].testo, TOUR.tappe[7].testo.indexOf('USDe ne ha cinque') > 0,
+  TOUR.tappe[8].testo.indexOf('<usdt-logo><usde>') > 0];
+USDT = false;
+const bu = novitaUsdtLibroP2P();
+LOG.length = 0; TOUR.tappe[6].prima();
+out.soloUsde = [/p2p-oc-novita-testo">USDe<\\/span>/.test(bu), /<usdt-logo>/.test(bu), TOUR.tappe[2].trova(),
+  p2pNuovoValuta, TOUR.tappe[7].testo];
+el('p2pNuovoSheet').classList.add('open'); TOUR.dopo(true);
+out.soloUsdeFine = p2pNuovoValuta;
+USDE = false;
 // fuori dal libro il tutorial non parte, e il banner si spegne
 USDT = false; el('p2pUsdtNovita').classList.add('acceso'); LOG.length = 0; tutorialUsdtP2P();
 out.chiuso = [LOG.slice(), el('p2pUsdtNovita').classList.contains('acceso')];
@@ -159798,12 +159821,27 @@ console.log(JSON.stringify(out));
            "    top:calc(var(--p2p-testa-alta,0px) + 62px);height:52px}" in mini,
            ".p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-usdt-novita.appeso .p2p-oc-faccia{top:0}" in mini))
     prova("...toccato: nessun segno nel browser, verde acceso, tutorial dal lato «Compra BTC» "
-          "in otto tappe; il foglio prepara due tappe e la chiusura una; tonde le due "
-          "tessere e il +; l'ultima al centro",
-          [["lato:compro", "tour:8"], [], True,
-           [False, False, False, False, False, True, True, True],
-           [False, False, True, True, True, False, False, False],
-           [False, False, False, False, False, False, False, True]], out["tutorial"])
+          "in nove tappe (dal 16 nov 2026 anche quella di USDe); il foglio prepara due tappe e la "
+          "chiusura una; tonde le tre tessere e il +; l'ultima al centro",
+          [["lato:compro", "tour:9"], [], True,
+           [False, False, False, False, False, False, True, True, True],
+           [False, False, True, True, True, True, False, False, False],
+           [False, False, False, False, False, False, False, False, True]], out["tutorial"])
+    prova("...a chi vede solo gli USDT: la tappa di USDe senza bersaglio, i testi degli USDT",
+          [None, True, "Al posto dei metodi scegli la rete: <b>Tron</b>, <b>Ethereum</b> o tutte e due."],
+          out["soloUsdtTappe"])
+    prova("LE STABLECOIN INSIEME (Andrea: «mettimi insieme USDT e USDE in un unico banner ... verde», "
+          "«tutorial dedicati»): i due loghi, «USDT · USDe», la novita' delle stablecoin, il foglio con "
+          "USDT o USDe, le cinque reti di USDe, i due loghi al centro",
+          [True, True, "<b>Novità!</b> Puoi scambiare bitcoin anche con le <b>stablecoin</b>: <b>USDT</b> e "
+           "<b>USDe</b>, dollari digitali da circa 1 dollaro.", True,
+           "…e in cima al foglio scegli la valuta: <b>USDT</b> o <b>USDe</b> al posto degli euro.", True, True],
+          out["stable"])
+    prova("...a chi vede solo USDe: «USDe» senza la T, niente card degli USDT, foglio in USDe con le sue "
+          "reti; alla fine il foglio torna in euro",
+          [True, False, None, "USDE",
+           "Al posto dei metodi scegli la rete: Ethereum, Arbitrum, Base, BNB Chain o Solana.", "EUR"],
+          out["soloUsde"] + [out["soloUsdeFine"]])
     prova("...e un libro ridisegnato durante il giro lo rimette acceso", True, out["acceso"])
     prova("la tappa della valuta apre il foglio di Lightning (non quello on-chain) gia' "
           "in USDT, senza metodi; quella delle reti apre la tendina; l'ultima chiude il foglio",
@@ -159884,16 +159922,14 @@ VETRINA = true; out.vetrina = novitaCoinLibroP2P(); VETRINA = false;
 LOG.length = 0;
 const b = novitaCoinLibroP2P();
 out.banner = [/class="p2p-oc-novita p2p-coin-novita appeso" id="p2pCoinNovita"/.test(b),
-  /<span class="p2p-coin-trio" aria-hidden="true"><eth><xmr><usde><\\/span>/.test(b),
-  /p2p-oc-novita-testo">ETH · XMR · USDe<\\/span><span class="p2p-oc-novita-tag">Novità<\\/span>/.test(b),
+  /<span class="p2p-coin-trio" aria-hidden="true"><eth><xmr><\\/span>/.test(b),
+  /p2p-oc-novita-testo">ETH · XMR<\\/span><span class="p2p-oc-novita-tag">Novità<\\/span>/.test(b),
   /onclick="apriNovitaCoinP2P\\(\\)"/.test(b), LOG.slice()];
-/* UN BANNER SOLO (16 nov 2026): chi vede anche gli USDT li trova qui,
-   in testa, con la T verde sul banner blu */
+/* (16 nov 2026, ricevi-mercato) anche a chi vede gli USDT il blu resta di
+   ETH e Monero: niente T verde, niente USDe */
 globalThis.novitaUsdtVistaP2P = () => true;
 const bu = novitaCoinLibroP2P();
-out.conUsdt = [/class="p2p-oc-novita p2p-coin-novita appeso con-usdt"/.test(bu),
-  /<span class="p2p-coin-trio" aria-hidden="true"><svg class="p2p-coin-svg"[^>]*><circle[^>]*fill="#26A17B"\\/><path[^>]*><\\/svg><eth><xmr><usde><\\/span>/.test(bu),
-  /p2p-oc-novita-testo">USDT · ETH<br>XMR · USDe<\\/span>/.test(bu)];
+out.conUsdt = [/con-usdt/.test(bu), /#26A17B|<usde>/.test(bu), /p2p-oc-novita-testo">ETH · XMR<\\/span>/.test(bu)];
 delete globalThis.novitaUsdtVistaP2P;
 LOG.length = 0;
 apriNovitaCoinP2P();
@@ -159939,45 +159975,46 @@ console.log(JSON.stringify(out));
         return
     prova("il «Novità» delle monete solo a chi le vede (leva accesa), mai nel demo "
           "ne' in vetrina", ["", "", ""], [out["spento"], out["demo"], out["vetrina"]])
-    prova("...coi tre loghi, «ETH · XMR · USDe» e «Novità» accanto alla freccia, appeso, "
-          "misura la testata, e il tocco apre il tutorial",
+    prova("...coi due loghi, «ETH · XMR» e «Novità» accanto alla freccia, appeso, "
+          "misura la testata, e il tocco apre il tutorial (16 nov 2026, ricevi-mercato: Andrea, «sotto "
+          "il terzo banner con XMR e ETH, blu»)",
           [True, True, True, True, ["testa"]], out["banner"])
-    prova("UN BANNER SOLO: a chi vede anche gli USDT il banner blu porta la T verde "
-          "in testa e «USDT · ETH / XMR · USDe» su due righe", [True, True, True], out["conUsdt"])
-    prova("...e il verde degli USDT tace quando c'e' quello blu",
-          True, "if (typeof novitaCoinVistaP2P === 'function' && novitaCoinVistaP2P()) return '';"
+    prova("...e anche a chi vede gli USDT resta di ETH e Monero: niente T verde, niente USDe",
+          [False, False, True], out["conUsdt"])
+    prova("...e il verde delle stablecoin non tace piu' davanti al blu",
+          False, "novitaCoinVistaP2P()) return '';"
           in pezzo_js(mini, "function novitaUsdtLibroP2P(){", "\n}\n"))
     prova("...toccato: acceso, tutorial dal lato «Compra BTC» in sette tappe; il foglio "
-          "prepara una tappa e la chiusura una; tonde la tessera e il +; l'ultima al centro",
+          "prepara una tappa e la chiusura una; tonde le due tessere e il +; l'ultima al centro",
           [["lato:compro", "tour:7"], True,
            [False, False, False, False, False, True, True],
-           [False, False, True, False, True, False, False],
+           [False, False, True, True, True, False, False],
            [False, False, False, False, False, False, True]], out["tutorial"])
     prova("...e un libro ridisegnato durante il giro lo rimette acceso", True, out["acceso"])
     prova("le card finte nascono una volta, subito dopo il banner: una IN ETH da 0,02 e "
-          "una IN USDe da 50 su due reti, coi sats fissi al cambio di adesso",
+          "una IN XMR da 0,1 (senza cambio di Monero, il numero tondo)",
           [1, "p2p-coin-esempi",
-           "<card ETH 0.02 60000:ETH (Ethereum)><card USDE 50 43000:USDe (Ethereum)|USDe (Base)>", True],
+           "<card ETH 0.02 60000:ETH (Ethereum)><card XMR 0.1 30000:XMR (Monero)>", True],
           out["esempi"])
-    prova("...e il giro illumina la tessera col logo della prima e i metodi della seconda",
-          [{"q": ".p2p-tessera-coin"}, {"q": ".p2p-paga"}, 1], out["bersagli"])
-    prova("la tappa del foglio apre quello di Lightning (non on-chain), IN USDe, senza "
-          "metodi ne' importo, con la tendina aperta; l'ultima lo chiude",
-          [[["apri:ln", "disegno:USDE:true:false"], "USDE", 0, True, False, "", ""], ["chiudi:p2pNuovoSheet"]],
+    prova("...e il giro illumina le due tessere col logo",
+          [{"q": ".p2p-tessera-coin"}, {"q": ".p2p-tessera-coin"}, 1], out["bersagli"])
+    prova("la tappa del foglio apre quello di Lightning (non on-chain), IN ETH, senza "
+          "metodi ne' importo; l'ultima lo chiude",
+          [[["apri:ln", "disegno:ETH:false:false"], "ETH", 0, False, False, "", ""], ["chiudi:p2pNuovoSheet"]],
           [out["foglio"], out["centro"]])
     _t = out["testi"]
-    prova("i testi dicono la regola: tre VALUTE come l'euro e l'USDT, il «deposito di "
-          "garanzia», la tessera e la cifra nella moneta, la rete di USDe, la valuta in "
-          "cima con le sue reti, i sats fissati alla pubblicazione, la chiave di Monero, "
-          "l'explorer; mai «resta in euro», «Altri metodi», «escrow» ne' «assicurato»",
+    prova("i testi dicono la regola: due VALUTE come l'euro, il «deposito di garanzia», la "
+          "tessera e la cifra nella moneta, la chiave di Monero, la valuta in cima, il prezzo di "
+          "MERCATO (16 nov 2026), la chiave, l'explorer; mai USDe, «resta in euro», «Altri metodi», "
+          "«escrow» ne' «assicurato»",
           [True] * 10,
-          ["<b>ETH</b>" in _t[0] and "<b>Monero</b>" in _t[0] and "<b>USDe</b>" in _t[0]
-           and "tre valute nuove" in _t[0],
-           "come l'<b>euro</b> o l'<b>USDT</b>" in _t[1], "<b>deposito di garanzia</b>" in _t[1],
-           "<b>tessera</b>" in _t[2] and "nella moneta" in _t[2], "<b>rete</b>" in _t[3],
-           "<b>valuta</b>" in _t[5] and "solo le sue reti" in _t[5],
-           "si fissano quando pubblichi" in _t[6],
-           "con Monero anche la chiave" in _t[6] and "<eth><xmr><usde>" in _t[6],
+          ["<b>ETH</b>" in _t[0] and "<b>Monero</b>" in _t[0] and "USDe" not in "".join(_t)
+           and "due valute nuove" in _t[0],
+           "come l'<b>euro</b>" in _t[1], "<b>deposito di garanzia</b>" in _t[1],
+           "<b>tessera</b>" in _t[2] and "nella moneta" in _t[2], "<b>chiave</b>" in _t[3],
+           "<b>valuta</b>" in _t[5],
+           "<b>mercato</b>" in _t[6] and "si fissano quando pubblichi" not in _t[6],
+           "con Monero anche la chiave" in _t[6] and "<eth><xmr></span>" in _t[6],
            "<b>explorer</b>" in _t[6],
            not any(("escrow" in x.lower() or "assicurat" in x.lower() or "resta in <b>euro" in x
                     or "Altri metodi" in x) for x in _t)])
@@ -160555,12 +160592,13 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
     prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
     dett = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
     fine = pezzo_js(mini, "function fineTutorialCoinP2P(finito){", "\n}\n")
-    prova("IL GIRO DEGLI USDT DAL BANNER SOLO: finito quello delle monete, col banner "
-          "che porta gli USDT parte il loro, appoggiato al rettangolo blu; chi salta, salta",
-          [True, True, True, 0],
-          ["const poiUsdt = finito === true && !!el('p2pCoinNovita')?.classList.contains('con-usdt')" in fine,
-           "if (poiUsdt) setTimeout(tutorialUsdtP2P, 450);" in fine,
-           "return el('p2pUsdtNovita') || el('p2pCoinNovita');" in mini,
+    # (16 nov 2026, ricevi-mercato) il banner solo non c'e' piu': le stablecoin
+    # hanno il loro verde e il loro giro, ETH e Monero il blu e il loro
+    prova("TRE BANNER, TRE GIRI: il giro delle monete non passa piu' la mano a quello degli "
+          "USDT, che si appoggia solo al suo verde",
+          [False, False, True, 0],
+          ["poiUsdt" in fine, "setTimeout(tutorialUsdtP2P" in fine,
+           "function nodoNovitaUsdtP2P(){\n  return el('p2pUsdtNovita');\n}" in mini,
            mini.count("trova: () => el('p2pUsdtNovita'),")])
     prova("I FILI: il libro on-chain dice i due cancelli a chi guarda; il foglio on-chain "
           "mette i tasti al posto di «via on-chain»; la presa passa la scelta; il foglio "

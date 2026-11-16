@@ -4357,11 +4357,9 @@
   /* il nome su UNA riga anche a 320 px (giro dal vivo: andava a capo
      dopo «XMR ·»): sotto i 360 px loghi e scritta un filo piu' piccoli */
   .p2p-coin-novita .p2p-oc-novita-testo{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  /* CON GLI USDT DENTRO (16 nov 2026, un banner solo): quattro loghi e
-     quattro nomi non stanno su una riga a 390 px (giro dal vivo: «USDT · ETH ·
-     XMR · US…»), quindi il nome va su due righe pari, «USDT · ETH» e
-     «XMR · USDe», mai mozzato */
-  .p2p-coin-novita.con-usdt .p2p-oc-novita-testo{white-space:normal;line-height:1.15;font-size:15px}
+  /* il verde delle stablecoin coi due loghi (16 nov 2026, ricevi-mercato):
+     acceso, il filo bianco come sul blu */
+  .p2p-oc-novita.p2p-usdt-novita.acceso .p2p-coin-trio .p2p-coin-svg{box-shadow:0 0 0 2px rgba(255,255,255,.9)}
   @media (max-width:360px){
     .p2p-coin-novita .p2p-oc-novita-testo{font-size:14px}
     .p2p-coin-trio .p2p-coin-svg{width:22px;height:22px}
@@ -62679,33 +62677,50 @@ const P2P_USDT_MONETA = '<span class="cambio-moneta usdt p2p-oc-moneta" aria-hid
 function novitaUsdtVistaP2P(){
   return typeof usdtVistoP2P === 'function' && usdtVistoP2P() && !DEMO && !VETRINA;
 }
+/* LE STABLECOIN INSIEME (16 nov 2026, cantiere ricevi-mercato, Andrea:
+   «mettimi insieme USDT e USDE in un unico banner, dato che sono
+   stablecoin, con il banner verde, come era prima USDT, e sotto il terzo
+   banner con XMR e ETH, blu», e «tutorial dedicati, ovviamente»): il
+   verde lo vede chi vede gli USDT o USDe (che si accende con le monete),
+   e dice quel che vede. Rovescia il «banner solo» blu della mattina */
+function novitaUsdeVistaP2P(){
+  return typeof novitaCoinVistaP2P === 'function' && novitaCoinVistaP2P();
+}
+function novitaStableVistaP2P(){
+  return novitaUsdtVistaP2P() || novitaUsdeVistaP2P();
+}
 /* appeso sempre, a chi lo vede (vedi sopra) */
 function novitaUsdtAppesaP2P(){
-  return novitaUsdtVistaP2P();
+  return novitaStableVistaP2P();
+}
+/* la faccia del verde: la moneta di Tether da sola, o i due loghi
+   accavallati quando c'e' USDe (`P2P_USDT_LOGO_TRIO` e `P2P_LOGHI_COIN`
+   nascono piu' giu' nel file: si leggono qui, a pagina viva) */
+function facciaStableP2P(usdt, usde){
+  if (!usde) return P2P_USDT_MONETA;
+  return '<span class="p2p-coin-trio" aria-hidden="true">'
+    + (usdt && typeof P2P_USDT_LOGO_TRIO !== 'undefined' ? P2P_USDT_LOGO_TRIO : '')
+    + (typeof P2P_LOGHI_COIN !== 'undefined' ? P2P_LOGHI_COIN.usde : '') + '</span>';
 }
 let tutorialUsdtLato = null;   // il lato da rimettere alla fine; null = nessun tutorial
 let p2pUsdtTutorialTimer = null;
 function novitaUsdtLibroP2P(){
-  if (!novitaUsdtVistaP2P()) return '';
-  /* UN BANNER SOLO (16 nov 2026, Andrea: «3 banner novità sono troppi.
-     Mettimi Ethereum, XMR, USDE nel banner di USDT»): con le monete
-     accese gli USDT entrano nel banner blu di quelle (`novitaCoinLibroP2P`),
-     e questo verde resta solo a chi vede gli USDT e non le monete */
-  if (typeof novitaCoinVistaP2P === 'function' && novitaCoinVistaP2P()) return '';
+  const usdt = novitaUsdtVistaP2P(), usde = novitaUsdeVistaP2P();
+  if (!usdt && !usde) return '';
   const appeso = novitaUsdtAppesaP2P();
   if (appeso && typeof testaAltaP2P === 'function') testaAltaP2P();
   return '<div class="p2p-oc-novita p2p-usdt-novita' + (appeso ? ' appeso' : '')
     + (tutorialUsdtLato !== null || p2pUsdtTutorialTimer ? ' acceso' : '') + '" id="p2pUsdtNovita">'
     + '<button type="button" class="p2p-oc-faccia" onclick="apriNovitaUsdtP2P()">'
-    + P2P_USDT_MONETA + '<span class="p2p-oc-novita-testo">USDT</span>'
+    + facciaStableP2P(usdt, usde) + '<span class="p2p-oc-novita-testo">'
+    + (usdt && usde ? 'USDT · USDe' : usde ? 'USDe' : 'USDT') + '</span>'
     + '<span class="p2p-oc-novita-tag">Novità</span>'
     + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
     + '</div>';
 }
-/* il rettangolo a cui il giro degli USDT si appoggia: il suo verde, o
-   dal 16 nov 2026 il banner blu che lo contiene (un banner solo) */
+/* il rettangolo a cui il giro delle stablecoin si appoggia: il verde */
 function nodoNovitaUsdtP2P(){
-  return el('p2pUsdtNovita') || el('p2pCoinNovita');
+  return el('p2pUsdtNovita');
 }
 function accendiNovitaUsdtP2P(si){
   const r = nodoNovitaUsdtP2P();
@@ -62734,30 +62749,46 @@ function apriNovitaUsdtP2P(){
    tappe del foglio hanno un ripiego (`p2pNuovoCorpo`): il motore scarta
    all'avvio le tappe senza bersaglio, e il foglio nasce alla sua tappa. */
 const TAPPE_TUTORIAL_USDT_P2P = [
+  /* (16 nov 2026, ricevi-mercato) le stablecoin: i testi dicono quel che
+     chi guarda vede — gli USDT, USDe, o tutt'e due —, e le tappe di una
+     moneta che non vede non hanno bersaglio (il motore le scarta) */
   { trova: () => nodoNovitaUsdtP2P(),
-    testo: `<b>Novità!</b> Da oggi puoi scambiare bitcoin anche in <b>USDT</b>, il dollaro digitale: 1 USDT vale 1 dollaro.` },
+    get testo(){
+      const usdt = novitaUsdtVistaP2P(), usde = novitaUsdeVistaP2P();
+      return usdt && usde
+        ? `<b>Novità!</b> Puoi scambiare bitcoin anche con le <b>stablecoin</b>: <b>USDT</b> e <b>USDe</b>, dollari digitali da circa 1 dollaro.`
+        : usde ? `<b>Novità!</b> Da oggi puoi scambiare bitcoin anche in <b>USDe</b>, il dollaro digitale di Ethena: vale circa 1 dollaro.`
+        : `<b>Novità!</b> Da oggi puoi scambiare bitcoin anche in <b>USDT</b>, il dollaro digitale: 1 USDT vale 1 dollaro.`; } },
   { trova: () => nodoNovitaUsdtP2P(),
-    testo: `I sats restano nel <b>deposito di garanzia</b> come sempre; gli USDT passano direttamente da una persona all'altra.` },
-  { trova: () => esempioTutorialUsdtP2P('USDT'), tondo: true,
+    get testo(){ return `I sats restano nel <b>deposito di garanzia</b> come sempre; `
+      + (novitaUsdeVistaP2P() ? 'le stablecoin' : 'gli USDT') + ` passano direttamente da una persona all'altra.`; } },
+  { trova: () => novitaUsdtVistaP2P() ? esempioTutorialUsdtP2P('USDT') : null, tondo: true,
     testo: `Un ordine in USDT lo riconosci dalla <b>T verde</b> di Tether.` },
+  { trova: () => novitaUsdeVistaP2P() ? esempioTutorialUsdtP2P('USDE') : null, tondo: true,
+    testo: `USDe ha il suo logo, col bollino della <b>rete</b> su cui si manda.` },
   { trova: () => esempioTutorialUsdtP2P('EUR'), tondo: true,
     testo: `Gli ordini in euro hanno invece le <b>stelle dell'Europa</b>.` },
   { trova: () => piuGiroP2P(), tondo: true,
     testo: `Vuoi pubblicarne uno tu? Tocca il <b>+</b>…` },
   { prima: () => foglioTutorialUsdtP2P(false), trova: () => el('p2pNuovoValutaBtn')?.closest('.p2p-sez') || el('p2pNuovoCorpo'),
-    testo: `…e in cima al foglio scegli la valuta: <b>USDT</b> al posto degli euro.` },
+    get testo(){ return novitaUsdtVistaP2P() && novitaUsdeVistaP2P()
+      ? `…e in cima al foglio scegli la valuta: <b>USDT</b> o <b>USDe</b> al posto degli euro.`
+      : `…e in cima al foglio scegli la valuta: <b>${novitaUsdtVistaP2P() ? 'USDT' : 'USDe'}</b> al posto degli euro.`; } },
   { prima: () => foglioTutorialUsdtP2P(true),
     trova: () => el('p2pNuovoMetodiBtn')?.closest('.p2p-sez') || el('p2pNuovoMetodiBtn') || el('p2pNuovoCorpo'),
-    testo: `Al posto dei metodi scegli la rete: <b>Tron</b>, <b>Ethereum</b> o tutte e due.` },
+    get testo(){ return novitaUsdtVistaP2P()
+      ? `Al posto dei metodi scegli la rete: <b>Tron</b>, <b>Ethereum</b> o tutte e due.`
+        + (novitaUsdeVistaP2P() ? ` USDe ne ha cinque.` : '')
+      : `Al posto dei metodi scegli la rete: Ethereum, Arbitrum, Base, BNB Chain o Solana.`; } },
   /* AL CENTRO, a foglio chiuso: la regola che salva i soldi, la rete */
   { prima: () => { if (el('p2pNuovoSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pNuovoSheet'); },
     trova: () => el('p2pCorpo'), centro: true,
-    testo: `<span class="tour-reti" aria-hidden="true">${P2P_USDT_MONETA}</span>`
-      + `Chi riceve scrive il suo indirizzo USDT e l'app controlla che la <b>rete</b> sia giusta. `
-      + `Chi paga incolla l'id della transazione e tocca «Ho inviato gli USDT».` },
+    get testo(){ return `<span class="tour-reti" aria-hidden="true">${facciaStableP2P(novitaUsdtVistaP2P(), novitaUsdeVistaP2P())}</span>`
+      + `Chi riceve scrive il suo indirizzo e l'app controlla che la <b>rete</b> sia giusta. `
+      + `Chi paga incolla l'id della transazione e tocca «Ho inviato».`; } },
 ];
 function tutorialUsdtP2P(){
-  if (tourInCorso || !novitaUsdtVistaP2P() || document.querySelector('.view.active')?.id !== 'view-p2p') {
+  if (tourInCorso || !novitaStableVistaP2P() || document.querySelector('.view.active')?.id !== 'view-p2p') {
     if (tutorialUsdtLato === null) accendiNovitaUsdtP2P(false);
     return;
   }
@@ -62783,12 +62814,15 @@ function esempioTutorialUsdtP2P(cod){
     t = document.createElement('div');
     t.className = 'p2p-usdt-esempi';
     t.setAttribute('aria-hidden', 'true');
-    t.innerHTML = carta('USDT', ['USDT (Tron)'], 50) + carta('EUR', ['Revolut'], 50);
+    /* ...e una in USDe su Base, col suo bollino, a chi vede USDe */
+    t.innerHTML = carta('USDT', ['USDT (Tron)'], 50) + carta('EUR', ['Revolut'], 50)
+      + (novitaUsdeVistaP2P() ? carta('USDE', ['USDe (Base)'], 50) : '');
     const nov = nodoNovitaUsdtP2P();
     if (nov && nov.parentNode === box) nov.after(t); else box.prepend(t);
   }
-  const card = t.querySelectorAll('.p2p-ord')[cod === 'USDT' ? 0 : 1];
-  return card ? card.querySelector(cod === 'USDT' ? '.p2p-tessera-usdt' : '.p2p-tessera-eur') : null;
+  const card = t.querySelectorAll('.p2p-ord')[cod === 'USDT' ? 0 : cod === 'EUR' ? 1 : 2];
+  return card ? card.querySelector(cod === 'USDT' ? '.p2p-tessera-usdt'
+    : cod === 'EUR' ? '.p2p-tessera-eur' : '.p2p-tessera-coin') : null;
 }
 /* il + «toccato» dal tutorial: il foglio «Pubblica» di Lightning si apre
    sotto il velo, gia' in USDT; alla tappa delle reti la tendina e'
@@ -62799,7 +62833,8 @@ function foglioTutorialUsdtP2P(reti){
     apriNuovoOrdineP2P();
   }
   if (!el('p2pNuovoSheet')?.classList.contains('open')) return;
-  p2pNuovoValuta = 'USDT';
+  /* in USDe a chi vede solo quella (16 nov 2026) */
+  p2pNuovoValuta = novitaUsdtVistaP2P() ? 'USDT' : 'USDE';
   p2pNuovoMetodi = [];
   p2pNuovoAperta = !!reti;
   renderNuovoOrdineP2P();
@@ -62814,6 +62849,8 @@ function fineTutorialUsdtP2P(){
   tutorialUsdtLato = null;
   document.querySelectorAll('.p2p-usdt-esempi').forEach(n => n.remove());
   if (el('p2pNuovoSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pNuovoSheet');
+  /* il foglio del prossimo + torna in euro: l'USDe era del giro */
+  if (p2pNuovoValuta === 'USDE') { p2pNuovoValuta = 'EUR'; p2pNuovoAperta = false; }
   if (lato && lato !== p2pLato) setLatoP2P(lato, true);
   accendiNovitaUsdtP2P(false);
 }
@@ -62844,10 +62881,11 @@ function fineTutorialUsdtP2P(){
    essere effettivamente blu come il colore di Ethereum») */
 const P2P_USDT_LOGO_TRIO = '<svg class="p2p-coin-svg" viewBox="0 0 32 32" aria-hidden="true">'
   + '<circle cx="16" cy="16" r="16" fill="#26A17B"/><path fill="#FFF" transform="translate(16 16) scale(.78) translate(-16 -16)" d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117"/></svg>';
-function trioCoinP2P(conUsdt){
+/* (16 nov 2026, ricevi-mercato) ETH e Monero soli: USDe e' andato con
+   gli USDT nel verde delle stablecoin */
+function trioCoinP2P(){
   return '<span class="p2p-coin-trio" aria-hidden="true">'
-    + (conUsdt ? P2P_USDT_LOGO_TRIO : '')
-    + P2P_LOGHI_COIN.eth + P2P_LOGHI_COIN.xmr + P2P_LOGHI_COIN.usde + '</span>';
+    + P2P_LOGHI_COIN.eth + P2P_LOGHI_COIN.xmr + '</span>';
 }
 function novitaCoinVistaP2P(){
   return typeof coinVistoP2P === 'function' && coinVistoP2P() && !DEMO && !VETRINA;
@@ -62856,13 +62894,11 @@ let tutorialCoinLato = null;   // il lato da rimettere alla fine; null = nessun 
 let p2pCoinTutorialTimer = null;
 function novitaCoinLibroP2P(){
   if (!novitaCoinVistaP2P()) return '';
-  /* ...con gli USDT dentro, quando chi guarda li vede (vedi sopra) */
-  const conUsdt = typeof novitaUsdtVistaP2P === 'function' && novitaUsdtVistaP2P();
   if (typeof testaAltaP2P === 'function') testaAltaP2P();
-  return '<div class="p2p-oc-novita p2p-coin-novita appeso' + (conUsdt ? ' con-usdt' : '')
+  return '<div class="p2p-oc-novita p2p-coin-novita appeso'
     + (tutorialCoinLato !== null || p2pCoinTutorialTimer ? ' acceso' : '') + '" id="p2pCoinNovita">'
     + '<button type="button" class="p2p-oc-faccia" onclick="apriNovitaCoinP2P()">'
-    + trioCoinP2P(conUsdt) + '<span class="p2p-oc-novita-testo">' + (conUsdt ? 'USDT · ETH<br>XMR · USDe' : 'ETH · XMR · USDe') + '</span>'
+    + trioCoinP2P() + '<span class="p2p-oc-novita-testo">ETH · XMR</span>'
     + '<span class="p2p-oc-novita-tag">Novità</span>'
     + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
     + '</div>';
@@ -62887,38 +62923,37 @@ function apriNovitaCoinP2P(){
     tutorialCoinP2P();
   }, 480);
 }
-/* LE TAPPE: la novita' e la regola sul banner — tre VALUTE nuove, come
-   l'euro e l'USDT (16 nov 2026, cantiere p2p-monete-valute, che rifa' le
-   tappe del giorno prima, quando erano metodi di un ordine in euro) —; la
-   tessera di una card finta in ETH con la cifra nella moneta, e su una
-   card in USDe le sue reti; il +, il foglio «Pubblica» in USDe con le
-   sole reti di USDe aperte, e al centro il prezzo fissato e come si paga
+/* LE TAPPE (16 nov 2026, rifatte col giro ricevi-mercato: il blu e' di
+   ETH e Monero, USDe sta nel verde delle stablecoin): la novita' e la
+   regola sul banner, due VALUTE come l'euro; le tessere di due card
+   finte, in ETH e in XMR, con la cifra nella moneta; il +, il foglio
+   «Pubblica» in ETH, e al centro il prezzo di mercato e come si paga
    senza sbagliare: indirizzo controllato, id della transazione (con
    Monero anche la chiave) e il controllo sull'explorer. Testi in due
    righe a 320 px, la regola del giro guidato; le tappe del foglio col
    ripiego (`p2pNuovoCorpo`), come negli USDT. */
 const TAPPE_TUTORIAL_COIN_P2P = [
   { trova: () => el('p2pCoinNovita'),
-    testo: `<b>Novità!</b> Nel P2P ci sono tre valute nuove: <b>ETH</b>, <b>Monero</b> (XMR) e <b>USDe</b>.` },
+    testo: `<b>Novità!</b> Nel P2P ci sono due valute nuove: <b>ETH</b> e <b>Monero</b> (XMR).` },
   { trova: () => el('p2pCoinNovita'),
-    testo: `Funzionano come l'<b>euro</b> o l'<b>USDT</b>: con ognuna compri o vendi sats, che restano nel <b>deposito di garanzia</b>.` },
+    testo: `Funzionano come l'<b>euro</b>: con ognuna compri o vendi sats, che restano nel <b>deposito di garanzia</b>.` },
   { trova: () => esempioTutorialCoinP2P(0), tondo: true,
     testo: `Ogni valuta ha la sua <b>tessera</b>, e la cifra è nella moneta: qui si mandano <b>ETH</b>.` },
-  { trova: () => esempioTutorialCoinP2P(1),
-    testo: `Con USDe scegli anche la <b>rete</b>: qui Ethereum o Base.` },
+  { trova: () => esempioTutorialCoinP2P(1), tondo: true,
+    testo: `Monero ha la tessera arancione: chi paga dà anche la <b>chiave</b> della transazione.` },
   { trova: () => piuGiroP2P(), tondo: true,
     testo: `Vuoi pubblicarne uno tu? Tocca il <b>+</b>…` },
-  { prima: () => foglioTutorialCoinP2P(), trova: () => el('p2pNuovoMetodiBtn')?.closest('.p2p-sez') || el('p2pNuovoMetodiBtn') || el('p2pNuovoCorpo'),
-    testo: `…scegli la <b>valuta</b> in cima: sotto trovi solo le sue reti, e l'importo lo scrivi nella moneta.` },
-  /* AL CENTRO, a foglio chiuso: come si paga senza sbagliare. Il testo
-     e' un GETTER: i tre loghi (`P2P_LOGHI_COIN`) nascono molto piu' giu'
-     nel file, e un template scritto qui li cercherebbe al caricamento —
-     «Cannot access before initialization», e la pagina intera si ferma
+  { prima: () => foglioTutorialCoinP2P(), trova: () => el('p2pNuovoValutaBtn')?.closest('.p2p-sez') || el('p2pNuovoCorpo'),
+    testo: `…scegli la <b>valuta</b> in cima, e l'importo lo scrivi nella moneta.` },
+  /* AL CENTRO, a foglio chiuso: il prezzo e come si paga senza sbagliare.
+     Il testo e' un GETTER: i loghi (`P2P_LOGHI_COIN`) nascono molto piu'
+     giu' nel file, e un template scritto qui li cercherebbe al caricamento
+     — «Cannot access before initialization», e la pagina intera si ferma
      (l'ha detto il giro dal vivo, non le prove) */
   { prima: () => { if (el('p2pNuovoSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pNuovoSheet'); },
     trova: () => el('p2pCorpo'), centro: true,
-    get testo(){ return `<span class="tour-reti tour-coin" aria-hidden="true">${P2P_LOGHI_COIN.eth}${P2P_LOGHI_COIN.xmr}${P2P_LOGHI_COIN.usde}</span>`
-      + `I sats si fissano quando pubblichi, al cambio di quel momento. Chi riceve scrive il suo indirizzo, `
+    get testo(){ return `<span class="tour-reti tour-coin" aria-hidden="true">${P2P_LOGHI_COIN.eth}${P2P_LOGHI_COIN.xmr}</span>`
+      + `Il prezzo è quello di <b>mercato</b>, al cambio del momento in cui qualcuno prende. Chi riceve scrive il suo indirizzo, `
       + `chi paga incolla l'id della transazione (con Monero anche la chiave): un tocco, e lo controllate sull'<b>explorer</b>.`; },
   },
 ];
@@ -62932,8 +62967,8 @@ function tutorialCoinP2P(){
   if (!avviaTour(TAPPE_TUTORIAL_COIN_P2P, fineTutorialCoinP2P)) fineTutorialCoinP2P();
 }
 /* LE DUE CARD FINTE, subito sotto il «Novità»: una in ETH da 0,02 (la
-   tessera col logo, la cifra nella moneta) e una in USDe da 50 su due
-   reti (la scatola dei metodi). I sats sono fissi come quelli di un
+   tessera col logo, la cifra nella moneta) e una in XMR da 0,1 (dal 16
+   nov 2026, ricevi-mercato: prima USDe). I sats sono fissi come quelli di un
    ordine vero in moneta, al cambio di adesso (senza cambio un numero
    tondo: e' un esempio, e lo dice il volto «Esempio»). La card
    d'esempio del giro guidato (`rigaOrdineP2P` con `esempio`), senza id e
@@ -62956,12 +62991,12 @@ function esempioTutorialCoinP2P(quale){
     t.className = 'p2p-coin-esempi';
     t.setAttribute('aria-hidden', 'true');
     t.innerHTML = carta('ETH', 0.02, ['ETH (Ethereum)'], 60000)
-      + carta('USDE', 50, ['USDe (Ethereum)', 'USDe (Base)'], 50000);
+      + carta('XMR', 0.1, ['XMR (Monero)'], 30000);
     const nov = el('p2pCoinNovita');
     if (nov && nov.parentNode === box) nov.after(t); else box.prepend(t);
   }
   const card = t.querySelectorAll('.p2p-ord')[quale ? 1 : 0];
-  return card ? card.querySelector(quale ? '.p2p-paga' : '.p2p-tessera-coin') : null;
+  return card ? card.querySelector('.p2p-tessera-coin') : null;
 }
 /* il + «toccato» dal tutorial: il foglio «Pubblica» di Lightning si apre
    sotto il velo IN USDe, con la tendina aperta: si vedono la valuta in
@@ -62972,30 +63007,24 @@ function foglioTutorialCoinP2P(){
     apriNuovoOrdineP2P();
   }
   if (!el('p2pNuovoSheet')?.classList.contains('open')) return;
-  p2pNuovoValuta = 'USDE';
+  p2pNuovoValuta = 'ETH';
   p2pNuovoMetodi = [];
   p2pNuovoEuro = '';
   p2pNuovoEuroMax = '';
-  p2pNuovoAperta = true;
+  p2pNuovoAperta = false;
   renderNuovoOrdineP2P();
 }
 /* la fine, qualunque strada la porti: via le card finte e il foglio, il
    lato di partenza, e si torna al libro (il «Novità» resta appeso) */
 function fineTutorialCoinP2P(finito){
   const lato = tutorialCoinLato;
-  /* UN BANNER SOLO (16 nov 2026): con gli USDT dentro, il giro delle
-     monete arrivato in fondo passa la mano a quello degli USDT, che si
-     appoggia allo stesso rettangolo blu; chi salta, salta tutti e due */
-  const poiUsdt = finito === true && !!el('p2pCoinNovita')?.classList.contains('con-usdt')
-    && typeof tutorialUsdtP2P === 'function';
   tutorialCoinLato = null;
   document.querySelectorAll('.p2p-coin-esempi').forEach(n => n.remove());
   if (el('p2pNuovoSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pNuovoSheet');
-  /* il foglio del prossimo + torna in euro: l'USDe era del giro */
-  if (p2pNuovoValuta === 'USDE') { p2pNuovoValuta = 'EUR'; p2pNuovoAperta = false; }
+  /* il foglio del prossimo + torna in euro: l'ETH era del giro */
+  if (p2pNuovoValuta === 'ETH') { p2pNuovoValuta = 'EUR'; p2pNuovoAperta = false; }
   if (lato && lato !== p2pLato) setLatoP2P(lato, true);
   accendiNovitaCoinP2P(false);
-  if (poiUsdt) setTimeout(tutorialUsdtP2P, 450);
 }
 /* ============ fine del «Novità» di ETH, Monero e USDe ============ */
 
