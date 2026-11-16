@@ -349,6 +349,9 @@ def main():
     SRV.ADMIN_IDS = [999, 888]
     SRV.ONCHAIN_ATTIVO = True
     SRV.P2P_ATTIVO = True
+    # (16 nov 2026, p2p-onchain-commissione) commissione del P2P on-chain
+    # a zero: il giro di prima (la vera: collaudo_p2p_onchain_commissione)
+    SRV._P2P_INFO["fee"] = 0.0
     SRV.P2P_ONCHAIN_ATTIVO = True
     SRV.MOSTRO_HEX = "cd" * 32
     SRV.MOSTRO_RELAY = ["ws://127.0.0.1:9"]

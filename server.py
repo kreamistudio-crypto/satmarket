@@ -100831,6 +100831,15 @@ async def onchain_controlla(oid: int) -> str:
     return stato
 
 
+def _onchain_incasso_sats(o) -> int:
+    """QUANTO ARRIVA ALL'INCASSO di un rilascio: il prezzo, meno la meta'
+    della commissione di chi riceve sugli scambi P2P on-chain (16 nov 2026,
+    cantiere p2p-onchain-commissione). Una riga del mercatino quella
+    colonna non ce l'ha: il prezzo intero, come ieri. PURA."""
+    return int(o["prezzo_sats"]) - int(
+        _p2p_onchain_campo(o, "quota_ricevente_sats", 0) or 0)
+
+
 def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
                           chiave_firmatario: str, decisa: bool = False) -> None:
     """Il server legge la proposta prima di passarla all'altro, e dice di
@@ -100866,7 +100875,7 @@ def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
             raise ValueError("chi ha messo i sats non ha ancora scelto dove "
                              "ricevere il resto: il rilascio aspetta il suo "
                              "wallet")
-        if [v for d, v in uscite if d == o["incasso"]] != [o["prezzo_sats"]]:
+        if [v for d, v in uscite if d == o["incasso"]] != [_onchain_incasso_sats(o)]:
             raise ValueError("al venditore deve andare esattamente il prezzo")
         permessi = (o["incasso"], o["rimborso"])
         # la quota di Barattolo, se l'ordine ne ha una: esatta, una volta
@@ -100995,10 +101004,10 @@ def _onchain_psbt_barattolo(con, oc, verso: str) -> str:
             raise ValueError("chi vende non ha ancora scelto dove ricevere: "
                              "decidi di nuovo quando l'ha fatto")
         quota = int(oc["quota_sats"] or 0)
-        uscite = [(oc["incasso"], int(oc["prezzo_sats"]))]
+        uscite = [(oc["incasso"], _onchain_incasso_sats(oc))]
         if quota:
             uscite.append((oc["quota_indirizzo"], quota))
-        resto = tot - int(oc["prezzo_sats"]) - quota - rete(3 if quota else 2)
+        resto = tot - _onchain_incasso_sats(oc) - quota - rete(3 if quota else 2)
         if resto >= ONCHAIN_POLVERE and oc["rimborso"]:
             uscite.append((oc["rimborso"], resto))
     else:
@@ -102603,7 +102612,13 @@ def _p2p_onchain_prepara(con):
                       ("rimborso_tipo", "TEXT DEFAULT ''"),
                       ("rimborso_valore", "TEXT DEFAULT ''"),
                       ("rimborso_firma", "TEXT DEFAULT ''"),
-                      ("rimborso_indice", "INTEGER DEFAULT 0")):
+                      ("rimborso_indice", "INTEGER DEFAULT 0"),
+                      # 16 nov 2026, cantiere p2p-onchain-commissione: la
+                      # META' della commissione di chi RICEVE i bitcoin, che
+                      # esce dal suo incasso (quella di chi deposita sta
+                      # dentro `importo_sats`); le due insieme sono
+                      # `quota_sats`, l'uscita verso Barattolo
+                      ("quota_ricevente_sats", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -102708,7 +102723,9 @@ def _p2p_onchain_testi_presa(o, nome: str = "") -> dict:
     return {
         dep: (testa(dep) + f"Vendi {quanto}.\n\n"
               f"Apri Barattolo: tocca a te depositare <b>{_fmt_sats(int(o['importo_sats']))} "
-              "sats</b> (prezzo + margine di rete) nell'indirizzo 2-di-3."
+              "sats</b> (prezzo + margine di rete"
+              + (" + la tua metà della commissione" if int(o['quota_sats'] or 0) else "")
+              + ") nell'indirizzo 2-di-3."
               f"\n\n⏳ <b>Hai {P2P_ONCHAIN_ORE_DEPOSITO} ore</b>, poi chi compra può rinunciare."),
         ric: (testa(ric) + f"Compri {quanto}.\n\n"
               "Apri Barattolo: appena chi vende deposita i sats e la rete li "
@@ -102923,6 +102940,12 @@ def _p2p_onchain_libro(chi: int) -> dict:
              "maxEuro": int(ONCHAIN_MAX_EURO or 0)}
     if chi:
         fuori["miei"] = miei
+        # I DUE TASTI DELLA RETE NEL FOGLIO DI CHI PRENDE (16 nov 2026, Andrea:
+        # «sotto ci devono essere già i due tasti per scegliere»): se chi
+        # guarda potrebbe ricevere in Lightning o depositare da Lightning,
+        # gli stessi cancelli della pagina dello scambio, detti PRIMA
+        fuori["lnPossibile"] = bool(p2p_onchain_ln_per(chi))
+        fuori["depositoLnPossibile"] = bool(p2p_onchain_deposito_ln_per(chi))
     return fuori
 
 
@@ -103036,6 +103059,9 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
                          if o["incasso_tipo"] else None),
         "quota_sats": int(o["quota_sats"] or 0),
         "quota_indirizzo": o["quota_indirizzo"] or "",
+        # (16 nov 2026, p2p-onchain-commissione) la meta' di chi riceve:
+        # il suo incasso e' il prezzo meno questa, e il telefono la rilegge
+        "quota_ricevente_sats": int(_p2p_onchain_campo(o, "quota_ricevente_sats", 0) or 0),
         "indirizzo": indirizzo, "proposta": proposta,
         "txid_uscita": o["txid_uscita"] or "",
         "scade": int(o["scade"]), "preso_il": int(o["preso_il"] or 0),
@@ -103527,6 +103553,35 @@ async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
     return {"ok": True}
 
 
+def _p2p_onchain_commissioni(con, dep: int, ric: int, prezzo: int, fee) -> tuple:
+    """LA COMMISSIONE DI UNO SCAMBIO P2P ON-CHAIN (16 nov 2026, cantiere
+    p2p-onchain-commissione, Andrea: «Deve essere uguale, come commissione
+    deve essere uguale a quella del lighting»). La regola del coordinatore
+    su Lightning, rifatta qui perche' il 2-di-3 Mostro non lo vede: la fee
+    viva del 38385 (`fee`, una frazione: 0.03 in beta) META' A TESTA sul
+    prezzo, e lo sconto fedelta' di ognuno sulla SUA meta' (`_fee_di_p2p`,
+    lo stesso giudice della frase del concluso: pioniere o livello 5 =
+    l'1% invece dell'1,5%). Torna (meta' di chi deposita, meta' di chi
+    riceve) in sats. Chi deposita mette la sua meta' SOPRA prezzo e
+    margine, chi riceve trova la sua tolta dall'incasso: come la hold
+    invoice e il payout di Mostro.
+    SOTTO LA POLVERE NON SI PRENDE NIENTE: un'uscita verso Barattolo
+    sotto i 546 sats la rete non la trasmette, e scaricarla sulla
+    commissione di rete la farebbe pagare ai miner; quindi a commissione
+    totale sotto la polvere tutt'e due le meta' sono zero (succede solo
+    sugli scambi piu' piccoli, sotto i ~18.000 sats in beta).
+    `fee` None = il 38385 non si e' letto: ValueError, e la presa non
+    parte (meglio un «riprova» che una commissione inventata). PURA sulla
+    connessione."""
+    if fee is None:
+        raise ValueError("la commissione del P2P non si legge")
+    meta = lambda tg: max(0, round(int(prezzo) * float(_fee_di_p2p(con, int(tg), fee)) / 2))
+    fd, fr = meta(dep), meta(ric)
+    if fd + fr < ONCHAIN_POLVERE:
+        return 0, 0
+    return fd, fr
+
+
 @app.post("/api/p2p/onchain/{oid}/prendi")
 async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Header(""),
                              barattolo_sessione: str = Cookie("")):
@@ -103624,6 +103679,19 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
         rec = o["recapito"] or ""
         if dep == int(user["id"]) and recapito and not rec:
             rec = recapito
+        # LA COMMISSIONE, uguale a quella di Lightning (16 nov 2026): la
+        # meta' di chi deposita entra nell'importo, quella di chi riceve
+        # esce dal suo incasso, e le due vanno a Barattolo su `/1/n` della
+        # SUA xpub, come la quota del mercatino
+        try:
+            q_dep, q_ric = _p2p_onchain_commissioni(con, dep, ric, prezzo,
+                                                    _P2P_INFO["fee"])
+        except ValueError:
+            raise HTTPException(503, "La commissione del P2P adesso non si "
+                                     "legge: riprova fra un minuto")
+        quota = q_dep + q_ric
+        quota_dove = (onchain_incasso(ind["xpub_barattolo"], ind["numero_barattolo"])
+                      if quota else "")
         # `prezzo_sats` si scrive QUI, nella stessa riga dell'importo: a
         # mercato e' nato adesso, e da qui in poi ronda, avvisi e giudice
         # dei PSBT leggono quello
@@ -103634,12 +103702,14 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
             " incasso_firma=?, incasso_indice=?, rimborso=?, recapito=?,"
             " preso_il=?, deposito_entro=?, aggiornato=?, prezzo_sats=?,"
             " cambio_presa=?, rimborso_tipo=?, rimborso_valore=?,"
-            " rimborso_firma=?, rimborso_indice=?"
+            " rimborso_firma=?, rimborso_indice=?, quota_sats=?,"
+            " quota_indirizzo=?, quota_ricevente_sats=?"
             " WHERE id=? AND stato='pending'",
-            (user["id"], dep, ric, ind_id, margine, prezzo + margine,
+            (user["id"], dep, ric, ind_id, margine, prezzo + margine + q_dep,
              incasso, i_tipo, i_val, i_firma, i_ind, rimborso, rec, adesso,
              adesso + P2P_ONCHAIN_ORE_DEPOSITO * 3600, adesso, prezzo,
-             cambio_presa, r_tipo, r_valore, r_firma, r_indice, oid))
+             cambio_presa, r_tipo, r_valore, r_firma, r_indice, quota,
+             quota_dove, q_ric, oid))
         con.commit()
         if not cur.rowcount:
             raise HTTPException(409, "Qualcun altro l'ha preso un attimo fa")
@@ -104458,7 +104528,7 @@ async def p2p_onchain_cambio_preventivo(oid: int, x_tg_init_data: str = Header("
                         (user["id"],)).fetchone()
     finally:
         con.close()
-    p = await _onchain_preventivo_cambio(o["prezzo_sats"])
+    p = await _onchain_preventivo_cambio(_onchain_incasso_sats(o))
     tetto = p2p_altra_rete_tetto()
     if tetto and p.get("ok") and int(p.get("mandi") or 0) > tetto:
         p = dict(p, ok=False, motivo="sopra_tetto", massimo=tetto)
@@ -104494,7 +104564,7 @@ async def p2p_onchain_cambio_fattura(oid: int, req: Request,
                         (user["id"],)).fetchone()
     finally:
         con.close()
-    if not 0 < sats < int(o["prezzo_sats"]):
+    if not 0 < sats < _onchain_incasso_sats(o):
         raise HTTPException(400, "Cifra della fattura fuori misura")
     ln = (u["ln_address"] if u else "") or ""
     if not ln.strip():
@@ -104561,7 +104631,7 @@ async def p2p_onchain_cambio_nasce(oid: int, req: Request,
     con = _p2p_onchain_db()
     try:
         o, ind = _p2p_onchain_mio_ln(con, oid, user["id"], confermato=True)
-        if not 0 < ricevi < mandi <= int(o["prezzo_sats"]):
+        if not 0 < ricevi < mandi <= _onchain_incasso_sats(o):
             raise HTTPException(400, "Le cifre dello swap non tornano col "
                                      "prezzo dello scambio")
         tetto = p2p_altra_rete_tetto()

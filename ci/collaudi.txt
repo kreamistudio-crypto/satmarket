@@ -149,6 +149,7 @@ collaudo_onchain_verso_lightning
 collaudo_onchain_rete_pannello
 collaudo_p2p_onchain
 collaudo_p2p_onchain_usdt
+collaudo_p2p_onchain_commissione
 collaudo_leve_pannello
 collaudo_certificati_relay
 collaudo_filtro_avorio

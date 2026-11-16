@@ -35746,6 +35746,38 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   li prendono col typeof (`usdtOc`, `cifraOc`, `paroleOc`): i banchi che
   le ritagliano da sole restano quelli di ieri. Il collaudo:
   `collaudo_p2p_onchain_usdt`; le prove: `prove_p2p_onchain_usdt`.
+- LA COMMISSIONE DEL P2P ON-CHAIN, UGUALE A LIGHTNING (16 nov 2026,
+  cantiere p2p-onchain-commissione; il perché in CANTIERI, «La
+  commissione del P2P on-chain, uguale a Lightning»). Alla presa
+  `_p2p_onchain_commissioni(con, dep, ric, prezzo, fee)` conta le due
+  metà dalla fee VIVA del nodo (`_P2P_INFO["fee"]`, la stessa del conto
+  Lightning), ognuna col suo sconto (`_fee_di_p2p`); sotto
+  `ONCHAIN_POLVERE` in tutto niente commissione; fee ignota = 503 (mai
+  una presa a commissione inventata). Chi deposita mette la sua metà
+  sopra (`importo_sats = prezzo + margine + q_dep`), `quota_sats` = le
+  due metà all'indirizzo di Barattolo (`/1/numero_barattolo` di
+  `xpub_barattolo`, come nel mercatino), la colonna nuova
+  `quota_ricevente_sats` = la metà di chi riceve, che
+  `_onchain_incasso_sats(o)` toglie dall'uscita d'incasso: giudice dei
+  PSBT, firma di Barattolo e misura del cambio la leggono tutti da lì
+  (nel mercatino la colonna non c'è e l'incasso resta il prezzo). Il
+  rimborso rende tutto. Il telefono rilegge prima di firmare
+  (`onchainIncassoSats`, `onchainQuotaStorta`: sul P2P, con `rotta`,
+  ogni metà ≤ `P2P_OC_META_MAX` 2,5% del prezzo; nel mercatino il fisso
+  `ONCHAIN_QUOTA_TETTO`). Il conto (`contoOnchainP2P`, `commissioneOnchainP2P`)
+  ha la riga «Fee P2P» di Lightning, stimata col «≈» prima della presa
+  e dai fatti dopo, ed entra anche nel foglio di chi prende.
+- I DUE TASTI DELLA RETE NEL FOGLIO DELL'ORDINE (16 nov 2026, cantiere
+  coin-quasi; il perché in CANTIERI, «I due tasti della rete nel foglio
+  dell'ordine…»). `tastiReteFoglioP2P` disegna «⚡ Lightning» / «₿
+  On-chain» sotto il titolo, al posto della riga «via …»: nel foglio
+  Lightning `reteDettP2P` (cancelli `swapP2PAcceso` per chi compra,
+  `presaOcPossibileP2P` per chi vende; la scelta in `p2pIncassoRete` o
+  `p2pPresaOc`, il costo in `p2pCambioDett`), nella domanda di presa
+  on-chain `reteOcPresaHtmlP2P` (cancelli `lnPossibile` /
+  `depositoLnPossibile` del libro on-chain, la scelta in `p2pOcPresaRete`,
+  passata dopo la presa da `applicaReteOcPresaP2P`). I costi vengono dai
+  preventivi di sempre (inverso e submarine), che non creano niente.
 - LO SWAP AUTOMATICO DEL MERCATINO (2 nov 2026, cantiere swap-auto;
   CANTIERI, «Lo swap automatico del mercatino»). Chi vende in Lightning e
   ha scelto nel Profilo di ricevere on-chain (`swap_auto_preferenze`, una

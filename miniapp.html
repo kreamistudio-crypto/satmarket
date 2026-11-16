@@ -4300,6 +4300,11 @@
   /* il nome su UNA riga anche a 320 px (giro dal vivo: andava a capo
      dopo «XMR ·»): sotto i 360 px loghi e scritta un filo piu' piccoli */
   .p2p-coin-novita .p2p-oc-novita-testo{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* CON GLI USDT DENTRO (16 nov 2026, un banner solo): quattro loghi e
+     quattro nomi non stanno su una riga a 390 px (giro dal vivo: «USDT · ETH ·
+     XMR · US…»), quindi il nome va su due righe pari, «USDT · ETH» e
+     «XMR · USDe», mai mozzato */
+  .p2p-coin-novita.con-usdt .p2p-oc-novita-testo{white-space:normal;line-height:1.15;font-size:15px}
   @media (max-width:360px){
     .p2p-coin-novita .p2p-oc-novita-testo{font-size:14px}
     .p2p-coin-trio .p2p-coin-svg{width:22px;height:22px}
@@ -61323,6 +61328,31 @@ function onchainScriptOrdine(B, o){
    se non e' sua, non firma. Lo stesso testo byte per byte del server
    (`onchain_messaggio_destinazione`). */
 const ONCHAIN_QUOTA_TETTO = 5000;   // come ONCHAIN_QUOTA_TETTO del server
+/* LA COMMISSIONE DEL P2P ON-CHAIN (16 nov 2026, cantiere
+   p2p-onchain-commissione, Andrea: «uguale a quella del lighting»): meta' a
+   testa sul prezzo, come la fee di Mostro. Su uno scambio P2P la quota non
+   e' la quota fissa del mercatino ma le DUE meta' (`quota_sats`), e quella
+   di chi riceve esce dal suo incasso (`quota_ricevente_sats`). IL TETTO
+   CHE IL TELEFONO RILEGGE PRIMA DI FIRMARE: ogni meta' al piu' il 2,5% del
+   prezzo (una fee del coordinatore fino al 5%; oggi e' il 3%) — un server
+   manomesso puo' sbagliare la cifra, mai oltre questo. */
+const P2P_OC_META_MAX = 0.025;
+/* quanto arriva all'incasso di un rilascio: il prezzo, meno la meta' di
+   chi riceve (zero nel mercatino). PURA */
+function onchainIncassoSats(o){
+  return Number(o.prezzo_sats) - (Number(o.quota_ricevente_sats) || 0);
+}
+/* la quota di un ordine sta nel suo tetto? Il mercatino il suo fisso, il
+   P2P (ha la `rotta`) le due meta' al 2,5% ciascuna. Vuoto = va bene. PURA */
+function onchainQuotaStorta(o){
+  const quota = Number(o.quota_sats) || 0;
+  const ric = Number(o.quota_ricevente_sats) || 0;
+  if (!o.rotta) return (quota > ONCHAIN_QUOTA_TETTO || ric) ? 'la quota di Barattolo supera il tetto' : '';
+  const tetto = Math.ceil(Number(o.prezzo_sats) * P2P_OC_META_MAX);
+  if (ric < 0 || ric > quota || ric > tetto || quota - ric > tetto)
+    return 'la commissione del P2P supera il tetto';
+  return '';
+}
 
 function onchainMessaggioDestinazione(tipo, valore){
   return new TextEncoder().encode(
@@ -61476,9 +61506,10 @@ function onchainUsciteVersoVenditore(o, incasso, piuVb){
   const vb = (k) => 11 + 105 * o.utxo.length + 31 * k + (Number(piuVb) || 0);
   const tar = Math.max(1, Number(o.tariffa) || 2);
   const quota = Number(o.quota_sats) || 0;
-  if (quota > ONCHAIN_QUOTA_TETTO) throw new Error('la quota di Barattolo supera il tetto');
-  const resto = tot - o.prezzo_sats - quota - Math.ceil(vb(quota ? 3 : 2) * tar);
-  const uscite = [[incasso, o.prezzo_sats]];
+  const storta = onchainQuotaStorta(o);
+  if (storta) throw new Error(storta);
+  const resto = tot - onchainIncassoSats(o) - quota - Math.ceil(vb(quota ? 3 : 2) * tar);
+  const uscite = [[incasso, onchainIncassoSats(o)]];
   if (quota) uscite.push([o.quota_indirizzo, quota]);
   /* (10 nov 2026) il resto torna al wallet di chi ha comprato; se non ne
      ha ancora scelto uno non ha dove andare, e resta alla rete */
@@ -61616,10 +61647,10 @@ async function onchainCofirma(o, parole){
       return 'il resto non tornerebbe al tuo wallet';
     if (!o.incasso) return 'chi vende non ha un incasso';
     if (!onchainFirmataDaChiVende(B, tx, o, w)) return 'la prima firma non è di chi vende';
-    if (uscite.filter(([a]) => a === o.incasso).map(([, v]) => v).join() !== String(o.prezzo_sats))
+    if (uscite.filter(([a]) => a === o.incasso).map(([, v]) => v).join() !== String(onchainIncassoSats(o)))
       return 'a chi vende non arriva il prezzo';
     const quota = Number(o.quota_sats) || 0;
-    if (quota > ONCHAIN_QUOTA_TETTO) return 'la quota di Barattolo supera il tetto';
+    if (onchainQuotaStorta(o)) return onchainQuotaStorta(o);
     if (quota && uscite.filter(([a]) => a === o.quota_indirizzo).map(([, v]) => v).join() !== String(quota))
       return 'la quota di Barattolo non è quella dell\'ordine';
     if (uscite.some(([a]) => a !== o.incasso && a !== o.rimborso
@@ -61630,10 +61661,10 @@ async function onchainCofirma(o, parole){
     const atteso = await onchainIncassoAtteso(B, parole, o, io);
     if (o.destinazione && !atteso) return 'la destinazione non è firmata dal tuo seme';
     if (o.ruolo !== 'venditore' || o.incasso !== atteso) return 'non è il tuo incasso';
-    if (uscite.filter(([a]) => a === atteso).map(([, v]) => v).join() !== String(o.prezzo_sats))
+    if (uscite.filter(([a]) => a === atteso).map(([, v]) => v).join() !== String(onchainIncassoSats(o)))
       return 'non ti arriva il prezzo';
     const quota = Number(o.quota_sats) || 0;
-    if (quota > ONCHAIN_QUOTA_TETTO) return 'la quota di Barattolo supera il tetto';
+    if (onchainQuotaStorta(o)) return onchainQuotaStorta(o);
     if (quota && uscite.filter(([a]) => a === o.quota_indirizzo).map(([, v]) => v).join() !== String(quota))
       return 'la quota di Barattolo non è quella dell\'ordine';
     if (uscite.some(([a]) => a !== atteso && a !== o.rimborso
@@ -61858,7 +61889,9 @@ function accogliLibroOnchainP2P(busta){
     minSats: Number(busta.minSats) || 10000,
     oreDeposito: Number(busta.oreDeposito) || 6,
     /* il tetto degli scambi on-chain (12 nov 2026): null = server di ieri */
-    maxEuro: busta.maxEuro == null ? null : Number(busta.maxEuro)};
+    maxEuro: busta.maxEuro == null ? null : Number(busta.maxEuro),
+    /* i due tasti della rete nel foglio di chi prende (16 nov 2026) */
+    lnPossibile: !!busta.lnPossibile, depositoLnPossibile: !!busta.depositoLnPossibile};
   p2pOnchainLetto = Date.now();
   return p2pOnchainLibro.eventi.length > 0;
 }
@@ -62301,6 +62334,11 @@ let tutorialUsdtLato = null;   // il lato da rimettere alla fine; null = nessun 
 let p2pUsdtTutorialTimer = null;
 function novitaUsdtLibroP2P(){
   if (!novitaUsdtVistaP2P()) return '';
+  /* UN BANNER SOLO (16 nov 2026, Andrea: «3 banner novità sono troppi.
+     Mettimi Ethereum, XMR, USDE nel banner di USDT»): con le monete
+     accese gli USDT entrano nel banner blu di quelle (`novitaCoinLibroP2P`),
+     e questo verde resta solo a chi vede gli USDT e non le monete */
+  if (typeof novitaCoinVistaP2P === 'function' && novitaCoinVistaP2P()) return '';
   const appeso = novitaUsdtAppesaP2P();
   if (appeso && typeof testaAltaP2P === 'function') testaAltaP2P();
   return '<div class="p2p-oc-novita p2p-usdt-novita' + (appeso ? ' appeso' : '')
@@ -62442,8 +62480,15 @@ function fineTutorialUsdtP2P(){
    LA DIFFERENZA CON GLI USDT, che il tutorial deve dire: qui l'ordine
    resta IN EURO. ETH, Monero e USDe sono METODI («Altri metodi ▾» del
    foglio), e chi paga manda il controvalore al cambio del momento. */
-function trioCoinP2P(){
+/* la T di Tether nel suo cerchio verde, della taglia dei loghi delle
+   monete: entra in testa al trio quando il banner porta anche gli USDT
+   (Andrea, 16 nov: «va bene l'icona di USDT verde, ma il banner deve
+   essere effettivamente blu come il colore di Ethereum») */
+const P2P_USDT_LOGO_TRIO = '<svg class="p2p-coin-svg" viewBox="0 0 32 32" aria-hidden="true">'
+  + '<circle cx="16" cy="16" r="16" fill="#26A17B"/><path fill="#FFF" transform="translate(16 16) scale(.78) translate(-16 -16)" d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117"/></svg>';
+function trioCoinP2P(conUsdt){
   return '<span class="p2p-coin-trio" aria-hidden="true">'
+    + (conUsdt ? P2P_USDT_LOGO_TRIO : '')
     + P2P_LOGHI_COIN.eth + P2P_LOGHI_COIN.xmr + P2P_LOGHI_COIN.usde + '</span>';
 }
 function novitaCoinVistaP2P(){
@@ -62453,11 +62498,13 @@ let tutorialCoinLato = null;   // il lato da rimettere alla fine; null = nessun 
 let p2pCoinTutorialTimer = null;
 function novitaCoinLibroP2P(){
   if (!novitaCoinVistaP2P()) return '';
+  /* ...con gli USDT dentro, quando chi guarda li vede (vedi sopra) */
+  const conUsdt = typeof novitaUsdtVistaP2P === 'function' && novitaUsdtVistaP2P();
   if (typeof testaAltaP2P === 'function') testaAltaP2P();
-  return '<div class="p2p-oc-novita p2p-coin-novita appeso'
+  return '<div class="p2p-oc-novita p2p-coin-novita appeso' + (conUsdt ? ' con-usdt' : '')
     + (tutorialCoinLato !== null || p2pCoinTutorialTimer ? ' acceso' : '') + '" id="p2pCoinNovita">'
     + '<button type="button" class="p2p-oc-faccia" onclick="apriNovitaCoinP2P()">'
-    + trioCoinP2P() + '<span class="p2p-oc-novita-testo">ETH · XMR · USDe</span>'
+    + trioCoinP2P(conUsdt) + '<span class="p2p-oc-novita-testo">' + (conUsdt ? 'USDT · ETH<br>XMR · USDe' : 'ETH · XMR · USDe') + '</span>'
     + '<span class="p2p-oc-novita-tag">Novità</span>'
     + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
     + '</div>';
@@ -62764,22 +62811,33 @@ function apriOnchainP2P(id, modo){
   }
   const vendeLui = o.lato === 'sell';
   const metodi = (o.metodi || []).join(', ');
+  const conTasti = typeof reteOcPresaPossibileP2P === 'function' && reteOcPresaPossibileP2P(vendeLui);
   chiediConferma({
     /* lo stesso cappello del dettaglio Lightning, con la rete sotto
        (20:24, Andrea): era «⛓️ Compri bitcoin on-chain» */
     titolo: vendeLui ? 'Stai comprando sats' : 'Stai vendendo sats',
-    via: 'via on-chain',
-    testata: '<div class="p2p-onchain-riass"><b>' + esc(satsCardOnchainP2P(o)) + '</b> per <b>'
+    /* i due tasti della rete al posto di «via on-chain» (16 nov 2026),
+       dove l'altra rete c'e' per chi guarda */
+    via: conTasti ? '' : 'via on-chain',
+    testata: (conTasti ? '<div id="p2pOcPresaRete" style="margin-bottom:12px">'
+        + reteOcPresaHtmlP2P(o, vendeLui) + '</div>' : '')
+      + '<div class="p2p-onchain-riass"><b>' + esc(satsCardOnchainP2P(o)) + '</b> per <b>'
       + esc(cifraOc(o)) + '</b>' + (metodi ? '<br><small>' + esc(metodi) + '</small>' : '')
       + (o.mercato ? '<br><small>A prezzo di mercato: i sats si contano quando prendi</small>' : '')
       + (Number(o.filtro) > 0 ? '<br><small>🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '</small>' : '')
-      + (o.nome ? '<br><small>di ' + esc(o.nome) + '</small>' : '') + '</div>',
+      + (o.nome ? '<br><small>di ' + esc(o.nome) + '</small>' : '') + '</div>'
+      /* IL CONTO DI CHI PRENDE, come nel dettaglio Lightning (16 nov 2026,
+         Andrea: «la schermata sarà similmente a quella del lighting»):
+         i sats, la MIA meta' della fee e il totale, dal mio verso */
+      + (typeof contoOnchainP2P === 'function'
+        ? '<div class="p2p-ord lato-' + (vendeLui ? 'compro' : 'vendo') + '">'
+          + contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo'}) + '</div>' : ''),
     /* in USDT le stesse frasi, con la rete (2 nov 2026) */
     corpo: paroleOc(o, vendeLui
       ? 'Chi vende deposita i sats in un indirizzo 2-di-3 (sue, tue e di Barattolo: ne servono due). '
         + 'Quando sono confermati mandi gli euro col metodo scritto e tocchi «Ho inviato gli euro»; '
-        + 'lui li libera e arrivano sul TUO wallet on-chain. Se qualcosa va storto decide un moderatore.'
-      : 'Se prendi, depositi tu ' + satsCardOnchainP2P(o) + ' più il margine di rete '
+        + 'lui li libera e arrivano sul TUO wallet on-chain, meno la tua metà della commissione. Se qualcosa va storto decide un moderatore.'
+      : 'Se prendi, depositi tu ' + satsCardOnchainP2P(o) + ' più la tua metà della commissione e il margine di rete '
         + 'nell\'indirizzo 2-di-3 entro ' + p2pOnchainLibro.oreDeposito + ' ore. Chi compra ti manda '
         + esc(fmtSoldiP2P(o.euro, o)) + ' € e tu liberi i sats SOLO quando li vedi sul tuo conto. '
         + 'Se non arrivano, apri una disputa: decide un moderatore.')
@@ -62795,6 +62853,194 @@ function apriOnchainP2P(id, modo){
     poi: () => prendiOnchainP2P(Number(o.id))});
 }
 
+/* ══ I DUE TASTI DELLA RETE IN CIMA AL FOGLIO DELL'ORDINE (16 nov 2026,
+   cantiere coin-quasi, Andrea: «se io clicco su un ordine Euro Lighting,
+   in alto vedo scritto stai comprando sats via Lighting… sotto ci devono
+   essere già i due tasti per scegliere… di default quando io apro
+   l'ordine è già impostato giusto, però io posso sempre comunque
+   scegliere») ══
+   I tasti «⚡ Lightning» e «₿ On-chain» c'erano già (1 nov, presa-altra-
+   rete), ma dentro i fogli DOPO la presa: «Dove ricevere i sats», «🔒
+   Blocca i sats», il riquadro «Ricevi in Lightning». Adesso stanno anche
+   sotto il titolo del foglio che si apre toccando l'ordine, al posto della
+   riga «via Lightning» / «via on-chain», accesi sulla rete dell'ordine.
+   Toccando l'altra rete si vede SUBITO il costo dello swap di SATS Routing
+   (Andrea: «verrà mostrata la fee anche di SATS Routing, giusto?»), coi
+   preventivi che esistono gia' e che non creano niente; la scelta resta
+   ricordata e il foglio dopo la presa si apre gia' su quella. I tasti ci
+   sono solo dove l'altra rete esiste davvero per chi guarda (gli stessi
+   cancelli delle pagine dopo): altrimenti resta la riga «via …». */
+function tastiReteFoglioP2P(id, scelta, gesto, nota){
+  const b = (r, label) => '<button class="btn ' + (scelta === r ? 'orange' : 'ghost')
+    + '" type="button" style="flex:1;margin:0" aria-pressed="' + (scelta === r) + '" onclick="'
+    + gesto + '(' + esc(JSON.stringify(id)) + ', \'' + r + '\')">' + label + '</button>';
+  return '<div role="group" aria-label="Su quale rete" style="display:flex;gap:8px">'
+    + b('ln', '⚡ Lightning') + b('oc', '₿ On-chain') + '</div>'
+    + (nota ? '<div class="hint p2p-rete-nota" style="margin-top:8px">' + nota + '</div>' : '');
+}
+/* -- il foglio di un ordine LIGHTNING (renderDettaglioP2P) -- */
+const p2pCambioDett = {};   // ordine -> {stato, sats, dati}: il costo dello swap prima della presa
+function reteDettP2P(o, compro){
+  if (typeof VETRINA !== 'undefined' && VETRINA) return '';
+  const alt = compro ? (typeof swapP2PAcceso === 'function' && swapP2PAcceso())
+    : (typeof presaOcPossibileP2P === 'function' && presaOcPossibileP2P());
+  if (!alt) return '';
+  const oc = compro ? p2pIncassoRete[o.id] === 'oc' : !!(p2pPresaOc[o.id] || {}).aperto;
+  if (oc && compro && !p2pCambioDett[o.id]) {
+    p2pCambioDett[o.id] = {stato: 'leggo'};
+    setTimeout(() => caricaCambioDettP2P(o.id), 0);
+  }
+  return '<div class="p2p-rete-foglio" style="margin:4px 0 12px">'
+    + tastiReteFoglioP2P(o.id, oc ? 'oc' : 'ln', 'scegliReteDettP2P',
+        oc ? (compro ? notaCambioDettP2P(o.id) : notaPresaDettP2P(o.id)) : '') + '</div>';
+}
+/* l'ordine come lo vede il conto, con la cifra scelta su un intervallo */
+function ordineDettSceltoP2P(id){
+  const riga = typeof rigaLibroP2P === 'function' ? rigaLibroP2P(id) : null;
+  if (!riga) return null;
+  const scelto = riga.euroMax ? (Number(p2pDettImporto) || 0) : 0;
+  return scelto ? Object.assign({}, riga, {euro: scelto, euroMax: 0}) : riga;
+}
+async function scegliReteDettP2P(id, rete){
+  haptic();
+  const o = ordineDettSceltoP2P(id);
+  if (!o) return;
+  if (o.lato === 'sell') {        // chi guarda compra sats: dove li riceve
+    if (rete === 'oc') p2pIncassoRete[id] = 'oc'; else delete p2pIncassoRete[id];
+    delete p2pCambioDett[id];
+    renderDettaglioP2P();
+    return;
+  }
+  /* chi guarda vende sats: la garanzia dai bitcoin on-chain, col riquadro
+     dello swap che sta sotto il conto (`rigaPresaOcP2P`) */
+  if (rete === 'oc') return apriPresaOcP2P(id);
+  p2pPresaOc[id] = Object.assign({}, p2pPresaOc[id] || {}, {aperto: false});
+  renderDettaglioP2P();
+}
+/* il costo dello swap per chi riceverebbe on-chain: la cifra che Mostro
+   paghera' (il netto del mio lato, come la fattura di «Dove ricevere») */
+async function caricaCambioDettP2P(id){
+  const o = ordineDettSceltoP2P(id);
+  if (!o) return;
+  const lordo = Number(o.sats) > 0 ? Number(o.sats)
+    : (!o.euroMax && Number(o.euro) > 0 && typeof satsMercatoP2P === 'function' ? satsMercatoP2P(o) : 0);
+  const netto = lordo > 0 ? nettoLatoP2P(o, lordo) : 0;
+  if (!(netto > 0)) {
+    p2pCambioDett[id] = {stato: 'cifra'};
+  } else {
+    p2pCambioDett[id] = {stato: 'leggo', sats: netto};
+    let d;
+    try { d = await leggiPreventivoCambioP2P(netto, '', ''); } catch(e){ d = {ok: false, motivo: 'non_risponde'}; }
+    p2pCambioDett[id] = {stato: 'pronto', sats: netto, dati: d || {ok: false, motivo: 'non_risponde'}};
+  }
+  if (String(p2pDettOrdine) === String(id)) renderDettaglioP2P();
+}
+function notaCambioDettP2P(id){
+  const st = p2pCambioDett[id];
+  if (!st || st.stato === 'leggo') return 'Chiedo a SATS Routing quanto costa lo swap…';
+  if (st.stato === 'cifra') return 'Scegli prima la cifra: poi vedi quanto costa lo swap.';
+  const d = st.dati || {};
+  if (!d.ok) return esc(percheCambioP2P(d));
+  const costo = Math.max(0, Number(st.sats) - Number(d.ricevi || 0));
+  return 'Ricevi on-chain con uno swap di ' + esc(d.fornitore_nome || 'SATS Routing')
+    + ': al tuo indirizzo bitcoin arrivano circa <b>' + fmt(Number(d.ricevi) || 0) + ' sats</b>, '
+    + 'lo swap costa <b>' + fmt(costo) + ' sats</b> (Barattolo non aggiunge niente). '
+    + 'L\'indirizzo lo scrivi dopo aver preso, in «Dove ricevere i sats».';
+}
+function notaPresaDettP2P(id){
+  const o = typeof presaOcOrdineP2P === 'function' ? presaOcOrdineP2P(id) : null;
+  const g = o ? garanziaVendoP2P(o) : {sats: 0};
+  if (!(g.sats > 0)) return 'Scegli prima la cifra: poi vedi quanto costa lo swap.';
+  const st = p2pPresaOc[id] || {};
+  const d = st.dati;
+  if (st.stato !== 'pronto' || !d) return 'Chiedo a SATS Routing quanto costa lo swap…';
+  if (!d.ok) return esc(perchePresaOcP2P(d));
+  return 'Paghi la garanzia coi tuoi bitcoin on-chain: mandi <b>' + fmt(Number(d.mandi) || 0) + ' sats</b>, '
+    + 'lo swap di ' + esc(d.fornitore_nome || 'SATS Routing') + ' costa <b>' + fmt(Number(d.costo) || 0) + ' sats</b> '
+    + '(Barattolo non aggiunge niente). Lo crei nel riquadro sotto il conto, poi tocchi «Vendi».';
+}
+/* -- il foglio di un ordine ON-CHAIN (apriOnchainP2P) -- */
+const p2pOcPresaRete = {};   // ordine -> {rete, stato, dati, sats}
+function reteOcPresaPossibileP2P(vendeLui){
+  return vendeLui ? !!p2pOnchainLibro.lnPossibile : !!p2pOnchainLibro.depositoLnPossibile;
+}
+/* i sats su cui si misura lo swap, prima della presa: chi riceve il
+   prezzo meno la sua meta' della commissione; chi deposita il prezzo
+   piu' la sua (il margine per la rete si aggiunge alla presa) */
+function satsOcPresaP2P(o, vendeLui){
+  const sats = Number(o.sats) > 0 ? Number(o.sats) : Number(o.stima) || 0;
+  if (!(sats > 0)) return 0;
+  const c = typeof commissioneOnchainP2P === 'function'
+    ? commissioneOnchainP2P(Object.assign({}, o, {preso_il: 0, quota_sats: 0}), !vendeLui) : null;
+  const cs = c ? Number(c.sats) || 0 : 0;
+  return vendeLui ? sats - cs : sats + cs;
+}
+function reteOcPresaHtmlP2P(o, vendeLui){
+  const st = p2pOcPresaRete[o.id] || {};
+  const ln = st.rete === 'ln';
+  let nota = '';
+  if (ln) {
+    const d = st.dati;
+    if (st.stato !== 'pronto' || !d) nota = 'Chiedo a SATS Routing quanto costa lo swap…';
+    else if (!d.ok) nota = esc(vendeLui ? perchePresaOcP2P(d) : percheDepositoLnOnchainP2P(d));
+    else if (vendeLui) {
+      const costo = Math.max(0, Number(d.costo) || 0);
+      nota = 'Ricevi in Lightning con uno swap di ' + esc(d.fornitore_nome || 'SATS Routing')
+        + ': ti arrivano circa <b>' + fmt(Math.max(0, st.sats - costo)) + ' sats</b>, lo swap costa circa <b>'
+        + fmt(costo) + ' sats</b> (Barattolo non aggiunge niente). La richiesta Lightning la incolli '
+        + 'quando chi vende conferma gli euro.';
+    } else {
+      const costo = Math.max(0, st.sats - (Number(d.ricevi) || 0));
+      nota = 'Depositi da Lightning con uno swap di ' + esc(d.fornitore_nome || 'SATS Routing')
+        + ': paghi circa <b>' + fmt(st.sats + costo) + ' sats</b> più il margine per la rete, '
+        + 'lo swap costa circa <b>' + fmt(costo) + ' sats</b> (Barattolo non aggiunge niente). '
+        + 'La richiesta la crei dopo aver preso, in «🔒 Blocca i sats».';
+    }
+  }
+  return tastiReteFoglioP2P(Number(o.id), ln ? 'ln' : 'oc', 'scegliReteOcPresaP2P', nota);
+}
+function ridisegnaReteOcPresaP2P(id){
+  const box = el('p2pOcPresaRete');
+  const o = (p2pOnchainLibro.eventi || []).find(x => +x.id === +id);
+  if (box && o) box.innerHTML = reteOcPresaHtmlP2P(o, o.lato === 'sell');
+}
+async function scegliReteOcPresaP2P(id, rete){
+  haptic();
+  const o = (p2pOnchainLibro.eventi || []).find(x => +x.id === +id);
+  if (!o) return;
+  const vendeLui = o.lato === 'sell';
+  if (rete !== 'ln') { p2pOcPresaRete[id] = {rete: 'oc'}; return ridisegnaReteOcPresaP2P(id); }
+  const sats = satsOcPresaP2P(o, vendeLui);
+  p2pOcPresaRete[id] = {rete: 'ln', stato: 'leggo', sats};
+  ridisegnaReteOcPresaP2P(id);
+  let d;
+  try {
+    d = vendeLui ? await leggiPreventivoPresaP2P(sats, '', '') : await leggiPreventivoCambioP2P(sats, '', '');
+  } catch(e){ d = null; }
+  if ((p2pOcPresaRete[id] || {}).rete !== 'ln') return;
+  p2pOcPresaRete[id] = {rete: 'ln', stato: 'pronto', sats, dati: d || {ok: false, motivo: 'non_risponde'}};
+  ridisegnaReteOcPresaP2P(id);
+}
+/* DOPO LA PRESA la scelta passa al foglio giusto: a chi deposita il foglio
+   «🔒 Blocca i sats» gia' su Lightning; a chi riceve il «Ricevi in
+   Lightning» gia' scelto (la rotta di sempre) */
+async function applicaReteOcPresaP2P(id, ruolo){
+  const st = p2pOcPresaRete[id];
+  if (!st || st.rete !== 'ln') return;
+  delete p2pOcPresaRete[id];
+  if (ruolo === 'compratore') { p2pOcDepositoRete[Number(id)] = 'ln'; return; }
+  if (ruolo !== 'venditore') return;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(id)}/ricevi-lightning`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({si: true})});
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      toast('⚡ Lightning non scelto: ' + (d.detail || 'riprova dallo scambio'), 6000);
+    }
+  } catch(e) { toast('⚡ Lightning non scelto: riprova dallo scambio', 6000); }
+}
+
 async function prendiOnchainP2P(id){
   haptic();
   try {
@@ -62806,6 +63052,7 @@ async function prendiOnchainP2P(id){
       body: JSON.stringify({})});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non si è potuto prendere');
+    await applicaReteOcPresaP2P(id, d.ruolo);
     await leggiMieiOnchainP2P();
     apriDettaglioOnchainP2P(id);
     toast(d.ruolo === 'compratore'
@@ -63138,7 +63385,7 @@ async function confermaCambioOnchainP2P(btn, id){
     let dove = null;
     try { dove = B.Address(onchainReteBtc(B)).decode(rec.lockupAddress); } catch(e) { dove = null; }
     if (!dove || dove.type !== 'tr') throw new Error('l\'indirizzo dello swap non è della rete giusta');
-    if (!(rec.mandi > 0 && rec.mandi <= o.prezzo_sats)) throw new Error('le cifre dello swap non tornano');
+    if (!(rec.mandi > 0 && rec.mandi <= onchainIncassoSats(o))) throw new Error('le cifre dello swap non tornano');
     const firma = await onchainFirmaDestinazione(B, parole, 'cambio', `p2p:${o.id}:${rec.lockupAddress}`);
     const psbt = onchainPsbtFirmata(B, o, io, w, onchainUsciteVersoVenditore(o, rec.lockupAddress, 12));
     const r = await fetch(`${API_BASE}/p2p/onchain/${Number(o.id)}/cambio`, {method: 'POST',
@@ -63669,7 +63916,7 @@ function riquadroOnchainP2P(){
   return sezioneNuovoP2P({ico: '', titolo: 'Quanto si può, e quanto costa',
     corpo: 'Minimo ' + fmt(p2pOnchainLibro.minSats || 0) + ' sats'
       + (tetto > 0 ? ' · fase beta: max ' + fmt(tetto) + (usdt ? ' USDT' : ' €') : '')
-      + '. Barattolo non prende commissioni: chi vende deposita anche il margine per la rete.'
+      + '. La commissione è quella degli scambi Lightning, metà a testa: chi vende la deposita insieme al margine per la rete, chi compra la trova tolta dai sats che riceve.'
       + (rete && rete !== 'mainnet'
          ? '<div class="hint">Rete di prova (' + esc(rete) + '): i sats non hanno valore.</div>' : '')});
 }
@@ -63743,7 +63990,8 @@ function schedaOnchainP2P(o){
       break;
     case 'preso':
       testo = deposito
-        ? `Deposita <b>${fmt(o.importo_sats)} sats</b> (${fmt(o.sats)} + ${fmt(o.margine_sats)} di margine per la rete) `
+        ? `Deposita <b>${fmt(o.importo_sats)} sats</b> (${fmt(o.sats)} + ${fmt(o.margine_sats)} di margine per la rete`
+          + (Number(o.quota_sats) > 0 ? ` + ${fmt(Number(o.quota_sats) - (Number(o.quota_ricevente_sats) || 0))} di commissione` : '') + ') '
           + `nel 2-di-3 entro le ${quando(o.deposito_entro)}: tocca «🔒 Blocca i sats». Con una conferma lo scambio va avanti.`
         : `Chi vende sta depositando ${fmt(o.importo_sats)} sats nell'indirizzo 2-di-3 (entro le ${quando(o.deposito_entro)}). `
           + 'Ti avvisiamo appena sono confermati: allora mandi gli euro.';
@@ -63903,6 +64151,27 @@ function schedaOnchainP2P(o){
    deposito (e quel che avanza gli torna). Il metodo non ha la sua
    riga, come nel conto di Lightning: lo dice la nota dello stato
    quando serve. */
+/* LA MIA META' DELLA COMMISSIONE su uno scambio P2P on-chain (16 nov 2026,
+   cantiere p2p-onchain-commissione): {sats, stima}. Dopo la presa e' un
+   fatto del server (`quota_sats`, `quota_ricevente_sats`): chi deposita la
+   mette sopra, chi riceve la trova tolta. Prima e' la STIMA del conto di
+   Lightning — la fee viva del coordinatore con lo sconto di chi guarda
+   (`feeMiaP2P`), meta' sul prezzo — e sotto la polvere (546 sats in tutto)
+   non si prende niente, come dice il server. `deposito` = chi guarda mette
+   i sats. Senza fee viva, null: la riga non si inventa. PURA sulle leve. */
+function commissioneOnchainP2P(o, deposito){
+  const quota = Number(o.quota_sats) || 0;
+  const ric = Number(o.quota_ricevente_sats) || 0;
+  if (Number(o.preso_il) > 0 || quota > 0)
+    return {sats: deposito ? quota - ric : ric, stima: false};
+  const sats = Number(o.sats) > 0 ? Number(o.sats) : Number(o.stima) || 0;
+  const mia = typeof feeMiaP2P === 'function' ? feeMiaP2P(o) : null;
+  const viva = typeof commissioneVivaP2P === 'function' ? commissioneVivaP2P() : null;
+  if (mia === null || viva === null || !(sats > 0)) return null;
+  const meta = Math.round(sats * mia / 2);
+  if (meta + Math.round(sats * viva / 2) < 546) return {sats: 0, stima: true};
+  return {sats: meta, stima: true};
+}
 function contoOnchainP2P(o){
   /* i pezzi degli USDT on-chain (2 nov 2026) col typeof: i banchi che
      ritagliano questa funzione da sola restano quelli di ieri */
@@ -63923,11 +64192,34 @@ function contoOnchainP2P(o){
   /* il moderatore non sta da nessun lato: le due cifre e basta */
   if (o.ruolo === 'moderatore') return '<div class="ctrl-conto conto-p2p lato-vendo"><div class="ctrl-chiusa">'
     + r('Sats', sats(o.sats), 'tot sats') + r(usdtOc(o) ? 'USDT' : 'Euro', euro, 'tot euro') + '</div></div>';
+  /* LA RIGA DELLA COMMISSIONE, come «Fee P2P» nel conto di Lightning
+     (16 nov 2026, p2p-onchain-commissione): la MIA meta', «+» a chi
+     deposita e «−» a chi riceve, e il totale la conta */
+  const versa = deposito || (!o.ruolo && !compro);
+  const comm = typeof commissioneOnchainP2P === 'function' ? commissioneOnchainP2P(o, versa) : null;
+  const cs = comm ? Number(comm.sats) || 0 : 0;
+  const circa = comm && comm.stima ? '≈ ' : '';
+  /* l'etichetta e' quella di Lightning, «Fee P2P 1,5%» con la sua
+     pastiglia (`cartelloFeeP2P`): prima della presa l'aliquota MIA viva,
+     dopo quella dei fatti del server (la mia meta' sui sats) */
+  const aliq = !comm || !cs ? ''
+    : comm.stima ? (typeof mezzaCommissioneP2P === 'function' ? mezzaCommissioneP2P(feeMiaP2P(o)) : '')
+    : (Number(o.sats) > 0 ? (cs * 100 / Number(o.sats)).toLocaleString('it-IT', {maximumFractionDigits: 1}) : '');
+  const pill = typeof cartelloFeeP2P === 'function' ? cartelloFeeP2P(o) : '';
+  const etichetta = 'Fee P2P' + (aliq ? ' <b class="p2p-avviso">' + esc(aliq) + '%</b>' : '')
+    + (pill ? '<span class="promo-tag dopo">' + esc(pill) + '</span>' : '');
+  const rigaComm = comm ? r(etichetta, '<span class="num">'
+    + (cs ? circa + (versa ? '+' : '−') + fmt(cs) : '0') + '<span class="unita-sats"> sats</span></span>') : '';
+  const totale = versa
+    ? (deposito ? (o.importo_sats || o.sats) : (Number(o.sats) || 0) + cs)
+    : (Number(o.sats) || 0) - cs;
+  const totSats = n => (cs && circa) ? '<span class="num">≈ ' + fmt(n) + '<span class="unita-sats"> sats</span></span>' : sats(n);
   return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo') + '">'
     + r('Sats dello scambio', sats(o.sats))
     + (deposito && o.margine_sats ? r('Margine per la rete', sats(o.margine_sats)) : '')
+    + rigaComm
     + '<div class="ctrl-chiusa">'
-    + r(compro ? 'Ricevi' : 'Deposita', sats(deposito ? (o.importo_sats || o.sats) : o.sats), 'tot sats')
+    + r(compro ? 'Ricevi' : 'Deposita', totSats(totale), 'tot sats')
     + r(compro ? 'Totale da inviare' : 'Ricevi', euro, 'tot euro')
     + '</div></div>';
 }
@@ -64040,7 +64332,8 @@ function renderDepositoOnchainP2P(){
        ? '<div class="hint">⚠️ Hai una richiesta Lightning aperta per questo deposito: se depositi on-chain, non pagarla.</div>' : '') +
     '<div class="hint">Manda <b>' + fmt(o.importo_sats) + ' sats</b> dal tuo wallet Bitcoin: '
       + 'restano <b>bloccati nel 2-di-3</b> e non escono finché non li liberi tu. '
-      + 'Dentro ci sono ' + fmt(o.margine_sats) + ' sats di margine per la rete.'
+      + 'Dentro ci sono ' + fmt(o.margine_sats) + ' sats di margine per la rete'
+      + (Number(o.quota_sats) > 0 ? ' e ' + fmt(Number(o.quota_sats) - (Number(o.quota_ricevente_sats) || 0)) + ' di commissione (la tua metà)' : '') + '.'
       + (prova ? ' Rete di prova (' + esc(onchainRete().nome) + ').' : '') + '</div>'
     + rigaCifraBtc(o.importo_sats)   /* il wallet on-chain la vuole in BTC (cifra-btc) */
     + (o.visti_sats ? '<div class="hint">👀 Visti in rete ' + fmt(o.visti_sats) + ' sats: aspetto la conferma.</div>' : '')
@@ -68058,10 +68351,21 @@ function voltoCardP2P(o){
 /* LA BARRA DEL TEMPO: PURA (l'orologio si passa). Senza una scadenza
    onesta (vedi `frazioneVitaP2P`) non c'e' barra: una riga piena
    direbbe «tutto il tempo» su un fatto che non si sa. */
+/* ⚠️ UNA VITA CORTA SI MISURA IN PROPORZIONE (16 nov 2026, Andrea sul
+   libro: «perché c'è la barra del tempo che lampeggia di rosso, però ed è
+   piena?»). Le soglie (arancio a tre giorni, rosso all'ultimo) sono per
+   l'ordine di casa da sette giorni: uno scambio on-chain vive 24 ore, e
+   «l'ultimo giorno» era tutta la sua vita — rosso che pulsa da appena
+   pubblicato, con la riga piena. Sotto i sette giorni il tempo che manca
+   si conta come se la vita fosse di sette (24 ore: arancio nelle ultime
+   ~10 ore, rosso nelle ultime ~3,4); da sette in su non cambia niente. */
+const P2P_VITA_SOGLIE_S = 7 * 86400;
 function barraScadenzaP2P(o, adesso){
   const resta = frazioneVitaP2P(o, adesso);
   if (resta < 0) return '';
-  const manca = (o.scade || 0) - (adesso || Math.floor(Date.now() / 1000));
+  const vita = (o.scade || 0) - (o.creato || 0);
+  const scala = vita > 0 && vita < P2P_VITA_SOGLIE_S ? P2P_VITA_SOGLIE_S / vita : 1;
+  const manca = ((o.scade || 0) - (adesso || Math.floor(Date.now() / 1000))) * scala;
   const st = statoAnelloP2P(manca);
   const aria = scadeTestoP2P(o.scade) || 'senza scadenza';
   return '<div class="p2p-barra' + (st ? ' ' + st : '') + '" role="img" title="'
@@ -77420,7 +77724,10 @@ function renderDettaglioP2P(){
      su un ordine si deve vedere in alto stai vendendo/comprando sats e
      sotto via lightning / via on-chain»): qui sempre Lightning; la presa
      on-chain dice «via on-chain» nella sua domanda (`apriOnchainP2P`) */
-  if (tit) tit.insertAdjacentHTML('beforeend', '<small class="p2p-via">via Lightning</small>');
+  /* ...e dove l'altra rete c'e' per chi guarda, al posto della riga i due
+     tasti (16 nov 2026, vedi `reteDettP2P`): sono la prima cosa del corpo */
+  const reteTasti = (tuo || !myTgId || typeof reteDettP2P !== 'function') ? '' : reteDettP2P(o, compro);
+  if (tit && !reteTasti) tit.insertAdjacentHTML('beforeend', '<small class="p2p-via">via Lightning</small>');
   /* ⚠️ IL BOTTONE NON SI SPEGNE PIU' PER IL METODO (9 ott 2026,
      cantiere prendi-metodo): qui nasceva `manca`, la frase rossa in
      fondo accanto a «Compra» spento. Adesso il bottone e' acceso e la
@@ -77447,6 +77754,7 @@ function renderDettaglioP2P(){
      resta e' l'ordine dei gesti — come pago, con chi ho a che fare,
      quanto tempo resta, quanto viene. */
   box.innerHTML =
+    reteTasti +
     (tuo ? '<div class="p2p-box p2p-tuo">È il tuo ordine: l\'hai pubblicato tu, e non si può prendere.</div>' : '') +
     metodiDettP2P(o) +
     /* la regola e il tetto del contanti, a chi sta per prendere (30 set 2026).

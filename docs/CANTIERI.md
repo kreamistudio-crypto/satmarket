@@ -84403,3 +84403,97 @@ sentinella di `prove_contanti_zona` sul vestito del metodo. Dal vivo
 (390 chiaro, gabbia, relay morti, CHF accesa): il filtro con le sette
 valute iconate, la scelta della valuta con CHF, la tendina delle reti
 USDT con la T, la card «USDT (Tron)» con la T.
+
+## La commissione del P2P on-chain, uguale a Lightning (16 nov 2026, cantiere coin-quasi, Andrea: «La commissione deve essere anche sul peer-to-peer on-chain» e «nel mercatino rimane a zero la commissione e nel peer-to-peer on-chain che la quota deve essere uguale a quella del lighting»)
+
+Gli scambi P2P on-chain (2-di-3) non pagavano niente a Barattolo: la
+frase del foglio «Pubblica» lo diceva («Barattolo non prende
+commissioni»), mentre su Lightning ogni parte paga la sua metà della fee
+del coordinatore. Andrea l'ha notato chiedendo se le fee fossero «le
+solite» (1% pionieri, 1,5% gli altri) e ha deciso: uguale a Lightning,
+il mercatino resta a zero, dentro la promozione del giorno.
+COME: la fee è quella VIVA del nodo (`_P2P_INFO["fee"]`, il 38385 che
+già leggono il conto e il foglio delle commissioni), una metà a testa
+sul prezzo, ognuna col suo sconto di fedeltà (`_fee_di_p2p`). Come in
+Mostro (hold invoice = importo + metà; pagamento = importo − metà): chi
+deposita mette la sua metà sopra il deposito, chi riceve trova la sua
+tolta dall'incasso, e le due metà vanno insieme all'indirizzo della
+quota di Barattolo che il mercatino usava già (stesso ramo `/1/` di
+`xpub_barattolo`): giudice dei PSBT e firma di Barattolo si riusano
+tali e quali, con l'incasso netto (`_onchain_incasso_sats`). Il
+rimborso rende TUTTO, commissione compresa (uno scambio non concluso
+non si paga, come su Lightning dove la hold invoice si cancella). La
+disputa vinta da chi compra paga la quota come un rilascio normale.
+DECISO NEL CANTIERE: sotto i 546 sats di commissione in tutto niente
+commissione (un'uscita sotto la polvere la rete la rifiuta); fee del
+nodo ignota = la presa risponde 503 «riprova fra un minuto» (mai una
+commissione inventata né uno scambio gratis per un nodo muto); il
+telefono rilegge prima di firmare e rifiuta una metà oltre il 2,5% del
+prezzo (il tetto fisso del mercatino, 5.000 sats, sul P2P a 999 €
+sarebbe stato troppo stretto). La schermata: nel conto dello scambio la
+riga «Fee P2P 1,5%» con la pastiglia (🌱 Pioniere, beta), come nel conto
+Lightning; e il foglio di chi prende, che prima aveva solo una frase,
+porta ora lo stesso conto con la stima «≈» (richiesta di Andrea: «la
+schermata sarà similmente a quella del lighting»).
+SCARTATE: una commissione fissa in sats (non è «uguale» a Lightning);
+prenderla tutta da chi deposita (Lightning la divide); farla pagare con
+un'uscita a parte di chi riceve (servirebbe una seconda transazione).
+PROVATO: `collaudo_p2p_onchain_commissione` (17) col server vero in
+gabbia: 503 senza fee, le due metà (un pioniere 1%, l'altro 1,5%),
+l'importo, l'indirizzo della quota, il testo del bot, il rilascio
+98.500/2.500/resto, i tre no del giudice, il rimborso intero, la
+disputa, la polvere; `prove_p2p_onchain_commissione` (12) in node coi
+pezzi veri del telefono; i collaudi on-chain di prima con la fee a zero
+(verdi, cifre invariate); adeguato il ritaglio di
+`prove_incasso_esterno_onchain`. Dal vivo (gabbia, relay morti, 390
+scuro): il foglio di chi prende nei due versi e la pagina dello scambio
+di chi deposita e di chi riceve, con le cifre giuste.
+DA GUARDARE: il primo scambio vero on-chain dopo la promozione (la
+quota arriva al wallet di Barattolo); gli scambi già presi prima del
+deploy restano senza commissione (colonna a 0), ed è giusto così.
+
+## I due tasti della rete nel foglio dell'ordine, un banner solo per le monete e la barra degli on-chain (16 nov 2026, cantiere coin-quasi, Andrea: «sotto ci devono essere già i due tasti per scegliere… di default quando io apro l'ordine è già impostato giusto», «verrà mostrata la fee anche di SATS Routing, giusto?», «3 banner novità sono troppi», «perché c'è la barra del tempo che lampeggia di rosso, però ed è piena?»)
+
+TASTI. I tasti «⚡ Lightning» / «₿ On-chain» del 1 nov (presa-altra-rete)
+stavano solo nei fogli DOPO la presa. Ora stanno anche sotto il titolo
+del foglio che si apre toccando l'ordine, al posto della riga «via …»,
+accesi sulla rete dell'ordine, in Lightning (`reteDettP2P`) e on-chain
+(`reteOcPresaHtmlP2P`, nella testata della domanda di presa). Toccando
+l'altra rete si legge subito il costo dello swap coi preventivi che
+c'erano già e che non creano niente: inverso (`/api/swap/p2p/preventivo`)
+per ricevere on-chain da un ordine Lightning e per depositare da
+Lightning, submarine (`/api/swap/p2p/presa/preventivo`) per ricevere in
+Lightning; chi vende su Lightning coi bitcoin apre il riquadro della
+garanzia di sempre (`rigaPresaOcP2P`). La scelta resta: «Dove ricevere i
+sats» si apre su on-chain (`p2pIncassoRete`), il foglio «🔒 Blocca i
+sats» su Lightning (`p2pOcDepositoRete`), e chi riceve on-chain in
+Lightning fa la rotta `ricevi-lightning` appena preso
+(`applicaReteOcPresaP2P`). I tasti solo dove l'altra rete c'è per chi
+guarda: in Lightning i cancelli del telefono (`swapP2PAcceso`,
+`presaOcPossibileP2P`), on-chain due campi nuovi del libro
+(`lnPossibile`, `depositoLnPossibile`, gli stessi cancelli della pagina
+dello scambio). Prima della presa le cifre on-chain sono stime («circa»):
+i sats veri e il margine nascono alla presa. Scartato: rifare il conto
+intero sulla rete scelta (il costo dello swap cambia di minuto in minuto,
+la nota col «circa» basta e il foglio dopo lo rilegge esatto).
+BANNER. Con le monete accese il verde «USDT» tace e gli USDT entrano nel
+banner blu di Ethereum (`novitaCoinLibroP2P`, classe `con-usdt`): la T
+verde in testa ai loghi e il nome su due righe pari, «USDT · ETH» /
+«XMR · USDe» (su una riga a 390 px veniva mozzato). Il tocco apre il
+tutorial delle monete; chi vede gli USDT senza le monete ha ancora il
+verde col suo.
+BARRA. Le soglie del colore (arancio a 3 giorni, rosso che pulsa
+all'ultimo) erano per l'ordine Lightning da 7 giorni: lo scambio on-chain
+vive 24 ore e nasceva rosso lampeggiante con la riga piena. Sotto i sette
+giorni il tempo che manca si conta in proporzione (`barraScadenzaP2P`;
+24 ore: arancio nelle ultime ~10, rosso nelle ultime ~3,4); da sette in
+su niente cambia.
+PROVATO: `prove_tasti_rete_foglio` (12, in node coi pezzi veri: tasti
+accesi sulla rete dell'ordine, niente tasti senza swap o in vetrina, i
+costi, il passaggio dopo la presa, i preventivi giusti, i fili),
+`prove_novita_coin_p2p` (+2: il banner con gli USDT, il verde che tace),
+`prove_p2p_libro` (+1: la barra di 24 ore neutra, arancio, rossa); il
+censimento di `prove_pagina_acquisto` conta ora due «Fee P2P» (Lightning
+e on-chain). Dal vivo (gabbia, relay morti, preventivi finti perché SATS
+Routing è fuori): i tasti nel foglio on-chain e in quello Lightning con la
+nota del costo, il banner a 390 scuro e 320 chiaro.

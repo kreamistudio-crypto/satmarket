@@ -260,3 +260,15 @@ frase: Nel Profilo c'è la sezione «Supporto», con le due strade per chi ha un
 dove: scheda Profilo, sezione «Supporto», voci «🤖 Chiedi a Tappo» e «💬 Assistenza».
 leva: TAPPO_LINK accesa di serie
 pubblico: sì
+
+## 2026-11-16 · p2p-onchain-commissione
+frase: Negli scambi P2P on-chain la commissione ora è la stessa degli scambi Lightning, metà a testa e con gli stessi sconti per pionieri e livello 5: chi vende la deposita insieme ai sats, chi compra la trova tolta dai sats che riceve. La vedi nella riga «Fee P2P» del conto, già prima di prendere. Gli acquisti del mercatino restano senza commissioni.
+dove: la scheda «P2P», un ordine on-chain del libro: il foglio «Stai comprando sats» / «Stai vendendo sats» col conto, e la pagina dello scambio.
+leva: P2P_ONCHAIN_ATTIVO spenta di serie (accesa per tutti in produzione dal 16 nov)
+pubblico: sì
+
+## 2026-11-16 · p2p-tasti-rete
+frase: Quando tocchi un ordine P2P, sotto «Stai comprando sats» o «Stai vendendo sats» ci sono già i due tasti «⚡ Lightning» e «₿ On-chain», accesi sulla rete dell'ordine. Se scegli l'altra rete vedi subito quanto costa lo swap e quanto ti arriva, prima ancora di prendere l'ordine.
+dove: la scheda «P2P», il foglio che si apre toccando un ordine del libro, Lightning o on-chain.
+leva: P2P_ALTRA_RETE_ATTIVO spenta di serie (accesa per tutti in produzione dal 16 nov)
+pubblico: sì

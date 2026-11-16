@@ -30481,7 +30481,10 @@ def prove_pagina_acquisto():
     _cod = re.sub(r"/\*[\s\S]*?\*/", "", mini3)
     prova("«Fee Barattolo» esce UNA volta sola: il conto del mercatino",
           1, _cod.count("'Fee Barattolo'"))
-    prova("...e il P2P ha la sua voce, «Fee P2P», una volta sola", 1,
+    #    (16 nov 2026, p2p-onchain-commissione) ...e la stessa voce nel
+    #    conto dello scambio ON-CHAIN, che da oggi paga la stessa fee:
+    #    due conti, la stessa parola, nessuna «Fee Barattolo»
+    prova("...e il P2P ha la sua voce, «Fee P2P»: il conto Lightning e quello on-chain", 2,
           _cod.count("'Fee P2P'"))
     prova("...e nessuna frase dice «commissione di Barattolo»", 0,
           _cod.lower().count("commissione di barattolo"))
@@ -69027,6 +69030,12 @@ out.barraQuasiPiena = barraScadenzaP2P({creato: 0, scade: meseS}, 60);
 /* ...e due giorni prima della fine: arancio, non ancora rosso */
 out.barraVicina = barraScadenzaP2P({creato: 0, scade: meseS},
                                    meseS - 2 * 86400);
+/* UNA VITA DI 24 ORE (lo scambio on-chain) si misura in proporzione
+   (16 nov 2026, Andrea: «lampeggia di rosso, però ed è piena?»): appena
+   pubblicato neutro, a 8 ore dalla fine arancio, a 2 ore rosso */
+out.barraGiorno = [barraScadenzaP2P({creato: 0, scade: 86400}, 60),
+                   barraScadenzaP2P({creato: 0, scade: 86400}, 86400 - 8 * 3600),
+                   barraScadenzaP2P({creato: 0, scade: 86400}, 86400 - 2 * 3600)];
 out.rigaAvviso = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','ra'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50'],['premium','3'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
 /* ...e fra due copie dello stesso range vince la piu' recente: la
    dedup e' quella di TUTTI gli ordini, non un binario a parte */
@@ -69608,6 +69617,10 @@ console.log(JSON.stringify(out));
     prova("il neutro e' un token che gira col tema, mai il bianco",
           True, ".p2p-barra > i{background:var(--ink-soft);" in mini
           and "#fff" not in _barra and "white" not in _barra and "p2p-barra" in _barra)
+    prova("...e una vita di 24 ore (lo scambio on-chain) non nasce rossa: neutra "
+          "appena pubblicata, arancio a 8 ore, rossa a 2", ["", "vicina", "ultimo-giorno"],
+          [("ultimo-giorno" if "ultimo-giorno" in b else "vicina" if "vicina" in b else "")
+           for b in out["barraGiorno"]])
     prova("...e a tre giorni la barra passa all'arancio di casa", True,
           ".p2p-barra.vicina > i{background:var(--sats)}" in mini
           and "vicina" in out["barraVicina"]
@@ -156476,9 +156489,14 @@ def _pezzi_verso_lightning_js(mini):
              "function onchainPrimaDiChiVende(o){",
              "function onchainDerACompatta(der){",
              "function onchainFirmataDaChiVende(B, tx, o, w){",
+             # (16 nov 2026, p2p-onchain-commissione) l'incasso e il tetto
+             # della quota, che le uscite e la co-firma chiedono
+             "function onchainIncassoSats(o){",
+             "function onchainQuotaStorta(o){",
              "function onchainUsciteVersoVenditore(o, incasso, piuVb){",
              "function onchainPsbtFirmata(B, o, io, w, uscite){")
-    return "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in firme)
+    return "const P2P_OC_META_MAX = 0.025;\n" + "\n".join(
+        pezzo_js(mini, f, "\n}\n") + "\n}" for f in firme)
 
 
 def prove_onchain_verso_lightning():
@@ -159710,7 +159728,7 @@ def prove_novita_coin_p2p():
     print("\n[il «Novità» di ETH, Monero e USDe e il suo tutorial]")
     import subprocess
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
-    blocco = mini[mini.index("function trioCoinP2P(){"):
+    blocco = mini[mini.index("const P2P_USDT_LOGO_TRIO = "):
                   mini.index("/* ============ fine del «Novità» di ETH, Monero e USDe")]
     banco = """
 const NODI = {};
@@ -159750,6 +159768,14 @@ out.banner = [/class="p2p-oc-novita p2p-coin-novita appeso" id="p2pCoinNovita"/.
   /<span class="p2p-coin-trio" aria-hidden="true"><eth><xmr><usde><\\/span>/.test(b),
   /p2p-oc-novita-testo">ETH · XMR · USDe<\\/span><span class="p2p-oc-novita-tag">Novità<\\/span>/.test(b),
   /onclick="apriNovitaCoinP2P\\(\\)"/.test(b), LOG.slice()];
+/* UN BANNER SOLO (16 nov 2026): chi vede anche gli USDT li trova qui,
+   in testa, con la T verde sul banner blu */
+globalThis.novitaUsdtVistaP2P = () => true;
+const bu = novitaCoinLibroP2P();
+out.conUsdt = [/class="p2p-oc-novita p2p-coin-novita appeso con-usdt"/.test(bu),
+  /<span class="p2p-coin-trio" aria-hidden="true"><svg class="p2p-coin-svg"[^>]*><circle[^>]*fill="#26A17B"\\/><path[^>]*><\\/svg><eth><xmr><usde><\\/span>/.test(bu),
+  /p2p-oc-novita-testo">USDT · ETH<br>XMR · USDe<\\/span>/.test(bu)];
+delete globalThis.novitaUsdtVistaP2P;
 LOG.length = 0;
 apriNovitaCoinP2P();
 out.tutorial = [LOG.slice(), el('p2pCoinNovita').classList.contains('acceso'),
@@ -159797,6 +159823,11 @@ console.log(JSON.stringify(out));
     prova("...coi tre loghi, «ETH · XMR · USDe» e «Novità» accanto alla freccia, appeso, "
           "misura la testata, e il tocco apre il tutorial",
           [True, True, True, True, ["testa"]], out["banner"])
+    prova("UN BANNER SOLO: a chi vede anche gli USDT il banner blu porta la T verde "
+          "in testa e «USDT · ETH / XMR · USDe» su due righe", [True, True, True], out["conUsdt"])
+    prova("...e il verde degli USDT tace quando c'e' quello blu",
+          True, "if (typeof novitaCoinVistaP2P === 'function' && novitaCoinVistaP2P()) return '';"
+          in pezzo_js(mini, "function novitaUsdtLibroP2P(){", "\n}\n"))
     prova("...toccato: acceso, tutorial dal lato «Compra BTC» in sette tappe; il foglio "
           "prepara una tappa e la chiusura una; tonde la tessera e il +; l'ultima al centro",
           [["lato:compro", "tour:7"], True,
@@ -159861,6 +159892,273 @@ console.log(JSON.stringify(out));
           (_s1 in mini, _s2 in mini, _s1 in mini and _s2 in mini and mini.index(_s1) < mini.index(_s2),
            ".p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-coin-novita.appeso .p2p-oc-faccia{top:0}" in mini))
 
+
+def prove_p2p_onchain_commissione():
+    """LA COMMISSIONE DEL P2P ON-CHAIN, DAL LATO DEL TELEFONO (16 nov 2026,
+    cantiere p2p-onchain-commissione, Andrea: «Deve essere uguale, come
+    commissione deve essere uguale a quella del lighting»). Il giro col
+    server vero sta in collaudo_p2p_onchain_commissione; qui i pezzi VERI
+    del telefono in node: l'incasso tolta la meta' di chi riceve, il tetto
+    che il telefono rilegge prima di firmare (2,5% per meta' sul P2P, la
+    quota fissa nel mercatino), le uscite del rilascio con l'uscita di
+    Barattolo, la riga «Fee P2P 1,5%» nel conto come in Lightning, la stima
+    prima della presa e il conto nel foglio di chi prende; poi i fili del
+    server."""
+    print("\n[la commissione del P2P on-chain, dal telefono]")
+    import json as _js, shutil, subprocess, tempfile
+    node = shutil.which("node")
+    if not node:
+        salta("il banco della commissione on-chain", "node non c'e'")
+        return
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    src = _SORGENTE
+    riga = lambda inizio: next(l for l in mini.split("\n") if l.startswith(inizio))
+    banco = "\n".join([
+        riga("const ONCHAIN_QUOTA_TETTO = "), riga("const P2P_OC_META_MAX = "),
+        _fn_js(mini, "function onchainIncassoSats(o){"),
+        _fn_js(mini, "function onchainQuotaStorta(o){"),
+        _fn_js(mini, "function onchainUsciteVersoVenditore(o, incasso, piuVb){"),
+        _fn_js(mini, "function commissioneOnchainP2P(o, deposito){"),
+        _fn_js(mini, "function contoOnchainP2P(o){"),
+        _fn_js(mini, "function mezzaCommissioneP2P(fee){"),
+    ]) + r"""
+const ONCHAIN_POLVERE = 546;
+const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const esc = s => String(s == null ? '' : s);
+const fmtEur = e => String(e);
+let fee = 0.03, mia = 0.02;
+const commissioneVivaP2P = () => fee, feeMiaP2P = () => mia, cartelloFeeP2P = () => 'beta';
+const nudo = h => String(h).replace(/<[^>]+>/g, '').replace(/ | /g, ' ');
+const righe = h => [...h.matchAll(/<div class="ctrl-riga[^"]*"><span>(.*?)<\/span><span class="mono">(.*?)<\/span><\/div>/g)]
+  .map(m => nudo(m[1]) + ' | ' + nudo(m[2]));
+const P = x => Object.assign({id: 1, rotta: '/p2p/onchain/1', prezzo_sats: 100000, sats: 100000,
+  quota_sats: 2500, quota_ricevente_sats: 1500, quota_indirizzo: 'qB', margine_sats: 1080,
+  importo_sats: 102080, preso_il: 5, tariffa: 2, rimborso: 'qR', euro: 90,
+  utxo: [{txid: 'aa', vout: 0, value: 102080}]}, x || {});
+const out = {};
+out.incasso = [onchainIncassoSats(P()), onchainIncassoSats({prezzo_sats: 7000})];
+out.storta = [onchainQuotaStorta(P()),
+  onchainQuotaStorta(P({quota_sats: 6000, quota_ricevente_sats: 1500})),
+  onchainQuotaStorta(P({quota_sats: 4000, quota_ricevente_sats: 2600})),
+  onchainQuotaStorta(P({quota_ricevente_sats: 3000})),
+  onchainQuotaStorta(P({quota_ricevente_sats: -1})),
+  onchainQuotaStorta({prezzo_sats: 7000, quota_sats: 5000}),
+  onchainQuotaStorta({prezzo_sats: 7000, quota_sats: 5001}),
+  onchainQuotaStorta({prezzo_sats: 7000, quota_sats: 1000, quota_ricevente_sats: 10})];
+out.uscite = onchainUsciteVersoVenditore(P(), 'qI');
+try { onchainUsciteVersoVenditore(P({quota_ricevente_sats: 3000}), 'qI'); out.troppo = 'passata'; }
+catch (e) { out.troppo = e.message; }
+out.deposita = righe(contoOnchainP2P(P({ruolo: 'compratore', parte: 'vendo'})));
+out.riceve = righe(contoOnchainP2P(P({ruolo: 'venditore', parte: 'compro'})));
+/* prima della presa, chi guarda e comprerebbe: la stima della sua meta' */
+out.stima = righe(contoOnchainP2P(P({ruolo: '', parte: 'compro', preso_il: 0, quota_sats: 0,
+  quota_ricevente_sats: 0})));
+out.piccolo = commissioneOnchainP2P(P({preso_il: 0, quota_sats: 0, quota_ricevente_sats: 0,
+  sats: 12000}), false);
+fee = null;
+out.senzaFee = commissioneOnchainP2P(P({preso_il: 0, quota_sats: 0, quota_ricevente_sats: 0}), false);
+process.stdout.write(JSON.stringify(out));
+"""
+    d = tempfile.mkdtemp()
+    try:
+        fn = os.path.join(d, "comm.js")
+        with open(fn, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = subprocess.run([node, fn], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco della commissione on-chain gira in node", "", (r.stderr or "")[-700:])
+        o = _js.loads(r.stdout) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if o:
+        prova("l'incasso: il prezzo meno la meta' di chi riceve; nel mercatino il prezzo intero",
+              [98500, 7000], o["incasso"])
+        prova("il tetto riletto prima di firmare: le due meta' giuste si'; una meta' "
+              "oltre il 2,5%, una ricevente piu' grande della quota o negativa no; "
+              "nel mercatino il fisso a 5.000 e mai una meta' di chi riceve",
+              [True, False, False, False, False, True, False, False],
+              [x == "" for x in o["storta"]])
+        prova("le uscite del rilascio: 98.500 all'incasso, 2.500 a Barattolo, il resto "
+              "meno la rete a chi ha depositato",
+              [["qI", 98500], ["qB", 2500], ["qR", 102080 - 98500 - 2500 - 418]], o["uscite"])
+        prova("...e con una meta' fuori tetto il telefono non costruisce niente",
+              "la commissione del P2P supera il tetto", o["troppo"])
+        prova("IL CONTO, come quello di Lightning: «Fee P2P» con l'aliquota e la pastiglia; "
+              "a chi deposita la sua meta' col «+» e il totale dell'importo; a chi riceve "
+              "la sua col «−» e il totale netto",
+              [["Sats dello scambio | 100.000 sats", "Margine per la rete | 1.080 sats",
+                "Fee P2P 1%beta | +1.000 sats", "Deposita | 102.080 sats"],
+               ["Sats dello scambio | 100.000 sats",
+                "Fee P2P 1,5%beta | −1.500 sats", "Ricevi | 98.500 sats"]],
+              [o["deposita"][:4], o["riceve"][:3]])
+        prova("PRIMA DELLA PRESA la stima col «≈», dalla fee viva con lo sconto di chi "
+              "guarda (100.000 x 2% / 2 = 1.000)",
+              ["Fee P2P 1%beta | ≈ −1.000 sats", "Ricevi | ≈ 99.000 sats"],
+              o["stima"][1:3])
+        prova("...sotto la polvere niente commissione, e senza fee viva niente riga",
+              [{"sats": 0, "stima": True}, None], [o["piccolo"], o["senzaFee"]])
+    prova("I FILI DEL SERVER: la presa conta le due meta' dalla fee viva (503 se non c'e'), "
+          "l'importo porta quella di chi deposita, la riga le scrive; il giudice dei PSBT e "
+          "la firma di Barattolo pagano l'incasso netto; il cambio si misura sull'incasso",
+          [True, True, True, True, True, True, True],
+          ["q_dep, q_ric = _p2p_onchain_commissioni(con, dep, ric, prezzo,\n"
+           "                                                    _P2P_INFO[\"fee\"])" in src,
+           "La commissione del P2P adesso non si \"\n                                     \"legge: riprova fra un minuto" in src,
+           "(user[\"id\"], dep, ric, ind_id, margine, prezzo + margine + q_dep," in src,
+           "quota_dove, q_ric, oid))" in src,
+           "if [v for d, v in uscite if d == o[\"incasso\"]] != [_onchain_incasso_sats(o)]:" in src,
+           "uscite = [(oc[\"incasso\"], _onchain_incasso_sats(oc))]" in src,
+           "p = await _onchain_preventivo_cambio(_onchain_incasso_sats(o))" in src])
+    cof = pezzo_js(mini, "async function onchainCofirma(o, parole){", "\n}\n")
+    prova("...e il telefono che co-firma rilegge l'incasso netto e il tetto, nei due versi, "
+          "e lo swap in Lightning si misura sull'incasso", [2, 2, True],
+          [cof.count("String(onchainIncassoSats(o))"), cof.count("if (onchainQuotaStorta(o)) return onchainQuotaStorta(o);"),
+           "if (!(rec.mandi > 0 && rec.mandi <= onchainIncassoSats(o))) throw new Error('le cifre dello swap non tornano');" in mini])
+    prova("la frase del foglio «Pubblica» on-chain non dice piu' «Barattolo non prende "
+          "commissioni»", [False, True],
+          ["Barattolo non prende commissioni: chi vende deposita" in mini,
+           "La commissione è quella degli scambi Lightning, metà a testa" in mini])
+    presa = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
+    prova("IL FOGLIO DI CHI PRENDE porta il conto, come il dettaglio Lightning, e le "
+          "due frasi dicono la meta' della commissione", [True, True, True],
+          ["contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo'})" in presa,
+           "più la tua metà della commissione e il margine di rete" in presa,
+           "meno la tua metà della commissione" in presa])
+
+
+
+def prove_tasti_rete_foglio():
+    """I DUE TASTI DELLA RETE IN CIMA AL FOGLIO DELL'ORDINE (16 nov 2026,
+    cantiere coin-quasi, Andrea: «sotto ci devono essere già i due tasti per
+    scegliere… di default quando io apro l'ordine è già impostato giusto»
+    e «verrà mostrata la fee anche di SATS Routing, giusto?»). I pezzi veri
+    in node con finte minime: i tasti accesi sulla rete dell'ordine, solo
+    dove l'altra rete c'e'; toccando l'altra il costo dello swap dai
+    preventivi di sempre; la scelta passa ai fogli dopo la presa. Poi i
+    fili: il libro on-chain dice i due cancelli, i fogli li usano."""
+    print("\n[i due tasti della rete nel foglio dell'ordine]")
+    import json as _js, shutil, subprocess, tempfile
+    node = shutil.which("node")
+    if not node:
+        salta("il banco dei tasti della rete", "node non c'e'")
+        return
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    src = _SORGENTE
+    a = mini.index("/* ══ I DUE TASTI DELLA RETE IN CIMA AL FOGLIO DELL'ORDINE")
+    b = mini.index("async function prendiOnchainP2P(id){")
+    banco = r"""
+const esc = s => String(s == null ? '' : s).replace(/"/g, '&quot;');
+const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const LOG = [];
+const haptic = () => {}, toast = t => LOG.push('toast:' + t), authHdr = () => '', API_BASE = '/api';
+let VETRINA = false, SWAP = true, PRESA = true, p2pDettOrdine = 'L1', p2pDettImporto = 0;
+const swapP2PAcceso = () => SWAP, presaOcPossibileP2P = () => PRESA;
+const p2pIncassoRete = {}, p2pPresaOc = {}, p2pOcDepositoRete = {};
+const RIGHE = {L1: {id: 'L1', lato: 'sell', sats: 100000, euro: 90}, L2: {id: 'L2', lato: 'buy', sats: 100000, euro: 90}};
+const rigaLibroP2P = id => RIGHE[id];
+const nettoLatoP2P = (o, sats) => o.lato === 'sell' ? sats - 1500 : sats + 1500;
+const satsMercatoP2P = () => 0;
+const renderDettaglioP2P = () => LOG.push('disegno');
+const leggiPreventivoCambioP2P = async (sats) => (LOG.push('rev:' + sats), {ok: true, ricevi: sats - 700, fornitore_nome: 'SATS Routing'});
+const leggiPreventivoPresaP2P = async (sats) => (LOG.push('sub:' + sats), {ok: true, mandi: sats + 900, costo: 900, fornitore_nome: 'SATS Routing'});
+const percheCambioP2P = d => 'no rev', perchePresaOcP2P = d => 'no sub', percheDepositoLnOnchainP2P = d => 'no dep';
+const presaOcOrdineP2P = id => RIGHE[id], garanziaVendoP2P = o => ({sats: 101500, stima: false});
+const apriPresaOcP2P = id => { p2pPresaOc[id] = {aperto: true, stato: 'pronto', dati: {ok: true, mandi: 102400, costo: 900}}; LOG.push('presa:' + id); };
+const commissioneOnchainP2P = (o, dep) => ({sats: dep ? 1000 : 1500, stima: true});
+const NODI = {}; const el = id => NODI[id] || null;
+let p2pOnchainLibro = {eventi: [{id: 7, lato: 'sell', sats: 100000}, {id: 8, lato: 'buy', sats: 100000}],
+  lnPossibile: true, depositoLnPossibile: false};
+let FETCH = []; const fetch = async (u, o) => { FETCH.push([u, o && o.body]); return {ok: true, json: async () => ({})}; };
+""" + mini[a:b] + r"""
+const out = {};
+const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed="(true|false)"[^>]*>([^<]+)</g)].map(m => m[3] + ':' + m[2]);
+(async () => {
+  out.compra = premuto(reteDettP2P(RIGHE.L1, true));
+  out.vende = premuto(reteDettP2P(RIGHE.L2, false));
+  SWAP = false; out.senzaSwap = reteDettP2P(RIGHE.L1, true); SWAP = true;
+  VETRINA = true; out.vetrina = reteDettP2P(RIGHE.L1, true); VETRINA = false;
+  /* chi compra tocca ₿: la scelta resta e si legge il costo */
+  await scegliReteDettP2P('L1', 'oc');
+  out.sceltaOc = [p2pIncassoRete.L1, premuto(reteDettP2P(RIGHE.L1, true))];
+  await caricaCambioDettP2P('L1');
+  out.notaOc = notaCambioDettP2P('L1');
+  await scegliReteDettP2P('L1', 'ln');
+  out.tornaLn = [p2pIncassoRete.L1 === undefined, premuto(reteDettP2P(RIGHE.L1, true))];
+  /* chi vende tocca ₿: si apre il riquadro dello swap della garanzia */
+  await scegliReteDettP2P('L2', 'oc');
+  out.vendeOc = [premuto(reteDettP2P(RIGHE.L2, false)), notaPresaDettP2P('L2')];
+  /* il foglio on-chain: chi riceve (ordine di vendita) ha i tasti, chi deposita no qui */
+  out.ocPossibile = [reteOcPresaPossibileP2P(true), reteOcPresaPossibileP2P(false)];
+  out.ocSats = [satsOcPresaP2P(p2pOnchainLibro.eventi[0], true), satsOcPresaP2P(p2pOnchainLibro.eventi[1], false)];
+  out.ocPrima = premuto(reteOcPresaHtmlP2P(p2pOnchainLibro.eventi[0], true));
+  NODI.p2pOcPresaRete = {innerHTML: ''};
+  await scegliReteOcPresaP2P(7, 'ln');
+  out.ocLn = [premuto(NODI.p2pOcPresaRete.innerHTML), NODI.p2pOcPresaRete.innerHTML.replace(/<[^>]+>/g, '').replace(/.*Lightning₿ On-chain/, '')];
+  await scegliReteOcPresaP2P(8, 'ln');
+  out.depLn = reteOcPresaHtmlP2P(p2pOnchainLibro.eventi[1], false).replace(/<[^>]+>/g, '').replace(/.*Lightning₿ On-chain/, '');
+  /* dopo la presa: chi deposita trova il foglio su Lightning, chi riceve chiede la rotta */
+  await applicaReteOcPresaP2P(8, 'compratore');
+  await applicaReteOcPresaP2P(7, 'venditore');
+  out.dopo = [p2pOcDepositoRete[8], FETCH.map(f => f[0] + ' ' + f[1]), p2pOcPresaRete[7] === undefined];
+  out.log = LOG.filter(x => /^(rev|sub|presa)/.test(x));
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { process.stderr.write(String(e && e.stack || e)); });
+"""
+    d = tempfile.mkdtemp()
+    try:
+        fn = os.path.join(d, "tasti.js")
+        with open(fn, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = subprocess.run([node, fn], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco dei tasti della rete gira in node", "", (r.stderr or "")[-700:])
+        o = _js.loads(r.stdout) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if o:
+        prova("SU UN ORDINE LIGHTNING i due tasti, «⚡ Lightning» acceso di serie, per chi "
+              "compra e per chi vende; senza swap o in vetrina niente tasti",
+              [["⚡ Lightning:true", "₿ On-chain:false"], ["⚡ Lightning:true", "₿ On-chain:false"], "", ""],
+              [o["compra"], o["vende"], o["senzaSwap"], o["vetrina"]])
+        prova("...chi compra tocca «₿ On-chain»: la scelta resta per «Dove ricevere i sats» "
+              "e si vede subito il costo dello swap sul netto che Mostro paghera'",
+              ["oc", ["⚡ Lightning:false", "₿ On-chain:true"]], o["sceltaOc"])
+        prova("...la nota dice quanto arriva, quanto costa e dove si scrive l'indirizzo",
+              True, "arrivano circa <b>97.800 sats</b>, lo swap costa <b>700 sats</b>" in o["notaOc"]
+              and "«Dove ricevere i sats»" in o["notaOc"])
+        prova("...e si torna su Lightning", [True, ["⚡ Lightning:true", "₿ On-chain:false"]], o["tornaLn"])
+        prova("...chi vende tocca «₿ On-chain»: si apre il riquadro dello swap della garanzia "
+              "e la nota dice quanto mandare e quanto costa",
+              True, o["vendeOc"][0] == ["⚡ Lightning:false", "₿ On-chain:true"]
+              and "mandi <b>102.400 sats</b>, lo swap di SATS Routing costa <b>900 sats</b>" in o["vendeOc"][1])
+        prova("SU UN ORDINE ON-CHAIN i cancelli del server (qui: ricevere in Lightning si', "
+              "depositare da Lightning no); i sats dello swap tolta o aggiunta la mia meta' "
+              "della commissione; «₿ On-chain» acceso di serie",
+              [[True, False], [98500, 101000], ["⚡ Lightning:false", "₿ On-chain:true"]],
+              [o["ocPossibile"], o["ocSats"], o["ocPrima"]])
+        prova("...toccato «⚡ Lightning» chi riceve vede subito quanto gli arriva e il costo",
+              True, o["ocLn"][0] == ["⚡ Lightning:true", "₿ On-chain:false"]
+              and "ti arrivano circa 97.600 sats, lo swap costa circa 900 sats" in o["ocLn"][1])
+        prova("...e chi deposita quanto paga in Lightning e il costo",
+              True, "paghi circa 101.700 sats più il margine per la rete, lo swap costa circa 700 sats" in o["depLn"])
+        prova("DOPO LA PRESA la scelta passa: il foglio del deposito gia' su Lightning, il "
+              "«Ricevi in Lightning» chiesto con la rotta di sempre, e la scelta si consuma",
+              ["ln", ['/api/p2p/onchain/7/ricevi-lightning {"si":true}'], True], o["dopo"])
+        prova("...coi preventivi giusti: lo swap inverso per ricevere on-chain e per "
+              "depositare, il submarine per ricevere in Lightning",
+              ["rev:98500", "presa:L2", "sub:98500", "rev:101000"], o["log"])
+    presa = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
+    prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
+    dett = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
+    prova("I FILI: il libro on-chain dice i due cancelli a chi guarda; il foglio on-chain "
+          "mette i tasti al posto di «via on-chain»; la presa passa la scelta; il foglio "
+          "Lightning li mette in cima al corpo al posto di «via Lightning»",
+          [True, True, True, True, True, True, True],
+          ['fuori["lnPossibile"] = bool(p2p_onchain_ln_per(chi))' in src,
+           'fuori["depositoLnPossibile"] = bool(p2p_onchain_deposito_ln_per(chi))' in src,
+           "lnPossibile: !!busta.lnPossibile, depositoLnPossibile: !!busta.depositoLnPossibile" in mini,
+           "via: conTasti ? '' : 'via on-chain'," in presa,
+           "await applicaReteOcPresaP2P(id, d.ruolo);" in prendi,
+           "if (tit && !reteTasti) tit.insertAdjacentHTML('beforeend', '<small class=\"p2p-via\">via Lightning</small>');" in dett,
+           "box.innerHTML =\n    reteTasti +" in dett])
 
 def prove_icone_valute_filtro():
     """LE ICONE DELLE VALUTE NEL FILTRO E DELLE RETI USDT (16 nov 2026,
@@ -162066,7 +162364,7 @@ console.log(JSON.stringify(out));
           ("badgePremioP2P({lato: o.lato, premium: Number(o.premio) || 0, sats: 0})" in riga,
            "fraseFiltroP2P(Number(o.filtro))" in riga, "' p2p-in-pausa' : ''" in riga,
            0 < apri.find("const pausa = pausaOnchainP2P(o);")
-           < apri.find("titolo: vendeLui ? 'Stai comprando sats' : 'Stai vendendo sats',\n    via: 'via on-chain',")))
+           < apri.find("titolo: vendeLui ? 'Stai comprando sats' : 'Stai vendendo sats',")))
     campi = pezzo_js(mini, "function campiNuovoP2P(){", "\n}\n")
     vale = pezzo_js(mini, "function valeNuovoOrdineP2P(v){", "\n}\n")
     prova("...e il giudice usa il minimo on-chain e non chiede la zona", (True, True),
@@ -162671,7 +162969,8 @@ def prove_incasso_esterno_onchain():
                  "onchain_messaggio_destinazione", "onchain_firma_valida",
                  "onchain_firma_valida_testo",
                  "onchain_destinazione_motivo", "onchain_indirizzo_esterno",
-                 "_onchain_sats_in_piu", "_onchain_psbt_giudica"):
+                 "_onchain_sats_in_piu", "_p2p_onchain_campo",
+                 "_onchain_incasso_sats", "_onchain_psbt_giudica"):
         exec(pezzo(nome), srv)
 
     def radice(p, versione):
@@ -198227,7 +198526,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione tasti_rete_foglio usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     """.split(),
@@ -198920,6 +199219,8 @@ def main():
     prove_novita_coin_p2p,
     prove_p2p_monete_valute,
     prove_icone_valute_filtro,
+    prove_p2p_onchain_commissione,
+    prove_tasti_rete_foglio,
     prove_prezzo_btc_libro,
     prove_usdt_foglio_presa,
     prove_sconto_fisso_decimale,

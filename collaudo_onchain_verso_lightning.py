@@ -121,6 +121,9 @@ def pezzi_pagina():
         "async function onchainRicevutoMio(B, parole, oc){",
         "function onchainPrimaDiChiVende(o){", "function onchainDerACompatta(der){",
         "function onchainFirmataDaChiVende(B, tx, o, w){",
+        # (16 nov 2026, p2p-onchain-commissione) l'incasso e il tetto
+        # della quota, che le uscite e la co-firma chiedono
+        "function onchainIncassoSats(o){", "function onchainQuotaStorta(o){",
         "function onchainUsciteVersoVenditore(o, incasso, piuVb){",
         "function onchainPsbtFirmata(B, o, io, w, uscite){",
         "function onchainParolePerOrdine(B, parole, o){",
@@ -133,6 +136,7 @@ def pezzi_pagina():
     return "\n".join([riga("const ONCHAIN_VERSIONI_PROVA = "),
                       blocco("const ONCHAIN_RETI = {", "\n};\n"),
                       riga("const ONCHAIN_QUOTA_TETTO = "),
+                      riga("const P2P_OC_META_MAX = "),
                       riga("const ONCHAIN_POLVERE = "),
                       riga("const onchainCambi = {};")]
                      + [f(x) for x in firme])

@@ -181,6 +181,7 @@ collaudo_onchain_verso_lightning.py
 collaudo_onchain_rete_pannello.py
 collaudo_p2p_onchain.py
 collaudo_p2p_onchain_usdt.py
+collaudo_p2p_onchain_commissione.py
 collaudo_leve_pannello.py
 cartone_satsrouting.py
 collaudo_fusione_da_telegram.py
