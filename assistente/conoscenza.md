@@ -344,7 +344,7 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 
 - Nessuno di Barattolo ti chiederà mai la seed, le parole di recupero, la nsec, una chiave privata o una password. Chi le chiede è un truffatore. Se le hai date a qualcuno, considerale esposte e sposta subito i fondi su un wallet nuovo.
 - Barattolo non ti scrive per primo chiedendo soldi.
-- Gli account ufficiali di Barattolo su Telegram sono SOLO questi: il bot https://t.me/ilbarattolobot, il canale https://t.me/barattolostore (con la sua chat privata e il gruppo dei commenti), Tappo https://t.me/TappoBarattoloBot, e le due persone dello staff, Andrea https://t.me/aandreaiita e Alan https://t.me/AlanBimbati. Quando qualcuno chiede se un account è vero o come trovare lo staff, metti SEMPRE questi link, nascosti dietro il nome (per esempio «Andrea» che porta a https://t.me/aandreaiita), così chi li tocca arriva all'account giusto senza poter sbagliare. Chiunque altro dica di essere dello staff, dell'assistenza o di Barattolo NON lo è, anche se il nome sembra uguale: i truffatori copiano nome e foto e cambiano una lettera (per esempio una «I» maiuscola al posto della «l», come @aIanbarattoIo, che NON è Alan). Prima di fidarti, guarda il NOME UTENTE, quello con la @ (lo trovi aprendo il profilo, alla voce «Nome utente»), e controllalo lettera per lettera: il nome visualizzato e la bio li può scrivere chiunque, quindi «Alan» o «Barattolo» scritto lì non prova niente.
+- Gli account ufficiali di Barattolo su Telegram sono SOLO questi: il bot https://t.me/ilbarattolobot, il canale https://t.me/barattolostore (con la sua chat privata e il gruppo dei commenti), Tappo https://t.me/TappoBarattoloBot (dal 16 novembre 2026 ci si arriva anche col bottone «💬 Chiedi a Tappo» nel bot di Barattolo, nel benvenuto e quando gli si scrive una frase), e le due persone dello staff, Andrea https://t.me/aandreaiita e Alan https://t.me/AlanBimbati. Quando qualcuno chiede se un account è vero o come trovare lo staff, metti SEMPRE questi link, nascosti dietro il nome (per esempio «Andrea» che porta a https://t.me/aandreaiita), così chi li tocca arriva all'account giusto senza poter sbagliare. Chiunque altro dica di essere dello staff, dell'assistenza o di Barattolo NON lo è, anche se il nome sembra uguale: i truffatori copiano nome e foto e cambiano una lettera (per esempio una «I» maiuscola al posto della «l», come @aIanbarattoIo, che NON è Alan). Prima di fidarti, guarda il NOME UTENTE, quello con la @ (lo trovi aprendo il profilo, alla voce «Nome utente»), e controllalo lettera per lettera: il nome visualizzato e la bio li può scrivere chiunque, quindi «Alan» o «Barattolo» scritto lì non prova niente.
 - Lo staff non ti chiede mai soldi in privato, né per «scambi di buoni», «sblocchi», «verifiche» o rimborsi. Se qualcuno lo fa, non mandare niente, bloccalo e segnalalo da Telegram, e avvisa lo staff.
 - Paga sempre dentro Barattolo: un pagamento fuori dal deposito di garanzia non è protetto.
 - Nel P2P, libera i sats solo quando gli euro sono arrivati davvero sul tuo conto, non prima e non sulla fiducia di una ricevuta.
@@ -1519,4 +1519,12 @@ pubblico: sì
 frase: Nel P2P ora puoi pagare anche in ETH, Monero o USDe. L'ordine resta in euro e la garanzia in sats come sempre: chi paga manda l'equivalente al cambio del momento, con indirizzo controllato, QR, cifra esatta e il link all'explorer per vedere che la transazione è arrivata. USDe su Ethereum, Arbitrum, Base, BNB Chain e Solana.
 dove: la scheda «P2P», nel foglio «Pubblica» di un ordine in euro (fra i metodi) e nel libro, col logo di ogni moneta.
 leva: P2P_COIN_ATTIVO (nuova, accesa)
+pubblico: sì
+
+<!-- pezzo novita-035 | novita -->
+## Novità · 2026-11-16 · bottone-tappo
+
+frase: Nel bot di Barattolo c'è il bottone «💬 Chiedi a Tappo»: un tocco e sei nella chat di Tappo, che risponde alle domande su come funziona Barattolo. Il bot di Barattolo resta quello degli avvisi su ordini e pagamenti.
+dove: il bot @ilbarattolobot, nel messaggio di benvenuto (/start) e nella risposta a chi gli scrive una frase.
+leva: TAPPO_LINK (accesa di serie)
 pubblico: sì

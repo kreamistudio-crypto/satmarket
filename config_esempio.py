@@ -87,6 +87,9 @@ TELEGRAM_MINIAPP_LINK = ""
 # che LINK_BOT sia il bot del BOT_TOKEN («⚠️ LINK_BOT dice @…»).
 URL_PUBBLICO = "https://barattolo.store"
 LINK_BOT = "https://t.me/ilbarattolobot"
+# Il bottone «💬 Chiedi a Tappo» nel bot (16 nov 2026): il link del bot di
+# Tappo. Vuota ("") = niente bottone.
+TAPPO_LINK = "https://t.me/TappoBarattoloBot"
 
 # --- Anthropic (ricerca AI in linguaggio naturale) -------------------
 ANTHROPIC_API_KEY = "INCOLLA_QUI_LA_API_KEY"

@@ -84022,3 +84022,36 @@ serie, segno di entraConNostr tolto. Scatti in Chromium (Playwright) della
 pagina statica coi due fogli e la copertura: in
 /mnt/project-files/accesso-rotellina/. NON provato dal vivo sull'APK Tor.
 DA GUARDARE: dall'APK su Tor, un ingresso col bot e uno con nostrconnect.
+
+## Il bottone «💬 Chiedi a Tappo» nel bot principale (16 nov 2026, cantiere bottone-tappo, Andrea: «l'idea del bottone mi piace»)
+
+Andrea ha chiesto se Tappo dovesse vivere anche dentro @ilbarattolobot.
+Il consiglio, che ha preso, è stato di no: il bot di Barattolo è il
+canale degli avvisi (ordini, pagamenti, dispute, codici), e una chat lì
+dentro li farebbe perdere. In più i suoi messaggi arrivano al server e
+non a n8n: Tappo andrebbe rifatto o messo dietro un ponte, sul bot che
+non deve fermarsi mai.
+Al suo posto c'è un bottone «💬 Chiedi a Tappo» che apre
+@TappoBarattoloBot. Sta nel benvenuto del /start e nella risposta a chi
+scrive una frase («Non sono un bot chiacchierone»), con una riga «Hai
+una domanda su come funziona? Chiedila a Tappo».
+LA LEVA `TAPPO_LINK` è accesa di serie (`https://t.me/TappoBarattoloBot`):
+- vuota = niente bottone e niente riga;
+- storta = quella di serie, con la stessa forma `t.me/<bot>` di LINK_BOT
+  e una riga nel journal.
+La Mini App resta il primo bottone (la regola di `prove_canale_bot`).
+LA RIGA DI TAPPO VIENE PRIMA di quella del vecchio assistente: così,
+se un giorno l'assistente si riaccende, il benvenuto di prima resta tutto
+davanti (la regola di `collaudo_assistente_bot`, che al primo giro era
+rosso con la riga in fondo).
+SCARTATO: dare la personalità di Tappo al vecchio assistente del bot
+(spento). Si riconsidera se le persone continuano a scrivere al bot
+principale invece di toccare il bottone.
+PROVATO:
+- `prove_canale_bot`, sezione 4 bis: leva d'esempio e di serie, bottone e
+  riga con link e senza, Mini App in cima, /start e risposta alla frase,
+  forma del link;
+- controprova rossa: senza il bottone nel /start diventano rosse due
+  prove;
+- `prove_assistente_bot` verde; suite severa intera 28276 passate, collaudi 134/134 (collaudo_assistente_bot rifatto verde dopo lo spostamento della riga).
+Libro di Tappo e NOVITA aggiornati.

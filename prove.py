@@ -36421,12 +36421,45 @@ def prove_canale_bot():
               t["inline_keyboard"][0][0]["url"] == "https://barattolo.store")
     sorgente_bot = pezzo("gestisci_update")
     prova("/start non elenca comandi, invita ad aprire", True,
-          "tastiera_bot()" in sorgente_bot and "/canale" not in
+          "tastiera_bot(righe_tappo())" in sorgente_bot and "/canale" not in
           sorgente_bot.split("if testo.startswith(\"/canale\")")[0]
           .split("return await bot_api")[1])
     prova("chi scrive altro riceve comunque i bottoni", True,
           "sfo:menu:0" in sorgente_bot.rsplit("reply_markup", 1)[1]
           or "sfo:menu:0" in sorgente_bot)
+
+    # --- 4 bis) IL BOTTONE DI TAPPO (16 nov 2026, Andrea: «l'idea del
+    # bottone mi piace»): Tappo resta nel suo bot, qui solo la porta
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("TAPPO_LINK: d'esempio e di serie, il bot di Tappo", (1, 1),
+          (esempio.count('\nTAPPO_LINK = "https://t.me/TappoBarattoloBot"\n'),
+           _SORGENTE.count('TAPPO_LINK_DI_SERIE = "https://t.me/TappoBarattoloBot"\n')))
+    for link, atteso in (("https://t.me/TappoBarattoloBot",
+                          [[{"text": "💬 Chiedi a Tappo",
+                             "url": "https://t.me/TappoBarattoloBot"}]]),
+                         ("", [])):
+        amb_t = {"TAPPO_LINK": link}
+        exec(pezzo("righe_tappo"), amb_t)
+        exec(pezzo("riga_tappo_testo"), amb_t)
+        prova(f"righe_tappo con «{link or 'vuota'}»", atteso,
+              amb_t["righe_tappo"]())
+        prova(f"...e la riga di testo va col bottone («{link or 'vuota'}»)",
+              bool(link), "Chiedila a Tappo" in amb_t["riga_tappo_testo"]())
+        t = amb2["tastiera_bot"](amb_t["righe_tappo"]())
+        prova(f"...sotto la Mini App, che resta in cima («{link or 'vuota'}»)",
+              (True, 1 + len(atteso)),
+              (t["inline_keyboard"][0][0]["url"] == "https://barattolo.store",
+               len(t["inline_keyboard"])))
+    gu_t = codice(sorgente_bot)
+    prova("il /start porta il bottone e la sua riga", (1, 1),
+          (gu_t.count("tastiera_bot(righe_tappo())"),
+           gu_t.count("coda + riga_tappo_testo()\n                    + riga_assistente_start(chat)")))
+    prova("...e anche chi scrive una frase, prima dello Sfoglia", (1, 1),
+          (gu_t.count("tastiera_bot(righe_tappo() +"),
+           gu_t.count('posso mostrarti i reparti 👇" + riga_tappo_testo()')))
+    prova("un TAPPO_LINK storto torna quello di serie (forma t.me/<bot>)", True,
+          "_FORMA_LINK_BOT.fullmatch(TAPPO_LINK)" in _SORGENTE
+          and "TAPPO_LINK = TAPPO_LINK_DI_SERIE\n" in _SORGENTE)
 
     # --- 5) IL CANALE HA UN GIUDICE SOLO -------------------------
     # Se un giorno divergessero, il ✅ Venduto finirebbe in un canale e
@@ -195328,7 +195361,8 @@ def prove_assistente_bot():
           gu.index('testo.startswith("/sfoglia")') < i_ass
           < gu.index("Non sono un bot chiacchierone"))
     prova("il /start lo dice solo a chi l'assistente risponde", True,
-          'Barattolo 👇" + coda + riga_assistente_start(chat)' in gu)
+          'Barattolo 👇" + coda + riga_tappo_testo()\n'
+          '                    + riga_assistente_start(chat)' in gu)
     prova("...cioe' a leva spenta il benvenuto e' quello di ieri", "",
           _banco_assistente()[0]["riga_assistente_start"](999))
     gc = codice(pezzo("gestisci_callback"))

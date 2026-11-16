@@ -21880,6 +21880,21 @@ def tastiera_bot(righe: list = None) -> dict:
     return {"inline_keyboard": [_riga_webapp()] + (righe or [])}
 
 
+def righe_tappo() -> list:
+    """Il bottone che porta a Tappo (TAPPO_LINK), o nessuna riga se la
+    leva e' vuota: si accoda a `tastiera_bot`, sotto la Mini App."""
+    if not TAPPO_LINK:
+        return []
+    return [[{"text": "💬 Chiedi a Tappo", "url": TAPPO_LINK}]]
+
+
+def riga_tappo_testo() -> str:
+    """La riga che accompagna il bottone: senza bottone, niente riga."""
+    if not TAPPO_LINK:
+        return ""
+    return "\n\n💬 Hai una domanda su come funziona? Chiedila a Tappo."
+
+
 def tastiera_categorie() -> dict:
     """La griglia «Sfoglia», la stessa che si vede nella Mini App: due
     colonne, ORDINE FISSO del catalogo (mai per numero di annunci —
@@ -23787,8 +23802,9 @@ async def gestisci_update(update: dict):
                     "confermi di aver ricevuto la roba.\n\n"
                     "Da questa chat ti avviso quando succede qualcosa "
                     "nei tuoi ordini. Per tutto il resto, apri "
-                    "Barattolo 👇" + coda + riga_assistente_start(chat),
-            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+                    "Barattolo 👇" + coda + riga_tappo_testo()
+                    + riga_assistente_start(chat),
+            "parse_mode": "HTML", "reply_markup": tastiera_bot(righe_tappo())})
     if testo.startswith("/anteprima"):
         return await comando_anteprima(mittente, testo)
     if testo.startswith("/canale"):
@@ -23825,8 +23841,8 @@ async def gestisci_update(update: dict):
         "text": "Non sono un bot chiacchierone 😅 — il mercatino vero, "
                 "con gli acquisti e le trattative, vive nella Mini "
                 "App.\n\nSe però vuoi solo dare un'occhiata da qui, "
-                "posso mostrarti i reparti 👇",
-        "reply_markup": tastiera_bot(
+                "posso mostrarti i reparti 👇" + riga_tappo_testo(),
+        "reply_markup": tastiera_bot(righe_tappo() +
             [[{"text": "🗂 Sfoglia le categorie",
                "callback_data": "sfo:menu:0"}]])})
 
@@ -74160,6 +74176,22 @@ if not (isinstance(LINK_BOT, str) and _FORMA_LINK_BOT.fullmatch(LINK_BOT)):
 # Il nome del bot, senza @: lo usano la Mini App (`_bot_nella_pagina`)
 # e il controllo all'avvio contro `getMe`.
 BOT_NOME = _FORMA_LINK_BOT.fullmatch(LINK_BOT).group(1)
+# IL BOTTONE DI TAPPO (16 nov 2026, Andrea: «l'idea del bottone mi
+# piace»). Tappo vive nel SUO bot, su n8n: il bot di Barattolo resta il
+# canale degli avvisi (ordini, pagamenti, dispute) e non diventa una
+# chat. Gli porta solo un bottone «💬 Chiedi a Tappo», nel benvenuto
+# del /start e nella risposta a chi gli scrive una frase. Vuota = niente
+# bottone; scritta storta = quella di serie, e il journal lo dice.
+TAPPO_LINK_DI_SERIE = "https://t.me/TappoBarattoloBot"
+try:
+    from config import TAPPO_LINK
+except ImportError:
+    TAPPO_LINK = TAPPO_LINK_DI_SERIE
+if TAPPO_LINK != "" and not (isinstance(TAPPO_LINK, str)
+                             and _FORMA_LINK_BOT.fullmatch(TAPPO_LINK)):
+    print("[telegram] TAPPO_LINK non e' https://t.me/<bot> ne' vuota: "
+          f"resta {TAPPO_LINK_DI_SERIE}", flush=True)
+    TAPPO_LINK = TAPPO_LINK_DI_SERIE
 # L'indirizzo come lo si SCRIVE in un testo («barattolo.store»): la
 # forma di sopra lo garantisce fatto di minuscole, cifre, punti, trattini
 # e al piu' i due punti della porta (`_dominio_nella_pagina`).

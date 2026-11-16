@@ -242,3 +242,9 @@ frase: Nel P2P ora puoi pagare anche in ETH, Monero o USDe. L'ordine resta in eu
 dove: la scheda «P2P», nel foglio «Pubblica» di un ordine in euro (fra i metodi) e nel libro, col logo di ogni moneta.
 leva: P2P_COIN_ATTIVO (nuova, accesa)
 pubblico: sì
+
+## 2026-11-16 · bottone-tappo
+frase: Nel bot di Barattolo c'è il bottone «💬 Chiedi a Tappo»: un tocco e sei nella chat di Tappo, che risponde alle domande su come funziona Barattolo. Il bot di Barattolo resta quello degli avvisi su ordini e pagamenti.
+dove: il bot @ilbarattolobot, nel messaggio di benvenuto (/start) e nella risposta a chi gli scrive una frase.
+leva: TAPPO_LINK (accesa di serie)
+pubblico: sì
