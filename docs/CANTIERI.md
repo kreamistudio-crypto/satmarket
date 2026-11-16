@@ -85092,7 +85092,7 @@ fa per te!» toccato dal bot, e lo stesso dalla notifica del telefono).
 Notato e non toccato: chi entra solo con Nostr riceve nel DM gli stessi
 link `t.me`, che fuori da Telegram portano al bot.
 
-## La mappa del contanti sempre visibile nei due tab, e «Più recenti» con le card on-chain mescolate (16 nov 2026, cantiere mappa-recenti; Andrea: «Come mai la mappa c'è solo in compra BTC e non in vendi BTC? L'avevo già chiesto in un altro thread», «se io seleziono più recenti, comunque le card devono essere ordinate più recenti, indipendentemente se siano on-chain o lighting»)
+## La mappa del contanti sempre visibile nei due tab, «Più recenti» con le card on-chain mescolate e Ripubblica in Barattozon «Compra BTC» (16 nov 2026, cantiere mappa-recenti; Andrea: «Come mai la mappa c'è solo in compra BTC e non in vendi BTC? L'avevo già chiesto in un altro thread», «se io seleziono più recenti, comunque le card devono essere ordinate più recenti, indipendentemente se siano on-chain o lighting»)
 
 LA MAPPA. Il tondo 🗺️ della testata spariva quando nel tab non c'era
 nessuna offerta in contanti col luogo, e in «Vendi BTC» non ce n'erano:
@@ -85115,5 +85115,23 @@ PROVATO: `prove_p2p_libro` (l'ordine misto a «Più recenti»: «oc-2 x oc-1
 y»; la sentinella di renderP2P) e `prove_mappa_contanti` (il tondo vuoto
 che parla e apre, la mappa aperta vuota con la frase), poi suite severa e
 collaudi nel worktree.
+RIPUBBLICA IN BARATTOZON «COMPRA BTC» (stesso giro; Andrea: «Perché non
+c'è il tasto ripubblica in compra Bitcoin con Barattozon?», «se io
+pubblico un annuncio compra Bitcoin con Baratto, non riesco a impostare un
+ripubblica»). Il cantiere ripubblica aveva escluso Barattozon intero col
+perché del PayCode che scade da solo («un PayCode morto in vetrina»): ma
+il PayCode sta solo sull'ordine di chi VENDE; chi compra pubblica una
+fascia senza PayCode (cantiere barattozon-compra, 31 ott), che il
+costruttore e il giudice trattano come un intervallo a mercato qualunque.
+Ora la sezione del foglio guarda `tab` (il percorso di chi vende) e non il
+metodo, i campi passano da `tabVenditaRipubblicaP2P`, il rifacimento dal
+telefono (`pubblicaDaSoloP2P`) lascia passare il lato «compro», e il
+server (`_dichiara_ripubblica_p2p`) scarta il tabacchino solo se il `k`
+del libro non è `buy`. In «Vendi BTC» resta fuori. Il paracadute non
+cambia (non chiesto).
+PROVATO anche: `prove_ripubblica_p2p` (la dichiarazione di un Barattozon
+in compra sul server, i campi col lato «compro», la sentinella del
+rifacimento), `prove_barattozon_in_compra`.
 DA GUARDARE: la testata in «Vendi BTC» sul telefono stretto, coi tre
-cerchietti.
+cerchietti; la prima scadenza vera di un Barattozon in compra con
+l'intervallo.
