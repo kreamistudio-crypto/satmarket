@@ -4407,10 +4407,16 @@
      tema scuro in tutti e due i temi, perche' stanno sempre sul fondo
      scuro (crema 13:1, grigio caldo 6:1, verde e rosso oltre il 5:1 sul
      grafite). Niente velo, niente colore che cambia col mercato: il verso
-     lo dicono la linea e la percentuale, come prima. */
-  :root{--valore-carta:#23282C;--valore-inchiostro:#F1E8D5;--valore-muto:#A99F87;
-    --valore-su:#34B47A;--valore-giu:#F37456}
-  html[data-tema="scuro"]{--valore-carta:#16120B}
+     lo dicono la linea e la percentuale, come prima.
+     IL BLU NOTTE (16 nov 2026, cantiere ricevi-mercato, Andrea: «non mi
+     piace quel colore lì», fra cinque esempi la «B · Blu notte»): resta
+     una carta scura in tutti e due i temi, ma fredda, cosi' si stacca dal
+     crema di giorno e dal bruno di sera. Scritte chiare tendenti al blu,
+     grigio-blu per l'etichetta, un verde piu' acceso che regge sul blu
+     (crema 14:1, grigio-blu 7:1, verde e rosso oltre il 5:1). */
+  :root{--valore-carta:#13243B;--valore-inchiostro:#EEF3FA;--valore-muto:#9FB2CC;
+    --valore-su:#3DD68C;--valore-giu:#F37456}
+  html[data-tema="scuro"]{--valore-carta:#0E1A2B}
   .p2p-valore{background:var(--valore-carta);border-color:var(--valore-carta);color:var(--valore-inchiostro)}
   .p2p-valore-simbolo{font:inherit;color:inherit;background:none;border:0;padding:0 2px;
     margin:0 -2px;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -5461,26 +5467,25 @@
      mouse lo dice l'etichetta sotto il volto. */
   .p2p-sez[role="button"]{cursor:pointer}
   .p2p-sez[role="button"]:active{background:var(--line-soft)}
-  /* L'ANELLO GRANDE: sessanta tacche, e a colorarsi sono le ACCESE.
-     La pista spenta resta `--line` come nell'anello piccolo, e i tre
-     stati sono gli stessi — stesso giudice nel JS, stessi token qui:
-     neutro, arancio negli ultimi tre giorni, rosso che pulsa
-     nell'ultimo. */
-  .p2p-tempone{display:flex;flex-direction:column;align-items:center;
-    gap:8px;margin:18px 0 6px}
-  .p2p-anellone{position:relative;width:132px;height:132px}
-  .p2p-anellone svg{width:132px;height:132px;display:block}
-  .p2p-anellone .tacca{stroke:var(--line);stroke-width:5;stroke-linecap:round}
-  .p2p-anellone .tacca.on{stroke:var(--ink-soft)}
-  .p2p-anellone.vicina .tacca.on{stroke:var(--sats)}
-  .p2p-anellone.ultimo-giorno .tacca.on{stroke:var(--rosso-p2p);
+  /* IL TEMPO IN UNA RIGA (16 nov 2026, cantiere ricevi-mercato, era
+     l'anello a sessanta tacche): sopra «Tempo rimasto» e il conto ai due
+     capi, sotto la barra piena che si accorcia da destra. La pista spenta
+     e' `--line` come quella delle card, e i tre stati sono gli stessi —
+     stesso giudice nel JS, stessi token: neutro, arancio negli ultimi tre
+     giorni, rosso che pulsa nell'ultimo. */
+  .p2p-tempone{display:flex;flex-direction:column;gap:7px;margin:16px 0 6px}
+  .p2p-tempone .p2p-tempo{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .p2p-tempo-barra{position:relative;width:100%;height:8px;border-radius:999px;
+    background:var(--line);overflow:hidden}
+  .p2p-tempo-barra > i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;
+    background:var(--ink-soft);transition:width .6s ease}
+  .p2p-tempo-barra.vicina > i{background:var(--sats)}
+  .p2p-tempo-barra.ultimo-giorno > i{background:var(--rosso-p2p);
     animation:p2pPulsa 1.5s ease-in-out infinite}
   @media (prefers-reduced-motion:reduce){
-    .p2p-anellone.ultimo-giorno .tacca.on{animation:none}
+    .p2p-tempo-barra.ultimo-giorno > i{animation:none}
+    .p2p-tempo-barra > i{transition:none}
   }
-  .p2p-anellone-cuore{position:absolute;inset:0;display:grid;
-    place-items:center;color:var(--muted)}
-  .p2p-anellone-cuore .p2p-ico{width:30px;height:30px}
   /* LE CIFRE DEL CONTO NON BALLANO: senza `tabular-nums` la riga si
      allarga e si stringe a ogni secondo, e a due centimetri
      dall'occhio si vede benissimo. */
@@ -63220,6 +63225,10 @@ function apriOnchainP2P(id, modo){
       + (o.mercato ? '<br><small>A prezzo di mercato: i sats si contano quando prendi</small>' : '')
       + (Number(o.filtro) > 0 ? '<br><small>🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '</small>' : '')
       + (o.nome ? '<br><small>di ' + esc(o.nome) + '</small>' : '') + '</div>'
+      /* IL TEMPO CHE SCORRE, come nel dettaglio Lightning (16 nov 2026,
+         Andrea: «se prendo un ordine on-chain non c'è più il riquadro del
+         tempo che scorre. Puoi metterlo anche lì?») */
+      + (typeof anelloneP2P === 'function' ? anelloneP2P(ordineVoltoOnchainP2P(o)) : '')
       /* IL CONTO DI CHI PRENDE, come nel dettaglio Lightning (16 nov 2026,
          Andrea: «la schermata sarà similmente a quella del lighting»):
          i sats, la MIA meta' della fee e il totale, dal mio verso */
@@ -77282,21 +77291,12 @@ let p2pDettOrdine = '';     // l'id dell'ordine aperto nel dettaglio
 let p2pDettMetodo = '';     // il metodo scelto con le pillole, prima della presa
 let p2pDettImporto = 0;     // su un intervallo, la cifra scelta col foglio «Quanto»
 
-/* ---- L'ANELLO GRANDE DEL TEMPO ----
-   Quello delle card e' un cerchio da 22px in un angolo; qui il tempo e'
-   il protagonista della meta' bassa della pagina, e diventa un anello
-   SEGMENTATO che si spegne una tacca alla volta — il calco di Mostro,
-   e un tempo che si guarda invece di leggersi.
-   ⚠️ SESSANTA TACCHE DISEGNATE UNA A UNA, e non un `stroke-dasharray`
-   con una maschera: la maschera vuole un `id`, e un id nell'SVG e' la
-   trappola gia' pagata con la stella (in un elenco di N card il primo
-   id vince per tutte). Qui di anello grande ce n'e' uno solo alla
-   volta, ma la regola resta la stessa e costa sessanta `<line>`.
-   IL GIUDICE DEL COLORE E' UNO SOLO per i due anelli — `statoAnelloP2P`
-   — e le due soglie restano quelle: arancio negli ultimi tre giorni,
-   rosso nell'ultimo. Due copie direbbero due colori sullo stesso
-   ordine, e a scoprirlo sarebbe chi guarda. */
-const P2P_ANELLONE_TACCHE = 60;
+/* ---- IL TEMPO GRANDE (fino al 16 nov 2026 un anello a sessanta tacche,
+   il calco di Mostro; adesso una riga, vedi `anelloneP2P`) ----
+   IL GIUDICE DEL COLORE E' UNO SOLO per la barra delle card e per questa
+   — `statoAnelloP2P` — e le due soglie restano quelle: arancio negli
+   ultimi tre giorni, rosso nell'ultimo. Due copie direbbero due colori
+   sullo stesso ordine, e a scoprirlo sarebbe chi guarda. */
 function statoAnelloP2P(manca){
   return manca <= P2P_ULTIMO_GIORNO_S ? 'ultimo-giorno'
        : manca <= P2P_ANELLO_VICINA_S ? 'vicina' : '';
@@ -77312,39 +77312,35 @@ function contoRimastoP2P(sec){
     + due(Math.floor(s / 3600) % 24) + ':'
     + due(Math.floor(s / 60) % 60) + ':' + due(s % 60);
 }
-/* PURA: quante tacche restano accese. L'ULTIMA NON SI SPEGNE FINCHE'
-   C'E' TEMPO — con l'arrotondamento secco, sotto lo 0,83% l'anello
-   sarebbe gia' vuoto con l'ordine ancora vivo, e un anello vuoto dice
-   «scaduto». A zero, invece, si spegne davvero. */
-function taccheAnelloneP2P(resta){
+/* PURA: quanto e' lunga la barra, «57.3%». LA PUNTA NON SPARISCE FINCHE'
+   C'E' TEMPO (la regola dell'ultima tacca dell'anello): sotto il 2% resta
+   il 2%, perche' una barra vuota dice «scaduto». A zero si spegne davvero */
+function larghezzaTempoP2P(resta){
   const r = Number(resta);
-  if (!Number.isFinite(r) || r <= 0) return 0;
-  if (r >= 1) return P2P_ANELLONE_TACCHE;
-  return Math.max(1, Math.round(r * P2P_ANELLONE_TACCHE));
+  if (!Number.isFinite(r) || r <= 0) return '0%';
+  return Math.max(2, Math.min(100, r * 100)).toFixed(1) + '%';
 }
+/* ⚠️ L'ANELLO E' DIVENTATO UNA RIGA (16 nov 2026, cantiere
+   ricevi-mercato, Andrea: «non mi piace più l'anello rotondo, piuttosto
+   fammelo in una riga, più similmente a come è adesso nelle card»): sopra
+   «Tempo rimasto» col conto che scorre, sotto la barra che si accorcia da
+   destra, coi TRE STATI di sempre (`statoAnelloP2P`). Il nome resta
+   `anelloneP2P`, e la classe `p2p-anellone` sulla barra, perche' il
+   battito e i chiamanti la cercano cosi'. Vale nel dettaglio di Lightning,
+   nella pagina di Barattozon e, dallo stesso giro, nel foglio di chi
+   prende un ordine on-chain, dove il tempo non c'era. */
 function anelloneP2P(o, adesso){
   const resta = frazioneVitaP2P(o, adesso);
   if (resta < 0) return '';
   const ora = adesso || Math.floor(Date.now() / 1000);
   const manca = Math.max(0, (o.scade || 0) - ora);
-  const accese = taccheAnelloneP2P(resta);
-  let tacche = '';
-  for (let i = 0; i < P2P_ANELLONE_TACCHE; i++)
-    tacche += '<line class="tacca' + (i < accese ? ' on' : '') + '"'
-      + ' x1="60" y1="7" x2="60" y2="19" transform="rotate('
-      + (i * 360 / P2P_ANELLONE_TACCHE).toFixed(2) + ' 60 60)"/>';
-  return '<div class="p2p-tempone">'
-    + '<div class="p2p-anellone ' + statoAnelloP2P(manca) + '" data-fine="'
-      + (o.scade || 0) + '" data-inizio="' + (o.creato || 0) + '" data-accese="'
-      + accese + '" role="img" aria-label="' + esc(scadeTestoP2P(o.scade) || 'senza scadenza') + '">'
-    + '<svg viewBox="0 0 120 120" aria-hidden="true">' + tacche + '</svg>'
-    + '<span class="p2p-anellone-cuore" aria-hidden="true">'
-      + '<svg class="p2p-ico" viewBox="2 2 20 20">'
-      + '<path class="velo" d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8z"/>'
-      + '<path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8z"/>'
-      + '<path d="M12 7.4V12l3.2 2"/></svg></span></div>'
-    + '<div class="p2p-tempo">Tempo rimasto: <b id="p2pDettConto">'
-      + esc(contoRimastoP2P(manca)) + '</b></div></div>';
+  const aria = scadeTestoP2P(o.scade) || 'senza scadenza';
+  return '<div class="p2p-tempone p2p-tempone-riga">'
+    + '<div class="p2p-tempo"><span>Tempo rimasto</span><b class="p2p-tempo-conto">'
+      + esc(contoRimastoP2P(manca)) + '</b></div>'
+    + '<div class="p2p-anellone p2p-tempo-barra ' + statoAnelloP2P(manca) + '" data-fine="'
+      + (o.scade || 0) + '" data-inizio="' + (o.creato || 0) + '" role="img" aria-label="'
+      + esc(aria) + '"><i style="width:' + larghezzaTempoP2P(resta) + '"></i></div></div>';
 }
 /* IL BATTITO SI ATTACCA ALL'UNICO INTERVAL DELL'APP (quello della
    lampo): un secondo timer per un solo anello sarebbe un secondo
@@ -77360,19 +77356,25 @@ function battitoAnelloneP2P(){
      lasciato dietro tiene ancora il suo nel DOM — il primo che
      `querySelector` trovava era quello, e il battito curava un
      anello che nessuno guardava */
-  const box = document.querySelector('.view.active .p2p-anellone');
+  /* ...e quello del foglio di chi prende un ordine on-chain (16 nov 2026),
+     che sta sopra la vista */
+  const box = document.querySelector('#confermaSheet.open .p2p-anellone')
+    || document.querySelector('.view.active .p2p-anellone');
   if (!box) return;
   const adesso = Math.floor(Date.now() / 1000);
   const fine = Number(box.dataset.fine) || 0;
   const manca = Math.max(0, fine - adesso);
-  const conto = el('p2pDettConto');
+  /* il conto e' quello della SUA riga, non un id: dettaglio e foglio
+     possono stare nel DOM insieme */
+  const riga = box.closest('.p2p-tempone');
+  const conto = riga && riga.querySelector('.p2p-tempo-conto');
   if (conto) conto.textContent = contoRimastoP2P(manca);
-  const accese = taccheAnelloneP2P(frazioneVitaP2P(
-    {scade: fine, creato: Number(box.dataset.inizio) || 0}, adesso));
-  if (Number(box.dataset.accese) !== accese) {
-    box.dataset.accese = accese;
-    box.querySelectorAll('.tacca').forEach((t, i) => t.classList.toggle('on', i < accese));
-  }
+  /* LA BARRA SI ACCORCIA (16 nov 2026, era l'anello a tacche): la
+     larghezza si riscrive solo quando cambia al decimo */
+  const resta = frazioneVitaP2P({scade: fine, creato: Number(box.dataset.inizio) || 0}, adesso);
+  const larga = larghezzaTempoP2P(resta);
+  const i = box.querySelector('i');
+  if (i && i.style.width !== larga) i.style.width = larga;
   const st = statoAnelloP2P(manca);
   box.classList.toggle('vicina', st === 'vicina');
   box.classList.toggle('ultimo-giorno', st === 'ultimo-giorno');

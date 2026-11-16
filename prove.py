@@ -70176,10 +70176,22 @@ def prove_p2p_dettaglio():
     # porterebbe via il fuoco alle pillole mentre uno le sta toccando
     prova("...e riscrive in place, mai col render", False,
           "renderDettaglioP2P" in ba)
-    # e le tacche si toccano solo quando cambiano: su sette giorni una
-    # tacca dura due ore, quindi 7199 battiti su 7200 non hanno da fare
-    prova("...e le tacche si toccano solo quando cambiano", True,
-          "if (Number(box.dataset.accese) !== accese) {" in ba)
+    # e la barra si tocca solo quando cambia al decimo: su sette giorni
+    # un decimo di punto dura dieci minuti, e gli altri battiti non hanno
+    # da fare (16 nov 2026: era l'anello a tacche, la regola e' la stessa)
+    prova("...e la barra si tocca solo quando cambia", True,
+          "if (i && i.style.width !== larga) i.style.width = larga;" in ba)
+    # IL CONTO E' DELLA SUA RIGA, non un id (16 nov 2026, cantiere
+    # ricevi-mercato): il foglio di chi prende un ordine on-chain e il
+    # dettaglio possono stare nel DOM insieme, e un id doppio vince il primo
+    prova("...e il conto si cerca nella riga della barra, mai per id", [True, False],
+          ["box.closest('.p2p-tempone')" in ba and ".p2p-tempo-conto" in ba,
+           "p2pDettConto" in mini])
+    prova("...e batte anche nel foglio di chi prende un ordine on-chain, prima della vista", True,
+          0 < ba.find("#confermaSheet.open .p2p-anellone") < ba.find(".view.active .p2p-anellone"))
+    prova("il foglio on-chain ha la sua riga del tempo, col volto dell'ordine", True,
+          "anelloneP2P(ordineVoltoOnchainP2P(o))"
+          in pezzo_js(mini, "function apriOnchainP2P(", "\n}\n"))
 
     # --- 5) UN GIUDICE SOLO PER I DUE ANELLI ------------------------
     # Le due soglie stavano dentro anelloScadenzaP2P; adesso i due
@@ -70191,19 +70203,23 @@ def prove_p2p_dettaglio():
           # barra sul bordo della card: il giudice e' lo stesso
           and "statoAnelloP2P(manca)" in pezzo_js(
               mini, "function barraScadenzaP2P(o, adesso){", "\n}\n"))
-    # NIENTE `id` NELL'SVG: la maschera che «sarebbe piu' semplice»
-    # vuole un id, e un id nell'SVG e' la trappola gia' pagata con la
-    # stella (in un elenco di N card il primo id vince per tutte).
+    # IL TEMPO IN UNA RIGA (16 nov 2026, Andrea: «Non mi piace piu'
+    # l'anello rotondo, piuttosto fammelo in una riga, piu' similmente a
+    # come e' adesso nelle card»): niente SVG, quindi niente id e niente
+    # maschere — la trappola della stella (il primo id vince per tutte)
+    # resta chiusa per costruzione.
     an = pezzo_js(mini, "function anelloneP2P(o, adesso){", "\n}\n")
-    prova("l'anello grande e' fatto di tacche, non di maschere", True,
-          '<line class="tacca' in an
-          and not any(s in an for s in ("<mask", "clipPath", "linearGradient")))
-    prova("...e i tre stati vestono le tacche accese", True,
-          all(s in mini for s in (".p2p-anellone .tacca.on{stroke:var(--ink-soft)}",
-                                  ".p2p-anellone.vicina .tacca.on{stroke:var(--sats)}",
-                                  ".p2p-anellone.ultimo-giorno .tacca.on{stroke:var(--rosso-p2p);")))
+    prova("il tempo rimasto e' una barra in una riga, senza SVG ne' id", True,
+          "p2p-tempo-barra" in an and "larghezzaTempoP2P(resta)" in an
+          and not any(s in an for s in ("<svg", "<mask", "clipPath", "linearGradient", " id=")))
+    prova("...e i tre stati vestono la barra coi colori delle card", True,
+          all(s in mini for s in (".p2p-tempo-barra > i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;\n    background:var(--ink-soft);",
+                                  ".p2p-tempo-barra.vicina > i{background:var(--sats)}",
+                                  ".p2p-tempo-barra.ultimo-giorno > i{background:var(--rosso-p2p);")))
     prova("...e l'ultimo giorno non pulsa a chi ha chiesto di non muoversi",
-          True, ".p2p-anellone.ultimo-giorno .tacca.on{animation:none}" in mini)
+          True, ".p2p-tempo-barra.ultimo-giorno > i{animation:none}" in mini)
+    prova("...e le tacche dell'anello non ci sono piu'", False,
+          any(s in mini for s in ("taccheAnelloneP2P", "P2P_ANELLONE_TACCHE", ".tacca.on")))
     prova("le cifre del conto non ballano", True,
           "font-variant-numeric:tabular-nums" in pezzo_js(
               mini, "  .p2p-tempo b{", "}"))
@@ -70292,7 +70308,7 @@ def prove_p2p_dettaglio():
         "function icoNuovoP2P(nome){",
         "function statoAnelloP2P(manca){",
         "function contoRimastoP2P(sec){",
-        "function taccheAnelloneP2P(resta){",
+        "function larghezzaTempoP2P(resta){",
         "function anelloneP2P(o, adesso){",
         # l'avviso alla presa col tabacchino (set 2026) e i suoi due giudici
         "function tabacchinoP2P(metodi){",
@@ -70429,7 +70445,7 @@ def prove_p2p_dettaglio():
                  "const P2P_ZONA_MAX = ", "let p2pZone = ",
                  "const REGOLA_CONTANTI_VENDE = ", "const CONSIGLI_CONTANTI = ",
                  "const P2P_GLIFI = ", "const P2P_ULTIMO_GIORNO_S = ",
-                 "const P2P_ANELLO_VICINA_S = ", "const P2P_ANELLONE_TACCHE = ",
+                 "const P2P_ANELLO_VICINA_S = ",
                  "const P2P_TABACCHINO = ", "const P2P_TABACCHINO_PM = ",
                  "const P2P_TAB_AVVISO_S = ",
                  "const P2P_TAB_ULTIMA_S = ",
@@ -70531,9 +70547,7 @@ const out = {};
 
 /* ---- i pezzi puri ---- */
 out.conto = [59, 85637, 604037, -10].map(contoRimastoP2P);
-out.tacche = [taccheAnelloneP2P(1), taccheAnelloneP2P(0.5),
-              taccheAnelloneP2P(0.001), taccheAnelloneP2P(0),
-              taccheAnelloneP2P(-1)];
+out.larghe = [1, 0.5, 0.001, 0, -1, NaN].map(larghezzaTempoP2P);
 out.stati = [statoAnelloP2P(7 * G), statoAnelloP2P(3 * G),
              statoAnelloP2P(2 * G), statoAnelloP2P(G), statoAnelloP2P(0)];
 
@@ -71070,11 +71084,11 @@ console.log(JSON.stringify(out));
            "conveniente" in pt,
            pt.index("È il tuo ordine") < pt.index("ctrl-conto"),
            '<div class="foglio-piede sola" id="p2pDettTuoPiede">' in pt])
-    # ⚠️ L'ULTIMA TACCA NON SI SPEGNE FINCHE' C'E' TEMPO: con
-    # l'arrotondamento secco, sotto lo 0,83% l'anello sarebbe gia' vuoto
-    # con l'ordine ancora vivo — e un anello vuoto dice «scaduto».
-    prova("le tacche si consumano, e l'ultima resta finche' c'e' tempo",
-          [60, 30, 1, 0, 0], o["tacche"])
+    # ⚠️ LA BARRA NON SI SVUOTA FINCHE' C'E' TEMPO (era l'ultima tacca):
+    # sotto il 2% resterebbe un filo invisibile con l'ordine ancora vivo,
+    # e una barra vuota dice «scaduto».
+    prova("la barra si consuma, e un filo resta finche' c'e' tempo",
+          ["100.0%", "50.0%", "2.0%", "0%", "0%", "0%"], o["larghe"])
     prova("i tre stati del colore sono quelli delle card",
           ["", "vicina", "vicina", "ultimo-giorno", "ultimo-giorno"], o["stati"])
 
@@ -71783,13 +71797,13 @@ console.log(JSON.stringify(out));
     prova("...e chi non l'ha indicato lo dice", True,
           "non l'ha indicato" in o["nessunMetodo"])
 
-    prova("l'anello nasce pieno e si consuma", [60, 30],
-          [o["anelloPieno"].count("tacca on"), o["anelloMeta"].count("tacca on")])
-    prova("...e ha sempre sessanta tacche in pista", 60,
-          o["anelloMeta"].count('<line class="tacca'))
-    prova("...e senza scadenza non c'e' anello", "", o["anelloSenza"])
-    prova("...e sotto c'e' il tempo rimasto", True,
-          'Tempo rimasto: <b id="p2pDettConto">' in o["anelloPieno"])
+    prova("la barra nasce piena e si consuma", [True, True],
+          ['<i style="width:100.0%"></i>' in o["anelloPieno"],
+           '<i style="width:50.0%"></i>' in o["anelloMeta"]])
+    prova("...e senza scadenza non c'e' barra", "", o["anelloSenza"])
+    prova("...e sopra c'e' il tempo rimasto, col conto a destra", True,
+          '<span>Tempo rimasto</span><b class="p2p-tempo-conto">' in o["anelloPieno"]
+          and o["anelloPieno"].index("p2p-tempo-conto") < o["anelloPieno"].index("p2p-tempo-barra"))
 
     # IL TITOLO E' IL CAPPELLO (set 2026, ritocco di Andrea): «Stai
     # comprando sats» era la prima riga del corpo ed e' salito nella
@@ -161698,12 +161712,14 @@ console.log(JSON.stringify(out));
           ['<div class="p2p-valore girabile"' in g[0], '<div class="p2p-valore girabile"' in g[1],
            '<div class="p2p-valore girabile"' in ind[0],
            mini.count("p2p-valore-sale"), mini.count("valore-velo")])
-    prova("...il CSS: la carta grafite anche di giorno, quasi nera calda di sera, con "
-          "inchiostro, grigio e i due colori della linea del tema scuro in tutti e due i temi",
+    # (16 nov 2026, cantiere ricevi-mercato) la grafite diventa «B · Blu
+    # notte», scelta da Andrea fra cinque esempi: scura in tutti e due i temi
+    prova("...il CSS: la carta blu notte anche di giorno, piu' fonda di sera, con "
+          "inchiostro, grigio-blu e i due colori della linea uguali in tutti e due i temi",
           [True, True, True, True, True, True],
-          [":root{--valore-carta:#23282C;--valore-inchiostro:#F1E8D5;--valore-muto:#A99F87;\n"
-           "    --valore-su:#34B47A;--valore-giu:#F37456}" in mini,
-           'html[data-tema="scuro"]{--valore-carta:#16120B}' in mini,
+          [":root{--valore-carta:#13243B;--valore-inchiostro:#EEF3FA;--valore-muto:#9FB2CC;\n"
+           "    --valore-su:#3DD68C;--valore-giu:#F37456}" in mini,
+           'html[data-tema="scuro"]{--valore-carta:#0E1A2B}' in mini,
            ".p2p-valore{background:var(--valore-carta);border-color:var(--valore-carta);"
            "color:var(--valore-inchiostro)}" in mini,
            "color:var(--valore-muto)}" in mini,
