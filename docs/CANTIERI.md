@@ -85254,3 +85254,65 @@ scudo Staff sulla card USDe di Andrea e la sua card che resta fuori dalla
 SUA home ma compare in quella degli altri; la pila delle novità su iPhone
 (lo scroll con l'inerzia); i conti on-chain di `/admin` sui dati veri
 (nessuno scambio on-chain concluso è passato dal vivo da qui).
+
+## L'estensione del browser per Barattozon (16 nov 2026, cantiere estensione-bz; Andrea, dopo l'estensione di Bitpost: «valutare una nostra estensione per acquistare direttamente su Barattozon. In pratica si modifica Amazon, il pagamento finisce direttamente su barattolo con il proprio account nel p2p con il numero di ordine e l'importo», poi «dobbiamo integrare questa estensione per barattolo»; valutazione nel documento «Estensione "Compra con Barattozon": valutazione», piano in dieci righe nel thread)
+COSA: `estensione/` è «Barattolo per Amazon», un'estensione nostra scritta
+da zero (manifest v3, un file, Chrome/Brave/Edge/Opera e Firefox 140+, solo
+https://www.amazon.it/*, nessun permesso). Sulla pagina Amazon dove c'è un
+PayCode compare in basso a destra «🫙 Pubblica su Barattozon»: apre
+`https://barattolo.store/p2p#barattozon?paycode=…&importo=…&scade=…&barre=…`
+in una scheda nuova, e Barattolo apre «Vendi BTC» col percorso Barattozon
+compilato. Chi l'ha aperto rilegge e pubblica lì.
+PERCHÉ NON COME BITPOST: Bitpost legge il cookie del suo sito e chiama il
+suo server, che crea l'ordine; e il suo bottone sta sulla pagina del
+prodotto perché da loro l'ordine Amazon lo fa un altro («Bitworker»). Da
+noi l'ordine Amazon lo fa chi vende sats, il PayCode esiste solo DOPO il
+checkout, e l'ordine P2P lo firma la chiave del dispositivo (regola ferrea
+2): quindi il bottone sta dove c'è il PayCode, e l'estensione non entra
+nell'account. Il codice di Bitpost (zip allegati da Andrea) è stato letto
+in una cartella a parte, mai eseguito né copiato.
+LE SCELTE: (1) il PayCode viaggia DOPO IL «#», che il browser non manda a
+nessun server: niente PayCode nei registri di Caddy, la regola del 14 nov
+tiene; (2) `noopener noreferrer`, così l'indirizzo della pagina Amazon (col
+numero dell'ordine) non arriva a Barattolo; (3) l'estensione non ha rete,
+memoria, cookie né messaggi (una sentinella li cerca nel codice); (4) la
+fonte buona è il link del PDF del PayCode, lo stesso che Barattolo legge da
+ottobre (`linkPdfPayCodeP2P`): porta PayCode, importo, scadenza («domenica,
+18 ottobre, 14:32 MET», l'anno si sceglie nella finestra di un PayCode) e
+codice a barre; senza, il PayCode solo accanto alla parola «PayCode», mai un
+numero qualunque; (5) dall'altra parte la DOGANA pura
+`datiBzDaFrammentoP2P` rigiudica ogni campo coi giudici di sempre, e un
+campo storto resta vuoto; i limiti (25 €, 999 €, un'ora-72 ore) li dicono
+le tappe del foglio; (6) il frammento si toglie dalla barra appena letto, e
+i campi aspettano in sessionStorage (la memoria della scheda, al più mezz'ora)
+il `location.reload()` di «Entra con Telegram»: chi arriva dal browser
+spesso non è entrato; quel che torna dalla memoria ripassa dalla dogana;
+(7) il foglio li prende con `p2pNuovoPrecompilato`, consumato una volta
+subito dopo l'azzeramento, solo su `vendo` + tabacchino, nelle stesse
+variabili dei fogli dei tre passi; (8) il tour della prima volta aspetta il
+foglio del link (`bzDavantiP2P`, gemello di `condivisoDavantiP2P`): al primo
+giro dal vivo gli stava sopra; (9) il numero dell'ordine Amazon NON viaggia:
+a chi paga non serve e dice di chi è l'ordine (Andrea lo citava: è una
+scelta da confermare con lui); (10) nessuna commissione in più e nessun link
+affiliato (Amazon Associates li vieta nelle estensioni).
+SCARTATE: il bottone sulla pagina del prodotto alla Bitpost (un altro tipo
+di ordine: indirizzi a sconosciuti, resi, settimane); il link Telegram
+`startapp` (64 caratteri e passa da Telegram); l'estensione che crea
+l'ordine da sola (vorrebbe una chiave dentro l'estensione); la `?` al posto
+del «#» (il PayCode nei registri).
+PROVATO: `prove_estensione_barattozon` (nuova: manifest e sentinelle di
+privacy, la porta, il foglio, il tour, e in node il giro intero dal link
+del PDF ai campi, coi tranelli: PDF finto, mese storto, capodanno, numeri
+lunghi, dogana, memoria scaduta o scritta da altri, navigazione privata);
+dal vivo l'estensione caricata in Chromium su pagine amazon.it finte
+(pagina «grazie» col PDF: bottone, link giusto, niente referer, `opener`
+nullo; dettagli disegnati dopo 1,5 s: il bottone arriva; pagina prodotto:
+niente bottone) e la porta sul server locale (relay morto, identità 111):
+frammento tolto, memoria svuotata, «Vendi BTC», i quattro passi fatti.
+DA GUARDARE: la pagina Amazon VERA con un PayCode (ordine di prova di
+Andrea: lo screenshot è chiesto) — oggi le due strade sono scritte sul link
+del PDF e sulla mail; Firefox dal vivo (qui solo Chromium); chi usa
+Barattolo solo dentro Telegram e apre il sito dal computer deve avere lì la
+stessa identità P2P; la pubblicazione sugli store (account a nome di
+Barattolo, pagina privacy, schermate) e la voce in NOVITA e per Tappo,
+quando l'estensione sarà scaricabile.

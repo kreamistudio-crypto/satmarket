@@ -28773,6 +28773,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   come scadenza del PayCode SOLO se l'ordine l'ha pubblicato chi vende,
   e `avvisoPresaTabacchinoP2P` tace sugli ordini d'acquisto. Il
   verbale: CANTIERI, «Barattozon anche in compra».
+  BARATTOZON DA UN LINK (16 nov 2026, cantiere estensione-bz, richiesta
+  di Andrea). L'estensione del browser «Barattolo per Amazon»
+  (`estensione/`, Chrome e Firefox, solo www.amazon.it, nessun permesso)
+  trova il PayCode nella pagina dell'ordine e, al tocco di «🫙 Pubblica su
+  Barattozon», apre `/p2p#barattozon?paycode=…&importo=…&scade=…&barre=…`
+  (scade in secondi dall'epoca) con `noopener noreferrer`. La fonte buona
+  e' il link del PDF del PayCode (lo stesso host di `linkPdfPayCodeP2P`);
+  in mancanza, il PayCode accanto alla parola «PayCode» nel testo. Nel
+  client: `prendiBzDaLinkP2P` legge il frammento UNA volta al caricamento
+  (`const P2P_BZ_LINK`), lo toglie subito dalla barra con `replaceState` e
+  lo tiene in sessionStorage (`P2P_BZ_SESSIONE`, al piu' 30 minuti) per il
+  `location.reload()` di «Entra con Telegram»; quel che torna dalla
+  memoria ripassa dalla dogana. La DOGANA e' pura,
+  `datiBzDaFrammentoP2P`: `payCodeP2P`, `centesimiP2P`,
+  `giudizioBarrePayCodeP2P` contro quel PayCode, la scadenza solo nella
+  forma; un campo storto resta vuoto, i limiti li dicono le tappe del
+  foglio. `apriP2PDaUrl`, a velo sceso e se scambio, ordine e pausa non
+  vincono, chiama `apriBarattozonDaLinkP2P`: a leva accesa e da entrati
+  mette «Vendi BTC», scrive `p2pNuovoPrecompilato` e apre
+  `apriNuovoOrdineP2P(P2P_TABACCHINO)`, che lo consuma subito dopo
+  l'azzeramento (una volta sola, solo `vendo` + tabacchino) nelle stesse
+  variabili dei fogli dei tre passi (`p2pNuovoTab.ordine/.scade/.barre`,
+  `p2pNuovoEuro`). Da non entrati l'invito di sempre, e i campi aspettano.
+  Il PayCode non tocca mai il server: il frammento il browser non lo
+  manda. Il numero dell'ordine Amazon non viaggia. Il verbale: CANTIERI,
+  «L'estensione del browser per Barattozon».
   IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea, rifatto due volte;
   il terzo giro il 24): nel libro, su «Vendi BTC», dal fondo del + rosso
   della barra scende A TENDINA la sua continuazione (`#navBarattozon`):

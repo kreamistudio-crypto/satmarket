@@ -64397,6 +64397,13 @@ function cambioDaFirmareOnchainP2P(o){
 let p2pNuovoOc = false;       // il foglio «Pubblica» e' on-chain
 let p2pOcRecapito = '';       // «Dove vuoi gli euro», se vendo on-chain
 let p2pNuovoReteChiesta = ''; // 'onchain' per la prossima apertura del foglio
+/* i campi di Barattozon arrivati da un link (16 nov 2026, cantiere
+   estensione-bz): li prende la PROSSIMA apertura del foglio e li spegne,
+   come `p2pNuovoReteChiesta`. Forma di `datiBzDaFrammentoP2P`, o null */
+let p2pNuovoPrecompilato = null;
+/* ...e il foglio aperto da quel link che passa davanti al tour della
+   prima volta: stato '' | 'volo' | 'aperto' (vedi `bzDavantiP2P`) */
+let p2pBzDavanti = {stato: '', visto: false};
 
 /* `lato` = 'sell' (vendo bitcoin) | 'buy' (compro) | niente: quello del libro */
 function apriPubblicaOnchainP2P(lato){
@@ -73422,6 +73429,9 @@ function apriTourP2PSePrimaVolta(){
      dopo che il dettaglio (o la riga «non piu' disponibile») si e'
      chiuso. Il giudice vive col «Condividi», da qui il typeof. */
   if (typeof condivisoDavantiP2P === 'function' && condivisoDavantiP2P()) return;
+  /* ...e il foglio di Barattozon aperto dal link dell'estensione (16 nov
+     2026): stessa ragione, vedi `bzDavantiP2P` */
+  if (typeof bzDavantiP2P === 'function' && bzDavantiP2P()) return;
   /* CHI E' DENTRO ASPETTA /me (26 set 2026): il tour ormai si apre
      all'ingresso, e prima di /me i timbri del profilo non ci sono —
      chi l'ha visto su un altro dispositivo se lo ritroverebbe. /me lo
@@ -86993,6 +87003,20 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoPremioTab = '';
   p2pNuovoPremioTabMano = false;
   p2pNuovoEuroVia = '';
+  /* BARATTOZON DA UN LINK (16 nov 2026, cantiere estensione-bz): i campi
+     gia' passati dalla dogana (`datiBzDaFrammentoP2P`) entrano per questa
+     sola apertura, e solo nel percorso — tabacchino e «Vendi BTC», dove
+     PayCode, importo e scadenza sono di chi pubblica. Si scrivono nelle
+     stesse variabili che scrivono i fogli dei tre passi, quindi il disegno,
+     i giudici e la pubblicazione non sanno da dove sono arrivati. */
+  let pre = null;
+  if (typeof p2pNuovoPrecompilato !== 'undefined') { pre = p2pNuovoPrecompilato; p2pNuovoPrecompilato = null; }
+  if (pre && p2pLato === 'vendo' && typeof tabacchinoP2P === 'function' && tabacchinoP2P(p2pNuovoMetodi)) {
+    p2pNuovoTab.ordine = pre.pc || '';
+    p2pNuovoTab.barre = pre.pc ? (pre.barre || '') : '';
+    p2pNuovoTab.scade = pre.scade ? campoDaScadeP2P(pre.scade) : '';
+    p2pNuovoEuro = pre.importo || '';
+  }
   /* LA RETE (30 ott 2026, cantiere oc-identico): 'onchain', chiesta da
      `apriPubblicaOnchainP2P` per questa sola apertura, apre questo stesso
      foglio per uno scambio con la garanzia 2-di-3, solo a chi e'
@@ -89414,6 +89438,48 @@ function moduliTotGs1128P2P(numero){
   return w.length ? w.reduce((a, x) => a + x, 0) + 2 * GS1128_QUIETE : 0;
 }
 /* ============ fine del codice a barre del PayCode ============ */
+/* ══ BARATTOZON DA UN LINK (16 nov 2026, cantiere estensione-bz,
+   richiesta di Andrea) ══════════════════════════════════════════
+   L'estensione del browser «Barattolo per Amazon» legge il PayCode
+   dalla pagina dell'ordine appena fatto su amazon.it e apre
+   `https://barattolo.store/p2p#barattozon?paycode=…&importo=…&scade=…&barre=…`:
+   «Vendi BTC» col percorso Barattozon gia' compilato. Chi l'ha aperto
+   rilegge e preme «Pubblica» lui, qui: l'ordine lo firma la chiave di
+   questo dispositivo, mai l'estensione e mai il server.
+   I DATI STANNO DOPO IL «#» e non nella `?`: il frammento il browser
+   non lo manda a nessuno, quindi il PayCode non entra nei registri di
+   Caddy ne' nel server — la regola del 14 nov («il PayCode non passa
+   mai dal server») tiene anche qui. Il frammento si toglie dalla barra
+   appena letto (vedi `prendiBzDaLinkP2P`).
+   QUESTA E' LA DOGANA, ED E' PURA: ogni campo passa dal giudice di
+   sempre (le nove cifre di `payCodeP2P`, i centesimi di `centesimiP2P`,
+   il numero lungo di `giudizioBarrePayCodeP2P` contro QUEL PayCode) e un
+   campo storto resta vuoto, mai ripulito a forza: il foglio lo chiede
+   come lo chiede a chi scrive a mano. I limiti (25 €, 999 €, la
+   scadenza fra un'ora e 72 ore) non si guardano qui: li dicono le tappe
+   del foglio con le loro frasi, che sono il giudice della
+   pubblicazione. La scadenza arriva in secondi dall'epoca, e qui si
+   prende solo la forma (9-11 cifre); `scade` 0 = non c'era o era
+   storta. Il numero dell'ordine Amazon (17 cifre) non viaggia: a chi
+   paga non serve, e dice di chi e' l'ordine. Null se non c'e' niente di
+   buono, o se il frammento non e' il nostro. */
+const P2P_BZ_LINK_MAX = 400;   // un frammento piu' lungo non e' nostro
+function datiBzDaFrammentoP2P(frammento){
+  const f = String(frammento == null ? '' : frammento).replace(/^#/, '');
+  if (f.length > P2P_BZ_LINK_MAX) return null;
+  const m = /^barattozon(?:\?([^#]*))?$/.exec(f);
+  if (!m) return null;
+  let q;
+  try { q = new URLSearchParams(m[1] || ''); } catch(e) { return null; }
+  const pc = payCodeP2P(q.get('paycode') || '');
+  const imp = centesimiP2P(String(q.get('importo') || '').replace(/\s*€\s*/g, '').trim());
+  const s = String(q.get('scade') || '');
+  const scade = /^[1-9][0-9]{8,10}$/.test(s) ? Number(s) : 0;
+  const gb = pc ? giudizioBarrePayCodeP2P(q.get('barre') || '', pc) : {stato: 'vuoto', numero: ''};
+  const d = {pc, importo: (!imp.storto && imp.n > 0) ? centesimiTestoP2P(imp.n) : '',
+             scade, barre: gb.stato === 'buono' ? gb.numero : ''};
+  return (d.pc || d.importo || d.scade) ? d : null;
+}
 /* PURE: le due righe dal valore com'e' nel foglio */
 function etichettaPayCodeTabP2P(ordine){
   return payCodeP2P(ordine) || 'Incolla il PayCode';
@@ -103156,10 +103222,95 @@ const P2P_ORDINE_URL = (P2P_URL
    resta sul libro, o sul coming soon, senza dire niente. Lo scambio e
    l'ordine nell'indirizzo vincono: sono una domanda piu' precisa. */
 const P2P_PAUSA_URL = !!P2P_URL && /[?&]pausa=1(?:&|$)/.test(location.search);
+/* BARATTOZON DA UN LINK (16 nov 2026, cantiere estensione-bz): il link
+   dell'estensione «Barattolo per Amazon», `/p2p#barattozon?…` (la dogana
+   e il perche' del «#» sopra `datiBzDaFrammentoP2P`). Si legge UNA volta
+   al caricamento e il frammento si toglie SUBITO dalla barra: una
+   ricarica, un «Condividi», la cronologia non devono portarsi dietro il
+   PayCode.
+   IL GIRO DELL'INGRESSO: chi arriva dal browser spesso non e' ancora
+   entrato, e «Entra con Telegram» finisce ricaricando la pagina. Per
+   non perdere i campi a meta' strada si tengono in sessionStorage — la
+   memoria di QUESTA scheda, che non esce dal dispositivo e muore con la
+   scheda — per al piu' mezz'ora, e si cancellano appena il foglio li
+   prende (`apriBarattozonDaLinkP2P`). Senza frammento si guarda li'. Una
+   memoria che non risponde (navigazione privata, WebView) = niente
+   giro: il link vale per questa apertura e basta. */
+const P2P_BZ_SESSIONE = 'barattolo-bz-link';
+const P2P_BZ_SESSIONE_S = 1800;
+function prendiBzDaLinkP2P(){
+  if (!P2P_URL) return null;
+  const adesso = Math.floor(Date.now() / 1000);
+  if (/^#barattozon(?:\?|$)/.test(location.hash || '')) {
+    const d = datiBzDaFrammentoP2P(location.hash);
+    try { history.replaceState(history.state, '', location.pathname + location.search); } catch(e) {}
+    try {
+      if (d) sessionStorage.setItem(P2P_BZ_SESSIONE, JSON.stringify({t: adesso, d}));
+      else sessionStorage.removeItem(P2P_BZ_SESSIONE);
+    } catch(e) {}
+    return d;
+  }
+  try {
+    const v = JSON.parse(sessionStorage.getItem(P2P_BZ_SESSIONE) || 'null');
+    if (!v || !(adesso - Number(v.t) >= 0 && adesso - Number(v.t) <= P2P_BZ_SESSIONE_S)) {
+      sessionStorage.removeItem(P2P_BZ_SESSIONE);
+      return null;
+    }
+    /* rientra dalla dogana: quel che sta in memoria non si crede sulla parola */
+    const q = new URLSearchParams();
+    if (v.d && v.d.pc) q.set('paycode', String(v.d.pc));
+    if (v.d && v.d.importo) q.set('importo', String(v.d.importo));
+    if (v.d && v.d.scade) q.set('scade', String(v.d.scade));
+    if (v.d && v.d.barre) q.set('barre', String(v.d.barre));
+    return datiBzDaFrammentoP2P('barattozon?' + q.toString());
+  } catch(e) { return null; }
+}
+const P2P_BZ_LINK = prendiBzDaLinkP2P();
+/* il foglio «Pubblica» di «Vendi BTC» col percorso gia' compilato. A
+   leva spenta niente (si resta sul coming soon, come le sorelle); chi
+   non e' entrato riceve l'invito di sempre da `apriNuovoOrdineP2P`, e i
+   campi aspettano in sessionStorage il ricaricamento dell'ingresso */
+function apriBarattozonDaLinkP2P(){
+  p2pBzDavanti = {stato: '', visto: false};
+  if (!P2P_BZ_LINK || !p2pAcceso()) return;
+  const entrato = !(typeof VETRINA !== 'undefined' && VETRINA) && !!myTgId
+    && !(typeof DEMO !== 'undefined' && DEMO);
+  if (entrato) {
+    try { sessionStorage.removeItem(P2P_BZ_SESSIONE); } catch(e) {}
+    setLatoP2P('vendo', true);
+    p2pNuovoPrecompilato = P2P_BZ_LINK;
+    p2pBzDavanti = {stato: 'aperto', visto: false};
+  }
+  apriNuovoOrdineP2P(P2P_TABACCHINO);
+}
+/* IL FOGLIO DEL LINK PASSA DAVANTI AL TOUR (16 nov 2026): chi arriva
+   dall'estensione e' spesso alla prima volta nel P2P, e il tour — un
+   fondo pieno — gli coprirebbe il foglio che ha chiesto. Come
+   `condivisoDavantiP2P`: il tour aspetta mentre il link e' «in volo»
+   (alzato in `apriP2PDaUrl` PRIMA di `vaiP2P`, che e' quando il tour si
+   arma) e finche' il foglio aperto dal link resta aperto — anche nel
+   tempo della morfosi, prima che il foglio prenda `open`. Chiuso il
+   foglio, la bandierina cade e il tour parte al primo ridisegno (la
+   bandierina, `p2pBzDavanti`, sta accanto a `p2pNuovoPrecompilato`) */
+function bzDavantiP2P(){
+  if (p2pBzDavanti.stato === 'volo') return true;
+  if (p2pBzDavanti.stato !== 'aperto') return false;
+  const aperto = !!el('p2pNuovoSheet')?.classList.contains('open');
+  if (aperto) { p2pBzDavanti.visto = true; return true; }
+  if (!p2pBzDavanti.visto) return true;
+  p2pBzDavanti = {stato: '', visto: false};
+  return false;
+}
 let p2pApertoDaUrl = false;
 function apriP2PDaUrl(){
   if (!P2P_URL || p2pApertoDaUrl) return;
   p2pApertoDaUrl = true;
+  /* il foglio di Barattozon dal link dell'estensione passa davanti al
+     tour, come l'ordine condiviso qui sotto (vedi `bzDavantiP2P`): la
+     bandierina si alza prima di `vaiP2P` */
+  if (typeof P2P_BZ_LINK !== 'undefined' && P2P_BZ_LINK && typeof p2pBzDavanti !== 'undefined'
+      && !P2P_SCAMBIO_URL && !P2P_ORDINE_URL && p2pAcceso())
+    p2pBzDavanti = {stato: 'volo', visto: false};
   /* l'ordine condiviso: solo a leva accesa, e lo scambio MIO vince.
      La bandierina si alza PRIMA di entrare nel libro: il tour della
      prima volta la guarda al primo render (`condivisoDavantiP2P`).
@@ -103200,6 +103351,11 @@ function apriP2PDaUrl(){
      d'apertura puo' scendere */
   arrivoP2PFatto();
   if (pausa) apriPausaP2P();
+  /* ...e Barattozon dal link dell'estensione (16 nov 2026): il foglio
+     compilato sopra il libro, a velo sceso. Lo scambio, l'ordine e la
+     pausa nell'indirizzo vincono: sono una domanda piu' precisa */
+  else if (!P2P_SCAMBIO_URL && !P2P_ORDINE_URL && typeof apriBarattozonDaLinkP2P === 'function')
+    apriBarattozonDaLinkP2P();
   /* ...e lo scambio dell'avviso che su questa memoria non c'e' ancora
      (13 ott 2026): `apriOrdineP2P` ha gia' portato a «I miei scambi», e
      qui lo si chiede all'archivio — si apre, o lo dice la riga gentile */

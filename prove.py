@@ -188314,6 +188314,233 @@ console.log(JSON.stringify(out));
 """
 
 
+def prove_estensione_barattozon():
+    """L'ESTENSIONE DEL BROWSER PER BARATTOZON (16 nov 2026, cantiere
+    estensione-bz, richiesta di Andrea). Due meta': l'estensione
+    `estensione/` (Chrome e Firefox, solo www.amazon.it) che trova il
+    PayCode nella pagina dell'ordine e apre `/p2p#barattozon?…`, e la
+    porta di Barattolo che compila il foglio «Vendi BTC» di Barattozon.
+    Le sentinelle tengono le promesse di privacy (l'estensione non parla
+    con nessuno, il PayCode sta dopo il «#» e si toglie dalla barra);
+    il banco in node fa il giro intero, dal link del PDF di Amazon fino
+    ai campi del foglio, coi tranelli."""
+    print("\n[l'estensione del browser per Barattozon]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ext = open("estensione/amazon.js", encoding="utf-8").read()
+    man = json.load(open("estensione/manifest.json", encoding="utf-8"))
+    ext_codice = re.sub(r"/\*[\s\S]*?\*/", "", ext)
+
+    def _in_ordine(t, *pezzi):
+        ii = [t.find(x) for x in pezzi]
+        return all(k >= 0 for k in ii) and ii == sorted(ii)
+
+    # --- 1) L'ESTENSIONE NON PARLA CON NESSUNO --------------------------------
+    prova("il manifest: v3, nessun permesso, nessun host oltre a www.amazon.it, nessuno sfondo",
+          [3, [], None, None, [["https://www.amazon.it/*"]], [["amazon.js"]]],
+          [man.get("manifest_version"), man.get("permissions"), man.get("host_permissions"),
+           man.get("background"), [c.get("matches") for c in man.get("content_scripts", [])],
+           [c.get("js") for c in man.get("content_scripts", [])]])
+    prova("...e per Firefox l'id e la dichiarazione dei dati (il contenuto della pagina)",
+          ["estensione@barattolo.store", ["websiteContent"]],
+          [man.get("browser_specific_settings", {}).get("gecko", {}).get("id"),
+           man.get("browser_specific_settings", {}).get("gecko", {})
+              .get("data_collection_permissions", {}).get("required")])
+    prova("il codice dell'estensione non ha rete, memoria, cookie ne' messaggi", [],
+          [x for x in ("fetch(", "XMLHttpRequest", "sendBeacon", "WebSocket", "cookie", "localStorage",
+                       "sessionStorage", "indexedDB", "chrome.", "browser.", "eval(", "new Function",
+                       "innerHTML", "insertAdjacentHTML", "tag=", "postMessage")
+           if x in ext_codice])
+    prova("...apre Barattolo col PayCode DOPO il «#», con noopener e noreferrer, e l'ombra e' chiusa",
+          [1, True, True, True],
+          [ext_codice.count("const BARATTOLO_P2P = 'https://barattolo.store/p2p';"),
+           "return BARATTOLO_P2P + '#barattozon' + (s ? '?' + s : '');" in ext_codice,
+           "a.rel = 'noopener noreferrer';" in ext_codice,
+           "attachShadow({mode: 'closed'})" in ext_codice])
+    prova("il link del PDF e' lo stesso nei due posti: host e percorso uguali a quelli di Barattolo",
+          [True, True],
+          ["const PDF_HOST = 'amsfm7t2lf.execute-api.eu-west-1.amazonaws.com';" in ext
+           and "const PAYCODE_PDF_HOST = 'amsfm7t2lf.execute-api.eu-west-1.amazonaws.com';" in mini,
+           "const PDF_PERCORSO = '/prod/generate-pdf';" in ext
+           and "const PAYCODE_PDF_PERCORSO = '/prod/generate-pdf';" in mini])
+    prova("trovato il PayCode, la pagina non si guarda piu'", True,
+          "if (d) { mostra(d); occhio.disconnect(); }" in ext_codice)
+
+    # --- 2) LA PORTA DI BARATTOLO --------------------------------------------
+    prende = pezzo_js(mini, "function prendiBzDaLinkP2P(){", "\n}\n")
+    prova("il frammento si toglie dalla barra APPENA letto, prima di tenerlo per l'ingresso", True,
+          _in_ordine(prende, "const d = datiBzDaFrammentoP2P(location.hash);",
+                     "history.replaceState(history.state, '', location.pathname + location.search);",
+                     "sessionStorage.setItem(P2P_BZ_SESSIONE"))
+    prova("...e quel che torna dalla memoria ripassa dalla dogana", True,
+          "return datiBzDaFrammentoP2P('barattozon?' + q.toString());" in prende)
+    apri = pezzo_js(mini, "function apriP2PDaUrl(){", "\n}\n")
+    prova("la porta del P2P apre Barattozon dopo il velo, e scambio, ordine e pausa vincono", True,
+          _in_ordine(apri, "arrivoP2PFatto();\n  if (pausa) apriPausaP2P();",
+                     "else if (!P2P_SCAMBIO_URL && !P2P_ORDINE_URL && typeof apriBarattozonDaLinkP2P === 'function')",
+                     "apriBarattozonDaLinkP2P();"))
+    abz = pezzo_js(mini, "function apriBarattozonDaLinkP2P(){", "\n}\n")
+    prova("solo a leva accesa; da entrati il lato «Vendi BTC», i campi per la prossima apertura, la memoria svuotata",
+          True, _in_ordine(abz, "if (!P2P_BZ_LINK || !p2pAcceso()) return;",
+                           "sessionStorage.removeItem(P2P_BZ_SESSIONE);", "setLatoP2P('vendo', true);",
+                           "p2pNuovoPrecompilato = P2P_BZ_LINK;", "apriNuovoOrdineP2P(P2P_TABACCHINO);"))
+    nuovo = pezzo_js(mini, "function apriNuovoOrdineP2P(metodo){", "\n}\n")
+    prova("il foglio prende i campi DOPO averli azzerati, una volta sola, e solo nel percorso di chi vende", True,
+          _in_ordine(nuovo, "p2pNuovoTab = {ordine: '', importo: '', scade: '', barre: ''};",
+                     "pre = p2pNuovoPrecompilato; p2pNuovoPrecompilato = null;",
+                     "if (pre && p2pLato === 'vendo' && typeof tabacchinoP2P === 'function' && tabacchinoP2P(p2pNuovoMetodi)) {",
+                     "p2pNuovoTab.scade = pre.scade ? campoDaScadeP2P(pre.scade) : '';",
+                     "p2pNuovoEuro = pre.importo || '';", "renderNuovoOrdineP2P();"))
+    tour = pezzo_js(mini, "function apriTourP2PSePrimaVolta(){", "\n}\n")
+    prova("il tour della prima volta aspetta il foglio del link, come aspetta l'ordine condiviso", True,
+          _in_ordine(tour, "if (typeof condivisoDavantiP2P === 'function' && condivisoDavantiP2P()) return;",
+                     "if (typeof bzDavantiP2P === 'function' && bzDavantiP2P()) return;"))
+    prova("...e la bandierina «in volo» si alza PRIMA di vaiP2P, che e' quando il tour si arma", True,
+          _in_ordine(apri, "p2pBzDavanti = {stato: 'volo', visto: false};", "vaiP2P();"))
+    for doc, cosa in (("docs/CANTIERI.md", "## L'estensione del browser per Barattozon"),
+                      ("docs/ARCHITETTURA.md", "BARATTOZON DA UN LINK"),
+                      ("estensione/LEGGIMI.md", "Barattolo per Amazon")):
+        prova(f"{doc} sa dell'estensione", True, cosa in open(doc, encoding="utf-8").read())
+
+    # --- 3) IL BANCO IN NODE: dal PDF di Amazon ai campi del foglio ----------
+    pura_ext = ext[:ext.index("/* ═══ IL BOTTONE")]
+    porta = (barre_paycode_js(mini)
+             + "\nfunction senzaEuroP2P(t){ return String(t == null ? '' : t).replace(/\\s*€\\s*/g, '').trim(); }\n"
+             + re.search(r"const P2P_BZ_LINK_MAX = [^\n]*", mini).group(0) + "\n"
+             + pezzo_js(mini, "function datiBzDaFrammentoP2P(frammento){", "\n}\n") + "\n}\n"
+             + re.search(r"const P2P_BZ_SESSIONE = [^\n]*", mini).group(0) + "\n"
+             + re.search(r"const P2P_BZ_SESSIONE_S = [^\n]*", mini).group(0) + "\n"
+             + prende + "\n}\n"
+             + pezzo_js(mini, "function bzDavantiP2P(){", "\n}\n") + "\n}\n")
+    prog = (pura_ext + "\n" + "const esc = s => String(s);\n" + porta + r"""
+/* il mondo di cartone della porta: indirizzo, storia, memoria della scheda */
+let location = {pathname: '/p2p', search: '', hash: ''};
+const P2P_URL = true;
+const STORIA = [];
+const history = {state: {k: 1}, replaceState(s, t, u){ STORIA.push(u); location.hash = ''; }};
+let MEM = {};
+let MEM_ROTTA = false;
+const sessionStorage = {
+  getItem(k){ if (MEM_ROTTA) throw new Error('no'); return k in MEM ? MEM[k] : null; },
+  setItem(k, v){ if (MEM_ROTTA) throw new Error('no'); MEM[k] = String(v); },
+  removeItem(k){ if (MEM_ROTTA) throw new Error('no'); delete MEM[k]; }};
+const ORA = Math.floor(new Date(2026, 9, 16, 10, 0).getTime() / 1000);
+const _now = Date.now; Date.now = () => ORA * 1000;
+const LINK = 'https://amsfm7t2lf.execute-api.eu-west-1.amazonaws.com/prod/generate-pdf?paycode=212-802-988'
+  + '&expiration_date=domenica,%2018%20ottobre,%2014:32%20MET&amount=39,99&locale=it_IT'
+  + '&country_code=IT&barcode=0100860003622209216085740002128029880&client_id=payagent';
+const N = '0100860003622209216085740002128029880';
+const pdf = datiDaLinkPdfBz(LINK, ORA);
+const link = linkBarattozonBz(pdf);
+const frammento = link.slice(link.indexOf('#'));
+const arrivo = datiBzDaFrammentoP2P(frammento);
+const giro = (hash) => { location.hash = hash; STORIA.length = 0; const d = prendiBzDaLinkP2P();
+  return {d, storia: STORIA.slice(), hash: location.hash, mem: Object.keys(MEM)}; };
+const r = {};
+r.pdf = pdf;
+r.scadeOra = new Date(pdf.scade * 1000).getHours() + ':' + new Date(pdf.scade * 1000).getMinutes();
+r.link = link;
+r.arrivo = arrivo;
+r.pdfNo = [LINK.replace('https:', 'http:'), LINK.replace('amazonaws.com/', 'amazonaws.com.evil.it/'),
+           LINK.replace('amazonaws.com/', 'amazonaws.com:8443/'), LINK.replace('/prod/generate-pdf', '/prod/x'),
+           LINK.replace('https://', 'https://x@'), LINK.replace('paycode=212-802-988', 'paycode=21280298'),
+           'nessun link', ''].map(t => datiDaLinkPdfBz(t, ORA));
+r.pdfPezzi = [datiDaLinkPdfBz(LINK.replace('amount=39,99', 'amount=tanti'), ORA).importo,
+              datiDaLinkPdfBz(LINK.replace('domenica,%2018%20ottobre', 'domenica,%2018%20brumaio'), ORA).scade,
+              datiDaLinkPdfBz(LINK.replace('18%20ottobre', '28%20ottobre'), ORA).scade,
+              datiDaLinkPdfBz(LINK.replace('&barcode=' + N, '&barcode=abc'), ORA).barre];
+r.capodanno = scadeDaPdfBz('venerdì, 1 gennaio, 9:05 MET', Math.floor(new Date(2026, 11, 31, 12, 0) / 1000))
+  === Math.floor(new Date(2027, 0, 1, 9, 5) / 1000);
+r.testo = ['Il tuo PayCode: 479 868 518, da pagare entro', 'PAYCODE 479-868-518', 'Ordine n. 405-1234567-1234567',
+           'PayCode 1234567890', 'PayCode: 12479868518', 'Totale 479868518 €', ''].map(payCodeDaTestoBz);
+r.pagina = [datiDaPaginaBz(['https://www.amazon.it/gp/css/order-details', LINK], 'PayCode: 479-868-518', ORA).pc,
+            datiDaPaginaBz([], 'Il tuo PayCode: 479868518', ORA), datiDaPaginaBz([], 'niente', ORA)];
+r.importi = ['39,99', '39.9', '39', '€ 39,99', '0', '39,999', '-5', '1e3', ''].map(importoBz);
+r.dogana = [datiBzDaFrammentoP2P('#barattozon?paycode=479868518&importo=39.99&scade=1792326720'),
+            datiBzDaFrammentoP2P('#barattozon?paycode=4798685&importo=abc&scade=12&barre=' + N),
+            datiBzDaFrammentoP2P('#barattozon?paycode=479868518&barre=' + N),
+            datiBzDaFrammentoP2P('#barattozon'), datiBzDaFrammentoP2P('#sicu-limiti'),
+            datiBzDaFrammentoP2P('#barattozonx?paycode=479868518'),
+            datiBzDaFrammentoP2P('#barattozon?paycode=479868518&x=' + 'a'.repeat(400)),
+            datiBzDaFrammentoP2P('#barattozon?importo=39%2C99%20%E2%82%AC')];
+/* LA PORTA, coi suoi giri */
+r.porta = giro(frammento);
+r.memTenuta = JSON.parse(MEM[P2P_BZ_SESSIONE]).d;
+r.ricarica = giro('').d;                                   // l'ingresso ricarica: torna dalla memoria
+Date.now = () => (ORA + 1801) * 1000;
+r.scaduta = [giro('').d, Object.keys(MEM).length];          // dopo mezz'ora non torna, e si cancella
+Date.now = () => ORA * 1000;
+MEM[P2P_BZ_SESSIONE] = JSON.stringify({t: ORA, d: {pc: '000-000-00', importo: '<b>', scade: 'x', barre: 'y'}});
+r.memoriaStorta = giro('').d;
+MEM[P2P_BZ_SESSIONE] = '{rotto';
+r.memoriaRotta = giro('').d;
+MEM = {};
+r.altroFrammento = giro('#sicu-limiti');
+r.fragStorto = giro('#barattozon?paycode=12');
+MEM_ROTTA = true;
+r.senzaMemoria = giro(frammento).d;
+/* il foglio del link davanti al tour: in volo, nella morfosi, aperto, chiuso */
+let APERTO = false;
+const el = id => id === 'p2pNuovoSheet' ? {classList: {contains: c => c === 'open' && APERTO}} : null;
+let p2pBzDavanti = {stato: '', visto: false};
+r.davanti = [];
+r.davanti.push(bzDavantiP2P());
+p2pBzDavanti = {stato: 'volo', visto: false}; r.davanti.push(bzDavantiP2P());
+p2pBzDavanti = {stato: 'aperto', visto: false}; r.davanti.push(bzDavantiP2P());
+APERTO = true; r.davanti.push(bzDavantiP2P());
+APERTO = false; r.davanti.push(bzDavantiP2P(), bzDavantiP2P(), p2pBzDavanti.stato);
+console.log(JSON.stringify(r));
+""")
+    out = _node_banco(prog)
+    if out is None:
+        salta("il banco dell'estensione di Barattozon", "serve node")
+        return
+    prova("il banco dell'estensione gira in node", True, bool(out))
+    if not out:
+        return
+    prova("dal link del PDF: PayCode, importo, scadenza (nell'ora di chi compra) e codice a barre",
+          [{"pc": "212-802-988", "importo": "39,99", "scade": out["pdf"].get("scade"),
+            "barre": "0100860003622209216085740002128029880"}, "14:32", True],
+          [out["pdf"], out["scadeOra"], out["pdf"].get("scade", 0) > 0])
+    prova("il link che apre Barattolo: tutto dopo il «#», il PayCode senza trattini",
+          "https://barattolo.store/p2p#barattozon?paycode=212802988&importo=39%2C99&scade="
+          + str(out["pdf"].get("scade")) + "&barre=0100860003622209216085740002128029880", out["link"])
+    prova("...e dall'altra parte la dogana di Barattolo legge gli stessi quattro campi", out["pdf"], out["arrivo"])
+    prova("un link del PDF storto non si crede: http, host finto, porta, percorso, credenziali, PayCode corto",
+          [None] * 8, out["pdfNo"])
+    prova("un pezzo storto del PDF resta vuoto, gli altri restano buoni (importo, mese, oltre 5 giorni, barre)",
+          ["", 0, 0, ""], out["pdfPezzi"])
+    prova("la scadenza a cavallo di capodanno prende l'anno dopo", True, out["capodanno"])
+    prova("nel testo il PayCode solo accanto alla parola, mai un pezzo di un numero piu' lungo",
+          ["479-868-518", "479-868-518", "", "", "", "", ""], out["testo"])
+    prova("nella pagina il link del PDF vince sul testo; senza PayCode niente bottone",
+          ["212-802-988", {"pc": "479-868-518", "importo": "", "scade": 0, "barre": ""}, None], out["pagina"])
+    prova("gli importi: centesimi con la virgola, il € tollerato, il resto vuoto",
+          ["39,99", "39,90", "39,00", "39,99", "", "", "", "", ""], out["importi"])
+    prova("la dogana di Barattolo: i campi buoni passano, gli storti restano vuoti, il frammento altrui e' null",
+          [{"pc": "479-868-518", "importo": "39,99", "scade": 1792326720, "barre": ""},
+           None,
+           {"pc": "479-868-518", "importo": "", "scade": 0, "barre": ""},
+           None, None, None, None,
+           {"pc": "", "importo": "39,99", "scade": 0, "barre": ""}],
+          out["dogana"])
+    prova("la porta: legge, toglie il frammento dalla barra (resta l'indirizzo nudo), tiene in memoria per l'ingresso",
+          [out["pdf"], ["/p2p"], "", ["barattolo-bz-link"]],
+          [out["porta"]["d"], out["porta"]["storia"], out["porta"]["hash"], out["porta"]["mem"]])
+    prova("...in memoria gli stessi campi, e dopo la ricarica dell'ingresso tornano uguali",
+          [out["pdf"], out["pdf"]], [out["memTenuta"], out["ricarica"]])
+    prova("dopo mezz'ora non tornano piu', e la memoria si svuota", [None, 0], out["scaduta"])
+    prova("una memoria scritta da altri ripassa dalla dogana: niente di storto entra", [None, None],
+          [out["memoriaStorta"], out["memoriaRotta"]])
+    prova("un frammento non nostro non si tocca; un nostro senza niente di buono si toglie lo stesso",
+          [[None, [], "#sicu-limiti"], [None, ["/p2p"], ""]],
+          [[out["altroFrammento"]["d"], out["altroFrammento"]["storia"], out["altroFrammento"]["hash"]],
+           [out["fragStorto"]["d"], out["fragStorto"]["storia"], out["fragStorto"]["hash"]]])
+    prova("senza memoria della scheda (navigazione privata) il link vale lo stesso per questa apertura",
+          out["pdf"], out["senzaMemoria"])
+    prova("il tour aspetta: niente link no; in volo si'; nella morfosi si'; aperto si'; chiuso no, e la bandierina cade",
+          [False, True, True, True, False, False, ""], out["davanti"])
+
+
 def prove_allegati_da_telegram():
     """IL DOCUMENTO DELL'ORDINE SCARICATO DALLA APP DI TELEGRAM (1 nov
     2026, dal campo: un compratore su GrapheneOS tocca «Apri il
@@ -200463,7 +200690,7 @@ CATEGORIE = {
     logo_compra_vendi tempo_di_chi_pubblica tempo_pubblica_app
     disputa_automatica_p2p pausa_in_vista paracadute_p2p paracadute_app
     selettore_di_casa ordine_in_pausa relay_per_mostro
-    notifica_porta_allo_scambio barre_paycode importo_copia
+    notifica_porta_allo_scambio barre_paycode estensione_barattozon importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
     presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia usdt_totale_euro
     sconto_fisso_decimale
@@ -201337,6 +201564,7 @@ def main():
               prove_annullata_pagata,
               prove_accordo_una_volta,
               prove_barre_paycode,
+              prove_estensione_barattozon,
               prove_allegati_chat,
               prove_pdf_allegati,
               prove_stampa_e_salti,
