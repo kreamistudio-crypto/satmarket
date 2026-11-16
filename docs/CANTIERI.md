@@ -84793,16 +84793,15 @@ tocca niente. Annotato in fondo al rapporto.
 IL FRANCO SOTTO L'EURO. `P2P_VALUTE` ora è EUR, CHF, USDT (poi le
 monete, aggiunte in coda da `P2P_VALUTE_COIN`); lo stesso ordine nelle
 chip degli avvisi (`P2P_AVVISI_VALUTE`). `P2P_VALUTE[0]` resta l'euro.
-LE VALUTE ON-CHAIN: NON in questa hotfix. Andrea: «Le altre valute
-servono solo per pagare», e ha ragione nel merito (si scambia sempre
-bitcoin). Il blocco non è solo `valuteVisibiliP2P(oc)`: il server dello
-scambio on-chain conosce due valute, EUR e USDT, e la ricava perfino dai
-metodi (`p2p_onchain_valuta`), con cifra, cambio, recapito, tetto e
-avvisi per quelle due (24 punti nel server, 38 nel telefono). I perché
-di allora: ETH/XMR scartati nel cantiere eth-xmr (13 nov, «vorrebbe
-recapito e id salvati sul server, è un passo a sé»), il franco on-chain
-«fuori per ora» (p2p-chf, 14 nov), USDe ha copiato ETH/XMR. È un
-cantiere suo, come gli USDT on-chain del 2 nov.
+LE VALUTE ON-CHAIN: prima NON in questa hotfix, poi SÌ nello stesso giro.
+Andrea: «Le altre valute servono solo per pagare», e ha ragione nel merito
+(si scambia sempre bitcoin). Il blocco non era solo `valuteVisibiliP2P(oc)`:
+il server dello scambio on-chain conosceva due valute, EUR e USDT, e la
+ricavava perfino dai metodi (`p2p_onchain_valuta`), con cifra, cambio,
+recapito, tetto e avvisi per quelle due. I perché di allora: ETH/XMR
+scartati nel cantiere eth-xmr (13 nov, «vorrebbe recapito e id salvati sul
+server, è un passo a sé»), il franco on-chain «fuori per ora» (p2p-chf, 14
+nov). Andrea ha risposto «Tutto insieme», e il passo s'è fatto: vedi sotto.
 LA TESSERA «ASTE». In «Esplora per categorie» la tessera aveva il suo
 disegno a matita (`aste-tessera.webp`, la «tessera-1» di nav-nostr),
 diverso dal martelletto dorato della card «Aste · In arrivo» di «Da
@@ -84829,3 +84828,87 @@ chip degli avvisi col franco secondo. La tessera passa la sua prova
 worktree, senza coincurve.
 DA GUARDARE: il foglio vero sul telefono a mercato dopo la promozione
 (Andrea); la tessera dorata in tema chiaro accanto alle sorelle.
+
+IL GIRO «TUTTO INSIEME» (stesso cantiere, stesso pomeriggio, sette commit
+firmati in fila sulla hotfix; Andrea: «Tutto insieme», «Esatto, con
+l'intervallo», «La funzione deve essere identica a euro», «Tutorial
+dedicati, ovviamente», «Non mi piace più l'anello rotondo», «B · Blu notte»).
+L'ICONA DEL «COMPRA». Nel foglio di un ordine on-chain il tasto «⚡
+Lightning» mette il fulmine sul bottone in basso, «₿ On-chain» la moneta
+(`iconaPresaOcP2P`): il bottone dice come arrivano i sats.
+FRANCHI E MONETE ON-CHAIN. Il 2-di-3 blocca bitcoin come sempre; chi
+compra paga anche in CHF (colonna `fiat` dello scambio) o in ETH, XMR,
+USDe. La cifra in moneta viaggia DENTRO il metodo, come sul filo di
+Mostro, e il telefono veste la riga con `vestiCoinOrdineP2P`: niente
+colonna nuova. A mercato i sats nascono dalla cifra al cambio della presa
+(`p2p_onchain_cent_mercato`), e il controvalore lo fa il server. Cancelli
+dei franchi e delle monete in pubblica, presa, libro e avvisi; il filtro
+della valuta vale anche per le card on-chain; gli USDT on-chain non sono
+più fermati dal giudice del foglio. LIMITI SCELTI: in moneta una rete
+sola per ordine (l'indirizzo ha il suo giudice per quella rete); chi paga
+in moneta vede rete, cifra da copiare e QR, ma non scrive il txid (la
+conferma resta il gesto di chi riceve, come per l'euro).
+SETTE GIORNI NEL LIBRO. Gli ordini on-chain duravano 24 ore; Andrea:
+«non ho capito perché gli ordini on-chain durano solo 24 ore e non 7
+giorni come gli altri». Ora 7 giorni, come quelli di Mostro.
+LE MONETE A MERCATO SU LIGHTNING, CON L'INTERVALLO. Mostro conosce un
+solo `fiat_code` per ordine e non ha cambi per ETH/XMR/USDe: un ordine in
+moneta a mercato non si può scrivere com'è. La strada scelta (Andrea:
+«Esatto, con l'intervallo»): sul filo l'ordine è un INTERVALLO in euro
+attorno al controvalore di adesso (`intervalloCoinP2P`, ±30%
+`P2P_COIN_FASCIA`, dentro il tetto in euro e i limiti in sats del nodo
+col premio, `max ≤ 2·min−1`, e deve contenere l'euro di adesso), amount 0
+e il premio sul filo; i metodi portano la quantità di moneta. Chi prende
+manda `round(quantità × cambio del suo momento)` (`sceltaCoinMercatoP2P`)
+e il nodo fa i sats col premio, IDENTICO a un ordine in euro. La riga
+resta nella moneta (`coinMercato`, `euroNodo`, `euroNodoMax`). Chi ha
+pubblicato vede un avviso quando il cambio di adesso esce dall'euro sul
+filo di oltre il 5% (`avvisoCambioCoinP2P`, `P2P_COIN_SCARTO`). Dove la
+fascia non ci sta (tetti stretti, cifre minuscole) si torna ai sats fissi
+di prima. LIMITE: l'euro sul filo è intero, quindi la cifra in moneta è
+giusta a mezzo euro. Ripubblica: vale anche in moneta, col prezzo di BTC
+IN EURO (`valutaRipubblicaP2P`; sul server `_p2p_coin_frase_rip` lascia
+in euro la riga «🔁»). DIFETTO TROVATO STRADA FACENDO: la risposta del
+nodo riscriveva la quantità col `fiat_amount` e la pagina dello scambio
+diceva «46 ETH»; ora `applicaMessaggioP2P` rimette la riga in moneta dai
+metodi. Una riprova senza il cambio della moneta si ferma con «Sto ancora
+leggendo il cambio».
+IL BOLLINO DELLA RETE. Scelta una rete sola di USDT o USDe, l'icona della
+valuta nella tendina di Pubblica porta il bollino della rete
+(`badgeReteValutaP2P`, `bandieraReteP2P`); anche la tessera di USDe nel
+libro. Bollini nuovi per Arbitrum, Base, BNB Chain e Solana; ETH e XMR
+no, hanno una rete sola.
+TRE BANNER NOVITÀ. On-Chain arancio; USDT e USDe insieme in verde («sono
+stablecoin»), che dice quel che vede (`facciaStableP2P`: «USDT · USDe»,
+o uno solo); ETH e Monero in blu. Ognuno col suo tutorial: il verde con
+la card d'esempio in USDe (Base), il foglio e le reti; il blu con le due
+tessere, il foglio in ETH e il prezzo di mercato. Il giro delle monete
+non passa più la mano a quello degli USDT.
+IL TEMPO IN UNA RIGA. L'anello a sessanta tacche del dettaglio (e della
+pagina dello scambio col tabacchino) diventa una riga: «Tempo rimasto» e
+il conto ai due capi, sotto una barra che si accorcia
+(`larghezzaTempoP2P`, un filo del 2% finché c'è tempo: una barra vuota
+direbbe «scaduto»). Stessi tre stati e stesso giudice delle card
+(`statoAnelloP2P`). La riga c'è anche nel foglio di chi prende un ordine
+on-chain, dove mancava; il battito cerca prima lì, poi nella vista, e il
+conto si trova nella riga della barra, non più per id (dettaglio e foglio
+possono stare nel DOM insieme). Il nome `anelloneP2P` e la classe
+`p2p-anellone` restano: li chiamano il tabacchino e il battito.
+LA CARTA DEL PREZZO IN BLU NOTTE. La grafite del 14 nov non piaceva più;
+fra cinque esempi (grafite, blu notte, crema col bordo arancio, arancio
+pieno, bianca come le card) Andrea ha scelto «B · Blu notte»: scura in
+tutti e due i temi ma fredda, così si stacca dal crema e dal bruno.
+SCARTATI: l'arancio pieno (le scritte piccole su #F7931A si leggono
+male), la crema e la bianca (troppo vicine alle card degli ordini).
+PROVATO: le sezioni toccate a ogni passo (`prove_p2p_monete_valute` con
+fascia, ripiego, scelta, scarto e controprove; `prove_ripubblica_p2p`;
+`prove_novita_usdt_p2p` e `prove_novita_coin_p2p` riscritte;
+`prove_p2p_dettaglio` con la barra; `prove_prezzo_btc_libro`), la
+sintassi dei tre script col node, poi suite severa e collaudi della CI
+nel worktree.
+DA GUARDARE (Andrea, dopo la promozione): un ordine in ETH a mercato
+preso davvero (la cifra a mezzo euro, lo scarto oltre il 5%), uno
+scambio on-chain pagato in franchi o in moneta, la barra del tempo nel
+foglio on-chain, la carta blu sul telefono. Restano come prima, non
+chiesti: a «Più recenti» le card on-chain stanno in cima; l'icona della
+mappa solo in «Compra BTC».

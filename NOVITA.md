@@ -296,3 +296,21 @@ frase: La cassa di Barattolo Negozio adesso è fatta come il carrello: le card d
 dove: Profilo → «Negozio e spedizioni» → «🏪 Cassa in negozio», scheda «🧾 Cassa».
 leva: CASSA_ATTIVA (accesa di serie)
 pubblico: sì
+
+## 2026-11-16 · p2p-onchain-valute
+frase: Negli scambi P2P on-chain ora puoi farti pagare anche in franchi svizzeri, ETH, Monero o USDe: i bitcoin restano nel deposito a tre chiavi, e chi compra paga nella sua moneta. E gli ordini on-chain restano nel libro 7 giorni, come quelli Lightning.
+dove: la scheda «P2P», il «+» con «On-chain»: la valuta in cima al foglio «Pubblica»; nel libro, il filtro della valuta vale anche per le card on-chain.
+leva: P2P_ONCHAIN_ATTIVO spenta di serie (accesa per tutti in produzione dal 16 nov)
+pubblico: sì
+
+## 2026-11-16 · p2p-monete-mercato
+frase: Gli ordini P2P in ETH, Monero e USDe ora funzionano come quelli in euro: a prezzo di mercato i sats si fanno quando qualcuno prende l'ordine, al cambio di quel momento, e anche questi ordini si possono ripubblicare da soli con «🔁 Ripubblica».
+dove: la scheda «P2P», il «+» con valuta ETH, XMR o USDe, a prezzo di mercato; la sezione «🔁 Ripubblica» del foglio.
+leva: P2P_COIN_ATTIVO accesa di serie
+pubblico: sì
+
+## 2026-11-16 · p2p-banner-tempo
+frase: In cima al libro P2P ora ci sono tre rettangoli «Novità», ognuno col suo tutorial: On-Chain arancio, le stablecoin USDT e USDe in verde, ETH e Monero in blu. La card del prezzo di bitcoin è blu notte, e il tempo rimasto di un ordine è una riga con la barra, anche quando prendi un ordine on-chain.
+dove: la scheda «P2P», in cima al libro; il foglio che si apre toccando un ordine, alla riga «Tempo rimasto».
+leva: nessuna
+pubblico: sì
