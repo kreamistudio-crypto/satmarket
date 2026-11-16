@@ -5730,6 +5730,12 @@
   .spedisci-a h4{font-size:16px}
   .spedisci-a .sped-tipo{font-size:14px;font-weight:800;color:var(--ink);margin:2px 0 2px}
   .spedisci-a .sped-tutto{margin-top:10px}
+  /* il punto nell'ordine del compratore, chiuso (16 nov 2026): la
+     stessa lettura del «Spedisci a» — cosa sopra, dove sotto */
+  .punto-ordine .sped-tipo{font-size:14px;font-weight:800;color:var(--ink);margin:2px 0}
+  .punto-ordine-dove{font-size:15px;font-weight:700;color:var(--ink);
+    overflow-wrap:anywhere;line-height:1.35;margin-bottom:4px}
+  .punto-ordine .btn.ghost{margin-top:10px}
   .p2p-sez-tit{display:flex;align-items:center;gap:8px;font-size:12.5px;
     font-weight:700;color:var(--muted);line-height:1.35;margin-bottom:10px}
   .p2p-sez-tit span{flex:1;min-width:0}
@@ -7865,6 +7871,11 @@
   .sped-zona-nome{flex:0 0 34%;font-size:13px;font-weight:700;
     color:var(--muted)}
   .sped-zona .sats-input{flex:1;min-width:0}
+  /* la riga del punto sotto quella di casa (16 nov 2026): la nota sta
+     sotto la casella, allineata a lei e non al nome */
+  #sellSpedPuntoField .sped-zona{margin-top:8px}
+  .sped-punto-nota{margin:4px 0 0 calc(34% + 10px);font-size:12px;
+    color:var(--muted);font-weight:600;line-height:1.4}
   .sped-zona .sped-paese{flex:1;min-width:0;padding:10px 12px;
     border-radius:12px;border:1px solid var(--line);
     background:var(--card);color:var(--ink);font:inherit;font-weight:600}
@@ -7994,6 +8005,22 @@
   .punto-riga{justify-content:flex-start;text-align:left}
   .punto-riga .punto-testo{flex:1 1 auto;min-width:0;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
+  /* la riga compatta su due righe (16 nov 2026): il COSA sopra, il
+     DOVE sotto e intero (va a capo, mai i puntini sull'indirizzo) */
+  .punto-riga .punto-testo.due-righe{white-space:normal;display:flex;
+    flex-direction:column;gap:2px}
+  .punto-riga .punto-cosa{font-size:12.5px;color:var(--ink-soft)}
+  .punto-riga .punto-dove{overflow-wrap:anywhere;line-height:1.3}
+  /* i passi del cassetto del punto: un numero tondo e l'aria fra una
+     domanda e l'altra */
+  #acqPuntoCampo .punto-passo{display:flex;align-items:center;gap:8px;
+    margin-top:14px}
+  #acqPuntoCampo .punto-passo:first-child{margin-top:4px}
+  #acqPuntoCampo label[for=acqEmail]{display:block;margin-top:16px}
+  .passo-n{flex:0 0 auto;width:20px;height:20px;border-radius:50%;
+    background:var(--sats);color:#fff;font-size:11.5px;font-weight:800;
+    display:inline-flex;align-items:center;justify-content:center;
+    letter-spacing:0}
   .punto-riga .punto-cambia{flex:0 0 auto;font-weight:800;
     text-decoration:underline}
   /* La riga che offre di ricordare il punto. Nacque terziario («testo
@@ -14717,6 +14744,19 @@ document.getElementById('cartello')?.remove();</script>
           <select id="sellPaeseDom" class="sped-paese" onchange="aggiornaSpedHint()"></select></div>
         <div class="sped-zona"><span class="sped-zona-nome" id="sellSpedDomNome">Italia</span>
           <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0 = gratis" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div></div>
+        <!-- Il SECONDO costo (ago 2026, pagina d'acquisto): la tariffa
+             verso un punto di ritiro. Facoltativo, stessa valuta del
+             campo sopra (un toggle solo per i due costi); VUOTO e ZERO
+             sono cose diverse — vuoto = vale il costo di casa,
+             0 scritto = gratis al punto.
+             DAL 16 NOV 2026 (cantiere punto-ritiro-ui) E' UNA RIGA
+             SORELLA di quella di casa, subito sotto: viveva in un campo
+             suo DOPO la spiegazione delle zone estere, e chi lo cercava
+             lo trovava staccato dal costo a cui si confronta. -->
+        <div class="sped-punto" id="sellSpedPuntoField" style="display:none">
+          <div class="sped-zona"><span class="sped-zona-nome">Locker / punto</span>
+            <div class="sats-input"><input id="sellSpedPunto" type="number" inputmode="numeric" placeholder="come a casa"><span class="suffix" id="sellSpedPuntoCur" style="pointer-events:none">sats</span></div></div>
+          <div class="sped-punto-nota">Facoltativo, spesso costa meno. Vuoto&nbsp;= come a casa; 0&nbsp;= gratis al punto.</div></div>
         <details class="sped-intl" id="sellIntl">
           <summary>🌍 Spedizione internazionale <span class="sped-intl-conto" id="sellIntlConto"></span></summary>
           <div id="sellZoneCampi"></div>
@@ -14733,14 +14773,7 @@ document.getElementById('cartello')?.remove();</script>
         <div id="sellSpedHint" style="margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div>
         <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Lo paga chi compra, tu lo incassi per intero. Nel tuo paese <b>vuoto o 0&nbsp;= gratis</b>. Nelle zone estere <b>0&nbsp;= gratis</b> e <b>casella vuota&nbsp;= lì non spedisci</b>. San Marino e Città del Vaticano contano come Italia.</div>
         <div id="sellSpedGratisHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div></div>
-      <!-- Il SECONDO costo (ago 2026, pagina d'acquisto): la tariffa
-           verso un punto di ritiro. Facoltativo, stessa valuta del
-           campo sopra (un toggle solo per i due costi); VUOTO e ZERO
-           sono cose diverse — vuoto = vale il costo qui sopra,
-           0 scritto = gratis al punto. -->
-      <div class="field" id="sellSpedPuntoField" style="display:none"><label>Costo verso un punto di ritiro (facoltativo)</label>
-        <div class="sats-input"><input id="sellSpedPunto" type="number" inputmode="numeric" placeholder="come sopra"><span class="suffix" id="sellSpedPuntoCur" style="pointer-events:none">sats</span></div>
-        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Spesso costa meno che a un indirizzo. Vuoto&nbsp;= vale il costo qui sopra; 0&nbsp;= gratis al punto.</div></div>
+
         <!-- la riga discreta del secondo giro, e dal 12 ott 2026
              dice la regola nuova: senza un corriere che consegna a
              una rete di punti la via punto NON si offre — il
@@ -30885,8 +30918,14 @@ function renderAcquisto(){
     `<button type="button" class="pill${d.rete===r?' pill-trust':''}"
        data-rete="${esc(r)}" onclick="setReteAcquisto(this.dataset.rete)"
        style="cursor:pointer">${esc(r)}</button>`;
+  /* I PASSI NUMERATI (16 nov 2026, cantiere punto-ritiro-ui): le
+     domande del cassetto sono una sequenza — corriere, tipo, dove — e
+     il numero lo dice senza parole; contano solo i passi che ci sono
+     (con una rete sola il corriere non si chiede e «Che tipo» e' 1). */
+  const passo = (n, testo) => `<label class="punto-passo"><span class="passo-n">${n}</span>${testo}</label>`;
+  const nTipo = sceglieRete ? 2 : 1;
   const scelteRete = sceglieRete
-    ? `<label>Con quale corriere?</label>
+    ? `${passo(1, 'Con quale corriere?')}
        <div class="fila-reti">${reti.map(retePill).join('')}</div>`
     : '';
   /* LA SECONDA DOMANDA: locker automatico o punto col banco (ago
@@ -30928,9 +30967,14 @@ function renderAcquisto(){
      riscritto a mano: appartiene alla scelta che segue, quindi sta
      piu' vicina alle pillole che alla domanda. */
   const fraseCorriere = fraseReti(reti);
-  const scelteTipo = `<label>Che tipo di punto?</label>
+  /* IL CONSIGLIO DEL LOCKER STA SOTTO LE DUE OPZIONI (16 nov 2026):
+     serve a SCEGLIERE, quindi si legge prima di scegliere — in coda al
+     campo arrivava dopo, e diceva «scegli un locker» a chi l'aveva
+     appena scelto. A locker scelto tace. */
+  const scelteTipo = `${passo(nTipo, 'Che tipo di punto?')}
        ${fraseCorriere ? `<div class="acq-nota" style="margin:4px 0 8px">${fraseCorriere}</div>` : ''}
-       <div class="fila-reti">${TIPI_PUNTO.map(tipoPill).join('')}</div>`;
+       <div class="fila-reti">${TIPI_PUNTO.map(tipoPill).join('')}</div>
+       ${d.tipoPunto !== 'locker' ? `<div class="acq-nota" style="margin-top:2px">${NOTA_LOCKER}</div>` : ''}`;
   /* IL CAMPO ARRIVA DOPO LE SCELTE (ago 2026, decisione di Andrea):
      prima il corriere, poi locker o banco, e SOLO ALLORA si scrive
      dove. Non e' un vezzo d'interfaccia, e' l'ordine in cui
@@ -30983,11 +31027,13 @@ function renderAcquisto(){
      una domanda senza risposte sbagliate. */
   const casa = puntiDiCasa(d, reti);
   const scelteFatte = (!sceglieRete || !!d.rete) && (!!casa || !!d.tipoPunto);
-  const campoDove = `<label>Indica il punto di ritiro (nome o indirizzo del punto${(!sceglieRete && reti.length)?' '+esc(reti[0]):(d.rete?' '+esc(d.rete):'')})</label>
+  const reteDove = (!sceglieRete && reti.length) ? reti[0] : d.rete;
+  const cosaDove = d.tipoPunto === 'locker' ? 'del locker' : 'del punto';
+  const campoDove = `${passo(nTipo + 1, `Dove? Nome o indirizzo ${cosaDove}${reteDove ? ' '+esc(reteDove) : ''}`)}
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Via Roma 1, Pavia"
       oninput="if(acqDati){acqDati.punto=this.value;acqDati.puntoToccato=true;aggiornaRigaRicorda()}">
-    ${mappePunti(retiMappa, sceglieRete ? 'apriMappaCassa' : 'apriMappaPunti')}
+    ${mappePunti(retiMappa, sceglieRete ? 'apriMappaCassa' : 'apriMappaPunti', false)}
     <div id="acqRicorda">${rigaRicordaPunto(d, retePerSalvare(d))}</div>
     ${notaOnionRecapito()}`;
   /* L'EMAIL PER IL CORRIERE (ago 2026): sotto il campo del punto,
@@ -31056,9 +31102,17 @@ function renderAcquisto(){
      dopo aver scelto, cioe' non direbbe cosa si e' scelto. */
   const rigaCasa = scelto
     ? `Punto Barattolo — ${scelto.nome}, ${scelto.comune}` : '';
+  /* LA RIGA COMPATTA SU DUE RIGHE (16 nov 2026): sopra COSA (il tipo
+     e la rete), sotto DOVE, per intero — su una riga sola il nome del
+     punto spesso ripete la rete («Locker InPost — Locker InPost…») e i
+     puntini mangiavano proprio l'indirizzo, cioe' la parte da
+     ricontrollare prima di pagare. Sempre nuda, senza icone. */
+  const testaRiga = rigaCasa ? 'Punto Barattolo'
+    : ((d.tipoPunto||d.rete) ? nomePunto(d.tipoPunto, d.rete) : 'Punto di ritiro');
+  const doveRiga = rigaCasa ? `${scelto.nome}, ${scelto.comune}` : puntoScritto;
   const campoChiuso = (rigaCasa || puntoScritto)
     ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
-        onclick="apriPuntoAcquisto()"><span class="punto-testo">${rigaCasa ? esc(rigaCasa) : ((d.tipoPunto||d.rete)?esc(nomePunto(d.tipoPunto, d.rete))+' — ':'')+esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
+        onclick="apriPuntoAcquisto()"><span class="punto-testo due-righe"><span class="punto-cosa">${esc(testaRiga)}</span><span class="punto-dove">${esc(doveRiga)}</span></span><span class="punto-cambia">Cambia</span></button>`
     : `<button type="button" class="btn ghost" aria-expanded="false"
         onclick="apriPuntoAcquisto()">Indica il punto di ritiro</button>`;
   const cassettoPunto = `<div class="${d.puntoAperto?'field':''}" id="acqPuntoCampo"
@@ -38716,36 +38770,14 @@ function openOrder(id){
             legge nell'ordine e non ha piu' niente da concordare. */''}
       ${(!o.puntoRitiro && o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un locker/punto di ritiro: indica il punto qui sotto.' : (o.retePunto ? `Il compratore indicherà il punto <b>${esc(o.retePunto)}</b> qui nell'ordine.` : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.')}</div>` : ''}
       ${obiezioneCompratore(o)}
-      ${(o.viaPunto && o.state==='locked' && o.role==='buyer') ? `
-      <!-- Il campo del punto DENTRO l'ordine: dal quarto giro e' la
-           RETE DI SICUREZZA della scelta anticipata — il punto si
-           sceglie in pagina prima di «Paga», qui si CORREGGE finche'
-           il venditore non spedisce (e si scrive per gli ordini nati
-           senza: i client di ieri, che il server tollera) -->
-      <div class="payout">
-        <h4>📦 Il tuo punto di ritiro${o.retePunto ? ` ${esc(o.retePunto)}` : ''}</h4>
-        <div class="hint">${o.puntoRitiro
-          ? 'Puoi correggerlo finché il venditore non spedisce.'
-          : (o.retePunto
-             ? `Nome o indirizzo del punto <b>${esc(o.retePunto)}</b>: il venditore lo vedrà qui e potrà spedire.`
-             : 'Nome o indirizzo del punto (locker o negozio convenzionato): il venditore lo vedrà qui e potrà spedire. Se non sai la rete del corriere, chiediglielo in chat.')}</div>
-        ${/* IL TIPO anche qui, ed e' la rete di sicurezza degli ordini
-              nati senza (i client di ieri) e del refuso: al venditore
-              serve per comprare l'etichetta, e senza questo campo un
-              ordine gia' pagato non potrebbe piu' completarsi. */''}
-        <div class="fila-reti" style="margin-top:8px">${TIPI_PUNTO.map(t =>
-          `<button type="button" class="pill${o.tipoPunto===t.id?' pill-trust':''}"
-             data-tipo="${t.id}" onclick="setTipoPuntoOrdine(this.dataset.tipo)"
-             style="cursor:pointer">${t.emoji} ${esc(t.nome)}</button>`).join('')}</div>
-        ${/* LA MAPPA GIUSTA, e per un anno qui e' arrivato un ''
-              hardcodato: si vedevano SEMPRE tutte e due le mappe,
-              anche quando la rete era dichiarata, e il commento del
-              giudice diceva il contrario. Adesso la rete viaggia
-              nell'ordine e la si puo' chiedere davvero. */''}
-        ${linkMappePunti(o.retePunto ? [o.retePunto] : [])}
-        <textarea id="puntoRitiroInp" style="min-height:38px" maxlength="120" placeholder="Es. Locker InPost — Via Roma 1">${esc(o.puntoRitiro)}</textarea>
-        <button class="btn orange" onclick="salvaPuntoRitiro()">${o.puntoRitiro ? 'Aggiorna il punto' : 'Salva il punto'}</button>
-      </div>` : ''}
+      ${/* Il campo del punto DENTRO l'ordine: dal quarto giro e' la
+            RETE DI SICUREZZA della scelta anticipata — il punto si
+            sceglie in pagina prima di «Paga», qui si CORREGGE finche'
+            il venditore non spedisce (e si scrive per gli ordini nati
+            senza: i client di ieri, che il server tollera). Dal 16 nov
+            2026 vive in `pannelloPuntoOrdine`, che sa ridisegnarsi da
+            solo. */
+        (o.viaPunto && o.state==='locked' && o.role==='buyer') ? pannelloPuntoOrdine(o) : ''}
 
       ${/* LA TESTATA STA SOPRA IL RECINTO (ago 2026, decisione di
             Andrea): dice lo STATO dell'affare, che e' l'intestazione
@@ -43321,18 +43353,24 @@ function renderSpedizioniere(){
   const conta = el('spedizioniereConta');
   if (conta) conta.textContent = mieRetiSped.join(' e ');
   if (!retiBozza) retiBozza = new Set(mieRetiSped);
+  /* L'ARMADIETTO SULLE PILLOLE CHE APRONO LA VIA PUNTO (16 nov 2026,
+     cantiere punto-ritiro-ui): quali corrieri portano ai locker lo
+     diceva solo la frase sopra, da leggere e ricordare; adesso lo dice
+     la pillola stessa, e la frase si accorcia. Chi consegna ai punti
+     lo sa RETE_DEL_CORRIERE, lo specchio del server — mai una lista
+     scritta qui. */
   const pill = (val) => {
     const on = retiBozza.has(val);
-    return `<button data-rete="${esc(val)}" onclick="toggleRete(this)" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${on?'var(--sats)':'var(--line)'};background:${on?'var(--sats)':'transparent'};color:${on?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${esc(val)}</button>`;
+    const punti = !!RETE_DEL_CORRIERE[val];
+    return `<button data-rete="${esc(val)}" onclick="toggleRete(this)" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${on?'var(--sats)':'var(--line)'};background:${on?'var(--sats)':'transparent'};color:${on?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${punti ? ICO_LOCKER + ' ' : ''}${esc(val)}</button>`;
   };
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
-      Con quali corrieri spedisci? Spuntali tutti. Con
-      <b style="color:var(--ink)">Poste Italiane, SDA o InPost</b>
-      chi compra può scegliere anche la consegna a un punto di ritiro
-      (locker o negozio convenzionato), e la rete la trovi scritta
-      nell'ordine. Con gli altri, o senza dichiararli, vendi lo
-      stesso: il pacco va all'indirizzo che indica chi compra.</div>
+      Con quali corrieri spedisci? Spuntali tutti. Con quelli
+      con l'armadietto (${ICO_LOCKER}) chi compra può scegliere anche
+      un <b style="color:var(--ink)">locker o un punto di ritiro</b>,
+      e la rete la trovi scritta nell'ordine. Con gli altri, o senza
+      dichiararli, il pacco va all'indirizzo che indica chi compra.</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
       ${corrieriDichiarabili().map(pill).join('')}</div>
     ${bloccoSpedStd()}
@@ -43370,8 +43408,8 @@ function bloccoSpedStd(){
           standard; 0 = spedizione gratis.</div>
       </div>
       <div class="field">
-        <label for="spedStdPunto">Verso un punto di ritiro (facoltativo)</label>
-        ${campo('spedStdPunto', b.punto, 'come sopra', false)}
+        <label for="spedStdPunto">Verso un locker / punto (facoltativo)</label>
+        ${campo('spedStdPunto', b.punto, 'come a casa', false)}
       </div>
       <div class="field">
         <label for="spedStdExtra">Ogni pezzo in più: + (facoltativo)</label>
@@ -48643,14 +48681,15 @@ function fraseReti(reti){
    in mente: dopo aver scelto InPost, la mappa Poste porta a un punto
    della rete sbagliata. A tenerlo a bada c'e' la label del campo,
    che nomina la rete SCELTA due righe piu' giu'. */
-function mappePunti(reti, gesto = 'apriMappaPunti'){
+function mappePunti(reti, gesto = 'apriMappaPunti', conNota = true){
   const {mappe} = retiMappe(reti);
   if (!mappe.length) return '';
   const link = mappe.map(r =>
     `<button type="button" class="btn mini" onclick="${gesto}('${r}')">🔎 ${MAPPE_PUNTI[r].nome}</button>`
   ).join(' ');
+  /* la cassa la dice da se', sotto le due opzioni (`scelteTipo`) */
   return `<div class="mappe-punti">${link}</div>`
-       + `<div class="hint" style="margin-top:6px">${NOTA_LOCKER}</div>`;
+       + (conNota ? `<div class="hint" style="margin-top:6px">${NOTA_LOCKER}</div>` : '');
 }
 
 /* LA MAPPA ALLA CASSA, DOVE LE RETI SONO DUE (12 ott 2026): chi apre
@@ -48690,6 +48729,85 @@ function linkMappePunti(reti){
        + mappePunti(reti);
 }
 
+/* IL PUNTO NELL'ORDINE DEL COMPRATORE, CHIUSO E APERTO (16 nov 2026,
+   cantiere punto-ritiro-ui). Col punto gia' scelto alla cassa il
+   pannello era SEMPRE un modulo aperto — tipo, mappe, consiglio, una
+   casella in monospazio e un «Aggiorna il punto» arancione grande come
+   «Paga» — cioe' chiedeva di rifare una scelta gia' fatta. Adesso si
+   legge come il «Spedisci a» del venditore (cosa, dove) e si riapre
+   con «Cambia»; aperto resta quel che era, con «Annulla». Senza punto
+   (gli ordini nati senza) nasce aperto, com'era.
+   SI RIDISEGNA IL SOLO PANNELLO, mai `openOrder`: un ridisegno pieno
+   riporta la pagina in cima (la lezione di busta, contenuto, email e
+   indirizzo) e cancellerebbe quel che si sta scrivendo — per questo il
+   testo vive in una BOZZA mentre si cambia il tipo. Lo stato e' per
+   ordine (l'id), cosi' un altro ordine non si apre gia' aperto. */
+let puntoOrdineAperto = 0;
+let puntoOrdineBozza = null;
+function pannelloPuntoOrdine(o){
+  /* con l'obiezione del venditore il punto VA cambiato: nasce aperto,
+     e le proposte toccate («usaPuntoProposto») trovano la casella */
+  const aperto = !o.puntoRitiro || puntoOrdineAperto === o.id
+    || !!o.puntoObiettatoIl;
+  const t = TIPI_PUNTO.find(x => x.id === o.tipoPunto);
+  if (!aperto) return `
+      <div class="payout punto-ordine" id="puntoOrdinePannello">
+        <h4>📦 Il tuo punto di ritiro</h4>
+        <div class="sped-tipo">${t ? t.emoji + ' ' : ''}${esc(nomePunto(o.tipoPunto, o.retePunto))}</div>
+        <div class="punto-ordine-dove">${esc(o.puntoRitiro)}</div>
+        <div class="hint">Puoi cambiarlo finché il venditore non spedisce.</div>
+        <button class="btn ghost" onclick="apriPuntoOrdine()">Cambia il punto</button>
+      </div>`;
+  const bozza = (puntoOrdineBozza && puntoOrdineBozza.id === o.id)
+    ? puntoOrdineBozza.testo : o.puntoRitiro;
+  return `
+      <div class="payout punto-ordine" id="puntoOrdinePannello">
+        <h4>📦 Il tuo punto di ritiro${o.retePunto ? ` ${esc(o.retePunto)}` : ''}</h4>
+        <div class="hint">${o.puntoRitiro
+          ? 'Puoi correggerlo finché il venditore non spedisce.'
+          : (o.retePunto
+             ? `Nome o indirizzo del punto <b>${esc(o.retePunto)}</b>: il venditore lo vedrà qui e potrà spedire.`
+             : 'Nome o indirizzo del punto (locker o negozio convenzionato): il venditore lo vedrà qui e potrà spedire. Se non sai la rete del corriere, chiediglielo in chat.')}</div>
+        ${/* IL TIPO anche qui, ed e' la rete di sicurezza degli ordini
+              nati senza (i client di ieri) e del refuso: al venditore
+              serve per comprare l'etichetta, e senza questo campo un
+              ordine gia' pagato non potrebbe piu' completarsi. */''}
+        <div class="fila-reti" style="margin-top:8px">${TIPI_PUNTO.map(x =>
+          `<button type="button" class="pill${o.tipoPunto===x.id?' pill-trust':''}"
+             data-tipo="${x.id}" onclick="setTipoPuntoOrdine(this.dataset.tipo)"
+             style="cursor:pointer">${x.emoji} ${esc(x.nome)}</button>`).join('')}</div>
+        ${/* LA MAPPA GIUSTA: la rete viaggia nell'ordine e la si puo'
+              chiedere davvero (per un anno qui arrivava un '' e si
+              vedevano sempre tutte e due) */''}
+        ${linkMappePunti(o.retePunto ? [o.retePunto] : [])}
+        <textarea id="puntoRitiroInp" style="min-height:38px" maxlength="120"
+          placeholder="Es. Locker InPost — Via Roma 1"
+          oninput="puntoOrdineBozza={id:${o.id},testo:this.value}">${esc(bozza)}</textarea>
+        <button class="btn orange" onclick="salvaPuntoRitiro()">Salva il punto</button>
+        ${(o.puntoRitiro && !o.puntoObiettatoIl) ? `<button class="btn ghost" onclick="chiudiPuntoOrdine()">Annulla</button>` : ''}
+      </div>`;
+}
+function ridisegnaPuntoOrdine(){
+  const o = currentOrder, box = el('puntoRitiroInp')?.closest('#puntoOrdinePannello')
+    || el('puntoOrdinePannello');
+  if (!o || !box) return;
+  box.outerHTML = pannelloPuntoOrdine(o);
+}
+function apriPuntoOrdine(){
+  haptic();
+  const o = currentOrder; if (!o) return;
+  puntoOrdineAperto = o.id;
+  puntoOrdineBozza = null;
+  ridisegnaPuntoOrdine();
+  el('puntoRitiroInp')?.focus();
+}
+function chiudiPuntoOrdine(){
+  haptic();
+  puntoOrdineAperto = 0;
+  puntoOrdineBozza = null;
+  ridisegnaPuntoOrdine();
+}
+
 /* Il punto di ritiro dal campo dell'ordine (dal quarto giro la rete
    di sicurezza: si corregge un punto gia' scelto in pagina, o si
    scrive quello degli ordini nati senza): solo il compratore, solo
@@ -48708,6 +48826,12 @@ async function salvaPuntoRitiro(){
   if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
   segnaOrdine(o, {puntoRitiro: d.punto_ritiro || punto, tipoPunto: d.tipo_punto || ''});
   toast('📦 Punto salvato: il venditore lo vede nell\'ordine');
+  /* salvato si richiude (16 nov 2026). Il ridisegno resta quello di
+     TUTTI i gesti che aspettano il server, `ridisegnaOrdine(o)`: nel
+     frattempo chi compra puo' aver aperto un altro ordine, e il solo
+     pannello si ridisegnerebbe su quello (prove_gesti_ordine) */
+  puntoOrdineAperto = 0;
+  puntoOrdineBozza = null;
   ridisegnaOrdine(o);
 }
 /* Il tipo dentro l'ordine si sceglie e basta: si salva col punto, col
@@ -48721,7 +48845,9 @@ function setTipoPuntoOrdine(t){
   o.tipoPunto = t;
   const viva = orders.find(x => x.id === o.id);
   if (viva) viva.tipoPunto = t;
-  openOrder(o.id);
+  /* il solo pannello (16 nov 2026): `openOrder` riportava in cima e
+     buttava via il punto appena riscritto nella casella */
+  ridisegnaPuntoOrdine();
 }
 async function markConsegnaMano(){
   haptic();

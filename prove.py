@@ -27452,7 +27452,9 @@ def prove_reti_corriere():
     # Spedisci a», in cima alla pagina dell'ordine di chi vende.
     # CINQUE dal 12 ott 2026: la riga del moderatore sotto il punto
     # (`puntoBannerAdmin`), che dice di che rete e tipo era.
-    prova("...e lo chiamano le superfici che lo scrivono", 5,
+    # SEI dal 16 nov 2026: il punto del compratore nell'ordine, chiuso
+    # (`pannelloPuntoOrdine`), che dice tipo e rete come «Spedisci a».
+    prova("...e lo chiamano le superfici che lo scrivono", 6,
           mini.count("nomePunto(") - mini.count("function nomePunto("))
     # E SI FA GIRARE, non si guarda soltanto: le sentinelle qui sopra
     # dicono che il giudice ESISTE ed e' uno, mai che risponda giusto
@@ -29650,12 +29652,16 @@ console.log(JSON.stringify({
     # per chi non ha dichiarato corrieri — cioe' per chi deve leggerlo.
     # Si conta: fra l'apertura del campo e il promemoria i <div e i
     # </div> devono essere pari, cioe' il campo e' gia' chiuso.
-    i_campo = mini.index('<div class="field" id="sellSpedPuntoField"')
+    i_campo = mini.index('<div class="sped-punto" id="sellSpedPuntoField"')
     i_riga = mini.index('<div id="sellSpedizioniereHint"')
     mezzo = mini[i_campo:i_riga]
+    # dal 16 nov 2026 il campo e' una riga DENTRO il blocco del costo
+    # (cantiere punto-ritiro-ui): fra lui e il promemoria si chiudono
+    # lui E il blocco, quindi il conto scende a -1 — mai sopra zero,
+    # che vorrebbe dire promemoria ancora dentro
     prova("il promemoria dei corrieri sta FUORI dal campo nascosto",
-          (True, 0), (i_campo < i_riga,
-                      mezzo.count("<div") - mezzo.count("</div>")))
+          (True, -1), (i_campo < i_riga,
+                       mezzo.count("<div") - mezzo.count("</div>")))
     prova("...e resta acceso per chi non ha dichiarato niente", True,
           "&& !mieRetiSped.length) ? '' : 'none';" in cf)
     # I TRE AVVISI DEL SALVA: le due frasi di prima promettevano il
@@ -29667,6 +29673,126 @@ console.log(JSON.stringify({
           "chi compra potrà scegliere anche un punto di ritiro'" in mini
           and "chi compra riceve a un indirizzo'" in mini
           and "chi compra riceverà il pacco a un indirizzo'" in mini)
+
+
+def prove_punto_ritiro_ui():
+    """L'INTERFACCIA DEL PUNTO DI RITIRO (16 nov 2026, cantiere
+    punto-ritiro-ui, gli otto punti approvati da Andrea): alla cassa i
+    passi numerati, il consiglio del locker PRIMA della scelta e muto a
+    locker scelto, la riga compatta su due righe; nell'ordine il punto
+    del compratore in scheda chiusa con «Cambia», aperto senza punto o
+    con l'obiezione, la bozza che sopravvive al cambio di tipo e il
+    ridisegno del SOLO pannello (mai openOrder: in cima e testo perso);
+    in Vendi la riga del punto sotto quella di casa; nel Profilo
+    l'armadietto sui corrieri che portano ai punti."""
+    print("\n[Il punto di ritiro: cassa, ordine del compratore, Vendi e Profilo]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- la cassa -----------------------------------------------------
+    ra = pezzo_js(mini, "function renderAcquisto(){", "\n}\n")
+    prova("cassa: i passi numerati contano solo quelli che ci sono", True,
+          "const nTipo = sceglieRete ? 2 : 1;" in ra
+          and "${passo(1, 'Con quale corriere?')}" in ra
+          and "${passo(nTipo, 'Che tipo di punto?')}" in ra
+          and "passo(nTipo + 1, `Dove? Nome o indirizzo ${cosaDove}" in ra)
+    prova("cassa: il consiglio del locker sta sotto le due opzioni e tace "
+          "a locker scelto", True,
+          "${d.tipoPunto !== 'locker' ? `<div class=\"acq-nota\" style=\"margin-top:2px\">${NOTA_LOCKER}</div>` : ''}" in ra)
+    prova("...e il campo non lo ripete dopo le mappe", 1,
+          ra.count("'apriMappaCassa' : 'apriMappaPunti', false)"))
+    prova("cassa: la riga compatta dice COSA sopra e DOVE sotto, senza icone",
+          True, '<span class="punto-cosa">${esc(testaRiga)}</span><span class="punto-dove">${esc(doveRiga)}</span>' in ra
+          and "📍" not in ra[ra.index("const testaRiga"):ra.index("const cassettoPunto")])
+    mp = pezzo_js(mini, "function mappePunti(", "\n}\n")
+    prova("mappePunti: la nota resta di serie (l'ordine), si spegne a richiesta",
+          True, "conNota = true" in mp
+          and "(conNota ? `<div class=\"hint\" style=\"margin-top:6px\">${NOTA_LOCKER}</div>` : '')" in mp)
+
+    # --- l'ordine del compratore: i gesti ridisegnano il SOLO pannello --
+    st = pezzo_js(mini, "function setTipoPuntoOrdine(t){", "\n}\n")
+    prova("ordine: il tipo ridisegna il solo pannello, mai openOrder", (1, 0),
+          (st.count("ridisegnaPuntoOrdine();"), st.count("openOrder(")))
+    sp = pezzo_js(mini, "async function salvaPuntoRitiro(){", "\n}\n")
+    # il Salva aspetta il server: nel frattempo puo' essere aperto un
+    # altro ordine, quindi ridisegna come tutti i gesti (prove_gesti_ordine)
+    prova("ordine: salvato si richiude e ridisegna dal giudice dei gesti", (True, 0),
+          ("puntoOrdineAperto = 0;" in sp and "ridisegnaOrdine(o);" in sp,
+           sp.count("ridisegnaPuntoOrdine(")))
+    oo = pezzo_js(mini, "function openOrder(id){", "\n}\n")
+    prova("ordine: openOrder disegna il pannello dal suo giudice", 1,
+          oo.count("? pannelloPuntoOrdine(o) : ''"))
+
+    # --- Vendi e Profilo ----------------------------------------------
+    i_sped = mini.index('<div class="field" id="sellSpedField"')
+    i_casa = mini.index('id="sellSped" type="number"')
+    i_punto = mini.index('<div class="sped-punto" id="sellSpedPuntoField"')
+    i_intl = mini.index('<details class="sped-intl" id="sellIntl">')
+    prova("Vendi: la riga del punto sta sotto quella di casa, prima delle "
+          "zone estere", True, i_sped < i_casa < i_punto < i_intl)
+    rs = pezzo_js(mini, "function renderSpedizioniere(){", "\n}\n")
+    prova("Profilo: l'armadietto lo decide lo specchio del server, mai una "
+          "lista qui", True, "const punti = !!RETE_DEL_CORRIERE[val];" in rs
+          and "${punti ? ICO_LOCKER + ' ' : ''}${esc(val)}" in rs)
+
+    node = _sh.which("node")
+    if not node:
+        salta("il pannello del punto nell'ordine in node", "node assente")
+        return
+    def costante(nome):
+        i = mini.index(f"const {nome} = ")
+        return mini[i:mini.index(";\n", i) + 2]
+    pezzi = "".join(costante(n) for n in (
+        "esc", "TIPI_PUNTO", "MAPPE_PUNTI", "NOTA_LOCKER", "RETE_MAPPA"))
+    pezzi += "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function nomePunto(", "function retiMappe(", "function fraseReti(",
+        "function mappePunti(", "function linkMappePunti(",
+        "function pannelloPuntoOrdine(o){"))
+    i = mini.index("let puntoOrdineAperto = 0;")
+    pezzi = mini[i:mini.index("\n", mini.index("let puntoOrdineBozza", i)) + 1] + pezzi
+    js = pezzi + r"""
+const base = {id: 7, puntoRitiro: 'Locker InPost Via Roma 12, Pavia',
+              tipoPunto: 'locker', retePunto: 'InPost', puntoObiettatoIl: 0};
+const out = {};
+out.chiuso = pannelloPuntoOrdine(base);
+puntoOrdineAperto = 7;
+out.aperto = pannelloPuntoOrdine(base);
+puntoOrdineBozza = {id: 7, testo: 'Corso Cavour 3'};
+out.bozza = pannelloPuntoOrdine(base);
+puntoOrdineBozza = {id: 8, testo: 'di un altro ordine'};
+out.bozzaAltrui = pannelloPuntoOrdine(base);
+puntoOrdineAperto = 0; puntoOrdineBozza = null;
+out.senza = pannelloPuntoOrdine(Object.assign({}, base, {puntoRitiro: ''}));
+out.obiezione = pannelloPuntoOrdine(Object.assign({}, base, {puntoObiettatoIl: 123}));
+out.altroAperto = (puntoOrdineAperto = 9, pannelloPuntoOrdine(base));
+process.stdout.write(JSON.stringify(out));
+"""
+    r = _sp.run([node, "-e", js], capture_output=True, text=True, timeout=30)
+    if r.returncode != 0:
+        prova("il pannello del punto gira in node", "", r.stderr[-600:])
+        return
+    o = _json.loads(r.stdout)
+    ha = lambda h, s: s in h
+    prova("chiuso: cosa e dove, «Cambia il punto», nessuna casella", (True, True, True, False),
+          (ha(o["chiuso"], "🔒 Locker InPost"), ha(o["chiuso"], "Locker InPost Via Roma 12, Pavia"),
+           ha(o["chiuso"], "Cambia il punto"), ha(o["chiuso"], "puntoRitiroInp")))
+    prova("...e porta l'id che il ridisegno cerca", True,
+          ha(o["chiuso"], 'id="puntoOrdinePannello"') and ha(o["aperto"], 'id="puntoOrdinePannello"'))
+    prova("aperto con «Cambia»: la casella col punto, Salva e Annulla", (True, True, True),
+          (ha(o["aperto"], ">Locker InPost Via Roma 12, Pavia</textarea>"),
+           ha(o["aperto"], "Salva il punto"), ha(o["aperto"], "chiudiPuntoOrdine()")))
+    prova("la bozza sopravvive al ridisegno (il cambio di tipo)", True,
+          ha(o["bozza"], ">Corso Cavour 3</textarea>"))
+    prova("...ma solo quella del SUO ordine", True,
+          ha(o["bozzaAltrui"], ">Locker InPost Via Roma 12, Pavia</textarea>"))
+    prova("senza punto nasce aperto, e senza Annulla", (True, False),
+          (ha(o["senza"], "puntoRitiroInp"), ha(o["senza"], "chiudiPuntoOrdine()")))
+    prova("con l'obiezione del venditore nasce aperto, e senza Annulla", (True, False),
+          (ha(o["obiezione"], "puntoRitiroInp"), ha(o["obiezione"], "chiudiPuntoOrdine()")))
+    prova("aperto un ALTRO ordine, questo resta chiuso", False,
+          ha(o["altroAperto"], "puntoRitiroInp"))
 
 
 def prove_punti_salvati():
@@ -30460,16 +30586,21 @@ def prove_pagina_acquisto():
     # sulla rete nostra `d.punto` e' vuoto per costruzione e a dire
     # dove va il pacco e' il catalogo. Quel che la prova continua a
     # garantire e' che il punto SCRITTO resti scappato col suo Cambia.
+    # dal 16 nov 2026 (cantiere punto-ritiro-ui) la riga va su due
+    # righe, COSA sopra e DOVE sotto: le due parti escono da esc()
     prova("...la riga compatta mostra il punto SCAPPATO, col Cambia",
           True,
-          "esc(nomePunto(d.tipoPunto, d.rete))+' — '" in mini3
-          and "esc(puntoScritto)}</span>" in mini3)
+          '<span class="punto-dove">${esc(doveRiga)}</span>' in mini3
+          and "const doveRiga = rigaCasa ? `${scelto.nome}, ${scelto.comune}` : puntoScritto;" in mini3
+          and '<span class="punto-cambia">Cambia</span>' in mini3)
     # e la riga della rete di casa passa dalla stessa porta: quel testo
     # lo compone il server dal catalogo, ma resta testo di un terzo
     prova("...e anche la riga del punto di casa passa da esc()",
-          True, "rigaCasa ? esc(rigaCasa)" in mini3)
+          True, "const doveRiga = rigaCasa ?" in mini3
+          and "${esc(doveRiga)}" in mini3)
     prova("...e il nome del punto passa anch'esso da esc()",
-          True, "esc(nomePunto(d.tipoPunto, d.rete))" in mini3)
+          True, "? nomePunto(d.tipoPunto, d.rete) : 'Punto di ritiro');" in mini3
+          and '<span class="punto-cosa">${esc(testaRiga)}</span>' in mini3)
     prova("...e a cedere coi puntini e' l'indirizzo, mai il Cambia",
           True, ".punto-testo{flex:1 1 auto;min-width:0;" in mini3)
     # OTTO dal cantiere dei punti di casa, ed e' la riga da leggere due
@@ -31445,8 +31576,10 @@ def prove_pagina_acquisto():
     _fr = pezzo_js(mini, "function fraseReti(reti){", "\n}")
     # la firma ha un secondo argomento dal 12 ott 2026: il GESTO del
     # bottone, che alla cassa con due reti non e' lo stesso dell'ordine
+    # e un terzo dal 16 nov 2026: la nota del locker, che la cassa dice
+    # da se' sotto le due opzioni
     _mp = pezzo_js(mini, "function mappePunti(reti, gesto = "
-                         "'apriMappaPunti'){", "\n}")
+                         "'apriMappaPunti', conNota = true){", "\n}")
     _lk = pezzo_js(mini, "function linkMappePunti(reti){", "\n}")
     prova("il giudice delle reti e' UNO (retiMappe)", 1,
           mini.count("function retiMappe"))
@@ -31502,9 +31635,10 @@ def prove_pagina_acquisto():
     # venditore: prima la frase viveva DENTRO il campo, cioe' si
     # leggeva DOPO aver scelto — si sceglieva al buio e il vincolo
     # arrivava dopo. La posizione qui e' CONTENUTO e non forma.
+    # (dal 16 nov 2026 la domanda porta il suo numero: `passo`)
     prova("la frase sta sotto la domanda e prima delle due opzioni",
           True,
-          "<label>Che tipo di punto?</label>\n       ${fraseCorriere"
+          "${passo(nTipo, 'Che tipo di punto?')}\n       ${fraseCorriere"
           in mini
           and mini.index("${fraseCorriere")
           < mini.index("${TIPI_PUNTO.map(tipoPill)"))
@@ -31512,7 +31646,7 @@ def prove_pagina_acquisto():
           mini.count("const fraseCorriere = fraseReti(reti);"))
     prova("...e i bottoni restano sotto il campo", True,
           "${mappePunti(retiMappa, sceglieRete ? 'apriMappaCassa' "
-          ": 'apriMappaPunti')}" in mini)
+          ": 'apriMappaPunti', false)}" in mini)
     # ...E SEGUONO LA RETE SCELTA, non le dichiarate come la frase
     # (ago 2026, decisione di Andrea dal campo: un pacco fermo per un
     # punto sbagliato). Dopo aver scelto InPost un bottone verso
@@ -31617,7 +31751,7 @@ def prove_pagina_acquisto():
                 + pezzo_js(mini, "function retiMappe(reti){", "\n}") + "}\n"
                 + pezzo_js(mini, "function fraseReti(reti){", "\n}") + "}\n"
                 + pezzo_js(mini, "function mappePunti(reti, gesto = "
-                                 "'apriMappaPunti'){", "\n}") + "}\n"
+                                 "'apriMappaPunti', conNota = true){", "\n}") + "}\n"
                 + "const casi = " + _js6.dumps([c[0] for c in _casi6])
                 + ";\nconsole.log(JSON.stringify(casi.map(r => {\n"
                 "  const f = fraseReti(r), m = mappePunti(r);\n"
@@ -202603,7 +202737,7 @@ CATEGORIE = {
     vetrina_negozio vetrina_canale cambio consegna_payload_punto
     reti_corriere punti_corrieri indirizzo_giusto rimborso_meno_spese
     annulla_chiude punti_barattolo presa_in_carico punti_pubblici
-    punti_salvati pagina_acquisto posizione_vetrina liste_ritorno
+    punti_salvati punto_ritiro_ui pagina_acquisto posizione_vetrina liste_ritorno
     impersonazione avviso_spedizione tracciamento_nei_messaggi
     niente_passo_intermedio ricevuta_compratore titoli_scappati
     timbri_periodici offerta_quantita offerta_carrello ritiro_offerta
@@ -203129,6 +203263,7 @@ def main():
               prove_punti_barattolo, prove_presa_in_carico,
               prove_punti_pubblici,
               prove_punti_salvati,
+              prove_punto_ritiro_ui,
               prove_pagina_acquisto,
               prove_posizione_vetrina, prove_liste_ritorno,
               prove_sbirciata, prove_anteprime, prove_seo,

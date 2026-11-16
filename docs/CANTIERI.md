@@ -86177,3 +86177,105 @@ PROVATO. `collaudo_freni` sul server vero: il primo ordine della
 settimana esce e si timbra; un ordine su Subito Crypto tre giorni fa, o
 un annuncio due giorni fa, lo tengono in casa (e la risposta lo dice);
 dopo otto giorni torna; a ritmo «tutto» nessun freno.
+
+## L'interfaccia del punto di ritiro: la cassa, l'ordine di chi compra, Vendi e il Profilo (16 nov 2026, cantiere punto-ritiro-ui; Andrea: «Migliora l'interfaccia spedizioni punto di ritiro», poi «Tutte e tre» sulla scelta delle schermate; proposta di otto punti con sei foto prima/dopo, «ottimo» e «ok» delle 22:47)
+
+Non è il cantiere della posta senza tracciamento né la rete dei Punti di
+Barattolo: è la FORMA delle tre schermate dove il punto si sceglie, si
+legge e si prezza. Fotografate prima, in locale coi dati finti, a 390
+px; i difetti visti lì e non leggendo il codice.
+
+LA CASSA. (1) Le domande del cassetto portano un numero tondo — corriere,
+tipo, dove — con l'aria fra l'una e l'altra: contano solo i passi che ci
+sono (`passo`, `nTipo`: con una rete sola il corriere non si chiede e «Che
+tipo» è 1). (2) Il consiglio del locker (NOTA_LOCKER) sta SOTTO le due
+opzioni del tipo e tace a locker scelto: in coda al campo arrivava dopo la
+scelta, e diceva «scegli un locker» a chi l'aveva appena fatto. È una
+correzione dichiarata del «NOTA_LOCKER resta in coda, com'era» di
+Architettura, che era una descrizione e non una decisione col suo perché;
+nell'ORDINE resta in coda (`mappePunti(…, conNota = true)`, di serie).
+(3) Il campo dice «Dove? Nome o indirizzo del locker InPost» (o «del
+punto»): la label di prima andava su due righe in maiuscoletto. (4) La riga
+compatta va su due righe, COSA sopra e DOVE sotto per intero: su una riga
+il nome del punto ripeteva spesso la rete («Locker InPost — Locker
+InPost…») e i puntini mangiavano proprio l'indirizzo, cioè la parte da
+ricontrollare prima di pagare. Resta NUDA, senza icone (la decisione di
+agosto sulle due icone nello stesso riquadro). NON toccati, apposta: i
+bottoni delle mappe tutti e due (12 ott), l'ordine rete → tipo → punto,
+niente default sul tipo.
+
+L'ORDINE DI CHI COMPRA. (5) Col punto già scelto il pannello era SEMPRE un
+modulo aperto, con un «Aggiorna il punto» arancione grande come «Paga»:
+chiedeva di rifare una scelta fatta. Adesso è `pannelloPuntoOrdine(o)`:
+chiuso si legge come il «Spedisci a» del venditore (tipo e rete, indirizzo,
+«Cambia il punto»), aperto è quello di prima con «Annulla». Nasce aperto
+senza punto (gli ordini nati senza) e con l'OBIEZIONE del venditore — lì il
+punto va cambiato e le proposte toccate (`usaPuntoProposto`) devono trovare
+la casella —, e in quel caso senza Annulla. (6) IL DIFETTO TROVATO NEL GIRO:
+toccare «Locker» o «Punto di ritiro» nell'ordine chiamava `openOrder`, che
+riporta la pagina in cima e ridisegna la casella dal punto SALVATO — cioè
+buttava via l'indirizzo appena riscritto. Tipo, Cambia e Annulla
+ridisegnano il solo `#puntoOrdinePannello` (`ridisegnaPuntoOrdine`), e il
+testo in corso vive in `puntoOrdineBozza` ({id, testo}: la bozza di un
+altro ordine non passa). La stessa lezione di busta, contenuto, email e
+indirizzo. IL SALVA NO, e l'ha detto `prove_gesti_ordine` alla prima
+suite: aspetta il server, e nel frattempo può essere aperto un altro
+ordine — il solo pannello si ridisegnerebbe su quello. Resta
+`ridisegnaOrdine(o)`, il giudice di tutti i gesti (dopo il Salva la
+pagina torna in cima, come prima, col punto ora chiuso).
+UN'ALTRA CHE HA DETTO LA SUITE: la riga compatta a due righe era un
+`:has()`, che fuori dallo schermo largo non si usa; è la classe
+`.due-righe`.
+
+VENDI E PROFILO. (7) In Vendi il costo verso il punto è una riga sorella di
+quella di casa («Locker / punto», segnaposto «come a casa»), subito sotto:
+viveva in un campo suo DOPO la spiegazione delle zone estere, staccato dal
+costo a cui si confronta. La regola di chi la vede non cambia
+(`offroPunti()`), e il promemoria dei corrieri resta fuori dal campo
+nascosto (la sentinella ora conta -1: fra i due si chiudono il campo E il
+blocco del costo). (8) Nel Profilo, «Come spedisci»: le pillole dei
+corrieri che portano ai punti hanno l'armadietto (lo decide
+RETE_DEL_CORRIERE, lo specchio del server: InPost, Poste, SDA), e la frase
+si accorcia; la casella del costo standard dice «Verso un locker / punto».
+
+LASCIATI FUORI APPOSTA: l'email per il corriere, il codice di ritiro e il
+riquadro «Spedisci l'oggetto» del venditore, dove lavora il cantiere del
+codice di ritiro al locker (stesso giorno).
+
+PROVATO. `prove_punto_ritiro_ui` (nuova, mercatino): le sentinelle della
+cassa, dei gesti dell'ordine (il tipo e il Salva non chiamano più
+openOrder; il Salva passa da ridisegnaOrdine), di Vendi (l'ordine casa → punto → estero) e
+del Profilo; in node `pannelloPuntoOrdine` vero su sette casi (chiuso,
+aperto col Cambia, la bozza tenuta, la bozza di un altro ordine scartata,
+senza punto, con l'obiezione, un altro ordine aperto). Controprove: rimessi
+openOrder nel tipo, tolta l'obiezione dall'«aperto», tolto l'id dalla bozza
+e resa sempre visibile la nota del locker, sono diventate rosse quattro
+prove; rimesso il codice, verdi. Aggiornate le sentinelle di
+`prove_pagina_acquisto` (la riga compatta, la firma di mappePunti, la
+domanda numerata) e di `prove_reti_corriere` (i chiamanti di nomePunto
+salgono a sei). Dal vivo nel Chromium
+locale col server vero (relay morto, dati della semina finta più un
+venditore con InPost e Poste): la cassa in tutti i suoi stati a 390, la
+riga compatta, l'ordine chiuso e aperto (dopo il tocco sul tipo la pagina
+resta a 300 px e il testo riscritto resta), Vendi, il Profilo; in scuro a
+320 cassa, riga e ordine.
+GLI ALBERI. Prima sull'albero del cantiere (da develop 59e89ef6): suite
+severa 28.634/0 e, nel venv della sola CI senza httpx, 28.629/0; collaudi
+nel venv senza coincurve 136/0. Poi, dopo la promozione della notte e il
+riallineamento di develop, rebasato su ecd76363 (un conflitto solo, la
+coda di questo file; nessun simbolo toccato in comune coi diciannove
+commit arrivati — controllati per nome renderAcquisto, openOrder,
+setTipoPuntoOrdine, salvaPuntoRitiro, mappePunti, renderSpedizioniere,
+sellSpedPunto, nomePunto): suite severa nel venv della CI 28.811/0 e
+collaudi senza proxy e senza coincurve 139/0; rifatto il giro dal vivo di
+cassa, ordine e Profilo sull'albero rebasato. Le due saltate di sempre
+sono nostr-tools, che in questa macchina non c'è. Al momento del push
+develop era già a c8193de4 (tre commit P2P, nessun simbolo in comune):
+rebasato ancora, giro mirato — la categoria mercatino severa 13.330/0, più
+conoscenza di Tappo, reti del corriere, gesti dell'ordine, pagina
+d'acquisto e la sezione nuova, 454/0. Sopra c'era ancora f021a324 (solo
+server.py e collaudo_freni: né la pagina né le prove): rebasato senza
+altro giro.
+DA GUARDARE: il tocco su «Cambia il punto» dal telefono vero dentro
+Telegram (la tastiera che si apre sul focus); un ordine con obiezione vera.
+
