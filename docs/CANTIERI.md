@@ -84469,8 +84469,10 @@ sats» si apre su on-chain (`p2pIncassoRete`), il foglio «🔒 Blocca i
 sats» su Lightning (`p2pOcDepositoRete`), e chi riceve on-chain in
 Lightning fa la rotta `ricevi-lightning` appena preso
 (`applicaReteOcPresaP2P`). I tasti solo dove l'altra rete c'è per chi
-guarda: in Lightning i cancelli del telefono (`swapP2PAcceso`,
-`presaOcPossibileP2P`), on-chain due campi nuovi del libro
+guarda: in Lightning la busta dello swap del server (`swapLeve.p2p`:
+`attivo` per chi compra, `presa` per chi vende; se i file dello swap del
+telefono non sono ancora arrivati si chiamano e il foglio si ridisegna,
+dopo la prova di Andrea sul collaudo dove i tasti non uscivano), on-chain due campi nuovi del libro
 (`lnPossibile`, `depositoLnPossibile`, gli stessi cancelli della pagina
 dello scambio). Prima della presa le cifre on-chain sono stime («circa»):
 i sats veri e il margine nascono alla presa. Scartato: rifare il conto
@@ -84480,8 +84482,14 @@ BANNER. Con le monete accese il verde «USDT» tace e gli USDT entrano nel
 banner blu di Ethereum (`novitaCoinLibroP2P`, classe `con-usdt`): la T
 verde in testa ai loghi e il nome su due righe pari, «USDT · ETH» /
 «XMR · USDe» (su una riga a 390 px veniva mozzato). Il tocco apre il
-tutorial delle monete; chi vede gli USDT senza le monete ha ancora il
-verde col suo.
+tutorial delle monete e, arrivato in fondo, quello degli USDT
+(`fineTutorialCoinP2P` → `tutorialUsdtP2P`, appoggiato al rettangolo blu
+con `nodoNovitaUsdtP2P`; chi salta, salta tutti e due); chi vede gli USDT
+senza le monete ha ancora il verde col suo. La frase sotto il conto
+della domanda di presa on-chain segue il tasto (`corpoPresaOcP2P`): con
+«⚡ Lightning» dice «ti arrivano in Lightning» e «pagando da Lightning
+con lo swap», non più «sul TUO wallet on-chain» (ritocco chiesto subito,
+prima della promozione).
 BARRA. Le soglie del colore (arancio a 3 giorni, rosso che pulsa
 all'ultimo) erano per l'ordine Lightning da 7 giorni: lo scambio on-chain
 vive 24 ore e nasceva rosso lampeggiante con la riga piena. Sotto i sette

@@ -62349,8 +62349,13 @@ function novitaUsdtLibroP2P(){
     + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
     + '</div>';
 }
+/* il rettangolo a cui il giro degli USDT si appoggia: il suo verde, o
+   dal 16 nov 2026 il banner blu che lo contiene (un banner solo) */
+function nodoNovitaUsdtP2P(){
+  return el('p2pUsdtNovita') || el('p2pCoinNovita');
+}
 function accendiNovitaUsdtP2P(si){
-  const r = el('p2pUsdtNovita');
+  const r = nodoNovitaUsdtP2P();
   if (r) r.classList[si ? 'add' : 'remove']('acceso');
 }
 /* il tocco: il colpo del rimbalzo, e a colpo finito il giro */
@@ -62376,9 +62381,9 @@ function apriNovitaUsdtP2P(){
    tappe del foglio hanno un ripiego (`p2pNuovoCorpo`): il motore scarta
    all'avvio le tappe senza bersaglio, e il foglio nasce alla sua tappa. */
 const TAPPE_TUTORIAL_USDT_P2P = [
-  { trova: () => el('p2pUsdtNovita'),
+  { trova: () => nodoNovitaUsdtP2P(),
     testo: `<b>Novità!</b> Da oggi puoi scambiare bitcoin anche in <b>USDT</b>, il dollaro digitale: 1 USDT vale 1 dollaro.` },
-  { trova: () => el('p2pUsdtNovita'),
+  { trova: () => nodoNovitaUsdtP2P(),
     testo: `I sats restano nel <b>deposito di garanzia</b> come sempre; gli USDT passano direttamente da una persona all'altra.` },
   { trova: () => esempioTutorialUsdtP2P('USDT'), tondo: true,
     testo: `Un ordine in USDT lo riconosci dalla <b>T verde</b> di Tether.` },
@@ -62426,7 +62431,7 @@ function esempioTutorialUsdtP2P(cod){
     t.className = 'p2p-usdt-esempi';
     t.setAttribute('aria-hidden', 'true');
     t.innerHTML = carta('USDT', ['USDT (Tron)'], 50) + carta('EUR', ['Revolut'], 50);
-    const nov = el('p2pUsdtNovita');
+    const nov = nodoNovitaUsdtP2P();
     if (nov && nov.parentNode === box) nov.after(t); else box.prepend(t);
   }
   const card = t.querySelectorAll('.p2p-ord')[cod === 'USDT' ? 0 : 1];
@@ -62623,8 +62628,13 @@ function foglioTutorialCoinP2P(){
 }
 /* la fine, qualunque strada la porti: via le card finte e il foglio, il
    lato di partenza, e si torna al libro (il «Novità» resta appeso) */
-function fineTutorialCoinP2P(){
+function fineTutorialCoinP2P(finito){
   const lato = tutorialCoinLato;
+  /* UN BANNER SOLO (16 nov 2026): con gli USDT dentro, il giro delle
+     monete arrivato in fondo passa la mano a quello degli USDT, che si
+     appoggia allo stesso rettangolo blu; chi salta, salta tutti e due */
+  const poiUsdt = finito === true && !!el('p2pCoinNovita')?.classList.contains('con-usdt')
+    && typeof tutorialUsdtP2P === 'function';
   tutorialCoinLato = null;
   document.querySelectorAll('.p2p-coin-esempi').forEach(n => n.remove());
   if (el('p2pNuovoSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pNuovoSheet');
@@ -62632,6 +62642,7 @@ function fineTutorialCoinP2P(){
   if (p2pNuovoValuta === 'USDE') { p2pNuovoValuta = 'EUR'; p2pNuovoAperta = false; }
   if (lato && lato !== p2pLato) setLatoP2P(lato, true);
   accendiNovitaCoinP2P(false);
+  if (poiUsdt) setTimeout(tutorialUsdtP2P, 450);
 }
 /* ============ fine del «Novità» di ETH, Monero e USDe ============ */
 
@@ -62832,17 +62843,9 @@ function apriOnchainP2P(id, modo){
       + (typeof contoOnchainP2P === 'function'
         ? '<div class="p2p-ord lato-' + (vendeLui ? 'compro' : 'vendo') + '">'
           + contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo'}) + '</div>' : ''),
-    /* in USDT le stesse frasi, con la rete (2 nov 2026) */
-    corpo: paroleOc(o, vendeLui
-      ? 'Chi vende deposita i sats in un indirizzo 2-di-3 (sue, tue e di Barattolo: ne servono due). '
-        + 'Quando sono confermati mandi gli euro col metodo scritto e tocchi «Ho inviato gli euro»; '
-        + 'lui li libera e arrivano sul TUO wallet on-chain, meno la tua metà della commissione. Se qualcosa va storto decide un moderatore.'
-      : 'Se prendi, depositi tu ' + satsCardOnchainP2P(o) + ' più la tua metà della commissione e il margine di rete '
-        + 'nell\'indirizzo 2-di-3 entro ' + p2pOnchainLibro.oreDeposito + ' ore. Chi compra ti manda '
-        + esc(fmtSoldiP2P(o.euro, o)) + ' € e tu liberi i sats SOLO quando li vedi sul tuo conto. '
-        + 'Se non arrivano, apri una disputa: decide un moderatore.')
-      + (usdtOc(o) ? ' ⚠️ Gli USDT viaggiano solo su ' + (o.metodi || []).map(m => (reteUsdtDaMetodoP2P(m) || {}).nome).filter(Boolean).join(' o ')
-        + (vendeLui ? '.' : ': dopo la presa scrivi nello scambio il tuo indirizzo USDT.') : ''),
+    /* in USDT le stesse frasi, con la rete (2 nov 2026); e col tasto
+       «⚡ Lightning» scelto la frase dice Lightning (`corpoPresaOcP2P`) */
+    corpo: corpoPresaOcP2P(o, vendeLui),
     /* «COMPRA» / «VENDI» COME NELLA PRESA LIGHTNING (30 ott 2026, 19:04,
        Andrea: «affianco a vendi e compra metti la relativa icona cosi chi
        lo prende sa se e' onchain o lightning»): era «Prendi lo scambio»
@@ -62882,9 +62885,14 @@ function tastiReteFoglioP2P(id, scelta, gesto, nota){
 const p2pCambioDett = {};   // ordine -> {stato, sats, dati}: il costo dello swap prima della presa
 function reteDettP2P(o, compro){
   if (typeof VETRINA !== 'undefined' && VETRINA) return '';
-  const alt = compro ? (typeof swapP2PAcceso === 'function' && swapP2PAcceso())
-    : (typeof presaOcPossibileP2P === 'function' && presaOcPossibileP2P());
+  /* il cancello lo dice la busta dello swap del server (`swapLeve.p2p`),
+     senza aspettare i file dello swap del telefono: se non sono ancora
+     arrivati si chiamano qui, e arrivati il foglio si ridisegna */
+  const leve = (typeof swapLeve !== 'undefined' && swapLeve && swapLeve.p2p) || {};
+  const alt = typeof swapAcceso === 'function' && swapAcceso() && (compro ? !!leve.attivo : !!leve.presa);
   if (!alt) return '';
+  if (typeof swapTelefonoPronto === 'function' && !swapTelefonoPronto() && typeof caricaSwapTelefono === 'function')
+    caricaSwapTelefono().then(ok => { if (ok && String(p2pDettOrdine) === String(o.id)) renderDettaglioP2P(); });
   const oc = compro ? p2pIncassoRete[o.id] === 'oc' : !!(p2pPresaOc[o.id] || {}).aperto;
   if (oc && compro && !p2pCambioDett[o.id]) {
     p2pCambioDett[o.id] = {stato: 'leggo'};
@@ -62999,10 +63007,34 @@ function reteOcPresaHtmlP2P(o, vendeLui){
   }
   return tastiReteFoglioP2P(Number(o.id), ln ? 'ln' : 'oc', 'scegliReteOcPresaP2P', nota);
 }
+/* LA FRASE DELLA DOMANDA DI PRESA ON-CHAIN, che segue il tasto scelto
+   (16 nov 2026, ritocco: con «⚡ Lightning» diceva ancora «arrivano sul
+   TUO wallet on-chain»). In USDT le stesse frasi, con la rete. */
+function corpoPresaOcP2P(o, vendeLui){
+  const usdtOc = typeof usdtOcP2P === 'function' ? usdtOcP2P : () => false;
+  const paroleOc = typeof paroleOcP2P === 'function' ? paroleOcP2P : (x, t) => t;
+  const ln = (p2pOcPresaRete[o.id] || {}).rete === 'ln';
+  return paroleOc(o, vendeLui
+      ? 'Chi vende deposita i sats in un indirizzo 2-di-3 (sue, tue e di Barattolo: ne servono due). '
+        + 'Quando sono confermati mandi gli euro col metodo scritto e tocchi «Ho inviato gli euro»; '
+        + (ln
+          ? 'lui li libera e, con lo swap, ti arrivano in Lightning, meno la tua metà della commissione e il costo dello swap. '
+          : 'lui li libera e arrivano sul TUO wallet on-chain, meno la tua metà della commissione. ')
+        + 'Se qualcosa va storto decide un moderatore.'
+      : 'Se prendi, depositi tu ' + satsCardOnchainP2P(o) + ' più la tua metà della commissione e il margine di rete '
+        + 'nell\'indirizzo 2-di-3 entro ' + p2pOnchainLibro.oreDeposito + ' ore'
+        + (ln ? ', pagando da Lightning con lo swap' : '') + '. Chi compra ti manda '
+        + esc(fmtSoldiP2P(o.euro, o)) + ' € e tu liberi i sats SOLO quando li vedi sul tuo conto. '
+        + 'Se non arrivano, apri una disputa: decide un moderatore.')
+    + (usdtOc(o) ? ' ⚠️ Gli USDT viaggiano solo su ' + (o.metodi || []).map(m => (reteUsdtDaMetodoP2P(m) || {}).nome).filter(Boolean).join(' o ')
+      + (vendeLui ? '.' : ': dopo la presa scrivi nello scambio il tuo indirizzo USDT.') : '');
+}
 function ridisegnaReteOcPresaP2P(id){
   const box = el('p2pOcPresaRete');
   const o = (p2pOnchainLibro.eventi || []).find(x => +x.id === +id);
   if (box && o) box.innerHTML = reteOcPresaHtmlP2P(o, o.lato === 'sell');
+  const corpo = el('confCorpo');
+  if (box && o && corpo) corpo.textContent = corpoPresaOcP2P(o, o.lato === 'sell');
 }
 async function scegliReteOcPresaP2P(id, rete){
   haptic();

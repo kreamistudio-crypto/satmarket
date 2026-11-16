@@ -160018,11 +160018,13 @@ process.stdout.write(JSON.stringify(out));
           ["Barattolo non prende commissioni: chi vende deposita" in mini,
            "La commissione è quella degli scambi Lightning, metà a testa" in mini])
     presa = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
+    frase = pezzo_js(mini, "function corpoPresaOcP2P(o, vendeLui){", "\n}\n")
     prova("IL FOGLIO DI CHI PRENDE porta il conto, come il dettaglio Lightning, e le "
-          "due frasi dicono la meta' della commissione", [True, True, True],
+          "due frasi dicono la meta' della commissione", [True, True, True, True],
           ["contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo'})" in presa,
-           "più la tua metà della commissione e il margine di rete" in presa,
-           "meno la tua metà della commissione" in presa])
+           "corpo: corpoPresaOcP2P(o, vendeLui)," in presa,
+           "più la tua metà della commissione e il margine di rete" in frase,
+           "meno la tua metà della commissione" in frase])
 
 
 
@@ -160051,7 +160053,10 @@ const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const LOG = [];
 const haptic = () => {}, toast = t => LOG.push('toast:' + t), authHdr = () => '', API_BASE = '/api';
 let VETRINA = false, SWAP = true, PRESA = true, p2pDettOrdine = 'L1', p2pDettImporto = 0;
-const swapP2PAcceso = () => SWAP, presaOcPossibileP2P = () => PRESA;
+const swapAcceso = () => true;
+let swapLeve = {attivo: true, p2p: {get attivo(){ return SWAP; }, get presa(){ return PRESA; }}};
+let PRONTO = true; const swapTelefonoPronto = () => PRONTO;
+const caricaSwapTelefono = () => { LOG.push('carica'); return Promise.resolve(true); };
 const p2pIncassoRete = {}, p2pPresaOc = {}, p2pOcDepositoRete = {};
 const RIGHE = {L1: {id: 'L1', lato: 'sell', sats: 100000, euro: 90}, L2: {id: 'L2', lato: 'buy', sats: 100000, euro: 90}};
 const rigaLibroP2P = id => RIGHE[id];
@@ -160068,6 +160073,7 @@ const NODI = {}; const el = id => NODI[id] || null;
 let p2pOnchainLibro = {eventi: [{id: 7, lato: 'sell', sats: 100000}, {id: 8, lato: 'buy', sats: 100000}],
   lnPossibile: true, depositoLnPossibile: false};
 let FETCH = []; const fetch = async (u, o) => { FETCH.push([u, o && o.body]); return {ok: true, json: async () => ({})}; };
+const satsCardOnchainP2P = o => fmt(o.sats) + ' sats', fmtSoldiP2P = e => String(e);
 """ + mini[a:b] + r"""
 const out = {};
 const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed="(true|false)"[^>]*>([^<]+)</g)].map(m => m[3] + ':' + m[2]);
@@ -160076,6 +160082,10 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
   out.vende = premuto(reteDettP2P(RIGHE.L2, false));
   SWAP = false; out.senzaSwap = reteDettP2P(RIGHE.L1, true); SWAP = true;
   VETRINA = true; out.vetrina = reteDettP2P(RIGHE.L1, true); VETRINA = false;
+  /* i file dello swap non ancora arrivati: i tasti ci sono lo stesso, i
+     file si chiamano, e arrivati il foglio si ridisegna */
+  PRONTO = false; LOG.length = 0; out.senzaFile = premuto(reteDettP2P(RIGHE.L1, true)).length;
+  await new Promise(r => setTimeout(r, 0)); out.caricati = LOG.slice(); PRONTO = true; LOG.length = 0;
   /* chi compra tocca ₿: la scelta resta e si legge il costo */
   await scegliReteDettP2P('L1', 'oc');
   out.sceltaOc = [p2pIncassoRete.L1, premuto(reteDettP2P(RIGHE.L1, true))];
@@ -160090,10 +160100,13 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
   out.ocPossibile = [reteOcPresaPossibileP2P(true), reteOcPresaPossibileP2P(false)];
   out.ocSats = [satsOcPresaP2P(p2pOnchainLibro.eventi[0], true), satsOcPresaP2P(p2pOnchainLibro.eventi[1], false)];
   out.ocPrima = premuto(reteOcPresaHtmlP2P(p2pOnchainLibro.eventi[0], true));
-  NODI.p2pOcPresaRete = {innerHTML: ''};
+  out.frasePrima = [corpoPresaOcP2P(p2pOnchainLibro.eventi[0], true), corpoPresaOcP2P(p2pOnchainLibro.eventi[1], false)];
+  NODI.p2pOcPresaRete = {innerHTML: ''}; NODI.confCorpo = {textContent: ''};
   await scegliReteOcPresaP2P(7, 'ln');
+  out.fraseLn = NODI.confCorpo.textContent;
   out.ocLn = [premuto(NODI.p2pOcPresaRete.innerHTML), NODI.p2pOcPresaRete.innerHTML.replace(/<[^>]+>/g, '').replace(/.*Lightning₿ On-chain/, '')];
   await scegliReteOcPresaP2P(8, 'ln');
+  out.fraseDepLn = NODI.confCorpo.textContent;
   out.depLn = reteOcPresaHtmlP2P(p2pOnchainLibro.eventi[1], false).replace(/<[^>]+>/g, '').replace(/.*Lightning₿ On-chain/, '');
   /* dopo la presa: chi deposita trova il foglio su Lightning, chi riceve chiede la rotta */
   await applicaReteOcPresaP2P(8, 'compratore');
@@ -160118,6 +160131,9 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
               "compra e per chi vende; senza swap o in vetrina niente tasti",
               [["⚡ Lightning:true", "₿ On-chain:false"], ["⚡ Lightning:true", "₿ On-chain:false"], "", ""],
               [o["compra"], o["vende"], o["senzaSwap"], o["vetrina"]])
+        prova("...il cancello e' la busta del server: coi file dello swap non ancora "
+              "arrivati i tasti ci sono, i file si chiamano e il foglio si ridisegna",
+              [2, ["carica", "disegno"]], [o["senzaFile"], o["caricati"]])
         prova("...chi compra tocca «₿ On-chain»: la scelta resta per «Dove ricevere i sats» "
               "e si vede subito il costo dello swap sul netto che Mostro paghera'",
               ["oc", ["⚡ Lightning:false", "₿ On-chain:true"]], o["sceltaOc"])
@@ -160137,6 +160153,15 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
         prova("...toccato «⚡ Lightning» chi riceve vede subito quanto gli arriva e il costo",
               True, o["ocLn"][0] == ["⚡ Lightning:true", "₿ On-chain:false"]
               and "ti arrivano circa 97.600 sats, lo swap costa circa 900 sats" in o["ocLn"][1])
+        prova("LA FRASE SOTTO IL CONTO segue il tasto: on-chain «sul TUO wallet on-chain», "
+              "con «⚡ Lightning» «ti arrivano in Lightning» e, per chi deposita, «pagando "
+              "da Lightning con lo swap»",
+              [True, False, True, False, True],
+              ["arrivano sul TUO wallet on-chain" in o["frasePrima"][0],
+               "pagando da Lightning" in o["frasePrima"][1],
+               "ti arrivano in Lightning, meno la tua metà della commissione e il costo dello swap" in o["fraseLn"],
+               "TUO wallet on-chain" in o["fraseLn"],
+               "pagando da Lightning con lo swap" in o["fraseDepLn"]])
         prova("...e chi deposita quanto paga in Lightning e il costo",
               True, "paghi circa 101.700 sats più il margine per la rete, lo swap costa circa 700 sats" in o["depLn"])
         prova("DOPO LA PRESA la scelta passa: il foglio del deposito gia' su Lightning, il "
@@ -160148,6 +160173,14 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
     presa = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
     prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
     dett = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
+    fine = pezzo_js(mini, "function fineTutorialCoinP2P(finito){", "\n}\n")
+    prova("IL GIRO DEGLI USDT DAL BANNER SOLO: finito quello delle monete, col banner "
+          "che porta gli USDT parte il loro, appoggiato al rettangolo blu; chi salta, salta",
+          [True, True, True, 0],
+          ["const poiUsdt = finito === true && !!el('p2pCoinNovita')?.classList.contains('con-usdt')" in fine,
+           "if (poiUsdt) setTimeout(tutorialUsdtP2P, 450);" in fine,
+           "return el('p2pUsdtNovita') || el('p2pCoinNovita');" in mini,
+           mini.count("trova: () => el('p2pUsdtNovita'),")])
     prova("I FILI: il libro on-chain dice i due cancelli a chi guarda; il foglio on-chain "
           "mette i tasti al posto di «via on-chain»; la presa passa la scelta; il foglio "
           "Lightning li mette in cima al corpo al posto di «via Lightning»",
