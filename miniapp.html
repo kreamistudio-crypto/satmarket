@@ -61573,7 +61573,8 @@ let myP2PChf = false;
    2-di-3 bitcoin; chi compra paga in USDT invece che in euro. */
 let myP2POnchainUsdt = false;
 /* ...e i metodi ETH e XMR (13 nov 2026, cantiere eth-xmr): `p2p_coin` di
-   /api/me, oggi solo sull'istanza di prova. Vedi «ETH E XMR COME METODI». */
+   /api/me, la leva P2P_COIN_ATTIVO del server (dal 16 nov, cantiere
+   p2p-monete; prima solo l'istanza di prova). Vedi «ETH E XMR COME METODI». */
 let myP2PCoin = false;
 let p2pOnchainLibro = {eventi: [], miei: [], quando: 0, rete: 'signet', minSats: 10000, oreDeposito: 6};
 let p2pOnchainMiei = [];        // /api/p2p/onchain/miei, gli ultimi trenta
@@ -81281,8 +81282,9 @@ function qrUsdtP2P(r, indirizzo, importo){
       rotta GET che la metteva nell'indirizzo l'explorer l'ha tolta, e
       la nostra CSP non lascia partire un modulo verso un altro sito —
       quindi chiave e indirizzo si copiano col loro «📋 Copia».
-   IL CANCELLO e' `myP2PCoin` (`p2p_coin` di /api/me): oggi solo
-   l'istanza di prova. Senza, i due metodi non compaiono da nessuna parte
+   IL CANCELLO e' `myP2PCoin` (`p2p_coin` di /api/me): la leva
+   P2P_COIN_ATTIVO del server (16 nov 2026, cantiere p2p-monete; prima
+   solo l'istanza di prova). Senza, i due metodi non compaiono da nessuna parte
    e un ordine che li porta non si mostra nel libro (`valutaVistaP2P`). */
 const P2P_RETI_COIN = [
   {coin: 'ETH', chiave: 'eth', nome: 'Ethereum', metodo: 'ETH (Ethereum)', forma: 'evm', catena: 1,

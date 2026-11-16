@@ -1388,6 +1388,13 @@ P2P_CHF_ATTIVO = False
 # Con la leva accesa, i franchi li vedono solo gli admin finche' questa
 # resta True. False = tutti gli ammessi al P2P.
 P2P_CHF_SOLO_ADMIN = True
+# ETH, MONERO E USDe COME METODI DEL P2P (16 nov 2026, cantiere
+# p2p-monete). Negli ordini in euro chi paga puo' mandare l'equivalente
+# in ETH (Ethereum), XMR (Monero) o USDe (Ethereum, Arbitrum, Base, BNB
+# Chain, Solana), da persona a persona: la garanzia resta la hold invoice
+# in sats, Barattolo le monete non le tocca. Nessun gesto sul nodo.
+# ACCESA di serie (regola del 14 nov 2026): False la spegne in emergenza.
+P2P_COIN_ATTIVO = True
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
 # RGB_ATTIVO si accende; una riga storta vale «chiusa a tutti» e lo dice.

@@ -16572,9 +16572,10 @@ async def orologio_cambio():
                 await riempi_andamento()
             except Exception:
                 pass
-        # ...e ETH e XMR, SOLO sull'istanza di prova (13 nov 2026, cantiere
-        # eth-xmr): in produzione il giro resta quello di ieri, una
-        # domanda sola a CoinGecko. Vedi «ETH E XMR NEL P2P».
+        # ...e ETH, XMR e USDe, SOLO con la loro leva accesa (13 nov 2026,
+        # cantiere eth-xmr; la leva dal 16 nov, cantiere p2p-monete): leva
+        # spenta, il giro resta quello di ieri, una domanda sola a
+        # CoinGecko. Vedi «ETH E XMR NEL P2P».
         if p2p_coin_acceso():
             try:
                 await _rileggi_cambio_coin()
@@ -16838,7 +16839,7 @@ def cambio_da_solo():
              "cambio_chf": cambio_noto_ora("chf"),
              "cambio_eta_s": cambio_eta_ora()}
     # ...e quanti euro vale un ETH e un XMR (13 nov 2026, cantiere
-    # eth-xmr), solo sull'istanza di prova: la cifra da mandare negli
+    # eth-xmr), solo con la leva P2P_COIN_ATTIVO: la cifra da mandare negli
     # scambi pagati in ETH o in Monero. Sempre la cache, mai la rete.
     if p2p_coin_acceso():
         busta["cambio_coin"] = cambio_coin_noto_ora()
@@ -23497,6 +23498,8 @@ def numeri_assistente() -> str:
         f"- Scambi P2P pagati in USDT: {si(p2p_usdt_ammesso(0))}.",
         # (14 nov 2026, cantiere p2p-chf) i franchi svizzeri, col loro cancello
         f"- Scambi P2P pagati in franchi svizzeri (CHF): {si(p2p_chf_ammesso(0))}.",
+        # (16 nov 2026, cantiere p2p-monete) ETH, Monero e USDe come metodi
+        f"- Scambi P2P pagati in ETH, Monero (XMR) o USDe: {si(p2p_coin_ammesso(0))}.",
         f"- Scambi P2P in bitcoin on-chain: {si(p2p_onchain_ammesso(0))}.",
         # (12 nov 2026, cantiere sapere-onchain) le due leve del P2P che
         # il libro di Tappo spiega e che dal pannello arrivavano solo come
@@ -36278,6 +36281,18 @@ def _leve_stato():
                          "(ADMIN_IDS)",
                   spento="appena P2P_CHF_ATTIVO si accende li vede "
                          "chiunque abbia il P2P"),
+            # ETH, MONERO E USDe COME METODI (16 nov 2026, cantiere
+            # p2p-monete): accesa di serie, l'interruttore d'emergenza
+            _leva("ETH, Monero e USDe nel P2P", "P2P_COIN_ATTIVO",
+                  bool(P2P_COIN_ATTIVO),
+                  acceso="negli ordini in euro si può pagare anche in ETH "
+                         "(Ethereum), XMR (Monero) o USDe (Ethereum, "
+                         "Arbitrum, Base, BNB Chain, Solana): sono metodi "
+                         "come Revolut, la garanzia resta in sats; il server "
+                         "chiede il loro cambio a CoinGecko una volta al "
+                         "minuto",
+                  spento="i tre metodi non compaiono, e il libro nasconde "
+                         "gli ordini che li portano"),
             _leva("USDT solo agli admin", "P2P_USDT_SOLO_ADMIN",
                   bool(P2P_USDT_SOLO_ADMIN),
                   acceso="gli ordini in USDT li vedono solo i moderatori "
@@ -56310,6 +56325,25 @@ if not isinstance(P2P_CHF_SOLO_ADMIN, bool):
     print("[p2p] P2P_CHF_SOLO_ADMIN non e' True/False: i franchi li "
           "vedono solo gli admin", flush=True)
     P2P_CHF_SOLO_ADMIN = True
+# ETH, MONERO E USDe COME METODI DEL P2P (16 nov 2026, cantiere
+# p2p-monete, Andrea: «Voglio accenderli tutti», «Attiva tutto, manda
+# tutto in produzione»). Fino a ieri il loro cancello era l'istanza di
+# prova (`PROVA_SOLO_IDS` piena), senza leva: questa ne prende il posto
+# in `p2p_coin_acceso()`. ACCESA DI SERIE (la regola di Andrea del 14
+# nov: le leve nuove nascono accese nel codice, e la promozione le porta
+# in produzione senza toccare il config); resta l'interruttore
+# d'emergenza, `P2P_COIN_ATTIVO = False` in una riga. Niente gesto sul
+# nodo: gli ordini restano in euro, ETH/XMR/USDe sono metodi come
+# Revolut. Storta: spenta, e si dice — un interruttore d'emergenza scritto
+# male deve chiudere, non aprire.
+try:
+    from config import P2P_COIN_ATTIVO
+except ImportError:
+    P2P_COIN_ATTIVO = True
+if not isinstance(P2P_COIN_ATTIVO, bool):
+    print("[p2p] P2P_COIN_ATTIVO non e' True/False: ETH, Monero e USDe "
+          "restano spenti", flush=True)
+    P2P_COIN_ATTIVO = False
 # IL TETTO DEL COLLAUDO (20 ott 2026, decisione di Andrea con Alan): sul
 # collaudo il P2P parla col coordinatore VERO, quindi ordini e sats sono
 # veri; un ordine dal collaudo non supera P2P_MAX_SATS_PROVA sats, di
@@ -56973,18 +57007,20 @@ def p2p_usdt_ammesso(tg_id) -> bool:
 # QR, id della transazione e link all'explorer li fa il TELEFONO
 # (blocco «ETH E XMR COME METODI» di miniapp.html): qui stanno il
 # cancello e il cambio.
-# IL CANCELLO E' L'ISTANZA DI PROVA, senza leva nel config: la lista di
-# `PROVA_SOLO_IDS` piena e' il segno che questa non e' la produzione,
-# come per i widget di prova. Il giorno della produzione si mette una
-# leva qui, e il resto non cambia.
+# IL CANCELLO E' LA LEVA `P2P_COIN_ATTIVO` (16 nov 2026, cantiere
+# p2p-monete). Fino ad allora era l'istanza di prova (`PROVA_SOLO_IDS`
+# piena), con la promessa scritta qui: «il giorno della produzione si
+# mette una leva qui, e il resto non cambia». E' arrivato quel giorno, e
+# il resto non e' cambiato: chi lo legge (`/api/me`, `/api/cambio`,
+# l'orologio, i numeri di Tappo) chiede sempre a queste due funzioni.
 def p2p_coin_acceso() -> bool:
-    """La funzione esiste su questo server? Solo sull'istanza di prova,
-    e solo col P2P acceso."""
-    return bool(PROVA_SOLO_IDS) and bool(_p2p_leve()["attivo"])
+    """La funzione esiste su questo server? Con la leva accesa, e solo
+    col P2P acceso."""
+    return bool(P2P_COIN_ATTIVO) and bool(_p2p_leve()["attivo"])
 
 
 def p2p_coin_ammesso(tg_id) -> bool:
-    """Chi vede i metodi ETH e XMR: sull'istanza di prova, chi ha il P2P."""
+    """Chi vede i metodi ETH, XMR e USDe: con la leva accesa, chi ha il P2P."""
     return p2p_coin_acceso() and bool(_p2p_per(tg_id)["attivo"])
 
 

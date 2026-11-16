@@ -156333,22 +156333,66 @@ def prove_eth_xmr():
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
 
     # --- 1) il server: il cancello e il cambio ---
-    amb = {"PROVA_SOLO_IDS": {111}, "_p2p_leve": lambda: {"attivo": True},
+    # (16 nov 2026, cantiere p2p-monete) il cancello e' la leva
+    # P2P_COIN_ATTIVO, non piu' l'istanza di prova: la lista della prova
+    # vuota (la produzione) con la leva accesa li mostra, piena con la
+    # leva spenta no
+    amb = {"P2P_COIN_ATTIVO": True, "PROVA_SOLO_IDS": set(),
+           "_p2p_leve": lambda: {"attivo": True},
            "_p2p_per": lambda tg: {"attivo": tg in (111, 222)}}
     exec(pezzo("p2p_coin_acceso"), amb)
     exec(pezzo("p2p_coin_ammesso"), amb)
     f = amb["p2p_coin_ammesso"]
-    prova_si = [f(111), f(222), f(333)]
-    amb["PROVA_SOLO_IDS"] = set()
-    produzione = [f(111), amb["p2p_coin_acceso"]()]
+    accesa = [f(111), f(222), f(333), amb["p2p_coin_acceso"]()]
+    amb["P2P_COIN_ATTIVO"] = False
     amb["PROVA_SOLO_IDS"] = {111}
+    spenta = [f(111), amb["p2p_coin_acceso"]()]
+    amb["P2P_COIN_ATTIVO"] = True
     amb["_p2p_leve"] = lambda: {"attivo": False}
-    senza_p2p = [f(111)]
-    prova("sull'istanza di prova chi ha il P2P vede ETH e XMR, gli altri no",
-          [True, True, False], prova_si)
-    prova("...in produzione (lista della prova vuota) nessuno, e il giro non parte",
-          [False, False], produzione)
-    prova("...e col P2P spento nessuno", [False], senza_p2p)
+    senza_p2p = [f(111), amb["p2p_coin_acceso"]()]
+    prova("leva accesa (anche in produzione, lista della prova vuota): chi ha il "
+          "P2P vede ETH, XMR e USDe, gli altri no", [True, True, False, True], accesa)
+    prova("...leva spenta nessuno, nemmeno sull'istanza di prova, e il giro non parte",
+          [False, False], spenta)
+    prova("...e col P2P spento nessuno", [False, False], senza_p2p)
+    prova("il cancello non guarda piu' l'istanza di prova",
+          (False, True), ("PROVA_SOLO_IDS" in pezzo("p2p_coin_acceso"),
+                          "bool(P2P_COIN_ATTIVO)" in pezzo("p2p_coin_acceso")))
+    # la leva: accesa di serie (regola di Andrea del 14 nov 2026), storta
+    # = spenta e detta, nel pannello e nel config d'esempio
+    import types as _types_leva
+    inizio = src.index("try:\n    from config import P2P_COIN_ATTIVO\n")
+    # il blocco intero: le righe dal `try:` finche' restano rientrate o
+    # sono le teste del blocco (try / except / if not isinstance)
+    righe_leva = []
+    for r in src[inizio:].split("\n"):
+        if righe_leva and not (r.startswith(" ") or r.startswith(("except", "if not isinstance"))):
+            break
+        righe_leva.append(r)
+    blocco_leva = "\n".join(righe_leva) + "\n"
+    for nome, valore, attesa in (("assente", None, True), ("True", True, True),
+                                 ("False", False, False), ("storta", "si", False)):
+        cfg = _types_leva.ModuleType("config")
+        if valore is not None:
+            cfg.P2P_COIN_ATTIVO = valore
+        vecchio_cfg = sys.modules.get("config")
+        sys.modules["config"] = cfg
+        try:
+            spazio = {"print": lambda *a, **k: None}
+            exec(blocco_leva, spazio)
+        finally:
+            if vecchio_cfg is None:
+                sys.modules.pop("config", None)
+            else:
+                sys.modules["config"] = vecchio_cfg
+        prova(f"P2P_COIN_ATTIVO {nome} nel config: {attesa}", attesa,
+              spazio["P2P_COIN_ATTIVO"])
+    prova("la leva sta nel pannello «Stato delle leve», nei numeri di Tappo "
+          "e nel config d'esempio (accesa)", (1, 1, 1),
+          (src.count('_leva("ETH, Monero e USDe nel P2P", "P2P_COIN_ATTIVO",'),
+           src.count('f"- Scambi P2P pagati in ETH, Monero (XMR) o USDe: {si(p2p_coin_ammesso(0))}."'),
+           len(re.findall(r"(?m)^P2P_COIN_ATTIVO = True$",
+                                open("config_esempio.py", encoding="utf-8").read()))))
     prova("/api/me lo dice al telefono", 1,
           src.count('profilo["p2p_coin"] = p2p_coin_ammesso(user["id"])'))
     cambio = pezzo("cambio_da_solo")
@@ -194650,7 +194694,7 @@ def _banco_assistente(**leve):
     for nome in ("cambio_libero_per", "swap_per", "onchain_ammesso",
                  "swap_auto_per", "p2p_usdt_ammesso", "p2p_onchain_ammesso",
                  "p2p_onchain_usdt_ammesso", "p2p_altra_rete_per",
-                 "p2p_chf_ammesso"):
+                 "p2p_chf_ammesso", "p2p_coin_ammesso"):
         amb[nome] = (lambda n: lambda t: CHI_GUARDA.append((n, t)) or False)(nome)
     exec(src[k:src.index("\n", k)], amb)
     for nome in ("_riga_webapp", "tastiera_bot", "_secchio_passa"):
@@ -194989,6 +195033,16 @@ def prove_assistente_bot():
                os.path.join(QUI, "assistente", "sapere.md"),
                encoding="utf-8").read(),
            "p2p_chf_ammesso" in {n for n, _ in CHI_GUARDA}])
+    # (16 nov 2026, cantiere p2p-monete) ETH, Monero e USDe: la riga che il
+    # libro usa come condizione, come quella dei franchi
+    prova("i numeri dicono anche ETH, Monero e USDe, spenti a leve spente, "
+          "col nome che usa il libro, guardati con gli occhi di chiunque",
+          [True, True, True],
+          ["Scambi P2P pagati in ETH, Monero (XMR) o USDe: SPENTO" in n0,
+           "«Scambi P2P pagati in ETH, Monero (XMR) o USDe»" in open(
+               os.path.join(QUI, "assistente", "sapere.md"),
+               encoding="utf-8").read(),
+           "p2p_coin_ammesso" in {n for n, _ in CHI_GUARDA}])
     # (13 nov 2026, cantiere sapere-donazioni) una persona chiede a Tappo
     # dove donare i sats che non usa: il libro non lo diceva, e la domanda
     # e' finita allo staff. L'indirizzo e' quello del profilo Nostr.
