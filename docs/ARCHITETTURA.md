@@ -34685,7 +34685,7 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   toglie la SUA conversazione intera (`CANCELLA_TOGLI`: `assistenza`,
   `assistenza_letture`, `assistenza_avvisi` per `utente`), e le risposte
   di un admin che se ne va restano negli altri senza il suo nome
-  (`CANCELLA_ANONIMIZZA`: `assistenza.autore`). Client: la voce-porta `vocAssistenza` in «Privacy»,
+  (`CANCELLA_ANONIMIZZA`: `assistenza.autore`). Client: la voce-porta `vocAssistenza` in «Supporto» (in «Privacy» fino al 16 nov 2026),
   il bottone `admAssistenza` in «Amministrazione», le viste
   `assistenza` e `assistenzaadm` (`renderAssistenza`,
   `renderAssistenzaAdmin`). Collaudo: `collaudo_assistenza`.

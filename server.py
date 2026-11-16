@@ -50531,6 +50531,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # L'ASSISTENZA IN APP (3 nov 2026): la voce c'e' solo a leva accesa,
     # e porta il conto delle risposte dello staff non ancora lette
     profilo["assistenza"] = bool(ASSISTENZA_ATTIVA)
+    # TAPPO NEL PROFILO (16 nov 2026, Andrea: chi e' gia' iscritto il
+    # benvenuto del bot non lo rivede): il link della leva TAPPO_LINK,
+    # gia' passato dalla forma t.me/<bot>; vuota = niente voce.
+    profilo["tappo_link"] = TAPPO_LINK or ""
     if ASSISTENZA_ATTIVA:
         _cn = db()
         try:

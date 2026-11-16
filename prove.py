@@ -36460,6 +36460,34 @@ def prove_canale_bot():
     prova("un TAPPO_LINK storto torna quello di serie (forma t.me/<bot>)", True,
           "_FORMA_LINK_BOT.fullmatch(TAPPO_LINK)" in _SORGENTE
           and "TAPPO_LINK = TAPPO_LINK_DI_SERIE\n" in _SORGENTE)
+    # ...E NEL PROFILO DELLA MINI APP (16 nov 2026, Andrea: chi e' gia'
+    # iscritto il benvenuto non lo rivede): /api/me porta il link, la
+    # voce «🤖 Chiedi a Tappo» nasce spenta e si accende solo con un
+    # link nella forma t.me/<bot>, nel cassetto «Supporto»
+    mini_t = open("miniapp.html", encoding="utf-8").read()
+    prova("/api/me porta il link di Tappo (vuoto = niente voce)", 1,
+          _SORGENTE.count('profilo["tappo_link"] = TAPPO_LINK or ""\n'))
+    prova("la voce nasce spenta e apre Tappo", (1, 1),
+          (mini_t.count('<div class="acc voce-porta" id="vocTappo" style="display:none">'),
+           mini_t.count('onclick="apriTappo()"><span class="em">🤖</span>Chiedi a Tappo<')))
+    prova("...si accende dalla risposta di /api/me", 1,
+          mini_t.count("tappoLink = linkTappoValido(me.tappo_link);\n"
+                       "    if (el('vocTappo')) el('vocTappo').style.display = tappoLink ? '' : 'none';"))
+    prova("...e dentro Telegram passa dal client", True,
+          "tg.openTelegramLink(tappoLink)" in pezzo_js(mini_t, "function apriTappo("))
+    out_t = _node_banco(pezzo_js(mini_t, "function linkTappoValido(",
+                                 "\n/* Dentro Telegram") + """
+console.log(JSON.stringify([
+  linkTappoValido('https://t.me/TappoBarattoloBot'),
+  linkTappoValido(''), linkTappoValido(null),
+  linkTappoValido('javascript:alert(1)'),
+  linkTappoValido('https://t.me/TappoBarattoloBot?start=x'),
+  linkTappoValido('https://evil.example/TappoBarattoloBot')]));""")
+    if out_t is None:
+        salta("linkTappoValido in node", "node non c'e'")
+    else:
+        prova("linkTappoValido: solo https://t.me/<bot>, il resto spegne",
+              ["https://t.me/TappoBarattoloBot", "", "", "", "", ""], out_t)
 
     # --- 5) IL CANALE HA UN GIUDICE SOLO -------------------------
     # Se un giorno divergessero, il ✅ Venduto finirebbe in un canale e
@@ -115992,8 +116020,9 @@ def prove_profilo_sezioni():
     # NOVE dal set 2026 («Il profilo più elegante»): «Completa il
     # profilo» diventa un cassetto, «Il tuo account» si divide in
     # «Livello e inviti» e «Avvisi e aspetto», e «Incassi e pagamenti»
-    # sale da cassetto a sezione.
-    prova("le sezioni sono nove", 9, vista.count('<div class="grp"'))
+    # sale da cassetto a sezione. DIECI dal 16 nov 2026: «Supporto»
+    # (Tappo e l'assistenza, Andrea: «un menu a parte»).
+    prova("le sezioni sono dieci", 10, vista.count('<div class="grp"'))
     # LE SEZIONI NASCONO CHIUSE (decisione di Andrea): il Profilo si
     # apre sulla mappa intera, non su un cassetto gia' spalancato.
     prova("nessuna sezione nasce aperta", 0, vista.count('class="grp open"'))
@@ -122188,7 +122217,7 @@ def prove_profilo_elegante():
     prova("i cassetti principali, nell'ordine deciso",
           ["grpChecklist", "grpCatalogo", "grpNegozio", "grpCompri",
            "grpIncassi", "grpLivello", "grpAspetto", "grpPrivacy",
-           "grpAdmin"], ordine)
+           "grpSupporto", "grpAdmin"], ordine)
     prova("...e nessuno nasce aperto", 0, len(re.findall(
         r'<div class="grp[^"]*\bopen\b', vista)))
 
@@ -122207,8 +122236,10 @@ def prove_profilo_elegante():
         # (14 nov 2026) le recensioni ricevute, prima del livello
         "grpLivello": ["accRecensioni", "accLivello", "accInviti", "accDistintivi"],
         "grpAspetto": ["accAvvisi", "accAspetto"],
-        # l'assistenza in app (3 nov 2026) sta con «I tuoi dati»
-        "grpPrivacy": ["accIdentita", "vocAssistenza", "vocPrivacy", "vocCancella", "accTor"],
+        "grpPrivacy": ["accIdentita", "vocPrivacy", "vocCancella", "accTor"],
+        # (16 nov 2026, Andrea: «un menu a parte») Tappo e l'assistenza in
+        # app, che prima stava in «Privacy» con «I tuoi dati»
+        "grpSupporto": ["vocTappo", "vocAssistenza"],
     }
     fuori = []
     for g, voci in CASSETTI.items():
@@ -122226,6 +122257,7 @@ def prove_profilo_elegante():
     GESTI = [
         ("apriMioNegozio()", "grpNegozio"), ("apriWidget('negozio')", "grpNegozio"),
         ("apriSicurezza()", "grpCompri"), ("apriPrivacy()", "grpPrivacy"),
+        ("apriTappo()", "grpSupporto"), ("go('assistenza')", "grpSupporto"),
         ("esportaDati()", "grpIncassi"), ("collegaWallet()", "grpIncassi"),
         ("scaricaModelloImport()", "grpCatalogo"), ("importPrepara(this)", "grpCatalogo"),
         ("setTema('auto')", "grpAspetto"), ("riavviaTour()", "piede"),

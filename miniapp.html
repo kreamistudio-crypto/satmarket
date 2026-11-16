@@ -15206,12 +15206,6 @@ document.getElementById('cartello')?.remove();</script>
 
       <!-- «I tuoi dati»: era un bottone a tutta larghezza in fondo alla
            pagina; dal set 2026 e' la voce-porta di «Privacy». -->
-      <!-- L'ASSISTENZA IN APP (3 nov 2026): la porta della chat con lo
-           staff. Nasce SPENTA: la accende `vestiAssistenza` solo se il
-           server dice `assistenza: true` (la leva ASSISTENZA_ATTIVA). -->
-      <div class="acc voce-porta" id="vocAssistenza" style="display:none">
-        <button type="button" class="acc-h" onclick="go('assistenza')"><span class="em">💬</span>Assistenza<span id="assistenzaPallino"></span><span class="fr">›</span></button>
-      </div>
       <div class="acc voce-porta" id="vocPrivacy">
         <button type="button" class="acc-h" onclick="apriPrivacy()"><span class="em">🔐</span>I tuoi dati<span class="fr">›</span></button>
       </div>
@@ -15243,6 +15237,33 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc" id="accTor" style="display:none">
         <button class="acc-h" onclick="toggleAcc('accTor')"><span class="em">🧅</span>Sito Tor<span class="fr">▾</span></button>
         <div class="acc-b"><div id="torBlocco"></div></div>
+      </div>
+        </div>
+      </div>
+
+      <!-- 🛟 SUPPORTO (16 nov 2026, Andrea: «non metterlo nella sezione
+           privacy, ma proprio fare un menu a parte»): chi ha una domanda
+           trova qui le due porte, Tappo che risponde subito e la chat con
+           lo staff. Prima l'assistenza stava in «Privacy», accanto a «I
+           tuoi dati». Come ogni cassetto, sparisce se le due voci sono
+           spente (aggiornaGruppiProfilo). -->
+      <div class="grp" id="grpSupporto">
+        <button type="button" class="grp-h" onclick="toggleGrp('grpSupporto')"
+                aria-expanded="false">Supporto<span class="fr">▾</span></button>
+        <div class="grp-b">
+      <!-- TAPPO NEL PROFILO (16 nov 2026, Andrea: «Nella Mini App, nel
+           Profilo»): chi e' gia' iscritto il benvenuto del bot non lo
+           rivede, e il bottone «💬 Chiedi a Tappo» del bot non lo trova.
+           Apre @TappoBarattoloBot. Nasce SPENTA: la accende /api/me solo
+           se il server manda `tappo_link` (la leva TAPPO_LINK). -->
+      <div class="acc voce-porta" id="vocTappo" style="display:none">
+        <button type="button" class="acc-h" onclick="apriTappo()"><span class="em">🤖</span>Chiedi a Tappo<span class="fr">›</span></button>
+      </div>
+      <!-- L'ASSISTENZA IN APP (3 nov 2026): la porta della chat con lo
+           staff. Nasce SPENTA: la accende `vestiAssistenza` solo se il
+           server dice `assistenza: true` (la leva ASSISTENZA_ATTIVA). -->
+      <div class="acc voce-porta" id="vocAssistenza" style="display:none">
+        <button type="button" class="acc-h" onclick="go('assistenza')"><span class="em">💬</span>Assistenza<span id="assistenzaPallino"></span><span class="fr">›</span></button>
       </div>
         </div>
       </div>
@@ -57634,6 +57655,23 @@ let cassaAttiva = false;   /* la cassa in negozio (15 nov 2026), da /api/me */
    OGNI testo esce da esc(): quel che scrive l'utente non diventa mai
    HTML, nemmeno nella pagina degli admin. */
 let assistenzaAttiva = false, assistenzaNuove = 0;
+/* TAPPO NEL PROFILO (16 nov 2026): il link a @TappoBarattoloBot che
+   manda /api/me (leva TAPPO_LINK); vuoto = voce spenta */
+let tappoLink = '';
+/* PURA: il link di Tappo solo nella forma https://t.me/<bot>, sennò '' */
+function linkTappoValido(u){
+  return typeof u === 'string' && /^https:\/\/t\.me\/[A-Za-z][A-Za-z0-9_]{3,31}$/.test(u) ? u : '';
+}
+/* Dentro Telegram il link passa dal client (apre la chat del bot senza
+   uscire); nel browser e' una scheda nuova. */
+function apriTappo(){
+  if (!tappoLink) return;
+  haptic();
+  if (tg?.initData && tg.openTelegramLink) {
+    try { tg.openTelegramLink(tappoLink); return; } catch(e){}
+  }
+  window.open(tappoLink, '_blank', 'noopener');
+}
 let assistenzaMsgs = null, assistenzaMax = 2000;
 let assistenzaAdmLista = null, assistenzaAdmAperta = null;
 let assistenzaInvio = false;
@@ -101962,6 +102000,10 @@ async function avvia(){
     /* L'ASSISTENZA IN APP (3 nov 2026): la leva viva e il conto delle
        risposte non lette (un server di ieri non le manda: spenta) */
     assistenzaAttiva = me.assistenza === true;
+    /* TAPPO NEL PROFILO (16 nov 2026): la voce solo se il server manda
+       un link nella forma t.me/<bot> (un server di ieri non lo manda) */
+    tappoLink = linkTappoValido(me.tappo_link);
+    if (el('vocTappo')) el('vocTappo').style.display = tappoLink ? '' : 'none';
     assistenzaNuove = Number(me.assistenza_nuove) || 0;
     vestiAssistenza();
     myClassificaNascosta = !!me.classifica_nascosta;

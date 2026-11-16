@@ -254,3 +254,9 @@ frase: La scheda «Swap» in basso adesso la vede anche chi apre Barattolo dal s
 dove: la barra in basso del sito, prima del login; il foglio «Ti aspettiamo su Telegram» (su Tor «Entra nel Barattolo»); la home del mercatino, «Esplora per categorie» e «Da scoprire».
 leva: SWAP_ATTIVO (nessuna leva nuova)
 pubblico: sì
+
+## 2026-11-16 · supporto-profilo
+frase: Nel Profilo c'è la sezione «Supporto», con le due strade per chi ha una domanda: «🤖 Chiedi a Tappo», che ti risponde subito su come funziona Barattolo, e «💬 Assistenza», la chat con lo staff, che prima stava in «Privacy».
+dove: scheda Profilo, sezione «Supporto», voci «🤖 Chiedi a Tappo» e «💬 Assistenza».
+leva: TAPPO_LINK accesa di serie
+pubblico: sì

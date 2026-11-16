@@ -84354,3 +84354,29 @@ senza commissione il Controvalore resta ≈, Subtotale e totale no, e il
 totale dice i suoi 321.675 sats; controprova con la regola di prima: rosso.
 Verdi anche dettaglio, card dello scambio, libro, PayCode, conto a
 intervallo, le prove delle monete e degli USDT.
+
+## La sezione «Supporto» nel Profilo, con Tappo e l'assistenza (16 nov 2026, cantiere tappo-profilo, Andrea: «Nella Mini App, nel Profilo» e poi «non metterlo nella sezione privacy, ma proprio fare un menu a parte»)
+
+Il bottone «💬 Chiedi a Tappo» del bot lo vede solo chi fa /start o
+scrive una frase al bot: chi è già iscritto non lo trova (domanda di
+Andrea). Scelte sulla scheda: la voce nel Profilo della Mini App,
+perché chi è già iscritto vive lì e non nella chat del bot. Scartati il
+comando /tappo nel menu del bot (lo trova solo chi apre il menu) e il
+«lasciamo così».
+Prima la voce doveva stare accanto a «💬 Assistenza», che dal 3 nov
+viveva in «Privacy» con «I tuoi dati». Andrea ha chiesto un menu a sé:
+nasce il cassetto «Supporto», dopo «Privacy» e prima di
+«Amministrazione», con «🤖 Chiedi a Tappo» (prima, perché risponde
+subito) e «💬 Assistenza» (spostata da «Privacy», stessi id e stesso
+gesto). Icona 🤖 e non 💬 per Tappo: due 💬 una sopra l'altra non si
+distinguono, e Tappo è un bot.
+COM'È FATTA: /api/me porta `tappo_link` (la leva TAPPO_LINK del bottone
+nel bot, già passata dalla forma t.me/<bot>; vuota = ""). Il client la
+ripassa da `linkTappoValido` (solo `https://t.me/<bot>`, il resto spegne
+la voce), e `apriTappo` dentro Telegram usa `openTelegramLink`, fuori
+una scheda nuova. Il cassetto si spegne da solo se le due voci sono
+spente (`aggiornaGruppiProfilo`).
+PROVATO: `prove_profilo_elegante` (ordine dei cassetti, censimento delle
+voci, gesti), `prove_canale_bot` 4 bis (api/me, voce spenta di serie,
+accensione, `linkTappoValido` in node), libro di Tappo aggiornato
+(Profilo → Supporto → Assistenza). Da guardare dal telefono.
