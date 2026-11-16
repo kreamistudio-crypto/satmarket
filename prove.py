@@ -97399,7 +97399,9 @@ def prove_ricarica_resta():
     # (16 ott 2026, chat-mercatino) la dodicesima: `apriOrdineDaUrl`, il tasto dell'avviso della chat
     # (5 nov 2026, assistenza passo 2) la tredicesima: `apriAssistenzaDaUrl`,
     # il tasto dell'avviso dell'assistenza
-    prova("le porte dei link d'arrivo sono tredici, ognuna con la sua bandierina", [13, []],
+    # (16 nov 2026, app-negozio) la quattordicesima: `apriAppNegozioDaUrl`,
+    # la porta diretta di Barattolo Negozio (`/?app=negozio`)
+    prova("le porte dei link d'arrivo sono quattordici, ognuna con la sua bandierina", [14, []],
           [len(porte), [p for p, b in bandiere.items() if not b]])
     prova("...e spegniLinkDaUrl le alza tutte", [],
           [b for b in bandiere.values() if not re.search(r"\b%s = " % b, sp)])
@@ -191814,6 +191816,105 @@ const fetch = async (url, o) => { CHIAMATE.push(url); return {ok:true, json: asy
           out.get("riga"))
 
 
+def prove_app_negozio():
+    """BARATTOLO NEGOZIO, tappa 1 (16 nov 2026, cantiere app-negozio):
+    la faccia per chi sta al banco e' una VISTA della stessa pagina. Qui,
+    in node con una pagina di cartone, il cambio di faccia vero
+    (`modoNegozio`): la cassa SPOSTATA e rimessa al suo posto, il blocco
+    dei pacchi idem, il parametro della porta tolto all'uscita, la DEMO
+    che resta fuori, la porta diretta una volta sola; e le sentinelle dei
+    tre ritocchi che tengono la cassa in pagina."""
+    print("\n[Barattolo Negozio: la faccia del banco, la cassa spostata e rimessa]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- le sentinelle ------------------------------------------------
+    cs = pezzo_js(mini, "function closeSheet(")
+    prova("closeSheet non chiude la cassa ne' ferma il battito dentro il negozio", True,
+          "if (!appNegozio) {\n    el('cassaSheet').classList.remove('open');\n    fermaBattitoCassa();\n  }" in cs)
+    g = pezzo_js(mini, "function go(view){", "\n}\n")
+    prova("la faccia si accende e si spegne in go(), sulla vista", True,
+          "modoNegozio(view === 'esercente');" in g)
+    av = pezzo_js(mini, "async function avvia(){", "\n}\n")
+    avv = pezzo_js(mini, "async function avviaVetrina(){", "\n}\n")
+    prova("la porta diretta sta nell'avvio da entrati, non nella vetrina anonima",
+          [1, 0], [av.count("apriAppNegozioDaUrl();"), avv.count("apriAppNegozioDaUrl();")])
+    prova("`appNegozio` e la sua bandierina dichiarati PRIMA di go() (niente TDZ)", True,
+          0 < mini.find("let appNegozio = false, appNegozioUrlAperto = false;")
+          < mini.find("function go(view){"))
+    prova("la voce del Profilo apre il negozio, non piu' il foglio", True,
+          'onclick="entraAppNegozio()"><span class="em">🏪</span>Cassa in negozio' in mini)
+
+    node = _sh.which("node")
+    if not node:
+        salta("Barattolo Negozio in node", "node assente")
+        return
+    pezzi = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function modoNegozio(acceso){", "async function schedaNegozio(k, soloVista){",
+        "async function eserControllaBanco(){", "function apriAppNegozioDaUrl(){"))
+    banco = r"""
+function nodo(id){ return {id, parentNode:null, figli:[], style:{}, textContent:'', innerHTML:'',
+  classList:{s:new Set(), add(...c){c.forEach(x=>this.s.add(x))}, remove(...c){c.forEach(x=>this.s.delete(x))},
+             contains(c){return this.s.has(c)}, toggle(c,v){v?this.s.add(c):this.s.delete(c)}},
+  get nextSibling(){ const f=this.parentNode&&this.parentNode.figli; return f ? (f[f.indexOf(this)+1]||null) : null; },
+  append(n){ if(n.parentNode) n.parentNode.figli.splice(n.parentNode.figli.indexOf(n),1); n.parentNode=this; this.figli.push(n); },
+  insertBefore(n, rif){ if(n.parentNode) n.parentNode.figli.splice(n.parentNode.figli.indexOf(n),1);
+    n.parentNode=this; const i = rif ? this.figli.indexOf(rif) : -1; if (i<0) this.figli.push(n); else this.figli.splice(i,0,n); }}; }
+const N = {};
+['app','cassaSheet','dopoCassa','profiloBox','puntoBlocco','eserCassa','eserVendite','eserBanco','eserSchedaBanco','sheetBg','cassaVaiVendite'].forEach(i => N[i]=nodo(i));
+N.app.append(N.cassaSheet); N.app.append(N.dopoCassa); N.profiloBox.append(N.puntoBlocco);
+const el = id => N[id] || null;
+const document = {body: nodo('body'), querySelectorAll: () => []};
+let DEMO = false, VETRINA = false, cassaAttiva = true, appNegozio = false, appNegozioUrlAperto = false;
+let eserScheda = 'cassa', eserPostoCassa = null, eserPostoPacchi = null, cassaVendita = null;
+let myPacchiPunto = {punti: [], pacchi: []}, ordiniCassa = [];
+const conta = {apriCassa:0, battito:0, go:[]};
+const apriCassa = () => conta.apriCassa++, fermaBattitoCassa = () => conta.battito++;
+const renderPuntoPacchi = async () => {}, caricaCassaOrdini = async () => {}, disegnaVenditeNegozio = () => {};
+const go = v => conta.go.push(v);
+let location = {pathname:'/', search:'?app=negozio&x=1', hash:''};
+const history = {state:null, replaceState(st, t, u){ const i=u.indexOf('?'); location.search = i<0 ? '' : u.slice(i); }};
+__PEZZI__
+(async () => {
+  const R = {};
+  modoNegozio(true); await new Promise(r => setTimeout(r, 0));
+  R.dentro = [appNegozio, document.body.classList.contains('app-negozio'), N.cassaSheet.parentNode.id,
+              N.cassaSheet.classList.contains('in-pagina') && N.cassaSheet.classList.contains('open'),
+              N.puntoBlocco.parentNode.id, conta.apriCassa, N.eserSchedaBanco.style.display];
+  modoNegozio(true); R.dueVolte = conta.apriCassa;
+  modoNegozio(false);
+  R.fuori = [appNegozio, document.body.classList.contains('app-negozio'),
+             N.app.figli.map(n => n.id).join(','), N.cassaSheet.classList.s.size,
+             N.puntoBlocco.parentNode.id, conta.battito, location.search];
+  DEMO = true; modoNegozio(true); R.demo = [appNegozio, N.cassaSheet.parentNode.id]; DEMO = false;
+  location.search = '?app=negozio';
+  apriAppNegozioDaUrl(); apriAppNegozioDaUrl(); R.porta = conta.go.slice();
+  appNegozioUrlAperto = false; cassaAttiva = false; conta.go = []; apriAppNegozioDaUrl(); R.spenta = conta.go.length;
+  console.log(JSON.stringify(R));
+})();
+""".replace("__PEZZI__", pezzi)
+    cart = _tf.mkdtemp()
+    pf = os.path.join(cart, "negozio.js")
+    open(pf, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, pf], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco del negozio gira", "", (r.stderr or "")[-600:])
+    if r.returncode or not r.stdout.strip():
+        return
+    e = _json.loads(r.stdout)
+    prova("entrando: faccia accesa, cassa in pagina e aperta, pacchi nel Banco, il conto chiesto una volta",
+          [True, True, "eserCassa", True, "eserBanco", 1, "none"], e["dentro"])
+    prova("...e una seconda accensione non rifa' niente", 1, e["dueVolte"])
+    prova("uscendo: la cassa torna AL SUO POSTO (prima del vicino), senza classi; il battito si ferma; "
+          "la porta esce dall'indirizzo e il resto resta",
+          [False, False, "cassaSheet,dopoCassa", 0, "profiloBox", 1, "?x=1"], e["fuori"])
+    prova("in DEMO la faccia non si accende", [False, "app"], e["demo"])
+    prova("la porta diretta apre una volta sola", ["esercente"], e["porta"])
+    prova("...e a cassa spenta non apre", 0, e["spenta"])
+
+
 def prove_mancia_venditore():
     """LA MANCIA AL VENDITORE (14 nov 2026, cantiere mancia-venditore,
     piano approvato da Andrea). Qui i pezzi veri, eseguiti; il giro sulle
@@ -199101,7 +199202,7 @@ CATEGORIE = {
     ripubblica_p2p
     """.split(),
     "mercatino": """
-    mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore
+    mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore app_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     ricategorizza collaudo_ricategorizza asta proxy_asta annullo
@@ -199981,6 +200082,7 @@ def main():
               prove_avvisi_nostr_arrivano,
               prove_notifiche_telefono,
               prove_mancia_venditore,
+              prove_app_negozio,
               prove_filtro_10050,
               prove_semina_collaudo, prove_leva_mercato_lavoro,
               prove_assistente_bot,

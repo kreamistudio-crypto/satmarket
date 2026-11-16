@@ -84634,3 +84634,84 @@ DA GUARDARE: NON provato dal vivo con un ordine vero scaduto sul nodo
 (la prima scadenza vera arriva dopo 7 giorni da un ordine con
 l'intervallo); il rifacimento dal webview vero del telefono; che
 l'avviso della scadenza arrivi con la riga giusta in franchi.
+
+## Barattolo Negozio, tappa 1: la faccia per chi sta al banco (16 nov 2026, cantiere app-negozio, Andrea: «vorrei che questa parte fosse un'app separata, piu dedicata agli esercenti e contemporaneamente così possono anche diventare punto di ritiro nella mappa di barattolo»)
+
+IL PIANO E LE SCELTE DI ANDREA. Prima una proposta scritta, senza codice
+(doc «App esercenti e punti di ritiro — proposta»): cosa conserva un
+punto di ritiro, la consegna passo passo, dispute e deposito di
+garanzia, quattro tappe (1 l'app, 2 i punti nel database con la
+domanda, 3 il banco con la consegna col codice, 4 la mappa). Le sei
+risposte di Andrea, 16 nov:
+1. stesso server, «per forza, altrimenti perde di utilità»;
+2. chiunque può entrare nella rete, ma i punti per ora restano SPENTI:
+   chi compra non li vede finché lui non ha chiare le dinamiche;
+3. chi compra conferma DUE volte, la ricezione al punto e poi «tutto
+   ok» ad apertura del pacco;
+4. giacenza di 10 giorni, e per il non ritirato reso + «meno spese»;
+5. niente sats ai punti: attirare gente al banco è già l'incentivo;
+6. la foto alla presa in carico è OBBLIGATORIA.
+Questa voce è la tappa 1; le altre avranno la loro.
+
+LA DECISIONE: UNA VISTA, NON UN FILE. «App separata» per chi la usa —
+una pagina tutta sua, senza la barra del mercatino, con la sua porta
+diretta (`/?app=negozio`, il tablet del banco o una Mini App sua in
+BotFather) — ma DENTRO la stessa pagina: `view-esercente`, acceso da
+`modoNegozio` in `go()`. SCARTATI: un `negozio.html` a parte (una rotta
+in più per la regola 3, e la cassa, i QR, l'accesso, il cambio e i
+formati andrebbero copiati e tenuti in pari: il giorno che divergono,
+il banco incassa diverso dal Profilo); un server suo (lo esclude la
+risposta 1); un parametro `startapp` nuovo (tre gemelli da tenere in
+pari, server e due nel client, per una porta che oggi nessun bottone
+del bot usa — si aggiunge quando servirà).
+
+LA CASSA SI SPOSTA, NON SI COPIA. Entrando, il nodo #cassaSheet passa
+nella scheda Cassa con `in-pagina` (il CSS ne fa una pagina: niente
+scivolata, niente velo, niente ✕) e `open` fissa, che il battito del
+conto guarda; uscendo torna dov'era. Lo stesso per #puntoBlocco, il
+blocco dei pacchi che `renderPuntoPacchi` scrive già. Tre ritocchi
+perché un foglio messo in pagina resti in pagina: `closeSheet` non
+chiude la cassa né ferma il battito finché `appNegozio` è vero (un
+altro foglio che si chiude sopra non deve portar via il conto che
+aspetta); `apriCassa` non apre il velo; `apriVenditaCassa` e
+`apriOrdiniCassa` restano nella faccia del banco (la scheda Cassa, la
+scheda Vendite). LE VENDITE restano quelle di «Ordini»
+(`caricaCassaOrdini`, `cardCassaOrdine`): la scheda dice che sono anche
+là, col filtro «🏪 Cassa». IL BANCO compare solo a chi tiene un punto
+(la domanda la fa `/api/punto/pacchi`, come nel Profilo): oggi a
+nessuno, i punti accesi sono zero.
+
+DUE COSE TROVATE NEL GIRO DAL VIVO, non leggendo. La porta diretta era
+stata agganciata alla PRIMA lista di «apri…DaUrl», che è quella
+dell'avvio ANONIMO (`avviaVetrina`): da entrati non scattava mai. Sta
+nella lista di `avvia()`, dopo `apriSwapDopoEntra`. E `appNegozio` è
+dichiarato in cima al blocco, accanto a ISTANZA_PRIVATA: go() e
+closeSheet() lo leggono, e un `let` più in basso sarebbe la temporal
+dead zone già pagata se una delle due girasse prima.
+
+PROVATO. `prove_app_negozio` (categoria mercatino), in node su una
+pagina di cartone: entrando la cassa passa nella scheda con `in-pagina`
+e `open`, i pacchi nel Banco, il conto chiesto una volta e una seconda
+accensione che non rifà niente; uscendo la cassa torna AL SUO POSTO
+(prima del vicino), senza classi, il battito si ferma e `app=negozio`
+esce dall'indirizzo lasciando il resto; in DEMO non si accende; la porta
+diretta apre una volta sola e a cassa spenta no. Più le sentinelle:
+closeSheet, l'aggancio in go(), la porta nell'avvio da entrati e non
+nella vetrina, le dichiarazioni prima di go(), la voce del Profilo.
+Tenute in pari due sentinelle: le porte dei link d'arrivo salgono a
+quattordici (la bandierina `appNegozioUrlAperto`, alzata anche da
+spegniLinkDaUrl) e nessun `!important` sulle transizioni (tolto dal
+foglio in pagina). `PROVE_SEVERE=1 python prove.py` 28.491 passate, 0
+fallite (le 2 saltate di sempre, nostr-tools); collaudi della CI
+135/135. DAL VIVO in collaudo, Chromium 390×844, chiaro e scuro:
+Profilo → «🏪 Cassa in negozio» → Barattolo Negozio; due articoli,
+Incassa, il QR in pagina; un `closeSheet()` sopra non lo porta via;
+«✓ Ricevuto», «Nuovo conto»; la scheda Vendite e la ricevuta riaperta;
+«↩ Barattolo» torna al Profilo con la barra, la cassa di nuovo foglio;
+`/?app=negozio` entra dritto e l'indietro esce all'Esplora. Nessun
+errore di pagina. Schermate in /mnt/project-files/app-negozio/.
+
+RESTA DA GUARDARE. Dentro Telegram l'indietro dalla porta diretta va
+all'Esplora (la radice madre) invece di chiudere la Mini App. Per una
+Mini App sua in BotFather (URL `https://barattolo.store/?app=negozio`)
+serve il gesto di Andrea, ed è facoltativa.

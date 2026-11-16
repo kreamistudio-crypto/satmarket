@@ -33428,6 +33428,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   con le card di sempre, il filtro `ordiniRuolo = 'cassa'` (pillola
   «🏪 Cassa») le mostra da sole, «Vendite» e «Tutti» le includono, e il
   tocco (`apriVenditaCassa`) riapre il foglio sulla ricevuta.
+  BARATTOLO NEGOZIO (16 nov 2026, cantiere app-negozio): la faccia per
+  chi sta al banco è una VISTA della stessa pagina (`view-esercente`),
+  non un file né un server suoi: stesso /api/me, stessi dati. Si accende
+  e si spegne in `go()` con `modoNegozio(view === 'esercente')`, così
+  indietro, cronologia e pagina ricordata la trattano come ogni vista.
+  Accesa: `body.app-negozio` (la nav sparisce), il nodo #cassaSheet
+  SPOSTATO nella scheda Cassa con `in-pagina` + `open` fissa, e
+  #puntoBlocco nella scheda Banco; spenta, tornano dov'erano
+  (`eserPostoCassa`/`eserPostoPacchi`). `closeSheet` non tocca la cassa
+  né il battito finché `appNegozio` è vero. `appNegozio` è dichiarato
+  in cima al blocco (accanto a ISTANZA_PRIVATA): go() e closeSheet() lo
+  leggono. Porte: la voce del Profilo (`entraAppNegozio`) e
+  `/?app=negozio` (`apriAppNegozioDaUrl`, solo nell'avvio da entrati);
+  all'uscita il parametro si toglie dall'indirizzo.
 - L'INDIRIZZO DELLA QUOTA: swap@barattolo.store (19 ott 2026, perché
   in CANTIERI, «L'indirizzo della quota: swap@barattolo.store»). Dove
   SATS Routing manda a fine mese la quota di Barattolo sugli swap. È lo

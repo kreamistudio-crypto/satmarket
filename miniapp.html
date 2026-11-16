@@ -8407,6 +8407,27 @@
   /* (.qta-step e' morto col foglio del set: i pezzi si toccano nella
      pagina del pacco, col chip − N + di stepperMini) */
   .consegna-scelta{display:flex;gap:8px;margin:2px 0 10px}
+  /* 🏪 BARATTOLO NEGOZIO (16 nov 2026): la faccia per chi sta al banco.
+     La barra di Barattolo sparisce, la cassa e' il foglio di sempre
+     messo in pagina (`.in-pagina`: niente scivolata, niente velo, niente
+     ✕ — si esce da «↩ Barattolo»). Gli !important battono la regola
+     centrata dei fogli da 768px in su, che vive piu' sotto. */
+  body.app-negozio nav{display:none}
+  #view-esercente{padding:14px var(--pad) 40px;max-width:560px;margin:0 auto}
+  .eser-testa{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
+  .eser-titolo{flex:1;min-width:0;white-space:nowrap;font-size:19px;font-weight:900;letter-spacing:-.2px}
+  .eser-esci{flex:none;margin:0;padding:8px 0 8px 8px;border:0;background:none;color:var(--ink);
+    font:inherit;font-size:13.5px;font-weight:800;text-decoration:underline;cursor:pointer}
+  #eserVendite .order{margin-left:0;margin-right:0}
+  .eser-schede .consegna-pill{flex:1}
+  #view-esercente .sheet.in-pagina{position:static!important;transform:none!important;opacity:1!important;
+    visibility:visible!important;max-height:none!important;overflow:visible!important;
+    width:auto!important;max-width:none!important;left:auto!important;top:auto!important;
+    margin:0!important;padding:4px 0 0!important;border-radius:0!important;
+    box-shadow:none!important;background:transparent!important;z-index:auto!important}
+  #view-esercente .sheet.in-pagina .grab,
+  #view-esercente .sheet.in-pagina .sheet-testa{display:none}
+  .eser-vuoto{text-align:center;padding:30px 10px;color:var(--muted);font-weight:600;font-size:14px;line-height:1.5}
   .consegna-scelta .consegna-pill{flex:1;padding:9px 10px;border-radius:12px;
     border:1.5px solid var(--line);background:var(--card);font-weight:700;
     font-size:13px;cursor:pointer;color:var(--ink)}
@@ -14945,7 +14966,7 @@ document.getElementById('cartello')?.remove();</script>
            utente vero, a leva accesa (`cassaAttiva` da /api/me); in DEMO
            e in vetrina sparisce, il patto del wallet. -->
       <div class="acc voce-porta" id="vocCassa" style="display:none">
-        <button type="button" class="acc-h" onclick="apriCassa()"><span class="em">🏪</span>Cassa in negozio<span class="fr">›</span></button>
+        <button type="button" class="acc-h" onclick="entraAppNegozio()"><span class="em">🏪</span>Cassa in negozio<span class="fr">›</span></button>
       </div>
       <div class="acc voce-porta" id="vocMioNegozio" style="display:none">
         <button type="button" class="acc-h" onclick="apriMioNegozio()"><span class="em">👁</span>Guarda il tuo negozio come lo vedono tutti<span class="fr">›</span></button>
@@ -15386,6 +15407,32 @@ document.getElementById('cartello')?.remove();</script>
        lo calcola (`ferma`).
        Il corpo lo scrive `renderOnchain()`: qui c'e' il guscio, perche'
        un ridisegno non debba ricostruire la pagina. -->
+  <!-- 🏪 BARATTOLO NEGOZIO (16 nov 2026, cantiere app-negozio, Andrea:
+       «vorrei che questa parte fosse un'app separata, piu dedicata agli
+       esercenti»). Una seconda FACCIA dello stesso Barattolo: stesso
+       server, stesso account, stessi dati («stesso server per forza,
+       altrimenti perde di utilità»). Ci si entra dal Profilo («🏪 Cassa
+       in negozio») o dall'indirizzo `/?app=negozio`; con la vista accesa
+       il corpo prende `app-negozio` e la barra di Barattolo sparisce.
+       La CASSA non e' copiata: e' il foglio di sempre, SPOSTATO qui
+       dentro (`modoNegozio`) e rimesso al suo posto all'uscita, cosi' i
+       due ingressi non possono divergere. Le schede si scrivono da
+       `schedaNegozio`. -->
+  <div class="view" id="view-esercente">
+    <div class="eser-testa">
+      <div class="eser-titolo">🏪 Barattolo Negozio</div>
+      <button type="button" class="eser-esci" onclick="esciAppNegozio()">↩ Barattolo</button>
+    </div>
+    <div class="consegna-scelta eser-schede" id="eserSchede">
+      <button type="button" class="consegna-pill attiva" data-scheda="cassa" onclick="schedaNegozio('cassa')">🧾 Cassa</button>
+      <button type="button" class="consegna-pill" data-scheda="vendite" onclick="schedaNegozio('vendite')">📒 Vendite</button>
+      <button type="button" class="consegna-pill" data-scheda="banco" id="eserSchedaBanco" style="display:none" onclick="schedaNegozio('banco')">📦 Banco</button>
+    </div>
+    <div class="eser-pannello" id="eserCassa"></div>
+    <div class="eser-pannello" id="eserVendite" style="display:none"></div>
+    <div class="eser-pannello" id="eserBanco" style="display:none"></div>
+  </div>
+
   <div class="view" id="view-onchain">
     <div class="form">
       <h2 class="profilo-tit"><span class="cambio-moneta btc p2p-oc-moneta" aria-hidden="true"><svg class="cambio-svg" viewBox="0 0 24 24"><g transform="rotate(13 12 12)"><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g></svg></span>On-chain</h2>
@@ -16358,7 +16405,7 @@ document.getElementById('cartello')?.remove();</script>
       <div class="field" style="margin:10px 0 0"><input id="cassaNota" maxlength="120" autocomplete="off" placeholder="Nota per te (facoltativa), es. tavolo 4"></div>
       <div id="cassaTotale" class="cassa-totale"></div>
       <button class="btn orange" id="cassaIncassa" onclick="cassaIncassa(this)" disabled>Incassa</button>
-      <button class="btn ghost" onclick="apriOrdiniCassa()">🧾 Le vendite della cassa, in «Ordini»</button>
+      <button class="btn ghost" id="cassaVaiVendite" onclick="apriOrdiniCassa()">🧾 Le vendite della cassa, in «Ordini»</button>
       <div class="hint" style="margin-top:8px">💡 Chi compra inquadra il QR con <b>qualsiasi wallet</b>: non serve un account. I sats vanno <b>dritti al tuo wallet</b>, senza deposito di garanzia e senza commissioni: è un pagamento di persona, come al banco.</div>
     </div>
     <div id="cassaQrVista" style="display:none">
@@ -16928,6 +16975,10 @@ const DOMINIO_SITO = 'barattolo.store';
    privato» copre tutto finché /api/me non risponde 200. In produzione
    resta false e questa pagina è quella di sempre. */
 const ISTANZA_PRIVATA = false;
+/* 🏪 Barattolo Negozio acceso (16 nov 2026): vedi `modoNegozio`. Qui in
+   cima anche la bandierina della sua porta: spegniLinkDaUrl la alza dal
+   motore della cronologia, che gira presto */
+let appNegozio = false, appNegozioUrlAperto = false;
 
 /* ══ IL LINK DENTRO TELEGRAM (10 ott 2026) ═══════════════════════
    Un link `https://t.me/<bot>?startapp=<parametro>` toccato dentro
@@ -19424,9 +19475,12 @@ async function apriVenditaCassa(id){
   haptic();
   const v = ordiniCassa.find(x => x.id === id);
   if (!v) return;
-  closeSheet();
-  el('sheetBg').classList.add('open');
-  el('cassaSheet').classList.add('open');
+  if (appNegozio) schedaNegozio('cassa', true);
+  else {
+    closeSheet();
+    el('sheetBg').classList.add('open');
+    el('cassaSheet').classList.add('open');
+  }
   try {
     const r = await fetch(`${API_BASE}/cassa`, {headers:{'X-Tg-Init-Data':authHdr()}});
     if (r.ok) cassaDati = await r.json();
@@ -20862,6 +20916,10 @@ function go(view){
   const daVendi = view !== 'vendi' ? misuraRitornoVendi() : null;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   el('view-'+view).classList.add('active');
+  /* 🏪 Barattolo Negozio si accende e si spegne QUI, sulla vista: cosi'
+     l'indietro, la cronologia e la pagina ricordata lo trattano come
+     ogni altra vista, senza una seconda strada da tenere in pari */
+  modoNegozio(view === 'esercente');
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
   el('nav-'+voceNav(view))?.classList.add('active');
   /* Il Profilo non ha voce in nav: si accende il tappo in testata */
@@ -35743,8 +35801,13 @@ function closeSheet(){
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
   el('manciaSheet').classList.remove('open');
-  el('cassaSheet').classList.remove('open');
-  fermaBattitoCassa();
+  /* in Barattolo Negozio la cassa e' la pagina e non un foglio: un
+     altro foglio che si chiude non la porta via, ne' ferma il battito
+     del conto che aspetta (16 nov 2026) */
+  if (!appNegozio) {
+    el('cassaSheet').classList.remove('open');
+    fermaBattitoCassa();
+  }
   el('offertaCarrelloSheet').classList.remove('open');
   el('confermaSheet').classList.remove('open');
   el('jarShareSheet').classList.remove('open');
@@ -39100,12 +39163,15 @@ function cassaTotaleSats(){
 async function apriCassa(){
   haptic();
   if (DEMO || VETRINA) { toast('Nel demo si guarda soltanto ⚡'); return; }
-  closeSheet();
+  /* in Barattolo Negozio la cassa E' la pagina: niente foglio da aprire */
+  if (!appNegozio) closeSheet();
   cassaCarrello = {}; cassaVendita = null;
   el('cassaImporto').value = ''; el('cassaNota').value = ''; el('cassaCerca').value = '';
   cassaTornaAlConto();
-  el('sheetBg').classList.add('open');
-  el('cassaSheet').classList.add('open');
+  if (!appNegozio) {
+    el('sheetBg').classList.add('open');
+    el('cassaSheet').classList.add('open');
+  }
   el('cassaOggi').textContent = 'Apro la cassa…';
   try {
     const r = await fetch(`${API_BASE}/cassa`, {headers:{'X-Tg-Init-Data':authHdr()}});
@@ -39370,11 +39436,128 @@ function cassaNuovoConto(){
    loro filtro: il foglio si chiude e la lista si apre gia' filtrata */
 function apriOrdiniCassa(){
   haptic();
+  /* in Barattolo Negozio le vendite hanno la loro scheda */
+  if (appNegozio) { schedaNegozio('vendite'); return; }
   closeSheet();
   ordiniRuolo = 'cassa';
   document.querySelectorAll('#ordiniRuoloPills .consegna-pill').forEach(b =>
     b.classList.toggle('attiva', (b.dataset.ruolo||'') === 'cassa'));
   go('affari');
+}
+
+/* ══ 🏪 BARATTOLO NEGOZIO (16 nov 2026, cantiere app-negozio) ══════
+   La faccia per chi sta al banco: la cassa, le sue vendite e (a chi
+   tiene un punto di ritiro) il banco dei pacchi. Stesso server, stesso
+   account, stessi dati: la vendita della cassa resta in «Ordini» di
+   Barattolo col filtro «🏪 Cassa», qui la stessa lista gia' filtrata.
+   IL FOGLIO DELLA CASSA SI SPOSTA E NON SI COPIA: entrando, il nodo
+   #cassaSheet passa nella scheda Cassa con la classe `in-pagina` (e
+   `open` fissa, che il battito del conto guarda); uscendo torna dov'era
+   (`eserPostoCassa`). Una copia avrebbe due id uguali nella pagina e due
+   casse da tenere in pari. Lo stesso per il blocco dei pacchi del punto
+   (`#puntoBlocco`), che `renderPuntoPacchi` scrive gia'. */
+/* `appNegozio` sta in cima al blocco (vicino a ISTANZA_PRIVATA): go() e
+   closeSheet() lo leggono, e un `let` qui sotto sarebbe la temporal dead
+   zone gia' pagata se una delle due girasse prima di questa riga */
+let eserScheda = 'cassa';
+let eserPostoCassa = null, eserPostoPacchi = null;
+
+function entraAppNegozio(){
+  haptic();
+  if (DEMO || VETRINA) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  closeSheet();
+  go('esercente');
+}
+function esciAppNegozio(){
+  haptic();
+  go('profilo');
+}
+/* l'indirizzo `/?app=negozio`: la porta diretta, per il tablet del banco
+   o per una Mini App sua in BotFather */
+function apriAppNegozioDaUrl(){
+  let q;
+  try { q = new URLSearchParams(location.search); } catch(e) { return; }
+  /* la bandierina: una pagina ricordata (spegniLinkDaUrl) o un secondo
+     giro dell'avvio non riportano dentro chi e' gia' passato di qui */
+  if (q.get('app') !== 'negozio' || DEMO || VETRINA || !cassaAttiva
+      || appNegozioUrlAperto) return;
+  appNegozioUrlAperto = true;
+  go('esercente');
+}
+function modoNegozio(acceso){
+  if (acceso === appNegozio) return;
+  const cassa = el('cassaSheet'), pacchi = el('puntoBlocco');
+  if (acceso) {
+    if (DEMO || VETRINA) return;
+    appNegozio = true;
+    document.body.classList.add('app-negozio');
+    el('sheetBg').classList.remove('open');
+    eserPostoCassa = {padre: cassa.parentNode, dopo: cassa.nextSibling};
+    cassa.classList.add('in-pagina', 'open');
+    el('eserCassa').append(cassa);
+    if (pacchi) {
+      eserPostoPacchi = {padre: pacchi.parentNode, dopo: pacchi.nextSibling};
+      el('eserBanco').append(pacchi);
+    }
+    el('cassaVaiVendite').textContent = '📒 Le vendite della cassa';
+    eserScheda = 'cassa';
+    schedaNegozio('cassa');
+    eserControllaBanco();
+  } else {
+    appNegozio = false;
+    document.body.classList.remove('app-negozio');
+    fermaBattitoCassa();
+    cassa.classList.remove('in-pagina', 'open');
+    el('cassaVaiVendite').textContent = '🧾 Le vendite della cassa, in «Ordini»';
+    if (eserPostoCassa) eserPostoCassa.padre.insertBefore(cassa, eserPostoCassa.dopo);
+    if (pacchi && eserPostoPacchi) eserPostoPacchi.padre.insertBefore(pacchi, eserPostoPacchi.dopo);
+    eserPostoCassa = eserPostoPacchi = null;
+    /* l'indirizzo della porta diretta non resta: una ricarica da qui
+       riporterebbe dentro chi ha appena chiesto di uscire */
+    try {
+      const q = new URLSearchParams(location.search);
+      if (q.get('app') === 'negozio') {
+        q.delete('app');
+        const resto = q.toString();
+        history.replaceState(history.state, '', location.pathname + (resto ? '?' + resto : '') + location.hash);
+      }
+    } catch(e) {}
+  }
+}
+/* la scheda Banco compare solo a chi tiene un punto di ritiro: la
+   domanda la fa il server, come nel Profilo */
+async function eserControllaBanco(){
+  await renderPuntoPacchi();
+  const ha = !!(myPacchiPunto && (myPacchiPunto.punti || []).length);
+  el('eserSchedaBanco').style.display = ha ? '' : 'none';
+  if (!ha && eserScheda === 'banco') schedaNegozio('cassa');
+}
+/* `soloVista`: la vendita riaperta dalla lista porta qui la sua
+   ricevuta, e il conto nuovo non deve coprirla */
+async function schedaNegozio(k, soloVista){
+  if (!appNegozio) return;
+  eserScheda = k;
+  document.querySelectorAll('#eserSchede .consegna-pill').forEach(b =>
+    b.classList.toggle('attiva', b.dataset.scheda === k));
+  el('eserCassa').style.display = k === 'cassa' ? '' : 'none';
+  el('eserVendite').style.display = k === 'vendite' ? '' : 'none';
+  el('eserBanco').style.display = k === 'banco' ? '' : 'none';
+  if (k === 'cassa' && !soloVista && !cassaVendita) apriCassa();
+  else if (k === 'vendite') {
+    el('eserVendite').innerHTML = '<div class="eser-vuoto">Carico le vendite…</div>';
+    await caricaCassaOrdini();
+    if (eserScheda === 'vendite') disegnaVenditeNegozio();
+  }
+  else if (k === 'banco') { myPacchiPunto = null; renderPuntoPacchi(); }
+}
+function disegnaVenditeNegozio(){
+  const box = el('eserVendite');
+  if (!ordiniCassa.length) {
+    box.innerHTML = '<div class="eser-vuoto">Ancora nessuna vendita della cassa.<br>Quando incassi, la ritrovi qui e in «Ordini» di Barattolo.</div>';
+    return;
+  }
+  box.innerHTML = `<div class="hint" style="margin:0 0 10px">${cassaOggiTesto(cassaDati && cassaDati.oggi)}<br>Le stesse vendite stanno anche in «Ordini» di Barattolo, col filtro «🏪 Cassa».</div>`
+    + ordiniCassa.map(cardCassaOrdine).join('');
 }
 
 /* ---- feedback reciproco a affare concluso ---- */
@@ -102511,6 +102694,7 @@ function spegniLinkDaUrl(){
   categoriaAperta = p2pApertoDaUrl = consigliatiApertiDaUrl = true;
   offertaAperta = barattoloAperto = invitoDaUrlMostrato = true;
   bozzaAperta = ordineUrlAperto = assistenzaUrlAperta = true;
+  appNegozioUrlAperto = true;
   /* ...e la porta del P2P non si aprira': il velo d'apertura non la
      aspetta (vedi IL LINK DEL P2P SENZA IL LAMPO DELLA HOME) */
   arrivoP2PFatto();
@@ -103073,6 +103257,9 @@ async function avvia(){
     apriBozzaDaUrl();
     /* chi ha toccato «Swap» da fuori ed e' appena entrato (16 nov 2026) */
     apriSwapDopoEntra();
+    /* la porta diretta di Barattolo Negozio (16 nov 2026): solo da
+       entrati, che la cassa e' di chi vende */
+    apriAppNegozioDaUrl();
     /* Il cartello del rodaggio ha la precedenza su tutti: il tour
        one-shot (e poi il banner installa) partono alla sua chiusura */
     modaleTest(() => { tourBenvenuto(); bannerInstallaPwa(); });

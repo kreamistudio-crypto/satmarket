@@ -284,3 +284,9 @@ frase: Quando pubblichi un ordine P2P c'è la sezione nuova «🔁 Ripubblica»:
 dove: la scheda «P2P», il «+» per pubblicare: la sezione «🔁 Ripubblica» sotto il paracadute; la card del tuo ordine («🔁 Ripubblica da… a…») e la sua pagina, col tasto «Non ripubblicarlo più».
 leva: P2P_RIPUBBLICA (nuova, accesa di serie)
 pubblico: sì
+
+## 2026-11-16 · app-negozio
+frase: La cassa in negozio diventa «Barattolo Negozio»: una pagina tutta per chi sta al banco, con lo stesso account di Barattolo e senza la barra del mercatino. Dentro trovi la Cassa e le Vendite della cassa. Dal browser, per esempio sul tablet del negozio, ci entri dritto con barattolo.store/?app=negozio.
+dove: Profilo → «Negozio e spedizioni» → «🏪 Cassa in negozio»; si torna a Barattolo con «↩ Barattolo» in alto a destra.
+leva: CASSA_ATTIVA (accesa di serie)
+pubblico: sì
