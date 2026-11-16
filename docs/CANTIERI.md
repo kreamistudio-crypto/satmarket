@@ -83867,3 +83867,15 @@ USDe hanno indirizzi uguali, alcuni wallet Monero non mostrano la tx key.
 I franchi svizzeri non sono passati di qui (li accende il thread della
 promozione: per «tutti» servono `P2P_CHF_ATTIVO = True` e
 `P2P_CHF_SOLO_ADMIN = False` nel config del VPS; il nodo ha CHF dal 14 nov).
+
+## Il tetto on-chain a 999 € nel libro di Tappo (16 nov 2026, cantiere sapere-999, Andrea: «Sì, 999 anche per Tappo»)
+
+Il 16 nov alle 07:01 UTC Andrea ha portato a 999 € due tetti sul VPS:
+`ONCHAIN_MAX_EURO` (riga 194: mercatino on-chain, P2P on-chain e USDT
+on-chain) e `P2P_ALTRA_RETE_MAX_EURO` (riga 201). Poi ha aperto a tutti
+`ONCHAIN_SOLO_ADMIN`, `SWAP_AUTO_SOLO_ADMIN` e
+`P2P_ALTRA_RETE_SOLO_MODERATORI`. Il libro diceva ancora «fino a 500 €
+in quelli on-chain»: ora dice 999 €, e aggiunge che lo stesso tetto vale
+per gli acquisti on-chain del mercatino e per l'altra rete. Solo testo,
+nessun codice. Il tetto in euro dei NUMERI DI OGGI resta la fonte viva:
+il libro lo ripete solo per chi lo chiede a parole.
