@@ -82671,7 +82671,8 @@ def prove_p2p_pubblica():
           "ico: 'valuta'," in nuovo and "ico: val.bandiera" not in nuovo)
     prova("...e la bandierina resta nella voce e nel picker", True,
           # (16 nov 2026) col nome della moneta, «USDe», dove serve
-          "val.bandiera + ' ' + esc(sigla)" in nuovo
+          # (16 nov 2026, ricevi-mercato) col bollino della rete scelta
+          "bandieraReteP2P(val, p2pNuovoMetodi) : val.bandiera)\n      + ' ' + esc(sigla)" in nuovo
           and "v.bandiera" in pezzo_js(mini, "function apriValutaP2P(){", "\n}\n"))
 
     # C) UN CAMPO SOLO ALL'APERTURA: la garanzia non e' il render, e'
@@ -158659,6 +158660,7 @@ console.log(JSON.stringify(out));
           + mini[mini.index("const P2P_RETI_USDT = ["):mini.index("];", mini.index("const P2P_RETI_USDT = [")) + 2] + "\n"
           + _fn_js(mini, "function reteUsdtDaMetodoP2P(m){") + "\n"
           + _riga_js(mini, "const P2P_BADGE_RETI_USDT = {") + "\n"
+          + _fn_js(mini, "function badgeReteValutaP2P(cod, metodi){") + "\n"
           + "const P2P_OC_MONETA = 'OC'; const P2P_LN_MONETA = 'LN';\n"
           + _riga_js(mini, "const P2P_STELLE_EU = ") + _riga_js(mini, "  + '<path fill=\"#FFCC00\"")
           + _riga_js(mini, "const P2P_TETHER_SEGNO = ") + _riga_js(mini, "  + '<path fill=\"#FFF\" d=\"M17.922")
@@ -160792,6 +160794,19 @@ out.tasti = [b, u, tastoEuroTabP2P('5,1', '2', false), modoEuroP2P('coin').campo
   etichettaEuroFoglioP2P('', 'XMR', 'coin')];
 // 7) la cifra da mandare e il post
 const vecchia = {fiat: 'EUR', euro: 30, metodi: ['ETH (Ethereum)']};
+// IL BOLLINO DELLA RETE (16 nov 2026, ricevi-mercato): USDT e USDe a rete
+// unica, mai a due reti, mai ETH o XMR (una rete sola), mai l'euro
+const nb = x => (x.match(/class="p2p-rete-badge"/g) || []).length;
+out.bollini = [badgeReteValutaP2P('USDE', ['USDe (Base)']).indexOf('#0052FF') > 0,
+  badgeReteValutaP2P('USDE', ['USDe (Ethereum)']).indexOf('#E9ECEF') > 0,
+  badgeReteValutaP2P('USDE', ['USDe (Solana)']).indexOf('#9945FF') > 0,
+  badgeReteValutaP2P('USDE', ['USDe (Arbitrum)']).indexOf('#213147') > 0,
+  badgeReteValutaP2P('USDE', ['USDe (BNB Chain)']).indexOf('#F3BA2F') > 0,
+  badgeReteValutaP2P('USDT', ['USDT (Tron)']).indexOf('#EF0027') > 0,
+  badgeReteValutaP2P('USDE', ['USDe (Base)', 'USDe (Solana)']), badgeReteValutaP2P('ETH', ['ETH (Ethereum)']),
+  badgeReteValutaP2P('XMR', ['XMR (Monero)']), badgeReteValutaP2P('EUR', ['SEPA']),
+  nb(bandieraReteP2P(P2P_VALUTE.find(v => v.cod === 'USDE'), ['USDe (Base)'])),
+  bandieraReteP2P(P2P_VALUTE.find(v => v.cod === 'USDE'), []) === P2P_VALUTE.find(v => v.cod === 'USDE').bandiera];
 out.manda = [quantoDaMandareCoinP2P(r1, P2P_RETI_COIN[0]), quantoDaMandareCoinP2P(vecchia, P2P_RETI_COIN[0]),
   metodoCanaleCoinP2P(['ETH (Ethereum)']), metodoCanaleCoinP2P(['USDe (Ethereum)', 'USDe (Base)'])];
 console.log(JSON.stringify(out));
@@ -160879,6 +160894,9 @@ console.log(JSON.stringify(out));
     prova("la cifra da mandare: in un ordine in moneta quella dell'ordine; in uno in euro al cambio, in su; "
           "il post dice le reti in breve",
           ["0.0153", "0.010000", "ETH (Ethereum)", "USDe su Ethereum, Base"], o["manda"])
+    prova("IL BOLLINO DELLA RETE: USDe su Base, Ethereum, Solana, Arbitrum, BNB Chain e USDT su Tron "
+          "lo portano; due reti, ETH, XMR e l'euro no; la tendina di Pubblica lo appoggia sull'icona",
+          [True] * 6 + [""] * 4 + [1, True], o["bollini"])
     # LE STRADE DEL MERCATO (16 nov 2026, ricevi-mercato), lette sul sorgente:
     # il lettore veste anche l'intervallo, la presa rifa' la cifra al cambio
     # di adesso, la risposta del nodo non sveste la moneta, chi ha pubblicato

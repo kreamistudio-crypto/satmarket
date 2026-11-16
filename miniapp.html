@@ -3266,6 +3266,10 @@
      colore della card lo stacca dalla tessera, come nei wallet */
   .p2p-tessera .p2p-rete-badge{position:absolute;top:-5px;right:-6px;
     width:15px;height:15px;border-radius:50%;box-shadow:0 0 0 1.5px var(--card)}
+  /* ...e sull'icona della valuta nella tendina di Pubblica (16 nov 2026) */
+  .p2p-band-rete{position:relative;display:inline-block;line-height:0;vertical-align:middle}
+  .p2p-band-rete .p2p-rete-badge{position:absolute;top:-5px;right:-6px;
+    width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 1.5px var(--card)}
   .p2p-freccia{flex:none;width:18px;height:18px;color:var(--muted);fill:none;
     stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
   /* A 320 LA COPPIA SI STRINGE (misurato: con 104px di posto «Invia ≈
@@ -68838,18 +68842,17 @@ function tesseraValutaP2P(cod, metodi){
   if (c === 'CHF')
     return '<span class="p2p-tessera p2p-tessera-chf" role="img" aria-label="Franco svizzero">'
       + P2P_CROCE_CH + '</span>';
-  if (c === 'USDT') {
-    const reti = Array.isArray(metodi) && typeof reteUsdtDaMetodoP2P === 'function'
-      ? [...new Set(metodi.map(m => (reteUsdtDaMetodoP2P(m) || {}).rete).filter(Boolean))] : [];
-    const bollino = reti.length === 1 ? (P2P_BADGE_RETI_USDT[reti[0]] || '') : '';
+  /* il bollino della rete dal suo giudice (16 nov 2026, anche per USDe) */
+  const bollino = typeof badgeReteValutaP2P === 'function' ? badgeReteValutaP2P(c, metodi) : '';
+  if (c === 'USDT')
     return '<span class="p2p-tessera p2p-tessera-usdt" role="img" aria-label="USDT">'
       + P2P_TETHER_SEGNO + bollino + '</span>';
-  }
   /* UN ORDINE IN MONETA (16 nov 2026, cantiere p2p-monete-valute) veste
-     il logo della sua moneta, dalla valuta stessa */
+     il logo della sua moneta, dalla valuta stessa — e USDe su una rete
+     sola il bollino di quella rete, come gli USDT */
   const vc = typeof valutaCoinP2P === 'function' ? valutaCoinP2P(c) : null;
   if (vc) return '<span class="p2p-tessera p2p-tessera-coin p2p-tessera-' + vc.logo + '" role="img" aria-label="'
-    + esc(vc.nome) + '">' + P2P_LOGHI_COIN[vc.logo] + '</span>';
+    + esc(vc.nome) + '">' + P2P_LOGHI_COIN[vc.logo] + bollino + '</span>';
   /* UN ORDINE IN EURO CHE SI PAGA SOLO IN ETH O SOLO IN XMR (13 nov
      2026, cantiere eth-xmr) veste il logo di quella moneta: e' quel che
      chi paga manda davvero. La cifra resta in euro, e lo dice l'aria */
@@ -82381,6 +82384,44 @@ function segnoValutaP2P(cod){
    alto a destra il rombo di Ethereum o il triangolo di Tron. Una riga
    sola, senza apici singoli: i banchi la tagliano al primo «;» di riga */
 const P2P_BADGE_RETI_USDT = {tron: '<svg class="p2p-rete-badge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#EF0027"/><path fill="#FFF" d="M21.932 9.913L7.5 7.257l7.595 19.112 10.583-12.894-3.746-3.562zm-.232 1.17l2.208 2.099-6.038 1.093 3.83-3.192zm-5.142 2.973l-6.364-5.278 10.402 1.914-4.038 3.364zm-.453.934l-1.038 8.58L9.472 9.487l6.633 5.502zm.96.455l6.687-1.21-7.67 9.343.983-8.133z"/></svg>', ethereum: '<svg class="p2p-rete-badge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#E9ECEF"/><g fill="#343434"><path fill-opacity=".6" d="M16.498 4v8.87l7.497 3.35z"/><path d="M16.498 4L9 16.22l7.498-3.35z"/><path fill-opacity=".6" d="M16.498 21.968v6.027L24 17.616z"/><path d="M16.498 27.995v-6.028L9 17.616z"/><path fill-opacity=".2" d="M16.498 20.573l7.497-4.353-7.497-3.348z"/><path fill-opacity=".6" d="M9 16.22l7.498 4.353v-7.701z"/></g></svg>'};
+/* I BOLLINI DELLE RETI DI USDe (16 nov 2026, cantiere ricevi-mercato,
+   Andrea: in Pubblica, scelta la rete, l'icona della valuta porta il
+   bollino in alto a destra come la card del libro). Disegni semplici nei
+   colori di ogni rete — Arbitrum blu notte con la A azzurra, Base il
+   cerchio blu, BNB Chain i rombi sul giallo, Solana le tre barre — della
+   stessa taglia di quelli degli USDT; Ethereum e' il suo */
+const P2P_BADGE_RETI_COIN = {
+  arbitrum: '<svg class="p2p-rete-badge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#213147"/><path fill="#28A0F0" d="M16 6.5l8.5 17h-3.6L16 13.4l-4.9 10.1H7.5z"/><path fill="#FFF" d="M16 17.2l2.3 4.8h-4.6z"/></svg>',
+  base: '<svg class="p2p-rete-badge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#0052FF"/><path fill="#FFF" d="M16 7.5a8.5 8.5 0 1 1-8.46 9.3H19.2v-1.6H7.54A8.5 8.5 0 0 1 16 7.5z"/></svg>',
+  bnb: '<svg class="p2p-rete-badge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#F3BA2F"/><path fill="#FFF" d="M16 6.5l3.2 3.2-3.2 3.2-3.2-3.2zM9.7 12.8l3.2 3.2-3.2 3.2L6.5 16zM22.3 12.8l3.2 3.2-3.2 3.2-3.2-3.2zM16 12.8l3.2 3.2-3.2 3.2-3.2-3.2zM16 19.1l3.2 3.2-3.2 3.2-3.2-3.2z"/></svg>',
+  solana: '<svg class="p2p-rete-badge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="16" fill="#111"/><path fill="#14F195" d="M10.5 9.5h13l-2.5 2.6H8z"/><path fill="#80ECFF" d="M8 14.7h13l2.5 2.6h-13z"/><path fill="#9945FF" d="M10.5 19.9h13L21 22.5H8z"/></svg>'
+};
+/* PURA: il bollino della rete di una valuta coi suoi metodi — solo a rete
+   UNICA (la regola degli USDT: «se l'ordine e' tutte e due le reti basta
+   solo il simbolo») e solo dove la valuta ne ha piu' d'una, cioe' USDT e
+   USDe: ETH e XMR hanno una rete sola, e il bollino direbbe due volte la
+   stessa cosa. '' se no */
+function badgeReteValutaP2P(cod, metodi){
+  const c = String(cod || '').toUpperCase(), m = Array.isArray(metodi) ? metodi : [];
+  if (c === 'USDT') {
+    const reti = typeof reteUsdtDaMetodoP2P === 'function'
+      ? [...new Set(m.map(x => (reteUsdtDaMetodoP2P(x) || {}).rete).filter(Boolean))] : [];
+    return reti.length === 1 ? (P2P_BADGE_RETI_USDT[reti[0]] || '') : '';
+  }
+  const vc = typeof valutaCoinP2P === 'function' ? valutaCoinP2P(c) : null;
+  if (!vc || metodiCoinValutaP2P(c).length < 2) return '';
+  const reti = [...new Set(m.map(x => reteCoinDaMetodoP2P(x))
+    .filter(r => r && r.coin === vc.coin).map(r => r.chiave))];
+  if (reti.length !== 1) return '';
+  const k = reti[0].replace(/^usde-/, '');
+  return k === 'ethereum' ? P2P_BADGE_RETI_USDT.ethereum : (P2P_BADGE_RETI_COIN[k] || '');
+}
+/* la bandierina della valuta col suo bollino, per la tendina di Pubblica */
+function bandieraReteP2P(val, metodi){
+  const b = (val && val.bandiera) || '';
+  const bo = badgeReteValutaP2P(val && val.cod, metodi);
+  return bo ? '<span class="p2p-band-rete">' + b + bo + '</span>' : b;
+}
 /* «gli euro» / «gli USDT», per le frasi del gesto */
 function soldiValutaP2P(cod){
   if (String(cod || '').toUpperCase() === 'CHF') return 'i franchi';
@@ -87883,7 +87924,9 @@ function renderNuovoOrdineP2P(){
     titolo: 'Seleziona la valuta con cui ' + (compro ? 'invierai' : 'riceverai'),
     corpo: '<button type="button" class="p2p-tendina" id="p2pNuovoValutaBtn" ' +
       'aria-haspopup="dialog" onclick="apriValutaP2P()">' +
-      '<span>' + val.bandiera + ' ' + esc(sigla) + '</span>' +
+      /* col bollino della rete scelta (16 nov 2026, ricevi-mercato) */
+      '<span>' + (typeof bandieraReteP2P === 'function' ? bandieraReteP2P(val, p2pNuovoMetodi) : val.bandiera)
+      + ' ' + esc(sigla) + '</span>' +
       '<i aria-hidden="true">▾</i></button>'
   });
 
