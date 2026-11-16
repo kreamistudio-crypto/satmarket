@@ -59351,8 +59351,15 @@ def _dichiara_ripubblica_p2p(con, tg_id: int, mappa, adesso: int) -> int:
     """Scrive le ripubbliche dichiarate, `{ordine: {minimo, massimo}}`, e
     torna quante ne ha scritte. La porta del paracadute: SOLO sulla riga
     di chi l'ordine l'ha PUBBLICATO (`maker`), LA PRIMA RESTA, mai
-    Barattozon (in moneta si', dal 16 nov 2026). La valuta la dice il libro. A
-    leva spenta non scrive; una mappa storta e' una mappa vuota."""
+    Barattozon in VENDITA (in moneta si', dal 16 nov 2026). La valuta la
+    dice il libro. A leva spenta non scrive; una mappa storta e' una mappa
+    vuota.
+    BARATTOZON IN COMPRA SI' (16 nov 2026, cantiere mappa-recenti, Andrea:
+    «se io pubblico un annuncio compra Bitcoin con Baratto, non riesco a
+    impostare un ripubblica»): il motivo dell'esclusione e' il PayCode che
+    scade da solo, e sta sull'ordine di chi VENDE; chi compra pubblica una
+    fascia senza PayCode (lo scrive chi prende), quindi rifarla uguale e'
+    come rifare un ordine qualunque. Il lato e' il `k` del libro."""
     if not P2P_RIPUBBLICA or not isinstance(mappa, dict):
         return 0
     scritti = 0
@@ -59362,11 +59369,11 @@ def _dichiara_ripubblica_p2p(con, tg_id: int, mappa, adesso: int) -> int:
         capi = _intervallo_ripubblica_p2p(v)
         if not capi:
             continue
-        r = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=? AND tg_id=? "
+        r = con.execute("SELECT metodi, lato FROM p2p_ordini WHERE ordine=? AND tg_id=? "
                         "AND maker=1", (ordine, int(tg_id))).fetchone()
         # in moneta si' dal 16 nov 2026 (cantiere ricevi-mercato): BTC si
         # misura in euro, la valuta del filo (`_valuta_ordine_ripubblica_p2p`)
-        if not r or _tabacchino_libro(_metodi_lista_p2p(r[0])):
+        if not r or (_tabacchino_libro(_metodi_lista_p2p(r[0])) and r[1] != "buy"):
             continue
         scritti += con.execute(
             "INSERT OR IGNORE INTO p2p_ripubblica(ordine, tg_id, minimo, massimo, "

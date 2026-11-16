@@ -84962,7 +84962,11 @@ function prezzoBtcRipubblicaP2P(cod){
   return per > 0 ? Math.round(per * 1e8) : 0;
 }
 /* PURA sulle leve: la ripubblica c'entra con questo foglio? Mai a leva
-   spenta, mai con Barattozon. IN MONETA SI' dal 16 nov 2026 (cantiere
+   spenta, mai con Barattozon IN VENDITA: `tab` e' il percorso di chi vende
+   (il PayCode che scade da solo); Barattozon in compra e' una fascia senza
+   PayCode e si ripubblica (16 nov 2026, cantiere mappa-recenti, Andrea: «se
+   io pubblico un annuncio compra Bitcoin con Baratto, non riesco a
+   impostare un ripubblica»). IN MONETA SI' dal 16 nov 2026 (cantiere
    ricevi-mercato, Andrea: ETH, XMR e USDe a mercato «con Ripubblica»):
    l'ordine si rifa' col cambio della moneta di quel momento */
 function ripubblicaPossibileP2P(tab, cod){
@@ -85016,13 +85020,18 @@ function cambiaRipubblicaNuovoP2P(){
 /* la ripubblica che parte con l'ordine, dai campi: {minimo, massimo} o
    null. Un intervallo storto non parte (lo ferma prima `inviaNuovoOrdineP2P`) */
 function ripubblicaDaCampiP2P(campi){
-  if (!campi || !ripubblicaPossibileP2P(tabacchinoP2P(campi.metodi), campi.valuta)) return null;
+  if (!campi || !ripubblicaPossibileP2P(tabVenditaRipubblicaP2P(campi), campi.valuta)) return null;
   const r = intervalloRipubblicaP2P(campi.ripMin, campi.ripMax);
   return (r && !r.errore) ? r : null;
 }
 /* PURA: l'errore dei campi da dire prima di pubblicare, o '' */
+/* PURA: il percorso di chi VENDE col tabacchino (il solo Barattozon che
+   non si ripubblica: vedi `ripubblicaPossibileP2P`) */
+function tabVenditaRipubblicaP2P(campi){
+  return !!(campi && tabacchinoP2P(campi.metodi || []) && campi.lato !== 'compro');
+}
 function erroreRipubblicaP2P(campi){
-  if (!campi || !ripubblicaPossibileP2P(tabacchinoP2P(campi.metodi), campi.valuta)) return '';
+  if (!campi || !ripubblicaPossibileP2P(tabVenditaRipubblicaP2P(campi), campi.valuta)) return '';
   const r = intervalloRipubblicaP2P(campi.ripMin, campi.ripMax);
   return (r && r.errore) ? '🔁 Ripubblica: ' + r.errore : '';
 }
@@ -88117,9 +88126,10 @@ function renderNuovoOrdineP2P(){
   /* IL PARACADUTE (13 ott 2026): dopo la pausa, e mai con Barattozon —
      vedi `sezioneParacaduteNuovoP2P` */
   const paracadute = typeof sezioneParacaduteNuovoP2P === 'function' ? sezioneParacaduteNuovoP2P(tabMetodo) : '';
-  /* LA RIPUBBLICA (16 nov 2026): dopo il paracadute, mai con Barattozon
-     ne' in moneta — vedi `sezioneRipubblicaNuovoP2P` */
-  const ripubblica = typeof sezioneRipubblicaNuovoP2P === 'function' ? sezioneRipubblicaNuovoP2P(tabMetodo) : '';
+  /* LA RIPUBBLICA (16 nov 2026): dopo il paracadute, mai col percorso di
+     Barattozon in vendita (`tab`, il PayCode); in compra si' — vedi
+     `sezioneRipubblicaNuovoP2P` */
+  const ripubblica = typeof sezioneRipubblicaNuovoP2P === 'function' ? sezioneRipubblicaNuovoP2P(tab) : '';
 
   /* I TRE DATI DEL TABACCHINO (set 2026), solo quando la voce e'
      scelta: numero, importo e scadenza dell'ordine Amazon, che chi
@@ -98192,7 +98202,10 @@ async function gestoRipubblicaP2P(id, gesto){
    rifa' ancora. NON apre la pagina e non annuncia nel canale: e' un
    gesto di sfondo. Vero se il coordinatore l'ha preso. */
 async function pubblicaDaSoloP2P(o){
-  if (!o || !o.mio || o.soloVista || o.tabacchino || tabacchinoP2P(o.metodi || [])) return false;
+  /* Barattozon in compra si', in vendita mai (il PayCode: vedi
+     `ripubblicaPossibileP2P`) */
+  if (!o || !o.mio || o.soloVista || o.tabacchino
+      || (tabacchinoP2P(o.metodi || []) && o.lato !== 'compro')) return false;
   const adesso = Math.floor(Date.now() / 1000);
   const campi = campiRipubblicaUgualeP2P(o, adesso);
   if (!valeNuovoOrdineP2P(campi).ok) return false;

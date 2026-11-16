@@ -182745,10 +182745,10 @@ def prove_ripubblica_p2p():
     if "fiat" not in {r[1] for r in con.execute("PRAGMA table_info(p2p_ordini)")}:
         con.execute("ALTER TABLE p2p_ordini ADD COLUMN fiat TEXT DEFAULT ''")
 
-    def ordine(oid, tg, maker=1, metodi='["SEPA"]', fiat="EUR"):
+    def ordine(oid, tg, maker=1, metodi='["SEPA"]', fiat="EUR", lato="sell"):
         con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, metodi, fiat)"
-                    " VALUES(?,?,?,?,?,?,?,?)", (oid, tg, ORA, "pending", "sell", maker, metodi, fiat))
-    A, B, C, D, E, F = ("0199b7c1-2d3e-4f50-a1b2-c3d4e5f6a00" + n for n in "123456")
+                    " VALUES(?,?,?,?,?,?,?,?)", (oid, tg, ORA, "pending", lato, maker, metodi, fiat))
+    A, B, C, D, E, F, G = ("0199b7c1-2d3e-4f50-a1b2-c3d4e5f6a00" + n for n in "1234567")
     ordine(A, 111)
     ordine(B, 111, maker=0)
     ordine(C, 111, metodi='["Contanti al tabacchino 23.47"]')
@@ -182756,16 +182756,20 @@ def prove_ripubblica_p2p():
     ordine(E, 111)
     ordine(F, 111)
     MONETE[F] = "ETH"
+    # (16 nov 2026, cantiere mappa-recenti) Barattozon IN COMPRA: la fascia
+    # di chi compra, senza PayCode, si ripubblica
+    ordine(G, 111, metodi='["Contanti al tabacchino"]', lato="buy")
     dich = amb["_dichiara_ripubblica_p2p"]
     iv1 = {"minimo": 90000, "massimo": 100000}
     n = dich(con, 111, {A: iv1, B: iv1, C: iv1, D: {"minimo": 80000, "massimo": 90000},
-                        E: {"minimo": 5, "massimo": 1}, F: iv1, "storto": iv1}, ORA)
+                        E: {"minimo": 5, "massimo": 1}, F: iv1, G: iv1, "storto": iv1}, ORA)
     righe = {r[0]: (r[1], r[2], r[3], r[4]) for r in con.execute(
         "SELECT ordine, minimo, massimo, valuta, stato FROM p2p_ripubblica")}
-    prova("la dichiarazione: solo da chi l'ha PUBBLICATO, mai Barattozon, mai un intervallo storto; "
-          "la valuta la dice il libro (franchi); IN MONETA SI' dal 16 nov 2026 (ricevi-mercato), in euro",
-          [3, {A: (90000, 100000, "eur", "armato"), D: (80000, 90000, "chf", "armato"),
-               F: (90000, 100000, "eur", "armato")}], [n, righe])
+    prova("la dichiarazione: solo da chi l'ha PUBBLICATO, mai Barattozon in vendita (il PayCode), "
+          "mai un intervallo storto; la valuta la dice il libro (franchi); IN MONETA SI' dal 16 nov "
+          "2026 (ricevi-mercato), in euro; Barattozon IN COMPRA SI' (mappa-recenti)",
+          [4, {A: (90000, 100000, "eur", "armato"), D: (80000, 90000, "chf", "armato"),
+               F: (90000, 100000, "eur", "armato"), G: (90000, 100000, "eur", "armato")}], [n, righe])
     prova("...e LA PRIMA RESTA: una seconda dichiarazione non sposta i capi", [0, (90000, 100000)],
           [dich(con, 111, {A: {"minimo": 1, "massimo": 2}}, ORA),
            tuple(con.execute("SELECT minimo, massimo FROM p2p_ripubblica WHERE ordine=?", (A,)).fetchone())])
@@ -182851,7 +182855,7 @@ def prove_ripubblica_p2p():
     con.execute("INSERT INTO p2p_ripubblica(ordine, tg_id, minimo, massimo, creato) "
                 "VALUES(?,?,?,?,?)", (B, 111, 1, 2, ORA))
     prova("togli su un armato", {"ok": True, "stato": "tolto"}, g(B, "togli"))
-    prova("le mie per la card: niente fatti ne' tolti", sorted([D, E, F]),
+    prova("le mie per la card: niente fatti ne' tolti", sorted([D, E, F, G]),
           sorted(amb["_miei_ripubblica_p2p"](con, 111)))
 
     # --- 3) L'ON-CHAIN: la ronda rimette nel libro ------------------------
@@ -182916,7 +182920,9 @@ def prove_ripubblica_p2p():
            if re.search(r"coordinator|mostro", x, re.I)])
     prova("il foglio: la sezione dopo il paracadute, i campi la portano, la riga la tiene, "
           "sempre vuota dal +", [True, True, True, True, True],
-          ["sezioneRipubblicaNuovoP2P(tabMetodo) : '';" in fn("function renderNuovoOrdineP2P(){"),
+          # (16 nov 2026, mappa-recenti) col percorso di chi VENDE, non col
+          # metodo: Barattozon in compra ha la sua sezione
+          ["sezioneRipubblicaNuovoP2P(tab) : '';" in fn("function renderNuovoOrdineP2P(){"),
            "ripMin: typeof p2pNuovoRipMin === 'string' ? p2pNuovoRipMin : ''," in fn("function campiNuovoP2P(){"),
            "if (ripOrd) ord.ripubblica = ripOrd;" in fn("async function inviaNuovoOrdineP2P(confermato){"),
            "p2pNuovoRipMin = ''; p2pNuovoRipMax = '';" in fn("function apriNuovoOrdineP2P(metodo){"),
@@ -182994,6 +183000,9 @@ c.daCampi = [ripubblicaDaCampiP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '900
              ripubblicaDaCampiP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '', ripMax: ''}),
              ripubblicaDaCampiP2P({metodi: ['Contanti al tabacchino'], valuta: 'EUR', ripMin: '1', ripMax: '2'}),
              ripubblicaDaCampiP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '9', ripMax: '2'}),
+             /* Barattozon IN COMPRA si' (16 nov 2026, mappa-recenti) */
+             ripubblicaDaCampiP2P({metodi: ['Contanti al tabacchino'], lato: 'compro', valuta: 'EUR',
+                                   ripMin: '90000', ripMax: '100000'}),
              erroreRipubblicaP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '9', ripMax: '2'}),
              erroreRipubblicaP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '', ripMax: ''})];
 MIE[ID] = {id: ID, mio: true, stato: 'pubblicato', lato: 'vendo', sats: 50000, euro: 50, euroMax: 0,
@@ -183061,10 +183070,14 @@ console.log(JSON.stringify(c));
           "in moneta SI' (16 nov 2026, ricevi-mercato), coi prezzi di BTC in euro",
           [["🔁 Ripubblica", 2, True], ["", True, ""]],
           [c.get("sezione"), c.get("fuori")])
-    prova("dai campi all'ordine: solo un intervallo buono, mai Barattozon; l'errore si dice",
-          [{"minimo": 90000, "massimo": 100000}, None, None, None,
+    prova("dai campi all'ordine: solo un intervallo buono, mai Barattozon in vendita (in compra si'); "
+          "l'errore si dice",
+          [{"minimo": 90000, "massimo": 100000}, None, None, None, {"minimo": 90000, "massimo": 100000},
            "🔁 Ripubblica: Il prezzo minimo di BTC deve essere più basso del massimo", ""],
           c.get("daCampi"))
+    prova("...e il telefono rifa' da solo anche Barattozon in compra, mai in vendita", True,
+          "|| (tabacchinoP2P(o.metodi || []) && o.lato !== 'compro')) return false;"
+          in fn("async function pubblicaDaSoloP2P(o){"))
     prova("si dichiarano solo le MIE righe", {ID: {"minimo": 90000, "massimo": 100000},
                                               ID3: {"minimo": 80000, "massimo": 90000}},
           c.get("dichiara"))
