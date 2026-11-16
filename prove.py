@@ -64687,6 +64687,7 @@ def prove_ritocchi_prova_alan():
             exec(pezzo(nome), amb)
         amb["P2P_TEMPO_DI_CHI_PUBBLICA"] = False
         amb["P2P_PARACADUTE"] = False
+        amb["P2P_RIPUBBLICA"] = True
         amb["P2P_CHAT_SCAMBIO"] = True
         EV = lambda d: {"kind": 38383, "created_at": 1, "tags": [["d", d]]}
         # la fotografia ha GIA' l'ordine appena pubblicato (il giro subito e'
@@ -81365,8 +81366,9 @@ def prove_p2p_pubblica():
           # (12 ott 2026, pausa-in-vista) e la pausa degli ordini, dopo
           # «chi puo' prendere» e prima dei limiti
           # (13 ott 2026, paracadute) e il paracadute, dopo la pausa
+          # (16 nov 2026, ripubblica) e la ripubblica, dopo il paracadute
           "valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo) + quanti + premio"
-          " + accesso + pausa + paracadute + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
+          " + accesso + pausa + paracadute + ripubblica + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
           in re.sub(r"\s+", " ", _foglio))
     _riq = pezzo_js(mini, "function riquadroLimitiP2P(){", "\n}\n")
     prova("la scatola e' quella delle altre, senza icona", True,
@@ -86348,6 +86350,7 @@ def prove_p2p_server():
              "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
+             "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
              "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
@@ -86382,11 +86385,12 @@ def prove_p2p_server():
     # (12 ott 2026, sera) SEDICI: i relay che contano come conferma
     # (13 ott 2026) DICIASSETTE: il paracadute degli ordini, spento di serie
     # (20 ott 2026) DICIOTTO: il tetto del collaudo, 0 in produzione
-    prova("le chiavi sono diciotto e sono sempre quelle",
+    # (16 nov 2026) DICIANNOVE: la ripubblica degli ordini scaduti
+    prova("le chiavi sono diciannove e sono sempre quelle",
           ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "cauzioneSulMetodo", "chat", "commissione",
            "conferma", "indirizziNo", "maxEuro", "maxEuroContanti", "maxSatsProva", "minEuroBz", "mostro",
            "paracadute",
-           "relay", "specchio", "tempoPubblica"],
+           "relay", "ripubblica", "specchio", "tempoPubblica"],
           sorted(piena.keys()))
     # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
     # client lo usa solo per dire quando la fee viva e' una promo.
@@ -91547,7 +91551,9 @@ def prove_p2p_campanello():
     _reg = _re.findall(r"registraChiaviP2P\(\[([^\]]*)\]\)", _mini)
     # NOVE dall'11 ott 2026 («tor-chiavi-scambio»): la copia cifrata del
     # profilo ripresa dai relay registra la sua pubblica, come le altre
-    prova("i chiamanti di registraChiaviP2P sono nove", 9, len(_reg))
+    # DIECI dal 16 nov 2026 («ripubblica»): l'ordine ripubblicato da solo
+    # registra la sua chiave come quello pubblicato a mano
+    prova("i chiamanti di registraChiaviP2P sono dieci", 10, len(_reg))
     for _arg in _reg:
         prova(f"...e `{_arg}` non e' una chiave della chat", True,
               not any(s in _arg.lower() for s in ("conv", "firma", "chat")))
@@ -97613,6 +97619,8 @@ def _banco_eventi_p2p(eventi_attivi=True):
            "P2P_TEMPO_DI_CHI_PUBBLICA": False, "P2P_CHAT_SCAMBIO": True,
            # il paracadute (13 ott 2026): spento di serie, come ieri
            "P2P_PARACADUTE": False,
+           # la ripubblica (16 nov 2026): accesa di serie
+           "P2P_RIPUBBLICA": True,
            "sqlite3": sqlite3,
            # il bottone del promemoria (10 ott 2026) porta alla pagina P2P
            "LINK_LIBRO_P2P": "https://barattolo.store/p2p"}
@@ -118396,6 +118404,7 @@ def prove_avvisi_nuovi_ordini():
              "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
+             "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
              "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": {},
@@ -143122,6 +143131,7 @@ def prove_contanti_a_mano():
              "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
+             "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
              "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
@@ -154198,6 +154208,7 @@ def prove_indirizzo_non_verificato():
              "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
+             "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
              "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": elenco,
@@ -162403,7 +162414,7 @@ console.log(JSON.stringify(out));
           (True, True),
           # le scatole sono quelle di Lightning, nello stesso ordine e con le
           # stesse parole: la rete cambia solo l'ultima, dentro `riquadroLimitiP2P`
-          ("+ quanti + premio + accesso + pausa + paracadute + riquadroLimitiP2P() +"
+          ("+ quanti + premio + accesso + pausa + paracadute + ripubblica + riquadroLimitiP2P() +"
            in nuovo,
            "const accesso = typeof sezioneAccessoNuovoP2P === 'function' ? sezioneAccessoNuovoP2P() : '';"
            in nuovo))
@@ -181717,6 +181728,466 @@ def prove_paracadute_p2p():
     con.close()
 
 
+def prove_ripubblica_p2p():
+    """LA RIPUBBLICA DEGLI ORDINI SCADUTI (16 nov 2026, cantiere
+    ripubblica, richiesta di Andrea): chi pubblica scrive un intervallo
+    del prezzo di BTC, e quando l'ordine scade nel libro, se BTC sta
+    dentro, l'ordine si rifa' uguale — il Lightning dal telefono alla
+    prima apertura (scelta di Andrea), l'on-chain dal server.
+
+    Quel che qui si rompe in silenzio: il server che firma al posto del
+    telefono; un ordine fuori dall'intervallo rifatto lo stesso; un
+    prezzo vecchio di ore che decide; due telefoni che rifanno lo stesso
+    ordine due volte; un intervallo dichiarato da chi l'ordine non l'ha
+    pubblicato, o su Barattozon; la riga del bot che dice una cosa e lo
+    stato un'altra; la cifra in euro sotto il simbolo dei franchi; il
+    foglio che riparte con l'intervallo di prima; l'ordine rifatto a
+    prezzo fisso con sats diversi; il battito che chiede a chi non ha
+    niente da chiedere."""
+    print("\n[la ripubblica: l'intervallo, la scadenza, il lucchetto, il telefono che rifa' l'ordine]")
+    import sqlite3
+    src = _SORGENTE
+    blocco = src[src.index("# ═══ LA RIPUBBLICA DEGLI ORDINI SCADUTI"):src.index("def _chi_pubblica_p2p(")]
+    nudo = codice(_senza_prosa(blocco))
+
+    # --- 1) LE SENTINELLE ------------------------------------------------
+    prova("la leva e' ACCESA di serie (le leve nuove dal 14 nov), una storta resta accesa, "
+          "e viaggia in busta", [True, True, True],
+          ["except ImportError:\n    P2P_RIPUBBLICA = True\n" in src,
+           "resta ACCESA come di serie\")\n        P2P_RIPUBBLICA = True\n" in src,
+           '"ripubblica": bool(P2P_RIPUBBLICA),' in src])
+    prova("...e sta nel pannello delle leve, col suo nome", True,
+          '"P2P_RIPUBBLICA",\n                  P2P_RIPUBBLICA,' in pezzo("_leve_stato"))
+    prova("IL SERVER NON FIRMA E NON ESCE: nel blocco nessuna firma, nessun relay, nessuna "
+          "chiamata di rete (regola ferrea 2)", [],
+          [x for x in ("schnorr", "coincurve", "nsec", "_seme_profilo_p2p", "firma(", "sign",
+                       "httpx", "create_connection", "pubblica_evento", "_spedisci_ai_relay",
+                       "new-order", "requests.", "cambio_btc_eur")
+           if x in nudo])
+    rotta = codice(pezzo("evento_p2p"))
+    prova("la scadenza si giudica dalla ROTTA, dopo la cronaca, col prezzo della cache "
+          "(mai la rete) — e `_registra_evento_p2p` non la conosce", [True, True, False],
+          [0 < rotta.find("_registra_evento_p2p(con, ev, adesso, cambio_noto_ora())")
+           < rotta.find("_segna_scadenza_ripubblica_p2p("),
+           "_prezzi, _letto = _prezzi_ripubblica_p2p()" in rotta,
+           "ripubblica" in pezzo("_registra_evento_p2p")])
+    prova("...e il prezzo della cache e' quello di `cambio_noto_ora`, con l'ora della lettura",
+          True, "cambio_noto_ora(v) for v in P2P_RIPUBBLICA_VALUTE" in pezzo("_prezzi_ripubblica_p2p")
+          and '_cambio_cache.get("quando")' in pezzo("_prezzi_ripubblica_p2p"))
+    invio = codice(pezzo("_manda_evento_p2p"))
+    prova("la riga nell'avviso va PRIMA dei traduttori della valuta (che ne voltano il €) e "
+          "dei moderatori", True,
+          0 < invio.find("_riga_ripubblica_scadenza_p2p(avvisi, fatto)")
+          < invio.find("p2p_usdt_frase(t)") < invio.find("_disputa_evento_p2p("))
+    prova("l'intestazione la dichiara dalla porta del paracadute", True,
+          '_dichiara_ripubblica_p2p(con, user["id"], (d or {}).get("ripubblica"),'
+          in pezzo("registra_ordini_p2p"))
+    prova("le due rotte: lettura senza parametri `no-store`, gesto in POST; a leva spenta "
+          "`attivo: false` e 409", [True, True, True, True],
+          ['@app.get("/api/p2p/ripubblica")' in src, '@app.post("/api/p2p/ripubblica")' in src,
+           'return JSONResponse({"attivo": False}, headers={"Cache-Control": "no-store"})'
+           in pezzo("mie_ripubbliche_p2p"),
+           'raise HTTPException(409, "La ripubblica non e\' attiva")' in pezzo("gesto_ripubblica_p2p")])
+    prova("«dimentica il profilo» le porta via, la fusione le sposta, cancellare l'account "
+          "le toglie", [True, True, True],
+          ['con.execute("DELETE FROM p2p_ripubblica WHERE tg_id=?", (user["id"],))' in src,
+           'con.execute("UPDATE p2p_ripubblica SET tg_id=? WHERE tg_id=?",' in src,
+           '    ("p2p_ripubblica", "tg_id"),\n' in src])
+    ronda = codice(pezzo("_p2p_onchain_ronda"))
+    prova("sull'on-chain la ronda giudica PRIMA di far scadere, e ripubblica il 38383 dei "
+          "rifatti", True,
+          0 < ronda.find("_p2p_onchain_passata_ripubblica(con, scaduti, _prezzi, _letto, adesso)")
+          < ronda.find("UPDATE p2p_onchain_ordini SET stato='scaduto'")
+          < ronda.find('await _p2p_onchain_pubblica(a["id"])'))
+
+    # --- 2) I PEZZI PURI, sul banco degli avvisi -------------------------
+    con, amb = _banco_eventi_p2p()
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_ripubblica(")
+    con.executescript(src[i:src.index("ON p2p_ripubblica(tg_id);", i)] + "ON p2p_ripubblica(tg_id);")
+    for riga in ("P2P_RIPUBBLICA_MAX = ", "P2P_RIPUBBLICA_FRESCO_S = ", "P2P_RIPUBBLICA_PRESA_S = ",
+                 "P2P_RIPUBBLICA_VALUTE = ", "P2P_RIPUBBLICA_GESTI = "):
+        j = src.index("\n" + riga) + 1
+        exec(src[j:src.index("\n", j)].split("  #")[0], amb)
+    MONETE = {}
+    amb["p2p_coin_ordine"] = lambda c, o: MONETE.get(o, "")
+    for f in ("_metodi_lista_p2p", "p2p_chf_ordine", "p2p_usdt_ordine", "_intervallo_ripubblica_p2p",
+              "_valuta_ripubblica_p2p", "_dentro_ripubblica_p2p", "_prezzo_ripubblica_p2p",
+              "_valuta_ordine_ripubblica_p2p", "_dichiara_ripubblica_p2p",
+              "_segna_scadenza_ripubblica_p2p", "_cifra_ripubblica_p2p", "_frase_ripubblica_p2p",
+              "_riga_ripubblica_scadenza_p2p", "_miei_ripubblica_p2p", "_pronti_ripubblica_p2p",
+              "_gesto_ripubblica_p2p", "p2p_chf_frase", "p2p_usdt_frase"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    for pezzo_c in ("P2P_CHF_FRASI = (", "P2P_USDT_FRASI = ("):
+        j = src.index("\n" + pezzo_c) + 1
+        exec(src[j:src.index("\n)\n", j) + 3], amb)
+    iv = amb["_intervallo_ripubblica_p2p"]
+    prova("l'intervallo: due interi positivi, il minimo sotto il massimo, niente sopra il "
+          "tetto; un booleano, un testo, un capo che manca non passano",
+          [(90000, 100000), (90000, 100000), None, None, None, None, None, None, None],
+          [iv({"minimo": 90000, "massimo": 100000}), iv({"minimo": "90000", "massimo": 100000.2}),
+           iv({"minimo": 100000, "massimo": 90000}), iv({"minimo": 90000, "massimo": 90000}),
+           iv({"minimo": 0, "massimo": 1}), iv({"minimo": True, "massimo": 5}),
+           iv({"minimo": 1, "massimo": 100_000_001}), iv({"massimo": 5}), iv([1, 2])])
+    dentro = amb["_dentro_ripubblica_p2p"]
+    prova("«compreso fra X e Y»: i capi contano, fuori no, e un prezzo che manca non e' dentro",
+          [True, True, True, False, False, False],
+          [dentro(90000, 100000, 90000), dentro(90000, 100000, 100000), dentro(90000, 100000, 95000),
+           dentro(90000, 100000, 89999.9), dentro(90000, 100000, 100001), dentro(90000, 100000, 0)])
+    ORA = 1_790_000_000
+    pz = amb["_prezzo_ripubblica_p2p"]
+    PREZZI = {"eur": 95000.0, "usd": 101000.0, "chf": 88000.0}
+    prova("il prezzo nella valuta giusta (USDT sul dollaro), e una lettura vecchia oltre "
+          "quindici minuti non giudica", [95000.0, 101000.0, 88000.0, 101000.0, 95000.0, 0.0, 0.0],
+          [pz(PREZZI, ORA - 60, "eur", ORA), pz(PREZZI, ORA - 60, "usd", ORA),
+           pz(PREZZI, ORA - 60, "chf", ORA), pz(PREZZI, ORA - 60, "USDT", ORA),
+           pz(PREZZI, ORA - 900, "eur", ORA), pz(PREZZI, ORA - 901, "eur", ORA),
+           pz({"eur": 0}, ORA, "eur", ORA)])
+
+    # la valuta del libro nasce con un ALTER (14 nov 2026, cantiere p2p-chf)
+    if "fiat" not in {r[1] for r in con.execute("PRAGMA table_info(p2p_ordini)")}:
+        con.execute("ALTER TABLE p2p_ordini ADD COLUMN fiat TEXT DEFAULT ''")
+
+    def ordine(oid, tg, maker=1, metodi='["SEPA"]', fiat="EUR"):
+        con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, metodi, fiat)"
+                    " VALUES(?,?,?,?,?,?,?,?)", (oid, tg, ORA, "pending", "sell", maker, metodi, fiat))
+    A, B, C, D, E, F = ("0199b7c1-2d3e-4f50-a1b2-c3d4e5f6a00" + n for n in "123456")
+    ordine(A, 111)
+    ordine(B, 111, maker=0)
+    ordine(C, 111, metodi='["Contanti al tabacchino 23.47"]')
+    ordine(D, 111, fiat="CHF")
+    ordine(E, 111)
+    ordine(F, 111)
+    MONETE[F] = "ETH"
+    dich = amb["_dichiara_ripubblica_p2p"]
+    iv1 = {"minimo": 90000, "massimo": 100000}
+    n = dich(con, 111, {A: iv1, B: iv1, C: iv1, D: {"minimo": 80000, "massimo": 90000},
+                        E: {"minimo": 5, "massimo": 1}, F: iv1, "storto": iv1}, ORA)
+    righe = {r[0]: (r[1], r[2], r[3], r[4]) for r in con.execute(
+        "SELECT ordine, minimo, massimo, valuta, stato FROM p2p_ripubblica")}
+    prova("la dichiarazione: solo da chi l'ha PUBBLICATO, mai Barattozon ne' in moneta, mai "
+          "un intervallo storto; la valuta la dice il libro (franchi)",
+          [2, {A: (90000, 100000, "eur", "armato"), D: (80000, 90000, "chf", "armato")}], [n, righe])
+    prova("...e LA PRIMA RESTA: una seconda dichiarazione non sposta i capi", [0, (90000, 100000)],
+          [dich(con, 111, {A: {"minimo": 1, "massimo": 2}}, ORA),
+           tuple(con.execute("SELECT minimo, massimo FROM p2p_ripubblica WHERE ordine=?", (A,)).fetchone())])
+    amb["P2P_RIPUBBLICA"] = False
+    prova("...e a leva spenta non scrive", 0, dich(con, 111, {E: iv1}, ORA))
+    amb["P2P_RIPUBBLICA"] = True
+    dich(con, 111, {E: iv1}, ORA)
+
+    segna = amb["_segna_scadenza_ripubblica_p2p"]
+
+    def scade(oid, prezzi, eta=60, momento="scaduto"):
+        fatto = {"momento": momento}
+        segna(con, {"ordine": oid}, fatto, prezzi, ORA - eta, ORA)
+        return fatto["ripubblica"], con.execute(
+            "SELECT stato FROM p2p_ripubblica WHERE ordine=?", (oid,)).fetchone()[0]
+    prova("un passaggio che non e' la scadenza nel libro non tocca niente", (None, "armato"),
+          scade(A, PREZZI, momento="annullato"))
+    r_a = scade(A, PREZZI)
+    prova("SCADUTO CON BTC DENTRO: `pronto`, e la riga dice prezzo e intervallo a chi l'ha "
+          "pubblicato", ({"tg_id": 111, "esito": "pronto", "prezzo": 95000.0, "minimo": 90000,
+                          "massimo": 100000, "valuta": "eur"}, "pronto"), r_a)
+    prova("SCADUTO CON BTC FUORI (in franchi, 91.000 sopra 80.000–90.000): `saltato`",
+          "saltato", scade(D, {"chf": 91000.0})[1])
+    prova("SENZA UN PREZZO FRESCO: `pronto` lo stesso, senza prezzo — rigiudica il server "
+          "quando il telefono chiede", ({"tg_id": 111, "esito": "pronto", "prezzo": 0.0,
+                                          "minimo": 90000, "massimo": 100000, "valuta": "eur"},
+                                         "pronto"), scade(E, PREZZI, eta=3600))
+    prova("una seconda scadenza (il retry) non giudica di nuovo", (None, "pronto"), scade(A, PREZZI))
+
+    riga = amb["_riga_ripubblica_scadenza_p2p"]
+    base = ("⏰ <b>Il tuo ordine è scaduto</b> senza che la presa fosse completata: vendevi "
+            "50.000 sats per 50,00 €. Puoi ripubblicarlo quando vuoi.")
+    fuori = riga([(111, base), (999, base)], {"momento": "scaduto", "ripubblica": r_a[0]})
+    prova("LA RIGA NELL'AVVISO: «Puoi ripubblicarlo» lascia il posto alla ripubblica, solo a "
+          "chi ha pubblicato", [False, False, True, True],
+          ["Puoi ripubblicarlo quando vuoi." in fuori[0][1],
+           "Lo ripubblico uguale" in fuori[1][1],
+           "🔁 <b>Lo ripubblico uguale</b>: BTC è a 95.000 €, dentro il tuo intervallo "
+           "(90.000–100.000 €). Parte appena apri Barattolo, non devi fare niente." in fuori[0][1],
+           fuori[1][1] == base])
+    sal = dict(r_a[0], esito="saltato", prezzo=101000.0, valuta="chf")
+    franchi = amb["p2p_chf_frase"](riga([(111, base)], {"momento": "scaduto", "ripubblica": sal})[0][1])
+    prova("...saltato: lo dice, col prezzo; e in franchi il traduttore volta anche il simbolo",
+          [True, False, True],
+          ["🔁 <b>Non l'ho ripubblicato</b>: BTC è a 101.000 CHF, fuori dal tuo intervallo "
+           "(90.000–100.000 CHF). Puoi ripubblicarlo quando vuoi." in franchi, "€" in franchi,
+           "quando vuoi." in franchi])
+
+    pronti = amb["_pronti_ripubblica_p2p"]
+    prova("QUANDO IL TELEFONO CHIEDE si rigiudica: senza prezzo fresco non parte niente",
+          ([], []), pronti(con, 111, PREZZI, ORA - 3600, ORA))
+    p, s = pronti(con, 111, {"eur": 101000.0}, ORA - 60, ORA)
+    prova("...BTC uscito: `saltato`, detto una volta sola", [[], [A, E], [], []],
+          [p, sorted(x["ordine"] for x in s)] + list(pronti(con, 111, {"eur": 101000.0}, ORA - 60, ORA)))
+    con.execute("UPDATE p2p_ripubblica SET stato='pronto' WHERE ordine IN (?,?)", (A, E))
+    prova("...BTC dentro: gli id da rifare, solo i miei", [[A, E], [], ([], [])],
+          list(pronti(con, 111, PREZZI, ORA - 60, ORA)) + [pronti(con, 222, PREZZI, ORA - 60, ORA)])
+
+    gesto = amb["_gesto_ripubblica_p2p"]
+
+    def g(oid, ge, prezzi=PREZZI, adesso=ORA, tg=111):
+        return gesto(con, tg, oid, ge, prezzi, adesso - 60, adesso)
+    prova("IL LUCCHETTO: il primo telefono la prende, il secondo no; un altro utente nemmeno",
+          [{"ok": True, "stato": "in_corso"}, {"ok": False, "motivo": "presa"},
+           {"ok": False, "motivo": "nessuna"}],
+          [g(A, "prendo"), g(A, "prendo"), g(A, "prendo", tg=222)])
+    prova("...e un telefono che tace dieci minuti la lascia a un altro",
+          {"ok": True, "stato": "in_corso"}, g(A, "prendo", adesso=ORA + 601))
+    prova("fatto chiude; un fatto ripetuto non riapre", [{"ok": True, "stato": "fatto"},
+                                                         {"ok": False, "motivo": "stato"}],
+          [g(A, "fatto"), g(A, "fatto")])
+    prova("prendere con BTC fuori la salta, e senza prezzo fresco non la prende",
+          [{"ok": False, "motivo": "prezzo"}, {"ok": False, "motivo": "fuori", "prezzo": 101000.0},
+           "saltato"],
+          [gesto(con, 111, E, "prendo", PREZZI, ORA - 3600, ORA), g(E, "prendo", {"eur": 101000.0}),
+           con.execute("SELECT stato FROM p2p_ripubblica WHERE ordine=?", (E,)).fetchone()[0]])
+    con.execute("UPDATE p2p_ripubblica SET stato='pronto' WHERE ordine=?", (E,))
+    prova("fallito torna `saltato`; togli spegne un armato o un pronto, non un fatto",
+          [{"ok": True, "stato": "in_corso"}, {"ok": True, "stato": "saltato"},
+           {"ok": False, "motivo": "stato"}, {"ok": False, "motivo": "gesto"}],
+          [g(E, "prendo"), g(E, "fallito"), g(A, "togli"), g(A, "rubo")])
+    dich(con, 111, {B: iv1}, ORA)  # non sua: non entra
+    con.execute("INSERT INTO p2p_ripubblica(ordine, tg_id, minimo, massimo, creato) "
+                "VALUES(?,?,?,?,?)", (B, 111, 1, 2, ORA))
+    prova("togli su un armato", {"ok": True, "stato": "tolto"}, g(B, "togli"))
+    prova("le mie per la card: niente fatti ne' tolti", sorted([D, E]),
+          sorted(amb["_miei_ripubblica_p2p"](con, 111)))
+
+    # --- 3) L'ON-CHAIN: la ronda rimette nel libro ------------------------
+    oc = sqlite3.connect(":memory:")
+    oc.row_factory = sqlite3.Row
+    oc.execute("CREATE TABLE p2p_onchain_ordini(id INTEGER PRIMARY KEY, ordine TEXT, lato TEXT,"
+               " maker_id INTEGER, euro_cent INTEGER, metodi TEXT, stato TEXT, scade INTEGER,"
+               " aggiornato INTEGER, rip_minimo INTEGER DEFAULT 0, rip_massimo INTEGER DEFAULT 0,"
+               " rip_giri INTEGER DEFAULT 0)")
+    for oid, metodi, rmin, rmax in ((1, '["SEPA"]', 90000, 100000), (2, '["SEPA"]', 96000, 99000),
+                                    (3, '["SEPA"]', 0, 0), (4, '["USDT (Tron)"]', 100000, 102000)):
+        oc.execute("INSERT INTO p2p_onchain_ordini(id, ordine, lato, maker_id, euro_cent, metodi,"
+                   " stato, scade, aggiornato, rip_minimo, rip_massimo) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                   (oid, f"bar-onchain-{oid}", "sell", 111, 5000, metodi, "pending", ORA - 1, ORA - 9,
+                    rmin, rmax))
+    j = src.index("\nP2P_ONCHAIN_ORE_LIBRO = ") + 1
+    exec(src[j:src.index("\n", j)].split("  #")[0], amb)
+    amb["P2P_ONCHAIN_SEGNO"] = "🟠"
+    amb["P2P_ONCHAIN_RETI_USDT"] = {"USDT (Tron)": {}, "USDT (Ethereum)": {}}
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
+              "p2p_onchain_usdt", "_p2p_onchain_passata_ripubblica",
+              "_p2p_onchain_testo_ripubblica", "_fmt_eur"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    scaduti = [1, 2, 3, 4]
+    rif = amb["_p2p_onchain_passata_ripubblica"](oc, scaduti, PREZZI, ORA - 60, ORA)
+    prova("la ronda: dentro resta nel libro con la vita intera e un giro in piu', fuori e "
+          "senza intervallo scadono; gli USDT si misurano sul dollaro",
+          [[2, 3], {1: "rifatto", 2: "fuori", 4: "rifatto"},
+           [(1, ORA + 24 * 3600, 1), (2, ORA - 1, 0), (3, ORA - 1, 0), (4, ORA + 24 * 3600, 1)]],
+          [scaduti, {a["id"]: a["esito"] for a in rif},
+           [tuple(r) for r in oc.execute("SELECT id, scade, rip_giri FROM p2p_onchain_ordini")]])
+    prova("...senza un prezzo fresco non rifa' niente e non dice niente", [[], [7]],
+          [amb["_p2p_onchain_passata_ripubblica"](oc, [7], PREZZI, ORA - 3600, ORA), [7]])
+    testi = [amb["_p2p_onchain_testo_ripubblica"](a) for a in rif]
+    prova("...e i due avvisi lo dicono, coi soldi giusti", [True, True, True],
+          ["🔁 <b>Ho ripubblicato il tuo ordine on-chain di vendita da 50,00 €</b>: era scaduto e "
+           "BTC è a 95.000 €, dentro il tuo intervallo (90.000–100.000 €)." in testi[0],
+           "non l'ho ripubblicato: BTC è a 95.000 €, fuori dal tuo intervallo "
+           "(96.000–99.000 €)" in testi[1],
+           "BTC è a 101.000 USDT" in testi[2]])
+
+    # --- 4) L'APP, in node -----------------------------------------------
+    m = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    motore = pezzo_js(m, "/* ============ LA RIPUBBLICA NEL MOTORE",
+                      "/* ============ fine della ripubblica nel motore ============ */")
+    chiede = pezzo_js(m, "/* ============ LA RIPUBBLICA, LA PARTE CHE CHIEDE",
+                      "/* ============ fine della ripubblica che chiede ============ */")
+    nudo_m = re.sub(r"/\*[\s\S]*?\*/", "", motore)
+    nudo_c = re.sub(r"/\*[\s\S]*?\*/", "", chiede)
+
+    def fn(firma):
+        return re.sub(r"/\*[\s\S]*?\*/", "", _fn_js(m, firma))
+    prova("il motore non ha fetch; la parte che chiede due, sulla sua rotta, e sta DOPO il "
+          "paracadute", [0, 2, 2, True],
+          [nudo_m.count("fetch("), nudo_c.count("fetch("), nudo_c.count("${API_BASE}/p2p/ripubblica"),
+           0 < m.find("/* ============ fine del paracadute che chiede ============ */")
+           < m.find("/* ============ LA RIPUBBLICA, LA PARTE CHE CHIEDE")])
+    prova("il custode non si nomina nelle frasi", [],
+          [x for x in re.findall(r"'((?:[^'\\\n]|\\.)*)'", nudo_m + nudo_c)
+           if re.search(r"coordinator|mostro", x, re.I)])
+    prova("il foglio: la sezione dopo il paracadute, i campi la portano, la riga la tiene, "
+          "sempre vuota dal +", [True, True, True, True, True],
+          ["sezioneRipubblicaNuovoP2P(tabMetodo) : '';" in fn("function renderNuovoOrdineP2P(){"),
+           "ripMin: typeof p2pNuovoRipMin === 'string' ? p2pNuovoRipMin : ''," in fn("function campiNuovoP2P(){"),
+           "if (ripOrd) ord.ripubblica = ripOrd;" in fn("async function inviaNuovoOrdineP2P(confermato){"),
+           "p2pNuovoRipMin = ''; p2pNuovoRipMax = '';" in fn("function apriNuovoOrdineP2P(metodo){"),
+           "if (ripOc) corpo.ripubblica = ripOc;" in fn("async function pubblicaOnchainDalFoglioP2P(confermato){")])
+    prova("...l'intervallo storto si dice PRIMA di pubblicare, nei due fogli", 2,
+          m.count("if (noRip) { toast(noRip, 6000);"))
+    prova("l'intestazione lo dichiara; il battito sta nell'interval unico; l'ordine che parte "
+          "per il libro non sa niente dell'intervallo", [True, True, True, False],
+          ["ripubblicaDaDichiarareP2P(lista) : {};" in m, "ripubblica: ripubblica," in m,
+           "battitoRipubblicaP2P(); } catch(e) {}" in m,
+           "ipubblica" in fn("function ordineDaCampiP2P(v, lato){")])
+    banco = r"""
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+function haptic(){}
+function sezioneNuovoP2P(o){ return o.titolo + '§' + o.corpo + '§' + o.sotto; }
+function tabacchinoP2P(metodi){ return (metodi || []).some(x => /tabacchino/i.test(x)); }
+function valutaCoinP2P(c){ return ['ETH', 'XMR', 'USDE'].indexOf(String(c || '').toUpperCase()) >= 0 ? {cod: c} : null; }
+function segnoValutaP2P(c){ return {EUR: '€', CHF: 'CHF', USDT: 'USDT'}[String(c || 'EUR').toUpperCase()] || c; }
+let VALUTA_FOGLIO = 'EUR';
+function valutaFoglioP2P(){ return VALUTA_FOGLIO; }
+function valutaOrdineP2P(o){ return (o && o.fiat) || 'EUR'; }
+function sogliaParacaduteP2P(n){ return [5, 10, 20].indexOf(Number(n)) >= 0 ? Number(n) : 0; }
+let LEVE = {ripubblica: true};
+function p2pCoord(){ return LEVE; }
+let MIE = {};
+function ordiniP2P(){ return MIE; }
+function scriviOrdineP2P(o){ MIE[o.id] = o; }
+function idMostroVero(id){ return /^[0-9a-f-]{36}$/.test(String(id)); }
+let cambioVivo = true, eurPerSat = 0.00095, usdPerSat = 0.00101, chfPerSat = 0.00088;
+let CAMPI = {}; function el(id){ return CAMPI[id] || null; }
+let DEMO = false, VETRINA = false, myTgId = 111;
+const API_BASE = '/api';
+function authHdr(){ return 'x'; }
+let CHIESTE = [], RISPOSTE = {};
+async function fetch(url, opz){
+  const corpo = opz && opz.body ? JSON.parse(opz.body) : null;
+  CHIESTE.push([url, (opz && opz.method) || 'GET', corpo && corpo.gesto, corpo && corpo.ordine]);
+  const r = corpo ? (RISPOSTE[corpo.gesto + ':' + corpo.ordine] || {ok: true, stato: 'x'}) : RISPOSTE.lettura;
+  return {ok: true, json: async () => r};
+}
+const document = {visibilityState: 'visible'};
+let TOAST = [], PRESE_CHIUSE = false;
+function toast(t){ TOAST.push(t); }
+function preseChiuseP2P(){ return PRESE_CHIUSE; }
+function vistaAttivaP2P(){ return 'view-home'; }
+function renderP2P(){} function renderOrdineP2P(){}
+let p2pOrdineAperto = '';
+function paracaduteDaCampiP2P(c){ return sogliaParacaduteP2P(c.paracadute); }
+function maxEuroP2P(){ return 250; } function tettoValutaP2P(){ return 250; }
+function minEuroBzP2P(){ return 0; } function maxEuroContantiP2P(){ return 250; }
+function finestraGaranziaP2P(){ return 0; }
+let p2pInfo = {maxSats: 1000000, minSats: 1000};
+""" + _fn_js(m, "function campiRipubblicaP2P(o, p, cambioOra){") + motore + chiede + r"""
+let RIFATTI = [], RIFA_ESITO = true;
+pubblicaDaSoloP2P = async function(o){ RIFATTI.push(o.id); return RIFA_ESITO; };
+(async () => {
+const c = {};
+const ID = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001', ID2 = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002',
+      ID3 = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60003';
+c.intero = ['95.000', '95 000', '95000', '95000,4', 'x', '', '-5', '1e5'].map(interoRipubblicaP2P);
+c.iv = [intervalloRipubblicaP2P('', ''), intervalloRipubblicaP2P('90.000', '100.000'),
+        intervalloRipubblicaP2P('90000', ''), intervalloRipubblicaP2P('100000', '90000'),
+        intervalloRipubblicaP2P('1', '200000000')];
+c.frasi = [fraseRipubblicaNuovoP2P('', '', 'EUR'), fraseRipubblicaNuovoP2P('90000', '100000', 'EUR'),
+           fraseRipubblicaNuovoP2P('90000', '', 'CHF'), fraseRipubblicaNuovoP2P('80000', '90000', 'CHF')];
+const sez = sezioneRipubblicaNuovoP2P(false);
+c.sezione = [sez.split('§')[0], (sez.match(/<input/g) || []).length, sez.indexOf('>€<') > 0];
+const conTab = sezioneRipubblicaNuovoP2P(true);
+VALUTA_FOGLIO = 'ETH'; const inMoneta = sezioneRipubblicaNuovoP2P(false); VALUTA_FOGLIO = 'EUR';
+LEVE = {ripubblica: false}; const spenta = sezioneRipubblicaNuovoP2P(false); LEVE = {ripubblica: true};
+c.fuori = [conTab, inMoneta, spenta];
+c.daCampi = [ripubblicaDaCampiP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '90000', ripMax: '100000'}),
+             ripubblicaDaCampiP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '', ripMax: ''}),
+             ripubblicaDaCampiP2P({metodi: ['Contanti al tabacchino'], valuta: 'EUR', ripMin: '1', ripMax: '2'}),
+             ripubblicaDaCampiP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '9', ripMax: '2'}),
+             erroreRipubblicaP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '9', ripMax: '2'}),
+             erroreRipubblicaP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '', ripMax: ''})];
+MIE[ID] = {id: ID, mio: true, stato: 'pubblicato', lato: 'vendo', sats: 50000, euro: 50, euroMax: 0,
+           premium: 0, metodi: ['SEPA'], fiat: 'EUR', zona: '', filtro: 3, paracadute: 10,
+           ripubblica: {minimo: 90000, massimo: 100000}, creato: Date.now() / 1000};
+MIE[ID2] = {id: ID2, mio: false, stato: 'pubblicato', ripubblica: {minimo: 1, massimo: 2}};
+MIE[ID3] = {id: ID3, mio: true, stato: 'annullato', lato: 'compro', sats: 0, euro: 20, euroMax: 100,
+            premium: 2, metodi: ['Revolut'], fiat: 'CHF', ripubblica: {minimo: 80000, massimo: 90000},
+            creato: Date.now() / 1000};
+c.dichiara = ripubblicaDaDichiarareP2P([ID, ID2, ID3]);
+c.segno = [segnoRipubblicaP2P(MIE[ID]), segnoRipubblicaP2P(MIE[ID3])];
+const uguale = campiRipubblicaUgualeP2P(MIE[ID], 1790000000);
+const range = campiRipubblicaUgualeP2P(MIE[ID3], 1790000000);
+c.uguale = [uguale.fisso, uguale.sats, uguale.euro, uguale.premio, uguale.filtro, uguale.paracadute,
+            uguale.ripMin, uguale.ripMax, uguale.lato, range.fisso, range.sats, range.euroMax,
+            range.premio, range.valuta, range.lato];
+c.righe = righeRipubblicaP2P().sort();
+/* il battito: niente da chiedere -> niente */
+const tutte = MIE; MIE = {};
+c.muto = [battitoRipubblicaP2P(true), CHIESTE.length];
+MIE = tutte;
+RISPOSTE.lettura = {attivo: true, ordini: {[ID]: {minimo: 90000, massimo: 100000, valuta: 'eur', stato: 'pronto'}},
+                    pronti: [ID, ID2, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f6ffff'], saltati: [{ordine: ID3, prezzo: 91000}]};
+const d = await chiediRipubblicheP2P();
+await ripubblicaProntiP2P(d);
+c.giro = [RIFATTI.slice(), CHIESTE.map(x => x.slice(1).join(' ')), TOAST.slice(), !!MIE[ID].ripubblicaChiusa,
+          !!MIE[ID3].ripubblicaChiusa];
+/* il lucchetto rifiuta: niente ordine rifatto */
+RIFATTI = []; TOAST = []; CHIESTE = []; MIE[ID].ripubblicaChiusa = false;
+RISPOSTE['prendo:' + ID] = {ok: false, motivo: 'presa'};
+await ripubblicaProntiP2P({pronti: [ID], saltati: []});
+c.presa = [RIFATTI.slice(), CHIESTE.map(x => x.slice(1).join(' '))];
+/* fallito */
+RISPOSTE['prendo:' + ID] = {ok: true, stato: 'in_corso'}; RIFA_ESITO = false; CHIESTE = [];
+await ripubblicaProntiP2P({pronti: [ID], saltati: []});
+c.fallito = [CHIESTE.map(x => x.slice(1).join(' ')), TOAST.slice(-1)[0]];
+/* prima delle 10 il P2P e' chiuso */
+PRESE_CHIUSE = true; CHIESTE = [];
+await ripubblicaProntiP2P({pronti: [ID], saltati: []});
+c.chiuso = CHIESTE.length;
+console.log(JSON.stringify(c));
+})().catch(e => { console.error(e && e.stack || e); process.exit(1); });
+"""
+    c = _node_banco(banco)
+    if c is None:
+        salta("la ripubblica, nell'app", "node non c'e'")
+        return
+    ID, ID2, ID3 = ("0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000" + n for n in "123")
+    prova("i prezzi come li scrive il dito: punti e spazi delle migliaia, la virgola; il "
+          "resto e' zero", [95000, 95000, 95000, 95000, 0, 0, 0, 0], c.get("intero"))
+    prova("il giudice dei campi: vuoti = spenta; storti con la frase giusta",
+          [None, {"minimo": 90000, "massimo": 100000},
+           {"errore": "Scrivi tutti e due i prezzi di BTC, il minimo e il massimo, o lasciali vuoti"},
+           {"errore": "Il prezzo minimo di BTC deve essere più basso del massimo"},
+           {"errore": "Questo prezzo di BTC è troppo alto: controlla gli zeri"}], c.get("iv"))
+    prova("la riga sotto i campi: cosa fa, col prezzo di adesso nella valuta del foglio",
+          ["Quando l'ordine scade, se BTC è fra questi due prezzi lo ripubblichiamo uguale, da "
+           "solo. Vuoto = non si ripubblica. BTC adesso: 95.000 €.",
+           "Alla scadenza, se BTC è fra 90.000 e 100.000 €, l'ordine si ripubblica uguale, ogni "
+           "volta che scade. Parte appena apri Barattolo. BTC adesso: 95.000 €.",
+           "⚠️ Scrivi tutti e due i prezzi di BTC, il minimo e il massimo, o lasciali vuoti.",
+           "Alla scadenza, se BTC è fra 80.000 e 90.000 CHF, l'ordine si ripubblica uguale, ogni "
+           "volta che scade. Parte appena apri Barattolo. BTC adesso: 88.000 CHF."], c.get("frasi"))
+    prova("la sezione: «🔁 Ripubblica», due campi e il simbolo; mai con Barattozon, in moneta "
+          "o a leva spenta", [["🔁 Ripubblica", 2, True], ["", "", ""]],
+          [c.get("sezione"), c.get("fuori")])
+    prova("dai campi all'ordine: solo un intervallo buono, mai Barattozon; l'errore si dice",
+          [{"minimo": 90000, "massimo": 100000}, None, None, None,
+           "🔁 Ripubblica: Il prezzo minimo di BTC deve essere più basso del massimo", ""],
+          c.get("daCampi"))
+    prova("si dichiarano solo le MIE righe", {ID: {"minimo": 90000, "massimo": 100000},
+                                              ID3: {"minimo": 80000, "massimo": 90000}},
+          c.get("dichiara"))
+    prova("il segno sulla card: il mio ordine nel libro (col prezzo che dice il server), non "
+          "quello gia' chiuso", ['<div class="p2p-box p2p-paracadute">🔁 Ripubblica fra 90.000 e '
+                                 '100.000 €</div>', ""], c.get("segno"))
+    prova("L'ORDINE RIFATTO E' UGUALE: a prezzo fisso gli stessi sats per gli stessi euro, col "
+          "filtro, il paracadute e l'intervallo di prima; un intervallo resta a mercato col "
+          "suo premio e la sua valuta",
+          [True, "50000", "50", 0, 3, 10, "90000", "100000", "vendo",
+           False, "", "100", 2, "CHF", "compro"], c.get("uguale"))
+    prova("il battito guarda solo le mie righe con la ripubblica aperta", sorted([ID, ID3]),
+          c.get("righe"))
+    prova("...e chi non ne ha non chiede niente al server", [False, 0], c.get("muto"))
+    giro = c.get("giro") or [None] * 5
+    prova("IL GIRO: il saltato si dice; il pronto con la riga su QUESTO telefono si prende, si "
+          "rifa', si chiude; quelli senza riga mia si lasciano",
+          [[ID], ["GET  ", "POST prendo " + ID, "POST fatto " + ID],
+           ["🔁 Non ho ripubblicato il tuo ordine: BTC è a 91.000 CHF, fuori dal tuo intervallo",
+            "🔁 Il tuo ordine era scaduto: l'ho ripubblicato uguale"], True, True], giro)
+    prova("IL LUCCHETTO RIFIUTA: niente ordine rifatto", [[], ["POST prendo " + ID]], c.get("presa"))
+    prova("...un ordine che non parte si dice al server e alla persona",
+          [["POST prendo " + ID, "POST fallito " + ID],
+           "🔁 Non sono riuscito a ripubblicare il tuo ordine: puoi rifarlo dal +"], c.get("fallito"))
+    prova("...e prima delle 10 il P2P e' chiuso: non si chiede niente", 0, c.get("chiuso"))
+
+
 def prove_paracadute_app():
     """IL PARACADUTE, NELL'APP (13 ott 2026, cantiere paracadute): la scelta
     nel foglio che pubblica, il segno sulla propria card, l'ordine di un
@@ -181779,7 +182250,7 @@ def prove_paracadute_app():
     prova("nel foglio che pubblica la sezione sta DOPO la pausa e prima dei limiti",
           [True, True],
           ["sezioneParacaduteNuovoP2P(tabMetodo) : '';" in foglio,
-           "+ quanti + premio + accesso + pausa + paracadute + riquadroLimitiP2P() +" in foglio])
+           "+ quanti + premio + accesso + pausa + paracadute + ripubblica + riquadroLimitiP2P() +" in foglio])
     # (13 ott 2026, sera, EMENDA dalla prova di Andrea sul telefono: il foglio
     # ripartiva dal 5% dell'ordine di prima, e un paracadute che nessuno ha
     # scelto ANNULLA un ordine. La scelta ricordata — decisa la mattina — e'
@@ -198627,6 +199098,7 @@ CATEGORIE = {
     presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione tasti_rete_foglio usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
+    ripubblica_p2p
     """.split(),
     "mercatino": """
     mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore
@@ -199525,6 +199997,7 @@ def main():
               prove_audit_pagamenti_2,
               prove_audit_pagamenti_3,
               prove_audit_tornata_tutto,
+              prove_ripubblica_p2p,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:

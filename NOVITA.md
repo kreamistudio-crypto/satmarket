@@ -278,3 +278,9 @@ frase: In cima al libro P2P «Compra BTC» e «Vendi BTC» sono due pillole gran
 dove: la scheda «P2P», in cima al libro.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-16 · ripubblica
+frase: Quando pubblichi un ordine P2P c'è la sezione nuova «🔁 Ripubblica»: scrivi due prezzi di bitcoin, da X a Y. Se l'ordine scade senza che nessuno l'abbia preso e BTC è fra quei due prezzi, lo ripubblichiamo uguale, da solo, a ogni scadenza. Il bot ti dice ogni volta com'è andata. Lightning riparte appena apri Barattolo, on-chain subito. Vuoto = non succede niente.
+dove: la scheda «P2P», il «+» per pubblicare: la sezione «🔁 Ripubblica» sotto il paracadute; la card del tuo ordine («🔁 Ripubblica da… a…») e la sua pagina, col tasto «Non ripubblicarlo più».
+leva: P2P_RIPUBBLICA (nuova, accesa di serie)
+pubblico: sì

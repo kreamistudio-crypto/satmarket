@@ -8085,6 +8085,34 @@ def init_db():
         superato INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_paracadute_tg ON p2p_paracadute(tg_id);
+    CREATE TABLE IF NOT EXISTS p2p_ripubblica(
+        -- LA RIPUBBLICA, PER ORDINE (16 nov 2026, cantiere ripubblica,
+        -- richiesta di Andrea): chi pubblica scrive un intervallo del
+        -- prezzo di BTC, «da X a Y», e quando l'ordine SCADE nel libro
+        -- (la vita la decide mostrod, 168 ore) se BTC sta dentro
+        -- l'ordine si rifa' uguale. Una riga per ordine, scritta
+        -- all'intestazione come il paracadute (la prima resta), solo da
+        -- chi l'ha PUBBLICATO. `minimo`/`massimo` in unita' intere della
+        -- `valuta` dell'ordine (eur, usd per gli USDT, chf), per un
+        -- bitcoin. `stato`: armato (nel libro) -> pronto (scaduto con BTC
+        -- dentro: aspetta il telefono) | saltato (fuori, o il telefono ha
+        -- fallito) -> in_corso (un telefono l'ha preso) -> fatto; tolto
+        -- se chi l'ha pubblicato dice basta. `prezzo` e' BTC alla
+        -- scadenza, `deciso` quando. ⚠️ IL NUOVO ORDINE LO FIRMA IL
+        -- TELEFONO, mai il server (regola ferrea 2, decisione di Andrea
+        -- del 16 nov: «dal telefono, all'apertura»).
+        ordine TEXT PRIMARY KEY,
+        tg_id INTEGER NOT NULL,
+        minimo INTEGER NOT NULL,
+        massimo INTEGER NOT NULL,
+        valuta TEXT NOT NULL DEFAULT 'eur',
+        stato TEXT NOT NULL DEFAULT 'armato',
+        prezzo REAL DEFAULT 0,
+        deciso INTEGER DEFAULT 0,
+        preso_il INTEGER DEFAULT 0,
+        creato INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_ripubblica_tg ON p2p_ripubblica(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_semi(
         -- IL SALE DEL PROFILO DI SCAMBIO (set 2026): la chiave
         -- d'identita' Mostro di chi entra da Telegram si ricava con
@@ -21198,6 +21226,9 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # ...e i paracadute (13 ott 2026) seguono gli ordini: la PK e'
         # l'ordine, quindi qui non collide niente
         con.execute("UPDATE p2p_paracadute SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        # ...e le ripubbliche (16 nov 2026), con la stessa PK sull'ordine
+        con.execute("UPDATE p2p_ripubblica SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         # ...e il registro della modifica in blocco (16 ott 2026) segue
         # il venditore: niente da far collidere (la PK e' la modifica),
@@ -36155,6 +36186,15 @@ def _leve_stato():
                   spento="come ieri: nessuna riga nel foglio che pubblica, "
                          "l'orologio non guarda il prezzo, e i paracadute "
                          "già aperti non nascondono più niente"),
+            # LA RIPUBBLICA (16 nov 2026): accesa di serie
+            _leva("Ripubblica degli ordini P2P scaduti", "P2P_RIPUBBLICA",
+                  P2P_RIPUBBLICA,
+                  acceso="chi pubblica può scrivere un intervallo del prezzo "
+                         "di BTC: alla scadenza, se BTC è dentro, l'ordine si "
+                         "rifà uguale (Lightning dal suo telefono alla prima "
+                         "apertura, on-chain dal server); mai Barattozon",
+                  spento="nessun paragrafo «Ripubblica» nel foglio, e gli "
+                         "ordini scaduti non si rifanno più"),
             # LA CHAT NELLO SCAMBIO (12 ott 2026): accesa di serie
             _leva("Chat nello scambio P2P", "P2P_CHAT_SCAMBIO",
                   P2P_CHAT_SCAMBIO,
@@ -56550,6 +56590,22 @@ try:
     P2P_PARACADUTE = P2P_PARACADUTE is True
 except ImportError:
     P2P_PARACADUTE = False
+# LA RIPUBBLICA (16 nov 2026, cantiere ripubblica, richiesta di Andrea):
+# chi pubblica un ordine puo' scrivere un intervallo del prezzo di BTC, e
+# quando l'ordine scade nel libro, se BTC sta dentro, si rifa' uguale. Il
+# nuovo ordine lo firma il TELEFONO alla prima apertura dell'app (scelta
+# di Andrea); sull'on-chain lo rifa' il server, che quel libro lo tiene
+# lui. ACCESA DI SERIE (regola del 14 nov: leve nuove accese nel codice):
+# e' comunque spenta per ogni ordine finche' chi pubblica non scrive i due
+# prezzi. Interruttore d'emergenza: `P2P_RIPUBBLICA = False` nel config.
+try:
+    from config import P2P_RIPUBBLICA
+    if not isinstance(P2P_RIPUBBLICA, bool):
+        print("[p2p] P2P_RIPUBBLICA non e' True/False: la ripubblica "
+              "resta ACCESA come di serie")
+        P2P_RIPUBBLICA = True
+except ImportError:
+    P2P_RIPUBBLICA = True
 # GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026, richiesta di Andrea):
 # chi lo chiede riceve un messaggio quando nel libro P2P compaiono
 # ordini nuovi — raggruppati, al piu' uno ogni P2P_AVVISI_NUOVI_MINUTI
@@ -56894,6 +56950,9 @@ def _p2p_leve() -> dict:
             # il paracadute (13 ott 2026): la riga nel foglio che pubblica
             # e il segno sulla card ci sono solo con questa
             "paracadute": bool(P2P_PARACADUTE),
+            # la ripubblica (16 nov 2026): il paragrafo nel foglio che
+            # pubblica e il battito che rifa' gli ordini scaduti
+            "ripubblica": bool(P2P_RIPUBBLICA),
             # la chat nello scambio (12 ott 2026): accesa di serie; a
             # leva spenta il client non mostra il riquadro
             "chat": bool(P2P_CHAT_SCAMBIO),
@@ -59109,6 +59168,336 @@ async def _giro_paracadute_p2p():
         await asyncio.sleep(0.2)
 
 
+# ═══ LA RIPUBBLICA DEGLI ORDINI SCADUTI (16 nov 2026, cantiere ripubblica) ═══
+# La richiesta di Andrea: «quando uno pubblica un annuncio, un paragrafo
+# nuovo che si intitola Ripubblica: se Bitcoin è compreso in un range di
+# prezzo da X a X, e il prezzo lo metti tu manualmente, alla scadenza
+# dell'annuncio ripubblica in automatico l'annuncio». La vita nel libro la
+# decide mostrod (`expiration_hours`, 168 ore): qui si decide solo cosa
+# succede DOPO.
+# LE SCELTE (le prime due di Andrea, le altre dette nel thread e non
+# contraddette):
+# 1) IL NUOVO ORDINE LO FIRMA IL TELEFONO, mai il server (regola ferrea 2,
+#    la stessa del `cancel` del paracadute): alla scadenza il server guarda
+#    il prezzo e scrive `pronto`; alla prima apertura dell'app, su
+#    qualunque pagina, il telefono rifa' l'ordine uguale senza chiedere.
+#    Sull'ON-CHAIN il libro e' del server, e lo rifa' lui (piu' sotto).
+# 2) STESSE CONDIZIONI: a prezzo fisso gli stessi sats per gli stessi euro,
+#    a mercato lo stesso premio, gli stessi metodi, la stessa zona, lo
+#    stesso filtro, lo stesso paracadute e lo stesso intervallo — quindi
+#    ripubblica OGNI VOLTA che scade, finche' BTC resta dentro o finche'
+#    chi l'ha pubblicato non dice basta.
+# 3) SPENTA PER OGNI ORDINE finche' non si scrivono i due prezzi.
+# 4) IL BOT LO DICE OGNI VOLTA, dentro l'avviso della scadenza che parte
+#    gia' (un momento, una notifica sola): «lo ripubblico» o «non l'ho
+#    ripubblicato, BTC è a X».
+# 5) FUORI BARATTOZON (il PayCode scade da se') e gli ordini in moneta
+#    (ETH, XMR, USDe: la cifra in moneta non e' un «uguale»).
+# IL PREZZO E' QUELLO CHE IL SERVER HA GIA' IN MANO (`cambio_noto_ora`
+# nella valuta dell'ordine: eur, usd per gli USDT, chf per i franchi), e
+# deve essere FRESCO: un intervallo e' una protezione, e un numero di ore
+# fa non la da'. Senza un prezzo fresco alla scadenza la riga va `pronto`
+# lo stesso, e il giudizio lo rifa' il server quando il telefono chiede:
+# senza prezzo fresco nemmeno allora parte niente.
+P2P_RIPUBBLICA_MAX = 100_000_000   # piu' di cosi' un bitcoin non costa: e' un errore di battitura
+P2P_RIPUBBLICA_FRESCO_S = 900      # un prezzo piu' vecchio non giudica
+P2P_RIPUBBLICA_PRESA_S = 600       # un telefono che ha preso e tace: dopo, la riprende un altro
+P2P_RIPUBBLICA_VALUTE = ("eur", "usd", "chf")
+
+
+def _intervallo_ripubblica_p2p(v):
+    """PURA: `(minimo, massimo)` interi da `{minimo, massimo}`, o None. I
+    due capi sono prezzi di UN bitcoin in unita' intere; servono tutti e
+    due, positivi, il minimo sotto il massimo, e niente sopra
+    P2P_RIPUBBLICA_MAX. Un booleano non e' un numero."""
+    if not isinstance(v, dict):
+        return None
+    capi = []
+    for k in ("minimo", "massimo"):
+        x = v.get(k)
+        if isinstance(x, bool):
+            return None
+        try:
+            f = float(x)
+        except (TypeError, ValueError):
+            return None
+        if not (f == f) or f in (float("inf"), float("-inf")):
+            return None
+        capi.append(int(round(f)))
+    minimo, massimo = capi
+    if not (0 < minimo < massimo <= P2P_RIPUBBLICA_MAX):
+        return None
+    return minimo, massimo
+
+
+def _valuta_ripubblica_p2p(v) -> str:
+    """PURA: la valuta di un intervallo, una di P2P_RIPUBBLICA_VALUTE
+    (l'euro se storta). USDT si misura sul dollaro."""
+    s = str(v or "").strip().lower()
+    if s == "usdt":
+        s = "usd"
+    return s if s in P2P_RIPUBBLICA_VALUTE else "eur"
+
+
+def _dentro_ripubblica_p2p(minimo, massimo, prezzo) -> bool:
+    """PURA: BTC «compreso fra X e Y»? I capi CONTANO (il filo esatto e'
+    dentro). Un prezzo che non c'e' non e' dentro."""
+    try:
+        p, a, b = float(prezzo or 0), float(minimo or 0), float(massimo or 0)
+    except (TypeError, ValueError):
+        return False
+    return p > 0 and a > 0 and a <= p <= b
+
+
+def _prezzo_ripubblica_p2p(prezzi, letto, valuta, adesso) -> float:
+    """PURA: il prezzo di un bitcoin nella `valuta`, da `prezzi`
+    ({eur, usd, chf}) letti all'ora `letto`; 0 se manca o se la lettura e'
+    piu' vecchia di P2P_RIPUBBLICA_FRESCO_S (la fonte muta non giudica)."""
+    try:
+        p = float((prezzi or {}).get(_valuta_ripubblica_p2p(valuta)) or 0)
+        letto = float(letto or 0)
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+    if not p > 0 or letto <= 0 or float(adesso) - letto > P2P_RIPUBBLICA_FRESCO_S:
+        return 0.0
+    return p
+
+
+def _prezzi_ripubblica_p2p() -> tuple:
+    """`({eur, usd, chf}, letto)` dalla cache del cambio: mai la rete."""
+    return ({v: cambio_noto_ora(v) for v in P2P_RIPUBBLICA_VALUTE},
+            float(_cambio_cache.get("quando") or 0))
+
+
+def _valuta_ordine_ripubblica_p2p(con, ordine: str) -> str:
+    """La valuta in cui si misura BTC per QUEST'ordine: i franchi, il
+    dollaro per gli USDT, sennò l'euro. La dice il libro, non il telefono:
+    e' la stessa che poi traduce l'avviso (`p2p_chf_frase`,
+    `p2p_usdt_frase`), cosi' cifra e simbolo non possono divergere."""
+    if p2p_chf_ordine(con, ordine):
+        return "chf"
+    if p2p_usdt_ordine(con, ordine):
+        return "usd"
+    return "eur"
+
+
+def _dichiara_ripubblica_p2p(con, tg_id: int, mappa, adesso: int) -> int:
+    """Scrive le ripubbliche dichiarate, `{ordine: {minimo, massimo}}`, e
+    torna quante ne ha scritte. La porta del paracadute: SOLO sulla riga
+    di chi l'ordine l'ha PUBBLICATO (`maker`), LA PRIMA RESTA, mai
+    Barattozon ne' un ordine in moneta. La valuta la dice il libro. A
+    leva spenta non scrive; una mappa storta e' una mappa vuota."""
+    if not P2P_RIPUBBLICA or not isinstance(mappa, dict):
+        return 0
+    scritti = 0
+    for ordine, v in list(mappa.items())[:MAX_ORDINI_P2P]:
+        if not isinstance(ordine, str) or not FORMA_ORDINE_P2P.fullmatch(ordine):
+            continue
+        capi = _intervallo_ripubblica_p2p(v)
+        if not capi:
+            continue
+        r = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=? AND tg_id=? "
+                        "AND maker=1", (ordine, int(tg_id))).fetchone()
+        if not r or _tabacchino_libro(_metodi_lista_p2p(r[0])) \
+                or p2p_coin_ordine(con, ordine):
+            continue
+        scritti += con.execute(
+            "INSERT OR IGNORE INTO p2p_ripubblica(ordine, tg_id, minimo, massimo, "
+            "valuta, creato) VALUES(?,?,?,?,?,?)",
+            (ordine, int(tg_id), capi[0], capi[1],
+             _valuta_ordine_ripubblica_p2p(con, ordine), int(adesso))).rowcount
+    if scritti:
+        con.commit()
+    return scritti
+
+
+def _segna_scadenza_ripubblica_p2p(con, ev: dict, fatto: dict, prezzi, letto,
+                                   adesso: int) -> list:
+    """ALLA SCADENZA NEL LIBRO (`scaduto`, cioe' `expired`/`book`: nessuno
+    l'ha preso): una riga `armato` di quest'ordine si giudica col prezzo di
+    adesso. Dentro, o senza un prezzo fresco -> `pronto` (il telefono la
+    rifa' alla prima apertura, e il server rigiudica quando chiede); fuori
+    -> `saltato`. Mette in `fatto["ripubblica"]` quel che serve alla riga
+    dell'avviso, e torna le righe di journal. Dalla ROTTA, come la presa a
+    paracadute aperto. Pura sulla connessione; COMMITTA se scrive."""
+    fatto["ripubblica"] = None
+    if fatto.get("momento") != "scaduto" or not P2P_RIPUBBLICA:
+        return []
+    ordine = ev["ordine"]
+    try:
+        r = con.execute("SELECT tg_id, minimo, massimo, valuta FROM p2p_ripubblica "
+                        "WHERE ordine=? AND stato='armato'", (ordine,)).fetchone()
+    except sqlite3.OperationalError:
+        return []
+    if not r:
+        return []
+    tg_id, minimo, massimo, valuta = int(r[0]), int(r[1]), int(r[2]), r[3]
+    prezzo = _prezzo_ripubblica_p2p(prezzi, letto, valuta, adesso)
+    esito = "saltato" if prezzo > 0 and not _dentro_ripubblica_p2p(
+        minimo, massimo, prezzo) else "pronto"
+    cur = con.execute("UPDATE p2p_ripubblica SET stato=?, prezzo=?, deciso=? "
+                      "WHERE ordine=? AND stato='armato'",
+                      (esito, prezzo, int(adesso), ordine))
+    if not cur.rowcount:
+        return []
+    con.commit()
+    fatto["ripubblica"] = {"tg_id": tg_id, "esito": esito, "prezzo": prezzo,
+                           "minimo": minimo, "massimo": massimo, "valuta": valuta}
+    return [f"🔁 Ripubblica P2P: {ordine[:8]} di {tg_id} scaduto con BTC a "
+            + (f"{prezzo:.0f} {valuta}" if prezzo > 0 else "prezzo non fresco")
+            + f" (intervallo {minimo}-{massimo}): "
+            + ("si ripubblica alla prima apertura dell'app" if esito == "pronto"
+               else "fuori, non si ripubblica")]
+
+
+def _cifra_ripubblica_p2p(v) -> str:
+    """PURA: «95.000» (senza simbolo)."""
+    try:
+        return f"{round(float(v or 0)):,}".replace(",", ".")
+    except (TypeError, ValueError, OverflowError):
+        return "—"
+
+
+def _frase_ripubblica_p2p(r: dict) -> str:
+    """PURA: la riga della ripubblica, in coda all'avviso della scadenza.
+    Il simbolo e' «€» anche per i franchi e gli USDT: lo traducono
+    `p2p_chf_frase` e `p2p_usdt_frase`, che girano dopo, come per il resto
+    dell'avviso — e la cifra e' gia' nella valuta dell'ordine."""
+    tra = (f"{_cifra_ripubblica_p2p(r.get('minimo'))}–"
+           f"{_cifra_ripubblica_p2p(r.get('massimo'))} €")
+    prezzo = float(r.get("prezzo") or 0)
+    if r.get("esito") == "saltato":
+        return (f"🔁 <b>Non l'ho ripubblicato</b>: BTC è a "
+                f"{_cifra_ripubblica_p2p(prezzo)} €, fuori dal tuo intervallo "
+                f"({tra}). Puoi ripubblicarlo quando vuoi.")
+    if prezzo > 0:
+        return (f"🔁 <b>Lo ripubblico uguale</b>: BTC è a "
+                f"{_cifra_ripubblica_p2p(prezzo)} €, dentro il tuo intervallo "
+                f"({tra}). Parte appena apri Barattolo, non devi fare niente.")
+    return (f"🔁 <b>Lo ripubblico uguale</b> appena apri Barattolo, se BTC è "
+            f"ancora dentro il tuo intervallo ({tra}).")
+
+
+def _riga_ripubblica_scadenza_p2p(avvisi: list, fatto: dict) -> list:
+    """PURA: nell'avviso della scadenza a chi aveva pubblicato, e a lui
+    solo, «Puoi ripubblicarlo quando vuoi.» lascia il posto alla riga della
+    ripubblica (`_frase_ripubblica_p2p`). Se quella frase non c'e' (un
+    avviso cambiato) la riga va in coda."""
+    r = (fatto or {}).get("ripubblica")
+    if not r or (fatto or {}).get("momento") != "scaduto":
+        return avvisi
+    riga, fuori = _frase_ripubblica_p2p(r), []
+    for tg, testo in avvisi:
+        if tg == r.get("tg_id"):
+            vecchia = " Puoi ripubblicarlo quando vuoi."
+            testo = (testo.replace(vecchia, "\n\n" + riga) if vecchia in testo
+                     else testo + "\n\n" + riga)
+        fuori.append((tg, testo))
+    return fuori
+
+
+def _miei_ripubblica_p2p(con, tg_id) -> dict:
+    """Le ripubbliche ancora in gioco di chi chiede, per la sua card:
+    `{ordine: {minimo, massimo, valuta, stato}}` (non `fatto`, non
+    `tolto`). Pura sulla connessione."""
+    try:
+        righe = con.execute(
+            "SELECT ordine, minimo, massimo, valuta, stato FROM p2p_ripubblica "
+            "WHERE tg_id=? AND stato NOT IN ('fatto','tolto') "
+            "ORDER BY creato DESC LIMIT ?",
+            (int(tg_id or 0), MAX_ORDINI_P2P)).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    return {r[0]: {"minimo": int(r[1]), "massimo": int(r[2]),
+                   "valuta": r[3], "stato": r[4]} for r in righe}
+
+
+def _pronti_ripubblica_p2p(con, tg_id, prezzi, letto, adesso: int) -> tuple:
+    """`(pronti, saltati)` di chi chiede: le righe `pronto` (o `in_corso`
+    di un telefono che tace da P2P_RIPUBBLICA_PRESA_S) RIGIUDICATE col
+    prezzo di adesso. Dentro -> in `pronti` (gli id da rifare); fuori ->
+    `saltato`, e in `saltati` una volta sola, `[{ordine, prezzo, minimo,
+    massimo, valuta}]`, perche' il telefono lo dica; senza prezzo fresco
+    restano dove sono. Pura sulla connessione; COMMITTA se scrive."""
+    try:
+        righe = con.execute(
+            "SELECT ordine, minimo, massimo, valuta FROM p2p_ripubblica "
+            "WHERE tg_id=? AND (stato='pronto' OR (stato='in_corso' AND preso_il<?)) "
+            "ORDER BY deciso LIMIT ?",
+            (int(tg_id or 0), int(adesso) - P2P_RIPUBBLICA_PRESA_S,
+             MAX_ORDINI_P2P)).fetchall()
+    except sqlite3.OperationalError:
+        return [], []
+    pronti, saltati, toccati = [], [], 0
+    for r in righe:
+        prezzo = _prezzo_ripubblica_p2p(prezzi, letto, r[3], adesso)
+        if not prezzo > 0:
+            continue
+        if _dentro_ripubblica_p2p(r[1], r[2], prezzo):
+            pronti.append(r[0])
+            continue
+        toccati += con.execute(
+            "UPDATE p2p_ripubblica SET stato='saltato', prezzo=?, deciso=? "
+            "WHERE ordine=? AND stato IN ('pronto','in_corso')",
+            (prezzo, int(adesso), r[0])).rowcount
+        saltati.append({"ordine": r[0], "prezzo": prezzo, "minimo": int(r[1]),
+                        "massimo": int(r[2]), "valuta": r[3]})
+    if toccati:
+        con.commit()
+    return pronti, saltati
+
+
+P2P_RIPUBBLICA_GESTI = ("prendo", "fatto", "fallito", "togli")
+
+
+def _gesto_ripubblica_p2p(con, tg_id, ordine, gesto, prezzi, letto,
+                          adesso: int) -> dict:
+    """Un gesto del telefono su UNA sua riga. `prendo`: la prende per
+    rifare l'ordine — solo da `pronto` (o da un `in_corso` di un telefono
+    muto da P2P_RIPUBBLICA_PRESA_S), e solo con BTC fresco e dentro: e' il
+    lucchetto, due telefoni aperti insieme non rifanno l'ordine due volte.
+    `fatto`/`fallito`: com'e' andata (`in_corso` -> fatto | saltato).
+    `togli`: chi l'ha pubblicato dice basta (`armato`/`pronto` -> tolto).
+    Torna `{ok, stato}` o `{ok: False, motivo}`. COMMITTA."""
+    if gesto not in P2P_RIPUBBLICA_GESTI or not isinstance(ordine, str) \
+            or not FORMA_ORDINE_P2P.fullmatch(ordine):
+        return {"ok": False, "motivo": "gesto"}
+    r = con.execute("SELECT minimo, massimo, valuta, stato, preso_il FROM "
+                    "p2p_ripubblica WHERE ordine=? AND tg_id=?",
+                    (ordine, int(tg_id or 0))).fetchone()
+    if not r:
+        return {"ok": False, "motivo": "nessuna"}
+    stato = r[3]
+    if gesto == "prendo":
+        libero = stato == "pronto" or (
+            stato == "in_corso" and int(r[4] or 0) < int(adesso) - P2P_RIPUBBLICA_PRESA_S)
+        if not libero:
+            return {"ok": False, "motivo": "presa"}
+        prezzo = _prezzo_ripubblica_p2p(prezzi, letto, r[2], adesso)
+        if not prezzo > 0:
+            return {"ok": False, "motivo": "prezzo"}
+        if not _dentro_ripubblica_p2p(r[0], r[1], prezzo):
+            con.execute("UPDATE p2p_ripubblica SET stato='saltato', prezzo=?, "
+                        "deciso=? WHERE ordine=?", (prezzo, int(adesso), ordine))
+            con.commit()
+            return {"ok": False, "motivo": "fuori", "prezzo": prezzo}
+        cur = con.execute("UPDATE p2p_ripubblica SET stato='in_corso', preso_il=?, "
+                          "prezzo=? WHERE ordine=? AND stato=?",
+                          (int(adesso), prezzo, ordine, stato))
+        con.commit()
+        return {"ok": True, "stato": "in_corso"} if cur.rowcount \
+            else {"ok": False, "motivo": "presa"}
+    da, a = {"fatto": (("in_corso",), "fatto"),
+             "fallito": (("in_corso",), "saltato"),
+             "togli": (("armato", "pronto"), "tolto")}[gesto]
+    if stato not in da:
+        return {"ok": False, "motivo": "stato"}
+    cur = con.execute("UPDATE p2p_ripubblica SET stato=?, deciso=? WHERE ordine=? "
+                      "AND stato=?", (a, int(adesso), ordine, stato))
+    con.commit()
+    return {"ok": bool(cur.rowcount), "stato": a}
+
+
 def _chi_pubblica_p2p(fatto: dict) -> tuple:
     """PURA: `(tg_id, ruolo)` di CHI HA PUBBLICATO l'ordine, da quel che
     mostrod ha detto del giro (`fatto`: le due parti e `preso_dal`):
@@ -60544,6 +60933,9 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         # il cambio che il server ha in mano adesso
         _dichiara_paracadute_p2p(con, user["id"], (d or {}).get("paracadute"),
                                  int(time.time()), cambio_noto_ora())
+        # ...e LA RIPUBBLICA (16 nov 2026): stessa porta, la prima resta
+        _dichiara_ripubblica_p2p(con, user["id"], (d or {}).get("ripubblica"),
+                                 int(time.time()))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -61009,6 +61401,60 @@ async def scrivi_pausa_p2p(req: Request, x_tg_init_data: str = Header(""),
     # la fotografia del libro la rilegge al prossimo giro; la porta vera
     # (`_posso_prendere_p2p`) l'ora la chiede al momento
     return JSONResponse(dict(fuori, attiva=True), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/p2p/ripubblica")
+def mie_ripubbliche_p2p(x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """«Come stanno le mie ripubbliche?» (16 nov 2026, cantiere
+    ripubblica): la chiede il telefono di chi ha pubblicato, una volta al
+    minuto su qualunque pagina. `ordini` per la sua card; `pronti` gli
+    ordini scaduti da rifare ADESSO (rigiudicati col prezzo di adesso);
+    `saltati` quelli che il prezzo ha appena messo fuori, detti una volta.
+    Nessun parametro: si chiede solo di se'. `no-store`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not P2P_RIPUBBLICA:
+        return JSONResponse({"attivo": False}, headers={"Cache-Control": "no-store"})
+    prezzi, letto = _prezzi_ripubblica_p2p()
+    con = db()
+    try:
+        pronti, saltati = _pronti_ripubblica_p2p(con, user["id"], prezzi, letto,
+                                                 int(time.time()))
+        ordini = _miei_ripubblica_p2p(con, user["id"])
+    finally:
+        con.close()
+    return JSONResponse({"attivo": True, "ordini": ordini, "pronti": pronti,
+                         "saltati": saltati},
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/p2p/ripubblica")
+async def gesto_ripubblica_p2p(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """Un gesto del telefono su una SUA ripubblica: `{ordine, gesto}`, il
+    gesto fra `prendo` (il lucchetto prima di rifare l'ordine), `fatto`,
+    `fallito` e `togli` (`_gesto_ripubblica_p2p`). Il nuovo ordine lo
+    firma il telefono: qui si scrive solo come e' andata."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not P2P_RIPUBBLICA:
+        raise HTTPException(409, "La ripubblica non e' attiva")
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    if not isinstance(d, dict):
+        raise HTTPException(400, "Richiesta illeggibile")
+    prezzi, letto = _prezzi_ripubblica_p2p()
+    con = db()
+    try:
+        esito = _gesto_ripubblica_p2p(con, user["id"], d.get("ordine"),
+                                      d.get("gesto"), prezzi, letto, int(time.time()))
+    finally:
+        con.close()
+    if esito.get("ok"):
+        print(f"🔁 Ripubblica P2P: {str(d.get('ordine'))[:8]} di {user['id']} "
+              f"«{d.get('gesto')}» -> {esito.get('stato')}", flush=True)
+    return JSONResponse(esito, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/p2p/paracadute")
@@ -61550,6 +61996,8 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
     # ...e i paracadute (13 ott 2026): stanno sulle righe degli ordini
     # appena tolte, e senza quelle non hanno piu' un ordine da guardare
     con.execute("DELETE FROM p2p_paracadute WHERE tg_id=?", (user["id"],))
+    # ...e le ripubbliche (16 nov 2026), per la stessa ragione
+    con.execute("DELETE FROM p2p_ripubblica WHERE tg_id=?", (user["id"],))
     con.commit()
     con.close()
     return {"ok": True, "tolte": tolte, "volti": volti}
@@ -72223,6 +72671,14 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
                 avvisi = _riga_paracadute_presa_p2p(avvisi, fatto)
             except Exception:
                 pass
+            # ...e la riga della RIPUBBLICA (16 nov 2026) nell'avviso della
+            # scadenza, a chi aveva pubblicato: prima dei traduttori della
+            # valuta qui sotto, che ne voltano il «€». Un guasto toglie la
+            # riga, mai l'avviso
+            try:
+                avvisi = _riga_ripubblica_scadenza_p2p(avvisi, fatto)
+            except Exception:
+                pass
             # ...e IN USDT le parole dei soldi (2 nov 2026, usdt-due-reti):
             # alle sole parti, e un guasto lascia l'avviso com'era
             try:
@@ -72325,6 +72781,19 @@ async def evento_p2p(req: Request):
             except Exception as e:
                 print(f"⚠️ Paracadute P2P: la presa di {ev['ordine'][:8]} non si "
                       f"e' guardata ({type(e).__name__}: {e})", flush=True)
+        # LA RIPUBBLICA ALLA SCADENZA (16 nov 2026, cantiere ripubblica):
+        # si giudica adesso, col prezzo di adesso, e l'avviso della
+        # scadenza porta la riga. Mai un 500 per lei
+        if fatto is not None:
+            try:
+                _prezzi, _letto = _prezzi_ripubblica_p2p()
+                for riga in _segna_scadenza_ripubblica_p2p(
+                        con, ev, fatto, _prezzi, _letto, adesso):
+                    print(riga, flush=True)
+            except Exception as e:
+                fatto["ripubblica"] = None
+                print(f"⚠️ Ripubblica P2P: la scadenza di {ev['ordine'][:8]} non "
+                      f"si e' guardata ({type(e).__name__}: {e})", flush=True)
         # GLI ESITI (10 ott 2026, reputazione-p2p): il completato alle due
         # parti, il non completato a chi ha preso e non ha fatto il suo
         # gesto. Mai un 500 per loro: l'evento e' gia' registrato
@@ -102618,7 +103087,14 @@ def _p2p_onchain_prepara(con):
                       # esce dal suo incasso (quella di chi deposita sta
                       # dentro `importo_sats`); le due insieme sono
                       # `quota_sats`, l'uscita verso Barattolo
-                      ("quota_ricevente_sats", "INTEGER DEFAULT 0")):
+                      ("quota_ricevente_sats", "INTEGER DEFAULT 0"),
+                      # 16 nov 2026, cantiere ripubblica: l'intervallo del
+                      # prezzo di BTC (unita' intere, euro o dollari per gli
+                      # USDT; 0 = spenta) e quante volte la ronda l'ha
+                      # rimesso nel libro
+                      ("rip_minimo", "INTEGER DEFAULT 0"),
+                      ("rip_massimo", "INTEGER DEFAULT 0"),
+                      ("rip_giri", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -102856,6 +103332,11 @@ def _p2p_onchain_foglio(o, pubblico: bool = False) -> dict:
                                               _p2p_onchain_cambio(o))
     if not pubblico:
         d["paracadute"] = int(_p2p_onchain_campo(o, "paracadute", 0) or 0)
+        # la ripubblica (16 nov 2026): come il paracadute, solo a lui
+        if int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0) > 0:
+            d["ripubblica"] = {"minimo": int(_p2p_onchain_campo(o, "rip_minimo", 0) or 0),
+                               "massimo": int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0),
+                               "valuta": "usd" if p2p_onchain_usdt(o) else "eur"}
         d["chiuso_perche"] = str(_p2p_onchain_campo(o, "chiuso_perche", "") or "")
     return d
 
@@ -103440,6 +103921,9 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     cambio_eur = cambio_noto_ora()
     para_da = cambio_eur if para and cambio_eur > 0 else 0.0
     para_letto = int(_cambio_cache["quando"] or 0) if para_da else 0
+    # LA RIPUBBLICA (16 nov 2026): l'intervallo, se c'e'; qui il nuovo
+    # ordine lo rifa' la ronda, il libro e' del server
+    rip = _intervallo_ripubblica_p2p(d.get("ripubblica")) if P2P_RIPUBBLICA else None
     try:
         onchain_xpub_barattolo()
     except ValueError as e:
@@ -103458,13 +103942,15 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
         cur = con.execute(
             "INSERT INTO p2p_onchain_ordini(ordine, lato, maker_id, prezzo_sats,"
             " euro_cent, metodi, recapito, scade, creato, aggiornato,"
-            " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura,"
+            " rip_minimo, rip_massimo)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ordine, lato, user["id"], sats, int(d["euro_cent"]),
              json.dumps(metodi, ensure_ascii=False), recapito,
              adesso + P2P_ONCHAIN_ORE_LIBRO * 3600, adesso, adesso,
              "mercato" if tipo == "mercato" else "fisso", premio, filtro,
-             para, para_da, para_letto))
+             para, para_da, para_letto,
+             rip[0] if rip else 0, rip[1] if rip else 0))
         con.commit()
         oid = cur.lastrowid
         riga = _p2p_onchain_carica(con, oid)
@@ -105116,6 +105602,69 @@ def _p2p_onchain_testo_paracadute(a: dict) -> str:
             "Puoi ripubblicarlo al prezzo nuovo dal libro degli ordini.")
 
 
+def _p2p_onchain_passata_ripubblica(con, scaduti: list, prezzi, letto,
+                                    adesso: int) -> list:
+    """LA RIPUBBLICA DEGLI ORDINI ON-CHAIN (16 nov 2026): fra gli ordini
+    appena arrivati alla scadenza (`scaduti`, ancora `pending`), quelli con
+    l'intervallo. BTC fresco e dentro -> la vita riparte intera
+    (`scade` = adesso + P2P_ONCHAIN_ORE_LIBRO), lo stesso ordine con lo
+    stesso nome, e l'id esce da `scaduti` (la lista la modifica QUI); fuori
+    -> scade come gli altri, e lo si dice. SENZA UN PREZZO FRESCO non si
+    rifa' niente e non si dice niente: l'ordine scade come sempre. Il
+    prezzo e' nella valuta dell'ordine (il dollaro per gli USDT). Torna
+    `[{id, ordine, maker_id, esito, prezzo, minimo, massimo, lato,
+    euro_cent, metodi}]`. Non committa: lo fa la ronda."""
+    if not P2P_RIPUBBLICA or not scaduti:
+        return []
+    fuori = []
+    for oid in list(scaduti):
+        o = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=? AND stato='pending'",
+                        (int(oid),)).fetchone()
+        if not o or int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0) <= 0:
+            continue
+        minimo = int(_p2p_onchain_campo(o, "rip_minimo", 0) or 0)
+        massimo = int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0)
+        valuta = "usd" if p2p_onchain_usdt(o) else "eur"
+        prezzo = _prezzo_ripubblica_p2p(prezzi, letto, valuta, adesso)
+        if not prezzo > 0:
+            continue
+        a = {"id": int(o["id"]), "ordine": o["ordine"], "maker_id": int(o["maker_id"]),
+             "prezzo": prezzo, "minimo": minimo, "massimo": massimo,
+             "valuta": valuta, "lato": o["lato"], "euro_cent": int(o["euro_cent"]),
+             "metodi": o["metodi"], "esito": "fuori"}
+        if _dentro_ripubblica_p2p(minimo, massimo, prezzo):
+            cur = con.execute(
+                "UPDATE p2p_onchain_ordini SET scade=?, aggiornato=?,"
+                " rip_giri=COALESCE(rip_giri,0)+1 WHERE id=? AND stato='pending'",
+                (int(adesso) + P2P_ONCHAIN_ORE_LIBRO * 3600, int(adesso), a["id"]))
+            if cur.rowcount:
+                a["esito"] = "rifatto"
+                scaduti.remove(oid)
+        fuori.append(a)
+    return fuori
+
+
+def _p2p_onchain_testo_ripubblica(a: dict) -> str:
+    """PURA: l'avviso della ripubblica di un ordine on-chain, rimesso nel
+    libro dalla ronda o lasciato scadere. In USDT i soldi si dicono in
+    USDT, e anche BTC si misura in dollari."""
+    segno = "USDT" if a.get("valuta") == "usd" else "€"
+    cosa = {"sell": " di vendita", "buy": " di acquisto"}.get(a.get("lato") or "", "")
+    euro = f" da {_fmt_eur(int(a['euro_cent']) / 100)} {segno}" if a.get("euro_cent") else ""
+    btc = f"{_cifra_ripubblica_p2p(a.get('prezzo'))} {segno}"
+    tra = (f"{_cifra_ripubblica_p2p(a.get('minimo'))}–"
+           f"{_cifra_ripubblica_p2p(a.get('massimo'))} {segno}")
+    if a.get("esito") == "rifatto":
+        return (f"{P2P_ONCHAIN_SEGNO} 🔁 <b>Ho ripubblicato il tuo ordine on-chain"
+                f"{cosa}{euro}</b>: era scaduto e BTC è a {btc}, dentro il tuo "
+                f"intervallo ({tra}). Resta nel libro altre "
+                f"{P2P_ONCHAIN_ORE_LIBRO} ore, uguale.")
+    return (f"{P2P_ONCHAIN_SEGNO} ⏰ <b>Il tuo ordine on-chain{cosa}{euro} è "
+            f"scaduto</b> e non l'ho ripubblicato: BTC è a {btc}, fuori dal tuo "
+            f"intervallo ({tra}). Puoi ripubblicarlo quando vuoi dal libro "
+            "degli ordini.")
+
+
 async def _p2p_onchain_ronda() -> None:
     """Il battito del libro on-chain, dentro `orologio_onchain` (ogni due
     minuti): gli scambi presi si guardano su mempool; gli ordini nel
@@ -105130,6 +105679,10 @@ async def _p2p_onchain_ronda() -> None:
         scaduti = [r["id"] for r in con.execute(
             "SELECT id FROM p2p_onchain_ordini WHERE stato='pending' AND scade<=?"
             " LIMIT 50", (adesso,))]
+        # LA RIPUBBLICA (16 nov 2026): chi ha l'intervallo e BTC dentro
+        # resta nel libro, con la vita di nuovo intera; gli altri scadono
+        _prezzi, _letto = _prezzi_ripubblica_p2p()
+        rifatti = _p2p_onchain_passata_ripubblica(con, scaduti, _prezzi, _letto, adesso)
         for oid in scaduti:
             con.execute("UPDATE p2p_onchain_ordini SET stato='scaduto', chiuso_il=?,"
                         " aggiornato=? WHERE id=? AND stato='pending'",
@@ -105150,6 +105703,21 @@ async def _p2p_onchain_ronda() -> None:
         _p2p_onchain_rifai_foto()
     for oid in scaduti:
         await _p2p_onchain_pubblica(oid)
+    # ...e la ripubblica, detta a chi l'ha chiesta: rimesso nel libro
+    # (col 38383 rifatto, la scadenza e' nuova) o lasciato scadere
+    for a in rifatti:
+        if a["esito"] == "rifatto":
+            await _p2p_onchain_pubblica(a["id"])
+        try:
+            await notifica(a["maker_id"], _p2p_onchain_testo_ripubblica(a),
+                           _p2p_onchain_bottone(a))
+        except Exception as e:
+            print(f"⚠️ P2P on-chain: avviso della ripubblica {a['id']} saltato: {e}",
+                  flush=True)
+        print(f"🔁 P2P on-chain: ordine {a['id']} di {a['maker_id']} "
+              + ("rimesso nel libro" if a["esito"] == "rifatto" else "scaduto, fuori")
+              + f" (BTC a {a['prezzo']:.0f}, intervallo {a['minimo']}-{a['massimo']})",
+              flush=True)
     for a in aperti:
         try:
             # il bottone di ogni avviso on-chain: apre lo scambio, che dice
@@ -110014,6 +110582,7 @@ CANCELLA_TOGLI = (
     ("p2p_attese", "tg_id"), ("p2p_avvisi", "tg_id"),
     ("p2p_avvisi_nuovi", "tg_id"), ("p2p_moderatori", "tg_id"),
     ("p2p_paracadute", "tg_id"), ("p2p_pause", "tg_id"),
+    ("p2p_ripubblica", "tg_id"),
     ("p2p_semi", "tg_id"), ("p2p_sveglie", "tg_id"),
     ("p2p_tentativi", "tg_id"), ("p2p_tolti", "tg_id"),
     ("p2p_presenze", "caricata_da"), ("p2p_sono_qui", "caricata_da"),

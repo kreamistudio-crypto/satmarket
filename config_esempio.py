@@ -1121,6 +1121,13 @@ P2P_TEMPO_DI_CHI_PUBBLICA = False
 # piu'); servono due letture di fila oltre la soglia, e una fonte muta
 # non apre niente. Mai sugli ordini Barattozon. Solo True accende.
 P2P_PARACADUTE = False
+# LA RIPUBBLICA DEGLI ORDINI SCADUTI (16 nov 2026): ACCESA di serie. Chi
+# pubblica scrive due prezzi di BTC («da X a Y»); quando l'ordine scade
+# nel libro, se BTC sta dentro, si rifa' uguale: il Lightning lo firma il
+# telefono alla prima apertura, l'on-chain lo rifa' la ronda del server.
+# Spenta per ogni ordine finche' non si scrivono i due prezzi; mai su
+# Barattozon ne' sugli ordini in moneta. Solo False spegne.
+P2P_RIPUBBLICA = True
 # LA CHAT NELLO SCAMBIO (12 ott 2026): ACCESA di serie. Dentro ogni
 # scambio preso le due parti si scrivono; i messaggi passano dal server
 # gia' chiusi dal telefono, stanno in un file a parte (`chat-scambi.db`,

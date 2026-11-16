@@ -84568,3 +84568,69 @@ PROVATO: `prove_logo_p2p_nitido` (la misura da 68 a 102, i 118,5px, il
 conto sulle larghezze dei telefoni veri) e `prove_nav_p2p` (gli angoli
 a 12px) adeguate. Foto mandata ad Andrea prima del push (390, chiaro e
 scuro, compra e vendi, gabbia con relay morti).
+
+## La ripubblica degli ordini P2P scaduti (16 nov 2026, cantiere ripubblica, Andrea: «Gli ordini nel peer-to-peer durano fino a un certo periodo. Questa regola è dovuta da mostro… un paragrafo nuovo che si intitola Ripubblica… se Bitcoin è compreso in un range di prezzo da X a X, e il prezzo lo metti tu manualmente, alla scadenza dell'annuncio ripubblica in automatico l'annuncio»; poi «Questa roba va in produzione adesso»)
+
+La vita di un ordine nel libro la decide mostrod (`expiration_hours`,
+168 ore) e non si tocca: si decide cosa succede DOPO. Nel foglio
+«Pubblica», dopo il paracadute, la sezione «🔁 Ripubblica» con due prezzi
+di BTC scritti a mano, nella valuta dell'ordine; alla scadenza, se BTC
+sta fra i due, l'ordine si rifà uguale. Il com'è fatto: ARCHITETTURA, «LA
+RIPUBBLICA DEGLI ORDINI SCADUTI».
+LA DECISIONE DI ANDREA (card nel thread): sul Lightning il nuovo ordine
+lo firma IL TELEFONO alla prima apertura dell'app, non il server. Il
+server non ha e non deve avere le chiavi dell'ordine (regola ferrea 2,
+la stessa ragione del `cancel` del paracadute): alla scadenza guarda il
+prezzo e segna `pronto`, e il telefono, su qualunque pagina, rifà
+l'ordine senza chiedere. Il prezzo: a telefono spento l'ordine resta
+fuori dal libro finché non si apre Barattolo, e il bot lo dice
+(«parte appena apri Barattolo»). Sull'on-chain il libro è del server, e
+lo rifà lui nella ronda, a telefono spento.
+LE ALTRE SCELTE (dette nel thread, non contraddette): spenta per ogni
+ordine finché non si scrivono i due prezzi (il foglio riparte vuoto,
+mai l'intervallo di ieri); ripubblica a OGNI scadenza finché BTC resta
+dentro o finché si tocca «Non ripubblicarlo più» nella pagina
+dell'ordine; STESSE CONDIZIONI (a prezzo fisso gli stessi sats per gli
+stessi euro, a mercato lo stesso premio, metodi, zona, filtro,
+paracadute e intervallo); il bot lo dice ogni volta, DENTRO l'avviso
+della scadenza che partiva già (una notifica, non due); fuori
+Barattozon (il PayCode scade da sé: rifarlo uguale vorrebbe dire un
+PayCode morto in vetrina) e gli ordini in moneta (ETH, XMR, USDe: «la
+stessa cifra in moneta» con BTC mosso non è più lo stesso ordine).
+LE GUARDIE: il prezzo è quello che il server ha già in mano
+(`cambio_noto_ora`) e deve avere meno di 15 minuti, perché un intervallo
+è una protezione e un numero vecchio non la dà; alla scadenza senza
+prezzo fresco la riga va `pronto` e il giudizio si RIFÀ quando il
+telefono chiede (anche ore dopo, col prezzo di quel momento: chi apre
+l'app con BTC uscito dall'intervallo si sente dire «non l'ho
+ripubblicato»). Due telefoni aperti insieme non rifanno l'ordine due
+volte: il lucchetto `prendo` è un UPDATE condizionato sullo stato, e un
+telefono che prende e tace per 10 minuti lascia il posto a un altro.
+L'intervallo lo dichiara solo chi l'ordine l'ha pubblicato, con la porta
+del paracadute (la prima dichiarazione resta). I franchi si misurano in
+franchi, gli USDT in dollari, e la cifra dell'avviso la traducono gli
+stessi traduttori del resto dell'avviso, così cifra e simbolo non
+divergono. Il nuovo ordine passa dallo STESSO giudice del foglio
+(`valeNuovoOrdineP2P`): se nel frattempo un tetto è cambiato, non parte
+e il telefono lo dice («puoi rifarlo dal +»).
+STRADE SCARTATE: una patch del nodo che rimette in vetrina l'ordine
+scaduto da sé (la riconsegna al libro di mostrod esiste solo per gli
+ordini presi e mollati, e una patch in più sul coordinator per una
+comodità era sproporzionata); il server che firma con una chiave
+consegnata dal telefono (regola ferrea 2, mai); una conferma a ogni
+ripubblica («sì, rifallo») (Andrea ha chiesto «in automatico»); l'annuncio
+della ripubblica sul canale (un ordine rifatto non è una novità).
+PROVATO: `prove_ripubblica_p2p` (55 prove: le sentinelle — leva accesa
+di serie, nessuna firma né rete nel blocco del server — l'intervallo,
+dentro/fuori coi capi, il prezzo vecchio che non giudica, la porta di
+chi dichiara, Barattozon e le monete fuori, il lucchetto con due
+telefoni, la riga del bot in euro, franchi e USDT, la ronda on-chain
+dentro/fuori/senza prezzo, il motore del client che rifà l'ordine coi
+sats uguali a prezzo fisso, il foglio che riparte vuoto), cinque
+controprove (rotto apposta, rosso, rimesso); suite intera e collaudi
+nel worktree. Sentinelle adeguate: le chiavi della busta P2P sono
+diciannove, i chiamanti di `registraChiaviP2P` dieci.
+DA GUARDARE: NON provato dal vivo con un ordine vero scaduto sul nodo
+(la prima scadenza vera arriva dopo 7 giorni da un ordine con
+l'intervallo); il rifacimento dal webview vero del telefono; che
+l'avviso della scadenza arrivi con la riga giusta in franchi.

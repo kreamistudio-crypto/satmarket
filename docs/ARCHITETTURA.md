@@ -32901,6 +32901,68 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   rimandata (CANTIERI). Prove: `prove_paracadute_p2p`,
   `prove_paracadute_app`, `collaudo_paracadute` (gabbia della CI).
 
+- LA RIPUBBLICA DEGLI ORDINI SCADUTI (16 nov 2026, cantiere
+  `ripubblica`; il perché in CANTIERI, «La ripubblica degli ordini P2P
+  scaduti»). Nel foglio «Pubblica», dopo il paracadute, la sezione
+  «🔁 Ripubblica»: due prezzi di UN bitcoin, «da X a Y», nella valuta
+  dell'ordine (euro, franchi, dollari per gli USDT). Quando l'ordine
+  scade nel libro senza che nessuno l'abbia preso, se BTC sta fra i due
+  (i capi contano) l'ordine si rifà UGUALE — a prezzo fisso gli stessi
+  sats per gli stessi euro, a mercato lo stesso premio, stessi metodi,
+  zona, filtro, paracadute e intervallo — e così a ogni scadenza, finché
+  BTC resta dentro o chi l'ha pubblicato tocca «Non ripubblicarlo più».
+  Vuoto = spenta, e il foglio riparte vuoto. Mai con Barattozon (il
+  PayCode scade da sé) né con le monete (ETH, XMR, USDe). DUE LIBRI, DUE
+  STRADE, e la firma sta sempre in chi ha la chiave.
+  IL LIGHTNING (Mostro): la leva `P2P_RIPUBBLICA` (ACCESA di serie, in
+  busta come `ripubblica`, nel pannello delle leve). Il telefono dichiara
+  l'intervallo con le chiavi dell'ordine (`registra_ordini_p2p`, campo
+  `ripubblica`, il patto del paracadute: solo sulla riga di chi l'ha
+  pubblicato, e la prima resta) nella tabella `p2p_ripubblica` (ordine, tg_id,
+  minimo, massimo, valuta, stato, prezzo, deciso, preso_il). Gli stati:
+  `armato` → alla scadenza (`evento_p2p`, momento `scaduto`, patch 0007)
+  il server guarda il prezzo che ha GIÀ in mano (`cambio_noto_ora`,
+  fresco da meno di `P2P_RIPUBBLICA_FRESCO_S` = 900 s, mai la rete) e
+  scrive `pronto` (dentro, o senza prezzo fresco) o `saltato` (fuori);
+  la riga sta in coda all'avviso della scadenza che parte già
+  (`_riga_ripubblica_scadenza_p2p`: una notifica sola, «Lo ripubblico
+  uguale» o «Non l'ho ripubblicato, BTC è a X»). Poi il TELEFONO, alla
+  prima apertura su qualunque pagina (`battitoRipubblicaP2P`, una volta
+  al minuto, nello stesso battito del paracadute), chiede `GET
+  /api/p2p/ripubblica`: il server RIGIUDICA i `pronto` col prezzo di
+  adesso e risponde `pronti` (da rifare) e `saltati` (detti una volta).
+  Per ogni pronto il telefono prende il LUCCHETTO (`POST
+  /api/p2p/ripubblica`, gesto `prendo`: `pronto` → `in_corso` con un
+  UPDATE condizionato, così due telefoni aperti insieme non rifanno lo
+  stesso ordine due volte; un `in_corso` muto da
+  `P2P_RIPUBBLICA_PRESA_S` = 600 s lo riprende un altro), FIRMA il
+  `new-order` coi campi di `campiRipubblicaUgualeP2P` passati dallo
+  STESSO giudice del foglio (`pubblicaDaSoloP2P`), registra la chiave e
+  l'intervallo del nuovo ordine, e chiude con `fatto` o `fallito`. Il
+  gesto `togli` (`armato`/`pronto` → `tolto`) è il tasto della pagina
+  dell'ordine. Le righe si cancellano con l'account e seguono la fusione
+  delle identità come quelle del paracadute.
+  L'ON-CHAIN: il libro è del server, e lo rifà lui. Le colonne
+  `rip_minimo`, `rip_massimo`, `rip_giri` di `p2p_onchain_ordini`
+  arrivano con la pubblicazione (`ripubblica` nel corpo); nella ronda
+  (`_p2p_onchain_ronda`) `_p2p_onchain_passata_ripubblica` prende gli
+  scaduti con l'intervallo: BTC fresco e dentro → `scade` riparte di
+  `P2P_ONCHAIN_ORE_LIBRO` ore, stesso ordine, `rip_giri` +1; fuori →
+  scade come gli altri; l'avviso lo scrive
+  `_p2p_onchain_testo_ripubblica`. Senza prezzo fresco scade come
+  sempre, in silenzio.
+  NEL CLIENT: il blocco «LA RIPUBBLICA NEL MOTORE» (i giudici puri:
+  `intervalloRipubblicaP2P`, `ripubblicaPossibileP2P`,
+  `fraseRipubblicaNuovoP2P`, `sezioneRipubblicaNuovoP2P`,
+  `campiRipubblicaUgualeP2P`, `segnoRipubblicaP2P` per la card,
+  `riquadroRipubblicaP2P` per la pagina) e, fuori dal motore, «LA
+  RIPUBBLICA, LA PARTE CHE CHIEDE» (`chiediRipubblicheP2P`,
+  `ripubblicaProntiP2P`, `togliRipubblicaP2P`). Il «🔁 Ripubblica al
+  prezzo nuovo» del paracadute porta con sé l'intervallo dell'ordine
+  vecchio. ⚠️ Il Lightning si rifà solo quando un telefono si apre:
+  a telefono spento l'ordine resta fuori dal libro (scelta di Andrea,
+  «Dal telefono, all'apertura»). Prove: `prove_ripubblica_p2p`.
+
 - LA CASSA DI RISONANZA SU X (9 ott 2026). I post di Barattolo su Nostr
   escono anche su X, dal server: un orologio in sottofondo
   (`orologio_x`, `X_GIRO_S` 5 minuti, parte da `avvia_x` SOLO se
