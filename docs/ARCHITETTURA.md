@@ -31399,6 +31399,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    di zap@ con un secondo nome nella whitelist, e il suo callback;
    niente Nostr, 404 a leva `SWAP_INDIRIZZO_ATTIVO` spenta; vedi
    «L'INDIRIZZO DELLA QUOTA»),
+   `/api/payjoin/{gettone}` (16 nov 2026, la porta del PayJoin degli
+   acquisti on-chain: la bussa il wallet di chi compra, senza sessione,
+   POST e OPTIONS, CORS aperto; il gettone a caso è dell'ordine, e senza
+   un ordine da pagare la risposta è sempre `unavailable`; vedi «IL
+   PAYJOIN DEGLI ACQUISTI ON-CHAIN»),
    `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
    trovare»: la prima è una costante PURA che non tocca il database e
    non può sollevare — un 5xx lì sospende la scansione di tutto il sito
@@ -35166,6 +35171,71 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   venuto dopo; le parole non escono mai. `backup-fuori.sh` copia
   `chiavi/` nell'archivio age. Prove: `prove_onchain_disputa`; il
   collaudo `collaudo_onchain_ordine` (sezioni 5b e 5c).
+- IL PAYJOIN DEGLI ACQUISTI ON-CHAIN (16 nov 2026, cantiere payjoin; il
+  perché in CANTIERI, «Il PayJoin negli acquisti on-chain»). Ricevitore
+  BIP78 v1 scritto in casa con embit, solo per il MERCATINO (il P2P no).
+  IL LINK: `_onchain_ordine_per` dà a chi compra `payjoin` =
+  `URL_PUBBLICO/api/payjoin/<gettone>` (colonna `payjoin_gettone` di
+  `onchain_ordini`, `secrets.token_urlsafe(18)` alla cassa) solo se
+  `_payjoin_link` dice sì: leva `PAYJOIN_ATTIVO` (True nel codice),
+  embit, ordine 'attesa' mai visto in rete e non scaduto, nessun
+  tentativo fatto, la chiave che firma qui (`_payjoin_chiave_qui`: sul
+  VPS, o cartone su rete di prova; mai una xpub solo pubblica dal
+  config) e almeno una moneta libera. Il telefono (`onchainUriPagamento`)
+  aggiunge `&pj=<url codificato>&pjos=0`; il foglio di pagamento dice
+  una riga «🔀 PayJoin» solo allora. Il P2P usa la stessa funzione ma il
+  suo ordine non ha `payjoin`: link di sempre.
+  LA PORTA: `POST /api/payjoin/{gettone}` (e `OPTIONS`), senza sessione,
+  CORS `*`, gettone `[A-Za-z0-9_-]{16,64}`, freno `payjoin` (10 l'ora per
+  gettone), corpo letto a pezzi fino a `PAYJOIN_CORPO_MAX`. I no sono
+  JSON `{errorCode, message}` coi soli codici del BIP (`PAYJOIN_ERRORI`,
+  503 per `unavailable`, 400 gli altri); il perché va nel journal.
+  `payjoin_ricevi`: ordine dal gettone → `payjoin_leggi_originale` (PSBT
+  v0 finalizzato, niente xpub, 1-10 ingressi tutti p2wpkh con firma
+  SIGHASH_ALL VERIFICATA, sequenza unica e non nulla, una sola uscita
+  verso il 2-di-3 per almeno l'importo, ≥ 1 sat/vB) → lo stesso
+  originale già visto riprende la stessa proposta, uno diverso no (UN
+  tentativo per ordine) → ingressi mai visti (`payjoin_visti`) → ogni
+  ingresso esiste con cifra e script dichiarati e non è speso
+  (`onchain_mempool_moneta`: `/tx/{txid}` e `/outspend`) → al più tre
+  delle NOSTRE monete pronte, a caso, rilette in rete allo stesso modo
+  (una spesa da poco, che la ronda non ha ancora visto, si segna
+  'spesa'; nessuna buona → unavailable) → in BEGIN IMMEDIATE una di
+  quelle, ancora libera, la chiave `conto/[catena, indice]`
+  ricontrollata contro il suo indirizzo, il resto su `/3/n`
+  (`PAYJOIN_CATENA_RESTI`) → `payjoin_costruisci`.
+  LA PROPOSTA (`payjoin_costruisci`, pura): ingressi e uscite del wallet
+  nel loro ordine, il nostro ingresso e la nostra uscita a un posto a
+  caso; la stessa tariffa dell'originale sul peso nuovo (99 vB: 68
+  l'ingresso, 31 l'uscita), mai sotto `minfeerate`; il contributo del
+  wallet solo con `additionalfeeoutputindex` + `maxadditionalfeecontribution`,
+  mai sull'uscita dell'ordine, al più tasso × 68 vB; il resto della rete
+  lo paga Barattolo dalla sua moneta fino a `PAYJOIN_SPESA_MAX_SATS`
+  (500), con l'uscita nostra ≥ `PAYJOIN_POLVERE` (330). Firma A MANO il
+  solo indice nostro (`sighash_segwit` + `chiave.sign`, mai
+  `sign_with`), mette `witness_utxo` e `final_scriptwitness` solo lì, e
+  ricontrolla che il txid del PSBT sia quello firmato.
+  LE TABELLE (`_payjoin_prepara`, da `_onchain_db_ordini`):
+  `payjoin_tentativi` (`onchain_id` UNIQUE, originale intero, proposta,
+  txid, moneta, resto, spesa, esito proposta|payjoin|originale|rifiutata|altro),
+  `payjoin_visti` (punto txid:vout), `payjoin_monete` (indirizzo, xpub,
+  catena 1 quote / 3 resti, indice, stato da_guardare|viva|attesa|spesa|mai,
+  la moneta più grande dell'indirizzo).
+  LA RONDA (`_payjoin_ronda`, dentro `orologio_onchain`, ogni 2 minuti):
+  registra le quote già uscite di mercatino e P2P (`quota_indirizzo` con
+  `txid_uscita`, l'indice è `numero_barattolo`); i tentativi aperti da
+  più di `PAYJOIN_ATTESA_ORIGINALE_S` (180 s): PayJoin in rete → 'payjoin'
+  e moneta 'spesa'; originale in rete → 'originale'; niente e ordine
+  ancora da pagare → l'originale la trasmette Barattolo
+  (`onchain_mempool_invia`); il resto di un PayJoin mai andato in rete
+  diventa 'mai'; poi 20 indirizzi riletti (`PAYJOIN_RILEGGI_S` 600 s):
+  confermata → 'viva', vuota da 'viva' (o mai riempita in 3 giorni) →
+  'spesa'. Una moneta è libera se viva, sulla xpub di adesso, ≥ 361
+  sats e non in un tentativo 'proposta' o 'payjoin'.
+  IL PANNELLO: riga «PayJoin negli acquisti on-chain» con monete pronte,
+  sats e PayJoin andati in rete (`_payjoin_a_parole`). Prove:
+  `prove_payjoin` (wallet di cartone, controlli del wallet sul calco
+  del BIP, controprove); collaudo `collaudo_payjoin`.
 - IL TETTO DELLA BETA ON-CHAIN (27 ott 2026, cantiere onchain-tetto):
   `ONCHAIN_MAX_EURO` (250 nel codice, 0 = spento) sul prezzo dell'ordine,
   col cambio del momento; `onchain_sopra_il_tetto` lo giudica e la cassa
