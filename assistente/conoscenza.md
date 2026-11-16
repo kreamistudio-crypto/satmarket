@@ -1662,6 +1662,8 @@ pubblico: sì
 
 frase: Toccando l'avviso di un annuncio, che arrivi dal bot, dal canale o come notifica sul telefono, adesso si apre la pagina di quell'annuncio, non più la home.
 dove: gli avvisi «🔎 Un annuncio fa per te!», i post del canale, gli avvisi delle offerte e dei nuovi annunci, nel bot e nelle notifiche del telefono.
+leva: nessuna
+pubblico: sì
 
 <!-- pezzo novita-049 | novita -->
 ## Novità · 2026-11-16 · p2p-mappa-recenti

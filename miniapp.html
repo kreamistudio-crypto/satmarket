@@ -5855,6 +5855,14 @@
     padding:6px 0;cursor:pointer}
   .p2p-tendina > span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap}
+  /* IL BOLLINO DELLA RETE NON SI MOZZA (16 nov 2026, Andrea: «Simbolino
+     mozzato», sul bollino Ethereum sopra Tether): la riga taglia quel che
+     esce (`overflow:hidden`, per i puntini), e il bollino sporge di 5px
+     in alto. Il margine di taglio si allarga col padding e il margine
+     negativo lo rende, cosi' la riga resta alta uguale; il margine a
+     destra lo stacca dalla sigla, che prima ci finiva sotto */
+  .p2p-tendina > span{padding-block:6px;margin-block:-6px}
+  .p2p-tendina > span .p2p-band-rete{margin-right:6px}
   .p2p-tendina.vuota span{color:var(--muted)}
   .p2p-tendina i{flex:0 0 auto;font-style:normal;font-size:11px;color:var(--muted)}
   .p2p-voci{margin-top:6px;display:grid;gap:2px}
