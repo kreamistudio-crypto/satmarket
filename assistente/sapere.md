@@ -266,6 +266,11 @@ L'indirizzo IP: come ogni server, quello di Barattolo vede l'IP di chi si colleg
 
 Tor: Barattolo ha anche un sito .onion, lo stesso Barattolo dentro la rete Tor. Da lì il server non vede il tuo IP e non lo scrive da nessuna parte. L'indirizzo esatto è nella pagina «I tuoi dati», e quando apri barattolo.store con Tor Browser la barra degli indirizzi ti propone da sola la versione .onion («.onion disponibile»). Con un .onion conta ogni carattere: usa solo quello ufficiale.
 
+Cancellare l'account: nel Profilo, nella parte della privacy accanto a «🔐 I tuoi dati», c'è «🗑 Cancella il mio account» (se la voce non c'è, oggi non è disponibile). Si può fare solo quando non hai niente in corso: se c'è un ordine non concluso, un pagamento in arrivo, sats ancora da ricevere, un'asta con puntate o uno scambio P2P aperto, il foglio te lo elenca e il bottone non compare finché non è tutto chiuso. Poi il foglio dice cosa sparisce e cosa resta; per confermare scrivi CANCELLA e tocchi «🗑 Cancella per sempre». Non si può annullare.
+- Spariscono il profilo (nome, foto, Lightning address, chiave Nostr collegata), i preferiti, gli avvisi, gli indirizzi salvati e le chat; gli annunci in vetrina vengono ritirati, anche da Nostr e dai canali; le recensioni ricevute, i punti e l'eventuale posto da pioniere si perdono.
+- Restano, senza il tuo nome, gli ordini conclusi e i pagamenti (per la contabilità e le contestazioni: chi ha fatto affari con te vede «Utente cancellato») e le recensioni che hai scritto, senza firma.
+- Di te Barattolo tiene solo un'impronta del numero dell'account (non il numero, e mai il telefono) con la data, e le eventuali penalità degli scambi P2P: se rientri con lo stesso account parti da zero, e tornano solo quelle. La chat col bot la togli tu da Telegram, e i messaggi Nostr firmati da te restano tuoi.
+
 Questo assistente: la tua domanda e le ultime battute arrivano ad Anthropic, l'azienda dell'intelligenza artificiale che risponde, ma mai il tuo nome, il tuo account o i tuoi ordini. Le conversazioni non vengono conservate: in chat privata l'assistente ricorda le domande e le risposte della giornata, per seguire il filo del discorso, e a mezzanotte spariscono.
 
 # Se Barattolo sparisse

@@ -83936,3 +83936,27 @@ collaudi della CI senza coincurve e senza proxy 134/0. Dopo il rebase su
 90080455 (sapere-999, non mio: solo sapere, conoscenza e CANTIERI) la suite
 severa intera di nuovo: 28267 passate, 0 fallite, 2 saltate d'ambiente.
 NON provato dal vivo su un telefono.
+
+## La cancellazione dell'account nel libro di Tappo (16 nov 2026, cantiere sapere-cancella-account, Andrea: «Tappo gli fai dire anche due righe riguardo a questo poi?»)
+
+Il 16 nov alle 07:58 UTC Andrea ha acceso sul VPS `ACCOUNT_CANCELLABILE`
+e `ASSISTENZA_ATTIVA` (salute 200). L'assistenza nel libro c'era già
+(«Parlare con una persona»); la cancellazione no. Ora «I tuoi dati, in
+breve» ha un paragrafo: dove sta la voce (Profilo, privacy, accanto a «🔐
+I tuoi dati»), quando si può (niente in corso: gli impegni li elenca il
+foglio, presi da `_impegni_cancellazione`), il gesto (scrivi CANCELLA,
+«🗑 Cancella per sempre», non si annulla), cosa sparisce e cosa resta
+senza nome, l'impronta e le penalità P2P che tornano. Le frasi vengono
+dal foglio vero (`renderCancella`) e dal pannello della privacy. Il
+paragrafo NON è legato ai NUMERI DI OGGI (lì la cancellazione non c'è):
+dice «se la voce non c'è, oggi non è disponibile», che regge anche a
+leva spenta. Solo testo, nessun codice; `conoscenza.md` rigenerato.
+GIRI: suite severa sull'albero da develop 90080455, con `config.py` copiato
+da `config_esempio.py` (poi cancellato): 28241 passate, 1 fallita
+d'ambiente (la chiave segnaposto `INCOLLA_QUI_LA_API_KEY` dell'esempio
+nella prova «di serie» dell'assistente del bot), 2 saltate d'ambiente
+(nostr-tools). Collaudi `collaudo_assistente_bot` e `collaudo_assistenza`
+verdi. Dopo il rebase su 26b75106 (p2p-monete-ritocchi, non mio)
+`conoscenza.md` era già in pari e i due collaudi rigirati verdi.
+DA GUARDARE: dopo la promozione, una domanda a Tappo («come cancello
+l'account?») in privato.
