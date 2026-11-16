@@ -83960,3 +83960,65 @@ verdi. Dopo il rebase su 26b75106 (p2p-monete-ritocchi, non mio)
 `conoscenza.md` era già in pari e i due collaudi rigirati verdi.
 DA GUARDARE: dopo la promozione, una domanda a Tappo («come cancello
 l'account?») in privato.
+
+## La rotellina durante l'accesso (16 nov 2026, cantiere accesso-rotellina, Andrea: «quando è lenta deve esserci almeno qualcosa che gira»)
+
+Dall'APK su Tor, dove tutto è lento, Andrea vedeva due attese ferme. La
+prima: dopo «✅ Sei dentro» col bot di Telegram la pagina si ricarica, e
+fra il ricaricamento e la home finita la copriva il suo fondo vuoto (la
+COPERTURA, vuota per decisione sua: niente logo) per secondi. La seconda:
+con nostrconnect il QR restava a schermo anche dopo che il firmatario
+aveva risposto, perché `firmatarioNostrConnect` passa al bunker (chiave
+pubblica, poi la firma d'ingresso) PRIMA di tornare, e il QR lo toglieva
+solo `loginNostrQr` al ritorno.
+DECISO (piano di 10 righe, ok di Andrea alle 07:56 UTC). Una rotellina sola,
+quella di casa: `.attesa-anello`, il giro del velo (nessun keyframe nuovo;
+i ripieghi di «meno movimento» valgono da soli). Tre posti:
+1) Foglio «Entra con Telegram»: `#botEntraAnello` accanto a
+   `#botEntraStato`, in una riga `.accesso-attesa`. Lo comanda
+   `dettaIngressoBot`: gira finché il giro è vivo (link in preparazione,
+   attesa di Avvia, attesa della figura, «Sei dentro: apro il tuo
+   account…»), si ferma solo dove compare «Riprova». Con la rete che
+   balla si ribussa e l'anello continua.
+2) Foglio Nostr: `#nostrEntro` (anello + «Sto entrando…», o «Preparo la
+   firma…» quando il foglio serve a firmare un annuncio) subito sotto il
+   QR. `anelloNostr(true)` toglie il QR e accende l'anello appena il
+   firmatario ha risposto (dentro `firmatarioNostrConnect`, prima del
+   bunker) e di nuovo prima di «Collegato: entro…»; lo spengono l'errore
+   (ma non quello di un giro morto), il foglio che si riapre e un codice
+   nuovo a schermo (`mostraQrConnessione`).
+3) Il ricaricamento: `segnaEntrando()` scrive `barattolo_entrando` in
+   sessionStorage subito prima del `location.reload()` del bot e di
+   `entraConNostr`; l'head, nel ramo FUORI dall'APK, lo legge, mette la
+   classe `copertura-entra` e lo cancella subito (vale una volta). La
+   classe accende `#coperturaEntro`, un elemento SUO sopra la copertura
+   (stesso fondo, stesso piano, dopo nel documento) con l'anello e
+   «Entro nel tuo account…». Lo toglie `togliGuscio` insieme alla
+   copertura, e la rete dei quattro secondi dell'head pure.
+SCARTATO: l'anello dentro `#copertura` (la sua prova la vuole vuota, ed è
+una decisione di Andrea: l'apertura normale resta com'era); localStorage
+per il segno (resterebbe acceso fra schede e aperture); un keyframe nuovo;
+l'anello anche nella strada bunker:// e nell'estensione (non chiesto: il
+ricaricamento con l'anello però vale per ogni ingresso Nostr, perché passa
+tutto da `entraConNostr`).
+LIMITE, scritto: i primi istanti del ricaricamento, prima che la pagina
+nuova arrivi, li decide il browser (che di solito tiene a schermo la
+pagina vecchia, cioè il foglio con l'anello). Nell'APK TWA all'avvio a
+freddo c'è il guscio col suo anello; dopo un ricaricamento il referrer non
+c'è più, quindi lì vale la copertura con l'anello.
+PROVATO: in `prove_login_dal_bot` il banco node guarda l'anello in ogni
+stato (gira 4 volte su 4 dal link al ricaricamento, fermo su scaduto,
+annullato, leva spenta e freno 429, acceso con la rete che balla) e il
+segno scritto solo a ingresso riuscito e prima del reload; in
+`prove_login_qr` il banco di `firmatarioNostrConnect` dice che in attesa
+l'anello non gira e che si accende una volta, prima del bunker, più
+`anelloNostr` vero sotto node e le sentinelle sul foglio; in
+`prove_copertura_home` l'elemento, le regole, il segno nell'head eseguito
+sotto node (col segno, senza, storage che lancia) e togliGuscio.
+Controprove, 9 su 9 rosse: anello del bot tolto, segno del bot tolto,
+anello dopo la risposta tolto, anello all'errore tolto, testo per lo scopo
+fisso, segno non cancellato, togliGuscio senza l'anello, elemento acceso di
+serie, segno di entraConNostr tolto. Scatti in Chromium (Playwright) della
+pagina statica coi due fogli e la copertura: in
+/mnt/project-files/accesso-rotellina/. NON provato dal vivo sull'APK Tor.
+DA GUARDARE: dall'APK su Tor, un ingresso col bot e uno con nostrconnect.

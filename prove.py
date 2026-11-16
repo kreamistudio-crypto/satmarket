@@ -114209,7 +114209,9 @@ const provaLoginWeb = () => {};
 const closeSheet = () => {};
 const apriNostrSheet = () => {};
 const navDaCapo = () => {};
-const location = {reload: () => { ricaricata++; }};
+const location = {reload: () => { ricaricata++; segnoAlReload.push(memoria.barattolo_entrando || ''); }};
+const memoria = {}, segnoAlReload = [];
+const sessionStorage = {setItem(k, v){ memoria[k] = String(v); }, getItem(k){ return memoria[k] ?? null; }};
 const navigator = {userAgent: '', platform: '', maxTouchPoints: 0};
 Object.defineProperty(navigator, 'userAgent', {get: () => ua});
 let qr = 0;
@@ -114231,6 +114233,7 @@ const el = id => (nodi[id] ||= nodo(id));
         "function telegramNelPortachiavi(){", "function rigaAltroTelegram(){",
         "function leggiPortaBot(){", "function telefonoQui(){", "function portaBot(altro){",
         "function fermaIngressoBot(){", "function dettaIngressoBot(testo, fine){",
+        "function segnaEntrando(){",
         "async function apriIngressoBot(){", "async function bussaIngressoBot(){",
         "function bottoneLoginTelegram(){", "function bottoneLoginBot(posto){",
         "function widgetLoginTelegram(posto){", "function bottoneLoginNostr(){",
@@ -114276,11 +114279,16 @@ const giri = {};
   const f = () => [el('botEntraStato').textContent, el('botEntraEmoji').textContent + '|' + el('botEntraNome').textContent,
     el('botEntraFigura').style.display, el('botEntraApri').style.display, el('botEntraRifai').style.display,
     el('botEntraQrBox').style.display];
+  // (16 nov 2026) l'anello accanto alla riga: '' = gira, 'none' = fermo
+  const an = () => el('botEntraAnello').style.display;
   giri.telefono = [f(), el('botEntraApri').href, el('botEntraApri').innerHTML.replace(/<img[^>]*> /, ''), qr];
-  risposte = [{json: {stato: 'attesa'}}];   await bussaIngressoBot(); giri.attesa = f()[0];
-  risposte = [{json: {stato: 'in_chat'}}];  await bussaIngressoBot(); giri.inChat = f()[0];
+  giri.anelli = [an()];
+  risposte = [{json: {stato: 'attesa'}}];   await bussaIngressoBot(); giri.attesa = f()[0]; giri.anelli.push(an());
+  risposte = [{json: {stato: 'in_chat'}}];  await bussaIngressoBot(); giri.inChat = f()[0]; giri.anelli.push(an());
+  giri.segnoPrima = memoria.barattolo_entrando ?? null;
   risposte = [{json: {stato: 'dentro', nome: 'Negozio'}}]; await bussaIngressoBot();
-  giri.dentro = [f()[0], ricaricata];
+  giri.dentro = [f()[0], ricaricata]; giri.anelli.push(an());
+  giri.segnoAlReload = segnoAlReload.slice();
   giri.chiamate = chiamate.slice();
   // scaduto, annullato, la leva spenta a meta' strada, la rete che balla
   for (const [k, r] of [['scaduto', {json: {stato: 'scaduto'}}], ['annullato', {json: {stato: 'annullato'}}],
@@ -114289,13 +114297,14 @@ const giri = {};
     if (r) risposte = [r]; else risposte = [];
     try { await bussaIngressoBot(); } catch(e) {}
     giri[k] = f();
+    giri['anello_' + k] = an();
   }
   // dal computer: il QR e il bottone di Telegram Desktop
   ua = 'Mozilla/5.0 (Windows NT 10.0)'; qr = 0;
   risposte = [{json: {link: 'L', figura: '🎸', figura_nome: 'Chitarra'}}]; await apriIngressoBot();
   giri.computer = [el('botEntraQrBox').style.display, qr, el('botEntraApri').innerHTML.replace(/<img[^>]*> /, '')];
   // il link non si prepara: si dice, e si puo' riprovare
-  risposte = [{ok: false, status: 429}]; await apriIngressoBot(); giri.freno = f();
+  risposte = [{ok: false, status: 429}]; await apriIngressoBot(); giri.freno = f(); giri.anelloFreno = an();
   // il banner della vetrina: bottone del bot o widget
   portaBotPromessa = Promise.resolve(true);
   const banner = el('demoBanner'); bottoneLoginTelegram(); await portaBotPromessa; await null;
@@ -114397,7 +114406,19 @@ const giri = {};
     prova("dopo l'Avvia la pagina dice QUALE figura toccare, come sul tasto",
           "Ora nel bot tocca 🍯 Miele", g["inChat"])
     prova("figura giusta: si e' dentro e la pagina si ricarica",
-          ["✅ Sei dentro come Negozio", 1], g["dentro"])
+          ["✅ Sei dentro come Negozio: apro il tuo account…", 1], g["dentro"])
+    # L'ANELLO DELL'ACCESSO (16 nov 2026, cantiere accesso-rotellina,
+    # richiesta di Andrea dall'APK su Tor: un foglio fermo sembra un blocco)
+    prova("l'anello gira dal link preparato fino al ricaricamento",
+          ["", "", "", ""], g["anelli"])
+    prova("...e si ferma dove compare «Riprova»: scaduto, annullato, leva "
+          "spenta, link che non si prepara", ["none"] * 4,
+          [g["anello_scaduto"], g["anello_annullato"], g["anello_spenta"], g["anelloFreno"]])
+    prova("...con la rete che balla no: si ribussa, e l'attesa continua",
+          "", g["anello_rete"])
+    prova("il segno di chi entra si scrive SOLO a ingresso riuscito, e "
+          "PRIMA del ricaricamento (la pagina nuova apre con l'anello)",
+          [None, ["1"]], [g["segnoPrima"], g["segnoAlReload"]])
     prova("si chiede una volta e si bussa con POST", ["POST /api/login/bot/inizia"]
           + ["POST /api/login/bot/stato"] * 3, g["chiamate"])
     prova("scaduto: si dice, e c'e' «Riprova» al posto della figura",
@@ -123291,6 +123312,44 @@ def prove_login_qr():
           "prima e' un appuntamento su una chiave che non ascolta "
           "piu'", (True, True),
           ("nostrQrGiro++" in _ap, "nascondiQrConnessione()" in _ap))
+    # L'ANELLO AL POSTO DEL QR (16 nov 2026, cantiere accesso-rotellina,
+    # richiesta di Andrea): dal foglio, da un errore e da un codice nuovo
+    # si spegne; si accende a firmatario collegato, prima di «entro…»
+    prova("...e nasce senza l'anello del giro di prima", True,
+          "anelloNostr(false);" in _ap)
+    _lq = pezzo_js(mini, "async function loginNostrQr(){", "\n}\n")
+    prova("nel login col telefono l'anello si accende prima di «entro…» e "
+          "si spegne all'errore, ma non per un giro morto", [True, True],
+          ["anelloNostr(true);\n    bunkerDice('Collegato: entro…');" in _lq,
+           "if (giro !== nostrQrGiro) return;   // il fallimento e' di un giro morto\n"
+           "    anelloNostr(false);" in _lq])
+    prova("un codice nuovo a schermo spegne l'anello", True,
+          "if (anello) anello.style.display = 'none';"
+          in pezzo_js(mini, "async function mostraQrConnessione(uri){", "\n}\n"))
+    _fq = mini[mini.index('<div id="nostrQrBox"'):]
+    prova("l'anello sta subito sotto il QR, spento, con l'anello di casa e "
+          "una riga che si legge a voce", [True, True, True],
+          [_fq.index('id="nostrEntro"') < _fq.index('loginNostrEstensione()'),
+           '<div id="nostrEntro" class="accesso-attesa" role="status" style="display:none">' in mini,
+           '<span class="attesa-anello" aria-hidden="true"></span>\n      <span class="accesso-attesa-testo" id="nostrEntroTesto">'
+           in mini])
+    import shutil as _shq, subprocess as _spq
+    if _shq.which("node"):
+        _ba = ("const nodi = {};\nconst el = id => (nodi[id] ||= {style: {}, textContent: ''});\n"
+               "let scopoFirmatario = null, nascosti = 0;\nfunction nascondiQrConnessione(){ nascosti++; }\n"
+               + pezzo_js(mini, "function anelloNostr(acceso){", "\n}\n") + "\n}\n"
+               + "const g = [];\nconst vedi = () => [el('nostrEntro').style.display, el('nostrEntroTesto').textContent, nascosti];\n"
+               "anelloNostr(true); g.push(vedi());\nanelloNostr(false); g.push(vedi());\n"
+               "scopoFirmatario = () => {}; anelloNostr(true); g.push(vedi());\n"
+               "console.log(JSON.stringify(g));")
+        _ra = _spq.run(["node", "-e", _ba], capture_output=True, text=True, timeout=30)
+        prova("anelloNostr, vero sotto node: acceso toglie il QR e dice "
+              "«Sto entrando…», spento si nasconde, per una firma dice "
+              "«Preparo la firma…»",
+              [["", "Sto entrando…", 1], ["none", "Sto entrando…", 1], ["", "Preparo la firma…", 2]],
+              json.loads(_ra.stdout or "null") if _ra.returncode == 0 else _ra.stderr)
+    else:
+        salta("anelloNostr sotto node", "node non c'e'")
     # SU IPHONE SI CONSIGLIA IL BUNKER (10 ott 2026): sullo stesso
     # iPhone il nostrconnect muore di iOS (Clave lo scrive nei suoi
     # documenti), il bunker:// di Clave firma via notifica.
@@ -123375,7 +123434,9 @@ def prove_login_qr():
     _pezzi = _banco_nip46_js(mini) + "\n" + fnc + "\n"
     _prog = _pezzi + r"""
 let subs = {}, filtri = {}, qrMostrato = null, qrAscolti = null, alBunker = null;
+let anello = [];                       // (16 nov 2026) quando gira l'anello, e se il bunker c'era gia'
 async function mostraQrConnessione(uri){ qrMostrato = uri; qrAscolti = Object.keys(subs).sort(); }
+function anelloNostr(acceso){ anello.push([acceso, alBunker !== null]); }
 function baseCondivisione(){ return 'https://barattolo.store'; }
 async function firmatarioBunker(uri, sk, modo, opz){
   alBunker = {uri, sk, modo, opz};
@@ -123414,6 +123475,7 @@ const ev = (pubkey, msg) => ({id: 'ev' + (++nEv), pubkey, content: JSON.stringif
 function avvia(comeConnette){
   globalThis.window = Object.assign({NostrTools: NTfinto(comeConnette)}, finestra);
   qrMostrato = null; qrAscolti = null; alBunker = null; subs = {}; filtri = {}; detti = []; cassettaPost = [];
+  anello = [];
   posta = () => ({viva: true, eventi: [], n: 0});
   document.visibilityState = 'visible';
   return firmatarioNostrConnect().then(() => 'FATTO', e => e.message);
@@ -123430,6 +123492,7 @@ const conTetto = (p, ms) => Promise.race([p,
   let p = avvia(url => url.includes('tre') ? Promise.resolve()
                                            : Promise.reject(new Error('giu')));
   esiti.attesa = await conTetto(p);
+  esiti.anelloInAttesa = anello.slice();
   esiti.qr = qrMostrato;
   esiti.qrAscolti = qrAscolti;
   esiti.since = typeof (filtri['wss://tre.example'] || [{}])[0].since;
@@ -123441,6 +123504,7 @@ const conTetto = (p, ms) => Promise.race([p,
   subs['wss://tre.example'].onevent(ev('REMOTO', {id: '2', result: 'ilsegreto'}));
   esiti.buono = await conTetto(p, 400);
   esiti.bunker = alBunker;
+  esiti.anelloBuono = anello.slice();
   // (d) DUE relay vivi: nel QR ci sono tutti e due, l'ascolto e' su
   //     tutti e due, e la risposta dal SECONDO vale
   p = avvia(url => url.includes('due') ? Promise.reject(new Error('giu'))
@@ -123545,6 +123609,15 @@ const conTetto = (p, ms) => Promise.race([p,
           False, "secret" in (d["bunker"] or {}).get("uri", ""))
     prova("...e col bunker che non rifa' la connect", True,
           ((d["bunker"] or {}).get("opz") or {}).get("giaConnesso"))
+    # L'ANELLO AL POSTO DEL QR (16 nov 2026, cantiere accesso-rotellina,
+    # richiesta di Andrea): finche' si aspetta il firmatario il codice
+    # resta e l'anello no; appena risponde, l'anello si accende UNA volta
+    # e PRIMA di passare al bunker — che su Tor (chiave, firma) dura
+    # secondi, ed era proprio li' che il QR restava a schermo.
+    prova("in attesa del firmatario il QR resta e l'anello non gira",
+          [], d["anelloInAttesa"])
+    prova("...appena risponde l'anello prende il posto del QR, prima del "
+          "bunker", [[True, False]], d["anelloBuono"])
     _qr2 = _unq(d["qr2"] or "")
     prova("con DUE relay vivi il codice li porta tutti e due, e non "
           "il terzo che non c'e'", (True, True, False, 2),
@@ -133174,15 +133247,79 @@ def prove_copertura_home():
           0, nudo[nudo.index("<body"):].count("classList.add('copertura')"))
     # LA RETE CHE NON DIPENDE DALL'APP: a pagina letta tutta, quattro
     # secondi — il doppio del tetto dell'app, che arriva sempre prima
+    # (16 nov 2026) la rete toglie anche l'anello di chi entra, che vive
+    # sopra la copertura e non deve sopravviverle
     prova("...con la sua rete nell'head, a pagina letta, oltre il tetto "
           "dell'app", True,
-          "addEventListener('DOMContentLoaded', () => setTimeout(() =>\n"
-          "      document.getElementById('copertura')?.remove(), 4000));"
+          "addEventListener('DOMContentLoaded', () => setTimeout(() => {\n"
+          "      document.getElementById('copertura')?.remove();\n"
+          "      document.getElementById('coperturaEntro')?.remove();\n"
+          "    }, 4000));"
           in altrimenti)
     tg_ = re.sub(r"/\*.*?\*/", "",
                  pezzo_js(mini, "function togliGuscio(){", "\n}\n"), flags=re.S)
     prova("togliGuscio toglie anche la copertura, nello stesso gesto", 1,
           tg_.count("document.getElementById('copertura')?.remove();"))
+
+    # --- 1b) LA COPERTURA DI CHI STA ENTRANDO (16 nov 2026, cantiere
+    # accesso-rotellina, richiesta di Andrea dall'APK su Tor): dopo un
+    # accesso la pagina si ricarica, e il fondo vuoto durava secondi.
+    # Solo in quel caso l'anello e una riga; l'apertura normale resta
+    # VUOTA (le prove qui sopra non si sono mosse).
+    prova("l'anello di chi entra e' un elemento SUO, dopo la copertura e "
+          "prima di #app, muto, con l'anello di casa", [1, True, True],
+          [mini.count('id="coperturaEntro"'),
+           '<div id="coperturaEntro" aria-hidden="true"><span class="attesa-anello"></span>' in corpo,
+           corpo.find(riga) < corpo.find('id="coperturaEntro"') < corpo.index('<div id="app">')])
+    prova("...nasce spento, e lo accende SOLO la classe di chi entra sopra "
+          "la copertura", [True, "display:flex"],
+          [reg.get("#coperturaEntro", "").startswith("display:none;"),
+           reg.get("html.copertura.copertura-entra #coperturaEntro", "")])
+    prova("...stesso fondo e stesso piano della copertura, sopra di lei "
+          "perche' viene dopo nel documento", [True, True],
+          ["background:var(--bg)" in reg.get("#coperturaEntro", ""),
+           "position:fixed;inset:0;z-index:9998;" in reg.get("#coperturaEntro", "")])
+    # il segno: l'head lo legge UNA volta, nell'«else» (fuori dall'APK) e
+    # lo cancella subito; lo scrive solo segnaEntrando, prima del reload
+    prova("l'head accende la classe dal segno e lo CANCELLA appena letto, "
+          "solo fuori dall'APK", [1, 1, 0],
+          [altrimenti.count("if (sessionStorage.getItem('barattolo_entrando') === '1')\n"
+                            "        document.documentElement.classList.add('copertura-entra');"),
+           altrimenti.count("sessionStorage.removeItem('barattolo_entrando');"),
+           ramo_apk[:ramo_apk.index("\n  } else {\n")].count("entrando")])
+    # E GIRA DAVVERO: il pezzo dell'head sotto node, col segno, senza, e
+    # con lo storage che si rifiuta (navigazione privata): mai un'eccezione
+    _i = altrimenti.index("    try {\n      if (sessionStorage")
+    _testa_segno = altrimenti[_i:altrimenti.index("} catch(e){}", _i) + len("} catch(e){}")]
+    if shutil.which("node"):
+        _bs = "const giri = [];\nfor (const caso of ['col segno', 'senza', 'rotto']) {\n" \
+            "  const classi = new Set(), mem = caso === 'col segno' ? {barattolo_entrando: '1'} : {};\n" \
+            "  const document = {documentElement: {classList: {add: c => classi.add(c)}}};\n" \
+            "  const sessionStorage = caso === 'rotto' ? {getItem(){ throw new Error('no'); }, removeItem(){ throw new Error('no'); }}\n" \
+            "    : {getItem: k => mem[k] ?? null, removeItem: k => { delete mem[k]; }};\n" \
+            "  try {\n" + _testa_segno + "\n  giri.push([caso, [...classi], Object.keys(mem)]); }\n" \
+            "  catch(e) { giri.push([caso, 'ESPLOSA ' + e.message]); }\n}\n" \
+            "console.log(JSON.stringify(giri));"
+        _r = subprocess.run(["node", "-e", _bs], capture_output=True, text=True, timeout=30)
+        prova("il segno nell'head, vero sotto node: accende la classe una "
+              "volta e si cancella; senza segno niente; storage rotto niente",
+              [["col segno", ["copertura-entra"], []], ["senza", [], []], ["rotto", [], []]],
+              json.loads(_r.stdout or "null") if _r.returncode == 0 else _r.stderr)
+    else:
+        salta("il segno nell'head sotto node", "node non c'e'")
+    prova("togliGuscio toglie anche l'anello di chi entra, nello stesso gesto",
+          1, tg_.count("document.getElementById('coperturaEntro')?.remove();"))
+    _seg = pezzo_js(mini, "function segnaEntrando(){", "\n}\n")
+    prova("il segno lo scrive segnaEntrando, in sessionStorage e protetto",
+          True, "try { sessionStorage.setItem('barattolo_entrando', '1'); } catch(e){}" in _seg)
+    prova("...e lo chiamano i due ingressi, subito prima del ricaricamento",
+          [True, True],
+          ["segnaEntrando();\n    navDaCapo(); location.reload();"
+           in pezzo_js(mini, "async function bussaIngressoBot(){", "\n}\n"),
+           "segnaEntrando();                   // la pagina nuova apre con l'anello\n"
+           "  if (firmatario.chiudi) { try { firmatario.chiudi(); } catch(e){} }\n"
+           "  navDaCapo(); location.reload();"
+           in pezzo_js(mini, "async function entraConNostr(firmatario){", "\n}\n")])
 
     # --- 2) L'ATTESA DELLE IMMAGINI, VERA SOTTO NODE ------------------
     # (10 ott 2026) il giudice del riquadro ha un nome suo

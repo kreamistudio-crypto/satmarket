@@ -9280,6 +9280,17 @@
      (7 ott 2026, `negozioInAttesa`): non un velo, la pagina stessa */
   .negozio-attesa{display:flex;justify-content:center;padding:56px 0}
   .negozio-attesa .attesa-anello{display:block}
+  /* ...e nei due fogli dell'ACCESSO (16 nov 2026, cantiere accesso-
+     rotellina, richiesta di Andrea dall'APK su Tor: «quando e' lenta
+     deve esserci almeno qualcosa che gira»). Lo stesso anello, accanto
+     alla riga di stato del foglio «Entra con Telegram» e al posto del QR
+     di nostrconnect appena il firmatario ha risposto: un foglio fermo
+     su una rete lenta si legge come un'app bloccata. */
+  .accesso-attesa{display:flex;align-items:center;justify-content:center;
+    gap:10px;margin:10px 0 2px;min-height:24px}
+  .accesso-attesa .attesa-anello{display:block}
+  .accesso-attesa .accesso-attesa-testo{font-size:13px;color:var(--ink-soft);
+    font-weight:700;text-align:center}
   @media (prefers-reduced-motion:reduce){
     .attesa-anello{animation:none}
   }
@@ -9394,6 +9405,21 @@
   #collaudoPrivatoTesto{color:var(--muted);font-weight:600;font-size:14px;
     max-width:340px}
   html.copertura #copertura{display:block}
+  /* LA COPERTURA DI CHI STA ENTRANDO (16 nov 2026, cantiere accesso-
+     rotellina). Dopo un accesso (il bot di Telegram, o Nostr) la pagina
+     si ricarica, e su Tor fra il ricaricamento e la home finita passano
+     secondi di fondo vuoto: Andrea, dall'APK, lo leggeva come un blocco.
+     Solo in QUEL caso, sopra il fondo, l'anello di casa e una riga. La
+     copertura dell'apertura normale resta VUOTA, com'era deciso: questo
+     e' un elemento SUO, acceso dalla classe `copertura-entra` che mette
+     l'head leggendo il segno di `segnaEntrando`, e lo toglie
+     `togliGuscio` nello stesso gesto della copertura (e la sua rete). */
+  #coperturaEntro{display:none;position:fixed;inset:0;z-index:9998;
+    background:var(--bg);flex-direction:column;align-items:center;
+    justify-content:center;gap:12px;color:var(--muted);font-weight:700;
+    font-size:14px}
+  #coperturaEntro .attesa-anello{display:block}
+  html.copertura.copertura-entra #coperturaEntro{display:flex}
   /* ⚠️ E' IL BARATTOLO DELLO SPLASH, NON UNO CHE GLI SOMIGLIA (secondo
      giro della 1.5, dal video: nel guscio stava 3px piu' in basso ed era
      3px piu' alto). Fino a ieri qui c'era il barattolo di
@@ -12408,8 +12434,19 @@
        in secondi), e le lascia quattro secondi: il doppio del tetto
        dell'app, che quindi arriva sempre prima di lei. */
     document.documentElement.classList.add('copertura');
-    addEventListener('DOMContentLoaded', () => setTimeout(() =>
-      document.getElementById('copertura')?.remove(), 4000));
+    /* CHI STA ENTRANDO (16 nov 2026, cantiere accesso-rotellina): il
+       segno lo lascia `segnaEntrando` subito prima del ricaricamento
+       del login, e vale UNA volta — si legge e si cancella qui, cosi'
+       la prossima apertura torna la copertura vuota di sempre. */
+    try {
+      if (sessionStorage.getItem('barattolo_entrando') === '1')
+        document.documentElement.classList.add('copertura-entra');
+      sessionStorage.removeItem('barattolo_entrando');
+    } catch(e){}
+    addEventListener('DOMContentLoaded', () => setTimeout(() => {
+      document.getElementById('copertura')?.remove();
+      document.getElementById('coperturaEntro')?.remove();
+    }, 4000));
   }
   /* e la misura del testo, per la stessa ragione: se la scala
      arrivasse dopo il primo paint, l'app comparirebbe piccola e poi
@@ -12545,6 +12582,10 @@ function barreDellApp(){
      apposta — niente logo, decisione di Andrea: il perche' sta nel
      foglio di stile, a #copertura. -->
 <div id="copertura" aria-hidden="true"></div>
+<!-- ...e, SOLO subito dopo un accesso, l'anello sopra quel fondo (16 nov
+     2026, cantiere accesso-rotellina): il perche' sta nel foglio di
+     stile, a #coperturaEntro. Nasce spento come la copertura. -->
+<div id="coperturaEntro" aria-hidden="true"><span class="attesa-anello"></span><span>Entro nel tuo account…</span></div>
 <div id="app">
 <!-- IL CARTELLO (ago 2026): il server ci infila dentro titolo, prezzo,
      descrizione e foto della pagina richiesta. Non e' testo nascosto —
@@ -16513,7 +16554,14 @@ document.getElementById('cartello')?.remove();</script>
       <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:6px;text-align:center">Inquadralo col telefono: entra l'account aperto nel Telegram del telefono.</div>
     </div>
     <a class="btn primary" id="botEntraApri" style="display:none;text-decoration:none" target="_blank" rel="noopener" href="#">Apri Telegram</a>
-    <div id="botEntraStato" role="status" style="font-size:13px;color:var(--ink-soft);font-weight:700;text-align:center;margin:10px 0 2px;min-height:20px"></div>
+    <!-- L'ANELLO DELL'ATTESA (16 nov 2026, cantiere accesso-rotellina)
+         gira accanto alla riga di stato finche' il giro e' vivo, fino al
+         ricaricamento; lo spegne solo un giro finito male (vedi
+         dettaIngressoBot). -->
+    <div class="accesso-attesa">
+      <span class="attesa-anello" id="botEntraAnello" aria-hidden="true" style="display:none"></span>
+      <div id="botEntraStato" role="status" style="font-size:13px;color:var(--ink-soft);font-weight:700;text-align:center;min-height:20px"></div>
+    </div>
     <button class="btn ghost" id="botEntraRifai" style="display:none" onclick="apriIngressoBot()">🔄 Riprova</button>
     <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
   </div>
@@ -16556,6 +16604,15 @@ document.getElementById('cartello')?.remove();</script>
       <div class="invoice" id="nostrQrUri" style="user-select:all;margin-top:10px"></div>
       <button class="btn mini" style="margin-top:6px" onclick="copiaUriConnessione()">📋 Copia il link</button>
       <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:6px">Se il firmatario ce l'hai su <b>questo</b> telefono il codice non lo puoi inquadrare da solo: copia il link, incollalo nell'app, approva e <b>torna qui</b>: la risposta ti aspetta. Su <b>iPhone con Clave</b> è più sicura la strada del <b>bunker://</b> qui sotto (Clave firma senza che tu cambi app).</div>
+    </div>
+    <!-- AL POSTO DEL QR, L'ANELLO (16 nov 2026, cantiere accesso-
+         rotellina): appena il firmatario ha risposto il codice non serve
+         piu', e su Tor quel che viene dopo (la chiave, la firma, il
+         ricaricamento) dura secondi. Lo accende e lo spegne
+         `anelloNostr`. -->
+    <div id="nostrEntro" class="accesso-attesa" role="status" style="display:none">
+      <span class="attesa-anello" aria-hidden="true"></span>
+      <span class="accesso-attesa-testo" id="nostrEntroTesto">Sto entrando…</span>
     </div>
     <button class="btn primary" style="margin-top:10px" onclick="loginNostrEstensione()">🧩 Con l'estensione del browser</button>
     <details style="margin-top:10px">
@@ -17254,6 +17311,7 @@ function togliGuscio(){
   guscioVia = true;
   document.getElementById('guscio')?.remove();   /* in un colpo, mai in dissolvenza */
   document.getElementById('copertura')?.remove();
+  document.getElementById('coperturaEntro')?.remove();   /* chi stava entrando */
   /* il velo di Telegram, nello stesso gesto (il perche' in cima a
      questo blocco); protetto come il colore qui sotto */
   try { tg?.ready(); } catch(e){}
@@ -58154,6 +58212,16 @@ function portaTelegramOnion(id, vestito, altro){
   return box;
 }
 
+/* IL SEGNO DI CHI STA ENTRANDO (16 nov 2026, cantiere accesso-
+   rotellina): subito prima del ricaricamento di un accesso riuscito,
+   perche' la pagina nuova mostri l'anello sopra la copertura invece del
+   fondo vuoto (vedi #coperturaEntro). sessionStorage e non localStorage:
+   vale per questa scheda e per questo ricaricamento, e l'head lo
+   cancella appena letto. Senza storage (navigazione privata) si entra
+   lo stesso, con la copertura vuota di sempre. */
+function segnaEntrando(){
+  try { sessionStorage.setItem('barattolo_entrando', '1'); } catch(e){}
+}
 let ingressoBotTimer = null, ingressoBotFigura = '', bussaInVolo = false;
 function fermaIngressoBot(){
   if (ingressoBotTimer) { clearInterval(ingressoBotTimer); ingressoBotTimer = null; }
@@ -58163,6 +58231,9 @@ function fermaIngressoBot(){
 function dettaIngressoBot(testo, fine){
   el('botEntraStato').textContent = testo;
   el('botEntraRifai').style.display = fine ? '' : 'none';
+  /* l'anello gira finche' il giro e' vivo (16 nov 2026): si ferma solo
+     dove compare «Riprova», cioe' dove non si aspetta piu' niente */
+  el('botEntraAnello').style.display = fine ? 'none' : '';
   if (fine) {
     fermaIngressoBot();
     el('botEntraFigura').style.display = 'none';
@@ -58242,7 +58313,8 @@ async function bussaIngressoBot(){
   }
   if (d.stato === 'dentro') {
     fermaIngressoBot();
-    dettaIngressoBot(`✅ Sei dentro come ${d.nome || 'te'}`);
+    dettaIngressoBot(`✅ Sei dentro come ${d.nome || 'te'}: apro il tuo account…`);
+    segnaEntrando();
     navDaCapo(); location.reload();
   } else if (d.stato === 'in_chat') {
     dettaIngressoBot(`Ora nel bot tocca ${ingressoBotFigura}`);
@@ -65530,6 +65602,7 @@ async function firmatarioNostrConnect(){
     cassetta.chiudi();
   }
   bunkerDice('Firmatario collegato: preparo la firma…');
+  anelloNostr(true);                 // il codice ha fatto il suo: ora gira l'anello
   return await firmatarioBunker(
     'bunker://' + remoto + '?' + stanza.map(r => 'relay=' + encodeURIComponent(r)).join('&'),
     NT.utils.bytesToHex(skLocale), cifra.modo, {giaConnesso: true});
@@ -65545,6 +65618,8 @@ async function mostraQrConnessione(uri){
   const box = el('nostrQrBox');
   if (!box) return;
   el('nostrQrUri').textContent = uri;
+  const anello = el('nostrEntro');   // un codice nuovo: l'anello di prima non c'entra
+  if (anello) anello.style.display = 'none';
   box.style.display = '';
   const fatto = await disegnaQr(el('nostrQr'), uri, 'Byte');
   bunkerDice(fatto
@@ -65555,6 +65630,19 @@ async function mostraQrConnessione(uri){
     : "Il codice non si e' potuto disegnare: copia il link qui sotto e "
     + "incollalo nel tuo firmatario. Resto in ascolto, anche se passi "
     + "a un'altra app e torni.");
+}
+/* L'anello al posto del QR (16 nov 2026, cantiere accesso-rotellina):
+   acceso appena il firmatario ha risposto, spento da un errore e dal
+   foglio che si riapre. La riga dice quel che succede davvero: entrare,
+   o preparare la firma di un annuncio quando il foglio serve a quello. */
+function anelloNostr(acceso){
+  const b = el('nostrEntro');
+  if (!b) return;
+  if (acceso) {
+    nascondiQrConnessione();
+    el('nostrEntroTesto').textContent = scopoFirmatario ? 'Preparo la firma…' : 'Sto entrando…';
+  }
+  b.style.display = acceso ? '' : 'none';
 }
 function nascondiQrConnessione(){
   const box = el('nostrQrBox');
@@ -65995,6 +66083,7 @@ async function entraConNostr(firmatario){
   /* IL FIRMATARIO SI CHIUDE QUI, prima del reload: il `finally` di chi
      ci ha chiamato arriverebbe a pagina gia' morta, e la cassetta sul
      server resterebbe aperta i suoi dieci minuti */
+  segnaEntrando();                   // la pagina nuova apre con l'anello
   if (firmatario.chiudi) { try { firmatario.chiudi(); } catch(e){} }
   navDaCapo(); location.reload();
 }
@@ -66068,12 +66157,13 @@ async function loginNostrQr(){
        connessione parla di un giro che non c'e' piu' */
     if (giro !== nostrQrGiro) return;
     ricordaBunker(f.sessione, await Promise.resolve(f.pubkey()).catch(() => ''));
-    nascondiQrConnessione();
+    anelloNostr(true);
     bunkerDice('Collegato: entro…');
     await consegnaFirmatario(f);
   } catch(e){
     const motivo = e?.message || 'non risponde';
     if (giro !== nostrQrGiro) return;   // il fallimento e' di un giro morto
+    anelloNostr(false);                 // l'attesa e' finita, male: via l'anello
     if (chiusoApposta(motivo)) return;  // il foglio chiuso da chi lo ha chiuso: niente da dire
     nascondiQrConnessione();
     /* IL MOTIVO NEL FOGLIO e non solo nel toast, la regola del bunker:
@@ -66178,6 +66268,7 @@ function apriNostrSheet(scopo){
      parlare di un foglio che non c'e' piu'. */
   nostrQrGiro++;
   nascondiQrConnessione();
+  anelloNostr(false);
   chiudiAppuntamentoNip46('foglio riaperto');
   /* IL CODICE INVITO e' del login, non della firma: nel foglio della
      firma la riga non c'e'. Al login, se il link d'invito ha lasciato
