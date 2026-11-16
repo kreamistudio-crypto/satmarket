@@ -887,11 +887,16 @@ function nodo(pub, alias){
    Chi non e' amministratore qui non arriva — `D.p2p_statistiche` e'
    falso e la richiesta non parte — e se arrivasse lo stesso il server
    risponde 403 e il riquadro resta vuoto. */
-let P = null, periodoP2P = 'oggi';
+let P = null, periodoP2P = 'oggi', reteP2P = 'tutti';
+/* LE DUE RETI (16 nov 2026, Andrea: «nei completati si devono vedere tutti
+   insieme», «poi posso filtrarli»): di serie i conti sommano Lightning e
+   on-chain, e il filtro ne tiene una sola */
+const RETI_P2P = [['tutti', 'Tutti'], ['ln', '⚡ Lightning'], ['oc', '₿ On-chain']];
 const PERIODI_P2P = [['oggi', 'Oggi'], ['7', '7 giorni'], ['30', '30 giorni'], ['tutto', 'Tutto']];
 const MOTIVI_P2P = {garanzia_non_pagata: 'garanzia non pagata', fattura_non_data: 'fattura non data',
   tempo_scaduto: 'tempo scaduto', garanzia_scaduta: 'garanzia arrivata a scadenza',
-  a_mano: 'annullato a mano', concordato: 'annullo concordato', moderatore: 'deciso da un moderatore'};
+  a_mano: 'annullato a mano', concordato: 'annullo concordato', moderatore: 'deciso da un moderatore',
+  rimborsato: 'sats tornati a chi li aveva messi'};
 const LATI_P2P = {sell: 'Vendi', buy: 'Compra'};
 const ESITI_P2P = {completato: '✅ concluso', annullato: '❌ annullato', tornato: '🔄 tornato in vetrina'};
 /* i sats col punto delle migliaia SEMPRE: l'italiano di serie non lo
@@ -901,10 +906,12 @@ const euro2 = n => '€ ' + Number(n || 0).toLocaleString('it-IT', {minimumFract
 
 async function caricaP2P(){
   const box = el('p2p');
-  box.querySelectorAll('.filtri button').forEach(b => b.setAttribute('aria-pressed', b.dataset.p === periodoP2P));
+  box.querySelectorAll('.filtri button[data-p]').forEach(b => b.setAttribute('aria-pressed', b.dataset.p === periodoP2P));
+  box.querySelectorAll('.filtri button[data-r]').forEach(b => b.setAttribute('aria-pressed', b.dataset.r === reteP2P));
   let r;
   try {
-    r = await fetch('/api/admin/p2p-statistiche?periodo=' + encodeURIComponent(periodoP2P),
+    r = await fetch('/api/admin/p2p-statistiche?periodo=' + encodeURIComponent(periodoP2P)
+      + '&rete=' + encodeURIComponent(reteP2P),
       {credentials: 'same-origin', headers: {'X-Tg-Init-Data': intestazione()}});
   } catch(e) { r = null; }
   if (r && (r.status === 403 || r.status === 401)) { P = null; box.innerHTML = ''; return; }
@@ -932,7 +939,11 @@ function disegnaP2P(){
   if (c.non_divise) fette.push(['Non divisibili (manca l\'importo dello scambio)', '—', fmtP(c.non_divise), '—']);
   const routing = rt.stato === 'ok' ? fmtP(rt.sats) + ' sats'
     : rt.stato === 'parziale' ? fmtP(rt.sats) + ' sats <span class="sub">parziale</span>' : 'non disponibile';
+  const pr = c.per_rete || {ln: {scambi: 0, sats: 0}, oc: {scambi: 0, sats: 0}};
+  const reteSola = P.rete === 'ln' || P.rete === 'oc';
+  const diviseRete = reteSola ? '' : `⚡ Lightning ${fmtP(pr.ln.sats)} · ₿ on-chain ${fmtP(pr.oc.sats)} sats`;
   const routingD = !s.completati ? 'nessuno scambio concluso nel periodo'
+    : rt.stato === 'ok' && !rt.abbinati ? 'gli scambi on-chain non pagano routing: l\'uscita sta nella transazione'
     : rt.stato === 'ok' ? rt.abbinati === 1 ? 'letto dal nodo' : `letto dal nodo per tutti e ${fmtP(rt.abbinati)} gli scambi`
     : rt.stato === 'parziale' ? `noto per ${fmtP(rt.abbinati)} ${sc(rt.abbinati)} su ${fmtP(s.completati)}: per gli altri non disponibile`
     : (P.lnd.stato === 'ok' ? 'il nodo risponde, ma non ha un pagamento che combaci' : esc(P.lnd.motivo || 'il nodo non risponde'));
@@ -948,10 +959,13 @@ function disegnaP2P(){
   <div class="filtri" role="group" aria-label="Periodo degli scambi P2P">
     ${PERIODI_P2P.map(([p, nome]) => `<button data-p="${p}" aria-pressed="${p === P.periodo}" onclick="periodoP2P='${p}';caricaP2P()">${nome}</button>`).join('')}
   </div>
+  <div class="filtri" role="group" aria-label="Rete degli scambi P2P">
+    ${RETI_P2P.map(([r, nome]) => `<button data-r="${r}" aria-pressed="${r === (P.rete || 'tutti')}" onclick="reteP2P='${r}';caricaP2P()">${nome}</button>`).join('')}
+  </div>
 
   <div class="card"><h2>Scambi</h2>
     <div class="tiles">
-      ${t('Completati', fmtP(s.completati), s.in_viaggio ? `${fmtP(s.in_viaggio)} col pagamento a chi compra ancora in viaggio` : 'sats arrivati a chi compra')}
+      ${t('Completati', fmtP(s.completati), (reteSola ? '' : `⚡ ${fmtP(pr.ln.scambi)} · ₿ ${fmtP(pr.oc.scambi)} · `) + (s.in_viaggio ? `${fmtP(s.in_viaggio)} col pagamento a chi compra ancora in viaggio` : 'sats arrivati a chi compra'))}
       ${t('Annullati', fmtP(s.annullati), (motivi || 'nessuno') + (s.tornati ? ` — ${fmtP(s.tornati)} con l'ordine tornato in vetrina` : ''))}
       ${t('In corso adesso', fmtP(s.in_corso), (s.in_disputa ? `${fmtP(s.in_disputa)} in disputa · ` : '') + 'non dipende dal periodo')}
       ${t('Tasso di completamento', s.tasso == null ? '—' : fmtd(s.tasso, 1) + '%', 'completati su chiusi (completati + annullati)')}
@@ -960,7 +974,7 @@ function disegnaP2P(){
 
   <div class="card"><h2>Volume</h2>
     <div class="tiles">
-      ${t('Euro scambiati', euro2(v.euro), v.senza_euro ? `${fmtP(v.senza_euro)} ${sc(v.senza_euro)} senza cifra in euro (ordini di altri client)` : 'la cifra del libro, scambi conclusi')}
+      ${t('Euro scambiati', euro2(v.euro), v.senza_euro ? `${fmtP(v.senza_euro)} ${sc(v.senza_euro)} senza cifra in euro (ordini di altri client, o in USDT e franchi)` : 'la cifra del libro, scambi conclusi')}
       ${t('Sats passati', fmtP(v.sats), eurOra(v.sats))}
       ${t('Scambio medio', s.completati - v.senza_euro > 0 ? euro2(v.euro / (s.completati - v.senza_euro)) : '—', s.completati ? fmtP(Math.round(v.sats / s.completati)) + ' sats in media' : '')}
     </div>
@@ -973,12 +987,12 @@ function disegnaP2P(){
 
   <div class="card"><h2>Commissioni</h2>
     <div class="tiles">
-      ${t('Incassate', fmtP(c.lorde_sats) + ' sats', c.lorde_sats ? `≈ ${euro2(c.euro)} al cambio del momento${c.senza_cambio ? ` (${fmtP(c.senza_cambio)} ${sc(c.senza_cambio)} senza cambio)` : ''}` : '')}
+      ${t('Incassate', fmtP(c.lorde_sats) + ' sats', [c.lorde_sats ? `≈ ${euro2(c.euro)} al cambio del momento${c.senza_cambio ? ` (${fmtP(c.senza_cambio)} ${sc(c.senza_cambio)} senza cambio)` : ''}` : '', diviseRete].filter(Boolean).join('<br>'))}
       ${t('Routing dei payout', routing, routingD)}
       ${t('Nette', c.nette_sats == null ? '—' : fmtP(c.nette_sats) + ' sats', c.nette_sats == null ? 'servono le fee di routing di tutti gli scambi' : 'incassate meno il routing')}
     </div>
     <div class="tab">${tabella(['Come è stata pagata', 'Metà', 'Sats', '% sullo scambio'], fette)}</div>
-    <div class="nota">Ogni scambio ha due metà di commissione: una di chi vende, una di chi compra.${c.senza_importi ? ` ${fmtP(c.senza_importi)} ${c.senza_importi === 1 ? 'scambio concluso non porta' : 'scambi conclusi non portano'} gli importi di chiusura e qui non ${c.senza_importi === 1 ? 'entra' : 'entrano'}.` : ''}</div>
+    <div class="nota">Ogni scambio ha due metà di commissione: una di chi vende, una di chi compra. Quelle on-chain vanno alla chiave di Barattolo (la terza del 2-di-3), un indirizzo nuovo per ogni scambio; prima del 16 novembre 2026 l'on-chain non prendeva commissione.${c.senza_importi ? ` ${fmtP(c.senza_importi)} ${c.senza_importi === 1 ? 'scambio concluso non porta' : 'scambi conclusi non portano'} gli importi di chiusura e qui non ${c.senza_importi === 1 ? 'entra' : 'entrano'}.` : ''}</div>
   </div>
 
   <div class="card"><h2>Ordini</h2>
@@ -999,10 +1013,10 @@ function disegnaP2P(){
   </div>
 
   <div class="card"><h2>Ultimi scambi${P.ultimi.length ? ` (${fmtP(P.ultimi.length)})` : ''}</h2>
-    <div class="tab">${tabella(['Data', 'Ordine', 'Tipo', 'Importo', 'Sats', 'Metodo', 'Esito', 'Commissione', 'Routing', 'Pubblica → prende'],
-      P.ultimi.map(u => [quando(u.quando), `<span class="mono">${esc(u.ordine)}</span>`, esc(LATI_P2P[u.lato] || '—'),
+    <div class="tab">${tabella(['Data', 'Rete', 'Ordine', 'Tipo', 'Importo', 'Sats', 'Metodo', 'Esito', 'Commissione', 'Routing', 'Pubblica → prende'],
+      P.ultimi.map(u => [quando(u.quando), u.rete === 'oc' ? '₿' : '⚡', `<span class="mono">${esc(u.ordine)}</span>`, esc(LATI_P2P[u.lato] || '—'),
         u.euro ? euro2(u.euro) : '—', u.sats ? fmtP(u.sats) : '—', esc(u.metodi || '—'), esito(u),
-        u.commissione == null ? '—' : fmtP(u.commissione), u.routing == null ? '—' : fmtP(u.routing), chi(u)]), [3, 4, 7, 8])}</div>
+        u.commissione == null ? '—' : fmtP(u.commissione), u.routing == null ? '—' : fmtP(u.routing), chi(u)]), [4, 5, 8, 9])}</div>
     <div class="nota">Al posto dei nomi le iniziali, o le ultime tre cifre dell'id per chi un nome non ce l'ha. «—» è chi il server non conosce, o non ricorda più.</div>
     <details><summary>Cosa è certo e cosa è una stima</summary>
       <div class="nota"><b>Certo</b> (lo dice il coordinatore): quanti scambi, i loro passi e le ore; i tre importi di chiusura — lo scambio, il netto a chi compra, il totale bloccato da chi vende — e quindi le commissioni incassate.</div>

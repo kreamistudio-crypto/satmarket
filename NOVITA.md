@@ -328,7 +328,7 @@ leva: nessuna
 pubblico: sì
 
 ## 2026-11-16 · p2p-mappa-recenti
-frase: Nel libro P2P il tondo della mappa 🗺️ c'è sempre, anche in «Vendi BTC» e anche quando non ci sono offerte in contanti. Con «Più recenti» le card on-chain e Lightning stanno nello stesso ordine, in cima la più nuova. E «🔁 Ripubblica» ora c'è anche negli ordini «Compra BTC» con Barattozon.
-dove: la scheda «P2P», in alto accanto alla campanella; la pillola «Ordina» con «Più recenti».
+frase: Nella home gli scambi P2P mostrano anche gli ordini on-chain (USDe, ETH, Monero compresi), col fulmine ⚡ o la ₿ in fondo alla card per dire subito la rete. Nel libro la mappa 🗺️ c'è sempre, «Più recenti» mescola on-chain e Lightning, scorrendo i rettangoli «Novità» diventano uno solo, e «🔁 Ripubblica» c'è anche in «Compra BTC» con Barattozon.
+dove: la home, fila «Scambi P2P»; la scheda «P2P», in alto accanto alla campanella; la pillola «Ordina» con «Più recenti».
 leva: nessuna
 pubblico: sì
