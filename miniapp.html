@@ -16992,7 +16992,8 @@ let appNegozio = false, appNegozioUrlAperto = false;
    al caricamento) fanno il loro mestiere senza sapere da dove si e'
    arrivati, e una ricarica riparte dallo stesso posto.
    IL VOCABOLARIO E' CHIUSO, il gemello di `_startapp_da_link` del
-   server: `p2p`, `scambio_<id>`, `ordine_<id>`. Tutto il resto — un
+   server: `p2p`, `scambio_<id>`, `ordine_<id>` (e dal 16 nov 2026
+   `annuncio_<id>` e `offerta_<id>`, che scrive `link_telegram`). Tutto il resto — un
    parametro di un altro mondo, una forma storta, piu' di 64 caratteri
    — non e' un indirizzo: si resta dove si e', senza dire niente.
    SOLO DALLA PORTA DI CASA (`/` o `/miniapp.html`): chi e' gia' su un
@@ -17024,6 +17025,16 @@ function percorsoDaStartapp(p){
     return (e[2] ? '/categoria/' + e[2] : '/')
       + (max ? '?max=' + max + '&valuta=' + (e[4] === 'e' ? 'eur' : 'sats') : '');
   }
+  /* UN ANNUNCIO O UNA TRATTATIVA (16 nov 2026, cantiere
+     notifica-apre-annuncio): `annuncio_<id>` e `offerta_<id>` li scrive
+     `link_telegram` del server — «🔎 Un annuncio fa per te!», il post
+     nel canale, le vetrine, gli avvisi delle offerte — da quando Andrea
+     ha scelto di tenere quel deep link; ma qui nessuno li rileggeva, e
+     il tocco apriva la Mini App sulla home. Si rileggono in
+     `/annuncio/<id>` e `/offerta/<id>`, che `apriAnnuncioDaUrl` e
+     `apriOffertaDaUrl` sanno gia' aprire */
+  const an = /^(annuncio|offerta)_([1-9][0-9]{0,11})$/.exec(p);
+  if (an) return '/' + an[1] + '/' + an[2];
   /* UN ORDINE DEL MERCATINO (16 ott 2026, cantiere chat-mercatino): il
      tasto dell'avviso di un messaggio nuovo nella chat dell'ordine. Si
      rilegge in `/?ordine=<numero>`, che `apriOrdineDaUrl` sa aprire */
@@ -17048,7 +17059,11 @@ function percorsoDaStartapp(p){
 function arrivoDaStartapp(){
   try {
     if (!/^\/(miniapp\.html)?$/.test(location.pathname)) return '';
-    const q = (location.search.match(/[?&]tgWebAppStartParam=([^&]*)/) || [])[1];
+    /* `?startapp=` e' la stessa parola portata dal tocco su una notifica
+       del telefono (`push_carico` del server, 16 nov 2026): fuori da
+       Telegram, ritradotta qui col vocabolario di sempre */
+    const q = (location.search.match(/[?&]tgWebAppStartParam=([^&]*)/) || [])[1]
+           || (location.search.match(/[?&]startapp=([^&]*)/) || [])[1];
     const dove = percorsoDaStartapp(q ? decodeURIComponent(q)
                                       : (tg?.initDataUnsafe?.start_param || ''));
     if (dove) history.replaceState(history.state, '', dove + location.hash);

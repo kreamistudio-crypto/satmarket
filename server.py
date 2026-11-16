@@ -19510,7 +19510,17 @@ def push_carico(testo: str, bottone, base: str) -> bytes:
     titolo, il resto il testo (spoglio dell'HTML, una riga, al piu'
     PUSH_TESTO_MAX caratteri). Il tocco apre il primo bottone che porta
     a casa NOSTRA (`base`), come percorso; ogni altro indirizzo vale la
-    home: il service worker non apre mai niente fuori dal sito."""
+    home: il service worker non apre mai niente fuori dal sito.
+    SENZA UN BOTTONE DI CASA, IL PRIMO LINK DEL TESTO (16 nov 2026,
+    cantiere notifica-apre-annuncio): gli avvisi degli annunci («🔎 Un
+    annuncio fa per te!», «🔔 … ha pubblicato», «🆕 N nuovi annunci»)
+    portano il link DENTRO il testo e nessun bottone, e il tocco sul
+    telefono finiva sempre sulla home. Si prende il primo link, in
+    ordine: uno di casa vale il suo percorso; un `https://t.me/<bot>
+    ?startapp=<parola>` (`link_telegram`, `_link_esplora_telegram`) vale
+    `/?startapp=<parola>`, che la pagina ritraduce col SUO vocabolario
+    (`arrivoDaStartapp`) — una sola tabella delle parole, quella del
+    client. Il bottone, se c'e', vince sempre sul testo."""
     righe = [r.strip() for r in spoglia_html(str(testo or "")).splitlines()
              if r.strip()]
     titolo, resto = (righe[0], righe[1:]) if righe else ("Barattolo", [])
@@ -19519,15 +19529,32 @@ def push_carico(testo: str, bottone, base: str) -> bytes:
         titolo, corpo = "Barattolo", titolo
     if len(corpo) > PUSH_TESTO_MAX:
         corpo = corpo[:PUSH_TESTO_MAX - 1].rstrip() + "…"
-    url = "/"
+    url = ""
     base = str(base or "").rstrip("/")
-    for _etichetta, link in _bottoni_avviso(bottone):
+
+    def _di_casa(link):
         if base and (link == base or link.startswith(base + "/")):
             percorso = link[len(base):] or "/"
             if percorso.startswith(("/?", "/#")) or (
                     percorso.startswith("/") and not percorso.startswith("//")):
-                url = percorso[:500]
+                return percorso[:500]
+        return ""
+
+    for _etichetta, link in _bottoni_avviso(bottone):
+        url = _di_casa(link)
+        if url:
+            break
+    if not url:
+        for link in re.findall(r"https?://[^\s\"'<>]+", str(testo or "")):
+            # la punteggiatura che chiude la frase non e' del link: «(link)»
+            link = html.unescape(link).rstrip(".,;:!?)")
+            m = re.fullmatch(r"https://t\.me/[A-Za-z][A-Za-z0-9_]{3,31}"
+                             r"(?:/[A-Za-z0-9_]{3,30})?\?startapp=([A-Za-z0-9_-]{1,64})",
+                             link)
+            url = f"/?startapp={m.group(1)}" if m else _di_casa(link)
+            if url:
                 break
+    url = url or "/"
     return json.dumps({"titolo": titolo[:80], "testo": corpo, "url": url},
                       ensure_ascii=False).encode()
 

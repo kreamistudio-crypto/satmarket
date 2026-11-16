@@ -26036,7 +26036,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   ES256, aud = origine del servizio, sub = URL_PUBBLICO, mai
   un'email); TTL 24 h, Urgency high; 404/410 = riga tolta. Il carico
   è {titolo, testo, url}: prima riga, resto spoglio, e il percorso
-  del primo bottone che porta a casa (`push_carico`); `sw.js`
+  del primo bottone che porta a casa (`push_carico`) — o, senza un
+  bottone di casa, del PRIMO LINK del testo (16 nov 2026, cantiere
+  notifica-apre-annuncio: gli avvisi degli annunci hanno il link nel
+  testo): uno del sito vale il suo percorso, un `t.me/<bot>?startapp=
+  <parola>` vale `/?startapp=<parola>`, che `arrivoDaStartapp` rilegge
+  col vocabolario del client; `sw.js`
   (`push`, `notificationclick`, `pushsubscriptionchange`) apre solo
   indirizzi della sua origine (`indirizzoDiCasa`). IL TIMBRO (chiave
   privata P-256) NON È NEL CONFIG: lo crea il server al primo bisogno
@@ -33209,8 +33214,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   nella busta di prima pagina, `tg_miniapp`). Il DM Nostr, la nota su
   Nostr, il foglio del telefono e gli appunti tengono l'indirizzo del
   sito; gli annunci non si traducono (il link web porta la foto in
-  anteprima). L'ARRIVO: `arrivoDaStartapp`, in cima allo script, legge
-  `tgWebAppStartParam` (o `start_param` dell'initData) e riscrive
+  anteprima). MA `link_telegram` (sempre acceso, scelta di Andrea:
+  Cantieri, «LA DECISIONE (di Andrea, a bivio posto)») scrive
+  `annuncio_<id>` e `offerta_<id>`, e dal 16 nov 2026 (cantiere
+  notifica-apre-annuncio) `percorsoDaStartapp` li rilegge in
+  `/annuncio/<id>` e `/offerta/<id>`: prima la Mini App si apriva sulla
+  home. L'ARRIVO: `arrivoDaStartapp`, in cima allo script, legge
+  `tgWebAppStartParam` (poi `startapp`, la parola portata dal tocco su
+  una notifica del telefono, poi `start_param` dell'initData) e riscrive
   l'indirizzo con `replaceState` PRIMA delle porte che leggono
   `location` — da lì `apriP2PDaUrl` fa il resto. LE PROVE:
   `prove_link_dentro_telegram`, e la sezione 8 di
