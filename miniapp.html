@@ -62878,8 +62878,9 @@ function apriOnchainP2P(id, modo){
          Andrea: «la schermata sarà similmente a quella del lighting»):
          i sats, la MIA meta' della fee e il totale, dal mio verso */
       + (typeof contoOnchainP2P === 'function'
-        ? '<div class="p2p-ord lato-' + (vendeLui ? 'compro' : 'vendo') + '">'
-          + contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo'}) + '</div>' : ''),
+        ? '<div class="p2p-ord lato-' + (vendeLui ? 'compro' : 'vendo') + '" id="p2pOcPresaConto">'
+          + contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo',
+                             swap: conTasti ? swapOcPresaP2P(o.id, vendeLui) : null}) + '</div>' : ''),
     /* in USDT le stesse frasi, con la rete (2 nov 2026); e col tasto
        «⚡ Lightning» scelto la frase dice Lightning (`corpoPresaOcP2P`) */
     corpo: corpoPresaOcP2P(o, vendeLui),
@@ -62987,10 +62988,9 @@ function notaCambioDettP2P(id){
   const d = st.dati || {};
   if (!d.ok) return esc(percheCambioP2P(d));
   const costo = Math.max(0, Number(st.sats) - Number(d.ricevi || 0));
-  return 'Ricevi on-chain con uno swap di ' + esc(d.fornitore_nome || 'SATS Routing')
-    + ': al tuo indirizzo bitcoin arrivano circa <b>' + fmt(Number(d.ricevi) || 0) + ' sats</b>, '
-    + 'lo swap costa <b>' + fmt(costo) + ' sats</b> (Barattolo non aggiunge niente). '
-    + 'L\'indirizzo lo scrivi dopo aver preso, in «Dove ricevere i sats».';
+  return 'L\'utente ha pubblicato quest\'ordine in Lightning: ricevi on-chain con uno swap di '
+    + esc(d.fornitore_nome || 'SATS Routing') + ' (costo <b>' + fmt(costo) + ' sats</b>, '
+    + 'ti arrivano circa <b>' + fmt(Number(d.ricevi) || 0) + ' sats</b>).';
 }
 function notaPresaDettP2P(id){
   const o = typeof presaOcOrdineP2P === 'function' ? presaOcOrdineP2P(id) : null;
@@ -63000,9 +63000,29 @@ function notaPresaDettP2P(id){
   const d = st.dati;
   if (st.stato !== 'pronto' || !d) return 'Chiedo a SATS Routing quanto costa lo swap…';
   if (!d.ok) return esc(perchePresaOcP2P(d));
-  return 'Paghi la garanzia coi tuoi bitcoin on-chain: mandi <b>' + fmt(Number(d.mandi) || 0) + ' sats</b>, '
-    + 'lo swap di ' + esc(d.fornitore_nome || 'SATS Routing') + ' costa <b>' + fmt(Number(d.costo) || 0) + ' sats</b> '
-    + '(Barattolo non aggiunge niente). Lo crei nel riquadro sotto il conto, poi tocchi «Vendi».';
+  return 'L\'utente ha pubblicato quest\'ordine in Lightning: blocchi i sats on-chain con uno swap di '
+    + esc(d.fornitore_nome || 'SATS Routing') + ' (costo <b>' + fmt(Number(d.costo) || 0) + ' sats</b>, '
+    + 'mandi <b>' + fmt(Number(d.mandi) || 0) + ' sats</b>).';
+}
+/* LA RIGA DELLO SWAP NEL CONTO (16 nov 2026, cantiere coin-quasi, Andrea:
+   «gli viene detto lo swap costa X sat, ok, ma nel dettaglio non c'è il
+   costo di quello swap lì»): scelta l'altra rete e letto il preventivo,
+   il conto porta «Swap SATS Routing» e il totale lo conta, cosi' torna
+   con la frase sotto i tasti. Lo stesso preventivo della frase, mai un
+   secondo numero. null finche' non c'e' (e allora niente riga). */
+function swapContoDettP2P(id, compro){
+  if (compro) {
+    if (p2pIncassoRete[id] !== 'oc') return null;
+    const st = p2pCambioDett[id];
+    const d = st && st.stato === 'pronto' ? st.dati : null;
+    if (!d || !d.ok) return null;
+    const costo = Math.max(0, Number(st.sats) - Number(d.ricevi || 0));
+    return costo > 0 ? {sats: costo, nome: d.fornitore_nome || 'SATS Routing'} : null;
+  }
+  const st = p2pPresaOc[id] || {};
+  const d = st.aperto && st.stato === 'pronto' ? st.dati : null;
+  if (!d || !d.ok || !(Number(d.costo) > 0)) return null;
+  return {sats: Number(d.costo), nome: d.fornitore_nome || 'SATS Routing'};
 }
 /* -- il foglio di un ordine ON-CHAIN (apriOnchainP2P) -- */
 const p2pOcPresaRete = {};   // ordine -> {rete, stato, dati, sats}
@@ -63030,19 +63050,26 @@ function reteOcPresaHtmlP2P(o, vendeLui){
     else if (!d.ok) nota = esc(vendeLui ? perchePresaOcP2P(d) : percheDepositoLnOnchainP2P(d));
     else if (vendeLui) {
       const costo = Math.max(0, Number(d.costo) || 0);
-      nota = 'Ricevi in Lightning con uno swap di ' + esc(d.fornitore_nome || 'SATS Routing')
-        + ': ti arrivano circa <b>' + fmt(Math.max(0, st.sats - costo)) + ' sats</b>, lo swap costa circa <b>'
-        + fmt(costo) + ' sats</b> (Barattolo non aggiunge niente). La richiesta Lightning la incolli '
-        + 'quando chi vende conferma gli euro.';
+      nota = 'L\'utente ha pubblicato quest\'ordine on-chain: ricevi in Lightning con uno swap di '
+        + esc(d.fornitore_nome || 'SATS Routing') + ' (costo circa <b>' + fmt(costo) + ' sats</b>, '
+        + 'ti arrivano circa <b>' + fmt(Math.max(0, st.sats - costo)) + ' sats</b>).';
     } else {
       const costo = Math.max(0, st.sats - (Number(d.ricevi) || 0));
-      nota = 'Depositi da Lightning con uno swap di ' + esc(d.fornitore_nome || 'SATS Routing')
-        + ': paghi circa <b>' + fmt(st.sats + costo) + ' sats</b> più il margine per la rete, '
-        + 'lo swap costa circa <b>' + fmt(costo) + ' sats</b> (Barattolo non aggiunge niente). '
-        + 'La richiesta la crei dopo aver preso, in «🔒 Blocca i sats».';
+      nota = 'L\'utente ha pubblicato quest\'ordine on-chain: depositi da Lightning con uno swap di '
+        + esc(d.fornitore_nome || 'SATS Routing') + ' (costo circa <b>' + fmt(costo) + ' sats</b>, '
+        + 'paghi circa <b>' + fmt(st.sats + costo) + ' sats</b> più il margine per la rete).';
     }
   }
   return tastiReteFoglioP2P(Number(o.id), ln ? 'ln' : 'oc', 'scegliReteOcPresaP2P', nota);
+}
+/* ...e lo stesso nel conto del foglio on-chain, col tasto «⚡ Lightning» */
+function swapOcPresaP2P(id, vendeLui){
+  const st = p2pOcPresaRete[id] || {};
+  const d = st.rete === 'ln' && st.stato === 'pronto' ? st.dati : null;
+  if (!d || !d.ok) return null;
+  const costo = vendeLui ? Math.max(0, Number(d.costo) || 0)
+                         : Math.max(0, Number(st.sats) - (Number(d.ricevi) || 0));
+  return costo > 0 ? {sats: costo, nome: d.fornitore_nome || 'SATS Routing'} : null;
 }
 /* LA FRASE DELLA DOMANDA DI PRESA ON-CHAIN, che segue il tasto scelto
    (16 nov 2026, ritocco: con «⚡ Lightning» diceva ancora «arrivano sul
@@ -63072,6 +63099,10 @@ function ridisegnaReteOcPresaP2P(id){
   if (box && o) box.innerHTML = reteOcPresaHtmlP2P(o, o.lato === 'sell');
   const corpo = el('confCorpo');
   if (box && o && corpo) corpo.textContent = corpoPresaOcP2P(o, o.lato === 'sell');
+  const conto = el('p2pOcPresaConto');
+  if (box && o && conto && typeof contoOnchainP2P === 'function')
+    conto.innerHTML = contoOnchainP2P({...o, parte: o.lato === 'sell' ? 'compro' : 'vendo',
+                                       swap: swapOcPresaP2P(o.id, o.lato === 'sell')});
 }
 async function scegliReteOcPresaP2P(id, rete){
   haptic();
@@ -64279,14 +64310,20 @@ function contoOnchainP2P(o){
     + (pill ? '<span class="promo-tag dopo">' + esc(pill) + '</span>' : '');
   const rigaComm = comm ? r(etichetta, '<span class="num">'
     + (cs ? circa + (versa ? '+' : '−') + fmt(cs) : '0') + '<span class="unita-sats"> sats</span></span>') : '';
-  const totale = versa
+  /* lo swap dell'altra rete scelto prima della presa (`swapOcPresaP2P`,
+     16 nov 2026): una riga sua, e il totale lo conta */
+  const sw = o.swap && Number(o.swap.sats) > 0 ? Math.round(Number(o.swap.sats)) : 0;
+  const rigaSwap = sw ? r('Swap ' + esc(o.swap.nome || 'SATS Routing'), '<span class="num">≈ '
+    + (versa ? '+' : '−') + fmt(sw) + '<span class="unita-sats"> sats</span></span>') : '';
+  const totale = (versa
     ? (deposito ? (o.importo_sats || o.sats) : (Number(o.sats) || 0) + cs)
-    : (Number(o.sats) || 0) - cs;
-  const totSats = n => (cs && circa) ? '<span class="num">≈ ' + fmt(n) + '<span class="unita-sats"> sats</span></span>' : sats(n);
+    : (Number(o.sats) || 0) - cs) + (versa ? sw : -sw);
+  const totSats = n => ((cs && circa) || sw) ? '<span class="num">≈ ' + fmt(n) + '<span class="unita-sats"> sats</span></span>' : sats(n);
   return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo') + '">'
     + r('Sats dello scambio', sats(o.sats))
     + (deposito && o.margine_sats ? r('Margine per la rete', sats(o.margine_sats)) : '')
     + rigaComm
+    + rigaSwap
     + '<div class="ctrl-chiusa">'
     + r(compro ? 'Ricevi' : 'Deposita', totSats(totale), 'tot sats')
     + r(compro ? 'Totale da inviare' : 'Ricevi', euro, 'tot euro')
@@ -77104,6 +77141,12 @@ function contoDettP2P(o){
      minimo. `conti` resta una lista di un elemento: `cella` lo legge
      cosi' da sempre. */
   const euri = [o.euro];
+  /* LO SWAP DELL'ALTRA RETE (16 nov 2026, cantiere coin-quasi): scelta
+     l'altra rete nel foglio dell'ordine, il costo di SATS Routing e' una
+     riga del conto (`swapContoDettP2P`), «−» a chi riceve e «+» a chi
+     blocca, e il totale lo conta. Senza `o.swap` il conto e' quello di
+     sempre. */
+  const sw = o.swap && Number(o.swap.sats) > 0 ? Math.round(Number(o.swap.sats)) : 0;
   const conti = euri.map(e => {
     /* ⚠️ `vivo` NON BASTA PIU' PER GUARDARE IL CAMBIO: con la cifra
        detta dal coordinatore e' vero anche a cambio muto, e una
@@ -77124,8 +77167,8 @@ function contoDettP2P(o){
                : (stimabile ? Math.round(e / metroVivo) : 0);
     const meta = (vivo && fee > 0) ? Math.round(merc * fee / 2) : 0;
     return {ctrl: ctrl, premio: Math.abs(ctrl - merc), merc: merc,
-            meta: meta,
-            netto: compro ? merc - meta : merc + meta};
+            meta: meta, swap: sw,
+            netto: compro ? merc - meta - sw : merc + meta + sw};
   });
   /* la cifra di una voce, coi suoi capi: il ≈ sta su ogni stima — e la
      meta' della commissione e' SEMPRE una stima, l'arrotondamento
@@ -77142,8 +77185,8 @@ function contoDettP2P(o){
      `merc` ± `meta`, e `merc` e' la cifra fissa o quella detta dal
      coordinatore — senza commissione e' esatto quanto il Subtotale, e il
      ≈ davanti a «Invia 97 000 sats» di un ordine a sats fissi mentiva */
-  const circaDi = campo => !esatto || campo === 'meta'
-    || (campo === 'netto' && conti[0].meta > 0)
+  const circaDi = campo => !esatto || campo === 'meta' || campo === 'swap'
+    || (campo === 'netto' && (conti[0].meta > 0 || sw > 0))
     || (ricavato && campo !== 'merc' && campo !== 'netto');
   /* una cella e' la cifra senza unita': «sats» lo aggiunge `conSats` */
   const cella = (c, campo, segno) => vivo
@@ -77376,6 +77419,7 @@ function contoDettP2P(o){
        (pillola «in promo» + percentuale + cifra a intervallo) sta.
        Misurato a 320, non stimato. */
     + r(etichettaFee, commissione)
+    + (sw && vivo ? r('Swap ' + esc(o.swap.nome || 'SATS Routing'), cifra('swap', compro ? '−' : '+')) : '')
     /* LE DUE RIGHE IN EVIDENZA NON PESANO UGUALE (set 2026, ritocco
        di Andrea): quella in SATS porta l'arancio di casa — e' la
        cifra che parla di bitcoin, ed e' quella che si va a cercare —
@@ -77857,7 +77901,8 @@ function renderDettaglioP2P(){
                               : 'Scegli quanto vuoi ' + verboEuro + ' per vedere il dettaglio')
       : (bzPronto ? rigaPresaBzP2P(bzPronto) : '')
         + (scelto ? rigaImportoSceltoP2P(o, scelto) : '')
-        + contoDettP2P(scelto ? Object.assign({}, o, {euro: scelto, euroMax: 0}) : o)) +
+        + contoDettP2P(Object.assign({}, o, scelto ? {euro: scelto, euroMax: 0} : {},
+            {swap: (tuo || typeof swapContoDettP2P !== 'function') ? null : swapContoDettP2P(o.id, compro)}))) +
     /* (1 nov 2026, presa-altra-rete, caso 4) chi VENDEREBBE e ha solo
        bitcoin: il cambio prima della presa, sotto il conto */
     (tuo || compro || VETRINA || !myTgId || typeof rigaPresaOcP2P !== 'function'

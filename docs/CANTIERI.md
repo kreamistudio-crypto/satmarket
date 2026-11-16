@@ -84505,6 +84505,25 @@ censimento di `prove_pagina_acquisto` conta ora due «Fee P2P» (Lightning
 e on-chain). Dal vivo (gabbia, relay morti, preventivi finti perché SATS
 Routing è fuori): i tasti nel foglio on-chain e in quello Lightning con la
 nota del costo, il banner a 390 scuro e 320 chiaro.
+LA FRASE CORTA E LA RIGA DELLO SWAP (ritocchi dello stesso giorno, Andrea:
+«l'utente ha pubblicato quest'ordine lighting, ricevi on-chain con uno
+swap… fai il testo più corto» e «nel dettaglio non c'è il costo di quello
+swap lì»). Le quattro note sotto i tasti dicono adesso in una frase sola
+chi ha pubblicato su quale rete, cosa fai con lo swap, il costo e la
+cifra: «L'utente ha pubblicato quest'ordine in Lightning: ricevi on-chain
+con uno swap di SATS Routing (costo X sats, ti arrivano circa Y sats)», e
+le sorelle (blocchi i sats on-chain, ricevi in Lightning, depositi da
+Lightning). Via «Barattolo non aggiunge niente» e il dove-si-fa-dopo: lo
+dicono i fogli dopo la presa. E il conto porta la riga «Swap SATS
+Routing» dopo la Fee P2P, «−» a chi riceve e «+» a chi blocca o deposita,
+col ≈, e il totale la conta: è lo STESSO preventivo della frase
+(`swapContoDettP2P` nel foglio Lightning, `swapOcPresaP2P` in quello
+on-chain, che ora si ridisegna anche nel conto, `#p2pOcPresaConto`), mai
+un secondo numero. Senza scelta dell'altra rete il conto è quello di
+sempre. PROVATO: `prove_tasti_rete_foglio` (16, le frasi intere e la riga
+dai preventivi), `prove_p2p_onchain_commissione` (+1, il conto on-chain
+con lo swap dai due lati), `prove_p2p_dettaglio` (+1, il conto Lightning
+con lo swap dai due lati e senza).
 
 ## I tasti «Compra BTC» e «Vendi BTC» diventano pillole (16 nov 2026, cantiere tasti-lato-p2p, Andrea con una foto: «I tasti compra BTC e vendi BTC nel peer-to-peer, me li puoi mettere così?», «Ovviamente anche nella versione scura», «Non c'è bisogno che mi mandi le foto. Falle così e mandale subito in produzione»)
 

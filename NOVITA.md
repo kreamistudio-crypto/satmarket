@@ -268,7 +268,7 @@ leva: P2P_ONCHAIN_ATTIVO spenta di serie (accesa per tutti in produzione dal 16 
 pubblico: sì
 
 ## 2026-11-16 · p2p-tasti-rete
-frase: Quando tocchi un ordine P2P, sotto «Stai comprando sats» o «Stai vendendo sats» ci sono già i due tasti «⚡ Lightning» e «₿ On-chain», accesi sulla rete dell'ordine. Se scegli l'altra rete vedi subito quanto costa lo swap e quanto ti arriva, prima ancora di prendere l'ordine.
+frase: Quando tocchi un ordine P2P, sotto «Stai comprando sats» o «Stai vendendo sats» ci sono già i due tasti «⚡ Lightning» e «₿ On-chain», accesi sulla rete dell'ordine. Se scegli l'altra rete vedi subito quanto costa lo swap e quanto ti arriva, prima ancora di prendere l'ordine, e il costo dello swap è una riga del dettaglio.
 dove: la scheda «P2P», il foglio che si apre toccando un ordine del libro, Lightning o on-chain.
 leva: P2P_ALTRA_RETE_ATTIVO spenta di serie (accesa per tutti in produzione dal 16 nov)
 pubblico: sì

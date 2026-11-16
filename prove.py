@@ -70505,6 +70505,9 @@ out.stati = [statoAnelloP2P(7 * G), statoAnelloP2P(3 * G),
 p2pInfo = {fee: 0.02};
 p2pLevaPubblica = {mostro: 'm', commissione: 2};
 out.contoMercato = contoDettP2P(ordine({}));
+/* (16 nov 2026) lo swap dell'altra rete scelto nel foglio: una riga sua */
+out.contoSwap = contoDettP2P(ordine({swap: {sats: 700, nome: 'SATS Routing'}}));
+out.contoSwapVendi = contoDettP2P(ordine({lato: 'buy', swap: {sats: 900, nome: 'SATS Routing'}}));
 /* col premio: mercato 11520, meta' 115, premio 480 — e la tinta */
 out.contoPremio = contoDettP2P(ordine({premium: 4}));
 out.contoVendi = contoDettP2P(ordine({lato: 'buy', premium: 4}));
@@ -71041,6 +71044,18 @@ console.log(JSON.stringify(out));
     # «Paga» del mercatino, e ogni riga e' la verita' di CHI LEGGE —
     # la meta' della commissione, o le righe non sommerebbero.
     cm = o["contoMercato"]
+    # LO SWAP DELL'ALTRA RETE (16 nov 2026, Andrea: «nel dettaglio non c'è il
+    # costo di quello swap lì»): la riga dopo la fee, «−» a chi riceve e «+» a
+    # chi blocca, e il totale la conta; senza swap nessuna riga
+    _sw, _swv = (re.sub(r"<[^>]+>", " ", o[k]) for k in ("contoSwap", "contoSwapVendi"))
+    prova("il conto con lo swap: «Swap SATS Routing» ≈ −700 e «Ricevi» ≈ 11180 "
+          "(12000 − 120 − 700); vendendo ≈ +900 e «Invia» ≈ 13020; senza, niente riga",
+          [True, True, True, True, False],
+          ["Swap SATS Routing" in _sw and '<span class="num meno">' in o["contoSwap"].split("Swap SATS Routing")[1][:80],
+           "≈ −700" in _sw and "≈ 11180" in _sw,
+           "≈ +900" in _swv and "≈ 13020" in _swv,
+           o["contoSwap"].index("Fee P2P") < o["contoSwap"].index("Swap SATS Routing") < o["contoSwap"].index("ctrl-chiusa"),
+           "Swap " in cm])
     # (28 set 2026) ...e sulla scatola il LATO di chi legge: qui compra
     prova("il conto veste il vestito del mercatino", True,
           '<div class="ctrl-conto conto-p2p lato-compro">' in cm and 'ctrl-riga' in cm)
@@ -117498,7 +117513,7 @@ def prove_passi_libro_p2p():
            "trust-note nota-scambio" in dett])
     # (9 ott 2026) la riga rossa non c'e' piu' (cantiere prendi-metodo):
     # il terzo paletto e' il piede coi bottoni
-    _posti = [dett.find(a) for a in ("contoDettP2P(scelto ?", "passiDettP2P(",
+    _posti = [dett.find(a) for a in ("contoDettP2P(Object.assign({}, o, scelto ?", "passiDettP2P(",
                                      "'<div class=\"foglio-piede\">' +")]
     prova("...e i passi stanno dopo il conto e prima dei bottoni", True,
           min(_posti) > 0 and _posti == sorted(_posti))
@@ -142927,8 +142942,7 @@ def prove_contanti_pagina_leggera():
           ["r(compro ? (o.consegna ? 'Totale da consegnare' : 'Totale da inviare') : 'Ricevi', cifreEuro, 'tot euro')" in cdp,
            "consegna: typeof pagaInContantiP2P === 'function'\n                                              && pagaInContantiP2P(o)}));" in ren,
            mini.count("contoDettP2P(") == 3
-           and "+ contoDettP2P(scelto ? Object.assign({}, o, {euro: scelto, euroMax: 0}) : o)) +"
-               in fn("function renderDettaglioP2P(){")])
+           and "+ contoDettP2P(Object.assign({}, o, scelto ? {euro: scelto, euroMax: 0} : {}," in fn("function renderDettaglioP2P(){")])
     prova("il CSS: la regola scura, il passo col filo verde, i numeri, il cassetto senza il triangolo di serie", [True] * 4,
           [".contanti-regola-forte{font-size:14px;font-weight:800;color:var(--ink)" in css,
            ".contanti-incontro{margin-top:10px;padding:10px 8px;border:2px solid var(--trust);" in css,
@@ -159971,6 +159985,11 @@ out.riceve = righe(contoOnchainP2P(P({ruolo: 'venditore', parte: 'compro'})));
 /* prima della presa, chi guarda e comprerebbe: la stima della sua meta' */
 out.stima = righe(contoOnchainP2P(P({ruolo: '', parte: 'compro', preso_il: 0, quota_sats: 0,
   quota_ricevente_sats: 0})));
+/* lo swap dell'altra rete scelto prima della presa: una riga sua, e il totale la conta */
+out.swapRiceve = righe(contoOnchainP2P(P({ruolo: '', parte: 'compro', preso_il: 0, quota_sats: 0,
+  quota_ricevente_sats: 0, swap: {sats: 900, nome: 'SATS Routing'}})));
+out.swapDeposita = righe(contoOnchainP2P(P({ruolo: '', parte: 'vendo', preso_il: 0, quota_sats: 0,
+  quota_ricevente_sats: 0, swap: {sats: 700, nome: 'SATS Routing'}})));
 out.piccolo = commissioneOnchainP2P(P({preso_il: 0, quota_sats: 0, quota_ricevente_sats: 0,
   sats: 12000}), false);
 fee = null;
@@ -160012,6 +160031,14 @@ process.stdout.write(JSON.stringify(out));
               "guarda (100.000 x 2% / 2 = 1.000)",
               ["Fee P2P 1%beta | ≈ −1.000 sats", "Ricevi | ≈ 99.000 sats"],
               o["stima"][1:3])
+        prova("LO SWAP DELL'ALTRA RETE nel conto (Andrea: «nel dettaglio non c'è il costo di "
+              "quello swap»): «Swap SATS Routing» col «−» a chi riceve e col «+» a chi deposita, "
+              "e il totale lo conta",
+              [["Sats dello scambio | 100.000 sats", "Fee P2P 1%beta | ≈ −1.000 sats",
+                "Swap SATS Routing | ≈ −900 sats", "Ricevi | ≈ 98.100 sats"],
+               ["Sats dello scambio | 100.000 sats", "Fee P2P 1%beta | ≈ +1.000 sats",
+                "Swap SATS Routing | ≈ +700 sats", "Deposita | ≈ 101.700 sats"]],
+              [o["swapRiceve"][:4], o["swapDeposita"][:4]])
         prova("...sotto la polvere niente commissione, e senza fee viva niente riga",
               [{"sats": 0, "stima": True}, None], [o["piccolo"], o["senzaFee"]])
     prova("I FILI DEL SERVER: la presa conta le due meta' dalla fee viva (503 se non c'e'), "
@@ -160039,7 +160066,7 @@ process.stdout.write(JSON.stringify(out));
     frase = pezzo_js(mini, "function corpoPresaOcP2P(o, vendeLui){", "\n}\n")
     prova("IL FOGLIO DI CHI PRENDE porta il conto, come il dettaglio Lightning, e le "
           "due frasi dicono la meta' della commissione", [True, True, True, True],
-          ["contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo'})" in presa,
+          ["contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo'," in presa,
            "corpo: corpoPresaOcP2P(o, vendeLui)," in presa,
            "più la tua metà della commissione e il margine di rete" in frase,
            "meno la tua metà della commissione" in frase])
@@ -160092,6 +160119,7 @@ let p2pOnchainLibro = {eventi: [{id: 7, lato: 'sell', sats: 100000}, {id: 8, lat
   lnPossibile: true, depositoLnPossibile: false};
 let FETCH = []; const fetch = async (u, o) => { FETCH.push([u, o && o.body]); return {ok: true, json: async () => ({})}; };
 const satsCardOnchainP2P = o => fmt(o.sats) + ' sats', fmtSoldiP2P = e => String(e);
+const contoOnchainP2P = o => 'CONTO ' + JSON.stringify(o.swap);
 """ + mini[a:b] + r"""
 const out = {};
 const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed="(true|false)"[^>]*>([^<]+)</g)].map(m => m[3] + ':' + m[2]);
@@ -160109,19 +160137,23 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
   out.sceltaOc = [p2pIncassoRete.L1, premuto(reteDettP2P(RIGHE.L1, true))];
   await caricaCambioDettP2P('L1');
   out.notaOc = notaCambioDettP2P('L1');
+  out.swapOc = swapContoDettP2P('L1', true);
   await scegliReteDettP2P('L1', 'ln');
   out.tornaLn = [p2pIncassoRete.L1 === undefined, premuto(reteDettP2P(RIGHE.L1, true))];
+  out.swapLn = swapContoDettP2P('L1', true);
   /* chi vende tocca ₿: si apre il riquadro dello swap della garanzia */
   await scegliReteDettP2P('L2', 'oc');
   out.vendeOc = [premuto(reteDettP2P(RIGHE.L2, false)), notaPresaDettP2P('L2')];
+  out.swapVende = swapContoDettP2P('L2', false);
   /* il foglio on-chain: chi riceve (ordine di vendita) ha i tasti, chi deposita no qui */
   out.ocPossibile = [reteOcPresaPossibileP2P(true), reteOcPresaPossibileP2P(false)];
   out.ocSats = [satsOcPresaP2P(p2pOnchainLibro.eventi[0], true), satsOcPresaP2P(p2pOnchainLibro.eventi[1], false)];
   out.ocPrima = premuto(reteOcPresaHtmlP2P(p2pOnchainLibro.eventi[0], true));
   out.frasePrima = [corpoPresaOcP2P(p2pOnchainLibro.eventi[0], true), corpoPresaOcP2P(p2pOnchainLibro.eventi[1], false)];
-  NODI.p2pOcPresaRete = {innerHTML: ''}; NODI.confCorpo = {textContent: ''};
+  NODI.p2pOcPresaRete = {innerHTML: ''}; NODI.confCorpo = {textContent: ''}; NODI.p2pOcPresaConto = {innerHTML: ''};
   await scegliReteOcPresaP2P(7, 'ln');
   out.fraseLn = NODI.confCorpo.textContent;
+  out.contoLn = NODI.p2pOcPresaConto.innerHTML;
   out.ocLn = [premuto(NODI.p2pOcPresaRete.innerHTML), NODI.p2pOcPresaRete.innerHTML.replace(/<[^>]+>/g, '').replace(/.*Lightning₿ On-chain/, '')];
   await scegliReteOcPresaP2P(8, 'ln');
   out.fraseDepLn = NODI.confCorpo.textContent;
@@ -160155,14 +160187,23 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
         prova("...chi compra tocca «₿ On-chain»: la scelta resta per «Dove ricevere i sats» "
               "e si vede subito il costo dello swap sul netto che Mostro paghera'",
               ["oc", ["⚡ Lightning:false", "₿ On-chain:true"]], o["sceltaOc"])
-        prova("...la nota dice quanto arriva, quanto costa e dove si scrive l'indirizzo",
-              True, "arrivano circa <b>97.800 sats</b>, lo swap costa <b>700 sats</b>" in o["notaOc"]
-              and "«Dove ricevere i sats»" in o["notaOc"])
+        prova("...la nota, corta, dice chi ha pubblicato in Lightning, quanto costa lo swap "
+              "e quanto arriva (Andrea: «l'utente ha pubblicato quest'ordine lighting, "
+              "ricevi on-chain con uno swap… fai il testo più corto»)",
+              "L'utente ha pubblicato quest'ordine in Lightning: ricevi on-chain con uno swap di "
+              "SATS Routing (costo <b>700 sats</b>, ti arrivano circa <b>97.800 sats</b>).", o["notaOc"])
         prova("...e si torna su Lightning", [True, ["⚡ Lightning:true", "₿ On-chain:false"]], o["tornaLn"])
+        prova("LA RIGA DELLO SWAP NEL CONTO viene dallo stesso preventivo della frase: 700 a "
+              "chi riceve on-chain, niente tornati su Lightning, 900 a chi blocca on-chain; nel "
+              "foglio on-chain col «⚡» il conto si ridisegna con lo swap",
+              [{"sats": 700, "nome": "SATS Routing"}, None, {"sats": 900, "nome": "SATS Routing"},
+               'CONTO {"sats":900,"nome":"SATS Routing"}'],
+              [o["swapOc"], o["swapLn"], o["swapVende"], o["contoLn"]])
         prova("...chi vende tocca «₿ On-chain»: si apre il riquadro dello swap della garanzia "
               "e la nota dice quanto mandare e quanto costa",
               True, o["vendeOc"][0] == ["⚡ Lightning:false", "₿ On-chain:true"]
-              and "mandi <b>102.400 sats</b>, lo swap di SATS Routing costa <b>900 sats</b>" in o["vendeOc"][1])
+              and o["vendeOc"][1] == "L'utente ha pubblicato quest'ordine in Lightning: blocchi i sats "
+              "on-chain con uno swap di SATS Routing (costo <b>900 sats</b>, mandi <b>102.400 sats</b>).")
         prova("SU UN ORDINE ON-CHAIN i cancelli del server (qui: ricevere in Lightning si', "
               "depositare da Lightning no); i sats dello swap tolta o aggiunta la mia meta' "
               "della commissione; «₿ On-chain» acceso di serie",
@@ -160170,7 +160211,8 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
               [o["ocPossibile"], o["ocSats"], o["ocPrima"]])
         prova("...toccato «⚡ Lightning» chi riceve vede subito quanto gli arriva e il costo",
               True, o["ocLn"][0] == ["⚡ Lightning:true", "₿ On-chain:false"]
-              and "ti arrivano circa 97.600 sats, lo swap costa circa 900 sats" in o["ocLn"][1])
+              and o["ocLn"][1] == "L'utente ha pubblicato quest'ordine on-chain: ricevi in Lightning "
+              "con uno swap di SATS Routing (costo circa 900 sats, ti arrivano circa 97.600 sats).")
         prova("LA FRASE SOTTO IL CONTO segue il tasto: on-chain «sul TUO wallet on-chain», "
               "con «⚡ Lightning» «ti arrivano in Lightning» e, per chi deposita, «pagando "
               "da Lightning con lo swap»",
@@ -160181,7 +160223,8 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
                "TUO wallet on-chain" in o["fraseLn"],
                "pagando da Lightning con lo swap" in o["fraseDepLn"]])
         prova("...e chi deposita quanto paga in Lightning e il costo",
-              True, "paghi circa 101.700 sats più il margine per la rete, lo swap costa circa 700 sats" in o["depLn"])
+              "L'utente ha pubblicato quest'ordine on-chain: depositi da Lightning con uno swap di "
+              "SATS Routing (costo circa 700 sats, paghi circa 101.700 sats più il margine per la rete).", o["depLn"])
         prova("DOPO LA PRESA la scelta passa: il foglio del deposito gia' su Lightning, il "
               "«Ricevi in Lightning» chiesto con la rotta di sempre, e la scelta si consuma",
               ["ln", ['/api/p2p/onchain/7/ricevi-lightning {"si":true}'], True], o["dopo"])
