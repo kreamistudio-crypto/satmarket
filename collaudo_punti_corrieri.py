@@ -396,9 +396,15 @@ def prove_segna_spedito():
     o = riga(oid)
     prova("la prima uscita: con SDA parte", ("shipped", "SDA"),
           (o["stato"], o["corriere"]))
+    # (dal 16 nov 2026 alla spedizione via punto parte anche
+    # «arriverà a te» al VENDITORE: chi compra resta uno solo)
+    al_compratore = [t for chi, t in DETTI if chi == 111]
     prova("...e adesso si' che chi ha comprato viene avvisato", True,
-          len(DETTI) == 1 and DETTI[0][0] == 111
-          and "in viaggio verso il punto" in DETTI[0][1])
+          len(al_compratore) == 1
+          and "in viaggio verso il punto" in al_compratore[0])
+    prova("...e il venditore sa che il codice arriva a lui", True,
+          [chi for chi, t in DETTI if chi != 111] == [222]
+          and any("arriverà a te" in t for chi, t in DETTI if chi == 222))
     prova("...e il contatore delle contestazioni resta (e' la memoria "
           "del moderatore)", 1, o["punto_obiezioni"])
 

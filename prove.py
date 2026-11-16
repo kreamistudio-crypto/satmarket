@@ -10269,6 +10269,50 @@ def prove_busta_ritiro():
           and "busta_diretta: bustaDiretta" in mini)
     prova("...e bustaDirettaIl sta in mapOrder", True,
           "bustaDirettaIl:o.busta_diretta_il" in mini)
+    # --- SENZA EMAIL LA SPUNTA NON C'E' (16 nov 2026, dal campo) ----
+    # La spunta «il codice arriva direttamente a lui» compariva su ogni
+    # ordine via punto: dove l'email non c'era, il venditore dichiarava
+    # una cosa impossibile e il codice non arrivava a nessuno.
+    prova("il SE dell'email arriva in mapOrder", True,
+          "emailCorrierePresente:!!o.email_corriere_presente" in mini)
+    _i_spunta = mini.index('id="shipBustaDiretta"')
+    _riga_spunta = mini[mini.rindex("${", 0, _i_spunta):_i_spunta]
+    prova("la spunta nasce SOLO con l'email (e mai sulla rete di casa)",
+          True, "(o.viaPunto && !o.puntoBarattolo && "
+                "o.emailCorrierePresente) ?" in _riga_spunta)
+    _senza = ("(o.viaPunto && !o.puntoBarattolo && "
+              "!o.emailCorrierePresente) ? `<div class=\"hint\"")
+    prova("...e senza, al suo posto la riga «arriverà a te», PRIMA del "
+          "«Segna come spedito»", (1, True),
+          (mini.count(_senza),
+           _i_spunta < mini.index(_senza) < mini.index("markShipped()")
+           and "il codice di ritiro arriverà a te" in
+           mini[mini.index(_senza):mini.index(_senza) + 400]))
+    _pb_tutto = pezzo_js(mini, "function pannelloBustaRitiro(o){")
+    _pb_v = _pb_tutto[_pb_tutto.index("/* venditore:"):]
+    prova("la porta tardiva nel pannello del venditore vuole l'email",
+          True, "!o.bustaIl && !o.bustaDirettaIl && "
+                "o.emailCorrierePresente) ?" in _pb_v)
+    # IL CODICE IN CIMA: il giudice si fa GIRARE stato per stato
+    _cima = pezzo_js(mini, "function bustaInCima(o){", "\n}\n") + "\n}"
+    _script = ("const CONCLUSI = ['released','refunded','annullato'];\n"
+               + _cima + "\nconst b = (role, viaPunto, bustaIl, state) => "
+               "bustaInCima({role, viaPunto, bustaIl, state});\n"
+               "console.log(JSON.stringify(["
+               "b('buyer',1,5,'shipped'), b('buyer',1,5,'dispute'),"
+               "b('buyer',1,5,'locked'), b('buyer',1,0,'shipped'),"
+               "b('seller',1,5,'shipped'), b('admin',1,5,'dispute'),"
+               "b('buyer',0,5,'shipped'), b('buyer',1,5,'released'),"
+               "b('buyer',1,5,'refunded'), b('buyer',1,5,'annullato')]));")
+    try:
+        _r = _sp.run(["node", "-e", _script], capture_output=True,
+                     text=True, timeout=30)
+        prova("il codice sale in cima solo per chi compra, a busta "
+              "depositata e ordine vivo",
+              [True, True, True, False, False, False, False, False,
+               False, False], _json.loads(_r.stdout.strip()))
+    except FileNotFoundError:
+        salta("il codice in cima", "node non c'e'")
     _bd = pezzo_js(mini, "function dichiaraBustaDiretta(){")
     prova("la porta tardiva chiede col foglio di casa", True,
           "chiediConferma({" in _bd)
@@ -10613,6 +10657,8 @@ def prove_busta_ritiro():
         punto_barattolo TEXT DEFAULT '', punto_preso_il INT DEFAULT 0, punto_preso_da TEXT DEFAULT '',
         indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
         indirizzo_atteso INT DEFAULT 0,
+        email_corriere TEXT DEFAULT '',
+        email_corriere_purgata_il INT DEFAULT 0,
         sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0,
         sollecito_punto_il INT DEFAULT 0, solleciti_punto INT DEFAULT 0,
         sollecito_diretto_il INT DEFAULT 0,
@@ -10677,6 +10723,7 @@ def prove_busta_ritiro():
                "html": __import__("html"),   # segna_spedito scappa i suoi
                "CHIAVE_CONTENUTI_DIGITALI": "", "Fernet": None,
                "MSG_BUSTA_PRONTA": "TI-ASPETTA",
+               "MSG_CODICE_A_TE": "A-TE",
                # il documento di ritiro: cartella usa-e-getta, cosi'
                # la prova scrive davvero un file e lo si puo' guardare
                "os": __import__("os"), "re": __import__("re"),
@@ -10686,6 +10733,9 @@ def prove_busta_ritiro():
                "_e_immagine": lambda raw: True,
                "io": _io, "ImmaginePillow": _Im, "ImageOps": _IOps}
         gemelli_trackbot(amb)   # il codice cliccabile del messaggio
+        # il giudice unico della busta diretta (16 nov 2026): quello
+        # VERO, che segna_spedito e la porta tardiva chiamano
+        exec(pezzo("_email_corriere_presente"), amb)
         exec(pezzo("_cifra_contenuto"), amb)
         exec(pezzo("_decifra_contenuto"), amb)
         exec(pezzo("_cifra_blob"), amb)
@@ -10793,9 +10843,12 @@ def prove_busta_ritiro():
     # Il venditore dichiara che il codice di ritiro arriva
     # direttamente al compratore: la spunta alla spedizione, la porta
     # tardiva, e il deposito che azzera. Tutto GIRATO, mai guardato.
+    # (l'email per il corriere c'e': dal 16 nov 2026 senza la busta
+    # diretta non esiste — il blob e' finto, conta che non sia vuoto)
     vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
-                 "stato, via_punto, punto_ritiro) "
-                 "VALUES(4, 111, 222, 'locked', 1, 'Locker InPost')")
+                 "stato, via_punto, punto_ritiro, email_corriere) "
+                 "VALUES(4, 111, 222, 'locked', 1, 'Locker InPost', "
+                 "'f2:finta')")
     # id 5: spedizione a casa — la spunta li' non ha oggetto
     vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
                  "stato) VALUES(5, 111, 222, 'locked')")
@@ -10823,9 +10876,9 @@ def prove_busta_ritiro():
     # LA PORTA TARDIVA: id 6, spedito senza la spunta (il distratto)
     vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
                  "stato, via_punto, punto_ritiro, spedito_il, "
-                 "aggiornato) "
+                 "aggiornato, email_corriere) "
                  "VALUES(6, 111, 222, 'shipped', 1, 'Punto Poste', "
-                 "1000, 1000)")
+                 "1000, 1000, 'f2:finta')")
     vero.commit()
 
     def dichiara(chi, oid):
@@ -11170,6 +11223,9 @@ def prove_busta_ritiro():
            "_fmt_sats": lambda n: str(n), "time": _t,
            "PROMEMORIA_BUSTA_GIORNI": 3, "PROMEMORIA_CONFERMA_GIORNI": 3,
            "PROMEMORIA_CONFERMA_MAX": 3}
+    # il giudice vero della coda del testo (16 nov 2026): con o senza
+    # email il sollecito nomina, o no, la porta tardiva
+    exec(pezzo("_email_corriere_presente"), amb)
     exec("async " + pezzo("sollecita_buste_ferme"), amb)
     asyncio.new_event_loop().run_until_complete(
         amb["sollecita_buste_ferme"]())
@@ -12643,7 +12699,9 @@ def prove_email_corriere():
     # NOTA: cosi' scritta resterebbe verde col cartello dell'email
     # tolto (era gia' cosi', ed e' la classe di prova che questo repo
     # ha gia' smascherato sei volte).
-    _riga_cartello = ("o.emailCorriereIl && !o.emailCorrierePurgataIl) ? "
+    # (dal 16 nov 2026 il gate e' il SE di adesso, `emailCorrierePresente`:
+    # il timbro restava anche a email tolta e il cartello mentiva)
+    _riga_cartello = ("(o.viaPunto && o.emailCorrierePresente) ? "
                       "`<div class=\"hint\">\U0001F4E7 L'acquirente ha "
                       "lasciato un'<b>email per il corriere</b>")
     prova("client: il pannello Spedisci porta il cartello dell'email",
@@ -13770,6 +13828,7 @@ def prove_nascondi_ordine():
         exec(pezzo("_titolo_ordine"), amb)
         exec(pezzo("_motivo_no_gesto_feedback"), amb)
         exec(pezzo("_gesti_feedback"), amb)
+        exec(pezzo("_email_corriere_presente"), amb)   # il SE dell'email
         exec(pezzo("miei_ordini"), amb)
         return {r["id"]: r for r in amb["miei_ordini"](0, "", "")}
 
@@ -14757,10 +14816,18 @@ console.log(JSON.stringify(out));
           re.findall(r"(pannello[A-Za-z]+)\(o\)", bu))
     # ...e il dettaglio non le chiama piu' una per una: una sola
     # chiamata, o una busta resterebbe fuori dalla chiusura
-    prova("...e il dettaglio ne chiama UNA, il gruppo", (1, [1] * len(BUSTE)),
+    # ...tranne la busta di RITIRO, che dal 16 nov 2026 per chi compra
+    # SALE IN CIMA quando c'e' (`bustaInCima`): due chiamate, ma col
+    # giudice unico da tutt'e due le parti — in cima solo a ordine
+    # VIVO, quindi la chiusura delle buste non la perde mai
+    prova("...e il dettaglio ne chiama UNA, il gruppo", (1, [1] * (len(BUSTE) - 1) + [2]),
           (mini.count("${busteOrdine(o)}"),
            [mini.count(b + "(o)") - mini.count("function " + b + "(o){")
             for b in BUSTE]))
+    prova("...e la seconda chiamata della busta di ritiro e' quella in "
+          "cima, col giudice", [True, True],
+          ["${bustaInCima(o) ? pannelloBustaRitiro(o) : ''}" in mini,
+           "bustaInCima(o) ? '' : pannelloBustaRitiro(o)" in bu])
     prova("finito e' CONCLUSI, lo stesso giudice dei verbi e del "
           "filtro «solo attivi»", True,
           "CONCLUSI.includes(o.state)" in bu)
@@ -14798,6 +14865,7 @@ console.log(JSON.stringify(out));
         "const CONCLUSI = " + _json.dumps(["released", "refunded",
                                            "annullato"]) + ";",
         finte,
+        pezzo_js(mini, "function bustaInCima(o){", "\n}\n") + "\n}",
         pezzo_js(mini, "function busteOrdine(o){", "\n}\n") + "\n}",
         """
 const STATI = __STATI__;
@@ -18978,7 +19046,7 @@ def prove_tracking_facoltativo():
         d = {"id": 7, "compratore_id": 111, "venditore_id": 222,
              "stato": "locked", "consegna_scelta": "spedizione",
              "annuncio_id": 3, "via_punto": 0, "punto_ritiro": "",
-             "rete_punto": "",
+             "rete_punto": "", "punto_barattolo": "",
              "busta_il": 0, "indirizzo_atteso": 0, "indirizzo_il": 0}
         d.update(extra)
         return d
@@ -19012,6 +19080,7 @@ def prove_tracking_facoltativo():
         amb = {"html": _html, "time": _time, "db": lambda: ConFinta(),
                "notifica": notifica_finta,
                "MSG_BUSTA_PRONTA": "il pacco ti aspetta",
+               "MSG_CODICE_A_TE": "il codice arriverà a te",
                "Header": lambda d="": d, "Cookie": lambda d="": d,
                "Request": object, "leggi_json": json_finto,
                "verifica_utente": lambda *a: {"id": 222},
@@ -38735,7 +38804,7 @@ def prove_avviso_spedizione():
         d = {"id": 7, "compratore_id": 111, "venditore_id": 222,
              "stato": "locked", "consegna_scelta": "spedizione",
              "annuncio_id": 3, "via_punto": 0, "punto_ritiro": "",
-             "rete_punto": "",
+             "rete_punto": "", "punto_barattolo": "",
              "busta_il": 0,
              # l'ordine del mondo di ieri: l'indirizzo non l'ha mai
              # chiesto, quindi il gate di segna_spedito non lo tocca
@@ -38774,6 +38843,7 @@ def prove_avviso_spedizione():
         amb = {"html": _html, "time": _time, "db": lambda: ConFinta(),
                "notifica": notifica_finta,
                "MSG_BUSTA_PRONTA": "il pacco ti aspetta",
+               "MSG_CODICE_A_TE": "il codice arriverà a te",
                "Header": lambda d="": d, "Cookie": lambda d="": d,
                "Request": object,
                "verifica_utente": lambda *a: {"id": 222},
@@ -39139,7 +39209,7 @@ async function tocca(o){
         o = {"id": 7, "compratore_id": 111, "venditore_id": 222,
              "stato": "locked", "consegna_scelta": "spedizione",
              "annuncio_id": 3, "via_punto": 0, "punto_ritiro": "",
-             "rete_punto": "",
+             "rete_punto": "", "punto_barattolo": "",
              "busta_il": 0, "indirizzo_atteso": 0, "indirizzo_il": 0}
         diretta = extra.pop("diretta", False)
         o.update(extra)
@@ -39166,10 +39236,12 @@ async function tocca(o){
         amb = gemelli_trackbot({
             "time": _time, "db": lambda: Con(), "notifica": notifica_finta,
             "MSG_BUSTA_PRONTA": "il pacco ti aspetta",
+            "MSG_CODICE_A_TE": "il codice arriverà a te",
             "Header": lambda d="": d, "Cookie": lambda d="": d,
             "Request": object, "leggi_json": json_finto,
             "verifica_utente": lambda *a: {"id": 222},
             "HTTPException": type("HTTPException", (Exception,), {})})
+        exec(pezzo("_email_corriere_presente"), amb)
         exec("async " + pezzo("segna_spedito"), amb)
         _aio.run(amb["segna_spedito"](7, None, "", ""))
         return detto[0] if detto else ""
@@ -39177,8 +39249,13 @@ async function tocca(o){
     for nome, extra in (("a casa", {}),
                         ("verso il punto di ritiro",
                          {"via_punto": 1, "punto_ritiro": "Locker InPost"}),
+                        # (dal 16 nov 2026 la busta diretta vuole
+                        # l'email del compratore: il blob e' finto,
+                        # conta che non sia vuoto)
                         ("verso il punto, busta diretta",
                          {"via_punto": 1, "punto_ritiro": "Locker InPost",
+                          "email_corriere": "f2:finta",
+                          "email_corriere_purgata_il": 0,
                           "diretta": True})):
         testo = spedisci(**extra)
         prova(f"«in viaggio» {nome}: il codice e' il link dell'app", True,
@@ -62152,7 +62229,8 @@ def prove_card_parte_ordine():
     amb["FEEDBACK_MODIFICABILE"] = True
     amb["FEEDBACK_MODIFICA_GIORNI"] = 7
     for f in ("_motivo_no_gesto_feedback", "_gesti_feedback",
-              "livello_utente", "_volti_persone", "miei_ordini"):
+              "livello_utente", "_volti_persone",
+              "_email_corriere_presente", "miei_ordini"):
         exec(pezzo(f), amb)
     # la SPIA sul costruttore: chi gli si chiede, a ogni giro
     chiesti = []

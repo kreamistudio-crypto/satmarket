@@ -332,3 +332,9 @@ frase: Nella home gli scambi P2P mostrano anche gli ordini on-chain (USDe, ETH, 
 dove: la home, fila «Scambi P2P»; la scheda «P2P», in alto accanto alla campanella; la pillola «Ordina» con «Più recenti».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-16 · codice-ritiro
+frase: Spedizioni a un locker o a un punto di ritiro: quando il codice per ritirare il pacco è pronto, chi ha comprato lo trova in cima all'ordine, subito sotto il prezzo. E chi vende sa fin dalla spedizione se il codice arriverà a lui, da incollare nell'ordine, o direttamente a chi compra.
+dove: l'ordine, riquadro «📦 Istruzioni per il ritiro»; per chi vende il riquadro «📦 Spedisci» e il messaggio del bot alla spedizione.
+leva: nessuna
+pubblico: sì

@@ -119,20 +119,22 @@ Hai un catalogo grande? Nel Profilo c'è «📥 Importa in blocco»: scarichi il
 
 Per incassare da solo imposta il tuo indirizzo Lightning nel Profilo: quando chi compra conferma, i sats ti arrivano lì.
 
+Se spedisci a un locker o a un punto di ritiro, il codice per ritirare il pacco lo manda il corriere a chi hai scritto come destinatario. Se chi compra ha lasciato un'email per il corriere, puoi metterla sull'etichetta e il codice arriva direttamente a lui. Se non l'ha lasciata, il codice arriva a te: appena ce l'hai, apri l'ordine e incollalo in «📦 Istruzioni di ritiro per l'acquirente». È l'unico modo in cui lui lo riceve, e la giacenza dura pochi giorni.
+
 Le commissioni del mercatino: Barattolo non prende commissioni, né a chi vende né a chi compra. Si pagano solo le commissioni della rete, che non vanno a Barattolo: su Lightning sono pochi sats o niente, on-chain sono quelle dei miner. Se un giorno cambiasse, la cifra sarebbe nei NUMERI DI OGGI. Negli acquisti on-chain può esserci solo una quota fissa a Barattolo per le spese di rete, scritta nel conto prima di pagare: quanto vale oggi lo dicono i NUMERI DI OGGI.
 
 Quando qualcuno chiede delle commissioni, tieni sempre separati il mercatino (zero commissioni di Barattolo, solo quelle della rete) e lo scambio P2P (la commissione del coordinatore, spiegata più sotto). Mescolarli confonde.
 
 Le donazioni: chi vuole sostenere Barattolo con qualche sats può mandarli all'indirizzo Lightning zap@barattolo.store (si incolla nel wallet come destinatario, si sceglie l'importo e si invia), oppure con uno zap al profilo Nostr «Barattolo», che accetta anche bitcoin on-chain. Sono un regalo libero: non danno vantaggi nell'app e non sono mai obbligatorie. Se qualcuno chiede come donare, dai questo indirizzo e ringrazia di cuore.
 
+<!-- pezzo libro-010 | libro -->
+## Libro · Vendere nel mercatino (2/3)
+
 Quando arriva un ordine il bot ti avvisa. Spedisci, segna il corriere e il codice di tracciamento nell'ordine, e aspetta la conferma di chi compra. L'indirizzo di chi compra lo vedi solo tu, per stampare l'etichetta: non usarlo per altro.
 
 Le prestazioni si possono vendere, ma devono essere definite: quanto durano, che cosa comprendono, a che prezzo. «Un'ora di lezione di inglese» sì; «ti faccio quello che ti serve» no.
 
 Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraffazioni, documenti, dati personali, farmaci, animali protetti.
-
-<!-- pezzo libro-010 | libro -->
-## Libro · Vendere nel mercatino (2/3)
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere.
 
@@ -1670,5 +1672,13 @@ pubblico: sì
 
 frase: Nella home gli scambi P2P mostrano anche gli ordini on-chain (USDe, ETH, Monero compresi), col fulmine ⚡ o la ₿ in fondo alla card per dire subito la rete. Nel libro la mappa 🗺️ c'è sempre, «Più recenti» mescola on-chain e Lightning, scorrendo i rettangoli «Novità» diventano uno solo, e «🔁 Ripubblica» c'è anche in «Compra BTC» con Barattozon.
 dove: la home, fila «Scambi P2P»; la scheda «P2P», in alto accanto alla campanella; la pillola «Ordina» con «Più recenti».
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-050 | novita -->
+## Novità · 2026-11-16 · codice-ritiro
+
+frase: Spedizioni a un locker o a un punto di ritiro: quando il codice per ritirare il pacco è pronto, chi ha comprato lo trova in cima all'ordine, subito sotto il prezzo. E chi vende sa fin dalla spedizione se il codice arriverà a lui, da incollare nell'ordine, o direttamente a chi compra.
+dove: l'ordine, riquadro «📦 Istruzioni per il ritiro»; per chi vende il riquadro «📦 Spedisci» e il messaggio del bot alla spedizione.
 leva: nessuna
 pubblico: sì
