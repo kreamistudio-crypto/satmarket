@@ -34222,12 +34222,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   carattere se la leva si rispegne. Il tocco passa da
   `toccaCellaAste()`: leva accesa → `vaiSwap()`, sennò `vaiAste()` come
   prima.
-  LE ASTE A LEVA ACCESA si raggiungono dalla porta `#portaAste` («🔨
-  Aste ›»), sotto l'header di Esplora e fuori da lui (comparendo non
-  cambia l'altezza su cui è appesa la striscia delle pillole). Nasce
-  nascosta e la accende solo `vestiCellaAste`. In quel caso `voceNav`
-  accende Esplora e non la quarta cella, per il ramo aste e per
-  `astepresto`.
+  LE ASTE A LEVA ACCESA si raggiungevano dalla porta `#portaAste` («🔨
+  Aste ›»), sotto l'header di Esplora: TOLTA il 16 nov 2026 (cantiere
+  nav-nostr, Andrea: «quel tasto in quella posizione non mi piace»).
+  Al suo posto LA TESSERA «ASTE» nella fila delle categorie (dopo
+  «Scambio P2P», `.cella-aste`, disegno `aste-tessera.webp` a tutto
+  quadrato come il carrello) e LA CARD QUADRATA di «Da scoprire» (voce
+  `aste` di `SCOPRIRE` con `quadra: true`: classe `.sc-quadra`, scritta
+  `.sc-quadra-eti` su velo pieno, testo funzione della leva quindi nella
+  firma). Tutte e due sempre visibili, tocco `vaiAste()`: ad aste spente
+  `astepresto`, accese la vetrina. Con lei «Da scoprire» non sparisce più.
+  A cella vestita da
+  Swap `voceNav` accende Esplora e non la quarta cella, per il ramo aste
+  e per `astepresto`.
   LA PAGINA `view-swap`: markup fisso con tre segnaposto, i testi li
   scrive `renderSwap()` da `SWAP_TESTI` (it/en, l'inglese se la lingua
   di Telegram non è l'italiano: `linguaSwap()`), chiamata da `go()` come

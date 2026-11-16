@@ -247,9 +247,10 @@ pubblico: sì
 frase: Nel bot di Barattolo c'è il bottone «💬 Chiedi a Tappo»: un tocco e sei nella chat di Tappo, che risponde alle domande su come funziona Barattolo. Il bot di Barattolo resta quello degli avvisi su ordini e pagamenti.
 dove: il bot @ilbarattolobot, nel messaggio di benvenuto (/start) e nella risposta a chi gli scrive una frase.
 leva: TAPPO_LINK (accesa di serie)
+pubblico: sì
 
 ## 2026-11-16 · nav-nostr
-frase: La scheda «Swap» in basso adesso la vede anche chi apre Barattolo dal sito e non è ancora entrato: al suo posto prima c'era «Aste», che sono spente. Toccandola si entra con Telegram o con Nostr, e subito dopo si arriva alla pagina «Swap».
-dove: la barra in basso del sito, prima del login; il foglio «Ti aspettiamo su Telegram» (su Tor «Entra nel Barattolo»).
+frase: La scheda «Swap» in basso adesso la vede anche chi apre Barattolo dal sito e non è ancora entrato: al suo posto prima c'era «Aste», che sono spente. Toccandola si entra con Telegram o con Nostr, e subito dopo si arriva alla pagina «Swap». E le aste hanno una casa nuova: la tessera «Aste» fra le categorie e una card quadrata in «Da scoprire», che portano alla pagina dove chiedere «🔔 Avvisami».
+dove: la barra in basso del sito, prima del login; il foglio «Ti aspettiamo su Telegram» (su Tor «Entra nel Barattolo»); la home del mercatino, «Esplora per categorie» e «Da scoprire».
 leva: SWAP_ATTIVO (nessuna leva nuova)
 pubblico: sì

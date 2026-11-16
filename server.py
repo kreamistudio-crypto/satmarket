@@ -105505,8 +105505,13 @@ def asset_categoria(nome: str, if_none_match: str = Header("")):
 # FILE_FONT); i nomi sono gli ID delle card (per le due occasioni,
 # anche le chiavi dei filtri che accendono), e restano quelli per
 # sempre.
+# Le due delle ASTE (16 nov 2026, cantiere nav-nostr): la card quadrata
+# di «Da scoprire» e la tessera della fila delle categorie, lo stesso
+# disegno in due tagli — stanno qui e non in assets/categorie perche'
+# quella cartella ha la whitelist degli slug dei reparti, e le aste un
+# reparto non sono.
 FILE_SCOPRIRE = ("lampo.webp", "sconto.webp", "p2p.webp",
-                 "to-the-moon.webp")
+                 "to-the-moon.webp", "aste.webp", "aste-tessera.webp")
 
 
 # Le anteprime dei reparti (ago 2026): l'og:image di

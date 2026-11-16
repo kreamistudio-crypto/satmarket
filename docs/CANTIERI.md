@@ -84232,7 +84232,46 @@ login: la pagina «Swap» aperta e la cella accesa.
 DA GUARDARE. Dal telefono vero, dopo la promozione: sul sito e sull'onion
 da visitatore, la cella e il foglio (su onion «Entra nel Barattolo»); il
 login Telegram dal sito (widget a redirect) che arriva alla pagina «Swap».
-Fuori dal cantiere, visti strada facendo: la porta «🔨 Aste ›» in Esplora
-adesso la vedono anche i visitatori, e ad aste spente porta all'«in
-arrivo», come già succedeva a chi era dentro. Gli id degli account Nostr
+LA PORTA «🔨 Aste ›» TOLTA, nello stesso giro (Andrea: «quel tasto in
+quella posizione non mi piace», poi «levalo pure adesso»). Stava in cima
+a Esplora, sotto l'header, dal 16 ott, e si accendeva a ogni cella vestita
+da Swap, anche ad aste spente: portava solo all'«in arrivo». Via markup,
+regola CSS e la riga di `vestiCellaAste`; `prove_swap_cella` ora guarda che
+non ci sia più (controprova: la regola rimessa la fa rossa), e il banco
+la vuole spenta in ogni caso.
+AL SUO POSTO, NELLO STESSO GIRO (Andrea: «oltre che metterlo in Esplora
+per categorie, io creerei un banner piccolo, quadrato… un'immagine da
+Google Flow», e poi «non devo scegliere io le immagini, scegliele tu»):
+una TESSERA «Aste» nella fila delle categorie, subito dopo «Scambio P2P»,
+e una CARD QUADRATA in «Da scoprire», dopo il P2P e gli spazi in vetrina e
+prima delle occasioni. Le immagini le ha fatte Google Flow sul PC di
+Andrea (sette proposte in due giri, scelte da noi):
+`assets/scoprire/aste.webp` (1024×1024: la «card-4», la dorata minimale, rifatta perché la prima, col turbine di monete, ad Andrea pareva «troppo confusionaria») e `aste-tessera.webp` (400×400, la «tessera-1»),
+servite dalla whitelist `FILE_SCOPRIRE` — non da assets/categorie, che
+ha la whitelist degli slug dei reparti. Tutte e due ci sono SEMPRE e
+toccano `vaiAste()`, cioè il tasto: ad aste spente l'«in arrivo» con
+«🔔 Avvisami», ad aste accese la vetrina. La card è la prima FORMA NUOVA
+di «Da scoprire» (`quadra: true`, 130×130, 248 sul sito): niente titolo
+dell'app sopra il disegno, ma due righe su un VELO del bruno di casa
+pieno sotto le lettere («ASTE» / «In arrivo», ad aste accese «Fai la tua
+offerta»), quindi il contrasto è per costruzione e `prove_scoprire_quadra`
+lo DERIVA dai numeri del CSS (righe + margine ≤ parte piena). LA SEZIONE
+«Da scoprire» NON SPARISCE PIÙ: con la card sempre viva, senza busta e
+senza occasioni resta lei — il banco diceva «la sezione sparisce», ora
+dice che resta, ed è il prezzo dichiarato come lo fu per il P2P d'agosto.
+Strade scartate: la tessera in assets/categorie (whitelist dei reparti);
+la scritta dentro il disegno (Flow le lettere le storpia); la card
+nascosta ad aste spente (Andrea la vuole proprio lì, a raccogliere gli
+«Avvisami»). Controprove: tocco della card spostato a `go('astepresto')`,
+scritta fissa, velo abbassato a 2,2em, tessera su `vaiP2P` → quattro
+rosse, rimesse a posto → verdi.
+Fuori dal cantiere, visto strada facendo: gli id degli account Nostr
 nativi superano i 2^53 e nel JavaScript arrivano arrotondati (`myTgId`).
+IL GIRO FINALE. Develop è corso mentre aspettavamo i disegni (3031eb0
+«Novità» di ETH/Monero/USDe, 73e08ef ordini misti, a82e1e1 e c11b674
+rotellina, 427c5ba bottone «Chiedi a Tappo», 12de7d0 Tappo e la
+cancellazione: non miei). Ribasati i due commit; nel conflitto di coda di
+NOVITA.md la riga «pubblico: sì» della voce bottone-tappo era scivolata
+sotto la nostra e la suite l'ha presa (`prove_novita_md`, riga 250):
+rimessa al suo posto. Sull'albero ribasato suite severa 28382 passate e
+quella sola rossa, poi verde da sola; collaudi 134/0 senza proxy.

@@ -50302,7 +50302,14 @@ def prove_scoprire():
     _voci = re.split(r"\n  \{id: ", _cat)[1:]
     _senza = {re.match(r"'([a-z0-9]+)'", v).group(1) + ".webp"
               for v in _voci
-              if "titoloDentro" not in v and "lancio: true" not in v}
+              if "titoloDentro" not in v and "lancio: true" not in v
+              and "quadra: true" not in v}
+    # LE CARD QUADRATE (16 nov 2026, cantiere nav-nostr: la card delle
+    # aste) hanno la scritta su un velo PIENO, come il lancio — il loro
+    # contrasto e' per costruzione e si prova piu' giu' dal CSS — e un
+    # rapporto loro, 1:1, che la misura dei file qui sotto conosce
+    QUADRE = {re.match(r"'([a-z0-9]+)'", v).group(1) + ".webp"
+              for v in _voci if "quadra: true" in v}
     # ...e i FILE da misurare sono quelli di TUTTE le voci del catalogo:
     # chi non porta il titolo dell'app porta comunque un banner
     FILE_CARD = {re.match(r"'([a-z0-9]+)'", v).group(1) + ".webp"
@@ -50351,12 +50358,21 @@ def prove_scoprire():
         _webW = re.search(r"html\.fuori-telegram \.scoprire-card\{"
                           r"width:(\d+)px\}", mini)
         _minW = max(CARD_W * 3, int(_webW.group(1)) * 2 if _webW else 0)
+        _webQ = re.search(r"html\.fuori-telegram \.scoprire-card\.sc-quadra"
+                          r"\{width:(\d+)px\}", mini)
+        _misQ = re.search(r"\.scoprire-card\.sc-quadra\{width:(\d+)px;"
+                          r"aspect-ratio:1\}", mini)
+        prova("la card quadrata dichiara la sua misura nel CSS",
+              (True, True), (bool(_misQ), bool(_webQ)))
+        _minQ = max(int(_misQ.group(1)) * 3 if _misQ else 0,
+                    int(_webQ.group(1)) * 2 if _webQ else 0)
         for _f in sorted(FILE_CARD):
             _w, _h = _Im.open(os.path.join("assets", "scoprire", _f)).size
+            _q = _f in QUADRE
             prova("...e %s regge 3x sul mobile e 2x sul web" % _f,
                   (True, True),
-                  (_w >= _minW,
-                   abs(_w / _h - CARD_W / CARD_H) < .01))
+                  (_w >= (_minQ if _q else _minW),
+                   abs(_w / _h - (1 if _q else CARD_W / CARD_H)) < .01))
         # ...e il minimo si DERIVA dalle due misure, mai da un numero
         # scritto qui: con `max(816, ...)` la prova PASSEREBBE LO STESSO
         # finche' i file sono grandi abbastanza — e mentirebbe in
@@ -51152,6 +51168,64 @@ def prove_scoprire():
            mini.index(_red) < mini.index(".sc-lancio.fx-battito .sc-l-boom{")))
 
 
+def prove_scoprire_quadra():
+    """LA CARD QUADRATA DELLE ASTE (16 nov 2026, cantiere nav-nostr): la
+    scritta sta su un velo del bruno di casa, PIENO sotto le lettere.
+    Il contrasto quindi non si campiona da un file: si DERIVA dai numeri
+    del CSS — l'altezza delle due righe piu' il margine sotto deve stare
+    dentro la parte piena del velo. Chi alza un corpo o una riga senza
+    alzare il velo mette le lettere sul disegno, e lo sente da qui.
+    E la tessera della fila: dopo lo Scambio P2P, col tocco del tasto."""
+    print("\n[«Da scoprire» e categorie: le aste]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = open("server.py", encoding="utf-8").read()
+    _eti = re.search(r"\.sc-quadra-eti\{[^}]*?padding:([\d.]+)em ([\d.]+)em "
+                     r"([\d.]+)em;[^}]*?#1A191C ([\d.]+)em", mini, re.S)
+    _pre = re.search(r"\.sc-q-pre\{font-size:([\d.]+)em;[^}]*?"
+                     r"line-height:([\d.]+)\}", mini, re.S)
+    _riga = re.search(r"\.sc-q-riga\{[^}]*?font-size:([\d.]+)em;[^}]*?"
+                      r"line-height:([\d.]+);", mini, re.S)
+    prova("la scritta della card quadrata dichiara le sue misure",
+          (True, True, True), (bool(_eti), bool(_pre), bool(_riga)))
+    if _eti and _pre and _riga:
+        alto = (float(_eti.group(3))
+                + float(_pre.group(1)) * float(_pre.group(2))
+                + float(_riga.group(1)) * float(_riga.group(2)))
+        prova("...e le lettere stanno tutte sul velo pieno "
+              "(%.2fem <= %sem)" % (alto, _eti.group(4)),
+              True, alto <= float(_eti.group(4)))
+    prova("...e il velo non c'e' senza disegno (sull'errore parla la riserva)",
+          True, ".scoprire-card img ~ .sc-quadra-eti{display:flex}" in mini
+          and re.search(r"\.sc-quadra-eti\{[^}]*display:none", mini) is not None)
+    # LA TESSERA: dopo lo Scambio P2P e prima dei reparti, col tocco del
+    # tasto, e i due file serviti dalla whitelist
+    _rs = pezzo_js(mini, "function renderStriscia(){", "\n}\n")
+    prova("la tessera «Aste» sta dopo lo Scambio P2P, prima dei reparti",
+          True, 0 <= _rs.find('<span class="cat-eti">Scambio P2P</span>')
+          < _rs.find('class="cat-cella cella-aste"') < _rs.find("voci.map("))
+    _t = _rs[_rs.find('class="cat-cella cella-aste"'):]
+    _t = _t[:_t.find("</a>")]
+    prova("...e il suo tocco e' quello del tasto, da dito e da tastiera",
+          (2, True), (_t.count("vaiAste()"),
+                      'src="/assets/scoprire/aste-tessera.webp"' in _t))
+    prova("...e non si accende mai (niente anello: e' una porta)", False,
+          "attiva" in _t)
+    _tupla = re.search(r"FILE_SCOPRIRE = \(([^)]*)\)", src, re.S)
+    prova("i due disegni delle aste sono nella whitelist e su disco",
+          (True, True, True, True),
+          ('"aste.webp"' in _tupla.group(1), '"aste-tessera.webp"' in _tupla.group(1),
+           os.path.exists("assets/scoprire/aste.webp"),
+           os.path.exists("assets/scoprire/aste-tessera.webp")))
+    try:
+        from PIL import Image as _Im
+        _w, _h = _Im.open("assets/scoprire/aste-tessera.webp").size
+        # la tessera e' 84px sul telefono e 160 sul sito: 3x e 2x
+        prova("...e la tessera regge 3x sul mobile e 2x sul web, quadrata",
+              (True, True), (_w >= max(84 * 3, 160 * 2), _w == _h))
+    except ImportError:
+        salta("la misura della tessera", "serve Pillow")
+
+
 def prove_scoprire_p2p(mini=None, node=None):
     """LA CARD CHE NAVIGA, FATTA GIRARE (ago 2026): «P2P»
     e' la prima della fila, porta al «coming soon» invece di accendere
@@ -51245,6 +51319,10 @@ function loadListings(){ scritte.push('loadListings');
   return Promise.resolve(); }
 function vaiP2P(){ scritte.push('vaiP2P'); }
 function go(v){ scritte.push('go:' + v); }
+/* le aste (16 nov 2026): la leva e il tasto, che il banco muove e conta */
+let asteSu = false;
+function asteAccese(){ return asteSu; }
+function vaiAste(){ scritte.push('vaiAste'); }
 /* LA CARD «P2P IN ARRIVO» (30 set 2026): lo stato che manda la busta.
    Si parte da quello di questi giorni, e il banco lo muove. */
 let p2pArrivo = {stato: 'arrivo', fino: '2026-10-10'};
@@ -51279,7 +51357,7 @@ const rifai = () => { scoprireFirma = ''; renderScoprire(); };
 
 occasioniServer = {lampo: 1, sconto: 1};
 rifai();
-dice("il P2P e il primo della fila", ['p2p','lampo','sconto'], idCard());
+dice("il P2P e il primo della fila", ['p2p','aste','lampo','sconto'], idCard());
 const suo = nodi['scoprireStrip'].innerHTML
   .split('data-id="p2p"')[1].split('>')[0];
 dice("...e non porta l aria-pressed dell interruttore", false,
@@ -51306,12 +51384,12 @@ filtroLampo = false;
 // dimostrare che non la legge e' proprio questo giro.
 interessiMiei = ['p2p'];
 rifai();
-dice("a chi ha gia votato la card RESTA", ['p2p','lampo','sconto'],
+dice("a chi ha gia votato la card RESTA", ['p2p','aste','lampo','sconto'],
      idCard());
 
 occasioniServer = {lampo: 0, sconto: 0};
 rifai();
-dice('...e senza occasioni resta lei sola', ['p2p'], idCard());
+dice('...e senza occasioni restano lei e la card delle aste', ['p2p','aste'], idCard());
 // IL PREZZO DICHIARATO: con una card fissa la sezione non puo' piu'
 // sparire — il display:none era la proprieta' piu' forte del blocco,
 // e questa riga e' il posto dove il suo prezzo si vede.
@@ -51320,7 +51398,7 @@ dice('...e la sezione resta, per lei', '',
 
 vistaBarattolo = true;
 rifai();
-dice('col barattolo resta la sola card che naviga', ['p2p'], idCard());
+dice('col barattolo restano le card che navigano', ['p2p','aste'], idCard());
 dice('...anche col voto gia dato', '',
      nodi['scoprireSez'].style.display);
 
@@ -51336,7 +51414,7 @@ occasioniServer = {lampo: 1, sconto: 1};
 sponsorizzati = [];
 rifai();
 dice('senza spazio venduto la fila e quella di sempre',
-     ['p2p','lampo','sconto'], idCard());
+     ['p2p','aste','lampo','sconto'], idCard());
 
 // FAIL-CLOSED: lo slug c'e', il codice negozio no — e la card NON
 // nasce. Meglio nessuna card che una che porta al negozio
@@ -51354,7 +51432,7 @@ const codiceVero = RACCONTI['to-the-moon'].negozio;
 RACCONTI['to-the-moon'].negozio = '';
 rifai();
 dice('...e con lo slug ma senza codice negozio nemmeno',
-     ['p2p','lampo','sconto'], idCard());
+     ['p2p','aste','lampo','sconto'], idCard());
 
 // ...e col codice la card e' la PRIMA: la posizione che a 320px si
 // vede senza scorrere e' quella che si vende. Si rimette QUELLO DEL
@@ -51367,7 +51445,7 @@ rifai();
 // ⚠️ DAL 30 SET 2026 E' LA SECONDA: davanti c'e' la card «P2P in
 // arrivo», che non entra nell'ordine degli spazi
 dice('col codice e la prima degli spazi, dietro la card P2P',
-     ['p2p','sponsor-to-the-moon','lampo','sconto'], idCard());
+     ['p2p','sponsor-to-the-moon','aste','lampo','sconto'], idCard());
 
 const cardDi = id => nodi['scoprireStrip'].innerHTML
   .split('data-id="' + id + '"')[1].split('</div>')[0];
@@ -51412,7 +51490,7 @@ const utpt = {slug: 'un-tempo-per-te', titolo: 'Un tempo per te',
 sponsorizzati = [utpt, {slug: 'to-the-moon'}];
 rifai();
 dice('due spazi: due card dietro la P2P, nell ordine della busta',
-     ['p2p','sponsor-un-tempo-per-te','sponsor-to-the-moon','lampo','sconto'],
+     ['p2p','sponsor-un-tempo-per-te','sponsor-to-the-moon','aste','lampo','sconto'],
      idCard());
 const cardU = cardDi('sponsor-un-tempo-per-te');
 dice('...e la pagina del server ha lo stesso aspetto: banner, pastiglia, niente titolo dell app',
@@ -51434,7 +51512,7 @@ dice('...e quello dell altra al suo, col suo slug',
 sponsorizzati = [{slug: 'to-the-moon'}, utpt];
 rifai();
 dice('l ordine rovesciato nella busta rovescia le card',
-     ['p2p','sponsor-to-the-moon','sponsor-un-tempo-per-te','lampo','sconto'],
+     ['p2p','sponsor-to-the-moon','sponsor-un-tempo-per-te','aste','lampo','sconto'],
      idCard());
 
 // LA SCADENZA DI UNO NON TOCCA L'ALTRO: il server smette di mandare
@@ -51442,7 +51520,7 @@ dice('l ordine rovesciato nella busta rovescia le card',
 sponsorizzati = [utpt];
 rifai();
 dice('scaduto To The Mooon resta Un tempo per te',
-     ['p2p','sponsor-un-tempo-per-te','lampo','sconto'], idCard());
+     ['p2p','sponsor-un-tempo-per-te','aste','lampo','sconto'], idCard());
 
 // FAIL-CLOSED PER VOCE: una pagina senza codice non nasce, e le altre
 // restano; uno slug fuori forma nemmeno; un doppione conta una volta.
@@ -51451,7 +51529,7 @@ sponsorizzati = [{slug: 'un-tempo-per-te', titolo: 'X', negozio: ''},
                  {slug: 'to-the-moon'}];
 rifai();
 dice('una voce senza codice o fuori forma non nasce, e le altre restano',
-     ['p2p','sponsor-to-the-moon','lampo','sconto'], idCard());
+     ['p2p','sponsor-to-the-moon','aste','lampo','sconto'], idCard());
 
 // IL TITOLO DAL SERVER PASSA DA esc(): niente di un catalogo entra nudo
 sponsorizzati = [{slug: 'un-tempo-per-te', titolo: 'A <b>"B"</b>',
@@ -51469,7 +51547,7 @@ sponsorizzati = [utpt, {slug: 'to-the-moon'}];
 vistaBarattolo = true;
 rifai();
 dice('col barattolo restano le card che navigano',
-     ['p2p','sponsor-un-tempo-per-te','sponsor-to-the-moon'], idCard());
+     ['p2p','sponsor-un-tempo-per-te','sponsor-to-the-moon','aste'], idCard());
 
 // E ALLA SCADENZA SE NE VANNO DA SOLE, senza che nessuna scopa passi:
 // il server smette di mandarle, e la fila guarda quella.
@@ -51477,7 +51555,7 @@ vistaBarattolo = false;
 sponsorizzati = [];
 rifai();
 dice('alla scadenza le card se ne vanno da sole',
-     ['p2p','lampo','sconto'], idCard());
+     ['p2p','aste','lampo','sconto'], idCard());
 
 // ---- LA CARD «P2P IN ARRIVO» (30 set 2026) ------------------------
 // La scritta la decide la BUSTA, la data si scrive dalla leva spezzando
@@ -51538,10 +51616,18 @@ dice('...e il tocco prende la strada del tasto', ['vaiP2P'], scritte);
 // SENZA BUSTA NON C'E': server di ieri, DEMO, card spenta o finita
 p2pArrivo = null;
 rifai();
-dice('senza la busta la card non c e', ['lampo','sconto'], idCard());
+dice('senza la busta la card non c e', ['aste','lampo','sconto'], idCard());
 occasioniServer = {lampo: 0, sconto: 0};
 rifai();
-dice('...e senza niente da scoprire la sezione sparisce', 'none',
+// ⚠️ DAL 16 NOV 2026 LA SEZIONE NON SPARISCE PIU' (cantiere nav-nostr,
+// decisione di Andrea): la card quadrata delle aste c'e' sempre — ad
+// aste spente porta al «in arrivo» con l'Avvisami, che e' proprio dove
+// serve — quindi senza busta e senza occasioni resta lei sola, e la
+// sezione con lei. Prima qui si provava che spariva: e' il prezzo
+// dichiarato della card fissa, come lo fu per il P2P di ago 2026.
+dice('...e senza niente da scoprire resta la card delle aste', ['aste'],
+     idCard());
+dice('...e la sezione resta, per lei', '',
      nodi['scoprireSez'].style.display);
 
 // FAIL-CLOSED SULLA FORMA: una data storta o uno stato sconosciuto non
@@ -51552,17 +51638,48 @@ for (const storto of [{stato: 'arrivo', fino: '10/10/2026'},
                       'arrivo']) {
   p2pArrivo = storto;
   rifai();
-  // senza card vive la sezione si SPEGNE e la striscia non si riscrive:
-  // l'HTML li' dentro e' quello di prima, quindi si guarda il display
+  // (fino al 16 nov 2026 qui si guardava la sezione spenta; da quando
+  // la card delle aste c'e' sempre, si guarda la fila: resta lei sola)
   dice('una busta storta non accende la card: ' + JSON.stringify(storto),
-       'none', nodi['scoprireSez'].style.display);
+       ['aste'], idCard());
 }
 // ...e un testo che arrivasse dal server passerebbe da esc()
 p2pArrivo = {stato: 'arrivo', fino: '2026-10-10'};
 occasioniServer = {lampo: 1, sconto: 1};
 rifai();
-dice('di nuovo in testa, davanti alle occasioni', ['p2p','lampo','sconto'],
+dice('di nuovo in testa, davanti alle occasioni', ['p2p','aste','lampo','sconto'],
      idCard());
+
+// ---- LA CARD QUADRATA DELLE ASTE (16 nov 2026, cantiere nav-nostr) ----
+// Il tocco e' QUELLO DEL TASTO (vaiAste, che sceglie fra «in arrivo» e
+// vetrina), la forma e' quadrata, e la scritta segue la leva.
+const cardA = () => nodi['scoprireStrip'].innerHTML
+  .split('data-id="aste"')[1].split('</div>')[0];
+const apreA = () => nodi['scoprireStrip'].innerHTML
+  .split('data-id="aste"')[0].split('<div').pop();
+dice('la card delle aste e quadrata', true, apreA().includes('sc-quadra'));
+dice('...ed e la sola quadrata', 1,
+     (nodi['scoprireStrip'].innerHTML.match(/sc-quadra"/g) || []).length
+     + (nodi['scoprireStrip'].innerHTML.match(/sc-quadra /g) || []).length);
+dice('ad aste spente dice «In arrivo», sul velo e nel nome',
+     [true, true, false],
+     [cardA().includes('<span class="sc-q-riga">In arrivo</span>'),
+      cardA().includes('aria-label="Aste: in arrivo"'),
+      cardA().includes('aria-pressed')]);
+dice('...senza il titolo dell app sopra il disegno', false,
+     cardA().includes('sc-titolo'));
+dice('...e il banner e il suo', true,
+     cardA().includes('src="/assets/scoprire/aste.webp"'));
+scritte = [];
+toccaScoperta('aste');
+dice('il suo tocco e quello del tasto', ['vaiAste'], scritte);
+dice('...e non sfiora nessun filtro', [false, false],
+     [filtroLampo, filtroSconto]);
+asteSu = true;
+renderScoprire();
+dice('ad aste accese la scritta cambia da sola (entra nella firma)', true,
+     cardA().includes('<span class="sc-q-riga">Fai la tua offerta</span>'));
+asteSu = false;
 """
 
 def prove_p2p_in_arrivo():
@@ -67278,7 +67395,7 @@ def prove_p2p_libro():
     # delle categorie e' il posto dove si guarda «cosa c'e' qui
     # dentro». Li' adesso c'e' la sua card, col logo completo.
     _st = pezzo_js(mini, "function renderStriscia(){", "\n}\n")
-    _cp2p = _st[_st.index("cella-p2p"):_st.index("voci.map(")]
+    _cp2p = _st[_st.index("cella-p2p"):_st.index("</a>", _st.index("cella-p2p"))]
     _css = mini[mini.index("<style"):mini.index("</style>")]
     prova("una sola card, un solo ingresso in piu'", 1,
           mini.count('class="cat-cella cella-p2p"'))
@@ -104948,7 +105065,6 @@ def prove_introduzioni_leggibili():
         ".strumenti select,.strumenti button",   # controlli
         ".p2p-leva", ".tema-pill", ".tour-salta",  # controlli
         ".giro-porta",                            # il link che riapre il tour
-        ".porta-aste",                            # la porta delle aste (16 ott 2026): un controllo, vestito come Ordina e Filtro
         ".p2p-sez-tit",                           # titoli di sezione
         ".acc-h .conta",                          # il conteggio del cassetto
         ".p2p-meta", ".p2p-box", ".order .sub",   # dati
@@ -186190,13 +186306,12 @@ def prove_swap_cella():
           '<button id="nav-aste" onclick="toccaCellaAste()">' in mini)
     prova("...e il suo vestito di sempre e' ancora il martelletto", True,
           '</svg></span>Aste</button>' in mini)
-    i_esp = mini.index('id="view-esplora"')
-    i_hdr = mini.index("</header>", i_esp)
-    i_porta = mini.index('id="portaAste"')
-    prova("la porta delle aste sta in Esplora, sotto l'header", True,
-          i_hdr < i_porta < mini.index('id="fasciaTest"'))
-    prova("...nasce nascosta e porta alle aste", True,
-          'onclick="vaiAste()" style="display:none">🔨 Aste' in mini)
+    # LA PORTA «🔨 Aste ›» sotto l'header di Esplora (16 ott) NON C'E' PIU'
+    # (16 nov 2026, cantiere nav-nostr, Andrea: «levalo pure adesso»):
+    # niente markup, niente regola, e la cella non la cerca piu'
+    prova("la porta delle aste in cima a Esplora non c'e' piu'", (False, False, False),
+          ('id="portaAste"' in mini, ".porta-aste" in mini,
+           "el('portaAste')" in mini))
     prova("la pagina «Swap» esiste ed e' una radice sorella", (True, True),
           ('<div class="view" id="view-swap">' in mini,
            "'swap'," in pezzo_js(mini, "const RADICI = new Set(", "]);")))
@@ -186332,7 +186447,7 @@ console.log(JSON.stringify(out));
     # per le due direzioni, chiesto da Andrea
     # (12 nov 2026, cantiere nome-swap, Andrea: «si») ora «Swap»
     prova("a leva accesa la STESSA cella si veste da «Swap» e apre la pagina",
-          [True, "swap", "", 1, ["swap"]], r.get("acceso"))
+          [True, "swap", "none", 1, ["swap"]], r.get("acceso"))
     prova("...e le aste, raggiunte dalla porta, accendono Esplora",
           ["aste", "esplora", "esplora"], r.get("voceAcceso"))
     prova("a leva rispenta torna il vestito di prima, al carattere",
@@ -186347,7 +186462,7 @@ console.log(JSON.stringify(out));
           [r.get("it"), r.get("senza")])
     # (16 nov 2026, cantiere nav-nostr) chi non e' ancora entrato
     prova("fuori, a busta che dice si', la cella e' «Swap» e il tocco invita a entrare",
-          ["swap", "", ["swap"], 0, 0, True], r.get("fuori"))
+          ["swap", "none", ["swap"], 0, 0, True], r.get("fuori"))
     prova("...e la nav accende Esplora sulle aste, come da dentro",
           ["esplora", "esplora"], r.get("voceFuori"))
     prova("dentro vince /api/me (per persona), fuori il no della busta",
@@ -197741,7 +197856,7 @@ CATEGORIE = {
     sollecito_a_comando sat_non_e_barattolo ai_segnala piani_condivisi
     filtro_avorio obiezione_punto ordini_fermi numero_ordine
     promesse_badge promesse_raggiungibili percentuale_della_promessa
-    verde_e_filtri prezzo_accordo scoprire strisce_web sponsor
+    verde_e_filtri prezzo_accordo scoprire scoprire_quadra strisce_web sponsor
     numeri_negozio racconto_girato racconti_bozza storia_dal_link
     consigliati guardia_is_bot altri_scorrimento widget ricerca
     condivisione_venditore condividi_col_link link_dentro_telegram
@@ -198283,6 +198398,7 @@ def main():
               prove_scoprire,
         prove_strisce_web,
               prove_scoprire_p2p,
+              prove_scoprire_quadra,
               prove_p2p_in_arrivo,
               prove_sponsor,
               prove_numeri_negozio,

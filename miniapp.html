@@ -940,14 +940,6 @@
     padding:10px 0 2px;font-size:12px;font-weight:800;color:var(--trust-text);
     border:0;background:none;font-family:inherit;width:100%;cursor:pointer}
   .trust-line .fr{font-size:15px;line-height:1;opacity:.75}
-  /* La porta delle aste (16 ott 2026): una pillola piccola sotto
-     l'header, coi colori dei comandi di vetrina — non e' una notizia,
-     e' una strada */
-  .porta-aste{display:flex;align-items:center;gap:6px;margin:8px auto 0;
-    padding:6px 14px;font:800 12.5px/1.2 Nunito,sans-serif;
-    color:var(--muted);background:var(--card);border:1.5px solid var(--line);
-    border-radius:999px;cursor:pointer}
-  .porta-aste .fr{font-size:15px;line-height:1;opacity:.75}
   .swap-vuoto{display:block;margin-top:10px;font-weight:700}
 
   /* ---------- strumenti di vetrina (ordina + filtri) ---------- */
@@ -1274,6 +1266,13 @@
      accese — questa non si accende mai. */
   html[data-tema="scuro"] .cella-carrello .cat-quad{
     box-shadow:0 0 0 1.5px var(--sats)}
+  /* LA TESSERA «ASTE» (16 nov 2026, cantiere nav-nostr, al posto della
+     porta in cima alla home): il disegno fatto con Google Flow ha il
+     suo fondo bruno e riempie tutto il quadrato, come il carrello. Il
+     filo arancio serale del carrello qui NO: guardato a schermo, di
+     sera sembrava l'anello di «sei qui» — e il fondo del disegno e'
+     gia' quello delle sorelle, che il filo non ce l'hanno. */
+  .cella-aste .cat-quad img{object-fit:cover}
   .cons-logo{opacity:0}
   .cons-logo.attivo{opacity:1}
   /* IL CENTRO OTTICO DI OGNI LOGO (set 2026): un marchio centrato a
@@ -1534,6 +1533,24 @@
     justify-content:center;padding:0 7.75em 0 1em;font-size:16px;
     background:linear-gradient(90deg,#1A191C 9.4em,rgba(26,25,28,0) 13.4em)}
   .scoprire-card img ~ .sc-lancio{display:flex}
+  /* LA CARD QUADRATA DELLE ASTE (16 nov 2026, cantiere nav-nostr): alta
+     quanto le sorelle (130) e larga uguale, quindi un quadrato; sul
+     sito da computer cresce col fattore delle sorelle (520/272), piu'
+     giu'. La scritta sta in basso su un velo del bruno di casa PIENO
+     sotto le lettere, che sfuma verso il disegno: il contrasto e' per
+     costruzione, crema e oro su un colore pieno, come la card del
+     lancio. Tutto in em dal corpo del blocco, cosi' il web cambia solo
+     quello. */
+  .scoprire-card.sc-quadra{width:130px;aspect-ratio:1}
+  .sc-quadra-eti{position:absolute;left:0;right:0;bottom:0;display:none;
+    flex-direction:column;justify-content:flex-end;font-size:16px;
+    padding:2.6em .7em .55em;
+    background:linear-gradient(0deg,#1A191C 2.7em,rgba(26,25,28,0) 4.6em)}
+  .scoprire-card img ~ .sc-quadra-eti{display:flex}
+  .sc-q-pre{font-size:.7em;font-weight:800;letter-spacing:.1em;
+    text-transform:uppercase;color:#FFA53D;line-height:1.1}
+  .sc-q-riga{font-family:'Baloo 2',system-ui,sans-serif;font-size:1.05em;
+    font-weight:800;line-height:1.1;color:#FAF4E4}
   .sc-lancio > span{position:relative;font-weight:800}
   .sc-l-pre{font-size:.7em;letter-spacing:.1em;text-transform:uppercase;
     color:#FFA53D;margin-bottom:.15em}
@@ -11880,6 +11897,9 @@
     /* la card «P2P in arrivo» (30 set 2026): tutto il suo blocco e' in
        em, quindi basta il corpo — 16 per lo stesso fattore della card */
     html.fuori-telegram .sc-lancio{font-size:30.6px}
+    /* ...e la card quadrata delle aste, allo stesso fattore (130 x 1,91) */
+    html.fuori-telegram .scoprire-card.sc-quadra{width:248px}
+    html.fuori-telegram .sc-quadra-eti{font-size:30.6px}
     html.fuori-telegram .cat-cella{width:160px}
     /* col quadrato piu' grande il nome sale di un gradino: 11px sotto
        una card da 160 si legge come una didascalia dimenticata. 15 e'
@@ -12728,16 +12748,12 @@ document.getElementById('cartello')?.remove();</script>
            dettaglio e sopra il Profilo. -->
       <div class="chips" id="chips"></div>
     </header>
-    <!-- LA PORTA DELLE ASTE (16 ott 2026, cantiere swap-venditore):
-         quando la leva dello swap e' accesa il quarto tasto della nav
-         diventa «Swap», e le aste si raggiungono da qui. Nasce nascosta
-         e la accende SOLO vestiCellaAste(): a leva spenta il
-         martelletto e' ancora nella nav, e due porte per la stessa
-         pagina sarebbero una di troppo. Fuori dall'header apposta:
-         comparendo non cambia l'altezza su cui e' appesa la striscia
-         delle pillole. -->
-    <button type="button" class="porta-aste" id="portaAste"
-            onclick="vaiAste()" style="display:none">🔨 Aste <span class="fr">›</span></button>
+    <!-- (Qui c'era LA PORTA DELLE ASTE, «🔨 Aste ›», del 16 ott 2026:
+         tolta il 16 nov 2026, cantiere nav-nostr, Andrea: «quel tasto in
+         quella posizione non mi piace», «levalo pure adesso». Al suo
+         posto verranno una tessera in «Esplora per categorie» e una card
+         quadrata in «Da scoprire», con le sue immagini. Intanto le aste,
+         a cella vestita da Swap, si trovano dal filtro «solo all'asta». -->
     <!-- La porta fissa al canale durante il rodaggio: la riempie
          renderFasciaTest(), solo se BANNER_TEST è acceso e mai in DEMO -->
     <div id="fasciaTest" style="display:none"></div>
@@ -19895,10 +19911,6 @@ function vestiCellaAste(){
     b.innerHTML = vestito === 'swap' ? CELLA_SWAP : cellaAsteMarkup;
     b.dataset.vestito = vestito;
   }
-  /* la porta delle aste in Esplora vive solo quando la cella non e'
-     piu' loro: due porte per la stessa pagina sarebbero una di troppo */
-  const p = el('portaAste');
-  if (p) p.style.display = vestito === 'swap' ? '' : 'none';
   /* ...e se la leva risulta spenta mentre si e' sulla pagina «Swap»
      (una ricarica, una entry della cronologia), si esce su Esplora:
      la pagina vive solo a leva accesa */
@@ -23169,6 +23181,22 @@ function renderStriscia(){
            decoding="async" onerror="this.remove()"><span class="cat-emoji"
            aria-hidden="true">₿</span></span></span>
       <span class="cat-eti">Scambio P2P</span>
+    </a>` +
+    /* LA TESSERA «ASTE» (16 nov 2026, cantiere nav-nostr, decisione di
+       Andrea): subito dopo lo Scambio P2P, e C'E' SEMPRE — ad aste spente
+       e' la strada per la pagina «in arrivo» dove si chiede «🔔
+       Avvisami», ad aste accese la vetrina delle aste. Il tocco e'
+       vaiAste, cioe' quello del tasto, e la scelta fra le due la fa
+       lui. Non si accende mai (niente anello: e' una porta, non un
+       filtro) e non entra nella firma della fila: e' sempre uguale. */
+    `
+    <a class="cat-cella cella-aste" role="button" tabindex="0"
+       title="Aste" aria-label="Aste" onclick="vaiAste()"
+       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();vaiAste()}">
+      <span class="cat-quad"><img src="/assets/scoprire/aste-tessera.webp"
+           alt="" loading="lazy" decoding="async" onerror="this.remove()"
+        ><span class="cat-emoji" aria-hidden="true">🔨</span></span>
+      <span class="cat-eti">Aste</span>
     </a>` + voci.map(c => `
     <a class="cat-cella${c === activeCat && !vistaBarattolo ? ' attiva' : ''}" data-cat="${esc(c)}"
        href="/categoria/${slugCat(c)}"
@@ -23390,6 +23418,28 @@ const SCOPRIRE = [
    vivo: () => !!lancioP2P(),
    accesa: () => false,
    tocca: () => toccaLancioP2P()},
+  /* LA CARD QUADRATA DELLE ASTE (16 nov 2026, cantiere nav-nostr,
+     decisione di Andrea): prende il posto della porta «🔨 Aste ›» che
+     stava in cima alla home, sopra il banner della fase di test, e che
+     ad Andrea li' non piaceva. E' la PRIMA FORMA NUOVA della fila: un
+     quadrato piccolo (`quadra`) accanto ai rettangoli, perche' «un
+     banner piccolo, quadrato, non rettangolare come adesso» e' la sua
+     richiesta alla lettera. Il disegno l'abbiamo fatto con Google Flow.
+     NAVIGA come la card del P2P, e il tocco e' QUELLO DEL TASTO
+     (vaiAste): ad aste spente porta alla pagina «in arrivo» con
+     «🔔 Avvisami», ad aste accese alla vetrina delle aste. Quindi C'E'
+     SEMPRE, anche a leva spenta — e' proprio li' che serve, a chiedere
+     di essere avvisati — e la sezione «Da scoprire» da oggi non sparisce
+     piu': il prezzo e' dichiarato nel banco, alla riga che lo diceva.
+     LA SCRITTA LA METTE L'APP su un velo suo in basso (il disegno non ha
+     testo: Flow le lettere le storpia), e cambia con la leva: e' una
+     funzione, quindi entra nella firma della fila. */
+  {id: 'aste', file: 'aste.webp', emoji: '🔨', quadra: true,
+   riga: () => asteAccese() ? 'Fai la tua offerta' : 'In arrivo',
+   testo: () => 'Aste: ' + (asteAccese() ? 'fai la tua offerta' : 'in arrivo'),
+   vivo: () => true,
+   accesa: () => false,
+   tocca: () => vaiAste()},
   {id: 'lampo', file: 'lampo.webp', emoji: '⚡', testo: 'Offerte a tempo',
    vivo: () => DEMO ? listings.some(l => lampoAttiva(l))
                     : !!(occasioniServer && occasioniServer.lampo),
@@ -23590,7 +23640,7 @@ function renderScoprire(){
        lo direbbe due volte. La RISERVA invece resta sempre — e' il
        ripiego di quando l'immagine non arriva, e li' un nome ci
        vuole. */
-    const titolo = (v.titoloDentro || v.lancio) ? ''
+    const titolo = (v.titoloDentro || v.lancio || v.quadra) ? ''
       : `<span class="sc-titolo" aria-hidden="true">${testo}</span>`;
     /* LA SCRITTA DEL LANCIO (30 set 2026) prende il posto del titolo
        sulla card «P2P in arrivo»: tre righe su un velo suo, e il
@@ -23603,15 +23653,19 @@ function renderScoprire(){
       ><span class="sc-l-pre">${esc(l.pre)}</span>${l.riga
         ? `<span class="sc-l-riga">${esc(l.riga)}</span>` : ''
       }<span class="sc-l-boom${l.lungo ? ' lungo' : ''}">${esc(l.boom)}</span></span>`;
+    /* ...e LA SCRITTA DELLA CARD QUADRATA (16 nov 2026): due righe
+       sul velo in basso, il nome e lo stato della leva. */
+    const quadra = !v.quadra ? '' : `<span class="sc-quadra-eti" aria-hidden="true"
+      ><span class="sc-q-pre">Aste</span><span class="sc-q-riga">${esc(v.riga())}</span></span>`;
     return `
-    <div class="scoprire-card${v.accesa() ? ' attiva' : ''}" role="button"
+    <div class="scoprire-card${v.quadra ? ' sc-quadra' : ''}${v.accesa() ? ' attiva' : ''}" role="button"
          tabindex="0" data-id="${v.id}" aria-label="${testo}"${premuto}
          onclick="toccaScoperta(this.dataset.id)"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toccaScoperta(this.dataset.id);}">
       <img src="/assets/scoprire/${file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
       ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${testo}</span
-      >${titolo}${lancio}${pastiglia}
+      >${titolo}${lancio}${quadra}${pastiglia}
     </div>`;
   }).join('');
   aggiornaFrecce('scoprireStrip');
