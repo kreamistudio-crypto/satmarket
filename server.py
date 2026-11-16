@@ -57060,6 +57060,49 @@ def p2p_coin_frase(testo: str, coin: str) -> str:
     return re.sub(r"\beuro\b", c, t)
 
 
+# ETH, MONERO E USDe COME VALUTE (16 nov 2026, cantiere p2p-monete-valute,
+# Andrea: «devono comportarsi come valute a sé stanti, esattamente come
+# USDT o euro»). Il nodo non ne conosce il prezzo e il `fiat_amount` e' un
+# intero, quindi un ordine in moneta viaggia come il tabacchino a prezzo
+# fisso: `fa` il controvalore in euro, sats fissi, e la cifra esatta DENTRO
+# OGNI METODO — «ETH (Ethereum) 0.0153», «USDe (Base) 50». I due giudici qui
+# sotto la leggono; chi li usa li chiede con `globals().get`, come le
+# sorelle, perche' i banchi che estraggono una funzione sola non li portano.
+def _coin_pm_libro(m):
+    """PURA: un metodo con la cifra della moneta → (nome, cifra col punto);
+    altrimenti None. Il nome dev'essere uno di `P2P_COIN_METODI`, la cifra
+    fino a nove cifre intere e sei decimali, sopra lo zero."""
+    t = str(m or "").strip()
+    i = t.rfind(") ")
+    if i < 0:
+        return None
+    nome, q = t[:i + 1], t[i + 2:].strip()
+    if nome not in globals().get("P2P_COIN_METODI", {}):
+        return None
+    intero, punto, dec = q.partition(".")
+    if (not intero.isdigit() or len(intero) > 9
+            or (punto and (not dec.isdigit() or len(dec) > 6))):
+        return None
+    return (nome, q) if float(q) > 0 else None
+
+
+def _coin_ordine_libro(metodi):
+    """PURA: i metodi di un ordine IN MONETA — tutti con la cifra, tutti
+    della stessa moneta, tutti la stessa cifra — → (moneta, cifra come si
+    legge, [nomi nudi]): «0,0153», USDe coi centesimi «50,00». Altrimenti
+    None, e l'ordine resta in euro (o USDT, o franchi) come dice il `fa`."""
+    pm = [_coin_pm_libro(m) for m in metodi or []]
+    if not pm or None in pm:
+        return None
+    monete = {globals()["P2P_COIN_METODI"][n] for n, _ in pm}
+    if len(monete) != 1 or len({float(q) for _, q in pm}) != 1:
+        return None
+    moneta, n = monete.pop(), float(pm[0][1])
+    s = f"{n:,.2f}" if moneta == "USDe" else f"{n:,.6f}".rstrip("0").rstrip(".")
+    return (moneta, s.replace(",", "X").replace(".", ",").replace("X", "."),
+            [nome for nome, _ in pm])
+
+
 def p2p_coin_ordine(con, ordine) -> str:
     """In che moneta si paga l'ordine: 'ETH', 'XMR', 'USDe', o '' (euro,
     riga che manca o storta). PRIMA la scelta di chi ha preso, nel giro in
@@ -57078,8 +57121,14 @@ def p2p_coin_ordine(con, ordine) -> str:
             (str(ordine or ""), giro)).fetchone() if giro is not None else None
     except Exception:
         sc = None
+    # il nome senza la cifra di un ordine in moneta (16 nov 2026)
+    _cp = globals().get("_coin_pm_libro")
+
+    def nudo(m):
+        c = _cp(m) if _cp else None
+        return c[0] if c else str(m).strip()
     if sc:
-        return P2P_COIN_METODI.get(str(sc[0] or "").strip(), "")
+        return P2P_COIN_METODI.get(nudo(sc[0] or ""), "")
     try:
         r = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=?",
                         (str(ordine or ""),)).fetchone()
@@ -57088,7 +57137,7 @@ def p2p_coin_ordine(con, ordine) -> str:
         return ""
     if not isinstance(metodi, list) or not metodi:
         return ""
-    monete = {P2P_COIN_METODI.get(str(m).strip()) for m in metodi}
+    monete = {P2P_COIN_METODI.get(nudo(m)) for m in metodi}
     return monete.pop() if len(monete) == 1 and None not in monete else ""
 
 
@@ -61995,6 +62044,10 @@ def _avviso_metodo_p2p(con, ordine, io: int, metodo, adesso: int) -> tuple:
     if not isinstance(metodi, list):
         metodi = []
     metodi = [str(x).strip() for x in metodi if str(x).strip()]
+    # in moneta (16 nov 2026, p2p-monete-valute) il libro porta la cifra
+    # dentro il metodo, il telefono il nome nudo: si confrontano i nomi
+    _cp = globals().get("_coin_pm_libro")
+    metodi = [((_cp(x) if _cp else None) or (x,))[0] for x in metodi]
     if len(metodi) < 2:
         return 0, "l'ordine ha un metodo solo: non c'era niente da scegliere"
     if m not in metodi:
@@ -64595,7 +64648,8 @@ def _premio_canale_p2p(lato: str, premio: int) -> str:
 
 
 def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
-                        premio=None, zona: str = "", valuta: str = "EUR") -> str:
+                        premio=None, zona: str = "", valuta: str = "EUR",
+                        cifra_coin: str = "") -> str:
     """La caption del post P2P nel canale «Barattolo Vetrina», gemella
     di `_caption_canale` ma per un ordine invece che per un annuncio
     (chiesto da Andrea, set 2026: il P2P deve vedersi in vetrina come
@@ -64619,6 +64673,10 @@ def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
     # ogni altra valuta resta la riga di ieri, byte per byte
     if valuta == "CHF":
         testo += f"\n🇨🇭 {_fmt_eur(euro)} CHF"
+    # ...e in moneta la cifra nella moneta, «🪙 0,0153 ETH» (16 nov 2026,
+    # p2p-monete-valute): l'euro e' solo il controvalore per il nodo
+    elif cifra_coin:
+        testo += f"\n🪙 {html.escape(cifra_coin)}"
     else:
         testo += f"\n💶 {_fmt_eur(euro)} €"
     # IL PREMIO DI BARATTOZON (26 set 2026): a prezzo fisso non sta in
@@ -64764,6 +64822,18 @@ async def annuncia_ordine_p2p_canale(req: Request,
     # chi lo legge non puo' prendere
     valuta = "CHF" if str(d.get("valuta") or "").upper() == "CHF" else "EUR"
     chf_chiuso = valuta == "CHF" and (P2P_CHF_SOLO_ADMIN or not P2P_CHF_ATTIVO)
+    # ...E LE MONETE (16 nov 2026, cantiere p2p-monete-valute): «ETH», «XMR»
+    # o «USDE» con la `cifra` col punto, letta dallo stesso giudice del
+    # libro; storta, il post esce con l'euro di sempre. A leva spenta il
+    # post non esce, come i franchi chiusi
+    moneta = {"ETH": "ETH", "XMR": "XMR", "USDE": "USDe"}.get(
+        str(d.get("valuta") or "").upper(), "")
+    cifra_coin = ""
+    if moneta:
+        nome = next(n for n, c in P2P_COIN_METODI.items() if c == moneta)
+        letto = _coin_ordine_libro([f"{nome} {str(d.get('cifra') or '').strip()[:20]}"])
+        cifra_coin = f"{letto[1]} {letto[0]}" if letto else ""
+        chf_chiuso = chf_chiuso or not P2P_COIN_ATTIVO
     postato = False
     # UN POST PER ORDINE, E UNO OGNI DIECI MINUTI PER PERSONA (cura 4, la
     # M3 del secondo audit): il doppione e il raffica NON sono un 429 —
@@ -64813,7 +64883,7 @@ async def annuncia_ordine_p2p_canale(req: Request,
                 "venditore_negozio": (riga["negozio"] if riga else "") or "",
             }
             caption = _caption_canale_p2p(lato, euro, metodo, venditore, premio, zona,
-                                          valuta)
+                                          valuta, cifra_coin)
             if canale_id():
                 try:
                     postato = bool(await _manda_post_canale(canale_id(), caption, []))
@@ -69401,7 +69471,11 @@ def _euro_tabacchino(metodo) -> float:
 def _metodi_libro(metodi) -> list:
     """I metodi come si DICONO: al tabacchino si toglie l'importo, che
     negli avvisi sta gia' nella cifra («per 23,47 €»)."""
-    return ["Contanti al tabacchino" if _euro_tabacchino(m) > 0 else str(m).strip()
+    # ...e in moneta la cifra dentro il metodo, che sta gia' nella cifra
+    # dell'avviso (16 nov 2026, p2p-monete-valute)
+    cp = globals().get("_coin_pm_libro")
+    return ["Contanti al tabacchino" if _euro_tabacchino(m) > 0
+            else (cp(m)[0] if cp and cp(m) else str(m).strip())
             for m in metodi or []]
 
 
@@ -69423,7 +69497,13 @@ def _euro_libro(valori, metodi=None) -> str:
     mercato): a prezzo fisso il filo porta l'intero piu' vicino, a
     mercato quello per eccesso — 25,47 sta bene su 25 e su 26 —, ed e'
     la stessa regola di `combaciaEsattoP2P` nel client. Senza `math`,
-    apposta: le prove estraggono questa funzione da sola."""
+    apposta: le prove estraggono questa funzione da sola.
+    UN ORDINE IN MONETA (16 nov 2026, p2p-monete-valute) si dice nella sua
+    moneta, «0,0153 ETH»: il `fa` e' solo il controvalore per il nodo."""
+    co = globals().get("_coin_ordine_libro")
+    coin = co(metodi) if co and metodi else None
+    if coin:
+        return f"{coin[1]} {coin[0]}"
     nums = []
     for v in valori or []:
         try:

@@ -238,8 +238,8 @@ leva: CASSA_ATTIVA (la stessa della cassa)
 pubblico: sì
 
 ## 2026-11-16 · p2p-monete
-frase: Nel P2P ora puoi pagare anche in ETH, Monero o USDe. L'ordine resta in euro e la garanzia in sats come sempre: chi paga manda l'equivalente al cambio del momento, con indirizzo controllato, QR, cifra esatta e il link all'explorer per vedere che la transazione è arrivata. USDe su Ethereum, Arbitrum, Base, BNB Chain e Solana.
-dove: la scheda «P2P», nel foglio «Pubblica» di un ordine in euro (fra i metodi) e nel libro, col logo di ogni moneta.
+frase: Nel P2P arrivano tre valute nuove: ETH, Monero e USDe. Funzionano come l'euro e l'USDT: scegli la valuta in cima a «Pubblica», sotto trovi solo le sue reti, l'importo lo scrivi nella moneta e i sats restano nel deposito di garanzia come sempre. Chi paga vede indirizzo controllato, QR, cifra esatta e il link all'explorer. USDe su Ethereum, Arbitrum, Base, BNB Chain e Solana.
+dove: la scheda «P2P»: la valuta in cima al foglio «Pubblica», il filtro di ogni moneta nel libro e la card col suo logo.
 leva: P2P_COIN_ATTIVO (nuova, accesa)
 pubblico: sì
 

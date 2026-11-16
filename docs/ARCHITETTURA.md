@@ -35915,3 +35915,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'ESPERTO (`TAPPO_MODELLO_ESPERTO`, Sonnet 5.5) con tutto il libro.
   I due modelli sono leve del pannello e arrivano a n8n nel campo
   `tappo` di `/api/assistente/numeri` (solo nomi `claude-...`).
+- ETH, XMR E USDe SONO VALUTE DEL P2P (16 nov 2026, cantiere
+  p2p-monete-valute; il perché in CANTIERI). Nel client stanno in
+  `P2P_VALUTE_COIN` (cod `ETH`/`XMR`/`USDE`, segno, logo, decimali 6/6/2)
+  accanto a EUR, USDT e CHF; il nodo invece le monete non le conosce,
+  quindi SUL FILO un ordine in moneta è un ordine in EURO coi sats FISSI:
+  `fiat_code 'EUR'`, `fiat_amount` = l'equivalente in euro arrotondato,
+  `amount` = i sats fissati alla pubblicazione (mercato: `satsCoinP2P`
+  col premio; prezzo fisso: quelli scritti), `premium 0`, niente fascia, e
+  OGNI metodo porta la cifra col punto: «ETH (Ethereum) 0.0153»,
+  «USDe (Base) 50». La lettura è una sola, `vestiCoinOrdineP2P(o)`: dai
+  metodi tira fuori la moneta e la cifra e rimette all'ordine `fiat` =
+  la moneta, `euro` = la cifra, `euroNodo` = gli euro del filo, metodi
+  nudi; la chiamano ordineDaEvento, rigaDaServerP2P, l'adozione e la
+  riga appena pubblicata, e da lì in poi `valutaOrdineP2P`/`coinP2P(o)`
+  bastano a tutto (card, filtro, foglio, dettaglio, cifra da mandare,
+  testi). Lato server `_coin_pm_libro`/`_coin_ordine_libro` fanno la
+  stessa lettura per il libro, il canale e gli avvisi del bot.

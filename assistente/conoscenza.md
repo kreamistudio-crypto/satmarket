@@ -219,7 +219,7 @@ Se chi vende chiede di annullare uno scambio coi sats già in garanzia, chi comp
 
 Barattozon (nel libro «Contanti al tabacchino»): chi vende sats fa un ordine Amazon da pagare in contanti nel punto vendita, e chi compra lo paga alla cassa di un tabacchino abilitato col PayCode. Il PayCode vale almeno 25 € e Amazon lo accetta fino a 999 €. Il PayCode arriva a chi compra solo quando i sats sono in garanzia (prima nella pagina non si vede), quindi si paga solo quando la pagina dice «Sats in garanzia»; si tiene lo scontrino come prova, e poi si tocca «Ho pagato al tabacchino». Chi vende controlla su Amazon che l'ordine risulti pagato e libera i sats. Alla cassa bisogna dire «devo pagare un ordine Amazon in contanti con un PayCode»: non una ricarica e non un buono regalo. Barattozon c'è da tutti e due i lati del libro: anche chi COMPRA sats può pubblicare un ordine «al tabacchino», con una fascia di euro (per esempio da 30 a 80 €, il massimo è obbligatorio); chi vende lo prende scrivendo il PayCode (importo esatto, le nove cifre, la scadenza) e chi compra lo paga al tabacchino.
 
-Altre valute e reti (solo se nei NUMERI DI OGGI risultano disponibili): ordini P2P pagati in USDT al posto degli euro (qui sotto), ordini P2P in franchi svizzeri (CHF), ordini P2P in euro pagati in ETH, Monero o USDe, e scambi P2P coi bitcoin on-chain, con la garanzia a firme multiple (due chiavi su tre).
+Altre valute e reti (solo se nei NUMERI DI OGGI risultano disponibili): ordini P2P pagati in USDT al posto degli euro (qui sotto), ordini P2P in franchi svizzeri (CHF), ordini P2P in ETH, Monero o USDe, e scambi P2P coi bitcoin on-chain, con la garanzia a firme multiple (due chiavi su tre).
 
 Ordini P2P in USDT (se nei NUMERI DI OGGI «Ordini P2P in USDT» è acceso): al posto degli euro si paga in USDT, il dollaro digitale di Tether (1 USDT vale 1 dollaro). I sats restano su Lightning con la garanzia di sempre (per gli USDT negli scambi on-chain vedi più sotto); gli USDT passano direttamente da una persona all'altra, e Barattolo non li tocca mai. Le reti sono solo due, Tron (TRC-20) ed Ethereum (ERC-20), mai altre: in un ordine in USDT le reti prendono il posto dei metodi di pagamento.
 - Nel libro un ordine in USDT si riconosce dalla T verde di Tether nei quadratini in alto a destra della card.
@@ -244,20 +244,21 @@ Ordini P2P in franchi svizzeri (se nei NUMERI DI OGGI «Scambi P2P pagati in fra
 <!-- pezzo libro-019 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (7/9)
 
-Ordini P2P pagati in ETH, Monero o USDe (se nei NUMERI DI OGGI «Scambi P2P pagati in ETH, Monero (XMR) o USDe» è disponibile): l'ordine resta in euro, e ETH (Ethereum), XMR (Monero) e USDe (il dollaro digitale di Ethena) sono modi di pagare come Revolut. Chi paga manda l'equivalente in quella moneta, al cambio del momento, direttamente all'altra persona. I sats restano su Lightning con la garanzia di sempre, e Barattolo le monete non le tocca mai.
-- Le voci fra i metodi sono «ETH (Ethereum)», «XMR (Monero)» e una per ogni rete di USDe: «USDe (Ethereum)», «USDe (Arbitrum)», «USDe (Base)», «USDe (BNB Chain)» e «USDe (Solana)». Si scelgono nel foglio «Pubblica» di un ordine in euro, accanto agli altri metodi; nel libro e nella card si riconoscono dal loro logo.
+Ordini P2P in ETH, Monero o USDe (se nei NUMERI DI OGGI «Scambi P2P pagati in ETH, Monero (XMR) o USDe» è disponibile): sono tre valute a sé, come l'euro, l'USDT e i franchi. Con ognuna si comprano o si vendono sats, che restano su Lightning con la garanzia di sempre; la moneta passa direttamente da una persona all'altra, e Barattolo non la tocca mai. ETH è Ethereum, XMR è Monero, USDe è il dollaro digitale di Ethena.
+- Per pubblicarne uno: scheda «P2P», nuovo ordine, e in cima al foglio si sceglie la valuta: EUR, USDT, ETH, XMR o USDe. Sotto compare solo la sua lista: con ETH «ETH (Ethereum)», con XMR «XMR (Monero)», con USDe le sue cinque reti, «USDe (Ethereum)», «USDe (Arbitrum)», «USDe (Base)», «USDe (BNB Chain)» e «USDe (Solana)», una o più. Con l'euro restano solo i metodi classici (bonifico, Revolut, contanti…).
+- L'importo si scrive nella moneta (per esempio 0,02 ETH o 50 USDe), ed è uno solo, senza una fascia «da… a…». I sats si fissano quando si pubblica, al cambio di quel momento, col premio o lo sconto scelto; si può anche scrivere un prezzo fisso in sats. Da lì in poi la cifra in moneta e i sats dell'ordine non cambiano più.
+- Nel libro ogni valuta ha il suo filtro in cima (EUR, USDT, ETH, XMR, USDe), e la card mostra il logo della moneta nei quadratini in alto a destra e la cifra nella moneta, per esempio «Invia 0,0153 ETH».
 - Chi riceve scrive nello scambio il suo indirizzo, copiato dal wallet. L'app controlla che sia della moneta e della rete giusta e ferma un indirizzo sbagliato o con un refuso. Un limite da sapere: Ethereum, Arbitrum, Base e BNB Chain hanno indirizzi uguali (0x…), quindi chi paga deve mandare proprio sulla rete scritta nello scambio. Per USDe lo scambio mostra anche il contratto del vero USDe, contro i token falsi con lo stesso nome.
-- Chi paga vede l'indirizzo col QR e la cifra esatta da mandare, calcolata dal cambio di adesso (se il cambio è troppo vecchio la cifra non compare: si aspetta un momento). Manda, incolla l'id della transazione e tocca «Ho inviato». Con Monero serve anche la chiave della transazione (tx key), che il wallet di chi manda conserva: Monero è privato, e solo con id, chiave e indirizzo si vede quanto è arrivato.
+- Chi paga vede l'indirizzo col QR e la cifra esatta da mandare, che è quella dell'ordine. Manda, incolla l'id della transazione e tocca «Ho inviato». Con Monero serve anche la chiave della transazione (tx key), che il wallet di chi manda conserva: Monero è privato, e solo con id, chiave e indirizzo si vede quanto è arrivato.
 - Chi vende controlla l'arrivo col tasto «🔎 Controlla su …» (Etherscan, xmrchain, Arbiscan, Basescan, BscScan o Solscan) e libera i sats solo quando ci sono davvero. Se qualcosa non torna si apre una disputa.
 - ETH, Monero e USDe non ci sono negli scambi on-chain (a tre chiavi): solo in quelli su Lightning.
-- In cima al libro, sotto quello verde degli USDT, c'è il rettangolo viola-blu «ETH · XMR · USDe · Novità» coi tre loghi: toccandolo parte un breve tutorial che mostra che l'ordine resta in euro, come si riconosce un ordine pagato in una di queste monete, dove si sceglie nel foglio «Pubblica» (fra gli «Altri metodi») e come si paga senza sbagliare. Si può rivedere toccandolo di nuovo.
-
-Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è disponibile): si scambiano bitcoin sulla rete principale, non su Lightning. La garanzia non è quella di Lightning: chi vende blocca i bitcoin in un deposito a tre chiavi, una sua, una di chi compra e una di Barattolo, e per spostarli ne servono due. Barattolo da solo non li può muovere.
-- Nel libro uno scambio on-chain si riconosce dalla moneta arancio ₿ (quelli di Lightning hanno il fulmine). Sopra le card c'è il rettangolo arancio «On-Chain» con la scritta «Novità», che apre la pagina «Scambi on-chain»: lì si pubblica («Pubblica uno scambio on-chain») e si seguono i propri.
+- In cima al libro, sotto quello verde degli USDT, c'è il rettangolo viola-blu «ETH · XMR · USDe · Novità» coi tre loghi: toccandolo parte un breve tutorial che mostra che sono tre valute come l'euro e l'USDT, come si riconosce un ordine in una di queste monete, come si sceglie la valuta in cima al foglio «Pubblica» e come si paga senza sbagliare. Si può rivedere toccandolo di nuovo.
 
 <!-- pezzo libro-020 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (8/9)
 
+Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è disponibile): si scambiano bitcoin sulla rete principale, non su Lightning. La garanzia non è quella di Lightning: chi vende blocca i bitcoin in un deposito a tre chiavi, una sua, una di chi compra e una di Barattolo, e per spostarli ne servono due. Barattolo da solo non li può muovere.
+- Nel libro uno scambio on-chain si riconosce dalla moneta arancio ₿ (quelli di Lightning hanno il fulmine). Sopra le card c'è il rettangolo arancio «On-Chain» con la scritta «Novità», che apre la pagina «Scambi on-chain»: lì si pubblica («Pubblica uno scambio on-chain») e si seguono i propri.
 - Per pubblicare si può anche toccare il + di «Compra BTC» o «Vendi BTC» e scegliere «On-chain» invece di «Lightning». Serve aver preparato Profilo → «₿ On-chain» (le 12 parole e la loro copia: vedi «Bitcoin on-chain»). Un ordine resta nel libro 24 ore; il tetto per ordine è quello on-chain dei NUMERI DI OGGI e del paragrafo sui limiti.
 - Il giro, passo per passo: chi prende fa nascere l'indirizzo a tre chiavi. Chi vende ha 6 ore per depositare con «🔒 Blocca i sats»: i sats dello scambio più un piccolo margine per la commissione della rete. Con una conferma della rete (circa dieci minuti) lo scambio va avanti, e tutti e due ricevono l'avviso. Allora chi compra manda gli euro col metodo scritto e tocca «💶 Ho inviato gli euro». Chi vende li controlla sul suo conto e SOLO quando li vede tocca «🔓 Ricevuti: libera i sats»; la seconda firma la mette da solo il telefono di chi compra, e i bitcoin partono.
 - Chi compra deve dire dove ricevere: nello scambio c'è «Dove ricevi i bitcoin?», si incolla un proprio indirizzo e si tocca «✍️ Firma e usa questo indirizzo». Chi ha messo nel Profilo la chiave del conto del suo wallet non deve scriverlo ogni volta: ogni scambio arriva a un indirizzo nuovo.
@@ -265,12 +266,11 @@ Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è
 - A fine scambio la pagina dice «Concluso: i sats sono andati al wallet di chi ha comprato» oppure «Rimborsato: i sats sono tornati a chi li aveva depositati».
 - USDT negli scambi on-chain (se nei NUMERI DI OGGI «Scambi P2P on-chain pagati in USDT» è disponibile): la garanzia resta il deposito bitcoin a tre chiavi, e al posto degli euro chi compra paga in USDT su Tron o Ethereum, da persona a persona, con le stesse regole degli ordini in USDT qui sopra: chi vende scrive il suo indirizzo USDT, chi paga incolla l'id della transazione e tocca «Ho inviato gli USDT». Un ordine è in una valuta sola: o euro o USDT.
 
-Ricevere o pagare su un'altra rete (se nei NUMERI DI OGGI «P2P su un'altra rete» è disponibile): la rete di un ordine dice come paga chi l'ha pubblicato, ma chi lo prende può usare l'altra, con uno swap di SATS Routing fatto dal suo telefono (come la pagina «Swap»). Il costo dello swap si vede prima di confermare, e Barattolo non aggiunge commissioni.
-- Ordine Lightning, ma vuoi ricevere bitcoin on-chain: nel foglio «Dove ricevere i sats» scegli «₿ On-chain», incolli un tuo indirizzo bitcoin e l'app ti dice quanti sats ti arrivano circa e quanto costa lo swap. Alla liberazione i sats diventano bitcoin al tuo indirizzo. Se il moderatore dà ragione a chi vende, lo swap scade senza costare niente.
-
 <!-- pezzo libro-021 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (9/9)
 
+Ricevere o pagare su un'altra rete (se nei NUMERI DI OGGI «P2P su un'altra rete» è disponibile): la rete di un ordine dice come paga chi l'ha pubblicato, ma chi lo prende può usare l'altra, con uno swap di SATS Routing fatto dal suo telefono (come la pagina «Swap»). Il costo dello swap si vede prima di confermare, e Barattolo non aggiunge commissioni.
+- Ordine Lightning, ma vuoi ricevere bitcoin on-chain: nel foglio «Dove ricevere i sats» scegli «₿ On-chain», incolli un tuo indirizzo bitcoin e l'app ti dice quanti sats ti arrivano circa e quanto costa lo swap. Alla liberazione i sats diventano bitcoin al tuo indirizzo. Se il moderatore dà ragione a chi vende, lo swap scade senza costare niente.
 - Scambio on-chain, ma vuoi ricevere in Lightning: nello scambio tocchi «⚡ Ricevi in Lightning» e, quando chi vende ha confermato gli euro, incolli una tua richiesta Lightning (o «⚡ Prendila dal mio Lightning address») e tocchi «✅ Conferma lo swap». Ti arriva il prezzo meno il costo dello swap; se la richiesta non si riesce a pagare, i bitcoin tornano da soli al tuo wallet on-chain di Barattolo. Si torna indietro con «₿ Ricevi on-chain invece».
 - Scambio on-chain che hai preso tu per vendere, ma hai solo sats Lightning: nel foglio «🔒 Blocca i sats» scegli «⚡ Lightning» e tocchi «⚡ Crea la richiesta Lightning»; la paghi col tuo wallet e lo swap mette i bitcoin nel deposito a tre chiavi. Un annullo o un rimborso tornano però on-chain, al tuo wallet di Barattolo.
 - Lo swap ha i suoi limiti di cifra (quelli di SATS Routing): fuori dai limiti l'app lo dice e lo scambio si fa sulla rete dell'ordine.
@@ -1519,8 +1519,8 @@ pubblico: sì
 <!-- pezzo novita-034 | novita -->
 ## Novità · 2026-11-16 · p2p-monete
 
-frase: Nel P2P ora puoi pagare anche in ETH, Monero o USDe. L'ordine resta in euro e la garanzia in sats come sempre: chi paga manda l'equivalente al cambio del momento, con indirizzo controllato, QR, cifra esatta e il link all'explorer per vedere che la transazione è arrivata. USDe su Ethereum, Arbitrum, Base, BNB Chain e Solana.
-dove: la scheda «P2P», nel foglio «Pubblica» di un ordine in euro (fra i metodi) e nel libro, col logo di ogni moneta.
+frase: Nel P2P arrivano tre valute nuove: ETH, Monero e USDe. Funzionano come l'euro e l'USDT: scegli la valuta in cima a «Pubblica», sotto trovi solo le sue reti, l'importo lo scrivi nella moneta e i sats restano nel deposito di garanzia come sempre. Chi paga vede indirizzo controllato, QR, cifra esatta e il link all'explorer. USDe su Ethereum, Arbitrum, Base, BNB Chain e Solana.
+dove: la scheda «P2P»: la valuta in cima al foglio «Pubblica», il filtro di ogni moneta nel libro e la card col suo logo.
 leva: P2P_COIN_ATTIVO (nuova, accesa)
 pubblico: sì
 
@@ -1530,6 +1530,7 @@ pubblico: sì
 frase: Nel bot di Barattolo c'è il bottone «💬 Chiedi a Tappo»: un tocco e sei nella chat di Tappo, che risponde alle domande su come funziona Barattolo. Il bot di Barattolo resta quello degli avvisi su ordini e pagamenti.
 dove: il bot @ilbarattolobot, nel messaggio di benvenuto (/start) e nella risposta a chi gli scrive una frase.
 leva: TAPPO_LINK (accesa di serie)
+pubblico: sì
 
 <!-- pezzo novita-036 | novita -->
 ## Novità · 2026-11-16 · nav-nostr

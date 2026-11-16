@@ -84275,3 +84275,65 @@ NOVITA.md la riga «pubblico: sì» della voce bottone-tappo era scivolata
 sotto la nostra e la suite l'ha presa (`prove_novita_md`, riga 250):
 rimessa al suo posto. Sull'albero ribasato suite severa 28382 passate e
 quella sola rossa, poi verde da sola; collaudi 134/0 senza proxy.
+
+## ETH, Monero e USDe valute a sé, come l'euro e l'USDT (16 nov 2026, cantiere p2p-monete-valute, Andrea: «ETH, XMR, USD si devono comportare come USDT. Ognuno deve avere la sua lista. Perché mi hai messo tutto assieme così?», «Poi c'entra l'euro con Ethereum, XMR, USD. Sono altre valute? E basta.», «hanno tutti la stessa funzione, cioè quella di comprare sempre Satoshi»; alla domanda sulla promozione, «Aspetta il cambio»)
+
+PERCHÉ. Con p2p-monete le tre monete erano METODI di un ordine in euro:
+nel foglio «Pubblica» in euro la tendina diventava una lista lunghissima
+(i metodi classici più sette voci di monete), e il libro le mescolava
+agli euro. Andrea le vuole come l'USDT: una valuta in cima, sotto solo
+la sua lista, l'importo nella moneta, un filtro e una tessera sue.
+COM'È ADESSO. In cima a «Pubblica» EUR, USDT, ETH, XMR, USDe (e CHF
+dove è accesa). ETH ha la sola voce «ETH (Ethereum)», XMR «XMR (Monero)»,
+USDe le sue cinque reti; l'euro torna ai soli metodi classici (via la
+concatenazione delle monete in `metodiPubblicabiliP2P`). L'importo si
+scrive nella moneta col tastierino (6 decimali ETH/XMR, 2 USDe), è UNO
+solo (niente fascia: il secondo campo sparisce e il giudice lo rifiuta);
+il tetto della beta si mostra nella moneta. Nel libro un filtro per
+moneta, la tessera col logo, la cifra nella moneta («Invia 0,0153 ETH»);
+il dettaglio, la card della home, il riquadro «Da mandare» (la cifra
+dell'ordine, esatta, non più ricalcolata dal cambio), i testi del bot e
+il post del canale («🪙 0,0153 ETH») parlano della moneta.
+IL FILO, E PERCHÉ COSÌ. Il nodo Mostro conosce solo le valute fiat dei
+suoi prezzi: ETH, XMR e USDe non ci sono. Quindi sul filo l'ordine resta
+in EUR coi SATS FISSI, come il tabacchino: l'app legge il cambio della
+moneta quando si pubblica, calcola i sats (col premio) e li fissa;
+`fiat_amount` è l'equivalente in euro, `premium` 0, e ogni metodo porta
+la cifra col punto («USDe (Base) 50.25»). Il client rilegge tutto con
+`vestiCoinOrdineP2P` (Architettura, «ETH, XMR E USDe SONO VALUTE DEL
+P2P»). Detto ad Andrea prima di partire: il prezzo lo fissa l'app alla
+pubblicazione. SCARTATA: una patch al nodo per i prezzi di mercato delle
+monete (un'altra patch sul fork, un'altra fonte di prezzi da tenere viva,
+e il lancio aspettava). Gli ordini di ieri (moneta fra i metodi di un
+ordine in euro, senza cifra) restano leggibili come prima: la vestizione
+scatta solo con UNA moneta e la cifra.
+LE TRAPPOLE. 1) Un `const sats` usato prima della sua riga in
+cardVetrinaP2P (TDZ): la card spariva; tornati i ternari in linea. 2) Una
+ricorsione involontaria in premioNotaP2P, vista solo dal vivo. 3) I banchi
+delle prove ritagliano funzioni singole: ogni globale nuova usata da una
+funzione ritagliata (qui `fmtSoldiP2P`) va finta in OGNI banco, e le
+funzioni server lette dai ritagli si chiamano via `globals().get(...)`.
+PROVATO: `prove_p2p_monete_valute` (22, cinque controprove rosse: USDe
+50 e 51 vestite come uno, i sats senza il premio cotto, il tetto intero
+che fa «1 ETH», il tastierino a due decimali, l'avviso del bot in «€»); adeguate eth_xmr, usde, novita_coin_p2p (il
+tutorial ora racconta tre valute, la valuta in cima, i sats fissati),
+card_p2p_monete, usdt_foglio_presa e le sentinelle di p2p_pubblica,
+p2p_canale, contanti_zona, importo_foglio. Dal vivo (Chromium 390 chiaro e
+320 scuro, server nella gabbia, relay morti): il filtro con le cinque
+valute, la scelta della valuta, le reti di USDe, il tastierino «50,25
+USDe», la pubblicazione che manda `{"amount":46973,"fiat_code":"EUR",
+"fiat_amount":43,"payment_method":"USDe (Arbitrum) 50.25,USDe (Base)
+50.25","premium":0}`, ETH 0,0153 → 46 € e 49891 sats, la lista euro senza
+monete, il dettaglio «Ricevi 0,3 XMR», le sette tappe del tutorial.
+Tappo (sapere.md) e la voce di NOVITA.md p2p-monete riscritte (non erano
+ancora uscite), conoscenza.md rigenerato.
+Da guardare: dal telefono vero dopo la promozione, una pubblicazione in
+ETH e una presa in USDe; il dettaglio di un ordine in moneta scrive ancora
+«≈» davanti ai sats, che invece sono fissi.
+GIRI: su develop 3031eb0b suite severa 28343 passate, 3 rosse (tre
+sentinelle: la conferma di Barattozon e il PayCode, che non sono mai in
+moneta e tornano a `fmtEur`, e la tendina con `usdtRete`), riparate e
+verdi da sole. Poi develop è corso (b3344d37 e b68b850c, nav-nostr, non
+miei): ribasato, conflitto solo in coda a CANTIERI; sull'albero 7abae3ce
+le 25 sezioni toccate dai due cantieri verdi e collaudi 134/0 senza
+variabili del proxy.
