@@ -1189,6 +1189,7 @@ Un attimo…
 📱 Entra con nostrconnect
 📋 Copia il link
 Se il firmatario ce l'hai su questo telefono il codice non lo puoi inquadrare da solo: copia il link, incollalo nell'app, approva e torna qui: la risposta ti aspetta. Su iPhone con Clave è più sicura la strada del bunker:// qui sotto (Clave firma senza che tu cambi app).
+ Sto entrando…
 🧩 Con l'estensione del browser
  🔗 Con un bunker remoto (NIP-46)
 📱 Su iPhone con Clave è la strada che funziona meglio: in Clave apri Connect → Bunker, tocca Copy URI e incolla qui sotto. Clave firma da sola, senza che tu cambi app.
