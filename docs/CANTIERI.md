@@ -85091,3 +85091,29 @@ la prova la fa Andrea sul collaudo (un avviso «🔎 Un annuncio
 fa per te!» toccato dal bot, e lo stesso dalla notifica del telefono).
 Notato e non toccato: chi entra solo con Nostr riceve nel DM gli stessi
 link `t.me`, che fuori da Telegram portano al bot.
+
+## La mappa del contanti sempre visibile nei due tab, e «Più recenti» con le card on-chain mescolate (16 nov 2026, cantiere mappa-recenti; Andrea: «Come mai la mappa c'è solo in compra BTC e non in vendi BTC? L'avevo già chiesto in un altro thread», «se io seleziono più recenti, comunque le card devono essere ordinate più recenti, indipendentemente se siano on-chain o lighting»)
+
+LA MAPPA. Il tondo 🗺️ della testata spariva quando nel tab non c'era
+nessuna offerta in contanti col luogo, e in «Vendi BTC» non ce n'erano:
+sembrava che la mappa lì non esistesse (gliel'avevano spiegato alle 15:38,
+e proposto di renderla fissa: la seconda domanda è il sì). Ora
+`tondoMappaP2P` disegna il tondo sempre, con l'etichetta «nessuna offerta
+in contanti di persona» quando è vuoto; `sezioneMappaP2P` aperta senza
+pallini mostra l'Italia vuota con la frase «Qui per ora non ci sono offerte
+in contanti di persona.», e il comune scelto si dimentica come prima. Una
+conseguenza voluta: la testata porta sempre `con-mappa`, quindi la pillola
+del filtro dice il numero senza la parola «offerte» anche dove prima la
+diceva (la regola di Andrea del 14 nov: tre cerchietti e due pillole in una
+riga).
+«PIÙ RECENTI». Il cantiere ricevi-mercato aveva mescolato le card on-chain
+nello stesso ordinamento solo per convenienza e importo, lasciandole in
+cima a «Più recenti» (annotato come «non chiesto»). Andrea l'ha chiesto:
+ora `misti` vale per ogni criterio, e a «Più recenti» conta solo il
+`creato` (secondi, uguale nei due mondi).
+PROVATO: `prove_p2p_libro` (l'ordine misto a «Più recenti»: «oc-2 x oc-1
+y»; la sentinella di renderP2P) e `prove_mappa_contanti` (il tondo vuoto
+che parla e apre, la mappa aperta vuota con la frase), poi suite severa e
+collaudi nel worktree.
+DA GUARDARE: la testata in «Vendi BTC» sul telefono stretto, coi tre
+cerchietti.

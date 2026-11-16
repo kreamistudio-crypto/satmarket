@@ -70281,12 +70281,16 @@ function renderP2P(){
   const usdtNovita = (typeof novitaUsdtLibroP2P === 'function' ? novitaUsdtLibroP2P() : '')
     + (typeof novitaCoinLibroP2P === 'function' ? novitaCoinLibroP2P() : '')
     + (typeof cartaPrezzoP2P === 'function' ? cartaPrezzoP2P() : '');
-  /* ORDINATO PER CONVENIENZA O PER IMPORTO, le card on-chain entrano
-     NELLO STESSO ordinamento di quelle di Lightning (16 nov 2026,
-     cantiere ricevi-mercato, vedi `vistaOrdinamentoOcP2P`); a «Piu'
-     recenti» restano in cima, sotto il loro rettangolo, come prima */
+  /* LE CARD ON-CHAIN ENTRANO NELLO STESSO ORDINAMENTO di quelle di
+     Lightning, qualunque sia il criterio (16 nov 2026, cantiere
+     ricevi-mercato, vedi `vistaOrdinamentoOcP2P`). Prima solo per
+     convenienza e importo, e a «Piu' recenti» restavano in cima; poi
+     Andrea: «se io seleziono più recenti, comunque le card devono essere
+     ordinate più recenti, indipendentemente se siano on-chain o
+     lighting» (cantiere mappa-recenti): la data di tutte e due e' il
+     `creato` in secondi, e a pari data decide lo stesso giudice */
   const critLibro = ordineLibroP2P();
-  const misti = critLibro !== 'recenti' && typeof vistaOrdinamentoOcP2P === 'function';
+  const misti = typeof vistaOrdinamentoOcP2P === 'function';
   const onchainCarte = typeof carteOnchainLibroP2P === 'function' ? carteOnchainLibroP2P(k, usdtNovita, misti) : '';
   const carteLibro = misti
     ? ordinaLibroP2P(elenco.concat(righeOnchainLibroP2P(k).map(vistaOrdinamentoOcP2P)), p2pLato, critLibro)
@@ -94402,20 +94406,26 @@ function numerinoMappaP2P(){ alternaNumerinoMappa('p2p'); renderP2P(); }
 function rigaNumerinoMappaP2P(){
   return rigaNumerinoMappa('p2p', 'Notifiche nuove offerte in contanti', 'numerinoMappaP2P');
 }
+/* IL TONDO C'E' SEMPRE, nei due tab (16 nov 2026, cantiere mappa-recenti,
+   Andrea: «Come mai la mappa c'è solo in compra BTC e non in vendi BTC?
+   L'avevo già chiesto»): prima spariva senza offerte in contanti col
+   luogo, e in «Vendi BTC» non ce n'erano — sembrava che la mappa li' non
+   esistesse. Adesso c'e' anche vuota, e lo dice. */
 function tondoMappaP2P(mostrati){
   const ids = idsMappaP2P(mostrati);
-  if (!ids.length) return '';
   return tondoMappa('p2p', p2pMappaAperta, ids,
-    ids.length + (ids.length === 1 ? ' offerta' : ' offerte') + ' in contanti di persona',
+    ids.length ? ids.length + (ids.length === 1 ? ' offerta' : ' offerte') + ' in contanti di persona'
+      : 'nessuna offerta in contanti di persona',
     'apriChiudiMappaP2P');
 }
 /* L'INTESTAZIONE sopra le card: la sola pillola del comune scelto (il
    bottone che apre e chiude e' salito nella testata, vedi qui sopra).
-   Niente se nel libro di adesso non c'e' nessuna offerta col punto — e
-   il comune scelto in quel caso si dimentica. */
+   Se nel libro di adesso non c'e' nessuna offerta col punto il comune
+   scelto si dimentica, e la mappa aperta resta vuota con la sua frase
+   (16 nov 2026, cantiere mappa-recenti: il tondo c'e' sempre). */
 function sezioneMappaP2P(mostrati){
   const comuni = comuniMappaP2P(mostrati);
-  if (!comuni.length) { p2pMappaComune = ''; return ''; }
+  if (!comuni.length) p2pMappaComune = '';
   if (p2pMappaComune && !comuni.some(c => c.nome === p2pMappaComune)) p2pMappaComune = '';
   const senza = (mostrati || []).filter(o => zonaOrdineP2P(o) && !postoOrdineP2P(o)).length;
   let h = '';
@@ -94431,7 +94441,8 @@ function sezioneMappaP2P(mostrati){
       + '<button type="button" onclick="zoomMappaP2P(1)" aria-label="Avvicina">＋</button>'
       + '<button type="button" onclick="zoomMappaP2P(-1)" aria-label="Allontana">−</button>'
       + '<button type="button" onclick="zoomMappaP2P(0)" aria-label="Tutta Italia">⟲</button></div>'
-      + '<div class="p2p-mappa-nota">Il pallino sta al centro del comune scritto da chi pubblica, mai sul luogo esatto: '
+      + '<div class="p2p-mappa-nota">' + (comuni.length ? '' : 'Qui per ora non ci sono offerte in contanti di persona. ')
+      + 'Il pallino sta al centro del comune scritto da chi pubblica, mai sul luogo esatto: '
       + 'quello lo decidete in chat.' + (senza ? ' ' + senza + (senza === 1
         ? ' offerta in contanti ha una zona che la mappa non riconosce: la trovi nell\'elenco.'
         : ' offerte in contanti hanno una zona che la mappa non riconosce: le trovi nell\'elenco.') : '')
