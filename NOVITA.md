@@ -441,6 +441,12 @@ dove: Profilo → «🎖 Livello e titolo» → «I vantaggi di ogni livello».
 leva: nessuna
 pubblico: sì
 
+## 2026-11-17 · stradina-obiettivi
+frase: Nel Profilo c'è «🧭 La tua stradina»: un tabellone lunghissimo dalla Terra alla Luna, su una mappa in otto zone, che vedi solo tu, fino all'halving del 2028. Ogni casella è una competenza (l'incasso automatico in Lightning, il wallet on-chain, la doppia configurazione Telegram + Nostr, il primo acquisto…): fatta, diventa una moneta d'oro e Tappo avanza. I tuoi amici sono pedine sul tabellone.
+dove: Profilo → «🎖 Livello e titolo» → «🧭 La tua stradina».
+leva: nessuna
+pubblico: sì
+
 ## 2026-11-17 · contante-per-posta
 frase: Nel P2P c'è un metodo in più, «Contante per posta»: chi compra sats spedisce le banconote a chi le vende, in una busta sigillata nascosta in un pacco, con un servizio tracciato. Le regole sono scritte nello scambio: chi spedisce filma l'imballo col numero di tracciamento in vista, chi riceve filma l'apertura prima di liberare i sats, e chi prende l'ordine blocca una piccola cauzione.
 dove: P2P → «Pubblica» → «Altri metodi ▾» → «Contante per posta»; la pagina dello scambio con le regole; «Info P2P», voce «Contante per posta».
@@ -488,3 +494,9 @@ frase: Negli scambi P2P on-chain, chi si ritira dopo che l'altro ha già bloccat
 dove: P2P on-chain: il foglio «↩️ Rinunci allo scambio?»; la pagina dello scambio rimborsato, con la frase «scambio non completato» e il riquadro «⭐ Lascia una recensione» per chi aveva depositato; il messaggio del bot «Scambio on-chain annullato».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-17 · quanto-vuoto
+frase: Quando prendi un ordine P2P con un intervallo (per esempio da 50 a 276 €), il campo dell'importo ora è vuoto: scrivi subito la cifra che vuoi, senza cancellare il minimo che prima c'era già scritto. Sotto ci sono i tasti «Minimo» e «Massimo» per metterla con un tocco.
+dove: P2P: tocca un ordine con un intervallo, poi «Scegli»; foglio «Quanto vuoi scambiare?».
+leva: nessuna
+pubblico: no

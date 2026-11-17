@@ -87963,6 +87963,204 @@ la carta tolta; sulla pagina del PayCode la commissione 3 apre
 `…&premio=-3`. NON visto dal vivo: il foglio di Barattolo aperto al
 passo 5 (provato in node sul pezzo vero).
 
+## La stradina degli obiettivi (17 nov 2026)
+
+COSA. Una schermata PRIVATA del Profilo, «🧭 La tua stradina» (voce
+`vocStradina` nel cassetto «🎖 Livello e titolo», vista `view-stradina`):
+un TABELLONE lunghissimo da scorrere, dalla Terra in basso alla Luna in
+cima, in otto zone («🫙 Primi passi», «🧺 Il mercatino», «⚓ Il porto»,
+«🌲 Il bosco dei sats», «🪜 La scala d'oro», «🏔 La vetta», «🛰 In
+orbita», «🌕 Verso la Luna»), ognuna col suo pezzo di mappa disegnato; i
+quattro gradini della scala chiudono le zone 2, 4, 6 e 8 (un BARATTOLO, il disegno
+del logo, spento finché non lo raggiungi). Sopra la mappa: la strada
+luminosa (il tratto fatto acceso), le caselle numerate come monete
+(d'oro con la spunta quelle fatte, quella che tocca a te che pulsa), i
+cartelli delle zone col conto, Tappo-pedina (il Tappo ufficiale, il
+robot col barattolo di monete) sull'ultima casella fatta col
+cappellino vinto nella Caccia (il fumetto «Prossima: …» c'era e copriva
+la casella dopo: la prossima la dice la scheda; resta «Sei sulla Luna!»), gli amici come pedine
+sul gradino del loro livello. In cima Tappo, «Casella N di M», la barra,
+i sats incassati e spesi, la serie 🔥 se c'è; in fondo «La gara fra
+amici»; una scheda fissa in basso dice la casella scelta e porta a
+farla («Vai ›», «Gioca ›», «Apri ›»). Tre suoni sintetizzati (tocco,
+passo, fanfara al gradino nuovo) col tasto 🔊/🔇.
+
+IL PERCORSO. Prima versione (serpentone da tre per riga, cerchi su fondo
+chiaro) BOCCIATA da Andrea alla prima occhiata: «cos'è questa
+schifezza», «voglio vedere qualcosa di figo», «un tabellone
+lunghissimo dove uno scorre», «una mappa sotto, in stile Barattolo»,
+«con dei suoni». Gli spunti: il programma a livelli di un'app di
+energia, il gioco da tavolo To The Mooon (t.me/ToTheMooon21) e il video
+del gioco digitale di Alan: preso il FLUSSO (pista a tratti, pedina
+sulla casella, dalla Terra alla Luna), mai la grafica, che è di casa
+(i barattoli del logo, le monete, i colori dell'app, Tappo).
+
+COME. Server (`server.py`, blocco «LA STRADINA DEGLI OBIETTIVI»):
+`STRADINA_ZONE` e `STRADINA_CASELLE` (id, emoji, nome, fatto, soglia,
+vista: le soglie crescono di zona in zona, 1 → 5 → 10 → 25, 10 mila →
+100 mila → 1 milione di sats); `fatti_stradina(con, tg_id)` legge i
+NUMERI VERI (xp, vendite, acquisti, indirizzo Lightning, foto, npub,
+annunci non rimossi, preferiti, recensioni date, venditori seguiti,
+scambi P2P completati da `p2p_esiti`, inviti, cappellino) — letture e
+basta, una che manca vale zero; i sats incassati li aggiunge la rotta
+da `numeri_negozio`; `tappe_stradina(...)` PURA mette tutto in fila,
+zona per zona, coi gradini di `scala_livelli()` (le soglie del
+carosello) in fondo a ogni zona; `amici_stradina` passa da
+`_volti_persone` (solo nome, faccia, negozio, livello) ed esclude
+`classifica_nascosta`; `emoji_oggetto_tappo` traduce il cappellino.
+`/api/me/stradina` con `verifica_utente` (privata, legge chi bussa);
+`/assets/stradina/{nome}` (whitelist a tupla `FILE_MAPPA_STRADINA`: i
+otto pezzi di mappa, le icone e `tappo-pedina.webp`). Client: `stradinaDisegno`
+(i posti dal basso, la banda di ogni zona sulla cucitura fra due pezzi
+di mappa, la strada che ondeggia), `stradinaCurva` (Catmull-Rom in
+Bézier), `stradinaHTML` e `stradinaSchedaHTML` PURE (banco node),
+`strScegli`, `vaiTappa`, `apriStradina`/`renderStradina` (si apre su
+Tappo), `suonoTappo`/`SUONI_TAPPO`/`suoniMuti` (WebAudio, niente file,
+il muto in localStorage dentro un try). Un pezzo di mappa che manca è un
+404 e la zona tiene il suo ripiego dipinto in CSS (terra, nebulose,
+stelle, la Terra e la Luna disegnate).
+
+I SUONI (Andrea: «devi metterci anche i suoni... anche il gioco»; «per i
+suoni fai tu, puoi scaricarli su Artlist»): venti effetti brevi presi da
+Artlist sul PC di Andrea (titolo e autore di ognuno in
+Desktop\bar\flow\stradina\suoni\elenco.txt), MP3 mono in
+`assets/stradina/suoni/`, rotta `/assets/stradina/suoni/{nome}` con
+whitelist `FILE_SUONI_STRADINA`; nel client `SUONI_FILE` (gli stessi
+nomi, una prova li tiene uguali) e `suonoTappo(nome)` suona il file, e se
+manca o non si apre torna al bip di `suonoSintetico` (un rifiuto del
+browser prima del primo tocco non conta come file rotto). Ogni casella ha
+la sua voce: moneta se fatta, tonfo se chiusa, magia se missione, slancio
+sul «Vai». Gli stessi nomi li usa il gioco di Tappo (salto, atterra,
+raccogli, giusto, sbagliato, stella, vittoria, sconfitta, tarlo, gazza,
+porta, conto), sempre dietro `typeof`. Scelti dal titolo e misurati
+(durata, picco a -1 dB, -14/-15 LUFS i lunghi), NON ascoltati da chi li
+ha presi: vanno sentiti una volta sul collaudo. Il «tarlo» è un
+macinapepe di legno (Artlist non ha tarli né roditori sul legno).
+
+«LIVELLO E TITOLO» SFOLTITO (Andrea, 14:37, la pagina in produzione: «c'è
+troppo testo, è troppo confusionario. La grafica va bene»). Grafica
+intatta; via la riga «Gli XP contano il commercio…» (scende in fondo in
+un «Come si contano gli XP» chiuso: il giudice `fraseXp` resta lui), via
+il titolo «I vantaggi di ogni livello», via la frase sotto ogni pannello
+(«Questi vantaggi sono già tuoi», «Si apre da…»: lo dicono già ✅ e 🔒),
+via la riga dello sconto P2P accanto al carosello (era doppia: il
+carosello la porta nel livello 5; resta solo per il server di ieri senza
+scala), via «Compare sotto il tuo nome…» sotto «Il tuo titolo», e la
+riga della classifica nascosta in una frase («Il nome esce dalla
+classifica e non si pubblica più su Nostr. Il livello resta.»). Sulla tessera del proprio gradino «Ancora 380
+XP e 6 affari» al posto di «Mancano 380 XP e 6 affari conclusi al livello
+4 (Mercante esperto)»: il nome del prossimo sta sulla tessera accanto.
+
+LE MISSIONI DI TAPPO (Andrea: «ogni tanto nel tabellone devi giocare
+con Tappo per proseguire», missioni educative su bitcoin). Le studia e
+le costruisce il cantiere del gioco di Tappo; il patto (concordato fra i
+due thread il 17 nov): il gioco espone `MISSIONI_TAPPO` (id, emoji,
+nome, zona 0-4; al lancio una per zona) e `missioni_superate(con,
+tg_id)`, il client `apriMissione(id)`. Il tabellone le legge con
+`globals()` SOLO a `GIOCO_TAPPO_ATTIVO` accesa, le mette nella loro zona
+subito prima del gradino, e UNA MISSIONE NON SUPERATA È UN CANCELLO:
+Tappo-pedina si ferma lì davanti anche se più su ci sono caselle già
+fatte (`stradinaUltimaFatta`). A missione finita il gioco lancia
+l'evento `tappo:missione` sulla finestra: il tabellone aperto si ricarica
+(`apriStradina(true)`, senza spingere un'altra pagina nella storia). I
+suoni li riusa il gioco. Al lancio le missioni sono cinque, una per zona
+(quaderno, lucchetto, staffetta, parole, halving).
+
+LE CASELLE SONO COMPETENZE (Andrea, 17 nov 13:30: «gamification... hai
+impostato il wallet on chain, hai impostato l'incasso automatico su
+lightning, hai fatto la doppia configurazione con Nostr, hai fatto un
+primo acquisto... così dimostri di avere delle competenze di Barattolo e
+bitcoin, e Tappo farà questo percorso come se fosse il tuo avatar»).
+Le prime zone sono i passi da imparare, coi nomi che l'utente legge
+nell'app: «Attiva l'incasso automatico in Lightning» è l'indirizzo
+Lightning (l'ordine dice «⚡ Incasso automatico attivo»); «Crea il tuo
+wallet on-chain» è una riga in `wallet_unico` (l'impronta del wallet di
+Barattolo) o in `onchain_xpub` (un wallet proprio); «Verifica la chiave
+Nostr» è `npub_verificata` (il distintivo Nostrano); «la doppia
+configurazione Telegram + Nostr» è un account Telegram con
+`npub_accesso` (il distintivo Doppia cittadinanza: un account solo-Nostr
+non conta). E TAPPO CAMMINA IN FILA: si ferma prima della prima casella
+da fare, come davanti a una missione non superata; le fatte più su
+restano accese (nessun merito si perde), ma per avanzare si impara il
+passo che manca. La porta inerte non ferma nessuno. LUNGO FINO ALL'HALVING (Andrea, 13:07:
+«hai solo il tabellone così corto?», poi sulla scheda «Sì, 70 caselle in
+8 zone», e «deve essere più lungo possibile, anche per arrivare all'anno
+dell'halving»): 61 caselle in otto zone, soglie fino a 100 vendite e 10
+milioni di sats, caselle a TEMPO («Un mese / sei mesi / un anno / un anno
+e mezzo / due anni con Barattolo», dai giorni dalla prima entrata,
+`utenti.registrato`) e, ultima prima della Luna, «Arriva all'halving del
+2028» (`STRADINA_HALVING_2028`, 16 aprile 2028: una STIMA del blocco
+1.050.000, non un orologio della catena). Tappo cammina in fila, quindi
+nessuno arriva in cima prima di quel giorno; poi, a ogni halving, le Ere
+del gioco di Tappo. I tre pezzi nuovi (porto, vetta, orbita) stanno fra i
+cinque di prima; il ripiego dipinto si sceglie con `STRADINA_FONDI`, le
+sfumature di testa e di coda con le classi `prima`/`ultima`; il campo
+`zona` delle missioni va da 0 a 7 (concordato col gioco: quaderno 0,
+lucchetto 1, staffetta 3, parole 5, halving 7). Dalle 13:21 le missioni
+sono minigiochi, tre per zona e sempre più difficili (campo `ordine`):
+stanno SPARSE fra le caselle della zona, l'ultima subito prima del
+gradino, e ognuna è un cancello. Con le missioni la casella «Gioca con
+Tappo» sparisce (l'ingresso al gioco sono loro: due cancelli sulla
+stessa porta fermavano Tappo alla quinta casella).
+PROGRESSIVA (Andrea, stesso giorno:
+«parti dalle cose più semplici, basilari, fino alle più difficili»):
+prima i gesti gratis da un minuto (un preferito, la foto, seguire,
+l'incasso in Lightning), poi le prime volte (annuncio, acquisto, la
+recensione che vuole un acquisto, la chiave Nostr, un invito), poi le
+competenze da bitcoiner (la vendita, il wallet on-chain, la verifica e
+la doppia configurazione Nostr, il P2P), poi le soglie; una casella che
+dipende da un'altra viene dopo, perché Tappo cammina in fila. LE ICONE
+(«non le emoji classiche, personalizzale in stile Barattolo»): sedici,
+una per famiglia di caselle (`STRADINA_ICONE`, il «fatto» più il
+benvenuto), disegnate in Flow nello stile della mappa, 160 px, in
+whitelist come `ico-<famiglia>.webp`; l'emoji resta sotto e torna se
+l'immagine manca. Scartato: «ricevi
+le vendite on-chain» come casella (spingerebbe una scelta di gusto,
+non una competenza); il wallet NWC (vive solo nel browser, il server
+non lo sa e non deve saperlo).
+
+DECISIONI. (1) NIENTE XP DALLE CASELLE NÉ DALLE MISSIONI: la regola «GLI
+XP» (ago 2026) non si rovescia; una casella è una spunta, i premi del
+gioco sono bulloni. (2) «Impara bitcoin con …» è una PORTA INERTE:
+senza `IMPARA_BITCOIN_LINK` (https) nel config la casella non esiste e
+nessuno è nominato; Andrea: «facciamola e poi al massimo la accendiamo
+dopo, la leva». Il partner: prima si era pensato a Bitvero (logo
+mandato da Andrea), poi Andrea l'ha scartato («abbiamo già buoni
+rapporti, non chiediamo un favore in più») per Villaggio Bitcoin, da
+proporre a loro: il nome di serie è il loro, il logo non c'è. (3) Gli amici: chi
+segui su Barattolo e chi ha scambiato con te; quelli da Nostr restano da
+fare, e in ogni caso solo il livello. (4) La tavola è sempre notte in
+tutti e due i temi: è un tabellone, ha il suo colore. (5) La mappa la
+disegna Google Flow (Nano Banana) sul PC di Andrea in otto pezzi, nello
+stile dei disegni dell'app (contorni scuri, arancio e crema), senza
+scritte né personaggi: strada, caselle e Tappo li disegna la pagina.
+STRADE SCARTATE: la tabella delle caselle spuntate (ogni casella è un
+fatto già scritto); il serpentone a tre colonne (bocciato); un'unica
+immagine lunga (Flow fa 9:16, e otto pezzi pesano meno e si caricano
+pigri); un file audio (tre bip sintetizzati bastano e non pesano).
+
+PROVATO. `prove_stradina` (75 verdi): le zone, le soglie crescenti, le
+caselle per un nuovo iscritto e un veterano, il gioco, la porta, le
+missioni (posto, campi, voci storte), le competenze (wallet on-chain
+dalle due tabelle, Nostr verificata, doppia sì e solo-Nostr no), Tappo
+in fila, il cappellino nelle quattro forme,
+i fatti su sqlite (tabelle che mancano e che ci sono), gli amici, le
+sentinelle della rotta, delle missioni a leva, degli asset e del
+client, i suoni; il banco node della tavola (caselle, barattoli,
+cartelli, mappe, il cancello della missione, la pedina, i posti dentro
+la tavola, le cuciture senza buchi, la gara fra amici, la scheda).
+Controllo visivo con Playwright a 360 px, chiaro e scuro.
+IL VERBALE: suite intera severa 29.381 verdi e 2 rosse (la frase della
+classifica nascosta e la regola CSS di «Come si contano gli XP», entrambe
+di questo giro: corrette, e le due sezioni rigirate verdi insieme a
+stradina, vantaggi dei livelli e livello accanto al titolo: 193/0), 2
+saltate per nostr-tools che in cloud non c'è; collaudi 148/148 verdi senza
+proxy. Tutto girato in cloud sull'albero riallineato a develop 9537d26
+(il PC era occupato con Flow e Artlist).
+RESTA DA GUARDARE. I pezzi della mappa da Flow; le missioni vere dal
+gioco; gli amici da Nostr; il menù per livello (aspetta Andrea); il link
+di Villaggio Bitcoin nel config del VPS se accettano.
+
 ## Il rimborso on-chain che non si incaglia (17 nov 2026, cantiere onchain-rimborso-liscio; Andrea: «Ok, sì, vai, correggi tutto»)
 
 DA DOVE VIENE. Un utente all'assistenza (scambio on-chain #13, contanti):
@@ -88280,3 +88478,47 @@ rimborsato, dal lato di chi aveva depositato.
 NOTATO E NON FATTO: il moderatore on-chain non ha la spunta della
 «colpa» che ha quello del Lightning; la card in «I miei scambi» di uno
 scambio rimborsato non dice «non completato» (lo dice la pagina).
+
+## Il campo «Quanto» che nasce vuoto (17 nov 2026 sera, cantiere quanto-vuoto, quinto commit del ramo onchain-rimborso-liscio; Andrea, girando il messaggio di un utente: «Questa cosa ha senso o no?»)
+
+DA DOVE VIENE. Un utente: «di default prende l'importo minore e quindi
+per impostare la somma desiderata occorre prima cancellare importo di
+default e ridigitarlo. Il mio suggerimento è fare come Mostro nella
+fase di scelta oppure lasciare il campo libero». Aveva ragione: su un
+ordine con un intervallo il foglio «Quanto vuoi scambiare?» si apriva
+col MINIMO già scritto nel campo, cioè con una cifra che nessuno aveva
+scelto. Chi voleva il minimo risparmiava un tocco, tutti gli altri ne
+spendevano di più per toglierla.
+
+COSA SI È FATTO, solo in `miniapp.html`:
+- il campo nasce vuoto; la fascia sta nel segnaposto («50 – 276»,
+  attaccato al segno della moneta: «da 50 a 276» si leggeva «€da 50…»);
+- sotto, due tasti «Minimo · 50 €» e «Massimo · 276 €» (`mettiQuantoP2P`):
+  scrivono il capo nel campo e rifanno la stima, NON confermano.
+  «Continua» resta il solo gesto che sceglie, e il tetto del contanti si
+  guarda lì come su una cifra scritta a mano;
+- a campo vuoto la stima tace (prima avrebbe detto «Scegli una cifra
+  fra…» a chi non aveva ancora scritto niente); «Continua» a campo vuoto
+  lo dice col toast di sempre;
+- chi torna da «Cambia» ritrova ANCORA la sua cifra: quella l'ha scelta
+  lui, ed è la regola del 7 ott che resta.
+
+LIGHTNING E ON-CHAIN INSIEME. Il foglio è uno solo: lo usa la presa
+Lightning e la usa chi prende dalla rete on-chain (lo swap), che legge
+la stessa `p2pDettImporto`. Gli ordini del 2-di-3 on-chain non hanno un
+intervallo (una cifra sola, `euro_cent`), quindi lì non c'è niente da
+scegliere. Il validatore della fascia (`quantoValeP2P`) non è cambiato,
+e il coordinatore resta il giudice vero.
+
+STRADE SCARTATE. I tasti che prendono subito (un tocco su «Massimo» e
+via): salterebbero il conto della cifra, che dal 7 ott si vede PRIMA di
+premere. Una fila di cifre intermedie o un cursore: l'utente chiedeva il
+campo libero, e una fascia 20-1000 non ha «cifre tonde» giuste per tutti.
+
+PROVATO: `prove_p2p_dettaglio` (il campo vuoto, il segnaposto, i due
+tasti, e in node la stima che tace, i due capi scritti, il fuori fascia
+detto, il tasto senza ordine che non tocca niente),
+`prove_usdt_foglio_presa` (il foglio vero disegnato in node: vuoto,
+segnaposto, capi in € e in USDT), `prove_p2p_pubblica`; due scatti del
+foglio coi fogli di stile veri, chiaro e scuro. NON provato dal vivo sul
+telefono: la tastiera che si apre sul campo vuoto è quella di prima.

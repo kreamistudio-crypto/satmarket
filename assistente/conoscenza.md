@@ -202,7 +202,7 @@ Il prezzo di bitcoin nel libro: in cima al libro P2P, sotto i rettangoli «Novit
 
 Quanto si può per ordine nel P2P, per ora (fase beta): fino a 250 € negli scambi in Lightning e fino a 999 € in quelli on-chain (dal 16 novembre 2026; prima 500 €, e fino al 12 novembre 250 €). Lo stesso tetto di 999 € vale per gli acquisti on-chain del mercatino e per chi prende un ordine ricevendo sull'altra rete. Il foglio «Pubblica» lo scrive sotto la cifra e non lascia andare oltre.
 
-Il prezzo: gli ordini si scrivono in euro e i sats si contano al cambio del momento, per questo finché l'ordine è nel libro la cifra in sats ha il segno ≈. La cifra esatta si fissa quando l'ordine viene preso. Alcuni ordini hanno un intervallo («da 20 a 100 €»): lì scegli tu quanto.
+Il prezzo: gli ordini si scrivono in euro e i sats si contano al cambio del momento, per questo finché l'ordine è nel libro la cifra in sats ha il segno ≈. La cifra esatta si fissa quando l'ordine viene preso. Alcuni ordini hanno un intervallo («da 20 a 100 €»): lì scegli tu quanto. Nel foglio «Quanto vuoi scambiare?» il campo è vuoto (dal 17 novembre 2026; prima c'era già scritto il minimo e andava cancellato): si scrive la cifra, oppure si tocca «Minimo» o «Massimo» per metterla con un tocco, e poi «Continua».
 
 I tasti «Compra BTC» e «Vendi BTC» in cima al libro P2P sono due pillole (dal 16 novembre 2026, di giorno e di sera): quella accesa, verde per «Compra BTC» e corallo per «Vendi BTC», dice quale lato del libro stai guardando.
 
@@ -440,13 +440,18 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 - Nel P2P, libera i sats solo quando gli euro sono arrivati davvero sul tuo conto, non prima e non sulla fiducia di una ricevuta.
 
 <!-- pezzo libro-040 | libro | sempre -->
-## Libro · Parlare con una persona
+## Libro · Parlare con una persona (1/2)
 
 Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Supporto → «💬 Assistenza» (fino al 16 novembre 2026 stava in Profilo → Privacy). Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta.
 
 Se l'assistente non basta, sotto ogni sua risposta c'è il bottone «🙋 Parla con una persona»: ti dà la chat privata di Barattolo (t.me/barattolostore?direct), dove risponde una persona dello staff. Se quel link ti apre il canale invece della chat: le chat private dei canali ci sono solo nelle versioni recenti di Telegram, quindi aggiorna l'app e riprova dal telefono; oppure apri il canale @barattolostore e cerca in fondo alla pagina il tasto per mandare un messaggio. Se ancora non va, scrivilo a Tappo (@TappoBarattoloBot): passa lui il messaggio allo staff. Per un problema con un ordine o uno scambio preciso, scrivi lì il numero dell'ordine e cosa è successo. Per una lite su un ordine coi sats in garanzia, la strada giusta resta la disputa, dalla pagina dell'ordine o dello scambio.
 
 I livelli: ogni persona ha un livello che sale con gli XP (li danno solo gli acquisti e le vendite concluse, più una quota per chi inviti) e con il numero di affari conclusi: Nuovo arrivato, Bottega avviata, Mercante pratico, Mercante esperto, Maestro del banco. Lo trovi nel Profilo, nel cassetto «🎖 Livello e titolo». Dal 17 novembre 2026 i livelli si sfogliano come tessere, scorrendo col dito: sulla tua c'è l'anello con i tuoi XP sulla soglia del prossimo e quanto manca, i livelli già passati hanno la spunta, quelli davanti il lucchetto; sotto ci sono i vantaggi del livello che stai guardando, ✅ se già tuoi, 🔒 se ancora da sbloccare (sconto sul banner del negozio, link del negozio a scelta, il titolo da mettere sotto il nome, lo sconto sulle commissioni P2P dal livello 5). Il livello si vede anche sul tuo negozio e in classifica, accanto al titolo.
+
+<!-- pezzo libro-041 | libro | sempre -->
+## Libro · Parlare con una persona (2/2)
+
+La stradina degli obiettivi (dal 17 novembre 2026): nel Profilo, nel cassetto «🎖 Livello e titolo», c'è «🧭 La tua stradina», un tabellone lunghissimo che vede solo chi lo apre, dalla Terra (in basso) alla Luna (in cima), su una mappa disegnata in otto zone: «Primi passi», «Il mercatino», «Il porto», «Il bosco dei sats», «La scala d'oro», «La vetta», «In orbita», «Verso la Luna». Ogni casella è una competenza di Barattolo e di bitcoin, dalla più facile alla più difficile: mettere un articolo nel barattolo, la foto, seguire un venditore, attivare l'incasso automatico in Lightning (l'indirizzo Lightning nel Profilo); poi il primo annuncio, il primo acquisto, la prima recensione, collegare la chiave Nostr, invitare una persona col proprio link; poi la prima vendita, creare il wallet on-chain, verificare la chiave Nostr con una nota pubblica, la doppia configurazione Telegram + Nostr, il primo scambio P2P; poi le soglie che crescono (fino a 100 vendite e 10 milioni di sats incassati) e le caselle a tempo («Un mese con Barattolo», sei mesi, un anno, un anno e mezzo, due anni). L'ultima casella prima della Luna è «Arriva all'halving del 2028» (circa aprile 2028): nessuno arriva in cima prima di allora. Le caselle si spuntano da sole quando la cosa è fatta e diventano monete d'oro; Tappo è la tua pedina e cammina in fila: si ferma prima della prima casella che manca (quelle fatte più su restano accese) e dice qual è la prossima; toccando una casella, la scheda in basso porta dove si fa. I gradini della scala dei livelli sono barattoli che si accendono quando si sale di livello. Gli amici (i venditori che segui e chi ha concluso uno scambio con te) stanno come pedine sul loro livello, e in fondo c'è «La gara fra amici». Ci sono anche dei suoni, che si spengono col tasto 🔊 in cima. Le caselle NON danno XP e non danno sats: sono la mappa, non un premio. Chi ha scelto «Non mostrarmi in classifica» non compare fra gli amici di nessuno.
 
 <!-- pezzo schermata-001 | schermata -->
 ## Schermata «astepresto»
@@ -1049,6 +1054,7 @@ Livello e inviti▾
 🎖Livello e titolo ▾
 💌I tuoi inviti ▾
 🏅Distintivi ▾
+🧭La tua stradinaLe tappe fatte e quelle davanti, con Tappo che avanza.›
 Avvisi e aspetto▾
 🔔Avvisi▾
 🌗Aspetto▾
@@ -1930,6 +1936,14 @@ leva: nessuna
 pubblico: sì
 
 <!-- pezzo novita-068 | novita -->
+## Novità · 2026-11-17 · stradina-obiettivi
+
+frase: Nel Profilo c'è «🧭 La tua stradina»: un tabellone lunghissimo dalla Terra alla Luna, su una mappa in otto zone, che vedi solo tu, fino all'halving del 2028. Ogni casella è una competenza (l'incasso automatico in Lightning, il wallet on-chain, la doppia configurazione Telegram + Nostr, il primo acquisto…): fatta, diventa una moneta d'oro e Tappo avanza. I tuoi amici sono pedine sul tabellone.
+dove: Profilo → «🎖 Livello e titolo» → «🧭 La tua stradina».
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-069 | novita -->
 ## Novità · 2026-11-17 · contante-per-posta
 
 frase: Nel P2P c'è un metodo in più, «Contante per posta»: chi compra sats spedisce le banconote a chi le vende, in una busta sigillata nascosta in un pacco, con un servizio tracciato. Le regole sono scritte nello scambio: chi spedisce filma l'imballo col numero di tracciamento in vista, chi riceve filma l'apertura prima di liberare i sats, e chi prende l'ordine blocca una piccola cauzione.
@@ -1937,7 +1951,7 @@ dove: P2P → «Pubblica» → «Altri metodi ▾» → «Contante per posta»; 
 leva: P2P_POSTA_ATTIVO (nuova, spenta di serie: in produzione resta spenta per scelta di Andrea, accesa solo sul collaudo)
 pubblico: no
 
-<!-- pezzo novita-069 | novita -->
+<!-- pezzo novita-070 | novita -->
 ## Novità · 2026-11-17 · chat-onchain
 
 frase: Anche negli scambi P2P on-chain adesso c'è la chat fra chi compra e chi vende, come nel Lightning: cifrata, con foto e PDF, da quando l'ordine è preso a quando i sats vengono liberati. Quando l'altra persona ti scrive, il bot te lo dice col tasto che apre dritto la chat; in una disputa il moderatore la può leggere, e a scambio finito si cancella.
@@ -1945,7 +1959,7 @@ dove: la pagina di uno scambio on-chain preso, riquadro «💬 Chat con …» in
 leva: P2P_CHAT_SCAMBIO (la stessa della chat del Lightning, accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-070 | novita -->
+<!-- pezzo novita-071 | novita -->
 ## Novità · 2026-11-17 · serie-giorni
 
 frase: Nel tuo Profilo c'è una fiamma che conta quanti giorni di fila hai aperto Barattolo, col tuo record e gli ultimi sette giorni. Basta entrare una volta al giorno. Se salti un giorno riparte da 1 e il record resta. Non dà punti né premi e la vedi solo tu: è solo la soddisfazione di non fermarla.
@@ -1953,7 +1967,7 @@ dove: Profilo, nel riquadro col tuo nome (riga «5 giorni di fila · record 12»
 leva: SERIE_GIORNI_ATTIVA (accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-071 | novita -->
+<!-- pezzo novita-072 | novita -->
 ## Novità · 2026-11-17 · premi-fedelta
 
 frase: I negozi possono premiare chi torna a comprare: nel Profilo, «🎀 Premi fedeltà», chi vende scrive fino a quattro soglie in euro col suo regalo («da 100 € la borsa, da 200 € la tazza»). Barattolo conta quanto ogni cliente ha speso lì e, passata la soglia, il premio compare sul suo ordine successivo: il venditore lo mette nel pacco. Sulla pagina del negozio vedi i premi e quanto hai già speso.
@@ -1961,7 +1975,7 @@ dove: Profilo → «🎀 Premi fedeltà»; la pagina di un negozio, riga «🎀 
 leva: PREMI_FEDELTA_ATTIVI (accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-072 | novita -->
+<!-- pezzo novita-073 | novita -->
 ## Novità · 2026-11-17 · onchain-rimborso-liscio
 
 frase: Rinunciare a uno scambio P2P on-chain è più semplice. Chi vende bitcoin scrive dove riavere i sats nel foglio stesso, prima di bloccarli. Se quell'indirizzo manca, il «Rinuncio» di chi compra non dà più errore: viene registrato e il bot avvisa chi vende col tasto che apre lo scambio. E se firmi da un dispositivo senza la chiave del wallet, Barattolo la cerca da solo o ti chiede lì le 12 parole.
@@ -1969,7 +1983,7 @@ dove: P2P on-chain: il foglio «🔒 Blocca i sats» col riquadro «Dove tornano
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-073 | novita -->
+<!-- pezzo novita-074 | novita -->
 ## Novità · 2026-11-17 · onchain-tempo-bonifico
 
 frase: Negli scambi P2P on-chain in euro e franchi il tempo per pagare scende da 72 a 24 ore, come per USDT e monete. In cambio, da «Ho inviato» chi vende ha 48 ore per veder arrivare il bonifico e liberare i sats: se passano senza rilascio, il bot avvisa tutti e due e indica la disputa. Niente si annulla da solo: i bitcoin restano nel deposito di garanzia.
@@ -1977,7 +1991,7 @@ dove: P2P on-chain: la card in «I miei scambi» e la riga «Tempo per pagare» 
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-074 | novita -->
+<!-- pezzo novita-075 | novita -->
 ## Novità · 2026-11-17 · annullo-registrato
 
 frase: Se prendi un ordine P2P, tocchi «Annulla» e l'annullo non arriva al coordinatore, alla scadenza del tempo non ti viene più contato uno scambio non completato: il bot te lo scrive nel messaggio.
@@ -1985,10 +1999,18 @@ dove: P2P Lightning: la pagina dello scambio appena preso, «✕ Annulla» e «S
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-075 | novita -->
+<!-- pezzo novita-076 | novita -->
 ## Novità · 2026-11-17 · onchain-ritiro
 
 frase: Negli scambi P2P on-chain, chi si ritira dopo che l'altro ha già bloccato i sats si vede contare uno «scambio non completato», come negli scambi Lightning, e chi aveva bloccato i sats può lasciargli una recensione. Nessuna cauzione e nessuna penale in denaro. Il foglio di «Rinuncio» lo dice prima della firma. Non conta se chi vende non aveva ancora scritto dove pagare.
 dove: P2P on-chain: il foglio «↩️ Rinunci allo scambio?»; la pagina dello scambio rimborsato, con la frase «scambio non completato» e il riquadro «⭐ Lascia una recensione» per chi aveva depositato; il messaggio del bot «Scambio on-chain annullato».
 leva: nessuna
 pubblico: sì
+
+<!-- pezzo novita-077 | novita -->
+## Novità · 2026-11-17 · quanto-vuoto
+
+frase: Quando prendi un ordine P2P con un intervallo (per esempio da 50 a 276 €), il campo dell'importo ora è vuoto: scrivi subito la cifra che vuoi, senza cancellare il minimo che prima c'era già scritto. Sotto ci sono i tasti «Minimo» e «Massimo» per metterla con un tocco.
+dove: P2P: tocca un ordine con un intervallo, poi «Scegli»; foglio «Quanto vuoi scambiare?».
+leva: nessuna
+pubblico: no

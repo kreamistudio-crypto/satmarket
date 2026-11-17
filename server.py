@@ -111528,6 +111528,494 @@ def asset_p2p_banner_fee_senza_barra():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+# ------------- LA STRADINA DEGLI OBIETTIVI (17 nov 2026) -------------
+# Una schermata PRIVATA del Profilo, a serpentone come un tabellone da
+# gioco: le tappe fatte, quella davanti, e Tappo-pedina sull'ultima
+# fatta. Spunto di Andrea: i programmi fedelta' delle app e il gioco da
+# tavolo To The Mooon (la pista dalla Terra alla Luna). Le tappe sono
+# FATTI GIA' SCRITTI ALTROVE (un annuncio, un acquisto, un indirizzo
+# Lightning, gli inviti, il livello): qui si leggono e si mettono in
+# fila, non nasce nessuna tabella e nessuna tappa si «spunta a mano».
+# NIENTE XP DALLE TAPPE (regola «GLI XP», ago 2026: gli XP sono il
+# commercio e nient'altro; Andrea 17 nov: «senza XP»): una tappa fatta
+# e' una spunta, non una moneta. I gradini della scala sono le tappe
+# grandi, e l'ultima — il Maestro — e' la Luna.
+# «Impara bitcoin»: una tappa-porta verso un partner dell'educazione
+# (Andrea, 17 nov: Villaggio Bitcoin, da proporre a loro; Bitvero
+# scartato per non chiedere un favore in piu'): INERTE finche' nel
+# config non c'e' il link — senza link la tappa non esiste, e nessuno
+# viene nominato.
+try:
+    from config import IMPARA_BITCOIN_LINK
+except ImportError:
+    IMPARA_BITCOIN_LINK = ""
+try:
+    from config import IMPARA_BITCOIN_NOME
+except ImportError:
+    IMPARA_BITCOIN_NOME = "Villaggio Bitcoin"
+STRADINA_AMICI_MAX = 12      # quanti amici si mostrano, i piu' alti
+
+# LE ZONE DEL TABELLONE, dal basso (la Terra) verso l'alto (la Luna):
+# ognuna ha il suo pezzo di mappa disegnato (assets/stradina/) e finisce
+# con un GRADINO della scala. Nomi di casa, mai quelli del gioco.
+STRADINA_ZONE = (
+    {"id": "primi", "emoji": "🫙", "nome": "Primi passi"},
+    {"id": "mercatino", "emoji": "🧺", "nome": "Il mercatino"},
+    {"id": "porto", "emoji": "⚓", "nome": "Il porto"},
+    {"id": "bosco", "emoji": "🌲", "nome": "Il bosco dei sats"},
+    {"id": "scala", "emoji": "🪜", "nome": "La scala d'oro"},
+    {"id": "vetta", "emoji": "🏔", "nome": "La vetta"},
+    {"id": "orbita", "emoji": "🛰", "nome": "In orbita"},
+    {"id": "luna", "emoji": "🌕", "nome": "Verso la Luna"},
+)
+# dove stanno i gradini della scala dei livelli: in fondo a queste zone
+# (il primo gradino chiude il mercatino, l'ultimo — la Luna — l'ultima
+# zona); se la scala ne avesse di piu', i restanti vanno nell'ultima
+STRADINA_ZONE_GRADINO = (1, 3, 5, 7)
+# L'HALVING DEL 2028 (Andrea, 17 nov: «deve essere il più lungo possibile,
+# per arrivare all'anno dell'halving»): l'ultima casella prima della Luna
+# si accende solo da quel giorno, quindi nessuno arriva in cima prima,
+# nemmeno chi vende tantissimo. La data e' una STIMA (il blocco
+# 1.050.000 cade intorno a meta' aprile 2028, a dieci minuti l'uno):
+# una casella, non un orologio della catena.
+STRADINA_HALVING_2028 = 1839369600     # 2028-04-16 00:00 UTC
+
+# LE CASELLE A SOGLIA, per zona: (id, emoji, nome, fatto da contare,
+# soglia, vista dove si fa). Ogni conto e' un FATTO GIA' SCRITTO altrove:
+# qui si legge e si confronta, non si timbra niente. Le soglie crescono
+# di zona in zona, cosi' il tabellone e' lungo come una partita vera.
+# LE CASELLE SONO COMPETENZE (Andrea, 17 nov 13:30: «gamification... hai
+# impostato il wallet on chain, l'incasso automatico su lightning, la
+# doppia configurazione con Nostr, il primo acquisto»): ogni casella e'
+# una cosa che si sa FARE su Barattolo e con bitcoin, e Tappo — il tuo
+# avatar — le percorre. Nomi uguali a quelli che l'utente legge nell'app
+# («Incasso automatico attivo» = l'indirizzo Lightning; «Doppia
+# cittadinanza» = il distintivo di Telegram+Nostr).
+STRADINA_CASELLE = (
+    # IN ORDINE DI FATICA (Andrea, 17 nov: «parti dalle cose più semplici,
+    # basilari, fino alle più difficili: progressiva»). Prima i gesti a
+    # costo zero, poi il primo sats speso, poi le competenze da bitcoiner,
+    # poi le soglie e il tempo, fino all'halving del 2028. Una casella che
+    # dipende da altri (una vendita, una recensione che vuole un acquisto)
+    # viene DOPO quella che la rende possibile: Tappo cammina in fila.
+    # zona 0, «Primi passi»: gesti da un minuto, senza spendere niente
+    (0, "barattolo", "🫙", "Metti un articolo nel barattolo", "preferiti", 1, "esplora"),
+    (0, "foto", "🖼", "Metti la tua foto", "foto", 1, "profilo"),
+    (0, "segui", "👀", "Segui un venditore", "seguiti", 1, "esplora"),
+    (0, "wallet", "⚡", "Attiva l'incasso automatico in Lightning", "wallet", 1, "profilo"),
+    # zona 1, «Il mercatino»: le prime volte
+    (1, "annuncio", "📦", "Pubblica il primo annuncio", "annunci", 1, "vendi"),
+    (1, "acquisto", "🛒", "Fai il primo acquisto", "acquisti", 1, "esplora"),
+    (1, "recensione", "⭐", "Lascia una recensione", "recensioni", 1, "affari"),
+    (1, "nostr", "🟣", "Collega la tua chiave Nostr", "nostr", 1, "profilo"),
+    (1, "invito", "💌", "Invita una persona col tuo link", "inviti", 1, "profilo"),
+    # zona 2, «Il porto»: le competenze da bitcoiner
+    (2, "vendita", "🤝", "Concludi la prima vendita", "vendite", 1, "vendi"),
+    (2, "onchain", "₿", "Crea il tuo wallet on-chain", "onchain", 1, "profilo"),
+    (2, "nostr_verificata", "✅", "Verifica la chiave Nostr con una nota pubblica", "nostr_verificata", 1, "profilo"),
+    (2, "doppia", "🔗", "Fai la doppia configurazione Telegram + Nostr", "doppia", 1, "profilo"),
+    (2, "p2p1", "🔁", "Fai il primo scambio P2P", "p2p", 1, "p2p"),
+    (2, "mese", "⏳", "Un mese con Barattolo", "giorni", 30, "profilo"),
+    (2, "annunci5", "📦", "Metti 5 annunci", "annunci", 5, "vendi"),
+    (2, "acquisti3", "🛍", "Fai 3 acquisti", "acquisti", 3, "esplora"),
+    # zona 3, «Il bosco dei sats»
+    (3, "vendite3", "🤝", "Concludi 3 vendite", "vendite", 3, "vendi"),
+    (3, "recensioni3", "⭐", "Lascia 3 recensioni", "recensioni", 3, "affari"),
+    (3, "inviti3", "💌", "Invita 3 persone", "inviti", 3, "profilo"),
+    (3, "incasso10k", "💰", "Incassa 10.000 sats", "incassati", 10_000, "vendi"),
+    (3, "p2p3", "🔁", "Completa 3 scambi P2P", "p2p", 3, "p2p"),
+    (3, "acquisti5", "🛍", "Fai 5 acquisti", "acquisti", 5, "esplora"),
+    (3, "vendite5", "🤝", "Concludi 5 vendite", "vendite", 5, "vendi"),
+    (3, "annunci10", "🏪", "Metti 10 annunci", "annunci", 10, "vendi"),
+    # zona 4, «La scala d'oro»
+    (4, "seimesi", "⏳", "Sei mesi con Barattolo", "giorni", 180, "profilo"),
+    (4, "incasso50k", "💰", "Incassa 50.000 sats", "incassati", 50_000, "vendi"),
+    (4, "acquisti10", "🛍", "Fai 10 acquisti", "acquisti", 10, "esplora"),
+    (4, "recensioni5", "⭐", "Lascia 5 recensioni", "recensioni", 5, "affari"),
+    (4, "vendite10", "🤝", "Concludi 10 vendite", "vendite", 10, "vendi"),
+    (4, "inviti5", "💌", "Invita 5 persone", "inviti", 5, "profilo"),
+    (4, "p2p5", "🔁", "Completa 5 scambi P2P", "p2p", 5, "p2p"),
+    (4, "annunci15", "🏪", "Metti 15 annunci", "annunci", 15, "vendi"),
+    (4, "incasso100k", "💰", "Incassa 100.000 sats", "incassati", 100_000, "vendi"),
+    # zona 5, «La vetta»
+    (5, "anno", "⏳", "Un anno con Barattolo", "giorni", 365, "profilo"),
+    (5, "recensioni10", "🌟", "Lascia 10 recensioni", "recensioni", 10, "affari"),
+    (5, "acquisti25", "🛍", "Fai 25 acquisti", "acquisti", 25, "esplora"),
+    (5, "vendite25", "🏆", "Concludi 25 vendite", "vendite", 25, "vendi"),
+    (5, "inviti10", "💌", "Invita 10 persone", "inviti", 10, "profilo"),
+    (5, "p2p10", "🔁", "Completa 10 scambi P2P", "p2p", 10, "p2p"),
+    (5, "annunci25", "🏬", "Metti 25 annunci", "annunci", 25, "vendi"),
+    (5, "incasso250k", "💰", "Incassa 250.000 sats", "incassati", 250_000, "vendi"),
+    (5, "incasso500k", "💰", "Incassa 500.000 sats", "incassati", 500_000, "vendi"),
+    # zona 6, «In orbita»
+    (6, "diciottomesi", "⏳", "Un anno e mezzo con Barattolo", "giorni", 540, "profilo"),
+    (6, "recensioni25", "🌟", "Lascia 25 recensioni", "recensioni", 25, "affari"),
+    (6, "acquisti50", "🛍", "Fai 50 acquisti", "acquisti", 50, "esplora"),
+    (6, "vendite50", "🏆", "Concludi 50 vendite", "vendite", 50, "vendi"),
+    (6, "inviti25", "💌", "Invita 25 persone", "inviti", 25, "profilo"),
+    (6, "p2p20", "🔁", "Completa 20 scambi P2P", "p2p", 20, "p2p"),
+    (6, "annunci50", "🏬", "Metti 50 annunci", "annunci", 50, "vendi"),
+    (6, "incasso1m", "💎", "Incassa 1.000.000 di sats", "incassati", 1_000_000, "vendi"),
+    (6, "incasso2m", "💎", "Incassa 2.500.000 sats", "incassati", 2_500_000, "vendi"),
+    # zona 7, «Verso la Luna»: l'ultima casella e' l'halving del 2028
+    (7, "dueanni", "⏳", "Due anni con Barattolo", "giorni", 730, "profilo"),
+    (7, "recensioni50", "🌟", "Lascia 50 recensioni", "recensioni", 50, "affari"),
+    (7, "acquisti100", "🛍", "Fai 100 acquisti", "acquisti", 100, "esplora"),
+    (7, "vendite100", "🏆", "Concludi 100 vendite", "vendite", 100, "vendi"),
+    (7, "inviti50", "💌", "Invita 50 persone", "inviti", 50, "profilo"),
+    (7, "p2p50", "🔁", "Completa 50 scambi P2P", "p2p", 50, "p2p"),
+    (7, "incasso10m", "💎", "Incassa 10.000.000 di sats", "incassati", 10_000_000, "vendi"),
+    (7, "halving", "🌗", "Arriva all'halving del 2028", "halving", 1, "esplora"),
+)
+
+
+# LE FAMIGLIE DELLE ICONE: il «fatto» di ogni casella (le soglie della
+# stessa famiglia hanno la stessa icona) piu' il benvenuto. Ognuna ha il
+# suo `ico-<nome>.webp` nella whitelist qui sotto.
+STRADINA_ICONE = ("benvenuto",) + tuple(dict.fromkeys(
+    c[4] for c in STRADINA_CASELLE))
+
+
+def fatti_stradina(con, tg_id: int) -> dict:
+    """I NUMERI VERI di chi legge, letti e basta: quel che serve alle
+    caselle. Una lettura che manca (una colonna di un cantiere parallelo,
+    una tabella su un database vecchio) vale zero, mai un errore: la
+    stradina e' una pagina di contorno e non deve mai chiudere il
+    Profilo. I sats incassati li aggiunge chi chiama (`numeri_negozio`)."""
+    u = con.execute("SELECT * FROM utenti WHERE tg_id=?", (tg_id,)).fetchone()
+    chiavi = set(u.keys()) if u else set()
+
+    def campo(nome):
+        return u[nome] if u is not None and nome in chiavi else None
+
+    def conta(sql, *a):
+        try:
+            return int(con.execute(sql, a).fetchone()[0] or 0)
+        except Exception:
+            return 0
+    foto = (campo("avatar") or "").strip() and campo("avatar_scelta") != "nessuna"
+    f = {"xp": int(campo("xp") or 0),
+         "vendite": int(campo("vendite_ok") or 0),
+         "acquisti": int(campo("acquisti_ok") or 0),
+         "wallet": 1 if (campo("ln_address") or "").strip() else 0,
+         "foto": 1 if foto else 0,
+         "nostr": 1 if (campo("npub") or "").strip() else 0,
+         # il distintivo «Nostrano»: la nota di verifica trovata sui relay
+         "nostr_verificata": 1 if campo("npub_verificata") else 0,
+         # il distintivo «Doppia cittadinanza»: un account Telegram (id
+         # positivo) in cui si entra anche con la chiave Nostr
+         "doppia": 1 if (tg_id > 0 and (campo("npub_accesso") or "").strip())
+                   else 0,
+         # il wallet on-chain: il wallet di Barattolo (l'impronta del seme)
+         # o una xpub di un wallet proprio. Tabelle di altri cantieri: se
+         # mancano vale zero.
+         "onchain": 1 if (conta("SELECT COUNT(*) FROM wallet_unico WHERE tg_id=?",
+                                tg_id)
+                          or conta("SELECT COUNT(*) FROM onchain_xpub WHERE tg_id=?",
+                                   tg_id)) else 0,
+         "annunci": conta("SELECT COUNT(*) FROM annunci WHERE venditore_id=? "
+                          "AND stato!='rimosso'", tg_id),
+         "preferiti": conta("SELECT COUNT(*) FROM preferiti WHERE tg_id=?",
+                            tg_id),
+         "recensioni": conta("SELECT COUNT(*) FROM feedback WHERE da_tg_id=?",
+                             tg_id),
+         "seguiti": conta("SELECT COUNT(*) FROM venditori_seguiti WHERE tg_id=? "
+                          "AND venditore_id!=?", tg_id, tg_id),
+         "p2p": conta("SELECT COUNT(*) FROM p2p_esiti WHERE tg_id=? "
+                      "AND esito='completato'", tg_id),
+         "incassati": 0, "inviti": 0, "tappo": 0,
+         # da quanti giorni e' con noi (la prima entrata), e se e' gia'
+         # arrivato il giorno dell'halving del 2028
+         "giorni": (max(0, int((time.time() - int(campo("registrato") or 0))
+                               // 86400))
+                    if int(campo("registrato") or 0) > 0 else 0),
+         "halving": 1 if time.time() >= STRADINA_HALVING_2028 else 0}
+    try:
+        f["inviti"] = int((stato_inviti(con, tg_id, campo("registrato") or 0)
+                           or {}).get("persone") or 0)
+    except Exception:
+        pass
+    # il cappellino della Caccia a Tappo (cantiere parallelo, 17 nov):
+    # la colonna puo' non esserci ancora, e allora la casella e' da fare
+    f["tappo"] = 1 if (campo("tappo_oggetto") or "").strip() else 0
+    return f
+
+
+def tappe_stradina(f: dict, scala: list, impara_link: str = "",
+                   impara_nome: str = "", gioco: bool = False,
+                   missioni=None, superate=None) -> list:
+    """PURA: dai numeri alle caselle del tabellone, dal basso in alto.
+    Ogni casella porta `zona` (indice di STRADINA_ZONE), `fatto`
+    (True/False; None = una porta che non si spunta, come «impara»),
+    `vai` (la vista dell'app dove si fa) e, dove la soglia e' piu' di
+    uno, `n` su `di`. Ogni zona finisce con un GRADINO della scala (le
+    stesse soglie del carosello): l'ultimo, il Maestro, e' la Luna.
+    LE MISSIONI DI TAPPO (Andrea, 17 nov: «ogni tanto nel tabellone devi
+    giocare con Tappo per proseguire»): le studia e le costruisce il
+    cantiere del gioco di Tappo; qui arrivano come elenco (`missioni`:
+    {id, emoji, nome, zona}) con l'insieme di quelle gia' `superate`, e
+    stanno nella loro zona subito prima del gradino. Senza elenco non
+    compaiono."""
+    affari = int(f.get("vendite", 0)) + int(f.get("acquisti", 0))
+    liv = livello_utente(int(f.get("xp", 0)), affari)
+    t = []
+
+    def tappa(zona, tid, emoji, nome, fatto, vai, n=None, di=None, link="",
+              tipo="casella", icona=""):
+        t.append({"id": tid, "zona": zona, "emoji": emoji, "nome": nome,
+                  "fatto": fatto, "vai": vai, "n": n, "di": di,
+                  "link": link, "tipo": tipo, "icona": icona})
+    gradini = [g for g in (scala or []) if int(g.get("numero") or 0) >= 2]
+    ultima_zona = len(STRADINA_ZONE) - 1
+    for z in range(len(STRADINA_ZONE)):
+        if z == 0:
+            tappa(0, "benvenuto", "👋", "Benvenuto in Barattolo", True,
+                  "esplora", icona="benvenuto")
+        inizio = len(t)
+        for (zz, tid, emoji, nome, chiave, soglia, vai) in STRADINA_CASELLE:
+            if zz != z:
+                continue
+            v = int(f.get(chiave, 0) or 0)
+            conto = soglia > 1
+            tappa(z, tid, emoji, nome, v >= soglia, vai,
+                  min(v, soglia) if conto else None,
+                  soglia if conto else None, icona=chiave)
+        # «Gioca con Tappo» serve solo finche' il gioco non porta le sue
+        # missioni: con le missioni l'ingresso al gioco sono loro, e una
+        # casella in piu' sarebbe un secondo cancello sulla stessa porta
+        if z == 0 and gioco and not missioni:
+            tappa(0, "gioco", "🎩", "Gioca con Tappo", bool(f.get("tappo")),
+                  "caccia")
+        if z == 0 and (impara_link or "").startswith("https://"):
+            tappa(0, "impara", "📖",
+                  f"Impara bitcoin con {impara_nome or 'Villaggio Bitcoin'}", None, "",
+                  link=impara_link, tipo="porta")
+        # LE MISSIONI DELLA ZONA (piu' d'una dal 17 nov: il gioco ne porta
+        # tre per zona, sempre piu' difficili, col campo `ordine`):
+        # SPARSE fra le caselle, l'ultima subito prima del gradino; ognuna
+        # e' un cancello, perche' Tappo cammina in fila
+        sue = []
+        for pos, m in enumerate(missioni or []):
+            try:
+                if int(m.get("zona", -1)) != z or not m.get("id"):
+                    continue
+                ordine = int(m.get("ordine") or 0)
+            except (TypeError, ValueError, AttributeError):
+                continue
+            sue.append((ordine, pos, m))
+        sue.sort(key=lambda x: (x[0], x[1]))
+        if sue:
+            caselle = t[inizio:]
+            del t[inizio:]
+            dopo = {}
+            for k in range(len(sue)):
+                dopo.setdefault(-(-(k + 1) * len(caselle) // len(sue)), []).append(k)
+            for j in range(len(caselle) + 1):
+                if j:
+                    t.append(caselle[j - 1])
+                for k in dopo.get(j, []):
+                    m = sue[k][2]
+                    mid = str(m["id"])
+                    tappa(z, f"missione_{mid}", str(m.get("emoji") or "🎯"),
+                          str(m.get("nome") or "Missione con Tappo"),
+                          mid in (superate or set()),
+                          str(m.get("vai") or "caccia"), tipo="missione")
+                    t[-1]["missione"] = mid
+        # i gradini: in fondo alle zone di STRADINA_ZONE_GRADINO, uno a
+        # testa; se la scala ne avesse di piu', i restanti nell'ultima
+        k = (STRADINA_ZONE_GRADINO.index(z)
+             if z in STRADINA_ZONE_GRADINO else None)
+        miei = ([] if k is None else gradini[k:] if z == ultima_zona
+                else gradini[k:k + 1])
+        for g in miei:
+            n = int(g["numero"])
+            luna = g is gradini[-1]
+            tappa(z, f"livello_{n}", "🌕" if luna else "🎖",
+                  f"Diventa {g['nome']}", int(liv["numero"]) >= n, "profilo",
+                  min(int(f.get("xp", 0)), int(g["xp"])), int(g["xp"]),
+                  tipo="luna" if luna else "gradino")
+    return t
+
+
+def emoji_oggetto_tappo(oggetto: str) -> str:
+    """Il cappellino sulla pedina: l'id dell'oggetto vinto nella Caccia a
+    Tappo (cantiere parallelo, 17 nov) tradotto nella sua emoji. L'elenco
+    `GIOCO_TAPPO_OGGETTI` arriva da quel cantiere e qui puo' non esserci
+    ancora, o avere una forma diversa (dizionario id->emoji, dizionario
+    di schede, lista di schede): si prova con garbo e si torna '' se
+    non si trova, mai un errore. Un id che non e' in elenco non si
+    mostra: sulla pedina va un'emoji, non un codice."""
+    oggetto = (oggetto or "").strip()
+    if not oggetto:
+        return ""
+    elenco = globals().get("GIOCO_TAPPO_OGGETTI")
+    try:
+        if isinstance(elenco, dict):
+            v = elenco.get(oggetto)
+            if isinstance(v, str):
+                return v
+            if isinstance(v, dict):
+                return str(v.get("emoji") or "")
+        elif isinstance(elenco, (list, tuple)):
+            for v in elenco:
+                if isinstance(v, dict) and v.get("id") == oggetto:
+                    return str(v.get("emoji") or "")
+    except Exception:
+        pass
+    return ""
+
+
+def amici_stradina(con, tg_id: int, adesso: int) -> list:
+    """Gli amici: i venditori che segui e chi ha concluso un affare con
+    te. SOLO quel che e' gia' pubblico sulla loro pagina (nome, faccia,
+    negozio, livello): niente XP, niente sats, mai chi segue chi. Chi ha
+    detto «Non mostrarmi in classifica» non compare, come la'."""
+    ids = {int(r[0]) for r in con.execute(
+        "SELECT venditore_id FROM venditori_seguiti WHERE tg_id=?", (tg_id,))}
+    for r in con.execute(
+            "SELECT venditore_id, compratore_id FROM ordini "
+            "WHERE stato='released' AND prova=0 "
+            "AND (venditore_id=? OR compratore_id=?)", (tg_id, tg_id)):
+        ids.add(int(r[0])); ids.add(int(r[1]))
+    ids.discard(int(tg_id))
+    ids = sorted(ids)[:40]
+    if not ids:
+        return []
+    segni = ",".join("?" * len(ids))
+    nascosti = {int(r[0]) for r in con.execute(
+        f"SELECT tg_id FROM utenti WHERE classifica_nascosta=1 "
+        f"AND tg_id IN ({segni})", ids)}
+    volti = _volti_persone(con, [i for i in ids if i not in nascosti], adesso)
+    amici = [{"nome": v["nome"], "avatar": v["avatar"],
+              "negozio": v["negozio"], "livello": v["livello"],
+              "livello_numero": int(v["livello_numero"] or 1)}
+             for v in volti.values()]
+    amici.sort(key=lambda a: (-a["livello_numero"], a["nome"].lower()))
+    return amici[:STRADINA_AMICI_MAX]
+
+
+@app.get("/api/me/stradina")
+def mia_stradina(x_tg_init_data: str = Header(""),
+                 barattolo_sessione: str = Cookie("")):
+    """LA PORTA DELLA STRADINA: le tappe, il livello, i sats e gli amici
+    di CHI BUSSA, mai di un altro (il tg_id viene dall'identita', non da
+    un parametro). L'anonimo prende il 401 di `verifica_utente`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        adesso = int(time.time())
+        f = fatti_stradina(con, user["id"])
+        sats = {"incassati": 0, "spesi": 0}
+        try:
+            v = con.execute(_CAMPI_NUMERI + "WHERE tg_id=?",
+                            (user["id"],)).fetchone()
+            if v:
+                n = numeri_negozio(con, v, adesso)
+                sats = {"incassati": int(n.get("sats_tot") or 0),
+                        "spesi": int(n.get("sats_acq_tot") or 0)}
+        except Exception:
+            pass
+        f["incassati"] = sats["incassati"]
+        gioco = bool(globals().get("GIOCO_TAPPO_ATTIVO"))
+        # le missioni del gioco di Tappo (cantiere parallelo): l'elenco e
+        # la lettura di quelle superate arrivano da li', e finche' non ci
+        # sono il tabellone resta senza caselle-missione
+        missioni, superate = [], set()
+        if gioco and isinstance(globals().get("MISSIONI_TAPPO"), (list, tuple)):
+            missioni = [m for m in globals()["MISSIONI_TAPPO"]
+                        if isinstance(m, dict)]
+            try:
+                superate = set(globals()["missioni_superate"](con, user["id"]))
+            except Exception:
+                superate = set()
+        tappe = tappe_stradina(f, scala_livelli(), IMPARA_BITCOIN_LINK,
+                               IMPARA_BITCOIN_NOME, gioco, missioni, superate)
+        liv = livello_utente(f["xp"], f["vendite"] + f["acquisti"])
+        try:
+            amici = amici_stradina(con, user["id"], adesso)
+        except Exception:
+            amici = []
+        tappo = ""
+        try:
+            r = con.execute("SELECT tappo_oggetto FROM utenti WHERE tg_id=?",
+                            (user["id"],)).fetchone()
+            tappo = (r[0] or "") if r else ""
+        except Exception:
+            tappo = ""
+        return {"tappe": tappe, "zone": list(STRADINA_ZONE),
+                "livello": liv, "sats": sats,
+                "amici": amici, "tappo_oggetto": tappo,
+                "tappo_emoji": emoji_oggetto_tappo(tappo),
+                "impara": {"nome": IMPARA_BITCOIN_NOME,
+                           "link": IMPARA_BITCOIN_LINK
+                           if (IMPARA_BITCOIN_LINK or "").startswith("https://")
+                           else ""}}
+    finally:
+        con.close()
+
+
+# I CINQUE PEZZI DELLA MAPPA della stradina (17 nov 2026): uno per zona,
+# disegnati in Google Flow senza scritte ne' personaggi (la strada, le
+# caselle e Tappo li disegna la pagina sopra), WebP verticali. Il nome
+# arriva dal client, quindi whitelist a tupla come FILE_CARRELLO; un
+# pezzo che manca e' un 404 e la pagina tiene il suo ripiego dipinto.
+FILE_MAPPA_STRADINA = ("zona1.webp", "zona2.webp", "zona3.webp",
+                       "zona4.webp", "zona5.webp",
+                       # Tappo-pedina: il Tappo ufficiale (il robot col
+                       # barattolo di monete), ritagliato tondo, 192 px
+                       "tappo-pedina.webp",
+                       # LE ICONE DELLE CASELLE (Andrea, 17 nov: «non le
+                       # emoji classiche, personalizzale in stile
+                       # Barattolo»): una per famiglia (`STRADINA_ICONE`),
+                       # disegnate in Flow come la mappa, 160 px. Una che
+                       # manca e' un 404 e la casella tiene la sua emoji.
+                       "ico-benvenuto.webp", "ico-preferiti.webp",
+                       "ico-foto.webp", "ico-seguiti.webp",
+                       "ico-wallet.webp", "ico-annunci.webp",
+                       "ico-acquisti.webp", "ico-recensioni.webp",
+                       "ico-inviti.webp", "ico-nostr.webp",
+                       "ico-vendite.webp", "ico-onchain.webp",
+                       "ico-nostr_verificata.webp", "ico-doppia.webp",
+                       "ico-p2p.webp", "ico-incassati.webp",
+                       "ico-giorni.webp", "ico-halving.webp",
+                       # i tre pezzi di mappa nuovi (8 zone, 17 nov)
+                       "zona6.webp", "zona7.webp", "zona8.webp")
+
+
+@app.get("/assets/stradina/{nome}")
+def asset_mappa_stradina(nome: str):
+    if nome not in FILE_MAPPA_STRADINA:
+        raise HTTPException(404, "immagine non trovata")
+    percorso = os.path.join("assets", "stradina", nome)
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "immagine non trovata")
+    return FileResponse(percorso, media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+# I SUONI della stradina e del gioco di Tappo (17 nov 2026, Andrea: «per i
+# suoni fai tu, puoi scaricarli su Artlist»): effetti brevi in MP3, uno per
+# nome, gli stessi nomi di `SUONI_FILE` nel client. Whitelist a tupla come
+# la mappa; uno che manca e' un 404 e il client torna al bip sintetizzato.
+FILE_SUONI_STRADINA = ("tocco.mp3", "passo.mp3", "traguardo.mp3",
+                       "moneta.mp3", "chiusa.mp3", "magia.mp3", "via.mp3",
+                       "apri.mp3", "salto.mp3", "atterra.mp3",
+                       "raccogli.mp3", "giusto.mp3", "sbagliato.mp3",
+                       "stella.mp3", "vittoria.mp3", "sconfitta.mp3",
+                       "tarlo.mp3", "gazza.mp3", "porta.mp3", "conto.mp3")
+
+
+@app.get("/assets/stradina/suoni/{nome}")
+def asset_suoni_stradina(nome: str):
+    if nome not in FILE_SUONI_STRADINA:
+        raise HTTPException(404, "suono non trovato")
+    percorso = os.path.join("assets", "stradina", "suoni", nome)
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "suono non trovato")
+    return FileResponse(percorso, media_type="audio/mpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/assets/tappo.jpeg")
 def asset_tappo():
     """Il tappo del barattolo (128px, ritagliato sul diametro): e' il
