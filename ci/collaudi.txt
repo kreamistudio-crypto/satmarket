@@ -200,6 +200,7 @@ collaudo_avvisi_barattolo
 collaudo_spedisci_entro
 collaudo_chiedi_locker
 collaudo_serie_giorni
+collaudo_stradina_prova
 collaudo_sentinella
 collaudo_nip05_utenti
 collaudo_raccolta

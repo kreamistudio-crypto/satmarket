@@ -31913,9 +31913,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    categorie»),
    `/assets/tappo.jpeg`, `/assets/stradina/{nome}` (whitelist a
    tupla `FILE_MAPPA_STRADINA`: gli otto pezzi di mappa del tabellone,
-   le diciotto icone delle caselle e Tappo-pedina),
+   le diciotto icone delle caselle, Tappo-pedina e gli otto stadi del
+   razzo di bulloni),
    `/assets/stradina/suoni/{nome}` (whitelist a tupla
-   `FILE_SUONI_STRADINA`: i venti effetti MP3 del tabellone e del gioco), le rotte PWA (`/manifest.json`, `/sw.js`,
+   `FILE_SUONI_STRADINA`: i venti effetti MP3 del tabellone e del gioco),
+   `/assets/stradina/musica/{nome}` (whitelist a tupla
+   `FILE_MUSICA_STRADINA`: la musica in loop del tabellone), le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
    `/assets/icona-192-maskable.png`, `/assets/icona-512-maskable.png`,
    `/assets/apple-touch-icon.png`) — tutti file singoli, rotte
@@ -35260,7 +35263,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `screenshotAssistenzaScelti` (preparati con `preparaFotoChatScP2P` a
   1600 px, ripiego `ridimensiona`), `caricaScreenshotAssistenza` (fetch
   con chi sei → objectURL in `assistenzaImgUrl`), il tocco apre
-  `apriLightbox`. Le risposte dello staff restano solo testo.
+  `apriLightbox`. DALLA SERA DEL 17 NOV anche `POST
+  /api/admin/assistenza/{utente}` accetta `immagini`, con le stesse
+  regole: la riga sta nella conversazione dell'utente, quindi lui e gli
+  admin la aprono; nel client due mucchi di scelte
+  (`assistenzaAllegati.mio` e `.adm`, `ASSISTENZA_CASELLA`), e quello
+  dello staff si svuota cambiando conversazione.
 - LO SWAP, L'INSTRADATORE (20 ott 2026, cantiere swap-instradatore;
   perché in CANTIERI, «Lo swap, l'instradatore»). La tappa 3 qui sopra è
   divisa: `swap/boltz.js` (il TIPO «boltz»: il motore della tappa 3 —

@@ -22,7 +22,8 @@ database usa-e-getta:
     testo; il tipo dai byte, i metadati via, cifrati sul disco; li legge
     solo chi li ha mandati e gli admin (agli altri un 404 uguale per
     tutti); agli admin arrivano nel bot anche dentro la pausa; con
-    l'account cancellato se ne vanno anche i file.
+    l'account cancellato se ne vanno anche i file. Dalla sera del 17 nov
+    anche lo staff risponde con uno screenshot, che l'utente apre.
 
 NON TOCCA NIENTE DI VERO: il config finto lo installa `avvio()` del banco,
 e `notifica` e' sostituita da un registro.
@@ -343,6 +344,46 @@ def gli_screenshot(c, S, avvisi, aspetta_sottofondo):
     aspetta_sottofondo()
     prova("l'admin che allega nella SUA conversazione non manda la foto a se stesso",
           [], [x[0] for x in foto_bot[gia:] if x[0] == 999])
+
+    print("\n[lo staff risponde con uno screenshot]")
+    file_prima = sorted(os.listdir(cartella))
+    prova("un non-admin non risponde come staff nemmeno con uno screenshot (403)",
+          (403, file_prima),
+          (c.post("/api/admin/assistenza/111", headers=VENDE,
+                  json={"testo": "", "immagini": [_dataurl(png)]}).status_code,
+           sorted(os.listdir(cartella))))
+    gia_avvisi = len([a for a in avvisi if a[0] == 111])
+    r = c.post("/api/admin/assistenza/111", headers=ADMIN,
+               json={"testo": "", "immagini": [_dataurl(_png((0, 200, 0)))]})
+    prova("la risposta dello staff fatta solo di uno screenshot entra", 200,
+          r.status_code)
+    rsp = r.json()["messaggi"][-1]
+    prova("...e' dello staff e porta un nome con la forma giusta", (True, 1, True),
+          (rsp["staff"], len(rsp["immagini"]),
+           bool(rsp["immagini"] and S.NOME_IMG_ASSISTENZA.match(rsp["immagini"][0]))))
+    n_staff = rsp["immagini"][0]
+    prova("l'utente riceve l'avviso di sempre", gia_avvisi + 1,
+          len([a for a in avvisi if a[0] == 111]))
+    msgs = c.get("/api/assistenza", headers=COMPRA).json()["messaggi"]
+    prova("l'utente lo trova nella sua conversazione", [n_staff],
+          msgs[-1]["immagini"])
+    prova("...e lo apre", 200,
+          c.get(f"/api/assistenza/immagine/{n_staff}", headers=COMPRA).status_code)
+    prova("un altro utente no: 404", 404,
+          c.get(f"/api/assistenza/immagine/{n_staff}", headers=VENDE).status_code)
+    prova("uno screenshot storto dello staff e' un 400 senza file lasciati",
+          (400, sorted(os.listdir(cartella))),
+          (c.post("/api/admin/assistenza/111", headers=ADMIN,
+                  json={"testo": "x", "immagini": [_dataurl(png), "data:image/png;base64,@@"]}
+                  ).status_code, sorted(os.listdir(cartella))))
+    prova("rispondere con uno screenshot a chi non esiste: 404 senza file lasciati",
+          (404, sorted(os.listdir(cartella))),
+          (c.post("/api/admin/assistenza/424242", headers=ADMIN,
+                  json={"testo": "x", "immagini": [_dataurl(png)]}).status_code,
+           sorted(os.listdir(cartella))))
+    prova("niente testo e niente screenshot resta un 400 anche per lo staff", 400,
+          c.post("/api/admin/assistenza/111", headers=ADMIN,
+                 json={"testo": "", "immagini": []}).status_code)
 
     print("\n[gli screenshot se ne vanno con l'account]")
     r = c.post("/api/assistenza", headers=TERZO,

@@ -88194,6 +88194,139 @@ RESTA DA GUARDARE. I pezzi della mappa da Flow; le missioni vere dal
 gioco; gli amici da Nostr; il menù per livello (aspetta Andrea); il link
 di Villaggio Bitcoin nel config del VPS se accettano.
 
+IL RACCONTO (stesso giorno, Andrea: «aggiungi una frase di Tappo
+all'inizio di ogni zona, deve essere una storia»). Ogni voce di
+`STRADINA_ZONE` porta `racconto`: una frase di Tappo che sta sul
+cartello della zona sotto il nome, con la pedina di Tappo accanto. La
+storia è UNA SOLA col gioco: «il razzo di bulloni», scelta da Andrea
+sulla proposta del thread del gioco (Tappo costruisce un razzo per la
+Luna, il Tarlo e la Gazza dispettosi rubano i bulloni, all'halving del
+2028 il razzo parte). Un pezzo di razzo per zona, gli stessi che i
+minigiochi danno nel loro finale: piedini (e lo zaino: barattolo e
+wallet Lightning), serbatoio (il mercatino), motore (il porto: on-chain
+e Nostr, al riparo dal Tarlo), ali (il bosco, i primi diecimila), oblò
+(la scala d'oro, sei mesi e centomila), punta (la vetta, un anno,
+mezzo milione), antenna (l'orbita, i milioni), il conto alla rovescia (la
+Luna, l'halving). REGOLA: ogni frase
+nomina solo quel che si fa DAVVERO nelle caselle della sua zona, così la
+storia non promette altro; chi sposta una casella di zona rilegge la
+frase. Il cartello è cresciuto (107 px), quindi la banda fra due zone
+passa da 92 a 124 px e il cartello della prima zona sta a metà fra la
+partenza e la prima casella. Scartato: il fumetto sopra Tappo che
+cambia a ogni zona (copriva le caselle, già tolto una volta).
+PROVATO: `prove_stradina` +4 (frasi presenti, corte, diverse, coerenti
+con le caselle, un pezzo di razzo per zona; otto cartelli con la frase passata da `esc`), sezioni
+stradina, vantaggi e livello accanto al titolo 150/0; controllo visivo
+degli otto cartelli a 360 px. IL VERBALE: suite intera severa 29.385
+verdi e 1 rossa (la frase di NOVITA a 414 caratteri sul tetto di 400:
+accorciata, e NOVITA, conoscenza di Tappo, stradina, vantaggi e livello
+rigirate verdi, 175/0), 2 saltate per nostr-tools che in cloud non c'è;
+collaudi 148/148. Girato in cloud sull'albero sopra develop 29c493c.
+RESTA: il razzo che cresce sul tabellone, coi pezzi razzo-1..8 che il
+thread del gioco fa in Flow.
+
+LA STRADA SI APRE ANDANDO, LA MAPPA INTERA, I SUONI PIÙ BASSI E LA MUSICA
+(stesso giorno, Andrea provando la prima versione sul collaudo). (1) «La
+gente quando sale vede la zona dove non è arrivata tutta grigia e spenta,
+e poi non può più andare su»: `stradinaVisibili` dice fin dove si vede,
+cioè la zona della prossima casella da fare più UNA, spenta (mappa e
+cartello in grigio); sopra, al posto della Luna, il muro «🔒 Più su la
+strada è chiusa — Finisci «zona» e si apre un altro pezzo di viaggio».
+Con tutto fatto si vede tutto. Le caselle nascoste non si disegnano
+proprio (la tavola è più corta: scorrendo ci si ferma lì), e un amico su
+un gradino nascosto non compare. (2) «Un tasto per vedere tutta la mappa
+da lontano»: «🗺 Vedi tutta», fisso in alto a destra (il tabellone si apre
+su Tappo, a metà pagina: un tasto nell'intestazione non si vedrebbe),
+apre «Il viaggio intero», le otto zone in una schermata, due per riga
+dalla Terra alla Luna, col pezzo di mappa, il conto, la spunta, Tappo
+sulla sua; la zona spenta in grigio e le altre col lucchetto, coerenti
+col punto (1). Toccando una zona si torna al tabellone, lì. Scartato: il
+tabellone intero rimpicciolito (7.000 px in una schermata sono una
+striscia larga trenta). (3) «Alcuni suoni sono troppo invasivi»: i venti
+MP3 abbassati di circa 13 dB (picco a -12 dB, media verso -30 dB), «passo»
+accorciato a 0,4 s e «apri» a 1,5 s, con una dissolvenza in coda; una
+prova misura il picco con ffmpeg e boccia un effetto oltre -9 dB. NON
+ASCOLTATI da me: li ha da sentire Andrea. Lui li ha sentiti sul collaudo
+(ancora quelli forti) e ha bocciato «il passo, il Boeing e la molla»:
+il «Classic Boing» di Artlist che era il passo, lo swoosh del «Vai» e il
+boing del salto. Sostituiti con suoni fatti qui, morbidi e corti: il
+passo è il colpo di legno del tocco, più grave e più basso; il «Vai» due
+note dolci che salgono (mi e si); il salto un «pop» che sale. Picco
+intorno a -19 dB. (4) «Non c'è la musica nella
+mappa»: il lettore c'è (`musicaStradinaParti`, loop, volume 0,35, parte
+col primo tocco, si spegne col 🔊 e uscendo dalla pagina) e la rotta
+`/assets/stradina/musica/{nome}` con la sua whitelist; il brano no: lo
+scarica da Artlist la sessione sul PC del thread del gioco appena finisce
+Flow, insieme a quello del gioco, nello stesso stile. Finché manca, la
+rotta dà 404 e la pagina resta in silenzio (niente musica sintetizzata).
+Arrivato alle 16:52: `mappa.mp3` è «Like a Feather - Acoustic Guitars
+Version» di Ziv Moran (Artlist, licenza di Andrea), sola chitarra
+acustica, loop di 72 s (30 battute a 100 BPM, giunta con 60 ms di
+dissolvenza), mono 96k, 845 KB, picco -13,5 dB: sotto il tetto di -9 dB
+della prova, ed è un sottofondo più basso degli effetti. Andrea alle
+17:01: «La musica non mi piace» → tolta prima del push; si sceglie lo
+stile (card) e il thread del gioco ne scarica un'altra. (5) IL RAZZO CHE CRESCE: gli otto
+stadi del thread del gioco (Flow, 297x520, trasparenti, stesso riquadro:
+pedana e gambe, serbatoio, motore, ali, oblò, punta, antenna, motori
+accesi), in whitelist con la mappa. `stradinaRazzo` dà lo stadio della
+zona dove sei (quello che stai costruendo; tutto fatto: 8); si vede in
+fondo alla barra in cima al tabellone, nel chip «🚀 Razzo 3/8» e in piedi
+al «viaggio intero». Scartato: il razzo sulla tavola alla partenza (il
+cartello della prima zona gli sta addosso, e il tabellone si apre su
+Tappo, lontano dalla partenza). I MINIGIOCHI sul tabellone restano fuori
+finché Andrea non sceglie col thread del gioco se tenerli lì. (6) LA
+ZONA SPENTA È UN MISTERO («gli obiettivi non si vedono: solo il cerchio
+grigio, non la scritta a fianco»): le sue caselle sono un cerchio col «?»
+senza nome, e la scheda dice solo «Da scoprire» (`stradinaMistero`). (7)
+LO SVELAMENTO («quando completo la casella prima, l'altra si illumina e
+compare la scritta in maniera scenografica, con un effetto grafico e
+anche sonoro»): il browser ricorda la «tocca a te» e la zona dell'ultima
+visita (`stradinaVista`); `stradinaSvelate` dice cosa è cambiato, cioè la
+nuova «tocca a te» e, entrando in una zona, tutte le sue caselle da fare;
+quelle scoppiano di luce, il nome entra di lato sfocato, in fila, col
+suono «stella». Alla prima visita niente (non c'è un prima); chi chiede
+meno movimento non ha l'animazione. Lo svelamento si vede RIAPRENDO il
+tabellone dopo aver fatto la cosa, perché le caselle sono fatti letti dal
+server. (8) LE CASELLE DI PROVA DEGLI ADMIN («fammelo provare tutto ...
+almeno me e Alan che siamo amministratori»): sulla scheda di un admin
+(`e_admin`) «🧪 Segna fatta (prova)» e «↩ Togli la prova», in cima «🧪
+Prova: N · azzera». `POST /api/me/stradina/prova` scrive SOLO la tabella
+`stradina_prova` (nasce alla prima scrittura), 403 prima di aprirla a chi
+non è admin, id in forma stretta, tetto 200; `/api/me/stradina` le accende
+solo sul tabellone dell'admin (`applica_finte`, mai una porta né una
+casella già fatta davvero) e marca `finta`. Niente XP, niente livello,
+nessun altro le vede. Vale anche in produzione per gli admin: è lì che
+Andrea e Alan proveranno il giro intero. Collaudo nuovo
+`collaudo_stradina_prova` (18 verdi: 403 senza tabella, accesa e `finta`,
+Tappo avanti, XP fermi, Anna non la vede, togli, azzera, id storti).
+
+(9) IL NOME E IL FONDO (17 nov, ore 17, prove di Andrea sulla demo):
+«non chiamarla la tua stradina… inventati qualcosa» → la pagina si
+chiama «🚀 Rotta per la Luna» (titolo, bottone del Profilo, avvisi):
+è la storia del razzo, e non è il nome di un gioco altrui. Gli id
+interni (`stradina*`, `/api/me/stradina`) restano: cambiano solo i
+testi. «Perché lo sfondo è bianco?» → sulla rotta il tema è sempre
+scuro (`temaStradina`, acceso da go() entrando e spento uscendo, letto
+da applicaTema): i dipinti sono notturni. Sulla casella dei sats il
+pane tostato diventa 🪙. (10) L'AMICO SULLA MAPPA: nella «gara fra
+amici» la riga è un bottone (`strVaiAmico`): porta alla pedina
+dell'amico (`data-lv`) e la fa pulsare; se l'amico è oltre la nebbia
+si va al lucchetto con un avviso, senza svelare le caselle. La scorsa
+chiede al giudice degli effetti ridotti, e con gli effetti ridotti la
+pedina resta ferma col solo contorno arancio. (11) Lo svelamento si
+chiama `si-svela` (il nome `svela` era del tour P2P di settembre, e
+`prove_libro_subito` lo vuole sparito) e non usa più `filter:blur`
+(il censimento di `prove_effetti_ridotti` ne ammette due). PROVATO:
+VERBALE (17 nov, cloud, venv dei collaudi, senza proxy): sull'albero
+94ed127 (ribasato su develop c247c34) `PROVE_SEVERE=1 python prove.py`
+29.506 passate, 0 fallite, 2 saltate (le due che cercano nostr-tools
+nel PC o nel WSL: mancano nel cloud, non toccano la rotta) e
+`collaudi_ci.py --elenco ci/collaudi.txt` 152 verdi, 0 rossi. Poi
+develop è corso di tre commit (CI mirata, rilascio senza incasso,
+raccolte spente): rebase, e di nuovo le sezioni toccate (stradina,
+libro subito, effetti ridotti, NOVITA, conoscenza, categorie delle
+prove, raccolta) 332/0 più `collaudo_stradina_prova` e
+`collaudo_raccolta` verdi. Commit non miei nell'albero: quelli di develop.
 
 ## Il nome verificato su Nostr, gratis dal livello 2 (17 nov 2026, cantiere nip05-utenti; Andrea: «attivare verifica NIP-05, gratis per utenti da lv2 in su»)
 
@@ -88548,6 +88681,35 @@ collaudi su 148»).
 
 **COSA RESTA.** Se un giorno serve un giro intero su main senza commit:
 Actions → prove → «Run workflow» su main (non sposta `pronto`).
+
+## Gli screenshot all'assistenza, seconda parte: anche lo staff risponde con uno screenshot (17 nov 2026, sera, cantiere assistenza-screenshot-staff; Andrea: «Sì, anche lo staff può rispondere con uno screenshot»)
+
+**COSA C'È.** La casella «Rispondi come staff…» del pannello ha il suo
+«📎 Allega screenshot», con le stesse regole di chi scrive: fino a tre,
+il testo può mancare se c'è uno screenshot, vaglio prima del disco, file
+cifrati in `buste/assistenza`. La riga sta nella conversazione
+dell'utente, quindi la rotta delle immagini la apre a lui e agli admin
+senza toccare niente. All'utente l'avviso di sempre («ti ha risposto»,
+senza il contenuto: la risposta si legge in app), niente foto nel bot.
+
+**LE DECISIONI.** Due mucchi di scelte nel client (`mio` e `adm`) e non
+uno: un admin che allega nella propria chat e poi apre il pannello non
+deve trovarsi quello screenshot nella risposta a un altro; per la stessa
+ragione il mucchio dello staff si svuota quando si apre o si lascia una
+conversazione. Nel server i file si scrivono DOPO il controllo che
+l'utente esista: rispondere a chi non c'è non lascia orfani.
+
+**PROVATO.** `collaudo_assistenza` 80/80 (10 nuove: il 403 al non-admin
+senza file scritti, la risposta fatta solo di uno screenshot, l'avviso
+all'utente, l'utente che la trova e la apre, l'altro utente 404, lo
+screenshot storto e l'utente inesistente senza orfani, il vuoto senza
+screenshot). CONTROPROVA ROSSA: la rotta dello staff che ignora gli
+screenshot. DAL VIVO in Playwright: l'admin 999 allega e risponde, le
+scelte si svuotano, il compratore 111 vede la miniatura dello staff.
+IL VERBALE: suite intera severa sull'albero del cantiere (sopra develop
+88de13e), 29.509 verdi, 0 rosse, 2 saltate di sempre (nostr-tools non
+c'è in cloud); collaudi della CI nella gabbia, venv senza coincurve,
+151/151. Tutto girato in cloud.
 
 
 ## Il rimborso on-chain che non si incaglia (17 nov 2026, cantiere onchain-rimborso-liscio; Andrea: «Ok, sì, vai, correggi tutto»)

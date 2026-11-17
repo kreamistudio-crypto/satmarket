@@ -53441,18 +53441,31 @@ async def assistenza_rispondi_admin(utente: int, req: Request,
     admin = _solo_admin_assistenza(x_tg_init_data, barattolo_sessione)
     _frena("assistenza_staff", admin["id"])
     d = await leggi_json(req)
-    testo = _testo_assistenza(d.get("testo"))
+    # GLI SCREENSHOT ANCHE DALLO STAFF (17 nov 2026, il sì di Andrea alla
+    # proposta): le stesse regole di chi scrive — vaglio prima del disco,
+    # testo vuoto solo con uno screenshot, file cifrati in buste/assistenza.
+    # La riga sta nella conversazione dell'UTENTE, quindi la rotta delle
+    # immagini la apre a lui e agli admin, come le sue.
+    pronte = _immagini_assistenza(d.get("immagini"))
+    testo = _testo_assistenza(d.get("testo"), vuoto_ok=bool(pronte))
     con = db()
+    nomi = []
     try:
         _utente_assistenza(con, utente)
+        nomi = _scrivi_immagini_assistenza(pronte)
         con.execute("INSERT INTO assistenza(utente, autore, admin, testo, "
-                    "quando) VALUES(?,?,1,?,?)",
-                    (int(utente), admin["id"], testo, int(time.time())))
+                    "quando, immagini) VALUES(?,?,1,?,?,?)",
+                    (int(utente), admin["id"], testo, int(time.time()),
+                     ",".join(nomi)))
         # lo staff ha risposto: il prossimo messaggio riavvisa subito
         con.execute("DELETE FROM assistenza_avvisi WHERE utente=?",
                     (int(utente),))
         con.commit()
         righe = _righe_assistenza(con, utente, True)
+    except Exception:
+        # la riga non e' nata (o l'utente non c'e'): via i file
+        _togli_immagini_assistenza(nomi)
+        raise
     finally:
         con.close()
     # dopo il commit, mai dentro: notifica e' fail-open e non alza
@@ -113260,15 +113273,39 @@ STRADINA_AMICI_MAX = 12      # quanti amici si mostrano, i piu' alti
 # LE ZONE DEL TABELLONE, dal basso (la Terra) verso l'alto (la Luna):
 # ognuna ha il suo pezzo di mappa disegnato (assets/stradina/) e finisce
 # con un GRADINO della scala. Nomi di casa, mai quelli del gioco.
+# IL RACCONTO (Andrea, 17 nov: «deve essere una storia»): all'ingresso di
+# ogni zona Tappo dice una frase, e lette in fila fanno il viaggio dalla
+# Terra alla Luna. E' la storia del RAZZO DI BULLONI, la stessa del gioco
+# (scelta di Andrea, 17 nov): un pezzo di razzo per zona, gli stessi
+# del finale dei minigiochi (piedini, serbatoio, motore, ali, oblò,
+# punta, antenna, poi il conto alla rovescia); il Tarlo e la Gazza sono
+# dispettosi, mai cattivi veri; all'halving del 2028 il razzo parte. Ogni frase nomina quel che si fa DAVVERO in quella
+# zona (le caselle qui sotto), cosi' la storia non promette altro.
 STRADINA_ZONE = (
-    {"id": "primi", "emoji": "🫙", "nome": "Primi passi"},
-    {"id": "mercatino", "emoji": "🧺", "nome": "Il mercatino"},
-    {"id": "porto", "emoji": "⚓", "nome": "Il porto"},
-    {"id": "bosco", "emoji": "🌲", "nome": "Il bosco dei sats"},
-    {"id": "scala", "emoji": "🪜", "nome": "La scala d'oro"},
-    {"id": "vetta", "emoji": "🏔", "nome": "La vetta"},
-    {"id": "orbita", "emoji": "🛰", "nome": "In orbita"},
-    {"id": "luna", "emoji": "🌕", "nome": "Verso la Luna"},
+    {"id": "primi", "emoji": "🫙", "nome": "Primi passi",
+     "racconto": "Sogno la Luna con un razzo di bulloni! Primi pezzi: i piedini, "
+                 "il tuo barattolo e un wallet Lightning."},
+    {"id": "mercatino", "emoji": "🧺", "nome": "Il mercatino",
+     "racconto": "Al mercatino si compra e si vende in sats, e il razzo ha il "
+                 "serbatoio. Occhio alla Gazza dispettosa!"},
+    {"id": "porto", "emoji": "⚓", "nome": "Il porto",
+     "racconto": "Al porto mettiamo al sicuro i sats, on-chain e con la firma "
+                 "Nostr: il motore è al riparo dal Tarlo."},
+    {"id": "bosco", "emoji": "🌲", "nome": "Il bosco dei sats",
+     "racconto": "Nel bosco i sats crescono piano, come le ali del razzo: "
+                 "arriviamo ai primi diecimila."},
+    {"id": "scala", "emoji": "🪜", "nome": "La scala d'oro",
+     "racconto": "La scala d'oro si sale un gradino alla volta: sei mesi di "
+                 "affari, centomila sats, e il razzo ha l'oblò."},
+    {"id": "vetta", "emoji": "🏔", "nome": "La vetta",
+     "racconto": "Dalla vetta si vede la Luna: un anno di scambi, mezzo milione "
+                 "di sats, e montiamo la punta."},
+    {"id": "orbita", "emoji": "🛰", "nome": "In orbita",
+     "racconto": "In orbita si conta a milioni: un anno e mezzo di scambi, e sul "
+                 "razzo gira l'antenna."},
+    {"id": "luna", "emoji": "🌕", "nome": "Verso la Luna",
+     "racconto": "Conto alla rovescia: all'halving del 2028 il razzo parte per "
+                 "la Luna. Ci arriviamo insieme!"},
 )
 # dove stanno i gradini della scala dei livelli: in fondo a queste zone
 # (il primo gradino chiude il mercatino, l'ultimo — la Luna — l'ultima
@@ -113596,6 +113633,73 @@ def amici_stradina(con, tg_id: int, adesso: int) -> list:
     return amici[:STRADINA_AMICI_MAX]
 
 
+# LE CASELLE DI PROVA (17 nov 2026, Andrea: «prima di metterlo in
+# produzione voglio provarlo tutto: lo segnerò come raggiunto in maniera
+# fittizia, così proseguo e vedo cosa succede; almeno me e Alan che siamo
+# amministratori»). Solo per chi e' ADMIN (`e_admin`): una casella segnata
+# qui si accende sul SUO tabellone e basta. Non e' un fatto: niente XP,
+# niente livello, niente premi, nessun altro la vede, e porta `finta`.
+# Una tabella sua, che si crea alla prima scrittura; si azzera intera.
+STRADINA_PROVA_MAX = 200     # caselle di prova per admin, piu' che abbastanza
+STRADINA_ID_TAPPA = re.compile(r"^[a-z0-9_]{1,40}$")
+
+
+def stradina_finte(con, tg_id: int) -> set:
+    """Le caselle di prova di un admin; tabella che non c'e' = nessuna."""
+    try:
+        return {r[0] for r in con.execute(
+            "SELECT tappa FROM stradina_prova WHERE tg_id=?", (tg_id,))}
+    except Exception:
+        return set()
+
+
+def applica_finte(tappe: list, finte: set) -> list:
+    """Accende le caselle di prova ancora da fare (mai una porta, mai una
+    gia' fatta davvero) e le marca `finta`. PURA."""
+    for t in tappe:
+        if t.get("id") in finte and t.get("fatto") is False:
+            t["fatto"] = True
+            t["finta"] = True
+    return tappe
+
+
+@app.post("/api/me/stradina/prova")
+async def prova_stradina(req: Request, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """Segna (o toglie) una casella di prova, o le azzera tutte. Solo admin:
+    a chiunque altro un 403, e la tabella non si tocca."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Solo gli amministratori possono provare il tabellone.")
+    d = await leggi_json(req)
+    con = db()
+    try:
+        con.execute("CREATE TABLE IF NOT EXISTS stradina_prova ("
+                    "tg_id INTEGER NOT NULL, tappa TEXT NOT NULL, "
+                    "quando INTEGER NOT NULL, PRIMARY KEY (tg_id, tappa))")
+        if d.get("azzera") is True:
+            con.execute("DELETE FROM stradina_prova WHERE tg_id=?", (user["id"],))
+        else:
+            tappa = d.get("tappa")
+            if not isinstance(tappa, str) or not STRADINA_ID_TAPPA.match(tappa):
+                raise HTTPException(400, "Casella sconosciuta.")
+            if d.get("fatto") is False:
+                con.execute("DELETE FROM stradina_prova WHERE tg_id=? AND tappa=?",
+                            (user["id"], tappa))
+            else:
+                n = con.execute("SELECT COUNT(*) FROM stradina_prova WHERE tg_id=?",
+                                (user["id"],)).fetchone()[0]
+                if n >= STRADINA_PROVA_MAX:
+                    raise HTTPException(400, "Troppe caselle di prova: azzerale.")
+                con.execute("INSERT OR IGNORE INTO stradina_prova "
+                            "(tg_id, tappa, quando) VALUES (?, ?, ?)",
+                            (user["id"], tappa, int(time.time())))
+        con.commit()
+        return {"ok": True, "finte": sorted(stradina_finte(con, user["id"]))}
+    finally:
+        con.close()
+
+
 @app.get("/api/me/stradina")
 def mia_stradina(x_tg_init_data: str = Header(""),
                  barattolo_sessione: str = Cookie("")):
@@ -113632,6 +113736,10 @@ def mia_stradina(x_tg_init_data: str = Header(""),
                 superate = set()
         tappe = tappe_stradina(f, scala_livelli(), IMPARA_BITCOIN_LINK,
                                IMPARA_BITCOIN_NOME, gioco, missioni, superate)
+        # le caselle di prova: solo sul tabellone di un admin
+        prova = e_admin(user["id"])
+        if prova:
+            tappe = applica_finte(tappe, stradina_finte(con, user["id"]))
         liv = livello_utente(f["xp"], f["vendite"] + f["acquisti"])
         try:
             amici = amici_stradina(con, user["id"], adesso)
@@ -113645,7 +113753,7 @@ def mia_stradina(x_tg_init_data: str = Header(""),
         except Exception:
             tappo = ""
         return {"tappe": tappe, "zone": list(STRADINA_ZONE),
-                "livello": liv, "sats": sats,
+                "livello": liv, "sats": sats, "prova": prova,
                 "amici": amici, "tappo_oggetto": tappo,
                 "tappo_emoji": emoji_oggetto_tappo(tappo),
                 "impara": {"nome": IMPARA_BITCOIN_NOME,
@@ -113681,7 +113789,13 @@ FILE_MAPPA_STRADINA = ("zona1.webp", "zona2.webp", "zona3.webp",
                        "ico-p2p.webp", "ico-incassati.webp",
                        "ico-giorni.webp", "ico-halving.webp",
                        # i tre pezzi di mappa nuovi (8 zone, 17 nov)
-                       "zona6.webp", "zona7.webp", "zona8.webp")
+                       "zona6.webp", "zona7.webp", "zona8.webp",
+                       # IL RAZZO DI BULLONI (17 nov, la storia unica col
+                       # gioco): otto stadi nello stesso riquadro, uno per
+                       # zona, dalla pedana ai motori accesi (Flow, 297x520)
+                       "razzo-1.webp", "razzo-2.webp", "razzo-3.webp",
+                       "razzo-4.webp", "razzo-5.webp", "razzo-6.webp",
+                       "razzo-7.webp", "razzo-8.webp")
 
 
 @app.get("/assets/stradina/{nome}")
@@ -113714,6 +113828,23 @@ def asset_suoni_stradina(nome: str):
     percorso = os.path.join("assets", "stradina", "suoni", nome)
     if not os.path.exists(percorso):
         raise HTTPException(404, "suono non trovato")
+    return FileResponse(percorso, media_type="audio/mpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+# LA MUSICA DEL TABELLONE (17 nov 2026, Andrea: «non c'è la musica nella
+# mappa»): un brano leggero in loop, da Artlist come gli effetti. Whitelist
+# a tupla; finche' il file non c'e' e' un 404 e il client resta in silenzio.
+FILE_MUSICA_STRADINA = ("mappa.mp3",)
+
+
+@app.get("/assets/stradina/musica/{nome}")
+def asset_musica_stradina(nome: str):
+    if nome not in FILE_MUSICA_STRADINA:
+        raise HTTPException(404, "musica non trovata")
+    percorso = os.path.join("assets", "stradina", "musica", nome)
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "musica non trovata")
     return FileResponse(percorso, media_type="audio/mpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
 

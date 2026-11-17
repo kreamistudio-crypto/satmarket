@@ -456,7 +456,7 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 <!-- pezzo libro-042 | libro | sempre -->
 ## Libro · Parlare con una persona (1/2)
 
-Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Aiuto → «💬 Assistenza». Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta. Al messaggio si possono allegare fino a tre screenshot (il bottone «📎 Allega screenshot» sotto la casella): li vedono solo lo staff e chi li ha mandati.
+Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Aiuto → «💬 Assistenza». Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta. Al messaggio si possono allegare fino a tre screenshot (il bottone «📎 Allega screenshot» sotto la casella): li vedono solo lo staff e chi li ha mandati. Anche lo staff può rispondere con uno screenshot, che trovi nella stessa conversazione.
 
 Se l'assistente non basta, sotto ogni sua risposta c'è il bottone «🙋 Parla con una persona»: ti dà la chat privata di Barattolo (t.me/barattolostore?direct), dove risponde una persona dello staff. Se quel link ti apre il canale invece della chat: le chat private dei canali ci sono solo nelle versioni recenti di Telegram, quindi aggiorna l'app e riprova dal telefono; oppure apri il canale @barattolostore e cerca in fondo alla pagina il tasto per mandare un messaggio. Se ancora non va, scrivilo a Tappo (@TappoBarattoloBot): passa lui il messaggio allo staff. Per un problema con un ordine o uno scambio preciso, scrivi lì il numero dell'ordine e cosa è successo. Per una lite su un ordine coi sats in garanzia, la strada giusta resta la disputa, dalla pagina dell'ordine o dello scambio.
 
@@ -465,7 +465,7 @@ I livelli: ogni persona ha un livello che sale con gli XP (li danno solo gli acq
 <!-- pezzo libro-043 | libro | sempre -->
 ## Libro · Parlare con una persona (2/2)
 
-La stradina degli obiettivi (dal 17 novembre 2026): nel Profilo, nel cassetto «🎖 Livello e titolo», c'è «🧭 La tua stradina», un tabellone lunghissimo che vede solo chi lo apre, dalla Terra (in basso) alla Luna (in cima), su una mappa disegnata in otto zone: «Primi passi», «Il mercatino», «Il porto», «Il bosco dei sats», «La scala d'oro», «La vetta», «In orbita», «Verso la Luna». Ogni casella è una competenza di Barattolo e di bitcoin, dalla più facile alla più difficile: mettere un articolo nel barattolo, la foto, seguire un venditore, attivare l'incasso automatico in Lightning (l'indirizzo Lightning nel Profilo); poi il primo annuncio, il primo acquisto, la prima recensione, collegare la chiave Nostr, invitare una persona col proprio link; poi la prima vendita, creare il wallet on-chain, verificare la chiave Nostr con una nota pubblica, la doppia configurazione Telegram + Nostr, il primo scambio P2P; poi le soglie che crescono (fino a 100 vendite e 10 milioni di sats incassati) e le caselle a tempo («Un mese con Barattolo», sei mesi, un anno, un anno e mezzo, due anni). L'ultima casella prima della Luna è «Arriva all'halving del 2028» (circa aprile 2028): nessuno arriva in cima prima di allora. Le caselle si spuntano da sole quando la cosa è fatta e diventano monete d'oro; Tappo è la tua pedina e cammina in fila: si ferma prima della prima casella che manca (quelle fatte più su restano accese) e dice qual è la prossima; toccando una casella, la scheda in basso porta dove si fa. I gradini della scala dei livelli sono barattoli che si accendono quando si sale di livello. Gli amici (i venditori che segui e chi ha concluso uno scambio con te) stanno come pedine sul loro livello, e in fondo c'è «La gara fra amici». Ci sono anche dei suoni, che si spengono col tasto 🔊 in cima. Le caselle NON danno XP e non danno sats: sono la mappa, non un premio. Chi ha scelto «Non mostrarmi in classifica» non compare fra gli amici di nessuno.
+Rotta per la Luna (dal 17 novembre 2026; nei primi giorni si chiamava «la stradina»): nel Profilo, nel cassetto «Livello e recensioni», c'è «🚀 Rotta per la Luna», un tabellone lunghissimo che vede solo chi lo apre, dalla Terra (in basso) alla Luna (in cima), su una mappa disegnata in otto zone: «Primi passi», «Il mercatino», «Il porto», «Il bosco dei sats», «La scala d'oro», «La vetta», «In orbita», «Verso la Luna». All'ingresso di ogni zona Tappo racconta in una frase cosa si impara lì (per esempio al porto: mettere al sicuro i sats con un wallet on-chain e la firma Nostr). La storia è quella del razzo di bulloni, la stessa del gioco di Tappo: Tappo costruisce un razzo per la Luna, un pezzo per zona (piedini, serbatoio, motore, ali, oblò, punta, antenna), il Tarlo e la Gazza dispettosi provano a rubargli i bulloni, e all'halving del 2028 il razzo parte. Ogni casella è una competenza di Barattolo e di bitcoin, dalla più facile alla più difficile: mettere un articolo nel barattolo, la foto, seguire un venditore, attivare l'incasso automatico in Lightning (l'indirizzo Lightning nel Profilo); poi il primo annuncio, il primo acquisto, la prima recensione, collegare la chiave Nostr, invitare una persona col proprio link; poi la prima vendita, creare il wallet on-chain, verificare la chiave Nostr con una nota pubblica, la doppia configurazione Telegram + Nostr, il primo scambio P2P; poi le soglie che crescono (fino a 100 vendite e 10 milioni di sats incassati) e le caselle a tempo («Un mese con Barattolo», sei mesi, un anno, un anno e mezzo, due anni). L'ultima casella prima della Luna è «Arriva all'halving del 2028» (circa aprile 2028): nessuno arriva in cima prima di allora. Le caselle si spuntano da sole quando la cosa è fatta e diventano monete d'oro; Tappo è la tua pedina e cammina in fila: si ferma prima della prima casella che manca (quelle fatte più su restano accese) e dice qual è la prossima; toccando una casella, la scheda in basso porta dove si fa. I gradini della scala dei livelli sono barattoli che si accendono quando si sale di livello. Gli amici (i venditori che segui e chi ha concluso uno scambio con te) stanno come pedine sul loro livello, e in fondo c'è «La gara fra amici». La strada si scopre camminando: si vede la zona dove sei e quella dopo, grigia e spenta, con le caselle ancora misteriose (un cerchio col punto di domanda); quando fai una casella, la prossima si accende e il suo nome compare, con un suono; più su c'è un lucchetto, e il pezzo successivo si apre finendo la zona dove sei. In cima, in fondo alla barra, c'è il razzo di Tappo, che cresce di un pezzo a ogni zona (otto pezzi, dalla pedana ai motori accesi). Il tasto «🗺 Vedi tutta», in alto a destra, mostra il viaggio intero in una schermata (le zone ancora chiuse hanno il lucchetto); toccando una zona si torna lì. Ci sono anche dei suoni, che si spengono col tasto 🔊 in cima. Le caselle NON danno XP e non danno sats: sono la mappa, non un premio. Chi ha scelto «Non mostrarmi in classifica» non compare fra gli amici di nessuno.
 
 <!-- pezzo schermata-001 | schermata -->
 ## Schermata «astepresto»
@@ -1068,7 +1068,7 @@ Livello e recensioni▾
 🎖Livello e titolo ▾
 💌I tuoi inviti ▾
 🏅Distintivi ▾
-🧭La tua stradinaLe tappe fatte e quelle davanti, con Tappo che avanza.›
+🚀Rotta per la LunaIl tuo viaggio con Tappo: le tappe fatte e quelle davanti.›
 Impostazioni▾
 🔔Avvisi▾
 🌗Aspetto▾
@@ -1979,8 +1979,8 @@ pubblico: sì
 <!-- pezzo novita-068 | novita -->
 ## Novità · 2026-11-17 · stradina-obiettivi
 
-frase: Nel Profilo c'è «🧭 La tua stradina»: un tabellone lunghissimo dalla Terra alla Luna, su una mappa in otto zone, che vedi solo tu, fino all'halving del 2028. Ogni casella è una competenza (l'incasso automatico in Lightning, il wallet on-chain, la doppia configurazione Telegram + Nostr, il primo acquisto…): fatta, diventa una moneta d'oro e Tappo avanza. I tuoi amici sono pedine sul tabellone.
-dove: Profilo → «🎖 Livello e titolo» → «🧭 La tua stradina».
+frase: Nel Profilo c'è «🚀 Rotta per la Luna»: un tabellone lunghissimo dalla Terra alla Luna, su una mappa in otto zone raccontate da Tappo, fino all'halving del 2028. Ogni casella è una competenza (l'incasso automatico in Lightning, il wallet on-chain, la doppia configurazione Telegram + Nostr, il primo acquisto…): fatta, diventa una moneta d'oro e Tappo avanza. I tuoi amici sono pedine sul tabellone.
+dove: Profilo → «Livello e recensioni» → «🚀 Rotta per la Luna».
 leva: nessuna
 pubblico: sì
 
@@ -2051,7 +2051,7 @@ pubblico: sì
 <!-- pezzo novita-077 | novita -->
 ## Novità · 2026-11-17 · assistenza-screenshot
 
-frase: Nella chat con l'assistenza di Barattolo ora puoi allegare anche degli screenshot, fino a tre per messaggio: lo staff vede subito cosa vedi tu. Li vedono solo lo staff e chi li ha mandati.
+frase: Nella chat con l'assistenza di Barattolo ora puoi allegare anche degli screenshot, fino a tre per messaggio: lo staff vede subito cosa vedi tu, e può risponderti anche lui con uno screenshot. Li vedete solo tu e lo staff.
 dove: Profilo → «Aiuto» → «💬 Assistenza», il bottone «📎 Allega screenshot» sotto la casella.
 leva: ASSISTENZA_ATTIVA (quella dell'assistenza, già accesa)
 pubblico: sì

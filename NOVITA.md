@@ -442,8 +442,8 @@ leva: nessuna
 pubblico: sì
 
 ## 2026-11-17 · stradina-obiettivi
-frase: Nel Profilo c'è «🧭 La tua stradina»: un tabellone lunghissimo dalla Terra alla Luna, su una mappa in otto zone, che vedi solo tu, fino all'halving del 2028. Ogni casella è una competenza (l'incasso automatico in Lightning, il wallet on-chain, la doppia configurazione Telegram + Nostr, il primo acquisto…): fatta, diventa una moneta d'oro e Tappo avanza. I tuoi amici sono pedine sul tabellone.
-dove: Profilo → «🎖 Livello e titolo» → «🧭 La tua stradina».
+frase: Nel Profilo c'è «🚀 Rotta per la Luna»: un tabellone lunghissimo dalla Terra alla Luna, su una mappa in otto zone raccontate da Tappo, fino all'halving del 2028. Ogni casella è una competenza (l'incasso automatico in Lightning, il wallet on-chain, la doppia configurazione Telegram + Nostr, il primo acquisto…): fatta, diventa una moneta d'oro e Tappo avanza. I tuoi amici sono pedine sul tabellone.
+dove: Profilo → «Livello e recensioni» → «🚀 Rotta per la Luna».
 leva: nessuna
 pubblico: sì
 
@@ -496,7 +496,7 @@ leva: LINGUA_INGLESE (accesa di serie; spenta, l'app torna italiana per tutti)
 pubblico: sì
 
 ## 2026-11-17 · assistenza-screenshot
-frase: Nella chat con l'assistenza di Barattolo ora puoi allegare anche degli screenshot, fino a tre per messaggio: lo staff vede subito cosa vedi tu. Li vedono solo lo staff e chi li ha mandati.
+frase: Nella chat con l'assistenza di Barattolo ora puoi allegare anche degli screenshot, fino a tre per messaggio: lo staff vede subito cosa vedi tu, e può risponderti anche lui con uno screenshot. Li vedete solo tu e lo staff.
 dove: Profilo → «Aiuto» → «💬 Assistenza», il bottone «📎 Allega screenshot» sotto la casella.
 leva: ASSISTENZA_ATTIVA (quella dell'assistenza, già accesa)
 pubblico: sì
