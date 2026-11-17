@@ -9105,6 +9105,14 @@ def init_db():
                     # non deve riaprire la porta a chi ha appena
                     # avuto il suo turno.
                     "promo_canale_il INTEGER DEFAULT 0",
+                    # ...e il timbro dell'ultimo ORDINE P2P di questa
+                    # persona finito su Subito Crypto (17 nov 2026,
+                    # Andrea: «non piu' di uno a settimana per persona»).
+                    # Colonna a se', e non `promo_canale_il`: quella
+                    # frena anche il NOSTRO canale per gli annunci, e un
+                    # ordine P2P non deve togliere a nessuno il turno di
+                    # casa. 0 = mai, e il DEFAULT e' la migrazione.
+                    "promo_vetrina_p2p_il INTEGER DEFAULT 0",
                     # LA DIMENSIONE DEL TESTO (ago 2026): percentuale
                     # scelta dal lettore, valida su ogni dispositivo
                     # (vedi SCALE_FONT). 100 = la misura di sempre,
@@ -66119,15 +66127,34 @@ async def annuncia_ordine_p2p_canale(req: Request,
     # entra da Nostr resta nel nostro canale, come per gli annunci.
     # Ogni canale fallisce per conto suo, e gli stessi freni valgono per
     # tutti e due: un doppione o una raffica non escono da nessuna parte.
+    # UNO A SETTIMANA PER PERSONA, ANCHE QUI (17 nov 2026, Andrea: «gli
+    # annunci della vetrina di subito crypto p2p devono comunque
+    # rispettare la regola di non piu' di uno a settimana per persona»).
+    # Il freno e' quello degli annunci, `ritmo_vetrina()` coi suoi
+    # giorni (a 0, ritmo «tutto», niente freno), e conta tutti e due i
+    # timbri: chi questa settimana ha gia' avuto in canale un annuncio
+    # (`promo_canale_il`) o un ordine P2P su Subito Crypto
+    # (`promo_vetrina_p2p_il`) non ci torna con un ordine. Il resto del
+    # post esce lo stesso: il nostro canale e BitcoinPodcast non hanno
+    # questo freno per il P2P.
     vetrina_ok = False
+    settimana_piena = False
     if canale_vetrina() and user["id"] > 0:
         try:
             con = db()
-            r_u = con.execute("SELECT username FROM utenti WHERE tg_id=?",
+            r_u = con.execute("SELECT username, promo_canale_il, "
+                              "promo_vetrina_p2p_il FROM utenti WHERE tg_id=?",
                               (user["id"],)).fetchone()
             con.close()
             vetrina_ok = bool(r_u and (r_u["username"] or ""))
+            giorni_v = ritmo_vetrina()[0]
+            if vetrina_ok and giorni_v > 0:
+                soglia_v = int(adesso_canale) - giorni_v * 86400
+                if max(r_u["promo_canale_il"] or 0,
+                       r_u["promo_vetrina_p2p_il"] or 0) > soglia_v:
+                    vetrina_ok, settimana_piena = False, True
         except Exception as e:
+            vetrina_ok = False
             print(f"⚠️ Post P2P su Subito Crypto saltato: {e}")
     # BITCOINPODCAST (10 nov 2026, Andrea: «su bitcoinpodcast devi
     # mandare anche quelli relativi al p2p»): la terza porta, e qui entra
@@ -66159,6 +66186,14 @@ async def annuncia_ordine_p2p_canale(req: Request,
                     print(f"⚠️ Post P2P nel canale saltato: {e}")
             if vetrina_ok:
                 try:
+                    # il timbro PRIMA dell'invio, il patto delle campagne
+                    # (`_posta_promo_singolo`): un guasto puo' far perdere
+                    # un post, mai raddoppiarlo
+                    con = db()
+                    con.execute("UPDATE utenti SET promo_vetrina_p2p_il=? "
+                                "WHERE tg_id=?", (int(adesso_canale), user["id"]))
+                    con.commit()
+                    con.close()
                     if await _manda_post_canale(canale_vetrina(), caption, []):
                         postato = True
                 except Exception as e:
@@ -66177,7 +66212,8 @@ async def annuncia_ordine_p2p_canale(req: Request,
             print(f"⚠️ Post P2P nel canale saltato: {e}")
     return {"ok": True, "postato": postato,
             **({"saltato": "doppione"} if doppione else {}),
-            **({"saltato": "raffica"} if raffica and not doppione else {})}
+            **({"saltato": "raffica"} if raffica and not doppione else {}),
+            **({"subito_crypto": "settimana"} if settimana_piena else {})}
 
 
 _CANALE_POSTATI: dict = {}      # ordine -> quando e' uscito il suo post (cura 4)
