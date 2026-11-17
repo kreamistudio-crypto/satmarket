@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Barattolo per Amazon",
   "short_name": "Barattolo",
-  "description": "Paghi in contanti un ordine di amazon.it? Pubblica il PayCode su Barattozon e fattelo pagare in sats.",
-  "version": "0.1.0",
+  "description": "Compra su amazon.it con Barattozon: paghi in contanti con un PayCode, lo pubblichi su Barattolo e te lo salda chi compra i tuoi sats.",
+  "version": "0.3.0",
   "homepage_url": "https://barattolo.store",
   "icons": {
     "16": "icone/16.png",

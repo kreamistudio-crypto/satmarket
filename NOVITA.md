@@ -411,16 +411,22 @@ dove: l'ordine venduto, riquadro «Spedisci e inserisci il tracciamento», sotto
 leva: nessuna
 pubblico: sì
 
-## 2026-11-17 · regali-livello
-frase: Salire di livello adesso regala qualcosa di vero: alla «Bottega avviata» la borsa di tela «Un tempo per te», al «Mercante pratico» la tazza, all'«esperto» la maglietta, al «Maestro del banco» il quaderno. Quando sblocchi un regalo il bot te lo dice: apri il Profilo, scrivi dove mandarlo (un locker o il tuo indirizzo) e te lo spediamo noi. Ogni regalo una volta sola, e i punti non cambiano.
-dove: il messaggio del bot «🎁 Hai sbloccato un regalo»; Profilo → «🎖 Livello e titolo» → «I tuoi regali» (il campo del recapito e «Mandamelo 🎁»); i regali di ogni gradino nella scala dei vantaggi.
-leva: REGALI_LIVELLO_ATTIVI (accesa di serie)
-pubblico: sì
-
 ## 2026-11-17 · chiedi-locker
 frase: Se un venditore non spedisce ai locker o ai punti di ritiro, alla cassa la riga del locker adesso resta visibile, spenta, con il tasto «Chiedi al venditore se spedisce con InPost o Poste»: lui riceve un avviso dal bot (senza sapere chi ha chiesto) che lo porta a spuntare i suoi corrieri, e quando lo fa chi aveva chiesto riceve l'avviso. Una richiesta per venditore ogni 7 giorni.
 dove: la cassa di un annuncio a spedizione di un venditore senza InPost, Poste o SDA, sotto «Spedizione a un indirizzo»; il messaggio del bot «Qualcuno vorrebbe ricevere … in un locker» col bottone «📦 Come spedisci».
 leva: RICHIESTA_PUNTI (accesa di serie)
+pubblico: sì
+
+## 2026-11-17 · onchain-controparte
+frase: Negli scambi P2P on-chain ora vedi chi c'è dall'altra parte: appena l'ordine è preso, nella pagina dello scambio compare la sua scheda con faccia, nome e stelline, come negli scambi Lightning. Toccando la faccia si apre il suo negozio.
+dove: P2P → «I miei scambi» → uno scambio on-chain preso, sotto la nota dello stato.
+leva: nessuna
+pubblico: sì
+
+## 2026-11-17 · onchain-annulla
+frase: Negli scambi P2P on-chain chi compra può annullare con «✕ Annulla» finché chi vende non ha ancora depositato i sats, come negli scambi Lightning: prima bisognava aspettare la fine del tempo del deposito.
+dove: P2P → «I miei scambi» → uno scambio on-chain preso, in attesa del deposito.
+leva: nessuna
 pubblico: sì
 
 ## 2026-11-17 · barattozon-onchain
@@ -433,6 +439,36 @@ pubblico: sì
 frase: I tuoi livelli adesso si sfogliano: nel Profilo, sotto «Livello e titolo», ogni livello è una tessera da scorrere col dito. Sulla tua c'è l'anello con i tuoi XP sulla soglia del prossimo, i livelli già passati hanno la spunta, quelli davanti il lucchetto, e sotto vedi i vantaggi del livello che stai guardando: ✅ quelli già tuoi, 🔒 quelli da sbloccare.
 dove: Profilo → «🎖 Livello e titolo» → «I vantaggi di ogni livello».
 leva: nessuna
+pubblico: sì
+
+## 2026-11-17 · stradina-obiettivi
+frase: Nel Profilo c'è «🧭 La tua stradina»: un tabellone lunghissimo dalla Terra alla Luna, su una mappa in otto zone, che vedi solo tu, fino all'halving del 2028. Ogni casella è una competenza (l'incasso automatico in Lightning, il wallet on-chain, la doppia configurazione Telegram + Nostr, il primo acquisto…): fatta, diventa una moneta d'oro e Tappo avanza. I tuoi amici sono pedine sul tabellone.
+dove: Profilo → «🎖 Livello e titolo» → «🧭 La tua stradina».
+leva: nessuna
+pubblico: sì
+
+## 2026-11-17 · contante-per-posta
+frase: Nel P2P c'è un metodo in più, «Contante per posta»: chi compra sats spedisce le banconote a chi le vende, in una busta sigillata nascosta in un pacco, con un servizio tracciato. Le regole sono scritte nello scambio: chi spedisce filma l'imballo col numero di tracciamento in vista, chi riceve filma l'apertura prima di liberare i sats, e chi prende l'ordine blocca una piccola cauzione.
+dove: P2P → «Pubblica» → «Altri metodi ▾» → «Contante per posta»; la pagina dello scambio con le regole; «Info P2P», voce «Contante per posta».
+leva: P2P_POSTA_ATTIVO (nuova, spenta di serie: in produzione resta spenta per scelta di Andrea, accesa solo sul collaudo)
+pubblico: no
+
+## 2026-11-17 · chat-onchain
+frase: Anche negli scambi P2P on-chain adesso c'è la chat fra chi compra e chi vende, come nel Lightning: cifrata, con foto e PDF, da quando l'ordine è preso a quando i sats vengono liberati. Quando l'altra persona ti scrive, il bot te lo dice col tasto che apre dritto la chat; in una disputa il moderatore la può leggere, e a scambio finito si cancella.
+dove: la pagina di uno scambio on-chain preso, riquadro «💬 Chat con …» in fondo (il richiamo «💬 Chat» in cima porta giù); il messaggio del bot «Hai un nuovo messaggio nello scambio on-chain» col bottone «🟠 Apri lo scambio».
+leva: P2P_CHAT_SCAMBIO (la stessa della chat del Lightning, accesa di serie)
+pubblico: sì
+
+## 2026-11-17 · serie-giorni
+frase: Nel tuo Profilo c'è una fiamma che conta quanti giorni di fila hai aperto Barattolo, col tuo record e gli ultimi sette giorni. Basta entrare una volta al giorno. Se salti un giorno riparte da 1 e il record resta. Non dà punti né premi e la vedi solo tu: è solo la soddisfazione di non fermarla.
+dove: Profilo, nel riquadro col tuo nome (riga «5 giorni di fila · record 12») e la fila dei sette giorni subito sotto; al primo accesso del giorno il saluto che compare in basso per un paio di secondi.
+leva: SERIE_GIORNI_ATTIVA (accesa di serie)
+pubblico: sì
+
+## 2026-11-17 · premi-fedelta
+frase: I negozi possono premiare chi torna a comprare: nel Profilo, «🎀 Premi fedeltà», chi vende scrive fino a quattro soglie in euro col suo regalo («da 100 € la borsa, da 200 € la tazza»). Barattolo conta quanto ogni cliente ha speso lì e, passata la soglia, il premio compare sul suo ordine successivo: il venditore lo mette nel pacco. Sulla pagina del negozio vedi i premi e quanto hai già speso.
+dove: Profilo → «🎀 Premi fedeltà»; la pagina di un negozio, riga «🎀 Premi fedeltà» sotto le promesse; il dettaglio dell'ordine, riga «🎀 Premio fedeltà»; il messaggio del bot «Premio fedeltà!».
+leva: PREMI_FEDELTA_ATTIVI (accesa di serie)
 pubblico: sì
 
 ## 2026-11-17 · caccia-a-tappo

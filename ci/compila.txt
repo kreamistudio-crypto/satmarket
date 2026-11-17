@@ -129,6 +129,7 @@ collaudo_recapito_aggiornato.py
 collaudo_chat_scambio.py
 collaudo_allegati_chat.py
 collaudo_chat_mercatino.py
+collaudo_chat_onchain.py
 collaudo_garanzia_lunga.py
 collaudo_promemoria_gesto.py
 collaudo_x_risonanza.py
@@ -205,6 +206,7 @@ collaudo_eth_xmr.py
 collaudo_mappa_ritiro.py
 collaudo_feedback_modificabile.py
 collaudo_mancia.py
+collaudo_premi_fedelta.py
 collaudo_cassa_negozio.py
 collaudo_payjoin.py
 collaudo_elimina_esauriti.py
@@ -212,5 +214,6 @@ collaudo_codici_uno_alla_volta.py
 collaudo_etichetta_alimenti.py
 collaudo_avvisi_barattolo.py
 collaudo_spedisci_entro.py
-collaudo_regali_livello.py
 collaudo_chiedi_locker.py
+collaudo_serie_giorni.py
+collaudo_sentinella.py

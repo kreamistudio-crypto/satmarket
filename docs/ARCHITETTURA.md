@@ -10954,10 +10954,12 @@
   ACCESA e oggi è SOSPESA: la CLASSIFICA aspetta quel giorno (finché
   farmare è gratis misurerebbe il tempo libero, non il commercio), e
   il «da N persone» qui sotto va tenuto, o nessuno può accorgersi di
-  niente. NIENTE streak consecutivo: in un mercatino non c'è nulla da
-  fare ogni giorno, e una fiammella che si spegne punisce chi ha
-  lavorato invece di aprire l'app; se servirà, si contano i giorni
-  TOTALI, che salgono e basta.
+  niente. NIENTE streak consecutivo NEGLI XP: in un mercatino non c'è
+  nulla da fare ogni giorno, e una fiammella che si spegne punisce chi
+  ha lavorato invece di aprire l'app. (ROVESCIATO IN PARTE il 17 nov
+  2026, su richiesta di Andrea: la serie dei giorni di fila ESISTE, ma
+  fuori dagli XP — è un contatore che non dà niente, riparte in
+  silenzio e tiene il record. Vedi «LA SERIE DEI GIORNI 🔥».)
   COORTI: `COORTI` generalizza il distintivo Pioniere (posizione
   ≤100) in una scala — pioniere 100 · fondatore 500 · veterano 2000 ·
   bottegaio 10000. Chi entra oltre l'ultima soglia NON ha coorte, ed
@@ -11294,35 +11296,6 @@
   `scalaLivelliHTML`, nel cassetto «Livello e titolo»). Un vantaggio
   nuovo legato al livello si aggiunge LÌ, o la scala dice meno del
   vero.
-  I REGALI PER LIVELLO (17 nov 2026, il merch «Un tempo per te»; il
-  perché in Cantieri, «I regali per livello»): il sesto vantaggio della
-  scala, chiave `regalo` di ogni gradino (`regalo_del_livello`: il
-  testo di `REGALI_LIVELLO`, '' a leva `REGALI_LIVELLO_ATTIVI` spenta,
-  se il gradino non ne ha o se il config è storto; «nuovo» non ne ha).
-  Tabella `regali_livello` (UNIQUE tg_id+livello, come `badge_utente`):
-  stato sbloccato → richiesto → spedito, col `recapito` scritto da chi
-  riceve. IL GIUDICE è `sblocca_regali_livello` (INSERT OR IGNORE sui
-  gradini attraversati, `livelli_raggiunti`: la scala si attraversa
-  tutta, un ordine grosso che salta due gradini sblocca due regali;
-  fantasma escluso), chiamato dal gancio `premia_regali_livello` IN
-  CODA a `premia_distintivi` — ogni posto che muove gli XP passa già di
-  lì — e dalla rotta della richiesta PRIMA di giudicare, così chi era
-  già «pratico» il giorno del deploy trova la riga nata lì. NON MUOVE
-  GLI XP. `/api/me` porta `regali_livello` (`regali_livello_di`, una
-  LETTURA: chi ha il gradino senza riga esce «sbloccato» lo stesso;
-  lista vuota a leva spenta, e il cassetto tace) su una connessione
-  sua, fail-open. Rotte: `POST /api/me/regali/{livello}/richiedi`
-  (recapito 10..`RECAPITO_REGALO_MAX`=500, 404 leva o gradino senza
-  regalo, 403 non raggiunto, 409 già chiesto; avviso ai moderatori con
-  COSA e A CHI, MAI il recapito), `GET /api/admin/regali` (l'unico
-  posto dove il recapito esce: richiesti prima, dal più vecchio, poi
-  spediti), `POST /api/admin/regali/{id}/spedito` (409 se non era
-  «richiesto»; avvisa chi riceve). Client: `renderRegali` nel blocco
-  `regaliBlocco` del cassetto (solo sbloccato/richiesto/spedito, il
-  campo del recapito e «Mandamelo» sullo sbloccato); pannello admin
-  «🎁 Regali per livello» (admin.html, `caricaRegali`, letto
-  all'apertura). La spedizione è un gesto A MANO di Andrea dal sito di
-  stampa: Barattolo non compra e non spedisce niente.
   I CODICI INVITO (set 2026; il perché in Cantieri, «I codici invito
   con gli XP»). Ognuno ha UN codice — sei caratteri da
   `INVITO_ALFABETO`, niente 0/O/1/I/L e niente vocali — nato la prima
@@ -29092,6 +29065,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Le prove: `prove_barattozon_onchain`; il collaudo:
   `collaudo_p2p_onchain_barattozon`. Il verbale: CANTIERI, «Barattozon
   anche on-chain».
+  COMPRA CON BARATTOZON (17 nov 2026, cantiere compra-con-bz, richiesta
+  di Andrea dopo il giro guidato su amazon.it). La stessa estensione
+  (0.2.0) mette il percorso INTERO col marchio Barattozon: sotto
+  «Aggiungi al carrello» (`#add-to-cart-button`) e sotto «Procedi
+  all'ordine» (`#sc-buy-box-ptc-button`) un bottone «Compra con» + logo,
+  che al tocco preme SOLO quel bottone di Amazon; alla cassa
+  (`/checkout/`, `/gp/buy/`) un cartello fisso coi tre passi e un
+  contorno arancio sulla riga della frase «Paga in contanti»
+  (`rigaContantiBz`), senza nessun clic. La pagina la decide
+  `paginaBz(location.pathname)`; «thankyou» resta al bottone del PayCode.
+  MAI «Acquista ora» (l'1-Click ordinerebbe) ne' l'invio dell'ordine:
+  sentinella in `prove_estensione_barattozon`. Il logo e' un data: URL
+  dentro `amazon.js` (`LOGO_BZ`, assets/barattozon.webp a 178x56): niente
+  `web_accessible_resources`, niente permessi nuovi. Dal secondo giro
+  (17 nov, sera): alla cassa `scegliContanti` preme il SOLO pallino di
+  quella riga (della label o l'unico), una volta; il riquadro del PayCode
+  chiede la commissione a chi paga (0-20 %, `commissioneBz`) e la manda
+  come `premio=-N`, che `datiBzDaFrammentoP2P` passa da
+  `premioTabacchinoP2P` e `apriNuovoOrdineP2P` scrive in
+  `p2pNuovoPremioTab`: il foglio si apre al passo 5, un tocco a
+  «Pubblica» (mai da solo). Il verbale: CANTIERI,
+  «Compra con Barattozon: il bottone col marchio su prodotto, carrello e cassa».
   IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea, rifatto due volte;
   il terzo giro il 24): nel libro, su «Vendi BTC», dal fondo del + rosso
   della barra scende A TENDINA la sua continuazione (`#navBarattozon`):
@@ -31594,6 +31589,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   systemd. Prova: `prove_connettore_interrompibile`. La metà di
   macchina (Caddy che aspetta, il tetto dello stop) sta in PRODUZIONE,
   «IL RIAVVIO DOLCE».
+- LA SENTINELLA DEL SERVER FERMO (17 nov 2026, perché in CANTIERI, «La
+  sentinella del server fermo»): un filo suo, `sentinella` (daemon, mai
+  un task: un ciclo fermo non lo farebbe girare), bussa a `/api/salute`
+  da loopback ogni `SENTINELLA_OGNI_S` (30 s) con un tetto di
+  `SENTINELLA_TETTO_S` (20 s). L'indirizzo lo leggono gli argomenti di
+  uvicorn (`sentinella_indirizzo`: `--port`, e `--host` 0.0.0.0 diventa
+  127.0.0.1): senza porta (prove, script) non parte, e la riga 🧊
+  all'avvio lo dice sempre. Il giudice è `sentinella_passo`, PURO: conta
+  SOLO il silenzio (un 503 o una porta chiusa sono «altro», e un
+  riavvio non li curerebbe). Al primo silenzio la pila di TUTTI i fili
+  nel journal (`faulthandler.dump_traceback`); muto da
+  `SENTINELLA_USCITA_S` (180 s) una seconda pila, il segno
+  `.sentinella-uscita` accanto al database e `os._exit(70)`: systemd
+  (Restart=always) lo rialza, e `avvia_sentinella` trasforma il segno
+  in un avviso nella stanza «errori». Lo spegnimento (`_SI_CHIUDE`) non
+  conta mai. A mano: `kill -USR1 <pid>` scrive la stessa pila
+  (`faulthandler.register`). Leva `SENTINELLA_ATTIVA`, di serie accesa.
+  Prove: `prove_sentinella_server_fermo`, `collaudo_sentinella` (un
+  server vero fermato con un `time.sleep` in una rotta async).
 - IL FALSO LOGOUT (19 ott 2026, cantiere logout-apk; perché in
   CANTIERI, «Il falso logout dell'APK»): in `avvia()` il /api/me passa
   da `sondaMe`, che restituisce SOLO una risposta vera del server. Un
@@ -31860,6 +31874,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    letterali li timbra `_timbra_asset_pagina`, quindi max-age di un
    giorno; vedi CANTIERI, «L'icona del carrello in Esplora per
    categorie»),
+   `/assets/tappo.jpeg`, `/assets/stradina/{nome}` (whitelist a
+   tupla `FILE_MAPPA_STRADINA`: gli otto pezzi di mappa del tabellone,
+   le diciotto icone delle caselle e Tappo-pedina),
+   `/assets/stradina/suoni/{nome}` (whitelist a tupla
+   `FILE_SUONI_STRADINA`: i venti effetti MP3 del tabellone e del gioco), le rotte PWA (`/manifest.json`, `/sw.js`,
    `/assets/caccia-tappo.webp` (Tappo in persona nella Caccia a Tappo,
    17 nov 2026: l'ufficiale scontornato, WebP con trasparenza, 560x721,
    ~58 KB, max-age di un giorno — vedi «LA CACCIA A TAPPO»),
@@ -32675,6 +32694,38 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   e la riga del metodo nel post del canale («💳 SEPA, 💵 Contanti»: il
   💵 solo davanti a «Contanti», a parola intera). Prove: `prove_contanti_zona`, la
   coda di `prove_p2p_libro` e `prove_card_p2p_vetrina`.
+
+- IL CONTANTE PER POSTA NEL P2P (17 nov 2026, perché in CANTIERI, «Il
+  contante per posta: la nona voce del P2P»). La voce «Contante per
+  posta» di `P2P_METODI` (sotto «Altri metodi ▾», anche in CHF) è la
+  busta di banconote spedita: chi compra sats la manda a chi li vende.
+  `P2P_POSTA` la nomina, `contantePerPostaFraP2P(metodi)` la cerca a
+  parola intera, `scambioInPostaP2P(o)` è la gemella di
+  `scambioInContantiP2P` coi tre gradi (recapito viaggiato
+  `recapitoInPostaP2P`, metodo scelto, unico dell'ordine). Il form del
+  recapito è `posta` (nome, via, CAP e città, note facoltative; si
+  ricorda come l'IBAN) e sta PRIMA di `contanti` in `P2P_FORME_RECAPITO`,
+  perché la regex del contanti prende «contant». Le regole sono quattro
+  costanti (`REGOLA_POSTA_COMPRA`, `REGOLA_POSTA_VENDE`, `CONSIGLI_POSTA`,
+  `REGOLA_DISPUTA_POSTA`), lette dal foglio Pubblica e dal dettaglio
+  (`regolaPostaFoglioP2P`), dalla pagina dello scambio
+  (`riquadroPostaP2P`) e da Info P2P (`#p2pinfo-posta`); il verbo del
+  gesto è «Ho spedito i contanti» (`gestoPagoP2P`), i passi e gli stati
+  (`STATI_POSTA_P2P`, dentro `statoContantiP2P`) dicono la spedizione e
+  l'apertura filmata. LA CAUZIONE LA DECIDE IL NODO: `only_payment_methods`
+  del suo settings.toml, letta dal 38385 (`cauzioneInfoP2P`); il client
+  cambia solo le parole («non hai spedito» al posto di «non ti sei
+  presentato»). LA LEVA (17 nov 2026, cantiere leva-posta, Andrea: «quando
+  la porto in produzione, la leva lasciala spenta»): `P2P_POSTA_ATTIVO`,
+  letta col solito import morbido, SPENTA di serie nel codice (eccezione
+  voluta alla regola delle leve nuove accese), in busta come `posta` e
+  nel pannello delle leve. Spenta, `metodiOffertiP2P(lista, attiva)`
+  toglie la voce da quel che il foglio e il filtro offrono
+  (`metodiPubblicabiliP2P`, `metodiValutaP2P`, anche in CHF) e
+  `renderP2PInfo` nasconde `#p2pInfoPosta`; i giudici degli ordini
+  (`scambioInPostaP2P` e compagni) NON la guardano, così un ordine che
+  porta il metodo si legge lo stesso. Il client la sa da `postaAttivaP2P()`
+  (`p2pCoord().posta`). Prove: `prove_contante_per_posta`.
 
 - LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, I TENTATIVI, IL
   FILTRO DI CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, perché
@@ -36326,6 +36377,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Lightning, `giudiceTxidCoinP2P` e `giudiceChiaveTxXmrP2P`) e
   `txCoinOcP2P` (copia ed explorer). Le due tabelle delle forme, server e
   `P2P_RETI_COIN`, le confronta `prove_onchain_txid_moneta`.
+- LA CHAT DELLO SCAMBIO ON-CHAIN (17 nov 2026, cantiere
+  onchain-chat-sollecito; CANTIERI, «La chat dello scambio on-chain»). Il
+  motore della chat del mercatino (chiavi d'ordine presentate dal server,
+  scorta, chiamata) sull'id pubblico dello scambio, `FORMA_CHAT_ONCHAIN`
+  («bar-onchain-» e 16 esadecimali). `_chat_chiavi_dal_server(ordine)`
+  (mercatino o on-chain) decide nelle rotte `leggi`, `invia`, `chiama`,
+  in `_chat_mercatino_per_moderatore` (a stato `disputa`) e
+  nell'allegato del moderatore; `_parti_chat` passa a
+  `_parti_ordine_onchain_chat` (compratore = `ricevente_id`, venditore =
+  `depositante_id`, viva in `CHAT_ONCHAIN_APERTA`, `disputa`).
+  `_chat_p2p_chiede` vuole `p2p_onchain_leva()` e risponde a
+  `P2P_CHAT_SCAMBIO`; la scorta si riempie con `MERCATINO_CHAT_ORDINI` o
+  con quella. La chiave `mod` parte solo a `disputa`. Avviso e chiamata
+  col bottone `P2P_ONCHAIN_BOTTONE` su `?scambio=<id>&chat=1`.
+  `_p2p_onchain_per` da' `chat` con `_p2p_onchain_chat_vista` ('aperta'
+  alle parti, 'moderazione' al moderatore in disputa). Nel telefono
+  `chatScOcP2P`, `chatScServerP2P`, la riga `chatScRigaP2P` da
+  `p2pOnchainMiei` (`mercatino: true, onchain: true`), `chatOcBloccoHTML`
+  / `chatOcRichiamoHTML` / `chatOcModHTML` in `schedaOnchainP2P`,
+  `ridisegnaOnchainChatP2P`; le frasi del riquadro sono quelle del
+  Lightning. Prove: `prove_chat_onchain`, `collaudo_chat_onchain`.
 - I DUE TASTI DELLA RETE NEL FOGLIO DELL'ORDINE (16 nov 2026, cantiere
   coin-quasi; il perché in CANTIERI, «I due tasti della rete nel foglio
   dell'ordine…»). `tastiReteFoglioP2P` disegna «⚡ Lightning» / «₿
@@ -36633,6 +36705,85 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   spedire entro …» / «Il venditore spedisce entro …» / «Spedito …» sul
   passo della spedizione (`rigaSpedito`). Prove: `prove_spedisci_entro`
   e `collaudo_spedisci_entro`.
+
+- LA SERIE DEI GIORNI 🔥 (17 nov 2026, cantiere serie-giorni; richiesta
+  di Andrea, sul modello di Ditto). Quanti giorni DI FILA una persona
+  ha aperto Barattolo: un contatore e basta — niente XP, niente premi,
+  e la vede solo chi la fa (mai nel negozio né nel riquadro venditore).
+  ROVESCIA IL «NIENTE STREAK» D'AGOSTO sapendolo: il motivo di allora
+  (la fiammella che si spegne punisce chi ha lavorato) resta dentro le
+  regole — chi salta un giorno riparte da 1 IN SILENZIO, nessun «hai
+  perso», nessun promemoria del bot, e il RECORD non scende mai.
+  I DATI: tabella `serie_giorni` (tg_id PK, `giorni`, `record`,
+  `ultimo` = giorno italiano «AAAA-MM-GG»), una riga a persona. La
+  lapide `utenti.xp_ultimo_giorno` NON si riusa. IL GIORNO È QUELLO
+  ITALIANO per tutti (`_giorno_roma`, senza tzdata: la regola dell'ora
+  legale europea, gemella di `_epoch_roma`), così il fuso del telefono
+  non regala e non toglie. IL GIUDICE è `serie_passo`, puro: già
+  passato oggi = niente; passato ieri = +1; un buco o la prima volta =
+  1; un `ultimo` nel futuro (orologio tornato indietro) non si tocca.
+  `_giorno_prima` è aritmetica di DATE (il giorno del cambio d'ora dura
+  23 o 25 ore). DUE PORTE, UN TIMBRO (`timbra_serie`, una scrittura al
+  giorno a testa): `/api/me` — dentro `if u:`, prima del commit,
+  FAIL-OPEN come gli XP — e `POST /api/me/serie` per l'app lasciata in
+  tasca (PWA, Mini App) che torna in primo piano senza rifare /api/me;
+  la rotta non legge un corpo, il giorno lo decide il server. LA BUSTA
+  (`/api/me` → `serie`): `giorni`, `record`, `oggi_contato`, `nuova`
+  (è il primo passaggio di oggi), `oggi`, `feriale` (0 = lunedì, in
+  Italia) e `tappe` (`SERIE_TAPPE`: 7, 30, 100, 365). FUSIONE:
+  `_serie_unisci` in `esegui_fusione` — resta la serie viva più lunga,
+  col record più alto dei due. CANCELLAZIONE: `serie_giorni` in
+  `CANCELLA_TOGLI`. IL CLIENT: tre pezzi PURI (busta → HTML), fatti per
+  essere riusati dalla stradina degli obiettivi: `serieRigaHTML` (la
+  riga «5 giorni di fila · record 12» dentro la carta del Profilo,
+  sotto le stelle), `serieSettimanaHTML` (gli ultimi sette giorni, oggi
+  per ultimo, accesi quelli della serie: mai una croce su un giorno
+  saltato) e `SERIE_FIAMMA` (SVG nell'arancio di casa: l'emoji cambia
+  faccia da un telefono all'altro). `serieBusta` rifà interi i numeri
+  prima che finiscano nella pagina. `serieFesta`: il saluto del primo
+  passaggio del giorno (solo con `nuova`, dal SECONDO giorno, fuori dal
+  tocco, 2,8 s; alle tappe il nome, il bordo e 4,2 s). `serieRitorno`
+  (visibilitychange): bussa alla rotta solo se il giorno italiano visto
+  dal telefono è diverso da quello dell'ultima busta, al più una volta
+  ogni dieci minuti. All'avvio la busta NON ridisegna il Profilo (a
+  metà di /api/me); al ritorno sì. Leva `SERIE_GIORNI_ATTIVA`, accesa
+  di serie: spenta, niente timbro, niente chiave in /api/me, rotta 404,
+  le righe restano. Prove: `prove_serie_giorni`,
+  `collaudo_serie_giorni`.
+- I PREMI FEDELTÀ DEL NEGOZIO 🎀 (17 nov 2026, cantiere premi-fedelta; la
+  proposta di un negozio vero, «Un tempo per te»). Il venditore scrive
+  fino a `PREMI_FEDELTA_MAX` (4) gradini «da N € spesi da me, nel pacco
+  dopo metto X» in `utenti.premi_fedelta` (JSON), sempre letto dal
+  giudice unico `premi_fedelta_leggi` (soglie da `PREMI_FEDELTA_MIN_EUR`
+  a `PREMI_FEDELTA_MAX_EUR`, regalo di `PREMIO_TESTO_MAX` caratteri,
+  doppioni e sporcizia cadono in silenzio). Il conto è
+  `speso_nel_negozio`: ordini `released` della coppia, non di prova e
+  col cambio, in euro (`prezzo_sats × cambio_eur`, lo stesso numero
+  degli XP). Una soglia passata MATURA una riga in
+  `premi_fedelta_maturati` (UNIQUE compratore, venditore, soglia; il
+  regalo fotografato) — da `premia_fedelta_negozio`, chiamata in
+  `_sblocca_sats` dopo i distintivi, con l'avviso a tutti e due — e si
+  AGGANCIA (`ordine_id`) al primo ordine della coppia pagato e non
+  spedito (`PREMI_STATI_AGGANCIO` = locked), uno per ordine; un ordine
+  morto (`PREMI_STATI_MORTI`) lo stacca. L'aggancio è PIGRO, in
+  `premi_di_ordini` dentro `/api/orders` (scrittura idempotente su una
+  GET, come i distintivi in /api/me), perché i pagamenti entrano da
+  molte porte; lì matura anche in silenzio chi aveva già speso prima
+  che il negozio scrivesse le soglie. Escono: `premio_fedelta`
+  {soglia, premio} sulle righe di `/api/orders`, solo alle due parti;
+  `premi_fedelta` (e `speso_qui_eur` a chi guarda da cliente) in
+  `/api/negozio`; la lista pulita e `premi_fedelta_leve` in `/api/me`.
+  Rotta: `POST /api/me/premi-fedelta` {premi: [...]}, chiave
+  obbligatoria (MSG_CLIENT_VECCHIO), lista vuota = spento. Fusione e
+  cancellazione portano/tolgono le righe per `compratore_id` e
+  `venditore_id`. Leva `PREMI_FEDELTA_ATTIVI` (accesa di serie, gruppo
+  «🎁 Premi fedeltà del negozio» del pannello): spenta, niente vetrina,
+  niente maturazioni né agganci nuovi; gli agganci fatti restano
+  scritti. Nessun sat si muove. Nel telefono: il cassetto
+  `#accPremiFedelta` del Profilo (`renderPremiFedelta`,
+  `setPremiFedelta`), la riga `premiNegozioRiga` dopo le due promesse
+  sorelle in `#negozioPromesse`, e `notaPremioFedelta(o)` nel dettaglio
+  dell'ordine. Prove: `prove_premi_fedelta` e `collaudo_premi_fedelta`.
 - LA CACCIA A TAPPO (17 nov 2026, cantiere caccia-a-tappo; il perché in
   CANTIERI, «La Caccia a Tappo: il gioco dentro Barattolo»). Il gioco
   sta tutto nel blocco in fondo a `server.py` e in una vista di

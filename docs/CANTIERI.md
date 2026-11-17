@@ -86917,88 +86917,6 @@ nella coda di questo file): sull'albero rebasato (sopra 8b63e4e8) le tre
 sezioni toccate più le 31 che leggono i documenti, 1.648/0, e i tre
 collaudi del relay 3/0.
 
-## I regali per livello (17 nov 2026, cantiere regali-livello; il merch «Un tempo per te», Andrea: «Idea 1: articoli prenotabili, se si raggiunge la quantità minima di ordini allora si producono. Idea 2: investire e farle a prescindere e poi metterle come regali nei pacchi al raggiungimento di una sorta di punteggio»)
-
-DECISO (studio prima, card alle 11:13, poi il piano in dieci righe e l'ok
-di Andrea alle 11:15). I quattro articoli (borsa di tela, tazza,
-maglietta, quaderno col logo «Un tempo per te») NON si producono in
-scorta e NON si prenotano: si stampano su richiesta e si REGALANO a chi
-sale di livello. I livelli esistevano già (LIVELLI: nuovo, avviato,
-pratico, esperto, maestro, due chiavi XP+affari) e sono già la scala del
-commercio: qui si appende un oggetto a ogni gradino, dal secondo —
-borsa all'avviato, tazza al pratico, maglietta all'esperto, quaderno al
-maestro (`REGALI_LIVELLO`). Leva `REGALI_LIVELLO_ATTIVI` accesa di serie
-(regola del 14 nov), nessun gesto sul VPS. Il regalo NON muove gli XP:
-il perimetro («gli XP sono il commercio e nient'altro») resta intero,
-e una prova lo dice. La spedizione è un gesto a mano di Andrea dal sito
-di stampa: Barattolo non compra, non tiene scorte e non spedisce.
-
-SCARTATO. Il crowdfunding vero (preordini che si producono alla soglia):
-avrebbe voluto sats tenuti per settimane, il rimborso se la soglia non
-arriva e un cambio che balla nel frattempo — codice nuovo e custodia
-lunga per provare un merch; la stampa su richiesta fa già quel che
-l'idea 1 chiedeva (si produce solo quando qualcuno compra, anche un pezzo
-solo), e quei quattro articoli possono stare in vetrina come annunci
-normali dell'account ufficiale senza una riga di codice. La scorta da 50
-(800-1.300 € per i quattro) resta possibile domani: la macchina dei
-regali non cambia. Il regalo NEL PACCO di un altro venditore: il pacco lo
-spedisce chi vende, non noi, quindi il regalo parte a parte — da qui il
-recapito scritto da chi riceve e non pescato da un ordine. Un punteggio
-NUOVO (100, 200…): due scale per la stessa cosa, la lezione del banner a
-due porte; si usano i livelli. Il recapito nell'avviso al canale admin:
-no, è un dato personale, esce solo nel pannello.
-
-COM'È FATTO. Un gancio solo: `premia_regali_livello` in coda a
-`premia_distintivi`, che ogni posto che muove gli XP chiama già (login,
-ordine concluso, fusione). Il giudice `sblocca_regali_livello` è un
-INSERT OR IGNORE sui gradini ATTRAVERSATI (`livelli_raggiunti`): chi
-salta due gradini con un ordine grosso sblocca due regali, e al secondo
-giro non succede niente. La rotta della richiesta chiama lo stesso
-giudice PRIMA di giudicare: chi era già «pratico» il giorno del deploy
-trova la riga nata lì, e `/api/me` nel frattempo lo mostra «sbloccato»
-senza scrivere (una lettura resta una lettura). Il testo del regalo si
-fotografa nella riga: il config può cambiare, la promessa fatta no. Il
-resto in Architettura, «I REGALI PER LIVELLO». ACCORDO col cantiere del
-carosello dei livelli (thread «Rifare la pagina dei livelli a
-carosello», stesso giorno): la logica e la chiave `regalo` nella scala le
-scrive questo cantiere; il carosello aggiunge da sé la riga «🎁 Un
-regalo: …» in `vantaggiLivello` quando il campo è su develop. Qui il
-blocco «I tuoi regali» sta SOTTO la scala, in `regaliBlocco`, per non
-toccare `renderLivello` che l'altro cantiere sta riscrivendo.
-
-PROVATO. `prove_vantaggi_livelli` (+3: il regalo di ogni gradino, la
-leva spenta, il config storto) e `prove_regali_livello` (28): leva accesa
-nel codice e in config_esempio, i giudici puri in esecuzione
-(`livelli_raggiunti` con le due chiavi, `regalo_del_livello` pulito e
-con una lista per sbaglio), le sentinelle (INSERT OR IGNORE, fantasma,
-tabella, gancio dopo il commit, avviso dopo il commit, mai `UPDATE
-utenti SET xp`, /api/me, i codici 400/403/409 della richiesta, l'avviso
-admin senza recapito, i 403 delle porte admin, la leva nel pannello,
-client e pannello) e il banco node del blocco (solo
-sbloccato/richiesto/spedito, un campo e un bottone, testo scappato).
-Controprove: senza il gancio una rossa; senza la chiave nella scala il
-banco salta (KeyError). `collaudo_regali_livello` (38) sul server vero
-nel venv senza coincurve: il gancio (due righe, due avvisi, idempotente,
-nuovo e «solo xp» a mani vuote, fantasma), /api/me (scala e stati), la
-richiesta (400 corto, 404 gradino senza regalo, 403 non raggiunto, ok
-col recapito ripulito, l'avviso admin senza via, 409 la seconda volta,
-tetto a 500), il giorno del deploy (nessuna riga, /api/me lo vede,
-la richiesta scrive entrambe), il pannello (403, coda dal più vecchio
-col recapito, «spedito» una volta con l'avviso alla persona, 404, lo
-spedito in fondo), la leva spenta (niente sblocchi, scala muta, 404,
-le righe di prima restano). Controprova: la guardia del 409 tolta,
-una rossa. Suite severa intera e collaudi della CI: vedi il verbale del
-push.
-
-DA GUARDARE. Dal vivo sul collaudo: con l'account 222 (venditore)
-concludere un ordine fino a «Bottega avviata» e leggere il messaggio del
-bot, poi il campo nel Profilo e la riga nel pannello admin. Da Andrea,
-fuori dal codice: l'account sul sito di stampa (Printful o Gelato), il
-logo in alta risoluzione, il costo dei quattro pezzi; se vuole venderli
-anche, quattro annunci normali dall'account ufficiale. Non c'è ancora il
-recapito precompilato dall'ultimo ordine (si riscrive a mano) né un
-tetto ai regali al giorno: con quattro gradini e la soglia degli affari
-non serve, ma se i regali diventassero dieci andrebbe guardato.
 ## «Chiedi al venditore se spedisce con InPost o Poste»: il campanello sulla porta chiusa del locker (17 nov 2026, cantiere chiedi-locker; voce #359 del Todo, Andrea: «si devono poter selezionare solo i locker scelti dal venditore, se non sono presenti, ci deve essere la possibilità di pingare il venditore per chiedergli se può spedire con InPost o Poste»)
 
 LA PRIMA METÀ C'ERA GIÀ. Dal 12 ott 2026 (il 213, «Il punto di ritiro
@@ -87265,6 +87183,984 @@ Categoria `mercatino` della suite verde (le 6 rosse erano il
 
 DA GUARDARE. Sul telefono vero il nastro sotto il dito; la tessera
 accanto a 320px di schermo.
+## Il contante per posta: la nona voce del P2P (17 nov 2026, cantiere contante-per-posta; Andrea: «aggiungere tra le modalità di pagamento anche il "send cash by mail", viene fatto un pacchetto con dentro materiale da imballaggio [...] assieme ad una busta di carta ben sigillata dentro una ulteriore busta apri chiudi di plastica e ulteriormente sigillata… Funziona!»; sulla scheda: «Sì, con cauzione obbligatoria»)
+
+LO STUDIO, PRIMA DEL CODICE (la domanda del coordinatore: si può fare?).
+Spedire banconote in Italia non è vietato per legge: Poste lo ammette
+con la Posta Assicurata («denaro nei limiti di legge, carte valori»,
+rimborso fino a 3.000 €, da 6,65 €, firma alla consegna), mentre la
+raccomandata ordinaria e i corrieri (BRT, GLS, DHL) il denaro lo
+escludono dalle condizioni: un pacco perso non si rimborsa. Il tetto ai
+contanti fra privati resta 5.000 € (dal 2027 il regolamento UE fissa
+10.000 € per le transazioni commerciali, l'Italia può tenere 5.000): il
+`P2P_MAX_EURO` a 250 € della beta è dentro con larghezza. Bisq ha il
+metodo dal 2021 (e Haveno lo eredita): chi spedisce filma l'imballo col
+numero di tracciamento in vista, chi riceve filma l'apertura col numero
+in vista, sempre tracciato e meglio assicurato, l'arbitro decide sulle
+prove e NON rimborsa chi le perde. Il metodo è il più truffabile del
+libro («ho spedito» senza prova, «la busta era vuota»), e la risposta
+di Bisq è l'unica che regge: le prove scritte PRIMA, non il giorno della
+disputa. Il deposito di Mostro basta (i sats di chi vende sono già
+fermi): non serve il 2-di-3 on-chain.
+
+COSA SI È FATTO. 1) La NONA VOCE di `P2P_METODI`, «Contante per posta»,
+sotto «Altri metodi ▾» (`P2P_METODI_ALTRI`) e anche in franchi
+(`P2P_METODI_CHF`). Il nome in italiano, non «cash by mail»: le voci del
+libro sono in italiano e viaggiano nel tag `pm` dei client altrui. 2) IL
+FORM DEL RECAPITO `posta`: nome e cognome sulla busta, via e civico, CAP
+e città, note facoltative (citofono, fermo posta); si ricorda come
+l'IBAN; il testo parte come «Contante per posta» + tre righe, che
+`righeRecapitoP2P` legge come il titolo e i dati. STA PRIMA DI `contanti`
+in `P2P_FORME_RECAPITO`, e non è ordine di comparsa: la regex del
+contanti (`/contant|di persona|a mano|cash/`) prende anche «Contante per
+posta», e chi vende finirebbe al form dell'appuntamento — la controprova
+di `prove_contante_per_posta` toglie il form e lo vede succedere. 3) I
+GIUDICI, gemelli di quelli del contanti: `P2P_POSTA`,
+`contantePerPostaFraP2P(metodi)` a parola intera (il filtro del libro
+cerca per pezzo), `recapitoInPostaP2P(o)` (la prima riga del recapito
+viaggiato, `/^contante per posta$/`), `scambioInPostaP2P(o)` coi tre
+gradi (recapito viaggiato, metodo scelto, unico dell'ordine — su «SEPA,
+Contante per posta» senza scelta tace, come il contanti dal 10 ott). 4)
+LE PAROLE: il gesto «Ho spedito i contanti» (`gestoPagoP2P`), i passi
+(«Spedisci i contanti tracciati», «Ricevi il pacco», «Lo apri filmando e
+conti»), gli stati (`STATI_POSTA_P2P` dentro `statoContantiP2P`:
+«Contanti spediti», le due frasi di chi aspetta), il recapito di chi
+spedisce intitolato «✉️ Dove spedire i contanti», il bottone di chi vende
+«✉️ Indica dove spedirti i contanti», le frasi dell'attesa del recapito.
+5) LE REGOLE, quattro costanti scritte una volta (`REGOLA_POSTA_COMPRA`,
+`REGOLA_POSTA_VENDE`, `CONSIGLI_POSTA`, `REGOLA_DISPUTA_POSTA`): nel
+foglio Pubblica e nel dettaglio sotto il metodo (`regolaPostaFoglioP2P`,
+con lo stesso confine del contanti: con più metodi solo scegliendolo),
+nella pagina dello scambio sopra il bottone del passo (`riquadroPostaP2P`,
+finché lo scambio è vivo: la regola dal proprio lato, i consigli
+dell'imballo a chi spedisce, la regola della disputa a tutti e due), e in
+«Info P2P» (`#p2pinfo-posta`, dopo il contanti di persona). Il numero di
+tracciamento e le foto vanno nella chat cifrata dello scambio, che c'è
+già; i video restano sui telefoni e si mostrano al moderatore in
+disputa. 6) LA CAUZIONE LA DECIDE IL NODO, e qui non si è toccato niente
+del giudice: `only_payment_methods` del blocco `[anti_abuse_bond]` di
+settings.toml (patch 0008 e 0010, a parola intera voce per voce), letta
+dal 38385 in `cauzioneInfoP2P`. Finché sul nodo c'è solo «Contanti», chi
+sceglie «Contante per posta» non blocca niente e il client non lo
+promette; la riga di DA-FARE-ANDREA (voce 18) aggiunge la voce alla
+lista, a libro fermo, dopo la promozione. Sono cambiate solo le PAROLE
+della cauzione: «col contante per posta» e «non hai spedito i contanti»
+al posto di «in contanti» e «non ti sei presentato all'incontro»
+(`rigaCauzioneDettP2P` sul metodo scelto o sull'unico dell'ordine,
+`riquadroCauzioneP2P` sullo scambio); la voce di Info P2P dice «non ha
+fatto la sua parte (all'incontro non si è presentato; per posta non ha
+spedito)». 7) Il libro di Tappo (l'elenco dei nove, gli «Altri metodi»,
+un paragrafo col metodo intero), `NOVITA.md`, ARCHITETTURA («IL CONTANTE
+PER POSTA NEL P2P»), PRODUZIONE (la nota al blocco della cauzione).
+
+IL NOME «POSTA ASSICURATA» NON STA NEI TESTI PER GLI UTENTI: la regola 9
+vieta «assicurato» (la sentinella del libro di Tappo e quelle di Info
+P2P cercano «assicurat»), e il nome commerciale del servizio di Poste
+l'avrebbe fatta rossa — visto alla prima suite. Nei testi si dice «il
+servizio di Poste Italiane per denaro e valori, da sportello, che il
+contante lo ammette e lo rimborsa fino a 3.000 €»; il nome resta qui e
+nello studio. Alla prima suite anche: `P2P_POSTA` nudo dentro
+`passiScambioP2P` rompeva i banchi che ritagliano i passi da soli
+(`typeof`, come le altre voci), NOVITA voleva la frase sotto i 400
+caratteri e `leva: nessuna` secca, `conoscenza.md` andava rigenerato, la
+sezione nuova voleva la sua categoria (`p2p`), e sette conteggi di
+metodi (otto → nove) in altre sezioni.
+SCARTATO. Un campo del tracciamento nel gesto «Ho spedito» (il `FiatSent`
+di Mostro non porta testo: il numero va in chat, che è cifrata e c'è
+già). Un video caricato nella chat (accetta foto e PDF; un video pesa e
+la prova vale anche se resta sul telefono). La mappa del contanti per la
+posta (è di chi si incontra: `contantiAManoP2P` resta a parola intera e
+la posta non ci entra). Una leva nuova (è una voce del vocabolario, come
+Wise: si toglie dalla lista se serve). Il 2-di-3 on-chain (il deposito
+Lightning basta).
+
+PROVATO. `prove_contante_per_posta` (nuova: il form e il suo posto, il
+testo composto con e senza note, la nona voce e gli «Altri metodi», il
+CHF, il giudice nei sette casi, il verbo, i passi, gli stati, la regola
+nel foglio, il riquadro, le quattro parole della cauzione, la
+controprova del form, i tre punti della pagina, Info P2P contro le
+costanti, la voce di Info sulla cauzione, il libro di Tappo, NOVITA).
+Aggiornate per la nona voce: `prove_lista_corta_metodi` (nove, cinque
+nascosti), `prove_p2p_chf` (sei metodi), `prove_contanti_zona` (nove
+etichette), le due sentinelle della lista letterale («nove voci»,
+«la stringa del protocollo non cambia»), `prove_contanti_pagina_leggera`
+(il titolo del recapito). Le chiamate nuove nel foglio e nel dettaglio
+sono dietro `typeof`: i banchi che ritagliano `renderNuovoOrdineP2P` da
+solo non la conoscono (visto rosso in `prove_pubblica_metodo_prima`,
+poi verde). IL VERBALE (17 nov 2026, albero del cantiere sopra
+origin/develop 108d8b7, venv come la CI senza coincurve): la suite
+severa intera 28.980 passate, 0 fallite, 2 saltate (le due di
+nostr-tools, che nel container non c'è: come negli altri cantieri
+cloud); i collaudi della CI `collaudi_ci.py --elenco ci/collaudi.txt
+--paralleli 2` 141 verdi, 0 rossi. POI IL REBASE su origin/develop
+868f797 (otto commit non miei: spedisci-entro, il primo wallet secondo e
+terzo giro, Packlink, lo specchio del relay, i regali per livello,
+chiedi-locker, la voce NOVITA dei regali), con tre conflitti di coda
+(NOVITA, CANTIERI: tenute tutt'e due; conoscenza.md rigenerato): nessun
+simbolo del cantiere toccato da quei commit (controllo per nome sul
+diff). Sull'albero rebasato: le 22 sezioni toccate e quelle che leggono
+i documenti, 0 fallite; i collaudi della CI di nuovo, 144 verdi, 0 rossi.
+RESTA DA GUARDARE. Il nodo: la riga di DA-FARE-ANDREA (voce 18), e poi
+dal telefono la riga della cauzione che compare scegliendo «Contante per
+posta» e tace con SEPA. Uno scambio vero per posta non c'è ancora stato.
+
+DAL VIVO, 17 NOV 2026, 12:10-12:17 Rome, con Andrea sul relay. Tre cose
+che la stesura non sapeva. (1) LO SPECCHIO NON RECUPERA LO STORICO: dopo
+il riavvio si è collegato a relay.zapstore.dev in 90 ms ma lo scan
+restava vuoto; letto `cmd_router.cpp` di strfry, la REQ del router porta
+`"limit": 0` — chiede solo quel che arriva da quel momento. La riga nel
+commento di `router.conf` sul flusso di Mostro («rifà la REQ senza
+since, quindi il relay serve quel che ha in magazzino») era SBAGLIATA
+da settembre: corretta. `strfry sync` non serve, relay.zapstore.dev non
+parla negentropy («the message type must be one between EVENT, REQ,
+CLOSE, COUNT and AUTH»). Scritto `deploy/relay/pesca-eventi.py` (solo
+libreria standard, gira nel container): UNA REQ, JSONL su stdout,
+`strfry import`. Pescati 8 eventi, 8 added: la scheda 32267, tre 30063
+(v1.3, v1.4, v1.5), tre 3063, un 30509. Il 1063 non c'era: resta nel
+filtro, non costa. (2) POWERSHELL: `git show … > file` scrive UTF-16 con
+CRLF; il file è arrivato sul relay doppio e illeggibile per `grep`, e
+riparato con `iconv -f UTF-16 -t UTF-8 | tr -d '\r'`. I valori sono
+giusti, le emoji dei commenti no: la copia pulita si porta con
+`cmd /c "git show … > %TEMP%\…"`, scritto in PRODUZIONE. (3) Il
+`router.conf` vivo era di 2593 byte contro i 6280 del repo: la macchina
+e la copia divergevano già (commenti), e nessuno lo diceva. Sul relay
+serve `sudo` (cartella di root), `jq` non c'è, e `docker compose exec`
+in una pipe vuole `-T` o non stampa. La riga di PRODUZIONE «se non
+arriva niente … relay.zapstore.dev non serve lo storico» è sostituita
+dalla procedura vera. Prova in più: `pesca-eventi.py` compila e non
+porta 64-hex. Questo giro è un secondo commit sopra a4f63637.
+
+## La chat dello scambio on-chain (17 nov 2026, cantiere onchain-chat-sollecito, terza parte; Andrea: «tutto deve essere come la parte lighting. Fai un giro su tutto», punto 6 della lista di parità)
+
+Nel P2P Lightning le due parti si scrivono in una chat cifrata dalla
+presa alla fine; nell'on-chain no: chi aveva mandato gli euro e chi li
+aspettava non avevano dove dirselo, se non fuori da Barattolo.
+
+DECISO. Lo stesso motore, con le chiavi del MERCATINO e non quelle del
+Lightning. Nel Lightning la chiave dello scambio la dà il coordinatore
+Mostro alle due parti, e la chat firma i saluti con quella; nell'on-chain
+il coordinatore non c'è, ed è esattamente il caso degli ordini del
+mercatino: le chiavi d'ordine le presenta il server (`chiavi_ordine`, la
+scorta di lucchetti di «fai come Signal», «Continua la chat qui», la
+chiamata «vuole scriverti»). Strada scartata: una terza famiglia di
+chiavi apposta, che avrebbe raddoppiato il codice delicato per niente.
+Un solo giudice nuovo, `_chat_chiavi_dal_server` (mercatino o on-chain),
+al posto della forma del mercatino dovunque il motore chiedeva «le chiavi
+le dà il server?»: ritiro, invio, chiamata, moderatore, allegato del
+moderatore. L'id nel cassetto è il nome pubblico dello scambio
+(`FORMA_CHAT_ONCHAIN`, «bar-onchain-» e sedici esadecimali: passa già per
+la forma del P2P, e il pallino lo prende senza ritocchi); le parti le dice
+la riga di `p2p_onchain_ordini` (`_parti_ordine_onchain_chat`: compra chi
+riceve i sats, vende chi li deposita). La chat c'è da `preso` alla fine,
+disputa compresa (`CHAT_ONCHAIN_APERTA`), e a sats rilasciati, rimborsati,
+o a scambio annullato o scaduto la scopa porta via tutto. LA LEVA è quella
+del Lightning, `P2P_CHAT_SCAMBIO` (accesa di serie), più l'on-chain del
+P2P acceso: «come la parte lighting», e niente leva nuova nel config del
+VPS. La scorta dei lucchetti si riempie con una delle due leve accese
+(mercatino o on-chain). LE FRASI sono quelle dello SCAMBIO: l'avviso e il
+patto del Lightning nel riquadro (non «Non pagare fuori dall'ordine»),
+«Si apre appena … apre lo scambio», «💬 Hai un nuovo messaggio nello
+scambio on-chain» senza il testo, col bottone «🟠 Apri lo scambio» che
+porta DRITTO alla chat (`&chat=1`, dentro Telegram `scambio_…_chat`). IN
+DISPUTA come nel mercatino: la chiave di lettura al moderatore la danno i
+telefoni di TUTTE E DUE le parti, e solo a stato `disputa` (il server
+rifiuta prima); il moderatore la legge dalla pagina dello scambio
+(`chatOcModHTML`, la riga dice `chat: 'moderazione'`). Sulla pagina il
+richiamo «💬 Chat» in cima e il riquadro in fondo, sotto i gesti; il
+telefono legge la riga da «I miei scambi» (`chatScRigaP2P` su
+`p2pOnchainMiei`, segnata `onchain`, mai «ferma»).
+
+PROVATO. `prove_chat_onchain` (14): i giudici puri (le chiavi dal server,
+la vista della riga per stato e per chi guarda, il journal con le sole
+ultime otto cifre, «vuole scriverti»), i fili nelle cinque rotte e nella
+leva, la riga del telefono in node e le stesse forme del server, la
+pagina, il riquadro che parla di scambio, il tasto dell'avviso.
+`collaudo_chat_onchain` (56, nuovo, in CI): le leve, l'accensione alla
+presa (prima no, estraneo 403), le chiavi d'ordine e la scorta a chat del
+mercatino spenta, il messaggio con l'avviso e il bottone, la chiamata una
+volta sola, la disputa (prima 409, poi le due chiavi, il moderatore legge,
+l'estraneo no), il pallino e la cancellazione dal file a rilasciato,
+rimborsato, annullato e scaduto; e IL CLIENT VERO IN NODE contro il server
+vero: chi compra col profilo, chi vende senza, i messaggi cifrati nei due
+sensi, in disputa le due chiavi al moderatore che legge col motore vero, e
+alla fine il telefono butta chiave e messaggi. Controprove su quattro
+mutazioni (il ritiro senza le chiavi dal server, la chiave al moderatore
+fuori disputa, il telefono senza il ramo on-chain, l'avviso senza il suo
+bottone): tutte rosse. Suite severa intera 28.996 verdi e 5 rosse, tutte
+prove vecchie che leggevano il testo di prima (la riga del metodo, la
+leva nel ramo del mercatino, due banchi senza `FORMA_CHAT_ONCHAIN` e
+`_parti_chat`, la mappa delle categorie, il conto dei giudici del
+journal da 6 a 7): ritoccate, e rigirate le sezioni toccate più tutte
+quelle che leggono documenti ed elenchi della CI, 1.976/0. Collaudi della
+CI nella gabbia, senza proxy, 145/0. Girati in cloud: il PC era già
+stato spento a fine giro di produzione.
+Poi develop è corso di cinque commit (Barattozon on-chain, i livelli a
+carosello, il contante per posta, la pesca della scheda Zapstore, i
+regali per livello spenti; l'ultimo tocca solo la sua leva):
+conflitti solo nelle code di NOVITA e CANTIERI, `conoscenza.md`
+rigenerato; sull'albero rebasato ventuno sezioni (le mie, quelle della
+chat, dell'on-chain, delle due novità e dei documenti) 664/0 e otto
+collaudi vicini (chat e P2P on-chain, Barattozon on-chain compreso) 8/0.
+
+DA GUARDARE DAL VIVO sul collaudo: due telefoni veri su uno scambio
+on-chain preso (la chat dentro Telegram e dal sito), l'avviso del bot col
+bottone che apre la chat, la lettura del moderatore in una disputa. La
+rete dei 30 giorni sotto la scopa vale anche qui: una disputa on-chain
+più lunga perderebbe i messaggi più vecchi (nel mercatino non la tocca).
+
+## La risalita dei «Novità»: la stessa animazione al contrario (17 nov 2026, cantiere pila-risale; Andrea dal telefono, col banner progressivo appena in produzione: «Bellissima l'animazione, però mi piacerebbe vederla anche all'incontrario ... quando cambio direzione e scorro dall'altra parte mi compaiono di nuovo i banner di colpo, invece dovrebbe esserci la stessa animazione all'incontrario»)
+PRIMA: scendendo i banner salivano col dito sotto il capo e le loro
+monete entravano a turno («Il banner unico dei «Novità» che si forma col
+dito»); al primo scatto in su (8 px) la pila si riapriva DI COLPO, i tre
+di nuovo appesi con la dissolvenza delle facce.
+ADESSO, LA RISALITA: al cambio di direzione gli altri restano
+`relative` e `risaliPilaNovitaP2P` li rimette, una volta, alle «mete»
+calcolate dalla pura `risalitaPilaP2P`: i loro posti appesi (sotto il
+capo, uno dopo l'altro) meno una CORSA — tutta, cioè l'ultimo col fondo
+appena sotto il fondo del capo, tutti ancora nascosti (104 px con due
+banner, 52 con uno); mai più di quanto la pagina può ancora salire
+(arrivano al posto al più in cima, anche se la pila si era chiusa a 50
+px); mai più di dove già stanno (un banner a metà riparte da lì, non
+torna indietro). Da lì li porta giù lo scorrimento vero: esce per primo
+ETH·XMR (è il più vicino al bordo), 52 px dopo USDT·USDe, e le monete
+escono dalla faccia unica nello stesso ordine; sparite tutte, torna la
+faccia «On-Chain». Quando l'ultimo tocca il suo posto
+(`arrivataPilaNovitaP2P`, 1 px di tolleranza) la pila si riapre
+`dolce`: tornano appesi lì dove sono, senza dissolvenza. Di nuovo in giù
+a metà: continuano col dito e rientrano sotto come alla scesa. Di colpo
+resta solo il tocco sulla faccia unica, e un tutorial acceso (vuole il
+suo banner subito). Un ridisegno del libro durante la risalita la fa
+ripartire dalle mete giuste.
+SCARTATE: i margini negativi compensati per far ripartire lo `sticky`
+da più in alto (si fermerebbero da soli, senza il cambio di classe, ma i
+margini collassano con quelli della card del prezzo e il libro
+scatterebbe di 10 px); la corsa sempre intera (con la pila chiusa vicino
+alla cima resterebbero a metà, la pagina finisce prima).
+PROVATO: in node (`prove_ritocchi_sera_p2p`) la pura in otto casi
+(lontani, vicino alla cima, a metà, già al posto, sotto il posto, un
+banner solo, nessuno, in cima) e l'arrivo con le finte di DOM; le
+stringhe dello scorrimento (risalita al cambio, riapertura all'arrivo, di
+colpo solo col tocco e col tutorial). Controprove: con la riapertura di
+colpo al cambio di direzione una rossa, senza il tetto della pagina una
+rossa. Nel banco (Chromium, 360 px, a passi di 3-4 px): giù fino a 260,
+su fino a 120, giù... il registro delle posizioni dice USDT a 57 ed ETH a
+109 al cambio (nascosti), 9 px a passo col dito, le monete di ETH fuori
+al primo passo e quelle di USDT 52 px dopo, appesi a 161/213 all'arrivo.
+Il video sta nella Library: `novita-scorrimento/banner-risalita.mp4`.
+DA GUARDARE: nel webview del telefono l'ultimo passo, quando tornano
+appesi: se lo scorrimento corre più veloce del JavaScript può esserci un
+fotogramma oltre il posto prima dello scatto indietro.
+
+## La serie dei giorni 🔥 (17 nov 2026, cantiere serie-giorni; Andrea: «una icona con scritto i giorni di connessione successiva, "streak": non aumenta exp, non dà nulla. Solo la soddisfazione personale di un contatore che non si ferma», sul modello di Ditto)
+ROVESCIA UNA DECISIONE D'AGOSTO, SAPENDOLO. In `/api/me` e in
+Architettura stava scritto «NIENTE serie consecutiva: in un mercatino
+non c'è nulla da fare ogni giorno, e una fiammella che si spegne
+punisce chi ha lavorato invece di aprire l'app; se servirà, si contano
+i giorni totali». Detto ad Andrea prima di scrivere codice; ha
+confermato la serie. Il motivo di allora è rimasto DENTRO le regole:
+chi salta un giorno riparte da 1 in silenzio (nessun «hai perso»),
+nessun promemoria del bot che rincorre, il record non scende mai, e
+nella settimana un giorno saltato è un cerchio vuoto, mai una croce.
+DECISO (piano approvato, grafica scelta da Andrea fra tre bozze montate
+sull'app vera: A riga nella carta, B pastiglia a destra, C riga +
+settimana — ha scelto C, io consigliavo B): (1) nel Profilo, dentro la
+carta col nome, sotto le stelle, «5 giorni di fila · record 12», e
+subito sotto gli ultimi sette giorni con oggi per ultimo; (2) conta
+aprire Barattolo da dentro il proprio account, una volta al giorno;
+(3) il giorno è quello ITALIANO per tutti, da mezzanotte a mezzanotte;
+(4) si vede dal primo giorno («1 giorno · torna domani»); (5) la
+fiamma è DISEGNATA (SVG nell'arancio di casa), non l'emoji, che cambia
+faccia da un telefono all'altro; (6) un saluto al primo passaggio del
+giorno, dal secondo giorno, più evidente a 7, 30, 100 e 365; (7) solo
+privata: né nel negozio né nel riquadro venditore; (8) niente XP,
+livelli o premi; (9) leva `SERIE_GIORNI_ATTIVA`, accesa di serie.
+COME È FATTO: tabella `serie_giorni` (una riga a persona), giudice puro
+`serie_passo`, giorno italiano senza tzdata (`_giorno_roma`), un timbro
+(`timbra_serie`) con due porte — `/api/me`, fail-open, e
+`POST /api/me/serie` per l'app che torna in primo piano dopo la
+mezzanotte senza riaprirsi. Fusione (`_serie_unisci`: la serie viva
+più lunga, il record più alto) e cancellazione dell'account
+(`CANCELLA_TOGLI`). Nel client tre pezzi puri e riusabili
+(`serieRigaHTML`, `serieSettimanaHTML`, `SERIE_FIAMMA`): li userà la
+«stradina» degli obiettivi del cantiere dei livelli a carosello, che
+legge la stessa chiave `serie` di `/api/me` (accordo fra i due thread,
+nessuna rotta in più per lei). Il dettaglio in Architettura, «LA SERIE
+DEI GIORNI 🔥».
+SCARTATE: l'avviso «la serie finisce tra X ore» di Ditto (là conta
+PUBBLICARE; qui conta aprire, e chi ha l'app aperta ha già contato:
+dentro l'app non comparirebbe mai, e come messaggio del bot la sera
+sarebbe il promemoria che rincorre); la colonna `utenti.xp_ultimo_giorno`
+(è una lapide: un rollback la riscriverebbe); il giorno nel fuso del
+telefono (cambiare fuso regalerebbe o toglierebbe un giorno); il conto
+derivato da `xp_eventi` (la visita non si registra più da agosto);
+l'emoji 🔥; il saluto al primo giorno (al lancio avrebbe salutato tutti
+con «1 giorno di fila»); una rotta GET (scrive: è una POST, e non legge
+un corpo — il giorno lo decide il server).
+PROVATO, nel venv SENZA coincurve. `develop` è corso tre volte mentre
+le prove giravano, e ogni volta ho rifatto il rebase (conflitti solo
+nei file «in coda»: NOVITA, CANTIERI, i due elenchi della CI, la base
+di Tappo; la prima volta anche lo schema e le rotte `/api/me/…` in
+`server.py`, coi regali per livello — tutti «tieni entrambi»). COSA È
+GIRATO SU QUALE ALBERO: la suite severa INTERA (`PROVE_SEVERE=1`) e
+`collaudi_ci.py --elenco ci/collaudi.txt` (senza le variabili del
+proxy) tre volte, tutte verdi — sull'albero nato da 6c6f1934 (29.094 e
+143), dopo il rebase su 37950a43 (29.134 e 144) e dopo quello su
+924b1631 (29.254 e 146). Sull'albero di QUESTO commit, rebasato su
+bbe63055 (quattro commit non miei arrivati dopo: 2de6fdd1 il relay
+Zapstore dal vivo, db98430e i regali per livello spenti, 9f8b294b la
+chat dello scambio on-chain, bbe63055 i «Novità» del P2P; nessun
+simbolo in comune coi miei, controllato per nome), il giro mirato:
+`prove_serie_giorni`, le sezioni che leggono i documenti e gli elenchi,
+e i collaudi vicini (serie, cancellazione e fusione dell'account, leve
+del pannello, rotte). I commit non miei entrati nei rebase di prima:
+7b19e7c8, 8b63e4e8, a4f63637, 37950a43, 28d4e262, c63bdd4c, 868f797e,
+c4aae3f2, 2b1af588, 6e92ae61, 924b1631. Dentro: `prove_serie_giorni` (73: il giorno italiano
+ai due cambi d'ora, a capodanno e contro tzdata ogni mezz'ora per due
+anni; il giudice caso per caso; il timbro su cartone con l'orologio
+finto; la fusione; i fili; in node la riga, la settimana, le tappe, il
+saluto, la busta storta che non porta markup, il ritorno in primo
+piano) e `collaudo_serie_giorni` (33, nella gabbia e in
+`ci/collaudi.txt`: il database di ieri, /api/me giorno dopo giorno,
+mezz'ora dopo la mezzanotte di Roma d'inverno e d'estate, la rotta che
+ignora quel che dichiara il client, il negozio pubblico che non la
+porta, `esegui_fusione` ed `esegui_cancellazione` vere, la leva spenta,
+il timbro che esplode senza costare il profilo). CONTROPROVE: diciotto
+mutazioni, tutte rosse (il giorno in UTC, il buco che non azzera, la
+riapertura che azzera, il record che scende, fusione e cancellazione
+dimenticate, la leva ignorata nelle due porte, il fail-open tolto, il
+commit tolto, il saluto al primo giorno e a ogni apertura, la settimana
+sfasata di un giorno e di lettere, i numeri non ripuliti, il ritorno
+senza le sue due guardie, la riga nel negozio pubblico). Adattata UNA
+sentinella altrui: `tondi: nel Profilo il solo link` ammette la riga
+della serie fra le stelle e la chiusura del riquadro (i tondi restano
+dopo). VISTO DAL VIVO: il server vero del worktree in collaudo, su
+loopback, con Chromium senza rete esterna (nessun relay), a 375 e 320
+px nei due temi: la riga e la settimana a 5 giorni, il primo giorno, il
+saluto a 5 e la tappa a 7, zero errori di pagina.
+DA GUARDARE: dal telefono vero (dentro Telegram su Android e iPhone, e
+nell'app di Zapstore) — la fiamma, la settimana, il saluto; il ritorno
+in primo piano dopo la mezzanotte NON è provato su un telefono vero
+(solo in node); il saluto, se all'apertura c'è un foglio o il tour, gli
+compare sotto il velo. Il primo giorno in produzione tutti partono da 1
+(nessuno storico da cui ricostruire). NOTATO E NON TOCCATO: il censimento
+della fusione in `prove.py` legge anche i commenti (lo dice lui stesso):
+la serie è coperta dal collaudo con la fusione vera.
+## La leva del contante per posta, spenta di serie (17 nov 2026, cantiere leva-posta; Andrea: «Lasciala spenta la leva per questa funzione. Quando la porto in produzione, la leva lasciala spenta»)
+
+COSA SI È DECISO. Il nono metodo del P2P (voce sopra, «Il contante per
+posta») era nato senza leva, come vuole la regola delle leve nuove
+accese di serie. Un'ora dopo il push Andrea ha chiesto l'opposto: la
+funzione deve esistere nel codice ma NON comparire in produzione, e
+restarci spenta anche dopo la promozione. Quindi una leva,
+`P2P_POSTA_ATTIVO`, SPENTA di serie nel codice (`False` sia nel default
+sia in `config_esempio.py`), letta col solito import morbido (un valore
+che non è True/False si legge come spento e lo dice a voce), in busta
+come `posta` (ventesima chiave di `_p2p_leve`) e nel pannello «⚙️ Stato
+delle leve» («Contante per posta nel P2P»). È un'ECCEZIONE VOLUTA alla
+regola «le leve nuove nascono accese»: la ragione è la parola di Andrea,
+non una prudenza mia; se un giorno la vorrà accesa in produzione, è una
+riga `P2P_POSTA_ATTIVO = True` nel config del VPS e il riavvio, più la
+riga del nodo (DA-FARE-ANDREA, voce 18, parte B).
+
+COSA CHIUDE LA LEVA, E COSA NO. Spenta, la voce sparisce da quel che si
+OFFRE: `metodiOffertiP2P(lista, attiva)` la toglie dalle liste di
+`metodiPubblicabiliP2P` (il foglio Pubblica, anche in franchi) e di
+`metodiValutaP2P` (il filtro del libro), e `renderP2PInfo` nasconde la
+sezione `#p2pInfoPosta` di Info P2P e la leva via dalla riga dei metodi.
+Il client lo sa da `postaAttivaP2P()`, cioè `p2pCoord().posta`. NON la
+guardano i giudici degli ordini (`scambioInPostaP2P`, `recapitoInPostaP2P`,
+le regole, gli stati, il form del recapito): un ordine che porta il
+metodo — pubblicato dal collaudo, o da un client di un'altra istanza
+sullo stesso nodo — si legge, si prende e si racconta lo stesso. La
+scelta è la stessa fatta per il CHF e per gli USDT: la leva decide cosa
+si propone, mai cosa si capisce.
+
+STRADE SCARTATE. Togliere la voce da `P2P_METODI` a leva spenta: avrebbe
+rotto i giudici e le prove che contano nove voci, e un ordine arrivato
+con quel metodo sarebbe diventato «metodo sconosciuto». Una leva lato
+server che filtra gli ordini del libro: il libro arriva dal relay, non
+dal server, e nascondere ordini veri è peggio che mostrarne uno con un
+metodo che qui non si offre. Un'altra chiave «solo admin» come per il
+CHF: Andrea ha chiesto spenta e basta, una leva sola.
+
+COSA È STATO PROVATO. `prove_contante_per_posta` allungata: il default
+False nel codice e nell'esempio, la chiave in busta, la riga del
+pannello, un banco Node che con la leva spenta trova la voce assente dal
+foglio, dal filtro e dalla lista CHF (8 voci) e con la leva accesa la
+ritrova (9 voci), mentre una lista senza la voce passa intatta;
+`renderP2PInfo` che legge la leva e il `div` nascosto nel sorgente.
+`prove_p2p_server` conta venti chiavi in busta (i quattro ambienti di
+prova che ricostruiscono `_p2p_leve` hanno la leva). I banchi Node che
+estraggono `metodiPubblicabiliP2P` o `metodiValutaP2P` da soli (eth-xmr,
+usde, tabacchino, lista corta) restano in piedi: le due funzioni usano
+`metodiOffertiP2P` solo se c'è (`typeof`), sennò la lista intera, come
+prima. NOVITA: la voce passa a `pubblico: no` con la leva scritta;
+sapere.md dice a Tappo che il metodo c'è solo dove la leva è accesa
+(conoscenza.md rigenerato); DA-FARE-ANDREA voce 18 ha la parte A (la
+riga nel config del collaudo, coi comandi) e la parte B (il nodo, solo
+quando la leva sarà accesa in produzione); PRODUZIONE e ARCHITETTURA
+aggiornate. Il verbale della suite e dei collaudi sta in fondo.
+
+RESTA DA GUARDARE. Sul collaudo, dopo la riga: «Altri metodi ▾» con la
+voce e Info P2P con la sezione; in produzione, dopo la promozione: la
+voce assente e il pannello che dice «spento». La riga del nodo aspetta.
+
+
+## Barattozon on-chain, più corto (17 nov 2026, cantiere barattozon-oc-corto; Andrea alle 12:38: «Ok, i testi però sono troppo lunghi, semplificali, anche la grafica semplifica un po', troppo lungo»)
+
+COSA. La scheda di chi paga non riusa più la scatola di Lightning
+(`riquadroPayCodeP2P`: quattro gesti, il riquadro del buono, due righe di
+spiegazione in fondo): `payCodeOcP2P` ha la sua, da strumento di cassa.
+Il codice col 📋, «📊 Mostra il codice alla cassa», l'importo, il tempo
+(`⏱` sul `#p2pTabPayResta` di sempre, che il battito riscrive) e tre
+gesti di una riga: il punto abilitato (mappa o PuntoLis), la frase alla
+cassa col buono che «non vale», lo scontrino e «Ho pagato al tabacchino».
+Prima del deposito un titolo e il tempo; chi ha pubblicato vede codice,
+importo e scadenza, e la riga «chi compra lo vede...» solo finché il
+deposito non c'è. Corti anche le note della scheda (preso, depositato,
+euro_inviati), il cappello del foglio, la riga «Rete» del riepilogo e i
+due avvisi del bot al deposito confermato.
+
+I DUE PROMEMORIA (l'«Ok» di Andrea alla lista del cantiere di prima). A
+chi paga un Barattozon on-chain non partiva niente (il promemoria voleva
+un recapito): ora `_p2p_onchain_promemoria_tab` dà un'ora, sei ore e
+quattro ore prima della scadenza del PayCode, togliendo quelli che
+cadrebbero dopo (un PayCode a tre ore ne ha uno solo) e con testi che non
+contano l'uno sull'altro. A chi libera, `P2P_ONCHAIN_RILASCIO_TAB_TESTI`
+parla di Amazon invece che del conto.
+
+PROVATO. Suite severa 29.200/0 (prove_barattozon_onchain riscritta sulla
+scatola nuova; prove_onchain_promemoria con tre controlli del
+Barattozon; la mappa e PuntoLis contati un posto in più),
+collaudo_p2p_onchain_barattozon con l'avviso nuovo. Screenshot della
+scheda prima, dopo il deposito e di chi ha pubblicato. Rebasato su
+886cca37 (la serie dei giorni, i «Novità» che riescono: non miei): le
+sezioni toccate e i collaudi on-chain e della serie; poi su 1cb0b906
+(contante per posta, non mio) le sezioni on-chain prima del push.
+
+DA GUARDARE. Il riquadro «Dove ricevi i bitcoin?» resta quello di tutti
+gli scambi on-chain, e nel conto «Totale da inviare» resta la parola di
+sempre.
+
+## Chi è l'altra parte nello scambio on-chain (17 nov 2026, cantiere onchain-controparte; un utente, girato da Andrea: «come faccio a capire chi ha preso l'ordine? Non c'è modo di scrivere un messaggio, né capire chi ha preso l'ordine»)
+
+LA VERIFICA. Andrea si aspettava chat e faccia dell'altra parte: nel
+P2P Lightning ci sono dal 12 ott (`profiloControparteP2P` e
+`bloccoChatScambioP2P`), nella pagina on-chain (`schedaOnchainP2P`) no,
+nessuna delle due. Il server mandava già alle parti il nome nudo
+(`altro`) ma la pagina non lo usava; i nomi con l'id andavano solo al
+moderatore (`parti`). La chat on-chain è il «punto 6» della lista di
+parità, mai fatta.
+
+DECISO. Il volto della card esce nell'ordine stesso, `controparte`, da
+`_volti_persone` (lo stesso costruttore del Lightning e del mercatino:
+una persona, una faccia), alle sole due parti e solo con tutt'e due le
+parti presenti; il moderatore no (ha la sua riga). La pagina lo disegna
+con `cardParte` (`controparteOcP2P`, sotto la nota dello stato e il
+tempo, sopra il recapito, come nel Lightning): la faccia apre il
+negozio, i tondi Telegram e Nostr dove ci sono.
+
+SCARTATO. Riusare `/api/p2p/controparte`: legge `p2p_ordini` e
+`p2p_scambi` di Mostro; l'ordine on-chain è nostro e la riga sa già chi
+sono le due parti, una domanda in più non serve. La frase «restano i
+recapiti, cifrati fra voi due» del Lightning: la frase della card on-chain
+rimanda alla chat della pagina.
+
+PROVATO. `collaudo_p2p_onchain` (+3): le due parti vedono il volto
+dell'altra (nome, negozio), prima della presa nessun volto, il
+moderatore senza; controprova (il campo rinominato nel server) rossa.
+`prove_deposito_p2p_onchain` (+1): la card con la porta solo se il
+server la manda, mai al moderatore.
+
+LA CHAT (punto 6) l'ha portata lo stesso giorno il cantiere
+onchain-chat-sollecito (voce qui sopra, «La chat dello scambio
+on-chain»): una seconda versione fatta qui in parallelo è stata
+lasciata cadere, la card ci si appoggia («per parlarvi c'è la chat qui
+sotto»).
+
+ANCHE L'ANNULLO DI CHI RICEVE (stesso giorno, secondo messaggio di
+Andrea: «Vorrei annullare lo scambio […] non c'è nessun pulsante "X
+Annulla". I Sats non sono ancora stati messi in garanzia»). Chi riceve
+in «preso» poteva solo «Rinuncia» e solo DOPO la finestra del deposito
+(il 409 «Chi vende ha ancora tempo»), una regola senza un perché
+scritto, mentre nel Lightning chi prende annulla finché la garanzia non
+è bloccata. DECISO: chi riceve annulla quando vuole finché nessun sats è
+visto; il riparo resta quello di prima — la rete guardata al momento
+(un sats visto e il 409 resta, per tutti e due) e lo swap del deposito
+in volo. Il tasto è «✕ Annulla», e dopo la finestra torna la scritta
+«Rinuncia: il deposito non è arrivato». RISCHIO DETTO: chi vende manda
+la transazione nello stesso minuto dell'annullo; i sats arrivati dopo un
+annullo hanno già la loro strada (la riga «un moderatore li rimanda
+indietro»). PROVATO: `collaudo_p2p_onchain`, su uno scambio a parte,
+chi compra annulla prima della scadenza e chi vende è avvisato.
+
+## Compra con Barattozon: il bottone col marchio su prodotto, carrello e cassa (17 nov 2026, cantiere compra-con-bz; Andrea, dopo il giro guidato su amazon.it: «genera una estensione per il browser per comprare direttamente su barattozon da lì», poi «prima del carrello o anche nella cassa vorrei il pulsante "Compra con Barattozon" e il logo relativo di barattozon chiaramente»)
+IL GIRO GUIDATO: Playwright sul PC di Andrea (dal cloud amazon.it e'
+chiuso dalla rete), Chrome in un profilo temporaneo, pannolini taglia 3
+(Pampers Baby Dry T3, 35,61 €) fino a «Procedi all'ordine»: li' Amazon
+chiede l'accesso, quindi la scelta del pagamento non si e' vista. Video,
+HTML e schermate di ogni pagina, piu' le pagine di aiuto sul «Paga in
+Contanti nel Punto Vendita più vicino» (PuntoLis e Western Union, 72 ore,
+nessun costo, nessun tetto scritto, niente Prime/digitali/Warehouse, resi
+come saldo buono regalo), in /mnt/project-files/amazon-contanti/.
+COSA: l'estensione (0.2.0) mostra il percorso dall'inizio. Prodotto: sotto
+«Aggiungi al carrello» il bottone blu Barattozon «Compra con» + logo, con
+una riga sotto («tu paghi in sats»); al tocco preme «Aggiungi al
+carrello». Carrello (anche il pannello smart-wagon): sotto «Procedi
+all'ordine», al tocco preme quello. Cassa: un cartello fisso coi tre passi
+(scegli «Paga in Contanti…», completa, poi «Pubblica su Barattozon») e la
+riga del contanti contornata d'arancio. Anche il bottone del PayCode porta
+ora il logo al posto del 🫙 (regola 9: il barattolo non e' metafora
+dell'escrow, e qui il marchio e' Barattozon).
+ROVESCIA, SAPENDOLO, una riga di ieri: «SCARTATE: il bottone sulla pagina
+del prodotto alla Bitpost». Quello scartato era un ALTRO ordine (chi
+compra manda indirizzo e soldi a un terzo che ordina per lui); questo
+bottone non cambia chi ordina: fa solo il passo innocuo di Amazon che ha
+accanto, e il PayCode nasce comunque dopo l'ordine fatto dalle mani di
+chi compra. La decisione e' di Andrea (17 nov).
+LE SCELTE: (1) MAI «Acquista ora»: con l'1-Click acceso ordinerebbe da
+solo; mai l'invio dell'ordine; alla cassa nessun clic, solo un contorno
+(sentinella sulle parole e un solo `.click()` nel file); (2) i selettori
+sono quelli VISTI nelle pagine vere salvate (`#add-to-cart-button`,
+`#sc-buy-box-ptc-button`, `input[name="proceedToRetailCheckout"]`); la
+cassa no (dietro l'accesso), quindi li' si cerca la FRASE «paga in
+contanti», mai la parola sola; (3) il logo DENTRO il file come data: URL:
+servirlo dall'estensione vorrebbe `web_accessible_resources` e la
+sentinella vieta `chrome.`; 10 KB in piu'; (4) ombra chiusa come il
+bottone del PayCode, testi col textContent; (5) nessun permesso nuovo,
+nessuna rete, il manifest invariato tranne versione e descrizione.
+SCARTATE: il «Compra con Barattozon» che salta direttamente alla cassa
+con «Acquista ora» (il rischio 1-Click); il cartello anche sulla pagina
+d'accesso (non e' ancora la cassa); un ricordo del «voglio Barattozon»
+fra una pagina e l'altra (vorrebbe la memoria, vietata): il bottone sta su
+ogni passo.
+PROVATO: `prove_estensione_barattozon` allargata (sentinelle di Acquista
+ora/1-Click/invio, i due id premuti, la cassa senza clic, il logo webp
+dentro il file e niente risorse servite; in node `paginaBz` su 16 percorsi
+e `rigaContantiBz` su 5 frasi). Dal vivo: l'estensione caricata in
+Chromium sulle pagine VERE salvate il 17 nov (prodotto e carrello) e su
+una cassa disegnata: il bottone sotto quello di Amazon, il tocco manda
+proprio il POST /cart/add-to-cart e il GET /checkout/entry/cart, il
+cartello e il contorno sulla riga giusta, non sulle note legali.
+DA GUARDARE: la cassa VERA (serve un account: la frase e' quella delle
+pagine di aiuto, l'aspetto no); Firefox dal vivo; la pagina col PayCode
+resta da vedere (vedi la voce di ieri).
+
+## La sentinella del server fermo (17 nov 2026, cantiere sentinella-loop; il blocco delle 08:07 dopo la promozione ecd76363)
+
+COSA È SUCCESSO. Il servizio è partito alle 08:05:19 col deploy della
+promozione (11 lavori più la cura dei segreti). Alle 08:07:42 ha servito
+le ultime richieste, alle 08:07:43 l'ultima riga del journal (l'import
+Nostr di un venditore: «Trovati 0 annunci… Nessun annuncio trovato»,
+nostr.oxtr.dev in timeout), poi più niente: /api/salute muta (000), la
+porta in ascolto, nessun errore. Andrea l'ha visto alle ~08:10 e ha
+riavviato: SIGTERM ignorato per 20 s, SIGKILL. 11,9 s di CPU in 6,5
+minuti, picco 1,3 GB: era FERMO ad aspettare, non a calcolare.
+
+LA CAUSA NON SI È POTUTA DIMOSTRARE, e si scrive così. Visto: gli 11
+lavori promossi non toccano il giro dell'import Nostr né l'orologio
+(le modifiche al server sono rotte e messaggi, più la categoria dei
+connettori, che gira in un task suo). La riga «🔄 Import Nostr: …», che
+l'orologio stampa appena finito l'ultimo venditore, non c'è: alle 08:07:43
+il ciclo era già fermo, o si è fermato in `_apri_revisioni` /
+`_chiedi_completamento`. Nello stesso minuto partono i tre orologi a 120 s
+(on-chain, cambi P2P, guardia della liquidità). Cercati e non trovati:
+`.result()` senza tetto, lucchetti fra fili, `urlopen` senza timeout nel
+ciclo, domande ai relay fuori da `to_thread`; sqlite ha 15 s di attesa e
+avrebbe lasciato un errore nel journal. Il SIGKILL da solo non prova il
+ciclo fermo: anche un filo di `to_thread` appeso trattiene l'uscita (la
+lezione del 30 set).
+
+LA CURA: VEDERE LA PROSSIMA, E NON RESTARE FERMI. Un filo `sentinella`
+bussa a /api/salute da dentro (30 s, tetto 20): è la domanda del deploy,
+quindi vede il ciclo fermo, il pool delle rotte pieno e il database
+sotto chiave senza indovinare quale. Al primo silenzio scrive nel journal
+la pila di tutti i fili (faulthandler); muto da 3 minuti, seconda pila,
+il segno accanto al database e `os._exit(70)` → systemd (Restart=always,
+5 s, letto sul VPS) lo rialza, e l'avvio manda «🧊 Il server si era
+fermato» nella stanza «errori». `kill -USR1 <pid>` dà la stessa pila a
+mano, prima di un riavvio. L'indirizzo dagli argomenti di uvicorn
+(produzione 8080, collaudo 8090), senza porta non parte. Leva
+`SENTINELLA_ATTIVA`, di serie accesa.
+⚠️ STRADE NON PRESE. Il battito del solo ciclo (una coroutine che
+aggiorna un orario): non vede il pool dei thread delle rotte pieno, e
+/api/salute è una `def` che gira proprio lì. La porta scritta nel config:
+sbagliata sul collaudo, avrebbe riavviato un server sano ogni 3 minuti.
+Contare anche il 503 o la porta chiusa: un riavvio non cura un database
+che non si apre, e si riavvierebbe all'infinito. py-spy sul VPS: è
+un'installazione, e faulthandler è già nella libreria standard.
+Indovinare un colpevole e «curarlo»: senza la pila sarebbe una
+correzione alla cieca.
+
+PROVATO. `prove_sentinella_server_fermo` (26: l'indirizzo dagli
+argomenti, il passo, il colpo vero contro un server di cartone muto /
+sano / 503 / porta chiusa, la forma). `collaudo_sentinella` (16, nella
+gabbia): un server VERO con uvicorn, una rotta che fa `time.sleep` nel
+ciclo → la pila arriva e contiene la rotta colpevole, uscita col 70,
+segno scritto; il riavvio dice «riavviato dopo un blocco», l'avviso parte
+e il segno sparisce; un SIGTERM normale non fa scattare niente. Dell'avvio
+nel collaudo gira la sola sentinella: il primo giro, senza le variabili
+del proxy, era rosso nella gabbia (gli altri compiti d'avvio chiedono il
+cambio a CoinGecko — la lezione del 2 nov). Controprove
+rosse: «altro» contato come silenzio, timeout letto come «altro», uscita
+a 2 minuti, porta di ripiego fissa, spegnimento non guardato, `os._exit`
+tolto (dal vivo).
+DA GUARDARE. Dopo il deploy, la riga «🧊 Sentinella del server fermo:
+accesa» nel journal. Se il blocco torna: le righe «🧊 Sentinella» con
+la pila vanno al thread, e la causa vera si cura allora. Su develop
+questo commit arriva come cherry-pick: alla prossima promozione è un
+doppione da togliere.
+
+## Tappo e l'annullo prima della garanzia (17 nov 2026, cantiere tappo-annullo-subito; un utente in privato a Tappo: «per annullare devo aspettare che i sats vengano messi in garanzia? Non si può far tornare il tutto nel libro subito?», e Andrea: «Non si può annullare subito?»)
+
+IL CASO. Tappo ha risposto di sì, che si aspetta la garanzia e poi
+serve l'annullo d'accordo, e che prima «non c'è niente da annullare».
+È falso: dal 7 ott 2026 («testi P2P che confondono») nei quattro stati
+prima di «Sats in garanzia» (`P2P_ANNULLA_DA_SOLO` in miniapp.html) il
+bottone «✕ Annulla» annulla subito, senza il sì dell'altro, perché
+`cancel_action` di mostrod manda `waiting-payment` e
+`waiting-buyer-invoice` a `cancel_not_active_order`. Se annulla chi ha
+preso l'ordine torna nel libro (avviso «🔄 … Il tuo ordine è tornato in
+vetrina», `collaudo_annullo_venditore`); se annulla chi ha pubblicato,
+l'ordine si chiude. La guida dei passi lo dice (GUIDA-P2P-PASSI, §8,
+«Dopo la presa, prima della garanzia»); il libro di Tappo no: diceva
+solo «I tempi» e l'annullo d'accordo coi sats in garanzia, e Tappo ha
+riempito il buco a modo suo.
+
+LA DECISIONE. Nessun codice dell'app: la funzione c'è già. Un paragrafo
+in `assistente/sapere.md`, nella sezione del P2P subito dopo «I tempi»,
+coi testi esatti dei bottoni, i due esiti (chi ha preso → torna nel
+libro; chi ha pubblicato → si chiude, si ripubblica) e il confine con
+l'annullo d'accordo e con «Ho inviato gli euro». `conoscenza.md`
+rigenerato (`python assistente/conoscenza.py`).
+
+LO SCREENSHOT DELL'UTENTE (stessa mattina). Detto all'utente che il tasto
+c'era, ha mandato la sua pagina: «Preso: si aspetta il deposito», 250 €,
+«Firma e usa questo indirizzo» — uno scambio ON-CHAIN, dove chi compra
+fino a quel momento non aveva il tasto prima che scadessero le 6 ore
+del deposito. Lo stesso messaggio, arrivato anche a un altro thread, ha
+fatto il cantiere onchain-controparte (voce sopra, 2438e21): «✕ Annulla»
+a chi riceve finché la rete non vede sats. Qui, in parallelo, era nato
+un tasto «↩️ Chiedi di annullare» (chi compra chiede, chi vende annulla
+col suo «Annulla (non deposito)»), scelto da Andrea su una card prima
+di sapere dell'altro cantiere; trovati i due rami, Andrea ha tenuto
+l'annullo subito e il tasto è stato buttato (resta sul ramo locale
+`cantiere/tappo-annullo-b-salvo` fino alla pulizia, mai pushato). Al
+libro di Tappo resta una sola frase on-chain in più, accanto a quella
+dell'altro cantiere: un annullo on-chain mette `annullato`, quindi
+l'ordine NON torna nel libro come su Lightning, si ripubblica.
+
+STRADE SCARTATE. Riscrivere anche il tempo che scade senza annullare
+(«l'ordine resta riservato mezz'ora»): «I tempi» lo dice già, e il
+dettaglio di chi torna nel libro allo scadere non serviva alla domanda.
+
+PROVATO. Due righe nuove in `prove_testi_p2p_confondono` (Lightning e
+on-chain), indipendenti da node; controprova sul libro di origin/develop
+di stamattina (8b63e4e): le frasi cercate non ci sono, le due righe
+sarebbero rosse. GIRATO: la suite severa intera sul primo albero
+(8b63e4e più questo cantiere, venv con requirements.txt tranne
+coincurve, nostr-tools in ~/wdk-prova) 29026 passate, 0 fallite; sul
+ramo col tasto, poi buttato, 29283 su 1042eb3. Sull'albero finale
+(origin/develop 1042eb3 più questo solo commit) il giro mirato: le
+categorie «infrastruttura» e «p2p» della suite severa (i numeri nel
+verbale del thread). Collaudi non girati: nessuno legge sapere.md o
+conoscenza.md.
+
+DA SAPERE. Tappo legge `conoscenza.md` da MAIN: la correzione arriva a
+Tappo con la promozione (o con un cherry-pick), non col push su develop.
+
+## I premi fedeltà del negozio, e i regali di Barattolo tolti (17 nov 2026, cantiere premi-fedelta; Andrea: «il negozio un tempo per te c'è già. Quel messaggio che ti avevo mandato era lui che proponeva, cioè in base a quanto la gente compra nel suo negozio»; sulla scheda: «Sì, premi del negozio»)
+
+LA STORIA. La mattina Andrea aveva girato la proposta di «Un tempo per
+te» (quattro articoli col logo; idea 1 preordini a quantità minima,
+idea 2 «chi compra da me sale di punteggio: a 100 il pacco dopo ha la
+borsa, a 200 la tazza»). L'avevo letta come un marchio di Andrea, e ne
+erano nati i REGALI PER LIVELLO di Barattolo (develop 37950a43: il merch
+a chi sale di gradino, spedito da Andrea), poi spenti (db98430e) quando
+si è capito che «Un tempo per te» non aveva aderito. Era invece un
+NEGOZIO già su Barattolo, e la proposta era sua, per i suoi clienti.
+Questo cantiere toglie i due commit (revert, non leva spenta: un
+codice morto con una tabella e un pannello admin che nessuno usa è un
+debito) e costruisce la cosa chiesta: soglie e regali li sceglie chi
+vende, Barattolo conta e ricorda, il regalo va nel SUO pacco.
+
+LE DECISIONI.
+- IN EURO E BASTA, non anche in sats come spedizione gratis e sconto: è
+  un conto lungo, fatto di ordini a cambi diversi, e l'euro di ognuno è
+  già fotografato in `cambio_eur`. Contano solo gli affari CONCLUSI
+  (released), non le prove, non i cambi sconosciuti (la regola di
+  xp_ordine). Il totale è quello pagato, spedizione compresa: lo stesso
+  numero degli XP, così due conti non si contraddicono mai.
+- IL PREMIO MATURA una volta per cliente, negozio e soglia, e il regalo
+  si FOTOGRAFA in riga: il negozio che poi cambia regalo non toglie
+  niente a chi l'aveva già guadagnato. Una soglia spostata (100 → 120)
+  è una soglia nuova e può maturare di nuovo: è il negozio a deciderlo.
+- SI ATTACCA al primo ordine pagato e non ancora spedito (locked): è
+  l'ultimo momento in cui il regalo può entrare nel pacco. Un premio per
+  ordine. L'ordine annullato o rimborsato lo stacca, e passa al prossimo.
+- L'AGGANCIO È PIGRO, alla lettura di /api/orders: i pagamenti entrano
+  da Lightning, on-chain e set, e un giudice solo dove tutti li leggono
+  non ne dimentica una. Lì matura anche, in silenzio, chi aveva già
+  speso abbastanza prima che il negozio scrivesse le soglie.
+- L'AVVISO a tutti e due parte allo sblocco dei sats (dopo i distintivi,
+  prima degli XP), fail-open come i distintivi.
+- NON È UNO SCONTO e non muove un sat: niente escrow, niente regola 10.
+  Niente avviso al canale admin: è un patto fra negozio e cliente.
+- Leva `PREMI_FEDELTA_ATTIVI` accesa di serie (regola del 14 nov).
+
+LE STRADE SCARTATE: i regali globali per livello (l'equivoco, tolti);
+il premio come sconto in sats sul pacco dopo (toccherebbe l'escrow);
+una scorta di regali tenuta da Barattolo; «Prenota senza pagare» per
+l'idea 1 dei preordini — proposta ad Andrea, non ancora decisa, NON
+costruita.
+
+IMPERFEZIONE DICHIARATA: se qualcuno apre la lista ordini proprio nei
+secondi fra lo sblocco e l'avviso, il premio matura in silenzio e
+l'avviso del bot non parte (la riga sull'ordine c'è comunque).
+
+PROVATO. `prove_premi_fedelta` (45: il giudice, il conto, la
+maturazione una volta sola col regalo fotografato, l'aggancio e lo
+stacco, la lista ordini solo alle due parti, la leva spenta, l'avviso
+scappato in HTML, le sentinelle, la riga del dettaglio in node);
+`collaudo_premi_fedelta` (25, sulle rotte vere: i no della rotta,
+/api/me, la vetrina con «hai speso qui», l'avviso una volta sola, il
+premio sul prossimo ordine solo alle due parti, la leva spenta). I
+banchi che eseguono `_sblocca_sats` e `miei_ordini` hanno il loro
+`premia_fedelta_negozio`/`premi_di_ordini` di cartone.
+
+DA GUARDARE DAL VIVO: il cassetto «🎀 Premi fedeltà» a 375 px (quattro
+righe con soglia e regalo), la riga sulla pagina del negozio, e un
+ordine vero di «Un tempo per te» che passa la soglia.
+
+## Compra con Barattozon, secondo giro: i contanti scelti da soli e la commissione (17 nov 2026, cantiere compra-con-bz; Andrea: «barattozon deve inserire da
+solo come metodo di pagamento i contanti, deve chiedermi anche quali sono
+le commissioni dell'ordine e poterlo inserire in automatico su
+barattolo»). (1) ALLA CASSA LA SCELTA: trovata la riga della frase «Paga
+in contanti», l'estensione preme il SUO pallino (`input[type=radio]`:
+quello della label, o l'unico della riga; con due pallini non preme
+niente), una volta per pagina e solo se non e' gia' scelto; il primo passo
+del cartello diventa «✓ Ho scelto io…». La conferma del metodo («Usa
+questo metodo di pagamento») e l'ordine restano a chi compra: la loro
+forma non l'abbiamo vista, e un clic su un bottone indovinato e' il modo
+di premere quello sbagliato. (2) LA COMMISSIONE: letta come il PREMIO del
+passo 4 di Barattozon, l'unica «commissione» che l'ordine ha (Barattolo
+non ne prende). Il riquadro del PayCode la chiede ogni volta (niente
+memoria): «Commissione a chi paga», intero da 0 a 20 %, il vuoto vale 0,
+storta spegne il link; viaggia come `premio=-N` dopo il «#»
+(`commissioneBz`, `premioBz`). Di la' la dogana la passa dal giudice del
+passo 4 (`premioTabacchinoP2P`), il ricordo dell'ingresso la porta, e
+`apriNuovoOrdineP2P` la scrive in `p2pNuovoPremioTab`. (3) «IN
+AUTOMATICO»: con PayCode, importo, scadenza e premio buoni il percorso si
+apre gia' al passo 5, e manca UN tocco, «Pubblica». La pubblicazione da
+sola, all'arrivo del link, e' SCARTATA: chiunque potrebbe mandare un link
+col suo PayCode e far pubblicare a un altro un ordine che vende i suoi
+sats; il tocco resta di chi pubblica, con la chiave del suo dispositivo.
+PROVATO: `prove_estensione_barattozon` (la scelta del solo pallino, la
+commissione e il link spento, il premio nel foglio; in node commissioni,
+link, dogana coi premi storti, il giro della memoria col premio) e dal
+vivo in Chromium: alla cassa disegnata il pallino del contanti scelto e
+la carta tolta; sulla pagina del PayCode la commissione 3 apre
+`…&premio=-3`. NON visto dal vivo: il foglio di Barattolo aperto al
+passo 5 (provato in node sul pezzo vero).
+
+## La stradina degli obiettivi (17 nov 2026)
+
+COSA. Una schermata PRIVATA del Profilo, «🧭 La tua stradina» (voce
+`vocStradina` nel cassetto «🎖 Livello e titolo», vista `view-stradina`):
+un TABELLONE lunghissimo da scorrere, dalla Terra in basso alla Luna in
+cima, in otto zone («🫙 Primi passi», «🧺 Il mercatino», «⚓ Il porto»,
+«🌲 Il bosco dei sats», «🪜 La scala d'oro», «🏔 La vetta», «🛰 In
+orbita», «🌕 Verso la Luna»), ognuna col suo pezzo di mappa disegnato; i
+quattro gradini della scala chiudono le zone 2, 4, 6 e 8 (un BARATTOLO, il disegno
+del logo, spento finché non lo raggiungi). Sopra la mappa: la strada
+luminosa (il tratto fatto acceso), le caselle numerate come monete
+(d'oro con la spunta quelle fatte, quella che tocca a te che pulsa), i
+cartelli delle zone col conto, Tappo-pedina (il Tappo ufficiale, il
+robot col barattolo di monete) sull'ultima casella fatta col
+cappellino vinto nella Caccia (il fumetto «Prossima: …» c'era e copriva
+la casella dopo: la prossima la dice la scheda; resta «Sei sulla Luna!»), gli amici come pedine
+sul gradino del loro livello. In cima Tappo, «Casella N di M», la barra,
+i sats incassati e spesi, la serie 🔥 se c'è; in fondo «La gara fra
+amici»; una scheda fissa in basso dice la casella scelta e porta a
+farla («Vai ›», «Gioca ›», «Apri ›»). Tre suoni sintetizzati (tocco,
+passo, fanfara al gradino nuovo) col tasto 🔊/🔇.
+
+IL PERCORSO. Prima versione (serpentone da tre per riga, cerchi su fondo
+chiaro) BOCCIATA da Andrea alla prima occhiata: «cos'è questa
+schifezza», «voglio vedere qualcosa di figo», «un tabellone
+lunghissimo dove uno scorre», «una mappa sotto, in stile Barattolo»,
+«con dei suoni». Gli spunti: il programma a livelli di un'app di
+energia, il gioco da tavolo To The Mooon (t.me/ToTheMooon21) e il video
+del gioco digitale di Alan: preso il FLUSSO (pista a tratti, pedina
+sulla casella, dalla Terra alla Luna), mai la grafica, che è di casa
+(i barattoli del logo, le monete, i colori dell'app, Tappo).
+
+COME. Server (`server.py`, blocco «LA STRADINA DEGLI OBIETTIVI»):
+`STRADINA_ZONE` e `STRADINA_CASELLE` (id, emoji, nome, fatto, soglia,
+vista: le soglie crescono di zona in zona, 1 → 5 → 10 → 25, 10 mila →
+100 mila → 1 milione di sats); `fatti_stradina(con, tg_id)` legge i
+NUMERI VERI (xp, vendite, acquisti, indirizzo Lightning, foto, npub,
+annunci non rimossi, preferiti, recensioni date, venditori seguiti,
+scambi P2P completati da `p2p_esiti`, inviti, cappellino) — letture e
+basta, una che manca vale zero; i sats incassati li aggiunge la rotta
+da `numeri_negozio`; `tappe_stradina(...)` PURA mette tutto in fila,
+zona per zona, coi gradini di `scala_livelli()` (le soglie del
+carosello) in fondo a ogni zona; `amici_stradina` passa da
+`_volti_persone` (solo nome, faccia, negozio, livello) ed esclude
+`classifica_nascosta`; `emoji_oggetto_tappo` traduce il cappellino.
+`/api/me/stradina` con `verifica_utente` (privata, legge chi bussa);
+`/assets/stradina/{nome}` (whitelist a tupla `FILE_MAPPA_STRADINA`: i
+otto pezzi di mappa, le icone e `tappo-pedina.webp`). Client: `stradinaDisegno`
+(i posti dal basso, la banda di ogni zona sulla cucitura fra due pezzi
+di mappa, la strada che ondeggia), `stradinaCurva` (Catmull-Rom in
+Bézier), `stradinaHTML` e `stradinaSchedaHTML` PURE (banco node),
+`strScegli`, `vaiTappa`, `apriStradina`/`renderStradina` (si apre su
+Tappo), `suonoTappo`/`SUONI_TAPPO`/`suoniMuti` (WebAudio, niente file,
+il muto in localStorage dentro un try). Un pezzo di mappa che manca è un
+404 e la zona tiene il suo ripiego dipinto in CSS (terra, nebulose,
+stelle, la Terra e la Luna disegnate).
+
+I SUONI (Andrea: «devi metterci anche i suoni... anche il gioco»; «per i
+suoni fai tu, puoi scaricarli su Artlist»): venti effetti brevi presi da
+Artlist sul PC di Andrea (titolo e autore di ognuno in
+Desktop\bar\flow\stradina\suoni\elenco.txt), MP3 mono in
+`assets/stradina/suoni/`, rotta `/assets/stradina/suoni/{nome}` con
+whitelist `FILE_SUONI_STRADINA`; nel client `SUONI_FILE` (gli stessi
+nomi, una prova li tiene uguali) e `suonoTappo(nome)` suona il file, e se
+manca o non si apre torna al bip di `suonoSintetico` (un rifiuto del
+browser prima del primo tocco non conta come file rotto). Ogni casella ha
+la sua voce: moneta se fatta, tonfo se chiusa, magia se missione, slancio
+sul «Vai». Gli stessi nomi li usa il gioco di Tappo (salto, atterra,
+raccogli, giusto, sbagliato, stella, vittoria, sconfitta, tarlo, gazza,
+porta, conto), sempre dietro `typeof`. Scelti dal titolo e misurati
+(durata, picco a -1 dB, -14/-15 LUFS i lunghi), NON ascoltati da chi li
+ha presi: vanno sentiti una volta sul collaudo. Il «tarlo» è un
+macinapepe di legno (Artlist non ha tarli né roditori sul legno).
+
+«LIVELLO E TITOLO» SFOLTITO (Andrea, 14:37, la pagina in produzione: «c'è
+troppo testo, è troppo confusionario. La grafica va bene»). Grafica
+intatta; via la riga «Gli XP contano il commercio…» (scende in fondo in
+un «Come si contano gli XP» chiuso: il giudice `fraseXp` resta lui), via
+il titolo «I vantaggi di ogni livello», via la frase sotto ogni pannello
+(«Questi vantaggi sono già tuoi», «Si apre da…»: lo dicono già ✅ e 🔒),
+via la riga dello sconto P2P accanto al carosello (era doppia: il
+carosello la porta nel livello 5; resta solo per il server di ieri senza
+scala), via «Compare sotto il tuo nome…» sotto «Il tuo titolo», e la
+riga della classifica nascosta in una frase («Il nome esce dalla
+classifica e non si pubblica più su Nostr. Il livello resta.»). Sulla tessera del proprio gradino «Ancora 380
+XP e 6 affari» al posto di «Mancano 380 XP e 6 affari conclusi al livello
+4 (Mercante esperto)»: il nome del prossimo sta sulla tessera accanto.
+
+LE MISSIONI DI TAPPO (Andrea: «ogni tanto nel tabellone devi giocare
+con Tappo per proseguire», missioni educative su bitcoin). Le studia e
+le costruisce il cantiere del gioco di Tappo; il patto (concordato fra i
+due thread il 17 nov): il gioco espone `MISSIONI_TAPPO` (id, emoji,
+nome, zona 0-4; al lancio una per zona) e `missioni_superate(con,
+tg_id)`, il client `apriMissione(id)`. Il tabellone le legge con
+`globals()` SOLO a `GIOCO_TAPPO_ATTIVO` accesa, le mette nella loro zona
+subito prima del gradino, e UNA MISSIONE NON SUPERATA È UN CANCELLO:
+Tappo-pedina si ferma lì davanti anche se più su ci sono caselle già
+fatte (`stradinaUltimaFatta`). A missione finita il gioco lancia
+l'evento `tappo:missione` sulla finestra: il tabellone aperto si ricarica
+(`apriStradina(true)`, senza spingere un'altra pagina nella storia). I
+suoni li riusa il gioco. Al lancio le missioni sono cinque, una per zona
+(quaderno, lucchetto, staffetta, parole, halving).
+
+LE CASELLE SONO COMPETENZE (Andrea, 17 nov 13:30: «gamification... hai
+impostato il wallet on chain, hai impostato l'incasso automatico su
+lightning, hai fatto la doppia configurazione con Nostr, hai fatto un
+primo acquisto... così dimostri di avere delle competenze di Barattolo e
+bitcoin, e Tappo farà questo percorso come se fosse il tuo avatar»).
+Le prime zone sono i passi da imparare, coi nomi che l'utente legge
+nell'app: «Attiva l'incasso automatico in Lightning» è l'indirizzo
+Lightning (l'ordine dice «⚡ Incasso automatico attivo»); «Crea il tuo
+wallet on-chain» è una riga in `wallet_unico` (l'impronta del wallet di
+Barattolo) o in `onchain_xpub` (un wallet proprio); «Verifica la chiave
+Nostr» è `npub_verificata` (il distintivo Nostrano); «la doppia
+configurazione Telegram + Nostr» è un account Telegram con
+`npub_accesso` (il distintivo Doppia cittadinanza: un account solo-Nostr
+non conta). E TAPPO CAMMINA IN FILA: si ferma prima della prima casella
+da fare, come davanti a una missione non superata; le fatte più su
+restano accese (nessun merito si perde), ma per avanzare si impara il
+passo che manca. La porta inerte non ferma nessuno. LUNGO FINO ALL'HALVING (Andrea, 13:07:
+«hai solo il tabellone così corto?», poi sulla scheda «Sì, 70 caselle in
+8 zone», e «deve essere più lungo possibile, anche per arrivare all'anno
+dell'halving»): 61 caselle in otto zone, soglie fino a 100 vendite e 10
+milioni di sats, caselle a TEMPO («Un mese / sei mesi / un anno / un anno
+e mezzo / due anni con Barattolo», dai giorni dalla prima entrata,
+`utenti.registrato`) e, ultima prima della Luna, «Arriva all'halving del
+2028» (`STRADINA_HALVING_2028`, 16 aprile 2028: una STIMA del blocco
+1.050.000, non un orologio della catena). Tappo cammina in fila, quindi
+nessuno arriva in cima prima di quel giorno; poi, a ogni halving, le Ere
+del gioco di Tappo. I tre pezzi nuovi (porto, vetta, orbita) stanno fra i
+cinque di prima; il ripiego dipinto si sceglie con `STRADINA_FONDI`, le
+sfumature di testa e di coda con le classi `prima`/`ultima`; il campo
+`zona` delle missioni va da 0 a 7 (concordato col gioco: quaderno 0,
+lucchetto 1, staffetta 3, parole 5, halving 7). Dalle 13:21 le missioni
+sono minigiochi, tre per zona e sempre più difficili (campo `ordine`):
+stanno SPARSE fra le caselle della zona, l'ultima subito prima del
+gradino, e ognuna è un cancello. Con le missioni la casella «Gioca con
+Tappo» sparisce (l'ingresso al gioco sono loro: due cancelli sulla
+stessa porta fermavano Tappo alla quinta casella).
+PROGRESSIVA (Andrea, stesso giorno:
+«parti dalle cose più semplici, basilari, fino alle più difficili»):
+prima i gesti gratis da un minuto (un preferito, la foto, seguire,
+l'incasso in Lightning), poi le prime volte (annuncio, acquisto, la
+recensione che vuole un acquisto, la chiave Nostr, un invito), poi le
+competenze da bitcoiner (la vendita, il wallet on-chain, la verifica e
+la doppia configurazione Nostr, il P2P), poi le soglie; una casella che
+dipende da un'altra viene dopo, perché Tappo cammina in fila. LE ICONE
+(«non le emoji classiche, personalizzale in stile Barattolo»): sedici,
+una per famiglia di caselle (`STRADINA_ICONE`, il «fatto» più il
+benvenuto), disegnate in Flow nello stile della mappa, 160 px, in
+whitelist come `ico-<famiglia>.webp`; l'emoji resta sotto e torna se
+l'immagine manca. Scartato: «ricevi
+le vendite on-chain» come casella (spingerebbe una scelta di gusto,
+non una competenza); il wallet NWC (vive solo nel browser, il server
+non lo sa e non deve saperlo).
+
+DECISIONI. (1) NIENTE XP DALLE CASELLE NÉ DALLE MISSIONI: la regola «GLI
+XP» (ago 2026) non si rovescia; una casella è una spunta, i premi del
+gioco sono bulloni. (2) «Impara bitcoin con …» è una PORTA INERTE:
+senza `IMPARA_BITCOIN_LINK` (https) nel config la casella non esiste e
+nessuno è nominato; Andrea: «facciamola e poi al massimo la accendiamo
+dopo, la leva». Il partner: prima si era pensato a Bitvero (logo
+mandato da Andrea), poi Andrea l'ha scartato («abbiamo già buoni
+rapporti, non chiediamo un favore in più») per Villaggio Bitcoin, da
+proporre a loro: il nome di serie è il loro, il logo non c'è. (3) Gli amici: chi
+segui su Barattolo e chi ha scambiato con te; quelli da Nostr restano da
+fare, e in ogni caso solo il livello. (4) La tavola è sempre notte in
+tutti e due i temi: è un tabellone, ha il suo colore. (5) La mappa la
+disegna Google Flow (Nano Banana) sul PC di Andrea in otto pezzi, nello
+stile dei disegni dell'app (contorni scuri, arancio e crema), senza
+scritte né personaggi: strada, caselle e Tappo li disegna la pagina.
+STRADE SCARTATE: la tabella delle caselle spuntate (ogni casella è un
+fatto già scritto); il serpentone a tre colonne (bocciato); un'unica
+immagine lunga (Flow fa 9:16, e otto pezzi pesano meno e si caricano
+pigri); un file audio (tre bip sintetizzati bastano e non pesano).
+
+PROVATO. `prove_stradina` (75 verdi): le zone, le soglie crescenti, le
+caselle per un nuovo iscritto e un veterano, il gioco, la porta, le
+missioni (posto, campi, voci storte), le competenze (wallet on-chain
+dalle due tabelle, Nostr verificata, doppia sì e solo-Nostr no), Tappo
+in fila, il cappellino nelle quattro forme,
+i fatti su sqlite (tabelle che mancano e che ci sono), gli amici, le
+sentinelle della rotta, delle missioni a leva, degli asset e del
+client, i suoni; il banco node della tavola (caselle, barattoli,
+cartelli, mappe, il cancello della missione, la pedina, i posti dentro
+la tavola, le cuciture senza buchi, la gara fra amici, la scheda).
+Controllo visivo con Playwright a 360 px, chiaro e scuro.
+IL VERBALE: suite intera severa 29.381 verdi e 2 rosse (la frase della
+classifica nascosta e la regola CSS di «Come si contano gli XP», entrambe
+di questo giro: corrette, e le due sezioni rigirate verdi insieme a
+stradina, vantaggi dei livelli e livello accanto al titolo: 193/0), 2
+saltate per nostr-tools che in cloud non c'è; collaudi 148/148 verdi senza
+proxy. Tutto girato in cloud sull'albero riallineato a develop 9537d26
+(il PC era occupato con Flow e Artlist).
+RESTA DA GUARDARE. I pezzi della mappa da Flow; le missioni vere dal
+gioco; gli amici da Nostr; il menù per livello (aspetta Andrea); il link
+di Villaggio Bitcoin nel config del VPS se accettano.
+
 
 ## La Caccia a Tappo: il gioco dentro Barattolo (17 nov 2026, cantiere caccia-a-tappo; Andrea: «un gioco di barattolo con dentro Tappo... l'utente giocando ne trae vantaggio», sulla scheda «Solo Caccia a Tappo», e poi a voce: «graficamente bellissimo, fluido», «anche nella web app... anche nel browser», «bello complesso... deve durare anche tra vent'anni... sfide difficili, progressive», «una mappa originale... un inventario»)
 

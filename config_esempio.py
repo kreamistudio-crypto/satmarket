@@ -348,6 +348,11 @@ DB_BUSY_TIMEOUT = 15         # secondi che una connessione aspetta sul
                              # il backup che tiene il file in lettura;
                              # le scritture lunghe non si curano da qui
                              # ma rendendole brevi
+SENTINELLA_ATTIVA = True     # la sentinella del server fermo (17 nov
+                             # 2026): se /api/salute tace, la pila dei
+                             # fili nel journal, e muto da 3 minuti il
+                             # server esce e systemd lo rialza. False =
+                             # spenta (solo per emergenza)
 MAX_PREFERITI = 10           # quanti annunci ATTIVI stanno «nel tuo
                              # barattolo». Piccolo apposta: e' una
                              # selezione, non una lista dei desideri
@@ -496,20 +501,6 @@ BANNER_NEGOZIO_ATTIVO = False   # interruttore generale (False = spento)
 # stesso prezzo — il banner resta comunque a pagamento in ogni caso.
 BANNER_SCONTI_LIVELLO = {"nuovo": 0, "avviato": 10, "pratico": 20,
                          "esperto": 35, "maestro": 50}
-# I REGALI PER LIVELLO (17 nov 2026): il merch «Un tempo per te» si
-# stampa su richiesta e si REGALA a chi sale di gradino, invece di una
-# campagna di preordini (decisione di Andrea). Accesa di serie: e' il
-# freno d'emergenza, si spegne con False. Spenta, la scala non promette
-# niente e nessuno sblocca o chiede. Chi riceve scrive il recapito nel
-# Profilo, l'avviso arriva nel canale admin e si segna «spedito» dal
-# pannello: la spedizione la fa Andrea a mano, dal sito di stampa.
-REGALI_LIVELLO_ATTIVI = True
-# Un regalo per gradino, con l'emoji davanti: e' il testo che la scala
-# mostra e che il bot scrive. «nuovo» non c'e' apposta.
-REGALI_LIVELLO = {"avviato": "👜 la borsa di tela «Un tempo per te»",
-                  "pratico": "☕ la tazza «Un tempo per te»",
-                  "esperto": "👕 la maglietta «Un tempo per te»",
-                  "maestro": "📓 il quaderno «Un tempo per te»"}
 # Il PREZZO della porta (tappa 2): si paga UNA VOLTA e vale per
 # sempre. E' il primo incasso che Barattolo fa per se', quindi ogni
 # sblocco lascia una riga nella tabella `pagamenti`: senza, sembrerebbe
@@ -680,6 +671,13 @@ SPED_GRATIS_MIN_EUR = 1         # una cintura contro lo zero travestito:
                                 # sempre — e quella si dichiara nel
                                 # prezzo dell'annuncio (costo 0)
 SPED_GRATIS_MIN_SATS = 1        # idem, in sats
+
+# --- Premi fedeltà del negozio (17 nov 2026) ---------------------------
+# «Da 100 € spesi da me, nel pacco dopo trovi la borsa»: le soglie e i
+# regali li scrive il venditore nel Profilo (fino a 4), Barattolo conta
+# quanto ha speso ogni cliente in quel negozio (affari conclusi, in euro)
+# e attacca il premio al suo ordine successivo. Nessun sat si muove.
+PREMI_FEDELTA_ATTIVI = True     # interruttore generale (False = spento)
 
 # --- Codici sconto del venditore -------------------------------------
 # «SATOSHI10» scritto alla cassa vale -X% sugli articoli. E' la TERZA
@@ -1137,6 +1135,13 @@ P2P_CAUZIONE = False
 # accesa prima, un nodo senza la 0010 rifiuterebbe le prese sugli
 # intervalli e chiederebbe la cauzione a chi aveva letto «niente».
 P2P_CAUZIONE_SUL_METODO = False
+# IL CONTANTE PER POSTA (17 nov 2026): la nona voce dei metodi P2P (la
+# busta di banconote spedita). SPENTA DI SERIE per parola di Andrea
+# («quando la porto in produzione, la leva lasciala spenta»): accesa, la
+# voce si offre nel foglio «Pubblica» e nel filtro del libro, e Info P2P
+# mostra le regole. La cauzione la chiede il nodo, se la voce sta in
+# `only_payment_methods` del suo settings.toml.
+P2P_POSTA_ATTIVO = False
 # IL TEMPO DI CHI PUBBLICA (12 ott 2026): spenta di serie. Accesa, mette in
 # campo la pausa degli ordini (ricorrente e una volta sola), il badge «⚡
 # risponde in fretta», i quattro avvisi a chi pubblica quando gli prendono
@@ -1197,6 +1202,12 @@ AVVISI_BARATTOLO_ATTIVI = True
 # passano almeno queste ore (quel che cade nel mezzo arriva dopo, se e'
 # ancora vero). Intero; storto vale 24.
 AVVISI_BARATTOLO_ORE = 24
+# LA SERIE DEI GIORNI 🔥 (17 nov 2026): nel Profilo ognuno vede quanti
+# giorni DI FILA ha aperto Barattolo (giorno italiano, da mezzanotte a
+# mezzanotte) e il suo record. Non da' XP ne' premi, e gli altri non la
+# vedono. Accesa di serie; a False niente fiamma e nessun giorno contato
+# (riaccendendola chi ha saltato dei giorni riparte da 1, il record resta).
+SERIE_GIORNI_ATTIVA = True
 # GLI AVVISI DEL MERCATINO (9 ott 2026): chi lo chiede dal cassetto Avvisi
 # del Profilo riceve un messaggio quando nel mercatino compaiono annunci
 # nuovi — TUTTI i nuovi, con un filtro facoltativo di categorie e prezzo
@@ -2318,6 +2329,17 @@ CLASSIFICA_KD = 0               # quante persone servono perche' il bonus
                                 # guardando i numeri veri: la sezione 3
                                 # di `classifica_prova.py` affianca le
                                 # tarature sulla classifica vera.
+
+# --- La stradina degli obiettivi (17 nov 2026) ------------------------
+# La tappa «📖 Impara bitcoin con …» della stradina (Profilo → Livello e
+# titolo → La tua stradina) e' una PORTA verso un partner dell'educazione
+# bitcoin. Nasce SPENTA: senza link la tappa non compare e nessuno viene
+# nominato nell'app. Si accende scrivendo qui il link ufficiale (solo
+# https://), quando il partner e' d'accordo (Andrea, 17 nov 2026:
+# Villaggio Bitcoin, da proporre a loro). Il nome e' quello che si
+# legge sulla tappa.
+IMPARA_BITCOIN_LINK = ""
+IMPARA_BITCOIN_NOME = "Villaggio Bitcoin"
 
 # --- Collaudo ---------------------------------------------------------
 # False = com'e' giusto che sia online: nessuna identita' finta.

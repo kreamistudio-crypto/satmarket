@@ -734,6 +734,33 @@ try:
     from config import SPED_GRATIS_ATTIVO
 except ImportError:
     SPED_GRATIS_ATTIVO = True
+# ==== I PREMI FEDELTA' DEL NEGOZIO (17 nov 2026) ======================
+# L'idea e' di un venditore («Un tempo per te», via Andrea): premiare chi
+# compra tanto NEL SUO negozio — «se arrivi a 100 € spesi da me, nel
+# pacco dopo trovi la borsa». Le soglie e i premi li sceglie il
+# venditore; Barattolo conta quanto ha speso ogni cliente lì (solo gli
+# affari CONCLUSI, `released`, in euro al cambio della consegna dei
+# sats, lo stesso numero degli XP) e quando la soglia e' passata attacca
+# il premio al SUO ordine successivo: lo vedono tutti e due, e il
+# regalo lo mette nel pacco chi vende. Barattolo non compra, non tiene
+# scorte e non spedisce niente.
+# IN EURO E BASTA, e non anche in sats come le due promesse sorelle: e'
+# un conto di lungo periodo, fatto di tanti ordini a cambi diversi, e
+# l'euro di ognuno e' gia' fotografato in colonna (`cambio_eur`). Una
+# soglia in sats sommerebbe sats di mesi diversi, che non valgono uguale.
+# NON E' UNO SCONTO e non muove un sat: il prezzo resta quello, e la
+# regola 10 (nessuna tariffa al venditore) non c'entra.
+# Leva ACCESA di serie (regola del 14 nov 2026): e' l'interruttore
+# d'emergenza. Spenta, nessun negozio mostra premi, nessuno ne matura e
+# nessun ordine ne porta di nuovi (quelli gia' attaccati restano scritti).
+try:
+    from config import PREMI_FEDELTA_ATTIVI
+except ImportError:
+    PREMI_FEDELTA_ATTIVI = True
+PREMI_FEDELTA_MAX = 4          # quattro gradini bastano a qualunque negozio
+PREMI_FEDELTA_MIN_EUR = 10     # sotto, il premio e' di fatto a ogni ordine
+PREMI_FEDELTA_MAX_EUR = 100_000
+PREMIO_TESTO_MAX = 60          # «la borsa di tela», non una descrizione
 try:
     from config import SPED_GRATIS_SOGLIE_EUR
 except ImportError:
@@ -1695,33 +1722,6 @@ try:
 except ImportError:
     BANNER_SCONTI_LIVELLO = {"nuovo": 0, "avviato": 10, "pratico": 20,
                              "esperto": 35, "maestro": 50}
-# ==== I REGALI PER LIVELLO (17 nov 2026, il merch «Un tempo per te») ====
-# Decisione di Andrea: il merch (borsa, tazza, maglietta, quaderno) si
-# stampa su richiesta e si REGALA a chi sale di livello, invece di una
-# campagna di preordini. I livelli esistono gia' (LIVELLI) e sono gia'
-# la scala del commercio: qui si appende un oggetto a ogni gradino.
-# NON MUOVE GLI XP: un regalo non e' un'azione, e il perimetro («gli XP
-# sono il commercio e nient'altro», vedi GLI XP) resta intero.
-# Leva ACCESA di serie (regola del 14 nov 2026): e' l'interruttore
-# d'emergenza, si spegne con una riga nel config. Spenta, la scala non
-# promette niente (`regalo` vuoto), nessuno sblocca, nessuno chiede.
-try:
-    from config import REGALI_LIVELLO_ATTIVI
-except ImportError:
-    REGALI_LIVELLO_ATTIVI = True
-# Chiave = l'id del livello, valore = il regalo in una riga, con la sua
-# emoji davanti: e' il testo che la scala mostra e che il bot scrive.
-# «nuovo» non c'e' apposta: il punto di partenza non si premia.
-try:
-    from config import REGALI_LIVELLO
-except ImportError:
-    REGALI_LIVELLO = {"avviato": "👜 la borsa di tela «Un tempo per te»",
-                      "pratico": "☕ la tazza «Un tempo per te»",
-                      "esperto": "👕 la maglietta «Un tempo per te»",
-                      "maestro": "📓 il quaderno «Un tempo per te»"}
-# Quanto puo' essere lungo il recapito scritto da chi riceve: un
-# indirizzo o un locker stanno in tre righe, non in una pagina.
-RECAPITO_REGALO_MAX = 500
 # IL PREZZO DELLA PORTA (ago 2026, tappa 2): chi non ha il livello la
 # apre pagando. E' il PRIMO incasso che Barattolo fa per se' — finora
 # ogni invoice in entrata era escrow per conto di terzi — e per questo
@@ -5392,6 +5392,137 @@ def xp_ordine(prezzo_sats: int, cambio_eur: float, ruolo: str) -> int:
                * XP_RUOLO.get(ruolo, 1.0))
 
 
+# ------------------ LA SERIE DEI GIORNI 🔥 (17 nov 2026) ------------------
+# Quanti giorni DI FILA una persona ha aperto Barattolo. Non da' XP, non
+# sblocca niente e non la vede nessun altro: e' un contatore, e basta
+# (richiesta di Andrea, sul modello di Ditto).
+# ROVESCIA UNA DECISIONE D'AGOSTO, e lo fa sapendolo. Qui era scritto
+# «niente serie consecutiva: in un mercatino non c'e' nulla da fare ogni
+# giorno, e una fiammella che si spegne punisce chi ha lavorato invece
+# di aprire l'app». Il motivo resta vero, e la serie lo porta dentro:
+# chi salta un giorno riparte da 1 IN SILENZIO — nessun «hai perso»,
+# nessun avviso del bot che rincorre — e il RECORD non scende mai.
+# COSA CONTA: un passaggio da /api/me (l'app la chiede a ogni apertura)
+# o dal ritorno in primo piano dopo la mezzanotte (`POST /api/me/serie`),
+# da chi e' entrato. Contano i GIORNI, non le volte.
+# IL GIORNO E' QUELLO ITALIANO, da mezzanotte a mezzanotte, per tutti:
+# uno solo, cosi' cambiare il fuso del telefono non regala e non toglie
+# niente. Il VPS vive in UTC e Windows non ha tzdata: la regola dell'ora
+# legale sta scritta qui, la stessa di `_epoch_roma`.
+# LA COLONNA `utenti.xp_ultimo_giorno` NON SI RIUSA: e' una lapide (vedi
+# la'), e un server vecchio tornato in un rollback la riscriverebbe. La
+# serie ha la sua tabella, `serie_giorni`, una riga a persona.
+# LA LEVA: SERIE_GIORNI_ATTIVA, accesa di serie. Spenta, il timbro non si
+# scrive, /api/me non manda la chiave e il client non disegna niente; le
+# righe restano, e riaccendendo chi ha saltato dei giorni riparte da 1.
+try:
+    from config import SERIE_GIORNI_ATTIVA
+except ImportError:
+    SERIE_GIORNI_ATTIVA = True
+SERIE_GIORNI_ATTIVA = bool(SERIE_GIORNI_ATTIVA)
+# le tappe che il client festeggia un filo di piu': una settimana, un
+# mese, cento giorni, un anno. Viaggiano con la risposta, cosi' non ne
+# esiste una seconda copia nella pagina.
+SERIE_TAPPE = (7, 30, 100, 365)
+
+
+def _giorno_roma(epoch) -> str:
+    """Il giorno di calendario in Italia («AAAA-MM-GG») di un istante.
+    Senza tzdata: CET d'inverno, CEST dall'ultima domenica di marzo
+    all'ultima di ottobre, il cambio alle 01:00 UTC (la regola europea,
+    ferma dal 1996 — la stessa di `_epoch_roma`, nel verso opposto)."""
+    from datetime import datetime, timedelta, timezone
+    utc = datetime.fromtimestamp(int(epoch), timezone.utc).replace(tzinfo=None)
+
+    def ultima_domenica(mese):
+        d = datetime(utc.year, mese, 31)
+        return d - timedelta(days=(d.weekday() + 1) % 7)
+    inizio = ultima_domenica(3).replace(hour=1)
+    fine = ultima_domenica(10).replace(hour=1)
+    ore = 2 if inizio <= utc < fine else 1
+    return (utc + timedelta(hours=ore)).strftime("%Y-%m-%d")
+
+
+def _giorno_prima(giorno: str) -> str:
+    """Il giorno di calendario prima di «AAAA-MM-GG». E' aritmetica di
+    DATE e non di secondi: il giorno del cambio d'ora dura 23 o 25 ore,
+    e «86400 secondi fa» una volta l'anno sarebbe l'altro ieri."""
+    from datetime import date, timedelta
+    return (date.fromisoformat(giorno) - timedelta(days=1)).isoformat()
+
+
+def serie_passo(giorni: int, record: int, ultimo: str, oggi: str):
+    """IL GIUDICE DELLA SERIE, puro: lo stato di ieri e il giorno di oggi
+    danno (giorni, record, ultimo, nuova). `nuova` = questo passaggio ha
+    contato un giorno in piu' (e' il primo di oggi).
+    Gia' passato oggi: niente cambia. Passato ieri: uno in piu'. Un buco
+    di un giorno o piu', o la prima volta: si riparte da 1. Un `ultimo`
+    nel FUTURO (orologio del server tornato indietro) non si tocca: si
+    aspetta che il calendario lo raggiunga, senza regalare e senza
+    togliere. Il record non scende mai."""
+    giorni, record = max(0, int(giorni or 0)), max(0, int(record or 0))
+    ultimo = str(ultimo or "")
+    if ultimo >= oggi and giorni > 0:
+        return giorni, max(record, giorni), ultimo, False
+    giorni = giorni + 1 if ultimo == _giorno_prima(oggi) and giorni > 0 else 1
+    return giorni, max(record, giorni), oggi, True
+
+
+def timbra_serie(con, tg_id: int, adesso=None) -> dict:
+    """Il passaggio di oggi di una persona: legge la sua riga, chiede al
+    giudice, scrive SOLO se il giorno e' nuovo (una scrittura al giorno a
+    testa, le altre aperture sono una SELECT sulla chiave primaria).
+    Ritorna la busta per il client: `giorni`, `record`, `oggi_contato`,
+    `nuova` (questo e' il primo passaggio di oggi: e' il momento della
+    festa), `oggi` (il giorno italiano di questa busta: il client lo
+    confronta al ritorno in primo piano), `feriale` (0 = lunedi': che
+    giorno e' oggi IN ITALIA, per disegnare la settimana senza chiederlo
+    al telefono) e le `tappe`.
+    Non fa commit: lo fa chi chiama, con le sue altre scritture."""
+    from datetime import date
+    oggi = _giorno_roma(time.time() if adesso is None else adesso)
+    r = con.execute("SELECT giorni, record, ultimo FROM serie_giorni "
+                    "WHERE tg_id=?", (tg_id,)).fetchone()
+    giorni, record, ultimo, nuova = serie_passo(
+        r["giorni"] if r else 0, r["record"] if r else 0,
+        r["ultimo"] if r else "", oggi)
+    if nuova:
+        con.execute(
+            "INSERT INTO serie_giorni(tg_id, giorni, record, ultimo) "
+            "VALUES(?,?,?,?) ON CONFLICT(tg_id) DO UPDATE SET "
+            "giorni=excluded.giorni, record=excluded.record, "
+            "ultimo=excluded.ultimo", (tg_id, giorni, record, ultimo))
+    return {"giorni": giorni, "record": record, "oggi_contato": ultimo == oggi,
+            "nuova": nuova, "oggi": oggi,
+            "feriale": date.fromisoformat(oggi).weekday(),
+            "tappe": list(SERIE_TAPPE)}
+
+
+def _serie_unisci(con, resta: int, va_via: int):
+    """LA FUSIONE DI DUE ACCOUNT: la stessa persona aveva due righe, e ne
+    resta una. Vince la serie VIVA piu' lunga (l'ultimo passaggio piu'
+    recente; a pari giorno, quella con piu' giorni), e il record e' il
+    piu' alto dei due: fondersi non deve mai costare una fiammella."""
+    righe = {r["tg_id"]: r for r in con.execute(
+        "SELECT tg_id, giorni, record, ultimo FROM serie_giorni "
+        "WHERE tg_id IN (?,?)", (resta, va_via))}
+    a, b = righe.get(resta), righe.get(va_via)
+    if not b:
+        return
+    if not a or (b["ultimo"], b["giorni"]) > (a["ultimo"], a["giorni"]):
+        meglio = b
+    else:
+        meglio = a
+    record = max(int(b["record"] or 0), int(a["record"] or 0) if a else 0)
+    con.execute("DELETE FROM serie_giorni WHERE tg_id=?", (va_via,))
+    con.execute(
+        "INSERT INTO serie_giorni(tg_id, giorni, record, ultimo) "
+        "VALUES(?,?,?,?) ON CONFLICT(tg_id) DO UPDATE SET "
+        "giorni=excluded.giorni, record=excluded.record, "
+        "ultimo=excluded.ultimo",
+        (resta, meglio["giorni"], record, meglio["ultimo"]))
+
+
 # ------------------- I CODICI INVITO (set 2026) ----------------------
 # Ogni persona ha UN codice, e un link t.me/<bot>?start=<codice>: chi
 # arriva da li' si collega da solo a chi l'ha invitato, al primo /start
@@ -6027,100 +6158,8 @@ def scala_livelli() -> list:
             "link_negozio": bool(slug_da) and n >= slug_da,
             "titolo": titoli.get(lid, ""),
             "p2p_sconto": p2p if (p2p > 0 and n >= P2P_SCONTO_LIVELLO)
-                          else 0,
-            # il sesto vantaggio (17 nov 2026): il regalo del gradino,
-            # '' a leva spenta — la regola della scala, come gli altri
-            "regalo": regalo_del_livello(lid)})
+                          else 0})
     return scala
-
-
-def regalo_del_livello(lid: str) -> str:
-    """Il regalo che quel gradino da', in una riga: '' se la leva e'
-    spenta, se il gradino non ne ha, o se il config lo scrive storto
-    (un numero, una lista). Giudice unico: la scala, il bot, la rotta
-    che riceve la richiesta e il pannello passano tutti di qui."""
-    if not REGALI_LIVELLO_ATTIVI:
-        return ""
-    try:
-        r = REGALI_LIVELLO.get(lid, "")
-    except Exception:
-        return ""
-    return r.strip()[:120] if isinstance(r, str) else ""
-
-
-def livelli_raggiunti(xp: int, affari: int) -> list[str]:
-    """Gli id dei gradini attraversati, dal primo a quello attuale: chi
-    e' «pratico» ha attraversato «nuovo» e «avviato». E' la stessa
-    lettura di `titoli_disponibili` (i livelli sono una scala), e sta
-    qui perche' il regalo di un gradino sotto non si perde salendo
-    due gradini in un colpo (un ordine grosso)."""
-    liv = livello_utente(xp, affari)["id"]
-    out = []
-    for l in LIVELLI:
-        out.append(l[2])
-        if l[2] == liv:
-            break
-    return out
-
-
-def sblocca_regali_livello(con, tg_id: int) -> list[tuple[str, str]]:
-    """Il giudice dei regali: segna «sbloccato» ogni regalo dei gradini
-    raggiunti che non era ancora scritto (INSERT OR IGNORE: idempotente,
-    mai doppioni, come i distintivi). Niente commit, e' del chiamante.
-    Ritorna le coppie (livello, regalo) appena sbloccate, per l'avviso.
-    A leva spenta non scrive e non promette: lista vuota. Un account
-    cancellato (il fantasma in [2^52, 2^53)) non riceve regali."""
-    if not REGALI_LIVELLO_ATTIVI or 2 ** 52 <= int(tg_id or 0) < 2 ** 53:
-        return []
-    u = con.execute("SELECT xp, vendite_ok, acquisti_ok FROM utenti "
-                    "WHERE tg_id=?", (tg_id,)).fetchone()
-    if not u:
-        return []
-    affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
-    nuovi = []
-    for lid in livelli_raggiunti(u["xp"] or 0, affari):
-        regalo = regalo_del_livello(lid)
-        if not regalo:
-            continue
-        r = con.execute(
-            "INSERT OR IGNORE INTO regali_livello"
-            "(tg_id, livello, regalo, stato, sbloccato_il) "
-            "VALUES(?,?,?,'sbloccato',?)",
-            (tg_id, lid, regalo, int(time.time())))
-        if r.rowcount:
-            nuovi.append((lid, regalo))
-    return nuovi
-
-
-def regali_livello_di(con, tg_id: int) -> list[dict]:
-    """La lista per /api/me: un regalo per gradino che ne ha uno, con lo
-    stato di CHI LEGGE — da_sbloccare | sbloccato | richiesto | spedito.
-    E' una LETTURA e non scrive: chi ha gia' il livello ma nessuna riga
-    (il deploy l'ha trovato gia' «pratico») lo vede «sbloccato» lo
-    stesso, e la riga nasce quando chiede (la rotta sblocca prima).
-    Lista vuota a leva spenta: il client non mostra niente."""
-    if not REGALI_LIVELLO_ATTIVI:
-        return []
-    u = con.execute("SELECT xp, vendite_ok, acquisti_ok FROM utenti "
-                    "WHERE tg_id=?", (tg_id,)).fetchone()
-    raggiunti = set(livelli_raggiunti(
-        (u["xp"] or 0) if u else 0,
-        ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0))
-    righe = {r["livello"]: r for r in con.execute(
-        "SELECT livello, regalo, stato FROM regali_livello WHERE tg_id=?",
-        (tg_id,))}
-    fuori = []
-    for _xp, _aff, lid, nome in LIVELLI:
-        regalo = regalo_del_livello(lid)
-        if not regalo:
-            continue
-        r = righe.get(lid)
-        stato = r["stato"] if r else (
-            "sbloccato" if lid in raggiunti else "da_sbloccare")
-        fuori.append({"livello": lid, "livello_nome": nome,
-                      "regalo": (r["regalo"] if r else regalo),
-                      "stato": stato})
-    return fuori
 
 
 def banner_porta_aperta(sbloccato_il: int) -> bool:
@@ -7106,6 +7145,24 @@ def init_db():
         annuncio_id INTEGER PRIMARY KEY,
         accodato INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS premi_fedelta_maturati(
+        -- I PREMI FEDELTA' DEL NEGOZIO (17 nov 2026): una riga quando un
+        -- cliente passa una soglia del venditore. `premio` e' il testo
+        -- del giorno in cui l'ha passata (il venditore puo' cambiare la
+        -- lista, la promessa fatta no). `ordine_id` e' l'ordine nel cui
+        -- pacco va: NULL finche' il cliente non compra di nuovo da lui,
+        -- e torna NULL se quell'ordine muore (annullato, rimborsato).
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        compratore_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        soglia_eur INTEGER NOT NULL,
+        premio TEXT NOT NULL,
+        maturato_il INTEGER NOT NULL,
+        ordine_id INTEGER,
+        UNIQUE(compratore_id, venditore_id, soglia_eur)
+    );
+    CREATE INDEX IF NOT EXISTS idx_premi_ordine
+        ON premi_fedelta_maturati(ordine_id);
     CREATE TABLE IF NOT EXISTS badge_utente(
         -- i distintivi guadagnati; le definizioni (nome, emoji,
         -- criterio) vivono nel codice, in DISTINTIVI: qui solo
@@ -7115,23 +7172,17 @@ def init_db():
         ottenuto_il INTEGER,
         PRIMARY KEY(tg_id, badge_id)
     );
-    CREATE TABLE IF NOT EXISTS regali_livello(
-        -- I REGALI PER LIVELLO (17 nov 2026): una riga per persona e
-        -- gradino, come badge_utente. `regalo` e' il testo del giorno
-        -- dello sblocco (il config puo' cambiare, la promessa fatta no).
-        -- stato: sbloccato -> richiesto (col recapito) -> spedito.
-        -- Il recapito e' un dato personale: esce SOLO nel pannello
-        -- admin, mai in un avviso di canale.
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tg_id INTEGER NOT NULL,
-        livello TEXT NOT NULL,
-        regalo TEXT NOT NULL,
-        stato TEXT NOT NULL DEFAULT 'sbloccato',
-        recapito TEXT NOT NULL DEFAULT '',
-        sbloccato_il INTEGER,
-        richiesto_il INTEGER,
-        spedito_il INTEGER,
-        UNIQUE(tg_id, livello)
+    CREATE TABLE IF NOT EXISTS serie_giorni(
+        -- LA SERIE DEI GIORNI 🔥 (17 nov 2026): una riga a persona.
+        -- `giorni` e' la serie in corso, `record` la piu' lunga di
+        -- sempre (non scende mai), `ultimo` il giorno ITALIANO
+        -- dell'ultimo passaggio, «AAAA-MM-GG». Il giudice e'
+        -- `serie_passo`; la serie mostrata si calcola da qui a ogni
+        -- lettura, quindi una riga vecchia non mente: dice solo quando.
+        tg_id INTEGER PRIMARY KEY,
+        giorni INTEGER NOT NULL DEFAULT 0,
+        record INTEGER NOT NULL DEFAULT 0,
+        ultimo TEXT NOT NULL DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS firme_nostr(
         -- LA CODA DELLE FIRME (ago 2026). Un doppio cittadino che
@@ -9594,6 +9645,11 @@ def init_db():
                     "sped_gratis_soglia INTEGER DEFAULT 0",
                     "sped_gratis_soglia_eur INTEGER DEFAULT 0",
                     "sped_gratis_valuta TEXT DEFAULT 'eur'",
+                    # I PREMI FEDELTA' DEL NEGOZIO (17 nov 2026): la
+                    # lista del venditore in JSON, [{soglia_eur, premio}];
+                    # '' = nessun premio. La legge e la ripulisce
+                    # SEMPRE `premi_fedelta_leggi`, mai il JSON nudo.
+                    "premi_fedelta TEXT DEFAULT ''",
                     # IL BANNER DEL NEGOZIO (ago 2026): l'insegna che
                     # il venditore appende sopra il suo catalogo — una
                     # foto e un link al suo sito. Il default '' E' la
@@ -21139,36 +21195,6 @@ async def premia_distintivi(tg_id: int):
         except Exception as e:
             print(f"⚠️ Badge Nostr del distintivo saltato per {tg_id}/"
                   f"{did}: {e}")
-    # I REGALI PER LIVELLO (17 nov 2026) viaggiano sullo stesso gancio:
-    # ogni posto che puo' aver mosso gli XP passa gia' di qui.
-    await premia_regali_livello(tg_id)
-
-
-async def premia_regali_livello(tg_id: int):
-    """Il gemello di `premia_distintivi` per i regali: valuta, committa
-    e POI avvisa (mai una notifica dentro una transazione). Fail-open
-    totale: un regalo non deve mai fermare il flusso che stava
-    chiudendo un ordine. L'avviso dice COSA e DOVE andare a chiederlo:
-    il recapito lo scrive la persona nel Profilo, non si chiede in chat."""
-    try:
-        con = db()
-        nuovi = sblocca_regali_livello(con, tg_id)
-        con.commit()
-        con.close()
-    except Exception as e:
-        print(f"⚠️ Regali per livello saltati per {tg_id}: {e}")
-        return
-    nomi = {l[2]: l[3] for l in LIVELLI}
-    for lid, regalo in nuovi:
-        try:
-            await notifica(
-                tg_id,
-                f"🎁 <b>Hai sbloccato un regalo: "
-                f"{html.escape(regalo)}!</b>\n"
-                f"Sei {html.escape(nomi.get(lid, lid))}: apri il tuo "
-                f"Profilo, «🎖 Livello e titolo», e dimmi dove mandarlo. 🫙")
-        except Exception as e:
-            print(f"⚠️ Avviso del regalo saltato per {tg_id}/{lid}: {e}")
 
 
 # ---------------- IL CAMPANELLO DEL BOT (webhook) --------------------
@@ -21611,13 +21637,14 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE badge_utente SET tg_id=? "
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM badge_utente WHERE tg_id=?", (id_nostr,))
-        # I regali per livello (17 nov 2026) migrano come i distintivi:
-        # UNIQUE(tg_id, livello) tiene una riga sola per gradino, e
-        # resta quella dell'account Telegram (che puo' gia' portare un
-        # recapito o uno «spedito»); il doppione Nostr muore sotto.
-        con.execute("UPDATE OR IGNORE regali_livello SET tg_id=? "
-                    "WHERE tg_id=?", (id_telegram, id_nostr))
-        con.execute("DELETE FROM regali_livello WHERE tg_id=?", (id_nostr,))
+        # I PREMI FEDELTA' (17 nov 2026) seguono gli ordini, in unione come
+        # i distintivi: la stessa soglia maturata da tutte e due le meta'
+        # resta una volta sola (la UNIQUE), il doppione muore sotto
+        for _col in ("compratore_id", "venditore_id"):
+            con.execute(f"UPDATE OR IGNORE premi_fedelta_maturati SET "
+                        f"{_col}=? WHERE {_col}=?", (id_telegram, id_nostr))
+            con.execute(f"DELETE FROM premi_fedelta_maturati WHERE {_col}=?",
+                        (id_nostr,))
         # L'ultimo 30382 pubblicato segue l'utente come i distintivi:
         # e' solo una CACHE (la prova resta l'evento sui relay), quindi
         # se sopravvive quella di Telegram va bene com'e' — diventera'
@@ -21696,6 +21723,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE preferiti SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM preferiti WHERE tg_id=?", (id_nostr,))
+        # La serie dei giorni 🔥 (17 nov 2026), tabella `serie_giorni`:
+        # non e' un UPDATE secco come le sorelle, perche' le due righe
+        # vanno CONFRONTATE — resta la serie migliore e il record piu'
+        # alto, e la riga di chi muore se ne va (`_serie_unisci`).
+        _serie_unisci(con, id_telegram, id_nostr)
         # LA CACCIA A TAPPO (17 nov 2026) segue l'utente, in UNIONE come
         # i preferiti: la PK contiene il tg_id. Se tutt'e due le meta'
         # hanno giocato lo STESSO giorno resta la giornata dell'account
@@ -31882,7 +31914,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
                      "sconto_pacco_valore, sconto_pacco_valore_eur, "
                      "sconto_pacco_valore_valuta, sconto_pacco_percento, "
                      "sped_gratis_soglia, sped_gratis_soglia_eur, "
-                     "sped_gratis_valuta, "
+                     "sped_gratis_valuta, premi_fedelta, "
                      "banner_stato, banner_foto, banner_link, "
                      "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                      "END) AS avatar FROM utenti ")
@@ -32079,6 +32111,10 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     seguito = bool(user and int(user["id"]) != int(v["tg_id"]) and con.execute(
         "SELECT 1 FROM venditori_seguiti WHERE tg_id=? AND venditore_id=?",
         (user["id"], v["tg_id"])).fetchone())
+    # ...e quanto ha speso qui chi guarda (premi fedelta', 17 nov 2026)
+    speso_qui = (round(speso_nel_negozio(con, user["id"], v["tg_id"]), 2)
+                 if user and int(user["id"]) != int(v["tg_id"])
+                 and PREMI_FEDELTA_ATTIVI and v["premi_fedelta"] else None)
     con.close()
     venditore = dict(v)
     venditore["seguito"] = seguito
@@ -32124,6 +32160,13 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     venditore["sped_gratis_soglia"] = _g["soglia"]
     venditore["sped_gratis_eur"] = _g["eur"]
     venditore["sped_gratis_valuta"] = _g["valuta"]
+    # I PREMI FEDELTA' (17 nov 2026), dal loro giudice e mai il JSON
+    # grezzo; a leva spenta la vetrina non promette niente. A chi guarda
+    # da cliente, quanto ha gia' speso li' (solo a lui: e' roba sua)
+    venditore["premi_fedelta"] = (premi_fedelta_leggi(v["premi_fedelta"])
+                                  if PREMI_FEDELTA_ATTIVI else [])
+    if venditore["premi_fedelta"] and speso_qui is not None:
+        venditore["speso_qui_eur"] = speso_qui
     # Il pezzo leggibile dell'indirizzo del negozio: lo calcola il
     # server, come per gli annunci, cosi' il client non ha un secondo
     # `_slug` da tenere in pari.
@@ -36693,6 +36736,13 @@ def _leve_stato():
             _leva("Soglia minima (sats)", "SPED_GRATIS_MIN_SATS",
                   SPED_GRATIS_MIN_SATS),
         ]},
+        {"gruppo": "🎁 Premi fedeltà del negozio", "voci": [
+            _leva("Premi fedeltà", "PREMI_FEDELTA_ATTIVI",
+                  bool(PREMI_FEDELTA_ATTIVI),
+                  spento="nessun negozio mostra premi, nessuno ne matura "
+                         "e nessun ordine ne riceve di nuovi; quelli già "
+                         "attaccati agli ordini restano scritti"),
+        ]},
         {"gruppo": "🎟 Codici sconto del venditore", "voci": [
             _leva("Codici sconto", "CODICI_SCONTO_ATTIVI",
                   bool(CODICI_SCONTO_ATTIVI),
@@ -37127,23 +37177,6 @@ def _leve_stato():
                          "recensore solo: è la classifica di prima "
                          "dello smorzamento"),
         ]},
-        # I REGALI PER LIVELLO (17 nov 2026, il merch «Un tempo per te»):
-        # accesa di serie, l'interruttore d'emergenza
-        {"gruppo": "🎁 Regali per livello", "voci": [
-            _leva("Regali per livello", "REGALI_LIVELLO_ATTIVI",
-                  bool(REGALI_LIVELLO_ATTIVI),
-                  acceso="chi sale di livello sblocca il regalo del "
-                         "gradino, lo chiede dal Profilo col recapito, e "
-                         "l'avviso arriva qui: si spedisce a mano dal sito "
-                         "di stampa e si segna «spedito» nel pannello",
-                  spento="la scala non promette regali, nessuno ne "
-                         "sblocca né ne chiede; le righe già scritte "
-                         "restano nel pannello"),
-            _leva("I regali, per gradino", "REGALI_LIVELLO",
-                  _elenco(f"{lid}: {regalo_del_livello(lid)}"
-                          for _x, _a, lid, _n in LIVELLI
-                          if regalo_del_livello(lid)) or "nessuno"),
-        ]},
         {"gruppo": "🔁 Scambio P2P (Mostro)", "voci": [
             # LA RIGA DICE IL FATTO E NON LA COSTANTE — la trappola che
             # questo pannello esiste per non far ricadere: una leva
@@ -37514,6 +37547,17 @@ def _leve_stato():
                   spento="gli scambi on-chain si pagano solo in euro",
                   allarme=bool(P2P_ONCHAIN_USDT_ATTIVO) and not (
                       P2P_ONCHAIN_ATTIVO and P2P_USDT_ATTIVO)),
+            # IL CONTANTE PER POSTA (17 nov 2026, cantiere leva-posta):
+            # spenta di serie per parola di Andrea
+            _leva("Contante per posta nel P2P", "P2P_POSTA_ATTIVO",
+                  bool(P2P_POSTA_ATTIVO),
+                  acceso="nel foglio «Pubblica» (sotto «Altri metodi ▾») e "
+                         "nel filtro del libro c'è la voce «Contante per "
+                         "posta», e Info P2P ne dice le regole; la cauzione "
+                         "la chiede il nodo solo se la voce sta nella sua "
+                         "lista (DA-FARE-ANDREA, voce 18)",
+                  spento="la voce non si offre a nessuno; un ordine che la "
+                         "porta si legge e si paga lo stesso"),
             # GLI ORDINI P2P IN FRANCHI (14 nov 2026, cantiere p2p-chf)
             _leva("Ordini P2P in franchi svizzeri", "P2P_CHF_ATTIVO",
                   bool(P2P_CHF_ATTIVO),
@@ -37705,6 +37749,18 @@ def _leve_stato():
         {"gruppo": "🎁 Mancia al venditore", "voci": _mancia_leve()},
         # LA CASSA IN NEGOZIO (15 nov 2026): accesa di serie
         {"gruppo": "🏪 Cassa in negozio", "voci": _cassa_leve()},
+        {"gruppo": "🔥 Serie dei giorni", "voci": [
+            # LA SERIE DEI GIORNI (17 nov 2026, cantiere serie-giorni):
+            # accesa di serie, nessun segreto
+            _leva("Serie dei giorni di fila nel Profilo",
+                  "SERIE_GIORNI_ATTIVA", bool(SERIE_GIORNI_ATTIVA),
+                  acceso="nel Profilo ognuno vede i SUOI giorni di fila "
+                         "(giorno italiano) e il record; non dà XP né "
+                         "premi, e gli altri non la vedono",
+                  spento="niente fiamma nel Profilo e nessun giorno "
+                         "contato; riaccendendola chi ha saltato dei "
+                         "giorni riparte da 1, il record resta"),
+        ]},
         {"gruppo": "🫙 Avvisi del barattolo", "voci": [
             # GLI AVVISI SUI PREFERITI (17 nov 2026, cantiere
             # avvisi-barattolo): accesa di serie, nessun segreto
@@ -52001,6 +52057,7 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     con = db()
     u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
+    serie_mia = None      # la serie dei giorni: la scrive il timbro, sotto
     # Rinfresco opportunistico del francobollo (e del nome, per i
     # nativi Nostr): alla prima apertura e poi al piu' una volta a
     # settimana, in sottofondo (fail-open: questa risposta non lo
@@ -52016,17 +52073,14 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         # e' cio' che rende il sistema auto-riparante. Niente notifiche
         # qui: quelle spettano ai ganci dal vivo.
         controlla_distintivi(con, user["id"])
-        # LA VISITA GIORNALIERA, timbrata qui perche' qui si passa
-        # comunque a ogni apertura — e il precedente c'e' gia': su
-        # questa GET si scrive da sempre (rinfresco avatar, passata
-        # dei distintivi). Il giorno LOCALE in colonna serve solo a
-        # non tentare la scrittura a ogni chiamata: a impedire il
-        # doppio punto ci pensa la UNIQUE del registro, che e' il vero
-        # giudice. NIENTE serie consecutiva, e non e' una svista: in
-        # un mercatino non c'e' nulla da fare ogni giorno, e una
-        # fiammella che si spegne punisce chi ha lavorato invece di
-        # aprire l'app. Se un giorno si vorra' premiare la costanza,
-        # si contano i giorni TOTALI, che salgono e basta.
+        # LA VISITA GIORNALIERA si timbrava qui, quando dava XP (ago
+        # 2026): qui si passa comunque a ogni apertura, e su questa GET
+        # si scrive da sempre (rinfresco avatar, passata dei
+        # distintivi). Dal 17 nov 2026 qui si timbra LA SERIE DEI
+        # GIORNI 🔥, piu' sotto, prima del commit — che rovescia il
+        # «niente serie consecutiva» scritto in questo punto: vedi il
+        # blocco «LA SERIE DEI GIORNI», col motivo di allora e come la
+        # serie lo rispetta (riparte in silenzio, il record resta).
         # La coorte al primo sguardo, per chi e' entrato dopo l'avvio
         # (il backfill di init_db copre solo chi c'era). Congelata.
         if not u["coorte"]:
@@ -52042,9 +52096,17 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         # in basso coi suoi vicini: il codice nasce la prima volta che
         # serve, cioe' e' una scrittura, e deve stare prima del commit.
         inviti_miei = stato_inviti(con, user["id"], u["registrato"])
-        # (Qui si timbrava la visita del giorno. Il commit RESTA: serve
-        # ad assegna_coorte, al titolo dei fondatori e al codice invito,
-        # qui sopra.)
+        # LA SERIE DEI GIORNI 🔥 (17 nov 2026): il passaggio di oggi,
+        # scritto una volta al giorno a testa. FAIL-OPEN come gli XP: un
+        # errore in un contatore non deve MAI costare il profilo a chi
+        # apre l'app — la chiave non parte e il client non disegna.
+        if SERIE_GIORNI_ATTIVA:
+            try:
+                serie_mia = timbra_serie(con, user["id"])
+            except Exception as e:
+                print(f"⚠️ Serie dei giorni saltata per {user['id']}: {e}")
+        # (Il commit serve ad assegna_coorte, al titolo dei fondatori,
+        # al codice invito e alla serie, qui sopra.)
         con.commit()
     presi = {r["badge_id"]: r["ottenuto_il"] for r in con.execute(
         "SELECT badge_id, ottenuto_il FROM badge_utente WHERE tg_id=?",
@@ -52226,6 +52288,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # la leva degli avvisi del barattolo (17 nov 2026): il client apre il
     # foglietto e mostra la 🔔 solo se e' accesa
     profilo["avvisi_barattolo"] = bool(AVVISI_BARATTOLO_ATTIVI)
+    # LA SERIE DEI GIORNI 🔥 (17 nov 2026): giorni di fila, record e se
+    # questo e' il primo passaggio di oggi (`nuova`: il client fa festa
+    # una volta). A leva spenta la chiave NON c'e', e la pagina non
+    # disegna niente — lo stesso patto di un server di ieri.
+    if serie_mia:
+        profilo["serie"] = serie_mia
     # La modifica di piu' annunci insieme (16 ott 2026): la leva VIVA,
     # perche' il bottone in «I tuoi annunci» nasca solo quando le sue
     # rotte rispondono.
@@ -52405,6 +52473,17 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # toggle ritrova senza chiedere niente; a spegnerla nelle vetrine
     # ci pensa il giudice, e il cassetto si nasconde da solo su
     # `attivo`.
+    # I PREMI FEDELTA' (17 nov 2026), per il cassetto «🎁»: la lista
+    # pulita dal giudice al posto del JSON in colonna, e le misure per
+    # i messaggi del 400; `attivo` nasconde il cassetto a leva spenta
+    profilo["premi_fedelta"] = premi_fedelta_leggi(
+        profilo.get("premi_fedelta"))
+    profilo["premi_fedelta_leve"] = {
+        "attivo": bool(PREMI_FEDELTA_ATTIVI),
+        "max": PREMI_FEDELTA_MAX,
+        "min_eur": PREMI_FEDELTA_MIN_EUR,
+        "max_eur": PREMI_FEDELTA_MAX_EUR,
+        "testo_max": PREMIO_TESTO_MAX}
     profilo["sped_gratis_leve"] = {
         "attivo": bool(SPED_GRATIS_ATTIVO),
         "valute": list(VALUTE_SOGLIA),
@@ -52569,17 +52648,6 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0)
     # ...e la scala intera coi vantaggi di ogni gradino (ott 2026)
     profilo["livelli_scala"] = scala_livelli()
-    # ...e i regali dei gradini, con lo stato di chi legge (17 nov 2026):
-    # lista vuota a leva spenta, e il cassetto non ne parla. Una
-    # connessione sua, breve: quella di sopra e' gia' chiusa qui, e un
-    # regalo non deve mai far cadere /api/me (fail-open, lista vuota).
-    try:
-        _cr = db()
-        profilo["regali_livello"] = regali_livello_di(_cr, user["id"])
-        _cr.close()
-    except Exception as e:
-        print(f"⚠️ Regali per livello non letti per /api/me: {e}")
-        profilo["regali_livello"] = []
     # ...e da che lato vengono quegli XP, che e' la meta' che il numero
     # da solo non dice. None quando i conti non tornano (vedi
     # `xp_per_ruolo`): chiave vuota = il cassetto dice la frase di
@@ -55098,6 +55166,261 @@ async def imposta_sped_gratis(req: Request,
             "soglia_eur": r["e"] if r else 0}
 
 
+# ----------------- I PREMI FEDELTA' DEL NEGOZIO (17 nov 2026) ---------
+# La proposta di un negozio vero, «Un tempo per te»: «chi compra da me
+# piu' volte sale di punteggio, a 100 € il pacco dopo ha la borsa, a 200
+# la tazza». Barattolo fa solo il CONTO e il PROMEMORIA: le soglie e i
+# regali li scrive chi vende, il regalo lo mette lui nel suo pacco.
+# Il conto: gli ordini CONCLUSI (`released`) tra quel cliente e quel
+# negozio, in euro al cambio fotografato alla consegna dei sats — lo
+# stesso numero da cui escono gli XP, cosi' due conti non litigano mai.
+# Il premio MATURA quando la soglia e' passata (una riga in
+# `premi_fedelta_maturati`, una volta sola per cliente, negozio e
+# soglia) e si ATTACCA al primo ordine dei due che e' pagato e non
+# ancora spedito: e' li' che il regalo puo' ancora entrare nel pacco.
+# Se quell'ordine muore (annullato, rimborsato) il premio si stacca e
+# aspetta il prossimo. L'aggancio e' PIGRO, alla lettura della lista
+# ordini: i pagamenti entrano da molte porte (Lightning, on-chain, il
+# set) e un giudice solo nel punto in cui tutti li leggono non ne
+# dimentica nessuna.
+# Le strade scartate (Cantieri, «I premi fedeltà del negozio»): i regali
+# di Barattolo ai livelli, nati da un equivoco e tolti lo stesso giorno;
+# il premio come sconto in sats (muoverebbe denaro e l'escrow);
+# un'avvertenza al canale admin (non e' un fatto di Barattolo).
+
+PREMI_STATI_AGGANCIO = ("locked",)          # pagato, non ancora spedito
+PREMI_STATI_MORTI = ("annullato", "refunded")
+
+
+def premi_fedelta_leggi(grezzo) -> list:
+    """Il giudice unico delle soglie di un negozio: dal JSON in colonna
+    alla lista pulita [{soglia, premio}] in ordine di soglia. Tutto cio'
+    che non torna (JSON rotto, soglie fuori misura, premi vuoti,
+    doppioni) cade in silenzio: una colonna sporca non deve mai far
+    cadere la pagina di un negozio."""
+    try:
+        dati = json.loads(grezzo) if isinstance(grezzo, str) else grezzo
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(dati, list):
+        return []
+    visti, fuori = set(), []
+    for voce in dati:
+        if not isinstance(voce, dict):
+            continue
+        try:
+            soglia = int(voce.get("soglia") or 0)
+        except (TypeError, ValueError):
+            continue
+        premio = re.sub(r"[\x00-\x1f\x7f]", " ",
+                        str(voce.get("premio") or ""))
+        premio = " ".join(premio.split())[:PREMIO_TESTO_MAX]
+        if (not premio or soglia in visti
+                or not PREMI_FEDELTA_MIN_EUR <= soglia
+                <= PREMI_FEDELTA_MAX_EUR):
+            continue
+        visti.add(soglia)
+        fuori.append({"soglia": soglia, "premio": premio})
+    fuori.sort(key=lambda x: x["soglia"])
+    return fuori[:PREMI_FEDELTA_MAX]
+
+
+def speso_nel_negozio(con, compratore_id: int, venditore_id: int) -> float:
+    """Gli euro spesi da un cliente in un negozio: solo affari conclusi,
+    al cambio di ognuno. Un ordine senza cambio (storico, CoinGecko
+    muto) conta zero, la regola di xp_ordine: meglio un conto corto che
+    un numero inventato. Gli ordini di PROVA non contano, come in
+    classifica."""
+    r = con.execute(
+        "SELECT COALESCE(SUM(prezzo_sats * cambio_eur), 0) AS s FROM ordini "
+        "WHERE compratore_id=? AND venditore_id=? AND stato='released' "
+        "AND cambio_eur > 0 AND COALESCE(prova,0)=0",
+        (compratore_id, venditore_id)).fetchone()
+    return float(r["s"] if r else 0) / 100_000_000
+
+
+def matura_premi_fedelta(con, compratore_id: int, venditore_id: int,
+                         soglie: list = None) -> list:
+    """Scrive i premi appena maturati e li RESTITUISCE (per gli avvisi):
+    ogni soglia passata una volta sola, grazie alla UNIQUE. Il premio si
+    fotografa in riga, cosi' un venditore che poi cambia regalo non
+    toglie niente a chi l'aveva gia' guadagnato. Leva spenta, o chi
+    compra da se stesso: niente."""
+    if not PREMI_FEDELTA_ATTIVI or compratore_id == venditore_id:
+        return []
+    if soglie is None:
+        r = con.execute("SELECT premi_fedelta FROM utenti WHERE tg_id=?",
+                        (venditore_id,)).fetchone()
+        soglie = premi_fedelta_leggi(r["premi_fedelta"] if r else "")
+    if not soglie:
+        return []
+    speso = speso_nel_negozio(con, compratore_id, venditore_id)
+    adesso = int(time.time())
+    nuovi = []
+    for s in soglie:
+        if speso < s["soglia"]:
+            break
+        cur = con.execute(
+            "INSERT OR IGNORE INTO premi_fedelta_maturati(compratore_id, "
+            "venditore_id, soglia_eur, premio, maturato_il) "
+            "VALUES(?,?,?,?,?)",
+            (compratore_id, venditore_id, s["soglia"], s["premio"], adesso))
+        if cur.rowcount:
+            nuovi.append(s)
+    return nuovi
+
+
+def aggancia_premi_fedelta(con, compratore_id: int,
+                           venditore_id: int) -> None:
+    """Stacca i premi dagli ordini morti e attacca quelli liberi agli
+    ordini pagati e non ancora spediti dei due, un premio per ordine,
+    il piu' vecchio al piu' vecchio. Prima matura in silenzio: chi
+    aveva gia' speso abbastanza quando il negozio ha scritto le soglie
+    trova il premio al primo ordine nuovo, senza aspettarne un altro."""
+    con.execute(
+        "UPDATE premi_fedelta_maturati SET ordine_id=NULL "
+        "WHERE compratore_id=? AND venditore_id=? AND ordine_id IN "
+        "(SELECT id FROM ordini WHERE stato IN "
+        f"({','.join('?' * len(PREMI_STATI_MORTI))}))",
+        (compratore_id, venditore_id) + PREMI_STATI_MORTI)
+    if not PREMI_FEDELTA_ATTIVI:
+        return
+    matura_premi_fedelta(con, compratore_id, venditore_id)
+    liberi = con.execute(
+        "SELECT id FROM premi_fedelta_maturati WHERE compratore_id=? AND "
+        "venditore_id=? AND ordine_id IS NULL ORDER BY soglia_eur, id",
+        (compratore_id, venditore_id)).fetchall()
+    if not liberi:
+        return
+    ordini = con.execute(
+        "SELECT o.id FROM ordini o WHERE o.compratore_id=? AND "
+        "o.venditore_id=? AND o.stato IN "
+        f"({','.join('?' * len(PREMI_STATI_AGGANCIO))}) AND NOT EXISTS "
+        "(SELECT 1 FROM premi_fedelta_maturati p WHERE p.ordine_id=o.id) "
+        "ORDER BY o.id", (compratore_id, venditore_id)
+        + PREMI_STATI_AGGANCIO).fetchall()
+    for premio, ordine in zip(liberi, ordini):
+        con.execute("UPDATE premi_fedelta_maturati SET ordine_id=? "
+                    "WHERE id=? AND ordine_id IS NULL",
+                    (ordine["id"], premio["id"]))
+
+
+def premi_di_ordini(con, righe: list, user_id: int) -> None:
+    """Attacca a ogni riga della lista ordini la chiave `premio_fedelta`
+    ({soglia, premio}), SOLO alle due parti e solo dove un premio c'e':
+    chi vende sa cosa mettere nel pacco, chi compra cosa trovarci.
+    Prima rifa' gli agganci delle coppie in lista (vedi
+    aggancia_premi_fedelta): e' una scrittura su una GET, idempotente,
+    il precedente di /api/me coi distintivi."""
+    mie = [r for r in righe
+           if user_id in (r["compratore_id"], r["venditore_id"])
+           and r["compratore_id"] != r["venditore_id"]]
+    if not mie:
+        return
+    coppie = {(r["compratore_id"], r["venditore_id"]) for r in mie
+              if r["stato"] in PREMI_STATI_AGGANCIO + PREMI_STATI_MORTI}
+    try:
+        for c, v in coppie:
+            aggancia_premi_fedelta(con, c, v)
+        if coppie:
+            con.commit()
+    except Exception as e:  # mai la lista ordini giu' per un premio
+        print(f"⚠️ Premi fedeltà: aggancio non riuscito ({e})", flush=True)
+    ids = [r["id"] for r in mie]
+    premi = {}
+    for i in range(0, len(ids), 500):
+        pezzo = ids[i:i + 500]
+        for p in con.execute(
+                "SELECT ordine_id, soglia_eur, premio FROM "
+                "premi_fedelta_maturati WHERE ordine_id IN "
+                f"({','.join('?' * len(pezzo))})", pezzo):
+            premi[p["ordine_id"]] = {"soglia": p["soglia_eur"],
+                                     "premio": p["premio"]}
+    for r in mie:
+        if r["id"] in premi:
+            r["premio_fedelta"] = premi[r["id"]]
+
+
+async def premia_fedelta_negozio(compratore_id: int,
+                                 venditore_id: int) -> None:
+    """Dopo un affare concluso: matura le soglie passate e lo dice a
+    tutti e due. Fail-open: un premio non deve mai fermare uno
+    sblocco di sats."""
+    if not PREMI_FEDELTA_ATTIVI or compratore_id == venditore_id:
+        return
+    try:
+        con = db()
+        try:
+            nuovi = matura_premi_fedelta(con, compratore_id, venditore_id)
+            con.commit()
+            r = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
+                            (venditore_id,)).fetchone()
+            negozio = (r["nome"] if r else "") or "il negozio"
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Premi fedeltà: maturazione non riuscita ({e})", flush=True)
+        return
+    for s in nuovi:
+        premio = html.escape(s["premio"])
+        await notifica(compratore_id,
+                       f"🎀 <b>Premio fedeltà!</b> Hai superato "
+                       f"{_fmt_sats(s['soglia'])} € di acquisti da "
+                       f"<b>{html.escape(negozio)}</b>: nel pacco del tuo "
+                       f"prossimo ordine lì trovi <b>{premio}</b>.")
+        await notifica(venditore_id,
+                       f"🎀 <b>Un tuo cliente ha superato {_fmt_sats(s['soglia'])} € "
+                       f"di acquisti:</b> nel pacco del suo prossimo "
+                       f"ordine metti <b>{premio}</b>. Te lo ricordo "
+                       f"anche sull'ordine.")
+
+
+@app.post("/api/me/premi-fedelta")
+async def imposta_premi_fedelta(req: Request,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """«🎁 Premi fedeltà»: il venditore scrive fino a PREMI_FEDELTA_MAX
+    gradini «da N € spesi da me, nel pacco dopo metto X». Body
+    {premi: [{soglia, premio}]}; la lista VUOTA spegne tutto, senza
+    guardie (togliere una promessa non e' mai un problema; i premi gia'
+    maturati restano a chi li ha guadagnati). La chiave `premi` deve
+    esserci: assente = 400 (il patto di MSG_CLIENT_VECCHIO, mai
+    un'assenza letta come spegnimento)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    if not PREMI_FEDELTA_ATTIVI:
+        raise HTTPException(400, "I premi fedeltà non sono attivi")
+    grezzi = d.get("premi")
+    if not isinstance(grezzi, list):
+        raise HTTPException(400, MSG_CLIENT_VECCHIO)
+    if len(grezzi) > PREMI_FEDELTA_MAX:
+        raise HTTPException(400, f"Al massimo {PREMI_FEDELTA_MAX} premi.")
+    for g in grezzi:
+        if not isinstance(g, dict):
+            raise HTTPException(400, "Premio non leggibile")
+        try:
+            soglia = int(g.get("soglia") or 0)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Soglia non leggibile")
+        if not PREMI_FEDELTA_MIN_EUR <= soglia <= PREMI_FEDELTA_MAX_EUR:
+            raise HTTPException(400,
+                f"Ogni soglia va da {PREMI_FEDELTA_MIN_EUR} a "
+                f"{_fmt_sats(PREMI_FEDELTA_MAX_EUR)} € di acquisti.")
+        if not str(g.get("premio") or "").strip():
+            raise HTTPException(400, f"Scrivi il regalo per la soglia "
+                                     f"di {soglia} €.")
+    premi = premi_fedelta_leggi(grezzi)
+    if len(premi) != len(grezzi):
+        raise HTTPException(400, "Due premi hanno la stessa soglia.")
+    con = db()
+    con.execute("UPDATE utenti SET premi_fedelta=? WHERE tg_id=?",
+                (json.dumps(premi, ensure_ascii=False) if premi else "",
+                 user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "premi": premi}
+
+
 @app.post("/api/me/ferie")
 async def imposta_ferie(req: Request,
                         x_tg_init_data: str = Header(""),
@@ -56844,114 +57167,30 @@ async def scegli_titolo(req: Request,
     return {"ok": True, "titolo": scelto}
 
 
-# ---- I REGALI PER LIVELLO: chiedere, elencare, spedire (17 nov 2026) ----
-@app.post("/api/me/regali/{livello}/richiedi")
-async def richiedi_regalo_livello(livello: str, req: Request,
-                                  x_tg_init_data: str = Header(""),
-                                  barattolo_sessione: str = Cookie("")):
-    """Chi ha sbloccato un regalo dice DOVE mandarlo: un locker o un
-    indirizzo, in testo libero (il regalo lo spedisce Andrea a mano dal
-    sito di stampa, non un venditore del mercatino). Il giudice del
-    diritto e' `sblocca_regali_livello`, lo stesso del gancio dal vivo:
-    si chiama PRIMA, cosi' chi era gia' «pratico» il giorno del deploy
-    trova la riga nata qui. Un regalo si chiede UNA volta (409 al
-    secondo giro) e mai per un gradino non raggiunto (403)."""
+@app.post("/api/me/serie")
+async def passa_serie(x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """LA SERIE DEI GIORNI 🔥 quando l'app NON si riapre (17 nov 2026):
+    una PWA o una Mini App lasciata in tasca torna in primo piano senza
+    rifare /api/me, e chi la guarda ogni giorno cosi' non conterebbe
+    mai. Il client bussa qui al ritorno, solo se in Italia e' cambiato
+    il giorno. Stesso timbro e stessa busta di /api/me (`timbra_serie`):
+    due porte, un giudice. A leva spenta risponde 404, come le sorelle.
+    Niente corpo: non c'e' niente che il client possa dichiarare — il
+    giorno lo decide l'orologio del server."""
+    if not SERIE_GIORNI_ATTIVA:
+        raise HTTPException(404, "Funzione non attiva")
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    if not REGALI_LIVELLO_ATTIVI:
-        raise HTTPException(404, "I regali per livello sono spenti")
-    if not regalo_del_livello(livello):
-        raise HTTPException(404, "Questo livello non ha un regalo")
-    d = await leggi_json(req)
-    recapito = " ".join(str(d.get("recapito") or "").split())
-    if len(recapito) < 10:
-        raise HTTPException(400, "Scrivi dove mandarlo: un locker o un "
-                                 "indirizzo completo (almeno 10 caratteri)")
-    recapito = recapito[:RECAPITO_REGALO_MAX]
     con = db()
     try:
-        sblocca_regali_livello(con, user["id"])
-        r = con.execute("SELECT id, regalo, stato FROM regali_livello "
-                        "WHERE tg_id=? AND livello=?",
-                        (user["id"], livello)).fetchone()
-        if not r:
-            raise HTTPException(403, "Questo regalo non l'hai ancora "
-                                     "sbloccato")
-        if r["stato"] != "sbloccato":
-            raise HTTPException(409, "L'hai gia' chiesto: e' in viaggio "
-                                     "o sta per partire")
-        con.execute("UPDATE regali_livello SET stato='richiesto', "
-                    "recapito=?, richiesto_il=? WHERE id=?",
-                    (recapito, int(time.time()), r["id"]))
-        con.commit()
-        nome = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
-                           (user["id"],)).fetchone()
-    finally:
-        con.close()
-    # L'avviso ai moderatori: COSA e A CHI, mai il recapito (sta nel
-    # pannello, dove entra solo un admin). Fail-open: la richiesta e'
-    # gia' scritta, un bot muto non la perde.
-    try:
-        chi = html.escape(str((nome["nome"] if nome else "") or user["id"]))
-        await notifica_admin(
-            f"🎁 <b>Regalo da spedire</b>: {html.escape(r['regalo'])} "
-            f"a {chi} (livello {html.escape(livello)}).\n"
-            f"Il recapito e' nel pannello admin, «🎁 Regali per livello».",
-            argomento="riepiloghi")
-    except Exception as e:
-        print(f"⚠️ Avviso admin del regalo saltato: {e}")
-    return {"ok": True, "stato": "richiesto"}
-
-
-@app.get("/api/admin/regali")
-def lista_regali_admin(x_tg_init_data: str = Header(""),
-                       barattolo_sessione: str = Cookie("")):
-    """SOLO ADMIN: i regali chiesti e non ancora spediti per primi, dal
-    piu' vecchio (chi aspetta da piu' si vede per primo, come i banner),
-    poi gli ultimi spediti. QUI esce il recapito, ed e' l'unico posto."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    if not e_admin(user["id"]):
-        raise HTTPException(403, "Riservato ai moderatori")
-    con = db()
-    righe = con.execute(
-        "SELECT r.id, r.tg_id, r.livello, r.regalo, r.stato, r.recapito, "
-        "r.richiesto_il, r.spedito_il, u.nome "
-        "FROM regali_livello r LEFT JOIN utenti u ON u.tg_id=r.tg_id "
-        "WHERE r.stato IN ('richiesto','spedito') "
-        "ORDER BY CASE r.stato WHEN 'richiesto' THEN 0 ELSE 1 END, "
-        "         COALESCE(r.richiesto_il, 0) ASC LIMIT 100").fetchall()
-    con.close()
-    return [dict(r) for r in righe]
-
-
-@app.post("/api/admin/regali/{rid}/spedito")
-async def regalo_spedito_admin(rid: int, x_tg_init_data: str = Header(""),
-                               barattolo_sessione: str = Cookie("")):
-    """SOLO ADMIN: il pacco e' partito. Una volta sola (409 se non era
-    «richiesto»), e chi lo riceve lo sa subito."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    if not e_admin(user["id"]):
-        raise HTTPException(403, "Riservato ai moderatori")
-    con = db()
-    try:
-        r = con.execute("SELECT tg_id, regalo, stato FROM regali_livello "
-                        "WHERE id=?", (rid,)).fetchone()
-        if not r:
-            raise HTTPException(404, "Regalo non trovato")
-        if r["stato"] != "richiesto":
-            raise HTTPException(409, "Questo regalo non e' in attesa")
-        con.execute("UPDATE regali_livello SET stato='spedito', "
-                    "spedito_il=? WHERE id=?", (int(time.time()), rid))
+        if not con.execute("SELECT 1 FROM utenti WHERE tg_id=?",
+                           (user["id"],)).fetchone():
+            raise HTTPException(404, "Profilo non trovato")
+        serie = timbra_serie(con, user["id"])
         con.commit()
     finally:
         con.close()
-    try:
-        await notifica(r["tg_id"],
-                       f"📦 <b>Il tuo regalo e' partito!</b>\n"
-                       f"{html.escape(r['regalo'])} e' in viaggio verso il "
-                       f"recapito che ci hai dato. Grazie di essere qui. 🫙")
-    except Exception as e:
-        print(f"⚠️ Avviso di spedizione del regalo saltato: {e}")
-    return {"ok": True, "stato": "spedito"}
+    return {"ok": True, "serie": serie}
 
 
 @app.post("/api/me/invito")
@@ -58882,6 +59121,23 @@ try:
     P2P_CAUZIONE_SUL_METODO = P2P_CAUZIONE_SUL_METODO is True
 except ImportError:
     P2P_CAUZIONE_SUL_METODO = False
+# IL CONTANTE PER POSTA (17 nov 2026, cantiere leva-posta, Andrea:
+# «lasciala spenta la leva per questa funzione. Quando la porto in
+# produzione, la leva lasciala spenta»): SPENTA DI SERIE, contro la
+# regola delle leve nuove accese, per sua parola. Accesa, il foglio
+# «Pubblica» e il filtro del libro offrono la voce «Contante per
+# posta» e Info P2P mostra la sua sezione; spenta, la voce non si
+# offre — ma un ordine che la porta (un altro client, o il collaudo)
+# si legge e si paga come sempre. Si accende sul collaudo (DA-FARE).
+# Solo True accende.
+try:
+    from config import P2P_POSTA_ATTIVO
+    if not isinstance(P2P_POSTA_ATTIVO, bool):
+        print("[p2p] P2P_POSTA_ATTIVO non e' True/False: il contante per "
+              "posta resta spento")
+    P2P_POSTA_ATTIVO = P2P_POSTA_ATTIVO is True
+except ImportError:
+    P2P_POSTA_ATTIVO = False
 # IL TEMPO DI CHI PUBBLICA (12 ott 2026, cantiere tempo-di-chi-pubblica):
 # spenta di serie. Accesa, il server e l'app mettono in campo il
 # pacchetto — la pausa degli ordini, il badge «⚡ risponde in fretta», i
@@ -59269,6 +59525,9 @@ def _p2p_leve() -> dict:
             "cauzione": bool(P2P_CAUZIONE),
             # ...e sul metodo scelto (11 ott 2026): solo col nodo alla -bar7
             "cauzioneSulMetodo": bool(P2P_CAUZIONE_SUL_METODO),
+            # il contante per posta (17 nov 2026): la voce si offre solo
+            # con questa; spenta di serie per parola di Andrea
+            "posta": bool(P2P_POSTA_ATTIVO),
             # il tempo di chi pubblica (12 ott 2026): pausa degli ordini,
             # badge e regole nuove; il client le mostra solo con questa
             "tempoPubblica": bool(P2P_TEMPO_DI_CHI_PUBBLICA),
@@ -65176,6 +65435,25 @@ try:
 except ImportError:
     MERCATINO_CHAT_ORDINI = False
 FORMA_CHAT_MERCATINO = re.compile(r"^m[1-9][0-9]{0,11}$")
+# LA CHAT DELLO SCAMBIO ON-CHAIN (17 nov 2026, cantiere
+# onchain-chat-sollecito, Andrea: «tutto deve essere come la parte
+# lighting»). Lo stesso motore, con le chiavi presentate dal SERVER come
+# nel mercatino: nell'on-chain non c'e' un coordinatore che dia le chiavi
+# dello scambio. L'id e' il nome pubblico dello scambio («bar-onchain-» e
+# sedici esadecimali), le parti le dice la riga di `p2p_onchain_ordini`
+# (chi deposita vende, chi riceve compra), e la chat c'e' dalla presa
+# alla fine, disputa compresa: a sats rilasciati o rimborsati se ne va.
+FORMA_CHAT_ONCHAIN = re.compile(r"^bar-onchain-[0-9a-f]{16}$")
+CHAT_ONCHAIN_APERTA = ("preso", "depositato", "euro_inviati", "disputa")
+
+
+def _chat_chiavi_dal_server(ordine) -> bool:
+    """PURA: in questa chat le chiavi d'ordine le presenta il server (il
+    mercatino e lo scambio on-chain), non il coordinatore."""
+    o = str(ordine or "")
+    return bool(FORMA_CHAT_MERCATINO.fullmatch(o) or FORMA_CHAT_ONCHAIN.fullmatch(o))
+
+
 # gli stati in cui la chat c'e': dal pagamento alla decisione
 CHAT_MERCATINO_APERTA = ("locked", "shipped", "delivered", "dispute",
                          "return_pending", "return_shipped")
@@ -65241,6 +65519,11 @@ def _chat_nel_journal(ordine: str) -> dict:
     42», «Chat degli ordini»), uno scambio P2P come sempre («sullo scambio
     c4a70000», «Chat P2P») — per il P2P le righe restano identiche."""
     o = str(ordine or "")
+    if FORMA_CHAT_ONCHAIN.fullmatch(o):
+        c = o[-8:]
+        return {"etichetta": "Chat on-chain", "su": f"sullo scambio on-chain {c}",
+                "di": f"dello scambio on-chain {c}",
+                "fine": f"lo scambio on-chain {c} e' finito"}
     if FORMA_CHAT_MERCATINO.fullmatch(o):
         n = int(o[1:])
         return {"etichetta": "Chat degli ordini", "su": f"sull'ordine {n}",
@@ -65282,11 +65565,39 @@ def _parti_ordine_mercatino(con, ordine: str) -> dict:
             "fonte": "mercatino", "stato": stato, "ferma": ferma}
 
 
+def _parti_ordine_onchain_chat(con, ordine: str) -> dict:
+    """CHI COMPRA E CHI VENDE IN UNO SCAMBIO ON-CHAIN, E SE LA SUA CHAT E'
+    APERTA (17 nov 2026). Pura sulla connessione (la tabella sta nel
+    database di tutti). La forma di `_parti_ordine_mercatino`, piu'
+    `disputa`: compra chi riceve i sats, vende chi li deposita. `fonte`
+    vuota = la riga non c'e' (o non c'e' ancora la tabella)."""
+    vuoto = {"compratore": 0, "venditore": 0, "giro": 0, "vivo": False,
+             "fonte": "", "stato": "", "ferma": False, "disputa": False}
+    if not FORMA_CHAT_ONCHAIN.fullmatch(str(ordine or "")):
+        return vuoto
+    try:
+        r = con.execute("SELECT depositante_id, ricevente_id, stato FROM "
+                        "p2p_onchain_ordini WHERE ordine=?", (ordine,)).fetchone()
+    except sqlite3.OperationalError:
+        return vuoto
+    if not r:
+        return vuoto
+    stato = str(r["stato"] or "")
+    return {"compratore": int(r["ricevente_id"] or 0),
+            "venditore": int(r["depositante_id"] or 0),
+            "giro": 0, "vivo": stato in CHAT_ONCHAIN_APERTA,
+            "fonte": "onchain", "stato": stato, "ferma": False,
+            "disputa": stato == "disputa"}
+
+
 def _parti_chat(con, ordine: str) -> dict:
     """IL GIUDICE DELLE PARTI PER LA CHAT: la forma `m<numero>` e' un
-    ordine del mercatino, tutto il resto uno scambio P2P."""
+    ordine del mercatino, «bar-onchain-…» uno scambio on-chain (17 nov
+    2026), tutto il resto uno scambio P2P."""
     if FORMA_CHAT_MERCATINO.fullmatch(str(ordine or "")):
         return _parti_ordine_mercatino(con, ordine)
+    if FORMA_CHAT_ONCHAIN.fullmatch(str(ordine or "")):
+        return _parti_ordine_onchain_chat(con, ordine)
     return _parti_scambio_p2p(con, ordine)
 
 
@@ -65450,8 +65761,12 @@ def _chat_mercatino_chiamata(cc, ordine: str, giro: int, io: int, altro: int,
 
 def _chat_chiama_testo(ordine: str, lato: str) -> str:
     """PURA: l'avviso «vuole scriverti» (20 ott 2026). Come ogni avviso
-    della chat: chi e l'ordine, mai un testo di nessuno."""
+    della chat: chi e l'ordine, mai un testo di nessuno. Nell'on-chain
+    (17 nov 2026) lo scambio, senza numero: il bottone porta li'."""
     chi = "Chi compra" if lato == "compra" else "Chi vende"
+    if FORMA_CHAT_ONCHAIN.fullmatch(str(ordine or "")):
+        return (f"💬 <b>{chi} vuole scriverti nello scambio on-chain.</b>\n"
+                "Apri la chat dello scambio: si apre appena entri, ed è cifrata fra voi due.")
     return (f"💬 <b>{chi} vuole scriverti nell'ordine #{int(ordine[1:])}.</b>\n"
             "Apri la chat dell'ordine: si apre appena entri, ed è cifrata fra voi due.")
 
@@ -65465,13 +65780,19 @@ def _chat_mercatino_per_moderatore(con, cc, io: int, ordine: str) -> tuple:
     `mod` chiuse per quella chiave dai telefoni delle parti; e le chiavi
     d'ordine di ogni parte (`lati`), che nel P2P il moderatore ha dal
     coordinatore e qui ha dal server — e' con quelle che verifica chi ha
-    scritto cosa. Non sposta nessun segnalibro."""
-    p = _parti_ordine_mercatino(con, ordine)
+    scritto cosa. Non sposta nessun segnalibro.
+    LO SCAMBIO ON-CHAIN (17 nov 2026) passa di qui uguale: le chiavi le
+    presenta il server anche li', e si legge solo a stato 'disputa'."""
+    p = _parti_chat(con, ordine) if _chat_chiavi_dal_server(ordine) \
+        else {"fonte": ""}
     if not p["fonte"]:
         return (404, "Ordine non trovato")
+    if p["fonte"] == "onchain":
+        if not p.get("disputa"):
+            return (409, "La chat si legge solo a disputa aperta")
     # ...anche a ordine FERMO (19 ott 2026): e' in coda per essere
     # ridecisa, e prima di ridecidere si rilegge
-    if p["stato"] not in CHAT_MERCATINO_DISPUTA and not p.get("ferma"):
+    elif p["stato"] not in CHAT_MERCATINO_DISPUTA and not p.get("ferma"):
         return (409, "La chat si legge solo a disputa aperta")
     r = con.execute("SELECT chiave FROM p2p_moderatori WHERE tg_id=?",
                     (int(io),)).fetchone()
@@ -65816,6 +66137,12 @@ def _chat_p2p_avviso(cc, ordine: str, giro: int, altro: int, n: int,
             f"💬 <b>Hai un nuovo messaggio nell'ordine #{int(ordine[1:])}.</b>\n"
             "Apri l'ordine nella Mini App per leggerlo: è cifrato fra voi due, "
             "e di qui il testo non passa.")
+    # nell'on-chain (17 nov 2026) lo scambio non ha un numero breve che la
+    # gente veda: il bottone sotto porta dritto alla sua pagina
+    if FORMA_CHAT_ONCHAIN.fullmatch(ordine):
+        return int(altro), (
+            f"💬 <b>Hai un nuovo messaggio nello scambio on-chain.</b>\n"
+            "Aprilo per leggerlo: è cifrato fra voi due, e di qui il testo non passa.")
     return int(altro), (
         f"💬 <b>Hai un nuovo messaggio nello scambio #{html.escape(ordine[:4])}.</b>\n"
         "Aprilo per leggerlo: è cifrato fra voi due, e di qui il testo non passa.")
@@ -65866,6 +66193,9 @@ async def _chat_p2p_avvisa(ordine: str, giro: int, altro: int, n: int,
             if mercatino:
                 esito = await notifica(a_chi, testo, (
                     CHAT_MERCATINO_BOTTONE, f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}&chat=1"))
+            elif FORMA_CHAT_ONCHAIN.fullmatch(ordine):
+                esito = await notifica(a_chi, testo, (
+                    P2P_ONCHAIN_BOTTONE, f"{LINK_LIBRO_P2P}?scambio={ordine}&chat=1"))
             else:
                 esito = await notifica(a_chi, testo, (P2P_BOTTONE_SCAMBIO,
                                                       f"{LINK_LIBRO_P2P}?scambio={ordine}&chat=1"))
@@ -65995,10 +66325,18 @@ def _chat_p2p_chiede(d: dict, user: dict) -> tuple:
     stato per chi chiede. Torna `(ordine, stato)`; un estraneo e' 403.
     UN ORDINE DEL MERCATINO (`m<numero>`, 16 ott 2026) non chiede il
     P2P attivo e ha la SUA leva, `MERCATINO_CHAT_ORDINI`: le due chat si
-    accendono e si spengono ognuna per conto suo."""
+    accendono e si spengono ognuna per conto suo.
+    UNO SCAMBIO ON-CHAIN («bar-onchain-…», 17 nov 2026) chiede l'on-chain
+    del P2P acceso (`p2p_onchain_leva`) e risponde alla leva della chat
+    del Lightning, `P2P_CHAT_SCAMBIO`: «come la parte lighting»."""
     ordine = str((d or {}).get("ordine") or "").strip()
     if FORMA_CHAT_MERCATINO.fullmatch(ordine):
         if not MERCATINO_CHAT_ORDINI:
+            return ordine, {"aperta": False, "giro": 0, "altro": 0, "perche": "spenta"}
+    elif FORMA_CHAT_ONCHAIN.fullmatch(ordine):
+        if not p2p_onchain_leva():
+            raise HTTPException(409, "Lo scambio on-chain non e' attivo")
+        if not P2P_CHAT_SCAMBIO:
             return ordine, {"aperta": False, "giro": 0, "altro": 0, "perche": "spenta"}
     else:
         if not _p2p_per(user["id"])["attivo"]:
@@ -66056,9 +66394,10 @@ async def chat_leggi_p2p(req: Request, x_tg_init_data: str = Header(""),
         # il segno di nascita del cassetto (19 ott 2026): il telefono vede
         # se il file e' rinato anche quando `perso` non lo vede
         corpo["cassetto"] = _chat_nascita(cc)
-        # nel mercatino le chiavi d'ordine le presenta il server: le mie
-        # e quelle dell'altra parte, nell'ordine in cui sono nate
-        if FORMA_CHAT_MERCATINO.fullmatch(ordine):
+        # nel mercatino (e nell'on-chain, 17 nov 2026) le chiavi d'ordine
+        # le presenta il server: le mie e quelle dell'altra parte,
+        # nell'ordine in cui sono nate
+        if _chat_chiavi_dal_server(ordine):
             # LA SCORTA (20 ott 2026): l'altra parte non si e' ancora
             # presentata? Il suo lucchetto in scorta diventa la sua chiave
             # d'ordine, e si scrive subito. A chat ferma niente di nuovo
@@ -66098,8 +66437,8 @@ async def chat_invia_p2p(req: Request, x_tg_init_data: str = Header(""),
     if st.get("ferma"):
         raise HTTPException(409, CHAT_MERCATINO_FERMA_TESTO)
     tipo, busta, per = d.get("tipo"), d.get("busta"), d.get("per") or ""
-    mercatino = bool(FORMA_CHAT_MERCATINO.fullmatch(ordine))
-    # LA CHIAVE D'ORDINE (mercatino, 16 ott 2026): la sola parte pubblica,
+    mercatino = _chat_chiavi_dal_server(ordine)
+    # LA CHIAVE D'ORDINE (mercatino, 16 ott 2026; on-chain, 17 nov): la sola parte pubblica,
     # che il server presenta all'altra parte. Non e' una busta
     if tipo == "chiave_ordine" and mercatino:
         cc = db_chat()
@@ -66130,12 +66469,14 @@ async def chat_invia_p2p(req: Request, x_tg_init_data: str = Header(""),
         if not noto:
             raise HTTPException(400, "Richiesta non valida")
         # NEL MERCATINO la chiave al moderatore parte SOLO a ordine in
-        # disputa: prima della disputa non legge nessuno, nemmeno l'admin
+        # disputa: prima della disputa non legge nessuno, nemmeno l'admin.
+        # Nell'on-chain lo stesso, a stato 'disputa' (17 nov 2026)
         if mercatino:
             con = db()
             try:
-                in_disputa = _parti_ordine_mercatino(con, ordine)["stato"] \
-                    in CHAT_MERCATINO_DISPUTA
+                pc = _parti_chat(con, ordine)
+                in_disputa = bool(pc.get("disputa")) if pc["fonte"] == "onchain" \
+                    else pc["stato"] in CHAT_MERCATINO_DISPUTA
             finally:
                 con.close()
             if not in_disputa:
@@ -66165,10 +66506,12 @@ async def chat_scorta_p2p(req: Request, x_tg_init_data: str = Header(""),
     """LA SCORTA DI LUCCHETTI (20 ott 2026, cantiere chat-dalla-notifica).
     Nel corpo `{lucchetti: [{pub, seme}]}`, anche vuoto: torna quanti ne
     ho in scorta, quali tiene il server, e le due soglie. Non chiede il
-    P2P attivo: e' della chat degli ordini, con la sua leva."""
+    P2P attivo: e' della chat degli ordini, con la sua leva — e dal 17 nov
+    2026 anche di quella dello scambio on-chain, che usa gli stessi
+    lucchetti: basta una delle due accesa."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    if not MERCATINO_CHAT_ORDINI:
+    if not (MERCATINO_CHAT_ORDINI or (P2P_CHAT_SCAMBIO and p2p_onchain_leva())):
         return JSONResponse({"ok": True, "spenta": True},
                             headers={"Cache-Control": "no-store"})
     cc = db_chat()
@@ -66194,7 +66537,7 @@ async def chat_chiama_p2p(req: Request, x_tg_init_data: str = Header(""),
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     ordine, st = _chat_p2p_chiede(d, user)
-    if not FORMA_CHAT_MERCATINO.fullmatch(ordine):
+    if not _chat_chiavi_dal_server(ordine):
         raise HTTPException(400, "Richiesta non valida")
     if not st["aperta"]:
         raise HTTPException(409, f"La chat di {_chat_questo(ordine)} non e' aperta")
@@ -66202,7 +66545,7 @@ async def chat_chiama_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(409, CHAT_MERCATINO_FERMA_TESTO)
     con = db()
     try:
-        p = _parti_ordine_mercatino(con, ordine)
+        p = _parti_chat(con, ordine)
     finally:
         con.close()
     lato = "compra" if int(p["compratore"]) == int(user["id"]) else "vende"
@@ -66217,13 +66560,18 @@ async def chat_chiama_p2p(req: Request, x_tg_init_data: str = Header(""),
     if esito != "nuova":
         return JSONResponse({"ok": True, "gia": esito == "gia", "serve": esito != "ha_chiave"},
                             headers={"Cache-Control": "no-store"})
+    if FORMA_CHAT_ONCHAIN.fullmatch(ordine):
+        bottone = (P2P_ONCHAIN_BOTTONE, f"{LINK_LIBRO_P2P}?scambio={ordine}&chat=1")
+    else:
+        bottone = (CHAT_MERCATINO_CHIAMA_BOTTONE,
+                   f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}&chat=1")
     try:
-        e = await notifica(st["altro"], _chat_chiama_testo(ordine, lato), (
-            CHAT_MERCATINO_CHIAMA_BOTTONE, f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}&chat=1"))
+        e = await notifica(st["altro"], _chat_chiama_testo(ordine, lato), bottone)
     except Exception as x:
         e = f"SALTATO ({type(x).__name__}: {x})"
-    print(f"💬 Chat degli ordini: {'chi compra' if lato == 'compra' else 'chi vende'} vuole "
-          f"scrivere sull'ordine {int(ordine[1:])}, avvisato {st['altro']}", flush=True)
+    j = _chat_nel_journal(ordine)
+    print(f"💬 {j['etichetta']}: {'chi compra' if lato == 'compra' else 'chi vende'} vuole "
+          f"scrivere {j['su']}, avvisato {st['altro']}", flush=True)
     _esiti_p2p_dice("💬", [(st["altro"], e)])
     return JSONResponse({"ok": True, "avvisato": True}, headers={"Cache-Control": "no-store"})
 
@@ -66394,9 +66742,10 @@ async def moderazione_chat_allegato_p2p(req: Request, x_tg_init_data: str = Head
     user = _moderatore_o_403(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     ordine = str(d.get("ordine") or "").strip()
-    # UN ORDINE DEL MERCATINO (16 ott 2026): a ordine in disputa, con la
-    # chiave di moderatore dichiarata — lo stesso giudice delle buste
-    if FORMA_CHAT_MERCATINO.fullmatch(ordine):
+    # UN ORDINE DEL MERCATINO (16 ott 2026), o uno scambio on-chain (17
+    # nov): a ordine in disputa, con la chiave di moderatore dichiarata —
+    # lo stesso giudice delle buste
+    if _chat_chiavi_dal_server(ordine):
         con, cc = db(), db_chat()
         try:
             codice, corpo = _chat_mercatino_per_moderatore(con, cc, user["id"], ordine)
@@ -66539,7 +66888,7 @@ def _chat_p2p_per_moderatore(con, cc, io: int, ordine: str) -> tuple:
     ritirato.
     Un ordine del mercatino (`m<numero>`, 16 ott 2026) ha il suo giudice:
     `_chat_mercatino_per_moderatore`."""
-    if FORMA_CHAT_MERCATINO.fullmatch(str(ordine or "")):
+    if _chat_chiavi_dal_server(ordine):
         return _chat_mercatino_per_moderatore(con, cc, io, ordine)
     if not FORMA_ORDINE_P2P.fullmatch(ordine):
         return (400, "Richiesta non valida")
@@ -87125,6 +87474,11 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             # ENTRAMBE le parti (primo baratto, primo acquisto...)
             await premia_distintivi(o["venditore_id"])
             await premia_distintivi(o["compratore_id"])
+            # ...e puo' far passare una soglia dei PREMI FEDELTA' del
+            # negozio (17 nov 2026): l'avviso a tutti e due, il premio
+            # si attacca al prossimo ordine pagato dei due
+            await premia_fedelta_negozio(o["compratore_id"],
+                                         o["venditore_id"])
             # ...e vale XP a tutti e due. Il cambio e' quello appena
             # scritto in colonna per l'export contabile: qui non
             # serve un secondo giro di rete. Il riferimento porta il
@@ -90996,6 +91350,9 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
     # LA MANCIA AL VENDITORE (14 nov 2026): se si puo' lasciare, e quelle
     # gia' lasciate — solo alle due parti, mai l'indirizzo di chi vende
     mance_di_ordini(con, righe, user["id"])
+    # I PREMI FEDELTA' DEL NEGOZIO (17 nov 2026): il regalo che chi vende
+    # mette nel pacco, solo alle due parti
+    premi_di_ordini(con, righe, user["id"])
     con.close()
     for r in righe:
         if r["id"] in stadi:
@@ -96273,6 +96630,193 @@ class SpegnimentoInCorso(RuntimeError):
 @app.on_event("shutdown")
 async def ferma_i_giri_lunghi():
     _SI_CHIUDE.set()
+
+
+# ═══ LA SENTINELLA DEL SERVER FERMO (17 nov 2026, dal campo) ═══
+# Alle 08:07:43 del 17 nov, due minuti e mezzo dopo un deploy, il
+# server ha smesso di rispondere a tutti: porta aperta, /api/salute
+# muta, journal zitto, 12 s di CPU in sei minuti (FERMO ad aspettare,
+# non a calcolare). Se n'e' accorto Andrea quattro minuti dopo, e il
+# riavvio ha dovuto ammazzarlo (SIGTERM ignorato). Dal codice e dal
+# journal la causa NON si e' potuta dimostrare (CANTIERI, «La
+# sentinella del server fermo»): mancava proprio la riga che dice
+# DOVE era fermo. Questa la scrive, e intanto non lascia la
+# produzione ferma finche' qualcuno guarda.
+#
+# COME. Un filo SUO (non un task: un ciclo fermo non lo farebbe mai
+# girare) bussa a /api/salute da dentro la macchina, ogni 30 s, con un
+# tetto di 20. E' la stessa domanda del deploy, cioe' da capo a piedi:
+# vede il ciclo fermo, il pool dei thread delle rotte pieno e il
+# database sotto chiave, senza dover indovinare quale. Alla prima
+# risposta che non arriva: la pila di TUTTI i fili nel journal
+# (faulthandler, che non ha bisogno del ciclo). Fermo da 3 minuti: una
+# seconda pila, un segno su disco, e `os._exit` — systemd
+# (Restart=always) lo rialza in 5 s, e all'avvio il segno diventa un
+# avviso nella stanza «errori» del gruppo admin.
+# CONTA SOLO IL SILENZIO: un 503 (il database non si apre) o una porta
+# chiusa non sono un ciclo fermo, e un riavvio non li cura — si
+# riavvierebbe all'infinito. Quelli li guarda il deploy.
+# L'INDIRIZZO NON SI SCRIVE: lo dicono gli argomenti di uvicorn
+# (`--port`), cosi' vale uguale in produzione (8080) e sul collaudo
+# (8090). Senza (`prove.py`, uno script, un TestClient) la sentinella
+# non parte, e lo dice.
+# A MANO: `kill -USR1 <pid>` scrive la stessa pila senza toccare
+# niente (faulthandler), da fare PRIMA di un riavvio a mano.
+import faulthandler
+import signal
+
+try:
+    from config import SENTINELLA_ATTIVA
+except ImportError:
+    SENTINELLA_ATTIVA = True     # leva di serie accesa (14 nov 2026)
+SENTINELLA_PRIMO_S = 90          # il primo colpo, a server avviato
+SENTINELLA_OGNI_S = 30           # un colpo ogni tanto
+SENTINELLA_TETTO_S = 20          # quanto si aspetta la risposta
+SENTINELLA_USCITA_S = 180        # fermo da tanto: si esce e systemd rialza
+SENTINELLA_CODICE = 70           # il codice d'uscita, riconoscibile nel journal
+SENTINELLA_SEGNO = ".sentinella-uscita"
+_APRITORE_SENTINELLA = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}))   # mai un proxy fra noi e noi
+_SENTINELLA_FILO = None
+
+
+def sentinella_indirizzo(argv) -> str:
+    """PURA: l'URL di /api/salute dagli argomenti di uvicorn, o '' se
+    non c'e' una porta (non gira sotto uvicorn: niente sentinella)."""
+    porta = host = ""
+    argv = list(argv or ())
+    for i, a in enumerate(argv):
+        a = str(a)
+        if a == "--port" and i + 1 < len(argv):
+            porta = str(argv[i + 1])
+        elif a.startswith("--port="):
+            porta = a.split("=", 1)[1]
+        elif a == "--host" and i + 1 < len(argv):
+            host = str(argv[i + 1])
+        elif a.startswith("--host="):
+            host = a.split("=", 1)[1]
+    if not porta.isdigit() or not 0 < int(porta) < 65536:
+        return ""
+    if host in ("", "0.0.0.0", "::", "[::]"):
+        host = "127.0.0.1"
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"http://{host}:{int(porta)}/api/salute"
+
+
+def sentinella_passo(fermo_dal, esito: str, adesso: float):
+    """PURA: il giudizio di un colpo. `esito` e' 'ok' | 'muto' | 'altro'
+    (solo 'muto' conta: vedi il cappello). Torna (azione, fermo_dal):
+    azione '' | 'pila' (il primo silenzio) | 'esci' (silenzio da
+    SENTINELLA_USCITA_S) | 'guarito' (risponde dopo un silenzio)."""
+    if esito != "muto":
+        return ("guarito" if fermo_dal is not None else ""), None
+    if fermo_dal is None:
+        return "pila", adesso
+    if adesso - fermo_dal >= SENTINELLA_USCITA_S:
+        return "esci", fermo_dal
+    return "", fermo_dal
+
+
+def _sentinella_bussa(url: str) -> str:
+    try:
+        with _APRITORE_SENTINELLA.open(url, timeout=SENTINELLA_TETTO_S) as r:
+            r.read(256)
+        return "ok"
+    except urllib.error.HTTPError:
+        return "altro"           # ha RISPOSTO (anche un 503): non e' fermo
+    except (TimeoutError, socket.timeout):
+        return "muto"
+    except urllib.error.URLError as e:
+        return ("muto" if isinstance(e.reason, (TimeoutError, socket.timeout))
+                else "altro")
+    except Exception:
+        return "altro"
+
+
+def _sentinella_pila(titolo: str) -> None:
+    print(f"🧊 Sentinella: {titolo} — ecco dove sono fermi i fili:",
+          flush=True)
+    try:
+        sys.stderr.flush()
+        faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+        sys.stderr.flush()
+    except Exception as e:
+        print(f"🧊 Sentinella: pila non scritta ({e})", flush=True)
+
+
+def _sentinella_percorso_segno() -> str:
+    return os.path.join(os.path.dirname(os.path.realpath(DB)) or ".",
+                        SENTINELLA_SEGNO)
+
+
+def _sentinella_filo(url: str) -> None:
+    fermo_dal = None
+    if _SI_CHIUDE.wait(SENTINELLA_PRIMO_S):
+        return
+    while not _SI_CHIUDE.is_set():
+        t0 = time.monotonic()
+        esito = _sentinella_bussa(url)
+        if _SI_CHIUDE.is_set():
+            return               # lo spegnimento non e' un server fermo
+        azione, fermo_dal = sentinella_passo(fermo_dal, esito,
+                                             time.monotonic())
+        if azione == "pila":
+            _sentinella_pila(f"/api/salute muta da {SENTINELLA_TETTO_S} s")
+        elif azione == "guarito":
+            print("🧊 Sentinella: /api/salute risponde di nuovo", flush=True)
+        elif azione == "esci":
+            _sentinella_pila(f"server fermo da piu' di "
+                             f"{SENTINELLA_USCITA_S} s, esco e systemd mi "
+                             f"rialza")
+            try:
+                with open(_sentinella_percorso_segno(), "w") as f:
+                    f.write(str(int(time.time())))
+            except Exception:
+                pass
+            os._exit(SENTINELLA_CODICE)
+        _SI_CHIUDE.wait(max(1.0, SENTINELLA_OGNI_S - (time.monotonic() - t0)))
+
+
+@app.on_event("startup")
+async def avvia_sentinella():
+    """La riga nel journal c'e' SEMPRE, accesa o spenta."""
+    global _SENTINELLA_FILO
+    if hasattr(signal, "SIGUSR1"):
+        try:
+            faulthandler.register(signal.SIGUSR1, file=sys.stderr,
+                                  all_threads=True)
+        except Exception:
+            pass
+    # il segno di un'uscita della sentinella: diventa un avviso, una volta
+    try:
+        segno = _sentinella_percorso_segno()
+        if os.path.exists(segno):
+            with open(segno) as f:
+                quando = int((f.read() or "0").strip() or 0)
+            os.remove(segno)
+            ora = time.strftime("%H:%M UTC", time.gmtime(quando)) \
+                if quando else "poco fa"
+            print(f"🧊 Sentinella: riavviato dopo un blocco ({ora})",
+                  flush=True)
+            await notifica_admin(
+                f"🧊 <b>Il server si era fermato</b> e la sentinella l'ha "
+                f"riavviato alle {ora}. Dove era fermo sta nel journal, "
+                f"alle righe «🧊 Sentinella».", argomento="errori")
+    except Exception as e:
+        print(f"🧊 Sentinella: segno dell'uscita non letto ({e})", flush=True)
+    url = sentinella_indirizzo(sys.argv)
+    if not SENTINELLA_ATTIVA or not url:
+        perche = ("SENTINELLA_ATTIVA = False" if not SENTINELLA_ATTIVA
+                  else "uvicorn senza --port")
+        print(f"🧊 Sentinella del server fermo: spenta ({perche})", flush=True)
+        return
+    _SENTINELLA_FILO = threading.Thread(target=_sentinella_filo, args=(url,),
+                                        name="sentinella", daemon=True)
+    _SENTINELLA_FILO.start()
+    print(f"🧊 Sentinella del server fermo: accesa — {url} ogni "
+          f"{SENTINELLA_OGNI_S} s; muta {SENTINELLA_USCITA_S} s = riavvio",
+          flush=True)
 
 
 def url_api_ammesso(url: str) -> bool:
@@ -107611,6 +108155,20 @@ def _p2p_onchain_recapiti_prima(con, oid: int) -> list:
         return []
 
 
+def _p2p_onchain_chat_vista(stato, parte: bool, moderatore: bool, accesa: bool) -> str:
+    """PURA: cosa dice di se' la chat di uno scambio on-chain a chi guarda
+    (17 nov 2026). 'aperta' alle due parti finche' lo scambio e' in corso
+    (`CHAT_ONCHAIN_APERTA`), 'moderazione' a un moderatore che non e' una
+    parte a disputa aperta, '' altrimenti o a leva spenta: a sats
+    rilasciati o rimborsati la chat non c'e' piu'."""
+    if not accesa:
+        return ""
+    stato = str(stato or "")
+    if parte:
+        return "aperta" if stato in CHAT_ONCHAIN_APERTA else ""
+    return "moderazione" if moderatore and stato == "disputa" else ""
+
+
 def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
     """Un ordine come lo vede UNA parte (o un moderatore): la forma di
     `_onchain_ordine_per`, con gli stessi nomi, perche' il codice delle
@@ -107715,6 +108273,14 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
     }
     if parte_vera and not admin:
         d["recapito"] = o["recapito"] or ""
+        # CHI E' L'ALTRO (17 nov 2026, cantiere onchain-controparte; un
+        # utente: «come faccio a capire chi ha preso l'ordine?»): il volto
+        # della card dell'altra parte, lo STESSO di `_controparti_p2p` nel
+        # Lightning (`_volti_persone`), alle sole due parti e solo da
+        # quando lo scambio ha le due parti. Il nome nudo (`altro`)
+        # c'era gia', la pagina non lo mostrava
+        if altro:
+            d["controparte"] = _volti_persone(con, [altro], int(time.time())).get(altro)
     # BARATTOZON ON-CHAIN (17 nov 2026): la scadenza la vedono le parti
     # (e il moderatore: e' il tempo, non il codice); il PayCode e il codice
     # a barre chi l'ha scritto sempre, chi paga SOLO a deposito confermato
@@ -107750,6 +108316,12 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         if admin and not parte_vera:
             d["coin_tx"]["indirizzo"] = o["recapito"] or ""
             d["coin_tx"]["indirizzi_prima"] = _p2p_onchain_recapiti_prima(con, int(o["id"]))
+    # LA CHAT (17 nov 2026, «come la parte lighting»): 'aperta' alle due
+    # parti dalla presa alla fine (disputa compresa), 'moderazione' al
+    # moderatore che non e' una parte a disputa aperta, '' altrimenti
+    d["chat"] = _p2p_onchain_chat_vista(o["stato"], bool(dep and ric and tg_id in (dep, ric)),
+                                        bool(admin and not parte_vera),
+                                        bool(P2P_CHAT_SCAMBIO))
     if admin and not parte_vera:
         # il moderatore vede chi sono le due parti (deve poterle sentire)
         d["parti"] = {"vende": _onchain_nome(con, dep) if dep else "",
@@ -108184,9 +108756,9 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
 async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
                               barattolo_sessione: str = Cookie("")):
     """ANNULLA. Nel libro (pending): chi l'ha pubblicato, quando vuole.
-    Preso ma senza un sats visto: chi deve depositare quando vuole (non
-    ha ancora messo niente), chi riceve solo DOPO la finestra del
-    deposito — e mai alla cieca: prima si guarda la rete, come
+    Preso ma senza un sats visto: tutt'e due quando vogliono (dal 17
+    nov 2026 anche chi riceve, prima solo dopo la finestra del
+    deposito) — e mai alla cieca: prima si guarda la rete, come
     nell'annullo del mercatino. Con anche un sats visto non si annulla:
     si esce col rimborso (due firme) o con una disputa."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
@@ -108224,10 +108796,13 @@ async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
                 raise HTTPException(409, "Ci sono già dei sats sull'indirizzo: "
                                          "ora si esce solo col rimborso o con "
                                          "una disputa")
-            if ruolo == "venditore" and adesso < int(o["deposito_entro"] or 0):
-                raise HTTPException(409, "Chi vende ha ancora tempo per "
-                                         "depositare: puoi rinunciare dopo "
-                                         "la scadenza")
+            # (17 nov 2026, cantiere onchain-controparte, Andrea: «non
+            # c'è nessun pulsante "X Annulla". I sats non sono ancora
+            # stati messi in garanzia») CHI RICEVE ANNULLA QUANDO VUOLE,
+            # come nel Lightning prima della garanzia: fino a ieri solo
+            # dopo la finestra del deposito. Il riparo resta quello di
+            # sopra: la rete guardata adesso (un sats visto e non si
+            # annulla piu') e lo swap del deposito in volo
         else:
             raise HTTPException(409, "Questo scambio non si annulla più")
         cur = con.execute(
@@ -109199,15 +109774,12 @@ def _p2p_onchain_testi_deposito_tab(o, euro: str) -> list:
     # le ore che restano, e non l'ora: il server non sa il fuso di chi legge
     ore = max(0, -(-(scade - int(time.time())) // 3600))
     return [
-        (o["ricevente_id"], "🔒 <b>Chi vende ha messo i sats nel deposito di "
-         f"garanzia 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
-         "Apri Barattolo: il <b>PayCode</b> adesso è nello scambio. Pagalo al "
-         f"tabacchino (<b>{euro} € in contanti</b>) prima che scada, fra circa {ore} ore, "
-         "poi tocca «Ho pagato al tabacchino»."),
-        (o["depositante_id"], "🔒 <b>Deposito confermato ✓:</b> chi compra adesso "
-         f"vede il PayCode e va al tabacchino. Vendi {_p2p_onchain_quanto(o)}.\n\n"
-         "Quando su Amazon l'ordine risulta <b>pagato</b>, apri lo scambio e "
-         "tocca «Ricevuti: libera i sats». Mai prima.")]
+        # corti (17 nov 2026, Andrea: «i testi però sono troppo lunghi»)
+        (o["ricevente_id"], f"🔒 <b>Sats nel 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
+         "Il <b>PayCode</b> adesso è nello scambio: pagalo al tabacchino "
+         f"(<b>{euro} € in contanti</b>) entro circa {ore} ore, poi tocca «Ho pagato al tabacchino»."),
+        (o["depositante_id"], f"🔒 <b>Deposito confermato ✓</b> Vendi {_p2p_onchain_quanto(o)}.\n\n"
+         "Quando su Amazon l'ordine risulta <b>pagato</b>, tocca «Ricevuti: libera i sats». Mai prima.")]
 
 
 def _p2p_onchain_mio_ln(con, oid: int, tg_id: int, confermato: bool = False):
@@ -110103,6 +110675,36 @@ def _p2p_onchain_testi_pagare(o) -> dict:
     }
 
 
+def _p2p_onchain_promemoria_tab(o) -> list:
+    """PURA: i promemoria a chi paga un BARATTOZON on-chain (17 nov 2026,
+    Andrea: «Ok» ai due ritocchi): `[(secondi dal deposito, testo)]` in
+    ordine di tempo. Il tempo e' quello del PayCode, che puo' essere di
+    poche ore: un promemoria che cadrebbe dopo la scadenza non c'e', e
+    ogni testo dice il suo momento senza contare sugli altri."""
+    S = P2P_ONCHAIN_SEGNO
+    fine = p2p_onchain_tab_scade(o) - int(o["depositato_il"] or 0)
+    tutti = [(3600, f"{S} 🧾 Promemoria: i sats sono nel 2-di-3. Paga il PayCode al "
+                    "tabacchino e tocca «Ho pagato al tabacchino»."),
+             (6 * 3600, f"{S} 🧾 Il PayCode non risulta ancora pagato. Se non puoi "
+                        "più, tocca «↩️ Rinuncio: rimborsa chi vende»."),
+             (fine - 4 * 3600, f"{S} ⏰ Il PayCode scade fra quattro ore. Pagalo e "
+                               "tocca «Ho pagato al tabacchino».")]
+    return sorted(t for t in tutti if 0 < t[0] < fine)
+
+
+# ...e a chi libera, con le parole di Amazon invece di quelle del conto
+P2P_ONCHAIN_RILASCIO_TAB_TESTI = {
+    1: "🧾 Promemoria: un'ora fa chi compra ha detto di aver pagato il tuo "
+       "PayCode. Se su Amazon l'ordine risulta pagato, libera i sats; se no, "
+       "apri una disputa.",
+    2: "🧾 Sei ore da quando chi compra ha detto di aver pagato il PayCode, e i "
+       "sats sono ancora nel 2-di-3. Controlla Amazon e decidi: libera, o apri "
+       "una disputa.",
+    3: "⏰ Venti ore da quando chi compra ha detto di aver pagato il PayCode. "
+       "Controlla Amazon e decidi: libera, o apri una disputa.",
+}
+
+
 def _p2p_onchain_solo_contanti(o) -> bool:
     """PURA: i metodi sono il SOLO «Contanti» (le parole di «consegnato»)."""
     return _metodi_libro(_p2p_onchain_metodi(o)) == ["Contanti"]
@@ -110124,6 +110726,14 @@ def _p2p_onchain_sollecito_dovuto(o, adesso: int):
     if stato == "depositato":
         if int(_p2p_onchain_campo(o, "pagamento_scaduto_il", 0) or 0):
             return None
+        # BARATTOZON (17 nov 2026): niente recapito, il tempo del PayCode
+        if p2p_onchain_tab_scade(o):
+            if not int(o["ricevente_id"] or 0):
+                return None
+            passi = _p2p_onchain_promemoria_tab(o)
+            n = livello(int(o["depositato_il"] or 0), [fra for fra, _ in passi],
+                        _p2p_onchain_campo(o, "sollecito_pagare", 0))
+            return ("sollecito_pagare", n, int(o["ricevente_id"]), passi[n - 1][1]) if n else None
         if not str(o["recapito"] or "").strip() or not int(o["ricevente_id"] or 0):
             return None
         if "Contanti" in _metodi_libro(_p2p_onchain_metodi(o)):
@@ -110138,7 +110748,8 @@ def _p2p_onchain_sollecito_dovuto(o, adesso: int):
         n = livello(int(o["euro_inviati_il"] or 0), SOLLECITI_RILASCIO_S,
                     _p2p_onchain_campo(o, "sollecito_libera", 0))
         if n:
-            testi = (SOLLECITO_RILASCIO_CONTANTI_TESTI if _p2p_onchain_solo_contanti(o)
+            testi = (P2P_ONCHAIN_RILASCIO_TAB_TESTI if p2p_onchain_tab_scade(o)
+                     else SOLLECITO_RILASCIO_CONTANTI_TESTI if _p2p_onchain_solo_contanti(o)
                      else SOLLECITO_RILASCIO_TESTI)
             return ("sollecito_libera", n, int(o["depositante_id"]),
                     f"{P2P_ONCHAIN_SEGNO} {testi[n]}")
@@ -110667,6 +111278,494 @@ def asset_p2p_banner_fee_senza_barra():
     mount (regola 3). Il timbro ?v= lo mette _timbra_asset_pagina."""
     return FileResponse("assets/p2p-banner-fee-senza-barra.webp",
                         media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+# ------------- LA STRADINA DEGLI OBIETTIVI (17 nov 2026) -------------
+# Una schermata PRIVATA del Profilo, a serpentone come un tabellone da
+# gioco: le tappe fatte, quella davanti, e Tappo-pedina sull'ultima
+# fatta. Spunto di Andrea: i programmi fedelta' delle app e il gioco da
+# tavolo To The Mooon (la pista dalla Terra alla Luna). Le tappe sono
+# FATTI GIA' SCRITTI ALTROVE (un annuncio, un acquisto, un indirizzo
+# Lightning, gli inviti, il livello): qui si leggono e si mettono in
+# fila, non nasce nessuna tabella e nessuna tappa si «spunta a mano».
+# NIENTE XP DALLE TAPPE (regola «GLI XP», ago 2026: gli XP sono il
+# commercio e nient'altro; Andrea 17 nov: «senza XP»): una tappa fatta
+# e' una spunta, non una moneta. I gradini della scala sono le tappe
+# grandi, e l'ultima — il Maestro — e' la Luna.
+# «Impara bitcoin»: una tappa-porta verso un partner dell'educazione
+# (Andrea, 17 nov: Villaggio Bitcoin, da proporre a loro; Bitvero
+# scartato per non chiedere un favore in piu'): INERTE finche' nel
+# config non c'e' il link — senza link la tappa non esiste, e nessuno
+# viene nominato.
+try:
+    from config import IMPARA_BITCOIN_LINK
+except ImportError:
+    IMPARA_BITCOIN_LINK = ""
+try:
+    from config import IMPARA_BITCOIN_NOME
+except ImportError:
+    IMPARA_BITCOIN_NOME = "Villaggio Bitcoin"
+STRADINA_AMICI_MAX = 12      # quanti amici si mostrano, i piu' alti
+
+# LE ZONE DEL TABELLONE, dal basso (la Terra) verso l'alto (la Luna):
+# ognuna ha il suo pezzo di mappa disegnato (assets/stradina/) e finisce
+# con un GRADINO della scala. Nomi di casa, mai quelli del gioco.
+STRADINA_ZONE = (
+    {"id": "primi", "emoji": "🫙", "nome": "Primi passi"},
+    {"id": "mercatino", "emoji": "🧺", "nome": "Il mercatino"},
+    {"id": "porto", "emoji": "⚓", "nome": "Il porto"},
+    {"id": "bosco", "emoji": "🌲", "nome": "Il bosco dei sats"},
+    {"id": "scala", "emoji": "🪜", "nome": "La scala d'oro"},
+    {"id": "vetta", "emoji": "🏔", "nome": "La vetta"},
+    {"id": "orbita", "emoji": "🛰", "nome": "In orbita"},
+    {"id": "luna", "emoji": "🌕", "nome": "Verso la Luna"},
+)
+# dove stanno i gradini della scala dei livelli: in fondo a queste zone
+# (il primo gradino chiude il mercatino, l'ultimo — la Luna — l'ultima
+# zona); se la scala ne avesse di piu', i restanti vanno nell'ultima
+STRADINA_ZONE_GRADINO = (1, 3, 5, 7)
+# L'HALVING DEL 2028 (Andrea, 17 nov: «deve essere il più lungo possibile,
+# per arrivare all'anno dell'halving»): l'ultima casella prima della Luna
+# si accende solo da quel giorno, quindi nessuno arriva in cima prima,
+# nemmeno chi vende tantissimo. La data e' una STIMA (il blocco
+# 1.050.000 cade intorno a meta' aprile 2028, a dieci minuti l'uno):
+# una casella, non un orologio della catena.
+STRADINA_HALVING_2028 = 1839369600     # 2028-04-16 00:00 UTC
+
+# LE CASELLE A SOGLIA, per zona: (id, emoji, nome, fatto da contare,
+# soglia, vista dove si fa). Ogni conto e' un FATTO GIA' SCRITTO altrove:
+# qui si legge e si confronta, non si timbra niente. Le soglie crescono
+# di zona in zona, cosi' il tabellone e' lungo come una partita vera.
+# LE CASELLE SONO COMPETENZE (Andrea, 17 nov 13:30: «gamification... hai
+# impostato il wallet on chain, l'incasso automatico su lightning, la
+# doppia configurazione con Nostr, il primo acquisto»): ogni casella e'
+# una cosa che si sa FARE su Barattolo e con bitcoin, e Tappo — il tuo
+# avatar — le percorre. Nomi uguali a quelli che l'utente legge nell'app
+# («Incasso automatico attivo» = l'indirizzo Lightning; «Doppia
+# cittadinanza» = il distintivo di Telegram+Nostr).
+STRADINA_CASELLE = (
+    # IN ORDINE DI FATICA (Andrea, 17 nov: «parti dalle cose più semplici,
+    # basilari, fino alle più difficili: progressiva»). Prima i gesti a
+    # costo zero, poi il primo sats speso, poi le competenze da bitcoiner,
+    # poi le soglie e il tempo, fino all'halving del 2028. Una casella che
+    # dipende da altri (una vendita, una recensione che vuole un acquisto)
+    # viene DOPO quella che la rende possibile: Tappo cammina in fila.
+    # zona 0, «Primi passi»: gesti da un minuto, senza spendere niente
+    (0, "barattolo", "🫙", "Metti un articolo nel barattolo", "preferiti", 1, "esplora"),
+    (0, "foto", "🖼", "Metti la tua foto", "foto", 1, "profilo"),
+    (0, "segui", "👀", "Segui un venditore", "seguiti", 1, "esplora"),
+    (0, "wallet", "⚡", "Attiva l'incasso automatico in Lightning", "wallet", 1, "profilo"),
+    # zona 1, «Il mercatino»: le prime volte
+    (1, "annuncio", "📦", "Pubblica il primo annuncio", "annunci", 1, "vendi"),
+    (1, "acquisto", "🛒", "Fai il primo acquisto", "acquisti", 1, "esplora"),
+    (1, "recensione", "⭐", "Lascia una recensione", "recensioni", 1, "affari"),
+    (1, "nostr", "🟣", "Collega la tua chiave Nostr", "nostr", 1, "profilo"),
+    (1, "invito", "💌", "Invita una persona col tuo link", "inviti", 1, "profilo"),
+    # zona 2, «Il porto»: le competenze da bitcoiner
+    (2, "vendita", "🤝", "Concludi la prima vendita", "vendite", 1, "vendi"),
+    (2, "onchain", "₿", "Crea il tuo wallet on-chain", "onchain", 1, "profilo"),
+    (2, "nostr_verificata", "✅", "Verifica la chiave Nostr con una nota pubblica", "nostr_verificata", 1, "profilo"),
+    (2, "doppia", "🔗", "Fai la doppia configurazione Telegram + Nostr", "doppia", 1, "profilo"),
+    (2, "p2p1", "🔁", "Fai il primo scambio P2P", "p2p", 1, "p2p"),
+    (2, "mese", "⏳", "Un mese con Barattolo", "giorni", 30, "profilo"),
+    (2, "annunci5", "📦", "Metti 5 annunci", "annunci", 5, "vendi"),
+    (2, "acquisti3", "🛍", "Fai 3 acquisti", "acquisti", 3, "esplora"),
+    # zona 3, «Il bosco dei sats»
+    (3, "vendite3", "🤝", "Concludi 3 vendite", "vendite", 3, "vendi"),
+    (3, "recensioni3", "⭐", "Lascia 3 recensioni", "recensioni", 3, "affari"),
+    (3, "inviti3", "💌", "Invita 3 persone", "inviti", 3, "profilo"),
+    (3, "incasso10k", "💰", "Incassa 10.000 sats", "incassati", 10_000, "vendi"),
+    (3, "p2p3", "🔁", "Completa 3 scambi P2P", "p2p", 3, "p2p"),
+    (3, "acquisti5", "🛍", "Fai 5 acquisti", "acquisti", 5, "esplora"),
+    (3, "vendite5", "🤝", "Concludi 5 vendite", "vendite", 5, "vendi"),
+    (3, "annunci10", "🏪", "Metti 10 annunci", "annunci", 10, "vendi"),
+    # zona 4, «La scala d'oro»
+    (4, "seimesi", "⏳", "Sei mesi con Barattolo", "giorni", 180, "profilo"),
+    (4, "incasso50k", "💰", "Incassa 50.000 sats", "incassati", 50_000, "vendi"),
+    (4, "acquisti10", "🛍", "Fai 10 acquisti", "acquisti", 10, "esplora"),
+    (4, "recensioni5", "⭐", "Lascia 5 recensioni", "recensioni", 5, "affari"),
+    (4, "vendite10", "🤝", "Concludi 10 vendite", "vendite", 10, "vendi"),
+    (4, "inviti5", "💌", "Invita 5 persone", "inviti", 5, "profilo"),
+    (4, "p2p5", "🔁", "Completa 5 scambi P2P", "p2p", 5, "p2p"),
+    (4, "annunci15", "🏪", "Metti 15 annunci", "annunci", 15, "vendi"),
+    (4, "incasso100k", "💰", "Incassa 100.000 sats", "incassati", 100_000, "vendi"),
+    # zona 5, «La vetta»
+    (5, "anno", "⏳", "Un anno con Barattolo", "giorni", 365, "profilo"),
+    (5, "recensioni10", "🌟", "Lascia 10 recensioni", "recensioni", 10, "affari"),
+    (5, "acquisti25", "🛍", "Fai 25 acquisti", "acquisti", 25, "esplora"),
+    (5, "vendite25", "🏆", "Concludi 25 vendite", "vendite", 25, "vendi"),
+    (5, "inviti10", "💌", "Invita 10 persone", "inviti", 10, "profilo"),
+    (5, "p2p10", "🔁", "Completa 10 scambi P2P", "p2p", 10, "p2p"),
+    (5, "annunci25", "🏬", "Metti 25 annunci", "annunci", 25, "vendi"),
+    (5, "incasso250k", "💰", "Incassa 250.000 sats", "incassati", 250_000, "vendi"),
+    (5, "incasso500k", "💰", "Incassa 500.000 sats", "incassati", 500_000, "vendi"),
+    # zona 6, «In orbita»
+    (6, "diciottomesi", "⏳", "Un anno e mezzo con Barattolo", "giorni", 540, "profilo"),
+    (6, "recensioni25", "🌟", "Lascia 25 recensioni", "recensioni", 25, "affari"),
+    (6, "acquisti50", "🛍", "Fai 50 acquisti", "acquisti", 50, "esplora"),
+    (6, "vendite50", "🏆", "Concludi 50 vendite", "vendite", 50, "vendi"),
+    (6, "inviti25", "💌", "Invita 25 persone", "inviti", 25, "profilo"),
+    (6, "p2p20", "🔁", "Completa 20 scambi P2P", "p2p", 20, "p2p"),
+    (6, "annunci50", "🏬", "Metti 50 annunci", "annunci", 50, "vendi"),
+    (6, "incasso1m", "💎", "Incassa 1.000.000 di sats", "incassati", 1_000_000, "vendi"),
+    (6, "incasso2m", "💎", "Incassa 2.500.000 sats", "incassati", 2_500_000, "vendi"),
+    # zona 7, «Verso la Luna»: l'ultima casella e' l'halving del 2028
+    (7, "dueanni", "⏳", "Due anni con Barattolo", "giorni", 730, "profilo"),
+    (7, "recensioni50", "🌟", "Lascia 50 recensioni", "recensioni", 50, "affari"),
+    (7, "acquisti100", "🛍", "Fai 100 acquisti", "acquisti", 100, "esplora"),
+    (7, "vendite100", "🏆", "Concludi 100 vendite", "vendite", 100, "vendi"),
+    (7, "inviti50", "💌", "Invita 50 persone", "inviti", 50, "profilo"),
+    (7, "p2p50", "🔁", "Completa 50 scambi P2P", "p2p", 50, "p2p"),
+    (7, "incasso10m", "💎", "Incassa 10.000.000 di sats", "incassati", 10_000_000, "vendi"),
+    (7, "halving", "🌗", "Arriva all'halving del 2028", "halving", 1, "esplora"),
+)
+
+
+# LE FAMIGLIE DELLE ICONE: il «fatto» di ogni casella (le soglie della
+# stessa famiglia hanno la stessa icona) piu' il benvenuto. Ognuna ha il
+# suo `ico-<nome>.webp` nella whitelist qui sotto.
+STRADINA_ICONE = ("benvenuto",) + tuple(dict.fromkeys(
+    c[4] for c in STRADINA_CASELLE))
+
+
+def fatti_stradina(con, tg_id: int) -> dict:
+    """I NUMERI VERI di chi legge, letti e basta: quel che serve alle
+    caselle. Una lettura che manca (una colonna di un cantiere parallelo,
+    una tabella su un database vecchio) vale zero, mai un errore: la
+    stradina e' una pagina di contorno e non deve mai chiudere il
+    Profilo. I sats incassati li aggiunge chi chiama (`numeri_negozio`)."""
+    u = con.execute("SELECT * FROM utenti WHERE tg_id=?", (tg_id,)).fetchone()
+    chiavi = set(u.keys()) if u else set()
+
+    def campo(nome):
+        return u[nome] if u is not None and nome in chiavi else None
+
+    def conta(sql, *a):
+        try:
+            return int(con.execute(sql, a).fetchone()[0] or 0)
+        except Exception:
+            return 0
+    foto = (campo("avatar") or "").strip() and campo("avatar_scelta") != "nessuna"
+    f = {"xp": int(campo("xp") or 0),
+         "vendite": int(campo("vendite_ok") or 0),
+         "acquisti": int(campo("acquisti_ok") or 0),
+         "wallet": 1 if (campo("ln_address") or "").strip() else 0,
+         "foto": 1 if foto else 0,
+         "nostr": 1 if (campo("npub") or "").strip() else 0,
+         # il distintivo «Nostrano»: la nota di verifica trovata sui relay
+         "nostr_verificata": 1 if campo("npub_verificata") else 0,
+         # il distintivo «Doppia cittadinanza»: un account Telegram (id
+         # positivo) in cui si entra anche con la chiave Nostr
+         "doppia": 1 if (tg_id > 0 and (campo("npub_accesso") or "").strip())
+                   else 0,
+         # il wallet on-chain: il wallet di Barattolo (l'impronta del seme)
+         # o una xpub di un wallet proprio. Tabelle di altri cantieri: se
+         # mancano vale zero.
+         "onchain": 1 if (conta("SELECT COUNT(*) FROM wallet_unico WHERE tg_id=?",
+                                tg_id)
+                          or conta("SELECT COUNT(*) FROM onchain_xpub WHERE tg_id=?",
+                                   tg_id)) else 0,
+         "annunci": conta("SELECT COUNT(*) FROM annunci WHERE venditore_id=? "
+                          "AND stato!='rimosso'", tg_id),
+         "preferiti": conta("SELECT COUNT(*) FROM preferiti WHERE tg_id=?",
+                            tg_id),
+         "recensioni": conta("SELECT COUNT(*) FROM feedback WHERE da_tg_id=?",
+                             tg_id),
+         "seguiti": conta("SELECT COUNT(*) FROM venditori_seguiti WHERE tg_id=? "
+                          "AND venditore_id!=?", tg_id, tg_id),
+         "p2p": conta("SELECT COUNT(*) FROM p2p_esiti WHERE tg_id=? "
+                      "AND esito='completato'", tg_id),
+         "incassati": 0, "inviti": 0, "tappo": 0,
+         # da quanti giorni e' con noi (la prima entrata), e se e' gia'
+         # arrivato il giorno dell'halving del 2028
+         "giorni": (max(0, int((time.time() - int(campo("registrato") or 0))
+                               // 86400))
+                    if int(campo("registrato") or 0) > 0 else 0),
+         "halving": 1 if time.time() >= STRADINA_HALVING_2028 else 0}
+    try:
+        f["inviti"] = int((stato_inviti(con, tg_id, campo("registrato") or 0)
+                           or {}).get("persone") or 0)
+    except Exception:
+        pass
+    # il cappellino della Caccia a Tappo (cantiere parallelo, 17 nov):
+    # la colonna puo' non esserci ancora, e allora la casella e' da fare
+    f["tappo"] = 1 if (campo("tappo_oggetto") or "").strip() else 0
+    return f
+
+
+def tappe_stradina(f: dict, scala: list, impara_link: str = "",
+                   impara_nome: str = "", gioco: bool = False,
+                   missioni=None, superate=None) -> list:
+    """PURA: dai numeri alle caselle del tabellone, dal basso in alto.
+    Ogni casella porta `zona` (indice di STRADINA_ZONE), `fatto`
+    (True/False; None = una porta che non si spunta, come «impara»),
+    `vai` (la vista dell'app dove si fa) e, dove la soglia e' piu' di
+    uno, `n` su `di`. Ogni zona finisce con un GRADINO della scala (le
+    stesse soglie del carosello): l'ultimo, il Maestro, e' la Luna.
+    LE MISSIONI DI TAPPO (Andrea, 17 nov: «ogni tanto nel tabellone devi
+    giocare con Tappo per proseguire»): le studia e le costruisce il
+    cantiere del gioco di Tappo; qui arrivano come elenco (`missioni`:
+    {id, emoji, nome, zona}) con l'insieme di quelle gia' `superate`, e
+    stanno nella loro zona subito prima del gradino. Senza elenco non
+    compaiono."""
+    affari = int(f.get("vendite", 0)) + int(f.get("acquisti", 0))
+    liv = livello_utente(int(f.get("xp", 0)), affari)
+    t = []
+
+    def tappa(zona, tid, emoji, nome, fatto, vai, n=None, di=None, link="",
+              tipo="casella", icona=""):
+        t.append({"id": tid, "zona": zona, "emoji": emoji, "nome": nome,
+                  "fatto": fatto, "vai": vai, "n": n, "di": di,
+                  "link": link, "tipo": tipo, "icona": icona})
+    gradini = [g for g in (scala or []) if int(g.get("numero") or 0) >= 2]
+    ultima_zona = len(STRADINA_ZONE) - 1
+    for z in range(len(STRADINA_ZONE)):
+        if z == 0:
+            tappa(0, "benvenuto", "👋", "Benvenuto in Barattolo", True,
+                  "esplora", icona="benvenuto")
+        inizio = len(t)
+        for (zz, tid, emoji, nome, chiave, soglia, vai) in STRADINA_CASELLE:
+            if zz != z:
+                continue
+            v = int(f.get(chiave, 0) or 0)
+            conto = soglia > 1
+            tappa(z, tid, emoji, nome, v >= soglia, vai,
+                  min(v, soglia) if conto else None,
+                  soglia if conto else None, icona=chiave)
+        # «Gioca con Tappo» serve solo finche' il gioco non porta le sue
+        # missioni: con le missioni l'ingresso al gioco sono loro, e una
+        # casella in piu' sarebbe un secondo cancello sulla stessa porta
+        if z == 0 and gioco and not missioni:
+            tappa(0, "gioco", "🎩", "Gioca con Tappo", bool(f.get("tappo")),
+                  "caccia")
+        if z == 0 and (impara_link or "").startswith("https://"):
+            tappa(0, "impara", "📖",
+                  f"Impara bitcoin con {impara_nome or 'Villaggio Bitcoin'}", None, "",
+                  link=impara_link, tipo="porta")
+        # LE MISSIONI DELLA ZONA (piu' d'una dal 17 nov: il gioco ne porta
+        # tre per zona, sempre piu' difficili, col campo `ordine`):
+        # SPARSE fra le caselle, l'ultima subito prima del gradino; ognuna
+        # e' un cancello, perche' Tappo cammina in fila
+        sue = []
+        for pos, m in enumerate(missioni or []):
+            try:
+                if int(m.get("zona", -1)) != z or not m.get("id"):
+                    continue
+                ordine = int(m.get("ordine") or 0)
+            except (TypeError, ValueError, AttributeError):
+                continue
+            sue.append((ordine, pos, m))
+        sue.sort(key=lambda x: (x[0], x[1]))
+        if sue:
+            caselle = t[inizio:]
+            del t[inizio:]
+            dopo = {}
+            for k in range(len(sue)):
+                dopo.setdefault(-(-(k + 1) * len(caselle) // len(sue)), []).append(k)
+            for j in range(len(caselle) + 1):
+                if j:
+                    t.append(caselle[j - 1])
+                for k in dopo.get(j, []):
+                    m = sue[k][2]
+                    mid = str(m["id"])
+                    tappa(z, f"missione_{mid}", str(m.get("emoji") or "🎯"),
+                          str(m.get("nome") or "Missione con Tappo"),
+                          mid in (superate or set()),
+                          str(m.get("vai") or "caccia"), tipo="missione")
+                    t[-1]["missione"] = mid
+        # i gradini: in fondo alle zone di STRADINA_ZONE_GRADINO, uno a
+        # testa; se la scala ne avesse di piu', i restanti nell'ultima
+        k = (STRADINA_ZONE_GRADINO.index(z)
+             if z in STRADINA_ZONE_GRADINO else None)
+        miei = ([] if k is None else gradini[k:] if z == ultima_zona
+                else gradini[k:k + 1])
+        for g in miei:
+            n = int(g["numero"])
+            luna = g is gradini[-1]
+            tappa(z, f"livello_{n}", "🌕" if luna else "🎖",
+                  f"Diventa {g['nome']}", int(liv["numero"]) >= n, "profilo",
+                  min(int(f.get("xp", 0)), int(g["xp"])), int(g["xp"]),
+                  tipo="luna" if luna else "gradino")
+    return t
+
+
+def emoji_oggetto_tappo(oggetto: str) -> str:
+    """Il cappellino sulla pedina: l'id dell'oggetto vinto nella Caccia a
+    Tappo (cantiere parallelo, 17 nov) tradotto nella sua emoji. L'elenco
+    `GIOCO_TAPPO_OGGETTI` arriva da quel cantiere e qui puo' non esserci
+    ancora, o avere una forma diversa (dizionario id->emoji, dizionario
+    di schede, lista di schede): si prova con garbo e si torna '' se
+    non si trova, mai un errore. Un id che non e' in elenco non si
+    mostra: sulla pedina va un'emoji, non un codice."""
+    oggetto = (oggetto or "").strip()
+    if not oggetto:
+        return ""
+    elenco = globals().get("GIOCO_TAPPO_OGGETTI")
+    try:
+        if isinstance(elenco, dict):
+            v = elenco.get(oggetto)
+            if isinstance(v, str):
+                return v
+            if isinstance(v, dict):
+                return str(v.get("emoji") or "")
+        elif isinstance(elenco, (list, tuple)):
+            for v in elenco:
+                if isinstance(v, dict) and v.get("id") == oggetto:
+                    return str(v.get("emoji") or "")
+    except Exception:
+        pass
+    return ""
+
+
+def amici_stradina(con, tg_id: int, adesso: int) -> list:
+    """Gli amici: i venditori che segui e chi ha concluso un affare con
+    te. SOLO quel che e' gia' pubblico sulla loro pagina (nome, faccia,
+    negozio, livello): niente XP, niente sats, mai chi segue chi. Chi ha
+    detto «Non mostrarmi in classifica» non compare, come la'."""
+    ids = {int(r[0]) for r in con.execute(
+        "SELECT venditore_id FROM venditori_seguiti WHERE tg_id=?", (tg_id,))}
+    for r in con.execute(
+            "SELECT venditore_id, compratore_id FROM ordini "
+            "WHERE stato='released' AND prova=0 "
+            "AND (venditore_id=? OR compratore_id=?)", (tg_id, tg_id)):
+        ids.add(int(r[0])); ids.add(int(r[1]))
+    ids.discard(int(tg_id))
+    ids = sorted(ids)[:40]
+    if not ids:
+        return []
+    segni = ",".join("?" * len(ids))
+    nascosti = {int(r[0]) for r in con.execute(
+        f"SELECT tg_id FROM utenti WHERE classifica_nascosta=1 "
+        f"AND tg_id IN ({segni})", ids)}
+    volti = _volti_persone(con, [i for i in ids if i not in nascosti], adesso)
+    amici = [{"nome": v["nome"], "avatar": v["avatar"],
+              "negozio": v["negozio"], "livello": v["livello"],
+              "livello_numero": int(v["livello_numero"] or 1)}
+             for v in volti.values()]
+    amici.sort(key=lambda a: (-a["livello_numero"], a["nome"].lower()))
+    return amici[:STRADINA_AMICI_MAX]
+
+
+@app.get("/api/me/stradina")
+def mia_stradina(x_tg_init_data: str = Header(""),
+                 barattolo_sessione: str = Cookie("")):
+    """LA PORTA DELLA STRADINA: le tappe, il livello, i sats e gli amici
+    di CHI BUSSA, mai di un altro (il tg_id viene dall'identita', non da
+    un parametro). L'anonimo prende il 401 di `verifica_utente`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        adesso = int(time.time())
+        f = fatti_stradina(con, user["id"])
+        sats = {"incassati": 0, "spesi": 0}
+        try:
+            v = con.execute(_CAMPI_NUMERI + "WHERE tg_id=?",
+                            (user["id"],)).fetchone()
+            if v:
+                n = numeri_negozio(con, v, adesso)
+                sats = {"incassati": int(n.get("sats_tot") or 0),
+                        "spesi": int(n.get("sats_acq_tot") or 0)}
+        except Exception:
+            pass
+        f["incassati"] = sats["incassati"]
+        gioco = bool(globals().get("GIOCO_TAPPO_ATTIVO"))
+        # le missioni del gioco di Tappo (cantiere parallelo): l'elenco e
+        # la lettura di quelle superate arrivano da li', e finche' non ci
+        # sono il tabellone resta senza caselle-missione
+        missioni, superate = [], set()
+        if gioco and isinstance(globals().get("MISSIONI_TAPPO"), (list, tuple)):
+            missioni = [m for m in globals()["MISSIONI_TAPPO"]
+                        if isinstance(m, dict)]
+            try:
+                superate = set(globals()["missioni_superate"](con, user["id"]))
+            except Exception:
+                superate = set()
+        tappe = tappe_stradina(f, scala_livelli(), IMPARA_BITCOIN_LINK,
+                               IMPARA_BITCOIN_NOME, gioco, missioni, superate)
+        liv = livello_utente(f["xp"], f["vendite"] + f["acquisti"])
+        try:
+            amici = amici_stradina(con, user["id"], adesso)
+        except Exception:
+            amici = []
+        tappo = ""
+        try:
+            r = con.execute("SELECT tappo_oggetto FROM utenti WHERE tg_id=?",
+                            (user["id"],)).fetchone()
+            tappo = (r[0] or "") if r else ""
+        except Exception:
+            tappo = ""
+        return {"tappe": tappe, "zone": list(STRADINA_ZONE),
+                "livello": liv, "sats": sats,
+                "amici": amici, "tappo_oggetto": tappo,
+                "tappo_emoji": emoji_oggetto_tappo(tappo),
+                "impara": {"nome": IMPARA_BITCOIN_NOME,
+                           "link": IMPARA_BITCOIN_LINK
+                           if (IMPARA_BITCOIN_LINK or "").startswith("https://")
+                           else ""}}
+    finally:
+        con.close()
+
+
+# I CINQUE PEZZI DELLA MAPPA della stradina (17 nov 2026): uno per zona,
+# disegnati in Google Flow senza scritte ne' personaggi (la strada, le
+# caselle e Tappo li disegna la pagina sopra), WebP verticali. Il nome
+# arriva dal client, quindi whitelist a tupla come FILE_CARRELLO; un
+# pezzo che manca e' un 404 e la pagina tiene il suo ripiego dipinto.
+FILE_MAPPA_STRADINA = ("zona1.webp", "zona2.webp", "zona3.webp",
+                       "zona4.webp", "zona5.webp",
+                       # Tappo-pedina: il Tappo ufficiale (il robot col
+                       # barattolo di monete), ritagliato tondo, 192 px
+                       "tappo-pedina.webp",
+                       # LE ICONE DELLE CASELLE (Andrea, 17 nov: «non le
+                       # emoji classiche, personalizzale in stile
+                       # Barattolo»): una per famiglia (`STRADINA_ICONE`),
+                       # disegnate in Flow come la mappa, 160 px. Una che
+                       # manca e' un 404 e la casella tiene la sua emoji.
+                       "ico-benvenuto.webp", "ico-preferiti.webp",
+                       "ico-foto.webp", "ico-seguiti.webp",
+                       "ico-wallet.webp", "ico-annunci.webp",
+                       "ico-acquisti.webp", "ico-recensioni.webp",
+                       "ico-inviti.webp", "ico-nostr.webp",
+                       "ico-vendite.webp", "ico-onchain.webp",
+                       "ico-nostr_verificata.webp", "ico-doppia.webp",
+                       "ico-p2p.webp", "ico-incassati.webp",
+                       "ico-giorni.webp", "ico-halving.webp",
+                       # i tre pezzi di mappa nuovi (8 zone, 17 nov)
+                       "zona6.webp", "zona7.webp", "zona8.webp")
+
+
+@app.get("/assets/stradina/{nome}")
+def asset_mappa_stradina(nome: str):
+    if nome not in FILE_MAPPA_STRADINA:
+        raise HTTPException(404, "immagine non trovata")
+    percorso = os.path.join("assets", "stradina", nome)
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "immagine non trovata")
+    return FileResponse(percorso, media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+# I SUONI della stradina e del gioco di Tappo (17 nov 2026, Andrea: «per i
+# suoni fai tu, puoi scaricarli su Artlist»): effetti brevi in MP3, uno per
+# nome, gli stessi nomi di `SUONI_FILE` nel client. Whitelist a tupla come
+# la mappa; uno che manca e' un 404 e il client torna al bip sintetizzato.
+FILE_SUONI_STRADINA = ("tocco.mp3", "passo.mp3", "traguardo.mp3",
+                       "moneta.mp3", "chiusa.mp3", "magia.mp3", "via.mp3",
+                       "apri.mp3", "salto.mp3", "atterra.mp3",
+                       "raccogli.mp3", "giusto.mp3", "sbagliato.mp3",
+                       "stella.mp3", "vittoria.mp3", "sconfitta.mp3",
+                       "tarlo.mp3", "gazza.mp3", "porta.mp3", "conto.mp3")
+
+
+@app.get("/assets/stradina/suoni/{nome}")
+def asset_suoni_stradina(nome: str):
+    if nome not in FILE_SUONI_STRADINA:
+        raise HTTPException(404, "suono non trovato")
+    percorso = os.path.join("assets", "stradina", "suoni", nome)
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "suono non trovato")
+    return FileResponse(percorso, media_type="audio/mpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
@@ -115131,7 +116230,8 @@ CANCELLA_TOGLI = (
     ("avvisi_app", "tg_id"), ("avvisi_notificati", "tg_id"),
     ("push_iscrizioni", "tg_id"),
     ("avvisi_ricerca", "tg_id"), ("badge_utente", "tg_id"),
-    ("regali_livello", "tg_id"),     # col recapito: un dato personale
+    ("premi_fedelta_maturati", "compratore_id"),
+    ("premi_fedelta_maturati", "venditore_id"),
     ("barattoli_condivisi", "tg_id"),
     ("carrello_salvato", "tg_id"), ("carrello_salvato", "venditore_id"),
     ("chiavi_p2p", "tg_id"), ("p2p_indice", "tg_id"),
@@ -115164,6 +116264,8 @@ CANCELLA_TOGLI = (
     ("wallet_unico", "tg_id"), ("swap_auto_preferenze", "tg_id"),
     ("unioni_semi", "tg_id"), ("unioni_semi", "da_id"),
     ("unioni_registro", "tg_id"), ("unioni_registro", "da_id"),
+    # la serie dei giorni 🔥 (17 nov 2026): era sua, se ne va con lui
+    ("serie_giorni", "tg_id"),
     # (17 nov 2026) la Caccia a Tappo: le giornate giocate e gli oggetti
     # presi coi bulloni erano suoi, e se ne vanno con lui
     ("gioco_tappo", "tg_id"), ("gioco_tappo_oggetti", "tg_id"),

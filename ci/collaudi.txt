@@ -105,6 +105,7 @@ collaudo_recapito_aggiornato
 collaudo_chat_scambio
 collaudo_allegati_chat
 collaudo_chat_mercatino
+collaudo_chat_onchain
 collaudo_garanzia_lunga
 collaudo_promemoria_gesto
 collaudo_x_risonanza
@@ -190,6 +191,7 @@ collaudo_eth_xmr
 collaudo_mappa_ritiro
 collaudo_feedback_modificabile
 collaudo_mancia
+collaudo_premi_fedelta
 collaudo_cassa_negozio
 collaudo_payjoin
 collaudo_elimina_esauriti
@@ -197,5 +199,6 @@ collaudo_codici_uno_alla_volta
 collaudo_etichetta_alimenti
 collaudo_avvisi_barattolo
 collaudo_spedisci_entro
-collaudo_regali_livello
 collaudo_chiedi_locker
+collaudo_serie_giorni
+collaudo_sentinella
