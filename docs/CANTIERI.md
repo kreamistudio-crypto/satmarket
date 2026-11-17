@@ -86455,6 +86455,33 @@ dal repo come sul PC); `collaudi_ci.py --elenco ci/collaudi.txt` in un
 venv senza coincurve, 139 verdi e 0 rossi (girato prima dei ritocchi a
 prove e colore, che i collaudi non leggono).
 
+IL SECONDO GIRO (stesso giorno, Andrea: «Guarda un po' se manca qualcosa,
+migliora la grafica, farla in maniera semplice, studialo bene»). La prima
+versione era un muro di testo grigio con un bottone in mezzo, e aveva un
+buco: parlava solo a chi deve INCASSARE («Attiva incassi automatici»)
+anche quando la si apriva dal foglio della fattura, dove chi sta davanti
+deve PAGARE e il suo problema non è l'indirizzo ma i sats. Rifatta: la
+nota verde dei sats per prima, poi TRE PASSI numerati col pallino di
+`.sicu-passi` (`.pw-passi`): scarica (col bottone dentro il passo),
+salva le parole di recupero su carta, e il terzo secondo lo SCOPO —
+`apriGuidaWallet('paga')` dal foglio della fattura (i primi sats da un
+amico o dal P2P, col bottone «Compra sats nel P2P» se la leva è accesa e
+c'è un account, poi «inquadra il QR»; il bottone finale dice «Torno a
+pagare»), `'incassa'` dalle altre quattro porte (il campo, o la riga
+verde con l'indirizzo che c'è già). Gli altri wallet e Phoenix stanno
+chiusi in una tendina; la nota «non ci dà niente» resta, piccola.
+«In italiano» tolto dal passo 1: non verificato. Prove rifatte sul
+banco node: i cinque stati del terzo passo e lo scopo ignoto che vale
+«incassa»; controprove su tre mutazioni (la guardia della vetrina, lo
+scopo della porta nella fattura, il nome del bottone finale), tre rosse.
+GIRATO sull'albero di origin/develop 35c5c1e0 più questo giro: suite
+severa 28940 passate, 0 fallite, 0 saltate; collaudi della CI nel venv
+senza coincurve 140 verdi, 0 rossi. Poi il rebase su 6c6f1934 (due
+cantieri altrui, spedisci-entro e avvisi-barattolo: nessun simbolo in
+comune, controllato per nome) e il giro mirato: le undici sezioni che
+leggono il foglio, il Profilo o i documenti (628 verdi, 0 saltate) e tre
+collaudi vicini nel venv (indirizzo-lightning e i due nuovi).
+
 DA GUARDARE. I nomi dei bottoni dentro Wallet of Satoshi («Ricevi») sono
 quelli del suo menu oggi: se cambiano, la guida va ritoccata. Se i
 neofiti si fermano ancora al wallet, la strada C dello studio.

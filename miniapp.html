@@ -9395,6 +9395,26 @@
      per caso. */
   .fine-frase{white-space:nowrap}
   .guida-wallet-riga{font-size:12.5px;color:var(--ink-soft);font-weight:600;margin:8px 0 10px}
+  /* LA GUIDA «IL TUO PRIMO WALLET» (17 nov 2026): tre passi col pallino
+     arancio di .sicu-passi, nelle misure di un foglio; il bottone di un
+     passo sta DENTRO il passo, cosi' «cosa fare» e «con cosa» sono una
+     riga sola */
+  .pw-passi{list-style:none;margin:14px 0 0;padding:0;counter-reset:pw}
+  .pw-passi li{counter-increment:pw;position:relative;padding:0 0 14px 38px;min-height:30px}
+  .pw-passi li:last-child{padding-bottom:4px}
+  .pw-passi li::before{content:counter(pw);position:absolute;left:0;top:0;
+    width:26px;height:26px;border-radius:999px;background:var(--sats);color:#fff;
+    font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;
+    display:flex;align-items:center;justify-content:center}
+  .pw-passi li>b{display:block;font-size:14.5px;line-height:26px}
+  .pw-riga{font-size:13px;color:var(--muted);font-weight:600;line-height:1.5;margin-top:2px}
+  .pw-passi .btn{margin-top:10px}
+  .pw-passi .field{margin-top:10px}
+  .pw-altri{margin-top:6px}
+  .pw-altri summary{cursor:pointer;font-weight:800;font-size:13.5px;padding:6px 0;list-style:none}
+  .pw-altri summary::before{content:'▸ ';color:var(--muted)}
+  .pw-altri[open] summary::before{content:'▾ '}
+  .pw-nota{font-size:11.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:10px}
   .scopri-link{border:0;background:none;padding:0;margin:0;
     font:inherit;font-weight:800;color:inherit;
     text-decoration:underline;text-underline-offset:3px;
@@ -15899,7 +15919,7 @@ document.getElementById('cartello')?.remove();</script>
     <!-- la porta della guida «Il tuo primo wallet» (17 nov 2026): e' di
          Lightning, quindi la porta on-chain la spegne e il ritorno alla
          fattura la riaccende (`payGuidaWalletVista`) -->
-    <div id="payGuidaWallet" class="guida-wallet-riga" style="text-align:center;margin:-6px 0 12px">Non hai un wallet? <button type="button" class="scopri-link" onclick="apriGuidaWallet()">Te lo spieghiamo in tre passi</button></div>
+    <div id="payGuidaWallet" class="guida-wallet-riga" style="text-align:center;margin:-6px 0 12px">Non hai un wallet? <button type="button" class="scopri-link" onclick="apriGuidaWallet('paga')">Te lo spieghiamo in tre passi</button></div>
     <!-- LA SCADENZA E LA PORTA DEL WALLET (24 set 2026, «Paga ora»):
          una riga sola, accesa da mostraQr per OGNI flusso che apre il
          foglio. A sinistra il conto alla rovescia letto dalla bolt11;
@@ -17124,49 +17144,37 @@ document.getElementById('cartello')?.remove();</script>
        foglio del pagamento nel markup, per la stessa ragione della guida
        Nostr: navPila ordina gli strati per posizione, quindi aperta dal
        foglio della fattura l'indietro chiude prima la guida e la fattura
-       resta sotto. Markup fisso (nessun dato utente dentro): l'unica
-       parte viva e' il riquadro dell'indirizzo, che scrive
-       `renderGuidaWallet`. L'ELENCO DEI WALLET E' QUI E SOLO QUI (piu'
-       i link in LINK_GUIDA_WALLET): si cambia in un punto. -->
+       resta sotto. SECONDO GIRO (stesso giorno, Andrea: «migliora la
+       grafica, farla in maniera semplice»): tre passi numerati e basta,
+       e il terzo cambia con lo SCOPO — chi deve PAGARE ha bisogno di
+       sats, chi deve INCASSARE del suo indirizzo (`renderGuidaWallet`).
+       Il resto (altri wallet, Phoenix, la nota) sta chiuso in una
+       tendina. L'ELENCO DEI WALLET E' QUI E SOLO QUI (piu' il link in
+       LINK_GUIDA_WALLET): si cambia in un punto. -->
   <div class="sheet" id="walletGuidaSheet" role="dialog" aria-modal="true" aria-labelledby="walletGuidaTit">
     <div class="grab"></div>
     <h3 id="walletGuidaTit">👛 Il tuo primo wallet</h3>
-    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.6">
-      Per pagare e per incassare su Barattolo serve un <b>wallet
-      Lightning</b>: un'app gratuita sul telefono dove tieni i tuoi sats.
-      I sats stanno <b>nel tuo wallet</b>, non su Barattolo: noi li
-      teniamo solo il tempo di un affare, nel deposito di garanzia.
-    </div>
-
-    <div style="font-weight:800;font-size:14px;margin-top:16px">⚡ Wallet of Satoshi, il più facile</div>
-    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.6">
-      In Europa i sats restano <b>sul tuo telefono</b>, non sui loro server.
-      <br>1. Installa Wallet of Satoshi.
-      <br>2. Aprilo. Se ti chiede di salvare il <b>backup</b> (le parole
-      di recupero), fallo subito: se perdi il telefono, è l'unico modo
-      per riavere i tuoi sats.
-      <br>3. Tocca <b>«Ricevi»</b>: in alto c'è il tuo indirizzo, tipo
-      <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>.
-      Copialo e incollalo qui sotto.
-    </div>
-    <button class="btn ghost" style="margin-top:8px" onclick="apriLinkGuidaWallet('wos')">⚡ Scarica Wallet of Satoshi</button>
-    <div id="walletGuidaIndirizzo"></div>
-
-    <div style="font-weight:800;font-size:14px;margin-top:16px">💶 I primi sats</div>
-    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.6">
-      Te li può mandare un amico al tuo indirizzo, oppure li compri in
-      euro nel <b>P2P</b> di Barattolo.
-    </div>
-
-    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:14px">
-      Hai già un altro wallet? Va bene qualsiasi wallet che ti dia un
-      indirizzo Lightning (<span class="mono" style="font-size:11px">nome@dominio</span>).
-      Quello di Phoenix Barattolo non lo sa ancora pagare: con Phoenix, a
-      ogni vendita incolli una fattura.
-      <br>Wallet of Satoshi non è di Barattolo: è un'app di altri, e non
-      ci dà niente per consigliarla.
-    </div>
-    <button class="btn primary" style="margin-top:14px" onclick="navIndietro()">Ho capito</button>
+    <div class="trust-note" style="margin-top:6px"><span>🫙</span><span>I sats stanno <b>nel tuo wallet</b>, non su Barattolo: noi li teniamo solo il tempo di un affare, nel deposito di garanzia.</span></div>
+    <ol class="pw-passi">
+      <li>
+        <b>Scarica Wallet of Satoshi</b>
+        <div class="pw-riga">Gratis, e i sats restano <b>sul tuo telefono</b>.</div>
+        <button class="btn ghost" onclick="apriLinkGuidaWallet('wos')">⚡ Scarica Wallet of Satoshi</button>
+      </li>
+      <li>
+        <b>Salva le parole di recupero</b>
+        <div class="pw-riga">Se il wallet te le chiede, scrivile <b>su carta</b>: sono l'unico modo per riavere i sats se perdi il telefono.</div>
+      </li>
+      <li id="walletGuidaPasso3">
+        <!-- il terzo passo lo scrive renderGuidaWallet, secondo lo scopo -->
+      </li>
+    </ol>
+    <details class="pw-altri">
+      <summary>Hai già un altro wallet?</summary>
+      <div class="pw-riga">Va bene qualsiasi wallet con un indirizzo Lightning (<span class="mono">nome@dominio</span>). Quello di <b>Phoenix</b> Barattolo non lo sa ancora pagare: con Phoenix, a ogni vendita incolli una fattura.</div>
+    </details>
+    <div class="pw-nota">Wallet of Satoshi è un'app di altri, non di Barattolo: non ci dà niente per consigliarla.</div>
+    <button class="btn primary" id="walletGuidaChiudi" style="margin-top:14px" onclick="navIndietro()">Ho capito</button>
   </div>
 
   <!-- ============ SHEET COLLEGAMENTO (npub già verificata) ============ -->
@@ -69714,33 +69722,51 @@ function apriLinkGuida(quale){
    Cantieri, «Il tuo primo wallet». Si apre SOPRA quel che c'e' (il
    pattern della guida Nostr): dal foglio della fattura, dal pannello
    dell'incasso e dal Profilo, e l'indietro riporta dove si era.
-   La porta e' una riga sola, `rigaGuidaWallet()`, uguale ovunque. */
-function rigaGuidaWallet(){
+   LO SCOPO (secondo giro): 'paga' dal foglio della fattura — chi deve
+   pagare ha bisogno di sats, non di un indirizzo —, 'incassa' da tutte
+   le altre porte. La porta e' una riga sola, `rigaGuidaWallet(scopo)`. */
+let guidaWalletScopo = 'incassa';
+function rigaGuidaWallet(scopo){
+  const sc = scopo === 'paga' ? 'paga' : 'incassa';
   return '<div class="guida-wallet-riga">Non hai un wallet? '
-    + '<button type="button" class="scopri-link" onclick="apriGuidaWallet()">Te lo spieghiamo in tre passi</button></div>';
+    + '<button type="button" class="scopri-link" onclick="apriGuidaWallet(\'' + sc + '\')">Te lo spieghiamo in tre passi</button></div>';
 }
-function apriGuidaWallet(){
+function apriGuidaWallet(scopo){
   haptic();
+  guidaWalletScopo = scopo === 'paga' ? 'paga' : 'incassa';
   renderGuidaWallet();
   el('sheetBg').classList.add('open');
   el('walletGuidaSheet').classList.add('open');
 }
-/* Il riquadro dell'indirizzo, l'unica parte viva della guida. In DEMO
-   non c'e' (come il blocco del Profilo: niente account, niente
-   indirizzo da salvare); chi l'indirizzo ce l'ha gia' lo legge, e non
-   gli si propone un campo vuoto. */
+/* Il terzo passo, l'unica parte viva della guida.
+   'paga': i primi sats (un amico, o il P2P se e' acceso e c'e' un
+   account) e poi il QR; 'incassa': l'indirizzo — il campo per chi non
+   ce l'ha, la riga verde per chi ce l'ha gia'. In DEMO il campo non
+   c'e' (niente account, niente indirizzo da salvare), come nel Profilo. */
 function renderGuidaWallet(){
-  const box = el('walletGuidaIndirizzo');
+  const box = el('walletGuidaPasso3');
   if (!box) return;
-  if (DEMO) { box.innerHTML = ''; return; }
+  const chiudi = el('walletGuidaChiudi');
+  if (chiudi) chiudi.textContent = guidaWalletScopo === 'paga' ? 'Torno a pagare' : 'Ho capito';
+  if (guidaWalletScopo === 'paga') {
+    const p2p = !DEMO && !VETRINA && typeof p2pAcceso === 'function' && p2pAcceso();
+    box.innerHTML = `
+      <b>Metti qualche sats e paga</b>
+      <div class="pw-riga">Te li può mandare un amico${p2p ? ', oppure li compri in euro nel <b>P2P</b> di Barattolo' : ''}. Poi torna qui e <b>inquadra il QR</b> dal wallet.</div>
+      ${p2p ? '<button class="btn ghost" onclick="navIndietro();vaiP2P()">🤝 Compra sats nel P2P</button>' : ''}`;
+    return;
+  }
+  const dove = `<div class="pw-riga">Nel wallet tocca <b>«Ricevi»</b>: in alto c'è il tuo indirizzo, tipo <span class="mono">nome@walletofsatoshi.com</span>.`;
+  if (DEMO) { box.innerHTML = `<b>Copia il tuo indirizzo</b>${dove} Incollalo nel Profilo e gli incassi arrivano da soli.</div>`; return; }
   if (myLnAddress) {
     box.innerHTML = `
-      <div style="margin-top:12px;font-size:13px;font-weight:800;color:var(--trust)">
-        ✅ Il tuo indirizzo c'è già: <span class="mono">${esc(myLnAddress)}</span></div>`;
+      <b>Copia il tuo indirizzo</b>
+      <div class="pw-riga" style="color:var(--trust);font-weight:800">✅ Fatto: <span class="mono">${esc(myLnAddress)}</span></div>`;
     return;
   }
   box.innerHTML = `
-    <div class="field" style="margin-top:12px"><label>Il tuo Lightning address</label>
+    <b>Copia il tuo indirizzo</b>${dove} Incollalo qui:</div>
+    <div class="field"><label>Il tuo indirizzo</label>
       <input id="lnAddrGuida" placeholder="nome@walletofsatoshi.com" autocomplete="off"
              autocapitalize="none" spellcheck="false"></div>
     <button class="btn orange" style="margin-top:0" onclick="salvaLnAddressGuida(this)">⚡ Attiva incassi automatici</button>`;

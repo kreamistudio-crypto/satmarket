@@ -201702,10 +201702,12 @@ def prove_guida_wallet():
     studio ha scelto la strada SENZA custodia: una guida a un wallet di
     terzi, e fra i wallet SOLO Wallet of Satoshi (l'indirizzo di Phoenix
     e' BIP-353, il nodo non lo sa pagare: consigliarlo sarebbe una
-    trappola). Qui: il foglio al posto giusto nella pila, le cinque porte,
-    la riga che la porta on-chain spegne, il campo che usa l'endpoint di
-    sempre, e — sotto node — il riquadro dell'indirizzo nei suoi tre
-    stati."""
+    trappola). Secondo giro dello stesso giorno («migliora la grafica,
+    falla semplice»): tre passi numerati, e il terzo cambia con lo scopo
+    — chi PAGA ha bisogno di sats, chi INCASSA del suo indirizzo. Qui: il
+    foglio al posto giusto nella pila, le cinque porte col loro scopo, la
+    riga che la porta on-chain spegne, il campo che usa l'endpoint di
+    sempre, e — sotto node — il terzo passo nei suoi cinque stati."""
     print("\n[la guida «Il tuo primo wallet»]")
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     i_g = mini.index('<div class="sheet" id="walletGuidaSheet"')
@@ -201715,24 +201717,31 @@ def prove_guida_wallet():
           (True, True),
           (0 < mini.index('<div class="sheet" id="paySheet"') < i_g,
            "el('walletGuidaSheet').classList.remove('open');" in mini))
+    prova("...tre passi e basta: scarica, parole di recupero, il terzo vivo",
+          (2, True, True, True),
+          (guida.count("<li>"), 'id="walletGuidaPasso3"' in guida,
+           "<b>Scarica Wallet of Satoshi</b>" in guida,
+           "<b>Salva le parole di recupero</b>" in guida))
     prova("...consiglia Wallet of Satoshi e NON Phoenix (lo nomina solo "
-          "per dire che il suo indirizzo non si paga)",
-          (True, True, False),
-          ("Wallet of Satoshi, il più facile" in guida,
+          "per dire che il suo indirizzo non si paga, nella tendina)",
+          (True, True, False, True),
+          ("Scarica Wallet of Satoshi" in guida,
            "Barattolo non lo sa ancora pagare" in guida,
-           "Scarica Phoenix" in guida or "phoenixwallet.me'" in mini))
-    prova("...dice dove stanno i sats, il backup e che il wallet non e' "
-          "nostro", (True, True, True),
+           "Scarica Phoenix" in guida or "phoenixwallet.me'" in mini,
+           guida.index("<details") < guida.index("Phoenix")))
+    prova("...dice dove stanno i sats (nella nota verde, per prima) e che "
+          "il wallet non e' nostro", (True, True, True),
           ("nel tuo wallet</b>, non su Barattolo" in guida,
-           "<b>backup</b>" in guida,
-           "non è di Barattolo" in guida))
+           guida.index("trust-note") < guida.index("pw-passi"),
+           "non di Barattolo" in guida))
     _lk = pezzo_js(mini, "const LINK_GUIDA_WALLET = {", "\n};")
     prova("...e il suo link e' uno, nostro e https", ["https://www.walletofsatoshi.com"],
           re.findall(r"'(https?://[^']+)'", _lk))
     porte = mini.count("${rigaGuidaWallet()}")
     prova("le porte: i due pannelli dell'incasso, il rimborso e il Profilo "
-          "(con la funzione), piu' il foglio della fattura (nel markup)",
-          (4, True), (porte, 'id="payGuidaWallet"' in mini))
+          "(scopo «incassa»), piu' il foglio della fattura (scopo «paga», "
+          "nel markup)",
+          (4, True), (porte, """onclick="apriGuidaWallet('paga')\"""" in mini))
     _pl = pezzo_js(mini, "function renderLnAddress(){", "\n}\n")
     prova("...nel Profilo solo nel ramo SENZA indirizzo", True,
           _pl.index("${rigaGuidaWallet()}") > _pl.index("if (myLnAddress && !lnAddrModifica)"))
@@ -201747,26 +201756,44 @@ def prove_guida_wallet():
            "renderLnAddress();" in _sg, "ridisegnaOrdine(viva)" in _sg))
     import shutil as _sh, subprocess as _sp
     if not _sh.which("node"):
-        salta("il riquadro dell'indirizzo sotto node", "node non c'e'")
+        salta("il terzo passo sotto node", "node non c'e'")
         return
-    banco = ("const nodi = {};\nconst el = id => (nodi[id] ||= {style: {}, innerHTML: ''});\n"
+    banco = ("const nodi = {};\nconst el = id => (nodi[id] ||= {style: {}, innerHTML: '', textContent: '', classList: {add(){}, remove(){}}});\n"
              "const esc = x => String(x).replace(/</g, '&lt;');\n"
-             "let DEMO = false, myLnAddress = '';\n"
+             "let DEMO = false, VETRINA = false, myLnAddress = '', p2p = false;\n"
+             "const p2pAcceso = () => p2p;\nfunction haptic(){}\n"
+             + pezzo_js(mini, "let guidaWalletScopo = ", "\n") + "\n"
+             + pezzo_js(mini, "function apriGuidaWallet(scopo){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function renderGuidaWallet(){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function payGuidaWalletVista(si){", "\n}\n") + "\n}\n"
-             "const g = [];\nconst h = () => el('walletGuidaIndirizzo').innerHTML;\n"
-             "renderGuidaWallet(); g.push(h().includes('id=\"lnAddrGuida\"'));\n"
+             "const g = [];\nconst h = () => el('walletGuidaPasso3').innerHTML;\n"
+             "const ch = () => el('walletGuidaChiudi').textContent;\n"
+             # incassa, senza indirizzo: il campo
+             "apriGuidaWallet('incassa'); g.push([h().includes('id=\"lnAddrGuida\"'), ch()]);\n"
+             # incassa, con l'indirizzo: la riga verde, niente campo
              "myLnAddress = 'mario@walletofsatoshi.com'; renderGuidaWallet();\n"
              "g.push(h().includes('mario@walletofsatoshi.com') && !h().includes('lnAddrGuida'));\n"
-             "DEMO = true; renderGuidaWallet(); g.push(h());\n"
+             # paga: i sats, niente campo; il P2P solo se acceso
+             "myLnAddress = ''; apriGuidaWallet('paga');\n"
+             "g.push([h().includes('inquadra il QR'), h().includes('lnAddrGuida'), h().includes('vaiP2P'), ch()]);\n"
+             "p2p = true; renderGuidaWallet(); g.push(h().includes('vaiP2P'));\n"
+             "VETRINA = true; renderGuidaWallet(); g.push(h().includes('vaiP2P'));\n"
+             # DEMO, incassa: niente campo, ma il passo c'e'
+             "VETRINA = false; DEMO = true; apriGuidaWallet('incassa');\n"
+             "g.push([h().includes('lnAddrGuida'), h().includes('Copia il tuo indirizzo')]);\n"
+             # uno scopo sconosciuto vale «incassa»
+             "DEMO = false; apriGuidaWallet('boh'); g.push(guidaWalletScopo);\n"
              "payGuidaWalletVista(false); g.push(el('payGuidaWallet').style.display);\n"
              "payGuidaWalletVista(true); g.push(el('payGuidaWallet').style.display);\n"
              "console.log(JSON.stringify(g));")
     r = _sp.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
-    prova("sotto node: senza indirizzo il campo, con l'indirizzo la riga "
-          "verde senza campo, in DEMO niente; la riga della fattura si "
-          "spegne e si riaccende",
-          [True, True, "", "none", ""],
+    prova("sotto node: «incassa» ha il campo (o la riga verde con l'indirizzo), "
+          "«paga» ha i sats e il QR senza campo, il P2P solo se acceso e "
+          "non in vetrina, in DEMO il passo senza campo, scopo ignoto = "
+          "incassa; la riga della fattura si spegne e si riaccende",
+          [[True, "Ho capito"], True,
+           [True, False, False, "Torno a pagare"], True, False,
+           [False, True], "incassa", "none", ""],
           json.loads(r.stdout or "null") if r.returncode == 0 else r.stderr)
 
 
