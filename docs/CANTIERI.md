@@ -86279,3 +86279,44 @@ altro giro.
 DA GUARDARE: il tocco su «Cambia il punto» dal telefono vero dentro
 Telegram (la tastiera che si apre sul focus); un ordine con obiezione vera.
 
+## Il filtro Barattozon che lasciava passare le card on-chain in contanti (17 nov 2026, cantiere filtro-barattozon; segnalazione di un utente girata da Andrea: «nella sezione p2p si vedono tutti gli ordini disponibili in contanti anche se ho attivato solo il filtro barattozon», poi «il numero degli ordini filtrati di fianco al bottone del filtro invece è giusto» e «è il filtro "onchain" e "tutte" che annullano gli altri filtri. quando filtro con lightning esplicitamente allora tutto è corretto»)
+
+COSA. Le card on-chain del libro (`righeOnchainLibroP2P`, che le mescola
+nell'ordinamento, e `carteOnchainLibroP2P`, la pila col rettangolo)
+guardavano solo due cose del filtro: la rete («solo Lightning» le toglie)
+e, dal 16 nov, la valuta. Il metodo, il premio e la reputazione erano
+solo in `passaFiltroP2P`, cioe' sul libro di Mostro. Con la rete su
+«Tutte» o «On-chain» un «solo Barattozon» lasciava quindi passare ogni
+card on-chain, contanti di persona compresi. Il numero della pillola era
+giusto perche' conta solo il libro di Lightning (`elenco`), ed e' il
+dettaglio che ha portato dritto al guasto.
+
+LA CURA. Un giudice puro, `passaFiltroOcP2P(o, f)`, accanto a
+`valutaPassaOcP2P`, chiamato dalle due strade col filtro vivo. Le regole
+sono quelle di Lightning sui campi della card on-chain: il metodo per
+contenimento; il premio quello che la card mostra (a mercato `o.premio`;
+a prezzo fisso la card non ha badge e non si scarta, come il prezzo fisso
+a cambio muto); la reputazione come chi non ha voti (la card on-chain non
+porta stelle, quindi passa solo col minimo a 0, `passaRepP2P` con un
+volto vuoto). I campi mancanti valgono «nessun limite», cosi' i banchi
+vecchi col filtro a meta' restano veri.
+
+SCARTATO. Riusare `passaFiltroP2P` con un ordine travestito: lascia fuori
+ogni on-chain con la rete «On-chain» (il suo primo no) e a prezzo fisso
+calcola una convenienza che la card on-chain non mostra. Contare le card
+on-chain nel numero della pillola: non chiesto, e il numero oggi e'
+quello che l'utente ha detto giusto.
+
+PROVATO. `prove_filtro_onchain_tutto` (categoria p2p): solo Barattozon con
+rete «Tutte» e «On-chain» non mostra nessuna card on-chain di persona,
+dalle due strade; «SEPA» prende anche «SEPA Instant»; il premio a mercato
+si giudica e il fisso resta; con almeno una stella le on-chain escono;
+«solo Lightning» e filtro spento come prima. Controprove: il giudice
+spento rifa' il guasto segnalato; tolto il filo da `righeOnchainLibroP2P`
+diventano rosse otto prove. Suite severa e collaudi della CI (venv senza
+coincurve) sull'albero del commit.
+
+DA GUARDARE. Il contenimento del metodo vale anche al contrario, su
+Lightning come on-chain: «Contanti» prende anche «Contanti al tabacchino»
+(Barattozon). Non e' stato toccato: e' la regola di sempre, da decidere
+con Andrea.

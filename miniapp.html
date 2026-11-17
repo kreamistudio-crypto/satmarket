@@ -63454,7 +63454,8 @@ function testaAltaP2P(){
    card on-chain, non il rettangolo (30 ott 2026) */
 function righeOnchainLibroP2P(k){
   return p2pFiltro && p2pFiltro.rete === 'ln' ? []
-    : p2pOnchainLibro.eventi.filter(o => o.lato === k && valutaPassaOcP2P(o));
+    : p2pOnchainLibro.eventi.filter(o => o.lato === k && valutaPassaOcP2P(o)
+      && (typeof passaFiltroOcP2P !== 'function' || passaFiltroOcP2P(o, p2pFiltro)));
 }
 /* PURA sul filtro: LA VALUTA DEL FILTRO VALE ANCHE ON-CHAIN (16 nov 2026,
    cantiere ricevi-mercato): da quando l'on-chain ha i franchi e le monete,
@@ -63462,6 +63463,44 @@ function righeOnchainLibroP2P(k){
 function valutaPassaOcP2P(o){
   const v = p2pFiltro && Array.isArray(p2pFiltro.valute) ? p2pFiltro.valute : [];
   return !v.length || v.indexOf(typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : 'EUR') >= 0;
+}
+/* PURA sul filtro: IL RESTO DEL FILTRO VALE ANCHE ON-CHAIN (17 nov 2026,
+   cantiere filtro-barattozon, dalla segnalazione di un utente: «ho
+   attivato solo il filtro Barattozon e vedo tutti gli ordini in
+   contanti»). Fin qui le card on-chain guardavano solo la rete e la
+   valuta: con la rete su «Tutte» o «On-chain» il metodo, il premio e la
+   reputazione non le toccavano, e un «solo Barattozon» lasciava passare
+   ogni on-chain in contanti — mentre il numero della pillola, che conta
+   solo il libro di Lightning, era giusto. Le regole sono quelle di
+   `passaFiltroP2P`, sui campi della card on-chain:
+   • il METODO per contenimento, come di la';
+   • il PREMIO quello che la card mostra (`vistaOrdinamentoOcP2P`): a
+     mercato `o.premio`; a prezzo fisso la card non ha badge e NON SI
+     SCARTA, come il prezzo fisso a cambio muto di Lightning;
+   • la REPUTAZIONE come chi non ha voti: la card on-chain non porta
+     stelle, quindi passa solo col minimo a 0 (`passaRepP2P` con un volto
+     vuoto).
+   I campi mancanti valgono «nessun limite»: il filtro puo' arrivare a
+   meta' (i banchi, una bozza vecchia). */
+function passaFiltroOcP2P(o, f){
+  if (!o || !f) return true;
+  const scelti = Array.isArray(f.metodi) ? f.metodi : [];
+  if (scelti.length) {
+    const suoi = (Array.isArray(o.metodi) ? o.metodi : []).map(m => String(m).toLowerCase());
+    if (!scelti.some(x => {
+      const s = String(x).toLowerCase();
+      return suoi.some(m => m.indexOf(s) >= 0);
+    })) return false;
+  }
+  /* col typeof come i fratelli: i banchi che ritagliano il blocco on-chain
+     da solo non hanno il giudice di Lightning */
+  const v = typeof filtroVuotoP2P === 'function' ? filtroVuotoP2P() : null;
+  if (v && o.mercato) {
+    const p = Math.round(Number(o.premio) || 0);
+    if (Number(f.premioDa) > v.premioDa && p < Number(f.premioDa)) return false;
+    if (Number(f.premioA) < v.premioA && p > Number(f.premioA)) return false;
+  }
+  return typeof passaRepP2P !== 'function' || passaRepP2P(f, null);
 }
 /* `senzaCarte` (16 nov 2026, cantiere ricevi-mercato): il rettangolo e i
    «Novità» si', le card no — le mescola renderP2P con quelle di Lightning
@@ -63471,7 +63510,8 @@ function carteOnchainLibroP2P(k, sotto, senzaCarte){
      di prove.py ritagliano questa funzione da sola */
   const righe = p2pFiltro && p2pFiltro.rete === 'ln' ? []
     : p2pOnchainLibro.eventi.filter(o => o.lato === k
-      && (typeof valutaPassaOcP2P !== 'function' || valutaPassaOcP2P(o)));
+      && (typeof valutaPassaOcP2P !== 'function' || valutaPassaOcP2P(o))
+      && (typeof passaFiltroOcP2P !== 'function' || passaFiltroOcP2P(o, p2pFiltro)));
   if (!righe.length && !myP2POnchain) return '';
   /* APPESO SEMPRE (12 nov 2026, sera, Andrea: «stessa cosa quando
      accenderemo onchain, quel banner deve stare incollato»): non piu'

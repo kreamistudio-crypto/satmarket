@@ -202512,6 +202512,91 @@ def prove_audit_pagamenti_2():
            "await " in blocco, "UPDATE " in blocco])
 
 
+def prove_filtro_onchain_tutto():
+    """IL FILTRO DEL LIBRO VALE TUTTO ANCHE SULLE CARD ON-CHAIN (17 nov
+    2026, cantiere filtro-barattozon, segnalazione di un utente: «ho
+    attivato solo il filtro Barattozon e vedo tutti gli ordini in
+    contanti»). Con la rete su «Tutte» o «On-chain» le card on-chain
+    guardavano solo la valuta: il metodo, il premio e la reputazione non
+    le toccavano. Il banco gira le due strade del libro —
+    `righeOnchainLibroP2P` (le card mescolate nell'ordinamento) e
+    `carteOnchainLibroP2P` (la pila col rettangolo) — col giudice
+    `passaFiltroOcP2P`, e la controprova lo spegne."""
+    print("\n[il filtro del libro sulle card on-chain: metodo, premio, reputazione]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    fns = (_riga_js(mini, "const P2P_PREMIO_MAX = ")
+           + "".join(_fn_js(mini, f) for f in (
+               "function filtroVuotoP2P(){", "function passaRepP2P(f, faccia){",
+               "function valutaPassaOcP2P(o){", "function passaFiltroOcP2P(o, f){",
+               "function righeOnchainLibroP2P(k){"))
+           + pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto, senzaCarte){", "\n}\n") + "\n}\n")
+
+    def banco(js):
+        return ("var p2pFiltro = null, myP2POnchain = false, tutorialOcLato = null, p2pOcTutorialTimer = 0;\n"
+                "const P2P_OC_MONETA = '';\n"
+                "const testaAltaP2P = () => {};\n"
+                "const rigaOnchainP2P = o => '[' + o.id + ']';\n"
+                + js + r"""
+const vuoto = filtroVuotoP2P();
+const f = x => Object.assign(filtroVuotoP2P(), x);
+const r = x => Object.assign({lato: 'sell', fiat: 'EUR', euro: 50, sats: 50000, mercato: false, premio: 0}, x);
+let p2pOnchainLibro = {eventi: [
+  r({id: 1, metodi: ['Contanti']}),
+  r({id: 2, metodi: ['SEPA Instant', 'Revolut']}),
+  r({id: 3, metodi: ['Contanti'], mercato: true, premio: 8}),
+  r({id: 4, metodi: ['Revolut'], mercato: true, premio: -5}),
+  r({id: 5, metodi: ['SEPA'], lato: 'buy'})]};
+const giro = filtro => { p2pFiltro = filtro;
+  return [righeOnchainLibroP2P('sell').map(o => o.id),
+          (carteOnchainLibroP2P('sell').match(/\[\d+\]/g) || []).join('')]; };
+const out = {};
+out.barattozon = giro(f({metodi: ['Contanti al tabacchino']}));
+out.barattozonOc = giro(f({metodi: ['Contanti al tabacchino'], rete: 'onchain'}));
+out.sepa = giro(f({metodi: ['SEPA']}));
+out.revolut = giro(f({metodi: ['Revolut']}));
+out.premio = giro(f({premioA: 0}));
+out.premioDa = giro(f({premioDa: 0}));
+out.rep = giro(f({repDa: 1}));
+out.ln = giro(f({metodi: ['Revolut'], rete: 'ln'}));
+out.spento = giro(null);
+out.meta = giro({valute: [], rete: ''});
+console.log(JSON.stringify(out));
+""")
+    o = _node_banco(banco(fns))
+    if o is None:
+        salta("il banco del filtro on-chain", "node assente")
+        return
+    if "barattozon" not in o:
+        prova("il banco del filtro on-chain gira", True, False)
+        return
+    prova("SOLO BARATTOZON, RETE «TUTTE»: nessuna card on-chain in contanti di persona "
+          "(la segnalazione), da tutte e due le strade del libro", [[], ""], o["barattozon"])
+    prova("...e lo stesso con la rete su «On-chain»", [[], ""], o["barattozonOc"])
+    prova("il metodo per contenimento, come su Lightning: «SEPA» prende anche «SEPA Instant»",
+          [[2], "[2]"], o["sepa"])
+    prova("«Revolut» prende le due card che lo dicono", [[2, 4], "[2][4]"], o["revolut"])
+    prova("IL PREMIO E' QUELLO DELLA CARD: a mercato si giudica (+8 fuori, -5 dentro), a "
+          "prezzo fisso non c'e' badge e si tiene", [[1, 2, 4], "[1][2][4]"], o["premio"])
+    prova("...e dall'altra parte del cursore", [[1, 2, 3], "[1][2][3]"], o["premioDa"])
+    prova("LA REPUTAZIONE: la card on-chain non porta stelle, quindi con almeno una stella "
+          "non passa (come chi non ha voti su Lightning)", [[], ""], o["rep"])
+    prova("solo Lightning lascia fuori tutto l'on-chain, come prima", [[], ""], o["ln"])
+    prova("a filtro spento passano tutte le card del lato", [[1, 2, 3, 4], "[1][2][3][4]"], o["spento"])
+    prova("un filtro a meta' (solo rete e valute, come i banchi vecchi) non ferma niente",
+          [[1, 2, 3, 4], "[1][2][3][4]"], o["meta"])
+    rotto = fns.replace("function passaFiltroOcP2P(o, f){\n", "function passaFiltroOcP2P(o, f){\n  return true;\n", 1)
+    prova("controprova: il banco rotto si e' davvero rotto", True, rotto != fns)
+    x = _node_banco(banco(rotto)) or {}
+    prova("controprova: col giudice spento il «solo Barattozon» torna a mostrare i contanti "
+          "di persona (il guasto segnalato)", True,
+          (x.get("barattozon") or [[]])[0] == [1, 2, 3, 4])
+    lib = pezzo_js(mini, "function righeOnchainLibroP2P(k){", "\n}\n")
+    pila = pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto, senzaCarte){", "\n}\n")
+    prova("I FILI: le due strade del libro chiedono il giudice col filtro vivo", [True, True],
+          ["passaFiltroOcP2P(o, p2pFiltro)" in lib, "passaFiltroOcP2P(o, p2pFiltro)" in pila])
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -202706,6 +202791,7 @@ CATEGORIE = {
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
+    filtro_onchain_tutto
     """.split(),
     "mercatino": """
     mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore app_negozio
@@ -203618,6 +203704,7 @@ def main():
               prove_audit_tornata_tutto,
               prove_ripubblica_p2p,
               prove_connettori_categoria,
+              prove_filtro_onchain_tutto,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:
