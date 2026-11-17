@@ -40804,6 +40804,15 @@ function openOrder(id){
                 ? `Posta senza tracciamento: il pacco non si può seguire${filaTracking(o, false)}`
             :(o.corriere && o.corriere!=='Consegna a mano'
                 ? `${esc(o.corriere)} — senza numero di tracciamento${filaTracking(o, false)}`
+                /* IL PASSO CHE DEVE ANCORA SUCCEDERE PARLA AL FUTURO
+                   anche qui (17 nov 2026, cantiere passo-spedito, dal
+                   «correggi» di Andrea): prima della spedizione diceva
+                   «Hai consegnato al corriere» a chi non aveva ancora
+                   spedito. Come il digitale qui sopra: a chi vende
+                   l'istruzione, a chi compra e al moderatore l'attesa;
+                   il fatto al passato resta quello di sempre */
+                : ['creato','locked'].includes(s)
+                ? (o.role==='seller'?'Consegni il pacco al corriere e lo segni qui':'Il venditore consegnerà il pacco al corriere')
                 : (o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere')),
            ora: rigaSpedito(o)},
       {t:(s==='delivered' && !inPagamento(o)) ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')

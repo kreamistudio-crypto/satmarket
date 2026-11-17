@@ -90303,3 +90303,17 @@ due rosse in prove e una nel collaudo. `collaudo_numeri_negozio` gira il
 giro di prima a leva accesa e poi `giro_acquisti_spenti` a leva spenta
 sul server vero, col contatore `acquisti_ok` intatto.
 
+## Il passo «Oggetto spedito» al futuro prima della spedizione (17 nov 2026, cantiere passo-spedito; il «correggi» di Andrea sulla voce notata in «Spedisci entro il…»)
+Prima che il pacco partisse il passo diceva già «Hai consegnato al
+corriere» a chi vende (e «Il venditore ha consegnato al corriere» a chi
+compra): un fatto al passato su una cosa ancora da fare. Ora, su
+`creato` e `locked`, il passo parla al futuro come quello del digitale:
+a chi vende l'istruzione «Consegni il pacco al corriere e lo segni qui»,
+a chi compra e al moderatore l'attesa «Il venditore consegnerà il pacco
+al corriere». Dalla spedizione in poi resta il passato di sempre (anche
+per «Consegna a mano»). PROVATO: in `prove_spedisci_entro` lo stepper
+vero in node su quattro casi (da spedire e spedito, chi vende e chi
+compra); in `prove_dettaglio_ordine` la coppia nuova nelle terze
+persone. Controprova: tolto il ramo al futuro, la prova del banco è
+rossa.
+

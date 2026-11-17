@@ -14604,6 +14604,11 @@ def prove_dettaglio_ordine():
              "Disputa risolta a favore dell\\'acquirente"),
             ("la consegna al corriere", "Hai consegnato al corriere",
              "Il venditore ha consegnato al corriere"),
+            # ...e prima della spedizione al futuro (17 nov 2026,
+            # passo-spedito): l'istruzione a chi vende, l'attesa agli altri
+            ("la consegna al corriere da fare",
+             "Consegni il pacco al corriere e lo segni qui",
+             "Il venditore consegnerà il pacco al corriere"),
             ("il contenuto digitale", "Hai consegnato il contenuto",
              "Il venditore ha consegnato il contenuto"),
             ("la spedizione offerta", "'hai':'il venditore ha'", ""),
@@ -19958,6 +19963,40 @@ def prove_spedisci_entro():
           ["", "", ""], v["daPagare"])
     prova("la riga piccola e' quella dei passi P2P", True,
           v["riga"] == '<small class="step-ora">Pagato ieri 10:00</small>')
+
+    # --- 4) il passo «Oggetto spedito» parla al futuro finche' il pacco
+    # non e' partito (17 nov 2026, cantiere passo-spedito): lo stepper
+    # vero, il ramo di sempre, quattro casi
+    oo = mini[mini.index("function openOrder(id){"):]
+    oo = oo[:oo.index("\n}\n")]
+    blocco = oo[oo.index("  const passoDeposito = s==='creato'"):
+                oo.index("  /* Le frasi di chiusura parlano a CHI legge")]
+    js = ("const esc = x => String(x);\n"
+          "const codiceTracking = (o, s) => o.tracking;\n"
+          "const rigaCorretto = () => '', filaTracking = () => '', "
+          "copiaTracking = () => '';\n"
+          "const inPagamento = () => false, dataAppuntamento = () => '';\n"
+          "const rigaPagato = () => '', rigaSpedito = () => '';\n"
+          "const annulloVenditore = () => false, annullataPagata = () => false;\n"
+          "const TEMPI = {confermaDig: 72};\n"
+          + _riga_js(mini, "const CORRIERE_SENZA_TRACCIA = ")
+          + "function stepper(o){ const s = o.state;\n" + blocco
+          + "\n  return steps[1].d; }\n"
+          + "console.log(JSON.stringify(JSON.parse(process.argv[1]).map(stepper)));\n")
+    casi = [{"state": st, "role": r, "corriere": c, "tracking": ""}
+            for st, c in (("locked", ""), ("shipped", "Consegna a mano"))
+            for r in ("seller", "buyer")]
+    r = _sp.run([node, "-e", js, _json.dumps(casi)], capture_output=True,
+                encoding="utf-8", timeout=60)
+    try:
+        detti = _json.loads(r.stdout)
+    except Exception:
+        detti = r.stderr[-400:]
+    prova("il passo della spedizione: al futuro prima, al passato dopo",
+          ["Consegni il pacco al corriere e lo segni qui",
+           "Il venditore consegnerà il pacco al corriere",
+           "Hai consegnato al corriere",
+           "Il venditore ha consegnato al corriere"], detti)
 
 
 def prove_notifica_fail_open():
