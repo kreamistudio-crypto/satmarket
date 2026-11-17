@@ -37315,3 +37315,12 @@ mai il kind 0 di nessuno: regola ferrea 2).
   i pezzi del razzo nell'ordine delle zone (piedini, serbatoio, motore,
   ali, oblo', punta, antenna, partenza), gli stessi degli otto stadi
   `assets/stradina/razzo-1..8.webp` del tabellone.
+  IL PALCO (stessa sera, Andrea: «più stile Barattolo, più scenografico»):
+  `missPalcoHTML(m, g)` mette in cima a ogni fase il pezzo dipinto della
+  zona (`/assets/stradina/zona<N>.webp`), Tappo e il dispettoso della
+  storia dipinti (`MISS_CHI` ha `img`, e `specchio` per chi guarda
+  dall'altra parte); alla fine lo stadio `razzo-<N>` al posto del
+  dispettoso. Ogni immagine che manca si toglie da sola (`onerror`).
+  Lo stile (`.miss-velo:not(.arena)`): fondo caldo della mappa, fumetti
+  e carte crema col contorno scuro, carte che arrivano come distribuite
+  e tremano a uno sbaglio (`missioneMale` rimette `.scossa`).

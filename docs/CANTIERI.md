@@ -89956,3 +89956,12 @@ caccia, stradina, novita', i due censimenti (388/0), il collaudo, e le
 tre missioni nuove giocate a schermo fino al bottone finale. DA GUARDARE:
 la musica del tabellone e del gioco (da Artlist, quando il PC finisce
 Flow); il gioco vetrina, se Andrea lo vuole.
+
+Poi la grafica (16:28, Andrea: «questo gioco a carte mi piace, ma
+graficamente non mi piace... più stile Barattolo, più scenografico, più
+carino»): il palco dipinto della zona in cima a ogni missione, coi
+personaggi di Flow al posto delle emoji, le carte crema col contorno
+scuro come i dipinti, e alla fine lo stadio del razzo appena montato.
+Nessun disegno nuovo: si riusano la mappa del tabellone, i dispettosi
+dipinti per il mondo e il razzo. Provato a schermo sulle tre missioni
+nuove, col razzo servito dalla prova.

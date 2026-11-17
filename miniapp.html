@@ -4218,6 +4218,70 @@
       transform:translate(-50%,140%);opacity:0;pointer-events:none;transition:transform .25s ease,opacity .25s ease}
     .miss-riga.bene{background:#14532D;color:#DDF7EA;transform:translate(-50%,0);opacity:1}
     .miss-riga.male{background:#7F1D1D;color:#FFE4E4;transform:translate(-50%,0);opacity:1}
+    /* LE MISSIONI A CARTE IN STILE BARATTOLO (17 nov 2026, Andrea: «più
+       stile Barattolo, più scenografico, più carino»): il fondo caldo
+       della mappa, in alto il PALCO — il pezzo dipinto della zona del
+       tabellone, con Tappo e il dispettoso disegnati —, i fumetti e le
+       carte color crema col contorno scuro dei disegni di Flow. Solo
+       fuori dai minigiochi in movimento (`.arena`), che hanno la tela. */
+    .miss-velo:not(.arena){padding-top:0;
+      background:radial-gradient(110% 45% at 50% 0%,rgba(247,147,26,.16) 0%,rgba(247,147,26,0) 60%),#1A120B}
+    .miss-velo:not(.arena) .miss-testa{position:absolute;top:0;left:0;right:0;z-index:3;margin:0;
+      padding:calc(10px + env(safe-area-inset-top)) 4px 26px;background:linear-gradient(180deg,rgba(20,12,4,.78),rgba(20,12,4,0))}
+    .miss-velo:not(.arena) .miss-testa h3{text-shadow:0 2px 6px rgba(0,0,0,.7)}
+    .miss-velo:not(.arena) .miss-testa button{background:rgba(26,18,11,.7)}
+    .miss-palco{position:relative;height:250px;margin:0 -12px 14px;overflow:hidden;
+      border-bottom:3px solid #2A1A0A;border-radius:0 0 26px 26px;background:#2A1A0A var(--palco) center 55%/cover no-repeat;
+      box-shadow:0 10px 24px rgba(0,0,0,.45);transition:height .35s ease}
+    .miss-palco::after{content:"";position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(180deg,rgba(26,18,11,0) 45%,rgba(26,18,11,.55) 100%)}
+    .miss-palco.gioco{height:160px}
+    .miss-palco.fine{height:280px}
+    .miss-attore{position:absolute;bottom:8px;z-index:1;height:150px;width:auto;
+      filter:drop-shadow(0 8px 8px rgba(0,0,0,.55));animation:miss-dondola 3.2s ease-in-out infinite}
+    .miss-attore.tappo{left:7%}
+    .miss-attore.altro{right:7%;height:112px;animation-delay:-1.4s}
+    .miss-attore.specchio{transform:scaleX(-1);animation-name:miss-dondola-sp}
+    .miss-palco.gioco .miss-attore.tappo{height:96px}
+    .miss-palco.gioco .miss-attore.altro{height:72px}
+    .miss-palco.fine .miss-attore.tappo{left:9%;height:140px}
+    .miss-razzo-pezzo{position:absolute;right:12%;bottom:8px;z-index:1;height:220px;width:auto;
+      filter:drop-shadow(0 0 22px rgba(255,197,107,.55));animation:miss-razzo-su .9s cubic-bezier(.2,1.3,.4,1) both}
+    @keyframes miss-dondola{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes miss-dondola-sp{0%,100%{transform:scaleX(-1) translateY(0)}50%{transform:scaleX(-1) translateY(-6px)}}
+    @keyframes miss-razzo-su{from{opacity:0;transform:translateY(40px) scale(.9)}to{opacity:1;transform:none}}
+    @keyframes miss-scossa{0%,100%{transform:none}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+    .miss-velo:not(.arena) #missioneCorpo.scossa .miss-scelte{animation:miss-scossa .35s ease}
+    .miss-velo:not(.arena) .miss-cosa{background:#FFE3A3;color:#3A2410;border:2px solid #2A1A0A;font-weight:800}
+    .miss-velo:not(.arena) .miss-nuvola{background:#FFF3D6;color:#3A2410;border:2.5px solid #2A1A0A;box-shadow:0 4px 0 #2A1A0A}
+    .miss-velo:not(.arena) .miss-fumetto.altro .miss-nuvola{background:#F3E6FF;color:#2A1A40}
+    .miss-volto img.specchio{transform:scaleX(-1)}
+    .miss-velo:not(.arena) .miss-scelta{position:relative;padding:14px 15px;border:2.5px solid #2A1A0A;border-radius:16px;
+      background:#FFF3D6;color:#3A2410;font-weight:800;box-shadow:0 5px 0 #2A1A0A,0 10px 18px rgba(0,0,0,.35);
+      animation:miss-carta-entra .45s cubic-bezier(.2,1.3,.4,1) both}
+    .miss-velo:not(.arena) .miss-scelta:nth-child(odd){--r:-.7deg}
+    .miss-velo:not(.arena) .miss-scelta:nth-child(even){--r:.7deg}
+    .miss-velo:not(.arena) .miss-scelta{transform:rotate(var(--r,0deg))}
+    .miss-velo:not(.arena) .miss-scelta:nth-child(2){animation-delay:.06s}
+    .miss-velo:not(.arena) .miss-scelta:nth-child(3){animation-delay:.12s}
+    .miss-velo:not(.arena) .miss-scelta:nth-child(4){animation-delay:.18s}
+    .miss-velo:not(.arena) .miss-scelta:nth-child(5){animation-delay:.24s}
+    .miss-velo:not(.arena) .miss-scelta:nth-child(n+6){animation-delay:.3s}
+    .miss-velo:not(.arena) .miss-scelta:active{transform:translateY(3px) rotate(var(--r,0deg));box-shadow:0 2px 0 #2A1A0A,0 4px 8px rgba(0,0,0,.3)}
+    .miss-velo:not(.arena) .miss-scelta.presa{background:#FFD98A;border-color:#2A1A0A}
+    .miss-velo:not(.arena) .miss-scelta.presa::after{content:"✓";position:absolute;top:-9px;right:-7px;width:26px;height:26px;
+      border:2.5px solid #2A1A0A;border-radius:50%;background:#5BE3A4;color:#0D3B24;font-size:14px;line-height:21px;text-align:center}
+    @keyframes miss-carta-entra{from{opacity:0;transform:translateY(24px) rotate(6deg) scale(.92)}to{opacity:1;transform:rotate(var(--r,0deg))}}
+    .miss-velo:not(.arena) .miss-ordine{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+    .miss-velo:not(.arena) .miss-ordine li{margin:0;padding:6px 11px;border-radius:999px;background:#2E2010;
+      border:1.5px solid #FFC56B;color:#FFD98A;font-size:13px;font-weight:800;counter-increment:passo}
+    .miss-velo:not(.arena) .miss-ordine li::before{content:counter(passo) ". "}
+    .miss-velo:not(.arena) .caccia-btn{border:2.5px solid #2A1A0A;box-shadow:0 5px 0 #2A1A0A}
+    .miss-velo:not(.arena) .caccia-btn:active{transform:translateY(3px);box-shadow:0 2px 0 #2A1A0A}
+    .miss-velo:not(.arena) .caccia-btn.piano{background:#FFF3D6;color:#3A2410;border:2.5px solid #2A1A0A;box-shadow:0 5px 0 #2A1A0A}
+    .miss-velo:not(.arena) .miss-figurina{background:linear-gradient(160deg,#FFF3D6,#FFE3A3);color:#3A2410;border:2.5px solid #2A1A0A;
+      box-shadow:0 6px 0 #2A1A0A,0 16px 26px rgba(0,0,0,.45)}
+    .miss-velo:not(.arena) .miss-figurina small{color:#B0631A}
     @keyframes miss-tempo{from{transform:scaleX(1)}to{transform:scaleX(0)}}
     /* SUGLI SCHERMI GRANDI (web app e browser): due colonne — a sinistra
        Tappo, le schede e la caccia; a destra la dispensa, sempre li'. */
@@ -64023,8 +64087,10 @@ function mondoCaso(seme){ const v = Math.sin(seme * 127.1 + 311.7) * 43758.5453;
    finti, e Tappo lo dice. */
 const MISS_CHI = {
   tappo: {nome: 'Tappo', img: '/assets/caccia-tappo.webp'},
-  tarlo: {nome: 'Il Tarlo', em: '🐛'},
-  gazza: {nome: 'La Gazza', em: '🐦'},
+  /* i dispettosi dipinti in Flow (17 nov 2026): l'emoji resta per chi
+     non carica il dipinto */
+  tarlo: {nome: 'Il Tarlo', em: '🐛', img: '/assets/mondo/miss-tarlo.webp'},
+  gazza: {nome: 'La Gazza', em: '🐦', img: '/assets/mondo/miss-gazza-ferma.webp', specchio: true},
   fidati: {nome: 'Il signor Fidati', em: '🦚'},
   topo: {nome: 'Topo', em: '🐭'}, ape: {nome: 'Ape', em: '🐝'}, rana: {nome: 'Rana', em: '🐸'}, riccio: {nome: 'Riccio', em: '🦔'},
   gufo: {nome: 'Il Gufo', em: '🦉'}, lumaca: {nome: 'Lumaca', em: '🐌'},
@@ -64039,7 +64105,7 @@ function missioneStelle(errori){
 /* PURA: un fumetto (testo gia' nostro, mai dal server) */
 function missFumettoHTML(chi, testo){
   const c = MISS_CHI[chi] || MISS_CHI.tappo;
-  const volto = c.img ? `<img src="${c.img}" alt="" width="44" height="56">` : `<span>${c.em}</span>`;
+  const volto = c.img ? `<img src="${c.img}" alt="" width="44" height="56"${c.specchio ? ' class="specchio"' : ''}>` : `<span>${c.em}</span>`;
   return `<div class="miss-fumetto${chi === 'tappo' ? '' : ' altro'}"><div class="miss-volto">${volto}</div>`
     + `<div class="miss-nuvola"><b>${esc(c.nome)}</b>${testo}</div></div>`;
 }
@@ -66263,21 +66329,36 @@ async function apriMissione(id){
   requestAnimationFrame(() => v.classList.add('aperto'));
   missioneDisegna();
 }
+/* IL PALCO (17 nov 2026, Andrea: «più scenografico»): in cima a ogni
+   missione il pezzo dipinto della SUA zona del tabellone, con Tappo a
+   sinistra e il dispettoso della storia a destra; alla fine, al posto
+   del dispettoso, lo stadio del razzo che quella missione monta (lo
+   stesso disegno del tabellone). Un dipinto che manca sparisce da solo. */
+function missPalcoHTML(m, g){
+  const z = Math.max(0, Math.min(7, Number(m.info && m.info.zona) || 0)) + 1;
+  const altro = ((g.guaio || []).find(x => x[0] !== 'tappo') || [])[0];
+  const c = altro && MISS_CHI[altro], via = ' onerror="this.remove()"';
+  const fondo = m.fase === 'fine'
+    ? `<img class="miss-razzo-pezzo" src="/assets/stradina/razzo-${z}.webp" alt=""${via}>`
+    : (c && c.img ? `<img class="miss-attore altro${c.specchio ? ' specchio' : ''}" src="${c.img}" alt=""${via}>` : '');
+  return `<div class="miss-palco ${esc(m.fase || '')}" style="--palco:url('/assets/stradina/zona${z}.webp')" aria-hidden="true">`
+    + `<img class="miss-attore tappo" src="${MISS_CHI.tappo.img}" alt=""${via}>` + fondo + '</div>';
+}
 function missioneDisegna(){
   const m = missione, corpo = el('missioneCorpo');
   if (!m || !corpo) return;
   const g = MISSIONI_GIOCO[m.id];
   let h = '';
   if (m.fase === 'guaio') {
-    h = `<div class="miss-cosa">🎯 ${esc(m.info.cosa)}</div>` + g.guaio.map(x => missFumettoHTML(x[0], esc(x[1]))).join('')
+    h = missPalcoHTML(m, g) + `<div class="miss-cosa">🎯 ${esc(m.info.cosa)}</div>` + g.guaio.map(x => missFumettoHTML(x[0], esc(x[1]))).join('')
       + `<button type="button" class="caccia-btn" onclick="missioneVia()">▶️ Gioca</button>`;
   } else if (m.fase === 'gioco') {
     if ((arena && arena.m === m) || (lato && lato.m === m)) return;       /* il minigioco disegna da se', sulla sua tela */
-    h = g.html(m);
+    h = missPalcoHTML(m, g) + g.html(m);
   }
   else {
     const st = missioneStelle(m.errori);
-    h = `<div class="miss-fine"><div class="miss-stelle">${[1, 2, 3].map(i => `<span class="${i <= st ? 'si' : ''}">★</span>`).join('')}</div>`
+    h = missPalcoHTML(m, g) + `<div class="miss-fine"><div class="miss-stelle">${[1, 2, 3].map(i => `<span class="${i <= st ? 'si' : ''}">★</span>`).join('')}</div>`
       + `<p class="miss-succo">«${esc(g.succo)}»</p><p class="miss-nome">Questa si chiama: <b>${esc(g.nome)}</b></p>`
       + `<div class="miss-figurina"><span>${m.info.emoji}</span><b>${esc(m.info.nome)}</b><small>Figurina del sapere</small></div>`
       + (m.bulloni ? `<p class="miss-premio">+${fmt(m.bulloni)} 🔩</p>` : '')
@@ -66342,7 +66423,11 @@ function missioneTimer(secondi, poi){
 }
 /* il bravo e il quasi: una riga in basso, che sparisce da sola */
 function missioneBene(t){ haptic('success'); missioneRiga(t, 'bene', 2200); }
-function missioneMale(t, ms){ haptic('error'); missioneRiga(t, 'male', ms || 3200); }
+function missioneMale(t, ms){
+  haptic('error'); missioneRiga(t, 'male', ms || 3200);
+  const c = el('missioneCorpo');                  /* le carte tremano: no */
+  if (c) { c.classList.remove('scossa'); void c.offsetWidth; c.classList.add('scossa'); }
+}
 function missioneRiga(t, tipo, ms){
   const r = el('missioneRiga'); if (!r) return;
   r.textContent = t; r.className = 'miss-riga ' + tipo;

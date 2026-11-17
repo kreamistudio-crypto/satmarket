@@ -485,7 +485,7 @@ pubblico: sì
 
 ## 2026-11-17 · mondo-di-tappo
 frase: Sul tabellone dei livelli arrivano le missioni di Tappo: otto scene brevi a carte sulla storia del denaro, il deposito di garanzia, le tue chiavi, Lightning, la privacy e Nostr, ognuna col bottone per farlo davvero. Danno bulloni 🔩 e montano il razzo con cui Tappo vuole arrivare sulla Luna. E nella Caccia a Tappo c'è il Mondo: la dispensa da girare, coi barattoli da aprire.
-dove: Profilo → «Livello e recensioni» → «🧭 La tua stradina»: la missione sta subito prima della casella che insegna; tutte anche nella «🔩 Caccia a Tappo», lì accanto, schede «Sfide» e «Mondo».
+dove: Profilo → «Livello e recensioni» → «🚀 Rotta per la Luna»: la missione sta subito prima della casella che insegna; tutte anche nella «🔩 Caccia a Tappo», lì accanto, schede «Sfide» e «Mondo».
 leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
 pubblico: sì
 
