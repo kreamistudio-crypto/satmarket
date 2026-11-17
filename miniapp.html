@@ -4081,6 +4081,34 @@
       letter-spacing:.06em;text-transform:uppercase}
     .arena-banner.su{opacity:1;transform:translate(-50%,-50%) scale(1)}
     .caccia-btn.arena-azione{flex:none;margin:10px 0 0}
+    /* il platform di lato: tre tasti grandi per i pollici */
+    .lato-pad{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;padding:0 12px calc(12px + env(safe-area-inset-bottom));
+      pointer-events:none}
+    .lato-tasto{pointer-events:auto;width:72px;height:72px;border-radius:50%;border:2px solid rgba(255,246,227,.55);
+      background:rgba(10,15,31,.45);color:#FFF6E3;font:inherit;font-size:28px;font-weight:900;line-height:1;cursor:pointer;
+      touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+    .lato-tasto.salta{margin-left:auto;width:88px;height:88px;background:rgba(247,147,26,.75);border-color:#FFD25A;color:#1C1F24}
+    .lato-tasto.premuto{transform:scale(.92);background:rgba(247,147,26,.9);color:#1C1F24}
+    .lato-tasto:focus-visible,.lato-chiudi:focus-visible{outline:3px solid var(--c-ambra2);outline-offset:2px}
+    /* nel platform il foglio e' tutto gioco: niente testata, una ✕ nell'angolo */
+    .miss-velo.lato .miss-testa{display:none}
+    .miss-velo.lato .miss-carta{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);width:100%}
+    .miss-velo.lato .arena-box{border-radius:0;border:0}
+    .miss-velo.lato .arena-hud{right:60px}
+    /* in orizzontale lo schermo e' basso: l'obiettivo sta in alto a destra
+       accanto ai contatori, il fumetto stretto a sinistra */
+    .miss-velo.lato .arena-obiettivo{top:8px;left:auto;right:56px;max-width:46%;padding:6px 11px;font-size:13px}
+    .miss-velo.lato .arena-fumetto{top:46px;right:auto;max-width:min(62%,460px)}
+    .miss-velo.lato .arena-fumetto .miss-fumetto{font-size:13px}
+    .lato-chiudi{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,246,227,.4);
+      background:rgba(10,15,31,.6);color:#FFF6E3;font:inherit;font-size:18px;cursor:pointer}
+    .lato-gira{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+      background:rgba(10,15,31,.92);color:#FFF6E3;text-align:center;z-index:2}
+    .lato-gira[hidden]{display:none}
+    .lato-gira b{font-size:22px}
+    .lato-gira small{font-size:14px;color:var(--c-muto)}
+    .lato-gira-tel{font-size:64px;animation:lato-gira 1.8s ease-in-out infinite}
+    @keyframes lato-gira{0%,20%{transform:rotate(0)}50%,80%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
     .caccia-btn.arena-azione:disabled{filter:none;opacity:1;background:rgba(255,255,255,.07);color:#F5F0E6;
       border:1px solid var(--c-riga);box-shadow:none}
     .miss-velo{position:fixed;inset:0;z-index:4001;overflow-y:auto;overscroll-behavior:contain;
@@ -64536,6 +64564,7 @@ function arenaApri(m){
 }
 /* il minigioco si ferma (fine, chiusura, rigioca): via il giro e la tela */
 function arenaFerma(){
+  if (typeof latoFerma === 'function' && lato) latoFerma();
   if (arena && arena.giro) cancelAnimationFrame(arena.giro);
   arena = null;
   const v = el('missioneVelo'); if (v) v.classList.remove('arena');
@@ -64696,7 +64725,7 @@ function arenaPassa(a, dt){
     a.fase += dt * 12;
     if (Math.floor(a.fase / Math.PI) !== prima) {          /* un saltello che atterra */
       a.schiaccia = fermo ? 0 : 0.06;
-      if (a.tempo - a.ultimoPasso > 0.26) { a.ultimoPasso = a.tempo; arenaSuono('passo'); }
+      /* niente suono dei passi: «troppo invasivo» (Andrea, 17 nov) */
       if (!fermo) a.polvere.push({x: a.x - a.vx * 22, y: a.y + 3, vita: 0.45});
     }
   }
@@ -65678,9 +65707,402 @@ function satsPrendi(i){
   missioneDisegna();
 }
 
+/* ============ IL PLATFORM DI LATO (17 nov 2026, Andrea: «un gioco in 2D
+   a scorrimento», dopo la vista dall'alto che «non entusiasma») ============
+   Un genere, non un gioco: corsa e salto di lato, tutto di Barattolo.
+   La sensazione e' il punto: passo fisso a 120 al secondo, accelerazione
+   e frenata morbide, salto che si allunga tenendo premuto, un attimo di
+   grazia sul bordo (si salta anche appena caduti) e il salto prenotato
+   (premuto poco prima di toccare terra vale lo stesso), schiacciato e
+   allungato quando salta e atterra, la telecamera che guarda avanti.
+   Il mondo e' alto LATO_H: la tela lo mostra intero in altezza e scorre
+   in larghezza. Le misure sono in unita' del mondo, mai in pixel. */
+const LATO_H = 900, LATO_LARGO = 1250;
+const LATO_FISICA = {passo: 1 / 120, corsa: 520, spinta: 3000, frena: 3400, aria: 0.7, gravita: 2700, cade: 1500,
+  salto: 1150, taglia: 0.45, grazia: 0.1, prenota: 0.13, molla: 1650, largo: 60, alto: 118};
+let lato = null;
+/* PURA: Tappo (x al centro, y ai piedi, largo w) tocca il rettangolo? */
+function latoTocca(x, y, w, h, r){ return x + w / 2 > r.x && x - w / 2 < r.x + r.w && y > r.y && y - h < r.y + r.h; }
+/* PURA: il terreno sotto x, se c'e' (i tratti di terra) */
+function latoTerra(liv, x){ for (const t of liv.terra) if (x >= t[0] && x <= t[1]) return liv.suolo; return null; }
+/* PURA: UN PASSO DELLA FISICA (s: lo stato di Tappo, c: i comandi
+   {sx, dx, salta, tiene}, liv: il livello). Torna gli eventi del passo
+   ('salto', 'atterra', 'molla', 'cade') perche' suoni e polvere li
+   decida chi chiama. Pura per essere provata in node passo per passo. */
+function latoFisica(s, c, liv, dt){
+  const F = LATO_FISICA, ev = [];
+  const voglia = (c.dx ? 1 : 0) - (c.sx ? 1 : 0);
+  const k = s.aterra ? 1 : F.aria;
+  if (voglia) s.vx += voglia * F.spinta * k * dt * (Math.sign(s.vx) === -voglia ? 1.6 : 1);
+  else { const f = F.frena * k * dt; s.vx = Math.abs(s.vx) <= f ? 0 : s.vx - Math.sign(s.vx) * f; }
+  s.vx = Math.max(-F.corsa, Math.min(F.corsa, s.vx));
+  if (voglia) s.verso = voglia;
+  /* il salto: prenotato e con la grazia del bordo */
+  if (c.salta) { s.prenota = F.prenota; c.salta = false; }
+  else s.prenota = Math.max(0, s.prenota - dt);
+  s.grazia = s.aterra ? F.grazia : Math.max(0, s.grazia - dt);
+  if (s.prenota > 0 && s.grazia > 0) { s.vy = -F.salto; s.aterra = false; s.grazia = 0; s.prenota = 0; ev.push('salto'); }
+  if (!c.tiene && s.vy < -300) s.vy *= 1 - F.taglia * dt * 30 * 0.25;   /* lasciato presto: salto piu' basso */
+  s.vy = Math.min(F.cade, s.vy + F.gravita * dt);
+  /* in orizzontale, contro le casse */
+  const nx = Math.max(F.largo / 2, Math.min(liv.lungo - F.largo / 2, s.x + s.vx * dt));
+  let bloc = false;
+  for (const r of liv.casse) if (latoTocca(nx, s.y - 2, F.largo, F.alto - 4, r)) { bloc = true; break; }
+  if (bloc) s.vx = 0; else s.x = nx;
+  /* in verticale: si atterra sulla terra, sulle pedane (solo da sopra) e sulle casse */
+  const ny = s.y + s.vy * dt, prima = s.aterra;
+  s.aterra = false;
+  if (s.vy >= 0) {
+    let sotto = null;
+    const t = latoTerra(liv, s.x);
+    if (t !== null && s.y <= t + 1 && ny >= t) sotto = t;
+    for (const p of liv.pedane) if (s.x + F.largo * 0.3 > p.x && s.x - F.largo * 0.3 < p.x + p.w && s.y <= p.y + 1 && ny >= p.y) sotto = sotto === null ? p.y : Math.min(sotto, p.y);
+    for (const r of liv.casse) if (s.x + F.largo / 2 > r.x && s.x - F.largo / 2 < r.x + r.w && s.y <= r.y + 1 && ny >= r.y) sotto = sotto === null ? r.y : Math.min(sotto, r.y);
+    if (sotto !== null) {
+      s.y = sotto; s.aterra = true;
+      if (!prima && s.vy > 260) ev.push('atterra');
+      s.vy = 0;
+      for (const m of liv.molle) if (Math.abs(s.x - m.x) < 46 && Math.abs(s.y - m.y) < 4) { s.vy = -F.molla; s.aterra = false; ev.push('molla'); }
+    } else s.y = ny;
+  } else {
+    /* la testa contro il fondo di una cassa */
+    let su = null;
+    for (const r of liv.casse) if (s.x + F.largo / 2 > r.x && s.x - F.largo / 2 < r.x + r.w && s.y - F.alto >= r.y + r.h - 1 && ny - F.alto < r.y + r.h) su = r.y + r.h + F.alto;
+    if (su !== null) { s.y = su; s.vy = 0; } else s.y = ny;
+  }
+  if (s.y > LATO_H + 200) ev.push('cade');
+  return ev;
+}
+
+/* IL LIVELLO DEI SATS: il vento ha sparso i sats lungo la strada fino al
+   forno; Tappo li raccoglie correndo e saltando. In tasca la Gazza glieli
+   ruba; nei wallet lungo la strada sono al sicuro (e li' si riparte se
+   si cade). Il wallet grande in fondo e' il traguardo. */
+const LATO_SATS = {
+  lungo: 7400, suolo: 760,
+  terra: [[0, 1500], [1720, 2900], [3160, 4300], [4560, 5900], [6120, 7400]],
+  pedane: [{x: 640, y: 560, w: 220}, {x: 1040, y: 430, w: 200}, {x: 1490, y: 600, w: 260}, {x: 2300, y: 520, w: 240},
+    {x: 2920, y: 600, w: 220}, {x: 3560, y: 470, w: 220}, {x: 3900, y: 330, w: 220}, {x: 4300, y: 600, w: 240},
+    {x: 5000, y: 540, w: 220}, {x: 5350, y: 400, w: 220}, {x: 5880, y: 600, w: 220}, {x: 6500, y: 520, w: 240}],
+  casse: [{x: 1950, y: 650, w: 110, h: 110}, {x: 2060, y: 540, w: 110, h: 220}, {x: 4750, y: 650, w: 110, h: 110}],
+  molle: [{x: 3450, y: 760}, {x: 6300, y: 760}],
+  sats: [[420, 690], [520, 690], [700, 480], [800, 480], [1100, 350], [1180, 350], [1560, 520], [1660, 520], [1810, 690],
+    [2115, 460], [2360, 440], [2460, 440], [2700, 690], [3000, 520], [3300, 690], [3450, 420], [3450, 300], [3620, 390],
+    [3960, 250], [4040, 250], [4380, 520], [4650, 690], [4805, 570], [5060, 460], [5410, 320], [5490, 320], [5700, 690],
+    [5960, 520], [6300, 380], [6300, 250], [6560, 440], [6660, 440], [6900, 690], [7000, 690]],
+  wallet: [2620, 5640], fine: 7180, via: 160,
+  gazze: [{da: 2200, a: 3200, y: 260}, {da: 4300, a: 5600, y: 230}, {da: 6000, a: 7000, y: 240}],
+};
+
+function latoHTML(nome){
+  return arenaHTML(nome).replace('</div><button', `<div class="lato-pad" id="latoPad">`
+    + `<button type="button" class="lato-tasto" data-tasto="sx" aria-label="Sinistra">◀</button>`
+    + `<button type="button" class="lato-tasto" data-tasto="dx" aria-label="Destra">▶</button>`
+    + `<button type="button" class="lato-tasto salta" data-tasto="salta" aria-label="Salta">⤒</button></div>`
+    + `<button type="button" class="lato-chiudi" onclick="missioneChiudi()" aria-label="Esci dal gioco">✕</button>`
+    + `<div class="lato-gira" id="latoGira" hidden><span class="lato-gira-tel" aria-hidden="true">📱</span><b>Gira il telefono</b><small>Si gioca in orizzontale</small></div></div><button`);
+}
+/* PARTE il platform (da `missioneVia`) */
+function latoApri(m){
+  const g0 = MISSIONI_GIOCO[m.id] || {}, liv = g0.lato, v = el('missioneVelo'), corpo = el('missioneCorpo');
+  if (!liv || !v || !corpo) return false;
+  arenaFerma();
+  v.classList.add('arena', 'lato');
+  corpo.innerHTML = latoHTML(m.info.nome);
+  const tela = el('arenaTela'), g = tela && tela.getContext('2d');
+  if (!g) { v.classList.remove('arena', 'lato'); return false; }
+  const az = el('arenaAzione'); if (az) az.style.display = 'none';
+  lato = {m, liv, tela, g, tempo: 0, resto: 0, prima: 0, giro: 0, cam: 0, liv0: arenaLivello(m.info.zona),
+    s: {x: liv.via, y: liv.suolo, vx: 0, vy: 0, verso: 1, aterra: true, grazia: 0, prenota: 0},
+    c: {sx: false, dx: false, salta: false, tiene: false},
+    fase: 0, schx: 1, schy: 1, atterrato: 0, ferito: 0, riparti: liv.via,
+    sats: liv.sats.map(p => ({x: p[0], y: p[1], via: false, seme: Math.random() * 6})),
+    wallet: liv.wallet.map(x => ({x, preso: false})), tasca: 0, salvi: 0, tot: liv.sats.length,
+    gazze: liv.gazze.map(z => ({...z, x: z.da, y: z.y, dir: 1, stato: 'gira', fra: 0, ali: 0})),
+    polvere: [], scoppi: [], dice: null, banner: 2.2, finito: false};
+  ['fermo', 'sale', 'scende', 'atterra', 1, 2, 3, 4, 5, 6, 7, 8].forEach(n => mondoImmagine('lato-tappo-' + n));
+  ['lato-cielo', 'lato-lontano', 'lato-vicino', 'lato-terra', 'lato-pedana', 'lato-cassa', 'lato-molla', 'lato-traguardo',
+    'miss-sat', 'miss-wallet', 'lato-gazza-1', 'lato-gazza-2', 'lato-gazza-3', 'lato-gazza-4', 'tappo-passo-1'].forEach(n => mondoImmagine(n));
+  /* in Telegram a tutto schermo, come i giochi (se la versione lo sa fare) */
+  try { const tg = window.Telegram && Telegram.WebApp; if (tg && tg.requestFullscreen && !tg.isFullscreen) { tg.requestFullscreen(); lato.pieno = true; } } catch(e) {}
+  latoComandi(tela);
+  latoDice('tappo', 'Il vento ha sparso i miei sats lungo la strada! Corri, salta e raccoglili. Nei wallet sono al sicuro.', 5);
+  lato.giro = requestAnimationFrame(latoGiro);
+  return true;
+}
+function latoFerma(){
+  if (lato && lato.giro) cancelAnimationFrame(lato.giro);
+  try { if (lato && lato.pieno && Telegram.WebApp.exitFullscreen) Telegram.WebApp.exitFullscreen(); } catch(e) {}
+  lato = null;
+  const v = el('missioneVelo'); if (v) v.classList.remove('lato');
+}
+function latoDice(chi, testo, sec){ if (lato) lato.dice = {chi, testo, fino: lato.tempo + (sec || 3.5), nuovo: true}; }
+/* i comandi: i tre tasti sullo schermo (piu' dita insieme) e la tastiera */
+function latoComandi(tela){
+  const pad = el('latoPad');
+  if (pad) pad.querySelectorAll('[data-tasto]').forEach(b => {
+    const t = b.dataset.tasto;
+    const giu = e => { e.preventDefault(); if (!lato) return; try { b.setPointerCapture(e.pointerId); } catch(_) {}
+      b.classList.add('premuto'); if (t === 'salta') { lato.c.salta = true; lato.c.tiene = true; } else lato.c[t] = true; };
+    const su = e => { if (!lato) return; b.classList.remove('premuto'); if (t === 'salta') lato.c.tiene = false; else lato.c[t] = false; };
+    b.addEventListener('pointerdown', giu); b.addEventListener('pointerup', su); b.addEventListener('pointercancel', su);
+    b.addEventListener('contextmenu', e => e.preventDefault());
+  });
+  /* toccare la tela a destra o a sinistra di Tappo: correre di la' */
+  tela.addEventListener('pointerdown', e => { if (!lato) return; e.preventDefault(); });
+  if (latoComandi.fatto) return;
+  latoComandi.fatto = true;
+  const tasto = (e, giu) => {
+    if (!lato) return;
+    const dove = e.target && e.target.tagName;
+    if (dove === 'INPUT' || dove === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = {ArrowLeft: 'sx', KeyA: 'sx', ArrowRight: 'dx', KeyD: 'dx', ArrowUp: 'salta', KeyW: 'salta', Space: 'salta'}[e.code];
+    if (!k) return;
+    e.preventDefault();
+    if (k === 'salta') { if (giu && !e.repeat) lato.c.salta = true; lato.c.tiene = giu; } else lato.c[k] = giu;
+  };
+  document.addEventListener('keydown', e => tasto(e, true));
+  document.addEventListener('keyup', e => tasto(e, false));
+}
+function latoGiro(ora){
+  const L = lato; if (!L) return;
+  const dt = L.prima ? Math.min(0.05, (ora - L.prima) / 1000) : 1 / 60;
+  L.prima = ora;
+  /* IN VERTICALE SI ASPETTA (Andrea, 17 nov: «in orizzontale, si gira il
+     telefono»): il cartello e il gioco fermo finche' non lo giri */
+  const gira = L.tela.clientHeight > L.tela.clientWidth * 1.05, cart = el('latoGira');
+  if (cart && cart.hidden === gira) cart.hidden = !gira;
+  if (gira) { if (lato === L) L.giro = requestAnimationFrame(latoGiro); return; }
+  L.resto += dt;
+  while (L.resto >= LATO_FISICA.passo) { latoPassa(L, LATO_FISICA.passo); L.resto -= LATO_FISICA.passo; if (lato !== L) return; }
+  latoDisegna(L);
+  latoPannelli(L);
+  if (lato === L) L.giro = requestAnimationFrame(latoGiro);
+}
+/* un passo del gioco: la fisica, i sats, i wallet, la Gazza, la caduta */
+function latoPassa(L, dt){
+  const s = L.s, liv = L.liv, fermo = effettiRidotti();
+  L.tempo += dt;
+  if (L.finito) { s.vx *= 0.9; return; }
+  const ev = latoFisica(s, L.c, liv, dt);
+  for (const e of ev) {
+    if (e === 'salto') { arenaSuono('salto'); L.schx = 0.86; L.schy = 1.16; }
+    if (e === 'molla') { arenaSuono('magia'); L.schx = 0.8; L.schy = 1.24; }
+    if (e === 'atterra') { arenaSuono('atterra'); L.schx = 1.2; L.schy = 0.82; L.atterrato = 0.12;
+      if (!fermo) for (let i = 0; i < 6; i++) L.polvere.push({x: s.x + (i - 2.5) * 10, y: s.y, vx: (i - 2.5) * 40, vy: -40 - Math.random() * 60, vita: 0.5}); }
+    if (e === 'cade') {
+      L.m.errori++; arenaSuono('sbagliato'); haptic('error');
+      s.x = L.riparti; s.y = liv.suolo - 300; s.vx = 0; s.vy = 0; L.ferito = 1.2;
+      latoDice('tappo', 'Oops, sono caduto! Si riparte dall\'ultimo wallet.', 2.5);
+    }
+  }
+  L.schx += (1 - L.schx) * Math.min(1, dt * 12); L.schy += (1 - L.schy) * Math.min(1, dt * 12);
+  L.atterrato = Math.max(0, L.atterrato - dt); L.ferito = Math.max(0, L.ferito - dt);
+  if (s.aterra && Math.abs(s.vx) > 40) {
+    L.fase += Math.abs(s.vx) * dt / 26;
+    if (!fermo && Math.random() < dt * 8) L.polvere.push({x: s.x - s.verso * 20, y: s.y, vx: -s.verso * 30, vy: -30, vita: 0.35});
+  }
+  /* i sats: si prendono passandoci attraverso */
+  for (const p of L.sats) if (!p.via && Math.abs(p.x - s.x) < 50 && p.y < s.y + 10 && p.y > s.y - LATO_FISICA.alto - 20) {
+    p.via = true; L.tasca++; arenaSuono('raccogli'); haptic();
+    L.scoppi.push({x: p.x, y: p.y, vita: 0.5});
+  }
+  /* i wallet lungo la strada: le tasche si svuotano e li' si riparte */
+  for (const w of L.wallet) if (Math.abs(w.x - s.x) < 70 && s.y > liv.suolo - 140) {
+    if (L.tasca) { L.salvi += L.tasca; L.tasca = 0; arenaSuono('conto'); L.scoppi.push({x: w.x, y: liv.suolo - 80, vita: 0.7, verde: true});
+      if (!w.preso) latoDice('tappo', 'Nel wallet i sats sono al sicuro: la Gazza qui non li tocca!', 3); }
+    w.preso = true; L.riparti = w.x;
+  }
+  /* il traguardo */
+  if (s.x >= liv.fine - 40) {
+    L.salvi += L.tasca; L.tasca = 0; L.finito = true; arenaSuono('conto');
+    L.scoppi.push({x: liv.fine, y: liv.suolo - 100, vita: 0.9, verde: true});
+    latoDice('tappo', 'Arrivato! ' + L.salvi + ' sats al sicuro nel mio wallet.', 3);
+    setTimeout(() => { if (lato === L) missioneFine(); }, 2200);
+  }
+  /* la Gazza: gira nel suo tratto; se Tappo ha sats in tasca ed e' vicino, picchia */
+  const vel = 240 * L.liv0.veloce;
+  for (const z of L.gazze) {
+    z.ali += dt * 13;
+    if (z.stato === 'gira') {
+      z.x += z.dir * vel * 0.55 * dt; if (z.x > z.a) z.dir = -1; if (z.x < z.da) z.dir = 1;
+      z.y = z.y + ((z.y0 || (z.y0 = z.y)) + Math.sin(L.tempo * 2 + z.da) * 30 - z.y) * Math.min(1, dt * 3);
+      if (L.tasca > 0 && Math.abs(z.x - s.x) < 420 && L.ferito <= 0) { z.stato = 'picchia'; arenaSuono('gazza'); }
+    } else if (z.stato === 'picchia') {
+      const tx = s.x, ty = s.y - 60, dx = tx - z.x, dy = ty - z.y, l = Math.hypot(dx, dy) || 1;
+      z.x += dx / l * vel * 1.15 * dt; z.y += dy / l * vel * 1.15 * dt; z.dir = dx > 0 ? 1 : -1;
+      if (!L.tasca || l > 700) z.stato = 'torna';
+      if (l < 56 && L.ferito <= 0) {
+        const quanti = L.tasca; L.tasca = 0; L.m.errori++; L.ferito = 1.5; haptic('error'); arenaSuono('sbagliato');
+        /* i sats cadono per terra intorno a Tappo: si possono riprendere */
+        for (let i = 0; i < quanti; i++) L.sats.push({x: Math.max(60, Math.min(liv.lungo - 60, s.x + (i - quanti / 2) * 70 + 40)), y: (latoTerra(liv, s.x) || liv.suolo) - 70, via: false, seme: Math.random() * 6});
+        latoDice('gazza', 'Presi! ' + quanti + (quanti === 1 ? ' sat' : ' sats') + ' luccicanti!', 2.5);
+        z.stato = 'torna';
+      }
+    } else {
+      z.y -= vel * 0.8 * dt; z.x += z.dir * vel * 0.3 * dt;
+      if (z.y < (z.y0 || 240)) { z.y = z.y0 || 240; z.stato = 'gira'; z.x = Math.max(z.da, Math.min(z.a, z.x)); }
+    }
+  }
+  for (const p of L.polvere) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; p.vita -= dt; }
+  L.polvere = L.polvere.filter(p => p.vita > 0);
+  for (const p of L.scoppi) p.vita -= dt;
+  L.scoppi = L.scoppi.filter(p => p.vita > 0);
+  L.banner = Math.max(0, L.banner - dt);
+  /* la telecamera guarda avanti, morbida */
+  const vis = L.visto || 900, visH = L.vistoH || LATO_H;
+  const voglio = Math.max(0, Math.min(liv.lungo - vis, s.x - vis * 0.38 + s.vx * 0.35));
+  L.cam += (voglio - L.cam) * Math.min(1, dt * 5);
+  /* in alto e in basso la telecamera segue solo se lo schermo e' basso:
+     Tappo resta a due terzi, la terra non esce mai dal fondo */
+  const su = Math.max(-500, Math.min(LATO_H - visH, s.y - visH * 0.68));
+  L.camY = L.camY === undefined ? su : L.camY + (su - L.camY) * Math.min(1, dt * 4);
+}
+/* un dipinto ripetuto in orizzontale, che scorre a `k` della telecamera */
+function latoStrato(g, nome, k, cam, vis, y, h){
+  const img = mondoImmagine(nome);
+  if (!img) return false;
+  const w = h * img.naturalWidth / img.naturalHeight;
+  let x0 = -((cam * k) % w); if (x0 > 0) x0 -= w;
+  for (let x = x0; x < vis + 2; x += w) g.drawImage(img, x, y, w + 1, h);
+  return true;
+}
+function latoDisegna(L){
+  const g = L.g, tela = L.tela, fermo = effettiRidotti(), s = L.s, liv = L.liv;
+  const dpr = Math.min(fermo ? 1 : 2, window.devicePixelRatio || 1);
+  const W = Math.max(2, Math.round(tela.clientWidth * dpr)), H = Math.max(2, Math.round(tela.clientHeight * dpr));
+  if (tela.width !== W || tela.height !== H) { tela.width = W; tela.height = H; }
+  /* LO ZOOM: si vede al massimo LATO_LARGO in larghezza (sul telefono
+     girato Tappo resta grande); se cosi' l'altezza non ci sta tutta, la
+     telecamera segue anche in verticale */
+  const k = Math.max(H / LATO_H, W / LATO_LARGO), vis = W / k, visH = H / k; L.visto = vis; L.vistoH = visH;
+  const cam = Math.round(L.cam * k) / k, camY = Math.round((L.camY === undefined ? LATO_H - visH : L.camY) * k) / k;
+  g.setTransform(k, 0, 0, k, 0, 0);
+  /* il cielo (fermo sullo schermo) e i due strati lontani (salgono piano) */
+  if (!latoStrato(g, 'lato-cielo', 0.08, cam, vis, 0, visH)) {
+    const cielo = g.createLinearGradient(0, 0, 0, visH); cielo.addColorStop(0, '#141A3A'); cielo.addColorStop(0.55, '#5B3A5E'); cielo.addColorStop(1, '#F2A24A');
+    g.fillStyle = cielo; g.fillRect(0, 0, vis, visH);
+    g.fillStyle = 'rgba(255,240,200,.8)';
+    for (let i = 0; i < 40; i++) { const x = ((i * 197 - cam * 0.05) % vis + vis) % vis, y = (i * 61) % 320; g.fillRect(x, y, 2, 2); }
+  }
+  g.save(); g.translate(0, -camY * 0.4 - (LATO_H - visH) * 0.6);
+  if (!latoStrato(g, 'lato-lontano', 0.25, cam, vis, LATO_H * 0.25, LATO_H * 0.6)) {
+    g.fillStyle = '#3A2A4A';
+    for (let i = -1; i < vis / 260 + 2; i++) { const x = i * 260 - (cam * 0.25) % 260; g.beginPath(); g.arc(x + 130, 700, 210, Math.PI, 0); g.fill(); }
+  }
+  if (!latoStrato(g, 'lato-vicino', 0.55, cam, vis, LATO_H * 0.35, LATO_H * 0.55)) {
+    g.fillStyle = '#2A1E2E';
+    for (let i = -1; i < vis / 340 + 2; i++) { const x = i * 340 - (cam * 0.55) % 340; g.fillRect(x + 150, 520, 16, 240); g.beginPath(); g.arc(x + 158, 500, 70, 0, 6.2832); g.fill(); }
+  }
+  g.restore();
+  g.save(); g.translate(-cam, -camY);
+  /* la terra: tratti con l'erba sopra; il vuoto fra i tratti */
+  const terra = mondoImmagine('lato-terra');
+  for (const t of liv.terra) {
+    if (t[1] < cam - 50 || t[0] > cam + vis + 50) continue;
+    if (terra) {
+      const h = LATO_H - liv.suolo + 40, w = h * terra.naturalWidth / terra.naturalHeight;
+      g.save(); g.beginPath(); g.rect(t[0], liv.suolo - 40, t[1] - t[0], h + 40); g.clip();
+      for (let x = t[0]; x < t[1]; x += w) g.drawImage(terra, x, liv.suolo - 40, w + 1, h + 40);
+      g.restore();
+    } else {
+      g.fillStyle = '#6B3E22'; g.fillRect(t[0], liv.suolo, t[1] - t[0], LATO_H - liv.suolo);
+      g.fillStyle = '#4FA341'; g.fillRect(t[0], liv.suolo - 6, t[1] - t[0], 26);
+      g.fillStyle = '#3C8A32'; for (let x = t[0]; x < t[1]; x += 24) g.fillRect(x, liv.suolo + 14, 12, 8);
+    }
+  }
+  /* le pedane, le casse, le molle */
+  for (const p of liv.pedane) if (!arenaFotoLato(g, 'lato-pedana', p.x, p.y - 12, p.w, 60)) {
+    g.fillStyle = '#8A5A33'; g.fillRect(p.x, p.y, p.w, 24); g.fillStyle = '#A8733F'; g.fillRect(p.x + 4, p.y + 3, p.w - 8, 8);
+    g.fillStyle = '#5A3A1E'; g.fillRect(p.x + 18, p.y + 24, 10, 22); g.fillRect(p.x + p.w - 28, p.y + 24, 10, 22);
+  }
+  for (const r of liv.casse) {
+    const img = mondoImmagine('lato-cassa');
+    if (img) for (let y = r.y; y < r.y + r.h - 1; y += r.w) g.drawImage(img, r.x - 4, y - 4, r.w + 8, r.w + 8);
+    else { g.fillStyle = '#9A6534'; g.fillRect(r.x, r.y, r.w, r.h); g.strokeStyle = '#5A3A1E'; g.lineWidth = 6; g.strokeRect(r.x + 3, r.y + 3, r.w - 6, r.h - 6);
+      g.beginPath(); g.moveTo(r.x + 6, r.y + 6); g.lineTo(r.x + r.w - 6, r.y + r.h - 6); g.stroke(); }
+  }
+  for (const m of liv.molle) if (!arenaFotoLato(g, 'lato-molla', m.x - 50, m.y - 70, 100, 76)) {
+    g.fillStyle = '#C0392B'; g.fillRect(m.x - 46, m.y - 26, 92, 14); g.strokeStyle = '#DDD'; g.lineWidth = 6;
+    g.beginPath(); for (let i = 0; i < 4; i++) { g.moveTo(m.x - 30, m.y - 10 - i * 4); g.lineTo(m.x + 30, m.y - 6 - i * 4); } g.stroke();
+  }
+  /* i wallet lungo la strada e il traguardo */
+  for (const w of L.wallet) {
+    if (w.preso) { g.save(); g.globalAlpha = 0.35 + (fermo ? 0 : Math.sin(L.tempo * 3) * 0.1); g.fillStyle = '#FFD25A'; g.beginPath(); g.ellipse(w.x, liv.suolo - 50, 80, 70, 0, 0, 6.2832); g.fill(); g.restore(); }
+    if (!arenaFoto(g, 'miss-wallet', w.x, liv.suolo + 6, 130)) { g.fillStyle = '#E8761A'; g.fillRect(w.x - 50, liv.suolo - 70, 100, 70); }
+  }
+  if (!arenaFoto(g, 'lato-traguardo', liv.fine, liv.suolo + 8, 230)) {
+    g.fillStyle = '#E8761A'; g.fillRect(liv.fine - 80, liv.suolo - 110, 160, 110);
+    g.fillStyle = '#EEE'; g.fillRect(liv.fine + 60, liv.suolo - 300, 8, 300); g.fillStyle = '#F7931A';
+    g.beginPath(); g.moveTo(liv.fine + 68, liv.suolo - 300); g.lineTo(liv.fine + 150, liv.suolo - 270); g.lineTo(liv.fine + 68, liv.suolo - 240); g.fill();
+  }
+  /* i sats */
+  const fs = mondoImmagine('miss-sat');
+  for (const p of L.sats) {
+    if (p.via || p.x < cam - 60 || p.x > cam + vis + 60) continue;
+    const su = fermo ? 0 : Math.sin(L.tempo * 3 + p.seme) * 6, giro = fermo ? 1 : Math.cos(L.tempo * 3.2 + p.seme);
+    g.save(); g.translate(p.x, p.y + su); g.scale(Math.max(0.2, Math.abs(giro)), 1);
+    if (fs) g.drawImage(fs, -26, -26, 52, 52); else { g.fillStyle = '#FFD25A'; g.beginPath(); g.arc(0, 0, 22, 0, 6.2832); g.fill(); }
+    g.restore();
+  }
+  /* la polvere, Tappo, la Gazza, gli scoppi */
+  for (const p of L.polvere) { g.fillStyle = 'rgba(240,222,196,' + p.vita + ')'; g.beginPath(); g.arc(p.x, p.y - 6, 6 + (0.5 - p.vita) * 14, 0, 6.2832); g.fill(); }
+  latoTappo(g, L, fermo);
+  for (const z of L.gazze) latoGazza(g, L, z, fermo);
+  for (const p of L.scoppi) {
+    const t = 1 - p.vita / 0.7;
+    g.strokeStyle = p.verde ? 'rgba(120,220,140,' + p.vita + ')' : 'rgba(255,214,107,' + (p.vita * 2) + ')'; g.lineWidth = 5;
+    g.beginPath(); g.arc(p.x, p.y, 20 + t * 60, 0, 6.2832); g.stroke();
+  }
+  g.restore();
+}
+/* un dipinto in un rettangolo (pedane e molle: si stirano alla misura) */
+function arenaFotoLato(g, nome, x, y, w, h){ const img = mondoImmagine(nome); if (!img) return false; g.drawImage(img, x, y, w, h); return true; }
+/* TAPPO DI LATO: la posa giusta (corsa a otto pose legate alla strada
+   fatta, fermo che respira, salita, discesa, atterraggio), schiacciato
+   e allungato; lampeggia quando e' appena stato colpito */
+function latoTappo(g, L, fermo){
+  const s = L.s;
+  if (L.ferito > 0 && !fermo && Math.floor(L.tempo * 14) % 2) return;
+  let nome = 'lato-tappo-fermo';
+  if (L.atterrato > 0) nome = 'lato-tappo-atterra';
+  else if (!s.aterra) nome = s.vy < 0 ? 'lato-tappo-sale' : 'lato-tappo-scende';
+  else if (Math.abs(s.vx) > 40) nome = 'lato-tappo-' + (1 + (Math.floor(L.fase) % 8));
+  let img = mondoImmagine(nome);
+  const riserva = !img;
+  if (riserva) img = mondoImmagine('tappo-passo-' + (s.aterra && Math.abs(s.vx) > 40 ? 1 + Math.floor(L.fase / 2) % 4 : 1));
+  const resp = fermo || Math.abs(s.vx) > 40 || !s.aterra ? 0 : Math.sin(L.tempo * 2.6) * 0.02;
+  const H = 150 * (L.schy + resp);
+  arenaOmbra(g, s.x, (latoTerra(L.liv, s.x) === null ? s.y : Math.min(s.y, L.liv.suolo)) + 2, 44 * Math.max(0.3, 1 - (L.liv.suolo - s.y) / 500), 0.45);
+  g.save(); g.translate(s.x, s.y); g.scale(s.verso, 1);
+  if (img) { const W = 150 * L.schx * img.naturalWidth / img.naturalHeight; g.drawImage(img, -W / 2, -H, W, H); }
+  else { g.fillStyle = '#F7931A'; g.fillRect(-28 * L.schx, -H, 56 * L.schx, H); }
+  g.restore();
+}
+function latoGazza(g, L, z, fermo){
+  const img = mondoImmagine('lato-gazza-' + (1 + Math.floor(z.ali / 1.6) % 4)) || mondoImmagine('miss-gazza');
+  if (!img) { arenaEmoji(g, '🐦', z.x, z.y, 60); return; }
+  const w = 170, h = w * img.naturalHeight / img.naturalWidth * (fermo ? 1 : 1 + Math.sin(z.ali) * 0.1);
+  /* i disegni della Gazza in volo guardano a sinistra */
+  g.save(); g.translate(z.x, z.y); g.scale(-z.dir, 1); g.drawImage(img, -w / 2, -h / 2, w, h); g.restore();
+}
+function latoPannelli(L){
+  const hud = el('arenaHud'), ob = el('arenaObiettivo'), fu = el('arenaFumetto'), ban = el('arenaBanner');
+  const h = `<span>${'★★★'.slice(0, missioneStelle(L.m.errori))}</span><span${L.tasca ? ' class="caldo"' : ''}>In tasca ⚡ ${L.tasca}</span><span>👛 ${L.salvi}</span>`;
+  if (hud && L.hud !== h) { hud.innerHTML = h; L.hud = h; }
+  const o = L.finito ? 'Arrivato al wallet!' : L.tasca ? `Porta i sats nel prossimo wallet 👛 prima della Gazza` : 'Corri verso destra e raccogli i sats';
+  if (ob && L.ob !== o) { ob.textContent = '🎯 ' + o; L.ob = o; ob.classList.remove('nuovo'); void ob.offsetWidth; ob.classList.add('nuovo'); }
+  const d = L.dice && L.tempo < L.dice.fino ? L.dice : null;
+  if (fu) {
+    const t = d ? missFumettoHTML(d.chi, esc(d.testo)) : '';
+    if (fu.dataset.t !== t) { fu.dataset.t = t; if (t) fu.innerHTML = t; fu.classList.toggle('su', !!d); }
+  }
+  if (ban) { const b = L.banner > 0 ? `<small>Prova 1 di 1</small>Corri fino al forno` : ''; if (ban.dataset.t !== b) { ban.dataset.t = b; ban.innerHTML = b; ban.classList.toggle('su', !!b); } }
+}
+
 /* ---------- il telaio comune ---------- */
 const MISSIONI_GIOCO = {
-  sats: {html: satsHTML, arena: ARENA_SATS, guaio: [['tappo', 'Il vento ha aperto la finestra del forno e ha sparso tutti i miei sats!'], ['gazza', 'Sats luccicanti per terra? Arrivo!']],
+  sats: {html: satsHTML, lato: LATO_SATS, arena: ARENA_SATS, guaio: [['tappo', 'Il vento ha aperto la finestra del forno e ha sparso tutti i miei sats!'], ['gazza', 'Sats luccicanti per terra? Arrivo!']],
     succo: 'Un bitcoin si divide in cento milioni di sats. I sats si tengono nel tuo wallet: lì sono tuoi e al sicuro, non in tasca.', razzo: 'i piedini del razzo', nome: 'sats e wallet',
     fai: ['⚡ Attiva l\'incasso automatico', () => apriCassettoProfilo('accLnAddress')]},
   quaderno: {html: quadernoHTML, arena: ARENA_QUADERNO, guaio: [['tappo', 'Nella dispensa i conti li teneva uno solo, in un quaderno.'], ['tarlo', 'E io stanotte gliel\'ho rosicchiato! Adesso risulto ricchissimo. Gnam gnam.']],
@@ -65734,7 +66156,7 @@ function missioneDisegna(){
     h = `<div class="miss-cosa">🎯 ${esc(m.info.cosa)}</div>` + g.guaio.map(x => missFumettoHTML(x[0], esc(x[1]))).join('')
       + `<button type="button" class="caccia-btn" onclick="missioneVia()">▶️ Gioca</button>`;
   } else if (m.fase === 'gioco') {
-    if (arena && arena.m === m) return;       /* il minigioco disegna da se', sulla sua tela */
+    if ((arena && arena.m === m) || (lato && lato.m === m)) return;       /* il minigioco disegna da se', sulla sua tela */
     h = g.html(m);
   }
   else {
@@ -65763,7 +66185,8 @@ async function missioneVia(){
   if (m.id === 'parole') m.dati = {scelti: []};
   /* dove c'e' l'arena (e la tela 2D), si gioca muovendo Tappo; se no la
      versione a fumetti, che resta */
-  if (!(MISSIONI_GIOCO[m.id].arena && mondoPossibile() && arenaApri(m))) missioneDisegna();
+  const gm = MISSIONI_GIOCO[m.id];
+  if (!((gm.lato && mondoPossibile() && latoApri(m)) || (gm.arena && mondoPossibile() && arenaApri(m)))) missioneDisegna();
   try { await cacciaChiama('/missione', {missione: m.id, azione: 'inizia'}); } catch(e) {}
 }
 function missioneDaCapo(){ const m = missione; if (m) { arenaFerma(); m.fase = 'guaio'; m.bulloni = 0; missioneDisegna(); } }
