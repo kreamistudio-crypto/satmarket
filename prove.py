@@ -206202,6 +206202,14 @@ console.log(JSON.stringify({
           "tranne l'halving finiscono col bottone per farla davvero", (True, ["halving"]),
           (all((x["zona"], x.get("prima")) in caselle for x in missioni),
            [x["id"] for x in missioni if "fai: [" not in righe[x["id"]].split("\n  },")[0].split("},\n  ")[0]]))
+    # IL RAZZO DI BULLONI (Andrea, 17 nov: la storia unica): un pezzo per
+    # missione, nello stesso ordine dei pezzi delle zone del tabellone
+    # (piedini 0, serbatoio 1, motore 2, ali 3; l'halving lo fa partire)
+    prova("ogni missione monta un pezzo del razzo della sua zona, e il finale lo dice", 
+          (["piedini", "serbatoio", "motore", "motore", "ali", "parte per la Luna"], True),
+          ([next(p for p in ("piedini", "serbatoio", "motore", "ali", "parte per la Luna")
+                 if p in righe[x["id"]].split("razzo: '")[1].split("', nome")[0]) for x in missioni],
+           "Con questi bulloni Tappo monta ${esc(g.razzo)}" in mini))
     prova("...il bottone chiude il gioco e porta alla casella", True,
           "missioneChiudi();\n  if (g && g.fai) { try { g.fai[1](); }" in mini
           and 'onclick="missioneFai()"' in mini)
