@@ -65059,7 +65059,14 @@ function rigaScambioOnchainP2P(o){
      diceva lo zero di `o.sats`. Adesso la stessa cifra della card del
      libro (`satsCardOnchainP2P`): «≈ X sats» al cambio di adesso, o la
      frase se il cambio non c'e'. Preso lo scambio, i sats veri. */
-  const sats = typeof satsCardOnchainP2P === 'function' ? satsCardOnchainP2P(o)
+  /* ...E AL NETTO DELLA FEE (17 nov 2026, cantiere convenienza-monete,
+     Andrea: «dovrebbe esserci scritto ciò che ricevo al netto della fee»):
+     la stessa cifra che il conto del dettaglio chiama «Ricevi» (o
+     «Deposita»), come la card di Lightning — vedi `satsNettiOnchainP2P`.
+     Senza una base (a mercato senza stima) resta la frase di prima. */
+  const netto = typeof satsNettiOnchainP2P === 'function' ? satsNettiOnchainP2P(o) : null;
+  const sats = netto ? (netto.circa ? '≈ ' : '') + fmt(netto.sats) + ' sats'
+    : typeof satsCardOnchainP2P === 'function' ? satsCardOnchainP2P(o)
     : fmt(Number(o.sats) || 0) + ' sats';
   const cifraSats = '<span class="p2p-sats ' + (ricevoSats ? 'riceve' : 'invia') + '">' + esc(sats) + '</span>';
   const cifraEuro = '<span class="p2p-euro">' + esc(cifraOc(o)) + '</span>';
@@ -65090,11 +65097,37 @@ function rigaScambioOnchainP2P(o){
     + 'onclick="apriScambioOnchainMioP2P(this.dataset.id)">'
     + (chiuso && data ? '<span class="p2p-scambio-chiuso">' + esc(data) + '</span>' : '')
     + righe
+    /* la convenienza, come sulla card di Lightning (17 nov 2026) */
+    + (typeof premioOcMioP2P === 'function' ? premioOcMioP2P(o) : '')
     + '<div class="p2p-scambio-stato' + tintaOnchainP2P(o) + '"><span>' + esc(st.t) + '</span>' + agire
     + (st.d ? '<span class="p2p-aspetta-riga">' + esc(st.d) + '</span>' : '') + '</div>'
     + (typeof pagaReteCardP2P === 'function' ? pagaReteCardP2P : x => x)(metodi.length ? '<div class="p2p-box p2p-paga" title="' + esc(metodi.join(', ')) + '">'
        + iconaMetodiP2P(metodi) + metodi.map(m => marchioMetodoP2P(m)).join(', ') + '</div>' : '', 'btc')
     + '</div>';
+}
+/* LA CONVENIENZA SULLA CARD ON-CHAIN DI «I MIEI SCAMBI» (17 nov 2026,
+   cantiere convenienza-monete, Andrea: «nelle card [...] on-chain non
+   c'è la convenienza. In tutte le altre card c'è»). La STESSA riga della
+   card di Lightning (`premioMioP2P`: «X% più conveniente per te», la
+   tinta dal giudice di tutti), col lato di chi legge — `parte` 'compro'
+   vuol dire che i sats arrivano a me, il 'sell' del libro.
+   • A MERCATO il premio scelto, che e' esatto prima e dopo la presa: i
+     sats della presa li fa il server con quel premio
+     (`p2p_onchain_sats_mercato`).
+   • A SATS FISSI, finche' l'ordine e' nel libro, la convenienza vera di
+     adesso nella sua valuta (`perSatP2P`: euro, dollaro, franco o
+     moneta), come la card del libro. Preso, il server non timbra un
+     cambio della presa per i prezzi fissi on-chain: la card tace, mai un
+     numero inventato. */
+function premioOcMioP2P(o){
+  if (!o || typeof premioMioP2P !== 'function') return '';
+  const lato = o.parte === 'compro' ? 'sell' : 'buy';
+  if (o.mercato) return premioMioP2P({lato: lato, premium: Number(o.premio) || 0, sats: 0});
+  const sats = Number(o.sats) || 0;
+  if (o.stato !== 'pending' || !(sats > 0) || typeof convenienzaFissaP2P !== 'function') return '';
+  const p = convenienzaFissaP2P({sats: sats, euro: Number(o.euro) || 0},
+                                typeof perSatP2P === 'function' ? perSatP2P(o) : 0);
+  return p === null ? '' : premioMioP2P({lato: lato, premium: p, sats: 0});
 }
 /* il tocco: «Nel dettaglio», la porta unica del design */
 function apriScambioOnchainMioP2P(id){
@@ -65330,14 +65363,23 @@ function riquadroUsdtOcP2P(o){
   const r = reteOcUsdtP2P(o);
   if (!r || !o.recapito) return '';
   return '<div class="p2p-box"><b>💵 Manda gli USDT su ' + esc(r.nome) + ' (' + esc(r.standard) + ')</b>'
-    + '<div class="mono" style="word-break:break-all">' + esc(o.recapito) + '</div>'
+    /* L'INDIRIZZO COL SUO «📋 Copia» ACCANTO (17 nov 2026, cantiere
+       convenienza-monete, Andrea: «Non c'è il copia affianco
+       all'indirizzo» e «sembra che quel tasto copi l'indirizzo del
+       contratto»). Il tasto grande «Copia l'indirizzo» stava in fondo,
+       SOTTO il contratto del vero USDT: copiava l'indirizzo giusto, ma a
+       vederlo sembrava il tasto del contratto — e chi incolla il
+       contratto come destinazione perde i fondi. Adesso la riga
+       dell'indirizzo e' la stessa della cifra (`rigaDato`, col tocco sul
+       valore), e il tasto in fondo non c'e' piu': un Copia solo, attaccato
+       a quel che copia. Vedi `riquadroCoinOcP2P`, uguale. */
+    + rigaDato('Indirizzo di destinazione', o.recapito, {mono: true, copia: true})
     /* la cifra da mandare col suo «📋 Copia» (14 nov 2026, cantiere
        usdt-cifra-copia): vedi `rigaCifraUsdtP2P` */
     + rigaCifraUsdtP2P(o.euro)
     + '<div id="p2pOcUsdtQr" class="qr" data-qr="' + esc(qrUsdtP2P(r, o.recapito, o.euro)) + '"></div>'
     + '<div class="hint">⚠️ Solo sulla rete ' + esc(r.nome) + ': con un\'altra rete gli USDT si perdono. '
-    + 'Contratto del vero USDT: <span class="mono">' + esc(r.contratto) + '</span></div>'
-    + '<button type="button" class="btn ghost" onclick="copiaOnchainP2P(' + esc(JSON.stringify(o.recapito)) + ')">📋 Copia l\'indirizzo</button></div>';
+    + 'Contratto del vero USDT: <span class="mono">' + esc(r.contratto) + '</span></div></div>';
 }
 /* l'id della transazione, a chi c'e' (le parti e il moderatore) */
 function txidUsdtOcP2P(o){
@@ -65425,13 +65467,14 @@ function riquadroCoinOcP2P(o){
   if (!r || !vc || !o.recapito) return '';
   const q = testoQuantoCoinP2P(o.euro, vc.cod);
   return '<div class="p2p-box"><b>🪙 Manda ' + esc(vc.segno) + ' su ' + esc(r.nome) + '</b>'
-    + '<div class="mono" style="word-break:break-all">' + esc(o.recapito) + '</div>'
+    /* l'indirizzo col suo «📋 Copia» accanto, e niente tasto in fondo
+       sotto il contratto (17 nov 2026): vedi `riquadroUsdtOcP2P` */
+    + rigaDato('Indirizzo di destinazione', o.recapito, {mono: true, copia: true})
     + (q ? rigaDato('Da mandare', q, {vista: fmtQuantoCoinP2P(o.euro, vc.cod) + ' ' + vc.segno, mono: true, copia: true}) : '')
     + '<div id="p2pOcUsdtQr" class="qr" data-qr="' + esc(qrCoinP2P(r, o.recapito, (Number(o.euro) || 0).toFixed(6))) + '"></div>'
     + '<div class="hint">⚠️ Solo sulla rete ' + esc(r.nome) + ': con un\'altra rete i fondi si perdono.'
     + (r.token ? ' Contratto del vero ' + esc(vc.segno) + ': <span class="mono">' + esc(r.token) + '</span>' : '')
-    + ' Conserva l\'id della transazione: in una disputa lo chiede il moderatore.</div>'
-    + '<button type="button" class="btn ghost" onclick="copiaOnchainP2P(' + esc(JSON.stringify(o.recapito)) + ')">📋 Copia l\'indirizzo</button></div>';
+    + ' Conserva l\'id della transazione: in una disputa lo chiede il moderatore.</div></div>';
 }
 
 /* «Dove vuoi gli euro»: la sezione in piu' di chi vende on-chain (in
@@ -65794,6 +65837,32 @@ function commissioneOnchainP2P(o, deposito){
   const meta = Math.round(sats * mia / 2);
   if (meta + Math.round(sats * viva / 2) < 546) return {sats: 0, stima: true};
   return {sats: meta, stima: true};
+}
+/* PURA: I SATS DELLA CARD ON-CHAIN DI «I MIEI SCAMBI», AL NETTO (17 nov
+   2026, cantiere convenienza-monete, Andrea davanti a «Vuoi ricevere
+   744 036 sats» e al conto che diceva «Ricevi 736 596»: «dovrebbe esserci
+   scritto ciò che ricevo al netto della fee»). E' il totale in sats del
+   conto (`contoOnchainP2P`), con gli stessi pezzi e lo stesso verso: chi
+   riceve trova tolte la sua meta' della commissione e lo swap, chi
+   deposita li mette sopra (e, preso, deposita `importo_sats`, margine di
+   rete compreso). `circa` quando qualcosa e' una stima: la base a mercato
+   prima della presa, la commissione stimata, lo swap. null senza una base
+   (a mercato e senza cambio): la card dice la frase di sempre.
+   ⚠️ DUE COPIE DELLO STESSO CONTO: una prova di casa le confronta
+   (`prove_convenienza_monete`), card e «Ricevi» non devono scollarsi. */
+function satsNettiOnchainP2P(o){
+  if (!o) return null;
+  const compro = o.parte !== 'vendo';
+  const deposito = o.ruolo === 'compratore';
+  const versa = deposito || (!o.ruolo && !compro);
+  const stima = o.mercato && !(Number(o.sats) > 0);
+  const base = stima ? (Number(o.stima) || 0) : (Number(o.sats) || 0);
+  if (!(base > 0)) return null;
+  const comm = typeof commissioneOnchainP2P === 'function' ? commissioneOnchainP2P(o, versa) : null;
+  const cs = comm ? Number(comm.sats) || 0 : 0;
+  const sw = o.swap && Number(o.swap.sats) > 0 ? Math.round(Number(o.swap.sats)) : 0;
+  const tot = (versa ? (deposito ? (o.importo_sats || o.sats) : base + cs) : base - cs) + (versa ? sw : -sw);
+  return {sats: tot, circa: !!(stima || (cs && comm.stima) || sw)};
 }
 function contoOnchainP2P(o){
   /* i pezzi degli USDT on-chain (2 nov 2026) col typeof: i banchi che
@@ -93708,6 +93777,9 @@ function comeLibroP2P(o){
              coordinatore, che arrivano solo dopo la presa — non
              `satsNetti`, che l'eco della pubblicazione scrive a un
              ordine fisso ancora nel libro (la lezione di 7251798). */
+          /* in moneta la cifra in euro del filo (17 nov 2026): dopo la
+             presa la convenienza si conta su quella (`convenienzaPresaP2P`) */
+          euroNodo: o.euroNodo || 0,
           preso: o.satsMiei > 0, cambioPresa: o.cambioPresa || 0};
 }
 /* PURA: i sats di uno scambio mio, in tre casi per ordine di VERITA'.
@@ -93785,6 +93857,33 @@ function satsScambioP2P(o){
    A premio zero la frase c'e' lo stesso: «nessun badge» lascerebbe la
    card muta proprio sul caso piu' comune. A prezzo fisso niente fino al
    26 set 2026; dal 27 la convenienza vera, qui sotto. */
+/* PURA: LA CONVENIENZA DI UN MIO SCAMBIO A SATS FISSI (17 nov 2026,
+   cantiere convenienza-monete, Andrea: «in tutte le altre card c'è la
+   convenienza [...] da quando abbiamo fatto queste modifiche non c'è
+   più»). Quella di sempre (`convenienzaFissaP2P` col metro di
+   `metroFissoP2P`), e quando quella tace su uno scambio PRESO in
+   un'altra valuta — il cambio della presa che il server timbra e' in
+   EURO, e su un ordine in USDT, in franchi o in moneta `metroFissoP2P`
+   da' zero apposta — la si rifa' cosi':
+   • IN MONETA (ETH, XMR, USDe) il filo e' in euro: `euroNodo` e' la
+     cifra in euro che il coordinatore conosce, e col cambio della presa
+     in euro il conto e' lo stesso di un ordine in euro, fermo per
+     sempre come quello;
+   • IN USDT E IN FRANCHI il bitcoin e' quello della presa, e il passo
+     dall'euro alla valuta (dollaro o franco per euro) e' quello di
+     adesso: si muove di decimi al giorno, e la percentuale e' intera.
+   Senza il cambio della presa resta null: la card tace, mai un numero
+   inventato. */
+function convenienzaPresaP2P(o){
+  const c = convenienzaFissaP2P(o, metroFissoP2P(o));
+  if (c !== null || !o || !o.preso || !(Number(o.cambioPresa) > 0)) return c;
+  const presa = Number(o.cambioPresa) / 1e8;
+  if (Number(o.euroNodo) > 0) return convenienzaFissaP2P({sats: o.sats, euro: Number(o.euroNodo)}, presa);
+  const altra = (typeof usdtP2P === 'function' && usdtP2P(o)) || (typeof chfP2P === 'function' && chfP2P(o));
+  const perSat = altra && typeof perSatP2P === 'function' ? perSatP2P(o) : 0;
+  if (!(perSat > 0) || !cambioVivo || !(eurPerSat > 0)) return null;
+  return convenienzaFissaP2P(o, presa * perSat / eurPerSat);
+}
 function premioMioP2P(o){
   /* A SATS FISSI LA CONVENIENZA VERA, anche per chi ha pubblicato (27
      set 2026, richiesta di Andrea): finche' e' nel libro quella di
@@ -93793,7 +93892,19 @@ function premioMioP2P(o){
      cambio) — qui si guarda anche uno scambio chiuso, e un affare
      fatto non cambia col mercato. Preso e senza il cambio della presa
      (gli scambi di prima di oggi): la card tace. */
-  const p = o.sats > 0 ? convenienzaFissaP2P(o, metroFissoP2P(o)) : (o.premium || 0);
+  /* ⚠️ COL PREMIO I SATS NON SONO FISSI (17 nov 2026, cantiere
+     convenienza-monete, Andrea: «nelle card USDT [...] non c'è più la
+     percentuale di convenienza»): la regola del coordinatore di
+     `contoDettP2P` — con `amount` > 0 il premio e' zero — quindi un
+     premio vuol dire mercato, anche se la riga si porta dietro i sats
+     che mostrod ha ripubblicato alla presa. Quei sats facevano credere
+     la card a sats fissi, e in USDT dopo la presa il metro e' zero:
+     la card taceva. */
+  const fisso = o.sats > 0 && !Math.round(Number(o.premium) || 0);
+  /* (il typeof: i banchi che ritagliano questa funzione da sola) */
+  const p = fisso ? (typeof convenienzaPresaP2P === 'function' ? convenienzaPresaP2P(o)
+                                                                : convenienzaFissaP2P(o, metroFissoP2P(o)))
+                  : (o.premium || 0);
   if (p === null) return '';
   if (!Math.round(p))
     return '<span class="p2p-badge">al prezzo di mercato</span>';
