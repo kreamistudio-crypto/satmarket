@@ -87202,3 +87202,66 @@ in produzione con un PayCode di prova. La revisione di Alan: il PayCode
 sul server e il cancello in `_p2p_onchain_per` sono il pezzo da
 rileggere. Nella scheda on-chain «Totale da inviare» resta la parola di
 sempre anche col tabacchino.
+
+## I livelli a carosello (17 nov 2026)
+
+Il compito (Andrea): un video, senza testo, del programma fedeltà di
+un'altra app — tessere dei livelli da scorrere col dito, un anello
+«416 su 500 punti» sul proprio, i successivi col lucchetto, «Altri 84
+punti e…», e sotto i vantaggi del livello che si guarda, spuntati o
+chiusi. Lettura confermata: lo stesso flusso per i cinque gradini di
+Barattolo, con la grafica di casa.
+
+**Cosa.** Nel cassetto «🎖 Livello e titolo» le cinque righe della scala
+(6 ott) diventano un nastro orizzontale (`.liv-car`, scroll-snap, una
+tessera per gradino al 60% della larghezza, il nastro sborda di 14px per
+lato così la tessera accanto spunta: è l'invito a scorrere). Sulla
+PROPRIA tessera l'anello SVG misura il tratto DENTRO il gradino, come
+faceva la barra (320 XP fra 200 e 800 = un quinto di cerchio), col
+numero al centro («320 / su 800 XP») e sotto la frase di `fraseManca`;
+le passate hanno la spunta verde e «Già tuo»; quelle davanti il
+lucchetto e la soglia («Da 800 XP e 15 affari»); un filo tratteggiato le
+lega come tappe. Sotto, i puntini con ‹ › e UN pannello alla volta,
+«Vantaggi del livello X»: ✅ sulle righe già mie, 🔒 su quelle da aprire,
+con le stesse righe di `vantaggiLivello` (leve vive, niente promesse).
+All'apertura il nastro si centra sul proprio gradino (`livCarCentra`,
+chiamata al disegno e da `toggleAcc`: dentro un cassetto chiuso il
+nastro non ha larghezza e lo scroll non attacca). La barra e la frase di
+ieri restano SOLO per un server senza scala.
+
+**Perché così.** `scalaLivelliHTML(scala, mio, xp, affari)` resta PURA e
+sforna tutti i pannelli (uno visibile, gli altri `hidden`), così il
+banco node la prova intera senza DOM; lo scorrimento è un `onscroll`
+diretto — cinque tessere, niente `requestAnimationFrame` da censire nel
+giro degli effetti ridotti — e la scorsa dei ‹ › chiede a `tourRidotto`.
+A zero l'arco non si disegna: con le punte tonde un arco lungo zero era
+un puntino arancione in cima ai lucchetti (visto nello scuro). Il fondo
+dell'anello usa `--b-off-bg`, che ha la sua tinta anche nel tema scuro
+(`--off-bg` non ce l'ha).
+
+**Il regalo del livello.** Accordo col cantiere del merch «Un tempo per
+te» (37950a4, arrivato su develop durante questo giro): il server mette
+in ogni gradino di `scala_livelli()` la chiave `regalo`, testo breve con
+l'emoji davanti, '' a leva spenta o senza regalo; `vantaggiLivello` la
+scrive come ultima riga «🎁 un regalo: …» (scappata), e nel carosello
+esce ✅ o 🔒 col gradino. Lo stato personale (richiesto, spedito) e il
+blocco per chiederlo sono suoi (`regaliBlocco`, sotto `livelloBlocco`
+nello stesso cassetto).
+
+**Scartato.** Un secondo anello per gli affari (due cerchi in 72px non
+si leggono: la frase li dice). Il «menù diverso per livello», la
+stradina degli obiettivi e gli amici sulla stradina, chiesti nello stesso
+giro: cantieri a parte, aspettano il sì di Andrea (il thread del
+minigioco ha ricordato la regola scritta degli XP: solo commercio, niente
+compiti ripetibili a costo zero — da non rovesciare senza il suo sì).
+
+**Provato.** `prove_vantaggi_livelli` (banco node: le cinque frasi,
+l'anello a un quinto, il numero dentro, un pannello visibile e quattro
+nascosti, 6 spunte e 7 lucchetti, il massimo col 🫙, la chiamata senza
+numeri). Chromium a 360px, chiaro e scuro: apertura centrata sul 3, › va
+al 4 e cambia pannello e puntino, scroll a zero mostra il pannello 1.
+Categoria `mercatino` della suite verde (le 6 rosse erano il
+`websocket` mancante nell'ambiente, poi installato).
+
+DA GUARDARE. Sul telefono vero il nastro sotto il dito; la tessera
+accanto a 320px di schermo.

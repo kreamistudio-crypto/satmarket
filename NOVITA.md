@@ -428,3 +428,9 @@ frase: Barattozon adesso c'è anche on-chain: in «Vendi BTC» col tabacchino pu
 dove: Il P2P, «Vendi BTC» → la capsula Barattozon (o il + col metodo «Contanti al tabacchino»), il tasto «On-chain» in cima al foglio; nello scambio il riquadro «🧾 Il PayCode da pagare al tabacchino».
 leva: P2P_ONCHAIN_BARATTOZON (accesa di serie)
 pubblico: sì
+
+## 2026-11-17 · livelli-carosello
+frase: I tuoi livelli adesso si sfogliano: nel Profilo, sotto «Livello e titolo», ogni livello è una tessera da scorrere col dito. Sulla tua c'è l'anello con i tuoi XP sulla soglia del prossimo, i livelli già passati hanno la spunta, quelli davanti il lucchetto, e sotto vedi i vantaggi del livello che stai guardando: ✅ quelli già tuoi, 🔒 quelli da sbloccare.
+dove: Profilo → «🎖 Livello e titolo» → «I vantaggi di ogni livello».
+leva: nessuna
+pubblico: sì

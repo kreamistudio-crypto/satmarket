@@ -6422,6 +6422,68 @@
   .barra-xp i{display:block;height:100%;border-radius:99px;
     background:var(--sats);transition:width .4s ease}
   @media (prefers-reduced-motion: reduce){.barra-xp i{transition:none}}
+  /* IL CAROSELLO DEI LIVELLI (17 nov 2026, spunto di Andrea da un
+     programma fedelta'): una tessera per gradino, da scorrere col
+     dito, col proprio gradino al centro all'apertura. L'anello misura
+     il tratto DENTRO il gradino come faceva la barra; i gradini gia'
+     passati portano la spunta, quelli davanti il lucchetto, e un filo
+     tratteggiato li lega come le tappe di un percorso. Sotto, i
+     vantaggi del gradino che si sta guardando: ✓ se gia' tuoi, 🔒 se
+     ancora da aprire. Il nastro sborda dal cassetto (14px per lato)
+     perche' la tessera accanto si veda spuntare: e' l'invito a
+     scorrere, piu' chiaro di una freccia. */
+  .liv-car{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
+    scrollbar-width:none;overscroll-behavior-x:contain;margin:14px -14px 0;
+    padding:4px 20% 2px;gap:0;scroll-padding:0 20%}
+  .liv-car::-webkit-scrollbar{display:none}
+  .liv-tess{flex:0 0 60%;min-width:0;scroll-snap-align:center;
+    scroll-snap-stop:always;text-align:center;position:relative;
+    padding:0 6px}
+  .liv-tess .liv-filo{position:absolute;top:36px;height:0;
+    border-top:2px dashed var(--line);width:50%}
+  .liv-tess .liv-filo.sx{left:0}
+  .liv-tess .liv-filo.dx{right:0}
+  .liv-tess:first-child .liv-filo.sx,.liv-tess:last-child .liv-filo.dx{display:none}
+  .liv-anello{position:relative;width:72px;height:72px;margin:0 auto;
+    border-radius:50%;background:var(--card);display:flex;
+    align-items:center;justify-content:center;
+    box-shadow:0 0 0 1px var(--line)}
+  .liv-anello svg{position:absolute;inset:0;width:72px;height:72px;
+    transform:rotate(-90deg)}
+  .liv-anello svg circle{fill:none;stroke-width:6}
+  .liv-anello svg .fondo{stroke:var(--b-off-bg)}
+  .liv-anello svg .pieno{stroke:var(--sats);stroke-linecap:round;
+    transition:stroke-dasharray .4s ease}
+  .liv-anello .liv-dentro{position:relative;font-family:var(--mono);
+    font-size:11px;font-weight:700;line-height:1.15;color:var(--ink)}
+  .liv-anello .liv-dentro b{display:block;font-size:15px}
+  .liv-anello .liv-dentro small{display:block;font-size:9.5px;color:var(--muted)}
+  .liv-anello.fatto{background:var(--trust-soft)}
+  .liv-anello.fatto svg .pieno{stroke:var(--trust)}
+  .liv-anello.fatto .liv-dentro{font-size:26px;color:var(--trust)}
+  .liv-anello.chiuso{background:var(--b-off-bg)}
+  .liv-anello.chiuso .liv-dentro{font-size:24px;filter:grayscale(1);opacity:.75}
+  .liv-tess .liv-nome{font-family:var(--font-tit);font-size:14px;
+    font-weight:800;margin-top:10px;color:var(--ink);line-height:1.25}
+  .liv-tess.chiusa .liv-nome{color:var(--muted)}
+  .liv-tess .liv-qui{display:block;width:max-content;font-size:10.5px;
+    font-weight:800;color:#fff;background:var(--sats);border-radius:99px;
+    padding:1px 8px;margin:4px auto 0}
+  .liv-tess .liv-frase{font-size:12.5px;color:var(--ink-soft);
+    font-weight:600;line-height:1.4;margin-top:4px;min-height:2.8em}
+  .liv-punti{display:flex;justify-content:center;align-items:center;
+    gap:6px;margin-top:8px}
+  .liv-punti i{width:6px;height:6px;border-radius:50%;background:var(--line)}
+  .liv-punti i.on{background:var(--sats);width:8px;height:8px}
+  .liv-punti button{font:inherit;background:none;border:0;color:var(--muted);
+    font-size:18px;line-height:1;padding:2px 10px;cursor:pointer}
+  .liv-vant{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+  .liv-vant[hidden]{display:none}
+  .liv-vant .liv-riga{display:flex;gap:8px;align-items:flex-start;
+    padding:5px 0;font-size:13px;line-height:1.4;color:var(--ink)}
+  .liv-vant .liv-riga .ic{flex:0 0 18px;text-align:center}
+  .liv-vant .liv-riga.no{color:var(--ink-soft)}
+  @media (prefers-reduced-motion: reduce){.liv-anello svg .pieno{transition:none}}
   /* I titoli: pillole come il tema, ma quelle non ancora sbloccate
      restano IN ELENCO e spente, col perche' scritto — e' la molla,
      la stessa dei distintivi mancanti in grigio. */
@@ -41152,7 +41214,10 @@ let myDoppioni = [];     // coppie importato/nativo sospette, da /api/me
 /* ---- i cassetti del Profilo: un tocco sull'header apre e chiude ---- */
 function toggleAcc(id){
   haptic();
-  el(id)?.classList.toggle('open');
+  const aperto = el(id)?.classList.toggle('open');
+  // il carosello dei livelli si centra sul proprio gradino quando il
+  // cassetto si apre (chiuso non ha larghezza: vedi livCarCentra)
+  if (aperto && id === 'accLivello') livCarCentra();
 }
 
 /* ---- le sezioni del Profilo: gemelle dei cassetti un piano piu' su.
@@ -41434,14 +41499,17 @@ function renderLivello(){
   const numLiv = Math.max(0, Math.floor(Number(myLivello.numero)) || 0);
   const vantaggio = rigaVantaggioLivello(myLivello,
     (typeof p2pAcceso === 'function' && p2pAcceso()) ? p2pSconto : null);
+  /* IL CAROSELLO (17 nov 2026) prende il posto della barra e della
+     frase «mancano…»: le dice lui, sulla tessera del gradino. La barra
+     resta SOLO per un server di ieri che la scala non la manda. */
+  const carosello = scalaLivelliHTML(myScalaLivelli, numLiv, myXp, myAffari);
   box.innerHTML = `
     <div class="grado">${esc(myLivello.nome)}${numLiv ? ` · Lv.&nbsp;${numLiv}` : ''}</div>
     <div class="grado-xp">${fmt(myXp)} XP · ${fmt(myAffari)} affari conclusi</div>
     <div class="hint" style="margin-top:6px">${fraseXp(myXpRuoli)}</div>
-    <div class="barra-xp"><i style="width:${q}%"></i></div>
-    <div class="hint">${manca}</div>
+    ${carosello || `<div class="barra-xp"><i style="width:${q}%"></i></div>
+    <div class="hint">${manca}</div>`}
     ${vantaggio ? `<div class="hint" style="margin-top:6px">${vantaggio}</div>` : ''}
-    ${scalaLivelliHTML(myScalaLivelli, numLiv)}
     <div style="margin-top:16px"><b>Il tuo titolo</b></div>
     <div class="hint">Compare sotto il tuo nome, dove ti vedono gli altri.</div>
     <div class="titoli">
@@ -41454,6 +41522,7 @@ function renderLivello(){
       ).join('')}
     </div>
     ${rigaClassificaNascosta()}`;
+  livCarCentra();
 }
 
 /* I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea): una riga
@@ -41462,7 +41531,15 @@ function renderLivello(){
    e un vantaggio a leva spenta non arriva — quindi non si promette.
    Il gradino di chi legge si riconosce, quelli gia' passati restano
    in elenco: si sa cosa si ha, non solo cosa manca. Un server di ieri
-   non manda la scala, e il blocco non c'e'. */
+   non manda la scala, e il blocco non c'e'.
+   DAL 17 NOV 2026 LA SCALA E' UN CAROSELLO (spunto di Andrea da un
+   programma fedelta' visto su un'altra app): una tessera per gradino
+   da scorrere col dito, l'anello del progresso sulla propria, la
+   spunta sulle passate, il lucchetto su quelle davanti, e sotto i
+   vantaggi del gradino che si guarda, ✓ o 🔒. `scalaLivelliHTML`
+   resta PURA (scala, gradino, xp, affari → HTML, tutti i pannelli
+   dentro, uno solo visibile): il banco node la fa girare cosi'. Lo
+   scorrimento vero lo seguono `livCarScorri` e `livCarVai`. */
 function vantaggiLivello(g){
   const v = [];
   if (g.banner_sconto > 0) v.push(`−${fmt(g.banner_sconto)}% sul banner del negozio`);
@@ -41470,23 +41547,128 @@ function vantaggiLivello(g){
   if (g.titolo) v.push(`il titolo «${esc(g.titolo)}»`);
   const p2p = scontoFedeltaTestoP2P(g.p2p_sconto);
   if (p2p) v.push(`${p2p} sulle commissioni P2P`);
+  /* IL REGALO DEL LIVELLO (17 nov 2026, accordo col cantiere del merch
+     di Barattolo): il server mette in `regalo` un testo breve, ''
+     a leva spenta o se il gradino non da' niente; lo stato personale
+     (richiesto, spedito) vive altrove e qui non serve. Un server di
+     ieri la chiave non la manda: niente riga. */
+  if (g.regalo) v.push(`🎁 un regalo: ${esc(g.regalo)}`);
   return v;
 }
-function scalaLivelliHTML(scala, mio){
+/* L'anello del progresso: un cerchio SVG riempito per `q` centesimi,
+   col testo al centro. Pura. */
+function anelloLivelloHTML(q, dentro, classe){
+  const C = 2 * Math.PI * 30;            // raggio 30 su una scatola di 72
+  const pieno = Math.max(0, Math.min(100, Number(q) || 0)) / 100 * C;
+  return `<div class="liv-anello ${classe || ''}">`
+    + `<svg viewBox="0 0 72 72" aria-hidden="true">`
+    + `<circle class="fondo" cx="36" cy="36" r="30"></circle>`
+    // a zero niente arco: con le punte tonde un arco lungo zero e' un puntino
+    + (pieno > 0 ? `<circle class="pieno" cx="36" cy="36" r="30" stroke-dasharray="${pieno.toFixed(1)} ${C.toFixed(1)}"></circle>` : '')
+    + `</svg><div class="liv-dentro">${dentro}</div></div>`;
+}
+function sogliaLivelloTesto(g, n){
+  return n <= 1 ? 'da subito'
+    : `da ${fmt(g.xp)} XP e ${fmt(g.affari)} ${g.affari === 1 ? 'affare' : 'affari'}`;
+}
+function scalaLivelliHTML(scala, mio, xp, affari){
   if (!Array.isArray(scala) || !scala.length) return '';
-  const righe = scala.map(g => {
+  xp = Math.max(0, Number(xp) || 0); affari = Math.max(0, Number(affari) || 0);
+  mio = Math.floor(Number(mio)) || 0;
+  const tessere = [], pannelli = [], punti = [];
+  scala.forEach((g, i) => {
     const n = Math.floor(Number(g.numero)) || 0;
-    const soglia = n <= 1 ? 'da subito'
-      : `da ${fmt(g.xp)} XP e ${fmt(g.affari)} ${g.affari === 1 ? 'affare' : 'affari'}`;
+    const pross = scala[i + 1] || null;
+    const qui = n === mio, fatto = n < mio;
+    const soglia = sogliaLivelloTesto(g, n);
+    let anello, frase;
+    if (fatto) {
+      anello = anelloLivelloHTML(100, '✓', 'fatto');
+      frase = 'Già tuo';
+    } else if (qui) {
+      /* L'anello misura il tratto DENTRO il gradino, come la barra di
+         prima: da 200 a 800 si parte da vuoto, o chi e' appena salito
+         si vedrebbe gia' a tre quarti. */
+      const da = Number(g.xp) || 0, a = pross ? Number(pross.xp) || 0 : 0;
+      const q = pross ? Math.round((xp - da) / Math.max(1, a - da) * 100) : 100;
+      const dentro = pross
+        ? `<b>${fmt(xp)}</b><small>su ${fmt(a)} XP</small>`
+        : '<b>🫙</b>';
+      anello = anelloLivelloHTML(q, dentro, 'mio');
+      frase = fraseManca({numero: n, xp_prossimo: pross ? pross.xp : 0,
+                          affari_prossimo: pross ? pross.affari : 0,
+                          nome_prossimo: pross ? pross.nome : ''}, xp, affari);
+    } else {
+      anello = anelloLivelloHTML(0, '🔒', 'chiuso');
+      frase = soglia[0].toUpperCase() + soglia.slice(1);
+    }
+    tessere.push(`<div class="liv-tess ${qui ? 'mia' : fatto ? 'fatta' : 'chiusa'}" data-n="${n}">`
+      + `<i class="liv-filo sx"></i><i class="liv-filo dx"></i>${anello}`
+      + `<div class="liv-nome">Lv.&nbsp;${n} · ${esc(g.nome)}${qui ? '<span class="liv-qui">sei qui</span>' : ''}</div>`
+      + `<div class="liv-frase">${frase}</div></div>`);
     const v = vantaggiLivello(g);
-    const qui = n === mio;
-    return `<div style="padding:6px 0;border-top:1px solid var(--line);${qui ? 'font-weight:800' : ''}">`
-      + `<b>Lv.&nbsp;${n} · ${esc(g.nome)}</b>${qui ? ' · <span style="color:var(--sats)">sei qui</span>' : ''}`
-      + `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">${soglia}: `
-      + (v.length ? v.join(' · ') : 'il punto di partenza') + `</div></div>`;
-  }).join('');
+    const aperti = n <= mio;
+    const sotto = aperti
+      ? (n <= 1 ? `Si apre ${soglia}: il punto di partenza.` : 'Questi vantaggi sono già tuoi.')
+      : `Si apre ${soglia}.`;
+    const righe = (v.length ? v : ['il punto di partenza']).map(t =>
+      `<div class="liv-riga ${aperti ? 'si' : 'no'}"><span class="ic">${aperti ? '✅' : '🔒'}</span><span>${t[0].toUpperCase() + t.slice(1)}</span></div>`).join('');
+    pannelli.push(`<div class="liv-vant" data-n="${n}"${qui ? '' : ' hidden'}>`
+      + `<b>Vantaggi del livello ${esc(g.nome)}</b>`
+      + `<div class="hint" style="margin-top:2px">${sotto}</div>${righe}</div>`);
+    punti.push(`<i class="${qui ? 'on' : ''}" data-n="${n}"></i>`);
+  });
   return `<div style="margin-top:16px"><b>I vantaggi di ogni livello</b></div>`
-    + `<div style="margin-top:6px">${righe}</div>`;
+    + `<div class="liv-car" id="livCar" data-mio="${mio}" onscroll="livCarScorri(this)">${tessere.join('')}</div>`
+    + `<div class="liv-punti" id="livPunti">`
+    + `<button type="button" onclick="livCarVai(-1)" aria-label="Livello precedente">‹</button>`
+    + punti.join('')
+    + `<button type="button" onclick="livCarVai(1)" aria-label="Livello successivo">›</button></div>`
+    + `<div id="livVantaggi">${pannelli.join('')}</div>`;
+}
+/* Il gradino al centro del nastro: quello piu' vicino alla meta'
+   della finestra visibile. */
+function livCarAlCentro(car){
+  const centro = car.scrollLeft + car.clientWidth / 2;
+  let vinto = null, dist = Infinity;
+  car.querySelectorAll('.liv-tess').forEach(t => {
+    const d = Math.abs(t.offsetLeft + t.offsetWidth / 2 - centro);
+    if (d < dist) { dist = d; vinto = t; }
+  });
+  return vinto;
+}
+/* Segue il dito: a ogni scorrimento il pannello e il puntino del
+   gradino al centro. Cinque tessere e dieci nodi: si fa diretto, senza
+   fotogrammi da aspettare (niente requestAnimationFrame da censire). */
+function livCarScorri(car){
+  const t = livCarAlCentro(car);
+  if (!t) return;
+  const n = t.dataset.n;
+  document.querySelectorAll('#livVantaggi .liv-vant').forEach(p => {
+    p.hidden = p.dataset.n !== n; });
+  document.querySelectorAll('#livPunti i').forEach(p => {
+    p.classList.toggle('on', p.dataset.n === n); });
+}
+function livCarVai(delta){
+  const car = el('livCar');
+  if (!car) return;
+  const t = livCarAlCentro(car);
+  const n = (Math.floor(Number(t && t.dataset.n)) || 1) + delta;
+  const dest = car.querySelector(`.liv-tess[data-n="${n}"]`);
+  if (!dest) return;
+  haptic();
+  car.scrollTo({left: dest.offsetLeft - (car.clientWidth - dest.offsetWidth) / 2,
+                behavior: tourRidotto() ? 'auto' : 'smooth'});
+}
+/* All'apertura il nastro si mette sul PROPRIO gradino, senza
+   animazione. Si chiama al disegno e all'apertura del cassetto: un
+   nastro dentro un `display:none` non ha larghezza, e lo scroll messo
+   li' non attacca. */
+function livCarCentra(){
+  const car = el('livCar');
+  if (!car || !car.clientWidth) return;
+  const dest = car.querySelector(`.liv-tess[data-n="${car.dataset.mio}"]`);
+  if (dest) car.scrollLeft = dest.offsetLeft - (car.clientWidth - dest.offsetWidth) / 2;
 }
 
 /* «🏆 Non mostrarmi in classifica» (set 2026, ritocchi piccoli,

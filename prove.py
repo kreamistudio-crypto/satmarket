@@ -128695,8 +128695,16 @@ def prove_vantaggi_livelli():
 
     mini = open("miniapp.html", encoding="utf-8").read()
     rl = pezzo_js(mini, "function renderLivello(){", "\n}\n")
-    prova("il cassetto del livello disegna la scala", True,
-          "scalaLivelliHTML(myScalaLivelli, numLiv)" in rl)
+    # DAL 17 NOV 2026 la scala e' un CAROSELLO, e vuole anche xp e affari
+    # (l'anello e la frase «mancano…» stanno sulla tessera)
+    prova("il cassetto del livello disegna la scala, coi miei numeri", True,
+          "scalaLivelliHTML(myScalaLivelli, numLiv, myXp, myAffari)" in rl)
+    prova("...la barra di ieri resta SOLO per un server senza scala", True,
+          "${carosello || `<div class=\"barra-xp\">" in rl)
+    prova("...e all'apertura del cassetto il nastro si centra", True,
+          "livCarCentra();" in rl
+          and "if (aperto && id === 'accLivello') livCarCentra();"
+          in pezzo_js(mini, "function toggleAcc(id){", "\n}\n"))
     node = _sh.which("node")
     if not node:
         salta("la scala dei vantaggi gira", "node non installato")
@@ -128705,14 +128713,32 @@ def prove_vantaggi_livelli():
         pezzo_js(mini, "const esc = s =>", "));") + "));",
         pezzo_js(mini, "function articoloPercentoP2P(", "\n}\n") + "\n}",
         pezzo_js(mini, "function scontoFedeltaTestoP2P(", "\n}\n") + "\n}",
+        pezzo_js(mini, "function fraseManca(", "\n}\n") + "\n}",
         pezzo_js(mini, "function vantaggiLivello(g){", "\n}\n") + "\n}",
-        pezzo_js(mini, "function scalaLivelliHTML(scala, mio){", "\n}\n")
-        + "\n}"]) + """
+        pezzo_js(mini, "function anelloLivelloHTML(", "\n}\n") + "\n}",
+        pezzo_js(mini, "function sogliaLivelloTesto(", "\n}\n") + "\n}",
+        pezzo_js(mini, "function scalaLivelliHTML(scala, mio, xp, affari){",
+                 "\n}\n") + "\n}"]) + """
 const fmt = n => Number(n).toLocaleString('it-IT');
 const sc = %s;
+const tess = h => h.split('class="liv-frase">').slice(1).map(s => s.split('</div>')[0]);
+const h = scalaLivelliHTML(sc, 3, 320, 7);
 console.log(JSON.stringify({
   righe: sc.map(vantaggiLivello),
-  html: scalaLivelliHTML(sc, 3),
+  html: h,
+  frasi: tess(h),
+  anello: (/class="liv-tess mia[^]*?stroke-dasharray="([\\d.]+) /.exec(h) || [])[1],
+  dentro: (/class="liv-tess mia[^]*?<div class="liv-dentro">([^]*?)<\\/div>/.exec(h) || [])[1],
+  visibile: (h.match(/<div class="liv-vant" data-n="(\\d)">/g) || []),
+  nascosti: (h.match(/ hidden>/g) || []).length,
+  spunte: (h.match(/<span class="ic">✅/g) || []).length,
+  lucchetti: (h.match(/<span class="ic">🔒/g) || []).length,
+  massimo: tess(scalaLivelliHTML(sc, 5, 4000, 50))[4],
+  massimo_dentro: scalaLivelliHTML(sc, 5, 4000, 50).includes('<b>🫙</b>'),
+  senza_numeri: tess(scalaLivelliHTML(sc, 3))[2],
+  tremila: fmt(3000),   // il node della CI puo' non avere l'ICU italiano
+  regalo: vantaggiLivello(Object.assign({}, sc[3], {regalo: 'la borsa <Un tempo per te>'})),
+  senza_regalo: vantaggiLivello(Object.assign({}, sc[3], {regalo: ''})),
   vuota: scalaLivelliHTML([], 1) + scalaLivelliHTML(undefined, 1)}));
 """ % _js.dumps(sc)
     import tempfile as _tfm
@@ -128724,10 +128750,12 @@ console.log(JSON.stringify({
     if r.returncode:
         return
     o = _js.loads(r.stdout)
-    prova("le righe dicono i vantaggi di ogni gradino",
-          [[], ["−10% sul banner del negozio", "il link del negozio a scelta"],
+    # dal 17 nov il regalo del gradino (cantiere del merch) e' l'ultima riga
+    prova("le righe dicono i vantaggi di ogni gradino, regalo compreso",
+          [[], ["−10% sul banner del negozio", "il link del negozio a scelta",
+                "🎁 un regalo: 👜 la borsa"],
            ["−20% sul banner del negozio", "il link del negozio a scelta",
-            "il titolo «🧺 Mercante pratico»"]],
+            "il titolo «🧺 Mercante pratico»", "🎁 un regalo: ☕ la tazza"]],
           o["righe"][:3])
     prova("...il quinto anche lo sconto P2P, detto come sconto", True,
           "sconto dello 0,5% sulle commissioni P2P" in " · ".join(o["righe"][4]))
@@ -128736,6 +128764,46 @@ console.log(JSON.stringify({
           ("da subito: il punto di partenza" in o["html"],
            o["html"].count("sei qui")))
     prova("una scala che non c'e' non disegna niente", "", o["vuota"])
+    # --- il carosello (17 nov 2026) -------------------------------------
+    prova("cinque tessere: le passate «Già tuo», la mia dice cosa manca, "
+          "le davanti la soglia",
+          ["Già tuo", "Già tuo",
+           "Mancano 480 XP e 8 affari conclusi al livello 4 (<b>Mercante esperto</b>)",
+           "Da 800 XP e 15 affari", "Da %s XP e 40 affari" % o["tremila"]],
+          o["frasi"])
+    # 320 XP sul gradino 200→800: un quinto del tratto, cioe' un quinto
+    # della circonferenza (raggio 30), e il numero scritto al centro
+    prova("l'anello misura il tratto DENTRO il gradino", "%.1f"
+          % (2 * 3.141592653589793 * 30 / 5), o["anello"])
+    prova("...e dentro scrive i miei XP sulla soglia", True,
+          o["dentro"] == "<b>320</b><small>su 800 XP</small>")
+    prova("un pannello solo e' visibile, il mio; gli altri quattro nascosti",
+          (['<div class="liv-vant" data-n="3">'], 4),
+          (o["visibile"], o["nascosti"]))
+    # i pannelli 1-3 sono aperti (1+3+4 righe, regalo compreso dal 2), i
+    # pannelli 4-5 chiusi (4+5 righe): spunte e lucchetti contano le
+    # righe, non i gradini
+    prova("spunte sui vantaggi gia' miei, lucchetti su quelli davanti",
+          (8, 9), (o["spunte"], o["lucchetti"]))
+    prova("al massimo: la frase del massimo e il barattolo nell'anello",
+          ("Hai raggiunto il livello massimo. 🫙", True),
+          (o["massimo"], o["massimo_dentro"]))
+    prova("senza xp e affari (un chiamante vecchio) non si rompe: conta "
+          "da zero", "Mancano 800 XP e 15 affari conclusi al livello 4 "
+          "(<b>Mercante esperto</b>)", o["senza_numeri"])
+    # il regalo del livello (accordo col cantiere del merch): la chiave
+    # `regalo` del server, quando c'e', diventa l'ultima riga, scappata
+    prova("un regalo nel gradino e' una riga in piu', e il testo e' scappato",
+          (4, "🎁 un regalo: la borsa &lt;Un tempo per te&gt;"),
+          (len(o["regalo"]), o["regalo"][-1]))
+    prova("...senza regalo (o chiave vuota) la riga del regalo non c'e'",
+          [r for r in o["righe"][3] if not r.startswith("🎁")],
+          o["senza_regalo"])
+    car = pezzo_js(mini, "function livCarScorri(car){", "\n}\n")
+    prova("lo scorrimento aggiorna pannello e puntino del gradino al centro",
+          True, "livCarAlCentro(car)" in car
+          and "p.hidden = p.dataset.n !== n;" in car
+          and "p.classList.toggle('on', p.dataset.n === n);" in car)
 
 
 def prove_regali_livello():
