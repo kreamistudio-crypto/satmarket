@@ -129377,6 +129377,11 @@ def prove_stradina():
           '@app.get("/assets/stradina/suoni/{nome}")' in _SORGENTE
           and "if nome not in FILE_SUONI_STRADINA:" in as_s
           and 'media_type="audio/mpeg"' in as_s)
+    prova("LA STRADINA E' SEMPRE DI SERA: entrando si accende il tema scuro, "
+          "uscendo torna quello scelto", True,
+          "const scuro = temaEffettivo()==='scuro' || temaStradina;" in mini
+          and "temaStradina = view === 'stradina';" in mini
+          and "var temaStradina = false;" in mini)
     mu = pezzo_js(mini, "function musicaStradinaParti(){", "\n}\n")
     prova("LA MUSICA DEL TABELLONE: un brano in loop, basso, zitto se muto o "
           "se il file manca; si ferma uscendo dalla pagina e col 🔇", True,
@@ -129496,6 +129501,8 @@ console.log(JSON.stringify({
   sats: h.includes(fmt(12345) + '</b> sats incassati'),
   frase: stradinaFraseAmici(d), fila: (h.match(/<span class="nome">([^<]*)<\\/span><span class="lv">/g) || []).map(x => x.replace(/<[^>]+>/g, '')),
   pedine_ugo: /class="str-pedine"[^>]*>[^]*?Ugo &lt;b&gt;/.test(h),
+  amico_tocca: /<button type="button" class="str-amico" onclick="strVaiAmico\(4\)">/.test(h),
+  pedine_lv4: h.includes('class="str-pedine" data-lv="1"'),
   scheda_missione: stradinaSchedaHTML(d, iMis),
   scheda_fatta: stradinaSchedaHTML(d, 0),
   scheda_prova: stradinaSchedaHTML(Object.assign({}, d, {prova: true}), stradinaProssima(d.tappe)),
@@ -129530,6 +129537,10 @@ console.log(JSON.stringify({
     prova("...e con tutto fatto si vede tutto: le 8 zone, la Luna, nessun muro",
           (o["n"], 8, False, True),
           (o["tutte_caselle"], o["tutte_bande"], o["tutte_muro"], o["tutte_luna"]))
+    prova("toccando un amico nella gara si va dalla sua pedina (il suo "
+          "livello), che porta il livello nel `data-lv` (Ada, livello 1, "
+          "alla partenza)", (True, True),
+          (o["amico_tocca"], o["pedine_lv4"]))
     prova("LA ZONA SPENTA E' UN MISTERO: solo il cerchio col «?», nessuna "
           "scritta accanto, e la scheda dice «Da scoprire» senza il nome",
           (o["in_spenta"], 0, True),
@@ -129599,7 +129610,7 @@ console.log(JSON.stringify({
     prova("un nuovo iscritto: Tappo sul benvenuto, tocca alla seconda",
           (0, "Casella 2: Metti &lt;un&gt; articolo"), (o["nuovo_u"], o["nuovo_ora"]))
     prova("senza caselle la pagina lo dice", 2,
-          o["vuota"].count("La stradina non è ancora pronta."))
+          o["vuota"].count("La rotta non è ancora pronta."))
     css = mini[mini.index("  .str-hero{"):mini.index("  .str-amico.io{")]
     prova("niente !important ne' backdrop-filter nella tavola (regola "
           "degli effetti ridotti)", (0, 0),

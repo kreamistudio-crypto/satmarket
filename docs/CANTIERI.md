@@ -88293,6 +88293,25 @@ Andrea e Alan proveranno il giro intero. Collaudo nuovo
 `collaudo_stradina_prova` (18 verdi: 403 senza tabella, accesa e `finta`,
 Tappo avanti, XP fermi, Anna non la vede, togli, azzera, id storti).
 
+(9) IL NOME E IL FONDO (17 nov, ore 17, prove di Andrea sulla demo):
+«non chiamarla la tua stradina… inventati qualcosa» → la pagina si
+chiama «🚀 Rotta per la Luna» (titolo, bottone del Profilo, avvisi):
+è la storia del razzo, e non è il nome di un gioco altrui. Gli id
+interni (`stradina*`, `/api/me/stradina`) restano: cambiano solo i
+testi. «Perché lo sfondo è bianco?» → sulla rotta il tema è sempre
+scuro (`temaStradina`, acceso da go() entrando e spento uscendo, letto
+da applicaTema): i dipinti sono notturni. Sulla casella dei sats il
+pane tostato diventa 🪙. (10) L'AMICO SULLA MAPPA: nella «gara fra
+amici» la riga è un bottone (`strVaiAmico`): porta alla pedina
+dell'amico (`data-lv`) e la fa pulsare; se l'amico è oltre la nebbia
+si va al lucchetto con un avviso, senza svelare le caselle. La scorsa
+chiede al giudice degli effetti ridotti, e con gli effetti ridotti la
+pedina resta ferma col solo contorno arancio. (11) Lo svelamento si
+chiama `si-svela` (il nome `svela` era del tour P2P di settembre, e
+`prove_libro_subito` lo vuole sparito) e non usa più `filter:blur`
+(il censimento di `prove_effetti_ridotti` ne ammette due). PROVATO:
+suite PROVE_SEVERE e collaudi sull'albero del push (verbale sotto).
+
 ## Il nome verificato su Nostr, gratis dal livello 2 (17 nov 2026, cantiere nip05-utenti; Andrea: «attivare verifica NIP-05, gratis per utenti da lv2 in su»)
 
 **COSA.** Dopo il NIP-05 di casa (16 nov, `_@barattolo.store`), ogni

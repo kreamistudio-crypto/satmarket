@@ -6645,16 +6645,20 @@
   .str-chiusa b{font-family:'Baloo 2',var(--font-tit),system-ui,sans-serif;font-size:18px;font-weight:800}
   .str-chiusa small{font-size:12px;font-weight:600;color:rgba(255,246,230,.75);max-width:260px}
   /* lo svelamento: la casella scoppia di luce, la scritta entra di lato */
-  .str-casella.svela{animation:strSvelaCasella 1.1s cubic-bezier(.2,.9,.3,1.3) both}
-  .str-nome.svela{animation:strSvelaNome .7s ease-out both}
+  .str-casella.si-svela{animation:strSvelaCasella 1.1s cubic-bezier(.2,.9,.3,1.3) both}
+  .str-nome.si-svela{animation:strSvelaNome .7s ease-out both}
   @keyframes strSvelaCasella{
     0%{transform:scale(.55);filter:brightness(.4) grayscale(1);box-shadow:0 0 0 0 rgba(255,193,100,0)}
     45%{transform:scale(1.28);filter:brightness(1.6);box-shadow:0 0 0 14px rgba(255,193,100,.35),0 0 40px 12px rgba(247,147,26,.8)}
     100%{transform:scale(1);filter:none}}
   @keyframes strSvelaNome{
-    0%{opacity:0;transform:translate(var(--sv-x,-14px),-50%) scale(.9);filter:blur(4px)}
-    100%{opacity:1;filter:none}}
-  @media (prefers-reduced-motion: reduce){.str-casella.svela,.str-nome.svela{animation:none}}
+    0%{opacity:0;transform:translate(var(--sv-x,-14px),-50%) scale(.9)}
+    100%{opacity:1}}
+  @media (prefers-reduced-motion: reduce){.str-casella.si-svela,.str-nome.si-svela{animation:none}}
+  button.str-amico{width:100%;border:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+  .str-pedine.cerca{animation:strCercaAmico 1.6s ease-out 2;outline:3px solid #F7931A;outline-offset:3px;border-radius:99px}
+  @keyframes strCercaAmico{0%,100%{transform:translate(0,-50%) scale(1)}30%{transform:translate(0,-50%) scale(1.6)}60%{transform:translate(0,-50%) scale(1.1)}}
+  @media (prefers-reduced-motion: reduce){.str-pedine.cerca{animation:none}}
   .str-casella.mistero .em{font-family:'Baloo 2',var(--font-tit),system-ui,sans-serif;font-weight:800;font-size:22px;color:rgba(255,246,230,.45)}
   .str-prova{display:inline-block;margin-top:6px;border:1px dashed rgba(255,193,100,.6);background:transparent;color:#FFC164;
     font:inherit;font-size:12px;font-weight:800;padding:4px 10px;border-radius:99px;cursor:pointer}
@@ -15099,8 +15103,8 @@ document.getElementById('cartello')?.remove();</script>
     <button class="back" onclick="navIndietro()">← Torna</button>
     <div class="sicu">
       <div class="sicu-hero">
-        <h2>🧭 La tua stradina</h2>
-        <p class="occhiello">Il tuo tabellone dalla Terra alla Luna: lo vedi solo tu</p>
+        <h2>🚀 Rotta per la Luna</h2>
+        <p class="occhiello">Il viaggio tuo e di Tappo, una casella alla volta: lo vedi solo tu</p>
       </div>
       <div id="stradinaCorpo"></div>
     </div>
@@ -15966,7 +15970,7 @@ document.getElementById('cartello')?.remove();</script>
            obiettivi. Nasce SPENTA in DEMO e in vetrina (renderLivello
            la accende): la' non c'e' un cammino vero da mostrare. -->
       <div class="acc voce-porta" id="vocStradina" style="display:none">
-        <button type="button" class="acc-h" onclick="apriStradina()"><span class="em">🧭</span><span class="tit2">La tua stradina<small>Le tappe fatte e quelle davanti, con Tappo che avanza.</small></span><span class="fr">›</span></button>
+        <button type="button" class="acc-h" onclick="apriStradina()"><span class="em">🚀</span><span class="tit2">Rotta per la Luna<small>Il tuo viaggio con Tappo: le tappe fatte e quelle davanti.</small></span><span class="fr">›</span></button>
       </div>
         </div>
       </div>
@@ -22161,6 +22165,10 @@ function go(view){
   el('view-'+view).classList.add('active');
   /* la musica della stradina suona solo sul tabellone (17 nov 2026) */
   if (view !== 'stradina' && typeof musicaStradinaFerma === 'function') musicaStradinaFerma();
+  if ((view === 'stradina') !== temaStradina && typeof applicaTema === 'function') {
+    temaStradina = view === 'stradina';
+    applicaTema();
+  }
   /* 🏪 Barattolo Negozio si accende e si spegne QUI, sulla vista: cosi'
      l'indietro, la cronologia e la pagina ricordata lo trattano come
      ogni altra vista, senza una seconda strada da tenere in pari */
@@ -29320,8 +29328,12 @@ function coloriVeriCollaudo(admin){
   } catch(e){}
   applicaTema();
 }
+/* LA STRADINA E' SEMPRE DI SERA (17 nov 2026, Andrea: «perché lo sfondo
+   è bianco?»): il tabellone e' notte in tutti e due i temi, e la pagina
+   intorno lo segue finche' ci si sta; uscendo torna il tema scelto */
+var temaStradina = false;
 function applicaTema(){
-  const scuro = temaEffettivo()==='scuro';
+  const scuro = temaEffettivo()==='scuro' || temaStradina;
   if (scuro) document.documentElement.dataset.tema = 'scuro';
   else delete document.documentElement.dataset.tema;
   /* la barra del browser e l'header di Telegram seguono il fondo */
@@ -43355,7 +43367,7 @@ function stradinaMistero(t, v){
 }
 function stradinaHTML(d, largo){
   const tappe = Array.isArray(d && d.tappe) ? d.tappe : [];
-  if (!tappe.length) return '<div class="hint">La stradina non è ancora pronta.</div>';
+  if (!tappe.length) return '<div class="hint">La rotta non è ancora pronta.</div>';
   const zone = Array.isArray(d.zone) ? d.zone : [];
   const ultima = stradinaUltimaFatta(tappe), prossima = stradinaProssima(tappe);
   /* LA STRADA SI APRE ANDANDO (17 nov, Andrea: «la gente quando sale vede
@@ -43463,7 +43475,7 @@ function stradinaHTML(d, largo){
     /* sul gradino stanno appena sotto il barattolo, al centro; alla partenza accanto al cartello */
     const larghe = Math.min(qui.length, 3) * 18 + 8 + (qui.length > 3 ? 22 : 0);
     const sx = i >= 0 ? p.x - larghe / 2 : p.x + 74, sy = i >= 0 ? p.y + 50 : p.y;
-    return `<span class="str-pedine" style="left:${Math.round(sx)}px;top:${sy}px">`
+    return `<span class="str-pedine" data-lv="${n}" style="left:${Math.round(sx)}px;top:${sy}px">`
       + qui.slice(0, 3).map(voltoAmicoStradina).join('')
       + (qui.length > 3 ? `<em>+${qui.length - 3}</em>` : '') + `</span>`;
   }).join('');
@@ -43481,8 +43493,9 @@ function stradinaHTML(d, largo){
   const righe = fila.map((r, k) => r.io
     ? `<div class="str-amico io"><span class="pos">${k + 1}</span><span class="str-av" style="display:flex;align-items:center;justify-content:center">🫵</span>`
       + `<span class="nome">Tu</span><span class="lv">Lv. ${mio}</span></div>`
-    : `<div class="str-amico"><span class="pos">${k + 1}</span>${voltoAmicoStradina(r.a)}`
-      + `<span class="nome">${esc(r.a.nome || '')}</span><span class="lv">Lv. ${r.n}</span></div>`).join('');
+    /* toccando un amico il tabellone va dalla sua pedina (17 nov, Andrea) */
+    : `<button type="button" class="str-amico" onclick="strVaiAmico(${r.n})"><span class="pos">${k + 1}</span>${voltoAmicoStradina(r.a)}`
+      + `<span class="nome">${esc(r.a.nome || '')}</span><span class="lv">Lv. ${r.n} ›</span></button>`).join('');
   const classifica = `<div class="str-amici"><h3>🏁 La gara fra amici</h3>`
     + `<div class="hint" style="margin:2px 0 6px">${stradinaFraseAmici(d)}</div>${righe}</div>`;
   const scelta = prossima >= 0 ? prossima : Math.max(0, ultima);
@@ -43557,6 +43570,22 @@ function strChiudiTutta(){
   const p = el('strPano');
   if (p) p.hidden = true;
 }
+/* dalla gara fra amici alla pedina dell'amico: la sua fila lampeggia; se
+   sta su un gradino che per te e' ancora chiuso, si va al lucchetto */
+function strVaiAmico(n){
+  haptic();
+  const p = document.querySelector(`#stradinaCorpo .str-pedine[data-lv="${Math.floor(Number(n)) || 1}"]`);
+  if (p) {
+    suonoTappo('tocco');
+    if (p.scrollIntoView) p.scrollIntoView({block: 'center', behavior: tourRidotto() ? 'auto' : 'smooth'});
+    p.classList.remove('cerca'); void p.offsetWidth; p.classList.add('cerca');
+    return;
+  }
+  const muro = document.querySelector('#stradinaCorpo .str-chiusa');
+  if (muro && muro.scrollIntoView) muro.scrollIntoView({block: 'start', behavior: tourRidotto() ? 'auto' : 'smooth'});
+  suonoTappo('chiusa');
+  if (typeof toast === 'function') toast('È più avanti di te: la sua zona per te è ancora chiusa.');
+}
 function strVaiZona(n){
   strChiudiTutta();
   suonoTappo('tocco');
@@ -43620,7 +43649,7 @@ function renderStradina(){
   const box = el('stradinaCorpo');
   if (!box) return;
   if (!stradinaDati) {
-    box.innerHTML = '<div class="hint">Non riesco a leggere la tua stradina adesso: riprova fra poco.</div>';
+    box.innerHTML = '<div class="hint">Non riesco ad aprire la rotta adesso: riprova fra poco.</div>';
     return;
   }
   box.innerHTML = stradinaHTML(stradinaDati, box.clientWidth);
@@ -43654,7 +43683,7 @@ function renderStradina(){
     const ritardo = `${0.35 + k * 0.12}s`;
     box.querySelectorAll(`.str-casella[data-i="${i}"], .str-nome[data-n="${i}"]`).forEach(x => {
       x.style.animationDelay = ritardo;
-      x.classList.add('svela');
+      x.classList.add('si-svela');
     });
   });
   suonoTappo(prima >= 0 && gradini > prima ? 'traguardo' : sv.caselle.length ? 'stella' : 'passo');
