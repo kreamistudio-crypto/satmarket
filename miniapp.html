@@ -7501,14 +7501,15 @@
      colore particolare, tipo il lucido grafite del p2p ma non grafite»):
      lo stesso riflesso chiaro nell'angolo in alto a sinistra della carta
      del prezzo P2P (`--valore-lucido`) e la stessa discesa verso lo
-     scuro, ma nel colore scelto fra quattro scatti dall'app vera. Uguale
+     scuro, ma ORO: scelto da Andrea fra quattro scatti dall'app vera
+     (brace, oro, viola, petrolio; la «B · Oro»). Uguale
      di giorno e di sera, come la carta: sta sempre sul suo fondo. Le
      scritte e la fiamma sono crema e bianco (sul punto piu' chiaro la
      scritta resta oltre il 4,5:1); il bordo e' il filo bianco della
      carta. Il colore sta in UNA riga, `--streak-lucido`. */
-  :root{--streak-fondo:#7A1F05;
+  :root{--streak-fondo:#573505;
     --streak-lucido:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%),
-      linear-gradient(160deg,#C2410C 0%,#7A1F05 100%)}
+      linear-gradient(160deg,#9A650C 0%,#573505 100%)}
   .serie-cl-porta{background:var(--streak-lucido),var(--streak-fondo);
     border-color:rgba(255,255,255,.14);color:#FFF7EC}
   .serie-cl-porta .cl-fr{color:rgba(255,247,236,.82)}
@@ -43697,6 +43698,7 @@ let myAvvisiP2P = true;   // «⚡ Avvisi sugli scambi P2P»: accesi di serie
    chi-e-l-altro, decisione di Andrea con Alan): chi scambia da Barattolo
    e' riconosciuto dalla controparte con qualunque login, e chi vuole
    l'anonimato entra con una chiave Nostr nuova. */
+let myAcquistiVisibili = false;  // la leva ACQUISTI_NEL_PROFILO, da /api/me
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecensori = 0, myNegozio = '';
 let myScambiP2P = 0;   // gli scambi P2P completati (da /api/me, `scambi_completati`)
 /* il francobollo della propria foto profilo e il suo selettore
@@ -43808,7 +43810,13 @@ function renderProfilo(){
      tocco apre «Recensioni ricevute», dove c'e' il cassetto */
   const rep = (myRating>0
     ? `<span class="rep-recensioni" role="button" tabindex="0" onclick="apriRecensioniRicevute()"><span class="stars">${'★'.repeat(Math.round(myRating))}</span> ${myRating}${contaFeedback(myNFeedback, myNRecensori)}</span> · ` : '')
-    + `${myVenditeOk} vendite · ${myAcquistiOk} acquisti conclusi`
+    /* GLI ACQUISTI NELLA TESTATA solo con la leva ACQUISTI_NEL_PROFILO
+       (17 nov 2026 sera, privacy; Andrea, sullo scatto del Profilo: gli
+       acquisti non si devono vedere). Spenta, di serie, la riga dice le
+       sole vendite; il numero arriva lo stesso, perche' serve al livello. */
+    + (myAcquistiVisibili
+       ? `${myVenditeOk} vendite · ${myAcquistiOk} acquisti conclusi`
+       : `${myVenditeOk} vendite concluse`)
     /* GLI SCAMBI P2P ANCHE QUI (12 ott 2026, voto-dopo-concluso, dal
        campo: «nel mio profilo non compare lo scambio»): la stessa
        frase del negozio, da uno in su */
@@ -115845,6 +115853,7 @@ async function avvia(){
     bozzaCodice = null;     // e la bozza si butta, o resterebbe fissata
     codiceInModifica = 0;   // a una regola letta prima di questo giro
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
+    myAcquistiVisibili = me.acquisti_nel_profilo === true;
     myScambiP2P = Number(me.scambi_completati) || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNRecensori = me.n_recensori || 0;

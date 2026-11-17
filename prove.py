@@ -54190,6 +54190,20 @@ def prove_numeri_negozio():
     prova("i contatori non si toccano: nessuna porta scrive acquisti_ok",
           False, "UPDATE" in codice(pezzo("miei_numeri_negozio"))
           + codice(pezzo("numeri_negozio_admin")))
+    prova("/api/me manda la leva viva alla testata del Profilo", True,
+          'profilo["acquisti_nel_profilo"] = ACQUISTI_NEL_PROFILO' in
+          pezzo("mio_profilo"))
+    prova("...il client la crede solo se arriva proprio true", True,
+          "myAcquistiVisibili = me.acquisti_nel_profilo === true;" in mini
+          and "let myAcquistiVisibili = false;" in mini)
+    _testata = pezzo_js(mini, "function renderProfilo(){", "\n}\n")
+    prova("...e la testata, spenta, scrive le sole vendite", True,
+          "(myAcquistiVisibili\n       ? `${myVenditeOk} vendite · "
+          "${myAcquistiOk} acquisti conclusi`\n       : `${myVenditeOk} "
+          "vendite concluse`)" in _testata)
+    prova("...con la frase gia' nel dizionario inglese", True,
+          '"{} vendite concluse":' in open(
+              os.path.join("lingua", "en.js"), encoding="utf-8").read())
     prova("la leva sta nel pannello delle leve", True,
           '"ACQUISTI_NEL_PROFILO", ACQUISTI_NEL_PROFILO,' in src
           and '"gruppo": "🛍️ Acquisti nel Profilo"' in src)
@@ -209146,6 +209160,18 @@ def prove_serie_classifica():
            ".serie-cl-porta .serie-f .f-fuori{fill:#fff}" in _css,
            # non e' la grafite della carta: i due colori del gradiente sono altri
            bool(re.search(r"--streak-lucido:[^;}]*#(2A2E35|121417)", _css))])
+    prova("...ed e' ORO, la scelta di Andrea fra i quattro scatti", True,
+          "linear-gradient(160deg,#9A650C 0%,#573505 100%)" in _css
+          and ":root{--streak-fondo:#573505;" in _css)
+
+    def _lum(esa):
+        c = [int(esa[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    _m = re.search(r"--streak-lucido:[^;}]*linear-gradient\(160deg,#([0-9A-F]{6}) 0%", _css)
+    prova("la scritta crema regge il 4,5:1 anche sul punto piu' chiaro del "
+          "gradiente", True,
+          bool(_m) and (_lum("FFF7EC") + 0.05) / (_lum(_m.group(1)) + 0.05) >= 4.5)
     prova("il foglio esiste, e' registrato in closeSheet e si chiude con "
           "l'indietro", [True, True, True],
           ['<div class="sheet" id="serieClassificaSheet">' in mini,

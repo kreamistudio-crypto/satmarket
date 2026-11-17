@@ -37068,6 +37068,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `serieClassificaRigaHTML` e `serieClassificaHTML` puri,
   `apriSerieClassifica`. «I tuoi dati» dichiara il dato e chi lo vede.
   Prove: `prove_serie_classifica`, `collaudo_serie_giorni` punto 8.
+  IL NOME E IL BOTTONE (17 nov 2026 notte, cantiere serie-nome): per
+  l'utente si chiama «Classifica Streak» (bottone e titolo del foglio,
+  con la fiamma DISEGNATA `SERIE_FIAMMA` al posto della coppa; nel
+  titolo la mette `apriSerieClassifica` in `#serieClassificaFiamma`).
+  Il bottone `.serie-cl-porta` è LUCIDO come la carta del prezzo P2P
+  (`--valore-lucido`: riflesso chiaro in alto a sinistra, discesa verso
+  lo scuro, filo bianco) ma ORO: `--streak-lucido` e `--streak-fondo`,
+  uguali di giorno e di sera, scritta crema oltre il 4,5:1.
 - I PREMI FEDELTÀ DEL NEGOZIO 🎀 (17 nov 2026, cantiere premi-fedelta; la
   proposta di un negozio vero, «Un tempo per te»). Il venditore scrive
   fino a `PREMI_FEDELTA_MAX` (4) gradini «da N € spesi da me, nel pacco
