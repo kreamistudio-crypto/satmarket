@@ -212,6 +212,18 @@ LND_PONTE_URL = "https://127.0.0.1:18080"      # lnd-ponte (socat + tor)
 # Vuoto = G e H «non attive», e la pagina esce lo stesso. Vedi
 # docs/PRODUZIONE.md, «LE HOLD DI PROVA».
 LND_PONTE_MACAROON_HOLD = ""             # esadecimale, tutto su una riga
+# LA CAUZIONE DEL CONTANTI ON-CHAIN (17 nov 2026, cantiere onchain-contanti):
+# chi prende in contanti un ordine P2P on-chain blocca una cauzione in
+# Lightning (3%, minimo 1000 sats), una hold invoice del nodo che torna a
+# fine scambio. Vuole un macaroon SUO (`root_key_id 5`), diverso da quello
+# delle hold di prova, e la leva: una riga senza l'altra e' spenta. Vedi
+# docs/PRODUZIONE.md, «LA CAUZIONE DEL CONTANTI ON-CHAIN».
+LND_PONTE_MACAROON_CAUZIONE = ""         # esadecimale, tutto su una riga
+P2P_ONCHAIN_CAUZIONE = False
+# ...e la porticina: True (di serie, anche senza la riga) = la cauzione la
+# vede e la mette SOLO un moderatore (ADMIN_IDS) che prende, per tutti gli
+# altri e' come spenta. Si apre a tutti scrivendo False, dopo la prova.
+P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True
 
 # --- Regole del mercatino --------------------------------------------
 COMMISSIONE_PERCENTO = 0     # trattenuta a vendita conclusa (0 = sospesa: cifra da decidere)

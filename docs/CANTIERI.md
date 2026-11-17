@@ -89228,3 +89228,129 @@ foglio è nuovo): è la prima cosa da guardare sul collaudo.
 RESTA il terzo pezzo: la scelta del metodo alla presa e la cauzione in
 Lightning col QR tenuta da Barattolo, da provare sul collaudo prima
 della produzione.
+
+## Il contanti di persona on-chain come su Lightning, terzo pezzo: il metodo scelto alla presa e la cauzione in Lightning col QR
+
+17 nov 2026 sera, cantiere `onchain-contanti`, terzo pezzo. Andrea:
+«Quando ci clicco poi non mi fa mettere la cauzione. Dovrebbe funzionare
+esattamente come Lightning anche l'on-chain contanti», «Anche la
+questione QR, tutto quanto».
+
+LE TRE DECISIONI DI ANDREA (card del 17 nov, non riaprire). Uno: la
+cauzione del contanti on-chain si blocca IN LIGHTNING col QR, la tiene
+Barattolo e torna a fine scambio, e si prova prima di darla a tutti.
+Scartate: la cauzione on-chain dentro il 2-di-3 (lenta, una
+transazione in più, ed è quella che Alan aveva bocciato lo stesso
+giorno) e «niente cauzione». Due: la cauzione si PERDE «come su
+Lightning», solo per decisione di un moderatore, metà all'altra persona
+e metà al servizio; mai per un tempo scaduto. Tre: la prova si fa IN
+PRODUZIONE, «solo tu e Alan» (e subito dopo, a voce: «Lo vediamo solo
+noi con una leva spenta?»). Scartato: dare alla VM di collaudo una
+strada verso il nodo vero (la VM non ha un LND, i pagamenti lì sono
+FakeWallet).
+
+COSA FA QUESTO PEZZO. (a) LA SCELTA DEL METODO: su un ordine on-chain con
+«Contanti» fra più metodi chi prende sceglie con le pillole, come nel
+dettaglio di Lightning; la scelta viaggia nella presa (`metodo`) e resta
+nella colonna `metodo_scelto`. «Contanti» scelto fa lo scambio in
+contanti di persona (il giudice unico `_p2p_onchain_contanti` si allarga:
+il solo «Contanti», o «Contanti» scelto), e il recapito scritto per i
+metodi online (un IBAN) si svuota per lasciare il posto all'appuntamento.
+Zona, regola col tetto e cauzione nel foglio compaiono scegliendo
+«Contanti», come su Lightning. (b) LA CAUZIONE: con la leva accesa chi
+prende in contanti blocca prima una cauzione del 3% dei sats, minimo
+1000 (la regola letta sul nodo: NODO-MOSTRO, «LA CAUZIONE DI CHI
+PRENDE»). È una HOLD invoice del nostro LND, chiesta dal ponte come le
+hold di prova, con un macaroon SUO (`LND_PONTE_MACAROON_CAUZIONE`).
+Il telefono mostra il foglio «🔐 Blocca la cauzione» col QR (le righe di
+WoS e di Phoenix sono quelle della cauzione di Lightning), chiede al
+server ogni tre secondi, e quando LND dice ACCEPTED chiude il foglio e
+prende l'ordine da solo. (c) IL RITORNO: una passata ogni mezzo minuto
+(`p2p_onchain_cauzioni_passata`, giudice puro
+`p2p_onchain_cauzione_sorte`) rimanda indietro con CancelInvoice la
+cauzione di uno scambio chiuso in qualunque modo, quella tenuta ma non
+usata (ordine uscito dal libro, o un quarto d'ora senza presa) e
+annulla la richiesta mai pagata. A scambio vivo, disputa compresa, la
+cauzione resta ferma. IN QUESTO PEZZO LA CAUZIONE TORNA SEMPRE: il gesto
+del moderatore che la fa perdere è il pezzo dopo.
+
+LE SCELTE, COI PERCHÉ. La cauzione viene PRIMA della presa: l'ordine
+resta nel libro finché la hold non è ferma sul nodo, poi la rotta della
+presa lo richiede a LND un'ultima volta prima di aprire la connessione
+(e lo ricontrolla dentro). Scartato lo stato «preso, aspetta la
+cauzione» con ritorno nel libro: avrebbe aggiunto uno stato (regola
+ferrea 4 vale per gli ordini del mercatino, ma il principio è lo
+stesso), e un ordine on-chain che torna nel libro romperebbe il «giro
+0» su cui il secondo pezzo appoggia presenze e appuntamenti. Il
+macaroon è NUOVO e non quello delle hold di prova: quello non sa
+saldare per costruzione, e deve restare così. Il preimage resta nella
+riga (`p2p_onchain_cauzioni.preimage`): la cauzione la tiene Barattolo,
+e senza preimage non si potrebbe mai dare torto a nessuno; al telefono
+non esce mai (né preimage né hash). La lettura dello stato è
+LookupInvoice (`GET /v1/invoice/{hash}`): scartata `/v2/invoices/lookup`,
+che vuole i byte in base64 url-safe nella query e non ha niente in più
+per noi. Il freno della richiesta è suo (`p2p_onchain_cauzione`), per
+non mangiare le prese. Chi cancella l'account non porta via la riga
+(lista delle anonimizzate): una hold viva deve poter tornare. La
+passata gira anche a leva spenta, se il macaroon c'è: spegnere la leva
+non deve lasciare cauzioni appese.
+
+I LIMITI, DETTI. L'HTLC vive 576 blocchi (circa quattro giorni, come su
+Mostro): uno scambio in disputa più a lungo vede la cauzione tornare da
+sola, e la passata lo scrive («tornata da sola dal nodo»). La scelta del
+metodo c'è solo con «Contanti» fra più metodi: fra soli metodi online
+on-chain non si sceglie, come ieri. Un telefono con la pagina di ieri
+prende senza dire il metodo: lo scambio va come ieri, non in contanti,
+e nessuna cauzione. La leva è SPENTA di serie (`P2P_ONCHAIN_CAUZIONE`
+più il macaroon): a leva spenta il contanti on-chain si prende senza
+cauzione.
+
+LA PORTICINA DEI MODERATORI (la terza decisione). Accanto alla leva c'è
+`P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN`, True di serie anche senza la riga nel
+config: finché è chiusa la cauzione la vede e la mette SOLO un
+moderatore (`e_admin`, cioè `ADMIN_IDS`) che prende. Per chiunque altro
+è come se la leva fosse spenta, in tutti e tre i posti dove conta: la
+busta del libro (`cauzione.accesa` falso, quindi nessuna riga e nessun
+foglio), la richiesta (409) e la presa (passa senza cauzione, come
+oggi). Il giudice è uno, `p2p_onchain_cauzione_accesa(tg_id)`, e si
+chiede sempre PER LA PERSONA che prende: mai a vuoto (una sentinella
+conta zero chiamate senza persona). Si apre a tutti solo con un `False`
+scritto: una riga storta resta chiusa. È la forma delle altre leve
+nuove (`ONCHAIN_SOLO_ADMIN`, `SWAP_AUTO_SOLO_ADMIN`). CONSEGUENZA DA
+SAPERE: durante la prova la cauzione dipende da CHI PRENDE, non
+dall'ordine: Andrea che prende un ordine in contanti di un utente la
+mette, un utente che prende quello di Andrea no.
+
+PROVATO: `prove_onchain_cauzione` (37 prove: la regola, i sats cifra per
+cifra uguali fra server e telefono, a chi serve, il giudice della
+passata stato per stato, le sentinelle sull'ordine dei controlli nella
+presa e sul fatto che nessuna strada salda una hold, il foglio della
+presa in node, la porticina chiusa di serie e chiesta sempre per la
+persona), `collaudo_p2p_onchain` sezione 11-novies (il giro vero
+contro un LND di cartone su 127.0.0.1: leva spenta e accesa, la
+porticina chiusa col 111 che non la vede, non la può chiedere e prende
+senza, poi aperta e richiusa, richiesta,
+stessa richiesta due volte, pagata, presa, scheda delle tre parti,
+disputa, ritorno a scambio chiuso, mai pagata, pagata all'ultimo, non
+usata, rimandata dal nodo, LND muto, macaroon sbagliato).
+IL GIRO INTERO SUL PC SUI PRIMI DUE PEZZI (ba8e484c, suite severa e
+collaudi della CI) ha trovato tre prove rimaste indietro, tutte mie e
+tutte fuori dall'elenco di sezioni che giravo qui: il conto dei gesti
+di `prove_fogli_di_casa` (122, sono 123: commit a parte), l'elenco
+degli `exec` di `prove_contanti_a_mano` (la scopa delle presenze chiama
+`_p2p_onchain_scorda_incontri`) e la sentinella del foglio in
+`prove_barattozon_onchain` (la riga del recapito ha ora anche il solo
+«Contanti»). Corrette qui, nessuna toccava il comportamento. LA
+LEZIONE: un elenco di sezioni «vicine» non basta quando si tocca una
+riga che altre sezioni citano parola per parola; prima del push il giro
+intero resta l'unica prova.
+NON PROVATO: niente di questo ha ancora parlato con un LND vero. Il
+conio e la cancel hanno la forma delle hold di prova, che in produzione
+funzionano; la lettura `GET /v1/invoice/{hash}` col macaroon nuovo e un
+wallet vero che paga la hold dal QR sono la prima cosa da guardare.
+
+RESTA: la cauzione persa per decisione del moderatore (SettleInvoice,
+la metà all'altra persona con una fattura sua, come `add-bond-invoice`
+di Mostro), e la prova di Andrea e Alan in produzione (DA-FARE-ANDREA,
+voce 20: il macaroon sul nodo, le due righe sul VPS, i passi).
+

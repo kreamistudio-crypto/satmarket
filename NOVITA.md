@@ -542,3 +542,9 @@ frase: Lo scambio P2P on-chain in contanti ora va come quello Lightning: chi ven
 dove: P2P on-chain con metodo «Contanti»: la pagina dello scambio, riquadro «📍 Dove vedervi» e, a sats bloccati, il riquadro con «📍 Sono qui»; il bottone «💵 Ho consegnato i contanti».
 leva: nessuna
 pubblico: no
+
+## 2026-11-17 · onchain-contanti-metodo
+frase: Negli ordini P2P on-chain con «Contanti» insieme ad altri metodi ora scegli come pagare prima di prendere: con «Contanti» lo scambio va di persona, con appuntamento e «📍 Sono qui».
+dove: P2P on-chain, tocca un ordine con più metodi fra cui «Contanti»: sotto il riassunto ci sono le pillole dei metodi.
+leva: nessuna
+pubblico: no
