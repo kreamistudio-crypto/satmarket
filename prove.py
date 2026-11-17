@@ -128955,6 +128955,22 @@ def prove_stradina():
           and z3.index("missione_b") - z3.index("missione_a") > 1
           and z3[z3.index("missione_c") + 1] == "livello_3"
           and not z3[0].startswith("missione_"))
+    # `prima` (17 nov, Andrea: i minigiochi rispecchiano le caselle): la
+    # missione sta subito davanti alla casella che insegna; due sulla
+    # stessa casella in fila per `ordine`; una casella che non c'e' nella
+    # zona la lascia sparsa come prima
+    pr = [{"id": "w", "zona": 0, "prima": "wallet"},
+          {"id": "p", "zona": 2, "prima": "onchain", "ordine": 2},
+          {"id": "q", "zona": 2, "prima": "onchain", "ordine": 1},
+          {"id": "x", "zona": 1, "prima": "inventata"}]
+    tp = [t["id"] for t in amb["tappe_stradina"](zero, scala, "", "", True, pr, set())]
+    prova("CON `prima` LA MISSIONE STA DAVANTI ALLA SUA CASELLA: sats prima "
+          "del wallet, quaderno e parole in fila prima dell'on-chain, la "
+          "casella sconosciuta resta sparsa (prima del gradino)",
+          (["missione_w", "wallet"], ["missione_q", "missione_p", "onchain"], "livello_2"),
+          (tp[tp.index("wallet") - 1:tp.index("wallet") + 1],
+           tp[tp.index("onchain") - 2:tp.index("onchain") + 1],
+           tp[tp.index("missione_x") + 1]))
     prova("...e le voci storte (zona non numero, senza id) non entrano", 2,
           sum(1 for t in t1 if t["tipo"] == "missione"))
     prova("senza elenco nessuna missione", 0,
@@ -206168,12 +206184,27 @@ console.log(JSON.stringify({
     # mondo, il passo che scivola, la telecamera, e le cinque missioni
     # giocate fino in fondo in node.
     missioni = G["MISSIONI_TAPPO"]
-    prova("sei missioni al lancio, la prima la piu' facile (i sats), sulle zone 0, 1, 2, 3, 5 e 7 degli otto del tabellone, "
+    prova("sei missioni al lancio, la prima la piu' facile (i sats), sulle zone 0, 1, 2, 2, 3 e 7 degli otto del tabellone, "
           "id di casa e bulloni veri",
-          (6, "sats", [0, 1, 2, 3, 5, 7], True, True),
+          (6, "sats", [0, 1, 2, 2, 3, 7], True, True),
           (len(missioni), missioni[0]["id"], [x["zona"] for x in missioni],
            all(re.fullmatch(r"[a-z]{3,20}", x["id"]) for x in missioni),
            all(isinstance(x["bulloni"], int) and x["bulloni"] >= 1 for x in missioni)))
+    # OGNI MISSIONE INSEGNA UNA CASELLA VERA (17 nov, Andrea): `prima` e'
+    # una casella della sua zona, e la pagina finisce col bottone per farla
+    # davvero (`fai`); l'halving e' l'ultima casella, li' non c'e' gesto
+    i_cas = src.index("\nSTRADINA_CASELLE = (")
+    exec(src[i_cas:src.index("\n)\n", i_cas) + 3], amb)
+    caselle = {(c[0], c[1]) for c in amb["STRADINA_CASELLE"]}
+    giochi = mini[mini.index("const MISSIONI_GIOCO = {"):mini.index("\n};\n", mini.index("const MISSIONI_GIOCO = {"))]
+    righe = {x["id"]: giochi[giochi.index(f"  {x['id']}: {{"):] for x in missioni}
+    prova("ogni missione sta davanti a una casella vera della sua zona, e tutte "
+          "tranne l'halving finiscono col bottone per farla davvero", (True, ["halving"]),
+          (all((x["zona"], x.get("prima")) in caselle for x in missioni),
+           [x["id"] for x in missioni if "fai: [" not in righe[x["id"]].split("\n  },")[0].split("},\n  ")[0]]))
+    prova("...il bottone chiude il gioco e porta alla casella", True,
+          "missioneChiudi();\n  if (g && g.fai) { try { g.fai[1](); }" in mini
+          and 'onclick="missioneFai()"' in mini)
     con = _sq.connect(":memory:")
     con.row_factory = _sq.Row
     for tab in tabelle_gioco:
