@@ -89440,6 +89440,16 @@ in node), `prove_fogli_di_casa` (i gesti della domanda unica sono 125),
 disputa, non moderatore, parte dello scambio, LND muto, bruciata, due
 volte, le tre schede, i tre avvisi, il giro che non la tocca a scambio
 chiuso, la cancel su una saldata, «Metà mandata», la `saldando` appesa
-nei due esiti). NON PROVATO: come tutto il terzo pezzo, niente ha
+nei due esiti). IL SESTO GIRO INTERO SUL PC (5373c779, i primi tre pezzi) ha trovato
+altre due prove fuori dal mio elenco, tutte e due del terzo pezzo:
+`prove_anteprime` (una cifra in sats scritta a mano nella riga
+d'avvio del journal: ora passa da `_fmt_sats`, e dice «1.000 sats») e
+`prove_apri_wallet_p2p` (la riga di Phoenix sta ora in TRE fogli: il
+terzo è «🔐 Blocca la cauzione»). Corrette in un commit a parte, con la
+stessa cifra nel journal del gesto che brucia. Il terzo rosso di quel
+giro, `prove_node_fisso` («otto minuti da adesso»), da solo è verde su
+develop e sul ramo: è una prova d'orologio sotto carico, non del
+cantiere.
+NON PROVATO: come tutto il terzo pezzo, niente ha
 ancora parlato con un LND vero: la prima SettleInvoice vera è la prova
 di Andrea e Alan (DA-FARE-ANDREA, voce 20, passo 5).
