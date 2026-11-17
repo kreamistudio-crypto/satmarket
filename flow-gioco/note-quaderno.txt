@@ -1,0 +1,22 @@
+IL QUADERNO DI TUTTI — immagini Flow (17/11/2026)
+Nano Banana 2.1 (0 crediti), download «2K» (stanze 1536x2752, oggetti 2048x2048, fogli Tappo 2752x1536). PNG salvati da qui; JPG originali di Flow in originali-jpg\, anteprime 1K in _1k\.
+Riferimento allegato a tutti i prompt: alto-1 (in Flow «Robot walking on wooden shelf»), «usato SOLO per stile e angolo di ripresa».
+Tappo: in più tappo-scelto-1.jpg come primo riferimento.
+
+STANZE (quaderno-stanza-a/b/c/d.png) — prompt con la pianta in percentuali, pavimento vuoto.
+- d: la più vicina alla pianta (parete ~29%, tane ~27%/75%, tappeto ~56%). CONSIGLIATA.
+- a: tappeto al 58% giusto, ma librerie laterali spezzate con candele e libri sopra.
+- b: pulita ma tappeto troppo in alto (~46%).
+- c: librerie laterali troppo larghe (~20%), parquet dritto.
+
+OGGETTI su #00FF00 (verde misurato agli angoli: ~[5,252,2])
+- leggio a/b: entrambi buoni; a più slanciato.
+- grande a: buono. grande b: fondo verde più SCURO (~[8,200,15]) e sfumato → scontorno più difficile.
+- cestino a: buono. cestino b: verde un po' più scuro (~[7,230,3]).
+- busta a/b: buone, sigillo rosso liscio.
+- tarlo a: dentoni e faccia dispettosa, migliore. tarlo b: più arrotolato, più simpatico che dispettoso.
+
+TAPPO CHE CAMMINA
+- Primo giro: il vetro del barattolo prendeva il verde dello sfondo (si sarebbe scontornato). Rifatto chiedendo vetro ambrato pieno di monete.
+- tappo-camminata-foglio-a/b/c/d.png = 4 fogli con le 4 pose in fila (stesso personaggio dentro ogni foglio).
+- tappo-passo-1..4.png = tagliati dal foglio b (il più coerente), 714x1536 ciascuno, stessa scala, posizione verticale originale mantenuta (il 2 è più in alto = a mezz'aria, il 4 è schiacciato).
