@@ -506,3 +506,9 @@ frase: Se prendi un ordine P2P, tocchi «Annulla» e l'annullo non arriva al coo
 dove: P2P Lightning: la pagina dello scambio appena preso, «✕ Annulla» e «Sì, annulla»; il messaggio del bot «Non hai proseguito in tempo» con la riga «Avevi chiesto di annullare».
 leva: nessuna
 pubblico: no
+
+## 2026-11-17 · onchain-ritiro
+frase: Negli scambi P2P on-chain, chi si ritira dopo che l'altro ha già bloccato i sats si vede contare uno «scambio non completato», come negli scambi Lightning, e chi aveva bloccato i sats può lasciargli una recensione. Nessuna cauzione e nessuna penale in denaro. Il foglio di «Rinuncio» lo dice prima della firma. Non conta se chi vende non aveva ancora scritto dove pagare.
+dove: P2P on-chain: il foglio «↩️ Rinunci allo scambio?»; la pagina dello scambio rimborsato, con la frase «scambio non completato» e il riquadro «⭐ Lascia una recensione» per chi aveva depositato; il messaggio del bot «Scambio on-chain annullato».
+leva: nessuna
+pubblico: sì
