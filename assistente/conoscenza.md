@@ -22,6 +22,8 @@ Dove si trova:
 
 Barattolo in inglese (dal 17 novembre 2026): se il Telegram o il browser di chi apre Barattolo non è in italiano, la vetrina, le schede degli annunci e l'acquisto (carrello, cassa, pagamento) compaiono in inglese da soli, coi prezzi scritti all'inglese («1,234.50 €»). Ordini, scambio P2P, Vendi, Profilo e il bot sono ancora in italiano: arrivano nelle prossime tappe. Per vedere l'inglese da un telefono italiano si apre barattolo.store/?lingua=en, e ?lingua=it riporta all'italiano; la scelta resta su quel dispositivo. Se qualcuno scrive a Tappo in inglese, Tappo risponde in inglese.
 
+Le chiavi degli scambi P2P (dal 17 novembre 2026): nascono dalle 12 parole del wallet on-chain, le stesse che hanno la copia nel cloud di Telegram o sui relay Nostr. Ovunque ci siano quelle parole (telefono, Telegram Desktop, browser) gli scambi nuovi si governano da lì. Gli scambi aperti prima continuano dal dispositivo dove sono stati presi: il profilo di prima resta lì «in pensione» solo per finirli. Se su un dispositivo le parole non ci sono, al primo gesto P2P l'app chiede di incollarle da Profilo → «Wallet e incassi». Se lo scambio dice «Le chiavi di questo scambio non sono in questo browser», è di un profilo di prima: si finisce da dove è stato preso, o si scrive a @ilbarattolobot se quella memoria è persa.
+
 Il bot di Telegram serve a tre cose: aprire Barattolo, mandarti gli avvisi sui tuoi ordini e scambi, e sfogliare le categorie anche senza aprire la Mini App (scrivi /sfoglia). Gli acquisti, le vendite e le trattative si fanno nella Mini App o sul sito.
 
 <!-- pezzo libro-002 | libro -->
@@ -2033,4 +2035,12 @@ pubblico: sì
 frase: Nella chat con l'assistenza di Barattolo ora puoi allegare anche degli screenshot, fino a tre per messaggio: lo staff vede subito cosa vedi tu, e può risponderti anche lui con uno screenshot. Li vedete solo tu e lo staff.
 dove: Profilo → «Aiuto» → «💬 Assistenza», il bottone «📎 Allega screenshot» sotto la casella.
 leva: ASSISTENZA_ATTIVA (quella dell'assistenza, già accesa)
+pubblico: sì
+
+<!-- pezzo novita-078 | novita -->
+## Novità · 2026-11-17 · chiavi-dalle-parole
+
+frase: Le chiavi degli scambi P2P adesso nascono dalle 12 parole del tuo wallet on-chain, le stesse che hanno già la loro copia nel cloud di Telegram o sui relay Nostr. Così, ovunque apri Barattolo con quelle parole, i tuoi scambi nuovi li governi da lì: telefono, Telegram Desktop o browser. Gli scambi già aperti continuano come prima, dal dispositivo dove li hai presi.
+dove: lo scambio P2P (pubblicare o prendere un ordine); il foglio «Il tuo profilo di scambio» lo dice; se su un dispositivo le parole non ci sono, il primo gesto chiede di incollarle da Profilo → «Wallet e incassi».
+leva: nessuna
 pubblico: sì

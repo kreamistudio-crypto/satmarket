@@ -500,3 +500,9 @@ frase: Nella chat con l'assistenza di Barattolo ora puoi allegare anche degli sc
 dove: Profilo → «Aiuto» → «💬 Assistenza», il bottone «📎 Allega screenshot» sotto la casella.
 leva: ASSISTENZA_ATTIVA (quella dell'assistenza, già accesa)
 pubblico: sì
+
+## 2026-11-17 · chiavi-dalle-parole
+frase: Le chiavi degli scambi P2P adesso nascono dalle 12 parole del tuo wallet on-chain, le stesse che hanno già la loro copia nel cloud di Telegram o sui relay Nostr. Così, ovunque apri Barattolo con quelle parole, i tuoi scambi nuovi li governi da lì: telefono, Telegram Desktop o browser. Gli scambi già aperti continuano come prima, dal dispositivo dove li hai presi.
+dove: lo scambio P2P (pubblicare o prendere un ordine); il foglio «Il tuo profilo di scambio» lo dice; se su un dispositivo le parole non ci sono, il primo gesto chiede di incollarle da Profilo → «Wallet e incassi».
+leva: nessuna
+pubblico: sì

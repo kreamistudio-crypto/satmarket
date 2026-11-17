@@ -76233,6 +76233,11 @@ let p2pGiudizio = null;   /* la promessa in volo: una per sessione */
    il loro freno, e passano per strade che si escludono. */
 let p2pSemeGiro = null;
 function semeContoP2P(){
+  /* (17 nov 2026) PRIMA LE 12 PAROLE, senza farle nascere; la strada di
+     ieri resta il ripiego del giudizio, che con un mazzo delle parole in
+     mano non scalza niente */
+  if (!p2pSemeGiro && typeof semeDaParoleP2P === 'function')
+    p2pSemeGiro = semeDaParoleP2P().catch(() => null).then(w => w || semeProfiloP2P());
   if (!p2pSemeGiro) p2pSemeGiro = semeProfiloP2P();
   return p2pSemeGiro;
 }
@@ -76279,6 +76284,9 @@ function mazzoDalSemeP2P(s, vecchio){
           backupFatto: vecchio ? !!vecchio.backupFatto : true,
           /* la copia riletta dai relay, quando il seme e' lei (12 ott 2026) */
           copiaRelay: (s.copiaRelay | 0) || (vecchio ? (vecchio.copiaRelay | 0) : 0),
+          /* (17 nov 2026, «chiavi-dalle-parole») 1 = nato dalle 12 parole
+             on-chain: e' il profilo di OGNI gesto nuovo */
+          parole: s.parole ? 1 : 0,
           origine: 'conto', conto: myTgId, versione: s.versione | 0};
 }
 /* IL PASSAGGIO VERO, in un posto solo perche' lo fanno in due: il
@@ -76309,11 +76317,167 @@ async function passaAlContoP2P(m, s){
   await registraChiaviP2P([mazzoMostro().pub]);
   return mazzoMostro();
 }
+/* ═══ IL PROFILO DALLE 12 PAROLE (17 nov 2026, cantiere chiavi-dalle-
+   parole, parola di Andrea: «ovunque apro barattolo devo avere le stesse
+   chiavi, similmente all'onchain, backuppate su telegram o nostr; possono
+   essere le stesse 12 parole del wallet onchain»; e alla scelta: «gli
+   ordini attivi rimangono quelli che sono, i prossimi devono usare quelle
+   chiavi; il profilo Barattolo e' lo stesso, il profilo Mostro
+   chissenefrega») ═════════════════════════════════════════════════════
+   IL FATTO: il profilo di oggi era gia' «del conto», ma i profili di
+   prima (nati su un dispositivo, o da un seme che non si rifa' piu')
+   vivevano solo nel localStorage dove erano nati, e uno scambio preso
+   con loro altrove si vedeva e non si governava («🔑 Le chiavi di questo
+   scambio non sono in questo browser»).
+   ADESSO IL SEGRETO E' UNO: l'identita' Mostro si ricava dalle 12 parole
+   on-chain, sulla strada standard di Mostro (m/44'/1237'/38383'/0/0), e
+   le trade key da lei come sempre (`chiaveScambio`). Le parole hanno
+   gia' le loro due case (cloud di Telegram, relay Nostr cifrati) e il
+   loro giudice (`onchainSemeAssicurato`: le cerca, e se il wallet esiste
+   altrove e qui non si raggiunge NON ne fa nascere un secondo). Quindi
+   dove ci sono le parole c'e' il profilo, uguale.
+   ⚠️ E BARATTOLO NON LO SA PIU' RIFARE: la strada di prima per chi
+   entra da Telegram era il seme del server (`/api/p2p/seme`); questa no.
+   Le reputazioni sul coordinatore ripartono (scelta di Andrea), quelle
+   di Barattolo sono dell'account e non si muovono.
+   IL PROFILO DI PRIMA VA IN PENSIONE (la meccanica del cantiere
+   profilo-unico del 2 nov, mai arrivata su develop): resta su questo
+   dispositivo con le sue righe al loro posto, e serve SOLO a finire i
+   suoi scambi — ascoltare, firmare, pagare, annullare. Con lui non nasce
+   niente: pubblicare e prendere passano da `assicuraMazzo`, che vuole il
+   profilo delle parole.
+   L'ECCEZIONE DICHIARATA resta la strada sovrana (`origine 'mia'`): una
+   chiave che l'utente ha messo lui, e che il foglio gli promette sua. */
+const P2P_STRADA_PAROLE = "m/44'/1237'/38383'/0/0";
+/* PURA (col bundle in mano): la sk dell'identita' dalle parole, '' se
+   le parole sono storte o la chiave non e' una chiave */
+function skDaParoleP2P(B, parole){
+  try {
+    const p = String(parole || '').trim();
+    if (!p || !B.validateMnemonic(p, B.wordlist)) return '';
+    const k = B.HDKey.fromMasterSeed(B.mnemonicToSeedSync(p, '')).derive(P2P_STRADA_PAROLE);
+    if (!k || !k.privateKey) return '';
+    const hex = Array.from(k.privateKey, b => b.toString(16).padStart(2, '0')).join('');
+    return FORMA_HEX64.test(hex) && !/^0+$/.test(hex) ? hex : '';
+  } catch(e){ return ''; }
+}
+/* le parole SENZA farle nascere: qui, nel cloud di Telegram, sui relay.
+   E' la strada del render, che non deve far nascere un wallet guardando
+   il libro; il gesto passa da `onchainSemeAssicurato`, che sa farlo. */
+async function paroleTrovateP2P(){
+  const qui = typeof onchainSemeLocale === 'function' ? onchainSemeLocale() : '';
+  if (qui) return qui;
+  try {
+    const B = await caricaBitcoin();
+    const r = await cloudLeggiEsito(ONCHAIN_CLOUD);
+    if (r.ok && r.testo) {
+      let p = '';
+      try { p = String(JSON.parse(r.testo).parole || '').trim(); } catch(e){ p = ''; }
+      if (p && B.validateMnemonic(p, B.wordlist)) { onchainScriviLocale(p); return p; }
+    }
+    const su = typeof onchainDaiRelay === 'function' ? await onchainDaiRelay() : '';
+    if (su) { onchainScriviLocale(su); return su; }
+  } catch(e){}
+  return '';
+}
+/* IL SEME DALLE PAROLE: {sk, versione, parole: 1} o null. Col gesto
+   (`opz.gesto`) le parole possono nascere, e un «non si puo'» diventa un
+   errore da leggere — mai un profilo a caso al suo posto. */
+async function semeDaParoleP2P(opz){
+  opz = opz || {};
+  if (DEMO || VETRINA || !myTgId || typeof caricaBitcoin !== 'function') return null;
+  let parole = '';
+  try {
+    parole = opz.gesto && typeof onchainSemeAssicurato === 'function'
+      ? await onchainSemeAssicurato() : await paroleTrovateP2P();
+  } catch(e) {
+    console.log('🔑 [p2p] profilo dalle parole: ' + ((e && e.message) || e));
+    if (opz.gesto) throw new Error(P2P_SENZA_PAROLE + ' (' + ((e && e.message) || e) + ')');
+    return null;
+  }
+  if (!parole) {
+    if (opz.gesto) throw new Error(P2P_SENZA_PAROLE);
+    return null;
+  }
+  const sk = skDaParoleP2P(await caricaBitcoin(), parole);
+  if (!sk) {
+    if (opz.gesto) throw new Error(P2P_SENZA_PAROLE);
+    return null;
+  }
+  return {sk, versione: 0, parole: 1};
+}
+const P2P_TESTO_PAROLE = 'Questo profilo <b>nasce dalle 12 parole</b> del tuo wallet on-chain: dove ci sono loro c\'è lui, uguale su ogni dispositivo, e non c\'è niente da salvare a parte. Barattolo non lo può ricavare da solo.';
+const P2P_SENZA_PAROLE = 'Per scambiare da qui servono le 12 parole del tuo wallet on-chain: '
+  + 'le chiavi degli scambi nascono da lì, uguali su ogni dispositivo. '
+  + 'Apri Profilo → «Wallet e incassi» e incollale';
+/* ── la pensione ── */
+const MOSTRO_PENSIONE = 'barattolo_mostro_pensione';
+function mazziPensioneP2P(){
+  try {
+    const a = JSON.parse(localStorage.getItem(chiaveP2P(MOSTRO_PENSIONE)));
+    return Array.isArray(a)
+      ? a.filter(d => d && FORMA_HEX64.test(d.sk || '') && FORMA_HEX64.test(d.pub || ''))
+      : [];
+  } catch(e){ return []; }
+}
+function mandaInPensioneP2P(m){
+  if (!m || !FORMA_HEX64.test(m.sk || '') || !FORMA_HEX64.test(m.pub || '')) return;
+  const tutti = mazziPensioneP2P().filter(d => d.sk !== m.sk);
+  tutti.push({sk: m.sk, pub: m.pub, indice: m.indice | 0, creato: m.creato | 0,
+              origine: m.origine || '', versione: m.versione | 0, parole: m.parole ? 1 : 0,
+              conto: numeroConto(m.conto), pensione: Math.floor(Date.now() / 1000)});
+  try { localStorage.setItem(chiaveP2P(MOSTRO_PENSIONE), JSON.stringify(tutti)); } catch(e){}
+  console.log('🔑 [p2p] profilo: ' + String(m.pub).slice(0, 8)
+              + ' in pensione, resta solo per finire i suoi scambi');
+}
+function scordaPensioneP2P(){
+  try { localStorage.removeItem(chiaveP2P(MOSTRO_PENSIONE)); } catch(e){}
+}
+function inPensioneP2P(sk){
+  return !!sk && mazziPensioneP2P().some(d => d.sk === sk);
+}
+/* IL MAZZO DI UNA RIGA: il vivo se la trade key della riga si rideriva
+   da lui, altrimenti quello in pensione da cui si rideriva — la prova e'
+   la derivazione (`rigaDiQuestoMazzoP2P`), e la restore (`identita`)
+   vince quando c'e'. Se nessuno torna, il vivo: e' il comportamento di
+   prima, e la cintura di `chiamataOrdineP2P` dice «di un altro profilo»
+   invece di firmare a vuoto. */
+function mazzoRigaP2P(o){
+  const vivo = mazzoMostro();
+  if (!o) return vivo;
+  const pens = mazziPensioneP2P();
+  if (!pens.length) return vivo;
+  const voce = p2pMieiOrdini && p2pMieiOrdini[o.id];
+  if (voce && voce.identita) {
+    if (vivo && voce.identita === vivo.pub) return vivo;
+    const p = pens.find(d => d.pub === voce.identita);
+    if (p) return p;
+  }
+  if (!o.pubTrade) return vivo;
+  if (vivo && rigaDiQuestoMazzoP2P(o, vivo)) return vivo;
+  return pens.find(d => rigaDiQuestoMazzoP2P(o, d)) || vivo;
+}
+/* IL PASSAGGIO CON LA PENSIONE: a differenza di `passaAlContoP2P` non
+   parcheggia niente — righe, lapidi e recapiti restano dove sono, sono
+   gli scambi che il profilo in pensione deve ancora finire. Cambia solo
+   il mazzo VIVO. */
+async function pensionaPerIlContoP2P(m, s){
+  await caricaNostrTools();
+  if (s.sk === m.sk) return passaAlContoP2P(m, s);
+  mandaInPensioneP2P(m);
+  ricordaMazzo(mazzoDalSemeP2P(s));
+  await registraChiaviP2P([mazzoMostro().pub]);
+  return mazzoMostro();
+}
 async function giudicaMazzoP2P(m){
   const s = await semeContoP2P();
   const ora = mazzoMostro();
   if (!ora || ora.sk !== m.sk) return;     /* cambiato nel frattempo: si giudica quello nuovo */
   if (!s) { p2pMazzoEsito = 'ignoto'; return; }   /* 409 o rete: non si sa, e non si tocca */
+  /* (17 nov 2026) IL PROFILO DELLE PAROLE NON LO SCALZA UN RIPIEGO: se
+     qui il seme e' arrivato da un'altra strada (le parole non si sono
+     raggiunte in silenzio), il vivo resta lui */
+  if (ora.parole && !s.parole) { p2pMazzoEsito = 'mio'; return; }
   if (s.sk === ora.sk) {
     await passaAlContoP2P(ora, s);         /* qui timbra e basta: stessa sk */
     p2pMazzoEsito = 'mio';
@@ -76357,7 +76521,13 @@ async function giudicaMazzoP2P(m){
   }
   const dopo = mazzoMostro();
   if (!dopo || dopo.sk !== ora.sk) return;
-  if (!senzaStoriaP2P(dopo)) { p2pMazzoEsito = 'tenuto'; return; }
+  /* CON UNA STORIA, VERSO LE PAROLE, SI VA IN PENSIONE (17 nov 2026):
+     le righe restano al loro posto e il posto lo prende il profilo delle
+     12 parole. Verso il seme di ieri resta la regola di ieri. */
+  if (!senzaStoriaP2P(dopo)) {
+    if (s.parole) { await pensionaPerIlContoP2P(dopo, s); p2pMazzoEsito = 'pensione'; return; }
+    p2pMazzoEsito = 'tenuto'; return;
+  }
   await passaAlContoP2P(dopo, s);
   p2pMazzoEsito = 'ceduto';
 }
@@ -76961,9 +77131,12 @@ function copiaP2PNonOra(){ chiudiFoglioCopiaP2P(false); }
    Stanno QUI e non nel motore dello scambio: la' una sentinella vieta
    le parole di protocollo a schermo, per chi entra da Telegram. */
 function comeRiprendereChiaviP2P(){
-  return numeroConto(myTgId) < 0
-    ? 'Le ritrovi sul dispositivo dove hai preso lo scambio, o entrando con la stessa chiave Nostr se il profilo deriva da lei.'
-    : 'Le ritrovi sul dispositivo dove hai preso lo scambio, o aprendo Barattolo dal tuo Telegram: lì il profilo torna da solo.';
+  /* (17 nov 2026, chiavi-dalle-parole) gli scambi nuovi nascono dalle 12
+     parole e tornano ovunque ci siano loro: una riga senza chiavi e' di
+     un profilo di prima, o di un dispositivo dove le parole non ci sono */
+  return 'Gli scambi nuovi nascono dalle 12 parole del tuo wallet on-chain, che tornano da sole '
+    + (numeroConto(myTgId) < 0 ? 'entrando con la stessa chiave Nostr' : 'aprendo Barattolo dal tuo Telegram')
+    + ': quelli li governi da ogni dispositivo. Questo è di un profilo di prima, e lo finisci dal dispositivo dove l\'hai preso.';
 }
 function contattoSupportoP2P(){
   const bot = `<a href="https://t.me/${BOT_TG}" target="_blank" rel="noopener">@${BOT_TG}</a>`;
@@ -77230,6 +77403,7 @@ function mazzoSerializza(m){
                          creato: m.creato|0, backupFatto: !!m.backupFatto,
                          origine: m.origine || '', versione: m.versione|0,
                          copiaRelay: m.copiaRelay|0,
+                         parole: m.parole ? 1 : 0,
                          conto: numeroConto(m.conto)});
 }
 /* LA RICONCILIAZIONE COL CLOUD (set 2026, dal campo: telefono e
@@ -77263,7 +77437,7 @@ function mazzoSerializza(m){
    chiedere» non autorizza NIENTE. Da qui `cloudLeggiEsito`, che
    risponde `{ok, testo}`, e la scrittura che vuole un vuoto
    DIMOSTRATO. */
-let mazzoNuvola = '';      /* '' | spento | copia | muto | illeggibile | diverso */
+let mazzoNuvola = '';      /* '' | spento | copia | muto | illeggibile | diverso | pensione */
 let mazzoNuvolaAltro = null;   /* il mazzo del cloud, quando e' DIVERSO */
 let sincroInCorso = null;
 function sincronizzaMazzo(){
@@ -77305,6 +77479,11 @@ function sincronizzaMazzo(){
       await caricaNostrTools();
       const su = mazzoDaTesto(letto.testo);
       if (!su) return (mazzoNuvola = 'illeggibile');
+      /* il cloud che porta il profilo IN PENSIONE (o quello di ieri,
+         quando qui vive quello delle parole) non e' un conflitto (17 nov
+         2026): e' la copia che porta la pensione agli altri dispositivi
+         Telegram, e il vivo torna da solo dalle parole */
+      if (su.sk !== m.sk && ((typeof inPensioneP2P === 'function' && inPensioneP2P(su.sk)) || m.parole)) { mazzoNuvolaAltro = null; return (mazzoNuvola = 'pensione'); }
       if (su.sk !== m.sk) { mazzoNuvolaAltro = su; return (mazzoNuvola = 'diverso'); }
       mazzoNuvolaAltro = null;
       /* L'INDICE CONVERGE, ed e' la meta' che mancava: fin qui lo stesso
@@ -77421,6 +77600,8 @@ function mazzoDaTesto(testo){
           /* `copiaRelay` e' QUANDO una copia cifrata del profilo e' stata
              riletta dai relay (11 ott 2026): 0 = mai */
           copiaRelay: d ? (d.copiaRelay|0) : 0,
+          /* `parole`: nato dalle 12 parole on-chain (17 nov 2026) */
+          parole: (d && d.parole) ? 1 : 0,
           /* `conto` e' il tg_id da cui un profilo 'conto' e' nato (set 2026,
              «IL CONTO SUL DISPOSITIVO»): 0 per quelli di ieri, che si
              verificano una volta col seme */
@@ -77795,6 +77976,15 @@ function assicuraMazzo(){
      ordine pubblicato con le chiavi di un altro conto e' esattamente
      il difetto (vedi «IL CONTO SUL DISPOSITIVO») */
   if (m && mazzoDaGiudicareP2P(m)) return giudizioInCorsoP2P(m).then(assicuraMazzo);
+  /* ⚠️ IL GESTO VUOLE IL PROFILO DELLE 12 PAROLE (17 nov 2026, cantiere
+     chiavi-dalle-parole): pubblicare e prendere passano tutti da qui, e
+     un ordine nuovo nato con un profilo di dispositivo e' esattamente
+     quello che altrove non si governa. Fuori resta solo la strada
+     sovrana; vetrina e demo non arrivano a firmare niente. */
+  if (typeof gestoDalleParoleP2P === 'function' && typeof onchainSemeAssicurato === 'function'
+      && !DEMO && !VETRINA && myTgId
+      && !(m && (m.parole || m.origine === 'mia')))
+    return gestoDalleParoleP2P();
   /* il mazzo c'e': il gesto parte SUBITO e la riconciliazione col cloud
      va per conto suo — e' la migrazione per chi il foglio non lo apre
      mai, e non deve far aspettare nessuno */
@@ -77865,6 +78055,51 @@ function assicuraMazzo(){
    apre non e' un posto libero — si resta a mani vuote, mai una
    sovrascrittura muta (la regola delle lapidi, come in
    `sincronizzaMazzo`). */
+/* IL PASSAGGIO DEL GESTO (17 nov 2026): le parole si cercano — e col
+   gesto possono nascere —, e un «non si puo'» e' un errore che il toast
+   legge, MAI un profilo a caso. Il mazzo che c'era e non e' quello delle
+   parole va in pensione (non sulla mensola: le sue righe restano), uno
+   di un altro conto sulla mensola come sempre, la strada sovrana non si
+   tocca. Senza mazzo qui, la copia nel cloud di Telegram che porta un
+   profilo di prima va in pensione anche lei: e' cosi' che un secondo
+   dispositivo Telegram finisce gli scambi del primo. */
+let paroleInCorso = null;
+function gestoDalleParoleP2P(){
+  if (!paroleInCorso) paroleInCorso = (async () => {
+    const s = await semeDaParoleP2P({gesto: true});
+    if (!s || !s.sk) throw new Error(P2P_SENZA_PAROLE);
+    await caricaNostrTools();
+    p2pSemeGiro = Promise.resolve(s);
+    let qui = mazzoMostro();
+    if (qui && qui.origine === 'mia') return qui;
+    if (qui && mazzoEstraneoP2P(qui)) {
+      await parcheggiaMazzoAltruiP2P(qui, 'dice di venire da un conto che non'
+        + ' e il mio: messo da parte');
+      qui = mazzoMostro();
+    }
+    if (qui) {
+      const m = await pensionaPerIlContoP2P(qui, s);
+      p2pMazzoEsito = qui.sk === s.sk ? 'mio' : 'pensione';
+      return m;
+    }
+    const letto = await cloudLeggiEsito(CLOUD_MAZZO);
+    const nuvola = letto.testo ? mazzoDaTesto(letto.testo) : null;
+    if (nuvola && nuvola.sk !== s.sk && !mazzoEstraneoP2P(nuvola) && nuvola.origine !== 'mia')
+      mandaInPensioneP2P(nuvola);
+    const nuovo = mazzoDalSemeP2P(s, nuvola && nuvola.sk === s.sk ? nuvola : null);
+    if (!mazzoMostro()) ricordaMazzo(nuovo);
+    /* la copia si scrive solo su un vuoto DIMOSTRATO, come sempre */
+    if (letto.ok && !letto.testo)
+      mazzoNuvola = await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(nuovo)) ? 'copia' : 'muto';
+    else if (nuvola && nuvola.sk === s.sk) mazzoNuvola = 'copia';
+    else if (nuvola && inPensioneP2P(nuvola.sk)) mazzoNuvola = 'pensione';
+    await registraChiaviP2P([mazzoMostro().pub]);
+    p2pMazzoEsito = 'mio';
+    console.log('🔑 [p2p] profilo: dalle 12 parole on-chain');
+    return mazzoMostro();
+  })().finally(() => { paroleInCorso = null; });
+  return paroleInCorso;
+}
 let contoInCorso = null;
 function adottaProfiloContoP2P(){
   if (DEMO || VETRINA || !myTgId) return Promise.resolve(null);
@@ -77872,7 +78107,9 @@ function adottaProfiloContoP2P(){
   if (mazzoInCorso) return mazzoInCorso;
   if (mazzoNuvola === 'illeggibile' || mazzoNuvola === 'diverso') return Promise.resolve(null);
   if (!contoInCorso) contoInCorso = (async () => {
-    const s = await semeProfiloP2P();
+    /* (17 nov 2026) prima le 12 parole, poi la strada di ieri */
+    const s = (typeof semeDaParoleP2P === 'function' ? await semeDaParoleP2P().catch(() => null) : null)
+      || await semeProfiloP2P();
     /* senza seme (409: nativo Nostr senza nsec nel browser) resta la
        copia cifrata sui relay (11 ott 2026): si RIPRENDE, non si genera */
     if (!s) return await riprendiCopiaProfiloP2P();
@@ -77989,7 +78226,9 @@ function renderProfiloP2P(){
     spento: `Questo Telegram non sa tenerne una copia: il profilo vale su questo dispositivo.`,
     muto: `Non siamo riusciti a metterne una copia nel tuo Telegram: per ora vale <b>solo su questo dispositivo</b>.`,
     illeggibile: `Nel tuo Telegram c'è una copia che non riusciamo a leggere, e non l'abbiamo toccata: il profilo vale su questo dispositivo.`,
-    diverso: `Nel tuo Telegram c'è un profilo <b>diverso</b> da questo: non ne abbiamo toccato nessuno dei due.`
+    diverso: `Nel tuo Telegram c'è un profilo <b>diverso</b> da questo: non ne abbiamo toccato nessuno dei due.`,
+    /* (17 nov 2026, chiavi-dalle-parole) */
+    pensione: `Nel tuo Telegram resta la copia del profilo di prima, che serve solo a finire i suoi scambi.`
   }[mazzoNuvola] || `Vale su questo dispositivo.`;
   /* FUORI DA TELEGRAM NON C'E' NESSUN TELEGRAM DI CUI PARLARE (11 ott
      2026, «tor-chiavi-scambio»): la riga dice il browser, e l'avviso di
@@ -78066,7 +78305,9 @@ function renderProfiloP2P(){
      un conto NEGATIVO deriva dalla chiave d'accesso nel browser, e lo
      dice `testoProfiloDerivatoFuoriP2P` (il testo vive la' per la
      sentinella del lessico) */
-  const debito = (m.origine === 'conto' && numeroConto(m.conto) < 0)
+  /* (17 nov 2026) il profilo delle 12 parole lo dice per primo */
+  const debito = m.parole ? P2P_TESTO_PAROLE
+    : (m.origine === 'conto' && numeroConto(m.conto) < 0)
     ? testoProfiloDerivatoFuoriP2P()
     : m.origine === 'conto'
     ? 'Questo profilo <b>torna da solo</b> ogni volta che entri, su qualunque dispositivo: non c\'è niente da salvare. Il codice segreto serve solo se vuoi portarlo fuori da Barattolo.'
@@ -78075,7 +78316,13 @@ function renderProfiloP2P(){
     : m.backupFatto
     ? '✓ Hai salvato il codice segreto.'
     : 'Il codice segreto è la tua copia: con lui il profilo torna su qualunque dispositivo, e le recensioni con lui. <b>Se lo perdi, la reputazione riparte da zero.</b> Gli scambi aperti restano qui.';
-  box.innerHTML = `<div class="hint">Profilo attivo dal <b>${esc(dal)}</b>. ${fuoriTelegram ? doveFuori : dove}</div>
+  /* IL PROFILO IN PENSIONE SI DICE (17 nov 2026): c'e', e serve solo a
+     finire gli scambi che aveva aperti */
+  const pensione = (typeof mazziPensioneP2P === 'function' && mazziPensioneP2P().length)
+    ? `<div class="hint">🔁 Il profilo che c'era prima qui resta solo per finire gli scambi che aveva aperti: con lui non si pubblica e non si prende più niente.</div>`
+    : '';
+  box.innerHTML = `<div class="hint">Profilo attivo dal <b>${esc(dal)}</b>. ${m.parole ? '' : (fuoriTelegram ? doveFuori : dove)}</div>
+    ${pensione}
     ${typeof rigaMiaReputazioneP2P === 'function' ? rigaMiaReputazioneP2P() : ''}
     ${typeof rigaPausaProfiloP2P === 'function' ? rigaPausaProfiloP2P() : ''}
     <div class="hint">${debito}</div>
@@ -78147,6 +78394,9 @@ function scordaMazzo(){
 }
 async function dimenticaMazzoOra(){
   scordaMazzoLocale();
+  /* ...e chi era in pensione: senza scambi aperti non ha piu' niente da
+     finire (17 nov 2026) */
+  if (typeof scordaPensioneP2P === 'function') scordaPensioneP2P();
   await cloudCancella(CLOUD_MAZZO);
   await dimenticaChiaviP2P();
   p2pRegistrato = false;
@@ -79980,9 +80230,18 @@ function giroArchiviatoP2P(locali, id){
 async function identitaMieP2P(mz){
   const mie = [];
   if (mz && (mz.indice | 0)) mie.push(mz.sk);
+  /* ...e quelle in pensione (17 nov 2026), in coda e senza doppioni */
+  if (typeof conPensioneP2P === 'function') conPensioneP2P(mie);
   if (mz && mz.origine === 'conto') return mie;
   const s = await semeContoP2P();
   if (s && s.sk && mie.indexOf(s.sk) < 0) mie.push(s.sk);
+  return mie;
+}
+/* ...e quelle in pensione (17 nov 2026): i loro ordini restano MIEI
+   finche' ne hanno, e la restore lo deve sapere */
+function conPensioneP2P(mie){
+  if (typeof mazziPensioneP2P !== 'function') return mie;   /* i banchi che ritagliano il blocco */
+  for (const d of mazziPensioneP2P()) if (mie.indexOf(d.sk) < 0) mie.push(d.sk);
   return mie;
 }
 /* UNA DOMANDA SOLA, A UN'IDENTITA' SOLA, con una sottoscrizione sua —
@@ -80247,7 +80506,7 @@ async function mostroArriva(ev){
   const soloVoto = !ord && typeof ordiniVotoP2P === 'function' && !!ordiniVotoP2P()[pub];
   if (soloVoto) ord = ordiniVotoP2P()[pub];
   if (!ord) return;                            // non e' roba nostra
-  const mz = mazzoMostro();
+  const mz = typeof mazzoRigaP2P === 'function' ? mazzoRigaP2P(ord) : mazzoMostro();
   if (!mz) return;
   const NT = window.NostrTools;
   const tk = chiaveScambio(mz.sk, ord.indice);
@@ -84391,7 +84650,7 @@ function payloadPresaP2P(riga, scelta, metodo, sulMetodo){
    dal profilo, l'indice si manda solo dove il coordinatore lo valida
    (prendere e creare un ordine) */
 async function chiamataOrdineP2P(o, azione, payload){
-  const mz = mazzoMostro();
+  let mz = mazzoMostro();
   if (!mz) throw new Error('Il profilo di scambio non si trova');
   /* ogni gesto di qui parla di un ordine PRECISO: senza l'id il
      coordinatore non saprebbe di quale, quindi si dice invece di
@@ -84409,6 +84668,12 @@ async function chiamataOrdineP2P(o, azione, payload){
     if (riparata === 'presa' && azione !== 'cancel')
       throw new Error('Questo è un tuo ordine, e lo scambio che stavi guardando non c\'è più: riapri la pagina');
   }
+  /* lo scambio di un profilo IN PENSIONE si firma con lui (17 nov 2026,
+     chiavi-dalle-parole): e' l'unica cosa per cui e' rimasto. Pubblicare
+     e prendere no: quelli nascono col vivo, cioe' con le 12 parole. */
+  if (typeof mazzoRigaP2P === 'function'
+      && ['take-sell', 'take-buy', 'new-order'].indexOf(azione) < 0)
+    mz = mazzoRigaP2P(o) || mz;
   /* ⚠️ LA CINTURA DEL MAZZO (14 set 2026): questa e' la porta UNICA dei
      gesti verso il coordinatore, e qui sotto la trade key si deriva dal
      mazzo VIVO dando per scontato che l'ordine sia suo. Quando non lo
@@ -96174,7 +96439,7 @@ function chiaviPeer(skHex, peerPub){
 /* le chiavi di UNO scambio, quando la controparte si conosce */
 function chiaviChatOrdine(o){
   if (!o || !o.peer) return null;
-  const mz = mazzoMostro();
+  const mz = typeof mazzoRigaP2P === 'function' ? mazzoRigaP2P(o) : mazzoMostro();
   if (!mz) return null;
   try {
     return chiaviPeer(chiaveScambio(mz.sk, o.indice).sk, o.peer);
@@ -96193,7 +96458,7 @@ function autoriChatP2P(){
 /* ---- quel che si scrive ---- */
 async function campoInvia(o, tipo, testo){
   const NT = window.NostrTools;
-  const mz = mazzoMostro();
+  const mz = typeof mazzoRigaP2P === 'function' ? mazzoRigaP2P(o) : mazzoMostro();
   if (!mz) throw new Error('Il profilo di scambio non si trova');
   const k = chiaviChatOrdine(o);
   if (!k) throw new Error('Non si sa ancora con chi stai scambiando');
@@ -96284,7 +96549,7 @@ function campoArriva(o, ev){
   catch(e) { return; }
   if (!dentro || dentro.kind !== 1) return;
   if (!NT.verifyEvent(dentro)) return;      // CHI ha scritto: solo questa lo dice
-  const mz = mazzoMostro();
+  const mz = typeof mazzoRigaP2P === 'function' ? mazzoRigaP2P(o) : mazzoMostro();
   if (!mz) return;
   const mia = chiaveScambio(mz.sk, o.indice).pub;
   if (dentro.pubkey !== o.peer && dentro.pubkey !== mia) return;
@@ -96380,7 +96645,7 @@ function posaMessaggioChatP2P(lista, m){
 }
 function chiaviModeratoreP2P(o){
   if (!o || !o.moderatore || o.soloVista) return null;
-  const mz = mazzoMostro();
+  const mz = typeof mazzoRigaP2P === 'function' ? mazzoRigaP2P(o) : mazzoMostro();
   if (!mz) return null;
   try {
     return chiaviPeer(chiaveScambio(mz.sk, o.indice).sk, o.moderatore);
@@ -96398,7 +96663,7 @@ function autoriModeratoreP2P(){
 }
 function chatModeratoreArriva(o, ev){
   const k = chiaviModeratoreP2P(o);
-  const mz = mazzoMostro();
+  const mz = typeof mazzoRigaP2P === 'function' ? mazzoRigaP2P(o) : mazzoMostro();
   if (!k || !mz) return;
   const mia = chiaveScambio(mz.sk, o.indice).pub;
   const dentro = apriBustaChatP2P(k, ev, [mia, o.moderatore]);
@@ -96416,7 +96681,7 @@ function chatModeratoreArriva(o, ev){
   if (aperto) renderOrdineP2P();
 }
 async function chatModeratoreInvia(o, testo){
-  const mz = mazzoMostro();
+  const mz = typeof mazzoRigaP2P === 'function' ? mazzoRigaP2P(o) : mazzoMostro();
   if (!mz) throw new Error('Il profilo di scambio non si trova');
   const k = chiaviModeratoreP2P(o);
   if (!k) throw new Error('Nessun moderatore ha ancora preso la disputa');
@@ -99428,7 +99693,11 @@ function adottaScambiServerP2P(locali){
     if (locali[id] && typeof riparaChiaveMakerP2P === 'function'
         && riparaChiaveMakerP2P(id, locali)) nati++;
     let gia = locali[id];
-    const tk = chiaveScambioDaServerP2P(mz, id, s);
+    /* ...e se il vivo non la sa, uno dei profili in pensione (17 nov
+       2026, chiavi-dalle-parole): sono suoi gli scambi che deve finire */
+    const tk = chiaveScambioDaServerP2P(mz, id, s)
+      || (typeof mazziPensioneP2P === 'function' ? mazziPensioneP2P() : [])
+           .map(d => chiaveScambioDaServerP2P(d, id, s)).find(Boolean) || null;
     /* LO STESSO ID, UN GIRO NUOVO (7 ott 2026): vedi `giroNuovoP2P` */
     const segno = gia && typeof giroNuovoP2P === 'function' ? giroNuovoP2P(gia, s, tk) : '';
     if (segno && !gia.mio && typeof archiviaGiroCadutoP2P === 'function') {
@@ -103202,7 +103471,7 @@ async function nonTuoOrdineP2P(e, o, azione, payload, usata){
       diarioP2P('gesto ' + azione + ' ' + corto + ': riletto, l\'ordine e\' gia\' annullato');
       return {action: 'canceled', riletto: true};
     }
-    const mz = mazzoMostro();
+    const mz = typeof mazzoRigaP2P === 'function' ? mazzoRigaP2P(riga) : mazzoMostro();
     let adesso = '';
     try { if (riga && mz) adesso = chiaveScambio(mz.sk, riga.indice).pub; } catch(x) {}
     const riprova = !!riga && !!adesso && adesso !== usata
@@ -105306,7 +105575,7 @@ function notaAppuntamentoP2P(ordine, pub, ora, quando, punto){
 /* la chiave usa-e-getta di QUESTO scambio, su questo dispositivo, o null */
 function chiaveOrdinePresenzaP2P(o){
   if (!o || !(o.indice > 0) || !o.pubTrade) return null;
-  const mz = mazzoMostro();
+  const mz = typeof mazzoRigaP2P === 'function' ? mazzoRigaP2P(o) : mazzoMostro();
   if (!mz || !mz.sk) return null;
   try {
     const tk = chiaveScambio(mz.sk, o.indice);
@@ -106572,7 +106841,7 @@ function chatScTradeP2P(o){
   if (!o || o.soloVista) return null;
   /* nel mercatino la fa la chiave dell'ordine */
   if (o.mercatino) return chatMercChiaveP2P(o);
-  const mz = mazzoMostro();
+  const mz = typeof mazzoRigaP2P === 'function' ? mazzoRigaP2P(o) : mazzoMostro();
   if (!mz) return null;
   try { return chiaveScambio(mz.sk, o.indice); } catch(e) { return null; }
 }

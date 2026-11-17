@@ -77509,6 +77509,10 @@ const corpo = f => JSON.parse(f.opt.body);
   out.paroleDiCasa = !['nostr', 'nsec', 'relay', 'chiave'].some(w => t.includes(w));
   // 16) tappa 7b: il mazzo qui non c'e', ma il SERVER sa che l'account
   //     una chiave l'ha registrata altrove — e il foglio lo dice.
+  // (17 nov 2026, «chiavi-dalle-parole») il giudizio del passo 15 chiede
+  // il seme DOPO aver cercato le 12 parole, cioe' qualche giro piu' tardi:
+  // si lascia finire, o la sua POST cadrebbe nel conto di questo passo
+  await new Promise(r => setTimeout(r, 20));
   reset(); rispChiavi = {chiavi: 47, dal: 1735689600};
   await apriProfiloP2P();
   const primo = nodi.p2pProfiloCorpo.innerHTML;
@@ -86188,6 +86192,184 @@ console.log(JSON.stringify({
           "if (!idMostroVero(o.id))" in ch and "throw new Error" in ch)
 
 
+
+BANCO_CHIAVI_PAROLE = r"""
+const fs = require('fs');
+const B = new Function(fs.readFileSync(process.argv[2], 'utf8') + '; return BarattoloBTC;')();
+const NT = new Function(fs.readFileSync(process.argv[3], 'utf8') + '; return NostrTools;')();
+const V = JSON.parse(fs.readFileSync(process.argv[4], 'utf8'));
+const window = {NostrTools: NT};
+const FORMA_HEX64 = /^[0-9a-f]{64}$/;
+const DEMO = false, VETRINA = false;
+let myTgId = 111;
+const mem = {};
+const localStorage = {getItem: k => (k in mem ? mem[k] : null),
+                      setItem: (k, v) => { mem[k] = String(v); },
+                      removeItem: k => { delete mem[k]; }};
+const chiaveP2P = b => b + '@' + myTgId;
+const MOSTRO_CHIAVE = 'barattolo_mostro';
+const numeroConto = x => { const n = Number(x); return Number.isFinite(n) ? Math.trunc(n) : 0; };
+let p2pMieiOrdini = null;
+const caricaBitcoin = async () => B;
+let PAROLE_QUI = '', NASCE = '', CLOUD = {ok: true, testo: ''}, RELAY = '';
+const onchainSemeLocale = () => PAROLE_QUI;
+const onchainScriviLocale = p => { PAROLE_QUI = p; return true; };
+const onchainSemeAssicurato = async () => { if (PAROLE_QUI) return PAROLE_QUI;
+  if (NASCE === 'altrove') throw new Error('Il tuo wallet on-chain è già nato su un altro dispositivo');
+  PAROLE_QUI = NASCE; return NASCE; };
+const ONCHAIN_CLOUD = 'barattolo_onchain';
+const cloudLeggiEsito = async () => CLOUD;
+const onchainDaiRelay = async () => RELAY;
+__PEZZI__
+(async () => {
+  const out = {};
+  const P1 = V.bip39_english[0].parole, P2 = V.bip39_english[1].parole;
+  const a = skDaParoleP2P(B, P1), a2 = skDaParoleP2P(B, P1), b = skDaParoleP2P(B, P2);
+  out.forma = FORMA_HEX64.test(a);
+  out.stabile = a === a2;
+  out.diverse = a !== b;
+  out.storte = skDaParoleP2P(B, 'ciao come stai');
+  /* la strada e' quella di Mostro: la rifa' qui il banco, a mano */
+  const k = B.HDKey.fromMasterSeed(B.mnemonicToSeedSync(P1, '')).derive("m/44'/1237'/38383'/0/0");
+  out.stradaMostro = Array.from(k.privateKey, x => x.toString(16).padStart(2, '0')).join('') === a;
+  /* il render non fa nascere niente; il gesto si' */
+  out.renderVuoto = await semeDaParoleP2P();
+  NASCE = P2;
+  let g = await semeDaParoleP2P({gesto: true});
+  out.gestoNasce = g && g.sk === b && g.parole === 1;
+  PAROLE_QUI = '';
+  /* dalla nuvola di Telegram, senza nascita */
+  CLOUD = {ok: true, testo: JSON.stringify({parole: P1})};
+  g = await semeDaParoleP2P();
+  out.dallaNuvola = !!g && g.sk === a && PAROLE_QUI === P1;
+  /* wallet altrove, parole non raggiungibili: il gesto lo DICE */
+  PAROLE_QUI = ''; CLOUD = {ok: true, testo: ''}; NASCE = 'altrove';
+  try { await semeDaParoleP2P({gesto: true}); out.altrove = 'passato'; }
+  catch(e) { out.altrove = e.message.indexOf('12 parole') >= 0 ? 'detto' : e.message; }
+  out.altroveRender = await semeDaParoleP2P();
+  /* la pensione e il mazzo di una riga */
+  const vecchio = {sk: b, pub: NT.getPublicKey(NT.utils.hexToBytes(b)), indice: 4, origine: ''};
+  const vivo = {sk: a, pub: NT.getPublicKey(NT.utils.hexToBytes(a)), indice: 1, origine: 'conto', parole: 1};
+  localStorage.setItem(chiaveP2P('barattolo_mostro'), JSON.stringify(vivo));
+  mandaInPensioneP2P(vecchio);
+  mandaInPensioneP2P(vecchio);
+  out.pensioneUna = mazziPensioneP2P().length;
+  out.inPensione = inPensioneP2P(b) && !inPensioneP2P(a);
+  const rigaVecchia = {id: 'x', indice: 4, pubTrade: chiaveScambio(b, 4).pub};
+  const rigaNuova = {id: 'y', indice: 1, pubTrade: chiaveScambio(a, 1).pub};
+  const rigaIgnota = {id: 'z', indice: 2, pubTrade: chiaveScambio(P2.length ? a : b, 9).pub};
+  out.rigaVecchia = mazzoRigaP2P(rigaVecchia).sk === b;
+  out.rigaNuova = mazzoRigaP2P(rigaNuova).sk === a;
+  out.rigaIgnota = mazzoRigaP2P(rigaIgnota).sk === a;
+  p2pMieiOrdini = {z: {identita: vecchio.pub}};
+  out.restoreVince = mazzoRigaP2P(rigaIgnota).sk === b;
+  /* un altro conto non vede la pensione del primo */
+  myTgId = 222;
+  out.altroConto = mazziPensioneP2P().length;
+  myTgId = 111;
+  scordaPensioneP2P();
+  out.scordata = mazziPensioneP2P().length;
+  console.log(JSON.stringify(out));
+})().catch(e => { console.log(JSON.stringify({errore: String(e && e.stack || e)})); });
+"""
+
+
+def prove_chiavi_dalle_parole():
+    """LE CHIAVI P2P DALLE 12 PAROLE (17 nov 2026, cantiere chiavi-dalle-
+    parole, parola di Andrea: «ovunque apro barattolo devo avere le stesse
+    chiavi... possono essere le stesse 12 parole del wallet onchain», e
+    alla scelta: «gli ordini attivi rimangono quelli che sono, i prossimi
+    devono usare quelle chiavi»). L'identita' Mostro nasce dalle parole
+    on-chain sulla strada di Mostro; il profilo di prima va in pensione e
+    serve solo a finire i suoi scambi; il gesto senza parole lo dice."""
+    import shutil as _sh, subprocess as _sp
+    print("\n[le chiavi P2P dalle 12 parole: un segreto, ogni dispositivo]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # 1) le sentinelle del cablaggio
+    am = pezzo_js(mini, "function assicuraMazzo(){", "\n}\n")
+    prova("il gesto (pubblicare, prendere) vuole il profilo delle parole, salvo la strada sovrana",
+          True, "return gestoDalleParoleP2P();" in am
+          and "!(m && (m.parole || m.origine === 'mia'))" in am)
+    sc = pezzo_js(mini, "function semeContoP2P(){", "\n}\n")
+    prova("il seme della sessione chiede PRIMA le parole, poi la strada di ieri",
+          True, sc.index("semeDaParoleP2P()") < sc.index("semeProfiloP2P()"))
+    gm = pezzo_js(mini, "async function giudicaMazzoP2P(m){", "\n}\n")
+    prova("il giudice: un ripiego non scalza il profilo delle parole, e con una storia si va in pensione",
+          [True, True], ["if (ora.parole && !s.parole) { p2pMazzoEsito = 'mio'; return; }" in gm,
+                         "if (s.parole) { await pensionaPerIlContoP2P(dopo, s);" in gm])
+    co = pezzo_js(mini, "async function chiamataOrdineP2P(o, azione, payload){", "\n}\n")
+    prova("la porta dei gesti firma con il profilo della RIGA, ma pubblicare e prendere col vivo",
+          True, "mz = mazzoRigaP2P(o) || mz;" in co
+          and "['take-sell', 'take-buy', 'new-order'].indexOf(azione) < 0" in co)
+    for firma in ("async function mostroArriva(ev){", "function chiaviChatOrdine(o){",
+                  "async function campoInvia(o, tipo, testo){", "function campoArriva(o, ev){",
+                  "function chiaviModeratoreP2P(o){", "function chatModeratoreArriva(o, ev){",
+                  "async function chatModeratoreInvia(o, testo){", "function chiaveOrdinePresenzaP2P(o){",
+                  "function chatScTradeP2P(o){"):
+        corpo = pezzo_js(mini, firma, "\n}\n")
+        prova("...e " + firma.split("(")[0].split()[-1] + " deriva dal mazzo della riga", True,
+              "mazzoRigaP2P(" in corpo)
+    ad = pezzo_js(mini, "function adottaScambiServerP2P(locali){", "\n}\n")
+    prova("l'archivio del server riprende la chiave anche da un profilo in pensione", True,
+          "mazziPensioneP2P()" in ad and "chiaveScambioDaServerP2P(d, id, s)" in ad)
+    prova("il segno delle parole viaggia: serializzato e riletto", [True, True],
+          ["parole: m.parole ? 1 : 0," in pezzo_js(mini, "function mazzoSerializza(m){", "\n}\n"),
+           "parole: (d && d.parole) ? 1 : 0," in pezzo_js(mini, "function mazzoDaTesto(testo){", "\n}\n")])
+    prova("il foglio del profilo lo dice, e dice la pensione", [True, True],
+          ["m.parole ? P2P_TESTO_PAROLE" in mini, "${pensione}" in mini])
+    prova("«dimentica il profilo» si porta via anche la pensione", True,
+          "scordaPensioneP2P()" in pezzo_js(mini, "async function dimenticaMazzoOra(){", "\n}\n"))
+
+    # 2) il banco, coi due bundle veri
+    node = _sh.which("node")
+    if not node:
+        salta("chiavi dalle parole: il banco node", "node non installato")
+        return
+    pezzi = [re.search(r"const MAZZO_INFO = [^\n]+", mini).group(0),
+             pezzo_js(mini, "function chiaveScambio(", "\n}\n") + "\n}",
+             pezzo_js(mini, "function rigaDiQuestoMazzoP2P(o, m){", "\n}\n") + "\n}",
+             pezzo_js(mini, "function mazzoMostro(){", "\n}\n") + "\n}"]
+    i = mini.index("const P2P_STRADA_PAROLE = ")
+    pezzi.append(mini[i:mini.index("/* IL PASSAGGIO CON LA PENSIONE", i)])
+    banco = BANCO_CHIAVI_PAROLE.replace("__PEZZI__", "\n".join(pezzi))
+    strada = os.path.join(QUI, ".banco-chiavi-parole.js")
+    with open(strada, "w", encoding="utf-8") as fh:
+        fh.write(banco)
+    try:
+        r = _sp.run([node, strada, os.path.join(QUI, "vendor", "btc.bundle.js"),
+                     os.path.join(QUI, "vendor", "nostr.bundle.js"),
+                     os.path.join(QUI, "vendor", "vettori-bip.json")],
+                    capture_output=True, text=True, encoding="utf-8",
+                    errors="replace", timeout=120)
+    finally:
+        os.unlink(strada)
+    try:
+        o = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        print((r.stderr or "")[-900:])
+        prova("chiavi dalle parole: il banco ha risposto", True, False)
+        return
+    if "errore" in o:
+        prova("chiavi dalle parole: il banco gira", "", o["errore"])
+        return
+    prova("dalle parole una chiave vera, sempre la stessa, diversa per parole diverse",
+          [True, True, True], [o["forma"], o["stabile"], o["diverse"]])
+    prova("...sulla strada di Mostro, m/44'/1237'/38383'/0/0", True, o["stradaMostro"])
+    prova("...e da parole storte niente", "", o["storte"])
+    prova("il render non fa nascere un wallet; il gesto si', e ne ricava il profilo",
+          [None, True], [o["renderVuoto"], o["gestoNasce"]])
+    prova("le parole nel cloud di Telegram bastano, senza nascita", True, o["dallaNuvola"])
+    prova("wallet nato altrove e parole irraggiungibili: il gesto lo DICE, il render tace",
+          ["detto", None], [o["altrove"], o["altroveRender"]])
+    prova("la pensione tiene un profilo una volta sola, e sa chi c'e'", [1, True],
+          [o["pensioneUna"], o["inPensione"]])
+    prova("una riga del profilo di prima si firma con lui, una nuova col vivo, un'ignota col vivo",
+          [True, True, True], [o["rigaVecchia"], o["rigaNuova"], o["rigaIgnota"]])
+    prova("...e la parola della restore vince sulla derivazione", True, o["restoreVince"])
+    prova("la pensione e' del conto: un altro account non la vede, e si scorda", [0, 0],
+          [o["altroConto"], o["scordata"]])
+
 def prove_p2p_conto_dispositivo():
     """IL CONTO SUL DISPOSITIVO (10 set 2026, dal campo di Andrea): due
     account Telegram sullo stesso telefono, e il secondo trovava nella
@@ -86336,7 +86518,10 @@ def prove_p2p_conto_dispositivo():
           and "backupFatto: vecchio ? !!vecchio.backupFatto : true," in cst)
     # QUATTRO USI: tre NASCITE (il gesto, la gamba dell'app, il
     # passaggio) e un TIMBRO, che e' l'unico a passare `vecchio`
-    prova("...e i quattro usi passano tutti di li'", 4,
+    # ...e CINQUE dal 17 nov 2026 («chiavi-dalle-parole»): la nascita
+    # del passaggio con la pensione (`pensionaPerIlContoP2P`); il gesto
+    # dalle parole passa `vecchio` col suo nome lungo e non si conta qui
+    prova("...e i cinque usi passano tutti di li'", 5,
           blocco_mazzo.count("mazzoDalSemeP2P(s)")
           + blocco_mazzo.count("mazzoDalSemeP2P(s, m)"))
     prova("...e il campo viaggia nel testo, andata e ritorno", True,
@@ -86388,7 +86573,9 @@ def prove_p2p_conto_dispositivo():
     # VENTI dal 13 ott 2026 («dimentica-copia-relay»): il togliere la
     # copia dai relay, la sua riga, il testo e il nome del «Dimentica»
     # chiedono anche loro «e' un nativo?» (e il testo: «deriva dalla nsec?»)
-    prova("...e i giudici e il testo usano numeroConto", 20,
+    # VENTUNO dal 17 nov 2026 («chiavi-dalle-parole»): la via per
+    # riprendere le chiavi dice la casa delle 12 parole, Telegram o Nostr
+    prova("...e i giudici e il testo usano numeroConto", 21,
           blocco_mazzo.count("numeroConto(m.conto)")
           + blocco_mazzo.count("numeroConto(d.conto)")
           + blocco_mazzo.count("numeroConto(myTgId)"))
@@ -86434,8 +86621,12 @@ def prove_p2p_conto_dispositivo():
     # quella riga proprio a chi l'aveva letta.
     prova("la strada sovrana non cede mai il posto da sola", True,
           "if (ora.origine === 'mia') { p2pMazzoEsito = 'sovrano'; return; }" in giu)
-    prova("...e un profilo con una storia nemmeno", True,
-          "if (!senzaStoriaP2P(dopo)) { p2pMazzoEsito = 'tenuto'; return; }" in giu)
+    # (17 nov 2026, «chiavi-dalle-parole») verso il seme di ieri resta
+    # 'tenuto'; verso le 12 parole va in pensione (scelta di Andrea),
+    # con le sue righe al loro posto: `prove_chiavi_dalle_parole`
+    prova("...e un profilo con una storia nemmeno, verso il seme di ieri", True,
+          "p2pMazzoEsito = 'tenuto'; return;" in giu
+          and "if (!senzaStoriaP2P(dopo)) {" in giu)
     # TRE APPIGLI E NON UNO: l'indice torna a zero su un dispositivo
     # svuotato, le righe si perdono, le lapidi restano quando le righe
     # se ne vanno. Una sola sarebbe una scommessa.
@@ -92758,7 +92949,10 @@ def prove_p2p_campanello():
     # profilo ripresa dai relay registra la sua pubblica, come le altre
     # DIECI dal 16 nov 2026 («ripubblica»): l'ordine ripubblicato da solo
     # registra la sua chiave come quello pubblicato a mano
-    prova("i chiamanti di registraChiaviP2P sono dieci", 10, len(_reg))
+    # DODICI dal 17 nov 2026 («chiavi-dalle-parole»): il passaggio con la
+    # pensione e il gesto dalle parole registrano la pubblica del profilo
+    # delle 12 parole, come la gamba dell'app
+    prova("i chiamanti di registraChiaviP2P sono dodici", 12, len(_reg))
     for _arg in _reg:
         prova(f"...e `{_arg}` non e' una chiave della chat", True,
               not any(s in _arg.lower() for s in ("conv", "firma", "chat")))
@@ -206788,7 +206982,7 @@ CATEGORIE = {
     scadenza_barattozon foglio_coperto passi_barattozon_fogli
     importo_foglio pubblica_metodo_prima libro_vuoto_monete revolut_tre_modi eth_xmr usde p2p_monete_ritocchi p2p_monete_scelta
     indietro_dal_libro ricarica_resta p2p_canale p2p_canonico p2p_bundle
-    p2p_nuvola p2p_conto_dispositivo recensione_p2p ritocchi_scambio
+    p2p_nuvola p2p_conto_dispositivo chiavi_dalle_parole recensione_p2p ritocchi_scambio
     pagina_scambio_ridisegno foglio_tastiera_iphone chiavi_p2p_firmate
     rotte_p2p_riverificate vestito_bottoni p2p_schermi_larghi
     scambi_verso passi_libro_p2p tolti_ovunque spia_passi_barattozon
@@ -207857,6 +208051,7 @@ def main():
     prove_p2p_bundle,
     prove_p2p_nuvola,
     prove_p2p_conto_dispositivo,
+    prove_chiavi_dalle_parole,
               prove_esclusioni_relay,
               prove_letture_relay_collaudo, prove_telegram_simulato_collaudo, prove_introduzioni_leggibili, prove_filtri_prezzo_convertono, prove_anteprima_prezzo_condiviso,
               prove_pagina_dati,

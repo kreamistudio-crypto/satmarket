@@ -36989,3 +36989,22 @@ mai il kind 0 di nessuno: regola ferrea 2).
   (la versione, il caricatore, il dizionario senza doppioni e con le
   parole che stanno in pagina, il traduttore e i numeri in node, le
   sentinelle del server) e `collaudo_lingua` (la rotta vera, la leva).
+
+
+- IL PROFILO P2P NASCE DALLE 12 PAROLE (17 nov 2026, cantiere
+  chiavi-dalle-parole; il verbale in CANTIERI con lo stesso nome).
+  L'identità Mostro di OGNI gesto nuovo è `m/44'/1237'/38383'/0/0`
+  delle parole on-chain (`skDaParoleP2P`), le trade key da lei con
+  `chiaveScambio`. Il mazzo porta `parole: 1`. Tre regole:
+  1) IL RENDER NON FA NASCERE: `semeContoP2P` chiede prima
+     `semeDaParoleP2P()` (qui, cloud, relay — `paroleTrovateP2P`) e
+     solo dopo la strada di ieri (`semeProfiloP2P`); il GESTO
+     (`assicuraMazzo` → `gestoDalleParoleP2P`) passa da
+     `onchainSemeAssicurato` e, senza parole raggiungibili, LANCIA
+     `P2P_SENZA_PAROLE`: mai un profilo a caso.
+  2) IL PROFILO DI PRIMA VA IN PENSIONE (`barattolo_mostro_pensione`
+     per conto): resta per finire i suoi scambi, e i posti che derivano
+     la chiave di UNA riga chiedono `mazzoRigaP2P(o)`; la porta dei
+     gesti lo usa tranne per `take-*`/`new-order`, che nascono col vivo.
+  3) UN SEME DI RIPIEGO NON SCALZA un mazzo delle parole (`giudicaMazzoP2P`).
+  Eccezione: la strada sovrana (`origine 'mia'`).
