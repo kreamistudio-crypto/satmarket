@@ -192,3 +192,4 @@ collaudo_cassa_negozio
 collaudo_payjoin
 collaudo_elimina_esauriti
 collaudo_codici_uno_alla_volta
+collaudo_sentinella

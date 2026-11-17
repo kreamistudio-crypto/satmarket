@@ -94629,6 +94629,193 @@ async def ferma_i_giri_lunghi():
     _SI_CHIUDE.set()
 
 
+# ═══ LA SENTINELLA DEL SERVER FERMO (17 nov 2026, dal campo) ═══
+# Alle 08:07:43 del 17 nov, due minuti e mezzo dopo un deploy, il
+# server ha smesso di rispondere a tutti: porta aperta, /api/salute
+# muta, journal zitto, 12 s di CPU in sei minuti (FERMO ad aspettare,
+# non a calcolare). Se n'e' accorto Andrea quattro minuti dopo, e il
+# riavvio ha dovuto ammazzarlo (SIGTERM ignorato). Dal codice e dal
+# journal la causa NON si e' potuta dimostrare (CANTIERI, «La
+# sentinella del server fermo»): mancava proprio la riga che dice
+# DOVE era fermo. Questa la scrive, e intanto non lascia la
+# produzione ferma finche' qualcuno guarda.
+#
+# COME. Un filo SUO (non un task: un ciclo fermo non lo farebbe mai
+# girare) bussa a /api/salute da dentro la macchina, ogni 30 s, con un
+# tetto di 20. E' la stessa domanda del deploy, cioe' da capo a piedi:
+# vede il ciclo fermo, il pool dei thread delle rotte pieno e il
+# database sotto chiave, senza dover indovinare quale. Alla prima
+# risposta che non arriva: la pila di TUTTI i fili nel journal
+# (faulthandler, che non ha bisogno del ciclo). Fermo da 3 minuti: una
+# seconda pila, un segno su disco, e `os._exit` — systemd
+# (Restart=always) lo rialza in 5 s, e all'avvio il segno diventa un
+# avviso nella stanza «errori» del gruppo admin.
+# CONTA SOLO IL SILENZIO: un 503 (il database non si apre) o una porta
+# chiusa non sono un ciclo fermo, e un riavvio non li cura — si
+# riavvierebbe all'infinito. Quelli li guarda il deploy.
+# L'INDIRIZZO NON SI SCRIVE: lo dicono gli argomenti di uvicorn
+# (`--port`), cosi' vale uguale in produzione (8080) e sul collaudo
+# (8090). Senza (`prove.py`, uno script, un TestClient) la sentinella
+# non parte, e lo dice.
+# A MANO: `kill -USR1 <pid>` scrive la stessa pila senza toccare
+# niente (faulthandler), da fare PRIMA di un riavvio a mano.
+import faulthandler
+import signal
+
+try:
+    from config import SENTINELLA_ATTIVA
+except ImportError:
+    SENTINELLA_ATTIVA = True     # leva di serie accesa (14 nov 2026)
+SENTINELLA_PRIMO_S = 90          # il primo colpo, a server avviato
+SENTINELLA_OGNI_S = 30           # un colpo ogni tanto
+SENTINELLA_TETTO_S = 20          # quanto si aspetta la risposta
+SENTINELLA_USCITA_S = 180        # fermo da tanto: si esce e systemd rialza
+SENTINELLA_CODICE = 70           # il codice d'uscita, riconoscibile nel journal
+SENTINELLA_SEGNO = ".sentinella-uscita"
+_APRITORE_SENTINELLA = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}))   # mai un proxy fra noi e noi
+_SENTINELLA_FILO = None
+
+
+def sentinella_indirizzo(argv) -> str:
+    """PURA: l'URL di /api/salute dagli argomenti di uvicorn, o '' se
+    non c'e' una porta (non gira sotto uvicorn: niente sentinella)."""
+    porta = host = ""
+    argv = list(argv or ())
+    for i, a in enumerate(argv):
+        a = str(a)
+        if a == "--port" and i + 1 < len(argv):
+            porta = str(argv[i + 1])
+        elif a.startswith("--port="):
+            porta = a.split("=", 1)[1]
+        elif a == "--host" and i + 1 < len(argv):
+            host = str(argv[i + 1])
+        elif a.startswith("--host="):
+            host = a.split("=", 1)[1]
+    if not porta.isdigit() or not 0 < int(porta) < 65536:
+        return ""
+    if host in ("", "0.0.0.0", "::", "[::]"):
+        host = "127.0.0.1"
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"http://{host}:{int(porta)}/api/salute"
+
+
+def sentinella_passo(fermo_dal, esito: str, adesso: float):
+    """PURA: il giudizio di un colpo. `esito` e' 'ok' | 'muto' | 'altro'
+    (solo 'muto' conta: vedi il cappello). Torna (azione, fermo_dal):
+    azione '' | 'pila' (il primo silenzio) | 'esci' (silenzio da
+    SENTINELLA_USCITA_S) | 'guarito' (risponde dopo un silenzio)."""
+    if esito != "muto":
+        return ("guarito" if fermo_dal is not None else ""), None
+    if fermo_dal is None:
+        return "pila", adesso
+    if adesso - fermo_dal >= SENTINELLA_USCITA_S:
+        return "esci", fermo_dal
+    return "", fermo_dal
+
+
+def _sentinella_bussa(url: str) -> str:
+    try:
+        with _APRITORE_SENTINELLA.open(url, timeout=SENTINELLA_TETTO_S) as r:
+            r.read(256)
+        return "ok"
+    except urllib.error.HTTPError:
+        return "altro"           # ha RISPOSTO (anche un 503): non e' fermo
+    except (TimeoutError, socket.timeout):
+        return "muto"
+    except urllib.error.URLError as e:
+        return ("muto" if isinstance(e.reason, (TimeoutError, socket.timeout))
+                else "altro")
+    except Exception:
+        return "altro"
+
+
+def _sentinella_pila(titolo: str) -> None:
+    print(f"🧊 Sentinella: {titolo} — ecco dove sono fermi i fili:",
+          flush=True)
+    try:
+        sys.stderr.flush()
+        faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+        sys.stderr.flush()
+    except Exception as e:
+        print(f"🧊 Sentinella: pila non scritta ({e})", flush=True)
+
+
+def _sentinella_percorso_segno() -> str:
+    return os.path.join(os.path.dirname(os.path.realpath(DB)) or ".",
+                        SENTINELLA_SEGNO)
+
+
+def _sentinella_filo(url: str) -> None:
+    fermo_dal = None
+    if _SI_CHIUDE.wait(SENTINELLA_PRIMO_S):
+        return
+    while not _SI_CHIUDE.is_set():
+        t0 = time.monotonic()
+        esito = _sentinella_bussa(url)
+        if _SI_CHIUDE.is_set():
+            return               # lo spegnimento non e' un server fermo
+        azione, fermo_dal = sentinella_passo(fermo_dal, esito,
+                                             time.monotonic())
+        if azione == "pila":
+            _sentinella_pila(f"/api/salute muta da {SENTINELLA_TETTO_S} s")
+        elif azione == "guarito":
+            print("🧊 Sentinella: /api/salute risponde di nuovo", flush=True)
+        elif azione == "esci":
+            _sentinella_pila(f"server fermo da piu' di "
+                             f"{SENTINELLA_USCITA_S} s, esco e systemd mi "
+                             f"rialza")
+            try:
+                with open(_sentinella_percorso_segno(), "w") as f:
+                    f.write(str(int(time.time())))
+            except Exception:
+                pass
+            os._exit(SENTINELLA_CODICE)
+        _SI_CHIUDE.wait(max(1.0, SENTINELLA_OGNI_S - (time.monotonic() - t0)))
+
+
+@app.on_event("startup")
+async def avvia_sentinella():
+    """La riga nel journal c'e' SEMPRE, accesa o spenta."""
+    global _SENTINELLA_FILO
+    if hasattr(signal, "SIGUSR1"):
+        try:
+            faulthandler.register(signal.SIGUSR1, file=sys.stderr,
+                                  all_threads=True)
+        except Exception:
+            pass
+    # il segno di un'uscita della sentinella: diventa un avviso, una volta
+    try:
+        segno = _sentinella_percorso_segno()
+        if os.path.exists(segno):
+            with open(segno) as f:
+                quando = int((f.read() or "0").strip() or 0)
+            os.remove(segno)
+            ora = time.strftime("%H:%M UTC", time.gmtime(quando)) \
+                if quando else "poco fa"
+            print(f"🧊 Sentinella: riavviato dopo un blocco ({ora})",
+                  flush=True)
+            await notifica_admin(
+                f"🧊 <b>Il server si era fermato</b> e la sentinella l'ha "
+                f"riavviato alle {ora}. Dove era fermo sta nel journal, "
+                f"alle righe «🧊 Sentinella».", argomento="errori")
+    except Exception as e:
+        print(f"🧊 Sentinella: segno dell'uscita non letto ({e})", flush=True)
+    url = sentinella_indirizzo(sys.argv)
+    if not SENTINELLA_ATTIVA or not url:
+        perche = ("SENTINELLA_ATTIVA = False" if not SENTINELLA_ATTIVA
+                  else "uvicorn senza --port")
+        print(f"🧊 Sentinella del server fermo: spenta ({perche})", flush=True)
+        return
+    _SENTINELLA_FILO = threading.Thread(target=_sentinella_filo, args=(url,),
+                                        name="sentinella", daemon=True)
+    _SENTINELLA_FILO.start()
+    print(f"🧊 Sentinella del server fermo: accesa — {url} ogni "
+          f"{SENTINELLA_OGNI_S} s; muta {SENTINELLA_USCITA_S} s = riavvio",
+          flush=True)
+
+
 def url_api_ammesso(url: str) -> bool:
     """Il guardiano delle chiamate alle API di un negozio.
 

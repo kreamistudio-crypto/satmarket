@@ -1601,6 +1601,22 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `tr '\0' '\n' < /proc/$(systemctl show -p MainPID --value barattolo)/environ | grep PYTHONUNBUFFERED`
   deve dire `PYTHONUNBUFFERED=1`.
   TORNARE INDIETRO: `rm` del drop-in e `systemctl daemon-reload`.
+- LA SENTINELLA DEL SERVER FERMO (17 nov 2026, dopo il blocco delle
+  08:07; il come in ARCHITETTURA, «LA SENTINELLA DEL SERVER FERMO»).
+  Niente da posare: sta nel codice e si accende da sola. Dopo il deploy
+  si guarda la riga d'avvio:
+  `journalctl -u barattolo --since "-10min" --no-pager | grep "🧊 Sentinella"`
+  deve dire «accesa — http://127.0.0.1:8080/api/salute ogni 30 s». Se il
+  server si ferma: le righe «🧊 Sentinella» nel journal hanno la pila di
+  tutti i fili (è la causa: si incolla al thread), e dopo 3 minuti il
+  processo esce col codice 70 e systemd lo rialza in 5 s; all'avvio
+  arriva «🧊 Il server si era fermato» nella stanza «errori».
+  PRIMA DI UN RIAVVIO A MANO di un server muto, la pila si chiede così
+  (non ferma niente):
+  `kill -USR1 $(systemctl show -p MainPID --value barattolo)`, poi
+  `journalctl -u barattolo --since "-2min" --no-pager | tail -80`.
+  SPEGNERLA (emergenza): `SENTINELLA_ATTIVA = False` nel config e
+  riavvio.
 - IL COOKIE SUL TUNNEL (10 ott 2026, cantiere cookie-onion): dal `.onion`
   il login reggeva SOLO con Tor Browser, che tratta l'onion come contesto
   sicuro; Chrome, Brave e Vanadium con Orbot scartano un cookie «Secure»

@@ -31435,6 +31435,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   systemd. Prova: `prove_connettore_interrompibile`. La metà di
   macchina (Caddy che aspetta, il tetto dello stop) sta in PRODUZIONE,
   «IL RIAVVIO DOLCE».
+- LA SENTINELLA DEL SERVER FERMO (17 nov 2026, perché in CANTIERI, «La
+  sentinella del server fermo»): un filo suo, `sentinella` (daemon, mai
+  un task: un ciclo fermo non lo farebbe girare), bussa a `/api/salute`
+  da loopback ogni `SENTINELLA_OGNI_S` (30 s) con un tetto di
+  `SENTINELLA_TETTO_S` (20 s). L'indirizzo lo leggono gli argomenti di
+  uvicorn (`sentinella_indirizzo`: `--port`, e `--host` 0.0.0.0 diventa
+  127.0.0.1): senza porta (prove, script) non parte, e la riga 🧊
+  all'avvio lo dice sempre. Il giudice è `sentinella_passo`, PURO: conta
+  SOLO il silenzio (un 503 o una porta chiusa sono «altro», e un
+  riavvio non li curerebbe). Al primo silenzio la pila di TUTTI i fili
+  nel journal (`faulthandler.dump_traceback`); muto da
+  `SENTINELLA_USCITA_S` (180 s) una seconda pila, il segno
+  `.sentinella-uscita` accanto al database e `os._exit(70)`: systemd
+  (Restart=always) lo rialza, e `avvia_sentinella` trasforma il segno
+  in un avviso nella stanza «errori». Lo spegnimento (`_SI_CHIUDE`) non
+  conta mai. A mano: `kill -USR1 <pid>` scrive la stessa pila
+  (`faulthandler.register`). Leva `SENTINELLA_ATTIVA`, di serie accesa.
+  Prove: `prove_sentinella_server_fermo`, `collaudo_sentinella` (un
+  server vero fermato con un `time.sleep` in una rotta async).
 - IL FALSO LOGOUT (19 ott 2026, cantiere logout-apk; perché in
   CANTIERI, «Il falso logout dell'APK»): in `avvia()` il /api/me passa
   da `sondaMe`, che restituisce SOLO una risposta vera del server. Un
