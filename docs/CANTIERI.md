@@ -86763,3 +86763,55 @@ telefono; la guida su iPhone. NOTATO E NON TOCCATO: sul passo «Oggetto
 spedito» ancora da fare chi vende legge «Hai consegnato al corriere»
 (e chi compra «Il venditore ha consegnato al corriere») al passato.
 
+## Il link a Packlink nel form della spedizione (17 nov 2026, cantiere link-packlink; Andrea: «Valutare questo sistema di spedizioni che accetta sats https://www.packlink.it/», poi «si» al solo link)
+
+LO STUDIO, PRIMA. Packlink NON accetta sats: le pagine di aiuto (consumer
+e PRO) e la home dicono carta Visa/Mastercard/Amex, PayPal e, per i PRO,
+addebito diretto; nessun Bitcoin, Lightning o processore crypto. Il resto
+è buono — Poste (Punto Poste), BRT, InPost (InPost Point), UPS, DHL, TNT,
+FedEx, DPD; ritiro a casa o consegna a un punto; privati ammessi; da
+5,48 € fino a 2 kg in Italia — e un'API PRO esiste (api.packlink.com,
+chiave API: servizi e prezzi, dropoff, etichette PDF, tracking, callback),
+ma documentata solo da terzi e dal codice dei loro plugin, non da un
+portale ufficiale. Kiwi Spedizioni (stesso giorno, altro studio): niente
+API, Bitcoin non dichiarato. Nessuno dei due paga in sats in modo
+verificato.
+
+LA DECISIONE. Niente integrazione: collegare l'API vorrebbe dire
+Barattolo che compra le etichette in euro con la SUA carta e se le fa
+ripagare in sats, cioè l'intermediario in euro bocciato il 16 nov per le
+etichette scontate. Al suo posto UN LINK, «Spedisci con Packlink», nel
+form della spedizione del venditore (ordine locked), sopra l'avviso
+sull'intermediario: il venditore compra l'etichetta là, in euro, e
+incolla qui il codice del CORRIERE. La riga sta SOPRA
+`AVVISO_INTERMEDIARIO` apposta: chi legge il link legge subito dopo
+quale codice va messo. Il link passa da `apriLinkApp('packlink')`, la
+scala di casa (tg.openLink dentro Telegram, scheda nuova con noopener
+fuori), non da un href nudo. Solo nel form della spedizione, NON in
+quello del reso: lì il compratore rispedisce, e una riga commerciale
+nel pannello di una disputa è fuori posto.
+
+STRADE SCARTATE. L'integrazione API (sopra). Un link anche nel reso
+(sopra). Una leva: è una riga di testo, si toglie con un commit.
+
+PROVATO. Tre righe in `prove_forma_tracking`: il link sta nel form della
+spedizione (fra `shipTracking` e `shipAvviso`), prima dell'avviso
+sull'intermediario, e l'indirizzo è packlink.it. Controprova: tolta la
+riga, le due prove diventano rosse (la terza guarda LINK_APP, che
+resta). GIRATO sull'albero di origin/develop 6953eda più questo
+cantiere, in un venv con le sole righe pip della CI (coincurve assente,
+nostr-tools 2.25.2 fuori dal repo in ~/wdk-prova): `PROVE_SEVERE=1
+python prove.py` 28875 passate, 1 fallita e 2 saltate al primo giro —
+la fallita era conoscenza.md non rigenerato dopo il ritocco a
+sapere.md, le saltate nostr-tools non ancora installato — poi
+`prove_annuncio_identita` e `prove_conoscenza_tappo` rigirate verdi;
+`collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2` 139 verdi, 0
+rossi. Dopo il rebase su 7b19e7c (negozio, avvisi dei preferiti,
+«Spedisci entro il…», primo wallet secondo giro: nessun simbolo in
+comune nel form della spedizione, conoscenza.md rigenerato) il giro
+mirato: le categorie «mercatino» e «infrastruttura» della suite severa
+nello stesso venv, verdi (i numeri nel verbale del thread).
+
+DA GUARDARE. Il prezzo «da 5,48 €» è quello della home di oggi: se
+Packlink lo cambia, la riga va ritoccata. Se Andrea trova dove ha letto
+che Packlink accetta sats, si riapre lo studio.

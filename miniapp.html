@@ -25464,6 +25464,12 @@ const LINK_APP = {
   zapstore:    'https://zapstore.dev',
   release:     'https://github.com/kreamistudio-crypto/barattolo-releases/releases',
   appverifier: 'https://github.com/soupslurpr/AppVerifier',
+  /* IL LINK A PACKLINK (17 nov 2026, decisione di Andrea): SOLO un
+     link, mai un'integrazione — Packlink si paga in euro (carta,
+     PayPal), non in sats, e Barattolo non fa da intermediario in
+     euro. Il venditore compra l'etichetta la' e incolla QUI il
+     codice del corriere (AVVISO_INTERMEDIARIO, subito sotto). */
+  packlink:    'https://www.packlink.it/',
 };
 function apriLinkApp(quale){
   const url = LINK_APP[quale];
@@ -39170,6 +39176,7 @@ function openOrder(id){
                 chi spedisce senza. Due volte perche' il codice e' la sola
                 prova che un moderatore ha in mano in disputa. */''}
           <div class="hint" style="margin-top:6px">⚠️ <b>Metti il tracciamento</b>: non è obbligatorio, ma in caso di disputa è la prova che il pacco è partito. Senza, i moderatori hanno solo la tua parola.</div>
+          <div class="hint" style="margin-top:6px">🚚 Non hai ancora l'etichetta? <a href="#" onclick="apriLinkApp('packlink');return false" style="color:var(--trust)">Spedisci con Packlink</a> (da 5,48 €, Poste, BRT, InPost…): la paghi là in euro, poi incolli qui il codice del corriere.</div>
           <div class="hint" style="margin-top:6px">💡 ${AVVISO_INTERMEDIARIO}</div>
           <div class="hint avviso-tracking" id="shipAvviso" style="display:none"></div>
           </div>

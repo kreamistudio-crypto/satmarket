@@ -404,3 +404,9 @@ frase: Quando vendi un oggetto da spedire, il messaggio del bot ti dice entro ch
 dove: il messaggio «Hai venduto!» del bot; l'ordine del venditore, riquadro «📦 Spedisci» (riga «⏳ Spedisci entro…» e link «📖 Come si spedisce?»); i passi dell'ordine, per chi vende e per chi compra.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-17 · link-packlink
+frase: Quando devi spedire un ordine e non hai ancora l'etichetta, nel riquadro della spedizione trovi il link «Spedisci con Packlink»: compri l'etichetta là (Poste, BRT, InPost e altri, da 5,48 €, in euro) e incolli nell'ordine il codice del corriere.
+dove: l'ordine venduto, riquadro «Spedisci e inserisci il tracciamento», sotto il campo del codice.
+leva: nessuna
+pubblico: sì

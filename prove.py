@@ -23845,6 +23845,17 @@ def prove_forma_tracking():
           "AVVISO_INTERMEDIARIO" in src)
     prova("...ed e' nel form della spedizione e in quello del reso",
           2, src.count("${AVVISO_INTERMEDIARIO}"))
+    # IL LINK A PACKLINK (17 nov 2026): solo nel form della spedizione,
+    # sopra l'avviso sull'intermediario, e per la scala di casa
+    # (apriLinkApp), mai un href nudo.
+    form_sped = src[src.index('id="shipTracking"'):src.index('id="shipAvviso"')]
+    prova("il link a Packlink sta nel form della spedizione", True,
+          "apriLinkApp('packlink')" in form_sped)
+    dove_link = form_sped.find("apriLinkApp('packlink')")
+    prova("...prima dell'avviso sull'intermediario", True,
+          0 <= dove_link < form_sped.find("${AVVISO_INTERMEDIARIO}"))
+    prova("...e l'indirizzo e' quello di Packlink", True,
+          "packlink:    'https://www.packlink.it/'" in src)
 
     # LE NOTIFICHE DEL PACCO via @trackbot (ago 2026): il giudice
     # della forma e' lo STESSO dell'euristica qui sopra — il codice
