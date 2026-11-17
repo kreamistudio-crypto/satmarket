@@ -92391,6 +92391,10 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
                     # vende, e il cambio nato (le parti pubbliche)
                     "incasso_tipo": oc["incasso_tipo"] or "",
                     "modo_venditore": onchain_modo_ordine(con, oc),
+                    # (17 nov 2026) la cifra grossa che esce on-chain
+                    # anche verso chi aveva scelto Lightning
+                    "grosso_ln_tolto": _onchain_grosso(oc)
+                    and _onchain_modo_scelto(con, oc) != "onchain",
                     "cambio": _onchain_cambio_letto(oc),
                     "prezzo_sats": int(oc["prezzo_sats"]),
                 } if oc else None)
@@ -105357,7 +105361,14 @@ def _onchain_prepara_ordini(con):
                       # PayJoin di questo ordine (`/api/payjoin/<gettone>`),
                       # a caso e una per ordine — il numero dell'ordine
                       # si indovina, questa no. Vuota = un ordine di prima
-                      ("payjoin_gettone", "TEXT DEFAULT ''")):
+                      ("payjoin_gettone", "TEXT DEFAULT ''"),
+                      # 17 nov 2026, cantiere onchain-grossi-uscita: 1 se
+                      # alla nascita l'ordine stava sopra la soglia degli
+                      # acquisti grossi (`onchain_consigliato`). Fissato
+                      # QUI e non rifatto col cambio di domani: chi vende
+                      # riceve on-chain anche se aveva scelto Lightning
+                      # (`onchain_modo_ordine`). 0 = un ordine di prima
+                      ("grosso", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -105486,9 +105497,17 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
     margine = onchain_margine(await onchain_mempool_tariffa())
     # il tetto della beta, sul prezzo (27 ott 2026): prima di ogni
     # scrittura, come il resto dei no
-    troppo = onchain_sopra_il_tetto(prezzo, await cambio_btc_eur())
+    cambio = await cambio_btc_eur()
+    troppo = onchain_sopra_il_tetto(prezzo, cambio)
     if troppo:
         raise HTTPException(400, troppo)
+    # L'ACQUISTO GROSSO ESCE ON-CHAIN ANCHE VERSO CHI VENDE (17 nov 2026,
+    # cantiere onchain-grossi-uscita, Andrea: «se vuole ricevere in
+    # lighting, sì, bisogna mettere anche verso di lui il limite»): sopra la
+    # soglia il cambio in Lightning a fine ordine non regge, quindi
+    # l'ordine nasce col segno `grosso` e riceve on-chain. Col cambio di
+    # ADESSO, e fissato: lo stesso cambio che ha deciso il tetto
+    grosso = 1 if onchain_consigliato(prezzo, cambio) else 0
     # la quota fissa di Barattolo (0 di serie): la paga chi compra, e
     # l'ha vista alla cassa (`/api/onchain/pronto`)
     quota = onchain_quota_sats()
@@ -105525,7 +105544,8 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
         # decide allo sblocco: l'incasso resta vuoto anche se ha un wallet
         # (9 nov 2026) il modo dell'ORDINE: la scelta dell'annuncio vince
         if onchain_modo_ordine(con, {"venditore_id": venditore,
-                                     "annuncio_id": a["id"]}) != "onchain":
+                                     "annuncio_id": a["id"],
+                                     "grosso": grosso}) != "onchain":
             dest = None
         if dest:
             d_tipo, d_valore, d_firma = dest["tipo"], dest["valore"], dest["firma"]
@@ -105552,8 +105572,8 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
             " scade, creato, aggiornato, incasso_tipo, incasso_valore,"
             " incasso_firma, incasso_indice, quota_sats, quota_indirizzo,"
             " rimborso_tipo, rimborso_valore, rimborso_firma, rimborso_indice,"
-            " payjoin_gettone)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " payjoin_gettone, grosso)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ind_id, a["id"], user["id"], venditore, richiesti,
              r["titolo"] or "", prezzo, margine, prezzo + quota + margine,
              incasso, rimborso,
@@ -105563,7 +105583,7 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
              r_tipo, r_valore, r_firma, r_indice,
              # la porta del PayJoin (16 nov 2026): nasce sempre, anche a
              # leva spenta, cosi' riaccenderla vale per gli ordini aperti
-             secrets.token_urlsafe(18)))
+             secrets.token_urlsafe(18), grosso))
         con.execute("UPDATE onchain_indirizzi SET ordine_id=? WHERE id=?",
                     (cur.lastrowid, ind_id))
         con.commit()
@@ -105636,6 +105656,9 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
         "rilascio_firma": o["rilascio_firma"] or "",
         "cambio": _onchain_cambio_letto(o),
         "modo_venditore": onchain_modo_ordine(con, o),
+        # (17 nov 2026) chi vende avrebbe ricevuto in Lightning, ma la cifra
+        # e' grossa e riceve on-chain: la pagina glielo dice
+        "grosso_ln_tolto": _onchain_grosso(o) and _onchain_modo_scelto(con, o) != "onchain",
         "scade": o["scade"], "creato": o["creato"],
         "pagato_il": o["pagato_il"], "chiuso_il": o["chiuso_il"],
         "tariffa": _ONCHAIN_TARIFFA["sat_vb"] or 2.0,
@@ -106252,7 +106275,10 @@ async def onchain_rilascio_chiesto(oid: int, req: Request,
         await notifica(o["venditore_id"],
             f"₿ <b>{tit}:</b> chi ha comprato ha confermato di averlo "
             "ricevuto. Scegli dove ricevere i sats (Profilo → «Incassi "
-            "on-chain») e partono." if modo == "onchain" else
+            "on-chain») e partono." + (
+                " Per una cifra così ricevi on-chain, anche se avevi scelto "
+                "Lightning." if _onchain_grosso(o) else "")
+            if modo == "onchain" else
             f"⚡ <b>{tit}:</b> chi ha comprato ha confermato di averlo "
             "ricevuto. Apri l'ordine: ti mostriamo quanto costa lo swap "
             "in Lightning e, se confermi, i sats partono."
@@ -106534,6 +106560,25 @@ def onchain_modo_ordine(con, o) -> str:
     Profilo — 'ln' diventa «lightning», 'onchain' resta — ma solo se il
     cambio c'e' per lui; a leva spenta «onchain», come ieri. `o` ha
     `venditore_id` e `annuncio_id`."""
+    if _onchain_grosso(o):
+        return "onchain"
+    return _onchain_modo_scelto(con, o)
+
+
+def _onchain_grosso(o) -> bool:
+    """L'ordine e' nato sopra la soglia degli acquisti grossi (17 nov
+    2026)? `o` puo' essere la riga o il dizionario della cassa; senza la
+    chiave (un banco di prima) no."""
+    try:
+        return bool(int(o["grosso"] or 0))
+    except (KeyError, IndexError, TypeError, ValueError):
+        return False
+
+
+def _onchain_modo_scelto(con, o) -> str:
+    """Come VORREBBE ricevere chi vende, senza il segno dell'acquisto
+    grosso: la scelta dell'annuncio, sennò quella del Profilo, e solo se
+    il cambio c'e' per lui."""
     if not onchain_ln_per(o["venditore_id"]):
         return "onchain"
     a = incasso_annuncio(con, o["annuncio_id"])
@@ -106624,6 +106669,11 @@ def _onchain_da_sbloccare(con, oid: int, tg_id: int):
         raise HTTPException(409, "Su questo ordine non c'è niente da "
                                  "scegliere adesso")
     _onchain_ordine_permette(con, o, "venditore")
+    # l'acquisto grosso esce on-chain (17 nov 2026): niente cambio in
+    # Lightning, e lo si dice invece di «non ha ancora confermato»
+    if _onchain_grosso(o):
+        raise HTTPException(409, "Per una cifra così ricevi on-chain: scegli "
+                                 "dove in Profilo → «Incassi on-chain»")
     ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
                       (o["indirizzo_id"],)).fetchone()
     if not _onchain_puo_firmare_prima(con, o, ind):

@@ -159823,8 +159823,10 @@ def prove_onchain_tetto():
     prova("...a tetto 0 nessun no, nemmeno senza cambio", ["", ""],
           [t(10**9, 100_000.0), t(10**9, 0)])
     compra = pezzo("_onchain_compra")
-    prova("la cassa giudica il tetto PRIMA di aprire il database", True,
-          compra.index("onchain_sopra_il_tetto(prezzo, await cambio_btc_eur())")
+    prova("la cassa giudica il tetto PRIMA di aprire il database, col "
+          "cambio di adesso", True,
+          compra.index("cambio = await cambio_btc_eur()")
+          < compra.index("onchain_sopra_il_tetto(prezzo, cambio)")
           < compra.index("con = _onchain_db_ordini()"))
     prova("il codice dice 250, anche con una riga storta", 2,
           _SORGENTE.count("    ONCHAIN_MAX_EURO = 250\n"))
@@ -159990,6 +159992,42 @@ console.log(JSON.stringify(out));
           "c'e'; a chi non lo vede solo l'avviso; sotto soglia niente",
           (True, [True, False], "none"),
           (out["carrello"], out["senzaOc"], out["piccolaFattura"]))
+    # L'ACQUISTO GROSSO ESCE ON-CHAIN ANCHE VERSO CHI VENDE (17 nov 2026,
+    # cantiere onchain-grossi-uscita, Andrea: «se vuole ricevere in
+    # lighting, sì, bisogna mettere anche verso di lui il limite»)
+    compra = pezzo("_onchain_compra")
+    prova("la cassa on-chain segna l'ordine grosso col cambio del tetto, "
+          "prima del database, e lo scrive nella riga",
+          (True, True, True),
+          (compra.index("grosso = 1 if onchain_consigliato(prezzo, cambio) else 0")
+           < compra.index("con = _onchain_db_ordini()"),
+           '"grosso": grosso}) != "onchain":' in compra,
+           "secrets.token_urlsafe(18), grosso))" in compra))
+    prova("la colonna nasce con le altre, 0 per gli ordini di prima", True,
+          '("grosso", "INTEGER DEFAULT 0")' in pezzo("_onchain_prepara_ordini"))
+    amb = {}
+    exec(pezzo("_onchain_grosso"), amb)
+    g = amb["_onchain_grosso"]
+
+    def scelto(con, o):
+        return "lightning"
+    amb2 = {"_onchain_grosso": g, "_onchain_modo_scelto": scelto}
+    exec(pezzo("onchain_modo_ordine"), amb2)
+    m = amb2["onchain_modo_ordine"]
+    prova("il giudice del modo: grosso = on-chain anche da «sempre Lightning»; "
+          "senza segno (o senza la chiave) la scelta di chi vende",
+          ["onchain", "lightning", "lightning", "lightning"],
+          [m(None, {"grosso": 1}), m(None, {"grosso": 0}), m(None, {}),
+           m(None, {"grosso": None})])
+    sb = pezzo("_onchain_da_sbloccare")
+    prova("il cambio in Lightning dell'ordine grosso dice di no col perche', "
+          "prima del «non ha ancora confermato»", True,
+          sb.index("if _onchain_grosso(o):") < sb.index("_onchain_puo_firmare_prima(con, o, ind)"))
+    prova("chi vende lo legge nell'ordine (le due righe che lo raccontano) e "
+          "nell'avviso", (2, True, True),
+          (srv.count('"grosso_ln_tolto": _onchain_grosso('),
+           "const grossoNota = o.role === 'seller' && oc.grosso_ln_tolto" in mini,
+           "Per una cifra così ricevi on-chain, anche se avevi scelto" in srv))
 
 
 def _pezzi_incasso_js(mini):

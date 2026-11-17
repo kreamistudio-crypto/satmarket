@@ -51682,6 +51682,11 @@ function pannelloOnchainOrdine(o, s){
   const allaFine = o.role === 'seller' && oc.modo_venditore && oc.modo_venditore !== 'onchain';
   let dove = o.role === 'seller'
     ? ' I sats arrivano dove hai scelto in Profilo → «Incassi on-chain».' : '';
+  /* L'ACQUISTO GROSSO ESCE ON-CHAIN (17 nov 2026): chi avrebbe ricevuto in
+     Lightning lo legge, perche' la sua scelta qui non vale (lo decide il
+     server, `grosso_ln_tolto`; il resto della pagina segue `modo_venditore`) */
+  const grossoNota = o.role === 'seller' && oc.grosso_ln_tolto
+    ? ' ⛓️ <b>Cifra grossa: ricevi on-chain</b>, anche se avevi scelto Lightning: con cifre così il Lightning spesso non passa.' : '';
   let cambio = '';
   if (senzaDove && allaFine && !p && !oc.txid_uscita) {
     dove = oc.rilascio_chiesto
@@ -51703,7 +51708,7 @@ function pannelloOnchainOrdine(o, s){
   const fatto = (oc.indirizzo && oc.indirizzo.indirizzo)
     ? onchainComeEFatto(Object.assign({}, oc, {ruolo: o.role === 'buyer' ? 'compratore' : o.role === 'seller' ? 'venditore' : ''}), {})
     : '';
-  return `<div class="trust-note">${P2P_OC_MONETA}<span>${riga ? riga + '<br>' : ''}Pagato <b>on-chain</b>, in un 2-di-3: tu, l'altra parte e Barattolo.${dove}${tx}</span></div>${cambio}${fatto}${gesto}`;
+  return `<div class="trust-note">${P2P_OC_MONETA}<span>${riga ? riga + '<br>' : ''}Pagato <b>on-chain</b>, in un 2-di-3: tu, l'altra parte e Barattolo.${grossoNota}${dove}${tx}</span></div>${cambio}${fatto}${gesto}`;
 }
 
 async function annullaOrdine(){

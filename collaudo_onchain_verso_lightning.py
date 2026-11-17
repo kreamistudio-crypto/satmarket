@@ -832,6 +832,54 @@ def main():
     prova("...e si riceve on-chain anche da «sempre Lightning»", (200, fisso),
           (r.status_code, (r.json().get("onchain") or {}).get("incasso")))
 
+    # ---- 6-bis) l'acquisto grosso esce on-chain (17 nov 2026) ---------------
+    # Andrea: «se vuole ricevere in lighting, sì, bisogna mettere anche
+    # verso di lui il limite». Il giudice della soglia ha le sue prove (e il
+    # suo collaudo in collaudo_onchain_ordine): qui si finge il suo si', e
+    # si guarda il filo dell'ordine
+    print("\n[l'acquisto grosso esce on-chain anche da «sempre Lightning»]")
+    con = SRV.db()
+    grande = con.execute(
+        "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
+        "categoria,zona,stato,creato,consegna,quantita,valuta,condizione)"
+        " VALUES(888,'Cosa grossa','una cosa',100000,'Altro','Pavia (PV)',"
+        "'attivo',1,'ritiro',1,'sats','nuovo')").lastrowid
+    con.commit()
+    con.close()
+    vero = SRV.onchain_consigliato
+    SRV.onchain_consigliato = lambda prezzo, cambio: True
+    try:
+        og = compra(grande)
+    finally:
+        SRV.onchain_consigliato = vero
+    prova("da «sempre Lightning» l'ordine grosso riceve on-chain, e "
+          "l'incasso e' gia' il suo wallet",
+          ("pagato", "onchain", fisso),
+          (og["stato"], og.get("modo_venditore"), og["incasso"]))
+    prova("...chi vende legge il perche'", True,
+          riassunto(888, og["id"])["onchain"].get("grosso_ln_tolto"))
+    ricevuto(og["id"], firma_ricevuto(999, og))
+    come(888)
+    prova("...e il cambio in Lightning non si apre: 409", 409,
+          c.get(f"/api/onchain/ordini/{og['id']}/cambio/preventivo").status_code)
+    con = SRV.db()
+    con.execute("UPDATE onchain_ordini SET incasso='', incasso_tipo='' WHERE id=?",
+                (og["id"],))
+    con.commit()
+    con.close()
+    come(888)
+    r = c.get(f"/api/onchain/ordini/{og['id']}/cambio/preventivo")
+    prova("...anche senza wallet scelto: 409 col perche', non «non ha "
+          "confermato»", (409, True),
+          (r.status_code, "ricevi on-chain" in r.json().get("detail", "")))
+    # l'incasso torna com'era: la vendita grossa non e' fra quelle che
+    # aspettano il wallet, qui sotto
+    con = SRV.db()
+    con.execute("UPDATE onchain_ordini SET incasso=?, incasso_tipo=? WHERE id=?",
+                (og["incasso"], og.get("incasso_tipo") or "indirizzo", og["id"]))
+    con.commit()
+    con.close()
+
     # ---- 7) di nuovo «sempre on-chain» --------------------------------------
     print("\n[di nuovo «sempre on-chain»: le vendite che aspettavano]")
     o5 = compra(annunci[4])
