@@ -120577,10 +120577,16 @@ GIOCO_TAPPO_EVIDENZA_POSTI = 3
 # `bulloni` si pagano UNA volta, la prima che la si finisce. Niente XP,
 # niente sats (regole di Andrea).
 MISSIONI_TAPPO = (
-    dict(id="quaderno", emoji="📓", nome="Il quaderno di tutti", zona=0,
-         bulloni=15, cosa="Bitcoin è un registro che tengono in tanti"),
+    # (17 nov 2026, Andrea: «le prime missioni devono essere facili,
+    # semplici... basta che la storia sia semplice») la prima e' la piu'
+    # facile — raccogliere i sats e metterli nel wallet — e il quaderno,
+    # che chiede di confrontare, scala alla terza zona
+    dict(id="sats", emoji="👛", nome="Raccogli i sats", zona=0,
+         bulloni=10, cosa="I sats e il tuo wallet"),
     dict(id="lucchetto", emoji="🔒", nome="Il barattolo col lucchetto",
          zona=1, bulloni=20, cosa="Il deposito di garanzia"),
+    dict(id="quaderno", emoji="📓", nome="Il quaderno di tutti", zona=2,
+         bulloni=15, cosa="Bitcoin è un registro che tengono in tanti"),
     dict(id="staffetta", emoji="⚡", nome="La staffetta del fulmine", zona=3,
          bulloni=25, cosa="Lightning: canali e strade"),
     dict(id="parole", emoji="🗝️", nome="Le dodici parole", zona=5,

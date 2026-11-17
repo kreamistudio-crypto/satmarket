@@ -65221,8 +65221,295 @@ function quadCosa(g, a, c){
   }
 }
 
+/* ============ MINIGIOCO: RACCOGLI I SATS (zona 0, la prima, il forno) ============
+   Andrea (17 nov): «le prime missioni devono essere facili, semplici...
+   basta che la storia sia semplice». La storia in una riga: il vento ha
+   sparso i sats di Tappo per il forno; raccoglili e mettili nel wallet,
+   prima che arrivi la Gazza. Si gioca solo camminando.
+   1. RACCOGLI I SATS — dodici sats per terra, una freccia sul piu' vicino;
+      presi tutti, si portano nel wallet.
+   2. ATTENTA ALLA GAZZA — altri sats, e la Gazza che vola: se tocca
+      Tappo coi sats in tasca se li porta via. Nel wallet invece sono al
+      sicuro: ci si passa accanto e si svuotano le tasche da sole.
+   Cosa resta: i sats sono pezzetti di bitcoin (cento milioni fanno un
+   bitcoin) e si tengono nel proprio wallet, non in tasca. */
+const SATS_SCENA = {L: 900, A: 1500, muri: [96, 384, 804, 1440], via: [450, 1320],
+  ostacoli: [{x: 330, y: 760, w: 240, h: 140}, {x: 210, y: 1180, r: 40}, {x: 690, y: 560, r: 40}], nido: [150, 430]};
+const SATS_WALLET = [690, 1230];
+const SATS_POSTI = [[200, 470], [450, 470], [560, 600], [240, 640], [180, 860], [700, 800], [460, 980],
+  [260, 1020], [640, 1040], [380, 1180], [560, 1330], [220, 1360], [700, 1360], [450, 650], [760, 980], [150, 1080]];
+const SATS_QUANTI = 12;
+/* PURA: dove cadono i sats, a caso fra i posti liberi */
+function satsSparsi(quanti){ return missMescola(SATS_POSTI).slice(0, quanti); }
+function satsCosa(p){ return {tipo: 'sat', x: p[0], y: p[1], r: 0, tocca: 64, seme: Math.random() * 6}; }
+function satsWallet(){ return {tipo: 'wallet', x: SATS_WALLET[0], y: SATS_WALLET[1], r: 150, alone: 70, solido: 42}; }
+/* PURA: la freccia va sul sat piu' vicino a Tappo */
+function satsVicino(cose, x, y){
+  let m = null, q = 1e9;
+  for (const c of cose) if (c.tipo === 'sat' && !c.via) { const d = Math.hypot(c.x - x, c.y - y); if (d < q) { q = d; m = c; } }
+  return m;
+}
+
+const ARENA_SATS = {
+  scena: SATS_SCENA,
+  prove: [
+    {nome: 'Raccogli i sats',
+     nasci(a){
+       a.dati = {tasca: 0, wallet: 0, tot: SATS_QUANTI};
+       a.cose = satsSparsi(SATS_QUANTI).map(satsCosa).concat([satsWallet()]);
+       arenaDice(a, 'tappo', 'Il vento ha sparso i miei sats per tutto il forno! Mi aiuti a raccoglierli?', 4.5);
+     },
+     obiettivo(a){
+       const d = a.dati;
+       return d.tasca < d.tot ? `Raccogli i sats: camminaci sopra (${d.tasca}/${d.tot})` : 'Portali nel tuo wallet 👛';
+     },
+     freccia(a){
+       const s = satsVicino(a.cose, a.x, a.y);
+       if (s) return [[s.x, s.y - 60]];
+       const w = a.cose.find(c => c.tipo === 'wallet');
+       return w ? [[w.x, w.y - 140]] : [];
+     },
+     hud(a){ return `<span>⚡ ${a.dati.tasca}/${a.dati.tot}</span>`; },
+     invito(a){ return a.dati.tasca < a.dati.tot ? 'Segui la freccia' : 'Vai al wallet'; },
+     tocca(a, c){
+       if (c.tipo !== 'sat') return;
+       c.via = true; a.dati.tasca++; arenaSuono('raccogli'); haptic();
+       arenaScoppio(a, c.x, c.y - 30, '255,214,107', 8);
+       if (a.dati.tasca === a.dati.tot) arenaDice(a, 'tappo', 'Presi tutti! Adesso mettiamoli al sicuro nel wallet.', 3.5);
+     },
+     azione(a, c){
+       if (c.tipo !== 'wallet') return null;
+       if (a.dati.tasca < a.dati.tot) return ['👛 Il tuo wallet: prima raccogli tutti i sats', null];
+       return ['👛 Metti i sats nel wallet', () => {
+         a.dati.wallet = a.dati.tasca; a.dati.tasca = 0; c.pieno = 1;
+         arenaSuono('conto'); arenaScoppio(a, c.x, c.y - 90);
+         arenaBene(a, 'Al sicuro! Un bitcoin si divide in cento milioni di sats.');
+         arenaDopo(a, 2.2, () => arenaProva(1));
+       }];
+     },
+     passa(a){ a.cose = a.cose.filter(c => !(c.tipo === 'sat' && c.via)); }},
+    {nome: 'Attenta alla Gazza',
+     nasci(a){
+       a.dati = {tasca: 0, wallet: 0, tot: SATS_QUANTI};
+       a.cose = satsSparsi(SATS_QUANTI).map(satsCosa).concat([Object.assign(satsWallet(), {pieno: 1})]);
+       const n = SATS_SCENA.nido;
+       a.nemici = [{tipo: 'gazza', x: n[0], y: n[1], z: 90, dir: 1, stato: 'nido', fra: 2.5, meta: null, ali: 0}];
+       arenaDice(a, 'gazza', 'Sats luccicanti in tasca? Li voglio! Li voglio!', 4);
+     },
+     obiettivo(a){
+       const d = a.dati;
+       return d.tasca ? `Hai ${d.tasca} sats in tasca: portali nel wallet prima della Gazza!` : `Raccogli i sats (nel wallet ${d.wallet}/${d.tot})`;
+     },
+     freccia(a){
+       const d = a.dati, w = a.cose.find(c => c.tipo === 'wallet');
+       /* con tre sats in tasca (o gli ultimi) la freccia porta al wallet */
+       if (w && d.tasca && (d.tasca >= 3 || !a.cose.some(c => c.tipo === 'sat'))) return [[w.x, w.y - 140]];
+       const s = satsVicino(a.cose, a.x, a.y);
+       return s ? [[s.x, s.y - 60]] : [];
+     },
+     hud(a){ return `<span${a.dati.tasca ? ' class="caldo"' : ''}>In tasca ⚡ ${a.dati.tasca}</span><span>👛 ${a.dati.wallet}/${a.dati.tot}</span>`; },
+     invito(a){ return a.dati.tasca ? 'Passa accanto al wallet per svuotare le tasche' : 'Raccogli i sats'; },
+     tocca(a, c){
+       if (c.tipo !== 'sat') return;
+       c.via = true; a.dati.tasca++; arenaSuono('raccogli'); haptic();
+       arenaScoppio(a, c.x, c.y - 30, '255,214,107', 8);
+     },
+     azione(a, c){ return c.tipo === 'wallet' ? ['👛 Il tuo wallet', null] : null; },
+     passa(a, dt){
+       const d = a.dati, liv = a.liv;
+       a.cose = a.cose.filter(c => !(c.tipo === 'sat' && c.via));
+       /* il wallet: ci si passa accanto e le tasche si svuotano da sole */
+       const w = a.cose.find(c => c.tipo === 'wallet');
+       if (w && d.tasca && Math.hypot(w.x - a.x, (w.y - a.y) * 1.3) < 130) {
+         d.wallet += d.tasca; d.tasca = 0; arenaSuono('conto'); arenaScoppio(a, w.x, w.y - 90, '120,220,140', 10);
+       }
+       if (d.wallet >= d.tot && !d.finita) {
+         d.finita = true; a.nemici.forEach(g => { g.stato = 'via'; });
+         arenaBene(a, 'Tutti nel wallet! I sats si tengono lì, non in tasca.');
+         arenaDopo(a, 2.2, () => arenaProva(2));
+       }
+       for (const g of a.nemici) gazzaPassa(a, g, dt, liv);
+     }},
+  ],
+  fondo: satsFondo, bordi: ['#4A2A1A', '#2A1A10'],
+  cosa: satsDisegnaCosa,
+  nemico: gazzaDisegna,
+};
+/* LA GAZZA: aspetta sul nido, poi vola verso Tappo SOLO se ha sats in
+   tasca (sennò gira a caso); se lo tocca se li prende e torna al nido */
+function gazzaPassa(a, g, dt, liv){
+  g.ali += dt * 14;
+  const d = a.dati, vel = 230 * liv.veloce;
+  const vola = (tx, ty, k) => {
+    const dx = tx - g.x, dy = ty - g.y, l = Math.hypot(dx, dy);
+    if (l < 12) return true;
+    const p = Math.min(l, vel * (k || 1) * dt);
+    g.x += dx / l * p; g.y += dy / l * p; if (Math.abs(dx) > 2) g.dir = dx > 0 ? 1 : -1;
+    return false;
+  };
+  const nido = SATS_SCENA.nido;
+  if (g.stato === 'via') { vola(nido[0], nido[1] - 40, 1.6); return; }
+  if (g.stato === 'nido') { g.fra -= dt; if (g.fra <= 0) { g.stato = 'gira'; g.meta = null; } return; }
+  if (g.stato === 'torna') { if (vola(nido[0], nido[1], 1.3)) { g.stato = 'nido'; g.fra = 3 / liv.veloce; } return; }
+  if (d.tasca > 0) {
+    vola(a.x, a.y - 10);
+    if (Math.hypot(g.x - a.x, (g.y - a.y) * 1.3) < 70) {
+      const quanti = d.tasca; d.tasca = 0;
+      /* i sats presi tornano per terra: la Gazza li lascia cadere scappando */
+      satsSparsi(quanti).forEach(p => a.cose.push(satsCosa(p)));
+      arenaErrore(a, 'La Gazza ti ha preso ' + quanti + (quanti === 1 ? ' sat' : ' sats') + ' dalla tasca! Nel wallet sarebbero stati al sicuro.');
+      arenaSuono('gazza');
+      g.stato = 'torna';
+    }
+  } else {
+    if (!g.meta || vola(g.meta[0], g.meta[1], 0.6)) g.meta = [140 + Math.random() * 620, 440 + Math.random() * 900];
+  }
+}
+function gazzaDisegna(g, a, n){
+  const fermo = effettiRidotti(), sc = arenaProfondo(a.sc, n.y), z = n.stato === 'nido' ? 40 : 110;
+  arenaOmbra(g, n.x, n.y + 6, 40 * sc, 0.35);
+  const y = n.y - z * sc - (fermo ? 0 : Math.sin(n.ali * 0.5) * 6);
+  g.save(); g.translate(n.x, y); g.scale(n.dir * sc, sc);
+  const ala = fermo ? 0.3 : Math.sin(n.ali) * 0.8;
+  /* le ali, bianche e nere, che battono */
+  [-1, 1].forEach(k => {
+    g.save(); g.rotate(k * (0.3 + ala * 0.6) - (k > 0 ? 0 : 0));
+    g.fillStyle = '#1A1E2E'; g.beginPath(); g.ellipse(-6, -10 * k, 40, 14, k * 0.5, 0, 6.2832); g.fill();
+    g.fillStyle = '#F2F4F8'; g.beginPath(); g.ellipse(-14, -10 * k, 18, 7, k * 0.5, 0, 6.2832); g.fill();
+    g.restore();
+  });
+  /* la coda lunga, il corpo, la pancia bianca, la testa col becco */
+  g.fillStyle = '#23304F'; g.beginPath(); g.moveTo(-26, 0); g.lineTo(-74, -8); g.lineTo(-74, 8); g.closePath(); g.fill();
+  g.fillStyle = '#1A1E2E'; g.beginPath(); g.ellipse(0, 0, 30, 18, 0, 0, 6.2832); g.fill();
+  g.fillStyle = '#F2F4F8'; g.beginPath(); g.ellipse(4, 6, 16, 9, 0, 0, 6.2832); g.fill();
+  g.fillStyle = '#1A1E2E'; g.beginPath(); g.arc(28, -8, 14, 0, 6.2832); g.fill();
+  g.fillStyle = '#F7B32B'; g.beginPath(); g.moveTo(40, -10); g.lineTo(56, -6); g.lineTo(40, -2); g.closePath(); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(32, -11, 4.5, 0, 6.2832); g.fill();
+  g.fillStyle = '#000'; g.beginPath(); g.arc(33.5, -11, 2.2, 0, 6.2832); g.fill();
+  g.restore();
+}
+/* IL FORNO disegnato da solo, finche' non arriva il dipinto: la parete
+   di mattoni col forno acceso e gli scaffali del pane, il pavimento di
+   cotto, il tavolo infarinato in mezzo, i sacchi di farina, il bancone
+   col wallet */
+function satsFondo(g){
+  const L = 900, A = 1500;
+  if (!satsFondo.tela) {
+    const t = document.createElement('canvas'); t.width = L; t.height = A;
+    const q = t.getContext('2d');
+    q.fillStyle = '#3A2214'; q.fillRect(0, 0, L, A);
+    /* la parete di mattoni */
+    for (let y = 0, r = 0; y < 384; y += 32, r++) for (let x = (r % 2) * -40; x < L; x += 80) {
+      const v = mondoCaso(x * 0.13 + r * 7.1);
+      q.fillStyle = 'rgb(' + Math.round(150 + v * 40) + ',' + Math.round(70 + v * 20) + ',' + Math.round(48 + v * 14) + ')';
+      q.fillRect(x + 2, y + 2, 76, 28);
+    }
+    /* il forno a cupola, con la bocca accesa */
+    q.fillStyle = '#7A5A48'; q.beginPath(); q.arc(450, 300, 190, Math.PI, 0); q.lineTo(640, 384); q.lineTo(260, 384); q.closePath(); q.fill();
+    q.fillStyle = '#5E4234'; q.beginPath(); q.arc(450, 300, 160, Math.PI, 0); q.lineTo(610, 384); q.lineTo(290, 384); q.closePath(); q.fill();
+    const fuoco = q.createRadialGradient(450, 340, 10, 450, 330, 110);
+    fuoco.addColorStop(0, '#FFE9A8'); fuoco.addColorStop(0.35, '#FFB040'); fuoco.addColorStop(0.75, '#D2461C'); fuoco.addColorStop(1, '#2A0E06');
+    q.fillStyle = fuoco; q.beginPath(); q.arc(450, 384, 100, Math.PI, 0); q.closePath(); q.fill();
+    /* gli scaffali del pane ai lati */
+    [[40, 220], [680, 860]].forEach(([x0, x1]) => {
+      for (let r = 0; r < 3; r++) {
+        const y = 70 + r * 100;
+        q.fillStyle = '#6B4424'; q.fillRect(x0, y + 60, x1 - x0, 12);
+        for (let x = x0 + 18; x < x1 - 20; x += 46) {
+          q.fillStyle = mondoCaso(x + r) > 0.5 ? '#D9963F' : '#C27A2E';
+          q.beginPath(); q.ellipse(x + 12, y + 46, 22, 14, 0, 0, 6.2832); q.fill();
+          q.strokeStyle = 'rgba(255,230,180,.6)'; q.lineWidth = 2; q.beginPath(); q.moveTo(x + 2, y + 44); q.lineTo(x + 22, y + 40); q.stroke();
+        }
+      }
+    });
+    /* il nido della Gazza sullo scaffale in alto a sinistra */
+    q.fillStyle = '#7A5A30'; q.beginPath(); q.ellipse(150, 390, 50, 18, 0, 0, 6.2832); q.fill();
+    q.strokeStyle = '#4A3418'; q.lineWidth = 3; for (let i = 0; i < 8; i++) { q.beginPath(); q.moveTo(104 + i * 12, 382); q.lineTo(118 + i * 10, 398); q.stroke(); }
+    q.fillStyle = '#3A2414'; q.fillRect(0, 372, L, 16);
+    /* il pavimento di cotto */
+    q.save(); q.beginPath(); q.rect(0, 388, L, A - 388); q.clip();
+    for (let y = 388, r = 0; y < A; y += 90, r++) for (let x = (r % 2) * -45; x < L; x += 90) {
+      const v = mondoCaso(x * 0.21 + r * 3.7);
+      q.fillStyle = 'rgb(' + Math.round(184 + v * 30) + ',' + Math.round(96 + v * 20) + ',' + Math.round(62 + v * 14) + ')';
+      q.fillRect(x + 2, y + 2, 86, 86);
+    }
+    const luce = q.createRadialGradient(450, 500, 40, 450, 600, 760); luce.addColorStop(0, 'rgba(255,170,80,.4)'); luce.addColorStop(1, 'rgba(255,170,80,0)');
+    q.fillStyle = luce; q.fillRect(0, 388, L, A);
+    const vign = q.createRadialGradient(450, 950, 300, 450, 950, 900); vign.addColorStop(0, 'rgba(0,0,0,0)'); vign.addColorStop(1, 'rgba(0,0,0,.5)');
+    q.fillStyle = vign; q.fillRect(0, 388, L, A);
+    q.restore();
+    /* le pareti ai lati */
+    q.fillStyle = '#5A3420'; q.fillRect(0, 388, 90, A); q.fillRect(810, 388, 90, A);
+    q.fillStyle = 'rgba(0,0,0,.3)'; q.fillRect(84, 388, 8, A); q.fillRect(808, 388, 8, A);
+    /* il tavolo infarinato in mezzo */
+    q.fillStyle = 'rgba(0,0,0,.3)'; q.fillRect(338, 772, 240, 150);
+    q.fillStyle = '#8A5A33'; q.fillRect(322, 740, 256, 160);
+    q.fillStyle = '#A8733F'; q.fillRect(330, 748, 240, 144);
+    q.fillStyle = 'rgba(255,250,240,.55)'; q.beginPath(); q.ellipse(430, 810, 70, 34, 0.2, 0, 6.2832); q.fill();
+    q.fillStyle = '#E8C48A'; q.beginPath(); q.ellipse(500, 790, 40, 24, 0, 0, 6.2832); q.fill();
+    q.fillStyle = '#C9915A'; q.beginPath(); q.ellipse(400, 850, 30, 18, 0, 0, 6.2832); q.fill();
+    /* i sacchi di farina */
+    [[210, 1180], [690, 560]].forEach(([x, y]) => {
+      q.fillStyle = 'rgba(0,0,0,.3)'; q.beginPath(); q.ellipse(x + 8, y + 10, 46, 20, 0, 0, 6.2832); q.fill();
+      q.fillStyle = '#EDE3CF'; q.beginPath(); q.ellipse(x, y - 20, 42, 50, 0, 0, 6.2832); q.fill();
+      q.fillStyle = '#C9B48E'; q.fillRect(x - 30, y - 64, 60, 10);
+      q.fillStyle = '#8A6A3A'; q.font = '700 18px system-ui, sans-serif'; q.textAlign = 'center'; q.fillText('FARINA', x, y - 12);
+    });
+    satsFondo.tela = t;
+  }
+  g.drawImage(satsFondo.tela, 0, 0);
+}
+function satsDisegnaCosa(g, a, c){
+  const sc = arenaProfondo(a.sc, c.y), fermo = effettiRidotti();
+  if (c.tipo === 'sat') {
+    /* un sat: la monetina d'oro col fulmine, che gira e saltella */
+    const su = fermo ? 0 : Math.abs(Math.sin(a.tempo * 3 + c.seme)) * 12, giro = fermo ? 1 : Math.cos(a.tempo * 3.4 + c.seme);
+    arenaOmbra(g, c.x, c.y + 2, 26 * sc, 0.4);
+    g.save(); g.translate(c.x, c.y - 30 * sc - su); g.scale(Math.max(0.15, Math.abs(giro)), 1);
+    g.fillStyle = '#C98A12'; g.beginPath(); g.arc(0, 0, 24 * sc, 0, 6.2832); g.fill();
+    g.fillStyle = '#FFD25A'; g.beginPath(); g.arc(0, 0, 19 * sc, 0, 6.2832); g.fill();
+    g.fillStyle = '#B06E08';
+    g.beginPath(); g.moveTo(3 * sc, -13 * sc); g.lineTo(-7 * sc, 2 * sc); g.lineTo(0, 2 * sc); g.lineTo(-3 * sc, 13 * sc); g.lineTo(7 * sc, -2 * sc); g.lineTo(0, -2 * sc); g.closePath(); g.fill();
+    g.restore();
+  } else if (c.tipo === 'wallet') {
+    /* il bancone col wallet sopra: un portafoglio arancione che si
+       illumina quando ci sono dentro i sats */
+    arenaOmbra(g, c.x, c.y + 6, 90 * sc, 0.5);
+    g.fillStyle = '#6B4424'; g.fillRect(c.x - 80 * sc, c.y - 60 * sc, 160 * sc, 60 * sc);
+    g.fillStyle = '#8A5A33'; g.fillRect(c.x - 90 * sc, c.y - 74 * sc, 180 * sc, 18 * sc);
+    if (c.pieno) {
+      const al = fermo ? 0.5 : 0.4 + Math.sin(a.tempo * 2.5) * 0.15;
+      const o = g.createRadialGradient(c.x, c.y - 110 * sc, 6, c.x, c.y - 110 * sc, 110 * sc);
+      o.addColorStop(0, 'rgba(255,214,107,' + al + ')'); o.addColorStop(1, 'rgba(255,214,107,0)');
+      g.fillStyle = o; g.fillRect(c.x - 120 * sc, c.y - 220 * sc, 240 * sc, 220 * sc);
+    }
+    g.fillStyle = '#E8761A'; g.strokeStyle = '#7A3A08'; g.lineWidth = 4;
+    g.beginPath(); g.roundRect ? g.roundRect(c.x - 52 * sc, c.y - 140 * sc, 104 * sc, 70 * sc, 14 * sc) : g.rect(c.x - 52 * sc, c.y - 140 * sc, 104 * sc, 70 * sc); g.fill(); g.stroke();
+    g.fillStyle = '#C85E10'; g.beginPath(); g.roundRect ? g.roundRect(c.x + 10 * sc, c.y - 120 * sc, 46 * sc, 30 * sc, 8 * sc) : g.rect(c.x + 10 * sc, c.y - 120 * sc, 46 * sc, 30 * sc); g.fill(); g.stroke();
+    g.fillStyle = '#FFD25A'; g.beginPath(); g.arc(c.x + 34 * sc, c.y - 105 * sc, 7 * sc, 0, 6.2832); g.fill();
+    if (c.pieno) arenaEmoji(g, '⚡', c.x - 22 * sc, c.y - 106 * sc, 34 * sc);
+  }
+}
+/* la versione senza tela (un browser che non disegna): si toccano i
+   sats e si mettono nel wallet, con gli stessi fumetti */
+function satsHTML(m){
+  const d = m.dati, presi = d.presi || (d.presi = []);
+  if (presi.length < SATS_QUANTI)
+    return missFumettoHTML('tappo', 'Tocca i sats per raccoglierli (' + presi.length + '/' + SATS_QUANTI + ').')
+      + `<div class="miss-scelte miss-mucchio">${Array.from({length: SATS_QUANTI}, (_, i) => presi.includes(i) ? '<span></span>' : `<button type="button" class="miss-scelta" onclick="satsPrendi(${i})">⚡</button>`).join('')}</div>`;
+  return missFumettoHTML('tappo', 'Presi tutti! Mettiamoli al sicuro.') + `<button type="button" class="caccia-btn" onclick="missioneFine()">👛 Metti i sats nel wallet</button>`;
+}
+function satsPrendi(i){
+  const m = missione; if (!m || m.id !== 'sats') return;
+  const p = m.dati.presi || (m.dati.presi = []);
+  if (!p.includes(i)) { p.push(i); haptic(); }
+  missioneDisegna();
+}
+
 /* ---------- il telaio comune ---------- */
 const MISSIONI_GIOCO = {
+  sats: {html: satsHTML, arena: ARENA_SATS, guaio: [['tappo', 'Il vento ha aperto la finestra del forno e ha sparso tutti i miei sats!'], ['gazza', 'Sats luccicanti per terra? Arrivo!']],
+    succo: 'Un bitcoin si divide in cento milioni di sats. I sats si tengono nel tuo wallet: lì sono tuoi e al sicuro, non in tasca.', nome: 'sats e wallet'},
   quaderno: {html: quadernoHTML, arena: ARENA_QUADERNO, guaio: [['tappo', 'Nella dispensa i conti li teneva uno solo, in un quaderno.'], ['tarlo', 'E io stanotte gliel\'ho rosicchiato! Adesso risulto ricchissimo. Gnam gnam.']],
     succo: 'Bitcoin è un quaderno dei conti che tengono in tantissimi: per barare bisognerebbe ingannarli tutti insieme.', nome: 'registro condiviso e doppia spesa'},
   lucchetto: {html: lucchettoHTML, guaio: [['tappo', 'Voglio comprare un frullatore da uno sconosciuto. Chi si muove per primo?'], ['tappo', 'Se pago prima rischio io. Se lui spedisce prima rischia lui. Come si fa?']],
