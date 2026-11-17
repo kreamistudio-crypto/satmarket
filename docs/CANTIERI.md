@@ -86282,3 +86282,41 @@ accesa» nel journal. Se il blocco torna: le righe «🧊 Sentinella» con
 la pila vanno al thread, e la causa vera si cura allora. Su develop
 questo commit arriva come cherry-pick: alla prossima promozione è un
 doppione da togliere.
+## I promemoria dello scambio on-chain (17 nov 2026, cantiere onchain-chat-sollecito, prima parte; Andrea: «tutto deve essere come la parte lighting. Fai un giro su tutto», punto 7 della lista di parità)
+
+Nel Lightning, a garanzia bloccata, il bot ricorda a chi compra di mandare
+gli euro (un'ora, sei, un giorno) e a chi vende, dopo il «pagato», di
+controllare e liberare (un'ora, sei, venti). Nello scambio on-chain non
+c'era niente: dopo l'avviso del deposito, silenzio fino al tempo finito.
+
+DECISO. Gli stessi due solleciti, battuti dalla ronda on-chain (ogni due
+minuti) e non da `p2p_attese`, che vive degli eventi di mostrod: qui gli
+eventi sono nostri e la riga dello scambio sa già tutto. Due colonne,
+`sollecito_pagare` e `sollecito_libera`, col livello raggiunto, timbrato
+prima dell'invio come ogni avviso. A chi PAGA: un'ora, sei ore, e quattro
+ore prima della fine del suo tempo (20 in moneta, 68 in euro) al posto del
+«un giorno» del Lightning, che in moneta cadrebbe proprio sulla scadenza,
+dove c'è già l'avviso del tempo finito. A chi LIBERA: i tre del Lightning,
+coi suoi testi (anche quelli del solo «Contanti»), tradotti nella valuta
+da `_notifica_p2p_onchain`. Come nel Lightning: niente a chi paga senza
+recapito scritto («invia» sarebbe falso) e niente col contanti di persona
+fra i metodi; disputa aperta o tempo finito fermano tutto.
+
+SCARTATO. Riusare `p2p_attese` (vuole un ordine di Mostro e i suoi
+momenti). Mandare tutti i livelli arretrati dopo un riavvio: una ronda in
+ritardo manda solo l'ultimo dovuto, mai tre di fila. Nei testi a chi paga
+il «✕ Annulla» del Lightning: nell'on-chain dopo il deposito chi compra
+non annulla da solo (si esce col rimborso a due firme o con la disputa).
+
+PROVATO. `prove_onchain_promemoria` (9): i livelli nel tempo in euro e in
+USDT, il ritardo, i quattro «niente», chi riceve cosa, la passata che non
+ripete, l'ordine nella ronda; controprove su sette mutazioni, tutte rosse
+(la guardia `COALESCE(col,0)<?` nell'UPDATE è difensiva per due ronde in
+volo e non si vede in una prova a un solo filo). `collaudo_p2p_onchain`
+(138): primo promemoria a due ore dal deposito, la ronda dopo tace, «Ho
+inviato» li ferma, a sette ore dal «Ho inviato» chi vende riceve il
+secondo e uno solo; a 73 ore il tempo finito supera il terzo.
+
+DA GUARDARE. Gli scambi già depositati al deploy: alla prima ronda
+ricevono SOLO l'ultimo livello dovuto (uno per scambio), è voluto. La
+chat dello scambio on-chain (punto 6) è la seconda parte di questo cantiere.

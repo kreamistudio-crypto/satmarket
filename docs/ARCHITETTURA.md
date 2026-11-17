@@ -36153,6 +36153,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   il battito). CONTI DI /ADMIN: `_conti_onchain_p2p(con, ordini, cambi)`
   da' agli scambi in USDT e franchi la cifra in euro di
   `_euro_conti_onchain_p2p` (cambi di adesso, `cambio_noto_ora`).
+- I PROMEMORIA DELLO SCAMBIO ON-CHAIN (17 nov 2026, cantiere
+  onchain-chat-sollecito; CANTIERI, «I promemoria dello scambio
+  on-chain»). Nella ronda, dopo il tempo finito:
+  `_p2p_onchain_passata_solleciti(con, adesso)` chiede a
+  `_p2p_onchain_sollecito_dovuto(o, adesso)` (pura) `(colonna, livello,
+  tg_id, testo)` e timbra il livello in `sollecito_pagare` o
+  `sollecito_libera` PRIMA dell'invio. A chi paga
+  `_p2p_onchain_intervalli_pagare` (1 h, 6 h, ore − 4 h) coi testi di
+  `_p2p_onchain_testi_pagare`, solo con recapito scritto e senza
+  «Contanti» fra i metodi; a chi libera `SOLLECITI_RILASCIO_S` coi testi
+  del Lightning (`SOLLECITO_RILASCIO_*TESTI`, quelli dei contanti col
+  solo «Contanti»). Conta solo l'ultimo livello dovuto; disputa o
+  `pagamento_scaduto_il` li fermano. Tutto passa da `_notifica_p2p_onchain`.
 - I DUE TASTI DELLA RETE NEL FOGLIO DELL'ORDINE (16 nov 2026, cantiere
   coin-quasi; il perché in CANTIERI, «I due tasti della rete nel foglio
   dell'ordine…»). `tastiReteFoglioP2P` disegna «⚡ Lightning» / «₿

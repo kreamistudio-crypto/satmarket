@@ -105200,6 +105200,20 @@ P2P_ONCHAIN_ORE_DEPOSITO = 6    # dalla presa: entro quando il deposito va confe
 # aprire la disputa. La disputa resta apribile anche prima, come oggi.
 P2P_ONCHAIN_ORE_PAGAMENTO_MONETE = 24
 P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI = 72
+# I PROMEMORIA (17 nov 2026, cantiere onchain-chat-sollecito, «tutto
+# deve essere come la parte Lightning»). Gli stessi due del Lightning
+# (`SOLLECITI_EURO_S`, `SOLLECITI_RILASCIO_S`), battuti dalla ronda:
+# • a chi PAGA, dal deposito confermato: un'ora, sei ore, e quattro ore
+#   prima della fine del suo tempo (20 ore in moneta, 68 in euro) — al
+#   posto del «un giorno» del Lightning, che in moneta cadrebbe proprio
+#   sulla scadenza. Solo se chi vende ha gia' scritto il recapito (senza,
+#   «invia» sarebbe una frase falsa) e mai col contanti di persona fra i
+#   metodi (ci si da' appuntamento, anche a giorni);
+# • a chi LIBERA, dal «Ho inviato»: un'ora, sei, venti, coi testi del
+#   Lightning (anche quelli del solo «Contanti»).
+# Una ronda in ritardo (un riavvio) manda solo l'ultimo livello dovuto,
+# mai tre di fila. Disputa aperta o tempo finito: niente piu' promemoria.
+P2P_ONCHAIN_SOLLECITI_PAGARE_PRIMA_S = 4 * 3600   # il terzo: prima della fine
 P2P_ONCHAIN_MIN_SATS = 10_000   # sotto, la commissione di rete mangia lo scambio
 P2P_ONCHAIN_METODI_MAX = 5
 P2P_ONCHAIN_METODO_MAX = 40
@@ -105616,7 +105630,13 @@ def _p2p_onchain_prepara(con):
                       # 17 nov 2026, cantiere convenienza-monete: quando la
                       # ronda ha detto alle due parti che il tempo per
                       # pagare e' finito (0 = non ancora): una volta sola
-                      ("pagamento_scaduto_il", "INTEGER DEFAULT 0")):
+                      ("pagamento_scaduto_il", "INTEGER DEFAULT 0"),
+                      # 17 nov 2026, cantiere onchain-chat-sollecito: fin
+                      # dove sono arrivati i promemoria (0 = nessuno), a chi
+                      # paga e a chi libera; un livello si scrive PRIMA
+                      # dell'invio, come ogni avviso
+                      ("sollecito_pagare", "INTEGER DEFAULT 0"),
+                      ("sollecito_libera", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -108368,6 +108388,95 @@ def _p2p_onchain_passata_tempo_pagare(con, adesso: int) -> list:
     return fuori
 
 
+def _p2p_onchain_intervalli_pagare(o) -> tuple:
+    """PURA: i tre promemoria a chi paga, in secondi dal deposito: un'ora,
+    sei, e quattro ore prima della fine del suo tempo."""
+    return (3600, 6 * 3600,
+            p2p_onchain_ore_pagamento(o) * 3600 - P2P_ONCHAIN_SOLLECITI_PAGARE_PRIMA_S)
+
+
+def _p2p_onchain_testi_pagare(o) -> dict:
+    """PURA: i tre promemoria a chi paga, scritti per gli euro (le parole
+    della valuta le mette `_notifica_p2p_onchain`). Le etichette fra «»
+    sono quelle dei bottoni dello scambio on-chain."""
+    S = P2P_ONCHAIN_SEGNO
+    ore = p2p_onchain_ore_pagamento(o)
+    return {
+        1: (f"{S} 💶 Promemoria: i sats sono nel 2-di-3 da un'ora e aspettano i "
+            "tuoi euro. Inviali al recapito che trovi nella pagina dello scambio, "
+            f"poi tocca «Ho inviato gli euro». Hai {ore} ore in tutto."),
+        2: (f"{S} 💶 Sono passate sei ore: i sats di chi vende sono fermi nel "
+            "2-di-3 e gli euro non risultano inviati. Inviali e tocca «Ho inviato "
+            f"gli euro». Ti restano {ore - 6} ore."),
+        3: (f"{S} ⏰ Mancano quattro ore alla fine del tempo per pagare. Invia gli "
+            "euro e tocca «Ho inviato gli euro»: dopo, chi vende può aprire una "
+            "disputa e a decidere sarà un moderatore."),
+    }
+
+
+def _p2p_onchain_solo_contanti(o) -> bool:
+    """PURA: i metodi sono il SOLO «Contanti» (le parole di «consegnato»)."""
+    return _metodi_libro(_p2p_onchain_metodi(o)) == ["Contanti"]
+
+
+def _p2p_onchain_sollecito_dovuto(o, adesso: int):
+    """PURA: il promemoria che tocca adesso a questo scambio, o None.
+    Torna `(colonna, livello, tg_id, testo)`: il livello e' l'ULTIMO
+    dovuto (una ronda in ritardo non ne manda tre di fila), e solo se e'
+    oltre quello gia' mandato."""
+    stato = str(o["stato"] or "")
+    if int(o["disputa_il"] or 0):
+        return None
+
+    def livello(dal, intervalli, gia):
+        n = sum(1 for fra in intervalli if dal > 0 and adesso >= dal + int(fra))
+        return n if n > int(gia or 0) else 0
+
+    if stato == "depositato":
+        if int(_p2p_onchain_campo(o, "pagamento_scaduto_il", 0) or 0):
+            return None
+        if not str(o["recapito"] or "").strip() or not int(o["ricevente_id"] or 0):
+            return None
+        if "Contanti" in _metodi_libro(_p2p_onchain_metodi(o)):
+            return None
+        n = livello(int(o["depositato_il"] or 0), _p2p_onchain_intervalli_pagare(o),
+                    _p2p_onchain_campo(o, "sollecito_pagare", 0))
+        if n:
+            return ("sollecito_pagare", n, int(o["ricevente_id"]),
+                    _p2p_onchain_testi_pagare(o)[n])
+        return None
+    if stato == "euro_inviati" and int(o["depositante_id"] or 0):
+        n = livello(int(o["euro_inviati_il"] or 0), SOLLECITI_RILASCIO_S,
+                    _p2p_onchain_campo(o, "sollecito_libera", 0))
+        if n:
+            testi = (SOLLECITO_RILASCIO_CONTANTI_TESTI if _p2p_onchain_solo_contanti(o)
+                     else SOLLECITO_RILASCIO_TESTI)
+            return ("sollecito_libera", n, int(o["depositante_id"]),
+                    f"{P2P_ONCHAIN_SEGNO} {testi[n]}")
+    return None
+
+
+def _p2p_onchain_passata_solleciti(con, adesso: int) -> list:
+    """I promemoria dovuti adesso: timbra il livello PRIMA dell'invio (una
+    volta sola, anche con due ronde in volo) e torna `[(riga, tg_id,
+    testo)]` da mandare."""
+    fuori = []
+    for o in con.execute(
+            "SELECT * FROM p2p_onchain_ordini WHERE stato IN "
+            "('depositato','euro_inviati') ORDER BY id LIMIT 200").fetchall():
+        dovuto = _p2p_onchain_sollecito_dovuto(o, adesso)
+        if not dovuto:
+            continue
+        col, n, chi, testo = dovuto
+        cur = con.execute(
+            f"UPDATE p2p_onchain_ordini SET {col}=? WHERE id=? AND stato=? AND "
+            f"COALESCE({col}, 0)<?", (n, o["id"], o["stato"], n))
+        if cur.rowcount:
+            fuori.append((o, chi, testo))
+    con.commit()
+    return fuori
+
+
 async def _p2p_onchain_ronda() -> None:
     """Il battito del libro on-chain, dentro `orologio_onchain` (ogni due
     minuti): gli scambi presi si guardano su mempool; gli ordini nel
@@ -108402,8 +108511,17 @@ async def _p2p_onchain_ronda() -> None:
             (adesso - P2P_ONCHAIN_RITARDATARI_S,))]
         # IL TEMPO PER PAGARE (17 nov 2026)
         senza_pagamento = _p2p_onchain_passata_tempo_pagare(con, adesso)
+        # I PROMEMORIA (17 nov 2026, dopo il tempo finito: chi l'ha appena
+        # avuto non riceve anche il terzo)
+        promemoria = _p2p_onchain_passata_solleciti(con, adesso)
     finally:
         con.close()
+    for o, chi, testo in promemoria:
+        try:
+            await _notifica_p2p_onchain(o, chi, testo, _p2p_onchain_bottone(o))
+        except Exception as e:
+            print(f"⚠️ P2P on-chain: promemoria dello scambio {o['id']} saltato: {e}",
+                  flush=True)
     for o in senza_pagamento:
         for chi, testo in _p2p_onchain_testi_tempo_scaduto(o).items():
             if not chi:
