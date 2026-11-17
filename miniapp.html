@@ -3797,7 +3797,7 @@
     .caccia-bolli b{color:var(--c-ambra2)}
 
     /* LE SCHEDE: Caccia, Sfide, Zaino, Bottega */
-    .caccia-schede{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:14px 0 12px;padding:4px;
+    .caccia-schede{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:4px;margin:14px 0 12px;padding:4px;
       border-radius:16px;background:rgba(0,0,0,.35);border:1px solid var(--c-riga)}
     .caccia-schede button{padding:8px 2px 7px;border:0;border-radius:12px;background:transparent;color:var(--c-muto);
       font:inherit;font-size:12.5px;font-weight:700;line-height:1.15;cursor:pointer;
@@ -3883,6 +3883,31 @@
       padding:10px;border-radius:20px;background:rgba(10,15,31,.96);border:1px solid var(--c-riga);
       animation:caccia-entra .35s cubic-bezier(.2,1.3,.4,1) both}
     .caccia-appiccicato .caccia-btn{margin:0}
+    /* IL MONDO: la tela dove Tappo cammina e quel che le sta sopra */
+    .caccia-tela-box{display:none;position:relative;margin-top:2px;border-radius:22px;overflow:hidden;
+      border:1px solid var(--c-riga);background:#0E1329;height:calc(100vh / var(--fs-zoom,1) - 262px);
+      min-height:340px;max-height:860px;touch-action:none;user-select:none;-webkit-user-select:none}
+    .caccia-mondo[data-scheda="mondo"] .caccia-tela-box{display:block}
+    .caccia-tela{display:block;width:100%;height:100%;touch-action:none;outline:none;cursor:pointer}
+    .caccia-hud{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:6px;
+      align-items:flex-start;pointer-events:none}
+    .caccia-hud span{padding:5px 10px;border-radius:999px;background:rgba(10,15,31,.74);color:#FFF6E3;
+      font-size:12.5px;font-weight:800}
+    .caccia-hud span:empty{display:none}
+    .caccia-mappina{position:absolute;right:10px;top:10px;width:76px;height:90px;border-radius:12px;
+      background:rgba(10,15,31,.74);border:1px solid var(--c-riga);pointer-events:none}
+    .caccia-btn.caccia-azione{position:absolute;left:12px;right:12px;bottom:12px;width:auto;margin:0;
+      box-shadow:0 10px 24px rgba(0,0,0,.45)}
+    .caccia-btn.caccia-azione:disabled{opacity:1;background:rgba(10,15,31,.88);color:#FFF6E3;
+      border:1px solid var(--c-riga);box-shadow:none;cursor:default}
+    .caccia-guida{position:absolute;left:50%;bottom:96px;transform:translateX(-50%);width:max-content;
+      max-width:calc(100% - 24px);padding:8px 12px;border-radius:14px;background:rgba(10,15,31,.82);
+      color:#FFF6E3;font-size:12.5px;font-weight:700;line-height:1.35;text-align:center;pointer-events:none}
+    .caccia-guida span{display:none}
+    .caccia-leva{display:none;position:absolute;width:76px;height:76px;margin:-38px 0 0 -38px;border-radius:50%;
+      border:2px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);pointer-events:none}
+    .caccia-leva i{position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;
+      border-radius:50%;background:rgba(255,214,107,.92)}
     .caccia-appiccicato small{display:block;margin:0 2px 8px;font-size:12.5px;line-height:1.35;color:var(--c-muto)}
 
     /* LA CACCIA DI OGGI: gli indizi, le occhiate, gli attrezzi */
@@ -4004,6 +4029,9 @@
        Tappo, le schede e la caccia; a destra la dispensa, sempre li'. */
     @media (min-width:900px){
       .caccia-dentro{max-width:1060px}
+      .caccia-tela-box{height:calc(100vh / var(--fs-zoom,1) - 252px)}
+      .caccia-guida span{display:inline}
+      .caccia-btn.caccia-azione{left:50%;right:auto;transform:translateX(-50%);min-width:360px}
       .caccia-due{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start}
       .caccia-palco{min-height:250px}
       .caccia-tappo{--tw:184px}
@@ -14342,6 +14370,19 @@ document.getElementById('cartello')?.remove();</script>
           <span class="caccia-saldo" id="cacciaSaldo" title="I tuoi bulloni">🔩 0</span>
         </div>
         <div id="cacciaCorpo"></div>
+        <!-- IL MONDO DI TAPPO: la tela sta FUORI dal corpo, che si
+             riscrive a ogni risposta del server — una tela WebGL
+             ricreata perderebbe il suo mondo ogni volta. Si vede solo
+             nella scheda «Mondo» (il CSS guarda data-scheda). -->
+        <div class="caccia-tela-box" id="cacciaTelaBox">
+          <canvas class="caccia-tela" id="cacciaTela" role="img"
+                  aria-label="La dispensa di Tappo: tocca dove vuoi farlo andare"></canvas>
+          <div class="caccia-hud"><span id="cacciaZonaNome"></span><span id="cacciaPezzi"></span></div>
+          <canvas class="caccia-mappina" id="cacciaMappina" width="152" height="180" aria-hidden="true"></canvas>
+          <div class="caccia-leva" id="cacciaLeva" aria-hidden="true"><i></i></div>
+          <div class="caccia-guida" id="cacciaGuida">Tocca dove vuoi andare, o trascina il dito per guidare Tappo.<span> Dal computer: frecce o WASD.</span></div>
+          <button type="button" class="caccia-btn caccia-azione" id="cacciaAzione" onclick="mondoFai()" style="display:none"></button>
+        </div>
       </div>
     </div>
   </div>
@@ -60067,8 +60108,10 @@ let cacciaStato = null;          /* l'ultima risposta del server */
 let cacciaGuardati = new Map();  /* annuncio gia' guardato → il suo calore, di sessione */
 let cacciaGiorno = '';           /* il giorno di cacciaGuardati */
 let cacciaOccupata = false;
-let cacciaUi = {scheda: 'caccia', scaffale: 0, grado: 0};
-const CACCIA_SCHEDE = [['caccia', '🗺️', 'Caccia'], ['sfide', '🏅', 'Sfide'],
+let cacciaUi = {scheda: 'mondo', scaffale: 0, grado: 0, mondo: false};
+/* «Mondo» c'e' solo dove WebGL c'e' (`ui.mondo`): sennò le schede sono
+   le altre quattro, e il gioco si gioca lo stesso */
+const CACCIA_SCHEDE = [['mondo', '🌍', 'Mondo'], ['caccia', '🔎', 'Caccia'], ['sfide', '🏅', 'Sfide'],
                        ['zaino', '🎒', 'Zaino'], ['bottega', '🛍️', 'Bottega']];
 const CACCIA_CALORE = {
   fuoco: ['🔥', 'Fuoco! Stesso barattolo e stessa fascia di prezzo'],
@@ -60159,8 +60202,8 @@ function cacciaEroeHTML(s){
     + '</div>';
 }
 /* PURA: le quattro schede */
-function cacciaSchedeHTML(scheda){
-  return '<div class="caccia-schede" role="tablist">' + CACCIA_SCHEDE.map(x =>
+function cacciaSchedeHTML(scheda, mondoC){
+  return '<div class="caccia-schede" role="tablist">' + CACCIA_SCHEDE.filter(x => x[0] !== 'mondo' || mondoC).map(x =>
     '<button type="button" role="tab" aria-selected="' + (x[0] === scheda) + '"' + (x[0] === scheda ? ' class="qui"' : '')
     + ' onclick="cacciaVai(\'' + x[0] + '\')"><span aria-hidden="true">' + x[1] + '</span>' + x[2] + '</button>').join('') + '</div>';
 }
@@ -60365,14 +60408,937 @@ function cacciaBottegaHTML(s){
     + gruppo('Cappelli per Tappo', ['cappello']) + gruppo('Sfondi', ['palco']) + gruppo('Speciali', ['titolo', 'posti', 'trofeo'])
     + '<div class="caccia-nota">I bulloni sono solo un gioco: non sono sats, non si comprano, non si passano e non danno XP.</div>';
 }
+/* ============ IL MONDO DI TAPPO (17 nov 2026) ============
+   Andrea: «io pensavo a un gioco dove Tappo esplorava proprio un mondo
+   a sé stante... dove Tappo poteva navigare in una mappa, proprio un
+   vero gioco». La dispensa diventa un POSTO: sei isole di legno sospese
+   (una per scaffale) unite da ponti, coi barattoli giganti delle
+   categorie. Tappo ci cammina — un tocco dove si vuole andare, il dito
+   trascinato per guidarlo, le frecce o WASD dal computer — raccoglie i
+   bulloni sparsi del giorno, entra nei barattoli (che sono le porte
+   sugli annunci VERI di quella categoria), va alla bottega.
+   E' UN MOTORE 3D PICCOLO E NOSTRO, in WebGL nudo: niente librerie da
+   scaricare (la CSP vuole solo roba di casa, e una pagina sola resta
+   una pagina sola). Maglie a facce piatte, una luce, la nebbia; Tappo
+   e le emoji sono cartelli sempre girati verso chi guarda.
+   IL SERVER RESTA IL GIUDICE: quali zone sono aperte e quali bulloni
+   ci sono oggi lo dice `stato.mondo`; raccoglierne uno e' una chiamata
+   (`/raccogli`), e il saldo torna da li'. Qui si disegna e si cammina.
+   Senza WebGL (Tor Browser lo spegne) la scheda «Mondo» non nasce e il
+   gioco resta quello delle altre schede: non si perde niente. */
+const MONDO_ZONA_L = 16, MONDO_ZONA_P = 12, MONDO_VUOTO = 3;   /* un'isola e il salto fra due */
+const MONDO_TINTE = {1: '#3D8FB8', 2: '#7A5BD1', 3: '#4E9A5B', 4: '#C75B8E', 5: '#D9822B', 6: '#C9A227'};
+const MONDO_METALLI = {'': '#6E7A93', bronzo: '#C8803C', argento: '#DCE3EE', oro: '#FFC93C'};
+/* dove stanno i barattoli su un'isola (in passi dall'angolo a nord-ovest):
+   cinque o quattro, mai in fila come su uno scaffale vero */
+const MONDO_VASI = {5: [[3, 3.2], [8, 2.4], [13, 3.2], [5.4, 7.4], [10.6, 7.4]],
+                    4: [[3, 3.2], [8, 2.4], [13, 3.2], [8, 7.4]]};
+/* i dieci POSTI di un'isola dove puo' cadere un bullone: il server dice
+   solo «zona 2, posto 7», il dove lo sa questa riga */
+const MONDO_POSTI = [[1.6, 5.3], [5.6, 4.9], [10.4, 4.9], [14.4, 5.3], [2.2, 9.2],
+                     [8, 5.2], [12.6, 8.6], [4.6, 10.6], [11.4, 10.6], [8, 9.4]];
+const MONDO_CARTELLO = [8, 11.1];      /* il cartello della caccia, a sud di ogni isola */
+const MONDO_BOTTEGA = [14.2, 10.4];    /* la bottega, solo sulla prima */
+const MONDO_CAMBIO = [2.3, 10.1];      /* il Banco del cambio (gli scambi P2P), solo sulla prima */
+const MONDO_PASSO = 5.4;               /* quanto corre Tappo, in passi al secondo */
+
+/* PURA: il rettangolo dell'isola n (1..6). La 1 e la 2 sono a SUD, le
+   piu' vicine a chi guarda: le altre si scoprono andando verso il fondo */
+function mondoZona(n){
+  const i = Math.min(6, Math.max(1, Number(n) || 1)) - 1;
+  const col = i % 2, riga = 2 - Math.floor(i / 2);
+  const x0 = col ? MONDO_VUOTO / 2 : -(MONDO_VUOTO / 2) - MONDO_ZONA_L;
+  const z0 = riga * (MONDO_ZONA_P + MONDO_VUOTO);
+  return {n: i + 1, x0, z0, x1: x0 + MONDO_ZONA_L, z1: z0 + MONDO_ZONA_P};
+}
+/* PURA: i sette ponti, ognuno fra due isole */
+function mondoPonti(){
+  const p = [];
+  for (const [a, b] of [[1, 2], [3, 4], [5, 6]]) {
+    const za = mondoZona(a), zb = mondoZona(b), m = (za.z0 + za.z1) / 2;
+    p.push({a, b, x0: za.x1, x1: zb.x0, z0: m - 1.3, z1: m + 1.3, lungo: 'x'});
+  }
+  for (const [a, b] of [[3, 1], [4, 2], [5, 3], [6, 4]]) {      /* a sta a nord di b */
+    const za = mondoZona(a), zb = mondoZona(b), m = (za.x0 + za.x1) / 2;
+    p.push({a, b, x0: m - 1.3, x1: m + 1.3, z0: za.z1, z1: zb.z0, lungo: 'z'});
+  }
+  return p;
+}
+/* PURA: dallo stato del server alla SCENA — isole, ponti, barattoli,
+   luoghi dove si puo' fare qualcosa, ostacoli e bulloni. Niente DOM e
+   niente WebGL qui dentro: e' quel che le prove fanno girare. */
+function mondoScena(s){
+  const m = s && s.mondo || {}, scena = {zone: [], ponti: [], vasi: [], luoghi: [], ostacoli: [], pezzi: [], roba: []};
+  const aperta = {};
+  (Array.isArray(m.zone) ? m.zone : []).forEach(z => { if (z) aperta[Number(z.n)] = z; });
+  for (let n = 1; n <= 6; n++) {
+    const r = mondoZona(n), sc = scaffaleCaccia(s, n) || {}, z = aperta[n] || {};
+    const zona = Object.assign(r, {aperta: !!z.aperta, mancano: Number(z.mancano) || 0,
+      nome: String(sc.nome || ''), emoji: String(sc.emoji || ''), tinta: MONDO_TINTE[n]});
+    scena.zone.push(zona);
+    if (!zona.aperta) {
+      scena.luoghi.push({tipo: 'chiusa', zona: n, x: (r.x0 + r.x1) / 2, z: r.z1 + 0.4, r: 3.2, mancano: zona.mancano, nome: zona.nome});
+      continue;
+    }
+    const vasi = Array.isArray(sc.barattoli) ? sc.barattoli.filter(b => b && b.categoria) : [];
+    const posti = MONDO_VASI[vasi.length >= 5 ? 5 : 4];
+    vasi.slice(0, posti.length).forEach((b, i) => {
+      const v = {x: r.x0 + posti[i][0], z: r.z0 + posti[i][1], zona: n, categoria: String(b.categoria),
+                 metallo: /^(bronzo|argento|oro)$/.test(String(b.metallo)) ? String(b.metallo) : '',
+                 volte: Number(b.volte) || 0};
+      scena.vasi.push(v);
+      scena.ostacoli.push({x: v.x, z: v.z, r: 1.5});
+      scena.luoghi.push({tipo: 'vaso', zona: n, x: v.x, z: v.z, r: 2.7, vaso: v});
+    });
+    scena.luoghi.push({tipo: 'cartello', zona: n, x: r.x0 + MONDO_CARTELLO[0], z: r.z0 + MONDO_CARTELLO[1], r: 2.1, nome: zona.nome});
+    scena.ostacoli.push({x: r.x0 + MONDO_CARTELLO[0], z: r.z0 + MONDO_CARTELLO[1], r: 0.7});
+    if (n === 1) {
+      scena.luoghi.push({tipo: 'bottega', zona: 1, x: r.x0 + MONDO_BOTTEGA[0], z: r.z0 + MONDO_BOTTEGA[1], r: 2.6});
+      scena.ostacoli.push({x: r.x0 + MONDO_BOTTEGA[0], z: r.z0 + MONDO_BOTTEGA[1], r: 1.55});
+    }
+    const cambio = n === 1 && m.cambio && m.cambio.attivo;
+    if (cambio) {
+      scena.luoghi.push({tipo: 'cambio', zona: 1, x: r.x0 + MONDO_CAMBIO[0], z: r.z0 + MONDO_CAMBIO[1], r: 2.6, scambi: Number(m.cambio.scambi) || 0});
+      scena.ostacoli.push({x: r.x0 + MONDO_CAMBIO[0], z: r.z0 + MONDO_CAMBIO[1], r: 1.5});
+    }
+    /* la roba della dispensa agli angoli: casse, sacchi, basilico, bottiglie */
+    [['cassa', 1.2, 1.2], ['sacco', 14.9, 1.2]].concat(cambio ? [] : [['basilico', 1.1, 10.9]], n === 1 ? [] : [['bottiglie', 14.9, 10.8]])
+      .forEach(([cosa, x, z]) => {
+        scena.roba.push({cosa, x: r.x0 + x, z: r.z0 + z, zona: n});
+        scena.ostacoli.push({x: r.x0 + x, z: r.z0 + z, r: 1.05});
+      });
+  }
+  mondoPonti().forEach(p => {
+    const za = scena.zone[p.a - 1], zb = scena.zone[p.b - 1];
+    scena.ponti.push(Object.assign(p, {aperto: !!(za.aperta && zb.aperta), visibile: !!(za.aperta || zb.aperta)}));
+  });
+  (Array.isArray(m.pezzi) ? m.pezzi : []).forEach(p => {
+    const z = p && scena.zone[Number(p.zona) - 1], posto = p && MONDO_POSTI[Number(p.posto)];
+    if (!z || !z.aperta || !posto) return;
+    scena.pezzi.push({n: Number(p.n), x: z.x0 + posto[0], z: z.z0 + posto[1], preso: !!p.preso});
+  });
+  return scena;
+}
+/* PURA: si puo' stare in (x, z)? Sopra un'isola aperta o un ponte aperto
+   (con mezzo passo di bordo), mai dentro un ostacolo */
+function mondoTerra(scena, x, z){
+  const B = 0.45;
+  for (const r of scena.zone)
+    if (r.aperta && x >= r.x0 + B && x <= r.x1 - B && z >= r.z0 + B && z <= r.z1 - B) return true;
+  for (const p of scena.ponti)
+    if (p.aperto && (p.lungo === 'x'
+        ? x >= p.x0 - 1 && x <= p.x1 + 1 && z >= p.z0 + B && z <= p.z1 - B
+        : z >= p.z0 - 1 && z <= p.z1 + 1 && x >= p.x0 + B && x <= p.x1 - B)) return true;
+  return false;
+}
+/* PURA: il passo da (x, z) di (dx, dz), SCIVOLANDO: un barattolo spinge
+   di lato, un bordo lascia passare la meta' del passo che non lo buca */
+function mondoMuovi(scena, x, z, dx, dz){
+  const fuori = (px, pz) => {
+    for (const o of scena.ostacoli) {
+      const ax = px - o.x, az = pz - o.z, d = Math.hypot(ax, az);
+      if (d < o.r && d > 1e-4) { px = o.x + ax / d * o.r; pz = o.z + az / d * o.r; }
+    }
+    return [px, pz];
+  };
+  for (const [ax, az] of [[dx, dz], [dx, 0], [0, dz]]) {
+    if (!ax && !az) continue;
+    const [nx, nz] = fuori(x + ax, z + az);
+    if (mondoTerra(scena, nx, nz)) return [nx, nz];
+  }
+  return [x, z];
+}
+/* PURA: il luogo piu' vicino entro il suo raggio, o null */
+function mondoVicino(scena, x, z){
+  let meglio = null, quanto = 1e9;
+  for (const l of scena.luoghi) {
+    const d = Math.hypot(l.x - x, l.z - z);
+    if (d <= l.r && d < quanto) { meglio = l; quanto = d; }
+  }
+  return meglio;
+}
+/* PURA: l'isola su cui si sta (0 = su un ponte) */
+function mondoZonaDi(scena, x, z){
+  const r = scena.zone.find(q => x >= q.x0 && x <= q.x1 && z >= q.z0 && z <= q.z1);
+  return r ? r.n : 0;
+}
+/* PURA: cosa dice il tasto in basso davanti a quel luogo: [testo, gesto]
+   (gesto '' = solo una scritta) */
+function mondoAzione(luogo, s){
+  if (!luogo) return null;
+  const c = s && s.caccia;
+  if (luogo.tipo === 'vaso') {
+    return ['🫙 ' + luogo.vaso.categoria + ': guarda gli annunci', 'vaso'];
+  }
+  if (luogo.tipo === 'bottega') return ['🛍️ Entra in bottega', 'bottega'];
+  if (luogo.tipo === 'cambio') return ['💱 Banco del cambio: apri gli scambi P2P', 'cambio'];
+  if (luogo.tipo === 'cartello') {
+    if (c && c.trovato) return ['✅ Per oggi la caccia è fatta', 'caccia'];
+    if (c && !c.vuoto) return [Number(c.scaffale) === luogo.zona ? '📜 Leggi gli indizi' : '📜 La caccia di oggi è su un\'altra isola', 'caccia'];
+    return ['🔩 Caccia qui, su «' + luogo.nome + '»', 'parti'];
+  }
+  if (luogo.tipo === 'chiusa')
+    return ['🔒 Si apre con ' + (luogo.mancano === 1 ? 'un altro ritrovamento' : 'altri ' + fmt(luogo.mancano) + ' ritrovamenti'), ''];
+  return null;
+}
+
+/* ---------- la matematica, quel poco che serve ---------- */
+function m4Per(a, b){
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++)
+    o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+  return o;
+}
+function m4Prospettiva(fovy, asp, vicino, lontano){
+  const t = 1 / Math.tan(fovy / 2), o = new Float32Array(16);
+  o[0] = t / asp; o[5] = t; o[10] = (lontano + vicino) / (vicino - lontano); o[11] = -1;
+  o[14] = 2 * lontano * vicino / (vicino - lontano);
+  return o;
+}
+/* la telecamera in `e` che guarda `c`: la matrice e i suoi tre assi */
+function m4Guarda(e, c){
+  let fx = c[0] - e[0], fy = c[1] - e[1], fz = c[2] - e[2];
+  const fl = Math.hypot(fx, fy, fz) || 1; fx /= fl; fy /= fl; fz /= fl;
+  let sx = -fz, sz = fx; const sl = Math.hypot(sx, sz) || 1; sx /= sl; sz /= sl;
+  const ux = -sz * fy, uy = sz * fx - sx * fz, uz = sx * fy;
+  const o = new Float32Array(16);
+  o[0] = sx; o[4] = 0; o[8] = sz; o[12] = -(sx * e[0] + sz * e[2]);
+  o[1] = ux; o[5] = uy; o[9] = uz; o[13] = -(ux * e[0] + uy * e[1] + uz * e[2]);
+  o[2] = -fx; o[6] = -fy; o[10] = -fz; o[14] = fx * e[0] + fy * e[1] + fz * e[2];
+  o[15] = 1;
+  return {m: o, lato: [sx, 0, sz], su: [ux, uy, uz], avanti: [fx, fy, fz]};
+}
+/* sposta, gira (attorno a Y poi a X) e scala */
+function m4Modello(x, y, z, ry, rx, s){
+  const cy = Math.cos(ry || 0), sy = Math.sin(ry || 0), cx = Math.cos(rx || 0), sx = Math.sin(rx || 0), k = s === undefined ? 1 : s;
+  const o = new Float32Array(16);
+  o[0] = cy * k; o[1] = 0; o[2] = -sy * k;
+  o[4] = sy * sx * k; o[5] = cx * k; o[6] = cy * sx * k;
+  o[8] = sy * cx * k; o[9] = -sx * k; o[10] = cy * cx * k;
+  o[12] = x; o[13] = y; o[14] = z; o[15] = 1;
+  return o;
+}
+/* PURA: '#RRGGBB' → [r, g, b] fra 0 e 1; `k` schiarisce (>1) o scurisce */
+function mondoColore(hex, k){
+  const n = parseInt(String(hex).slice(1), 16), q = k === undefined ? 1 : k;
+  return [Math.min(1, (n >> 16 & 255) / 255 * q), Math.min(1, (n >> 8 & 255) / 255 * q), Math.min(1, (n & 255) / 255 * q)];
+}
+function mondoMischia(a, b, t){ return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+/* un numero «a caso» ma sempre lo stesso per lo stesso seme: le assi del
+   pavimento non devono cambiare tinta a ogni ridisegno */
+function mondoCaso(seme){ const v = Math.sin(seme * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); }
+
+/* ---------- le maglie: triangoli a facce piatte ---------- */
+/* un triangolo, con la normale girata sempre via da `centro` */
+function mgTri(m, a, b, c, col, centro){
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+  let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+  const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+  if (centro && nx * (a[0] - centro[0]) + ny * (a[1] - centro[1]) + nz * (a[2] - centro[2]) < 0) {
+    nx = -nx; ny = -ny; nz = -nz; const t = b; b = c; c = t;
+  }
+  for (const p of [a, b, c]) m.push(p[0], p[1], p[2], nx, ny, nz, col[0], col[1], col[2]);
+}
+function mgQuad(m, a, b, c, d, col, centro){ mgTri(m, a, b, c, col, centro); mgTri(m, a, c, d, col, centro); }
+/* una scatola; `sopra` e' la tinta del coperchio (se diversa) */
+function mgScatola(m, x0, y0, z0, x1, y1, z1, col, sopra){
+  const c = [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2];
+  mgQuad(m, [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1], sopra || col, c);
+  mgQuad(m, [x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], col, c);
+  mgQuad(m, [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], col, c);
+  mgQuad(m, [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], col, c);
+  mgQuad(m, [x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], col, c);
+  mgQuad(m, [x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0], col, c);
+}
+/* un tronco di cono dritto (r0 sotto, r1 sopra), col tappo sopra */
+function mgTronco(m, x, y0, z, r0, y1, r1, lati, col, sopra){
+  const c = [x, (y0 + y1) / 2, z];
+  for (let i = 0; i < lati; i++) {
+    const a = i / lati * 6.2832, b = (i + 1) / lati * 6.2832;
+    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+    mgQuad(m, [x + ca * r0, y0, z + sa * r0], [x + cb * r0, y0, z + sb * r0], [x + cb * r1, y1, z + sb * r1], [x + ca * r1, y1, z + sa * r1], col, c);
+    if (r1 > 0.001) mgTri(m, [x, y1, z], [x + ca * r1, y1, z + sa * r1], [x + cb * r1, y1, z + sb * r1], sopra || col, [x, y0, z]);
+  }
+}
+/* una palla a poche facce, schiacciabile */
+function mgPalla(m, x, y, z, rx, ry, rz, col){
+  const F = 4, S = 7, c = [x, y, z];
+  const p = (i, j) => { const a = i / F * 3.1416, b = j / S * 6.2832; return [x + Math.sin(a) * Math.cos(b) * rx, y + Math.cos(a) * ry, z + Math.sin(a) * Math.sin(b) * rz]; };
+  for (let i = 0; i < F; i++) for (let j = 0; j < S; j++) {
+    if (i > 0) mgTri(m, p(i, j), p(i + 1, j), p(i, j + 1), col, c);
+    if (i < F - 1) mgTri(m, p(i, j + 1), p(i + 1, j), p(i + 1, j + 1), col, c);
+  }
+}
+/* LA MAGLIA FERMA DEL MONDO: isole, ponti, cartelli, bottega, la roba
+   della dispensa e i coperchi dei barattoli. Si rifa' solo quando lo
+   stato cambia (un'isola si apre, un barattolo prende il suo metallo). */
+function mondoMagliaFerma(scena){
+  const m = [], LEGNO = mondoColore('#9A7450'), NOTTE = mondoColore('#1A2142');
+  scena.zone.forEach(r => {
+    const tinta = mondoColore(r.tinta), base = r.aperta ? mondoMischia(tinta, LEGNO, 0.22) : mondoMischia(NOTTE, tinta, 0.10);
+    for (let i = 0; i < MONDO_ZONA_L; i++) {          /* le assi */
+      const k = 0.9 + mondoCaso(r.n * 31 + i) * 0.2;
+      const col = [base[0] * k, base[1] * k, base[2] * k];
+      mgQuad(m, [r.x0 + i, 0, r.z0], [r.x0 + i + 0.96, 0, r.z0], [r.x0 + i + 0.96, 0, r.z1], [r.x0 + i, 0, r.z1], col, [r.x0 + i, -5, r.z0]);
+    }
+    const fianco = mondoMischia(base, NOTTE, 0.45), sotto = mondoMischia(base, NOTTE, 0.7);
+    if (r.aperta) {                                    /* il bordo chiaro dell'isola */
+      const orlo = mondoMischia(mondoColore('#F3E3C3'), tinta, 0.25);
+      mgScatola(m, r.x0, 0, r.z0, r.x1, 0.07, r.z0 + 0.3, orlo); mgScatola(m, r.x0, 0, r.z1 - 0.3, r.x1, 0.07, r.z1, orlo);
+      mgScatola(m, r.x0, 0, r.z0, r.x0 + 0.3, 0.07, r.z1, orlo); mgScatola(m, r.x1 - 0.3, 0, r.z0, r.x1, 0.07, r.z1, orlo);
+    }
+    mgScatola(m, r.x0, -0.9, r.z0, r.x1, -0.02, r.z1, fianco, mondoMischia(base, NOTTE, 0.6));
+    mgScatola(m, r.x0 + 1.5, -1.9, r.z0 + 1.5, r.x1 - 1.5, -0.9, r.z1 - 1.5, sotto);
+    mgScatola(m, r.x0 + 4, -3.2, r.z0 + 3.5, r.x1 - 4, -1.9, r.z1 - 3.5, mondoMischia(sotto, NOTTE, 0.4));
+  });
+  scena.ponti.forEach(p => {
+    if (!p.visibile) return;
+    const asse = mondoColore('#B08A5E', p.aperto ? 1 : 0.5), corda = mondoColore('#E8D9B8', p.aperto ? 1 : 0.5);
+    const lungo = p.lungo === 'x' ? p.x1 - p.x0 : p.z1 - p.z0, n = Math.round(lungo / 0.5);
+    for (let i = 0; i < n; i++) {
+      const k = 0.88 + mondoCaso(p.a * 17 + p.b * 5 + i) * 0.24, col = [asse[0] * k, asse[1] * k, asse[2] * k];
+      const a = i * lungo / n + 0.04, b = (i + 1) * lungo / n - 0.04;
+      if (p.lungo === 'x') mgScatola(m, p.x0 + a, -0.16, p.z0 + 0.15, p.x0 + b, -0.02, p.z1 - 0.15, col);
+      else mgScatola(m, p.x0 + 0.15, -0.16, p.z0 + a, p.x1 - 0.15, -0.02, p.z0 + b, col);
+    }
+    for (const lato of [0, 1]) {                       /* i due corrimano */
+      if (p.lungo === 'x') {
+        const z = lato ? p.z1 - 0.12 : p.z0 + 0.12;
+        mgScatola(m, p.x0 - 0.1, 0.62, z - 0.04, p.x1 + 0.1, 0.7, z + 0.04, corda);
+        for (const x of [p.x0 - 0.1, p.x1 + 0.1]) mgScatola(m, x - 0.09, -0.05, z - 0.09, x + 0.09, 0.82, z + 0.09, asse);
+      } else {
+        const x = lato ? p.x1 - 0.12 : p.x0 + 0.12;
+        mgScatola(m, x - 0.04, 0.62, p.z0 - 0.1, x + 0.04, 0.7, p.z1 + 0.1, corda);
+        for (const z of [p.z0 - 0.1, p.z1 + 0.1]) mgScatola(m, x - 0.09, -0.05, z - 0.09, x + 0.09, 0.82, z + 0.09, asse);
+      }
+    }
+    if (!p.aperto) {                                   /* la sbarra, dal lato dell'isola aperta */
+      const ambra = mondoColore('#F7931A'), za = scena.zone[p.a - 1];
+      if (p.lungo === 'x') { const x = za.aperta ? p.x0 + 0.5 : p.x1 - 0.5; mgScatola(m, x - 0.1, 0.5, p.z0, x + 0.1, 0.95, p.z1, ambra); }
+      else { const z = za.aperta ? p.z0 + 0.5 : p.z1 - 0.5; mgScatola(m, p.x0, 0.5, z - 0.1, p.x1, 0.95, z + 0.1, ambra); }
+    }
+  });
+  scena.vasi.forEach(v => {
+    const met = mondoColore(MONDO_METALLI[v.metallo]), tinta = mondoColore(scena.zone[v.zona - 1].tinta, 1.15);
+    /* LA CONSERVA: il barattolo si riempie coi ritrovamenti — un dito
+       sul fondo, poi bronzo, argento, e all'oro e' pieno */
+    const pieno = {'': 0.42, bronzo: 0.95, argento: 1.45, oro: 1.95}[v.metallo];
+    const dentro = v.metallo === 'oro' ? mondoColore('#FFC93C') : v.metallo ? tinta : mondoMischia(tinta, mondoColore('#56607F'), 0.6);
+    mgTronco(m, v.x, 0.1, v.z, 0.88, pieno, 0.88, 12, dentro, [Math.min(1, dentro[0] * 1.25), Math.min(1, dentro[1] * 1.25), Math.min(1, dentro[2] * 1.25)]);
+    mgTronco(m, v.x, 0, v.z, 1.04, 0.1, 1.04, 14, mondoColore('#C9D6EE'));                               /* il fondo di vetro spesso */
+    mgTronco(m, v.x, 2.42, v.z, 0.92, 2.72, 0.92, 14, met, [Math.min(1, met[0] * 1.15), Math.min(1, met[1] * 1.15), Math.min(1, met[2] * 1.15)]);
+    mgTronco(m, v.x, 2.72, v.z, 0.2, 2.9, 0.14, 8, met);
+    mgScatola(m, v.x - 0.6, 0.62, v.z + 0.97, v.x + 0.6, 1.72, v.z + 1.03, [1.5, 1.42, 1.28]);     /* il cartellino */
+  });
+  scena.luoghi.forEach(l => {
+    if (l.tipo === 'cartello') {
+      const legno = mondoColore('#8B6642'), tavola = mondoColore('#D9B98A');
+      mgScatola(m, l.x - 0.09, 0, l.z - 0.09, l.x + 0.09, 1.9, l.z + 0.09, legno);
+      mgScatola(m, l.x - 0.95, 1.15, l.z - 0.07, l.x + 0.95, 1.95, l.z + 0.07, tavola, mondoColore('#EBD3AC'));
+    } else if (l.tipo === 'bottega') {
+      const legno = mondoColore('#8B6642'), banco = mondoColore('#C79A63');
+      mgScatola(m, l.x - 1.3, 0, l.z - 0.6, l.x + 1.3, 0.95, l.z + 0.6, banco, mondoColore('#E3BE8A'));
+      for (const [dx, dz] of [[-1.3, -0.6], [1.3, -0.6], [-1.3, 0.6], [1.3, 0.6]])
+        mgScatola(m, l.x + dx - 0.07, 0.95, l.z + dz - 0.07, l.x + dx + 0.07, 2.35, l.z + dz + 0.07, legno);
+      for (let i = 0; i < 6; i++) {                    /* la tenda a strisce */
+        const x = l.x - 1.5 + i * 0.5, col = i % 2 ? mondoColore('#FFF3DC') : mondoColore('#F7931A');
+        mgQuad(m, [x, 2.75, l.z - 0.75], [x + 0.5, 2.75, l.z - 0.75], [x + 0.5, 2.3, l.z + 0.95], [x, 2.3, l.z + 0.95], col, [x, -5, l.z]);
+        mgQuad(m, [x, 2.3, l.z + 0.95], [x + 0.5, 2.3, l.z + 0.95], [x + 0.5, 2.08, l.z + 0.95], [x, 2.08, l.z + 0.95], col, [x, 2, l.z - 5]);
+      }
+    } else if (l.tipo === 'cambio') {                  /* l'edicola tonda del cambio, col tetto d'oro */
+      const blu = mondoColore('#2C4F8F'), legno = mondoColore('#8B6642');
+      mgTronco(m, l.x, 0, l.z, 1.15, 1.0, 1.15, 12, blu, mondoColore('#4C78C4'));
+      for (let i = 0; i < 4; i++) { const a = i / 4 * 6.2832 + 0.785, x = l.x + Math.cos(a) * 1.0, z = l.z + Math.sin(a) * 1.0; mgScatola(m, x - 0.06, 1.0, z - 0.06, x + 0.06, 2.3, z + 0.06, legno); }
+      mgTronco(m, l.x, 2.3, l.z, 1.55, 3.15, 0.12, 12, mondoColore('#F7B733'), mondoColore('#FFE08A'));
+    }
+  });
+  scena.roba.forEach(o => {
+    if (o.cosa === 'cassa') {
+      const c = mondoColore('#B5895A');
+      mgScatola(m, o.x - 0.62, 0, o.z - 0.62, o.x + 0.62, 1.0, o.z + 0.62, c, mondoColore('#D4A873'));
+      mgScatola(m, o.x - 0.2, 1.0, o.z - 0.35, o.x + 0.5, 1.6, o.z + 0.35, mondoColore('#A67C52'), mondoColore('#C89A66'));
+    } else if (o.cosa === 'sacco') {
+      mgPalla(m, o.x, 0.55, o.z, 0.72, 0.62, 0.66, mondoColore('#D9C7A0'));
+      mgTronco(m, o.x, 1.08, o.z, 0.16, 1.34, 0.26, 7, mondoColore('#C4AF85'));
+    } else if (o.cosa === 'basilico') {
+      mgTronco(m, o.x, 0, o.z, 0.42, 0.62, 0.56, 9, mondoColore('#C2643C'), mondoColore('#5A3B26'));
+      mgPalla(m, o.x - 0.2, 1.0, o.z + 0.05, 0.42, 0.4, 0.42, mondoColore('#4FAE5B'));
+      mgPalla(m, o.x + 0.25, 1.12, o.z - 0.1, 0.4, 0.42, 0.4, mondoColore('#3F9A4E'));
+      mgPalla(m, o.x + 0.02, 1.42, o.z + 0.08, 0.34, 0.36, 0.34, mondoColore('#62C06C'));
+    } else {
+      for (const [dx, dz, h, col] of [[-0.3, 0, 1.0, '#3E8F5A'], [0.28, -0.2, 0.8, '#C98A2B'], [0.15, 0.36, 0.9, '#7FB8D6']]) {
+        const c = mondoColore(col);
+        mgTronco(m, o.x + dx, 0, o.z + dz, 0.24, h, 0.24, 9, c);
+        mgTronco(m, o.x + dx, h, o.z + dz, 0.24, h + 0.18, 0.09, 9, c);
+        mgTronco(m, o.x + dx, h + 0.18, o.z + dz, 0.09, h + 0.48, 0.09, 9, c, mondoColore('#F1E3C4'));
+      }
+    }
+  });
+  return new Float32Array(m);
+}
+/* il vetro di un barattolo (attorno all'origine) e il suo riflesso */
+function mondoMagliaVetro(){
+  const m = [], c = [0.78, 0.92, 1];
+  mgTronco(m, 0, 0.1, 0, 1.0, 1.95, 1.0, 14, c);
+  mgTronco(m, 0, 1.95, 0, 1.0, 2.28, 0.84, 14, c);
+  mgTronco(m, 0, 2.28, 0, 0.84, 2.42, 0.84, 14, c);
+  return new Float32Array(m);
+}
+/* il bullone: un dado esagonale d'oro, in piedi sul taglio */
+function mondoMagliaBullone(){
+  const m = [], oro = mondoColore('#FFC93C'), chiaro = mondoColore('#FFE9A0');
+  mgTronco(m, 0, -0.1, 0, 0.36, 0.1, 0.36, 6, oro, chiaro);
+  for (let i = 0; i < 6; i++) {                        /* la faccia sotto */
+    const a = i / 6 * 6.2832, b = (i + 1) / 6 * 6.2832;
+    mgTri(m, [0, -0.1, 0], [Math.cos(a) * 0.36, -0.1, Math.sin(a) * 0.36], [Math.cos(b) * 0.36, -0.1, Math.sin(b) * 0.36], chiaro, [0, 0.1, 0]);
+  }
+  mgTronco(m, 0, 0.1, 0, 0.15, 0.13, 0.15, 8, mondoColore('#B8860B'));
+  return new Float32Array(m);
+}
+
+/* ---------- le figure: emoji, ombre, luci e scritte su una tela ---------- */
+const MONDO_CASELLA = 128;
+/* l'atlante: ogni emoji in una casella, piu' quattro figure disegnate
+   (l'ombra, l'alone, l'anello della meta, il granello) */
+function mondoAtlante(emoji){
+  const c = document.createElement('canvas'); c.width = c.height = 1024;
+  const g = c.getContext('2d'), dove = {}, Q = MONDO_CASELLA;
+  const casella = i => [i % 8 * Q, Math.floor(i / 8) * Q];
+  const sfuma = (i, da, a) => {
+    const [x, y] = casella(i), r = g.createRadialGradient(x + Q / 2, y + Q / 2, 0, x + Q / 2, y + Q / 2, Q / 2);
+    r.addColorStop(0, da); r.addColorStop(1, a); g.fillStyle = r; g.fillRect(x, y, Q, Q);
+  };
+  sfuma(0, 'rgba(0,0,0,.55)', 'rgba(0,0,0,0)'); dove.ombra = 0;
+  sfuma(1, 'rgba(255,255,255,.95)', 'rgba(255,255,255,0)'); dove.alone = 1;
+  { const [x, y] = casella(2); g.strokeStyle = '#fff'; g.lineWidth = 9; g.beginPath(); g.arc(x + Q / 2, y + Q / 2, Q / 2 - 12, 0, 6.2832); g.stroke(); dove.anello = 2; }
+  { const [x, y] = casella(3), r = g.createRadialGradient(x + Q / 2, y + Q / 2, 0, x + Q / 2, y + Q / 2, Q / 4);
+    r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(x, y, Q, Q); dove.granello = 3; }
+  g.font = '92px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff';
+  let i = 4;
+  for (const e of emoji) {
+    if (!e || dove[e] !== undefined || i >= 64) continue;
+    const [x, y] = casella(i);
+    g.fillText(e, x + Q / 2, y + Q / 2 + 6, Q - 8);
+    dove[e] = i++;
+  }
+  return {tela: c, dove};
+}
+/* PURA: i quattro numeri della casella i nell'atlante (u0, v0, u1, v1),
+   con l'immagine caricata a testa in su */
+function mondoUV(i){
+  const q = MONDO_CASELLA / 1024, x = i % 8, y = Math.floor(i / 8);
+  return [x * q, 1 - (y + 1) * q, (x + 1) * q, 1 - y * q];
+}
+/* le scritte: una riga a testa, due colonne */
+function mondoScritte(testi){
+  const c = document.createElement('canvas'); c.width = c.height = 1024;
+  const g = c.getContext('2d'), dove = {};
+  g.font = '800 34px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  let i = 0;
+  for (const t of testi) {
+    if (!t || dove[t] || i >= 32) continue;
+    const x = i % 2 * 512, y = Math.floor(i / 2) * 64;
+    g.lineWidth = 8; g.strokeStyle = 'rgba(8,12,28,.92)'; g.strokeText(t, x + 256, y + 33, 496);
+    g.fillStyle = '#FFF6E3'; g.fillText(t, x + 256, y + 33, 496);
+    dove[t] = [x / 1024, 1 - (y + 64) / 1024, (x + 512) / 1024, 1 - y / 1024];
+    i++;
+  }
+  return {tela: c, dove};
+}
+
+/* ---------- WebGL: due programmi, e basta ---------- */
+const MONDO_VS_MAGLIA = 'attribute vec3 aP;attribute vec3 aN;attribute vec3 aC;uniform mat4 uVP;uniform mat4 uM;uniform vec3 uLuce;uniform vec4 uTinta;uniform vec2 uNebbia;varying vec3 vC;varying float vN;'
+  + 'void main(){vec4 w=uM*vec4(aP,1.0);vec3 n=normalize((uM*vec4(aN,0.0)).xyz);float d=max(dot(n,uLuce),0.0);'
+  + 'vec3 luce=vec3(0.44,0.47,0.62)*(0.72+0.28*n.y)+vec3(1.0,0.93,0.80)*d*0.80;'
+  + 'vC=aC*uTinta.rgb*mix(luce,vec3(1.0),uTinta.a);gl_Position=uVP*w;'
+  + 'vN=clamp((gl_Position.w-uNebbia.x)/(uNebbia.y-uNebbia.x),0.0,1.0);}';
+const MONDO_FS_MAGLIA = 'precision mediump float;uniform vec3 uCielo;uniform float uAlfa;varying vec3 vC;varying float vN;'
+  + 'void main(){vec3 c=mix(vC,uCielo,vN*vN);gl_FragColor=vec4(c*uAlfa,uAlfa);}';
+const MONDO_VS_FIGURA = 'attribute vec2 aQ;uniform mat4 uVP;uniform vec3 uCentro;uniform vec3 uDx;uniform vec3 uDy;uniform vec4 uUV;uniform vec2 uNebbia;varying vec2 vT;varying float vN;'
+  + 'void main(){vec3 w=uCentro+uDx*aQ.x+uDy*aQ.y;gl_Position=uVP*vec4(w,1.0);'
+  + 'vT=vec2(mix(uUV.x,uUV.z,aQ.x+0.5),mix(uUV.y,uUV.w,aQ.y));'
+  + 'vN=clamp((gl_Position.w-uNebbia.x)/(uNebbia.y-uNebbia.x),0.0,1.0);}';
+const MONDO_FS_FIGURA = 'precision mediump float;uniform sampler2D uT;uniform vec4 uCol;uniform vec3 uCielo;uniform float uNeb;varying vec2 vT;varying float vN;'
+  + 'void main(){vec4 t=texture2D(uT,vT)*uCol;float n=vN*vN*uNeb;gl_FragColor=vec4(mix(t.rgb,uCielo*t.a,n),t.a);}';
+let mondo = null;                 /* tutto quel che il mondo tiene in mano, o null finche' non nasce */
+let mondoPosto = null;            /* dov'era Tappo l'ultima volta: lo ritrova li' */
+/* C'e' WebGL? Si chiede UNA volta, su una tela buttata via */
+let mondoSiPuo = null;
+function mondoPossibile(){
+  if (mondoSiPuo === null) {
+    try { const c = document.createElement('canvas'); mondoSiPuo = !!(window.WebGLRenderingContext && c.getContext('webgl')); }
+    catch(e) { mondoSiPuo = false; }
+  }
+  return mondoSiPuo;
+}
+function mondoProgramma(gl, vs, fs){
+  const fai = (tipo, testo) => { const s = gl.createShader(tipo); gl.shaderSource(s, testo); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) || 'shader'); return s; };
+  const p = gl.createProgram();
+  gl.attachShader(p, fai(gl.VERTEX_SHADER, vs)); gl.attachShader(p, fai(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) || 'programma');
+  const u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const nome = gl.getActiveUniform(p, i).name; u[nome] = gl.getUniformLocation(p, nome); }
+  return {p, u};
+}
+function mondoTrama(gl, sorgente, vecchia){
+  const t = vecchia || gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sorgente);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+function mondoSerbatoio(gl, dati, vecchio){
+  const b = vecchio || gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, dati, gl.STATIC_DRAW);
+  return b;
+}
+/* Fa nascere il mondo sulla tela: programmi, maglie fisse, Tappo. Torna
+   false se WebGL non c'e' o non vuole saperne. */
+function mondoNasci(){
+  const tela = el('cacciaTela');
+  if (!tela || !mondoPossibile()) return false;
+  if (mondo && mondo.tela === tela && !mondo.perso) return true;
+  let gl = null;
+  try { gl = tela.getContext('webgl', {antialias: true, alpha: false, powerPreference: 'low-power'}); } catch(e) {}
+  if (!gl) { mondoSiPuo = false; return false; }
+  try {
+    const maglia = mondoProgramma(gl, MONDO_VS_MAGLIA, MONDO_FS_MAGLIA), figura = mondoProgramma(gl, MONDO_VS_FIGURA, MONDO_FS_FIGURA);
+    const vetro = mondoMagliaVetro(), bullone = mondoMagliaBullone();
+    mondo = {tela, gl, maglia, figura, perso: false, giro: 0, prima: 0, tempo: 0,
+      ferma: null, fermaN: 0, vetro: mondoSerbatoio(gl, vetro), vetroN: vetro.length / 9,
+      bullone: mondoSerbatoio(gl, bullone), bulloneN: bullone.length / 9,
+      quadro: mondoSerbatoio(gl, new Float32Array([-0.5, 0, 0.5, 0, -0.5, 1, 0.5, 1])),
+      atlante: null, dove: {}, scritte: null, scritto: {}, tappo: null, tappoPronto: false,
+      scena: null, firma: '', x: 0, z: 0, verso: 1, fase: 0, salto: 0, cammina: 0,
+      meta: null, guida: null, tasti: {}, dito: null, cam: null, vicino: null, zona: -1,
+      polvere: [], scoppi: [], presi: {}, mappina: 0, visto: false};
+    const img = new Image();
+    img.onload = () => {
+      if (!mondo || mondo.gl !== gl) return;
+      const c = document.createElement('canvas'); c.width = c.height = 512;
+      c.getContext('2d').drawImage(img, 0, 0, 512, 512);
+      mondo.tappo = mondoTrama(gl, c); mondo.tappoPronto = true;
+    };
+    img.src = '/assets/caccia-tappo.webp';
+    tela.addEventListener('webglcontextlost', e => { e.preventDefault(); if (mondo) mondo.perso = true; });
+    tela.addEventListener('webglcontextrestored', () => { mondo = null; mondoAccendi(); });
+    mondoComandi(tela);
+  } catch(e) { mondo = null; mondoSiPuo = false; return false; }
+  return true;
+}
+/* Lo stato e' cambiato (o il mondo e' appena nato): scena, maglia ferma e
+   figure nuove. La `firma` evita di rifare tutto a ogni risposta uguale. */
+function mondoAdotta(){
+  if (!mondo || !cacciaStato) return;
+  const s = cacciaStato, gl = mondo.gl, scena = mondoScena(s);
+  const cappello = cappelloCaccia(s);
+  const firma = JSON.stringify([scena.zone.map(z => [z.aperta, z.mancano]), scena.vasi.map(v => v.metallo), cappello, s.giorno]);
+  if (mondo.giorno !== s.giorno) { mondo.giorno = s.giorno; mondo.presi = {}; }
+  mondo.scena = scena;
+  scena.pezzi.forEach(p => { if (mondo.presi[p.n]) p.preso = true; });
+  if (firma !== mondo.firma) {
+    mondo.firma = firma;
+    const ferma = mondoMagliaFerma(scena);
+    mondo.ferma = mondoSerbatoio(gl, ferma, mondo.ferma); mondo.fermaN = ferma.length / 9;
+    const emoji = scena.vasi.map(v => EMOJI_CAT[v.categoria] || '🫙').concat(scena.zone.map(z => z.emoji), ['🔒', '🛍️', '🔩', '💱', cappello]);
+    const a = mondoAtlante(emoji);
+    mondo.atlante = mondoTrama(gl, a.tela, mondo.atlante); mondo.dove = a.dove;
+    const sc = mondoScritte(scena.vasi.map(v => v.categoria).concat(scena.zone.map(z => z.nome), ['Bottega', 'Banco del cambio']));
+    mondo.scritte = mondoTrama(gl, sc.tela, mondo.scritte); mondo.scritto = sc.dove;
+  }
+  if (!mondoTerra(scena, mondo.x, mondo.z)) {          /* la prima volta, o un'isola sparita sotto i piedi */
+    const r = scena.zone[0], p = mondoPosto && mondoTerra(scena, mondoPosto[0], mondoPosto[1]) ? mondoPosto : [r.x0 + 8, r.z0 + 6.3];
+    mondo.x = p[0]; mondo.z = p[1]; mondo.meta = null; mondo.cam = null;
+  }
+  mondoCruscotto(true);
+}
+/* I COMANDI: il dito (un tocco = «vai li'», trascinato = lo guidi) e la
+   tastiera (frecce o WASD), solo mentre il mondo e' davanti */
+function mondoComandi(tela){
+  const punto = e => { const r = tela.getBoundingClientRect(); return [(e.clientX - r.left) / (r.width || 1), (e.clientY - r.top) / (r.height || 1)]; };
+  tela.addEventListener('pointerdown', e => {
+    if (!mondo) return;
+    const [u, v] = punto(e);
+    mondo.dito = {id: e.pointerId, u0: u, v0: v, u, v, x0: e.clientX, y0: e.clientY, mosso: false};
+    try { tela.setPointerCapture(e.pointerId); } catch(_) {}
+    e.preventDefault();
+  });
+  tela.addEventListener('pointermove', e => {
+    const d = mondo && mondo.dito;
+    if (!d || d.id !== e.pointerId) return;
+    const dx = e.clientX - d.x0, dy = e.clientY - d.y0, l = Math.hypot(dx, dy);
+    if (l > 12) d.mosso = true;
+    if (d.mosso) {
+      const k = Math.min(1, l / 64) / (l || 1);
+      mondo.guida = [dx * k, dy * k]; mondo.meta = null;
+      mondoLeva(d.x0, d.y0, dx, dy);
+    }
+  });
+  const su = e => {
+    const d = mondo && mondo.dito;
+    if (!d || d.id !== e.pointerId) return;
+    mondo.dito = null; mondo.guida = null; mondoLeva();
+    if (!d.mosso && e.type === 'pointerup') {
+      const p = mondoSottoIlDito(d.u0, d.v0);
+      if (p) { mondo.meta = p; mondo.metaNata = mondo.tempo; }
+    }
+    mondoVisto();
+  };
+  tela.addEventListener('pointerup', su);
+  tela.addEventListener('pointercancel', su);
+  const tasto = (e, giu) => {
+    if (!mondo || !mondoDavanti()) return;
+    const dove = e.target && e.target.tagName;
+    if (dove === 'INPUT' || dove === 'TEXTAREA' || dove === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = {ArrowUp: 'su', KeyW: 'su', ArrowDown: 'giu', KeyS: 'giu', ArrowLeft: 'sx', KeyA: 'sx', ArrowRight: 'dx', KeyD: 'dx'}[e.code];
+    if (!k) {
+      if (giu && (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyE') && mondo.vicino) { e.preventDefault(); mondoFai(); }
+      return;
+    }
+    e.preventDefault();
+    mondo.tasti[k] = giu;
+    if (giu) { mondo.meta = null; mondoVisto(); }
+  };
+  if (!mondoComandi.fatto) {
+    mondoComandi.fatto = true;
+    window.addEventListener('keydown', e => tasto(e, true));
+    window.addEventListener('keyup', e => tasto(e, false));
+    window.addEventListener('blur', () => { if (mondo) mondo.tasti = {}; });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) mondoAccendi(); });
+  }
+}
+/* la levetta sotto il dito, mentre lo si guida */
+function mondoLeva(x0, y0, dx, dy){
+  const l = el('cacciaLeva');
+  if (!l) return;
+  if (x0 === undefined) { l.style.display = 'none'; return; }
+  const r = el('cacciaTelaBox').getBoundingClientRect(), k = Math.min(1, 34 / (Math.hypot(dx, dy) || 1));
+  l.style.display = 'block';
+  l.style.left = (x0 - r.left) + 'px'; l.style.top = (y0 - r.top) + 'px';
+  l.firstElementChild.style.transform = 'translate(' + (dx * k) + 'px,' + (dy * k) + 'px)';
+}
+/* la guida della prima volta sparisce al primo gesto */
+function mondoVisto(){
+  if (!mondo || mondo.visto) return;
+  mondo.visto = true;
+  const g = el('cacciaGuida'); if (g) g.style.display = 'none';
+  try { localStorage.setItem('caccia_mondo_visto', '1'); } catch(e) {}
+}
+/* il punto del pavimento sotto il dito (u, v fra 0 e 1), o null */
+function mondoSottoIlDito(u, v){
+  const c = mondo && mondo.cam;
+  if (!c) return null;
+  const t = Math.tan(c.fovy / 2), nx = (u * 2 - 1) * t * c.asp, ny = (1 - v * 2) * t;
+  const d = [c.avanti[0] + c.lato[0] * nx + c.su[0] * ny, c.avanti[1] + c.lato[1] * nx + c.su[1] * ny, c.avanti[2] + c.lato[2] * nx + c.su[2] * ny];
+  if (d[1] > -0.02) return null;
+  const k = -c.occhio[1] / d[1];
+  return [c.occhio[0] + d[0] * k, c.occhio[2] + d[2] * k];
+}
+/* Il mondo e' davanti agli occhi? Sennò il giro si ferma da solo */
+function mondoDavanti(){
+  const v = el('view-caccia');
+  return !!(mondo && !mondo.perso && v && v.classList.contains('active') && cacciaUi.scheda === 'mondo' && !document.hidden);
+}
+/* Accende il giro (se serve): lo chiamano la scheda, lo stato nuovo, il
+   ritorno alla pagina */
+function mondoAccendi(){
+  if (cacciaUi.scheda !== 'mondo' || !cacciaStato) return;
+  if (!mondoNasci()) return;
+  mondoAdotta();
+  if (!mondo.visto) {
+    let visto = false; try { visto = localStorage.getItem('caccia_mondo_visto') === '1'; } catch(e) {}
+    const g = el('cacciaGuida'); if (g) g.style.display = visto ? 'none' : '';
+    mondo.visto = visto;
+  }
+  if (!mondo.giro && mondoDavanti()) { mondo.prima = 0; mondo.giro = requestAnimationFrame(mondoGiro); }
+}
+function mondoGiro(adesso){
+  if (!mondo) return;
+  mondo.giro = 0;
+  if (!mondoDavanti() || !mondo.scena) { mondo.tasti = {}; return; }
+  const dt = Math.min(0.05, mondo.prima ? (adesso - mondo.prima) / 1000 : 0.016);
+  mondo.prima = adesso; mondo.tempo += dt;
+  mondoPassa(dt);
+  mondoDisegna();
+  mondo.giro = requestAnimationFrame(mondoGiro);
+}
+/* UN PASSO DEL TEMPO: Tappo si muove, raccoglie, si avvicina alle cose */
+function mondoPassa(dt){
+  const m = mondo, scena = m.scena, fermo = effettiRidotti();
+  m.dt = dt;
+  let vx = 0, vz = 0;
+  const t = m.tasti;
+  if (t.su || t.giu || t.sx || t.dx) { vx = (t.dx ? 1 : 0) - (t.sx ? 1 : 0); vz = (t.giu ? 1 : 0) - (t.su ? 1 : 0); const l = Math.hypot(vx, vz) || 1; vx /= l; vz /= l; }
+  else if (m.guida) { vx = m.guida[0]; vz = m.guida[1]; }
+  else if (m.meta) {
+    const dx = m.meta[0] - m.x, dz = m.meta[1] - m.z, l = Math.hypot(dx, dz);
+    if (l < 0.14) m.meta = null; else { const k = Math.min(1, l / 0.6); vx = dx / l * k; vz = dz / l * k; }
+  }
+  const px = m.x, pz = m.z;
+  if (vx || vz) { const p = mondoMuovi(scena, m.x, m.z, vx * MONDO_PASSO * dt, vz * MONDO_PASSO * dt); m.x = p[0]; m.z = p[1]; }
+  const fatto = Math.hypot(m.x - px, m.z - pz);
+  if (m.meta && (vx || vz) && fatto < MONDO_PASSO * dt * 0.08) { m.blocco = (m.blocco || 0) + dt; if (m.blocco > 0.35) m.meta = null; } else m.blocco = 0;
+  const va = fatto > MONDO_PASSO * dt * 0.2;
+  m.cammina += ((va ? 1 : 0) - m.cammina) * Math.min(1, dt * 10);
+  if (va) { m.fase += dt * 11; if (Math.abs(vx) > 0.2) m.verso = vx > 0 ? 1 : -1; mondoPosto = [m.x, m.z]; }
+  m.salto = fermo ? 0 : Math.abs(Math.sin(m.fase)) * 0.16 * m.cammina;
+  if (va && !fermo) {
+    m.sbuffo = (m.sbuffo || 0) + dt;
+    if (m.sbuffo > 0.11) { m.sbuffo = 0; m.polvere.push({x: m.x - vx * 0.25 + (mondoCaso(m.fase) - 0.5) * 0.3, y: 0.08, z: m.z - vz * 0.25 + 0.1, vita: 0.5}); }
+  }
+  m.polvere = m.polvere.filter(p => (p.vita -= dt) > 0);
+  m.scoppi = m.scoppi.filter(p => (p.vita -= dt) > 0);
+  for (const p of scena.pezzi) {
+    if (p.preso || Math.hypot(p.x - m.x, p.z - m.z) > 0.95) continue;
+    p.preso = true; m.presi[p.n] = true;
+    if (!fermo) for (let i = 0; i < 9; i++) m.scoppi.push({x: p.x, y: 0.7, z: p.z, a: i / 9 * 6.2832, vita: 0.6});
+    mondoRaccogli(p.n);
+  }
+  const vicino = mondoVicino(scena, m.x, m.z), zona = mondoZonaDi(scena, m.x, m.z);
+  if (vicino !== m.vicino || (zona && zona !== m.zona)) { m.vicino = vicino; if (zona) m.zona = zona; mondoCruscotto(); }
+  m.mappina += dt;
+  if (m.mappina > 0.15) { m.mappina = 0; mondoMappina(); }
+}
+/* Un bullone raccolto: il server lo conferma e ridice il saldo */
+async function mondoRaccogli(n){
+  haptic('success');
+  try {
+    const d = await cacciaChiama('/raccogli', {pezzo: n});
+    if (d) { cacciaAdotta(d); mondoAdotta(); cacciaSaldoMostra(); if (d.preso) toast('+1 🔩'); }
+  } catch(e) { toast('Rete assente: il bullone ti aspetta'); if (mondo) { delete mondo.presi[n]; mondoAdotta(); } }
+}
+/* IL CRUSCOTTO sopra la tela: l'isola dove si e', i bulloni di oggi, il
+   tasto del luogo vicino. Solo testo (textContent): niente di quel che
+   arriva dal server diventa HTML. */
+function mondoCruscotto(tutto){
+  const m = mondo, s = cacciaStato;
+  if (!m || !m.scena || !s) return;
+  const z = m.scena.zone[(m.zona > 0 ? m.zona : mondoZonaDi(m.scena, m.x, m.z) || 1) - 1];
+  const nome = el('cacciaZonaNome'); if (nome && z) nome.textContent = (z.emoji ? z.emoji + ' ' : '') + z.nome;
+  const pz = el('cacciaPezzi'), mm = s.mondo || {};
+  if (pz) pz.textContent = '🔩 ' + (m.scena.pezzi.filter(p => p.preso).length) + '/' + (Number(mm.pezzi_totale) || 0) + ' oggi';
+  const b = el('cacciaAzione'), az = mondoAzione(m.vicino, s);
+  if (b) {
+    b.style.display = az ? '' : 'none';
+    if (az) { b.textContent = az[0]; b.disabled = !az[1]; b.dataset.gesto = az[1]; }
+  }
+  if (tutto) mondoMappina();
+}
+/* Il tasto in basso: cosa si fa nel luogo dove si e' */
+function mondoFai(){
+  const l = mondo && mondo.vicino, az = mondoAzione(l, cacciaStato);
+  if (!l || !az || !az[1]) return;
+  haptic();
+  if (az[1] === 'vaso') {
+    const c = l.vaso.categoria;
+    go('esplora');
+    if (CATS.includes(c) && c !== 'Tutto') apriCategoria(c);
+  } else if (az[1] === 'bottega') cacciaVai('bottega');
+  else if (az[1] === 'cambio') go('p2p');
+  else if (az[1] === 'parti') { cacciaUi.scaffale = l.zona; cacciaVai('caccia'); }
+  else cacciaVai('caccia');
+}
+/* LA MAPPINA in alto a destra: le sei isole, i ponti, i bulloni, Tappo */
+function mondoMappina(){
+  const c = el('cacciaMappina'), m = mondo;
+  if (!c || !m || !m.scena) return;
+  const g = c.getContext('2d'), L = c.width, A = c.height;
+  const X0 = -(MONDO_VUOTO / 2) - MONDO_ZONA_L - 1, X1 = -X0, Z1 = 3 * MONDO_ZONA_P + 2 * MONDO_VUOTO + 1, Z0 = -1;
+  const px = x => (x - X0) / (X1 - X0) * L, pz = z => (z - Z0) / (Z1 - Z0) * A;
+  g.clearRect(0, 0, L, A);
+  m.scena.ponti.forEach(p => {
+    if (!p.visibile) return;
+    g.fillStyle = p.aperto ? 'rgba(232,217,184,.85)' : 'rgba(232,217,184,.25)';
+    g.fillRect(px(p.x0), pz(p.z0), px(p.x1) - px(p.x0), pz(p.z1) - pz(p.z0));
+  });
+  m.scena.zone.forEach(r => {
+    g.fillStyle = r.aperta ? r.tinta : 'rgba(255,255,255,.10)';
+    g.fillRect(px(r.x0), pz(r.z0), px(r.x1) - px(r.x0), pz(r.z1) - pz(r.z0));
+  });
+  g.fillStyle = '#FFD86B';
+  m.scena.pezzi.forEach(p => { if (!p.preso) { g.beginPath(); g.arc(px(p.x), pz(p.z), L / 34, 0, 6.2832); g.fill(); } });
+  g.fillStyle = '#fff'; g.strokeStyle = '#0A0F1F'; g.lineWidth = L / 40;
+  g.beginPath(); g.arc(px(m.x), pz(m.z), L / 18, 0, 6.2832); g.fill(); g.stroke();
+}
+function cacciaSaldoMostra(){
+  const saldo = el('cacciaSaldo');
+  if (!saldo || !cacciaStato) return;
+  const nuovo = '🔩 ' + fmt(Number(cacciaStato.saldo) || 0);
+  if (saldo.textContent !== nuovo) {
+    saldo.textContent = nuovo;
+    saldo.classList.remove('su'); void saldo.offsetWidth; saldo.classList.add('su');
+  }
+}
+
+/* ---------- IL DISEGNO di un fotogramma ---------- */
+function mondoDisegna(){
+  const m = mondo, gl = m.gl, tela = m.tela, scena = m.scena, fermo = effettiRidotti();
+  const dpr = Math.min(fermo ? 1 : 2, window.devicePixelRatio || 1);
+  const L = Math.max(2, Math.round(tela.clientWidth * dpr)), A = Math.max(2, Math.round(tela.clientHeight * dpr));
+  if (tela.width !== L || tela.height !== A) { tela.width = L; tela.height = A; }
+  gl.viewport(0, 0, L, A);
+  /* LA TELECAMERA segue Tappo da dietro e dall'alto, senza girare mai:
+     su = nord. Sul telefono in piedi guarda piu' largo e da piu' lontano. */
+  const asp = L / A, stretto = asp < 0.9;
+  const fovy = stretto ? 0.98 : 0.74, dist = stretto ? 14.6 : 16.5, piega = stretto ? 0.72 : 0.64;
+  const mira = [m.x, 1.0, m.z - (stretto ? 1.5 : 0.7)];
+  if (!m.cam) m.cam = {mx: mira[0], mz: mira[2]};
+  const k = fermo ? 1 : Math.min(1, (m.dt || 0.016) * 7);
+  m.cam.mx += (mira[0] - m.cam.mx) * k; m.cam.mz += (mira[2] - m.cam.mz) * k;
+  const centro = [m.cam.mx, 1.0, m.cam.mz];
+  const occhio = [centro[0], centro[1] + Math.sin(piega) * dist, centro[2] + Math.cos(piega) * dist];
+  const vista = m4Guarda(occhio, centro);
+  const VP = m4Per(m4Prospettiva(fovy, asp, 0.5, 140), vista.m);
+  Object.assign(m.cam, {fovy, asp, occhio, lato: vista.lato, su: vista.su, avanti: vista.avanti});
+  const CIELO = [0.055, 0.075, 0.16], nebbia = [dist + 9, dist + 46];
+  gl.clearColor(CIELO[0], CIELO[1], CIELO[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
+
+  /* --- le maglie piene --- */
+  const pm = m.maglia;
+  gl.useProgram(pm.p);
+  gl.uniformMatrix4fv(pm.u.uVP, false, VP);
+  gl.uniform3f(pm.u.uLuce, 0.42, 0.82, 0.39);
+  gl.uniform3f(pm.u.uCielo, CIELO[0], CIELO[1], CIELO[2]);
+  gl.uniform2f(pm.u.uNebbia, nebbia[0], nebbia[1]);
+  const UNO = m4Modello(0, 0, 0, 0, 0, 1);
+  const maglia = (serbatoio, quanti, M, tinta, alfa) => {
+    gl.bindBuffer(gl.ARRAY_BUFFER, serbatoio);
+    const aP = gl.getAttribLocation(pm.p, 'aP'), aN = gl.getAttribLocation(pm.p, 'aN'), aC = gl.getAttribLocation(pm.p, 'aC');
+    gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP, 3, gl.FLOAT, false, 36, 0);
+    gl.enableVertexAttribArray(aN); gl.vertexAttribPointer(aN, 3, gl.FLOAT, false, 36, 12);
+    gl.enableVertexAttribArray(aC); gl.vertexAttribPointer(aC, 3, gl.FLOAT, false, 36, 24);
+    gl.uniformMatrix4fv(pm.u.uM, false, M);
+    gl.uniform4f(pm.u.uTinta, tinta[0], tinta[1], tinta[2], tinta[3]);
+    gl.uniform1f(pm.u.uAlfa, alfa);
+    gl.drawArrays(gl.TRIANGLES, 0, quanti);
+  };
+  if (m.ferma) maglia(m.ferma, m.fermaN, UNO, [1, 1, 1, 0], 1);
+  scena.pezzi.forEach(p => {
+    if (p.preso) return;
+    const su = fermo ? 0.75 : 0.75 + Math.sin(m.tempo * 2.4 + p.n) * 0.12;
+    maglia(m.bullone, m.bulloneN, m4Modello(p.x, su, p.z, fermo ? 0.6 : m.tempo * 2.2 + p.n, 1.5708, 1), [1, 1, 1, 0.55], 1);
+  });
+
+  /* --- le figure: tutto quel che e' trasparente, dal fondo in avanti --- */
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+  const pf = m.figura;
+  const figuraPronta = () => {
+    gl.useProgram(pf.p);
+    gl.uniformMatrix4fv(pf.u.uVP, false, VP);
+    gl.uniform3f(pf.u.uCielo, CIELO[0], CIELO[1], CIELO[2]);
+    gl.uniform2f(pf.u.uNebbia, nebbia[0], nebbia[1]);
+    gl.uniform1i(pf.u.uT, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, m.quadro);
+    const aQ = gl.getAttribLocation(pf.p, 'aQ');
+    gl.enableVertexAttribArray(aQ); gl.vertexAttribPointer(aQ, 2, gl.FLOAT, false, 8, 0);
+    for (let i = 1; i < 3; i++) if (i !== aQ) gl.disableVertexAttribArray(i);
+  };
+  let trama = null;
+  const figura = (t, uv, cx, cy, cz, dx, dy, col, luce) => {
+    if (!t || !uv) return;
+    if (t !== trama) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, t); trama = t; }
+    gl.blendFunc(gl.ONE, luce ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
+    gl.uniform3f(pf.u.uCentro, cx, cy, cz);
+    gl.uniform3f(pf.u.uDx, dx[0], dx[1], dx[2]); gl.uniform3f(pf.u.uDy, dy[0], dy[1], dy[2]);
+    gl.uniform4f(pf.u.uUV, uv[0], uv[1], uv[2], uv[3]);
+    gl.uniform4f(pf.u.uCol, col[0] * col[3], col[1] * col[3], col[2] * col[3], col[3]);
+    gl.uniform1f(pf.u.uNeb, luce ? 0 : 1);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  };
+  /* in piedi: larga `l`, alta `a`, mezza girata verso chi guarda */
+  const SU = (() => { const y = 1 + vista.su[1], z = vista.su[2], n = Math.hypot(y, z) || 1; return [0, y / n, z / n]; })();
+  const inPiedi = (t, uv, x, y, z, l, a, col, luce) => figura(t, uv, x, y, z, [l, 0, 0], [0, SU[1] * a, SU[2] * a], col || [1, 1, 1, 1], luce);
+  /* per terra: un tondo largo `l` */
+  const perTerra = (uv, x, z, l, col, luce, y) => figura(m.atlante, uv, x, y || 0.03, z + l / 2, [l, 0, 0], [0, 0, -l], col, luce);
+  const uv = nome => m.dove[nome] === undefined ? null : mondoUV(m.dove[nome]);
+  figuraPronta();
+  const OMBRA = uv('ombra'), ALONE = uv('alone'), GRANELLO = uv('granello');
+  scena.vasi.forEach(v => {
+    perTerra(OMBRA, v.x + 0.25, v.z + 0.2, 3.4, [1, 1, 1, 0.75]);
+    if (v.metallo) { const c = mondoColore(MONDO_METALLI[v.metallo]); perTerra(ALONE, v.x, v.z, 4.6, [c[0], c[1], c[2], fermo ? 0.3 : 0.26 + Math.sin(m.tempo * 2 + v.x) * 0.06], true, 0.04); }
+  });
+  scena.roba.forEach(o => perTerra(OMBRA, o.x + 0.15, o.z + 0.12, 2.2, [1, 1, 1, 0.6]));
+  scena.luoghi.forEach(l => { if (l.tipo === 'bottega' || l.tipo === 'cambio') perTerra(OMBRA, l.x, l.z + 0.2, 4.2, [1, 1, 1, 0.6]); });
+  scena.pezzi.forEach(p => { if (!p.preso) { perTerra(OMBRA, p.x, p.z, 0.9, [1, 1, 1, 0.5]); perTerra(ALONE, p.x, p.z, 1.9, [1, 0.82, 0.3, 0.3], true, 0.04); } });
+  if (m.meta) { const q = fermo ? 1 : 0.85 + Math.sin(m.tempo * 8) * 0.15; perTerra(uv('anello'), m.meta[0], m.meta[1], 1.1 * q, [1, 0.78, 0.25, 0.9], false, 0.05); }
+  perTerra(OMBRA, m.x, m.z, 1.9 - m.salto * 2, [1, 1, 1, 0.8], false, 0.09);
+
+  /* le cose in piedi, ordinate dal fondo (z piccola) al davanti */
+  const cose = [];
+  scena.vasi.forEach(v => {
+    const e = uv(EMOJI_CAT[v.categoria] || '🫙');
+    cose.push([v.z, () => {
+      gl.useProgram(pm.p); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.enable(gl.CULL_FACE);
+      const M = m4Modello(v.x, 0, v.z, 0, 0, 1);
+      gl.cullFace(gl.FRONT); maglia(m.vetro, m.vetroN, M, [0.7, 0.85, 1, 0.5], 0.16);    /* il vetro dietro... */
+      gl.cullFace(gl.BACK); maglia(m.vetro, m.vetroN, M, [1, 1, 1, 0.35], 0.26);          /* ...e quello davanti */
+      gl.disable(gl.CULL_FACE); figuraPronta(); trama = null;
+      /* due lame di luce sul vetro, e l'emoji del reparto sul cartellino */
+      figura(m.atlante, ALONE, v.x - 0.62, 0.35, v.z + 0.8, [0.16, 0, 0], [0, 1.9, 0], [1, 1, 1, 0.5]);
+      figura(m.atlante, ALONE, v.x + 0.74, 0.5, v.z + 0.68, [0.09, 0, 0], [0, 1.5, 0], [1, 1, 1, 0.35]);
+      figura(m.atlante, e, v.x, 0.72, v.z + 1.06, [0.95, 0, 0], [0, 0.95, 0], [1, 1, 1, 1]);
+    }]);
+    const d = Math.hypot(v.x - m.x, v.z - m.z);
+    if (d < 6.5 && m.scritto[v.categoria]) {
+      const a = Math.min(1, (6.5 - d) / 2);
+      cose.push([v.z + 0.03, () => inPiedi(m.scritte, m.scritto[v.categoria], v.x, 3.15, v.z, 4.4, 0.55, [1, 1, 1, a])]);
+    }
+    if (v.metallo === 'oro' && !fermo) cose.push([v.z + 0.04, () => inPiedi(m.atlante, ALONE, v.x, 1.9, v.z, 2.4, 2.4, [1, 0.8, 0.3, 0.22 + Math.sin(m.tempo * 3 + v.z) * 0.08], true)]);
+  });
+  scena.luoghi.forEach(l => {
+    if (l.tipo === 'cartello') cose.push([l.z + 0.1, () => inPiedi(m.atlante, uv('🔩'), l.x, 1.12, l.z + 0.09, 0.9, 0.9)]);
+    else if (l.tipo === 'bottega') {
+      cose.push([l.z + 0.7, () => inPiedi(m.atlante, uv('🛍️'), l.x, 0.98, l.z + 0.3, 1.1, 1.1)]);
+      if (m.scritto.Bottega) cose.push([l.z + 0.72, () => inPiedi(m.scritte, m.scritto.Bottega, l.x, 3.0, l.z, 5.2, 0.65)]);
+    } else if (l.tipo === 'cambio') {
+      cose.push([l.z + 0.7, () => inPiedi(m.atlante, uv('💱'), l.x, 1.05, l.z + 0.2, 1.15, 1.15)]);
+      if (m.scritto['Banco del cambio']) cose.push([l.z + 0.72, () => inPiedi(m.scritte, m.scritto['Banco del cambio'], l.x, 3.35, l.z, 5.2, 0.65)]);
+    } else if (l.tipo === 'chiusa') {
+      const r = scena.zone[l.zona - 1], cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
+      cose.push([cz, () => inPiedi(m.atlante, uv('🔒'), cx, 0.6 + (fermo ? 0 : Math.sin(m.tempo * 1.3 + l.zona) * 0.15), cz, 3.2, 3.2, [1, 1, 1, 0.92])]);
+      if (m.scritto[r.nome]) cose.push([cz + 0.02, () => inPiedi(m.scritte, m.scritto[r.nome], cx, 4.3, cz, 7.5, 0.94, [1, 1, 1, 0.8])]);
+    }
+  });
+  if (m.tappoPronto) {
+    const ondeggia = fermo ? 0 : Math.sin(m.fase) * 0.05 * m.cammina, largo = 1.86 * (1 + ondeggia), alto = 2.4 * (1 - ondeggia);
+    cose.push([m.z, () => figura(m.tappo, m.verso > 0 ? [0, 0, 1, 1] : [1, 0, 0, 1], m.x, m.salto, m.z, [largo, 0, 0], [0, SU[1] * alto, SU[2] * alto], [1, 1, 1, 1])]);
+    const cappello = cappelloCaccia(cacciaStato);
+    if (cappello && uv(cappello)) cose.push([m.z + 0.01, () => inPiedi(m.atlante, uv(cappello), m.x, m.salto + 2.0, m.z + 0.02, 0.95, 0.95)]);
+  }
+  m.polvere.forEach(p => cose.push([p.z, () => inPiedi(m.atlante, GRANELLO, p.x, p.y + (0.5 - p.vita) * 0.6, p.z, 0.9, 0.9, [0.9, 0.85, 0.75, p.vita * 0.7])]));
+  m.scoppi.forEach(p => { const q = 0.6 - p.vita; cose.push([p.z + 0.2, () => inPiedi(m.atlante, GRANELLO, p.x + Math.cos(p.a) * q * 2.2, p.y + Math.sin(p.a) * q * 2.2 + q, p.z, 0.8, 0.8, [1, 0.85, 0.35, p.vita * 1.6], true)]); });
+  if (!fermo) for (let i = 0; i < 46; i++) {           /* le lucciole della dispensa */
+    const x = (mondoCaso(i * 3.1) - 0.5) * 44, z = mondoCaso(i * 7.7) * 46 - 2, y = 0.8 + mondoCaso(i * 1.3) * 4.2;
+    if (Math.abs(x - centro[0]) > 16 || z > centro[2] + 9 || z < centro[2] - 30) continue;
+    const a = 0.25 + 0.25 * Math.sin(m.tempo * (0.6 + mondoCaso(i) * 1.2) + i);
+    cose.push([z, () => inPiedi(m.atlante, GRANELLO, x + Math.sin(m.tempo * 0.4 + i) * 0.6, y + Math.sin(m.tempo * 0.7 + i * 2) * 0.3, z, 0.7, 0.7, [1, 0.9, 0.6, a], true)]);
+  }
+  cose.sort((a, b) => a[0] - b[0]);
+  for (const c of cose) c[1]();
+  gl.depthMask(true); gl.disable(gl.BLEND);
+}
 /* PURA: la pagina intera. Due colonne (una sul telefono): a sinistra
    Tappo, le schede e la scheda aperta; a destra la dispensa. */
 function cacciaHTML(s, ui){
   if (!s || !Array.isArray(s.scaffali)) return '<div class="caccia-sotto" style="padding:60px 0;text-align:center">Cerco Tappo…</div>';
-  const scheda = CACCIA_SCHEDE.some(x => x[0] === (ui && ui.scheda)) ? ui.scheda : 'caccia';
+  const conMondo = !!(ui && ui.mondo && s.mondo);
+  const scheda = CACCIA_SCHEDE.some(x => x[0] === (ui && ui.scheda)) && (ui.scheda !== 'mondo' || conMondo) ? ui.scheda : 'caccia';
+  /* nel mondo la pagina e' la tela: qui restano solo le schede */
+  if (scheda === 'mondo') return cacciaSchedeHTML(scheda, true);
   const corpo = scheda === 'sfide' ? cacciaSfideHTML(s) : scheda === 'zaino' ? cacciaZainoHTML(s)
     : scheda === 'bottega' ? cacciaBottegaHTML(s) : cacciaOggiHTML(s, ui);
-  return '<div class="caccia-due"><div class="caccia-col-a">' + cacciaEroeHTML(s) + cacciaSchedeHTML(scheda) + corpo + '</div>'
+  return '<div class="caccia-due"><div class="caccia-col-a">' + cacciaEroeHTML(s) + cacciaSchedeHTML(scheda, conMondo) + corpo + '</div>'
     + '<div class="caccia-col-b">' + cacciaDispensaHTML(s, ui) + '</div></div>';
 }
 /* Adotta una risposta del server: lo stato, la bandierina degli annunci,
@@ -60388,10 +61354,13 @@ function cacciaAdotta(s){
   vestiCaccia();
 }
 function disegnaCaccia(){
-  const mondo = el('cacciaMondo'), box = el('cacciaCorpo'), saldo = el('cacciaSaldo');
+  const pagina = el('cacciaMondo'), box = el('cacciaCorpo'), saldo = el('cacciaSaldo');
   if (!box) return;
-  if (mondo) mondo.dataset.scheda = cacciaUi.scheda;
+  cacciaUi.mondo = mondoPossibile();
+  if (cacciaUi.scheda === 'mondo' && !(cacciaUi.mondo && cacciaStato && cacciaStato.mondo) && cacciaStato) cacciaUi.scheda = 'caccia';
+  if (pagina) pagina.dataset.scheda = cacciaUi.scheda;
   box.innerHTML = cacciaHTML(cacciaStato, cacciaUi);
+  mondoAccendi();
   if (saldo && cacciaStato) {
     const nuovo = '🔩 ' + fmt(Number(cacciaStato.saldo) || 0);
     if (saldo.textContent !== nuovo) {

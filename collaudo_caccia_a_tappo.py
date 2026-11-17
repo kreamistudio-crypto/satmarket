@@ -22,6 +22,12 @@ database usa-e-getta:
     si conta sul server;
   · NIENTE XP: `xp_eventi` e gli xp dell'utente non si muovono;
   · il nascondiglio venduto si ripara; a mezzanotte si ricomincia;
+  · IL MONDO (17 nov 2026): le zone si aprono coi ritrovamenti (una zona
+    chiusa non fa partire la caccia), i bulloni sparsi si raccolgono una
+    volta sola, il Banco del cambio segue la vista del P2P;
+  · L'EVIDENZA NEL MONDO: solo un annuncio proprio e in vetrina, uno al
+    giorno, coi bulloni contati sul server, palco pieno = 400, l'annuncio
+    venduto scende dal palco da solo;
   · il freno delle occhiate morde.
 
 NON TOCCA NIENTE DI VERO: il config finto lo installa `avvio()` del banco,
@@ -91,7 +97,7 @@ def main():
                     "VALUES(?,?,?,1)", (tg, nome, f"neg{tg}"))
     con.execute("DELETE FROM annunci")
     for t in ("gioco_tappo", "gioco_tappo_oggetti", "gioco_tappo_attrezzi",
-              "gioco_tappo_sfide"):
+              "gioco_tappo_sfide", "gioco_tappo_mondo", "gioco_tappo_evidenza"):
         con.execute(f"DELETE FROM {t}")
     con.commit()
     con.close()
@@ -105,9 +111,10 @@ def main():
     print("\n[a leva spenta il gioco non esiste]")
     S.GIOCO_TAPPO_ATTIVO = False
     prova("GET della pagina: 404", 404, c.get(B, headers=COMPRA).status_code)
-    prova("le cinque POST: 404", [404] * 5,
+    prova("le sette POST: 404", [404] * 7,
           [c.post(f"{B}/{r}", json={}, headers=COMPRA).status_code
-           for r in ("parti", "indizio", "attrezzo", "guarda", "oggetto")])
+           for r in ("parti", "indizio", "attrezzo", "guarda", "oggetto",
+                     "raccogli", "evidenza")])
     prova("/api/me dice gioco_tappo: false", (False, False),
           (c.get("/api/me", headers=COMPRA).json().get("gioco_tappo"),
            c.get("/api/me", headers=COMPRA).json().get("tappo_caccia")))
@@ -314,6 +321,25 @@ def main():
     prova("gli xp di chi ha giocato sono quelli di prima", 0,
           conta("SELECT COALESCE(SUM(xp),0) FROM utenti WHERE tg_id IN (111, 222)"))
 
+    print("\n[il mondo: le zone si aprono coi ritrovamenti]")
+    m = c.get(B, headers=ADMIN).json()["mondo"]
+    prova("chi non ha mai trovato Tappo cammina solo nella prima zona",
+          [True, False, False, False, False, False], [z["aperta"] for z in m["zone"]])
+    prova("...e la terza gli dice quanti ritrovamenti mancano", 3, m["zone"][2]["mancano"])
+    r = c.post(f"{B}/parti", json={"scaffale": 3}, headers=ADMIN)
+    prova("una zona chiusa non fa partire la caccia: 400, e non nasce niente",
+          (400, True, None), (r.status_code, "chiusa" in r.text, riga(999)))
+    con = S.db()
+    for g in ("2020-01-01", "2020-01-02", "2020-01-03"):
+        con.execute("INSERT INTO gioco_tappo(tg_id, giorno, annuncio_id, scaffale, "
+                    "partito, trovato, bulloni, categoria) VALUES(999,?,1,1,1,2,0,"
+                    "'Elettronica')", (g,))
+    con.commit()
+    con.close()
+    m = c.get(B, headers=ADMIN).json()["mondo"]
+    prova("tre ritrovamenti aprono le prime tre zone",
+          [True, True, True, False, False, False], [z["aperta"] for z in m["zone"]])
+
     print("\n[il nascondiglio che sparisce si ripara]")
     r = c.post(f"{B}/parti", json={"scaffale": 3}, headers=ADMIN)
     prova("l'admin caccia sulla mensola di casa: c'e' solo la lampada", lampada,
@@ -338,6 +364,83 @@ def main():
           (None, 1, True),
           (st["caccia"], st["barattoli_accesi"],
            any(o["mio"] for o in st["oggetti"] if o["id"] == "berretto")))
+
+    print("\n[il mondo: i bulloni sparsi]")
+    st = c.get(B, headers=COMPRA).json()
+    m = st["mondo"]
+    aperte = {z["n"] for z in m["zone"] if z["aperta"]}
+    prova("cinque bulloni oggi, tutti in zone aperte, nessuno ancora raccolto",
+          (5, True, 0), (m["pezzi_totale"], all(p["zona"] in aperte for p in m["pezzi"]),
+                         m["pezzi_presi"]))
+    n = m["pezzi"][0]["n"]
+    r = c.post(f"{B}/raccogli", json={"pezzo": n}, headers=COMPRA).json()
+    prova("raccolto: un bullone in piu' nel saldo", (True, st["saldo"] + 1, 1),
+          (r["preso"], r["saldo"], r["mondo"]["pezzi_presi"]))
+    r = c.post(f"{B}/raccogli", json={"pezzo": n}, headers=COMPRA).json()
+    prova("lo stesso bullone una seconda volta non da' niente", (False, st["saldo"] + 1),
+          (r["preso"], r["saldo"]))
+    prova("un bullone che oggi non c'e': 400", 400,
+          c.post(f"{B}/raccogli", json={"pezzo": 99}, headers=COMPRA).status_code)
+    prova("la ricevuta del giorno: un pezzo, un bullone", 1,
+          conta("SELECT bulloni FROM gioco_tappo_mondo WHERE tg_id=111"))
+
+    print("\n[il Banco del cambio]")
+    prova("c'e' nel mondo se e solo se il P2P c'e' per lei, coi suoi scambi",
+          (bool(S._p2p_per(111).get("attivo")), 0),
+          (st["mondo"]["cambio"]["attivo"], st["mondo"]["cambio"]["scambi"]))
+    prova("...e le sue sfide stanno con le altre", True,
+          any(f["id"] == "cambio" for f in st["sfide"]))
+
+    print("\n[l'annuncio in evidenza nel mondo]")
+    ev = c.get(B, headers=VENDE).json()["mondo"]["evidenza"]
+    prova("nessuno sul palco; costa 40; fra i suoi annunci ci sono le cuffie (zona 1)",
+          ([], 0, 40, True),
+          (ev["palchi"], ev["mio"], ev["bulloni"],
+           any(x["annuncio"] == cuffie and x["zona"] == 1 for x in ev["candidati"])))
+    prova("l'annuncio di un altro: 400", 400,
+          c.post(f"{B}/evidenza", json={"annuncio": nokia}, headers=VENDE).status_code)
+    saldo = c.get(B, headers=VENDE).json()["saldo"]
+    if saldo >= 40:
+        con = S.db()
+        con.execute("INSERT INTO gioco_tappo_oggetti(tg_id, oggetto, bulloni, creato) "
+                    "VALUES(222, 'zavorra', ?, 0)", (saldo - 10,))
+        con.commit()
+        con.close()
+    r = c.post(f"{B}/evidenza", json={"annuncio": cuffie}, headers=VENDE)
+    prova("senza abbastanza bulloni: 400, e il palco resta vuoto", (400, 0),
+          (r.status_code, conta("SELECT COUNT(*) FROM gioco_tappo_evidenza")))
+    con = S.db()
+    con.execute("INSERT INTO gioco_tappo_mondo(tg_id, giorno, presi, bulloni, creato) "
+                "VALUES(222, '2020-01-01', '', 50, 0)")
+    con.commit()
+    con.close()
+    prima = c.get(B, headers=VENDE).json()["saldo"]
+    r = c.post(f"{B}/evidenza", json={"annuncio": cuffie}, headers=VENDE).json()
+    prova("con i bulloni: le cuffie salgono sul palco, il saldo scende di 40",
+          ([(cuffie, 1, True)], cuffie, prima - 40, []),
+          ([(p["annuncio"], p["zona"], p["mio"]) for p in r["mondo"]["evidenza"]["palchi"]],
+           r["mondo"]["evidenza"]["mio"], r["saldo"], r["mondo"]["evidenza"]["candidati"]))
+    r = c.post(f"{B}/evidenza", json={"annuncio": tastiera}, headers=VENDE)
+    prova("un secondo annuncio lo stesso giorno: 400", (400, True),
+          (r.status_code, "domani" in r.text))
+    ev = c.get(B, headers=COMPRA).json()["mondo"]["evidenza"]
+    prova("gli altri giocatori le vedono, e non sono loro", [(cuffie, False)],
+          [(p["annuncio"], p["mio"]) for p in ev["palchi"]])
+    S.GIOCO_TAPPO_EVIDENZA_POSTI = 1
+    con = S.db()
+    con.execute("INSERT INTO gioco_tappo_mondo(tg_id, giorno, presi, bulloni, creato) "
+                "VALUES(111, '2020-01-01', '', 50, 0)")
+    con.commit()
+    con.close()
+    r = c.post(f"{B}/evidenza", json={"annuncio": radio}, headers=COMPRA)
+    prova("il palco della zona pieno: 400", (400, True), (r.status_code, "pieno" in r.text))
+    S.GIOCO_TAPPO_EVIDENZA_POSTI = 3
+    con = S.db()
+    con.execute("UPDATE annunci SET stato='venduto' WHERE id=?", (cuffie,))
+    con.commit()
+    con.close()
+    prova("venduto l'annuncio, scende dal palco da solo", [],
+          c.get(B, headers=COMPRA).json()["mondo"]["evidenza"]["palchi"])
 
     print("\n[il freno delle occhiate]")
     S._SECCHI.clear()

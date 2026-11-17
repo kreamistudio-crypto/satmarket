@@ -7668,6 +7668,38 @@ def init_db():
         creato INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY(tg_id, sfida)
     );
+    CREATE TABLE IF NOT EXISTS gioco_tappo_mondo(
+        -- IL MONDO DI TAPPO: i bulloni sparsi che una persona ha
+        -- raccolto camminando, una riga per giorno. `presi` sono i
+        -- numeri dei pezzi di QUEL giorno gia' raccolti («1,4,5»),
+        -- `bulloni` quanti ne hanno dato: e' la ricevuta, un pezzo non
+        -- si raccoglie due volte.
+        tg_id INTEGER NOT NULL,
+        giorno TEXT NOT NULL,
+        presi TEXT NOT NULL DEFAULT '',
+        bulloni INTEGER NOT NULL DEFAULT 0,
+        creato INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(tg_id, giorno)
+    );
+    CREATE TABLE IF NOT EXISTS gioco_tappo_evidenza(
+        -- L'ANNUNCIO IN EVIDENZA NEL MONDO (17 nov 2026, Andrea: «mette
+        -- l'annuncio in evidenza, è carino», e sulla scheda «Solo dentro
+        -- il gioco»): chi vende spende bulloni e un suo annuncio sta per
+        -- UN giorno (italiano) sul palco della sua zona, dove passano
+        -- tutti i giocatori. Una riga per giorno e annuncio; `zona` e'
+        -- lo scaffale della categoria, fotografato allora; `bulloni`
+        -- quanto e' costato QUEL giorno. Fuori dal gioco non cambia
+        -- niente: la vetrina del mercatino resta quella di sempre.
+        giorno TEXT NOT NULL,
+        annuncio_id INTEGER NOT NULL,
+        tg_id INTEGER NOT NULL,
+        zona INTEGER NOT NULL DEFAULT 0,
+        bulloni INTEGER NOT NULL DEFAULT 0,
+        creato INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(giorno, annuncio_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_gioco_tappo_evidenza_tg
+      ON gioco_tappo_evidenza(tg_id, giorno);
     CREATE TABLE IF NOT EXISTS carrello_salvato(
         -- il carrello che si ritrova rientrando (6 ott 2026). UNO per
         -- persona per costruzione: la chiave e' il tg_id, quindi due
@@ -21654,7 +21686,8 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # Telegram (i bulloni di un giorno non si sommano: e' una
         # persona sola, e ha giocato due volte), e lo stesso oggetto
         # preso (o la stessa sfida pagata) da entrambe e' una riga sola.
-        for tab in ("gioco_tappo", "gioco_tappo_oggetti", "gioco_tappo_sfide"):
+        for tab in ("gioco_tappo", "gioco_tappo_oggetti", "gioco_tappo_sfide",
+                    "gioco_tappo_mondo"):
             con.execute(f"UPDATE OR IGNORE {tab} SET tg_id=? WHERE tg_id=?",
                         (id_telegram, id_nostr))
             con.execute(f"DELETE FROM {tab} WHERE tg_id=?", (id_nostr,))
@@ -21671,6 +21704,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                 (id_telegram, r[0], r[1], r[2], r[3]))
         con.execute("DELETE FROM gioco_tappo_attrezzi WHERE tg_id=?",
                     (id_nostr,))
+        # L'evidenza nel mondo (17 nov 2026): la PK e' (giorno, annuncio),
+        # senza il tg_id, quindi le righe passano intere e nessuna si
+        # scontra — i bulloni spesi restano spesi da chi resta.
+        con.execute("UPDATE gioco_tappo_evidenza SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
         # Il carrello salvato (ott 2026) segue l'utente, ma qui la PK E'
         # il tg_id: uno solo per persona. Se tutt'e due le meta' ne
         # avevano uno resta quello dell'account Telegram (l'OR IGNORE
@@ -115088,6 +115126,7 @@ CANCELLA_TOGLI = (
     # presi coi bulloni erano suoi, e se ne vanno con lui
     ("gioco_tappo", "tg_id"), ("gioco_tappo_oggetti", "tg_id"),
     ("gioco_tappo_attrezzi", "tg_id"), ("gioco_tappo_sfide", "tg_id"),
+    ("gioco_tappo_mondo", "tg_id"), ("gioco_tappo_evidenza", "tg_id"),
 )
 # Le colonne personali di chi COMPRA, svuotate negli ordini chiusi che
 # restano: l'indirizzo, l'email per il corriere, la busta di ritiro, il
@@ -115422,6 +115461,24 @@ GIOCO_TAPPO_INDIZI = 3           # gli indizi di ogni tappa (il primo e' di casa
 GIOCO_TAPPO_TORCIA = 3           # le occhiate in piu' che da' la torcia
 GIOCO_TAPPO_FULMINE_SECONDI = 180  # la sfida «Fulmine»: trovato entro tanto
 GIOCO_TAPPO_ATTREZZI_MAX = 9     # quanti attrezzi di un tipo stanno nello zaino
+# IL MONDO DI TAPPO (17 nov 2026, Andrea: «io pensavo a un gioco dove
+# Tappo esplorava proprio un mondo a sé stante... dove Tappo poteva
+# navigare in una mappa, proprio un vero gioco»). La dispensa e' un
+# posto dove si CAMMINA: sei zone, una per scaffale, coi barattoli
+# giganti. Il mondo lo disegna il client; qui stanno le DUE cose che
+# contano e che il client non decide: quali zone sono aperte e quali
+# bulloni ci sono oggi da raccogliere.
+GIOCO_TAPPO_PEZZI = 5            # i bulloni sparsi nel mondo, ogni giorno
+GIOCO_TAPPO_POSTI_ZONA = 10      # i posti di una zona dove un bullone puo' cadere
+# quanti ritrovamenti servono per aprire la zona 1, 2, ... 6: la prima
+# e' di casa, l'ultima si apre in un paio di settimane di cacce
+GIOCO_TAPPO_ZONE_SOGLIE = (0, 1, 3, 6, 10, 15)
+# L'ANNUNCIO IN EVIDENZA NEL MONDO: quanto costa un giorno sul palco
+# della zona (circa tre giorni di gioco: 5 bulloni sparsi e una caccia al
+# giorno) e quanti annunci ci stanno, per zona e per giorno. Uno al
+# giorno per persona: il palco e' di tutti, non di chi ha piu' bulloni.
+GIOCO_TAPPO_EVIDENZA_BULLONI = 40
+GIOCO_TAPPO_EVIDENZA_POSTI = 3
 # LA DISPENSA: sei scaffali, e su ognuno i barattoli delle sue categorie.
 # Ogni categoria di CATEGORIE sta su UNO scaffale e uno solo (una prova
 # lo guarda: una categoria nuova senza scaffale e' un barattolo che
@@ -115555,6 +115612,15 @@ GIOCO_TAPPO_SFIDE = (
     dict(id="pista", emoji="👣", nome="Sulla pista",
          cosa="Finisci {n} cacce a più tappe", conta="piste",
          soglie=((1, 5), (10, 15), (50, 40), (150, 100), (500, 250))),
+    # IL BANCO DEL CAMBIO (17 nov 2026, Andrea: «nel gioco aggiungi anche
+    # gli scambi peer-to-peer... dagli qualche regola»). La regola: qui
+    # contano solo gli scambi P2P VERI e CONCLUSI (`_completati_p2p`, la
+    # stessa conta che sta accanto alle stelline). Niente bulloni per
+    # aver guardato il libro o pubblicato un ordine: un ordine si
+    # pubblica e si ritira gratis, e sarebbe un rubinetto.
+    dict(id="cambio", emoji="💱", nome="Cambiavalute",
+         cosa="Concludi {n} scambi P2P veri", conta="scambi",
+         soglie=((1, 10), (5, 20), (20, 40), (50, 80), (100, 150))),
 )
 _RE_PAROLA_TAPPO = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]{4,}")
 # Dove Tappo puo' nascondersi: quel che la vetrina mostra (attivo, una
@@ -115830,6 +115896,46 @@ def _tappo_sfide_raggiunte(numeri) -> list:
     return fatte
 
 
+def _tappo_zone_aperte(trovate, in_vetrina=None) -> list:
+    """PURA: i numeri delle zone del mondo dove si puo' camminare (e
+    cacciare) con tanti ritrovamenti. La prima e' sempre aperta.
+    `in_vetrina` = {scaffale: quanti annunci}: se nelle zone aperte non
+    c'e' NEMMENO un annuncio la dispensa si apre tutta — o chi comincia
+    in un giorno di vetrina magra non potrebbe mai fare il primo
+    ritrovamento, cioe' quello che apre il resto."""
+    try:
+        t = max(0, int(trovate or 0))
+    except (TypeError, ValueError):
+        t = 0
+    aperte = [n for n, serve in enumerate(GIOCO_TAPPO_ZONE_SOGLIE, 1)
+              if t >= serve]
+    if in_vetrina is not None and not any(
+            int(in_vetrina.get(n) or 0) > 0 for n in aperte):
+        return [n for n, _s in enumerate(GIOCO_TAPPO_ZONE_SOGLIE, 1)]
+    return aperte
+
+
+def _tappo_pezzi(tg_id, giorno, zone) -> list:
+    """PURA: i bulloni sparsi di QUELLA persona in QUEL giorno, `[(n,
+    zona, posto)]` con n da 1. Stanno solo nelle zone aperte, mai due
+    nello stesso posto, e sono gli stessi a ogni lettura (il dado e'
+    `_tappo_dado`, col seme di persona e giorno): la pagina puo'
+    richiederli quanto vuole. Il `posto` e' un numero da 0 a
+    GIOCO_TAPPO_POSTI_ZONA-1: DOVE sta quel posto lo sa la mappa."""
+    zone = [int(z) for z in (zone or [])]
+    if not zone:
+        return []
+    liberi = [(z, p) for z in zone for p in range(GIOCO_TAPPO_POSTI_ZONA)]
+    pezzi = []
+    for n in range(1, GIOCO_TAPPO_PEZZI + 1):
+        if not liberi:
+            break
+        z, p = liberi.pop(_tappo_dado(f"{tg_id}:{giorno}:pezzo:{n}",
+                                      len(liberi)))
+        pezzi.append((n, z, p))
+    return pezzi
+
+
 def _tappo_e_qui(nascondiglio, guardato) -> bool:
     """PURA: l'annuncio guardato e' il nascondiglio? Lo stesso annuncio,
     oppure una sua SORELLA: in vetrina una famiglia di varianti e' una
@@ -115952,16 +116058,18 @@ def _tappo_oggetti_di(con, tg_id: int) -> set:
 
 
 def _tappo_saldo(con, tg_id: int) -> int:
-    """I bulloni da spendere: quelli vinti (cacce e sfide) meno quelli
-    spesi (oggetti e attrezzi). Il conto si rifa' ogni volta dalle
-    quattro tabelle — non c'e' una colonna «saldo» che possa dire un
-    numero diverso."""
+    """I bulloni da spendere: quelli vinti (cacce e sfide) e raccolti
+    (nel mondo) meno quelli spesi (oggetti, attrezzi e giorni in
+    evidenza). Il conto si rifa' ogni volta dalle sei tabelle — non c'e' una colonna «saldo»
+    che possa dire un numero diverso."""
     def somma(tabella):
         return int(con.execute(
             f"SELECT COALESCE(SUM(bulloni),0) FROM {tabella} WHERE tg_id=?",
             (int(tg_id),)).fetchone()[0] or 0)
     return (somma("gioco_tappo") + somma("gioco_tappo_sfide")
-            - somma("gioco_tappo_oggetti") - somma("gioco_tappo_attrezzi"))
+            + somma("gioco_tappo_mondo")
+            - somma("gioco_tappo_oggetti") - somma("gioco_tappo_attrezzi")
+            - somma("gioco_tappo_evidenza"))
 
 
 def _tappo_numeri(con, tg_id: int) -> dict:
@@ -115987,6 +116095,8 @@ def _tappo_numeri(con, tg_id: int) -> dict:
         b = _tappo_barattolo_di(r["categoria"])
         n["per_barattolo"][b] = n["per_barattolo"].get(b, 0) + 1
     n["barattoli"] = len(n["per_barattolo"])
+    # gli scambi P2P conclusi: la conta di casa (0 se la tabella non c'e')
+    n["scambi"] = int(_completati_p2p(con, [tg_id]).get(int(tg_id), 0))
     n["oro"] = sum(1 for v in n["per_barattolo"].values()
                    if _tappo_metallo(v) == "oro")
     return n
@@ -116027,6 +116137,74 @@ def _tappo_corredo(con, tg_id: int):
                     (int(tg_id), a["id"]))
 
 
+def _tappo_in_vetrina(con, tg_id: int) -> dict:
+    """Quanti annunci (non suoi) ci sono oggi su ogni scaffale:
+    `{scaffale: quanti}`. E' quel che dice se una zona ha dove cercare."""
+    in_vetrina = {}
+    for r in con.execute(
+            "SELECT a.categoria, COUNT(*) FROM annunci a WHERE "
+            f"{_TAPPO_SQL_VETRINA} AND a.venditore_id<>? GROUP BY a.categoria",
+            (int(tg_id),)):
+        s = _tappo_scaffale_di(r[0])
+        in_vetrina[s] = in_vetrina.get(s, 0) + int(r[1])
+    return in_vetrina
+
+
+def _tappo_mondo(con, tg_id: int, giorno: str, trovate, in_vetrina) -> dict:
+    """IL MONDO come lo vede quella persona oggi: le zone (aperte o
+    quanti ritrovamenti mancano) e i bulloni sparsi, con quelli gia'
+    raccolti. Sola lettura."""
+    aperte = _tappo_zone_aperte(trovate, in_vetrina)
+    r = con.execute("SELECT presi FROM gioco_tappo_mondo WHERE tg_id=? AND "
+                    "giorno=?", (int(tg_id), giorno)).fetchone()
+    presi = {int(x) for x in str(r["presi"] if r else "").split(",")
+             if x.isdigit()}
+    pezzi = _tappo_pezzi(tg_id, giorno, aperte)
+    return {
+        "zone": [dict(n=n, aperta=n in aperte, serve=serve,
+                      mancano=0 if n in aperte
+                      else max(1, serve - int(trovate or 0)))
+                 for n, serve in enumerate(GIOCO_TAPPO_ZONE_SOGLIE, 1)],
+        "pezzi": [dict(n=n, zona=z, posto=p, preso=n in presi)
+                  for n, z, p in pezzi],
+        "pezzi_presi": sum(1 for n, _z, _p in pezzi if n in presi),
+        "pezzi_totale": len(pezzi),
+    }
+
+
+def _tappo_evidenza(con, tg_id: int, giorno: str) -> dict:
+    """L'EVIDENZA NEL MONDO di oggi, come la vede quella persona: gli
+    annunci sui palchi delle zone (solo quelli ancora in vetrina: uno
+    venduto stamattina scende dal palco da solo), il suo di oggi, quanto
+    costa, e i suoi annunci che potrebbe metterci. Sola lettura."""
+    palchi = []
+    for r in con.execute(
+            "SELECT e.annuncio_id, e.zona, e.tg_id, a.titolo FROM "
+            "gioco_tappo_evidenza e JOIN annunci a ON a.id = e.annuncio_id "
+            f"WHERE e.giorno=? AND {_TAPPO_SQL_VETRINA} "
+            "ORDER BY e.creato, e.annuncio_id", (giorno,)):
+        palchi.append(dict(annuncio=int(r[0]), zona=int(r[1]),
+                           titolo=r[3] or "", mio=int(r[2]) == int(tg_id)))
+    mio = con.execute("SELECT annuncio_id FROM gioco_tappo_evidenza WHERE "
+                      "tg_id=? AND giorno=?", (int(tg_id), giorno)).fetchone()
+    pieni = {}
+    for p in palchi:
+        pieni[p["zona"]] = pieni.get(p["zona"], 0) + 1
+    candidati = []
+    if not mio:
+        for r in con.execute(
+                "SELECT a.id, a.titolo, a.categoria FROM annunci a WHERE "
+                f"{_TAPPO_SQL_VETRINA} AND a.venditore_id=? "
+                "ORDER BY a.id DESC LIMIT 30", (int(tg_id),)):
+            z = _tappo_scaffale_di(r[2])
+            candidati.append(dict(
+                annuncio=int(r[0]), titolo=r[1] or "", zona=z,
+                libero=pieni.get(z, 0) < GIOCO_TAPPO_EVIDENZA_POSTI))
+    return {"palchi": palchi, "mio": int(mio[0]) if mio else 0,
+            "bulloni": GIOCO_TAPPO_EVIDENZA_BULLONI,
+            "posti": GIOCO_TAPPO_EVIDENZA_POSTI, "candidati": candidati}
+
+
 def _tappo_stato(con, tg_id: int, adesso: int) -> dict:
     """Tutto quel che la pagina del gioco disegna, in una risposta: la
     dispensa coi barattoli, i gradi, la caccia di oggi (se e' partita),
@@ -116043,13 +116221,7 @@ def _tappo_stato(con, tg_id: int, adesso: int) -> dict:
     presi = _tappo_oggetti_di(con, tg_id)
     u = con.execute("SELECT tappo_oggetto, tappo_palco FROM utenti WHERE "
                     "tg_id=?", (int(tg_id),)).fetchone()
-    in_vetrina = {}
-    for r in con.execute(
-            "SELECT a.categoria, COUNT(*) FROM annunci a WHERE "
-            f"{_TAPPO_SQL_VETRINA} AND a.venditore_id<>? GROUP BY a.categoria",
-            (int(tg_id),)):
-        s = _tappo_scaffale_di(r[0])
-        in_vetrina[s] = in_vetrina.get(s, 0) + int(r[1])
+    in_vetrina = _tappo_in_vetrina(con, tg_id)
     pagate = {r[0] for r in con.execute(
         "SELECT sfida FROM gioco_tappo_sfide WHERE tg_id=?", (int(tg_id),))}
     zaino = {r["attrezzo"]: max(0, int(r["presi"]) - int(r["usati"]))
@@ -116111,7 +116283,17 @@ def _tappo_stato(con, tg_id: int, adesso: int) -> dict:
         # il tetto del barattolo, che l'oggetto «posti» allarga: la
         # pagina lo adotta subito, senza aspettare il prossimo /api/me
         "max_barattolo": max_barattolo_di(con, tg_id),
+        # il mondo dove Tappo cammina: zone aperte e bulloni di oggi
+        "mondo": _tappo_mondo(con, tg_id, giorno, numeri["trovate"],
+                              in_vetrina),
     }
+    # il Banco del cambio c'e' nel mondo solo se il P2P c'e' PER LEI (la
+    # vista, non il fatto: `_p2p_per`), col numero dei suoi scambi conclusi
+    stato["mondo"]["cambio"] = {
+        "attivo": bool(_p2p_per(tg_id).get("attivo")),
+        "scambi": numeri["scambi"]}
+    # i palchi dell'evidenza: chi c'e' oggi, e cosa potrebbe metterci lei
+    stato["mondo"]["evidenza"] = _tappo_evidenza(con, tg_id, giorno)
     stato["sfide_fatte"] = sum(1 for f in stato["sfide"]
                                for s in f["soglie"] if s["fatta"])
     stato["sfide_totale"] = sum(len(f["soglie"]) for f in stato["sfide"])
@@ -116233,8 +116415,14 @@ async def gioco_tappo_parti(req: Request, x_tg_init_data: str = Header(""),
         giorno = _giorno_roma(adesso)
         riga, _n = _tappo_oggi(con, user["id"], adesso)
         if not riga:
-            aperto = _tappo_gradi_aperti(
-                _tappo_numeri(con, user["id"])["per_grado"])
+            numeri = _tappo_numeri(con, user["id"])
+            # si caccia dove si puo' camminare: una zona chiusa del
+            # mondo e' uno scaffale dove oggi non si cerca
+            if scaffale not in _tappo_zone_aperte(
+                    numeri["trovate"], _tappo_in_vetrina(con, user["id"])):
+                raise HTTPException(400, "Questa zona della dispensa è "
+                                         "ancora chiusa")
+            aperto = _tappo_gradi_aperti(numeri["per_grado"])
             grado = grado or aperto
             if grado > aperto or grado < 1:
                 raise HTTPException(400, "Questo grado non è ancora aperto")
@@ -116250,6 +116438,109 @@ async def gioco_tappo_parti(req: Request, x_tg_init_data: str = Header(""),
                 "VALUES(?,?,?,?,?,?,?,?)",
                 (user["id"], giorno, scelto, scaffale, grado,
                  _tappo_grado(grado)["tappe"], adesso, adesso))
+        stato = _tappo_stato(con, user["id"], adesso)
+        con.commit()
+    finally:
+        con.close()
+    return stato
+
+
+@app.post("/api/gioco/tappo/raccogli")
+async def gioco_tappo_raccogli(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """Tappo e' passato sopra un bullone sparso: `pezzo` e' il suo
+    numero. Vale UN bullone, una volta: la ricevuta e' `presi` nella
+    riga del giorno. Il server non sa DOVE cammina Tappo (il mondo lo
+    muove il client) e non finge di saperlo: quel che garantisce e' il
+    TETTO — i pezzi di oggi sono GIOCO_TAPPO_PEZZI, li ha scelti lui, e
+    un numero che oggi non c'e' o gia' raccolto non da' niente. Chi
+    chiama la rotta senza camminare prende quel che prenderebbe
+    camminando, e non un bullone di piu'."""
+    _tappo_acceso()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("tappo_oggetto", user["id"])
+    d = await leggi_json(req)
+    try:
+        pezzo = int(d.get("pezzo") or 0)
+    except (TypeError, ValueError):
+        pezzo = 0
+    con = db()
+    try:
+        adesso = int(time.time())
+        giorno = _giorno_roma(adesso)
+        mondo = _tappo_mondo(
+            con, user["id"], giorno,
+            _tappo_numeri(con, user["id"])["trovate"],
+            _tappo_in_vetrina(con, user["id"]))
+        c = next((x for x in mondo["pezzi"] if x["n"] == pezzo), None)
+        if not c:
+            raise HTTPException(400, "Questo bullone oggi non c'è")
+        preso = not c["preso"]
+        if preso:
+            presi = sorted(x["n"] for x in mondo["pezzi"]
+                           if x["preso"] or x["n"] == pezzo)
+            con.execute("INSERT OR IGNORE INTO gioco_tappo_mondo(tg_id, "
+                        "giorno, creato) VALUES(?,?,?)",
+                        (user["id"], giorno, adesso))
+            con.execute("UPDATE gioco_tappo_mondo SET presi=?, bulloni=? "
+                        "WHERE tg_id=? AND giorno=?",
+                        (",".join(str(x) for x in presi), len(presi),
+                         user["id"], giorno))
+        stato = _tappo_stato(con, user["id"], adesso)
+        con.commit()
+    finally:
+        con.close()
+    return {"preso": preso, **stato}
+
+
+@app.post("/api/gioco/tappo/evidenza")
+async def gioco_tappo_evidenza(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """Mettere un PROPRIO annuncio in evidenza nel mondo per oggi:
+    `annuncio` e' il suo id. Costa GIOCO_TAPPO_EVIDENZA_BULLONI, contati
+    qui dal database. Le regole: l'annuncio e' suo e sta in vetrina (le
+    stesse del nascondiglio: attivo, capofila, mai un'asta); uno al
+    giorno per persona; un annuncio una volta al giorno; al piu'
+    GIOCO_TAPPO_EVIDENZA_POSTI per zona. Vale SOLO dentro il gioco
+    (scelta di Andrea): la vetrina del mercatino non cambia."""
+    _tappo_acceso()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("tappo_oggetto", user["id"])
+    d = await leggi_json(req)
+    try:
+        annuncio = int(d.get("annuncio") or 0)
+    except (TypeError, ValueError):
+        annuncio = 0
+    con = db()
+    try:
+        adesso = int(time.time())
+        giorno = _giorno_roma(adesso)
+        a = con.execute(
+            "SELECT a.id, a.categoria FROM annunci a WHERE a.id=? AND "
+            f"a.venditore_id=? AND {_TAPPO_SQL_VETRINA}",
+            (annuncio, user["id"])).fetchone()
+        if not a:
+            raise HTTPException(400, "Questo annuncio non è tuo, o non è "
+                                     "in vetrina")
+        if con.execute("SELECT 1 FROM gioco_tappo_evidenza WHERE tg_id=? "
+                       "AND giorno=?", (user["id"], giorno)).fetchone():
+            raise HTTPException(400, "Oggi hai già un annuncio in evidenza: "
+                                     "domani puoi metterne un altro")
+        zona = _tappo_scaffale_di(a["categoria"])
+        pieni = con.execute(
+            "SELECT COUNT(*) FROM gioco_tappo_evidenza e JOIN annunci a ON "
+            f"a.id = e.annuncio_id WHERE e.giorno=? AND e.zona=? AND "
+            f"{_TAPPO_SQL_VETRINA}", (giorno, zona)).fetchone()[0]
+        if pieni >= GIOCO_TAPPO_EVIDENZA_POSTI:
+            raise HTTPException(400, "Il palco di questa zona oggi è pieno: "
+                                     "riprova domani")
+        if _tappo_saldo(con, user["id"]) < GIOCO_TAPPO_EVIDENZA_BULLONI:
+            raise HTTPException(400, "Non hai ancora abbastanza bulloni 🔩")
+        con.execute("INSERT OR IGNORE INTO gioco_tappo_evidenza(giorno, "
+                    "annuncio_id, tg_id, zona, bulloni, creato) "
+                    "VALUES(?,?,?,?,?,?)",
+                    (giorno, annuncio, user["id"], zona,
+                     GIOCO_TAPPO_EVIDENZA_BULLONI, adesso))
         stato = _tappo_stato(con, user["id"], adesso)
         con.commit()
     finally:
