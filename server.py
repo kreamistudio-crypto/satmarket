@@ -111830,8 +111830,17 @@ def _file_con_etag(percorso: str, media_type: str, cache: str,
 # (barattolo, bullone, bancarella, chiosco), in assets/mondo/. I NOMI
 # AMMESSI sono questi e solo questi: la parte variabile dell'indirizzo
 # passa da qui, mai da un percorso costruito col nome che arriva.
+# I MINIGIOCHI DIPINTI (17 nov 2026, Flow sul PC di Andrea): la stanza
+# di ogni missione (`miss-<id>`), le sue cose scontornate e le quattro
+# pose di Tappo che cammina. Qui ci sono solo i file che esistono davvero
+# in assets/mondo/ (una prova li confronta con la cartella).
 MONDO_ASSET = frozenset([f"zona-{n}" for n in range(1, 7)]
-                        + ["barattolo", "bullone", "bancarella", "chiosco"])
+                        + ["barattolo", "bullone", "bancarella", "chiosco"]
+                        + ["miss-sats", "miss-sat", "miss-wallet", "miss-gazza",
+                           "miss-gazza-ferma",
+                           "miss-quaderno", "miss-leggio", "miss-grande",
+                           "miss-cestino", "miss-busta", "miss-tarlo"]
+                        + [f"tappo-passo-{n}" for n in range(1, 5)])
 
 
 @app.get("/assets/mondo/{nome}")

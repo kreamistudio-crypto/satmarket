@@ -62669,6 +62669,78 @@ function arenaMuovi(sc, x, y, dx, dy, r){
   }
   return [nx, ny];
 }
+/* PURA: Tappo ci sta, qui? Dentro i muri e lontano dagli ostacoli */
+function arenaLibero(sc, x, y, r){
+  const m = sc.muri;
+  if (x < m[0] + r || x > m[2] - r || y < m[1] + r * 0.5 || y > m[3] - r * 0.5) return false;
+  for (const o of sc.ostacoli || []) {
+    if (o.w !== undefined) {
+      const px = Math.max(o.x, Math.min(o.x + o.w, x)), py = Math.max(o.y, Math.min(o.y + o.h, y));
+      if (Math.hypot(x - px, y - py) < r) return false;
+    } else if (Math.hypot(x - o.x, y - o.y) < o.r + r) return false;
+  }
+  return true;
+}
+/* PURA: si va dritti da qui a li' senza toccare niente? */
+function arenaVedo(sc, x0, y0, x1, y1, r){
+  const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 12);
+  for (let i = 1; i <= n; i++) if (!arenaLibero(sc, x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, r)) return false;
+  return true;
+}
+/* PURA: LA STRADA da (x0, y0) a (x1, y1) girando intorno agli ostacoli:
+   una griglia da 30, A* a otto direzioni, poi si tira il filo (si salta
+   ogni tappa da cui si vede la successiva). Le tappe in mezzo, senza la
+   meta; vuoto se si va dritti o se non c'e' strada (allora si prova
+   dritti, come prima). */
+function arenaStrada(sc, x0, y0, x1, y1, r){
+  if (arenaVedo(sc, x0, y0, x1, y1, r)) return [];
+  const Q = 30, C = Math.ceil(sc.L / Q), Rr = Math.ceil(sc.A / Q);
+  const cella = (x, y) => Math.max(0, Math.min(Rr - 1, Math.floor(y / Q))) * C + Math.max(0, Math.min(C - 1, Math.floor(x / Q)));
+  const centro = i => [(i % C) * Q + Q / 2, Math.floor(i / C) * Q + Q / 2];
+  const libera = new Array(C * Rr);
+  for (let i = 0; i < C * Rr; i++) { const c = centro(i); libera[i] = arenaLibero(sc, c[0], c[1], r); }
+  const da = cella(x0, y0);
+  let a = cella(x1, y1);
+  if (!libera[a]) {                 /* la meta sta su un mobile: la cella libera piu' vicina */
+    let q = 1e9, m = -1;
+    for (let i = 0; i < C * Rr; i++) if (libera[i]) { const c = centro(i), d = Math.hypot(c[0] - x1, c[1] - y1); if (d < q) { q = d; m = i; } }
+    if (m < 0) return [];
+    a = m;
+  }
+  const g = new Map([[da, 0]]), prima = new Map(), aperte = [da], chiuse = new Set();
+  const stima = i => { const c = centro(i), t = centro(a); return Math.hypot(c[0] - t[0], c[1] - t[1]); };
+  while (aperte.length) {
+    let k = 0;
+    for (let j = 1; j < aperte.length; j++) if (g.get(aperte[j]) + stima(aperte[j]) < g.get(aperte[k]) + stima(aperte[k])) k = j;
+    const i = aperte.splice(k, 1)[0];
+    if (i === a) break;
+    chiuse.add(i);
+    const cx = i % C, cy = Math.floor(i / C);
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const nx = cx + dx, ny = cy + dy;
+      if (nx < 0 || ny < 0 || nx >= C || ny >= Rr) continue;
+      const n = ny * C + nx;
+      if (!libera[n] || chiuse.has(n)) continue;
+      if (dx && dy && (!libera[cy * C + nx] || !libera[ny * C + cx])) continue;   /* niente spigoli tagliati */
+      const v = g.get(i) + Q * (dx && dy ? 1.414 : 1);
+      if (!g.has(n) || v < g.get(n)) { g.set(n, v); prima.set(n, i); if (!aperte.includes(n)) aperte.push(n); }
+    }
+  }
+  if (!prima.has(a) && a !== da) return [];
+  const celle = [];
+  for (let i = a; i !== da && i !== undefined; i = prima.get(i)) celle.unshift(centro(i));
+  /* si tira il filo */
+  const fuori = [], pt = [...celle, [x1, y1]];
+  let qui = [x0, y0], j = 0;
+  while (j < pt.length - 1) {
+    let k = pt.length - 1;
+    while (k > j && !arenaVedo(sc, qui[0], qui[1], pt[k][0], pt[k][1], r * 0.9)) k--;
+    if (k === pt.length - 1) break;
+    if (k === j) { fuori.push(pt[j]); qui = pt[j]; j++; } else { fuori.push(pt[k]); qui = pt[k]; j = k; }
+  }
+  return fuori;
+}
 /* PURA: la telecamera — la stanza intera dentro la tela (sul telefono
    in piedi ci sta tutta), al centro */
 function arenaInquadra(L, A, sc){
@@ -62715,6 +62787,10 @@ function arenaApri(m){
   tappo.onload = () => { if (arena && arena.tappo === tappo) arena.tappoPronto = true; };
   tappo.src = '/assets/caccia-tappo.webp';
   mondoImmagine('miss-' + m.id);
+  /* i dipinti di Flow: le quattro pose di Tappo e le cose della stanza,
+     chiesti subito perche' arrivino prima del primo passo */
+  [1, 2, 3, 4].forEach(n => mondoImmagine('tappo-passo-' + n));
+  (def.foto || []).forEach(n => mondoImmagine(n));
   arenaComandi(tela);
   arenaProva(0);
   arenaAccendi();
@@ -62735,7 +62811,7 @@ function arenaProva(n){
   p.nasci(a);
   /* la pianta di questa prova: i muri della stanza, gli ostacoli fissi e
      le cose solide (un leggio non si attraversa) */
-  a.pianta = {muri: a.sc.muri, ostacoli: (a.sc.ostacoli || []).concat(a.cose.filter(c => c.solido).map(c => ({x: c.x, y: c.y, r: c.solido})))};
+  a.pianta = {L: a.sc.L, A: a.sc.A, muri: a.sc.muri, ostacoli: (a.sc.ostacoli || []).concat(a.cose.filter(c => c.solido).map(c => ({x: c.x, y: c.y, r: c.solido})))};
   a.banner = effettiRidotti() ? 1.6 : 2.2;
   const b = el('arenaBanner');
   if (b) { b.innerHTML = `<small>Prova ${n + 1} di ${a.def.prove.length}</small>${esc(p.nome)}`; b.className = 'arena-banner su'; }
@@ -62858,8 +62934,14 @@ function arenaPassa(a, dt){
   if (t.su || t.giu || t.sx || t.dx) { vx = (t.dx ? 1 : 0) - (t.sx ? 1 : 0); vy = (t.giu ? 1 : 0) - (t.su ? 1 : 0); const l = Math.hypot(vx, vy) || 1; vx /= l; vy /= l; }
   else if (a.guida) { vx = a.guida[0]; vy = a.guida[1]; }
   else if (a.meta) {
-    const dx = a.meta[0] - a.x, dy = a.meta[1] - a.y, l = Math.hypot(dx, dy);
-    if (l < 8) a.meta = null; else { const k = Math.min(1, l / 46); vx = dx / l * k; vy = dy / l * k; }
+    /* LA STRADA INTORNO AI MOBILI (17 nov, coi dipinti: tavoli e banconi
+       veri): toccato un posto, Tappo ci gira intorno invece di sbattere */
+    if (a.metaPer !== a.meta) { a.metaPer = a.meta; a.tappe = arenaStrada(a.pianta, a.x, a.y, a.meta[0], a.meta[1], ARENA_RAGGIO); }
+    const via = a.tappe && a.tappe.length ? a.tappe[0] : a.meta;
+    const dx = via[0] - a.x, dy = via[1] - a.y, l = Math.hypot(dx, dy);
+    if (via !== a.meta && l < 26) a.tappe.shift();
+    else if (l < 8) a.meta = null;
+    else { const k = via !== a.meta ? 1 : Math.min(1, l / 46); vx = dx / l * k; vy = dy / l * k; }
   }
   /* la velocita' insegue la voglia: parte e si ferma morbido */
   const mor = Math.min(1, dt * (vx || vy ? 12 : 16));
@@ -62979,6 +63061,12 @@ function arenaDisegna(a){
     g.beginPath(); g.arc(p.x, p.y - (0.45 - p.vita) * 26, 6 + (0.45 - p.vita) * 18, 0, 6.2832); g.fill();
   }]));
   roba.push([a.y, () => arenaTappo(g, a, fermo)]);
+  /* I MOBILI DIPINTI COPRONO chi ci passa dietro (17 nov, coi dipinti di
+     Flow): il loro pezzo di dipinto si ridisegna alla loro profondita' */
+  if (fondo) (sc.copri || []).forEach(o => roba.push([o.fino, () => {
+    g.save(); g.beginPath(); o.poli.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.clip();
+    g.drawImage(fondo, 0, 0, sc.L, sc.A); g.restore();
+  }]));
   roba.sort((p, q) => p[0] - q[0]);
   for (const r of roba) r[1]();
   a.scoppi.forEach(p => {
@@ -63012,7 +63100,14 @@ function arenaTappo(g, a, fermo){
   g.save();
   g.translate(a.x, a.y - a.salto);
   g.scale(a.verso, 1);              /* si gira di colpo: girato di taglio sembrava di carta (Andrea, 17 nov) */
-  if (a.tappoPronto) g.drawImage(a.tappo, -largo / 2, -alto, largo, alto);
+  /* LE QUATTRO POSE DIPINTE (Flow, 17 nov: «Tappo monodimensionale»):
+     fermo la prima, camminando in giro; il saltello e' gia' nel disegno */
+  const posa = a.cammina > 0.2 && !fermo ? 1 + (((Math.floor(a.fase / (Math.PI / 2)) % 4) + 4) % 4) : 1;
+  const passo = mondoImmagine('tappo-passo-' + posa) || mondoImmagine('tappo-passo-1');
+  if (passo) {
+    const h = 200 * sc * (1 + resp - a.schiaccia * 0.6), w = 200 * sc * passo.naturalWidth / passo.naturalHeight * (1 + a.schiaccia * 0.5);
+    g.drawImage(passo, -w / 2, -h, w, h);
+  } else if (a.tappoPronto) g.drawImage(a.tappo, -largo / 2, -alto, largo, alto);
   else {                                    /* finche' il disegno non arriva: un barattolino */
     g.fillStyle = 'rgba(200,235,255,.75)'; g.strokeStyle = '#fff'; g.lineWidth = 4;
     g.beginPath(); g.roundRect ? g.roundRect(-largo * 0.36, -alto * 0.8, largo * 0.72, alto * 0.8, 22) : g.rect(-largo * 0.36, -alto * 0.8, largo * 0.72, alto * 0.8); g.fill(); g.stroke();
@@ -63024,6 +63119,17 @@ function arenaTappo(g, a, fermo){
     g.font = Math.round(56 * sc) + 'px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(cap, a.x, a.y - a.salto - alto * 0.95);
   }
+}
+/* UN DIPINTO DI FLOW (scontornato) coi piedi in (x, y), largo `largo`;
+   `verso` -1 lo specchia. Falso finche' non e' arrivato: chi chiama
+   disegna la sua versione a mano, che resta la riserva */
+function arenaFoto(g, nome, x, y, largo, verso){
+  const img = mondoImmagine(nome);
+  if (!img) return false;
+  const alto = largo * img.naturalHeight / img.naturalWidth;
+  g.save(); g.translate(x, y); if (verso === -1) g.scale(-1, 1);
+  g.drawImage(img, -largo / 2, -alto, largo, alto); g.restore();
+  return true;
 }
 function arenaOmbra(g, x, y, r, al){
   g.save(); g.translate(x, y); g.scale(1, 0.36);
@@ -63042,6 +63148,20 @@ function arenaEmoji(g, em, x, y, px){
 function arenaTarlo(g, a, n){
   const fermo = effettiRidotti(), sc = arenaProfondo(a.sc, n.y);
   if (n.stato === 'tana') return;
+  const foto = mondoImmagine('miss-tarlo');
+  if (foto) {                      /* il Tarlo dipinto: guarda a sinistra, si specchia */
+    const morde = n.stato === 'morde' && !fermo ? Math.abs(Math.sin(a.tempo * 16)) * 8 : 0;
+    const onda = fermo || n.stato === 'stordito' ? 0 : Math.sin(a.tempo * 12) * 0.06;
+    const w = 150 * sc * (1 + onda), h = 150 * sc * foto.naturalHeight / foto.naturalWidth * (1 - onda);
+    arenaOmbra(g, n.x, n.y + 4, 60 * sc, 0.45);
+    g.save(); g.translate(n.x, n.y + 6 * sc - morde); g.scale(-(n.dir || 1), 1);
+    g.drawImage(foto, -w / 2, -h, w, h); g.restore();
+    if (n.stato === 'stordito' && !fermo) for (let i = 0; i < 3; i++) {
+      const t = a.tempo * 5 + i * 2.09;
+      arenaEmoji(g, '⭐', n.x + Math.cos(t) * 34 * sc, n.y - h - 6 * sc + Math.sin(t) * 9 * sc, 20 * sc);
+    }
+    return;
+  }
   const anelli = n.anelli;
   arenaOmbra(g, n.x, n.y + 4, 46 * sc, 0.45);
   for (let i = anelli.length - 1; i >= 0; i--) {
@@ -63117,8 +63237,11 @@ function arenaTarloVa(a, n, tx, ty, veloce, dt){
       Si scrive nel quaderno grande. Gli stessi bulloni spesi due volte?
       Si strappa nel cestino.
    I conti e i nomi sono finti, come sempre. */
-const QUAD_SCENA = {L: 900, A: 1500, muri: [124, 372, 776, 1440], via: [450, 1330], ostacoli: [],
-  tane: [[700, 392], [200, 392], [146, 1060], [754, 1060]]};
+/* le misure sono quelle del dipinto (Flow, quaderno-stanza-d, 17 nov):
+   la parete con la finestra e le due tane in fondo, le librerie dei
+   fianchi con le loro tane, il tappeto rosso in mezzo */
+const QUAD_SCENA = {L: 900, A: 1500, muri: [110, 450, 790, 1440], via: [450, 1330], ostacoli: [],
+  tane: [[678, 470], [245, 470], [120, 980], [780, 980]]};
 const QUAD_POSTI_5 = [[450, 600], [690, 800], [600, 1110], [300, 1110], [210, 800]];
 const QUAD_POSTI_7 = [[450, 560], [670, 660], [700, 930], [585, 1180], [315, 1180], [200, 930], [230, 660]];
 const QUAD_AMICI = ['topo', 'ape', 'rana', 'riccio', 'gufo', 'lumaca', 'tappo'];
@@ -63311,6 +63434,7 @@ const ARENA_QUADERNO = {
      }},
   ],
   fondo: quadFondo, bordi: ['#1E3328', '#1C120A'],
+  foto: ['miss-leggio', 'miss-grande', 'miss-cestino', 'miss-busta', 'miss-tarlo'],
   cosa: quadCosa,
   nemico: arenaTarlo,
 };
@@ -63428,11 +63552,17 @@ function quadCosa(g, a, c){
     arenaOmbra(g, c.x, c.y + 4, 64 * sc, 0.5);
     const rosso = c.rotto ? (fermo ? 0.8 : 0.55 + Math.sin(a.tempo * 8) * 0.3) : 0;
     if (rosso) { g.save(); g.translate(c.x, c.y); g.scale(1, 0.4); g.fillStyle = 'rgba(230,60,50,' + rosso * 0.6 + ')'; g.beginPath(); g.arc(0, 0, 80 * sc, 0, 6.2832); g.fill(); g.restore(); }
+    const foto = arenaFoto(g, 'miss-leggio', c.x, c.y + 8 * sc, 132 * sc);
+    const y0 = foto ? c.y - 150 * sc : c.y - 120 * sc, w = 116 * sc, h = 54 * sc;
+    if (foto && c.rotto) {            /* la copia rosicchiata: le pagine arrossiscono e c'e' il morso */
+      g.fillStyle = 'rgba(230,70,60,.35)'; g.beginPath(); g.ellipse(c.x, y0 + 22 * sc, 56 * sc, 22 * sc, 0, 0, 6.2832); g.fill();
+      g.fillStyle = '#2B1A10'; g.beginPath(); g.arc(c.x + w * 0.38, y0 + 10 * sc, 13 * sc, 0, 6.2832); g.fill();
+    }
+    if (!foto) {
     /* il piede e la colonnina */
     g.fillStyle = '#4A2C16'; g.beginPath(); g.ellipse(c.x, c.y, 36 * sc, 13 * sc, 0, 0, 6.2832); g.fill();
     g.fillStyle = '#6B4424'; g.fillRect(c.x - 8 * sc, c.y - 92 * sc, 16 * sc, 92 * sc);
     /* il piano inclinato col quaderno aperto */
-    const y0 = c.y - 120 * sc, w = 116 * sc, h = 54 * sc;
     g.fillStyle = '#7A4E28'; g.beginPath(); g.moveTo(c.x - w / 2, y0 + h); g.lineTo(c.x + w / 2, y0 + h); g.lineTo(c.x + w * 0.44, y0); g.lineTo(c.x - w * 0.44, y0); g.closePath(); g.fill();
     g.fillStyle = c.rotto ? '#F3C9C0' : '#FFF8E6';
     g.beginPath(); g.moveTo(c.x - w * 0.44, y0 + h - 6 * sc); g.lineTo(c.x - 2 * sc, y0 + h - 2 * sc); g.lineTo(c.x - 2 * sc, y0 + 4 * sc); g.lineTo(c.x - w * 0.38, y0 + 6 * sc); g.closePath(); g.fill();
@@ -63441,6 +63571,7 @@ function quadCosa(g, a, c){
     for (let i = 1; i < 5; i++) { const yy = y0 + 6 * sc + i * 9 * sc; g.beginPath(); g.moveTo(c.x - w * 0.36, yy); g.lineTo(c.x - 8 * sc, yy); g.moveTo(c.x + 8 * sc, yy); g.lineTo(c.x + w * 0.36, yy); g.stroke(); }
     if (c.rotto) {                    /* il morso del Tarlo: una mezzaluna mangiata */
       g.fillStyle = '#2B1A10'; g.beginPath(); g.arc(c.x + w * 0.4, y0 + 8 * sc, 14 * sc, 0, 6.2832); g.fill();
+    }
     }
     if (c.morso > 0) {                /* sta mangiando: l'anello che si chiude */
       g.strokeStyle = '#FF6B4A'; g.lineWidth = 7 * sc;
@@ -63458,6 +63589,7 @@ function quadCosa(g, a, c){
     g.save(); g.translate(c.x, c.y - 40 * sc); g.scale(1, 0.5);
     const o = g.createRadialGradient(0, 0, 10, 0, 0, 170 * sc); o.addColorStop(0, 'rgba(255,214,107,' + luce + ')'); o.addColorStop(1, 'rgba(255,214,107,0)');
     g.fillStyle = o; g.beginPath(); g.arc(0, 0, 170 * sc, 0, 6.2832); g.fill(); g.restore();
+    if (!arenaFoto(g, 'miss-grande', c.x, c.y + 10 * sc, 230 * sc)) {
     g.fillStyle = '#5A3A1E'; g.fillRect(c.x - 70 * sc, c.y - 70 * sc, 140 * sc, 70 * sc);
     g.fillStyle = '#7A4E28'; g.fillRect(c.x - 80 * sc, c.y - 82 * sc, 160 * sc, 16 * sc);
     const w = 220 * sc, h = 96 * sc, y0 = c.y - 82 * sc - h;
@@ -63465,9 +63597,11 @@ function quadCosa(g, a, c){
     g.fillStyle = '#FFF8E6'; g.fillRect(c.x - w / 2, y0, w / 2 - 3 * sc, h); g.fillRect(c.x + 3 * sc, y0, w / 2 - 3 * sc, h);
     g.strokeStyle = 'rgba(80,60,40,.45)'; g.lineWidth = 2;
     for (let i = 1; i < 7; i++) { const yy = y0 + i * 13 * sc; g.beginPath(); g.moveTo(c.x - w / 2 + 12 * sc, yy); g.lineTo(c.x - 12 * sc, yy); g.moveTo(c.x + 12 * sc, yy); g.lineTo(c.x + w / 2 - 12 * sc, yy); g.stroke(); }
+    }
     arenaEmoji(g, '🦉', c.x + 120 * sc, c.y - 60 * sc, 54 * sc);
   } else if (c.tipo === 'cestino') {
     arenaOmbra(g, c.x, c.y + 4, 60 * sc, 0.5);
+    if (arenaFoto(g, 'miss-cestino', c.x, c.y + 8 * sc, 130 * sc)) return;
     g.fillStyle = '#A8793E'; g.beginPath(); g.moveTo(c.x - 46 * sc, c.y - 90 * sc); g.lineTo(c.x + 46 * sc, c.y - 90 * sc); g.lineTo(c.x + 36 * sc, c.y); g.lineTo(c.x - 36 * sc, c.y); g.closePath(); g.fill();
     g.strokeStyle = '#7A5428'; g.lineWidth = 4;
     for (let i = 1; i < 4; i++) { const yy = c.y - i * 22 * sc; g.beginPath(); g.moveTo(c.x - (36 + i * 2.5) * sc, yy); g.lineTo(c.x + (36 + i * 2.5) * sc, yy); g.stroke(); }
@@ -63476,6 +63610,8 @@ function quadCosa(g, a, c){
     const z = c.z || 0, dondola = fermo ? 0 : Math.sin(a.tempo * 3 + c.seme) * Math.min(1, z / 80);
     arenaOmbra(g, c.x, c.y + 2, 34 * sc * (1 - z / 600), 0.45);
     g.save(); g.translate(c.x + dondola * 40, c.y - 18 * sc - z - (fermo || z ? 0 : Math.abs(Math.sin(a.tempo * 3 + c.seme)) * 6)); g.rotate(dondola * 0.5);
+    const fb = mondoImmagine('miss-busta');
+    if (fb) { const bw = 84 * sc, bh = bw * fb.naturalHeight / fb.naturalWidth; g.drawImage(fb, -bw / 2, -bh / 2, bw, bh); g.restore(); return; }
     g.fillStyle = '#FFF3DC'; g.strokeStyle = '#B0631A'; g.lineWidth = 3;
     g.beginPath(); g.rect(-30 * sc, -20 * sc, 60 * sc, 40 * sc); g.fill(); g.stroke();
     g.beginPath(); g.moveTo(-30 * sc, -20 * sc); g.lineTo(0, 4 * sc); g.lineTo(30 * sc, -20 * sc); g.stroke();
@@ -63496,11 +63632,19 @@ function quadCosa(g, a, c){
       sicuro: ci si passa accanto e si svuotano le tasche da sole.
    Cosa resta: i sats sono pezzetti di bitcoin (cento milioni fanno un
    bitcoin) e si tengono nel proprio wallet, non in tasca. */
-const SATS_SCENA = {L: 900, A: 1500, muri: [96, 384, 804, 1440], via: [450, 1320],
-  ostacoli: [{x: 330, y: 760, w: 240, h: 140}, {x: 210, y: 1180, r: 40}, {x: 690, y: 560, r: 40}], nido: [150, 430]};
-const SATS_WALLET = [690, 1230];
-const SATS_POSTI = [[200, 470], [450, 470], [560, 600], [240, 640], [180, 860], [700, 800], [460, 980],
-  [260, 1020], [640, 1040], [380, 1180], [560, 1330], [220, 1360], [700, 1360], [450, 650], [760, 980], [150, 1080]];
+/* LE MISURE SONO QUELLE DEL DIPINTO (Flow, forno-stanza-c, 17 nov): il
+   forno a cupola in fondo, il tavolo infarinato in mezzo, i due sacchi,
+   il bancone in basso a destra, il nido in cima allo scaffale */
+const SATS_SCENA = {L: 900, A: 1500, muri: [60, 440, 840, 1450], via: [190, 1380],
+  ostacoli: [{x: 270, y: 384, w: 360, h: 130}, {x: 225, y: 800, w: 450, h: 190}, {x: 480, y: 1080, w: 390, h: 250},
+    {x: 125, y: 1110, r: 75}, {x: 790, y: 560, r: 70}], nido: [110, 130],
+  copri: [{fino: 990, poli: [[196, 770], [525, 560], [695, 686], [690, 722], [660, 862], [640, 865], [400, 1045], [352, 1045], [228, 945], [200, 800]]},
+    {fino: 1330, poli: [[468, 1140], [770, 948], [878, 1030], [872, 1165], [590, 1378], [560, 1372], [478, 1300]]},
+    {fino: 620, poli: [[740, 470], [820, 455], [862, 490], [850, 600], [835, 645], [760, 640], [715, 600]]},
+    {fino: 1160, poli: [[60, 1000], [150, 980], [200, 1040], [215, 1150], [160, 1185], [70, 1180], [42, 1100]]}]};
+const SATS_WALLET = [320, 1320];
+const SATS_POSTI = [[150, 500], [700, 470], [450, 560], [180, 700], [720, 700], [450, 1040], [150, 880], [760, 900],
+  [300, 1180], [600, 1400], [780, 1400], [240, 1420], [560, 650], [330, 690], [800, 1010], [130, 1300]];
 const SATS_QUANTI = 12;
 /* PURA: dove cadono i sats, a caso fra i posti liberi */
 function satsSparsi(quanti){ return missMescola(SATS_POSTI).slice(0, quanti); }
@@ -63561,7 +63705,7 @@ const ARENA_SATS = {
      },
      obiettivo(a){
        const d = a.dati;
-       return d.tasca ? `Hai ${d.tasca} sats in tasca: portali nel wallet prima della Gazza!` : `Raccogli i sats (nel wallet ${d.wallet}/${d.tot})`;
+       return d.tasca ? `Hai ${d.tasca} ${d.tasca === 1 ? 'sat' : 'sats'} in tasca: portali nel wallet prima della Gazza!` : `Raccogli i sats (nel wallet ${d.wallet}/${d.tot})`;
      },
      freccia(a){
        const d = a.dati, w = a.cose.find(c => c.tipo === 'wallet');
@@ -63595,6 +63739,7 @@ const ARENA_SATS = {
      }},
   ],
   fondo: satsFondo, bordi: ['#4A2A1A', '#2A1A10'],
+  foto: ['miss-sat', 'miss-wallet', 'miss-gazza', 'miss-gazza-ferma'],
   cosa: satsDisegnaCosa,
   nemico: gazzaDisegna,
 };
@@ -63632,6 +63777,16 @@ function gazzaDisegna(g, a, n){
   const fermo = effettiRidotti(), sc = arenaProfondo(a.sc, n.y), z = n.stato === 'nido' ? 40 : 110;
   arenaOmbra(g, n.x, n.y + 6, 40 * sc, 0.35);
   const y = n.y - z * sc - (fermo ? 0 : Math.sin(n.ali * 0.5) * 6);
+  /* la Gazza dipinta: in volo guarda a sinistra, ferma a destra; battito
+     d'ali finto con un respiro verticale */
+  const ferma = n.stato === 'nido', fg = mondoImmagine(ferma ? 'miss-gazza-ferma' : 'miss-gazza');
+  if (fg) {
+    const bat = ferma || fermo ? 0 : Math.sin(n.ali) * 0.12;
+    const w = (ferma ? 120 : 170) * sc, h = w * fg.naturalHeight / fg.naturalWidth * (1 + bat);
+    g.save(); g.translate(n.x, y); g.scale((ferma ? 1 : -1) * n.dir, 1);
+    g.drawImage(fg, -w / 2, -h / 2, w, h); g.restore();
+    return;
+  }
   g.save(); g.translate(n.x, y); g.scale(n.dir * sc, sc);
   const ala = fermo ? 0.3 : Math.sin(n.ali) * 0.8;
   /* le ali, bianche e nere, che battono */
@@ -63705,14 +63860,16 @@ function satsFondo(g){
     q.fillStyle = '#5A3420'; q.fillRect(0, 388, 90, A); q.fillRect(810, 388, 90, A);
     q.fillStyle = 'rgba(0,0,0,.3)'; q.fillRect(84, 388, 8, A); q.fillRect(808, 388, 8, A);
     /* il tavolo infarinato in mezzo */
-    q.fillStyle = 'rgba(0,0,0,.3)'; q.fillRect(338, 772, 240, 150);
-    q.fillStyle = '#8A5A33'; q.fillRect(322, 740, 256, 160);
-    q.fillStyle = '#A8733F'; q.fillRect(330, 748, 240, 144);
+    q.fillStyle = 'rgba(0,0,0,.3)'; q.fillRect(241, 832, 450, 190);
+    q.fillStyle = '#8A5A33'; q.fillRect(225, 760, 450, 230);
+    q.fillStyle = '#A8733F'; q.fillRect(233, 768, 434, 214);
+    /* il bancone in basso a destra */
+    q.fillStyle = '#6B4424'; q.fillRect(480, 1080, 390, 250); q.fillStyle = '#8A5A33'; q.fillRect(470, 1060, 410, 40);
     q.fillStyle = 'rgba(255,250,240,.55)'; q.beginPath(); q.ellipse(430, 810, 70, 34, 0.2, 0, 6.2832); q.fill();
     q.fillStyle = '#E8C48A'; q.beginPath(); q.ellipse(500, 790, 40, 24, 0, 0, 6.2832); q.fill();
     q.fillStyle = '#C9915A'; q.beginPath(); q.ellipse(400, 850, 30, 18, 0, 0, 6.2832); q.fill();
     /* i sacchi di farina */
-    [[210, 1180], [690, 560]].forEach(([x, y]) => {
+    [[125, 1150], [790, 600]].forEach(([x, y]) => {
       q.fillStyle = 'rgba(0,0,0,.3)'; q.beginPath(); q.ellipse(x + 8, y + 10, 46, 20, 0, 0, 6.2832); q.fill();
       q.fillStyle = '#EDE3CF'; q.beginPath(); q.ellipse(x, y - 20, 42, 50, 0, 0, 6.2832); q.fill();
       q.fillStyle = '#C9B48E'; q.fillRect(x - 30, y - 64, 60, 10);
@@ -63729,6 +63886,8 @@ function satsDisegnaCosa(g, a, c){
     const su = fermo ? 0 : Math.abs(Math.sin(a.tempo * 3 + c.seme)) * 12, giro = fermo ? 1 : Math.cos(a.tempo * 3.4 + c.seme);
     arenaOmbra(g, c.x, c.y + 2, 26 * sc, 0.4);
     g.save(); g.translate(c.x, c.y - 30 * sc - su); g.scale(Math.max(0.15, Math.abs(giro)), 1);
+    const fs = mondoImmagine('miss-sat');
+    if (fs) { g.drawImage(fs, -30 * sc, -30 * sc, 60 * sc, 60 * sc); g.restore(); return; }
     g.fillStyle = '#C98A12'; g.beginPath(); g.arc(0, 0, 24 * sc, 0, 6.2832); g.fill();
     g.fillStyle = '#FFD25A'; g.beginPath(); g.arc(0, 0, 19 * sc, 0, 6.2832); g.fill();
     g.fillStyle = '#B06E08';
@@ -63738,6 +63897,18 @@ function satsDisegnaCosa(g, a, c){
     /* il bancone col wallet sopra: un portafoglio arancione che si
        illumina quando ci sono dentro i sats */
     arenaOmbra(g, c.x, c.y + 6, 90 * sc, 0.5);
+    const fw = mondoImmagine('miss-wallet');
+    if (fw) {                         /* il wallet dipinto, per terra vicino al bancone */
+      if (c.pieno) {
+        const al = fermo ? 0.5 : 0.4 + Math.sin(a.tempo * 2.5) * 0.15;
+        const o = g.createRadialGradient(c.x, c.y - 50 * sc, 6, c.x, c.y - 50 * sc, 120 * sc);
+        o.addColorStop(0, 'rgba(255,214,107,' + al + ')'); o.addColorStop(1, 'rgba(255,214,107,0)');
+        g.fillStyle = o; g.fillRect(c.x - 130 * sc, c.y - 170 * sc, 260 * sc, 200 * sc);
+      }
+      arenaFoto(g, 'miss-wallet', c.x, c.y + 14 * sc, 170 * sc);
+      if (c.pieno) arenaEmoji(g, '⚡', c.x, c.y - 120 * sc - (fermo ? 0 : Math.abs(Math.sin(a.tempo * 3)) * 8), 40 * sc);
+      return;
+    }
     g.fillStyle = '#6B4424'; g.fillRect(c.x - 80 * sc, c.y - 60 * sc, 160 * sc, 60 * sc);
     g.fillStyle = '#8A5A33'; g.fillRect(c.x - 90 * sc, c.y - 74 * sc, 180 * sc, 18 * sc);
     if (c.pieno) {
