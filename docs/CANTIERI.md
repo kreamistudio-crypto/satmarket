@@ -87962,3 +87962,96 @@ vivo in Chromium: alla cassa disegnata il pallino del contanti scelto e
 la carta tolta; sulla pagina del PayCode la commissione 3 apre
 `…&premio=-3`. NON visto dal vivo: il foglio di Barattolo aperto al
 passo 5 (provato in node sul pezzo vero).
+
+## La CI mirata: prove.py e i collaudi scelti dai file cambiati da `pronto` (17 nov 2026, cantiere ci-mirata, richiesta di Andrea)
+
+**LA RICHIESTA.** Andrea: «le CI sono decisamente troppo lente, quelle
+inutili devono essere saltate, cioè se tocco qualcosa di quella
+categoria sì, altrimenti se sai già a prescindere che non l'ho
+modificato saltalo». Un giro su main durava ~31 minuti in fila:
+prove.py ~13,5 e collaudi ~16,5, sulla vm-2050.
+
+**COSA C'È.** Due scelte, tutte e due contro `pronto` (l'ultimo albero
+verde, non il push di prima: con la coda un giro può saltare, e il suo
+codice lo deve provare il giro dopo — il perché di `cambiati_da`):
+- `prove.py` nudo, SOLO sul push a main della CI (le tre variabili di
+  GitHub: `GITHUB_ACTIONS`, `GITHUB_EVENT_NAME=push`,
+  `GITHUB_REF=refs/heads/main`), diventa `--dai-file=origin/pronto`
+  (`_argomenti_della_ci`): le categorie del giudice del 5 nov. Prende
+  da sé la punta di `pronto` (`--depth=1`) e, senza la storia in mezzo
+  (il checkout corto), confronta gli ALBERI. Fail-closed in tre punti
+  nuovi: un confronto che non riesce → tutto; lo stesso albero di
+  `pronto` (un giro rifatto) → tutto; il resto come il giudice (nel
+  dubbio, tutto). Il lancio a mano («Run workflow», anche su main), i
+  rami e il locale girano TUTTO come prima; `PROVE_INTERE=1` lo forza.
+  Per vedere prima cosa farebbe la CI: le tre variabili +
+  `python prove.py --mostra`.
+- `collaudi_ci.py --salvo-solo-documenti-da pronto` (il nome è rimasto
+  per non toccare il workflow) adesso salta anche i collaudi che NON
+  VEDONO i file cambiati (`scegli_collaudi`). Un collaudo «vede» un file
+  se lo importa a qualunque profondità (quasi tutti importano il server,
+  anche passando da un altro collaudo) o se il file è NOMINATO nel
+  codice di quel che importa — il percorso, il nome, il modulo fra
+  virgolette, la cartella fra virgolette — tolti commenti, docstring e
+  i `-- ` dell'SQL nelle stringhe (`senza_commenti`). Quindi server.py
+  fa girare TUTTI i 148 (anche i due che lo leggono con `ast`), e ogni
+  file che il server nomina (miniapp.html, sw.js, vendor/…) 146.
+  Girano TUTTI anche per il lanciatore,
+  `requirements.txt`, `config_esempio.py`, `.github/` e un file
+  sparito; l'elenco fa girare i soli nomi NUOVI rispetto a quello di
+  `pronto` (illeggibile → tutto); un import che non si legge → tutto.
+
+**IL WORKFLOW NON SI TOCCA, ed è voluto.** Dopo un commit che cambia
+`.github/workflows/` il robot può non spostare `pronto` e il deploy
+resta fermo (la lezione dell'elenco in `ci/`, 13 ott). Perciò la scelta
+vive in prove.py e in collaudi_ci.py, e il passo resta `python prove.py`.
+
+**QUANTO SI RISPARMIA, MISURATO** sui commit di main dal 14 al 17 nov,
+uno per uno (`--dai-file=<sha>^`): prove.py — 9 su 24 fra il 40 e il
+65% delle sezioni, 1 di soli documenti con le sole 8 sentinelle, il
+resto (14) quasi tutto o tutto, perché toccano server.py e miniapp.html
+in funzioni di più categorie. Collaudi — chi tocca server.py li
+gira tutti, miniapp.html 146 su 148 (fuori `collaudo_canale_admin` e
+`collaudo_verita_lnd`, che il server lo leggono con `ast`); commit di soli prove.py, deploy/,
+estensione/ o LICENSE ne girano 14–16 su 148 invece di 148 (i 14 sono
+quelli che importano `giudice_deploy`, che nomina prove.py in una
+stringa: una menzione in più, mai una in meno). La scelta costa ~9 s.
+ONESTAMENTE: la promozione unica, che porta il lavoro di più thread,
+tocca quasi sempre server.py, e lì il giro resta intero. Il guadagno
+grosso viene dai push piccoli (un ritocco di testi, uno script del
+nodo, l'estensione, un documento con la sua sezione).
+
+**LA RETE, che resta.** Il giudice di prove.py è un'euristica (lo diceva
+già la voce del 5 nov): può scegliere meno del necessario quando una
+funzione cambia comportamento per una sezione che non la nomina. La
+suite intera `PROVE_SEVERE=1 python prove.py` e i collaudi della CI
+restano obbligatori nel worktree prima di ogni push su develop (regola
+di CLAUDE.md, invariata): la CI di main diventa il secondo controllo,
+non più l'unico intero.
+
+**LE STRADE SCARTATE.** I collaudi scelti per FUNZIONE toccata in
+server.py: un collaudo gira un flusso intero del server vero, e una
+funzione non dice quali flussi attraversa. Due job paralleli (prove.py
+e collaudi): sulla vm-2050 c'è UN runner, i job andrebbero in fila lo
+stesso, e il giudice del VPS chiede `prove` per nome. Il diff col push
+di prima: vedi sopra, la coda. Il passo condizionato nel workflow: il
+`pronto` fermo.
+
+**PROVATO.** Le sezioni `prove_ci_leggera` e
+`prove_categorie_delle_prove`, allargate: il giudice dei collaudi su
+file di cartone (chi importa per interposto collaudo, la pagina nominata
+dal server, prove.py nominato solo in commento e nell'SQL, il manifest
+dell'estensione che non è quello di casa, i quattro «tutti», lo
+sparito, l'elenco coi nomi nuovi, l'import illeggibile) e DAL VERO su un
+repo di cartone (lo script che nessuno vede: zero collaudi; il collaudo
+stesso cambiato; un file nominato; un nome nuovo nell'elenco gira da
+solo); gli argomenti della CI (push su main sì; a mano, ramo,
+PROVE_INTERE, locale no; `--mostra` da solo non è una scelta) e il
+fail-closed del confronto (vuoto e rotto: tutto). `--mostra` con le
+variabili della CI in un clone `--depth=1` di develop: prende `pronto`
+da solo e sceglie. NON visto dal vivo: il primo giro vero su main (il
+registro dirà «I file toccati rispetto a origin/pronto» e «girano N
+collaudi su 148»).
+
+**COSA RESTA.** Se un giorno serve un giro intero su main senza commit:
+Actions → prove → «Run workflow» su main (non sposta `pronto`).
