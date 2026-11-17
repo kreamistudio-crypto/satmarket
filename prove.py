@@ -155570,6 +155570,21 @@ out.nascosto = [
   applica(0.03, {commissione: 4}, {punti: 0.5})];
 console.log(JSON.stringify(out));
 """)
+    # (17 nov 2026, tappo-annullo-subito) un utente ha chiesto a Tappo se
+    # per annullare deve aspettare la garanzia, e Tappo ha detto di si':
+    # il libro non lo diceva. L'annullo da soli prima della garanzia, e
+    # l'ordine che torna nel libro se annulla chi ha preso, ora Tappo li sa.
+    _libro = open(os.path.join(QUI, "assistente", "sapere.md"), encoding="utf-8").read()
+    prova("Tappo sa che prima della garanzia si annulla subito, da soli", [True] * 3,
+          ["prima che i sats siano in garanzia NON serve aspettare" in _libro,
+           "Se annulla chi aveva preso, l'ordine torna subito nel libro" in _libro,
+           "Solo dopo, coi sats in garanzia, annullare da soli non si può più" in _libro])
+    # ...e la presa ON-CHAIN, dove chi compra non ha il tasto nelle prime
+    # ore (lo screenshot dell'utente era proprio quello): Tappo lo dice
+    prova("Tappo sa che sull'on-chain chi compra chiede a chi vende di annullare",
+          [True] * 2,
+          ["chi compra NON ha un tasto per annullare" in _libro,
+           "a differenza di Lightning non torna nel libro" in _libro])
     out = _node_banco(js)
     if out is None:
         salta("i testi del P2P girati in node", "node non c'e'")
