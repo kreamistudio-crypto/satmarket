@@ -28,9 +28,11 @@ Il percorso si vede fin dall'inizio, col marchio Barattozon:
 - **Carrello**: sotto «Procedi all'ordine» lo stesso bottone. Al tocco
   preme «Procedi all'ordine».
 - **Cassa**: un cartello in basso a destra coi tre passi, e la riga
-  «Paga in Contanti nel Punto Vendita più vicino» contornata d'arancio.
-  Qui l'estensione non clicca niente: il pagamento lo scegli tu.
-- Poi, sulla pagina del PayCode, «Pubblica su Barattozon» come sopra.
+  «Paga in Contanti nel Punto Vendita più vicino» contornata d'arancio
+  e **già scelta**. La conferma del metodo e l'ordine li premi tu.
+- **Pagina del PayCode**: il riquadro ti chiede la **commissione a chi
+  paga** (da 0 a 20 %), poi «Pubblica su Barattozon» apre Barattolo col
+  foglio già all'ultimo passo: manca solo il tuo «Pubblica».
 
 Non preme MAI «Acquista ora» (con l'1-Click ordinerebbe da solo) né il
 bottone che invia l'ordine.
