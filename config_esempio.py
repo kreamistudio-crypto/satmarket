@@ -392,6 +392,14 @@ MERCATINO_MAPPA_RITIRO = True
 FEEDBACK_MODIFICABILE = True
 FEEDBACK_MODIFICA_GIORNI = 7
 
+# --- L'etichetta degli alimenti (17 nov 2026) -------------------------
+# In «Alimenti e bevande» chi vende puo' scrivere ingredienti, i 14
+# allergeni UE, il peso netto e la tabella nutrizionale (per 100 g o
+# 100 ml), e la scheda li mostra prima di comprare (Reg. UE 1169/2011,
+# art. 14). Facoltativa per chi vende. Nasce ACCESA (le leve nuove sono
+# accese di serie): la riga serve per SPEGNERLA, e solo False spegne.
+ETICHETTA_ALIMENTI = True
+
 # --- Consegna digitale (buoni regalo, codici, licenze) ---------------
 # Il codice passa DENTRO Barattolo: il venditore lo consegna in un
 # campo dedicato dell'ordine, il compratore lo rivela con un tocco

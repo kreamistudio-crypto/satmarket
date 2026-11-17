@@ -86501,3 +86501,70 @@ controprova sulla porta: rossa.
 DA GUARDARE. Gli acquisti on-chain e del P2P non entrano, come per le
 vendite. La commissione sulla spedizione nel netto delle vendite è la
 regola del pagamento di oggi: non toccata.
+
+## L'etichetta degli alimenti (17 nov 2026, cantiere etichetta-alimenti; idea di Luca, via Andrea)
+
+Luca: «per essere conformi alle leggi europee qualsiasi prodotto
+alimentare venduto online deve mostrare la tabella con i valori
+nutrizionali… una uguale per tutti, coi valori inseribili a mano dal
+venditore». L'art. 14 del Reg. UE 1169/2011: nella vendita a distanza
+le informazioni obbligatorie (ingredienti, allergeni, quantità netta,
+dichiarazione nutrizionale) si leggono PRIMA di comprare.
+
+DECISO. Piano mandato ad Andrea e approvato con una scelta sola:
+FACOLTATIVA (17 nov), perché molti piccoli produttori sono esentati
+dalla tabella nutrizionale (Allegato V) e obbligarla fermerebbe chi non
+la deve; il form lo dice nel suo riquadro. Solo in «Alimenti e bevande»:
+peso netto con unità, ingredienti, i 14 allergeni come bottoncini, la
+tabella per 100 g o 100 ml. Nella scheda sta sotto la descrizione,
+quindi prima del venditore e di ogni «Compra», allergeni in grassetto.
+Una colonna JSON e non dodici: la tabella è una cosa sola, e il giorno
+che servisse un campo in più (le tracce, l'origine) non si migra niente.
+LA TABELLA O È INTERA O NON C'È: un «grassi 2 g» senza saturi e zuccheri
+racconta un alimento che non è; il 400 nomina quel che manca. Gli altri
+pezzi stanno in piedi da soli. L'energia si scrive una volta: l'altra
+unità la fa il conto (nel form e nel server). I controlli di coerenza
+sono quelli che una confezione vera non viola mai (saturi ≤ grassi,
+zuccheri ≤ carboidrati, per 100 g la somma ≤ 100); per 100 ml i grammi
+possono passare 100 (uno sciroppo pesa più dell'acqua) e la somma non
+si guarda. Ingredienti senza link né contatti e col filtro parole: è
+un'etichetta, non una seconda descrizione. Un annuncio che cambia
+categoria se la porta via (modifica); uno spostato da un moderatore la
+tiene in colonna ma la scheda non la mostra. Leva `ETICHETTA_ALIMENTI`
+accesa di serie (regola del 14 nov): spenta, niente form, niente
+scrittura, niente scheda; quel che c'è resta e torna con la leva.
+
+SCARTATO. Obbligarla (scelta di Andrea). Dodici colonne. Tagliare in
+silenzio i valori fuori misura (la regola delle domande: il 400 e non il
+troncamento). Mostrarla nella vetrina o nella card: la vetrina resta
+leggera, l'etichetta viaggia solo con la scheda come le domande. Portarla
+su Nostr e negli import (CSV, Shopify/WooCommerce): fuori dal piano,
+detto ad Andrea.
+
+PROVATO. `prove_etichetta_alimenti` (18): la leva (nasce accesa, solo
+False spegne, pannello, /api/me, migrazione), i gemelli server/client
+(14 allergeni, 8 valori, stesso ordine), il giro del client (payload da
+pubblica E modifica, scheda, categoria, strada firmata), e la resa fatta
+girare in node: ingredienti scappati, allergeni ignoti buttati, numeri
+alla italiana, energia completata e kcal scritti a mano intoccati.
+Controprove: tolto `esc()` e tolta la guardia dei kcal a mano, rosse.
+`collaudo_etichetta_alimenti` (32, nella gabbia della CI e nel venv
+senza coincurve): pubblica con etichetta e la scheda la rilegge pulita;
+senza etichetta come ieri; nove forme storte, 400 senza righe; lo
+sciroppo per 100 ml; fuori categoria buttata; spostata dal moderatore
+non mostrata; JSON rovinato = nessuna; modifica che conserva, riscrive,
+rifiuta senza toccare, cancella, e il cambio di categoria; la leva
+spenta e riaccesa. Controprove su quattro mutazioni del server, tutte
+rosse. Giro dal vivo in Chromium a 390 px: form e scheda disegnati,
+kcal riempiti dai kJ, nessun errore in console, nessuno scorrimento
+orizzontale. Sull'albero del cantiere (da origin/develop f0b2a6b3): suite
+severa nel venv del passo «Le prove» (senza httpx né coincurve), 28.916
+passate e 1 fallita, `prove_domande_compratore` che legge la riga `cns`
+alla lettera: l'etichetta entra con un `Object.assign` sulla riga dopo,
+e le quattro sezioni vicine (domande, incasso, chiavi di mapListing,
+etichetta) rigirate verdi; collaudi della CI 140 su 140 nel venv senza
+coincurve, il nuovo anche senza le variabili del proxy.
+
+DA GUARDARE. Gli import (CSV, negozi collegati, Nostr) non la portano:
+chi carica alimenti in blocco la scrive a mano annuncio per annuncio. In
+modalità DEMO la scheda non la mostra (non c'è il server che la rilegge).

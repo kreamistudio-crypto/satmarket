@@ -36314,6 +36314,35 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   on-chain non le mostra. Nell'ordine il riquadro `pannelloRisposte`
   («📋 Leggi le risposte»). La strada firmata (Nostr) le domande non le
   porta. Prove: `prove_domande_compratore`, `collaudo_domande_compratore`.
+- L'ETICHETTA DEGLI ALIMENTI (17 nov 2026, cantiere etichetta-alimenti;
+  il perché in CANTIERI, «L'etichetta degli alimenti»). Solo in
+  «Alimenti e bevande» (`CATEGORIA_ETICHETTA`), FACOLTATIVA: ingredienti,
+  i 14 allergeni dell'Allegato II (`ALLERGENI_UE`, chiavi interne; i nomi
+  li scrive il gemello `ALLERGENI_UE` del client), peso netto con unità
+  (`UNITA_PESO`) e la tabella dell'art. 30 per 100 g o 100 ml
+  (`NUTRIENTI_UE`: kJ, kcal, grassi, saturi, carboidrati, zuccheri,
+  proteine, sale). L'ANNUNCIO: `annunci.etichetta` (JSON, '' = nessuna).
+  Il giudice unico è `etichetta_da_payload` (pubblica e modifica, PRIMA
+  di ogni scrittura; chiave assente o leva spenta = None = conserva;
+  fuori categoria ''): numeri con la virgola italiana, tetti per 100 g
+  (per 100 ml i grammi fino a `TETTO_NUTRIENTE_ML`), l'energia mancante
+  la fa il conto (1 kcal = 4,184 kJ), LA TABELLA O È INTERA O NON C'È
+  (400 che nomina quel che manca), saturi ≤ grassi, zuccheri ≤
+  carboidrati, per 100 g la somma ≤ 100; ingredienti fino a
+  `MAX_INGREDIENTI`, senza link né contatti, col filtro parole. Esce SOLO
+  da `/api/listings/{id}` (`etichetta`, oggetto) e solo se
+  `etichetta_letta` la ammette (leva accesa, categoria giusta, JSON
+  sano): un annuncio spostato di categoria la tiene in colonna ma non la
+  mostra. IL CLIENT: nel form `#sellEtichettaField` sotto la descrizione
+  (`renderEtichettaForm`, stato `etichettaSell`, null = non toccare
+  finché la scheda non arriva, `etichettaPayload` nelle due `cns`); la
+  categoria la accende da `aggiornaCondizioneForm`; la strada firmata
+  (Nostr) non la porta. Nella scheda `etichettaScheda` sotto la
+  descrizione, riempita da `caricaEtichetta` (cache `etichetteNote`,
+  svuotata alla modifica) con `htmlEtichetta`, tutto in `esc()`. LA LEVA
+  `ETICHETTA_ALIMENTI` nasce accesa (solo False spegne), sta nel pannello
+  e in `/api/me` (`etichetta_alimenti`). Prove: `prove_etichetta_alimenti`,
+  `collaudo_etichetta_alimenti`.
 - LE NOVITÀ PER GLI UTENTI (`NOVITA.md`, 10 nov 2026, cantiere novita).
   Il file in cima al repo dove ogni cantiere che porta qualcosa di
   VISIBILE scrive una voce: `## data · nome`, poi `frase:` (per gli

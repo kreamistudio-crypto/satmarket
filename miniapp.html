@@ -8638,6 +8638,36 @@
   .field .dom-azioni{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
   .field .dom-azioni .btn{flex:1 1 auto;width:auto}
   .dom-cassa select, .dom-cassa input{width:100%}
+  /* L'ETICHETTA DEGLI ALIMENTI (17 nov 2026): nel form la scatola delle
+     domande (stesse regole rimesse a mano), nella scheda una tabella
+     uguale per tutti, come quella sulla confezione. */
+  .field .et-riga{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .field .et-riga input{flex:1 1 auto;min-width:0}
+  .field .et-riga select{flex:0 0 84px}
+  .field .et-sez{margin-top:12px;font-size:12.5px;font-weight:800;
+    color:var(--ink)}
+  .field .et-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .field .et-chips .chip{padding:6px 11px;font-size:12.5px}
+  .field .et-base{display:inline-flex;gap:4px;margin-left:6px}
+  .field .et-base .chip{padding:3px 10px;font-size:12px}
+  .field .et-griglia{display:grid;grid-template-columns:1fr 96px;gap:6px 8px;
+    align-items:center;margin-top:8px}
+  .field .et-griglia span{font-size:13px;font-weight:700;color:var(--ink)}
+  .field .et-griglia span.et-dicui{padding-left:14px;font-weight:600;
+    color:var(--muted)}
+  .field .et-griglia input{width:100%;padding:8px 10px}
+  .etichetta{margin:6px 0 16px;border:1.5px solid var(--ink);border-radius:12px;
+    padding:12px 14px;font-size:13.5px;color:var(--desc);background:var(--card)}
+  .etichetta .et-t{font-size:11px;font-weight:800;text-transform:uppercase;
+    letter-spacing:.04em;color:var(--muted);margin-top:10px}
+  .etichetta .et-t:first-child{margin-top:0}
+  .etichetta .et-testo{white-space:pre-line;margin-top:2px}
+  .etichetta table{width:100%;border-collapse:collapse;margin-top:4px}
+  .etichetta th,.etichetta td{padding:5px 0;border-bottom:1px solid var(--line);
+    text-align:left;font-weight:600}
+  .etichetta td{text-align:right;font-variant-numeric:tabular-nums}
+  .etichetta tr.et-dicui th{padding-left:14px;font-weight:500}
+  .etichetta tr:last-child th,.etichetta tr:last-child td{border-bottom:0}
   .field label.cons-riga{display:flex;align-items:flex-start;gap:9px;
     margin:8px 0 0;font-size:13.5px;font-weight:700;color:var(--ink);
     text-transform:none;letter-spacing:normal;line-height:1.4;
@@ -14808,6 +14838,10 @@ document.getElementById('cartello')?.remove();</script>
         <div id="zonaHint" style="display:none;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45"></div></div>
       <div class="field"><label>Descrizione</label>
         <textarea id="sellDesc" placeholder="Condizioni, difetti, motivo della vendita…"></textarea></div>
+      <!-- L'ETICHETTA DEGLI ALIMENTI (17 nov 2026): solo in «Alimenti e
+           bevande», la disegna renderEtichettaForm -->
+      <div class="field" id="sellEtichettaField" style="display:none">
+        <div id="sellEtichettaBox" class="dom-box"></div></div>
       <!-- La prevenzione del venditore irraggiungibile (ago 2026,
            caso vero: «contattami per i colori» da chi non ha ne'
            username ne' npub — nessuno poteva scriverle, moderatori
@@ -18613,6 +18647,9 @@ function mapListing(a){
     /* (9 nov 2026) come vuole ricevere chi vende per QUESTO annuncio:
        arriva solo dalla scheda (undefined = «non lo so») */
     incassoAnn: typeof a.incasso === 'string' ? (['ln', 'onchain'].includes(a.incasso) ? a.incasso : '') : undefined,
+    /* (17 nov 2026) l'etichetta degli alimenti: arriva solo dalla
+       scheda, e solo se c'e' (undefined = «non lo so») */
+    etichetta: (typeof a.etichetta === 'object' && a.etichetta) || undefined,
     servDove:a.servizio_dove||'', durataMin:a.durata_min||0,
     /* il limite per ordine (cantiere quantita-servizi): 0 = nessuno.
        NON e' lo stock — vedi qtaMassimaAnnuncio, che lo usa al posto
@@ -33938,6 +33975,7 @@ function openDetail(id){
       ${famigliaScheda(l)}
       <div class="desc-tit">Descrizione</div>
       <div class="desc">${descrizioneHTML(l)}</div>
+      ${etichettaScheda(l)}
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         ${voltoHTML({nome: l.seller, avatar: l.avatar, negozio: l.negozio,
                      ignoto: true}, 'avatar', {tag: 'div'})}
@@ -34153,6 +34191,7 @@ function openDetail(id){
      se non e' cambiato nulla non fa nulla. */
   navRiflette();
   caricaFamiglia(l);                  // le sorelle, se non si sanno ancora
+  caricaEtichetta(l);                 // l'etichetta degli alimenti, idem
   sezioneAltriOggetti(l);             // in coda, fail-open: arriva quando arriva
 }
 
@@ -56223,6 +56262,181 @@ function domandePayload(){
                 o: (q.o||[]).map(x => String(x).trim()).filter(Boolean)}))
     .filter(q => q.t)};
 }
+/* ===== L'ETICHETTA DEGLI ALIMENTI (17 nov 2026, cantiere etichetta-alimenti)
+   Da Luca, via Andrea: per l'art. 14 del Regolamento UE 1169/2011 chi
+   compra a distanza legge ingredienti, allergeni, peso netto e valori
+   nutrizionali PRIMA di pagare. Una tabella uguale per tutti, coi valori
+   scritti a mano. FACOLTATIVA (decisione di Andrea): il form la offre e
+   ricorda la legge, il giudice e' `etichetta_da_payload` nel server.
+   I DUE ELENCHI sono i gemelli di ALLERGENI_UE e NUTRIENTI_UE del
+   server: le chiavi sono le sue, qui ci sono i nomi da leggere
+   (prove.py fallisce se le chiavi divergono). */
+const CAT_ETICHETTA = 'Alimenti e bevande';
+const ALLERGENI_UE = [['glutine','Cereali con glutine'], ['crostacei','Crostacei'],
+  ['uova','Uova'], ['pesce','Pesce'], ['arachidi','Arachidi'], ['soia','Soia'],
+  ['latte','Latte'], ['frutta_guscio','Frutta a guscio'], ['sedano','Sedano'],
+  ['senape','Senape'], ['sesamo','Semi di sesamo'], ['solfiti','Solfiti'],
+  ['lupini','Lupini'], ['molluschi','Molluschi']];
+const NUTRIENTI_UE = [['kj','Energia (kJ)'], ['kcal','Energia (kcal)'],
+  ['grassi','Grassi'], ['saturi','di cui acidi grassi saturi'],
+  ['carboidrati','Carboidrati'], ['zuccheri','di cui zuccheri'],
+  ['proteine','Proteine'], ['sale','Sale']];
+const UNITA_PESO = ['g', 'kg', 'ml', 'cl', 'l'];
+/* la leva viva, da /api/me: nasce accesa come nel server */
+let etichettaAttiva = true;
+/* lo stato del form: null = «non la so ancora» (la modifica aspetta la
+   scheda, e fino ad allora il salvataggio non la tocca) */
+const etichettaVuota = () => ({ingredienti:'', allergeni:[], peso:'', unita:'g',
+                                base:'100g', valori:{}});
+let etichettaSell = etichettaVuota();
+/* dalla scheda al form: i numeri tornano testo da correggere */
+function etichettaDaScheda(e){
+  const v = etichettaVuota();
+  if (!e || typeof e !== 'object') return v;
+  v.ingredienti = String(e.ingredienti || '');
+  v.allergeni = Array.isArray(e.allergeni) ? e.allergeni.slice() : [];
+  v.peso = e.peso ? String(e.peso) : '';
+  v.unita = UNITA_PESO.includes(e.unita) ? e.unita : 'g';
+  v.base = e.base === '100ml' ? '100ml' : '100g';
+  for (const [k] of NUTRIENTI_UE)
+    if (e.valori && e.valori[k] != null) v.valori[k] = String(e.valori[k]);
+  return v;
+}
+const etichettaNelForm = () => etichettaAttiva && !editandoNostr
+  && el('sellCat') && el('sellCat').value === CAT_ETICHETTA;
+function renderEtichettaForm(){
+  const campo = el('sellEtichettaField'), box = el('sellEtichettaBox');
+  if (!campo || !box) return;
+  /* la strada firmata (Nostr) non la porta, come le domande */
+  if (!etichettaNelForm()) { campo.style.display = 'none'; return; }
+  campo.style.display = '';
+  if (etichettaSell === null){
+    box.innerHTML = '<div class="dom-hint">Carico l\'etichetta…</div>';
+    return;
+  }
+  const e = etichettaSell;
+  const num = (k, n, cls) => `<span${cls ? ' class="et-dicui"' : ''}>${n}</span>
+    <input id="etV_${k}" type="text" inputmode="decimal" maxlength="8"
+      aria-label="${esc(n)}" value="${esc(e.valori[k] || '')}"
+      oninput="scriviValoreEtichetta('${k}', this.value)">`;
+  box.innerHTML = `
+    <div class="dom-tit">🏷️ Etichetta dell'alimento <span class="dom-fac">facoltativa</span></div>
+    <div class="dom-hint">La legge europea (Reg. UE 1169/2011) chiede che chi compra online legga queste informazioni prima di pagare. Copiale dalla confezione. Se il tuo prodotto ne è esentato, lascia vuoto.</div>
+    <div class="et-sez">Peso netto</div>
+    <div class="et-riga">
+      <input id="etPeso" type="text" inputmode="decimal" maxlength="9" placeholder="Es. 500"
+        aria-label="Peso netto" value="${esc(e.peso)}" oninput="etichettaSell.peso=this.value">
+      <select id="etUnita" aria-label="Unità" onchange="etichettaSell.unita=this.value">${
+        UNITA_PESO.map(u => `<option value="${u}"${e.unita===u ? ' selected' : ''}>${u}</option>`).join('')}</select>
+    </div>
+    <div class="et-sez">Ingredienti</div>
+    <textarea id="etIngr" class="dom-opz" rows="3" maxlength="1500"
+      placeholder="Es. Farina di frumento, zucchero, burro, uova…"
+      oninput="etichettaSell.ingredienti=this.value">${esc(e.ingredienti)}</textarea>
+    <div class="et-sez">Allergeni presenti</div>
+    <div class="et-chips" role="group" aria-label="Allergeni presenti">${
+      ALLERGENI_UE.map(([k, n]) => `<button type="button" class="chip${e.allergeni.includes(k) ? ' active' : ''}"
+        aria-pressed="${e.allergeni.includes(k)}" onclick="scegliAllergene('${k}', this)">${n}</button>`).join('')}</div>
+    <div class="et-sez">Valori nutrizionali medi per
+      <span class="et-base" role="radiogroup" aria-label="Valori per">${
+        ['100g', '100ml'].map(b => `<button type="button" role="radio" class="chip${e.base===b ? ' active' : ''}"
+          aria-checked="${e.base===b}" onclick="scegliBaseEtichetta('${b}')">${b === '100g' ? '100 g' : '100 ml'}</button>`).join('')}</span></div>
+    <div class="et-griglia">
+      ${NUTRIENTI_UE.map(([k, n]) => num(k, n + (k === 'kj' || k === 'kcal' ? '' : ' (g)'),
+                                         k === 'saturi' || k === 'zuccheri')).join('')}
+    </div>
+    <div class="dom-hint">Compila tutta la tabella o lasciala vuota. L'energia basta in kJ o in kcal: l'altra si calcola da sola.</div>`;
+}
+function scegliAllergene(k, b){
+  haptic();
+  const a = etichettaSell.allergeni, i = a.indexOf(k);
+  if (i < 0) a.push(k); else a.splice(i, 1);
+  b.classList.toggle('active', i < 0);
+  b.setAttribute('aria-pressed', String(i < 0));
+}
+function scegliBaseEtichetta(b){
+  haptic();
+  etichettaSell.base = b;
+  renderEtichettaForm();
+}
+/* L'ENERGIA SI SCRIVE UNA VOLTA: chi riempie i kJ si vede i kcal (e il
+   contrario), finche' l'altra casella e' vuota o era stata riempita dal
+   conto — quel che il venditore scrive a mano non si tocca. */
+let etichettaEnergiaAuto = '';
+function scriviValoreEtichetta(k, v){
+  etichettaSell.valori[k] = v;
+  if (k !== 'kj' && k !== 'kcal') return;
+  const altra = k === 'kj' ? 'kcal' : 'kj';
+  if (etichettaSell.valori[altra] && etichettaEnergiaAuto !== altra) return;
+  const n = parseFloat(String(v).replace(',', '.'));
+  const conto = isFinite(n) && n >= 0
+    ? String(Math.round(k === 'kj' ? n / 4.184 : n * 4.184)) : '';
+  etichettaSell.valori[altra] = conto;
+  etichettaEnergiaAuto = conto ? altra : '';
+  if (el('etV_' + altra)) el('etV_' + altra).value = conto;
+}
+/* il pezzo del payload: chiave assente finche' non la sappiamo, o dove
+   il form non la mostra (fuori categoria il server la toglierebbe da
+   solo, ma una categoria cambiata deve portarsela via: quindi la chiave
+   parte anche vuota, se la sappiamo) */
+function etichettaPayload(){
+  if (etichettaSell === null || !etichettaAttiva || editandoNostr) return {};
+  if (!etichettaNelForm()) return {etichetta: {}};
+  const e = etichettaSell;
+  return {etichetta: {ingredienti: e.ingredienti.trim(), allergeni: e.allergeni.slice(),
+    peso: String(e.peso).trim(), unita: e.unita, base: e.base,
+    valori: Object.fromEntries(NUTRIENTI_UE.map(([k]) => [k, String(e.valori[k] || '').trim()])
+                                .filter(([, v]) => v !== ''))}};
+}
+/* LA SCHEDA: una tabella uguale per tutti, sotto la descrizione e prima
+   del venditore — quindi prima di qualsiasi «Compra». L'etichetta
+   arriva solo con la scheda del singolo annuncio (la vetrina non la
+   porta): se non c'e' ancora, un segnaposto che caricaEtichetta riempie. */
+const etichetteNote = {};   // id -> etichetta (null = nessuna)
+const numIt = n => Number(n).toLocaleString('it-IT', {maximumFractionDigits: 2});
+function htmlEtichetta(e){
+  if (!e || typeof e !== 'object') return '';
+  const nome = Object.fromEntries(ALLERGENI_UE);
+  const pezzi = [];
+  if (e.peso)
+    pezzi.push(`<div class="et-t">Peso netto</div><div class="et-testo">${numIt(e.peso)} ${esc(e.unita || 'g')}</div>`);
+  if (e.ingredienti)
+    pezzi.push(`<div class="et-t">Ingredienti</div><div class="et-testo">${esc(e.ingredienti)}</div>`);
+  if (Array.isArray(e.allergeni) && e.allergeni.length)
+    pezzi.push(`<div class="et-t">Allergeni</div><div class="et-testo">${
+      e.allergeni.filter(k => nome[k]).map(k => `<b>${esc(nome[k])}</b>`).join(', ')}</div>`);
+  const v = e.valori;
+  if (v && typeof v === 'object' && v.kcal != null) {
+    const riga = (k, n, dicui) => `<tr${dicui ? ' class="et-dicui"' : ''}><th>${n}</th><td>${numIt(v[k])} g</td></tr>`;
+    pezzi.push(`<div class="et-t">Valori nutrizionali medi per ${e.base === '100ml' ? '100 ml' : '100 g'}</div>
+      <table><tbody>
+        <tr><th>Energia</th><td>${numIt(v.kj)} kJ / ${numIt(v.kcal)} kcal</td></tr>
+        ${riga('grassi', 'Grassi')}${riga('saturi', 'di cui acidi grassi saturi', true)}
+        ${riga('carboidrati', 'Carboidrati')}${riga('zuccheri', 'di cui zuccheri', true)}
+        ${riga('proteine', 'Proteine')}${riga('sale', 'Sale')}
+      </tbody></table>`);
+  }
+  return pezzi.length ? `<div class="desc-tit">Etichetta</div><div class="etichetta">${pezzi.join('')}</div>` : '';
+}
+function etichettaScheda(l){
+  if (!etichettaAttiva || l.cat !== CAT_ETICHETTA) return '';
+  const e = l.etichetta !== undefined ? l.etichetta : etichetteNote[l.id];
+  return `<div id="etichettaScheda">${e ? htmlEtichetta(e) : ''}</div>`;
+}
+async function caricaEtichetta(l){
+  if (!etichettaAttiva || l.cat !== CAT_ETICHETTA || DEMO) return;
+  if (l.etichetta !== undefined || l.id in etichetteNote) return;
+  try {
+    const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+    const r = await fetch(`${API_BASE}/listings/${l.id}`, opz);
+    if (!r.ok) return;
+    const a = await r.json();
+    etichetteNote[l.id] = (a && a.etichetta && typeof a.etichetta === 'object') ? a.etichetta : null;
+    if (!currentListing || currentListing.id !== l.id) return;
+    const box = el('etichettaScheda');
+    if (box) box.innerHTML = htmlEtichetta(etichetteNote[l.id]);
+  } catch(e) {}
+}
 /* la modifica e il duplicato: le domande stanno nella SCHEDA, non nella
    riga della vetrina, quindi se non le abbiamo si chiedono. Fino alla
    risposta `domandeSell` resta null e il salvataggio non le tocca. */
@@ -56231,11 +56445,16 @@ async function caricaDomandeForm(l){
   /* (9 nov 2026) l'incasso dell'annuncio arriva con la scheda, come le
      domande: finche' non c'e', null (il salvataggio non lo tocca) */
   incassoSell = typeof l.incassoAnn === 'string' ? l.incassoAnn : null;
-  renderDomandeForm(); renderIncassoForm();
-  if ((domandeSell !== null && incassoSell !== null) || DEMO || !l.id) {
+  /* (17 nov 2026) l'etichetta degli alimenti, stesso giro: la vetrina
+     non la porta, quindi di solito si chiede alla scheda */
+  etichettaSell = l.etichetta !== undefined ? etichettaDaScheda(l.etichetta) : null;
+  renderDomandeForm(); renderIncassoForm(); renderEtichettaForm();
+  if ((domandeSell !== null && incassoSell !== null && etichettaSell !== null)
+      || DEMO || !l.id) {
     if (domandeSell === null) domandeSell = [];
     if (incassoSell === null) incassoSell = '';
-    renderDomandeForm(); renderIncassoForm(); return;
+    if (etichettaSell === null) etichettaSell = etichettaVuota();
+    renderDomandeForm(); renderIncassoForm(); renderEtichettaForm(); return;
   }
   try {
     const r = await fetch(`${API_BASE}/listings/${l.id}`,
@@ -56245,8 +56464,10 @@ async function caricaDomandeForm(l){
       domandeSell = a.domande.map(q => ({...q, o:[...(q.o||[])]}));
     if (a && incassoSell === null)
       incassoSell = ['ln', 'onchain'].includes(a.incasso) ? a.incasso : '';
+    /* la scheda risponde: senza la chiave vuol dire «nessuna etichetta» */
+    if (a && etichettaSell === null) etichettaSell = etichettaDaScheda(a.etichetta);
   } catch(e) {}
-  renderDomandeForm(); renderIncassoForm();
+  renderDomandeForm(); renderIncassoForm(); renderEtichettaForm();
 }
 /* Il campo costo (e la taglia) esistono solo se l'annuncio spedisce;
    il codice online mostra il suo hint operativo (consegna in
@@ -56581,6 +56802,9 @@ function aggiornaCondizioneForm(){
     el('sellCond').value = '';
     aggiornaPicker('sellCond');
   }
+  /* (17 nov 2026) la categoria decide anche l'etichetta degli alimenti,
+     e passa dagli stessi ingressi */
+  renderEtichettaForm();
 }
 /* I campi di consegna del payload: la valuta del listino comanda,
    ma sul listino sats il costo scritto in euro parte come
@@ -56869,6 +57093,7 @@ function annullaModifica(){
   impostaConsegnaForm('', 0);
   domandeSell = []; renderDomandeForm();
   incassoSell = ''; renderIncassoForm();
+  etichettaSell = etichettaVuota(); etichettaEnergiaAuto = ''; renderEtichettaForm();
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
   precompilaSpedStd(true);   // il form rinasce: col costo standard, se c'e'
@@ -57883,6 +58108,7 @@ async function publish(){
   const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
   let nuovoId, inRevisione = false, attesaOre = 24, avvisoFotoTesto = '';
   const cns = {...consegnaPayload(), ...domandePayload(), ...incassoPayload()};
+  Object.assign(cns, etichettaPayload());   // (17 nov 2026) l'etichetta degli alimenti
   const asta = astaForm();   /* null = vendita normale */
   if (DEMO) {
     nuovoId = Date.now();
@@ -57980,6 +58206,7 @@ async function publish(){
   impostaConsegnaForm('', 0);
   domandeSell = []; renderDomandeForm();
   incassoSell = ''; renderIncassoForm();
+  etichettaSell = etichettaVuota(); etichettaEnergiaAuto = ''; renderEtichettaForm();
   impostaSellValuta('sats');
   /* il duplicato si spegne qui: senza, rientrando in Vendi si
      ritroverebbe il banner «stai duplicando» sopra un form vuoto —
@@ -58025,6 +58252,7 @@ async function salvaModifica(t, p){
   const ripristina = bottoneInAttesa(el('sellSubmit'), 'Salvo le modifiche…');
   try {
   const cns = {...consegnaPayload(), ...domandePayload(), ...incassoPayload()};
+  Object.assign(cns, etichettaPayload());   // (17 nov 2026) l'etichetta degli alimenti
   let avvisoFotoTesto = '';
   if (DEMO) {
     const l = listings.find(x=>x.id===id) || myListings.find(x=>x.id===id);
@@ -58072,6 +58300,7 @@ async function salvaModifica(t, p){
       return;
     }
     await loadListings();
+    delete etichetteNote[id];   // la scheda la rilegge fresca
   }
   await loadMyListings(); renderMyListings();
   annullaModifica();
@@ -105711,6 +105940,10 @@ async function avvia(){
     /* la modifica di piu' annunci insieme: la leva VIVA del server (un
        server di ieri non manda la chiave, e il bottone resta spento) */
     modificaMassivaAttiva = me.modifica_massiva === true;
+    /* (17 nov 2026) l'etichetta degli alimenti: accesa di serie, e solo
+       un false esplicito del server la spegne */
+    etichettaAttiva = me.etichetta_alimenti !== false;
+    renderEtichettaForm();
     aggiornaBottoneMM();
     astaLeve = me.asta_leve || null;
     aggiornaAstaVisibilita();

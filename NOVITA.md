@@ -386,3 +386,9 @@ frase: Nel Profilo ora vedi anche quanto hai comprato: negli ultimi 30 giorni e 
 dove: Profilo → «Negozio e spedizioni» → «📊 Il tuo negozio» (o «📊 I tuoi acquisti»), sezione «🛍️ Acquisti conclusi».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-17 · etichetta-alimenti
+frase: Chi vende alimenti e bevande può aggiungere all'annuncio l'etichetta: peso netto, ingredienti, allergeni e tabella dei valori nutrizionali, come sulla confezione. Chi compra la legge nella pagina dell'annuncio prima di comprare, uguale per tutti, con gli allergeni in grassetto. È facoltativa, ma la legge europea la chiede per gli alimenti venduti online.
+dove: Vendi → categoria «Alimenti e bevande» → riquadro «🏷️ Etichetta dell'alimento» sotto la descrizione; nella pagina dell'annuncio, la sezione «Etichetta» sotto la descrizione.
+leva: ETICHETTA_ALIMENTI (accesa di serie)
+pubblico: sì

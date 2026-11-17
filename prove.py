@@ -169111,6 +169111,146 @@ console.log(JSON.stringify({ levetta: [levetta.ico.textContent, levetta.title, l
     prova("...e NON il tondo della mappa, che resta «Mappa: …» per chi legge con la voce",
           ["Mappa: 3 annunci", "Mappa: 3 annunci"], r2.get("tondo"))
 
+def prove_etichetta_alimenti():
+    """L'ETICHETTA DEGLI ALIMENTI (17 nov 2026, cantiere etichetta-
+    alimenti). Da Luca, via Andrea: per l'art. 14 del Reg. UE 1169/2011
+    chi compra online legge ingredienti, allergeni, peso netto e valori
+    nutrizionali PRIMA di pagare. Facoltativa (decisione di Andrea).
+    Il giro vero — pubblica, modifica, scheda, leva — e' in
+    `collaudo_etichetta_alimenti.py`; qui la forma.
+
+    QUEL CHE SI ROMPE IN SILENZIO: i due elenchi (allergeni, nutrienti)
+    che divergono fra server e client, e la scheda che mostra «undefined»
+    o butta un allergene; la leva che non si spegne col False, o che il
+    form non sa; il payload che non parte da una delle due strade
+    (pubblica e modifica); la scheda che non disegna l'etichetta, o la
+    disegna senza esc() — gli ingredienti sono testo del venditore;
+    l'energia scritta una volta che non completa l'altra."""
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    import json as _js
+    print("\n[etichetta-alimenti: la tabella uguale per tutti]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    es = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) LA LEVA -------------------------------------------------------
+    prova("1) la leva nasce ACCESA e solo False la spegne", [True] * 4,
+          ["except ImportError:\n    ETICHETTA_ALIMENTI = True" in src,
+           "ETICHETTA_ALIMENTI = ETICHETTA_ALIMENTI is not False" in src,
+           "\nETICHETTA_ALIMENTI = True\n" in es,
+           bool(re.search(r'"ETICHETTA_ALIMENTI",\s+ETICHETTA_ALIMENTI,',
+                          src))])
+    prova("...il form la sa da /api/me, e solo un false esplicito la spegne",
+          [True, True],
+          ['profilo["etichetta_alimenti"] = ETICHETTA_ALIMENTI' in src,
+           "etichettaAttiva = me.etichetta_alimenti !== false;" in mini])
+    prova("...e la colonna nasce con la migrazione", True,
+          "\"etichetta TEXT DEFAULT ''\"" in src)
+
+    # --- 2) I GEMELLI -------------------------------------------------------
+    m = re.search(r"ALLERGENI_UE = \((.*?)\)\n", src, re.S)
+    srv_all = re.findall(r'"(\w+)"', m.group(1)) if m else []
+    m = re.search(r"NUTRIENTI_UE = \((.*?)\)\n", src, re.S)
+    srv_nut = re.findall(r'\("(\w+)", \d+\)', m.group(1)) if m else []
+    m = re.search(r"const ALLERGENI_UE = \[(.*?)\];", mini, re.S)
+    cli_all = re.findall(r"\['(\w+)',", m.group(1)) if m else []
+    m = re.search(r"const NUTRIENTI_UE = \[(.*?)\];", mini, re.S)
+    cli_nut = re.findall(r"\['(\w+)',", m.group(1)) if m else []
+    prova("2) i 14 allergeni dell'Allegato II, uguali e nello stesso "
+          "ordine nei due lati", (14, True), (len(srv_all), srv_all == cli_all))
+    prova("...e gli 8 valori della tabella", (8, True),
+          (len(srv_nut), srv_nut == cli_nut))
+    prova("...la categoria e' la stessa, ed esiste nel catalogo",
+          [True, True],
+          ['CATEGORIA_ETICHETTA = "Alimenti e bevande"' in src,
+           "const CAT_ETICHETTA = 'Alimenti e bevande';" in mini])
+
+    # --- 3) IL GIRO DEL CLIENT ---------------------------------------------
+    prova("3) il payload parte da pubblica E da modifica", 2,
+          mini.count("...incassoPayload()};\n  Object.assign(cns, "
+                     "etichettaPayload());"))
+    prova("...la scheda la disegna sotto la descrizione e la carica",
+          [True, True],
+          ["<div class=\"desc\">${descrizioneHTML(l)}</div>\n"
+           "      ${etichettaScheda(l)}" in mini,
+           "caricaEtichetta(l);" in mini])
+    prova("...la categoria decide il form, dagli stessi ingressi della "
+          "condizione", True,
+          "aggiornaPicker('sellCond');\n  }\n  /* (17 nov 2026) la "
+          "categoria decide anche l'etichetta" in mini)
+    prova("...la modifica la legge dalla scheda, e la strada firmata no",
+          [True, True],
+          ["etichettaSell = etichettaDaScheda(a.etichetta);" in mini,
+           "const etichettaNelForm = () => etichettaAttiva && !editandoNostr"
+           in mini])
+    prova("...il server la legge in pubblica E in modifica prima di "
+          "scrivere", 2,
+          src.count("etichetta = etichetta_da_payload(d, "
+                    "categoria_valida(d.get(\"categoria\")))"))
+
+    # --- 4) LA RESA, fatta girare -----------------------------------------
+    _node = _sh.which("node")
+    if not _node:
+        salta("la scheda scappa gli ingredienti e l'energia si completa",
+              "node non installato")
+        return
+    corpo = "\n".join([
+        re.search(r"const esc = s => .*?\n.*?\n", mini, re.S).group(0),
+        re.search(r"const CAT_ETICHETTA = .*?const UNITA_PESO = .*?;\n",
+                  mini, re.S).group(0),
+        "let etichettaSell = {valori: {}};",
+        "const el = () => null;",
+        pezzo_js(mini, "let etichettaEnergiaAuto = '';",
+                 "/* il pezzo del payload: chiave assente"),
+        pezzo_js(mini, "const numIt = n =>", "\n"),
+        pezzo_js(mini, "function htmlEtichetta(e){",
+                 "function etichettaScheda(l){"),
+    ])
+    prog = corpo + """
+const fuori = [];
+fuori.push(htmlEtichetta({ingredienti: '<img src=x onerror=alert(1)>',
+  allergeni: ['latte', 'inventato'], peso: 1.5, unita: 'kg', base: '100ml',
+  valori: {kj: 1272, kcal: 304, grassi: 0, saturi: 0, carboidrati: 82.4,
+           zuccheri: 82.1, proteine: 0.3, sale: 0.01}}));
+fuori.push(htmlEtichetta(null));
+fuori.push(htmlEtichetta({}));
+scriviValoreEtichetta('kj', '1000');
+fuori.push(etichettaSell.valori.kcal);
+scriviValoreEtichetta('kj', '2092');
+fuori.push(etichettaSell.valori.kcal);
+etichettaSell = {valori: {kcal: '99'}}; etichettaEnergiaAuto = '';
+scriviValoreEtichetta('kj', '1000');
+fuori.push(etichettaSell.valori.kcal);
+console.log(JSON.stringify(fuori));
+"""
+    f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8")
+    f.write(prog)
+    f.close()
+    r = _sp.run([_node, f.name], capture_output=True, text=True,
+                timeout=60, encoding="utf-8")
+    os.unlink(f.name)
+    try:
+        h, vuota1, vuota2, k1, k2, k3 = _js.loads(r.stdout.strip())
+    except Exception:
+        prova("4) il programma della resa gira", "", r.stderr[-300:])
+        return
+    prova("4) gli ingredienti escono scappati, mai come HTML", [False, True],
+          ["<img" in h, "&lt;img" in h])
+    prova("...gli allergeni col loro nome, in grassetto; gli ignoti no",
+          [True, False], ["<b>Latte</b>" in h, "inventato" in h])
+    prova("...il peso alla italiana, la base e l'energia nelle due unita'",
+          [True, True, True],
+          ["1,5 kg" in h, "per 100 ml" in h, "1272 kJ / 304 kcal" in h])
+    prova("...i decimali con la virgola", True, "82,4 g" in h)
+    prova("...niente etichetta, niente riquadro", ["", ""], [vuota1, vuota2])
+    prova("l'energia scritta in kJ completa i kcal, e segue i ritocchi",
+          ["239", "500"], [k1, k2])
+    prova("...ma i kcal scritti a mano non si toccano", "99", k3)
+
+
 def prove_esauriti_eliminabili():
     """GLI ESAURITI CHE NON TORNANO SI ELIMINANO, E IL COMUNE SI RICORDA
     (16 nov 2026, richiesta di Andrea). Due cose del venditore: 1) il
@@ -203215,6 +203355,7 @@ CATEGORIE = {
     venduto_canale esauriti_eliminabili chat_mercatino chat_dalla_notifica
     modifica_massiva_foto miniature_leggere leva_mercato_lavoro
     allegati_da_telegram domande_compratore incasso_annuncio
+    etichetta_alimenti
     audit_pagamenti_2 audit_pagamenti_3 audit_tornata_tutto
     """.split(),
     "infrastruttura": """
@@ -203994,6 +204135,7 @@ def main():
               prove_prendi_metodo,
               prove_contanti_zona,
               prove_esauriti_eliminabili,
+              prove_etichetta_alimenti,
               prove_mappa_contanti,
               prove_mappa_ritiro,
               prove_mappa_ritocchi,

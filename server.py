@@ -9861,7 +9861,13 @@ def init_db():
                     # nel Profilo, 'ln' o 'onchain'. Vince sul Profilo,
                     # per tutt'e due le strade di chi paga
                     # (`incasso_ln_ordine`, `onchain_modo_ordine`).
-                    "incasso TEXT DEFAULT ''"):
+                    "incasso TEXT DEFAULT ''",
+                    # L'ETICHETTA DEGLI ALIMENTI (17 nov 2026): il JSON di
+                    # `etichetta_da_payload` — ingredienti, allergeni,
+                    # peso netto e tabella nutrizionale — '' = nessuna.
+                    # Si legge solo in «Alimenti e bevande»
+                    # (`etichetta_letta`).
+                    "etichetta TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -29661,6 +29667,9 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # le domande a chi compra (6 nov 2026): il giudice PRIMA di ogni
     # scrittura, cosi' il 400 non lascia un annuncio a meta'
     domande = domande_da_payload(d, consegna, anche_dig)
+    # l'etichetta degli alimenti (17 nov 2026), stesso patto: il 400
+    # prima di ogni scrittura
+    etichetta = etichetta_da_payload(d, categoria_valida(d.get("categoria")))
     no_casa = non_spedisce_casa_da_payload(d, consegna)
     guardia_almeno_una_zona(consegna, zone, no_casa)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
@@ -29850,6 +29859,10 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     if incasso_da_payload(d):
         con.execute("UPDATE annunci SET incasso=? WHERE id=?",
                     (incasso_da_payload(d), annuncio_id))
+    # l'etichetta degli alimenti (17 nov 2026): stesso UPDATE a parte
+    if etichetta:
+        con.execute("UPDATE annunci SET etichetta=? WHERE id=?",
+                    (etichetta, annuncio_id))
     con.commit()
     con.close()
     # Le foto in un thread: convertire una HEIC da 15MB costa secondi
@@ -30104,7 +30117,7 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     con = db()
     # le domande a chi compra escono SOLO qui, nella scheda: sono
     # pubbliche (sono testi del venditore), ma alla vetrina non servono
-    r = con.execute(f"SELECT {campi}, a.stato, a.domande, a.incasso FROM annunci a "
+    r = con.execute(f"SELECT {campi}, a.etichetta, a.stato, a.domande, a.incasso FROM annunci a "
                     "JOIN utenti u ON u.tg_id = a.venditore_id "
                     "WHERE a.id=? AND a.stato IN ('attivo','venduto')",
                     (annuncio_id,)).fetchone()
@@ -30128,6 +30141,12 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
         raise HTTPException(404, "Annuncio non trovato")
     riga = arricchisci_righe_vetrina([dict(r)])[0]
     riga["domande"] = domande_lette(riga.get("domande"))
+    # l'etichetta degli alimenti (17 nov 2026): un oggetto, o la chiave
+    # non c'e' (leva spenta, non e' un alimento, nessuna etichetta)
+    etichetta = etichetta_letta(riga.pop("etichetta", ""),
+                                riga.get("categoria"))
+    if etichetta:
+        riga["etichetta"] = etichetta
     if riga.get("famiglia"):
         riga["famiglia_varianti"] = sorelle
     if not user or (user["id"] != riga.get("venditore_id")
@@ -31761,6 +31780,9 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # le domande a chi compra (6 nov 2026): il giudice PRIMA di ogni
     # scrittura, cosi' il 400 non lascia un annuncio a meta'
     domande = domande_da_payload(d, consegna, anche_dig)
+    # l'etichetta degli alimenti (17 nov 2026): chiave assente = resta
+    # quella di prima; la categoria nuova decide se ha un posto
+    etichetta = etichetta_da_payload(d, categoria_valida(d.get("categoria")))
     no_casa = non_spedisce_casa_da_payload(d, consegna)
     guardia_almeno_una_zona(consegna, zone, no_casa)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
@@ -32004,6 +32026,10 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     if "incasso" in d:
         con.execute("UPDATE annunci SET incasso=? WHERE id=?",
                     (incasso_da_payload(d), annuncio_id))
+    # (17 nov 2026) l'etichetta, stesso patto: None = non si tocca
+    if etichetta is not None:
+        con.execute("UPDATE annunci SET etichetta=? WHERE id=?",
+                    (etichetta, annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -36098,6 +36124,16 @@ def _leve_stato():
                          f"annullabile per 24 ore",
                   spento="il bottone non c'è e le rotte rispondono 404: "
                          "gli annunci si modificano uno per uno"),
+            # L'ETICHETTA DEGLI ALIMENTI (17 nov 2026): accesa di serie,
+            # la leva e' l'interruttore d'emergenza
+            _leva("Etichetta degli alimenti", "ETICHETTA_ALIMENTI",
+                  ETICHETTA_ALIMENTI,
+                  acceso="in «Alimenti e bevande» chi vende può scrivere "
+                         "ingredienti, allergeni, peso netto e tabella "
+                         "nutrizionale, e la scheda li mostra prima di "
+                         "comprare",
+                  spento="il form non la offre e la scheda non la mostra; "
+                         "quelle già scritte restano nel database"),
             # L'ASSISTENZA IN APP (3 nov 2026): spenta di serie
             _leva("Assistenza in app", "ASSISTENZA_ATTIVA",
                   bool(ASSISTENZA_ATTIVA),
@@ -38729,6 +38765,183 @@ def domande_lette(colonna) -> list:
         return []
     return [x for x in v if isinstance(x, dict) and x.get("t")] \
         if isinstance(v, list) else []
+
+
+# ---- L'ETICHETTA DEGLI ALIMENTI (17 nov 2026, cantiere etichetta-alimenti)
+# Da Luca, via Andrea: per l'art. 14 del Regolamento UE 1169/2011 chi
+# compra a distanza deve poter leggere PRIMA di pagare le informazioni
+# obbligatorie di un alimento — ingredienti, allergeni, quantita' netta,
+# dichiarazione nutrizionale. Una tabella UGUALE PER TUTTI, coi valori
+# scritti a mano dal venditore.
+# FACOLTATIVA (decisione di Andrea, 17 nov): molti piccoli produttori
+# sono esentati dalla tabella nutrizionale (Allegato V), e obbligarla
+# fermerebbe chi non la deve. Il form la offre e ricorda che la legge la
+# chiede; il server non la esige.
+# VIVE SOLO IN «Alimenti e bevande»: altrove la chiave si butta in
+# silenzio (come le domande fuori dal digitale) e la scheda non la manda
+# nemmeno se in colonna e' rimasta (un moderatore che sposta l'annuncio
+# di categoria non deve lasciare un'etichetta su un trapano).
+# LA TABELLA O E' INTERA O NON C'E': mezza dichiarazione nutrizionale
+# inganna piu' di nessuna (un «grassi 2 g» senza i saturi e lo zucchero
+# racconta un alimento che non e'). Gli altri pezzi — ingredienti,
+# allergeni, peso — stanno in piedi da soli.
+# LA LEVA NASCE ACCESA (regola di Andrea del 14 nov): spenta, il form
+# non la disegna, il server non la scrive e la scheda non la manda —
+# quel che c'e' in colonna resta li', e torna con la leva.
+try:
+    from config import ETICHETTA_ALIMENTI
+    if not isinstance(ETICHETTA_ALIMENTI, bool):
+        print("[etichetta] ETICHETTA_ALIMENTI non e' True/False: "
+              "l'etichetta degli alimenti resta accesa")
+    ETICHETTA_ALIMENTI = ETICHETTA_ALIMENTI is not False
+except ImportError:
+    ETICHETTA_ALIMENTI = True
+CATEGORIA_ETICHETTA = "Alimenti e bevande"
+# I 14 dell'Allegato II, nell'ordine della legge. Le chiavi sono interne
+# e non cambiano; il NOME che si legge lo scrive il client (il gemello
+# ALLERGENI_UE in miniapp.html, e prove.py fallisce se divergono).
+ALLERGENI_UE = ("glutine", "crostacei", "uova", "pesce", "arachidi",
+                "soia", "latte", "frutta_guscio", "sedano", "senape",
+                "sesamo", "solfiti", "lupini", "molluschi")
+# La dichiarazione nutrizionale dell'art. 30, nell'ordine dell'Allegato
+# XV: (chiave, tetto per 100 g). L'energia ha due chiavi perche' la
+# legge la vuole in kJ E in kcal; chi ne scrive una, l'altra la calcola
+# il server (1 kcal = 4,184 kJ).
+NUTRIENTI_UE = (("kj", 3800), ("kcal", 900), ("grassi", 100),
+                ("saturi", 100), ("carboidrati", 100), ("zuccheri", 100),
+                ("proteine", 100), ("sale", 100))
+# per 100 ml i grammi possono passare i 100 (un miele liquido pesa 140 g
+# a decilitro): il tetto si allarga e la somma non si controlla
+TETTO_NUTRIENTE_ML = 150
+UNITA_PESO = ("g", "kg", "ml", "cl", "l")
+MAX_INGREDIENTI = 1500
+_RE_LINK_ETICHETTA = re.compile(r"https?://|www\.|\bt\.me/|@\w{3,}", re.I)
+
+
+def _numero_etichetta(v, nome: str, tetto: float):
+    """Un valore della tabella: None se vuoto, sennò un numero fra 0 e il
+    tetto con al piu' due decimali. La virgola italiana vale il punto."""
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    if isinstance(v, bool):
+        raise HTTPException(400, f"Etichetta: «{nome}» non è un numero")
+    try:
+        n = float(str(v).strip().replace(",", "."))
+    except ValueError:
+        raise HTTPException(400, f"Etichetta: «{nome}» non è un numero")
+    if n != n or n < 0 or n > tetto:
+        raise HTTPException(400, f"Etichetta: «{nome}» deve stare fra 0 "
+                                 f"e {tetto:g}")
+    return round(n, 2)
+
+
+NOMI_NUTRIENTI = {"kj": "energia (kJ)", "kcal": "energia (kcal)",
+                  "grassi": "grassi", "saturi": "di cui saturi",
+                  "carboidrati": "carboidrati", "zuccheri": "di cui zuccheri",
+                  "proteine": "proteine", "sale": "sale"}
+
+
+def etichetta_da_payload(d: dict, categoria: str) -> str | None:
+    """Il giudice unico dell'etichetta (pubblica e modifica): il JSON da
+    scrivere in colonna, '' per «nessuna», None se la chiave NON c'e' o
+    la leva e' spenta (in modifica = conserva quella di prima: il patto
+    delle domande, la dichiarazione e' la PRESENZA della chiave).
+
+    Fuori da «Alimenti e bevande» vale '' in silenzio: l'annuncio che
+    cambia categoria se la lascia dietro.
+    IL 400 E NON IL TRONCAMENTO, come per le domande: un valore storto o
+    una tabella a meta' si dicono, non si aggiustano."""
+    if not ETICHETTA_ALIMENTI or "etichetta" not in d:
+        return None
+    if categoria != CATEGORIA_ETICHETTA:
+        return ""
+    g = d.get("etichetta") or {}
+    if not isinstance(g, dict):
+        raise HTTPException(400, "L'etichetta non si legge: riprova")
+    fuori = {}
+    # gli ingredienti: un testo solo, gli a-capo restano (l'elenco si
+    # scrive spesso a righe); niente link ne' contatti — e' un'etichetta,
+    # non una seconda descrizione
+    ingr = "\n".join(" ".join(r.split()) for r in
+                     str(g.get("ingredienti") or "").splitlines()).strip()
+    if len(ingr) > MAX_INGREDIENTI:
+        raise HTTPException(400, f"Gli ingredienti sono troppo lunghi "
+                                 f"(massimo {MAX_INGREDIENTI} caratteri)")
+    if ingr and _RE_LINK_ETICHETTA.search(ingr):
+        raise HTTPException(400, "Negli ingredienti niente link né "
+                                 "contatti: solo l'elenco degli "
+                                 "ingredienti")
+    if ingr and controlla_vietato("", ingr):
+        raise HTTPException(400, "Negli ingredienti c'è una parola che su "
+                                 "Barattolo non è ammessa")
+    if ingr:
+        fuori["ingredienti"] = ingr
+    allergeni = g.get("allergeni") or []
+    if not isinstance(allergeni, list):
+        raise HTTPException(400, "Gli allergeni non si leggono: riprova")
+    scelti = [a for a in ALLERGENI_UE if a in allergeni]
+    if scelti:
+        fuori["allergeni"] = scelti
+    # la quantita' netta: un numero e la sua unita'
+    peso = _numero_etichetta(g.get("peso"), "peso netto", 100_000)
+    if peso:
+        unita = g.get("unita") if g.get("unita") in UNITA_PESO else "g"
+        fuori["peso"] = peso
+        fuori["unita"] = unita
+    # la tabella: per 100 g o per 100 ml
+    base = "100ml" if g.get("base") == "100ml" else "100g"
+    grezzi = g.get("valori") or {}
+    if not isinstance(grezzi, dict):
+        raise HTTPException(400, "La tabella nutrizionale non si legge: "
+                                 "riprova")
+    valori = {}
+    for chiave, tetto in NUTRIENTI_UE:
+        if base == "100ml" and chiave not in ("kj", "kcal"):
+            tetto = TETTO_NUTRIENTE_ML
+        n = _numero_etichetta(grezzi.get(chiave), NOMI_NUTRIENTI[chiave],
+                              tetto)
+        if n is not None:
+            valori[chiave] = n
+    if valori:
+        # l'energia: chi ne scrive una, l'altra la fa il conto
+        if "kj" in valori and "kcal" not in valori:
+            valori["kcal"] = round(valori["kj"] / 4.184)
+        elif "kcal" in valori and "kj" not in valori:
+            valori["kj"] = round(valori["kcal"] * 4.184)
+        mancano = [NOMI_NUTRIENTI[k] for k, _ in NUTRIENTI_UE
+                   if k not in valori and k != "kj"]
+        if mancano:
+            raise HTTPException(400, "Completa la tabella nutrizionale o "
+                                     "lasciala tutta vuota: manca "
+                                     + ", ".join(mancano))
+        if valori["saturi"] > valori["grassi"]:
+            raise HTTPException(400, "Etichetta: i grassi saturi non "
+                                     "possono superare i grassi")
+        if valori["zuccheri"] > valori["carboidrati"]:
+            raise HTTPException(400, "Etichetta: gli zuccheri non possono "
+                                     "superare i carboidrati")
+        if base == "100g" and (valori["grassi"] + valori["carboidrati"]
+                               + valori["proteine"] + valori["sale"]
+                               > 100.5):
+            raise HTTPException(400, "Etichetta: grassi, carboidrati, "
+                                     "proteine e sale insieme superano i "
+                                     "100 g su 100 g. Ricontrolla i valori")
+        fuori["base"] = base
+        fuori["valori"] = {k: valori[k] for k, _ in NUTRIENTI_UE}
+    return json.dumps(fuori, ensure_ascii=False) if fuori else ""
+
+
+def etichetta_letta(colonna, categoria: str) -> dict | None:
+    """L'etichetta per la scheda, difensiva: None se la leva e' spenta,
+    se l'annuncio non e' (piu') un alimento o se la colonna e' vuota o
+    storta — mai un 500 per un JSON rovinato."""
+    if not ETICHETTA_ALIMENTI or categoria != CATEGORIA_ETICHETTA:
+        return None
+    try:
+        v = json.loads(colonna or "{}")
+    except Exception:
+        return None
+    return v if isinstance(v, dict) and v else None
 
 
 def _risposte_da_payload(domande: list, d: dict) -> str:
@@ -50999,6 +51212,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # perche' il bottone in «I tuoi annunci» nasca solo quando le sue
     # rotte rispondono.
     profilo["modifica_massiva"] = MODIFICA_MASSIVA_ATTIVA
+    # L'etichetta degli alimenti (17 nov 2026): la leva VIVA, perche' il
+    # form non disegni una sezione che il server non scriverebbe.
+    profilo["etichetta_alimenti"] = ETICHETTA_ALIMENTI
     # NIP-85 (set 2026): la pubkey di servizio e i relay servono al
     # browser per costruire e firmare il kind 10040 (la dichiarazione di
     # fiducia in Barattolo per il tag "30382:rank") — mai una copia a

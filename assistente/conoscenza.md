@@ -117,18 +117,20 @@ Pagare fuori da Barattolo (un bonifico, un pagamento diretto al venditore) vuol 
 3. Scegli come consegni: spedizione (con i corrieri che usi), punto di ritiro o locker, ritiro a mano in zona, o consegna digitale per codici e buoni.
 4. Pubblica. Ogni annuncio passa dalla moderazione, anche quando lo modifichi: se qualcosa non convince resta in attesa di un moderatore, e se viene fermato il messaggio spiega perché e come rimediare.
 
+Chi vende alimenti o bevande (categoria «Alimenti e bevande») trova sotto la descrizione il riquadro «🏷️ Etichetta dell'alimento»: peso netto, ingredienti, gli allergeni da toccare fra i 14 della legge europea e la tabella dei valori nutrizionali per 100 g o per 100 ml, da copiare dalla confezione. È facoltativa, ma la legge europea (Reg. UE 1169/2011) chiede che chi compra online legga queste informazioni prima di pagare; chi ne è esentato (per esempio certi piccoli produttori) la lascia vuota. La tabella va compilata tutta o lasciata vuota; l'energia basta scriverla in kJ o in kcal. Chi compra la trova nella pagina dell'annuncio, nella sezione «Etichetta» sotto la descrizione (dal 17 novembre 2026).
+
 La «Zona» di un annuncio nuovo parte già scritta con quella del tuo ultimo annuncio (per esempio «Dro (TN)»): se vendi da un altro posto la cambi come ogni altro campo (dal 16 novembre 2026).
 
 Gli annunci esauriti: quando vendi l'ultimo pezzo l'annuncio diventa «Esaurito», resta in fondo al tuo negozio e con «🔄 Rifornisci» torna in vendita appena hai altri pezzi. Se era un pezzo unico che non tornerà (un oggetto usato, per esempio), in «I tuoi annunci» o nella sua pagina tocca «🗑 Elimina»: sparisce dal negozio, da Nostr e dal canale, ma gli ordini e le recensioni restano (dal 16 novembre 2026). Si può fare quando l'ordine di quel pezzo è concluso: con una spedizione, un reso o un rimborso ancora aperti l'app dice di aspettare.
 
 Hai un catalogo grande? Nel Profilo c'è «📥 Importa in blocco»: scarichi il modello CSV, una riga per annuncio, fino a 500 annunci per volta. Ogni riga vuole almeno una foto, con un link nella colonna «foto» (più d'uno separati da |) oppure coi nomi dei file dentro uno ZIP che carichi insieme; una riga senza foto viene scartata. Prima di pubblicare tocchi «🔎 Controlla il file» e vedi cosa va e cosa no. Se hai un negozio Shopify o WooCommerce, nella stessa sezione lo puoi collegare: i prodotti entrano da soli e restano in pari (se la sezione non la vedi, guarda i NUMERI DI OGGI o chiedi allo staff). Nel collegamento (✏️ sul negozio) c'è anche «Categoria dei prodotti»: se vende tutto dello stesso tipo la sceglie lì e vale per tutti, anche per quelli già entrati; con «Decide il negozio» Barattolo usa la categoria del suo e-commerce quando corrisponde a una delle nostre, e il resto va in «Altro». Gli annunci importati passano dalla moderazione come gli altri.
 
+<!-- pezzo libro-010 | libro -->
+## Libro · Vendere nel mercatino (2/4)
+
 Per incassare da solo imposta il tuo indirizzo Lightning nel Profilo: quando chi compra conferma, i sats ti arrivano lì.
 
 Se spedisci a un locker o a un punto di ritiro, il codice per ritirare il pacco lo manda il corriere a chi hai scritto come destinatario. Se chi compra ha lasciato un'email per il corriere, puoi metterla sull'etichetta e il codice arriva direttamente a lui. Se non l'ha lasciata, il codice arriva a te: appena ce l'hai, apri l'ordine e incollalo in «📦 Istruzioni di ritiro per l'acquirente». È l'unico modo in cui lui lo riceve, e la giacenza dura pochi giorni.
-
-<!-- pezzo libro-010 | libro -->
-## Libro · Vendere nel mercatino (2/4)
 
 Le commissioni del mercatino: Barattolo non prende commissioni, né a chi vende né a chi compra. Si pagano solo le commissioni della rete, che non vanno a Barattolo: su Lightning sono pochi sats o niente, on-chain sono quelle dei miner. Se un giorno cambiasse, la cifra sarebbe nei NUMERI DI OGGI. Negli acquisti on-chain può esserci solo una quota fissa a Barattolo per le spese di rete, scritta nel conto prima di pagare: quanto vale oggi lo dicono i NUMERI DI OGGI.
 
@@ -144,10 +146,10 @@ Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraff
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere.
 
-I numeri del negozio: nel Profilo, gruppo «Negozio e spedizioni», il cassetto «📊 Il tuo negozio» mostra le visite alla pagina del negozio, le vendite concluse (ultimi 30 giorni e da sempre, coi sats che ha incassato: spedizione compresa, commissione tolta) e le recensioni. Dal 17 novembre 2026 ci sono anche gli «🛍️ Acquisti conclusi», ultimi 30 giorni e da sempre, coi sats del totale pagato (prodotti, spedizione e protezione acquisti). Chi ha solo comprato e non ha annunci vede lo stesso cassetto col nome «📊 I tuoi acquisti». Contano gli ordini del mercatino conclusi, non gli scambi P2P.
-
 <!-- pezzo libro-011 | libro -->
 ## Libro · Vendere nel mercatino (3/4)
+
+I numeri del negozio: nel Profilo, gruppo «Negozio e spedizioni», il cassetto «📊 Il tuo negozio» mostra le visite alla pagina del negozio, le vendite concluse (ultimi 30 giorni e da sempre, coi sats che ha incassato: spedizione compresa, commissione tolta) e le recensioni. Dal 17 novembre 2026 ci sono anche gli «🛍️ Acquisti conclusi», ultimi 30 giorni e da sempre, coi sats del totale pagato (prodotti, spedizione e protezione acquisti). Chi ha solo comprato e non ha annunci vede lo stesso cassetto col nome «📊 I tuoi acquisti». Contano gli ordini del mercatino conclusi, non gli scambi P2P.
 
 I codici sconto: nel Profilo, alla voce «🎟 Codici sconto», chi vende crea i suoi codici (in percentuale o a cifra fissa, con una durata e un tetto di usi) e li dà a chi vuole; chi compra lo scrive alla cassa. Col tasto «📣» sulla riga di un codice ancora valido può anche mandarlo ai clienti che hanno già comprato da lui: sceglie chi (sono già tutti spuntati) e preme «Invia invito sconto». Il messaggio lo manda Barattolo, sul bot, come DM Nostr o dentro l'app, e chi vende non vede mai i contatti dei clienti. Ogni cliente riceve lo stesso codice una volta sola, e al massimo un invito a settimana dallo stesso negozio. Un codice scaduto, finito o in pausa non si può mandare: si riattiva con ✏️ (scegliendo di nuovo i giorni, che ripartono da oggi). La data «scade il» è scritta all'italiana, giorno/mese/anno. Chi riceve le offerte e non le vuole più le spegne in Profilo → «🔔 Avvisi» → «🎟️ Offerte dei negozi», per tutti i negozi o per uno solo.
 
@@ -1797,4 +1799,12 @@ pubblico: sì
 frase: Nel Profilo ora vedi anche quanto hai comprato: negli ultimi 30 giorni e da sempre, quanti acquisti e quanti sats hai pagato in tutto, spedizione compresa. Se non hai annunci il cassetto si chiama «I tuoi acquisti».
 dove: Profilo → «Negozio e spedizioni» → «📊 Il tuo negozio» (o «📊 I tuoi acquisti»), sezione «🛍️ Acquisti conclusi».
 leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-059 | novita -->
+## Novità · 2026-11-17 · etichetta-alimenti
+
+frase: Chi vende alimenti e bevande può aggiungere all'annuncio l'etichetta: peso netto, ingredienti, allergeni e tabella dei valori nutrizionali, come sulla confezione. Chi compra la legge nella pagina dell'annuncio prima di comprare, uguale per tutti, con gli allergeni in grassetto. È facoltativa, ma la legge europea la chiede per gli alimenti venduti online.
+dove: Vendi → categoria «Alimenti e bevande» → riquadro «🏷️ Etichetta dell'alimento» sotto la descrizione; nella pagina dell'annuncio, la sezione «Etichetta» sotto la descrizione.
+leva: ETICHETTA_ALIMENTI (accesa di serie)
 pubblico: sì
