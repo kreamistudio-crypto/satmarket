@@ -47152,7 +47152,7 @@ def prove_fogli_di_casa():
     # (`pubblicaOnchainDalFoglioP2P`), gemello di quello di Lightning.
     # CENTOVENTI (17 nov 2026, cantiere stradina): «Esci da Barattolo?»
     # sulla casella che porta al partner dell'educazione (`vaiTappa`).
-    prova("i gesti che passano dalla domanda unica sono centoventidue (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoventitre' (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47165,8 +47165,9 @@ def prove_fogli_di_casa():
           "le quattro dei codici uno alla volta; dal 17 nov «Hai inviato gli "
           "USDe?» on-chain e il riepilogo di Barattozon on-chain; «Esci da "
           "Barattolo?» della stradina; «Annulli il deposito?» e «Fermi la "
-          "raccolta?» delle raccolte)",
-          122, solo_codice(mini).count("chiediConferma({"))
+          "raccolta?» delle raccolte; «Hai consegnato i contanti?» del "
+          "contanti on-chain)",
+          123, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
