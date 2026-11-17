@@ -16765,6 +16765,16 @@ document.getElementById('cartello')?.remove();</script>
     <div id="p2pOcDepositoCorpo"></div>
   </div>
 
+  <!-- LE 12 PAROLE CHIESTE LI' (17 nov 2026, cantiere
+       onchain-rimborso-liscio): chi firma uno scambio on-chain da un
+       dispositivo che non ha la sua chiave le incolla qui, al posto
+       dell'errore. Lo riempie `apriParoleOnchainP2P`. -->
+  <div class="sheet" id="p2pOcParoleSheet" role="dialog" aria-modal="true" aria-labelledby="p2pOcParoleTit">
+    <div class="grab"></div>
+    <h3 id="p2pOcParoleTit">🔑 Serve la chiave del tuo wallet</h3>
+    <div id="p2pOcParoleCorpo"></div>
+  </div>
+
   <!-- LA META' DELLA CAUZIONE BRUCIATA ALL'ALTRA PERSONA (1 ott 2026):
        una fattura dell'importo esatto, dal wallet o incollata -->
   <div class="sheet" id="p2pCauzioneSheet" role="dialog" aria-modal="true" aria-labelledby="p2pCauzioneTit">
@@ -36997,6 +37007,8 @@ function closeSheet(){
   el('p2pVotoSheet').classList.remove('open');
   el('p2pHoldSheet').classList.remove('open');
   el('p2pOcDepositoSheet').classList.remove('open');
+  el('p2pOcParoleSheet').classList.remove('open');
+  paroleOnchainP2PAnnulla();   // il gesto che aspettava la chiave non parte
   el('backupObbligoSheet').classList.remove('open');
   backupObbligoAnnulla();   // il gesto che aspettava le parole non parte
   el('p2pIncassoSheet').classList.remove('open');
@@ -64043,7 +64055,7 @@ async function onchainIncassoGuarda(pref){
   if (!tipo) { const rt = onchainRete(); return dici(`Incolla un indirizzo <span class="mono">${rt.indirizzo}…</span> o una chiave <span class="mono">${rt.conto}…</span> / <span class="mono">${rt.xpub}…</span>.`); }
   /* nello scambio P2P solo l'indirizzo al volo (30 ott 2026, Andrea): la
      chiave del conto e' una scelta delle impostazioni, vale per tutti */
-  if (pref === 'ocP2p' && tipo !== 'indirizzo')
+  if (String(pref).indexOf('ocP2p') === 0 && tipo !== 'indirizzo')
     return dici('Qui va un indirizzo. La chiave del conto si mette nel <b>Profilo</b>: da lì vale per tutti i tuoi scambi.');
   const valore = onchainNormaDestinazione(tipo, v);
   const giro = ++onchainIncassoGiro;
@@ -67644,6 +67656,194 @@ async function incassoQuiOnchainP2P(btn, id){
   } finally { rip(); }
 }
 
+/* ====== IL RIMBORSO CHE NON SI INCAGLIA (17 nov 2026, cantiere
+   onchain-rimborso-liscio) ======
+   Un utente all'assistenza: ha toccato «Rinuncio», l'app gli ha chiesto
+   la chiave, ha ricaricato le 12 parole, e poi «chi ha messo i sats non
+   ha ancora scelto dove riceverli». Chi vendeva non lo sapeva, e il
+   posto dove scriverlo era solo nel Profilo. Tre pezzi:
+   1. DOVE TORNANO I SATS, CHIESTO PRIMA: a chi deposita senza un wallet
+      suo il foglio «🔒 Blocca i sats» chiede un indirizzo PRIMA del QR
+      (`rimborsoMancanteOnchainP2P`, il gemello di `incassoMancante…`);
+      a deposito gia' fatto lo stesso riquadro sta nella pagina.
+   2. «RINUNCIO» NON E' PIU' UN ERRORE: senza quell'indirizzo la rinuncia
+      si scrive (`rinunciaChiestaOnchainP2P`) e il bot avvisa chi ha
+      depositato; quando l'indirizzo arriva, chi compra lo sa.
+   3. LA CHIAVE CHIESTA LI': se su questo dispositivo la chiave dello
+      scambio non c'e' la si cerca dov'e' gia' (cloud di Telegram,
+      relay) e, se non si trova, si apre il foglio delle 12 parole
+      (`apriParoleOnchainP2P`) e poi il gesto riparte da solo. */
+/* PURA: a chi deposita manca il posto dove riavere i sats? */
+function rimborsoDaChiedereOnchainP2P(o){
+  return !!(o && o.ruolo === 'compratore' && !o.rimborso && !o.proposta
+    && ['preso', 'depositato', 'euro_inviati', 'disputa'].includes(o.stato));
+}
+/* PURA: il foglio del deposito lo chiede PRIMA del QR (finche' nessun
+   sats e' visto: dopo, il riquadro sta nella pagina) */
+function rimborsoPrimaDelDepositoOnchainP2P(o){
+  return rimborsoDaChiedereOnchainP2P(o) && o.stato === 'preso' && !(Number(o.visti_sats) > 0);
+}
+function rimborsoMancanteOnchainP2P(o, pref){
+  if (!rimborsoDaChiedereOnchainP2P(o)) return '';
+  pref = pref || 'ocP2pRimb';
+  const rt = onchainRete();
+  const chiesta = Number(o.rinuncia_chiesta_il) > 0;
+  const prima = o.stato === 'preso';
+  return '<div class="p2p-box p2p-onchain-incasso"><b>'
+    + (chiesta ? '↩️ Chi compra vuole rinunciare: dove ti rimandiamo i sats?' : 'Dove tornano i sats?') + '</b>'
+    + '<div class="hint">' + (prima
+        ? 'Prima di bloccare i sats: se lo scambio si annulla tornano qui, e qui torna il resto quando li liberi. '
+        : 'Serve per rimandarteli se lo scambio si annulla, e per il resto quando li liberi. ')
+      + 'Incolla un indirizzo del tuo wallet Bitcoin, vale per questo scambio.</div>'
+    + '<div class="field" style="margin:12px 0 4px"><input id="' + pref + 'Valore" class="mono" autocomplete="off" spellcheck="false"'
+    + ' placeholder="' + rt.indirizzo + '…" oninput="onchainIncassoGuardaPresto(\'' + pref + '\')"></div>'
+    + '<div id="' + pref + 'Esito" class="hint" style="min-height:1.2em"></div>'
+    + '<button class="btn" id="' + pref + 'Salva" disabled onclick="rimborsoQuiOnchainP2P(this, ' + Number(o.id) + ', \'' + pref + '\')">✍️ Firma e usa questo indirizzo</button>'
+    + '<div class="hint" style="margin-top:8px">Per non doverlo scrivere ogni volta, scegli il tuo wallet nel <b>Profilo</b> '
+    + '→ «₿ On-chain»: vale per tutti i tuoi scambi.</div>'
+    + '</div>';
+}
+/* «Firma e usa questo indirizzo», per chi deposita: la firma del seme
+   del Profilo verso lo scambio (rotta `rimborso`). Salvato, il foglio
+   del deposito passa al QR e la pagina si rifa'. */
+async function rimborsoQuiOnchainP2P(btn, id, pref){
+  haptic();
+  pref = pref || 'ocP2pRimb';
+  const campo = el(pref + 'Valore');
+  const grezzo = campo ? campo.value.trim() : '';
+  if (onchainSembraSegreto(grezzo)) { if (campo) campo.value = ''; return toast('⛔ Una chiave privata non si incolla qui'); }
+  if (onchainTipoIncollato(grezzo) !== 'indirizzo') return toast('⚠️ Incolla prima un tuo indirizzo');
+  const valore = onchainNormaDestinazione('indirizzo', grezzo);
+  const rip = onchainAttesa(btn, 'Firmo…');
+  try {
+    await onchainAccendiDaSolo();
+    await onchainCercaSemeP2P();
+    const parole = onchainSemeLocale();
+    if (!parole) {
+      rip();
+      return apriParoleOnchainP2P(null, () => rimborsoQuiOnchainP2P(el(pref + 'Salva'), id, pref));
+    }
+    const firma = await onchainFirmaDestinazione(await caricaBitcoin(), parole, 'indirizzo', valore);
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(id)}/rimborso`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({valore, firma})});
+    const x = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(x.detail || 'non salvato');
+    toast('✅ I sats tornano a questo indirizzo', 4000);
+    const fresco = typeof vestiOcP2P === 'function' ? vestiOcP2P(x) : x;
+    const mio = p2pOnchainMiei.find(o => o.id === Number(id));
+    if (mio) Object.assign(mio, fresco);
+    if (p2pOcDeposito && p2pOcDeposito.id === Number(id)) {
+      p2pOcDeposito = mio || fresco;
+      if (el('p2pOcDepositoSheet').classList.contains('open')) renderDepositoOnchainP2P();
+    }
+    if (vistaAttivaP2P() === 'view-p2ponchain') renderP2POnchain();
+  } catch(e) {
+    toast('⚠️ ' + (e.message && e.message.length < 120 ? e.message : 'indirizzo non salvato'), 6000);
+  } finally { rip(); }
+}
+
+/* «RINUNCIO» QUANDO IL RIMBORSO NON HA ANCORA DOVE ANDARE: si scrive
+   sul server, che avvisa chi ha depositato. Se nel frattempo
+   l'indirizzo e' arrivato (`pronto`) si rilegge lo scambio e si firma. */
+async function rinunciaChiestaOnchainP2P(o){
+  const rip = attesaP2P('Avviso chi vende…');
+  let d = {};
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(o.id)}/rinuncia-chiesta`, {method: 'POST',
+      headers: {'X-Tg-Init-Data': authHdr()}});
+    d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non registrata');
+  } catch(e) {
+    rip();
+    toast('⚠️ ' + (e.message || 'non registrata'), 7000);
+    return renderP2POnchain();
+  }
+  if (d.pronto) {
+    rip();
+    try { await leggiMieiOnchainP2P(); } catch(e) {}
+    const fresco = p2pOnchainMiei.find(x => x.id === Number(o.id));
+    if (fresco && fresco.rimborso) return firmaOnchainP2P(o.id, 'compratore');
+    return renderP2POnchain();
+  }
+  o.rinuncia_chiesta_il = o.rinuncia_chiesta_il || Math.floor(Date.now() / 1000);
+  rip();
+  toast('↩️ Rinuncia registrata: abbiamo avvisato chi vende. Appena scrive dove riavere i sats ti avvisiamo, e tocchi di nuovo «Rinuncio».', 9000);
+  renderP2POnchain();
+}
+
+/* LA CHIAVE DI QUESTO SCAMBIO E' SU QUESTO DISPOSITIVO? (le parole di
+   adesso o quelle «di prima», `onchainParolePerOrdine`) */
+function chiaveQuiOnchainP2P(B, o){
+  const p = onchainParolePerOrdine(B, onchainSemeLocale(), o);
+  if (!p) return false;
+  try { return B.hex.encode(onchainMieChiavi(B, p, o).firma.publicKey) === o.indirizzo.chiavi[o.ruolo]; }
+  catch(e){ return false; }
+}
+/* LA SI CERCA DOV'E' GIA', SENZA FARNE NASCERE UNA: il cloud di
+   Telegram e i relay li guarda `onchainSemeAssicurato`, che pero' in
+   fondo alla sua strada fa nascere un wallet nuovo. Qui si entra solo
+   se il server dice che un wallet c'e' gia' (`walletUnicoLeggi`): la'
+   la strada si ferma con «altrove» prima della nascita. Un server o un
+   cloud muto non e' un no: lo decide il foglio delle parole. */
+async function onchainCercaSemeP2P(){
+  if (onchainSemeLocale()) return;
+  let st = null;
+  try { st = await walletUnicoLeggi(); } catch(e) { return; }
+  if (!st || !st.impronta) return;
+  try { await onchainSemeAssicurato(); } catch(e) { /* altrove o muto */ }
+}
+/* true = si puo' firmare qui; false = e' aperto il foglio delle 12
+   parole, e `poi` riparte quando le parole giuste sono arrivate */
+async function chiaveProntaOnchainP2P(o, poi){
+  const B = await caricaBitcoin();
+  if (chiaveQuiOnchainP2P(B, o)) return true;
+  await onchainCercaSemeP2P();
+  if (chiaveQuiOnchainP2P(B, o)) return true;
+  apriParoleOnchainP2P(o, poi);
+  return false;
+}
+let p2pOcParolePoi = null;     // il gesto che aspetta la chiave
+let p2pOcParoleOrdine = null;  // lo scambio di cui serve la chiave (o null)
+function paroleOnchainP2PAnnulla(){ p2pOcParolePoi = null; p2pOcParoleOrdine = null; }
+function apriParoleOnchainP2P(o, poi){
+  if (typeof closeSheet === 'function') closeSheet();
+  p2pOcParolePoi = typeof poi === 'function' ? poi : null;
+  p2pOcParoleOrdine = o || null;
+  const box = el('p2pOcParoleCorpo');
+  if (!box) return;
+  box.innerHTML = '<div class="hint">Per firmare serve la chiave del tuo wallet on-chain, e <b>su questo dispositivo non c\'è</b>: '
+    + 'è nata su un altro. Incolla qui le sue 12 parole: le trovi là, in Profilo → «₿ On-chain» → «Mostra le 12 parole». '
+    + 'Restano solo su questo dispositivo, a Barattolo non arrivano.</div>'
+    + '<textarea id="p2pOcParoleCampo" class="mono" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" '
+    + 'placeholder="le 12 parole, separate da uno spazio"></textarea>'
+    + '<button class="btn orange" onclick="usaParoleOnchainP2P(this)">Usa queste parole e continua</button>'
+    + '<button class="btn link" onclick="closeSheet()">Non adesso</button>';
+  el('sheetBg').classList.add('open');
+  el('p2pOcParoleSheet').classList.add('open');
+}
+async function usaParoleOnchainP2P(btn){
+  haptic();
+  const campo = el('p2pOcParoleCampo');
+  const testo = campo ? campo.value : '';
+  const rip = onchainAttesa(btn, 'Controllo…');
+  try {
+    await walletUsaParoleDi(testo);
+    if (p2pOcParoleOrdine && !chiaveQuiOnchainP2P(await caricaBitcoin(), p2pOcParoleOrdine))
+      throw new Error('Le parole sono giuste, ma questo scambio è nato con un altro wallet: servono quelle del dispositivo da cui l\'hai fatto.');
+  } catch(e) {
+    rip();
+    return toast('⚠️ ' + (e.message || 'parole non usate'), 8000);
+  }
+  rip();
+  if (campo) campo.value = '';
+  const poi = p2pOcParolePoi;
+  p2pOcParolePoi = null;       // prima di chiudere: `closeSheet` lo annullerebbe
+  closeSheet();
+  toast('✅ Chiave pronta su questo dispositivo', 3000);
+  if (poi) poi();
+}
+
 /* ====== CHI COMPRA BITCOIN RICEVE IN LIGHTNING (1 nov 2026, cantiere
    presa-altra-rete, tappa 2) ======
    Il calco del cambio del mercatino (`onchainCambioBlocco`, 28 ott) nello
@@ -68190,8 +68390,11 @@ async function renderP2POnchain(){
     /* la bozza della recensione sopravvive al ridisegno (17 nov 2026) */
     const bozza = el('p2pOcRecCommento');
     const bozzaV = bozza && bozza.dataset.ordine === o.ordine ? bozza.value : null;
+    /* ...e l'indirizzo del rimborso che si sta scrivendo (17 nov 2026) */
+    const rimbV = (el('ocP2pRimbValore') || {}).value || '';
     box.innerHTML = schedaOnchainP2P(o);
     if (bozzaV !== null && el('p2pOcRecCommento')) el('p2pOcRecCommento').value = bozzaV;
+    if (rimbV && el('ocP2pRimbValore')) { el('ocP2pRimbValore').value = rimbV; onchainIncassoGuardaPresto('ocP2pRimb'); }
     if (typeof chiediRecensibileOcP2P === 'function') chiediRecensibileOcP2P(o);
     /* il QR dell'indirizzo USDT di chi vende, a chi paga (2 nov 2026) */
     /* ...e quello dell'indirizzo della moneta (16 nov 2026), stesso posto */
@@ -68959,6 +69162,12 @@ function schedaOnchainP2P(o){
   } else if (o.proposta && o.proposta.mia && o.stato !== 'rilasciato' && o.stato !== 'rimborsato') {
     testo += '<br>Hai firmato: si aspetta la seconda firma dell\'altra parte (il suo telefono la mette quando apre l\'app).';
   }
+  /* (17 nov 2026, onchain-rimborso-liscio) la rinuncia che aspetta
+     l'indirizzo di chi ha depositato: chi compra lo legge qui */
+  if (ricevo && Number(o.rinuncia_chiesta_il) > 0 && !o.rimborso && !o.proposta
+      && ['preso', 'depositato', 'euro_inviati'].includes(o.stato))
+    testo += '<br>↩️ <b>Hai chiesto di rinunciare.</b> Chi vende deve ancora scrivere dove riavere i sats: '
+      + 'l\'abbiamo avvisato, e ti avvisiamo appena lo fa.';
   /* le frasi nella valuta dello scambio (2 nov 2026): solo il testo */
   testo = paroleOc(o, testo);
   /* il recapito per gli euro: lo scrive chi vende bitcoin, finche' gli euro non partono */
@@ -69041,6 +69250,10 @@ function schedaOnchainP2P(o){
     /* chi compra senza un posto dove ricevere lo scrive qui (thread del
        2-di-3, richiesta di Alan): subito sotto la nota, ben in vista */
     + `${incassoMancanteOnchainP2P(o)}`
+    /* ...e chi ha depositato senza un posto dove riaverli (17 nov 2026):
+       prima del deposito lo chiede il foglio «🔒 Blocca i sats» */
+    + (typeof rimborsoMancanteOnchainP2P === 'function' && !rimborsoPrimaDelDepositoOnchainP2P(o)
+       ? rimborsoMancanteOnchainP2P(o) : '')
     + incassoLnOnchainP2P(o)
     + recapitoBox
     + (gesti.includes('usdtInviatiOcP2P') ? campoTxidOcP2P(o) : '')
@@ -69429,6 +69642,13 @@ function renderDepositoOnchainP2P(){
   const box = el('p2pOcDepositoCorpo');
   const o = p2pOcDeposito;
   if (!box || !o) return;
+  /* (17 nov 2026, onchain-rimborso-liscio) PRIMA DOVE TORNANO: senza un
+     wallet suo chi deposita scrive un indirizzo, poi vede il QR. Un
+     ridisegno (il battito della pagina) non tocca il campo gia' aperto */
+  if (typeof rimborsoPrimaDelDepositoOnchainP2P === 'function' && rimborsoPrimaDelDepositoOnchainP2P(o)) {
+    if (!el('ocP2pDepValore')) box.innerHTML = rimborsoMancanteOnchainP2P(o, 'ocP2pDep');
+    return;
+  }
   const prova = typeof onchainRete === 'function' && onchainRete().prova;
   /* (tappa 3) chi ha preso vendendo puo' pagare in Lightning: la scelta in
      cima, e un cambio gia' nato fa partire il foglio dal suo lato */
@@ -69950,7 +70170,26 @@ async function fattoOnchainP2P(rip){
 async function firmaOnchainP2P(id, verso){
   const o = p2pOnchainMiei.find(x => x.id === id);
   if (!o) return;
+  /* (17 nov 2026, onchain-rimborso-liscio) il rimborso non ha ancora
+     dove andare: la rinuncia si registra, e chi ha depositato lo sa */
+  if (verso === 'compratore' && o.ruolo === 'venditore' && !o.rimborso
+      && typeof rinunciaChiestaOnchainP2P === 'function') return rinunciaChiestaOnchainP2P(o);
+  /* ...e chi libera senza un posto per il resto lo scrive nel riquadro
+     della pagina, al posto del rimando al Profilo */
+  if (verso === 'venditore' && typeof rimborsoDaChiedereOnchainP2P === 'function' && rimborsoDaChiedereOnchainP2P(o)) {
+    toast('Prima scrivi dove tornano i sats: il riquadro «Dove tornano i sats?» qui nello scambio', 7000);
+    const campo = el('ocP2pRimbValore');
+    if (campo) { try { campo.scrollIntoView({block: 'center'}); campo.focus({preventScroll: true}); } catch(e) {} }
+    return;
+  }
   const rip = attesaP2P(verso === 'venditore' ? 'Libero i sats…' : 'Firmo il rimborso…');
+  /* ...e la chiave che non e' su questo dispositivo si cerca, o si chiede */
+  if (typeof chiaveProntaOnchainP2P === 'function') {
+    let pronta = false;
+    try { pronta = await chiaveProntaOnchainP2P(o, () => firmaOnchainP2P(id, verso)); }
+    catch(e) { rip(); toast('⚠️ ' + (e.message || 'non firmato'), 7000); return; }
+    if (!pronta) { rip(); return; }
+  }
   try {
     await onchainFirmaProposta(o, verso);
   } catch(e) {
@@ -69971,6 +70210,13 @@ async function cofirmaOnchainP2P(btn, id){
   if (!o) return;
   const rip = attesaP2P('Firmo…', btn);
   let no = '';
+  /* (17 nov 2026) la chiave che non e' qui si cerca, o si chiede li' */
+  if (typeof chiaveProntaOnchainP2P === 'function') {
+    let pronta = false;
+    try { pronta = await chiaveProntaOnchainP2P(o, () => cofirmaOnchainP2P(null, id)); }
+    catch(e) { rip(); toast('⚠️ Non firmato: ' + (e.message || 'errore'), 7000); return; }
+    if (!pronta) { rip(); return; }
+  }
   try {
     const parole = await onchainSemeAssicurato();
     no = await onchainCofirma(o, parole);

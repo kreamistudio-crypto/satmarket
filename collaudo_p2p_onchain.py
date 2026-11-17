@@ -1038,6 +1038,154 @@ def main():
     SRV.P2P_PARACADUTE = False
     SRV.P2P_ONCHAIN_APERTI_MAX = tetto
 
+    # ---- 11-sexies) il rimborso che non si incaglia (17 nov 2026, cantiere
+    # onchain-rimborso-liscio; un utente all'assistenza: «la persona che ha
+    # depositato deve indicare dove ricevere di ritorno i sats») ---------------
+    print("\n[il rimborso che non si incaglia: l'indirizzo al volo di chi "
+          "deposita, e la rinuncia registrata]")
+    tetto = SRV.P2P_ONCHAIN_APERTI_MAX
+    SRV.P2P_ONCHAIN_APERTI_MAX = 100
+    # il freno delle destinazioni (10 l'ora) il giro l'ha gia' consumato:
+    # qui si prova la rotta, non il freno
+    SRV.FRENI["onchain_incasso"] = (1000, 3600)
+    come(888)
+    c.post("/api/onchain/incasso", json={"tipo": "barattolo"})   # Alan senza wallet
+    INVIATE.clear()
+    oid7 = pubblica(888, sats=70000, euro_cent=6300, metodi=["Bonifico"]).json()["id"]
+    gesto(999, oid7, "prendi")
+    o7 = uno(888, oid7)
+    prova("Alan vende senza un wallet suo: lo scambio nasce col rimborso vuoto",
+          ("compratore", "", None, 0),
+          (o7["ruolo"], o7["rimborso"], o7["destinazione_rimborso"],
+           o7["rinuncia_chiesta_il"]))
+    prova("prima del deposito non c'e' niente a cui rinunciare: 409", 409,
+          gesto(999, oid7, "rinuncia-chiesta").status_code)
+    torna = dal_wallet(31)
+    prova("dove tornano i sats lo scrive solo chi deposita: 403 a chi compra", 403,
+          gesto(999, oid7, "rimborso", valore=torna,
+                firma=firma_dest(999, "indirizzo", torna)).status_code)
+    prova("...solo un indirizzo (la chiave del conto e' del Profilo): 400", 400,
+          gesto(888, oid7, "rimborso", valore=vpub,
+                firma=firma_dest(888, "xpub", vpub)).status_code)
+    prova("...firmato da un altro seme: 400, e non si scrive niente", (400, ""),
+          (gesto(888, oid7, "rimborso", valore=torna,
+                 firma=firma_dest(999, "indirizzo", torna)).status_code,
+           uno(888, oid7)["rimborso"]))
+    paga(o7)
+    prova("il deposito parte lo stesso (un indirizzo in rete non si ferma): "
+          "depositato, col rimborso ancora vuoto", ("depositato", ""),
+          (lambda d: (d["stato"], d["rimborso"]))(gesto(888, oid7, "controlla").json()))
+    o7b = uno(999, oid7)
+    prova("un rimborso verso «niente» il giudice non lo firma: 400", 400,
+          gesto(999, oid7, "proposta", verso="compratore",
+                psbt=psbt_di(o7b, [(torna, 71080 - 300)], 999).to_string()).status_code)
+    prova("la rinuncia la chiede solo chi compra: 403 a chi ha depositato", 403,
+          gesto(888, oid7, "rinuncia-chiesta").status_code)
+    banco.DETTO.clear()
+    n_bottoni = len(BOTTONI)
+    r = gesto(999, oid7, "rinuncia-chiesta")
+    prova("chi compra tocca «Rinuncio»: non e' un errore, si registra, e chi ha "
+          "depositato lo sa dal bot (col bottone dello scambio)",
+          (200, False, True, True, True),
+          (r.status_code, r.json()["pronto"], r.json()["avvisato"],
+           detto_a(888, "Chi compra vuole rinunciare") and detto_a(888, "Dove tornano i sats?"),
+           any(chi == 888 and b and "?scambio=bar-onchain-" in b[1]
+               for chi, t, b in BOTTONI[n_bottoni:])))
+    prova("...lo scambio se lo ricorda, per tutt'e due", (True, True),
+          (uno(999, oid7)["rinuncia_chiesta_il"] > 0,
+           uno(888, oid7)["rinuncia_chiesta_il"] > 0))
+    banco.DETTO.clear()
+    r = gesto(999, oid7, "rinuncia-chiesta")
+    prova("un secondo tocco entro l'ora non manda un secondo avviso",
+          (200, False, []),
+          (r.status_code, r.json()["avvisato"], [t[:30] for chi, t in banco.DETTO]))
+    con = SRV._p2p_onchain_db()
+    try:
+        con.execute("UPDATE p2p_onchain_ordini SET rinuncia_chiesta_il="
+                    "rinuncia_chiesta_il-? WHERE id=?",
+                    (SRV.P2P_ONCHAIN_RINUNCIA_RIAVVISO + 5, oid7))
+        con.commit()
+    finally:
+        con.close()
+    prova("...passata l'ora si' (un sollecito, non una raffica)", (True, True),
+          (gesto(999, oid7, "rinuncia-chiesta").json()["avvisato"],
+           detto_a(888, "Chi compra vuole rinunciare")))
+    banco.DETTO.clear()
+    r = gesto(888, oid7, "rimborso", valore=torna,
+              firma=firma_dest(888, "indirizzo", torna))
+    o7 = uno(888, oid7)
+    come(888)
+    prova("chi ha depositato scrive l'indirizzo, firmato dal suo seme: 200, lo "
+          "scambio rimborsa li', il Profilo resta vuoto, il segno si toglie",
+          (200, torna, "indirizzo", "", 0),
+          (r.status_code, o7["rimborso"],
+           (o7["destinazione_rimborso"] or {}).get("tipo"),
+           c.get("/api/me").json().get("onchain_incasso") or "",
+           o7["rinuncia_chiesta_il"]))
+    prova("...e chi aspettava di rinunciare lo sa: «Ora puoi rinunciare», una volta",
+          1, sum(1 for chi, t in banco.DETTO if chi == 999 and "Ora puoi rinunciare" in t))
+    prova("...scritto non si cambia: 409", 409,
+          gesto(888, oid7, "rimborso", valore=dal_wallet(32),
+                firma=firma_dest(888, "indirizzo", dal_wallet(32))).status_code)
+    r = gesto(999, oid7, "rinuncia-chiesta")
+    prova("adesso «Rinuncio» trova l'indirizzo: `pronto`, nessun avviso in piu'",
+          (200, True, False),
+          (r.status_code, r.json()["pronto"], r.json()["avvisato"]))
+    o7b = uno(999, oid7)
+    prova("...la rinuncia si firma e la seconda firma di chi ha depositato "
+          "rimborsa", (200, "rimborsato"),
+          (gesto(999, oid7, "proposta", verso="compratore",
+                 psbt=psbt_di(o7b, [(torna, 71080 - 300)], 999).to_string()).status_code,
+           gesto(888, oid7, "firma", tx=cofirma(888, uno(888, oid7))).json()["stato"]))
+    prova("...e i sats tornano all'indirizzo scritto li', meno la rete",
+          [(torna, 71080 - 300)],
+          [(script.Script(v.script_pubkey.data).address(N), v.value)
+           for v in Transaction.from_string(INVIATE[-1]).vout])
+    # dal Profilo: la scelta del wallet sblocca la rinuncia che aspettava
+    oid8 = pubblica(888, sats=40000, euro_cent=3600, metodi=["Bonifico"]).json()["id"]
+    gesto(999, oid8, "prendi")
+    paga(uno(888, oid8))
+    gesto(888, oid8, "controlla")
+    gesto(999, oid8, "rinuncia-chiesta")
+    banco.DETTO.clear()
+    casa = dal_wallet(33)
+    come(888)
+    r = c.post("/api/onchain/incasso", json={
+        "tipo": "indirizzo", "valore": casa,
+        "firma": firma_dest(888, "indirizzo", casa)})
+    o8 = uno(888, oid8)
+    prova("la stessa rinuncia, e chi ha depositato sceglie il wallet dal "
+          "Profilo: il rimborso si riempie, il segno si toglie, chi compra lo sa",
+          (200, casa, 0, 1),
+          (r.status_code, o8["rimborso"], o8["rinuncia_chiesta_il"],
+           sum(1 for chi, t in banco.DETTO if chi == 999 and "Ora puoi rinunciare" in t)))
+    banco.DETTO.clear()
+    come(888)
+    c.post("/api/onchain/incasso", json={
+        "tipo": "indirizzo", "valore": casa,
+        "firma": firma_dest(888, "indirizzo", casa)})
+    prova("...salvare di nuovo il Profilo non lo ridice", 0,
+          sum(1 for chi, t in banco.DETTO if "Ora puoi rinunciare" in t))
+    # in disputa il moderatore non poteva rimborsare senza indirizzo
+    come(888)
+    c.post("/api/onchain/incasso", json={"tipo": "barattolo"})
+    oid9 = pubblica(888, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()["id"]
+    gesto(999, oid9, "prendi")
+    paga(uno(888, oid9))
+    gesto(888, oid9, "controlla")
+    gesto(999, oid9, "disputa", motivo="non risponde")
+    prova("in disputa la rinuncia non si chiede (decide un moderatore): 409", 409,
+          gesto(999, oid9, "rinuncia-chiesta").status_code)
+    banco.AVVISI.clear()
+    qua = dal_wallet(34)
+    r = gesto(888, oid9, "rimborso", valore=qua,
+              firma=firma_dest(888, "indirizzo", qua))
+    prova("...ma chi ha depositato l'indirizzo lo scrive anche li', e i "
+          "moderatori lo sanno", (200, qua, True),
+          (r.status_code, uno(888, oid9)["rimborso"],
+           any("dove riavere i sats" in str(a) for a in banco.AVVISI)))
+    SRV.P2P_ONCHAIN_APERTI_MAX = tetto
+
     # ---- 12) gli avvisi, tutti ----------------------------------------------
     print("\n[ogni avviso a una parte porta il bottone del suo scambio]")
     # (17 nov 2026) l'avviso della recensione ricevuta e' quello di sempre,
