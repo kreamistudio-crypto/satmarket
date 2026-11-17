@@ -14006,7 +14006,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = '320d44d6cf';
+const LINGUA_VER = '4e3a739f0f';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -22104,12 +22104,24 @@ function caricaDizionario(diz){
                                       .replace(/\\\{\\\}/g, '([\\s\\S]+?)') + '$');
     const prima = chiave.split(' ', 1)[0];
     const secchio = prima.includes('{}') ? '' : prima;
+    /* il pezzo letterale piu' lungo fra i segnaposto: un `includes` prima
+       della regex, e le forme piu' lunghe (piu' specifiche) provate prima */
+    const pezzo = chiave.split('{}').reduce((a, b) => b.length > a.length ? b : a, '');
+    /* LA FORMA CORTA (17 nov 2026, tappa 2): una chiave che comincia col
+       segnaposto e ha meno di tre parole sue («{} annunci», «{} giorni»)
+       e' un conteggio, e il suo buco vuole un numero o un nome breve:
+       senza questo freno «Pubblica il primo annuncio» usciva «Pubblica
+       il primo listing(s)» e «🔥 Serie dei giorni» diventava «Serie dei
+       days». Al piu' due parole nel primo buco, sennò la forma non vale. */
+    const corta = secchio === '' && chiave.replace(/\{\}/g, ' ').trim().split(/\s+/).filter(Boolean).length < 3;
     if (!TRADUZIONI_FORME.has(secchio)) TRADUZIONI_FORME.set(secchio, []);
-    TRADUZIONI_FORME.get(secchio).push({re, resa: v});
+    const forme = TRADUZIONI_FORME.get(secchio);
+    forme.push({re, resa: v, pezzo, corta});
+    forme.sort((a, b) => b.pezzo.length - a.pezzo.length);
   }
 }
 /* la frase inglese, o null se il dizionario non la sa (o non c'e') */
-function traduci(testo){
+function traduci(testo, fondo){
   if (!traduttoreArmato) return null;
   const chiave = String(testo).replace(T_SPAZI, ' ').trim();
   if (!chiave) return null;
@@ -22119,10 +22131,39 @@ function traduci(testo){
   for (const forme of [TRADUZIONI_FORME.get(prima), TRADUZIONI_FORME.get('')]) {
     if (!forme) continue;
     for (const f of forme) {
+      if (f.pezzo && !chiave.includes(f.pezzo)) continue;
       const m = f.re.exec(chiave);
       if (!m) continue;
+      /* un buco non ingoia una frase intera: niente punto, due punti,
+         punto interrogativo o esclamativo seguiti da spazio (o in coda)
+         dentro quel che cattura — sennò una frase lunga che finisce con
+         «annunci» passava per «{} annunci» e usciva mezza inglese */
+      if (m.slice(1).some(g => /[.?!;](\s|$)|:\s/.test(g))) continue;
+      if (f.corta && m[1].trim().split(/\s+/).length > 2) continue;
       let i = 0;
-      return f.resa.replace(/\{(\d*)\}/g, (_, n) => m[n ? +n : ++i] ?? '');
+      /* quel che il buco cattura si prova a tradurre a sua volta, un
+         livello solo: «Casella 7: Fai il primo acquisto» e' la forma
+         «Casella {}: {}» col titolo dentro, che ha la sua voce */
+      const dentro = g => (g == null) ? '' : (fondo ? g : (traduci(g, true) ?? g));
+      return f.resa.replace(/\{(\d*)\}/g, (_, n) => dentro(m[n ? +n : ++i]));
+    }
+  }
+  /* FRASE PER FRASE (17 nov 2026, tappa 2): un testo che il codice
+     compone a pezzi — «Deposito confermato. Quando vi vedete, …» più
+     la coda scelta da un ternario — non e' mai una chiave intera, e le
+     sue frasi si'. Senza chiave intera si prova una frase alla volta
+     (il taglio e' punto, ?, !, ; seguiti da spazio) e si riscrive quel
+     che si sa; la frase ignota resta italiana, come ovunque. Un livello
+     solo: una frase sola non si ritaglia piu'. Niente lookbehind: le
+     WebView vecchie lo rifiutano all'analisi dell'intero file. */
+  if (!fondo) {
+    const pezzi = []; const taglio = /[.!?;…]+\s+(?=\S)/g; let da = 0, c;
+    while ((c = taglio.exec(chiave))) { pezzi.push(chiave.slice(da, c.index + c[0].trimEnd().length)); da = c.index + c[0].length; }
+    if (pezzi.length) {
+      pezzi.push(chiave.slice(da));
+      let note = 0;
+      const resa = pezzi.map(p => { const r = traduci(p, false); if (r != null) note++; return r ?? p; });
+      if (note) return resa.join(' ');
     }
   }
   return null;
@@ -22130,6 +22171,12 @@ function traduci(testo){
 /* per i testi che non passano dal DOM (popup di Telegram, titolo
    della finestra): la frase inglese se c'e', sennò quella italiana,
    coi segnaposto {nome} riempiti */
+/* «di Anna» → «by Anna»: la riga di chi vende (cassa) e di chi raccoglie
+   (raccolte). Una chiave secca, non una forma «di {}»: quella ingoiava
+   « di spedizione in Italia». Regge anche dove il traduttore non c'e'. */
+function diChi(nome){
+  return (typeof t === 'function') ? t('di {nome}', {nome}) : 'di ' + nome;
+}
 function t(frase, valori){
   let resa = traduci(frase) ?? frase;
   if (valori) for (const k of Object.keys(valori)) resa = resa.split('{' + k + '}').join(valori[k]);
@@ -22163,6 +22210,30 @@ function traduciAlbero(radice){
 }
 /* i numeri e le date all'inglese, con una mappa sola sui metodi che
    le 79 righe di questo file gia' chiamano con 'it-IT' */
+/* i testi che non passano dal DOM: le finestre di Telegram e del browser.
+   Si avvolgono una volta sola, e la frase passa da traduci() — intera,
+   o col pezzo prima dei due punti/del primo a capo se e' composta */
+function fraseInglese(testo){
+  if (typeof testo !== 'string' || !testo) return testo;
+  const intera = traduci(testo);
+  if (intera != null) return intera;
+  return testo.split('\n').map(r => traduci(r) ?? r).join('\n');
+}
+function finestreInglesi(){
+  const w = globalThis;
+  if (typeof w.confirm === 'function') { const c = w.confirm.bind(w); w.confirm = m => c(fraseInglese(m)); }
+  if (typeof w.alert === 'function') { const a = w.alert.bind(w); w.alert = m => a(fraseInglese(m)); }
+  const tg = w.Telegram && w.Telegram.WebApp;
+  if (!tg) return;
+  const popup = p => (p && typeof p === 'object') ? {...p,
+    title: fraseInglese(p.title), message: fraseInglese(p.message),
+    buttons: Array.isArray(p.buttons) ? p.buttons.map(b => b && b.text ? {...b, text: fraseInglese(b.text)} : b) : p.buttons} : p;
+  for (const nome of ['showPopup', 'showConfirm', 'showAlert']) {
+    if (typeof tg[nome] !== 'function') continue;
+    const orig = tg[nome].bind(tg);
+    tg[nome] = (a, ...r) => orig(nome === 'showPopup' ? popup(a) : fraseInglese(a), ...r);
+  }
+}
 function numeriInglesi(){
   const mappa = f => function(loc, opt){ return f.call(this, loc === 'it-IT' ? 'en-GB' : loc, opt); };
   Number.prototype.toLocaleString = mappa(Number.prototype.toLocaleString);
@@ -22178,6 +22249,7 @@ function registraTraduzioni(codice){
   caricaDizionario(diz);
   traduttoreArmato = true;
   numeriInglesi();
+  finestreInglesi();
   document.documentElement.lang = codice;
   traduciAlbero(document.documentElement);
   new MutationObserver(records => {
@@ -32768,7 +32840,7 @@ function renderAcquisto(){
     ? listings.find(x=>setScelte.has(x.id))
     : (listings.find(x=>x.id===d.annuncioId)
        || myListings.find(x=>x.id===d.annuncioId));
-  el('acqSub').textContent = primo ? `di ${primo.seller}` : '';
+  el('acqSub').textContent = primo ? diChi(primo.seller) : '';   // «by Anna» in inglese (tappa 2)
   /* IL TITOLO DICE QUALE DEI DUE ACQUISTI E' (ago 2026): sul carrello
      resta «Controlla il carrello», che e' quel che il bottone della
      barra promette — e la pagina fa davvero tutte e due le cose. */
@@ -41406,6 +41478,9 @@ async function fineMancia(){
    Il giudice di tutto e' il server: qui si disegna e si riferisce. Zero
    XP. Il lessico: «deposito di garanzia», come nel mercatino. */
 const RACC_ZAP_PILLOLE = [1000, 2100, 5000, 21000];
+/* «di Anna» → «by Anna» in inglese; il banco delle prove ritaglia questo
+   blocco da solo, senza il traduttore, e la mano regge lo stesso */
+const raccDiChi = n => (typeof diChi === 'function') ? diChi(n) : 'di ' + n;
 const RACC_DEP_PILLOLE = [50, 100, 200];
 const RACC_GIORNI = [15, 30, 60];
 const RACC_BATTITO_ZAP_MS = 5000;
@@ -41465,7 +41540,7 @@ function raccStato(r){
 function cardRaccolta(r){
   return `<button type="button" class="racc-card" onclick="apriRaccolta(${Number(r.id)})">
       <div class="racc-card-testa"><b>🎯 ${esc(r.titolo)}</b>${raccStato(r)}</div>
-      <div class="racc-chi">di ${esc(raccChi(r))}${r.garantita ? ' · 🛡️ con garanzia' : ''}</div>
+      <div class="racc-chi">${raccDiChi(esc(raccChi(r)))}${r.garantita ? ' · 🛡️ con garanzia' : ''}</div>
       ${raccBarra(r)}${raccNumeri(r)}
     </button>`;
 }
@@ -41566,7 +41641,7 @@ function renderSchedaRaccolta(){
   box.innerHTML = `${torna}
     <div class="sicu-hero" style="text-align:left">
       <h2 style="margin:0 0 4px">🎯 ${esc(r.titolo)}</h2>
-      <p class="occhiello" style="margin:0">di ${esc(raccChi(r))} · ${raccStato(r)}</p>
+      <p class="occhiello" style="margin:0">${raccDiChi(esc(raccChi(r)))} · ${raccStato(r)}</p>
     </div>
     ${perche}
     ${raccBarra(r)}${raccNumeri(r)}

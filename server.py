@@ -5435,14 +5435,16 @@ SERIE_GIORNI_ATTIVA = bool(SERIE_GIORNI_ATTIVA)
 # pagina chiede da sola a chi ha Telegram (o il browser) in un'altra
 # lingua e applica ai testi mentre compaiono (miniapp.html, «L'INGLESE»).
 # Il server non traduce niente: serve il file, e basta.
-# LA LEVA: LINGUA_INGLESE, accesa di serie (regola del 14 nov 2026: le
-# leve nuove nascono accese). Spenta, `/lingua/en.js` risponde 404 e
-# l'app parla italiano a tutti — e' l'interruttore d'emergenza, una riga
-# nel config. Solo True accende.
+# LA LEVA: LINGUA_INGLESE, SPENTA di serie (17 nov 2026 sera, Andrea:
+# «L'inglese della prima parte lascialo spento» — eccezione sua alla
+# regola del 14 nov sulle leve nuove accese: l'inglese arriva in
+# produzione spento e si accende dal config, dopo la prova sul collaudo).
+# Spenta, `/lingua/en.js` risponde 404 e l'app parla italiano a tutti.
+# Solo True accende.
 try:
     from config import LINGUA_INGLESE
 except ImportError:
-    LINGUA_INGLESE = True
+    LINGUA_INGLESE = False
 LINGUA_INGLESE = LINGUA_INGLESE is True
 # la lista CHIUSA dei dizionari (regola ferrea 3: il nome arriva dal
 # client); oggi uno solo

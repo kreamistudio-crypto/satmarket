@@ -199100,7 +199100,10 @@ for (const [k, v] of Object.entries(d)) {
   const numerati = segn.filter(x => x !== '{}').map(x => +x.slice(1, -1));
   if (numerati.length && (segn.length !== numerati.length || Math.max(...numerati) > nk || Math.min(...numerati) < 1))
     guai.push('segnaposto numerati storti: ' + k);
-  if (!numerati.length && segn.length !== nk) guai.push('segnaposto non in pari: ' + k);
+  /* una resa puo' usare MENO buchi della chiave (prende i primi, in fila:
+     «{} annunc{}» → «{} listing(s)»), mai di piu', e mai nessuno se la
+     chiave ne ha */
+  if (!numerati.length && (segn.length > nk || (nk && !segn.length))) guai.push('segnaposto non in pari: ' + k);
 }
 console.log(JSON.stringify({quante: Object.keys(d).length, guai}));
 """.replace("__EN__", testo)
@@ -199115,18 +199118,20 @@ console.log(JSON.stringify({quante: Object.keys(d).length, guai}));
 
     # --- 3. le chiavi stanno nella pagina ---
     import html as _html
-    piatto = re.sub(r"\s+", " ", _html.unescape(mini)).replace("\\'", "'")
+    # (tappa 2) anche server.py: le caselle della stradina, i distintivi,
+    # i livelli e i gruppi delle leve arrivano al DOM dal server
+    piatto = re.sub(r"\s+", " ", _html.unescape(mini + "\n" + src)).replace("\\'", "'").lower()
     senza = []
     for k in dict.fromkeys(chiavi_testo):
         k = k.replace('\\"', '"').replace("\\\\", "\\")
-        if "{}" not in k and k in piatto:
+        if "{}" not in k and k.lower() in piatto:
             continue
-        parole = [w for w in re.findall(r"[A-Za-zÀ-ÿ']+", k) if len(w) >= 4]
+        parole = [w.lower() for w in re.findall(r"[A-Za-zÀ-ÿ']+", k) if len(w) >= 4]
         if all(w[:-1] in piatto for w in parole):
             continue
         senza.append(k)
     prova("inglese: ogni chiave del dizionario ha le sue parole in "
-          "miniapp.html (una frase cambiata la' si cambia anche qui)",
+          "miniapp.html o in server.py (una frase cambiata la' si cambia anche qui)",
           [], senza)
 
     # --- 4. il traduttore ---
@@ -199158,7 +199163,9 @@ location.search = '?lingua=it&x=1'; out.paramIt = linguaApp();
 location.search = ''; out.ricordato = [linguaApp(), scatola.barattolo_lingua];
 scatola.barattolo_lingua = 'en'; out.ricordatoEn = linguaApp();
 caricaDizionario({"Ciao": "Hello", "{} oggetti": "{} items", "da {} a {}": "from {2} to {1}",
-                  "· {} offerenti · si chiude tra": "· {} bidders · closes in", "Nuovo": "New"});
+                  "· {} offerenti · si chiude tra": "· {} bidders · closes in", "Nuovo": "New",
+                  "{} annunci": "{} listings", "Casella {}: {}": "Square {}: {}",
+                  "Fai il primo acquisto": "Make your first purchase"});
 out.spento = traduci("Ciao");
 traduttoreArmato = true;
 out.secca = traduci("  Ciao\n ");
@@ -199167,6 +199174,13 @@ out.ordine = traduci("da 1 a 9");
 out.punto = traduci("· 3 offerenti · si chiude tra");
 out.manca = traduci("Arrivederci");
 out.vuota = traduci("   ");
+/* tappa 2: la forma corta vuole un buco breve, un buco non ingoia una
+   frase con la punteggiatura, e quel che cattura si traduce a sua volta */
+out.corta = [traduci("3 annunci"), traduci("Metti i tuoi annunci")];
+out.frase = traduci("da Roma. Poi a Milano");
+out.dentro = traduci("Casella 7: Fai il primo acquisto");
+out.popup = fraseInglese("Ciao\nArrivederci");
+out.frasi = [traduci("Metti i tuoi annunci. Casella 7: Fai il primo acquisto"), traduci("Titolo. Con un punto")];
 out.tManca = t("Arrivederci {n}", {n: 2});
 out.tOk = t("Ciao");
 const opz = {minimumFractionDigits: 2, maximumFractionDigits: 2};
@@ -199197,6 +199211,17 @@ console.log(JSON.stringify(out));
         prova("inglese: t() — la frase che manca resta italiana coi "
               "segnaposto riempiti, quella che c'e' esce inglese",
               ["Arrivederci 2", "Hello"], [o.get("tManca"), o.get("tOk")])
+        prova("inglese (tappa 2): la forma corta prende «3 annunci» e lascia "
+              "«Metti i tuoi annunci»; un buco non ingoia «Roma. Poi»; il "
+              "titolo dentro «Casella 7: …» si traduce; il popup riga per riga",
+              [["3 listings", None], None, "Square 7: Make your first purchase",
+               "Hello\nArrivederci"],
+              [o.get("corta"), o.get("frase"), o.get("dentro"), o.get("popup")])
+        prova("inglese (tappa 2, sera): frase per frase — il paragrafo "
+              "composto si riscrive dove si sa, e un testo senza chiavi "
+              "resta nullo",
+              ["Metti i tuoi annunci. Square 7: Make your first purchase", None],
+              o.get("frasi"))
         # (l'it-IT non raggruppa a quattro cifre: «1234,50», e' noto)
         prova("inglese: i numeri all'italiana PRIMA di numeriInglesi",
               ["1234,50", "19 601", "1 234"], o.get("prima"))
@@ -199213,12 +199238,15 @@ console.log(JSON.stringify(out));
            'LINGUE_FILE = ("en",)' in src,
            "if codice not in LINGUE_FILE or not LINGUA_INGLESE:" in src,
            'FileResponse(f"lingua/{codice}.js"' in src))
-    prova("inglese: la leva LINGUA_INGLESE nasce accesa, solo True accende, "
+    # SPENTA di serie dal 17 nov 2026 sera (Andrea: «L'inglese della prima
+    # parte lascialo spento»): in produzione arriva spenta, si accende dal
+    # config; sul collaudo sta accesa
+    prova("inglese: la leva LINGUA_INGLESE nasce SPENTA, solo True accende, "
           "e sta nel pannello e nel config d'esempio", (True, True, True),
           ("    from config import LINGUA_INGLESE\nexcept ImportError:\n"
-           "    LINGUA_INGLESE = True\nLINGUA_INGLESE = LINGUA_INGLESE is True" in src,
+           "    LINGUA_INGLESE = False\nLINGUA_INGLESE = LINGUA_INGLESE is True" in src,
            '"LINGUA_INGLESE", LINGUA_INGLESE,' in src,
-           "\nLINGUA_INGLESE = True\n" in open("config_esempio.py", encoding="utf-8").read()))
+           "\nLINGUA_INGLESE = False\n" in open("config_esempio.py", encoding="utf-8").read()))
     prova("inglese: il traduttore guarda il DOM (osservatore sulla radice, "
           "testi e attributi) e linguaSwap legge la lingua dell'app",
           (True, True, True),

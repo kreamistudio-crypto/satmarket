@@ -33,6 +33,9 @@ def main():
 
     c = TestClient(banco.SRV.app)
 
+    # la leva nasce SPENTA (17 nov 2026 sera, scelta di Andrea): qui si
+    # accende, come sul collaudo; la sezione «la leva spenta» la rispegne
+    banco.SRV.LINGUA_INGLESE = True
     print("\n[la rotta del dizionario]")
     r = c.get("/lingua/en.js")
     prova("il dizionario inglese risponde 200", 200, r.status_code)

@@ -20,7 +20,7 @@ Dove si trova:
 - come app per Android, da Zapstore o dalle release su GitHub (con Obtainium si aggiorna da sola). L'app è una finestra su barattolo.store: dentro non c'è niente di diverso. Per controllare che sia proprio quella ufficiale c'è AppVerifier: le due righe da incollare sono nella pagina «Il pagamento protetto» (barattolo.store/sicurezza);
 - su Nostr: gli annunci vengono pubblicati anche lì, e si leggono con qualunque app Nostr che mostra gli annunci (NIP-99).
 
-Barattolo in inglese (dal 17 novembre 2026): se il Telegram o il browser di chi apre Barattolo non è in italiano, la vetrina, le schede degli annunci e l'acquisto (carrello, cassa, pagamento) compaiono in inglese da soli, coi prezzi scritti all'inglese («1,234.50 €»). Ordini, scambio P2P, Vendi, Profilo e il bot sono ancora in italiano: arrivano nelle prossime tappe. Per vedere l'inglese da un telefono italiano si apre barattolo.store/?lingua=en, e ?lingua=it riporta all'italiano; la scelta resta su quel dispositivo. Se qualcuno scrive a Tappo in inglese, Tappo risponde in inglese.
+Barattolo in inglese (dal 17 novembre 2026): se il Telegram o il browser di chi apre Barattolo non è in italiano, tutta l'app compare in inglese da sola — vetrina, schede, acquisto, Ordini, scambio P2P, Vendi, Profilo, aste, raccolte, avvisi e assistenza — coi prezzi scritti all'inglese («1,234.50 €»). Restano in italiano, per ora, i messaggi del bot di Telegram e gli avvisi di errore del server; l'interruttore della lingua nel Profilo arriva in una tappa successiva. Per vedere l'inglese da un telefono italiano si apre barattolo.store/?lingua=en, e ?lingua=it riporta all'italiano; la scelta resta su quel dispositivo. Se qualcuno scrive a Tappo in inglese, Tappo risponde in inglese.
 
 Le chiavi degli scambi P2P (dal 17 novembre 2026): nascono dalle 12 parole del wallet on-chain, le stesse che hanno la copia nel cloud di Telegram o sui relay Nostr. Ovunque ci siano quelle parole (telefono, Telegram Desktop, browser) gli scambi nuovi si governano da lì. Gli scambi aperti prima continuano dal dispositivo dove sono stati presi: il profilo di prima resta lì «in pensione» solo per finirli. Se su un dispositivo le parole non ci sono, al primo gesto P2P l'app chiede di incollarle da Profilo → «Wallet e incassi». Se lo scambio dice «Le chiavi di questo scambio non sono in questo browser», è di un profilo di prima: si finisce da dove è stato preso, o si scrive a @ilbarattolobot se quella memoria è persa.
 
@@ -2089,7 +2089,7 @@ pubblico: no
 
 frase: Barattolo si legge anche in inglese: se il tuo Telegram o il tuo browser non sono in italiano, la vetrina, gli annunci e l'acquisto compaiono in inglese da soli, coi prezzi all'inglese (1,234.50 €). Ordini, P2P, Profilo e bot arrivano nelle prossime tappe. Per provarlo da un telefono italiano apri barattolo.store/?lingua=en (?lingua=it per tornare).
 dove: tutta la Mini App e il sito per chi ha Telegram o il browser in una lingua diversa dall'italiano; la pagina «Il pagamento protetto» (barattolo.store/sicurezza) anche lei.
-leva: LINGUA_INGLESE (accesa di serie; spenta, l'app torna italiana per tutti)
+leva: LINGUA_INGLESE (spenta di serie dal 17 nov sera, scelta di Andrea: in produzione arriva spenta e si accende dal config; accesa sul collaudo)
 pubblico: sì
 
 <!-- pezzo novita-079 | novita -->
@@ -2187,3 +2187,11 @@ frase: Per gli acquisti sopra 500 € la cassa ti propone da sola l'on-chain: ne
 dove: Mercatino: un oggetto sopra 500 €, «Acquista», foglio «Come vuoi pagare?»; nel foglio della fattura Lightning la riga «⚠️ Sopra 500 € il Lightning spesso non passa».
 leva: ONCHAIN_CONSIGLIATO_SOPRA_EURO accesa di serie (500)
 pubblico: sì
+
+<!-- pezzo novita-091 | novita -->
+## Novità · 2026-11-17 · inglese-tappa-2
+
+frase: Barattolo è tutto in inglese: ordini, scambio P2P, Vendi, Profilo, aste, raccolte, avvisi e assistenza compaiono in inglese da soli se il tuo Telegram o il tuo browser non sono in italiano, coi prezzi all'inglese (1,234.50 €). Mancano solo i messaggi del bot e l'interruttore della lingua nel Profilo, in arrivo. Da un telefono italiano apri barattolo.store/?lingua=en (?lingua=it per tornare).
+dove: tutta la Mini App e il sito, per chi ha Telegram o il browser in una lingua diversa dall'italiano: Ordini, P2P, Vendi, Profilo, aste, raccolte, cassa in negozio, swap, on-chain, avvisi, assistenza, privacy.
+leva: LINGUA_INGLESE (spenta di serie dal 17 nov sera, scelta di Andrea: in produzione arriva spenta e si accende dal config; accesa sul collaudo)
+pubblico: no

@@ -504,7 +504,7 @@ pubblico: no
 ## 2026-11-17 · inglese-tappa-1
 frase: Barattolo si legge anche in inglese: se il tuo Telegram o il tuo browser non sono in italiano, la vetrina, gli annunci e l'acquisto compaiono in inglese da soli, coi prezzi all'inglese (1,234.50 €). Ordini, P2P, Profilo e bot arrivano nelle prossime tappe. Per provarlo da un telefono italiano apri barattolo.store/?lingua=en (?lingua=it per tornare).
 dove: tutta la Mini App e il sito per chi ha Telegram o il browser in una lingua diversa dall'italiano; la pagina «Il pagamento protetto» (barattolo.store/sicurezza) anche lei.
-leva: LINGUA_INGLESE (accesa di serie; spenta, l'app torna italiana per tutti)
+leva: LINGUA_INGLESE (spenta di serie dal 17 nov sera, scelta di Andrea: in produzione arriva spenta e si accende dal config; accesa sul collaudo)
 pubblico: sì
 
 ## 2026-11-17 · assistenza-screenshot
@@ -578,3 +578,9 @@ frase: Per gli acquisti sopra 500 € la cassa ti propone da sola l'on-chain: ne
 dove: Mercatino: un oggetto sopra 500 €, «Acquista», foglio «Come vuoi pagare?»; nel foglio della fattura Lightning la riga «⚠️ Sopra 500 € il Lightning spesso non passa».
 leva: ONCHAIN_CONSIGLIATO_SOPRA_EURO accesa di serie (500)
 pubblico: sì
+
+## 2026-11-17 · inglese-tappa-2
+frase: Barattolo è tutto in inglese: ordini, scambio P2P, Vendi, Profilo, aste, raccolte, avvisi e assistenza compaiono in inglese da soli se il tuo Telegram o il tuo browser non sono in italiano, coi prezzi all'inglese (1,234.50 €). Mancano solo i messaggi del bot e l'interruttore della lingua nel Profilo, in arrivo. Da un telefono italiano apri barattolo.store/?lingua=en (?lingua=it per tornare).
+dove: tutta la Mini App e il sito, per chi ha Telegram o il browser in una lingua diversa dall'italiano: Ordini, P2P, Vendi, Profilo, aste, raccolte, cassa in negozio, swap, on-chain, avvisi, assistenza, privacy.
+leva: LINGUA_INGLESE (spenta di serie dal 17 nov sera, scelta di Andrea: in produzione arriva spenta e si accende dal config; accesa sul collaudo)
+pubblico: no

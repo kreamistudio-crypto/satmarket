@@ -37166,7 +37166,9 @@ mai il kind 0 di nessuno: regola ferrea 2).
   volta, senza toccare `fmt`/`fmtEur` (che le prove cercano per testo):
   «1,234.50», «19,601», «14 Nov». Per chi legge in italiano non cambia
   NIENTE: nessun fetch, `traduttoreArmato` resta falso, `traduci()`
-  risponde null. La leva `LINGUA_INGLESE` (accesa di serie, gruppo
+  risponde null. La leva `LINGUA_INGLESE` (SPENTA di serie dal 17 nov
+  sera, scelta di Andrea — «lascialo spento» — e accesa dal config, sul
+  collaudo prima e in produzione quando lo dirà lui; gruppo
   «🌍 Lingua» del pannello) spenta fa rispondere 404 alla rotta: l'app
   torna italiana per tutti, l'interruttore d'emergenza. Il pannello
   admin resta italiano per scelta. Coperto in questa tappa: la
@@ -37347,3 +37349,32 @@ mai il kind 0 di nessuno: regola ferrea 2).
   niente giro. I file stanno in assets/mondo/ e nella whitelist
   `MONDO_ASSET` (la prova confronta whitelist, cartella e chiavi: un
   testo di bottone ritoccato senza ritoccare la chiave fa rosso).
+- L'INGLESE, TAPPA 2: TUTTA L'APP (17 nov 2026, cantiere
+  inglese-tappa-2). Il dizionario `lingua/en.js` ha ~9.200 voci (la
+  sezione «TAPPA 2» in coda) e copre Ordini, P2P, Vendi, Profilo, aste,
+  raccolte, cassa in negozio, swap, on-chain, avvisi, assistenza,
+  privacy, tour, popup e pannelli admin. Tre regole in piu' nel
+  traduttore: la FORMA CORTA (`corta` in `caricaDizionario`: chiave che
+  comincia con `{}` e ha meno di tre parole sue → al piu' due parole
+  nel primo buco), il BUCO CHE NON INGOIA UNA FRASE (in `traduci`,
+  nessun `. ? ! ;` seguito da spazio ne' `: ` dentro una cattura) e la
+  TRADUZIONE DENTRO LA CATTURA (`traduci(g, true)`: un livello solo,
+  cosi' «Casella 7: Fai il primo acquisto» esce intero). Dalla sera
+  dello stesso giorno la quarta: FRASE PER FRASE — un nodo che non
+  e' una chiave intera ne' una forma si taglia a `. ? ! ;` + spazio e
+  ogni frase si cerca da sola (i paragrafi composti dal codice a pezzi);
+  un livello, senza lookbehind. I testi che
+  arrivano DAL SERVER e finiscono nel DOM (caselle e zone della
+  stradina, distintivi e il loro `title` «Nome: descrizione», livelli,
+  gruppi delle leve) stanno nel dizionario come chiavi secche: una
+  frase cambiata in `server.py` si cambia anche li' (la prova cerca le
+  parole delle chiavi in miniapp.html E in server.py). I `confirm`,
+  `alert` e i popup di Telegram passano da `fraseInglese` /
+  `finestreInglesi` (riga per riga se la frase intera manca). La riga
+  «di <venditore>» della cassa e delle raccolte usa `diChi()` /
+  `raccDiChi()`, che chiamano `t('di {nome}', …)` (chiave secca, non
+  una forma) e reggono senza traduttore. Le chiavi del dizionario
+  NON hanno entita' HTML: `&nbsp;` nel sorgente e' uno spazio nel DOM.
+  Restano italiani: le descrizioni delle leve (testo per Andrea), i
+  dati (titoli, negozi), i mesi brevi del P2P, il bot e gli errori del
+  server (tappa 3, con l'interruttore della lingua salvato sul server).

@@ -857,3 +857,25 @@ Bruciata, i sats sono rimasti fuori dal wallet di chi l'aveva messa?
 **PER SPEGNERE:** via la riga `P2P_ONCHAIN_CAUZIONE` e riavvio, LASCIANDO
 il macaroon finché ci sono cauzioni vive. **PER APRIRE A TUTTI** (a prova
 fatta): la riga `P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = False` e riavvio.
+
+## 21. L'inglese sul collaudo: la leva `LINGUA_INGLESE` accesa (17 nov 2026 sera, cantiere inglese-tappa-2)
+
+**Perché.** Andrea ha deciso che l'inglese arriva in produzione SPENTO
+(«L'inglese della prima parte lascialo spento»): la leva nasce False
+nel codice. Sul collaudo invece va ACCESA, per provare l'app in inglese
+(`https://collaudo.barattolo.store/?lingua=en`). In produzione non si
+tocca niente finché Andrea non lo dice.
+
+**Sola lettura (sulla VM di collaudo):**
+```
+sudo grep -n "^LINGUA_INGLESE" /srv/collaudo/barattolo/config.py
+```
+
+**Poi, se la riga non c'è (sulla VM di collaudo, mai sul VPS):**
+```
+sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-inglese
+printf '\nLINGUA_INGLESE = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
+sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/lingua/en.js
+```
+Atteso: `200`. Poi l'app con `?lingua=en` parla inglese.
