@@ -348,6 +348,11 @@ DB_BUSY_TIMEOUT = 15         # secondi che una connessione aspetta sul
                              # il backup che tiene il file in lettura;
                              # le scritture lunghe non si curano da qui
                              # ma rendendole brevi
+SENTINELLA_ATTIVA = True     # la sentinella del server fermo (17 nov
+                             # 2026): se /api/salute tace, la pila dei
+                             # fili nel journal, e muto da 3 minuti il
+                             # server esce e systemd lo rialza. False =
+                             # spenta (solo per emergenza)
 MAX_PREFERITI = 10           # quanti annunci ATTIVI stanno «nel tuo
                              # barattolo». Piccolo apposta: e' una
                              # selezione, non una lista dei desideri

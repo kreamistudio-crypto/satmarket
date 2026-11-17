@@ -87845,3 +87845,68 @@ cartello e il contorno sulla riga giusta, non sulle note legali.
 DA GUARDARE: la cassa VERA (serve un account: la frase e' quella delle
 pagine di aiuto, l'aspetto no); Firefox dal vivo; la pagina col PayCode
 resta da vedere (vedi la voce di ieri).
+
+## La sentinella del server fermo (17 nov 2026, cantiere sentinella-loop; il blocco delle 08:07 dopo la promozione ecd76363)
+
+COSA È SUCCESSO. Il servizio è partito alle 08:05:19 col deploy della
+promozione (11 lavori più la cura dei segreti). Alle 08:07:42 ha servito
+le ultime richieste, alle 08:07:43 l'ultima riga del journal (l'import
+Nostr di un venditore: «Trovati 0 annunci… Nessun annuncio trovato»,
+nostr.oxtr.dev in timeout), poi più niente: /api/salute muta (000), la
+porta in ascolto, nessun errore. Andrea l'ha visto alle ~08:10 e ha
+riavviato: SIGTERM ignorato per 20 s, SIGKILL. 11,9 s di CPU in 6,5
+minuti, picco 1,3 GB: era FERMO ad aspettare, non a calcolare.
+
+LA CAUSA NON SI È POTUTA DIMOSTRARE, e si scrive così. Visto: gli 11
+lavori promossi non toccano il giro dell'import Nostr né l'orologio
+(le modifiche al server sono rotte e messaggi, più la categoria dei
+connettori, che gira in un task suo). La riga «🔄 Import Nostr: …», che
+l'orologio stampa appena finito l'ultimo venditore, non c'è: alle 08:07:43
+il ciclo era già fermo, o si è fermato in `_apri_revisioni` /
+`_chiedi_completamento`. Nello stesso minuto partono i tre orologi a 120 s
+(on-chain, cambi P2P, guardia della liquidità). Cercati e non trovati:
+`.result()` senza tetto, lucchetti fra fili, `urlopen` senza timeout nel
+ciclo, domande ai relay fuori da `to_thread`; sqlite ha 15 s di attesa e
+avrebbe lasciato un errore nel journal. Il SIGKILL da solo non prova il
+ciclo fermo: anche un filo di `to_thread` appeso trattiene l'uscita (la
+lezione del 30 set).
+
+LA CURA: VEDERE LA PROSSIMA, E NON RESTARE FERMI. Un filo `sentinella`
+bussa a /api/salute da dentro (30 s, tetto 20): è la domanda del deploy,
+quindi vede il ciclo fermo, il pool delle rotte pieno e il database
+sotto chiave senza indovinare quale. Al primo silenzio scrive nel journal
+la pila di tutti i fili (faulthandler); muto da 3 minuti, seconda pila,
+il segno accanto al database e `os._exit(70)` → systemd (Restart=always,
+5 s, letto sul VPS) lo rialza, e l'avvio manda «🧊 Il server si era
+fermato» nella stanza «errori». `kill -USR1 <pid>` dà la stessa pila a
+mano, prima di un riavvio. L'indirizzo dagli argomenti di uvicorn
+(produzione 8080, collaudo 8090), senza porta non parte. Leva
+`SENTINELLA_ATTIVA`, di serie accesa.
+⚠️ STRADE NON PRESE. Il battito del solo ciclo (una coroutine che
+aggiorna un orario): non vede il pool dei thread delle rotte pieno, e
+/api/salute è una `def` che gira proprio lì. La porta scritta nel config:
+sbagliata sul collaudo, avrebbe riavviato un server sano ogni 3 minuti.
+Contare anche il 503 o la porta chiusa: un riavvio non cura un database
+che non si apre, e si riavvierebbe all'infinito. py-spy sul VPS: è
+un'installazione, e faulthandler è già nella libreria standard.
+Indovinare un colpevole e «curarlo»: senza la pila sarebbe una
+correzione alla cieca.
+
+PROVATO. `prove_sentinella_server_fermo` (26: l'indirizzo dagli
+argomenti, il passo, il colpo vero contro un server di cartone muto /
+sano / 503 / porta chiusa, la forma). `collaudo_sentinella` (16, nella
+gabbia): un server VERO con uvicorn, una rotta che fa `time.sleep` nel
+ciclo → la pila arriva e contiene la rotta colpevole, uscita col 70,
+segno scritto; il riavvio dice «riavviato dopo un blocco», l'avviso parte
+e il segno sparisce; un SIGTERM normale non fa scattare niente. Dell'avvio
+nel collaudo gira la sola sentinella: il primo giro, senza le variabili
+del proxy, era rosso nella gabbia (gli altri compiti d'avvio chiedono il
+cambio a CoinGecko — la lezione del 2 nov). Controprove
+rosse: «altro» contato come silenzio, timeout letto come «altro», uscita
+a 2 minuti, porta di ripiego fissa, spegnimento non guardato, `os._exit`
+tolto (dal vivo).
+DA GUARDARE. Dopo il deploy, la riga «🧊 Sentinella del server fermo:
+accesa» nel journal. Se il blocco torna: le righe «🧊 Sentinella» con
+la pila vanno al thread, e la causa vera si cura allora. Su develop
+questo commit arriva come cherry-pick: alla prossima promozione è un
+doppione da togliere.
