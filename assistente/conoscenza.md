@@ -308,13 +308,14 @@ Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è
 - Per pubblicare si può anche toccare il + di «Compra BTC» o «Vendi BTC» e scegliere «On-chain» invece di «Lightning». Serve aver preparato Profilo → «₿ On-chain» (le 12 parole e la loro copia: vedi «Bitcoin on-chain»). Un ordine resta nel libro 7 giorni (dal 16 novembre 2026; prima 24 ore); il tetto per ordine è quello on-chain dei NUMERI DI OGGI e del paragrafo sui limiti.
 - Il giro, passo per passo: chi prende fa nascere l'indirizzo a tre chiavi. Chi vende ha 6 ore per depositare con «🔒 Blocca i sats»: i sats dello scambio più un piccolo margine per la commissione della rete, più la sua metà della commissione del P2P. Con una conferma della rete (circa dieci minuti) lo scambio va avanti, e tutti e due ricevono l'avviso. Allora chi compra manda gli euro col metodo scritto e tocca «💶 Ho inviato gli euro». Chi vende li controlla sul suo conto e SOLO quando li vede tocca «🔓 Ricevuti: libera i sats»; la seconda firma la mette da solo il telefono di chi compra, e i bitcoin partono.
 - Chi compra deve dire dove ricevere: nello scambio c'è «Dove ricevi i bitcoin?», si incolla un proprio indirizzo e si tocca «✍️ Firma e usa questo indirizzo». Chi ha messo nel Profilo la chiave del conto del suo wallet non deve scriverlo ogni volta: ogni scambio arriva a un indirizzo nuovo.
-- Se il deposito non arriva in tempo, chi compra può rinunciare («Rinuncia: il deposito non è arrivato»); chi deve depositare e non ha ancora mandato niente può annullare («Annulla (non deposito)»). Con i sats già nel deposito non si annulla da soli: si esce col rimborso d'accordo o con «⚖️ Apri una disputa». Decide un moderatore di Barattolo, Barattolo mette la sua firma e la seconda la mette il telefono di chi ha ragione.
+- Finché nessun sats è arrivato nel deposito, chi compra può annullare quando vuole con «✕ Annulla» (dal 17 novembre 2026; prima solo a tempo del deposito finito, e allora il tasto si chiama «Rinuncia: il deposito non è arrivato»); chi deve depositare e non ha ancora mandato niente può annullare («Annulla (non deposito)»). Con i sats già nel deposito non si annulla da soli: si esce col rimborso d'accordo o con «⚖️ Apri una disputa». Decide un moderatore di Barattolo, Barattolo mette la sua firma e la seconda la mette il telefono di chi ha ragione.
 - La commissione (dal 16 novembre 2026) è quella degli scambi Lightning, metà a testa e con gli stessi sconti: chi vende deposita la sua metà insieme ai sats, chi compra riceve i sats meno la sua metà. Nel conto dello scambio, e già nel foglio prima di prendere, c'è la riga «Fee P2P» con la percentuale, come negli scambi Lightning. Se lo scambio finisce col rimborso a chi vende, torna tutto, commissione compresa. Sotto i 546 sats di commissione in tutto non si paga niente.
 - Il tempo per pagare (dal 17 novembre 2026): dal deposito confermato chi compra ha 24 ore per pagare in USDT, ETH, Monero o USDe, e 72 ore per euro e franchi (un bonifico può cadere nel fine settimana). La card in «I miei scambi» dice quanto resta («Hai ancora 23 h 10 min») e ha la barra del tempo sul bordo di sotto; la pagina dello scambio ha la riga «Tempo per pagare» col conto che scorre. Alla scadenza non si annulla niente, i bitcoin restano nel deposito: il bot avvisa tutti e due, chi compra se ha già pagato tocca «Ho inviato», e chi vende, se i soldi non sono arrivati, può aprire una disputa. La disputa si può aprire anche prima.
 
 <!-- pezzo libro-027 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (12/13)
 
+- Chi è l'altra persona (dal 17 novembre 2026): nella pagina dello scambio on-chain, appena l'ordine è preso, c'è il riquadro con la faccia, il nome e le stelline dell'altra persona, come negli scambi Lightning; toccando la faccia si apre il suo negozio, e i tondi accanto (Telegram, Nostr) servono a scriverle, se li ha. La chat interna dello scambio, negli scambi on-chain, per ora non c'è.
 - I promemoria dello scambio on-chain (dal 17 novembre 2026), come nel Lightning: il bot ricorda a chi compra di pagare dopo un'ora, dopo sei ore e quattro ore prima della fine del suo tempo (solo se chi vende ha già scritto dove ricevere i soldi, e mai con i contanti di persona); e ricorda a chi vende di controllare e liberare i sats un'ora, sei ore e venti ore dopo «Ho inviato». Con una disputa aperta i promemoria si fermano.
 - Negli scambi on-chain pagati in ETH, Monero o USDe (dal 17 novembre 2026), come per gli USDT: prima di «Ho inviato» si incolla l'id della transazione (con Monero anche la chiave della transazione, la «tx key»). Lo vedono chi vende e, in una disputa, il moderatore, col tasto per controllarlo sull'explorer.
 - La chat negli scambi on-chain (dal 17 novembre 2026), come nel Lightning: da quando l'ordine è preso a quando i sats vengono liberati o rimborsati c'è una chat fra voi due, cifrata, con foto e PDF, in fondo alla pagina dello scambio («💬 Chat» in cima porta giù). Quando l'altra persona ti scrive, il bot dice «Hai un nuovo messaggio nello scambio on-chain» (mai il testo) e il bottone «🟠 Apri lo scambio» porta dritto alla chat. Se l'altra persona non ha ancora aperto Barattolo, al posto del campo c'è «🔔 Avvisa». In una disputa il moderatore la legge; a scambio finito si cancella.
@@ -1883,6 +1884,22 @@ leva: RICHIESTA_PUNTI (accesa di serie)
 pubblico: sì
 
 <!-- pezzo novita-065 | novita -->
+## Novità · 2026-11-17 · onchain-controparte
+
+frase: Negli scambi P2P on-chain ora vedi chi c'è dall'altra parte: appena l'ordine è preso, nella pagina dello scambio compare la sua scheda con faccia, nome e stelline, come negli scambi Lightning. Toccando la faccia si apre il suo negozio.
+dove: P2P → «I miei scambi» → uno scambio on-chain preso, sotto la nota dello stato.
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-066 | novita -->
+## Novità · 2026-11-17 · onchain-annulla
+
+frase: Negli scambi P2P on-chain chi compra può annullare con «✕ Annulla» finché chi vende non ha ancora depositato i sats, come negli scambi Lightning: prima bisognava aspettare la fine del tempo del deposito.
+dove: P2P → «I miei scambi» → uno scambio on-chain preso, in attesa del deposito.
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-067 | novita -->
 ## Novità · 2026-11-17 · barattozon-onchain
 
 frase: Barattozon adesso c'è anche on-chain: in «Vendi BTC» col tabacchino puoi toccare «On-chain» in cima al foglio e pubblicare il tuo PayCode nel libro on-chain. Serve un PayCode che scade fra almeno 12 ore; chi prende l'ordine vede il codice solo quando i tuoi sats sono confermati nel deposito di garanzia, poi lo paga al tabacchino e tocca «Ho pagato al tabacchino».
@@ -1890,7 +1907,7 @@ dove: Il P2P, «Vendi BTC» → la capsula Barattozon (o il + col metodo «Conta
 leva: P2P_ONCHAIN_BARATTOZON (accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-066 | novita -->
+<!-- pezzo novita-068 | novita -->
 ## Novità · 2026-11-17 · livelli-carosello
 
 frase: I tuoi livelli adesso si sfogliano: nel Profilo, sotto «Livello e titolo», ogni livello è una tessera da scorrere col dito. Sulla tua c'è l'anello con i tuoi XP sulla soglia del prossimo, i livelli già passati hanno la spunta, quelli davanti il lucchetto, e sotto vedi i vantaggi del livello che stai guardando: ✅ quelli già tuoi, 🔒 quelli da sbloccare.
@@ -1898,7 +1915,7 @@ dove: Profilo → «🎖 Livello e titolo» → «I vantaggi di ogni livello».
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-067 | novita -->
+<!-- pezzo novita-069 | novita -->
 ## Novità · 2026-11-17 · contante-per-posta
 
 frase: Nel P2P c'è un metodo in più, «Contante per posta»: chi compra sats spedisce le banconote a chi le vende, in una busta sigillata nascosta in un pacco, con un servizio tracciato. Le regole sono scritte nello scambio: chi spedisce filma l'imballo col numero di tracciamento in vista, chi riceve filma l'apertura prima di liberare i sats, e chi prende l'ordine blocca una piccola cauzione.
@@ -1906,7 +1923,7 @@ dove: P2P → «Pubblica» → «Altri metodi ▾» → «Contante per posta»; 
 leva: P2P_POSTA_ATTIVO (nuova, spenta di serie: in produzione resta spenta per scelta di Andrea, accesa solo sul collaudo)
 pubblico: no
 
-<!-- pezzo novita-068 | novita -->
+<!-- pezzo novita-070 | novita -->
 ## Novità · 2026-11-17 · chat-onchain
 
 frase: Anche negli scambi P2P on-chain adesso c'è la chat fra chi compra e chi vende, come nel Lightning: cifrata, con foto e PDF, da quando l'ordine è preso a quando i sats vengono liberati. Quando l'altra persona ti scrive, il bot te lo dice col tasto che apre dritto la chat; in una disputa il moderatore la può leggere, e a scambio finito si cancella.
@@ -1914,7 +1931,7 @@ dove: la pagina di uno scambio on-chain preso, riquadro «💬 Chat con …» in
 leva: P2P_CHAT_SCAMBIO (la stessa della chat del Lightning, accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-069 | novita -->
+<!-- pezzo novita-071 | novita -->
 ## Novità · 2026-11-17 · serie-giorni
 
 frase: Nel tuo Profilo c'è una fiamma che conta quanti giorni di fila hai aperto Barattolo, col tuo record e gli ultimi sette giorni. Basta entrare una volta al giorno. Se salti un giorno riparte da 1 e il record resta. Non dà punti né premi e la vedi solo tu: è solo la soddisfazione di non fermarla.

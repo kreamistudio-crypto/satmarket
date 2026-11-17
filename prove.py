@@ -62615,8 +62615,9 @@ def prove_feedback_tre_e_tondi():
           "card dell'altra parte",
           ["renderNegozio", "renderProfilo", "cardParte", "cardParte"],
           chiamanti("tondiVenditore"))
-    prova("censimento: la card dell'altra parte la chiamano il P2P e l'ordine",
-          ["cardParteOrdine", "profiloControparteP2P"],
+    prova("censimento: la card dell'altra parte la chiamano il P2P (Lightning e, dal 17 nov 2026, "
+          "on-chain) e l'ordine",
+          ["cardParteOrdine", "controparteOcP2P", "profiloControparteP2P"],
           chiamanti("cardParte"))
     # ...e le due condivisioni del negozio partono SOLO dai tondi: fuori
     # dalla definizione, il nome si trova una volta, nel catalogo dei
@@ -161671,10 +161672,11 @@ def prove_p2p_onchain():
            'return "compratore"' in pezzo("_p2p_onchain_ruolo")))
     prova("la disputa fa decadere la proposta di parte", True,
           "proposta_psbt='', proposta_da=0" in pezzo("p2p_onchain_disputa"))
-    prova("l'annullo di chi riceve aspetta la finestra del deposito, e nessuno "
+    # (17 nov 2026, onchain-controparte) chi riceve annulla quando vuole,
+    # come nel Lightning prima della garanzia: la finestra non lo ferma piu'
+    prova("l'annullo di chi riceve NON aspetta la finestra del deposito, e nessuno "
           "annulla con sats visti", (True, True),
-          ('if ruolo == "venditore" and adesso < int(o["deposito_entro"] or 0):'
-           in pezzo("p2p_onchain_annulla"),
+          ('adesso < int(o["deposito_entro"] or 0)' not in pezzo("p2p_onchain_annulla"),
            "AND visti_sats=0" in pezzo("p2p_onchain_annulla")))
     prova("la ronda batte dentro `orologio_onchain`, e i tre freni esistono",
           (True, True),
