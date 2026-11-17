@@ -89856,3 +89856,63 @@ del tabellone, mai un premio in XP: caselle e missioni SENZA XP
 DA GUARDARE. I dipinti di Flow (in coda dopo la mappa del tabellone):
 quando arrivano, la pianta di ogni zona si prende guardando il dipinto.
 Le «Ere» a ogni halving (approvate, non ancora costruite).
+
+## I minigiochi davanti alle caselle, il razzo di bulloni e il platform di lato (17 nov 2026, pomeriggio, stesso cantiere caccia-a-tappo; Andrea: «i minigame devono rispecchiare» le caselle del tabellone, «le prime missioni devono essere facili, semplici», sulla storia «Sì, il razzo di bulloni», sul razzo «super mega moderno», sulla vista dall'alto «non mi entusiasma... meglio un gioco in 2D», «in orizzontale»)
+
+COSA. Le missioni non sono piu' fumetti: sono minigiochi dove Tappo si
+muove, e ognuno sta SUBITO PRIMA della casella del tabellone che
+insegna (campo `prima` in `MISSIONI_TAPPO`): «Raccogli i sats» prima di
+«Attiva l'incasso automatico in Lightning», il lucchetto prima del
+primo acquisto, il quaderno e le dodici parole prima del wallet
+on-chain, la staffetta prima dei 10.000 sats incassati, l'halving
+sull'ultima casella. Finito il gioco, il bottone `fai` porta a fare la
+casella vera («⚡ Attiva l'incasso automatico»), «Più tardi» chiude. La
+prima missione e' la piu' facile (raccogliere i sats e metterli nel
+wallet); il quaderno, che chiede di confrontare, scala dopo.
+
+LA STORIA UNICA, «Il razzo di bulloni»: Tappo costruisce un razzo per la
+Luna; ogni missione monta un pezzo (piedini, serbatoio, motore e il suo
+scudo, ali; l'halving lo fa partire), le stesse parole delle frasi di
+zona che scrive il thread della stradina. Il razzo e' l'unico oggetto
+super moderno della mappa (Andrea): gli otto stadi li disegna Flow.
+
+I DIPINTI. Flow (sul PC di Andrea, a crediti zero) ha fatto il forno, la
+biblioteca, sats, wallet, Gazza, Tarlo, leggii, cestino, busta e Tappo
+in quattro pose; qui scontornati dal verde e ridotti in WebP. Le scene
+hanno preso le misure dei dipinti (muri, mobili, tane). Due cose sono
+nate guardandoli: la STRADA (A* su una griglia da 30 e il filo tirato:
+toccando un posto dietro un tavolo Tappo ci gira intorno; prima sbatteva
+e si fermava) e i MOBILI CHE COPRONO (`copri`: il pezzo di dipinto del
+tavolo si ridisegna alla sua profondita', cosi' Tappo passa dietro e non
+sopra).
+
+LA SVOLTA AL PLATFORM. Provata la demo dall'alto, Andrea: suono dei passi
+«troppo invasivo» (tolto) e movimenti «non entusiasmano»: vuole un
+platform di lato, in orizzontale. Fatto il motore `lato` (fisica pura a
+passo fisso, salto che si allunga tenendo premuto, grazia del bordo e
+salto prenotato, schiacciato e allungato, telecamera che guarda avanti,
+tre tasti grandi per i pollici, cartello «Gira il telefono» in
+verticale, Telegram a tutto schermo dove lo sa fare) e il livello dei
+sats di lato: sats lungo la strada, wallet dove sono al sicuro e da dove
+si riparte, la Gazza che picchia chi ha sats in tasca (cadono per terra
+e si riprendono), il wallet grande come traguardo. Il genere si', il
+gioco di altri no: niente personaggi, livelli o stile copiati (Andrea
+chiedeva se si potesse rifare Rayman: no).
+
+STRADE SCARTATE. Il 3D WebGL (bocciato prima); la vista dall'alto come
+motore principale (resta per le missioni «dentro un posto», ma per i
+sats vince il platform); uno strumento esterno che genera giochi (il
+gioco deve vivere dentro Barattolo, legato a tabellone e bulloni).
+
+PROVATO. Prove della caccia (fisica del platform passo per passo, la
+strada intorno ai mobili, i pezzi del razzo, `prima` contro le caselle
+vere, i dipinti contro la whitelist), della stradina (`prima`), degli
+effetti ridotti (il censimento di requestAnimationFrame con latoApri e
+latoGiro); collaudo della caccia; giri dal vivo headless di forno,
+biblioteca e platform fino in fondo, senza errori in pagina.
+
+DA GUARDARE. I disegni del platform (fondali a strati, terreno, Tappo
+che corre di profilo in otto pose, Gazza in volo) e gli otto stadi del
+razzo sono in coda a Flow sul PC: finche' non arrivano il platform usa i
+disegni a mano. Le altre missioni come platform o stanza, una alla
+volta, sempre piu' difficili salendo.

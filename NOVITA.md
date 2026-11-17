@@ -475,7 +475,7 @@ pubblico: sì
 frase: Dal livello «Bottega avviata» puoi avere gratis il tuo nome verificato su Nostr, tipo mario@barattolo.store. Lo scegli nel Profilo, lo incolli nel campo NIP-05 del tuo profilo Nostr e le app Nostr mostrano la spunta accanto al tuo nome. Serve una chiave Nostr collegata con una firma.
 dove: Profilo → «Impostazioni» → «🆔 Nostr e identità» → riga «✔️ Nome verificato su Nostr» → «Prendi questo nome» e poi «📋 Copia»; nella scala dei livelli, tra i vantaggi di «Bottega avviata».
 leva: NIP05_UTENTI_ATTIVO (accesa di serie)
-pubblico: sÃ¬
+pubblico: sì
 
 ## 2026-11-17 · caccia-a-tappo
 frase: È arrivata la Caccia a Tappo, il gioco di Barattolo. Ogni giorno Tappo si nasconde in un annuncio vero, diverso per ognuno: leggi gli indizi, apri gli annunci e tocca «Tappo è qui?». Chi lo trova vince i bulloni 🔩, accende i barattoli della dispensa, sale di grado e completa le sfide. Coi bulloni prendi cappellini, attrezzi e 5 posti in più nei preferiti. Si gioca gratis: i bulloni non sono sats.
@@ -484,7 +484,7 @@ leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
 pubblico: sì
 
 ## 2026-11-17 · mondo-di-tappo
-frase: Nella Caccia a Tappo arriva il Mondo di Tappo: guidi Tappo dentro la dispensa, raccogli i bulloni 🔩, apri i barattoli e sali di zona. E ci sono le missioni: cinque giochi brevi per capire Bitcoin, dalle dodici parole al dimezzamento. Chi vende può mettere un annuncio sul palco del mondo per un giorno, coi bulloni.
+frase: Nella Caccia a Tappo arriva il Mondo di Tappo: guidi Tappo dentro la dispensa, raccogli i bulloni 🔩, apri i barattoli e sali di zona. E ci sono i minigiochi di Tappo, sul tabellone dei livelli subito prima delle caselle che insegnano: si corre, si salta e si impara Bitcoin, e alla fine un bottone ti porta a fare la cosa vera. Ogni minigioco monta un pezzo del razzo con cui Tappo vuole arrivare sulla Luna. Chi vende può mettere un annuncio sul palco del mondo per un giorno, coi bulloni.
 dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo»: scheda «Mondo» per camminare, scheda «Sfide» per le missioni.
 leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
 pubblico: sì

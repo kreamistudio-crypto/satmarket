@@ -31925,8 +31925,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    17 nov 2026: l'ufficiale scontornato, WebP con trasparenza, 560x721,
    ~58 KB, max-age di un giorno — vedi «LA CACCIA A TAPPO»),
    `/assets/mondo/{nome}` (le illustrazioni del Mondo di Tappo, 17 nov
-   2026: sei zone `zona-1..6.webp` e quattro oggetti, whitelist
-   `MONDO_ASSET`, file in assets/mondo/, ETag e `no-cache`; senza il
+   2026: sei zone `zona-1..6.webp` e quattro oggetti, poi le stanze e
+   le cose dei minigiochi `miss-*` e le quattro pose `tappo-passo-1..4`
+   dipinte con Flow, whitelist `MONDO_ASSET` — una prova la confronta
+   con la cartella —, file in assets/mondo/, ETag e `no-cache`; senza il
    file 404 e la zona si disegna da sola),
    le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
@@ -37277,3 +37279,26 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `missioneFine` manda le stelle e lancia l'evento `tappo:missione`.
   Nel gioco l'elenco sta in cima a «Sfide» (`cacciaMissioniHTML`: un
   tasto solo per un id che sta in `MISSIONI_GIOCO`).
+  I MINIGIOCHI (17 nov 2026, pomeriggio): ogni voce di `MISSIONI_TAPPO`
+  porta `prima`, l'id della casella di `STRADINA_CASELLE` che insegna
+  (stessa zona): `tappe_stradina` la mette subito davanti a quella
+  casella (senza `prima`, o con una casella che non c'e', resta sparsa
+  come prima, in fila per `ordine`). In `MISSIONI_GIOCO` ogni missione
+  ha `fai` ([testo, gesto]: il bottone finale che porta a fare la
+  casella vera, `missioneFai`) e `razzo` (il pezzo del razzo di bulloni
+  che monta). Tre motori, scelti in `missioneVia` in quest'ordine:
+  `lato` (il PLATFORM DI LATO: `latoApri`/`latoGiro`/`latoFerma`, la
+  pura `latoFisica(s, c, liv, dt)` a passo fisso 1/120 con accelerazione,
+  salto variabile, grazia del bordo, salto prenotato, pedane da sopra,
+  casse, molle; il livello e' un oggetto come `LATO_SATS`; in verticale
+  si ferma col cartello «Gira il telefono»; la telecamera zooma a
+  `LATO_LARGO` e segue anche in verticale), `arena` (la stanza dall'alto:
+  `arenaApri`/`arenaGiro`, le pure `arenaMuovi`, `arenaLibero`,
+  `arenaVedo`, `arenaStrada` — A* su griglia da 30 piu' il filo tirato —,
+  `arenaInquadra`; le scene `SATS_SCENA`/`QUAD_SCENA` hanno le misure
+  dei dipinti, e `copri` ridisegna i mobili dipinti davanti a chi ci
+  passa dietro) e il fumetto (`html`), che resta la riserva. I dipinti
+  arrivano da `mondoImmagine(nome)` (rotta `/assets/mondo/{nome}`);
+  `arenaFoto` li disegna coi piedi a terra, e senza file ogni cosa ha
+  il suo disegno a mano. `arenaFerma` ferma anche il platform: ogni
+  uscita passa da li'.

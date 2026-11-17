@@ -418,6 +418,28 @@ La privacy dello Swap, cioè chi vede cosa:
 - Il consiglio di sempre: un indirizzo nuovo per ogni swap, in un wallet di cui solo tu hai le chiavi.
 
 <!-- pezzo libro-038 | libro -->
+## Libro · La Caccia a Tappo (il gioco) (1/2)
+
+La Caccia a Tappo è il gioco di Barattolo (se nelle REGOLAZIONI del pannello «Caccia a Tappo (il gioco)» è accesa). Si apre dal Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», e funziona uguale nella Mini App di Telegram, nell'app e sul sito.
+
+Come si gioca: ogni giorno Tappo scappa dal barattolo e si nasconde in un annuncio vero della vetrina, diverso per ogni persona (quindi chiedere a un amico dov'è non serve). Nella pagina del gioco c'è la dispensa di Tappo: sei scaffali, con un barattolo per ogni categoria. Scegli lo scaffale dove cercare e il grado della caccia, leggi il primo indizio (per esempio il barattolo, cioè la categoria, la fascia di prezzo o una parola del titolo) e vai fra gli annunci: in ogni scheda c'è il tasto «🔩 Tappo è qui?», che risponde sì o no. Ogni tocco è un'occhiata, e le occhiate del giorno sono contate. A mezzanotte (ora italiana) la caccia ricomincia con un nascondiglio nuovo. Dov'è nascosto Tappo oggi non lo sa nessuno, nemmeno l'assistente: non si può dire.
+
+Cosa si vince: i bulloni 🔩, la moneta del gioco. Chi trova Tappo ne prende di più se ha usato meno indizi. I bulloni NON sono sats e NON sono XP: non si comprano, non si regalano, non si scambiano, non si incassano e non fanno salire di livello. Giocare è gratis e non si vince denaro.
+
+Cosa lo rende lungo: i sei gradi (Curioso, Segugio, Esploratore, Detective, Volpe, Leggenda), che si aprono trovando Tappo più volte al grado prima; salendo gli indizi sono più vaghi, le occhiate meno, e dal Detective Tappo scappa lasciando un biglietto e va ritrovato in due o tre tappe. Ogni ritrovamento accende il barattolo di quella categoria: bronzo, argento dopo 5 volte, oro dopo 20. Poi ci sono le sfide (scheda «Sfide»), che pagano bulloni da sole quando arrivi alla soglia.
+
+Coi bulloni, nella scheda «Bottega», si prendono: attrezzi che si consumano (🔦 torcia: 3 occhiate in più per oggi; 💡 lampadina: apre il prossimo indizio senza abbassare il premio; 🧲 calamita: per oggi dice se sei vicino a ogni occhiata sbagliata), cappellini e sfondi per Tappo, il titolo «🔩 Amico di Tappo», 5 posti in più nel barattolo dei preferiti e una coppa. Quel che hai sta nella scheda «Zaino». Un oggetto preso non si rende.
+
+Per chi vende: se Tappo si nasconde in un tuo annuncio e qualcuno lo trova, il bot te lo dice (senza dire chi è stato). Non devi fare niente: sono visite in più. Nei tuoi annunci, per te, Tappo non si nasconde mai.
+
+<!-- pezzo libro-039 | libro -->
+## Libro · La Caccia a Tappo (il gioco) (2/2)
+
+Il Mondo di Tappo (scheda «Mondo», la prima): Tappo cammina dentro la dispensa, sei zone una sopra l'altra, una per scaffale. Si guida toccando dove andare o trascinando il dito (dal computer anche frecce o WASD). Nel mondo si raccolgono i bulloni sparsi (ognuno si prende una volta), si aprono i barattoli (portano agli annunci di quella categoria), si legge il cartello con la caccia del giorno, si entra in bottega e, nella prima zona, il Banco del cambio porta agli scambi P2P. Le zone più in alto si aprono trovando Tappo più volte. Sul palco di ogni zona ci sono gli annunci in evidenza: chi vende può metterci un suo annuncio in vetrina per un giorno spendendo 40 bulloni (uno al giorno a testa, al massimo 3 annunci per zona). L'evidenza vale solo dentro il gioco, non in Esplora.
+
+Le missioni di Tappo: giochi brevi per capire Bitcoin, in cima alla scheda «Sfide» e nel tabellone dei livelli, ognuna subito prima della casella che insegna (per esempio «Raccogli i sats» prima di «Attiva l'incasso automatico in Lightning»): finito il gioco, un bottone porta a fare la cosa vera nell'app. Alcune si giocano di lato, correndo e saltando, col telefono in orizzontale; altre in una stanza vista dall'alto. Ogni missione monta un pezzo del razzo con cui Tappo vuole arrivare sulla Luna, all'halving del 2028. Tra le missioni ci sono «Raccogli i sats» (i sats e il tuo wallet), «Il quaderno di tutti» (Bitcoin è un registro che tengono in tanti, e un bullone si spende una volta sola), «Il barattolo col lucchetto» (il deposito di garanzia), «La staffetta del fulmine» (come corrono i pagamenti Lightning di canale in canale), «Le dodici parole» (dove tenere la frase di recupero, e che nessuno, nemmeno Barattolo, la chiede mai) e «L'ultimo bullone» (il dimezzamento e i 21 milioni). Danno da una a tre stelle: la prima volta pagano bulloni, rigiocarle per le tre stelle si può ma non paga di nuovo. Non danno XP. Le parole e i conti dentro le missioni sono finti.
+
+<!-- pezzo libro-040 | libro -->
 ## Libro · Nostr
 
 Gli annunci di Barattolo vengono pubblicati anche su Nostr, una rete aperta: esistono sui relay anche indipendentemente da Barattolo. Se colleghi una tua chiave Nostr dal Profilo, i tuoi annunci escono firmati da te (la firma la fa il tuo browser) e restano tuoi. Gli avvisi possono arrivarti anche su Nostr, oltre che su Telegram. La chiave privata (nsec) non va mai data a nessuno, nemmeno a Barattolo.
@@ -426,7 +448,7 @@ Il nome verificato su Nostr (se nelle REGOLAZIONI del pannello «Nome verificato
 
 Su Nostr risponde anche Tappo: si può scrivere un DM al profilo «Barattolo» (npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy) oppure rispondere sotto le sue note, e Tappo risponde come su Telegram. Ai bot e allo spam non risponde, e se qualcuno dello staff sta già seguendo quella conversazione lascia parlare lui. Per un problema con un ordine, in pubblico Tappo invita a scrivergli in privato.
 
-<!-- pezzo libro-039 | libro -->
+<!-- pezzo libro-041 | libro -->
 ## Libro · I tuoi dati, in breve
 
 Barattolo sa di te pochissimo: niente email, password o telefono. Da Telegram riceve il numero identificativo, il nome e lo username; da Nostr solo la chiave pubblica. L'indirizzo di spedizione è cifrato e si cancella quando confermi di aver ricevuto. Niente tracciamento, niente pubblicità, niente cookie di terzi. Tutto è spiegato nella pagina «I tuoi dati» (barattolo.store/privacy).
@@ -442,12 +464,12 @@ Cancellare l'account: nel Profilo, nel gruppo «Impostazioni» accanto a «🔐 
 
 Questo assistente: la tua domanda e le ultime battute arrivano ad Anthropic, l'azienda dell'intelligenza artificiale che risponde, ma mai il tuo nome, il tuo account o i tuoi ordini. Le conversazioni non vengono conservate: in chat privata l'assistente ricorda le domande e le risposte della giornata, per seguire il filo del discorso, e a mezzanotte spariscono.
 
-<!-- pezzo libro-040 | libro -->
+<!-- pezzo libro-042 | libro -->
 ## Libro · Se Barattolo sparisse
 
 Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma i sats del deposito stanno su un nodo Lightning separato, con la seed custodita offline; gli annunci restano su Nostr; lo storico è salvato ogni giorno con copie cifrate anche fuori dal server.
 
-<!-- pezzo libro-041 | libro | sempre -->
+<!-- pezzo libro-043 | libro | sempre -->
 ## Libro · Sicurezza e truffe
 
 - Nessuno di Barattolo ti chiederà mai la seed, le parole di recupero, la nsec, una chiave privata o una password. Chi le chiede è un truffatore. Se le hai date a qualcuno, considerale esposte e sposta subito i fondi su un wallet nuovo.
@@ -457,7 +479,7 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 - Paga sempre dentro Barattolo: un pagamento fuori dal deposito di garanzia non è protetto.
 - Nel P2P, libera i sats solo quando gli euro sono arrivati davvero sul tuo conto, non prima e non sulla fiducia di una ricevuta.
 
-<!-- pezzo libro-042 | libro | sempre -->
+<!-- pezzo libro-044 | libro | sempre -->
 ## Libro · Parlare con una persona (1/2)
 
 Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Aiuto → «💬 Assistenza». Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta. Al messaggio si possono allegare fino a tre screenshot (il bottone «📎 Allega screenshot» sotto la casella): li vedono solo lo staff e chi li ha mandati. Anche lo staff può rispondere con uno screenshot, che trovi nella stessa conversazione.
@@ -466,7 +488,7 @@ Se l'assistente non basta, sotto ogni sua risposta c'è il bottone «🙋 Parla 
 
 I livelli: ogni persona ha un livello che sale con gli XP (li danno solo gli acquisti e le vendite concluse, più una quota per chi inviti) e con il numero di affari conclusi: Nuovo arrivato, Bottega avviata, Mercante pratico, Mercante esperto, Maestro del banco. Lo trovi nel Profilo, nel cassetto «🎖 Livello e titolo». Dal 17 novembre 2026 i livelli si sfogliano come tessere, scorrendo col dito: sulla tua c'è l'anello con i tuoi XP sulla soglia del prossimo e quanto manca, i livelli già passati hanno la spunta, quelli davanti il lucchetto; sotto ci sono i vantaggi del livello che stai guardando, ✅ se già tuoi, 🔒 se ancora da sbloccare (sconto sul banner del negozio, link del negozio a scelta, il titolo da mettere sotto il nome, lo sconto sulle commissioni P2P dal livello 5). Il livello si vede anche sul tuo negozio e in classifica, accanto al titolo.
 
-<!-- pezzo libro-043 | libro | sempre -->
+<!-- pezzo libro-045 | libro | sempre -->
 ## Libro · Parlare con una persona (2/2)
 
 Rotta per la Luna (dal 17 novembre 2026; nei primi giorni si chiamava «la stradina»): nel Profilo, nel cassetto «Livello e recensioni», c'è «🚀 Rotta per la Luna», un tabellone lunghissimo che vede solo chi lo apre, dalla Terra (in basso) alla Luna (in cima), su una mappa disegnata in otto zone: «Primi passi», «Il mercatino», «Il porto», «Il bosco dei sats», «La scala d'oro», «La vetta», «In orbita», «Verso la Luna». All'ingresso di ogni zona Tappo racconta in una frase cosa si impara lì (per esempio al porto: mettere al sicuro i sats con un wallet on-chain e la firma Nostr). La storia è quella del razzo di bulloni, la stessa del gioco di Tappo: Tappo costruisce un razzo per la Luna, un pezzo per zona (piedini, serbatoio, motore, ali, oblò, punta, antenna), il Tarlo e la Gazza dispettosi provano a rubargli i bulloni, e all'halving del 2028 il razzo parte. Ogni casella è una competenza di Barattolo e di bitcoin, dalla più facile alla più difficile: mettere un articolo nel barattolo, la foto, seguire un venditore, attivare l'incasso automatico in Lightning (l'indirizzo Lightning nel Profilo); poi il primo annuncio, il primo acquisto, la prima recensione, collegare la chiave Nostr, invitare una persona col proprio link; poi la prima vendita, creare il wallet on-chain, verificare la chiave Nostr con una nota pubblica, la doppia configurazione Telegram + Nostr, il primo scambio P2P; poi le soglie che crescono (fino a 100 vendite e 10 milioni di sats incassati) e le caselle a tempo («Un mese con Barattolo», sei mesi, un anno, un anno e mezzo, due anni). L'ultima casella prima della Luna è «Arriva all'halving del 2028» (circa aprile 2028): nessuno arriva in cima prima di allora. Le caselle si spuntano da sole quando la cosa è fatta e diventano monete d'oro; Tappo è la tua pedina e cammina in fila: sta sulla prima casella che manca, quella da fare adesso (quelle fatte più su restano accese), e quando la fai cammina fino alla successiva. La prima volta Tappo si presenta e racconta il razzo (si rivede col tasto «❓ Come funziona» in cima). Toccando la casella da fare, la scheda in basso dice a cosa serve, con «Come funziona?» e i passi (per esempio il primo acquisto spiega il deposito di garanzia); sulle caselle già fatte la scheda non esce. Il bottone «Vai» porta dritto al posto giusto (il cassetto del Profilo, la vetrina, un negozio da seguire, «Vendi») e un riflettore, come nei tutorial dell'app, indica cosa toccare; appena la cosa è fatta l'app torna da sola alla Rotta per la Luna. Quando finisci una zona compare il razzo che prende il pezzo nuovo; toccando il razzo in cima lo si rivede. I gradini della scala dei livelli sono barattoli che si accendono quando si sale di livello. Gli amici (i venditori che segui e chi ha concluso uno scambio con te) stanno come pedine sul loro livello, e in fondo c'è «La gara fra amici». La strada si scopre camminando: si vede la zona dove sei e quella dopo, grigia e spenta, con le caselle ancora misteriose (un cerchio col punto di domanda); quando fai una casella, la prossima si accende e il suo nome compare, con un suono; più su c'è un lucchetto, e il pezzo successivo si apre finendo la zona dove sei. In cima, in fondo alla barra, c'è il razzo di Tappo, che cresce di un pezzo a ogni zona (otto pezzi, dalla pedana ai motori accesi). Il tasto «🗺 Vedi tutta», in alto a destra, mostra il viaggio intero in una schermata (le zone ancora chiuse hanno il lucchetto); toccando una zona si torna lì. Ci sono anche dei suoni, che si spengono col tasto 🔊 in cima. Le caselle NON danno XP e non danno sats: sono la mappa, non un premio. Chi ha scelto «Non mostrarmi in classifica» non compare fra gli amici di nessuno.
@@ -1073,6 +1095,7 @@ Livello e recensioni▾
 💌I tuoi inviti ▾
 🏅Distintivi ▾
 🚀Rotta per la LunaIl tuo viaggio con Tappo: le tappe fatte e quelle davanti.›
+🔩Caccia a Tappo›
 Impostazioni▾
 🔔Avvisi▾
 🌗Aspetto▾
@@ -2029,6 +2052,22 @@ leva: NIP05_UTENTI_ATTIVO (accesa di serie)
 pubblico: sì
 
 <!-- pezzo novita-074 | novita -->
+## Novità · 2026-11-17 · caccia-a-tappo
+
+frase: È arrivata la Caccia a Tappo, il gioco di Barattolo. Ogni giorno Tappo si nasconde in un annuncio vero, diverso per ognuno: leggi gli indizi, apri gli annunci e tocca «Tappo è qui?». Chi lo trova vince i bulloni 🔩, accende i barattoli della dispensa, sale di grado e completa le sfide. Coi bulloni prendi cappellini, attrezzi e 5 posti in più nei preferiti. Si gioca gratis: i bulloni non sono sats.
+dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», nella Mini App, nell'app e sul sito; il tasto «Tappo è qui?» nella scheda di ogni annuncio, quando la caccia del giorno è aperta.
+leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-075 | novita -->
+## Novità · 2026-11-17 · mondo-di-tappo
+
+frase: Nella Caccia a Tappo arriva il Mondo di Tappo: guidi Tappo dentro la dispensa, raccogli i bulloni 🔩, apri i barattoli e sali di zona. E ci sono i minigiochi di Tappo, sul tabellone dei livelli subito prima delle caselle che insegnano: si corre, si salta e si impara Bitcoin, e alla fine un bottone ti porta a fare la cosa vera. Ogni minigioco monta un pezzo del razzo con cui Tappo vuole arrivare sulla Luna. Chi vende può mettere un annuncio sul palco del mondo per un giorno, coi bulloni.
+dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo»: scheda «Mondo» per camminare, scheda «Sfide» per le missioni.
+leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-076 | novita -->
 ## Novità · 2026-11-17 · profilo-semplice
 
 frase: Il Profilo è più semplice da leggere: ogni casella dice cosa c'è dentro. Ci sono «Annunci», «Il tuo negozio», «Spedizioni e sconti», «Quando compri», «Wallet e incassi», «Livello e recensioni», «Impostazioni» e «Aiuto».
@@ -2036,7 +2075,7 @@ dove: scheda Profilo, le caselle sotto il riquadro col tuo nome.
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-075 | novita -->
+<!-- pezzo novita-077 | novita -->
 ## Novità · 2026-11-17 · raccolta
 
 frase: Su Barattolo si può aprire una raccolta fondi in sats: un obiettivo, una scadenza fino a 60 giorni e una barra che si riempie. Chi vuole sostenerla manda uno zap, che va dritto al wallet di chi raccoglie, senza commissioni. Per aprirne una servono tre vendite concluse e un indirizzo Lightning; ogni raccolta la guardano i moderatori prima della vetrina.
@@ -2044,7 +2083,7 @@ dove: Profilo → «Il tuo negozio» → «🎯 Raccolte fondi» (lì il bottone
 leva: RACCOLTE_ATTIVE spenta di serie (e i depositi di garanzia, RACCOLTA_GARANTITA_ATTIVA, spenti di serie)
 pubblico: no
 
-<!-- pezzo novita-076 | novita -->
+<!-- pezzo novita-078 | novita -->
 ## Novità · 2026-11-17 · inglese-tappa-1
 
 frase: Barattolo si legge anche in inglese: se il tuo Telegram o il tuo browser non sono in italiano, la vetrina, gli annunci e l'acquisto compaiono in inglese da soli, coi prezzi all'inglese (1,234.50 €). Ordini, P2P, Profilo e bot arrivano nelle prossime tappe. Per provarlo da un telefono italiano apri barattolo.store/?lingua=en (?lingua=it per tornare).
@@ -2052,7 +2091,7 @@ dove: tutta la Mini App e il sito per chi ha Telegram o il browser in una lingua
 leva: LINGUA_INGLESE (accesa di serie; spenta, l'app torna italiana per tutti)
 pubblico: sì
 
-<!-- pezzo novita-077 | novita -->
+<!-- pezzo novita-079 | novita -->
 ## Novità · 2026-11-17 · assistenza-screenshot
 
 frase: Nella chat con l'assistenza di Barattolo ora puoi allegare anche degli screenshot, fino a tre per messaggio: lo staff vede subito cosa vedi tu, e può risponderti anche lui con uno screenshot. Li vedete solo tu e lo staff.
@@ -2060,7 +2099,7 @@ dove: Profilo → «Aiuto» → «💬 Assistenza», il bottone «📎 Allega sc
 leva: ASSISTENZA_ATTIVA (quella dell'assistenza, già accesa)
 pubblico: sì
 
-<!-- pezzo novita-078 | novita -->
+<!-- pezzo novita-080 | novita -->
 ## Novità · 2026-11-17 · chiavi-dalle-parole
 
 frase: Le chiavi degli scambi P2P adesso nascono dalle 12 parole del tuo wallet on-chain, le stesse che hanno già la loro copia nel cloud di Telegram o sui relay Nostr. Così, ovunque apri Barattolo con quelle parole, i tuoi scambi nuovi li governi da lì: telefono, Telegram Desktop o browser. Gli scambi già aperti continuano come prima, dal dispositivo dove li hai presi.
@@ -2068,7 +2107,7 @@ dove: lo scambio P2P (pubblicare o prendere un ordine); il foglio «Il tuo profi
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-079 | novita -->
+<!-- pezzo novita-081 | novita -->
 ## Novità · 2026-11-17 · onchain-rimborso-liscio
 
 frase: Rinunciare a uno scambio P2P on-chain è più semplice. Chi vende bitcoin scrive dove riavere i sats nel foglio stesso, prima di bloccarli. Se quell'indirizzo manca, il «Rinuncio» di chi compra non dà più errore: viene registrato e il bot avvisa chi vende col tasto che apre lo scambio. E se firmi da un dispositivo senza la chiave del wallet, Barattolo la cerca da solo o ti chiede lì le 12 parole.
@@ -2076,7 +2115,7 @@ dove: P2P on-chain: il foglio «🔒 Blocca i sats» col riquadro «Dove tornano
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-080 | novita -->
+<!-- pezzo novita-082 | novita -->
 ## Novità · 2026-11-17 · onchain-tempo-bonifico
 
 frase: Negli scambi P2P on-chain in euro e franchi il tempo per pagare scende da 72 a 24 ore, come per USDT e monete. In cambio, da «Ho inviato» chi vende ha 48 ore per veder arrivare il bonifico e liberare i sats: se passano senza rilascio, il bot avvisa tutti e due e indica la disputa. Niente si annulla da solo: i bitcoin restano nel deposito di garanzia.
@@ -2084,7 +2123,7 @@ dove: P2P on-chain: la card in «I miei scambi» e la riga «Tempo per pagare» 
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-081 | novita -->
+<!-- pezzo novita-083 | novita -->
 ## Novità · 2026-11-17 · annullo-registrato
 
 frase: Se prendi un ordine P2P, tocchi «Annulla» e l'annullo non arriva al coordinatore, alla scadenza del tempo non ti viene più contato uno scambio non completato: il bot te lo scrive nel messaggio.
@@ -2092,7 +2131,7 @@ dove: P2P Lightning: la pagina dello scambio appena preso, «✕ Annulla» e «S
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-082 | novita -->
+<!-- pezzo novita-084 | novita -->
 ## Novità · 2026-11-17 · onchain-ritiro
 
 frase: Negli scambi P2P on-chain, chi si ritira dopo che l'altro ha già bloccato i sats si vede contare uno «scambio non completato», come negli scambi Lightning, e chi aveva bloccato i sats può lasciargli una recensione. Nessuna cauzione e nessuna penale in denaro. Il foglio di «Rinuncio» lo dice prima della firma. Non conta se chi vende non aveva ancora scritto dove pagare.
@@ -2100,7 +2139,7 @@ dove: P2P on-chain: il foglio «↩️ Rinunci allo scambio?»; la pagina dello 
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-083 | novita -->
+<!-- pezzo novita-085 | novita -->
 ## Novità · 2026-11-17 · quanto-vuoto
 
 frase: Quando prendi un ordine P2P con un intervallo (per esempio da 50 a 276 €), il campo dell'importo ora è vuoto: scrivi subito la cifra che vuoi, senza cancellare il minimo che prima c'era già scritto. Sotto ci sono i tasti «Minimo» e «Massimo» per metterla con un tocco.
@@ -2108,7 +2147,7 @@ dove: P2P: tocca un ordine con un intervallo, poi «Scegli»; foglio «Quanto vu
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-084 | novita -->
+<!-- pezzo novita-086 | novita -->
 ## Novità · 2026-11-17 · onchain-contanti-luogo
 
 frase: Gli ordini P2P on-chain in contanti ora hanno il luogo dello scambio, come quelli Lightning: chi pubblica scrive la zona, e la card la mostra con «📍». Vale anche lo stesso tetto in euro del contanti.
@@ -2116,7 +2155,7 @@ dove: P2P: «+», rete on-chain, metodo «Contanti», campo «Zona di scambio»;
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-085 | novita -->
+<!-- pezzo novita-087 | novita -->
 ## Novità · 2026-11-17 · onchain-contanti-scambio
 
 frase: Lo scambio P2P on-chain in contanti ora va come quello Lightning: chi vende scrive dove e quando vedervi, chi compra apre il navigatore, ognuno può segnare «📍 Sono qui» quando arriva, e il bottone è «Ho consegnato i contanti».
@@ -2124,7 +2163,7 @@ dove: P2P on-chain con metodo «Contanti»: la pagina dello scambio, riquadro «
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-086 | novita -->
+<!-- pezzo novita-088 | novita -->
 ## Novità · 2026-11-17 · onchain-contanti-metodo
 
 frase: Negli ordini P2P on-chain con «Contanti» insieme ad altri metodi ora scegli come pagare prima di prendere: con «Contanti» lo scambio va di persona, con appuntamento e «📍 Sono qui».
