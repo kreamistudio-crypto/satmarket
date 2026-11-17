@@ -289,6 +289,20 @@ La privacy dello Swap, cioè chi vede cosa:
 - Payjoin: nello Swap non si usa. Da Lightning a bitcoin la transazione verso il tuo indirizzo la prepara il tuo telefono per lo swap, e non sa fare Payjoin: se incolli un link Payjoin («bitcoin:…?pj=…») l'app tiene solo l'indirizzo e i bitcoin arrivano lì con una transazione normale. Da bitcoin a Lightning l'indirizzo del servizio non accetta Payjoin, quindi anche il tuo wallet manda una transazione normale.
 - Il consiglio di sempre: un indirizzo nuovo per ogni swap, in un wallet di cui solo tu hai le chiavi.
 
+# La Caccia a Tappo (il gioco)
+
+La Caccia a Tappo è il gioco di Barattolo (se nelle REGOLAZIONI del pannello «Caccia a Tappo (il gioco)» è accesa). Si apre dal Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», e funziona uguale nella Mini App di Telegram, nell'app e sul sito.
+
+Come si gioca: ogni giorno Tappo scappa dal barattolo e si nasconde in un annuncio vero della vetrina, diverso per ogni persona (quindi chiedere a un amico dov'è non serve). Nella pagina del gioco c'è la dispensa di Tappo: sei scaffali, con un barattolo per ogni categoria. Scegli lo scaffale dove cercare e il grado della caccia, leggi il primo indizio (per esempio il barattolo, cioè la categoria, la fascia di prezzo o una parola del titolo) e vai fra gli annunci: in ogni scheda c'è il tasto «🔩 Tappo è qui?», che risponde sì o no. Ogni tocco è un'occhiata, e le occhiate del giorno sono contate. A mezzanotte (ora italiana) la caccia ricomincia con un nascondiglio nuovo. Dov'è nascosto Tappo oggi non lo sa nessuno, nemmeno l'assistente: non si può dire.
+
+Cosa si vince: i bulloni 🔩, la moneta del gioco. Chi trova Tappo ne prende di più se ha usato meno indizi. I bulloni NON sono sats e NON sono XP: non si comprano, non si regalano, non si scambiano, non si incassano e non fanno salire di livello. Giocare è gratis e non si vince denaro.
+
+Cosa lo rende lungo: i sei gradi (Curioso, Segugio, Esploratore, Detective, Volpe, Leggenda), che si aprono trovando Tappo più volte al grado prima; salendo gli indizi sono più vaghi, le occhiate meno, e dal Detective Tappo scappa lasciando un biglietto e va ritrovato in due o tre tappe. Ogni ritrovamento accende il barattolo di quella categoria: bronzo, argento dopo 5 volte, oro dopo 20. Poi ci sono le sfide (scheda «Sfide»), che pagano bulloni da sole quando arrivi alla soglia.
+
+Coi bulloni, nella scheda «Bottega», si prendono: attrezzi che si consumano (🔦 torcia: 3 occhiate in più per oggi; 💡 lampadina: apre il prossimo indizio senza abbassare il premio; 🧲 calamita: per oggi dice se sei vicino a ogni occhiata sbagliata), cappellini e sfondi per Tappo, il titolo «🔩 Amico di Tappo», 5 posti in più nel barattolo dei preferiti e una coppa. Quel che hai sta nella scheda «Zaino». Un oggetto preso non si rende.
+
+Per chi vende: se Tappo si nasconde in un tuo annuncio e qualcuno lo trova, il bot te lo dice (senza dire chi è stato). Non devi fare niente: sono visite in più. Nei tuoi annunci, per te, Tappo non si nasconde mai.
+
 # Nostr
 
 Gli annunci di Barattolo vengono pubblicati anche su Nostr, una rete aperta: esistono sui relay anche indipendentemente da Barattolo. Se colleghi una tua chiave Nostr dal Profilo, i tuoi annunci escono firmati da te (la firma la fa il tuo browser) e restano tuoi. Gli avvisi possono arrivarti anche su Nostr, oltre che su Telegram. La chiave privata (nsec) non va mai data a nessuno, nemmeno a Barattolo.

@@ -434,3 +434,9 @@ frase: I tuoi livelli adesso si sfogliano: nel Profilo, sotto «Livello e titolo
 dove: Profilo → «🎖 Livello e titolo» → «I vantaggi di ogni livello».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-17 · caccia-a-tappo
+frase: È arrivata la Caccia a Tappo, il gioco di Barattolo. Ogni giorno Tappo si nasconde in un annuncio vero, diverso per ognuno: leggi gli indizi, apri gli annunci e tocca «Tappo è qui?». Chi lo trova vince i bulloni 🔩, accende i barattoli della dispensa, sale di grado e completa le sfide. Coi bulloni prendi cappellini, attrezzi e 5 posti in più nei preferiti. Si gioca gratis: i bulloni non sono sats.
+dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», nella Mini App, nell'app e sul sito; il tasto «Tappo è qui?» nella scheda di ogni annuncio, quando la caccia del giorno è aperta.
+leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
+pubblico: sì

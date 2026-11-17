@@ -378,13 +378,28 @@ La privacy dello Swap, cioè chi vede cosa:
 - Il consiglio di sempre: un indirizzo nuovo per ogni swap, in un wallet di cui solo tu hai le chiavi.
 
 <!-- pezzo libro-033 | libro -->
+## Libro · La Caccia a Tappo (il gioco)
+
+La Caccia a Tappo è il gioco di Barattolo (se nelle REGOLAZIONI del pannello «Caccia a Tappo (il gioco)» è accesa). Si apre dal Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», e funziona uguale nella Mini App di Telegram, nell'app e sul sito.
+
+Come si gioca: ogni giorno Tappo scappa dal barattolo e si nasconde in un annuncio vero della vetrina, diverso per ogni persona (quindi chiedere a un amico dov'è non serve). Nella pagina del gioco c'è la dispensa di Tappo: sei scaffali, con un barattolo per ogni categoria. Scegli lo scaffale dove cercare e il grado della caccia, leggi il primo indizio (per esempio il barattolo, cioè la categoria, la fascia di prezzo o una parola del titolo) e vai fra gli annunci: in ogni scheda c'è il tasto «🔩 Tappo è qui?», che risponde sì o no. Ogni tocco è un'occhiata, e le occhiate del giorno sono contate. A mezzanotte (ora italiana) la caccia ricomincia con un nascondiglio nuovo. Dov'è nascosto Tappo oggi non lo sa nessuno, nemmeno l'assistente: non si può dire.
+
+Cosa si vince: i bulloni 🔩, la moneta del gioco. Chi trova Tappo ne prende di più se ha usato meno indizi. I bulloni NON sono sats e NON sono XP: non si comprano, non si regalano, non si scambiano, non si incassano e non fanno salire di livello. Giocare è gratis e non si vince denaro.
+
+Cosa lo rende lungo: i sei gradi (Curioso, Segugio, Esploratore, Detective, Volpe, Leggenda), che si aprono trovando Tappo più volte al grado prima; salendo gli indizi sono più vaghi, le occhiate meno, e dal Detective Tappo scappa lasciando un biglietto e va ritrovato in due o tre tappe. Ogni ritrovamento accende il barattolo di quella categoria: bronzo, argento dopo 5 volte, oro dopo 20. Poi ci sono le sfide (scheda «Sfide»), che pagano bulloni da sole quando arrivi alla soglia.
+
+Coi bulloni, nella scheda «Bottega», si prendono: attrezzi che si consumano (🔦 torcia: 3 occhiate in più per oggi; 💡 lampadina: apre il prossimo indizio senza abbassare il premio; 🧲 calamita: per oggi dice se sei vicino a ogni occhiata sbagliata), cappellini e sfondi per Tappo, il titolo «🔩 Amico di Tappo», 5 posti in più nel barattolo dei preferiti e una coppa. Quel che hai sta nella scheda «Zaino». Un oggetto preso non si rende.
+
+Per chi vende: se Tappo si nasconde in un tuo annuncio e qualcuno lo trova, il bot te lo dice (senza dire chi è stato). Non devi fare niente: sono visite in più. Nei tuoi annunci, per te, Tappo non si nasconde mai.
+
+<!-- pezzo libro-034 | libro -->
 ## Libro · Nostr
 
 Gli annunci di Barattolo vengono pubblicati anche su Nostr, una rete aperta: esistono sui relay anche indipendentemente da Barattolo. Se colleghi una tua chiave Nostr dal Profilo, i tuoi annunci escono firmati da te (la firma la fa il tuo browser) e restano tuoi. Gli avvisi possono arrivarti anche su Nostr, oltre che su Telegram. La chiave privata (nsec) non va mai data a nessuno, nemmeno a Barattolo.
 
 Su Nostr risponde anche Tappo: si può scrivere un DM al profilo «Barattolo» (npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy) oppure rispondere sotto le sue note, e Tappo risponde come su Telegram. Ai bot e allo spam non risponde, e se qualcuno dello staff sta già seguendo quella conversazione lascia parlare lui. Per un problema con un ordine, in pubblico Tappo invita a scrivergli in privato.
 
-<!-- pezzo libro-034 | libro -->
+<!-- pezzo libro-035 | libro -->
 ## Libro · I tuoi dati, in breve
 
 Barattolo sa di te pochissimo: niente email, password o telefono. Da Telegram riceve il numero identificativo, il nome e lo username; da Nostr solo la chiave pubblica. L'indirizzo di spedizione è cifrato e si cancella quando confermi di aver ricevuto. Niente tracciamento, niente pubblicità, niente cookie di terzi. Tutto è spiegato nella pagina «I tuoi dati» (barattolo.store/privacy).
@@ -400,12 +415,12 @@ Cancellare l'account: nel Profilo, nella parte della privacy accanto a «🔐 I 
 
 Questo assistente: la tua domanda e le ultime battute arrivano ad Anthropic, l'azienda dell'intelligenza artificiale che risponde, ma mai il tuo nome, il tuo account o i tuoi ordini. Le conversazioni non vengono conservate: in chat privata l'assistente ricorda le domande e le risposte della giornata, per seguire il filo del discorso, e a mezzanotte spariscono.
 
-<!-- pezzo libro-035 | libro -->
+<!-- pezzo libro-036 | libro -->
 ## Libro · Se Barattolo sparisse
 
 Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma i sats del deposito stanno su un nodo Lightning separato, con la seed custodita offline; gli annunci restano su Nostr; lo storico è salvato ogni giorno con copie cifrate anche fuori dal server.
 
-<!-- pezzo libro-036 | libro | sempre -->
+<!-- pezzo libro-037 | libro | sempre -->
 ## Libro · Sicurezza e truffe
 
 - Nessuno di Barattolo ti chiederà mai la seed, le parole di recupero, la nsec, una chiave privata o una password. Chi le chiede è un truffatore. Se le hai date a qualcuno, considerale esposte e sposta subito i fondi su un wallet nuovo.
@@ -415,7 +430,7 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 - Paga sempre dentro Barattolo: un pagamento fuori dal deposito di garanzia non è protetto.
 - Nel P2P, libera i sats solo quando gli euro sono arrivati davvero sul tuo conto, non prima e non sulla fiducia di una ricevuta.
 
-<!-- pezzo libro-037 | libro | sempre -->
+<!-- pezzo libro-038 | libro | sempre -->
 ## Libro · Parlare con una persona
 
 Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Supporto → «💬 Assistenza» (fino al 16 novembre 2026 stava in Profilo → Privacy). Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta.
@@ -1013,6 +1028,7 @@ Livello e inviti▾
 🎖Livello e titolo ▾
 💌I tuoi inviti ▾
 🏅Distintivi ▾
+🔩Caccia a Tappo›
 Avvisi e aspetto▾
 🔔Avvisi▾
 🌗Aspetto▾
@@ -1882,4 +1898,12 @@ pubblico: sì
 frase: I tuoi livelli adesso si sfogliano: nel Profilo, sotto «Livello e titolo», ogni livello è una tessera da scorrere col dito. Sulla tua c'è l'anello con i tuoi XP sulla soglia del prossimo, i livelli già passati hanno la spunta, quelli davanti il lucchetto, e sotto vedi i vantaggi del livello che stai guardando: ✅ quelli già tuoi, 🔒 quelli da sbloccare.
 dove: Profilo → «🎖 Livello e titolo» → «I vantaggi di ogni livello».
 leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-067 | novita -->
+## Novità · 2026-11-17 · caccia-a-tappo
+
+frase: È arrivata la Caccia a Tappo, il gioco di Barattolo. Ogni giorno Tappo si nasconde in un annuncio vero, diverso per ognuno: leggi gli indizi, apri gli annunci e tocca «Tappo è qui?». Chi lo trova vince i bulloni 🔩, accende i barattoli della dispensa, sale di grado e completa le sfide. Coi bulloni prendi cappellini, attrezzi e 5 posti in più nei preferiti. Si gioca gratis: i bulloni non sono sats.
+dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», nella Mini App, nell'app e sul sito; il tasto «Tappo è qui?» nella scheda di ogni annuncio, quando la caccia del giorno è aperta.
+leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
 pubblico: sì

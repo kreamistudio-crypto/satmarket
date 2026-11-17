@@ -3138,6 +3138,10 @@ FRENI = {
     # l'assistenza in app (3 nov 2026): chi scrive allo staff, e lo staff
     # che risponde — un dito non ci arriva, una raffica si'
     "assistenza": (20, 3600),         # messaggi allo staff, per persona
+    # la Caccia a Tappo (17 nov 2026): le occhiate hanno gia' il loro
+    # tetto del giorno (GIOCO_TAPPO_OCCHIATE), questo ferma la raffica
+    "tappo_guarda": (60, 3600),       # «Tappo è qui?», per persona
+    "tappo_oggetto": (40, 3600),      # indizi, oggetti presi e indossati, per persona
     "assistenza_staff": (120, 3600),  # risposte di un admin, per admin
     # la mancia al venditore (14 nov 2026): ogni fattura e' una GET al
     # wallet di chi vende; il battito del foglio chiede a LUD-21 ogni 5 s
@@ -5925,7 +5929,14 @@ TITOLI = (
             serve=("livello", "esperto")),
        dict(id="t_maestro", nome="👑 Maestro del banco",
             descrizione="Serve il livello «Maestro del banco»",
-            serve=("livello", "maestro"))])
+            serve=("livello", "maestro"))]
+    # LA CACCIA A TAPPO (17 nov 2026): l'unico titolo che non nasce dal
+    # commercio ne' da un distintivo — si prende coi bulloni del gioco
+    # (l'oggetto «amico» di GIOCO_TAPPO_OGGETTI). In fondo alla fila
+    # apposta: i titoli di chi commercia restano davanti.
+    + [dict(id="t_amico_tappo", nome="🔩 Amico di Tappo",
+            descrizione="Si prende coi bulloni della Caccia a Tappo",
+            serve=("tappo", "amico"))])
 
 
 NOMI_TITOLI = {t["id"]: t["nome"] for t in TITOLI}
@@ -5948,10 +5959,18 @@ def titoli_disponibili(con, tg_id: int) -> list[str]:
     # titoli dei gradini sotto (li ha attraversati tutti)
     raggiunti = {l[2] for l in LIVELLI[:LIVELLI.index(
         next(l for l in LIVELLI if l[2] == liv["id"])) + 1]}
+    # LA CACCIA A TAPPO (17 nov 2026): un titolo che si prende coi
+    # bulloni del gioco. Il giudice si cerca per NOME e, se manca, il
+    # titolo resta chiuso: i banchi che montano questa funzione da sola
+    # non devono esplodere su un nome che non hanno (la trappola delle
+    # funzioni estratte, come `punti_barattolo_vivi` nei distintivi).
+    _presi = globals().get("_tappo_oggetti_di")
+    del_gioco = _presi(con, tg_id) if _presi else set()
     fatto = {"coorte": lambda v: v == (u["coorte"] or ""),
              "distintivo": lambda v: v in badge,
              "livello": lambda v: v in raggiunti,
-             "fondatore": lambda _v: tg_id in FONDATORI}
+             "fondatore": lambda _v: tg_id in FONDATORI,
+             "tappo": lambda v: v in del_gioco}
     return [t["id"] for t in TITOLI if fatto[t["serve"][0]](t["serve"][1])]
 
 
@@ -7574,6 +7593,81 @@ def init_db():
     -- — sarebbe una scansione della tabella intera.
     CREATE INDEX IF NOT EXISTS idx_preferiti_annuncio
       ON preferiti(annuncio_id);
+    CREATE TABLE IF NOT EXISTS gioco_tappo(
+        -- LA CACCIA A TAPPO (17 nov 2026, richiesta di Andrea: «un gioco
+        -- di barattolo con dentro Tappo»): UNA riga per persona e per
+        -- giorno (il giorno e' quello ITALIANO, «AAAA-MM-GG»). Nasce
+        -- quando la caccia PARTE: `scaffale` e `grado` scelti allora,
+        -- `annuncio_id` il nascondiglio di ADESSO, diverso per ognuno.
+        -- `tappe` quante volte Tappo scappa a quel grado, `tappa` a
+        -- quale si e', `pista` gli annunci delle tappe gia' fatte
+        -- («12,40»). `indizi` quanti ne ha aperti in QUESTA tappa (il
+        -- primo e' di casa), `aiuti` quanti ne ha PAGATI in tutto (e'
+        -- quel che abbassa il premio), `attrezzi` quelli usati oggi
+        -- («torcia,calamita»). `occhiate` le volte che ha guardato in
+        -- un annuncio, `sbagli` quelle a vuoto. `partito` e `trovato`
+        -- sono ore (0 = non ancora), `bulloni` quanti ne ha vinti.
+        -- `categoria` e' il RICORDO: il barattolo dove l'ha trovato,
+        -- fotografato allora (l'annuncio puo' sparire).
+        -- I BULLONI NON SONO SATS E NON SONO XP: stanno solo qui.
+        tg_id INTEGER NOT NULL,
+        giorno TEXT NOT NULL,
+        annuncio_id INTEGER NOT NULL DEFAULT 0,
+        scaffale INTEGER NOT NULL DEFAULT 0,
+        grado INTEGER NOT NULL DEFAULT 1,
+        tappe INTEGER NOT NULL DEFAULT 1,
+        tappa INTEGER NOT NULL DEFAULT 1,
+        pista TEXT NOT NULL DEFAULT '',
+        indizi INTEGER NOT NULL DEFAULT 1,
+        aiuti INTEGER NOT NULL DEFAULT 0,
+        attrezzi TEXT NOT NULL DEFAULT '',
+        occhiate INTEGER NOT NULL DEFAULT 0,
+        sbagli INTEGER NOT NULL DEFAULT 0,
+        partito INTEGER NOT NULL DEFAULT 0,
+        trovato INTEGER NOT NULL DEFAULT 0,
+        bulloni INTEGER NOT NULL DEFAULT 0,
+        categoria TEXT NOT NULL DEFAULT '',
+        creato INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(tg_id, giorno)
+    );
+    CREATE INDEX IF NOT EXISTS idx_gioco_tappo_annuncio
+      ON gioco_tappo(annuncio_id, giorno);
+    CREATE TABLE IF NOT EXISTS gioco_tappo_oggetti(
+        -- quel che si e' preso coi bulloni e RESTA (cappellini, sfondi,
+        -- titolo, posti, coppa): una riga per oggetto, con quanto e'
+        -- costato QUEL giorno (un prezzo ritoccato dopo non cambia il
+        -- saldo di ieri). Il saldo e' vinti meno spesi, e non ha una
+        -- colonna sua: due numeri che dicono la stessa cosa prima o
+        -- poi ne dicono due.
+        tg_id INTEGER NOT NULL,
+        oggetto TEXT NOT NULL,
+        bulloni INTEGER NOT NULL DEFAULT 0,
+        creato INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(tg_id, oggetto)
+    );
+    CREATE TABLE IF NOT EXISTS gioco_tappo_attrezzi(
+        -- LO ZAINO: gli attrezzi che si consumano (torcia, lampadina,
+        -- calamita). Una riga per tipo: `presi` quanti ne sono entrati
+        -- (il primo e' il corredo, regalato), `usati` quanti ne sono
+        -- usciti, `bulloni` quanto sono costati in tutto. Nello zaino
+        -- ce ne sono presi meno usati.
+        tg_id INTEGER NOT NULL,
+        attrezzo TEXT NOT NULL,
+        presi INTEGER NOT NULL DEFAULT 0,
+        usati INTEGER NOT NULL DEFAULT 0,
+        bulloni INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(tg_id, attrezzo)
+    );
+    CREATE TABLE IF NOT EXISTS gioco_tappo_sfide(
+        -- le sfide gia' PAGATE: una riga per soglia raggiunta
+        -- («tappi:15»), coi bulloni che ha dato quel giorno. La chiave
+        -- e' la ricevuta: una sfida non si paga due volte.
+        tg_id INTEGER NOT NULL,
+        sfida TEXT NOT NULL,
+        bulloni INTEGER NOT NULL DEFAULT 0,
+        creato INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(tg_id, sfida)
+    );
     CREATE TABLE IF NOT EXISTS carrello_salvato(
         -- il carrello che si ritrova rientrando (6 ott 2026). UNO per
         -- persona per costruzione: la chiave e' il tg_id, quindi due
@@ -9633,7 +9727,18 @@ def init_db():
                     # la sua rotta. Escono da /api/me col SELECT *.
                     "relay_dm TEXT DEFAULT ''",
                     "relay_dm_visto INTEGER DEFAULT 0",
-                    "relay_dm_avvisato INTEGER DEFAULT 0"):
+                    "relay_dm_avvisato INTEGER DEFAULT 0",
+                    # LA CACCIA A TAPPO (17 nov 2026): il cappellino che
+                    # Tappo porta, l'id di un oggetto di
+                    # GIOCO_TAPPO_OGGETTI gia' preso coi bulloni ('' =
+                    # niente). Esce da /api/me col SELECT *: lo legge la
+                    # pagina del gioco e lo leggera' la stradina dei
+                    # livelli, che disegna Tappo come pedina.
+                    "tappo_oggetto TEXT DEFAULT ''",
+                    # ...e lo sfondo dietro a Tappo nella pagina del
+                    # gioco (un oggetto di tipo «palco»; '' = la notte
+                    # di casa).
+                    "tappo_palco TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -21543,6 +21648,29 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE preferiti SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM preferiti WHERE tg_id=?", (id_nostr,))
+        # LA CACCIA A TAPPO (17 nov 2026) segue l'utente, in UNIONE come
+        # i preferiti: la PK contiene il tg_id. Se tutt'e due le meta'
+        # hanno giocato lo STESSO giorno resta la giornata dell'account
+        # Telegram (i bulloni di un giorno non si sommano: e' una
+        # persona sola, e ha giocato due volte), e lo stesso oggetto
+        # preso (o la stessa sfida pagata) da entrambe e' una riga sola.
+        for tab in ("gioco_tappo", "gioco_tappo_oggetti", "gioco_tappo_sfide"):
+            con.execute(f"UPDATE OR IGNORE {tab} SET tg_id=? WHERE tg_id=?",
+                        (id_telegram, id_nostr))
+            con.execute(f"DELETE FROM {tab} WHERE tg_id=?", (id_nostr,))
+        # Lo ZAINO invece si SOMMA: gli attrezzi sono cose contate, e
+        # quelli della meta' che muore non devono sparire.
+        for r in con.execute(
+                "SELECT attrezzo, presi, usati, bulloni FROM "
+                "gioco_tappo_attrezzi WHERE tg_id=?", (id_nostr,)).fetchall():
+            con.execute(
+                "INSERT INTO gioco_tappo_attrezzi(tg_id, attrezzo, presi, "
+                "usati, bulloni) VALUES(?,?,?,?,?) ON CONFLICT(tg_id, attrezzo) "
+                "DO UPDATE SET presi=presi+excluded.presi, "
+                "usati=usati+excluded.usati, bulloni=bulloni+excluded.bulloni",
+                (id_telegram, r[0], r[1], r[2], r[3]))
+        con.execute("DELETE FROM gioco_tappo_attrezzi WHERE tg_id=?",
+                    (id_nostr,))
         # Il carrello salvato (ott 2026) segue l'utente, ma qui la PK E'
         # il tg_id: uno solo per persona. Se tutt'e due le meta' ne
         # avevano uno resta quello dell'account Telegram (l'OR IGNORE
@@ -30623,6 +30751,23 @@ try:
 except ImportError:
     MAX_PREFERITI = 10
 
+def max_barattolo_di(con, tg_id) -> int:
+    """Il tetto del barattolo di QUELLA persona (17 nov 2026): la leva
+    MAX_PREFERITI, piu' i posti presi coi bulloni della Caccia a Tappo
+    (`GIOCO_TAPPO_POSTI`, l'oggetto «posti»). Giudice unico: lo chiamano
+    il salvataggio e /api/me, o il Profilo direbbe un numero e la porta
+    un altro. Chi i posti li ha presi li TIENE anche a gioco spento: li
+    ha guadagnati. Fail-open al tetto di sempre: una tabella che manca
+    (un banco di prova col suo schema) non deve chiudere il barattolo."""
+    try:
+        presi = con.execute(
+            "SELECT 1 FROM gioco_tappo_oggetti WHERE tg_id=? AND "
+            "oggetto='posti'", (int(tg_id or 0),)).fetchone()
+    except sqlite3.Error:
+        presi = None
+    return int(MAX_PREFERITI) + (int(GIOCO_TAPPO_POSTI) if presi else 0)
+
+
 def _conta_barattolo(con, tg_id):
     """Quanti annunci ATTIVI nel barattolo: i venduti/rimossi non
     occupano posto (comprare qualcosa che c'e' dentro libera spazio)."""
@@ -30925,9 +31070,10 @@ async def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
             raise HTTPException(404, "Annuncio non trovato")
         # Limite: niente await tra COUNT e INSERT, nel server
         # mono-processo il blocco e' atomico (il patto anti-doppione).
-        if _conta_barattolo(con, user["id"]) >= MAX_PREFERITI:
+        _tetto = max_barattolo_di(con, user["id"])
+        if _conta_barattolo(con, user["id"]) >= _tetto:
             con.close()
-            raise HTTPException(400, f"Il barattolo è pieno ({MAX_PREFERITI} "
+            raise HTTPException(400, f"Il barattolo è pieno ({_tetto} "
                                      f"oggetti)! Togline qualcuno o compra "
                                      f"qualcosa che c'è dentro 🫙")
         # GLI AVVISI (17 nov 2026): la riga nasce con tutte le spunte
@@ -36885,6 +37031,17 @@ def _leve_stato():
             # cancella-account): la riga sta QUI e non in una `_x_leve()`
             # in fondo al file — ogni funzione-pannello in piu' e' un nome
             # da insegnare al censimento delle prove (la «trappola»)
+            # LA CACCIA A TAPPO (17 nov 2026): accanto alla cancellazione
+            # per la stessa ragione — nessuna funzione-pannello in piu'
+            _leva("Caccia a Tappo (il gioco)", "GIOCO_TAPPO_ATTIVO",
+                  bool(GIOCO_TAPPO_ATTIVO),
+                  acceso="nel Profilo (Livello) c'è «🔩 Caccia a Tappo»: la "
+                         "dispensa a sei scaffali, un annuncio al giorno da "
+                         "trovare, sei gradi, sfide e zaino; si vincono "
+                         "bulloni (mai sats né XP)",
+                  spento="la voce non c'è e le rotte rispondono 404; "
+                         "cappellini, sfondi, titolo e posti già presi "
+                         "restano"),
             _leva("Cancellazione dell'account", "ACCOUNT_CANCELLABILE",
                   bool(ACCOUNT_CANCELLABILE),
                   acceso="nel Profilo (Privacy) c'è «🗑 Cancella il mio "
@@ -51996,7 +52153,22 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["aste_da_agire"] = superato + da_riscuotere
     # Il tetto del barattolo, che dall'ago 2026 e' una leva: il client
     # non ne tiene una copia a memoria (divergerebbe al primo ritocco).
-    profilo["max_barattolo"] = MAX_PREFERITI
+    # (17 nov 2026) ...piu' i posti presi coi bulloni della Caccia a
+    # Tappo: il giudice e' `max_barattolo_di`, lo stesso della porta.
+    # E LA CACCIA A TAPPO: `gioco_tappo` e' la leva VIVA (la voce nel
+    # Profilo nasce solo quando le rotte rispondono), `tappo_caccia`
+    # dice se OGGI c'e' una caccia aperta — e' quel che fa nascere il
+    # tasto «Tappo è qui?» dentro gli annunci, e chi non gioca non lo
+    # vede mai. `tappo_oggetto` (il cappellino) esce gia' dal SELECT *.
+    _cn = db()
+    try:
+        profilo["max_barattolo"] = max_barattolo_di(_cn, user["id"])
+        profilo["gioco_tappo"] = bool(GIOCO_TAPPO_ATTIVO)
+        profilo["tappo_caccia"] = bool(
+            GIOCO_TAPPO_ATTIVO
+            and _tappo_caccia_aperta(_cn, user["id"], int(time.time())))
+    finally:
+        _cn.close()
     # la leva degli avvisi del barattolo (17 nov 2026): il client apre il
     # foglietto e mostra la 🔔 solo se e' accesa
     profilo["avvisi_barattolo"] = bool(AVVISI_BARATTOLO_ATTIVI)
@@ -110452,6 +110624,18 @@ def asset_tappo():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/caccia-tappo.webp")
+def asset_caccia_tappo():
+    """Tappo in persona (17 nov 2026, la Caccia a Tappo): il Tappo
+    ufficiale scelto da Andrea, SCONTORNATO (WebP con trasparenza,
+    560x721, ~58 KB): cosi' sta in piedi sul palco del gioco, qualunque
+    sfondo gli si metta dietro (alba, luna, aurora). Lo disegnano la
+    pagina del gioco e il foglio «L'hai trovato!». Rotta esplicita come
+    le sorelle: mai un mount (regola 3)."""
+    return FileResponse("assets/caccia-tappo.webp", media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 def _file_con_etag(percorso: str, media_type: str, cache: str,
                    if_none_match: str):
     """Serve un file col 304, che FileResponse da sola non fa:
@@ -114900,6 +115084,10 @@ CANCELLA_TOGLI = (
     ("wallet_unico", "tg_id"), ("swap_auto_preferenze", "tg_id"),
     ("unioni_semi", "tg_id"), ("unioni_semi", "da_id"),
     ("unioni_registro", "tg_id"), ("unioni_registro", "da_id"),
+    # (17 nov 2026) la Caccia a Tappo: le giornate giocate e gli oggetti
+    # presi coi bulloni erano suoi, e se ne vanno con lui
+    ("gioco_tappo", "tg_id"), ("gioco_tappo_oggetti", "tg_id"),
+    ("gioco_tappo_attrezzi", "tg_id"), ("gioco_tappo_sfide", "tg_id"),
 )
 # Le colonne personali di chi COMPRA, svuotate negli ordini chiusi che
 # restano: l'indirizzo, l'email per il corriere, la busta di ritiro, il
@@ -115149,3 +115337,1164 @@ async def cancella_account(req: Request, response: Response,
 # (Qui finisce il blocco della cancellazione dell'account. La riga non
 # e' un vezzo: le prove ritagliano una funzione fino alle due righe vuote
 # che la seguono, e l'ultima del file senza niente dopo non si ritaglia.)
+
+
+# =====================================================================
+# LA CACCIA A TAPPO (17 nov 2026, cantiere caccia-a-tappo, richiesta di
+# Andrea: «un gioco di barattolo con dentro Tappo... l'utente giocando
+# ne trae vantaggio»; la sua scelta sulla scheda: «Solo Caccia a Tappo»;
+# e poi, a voce: «bello complesso... deve durare anche tra vent'anni...
+# sfide progressive... una mappa originale... un inventario»).
+#
+# IL GIOCO. Ogni giorno Tappo scappa dal barattolo e si nasconde in un
+# annuncio VERO della vetrina, diverso per ogni persona. Chi gioca apre
+# «🔩 Caccia a Tappo» (Profilo → Livello) e trova LA DISPENSA DI TAPPO:
+# sei scaffali (`GIOCO_TAPPO_SCAFFALI`), su ognuno i barattoli delle sue
+# categorie. Sceglie lo SCAFFALE dove cacciare e il GRADO della caccia,
+# legge gli indizi e va a cercarlo: in ogni annuncio c'e' il tasto
+# «Tappo è qui?», e il server risponde si' o no. Le occhiate del giorno
+# sono contate. A mezzanotte, ora italiana, si ricomincia.
+#
+# QUATTRO COSE LO FANNO DURARE, ed e' il «vent'anni» di Andrea:
+#  · I SEI GRADI (`GIOCO_TAPPO_GRADI`), dal Curioso alla Leggenda: gli
+#    indizi si fanno vaghi (tre barattoli invece di uno, un anagramma
+#    invece della parola), le occhiate calano, sparisce il «fuochino», e
+#    dal quarto la caccia e' una PISTA A TAPPE — lo trovi e non c'e'
+#    piu', ha lasciato un biglietto. Un grado si apre trovando Tappo un
+#    certo numero di volte a quello prima: alla Leggenda si arriva in
+#    mesi, non in un pomeriggio.
+#  · I BARATTOLI: ogni ritrovamento accende il barattolo di QUELLA
+#    categoria — bronzo, poi argento, poi oro (`GIOCO_TAPPO_METALLI`).
+#  · LE SFIDE (`GIOCO_TAPPO_SFIDE`): famiglie a soglie crescenti, fino
+#    ai 7.300 ritrovamenti (vent'anni di cacce). Si pagano da sole.
+#  · LO ZAINO: gli attrezzi che si consumano (`GIOCO_TAPPO_ATTREZZI`) e
+#    quel che resta (`GIOCO_TAPPO_OGGETTI`): cappellini, sfondi, coppa.
+#
+# I BULLONI NON SONO SATS E NON SONO XP, ed e' la meta' che conta:
+#  · NON SONO SATS: non si comprano, non si passano a nessuno, non si
+#    incassano e nessuno paga per giocare. Niente posta e niente premio
+#    in denaro: non e' un gioco d'azzardo, e non lo deve diventare — un
+#    premio in sats qui dentro e' una decisione di Andrea (e del legale),
+#    mai un ritocco.
+#  · NON SONO XP: «GLI XP» (ago 2026, decisione di Andrea) sono il
+#    COMMERCIO e nient'altro — «nessuna azione ripetibile a costo zero
+#    deve valere quanto una che muove sats». Un gioco gratis che desse
+#    punti farebbe salire di livello chi ha tempo libero invece di chi
+#    commercia. Questo blocco non tocca `xp_eventi`, i livelli ne' la
+#    classifica, e una prova lo guarda.
+#
+# A CHI SERVE DAVVERO: AI VENDITORI. Chi cerca Tappo apre annunci veri,
+# li legge, e ogni scheda aperta e' una visita in piu'. Per questo il
+# nascondiglio si pesca in DUE passi — prima il VENDITORE, poi un suo
+# annuncio (`_tappo_pesca`): pescando fra gli annunci, un negozio da
+# duecento articoli ospiterebbe Tappo duecento volte piu' spesso di chi
+# ne ha uno. E per questo e' diverso per ognuno: niente «sta li'»
+# scritto in chat, e le visite si spargono su tutta la vetrina. Il
+# venditore lo viene a sapere (`_tappo_avvisa_venditore`): un avviso
+# ANONIMO, al piu' uno ogni GIOCO_TAPPO_AVVISO_GIORNI giorni.
+#
+# CONTRO I FURBI. Il nascondiglio non esce MAI dal server prima di
+# essere trovato: gli indizi si scrivono qui, e la risposta a un'occhiata
+# e' un si' o un no (al piu' un «fuochino»). Le occhiate hanno il tetto
+# del giorno e il freno dell'ora; il proprio annuncio non ospita Tappo e
+# non si guarda. Grado, premio, sfide e saldo si contano QUI dal
+# database: dal client arrivano solo nomi, mai una cifra. Piu' account
+# non rendono niente che valga: i bulloni non si passano.
+#
+# LA LEVA NASCE ACCESA (decisione di Andrea del 14 nov 2026: le leve
+# nuove sono accese di serie, e restano come interruttore d'emergenza).
+# Spenta — `GIOCO_TAPPO_ATTIVO = False` nel config — le rotte rispondono
+# 404 e la voce nel Profilo non c'e'; quel che uno ha gia' preso resta.
+
+try:
+    from config import GIOCO_TAPPO_ATTIVO
+except ImportError:
+    GIOCO_TAPPO_ATTIVO = True
+if not isinstance(GIOCO_TAPPO_ATTIVO, bool):
+    print("[gioco] GIOCO_TAPPO_ATTIVO non e' True/False: la Caccia a "
+          "Tappo resta spenta", flush=True)
+    GIOCO_TAPPO_ATTIVO = False
+
+GIOCO_TAPPO_POSTI = 5            # i posti in piu' nel barattolo (l'oggetto «posti»)
+GIOCO_TAPPO_RIPOSO_GIORNI = 7    # un nascondiglio non torna prima, se c'e' altro
+GIOCO_TAPPO_AVVISO_GIORNI = 3    # al venditore, al piu' un avviso ogni tanti giorni
+GIOCO_TAPPO_INDIZI = 3           # gli indizi di ogni tappa (il primo e' di casa)
+GIOCO_TAPPO_TORCIA = 3           # le occhiate in piu' che da' la torcia
+GIOCO_TAPPO_FULMINE_SECONDI = 180  # la sfida «Fulmine»: trovato entro tanto
+GIOCO_TAPPO_ATTREZZI_MAX = 9     # quanti attrezzi di un tipo stanno nello zaino
+# LA DISPENSA: sei scaffali, e su ognuno i barattoli delle sue categorie.
+# Ogni categoria di CATEGORIE sta su UNO scaffale e uno solo (una prova
+# lo guarda: una categoria nuova senza scaffale e' un barattolo che
+# nessuno puo' accendere). Una categoria che qui non c'e' — un annuncio
+# vecchio, un importato — cade nel barattolo «Altro».
+GIOCO_TAPPO_SCAFFALI = (
+    dict(n=1, emoji="🔌", nome="Il banco dei fili",
+         categorie=("Elettronica", "Informatica", "Telefonia",
+                    "Audio e video", "Bitcoin")),
+    dict(n=2, emoji="🎮", nome="Lo scaffale dello svago",
+         categorie=("Console e videogiochi", "Musica e film",
+                    "Strumenti musicali", "Libri e media", "Foto e ottica")),
+    dict(n=3, emoji="🏡", nome="La mensola di casa",
+         categorie=("Casa e giardino", "Elettrodomestici",
+                    "Fai da te e utensili", "Alimenti e bevande", "Animali")),
+    dict(n=4, emoji="👗", nome="L'armadio",
+         categorie=("Abbigliamento", "Scarpe e accessori",
+                    "Orologi e gioielli", "Bellezza e benessere", "Bambini")),
+    dict(n=5, emoji="🚲", nome="Il garage",
+         categorie=("Sport e hobby", "Biciclette", "Motori",
+                    "Collezionismo", "Arte e artigianato")),
+    dict(n=6, emoji="🎟️", nome="Lo sportello",
+         categorie=("Buoni ed esperienze", "Lezioni e corsi",
+                    "Lavoro e servizi", "Altro")),
+)
+# I GRADI. `occhiate`: quante in un giorno; `tappe`: quante volte Tappo
+# scappa prima di farsi prendere; `indizi`: i tre, dal piu' vago al piu'
+# chiaro (i tipi li scrive `_tappo_indizio`); `calore`: se un'occhiata
+# sbagliata dice «fuochino»; `premio` i bulloni pieni e `calo` quanti ne
+# toglie ogni indizio in piu'; `serve`: i ritrovamenti al grado PRIMA
+# (o a uno piu' alto) che lo aprono.
+GIOCO_TAPPO_GRADI = (
+    dict(n=1, emoji="🐣", nome="Curioso", occhiate=12, tappe=1,
+         indizi=("barattolo", "fascia", "parola"),
+         calore=True, premio=3, calo=1, serve=0),
+    dict(n=2, emoji="🐕", nome="Segugio", occhiate=10, tappe=1,
+         indizi=("barattolo", "fascia", "iniziale"),
+         calore=True, premio=5, calo=1, serve=5),
+    dict(n=3, emoji="🧭", nome="Esploratore", occhiate=9, tappe=1,
+         indizi=("tre_barattoli", "fascia_larga", "anagramma"),
+         calore=True, premio=8, calo=2, serve=10),
+    dict(n=4, emoji="🕵️", nome="Detective", occhiate=9, tappe=2,
+         indizi=("barattolo", "fascia", "iniziale"),
+         calore=False, premio=12, calo=2, serve=15),
+    dict(n=5, emoji="🦊", nome="Volpe", occhiate=8, tappe=2,
+         indizi=("tre_barattoli", "fascia_larga", "anagramma"),
+         calore=False, premio=18, calo=3, serve=20),
+    dict(n=6, emoji="🌟", nome="Leggenda", occhiate=8, tappe=3,
+         indizi=("fascia_larga", "tre_barattoli", "anagramma"),
+         calore=False, premio=30, calo=4, serve=30),
+)
+# Il metallo di un barattolo: quante volte Tappo e' stato trovato li'.
+GIOCO_TAPPO_METALLI = ((20, "oro"), (5, "argento"), (1, "bronzo"))
+# GLI ATTREZZI si consumano: uno per tipo al giorno, e chi li usa non
+# fa «Naso fino». Il primo di ognuno e' il CORREDO, regalato.
+GIOCO_TAPPO_ATTREZZI = (
+    dict(id="torcia", emoji="🔦", nome="Torcia", bulloni=4,
+         cosa=f"{GIOCO_TAPPO_TORCIA} occhiate in più, per oggi"),
+    dict(id="lampadina", emoji="💡", nome="Lampadina", bulloni=5,
+         cosa="Apre il prossimo indizio senza abbassare il premio"),
+    dict(id="calamita", emoji="🧲", nome="Calamita", bulloni=6,
+         cosa="Per oggi, a ogni occhiata sbagliata ti dice se sei vicino"),
+)
+# Quel che si prende coi bulloni e RESTA. `tipo`: «cappello» si indossa
+# (uno alla volta, `utenti.tappo_oggetto`), «palco» e' lo sfondo dietro
+# a Tappo (`utenti.tappo_palco`), «titolo» apre il titolo
+# `t_amico_tappo`, «posti» allarga il barattolo dei preferiti, «trofeo»
+# sta nello zaino e basta. Un oggetto preso non si rende e non si
+# regala. Togliere una riga di qui non toglie l'oggetto a chi l'ha:
+# smette di vendersi.
+GIOCO_TAPPO_OGGETTI = (
+    dict(id="berretto", tipo="cappello", emoji="🧢", nome="Berretto",
+         bulloni=6),
+    dict(id="paglia", tipo="cappello", emoji="👒", nome="Cappello di paglia",
+         bulloni=6),
+    dict(id="fiocco", tipo="cappello", emoji="🎀", nome="Fiocco",
+         bulloni=10),
+    dict(id="cilindro", tipo="cappello", emoji="🎩", nome="Cilindro",
+         bulloni=15),
+    # (le cuffie e non il tocco da laureato: il 🎓 e' SOLO il reparto
+    # «Lezioni e corsi», una sentinella di prove.py lo sorveglia)
+    dict(id="cuffie", tipo="cappello", emoji="🎧", nome="Cuffie",
+         bulloni=15),
+    dict(id="elmetto", tipo="cappello", emoji="⛑️", nome="Elmetto",
+         bulloni=25),
+    dict(id="corona", tipo="cappello", emoji="👑", nome="Corona",
+         bulloni=100),
+    dict(id="alba", tipo="palco", emoji="🌅", nome="Lo sfondo «Alba»",
+         bulloni=30),
+    dict(id="luna", tipo="palco", emoji="🌙", nome="Lo sfondo «Luna piena»",
+         bulloni=80),
+    dict(id="aurora", tipo="palco", emoji="🌌", nome="Lo sfondo «Aurora»",
+         bulloni=200),
+    dict(id="amico", tipo="titolo", emoji="🔩",
+         nome="Il titolo «Amico di Tappo»", bulloni=15),
+    dict(id="posti", tipo="posti", emoji="🫙",
+         nome=f"{GIOCO_TAPPO_POSTI} posti in più nel barattolo", bulloni=30),
+    dict(id="coppa", tipo="trofeo", emoji="🏆",
+         nome="La coppa della dispensa", bulloni=500),
+)
+# LE SFIDE: famiglie a soglie crescenti, `(quanto, bulloni)`. `conta`
+# e' la voce di `_tappo_numeri` che la famiglia guarda. Si pagano DA
+# SOLE, una volta (`gioco_tappo_sfide`). Aggiungere una soglia o una
+# famiglia paga anche chi c'era gia' arrivato, alla prossima apertura;
+# toglierne una non riprende i bulloni a nessuno.
+GIOCO_TAPPO_SFIDE = (
+    dict(id="tappi", emoji="🔩", nome="Collezionista di tappi",
+         cosa="Trova Tappo {n} volte", conta="trovate",
+         soglie=((1, 2), (5, 4), (15, 8), (30, 12), (60, 20), (100, 30),
+                 (200, 50), (365, 80), (500, 100), (1000, 200), (2000, 350),
+                 (3650, 500), (7300, 1000))),
+    dict(id="naso", emoji="👃", nome="Naso fino",
+         cosa="Trovalo {n} volte col solo primo indizio, senza attrezzi",
+         conta="naso",
+         soglie=((1, 3), (5, 8), (20, 20), (50, 40), (150, 100), (500, 250))),
+    dict(id="secco", emoji="🎯", nome="Colpo secco",
+         cosa="Trovalo {n} volte senza sbagliare un'occhiata", conta="secco",
+         soglie=((1, 3), (5, 8), (20, 20), (50, 40), (150, 100), (500, 250))),
+    dict(id="fulmine", emoji="⚡", nome="Fulmine",
+         cosa="Trovalo {n} volte in meno di tre minuti", conta="fulmine",
+         soglie=((1, 3), (5, 8), (20, 20), (50, 40), (150, 100))),
+    dict(id="giro", emoji="🫙", nome="Il giro della dispensa",
+         cosa="Accendi {n} barattoli diversi", conta="barattoli",
+         soglie=((3, 3), (8, 8), (15, 15), (22, 25), (29, 50))),
+    dict(id="oro", emoji="🥇", nome="Barattoli d'oro",
+         cosa="Porta all'oro {n} barattoli", conta="oro",
+         soglie=((1, 10), (3, 25), (6, 50), (12, 100), (20, 200), (29, 500))),
+    dict(id="scala", emoji="🪜", nome="In cima alla scala",
+         cosa="Finisci una caccia da {n}", conta="grado", nomi="gradi",
+         soglie=((2, 5), (3, 10), (4, 15), (5, 25), (6, 50))),
+    dict(id="pista", emoji="👣", nome="Sulla pista",
+         cosa="Finisci {n} cacce a più tappe", conta="piste",
+         soglie=((1, 5), (10, 15), (50, 40), (150, 100), (500, 250))),
+)
+_RE_PAROLA_TAPPO = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]{4,}")
+# Dove Tappo puo' nascondersi: quel che la vetrina mostra (attivo, una
+# card per famiglia), mai un'asta (li' il prezzo e' una puntata e
+# l'indizio mentirebbe), mai un titolo vuoto. L'alias e' `a`.
+_TAPPO_SQL_VETRINA = (f"a.stato='attivo' AND {SQL_CAPOFILA} "
+                      "AND COALESCE(a.asta_base_sats,0)=0 "
+                      "AND TRIM(COALESCE(a.titolo,''))<>''")
+
+
+def _giorno_roma(adesso) -> str:
+    """PURA: il giorno «AAAA-MM-GG» in ORA ITALIANA di un istante epoch.
+    La caccia cambia a mezzanotte di chi gioca, non a quella di
+    Greenwich. Senza zoneinfo, come `_epoch_roma` e per la stessa
+    ragione (su Windows «Europe/Rome» non c'e'): la regola dell'ora
+    legale europea — dall'ultima domenica di marzo all'ultima di
+    ottobre, alle 01:00 UTC — e' ferma dal 1996."""
+    from datetime import datetime, timedelta, timezone
+    utc = datetime.fromtimestamp(int(adesso), timezone.utc).replace(tzinfo=None)
+
+    def ultima_domenica(mese):
+        d = datetime(utc.year, mese, 31)
+        return d - timedelta(days=(d.weekday() + 1) % 7)
+    legale = (ultima_domenica(3).replace(hour=1) <= utc
+              < ultima_domenica(10).replace(hour=1))
+    return (utc + timedelta(hours=2 if legale else 1)).strftime("%Y-%m-%d")
+
+
+def _tappo_pesca(candidati, caso) -> int:
+    """PURA: il nascondiglio fra i candidati `(annuncio_id,
+    venditore_id)`. In DUE passi, ed e' la regola del blocco: prima il
+    VENDITORE, poi un suo annuncio — cosi' ogni venditore ospita Tappo
+    con la stessa frequenza, che abbia un annuncio o duecento. `caso(n)`
+    da' un intero in [0, n): in produzione `secrets.randbelow`, nelle
+    prove un dado truccato. 0 = nessun candidato."""
+    per_venditore = {}
+    for annuncio_id, venditore_id in candidati:
+        per_venditore.setdefault(venditore_id, []).append(annuncio_id)
+    if not per_venditore:
+        return 0
+    venditori = sorted(per_venditore)
+    suoi = sorted(per_venditore[venditori[caso(len(venditori))]])
+    return int(suoi[caso(len(suoi))])
+
+
+def _tappo_fascia(prezzo) -> tuple:
+    """PURA: la fascia `(da, a)` della scala 1-2-5 che contiene il
+    prezzo, con `da <= prezzo < a`: 15.000 sta fra 10.000 e 20.000, 35
+    fra 20 e 50. E' l'indizio del prezzo: abbastanza stretta da aiutare,
+    abbastanza larga da non dire la cifra. (0, 0) = prezzo che non c'e'."""
+    try:
+        p = float(prezzo or 0)
+    except (TypeError, ValueError):
+        return (0, 0)
+    if p <= 0:
+        return (0, 0)
+    if p < 1:
+        return (0, 1)
+    passo = 1
+    while passo * 10 <= p:
+        passo *= 10
+    for da, a in ((1, 2), (2, 5), (5, 10)):
+        if p < a * passo:
+            return (da * passo, a * passo)
+    return (5 * passo, 10 * passo)
+
+
+def _tappo_fascia_larga(prezzo) -> tuple:
+    """PURA: la fascia dei gradi alti — la DECINA intera che contiene il
+    prezzo: 15.000 sta fra 10.000 e 100.000. Dice l'ordine di grandezza
+    e basta. (0, 0) = prezzo che non c'e'."""
+    da, a = _tappo_fascia(prezzo)
+    if not a:
+        return (0, 0)
+    if da == 0:
+        return (0, 1)
+    passo = 1
+    while passo * 10 <= da:
+        passo *= 10
+    return (passo, passo * 10)
+
+
+def _tappo_parola(titolo) -> str:
+    """PURA: la parola del titolo che fa da indizio — la piu' lunga (la
+    prima, a parita'), in minuscolo, di sole lettere: e' quella che si
+    scrive nella ricerca per arrivarci. '' se il titolo non ha una
+    parola di almeno quattro lettere."""
+    parole = _RE_PAROLA_TAPPO.findall(str(titolo or ""))
+    return max(parole, key=len).lower() if parole else ""
+
+
+def _tappo_dado(seme, n) -> int:
+    """PURA: un intero in [0, n) che dipende SOLO dal seme. E' il dado
+    degli indizi: lo stesso nascondiglio nello stesso giorno deve dare
+    lo stesso anagramma e gli stessi tre barattoli a ogni apertura della
+    pagina, o basterebbe ricaricarla per incrociare le risposte."""
+    return int(hashlib.sha256(str(seme).encode("utf-8")).hexdigest(), 16) % max(1, int(n))
+
+
+def _tappo_mescola(cose, seme) -> list:
+    """PURA: le stesse cose in un ordine che dipende solo dal seme."""
+    cose = list(cose)
+    for i in range(len(cose) - 1, 0, -1):
+        j = _tappo_dado(f"{seme}:{i}", i + 1)
+        cose[i], cose[j] = cose[j], cose[i]
+    return cose
+
+
+def _tappo_anagramma(parola, seme) -> str:
+    """PURA: le lettere della parola rimescolate, in maiuscolo. Mai la
+    parola stessa, se ha almeno due lettere diverse: un anagramma che
+    esce gia' risolto non e' un indizio difficile, e' un regalo."""
+    lettere = list(str(parola or "").upper())
+    mischiate = _tappo_mescola(lettere, seme)
+    if mischiate == lettere and len(set(lettere)) > 1:
+        mischiate = lettere[1:] + lettere[:1]
+    return "".join(mischiate)
+
+
+def _tappo_scaffale_di(categoria) -> int:
+    """PURA: il numero dello scaffale di una categoria. Una categoria che
+    la dispensa non conosce sta dove sta «Altro»."""
+    categoria = (categoria or "").strip()
+    altro = GIOCO_TAPPO_SCAFFALI[-1]["n"]
+    for s in GIOCO_TAPPO_SCAFFALI:
+        if categoria in s["categorie"]:
+            return s["n"]
+        if "Altro" in s["categorie"]:
+            altro = s["n"]
+    return altro
+
+
+def _tappo_barattolo_di(categoria) -> str:
+    """PURA: il barattolo che una categoria accende — lei stessa se ha
+    il suo, «Altro» sennò."""
+    categoria = (categoria or "").strip()
+    return categoria if any(categoria in s["categorie"]
+                            for s in GIOCO_TAPPO_SCAFFALI) else "Altro"
+
+
+def _tappo_grado(n) -> dict:
+    """PURA: la riga di GIOCO_TAPPO_GRADI di quel numero; fuori scala,
+    il primo (una riga scritta da un codice piu' nuovo non deve rompere
+    la pagina)."""
+    try:
+        n = int(n or 0)
+    except (TypeError, ValueError):
+        n = 0
+    return next((g for g in GIOCO_TAPPO_GRADI if g["n"] == n),
+                GIOCO_TAPPO_GRADI[0])
+
+
+def _tappo_prezzo_di(a) -> tuple:
+    """PURA: `(prezzo, unita')` di un annuncio COME STA SUL CARTELLINO:
+    un listino in euro si legge in euro anche sulla card, e l'indizio
+    deve dire la cifra che uno poi vede."""
+    if (a.get("valuta") or "sats") == "eur" and float(a.get("prezzo_eur") or 0) > 0:
+        return float(a.get("prezzo_eur") or 0), "€"
+    return float(a.get("prezzo_sats") or 0), "sats"
+
+
+def _tappo_indizio(tipo, a, seme) -> str:
+    """PURA: la FRASE di un indizio sul nascondiglio `a` (categoria,
+    valuta, prezzi e titolo dell'annuncio). Il nascondiglio non esce dal
+    server: escono le frasi. Testo e non HTML: il titolo e' di chi
+    vende, e la pagina lo passa da esc()."""
+    barattolo = _tappo_barattolo_di(a.get("categoria"))
+    prezzo, unita = _tappo_prezzo_di(a)
+    parola = _tappo_parola(a.get("titolo"))
+    if tipo == "barattolo":
+        return f"Mi sono nascosto nel barattolo «{barattolo}»."
+    if tipo == "tre_barattoli":
+        scaffale = next(s for s in GIOCO_TAPPO_SCAFFALI
+                        if s["n"] == _tappo_scaffale_di(barattolo))
+        altri = _tappo_mescola([c for c in scaffale["categorie"]
+                                if c != barattolo], f"{seme}:finti")[:2]
+        tre = sorted([barattolo] + altri)
+        return ("Sono in uno di questi barattoli: "
+                + ", ".join(f"«{c}»" for c in tre) + ".")
+    if tipo in ("fascia", "fascia_larga"):
+        da, fino = (_tappo_fascia if tipo == "fascia"
+                    else _tappo_fascia_larga)(prezzo)
+        if not fino:
+            return ("Sul cartellino non c'è una cifra: cerca fra gli "
+                    "annunci senza prezzo.")
+        return f"Sul cartellino c'è scritto tra {_fmt_sats(da)} e {_fmt_sats(fino)} {unita}."
+    if tipo == "parola":
+        return (f"Nel titolo c'è la parola «{parola}»." if parola else
+                "Il titolo è cortissimo: poche lettere, o solo numeri.")
+    if tipo == "iniziale":
+        titolo = str(a.get("titolo") or "").strip()
+        parole = len(titolo.split())
+        return (f"Il titolo comincia per «{titolo[:1].upper()}» e ha "
+                + ("una parola sola." if parole == 1 else f"{parole} parole."))
+    if tipo == "anagramma":
+        return ("Una parola del titolo, con le lettere in disordine: "
+                f"{' '.join(_tappo_anagramma(parola, seme))}." if parola else
+                "Il titolo è cortissimo: poche lettere, o solo numeri.")
+    return ""
+
+
+def _tappo_indizi(a, grado, quanti, seme) -> list:
+    """PURA: i primi `quanti` indizi (da 1 a GIOCO_TAPPO_INDIZI) del
+    grado sul nascondiglio `a`: `[{tipo, testo}]`."""
+    tipi = _tappo_grado(grado)["indizi"]
+    quanti = max(1, min(len(tipi), int(quanti or 1)))
+    return [{"tipo": t, "testo": _tappo_indizio(t, a, seme)}
+            for t in tipi[:quanti]]
+
+
+def _tappo_premio(grado, aiuti) -> int:
+    """PURA: i bulloni per chi lo trova a quel grado dopo aver PAGATO
+    `aiuti` indizi (il primo di ogni tappa e' di casa, quello aperto con
+    la lampadina non conta). Mai meno di uno: trovarlo vale sempre."""
+    g = _tappo_grado(grado)
+    return max(1, int(g["premio"]) - int(g["calo"]) * max(0, int(aiuti or 0)))
+
+
+def _tappo_occhiate_max(grado, attrezzi) -> int:
+    """PURA: le occhiate del giorno — quelle del grado, piu' quelle
+    della torcia se oggi e' stata accesa."""
+    usati = {x for x in str(attrezzi or "").split(",") if x}
+    return int(_tappo_grado(grado)["occhiate"]) + (
+        GIOCO_TAPPO_TORCIA if "torcia" in usati else 0)
+
+
+def _tappo_calore(nascondiglio, guardato) -> str:
+    """PURA: quanto e' vicina un'occhiata sbagliata. 'fuoco' = stesso
+    barattolo e stessa fascia di prezzo; 'fuochino' = stesso barattolo;
+    'tiepido' = stesso scaffale; 'acqua' = altrove."""
+    qui = _tappo_barattolo_di(nascondiglio.get("categoria"))
+    la = _tappo_barattolo_di(guardato.get("categoria"))
+    if qui == la:
+        p1, u1 = _tappo_prezzo_di(nascondiglio)
+        p2, u2 = _tappo_prezzo_di(guardato)
+        return ("fuoco" if u1 == u2 and _tappo_fascia(p1) == _tappo_fascia(p2)
+                else "fuochino")
+    return ("tiepido" if _tappo_scaffale_di(qui) == _tappo_scaffale_di(la)
+            else "acqua")
+
+
+def _tappo_metallo(volte) -> str:
+    """PURA: il metallo di un barattolo dove Tappo e' stato trovato
+    `volte` volte: 'oro', 'argento', 'bronzo', o '' se e' ancora spento."""
+    return next((m for soglia, m in GIOCO_TAPPO_METALLI
+                 if int(volte or 0) >= soglia), "")
+
+
+def _tappo_gradi_aperti(per_grado) -> int:
+    """PURA: il grado piu' alto che si puo' scegliere, da `{grado:
+    ritrovamenti}`. Un grado si apre coi ritrovamenti fatti a quello
+    PRIMA o a uno piu' alto (`serve`): chi gioca da Volpe non deve
+    tornare Segugio per aprire la Leggenda. La scala si sale un gradino
+    alla volta: al primo chiuso ci si ferma."""
+    aperto = GIOCO_TAPPO_GRADI[0]["n"]
+    for g in GIOCO_TAPPO_GRADI[1:]:
+        fatti = sum(int(v or 0) for k, v in (per_grado or {}).items()
+                    if int(k or 0) >= g["n"] - 1)
+        if fatti < g["serve"]:
+            break
+        aperto = g["n"]
+    return aperto
+
+
+def _tappo_sfide_raggiunte(numeri) -> list:
+    """PURA: tutte le soglie GIA' raggiunte coi numeri di una persona:
+    `[(id, bulloni)]`, con l'id «famiglia:soglia»."""
+    fatte = []
+    for fam in GIOCO_TAPPO_SFIDE:
+        valore = int((numeri or {}).get(fam["conta"]) or 0)
+        fatte += [(f"{fam['id']}:{n}", int(b)) for n, b in fam["soglie"]
+                  if valore >= n]
+    return fatte
+
+
+def _tappo_e_qui(nascondiglio, guardato) -> bool:
+    """PURA: l'annuncio guardato e' il nascondiglio? Lo stesso annuncio,
+    oppure una sua SORELLA: in vetrina una famiglia di varianti e' una
+    card sola, e chi apre «la taglia M» ha trovato la card giusta."""
+    if not nascondiglio or not guardato:
+        return False
+    if int(nascondiglio["id"]) == int(guardato["id"]):
+        return True
+    famiglia = (nascondiglio["famiglia"] or "").strip()
+    return bool(famiglia) and famiglia == (guardato["famiglia"] or "").strip()
+
+
+def _tappo_acceso():
+    """A leva spenta il gioco non esiste: 404, come le sorelle."""
+    if not GIOCO_TAPPO_ATTIVO:
+        raise HTTPException(404, "Not Found")
+
+
+def _tappo_annuncio(con, annuncio_id):
+    """La riga di un annuncio con quel che serve al gioco, o None."""
+    return con.execute(
+        "SELECT a.id, a.venditore_id, a.titolo, a.categoria, a.valuta, "
+        "a.prezzo_sats, a.prezzo_eur, a.famiglia, a.stato, a.contatto_nostr "
+        "FROM annunci a WHERE a.id=?", (int(annuncio_id or 0),)).fetchone()
+
+
+def _tappo_candidati(con, tg_id: int, giorno: str, scaffale: int = 0,
+                     escludi=()) -> list:
+    """Dove Tappo puo' nascondersi oggi per QUESTA persona su quello
+    scaffale (0 = dovunque): `[(annuncio_id, venditore_id)]`. Mai i suoi
+    annunci, mai quelli in `escludi` (le tappe gia' fatte della pista).
+    Prima quelli di chi vende DA Barattolo — sono loro che il gioco deve
+    aiutare, e solo a loro si puo' dire «Tappo e' stato da te» —, gli
+    importati da Nostr solo se non c'e' altro. I nascondigli degli ultimi
+    GIOCO_TAPPO_RIPOSO_GIORNI giorni riposano, finche' ce n'e' di nuovi."""
+    base = ("SELECT a.id, a.venditore_id, a.categoria FROM annunci a WHERE "
+            f"{_TAPPO_SQL_VETRINA} AND a.venditore_id<>?")
+    recenti = {r[0] for r in con.execute(
+        "SELECT annuncio_id FROM gioco_tappo WHERE tg_id=? AND giorno<>? "
+        "ORDER BY giorno DESC LIMIT ?",
+        (int(tg_id), giorno, GIOCO_TAPPO_RIPOSO_GIORNI))}
+    via = {int(x) for x in escludi if x}
+    for filtro in (" AND COALESCE(a.contatto_nostr,'')=''", ""):
+        tutti = [(r[0], r[1]) for r in con.execute(base + filtro,
+                                                   (int(tg_id),))
+                 if r[0] not in via
+                 and (not scaffale or _tappo_scaffale_di(r[2]) == int(scaffale))]
+        nuovi = [c for c in tutti if c[0] not in recenti]
+        if nuovi or tutti:
+            return nuovi or tutti
+    return []
+
+
+def _tappo_pista(riga) -> list:
+    """Gli annunci delle tappe GIA' fatte oggi (il nascondiglio di
+    adesso non c'e'): la pista e' scritta come «12,40»."""
+    return [int(x) for x in str(riga["pista"] or "").split(",") if x.isdigit()]
+
+
+def _tappo_oggi(con, tg_id: int, adesso: int):
+    """La caccia di oggi di una persona: `(riga, nascondiglio)`, o
+    `(None, None)` se oggi non e' ancora partita (parte da
+    `/api/gioco/tappo/parti`, con lo scaffale scelto).
+    IL NASCONDIGLIO SI RIPARA DA SOLO: se l'annuncio non e' piu' in
+    vetrina — venduto, tolto, in revisione — e Tappo non e' ancora stato
+    trovato, se ne pesca un altro sullo stesso scaffale (o, se li' non
+    c'e' piu' niente, dovunque: lo scaffale della riga lo segue).
+    Nessuno deve cercare un giorno intero una cosa che non c'e' piu'.
+    Indizi letti e occhiate restano. Niente commit: e' del chiamante."""
+    giorno = _giorno_roma(adesso)
+    riga = con.execute("SELECT * FROM gioco_tappo WHERE tg_id=? AND giorno=?",
+                       (int(tg_id), giorno)).fetchone()
+    if not riga:
+        return None, None
+    nascondiglio = _tappo_annuncio(con, riga["annuncio_id"])
+    if riga["trovato"] or (nascondiglio and nascondiglio["stato"] == "attivo"):
+        return riga, nascondiglio
+    fatte = _tappo_pista(riga)
+    scelto = _tappo_pesca(_tappo_candidati(con, tg_id, giorno, riga["scaffale"],
+                                           fatte), secrets.randbelow)
+    if not scelto:
+        scelto = _tappo_pesca(_tappo_candidati(con, tg_id, giorno, 0, fatte),
+                              secrets.randbelow)
+    nascondiglio = _tappo_annuncio(con, scelto) if scelto else None
+    con.execute(
+        "UPDATE gioco_tappo SET annuncio_id=?, scaffale=? WHERE tg_id=? AND "
+        "giorno=?", (scelto, _tappo_scaffale_di(nascondiglio["categoria"])
+                     if nascondiglio else riga["scaffale"],
+                     int(tg_id), giorno))
+    riga = con.execute("SELECT * FROM gioco_tappo WHERE tg_id=? AND giorno=?",
+                       (int(tg_id), giorno)).fetchone()
+    return riga, nascondiglio
+
+
+def _tappo_caccia_aperta(con, tg_id: int, adesso: int) -> bool:
+    """C'e' una caccia APERTA oggi: partita, Tappo non ancora trovato e
+    occhiate rimaste. E' quel che accende il tasto «Tappo è qui?» negli
+    annunci (`tappo_caccia` in /api/me). Fail-open al no."""
+    try:
+        r = con.execute(
+            "SELECT annuncio_id, trovato, occhiate, grado, attrezzi FROM "
+            "gioco_tappo WHERE tg_id=? AND giorno=?",
+            (int(tg_id), _giorno_roma(adesso))).fetchone()
+    except sqlite3.Error:
+        return False
+    return bool(r and r["annuncio_id"] and not r["trovato"]
+                and r["occhiate"] < _tappo_occhiate_max(r["grado"],
+                                                        r["attrezzi"]))
+
+
+def _tappo_oggetti_di(con, tg_id: int) -> set:
+    """Gli id degli oggetti che quella persona ha preso coi bulloni.
+    Fail-open al vuoto (un banco di prova col suo schema)."""
+    try:
+        return {r[0] for r in con.execute(
+            "SELECT oggetto FROM gioco_tappo_oggetti WHERE tg_id=?",
+            (int(tg_id or 0),))}
+    except sqlite3.Error:
+        return set()
+
+
+def _tappo_saldo(con, tg_id: int) -> int:
+    """I bulloni da spendere: quelli vinti (cacce e sfide) meno quelli
+    spesi (oggetti e attrezzi). Il conto si rifa' ogni volta dalle
+    quattro tabelle — non c'e' una colonna «saldo» che possa dire un
+    numero diverso."""
+    def somma(tabella):
+        return int(con.execute(
+            f"SELECT COALESCE(SUM(bulloni),0) FROM {tabella} WHERE tg_id=?",
+            (int(tg_id),)).fetchone()[0] or 0)
+    return (somma("gioco_tappo") + somma("gioco_tappo_sfide")
+            - somma("gioco_tappo_oggetti") - somma("gioco_tappo_attrezzi"))
+
+
+def _tappo_numeri(con, tg_id: int) -> dict:
+    """I NUMERI di una persona, contati dalle sue cacce finite: e' da
+    qui che escono i gradi aperti, i barattoli accesi e le sfide. Un
+    giro solo sulla tabella (una riga al giorno: vent'anni sono 7.300
+    righe)."""
+    n = dict(trovate=0, naso=0, secco=0, fulmine=0, piste=0, grado=0,
+             per_grado={}, per_barattolo={})
+    for r in con.execute(
+            "SELECT grado, tappe, aiuti, attrezzi, sbagli, partito, trovato, "
+            "categoria FROM gioco_tappo WHERE tg_id=? AND trovato>0",
+            (int(tg_id),)):
+        n["trovate"] += 1
+        n["naso"] += 1 if not r["aiuti"] and not (r["attrezzi"] or "") else 0
+        n["secco"] += 1 if not r["sbagli"] else 0
+        n["fulmine"] += 1 if (r["partito"] and r["trovato"] - r["partito"]
+                              <= GIOCO_TAPPO_FULMINE_SECONDI) else 0
+        n["piste"] += 1 if r["tappe"] >= 2 else 0
+        n["grado"] = max(n["grado"], int(r["grado"] or 0))
+        n["per_grado"][int(r["grado"] or 0)] = n["per_grado"].get(
+            int(r["grado"] or 0), 0) + 1
+        b = _tappo_barattolo_di(r["categoria"])
+        n["per_barattolo"][b] = n["per_barattolo"].get(b, 0) + 1
+    n["barattoli"] = len(n["per_barattolo"])
+    n["oro"] = sum(1 for v in n["per_barattolo"].values()
+                   if _tappo_metallo(v) == "oro")
+    return n
+
+
+def _tappo_passa_sfide(con, tg_id: int, adesso: int, numeri=None) -> list:
+    """Paga le sfide raggiunte e non ancora pagate: `[{id, emoji, nome,
+    bulloni}]` di quelle NUOVE. Idempotente — la chiave e' (persona,
+    sfida) — quindi si puo' chiamare a ogni apertura: una soglia
+    aggiunta domani paga da sola chi c'era gia'. Niente commit."""
+    numeri = numeri or _tappo_numeri(con, tg_id)
+    pagate = {r[0] for r in con.execute(
+        "SELECT sfida FROM gioco_tappo_sfide WHERE tg_id=?", (int(tg_id),))}
+    nuove = []
+    for sfida, bulloni in _tappo_sfide_raggiunte(numeri):
+        if sfida in pagate:
+            continue
+        con.execute("INSERT OR IGNORE INTO gioco_tappo_sfide(tg_id, sfida, "
+                    "bulloni, creato) VALUES(?,?,?,?)",
+                    (int(tg_id), sfida, bulloni, int(adesso)))
+        fam = next(f for f in GIOCO_TAPPO_SFIDE
+                   if f["id"] == sfida.split(":")[0])
+        nuove.append(dict(id=sfida, emoji=fam["emoji"], nome=fam["nome"],
+                          bulloni=bulloni))
+    return nuove
+
+
+def _tappo_corredo(con, tg_id: int):
+    """IL CORREDO: la prima volta che uno apre il gioco trova nello
+    zaino un attrezzo per tipo, regalato (bulloni 0). Una riga per
+    attrezzo: «la prima volta» e' «non ha ancora nessuna riga»."""
+    if con.execute("SELECT 1 FROM gioco_tappo_attrezzi WHERE tg_id=? LIMIT 1",
+                   (int(tg_id),)).fetchone():
+        return
+    for a in GIOCO_TAPPO_ATTREZZI:
+        con.execute("INSERT OR IGNORE INTO gioco_tappo_attrezzi(tg_id, "
+                    "attrezzo, presi, usati, bulloni) VALUES(?,?,1,0,0)",
+                    (int(tg_id), a["id"]))
+
+
+def _tappo_stato(con, tg_id: int, adesso: int) -> dict:
+    """Tutto quel che la pagina del gioco disegna, in una risposta: la
+    dispensa coi barattoli, i gradi, la caccia di oggi (se e' partita),
+    lo zaino, la bottega e le sfide. IL NASCONDIGLIO NON C'E', finche'
+    non e' stato trovato: dopo esce col titolo, cosi' la pagina puo'
+    dire dov'era. Scrive il corredo e le sfide maturate (idempotenti,
+    come la passata dei distintivi di /api/me). Niente commit."""
+    giorno = _giorno_roma(adesso)
+    _tappo_corredo(con, tg_id)
+    riga, nascondiglio = _tappo_oggi(con, tg_id, adesso)
+    numeri = _tappo_numeri(con, tg_id)
+    _tappo_passa_sfide(con, tg_id, adesso, numeri)
+    aperto = _tappo_gradi_aperti(numeri["per_grado"])
+    presi = _tappo_oggetti_di(con, tg_id)
+    u = con.execute("SELECT tappo_oggetto, tappo_palco FROM utenti WHERE "
+                    "tg_id=?", (int(tg_id),)).fetchone()
+    in_vetrina = {}
+    for r in con.execute(
+            "SELECT a.categoria, COUNT(*) FROM annunci a WHERE "
+            f"{_TAPPO_SQL_VETRINA} AND a.venditore_id<>? GROUP BY a.categoria",
+            (int(tg_id),)):
+        s = _tappo_scaffale_di(r[0])
+        in_vetrina[s] = in_vetrina.get(s, 0) + int(r[1])
+    pagate = {r[0] for r in con.execute(
+        "SELECT sfida FROM gioco_tappo_sfide WHERE tg_id=?", (int(tg_id),))}
+    zaino = {r["attrezzo"]: max(0, int(r["presi"]) - int(r["usati"]))
+             for r in con.execute("SELECT attrezzo, presi, usati FROM "
+                                  "gioco_tappo_attrezzi WHERE tg_id=?",
+                                  (int(tg_id),))}
+    usati_oggi = ([x for x in str(riga["attrezzi"] or "").split(",") if x]
+                  if riga else [])
+    stato = {
+        "giorno": giorno,
+        "saldo": max(0, _tappo_saldo(con, tg_id)),
+        "trovate": numeri["trovate"],
+        "grado_max": aperto,
+        "gradi": [dict(
+            n=g["n"], emoji=g["emoji"], nome=g["nome"],
+            occhiate=g["occhiate"], tappe=g["tappe"], calore=g["calore"],
+            premio=g["premio"], calo=g["calo"], serve=g["serve"],
+            aperto=g["n"] <= aperto,
+            # quanti ritrovamenti mancano per aprirlo (0 = aperto)
+            mancano=max(0, g["serve"] - sum(
+                v for k, v in numeri["per_grado"].items()
+                if k >= g["n"] - 1)) if g["n"] > aperto else 0,
+        ) for g in GIOCO_TAPPO_GRADI],
+        "scaffali": [dict(
+            n=s["n"], emoji=s["emoji"], nome=s["nome"],
+            annunci=in_vetrina.get(s["n"], 0),
+            barattoli=[dict(categoria=c,
+                            volte=numeri["per_barattolo"].get(c, 0),
+                            metallo=_tappo_metallo(
+                                numeri["per_barattolo"].get(c, 0)))
+                       for c in s["categorie"]],
+        ) for s in GIOCO_TAPPO_SCAFFALI],
+        "barattoli_accesi": numeri["barattoli"],
+        "barattoli_totale": sum(len(s["categorie"])
+                                for s in GIOCO_TAPPO_SCAFFALI),
+        "caccia": None,
+        "attrezzi": [dict(id=a["id"], emoji=a["emoji"], nome=a["nome"],
+                          cosa=a["cosa"], bulloni=a["bulloni"],
+                          quanti=zaino.get(a["id"], 0),
+                          usato_oggi=a["id"] in usati_oggi)
+                     for a in GIOCO_TAPPO_ATTREZZI],
+        "oggetti": [dict(id=o["id"], tipo=o["tipo"], emoji=o["emoji"],
+                         nome=o["nome"], bulloni=o["bulloni"],
+                         mio=o["id"] in presi) for o in GIOCO_TAPPO_OGGETTI],
+        "indossato": (u["tappo_oggetto"] or "") if u and (
+            u["tappo_oggetto"] or "") in presi else "",
+        "palco": (u["tappo_palco"] or "") if u and (
+            u["tappo_palco"] or "") in presi else "",
+        "sfide": [dict(
+            id=f["id"], emoji=f["emoji"], nome=f["nome"],
+            valore=int(numeri.get(f["conta"]) or 0),
+            soglie=[dict(
+                n=n, bulloni=b, fatta=f"{f['id']}:{n}" in pagate,
+                cosa=f["cosa"].format(n=(
+                    _tappo_grado(n)["nome"] if f.get("nomi") == "gradi"
+                    else _fmt_sats(n))))
+                for n, b in f["soglie"]],
+        ) for f in GIOCO_TAPPO_SFIDE],
+        # il tetto del barattolo, che l'oggetto «posti» allarga: la
+        # pagina lo adotta subito, senza aspettare il prossimo /api/me
+        "max_barattolo": max_barattolo_di(con, tg_id),
+    }
+    stato["sfide_fatte"] = sum(1 for f in stato["sfide"]
+                               for s in f["soglie"] if s["fatta"])
+    stato["sfide_totale"] = sum(len(f["soglie"]) for f in stato["sfide"])
+    if riga:
+        g = _tappo_grado(riga["grado"])
+        aperta = bool(nascondiglio) and not riga["trovato"]
+        indizi = (_tappo_indizi(dict(nascondiglio), g["n"], riga["indizi"],
+                                f"{nascondiglio['id']}:{giorno}")
+                  if aperta else [])
+        massimo = _tappo_occhiate_max(g["n"], riga["attrezzi"])
+        stato["caccia"] = {
+            "scaffale": int(riga["scaffale"] or 0),
+            "grado": g["n"],
+            "tappa": int(riga["tappa"] or 1),
+            "tappe": int(riga["tappe"] or 1),
+            "trovato": bool(riga["trovato"]),
+            # Tappo oggi non ha dove nascondersi (vetrina vuota)
+            "vuoto": not nascondiglio and not riga["trovato"],
+            "bulloni": int(riga["bulloni"] or 0),
+            "indizi": indizi,
+            "indizi_max": GIOCO_TAPPO_INDIZI,
+            "premio": _tappo_premio(g["n"], riga["aiuti"]),
+            "calo": g["calo"],
+            "occhiate": max(0, massimo - int(riga["occhiate"] or 0)),
+            "occhiate_max": massimo,
+            "sbagli": int(riga["sbagli"] or 0),
+            "attrezzi": usati_oggi,
+            "calore": bool(g["calore"] or "calamita" in usati_oggi),
+            # il barattolo esce da solo SOLO se un indizio l'ha gia'
+            # detto: e' quel che fa aprire quel reparto a «Vai a cercare»
+            "categoria": (_tappo_barattolo_di(nascondiglio["categoria"])
+                          if aperta and any(i["tipo"] == "barattolo"
+                                            for i in indizi) else ""),
+            "secondi": (max(0, int(riga["trovato"]) - int(riga["partito"] or 0))
+                        if riga["trovato"] else 0),
+            # il barattolo che il ritrovamento di oggi ha acceso
+            "barattolo": (riga["categoria"] or "") if riga["trovato"] else "",
+        }
+        if riga["trovato"] and nascondiglio:
+            stato["caccia"]["annuncio"] = {"id": nascondiglio["id"],
+                                           "titolo": nascondiglio["titolo"] or ""}
+    return stato
+
+
+async def _tappo_avvisa_venditore(venditore_id: int, annuncio_id: int,
+                                  titolo: str):
+    """Dice a chi vende che oggi Tappo era nascosto da lui. ANONIMO — mai
+    chi l'ha trovato ne' quanti, la regola dell'avviso «ha fatto colpo» —
+    e fail-open: un avviso non deve poter rompere una partita."""
+    try:
+        await notifica(venditore_id, (
+            "🔩 Tappo si è nascosto nel tuo annuncio!\n"
+            f"<b>{html.escape(titolo or 'Il tuo annuncio')}</b>: qualcuno "
+            "l'ha appena trovato lì, giocando alla Caccia a Tappo.\n"
+            "È il gioco di Barattolo: ogni giorno porta dei curiosi in più "
+            "sugli annunci in vetrina. Tu non devi fare niente.\n"
+            f"{link_telegram('annuncio', annuncio_id)}"))
+    except Exception as e:
+        print(f"⚠️ Avviso della Caccia a Tappo saltato "
+              f"(venditore {venditore_id}): {e}")
+
+
+def _tappo_da_avvisare(con, nascondiglio, giorno: str, adesso: int) -> bool:
+    """Si avvisa il venditore? Solo chi vende DA Barattolo (un importato
+    da Nostr non ha una chat con noi), e solo se questo e' il PRIMO
+    ritrovamento fra i suoi annunci negli ultimi GIOCO_TAPPO_AVVISO_GIORNI
+    giorni: dieci persone che lo trovano da lui in una settimana non sono
+    dieci messaggi. Si chiama DOPO aver scritto il ritrovamento, quindi
+    «il primo» vuol dire che ce n'e' uno solo: questo."""
+    if (nascondiglio["contatto_nostr"] or "") != "":
+        return False
+    da = _giorno_roma(adesso - (GIOCO_TAPPO_AVVISO_GIORNI - 1) * 86400)
+    quanti = con.execute(
+        "SELECT COUNT(*) FROM gioco_tappo g JOIN annunci a "
+        "ON a.id = g.annuncio_id WHERE g.trovato>0 AND g.giorno>=? "
+        "AND a.venditore_id=?", (da, nascondiglio["venditore_id"])).fetchone()[0]
+    return quanti == 1
+
+
+@app.get("/api/gioco/tappo")
+async def gioco_tappo_stato(x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """La pagina del gioco. Scrive il corredo (la prima volta) e le
+    sfide maturate — su una GET, come la passata dei distintivi di
+    /api/me: idempotenti. `async` apposta: senza un await fra la lettura
+    e la scrittura, nel server mono-processo il blocco e' atomico (il
+    patto del barattolo)."""
+    _tappo_acceso()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        stato = _tappo_stato(con, user["id"], int(time.time()))
+        con.commit()
+    finally:
+        con.close()
+    return stato
+
+
+@app.post("/api/gioco/tappo/parti")
+async def gioco_tappo_parti(req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """La caccia di oggi PARTE: `scaffale` (dove cacciare) e `grado`
+    (0 = il piu' alto aperto). Una al giorno: se e' gia' partita la
+    risposta e' lo stato com'e', e scaffale e grado non si cambiano piu'
+    — sennò basterebbe ripartire per farsi ridare indizi nuovi."""
+    _tappo_acceso()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("tappo_oggetto", user["id"])
+    d = await leggi_json(req)
+    try:
+        scaffale, grado = int(d.get("scaffale") or 0), int(d.get("grado") or 0)
+    except (TypeError, ValueError):
+        scaffale, grado = 0, 0
+    if scaffale not in {s["n"] for s in GIOCO_TAPPO_SCAFFALI}:
+        raise HTTPException(400, "Scegli uno scaffale della dispensa")
+    con = db()
+    try:
+        adesso = int(time.time())
+        giorno = _giorno_roma(adesso)
+        riga, _n = _tappo_oggi(con, user["id"], adesso)
+        if not riga:
+            aperto = _tappo_gradi_aperti(
+                _tappo_numeri(con, user["id"])["per_grado"])
+            grado = grado or aperto
+            if grado > aperto or grado < 1:
+                raise HTTPException(400, "Questo grado non è ancora aperto")
+            scelto = _tappo_pesca(
+                _tappo_candidati(con, user["id"], giorno, scaffale),
+                secrets.randbelow)
+            if not scelto:
+                raise HTTPException(400, "Su questo scaffale oggi non c'è "
+                                         "nessun annuncio: scegline un altro")
+            con.execute(
+                "INSERT OR IGNORE INTO gioco_tappo(tg_id, giorno, annuncio_id, "
+                "scaffale, grado, tappe, partito, creato) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (user["id"], giorno, scelto, scaffale, grado,
+                 _tappo_grado(grado)["tappe"], adesso, adesso))
+        stato = _tappo_stato(con, user["id"], adesso)
+        con.commit()
+    finally:
+        con.close()
+    return stato
+
+
+@app.post("/api/gioco/tappo/indizio")
+async def gioco_tappo_indizio(x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """Un indizio in piu', PAGATO: abbassa il premio del `calo` del
+    grado. Oltre l'ultimo, a caccia non partita o a Tappo gia' trovato
+    non succede niente: la risposta e' lo stato com'e'. (Quello gratis
+    lo apre la lampadina, da `/api/gioco/tappo/attrezzo`.)"""
+    _tappo_acceso()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("tappo_oggetto", user["id"])
+    con = db()
+    try:
+        adesso = int(time.time())
+        riga, nascondiglio = _tappo_oggi(con, user["id"], adesso)
+        if (riga and nascondiglio and not riga["trovato"]
+                and riga["indizi"] < GIOCO_TAPPO_INDIZI):
+            con.execute("UPDATE gioco_tappo SET indizi=indizi+1, "
+                        "aiuti=aiuti+1 WHERE tg_id=? AND giorno=?",
+                        (user["id"], riga["giorno"]))
+        stato = _tappo_stato(con, user["id"], adesso)
+        con.commit()
+    finally:
+        con.close()
+    return stato
+
+
+@app.post("/api/gioco/tappo/attrezzo")
+async def gioco_tappo_attrezzo(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """Gli attrezzi dello zaino. `azione`: 'prendi' (uno in piu', coi
+    bulloni) o 'usa' (uno in meno, nella caccia di OGGI: al piu' uno per
+    tipo al giorno). La torcia riapre anche una caccia rimasta senza
+    occhiate — e' il suo mestiere."""
+    _tappo_acceso()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("tappo_oggetto", user["id"])
+    d = await leggi_json(req)
+    azione = str(d.get("azione") or "")
+    attrezzo = next((a for a in GIOCO_TAPPO_ATTREZZI
+                     if a["id"] == str(d.get("attrezzo") or "")), None)
+    if azione not in ("prendi", "usa") or not attrezzo:
+        raise HTTPException(400, "Questo attrezzo non c'è")
+    con = db()
+    try:
+        adesso = int(time.time())
+        _tappo_corredo(con, user["id"])
+        r = con.execute("SELECT presi, usati FROM gioco_tappo_attrezzi WHERE "
+                        "tg_id=? AND attrezzo=?",
+                        (user["id"], attrezzo["id"])).fetchone()
+        quanti = max(0, int(r["presi"]) - int(r["usati"])) if r else 0
+        if azione == "prendi":
+            if quanti >= GIOCO_TAPPO_ATTREZZI_MAX:
+                raise HTTPException(400, "Nello zaino non ce ne stanno altri")
+            if _tappo_saldo(con, user["id"]) < attrezzo["bulloni"]:
+                raise HTTPException(400, "Non hai ancora abbastanza bulloni "
+                                         "🔩: trova Tappo qualche altra volta")
+            con.execute(
+                "INSERT INTO gioco_tappo_attrezzi(tg_id, attrezzo, presi, "
+                "usati, bulloni) VALUES(?,?,1,0,?) ON CONFLICT(tg_id, attrezzo) "
+                "DO UPDATE SET presi=presi+1, bulloni=bulloni+excluded.bulloni",
+                (user["id"], attrezzo["id"], attrezzo["bulloni"]))
+        else:
+            riga, nascondiglio = _tappo_oggi(con, user["id"], adesso)
+            if not riga or not nascondiglio or riga["trovato"]:
+                raise HTTPException(400, "Gli attrezzi si usano durante la "
+                                         "caccia: oggi non ce n'è una aperta")
+            usati = [x for x in str(riga["attrezzi"] or "").split(",") if x]
+            if attrezzo["id"] in usati:
+                raise HTTPException(400, f"{attrezzo['nome']}: oggi l'hai già "
+                                         "usata. Una al giorno")
+            if quanti < 1:
+                raise HTTPException(400, f"Nello zaino non hai una "
+                                         f"{attrezzo['nome'].lower()}: si "
+                                         "prende in bottega")
+            if (attrezzo["id"] == "lampadina"
+                    and riga["indizi"] >= GIOCO_TAPPO_INDIZI):
+                raise HTTPException(400, "Gli indizi sono già tutti aperti")
+            if (attrezzo["id"] == "calamita"
+                    and _tappo_grado(riga["grado"])["calore"]):
+                raise HTTPException(400, "A questo grado Tappo ti dice già "
+                                         "se sei vicino: la calamita serve dal "
+                                         "Detective in su")
+            con.execute("UPDATE gioco_tappo_attrezzi SET usati=usati+1 WHERE "
+                        "tg_id=? AND attrezzo=?", (user["id"], attrezzo["id"]))
+            con.execute(
+                "UPDATE gioco_tappo SET attrezzi=?, indizi=indizi+? WHERE "
+                "tg_id=? AND giorno=?",
+                (",".join(usati + [attrezzo["id"]]),
+                 1 if attrezzo["id"] == "lampadina" else 0,
+                 user["id"], riga["giorno"]))
+        stato = _tappo_stato(con, user["id"], adesso)
+        con.commit()
+    finally:
+        con.close()
+    return stato
+
+
+@app.post("/api/gioco/tappo/guarda")
+async def gioco_tappo_guarda(req: Request, x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """«Tappo è qui?»: un'occhiata dentro un annuncio. `esito`:
+    'trovato' (la caccia e' finita), 'biglietto' (era qui, ma la pista
+    continua: e' scappato in un altro annuncio dello scaffale), 'no'
+    (con `calore`, se il grado o la calamita lo danno), 'finite' (le
+    occhiate di oggi) o 'gia' (trovato prima) — con lo stato aggiornato
+    e, su 'trovato', le `sfide_nuove` appena pagate. Un'occhiata si
+    consuma solo se e' stata data davvero: il proprio annuncio, un
+    annuncio che non c'e' e una caccia non partita non costano niente."""
+    _tappo_acceso()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("tappo_guarda", user["id"])
+    d = await leggi_json(req)
+    try:
+        annuncio_id = int(d.get("annuncio_id") or 0)
+    except (TypeError, ValueError):
+        annuncio_id = 0
+    avviso, calore, nuove = None, "", []
+    con = db()
+    try:
+        adesso = int(time.time())
+        riga, nascondiglio = _tappo_oggi(con, user["id"], adesso)
+        if not riga:
+            raise HTTPException(400, "La caccia di oggi non è ancora partita: "
+                                     "apri «Caccia a Tappo» dal Profilo e "
+                                     "scegli uno scaffale")
+        guardato = _tappo_annuncio(con, annuncio_id)
+        if not guardato or guardato["stato"] not in ("attivo", "venduto"):
+            raise HTTPException(404, "Annuncio non trovato")
+        if guardato["venditore_id"] == user["id"]:
+            raise HTTPException(400, "Nei tuoi annunci Tappo non si "
+                                     "nasconde mai")
+        dove = (user["id"], riga["giorno"])
+        if riga["trovato"]:
+            esito = "gia"
+        elif riga["occhiate"] >= _tappo_occhiate_max(riga["grado"],
+                                                     riga["attrezzi"]):
+            esito = "finite"
+        elif _tappo_e_qui(nascondiglio, guardato):
+            fatte = _tappo_pista(riga) + [int(nascondiglio["id"])]
+            prossimo = 0
+            if riga["tappa"] < riga["tappe"]:
+                prossimo = _tappo_pesca(
+                    _tappo_candidati(con, user["id"], riga["giorno"],
+                                     riga["scaffale"], fatte),
+                    secrets.randbelow)
+            if prossimo:
+                # LA PISTA: era qui, ma e' scappato. La tappa nuova
+                # riparte dal suo primo indizio; le occhiate no.
+                esito = "biglietto"
+                con.execute(
+                    "UPDATE gioco_tappo SET occhiate=occhiate+1, "
+                    "annuncio_id=?, pista=?, tappa=tappa+1, indizi=1 WHERE "
+                    "tg_id=? AND giorno=?",
+                    (prossimo, ",".join(str(x) for x in fatte), *dove))
+            else:
+                # trovato davvero. Se la pista si e' accorciata (sullo
+                # scaffale non c'era un altro annuncio) le tappe sono
+                # quelle FATTE: «Sulla pista» non si regala.
+                esito = "trovato"
+                con.execute(
+                    "UPDATE gioco_tappo SET occhiate=occhiate+1, trovato=?, "
+                    "bulloni=?, categoria=?, tappe=tappa WHERE tg_id=? AND "
+                    "giorno=?",
+                    (adesso, _tappo_premio(riga["grado"], riga["aiuti"]),
+                     _tappo_barattolo_di(nascondiglio["categoria"]), *dove))
+                nuove = _tappo_passa_sfide(con, user["id"], adesso)
+                if _tappo_da_avvisare(con, nascondiglio, riga["giorno"], adesso):
+                    avviso = (nascondiglio["venditore_id"], nascondiglio["id"],
+                              nascondiglio["titolo"] or "")
+        else:
+            esito = "no"
+            con.execute("UPDATE gioco_tappo SET occhiate=occhiate+1, "
+                        "sbagli=sbagli+1 WHERE tg_id=? AND giorno=?", dove)
+            usati = {x for x in str(riga["attrezzi"] or "").split(",") if x}
+            if nascondiglio and (_tappo_grado(riga["grado"])["calore"]
+                                 or "calamita" in usati):
+                calore = _tappo_calore(dict(nascondiglio), dict(guardato))
+        stato = _tappo_stato(con, user["id"], adesso)
+        con.commit()
+    finally:
+        con.close()
+    # dopo il commit e in sottofondo: chi gioca non aspetta Telegram
+    if avviso:
+        asyncio.create_task(_tappo_avvisa_venditore(*avviso))
+    return {"esito": esito, "calore": calore, "sfide_nuove": nuove, **stato}
+
+
+@app.post("/api/gioco/tappo/oggetto")
+async def gioco_tappo_oggetto(req: Request, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """Prendere un oggetto coi bulloni, o cambiare cappello e sfondo a
+    Tappo. `azione`: 'prendi' (si paga, una volta sola), 'indossa' (un
+    cappello o uno sfondo gia' preso), 'togli' (si torna a testa nuda, o
+    allo sfondo di casa). Il saldo si conta QUI, dal database: dal
+    client arriva solo il nome dell'oggetto, mai una cifra."""
+    _tappo_acceso()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("tappo_oggetto", user["id"])
+    d = await leggi_json(req)
+    azione = str(d.get("azione") or "")
+    oggetto = next((o for o in GIOCO_TAPPO_OGGETTI
+                    if o["id"] == str(d.get("oggetto") or "")), None)
+    if azione not in ("prendi", "indossa", "togli") or not oggetto:
+        raise HTTPException(400, "Questo oggetto non c'è")
+    # dove si scrive quel che si indossa: il cappello e lo sfondo
+    colonna = {"cappello": "tappo_oggetto", "palco": "tappo_palco"}.get(
+        oggetto["tipo"])
+    con = db()
+    try:
+        adesso = int(time.time())
+        presi = _tappo_oggetti_di(con, user["id"])
+        if azione == "prendi":
+            if oggetto["id"] in presi:
+                raise HTTPException(400, "Questo l'hai già preso")
+            if _tappo_saldo(con, user["id"]) < oggetto["bulloni"]:
+                raise HTTPException(400, "Non hai ancora abbastanza bulloni "
+                                         "🔩: trova Tappo qualche altra volta")
+            con.execute("INSERT INTO gioco_tappo_oggetti(tg_id, oggetto, "
+                        "bulloni, creato) VALUES(?,?,?,?)",
+                        (user["id"], oggetto["id"], oggetto["bulloni"], adesso))
+            # un cappello (o uno sfondo) appena preso si mette subito
+            if colonna:
+                con.execute(f"UPDATE utenti SET {colonna}=? WHERE tg_id=?",
+                            (oggetto["id"], user["id"]))
+        elif not colonna or oggetto["id"] not in presi:
+            raise HTTPException(400, "Questo non l'hai ancora preso, o non "
+                                     "si indossa")
+        else:
+            con.execute(f"UPDATE utenti SET {colonna}=? WHERE tg_id=?",
+                        (oggetto["id"] if azione == "indossa" else "",
+                         user["id"]))
+        stato = _tappo_stato(con, user["id"], adesso)
+        con.commit()
+    finally:
+        con.close()
+    return stato
+
+
+# (Qui finisce il blocco della Caccia a Tappo. La riga non e' un vezzo:
+# le prove ritagliano una funzione fino alle due righe vuote che la
+# seguono, e l'ultima del file senza niente dopo non si ritaglia.)

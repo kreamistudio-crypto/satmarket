@@ -159,6 +159,7 @@ collaudo_assistente_bot
 collaudo_cancella_account
 collaudo_wallet_unico
 collaudo_assistenza
+collaudo_caccia_a_tappo
 collaudo_unione_seme
 collaudo_domande_compratore
 

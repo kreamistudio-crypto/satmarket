@@ -2158,6 +2158,14 @@ ACCOUNT_CANCELLABILE = False
 # (al piu' uno ogni 10 minuti per conversazione). SPENTA di serie: si
 # accende dopo la prova sulla VM di collaudo.
 ASSISTENZA_ATTIVA = False
+# LA CACCIA A TAPPO (17 nov 2026, richiesta di Andrea: «un gioco di
+# barattolo con dentro Tappo»): nel Profilo → Livello la voce «🔩 Caccia
+# a Tappo». Ogni giorno Tappo si nasconde in un annuncio vero, diverso
+# per ognuno: la dispensa a sei scaffali, sei gradi, le sfide, lo zaino.
+# Si vincono BULLONI, che non sono sats e non danno XP. ACCESA di serie
+# (decisione del 14 nov 2026 sulle leve nuove): False la spegne — le
+# rotte rispondono 404, quel che uno ha gia' preso resta.
+GIOCO_TAPPO_ATTIVO = True
 
 # ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot): sul web e
 # nella PWA «Entra con Telegram» apre il bot con un codice monouso, e

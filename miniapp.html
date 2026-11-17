@@ -3701,6 +3701,331 @@
       overflow-wrap:anywhere}
     .assist-pallino{display:inline-block;width:9px;height:9px;border-radius:50%;
       background:var(--danger);margin-left:6px;vertical-align:middle}
+    /* LA CACCIA A TAPPO (17 nov 2026): la pagina del gioco. E' UN MONDO
+       A PARTE — la dispensa di Tappo, di notte — ed e' scuro nei DUE
+       temi, apposta: il Tappo ufficiale e' nato su fondo nero e i
+       barattoli devono potersi ACCENDERE (bronzo, argento, oro), e una
+       luce si vede solo al buio. I colori sono suoi (--c-*), non quelli
+       di casa: qui dentro non c'e' un prezzo, un ordine, un tasto che
+       muove sats — niente che debba somigliare al mercatino.
+       SI MUOVE SOLO CON transform E opacity (Tappo che dondola, le
+       stelle, la festa): niente che ridisegni la pagina a ogni
+       fotogramma. Con gli effetti ridotti sta tutto fermo. */
+    #view-caccia,.caccia-velo{--c-notte:#0A0F1F;--c-notte2:#141B36;--c-carta:rgba(255,255,255,.065);
+      --c-riga:rgba(255,255,255,.13);--c-ink:#F5F0E6;--c-muto:#A7AFC8;--c-ambra:#F7931A;
+      --c-ambra2:#FFC56B;--c-legno:#8A5A33;--c-legno2:#55361D;--c-bronzo:#D9905A;
+      --c-argento:#DCE3EC;--c-oro:#FFD25A;--c-verde:#5BE3A4;
+      color:var(--c-ink)}
+    /* (i colori valgono anche nel VELO della festa, che sta sul body:
+       senza, il tasto arancione li' dentro nascerebbe senza colore) */
+    .caccia-mondo{position:relative;min-height:calc(100vh / var(--fs-zoom,1) - 80px);padding:0 var(--pad) 46px;
+      background:radial-gradient(120% 60% at 50% -10%,#28346A 0%,rgba(40,52,106,0) 60%),
+        linear-gradient(180deg,var(--c-notte2) 0%,var(--c-notte) 38%,#070A16 100%);
+      overflow:hidden;overflow:clip}
+    /* (`clip` e non solo `hidden`: un antenato con overflow:hidden e'
+       un contenitore di scorrimento, e li' dentro il «Caccia qui»
+       appiccicato in fondo non si appiccica piu'. Chi non conosce clip
+       tiene hidden: il tasto resta in fondo alla dispensa.) */
+    /* le stelle: due strati di puntini, uno fermo e uno che respira */
+    .caccia-mondo::before,.caccia-mondo::after{content:"";position:absolute;inset:0 0 auto 0;height:520px;
+      pointer-events:none;background-repeat:repeat;opacity:.7;
+      background-image:radial-gradient(1.2px 1.2px at 12% 18%,#fff 50%,transparent 51%),
+        radial-gradient(1px 1px at 31% 42%,#cfd8ff 50%,transparent 51%),
+        radial-gradient(1.4px 1.4px at 58% 12%,#fff 50%,transparent 51%),
+        radial-gradient(1px 1px at 77% 33%,#ffe9c2 50%,transparent 51%),
+        radial-gradient(1.2px 1.2px at 91% 9%,#fff 50%,transparent 51%),
+        radial-gradient(1px 1px at 44% 71%,#cfd8ff 50%,transparent 51%);
+      background-size:260px 260px;
+      -webkit-mask-image:linear-gradient(180deg,#000 0%,transparent 100%);
+      mask-image:linear-gradient(180deg,#000 0%,transparent 100%)}
+    .caccia-mondo::after{background-size:190px 190px;background-position:70px 40px;opacity:.5;
+      animation:caccia-stelle 5.5s ease-in-out infinite alternate}
+    .caccia-mondo>*{position:relative;z-index:1}
+    .caccia-dentro{max-width:600px;margin:0 auto}
+    .caccia-testa{display:flex;align-items:center;gap:10px;padding:12px 0 10px}
+    .caccia-testa h3{flex:1 1 auto;margin:0;font-size:23px;line-height:1.1;letter-spacing:.2px;color:var(--c-ink)}
+    .caccia-x{flex:none;width:38px;height:38px;border-radius:50%;border:1px solid var(--c-riga);
+      background:var(--c-carta);color:var(--c-ink);font-size:15px;line-height:1;cursor:pointer}
+    .caccia-saldo{flex:none;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;
+      border:1px solid rgba(247,147,26,.55);background:rgba(247,147,26,.14);color:var(--c-ambra2);
+      font-weight:800;font-size:16px;font-variant-numeric:tabular-nums}
+    .caccia-saldo.su{animation:caccia-pop .5s cubic-bezier(.2,1.6,.4,1)}
+
+    /* IL PALCO: dove sta Tappo. Lo sfondo e' un oggetto della bottega
+       (.alba, .luna, .aurora); la mensola davanti e' quella da dietro
+       cui SBIRCIA quando e' scappato. */
+    .caccia-palco{position:relative;display:flex;align-items:flex-end;gap:4px;min-height:206px;
+      padding:14px 14px 30px;border-radius:24px;overflow:hidden;border:1px solid var(--c-riga);
+      background:radial-gradient(90% 80% at 24% 100%,rgba(247,147,26,.28) 0%,rgba(247,147,26,0) 62%),
+        linear-gradient(180deg,#1B2550 0%,#0D1330 100%);
+      box-shadow:0 18px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08)}
+    .caccia-palco.alba{background:radial-gradient(90% 70% at 24% 100%,rgba(255,197,107,.5) 0%,rgba(255,197,107,0) 65%),
+      linear-gradient(180deg,#2A2258 0%,#7C3D63 52%,#E9824A 100%)}
+    .caccia-palco.luna{background:radial-gradient(circle at 82% 24%,#FFF6D2 0 22px,rgba(255,246,210,.22) 23px 44px,transparent 45px),
+      radial-gradient(90% 80% at 24% 100%,rgba(140,170,255,.25) 0%,transparent 62%),
+      linear-gradient(180deg,#14204A 0%,#070B1B 100%)}
+    .caccia-palco.aurora{background:radial-gradient(90% 80% at 24% 100%,rgba(91,227,164,.3) 0%,transparent 62%),
+      linear-gradient(155deg,#071124 0%,#0C4250 30%,#1BA57C 47%,#5C40AA 66%,#0A0F24 100%)}
+    .caccia-palco::after{content:"";position:absolute;left:0;right:0;bottom:0;height:22px;z-index:3;
+      background:linear-gradient(180deg,#A16B3E 0%,var(--c-legno) 22%,var(--c-legno2) 100%);
+      box-shadow:0 -1px 0 rgba(255,255,255,.18) inset,0 -8px 18px rgba(0,0,0,.35)}
+    .caccia-tappo{--tw:146px;position:relative;flex:none;width:var(--tw);aspect-ratio:560/721;z-index:2;
+      margin-bottom:-12px;transform-origin:50% 100%;animation:caccia-dondola 4.2s ease-in-out infinite}
+    .caccia-tappo img{display:block;width:100%;height:100%;filter:drop-shadow(0 10px 14px rgba(0,0,0,.5))}
+    /* le due luci di Tappo: il pallino dell'antenna e la saetta */
+    .caccia-tappo i{position:absolute;border-radius:50%;pointer-events:none;mix-blend-mode:screen;
+      background:radial-gradient(circle,rgba(255,190,90,.95) 0%,rgba(255,150,40,.35) 45%,transparent 70%);
+      animation:caccia-luce 2.4s ease-in-out infinite}
+    .caccia-tappo i.a{left:42.1%;top:6.4%;width:26%;aspect-ratio:1;transform:translate(-50%,-50%)}
+    .caccia-tappo i.b{left:59.6%;top:58.5%;width:44%;aspect-ratio:1;transform:translate(-50%,-50%);animation-delay:.8s}
+    .caccia-cappello{position:absolute;left:45.2%;top:17.5%;transform:translate(-50%,-80%) rotate(-4deg);
+      font-size:calc(var(--tw) * .36);line-height:1;pointer-events:none;z-index:2;
+      filter:drop-shadow(0 3px 3px rgba(0,0,0,.6))}
+    /* SCAPPATO: resta dietro la mensola, e ogni tanto tira su gli occhi */
+    .caccia-tappo.sbircia{margin-bottom:-22px;transform:translateY(52%);animation:caccia-sbircia 7s ease-in-out infinite}
+    .caccia-tappo.sbircia i.b{display:none}
+    .caccia-fumetto{position:relative;flex:1 1 auto;min-width:0;align-self:center;margin:0 0 26px 2px;
+      padding:11px 13px;border-radius:18px;background:rgba(255,255,255,.96);color:#1C1F24;
+      font-size:14.5px;line-height:1.36;box-shadow:0 8px 20px rgba(0,0,0,.35);
+      animation:caccia-entra .45s cubic-bezier(.2,1.3,.4,1) both}
+    .caccia-fumetto::before{content:"";position:absolute;left:-7px;bottom:22px;width:16px;height:16px;
+      background:inherit;transform:rotate(45deg);border-radius:3px}
+    .caccia-fumetto b{color:#B85C00}
+    .caccia-bolli{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 0}
+    .caccia-bolli span{padding:5px 10px;border-radius:999px;border:1px solid var(--c-riga);background:var(--c-carta);
+      color:var(--c-ink);font-size:12.5px;line-height:1.2;white-space:nowrap}
+    .caccia-bolli b{color:var(--c-ambra2)}
+
+    /* LE SCHEDE: Caccia, Sfide, Zaino, Bottega */
+    .caccia-schede{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:14px 0 12px;padding:4px;
+      border-radius:16px;background:rgba(0,0,0,.35);border:1px solid var(--c-riga)}
+    .caccia-schede button{padding:8px 2px 7px;border:0;border-radius:12px;background:transparent;color:var(--c-muto);
+      font:inherit;font-size:12.5px;font-weight:700;line-height:1.15;cursor:pointer;
+      transition:background .18s ease,color .18s ease,transform .18s ease}
+    .caccia-schede button span{display:block;font-size:19px;margin-bottom:2px}
+    .caccia-schede button.qui{background:linear-gradient(180deg,#FFB24A,var(--c-ambra));color:#1C1F24;
+      box-shadow:0 6px 14px rgba(247,147,26,.35)}
+    .caccia-schede button:active{transform:scale(.96)}
+    .caccia-h{margin:16px 0 4px;font-size:18px;font-weight:800;color:var(--c-ink)}
+    .caccia-sotto{margin:0 0 10px;font-size:13.5px;line-height:1.4;color:var(--c-muto)}
+    .caccia-carta{margin:0 0 10px;padding:12px 13px;border-radius:18px;border:1px solid var(--c-riga);
+      background:var(--c-carta);color:var(--c-ink)}
+    .caccia-btn{display:block;width:100%;margin:10px 0 0;padding:14px 16px;border:0;border-radius:16px;
+      background:linear-gradient(180deg,#FFB24A,var(--c-ambra));color:#1C1F24;font:inherit;font-size:16.5px;
+      font-weight:800;cursor:pointer;box-shadow:0 10px 22px rgba(247,147,26,.32);
+      transition:transform .15s ease,filter .15s ease}
+    .caccia-btn:active{transform:scale(.97)}
+    .caccia-btn:disabled{filter:grayscale(1);opacity:.5;cursor:default;box-shadow:none}
+    .caccia-btn.piano{background:var(--c-carta);color:var(--c-ink);border:1px solid var(--c-riga);box-shadow:none;
+      font-weight:700;font-size:15px}
+    .caccia-btn.stretto{display:inline-block;width:auto;margin:0;padding:8px 13px;border-radius:12px;font-size:13.5px;
+      box-shadow:none}
+
+    /* I GRADI: una scala che si scorre di lato */
+    .caccia-gradi{display:flex;gap:8px;margin:0 calc(var(--pad) * -1) 6px;padding:2px var(--pad) 8px;overflow-x:auto;
+      scroll-snap-type:x proximity;scrollbar-width:none}
+    .caccia-gradi::-webkit-scrollbar{display:none}
+    .caccia-grado{flex:none;width:118px;padding:10px 10px 9px;border-radius:16px;border:1px solid var(--c-riga);
+      background:var(--c-carta);color:var(--c-ink);font:inherit;text-align:left;cursor:pointer;scroll-snap-align:start;
+      transition:transform .18s ease,border-color .18s ease,background .18s ease}
+    .caccia-grado .em{display:block;font-size:26px;line-height:1.1}
+    .caccia-grado b{display:block;margin-top:3px;font-size:15px}
+    .caccia-grado small{display:block;margin-top:2px;font-size:11.5px;line-height:1.3;color:var(--c-muto)}
+    .caccia-grado.scelto{border-color:var(--c-ambra);background:rgba(247,147,26,.16);transform:translateY(-3px);
+      box-shadow:0 10px 20px rgba(247,147,26,.2)}
+    .caccia-grado.chiuso{opacity:.55}
+    .caccia-grado.chiuso .em{filter:grayscale(1)}
+
+    /* LA DISPENSA: sei mensole, e sopra ognuna i suoi barattoli */
+    .caccia-dispensa{margin:6px 0 0}
+    .caccia-scaffale{display:block;width:100%;margin:0 0 14px;padding:8px 8px 0;border:1px solid transparent;
+      border-radius:18px;background:transparent;color:var(--c-ink);font:inherit;text-align:left;
+      transition:transform .2s ease,background .2s ease,border-color .2s ease,opacity .2s ease}
+    button.caccia-scaffale{cursor:pointer}
+    .caccia-scaffale .targa{display:flex;align-items:baseline;gap:8px;margin:0 2px 8px;font-size:13px;color:var(--c-muto)}
+    .caccia-scaffale .targa b{font-size:14.5px;color:var(--c-ink)}
+    .caccia-scaffale .targa em{margin-left:auto;font-style:normal;font-size:12px;white-space:nowrap}
+    .caccia-vasi{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;align-items:end;padding:0 4px}
+    .caccia-asse{display:block;height:15px;margin:0 -8px;border-radius:5px;
+      background:linear-gradient(180deg,#A9713F 0%,var(--c-legno) 30%,var(--c-legno2) 100%);
+      box-shadow:0 9px 14px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.22)}
+    .caccia-scaffale.scelto{background:rgba(247,147,26,.12);border-color:rgba(247,147,26,.7);transform:translateY(-2px)}
+    .caccia-scaffale.vuoto{opacity:.45}
+    .caccia-scaffale.spento{opacity:.5}
+    .caccia-scaffale.qui{background:rgba(247,147,26,.1);border-color:rgba(247,147,26,.55);
+      box-shadow:0 0 0 0 rgba(247,147,26,.5)}
+    .caccia-scaffale.qui .targa em{color:var(--c-ambra2);font-weight:700}
+    .caccia-vaso{position:relative;display:flex;flex-direction:column;align-items:center;min-width:0}
+    .caccia-vaso .tap{width:66%;height:8px;border-radius:3px 3px 1px 1px;
+      background:linear-gradient(180deg,#8B93A8,#565D72);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+    .caccia-vaso .vetro{position:relative;display:flex;align-items:center;justify-content:center;width:100%;
+      max-width:62px;aspect-ratio:1/1.08;border-radius:9px 9px 13px 13px;border:1px solid rgba(255,255,255,.2);
+      background:linear-gradient(155deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.03) 42%,rgba(255,255,255,.09) 100%);
+      overflow:hidden}
+    .caccia-vaso .vetro::before{content:"";position:absolute;left:12%;top:10%;width:9%;height:58%;border-radius:9px;
+      background:rgba(255,255,255,.28)}
+    .caccia-vaso .em{font-size:clamp(20px,6.4vw,27px);line-height:1;filter:grayscale(1) brightness(.75);opacity:.5}
+    .caccia-vaso .nm{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+      margin:5px 0 6px;min-height:23px;font-size:9.5px;line-height:1.2;text-align:center;color:var(--c-muto);
+      overflow-wrap:break-word;-webkit-hyphens:manual;hyphens:manual}
+    .caccia-vaso .vt{position:absolute;right:-2px;top:2px;min-width:18px;padding:1px 4px;border-radius:999px;
+      background:#11162B;border:1px solid currentColor;font-size:10px;font-weight:800;line-height:1.3;text-align:center}
+    .caccia-vaso.bronzo{color:var(--c-bronzo)} .caccia-vaso.argento{color:var(--c-argento)} .caccia-vaso.oro{color:var(--c-oro)}
+    .caccia-vaso.bronzo .tap,.caccia-vaso.argento .tap,.caccia-vaso.oro .tap{
+      background:linear-gradient(180deg,currentColor,rgba(0,0,0,.35)),currentColor}
+    .caccia-vaso.bronzo .vetro,.caccia-vaso.argento .vetro,.caccia-vaso.oro .vetro{border-color:currentColor;
+      box-shadow:inset 0 -14px 20px -6px currentColor,0 0 16px -4px currentColor}
+    .caccia-vaso.bronzo .em,.caccia-vaso.argento .em,.caccia-vaso.oro .em{filter:none;opacity:1}
+    .caccia-vaso.bronzo .nm,.caccia-vaso.argento .nm,.caccia-vaso.oro .nm{color:var(--c-ink)}
+    .caccia-vaso.oro .vetro{animation:caccia-oro 3s ease-in-out infinite}
+    .caccia-vaso.nuovo .vetro{animation:caccia-pop .7s cubic-bezier(.2,1.6,.4,1)}
+    .caccia-appiccicato{position:sticky;bottom:calc(84px + env(safe-area-inset-bottom));z-index:5;margin-top:4px;
+      padding:10px;border-radius:20px;background:rgba(10,15,31,.96);border:1px solid var(--c-riga);
+      animation:caccia-entra .35s cubic-bezier(.2,1.3,.4,1) both}
+    .caccia-appiccicato .caccia-btn{margin:0}
+    .caccia-appiccicato small{display:block;margin:0 2px 8px;font-size:12.5px;line-height:1.35;color:var(--c-muto)}
+
+    /* LA CACCIA DI OGGI: gli indizi, le occhiate, gli attrezzi */
+    .caccia-indizio{position:relative;display:flex;gap:11px;align-items:flex-start;margin:0 0 8px;padding:12px 13px;
+      border-radius:16px;border:1px solid var(--c-riga);background:var(--c-carta);font-size:15px;line-height:1.38;
+      overflow-wrap:anywhere;animation:caccia-entra .4s cubic-bezier(.2,1.3,.4,1) both}
+    .caccia-indizio .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--c-ambra);color:#1C1F24;
+      font-weight:800;font-size:14px;line-height:26px;text-align:center}
+    .caccia-indizio.chiuso{border-style:dashed;color:var(--c-muto);align-items:center;animation:none}
+    .caccia-indizio.chiuso .n{background:transparent;border:1px dashed var(--c-riga);color:var(--c-muto)}
+    .caccia-indizio.chiuso .tx{flex:1 1 auto}
+    .caccia-numeri{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+    .caccia-numeri div{padding:10px 12px;border-radius:16px;border:1px solid var(--c-riga);background:var(--c-carta);
+      font-size:12.5px;line-height:1.3;color:var(--c-muto)}
+    .caccia-numeri b{display:block;font-size:21px;line-height:1.15;color:var(--c-ink);font-variant-numeric:tabular-nums}
+    .caccia-occhi{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+    .caccia-occhi i{width:9px;height:9px;border-radius:50%;background:var(--c-ambra);box-shadow:0 0 6px rgba(247,147,26,.7)}
+    .caccia-occhi i.no{background:rgba(255,255,255,.14);box-shadow:none}
+    .caccia-attrezzi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 4px}
+    .caccia-attrezzo{position:relative;padding:10px 6px 9px;border-radius:16px;border:1px solid var(--c-riga);
+      background:var(--c-carta);color:var(--c-ink);font:inherit;font-size:12px;line-height:1.25;text-align:center;
+      cursor:pointer;transition:transform .15s ease,border-color .15s ease}
+    .caccia-attrezzo:active{transform:scale(.95)}
+    .caccia-attrezzo .em{display:block;font-size:26px;line-height:1.15}
+    .caccia-attrezzo b{display:block;margin-top:2px;font-size:13px}
+    .caccia-attrezzo .q{position:absolute;right:7px;top:6px;padding:1px 6px;border-radius:999px;background:var(--c-ambra);
+      color:#1C1F24;font-size:11px;font-weight:800}
+    .caccia-attrezzo:disabled{opacity:.5;cursor:default}
+    .caccia-attrezzo.acceso{border-color:var(--c-verde);opacity:1}
+    .caccia-attrezzo.acceso small{color:var(--c-verde)}
+    .caccia-attrezzo small{display:block;color:var(--c-muto);font-size:11px}
+    .caccia-trovato{text-align:center;padding:16px 14px;border-color:rgba(247,147,26,.6);
+      background:linear-gradient(180deg,rgba(247,147,26,.2),rgba(247,147,26,.05))}
+    .caccia-trovato .grande{font-size:30px;font-weight:800;color:var(--c-ambra2);line-height:1.1}
+    .caccia-trovato p{margin:6px 0 0;font-size:14.5px;line-height:1.4}
+    .caccia-trovato a{color:var(--c-ambra2);font-weight:700;text-decoration:underline;cursor:pointer}
+
+    /* LE SFIDE */
+    .caccia-sfida{display:flex;gap:12px;align-items:flex-start;margin:0 0 10px;padding:12px 13px;border-radius:18px;
+      border:1px solid var(--c-riga);background:var(--c-carta)}
+    .caccia-sfida .em{flex:none;width:44px;height:44px;border-radius:14px;background:rgba(0,0,0,.3);font-size:25px;
+      line-height:44px;text-align:center}
+    .caccia-sfida .co{flex:1 1 auto;min-width:0}
+    .caccia-sfida b{font-size:15.5px}
+    .caccia-sfida .ch{margin:2px 0 7px;font-size:13px;line-height:1.35;color:var(--c-muto)}
+    .caccia-sfida .pr{float:right;margin-left:8px;color:var(--c-ambra2);font-weight:800;font-size:14px;white-space:nowrap}
+    .caccia-barra{height:8px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden}
+    .caccia-barra i{display:block;height:100%;border-radius:999px;transform-origin:0 50%;
+      background:linear-gradient(90deg,var(--c-ambra),var(--c-ambra2));animation:caccia-cresce .7s ease-out both}
+    .caccia-tacche{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+    .caccia-tacche i{width:9px;height:9px;border-radius:3px;background:rgba(255,255,255,.14);transform:rotate(45deg)}
+    .caccia-tacche i.si{background:var(--c-ambra2);box-shadow:0 0 6px rgba(255,197,107,.7)}
+    .caccia-sfida.finita{border-color:rgba(91,227,164,.5)}
+    .caccia-sfida.finita .ch{color:var(--c-verde)}
+
+    /* LO ZAINO E LA BOTTEGA: una griglia di oggetti */
+    .caccia-griglia{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:0 0 6px}
+    .caccia-ogg{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:14px 8px 10px;
+      border-radius:18px;border:1px solid var(--c-riga);background:var(--c-carta);text-align:center;min-width:0}
+    .caccia-ogg .em{font-size:38px;line-height:1.1;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4))}
+    .caccia-ogg .nm{font-size:13.5px;font-weight:700;line-height:1.25;min-height:34px;display:flex;align-items:center}
+    .caccia-ogg small{font-size:11.5px;line-height:1.3;color:var(--c-muto);min-height:30px}
+    .caccia-ogg .caccia-btn{margin-top:4px}
+    .caccia-ogg.mio{border-color:rgba(91,227,164,.45)}
+    .caccia-ogg.addosso{border-color:var(--c-ambra);background:rgba(247,147,26,.14)}
+    .caccia-ogg .segno{position:absolute;left:8px;top:8px;padding:2px 7px;border-radius:999px;background:var(--c-verde);
+      color:#06281A;font-size:10.5px;font-weight:800}
+    .caccia-nota{margin:12px 0 0;font-size:12.5px;line-height:1.45;color:var(--c-muto)}
+
+    /* ...il tasto dentro la scheda di un annuncio: una riga sola, a
+       destra, sopra il titolo. Nasce solo a caccia aperta. Questo sta
+       FUORI dal mondo del gioco, quindi veste i colori di casa. */
+    .caccia-riga{display:flex;justify-content:flex-end;margin:0 0 6px}
+    .caccia-qui{padding:7px 13px;border-radius:999px;border:1px solid var(--sats);background:var(--sats-soft);
+      color:var(--ink);font:inherit;font-size:13.5px;font-weight:700;cursor:pointer;
+      animation:caccia-entra .4s cubic-bezier(.2,1.3,.4,1) both}
+    .caccia-qui:disabled{opacity:.7;cursor:default;border-color:var(--field-line);background:var(--card);animation:none}
+
+    /* IL VELO: la festa quando lo si trova, e il biglietto della pista.
+       Sta sul body (fuori da #view-caccia), quindi i colori sono scritti. */
+    .caccia-velo{position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center;
+      padding:20px;background:rgba(5,8,18,.9);color:#F5F0E6;overflow:hidden;animation:caccia-velo .25s ease both}
+    .caccia-velo .scatola{position:relative;width:min(100%,380px);padding:20px 18px 18px;border-radius:26px;text-align:center;
+      border:1px solid rgba(247,147,26,.55);background:linear-gradient(180deg,#1B2550,#0B1128);
+      box-shadow:0 30px 70px rgba(0,0,0,.6),0 0 60px rgba(247,147,26,.18)}
+    .caccia-velo .caccia-tappo{--tw:170px;margin:0 auto -6px;animation:caccia-salta .8s cubic-bezier(.2,1.5,.4,1) both}
+    .caccia-velo .grande{font-size:27px;font-weight:800;line-height:1.15}
+    .caccia-velo .premio{margin:6px 0 2px;font-size:40px;font-weight:800;color:#FFC56B;line-height:1;
+      animation:caccia-pop .7s .35s cubic-bezier(.2,1.6,.4,1) both}
+    .caccia-velo p{margin:8px 0 0;font-size:14.5px;line-height:1.4;color:#D5DAEA}
+    .caccia-velo ul{margin:12px 0 0;padding:0;list-style:none;text-align:left}
+    .caccia-velo li{display:flex;gap:9px;align-items:center;margin:0 0 6px;padding:8px 11px;border-radius:14px;
+      background:rgba(255,255,255,.07);font-size:13.5px;animation:caccia-entra .45s cubic-bezier(.2,1.3,.4,1) both}
+    .caccia-velo li b{margin-left:auto;color:#FFC56B;white-space:nowrap}
+    .caccia-velo .caccia-btn{margin-top:12px}
+    .caccia-velo .caccia-btn.piano{background:rgba(255,255,255,.07);color:#F5F0E6;border:1px solid rgba(255,255,255,.14)}
+    .caccia-velo .foglio{margin:14px 0 4px;padding:16px 15px;border-radius:6px 16px 8px 14px;background:#FFF6DC;color:#3A2A12;
+      font-size:16px;line-height:1.45;text-align:left;transform:rotate(-1.5deg);
+      box-shadow:0 12px 24px rgba(0,0,0,.45);animation:caccia-foglio .6s cubic-bezier(.2,1.4,.4,1) both}
+    .caccia-velo .foglio small{display:block;margin-top:9px;font-size:13px;color:#7A5A2A}
+    .caccia-coriandolo{position:absolute;top:-8%;font-size:22px;line-height:1;pointer-events:none;
+      animation:caccia-piove 2.6s cubic-bezier(.3,.6,.6,1) both}
+
+    @keyframes caccia-stelle{from{opacity:.15}to{opacity:.65}}
+    @keyframes caccia-dondola{0%,100%{transform:translateY(0) rotate(-1.2deg)}50%{transform:translateY(-6px) rotate(1.2deg)}}
+    @keyframes caccia-luce{0%,100%{opacity:.35}50%{opacity:1}}
+    @keyframes caccia-sbircia{0%,16%{transform:translateY(88%)}28%,64%{transform:translateY(50%)}
+      70%{transform:translateY(53%)}82%,100%{transform:translateY(88%)}}
+    @keyframes caccia-entra{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+    @keyframes caccia-pop{0%{transform:scale(.6)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+    @keyframes caccia-oro{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+    @keyframes caccia-cresce{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+    @keyframes caccia-velo{from{opacity:0}to{opacity:1}}
+    @keyframes caccia-salta{0%{transform:translateY(80%) scale(.5);opacity:0}100%{transform:none;opacity:1}}
+    @keyframes caccia-foglio{from{opacity:0;transform:translateY(-30px) rotate(8deg)}to{opacity:1;transform:rotate(-1.5deg)}}
+    @keyframes caccia-piove{0%{transform:translateY(0) rotate(0);opacity:0}12%{opacity:1}
+      100%{transform:translateY(115vh) rotate(540deg);opacity:.9}}
+    /* SUGLI SCHERMI GRANDI (web app e browser): due colonne — a sinistra
+       Tappo, le schede e la caccia; a destra la dispensa, sempre li'. */
+    @media (min-width:900px){
+      .caccia-dentro{max-width:1060px}
+      .caccia-due{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start}
+      .caccia-palco{min-height:250px}
+      .caccia-tappo{--tw:184px}
+      .caccia-fumetto{font-size:16px}
+      .caccia-col-b{position:sticky;top:76px;padding:14px 16px 4px;border-radius:26px;border:1px solid var(--c-riga);
+        background:rgba(0,0,0,.25)}
+      .caccia-vaso .em{font-size:27px}
+      .caccia-vaso .nm{font-size:11px;min-height:27px}
+      .caccia-appiccicato{bottom:14px}
+      .caccia-gradi{margin:0 0 6px;padding:2px 0 8px;flex-wrap:wrap;overflow:visible}
+      .caccia-grado{width:calc(33.333% - 6px)}
+      .caccia-griglia{grid-template-columns:repeat(3,1fr)}
+    }
+    /* sul telefono la dispensa sta sotto la caccia, e solo in quella scheda */
+    @media (max-width:899px){
+      .caccia-mondo:not([data-scheda="caccia"]) .caccia-col-b{display:none}
+    }
+    /* GLI EFFETTI RIDOTTI li spegne la regola di casa (`html.fx-ridotti`,
+       in fondo al foglio: si accende da sola con «riduci movimento»),
+       e qui non serve un gemello: ogni animazione del gioco PARTE dallo
+       stato fermo giusto (Tappo che sbircia sta gia' a meta', le carte
+       sono gia' visibili) e i coriandoli non nascono (`cacciaFesta`). */
     /* LA CHAT NELLO SCAMBIO (12 ott 2026): il vestito e' quello della
        chat col moderatore; di suo ha l'avviso fisso, la riga rossa
        sotto un messaggio e il link che si vede e non si apre */
@@ -14000,6 +14325,26 @@ document.getElementById('cartello')?.remove();</script>
        lo staff, e la pagina degli admin (l'elenco per utente, e la
        conversazione aperta). Le riempiono renderAssistenza e
        renderAssistenzaAdmin. -->
+  <!-- ============ VISTA: LA CACCIA A TAPPO (17 nov 2026) ============ -->
+  <!-- LA CACCIA A TAPPO: la dispensa di Tappo, il gioco. Vista INTERNA
+       come l'assistenza (fuori da RADICI: il gesto indietro funziona
+       gratis). Il markup e' un GUSCIO: tutto lo scrive renderCaccia()
+       dalla risposta di /api/gioco/tappo, con esc() su ogni testo che
+       non e' nostro. NON porta `.sicu`: e' un mondo suo, scuro nei due
+       temi, largo quanto lo schermo (vedi il CSS, «UN MONDO A PARTE»). -->
+  <div class="view" id="view-caccia">
+    <div class="caccia-mondo" id="cacciaMondo" data-scheda="caccia">
+      <div class="caccia-dentro">
+        <div class="caccia-testa">
+          <button type="button" class="caccia-x" onclick="navIndietro()"
+                  title="Torna indietro" aria-label="Torna indietro">&#10005;</button>
+          <h3 class="font-brand">Caccia a Tappo</h3>
+          <span class="caccia-saldo" id="cacciaSaldo" title="I tuoi bulloni">🔩 0</span>
+        </div>
+        <div id="cacciaCorpo"></div>
+      </div>
+    </div>
+  </div>
   <div class="view" id="view-assistenza">
     <div class="sicu">
       <div class="foglio-testa">
@@ -15482,6 +15827,13 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc" id="accDistintivi">
         <button class="acc-h" onclick="toggleAcc('accDistintivi')"><span class="em">🏅</span>Distintivi <span class="conta" id="distintiviConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="distintiviBlocco"></div></div>
+      </div>
+      <!-- LA CACCIA A TAPPO (17 nov 2026, richiesta di Andrea: «un gioco
+           di barattolo con dentro Tappo»): la porta del gioco, accanto a
+           livello e distintivi. Nasce SPENTA: la accende /api/me solo se
+           il server dice `gioco_tappo: true` (la leva GIOCO_TAPPO_ATTIVO). -->
+      <div class="acc voce-porta" id="vocCaccia" style="display:none">
+        <button type="button" class="acc-h" onclick="go('caccia')"><span class="em">🔩</span>Caccia a Tappo<span id="cacciaPallino"></span><span class="fr">›</span></button>
       </div>
         </div>
       </div>
@@ -21399,6 +21751,10 @@ function go(view){
   /* L'ASSISTENZA IN APP (3 nov 2026): si ridisegna a ogni ingresso, da
      qualunque strada (la voce, il gesto indietro, la cronologia) */
   if (view==='assistenza') renderAssistenza();
+  /* LA CACCIA A TAPPO (17 nov 2026): come l'assistenza, si richiede al
+     server a ogni ingresso — tornando da un annuncio la pagina deve
+     dire le occhiate di ADESSO */
+  if (view==='caccia') renderCaccia();
   if (view==='assistenzaadm') renderAssistenzaAdmin();
   /* LA MODERAZIONE (28 set 2026): la striscia in cima a «I miei
      scambi» e la sua pagina, solo per chi e' moderatore — a tutti gli
@@ -34407,6 +34763,7 @@ function openDetail(id){
   caricaFamiglia(l);                  // le sorelle, se non si sanno ancora
   caricaEtichetta(l);                 // l'etichetta degli alimenti, idem
   sezioneAltriOggetti(l);             // in coda, fail-open: arriva quando arriva
+  cacciaNellaScheda(l);               // «Tappo è qui?», solo a caccia aperta
 }
 
 /* ================ LA FAMIGLIA DI VARIANTI (set 2026) =================
@@ -59687,6 +60044,566 @@ function apriTappo(){
     try { tg.openTelegramLink(tappoLink); return; } catch(e){}
   }
   window.open(tappoLink, '_blank', 'noopener');
+}
+/* ---------------- 🔩 LA CACCIA A TAPPO (17 nov 2026) ----------------
+   Il gioco (richiesta di Andrea: «un gioco di barattolo con dentro
+   Tappo... bello complesso, deve durare anche tra vent'anni... una
+   mappa, un inventario»). Ogni giorno Tappo scappa e si nasconde in un
+   annuncio VERO, diverso per ognuno. La pagina e' LA DISPENSA: sei
+   scaffali coi barattoli delle categorie; si sceglie lo scaffale e il
+   grado, si leggono gli indizi, e in ogni scheda c'e' il tasto «Tappo
+   è qui?». DOVE sia nascosto qui non si sa MAI: lo sa il server, che a
+   un'occhiata risponde si' o no — nel telefono non c'e' niente da
+   sbirciare. Si vincono BULLONI, che non sono sats e non danno XP.
+   QUI SI DISEGNA E BASTA: gradi, premi, sfide, saldo e indizi arrivano
+   fatti da /api/gioco/tappo, e ai tasti si passa solo un NOME (uno
+   scaffale, un attrezzo, un oggetto), mai una cifra.
+   Quattro schede: Caccia (la giornata + la dispensa), Sfide, Zaino,
+   Bottega. Sul telefono una colonna; sugli schermi grandi (web app e
+   browser) due, con la dispensa sempre a destra. */
+let cacciaAttiva = false;        /* la leva viva (me.gioco_tappo) */
+let cacciaAperta = false;        /* oggi c'e' una caccia aperta */
+let cacciaStato = null;          /* l'ultima risposta del server */
+let cacciaGuardati = new Map();  /* annuncio gia' guardato → il suo calore, di sessione */
+let cacciaGiorno = '';           /* il giorno di cacciaGuardati */
+let cacciaOccupata = false;
+let cacciaUi = {scheda: 'caccia', scaffale: 0, grado: 0};
+const CACCIA_SCHEDE = [['caccia', '🗺️', 'Caccia'], ['sfide', '🏅', 'Sfide'],
+                       ['zaino', '🎒', 'Zaino'], ['bottega', '🛍️', 'Bottega']];
+const CACCIA_CALORE = {
+  fuoco: ['🔥', 'Fuoco! Stesso barattolo e stessa fascia di prezzo'],
+  fuochino: ['♨️', 'Fuochino: è nello stesso barattolo'],
+  tiepido: ['🌤️', 'Tiepido: è sullo stesso scaffale'],
+  acqua: ['💧', 'Acqua: è su un altro scaffale'],
+};
+const CACCIA_ID = /^[a-z]{2,20}$/;
+function vestiCaccia(){
+  const v = el('vocCaccia');
+  if (v) v.style.display = cacciaAttiva && !DEMO && !VETRINA ? '' : 'none';
+  const p = el('cacciaPallino');
+  if (p) p.innerHTML = cacciaAperta ? '<span class="assist-pallino" aria-label="Caccia aperta"></span>' : '';
+}
+/* PURA: la caccia di oggi e' partita ed e' ancora da giocare? */
+function cacciaApertaDa(s){
+  const c = s && s.caccia;
+  return !!(c && !c.vuoto && !c.trovato && Number(c.occhiate) > 0);
+}
+/* PURA: «1 bullone», «3 bulloni» */
+function bulloniCaccia(n){
+  const q = Number(n) || 0;
+  return fmt(q) + (q === 1 ? ' bullone' : ' bulloni');
+}
+/* PURA: «45 s», «2 min 14 s», «1 h 5 min» */
+function tempoCaccia(secondi){
+  const s = Math.max(0, Math.round(Number(secondi) || 0));
+  if (s < 60) return s + ' s';
+  if (s < 3600) return Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : '');
+  return Math.floor(s / 3600) + ' h' + (Math.floor(s % 3600 / 60) ? ' ' + Math.floor(s % 3600 / 60) + ' min' : '');
+}
+/* PURA: l'emoji del cappellino indossato, '' se nessuno */
+function cappelloCaccia(s){
+  const o = s && Array.isArray(s.oggetti)
+    ? s.oggetti.find(x => x && x.id === s.indossato && x.tipo === 'cappello') : null;
+  return o ? String(o.emoji || '') : '';
+}
+/* PURA: la classe dello sfondo del palco — solo un nome di casa */
+function palcoCaccia(s){
+  const p = String(s && s.palco || '');
+  return /^(alba|luna|aurora)$/.test(p) ? p : '';
+}
+/* PURA: lo scaffale numero n, o null */
+function scaffaleCaccia(s, n){
+  return (s && Array.isArray(s.scaffali) ? s.scaffali : []).find(x => x && Number(x.n) === Number(n)) || null;
+}
+/* PURA: il grado che la pagina propone prima di partire — quello
+   scelto se e' aperto, sennò il piu' alto aperto */
+function gradoCaccia(s, scelto){
+  const g = (s && Array.isArray(s.gradi) ? s.gradi : []).find(x => x && Number(x.n) === Number(scelto));
+  return g && g.aperto ? Number(g.n) : (Number(s && s.grado_max) || 1);
+}
+/* PURA: Tappo, col cappellino se ne porta uno. `modo`: '' (dondola),
+   'sbircia' (e' scappato: tira su gli occhi da dietro la mensola) */
+function tappoCacciaHTML(cappello, modo){
+  return '<div class="caccia-tappo' + (modo === 'sbircia' ? ' sbircia' : '') + '">'
+    + '<img src="/assets/caccia-tappo.webp" alt="Tappo" width="560" height="721" decoding="async">'
+    + '<i class="a"></i><i class="b"></i>'
+    + (cappello ? '<span class="caccia-cappello" aria-hidden="true">' + esc(cappello) + '</span>' : '')
+    + '</div>';
+}
+/* PURA: quel che dice Tappo, in HTML (i nomi passano da esc) */
+function cacciaFumettoHTML(s){
+  const c = s.caccia;
+  if (!c) return 'Oggi scappo di nuovo! <b>Scegli uno scaffale</b>: io mi nascondo in un annuncio lì sopra, tu vieni a cercarmi.';
+  if (c.vuoto) return 'Oggi in vetrina non c\'è un posto dove nascondermi. Resto nel barattolo: a domani!';
+  if (c.trovato) return 'Mi hai trovato! Torno nel barattolo. <b>A mezzanotte scappo di nuovo.</b>';
+  if (!(Number(c.occhiate) > 0)) return 'Per oggi hai finito le occhiate. <b>Domani</b> mi nascondo da un\'altra parte!';
+  const sc = scaffaleCaccia(s, c.scaffale);
+  const dove = sc ? '«' + esc(sc.nome) + '»' : 'uno scaffale';
+  if (Number(c.tappa) > 1) return 'Mi avevi quasi preso! <b>Tappa ' + fmt(Number(c.tappa)) + ' di ' + fmt(Number(c.tappe))
+    + '</b>: adesso sono in un altro annuncio di ' + dove + '.';
+  return 'Sono in un annuncio di <b>' + dove + '</b>. Leggi gli indizi e vieni a prendermi!';
+}
+/* PURA: il palco con Tappo e il fumetto, e sotto i quattro numeri */
+function cacciaEroeHTML(s){
+  const c = s.caccia;
+  const scappato = !!(c && !c.trovato && !c.vuoto);
+  const g = (s.gradi || []).find(x => x && Number(x.n) === Number(c ? c.grado : s.grado_max));
+  const volte = Number(s.trovate) || 0;
+  return '<div class="caccia-palco ' + palcoCaccia(s) + '">' + tappoCacciaHTML(cappelloCaccia(s), scappato ? 'sbircia' : '')
+    + '<div class="caccia-fumetto">' + cacciaFumettoHTML(s) + '</div></div>'
+    + '<div class="caccia-bolli">'
+    + (g ? '<span>' + esc(g.emoji) + ' <b>' + esc(g.nome) + '</b></span>' : '')
+    + '<span>Trovato <b>' + fmt(volte) + '</b> ' + (volte === 1 ? 'volta' : 'volte') + '</span>'
+    + '<span>Barattoli <b>' + fmt(Number(s.barattoli_accesi) || 0) + '</b> di ' + fmt(Number(s.barattoli_totale) || 0) + '</span>'
+    + '<span>Sfide <b>' + fmt(Number(s.sfide_fatte) || 0) + '</b> di ' + fmt(Number(s.sfide_totale) || 0) + '</span>'
+    + '</div>';
+}
+/* PURA: le quattro schede */
+function cacciaSchedeHTML(scheda){
+  return '<div class="caccia-schede" role="tablist">' + CACCIA_SCHEDE.map(x =>
+    '<button type="button" role="tab" aria-selected="' + (x[0] === scheda) + '"' + (x[0] === scheda ? ' class="qui"' : '')
+    + ' onclick="cacciaVai(\'' + x[0] + '\')"><span aria-hidden="true">' + x[1] + '</span>' + x[2] + '</button>').join('') + '</div>';
+}
+/* PURA: la scala dei gradi, prima di partire */
+function cacciaGradiHTML(s, scelto){
+  return '<div class="caccia-gradi">' + (s.gradi || []).filter(g => g && Number(g.n) > 0).map(g => {
+    const n = Number(g.n), manca = Number(g.mancano) || 0;
+    const riga = g.aperto
+      ? fmt(Number(g.occhiate) || 0) + ' occhiate · ' + fmt(Number(g.premio) || 0) + ' 🔩'
+        + (Number(g.tappe) > 1 ? ' · ' + fmt(Number(g.tappe)) + ' tappe' : '')
+      : '🔒 ancora ' + fmt(manca) + (manca === 1 ? ' ritrovamento' : ' ritrovamenti');
+    return '<button type="button" class="caccia-grado' + (n === scelto ? ' scelto' : '') + (g.aperto ? '' : ' chiuso')
+      + '" aria-pressed="' + (n === scelto) + '" onclick="cacciaScegliGrado(' + n + ')">'
+      + '<span class="em" aria-hidden="true">' + esc(g.emoji) + '</span><b>' + esc(g.nome) + '</b><small>' + riga + '</small></button>';
+  }).join('') + '</div>';
+}
+/* PURA: un barattolo della dispensa. Spento e' vetro grigio; acceso
+   prende il colore del suo metallo e il numero dei ritrovamenti. */
+function cacciaVasoHTML(b, nuovo){
+  const metallo = /^(bronzo|argento|oro)$/.test(String(b.metallo)) ? b.metallo : '';
+  const volte = Number(b.volte) || 0;
+  return '<span class="caccia-vaso ' + metallo + (nuovo ? ' nuovo' : '') + '"><span class="tap"></span>'
+    + '<span class="vetro"><span class="em" aria-hidden="true">' + esc(EMOJI_CAT[b.categoria] || '📦') + '</span></span>'
+    + (volte > 0 ? '<span class="vt">' + fmt(volte) + '</span>' : '')
+    + '<span class="nm">' + esc(nomeVasoCaccia(b.categoria)) + '</span></span>';
+}
+/* PURA: il nome sotto un barattolo. Lo spazio e' di una sessantina di
+   pixel: le parole lunghe portano un trattino MORBIDO (U+00AD) dove
+   andare a capo, sennò il browser le spezza dove capita («Abbigliament
+   / o»). Le tre di oggi sono scritte; una parola nuova oltre le dodici
+   lettere si spezza a meta'. */
+const CACCIA_A_CAPO = {'Elettrodomestici': 'Elettro\u00ADdomestici', 'Abbigliamento': 'Abbiglia\u00ADmento',
+                       'Collezionismo': 'Collezio\u00ADnismo'};
+function nomeVasoCaccia(categoria){
+  return String(categoria || '').split(' ').map(p => CACCIA_A_CAPO[p]
+    || (p.length > 12 ? p.slice(0, Math.ceil(p.length / 2)) + '\u00AD' + p.slice(Math.ceil(p.length / 2)) : p)).join(' ');
+}
+/* PURA: LA DISPENSA. Prima di partire ogni scaffale e' un tasto (si
+   sceglie dove cacciare, e in fondo nasce «Caccia qui»); a caccia
+   partita si guarda e basta, con lo scaffale di oggi acceso. */
+function cacciaDispensaHTML(s, ui){
+  const c = s.caccia, libera = !c;
+  const scelto = libera ? Number(ui && ui.scaffale) || 0 : 0;
+  const righe = (s.scaffali || []).filter(x => x && Number(x.n) > 0).map(sc => {
+    const n = Number(sc.n), quanti = Number(sc.annunci) || 0, oggi = !!c && Number(c.scaffale) === n;
+    const classe = 'caccia-scaffale' + (libera ? (n === scelto ? ' scelto' : '') + (quanti ? '' : ' vuoto')
+                                               : (oggi ? ' qui' : ''));
+    const coda = libera ? (quanti ? fmt(quanti) + (quanti === 1 ? ' annuncio' : ' annunci') : 'oggi è vuoto')
+      : (oggi ? (c.trovato ? '✓ trovato qui' : '👀 è qui sopra') : '');
+    const dentro = '<span class="targa"><b>' + esc(sc.emoji) + ' ' + esc(sc.nome) + '</b><em>' + coda + '</em></span>'
+      + '<span class="caccia-vasi">' + (sc.barattoli || []).filter(b => b && b.categoria)
+          .map(b => cacciaVasoHTML(b, !!c && !!c.trovato && c.barattolo === b.categoria)).join('') + '</span>'
+      + '<span class="caccia-asse"></span>';
+    return libera
+      ? '<button type="button" class="' + classe + '" aria-pressed="' + (n === scelto) + '" onclick="cacciaScegliScaffale(' + n + ')">' + dentro + '</button>'
+      : '<div class="' + classe + '">' + dentro + '</div>';
+  }).join('');
+  const sc = scaffaleCaccia(s, scelto);
+  const g = (s.gradi || []).find(x => x && Number(x.n) === gradoCaccia(s, ui && ui.grado));
+  const parti = libera && sc && Number(sc.annunci) > 0
+    ? '<div class="caccia-appiccicato"><small>' + (g ? 'Da <b>' + esc(g.nome) + '</b>: ' + fmt(Number(g.occhiate) || 0)
+        + ' occhiate, ' + fmt(Number(g.premio) || 0) + ' 🔩 se lo trovi al primo indizio.' : '') + '</small>'
+      + '<button type="button" class="caccia-btn" onclick="cacciaParti()">🔎 Caccia su «' + esc(sc.nome) + '»</button></div>'
+    : '';
+  return '<div class="caccia-h">La dispensa di Tappo</div>'
+    + '<div class="caccia-sotto">Ogni barattolo è una categoria. Si accende quando trovi Tappo lì: '
+    + '<b style="color:var(--c-bronzo)">bronzo</b> alla prima, <b style="color:var(--c-argento)">argento</b> alla quinta, '
+    + '<b style="color:var(--c-oro)">oro</b> alla ventesima.</div>'
+    + '<div class="caccia-dispensa">' + righe + '</div>' + parti;
+}
+/* PURA: gli attrezzi durante la caccia — tre tasti. Uno per tipo al
+   giorno; quello gia' acceso oggi resta li', verde. */
+function cacciaAttrezziHTML(s){
+  const c = s.caccia || {};
+  const tuttiAperti = (c.indizi || []).length >= Number(c.indizi_max);
+  return '<div class="caccia-attrezzi">' + (s.attrezzi || []).filter(a => a && CACCIA_ID.test(String(a.id))).map(a => {
+    const quanti = Number(a.quanti) || 0;
+    let sotto = '', spento = false, tocco = 'cacciaAttrezzo(\'' + a.id + '\',\'usa\')';
+    if (a.usato_oggi) { sotto = '✓ oggi è in uso'; spento = true; }
+    else if (a.id === 'calamita' && c.calore) { sotto = 'qui non serve'; spento = true; }
+    else if (a.id === 'lampadina' && tuttiAperti) { sotto = 'indizi tutti aperti'; spento = true; }
+    else if (!quanti) { sotto = 'prendila in bottega'; tocco = 'cacciaVai(\'bottega\')'; }
+    else sotto = 'tocca per usarla';
+    return '<button type="button" class="caccia-attrezzo' + (a.usato_oggi ? ' acceso' : '') + '"' + (spento ? ' disabled' : '')
+      + ' onclick="' + tocco + '" title="' + esc(a.cosa) + '"><span class="q">×' + fmt(quanti) + '</span>'
+      + '<span class="em" aria-hidden="true">' + esc(a.emoji) + '</span><b>' + esc(a.nome) + '</b><small>' + sotto + '</small></button>';
+  }).join('') + '</div>';
+}
+/* PURA: la scheda «Caccia» — prima di partire la scala dei gradi; a
+   caccia aperta indizi, occhiate, attrezzi; a caccia finita il bottino */
+function cacciaOggiHTML(s, ui){
+  const c = s.caccia;
+  if (!c) return '<div class="caccia-h">Dove lo cerchi oggi?</div>'
+    + '<div class="caccia-sotto">Scegli il grado della caccia, poi tocca uno scaffale della dispensa. '
+    + 'Più sali di grado, più gli indizi si fanno vaghi e i bulloni tanti.</div>'
+    + cacciaGradiHTML(s, gradoCaccia(s, ui && ui.grado));
+  if (c.vuoto) return '<div class="caccia-carta">Oggi Tappo non ha trovato un annuncio dove nascondersi. Torna domani!</div>';
+  if (c.trovato) return '<div class="caccia-carta caccia-trovato"><div class="grande">+' + fmt(Number(c.bulloni) || 0) + ' 🔩</div>'
+    + (c.annuncio && c.annuncio.titolo
+       ? '<p>Era nascosto in <a role="button" tabindex="0" onclick="cacciaApriAnnuncio()">«' + esc(c.annuncio.titolo) + '»</a>.</p>' : '')
+    + '<p>Preso in ' + tempoCaccia(c.secondi) + (Number(c.sbagli) ? ', con ' + fmt(Number(c.sbagli))
+        + (Number(c.sbagli) === 1 ? ' occhiata a vuoto' : ' occhiate a vuoto') : ', senza sbagliare un colpo') + '.</p></div>'
+    + '<button type="button" class="caccia-btn piano" onclick="cacciaVai(\'bottega\')">🛍️ Spendi i bulloni in bottega</button>';
+  const indizi = Array.isArray(c.indizi) ? c.indizi : [];
+  const rimaste = Number(c.occhiate) || 0, massimo = Number(c.occhiate_max) || 0, calo = Number(c.calo) || 0;
+  let h = '<div class="caccia-h">Gli indizi' + (Number(c.tappe) > 1 ? ' · tappa ' + fmt(Number(c.tappa)) + ' di ' + fmt(Number(c.tappe)) : '') + '</div>';
+  h += indizi.map((i, k) => '<div class="caccia-indizio"><span class="n">' + (k + 1) + '</span><span class="tx">'
+    + esc(i && i.testo) + '</span></div>').join('');
+  for (let k = indizi.length; k < Number(c.indizi_max); k++)
+    h += '<div class="caccia-indizio chiuso"><span class="n">' + (k + 1) + '</span><span class="tx">Indizio coperto</span>'
+      + (k === indizi.length && rimaste
+         ? '<button type="button" class="caccia-btn stretto" onclick="cacciaIndizio()">Apri (−' + fmt(calo) + ' 🔩)</button>' : '')
+      + '</div>';
+  let occhi = '';
+  for (let k = 0; k < massimo; k++) occhi += '<i' + (k < rimaste ? '' : ' class="no"') + '></i>';
+  h += '<div class="caccia-numeri"><div><b>' + fmt(rimaste) + '</b>' + (rimaste === 1 ? 'occhiata rimasta' : 'occhiate rimaste')
+    + '<span class="caccia-occhi">' + occhi + '</span></div>'
+    + '<div><b>' + fmt(Number(c.premio) || 0) + ' 🔩</b>se lo trovi adesso'
+    + (c.calore ? '<br>🔥 ti dico se sei vicino' : '') + '</div></div>';
+  h += cacciaAttrezziHTML(s);
+  h += rimaste
+    ? '<button type="button" class="caccia-btn" onclick="cacciaVaiACercare()">🔎 Vai a cercare</button>'
+      + '<div class="caccia-nota">Apri un annuncio e tocca <b>«🔩 Tappo è qui?»</b>: ti rispondo sì o no. Ogni tocco è un\'occhiata.</div>'
+    : '<div class="caccia-carta" style="margin-top:10px">Le occhiate di oggi sono finite. Con una <b>torcia 🔦</b> ne hai altre tre.</div>';
+  return h;
+}
+/* PURA: la scheda «Sfide» — una famiglia per riga, con la prossima
+   soglia, la barra e una tacca per ogni soglia */
+function cacciaSfideHTML(s){
+  return '<div class="caccia-h">Le sfide</div><div class="caccia-sotto">Si pagano da sole, in bulloni, appena ci arrivi. Ne hai fatte <b>'
+    + fmt(Number(s.sfide_fatte) || 0) + '</b> di ' + fmt(Number(s.sfide_totale) || 0) + '.</div>'
+    + (s.sfide || []).filter(f => f && Array.isArray(f.soglie)).map(f => {
+      const prossima = f.soglie.find(x => x && !x.fatta);
+      const valore = Number(f.valore) || 0;
+      const tacche = '<div class="caccia-tacche">' + f.soglie.map(x => '<i' + (x && x.fatta ? ' class="si"' : '') + '></i>').join('') + '</div>';
+      const testa = '<span class="em" aria-hidden="true">' + esc(f.emoji) + '</span><div class="co">';
+      if (!prossima) return '<div class="caccia-sfida finita">' + testa + '<b>' + esc(f.nome) + '</b>'
+        + '<div class="ch">Tutte fatte! 🎉</div>' + tacche + '</div></div>';
+      const meta = Number(prossima.n) || 1;
+      const quanto = Math.round(Math.max(0, Math.min(1, valore / meta)) * 100);
+      return '<div class="caccia-sfida">' + testa + '<span class="pr">+' + fmt(Number(prossima.bulloni) || 0) + ' 🔩</span><b>' + esc(f.nome) + '</b>'
+        + '<div class="ch">' + esc(prossima.cosa) + (f.id === 'scala' ? '' : ' · <b>' + fmt(valore) + '</b> di ' + fmt(meta)) + '</div>'
+        + '<div class="caccia-barra"><i style="width:' + quanto + '%"></i></div>' + tacche + '</div></div>';
+    }).join('');
+}
+/* PURA: un oggetto, nello zaino o in bottega. Negli onclick viaggia
+   SOLO un id passato dal filtro-alfabeto (il patto anti-XSS di
+   renderNegozio); il prezzo si legge e basta, lo conta il server. */
+function cacciaOggHTML(o, s, bottega){
+  const saldo = Number(s.saldo) || 0, costo = Number(o.bulloni) || 0;
+  const veste = o.tipo === 'cappello' || o.tipo === 'palco';
+  const addosso = veste && (s.indossato === o.id || s.palco === o.id);
+  let tasto = '';
+  if (!o.mio) tasto = saldo >= costo
+    ? '<button type="button" class="caccia-btn stretto" onclick="cacciaOggetto(\'' + o.id + '\',\'prendi\')">Prendi · ' + fmt(costo) + ' 🔩</button>'
+    : '<button type="button" class="caccia-btn stretto piano" disabled>' + fmt(costo) + ' 🔩 · ne mancano ' + fmt(costo - saldo) + '</button>';
+  else if (veste) tasto = addosso
+    ? '<button type="button" class="caccia-btn stretto piano" onclick="cacciaOggetto(\'' + o.id + '\',\'togli\')">Togli</button>'
+    : '<button type="button" class="caccia-btn stretto" onclick="cacciaOggetto(\'' + o.id + '\',\'indossa\')">' + (o.tipo === 'palco' ? 'Metti' : 'Indossa') + '</button>';
+  return '<div class="caccia-ogg' + (o.mio ? ' mio' : '') + (addosso ? ' addosso' : '') + '">'
+    + (o.mio && bottega ? '<span class="segno">✓ tuo</span>' : '') + (addosso && !bottega ? '<span class="segno">addosso</span>' : '')
+    + '<span class="em" aria-hidden="true">' + esc(o.emoji) + '</span><span class="nm">' + esc(o.nome) + '</span>' + tasto + '</div>';
+}
+/* PURA: un attrezzo in bottega (se ne prendono quanti ne stanno) */
+function cacciaAttrezzoOggHTML(a, s){
+  const saldo = Number(s.saldo) || 0, costo = Number(a.bulloni) || 0;
+  return '<div class="caccia-ogg"><span class="segno" style="background:var(--c-ambra)">×' + fmt(Number(a.quanti) || 0) + '</span>'
+    + '<span class="em" aria-hidden="true">' + esc(a.emoji) + '</span><span class="nm">' + esc(a.nome) + '</span><small>' + esc(a.cosa) + '</small>'
+    + (saldo >= costo
+       ? '<button type="button" class="caccia-btn stretto" onclick="cacciaAttrezzo(\'' + a.id + '\',\'prendi\')">Prendi · ' + fmt(costo) + ' 🔩</button>'
+       : '<button type="button" class="caccia-btn stretto piano" disabled>' + fmt(costo) + ' 🔩 · ne mancano ' + fmt(costo - saldo) + '</button>')
+    + '</div>';
+}
+/* PURA: la scheda «Zaino» — quel che hai: attrezzi, cappelli, sfondi,
+   trofei. Qui i cappelli si provano; per prenderne c'e' la bottega. */
+function cacciaZainoHTML(s){
+  const miei = (s.oggetti || []).filter(o => o && o.mio && CACCIA_ID.test(String(o.id)));
+  const gruppo = (titolo, tipi) => {
+    const g = miei.filter(o => tipi.includes(o.tipo));
+    return g.length ? '<div class="caccia-h">' + titolo + '</div><div class="caccia-griglia">'
+      + g.map(o => cacciaOggHTML(o, s, false)).join('') + '</div>' : '';
+  };
+  return '<div class="caccia-h">Gli attrezzi</div><div class="caccia-sotto">Si usano durante la caccia, uno per tipo al giorno.</div>'
+    + '<div class="caccia-griglia">' + (s.attrezzi || []).filter(a => a && CACCIA_ID.test(String(a.id))).map(a =>
+        '<div class="caccia-ogg"><span class="segno" style="background:var(--c-ambra)">×' + fmt(Number(a.quanti) || 0) + '</span>'
+        + '<span class="em" aria-hidden="true">' + esc(a.emoji) + '</span><span class="nm">' + esc(a.nome) + '</span><small>' + esc(a.cosa) + '</small></div>').join('')
+    + '</div>'
+    + gruppo('I cappelli di Tappo', ['cappello']) + gruppo('Gli sfondi', ['palco']) + gruppo('Trofei e premi', ['titolo', 'posti', 'trofeo'])
+    + (miei.length ? '' : '<div class="caccia-nota">Per ora nello zaino ci sono solo gli attrezzi. Cappelli, sfondi e la coppa si prendono in <b>bottega</b>, coi bulloni.</div>');
+}
+/* PURA: la scheda «Bottega» — quel che si prende coi bulloni */
+function cacciaBottegaHTML(s){
+  const tutti = (s.oggetti || []).filter(o => o && CACCIA_ID.test(String(o.id)));
+  const gruppo = (titolo, tipi) => {
+    const g = tutti.filter(o => tipi.includes(o.tipo));
+    return g.length ? '<div class="caccia-h">' + titolo + '</div><div class="caccia-griglia">'
+      + g.map(o => cacciaOggHTML(o, s, true)).join('') + '</div>' : '';
+  };
+  return '<div class="caccia-h">La bottega</div><div class="caccia-sotto">Hai <b>' + bulloniCaccia(s.saldo) + ' 🔩</b> da spendere.</div>'
+    + '<div class="caccia-h">Attrezzi</div><div class="caccia-griglia">'
+    + (s.attrezzi || []).filter(a => a && CACCIA_ID.test(String(a.id))).map(a => cacciaAttrezzoOggHTML(a, s)).join('') + '</div>'
+    + gruppo('Cappelli per Tappo', ['cappello']) + gruppo('Sfondi', ['palco']) + gruppo('Speciali', ['titolo', 'posti', 'trofeo'])
+    + '<div class="caccia-nota">I bulloni sono solo un gioco: non sono sats, non si comprano, non si passano e non danno XP.</div>';
+}
+/* PURA: la pagina intera. Due colonne (una sul telefono): a sinistra
+   Tappo, le schede e la scheda aperta; a destra la dispensa. */
+function cacciaHTML(s, ui){
+  if (!s || !Array.isArray(s.scaffali)) return '<div class="caccia-sotto" style="padding:60px 0;text-align:center">Cerco Tappo…</div>';
+  const scheda = CACCIA_SCHEDE.some(x => x[0] === (ui && ui.scheda)) ? ui.scheda : 'caccia';
+  const corpo = scheda === 'sfide' ? cacciaSfideHTML(s) : scheda === 'zaino' ? cacciaZainoHTML(s)
+    : scheda === 'bottega' ? cacciaBottegaHTML(s) : cacciaOggiHTML(s, ui);
+  return '<div class="caccia-due"><div class="caccia-col-a">' + cacciaEroeHTML(s) + cacciaSchedeHTML(scheda) + corpo + '</div>'
+    + '<div class="caccia-col-b">' + cacciaDispensaHTML(s, ui) + '</div></div>';
+}
+/* Adotta una risposta del server: lo stato, la bandierina degli annunci,
+   il tetto del barattolo (l'oggetto «posti») e il titolo appena preso */
+function cacciaAdotta(s){
+  if (!s || typeof s !== 'object' || !Array.isArray(s.scaffali)) return;
+  cacciaStato = s;
+  if (s.giorno !== cacciaGiorno) { cacciaGiorno = s.giorno || ''; cacciaGuardati = new Map(); cacciaUi.scaffale = 0; }
+  cacciaAperta = cacciaApertaDa(s);
+  if (Number(s.max_barattolo) > 0) MAX_PREFERITI = Number(s.max_barattolo);
+  if ((s.oggetti || []).some(o => o && o.id === 'amico' && o.mio))
+    (myTitoli || []).forEach(t => { if (t.id === 't_amico_tappo') t.sbloccato = true; });
+  vestiCaccia();
+}
+function disegnaCaccia(){
+  const mondo = el('cacciaMondo'), box = el('cacciaCorpo'), saldo = el('cacciaSaldo');
+  if (!box) return;
+  if (mondo) mondo.dataset.scheda = cacciaUi.scheda;
+  box.innerHTML = cacciaHTML(cacciaStato, cacciaUi);
+  if (saldo && cacciaStato) {
+    const nuovo = '🔩 ' + fmt(Number(cacciaStato.saldo) || 0);
+    if (saldo.textContent !== nuovo) {
+      saldo.textContent = nuovo;
+      saldo.classList.remove('su'); void saldo.offsetWidth; saldo.classList.add('su');
+    }
+  }
+}
+async function cacciaChiama(percorso, corpo){
+  const r = await fetch(`${API_BASE}/gioco/tappo${percorso}`, corpo === undefined
+    ? {headers:{'X-Tg-Init-Data':authHdr()}}
+    : {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify(corpo)});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return null; }
+  return d;
+}
+/* Un gesto della pagina: una chiamata alla volta, poi si ridisegna */
+async function cacciaFai(percorso, corpo){
+  if (cacciaOccupata) return null;
+  cacciaOccupata = true; haptic();
+  try {
+    const d = await cacciaChiama(percorso, corpo);
+    if (d) { cacciaAdotta(d); disegnaCaccia(); }
+    return d;
+  } catch(e) { toast('Rete assente: riprova'); return null; }
+  finally { cacciaOccupata = false; }
+}
+async function renderCaccia(){
+  disegnaCaccia();
+  if (DEMO || VETRINA || !cacciaAttiva) return;
+  try {
+    const d = await cacciaChiama('');
+    if (d) { cacciaAdotta(d); disegnaCaccia(); }
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+function cacciaVai(scheda){
+  if (!CACCIA_SCHEDE.some(x => x[0] === scheda)) return;
+  haptic(); cacciaUi.scheda = scheda; disegnaCaccia();
+}
+function cacciaScegliGrado(n){
+  const g = ((cacciaStato && cacciaStato.gradi) || []).find(x => x && Number(x.n) === Number(n));
+  if (!g) return;
+  if (!g.aperto) {
+    const manca = Number(g.mancano) || 0;
+    toast('«' + g.nome + '» si apre trovando Tappo ' + (manca === 1 ? 'un\'altra volta' : 'altre ' + fmt(manca) + ' volte')
+      + ' al grado prima (o più su).', 6000);
+    return;
+  }
+  haptic(); cacciaUi.grado = Number(g.n); disegnaCaccia();
+}
+function cacciaScegliScaffale(n){
+  const sc = scaffaleCaccia(cacciaStato, n);
+  if (!sc) return;
+  if (!(Number(sc.annunci) > 0)) { toast('Su «' + sc.nome + '» oggi non c\'è nessun annuncio: scegline un altro'); return; }
+  haptic(); cacciaUi.scaffale = Number(sc.n); disegnaCaccia();
+}
+async function cacciaParti(){
+  if (!cacciaStato || !cacciaUi.scaffale) return;
+  const d = await cacciaFai('/parti', {scaffale: cacciaUi.scaffale, grado: gradoCaccia(cacciaStato, cacciaUi.grado)});
+  if (d && d.caccia) {
+    cacciaUi.scheda = 'caccia'; disegnaCaccia();
+    const su = el('cacciaMondo');
+    if (su && su.scrollIntoView) su.scrollIntoView({block:'start', behavior: tourRidotto() ? 'auto' : 'smooth'});
+  }
+}
+function cacciaIndizio(){ return cacciaFai('/indizio', {}); }
+async function cacciaAttrezzo(id, azione){
+  if (!CACCIA_ID.test(String(id))) return;
+  const d = await cacciaFai('/attrezzo', {attrezzo: id, azione});
+  if (d) toast(azione === 'prendi' ? 'Nello zaino! 🎒' : id === 'torcia' ? '🔦 Tre occhiate in più'
+    : id === 'calamita' ? '🧲 Da adesso ti dico se sei vicino' : '💡 Un indizio in più, senza pagare');
+}
+async function cacciaOggetto(id, azione){
+  if (!CACCIA_ID.test(String(id))) return;
+  const d = await cacciaFai('/oggetto', {oggetto: id, azione});
+  if (d) {
+    if (azione === 'prendi') toast('Preso! 🔩');
+    if (typeof renderLivello === 'function') renderLivello();
+  }
+}
+/* «Vai a cercare»: apre il reparto che un indizio ha gia' detto — solo
+   se e' una categoria VERA del catalogo, sennò la vetrina intera */
+function cacciaVaiACercare(){
+  const c = cacciaStato && cacciaStato.caccia && cacciaStato.caccia.categoria;
+  if (c && CATS.includes(c) && c !== 'Tutto') { go('esplora'); apriCategoria(c); }
+  else go('esplora');
+}
+function cacciaApriAnnuncio(){
+  const a = cacciaStato && cacciaStato.caccia && cacciaStato.caccia.annuncio;
+  if (a && Number(a.id) > 0) apriAnnuncioPuntata(Number(a.id));
+}
+/* IL TASTO NELLA SCHEDA: nasce solo a caccia aperta, mai sui propri
+   annunci (li' Tappo non si nasconde). Si aggiunge al DOM dopo che
+   openDetail ha scritto la scheda: non entra nel suo template. */
+function cacciaNellaScheda(l){
+  if (DEMO || VETRINA || !cacciaAttiva || !cacciaAperta || !l) return;
+  if (myTgId && l.sellerId === myTgId) return;
+  const corpo = document.querySelector('#detailContent .detail-body');
+  if (!corpo) return;
+  const riga = document.createElement('div');
+  riga.className = 'caccia-riga';
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'caccia-qui'; b.id = 'cacciaQui';
+  const visto = cacciaGuardati.has(l.id);
+  b.textContent = visto ? cacciaTestoNo(cacciaGuardati.get(l.id)) : '🔩 Tappo è qui?';
+  b.disabled = visto;
+  b.addEventListener('click', () => cacciaGuarda(l.id));
+  riga.appendChild(b);
+  corpo.insertBefore(riga, corpo.firstChild);
+}
+/* PURA: la coppia [emoji, frase] di un calore, o null. Solo le voci
+   PROPRIE della tabella: «__proto__» o «constructor» arrivati dalla
+   rete non sono un calore. */
+function caloreCaccia(calore){
+  return typeof calore === 'string' && Object.prototype.hasOwnProperty.call(CACCIA_CALORE, calore)
+    ? CACCIA_CALORE[calore] : null;
+}
+/* PURA: la scritta del tasto dopo un'occhiata a vuoto */
+function cacciaTestoNo(calore){
+  const c = caloreCaccia(calore);
+  return c ? c[0] + ' Qui non c\'è' : '🔩 Qui Tappo non c\'è';
+}
+async function cacciaGuarda(id){
+  if (cacciaOccupata) return;
+  cacciaOccupata = true; haptic();
+  const b = el('cacciaQui');
+  if (b) b.disabled = true;
+  try {
+    const d = await cacciaChiama('/guarda', {annuncio_id: id});
+    if (!d) { if (b) b.disabled = false; return; }
+    cacciaAdotta(d);
+    const c = d.caccia || {};
+    if (d.esito === 'trovato') { if (b) b.closest('.caccia-riga')?.remove(); cacciaFesta(d); return; }
+    if (d.esito === 'biglietto') { if (b) b.closest('.caccia-riga')?.remove(); cacciaBiglietto(d); return; }
+    if (d.esito === 'no') {
+      cacciaGuardati.set(id, d.calore || '');
+      if (b) b.textContent = cacciaTestoNo(d.calore);
+      const caldo = caloreCaccia(d.calore);
+      const resto = Number(c.occhiate) > 0
+        ? 'Ti restano ' + fmt(Number(c.occhiate)) + (Number(c.occhiate) === 1 ? ' occhiata.' : ' occhiate.')
+        : 'Per oggi le occhiate sono finite.';
+      toast((caldo ? caldo[0] + ' ' + caldo[1] + '. ' : 'Qui non c\'è. ') + resto, 6000);
+      return;
+    }
+    if (b) b.closest('.caccia-riga')?.remove();
+    toast(d.esito === 'finite' ? 'Per oggi le occhiate sono finite. A domani!' : 'Oggi Tappo l\'hai già trovato', 5000);
+  } catch(e) { if (b) b.disabled = false; toast('Rete assente: riprova'); }
+  finally { cacciaOccupata = false; }
+}
+/* IL VELO: un velo nostro a tutto schermo, non un dialogo di sistema;
+   un tocco fuori dalla scatola lo chiude. */
+function cacciaVelo(dentro, etichetta){
+  chiudiCacciaVelo();
+  const velo = document.createElement('div');
+  velo.className = 'caccia-velo'; velo.id = 'cacciaVelo';
+  velo.setAttribute('role', 'dialog'); velo.setAttribute('aria-label', etichetta);
+  velo.innerHTML = dentro;
+  velo.addEventListener('click', e => { if (e.target === velo) chiudiCacciaVelo(); });
+  document.body.appendChild(velo);
+  return velo;
+}
+function chiudiCacciaVelo(){
+  const v = el('cacciaVelo');
+  if (v) v.remove();
+}
+/* PURA: i coriandoli della festa — bulloni e saette che piovono. I
+   posti sono scritti (niente dado): la stessa festa a ogni ritrovamento. */
+function cacciaCoriandoliHTML(){
+  const cosa = ['🔩', '⚡', '✨', '🔩', '⭐'];
+  let h = '';
+  for (let k = 0; k < 22; k++)
+    h += '<span class="caccia-coriandolo" aria-hidden="true" style="left:' + ((k * 37 + 11) % 100) + '%;animation-delay:'
+      + ((k * 13) % 9) / 10 + 's;animation-duration:' + (2.1 + ((k * 7) % 10) / 10) + 's;font-size:' + (16 + (k * 5) % 14) + 'px">'
+      + cosa[k % cosa.length] + '</span>';
+  return h;
+}
+/* PURA: la scatola della festa */
+function cacciaFestaHTML(d, fermo){
+  const c = d.caccia || {};
+  const nuove = (Array.isArray(d.sfide_nuove) ? d.sfide_nuove : []).filter(x => x && x.nome);
+  /* coi movimenti ridotti i coriandoli non nascono: fermi sarebbero
+     solo macchie sopra la scatola */
+  return (fermo ? '' : cacciaCoriandoliHTML()) + '<div class="scatola">' + tappoCacciaHTML(cappelloCaccia(d), '')
+    + '<div class="grande">Mi hai trovato! 🎉</div>'
+    + '<div class="premio">+' + fmt(Number(c.bulloni) || 0) + ' 🔩</div>'
+    + '<p>Preso in ' + tempoCaccia(c.secondi) + '. Torno nel barattolo: a mezzanotte scappo di nuovo.</p>'
+    + (nuove.length ? '<ul>' + nuove.map((x, k) => '<li style="animation-delay:' + (0.5 + k * 0.12) + 's"><span aria-hidden="true">' + esc(x.emoji)
+        + '</span><span>Sfida fatta: ' + esc(x.nome) + '</span><b>+' + fmt(Number(x.bulloni) || 0) + ' 🔩</b></li>').join('') + '</ul>' : '')
+    + '<button type="button" class="caccia-btn" onclick="chiudiCacciaVelo();cacciaUi.scheda=\'caccia\';go(\'caccia\')">Torna alla dispensa</button>'
+    + '<button type="button" class="caccia-btn piano" onclick="chiudiCacciaVelo()">Resto qui</button></div>';
+}
+/* LA FESTA: Tappo salta fuori dall'annuncio, piovono bulloni */
+function cacciaFesta(d){
+  haptic('success');
+  cacciaVelo(cacciaFestaHTML(d, effettiRidotti()), 'Hai trovato Tappo');
+}
+/* PURA: il biglietto che Tappo lascia quando la pista continua */
+function cacciaBigliettoHTML(d){
+  const c = d.caccia || {};
+  const primo = Array.isArray(c.indizi) && c.indizi[0] ? String(c.indizi[0].testo || '') : '';
+  return '<div class="scatola"><div class="grande">Un biglietto! 👣</div>'
+    + '<div class="foglio">«Ero qui, ma ti ho sentito arrivare e sono scappato di nuovo.»'
+    + (primo ? '<small>' + esc(primo) + '</small>' : '') + '</div>'
+    + '<p><b>Tappa ' + fmt(Number(c.tappa) || 0) + ' di ' + fmt(Number(c.tappe) || 0) + '.</b> Ti restano '
+    + fmt(Number(c.occhiate) || 0) + (Number(c.occhiate) === 1 ? ' occhiata.' : ' occhiate.') + '</p>'
+    + '<button type="button" class="caccia-btn" onclick="chiudiCacciaVelo()">Continuo a cercare</button>'
+    + '<button type="button" class="caccia-btn piano" onclick="chiudiCacciaVelo();cacciaUi.scheda=\'caccia\';go(\'caccia\')">Rileggo gli indizi</button></div>';
+}
+function cacciaBiglietto(d){
+  haptic('warning');
+  cacciaVelo(cacciaBigliettoHTML(d), 'Tappo ha lasciato un biglietto');
 }
 let assistenzaMsgs = null, assistenzaMax = 2000;
 let assistenzaAdmLista = null, assistenzaAdmAperta = null;
@@ -106647,6 +107564,12 @@ async function avvia(){
     if (el('vocTappo')) el('vocTappo').style.display = tappoLink ? '' : 'none';
     assistenzaNuove = Number(me.assistenza_nuove) || 0;
     vestiAssistenza();
+    /* LA CACCIA A TAPPO (17 nov 2026): la leva viva, e se OGGI c'e' una
+       caccia aperta — e' quel che fa nascere «Tappo è qui?» negli
+       annunci (un server di ieri non manda niente: tutto spento) */
+    cacciaAttiva = me.gioco_tappo === true;
+    cacciaAperta = cacciaAttiva && me.tappo_caccia === true;
+    vestiCaccia();
     myClassificaNascosta = !!me.classifica_nascosta;
     myAnnunciSulProfilo = me.annunci_su_profilo_nostr == null ? true : !!me.annunci_su_profilo_nostr;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);

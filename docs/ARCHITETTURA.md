@@ -31860,6 +31860,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    letterali li timbra `_timbra_asset_pagina`, quindi max-age di un
    giorno; vedi CANTIERI, «L'icona del carrello in Esplora per
    categorie»),
+   `/assets/caccia-tappo.webp` (Tappo in persona nella Caccia a Tappo,
+   17 nov 2026: l'ufficiale scontornato, WebP con trasparenza, 560x721,
+   ~58 KB, max-age di un giorno — vedi «LA CACCIA A TAPPO»),
    `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
    `/assets/icona-192-maskable.png`, `/assets/icona-512-maskable.png`,
@@ -36626,3 +36629,63 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   spedire entro …» / «Il venditore spedisce entro …» / «Spedito …» sul
   passo della spedizione (`rigaSpedito`). Prove: `prove_spedisci_entro`
   e `collaudo_spedisci_entro`.
+- LA CACCIA A TAPPO (17 nov 2026, cantiere caccia-a-tappo; il perché in
+  CANTIERI, «La Caccia a Tappo: il gioco dentro Barattolo»). Il gioco
+  sta tutto nel blocco in fondo a `server.py` e in una vista di
+  `miniapp.html` (`#view-caccia`); non tocca ordini, sats, XP né livelli.
+  LA LEVA: `GIOCO_TAPPO_ATTIVO`, accesa di serie; il giudice è
+  `_tappo_acceso()`, ed è il primo gesto di ogni rotta (spenta: 404,
+  `/api/me` dà `gioco_tappo: false` e la voce del Profilo non si vede).
+  I DATI: `gioco_tappo` (chiave `tg_id, giorno`; il giorno è quello di
+  Roma, `_giorno_roma`; dentro: annuncio, scaffale, grado, tappa e
+  `pista`, indizi aperti, aiuti, attrezzi usati, occhiate, sbagli,
+  `partito`, `trovato`, bulloni presi, categoria),
+  `gioco_tappo_oggetti` (quel che resta), `gioco_tappo_attrezzi` (presi
+  e usati), `gioco_tappo_sfide` (le soglie già pagate), e in `utenti`
+  `tappo_oggetto` (il cappellino indossato) e `tappo_palco` (lo sfondo).
+  IL SALDO NON È UNA COLONNA: `_tappo_saldo` = bulloni delle cacce +
+  delle sfide − oggetti − attrezzi, ricontato a ogni lettura. La fusione
+  di due account (`esegui_fusione`) porta le righe e SOMMA gli attrezzi;
+  la cancellazione (`CANCELLA_TOGLI`) toglie le quattro tabelle.
+  I CATALOGHI, tuple in testa al blocco: `GIOCO_TAPPO_SCAFFALI` (sei
+  scaffali, ogni categoria di `CATEGORIE` su uno e uno solo: una prova lo
+  guarda), `GIOCO_TAPPO_GRADI` (occhiate, tappe, i tre tipi d'indizio,
+  calore, premio, calo, quante cacce al grado prima per aprirlo),
+  `GIOCO_TAPPO_METALLI`, `GIOCO_TAPPO_ATTREZZI`, `GIOCO_TAPPO_OGGETTI`,
+  `GIOCO_TAPPO_SFIDE`. Togliere una riga da un catalogo non toglie niente
+  a chi l'ha già: smette di vendersi.
+  I GIUDICI PURI (prendono campi, mai la riga): `_tappo_pesca` (prima il
+  venditore, poi un suo annuncio), `_tappo_dado` (sha256 del seme: lo
+  stesso giorno e la stessa persona danno lo stesso lancio),
+  `_tappo_indizio` e `_tappo_indizi` (gli indizi si scrivono SOLO sul
+  server), `_tappo_premio` (mai sotto 1), `_tappo_occhiate_max`,
+  `_tappo_calore`, `_tappo_metallo`, `_tappo_gradi_aperti`,
+  `_tappo_sfide_raggiunte`. Sul database: `_tappo_candidati` (la vetrina
+  di `_TAPPO_SQL_VETRINA`, mai i propri annunci, mai un nascondiglio
+  degli ultimi `GIOCO_TAPPO_RIPOSO_GIORNI` se c'è altro), `_tappo_oggi`
+  (legge la caccia del giorno senza crearla; se l'annuncio è sparito ne
+  pesca un altro, prima sullo stesso scaffale), `_tappo_passa_sfide`,
+  `_tappo_corredo`, e `_tappo_stato`, l'UNICA fotografia che esce verso
+  il client: l'annuncio c'è dentro solo a caccia finita.
+  LE ROTTE, tutte con `verifica_utente`: `GET /api/gioco/tappo` (lo
+  stato), `POST .../parti` `{scaffale, grado}`, `.../indizio`,
+  `.../attrezzo` `{attrezzo, azione: prendi|usa}`, `.../guarda`
+  `{annuncio_id}` (esito `trovato | biglietto | no | finite | gia`, più
+  il calore dove il grado o la calamita lo danno; freno `tappo_guarda`),
+  `.../oggetto` `{oggetto, azione: prendi|indossa|togli}` (freno
+  `tappo_oggetto`). Dal client arrivano solo NOMI: prezzi, premi e
+  soglie si leggono dai cataloghi. Il venditore riceve
+  `_tappo_avvisa_venditore`, anonimo e fail-open, al più uno ogni
+  `GIOCO_TAPPO_AVVISO_GIORNI` (`_tappo_da_avvisare`).
+  FUORI DAL BLOCCO il gioco tocca tre cose: `max_barattolo_di` (i posti
+  dei preferiti, +`GIOCO_TAPPO_POSTI` con l'oggetto «posti»), il titolo
+  `t_amico_tappo` in `TITOLI` (giudice `tappo` in `titoli_disponibili`,
+  cercato per nome: i banchi che montano la funzione da sola non lo
+  hanno) e `/api/me` (`max_barattolo`, `gioco_tappo`, `tappo_caccia`).
+  IL CLIENT: `renderCaccia` chiede lo stato e `cacciaHTML(s, ui)` lo
+  disegna, quattro schede (`CACCIA_SCHEDE`); ogni gesto passa da
+  `cacciaFai`, che riceve lo stato nuovo e ridisegna. Nella scheda di un
+  annuncio `cacciaNellaScheda` mette «Tappo è qui?» solo a caccia aperta.
+  I colori sono suoi (`--c-*` su `#view-caccia, .caccia-velo`), le
+  animazioni solo `transform` e `opacity`. Le prove:
+  `prove_caccia_a_tappo` e `collaudo_caccia_a_tappo`.
