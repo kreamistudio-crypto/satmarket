@@ -1,0 +1,53 @@
+PLATFORM 2D DI TAPPO — immagini Flow (17/11/2026)
+Nano Banana 2.1 (0 crediti), x2 per ogni richiesta, scelta la migliore. Download «2K» di Flow, salvati in PNG.
+JPG 2K originali (senza ritocchi) in originali-jpg\, anteprime 1K e varianti scartate in _1k\.
+Riferimenti di stile per fondali e oggetti: il forno («Rustic bakery game background…») e il pezzo di mappa della stradina («Village houses and bitcoi…»).
+Fondo verde misurato: ~[0-3, 254-255, 2-3].
+
+FONDALI (vista di lato pura, ripetibili in orizzontale)
+- fondo-cielo.png 5504x1536: tramonto ambra -> blu notte con stelle, nuvole, colline lontane.
+  Il taglio «a minimo errore» lasciava un salto di colore (il bagliore del sole cambia da sinistra a destra),
+  quindi è l'immagine + la stessa SPECCHIATA: bordi identici al pixel, ma la nuvola centrale si vede simmetrica.
+- fondo-cielo-b.png 5504x1536: stessa cosa, versione più semplice (meno nuvole, la simmetria si nota meno). CONSIGLIATO b.
+- fondo-lontano.png 2400x1536: città-mercatino lontana (tetti, bancarelle a strisce, due mulini, torre con orologio), verde sopra i tetti.
+- fondo-vicino.png 2400x1536: alberi d'autunno, lanterne, lucine, steccato, verde sopra.
+  Lontano e vicino: resi ripetibili con un taglio a minimo errore nella zona di sovrapposizione (passa nel verde o dove le due parti combaciano),
+  sfumato 6 px, SENZA stirare: per questo sono larghi 2400 e non 2752. Controllo: due copie affiancate, giunzione non visibile.
+
+TERRENO E OGGETTI (2048x2048 su verde)
+- terreno-a.png 1792x2048: blocco di terra con erba color ocra e fiorellini, monete sepolte; ripetibile in orizzontale (stesso taglio, 1792 di larghezza).
+  La variante b è stata scartata: il suo «2K» aveva una fascia fantasma sotto.
+- piattaforma-a.png: piattaforma di legno sospesa con fasce di rame, corde e lanternina (attenzione: la lanterna ha un piccolo alone caldo sul verde).
+- cassa-a.png: cassa di legno vista di fronte, croce diagonale, angoli di rame.
+- molla-a.png: trampolino, base di legno scuro, molla di rame, piatto ambra con bordo crema.
+- traguardo-a.png: il wallet arancione grande in piedi, monete che spuntano, bandierina ambra/crema (nessuna scritta).
+
+TAPPO (vista di profilo, verso destra, vetro ambrato pieno)
+- La prima prova dei fogli usando la vecchia camminata come riferimento usciva di 3/4 e con 4 o 12 pose: scartata.
+  Allora prima un Tappo di profilo puro (tappo-profilo.png), poi i fogli con lui come riferimento.
+- corsa-foglio.png 2752x1536: 8 pose della corsa in una riga. corsa-1..8.png: 470x710 ciascuno, piedi alla stessa altezza (24 px dal fondo).
+- salto-foglio.png: fermo, sale (braccia su, gambe raccolte), scende (braccia aperte, gambe giù), atterra (schiacciato).
+  fermo/sale/scende/atterra.png: 807x1186 ciascuno, piedi alla stessa altezza (il salto vero lo fa il codice).
+- Nota: la testa sale e scende un po' tra le pose della corsa (è il rimbalzo), le figure hanno larghezze diverse ma la cornice è uguale per tutte.
+
+GAZZA IN VOLO (di lato, verso destra)
+- gazza-volo-foglio.png: 4 pose del battito d'ali (ali su, orizzontali, giù, a metà).
+- gazza-volo-1..4.png: 733x838 ciascuno, stessa posizione verticale del foglio (il corpo resta alla stessa altezza).
+
+Tagli fatti sul PC: ogni posa tiene solo i pixel della sua figura (niente pezzetti delle vicine), il resto è riempito con il verde del foglio.
+
+PROMPT (inizio comune per fondali e oggetti)
+«Use the two reference images ONLY for the painting style and colors, do NOT copy their objects or their camera angle: same hand-painted cozy cartoon game-art style with subtle dark-brown outlines, warm lighting and the Barattolo palette (bitcoin amber orange, deep night blue, copper, cream). PURE SIDE VIEW like a 2D side-scrolling platform game…»
+- cielo: «…the farthest layer: a magical sunset sky, glowing warm amber and orange near the horizon fading upward into deep night blue with small twinkling stars at the top, a few soft warm-lit clouds, and along the bottom quarter a band of distant soft blue-violet rolling hills… tile seamlessly…»
+- lontano: «…a cozy market town seen far away at dusk, filling the bottom 45 percent: rooftops, houses with warm windows, orange and cream striped awnings, two old windmills, a small clock tower… EVERYTHING ABOVE THE ROOFTOPS IS A COMPLETELY FLAT, UNIFORM, PURE CHROMA-KEY GREEN (#00FF00)… edges: only low houses and the ground strip at the same height…»
+- vicino: «…trees with round leafy crowns in warm autumn colors, wooden picket fences, poles with hanging warm paper lanterns and string lights, bushes… everything above is flat pure #00FF00… nothing is green…»
+- terreno: «…a horizontally tileable GROUND BLOCK seen exactly from the side: brown earth with stones, roots and a buried bitcoin coin, topped by warm golden-ochre autumn grass with tiny amber flowers… full width, middle 50 percent of the height… grass NOT green.»
+- piattaforma: «…a FLOATING WOODEN PLATFORM: wooden boards held by copper bands and brass rivets, short dangling ropes and a tiny hanging lantern underneath, flat walkable top…»
+- cassa: «…a WOODEN CRATE seen exactly from the front (only the front face, square): planks with a diagonal cross brace, dark copper corners, brass nails…»
+- molla: «…a SPRING TRAMPOLINE: dark wooden base plate, big shiny coiled copper spring, round flat amber bounce pad with a cream rim…»
+- traguardo (riferimento: il wallet arancione): «…the FINISH LINE: the same orange wallet, BIG and standing upright, slightly open with gold coins peeking out, a small amber and cream pennant flag on a brass pole… no text, no logos…»
+- tappo-profilo (riferimento: la vecchia camminata «Robot walking game spri…»): «…Draw Tappo in a STRICT SIDE PROFILE view facing RIGHT… only ONE eye-lens visible… Standing still… glass opaque amber…»
+- corsa (riferimento: tappo-profilo): «…EXACTLY EIGHT (8) small figures of Tappo in ONE single horizontal row… feet on exactly the same baseline… RUN CYCLE: contact, down, passing, up, contact (other leg), down, passing, up…»
+- salto (riferimento: tappo-profilo): «…EXACTLY FOUR (4) figures… IDLE, JUMP RISING (arms up, legs tucked), JUMP FALLING (arms out, legs down), LANDING SQUASH…»
+- gazza (riferimento: la gazza in volo già fatta): «…4 frames of the magpie FLYING to the RIGHT, in PURE SIDE PROFILE… WING-BEAT cycle: wings up, level, down, half-way up… body at the same height…»
+Tutti chiudono con fondo «completely flat, uniform, pure chroma-key green (#00FF00), no shadow, no gradient» e «No text, no letters, no logos».
