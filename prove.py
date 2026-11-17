@@ -146181,6 +146181,10 @@ def prove_contanti_a_mano():
               "_appuntamento_in_vigore_p2p", "_presenze_per_parte_p2p", "_registra_sono_qui_p2p",
               "_registra_appuntamento_p2p", "_confronto_presenze_p2p", "_confronto_giro_p2p",
               "_incontro_da_riga_p2p", "_incontro_p2p", "_scorda_posizioni_presenza_p2p",
+              # (17 nov 2026, onchain-contanti) la scopa chiama anche lo
+              # scordo degli scambi on-chain chiusi: qui la tabella degli
+              # ordini on-chain non c'e', e risponde 0
+              "_p2p_onchain_scorda_incontri",
               "_scopa_presenze_p2p", "_dimentica_presenze_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
     ORA = 1_790_000_000
@@ -153509,6 +153513,7 @@ def prove_freni():
            # prendere 10 all'ora, una disputa 5 all'ora; il battito della
            # pagina di chi deposita (uno ogni 15 s) 300 all'ora
            "p2p_onchain_pubblica": (10, 3600), "p2p_onchain_prendi": (10, 3600),
+           "p2p_onchain_cauzione": (10, 3600),
            "p2p_onchain_controlla": (300, 3600), "p2p_onchain_disputa": (5, 3600),
            # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
            # un login con la sua coda sta largo in 60 al minuto per IP
@@ -163531,7 +163536,7 @@ process.stdout.write(JSON.stringify(out));
            "                                                    _P2P_INFO[\"fee\"])" in src,
            "La commissione del P2P adesso non si \"\n                                     \"legge: riprova fra un minuto" in src,
            "(user[\"id\"], dep, ric, ind_id, margine, prezzo + margine + q_dep," in src,
-           "quota_dove, q_ric, oid))" in src,
+           "quota_dove, q_ric, scelto if piu_metodi else \"\", oid))" in src,
            "if [v for d, v in uscite if d == o[\"incasso\"]] != [_onchain_incasso_sats(o)]:" in src,
            "uscite = [(oc[\"incasso\"], _onchain_incasso_sats(oc))]" in src,
            "p = await _onchain_preventivo_cambio(_onchain_incasso_sats(o))" in src])
@@ -172857,9 +172862,10 @@ def prove_apri_nel_wallet():
     # (14 nov 2026) il quinto QR e' quello della mancia al venditore
     # (15 nov 2026) il sesto e' quello della cassa in negozio
     # (17 nov 2026) il settimo e' quello dello zap a una raccolta
-    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei sette QR "
+    # (17 nov 2026 sera) l'ottavo e' quello della cauzione del contanti on-chain
+    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, negli otto QR "
           "e nel Riprova, e in nessuna navigazione da script",
-          [0, 8],
+          [0, 9],
           [len([l for l in mini.splitlines()
                 if re.search(r"""location(\.href)?\s*=\s*['"`]lightning:""", l)]),
            mini.count("('lightning:' + ")])
@@ -192046,7 +192052,11 @@ def prove_barattozon_onchain():
           [1, 1, 1, 0],
           [mini.count("interruttoreReteP2P(oc ? 'onchain' : 'ln', tabMetodo && (compro || !(typeof bzOnchainP2P === 'function' && bzOnchainP2P())))"),
            mini.count("if (oc && tabacchinoP2P(p2pNuovoMetodi) && (p2pLato === 'compro' || !bzOnchainP2P())) {"),
-           mini.count("(p2pLato !== 'compro' && !tabacchinoP2P(p2pNuovoMetodi) ? sezioneRecapitoOnchainP2P() : '')"),
+           # (17 nov 2026, onchain-contanti) fra le due meta' c'e' ora anche
+           # il SOLO «Contanti», che al posto del recapito ha la zona
+           mini.count("return (p2pLato !== 'compro' && !tabacchinoP2P(p2pNuovoMetodi)\n"
+                      "            && !(typeof soloContantiP2P === 'function' && soloContantiP2P(p2pNuovoMetodi))\n"
+                      "            ? sezioneRecapitoOnchainP2P() : '') + riquadroOnchainP2P();"),
            mini.count("if (oc && tabacchinoP2P(p2pNuovoMetodi)) { toast('Barattozon si scambia solo via Lightning ⚡'); return; }")])
     prova("il giudice del foglio on-chain: almeno 12 ore, e la finestra della garanzia di Lightning non conta",
           [1, 1, 1],
@@ -204289,6 +204299,7 @@ def prove_onchain_promemoria():
               "p2p_onchain_usdt", "_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin",
               "p2p_onchain_ore_pagamento", "_p2p_onchain_intervalli_pagare",
               "_p2p_onchain_testi_pagare", "_p2p_onchain_solo_contanti",
+              "_p2p_onchain_contanti",
               "p2p_onchain_tab_dati", "p2p_onchain_tab_scade", "_p2p_onchain_promemoria_tab",
               "_p2p_onchain_sollecito_dovuto", "_p2p_onchain_passata_solleciti"):
         exec(pezzo(f), amb)
@@ -205030,7 +205041,7 @@ def prove_onchain_contanti():
            "tetto_c = p2p_onchain_tetto_usdt(tetto_c, cambio_noto_ora(\"eur\"), cambio)" in rotta))
     prova("la colonna nasce da sola, e la zona esce nel libro e nella scheda dello scambio",
           (True, True, True),
-          ('("zona", "TEXT DEFAULT \'\'")):' in src,
+          ('("zona", "TEXT DEFAULT \'\'"),' in src,
            "zona = _p2p_onchain_zona(o)\n    if zona:\n        r[\"zona\"] = zona"
            in pezzo("_p2p_onchain_riga_pubblica"),
            "\"zona\": _p2p_onchain_zona(o)," in pezzo("_p2p_onchain_per")))
@@ -205044,8 +205055,13 @@ def prove_onchain_contanti():
           ("zona: typeof zonaDaCampiP2P === 'function' ? zonaDaCampiP2P(campi) : ''," in pubb,
            "rigaZonaP2P({metodi: metodi, zona: o.zona})" in riga
            and riga.index("${paga}") < riga.index("${zona}") < riga.index("${filtro}"),
-           "zonaDettP2P({metodi: o.metodi || [], zona: o.zona})" in apri,
-           "(o.metodi || []).length === 1\n        ? regolaContantiFoglioP2P(o.metodi," in apri))
+           # (17 nov 2026 sera, terzo pezzo) zona e regola stanno nel riquadro
+           # dei metodi, che si ridisegna scegliendo «Contanti»
+           "'<div id=\"p2pOcPresaMetodi\">' + metodiPresaOcHtmlP2P(o, vendeLui) + '</div>'" in apri
+           and "zonaDettP2P({metodi: perZona, zona: o.zona})"
+           in _fn_js(mini, "function metodiPresaOcHtmlP2P(o, vendeLui){"),
+           "(scelta ? m === 'Contanti' : (o.metodi || []).length === 1)\n    ? regolaContantiFoglioP2P([m],"
+           in _fn_js(mini, "function metodiPresaOcHtmlP2P(o, vendeLui){")))
     banco = "\n".join(_fn_js(mini, f) for f in (
         "function metodoBaseP2P(m){", "function contantiAManoP2P(metodi){",
         "function zonaPulitaP2P(t){", "function zonaOrdineP2P(o){", "function rigaZonaP2P(o){",
@@ -205340,6 +205356,300 @@ console.log(JSON.stringify(out));
           "senza la riga delle firme; le parti no",
           [True, True, True, True, False, True, ""], out["moderatore"])
 
+
+
+def prove_onchain_cauzione():
+    """IL CONTANTI DI PERSONA ON-CHAIN, TERZO PEZZO: IL METODO SCELTO ALLA
+    PRESA E LA CAUZIONE IN LIGHTNING (17 nov 2026 sera, cantiere onchain-
+    contanti; Andrea: «Quando ci clicco poi non mi fa mettere la cauzione.
+    Dovrebbe funzionare esattamente come Lightning anche l'on-chain
+    contanti», «Anche la questione QR, tutto quanto»; le due card: la
+    cauzione in Lightning col QR tenuta da Barattolo, e persa solo per
+    decisione del moderatore). Qui i giudici puri (quanti sats, a chi
+    serve, cosa fa il giro di ogni cauzione), le sentinelle (la cauzione
+    si guarda PRIMA della presa, nessuna strada la salda, il macaroon
+    delle hold di prova non c'entra) e il foglio della presa in node. Il
+    giro vero contro un LND di cartone sta in collaudo_p2p_onchain
+    (11-novies)."""
+    print("\n[on-chain: il metodo scelto alla presa e la cauzione in Lightning]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    amb = {"json": json, "re": re, "base64": __import__("base64"),
+           "_euro_tabacchino": lambda m: 0}
+    for riga in ("\nP2P_ONCHAIN_CAUZIONE_PCT = ", "\nP2P_ONCHAIN_CAUZIONE_BASE_SATS = ",
+                 "\nP2P_ONCHAIN_CAUZIONE_FINESTRA_S = ", "\nP2P_ONCHAIN_CAUZIONE_CLTV = ",
+                 "\nP2P_ONCHAIN_CAUZIONE_PRESA_S = ", "\nP2P_ONCHAIN_CAUZIONE_GUARDA_S = ",
+                 "\nP2P_ONCHAIN_STATI_CHIUSI = "):
+        k = src.index(riga) + 1
+        exec(src[k:src.index("\n", k)], amb)
+    k = src.index("\nP2P_ONCHAIN_CAUZIONE_MEMO = ") + 1
+    exec(src[k:src.index("\n", src.index("\n", k) + 1)], amb)
+    for f in ("_metodi_libro", "_p2p_onchain_campo", "_p2p_onchain_metodi", "_p2p_onchain_solo_contanti",
+              "_p2p_onchain_contanti", "p2p_onchain_cauzione_sats", "p2p_onchain_metodo_presa",
+              "p2p_onchain_cauzione_serve", "richiesta_hold_cauzione", "p2p_onchain_cauzione_sorte",
+              "_p2p_onchain_cauzione_fuori"):
+        exec(pezzo(f), amb)
+    S, M, V = amb["p2p_onchain_cauzione_sats"], amb["p2p_onchain_metodo_presa"], amb["p2p_onchain_cauzione_serve"]
+    prova("la regola e' quella letta sul nodo: 3%, almeno 1000 sats, quindici minuti, 576 blocchi",
+          (3, 1000, 900, 576),
+          (amb["P2P_ONCHAIN_CAUZIONE_PCT"], amb["P2P_ONCHAIN_CAUZIONE_BASE_SATS"],
+           amb["P2P_ONCHAIN_CAUZIONE_FINESTRA_S"], amb["P2P_ONCHAIN_CAUZIONE_CLTV"]))
+    prova("quanti sats: il 3% col mezzo che sale, mai sotto il minimo, e una cifra storta fa 0",
+          [3000, 1000, 1000, 1001, 30000, 0, 0, 0],
+          [S(100000), S(10000), S(33334), S(33350), S(1000000), S(0), S(-5), S("x")])
+    solo = {"metodi": '["Contanti"]'}
+    misto = {"metodi": '["Bonifico", "Contanti"]'}
+    online = {"metodi": '["Bonifico", "Revolut"]'}
+    prova("il metodo della presa: l'unico senza chiedere; fra piu' metodi quello chiesto se e' "
+          "dell'ordine, sennò nessuna scelta",
+          ["Contanti", "Contanti", "Bonifico", "", "", "Contanti"],
+          [M(solo, ""), M(misto, "Contanti"), M(misto, " Bonifico "), M(misto, ""),
+           M(misto, "Satispay"), M(solo, "Bonifico")])
+    prova("la cauzione serve solo con la leva accesa e «Contanti» scelto (o unico)",
+          [True, True, False, False, False, False],
+          [V(solo, "Contanti", True), V(misto, "Contanti", True), V(misto, "Bonifico", True),
+           V(misto, "", True), V(solo, "Contanti", False), V(online, "Contanti", True)])
+    C = amb["_p2p_onchain_contanti"]
+    prova("il giudice unico del contanti si allarga al metodo scelto: il solo «Contanti», o "
+          "«Contanti» scelto su un ordine che ce l'ha; mai su un ordine che non ce l'ha",
+          [True, True, False, False, False],
+          [C(solo), C({**misto, "metodo_scelto": "Contanti"}), C({**misto, "metodo_scelto": "Bonifico"}),
+           C(misto), C({**online, "metodo_scelto": "Contanti"})])
+    corpo = amb["richiesta_hold_cauzione"](bytes(range(32)), 3000)
+    prova("la hold chiesta a LND: i sats, quindici minuti, 576 blocchi, l'hash in base64, numeri "
+          "come stringhe, e un memo che dice che torna",
+          ("3000", "900", "576", bytes(range(32)), True),
+          (corpo["value"], corpo["expiry"], corpo["cltv_expiry"],
+           __import__("base64").b64decode(corpo["hash"]), "torna a fine scambio" in corpo["memo"]))
+    G = amb["p2p_onchain_cauzione_sorte"]
+    def cz(**k):
+        base = {"stato": "attesa", "scade": 1000, "in_gioco": 0, "tenuta_il": 0, "guardata_il": 0}
+        base.update(k)
+        return base
+    prova("il giro di una cauzione IN ATTESA: finche' la richiesta e' viva si lascia al telefono, "
+          "scaduta si guarda (pagata all'ultimo o da annullare)",
+          ["aspetta", "aspetta", "guarda"],
+          [G(cz(), "pending", 500), G(cz(), "pending", 1000), G(cz(), "pending", 1001)])
+    prova("TENUTA e non usata: torna se l'ordine non e' piu' nel libro, o dopo un quarto d'ora",
+          ["aspetta", "annulla", "annulla", "aspetta", "annulla"],
+          [G(cz(stato="tenuta", tenuta_il=1000), "pending", 1100),
+           G(cz(stato="tenuta", tenuta_il=1000), "preso", 1100),
+           G(cz(stato="tenuta", tenuta_il=1000), "annullato", 1100),
+           G(cz(stato="tenuta", tenuta_il=1000), "pending", 1900),
+           G(cz(stato="tenuta", tenuta_il=1000), "pending", 1901)])
+    viva = cz(stato="tenuta", in_gioco=1, tenuta_il=1000, guardata_il=1000)
+    prova("IN GIOCO: a scambio vivo (disputa compresa) si tiene e ogni dieci minuti si guarda; "
+          "torna SOLO a scambio chiuso, in qualunque modo; il tempo da solo non la brucia mai",
+          ["aspetta", "aspetta", "aspetta", "aspetta", "guarda",
+           "annulla", "annulla", "annulla", "annulla", "annulla"],
+          [G(viva, "preso", 1100), G(viva, "depositato", 1100), G(viva, "euro_inviati", 1100),
+           G(viva, "disputa", 1500), G(viva, "disputa", 1600),
+           G(viva, "rilasciato", 1100), G(viva, "rimborsato", 1100), G(viva, "annullato", 1100),
+           G(viva, "scaduto", 1100), G(viva, "", 1100)])
+    prova("...e una gia' chiusa non si tocca piu'",
+          ["aspetta", "aspetta"],
+          [G(cz(stato="tornata", in_gioco=1), "rilasciato", 9999), G(cz(stato="scaduta"), "pending", 9999)])
+    FU = amb["_p2p_onchain_cauzione_fuori"]
+    riga = {"stato": "attesa", "sats": 3000, "scade": 1000, "in_gioco": 0, "bolt11": "lnbc1x",
+            "preimage": "aa" * 32, "hash": "bb" * 32}
+    prova("al telefono esce la richiesta solo finche' e' da pagare; preimage e hash MAI",
+          ({"stato": "attesa", "sats": 3000, "scade": 1000, "in_gioco": False, "bolt11": "lnbc1x"},
+           False, False),
+          (FU(riga, 900), "bolt11" in FU(riga, 1001), "bolt11" in FU({**riga, "stato": "tenuta"}, 900)))
+    # --- le sentinelle del server ---
+    lnd = pezzo("_lnd_cauzione")
+    presa = pezzo("p2p_onchain_prendi")
+    chiedi = pezzo("p2p_onchain_cauzione_chiedi")
+    prova("a LND, per le cauzioni, passano SOLO hodl, cancel e la lettura di una fattura per "
+          "hash; il macaroon e' il SUO, e quello delle hold di prova (che non sa saldare) qui "
+          "non entra",
+          (True, True, False),
+          ('(metodo == "POST" and percorso in ("/v2/invoices/hodl",' in lnd
+           and '"/v2/invoices/cancel"))' in lnd
+           and 're.fullmatch(r"/v1/invoice/[0-9a-f]{64}", percorso)' in lnd
+           and lnd.count("/v2/invoices/") == 2,
+           "str(LND_PONTE_MACAROON_CAUZIONE).strip()" in lnd,
+           "LND_PONTE_MACAROON_HOLD" in lnd))
+    prova("nessuna strada del server salda una hold (la cauzione persa e' un pezzo a parte, "
+          "con la sua decisione)", 0, src.count("/v2/invoices/settle"))
+    accesa = pezzo("p2p_onchain_cauzione_accesa")
+    prova("la leva e' SPENTA di serie, e accesa vuole la riga del config E il macaroon",
+          (True, True),
+          ("except ImportError:\n    P2P_ONCHAIN_CAUZIONE = False\n" in src,
+           "if not (P2P_ONCHAIN_CAUZIONE is True and _p2p_onchain_cauzione_macaroon()):\n"
+           "        return False" in accesa))
+    # LA PORTICINA DEI MODERATORI (17 nov 2026, Andrea: «In produzione, solo
+    # tu e Alan», «Lo vediamo solo noi con una leva spenta?»)
+    prova("la porticina dei moderatori e' CHIUSA di serie (anche senza la riga), si apre "
+          "solo con un False scritto, e a porticina chiusa giudica `e_admin` sulla persona",
+          (True, True, True, True),
+          ("except ImportError:\n    P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True\n" in src,
+           "P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN is not False" in src,
+           "if P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN is not False:" in accesa
+           and "return bool(tg_id) and e_admin(int(tg_id))" in accesa,
+           accesa.index("P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN is not False")
+           < accesa.rindex("return True")))
+    prova("...e la leva si chiede SEMPRE per la persona: nella busta del libro, nella "
+          "richiesta, prima della presa e dentro la presa; mai a vuoto",
+          (True, True, True, True, 0),
+          ('"cauzione": {"accesa": p2p_onchain_cauzione_accesa(chi),' in pezzo("_p2p_onchain_libro"),
+           'p2p_onchain_cauzione_accesa(user["id"])' in chiedi,
+           "p2p_onchain_cauzione_accesa(tg_id)" in pezzo("_p2p_onchain_cauzione_per_presa"),
+           'p2p_onchain_cauzione_accesa(user["id"])' in presa,
+           src.count("p2p_onchain_cauzione_accesa()")))
+    prova("...e il config di esempio la porta chiusa",
+          True, "\nP2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True\n" in open("config_esempio.py", encoding="utf-8").read())
+    prova("la presa guarda la cauzione su LND PRIMA di aprire la connessione, la ricontrolla "
+          "dentro, scrive il metodo scelto e mette la cauzione in gioco solo a presa riuscita",
+          (True, True, True, True),
+          (presa.index("await _p2p_onchain_cauzione_per_presa(") < presa.index("con = _p2p_onchain_db()"),
+           presa.index("and not cauzione_id:") < presa.index('"UPDATE p2p_onchain_ordini SET stato=\'preso\''),
+           "quota_indirizzo=?, quota_ricevente_sats=?, metodo_scelto=?" in presa,
+           presa.index("Qualcun altro l'ha preso un attimo fa")
+           < presa.index("UPDATE p2p_onchain_cauzioni SET in_gioco=1 WHERE id=?")))
+    prova("...e «Contanti» scelto fra piu' metodi toglie il recapito dei metodi online",
+          True, 'if piu_metodi and scelto == "Contanti":\n            rec = ""' in presa)
+    prova("la richiesta della cauzione: ha il SUO freno, non prende niente, passa dalle porte "
+          "della presa, e la hold nasce fuori dalla connessione",
+          (True, True, False, True, True),
+          ('"p2p_onchain_cauzione": (10, 3600),' in src,
+           '_frena("p2p_onchain_cauzione", user["id"])' in chiedi,
+           "UPDATE p2p_onchain_ordini" in chiedi,
+           "_p2p_onchain_porta_presa(con, o, user[\"id\"], adesso)" in chiedi
+           and "_p2p_onchain_vivi_di(con, user[\"id\"]) >= P2P_ONCHAIN_APERTI_MAX" in chiedi,
+           chiedi.index("con.close()") < chiedi.index('await _lnd_cauzione("POST", "/v2/invoices/hodl"')))
+    passata = pezzo("p2p_onchain_cauzioni_passata")
+    prova("il giro gira anche a leva spenta se il macaroon c'e' (una cauzione presa deve poter "
+          "tornare), e una cancel che non passa lascia la riga viva per il giro dopo",
+          (True, False, True),
+          ("if not _p2p_onchain_cauzione_macaroon():\n        return conto" in passata,
+           "p2p_onchain_cauzione_accesa()" in passata,
+           "elif await _p2p_onchain_cauzione_annulla(r[\"hash\"]):" in passata))
+    i_a = src.index("CANCELLA_ANONIMIZZA = (")
+    prova("chi cancella l'account non porta via la riga di una cauzione (una hold viva deve "
+          "poter tornare): resta, senza il suo nome",
+          True, '("p2p_onchain_cauzioni", "tg_id")' in src[i_a:src.index("\n)\n", i_a)])
+    prova("la scheda dello scambio dice il metodo scelto e la cauzione in gioco a chi l'ha messa "
+          "e al moderatore, mai all'altra parte",
+          (True, True),
+          ('d["metodo_scelto"] = ' in pezzo("_p2p_onchain_per")
+           and "cz = _p2p_onchain_cauzione_di(con, o, tg_id, admin)" in pezzo("_p2p_onchain_per"),
+           "if not mia and not admin:\n        return None" in pezzo("_p2p_onchain_cauzione_di")))
+    # --- il telefono ---
+    prendi = _fn_js(mini, "async function prendiOnchainP2P(id){")
+    apri = _fn_js(mini, "async function apriCauzioneOcP2P(id, metodo){")
+    prova("il telefono: senza metodo scelto non prende e riapre il foglio; in contanti con la "
+          "leva accesa apre PRIMA il foglio della cauzione; il metodo viaggia nella presa",
+          (True, True, True),
+          ("if (riga && sceltaMetodoOcP2P(riga) && !metodo) {" in prendi
+           and "return apriOnchainP2P(id);" in prendi,
+           prendi.index("if (riga && !conCauzione && cauzioneOcServeP2P(riga)) return apriCauzioneOcP2P(id, metodo);")
+           < prendi.index("/prendi`"),
+           "body: JSON.stringify(metodo ? {metodo} : {})});" in prendi))
+    prova("il foglio della cauzione: il QR della richiesta, il battito che si ferma a foglio "
+          "chiuso, e a cauzione tenuta chiude e prende da solo",
+          (True, True, True, True),
+          ("disegnaQr(el('p2pOcCauzQr'), ('lightning:' + c.bolt11.trim()).toUpperCase(), 'Alphanumeric');" in apri,
+           "if (!foglio || !foglio.classList.contains('open') || !p2pOcCauz) return fermaCauzioneOcP2P();" in apri,
+           "if (ora && ora.stato === 'tenuta' && p2pOcCauz) {" in apri
+           and "p2pOcCauzPronta = idPreso;\n      prendiOnchainP2P(idPreso);" in apri,
+           "if (c.stato === 'tenuta') { p2pOcCauzPronta = Number(id); return prendiOnchainP2P(id); }" in apri))
+    prova("...e il foglio c'e', si chiude con gli altri, e le righe di WoS e Phoenix sono quelle "
+          "della cauzione di Lightning",
+          (1, True, True),
+          (mini.count('<div class="sheet" id="p2pOcCauzSheet"'),
+           "el('p2pOcCauzSheet').classList.remove('open');" in _fn_js(mini, "function closeSheet(){"),
+           "rigaWosHoldP2P('cauzione')" in _fn_js(mini, "function renderCauzioneOcP2P(){")
+           and "rigaPhoenixHoldP2P()" in _fn_js(mini, "function renderCauzioneOcP2P(){")))
+    banco = "\n".join(_fn_js(mini, f) for f in (
+        "function sceltaMetodoOcP2P(o){", "function metodoPresaOcP2P(o){",
+        "function cauzioneOcSatsP2P(sats, c){", "function cauzioneOcServeP2P(o){",
+        "function rigaCauzioneOcP2P(o, c){", "function metodiPresaOcHtmlP2P(o, vendeLui){",
+        "function riquadroCauzioneOcP2P(o){", "function riquadroCauzioneP2P(o){",
+        "function cauzioneAFineP2P(o){")) + "\n" \
+        + "".join(_riga_js(mini, r) for r in ("const P2P_METODO_FISSO = ",)) + r"""
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const fmt = n => String(n);
+const P2P_FINALI = ['concluso', 'annullato'];
+let p2pOcPresaMetodo = {id: 0, metodo: ''};
+let p2pOnchainLibro = {cauzione: null};
+const zonaDettP2P = o => (o.metodi || []).indexOf('Contanti') >= 0 && o.zona ? '[zona ' + o.zona + ']' : '';
+const regolaContantiFoglioP2P = (m, max, lato) => '[regola ' + lato + ' ' + max + ']';
+const maxEuroContantiP2P = () => 250;
+const REGOLA = {accesa: true, pct: 3, base: 1000, finestra: 900};
+const solo = {id: 1, metodi: ['Contanti'], zona: 'Milano centro', sats: 100000, lato: 'sell'};
+const misto = {id: 2, metodi: ['Bonifico', 'Contanti'], zona: 'Milano centro', sats: 100000, lato: 'sell'};
+const online = {id: 3, metodi: ['Bonifico', 'Revolut'], sats: 100000, lato: 'sell'};
+const out = {};
+out.scelta = [sceltaMetodoOcP2P(solo), sceltaMetodoOcP2P(misto), sceltaMetodoOcP2P(online)];
+out.sats = [cauzioneOcSatsP2P(100000, REGOLA), cauzioneOcSatsP2P(10000, REGOLA), cauzioneOcSatsP2P(33334, REGOLA),
+            cauzioneOcSatsP2P(33350, REGOLA), cauzioneOcSatsP2P(1000000, REGOLA), cauzioneOcSatsP2P(0, REGOLA),
+            cauzioneOcSatsP2P(100000, null)];
+out.metodo0 = [metodoPresaOcP2P(solo), metodoPresaOcP2P(misto)];
+/* leva spenta: le pillole ci sono, la cauzione no */
+const h0 = metodiPresaOcHtmlP2P(misto, true);
+out.spenta = [h0.split('tema-pill').length - 1, h0.includes('active'), h0.includes('[zona'), h0.includes('[regola'),
+              h0.includes('cauzione-regola'), h0.includes(esc(P2P_METODO_FISSO))];
+p2pOcPresaMetodo = {id: 2, metodo: 'Contanti'};
+const h1 = metodiPresaOcHtmlP2P(misto, true);
+out.contanti = [metodoPresaOcP2P(misto), h1.includes('tema-pill active'), h1.includes('[zona Milano centro]'),
+                h1.includes('[regola compro 250]'), h1.includes('cauzione-regola'), cauzioneOcServeP2P(misto)];
+/* la scelta e' di QUELL'ordine: su un altro non vale */
+out.altro = metodoPresaOcP2P({...misto, id: 9});
+p2pOnchainLibro = {cauzione: REGOLA};
+const h2 = metodiPresaOcHtmlP2P(misto, true);
+out.accesa = [cauzioneOcServeP2P(misto), h2.includes('cauzione-regola'), h2.includes('<b>3000 sats</b>'),
+              h2.includes('il 3%, almeno 1000 sats'), h2.includes('torna a fine scambio'),
+              h2.includes('solo se un moderatore')];
+p2pOcPresaMetodo = {id: 2, metodo: 'Bonifico'};
+const h3 = metodiPresaOcHtmlP2P(misto, true);
+out.bonifico = [cauzioneOcServeP2P(misto), h3.includes('cauzione-regola'), h3.includes('[zona'), h3.includes('[regola')];
+/* un metodo solo: niente pillole, la regola e la cauzione subito */
+const h4 = metodiPresaOcHtmlP2P(solo, false);
+out.solo = [h4.includes('tema-pill'), h4.includes('[zona Milano centro]'), h4.includes('[regola vendo 250]'),
+            h4.includes('cauzione-regola'), cauzioneOcServeP2P(solo), cauzioneOcServeP2P(online)];
+/* a mercato senza sats: la riga c'e', la cifra no */
+out.mercato = [rigaCauzioneOcP2P({sats: 0, stima: 0}, REGOLA).includes('di circa'),
+               rigaCauzioneOcP2P({sats: 0, stima: 50000}, REGOLA).includes('<b>1500 sats</b>')];
+/* la pagina dello scambio */
+const mia = riquadroCauzioneOcP2P({cauzione: {stato: 'tenuta', sats: 3000, mia: true}});
+const tornata = riquadroCauzioneOcP2P({cauzione: {stato: 'tornata', sats: 3000, mia: true}});
+const mod = riquadroCauzioneOcP2P({cauzione: {stato: 'tenuta', sats: 3000, mia: false}});
+out.scambio = [mia.includes('Cauzione bloccata') && mia.includes('3000 sats') && mia.includes('Torna a fine scambio'),
+               tornata.includes('Cauzione restituita'), mod.includes('Cauzione di chi ha preso') && mod.includes('3000 sats'),
+               riquadroCauzioneOcP2P({}), riquadroCauzioneOcP2P({cauzione: {stato: 'scaduta', sats: 3000, mia: true}})];
+console.log(JSON.stringify(out));
+"""
+    out = _node_banco(banco)
+    if out is None:
+        salta("onchain_cauzione", "node non c'e': il foglio della presa on-chain col metodo e la cauzione non si disegna")
+        return
+    prova("le pillole del metodo solo con «Contanti» fra piu' metodi",
+          [False, True, False], out.get("scelta"))
+    prova("i sats della cauzione sul telefono sono quelli del server, cifra per cifra",
+          [S(100000), S(10000), S(33334), S(33350), S(1000000), 0, 0], out.get("sats"))
+    prova("un metodo solo e' gia' scelto; fra piu' metodi si parte senza scelta",
+          ["Contanti", ""], out.get("metodo0"))
+    prova("senza scelta: due pillole spente, la frase del metodo fisso, e ne' zona ne' regola ne' cauzione",
+          [2, False, False, False, False, True], out.get("spenta"))
+    prova("«Contanti» scelto a leva spenta: la pillola accesa, la zona e la regola col tetto; cauzione no",
+          ["Contanti", True, True, True, False, False], out.get("contanti"))
+    prova("la scelta vale per QUELL'ordine: su un altro si riparte", "", out.get("altro"))
+    prova("a leva accesa «Contanti» porta la riga della cauzione: la cifra, il 3% col minimo, "
+          "che torna, e che si perde solo per un moderatore",
+          [True, True, True, True, True, True], out.get("accesa"))
+    prova("...e «Bonifico» no: niente cauzione, niente zona, niente regola del contanti",
+          [False, False, False, False], out.get("bonifico"))
+    prova("con il solo «Contanti»: niente pillole, zona, regola e cauzione subito; un ordine "
+          "senza contanti non ne ha mai una",
+          [False, True, True, True, True, False], out.get("solo"))
+    prova("a prezzo di mercato la cifra si dice solo se c'e' una stima",
+          [False, True], out.get("mercato"))
+    prova("la pagina dello scambio: a chi l'ha messa «bloccata» e poi «restituita» con le parole "
+          "di Lightning, al moderatore una riga; senza cauzione, o mai pagata, niente",
+          [True, True, True, "", ""], out.get("scambio"))
 
 def prove_guida_wallet():
     """LA GUIDA «👛 IL TUO PRIMO WALLET» (17 nov 2026, cantiere
@@ -208093,7 +208403,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -209114,6 +209424,7 @@ def main():
     prove_onchain_ritiro,
     prove_onchain_contanti,
     prove_onchain_contanti_scambio,
+    prove_onchain_cauzione,
     prove_guida_wallet,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,

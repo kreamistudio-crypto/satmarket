@@ -1394,6 +1394,352 @@ def main():
     SRV.P2P_CONTANTI_MAX_EURO = tetto_c
     SRV.P2P_ONCHAIN_APERTI_MAX = tetto
 
+    # ---- 11-novies) il metodo scelto alla presa e la cauzione in Lightning del
+    # contanti on-chain, contro un LND di cartone (17 nov 2026 sera, onchain-
+    # contanti terzo pezzo; Andrea: «Quando ci clicco poi non mi fa mettere la
+    # cauzione», «Anche la questione QR, tutto quanto») -------------------------
+    print("\n[il metodo scelto alla presa e la cauzione in Lightning del contanti]")
+    import base64
+    import http.server
+    import threading
+    import urllib.parse
+    import httpx as httpx_vero
+    MAC_C = "0201036c6e64" + "cd" * 40
+    LND = {"fatture": {}, "visti": [], "muto": False}
+
+    class FintoLndCauzioni(http.server.BaseHTTPRequestHandler):
+        """La REST di LND per le hold: `hodl` conia, `GET /v1/invoice/{hash}`
+        dice lo stato, `cancel` annulla (e la seconda volta dice «already
+        canceled»)."""
+        def log_message(self, *a):
+            pass
+
+        def _rispondi(self, codice, d):
+            dati = json.dumps(d).encode()
+            self.send_response(codice)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(dati)))
+            self.end_headers()
+            self.wfile.write(dati)
+
+        def _porta(self):
+            if self.headers.get("Grpc-Metadata-macaroon", "") != MAC_C:
+                self._rispondi(401, {"code": 16, "message": "permission denied"})
+                return False
+            if LND["muto"]:
+                self._rispondi(500, {"code": 2, "message": "cartone muto"})
+                return False
+            return True
+
+        def do_GET(self):
+            u = urllib.parse.urlparse(self.path)
+            LND["visti"].append(("GET", u.path, dict(urllib.parse.parse_qsl(u.query))))
+            if not self._porta():
+                return
+            if not u.path.startswith("/v1/invoice/"):
+                return self._rispondi(404, {"code": 5, "message": "Not Found"})
+            h = u.path.rsplit("/", 1)[1]
+            f = LND["fatture"].get(h)
+            if not f:
+                return self._rispondi(404, {"code": 5, "message": "there are no existing invoices"})
+            return self._rispondi(200, {"state": f["state"], "value": str(f["value"])})
+
+        def do_POST(self):
+            n = int(self.headers.get("Content-Length") or 0)
+            corpo = json.loads(self.rfile.read(n) or b"{}")
+            LND["visti"].append(("POST", self.path, corpo))
+            if not self._porta():
+                return
+            if self.path == "/v2/invoices/hodl":
+                h = base64.b64decode(corpo["hash"]).hex()
+                LND["fatture"][h] = {"state": "OPEN", "value": int(corpo["value"])}
+                return self._rispondi(200, {"payment_request": "lnbc1cauzione" + h[:24]})
+            if self.path == "/v2/invoices/cancel":
+                h = base64.b64decode(corpo["payment_hash"]).hex()
+                f = LND["fatture"].get(h)
+                if not f or f["state"] == "CANCELED":
+                    return self._rispondi(500, {"code": 2, "message": "invoice already canceled"})
+                f["state"] = "CANCELED"
+                return self._rispondi(200, {})
+            return self._rispondi(404, {"code": 5, "message": "Not Found"})
+
+    lnd_srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), FintoLndCauzioni)
+    lnd_srv.daemon_threads = True
+    threading.Thread(target=lnd_srv.serve_forever, daemon=True).start()
+    httpx_del_banco, ponte_prima = SRV.httpx, SRV.LND_PONTE_URL
+    SRV.httpx = httpx_vero
+    SRV.LND_PONTE_URL = f"http://127.0.0.1:{lnd_srv.server_address[1]}"
+    SRV.FRENI["p2p_onchain_cauzione"] = (1000, 3600)
+    tetto = SRV.P2P_ONCHAIN_APERTI_MAX
+    SRV.P2P_ONCHAIN_APERTI_MAX = 100
+
+    def hodl_visti():
+        return [v for v in LND["visti"] if v[1] == "/v2/invoices/hodl"]
+
+    def busta_oc(tg):
+        # come `libro`: nella gabbia chi guarda glielo si dice
+        SRV._chi_guarda_p2p = lambda *a, **k: int(tg)
+        come(tg)
+        return c.get("/api/p2p/onchain/libro").json()
+
+    def cauz(tg, oid, metodo=None):
+        come(tg)
+        if metodo is None:
+            return c.get(f"/api/p2p/onchain/{oid}/cauzione")
+        return c.post(f"/api/p2p/onchain/{oid}/cauzione", json={"metodo": metodo})
+
+    def riga_cauz(oid):
+        con = SRV.db()
+        try:
+            r = con.execute("SELECT * FROM p2p_onchain_cauzioni WHERE ordine_id=? "
+                            "ORDER BY id DESC LIMIT 1", (oid,)).fetchone()
+            return dict(r) if r else None
+        finally:
+            con.close()
+
+    def misto(**d):
+        return pubblica(888, metodi=["Bonifico", "Contanti"], zona="Milano centro",
+                        **d).json().get("id")
+
+    prova("i sats della cauzione: il 3% col mezzo che sale, mai sotto i 1000; storta = 0",
+          (3000, 1000, 1001, 0, 0),
+          (SRV.p2p_onchain_cauzione_sats(100000), SRV.p2p_onchain_cauzione_sats(10000),
+           SRV.p2p_onchain_cauzione_sats(33350), SRV.p2p_onchain_cauzione_sats(0),
+           SRV.p2p_onchain_cauzione_sats("x")))
+    # -- a leva SPENTA: la scelta del metodo c'e', la cauzione no
+    SRV.P2P_ONCHAIN_CAUZIONE, SRV.LND_PONTE_MACAROON_CAUZIONE = False, MAC_C
+    # la porticina degli admin resta CHIUSA, com'e' di serie e come sara'
+    # in produzione (Andrea, 17 nov: «In produzione, solo tu e Alan»): chi
+    # prende in tutto il giro e' il 999, un moderatore; il 111 non lo e'
+    porticina = SRV.P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN
+    SRV.P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True
+    # ...mentre l'on-chain e' aperto a tutti, com'e' in produzione dal 16
+    # nov: il 111 deve poter prendere, sennò la porticina non si vede
+    solo_admin_oc = SRV.ONCHAIN_SOLO_ADMIN
+    SRV.ONCHAIN_SOLO_ADMIN = False
+    semi[111] = vett["bip39_english"][3]["parole"]
+    come(111)
+    c.post("/api/onchain/xpub", json={"xpub": conto(111)})
+    prova("la porticina dei moderatori e' chiusa di serie", True, porticina)
+    prova("la leva vuole la riga E il macaroon: una senza l'altro e' spenta",
+          (False, False, True),
+          (SRV.p2p_onchain_cauzione_accesa(999),
+           (setattr(SRV, "P2P_ONCHAIN_CAUZIONE", True), setattr(SRV, "LND_PONTE_MACAROON_CAUZIONE", ""),
+            SRV.p2p_onchain_cauzione_accesa(999))[2],
+           (setattr(SRV, "LND_PONTE_MACAROON_CAUZIONE", MAC_C), SRV.p2p_onchain_cauzione_accesa(999))[1]))
+    prova("...e a porticina chiusa e' accesa SOLO per un moderatore: non per il 111, "
+          "non per un ospite, non per un id storto",
+          (True, True, False, False, False),
+          (SRV.p2p_onchain_cauzione_accesa(999), SRV.p2p_onchain_cauzione_accesa(888),
+           SRV.p2p_onchain_cauzione_accesa(111), SRV.p2p_onchain_cauzione_accesa(),
+           SRV.p2p_onchain_cauzione_accesa("x")))
+    SRV.P2P_ONCHAIN_CAUZIONE = False
+    SRV._p2p_onchain_rifai_foto()
+    prova("a leva spenta la busta del libro on-chain lo dice",
+          False, busta_oc(999).get("cauzione", {}).get("accesa"))
+    m1, m2, m3, m4 = misto(), misto(), misto(), misto()
+    prova("a leva spenta la cauzione non si chiede: 409, e a LND non bussa nessuno",
+          (409, 0), (cauz(999, m1, "Contanti").status_code, len(LND["visti"])))
+    r = gesto(999, m1, "prendi", metodo="Contanti")
+    prova("«Contanti» scelto su un ordine con piu' metodi: lo scambio e' in contanti, "
+          "il metodo resta scritto e l'IBAN lascia il posto all'appuntamento",
+          (200, True, "Contanti", ""),
+          (r.status_code, r.json().get("contanti"), r.json().get("metodo_scelto"),
+           uno(888, m1)["recapito"]))
+    r = gesto(999, m2, "prendi", metodo="Bonifico")
+    prova("«Bonifico» scelto: non e' in contanti, e il recapito di chi vende resta",
+          (200, False, "Bonifico", "IT00 X 1234"),
+          (r.status_code, r.json().get("contanti"), r.json().get("metodo_scelto"),
+           uno(888, m2)["recapito"]))
+    r, r4 = gesto(999, m3, "prendi"), gesto(999, m4, "prendi", metodo="Satispay")
+    prova("senza scelta (un telefono di ieri), o con un metodo che non e' dell'ordine: "
+          "si prende come ieri, non in contanti",
+          (200, False, "", 200, False, ""),
+          (r.status_code, r.json().get("contanti"), r.json().get("metodo_scelto"),
+           r4.status_code, r4.json().get("contanti"), r4.json().get("metodo_scelto")))
+    # -- a leva ACCESA
+    SRV.P2P_ONCHAIN_CAUZIONE = True
+    SRV._p2p_onchain_rifai_foto()
+    busta_c = busta_oc(999).get("cauzione", {})
+    prova("a leva accesa la busta porta la regola: 3%, almeno 1000 sats, quindici minuti",
+          (True, 3, 1000, 900),
+          (busta_c.get("accesa"), busta_c.get("pct"), busta_c.get("base"), busta_c.get("finestra")))
+    # -- LA PORTICINA: a leva accesa, chi non e' moderatore non vede niente
+    g1 = pubblica(888, metodi=["Contanti"], recapito="", zona="Milano centro").json().get("id")
+    g2 = pubblica(888, metodi=["Contanti"], recapito="", zona="Milano centro").json().get("id")
+    n_hodl = len(hodl_visti())
+    prova("a porticina chiusa la busta del 111 dice «spenta», quella del moderatore «accesa»",
+          (False, True),
+          (busta_oc(111).get("cauzione", {}).get("accesa"),
+           busta_oc(999).get("cauzione", {}).get("accesa")))
+    prova("...il 111 non puo' chiedere la cauzione (409) e LND non conia niente",
+          (409, n_hodl), (cauz(111, g1, "Contanti").status_code, len(hodl_visti())))
+    r = gesto(111, g1, "prendi")
+    prova("...e prende in contanti SENZA cauzione, come a leva spenta: nessuna riga, "
+          "nessun riquadro nella scheda",
+          (200, "preso", True, None, None),
+          (r.status_code, r.json().get("stato"), r.json().get("contanti"),
+           riga_cauz(g1), uno(111, g1).get("cauzione")))
+    SRV.P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = False
+    prova("porticina APERTA (un False scritto): vale per tutti, e il 111 senza cauzione "
+          "non prende piu'",
+          (True, True, 409, True),
+          (SRV.p2p_onchain_cauzione_accesa(111), busta_oc(111).get("cauzione", {}).get("accesa"))
+          + (lambda r: (r.status_code, "serve la cauzione" in r.text))(gesto(111, g2, "prendi")))
+    SRV.P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True
+    prova("richiusa, il 111 torna a non vederla",
+          False, busta_oc(111).get("cauzione", {}).get("accesa"))
+    c1 = pubblica(888, metodi=["Contanti"], recapito="", zona="Milano centro").json().get("id")
+    prova("in contanti senza cauzione non si prende: 409 con la frase, e l'ordine resta nel libro",
+          (409, True, "pending"),
+          (lambda r: (r.status_code, "serve la cauzione" in r.text, uno(888, c1)["stato"]))(
+              gesto(999, c1, "prendi")))
+    prova("chi ha pubblicato non chiede la cauzione sul suo ordine: 409",
+          409, cauz(888, c1, "Contanti").status_code)
+    r = cauz(999, c1, "Contanti")
+    cz = r.json().get("cauzione") or {}
+    h1 = hodl_visti()
+    prova("la richiesta: 200, in attesa, 3000 sats su 100.000, con la fattura da pagare",
+          (200, "attesa", 3000, True, False),
+          (r.status_code, cz.get("stato"), cz.get("sats"),
+           str(cz.get("bolt11", "")).startswith("lnbc1cauzione"), cz.get("in_gioco")))
+    prova("...e LND ha visto UNA hodl: 3000 sats, quindici minuti, cltv 576, hash di 32 byte",
+          (1, "3000", "900", "576", 32),
+          (len(h1), h1[0][2]["value"], h1[0][2]["expiry"], h1[0][2]["cltv_expiry"],
+           len(base64.b64decode(h1[0][2]["hash"]))))
+    r = cauz(999, c1, "Contanti")
+    prova("chiesta due volte torna la STESSA richiesta: nessuna seconda hold",
+          (cz.get("bolt11"), 1), ((r.json().get("cauzione") or {}).get("bolt11"), len(hodl_visti())))
+    prova("non ancora pagata: lo stato resta in attesa, e la presa dice di pagarla",
+          ("attesa", 409, True),
+          ((cauz(999, c1).json().get("cauzione") or {}).get("stato"),) +
+          (lambda r: (r.status_code, "non risulta ancora bloccata" in r.text))(
+              gesto(999, c1, "prendi")))
+    riga1 = riga_cauz(c1)
+    prova("il preimage resta sul server e fa l'hash che LND conosce; al telefono non esce mai",
+          (True, False),
+          (hashlib.sha256(bytes.fromhex(riga1["preimage"])).hexdigest() == riga1["hash"]
+           and riga1["hash"] in LND["fatture"], "preimage" in cauz(999, c1).text))
+    LND["fatture"][riga1["hash"]]["state"] = "ACCEPTED"     # il wallet ha pagato: HTLC fermo
+    cz = cauz(999, c1).json().get("cauzione") or {}
+    prova("pagata: LND dice ACCEPTED, la cauzione e' TENUTA e la fattura non serve piu'",
+          ("tenuta", False, False), (cz.get("stato"), "bolt11" in cz, cz.get("in_gioco")))
+    r = gesto(999, c1, "prendi")
+    prova("con la cauzione tenuta la presa passa, e la cauzione entra in gioco",
+          (200, "preso", True, 1),
+          (r.status_code, r.json().get("stato"), r.json().get("contanti"),
+           riga_cauz(c1)["in_gioco"]))
+    prova("la scheda: a chi l'ha messa «tenuta, 3000, mia»; all'altra parte niente; "
+          "al moderatore senza «mia»",
+          ({"stato": "tenuta", "sats": 3000, "mia": True}, None,
+           {"stato": "tenuta", "sats": 3000, "mia": False}),
+          (uno(999, c1).get("cauzione"), uno(888, c1).get("cauzione"),
+           uno(777, c1).get("cauzione")))
+    conto = asyncio.run(SRV.p2p_onchain_cauzioni_passata())
+    prova("a scambio vivo il giro non tocca niente",
+          ({"tenute": 0, "tornate": 0, "scadute": 0}, "ACCEPTED"),
+          (conto, LND["fatture"][riga1["hash"]]["state"]))
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET stato='disputa' WHERE id=?", (c1,))
+    con.commit()
+    con.close()
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata())
+    prova("...nemmeno in disputa: la cauzione resta ferma finche' qualcuno decide",
+          "ACCEPTED", LND["fatture"][riga1["hash"]]["state"])
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET stato='rimborsato' WHERE id=?", (c1,))
+    con.commit()
+    con.close()
+    conto = asyncio.run(SRV.p2p_onchain_cauzioni_passata())
+    r1 = riga_cauz(c1)
+    prova("a scambio chiuso il giro la rimanda indietro: cancel su LND, «tornata», col perche'",
+          (1, "CANCELED", "tornata", "scambio chiuso", "tornata"),
+          (conto["tornate"], LND["fatture"][riga1["hash"]]["state"], r1["stato"], r1["perche"],
+           (uno(999, c1).get("cauzione") or {}).get("stato")))
+    # -- le cauzioni che non arrivano alla presa
+    c2 = pubblica(888, metodi=["Contanti"], recapito="", zona="Milano centro",
+                  sats=20000, euro_cent=1800).json().get("id")
+    cz2 = cauz(999, c2, "Contanti").json().get("cauzione") or {}
+    r2 = riga_cauz(c2)
+    conto = asyncio.run(SRV.p2p_onchain_cauzioni_passata(r2["scade"] + 1))
+    prova("su 20.000 sats la cauzione e' il minimo, 1000; mai pagata e scaduta, il giro la "
+          "annulla e la scrive «scaduta»",
+          (1000, 1, "scaduta", "CANCELED"),
+          (cz2.get("sats"), conto["scadute"], riga_cauz(c2)["stato"],
+           LND["fatture"][r2["hash"]]["state"]))
+    cauz(999, c2, "Contanti")
+    r2 = riga_cauz(c2)
+    LND["fatture"][r2["hash"]]["state"] = "ACCEPTED"
+    conto = asyncio.run(SRV.p2p_onchain_cauzioni_passata(r2["scade"] + 1))
+    prova("pagata all'ultimo secondo a telefono chiuso: il giro la vede e la scrive tenuta",
+          (1, "tenuta", 0), (conto["tenute"], riga_cauz(c2)["stato"], riga_cauz(c2)["in_gioco"]))
+    conto = asyncio.run(SRV.p2p_onchain_cauzioni_passata(
+        r2["scade"] + 1 + SRV.P2P_ONCHAIN_CAUZIONE_PRESA_S + 1))
+    prova("tenuta ma mai usata: dopo un quarto d'ora torna da sola («non usata»)",
+          (1, "tornata", "non usata", "CANCELED"),
+          (conto["tornate"], riga_cauz(c2)["stato"], riga_cauz(c2)["perche"],
+           LND["fatture"][r2["hash"]]["state"]))
+    cauz(999, c2, "Contanti")
+    r2 = riga_cauz(c2)
+    LND["fatture"][r2["hash"]]["state"] = "ACCEPTED"
+    cauz(999, c2)
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET stato='annullato' WHERE id=?", (c2,))
+    con.commit()
+    con.close()
+    conto = asyncio.run(SRV.p2p_onchain_cauzioni_passata())
+    prova("tenuta, e l'ordine esce dal libro prima della presa: torna subito",
+          (1, "tornata", "non usata"),
+          (conto["tornate"], riga_cauz(c2)["stato"], riga_cauz(c2)["perche"]))
+    # -- in gioco, e il nodo la rimanda indietro da solo (i 576 blocchi)
+    c3 = pubblica(888, metodi=["Contanti"], recapito="", zona="Milano centro").json().get("id")
+    cauz(999, c3, "Contanti")
+    r3 = riga_cauz(c3)
+    LND["fatture"][r3["hash"]]["state"] = "ACCEPTED"
+    gesto(999, c3, "prendi")
+    LND["fatture"][r3["hash"]]["state"] = "CANCELED"
+    conto = asyncio.run(SRV.p2p_onchain_cauzioni_passata(
+        int(time.time()) + SRV.P2P_ONCHAIN_CAUZIONE_GUARDA_S + 1))
+    prova("in gioco, ma il nodo l'ha gia' rimandata: il giro lo scrive com'e'",
+          (1, "tornata", "tornata da sola dal nodo"),
+          (conto["tornate"], riga_cauz(c3)["stato"], riga_cauz(c3)["perche"]))
+    # -- un ordine con piu' metodi, a leva accesa
+    m5, m6 = misto(), misto()
+    n_hodl = len(hodl_visti())
+    r = gesto(999, m5, "prendi", metodo="Bonifico")
+    prova("a leva accesa chi sceglie «Bonifico» prende senza cauzione, e LND non conia niente",
+          (200, False, n_hodl), (r.status_code, r.json().get("contanti"), len(hodl_visti())))
+    prova("...chi sceglie «Contanti» no: 409 finche' non la blocca; e «Bonifico» non ne ha una",
+          (409, 409),
+          (gesto(999, m6, "prendi", metodo="Contanti").status_code,
+           cauz(999, m6, "Bonifico").status_code))
+    # -- LND muto
+    LND["muto"] = True
+    r = cauz(999, m6, "Contanti")
+    prova("LND muto: la richiesta dice di riprovare (503) e niente si scrive",
+          (503, None), (r.status_code, riga_cauz(m6)))
+    LND["muto"] = False
+    prova("col macaroon sbagliato LND dice di no e la rotta non esplode: 503",
+          503, (setattr(SRV, "LND_PONTE_MACAROON_CAUZIONE", "0201036c6e64" + "ef" * 40),
+                cauz(999, m6, "Contanti").status_code)[1])
+    SRV.LND_PONTE_MACAROON_CAUZIONE = MAC_C
+    prova("al nodo passano solo hodl, cancel e la lettura di una fattura: nessuna strada "
+          "salda una cauzione",
+          set(), {v[1] for v in LND["visti"] if not v[1].startswith("/v1/invoice/")}
+          - {"/v2/invoices/hodl", "/v2/invoices/cancel"})
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET stato='annullato' WHERE id IN (?,?,?,?,?,?,?,?,?,?)",
+                (m1, m2, m3, m4, m5, m6, c3, c1, g1, g2))
+    con.commit()
+    con.close()
+    SRV.P2P_ONCHAIN_CAUZIONE, SRV.LND_PONTE_MACAROON_CAUZIONE = False, ""
+    SRV.P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = porticina
+    SRV.ONCHAIN_SOLO_ADMIN = solo_admin_oc
+    SRV.httpx, SRV.LND_PONTE_URL = httpx_del_banco, ponte_prima
+    SRV.P2P_ONCHAIN_APERTI_MAX = tetto
+    SRV._p2p_onchain_rifai_foto()
+    lnd_srv.shutdown()
+
     # ---- 12) gli avvisi, tutti ----------------------------------------------
     print("\n[ogni avviso a una parte porta il bottone del suo scambio]")
     # (17 nov 2026) l'avviso della recensione ricevuta e' quello di sempre,
