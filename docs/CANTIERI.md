@@ -86320,6 +86320,7 @@ DA GUARDARE. Il contenimento del metodo vale anche al contrario, su
 Lightning come on-chain: «Contanti» prende anche «Contanti al tabacchino»
 (Barattozon). Non e' stato toccato: e' la regola di sempre, da decidere
 con Andrea.
+
 ## I promemoria dello scambio on-chain (17 nov 2026, cantiere onchain-chat-sollecito, prima parte; Andrea: «tutto deve essere come la parte lighting. Fai un giro su tutto», punto 7 della lista di parità)
 
 Nel Lightning, a garanzia bloccata, il bot ricorda a chi compra di mandare
@@ -86342,9 +86343,9 @@ fra i metodi; disputa aperta o tempo finito fermano tutto.
 
 SCARTATO. Riusare `p2p_attese` (vuole un ordine di Mostro e i suoi
 momenti). Mandare tutti i livelli arretrati dopo un riavvio: una ronda in
-ritardo manda solo l'ultimo dovuto, mai tre di fila. Nei testi a chi paga
-il «✕ Annulla» del Lightning: nell'on-chain dopo il deposito chi compra
-non annulla da solo (si esce col rimborso a due firme o con la disputa).
+ritardo manda solo l'ultimo dovuto, mai tre di fila. Al posto del «✕
+Annulla» del Lightning, nel secondo promemoria a chi paga c'è il tasto
+dell'on-chain, «↩️ Rinuncio: rimborsa chi vende».
 
 PROVATO. `prove_onchain_promemoria` (9): i livelli nel tempo in euro e in
 USDT, il ritardo, i quattro «niente», chi riceve cosa, la passata che non
@@ -86358,3 +86359,37 @@ secondo e uno solo; a 73 ore il tempo finito supera il terzo.
 DA GUARDARE. Gli scambi già depositati al deploy: alla prima ronda
 ricevono SOLO l'ultimo livello dovuto (uno per scambio), è voluto. La
 chat dello scambio on-chain (punto 6) è la seconda parte di questo cantiere.
+
+## L'id della transazione in moneta nello scambio on-chain (17 nov 2026, cantiere onchain-chat-sollecito, seconda parte; Andrea: «Perché per usde non si può incollare id transazione?»)
+
+Negli scambi on-chain in USDT «Ho inviato» vuole l'id della transazione;
+in ETH, XMR e USDe no, per una scelta scritta il 16 nov (ricevi-mercato:
+«l'id resta nel suo wallet, e in disputa lo mostra al moderatore»).
+Andrea l'ha trovato scambiando USDe: chi vende non aveva niente da
+controllare. La «Transazione: 9ae15bbc…» della sua foto a scambio
+concluso è il rilascio bitcoin (`txid_uscita`, senza 0x), non l'invio
+degli USDe: quello non è mai stato chiesto.
+
+DECISO. Come gli USDT e come il Lightning in moneta: prima del gesto il
+campo dell'id (e con Monero la chiave della transazione, che prova a chi
+sono andati gli XMR), giudicati dal telefono coi giudici del Lightning e
+dal server con le stesse regole (`p2p_onchain_giudica_txid_coin`,
+`p2p_onchain_giudica_chiave_xmr`: EVM con o senza 0x, Monero nudo,
+Solana la firma in Base58). L'id va a chi vende nell'avviso e nella
+pagina, col tasto dell'explorer; al moderatore anche l'indirizzo di chi
+riceveva. Colonne nuove `txid_coin` e `chiave_tx_coin`, non `txid_usdt`:
+un nome che dice USDT su un id Ethereum di USDe avrebbe confuso chi legge
+il database in una disputa.
+
+PROVATO. `prove_onchain_txid_moneta` (7): il giudice del server su undici
+casi, i due giudici (server e telefono in node) uguali caso per caso e
+rete per rete, la pagina e la rotta; controprove su sette mutazioni,
+cinque rosse in sezione — il ramo Monero della rotta lo tiene il
+collaudo, il «return» dopo il giudice del telefono è stato aggiunto alla
+prova dopo che restava verde. `collaudo_p2p_onchain_usdt` (46): USDe su
+Ethereum senza id 400, storto 400, senza 0x passa e si salva con 0x, chi
+vende lo riceve con «50,00 USDe su Ethereum», le due parti e il
+moderatore lo vedono; Monero senza chiave 400, con la chiave passa.
+
+DA GUARDARE. Gli scambi in moneta già in «Ho inviato» al deploy restano
+senza id (nessuno l'ha chiesto allora).

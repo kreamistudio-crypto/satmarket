@@ -36163,6 +36163,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   del Lightning (`SOLLECITO_RILASCIO_*TESTI`, quelli dei contanti col
   solo «Contanti»). Conta solo l'ultimo livello dovuto; disputa o
   `pagamento_scaduto_il` li fermano. Tutto passa da `_notifica_p2p_onchain`.
+- L'ID DELLA TRANSAZIONE IN MONETA NELLO SCAMBIO ON-CHAIN (17 nov 2026,
+  cantiere onchain-chat-sollecito; CANTIERI, «L'id della transazione in
+  moneta»). `p2p_onchain_euro_inviati`, in ETH/XMR/USDe, vuole `txid`
+  giudicato da `p2p_onchain_giudica_txid_coin(txid, metodo)` → `(perche,
+  normalizzato)` (forma da `P2P_COIN_FORMA`: evm con 0x rimesso, monero,
+  solana in Base58 da 64 byte con `_base58_byte`) e, con Monero, `chiave`
+  (`p2p_onchain_giudica_chiave_xmr`); colonne `txid_coin`,
+  `chiave_tx_coin`; `_p2p_onchain_per` le da' in `coin_tx` alle parti e al
+  moderatore (a lui anche `indirizzo` e `indirizzi_prima`). Nel telefono
+  `campoTxidCoinOcP2P`, `coinInviatiOcP2P` (gli stessi giudici del
+  Lightning, `giudiceTxidCoinP2P` e `giudiceChiaveTxXmrP2P`) e
+  `txCoinOcP2P` (copia ed explorer). Le due tabelle delle forme, server e
+  `P2P_RETI_COIN`, le confronta `prove_onchain_txid_moneta`.
 - I DUE TASTI DELLA RETE NEL FOGLIO DELL'ORDINE (16 nov 2026, cantiere
   coin-quasi; il perché in CANTIERI, «I due tasti della rete nel foglio
   dell'ordine…»). `tastiReteFoglioP2P` disegna «⚡ Lightning» / «₿

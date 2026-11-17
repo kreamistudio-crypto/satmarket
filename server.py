@@ -57901,6 +57901,14 @@ P2P_COIN_METODI = {
     "USDe (Ethereum)": "USDe", "USDe (Arbitrum)": "USDe", "USDe (Base)": "USDe",
     "USDe (BNB Chain)": "USDe", "USDe (Solana)": "USDe",
 }
+# ...e la FORMA dell'id della transazione su ogni rete (17 nov 2026,
+# cantiere onchain-chat-sollecito): quella del giudice del telefono
+# (`giudiceTxidCoinP2P`, il campo `forma` di P2P_RETI_COIN), rete per rete
+P2P_COIN_FORMA = {
+    "ETH (Ethereum)": "evm", "XMR (Monero)": "monero",
+    "USDe (Ethereum)": "evm", "USDe (Arbitrum)": "evm", "USDe (Base)": "evm",
+    "USDe (BNB Chain)": "evm", "USDe (Solana)": "solana",
+}
 P2P_COIN_FRASI = (
     (P2P_USDT_FRASI[0][0], P2P_USDT_FRASI[0][1]),
     (P2P_USDT_FRASI[1][0], P2P_USDT_FRASI[1][1]),
@@ -105308,6 +105316,69 @@ def p2p_onchain_giudica_txid_usdt(txid, rete: str) -> str:
     return ""
 
 
+def _base58_byte(s: str) -> bytes:
+    """PURA: un testo Base58 (l'alfabeto di Bitcoin) come byte, gli «1» in
+    testa come zeri; b'' se un carattere non e' dell'alfabeto."""
+    n = 0
+    for c in s:
+        i = _BASE58_ALFABETO.find(c)
+        if i < 0:
+            return b""
+        n = n * 58 + i
+    zeri = len(s) - len(s.lstrip("1"))
+    corpo = n.to_bytes((n.bit_length() + 7) // 8, "big") if n else b""
+    return b"\x00" * zeri + corpo
+
+
+def p2p_onchain_giudica_txid_coin(txid, metodo: str) -> tuple:
+    """PURA: l'id della transazione che chi paga in moneta scrive a «Ho
+    inviato» (17 nov 2026, cantiere onchain-chat-sollecito, Andrea: «Perché
+    per usde non si può incollare id transazione?»). Lo stesso giudice del
+    telefono (`giudiceTxidCoinP2P`): EVM 0x e 64 cifre (senza 0x lo si
+    rimette), Monero 64 cifre, Solana la firma in Base58 (64 byte). Torna
+    `(perche, id normalizzato)`; perche '' = va bene."""
+    s = re.sub(r"\s+", "", str(txid or ""))
+    forma = P2P_COIN_FORMA.get(str(metodo or ""), "")
+    m = str(metodo or "")
+    nome = m[m.find("(") + 1:m.rfind(")")] if "(" in m else m
+    if not s:
+        return ("Incolla l'id della transazione: lo trovi nel tuo wallet, nei "
+                "dettagli dell'invio", "")
+    evm = bool(re.fullmatch(r"0x[0-9a-fA-F]{64}", s))
+    nudo = bool(re.fullmatch(r"[0-9a-fA-F]{64}", s))
+    if forma == "monero" and evm:
+        return ("⚠️ Questo id ha la forma di Ethereum, ma lo scambio è in Monero: "
+                "controlla da che wallet hai mandato", "")
+    if forma == "solana":
+        if evm or nudo:
+            return ("⚠️ Questo id ha la forma di una rete 0x, ma lo scambio è su "
+                    "Solana: controlla da che rete hai mandato", "")
+        if re.fullmatch(r"[1-9A-HJ-NP-Za-km-z]{80,90}", s) and len(_base58_byte(s)) == 64:
+            return ("", s)
+        return ("Questo non sembra l'id di una transazione Solana: copialo di "
+                "nuovo dal wallet", "")
+    if forma == "evm" and (evm or nudo):
+        return ("", s if evm else "0x" + s)
+    if forma == "monero" and nudo:
+        return ("", s)
+    return (f"Questo non sembra l'id di una transazione {nome}: copialo di nuovo "
+            "dal wallet", "")
+
+
+def p2p_onchain_giudica_chiave_xmr(chiave) -> str:
+    """PURA: la chiave della transazione Monero (tx key), come
+    `giudiceChiaveTxXmrP2P` del telefono: 64 cifre esadecimali, o piu'
+    chiavi di fila (le «additional tx keys»). '' = va bene."""
+    s = re.sub(r"\s+", "", str(chiave or ""))
+    if not s:
+        return ("Incolla anche la chiave della transazione (tx key): è quella che "
+                "dimostra a chi sono andati gli XMR. La trovi nei dettagli dell'invio")
+    if not re.fullmatch(r"(?:[0-9a-fA-F]{64}){1,17}", s):
+        return ("Questa non sembra la chiave di una transazione Monero (64 caratteri, "
+                "cifre e lettere da a a f): copiala di nuovo dal wallet")
+    return ""
+
+
 def p2p_onchain_tetto_usdt(tetto_euro, eur_btc, usd_btc) -> int:
     """PURA: il tetto del P2P (in euro, UNO per tutti) tradotto in USDT al
     cambio di adesso, come `tettoValutaP2P` del telefono. Spento resta
@@ -105449,7 +105520,11 @@ def _p2p_onchain_prepara(con):
                       # paga e a chi libera; un livello si scrive PRIMA
                       # dell'invio, come ogni avviso
                       ("sollecito_pagare", "INTEGER DEFAULT 0"),
-                      ("sollecito_libera", "INTEGER DEFAULT 0")):
+                      ("sollecito_libera", "INTEGER DEFAULT 0"),
+                      # ...e l'id della transazione in moneta (ETH, XMR, USDe),
+                      # con la chiave della transazione di Monero: come gli USDT
+                      ("txid_coin", "TEXT DEFAULT ''"),
+                      ("chiave_tx_coin", "TEXT DEFAULT ''")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -105973,6 +106048,15 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
             # vende l'ha cambiato dopo il deposito: chi compra puo' aver
             # pagato a uno di quelli
             d["usdt"]["indirizzi_prima"] = _p2p_onchain_recapiti_prima(con, int(o["id"]))
+    # LE MONETE (17 nov 2026): l'id della transazione (e la chiave di
+    # Monero) alle due parti e al moderatore; al moderatore anche
+    # l'indirizzo, che con Monero serve a provare a chi sono andati
+    elif p2p_onchain_coin(o):
+        d["coin_tx"] = {"txid": _p2p_onchain_campo(o, "txid_coin", "") or "",
+                        "chiave": _p2p_onchain_campo(o, "chiave_tx_coin", "") or ""}
+        if admin and not parte_vera:
+            d["coin_tx"]["indirizzo"] = o["recapito"] or ""
+            d["coin_tx"]["indirizzi_prima"] = _p2p_onchain_recapiti_prima(con, int(o["id"]))
     if admin and not parte_vera:
         # il moderatore vede chi sono le due parti (deve poterle sentire)
         d["parti"] = {"vende": _onchain_nome(con, dep) if dep else "",
@@ -106768,7 +106852,28 @@ async def p2p_onchain_euro_inviati(oid: int, req: Request, x_tg_init_data: str =
                                 + " si mandano quando i sats sono depositati, "
                                   "e una volta sola")
         txid = ""
-        if usdt:
+        coin = p2p_onchain_coin(o)
+        chiave = ""
+        if coin and not usdt:
+            # IN MONETA (17 nov 2026): l'id, e con Monero la chiave
+            if not (o["recapito"] or "").strip():
+                raise HTTPException(409, "Chi vende non ha ancora scritto il suo "
+                                         "indirizzo: aspetta che lo scriva")
+            metodo = (coin.get("metodi") or [""])[0]
+            perche, txid = p2p_onchain_giudica_txid_coin(d.get("txid"), metodo)
+            if perche:
+                raise HTTPException(400, perche)
+            if P2P_COIN_FORMA.get(metodo) == "monero":
+                chiave = re.sub(r"\s+", "", str(d.get("chiave") or ""))
+                perche = p2p_onchain_giudica_chiave_xmr(chiave)
+                if perche:
+                    raise HTTPException(400, perche)
+            con.execute("UPDATE p2p_onchain_ordini SET stato='euro_inviati',"
+                        " euro_inviati_il=?, txid_coin=?, chiave_tx_coin=?, aggiornato=?"
+                        " WHERE id=? AND stato='depositato'",
+                        (adesso, txid, chiave, adesso, oid))
+            con.commit()
+        elif usdt:
             rete = p2p_onchain_rete_scambio(o)
             if not rete or not (o["recapito"] or "").strip():
                 raise HTTPException(409, "Chi vende non ha ancora scritto il suo "
@@ -106777,15 +106882,27 @@ async def p2p_onchain_euro_inviati(oid: int, req: Request, x_tg_init_data: str =
             perche = p2p_onchain_giudica_txid_usdt(txid, rete["rete"])
             if perche:
                 raise HTTPException(400, perche)
-        con.execute("UPDATE p2p_onchain_ordini SET stato='euro_inviati',"
-                    " euro_inviati_il=?, txid_usdt=?, aggiornato=?"
-                    " WHERE id=? AND stato='depositato'",
-                    (adesso, txid, adesso, oid))
-        con.commit()
+        if not (coin and not usdt):
+            con.execute("UPDATE p2p_onchain_ordini SET stato='euro_inviati',"
+                        " euro_inviati_il=?, txid_usdt=?, aggiornato=?"
+                        " WHERE id=? AND stato='depositato'",
+                        (adesso, txid, adesso, oid))
+            con.commit()
         euro = _fmt_eur(int(o["euro_cent"]) / 100)
     finally:
         con.close()
-    if usdt:
+    if coin and not usdt:
+        rete_c = (coin.get("metodi") or [""])[0]
+        rete_c = rete_c[rete_c.find("(") + 1:rete_c.rfind(")")] if "(" in rete_c else rete_c
+        testo = (f"🪙 <b>Chi compra dice di averti inviato {html.escape(p2p_onchain_cifra(o))} "
+                 f"su {html.escape(rete_c)}.</b> Vendi {_p2p_onchain_quanto(o)}.\n\n"
+                 f"Id della transazione: <code>{html.escape(txid)}</code>"
+                 + (f"\nChiave della transazione: <code>{html.escape(chiave)}</code>"
+                    if chiave else "")
+                 + "\n\nControlla il tuo wallet sulla rete giusta: quando li vedi, apri "
+                 "lo scambio e tocca «Ricevuti: libera i sats». Se non arrivano, "
+                 "apri una disputa.")
+    elif usdt:
         testo = (f"💵 <b>Chi compra dice di averti inviato {euro} USDT su "
                  f"{html.escape(rete['nome'])}.</b> Vendi {_p2p_onchain_quanto(o)}.\n\n"
                  f"Id della transazione: <code>{html.escape(txid)}</code>\n\n"
@@ -108220,7 +108337,8 @@ def _p2p_onchain_testi_pagare(o) -> dict:
             f"poi tocca «Ho inviato gli euro». Hai {ore} ore in tutto."),
         2: (f"{S} 💶 Sono passate sei ore: i sats di chi vende sono fermi nel "
             "2-di-3 e gli euro non risultano inviati. Inviali e tocca «Ho inviato "
-            f"gli euro». Ti restano {ore - 6} ore."),
+            f"gli euro». Ti restano {ore - 6} ore. Se non puoi più, tocca «↩️ Rinuncio: "
+            "rimborsa chi vende» nella pagina dello scambio: i sats tornano a chi vende."),
         3: (f"{S} ⏰ Mancano quattro ore alla fine del tempo per pagare. Invia gli "
             "euro e tocca «Ho inviato gli euro»: dopo, chi vende può aprire una "
             "disputa e a decidere sarà un moderatore."),

@@ -65738,6 +65738,70 @@ function usdtInviatiOcP2P(btn, id){
     poi: () => eseguiGestoOnchainP2P(id, 'euro-inviati', {txid}, btn)});
 }
 
+/* L'ID DELLA TRANSAZIONE IN MONETA (17 nov 2026, cantiere
+   onchain-chat-sollecito, Andrea: «Perché per usde non si può incollare id
+   transazione?»): come gli USDT, prima di «Ho inviato gli ETH/XMR/USDe»
+   l'id, giudicato sulla rete dello scambio con i giudici del Lightning
+   (`giudiceTxidCoinP2P`, e con Monero anche la chiave della transazione,
+   `giudiceChiaveTxXmrP2P`). Va a chi vende e, in disputa, al moderatore,
+   col tasto dell'explorer. */
+let p2pOcTxCoinBozza = {};   // per scambio: {txid, chiave} che si stanno scrivendo
+function campoTxidCoinOcP2P(o){
+  const r = typeof reteOcCoinP2P === 'function' ? reteOcCoinP2P(o) : null;
+  if (!r) return '';
+  const b = p2pOcTxCoinBozza[o.id] || {};
+  const n = Number(o.id);
+  const scrivi = k => 'oninput="(p2pOcTxCoinBozza[' + n + ']=p2pOcTxCoinBozza[' + n + ']||{}).' + k + '=this.value"';
+  const attr = 'autocomplete="off" autocapitalize="off" spellcheck="false"';
+  return '<div class="field"><label for="p2pOcTxidCoin">Id della transazione su ' + esc(r.nome) + '</label>'
+    + '<input type="text" id="p2pOcTxidCoin" maxlength="100" ' + attr + ' placeholder="'
+    + (r.forma === 'evm' ? '0x… (66 caratteri), dal tuo wallet' : r.forma === 'solana'
+      ? 'la firma della transazione, dal tuo wallet' : '64 caratteri, dal tuo wallet') + '" '
+    + 'value="' + esc(b.txid || '') + '" ' + scrivi('txid') + '>'
+    + (r.forma === 'monero'
+      ? '<label for="p2pOcChiaveCoin" style="margin-top:8px">Chiave della transazione (tx key)</label>'
+        + '<input type="text" id="p2pOcChiaveCoin" maxlength="1200" ' + attr + ' placeholder="64 caratteri, dai dettagli dell\'invio" '
+        + 'value="' + esc(b.chiave || '') + '" ' + scrivi('chiave') + '>'
+      : '')
+    + '<div class="hint">Lo trovi nei dettagli dell\'invio. Lo vedono chi vende e, in disputa, il moderatore.</div></div>';
+}
+/* «HO INVIATO» IN MONETA: l'id (e la chiave di Monero) prima */
+function coinInviatiOcP2P(btn, id){
+  haptic();
+  const o = p2pOnchainMiei.find(x => x.id === id);
+  const r = o && typeof reteOcCoinP2P === 'function' ? reteOcCoinP2P(o) : null;
+  if (!o || !r || !o.recapito) return toast('Chi vende non ha ancora scritto il suo indirizzo', 5000);
+  const b = p2pOcTxCoinBozza[id] || {};
+  const iT = el('p2pOcTxidCoin'), iC = el('p2pOcChiaveCoin');
+  const txid = txidCoinNormaleP2P(String((iT && iT.value) || b.txid || ''), r);
+  let no = giudiceTxidCoinP2P(txid, r);
+  if (no) { toast(no, 7000); if (iT) iT.focus(); return; }
+  const chiave = r.forma === 'monero' ? String((iC && iC.value) || b.chiave || '').replace(/\s+/g, '') : '';
+  if (r.forma === 'monero') {
+    no = giudiceChiaveTxXmrP2P(chiave);
+    if (no) { toast(no, 7000); if (iC) iC.focus(); return; }
+  }
+  chiediConferma({titolo: 'Hai inviato gli ' + r.coin + '?', etichetta: 'Sì, li ho inviati',
+    corpo: 'Dillo solo dopo aver davvero mandato ' + cifraOcP2P(vestiOcP2P(o)) + ' su ' + r.nome
+      + ' all\'indirizzo di chi vende. L\'id della transazione arriva a chi vende, che controlla e libera i sats. '
+      + 'Da qui non potrai più rinunciare: se qualcosa va storto, resta la disputa.',
+    poi: () => eseguiGestoOnchainP2P(id, 'euro-inviati', chiave ? {txid, chiave} : {txid}, btn)});
+}
+/* l'id mandato, nella pagina: alle due parti e al moderatore, coi «📋
+   Copia» e il tasto dell'explorer; al moderatore anche l'indirizzo di chi
+   riceveva (con Monero serve a provare a chi sono andati) */
+function txCoinOcP2P(o){
+  const r = typeof reteOcCoinP2P === 'function' ? reteOcCoinP2P(o) : null;
+  const t = o && o.coin_tx && o.coin_tx.txid;
+  if (!r || !t) return '';
+  const prima = Array.isArray(o.coin_tx.indirizzi_prima) ? o.coin_tx.indirizzi_prima : [];
+  return '<div class="p2p-recapito">' + rigaDato('Id della transazione', t, {mono: true, copia: true})
+    + (o.coin_tx.chiave ? rigaDato('Chiave della transazione', o.coin_tx.chiave, {mono: true, copia: true}) : '')
+    + (o.coin_tx.indirizzo ? rigaDato('Indirizzo di chi vende', o.coin_tx.indirizzo, {mono: true, copia: true}) : '')
+    + prima.map(x => rigaDato('⚠️ Indirizzo di prima', String(x), {mono: true, copia: true})).join('')
+    + tastoEsploraCoinP2P(r, t) + '</div>';
+}
+
 /* ═══ IL FRANCO E LE MONETE NEGLI SCAMBI ON-CHAIN (16 nov 2026, cantiere
    ricevi-mercato, Andrea: «alla fine si scambia sempre Bitcoin on-chain o
    Lightning, non le altre valute… Le altre valute servono solo per
@@ -65748,8 +65812,8 @@ function usdtInviatiOcP2P(btn, id){
    (`vestiCoinOrdineP2P`: `fiat` la moneta, `euro` la cifra nella moneta,
    `euroNodo` il controvalore in euro di quando e' stato pubblicato). Una
    rete sola per ordine in moneta: e' quella dell'indirizzo e del QR. Chi
-   paga in moneta tocca «Ho inviato gli ETH» senza l'id: l'id resta nel
-   suo wallet, e in disputa lo mostra al moderatore. ═══ */
+   paga in moneta incolla l'id della transazione prima di «Ho inviato gli
+   ETH» (17 nov 2026: `coinInviatiOcP2P`, come gli USDT). ═══ */
 function vestiOcP2P(o){
   return o && typeof vestiCoinOrdineP2P === 'function' ? vestiCoinOrdineP2P(o) : o;
 }
@@ -65968,8 +66032,9 @@ function schedaOnchainP2P(o){
       if (ricevo && rCoin) {
         testo = `I <b>${fmt(o.sats)} sats</b> sono nel 2-di-3. Manda <b>${esc(cifraOc(o))}</b> su <b>${esc(rCoin.nome)}</b>`
           + (o.recapito ? ' all\'indirizzo qui sotto' : ': chi vende sta per scrivere il suo indirizzo')
-          + ', poi tocca «Ho inviato gli euro».';
-        gesti = (o.recapito ? g('euro-inviati', paroleOc(o, '💶 Ho inviato gli euro'), 'orange') : '')
+          + ', poi incolla l\'id della transazione e tocca «Ho inviato gli euro».';
+        /* l'id prima del gesto (17 nov 2026), come gli USDT */
+        gesti = (o.recapito ? bott('orange', `coinInviatiOcP2P(this, ${o.id})`, paroleOc(o, '💶 Ho inviato gli euro')) : '')
           + bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende')
           + g('disputa', '⚖️ Apri una disputa');
         break;
@@ -66110,6 +66175,8 @@ function schedaOnchainP2P(o){
     + incassoLnOnchainP2P(o)
     + recapitoBox
     + (gesti.includes('usdtInviatiOcP2P') ? campoTxidOcP2P(o) : '')
+    + (gesti.includes('coinInviatiOcP2P') && typeof campoTxidCoinOcP2P === 'function' ? campoTxidCoinOcP2P(o) : '')
+    + (typeof txCoinOcP2P === 'function' ? txCoinOcP2P(o) : '')
     + (usdt ? txidUsdtOcP2P(o) : '')
     + (usdt && mod ? modUsdtOcP2P(o) : '')
     + indirizzoBox
