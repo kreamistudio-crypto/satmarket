@@ -1441,6 +1441,14 @@ P2P_USDT_SOLO_ADMIN = True
 # Vale solo per chi ha P2P_ONCHAIN_ATTIVO e gli USDT (P2P_USDT_ATTIVO,
 # con P2P_USDT_SOLO_ADMIN). Spento di serie; sul collaudo si accende.
 P2P_ONCHAIN_USDT_ATTIVO = False
+# BARATTOZON ANCHE ON-CHAIN (17 nov 2026, «si» di Andrea al piano). Chi
+# VENDE bitcoin col 2-di-3 puo' farsi pagare un PayCode Amazon al
+# tabacchino: un metodo solo, euro, PayCode che scade fra almeno 12 ore,
+# l'ordine esce dal libro 8 ore prima. Il PayCode lo custodisce il server
+# e lo vede chi compra SOLO coi sats confermati nel 2-di-3 (mai i
+# moderatori, il libro, Nostr, gli avvisi o il journal). Acceso di serie;
+# False lo rimette solo via Lightning.
+P2P_ONCHAIN_BARATTOZON = True
 # GLI ORDINI P2P IN FRANCHI SVIZZERI (14 nov 2026, cantiere p2p-chf,
 # Andrea: «abbiamo stretto una collaborazione con Lugano»). Accanto agli
 # ordini in euro e in USDT, ordini Mostro in CHF: la garanzia resta la

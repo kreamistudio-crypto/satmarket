@@ -87104,3 +87104,101 @@ un pacchetto che manca nel venv dei collaudi si aggiunge al workflow
 nello stesso commit del collaudo che lo vuole, mai solo nel venv locale.
 Il commit tocca `.github/workflows/`: dopo il verde si guarda che
 `pronto` avanzi davvero (CLAUDE.md).
+
+
+## Barattozon anche on-chain (17 nov 2026, cantiere barattozon-onchain; Andrea alle 10:08: «Perché Barattozon funziona solo via Lighting e non on-chain?», poi alle 10:11 «Sì, mettiamolo in chain anche. Tanto un ordine che scade, per esempio, il giorno dopo, non vedo dove sia il problema», e «si» al piano alle 10:14)
+
+LA DOMANDA. Il 30 ott Andrea aveva scelto «solo Lightning, interruttore
+fisso» (Cantieri, «Il "Novità" che apre il tutorial on-chain… Barattozon
+solo via Lightning»): il PayCode pagato coi sats del 2-di-3 era «un
+cantiere a parte». Oggi l'ha chiesto. Il nodo era il tempo: dal 14 nov
+il PayCode si mostra solo coi sats in garanzia, e on-chain la garanzia
+arriva con una conferma (10-60 minuti, fino alle 6 ore di
+`P2P_ONCHAIN_ORE_DEPOSITO`) mentre il PayCode scade. Per Andrea un
+PayCode che scade il giorno dopo basta: e' la misura scelta.
+
+IL PIANO APPROVATO (mandato prima del codice, «si» di Andrea):
+1) solo «Vendi BTC», in euro, un metodo solo; Barattozon in compra resta
+   Lightning (li' il PayCode lo scrive chi prende: un'altra strada);
+2) si pubblica solo un PayCode con almeno 12 ore di vita, e l'ordine esce
+   dal libro da solo 8 ore prima della scadenza (6 per confermare il
+   deposito + 2 per andare al tabacchino): con un PayCode di 24 ore resta
+   nel libro circa 16 ore; la presa e la ronda guardano gia' `scade`;
+3) la commissione di Barattolo e' quella di sempre (uguale a Lightning,
+   16 nov); la rete del deposito la paga chi vende, come ogni on-chain;
+4) LA DIFFERENZA DETTA AD ANDREA: su Lightning il PayCode viaggia cifrato
+   fra i due telefoni; qui lo scambio e' del server, e il PayCode sta nel
+   server (colonna `paycode`, accanto a dove sta l'IBAN). Esce a chi
+   l'ha scritto sempre, a chi paga SOLO col deposito confermato, mai al
+   moderatore, mai nel libro, nel 38383, negli avvisi o nel journal. E'
+   un cancello piu' duro di quello del telefono: lo tiene il server.
+
+COSA SI E' FATTO. Server: la leva `P2P_ONCHAIN_BARATTOZON` (accesa di
+serie, nella busta del libro), il giudice puro
+`p2p_onchain_giudica_tabacchino`, la vita del libro
+`p2p_onchain_scade_libro`, la colonna `paycode` con le sue letture, il
+cancello in `_p2p_onchain_per`, le ore per pagare che non passano la
+scadenza del PayCode, gli avvisi del deposito confermato / di «Ho
+pagato» / del tempo scaduto con le parole del tabacchino, il recapito
+che dice 409, la pausa che non ferma un Barattozon (come su Lightning).
+Niente ripubblica ne' paracadute sul PayCode: lo fa il server anche se
+il telefono li manda. Telefono: il tabacchino nella lista dei metodi
+on-chain a leva accesa, l'interruttore non piu' fisso in «Vendi BTC», il
+percorso dei quattro passi con la regola delle 12 ore e l'aiuto del
+passo 3 detto per l'on-chain, il riepilogo prima di pubblicare (lo
+stesso di Lightning, con la vita del libro on-chain), e nella scheda
+«🧾 Ho pagato al tabacchino», il terzo passo «PayCode pagato» e il
+riquadro del PayCode di Lightning (`payCodeOcP2P` gli passa una riga
+fatta apposta) con le frasi del «cifrato» rifatte per l'on-chain.
+
+TROVATO NEL GIRO DAL VIVO. Il foglio aperto dal link dell'estensione
+nasceva prima del libro on-chain: la leva letta come «spenta» lasciava
+l'interruttore fisso su Lightning. Ora la leva vale accesa finche' la
+busta non dice false (a leva spenta lo dice il server al tocco). E il
+cappello di Barattozon diceva «ricevi cifrati codice, importo e
+scadenza appena l'ordine è tuo», falso on-chain: `testoBarattozonP2P`
+ha il terzo argomento `oc`.
+
+STRADE SCARTATE. Il PayCode cifrato fra i telefoni anche on-chain: gli
+scambi on-chain non hanno il canale cifrato di Mostro, e il recapito
+sta gia' sul server; rifarlo era un cantiere grosso per un rischio che
+il cancello sul deposito chiude. Allungare il deposito o il libro: il
+tempo di chi deposita resta 6 ore. Una soglia piu' bassa delle 12 ore:
+con 6 di deposito e 2 di tabacchino, sotto le 12 il libro durerebbe
+poche ore; con meno tempo si usa Lightning, e la frase lo dice.
+
+PROVATO. `prove_barattozon_onchain` (25 controlli: il giudice coi suoi
+undici rifiuti, la vita nel libro, le ore per pagare, gli avvisi senza
+codice, le sentinelle del cancello e della pubblicazione, il banco node
+di lista metodi, leva, vita e riquadro), coi contro-test (cancello
+senza deposito, vita senza margine, frase «cifrato»: rossi).
+`collaudo_p2p_onchain_barattozon` col server vero (16 verdi: i rifiuti,
+la riga, il 38383 e il libro senza codice, chi prende e il moderatore
+senza codice prima del deposito, il codice dopo, gli avvisi, «Ho
+pagato», la presa chiusa a libro scaduto). Giro dal vivo in Chromium sul
+server locale (relay morti): il foglio dal link con l'interruttore
+On-chain, il percorso compilato e il giudizio buono, la scheda prima e
+dopo il deposito. Sentinelle del 30 ott che scrivevano il «solo
+Lightning» (prove_grafica_p2p_onchain, prove_deposito_p2p_onchain)
+aggiornate alla regola nuova: in «Compra BTC» o a leva spenta resta. Le
+domande uniche salgono a 119 (la 118 l'aveva presa onchain-chat-sollecito
+nello stesso giorno). Develop è corso tre volte durante il cantiere: suite
+severa e collaudi interi (141/0, senza variabili del proxy) sull'albero
+rebasato su 35c5c1e0; sull'ultimo, 7b19e7c8 (primo wallet, spedisci
+entro, avvisi dei preferiti: commit non miei), suite severa 29.048/0 e i
+sei collaudi toccati (i quattro on-chain, avvisi_barattolo,
+spedisci_entro); ancora rebasato su a4f63637 (Packlink, scheda dell'app
+nel relay: non miei, nessun collaudo toccato), suite severa rifatta lì;
+poi su 37950a43 (i regali per livello, non mio): suite severa 29.087/0 e
+i collaudi on-chain e dei regali; infine su c4aae3f2 (chiedi locker, primo
+wallet terzo giro, due ritocchi di CI e NOVITA: non miei): le sezioni
+toccate e i collaudi on-chain prima del push, la suite intera dopo.
+
+DA GUARDARE. I promemoria a chi paga dello scambio on-chain (cantiere
+onchain-chat-sollecito) non partono per Barattozon, perché vogliono un
+recapito; quelli a chi libera usano le parole degli euro.
+Lo scambio vero sul collaudo (mempool vera, signet) e poi
+in produzione con un PayCode di prova. La revisione di Alan: il PayCode
+sul server e il cancello in `_p2p_onchain_per` sono il pezzo da
+rileggere. Nella scheda on-chain «Totale da inviare» resta la parola di
+sempre anche col tabacchino.

@@ -29053,6 +29053,45 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Il PayCode non tocca mai il server: il frammento il browser non lo
   manda. Il numero dell'ordine Amazon non viaggia. Il verbale: CANTIERI,
   «L'estensione del browser per Barattozon».
+  BARATTOZON ANCHE ON-CHAIN (17 nov 2026, cantiere barattozon-onchain,
+  Andrea: «Sì, mettiamolo in chain anche»; il piano col suo «si»). Solo
+  «Vendi BTC», in euro, un metodo solo, dietro la leva
+  `P2P_ONCHAIN_BARATTOZON` (accesa di serie; nella busta del libro
+  on-chain come `barattozon`). SERVER: il giudice puro
+  `p2p_onchain_giudica_tabacchino(lato, metodi, euro_cent, valuta, tab,
+  adesso, minimo)` → `(perche, {pc, scade, barre})`, chiamato da
+  `/api/p2p/onchain/pubblica` col corpo `tabacchino: {paycode, scade,
+  barre}`: importo con `_importo_paycode_valido` e `_paycode_sopra_minimo`
+  (`BARATTOZON_MIN_EURO`), nove cifre, scadenza fra `P2P_ONCHAIN_TAB_MIN_S`
+  (12 ore) e `P2P_ONCHAIN_TAB_MAX_S`, codice a barre GS1 col PayCode
+  dentro. La riga nasce con `scade` = `p2p_onchain_scade_libro` (la vita
+  di sempre o la scadenza meno `P2P_ONCHAIN_TAB_MARGINE_S`, le 6 ore del
+  deposito + 2), senza ripubblica, paracadute ne' recapito, e il PayCode
+  nella colonna `paycode` (JSON; letta da `p2p_onchain_tab_dati` e
+  `p2p_onchain_tab_scade`). IL CANCELLO: `_p2p_onchain_per` mette in
+  `tabacchino` la scadenza per chi apre lo scambio e `paycode`/`barre` solo
+  a chi l'ha scritto e a chi paga con `depositato_il` > 0, mai al
+  moderatore; la riga pubblica del libro e il 38383 non lo portano. Le
+  ore per pagare (`p2p_onchain_ore_pagamento`, `p2p_onchain_paga_entro`)
+  finiscono con la scadenza del PayCode; gli avvisi del deposito
+  confermato (`_p2p_onchain_testi_deposito_tab`), di «Ho pagato» e del
+  tempo scaduto parlano di tabacchino e Amazon, mai col codice dentro. La
+  rotta `recapito` dice 409; la porta della presa e il libro ignorano la
+  pausa (come su Lightning). TELEFONO: `metodiOnchainP2P('vendo')` ha il
+  tabacchino a leva accesa (`bzOnchainP2P`, accesa finche' la busta non
+  dice false); `interruttoreReteP2P` e' fisso su Lightning solo in compra
+  o a leva spenta; il foglio e' il percorso di sempre, con la regola delle
+  12 ore in `valeNuovoOrdineP2P` (`v.oc`), l'aiuto del passo 3, il
+  riepilogo con `vitaLibroOcTabP2P`, e `pubblicaOnchainDalFoglioP2P` che
+  manda centesimi, `metodoTabacchinoP2P`, i sats di `satsTabacchinoP2P` e
+  i tre dati. La scheda (`schedaOnchainP2P`, `tabOc`): «🧾 Ho pagato al
+  tabacchino» (il gesto `euro-inviati`), il terzo passo «PayCode pagato»,
+  e al posto del recapito `payCodeOcP2P`, che riusa
+  `riquadroPayCodeP2P`/`riquadroScadenzaPayCodeP2P` con una riga fatta
+  apposta e cambia le frasi del «cifrato» (`testoBarattozonP2P(…, oc)`).
+  Le prove: `prove_barattozon_onchain`; il collaudo:
+  `collaudo_p2p_onchain_barattozon`. Il verbale: CANTIERI, «Barattozon
+  anche on-chain».
   IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea, rifatto due volte;
   il terzo giro il 24): nel libro, su «Vendi BTC», dal fondo del + rosso
   della barra scende A TENDINA la sua continuazione (`#navBarattozon`):

@@ -422,3 +422,9 @@ frase: Se un venditore non spedisce ai locker o ai punti di ritiro, alla cassa l
 dove: la cassa di un annuncio a spedizione di un venditore senza InPost, Poste o SDA, sotto «Spedizione a un indirizzo»; il messaggio del bot «Qualcuno vorrebbe ricevere … in un locker» col bottone «📦 Come spedisci».
 leva: RICHIESTA_PUNTI (accesa di serie)
 pubblico: sì
+
+## 2026-11-17 · barattozon-onchain
+frase: Barattozon adesso c'è anche on-chain: in «Vendi BTC» col tabacchino puoi toccare «On-chain» in cima al foglio e pubblicare il tuo PayCode nel libro on-chain. Serve un PayCode che scade fra almeno 12 ore; chi prende l'ordine vede il codice solo quando i tuoi sats sono confermati nel deposito di garanzia, poi lo paga al tabacchino e tocca «Ho pagato al tabacchino».
+dove: Il P2P, «Vendi BTC» → la capsula Barattozon (o il + col metodo «Contanti al tabacchino»), il tasto «On-chain» in cima al foglio; nello scambio il riquadro «🧾 Il PayCode da pagare al tabacchino».
+leva: P2P_ONCHAIN_BARATTOZON (accesa di serie)
+pubblico: sì

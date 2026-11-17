@@ -63931,7 +63931,9 @@ function accogliLibroOnchainP2P(busta){
     /* il tetto degli scambi on-chain (12 nov 2026): null = server di ieri */
     maxEuro: busta.maxEuro == null ? null : Number(busta.maxEuro),
     /* i due tasti della rete nel foglio di chi prende (16 nov 2026) */
-    lnPossibile: !!busta.lnPossibile, depositoLnPossibile: !!busta.depositoLnPossibile};
+    lnPossibile: !!busta.lnPossibile, depositoLnPossibile: !!busta.depositoLnPossibile,
+    /* Barattozon anche on-chain (17 nov 2026): la leva del server */
+    barattozon: busta.barattozon !== false};
   p2pOnchainLetto = Date.now();
   return p2pOnchainLibro.eventi.length > 0;
 }
@@ -66258,8 +66260,75 @@ function metodiOnchainP2P(lato){
      ricevi-mercato, Andrea: «le altre valute servono solo per pagare»):
      dal 13 nov stavano fuori, e la loro strada e' arrivata — la valuta del
      foglio da' le sue reti, come su Lightning */
-  return metodiPubblicabiliP2P(lato).filter(m => m !== P2P_TABACCHINO);
+  /* il tabacchino si' dal 17 nov 2026, ma solo in «Vendi BTC» e a leva
+     accesa (`bzOnchainP2P`) */
+  return metodiPubblicabiliP2P(lato).filter(m => m !== P2P_TABACCHINO
+    || (lato === 'vendo' && typeof bzOnchainP2P === 'function' && bzOnchainP2P()));
 }
+
+/* ═══ BARATTOZON ANCHE ON-CHAIN (17 nov 2026, cantiere barattozon-onchain,
+   Andrea: «Sì, mettiamolo in chain anche. Tanto un ordine che scade, per
+   esempio, il giorno dopo, non vedo dove sia il problema») ═════════════
+   Chi vende sats pubblica il PayCode anche nel libro on-chain. Il
+   percorso del foglio e' lo stesso di Lightning (i quattro passi); cambia
+   il tempo: il deposito si conferma in rete, quindi il PayCode deve
+   vivere ancora almeno 12 ore, e l'ordine esce dal libro 8 ore prima
+   della sua scadenza (le 6 del deposito + 2 per il tabacchino). Il
+   PayCode lo tiene il SERVER e lo mostra a chi paga solo col deposito
+   confermato: su Lightning viaggia cifrato fra i due telefoni. Il perche'
+   lungo sta in server.py, sopra `P2P_ONCHAIN_BARATTOZON`. */
+const P2P_OC_TAB_MIN_S = 12 * 3600;
+const P2P_OC_TAB_MARGINE_S = 8 * 3600;
+/* la leva del server: spenta solo quando la busta lo dice. Prima che il
+   libro on-chain arrivi (il foglio aperto dal link dell'estensione, o
+   dalla capsula al primo colpo) vale accesa, o l'interruttore nascerebbe
+   fisso su Lightning e resterebbe cosi': a leva spenta lo dice il
+   server, al tocco «Pubblica» */
+function bzOnchainP2P(){
+  return typeof p2pOnchainLibro === 'object' && !!p2pOnchainLibro && p2pOnchainLibro.barattozon !== false;
+}
+/* PURA: fino a quando un Barattozon on-chain sta nel libro: la vita di
+   sempre (7 giorni) o la scadenza del PayCode meno 8 ore, se viene
+   prima. Il gemello del server e' `p2p_onchain_scade_libro`. */
+function vitaLibroOcTabP2P(scade, adesso){
+  const s = Math.floor(Number(scade) || 0), ora = Math.floor(Number(adesso) || 0);
+  return Math.min(s - P2P_OC_TAB_MARGINE_S, ora + 168 * 3600);
+}
+/* PURA: il riquadro del PayCode di uno scambio on-chain, per la scheda.
+   Chi l'ha scritto lo rivede; chi paga lo vede solo col deposito
+   confermato (il server non glielo manda prima), e prima vede il tempo
+   con la frase di Lightning. Riusa il riquadro di Lightning
+   (`riquadroPayCodeP2P`) con una riga fatta apposta: il testo composto
+   coi due campi che quella scatola sa leggere. */
+function payCodeOcP2P(o){
+  const t = (o && o.tabacchino) || null;
+  if (!t || !tabacchinoP2P(o.metodi)) return '';
+  const riga = {metodi: o.metodi, euro: o.euro, lato: 'compro', mio: false,
+    stato: ['depositato', 'euro_inviati', 'disputa'].indexOf(o.stato) >= 0 ? 'attivo' : o.stato,
+    tabacchino: {scade: Number(t.scade) || 0},
+    campiLoro: {euro: {testo: t.paycode ? 'PayCode: ' + payCodeP2P(t.paycode)
+      + (t.barre ? '\nCodice a barre: ' + t.barre : '') : ''}}};
+  if (o.ruolo === 'venditore') {
+    if (!t.paycode) return ['annullato', 'scaduto', 'rimborsato'].indexOf(o.stato) >= 0 ? ''
+      : riquadroScadenzaPayCodeP2P(riga, 0, true).replace('La scadenza è quella scritta nel libro pubblico dell\'ordine.',
+        'La scadenza l\'ha scritta chi vende, insieme al PayCode.');
+    return riquadroPayCodeP2P(riga).replace(P2P_PAYCODE_CIFRATO_HTML, P2P_PAYCODE_SERVER_HTML)
+      .replace(esc(testoBarattozonP2P(false, true)), esc(testoBarattozonOcP2P(false)));
+  }
+  /* chi l'ha scritto: il codice e la scadenza, corti, senza i gesti della cassa */
+  if (!t.paycode) return '';
+  return '<div class="p2p-paycode"><div class="p2p-paycode-tit">🧾 Il tuo PayCode</div>'
+    + '<div class="p2p-paycode-riga"><span>PayCode</span><b>' + esc(payCodeP2P(t.paycode)) + '</b></div>'
+    + '<div class="p2p-paycode-riga"><span>Importo</span><b>' + esc(fmtEur(o.euro)) + ' €</b></div>'
+    + (Number(t.scade) > 0 ? '<div class="p2p-paycode-riga"><span>Scade il</span><b>'
+      + esc(dataTabacchinoP2P(Number(t.scade))) + '</b></div>' : '')
+    + '<div class="hint">Chi prende lo vede solo quando il tuo deposito è confermato. '
+    + 'Libera i sats solo quando su Amazon l\'ordine risulta pagato.</div></div>';
+}
+/* la riga in fondo al riquadro di Lightning dice che il codice viaggia
+   cifrato: on-chain non e' vero, e si dice com'e' */
+const P2P_PAYCODE_CIFRATO_HTML = '<div class="hint">Il codice resta tuo e di chi vende: viaggia cifrato, e Barattolo non lo legge.</div>';
+const P2P_PAYCODE_SERVER_HTML = '<div class="hint">Negli scambi on-chain il PayCode lo custodisce Barattolo, e te lo mostra solo coi sats confermati nel 2-di-3.</div>';
 
 /* ═══ GLI USDT NEGLI SCAMBI ON-CHAIN (2 nov 2026, cantiere
    p2p-onchain-usdt, Andrea: «usdt onchain assolutamente è da fare»; la
@@ -66601,7 +66670,16 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
      pausa: dalla conferma della pausa si torna qui col velo addosso */
   if (!confermato && typeof backupOnchainPrima === 'function'
       && !backupOnchainPrima(() => pubblicaOnchainDalFoglioP2P(false))) return;
-  if (!confermato && typeof fermaPerPausaP2P === 'function' && fermaPerPausaP2P()) return;
+  /* BARATTOZON ON-CHAIN (17 nov 2026): niente domanda della pausa (il
+     PayCode si prende anche in pausa, come su Lightning) e il riepilogo
+     prima di pubblicare, lo stesso di Lightning */
+  const tabOc = tabacchinoP2P(campi.metodi) && campi.lato === 'vendo';
+  if (!confermato && !tabOc && typeof fermaPerPausaP2P === 'function' && fermaPerPausaP2P()) return;
+  if (tabOc && !confermato) {
+    chiediConferma({titolo: 'Il tuo PayCode, in breve', corpo: riepilogoTabacchinoP2P(campi),
+      etichetta: 'Pubblica', vestito: 'bz', poi: () => pubblicaOnchainDalFoglioP2P(true)});
+    return;
+  }
   const vendo = campi.lato === 'vendo';
   /* in USDT l'indirizzo di chi vende passa dal giudice della rete prima
      di partire (2 nov 2026); il server lo rigiudica */
@@ -66630,6 +66708,25 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
   if (ripOc) corpo.ripubblica = ripOc;
   if (campi.fisso) corpo.sats = interoP2P(campi.sats).n;
   else corpo.premio = Number(campi.premio) || 0;
+  /* IL PAYCODE (17 nov 2026): l'importo coi centesimi, il metodo con
+     l'importo come sul filo di Lightning, i sats a prezzo fisso fatti
+     dal foglio col premio del percorso, e i tre dati per il server, che
+     li rigiudica e li tiene fino al deposito confermato */
+  if (tabOc) {
+    const eTab = centesimiP2P(campi.euro).n, prTab = premioTabacchinoP2P(campi.premioTab).n;
+    corpo.euro_cent = Math.round(eTab * 100);
+    corpo.metodi = [metodoTabacchinoP2P(eTab)];
+    corpo.recapito = '';
+    /* come su Lightning: niente ripubblica e niente paracadute sul PayCode */
+    corpo.paracadute = 0;
+    delete corpo.ripubblica;
+    if (campi.fisso) corpo.sats = satsTabacchinoP2P(eTab, campi.cambio, prTab);
+    else corpo.premio = prTab;
+    const tB = p2pNuovoTab || {};
+    const barre = giudizioBarrePayCodeP2P(tB.barre, tB.ordine);
+    corpo.tabacchino = {paycode: payCodeP2P(tB.ordine).replace(/-/g, ''),
+      scade: scadeDaCampoP2P(tB.scade), barre: barre.stato === 'buono' ? barre.numero : ''};
+  }
   const rip = onchainAttesa(el('p2pNuovoInvia'), 'Pubblico…');
   let fatto = 0;
   try {
@@ -66655,6 +66752,8 @@ function schedaOnchainP2P(o){
   const usdtOc = typeof usdtOcP2P === 'function' ? usdtOcP2P : () => false;
   const cifraOc = typeof cifraOcP2P === 'function' ? cifraOcP2P : x => fmtEur(x.euro) + ' €';
   const paroleOc = typeof paroleOcP2P === 'function' ? paroleOcP2P : (x, t) => t;
+  /* Barattozon on-chain (17 nov 2026): si paga il PayCode al tabacchino */
+  const tabOc = !!(o.tabacchino && typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi));
   const vendo = o.parte === 'vendo';
   const deposito = o.ruolo === 'compratore';   // chi vende bitcoin
   const ricevo = o.ruolo === 'venditore';      // chi compra bitcoin
@@ -66681,7 +66780,8 @@ function schedaOnchainP2P(o){
           + (Number(o.quota_sats) > 0 ? ` + ${fmt(Number(o.quota_sats) - (Number(o.quota_ricevente_sats) || 0))} di commissione` : '') + ') '
           + `nel 2-di-3 entro le ${quando(o.deposito_entro)}: tocca «🔒 Blocca i sats». Con una conferma lo scambio va avanti.`
         : `Chi vende sta depositando ${fmt(o.importo_sats)} sats nell'indirizzo 2-di-3 (entro le ${quando(o.deposito_entro)}). `
-          + 'Ti avvisiamo appena sono confermati: allora mandi gli euro.';
+          + (tabOc ? 'Ti avvisiamo appena sono confermati: allora vedi il PayCode e vai al tabacchino.'
+                   : 'Ti avvisiamo appena sono confermati: allora mandi gli euro.');
       /* il foglio del deposito, come «🔒 Blocca i sats» di Lightning
          (30 ott 2026): il suo tasto e' quello in evidenza */
       gesti = (deposito ? bott('orange', `apriDepositoOnchainP2P(${o.id})`, '🔒 Blocca i sats')
@@ -66690,6 +66790,21 @@ function schedaOnchainP2P(o){
            ? g('annulla', deposito ? 'Annulla (non deposito)' : 'Rinuncia: il deposito non è arrivato') : '');
       break;
     case 'depositato':
+      /* BARATTOZON ON-CHAIN (17 nov 2026): il PayCode nel riquadro qui
+         sotto, «Ho pagato al tabacchino» al posto di «Ho inviato gli
+         euro» (il gesto e' lo stesso, `euro-inviati`), e chi vende guarda
+         Amazon invece del conto */
+      if (tabOc) {
+        testo = ricevo
+          ? `I <b>${fmt(o.sats)} sats</b> sono nel 2-di-3. Paga il PayCode qui sotto al tabacchino `
+            + `(<b>${esc(fmtEur(o.euro))} € in contanti</b>), poi tocca «Ho pagato al tabacchino».`
+          : 'Deposito confermato. Chi compra adesso vede il PayCode e va al tabacchino: quando su Amazon '
+            + 'l\'ordine risulta <b>pagato</b>, libera i sats. Mai prima.';
+        gesti = (ricevo ? g('euro-inviati', '🧾 Ho pagato al tabacchino', 'orange') : bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'))
+          + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
+          + g('disputa', '⚖️ Apri una disputa');
+        break;
+      }
       /* in USDT (2 nov 2026): la rete, l'indirizzo nel riquadro col QR, e
          l'id della transazione prima di «Ho inviato gli USDT» */
       if (ricevo && usdtOc(o)) {
@@ -66727,6 +66842,17 @@ function schedaOnchainP2P(o){
         + g('disputa', '⚖️ Apri una disputa');
       break;
     case 'euro_inviati':
+      if (tabOc) {
+        testo = deposito
+          ? `Chi compra dice di aver pagato il PayCode al tabacchino (${quando(o.euro_inviati_il)}). `
+            + 'Guarda su Amazon: se l\'ordine risulta pagato, libera i sats; se no, apri una disputa.'
+          : `Hai detto di aver pagato il PayCode (${quando(o.euro_inviati_il)}). Chi vende lo controlla su Amazon `
+            + 'e libera i sats sul tuo wallet. Tieni lo scontrino: in una disputa è la tua prova.';
+        gesti = (deposito ? bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats') : '')
+          + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
+          + g('disputa', '⚖️ Apri una disputa');
+        break;
+      }
       testo = deposito
         ? `Chi compra dice di averti mandato <b>${esc(fmtSoldiP2P(o.euro, o))} €</b> (${quando(o.euro_inviati_il)}). `
           + 'Controlla il tuo conto: se ci sono, libera i sats; se non arrivano, apri una disputa.'
@@ -66780,7 +66906,9 @@ function schedaOnchainP2P(o){
   const usdt = usdtOc(o);
   /* in moneta l'indirizzo della sua rete, in franchi il conto (16 nov 2026) */
   const rCoinR = typeof reteOcCoinP2P === 'function' ? reteOcCoinP2P(o) : null;
-  const recapitoBox = recapito && ['pending', 'preso', 'depositato'].includes(o.stato) && rCoinR
+  /* col tabacchino al posto del recapito c'e' il PayCode (17 nov 2026) */
+  const recapitoBox = tabOc ? (typeof payCodeOcP2P === 'function' ? payCodeOcP2P(o) : '')
+    : recapito && ['pending', 'preso', 'depositato'].includes(o.stato) && rCoinR
     ? '<div class="p2p-box"><label>Il tuo indirizzo ' + esc(rCoinR.coin) + ' (' + esc(rCoinR.nome) + ')</label>'
       + '<input id="p2pOcRecapitoVivo" maxlength="120" autocapitalize="off" spellcheck="false" value="' + esc(o.recapito || '')
       + '" placeholder="Copialo dal tuo wallet"> ' + bott('ghost', `recapitoOnchainP2P(this, ${o.id})`, 'Salva') + '</div>'
@@ -67146,6 +67274,9 @@ function passiOnchainP2P(o){
   ];
   if (o.stato === 'pending') passi[0] = {t: 'Ordine pubblicato',
     d: vendo ? 'Aspetta chi ti compra i sats' : 'Aspetta chi ti vende i sats'};
+  /* Barattozon on-chain (17 nov 2026): il terzo passo e' il tabacchino */
+  if (o.tabacchino && typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi))
+    passi[2] = {t: 'PayCode pagato', d: vendo ? 'Al tabacchino, da chi compra' : 'Al tabacchino, in contanti'};
   const euroPartiti = !!o.euro_inviati_il;
   const PROG = {pending: 0, preso: 0, depositato: 2, euro_inviati: 3, rilasciato: 4,
                 disputa: euroPartiti ? 3 : 2};
@@ -67840,7 +67971,10 @@ function apriSceltaPubblicaP2P(){
    sara' solo il simbolo lightning»): col tabacchino nel foglio in cima
    resta il solo Lightning — prima il passaggio a On-chain toglieva il
    tabacchino e il bottone in fondo cambiava colore e misura. Il PayCode
-   pagato coi sats del 2-di-3 sarebbe un cantiere a parte. */
+   pagato coi sats del 2-di-3 sarebbe un cantiere a parte.
+   ...E IL CANTIERE A PARTE E' ARRIVATO (17 nov 2026, barattozon-onchain,
+   Andrea: «Sì, mettiamolo in chain anche»): `soloLn` resta vero solo per
+   Barattozon in «Compra BTC» e a leva spenta (`bzOnchainP2P`). */
 function interruttoreReteP2P(attiva, soloLn){
   if (!myP2POnchain || DEMO || VETRINA) return '';
   const tasto = (rete, moneta, nome) => '<button type="button" role="radio" class="p2p-rete-tasto'
@@ -67858,7 +67992,11 @@ function interruttoreReteP2P(attiva, soloLn){
 function cambiaReteP2P(rete){
   const oc = rete === 'onchain' && !!myP2POnchain;
   if (oc === p2pNuovoOc) return;
-  if (oc && tabacchinoP2P(p2pNuovoMetodi)) { toast('Barattozon si scambia solo via Lightning ⚡'); return; }
+  /* dal 17 nov 2026 Barattozon passa anche on-chain, ma solo in «Vendi
+     BTC» e a leva accesa (`bzOnchainP2P`) */
+  if (oc && tabacchinoP2P(p2pNuovoMetodi) && (p2pLato === 'compro' || !bzOnchainP2P())) {
+    toast(p2pLato === 'compro' ? 'Barattozon in acquisto si scambia solo via Lightning ⚡'
+      : 'Barattozon si scambia solo via Lightning ⚡'); return; }
   haptic();
   p2pNuovoOc = oc;
   if (oc) {
@@ -86168,6 +86306,15 @@ function scadenzaPayCodeDaLibroP2P(scadeLibro, nato){
    PayCode, dove lo scontrino lo dice gia' il terzo gesto della lista
    («Tieni lo scontrino: è la tua prova») due righe piu' su. Dirlo due
    volte nella stessa scatola non e' un promemoria, e' insistenza. */
+/* ON-CHAIN (17 nov 2026, barattozon-onchain) il codice non viaggia
+   cifrato: lo custodisce Barattolo e lo mostra coi sats confermati. Il
+   gemello di `testoBarattozonP2P`, senza lo scontrino (lo dicono i gesti) */
+function testoBarattozonOcP2P(mio){
+  return (mio
+    ? 'Con Barattozon fai pagare in contanti alla cassa del tabacchino un tuo ordine Amazon. On-chain il PayCode lo custodisce Barattolo: chi prende l\'ordine lo vede solo quando il tuo deposito è confermato nel 2-di-3, e paga solo allora. Non vede nome, indirizzo né cosa hai comprato.'
+    : 'Paghi in contanti alla cassa del tabacchino un ordine Amazon di chi vende, e paghi solo coi sats confermati nel 2-di-3. Non vedi nome, indirizzo né cosa ha comprato.')
+    + ' Per pagare non serve alcun documento.';
+}
 function testoBarattozonP2P(mio, senzaScontrino){
   const cosa = mio
     ? 'Con Barattozon fai pagare in contanti alla cassa del tabacchino un tuo ordine Amazon: chi lo paga riceve cifrati codice, importo e scadenza appena prende l\'ordine, e paga solo quando la pagina dice «Sats in garanzia». Non vede nome, indirizzo né cosa hai comprato.'
@@ -89809,18 +89956,27 @@ function valeNuovoOrdineP2P(v){
     if (quando <= adesso)
       return {ok: false, manca: 'La scadenza è già passata: serve un PayCode nuovo',
               campo: 'p2pNuovoTabScade'};
+    /* ON-CHAIN (17 nov 2026, barattozon-onchain) il tempo e' un altro:
+       il deposito si conferma in rete (fino a 6 ore) e poi si va al
+       tabacchino, quindi almeno 12 ore; la finestra della garanzia del
+       coordinatore qui non c'entra. Il server rigiudica. */
+    if (v.oc) {
+      if (quando < adesso + P2P_OC_TAB_MIN_S)
+        return {ok: false, manca: 'Su on-chain serve un PayCode che scade fra almeno 12 ore: con meno tempo pubblicalo via Lightning ⚡',
+                campo: 'p2pNuovoTabScade'};
+    }
     /* FRA UN'ORA E 72 ORE (23 set 2026): sotto l'ora nessuno fa in
        tempo ad andare al tabacchino, sopra le 72 non e' un PayCode */
-    if (quando < adesso + P2P_PAYCODE_MIN_S)
+    else if (quando < adesso + P2P_PAYCODE_MIN_S)
       return {ok: false, manca: 'Scade troppo presto: serve almeno un\'ora perché qualcuno vada al tabacchino',
               campo: 'p2pNuovoTabScade'};
     if (quando > adesso + P2P_PAYCODE_MAX_S)
       return {ok: false, manca: 'Troppo lontana: un PayCode vale al massimo 72 ore',
               campo: 'p2pNuovoTabScade'};
-    if (!(v.finestra > 0))
+    if (!v.oc && !(v.finestra > 0))
       return {ok: false, manca: 'Aspetta un attimo: sto leggendo quanto dura la garanzia',
               campo: 'p2pNuovoTabScade'};
-    if (quando > adesso + v.finestra)
+    if (!v.oc && quando > adesso + v.finestra)
       return {ok: false, manca: 'Troppo lontana: la garanzia copre al massimo '
                 + Math.floor(v.finestra / 3600) + ' ore da adesso',
               campo: 'p2pNuovoTabScade'};
@@ -90322,7 +90478,8 @@ function riquadroLimitiP2P(){
      fondo e' la sua: «Dove vuoi gli euro» per chi vende, e i numeri del
      2-di-3 al posto del tetto e della fee di Lightning */
   if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc && myP2POnchain)
-    return (p2pLato !== 'compro' ? sezioneRecapitoOnchainP2P() : '') + riquadroOnchainP2P();
+    /* col tabacchino il recapito e' il PayCode, gia' nel percorso (17 nov 2026) */
+    return (p2pLato !== 'compro' && !tabacchinoP2P(p2pNuovoMetodi) ? sezioneRecapitoOnchainP2P() : '') + riquadroOnchainP2P();
   const riga = rigaTettoFeeP2P();
   return riga ? sezioneNuovoP2P({
     ico: '', titolo: 'Quanto si può, e quanto costa', corpo: riga}) : '';
@@ -90393,7 +90550,9 @@ function renderNuovoOrdineP2P(){
   /* l'interruttore della rete in cima (30 ott 2026): vuoto a chi non e'
      ammesso all'on-chain, e nel banco del motore non c'e' */
   const rete = el('p2pNuovoRete');
-  if (rete) rete.innerHTML = typeof interruttoreReteP2P === 'function' ? interruttoreReteP2P(oc ? 'onchain' : 'ln', tab) : '';
+  /* col tabacchino l'On-chain c'e' solo in «Vendi BTC» e a leva accesa (17 nov 2026) */
+  if (rete) rete.innerHTML = typeof interruttoreReteP2P === 'function'
+    ? interruttoreReteP2P(oc ? 'onchain' : 'ln', tabMetodo && (compro || !(typeof bzOnchainP2P === 'function' && bzOnchainP2P()))) : '';
   const val = P2P_VALUTE.find(v => v.cod === (typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR')) || P2P_VALUTE[0];
   /* CON GLI USDT I METODI SONO LE RETI (2 nov 2026, Andrea): la tendina
      chiede la rete, e l'icona non e' piu' la carta di pagamento */
@@ -90728,7 +90887,7 @@ function renderNuovoOrdineP2P(){
         /* a rete on-chain la moneta arancio al posto del fulmine (30 ott
            2026, oc-identico); l'una e l'altro in rilievo, accanto alla
            scritta (vedi L'ICONA IN RILIEVO) */
-        (oc ? '<span class="p2p-invia-oc">' + P2P_OC_MONETA + 'Pubblica ordine</span></button>'
+        (oc ? '<span class="p2p-invia-oc">' + P2P_OC_MONETA + (tab ? 'Rileggi e pubblica' : 'Pubblica ordine') + '</span></button>'
           : (tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : '<span class="p2p-invia-ico">⚡</span>Pubblica ordine') + '</button>') +
     '</div>';
 }
@@ -90933,7 +91092,7 @@ function percorsoTabacchinoP2P(val){
        serviva la cosa che nessun'altra riga diceva: che chi paga vede
        il codice e basta, e che alla cassa non gli chiedono un
        documento. */
-    '<div class="hint">🧾 ' + esc(testoBarattozonP2P(true)) + '</div>' +
+    '<div class="hint">🧾 ' + esc(typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc && typeof testoBarattozonOcP2P === 'function' ? testoBarattozonOcP2P(true) : testoBarattozonP2P(true)) + '</div>' +
     /* I PASSI 1 E 2 COME IL 3 (9 ott 2026, sera): righe di casa che
        aprono il loro foglio. Tengono l'id (ogni «manca» del giudice le
        trova) e il `value` (che `cambiaTabP2P` e `cambiaCampoNuovoP2P`
@@ -90979,9 +91138,12 @@ function percorsoTabacchinoP2P(val){
         'onclick="apriScadeTabP2P()"' + ariaTappaTabP2P(3, giud[3]) + '>' +
         '<span>' + esc(etichettaScadeTabP2P(p2pNuovoTab.scade)) + '</span>' +
         '<i aria-hidden="true">▾</i></button>',
-      '<div class="hint">⏳ Amazon dà 72 ore dal checkout: copia la scadenza dalla mail. Deve stare fra un\'ora e 72 ore da adesso. Nel libro l\'ordine resta fino a <b>'
+      (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc
+        /* on-chain (17 nov 2026): il deposito si conferma in rete */
+        ? '<div class="hint">⏳ Amazon dà 72 ore dal checkout: copia la scadenza dalla mail. Su on-chain deve stare fra 12 e 72 ore da adesso. Nel libro l\'ordine resta fino a <b>8 ore prima</b> di quella scadenza: 6 per confermare il deposito e 2 per andare al tabacchino; poi esce da solo.</div>'
+        : '<div class="hint">⏳ Amazon dà 72 ore dal checkout: copia la scadenza dalla mail. Deve stare fra un\'ora e 72 ore da adesso. Nel libro l\'ordine resta fino a <b>'
         + (typeof margineParoleP2P === 'function' ? margineParoleP2P() : 'due ore')
-        + ' prima</b> di quella scadenza, per lasciare a chi paga il tempo di andare al tabacchino; poi esce da solo.</div>') +
+        + ' prima</b> di quella scadenza, per lasciare a chi paga il tempo di andare al tabacchino; poi esce da solo.</div>')) +
     tappa(4, P2P_TAPPE_TAB[3].t,
       '<div class="p2p-premio">' +
         '<div class="p2p-premio-val" id="p2pTabPremioBox">' + premioTabValP2P() + '</div>' +
@@ -91022,7 +91184,9 @@ function riepilogoTabacchinoP2P(v){
   const fisso = !!v.fisso;
   const netto = satsTabacchinoP2P(e, v.cambio, pr);
   /* la stessa vita che `expires_at` avra': col margine vivo (12 ott 2026) */
-  const libro = typeof vitaLibroVivaP2P === 'function'
+  /* ...e on-chain (17 nov 2026) quella del server: 8 ore prima del PayCode */
+  const libro = v.oc && typeof vitaLibroOcTabP2P === 'function' ? vitaLibroOcTabP2P(scade, adesso)
+    : typeof vitaLibroVivaP2P === 'function'
     ? vitaLibroVivaP2P(scade, adesso) : vitaLibroTabacchinoP2P(scade, adesso);
   /* A MERCATO (30 set 2026) il riepilogo dice l'ARROTONDAMENTO — «26 €»
      per un PayCode da 25,47 — e quanto costa a chi pubblica, e solo se
@@ -91038,6 +91202,7 @@ function riepilogoTabacchinoP2P(v){
     + '\nPrezzo: ' + (fisso ? 'fisso, sats calcolati adesso' : 'di mercato, sats calcolati alla presa')
     + '\nPremio: ' + premioTestoTabP2P(pr)
     + '\n\n' + rigaPremioTabP2P(v.euro, v.cambio, v.premioTab, fisso)
+    + (v.oc ? '\nRete: on-chain. Chi prende vede il PayCode solo quando il tuo deposito è confermato.' : '')
     + (fisso
       ? '\nTu blocchi ' + fmt(netto) + ' sats in garanzia, e l\'ordine Amazon lo paga chi li riceve.'
       : (differenza > 0
