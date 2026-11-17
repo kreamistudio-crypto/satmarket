@@ -20831,6 +20831,54 @@
   sta FUORI da quel campo.
   Collaudo: `collaudo_punti_corrieri.py` (70 passi, nella gabbia della
   CI). Procedura della leva: PRODUZIONE.
+  «CHIEDI AL VENDITORE SE SPEDISCE CON INPOST O POSTE» (17 nov 2026,
+  cantiere chiedi-locker, voce #359 del Todo, richiesta di Andrea): la
+  porta chiusa del 12 ott ha il campanello. Alla cassa di un venditore
+  che ai punti non arriva la riga del locker RESTA IN VISTA, spenta
+  come la zona non offerta (`rigaChiediPunti`: si spegne col motivo,
+  non sparisce), e sotto, FUORI dal div sbiadito, il tasto «🔔 Chiedi
+  al venditore se spedisce con InPost o Poste». La disegna un giudice
+  puro (`chiediPuntiVisibile`, banco node): solo col sì del server
+  (`punto_chiedibile`), mai accanto a una via punto viva, e solo dove
+  la via punto ESISTEREBBE (la casa domestica e aperta). Il server
+  manda le due chiavi dai due preventivi (`_stato_richiesta_punti`:
+  una SELECT, e solo dove il tasto esiste); `punto_chiesto` dice che
+  la coppia ha già una richiesta in piedi e la riga diventa «Richiesta
+  inviata», anche dopo una ricarica.
+  LA ROTTA `POST /api/annunci/{id}/chiedi-punti`: 404 a leva spenta,
+  il freno `chiedi_punti` (10/ora), poi il giudice PURO
+  `motivo_niente_richiesta_punti(reti, strade, mio, chiesto_il,
+  adesso)` nell'ordine in cui conviene leggere i motivi — il venditore
+  ai punti arriva già (la pagina è vecchia: «ricarica»), l'annuncio
+  non si spedisce, è mio, già chiesto entro la finestra. La riga va in
+  `richieste_punti` (PRIMARY KEY la coppia: una richiesta per coppia
+  per costruzione, `chiesto` e il timbro `avvisato`) PRIMA dell'avviso,
+  il patto delle campagne. L'avviso al venditore
+  (`avviso_al_venditore_punti`) nomina l'annuncio e i tre corrieri
+  dalla tabella, MAI chi ha chiesto («Qualcuno vorrebbe…»), col bottone
+  «📦 Come spedisci» che è un deep link: `/?corrieri=1` ↔ `corrieri`,
+  parola nuova nei tre lettori (`_startapp_da_link`, `startappDaLink`,
+  `percorsoDaStartapp`) e la porta `apriCorrieriDaUrl` che apre il
+  Profilo sul cassetto `accSpedizioniere`. I TETTI stanno nel codice
+  accanto al giudice, non nel config (non muovono denaro):
+  `RICHIESTA_PUNTI_OGNI_GIORNI` 7 per coppia, `RICHIESTA_PUNTI_AL_GIORNO`
+  3 avvisi al venditore nelle 24 ore — oltre, la richiesta si SCRIVE lo
+  stesso (così il ritorno arriva a tutti) e il bot tace; si contano le
+  richieste ALTRUI, un rinnovo della stessa coppia non è una persona in
+  più.
+  IL RITORNO vive nel Salva VERO del Profilo (`scegli_spedizioniere`,
+  che serve anche al foglio «Come spedirai?» di Vendi): DOPO il close e
+  solo se le reti si sono toccate, `avvisa_richiedenti_punti(venditore,
+  nome, reti_punto(...))` — senza reti dei punti non legge niente
+  (togliere InPost non avvisa nessuno), timbra `avvisato` PRIMA di
+  mandare, chiude la connessione prima del bot, e dice a chi aveva
+  chiesto le RETI dei punti («adesso spedisce anche ai punti InPost»),
+  col bottone sull'annuncio solo se è ancora in vetrina. Leva
+  `RICHIESTA_PUNTI`, ACCESA di serie (regola del 14 nov): spenta, la
+  riga sparisce come dal 12 ott e nessun avviso nei due versi, nemmeno
+  per una richiesta rimasta in tabella. Collaudo:
+  `collaudo_chiedi_locker.py` (45 passi, nella gabbia della CI);
+  prove: `prove_richiesta_punti`.
   LA VIA PUNTO SI OFFRE SEMPRE dove c'è la spedizione (secondo giro,
   ago 2026 — la decisione di Andrea che SUPERA quella del primo
   giro, «punto solo con spedizioniere dichiarato»; il perché:

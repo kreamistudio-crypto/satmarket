@@ -1004,6 +1004,21 @@ except ImportError:
     # volta partita non riparte (timbro in `timbri`), e rispegnerla
     # non serve.
     AVVISO_CORRIERI_PUNTI = False
+try:
+    from config import RICHIESTA_PUNTI
+except ImportError:
+    # «CHIEDI AL VENDITORE SE SPEDISCE CON INPOST O POSTE» (17 nov 2026,
+    # cantiere chiedi-locker, voce #359 del Todo, richiesta di Andrea):
+    # alla cassa di un venditore che ai punti non consegna la riga del
+    # locker resta in vista, spenta, con un tasto che bussa al venditore
+    # — un avviso del bot, senza dire chi ha chiesto — e quando lui
+    # spunta InPost, Poste o SDA chi aveva chiesto riceve l'avviso.
+    # ACCESA DI SERIE (regola del 14 nov 2026): con la promozione e'
+    # viva senza toccare il config; la riga nel config la spegne
+    # (404 sulla rotta, tasto che non si disegna). I tetti antispam
+    # stanno nel codice, accanto al giudice (RICHIESTA_PUNTI_OGNI_GIORNI,
+    # RICHIESTA_PUNTI_AL_GIORNO): non muovono denaro.
+    RICHIESTA_PUNTI = True
 
 # La protezione acquisti (lug 2026, modello Vinted): percentuale a
 # carico del COMPRATORE sul solo prezzo articolo, si aggiunge al conto
@@ -3093,6 +3108,10 @@ FRENI = {
     # e una proposta firmata e' un PSBT da leggere con embit
     "onchain_controlla": (60, 3600),  # «ho pagato, guarda» di un ordine on-chain, per persona
     "onchain_firma": (30, 3600),      # proposte e co-firme on-chain, per persona
+    # «chiedi al venditore se spedisce con InPost o Poste» (17 nov 2026):
+    # ogni colpo e' un avviso in chat a un'altra persona; il giudice ha
+    # gia' il suo tetto per coppia e per venditore, questo ferma il dito
+    "chiedi_punti": (10, 3600),       # le richieste di un locker, per persona
     # (16 nov 2026) la porta del PayJoin: la bussa il wallet, senza
     # sessione, quindi il secchio e' il gettone dell'ordine
     "payjoin": (10, 3600),            # originali mandati al PayJoin, per ordine
@@ -8863,6 +8882,27 @@ def init_db():
         valore TEXT DEFAULT '',       -- il giorno, o quel che il chiamante timbra
         quando INTEGER DEFAULT 0      -- quando l'abbiamo scritto (unix)
     );
+    CREATE TABLE IF NOT EXISTS richieste_punti(
+        -- «CHIEDI AL VENDITORE SE SPEDISCE CON INPOST O POSTE» (17 nov
+        -- 2026, cantiere chiedi-locker): chi compra ha bussato a un
+        -- venditore che ai punti non consegna. UNA riga per coppia, ed
+        -- e' il freno antispam per costruzione: richiedere entro
+        -- RICHIESTA_PUNTI_OGNI_GIORNI non riscrive niente, dopo si
+        -- rinfresca `chiesto` e si riapre l'avviso. `avvisato` e' il
+        -- timbro dell'altro verso — quando il venditore ha spuntato una
+        -- rete e il compratore l'ha saputo — e si scrive PRIMA di
+        -- mandare, il patto delle campagne. L'annuncio serve solo al
+        -- bottone dell'avviso: se nel frattempo e' sparito, l'avviso
+        -- parte lo stesso senza bottone. Nessun conto ci poggia sopra.
+        compratore INTEGER NOT NULL,
+        venditore INTEGER NOT NULL,
+        annuncio_id INTEGER DEFAULT 0,
+        chiesto INTEGER NOT NULL,     -- quando ha chiesto (unix)
+        avvisato INTEGER DEFAULT 0,   -- quando ha saputo che ora si puo' (0 = mai)
+        PRIMARY KEY(compratore, venditore)
+    );
+    CREATE INDEX IF NOT EXISTS idx_richieste_punti_venditore
+        ON richieste_punti(venditore, chiesto);
     CREATE TABLE IF NOT EXISTS fatture_scadute(
         -- LE FATTURE DI CHECKOUT SCADUTE SENZA PAGAMENTO (5 ott 2026):
         -- il registro dell'avviso «pagamenti non arrivati» ai
@@ -19299,6 +19339,11 @@ def _startapp_da_link(url) -> str:
         if re.fullmatch(r"-?[1-9][0-9]{0,15}", chi):
             return "assistenza_" + chi
         return ""
+    # I CORRIERI NEL PROFILO (17 nov 2026, cantiere chiedi-locker):
+    # `/?corrieri=1` → `corrieri`, il bottone dell'avviso «qualcuno
+    # vorrebbe un locker» che porta dritti a «📦 Come spedisci»
+    if u == URL_PUBBLICO + "/?corrieri=1":
+        return "corrieri"
     testa = URL_PUBBLICO + "/?ordine="
     if u.startswith(testa):
         resto = u[len(testa):]
@@ -28137,6 +28182,92 @@ def frase_corriere_sbagliato(rete: str, corriere: str) -> str:
     return (f"Questo punto accetta solo {ammessi}: {con_chi} il pacco "
             f"verrà rifiutato. Cambia corriere, oppure segnala che il "
             f"punto non va bene.")
+
+
+# ---- «CHIEDI AL VENDITORE SE SPEDISCE CON INPOST O POSTE» (17 nov 2026,
+# cantiere chiedi-locker, voce #359 del Todo, richiesta di Andrea) ----
+# Dal 12 ott la via punto si offre SOLO dove il venditore ci arriva, e
+# chi compra da un venditore senza corrieri dichiarati trovava la riga
+# del locker sparita e basta: una porta chiusa senza campanello. Il
+# campanello e' questo — la riga resta in vista, spenta, con un tasto
+# che bussa al venditore. Il bot gli dice che QUALCUNO vorrebbe un
+# locker per quell'annuncio (mai chi: e' una richiesta, non un
+# contatto) e lo porta a «📦 Come spedisci»; quando spunta una rete che
+# ai punti consegna, chi aveva chiesto lo sa.
+# I TETTI stanno qui e non nel config: non muovono denaro e sono la
+# forma del gesto. Una richiesta per coppia ogni tot giorni, e al
+# venditore non piu' di tante al giorno — oltre, la richiesta si
+# REGISTRA lo stesso (cosi' l'avviso di ritorno arriva a tutti) ma il
+# bot tace: dieci persone che bussano nella stessa ora sono una sola
+# notizia, e chi riceve dieci messaggi uguali blocca il bot.
+RICHIESTA_PUNTI_OGNI_GIORNI = 7
+RICHIESTA_PUNTI_AL_GIORNO = 3
+
+MSG_PUNTI_GIA_OFFERTI = ("Questo venditore spedisce già ai punti di "
+                         "ritiro: ricarica la pagina e scegli il locker")
+MSG_PUNTI_GIA_CHIESTO = ("Gliel'hai già chiesto: se aggiunge InPost o "
+                         "Poste ti avvisiamo noi")
+MSG_PUNTI_SOLO_SPEDIZIONE = ("Questo annuncio non si spedisce: non c'è "
+                             "nessun locker da chiedere")
+MSG_PUNTI_MIO_ANNUNCIO = "È un tuo annuncio: i corrieri li scegli nel Profilo"
+
+
+def richiesta_punti_viva(chiesto_il: int, adesso: int) -> bool:
+    """«Questa coppia ha gia' una richiesta in piedi?» — vera finche'
+    non passano RICHIESTA_PUNTI_OGNI_GIORNI. PURA, e serve in due: al
+    preventivo (il tasto si disegna come «già chiesto») e alla rotta
+    (il secondo tocco non rifa' partire niente)."""
+    return bool(chiesto_il) and (adesso - int(chiesto_il)
+                                 < RICHIESTA_PUNTI_OGNI_GIORNI * 86400)
+
+
+def motivo_niente_richiesta_punti(reti: list, strade: set, mio: bool,
+                                  chiesto_il: int, adesso: int) -> str:
+    """Perche' la richiesta NON si accetta: '' = si accetta. Il giudice
+    PURO della rotta, nell'ordine in cui conviene leggerlo a chi compra:
+    prima la buona notizia (il venditore ai punti gia' ci arriva, cioe'
+    la pagina e' vecchia), poi l'annuncio che non si spedisce, il mio
+    annuncio, e per ultimo «gia' chiesto» — che non e' un errore ma un
+    «aspetta», e il tasto lo dice gia' da solo."""
+    if reti:
+        return MSG_PUNTI_GIA_OFFERTI
+    if "spedizione" not in (strade or set()):
+        return MSG_PUNTI_SOLO_SPEDIZIONE
+    if mio:
+        return MSG_PUNTI_MIO_ANNUNCIO
+    if richiesta_punti_viva(chiesto_il, adesso):
+        return MSG_PUNTI_GIA_CHIESTO
+    return ""
+
+
+def avviso_al_venditore_punti(titolo: str) -> str:
+    """Il messaggio al venditore: chi ha chiesto NON si nomina (e' una
+    richiesta, non un contatto: il nome lo vedra' sull'ordine, se
+    arriva), si dice cosa gli manca e dove si mette. Le tre voci
+    sono quelle di RETE_DEL_CORRIERE, lette dalla tabella e non scritte
+    a mano: il giorno che una mappa nuova entra, la frase la dice."""
+    corrieri = ", ".join(corrieri_della_rete("InPost")
+                         + corrieri_della_rete("Poste Italiane"))
+    return (f"📦 <b>Qualcuno vorrebbe ricevere «{html.escape(titolo)}» "
+            f"in un locker o in un punto di ritiro.</b>\n\n"
+            f"Oggi i tuoi annunci si spediscono solo a un indirizzo. Se "
+            f"spedisci anche con {corrieri}, spuntali in Profilo → "
+            f"«📦 Come spedisci»: da quel momento chi compra potrà "
+            f"scegliere un locker o un punto di ritiro, e chi te l'ha "
+            f"chiesto riceverà un avviso.")
+
+
+def avviso_al_compratore_punti(nome: str, reti: list) -> str:
+    """Il ritorno: il venditore ha spuntato una rete che ai punti
+    consegna. Si nominano le RETI dei punti (InPost, Poste Italiane),
+    non i corrieri: a chi compra interessa dove ritira. `nome` e' il
+    nome che il venditore mostra (`utenti.nome`), MAI il codice
+    negozio, che e' una sigla."""
+    dove = " e ".join(reti) if reti else "InPost o Poste"
+    return (f"📦 <b>{html.escape(nome or 'Il venditore')} adesso "
+            f"spedisce anche ai punti {html.escape(dove)}.</b>\n\n"
+            f"Glielo avevi chiesto: ora alla cassa puoi scegliere un "
+            f"locker o un punto di ritiro.")
 
 
 def rete_da_payload(grezza: str, reti: list) -> str:
@@ -37414,6 +37545,17 @@ def _leve_stato():
                          "dichiarato; partito una volta non riparte",
                   spento="nessun messaggio: chi non dichiara lo scopre "
                          "dal foglio quando pubblica"),
+            _leva("«Chiedi al venditore» InPost o Poste",
+                  "RICHIESTA_PUNTI", bool(RICHIESTA_PUNTI),
+                  acceso="alla cassa di chi ai punti non consegna la riga "
+                         "del locker resta in vista, spenta, col tasto che "
+                         "avvisa il venditore (una richiesta per coppia "
+                         f"ogni {RICHIESTA_PUNTI_OGNI_GIORNI} giorni, al "
+                         f"venditore al più {RICHIESTA_PUNTI_AL_GIORNO} "
+                         "avvisi al giorno); quando spunta una rete, chi "
+                         "ha chiesto riceve l'avviso",
+                  spento="la riga del locker sparisce e basta, come dal "
+                         "12 ott 2026; nessun avviso nei due versi"),
         ]},
         {"gruppo": "🤖 Assistente del bot", "voci": [
             # L'ASSISTENTE DEL BOT (28 ott 2026): spento di serie; della
@@ -45298,6 +45440,10 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # regola «il client mostra». Una SELECT sul prefisso della PK.
     punti_salvati = punti_per_venditore(
         _punti_utente(con, user["id"]), reti)
+    # «CHIEDI AL VENDITORE» (17 nov 2026): le due chiavi del tasto,
+    # con `con` ancora aperta — una SELECT, e solo dove il tasto esiste
+    chiedi_punti = _stato_richiesta_punti(con, user["id"], a["venditore_id"],
+                                          reti, strade_annuncio(a))
     regole_sc = _regole_sconto(
         sp["sconto_pacco_criterio"] if sp else "",
         sp["sconto_pacco_valore_valuta"] if sp else "",
@@ -45569,6 +45715,9 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
             "punti_salvati": punti_salvati,
+            # il tasto «chiedi al venditore» (17 nov 2026): due chiavi,
+            # false dove la via punto c'e' gia' o non si spedisce
+            **chiedi_punti,
             # I PUNTI DI CASA: escono solo se quel venditore la rete la
             # dichiara (`reti` e' gia' gatata), o si offrirebbe un
             # elenco su una strada che quell'ordine non puo' prendere.
@@ -45846,6 +45995,9 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # il gemello del ramo mono: stesso giudice, stessa SELECT sola
     punti_salvati = punti_per_venditore(
         _punti_utente(con, user["id"]), reti)
+    # «chiedi al venditore»: come nel mono, sulle strade del SET
+    chiedi_punti = _stato_richiesta_punti(con, user["id"], venditore_id,
+                                          reti, strade)
     regole_sc = _regole_sconto(
         sp["sconto_pacco_criterio"] if sp else "",
         sp["sconto_pacco_valore_valuta"] if sp else "",
@@ -46110,6 +46262,9 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
             "punti_salvati": punti_salvati,
+            # il tasto «chiedi al venditore» (17 nov 2026): due chiavi,
+            # false dove la via punto c'e' gia' o non si spedisce
+            **chiedi_punti,
             # I PUNTI DI CASA: escono solo se quel venditore la rete la
             # dichiara (`reti` e' gia' gatata), o si offrirebbe un
             # elenco su una strada che quell'ordine non puo' prendere.
@@ -53059,16 +53214,147 @@ async def scegli_spedizioniere(req: Request,
     # si rilegge cio' che e' rimasto scritto (il patto dello sconto
     # sugli articoli): con due chiavi facoltative la risposta non si
     # deduce dal body, e il client riallinea il cassetto a colpo sicuro
-    r = con.execute("SELECT spedizionieri, spedizioniere, "
+    r = con.execute("SELECT spedizionieri, spedizioniere, nome, "
                     "spedizione_standard FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
     con.close()
     reti = reti_venditore(r["spedizionieri"], r["spedizioniere"],
                           True) if r else []
+    # «CHIEDI AL VENDITORE» (17 nov 2026): se da questo Salva ai punti
+    # ci arriva, chi glielo aveva chiesto lo sa. DOPO il close e dopo
+    # il commit — l'avviso legge quel che e' rimasto scritto — e solo
+    # quando le reti si sono toccate: un Salva del solo costo standard
+    # non ha niente da raccontare. Fail-open dentro: un avviso di
+    # cortesia non puo' far fallire il Salva.
+    if tocca_reti and r:
+        await avvisa_richiedenti_punti(
+            user["id"], r["nome"] or "",
+            reti_punto(reti_venditore(r["spedizionieri"], r["spedizioniere"],
+                                      rete_barattolo_viva())))
     return {"ok": True, "spedizionieri": reti,
             "spedizioniere": reti[0] if reti else "",
             "spedizione_standard": spedizione_standard_leggi(
                 r["spedizione_standard"] if r else "")}
+
+
+# ---- «CHIEDI AL VENDITORE SE SPEDISCE CON INPOST O POSTE» (17 nov 2026,
+# cantiere chiedi-locker): la rotta, il suo stato nel preventivo e il
+# ritorno. Il giudice e i testi stanno accanto a MSG_NIENTE_PUNTI. ----
+def _stato_richiesta_punti(con, compratore: int, venditore: int,
+                           reti: list, strade) -> dict:
+    """Le due chiavi che il preventivo porta al tasto: `punto_chiedibile`
+    (la via punto manca, si spedisce, non e' roba mia, leva accesa) e
+    `punto_chiesto` (questa coppia ha gia' una richiesta in piedi). UNA
+    SELECT, e solo dove il tasto si disegna; a leva spenta tutto falso
+    e nessuna lettura — il client di oggi non disegna niente, quello
+    di ieri non conosce le chiavi."""
+    niente = {"punto_chiedibile": False, "punto_chiesto": False}
+    if not RICHIESTA_PUNTI or compratore == venditore:
+        return niente
+    if motivo_niente_richiesta_punti(reti, strade, False, 0, 0):
+        return niente
+    r = con.execute("SELECT chiesto FROM richieste_punti "
+                    "WHERE compratore=? AND venditore=?",
+                    (compratore, venditore)).fetchone()
+    return {"punto_chiedibile": True,
+            "punto_chiesto": richiesta_punti_viva(
+                r["chiesto"] if r else 0, int(time.time()))}
+
+
+def _richiesta_punti_accesa():
+    """A leva spenta la rotta non esiste: 404, come le sorelle."""
+    if not RICHIESTA_PUNTI:
+        raise HTTPException(404, "Not Found")
+
+
+@app.post("/api/annunci/{annuncio_id}/chiedi-punti")
+async def chiedi_punti(annuncio_id: int, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Chi compra bussa: «spedisci con InPost o Poste?». Il giudice
+    PURO decide (`motivo_niente_richiesta_punti`), la riga si scrive
+    PRIMA dell'avviso (il patto delle campagne: un errore di rete puo'
+    perdere un avviso di cortesia, mai raddoppiarlo), e l'avviso parte
+    solo sotto il tetto del venditore — oltre, la richiesta resta
+    scritta lo stesso, cosi' il ritorno arriva anche a lui. Il tetto
+    conta le richieste ALTRUI delle ultime 24 ore: la mia coppia e'
+    gia' passata dal giudice, e un rinnovo dopo i sette giorni non e'
+    una persona in piu'."""
+    _richiesta_punti_accesa()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("chiedi_punti", user["id"])
+    adesso = int(time.time())
+    con = db()
+    try:
+        a = con.execute("SELECT * FROM annunci WHERE id=?",
+                        (annuncio_id,)).fetchone()
+        if not a or a["stato"] != "attivo":
+            raise HTTPException(404, "Annuncio non trovato")
+        sp = con.execute("SELECT spedizionieri, spedizioniere FROM utenti "
+                         "WHERE tg_id=?", (a["venditore_id"],)).fetchone()
+        reti = reti_punto(reti_venditore(
+            sp["spedizionieri"], sp["spedizioniere"],
+            rete_barattolo_viva())) if sp else []
+        r = con.execute("SELECT chiesto FROM richieste_punti "
+                        "WHERE compratore=? AND venditore=?",
+                        (user["id"], a["venditore_id"])).fetchone()
+        motivo = motivo_niente_richiesta_punti(
+            reti, strade_annuncio(a), a["venditore_id"] == user["id"],
+            r["chiesto"] if r else 0, adesso)
+        if motivo:
+            raise HTTPException(400, motivo)
+        altrui = con.execute(
+            "SELECT COUNT(*) FROM richieste_punti WHERE venditore=? "
+            "AND chiesto>? AND compratore<>?",
+            (a["venditore_id"], adesso - 86400, user["id"])).fetchone()[0]
+        con.execute("INSERT OR REPLACE INTO richieste_punti"
+                    "(compratore, venditore, annuncio_id, chiesto, avvisato) "
+                    "VALUES(?,?,?,?,0)",
+                    (user["id"], a["venditore_id"], a["id"], adesso))
+        con.commit()
+    finally:
+        con.close()
+    avvisato = altrui < RICHIESTA_PUNTI_AL_GIORNO
+    if avvisato:
+        await notifica(a["venditore_id"], avviso_al_venditore_punti(a["titolo"]),
+                       ("📦 Come spedisci",
+                        _link_dentro_telegram(URL_PUBBLICO + "/?corrieri=1")))
+    return {"ok": True, "avvisato": avvisato}
+
+
+async def avvisa_richiedenti_punti(venditore: int, nome: str,
+                                   reti_p: list) -> int:
+    """IL RITORNO: il venditore ha appena salvato i corrieri e ai punti
+    ci arriva (`reti_p` non vuota) — chi glielo aveva chiesto e non l'ha
+    ancora saputo riceve l'avviso, col bottone sull'annuncio se e'
+    ancora in vetrina. Il timbro `avvisato` si scrive PRIMA di mandare,
+    e si manda DOPO il close: niente connessione aperta attraverso una
+    chiamata al bot. Torna quanti ne ha avvisati. Senza reti non legge
+    niente: chi toglie InPost non deve far partire nessun avviso."""
+    if not reti_p or not RICHIESTA_PUNTI:
+        return 0
+    adesso = int(time.time())
+    try:
+        con = db()
+        righe = con.execute(
+            "SELECT r.compratore, r.annuncio_id, a.stato "
+            "FROM richieste_punti r "
+            "LEFT JOIN annunci a ON a.id = r.annuncio_id "
+            "WHERE r.venditore=? AND r.avvisato=0", (venditore,)).fetchall()
+        if righe:
+            con.execute("UPDATE richieste_punti SET avvisato=? "
+                        "WHERE venditore=? AND avvisato=0", (adesso, venditore))
+            con.commit()
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Richieste di locker non lette per {venditore}: {e}")
+        return 0
+    testo = avviso_al_compratore_punti(nome, reti_p)
+    for r in righe:
+        bottone = (("🔎 Apri l'annuncio",
+                    link_telegram("annuncio", r["annuncio_id"]))
+                   if r["stato"] == "attivo" else None)
+        await notifica(r["compratore"], testo, bottone)
+    return len(righe)
 
 
 @app.post("/api/me/spedizione-standard/anteprima")

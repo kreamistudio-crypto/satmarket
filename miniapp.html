@@ -7983,6 +7983,9 @@
   /* la strada spenta (cambio assente) resta visibile col motivo:
      si spegne, non sparisce — il campo non deve mentire */
   .via-opzione.off{opacity:.55;cursor:default}
+  /* il campanello sotto la riga spenta del locker (17 nov 2026) */
+  .chiedi-punti{margin:-2px 0 10px}
+  .chiedi-punti .btn.mini{white-space:normal;text-align:left;line-height:1.3}
   .acq-nota{font-size:12.5px;color:var(--ink-soft);font-weight:600;
     line-height:1.45;margin-top:10px}
   /* Il cassetto del punto (quinto giro): il margine del bottone lo
@@ -17330,6 +17333,11 @@ function percorsoDaStartapp(p){
      utente per gli admin (il tasto del loro avviso). Si rilegge in
      `/?assistenza=mia|<utente>`, che `apriAssistenzaDaUrl` sa aprire */
   if (p === 'assistenza') return '/?assistenza=mia';
+  /* i corrieri nel Profilo (17 nov 2026, cantiere chiedi-locker): il
+     bottone dell'avviso «qualcuno vorrebbe un locker» porta dritti a
+     «📦 Come spedisci». Si rilegge in `/?corrieri=1`, che
+     `apriCorrieriDaUrl` sa aprire */
+  if (p === 'corrieri') return '/?corrieri=1';
   const as = /^assistenza_(-?[1-9][0-9]{0,15})$/.exec(p);
   if (as) return '/?assistenza=' + as[1];
   const sc = /^scambio_([0-9a-zA-Z-]{8,64})_chat$/.exec(p);
@@ -17673,6 +17681,8 @@ function startappDaLink(link, base){
   /* l'assistenza (5 nov 2026): il gemello di `_startapp_da_link` */
   const as = /^\/\?assistenza=(mia|-?[1-9][0-9]{0,15})$/.exec(u.indexOf(base) === 0 ? u.slice(base.length) : '');
   if (as) return as[1] === 'mia' ? 'assistenza' : 'assistenza_' + as[1];
+  /* i corrieri nel Profilo (17 nov 2026): il gemello di `_startapp_da_link` */
+  if (u === base + '/?corrieri=1') return 'corrieri';
   if (u === radice) return 'p2p';
   if (u === radice + '?pausa=1') return 'pausa';
   for (const nome of ['scambio', 'ordine']) {
@@ -30303,6 +30313,72 @@ function viaDefault(vive){
 function stradaViva(s){
   return !!s && !s.cambio_assente && !s.zona_non_offerta;
 }
+/* LA RIGA DEL LOCKER CHE RESTA IN VISTA, SPENTA (17 nov 2026, cantiere
+   chiedi-locker, voce #359 del Todo, richiesta di Andrea). Dal 12 ott
+   la via punto non si offre dove il venditore non ci arriva, e
+   SPARIVA: chi compra non sapeva se il locker non esistesse o se
+   fosse una scelta di chi vende. Adesso la riga resta, spenta come la
+   zona non offerta (si spegne col motivo, non sparisce), e sotto c'e'
+   il campanello: «Chiedi al venditore». PURO il giudice di quando
+   disegnarla, un banco node lo fa girare: solo se il server dice che
+   si puo' chiedere (`punto_chiedibile`: la via manca, si spedisce,
+   non e' roba mia, leva accesa), mai accanto a una via punto viva, e
+   solo dove la via punto ESISTEREBBE — la casa domestica e aperta: un
+   locker di Poste a Lisbona non c'e', e la zona chiusa ha gia' il suo
+   cartello. */
+function chiediPuntiVisibile(p, strade, zona){
+  if (!p || !p.punto_chiedibile) return false;
+  if ((strade || []).some(s => s.via === 'punto')) return false;
+  /* «viva» lo dice il giudice unico delle strade spente, mai i due flag
+     letti a mano: c'e' la sentinella che li conta */
+  const casa = (strade || []).find(s => s.via === 'casa');
+  if (!stradaViva(casa)) return false;
+  return zona === 'dom';
+}
+/* La riga: la frase dice il fatto (non le reti che CI SONO, che non
+   ce ne sono), il tasto sta FUORI dal div sbiadito o sarebbe spento
+   anche lui — il patto del menu del paese sotto la via chiusa. Dopo
+   il tocco il tasto diventa la riga «richiesta inviata»: lo dice il
+   server (`punto_chiesto`, che sopravvive a una ricarica) o il gesto
+   appena fatto. */
+function rigaChiediPunti(p, d, strade, zona){
+  if (!chiediPuntiVisibile(p, strade, zona)) return '';
+  const chiesto = !!(d?.puntoChiesto || p.punto_chiesto);
+  return `<div class="via-opzione off"><span class="via-nome">${nomeVia('punto')}
+      <span class="via-sped">chi vende non spedisce ai punti InPost o Poste</span></span></div>
+    <div class="chiedi-punti">${chiesto
+      ? `<div class="acq-nota" style="margin-top:0">✅ Richiesta inviata: se il venditore aggiunge InPost o Poste ti avvisiamo noi.</div>`
+      : `<button type="button" class="btn mini" onclick="chiediPunti()">🔔 Chiedi al venditore se spedisce con InPost o Poste</button>`}</div>`;
+}
+let chiediPuntiInVolo = false;
+async function chiediPunti(){
+  haptic();
+  const d = acqDati;
+  if (!d || d.puntoChiesto || chiediPuntiInVolo) return;
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  /* nel carrello il venditore e' uno: basta il primo annuncio */
+  const aid = d.tipo === 'set' ? [...setScelte.keys()][0] : d.annuncioId;
+  if (!aid) return;
+  chiediPuntiInVolo = true;
+  try {
+    const r = await fetch(`${API_BASE}/annunci/${aid}/chiedi-punti`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      toast(j.detail || 'Richiesta non riuscita, riprova', 6000);
+      /* «gia' chiesto» non e' un errore: la pagina si allinea al server */
+      if (r.status === 400 && /già chiesto/i.test(j.detail || '')) {
+        acqDati.puntoChiesto = true; renderAcquisto();
+      }
+      return;
+    }
+    acqDati.puntoChiesto = true;
+    toast(j.avvisato ? '🔔 Chiesto: il venditore riceve un avviso'
+                     : '🔔 Richiesta registrata: se aggiunge InPost o Poste ti avvisiamo', 6000);
+    renderAcquisto();
+  } catch(e) { toast('Errore di rete'); }
+  finally { chiediPuntiInVolo = false; }
+}
 /* IL CONTO DELLA CASSA IN NUMERI, e la frase quando numeri non ce ne
    sono. Pura apposta: renderAcquisto e' un template da 55 KB che
    nessuna prova fa girare, questa la chiama un banco node.
@@ -31577,7 +31653,8 @@ function renderAcquisto(){
         class="via-opzione" data-via="${s.via}" onclick="setViaAcquisto(this.dataset.via)">
         <span class="via-nome">${nomeVia(s.via)}${nota}</span>${cifra}
       </button>`;
-    }).join('') + `</div>`;
+    }).join('') + rigaChiediPunti(p, d, strade, zonaPaese(d.paese || DOM_DEFAULT, domVend))
+      + `</div>`;
   }
   /* --- le note oneste --- */
   let note = '';
@@ -59444,6 +59521,29 @@ function apriAssistenzaDaUrl(){
   if (!isAdmin) return;
   assistenzaAdmAperta = {utente: Number(ASSISTENZA_URL), dati: null};
   go('assistenzaadm');
+}
+/* I CORRIERI DAL BOTTONE DELL'AVVISO (17 nov 2026, cantiere
+   chiedi-locker): `/?corrieri=1` apre il Profilo su «📦 Come spedisci»,
+   dove il venditore spunta InPost, Poste o SDA. Una volta sola, dopo
+   /api/me (e' lui che riempie il cassetto); in demo e in vetrina non
+   c'e' nessun Profilo da aprire. */
+const CORRIERI_URL = /^\/(miniapp\.html)?$/.test(location.pathname)
+  && /[?&]corrieri=1(?:&|$)/.test(location.search);
+let corrieriUrlAperto = false;
+function apriCorrieriDaUrl(){
+  if (!CORRIERI_URL || corrieriUrlAperto) return;
+  corrieriUrlAperto = true;
+  if (DEMO || VETRINA) return;
+  go('profilo');
+  const acc = el('accSpedizioniere');
+  if (!acc) return;
+  /* il cassetto vive dentro la sezione «Negozio e spedizioni», che
+     da chiusa lo nasconde: si apre prima lei (col gesto di sempre,
+     che chiude le altre), poi il cassetto */
+  const grp = el('grpNegozio');
+  if (grp && !grp.classList.contains('open')) toggleGrp('grpNegozio');
+  acc.classList.add('open');
+  setTimeout(() => acc.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'start'}), 150);
 }
 function vestiAssistenza(){
   const v = el('vocAssistenza');
@@ -105806,7 +105906,7 @@ function spegniLinkDaUrl(){
   categoriaAperta = p2pApertoDaUrl = consigliatiApertiDaUrl = true;
   offertaAperta = barattoloAperto = invitoDaUrlMostrato = true;
   bozzaAperta = ordineUrlAperto = assistenzaUrlAperta = true;
-  appNegozioUrlAperto = true;
+  appNegozioUrlAperto = corrieriUrlAperto = true;
   /* ...e la porta del P2P non si aprira': il velo d'apertura non la
      aspetta (vedi IL LINK DEL P2P SENZA IL LAMPO DELLA HOME) */
   arrivoP2PFatto();
@@ -105872,6 +105972,7 @@ async function avviaVetrina(){
     apriOffertaDaUrl();
     apriOrdineDaUrl();
     apriAssistenzaDaUrl();
+    apriCorrieriDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();
     apriInvitoDaUrl();
@@ -106382,6 +106483,7 @@ async function avvia(){
     apriOffertaDaUrl();
     apriOrdineDaUrl();
     apriAssistenzaDaUrl();
+    apriCorrieriDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();
     /* chi ha toccato «Swap» da fuori ed e' appena entrato (16 nov 2026) */

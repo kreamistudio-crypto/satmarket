@@ -29567,8 +29567,10 @@ def prove_punti_corrieri():
               f"rete e del punto", True,
               corpo.index("raise HTTPException(400, MSG_NIENTE_PUNTI)")
               < corpo.index("rete = rete_da_payload("))
-    prova("i due preventivi fanno lo stesso", 4,
-          src.count("reti = reti_punto(reti_venditore("))
+    # (17 nov 2026, chiedi-locker) il quinto lettore e' la rotta «chiedi
+    # al venditore»: giudica sulle stesse reti dei punti della cassa
+    prova("i due preventivi, i due acquisti e «chiedi al venditore» fanno "
+          "lo stesso", 5, src.count("reti = reti_punto(reti_venditore("))
     prova("il Profilo invece legge i corrieri DICHIARATI (non le reti)",
           True,
           'profilo["spedizionieri_miei"] = reti_venditore(' in src)
@@ -59986,9 +59988,12 @@ def prove_link_dentro_telegram():
           # (13 ott 2026, notifica-porta-allo-scambio) una riga per OGNI bottone
           ['"".join(f"\\n\\n{b[0]}: {b[1]}" for b in _bottoni_avviso(bottone))' in dm,
            "_link_dentro_telegram" in dm])
-    prova("la traduzione ha TRE chiamanti: il bottone del ramo Telegram, lo stesso "
-          "bottone nel gruppo degli admin (12 ott 2026) e il link di testo "
-          "dell'avviso dei nuovi ordini", [3, True, True, True],
+    # (17 nov 2026, chiedi-locker) il quarto: il bottone «📦 Come spedisci»
+    # dell'avviso «qualcuno vorrebbe un locker», che traduce /?corrieri=1
+    prova("la traduzione ha QUATTRO chiamanti: il bottone del ramo Telegram, lo "
+          "stesso bottone nel gruppo degli admin (12 ott 2026), il link di testo "
+          "dell'avviso dei nuovi ordini e il bottone di «chiedi al venditore»",
+          [4, True, True, True],
           [codice(src).count("_link_dentro_telegram(") - 1,
            '"url": str(_link_dentro_telegram(bottone[1]))' in pezzo("_al_gruppo_admin"),
            # (13 ott 2026) uno o piu' bottoni: ognuno passa dalla traduzione
@@ -98496,7 +98501,8 @@ def prove_ricarica_resta():
     # il tasto dell'avviso dell'assistenza
     # (16 nov 2026, app-negozio) la quattordicesima: `apriAppNegozioDaUrl`,
     # la porta diretta di Barattolo Negozio (`/?app=negozio`)
-    prova("le porte dei link d'arrivo sono quattordici, ognuna con la sua bandierina", [14, []],
+    # (17 nov 2026, chiedi-locker) la quindicesima: `apriCorrieriDaUrl`
+    prova("le porte dei link d'arrivo sono quindici, ognuna con la sua bandierina", [15, []],
           [len(porte), [p for p, b in bandiere.items() if not b]])
     prova("...e spegniLinkDaUrl le alza tutte", [],
           [b for b in bandiere.values() if not re.search(r"\b%s = " % b, sp)])
@@ -152468,6 +152474,9 @@ def prove_freni():
            "onchain_controlla": (60, 3600), "onchain_firma": (30, 3600),
            # il PayJoin (16 nov 2026): dieci proposte all'ora per indirizzo
            "payjoin": (10, 3600),
+           # «chiedi al venditore» (17 nov 2026): dieci richieste di un
+           # locker all'ora per persona, ognuna e' un avviso a qualcun altro
+           "chiedi_punti": (10, 3600),
            # 27 ott 2026: «Dove ricevi i sats» 10 all'ora, una leva
            # cambiata dal pannello 20 all'ora per admin
            "onchain_incasso": (10, 3600), "onchain_incasso_guarda": (40, 3600), "leva_pannello": (20, 3600),
@@ -203990,7 +203999,7 @@ CATEGORIE = {
     forma_sconto_pacco codice_a_valore invito_codice divisione_a_ritroso sped_gratis
     valuta_soglia suggerimenti libro_mastro canale_bot podio_riepilogo
     vetrina_negozio vetrina_canale cambio consegna_payload_punto
-    reti_corriere punti_corrieri indirizzo_giusto rimborso_meno_spese
+    reti_corriere punti_corrieri richiesta_punti indirizzo_giusto rimborso_meno_spese
     annulla_chiude punti_barattolo presa_in_carico punti_pubblici
     punti_salvati punto_ritiro_ui pagina_acquisto posizione_vetrina liste_ritorno
     impersonazione avviso_spedizione tracciamento_nei_messaggi
@@ -204435,6 +204444,253 @@ def _scelta_da_riga_di_comando(argv, tutte):
     return sezioni, titolo
 
 
+def prove_richiesta_punti():
+    """«CHIEDI AL VENDITORE SE SPEDISCE CON INPOST O POSTE» (17 nov 2026,
+    cantiere chiedi-locker, voce #359 del Todo, richiesta di Andrea).
+
+    Dal 12 ott la via punto si offre solo dove il venditore ci arriva,
+    e chi compra da uno senza corrieri trovava la riga del locker
+    sparita e basta. Adesso resta in vista, spenta, con un campanello:
+    il bot avvisa il venditore (senza dire chi), e quando spunta una
+    rete chi aveva chiesto lo sa.
+
+    Qui la FORMA e i GIUDICI PURI (il giudice della richiesta, i due
+    testi, la finestra dei sette giorni, il giudice del client che
+    disegna la riga, il deep link `corrieri`); la cosa vera — righe,
+    avvisi contati, il Salva del Profilo che avvisa — gira in
+    `collaudo_chiedi_locker.py`."""
+    print("\n[chiedi al venditore: il locker che manca]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    import html as _html
+    amb = gemelli_corrieri({"html": _html, "HTTPException": Exception})
+    for ancora in ("RICHIESTA_PUNTI_OGNI_GIORNI = ", "RICHIESTA_PUNTI_AL_GIORNO = ",
+                   "MSG_PUNTI_GIA_OFFERTI = (", "MSG_PUNTI_GIA_CHIESTO = (",
+                   "MSG_PUNTI_SOLO_SPEDIZIONE = (", "MSG_PUNTI_MIO_ANNUNCIO = "):
+        i = src.index(ancora)
+        exec(src[i:src.index("\n\n", i)], amb)
+    for nome in ("richiesta_punti_viva", "motivo_niente_richiesta_punti",
+                 "avviso_al_venditore_punti", "avviso_al_compratore_punti"):
+        exec(pezzo(nome), amb)
+    viva, motivo = amb["richiesta_punti_viva"], amb["motivo_niente_richiesta_punti"]
+    GIORNI = amb["RICHIESTA_PUNTI_OGNI_GIORNI"]
+
+    # --- la leva: accesa di serie, col pattern di casa ---------------
+    prova("RICHIESTA_PUNTI nasce True nel codice (regola del 14 nov)", True,
+          "\n    RICHIESTA_PUNTI = True\n" in src)
+    prova("...e si legge dal config col pattern di casa", True,
+          "try:\n    from config import RICHIESTA_PUNTI\nexcept ImportError:" in src)
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("...e il config d'esempio la porta ACCESA", True,
+          "\nRICHIESTA_PUNTI = True\n" in esempio)
+    prova("...e il pannello delle leve la mostra, coi due tetti nella frase",
+          True, '"RICHIESTA_PUNTI", bool(RICHIESTA_PUNTI),' in src
+          and "{RICHIESTA_PUNTI_OGNI_GIORNI} giorni" in src
+          and "{RICHIESTA_PUNTI_AL_GIORNO} " in src)
+    prova("i tetti stanno nel codice, non nel config: 7 giorni e 3 al giorno",
+          (7, 3), (GIORNI, amb["RICHIESTA_PUNTI_AL_GIORNO"]))
+
+    # --- la finestra dei sette giorni -----------------------------
+    adesso = 1_800_000_000
+    prova("mai chiesto = non viva", False, viva(0, adesso))
+    prova("chiesto un'ora fa = viva", True, viva(adesso - 3600, adesso))
+    prova("chiesto 7 giorni meno un secondo fa = ancora viva", True,
+          viva(adesso - GIORNI * 86400 + 1, adesso))
+    prova("chiesto 7 giorni esatti fa = finita (si puo' richiedere)", False,
+          viva(adesso - GIORNI * 86400, adesso))
+
+    # --- il giudice della richiesta, nell'ordine dei motivi ----------
+    SPED = {"spedizione"}
+    prova("venditore senza reti, annuncio che si spedisce, non mio, mai "
+          "chiesto: si accetta", "", motivo([], SPED, False, 0, adesso))
+    prova("...anche con le strade di un annuncio «entrambe»", "",
+          motivo([], {"spedizione", "ritiro"}, False, 0, adesso))
+    prova("col venditore che ai punti arriva gia': «ricarica», la pagina e' vecchia",
+          amb["MSG_PUNTI_GIA_OFFERTI"], motivo(["InPost"], SPED, False, 0, adesso))
+    prova("...e vince su tutto il resto (mio, gia' chiesto)",
+          amb["MSG_PUNTI_GIA_OFFERTI"],
+          motivo(["Poste Italiane"], set(), True, adesso - 10, adesso))
+    prova("un annuncio che non si spedisce: niente locker da chiedere",
+          amb["MSG_PUNTI_SOLO_SPEDIZIONE"], motivo([], {"ritiro"}, False, 0, adesso))
+    prova("...anche a strade vuote o None", [amb["MSG_PUNTI_SOLO_SPEDIZIONE"]] * 2,
+          [motivo([], set(), False, 0, adesso), motivo([], None, False, 0, adesso)])
+    prova("il mio annuncio", amb["MSG_PUNTI_MIO_ANNUNCIO"],
+          motivo([], SPED, True, 0, adesso))
+    prova("gia' chiesto, entro la finestra: l'«aspetta»", amb["MSG_PUNTI_GIA_CHIESTO"],
+          motivo([], SPED, False, adesso - 86400, adesso))
+    prova("...e passata la finestra si riaccetta", "",
+          motivo([], SPED, False, adesso - GIORNI * 86400, adesso))
+    prova("i quattro motivi parlano a chi compra, senza «escrow» ne' «assicurato»",
+          [], [m for m in (amb["MSG_PUNTI_GIA_OFFERTI"], amb["MSG_PUNTI_GIA_CHIESTO"],
+                           amb["MSG_PUNTI_SOLO_SPEDIZIONE"], amb["MSG_PUNTI_MIO_ANNUNCIO"])
+               if "escrow" in m.lower() or "assicurat" in m.lower()])
+
+    # --- i due testi del bot ----------------------------------------
+    t = amb["avviso_al_venditore_punti"]("Lampada <b>&</b> co")
+    prova("al venditore: il titolo scappato, dove andare, i tre corrieri dalla "
+          "tabella", True, "«Lampada &lt;b&gt;&amp;&lt;/b&gt; co»" in t
+          and "Come spedisci" in t and "InPost, Poste Italiane, SDA" in t)
+    prova("...e promette il ritorno a chi ha chiesto", True,
+          "riceverà un avviso" in t)
+    prova("...senza nominare chi ha chiesto (e' «Qualcuno»)", True,
+          t.startswith("📦 <b>Qualcuno vorrebbe"))
+    c = amb["avviso_al_compratore_punti"]("Bottega <x>", ["InPost", "Poste Italiane"])
+    prova("a chi compra: il nome del venditore scappato e le RETI dei punti", True,
+          "Bottega &lt;x&gt;" in c and "punti InPost e Poste Italiane" in c)
+    prova("...senza negozio: «Il venditore»", True,
+          amb["avviso_al_compratore_punti"]("", ["InPost"]).startswith(
+              "📦 <b>Il venditore adesso"))
+
+    # --- la tabella: una riga per coppia ----------------------------
+    i = src.index("CREATE TABLE IF NOT EXISTS richieste_punti(")
+    tab = src[i:src.index(");", i)]
+    prova("richieste_punti: la chiave e' la coppia (una riga, per costruzione)",
+          True, "PRIMARY KEY(compratore, venditore)" in tab)
+    prova("...con `chiesto` e il timbro `avvisato`", True,
+          "chiesto INTEGER NOT NULL" in tab and "avvisato INTEGER DEFAULT 0" in tab)
+
+    # --- la rotta: l'ordine delle cose ------------------------------
+    rotta = codice(pezzo("chiedi_punti"))
+    prova("la rotta: il 404 della leva PRIMA di tutto", True,
+          rotta.index("_richiesta_punti_accesa()") < rotta.index("verifica_utente("))
+    prova("...poi il freno, con un secchio suo", True,
+          '_frena("chiedi_punti", user["id"])' in rotta
+          and '"chiedi_punti": (10, 3600)' in src)
+    prova("...il giudice decide PRIMA di scrivere", True,
+          rotta.index("motivo_niente_richiesta_punti(")
+          < rotta.index("INSERT OR REPLACE INTO richieste_punti"))
+    prova("...la riga si scrive PRIMA dell'avviso (il patto delle campagne)",
+          True, rotta.index("INSERT OR REPLACE INTO richieste_punti")
+          < rotta.index("con.commit()") < rotta.index("await notifica("))
+    prova("...e l'avviso parte solo sotto il tetto del venditore, contando "
+          "le richieste ALTRUI", True,
+          "avvisato = altrui < RICHIESTA_PUNTI_AL_GIORNO" in rotta
+          and "AND chiesto>? AND compratore<>?" in rotta)
+    prova("...col bottone che porta a «Come spedisci» dentro Telegram", True,
+          '_link_dentro_telegram(URL_PUBBLICO + "/?corrieri=1")' in rotta)
+    prova("...e si legge la rotta vera", True,
+          '@app.post("/api/annunci/{annuncio_id}/chiedi-punti")' in src)
+    ritorno = codice(pezzo("avvisa_richiedenti_punti"))
+    prova("il ritorno: senza reti (o a leva spenta) non legge niente", True,
+          ritorno.index("if not reti_p or not RICHIESTA_PUNTI:")
+          < ritorno.index("db()"))
+    prova("...solo chi non l'ha ancora saputo", True,
+          "AND r.avvisato=0" in ritorno)
+    prova("...il timbro PRIMA di mandare, e il close prima del bot", True,
+          ritorno.index("UPDATE richieste_punti SET avvisato=?")
+          < ritorno.index("con.close()") < ritorno.index("await notifica("))
+    prova("...col bottone sull'annuncio solo se e' ancora in vetrina", True,
+          'if r["stato"] == "attivo" else None' in ritorno)
+    salva = codice(pezzo("scegli_spedizioniere"))
+    prova("il Salva del Profilo chiama il ritorno DOPO il close, solo se le "
+          "reti si sono toccate", True,
+          salva.index("con.close()") < salva.index("if tocca_reti and r:")
+          < salva.index("await avvisa_richiedenti_punti("))
+    prova("...passando le RETI DEI PUNTI, con la rete di casa gatata", True,
+          "reti_punto(reti_venditore(r[\"spedizionieri\"], r[\"spedizioniere\"],\n"
+          "                                      rete_barattolo_viva()))" in salva)
+    prova("i due preventivi portano le due chiavi, dalla stessa funzione",
+          (2, 2), (src.count('_stato_richiesta_punti(con, user["id"]'),
+                   src.count("**chiedi_punti,")))
+    stato = codice(pezzo("_stato_richiesta_punti"))
+    prova("...che a leva spenta o sul mio annuncio non legge niente", True,
+          stato.index("if not RICHIESTA_PUNTI or compratore == venditore:")
+          < stato.index("con.execute("))
+
+    # --- il deep link `corrieri`, nei tre lettori --------------------
+    BASE = "https://barattolo.store"
+    L = gemelli_link_telegram({"URL_PUBBLICO": BASE}, "https://t.me/ilbarattolobot")
+    prova("il server: /?corrieri=1 → corrieri, e nient'altro di simile",
+          ["corrieri", "", "", ""],
+          [L["_startapp_da_link"](BASE + u) for u in
+           ("/?corrieri=1", "/?corrieri=2", "/?corrieri=1&x=1", "/corrieri")])
+    prova("...e il bottone diventa un link alla Mini App",
+          "https://t.me/ilbarattolobot?startapp=corrieri",
+          L["_link_dentro_telegram"](BASE + "/?corrieri=1"))
+    prova("la pagina: la porta `apriCorrieriDaUrl` esiste e si chiama nei due "
+          "rami dell'avvio, dopo l'assistenza", 2,
+          mini.count("    apriAssistenzaDaUrl();\n    apriCorrieriDaUrl();\n"))
+    porta = pezzo_js(mini, "function apriCorrieriDaUrl(){", "\n}\n")
+    prova("...e apre il Profilo sulla sezione «Negozio e spedizioni» e sul "
+          "cassetto «Come spedisci»", True,
+          "go('profilo')" in porta and "el('accSpedizioniere')" in porta
+          and "toggleGrp('grpNegozio')" in porta
+          and porta.index("toggleGrp('grpNegozio')") < porta.index("classList.add('open')"))
+
+    # --- la cassa: la riga spenta e il tasto -------------------------
+    prova("la riga spenta: il nome di sempre della via, il fatto, il tasto "
+          "FUORI dal div sbiadito", True,
+          "nomeVia('punto')" in pezzo_js(mini, "function rigaChiediPunti(", "\n}\n")
+          and "chi vende non spedisce ai punti InPost o Poste" in mini
+          and '<div class="chiedi-punti">' in mini)
+    prova("...il tasto dice la domanda intera", True,
+          "🔔 Chiedi al venditore se spedisce con InPost o Poste" in mini)
+    prova("...e dopo il tocco la riga «richiesta inviata»", True,
+          "✅ Richiesta inviata: se il venditore aggiunge InPost o Poste" in mini)
+    prova("...dentro il radiogroup delle vie, prima della chiusura", True,
+          "}).join('') + rigaChiediPunti(p, d, strade, zonaPaese(d.paese || DOM_DEFAULT, domVend))\n      + `</div>`;" in mini)
+    gesto = pezzo_js(mini, "async function chiediPunti(){", "\n}\n")
+    prova("il gesto chiama la rotta del server, in POST, senza corpo", True,
+          "fetch(`${API_BASE}/annunci/${aid}/chiedi-punti`" in gesto
+          and "method:'POST'" in gesto)
+    prova("...nel carrello usa il primo annuncio (il venditore e' uno)", True,
+          "[...setScelte.keys()][0]" in gesto)
+    prova("...in demo non chiama niente", True,
+          "if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }" in gesto)
+    prova("...e un «gia' chiesto» del server allinea la pagina invece di "
+          "restare un errore", True, "/già chiesto/i.test(j.detail" in gesto)
+    prova("il CSS del campanello c'e'", True, "  .chiedi-punti{" in mini)
+
+    # --- il giudice del client, fatto girare --------------------------
+    import shutil
+    import subprocess
+    import tempfile
+    node = shutil.which("node")
+    if not node:
+        salta("chiediPuntiVisibile: quando la riga si disegna", "node non c'e'")
+    else:
+        CASA = {"via": "casa", "spedizione_sats": 0}
+        PUNTO = {"via": "punto", "spedizione_sats": 0}
+        casi = [
+            ({"punto_chiedibile": True}, [CASA], "dom"),                 # si'
+            ({"punto_chiedibile": False}, [CASA], "dom"),                # il server dice no
+            ({}, [CASA], "dom"),                                          # il server di ieri
+            (None, [CASA], "dom"),                                        # niente preventivo
+            ({"punto_chiedibile": True}, [CASA, PUNTO], "dom"),           # la via punto c'e' gia'
+            ({"punto_chiedibile": True}, [{"via": "ritiro"}], "dom"),     # senza la casa
+            ({"punto_chiedibile": True}, [{"via": "casa", "zona_non_offerta": True}], "dom"),
+            ({"punto_chiedibile": True}, [{"via": "casa", "cambio_assente": True}], "dom"),
+            ({"punto_chiedibile": True}, [CASA], "ue"),                   # all'estero
+            ({"punto_chiedibile": True}, [], "dom"),
+        ]
+        js = (pezzo_js(mini, "function stradaViva(s){", "\n}\n") + "\n}\n"
+              + pezzo_js(mini, "function chiediPuntiVisibile(", "\n}\n") + "\n}\n"
+              + "const CASI = " + json.dumps(casi) + ";\n"
+              + "console.log(JSON.stringify(CASI.map(c => chiediPuntiVisibile(c[0], c[1], c[2]))));\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                         encoding="utf-8") as f:
+            f.write(js)
+        try:
+            out = subprocess.run([node, f.name], capture_output=True,
+                                 encoding="utf-8", timeout=60)
+            esiti = json.loads(out.stdout or "null")
+        except Exception as e:
+            esiti = f"node e' esploso: {e}"
+        finally:
+            os.unlink(f.name)
+        prova("chiediPuntiVisibile: solo col si' del server, senza via punto, "
+              "con la casa viva, in Italia",
+              [True] + [False] * 9, esiti)
+
+    # --- il collaudo e' nella gabbia e si compila -------------------
+    prova("collaudo_chiedi_locker sta in ci/collaudi.txt e in ci/compila.txt",
+          (True, True),
+          ("collaudo_chiedi_locker\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
+           "collaudo_chiedi_locker.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
+    prova("i testi nuovi del server e della pagina non dicono «assicurato»",
+          False, "assicurat" in (t + c).lower())
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -204515,6 +204771,7 @@ def main():
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
               prove_punti_corrieri,
+              prove_richiesta_punti,
               prove_indirizzo_giusto,
               prove_rimborso_meno_spese,
               prove_annulla_chiude,

@@ -43,7 +43,7 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 # Comprare nel mercatino
 
 1. Trovi l'annuncio: dalla vetrina (Esplora), dalla ricerca, dalle categorie. Puoi salvare i preferiti e farti avvisare quando arriva quello che cerchi.
-2. Scegli come riceverlo, fra quelli che il venditore offre: spedizione a un indirizzo, spedizione a un punto di ritiro o a un locker, ritiro a mano in zona, oppure consegna dentro Barattolo se è un codice o un buono digitale.
+2. Scegli come riceverlo, fra quelli che il venditore offre: spedizione a un indirizzo, spedizione a un punto di ritiro o a un locker, ritiro a mano in zona, oppure consegna dentro Barattolo se è un codice o un buono digitale. Se il venditore non spedisce ai locker, la riga del locker è spenta e c'è il tasto «Chiedi al venditore se spedisce con InPost o Poste»: lui riceve un avviso (senza sapere chi ha chiesto) e, se aggiunge InPost, Poste Italiane o SDA nel Profilo, Barattolo ti avvisa. Una richiesta per venditore ogni 7 giorni.
 3. Paghi con «🔒 Compra in sicurezza»: arriva una fattura Lightning da pagare col wallet. La fattura dura pochi minuti (vedi i NUMERI DI OGGI): se scade non è successo niente, se ne fa un'altra al cambio del momento.
 4. I sats entrano nel deposito di garanzia. Il venditore viene avvisato, sa di essere pagato, ma i sats non sono ancora suoi.
 5. Il venditore spedisce e segna il corriere col tracciamento, oppure vi accordate per il ritiro, oppure ti consegna il codice dentro l'ordine.

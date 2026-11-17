@@ -196,3 +196,4 @@ collaudo_etichetta_alimenti
 collaudo_avvisi_barattolo
 collaudo_spedisci_entro
 collaudo_regali_livello
+collaudo_chiedi_locker

@@ -55,7 +55,7 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 ## Libro · Comprare nel mercatino (1/3)
 
 1. Trovi l'annuncio: dalla vetrina (Esplora), dalla ricerca, dalle categorie. Puoi salvare i preferiti e farti avvisare quando arriva quello che cerchi.
-2. Scegli come riceverlo, fra quelli che il venditore offre: spedizione a un indirizzo, spedizione a un punto di ritiro o a un locker, ritiro a mano in zona, oppure consegna dentro Barattolo se è un codice o un buono digitale.
+2. Scegli come riceverlo, fra quelli che il venditore offre: spedizione a un indirizzo, spedizione a un punto di ritiro o a un locker, ritiro a mano in zona, oppure consegna dentro Barattolo se è un codice o un buono digitale. Se il venditore non spedisce ai locker, la riga del locker è spenta e c'è il tasto «Chiedi al venditore se spedisce con InPost o Poste»: lui riceve un avviso (senza sapere chi ha chiesto) e, se aggiunge InPost, Poste Italiane o SDA nel Profilo, Barattolo ti avvisa. Una richiesta per venditore ogni 7 giorni.
 3. Paghi con «🔒 Compra in sicurezza»: arriva una fattura Lightning da pagare col wallet. La fattura dura pochi minuti (vedi i NUMERI DI OGGI): se scade non è successo niente, se ne fa un'altra al cambio del momento.
 4. I sats entrano nel deposito di garanzia. Il venditore viene avvisato, sa di essere pagato, ma i sats non sono ancora suoi.
 5. Il venditore spedisce e segna il corriere col tracciamento, oppure vi accordate per il ritiro, oppure ti consegna il codice dentro l'ordine.
@@ -1853,4 +1853,11 @@ pubblico: sì
 frase: Salire di livello adesso regala qualcosa di vero: alla «Bottega avviata» la borsa di tela «Un tempo per te», al «Mercante pratico» la tazza, all'«esperto» la maglietta, al «Maestro del banco» il quaderno. Quando sblocchi un regalo il bot te lo dice: apri il Profilo, scrivi dove mandarlo (un locker o il tuo indirizzo) e te lo spediamo noi. Ogni regalo una volta sola, e i punti non cambiano.
 dove: il messaggio del bot «🎁 Hai sbloccato un regalo»; Profilo → «🎖 Livello e titolo» → «I tuoi regali» (il campo del recapito e «Mandamelo 🎁»); i regali di ogni gradino nella scala dei vantaggi.
 leva: REGALI_LIVELLO_ATTIVI (accesa di serie)
+
+<!-- pezzo novita-064 | novita -->
+## Novità · 2026-11-17 · chiedi-locker
+
+frase: Se un venditore non spedisce ai locker o ai punti di ritiro, alla cassa la riga del locker adesso resta visibile, spenta, con il tasto «Chiedi al venditore se spedisce con InPost o Poste»: lui riceve un avviso dal bot (senza sapere chi ha chiesto) che lo porta a spuntare i suoi corrieri, e quando lo fa chi aveva chiesto riceve l'avviso. Una richiesta per venditore ogni 7 giorni.
+dove: la cassa di un annuncio a spedizione di un venditore senza InPost, Poste o SDA, sotto «Spedizione a un indirizzo»; il messaggio del bot «Qualcuno vorrebbe ricevere … in un locker» col bottone «📦 Come spedisci».
+leva: RICHIESTA_PUNTI (accesa di serie)
 pubblico: sì

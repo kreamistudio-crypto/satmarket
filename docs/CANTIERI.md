@@ -86961,3 +86961,92 @@ anche, quattro annunci normali dall'account ufficiale. Non c'è ancora il
 recapito precompilato dall'ultimo ordine (si riscrive a mano) né un
 tetto ai regali al giorno: con quattro gradini e la soglia degli affari
 non serve, ma se i regali diventassero dieci andrebbe guardato.
+## «Chiedi al venditore se spedisce con InPost o Poste»: il campanello sulla porta chiusa del locker (17 nov 2026, cantiere chiedi-locker; voce #359 del Todo, Andrea: «si devono poter selezionare solo i locker scelti dal venditore, se non sono presenti, ci deve essere la possibilità di pingare il venditore per chiedergli se può spedire con InPost o Poste»)
+
+LA PRIMA METÀ C'ERA GIÀ. Dal 12 ott 2026 (il 213, «Il punto di ritiro
+solo dove il corriere ci arriva») chi compra vede solo le reti che il
+venditore ha spuntato: con la sola InPost esce la sola mappa InPost, e
+senza InPost, Poste o SDA la via punto non si offre. Letto e lasciato
+com'è: la richiesta di Andrea è la seconda metà, il campanello.
+COSA SI È DECISO (piano in cinque righe, ok di Andrea alle 11:11).
+1) La riga del locker RESTA IN VISTA, spenta col motivo («chi vende non
+spedisce ai punti InPost o Poste»), come la zona non offerta: sparire
+faceva credere che il locker non esistesse. Sotto, il tasto «🔔 Chiedi
+al venditore se spedisce con InPost o Poste», FUORI dal div sbiadito o
+sarebbe spento anche lui (il patto del menu del paese). 2) Il bot
+scrive al venditore SENZA dire chi ha chiesto: «Qualcuno vorrebbe
+ricevere «titolo» in un locker o in un punto di ritiro», cosa gli manca
+e dove si mette, col bottone «📦 Come spedisci» che apre l'app sul
+cassetto (deep link `corrieri`, parola nuova nei tre lettori). 3) I
+freni: una richiesta per coppia ogni 7 giorni (è la chiave primaria di
+`richieste_punti`), al venditore al più 3 avvisi al giorno — la quarta
+persona resta scritta e il bot tace, così il ritorno arriva anche a
+lei. 4) Il ritorno: quando il venditore spunta una rete dal Salva vero
+del Profilo (o dal foglio di Vendi, che è la stessa rotta), chi aveva
+chiesto riceve «adesso spedisce anche ai punti InPost», col bottone
+sull'annuncio se è ancora in vetrina; timbro `avvisato` PRIMA di
+mandare, una volta sola. 5) Leva `RICHIESTA_PUNTI` ACCESA di serie
+(regola del 14 nov): interruttore d'emergenza, nel codice e nel
+config d'esempio; i tetti nel codice accanto al giudice, perché non
+muovono denaro.
+COM'È FATTO (ARCHITETTURA, «CHIEDI AL VENDITORE SE SPEDISCE CON INPOST
+O POSTE», dentro «IL PUNTO SOLO DOVE IL CORRIERE CI ARRIVA»). Server:
+la tabella `richieste_punti`, il giudice puro
+`motivo_niente_richiesta_punti` coi quattro messaggi, `richiesta_punti_viva`,
+i due testi, `_stato_richiesta_punti` nei due preventivi
+(`punto_chiedibile`, `punto_chiesto`), la rotta
+`POST /api/annunci/{id}/chiedi-punti` col freno `chiedi_punti`,
+`avvisa_richiedenti_punti` chiamata dal Salva del Profilo, `/?corrieri=1`
+in `_startapp_da_link`, la voce nel pannello delle leve. Pagina:
+`chiediPuntiVisibile` (puro), `rigaChiediPunti`, `chiediPunti()`,
+`apriCorrieriDaUrl`, la parola `corrieri` in `percorsoDaStartapp` e
+`startappDaLink`, due righe di CSS. Nessuna migrazione di dati, nessuno
+stato nuovo, nessun ordine toccato.
+LE STRADE SCARTATE. (a) Un messaggio in chat dal compratore al
+venditore: la chat del mercatino vive dentro un ordine, e qui l'ordine
+non è ancora nato; e un messaggio libero dice chi chiede, mentre qui
+basta il fatto. (b) Il tetto del venditore nel config: non muove
+denaro, e un numero nel config del VPS è una riga da aggiungere a mano
+a ogni deploy. (c) Rifiutare la quarta richiesta del giorno con un 400:
+avrebbe lasciato fuori dal ritorno proprio chi ha chiesto per ultimo.
+(d) Avvisare il venditore anche quando TOGLIE una rete: niente da
+raccontare a nessuno.
+PROVATO. Sull'albero del cantiere (da develop 35c5c1e, nel venv della
+CI senza coincurve): `collaudo_chiedi_locker.py` 45/0 (preventivo,
+richiesta, tetto, ritorno, rifiuti, leva); `prove_richiesta_punti`
+(leva, finestra, giudice, testi, tabella, ordine delle cose nella
+rotta e nel ritorno, deep link nei tre lettori, giudice del client via
+node) e `prove_punti_corrieri` aggiornata (il quinto lettore di
+`reti_punto(reti_venditore(...))` è la rotta). Cinque controprove
+rosse: tetto del venditore tolto (2 rosse), timbro `avvisato` non
+filtrato (3), «già offerti» spento (3), finestra dei 7 giorni spenta
+(3), leva ignorata nel ritorno (2); una sesta (INSERT tolta) ha fatto
+esplodere il collaudo, che è rosso lo stesso. Il primo giro intero della
+suite ha preso nove sentinelle di casa (la quinta lettrice di
+`reti_punto`, il quarto chiamante di `_link_dentro_telegram`, i flag
+delle strade letti a mano invece di `stradaViva`, la quindicesima
+porta dei link d'arrivo e la sua bandierina in `spegniLinkDaUrl`, la
+scorsa morbida senza `tourRidotto`, il freno nuovo nell'elenco, la
+categoria della sezione, `conoscenza.md` da rigenerare): tutte
+sistemate, nessuna ammorbidita. Terzo giro: suite severa 28.961/0 (le
+due saltate di sempre: nostr-tools non c'è qui), collaudi della CI
+nella gabbia 141/0 (il giro intero è partito prima dell'ultimo ritocco
+— il nome del venditore al posto del codice negozio nell'avviso di
+ritorno, due righe del client — e i dieci collaudi vicini sono stati
+rifatti sull'albero finale: 10/0). Giro dal vivo con Playwright sul
+server in MODALITA_COLLAUDO: la riga spenta col tasto alla cassa, il
+tocco che la trasforma in «Richiesta inviata» con l'avviso simulato al
+venditore, il deep link `/?corrieri=1` che apre il Profilo su «Negozio
+e spedizioni» → «Come spedisci», la spunta di InPost che fa partire
+l'avviso di ritorno col bottone sull'annuncio (foto nella Library,
+`chiedi-locker/`). Poi develop è corso di sei commit (gli avvisi sui
+preferiti, «Spedisci entro», il primo wallet, Packlink, la scheda
+dell'app sul relay, i regali per livello): nessun simbolo in comune,
+conflitti solo nelle code di NOVITA, CANTIERI e delle due liste della
+CI, `conoscenza.md` rigenerato; sull'albero rebasato il giro mirato —
+undici sezioni (la mia, le sentinelle toccate, quelle che leggono i
+documenti) 702/0 e nove collaudi vicini 9/0.
+DA GUARDARE DAL VIVO sul collaudo: la riga spenta col tasto su un
+annuncio di un venditore senza corrieri (dal telefono, dentro
+Telegram); il messaggio del bot al venditore e il bottone che apre il
+Profilo sul cassetto; il ritorno dopo aver spuntato InPost.

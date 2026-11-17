@@ -211,3 +211,4 @@ collaudo_etichetta_alimenti.py
 collaudo_avvisi_barattolo.py
 collaudo_spedisci_entro.py
 collaudo_regali_livello.py
+collaudo_chiedi_locker.py

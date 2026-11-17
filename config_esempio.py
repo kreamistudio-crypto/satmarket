@@ -772,6 +772,15 @@ INVITO_CORRIERI_MAX = 3         # quante volte al massimo. 0 = niente
 # riparte (timbro nel database), e rispegnerla non serve.
 AVVISO_CORRIERI_PUNTI = False
 
+# «Chiedi al venditore se spedisce con InPost o Poste» (17 nov 2026):
+# alla cassa di un venditore che ai punti non consegna la riga del
+# locker resta in vista, spenta, con un tasto che manda un avviso al
+# venditore (senza dire chi ha chiesto); quando lui spunta InPost,
+# Poste Italiane o SDA, chi aveva chiesto riceve l'avviso.
+# ACCESA DI SERIE. False = la riga del locker sparisce e basta, come
+# dal 12 ott 2026, e nessun avviso nei due versi.
+RICHIESTA_PUNTI = True
+
 # --- Offerta lampo (sconto a tempo su tutto l'annuncio) --------------
 # Modello Vinted «sconto ai follower»: quando qualcuno mette l'annuncio
 # nel suo barattolo il venditore riceve un avviso anonimo e puo' lanciare
