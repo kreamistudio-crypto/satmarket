@@ -103749,9 +103749,12 @@ async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
         # ...e i RIMBORSI di quando ha messo lui i sats (10 nov 2026)
         _p2p_onchain_prepara(con)
         _onchain_riempi_rimborsi(con, user["id"])
+        # ...e chi aspettava quell'indirizzo per rinunciare lo sa (17 nov)
+        sbloccate = _p2p_onchain_rinunce_sbloccate(con, user["id"])
         con.commit()
     finally:
         con.close()
+    await _p2p_onchain_avvisa_rinunce(sbloccate)
     for o in riempiti:
         if o["rilascio_chiesto_il"]:
             await notifica(o["compratore_id"],
@@ -107759,7 +107762,13 @@ def _p2p_onchain_prepara(con):
                       # 17 nov 2026, cantiere barattozon-onchain: il PayCode
                       # di un Barattozon, JSON {pc, scade, barre}; '' per
                       # tutto il resto. Esce solo da `_p2p_onchain_per`
-                      ("paycode", "TEXT DEFAULT ''")):
+                      ("paycode", "TEXT DEFAULT ''"),
+                      # 17 nov 2026, cantiere onchain-rimborso-liscio: chi
+                      # compra ha toccato «Rinuncio» ma chi ha depositato
+                      # non ha ancora scritto dove riavere i sats. Quando
+                      # l'ultimo avviso e' partito (0 = nessuna rinuncia
+                      # che aspetta): si azzera appena l'indirizzo c'e'
+                      ("rinuncia_chiesta_il", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -108274,6 +108283,9 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "incasso_ln": bool(_p2p_onchain_campo(o, "incasso_ln", 0)),
         "rilascio_chiesto_il": int(_p2p_onchain_campo(o, "rilascio_chiesto_il", 0) or 0),
         "rilascio_firma": _p2p_onchain_campo(o, "rilascio_firma", "") or "",
+        # (17 nov 2026, onchain-rimborso-liscio) chi compra vuole
+        # rinunciare e il rimborso aspetta l'indirizzo di chi ha depositato
+        "rinuncia_chiesta_il": int(_p2p_onchain_campo(o, "rinuncia_chiesta_il", 0) or 0),
         "cambio": _onchain_cambio_letto({"cambio": _p2p_onchain_campo(o, "cambio", "")}),
         "ln_possibile": bool(ruolo == "venditore" and p2p_onchain_ln_per(tg_id)),
         # (tappa 3) chi ha preso vendendo bitcoin puo' depositare in Lightning
@@ -109332,6 +109344,175 @@ async def p2p_onchain_incasso_qui(oid: int, req: Request, x_tg_init_data: str = 
         con.close()
     await _p2p_onchain_avvisa_confermato(o)
     return risposta
+
+
+# ---- IL RIMBORSO CHE NON SI INCAGLIA (17 nov 2026, cantiere
+# onchain-rimborso-liscio; un utente all'assistenza: «la persona che ha
+# depositato deve indicare dove ricevere di ritorno i sats [...] mi
+# appare un po' macchinosa la procedura»; Andrea: «Ok, sì, vai, correggi
+# tutto») ----
+# Dal 10 nov (rimborso-wallet) il rimborso di chi deposita va al wallet
+# SUO, e senza resta vuoto: chi compra toccava «Rinuncio», leggeva un
+# errore, e chi vendeva non sapeva di dover fare niente — il posto dove
+# scriverlo era solo nel Profilo. Tre pezzi, e nessuno cambia la regola
+# (un rimborso vuoto non e' mai un'uscita permessa):
+#  - `rimborso`: l'indirizzo AL VOLO di chi deposita, gemello di
+#    `incasso` qui sopra (stesso giudice, stessa firma del seme, vale
+#    per lo scambio e il Profilo non si tocca). La pagina lo chiede
+#    PRIMA di «🔒 Blocca i sats»;
+#  - `rinuncia-chiesta`: «Rinuncio» senza quell'indirizzo non e' piu' un
+#    errore. Si scrive, e il bot lo dice a chi ha depositato col bottone
+#    che apre lo scambio;
+#  - `_p2p_onchain_rinunce_sbloccate`: appena l'indirizzo c'e' (da qui o
+#    dal Profilo) chi compra lo sa, e «Rinuncio» stavolta firma. NIENTE
+#    firma da sola: una rinuncia la firma il seme di chi rinuncia sul
+#    tocco suo, mai sulla parola del server.
+P2P_ONCHAIN_RINUNCIA_RIAVVISO = 3600   # un avviso all'ora, al massimo
+
+
+def _p2p_onchain_rinuncia_possibile(o) -> bool:
+    """PURA: chi compra puo' proporre il rimborso adesso? La stessa
+    condizione della rotta `proposta` per il verso «compratore»."""
+    return bool(o["stato"] in ("depositato", "euro_inviati")
+                or (o["stato"] in ("preso", "annullato")
+                    and int(o["ricevuti_sats"] or 0) > 0))
+
+
+def _p2p_onchain_rinunce_sbloccate(con, depositante_id: int) -> list:
+    """Gli scambi di chi ha depositato su cui una rinuncia aspettava il
+    suo indirizzo, e adesso l'indirizzo c'e'. Il segno si toglie QUI,
+    prima dell'avviso (come ogni avviso: mai due volte), e chi compra
+    torna ad avere il suo «Rinuncio» di sempre. Non fa commit."""
+    try:
+        righe = con.execute(
+            "SELECT * FROM p2p_onchain_ordini WHERE depositante_id=? AND "
+            "rinuncia_chiesta_il>0 AND rimborso<>'' ORDER BY id",
+            (int(depositante_id),)).fetchall()
+    except sqlite3.OperationalError:
+        return []
+    fatti = []
+    for o in righe:
+        cur = con.execute("UPDATE p2p_onchain_ordini SET rinuncia_chiesta_il=0 "
+                          "WHERE id=? AND rinuncia_chiesta_il>0", (o["id"],))
+        if cur.rowcount and not o["proposta_psbt"] \
+                and _p2p_onchain_rinuncia_possibile(o):
+            fatti.append(o)
+    return fatti
+
+
+async def _p2p_onchain_avvisa_rinunce(righe) -> None:
+    for o in righe:
+        await _notifica_p2p_onchain(o, o["ricevente_id"],
+            "↩️ <b>Ora puoi rinunciare:</b> chi vende ha scritto dove riavere "
+            f"i sats dello scambio di {_p2p_onchain_quanto(o)}.\n\n"
+            "Apri lo scambio e tocca di nuovo «Rinuncio»: stavolta parte.",
+            _p2p_onchain_bottone(o))
+
+
+@app.post("/api/p2p/onchain/{oid}/rimborso")
+async def p2p_onchain_rimborso_qui(oid: int, req: Request, x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """DOVE TORNANO I SATS, SCRITTO LI': il gemello di `incasso` per chi
+    DEPOSITA. Un indirizzo per QUESTO scambio, giudicato e firmato come
+    quello del Profilo (`onchain_destinazione_motivo`,
+    `onchain_firma_valida`): il telefono di chi deposita lo rilegge
+    prima di ogni firma (`onchainRimborsoAtteso`). Solo un indirizzo,
+    solo a rimborso vuoto e senza una proposta gia' firmata."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("onchain_incasso", user["id"])
+    d = await leggi_json(req)
+    valore = str(d.get("valore") or "").strip()
+    firma = str(d.get("firma") or "").strip().lower()
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if _p2p_onchain_ruolo(o, user["id"]) != "compratore":
+            raise HTTPException(403, "Dove tornano i sats lo sceglie chi li deposita")
+        if (o["stato"] not in ("preso", "depositato", "euro_inviati", "disputa")
+                or o["rimborso"] or o["proposta_psbt"]):
+            raise HTTPException(409, "Dove tornano i sats non si cambia più")
+        r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        if not r:
+            raise HTTPException(400, "Prima accendi l'on-chain")
+        motivo = onchain_destinazione_motivo("indirizzo", valore, r["xpub"])
+        if motivo:
+            raise HTTPException(400, motivo)
+        valore = onchain_indirizzo_esterno("indirizzo", valore, 0)
+        if not onchain_firma_valida(r["xpub"], "indirizzo", valore, firma):
+            raise HTTPException(400, "L'indirizzo non è firmato dal tuo seme: "
+                                     "rifallo da questo telefono")
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET rimborso=?, rimborso_tipo='indirizzo',"
+            " rimborso_valore=?, rimborso_firma=?, rimborso_indice=0,"
+            " aggiornato=? WHERE id=? AND rimborso='' AND proposta_psbt=''",
+            (valore, valore, firma, int(time.time()), oid))
+        if not cur.rowcount:
+            con.commit()
+            raise HTTPException(409, "Dove tornano i sats non si cambia più")
+        sbloccate = _p2p_onchain_rinunce_sbloccate(con, user["id"])
+        con.commit()
+        o = _p2p_onchain_carica(con, oid)
+        risposta = _p2p_onchain_per(con, o, user["id"])
+    finally:
+        con.close()
+    await _p2p_onchain_avvisa_rinunce(sbloccate)
+    if o["stato"] == "disputa":
+        # il moderatore non poteva rimborsare senza un indirizzo
+        # (`_onchain_psbt_barattolo`): adesso si', e lo deve sapere
+        await notifica_admin(
+            f"↩️ <b>Scambio on-chain #{int(oid)}:</b> chi ha depositato ha "
+            "scritto dove riavere i sats. Se la decisione era un rimborso, "
+            "adesso si può firmare.", argomento="moderazione")
+    return risposta
+
+
+@app.post("/api/p2p/onchain/{oid}/rinuncia-chiesta")
+async def p2p_onchain_rinuncia_chiesta(oid: int, x_tg_init_data: str = Header(""),
+                                       barattolo_sessione: str = Cookie("")):
+    """«RINUNCIO» SENZA L'INDIRIZZO DI CHI HA DEPOSITATO: il rimborso non
+    si puo' ancora firmare (non ha dove andare), ma la rinuncia non si
+    perde. Si scrive quando e' partito l'avviso, e il bot dice a chi ha
+    depositato cosa manca, col bottone dello scambio. `pronto` = nel
+    frattempo l'indirizzo e' arrivato: il telefono firma come sempre."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("onchain_firma", user["id"])
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if _p2p_onchain_ruolo(o, user["id"]) != "venditore":
+            raise HTTPException(403, "Il rimborso lo propone chi compra bitcoin")
+        if o["stato"] == "disputa":
+            raise HTTPException(409, "C'è una disputa aperta: decide un moderatore")
+        if o["decisione_da"] or o["proposta_psbt"]:
+            raise HTTPException(409, "Su questo scambio c'è già una firma: "
+                                     "manca solo la seconda")
+        if not _p2p_onchain_rinuncia_possibile(o):
+            raise HTTPException(409, "Non c'è niente da rimborsare adesso")
+        if o["rimborso"]:
+            return {"ok": True, "pronto": True, "avvisato": False}
+        ultimo = int(_p2p_onchain_campo(o, "rinuncia_chiesta_il", 0) or 0)
+        avvisa = not ultimo or adesso - ultimo >= P2P_ONCHAIN_RINUNCIA_RIAVVISO
+        if avvisa:
+            # scritto PRIMA dell'invio, come ogni avviso
+            con.execute("UPDATE p2p_onchain_ordini SET rinuncia_chiesta_il=?,"
+                        " aggiornato=? WHERE id=?", (adesso, adesso, oid))
+            con.commit()
+    finally:
+        con.close()
+    if avvisa:
+        await _notifica_p2p_onchain(o, o["depositante_id"],
+            "↩️ <b>Chi compra vuole rinunciare</b> allo scambio di "
+            f"{_p2p_onchain_quanto(o)}.\n\n"
+            "Per riavere i tuoi sats manca una cosa sola: <b>dove "
+            "mandarteli</b>. Apri lo scambio e incolla un indirizzo del tuo "
+            "wallet Bitcoin nel riquadro «Dove tornano i sats?». Intanto "
+            "restano al sicuro nel 2-di-3.",
+            _p2p_onchain_bottone(o))
+    return {"ok": True, "pronto": False, "avvisato": avvisa}
 
 
 @app.post("/api/p2p/onchain/{oid}/proposta")
