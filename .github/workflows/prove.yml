@@ -248,9 +248,12 @@ jobs:
       # prove sono rosse — la lezione del job dei segreti, un rosso
       # prima non deve zittire le domande dopo. Il job resta rosso lo
       # stesso, e con lui il semaforo del deploy.
+      # uvicorn (17 nov 2026, la promozione rossa della sentinella):
+      # `collaudo_sentinella` fa nascere un server vero in un processo
+      # figlio, come sul VPS; senza, il figlio muore all'import.
       - name: Le dipendenze del server, per i collaudi
         if: ${{ !cancelled() }}
-        run: pip install --quiet fastapi httpx anthropic "$(grep -E '^embit==' requirements.txt)"
+        run: pip install --quiet fastapi uvicorn httpx anthropic "$(grep -E '^embit==' requirements.txt)"
 
       # LE DUE OPZIONI DELLA CI LEGGERA (16 ott 2026), che cambiano
       # QUANDO e COME girano i collaudi e mai QUALI (il perche' sta in
