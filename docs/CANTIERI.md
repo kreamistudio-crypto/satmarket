@@ -88258,7 +88258,14 @@ col primo tocco, si spegne col 🔊 e uscendo dalla pagina) e la rotta
 `/assets/stradina/musica/{nome}` con la sua whitelist; il brano no: lo
 scarica da Artlist la sessione sul PC del thread del gioco appena finisce
 Flow, insieme a quello del gioco, nello stesso stile. Finché manca, la
-rotta dà 404 e la pagina resta in silenzio (niente musica sintetizzata). (5) IL RAZZO CHE CRESCE: gli otto
+rotta dà 404 e la pagina resta in silenzio (niente musica sintetizzata).
+Arrivato alle 16:52: `mappa.mp3` è «Like a Feather - Acoustic Guitars
+Version» di Ziv Moran (Artlist, licenza di Andrea), sola chitarra
+acustica, loop di 72 s (30 battute a 100 BPM, giunta con 60 ms di
+dissolvenza), mono 96k, 845 KB, picco -13,5 dB: sotto il tetto di -9 dB
+della prova, ed è un sottofondo più basso degli effetti. Andrea alle
+17:01: «La musica non mi piace» → tolta prima del push; si sceglie lo
+stile (card) e il thread del gioco ne scarica un'altra. (5) IL RAZZO CHE CRESCE: gli otto
 stadi del thread del gioco (Flow, 297x520, trasparenti, stesso riquadro:
 pedana e gambe, serbatoio, motore, ali, oblò, punta, antenna, motori
 accesi), in whitelist con la mappa. `stradinaRazzo` dà lo stadio della
@@ -88310,7 +88317,16 @@ pedina resta ferma col solo contorno arancio. (11) Lo svelamento si
 chiama `si-svela` (il nome `svela` era del tour P2P di settembre, e
 `prove_libro_subito` lo vuole sparito) e non usa più `filter:blur`
 (il censimento di `prove_effetti_ridotti` ne ammette due). PROVATO:
-suite PROVE_SEVERE e collaudi sull'albero del push (verbale sotto).
+VERBALE (17 nov, cloud, venv dei collaudi, senza proxy): sull'albero
+94ed127 (ribasato su develop c247c34) `PROVE_SEVERE=1 python prove.py`
+29.506 passate, 0 fallite, 2 saltate (le due che cercano nostr-tools
+nel PC o nel WSL: mancano nel cloud, non toccano la rotta) e
+`collaudi_ci.py --elenco ci/collaudi.txt` 152 verdi, 0 rossi. Poi
+develop è corso di tre commit (CI mirata, rilascio senza incasso,
+raccolte spente): rebase, e di nuovo le sezioni toccate (stradina,
+libro subito, effetti ridotti, NOVITA, conoscenza, categorie delle
+prove, raccolta) 332/0 più `collaudo_stradina_prova` e
+`collaudo_raccolta` verdi. Commit non miei nell'albero: quelli di develop.
 
 ## Il nome verificato su Nostr, gratis dal livello 2 (17 nov 2026, cantiere nip05-utenti; Andrea: «attivare verifica NIP-05, gratis per utenti da lv2 in su»)
 

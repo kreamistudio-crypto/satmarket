@@ -129501,7 +129501,7 @@ console.log(JSON.stringify({
   sats: h.includes(fmt(12345) + '</b> sats incassati'),
   frase: stradinaFraseAmici(d), fila: (h.match(/<span class="nome">([^<]*)<\\/span><span class="lv">/g) || []).map(x => x.replace(/<[^>]+>/g, '')),
   pedine_ugo: /class="str-pedine"[^>]*>[^]*?Ugo &lt;b&gt;/.test(h),
-  amico_tocca: /<button type="button" class="str-amico" onclick="strVaiAmico\(4\)">/.test(h),
+  amico_tocca: /<button type="button" class="str-amico" onclick="strVaiAmico\\(4\\)">/.test(h),
   pedine_lv4: h.includes('class="str-pedine" data-lv="1"'),
   scheda_missione: stradinaSchedaHTML(d, iMis),
   scheda_fatta: stradinaSchedaHTML(d, 0),
