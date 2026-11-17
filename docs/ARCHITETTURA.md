@@ -36357,7 +36357,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (giro 0, dettaglio «onchain») dalle coppie di `_p2p_onchain_esiti`.
   NETTO: `_p2p_onchain_quanto(o, netti=True)` toglie
   `quota_ricevente_sats`. TEMPO PER PAGARE:
-  `p2p_onchain_ore_pagamento(o)` (24 USDT/monete, 72 euro/franchi),
+  `p2p_onchain_ore_pagamento(o)` (24 per tutti dal 17 nov sera: erano
+  72 in euro/franchi; il PayCode tiene il tetto `P2P_ONCHAIN_ORE_PAGAMENTO_TAB`),
   `p2p_onchain_paga_entro(o)` da `depositato_il`, in `_p2p_onchain_per`
   come `paga_entro`/`ore_pagamento`; colonna `pagamento_scaduto_il`, la
   timbra `_p2p_onchain_passata_tempo_pagare` nella ronda, che avvisa con
@@ -36447,6 +36448,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che poi fa ripartire il gesto; `closeSheet` lo annulla. Prove:
   `prove_onchain_rimborso_liscio`, `collaudo_p2p_onchain` (sezione
   11-sexies).
+- IL TEMPO DEL BONIFICO NEL P2P ON-CHAIN (17 nov 2026 sera, stesso
+  cantiere; CANTIERI, «24 ore per pagare, 48 per il bonifico»). Due
+  tempi in fila, nessuno dei due annulla o libera: PAGARE, dal deposito
+  confermato, `P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI = 24` (come le monete);
+  IL BONIFICO, da «Ho inviato», `P2P_ONCHAIN_ORE_BONIFICO = 48`.
+  `p2p_onchain_ore_bonifico(o)` (pura: 48 per euro e franchi, 0 per
+  USDT, monete, PayCode e solo «Contanti») e
+  `p2p_onchain_bonifico_entro(o)` da `euro_inviati_il`, in
+  `_p2p_onchain_per` come `bonifico_entro`/`ore_bonifico`; colonna
+  `bonifico_scaduto_il`, la timbra
+  `_p2p_onchain_passata_tempo_bonifico` nella ronda (solo stato
+  `euro_inviati`: una disputa aperta ne esce da sola), che avvisa le
+  due parti con `_p2p_onchain_testi_bonifico_scaduto`. I tre promemoria
+  a chi libera (1, 6, 20 ore) restano. Nel telefono `tempoBonificoOcP2P`
+  (pura) e le frasi di `schedaOnchainP2P` nello stato «euro inviati».
+  Prove: `prove_onchain_tempo_bonifico`, `collaudo_p2p_onchain`.
 - I DUE TASTI DELLA RETE NEL FOGLIO DELL'ORDINE (16 nov 2026, cantiere
   coin-quasi; il perché in CANTIERI, «I due tasti della rete nel foglio
   dell'ordine…»). `tastiReteFoglioP2P` disegna «⚡ Lightning» / «₿

@@ -490,7 +490,13 @@ leva: RACCOLTE_ATTIVE (accesa di serie; i depositi di garanzia, RACCOLTA_GARANTI
 pubblico: sì
 
 ## 2026-11-17 · onchain-rimborso-liscio
-frase: Rinunciare a uno scambio P2P on-chain è più semplice. Chi vende bitcoin scrive dove riavere i sats nel foglio stesso, prima di bloccarli. Se quell'indirizzo manca, il «Rinuncio» di chi compra non dà più errore: viene registrato e il bot avvisa chi vende col tasto che apre lo scambio. E se firmi da un dispositivo dove la chiave del wallet non c'è, Barattolo la cerca da solo o ti chiede lì le 12 parole.
+frase: Rinunciare a uno scambio P2P on-chain è più semplice. Chi vende bitcoin scrive dove riavere i sats nel foglio stesso, prima di bloccarli. Se quell'indirizzo manca, il «Rinuncio» di chi compra non dà più errore: viene registrato e il bot avvisa chi vende col tasto che apre lo scambio. E se firmi da un dispositivo senza la chiave del wallet, Barattolo la cerca da solo o ti chiede lì le 12 parole.
 dove: P2P on-chain: il foglio «🔒 Blocca i sats» col riquadro «Dove tornano i sats?»; la pagina dello scambio, tasto «↩️ Rinuncio: rimborsa chi vende»; il foglio «🔑 Serve la chiave del tuo wallet»; i messaggi del bot «Chi compra vuole rinunciare» e «Ora puoi rinunciare».
 leva: nessuna
 pubblico: no
+
+## 2026-11-17 · onchain-tempo-bonifico
+frase: Negli scambi P2P on-chain in euro e franchi il tempo per pagare scende da 72 a 24 ore, come per USDT e monete. In cambio, da «Ho inviato» chi vende ha 48 ore per veder arrivare il bonifico e liberare i sats: se passano senza rilascio, il bot avvisa tutti e due e indica la disputa. Niente si annulla da solo: i bitcoin restano nel deposito di garanzia.
+dove: P2P on-chain: la card in «I miei scambi» e la riga «Tempo per pagare» nella pagina dello scambio; nello stato «Euro inviati» la frase con le 48 ore; i messaggi del bot «Il tempo per pagare è finito» e «Sono passate 48 ore da «Ho inviato gli euro»».
+leva: nessuna
+pubblico: sì
