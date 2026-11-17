@@ -414,8 +414,8 @@ pubblico: sì
 ## 2026-11-17 · regali-livello
 frase: Salire di livello adesso regala qualcosa di vero: alla «Bottega avviata» la borsa di tela «Un tempo per te», al «Mercante pratico» la tazza, all'«esperto» la maglietta, al «Maestro del banco» il quaderno. Quando sblocchi un regalo il bot te lo dice: apri il Profilo, scrivi dove mandarlo (un locker o il tuo indirizzo) e te lo spediamo noi. Ogni regalo una volta sola, e i punti non cambiano.
 dove: il messaggio del bot «🎁 Hai sbloccato un regalo»; Profilo → «🎖 Livello e titolo» → «I tuoi regali» (il campo del recapito e «Mandamelo 🎁»); i regali di ogni gradino nella scala dei vantaggi.
-leva: REGALI_LIVELLO_ATTIVI (spenta di serie: si accende quando «Un tempo per te» aderisce)
-pubblico: no
+leva: REGALI_LIVELLO_ATTIVI (accesa di serie)
+pubblico: sì
 
 ## 2026-11-17 · chiedi-locker
 frase: Se un venditore non spedisce ai locker o ai punti di ritiro, alla cassa la riga del locker adesso resta visibile, spenta, con il tasto «Chiedi al venditore se spedisce con InPost o Poste»: lui riceve un avviso dal bot (senza sapere chi ha chiesto) che lo porta a spuntare i suoi corrieri, e quando lo fa chi aveva chiesto riceve l'avviso. Una richiesta per venditore ogni 7 giorni.

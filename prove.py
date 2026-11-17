@@ -128832,11 +128832,9 @@ def prove_regali_livello():
     print("\n[i regali per livello]")
     cfg = open("config_esempio.py", encoding="utf-8").read()
     # 1. la leva: accesa di serie (regola del 14 nov 2026) e gemella
-    # SPENTA di serie: eccezione alla regola del 14 nov, perche' «Un
-    # tempo per te» non ha ancora aderito (Andrea, 17 nov 2026)
-    prova("leva SPENTA di serie nel codice e nel config d'esempio", (True, True),
-          ("    REGALI_LIVELLO_ATTIVI = False" in _SORGENTE,
-           "\nREGALI_LIVELLO_ATTIVI = False" in cfg))
+    prova("leva accesa di serie nel codice e nel config d'esempio", (True, True),
+          ("    REGALI_LIVELLO_ATTIVI = True" in _SORGENTE,
+           "\nREGALI_LIVELLO_ATTIVI = True" in cfg))
     prova("i quattro regali nel config d'esempio, «nuovo» escluso", True,
           all(f'"{l}":' in cfg.split("REGALI_LIVELLO = {", 1)[1][:400]
               for l in ("avviato", "pratico", "esperto", "maestro"))
