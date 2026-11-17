@@ -136418,6 +136418,11 @@ def prove_effetti_ridotti():
     #   apriMissione (17 nov 2026): un'attesa di fotogramma prima della
     #     classe `aperto` del foglio delle missioni; la dissolvenza e' del
     #     CSS, e la classe la spegne
+    #   arenaAccendi, arenaGiro (17 nov 2026, i minigiochi delle
+    #     missioni): il giro dell'arena, solo col foglio della missione
+    #     aperto e in vista (`arenaDavanti`); muove Tappo dove lo guida il
+    #     dito, come mondoGiro. Saltelli, polvere, scintille e scosse con
+    #     gli effetti ridotti stanno fermi: `fermo = effettiRidotti()`
     chi = collections.Counter()
     for m in re.finditer(r"requestAnimationFrame", js):
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
@@ -136426,6 +136431,7 @@ def prove_effetti_ridotti():
           {"togliGuscio": 2, "decodificaInVista": 2, "navArrivoSecco": 2,
            "avviaTour": 2, "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1,
            "passo": 2, "mondoAccendi": 1, "mondoGiro": 1, "apriMissione": 1,
+           "arenaAccendi": 1, "arenaGiro": 1,
            "zoomQuiMappaP2P": 1},
           dict(chi))
 
@@ -204590,6 +204596,48 @@ for (const id of Object.keys(MISSIONI_GIOCO)) {
   if (id === 'halving') { for (let i = 0; i < 5; i++) { halvingRaccogli(); guarda(); if (i === 2) { halvingTarlo(true); guarda(); } if (i < 4) halvingIndovina(true); } halvingAvanti(); guarda(); }
   giocate[id] = [scene >= 4, fine, missione.errori];
 }
+/* L'ARENA: il quaderno giocato muovendo Tappo, a passi di tempo finti */
+let finita = 0;
+missioneFine = () => { finita++; };
+const mq = {id: 'quaderno', info: {zona: 0, nome: 'Q'}, fase: 'gioco', errori: 0};
+missione = mq;
+arena = {def: ARENA_QUADERNO, m: mq, sc: QUAD_SCENA, pianta: QUAD_SCENA, liv: arenaLivello(0), tempo: 0, dt: 0.016,
+  x: 450, y: 1330, vx: 0, vy: 0, verso: 1, gira: 1, fase: 0, salto: 0, cammina: 0, schiaccia: 0, meta: null, guida: null,
+  tasti: {}, blocco: 0, ultimoPasso: 0, cose: [], nemici: [], polvere: [], scoppi: [], prova: -1, dice: null, vicino: null,
+  scossa: 0, banner: 0, attesa: null, hud: '', cartello: '', azione: ''};
+const a = arena, passi = (sec) => { for (let i = 0; i < sec * 60 && arena === a; i++) arenaPassa(a, 1 / 60); };
+const vai = (x, y) => { a.x = x; a.y = y; arenaPassa(a, 1 / 60); };
+arenaProva(0);
+const tr = a.dati.truccato, altro = (tr + 1) % 5;
+vai(a.cose[altro].x, a.cose[altro].y + 60); arenaFai();
+vai(a.cose[tr].x, a.cose[tr].y + 60);
+const cartello = a.def.prove[0].cartello(a, a.vicino), azione = a.def.prove[0].azione(a, a.vicino)[0];
+arenaFai(); passi(3);
+const prova2 = [a.prova, a.cose.length, a.nemici.length, mq.errori];
+a.x = 450; a.y = 1400; a.dati.resta = 999;            /* Tappo fermo (a orologio fermo): il Tarlo prende la maggioranza */
+for (let i = 0; i < 120 * 60 && mq.errori < 2; i++) arenaPassa(a, 1 / 60);
+const errMaggioranza = mq.errori;
+a.dati.resta = 12;
+for (let i = 0; i < 40 * 60 && a.prova === 1; i++) {    /* poi Tappo gli sta addosso */
+  const n = a.nemici.find(x => x.stato === 'va' || x.stato === 'morde'), r = a.cose.find(c => c.rotto);
+  if (r) { a.x = r.x; a.y = r.y + 60; } else if (n) { a.x = n.x; a.y = n.y; }
+  arenaPassa(a, 1 / 60);
+}
+const prova3 = [a.prova, mq.errori];
+const decise = [];
+for (let k = 0; k < 4 && arena === a; k++) {
+  for (let i = 0; i < 300 && !a.cose.some(c => c.tipo === 'busta' && !c.z); i++) arenaPassa(a, 1 / 60);
+  const b = a.cose.find(c => c.tipo === 'busta');
+  vai(b.x, b.y);
+  const valida = quadernoBustaValida(a.dati.saldi, a.dati.mano);
+  const dove = a.cose.find(c => c.tipo === (valida ? 'grande' : 'cestino'));
+  vai(dove.x, dove.y + 90);
+  decise.push([valida, a.def.prove[2].azione(a, a.vicino)[0]]);
+  arenaFai(); passi(1);
+}
+passi(3);
+const arenaEsito = {prova2, errMaggioranza, prova3, decise, saldi: a.dati.saldi, finita, chiusa: arena === null, errori: mq.errori,
+  cartello: cartello.includes('<b>' + quadernoRigheArena()[a.dati ? 0 : 0][2] * 10 + '</b>') || cartello.includes('0</b>'), azione};
 const L2 = staffettaLivelli()[1];
 const lista = cacciaMissioniHTML(s);
 console.log(JSON.stringify({
@@ -204609,6 +204657,17 @@ console.log(JSON.stringify({
   terra: [mondoTerra(z1, 450, 960), mondoTerra(z1, 10, 10), mondoTerra(z2, 450, 960), mondoTerra(z1, 220, 670)],
   cam: cam.map(c => [Math.round(c.k * 1000) / 1000, Math.round(c.x0), Math.round(c.cima)]),
   profondo: [mondoProfondo(0), mondoProfondo(1600), mondoProfondo(9999)],
+  livelli: [0, 1, 2, 3, 5, 7, 9, -1, 'x'].map(z => ARENA_LIVELLI.indexOf(arenaLivello(z))),
+  muovi: [arenaMuovi(QUAD_SCENA, 450, 400, 0, -300, 34), arenaMuovi({muri: [0, 0, 900, 1500], ostacoli: [{x: 400, y: 400, r: 30}]}, 300, 400, 80, 0, 34),
+          arenaMuovi({muri: [0, 0, 900, 1500], ostacoli: [{x: 400, y: 300, w: 100, h: 200}]}, 300, 400, 80, 0, 34)].map(p => p.map(Math.round)),
+  inquadra: [arenaInquadra(390, 700, QUAD_SCENA), arenaInquadra(1200, 700, QUAD_SCENA)].map(c => [Math.round(c.k * 1000) / 1000, Math.round(c.x0), Math.round(c.y0)]),
+  vicina: [(arenaVicina([{x: 0, y: 0, r: 100, n: 1}, {x: 50, y: 0, r: 100, n: 2}, {x: 40, y: 0, r: 100, n: 3, via: true}], 45, 0) || {}).n,
+           arenaVicina([{x: 0, y: 0, r: 0}], 0, 0)],
+  buste: [quadernoBustaValida(QUAD_SALDI, ['tarlo', 'ape', 5]), quadernoBustaValida(quadernoScrivi(QUAD_SALDI, ['tarlo', 'ape', 5]), ['tarlo', 'riccio', 5]),
+          quadernoBustaValida({}, ['x', 'y', 1])],
+  maggioranza: [quadernoMaggioranza([{tipo: 'leggio', rotto: true}, {tipo: 'leggio', rotto: true}, {tipo: 'leggio'}]),
+                quadernoMaggioranza([{tipo: 'leggio', rotto: true}, {tipo: 'leggio'}, {tipo: 'grande', rotto: true}])],
+  arenaEsito,
 }));
 """
     r = _node_banco(banco2)
@@ -204649,6 +204708,31 @@ console.log(JSON.stringify({
           [[0.542, -49, 89], [0.561, 431, 114]], r.get("cam"))
     prova("la profondita' finta: piu' piccolo in fondo, piu' grande davanti, mai oltre", [0.8, 1.1, 1.1],
           r.get("profondo"))
+    # L'ARENA DEI MINIGIOCHI (17 nov 2026, Andrea: «piu' si va avanti
+    # del tabellone, piu' devono essere difficili»)
+    prova("l'arena: la difficolta' sale a coppie di zone, e una zona storta e' la piu' facile",
+          [0, 0, 1, 1, 2, 3, 3, 0, 0], r.get("livelli"))
+    prova("...Tappo non buca il muro di fondo e si ferma contro un cerchio e contro un rettangolo",
+          [[450, 389], [336, 400], [366, 400]], r.get("muovi"))
+    prova("...la stanza intera nella tela, al centro", [[0.433, 0, 25], [0.467, 390, 0]], r.get("inquadra"))
+    prova("...il tasto si accende per la cosa piu' vicina, mai per una sparita o senza raggio", [2, None], r.get("vicina"))
+    prova("la doppia spesa: i bulloni che ci sono si spendono, gli stessi una seconda volta no",
+          [True, False, False], r.get("buste"))
+    prova("...e il Tarlo vince solo con piu' della meta' delle copie (il quaderno grande non conta)",
+          [{"rotti": 2, "tot": 3, "vinta": True}, {"rotti": 1, "tot": 2, "vinta": False}], r.get("maggioranza"))
+    ae = r.get("arenaEsito") or {}
+    prova("il quaderno giocato muovendo Tappo: la copia sbagliata costa un errore, quella giusta porta alla seconda prova "
+          "(sette leggii, un Tarlo)", [1, 7, 1, 1], ae.get("prova2"))
+    prova("...il cartello del leggio dice le righe e il tasto propone la correzione", "✏️ Questa copia è sbagliata: correggila",
+          ae.get("azione"))
+    prova("...con Tappo fermo il Tarlo prende la maggioranza (un errore), standogli addosso si arriva alla terza prova",
+          (2, [2, 2]), (ae.get("errMaggioranza"), ae.get("prova3")))
+    prova("...le quattro buste: scritte quelle col conto che torna, strappata la doppia spesa",
+          [[True, "📓 Scrivi nel quaderno"], [True, "📓 Scrivi nel quaderno"], [False, "🗑️ Strappa: è una doppia spesa"],
+           [True, "📓 Scrivi nel quaderno"]], ae.get("decise"))
+    prova("...i saldi alla fine, e la missione finisce una volta sola, con l'arena chiusa",
+          ({"tarlo": 0, "rana": 2, "topo": 3, "ape": 2, "riccio": 2, "tappo": 3}, 1, True, 2),
+          (ae.get("saldi"), ae.get("finita"), ae.get("chiusa"), ae.get("errori")))
 
 
 def prove_categorie_delle_prove():
