@@ -87088,3 +87088,19 @@ DA GUARDARE DAL VIVO sul collaudo: la riga spenta col tasto su un
 annuncio di un venditore senza corrieri (dal telefono, dentro
 Telegram); il messaggio del bot al venditore e il bottone che apre il
 Profilo sul cassetto; il ritorno dopo aver spuntato InPost.
+## La promozione rossa della sentinella: uvicorn nei collaudi della CI (17 nov 2026, giro unico di correzioni)
+
+Il giro delle sette correzioni (e818c739) è arrivato su main con la CI
+rossa: 139 collaudi verdi e uno rosso, `collaudo_sentinella`, con
+«No module named 'uvicorn'» nel processo figlio che fa nascere il server.
+Il passo «Le dipendenze del server, per i collaudi» di prove.yml installa
+fastapi, httpx, anthropic ed embit, non uvicorn; in cloud e sul PC il
+collaudo era verde perché uvicorn c'era già nell'ambiente (in cloud
+l'avevo installato io a mano per farlo girare, senza chiedermi perché
+mancasse: era il segnale). `pronto` è rimasto su d0f1d2d2 e il VPS non
+ha tirato niente. CURA: uvicorn nella riga dei collaudi del workflow,
+come fastapi (requirements.txt lo elenca già, senza versione). LEZIONE:
+un pacchetto che manca nel venv dei collaudi si aggiunge al workflow
+nello stesso commit del collaudo che lo vuole, mai solo nel venv locale.
+Il commit tocca `.github/workflows/`: dopo il verde si guarda che
+`pronto` avanzi davvero (CLAUDE.md).
