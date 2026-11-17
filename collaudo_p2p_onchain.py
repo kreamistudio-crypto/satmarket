@@ -608,6 +608,8 @@ def main():
                 psbt=psbt_di(uno(999, oid2), [(oa["rimborso"], 51080 - 300)], 999)
                 .to_string()).status_code)
     ob = uno(888, oid2)
+    prova("...prima di rinunciare la riga dice ad Alan che ADESSO conterebbe (deposito "
+          "confermato, recapito scritto)", True, ob["rinuncia_conta"])
     banco.DETTO.clear()
     r = gesto(888, oid2, "proposta", verso="compratore",
               psbt=psbt_di(ob, [(ob["rimborso"], 51080 - 300)], 888).to_string())
@@ -621,13 +623,36 @@ def main():
           [(oa["rimborso"], 51080 - 300)],
           [(script.Script(v.script_pubkey.data).address(N), v.value) for v in tx.vout])
     come(888)
-    prova("...un rimborso d'accordo non apre la recensione (come l'annullo di "
-          "Lightning) e non conta fra i completati", (False, "non_conclusa", 0),
-          (lambda d: (d["si"], d["motivo"],
-                      (lambda k: (k.execute("SELECT COUNT(*) FROM p2p_esiti WHERE ordine=?",
-                                            (uno(999, oid2)["ordine"],)).fetchone()[0],
-                                  k.close())[0])(SRV.db())))(
-              c.post("/api/p2p/recensibile", json={"ordine": uno(999, oid2)["ordine"]}).json()))
+    # CHI SI RITIRA DOPO IL DEPOSITO (17 nov 2026 sera, cantiere onchain-
+    # ritiro; Andrea: «si prende la penalità e il rischio di un giudizio
+    # negativo, punto»). Fino a quel giorno questa prova diceva il
+    # contrario: «un rimborso d'accordo non apre la recensione e non conta».
+    ord2 = uno(999, oid2)["ordine"]
+    k = SRV.db()
+    esiti2 = [tuple(x) for x in k.execute(
+        "SELECT tg_id, esito, ruolo, dettaglio FROM p2p_esiti WHERE ordine=?", (ord2,))]
+    k.close()
+    prova("...la rinuncia a deposito confermato e col recapito scritto conta a chi si e' "
+          "ritirato: UN «mancato», a lui solo, e nessun «completato»",
+          [(888, "mancato", "compra", "onchain-rinuncia")], esiti2)
+    prova("...glielo dice il bot con la riga del conto del Lightning, e a chi aveva "
+          "depositato dice che puo' lasciare una recensione",
+          (True, True, False),
+          (detto_a(888, "Questo conta come scambio non completato"),
+           detto_a(999, "puoi lasciargli una recensione"),
+           detto_a(888, "puoi lasciargli una recensione")))
+    come(999)
+    da_chi_vende = c.post("/api/p2p/recensibile", json={"ordine": ord2}).json()
+    come(888)
+    da_chi_rinuncia = c.post("/api/p2p/recensibile", json={"ordine": ord2}).json()
+    prova("...la recensione e' A SENSO UNICO: la lascia chi aveva bloccato i sats, non chi "
+          "si e' ritirato", ((True, ""), (False, "non_conclusa")),
+          ((da_chi_vende["si"], da_chi_vende["motivo"]),
+           (da_chi_rinuncia["si"], da_chi_rinuncia["motivo"])))
+    prova("...e la riga dello scambio lo porta a tutti e due, ognuno dal suo lato",
+          (("altro", "onchain-rinuncia"), ("io", "onchain-rinuncia")),
+          ((uno(999, oid2)["non_completato"], uno(999, oid2)["non_completato_perche"]),
+           (uno(888, oid2)["non_completato"], uno(888, oid2)["non_completato_perche"])))
 
     # ---- 7) la disputa e la firma di Barattolo ----------------------------
     print("\n[la disputa: decide un moderatore, firma Barattolo]")
