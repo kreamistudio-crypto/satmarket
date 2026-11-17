@@ -86878,3 +86878,86 @@ entro, primo wallet, Packlink: nessun simbolo in comune, conflitto solo
 nella coda di questo file): sull'albero rebasato (sopra 8b63e4e8) le tre
 sezioni toccate più le 31 che leggono i documenti, 1.648/0, e i tre
 collaudi del relay 3/0.
+
+## I regali per livello (17 nov 2026, cantiere regali-livello; il merch «Un tempo per te», Andrea: «Idea 1: articoli prenotabili, se si raggiunge la quantità minima di ordini allora si producono. Idea 2: investire e farle a prescindere e poi metterle come regali nei pacchi al raggiungimento di una sorta di punteggio»)
+
+DECISO (studio prima, card alle 11:13, poi il piano in dieci righe e l'ok
+di Andrea alle 11:15). I quattro articoli (borsa di tela, tazza,
+maglietta, quaderno col logo «Un tempo per te») NON si producono in
+scorta e NON si prenotano: si stampano su richiesta e si REGALANO a chi
+sale di livello. I livelli esistevano già (LIVELLI: nuovo, avviato,
+pratico, esperto, maestro, due chiavi XP+affari) e sono già la scala del
+commercio: qui si appende un oggetto a ogni gradino, dal secondo —
+borsa all'avviato, tazza al pratico, maglietta all'esperto, quaderno al
+maestro (`REGALI_LIVELLO`). Leva `REGALI_LIVELLO_ATTIVI` accesa di serie
+(regola del 14 nov), nessun gesto sul VPS. Il regalo NON muove gli XP:
+il perimetro («gli XP sono il commercio e nient'altro») resta intero,
+e una prova lo dice. La spedizione è un gesto a mano di Andrea dal sito
+di stampa: Barattolo non compra, non tiene scorte e non spedisce.
+
+SCARTATO. Il crowdfunding vero (preordini che si producono alla soglia):
+avrebbe voluto sats tenuti per settimane, il rimborso se la soglia non
+arriva e un cambio che balla nel frattempo — codice nuovo e custodia
+lunga per provare un merch; la stampa su richiesta fa già quel che
+l'idea 1 chiedeva (si produce solo quando qualcuno compra, anche un pezzo
+solo), e quei quattro articoli possono stare in vetrina come annunci
+normali dell'account ufficiale senza una riga di codice. La scorta da 50
+(800-1.300 € per i quattro) resta possibile domani: la macchina dei
+regali non cambia. Il regalo NEL PACCO di un altro venditore: il pacco lo
+spedisce chi vende, non noi, quindi il regalo parte a parte — da qui il
+recapito scritto da chi riceve e non pescato da un ordine. Un punteggio
+NUOVO (100, 200…): due scale per la stessa cosa, la lezione del banner a
+due porte; si usano i livelli. Il recapito nell'avviso al canale admin:
+no, è un dato personale, esce solo nel pannello.
+
+COM'È FATTO. Un gancio solo: `premia_regali_livello` in coda a
+`premia_distintivi`, che ogni posto che muove gli XP chiama già (login,
+ordine concluso, fusione). Il giudice `sblocca_regali_livello` è un
+INSERT OR IGNORE sui gradini ATTRAVERSATI (`livelli_raggiunti`): chi
+salta due gradini con un ordine grosso sblocca due regali, e al secondo
+giro non succede niente. La rotta della richiesta chiama lo stesso
+giudice PRIMA di giudicare: chi era già «pratico» il giorno del deploy
+trova la riga nata lì, e `/api/me` nel frattempo lo mostra «sbloccato»
+senza scrivere (una lettura resta una lettura). Il testo del regalo si
+fotografa nella riga: il config può cambiare, la promessa fatta no. Il
+resto in Architettura, «I REGALI PER LIVELLO». ACCORDO col cantiere del
+carosello dei livelli (thread «Rifare la pagina dei livelli a
+carosello», stesso giorno): la logica e la chiave `regalo` nella scala le
+scrive questo cantiere; il carosello aggiunge da sé la riga «🎁 Un
+regalo: …» in `vantaggiLivello` quando il campo è su develop. Qui il
+blocco «I tuoi regali» sta SOTTO la scala, in `regaliBlocco`, per non
+toccare `renderLivello` che l'altro cantiere sta riscrivendo.
+
+PROVATO. `prove_vantaggi_livelli` (+3: il regalo di ogni gradino, la
+leva spenta, il config storto) e `prove_regali_livello` (28): leva accesa
+nel codice e in config_esempio, i giudici puri in esecuzione
+(`livelli_raggiunti` con le due chiavi, `regalo_del_livello` pulito e
+con una lista per sbaglio), le sentinelle (INSERT OR IGNORE, fantasma,
+tabella, gancio dopo il commit, avviso dopo il commit, mai `UPDATE
+utenti SET xp`, /api/me, i codici 400/403/409 della richiesta, l'avviso
+admin senza recapito, i 403 delle porte admin, la leva nel pannello,
+client e pannello) e il banco node del blocco (solo
+sbloccato/richiesto/spedito, un campo e un bottone, testo scappato).
+Controprove: senza il gancio una rossa; senza la chiave nella scala il
+banco salta (KeyError). `collaudo_regali_livello` (38) sul server vero
+nel venv senza coincurve: il gancio (due righe, due avvisi, idempotente,
+nuovo e «solo xp» a mani vuote, fantasma), /api/me (scala e stati), la
+richiesta (400 corto, 404 gradino senza regalo, 403 non raggiunto, ok
+col recapito ripulito, l'avviso admin senza via, 409 la seconda volta,
+tetto a 500), il giorno del deploy (nessuna riga, /api/me lo vede,
+la richiesta scrive entrambe), il pannello (403, coda dal più vecchio
+col recapito, «spedito» una volta con l'avviso alla persona, 404, lo
+spedito in fondo), la leva spenta (niente sblocchi, scala muta, 404,
+le righe di prima restano). Controprova: la guardia del 409 tolta,
+una rossa. Suite severa intera e collaudi della CI: vedi il verbale del
+push.
+
+DA GUARDARE. Dal vivo sul collaudo: con l'account 222 (venditore)
+concludere un ordine fino a «Bottega avviata» e leggere il messaggio del
+bot, poi il campo nel Profilo e la riga nel pannello admin. Da Andrea,
+fuori dal codice: l'account sul sito di stampa (Printful o Gelato), il
+logo in alta risoluzione, il costo dei quattro pezzi; se vuole venderli
+anche, quattro annunci normali dall'account ufficiale. Non c'è ancora il
+recapito precompilato dall'ultimo ordine (si riscrive a mano) né un
+tetto ai regali al giorno: con quattro gradini e la soglia degli affari
+non serve, ma se i regali diventassero dieci andrebbe guardato.

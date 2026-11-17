@@ -36737,6 +36737,13 @@ def _censimento(acceso, dopo=None):
     amb["tetto_sats_prova"] = lambda: 10_000 if acceso else 0
     # il tetto dell'altra rete in euro (12 nov 2026): una FUNZIONE anche lui
     amb["p2p_altra_rete_tetto"] = lambda: 775_170 if acceso else 0
+    # i regali per livello (17 nov 2026): la scala VERA e il giudice
+    # `regalo_del_livello`, che e' una funzione (7 non si chiama); i
+    # regali sono un dizionario, e a leve spente e' vuoto
+    amb["LIVELLI"] = _livelli_dal_sorgente()
+    exec(pezzo("regalo_del_livello"), amb)
+    amb["REGALI_LIVELLO"] = ({"avviato": "👜 la borsa", "maestro": "📓 il quaderno"}
+                             if acceso else {})
     amb["_fmt_sats"] = str
     amb["NIP05_NOMI"] = {"usdb": "a" * 64} if acceso else {}
     # IL SEGRETO DEL PROFILO E' UN DIZIONARIO, non una stringa: il
@@ -36756,7 +36763,7 @@ def _censimento(acceso, dopo=None):
                  "SCONTO_PACCO_ATTIVO", "CODICI_SCONTO_ATTIVI",
                  "CODICI_SCONTO_TENTATIVI_ORA", "FERIE_ATTIVE", "BANNER_TEST",
                  "BANNER_TEST_LINK", "CONTATORE_UTENTI", "POST_AUTOMATICI",
-                 "IMPORT_NOSTR_APERTO", "RICATEGORIZZA_AUTO",
+                 "IMPORT_NOSTR_APERTO", "RICATEGORIZZA_AUTO", "REGALI_LIVELLO_ATTIVI",
                  "MODERAZIONE_REVISIONE", "AVVISI_ISCRITTI",
                  "AVVISI_ORDINI_ADMIN", "TERMOMETRO_SOTTOCATEGORIE",
                  "CONTROLLO_LIBRO_MASTRO", "ORE_INITDATA",
@@ -128624,6 +128631,7 @@ def prove_vantaggi_livelli():
     exec(_SORGENTE[i:_SORGENTE.index("\n\n\nNOMI_TITOLI", i)], amb)
     exec(pezzo("_gradino_livello"), amb)
     exec(pezzo("scala_livelli"), amb)
+    exec(pezzo("regalo_del_livello"), amb)   # il sesto vantaggio (17 nov 2026)
 
     def leve(**k):
         amb.update(dict(BANNER_NEGOZIO_ATTIVO=True, BANNER_PREZZO_SATS=20000,
@@ -128633,7 +128641,12 @@ def prove_vantaggi_livelli():
                         SLUG_NEGOZIO_LIVELLO="avviato",
                         SLUG_NEGOZIO_PREZZO_SATS=5000, P2P_ATTIVO=True,
                         P2P_SCONTO_FEDELTA_PERCENTO=0.5,
-                        P2P_SCONTO_LIVELLO=5))
+                        P2P_SCONTO_LIVELLO=5,
+                        REGALI_LIVELLO_ATTIVI=True,
+                        REGALI_LIVELLO={"avviato": "👜 la borsa",
+                                        "pratico": "☕ la tazza",
+                                        "esperto": "👕 la maglietta",
+                                        "maestro": "📓 il quaderno"}))
         amb.update(k)
         return amb["scala_livelli"]()
 
@@ -128659,6 +128672,14 @@ def prove_vantaggi_livelli():
            [x["p2p_sconto"] for x in leve(P2P_SCONTO_FEDELTA_PERCENTO=0)]))
     prova("uno sconto del banner scritto storto non passa il 99", 99,
           leve(BANNER_SCONTI_LIVELLO={"maestro": 150})[4]["banner_sconto"])
+    # IL REGALO DEL GRADINO (17 nov 2026): la stessa regola della scala
+    prova("il regalo di ogni gradino, e il primo non ne ha",
+          ["", "👜 la borsa", "☕ la tazza", "👕 la maglietta", "📓 il quaderno"],
+          [x["regalo"] for x in leve()])
+    prova("regali spenti: la scala non promette niente", [""] * 5,
+          [x["regalo"] for x in leve(REGALI_LIVELLO_ATTIVI=False)])
+    prova("un regalo scritto storto (non testo) non esce", "",
+          leve(REGALI_LIVELLO={"maestro": 42})[4]["regalo"])
     me = pezzo("mio_profilo")
     prova("/api/me porta la scala", True,
           'profilo["livelli_scala"] = scala_livelli()' in me)
@@ -128706,6 +128727,136 @@ console.log(JSON.stringify({
           ("da subito: il punto di partenza" in o["html"],
            o["html"].count("sei qui")))
     prova("una scala che non c'e' non disegna niente", "", o["vuota"])
+
+
+def prove_regali_livello():
+    """I REGALI PER LIVELLO (17 nov 2026, il merch «Un tempo per te»,
+    decisione di Andrea: stampa su richiesta e regalo a chi sale di
+    gradino, non una campagna di preordini). Qui i GIUDICI PURI girano
+    davvero e il resto sono sentinelle: il giro col database vero sta
+    in `collaudo_regali_livello.py`."""
+    print("\n[i regali per livello]")
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    # 1. la leva: accesa di serie (regola del 14 nov 2026) e gemella
+    prova("leva accesa di serie nel codice e nel config d'esempio", (True, True),
+          ("    REGALI_LIVELLO_ATTIVI = True" in _SORGENTE,
+           "\nREGALI_LIVELLO_ATTIVI = True" in cfg))
+    prova("i quattro regali nel config d'esempio, «nuovo» escluso", True,
+          all(f'"{l}":' in cfg.split("REGALI_LIVELLO = {", 1)[1][:400]
+              for l in ("avviato", "pratico", "esperto", "maestro"))
+          and '"nuovo":' not in cfg.split("REGALI_LIVELLO = {", 1)[1][:400])
+    # 2. i giudici puri
+    amb = {"LIVELLI": _livelli_dal_sorgente()}
+    exec(pezzo("livello_utente"), amb)
+    exec(pezzo("livelli_raggiunti"), amb)
+    exec(pezzo("regalo_del_livello"), amb)
+    amb.update(REGALI_LIVELLO_ATTIVI=True,
+               REGALI_LIVELLO={"avviato": " 👜 la borsa ", "maestro": "📓"})
+    prova("chi e' pratico ha attraversato nuovo e avviato",
+          ["nuovo", "avviato", "pratico"], amb["livelli_raggiunti"](5000, 9))
+    prova("chi e' nuovo ha solo il suo gradino", ["nuovo"],
+          amb["livelli_raggiunti"](0, 0))
+    prova("una vendita grossa da sola non fa salire (due chiavi)",
+          ["nuovo"], amb["livelli_raggiunti"](5000, 0))
+    prova("il regalo si legge pulito, e un gradino senza resta vuoto",
+          ("👜 la borsa", "", "📓"),
+          (amb["regalo_del_livello"]("avviato"),
+           amb["regalo_del_livello"]("pratico"),
+           amb["regalo_del_livello"]("maestro")))
+    amb["REGALI_LIVELLO"] = ["una lista per sbaglio"]
+    prova("un config storto (lista) non esplode: nessun regalo", "",
+          amb["regalo_del_livello"]("avviato"))
+    # 3. lo sblocco: idempotente, a leva spenta non scrive, fantasma escluso
+    sb = pezzo("sblocca_regali_livello")
+    prova("lo sblocco e' INSERT OR IGNORE (mai doppioni), come i distintivi",
+          True, "INSERT OR IGNORE INTO regali_livello" in sb)
+    prova("...a leva spenta non scrive, e un account cancellato non riceve",
+          True, "if not REGALI_LIVELLO_ATTIVI or 2 ** 52 <= int(tg_id or 0) < 2 ** 53:"
+          in sb and "return []" in sb)
+    prova("la tabella nasce con init_db, una riga per persona e gradino",
+          True, "CREATE TABLE IF NOT EXISTS regali_livello(" in _SORGENTE
+          and "UNIQUE(tg_id, livello)" in _SORGENTE)
+    # 4. il gancio: lo stesso di premia_distintivi, e MAI dentro la transazione
+    pd = pezzo("premia_distintivi")
+    prova("il gancio dei regali viaggia su premia_distintivi, dopo il commit",
+          True, "await premia_regali_livello(tg_id)" in pd
+          and pd.index("con.commit()") < pd.index("await premia_regali_livello"))
+    pr = pezzo("premia_regali_livello")
+    prova("...e avvisa DOPO il commit, fail-open, senza chiedere il recapito in chat",
+          True, pr.index("con.commit()") < pr.index("await notifica(")
+          and "except Exception" in pr and "Livello e titolo" in pr)
+    prova("gli XP non si toccano: il cantiere non scrive mai utenti.xp", True,
+          "UPDATE utenti SET xp" not in sb + pr + pezzo("regali_livello_di")
+          + pezzo("richiedi_regalo_livello"))
+    # 5. le rotte e /api/me
+    rr = pezzo("richiedi_regalo_livello")
+    prova("/api/me porta i regali con lo stato di chi legge", True,
+          'profilo["regali_livello"] = regali_livello_di(' in pezzo("mio_profilo"))
+    prova("la richiesta: sblocca prima, poi 403 non raggiunto, 409 gia' chiesto, "
+          "recapito corto 400", True,
+          rr.index("sblocca_regali_livello(con, user[\"id\"])") < rr.index("HTTPException(403")
+          and "HTTPException(409" in rr and "len(recapito) < 10" in rr
+          and "recapito[:RECAPITO_REGALO_MAX]" in rr)
+    prova("...e l'avviso ai moderatori NON porta il recapito", True,
+          "notifica_admin(" in rr and "{recapito" not in rr.split("notifica_admin(", 1)[1].split("argomento=", 1)[0])
+    prova("le due porte admin chiudono col 403 prima di tutto", True,
+          all('raise HTTPException(403, "Riservato ai moderatori")' in pezzo(f)
+              for f in ("lista_regali_admin", "regalo_spedito_admin")))
+    prova("«spedito» una volta sola (409), e la persona lo sa", True,
+          "HTTPException(409" in pezzo("regalo_spedito_admin")
+          and "await notifica(r[\"tg_id\"]" in pezzo("regalo_spedito_admin"))
+    prova("la leva sta nel pannello «Stato delle leve»", True,
+          '_leva("Regali per livello", "REGALI_LIVELLO_ATTIVI",' in _SORGENTE)
+    # 6. il client: il blocco nel cassetto del livello, e il pannello admin
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il cassetto «Livello e titolo» ha il blocco dei regali e lo disegna",
+          True, '<div id="regaliBlocco"></div>' in mini
+          and "  renderLivello();\n  renderRegali();\n" in mini
+          and "myRegali = Array.isArray(me.regali_livello)" in mini)
+    prova("il client chiede alla rotta giusta, col recapito", True,
+          "/me/regali/${encodeURIComponent(livello)}/richiedi" in mini
+          and "JSON.stringify({recapito})" in mini)
+    adm = open("admin.html", encoding="utf-8").read()
+    prova("il pannello admin legge i regali e segna «spedito»", True,
+          "fetch('/api/admin/regali'" in adm and "/spedito'" in adm
+          and 'id="regaliBox"' in adm)
+    # 7. il banco del client: solo sbloccato/richiesto/spedito escono
+    import shutil as _sh
+    node = _sh.which("node")
+    if not node:
+        salta("il blocco dei regali gira", "node non installato")
+        return
+    import json as _js, subprocess as _sp, tempfile as _tfm
+    banco = "\n".join([
+        pezzo_js(mini, "const esc = s =>", "));") + "));",
+        pezzo_js(mini, "function regaliDaMostrare(lista){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function regaloHTML(r){", "\n}\n") + "\n}"]) + """
+const lista = [
+  {livello: "avviato", regalo: "👜 la borsa <b>", stato: "spedito"},
+  {livello: "pratico", regalo: "☕ la tazza", stato: "richiesto"},
+  {livello: "esperto", regalo: "👕 la maglietta", stato: "sbloccato"},
+  {livello: "maestro", regalo: "📓 il quaderno", stato: "da_sbloccare"},
+  null, {stato: "boh"}];
+const da = regaliDaMostrare(lista);
+console.log(JSON.stringify({
+  quanti: da.length, stati: da.map(r => r.stato),
+  html: da.map(regaloHTML).join(""), vuota: regaliDaMostrare(undefined).length}));
+"""
+    cart = _tfm.mkdtemp(prefix="regali_")
+    pf = os.path.join(cart, "regali.js")
+    open(pf, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, pf], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco dei regali gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    o = _js.loads(r.stdout)
+    prova("escono solo sbloccato, richiesto e spedito, nell'ordine della scala",
+          (3, ["spedito", "richiesto", "sbloccato"], 0),
+          (o["quanti"], o["stati"], o["vuota"]))
+    prova("il campo del recapito e il bottone solo per lo sbloccato", (1, 1),
+          (o["html"].count("<textarea"), o["html"].count("chiediRegalo(")))
+    prova("il testo del regalo e' scappato", True,
+          "&lt;b&gt;" in o["html"] and "la borsa <b>" not in o["html"])
 
 
 def prove_livello_accanto_al_titolo():
@@ -180062,8 +180213,11 @@ def prove_canale_admin():
           # (14 nov 2026, audit-tornata-tutto) due nella moderazione: il
           # recapito P2P on-chain cambiato dopo il deposito e l'acquisto
           # on-chain pagato oltre un'ora dopo la scadenza del prezzo
+          # (17 nov 2026, regali-livello) il regalo da spedire, chiesto
+          # col recapito dal Profilo: nei riepiloghi, e' un fatto da
+          # fare e non un errore (il recapito resta nel pannello)
           {"assistenza": 1, "dispute": 6, "dm": 1, "errori": 35,
-           "liquidita": 5, "moderazione": 20, "riepiloghi": 27}, per_stanza)
+           "liquidita": 5, "moderazione": 20, "riepiloghi": 28}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -180114,7 +180268,7 @@ def prove_canale_admin():
           "14 nov sera il pagamento uscito verso l'altra parte, la fattura "
           "con due hash e la chiave on-chain cambiata; e il recapito P2P "
           "on-chain cambiato dopo il deposito e l'acquisto on-chain pagato "
-          "tardi)", 104,
+          "tardi; dal 17 nov il regalo per livello da spedire)", 105,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -203826,7 +203980,7 @@ CATEGORIE = {
     dettaglio_ordine card_ordini righe_ordine niente_ai_nella_ricerca
     tracking_corretto tracking_venditore tracking_facoltativo
     posta_senza_traccia spedisci_entro
-    vantaggi_livelli cruscotto_admin cruscotto_semplice buoni_cumulabili
+    vantaggi_livelli regali_livello cruscotto_admin cruscotto_semplice buoni_cumulabili
     barattolo savers_proprietario visualizzazioni barattolo_in_striscia
     interesse barattolo_filtra barattolo_condiviso notifica_fail_open
     messaggio_admin avviso_contatto forma_tracking bip353 conta_feedback
@@ -204324,7 +204478,8 @@ def main():
               prove_tracking_corretto, prove_tracking_venditore,
               prove_tracking_facoltativo, prove_posta_senza_traccia,
               prove_spedisci_entro,
-              prove_vantaggi_livelli, prove_cruscotto_admin,
+              prove_vantaggi_livelli, prove_regali_livello,
+              prove_cruscotto_admin,
               prove_statistiche_p2p, prove_dispute_cruscotto_p2p,
               prove_cruscotto_semplice,
               prove_buoni_cumulabili,

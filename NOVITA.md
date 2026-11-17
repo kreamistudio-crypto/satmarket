@@ -410,3 +410,9 @@ frase: Quando devi spedire un ordine e non hai ancora l'etichetta, nel riquadro 
 dove: l'ordine venduto, riquadro «Spedisci e inserisci il tracciamento», sotto il campo del codice.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-17 · regali-livello
+frase: Salire di livello adesso regala qualcosa di vero: alla «Bottega avviata» la borsa di tela «Un tempo per te», al «Mercante pratico» la tazza, all'«esperto» la maglietta, al «Maestro del banco» il quaderno. Quando sblocchi un regalo il bot te lo dice: apri il Profilo, scrivi dove mandarlo (un locker o il tuo indirizzo) e te lo spediamo noi. Ogni regalo una volta sola, e i punti non cambiano.
+dove: il messaggio del bot «🎁 Hai sbloccato un regalo»; Profilo → «🎖 Livello e titolo» → «I tuoi regali» (il campo del recapito e «Mandamelo 🎁»); i regali di ogni gradino nella scala dei vantaggi.
+leva: REGALI_LIVELLO_ATTIVI (accesa di serie)
+pubblico: sì

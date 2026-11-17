@@ -11294,6 +11294,35 @@
   `scalaLivelliHTML`, nel cassetto «Livello e titolo»). Un vantaggio
   nuovo legato al livello si aggiunge LÌ, o la scala dice meno del
   vero.
+  I REGALI PER LIVELLO (17 nov 2026, il merch «Un tempo per te»; il
+  perché in Cantieri, «I regali per livello»): il sesto vantaggio della
+  scala, chiave `regalo` di ogni gradino (`regalo_del_livello`: il
+  testo di `REGALI_LIVELLO`, '' a leva `REGALI_LIVELLO_ATTIVI` spenta,
+  se il gradino non ne ha o se il config è storto; «nuovo» non ne ha).
+  Tabella `regali_livello` (UNIQUE tg_id+livello, come `badge_utente`):
+  stato sbloccato → richiesto → spedito, col `recapito` scritto da chi
+  riceve. IL GIUDICE è `sblocca_regali_livello` (INSERT OR IGNORE sui
+  gradini attraversati, `livelli_raggiunti`: la scala si attraversa
+  tutta, un ordine grosso che salta due gradini sblocca due regali;
+  fantasma escluso), chiamato dal gancio `premia_regali_livello` IN
+  CODA a `premia_distintivi` — ogni posto che muove gli XP passa già di
+  lì — e dalla rotta della richiesta PRIMA di giudicare, così chi era
+  già «pratico» il giorno del deploy trova la riga nata lì. NON MUOVE
+  GLI XP. `/api/me` porta `regali_livello` (`regali_livello_di`, una
+  LETTURA: chi ha il gradino senza riga esce «sbloccato» lo stesso;
+  lista vuota a leva spenta, e il cassetto tace) su una connessione
+  sua, fail-open. Rotte: `POST /api/me/regali/{livello}/richiedi`
+  (recapito 10..`RECAPITO_REGALO_MAX`=500, 404 leva o gradino senza
+  regalo, 403 non raggiunto, 409 già chiesto; avviso ai moderatori con
+  COSA e A CHI, MAI il recapito), `GET /api/admin/regali` (l'unico
+  posto dove il recapito esce: richiesti prima, dal più vecchio, poi
+  spediti), `POST /api/admin/regali/{id}/spedito` (409 se non era
+  «richiesto»; avvisa chi riceve). Client: `renderRegali` nel blocco
+  `regaliBlocco` del cassetto (solo sbloccato/richiesto/spedito, il
+  campo del recapito e «Mandamelo» sullo sbloccato); pannello admin
+  «🎁 Regali per livello» (admin.html, `caricaRegali`, letto
+  all'apertura). La spedizione è un gesto A MANO di Andrea dal sito di
+  stampa: Barattolo non compra e non spedisce niente.
   I CODICI INVITO (set 2026; il perché in Cantieri, «I codici invito
   con gli XP»). Ognuno ha UN codice — sei caratteri da
   `INVITO_ALFABETO`, niente 0/O/1/I/L e niente vocali — nato la prima
