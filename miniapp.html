@@ -94626,6 +94626,14 @@ async function inviaAnnulloP2P(modo){
   if (provvisorioP2P(id)) { toast('Aspetta: la risposta non è ancora arrivata'); return; }
   const gesto = ANNULLI_P2P[modo] ? modo : 'chiedi';
   const voce = ANNULLI_P2P[gesto];
+  /* L'ANNULLO CHIESTO SI DICHIARA AL SERVER (17 nov 2026, cantiere
+     annullo-registrato; Andrea: «tu in effetti hai richiesto
+     l'annullamento»). Il `cancel` e' un messaggio al coordinatore: se non
+     arriva, il server non ne sa niente e alla scadenza contava uno
+     scambio non completato a chi si stava ritirando. Detto PRIMA di
+     mandarlo, come gli altri tentativi; il ritiro di un ordine mai preso
+     e l'accettare l'annullo dell'altro non c'entrano. */
+  if (gesto === 'chiedi' && typeof segnaTentativoP2P === 'function') segnaTentativoP2P(id, 'annullo_chiesto');
   const detto = () => ((ordiniP2P()[id] || {}).stato === 'annullato' ? voce.chiuso : voce.fatto);
   /* il velo e' globale e il gesto arriva dal foglio della conferma,
      che il bottone se l'e' portato via: si passa null e a parlare e'
