@@ -90260,3 +90260,46 @@ mio. Dopo il rebase su 71e546c5 (non miei: 78e4fe2c, 411b15c5, 0e02b7d8
 di onchain-grossi-uscita e 71e546c5 della stradina, nessuno tocca
 `onchainCofirma`) rigirati `prove_ordine_onchain`, le sezioni che
 leggono i documenti e gli 11 collaudi on-chain.
+
+## Gli acquisti fuori dal Profilo (17 nov 2026 sera, cantiere totali-tolti; Andrea: «il fatto che nel profilo si veda quanto hai comprato, quanto hai venduto, secondo me è un problema per la privacy»)
+
+Chi vedeva i totali, guardato prima di toccare: il cassetto «📊 I numeri
+del negozio» (vendite dal 24 set, in produzione; acquisti da stamattina,
+6de747a6, solo su develop) li riceveva SOLO dal proprietario
+(`/api/me/negozio/numeri`, identità dal login) e dai moderatori
+(`/api/admin/negozio/{codice}/numeri`, anche gli acquisti di chiunque).
+Il profilo pubblico dà «N vendite concluse» senza sats e cancella
+`acquisti_ok`; il bot non manda totali. Il rischio vero era il telefono:
+uno sguardo da dietro o uno screenshot.
+
+La strada, in tre giri con Andrea: sulla card (cifre coperte con un
+tocco, solo i sats via, tutto via) ha scelto «Togliere tutto»; poi,
+saputo che le vendite c'erano da settembre e gli acquisti erano di
+stamattina: «le vendite lasciale, rimetti come era prima. Gli acquisti
+non li aggiungere», e i contatori sotto «non li toccare», perché servono
+a livello e distintivi. Nasce `ACQUISTI_NEL_PROFILO`, SPENTA di serie
+(eccezione decisa da lui alla regola delle leve accese, come la Rotta).
+Spenta: le due porte tolgono `_CHIAVI_ACQUISTI`, chi ha solo comprato
+non ha il cassetto, il client (che salta gli acquisti senza
+`acquisti_tot`) non cambia di una riga. Il Profilo torna com'era prima
+di stamattina; il pannello pure. La riga nel pannello delle leve, gruppo
+«🛍️ Acquisti nel Profilo». La voce NOVITA `totali-acquisti` passa a
+`pubblico: no`; il sapere di Tappo dice che gli acquisti si leggono uno
+per uno in «Ordini».
+
+Scartate: le cifre coperte e il «togliere tutto» (preparati e buttati ai
+due cambi di idea); cancellare il codice degli acquisti (la leva costa
+meno, e una riga del config li rimette se un giorno li si vuole).
+Non toccata, da guardare se si accende: la Rotta per la Luna (spenta)
+legge `sats_acq_tot` dal giudice per chi bussa — i sats spesi sul
+tabellone sono la stessa domanda di privacy.
+
+Provato: in `prove_numeri_negozio` la leva spenta nel codice e
+nell'esempio, le chiavi tolte da tutte e due le porte, il cassetto
+chiuso a chi ha solo comprato, nessun UPDATE nelle porte, il pannello,
+e nel banco node la tabella senza acquisti con le vendite di prima;
+controprova (leva accesa di serie, porta dei moderatori che non toglie)
+due rosse in prove e una nel collaudo. `collaudo_numeri_negozio` gira il
+giro di prima a leva accesa e poi `giro_acquisti_spenti` a leva spenta
+sul server vero, col contatore `acquisti_ok` intatto.
+

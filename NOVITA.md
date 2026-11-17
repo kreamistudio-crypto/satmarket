@@ -384,8 +384,8 @@ pubblico: sì
 ## 2026-11-17 · totali-acquisti
 frase: Nel Profilo ora vedi anche quanto hai comprato: negli ultimi 30 giorni e da sempre, quanti acquisti e quanti sats hai pagato in tutto, spedizione compresa. Se non hai annunci il cassetto si chiama «I tuoi acquisti».
 dove: Profilo → «Negozio e spedizioni» → «📊 Il tuo negozio» (o «📊 I tuoi acquisti»), sezione «🛍️ Acquisti conclusi».
-leva: nessuna
-pubblico: sì
+leva: ACQUISTI_NEL_PROFILO spenta di serie (17 nov sera, privacy: Andrea «gli acquisti non li aggiungere»)
+pubblico: no
 
 ## 2026-11-17 · etichetta-alimenti
 frase: Chi vende alimenti e bevande può aggiungere all'annuncio l'etichetta: peso netto, ingredienti, allergeni e tabella dei valori nutrizionali, come sulla confezione. Chi compra la legge nella pagina dell'annuncio prima di comprare, uguale per tutti, con gli allergeni in grassetto. È facoltativa, ma la legge europea la chiede per gli alimenti venduti online.

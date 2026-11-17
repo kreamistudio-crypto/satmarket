@@ -54128,6 +54128,32 @@ def prove_numeri_negozio():
     prova("...il «da sempre» degli acquisti e' acquisti_ok", True,
           '"acquisti_tot": int(v["acquisti_ok"] or 0)' in _pr)
 
+    # ---- 4c. 🛍️ gli acquisti fuori dal Profilo (17 nov 2026 sera) ----
+    import ast as _ast
+    prova("la leva ACQUISTI_NEL_PROFILO nasce SPENTA nel codice e "
+          "nell'esempio", True, "    ACQUISTI_NEL_PROFILO = False\n" in src
+          and "\nACQUISTI_NEL_PROFILO = False\n" in open(
+              "config_esempio.py", encoding="utf-8").read())
+    _acq = _ast.literal_eval(re.search(
+        r"_CHIAVI_ACQUISTI = (\([^)]*\))", src).group(1))
+    prova("le chiavi tolte sono tutte e quattro quelle degli acquisti del "
+          "giudice, e nessuna delle vendite",
+          sorted(k for k in d if "acq" in k), sorted(_acq))
+    for _porta in ("miei_numeri_negozio", "numeri_negozio_admin"):
+        _cp = codice(pezzo(_porta))
+        prova(f"{_porta}: a leva spenta toglie gli acquisti", True,
+              "if not ACQUISTI_NEL_PROFILO:" in _cp
+              and "for k in _CHIAVI_ACQUISTI:" in _cp)
+    prova("...e chi ha solo comprato, a leva spenta, non ha il cassetto",
+          True, "if not ha and (not ACQUISTI_NEL_PROFILO" in codice(
+              pezzo("miei_numeri_negozio")))
+    prova("i contatori non si toccano: nessuna porta scrive acquisti_ok",
+          False, "UPDATE" in codice(pezzo("miei_numeri_negozio"))
+          + codice(pezzo("numeri_negozio_admin")))
+    prova("la leva sta nel pannello delle leve", True,
+          '"ACQUISTI_NEL_PROFILO", ACQUISTI_NEL_PROFILO,' in src
+          and '"gruppo": "🛍️ Acquisti nel Profilo"' in src)
+
     # ---- 5. lo spazio in vetrina: solo acceso, solo il suo -----------
     prova("spento, lo spazio non esce", [], d["sponsor"])
     accesi.update({"to-the-moon": ora + 86400})
@@ -54173,9 +54199,11 @@ def prove_numeri_negozio():
           0 <= _ad.find("re.fullmatch(") < _ad.find("con.execute("))
     prova("le due porte passano dallo stesso giudice", (True, True),
           ("numeri_negozio(con, v)" in _me, "numeri_negozio(con, v)" in _ad))
-    prova("chi ha solo comprato entra, e la porta dice che non vende",
-          True, 'if not ha and not (v and (v["acquisti_ok"] or 0) > 0):'
-          in _me and "venditore=bool(ha)" in _me)
+    # dal 17 nov 2026 sera entra solo con ACQUISTI_NEL_PROFILO accesa
+    prova("chi ha solo comprato entra (con ACQUISTI_NEL_PROFILO), e la "
+          "porta dice che non vende", True,
+          'or not (v and (v["acquisti_ok"] or 0) > 0)):' in _me
+          and "venditore=bool(ha)" in _me)
     prova("...il moderatore guarda sempre un negozio intero", True,
           "venditore=True" in _ad)
     prova("i campi letti portano acquisti_ok", True,
@@ -54302,6 +54330,12 @@ const pieno = {mostra: true, negozio: 'ab12cd34', visite_7: 12,
   out.due = tabellaNumeriNegozio(Object.assign({}, pieno, {sponsor:
     [{slug: 'to-the-moon', fino: 1792000000, aperture_30: 7},
      {slug: '<b>x', fino: 1792000000, aperture_30: 1}]}), false);
+  /* 🛍️ a leva spenta (17 nov 2026 sera) la porta non manda gli
+     acquisti: la tabella e' quella di prima, vendite comprese */
+  const senzaAcq = Object.assign({}, pieno);
+  for (const k of ['acquisti_30', 'sats_acq_30', 'acquisti_tot',
+                   'sats_acq_tot']) delete senzaAcq[k];
+  out.senzaAcq = tabellaNumeriNegozio(senzaAcq, false);
   chiesti.length = 0;
   await apriNegozio('ab12cd34');
   await caricaAltriNegozio();
@@ -54386,6 +54420,11 @@ const pieno = {mostra: true, negozio: 'ab12cd34', visite_7: 12,
     prova("...con due spazi ognuno ha il suo nome, passato da esc()", True,
           "· To The Mooon!" in o["due"] and "&lt;b&gt;x" in o["due"]
           and "<b>x" not in o["due"])
+    prova("🛍️ senza acquisti dal server: niente sezione acquisti, le "
+          "vendite come prima", (False, True), (
+              "Acquisti" in o["senzaAcq"],
+              "<span>Da sempre</span><b>14 · 150\u202f000 sats</b>"
+              in o["senzaAcq"]))
     prova("aprire il negozio conta una visita; la pagina dopo, il "
           "ridisegno e l'anteprima no",
           ["/api/negozio/ab12cd34?limit=12&vista=1",

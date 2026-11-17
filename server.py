@@ -31985,6 +31985,18 @@ def numeri_negozio(con, v, adesso: int | None = None) -> dict:
 _CAMPI_NUMERI = ("SELECT tg_id, negozio, nome, vendite_ok, acquisti_ok, "
                  "rating, n_feedback, n_recensori FROM utenti ")
 
+# GLI ACQUISTI RESTANO FUORI DAL PROFILO (17 nov 2026 sera, Andrea: «il
+# fatto che nel profilo si veda quanto hai comprato, quanto hai venduto,
+# secondo me e' un problema per la privacy», e poi: «le vendite
+# lasciale, rimetti come era prima. Gli acquisti non li aggiungere»).
+# Con la leva ACQUISTI_NEL_PROFILO spenta (di serie, scelta di Andrea)
+# le due porte non mandano piu' i totali degli acquisti, e chi ha solo
+# comprato non ha il cassetto: tutto com'era prima del 17 nov. Le
+# vendite restano come dal 24 set. I contatori `vendite_ok` e
+# `acquisti_ok` NON si toccano: servono a livello e distintivi.
+_CHIAVI_ACQUISTI = ("acquisti_30", "sats_acq_30", "acquisti_tot",
+                    "sats_acq_tot")
+
 
 @app.get("/api/me/negozio/numeri")
 def miei_numeri_negozio(x_tg_init_data: str = Header(""),
@@ -32011,10 +32023,15 @@ def miei_numeri_negozio(x_tg_init_data: str = Header(""),
         ha = v and con.execute(
             "SELECT 1 FROM annunci WHERE venditore_id=? LIMIT 1",
             (user["id"],)).fetchone()
-        if not ha and not (v and (v["acquisti_ok"] or 0) > 0):
+        # chi ha solo comprato entra solo con gli acquisti nel Profilo
+        if not ha and (not ACQUISTI_NEL_PROFILO
+                       or not (v and (v["acquisti_ok"] or 0) > 0)):
             return {"mostra": False}
-        return dict(numeri_negozio(con, v), mostra=True,
-                    venditore=bool(ha))
+        n = numeri_negozio(con, v)
+        if not ACQUISTI_NEL_PROFILO:
+            for k in _CHIAVI_ACQUISTI:
+                n.pop(k, None)
+        return dict(n, mostra=True, venditore=bool(ha))
     finally:
         con.close()
 
@@ -32040,9 +32057,12 @@ def numeri_negozio_admin(codice: str, x_tg_init_data: str = Header(""),
         if not v:
             raise HTTPException(404, "Negozio non trovato")
         # `venditore: True`: il moderatore guarda un NEGOZIO, e la
-        # tabella intera — anche gli acquisti, se ce ne sono
-        return dict(numeri_negozio(con, v), mostra=True, venditore=True,
-                    nome=v["nome"] or "")
+        # tabella intera — gli acquisti solo con ACQUISTI_NEL_PROFILO
+        n = numeri_negozio(con, v)
+        if not ACQUISTI_NEL_PROFILO:
+            for k in _CHIAVI_ACQUISTI:
+                n.pop(k, None)
+        return dict(n, mostra=True, venditore=True, nome=v["nome"] or "")
     finally:
         con.close()
 
@@ -37977,6 +37997,18 @@ def _leve_stato():
                   spento="niente fiamma nel Profilo e nessun giorno "
                          "contato; riaccendendola chi ha saltato dei "
                          "giorni riparte da 1, il record resta"),
+        ]},
+        {"gruppo": "🛍️ Acquisti nel Profilo", "voci": [
+            # LA PRIVACY DI CHI COMPRA (17 nov 2026 sera): spenta di
+            # serie per decisione di Andrea, nessun segreto
+            _leva("Totali degli acquisti nel Profilo",
+                  "ACQUISTI_NEL_PROFILO", ACQUISTI_NEL_PROFILO,
+                  acceso="nel cassetto 📊 del Profilo ci sono anche gli "
+                         "acquisti conclusi coi sats pagati, e chi ha "
+                         "solo comprato ha il cassetto «I tuoi acquisti»",
+                  spento="nel cassetto solo visite, vendite e recensioni, "
+                         "come prima; i moderatori non vedono gli acquisti; "
+                         "i contatori di livello e distintivi non cambiano"),
         ]},
         {"gruppo": "🚀 Rotta per la Luna", "voci": [
             # IL TABELLONE (17 nov 2026, cantiere stradina): spento di
@@ -113875,6 +113907,16 @@ try:
 except ImportError:
     STRADINA_ATTIVA = False
 STRADINA_ATTIVA = bool(STRADINA_ATTIVA)
+# LA LEVA DEGLI ACQUISTI NEL PROFILO: ACQUISTI_NEL_PROFILO (17 nov 2026
+# sera, privacy). SPENTA di serie, eccezione decisa da Andrea («gli
+# acquisti non li aggiungere»): nel cassetto 📊 restano le vendite come
+# prima, e i totali degli acquisti non escono da nessuna porta. True li
+# rimette. Il perche' accanto a `_CAMPI_NUMERI`.
+try:
+    from config import ACQUISTI_NEL_PROFILO
+except ImportError:
+    ACQUISTI_NEL_PROFILO = False
+ACQUISTI_NEL_PROFILO = bool(ACQUISTI_NEL_PROFILO)
 STRADINA_AMICI_MAX = 12      # quanti amici si mostrano, i piu' alti
 
 # LE ZONE DEL TABELLONE, dal basso (la Terra) verso l'alto (la Luna):

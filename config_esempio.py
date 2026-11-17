@@ -1225,6 +1225,11 @@ SERIE_GIORNI_ATTIVA = True
 # sats. SPENTA di serie per decisione di Andrea («anche il tabellone
 # lascialo spento per il momento»): True la accende (sul collaudo si).
 STRADINA_ATTIVA = False
+# GLI ACQUISTI NEL PROFILO 🛍️ (17 nov 2026 sera, privacy): i totali di
+# quanto hai comprato nel cassetto 📊. SPENTA di serie per decisione di
+# Andrea («gli acquisti non li aggiungere»): nel cassetto restano le
+# vendite, come prima. True li mostra; i contatori non cambiano mai.
+ACQUISTI_NEL_PROFILO = False
 # L'APP IN INGLESE 🌍 (17 nov 2026, tappa 1): chi ha Telegram (o il
 # browser) in una lingua che non e' l'italiano legge in inglese le parti
 # gia' tradotte — vetrina, scheda dell'annuncio, carrello, cassa, foglio

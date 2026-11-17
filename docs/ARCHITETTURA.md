@@ -3960,6 +3960,14 @@
   netto). La porta del venditore apre il cassetto anche a chi ha solo
   comprato e glielo dice con `venditore: false`: il client mostra i
   soli acquisti, col titolo «I tuoi acquisti».
+  GLI ACQUISTI DIETRO UNA LEVA SPENTA (17 nov 2026 sera, privacy;
+  Andrea: «le vendite lasciale, rimetti come era prima. Gli acquisti
+  non li aggiungere»): con `ACQUISTI_NEL_PROFILO` spenta, di serie, le
+  DUE porte tolgono `_CHIAVI_ACQUISTI` dalla risposta e chi ha solo
+  comprato riceve `mostra: false`; il client salta gli acquisti da solo
+  (`acquisti_tot` assente vale zero). Il giudice resta intero e i
+  contatori `vendite_ok`/`acquisti_ok` (livello, distintivi) non si
+  toccano: si chiude la PORTA, e la leva accesa rimette tutto.
   LA ROTTA DEGLI ASSET E' UNA WHITELIST DI FORMA e non un elenco
   (`FORMA_RACCONTO` + `SLUG_SPONSOR`): le foto di un racconto sono tre
   oggi e cinque domani, e un elenco a mano sarebbe l'ennesima lista da
