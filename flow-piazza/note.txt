@@ -1,0 +1,25 @@
+MAPPA GIGANTE DI BARATTOLO — disegni Google Flow (17/11/2026)
+Nano Banana 2.1 (0 crediti), 2 versioni per prompt, tenuta la migliore. Niente scritte, lettere, numeri,
+loghi, personaggi. Anteprime 1K e versioni scartate in 1k\. Riferimenti caricati in Flow come piazza-ref-*.
+
+STORIA DELLE GUIDE
+- guida-v1.png, guida.png / guida-quartieri.png: prime guide (quartieri-categoria del mercatino).
+- guida-A.png (isola a barattolo), guida-B.png (città rotonda ad anelli), guida-C.png (città sulla collina).
+  Andrea ha scelto la C, poi «è troppo piccola»: la collina C diventa il CENTRO di una terra molto più grande.
+
+GUIDA-D (guida-D.png, 2048x2048) — scelta fra 4 versioni (1k\guidaD-terra-1..4, confronto _conf_guidaD*.jpg)
+Riferimenti: piazza-ref-zona6 + piazza-ref-zona1 (stile notte calda), piazza-ref-razzo8 (razzo).
+- terra-1/2: fatte con guida-C come riferimento → troppo uguali alla C (la collina riempie tutto). Scartate.
+- terra-3 = GUIDA-D: vista larga, prospettiva leggera, strade leggibili. Al centro la collina a terrazze con la
+  piazza e la Torre dal quadrante pulito; dietro, in cima, la rampa col razzo in costruzione (impalcature) e la
+  Luna grande. Intorno: Mercato coi banchi e la cassaforte col lucchetto (in alto a sinistra), villaggio dei
+  mercanti con pacchi e locker (sinistra), caveau scavato nella roccia con la porta rotonda e le monete col
+  fulmine (destra), Studio fotografico sulla collina degli artisti (in basso a sinistra), porto col Cambiavalute
+  e le frecce verde/rossa (in basso al centro), Posta in riva al fiume con buste, cassette e struzzo viola
+  (in basso a destra). Ai margini da sbloccare: miniera coi cristalli dietro un cancello (in alto a destra) e
+  nuvole di monete col fulmine (in alto a sinistra). Fiume con ponti, lago, bosco, campi.
+- terra-4: razzo in cima a una torre (sbagliato). Scartata.
+Il 2K (terra-3_2K) è stato confrontato con l'anteprima 1K (scarto 2.5 = stessa immagine, niente fantasmi).
+
+PROSSIMO PASSO: Andrea guarda la guida-D; poi griglia di almeno 8x8 pezzi quadrati che combaciano,
+poi le sette facciate su verde e (solo se a 0 crediti) il video del decollo.
