@@ -115525,9 +115525,10 @@ GIOCO_TAPPO_EVIDENZA_POSTI = 3
 # LE MISSIONI DI TAPPO (17 nov 2026): piccoli giochi da uno a tre minuti
 # dove una cosa di Bitcoin si impara FACENDOLA (lo studio approvato da
 # Andrea: «Studio: le missioni di Tappo su Bitcoin»). Il tabellone dei
-# livelli ne mette una per zona, subito prima del gradino, e la legge da
+# livelli le mette nelle sue zone, subito prima del gradino, e le legge da
 # qui (`MISSIONI_TAPPO` e `missioni_superate`, il patto col thread della
-# stradina): `zona` e' la SUA zona, 0-4. Gli id sono per sempre.
+# stradina): `zona` e' la SUA zona, 0-7 (otto zone dal 17 nov; una zona
+# fuori di li' il tabellone la ignora). Gli id sono per sempre.
 # `bulloni` si pagano UNA volta, la prima che la si finisce. Niente XP,
 # niente sats (regole di Andrea).
 MISSIONI_TAPPO = (
@@ -115535,11 +115536,11 @@ MISSIONI_TAPPO = (
          bulloni=15, cosa="Bitcoin è un registro che tengono in tanti"),
     dict(id="lucchetto", emoji="🔒", nome="Il barattolo col lucchetto",
          zona=1, bulloni=20, cosa="Il deposito di garanzia"),
-    dict(id="staffetta", emoji="⚡", nome="La staffetta del fulmine", zona=2,
+    dict(id="staffetta", emoji="⚡", nome="La staffetta del fulmine", zona=3,
          bulloni=25, cosa="Lightning: canali e strade"),
-    dict(id="parole", emoji="🗝️", nome="Le dodici parole", zona=3,
+    dict(id="parole", emoji="🗝️", nome="Le dodici parole", zona=5,
          bulloni=30, cosa="La frase di recupero e la custodia"),
-    dict(id="halving", emoji="🌕", nome="L'ultimo bullone", zona=4,
+    dict(id="halving", emoji="🌕", nome="L'ultimo bullone", zona=7,
          bulloni=40, cosa="Il dimezzamento e i 21 milioni"),
 )
 # il tempo minimo fra la partenza e la fine perche' una missione valga:

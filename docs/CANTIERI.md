@@ -87440,7 +87440,7 @@ in vetrina: uno venduto scende da solo). Andrea ha scelto «Solo dentro
 il gioco»: niente posto in Esplora, che resta della vetrina vera.
 
 LE MISSIONI (lo studio approvato, Claude Doc «Studio: le missioni di
-Tappo su Bitcoin»). Cinque al lancio, una per zona del tabellone dei
+Tappo su Bitcoin»). Cinque al lancio, nelle zone del tabellone dei
 livelli: il quaderno di tutti (registro condiviso e doppia spesa), il
 barattolo col lucchetto (deposito di garanzia), la staffetta del
 fulmine (canali e liquidità di Lightning), le dodici parole (la frase di
@@ -87461,7 +87461,8 @@ tiene le stelle migliori, e una fine vale solo dopo
 Rigiocare per le tre stelle non paga di nuovo.
 
 IL PATTO CON LA STRADINA (il tabellone dei livelli, cantiere a parte).
-Il server espone `MISSIONI_TAPPO` (id, emoji, nome, zona 0-4) e
+Il server espone `MISSIONI_TAPPO` (id, emoji, nome, zona del tabellone
+0-7: le cinque stanno su 0, 1, 3, 5 e 7, l'halving del 2028 per ultimo) e
 `missioni_superate(con, tg_id)` (fail-open al vuoto); il client
 `apriMissione(id)`, che apre un foglio a tutto schermo sul body (si
 apre anche fuori dal gioco), e a missione finita l'evento

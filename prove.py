@@ -204527,8 +204527,8 @@ console.log(JSON.stringify({
     # mondo, il passo che scivola, la telecamera, e le cinque missioni
     # giocate fino in fondo in node.
     missioni = G["MISSIONI_TAPPO"]
-    prova("cinque missioni al lancio, una per zona del tabellone (0-4), id di casa e bulloni veri",
-          (5, [0, 1, 2, 3, 4], True, True),
+    prova("cinque missioni al lancio, sulle zone 0, 1, 3, 5 e 7 degli otto del tabellone, id di casa e bulloni veri",
+          (5, [0, 1, 3, 5, 7], True, True),
           (len(missioni), sorted(x["zona"] for x in missioni),
            all(re.fullmatch(r"[a-z]{3,20}", x["id"]) for x in missioni),
            all(isinstance(x["bulloni"], int) and x["bulloni"] >= 1 for x in missioni)))
