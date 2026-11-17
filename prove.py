@@ -47202,7 +47202,7 @@ def prove_fogli_di_casa():
     # (`pubblicaOnchainDalFoglioP2P`), gemello di quello di Lightning.
     # CENTOVENTI (17 nov 2026, cantiere stradina): «Esci da Barattolo?»
     # sulla casella che porta al partner dell'educazione (`vaiTappa`).
-    prova("i gesti che passano dalla domanda unica sono centoventicinque (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoventisei (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47217,8 +47217,9 @@ def prove_fogli_di_casa():
           "Barattolo?» della stradina; «Annulli il deposito?» e «Fermi la "
           "raccolta?» delle raccolte; «Hai consegnato i contanti?» del "
           "contanti on-chain; «Brucia la cauzione» e «Metà mandata» del "
-          "moderatore sulla cauzione on-chain)",
-          125, solo_codice(mini).count("chiediConferma({"))
+          "moderatore sulla cauzione on-chain; «Chi compra non ha scelto dove "
+          "ricevere» davanti a «Ricevuti» on-chain)",
+          126, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -163345,6 +163346,109 @@ console.log(JSON.stringify([
     prova("il collaudo del giro vero sta nelle due liste della CI", (True, True),
           ("\ncollaudo_p2p_onchain\n" in open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read(),
            "\ncollaudo_p2p_onchain.py\n" in open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()))
+
+    # L'INDIRIZZO DI CHI COMPRA, DETTO A CHI LIBERA (17 nov 2026, cantiere
+    # avviso-indirizzo; un utente: «hai liberato i sats prima che abbia
+    # inserito l'indirizzo»). Il giro col server sta in collaudo_p2p_onchain
+    # (11-sexies-bis); qui la leva, la forma e il foglio del telefono.
+    prova("la leva P2P_ONCHAIN_AVVISO_INCASSO nasce ACCESA nel codice e "
+          "nell'esempio, e sta nel pannello", (True, True, True),
+          ("    P2P_ONCHAIN_AVVISO_INCASSO = True\n" in src,
+           "\nP2P_ONCHAIN_AVVISO_INCASSO = True\n" in esempio,
+           '"P2P_ONCHAIN_AVVISO_INCASSO", P2P_ONCHAIN_AVVISO_INCASSO,' in src))
+    _sol = codice(pezzo("p2p_onchain_sollecita_incasso"))
+    prova("il sollecito: solo chi ha depositato, solo a deposito fatto, il "
+          "segno scritto PRIMA dell'invio, e a leva spenta non esiste",
+          (True, True, True, True),
+          ('!= "compratore"' in _sol,
+           'o["stato"] not in ("depositato", "euro_inviati")' in _sol,
+           _sol.index("SET incasso_sollecito_il=?") < _sol.index("await _notifica_p2p_onchain("),
+           _sol.index("if not P2P_ONCHAIN_AVVISO_INCASSO:") < _sol.index("con = _p2p_onchain_db()")))
+    _conf = codice(pezzo("_p2p_onchain_avvisa_confermato"))
+    prova("l'avviso «Chi compra ha scelto dove ricevere» parte solo a "
+          "deposito fatto e con la leva accesa", (True, True),
+          ("P2P_ONCHAIN_AVVISO_INCASSO and" in _conf,
+           'o["stato"] in ("depositato", "euro_inviati")' in _conf))
+    prova("...anche quando l'indirizzo arriva dal Profilo (le due porte che "
+          "riempiono gli scambi)", 2,
+          src.count("await _p2p_onchain_avvisa_riempiti(riempiti_p2p)"))
+    import json as _jsA, os as _osA, shutil as _shA, tempfile as _tfA
+    if not _shA.which("node"):
+        salta("il foglio di «Ricevuti» senza indirizzo, in node", "node non installato")
+        return
+    _banco = r"""
+let P2P = {miei: [], fresche: [], chieste: [], toast: [], fetch: [], firme: [], risposta: {}};
+let p2pOnchainMiei = [];
+const API_BASE = '/api', haptic = () => {}, authHdr = () => 'x';
+const fmtEur = x => String(x);
+const toast = t => { P2P.toast.push(t); };
+const chiediConferma = c => { P2P.chieste.push(c); };
+const firmaOnchainP2P = (id, verso) => { P2P.firme.push(verso); };
+const euroRicevutiOnchainP2P = () => {};
+const onchainAttesa = () => () => {};
+const vistaAttivaP2P = () => '';
+const renderP2POnchain = () => {};
+async function leggiMieiOnchainP2P(){ p2pOnchainMiei = P2P.fresche; return p2pOnchainMiei; }
+async function fetch(u, o){ P2P.fetch.push([u, (o || {}).method]);
+  return {ok: true, json: async () => P2P.risposta}; }
+""" + "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function liberaOnchainP2P(btn, id){",
+        "async function incassoAttesoOnchainP2P(id){",
+        "async function sollecitaIncassoOnchainP2P(btn, id){")) + r"""
+const vuoto = {id: 7, incasso: '', incasso_ln: false, sollecito_incasso: true};
+const pieno = Object.assign({}, vuoto, {incasso: 'tb1qxyz'});
+const giro = async (prima, dopo, risposta) => {
+  P2P.chieste = []; P2P.toast = []; P2P.fetch = []; P2P.firme = [];
+  p2pOnchainMiei = [prima]; P2P.fresche = [dopo]; P2P.risposta = risposta || {};
+  await liberaOnchainP2P(null, 7);
+  await new Promise(r => setTimeout(r, 0));
+  const c = P2P.chieste[0] || {};
+  return {titolo: c.titolo || '', etichetta: c.etichetta || '', c};
+};
+(async () => {
+  const out = {};
+  let g = await giro(vuoto, vuoto, {ok: true, avvisato: true});
+  out.manca = [g.titolo, g.etichetta];
+  await g.c.poi(); await new Promise(r => setTimeout(r, 0));
+  out.mandato = [P2P.fetch[0], P2P.toast[0], P2P.firme.length];
+  g = await giro(vuoto, pieno);
+  out.arrivato = g.titolo;
+  g = await giro(Object.assign({}, vuoto, {sollecito_incasso: false}), vuoto);
+  out.spenta = [g.titolo, P2P.fetch.length];
+  g = await giro(vuoto, vuoto, {ok: true, pronto: true});
+  await g.c.poi(); await new Promise(r => setTimeout(r, 0));
+  out.pronto = P2P.toast[0];
+  g = await giro(vuoto, vuoto, {ok: true, avvisato: false, prossimo: 1794950000});
+  await g.c.poi(); await new Promise(r => setTimeout(r, 0));
+  out.presto = P2P.toast[0];
+  console.log(JSON.stringify(out));
+})();
+"""
+    with _tfA.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as _f:
+        _f.write(_banco)
+        _pf = _f.name
+    try:
+        _r = subprocess.run(["node", _pf], capture_output=True, text=True,
+                            encoding="utf-8", timeout=60)
+    finally:
+        _osA.unlink(_pf)
+    _o = _jsA.loads(_r.stdout) if _r.returncode == 0 else {}
+    prova("il banco del foglio gira", "", "" if _o else _r.stderr[-300:])
+    if not _o:
+        return
+    prova("«Ricevuti» senza l'indirizzo di chi compra (riletto dal server): "
+          "il foglio lo dice e offre «🔔 Ricordaglielo»",
+          ["⏳ Chi compra non ha scelto dove ricevere", "🔔 Ricordaglielo"], _o["manca"])
+    prova("...il bottone manda il sollecito, lo dice, e non firma niente",
+          [["/api/p2p/onchain/7/sollecita-incasso", "POST"], True, 0],
+          [_o["mandato"][0], "Telegram" in (_o["mandato"][1] or ""), _o["mandato"][2]])
+    prova("se rileggendo l'indirizzo c'e', torna il foglio di sempre",
+          "🔓 Liberi i sats?", _o["arrivato"])
+    prova("a leva spenta il foglio e' quello di prima, senza rileggere",
+          ["🔓 Liberi i sats?", 0], _o["spenta"])
+    prova("`pronto` e il sollecito gia' mandato si dicono in parole",
+          (True, True), (_o["pronto"].startswith("✅"),
+                         "Gliel'hai già ricordato: puoi rifarlo dopo le" in _o["presto"]))
 
 
 def prove_scelta_rete_mercatino():

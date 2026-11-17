@@ -1503,6 +1503,12 @@ P2P_USDT_SOLO_ADMIN = True
 # Vale solo per chi ha P2P_ONCHAIN_ATTIVO e gli USDT (P2P_USDT_ATTIVO,
 # con P2P_USDT_SOLO_ADMIN). Spento di serie; sul collaudo si accende.
 P2P_ONCHAIN_USDT_ATTIVO = False
+# L'INDIRIZZO DI CHI COMPRA, DETTO A CHI LIBERA (17 nov 2026, un utente:
+# «hai liberato i sats prima che abbia inserito l'indirizzo»). Negli
+# scambi on-chain chi ha depositato riceve un messaggio quando chi compra
+# sceglie dove ricevere, e davanti a «Ricevuti» senza quell'indirizzo ha
+# «🔔 Ricordaglielo» (un sollecito all'ora). Accesa di serie; False li toglie.
+P2P_ONCHAIN_AVVISO_INCASSO = True
 # BARATTOZON ANCHE ON-CHAIN (17 nov 2026, «si» di Andrea al piano). Chi
 # VENDE bitcoin col 2-di-3 puo' farsi pagare un PayCode Amazon al
 # tabacchino: un metodo solo, euro, PayCode che scade fra almeno 12 ore,

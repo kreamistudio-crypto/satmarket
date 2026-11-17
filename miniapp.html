@@ -75176,9 +75176,21 @@ function schedaOnchainP2P(o){
   /* (17 nov 2026, rilascio-senza-incasso) chi compra non ha ancora detto
      dove ricevere: chi vende lo legge PRIMA di premere «Ricevuti» */
   if (deposito && !o.incasso && !o.incasso_ln && !o.proposta
-      && (o.stato === 'depositato' || o.stato === 'euro_inviati'))
-    testo += '<br>⏳ Chi compra non ha ancora scelto il wallet dove ricevere i sats: '
-      + 'puoi liberarli appena lo fa (glielo ricordiamo noi nella sua pagina dello scambio).';
+      && (o.stato === 'depositato' || o.stato === 'euro_inviati')) {
+    /* (17 nov 2026, avviso-indirizzo; un utente: «il venditore prima di
+       rilasciare i sats sollecita il compratore ad indicare dove
+       inviarli») il sollecito lo manda chi vende, e quando chi compra
+       sceglie il bot glielo dice */
+    if (o.sollecito_incasso) {
+      testo += '<br>⏳ Chi compra non ha ancora scelto il wallet dove ricevere i sats: '
+        + 'puoi liberarli appena lo fa, e ti avvisiamo noi.'
+        + (Number(o.incasso_sollecito_il) > 0 ? ' Gliel\'hai ricordato (' + quando(o.incasso_sollecito_il) + ').' : '');
+      gesti += bott('ghost', `sollecitaIncassoOnchainP2P(this, ${o.id})`, '🔔 Ricordaglielo');
+    } else {
+      testo += '<br>⏳ Chi compra non ha ancora scelto il wallet dove ricevere i sats: '
+        + 'puoi liberarli appena lo fa (glielo ricordiamo noi nella sua pagina dello scambio).';
+    }
+  }
   /* la seconda firma, quando tocca a me: lo stesso bottone in ogni stato */
   if (daFirmareOnchainP2P(o) && !mod) {
     gesti = bott('orange', `cofirmaOnchainP2P(this, ${o.id})`,
@@ -76429,6 +76441,11 @@ function liberaOnchainP2P(btn, id){
   const o = p2pOnchainMiei.find(x => x.id === id);
   /* le frasi nella valuta dello scambio (2 nov 2026) */
   const pa = t => o ? paroleOc(o, t) : t;
+  /* (17 nov 2026, avviso-indirizzo) chi compra non ha ancora scelto dove
+     ricevere: prima di chiedere «Liberi i sats?» si rilegge, e se manca
+     ancora il foglio lo dice e offre «🔔 Ricordaglielo» */
+  if (o && !o.incasso && !o.incasso_ln && o.sollecito_incasso
+      && typeof incassoAttesoOnchainP2P === 'function') return incassoAttesoOnchainP2P(id);
   if (o && o.incasso_ln && !o.incasso) return chiediConferma({titolo: pa('🔓 Hai ricevuto gli euro?'),
     etichetta: 'Sì, li ho ricevuti',
     corpo: pa('Chi compra riceve in Lightning: con la tua conferma, firmata dal tuo seme, fa lo swap e i sats '
@@ -76439,6 +76456,38 @@ function liberaOnchainP2P(btn, id){
     corpo: pa('Hai VISTO gli euro sul tuo conto? Liberando, i sats partono verso chi compra e non tornano.')
       + (o && usdtOc(o) ? ' Controlla sull\'explorer che siano arrivati sulla rete giusta.' : ''),
     poi: () => firmaOnchainP2P(id, 'venditore')});
+}
+
+/* L'INDIRIZZO CHE MANCA DAVANTI A «RICEVUTI» (17 nov 2026, cantiere
+   avviso-indirizzo). Chi compra lo sceglie spesso proprio mentre chi
+   vende aspetta: lo scambio si rilegge, e se c'e' si torna al foglio di
+   sempre; se no il foglio dice cosa manca e il bottone glielo ricorda. */
+async function incassoAttesoOnchainP2P(id){
+  const o = (await leggiMieiOnchainP2P()).find(x => x.id === id);
+  if (!o) return;
+  if (o.incasso || o.incasso_ln || !o.sollecito_incasso) return liberaOnchainP2P(null, id);
+  chiediConferma({titolo: '⏳ Chi compra non ha scelto dove ricevere', etichetta: '🔔 Ricordaglielo',
+    corpo: 'Senza il suo indirizzo i sats non possono partire: restano al sicuro nel 2-di-3. '
+      + 'Gli scriviamo su Telegram, e quando lo sceglie ti avvisiamo: allora potrai liberarli.',
+    poi: () => sollecitaIncassoOnchainP2P(null, id)});
+}
+async function sollecitaIncassoOnchainP2P(btn, id){
+  haptic();
+  const rip = btn ? onchainAttesa(btn, '…') : () => {};
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(id)}/sollecita-incasso`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()}, body: '{}'});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non mandato');
+    if (d.pronto) toast('✅ Chi compra ha appena scelto dove ricevere: ora puoi liberare', 6000);
+    else if (d.avvisato) toast('🔔 Gliel\'abbiamo scritto su Telegram. Ti avvisiamo quando sceglie', 6000);
+    else toast('🔔 Gliel\'hai già ricordato: puoi rifarlo dopo le '
+      + new Date((Number(d.prossimo) || 0) * 1000).toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'}), 6000);
+  } catch(e) {
+    toast('⚠️ ' + (e.message && e.message.length < 120 ? e.message : 'non mandato'), 6000);
+  } finally { rip(); }
+  await leggiMieiOnchainP2P();
+  if (vistaAttivaP2P() === 'view-p2ponchain') renderP2POnchain();
 }
 
 function rinunciaOnchainP2P(btn, id){

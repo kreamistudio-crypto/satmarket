@@ -36629,6 +36629,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che poi fa ripartire il gesto; `closeSheet` lo annulla. Prove:
   `prove_onchain_rimborso_liscio`, `collaudo_p2p_onchain` (sezione
   11-sexies).
+- L'INDIRIZZO DI CHI COMPRA, DETTO A CHI LIBERA (17 nov 2026, cantiere
+  avviso-indirizzo; CANTIERI, «L'indirizzo di chi compra, detto a chi
+  libera»). Leva `P2P_ONCHAIN_AVVISO_INCASSO`, accesa di serie. Il
+  gemello di `rinuncia-chiesta`, dall'altra parte: `POST
+  /api/p2p/onchain/{oid}/sollecita-incasso` (solo chi ha depositato, solo
+  `depositato`/`euro_inviati`, senza proposta né decisione, mai con
+  `incasso_ln`; 404 a leva spenta) avvisa chi compra col bottone dello
+  scambio; colonna `incasso_sollecito_il`, scritta PRIMA dell'invio, un
+  riavviso ogni `P2P_ONCHAIN_INCASSO_RIAVVISO`; risponde `pronto` se
+  l'incasso c'è già, `prossimo` quando si può rifare. L'avviso a chi ha
+  depositato quando l'incasso arriva sta in `_p2p_onchain_avvisa_confermato`
+  (il ramo nuovo, accanto a quello della conferma del Lightning: solo a
+  deposito fatto), chiamato dalle porte che riempiono l'incasso: la rotta
+  `incasso`, `ricevi-lightning` col no, e via
+  `_p2p_onchain_avvisa_riempiti` (rilegge le righe che
+  `_p2p_onchain_riempi_incassi` torna vecchie) da `onchain_incasso_scegli`
+  e dalla scelta del modo. In `_p2p_onchain_per`: `sollecito_incasso`
+  (leva accesa e ruolo «compratore») e `incasso_sollecito_il`. Nel
+  telefono: `liberaOnchainP2P` passa da `incassoAttesoOnchainP2P` (rilegge,
+  e se manca ancora il foglio «⏳ Chi compra non ha scelto dove ricevere»
+  con «🔔 Ricordaglielo»), `sollecitaIncassoOnchainP2P`, e il bottone
+  «🔔 Ricordaglielo» nella pagina di chi ha depositato. Il no in parole di
+  `onchainFirmaProposta` resta il cancello finale. Prove:
+  `prove_p2p_onchain` (in fondo), `collaudo_p2p_onchain` (11-sexies-bis).
 - IL TEMPO DEL BONIFICO NEL P2P ON-CHAIN (17 nov 2026 sera, stesso
   cantiere; CANTIERI, «24 ore per pagare, 48 per il bonifico»). Due
   tempi in fila, nessuno dei due annulla o libera: PAGARE, dal deposito

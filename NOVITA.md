@@ -596,3 +596,9 @@ frase: Negli acquisti on-chain sopra 500 € chi vende riceve on-chain anche se 
 dove: Ordini → una vendita pagata on-chain sopra 500 €, riquadro «Pagato on-chain»; il messaggio del bot quando chi compra conferma.
 leva: ONCHAIN_CONSIGLIATO_SOPRA_EURO accesa di serie (500)
 pubblico: sì
+
+## 2026-11-17 · avviso-indirizzo
+frase: Negli scambi on-chain chi vende sa quando chi compra ha scelto dove ricevere i sats: arriva un messaggio dal bot. E se tocca «Ricevuti» prima, Barattolo glielo dice e c'è «🔔 Ricordaglielo», che manda un promemoria a chi compra.
+dove: P2P → «I miei scambi» → uno scambio on-chain con i sats nel deposito: la riga «⏳ Chi compra non ha ancora scelto il wallet» col bottone «🔔 Ricordaglielo», e il foglio di «Ricevuti: libera i sats»; il messaggio del bot «📍 Chi compra ha scelto dove ricevere».
+leva: P2P_ONCHAIN_AVVISO_INCASSO accesa di serie
+pubblico: sì

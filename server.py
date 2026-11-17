@@ -37750,6 +37750,16 @@ def _leve_stato():
                   spento="gli scambi on-chain si pagano solo in euro",
                   allarme=bool(P2P_ONCHAIN_USDT_ATTIVO) and not (
                       P2P_ONCHAIN_ATTIVO and P2P_USDT_ATTIVO)),
+            # L'INDIRIZZO DI CHI COMPRA (17 nov 2026, cantiere
+            # avviso-indirizzo): accesa di serie, nessun segreto
+            _leva("Avviso «indirizzo scelto» negli scambi on-chain",
+                  "P2P_ONCHAIN_AVVISO_INCASSO", P2P_ONCHAIN_AVVISO_INCASSO,
+                  acceso="chi ha depositato riceve un messaggio quando chi "
+                         "compra sceglie dove ricevere i sats, e se preme "
+                         "«Ricevuti» prima può toccare «🔔 Ricordaglielo» "
+                         "(un sollecito all'ora)",
+                  spento="niente avviso né sollecito: «Ricevuti» senza "
+                         "l'indirizzo di chi compra dice solo di riprovare"),
             # IL CONTANTE PER POSTA (17 nov 2026, cantiere leva-posta):
             # spenta di serie per parola di Andrea
             _leva("Contante per posta nel P2P", "P2P_POSTA_ATTIVO",
@@ -104694,7 +104704,7 @@ async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
         _onchain_prepara_ordini(con)
         riempiti = _onchain_riempi_incassi(con, user["id"])
         # ...e gli scambi P2P on-chain presi senza destinazione (30 ott 2026)
-        _p2p_onchain_riempi_incassi(con, user["id"])
+        riempiti_p2p = _p2p_onchain_riempi_incassi(con, user["id"])
         # ...e i RIMBORSI di quando ha messo lui i sats (10 nov 2026)
         _p2p_onchain_prepara(con)
         _onchain_riempi_rimborsi(con, user["id"])
@@ -104704,6 +104714,8 @@ async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     await _p2p_onchain_avvisa_rinunce(sbloccate)
+    # chi ha depositato lo sa (17 nov 2026, cantiere avviso-indirizzo)
+    await _p2p_onchain_avvisa_riempiti(riempiti_p2p)
     for o in riempiti:
         if o["rilascio_chiesto_il"]:
             await notifica(o["compratore_id"],
@@ -106842,7 +106854,7 @@ async def onchain_incasso_modo(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Scelta sconosciuta")
     if modo != "onchain" and not onchain_ln_per(user["id"]):
         raise HTTPException(403, "Lo swap in Lightning non è disponibile")
-    riempiti = []
+    riempiti, riempiti_p2p = [], []
     con = _onchain_db()
     try:
         if modo == "onchain":
@@ -106856,10 +106868,11 @@ async def onchain_incasso_modo(req: Request, x_tg_init_data: str = Header(""),
         if modo == "onchain":
             _onchain_prepara_ordini(con)
             riempiti = _onchain_riempi_incassi(con, user["id"])
-            _p2p_onchain_riempi_incassi(con, user["id"])   # gli scambi P2P (30 ott)
+            riempiti_p2p = _p2p_onchain_riempi_incassi(con, user["id"])   # gli scambi P2P (30 ott)
             con.commit()
     finally:
         con.close()
+    await _p2p_onchain_avvisa_riempiti(riempiti_p2p)   # (17 nov 2026, avviso-indirizzo)
     for o in riempiti:
         if o["rilascio_chiesto_il"]:
             await notifica(o["compratore_id"],
@@ -108097,6 +108110,23 @@ if not isinstance(P2P_ONCHAIN_USDT_ATTIVO, bool):
 # le reti, coi nomi del metodo e il contratto del vero USDT (contro i
 # token falsi che si chiamano «USDT» anche loro); gemelle di
 # `P2P_RETI_USDT` del telefono
+# L'INDIRIZZO DI CHI COMPRA, DETTO A CHI LIBERA (17 nov 2026, cantiere
+# avviso-indirizzo; un utente: «hai liberato i sats prima che abbia
+# inserito l'indirizzo [...] magari metto una notifica per quando il
+# compratore ha inserito l'indirizzo e che il venditore prima di
+# rilasciare i sats sollecita il compratore ad indicare dove inviarli»).
+# Due pezzi: chi ha depositato riceve un avviso quando chi compra sceglie
+# dove ricevere a deposito fatto (`_p2p_onchain_avvisa_confermato`), e
+# davanti a «Ricevuti» senza indirizzo ha «🔔 Ricordaglielo»
+# (`sollecita-incasso`, uno all'ora). ACCESA di serie (regola delle leve
+# nuove, 14 nov): False toglie l'avviso e il bottone, e il rilascio senza
+# indirizzo resta fermo come prima (il no in parole del telefono).
+try:
+    from config import P2P_ONCHAIN_AVVISO_INCASSO
+except ImportError:
+    P2P_ONCHAIN_AVVISO_INCASSO = True
+P2P_ONCHAIN_AVVISO_INCASSO = bool(P2P_ONCHAIN_AVVISO_INCASSO)
+P2P_ONCHAIN_INCASSO_RIAVVISO = 3600   # un sollecito all'ora, al massimo
 P2P_ONCHAIN_RETI_USDT = {
     "USDT (Tron)": {"rete": "tron", "nome": "Tron",
                     "contratto": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"},
@@ -108826,6 +108856,10 @@ def _p2p_onchain_prepara(con):
                       # l'ultimo avviso e' partito (0 = nessuna rinuncia
                       # che aspetta): si azzera appena l'indirizzo c'e'
                       ("rinuncia_chiesta_il", "INTEGER DEFAULT 0"),
+                      # 17 nov 2026, cantiere avviso-indirizzo: quando chi
+                      # ha depositato ha ricordato a chi compra di scegliere
+                      # dove ricevere (0 = mai): uno all'ora, al massimo
+                      ("incasso_sollecito_il", "INTEGER DEFAULT 0"),
                       # 17 nov 2026 sera: quando la ronda ha detto alle due
                       # parti che le 48 ore del bonifico sono passate (0 =
                       # non ancora): una volta sola
@@ -109439,6 +109473,10 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         # (17 nov 2026, onchain-rimborso-liscio) chi compra vuole
         # rinunciare e il rimborso aspetta l'indirizzo di chi ha depositato
         "rinuncia_chiesta_il": int(_p2p_onchain_campo(o, "rinuncia_chiesta_il", 0) or 0),
+        # (17 nov 2026, avviso-indirizzo) «🔔 Ricordaglielo» davanti a
+        # «Ricevuti» senza l'indirizzo di chi compra, e l'ultimo sollecito
+        "sollecito_incasso": bool(P2P_ONCHAIN_AVVISO_INCASSO and ruolo == "compratore"),
+        "incasso_sollecito_il": int(_p2p_onchain_campo(o, "incasso_sollecito_il", 0) or 0),
         # (17 nov 2026 sera, onchain-ritiro) il «non completato» di chi si
         # ritira dopo il deposito: se una rinuncia ADESSO conterebbe (il
         # telefono lo dice prima della firma), e a chi e' stato contato
@@ -111542,6 +111580,60 @@ async def p2p_onchain_incasso_qui(oid: int, req: Request, x_tg_init_data: str = 
     return risposta
 
 
+@app.post("/api/p2p/onchain/{oid}/sollecita-incasso")
+async def p2p_onchain_sollecita_incasso(oid: int, x_tg_init_data: str = Header(""),
+                                        barattolo_sessione: str = Cookie("")):
+    """«🔔 RICORDAGLIELO» (17 nov 2026, cantiere avviso-indirizzo). Chi ha
+    depositato vuole liberare, ma chi compra non ha ancora scelto dove
+    ricevere: il bot glielo ricorda, col bottone che apre lo scambio. Uno
+    all'ora (`incasso_sollecito_il`, scritto PRIMA dell'invio, come ogni
+    avviso). `pronto` = nel frattempo l'indirizzo e' arrivato: si libera
+    come sempre. Chi riceve in Lightning non serve: li' «Ricevuti» e' la
+    conferma firmata, e lo swap lo fa lui."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    if not P2P_ONCHAIN_AVVISO_INCASSO:
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_firma", user["id"])
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if _p2p_onchain_ruolo(o, user["id"]) != "compratore":
+            raise HTTPException(403, "Lo ricorda chi ha depositato i sats")
+        if o["stato"] not in ("depositato", "euro_inviati"):
+            raise HTTPException(409, "Si ricorda a deposito confermato")
+        if o["decisione_da"] or o["proposta_psbt"]:
+            raise HTTPException(409, "Su questo scambio c'è già una firma")
+        if o["incasso"]:
+            return {"ok": True, "pronto": True, "avvisato": False, "prossimo": 0}
+        if _p2p_onchain_campo(o, "incasso_ln", 0):
+            raise HTTPException(409, "Chi compra riceve in Lightning: "
+                                     "conferma gli euro con «Ricevuti»")
+        ultimo = int(_p2p_onchain_campo(o, "incasso_sollecito_il", 0) or 0)
+        if ultimo and adesso - ultimo < P2P_ONCHAIN_INCASSO_RIAVVISO:
+            return {"ok": True, "pronto": False, "avvisato": False,
+                    "prossimo": ultimo + P2P_ONCHAIN_INCASSO_RIAVVISO}
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET incasso_sollecito_il=?, aggiornato=?"
+            " WHERE id=? AND incasso='' AND COALESCE(incasso_sollecito_il,0)=?",
+            (adesso, adesso, oid, ultimo))
+        con.commit()
+        if not cur.rowcount:
+            return {"ok": True, "pronto": False, "avvisato": False,
+                    "prossimo": adesso + P2P_ONCHAIN_INCASSO_RIAVVISO}
+    finally:
+        con.close()
+    await _notifica_p2p_onchain(o, o["ricevente_id"],
+        "📍 <b>Chi vende vuole liberarti i sats</b> dello scambio di "
+        f"{_p2p_onchain_quanto(o, netti=True)}, ma non sa dove mandarli.\n\n"
+        "Apri lo scambio e incolla un indirizzo del tuo wallet Bitcoin nel "
+        "riquadro «Dove ricevi i bitcoin?».",
+        _p2p_onchain_bottone(o))
+    return {"ok": True, "pronto": False, "avvisato": True,
+            "prossimo": adesso + P2P_ONCHAIN_INCASSO_RIAVVISO}
+
+
 # ---- IL RIMBORSO CHE NON SI INCAGLIA (17 nov 2026, cantiere
 # onchain-rimborso-liscio; un utente all'assistenza: «la persona che ha
 # depositato deve indicare dove ricevere di ritorno i sats [...] mi
@@ -112240,15 +112332,43 @@ def _p2p_onchain_confermato(con, o, ind=None) -> bool:
 
 
 async def _p2p_onchain_avvisa_confermato(o) -> None:
-    """Chi compra ha appena scelto un incasso on-chain su uno scambio in cui
-    chi vende aveva gia' confermato gli euro: il telefono di chi vende ora
-    puo' firmare il rilascio, e glielo si dice."""
-    if o["incasso"] and o["rilascio_chiesto_il"] and not o["proposta_psbt"]:
+    """Chi compra ha appena scelto un incasso on-chain. Se chi vende aveva
+    gia' confermato gli euro, il suo telefono ora puo' firmare il rilascio,
+    e glielo si dice. Se no (17 nov 2026, cantiere avviso-indirizzo), a
+    deposito fatto gli si dice che adesso «Ricevuti» ha dove mandare i
+    sats: prima del deposito non serve, la pagina lo mostra da sola."""
+    if not o["incasso"] or o["proposta_psbt"]:
+        return
+    if o["rilascio_chiesto_il"]:
         await _notifica_p2p_onchain(o, o["depositante_id"],
             "🔓 <b>Chi compra ha scelto dove ricevere</b> (on-chain) sullo scambio "
             f"di {_p2p_onchain_quanto(o)}.\n\nApri Barattolo: il tuo telefono firma "
             "il rilascio che avevi confermato, e i sats partono.",
             _p2p_onchain_bottone(o))
+    elif (P2P_ONCHAIN_AVVISO_INCASSO and o["stato"] in ("depositato", "euro_inviati")
+          and not int(_p2p_onchain_campo(o, "decisione_da", 0) or 0)):
+        await _notifica_p2p_onchain(o, o["depositante_id"],
+            "📍 <b>Chi compra ha scelto dove ricevere</b> i sats dello scambio "
+            f"di {_p2p_onchain_quanto(o)}.\n\nQuando hai ricevuto il pagamento, "
+            "«Ricevuti: libera i sats» adesso li manda lì.",
+            _p2p_onchain_bottone(o))
+
+
+async def _p2p_onchain_avvisa_riempiti(righe) -> None:
+    """Gli scambi che hanno appena preso l'incasso dal Profilo
+    (`_p2p_onchain_riempi_incassi` torna le righe di PRIMA): si rileggono
+    e chi ha depositato lo sa, come dal riquadro dello scambio."""
+    if not righe:
+        return
+    con = _p2p_onchain_db()
+    try:
+        fresche = [_p2p_onchain_carica(con, int(o["id"])) for o in righe]
+    except HTTPException:
+        return
+    finally:
+        con.close()
+    for o in fresche:
+        await _p2p_onchain_avvisa_confermato(o)
 
 
 def _p2p_onchain_testi_deposito_tab(o, euro: str) -> list:

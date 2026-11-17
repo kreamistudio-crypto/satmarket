@@ -90317,3 +90317,69 @@ compra); in `prove_dettaglio_ordine` la coppia nuova nelle terze
 persone. Controprova: tolto il ramo al futuro, la prova del banco è
 rossa.
 
+## L'indirizzo di chi compra, detto a chi libera (17 nov 2026 sera, cantiere avviso-indirizzo; un utente: «hai liberato i sats prima che abbia inserito l'indirizzo [...] magari metto una notifica per quando il compratore ha inserito l'indirizzo e che il venditore prima di rilasciare i sats sollecita il compratore ad indicare dove inviarli»)
+
+Il caso: in uno scambio P2P on-chain chi vende ha premuto «Ricevuti»
+mentre chi compra non aveva ancora scelto dove ricevere. Dal cantiere
+rilascio-senza-incasso di stamattina il telefono dice il no in parole e
+non manda niente, ma chi vende restava senza un gesto (e la pagina di chi
+vende prometteva «glielo ricordiamo noi nella sua pagina»), e quando chi
+compra sceglieva il wallet nessuno lo diceva a chi vende, salvo il caso
+del Lightning confermato. Era la voce «RESTA» di quel cantiere.
+
+Due pezzi, dietro la leva nuova `P2P_ONCHAIN_AVVISO_INCASSO`, accesa di
+serie (regola delle leve del 14 nov, nessun segreto):
+- «🔔 RICORDAGLIELO»: `POST /api/p2p/onchain/{oid}/sollecita-incasso`, il
+  gemello di `rinuncia-chiesta` dall'altra parte. Solo chi ha depositato,
+  solo a deposito confermato (prima non c'è niente da liberare), mai con
+  una firma già messa o col Lightning scelto (lì «Ricevuti» è la conferma
+  firmata e lo swap lo fa chi compra). Il bot scrive a chi compra di
+  incollare un indirizzo nel riquadro «Dove ricevi i bitcoin?», col
+  bottone dello scambio. Uno all'ora: `incasso_sollecito_il` scritto
+  PRIMA dell'invio, con l'UPDATE condizionato sul valore letto (due tocchi
+  in volo ne mandano uno). Sul telefono: «Ricevuti» senza indirizzo
+  rilegge lo scambio (`incassoAttesoOnchainP2P`) e, se manca ancora, apre
+  il foglio «⏳ Chi compra non ha scelto dove ricevere» col bottone; lo
+  stesso bottone sta nella pagina di chi ha depositato, accanto alla riga
+  «⏳», che dice anche quando l'ha ricordato l'ultima volta.
+- L'AVVISO QUANDO L'INDIRIZZO ARRIVA: «📍 Chi compra ha scelto dove
+  ricevere», a chi ha depositato, solo a deposito fatto (prima la pagina
+  basta). È un ramo nuovo di `_p2p_onchain_avvisa_confermato`, che c'era
+  già per il Lightning confermato, quindi parte da tutte le porte da cui
+  l'incasso arriva: il riquadro dello scambio, «ricevi on-chain» dopo il
+  Lightning, il Profilo e la scelta del modo (queste due passano da
+  `_p2p_onchain_avvisa_riempiti`, perché `_p2p_onchain_riempi_incassi`
+  torna le righe di prima del riempimento). Ogni scambio prende l'incasso
+  una volta sola, quindi l'avviso non si ripete.
+
+A leva spenta tutto torna a ieri: niente avviso, la rotta è 404, il
+foglio di «Ricevuti» è quello di sempre e il no in parole di
+`onchainFirmaProposta` resta il cancello finale (c'è anche a leva
+accesa).
+
+Scartati: il sollecito automatico del bot al primo «Ricevuti» senza
+indirizzo (il gesto lo vuole chi vende, come ha scritto l'utente, e il
+promemoria a tempo per chi compra non esiste per l'incasso);
+l'avviso anche prima del deposito (rumore: chi vende deve ancora
+depositare). Non toccato il mercatino on-chain, dove chi riceve è chi
+vende e la rotta `rilascio-chiesto` ha già il suo avviso.
+
+Notato e non fatto: i promemoria della ronda a chi vende («controlla e
+libera i sats» dopo «Ho inviato») partono anche quando chi compra non ha
+ancora l'indirizzo.
+
+Provato, nel cloud (Andrea dormiva, il PC forse spento): suite severa
+intera nel venv delle prove 29.960 passate, 2 rosse mie (il conto dei
+fogli «chiediConferma» passa a 126, conoscenza.md da rifare: curate e
+rigirate le loro sezioni, 111/0) e 2 saltate d'ambiente (nostr-tools);
+i 153 collaudi della CI verdi senza coincurve e senza proxy. Albero:
+develop 3de12ff5 (rimesso uguale a main come 24874f5a, stesso albero)
+più questo cantiere. Controprove: il sollecito senza il freno dell'ora
+e il Profilo che non avvisa fanno rosse due righe del collaudo; il foglio
+che non rilegge e la leva spenta di serie una riga ciascuno in prove.
+Dopo il rebase su 8c7d9c8 (non mio: il passo «Oggetto spedito»,
+cantiere passo-spedito, nessun simbolo in comune) rigirate la suite
+severa intera (29.965/0, le stesse 2 saltate) e i 4 collaudi on-chain
+vicini (verdi).
+RESTA da guardare dal vivo sul collaudo: il foglio a 390px e i due
+messaggi del bot.
