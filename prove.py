@@ -149145,8 +149145,12 @@ def prove_apri_wallet_p2p():
           [True, False, False],
           [len(TESTO_PHOENIX) <= 260, bool(re.search(r"\d+ minut", TESTO_PHOENIX)),
            any(s in TESTO_PHOENIX.lower() for s in ("mostro", "coordinator", "acinq", "nodo"))])
-    prova("...nei due fogli, in fondo, dopo il Copia e la sua nota",
-          [2, True, True],
+    # (17 nov 2026 sera, onchain-contanti) il terzo e' il foglio «🔐 Blocca
+    # la cauzione» del contanti on-chain (`renderCauzioneOcP2P`), che e'
+    # una hold come le altre due: stessa riga, stessa funzione
+    prova("...nei due fogli, in fondo, dopo il Copia e la sua nota (e nel terzo, la cauzione "
+          "del contanti on-chain)",
+          [3, True, True],
           [mini.count("rigaPhoenixHoldP2P(") - mini.count("function rigaPhoenixHoldP2P(){"),
            "non conta come scambio non completato.</div>' +\n    rigaPhoenixHoldP2P();\n" in rh,
            "non c\\'è niente da confermare.</div>' +\n    rigaPhoenixHoldP2P();\n" in rc])

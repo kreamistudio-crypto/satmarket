@@ -4890,7 +4890,7 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   deve dire 0; poi le due righe in coda al config e il riavvio.
   Controllo DOPO: `journalctl -u barattolo -n 80 | grep 🔐` deve dire
   «Cauzione del contanti on-chain: ACCESA SOLO PER I MODERATORI, 3% con
-  minimo 1000 sats» («ACCESA PER TUTTI» solo dopo il `False` della
+  minimo 1.000 sats» («ACCESA PER TUTTI» solo dopo il `False` della
   porticina; «leva spenta, solo il giro dei ritorni» col solo macaroon),
   e il pannello «⚙️ Stato delle leve» le voci «Cauzione nel contanti
   on-chain (in Lightning)» e «Cauzione on-chain solo ai moderatori»
