@@ -1702,13 +1702,18 @@ except ImportError:
 # la scala del commercio: qui si appende un oggetto a ogni gradino.
 # NON MUOVE GLI XP: un regalo non e' un'azione, e il perimetro («gli XP
 # sono il commercio e nient'altro», vedi GLI XP) resta intero.
-# Leva ACCESA di serie (regola del 14 nov 2026): e' l'interruttore
-# d'emergenza, si spegne con una riga nel config. Spenta, la scala non
-# promette niente (`regalo` vuoto), nessuno sblocca, nessuno chiede.
+# Leva SPENTA di serie, ed e' l'ECCEZIONE alla regola del 14 nov 2026
+# (leve nuove accese nel codice), decisa da Andrea lo stesso giorno:
+# «Un tempo per te» e' un marchio di altri e NON HA ANCORA ADERITO, e
+# una promozione non deve promettere in produzione oggetti di qualcuno
+# che non ha detto si'. Si accende con una riga nel config
+# (`REGALI_LIVELLO_ATTIVI = True`) il giorno dell'accordo. Spenta, la
+# scala non promette niente (`regalo` vuoto), nessuno sblocca, nessuno
+# chiede.
 try:
     from config import REGALI_LIVELLO_ATTIVI
 except ImportError:
-    REGALI_LIVELLO_ATTIVI = True
+    REGALI_LIVELLO_ATTIVI = False
 # Chiave = l'id del livello, valore = il regalo in una riga, con la sua
 # emoji davanti: e' il testo che la scala mostra e che il bot scrive.
 # «nuovo» non c'e' apposta: il punto di partenza non si premia.

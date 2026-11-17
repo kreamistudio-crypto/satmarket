@@ -498,12 +498,13 @@ BANNER_SCONTI_LIVELLO = {"nuovo": 0, "avviato": 10, "pratico": 20,
                          "esperto": 35, "maestro": 50}
 # I REGALI PER LIVELLO (17 nov 2026): il merch «Un tempo per te» si
 # stampa su richiesta e si REGALA a chi sale di gradino, invece di una
-# campagna di preordini (decisione di Andrea). Accesa di serie: e' il
-# freno d'emergenza, si spegne con False. Spenta, la scala non promette
+# campagna di preordini (decisione di Andrea). SPENTA di serie: «Un
+# tempo per te» non ha ancora aderito (Andrea, 17 nov 2026), e si
+# accende con True il giorno dell'accordo. Spenta, la scala non promette
 # niente e nessuno sblocca o chiede. Chi riceve scrive il recapito nel
 # Profilo, l'avviso arriva nel canale admin e si segna «spedito» dal
 # pannello: la spedizione la fa Andrea a mano, dal sito di stampa.
-REGALI_LIVELLO_ATTIVI = True
+REGALI_LIVELLO_ATTIVI = False
 # Un regalo per gradino, con l'emoji davanti: e' il testo che la scala
 # mostra e che il bot scrive. «nuovo» non c'e' apposta.
 REGALI_LIVELLO = {"avviato": "👜 la borsa di tela «Un tempo per te»",
