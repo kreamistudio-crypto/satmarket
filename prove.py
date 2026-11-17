@@ -105332,7 +105332,10 @@ def prove_p2p_ascolto():
           True, "if not lampo and not solo_attese:\n"
           "            prossima = time.time() + P2P_GIRO_S" in orologio)
     conf = open(os.path.join("deploy", "relay", "router.conf"), encoding="utf-8").read()
-    righe_filtro = [r for r in conf.split("\n") if r.strip().startswith("filter")]
+    # dal 17 nov 2026 lo specchio ha DUE flussi (il libro di Mostro e la
+    # scheda dell'app: `prove_app_android`): qui si guarda quello del libro
+    righe_filtro = [r for r in conf.split("\n")
+                    if r.strip().startswith("filter") and "38383" in r]
     prova("lo specchio copia i DUE kind pubblici del libro — il 14 non piu' — da UN autore, in discesa",
           True, len(righe_filtro) == 1 and '"kinds": [38383, 38385]' in righe_filtro[0]
           and righe_filtro[0].count('"authors": ["') == 1
@@ -135410,6 +135413,56 @@ def prove_app_android():
     prova("...e il blocco da copiare nelle note delle release, in "
           "PRODUZIONE, e' lo stesso", [righe_vere],
           [list(b) for b in blocchi])
+
+    # --- LA SCHEDA DELL'APP SUL NOSTRO RELAY (17 nov 2026) -------------
+    # Zapstore legge l'app dagli eventi che `zsp publish` firma con la
+    # chiave FREDDA delle release e manda su relay.zapstore.dev. Lo
+    # specchio del nostro relay (`router.conf`, il processo che copia
+    # il libro di Mostro) ne tiene una copia: in DISCESA, da QUELL'autore
+    # solo, i soli kind dell'app. Non e' una porta in scrittura — la
+    # chiave delle release NON sta in `chiavi.txt`, e non deve starci —
+    # quindi quel che si prova qui e' la forma del filtro: chi lo
+    # allarga per sbaglio (un kind di troppo, un autore in piu', la
+    # corrente all'insu') apre una strada che nessuno ha deciso.
+    router = open(os.path.join("deploy", "relay", "router.conf"),
+                  encoding="utf-8").read()
+    flussi = re.findall(r"\n    (\w+) \{\n(.*?)\n    \}", router, re.S)
+    nomi = [n for n, _ in flussi]
+    prova("lo specchio ha DUE flussi: il libro di Mostro e la scheda "
+          "dell'app", ["mostro", "zapstore"], nomi)
+    zap = dict(flussi).get("zapstore", "")
+    prova("...e quello dell'app scende soltanto", 1,
+          zap.count('dir = "down"'))
+    prova("...da relay.zapstore.dev e basta", ['"wss://relay.zapstore.dev"'],
+          re.findall(r'"wss?://[^"]+"', zap))
+    # L'HEX NON SI SCRIVE QUI PER ESTESO: lo scanner della CI prende
+    # ogni 64-hex nudo fuori dai quattro file del relay. Si RICAVA
+    # dalla npub fredda scritta in PRODUZIONE (`npub_to_hex` del
+    # server): cosi' la prova dice anche che le due righe — la npub del
+    # rito e l'autore del filtro — sono la stessa chiave, come per Mostro.
+    amb = {"CHARSET_BECH32": "qpzry9x8gf2tvdw0s3jn54khce6mua7l"}
+    exec(pezzo("npub_to_hex"), amb)
+    npub_release = re.search(r"\(`(npub1[a-z0-9]{58})`,\s+nsec su due foglietti",
+                             prod)
+    prova("la npub FREDDA delle release sta scritta in PRODUZIONE, nel rito",
+          True, npub_release is not None)
+    hex_release = amb["npub_to_hex"](npub_release.group(1)) if npub_release else ""
+    filtri = [r for r in zap.split("\n") if r.strip().startswith("filter")]
+    prova("...con UN filtro: i cinque kind dell'app (scheda, release, "
+          "file nuovo e vecchio, prova del certificato) da QUELLA chiave, "
+          "nient'altro",
+          ['{ "kinds": [32267, 30063, 3063, 1063, 30509], "authors": '
+           f'["{hex_release}"] }}'],
+          [f.split("=", 1)[1].strip() for f in filtri])
+    testo_plugin = open(os.path.join("deploy", "relay", "policy",
+                                     "chi-scrive.py"), encoding="utf-8").read()
+    piattaforma = re.search(r'\nPIATTAFORMA = "([0-9a-f]{64})"', testo_plugin)
+    prova("...e non e' la chiave della piattaforma: i due destini restano "
+          "separati", [True, False],
+          [piattaforma is not None and piattaforma.group(1) != hex_release,
+           bool(piattaforma) and piattaforma.group(1) in zap])
+    prova("...e in `chiavi.txt` non entra: il plugin non la conosce",
+          0, testo_plugin.count(hex_release[:16]))
 
 
 # I DUE MODELLI DI BUBBLEWRAP 1.24.1 su cui le sezioni dell'APK girano
@@ -183594,7 +183647,10 @@ def prove_relay_per_mostro():
     prova("il destinatario scolpito nel plugin e' l'autore di "
           "`router.conf`, ed e' la MOSTRO_NPUB del config d'esempio",
           (True, True),
-          (re.findall(r'"authors": \["([0-9a-f]{64})"\]', router) == [MOSTRO],
+          # il PRIMO flusso dello specchio: il secondo (la scheda
+          # dell'app, 17 nov 2026) ha un altro autore ed e' di
+          # `prove_app_android`
+          (re.findall(r'"authors": \["([0-9a-f]{64})"\]', router)[:1] == [MOSTRO],
            (lambda amb: (exec("CHARSET_BECH32 = "
                               + repr("qpzry9x8gf2tvdw0s3jn54khce6mua7l"), amb),
                          exec(pezzo("npub_to_hex"), amb),

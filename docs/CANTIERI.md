@@ -86815,3 +86815,66 @@ nello stesso venv, verdi (i numeri nel verbale del thread).
 DA GUARDARE. Il prezzo «da 5,48 €» è quello della home di oggi: se
 Packlink lo cambia, la riga va ritoccata. Se Andrea trova dove ha letto
 che Packlink accetta sats, si riapre lo studio.
+
+## La scheda dell'app sul nostro relay, come Zapstore (17 nov 2026, cantiere relay-zapstore; Andrea: «nel relay aggiungere il kind relativo a conservare l'app Barattolo similmente a Zapstore»)
+
+L'APK di Barattolo vive su Zapstore attraverso gli eventi che `zsp
+publish` firma con la chiave fredda delle release e manda a
+relay.zapstore.dev: 32267 la scheda dell'app, 30063 la release, 3063 il
+file (prima si chiamava 1063), 30509 la prova NIP-C1 che lega il
+certificato Android alla npub. Finché stanno su un relay solo, e non
+nostro, la prova che QUELL'APK è nostro è in mano ad altri. Da oggi una
+copia sta su relay.barattolo.store.
+
+LA SCELTA: LO SPECCHIO, NON UNA PORTA. Tre strade. (a) La chiave delle
+release in `chiavi.txt`: una riga, ma le apre OGNI kind sul nostro relay
+e mischia due destini che PRODUZIONE tiene separati apposta (la chiave
+fredda non è la piattaforma, mai sul VPS). (b) Un'eccezione nel plugin
+`chi-scrive.py` per quella chiave sui soli kind dell'app, e `zsp` che
+pubblica anche da noi (`RELAYS=` con due indirizzi): un secondo
+cancello da tenere in pari col primo, e un rito della release che
+cambia. (c) Un secondo flusso dello specchio (`router.conf`, il
+processo che già copia il libro di Mostro): in DISCESA da
+relay.zapstore.dev, UN autore, CINQUE kind. Non si apre niente in
+scrittura, il rito non cambia di una riga, e si recupera da sé anche la
+v1.5 già uscita, perché il router rifà la REQ senza `since`. Scelta la
+(c), col sì di Andrea. Il 1063 sta nel filtro per le release vecchie:
+se la v1.5 l'avesse usato, con il solo 3063 resterebbe fuori; un kind in
+più da UN autore non costa niente. I byte sono pochi: sul relay stanno
+le schede firmate, l'APK sta su GitHub e sul Blossom di Zapstore.
+
+PROVATO. `prove_app_android` (+7): due flussi e nient'altro, quello
+dell'app scende soltanto, da relay.zapstore.dev e basta, la npub fredda
+presente nel rito di PRODUZIONE, UN filtro coi cinque kind e l'hex di
+QUELLA npub (ricavato con `npub_to_hex` del server), la chiave della
+piattaforma assente dal flusso, e il plugin che la chiave delle release
+non la conosce. Controprove: un kind in più, un relay in più, `dir =
+"up"`, l'autore scambiato con Mostro, la npub di PRODUZIONE con un
+carattere cambiato — cinque mutazioni, cinque rosse. LEZIONE: l'hex
+della chiave delle release per esteso sta SOLO in `router.conf`, che è
+fra i quattro file del relay esclusi dallo scanner della CI; nella
+prova si ricava dalla npub, in PRODUZIONE si scrive `HEX` come per
+Mostro. La prima stesura l'aveva messo in tutti e due, e la CI
+l'avrebbe segnato come chiave nuda — e la cronologia per sempre. Le due
+prove di prima che contavano UN filtro e UN autore (`prove_p2p_ascolto`,
+`prove_relay_per_mostro`) guardano adesso il flusso del libro. Sezioni
+mirate 173/0; suite severa e collaudi nel venv della CI: in coda a
+questa voce. NON PROVATO DAL VIVO: che relay.zapstore.dev serva lo
+storico a una REQ senza `since` (dal cloud la websocket non esce); la
+verifica con `strfry scan` sta in PRODUZIONE, la fa Andrea sul relay.
+
+DA GUARDARE. Il kind 0 della npub delle release non si copia (sta su
+damus/primal/nos.lol, non su relay.zapstore.dev): se un giorno il
+nostro relay dovesse bastare da solo a Zapstore, va aggiunto un flusso
+coi relay sociali. `zsp` cambia in fretta: se i kind cambiano, cambia il
+filtro.
+
+IL GIRO DELLE PROVE. Sull'albero del cantiere (da origin/develop
+922faccf), nei due venv della CI: suite severa 28.945 passate, 0 fallite,
+0 saltate (venv del passo «Le prove», con nostr-tools fuori dal repo);
+collaudi della CI 140 su 140 nel venv senza coincurve. Poi develop è
+corso di cinque commit (licenza AGPL, avvisi del barattolo, spedisci
+entro, primo wallet, Packlink: nessun simbolo in comune, conflitto solo
+nella coda di questo file): sull'albero rebasato (sopra 8b63e4e8) le tre
+sezioni toccate più le 31 che leggono i documenti, 1.648/0, e i tre
+collaudi del relay 3/0.

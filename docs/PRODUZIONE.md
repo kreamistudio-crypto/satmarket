@@ -3226,6 +3226,32 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   cancellare subito). Scaduta non blocca niente — le release escono lo
   stesso — ma il legame smette di essere dimostrabile. Il perché e il
   rito per esteso stanno in ARCHITETTURA, «Distribuzione dell'APK».
+  LA COPIA DELLA SCHEDA SUL NOSTRO RELAY (17 nov 2026, cantiere
+  relay-zapstore): gli eventi che `zsp publish` manda a
+  relay.zapstore.dev (32267, 30063, 3063, 1063, 30509, firmati dalla
+  chiave fredda qui sopra) li copia da sé lo specchio di
+  relay.barattolo.store, secondo flusso di `router.conf`. Il rito
+  della release NON cambia: si pubblica su Zapstore come sempre e la
+  copia arriva in pochi secondi. LA RIGA SULLA MACCHINA DEL RELAY
+  (non il VPS), una volta, dopo il push: `cd /opt/relay && cp
+  router.conf router.conf.prima-di-zapstore`, poi si porta il
+  `router.conf` del repo (`deploy/relay/router.conf`) al posto di
+  quello, si guarda con `grep -n '"kinds"\|dir =' router.conf` (DUE
+  righe `kinds`, DUE `dir = "down"`), e `docker compose up -d
+  --force-recreate specchio` — COL NOME DEL SERVIZIO, che un `up -d`
+  nudo ricrea anche il relay vivo. Poi `docker compose logs --tail 20
+  specchio`: la connessione a relay.zapstore.dev accanto alle tre del
+  coordinator, nessun errore di config. LA VERIFICA, un minuto dopo:
+  `docker compose exec relay strfry scan '{"kinds":[32267,30063,3063,1063,30509],"authors":["HEX"]}' | jq -r '[.kind, .created_at, .id[0:8]] | @tsv'`
+  (HEX = l'autore del flusso `zapstore` di `router.conf`, cioè la npub
+  fredda qui sopra in esadecimale; per esteso non sta in questo
+  documento perché lo scanner della CI prende ogni 64-hex nudo)
+  — almeno la scheda (32267) e la release della v1.5 (30063 e il suo
+  3063). Se non arriva niente, il router non ha ancora fatto la REQ o
+  relay.zapstore.dev non serve lo storico: si rilegge il log. PER
+  TORNARE INDIETRO: `cp router.conf.prima-di-zapstore router.conf` e
+  lo stesso `up -d --force-recreate specchio`; le copie già prese
+  restano nel db finché non si tolgono con `strfry delete`.
 - DOVE SI LEGGE IL GIRO DEI NEGOZI COLLEGATI (set 2026): il giro
   dell'ora stampa una riga per annuncio nato (`🏪 Titolo — prezzo €
   [categoria]`, con ` · digitale` sui virtuali), una per consegna

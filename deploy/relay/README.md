@@ -96,7 +96,7 @@ una prova di `prove.py` lo pretende.
 | `Dockerfile` | `/opt/relay/` | strfry inchiodato a un **digest** e non a un tag che si muove, più `python3` per il plugin |
 | `compose.yml` | `/opt/relay/` | il servizio. Porta due righe che non sono decorative: `user: "1001:1001"` e il `127.0.0.1:` davanti alla porta |
 | `strfry.conf` | `/opt/relay/` | il relay. `restrictedReadKinds` tiene i DM leggibili solo a chi li riguarda |
-| `router.conf` | `/opt/relay/` | lo **specchio** del P2P: tre kind (libro, impostazioni e — dal 17 set 2026 — le buste cifrate del coordinator), un autore, corrente in discesa |
+| `router.conf` | `/opt/relay/` | lo **specchio**, due flussi in discesa: il libro del P2P (38383 e 38385 dal coordinator; le buste cifrate c'erano dal 17 al 18 set 2026) e — dal 17 nov 2026 — la **scheda dell'app** come la pubblica Zapstore (32267, 30063, 3063, 1063, 30509 dalla chiave fredda delle release, da `relay.zapstore.dev`). Un autore per flusso; la chiave delle release NON sta in `chiavi.txt` |
 | `policy/chi-scrive.py` | `/opt/relay/policy/` | chi può scrivere: la lista, e la buca del coordinatore coi suoi freni. **Fail-closed**: se qualcosa esplode rifiuta |
 | `aggiorna-chiavi.sh` | `/opt/relay/` | rinfresca la whitelist da `/api/relay/chiavi`. Legge il token da `token.header` |
 | `backup-relay.sh` | `/usr/local/sbin/` | l'archivio cifrato delle 03:45. **Mai il database** — e ha la guardia che lo verifica (**nove** nomi da quando c'è `router.conf`) |

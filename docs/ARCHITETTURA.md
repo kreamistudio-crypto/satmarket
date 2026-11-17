@@ -26319,7 +26319,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   in WSL Ubuntu, `~/bin/zsp`; il progetto corre, ricontrollare il
   README a ogni uso) pubblica gli eventi NIP-82 (32267 app, 30063
   release, 3063 asset) su `relay.zapstore.dev` e carica i file sul suo
-  Blossom. CHIAVE NOSTR DEDICATA E FREDDA (scelta deliberata: NON
+  Blossom. DAL 17 NOV 2026 UNA COPIA STA ANCHE SUL NOSTRO RELAY
+  (cantiere relay-zapstore, chiesto da Andrea): lo specchio di
+  relay.barattolo.store (`deploy/relay/router.conf`, il processo che
+  copia il libro di Mostro) ha un secondo flusso, in discesa da
+  `relay.zapstore.dev`, UN autore (la chiave fredda delle release,
+  in hex) e CINQUE kind — 32267, 30063, 3063, il 1063 (la forma
+  vecchia del file, per le release già uscite) e il 30509 della prova
+  NIP-C1. Non è una porta in scrittura: la chiave delle release NON
+  entra in `chiavi.txt` (i destini restano separati), il rito di
+  `zsp publish` non cambia e l'APK non passa di lì (sta su GitHub e
+  sul Blossom); se Zapstore sparisce, la prova che quell'APK è nostro
+  resta a casa nostra. `prove_app_android` tiene stretta la forma del
+  filtro e in pari la npub di PRODUZIONE con l'hex. CHIAVE NOSTR DEDICATA E FREDDA (scelta deliberata: NON
   quella della piattaforma, per separarne i destini): vive SOLO su
   foglietti + Bitwarden («Barattolo release Nostr»), MAI su
   VPS/disco/repo/chat; si usa in WSL con `read -rs SIGN_WITH &&
