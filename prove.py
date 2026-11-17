@@ -206168,9 +206168,10 @@ console.log(JSON.stringify({
     # mondo, il passo che scivola, la telecamera, e le cinque missioni
     # giocate fino in fondo in node.
     missioni = G["MISSIONI_TAPPO"]
-    prova("cinque missioni al lancio, sulle zone 0, 1, 3, 5 e 7 degli otto del tabellone, id di casa e bulloni veri",
-          (5, [0, 1, 3, 5, 7], True, True),
-          (len(missioni), sorted(x["zona"] for x in missioni),
+    prova("sei missioni al lancio, la prima la piu' facile (i sats), sulle zone 0, 1, 2, 3, 5 e 7 degli otto del tabellone, "
+          "id di casa e bulloni veri",
+          (6, "sats", [0, 1, 2, 3, 5, 7], True, True),
+          (len(missioni), missioni[0]["id"], [x["zona"] for x in missioni],
            all(re.fullmatch(r"[a-z]{3,20}", x["id"]) for x in missioni),
            all(isinstance(x["bulloni"], int) and x["bulloni"] >= 1 for x in missioni)))
     con = _sq.connect(":memory:")
@@ -206216,7 +206217,7 @@ const sc = mondoScena(s), z1 = sc.zone[0], z2 = sc.zone[1];
 const azioni = z1.luoghi.map(l => (mondoAzione(l, s) || [''])[0]);
 const muro = mondoMuovi(z1, 450, 520, 0, -200);
 const cam = [mondoInquadra(390, 700, 800, 450), mondoInquadra(1366, 700, 800, 450)];
-/* le cinque missioni giocate fino in fondo, scena dopo scena, senza esplodere */
+/* le missioni giocate fino in fondo (nella versione senza tela), scena dopo scena, senza esplodere */
 const giocate = {};
 for (const id of Object.keys(MISSIONI_GIOCO)) {
   const g = MISSIONI_GIOCO[id];
@@ -206224,6 +206225,7 @@ for (const id of Object.keys(MISSIONI_GIOCO)) {
   let scene = 0, fine = false;
   const guarda = () => { scene++; const h = g.html(missione); if (h.includes('missioneFine()')) fine = true; return h; };
   guarda();
+  if (id === 'sats') { for (let i = 0; i < SATS_QUANTI; i++) satsPrendi(i); guarda(); }
   if (id === 'quaderno') { quadernoTocca(3); guarda(); missione.dati.respinto = true; missione.passo = 2; missione.dati = {}; guarda(); quadernoNulla(true); guarda(); quadernoRipara(); guarda(); }
   if (id === 'lucchetto') { lucchettoPrima(true); guarda(); [0, 1, 2, 3].forEach(lucchettoPasso); guarda(); lucchettoProva(0); lucchettoProva(1); lucchettoDecidi(); guarda(); }
   if (id === 'staffetta') { ['A', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); ['R', 'I', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); ['A', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); }
@@ -206273,6 +206275,33 @@ for (let k = 0; k < 4 && arena === a; k++) {
 passi(3);
 const arenaEsito = {prova2, errMaggioranza, prova3, decise, saldi: a.dati.saldi, finita, chiusa: arena === null, errori: mq.errori,
   cartello, azione};
+/* ...e i sats: raccolti tutti, nel wallet; poi la Gazza ne ruba dalla tasca una volta */
+finita = 0;
+const ms = {id: 'sats', info: {zona: 0, nome: 'S'}, fase: 'gioco', errori: 0};
+missione = ms;
+arena = Object.assign({}, a, {def: ARENA_SATS, m: ms, sc: SATS_SCENA, pianta: SATS_SCENA, cose: [], nemici: [], prova: -1, attesa: null, dati: null, x: 450, y: 1320});
+const b2 = arena, passi2 = (sec) => { for (let i = 0; i < sec * 60 && arena === b2; i++) arenaPassa(b2, 1 / 60); };
+arenaProva(0);
+const satsAzionePrima = (b2.def.prove[0].azione(b2, b2.cose.find(c => c.tipo === 'wallet')) || [])[1];
+for (const c of b2.cose.filter(c => c.tipo === 'sat')) { b2.x = c.x; b2.y = c.y; arenaPassa(b2, 1 / 60); }
+const satsTasca = b2.dati.tasca;
+const w = b2.cose.find(c => c.tipo === 'wallet'); b2.x = w.x; b2.y = w.y + 100; arenaPassa(b2, 1 / 60);
+const satsAzione = b2.def.prove[0].azione(b2, b2.vicino)[0];
+arenaFai(); passi2(3);
+const satsProva2 = [b2.prova, b2.nemici.length, ms.errori];
+/* un sat in tasca e la Gazza addosso */
+const s1 = b2.cose.find(c => c.tipo === 'sat'); b2.x = s1.x; b2.y = s1.y; arenaPassa(b2, 1 / 60);
+const gz = b2.nemici[0]; gz.stato = 'gira'; gz.x = b2.x; gz.y = b2.y; arenaPassa(b2, 1 / 60);
+const satsRubato = [ms.errori, b2.dati.tasca, b2.cose.filter(c => c.tipo === 'sat').length];
+for (let i = 0; i < 60 * 60 && arena === b2 && b2.prova === 1; i++) {
+  b2.nemici[0].stato = 'nido'; b2.nemici[0].fra = 99;
+  const c = satsVicino(b2.cose, b2.x, b2.y);
+  if (c) { b2.x = c.x; b2.y = c.y; } else { b2.x = w.x; b2.y = w.y + 80; }
+  arenaPassa(b2, 1 / 60);
+}
+passi2(3);
+const satsEsito = {azionePrima: !!satsAzionePrima, tasca: satsTasca, azione: satsAzione, prova2: satsProva2, rubato: satsRubato,
+  wallet: b2.dati && b2.dati.wallet, finita, chiusa: arena === null};
 const L2 = staffettaLivelli()[1];
 const lista = cacciaMissioniHTML(s);
 console.log(JSON.stringify({
@@ -206302,7 +206331,7 @@ console.log(JSON.stringify({
           quadernoBustaValida({}, ['x', 'y', 1])],
   maggioranza: [quadernoMaggioranza([{tipo: 'leggio', rotto: true}, {tipo: 'leggio', rotto: true}, {tipo: 'leggio'}]),
                 quadernoMaggioranza([{tipo: 'leggio', rotto: true}, {tipo: 'leggio'}, {tipo: 'grande', rotto: true}])],
-  arenaEsito,
+  arenaEsito, satsEsito,
 }));
 """
     r = _node_banco(banco2)
@@ -206322,8 +206351,9 @@ console.log(JSON.stringify({
            {"rubate": False, "sola": True, "metallo": False, "salve": False}], r.get("parole"))
     prova("il barattolone: vuoto, meta', 96,875% dopo cinque ere, e mai oltre i 21 milioni",
           [0, 50, 96.875, 100.0], r.get("pieno"))
-    prova("le cinque missioni si giocano fino al «Avanti», senza errori, scena dopo scena",
-          {x: [True, True, 0] for x in ("quaderno", "lucchetto", "staffetta", "parole", "halving")}, r.get("giocate"))
+    prova("le missioni si giocano fino al «Avanti», senza errori, scena dopo scena",
+          {**{x: [True, True, 0] for x in ("quaderno", "lucchetto", "staffetta", "parole", "halving")},
+           "sats": [False, True, 0]}, r.get("giocate"))
     prova("ogni missione del server ha il suo gioco nella pagina, e viceversa",
           sorted(x["id"] for x in missioni), r.get("stessiId"))
     prova("l'elenco nelle sfide: un tasto per missione conosciuta, nessuna bomba, nessun tag vivo",
@@ -206365,6 +206395,14 @@ console.log(JSON.stringify({
     prova("...le quattro buste: scritte quelle col conto che torna, strappata la doppia spesa",
           [[True, "📓 Scrivi nel quaderno"], [True, "📓 Scrivi nel quaderno"], [False, "🗑️ Strappa: è una doppia spesa"],
            [True, "📓 Scrivi nel quaderno"]], ae.get("decise"))
+    se = r.get("satsEsito") or {}
+    prova("la prima missione: il wallet non si apre a mani vuote, dodici sats raccolti camminandoci sopra, poi nel wallet",
+          (False, 12, "👛 Metti i sats nel wallet"), (se.get("azionePrima"), se.get("tasca"), se.get("azione")))
+    prova("...la seconda prova ha la Gazza, e nessun errore fin li'", [1, 1, 0], se.get("prova2"))
+    prova("...la Gazza che tocca Tappo coi sats in tasca: un errore, tasca vuota, il sat torna per terra",
+          [1, 0, 12], se.get("rubato"))
+    prova("...tutti nel wallet, la missione finisce una volta sola e l'arena si chiude", (12, 1, True),
+          (se.get("wallet"), se.get("finita"), se.get("chiusa")))
     prova("...i saldi alla fine, e la missione finisce una volta sola, con l'arena chiusa",
           ({"tarlo": 0, "rana": 2, "topo": 3, "ape": 2, "riccio": 2, "tappo": 3}, 1, True, 2),
           (ae.get("saldi"), ae.get("finita"), ae.get("chiusa"), ae.get("errori")))
