@@ -470,3 +470,9 @@ frase: I negozi possono premiare chi torna a comprare: nel Profilo, «🎀 Premi
 dove: Profilo → «🎀 Premi fedeltà»; la pagina di un negozio, riga «🎀 Premi fedeltà» sotto le promesse; il dettaglio dell'ordine, riga «🎀 Premio fedeltà»; il messaggio del bot «Premio fedeltà!».
 leva: PREMI_FEDELTA_ATTIVI (accesa di serie)
 pubblico: sì
+
+## 2026-11-17 · onchain-rimborso-liscio
+frase: Rinunciare a uno scambio P2P on-chain è più semplice. Chi vende bitcoin scrive dove riavere i sats nel foglio stesso, prima di bloccarli. Se quell'indirizzo manca, il «Rinuncio» di chi compra non dà più errore: viene registrato e il bot avvisa chi vende col tasto che apre lo scambio. E se firmi da un dispositivo dove la chiave del wallet non c'è, Barattolo la cerca da solo o ti chiede lì le 12 parole.
+dove: P2P on-chain: il foglio «🔒 Blocca i sats» col riquadro «Dove tornano i sats?»; la pagina dello scambio, tasto «↩️ Rinuncio: rimborsa chi vende»; il foglio «🔑 Serve la chiave del tuo wallet»; i messaggi del bot «Chi compra vuole rinunciare» e «Ora puoi rinunciare».
+leva: nessuna
+pubblico: no

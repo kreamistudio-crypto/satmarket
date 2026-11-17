@@ -36390,6 +36390,39 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   / `chatOcRichiamoHTML` / `chatOcModHTML` in `schedaOnchainP2P`,
   `ridisegnaOnchainChatP2P`; le frasi del riquadro sono quelle del
   Lightning. Prove: `prove_chat_onchain`, `collaudo_chat_onchain`.
+- IL RIMBORSO ON-CHAIN CHE NON SI INCAGLIA (17 nov 2026, cantiere
+  onchain-rimborso-liscio; CANTIERI, «Il rimborso on-chain che non si
+  incaglia»). La regola del 10 nov non cambia (un rimborso vuoto non è
+  mai un'uscita permessa, `_onchain_psbt_giudica`): cambia come ci si
+  arriva. `POST /api/p2p/onchain/{oid}/rimborso` è l'indirizzo AL VOLO
+  di chi deposita, gemello di `…/incasso` (stesso giudice
+  `onchain_destinazione_motivo`, stessa firma `onchain_firma_valida`,
+  solo a `rimborso=''` e senza `proposta_psbt`, il Profilo non si
+  tocca); scrive le quattro colonne `rimborso_*` che il telefono rilegge
+  con `onchainRimborsoAtteso`. `POST …/rinuncia-chiesta` registra il
+  «Rinuncio» di chi compra quando il rimborso è vuoto: colonna
+  `rinuncia_chiesta_il` (quando è partito l'ultimo avviso, scritta
+  PRIMA dell'invio; un riavviso ogni `P2P_ONCHAIN_RINUNCIA_RIAVVISO`),
+  stessa condizione della proposta verso «compratore»
+  (`_p2p_onchain_rinuncia_possibile`), `pronto` se l'indirizzo c'è già.
+  `_p2p_onchain_rinunce_sbloccate` azzera il segno e
+  `_p2p_onchain_avvisa_rinunce` dice «Ora puoi rinunciare» a chi
+  compra, dalle due porte da cui l'indirizzo può arrivare (la rotta
+  `rimborso` e `onchain_incasso_scegli` del Profilo). Niente firma da
+  sola: la rinuncia la firma il seme di chi rinuncia, sul tocco suo. In
+  disputa la rotta `rimborso` avvisa i moderatori. Nel telefono:
+  `rimborsoDaChiedereOnchainP2P` / `rimborsoPrimaDelDepositoOnchainP2P`
+  (pure), `rimborsoMancanteOnchainP2P(o, pref)` nel foglio del deposito
+  PRIMA del QR (`ocP2pDep`) e nella pagina a deposito fatto
+  (`ocP2pRimb`), `rimborsoQuiOnchainP2P`; `firmaOnchainP2P` passa da
+  `rinunciaChiestaOnchainP2P` se il rimborso è vuoto; la chiave che non
+  è sul dispositivo: `chiaveProntaOnchainP2P` → `onchainCercaSemeP2P`
+  (chiama `onchainSemeAssicurato` SOLO se `walletUnicoLeggi` dice che un
+  wallet c'è: mai una nascita) → il foglio `p2pOcParoleSheet`
+  (`apriParoleOnchainP2P`, `usaParoleOnchainP2P` con `walletUsaParoleDi`),
+  che poi fa ripartire il gesto; `closeSheet` lo annulla. Prove:
+  `prove_onchain_rimborso_liscio`, `collaudo_p2p_onchain` (sezione
+  11-sexies).
 - I DUE TASTI DELLA RETE NEL FOGLIO DELL'ORDINE (16 nov 2026, cantiere
   coin-quasi; il perché in CANTIERI, «I due tasti della rete nel foglio
   dell'ordine…»). `tastiReteFoglioP2P` disegna «⚡ Lightning» / «₿
