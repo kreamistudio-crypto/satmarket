@@ -90045,3 +90045,62 @@ carrello senza giudice, il bollino anche a on-chain impossibile e
 l'avviso che resta a foglio chiuso fanno rosso, uno per uno.
 NON PROVATO dal vivo: nessun acquisto vero sopra 500 €; il foglio si
 guarda sul collaudo, che segue develop.
+
+## La classifica della serie 🔥 (17 nov 2026 sera, cantiere serie-classifica; Andrea: «nel profilo dove c'è lo streak, metti anche una classifica degli utenti che accedono a barattolo ogni giorno, e ogni utente può verificare questa classifica», poi «aggiungila e includila nella promozione di adesso»)
+
+COSA: sotto i sette giorni del Profilo un bottone, «🏆 Classifica dei
+giorni di fila», che apre un foglio: chi ha la fila VIVA più lunga —
+posizione, foto, nome, giorni — con la propria riga accesa. Rotta nuova
+`GET /api/serie/classifica`, giudice puro `serie_podio`, lettura
+`serie_classifica`. Nessuna tabella nuova, nessuna leva nuova: vive
+sotto `SERIE_GIORNI_ATTIVA`.
+
+ROVESCIA UNA RIGA DELLA MATTINA, e lo fa sapendolo: la serie era nata
+«solo di chi la fa», ed è già in produzione da oggi con quella frase
+(NOVITA `serie-giorni`: «la vedi solo tu»). Da qui nome, foto e giorni
+di chi è in classifica li vede chiunque sia entrato. I contrappesi: la
+rotta vuole l'identità (non è una pagina del web aperto, e negozio e
+profilo pubblico continuano a tacere la serie); chi non vuole comparire
+ha l'interruttore che c'è già, «Non mostrarmi in classifica»
+(`classifica_nascosta`), che ora vale per tutte e due le classifiche e
+si vede anche dove quella del mercatino è spenta; «I tuoi dati»
+dichiara il dato nuovo e chi lo vede; la NOVITA nuova lo dice chiaro.
+SEGNALATO AD ANDREA nella risposta: chi ha letto «la vedi solo tu» oggi
+si ritrova in lista senza averlo scelto, finché non spegne.
+
+LE DECISIONI (prese da me per fare presto, «falla semplice»):
+- VIVA = ultimo passaggio di oggi o di ieri. Chi ieri c'era e oggi non
+  ha ancora aperto è in gara col numero di ieri; una fila finita non si
+  mostra a nessuno (mai «ha perso»).
+- SI ENTRA DAL SECONDO GIORNO: un giorno solo non è una fila, come per
+  il saluto. Il giorno del lancio la lista è vuota e dice «torna
+  domani».
+- A PARI GIORNI, PARI POSIZIONE (1, 1, 3). La serie è partita oggi per
+  tutti: per giorni la testa sarà un grande pari merito, e un ordine
+  fra pari sarebbe inventato. L'ordine di scrittura fra pari è per id,
+  solo perché la lista non balli.
+- 20 RIGHE FUORI; chi sta sotto riceve la SUA a parte («La tua
+  posizione»), e una riga dice quanti altri hanno una fila accesa.
+- IL RECORD NON ENTRA IN GARA: si guarda chi c'è adesso.
+- NIENTE ID, NIENTE NEGOZIO nella riga: non è una vetrina, la riga non
+  si tocca.
+- NIENTE CACHE: una lettura con una riga a persona.
+SCARTATE: una classifica pubblica senza accesso (Andrea dice «ogni
+utente»: chi è entrato basta, e costa meno riservatezza); un secondo
+interruttore solo per i giorni (due domande per la stessa cosa); la
+gara sui record; il pannello con una leva sua (si spegne con la serie).
+
+PROVATO: `prove_serie_classifica` (40 prove: giudice con controprova,
+lettura vera su database di cartone — file vive, nascosti, fila finita,
+orfani, foto «nessuna», oltre le venti — fili e foglio in node);
+`prove_serie_giorni` ritoccata (la porta fra settimana e casella del
+wallet); `collaudo_serie_giorni` punto 8 nella gabbia e senza proxy
+(rotta vera, identità, guardare non timbra, l'interruttore vero toglie
+e rimette subito, ieri vale, due giorni dopo vuota, leva spenta 404).
+DAL VIVO: server vero del worktree in collaudo su loopback, Chromium
+senza rete esterna, 375 e 320 px, chiaro e scuro, nove persone e poi
+trentaquattro (la mia riga a parte): nessun errore di pagina, niente
+che sfora, il foglio si chiude con l'indietro. Scatti in
+/mnt/project-files/serie-giorni/classifica-dal-vivo.png.
+NON PROVATO: un telefono vero; la classifica con persone vere (in
+produzione la serie è nata oggi: fino a domani la lista è vuota).

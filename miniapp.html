@@ -7485,6 +7485,34 @@
     box-shadow:0 0 0 3px var(--sats-soft)}
   .serie-g.oggi .f-fuori{fill:#fff}
   .serie-g.oggi .f-cuore{fill:#FFE7C2}
+  /* LA CLASSIFICA DELLA SERIE (17 nov 2026, sera): la porta sotto la
+     settimana — un bottone largo quanto lei, col suo stesso vestito —
+     e le righe del foglio: posizione, volto, nome, e i giorni a destra
+     con la fiamma. La riga di chi guarda prende il fondo arancio tenue,
+     lo stesso dei giorni accesi. */
+  .serie-cl-porta{display:flex;align-items:center;gap:8px;width:100%;
+    margin-top:8px;font:inherit;font-size:13.5px;font-weight:800;
+    color:var(--ink);text-align:left;cursor:pointer;background:var(--card);
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px 14px}
+  .serie-cl-porta .cl-fr{font-size:18px}
+  .serie-cl-lista{max-height:56vh;overflow-y:auto;margin-top:10px}
+  .serie-cl-riga{display:flex;align-items:center;gap:10px;padding:8px 6px;
+    border-bottom:1px solid var(--line)}
+  .serie-cl-riga:last-child{border-bottom:0}
+  .serie-cl-riga.io{background:var(--sats-soft);border-radius:12px;
+    border-bottom-color:transparent}
+  .serie-cl-riga .cl-pos{min-width:30px}
+  .serie-cl-volto{width:34px;height:34px;font-size:14px}
+  .serie-cl-nome{flex:1;min-width:0;font-size:14px;font-weight:800;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .serie-cl-nome small{font-size:11.5px;font-weight:700;color:var(--muted);
+    margin-left:4px}
+  .serie-cl-g{flex:0 0 auto;font-family:var(--mono);font-weight:800;
+    font-size:14px;color:var(--sats-text);white-space:nowrap}
+  .serie-cl-g .serie-f{width:15px;height:15px}
+  .serie-cl-nota{font-size:12.5px;font-weight:600;color:var(--muted);
+    line-height:1.45;margin-top:10px}
   .serie-festa{position:fixed;left:50%;bottom:156px;z-index:60;
     transform:translateX(-50%) translateY(14px) scale(.92);opacity:0;
     pointer-events:none;display:flex;align-items:center;gap:10px;
@@ -15520,6 +15548,9 @@ document.getElementById('cartello')?.remove();</script>
              della riga sulla classifica qui sotto. -->
         <li>Gli <b>inviti</b>: il tuo codice e, se sei arrivato con un invito, chi ti ha invitato. A chi ti ha invitato non diciamo mai chi sei: vede <b>quante</b> persone ha portato, e i <b>punti</b> che gli hanno fruttato tutte insieme gli arrivano — nel cassetto, nel suo totale, nel livello e in classifica — solo quando quelle che commerciano sono almeno tre: prima restano da parte, e lui vede soltanto che ci sono, senza la cifra. Un limite onesto: se ha invitato soltanto te, la riga «punti in attesa» gli dice che hai cominciato a commerciare — non quanto.</li>
         <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo. Se non vuoi comparire, nel Profilo («Livello e titolo») c'è <b>Non mostrarmi in classifica</b>: il tuo livello resta sul profilo, perché a chi scambia con te serve per fidarsi. E se la tua reputazione la pubblichiamo su Nostr (vedi sotto), smettiamo e chiediamo ai relay di ritirarla.</li>
+        <!-- LA SERIE DEI GIORNI (17 nov 2026): un dato nuovo — quando
+             apri l'app — e si dichiara come gli altri, con chi lo vede. -->
+        <li>I tuoi <b>giorni di fila</b>: contiamo i giorni consecutivi in cui apri Barattolo — il numero di adesso, il tuo record e la data dell'ultimo giorno, non le ore né le volte. Dal secondo giorno di fila entri nella <b>classifica dei giorni di fila</b>, che vede solo chi è entrato in Barattolo: lì di te si leggono nome, foto e giorni. <b>Non mostrarmi in classifica</b> ti toglie anche da lì.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
         <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
         <!-- GLI AVVISI DEL MERCATINO (9 ott 2026): le preferenze e i
@@ -18629,6 +18660,17 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
   </div>
 
+  <!-- ============ SHEET CLASSIFICA DELLA SERIE 🔥 (17 nov 2026) ====== -->
+  <div class="sheet" id="serieClassificaSheet">
+    <div class="grab"></div>
+    <h3>🏆 Giorni di fila: la classifica</h3>
+    <div style="font-size:13px;color:var(--muted);font-weight:600">
+      Chi apre Barattolo ogni giorno, senza saltarne uno. Non dà punti né premi.
+    </div>
+    <div id="serieClassificaCorpo" class="serie-cl-lista"></div>
+    <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
+  </div>
+
   <!-- La pastiglia del gesto «tira giù per aggiornare» -->
   <div class="ptr" id="ptr" aria-hidden="true"><span>↻</span></div>
   <div class="toast" id="toast"></div>
@@ -21609,6 +21651,66 @@ function serieSettimanaHTML(s){
   }
   return `<div class="serie-sett" role="img" aria-label="Ultimi sette giorni: ${
     Math.min(b.giorni, 7)} di fila">${celle}</div>`;
+}
+/* LA CLASSIFICA DELLA SERIE (17 nov 2026, sera; Andrea: «una classifica
+   degli utenti che accedono a barattolo ogni giorno»): la porta sta
+   sotto la settimana, il foglio lo riempie il server (`GET
+   /api/serie/classifica`, che vuole l'identita'). Qui si disegna e
+   basta: posizioni, pari merito e chi non compare li ha gia' decisi
+   lui. I pezzi che disegnano sono PURI, come quelli della serie. */
+function serieClassificaPortaHTML(s){
+  if (!serieBusta(s)) return '';
+  return `<button type="button" class="serie-cl-porta" onclick="apriSerieClassifica()">🏆 <span style="flex:1;min-width:0">Classifica dei giorni di fila</span><span class="cl-fr" aria-hidden="true">›</span></button>`;
+}
+function serieClassificaRigaHTML(v){
+  const g = Math.floor(Number(v && v.giorni)) || 0;
+  const pos = Math.floor(Number(v && v.posizione)) || 0;
+  if (g < 1 || pos < 1) return '';
+  return `<div class="serie-cl-riga${v.io ? ' io' : ''}">
+      <div class="cl-pos">${pos <= 3 ? ['🥇','🥈','🥉'][pos - 1] : pos + '°'}</div>
+      ${voltoHTML({nome: v.nome, avatar: v.avatar, ignoto: true}, 'avatar serie-cl-volto', {tag: 'div'})}
+      <div class="serie-cl-nome">${esc(v.nome || '—')}${v.io ? '<small>tu</small>' : ''}</div>
+      <div class="serie-cl-g" title="${g} giorni di fila">${SERIE_FIAMMA}${g}</div>
+    </div>`;
+}
+function serieClassificaHTML(d){
+  if (!d || !Array.isArray(d.voci))
+    return '<div class="hint">La classifica adesso non risponde: riprova fra poco.</div>';
+  const minimo = Math.floor(Number(d.minimo)) || 2;
+  /* chi ha detto «Non mostrarmi in classifica» lo legge, invece di
+     cercarsi: l'interruttore e' quello di «Livello e titolo» */
+  const nascosto = d.nascosto
+    ? '<div class="serie-cl-nota">Tu qui non compari: hai acceso «Non mostrarmi in classifica» in «Livello e titolo».</div>' : '';
+  if (!d.voci.length)
+    return `<div class="hint">Ancora nessuno in classifica: si entra dal ${
+      minimo === 2 ? 'secondo' : minimo + '°'} giorno di fila. Torna domani.</div>${nascosto}`;
+  const totale = Math.floor(Number(d.totale)) || d.voci.length;
+  const altri = totale - d.voci.length - (d.mia ? 1 : 0);
+  const mia = d.mia ? `<div class="section-label" style="margin-top:14px">La tua posizione</div>${
+    serieClassificaRigaHTML(Object.assign({}, d.mia, {io: true}))}` : '';
+  /* chi guarda e non e' in gara (un giorno solo, o la fila di ieri
+     finita) si sente dire come si entra — mai «hai perso» */
+  const fuori = (!d.mia && !d.nascosto && !d.voci.some(v => v.io))
+    ? `<div class="serie-cl-nota">Si entra dal ${minimo === 2 ? 'secondo' : minimo + '°'} giorno di fila: torna domani e ci sei anche tu.</div>` : '';
+  return d.voci.map(serieClassificaRigaHTML).join('') + mia
+    + (altri > 0 ? `<div class="serie-cl-nota">E ${altri === 1 ? 'un\'altra persona ha' : 'altre ' + altri + ' persone hanno'} una fila accesa.</div>` : '')
+    + fuori + nascosto
+    + '<div class="serie-cl-nota">A pari giorni la posizione è la stessa. Se non vuoi comparire: Profilo, «Livello e titolo», «Non mostrarmi in classifica».</div>';
+}
+async function apriSerieClassifica(){
+  haptic();
+  const box = el('serieClassificaCorpo');
+  if (!box) return;
+  box.innerHTML = '<div class="hint">Preparo la classifica…</div>';
+  el('sheetBg').classList.add('open');
+  el('serieClassificaSheet').classList.add('open');
+  if (DEMO) { box.innerHTML = '<div class="hint">In demo la classifica non è quella vera 🙂</div>'; return; }
+  let d = null;
+  try {
+    const r = await fetch(`${API_BASE}/serie/classifica`, {headers:{'X-Tg-Init-Data':authHdr()}});
+    d = r.ok ? await r.json() : null;
+  } catch(e){ d = null; }
+  box.innerHTML = serieClassificaHTML(d);
 }
 /* Il nome di una tappa, o '' se il numero non e' una tappa. Le tappe le
    manda il server: qui ci sono solo le parole di quelle che conosciamo,
@@ -38009,6 +38111,7 @@ function closeSheet(){
   el('nwcConfermaSheet').classList.remove('open');
   el('installSheet').classList.remove('open');
   el('distintiviSheet').classList.remove('open');
+  el('serieClassificaSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
   el('manciaSheet').classList.remove('open');
   /* le raccolte (17 nov 2026): i tre fogli, e i battiti che aspettano
@@ -43624,6 +43727,7 @@ function renderProfilo(){
       ${tondi}
     </div>
     ${serieSettimanaHTML(mySerie)}
+    ${serieClassificaPortaHTML(mySerie)}
     ${guidaWalletBoxHTML()}`;
   /* LA FOTO DELLA TESTATA APRE «I TUOI ACCOUNT» (16 ott 2026, dal campo:
      «il doppio tocco sulla foto non fa niente»): sul telefono il tappo
@@ -44908,13 +45012,16 @@ function suonoSintetico(nome){
    nascosto, e la frase sotto dice cosa comporta. Una function e non
    una const: `renderLivello`, che la chiama, sta piu' su. */
 function rigaClassificaNascosta(){
-  if (!myClassifica) return '';
+  /* ...e c'e' anche con la sola classifica dei GIORNI DI FILA accesa (17
+     nov 2026): l'interruttore e' uno, e chi sta in quella deve poterne
+     uscire anche dove la classifica del mercatino e' spenta */
+  if (!myClassifica && !(typeof mySerie !== 'undefined' && mySerie)) return '';
   return `
     <div style="display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
       <div style="min-width:0;flex:1">
         <div style="font-size:13.5px;font-weight:800">🏆 Non mostrarmi in classifica</div>
         <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
-          Il nome esce dalla classifica e non si pubblica più su Nostr. Il livello resta.</div>
+          Il nome esce dalle classifiche (anche quella dei giorni di fila) e non si pubblica più su Nostr. Il livello resta.</div>
       </div>
       <button onclick="setClassificaNascosta(${myClassificaNascosta ? 'false' : 'true'}, this)"
         aria-pressed="${myClassificaNascosta ? 'true' : 'false'}"

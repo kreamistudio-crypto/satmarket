@@ -36961,7 +36961,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
 - LA SERIE DEI GIORNI 🔥 (17 nov 2026, cantiere serie-giorni; richiesta
   di Andrea, sul modello di Ditto). Quanti giorni DI FILA una persona
   ha aperto Barattolo: un contatore e basta — niente XP, niente premi,
-  e la vede solo chi la fa (mai nel negozio né nel riquadro venditore).
+  mai nel negozio né nel riquadro venditore (dalla sera ha la sua
+  classifica, per chi è entrato: vedi in fondo a questa voce).
   ROVESCIA IL «NIENTE STREAK» D'AGOSTO sapendolo: il motivo di allora
   (la fiammella che si spegne punisce chi ha lavorato) resta dentro le
   regole — chi salta un giorno riparte da 1 IN SILENZIO, nessun «hai
@@ -37002,6 +37003,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   di serie: spenta, niente timbro, niente chiave in /api/me, rotta 404,
   le righe restano. Prove: `prove_serie_giorni`,
   `collaudo_serie_giorni`.
+  LA CLASSIFICA DELLA SERIE (17 nov 2026 sera, cantiere
+  serie-classifica; Andrea: «una classifica degli utenti che accedono a
+  barattolo ogni giorno, e ogni utente può verificare questa
+  classifica»). ROVESCIA «la vede solo chi la fa» della mattina: nome,
+  foto e giorni di chi è in classifica li vede chiunque sia ENTRATO
+  (`GET /api/serie/classifica` vuole `verifica_utente`; il negozio e il
+  profilo pubblico continuano a non dire la serie). CHI NON VUOLE
+  COMPARIRE usa l'interruttore che c'è già, `utenti.classifica_nascosta`
+  («Non mostrarmi in classifica»): uno solo per le due classifiche, e
+  la riga dell'interruttore ora si vede anche con la sola serie accesa.
+  IL GIUDICE è `serie_podio`, puro: in gara le file VIVE (`ultimo` di
+  oggi o di ieri, giorno italiano) da `SERIE_CLASSIFICA_MIN` (2) giorni;
+  a pari giorni la STESSA posizione (1, 1, 3), l'ordine fra pari è
+  fermo per id solo perché la lista non balli; fuori le prime
+  `SERIE_CLASSIFICA_TOP` (20) righe, e a chi sta sotto la SUA (`mia`).
+  Una fila finita non si mostra, il record non entra in gara.
+  `serie_classifica` fa UNA lettura (join con `utenti`: gli orfani
+  cadono), non scrive e non timbra; in uscita cinque campi elencati
+  (`posizione`, `nome`, `avatar` con la scelta «nessuna», `giorni`,
+  `io`), mai il `tg_id`; più `totale`, `nascosto` (chi guarda si è
+  nascosto) e `minimo`. Niente cache: una riga a persona. A leva
+  spenta 404. IL CLIENT: `serieClassificaPortaHTML` (il bottone sotto
+  la settimana), il foglio `serieClassificaSheet` (in `closeSheet`),
+  `serieClassificaRigaHTML` e `serieClassificaHTML` puri,
+  `apriSerieClassifica`. «I tuoi dati» dichiara il dato e chi lo vede.
+  Prove: `prove_serie_classifica`, `collaudo_serie_giorni` punto 8.
 - I PREMI FEDELTÀ DEL NEGOZIO 🎀 (17 nov 2026, cantiere premi-fedelta; la
   proposta di un negozio vero, «Un tempo per te»). Il venditore scrive
   fino a `PREMI_FEDELTA_MAX` (4) gradini «da N € spesi da me, nel pacco

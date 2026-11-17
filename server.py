@@ -5402,8 +5402,10 @@ def xp_ordine(prezzo_sats: int, cambio_eur: float, ruolo: str) -> int:
 
 # ------------------ LA SERIE DEI GIORNI 🔥 (17 nov 2026) ------------------
 # Quanti giorni DI FILA una persona ha aperto Barattolo. Non da' XP, non
-# sblocca niente e non la vede nessun altro: e' un contatore, e basta
-# (richiesta di Andrea, sul modello di Ditto).
+# sblocca niente: e' un contatore, e basta (richiesta di Andrea, sul
+# modello di Ditto). Dalla sera dello stesso giorno ha la sua CLASSIFICA
+# (`serie_classifica`, piu' sotto): la vede chi e' entrato, e chi ha
+# detto «Non mostrarmi in classifica» non ci compare.
 # ROVESCIA UNA DECISIONE D'AGOSTO, e lo fa sapendolo. Qui era scritto
 # «niente serie consecutiva: in un mercatino non c'e' nulla da fare ogni
 # giorno, e una fiammella che si spegne punisce chi ha lavorato invece
@@ -5548,6 +5550,95 @@ def _serie_unisci(con, resta: int, va_via: int):
         "giorni=excluded.giorni, record=excluded.record, "
         "ultimo=excluded.ultimo",
         (resta, meglio["giorni"], record, meglio["ultimo"]))
+
+
+# LA CLASSIFICA DELLA SERIE 🔥 (17 nov 2026, sera; Andrea: «una classifica
+# degli utenti che accedono a barattolo ogni giorno, e ogni utente puo'
+# verificare questa classifica»). Chi ha la fila VIVA piu' lunga, dal
+# Profilo, accanto alla propria serie.
+# COSA ROVESCIA: la mattina la serie era «solo di chi la fa». Ora nome,
+# foto e giorni di fila di chi sta in classifica li vede chiunque sia
+# ENTRATO in Barattolo (la rotta vuole l'identita': non e' una pagina del
+# web aperto, e sul profilo pubblico la serie continua a non esserci).
+# CHI NON VUOLE COMPARIRE ha gia' il suo interruttore, «Non mostrarmi in
+# classifica» (`utenti.classifica_nascosta`): vale anche qui, lo stesso
+# — uno solo, perche' la domanda e' una sola. La sua riga non c'e' e chi
+# gli stava dietro sale; lui la sua serie continua a vederla nel Profilo.
+# VIVA = l'ultimo passaggio e' di oggi o di ieri (il giorno italiano):
+# la fila di chi ieri c'era e oggi non ha ancora aperto e' ancora in
+# piedi, e si spegne da sola domani. Una fila finita non si mostra a
+# nessuno: «ha perso» non lo diciamo a lui, figurarsi agli altri.
+# UN GIORNO SOLO NON E' UNA FILA (`SERIE_CLASSIFICA_MIN`): si entra dal
+# secondo, come il saluto. Il RECORD non entra in gara ne' esce: e' una
+# cosa di ieri, e qui si guarda chi c'e' adesso.
+# A PARI GIORNI LA POSIZIONE E' LA STESSA (1°, 1°, 3°): al lancio partono
+# tutti lo stesso giorno, e un ordine fra pari sarebbe inventato. Fuori
+# escono le prime `SERIE_CLASSIFICA_TOP` righe; chi non ci sta riceve la
+# SUA, e solo lui. Niente `tg_id` in uscita, come nella classifica del
+# mercatino. Niente cache: e' una lettura su una tabella con una riga a
+# persona, e cambia una volta al giorno a testa.
+SERIE_CLASSIFICA_TOP = 20
+SERIE_CLASSIFICA_MIN = 2
+
+
+def serie_podio(vive, nascosti=(), io=None, top=SERIE_CLASSIFICA_TOP) -> dict:
+    """IL GIUDICE DELLA CLASSIFICA DELLA SERIE, puro. `vive` sono le
+    coppie (tg_id, giorni) delle file ancora in piedi; `nascosti` chi ha
+    detto di non comparire; `io` chi guarda. Ritorna le prime `top` righe
+    (`id`, `giorni`, `posizione`), quante sono in gara e la riga di chi
+    guarda, se e' in gara (anche quando sta gia' fra le prime: decide chi
+    disegna). A pari giorni la posizione e' la stessa e la successiva
+    salta (1, 1, 3); l'ordine fra pari e' fermo (per id) solo perche' la
+    lista non balli da un'apertura all'altra."""
+    nascosti = set(nascosti)
+    in_gara = sorted(((int(g), int(t)) for t, g in vive
+                      if t not in nascosti and int(g) >= SERIE_CLASSIFICA_MIN),
+                     key=lambda x: (-x[0], x[1]))
+    righe, posizione = [], 0
+    for i, (g, t) in enumerate(in_gara, 1):
+        if i == 1 or g != in_gara[i - 2][0]:
+            posizione = i
+        righe.append({"id": t, "giorni": g, "posizione": posizione})
+    mia = next((r for r in righe if r["id"] == io), None)
+    return {"voci": righe[:max(0, int(top))], "totale": len(righe), "mia": mia}
+
+
+def serie_classifica(con, io: int, adesso=None) -> dict:
+    """La classifica della serie di ADESSO, per chi guarda (`io`): una
+    lettura sola, poi il giudice (`serie_podio`). LEGGE E BASTA. I campi
+    in uscita si ELENCANO uno per uno (la regola di CAMPI_VETRINA):
+    posizione, nome, foto, giorni, e `io` sulla riga di chi guarda. La
+    foto esce con la stessa scelta dell'utente che vale nel mercatino
+    («nessuna» = niente foto)."""
+    oggi = _giorno_roma(time.time() if adesso is None else adesso)
+    ana, vive, nascosti = {}, [], set()
+    for r in con.execute(
+            "SELECT s.tg_id, s.giorni, u.nome, u.classifica_nascosta, "
+            "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar "
+            "END) AS avatar FROM serie_giorni s "
+            "JOIN utenti u ON u.tg_id=s.tg_id "
+            "WHERE s.ultimo>=? AND s.giorni>=?",
+            (_giorno_prima(oggi), SERIE_CLASSIFICA_MIN)):
+        ana[r["tg_id"]] = r
+        vive.append((r["tg_id"], r["giorni"]))
+        if r["classifica_nascosta"]:
+            nascosti.add(r["tg_id"])
+    esito = serie_podio(vive, nascosti, io)
+
+    def voce(r):
+        u = ana[r["id"]]
+        return {"posizione": r["posizione"], "nome": u["nome"] or "—",
+                "avatar": u["avatar"] or "", "giorni": r["giorni"],
+                "io": r["id"] == io}
+    return {"voci": [voce(r) for r in esito["voci"]],
+            "totale": esito["totale"],
+            # la tua riga esce SOLO se sei in gara e fuori dalle prime:
+            # dentro le prime la vedi gia', accesa
+            "mia": (voce(esito["mia"]) if esito["mia"]
+                    and esito["mia"] not in esito["voci"] else None),
+            # chi ha detto di non comparire lo legge, invece di cercarsi
+            "nascosto": io in nascosti,
+            "minimo": SERIE_CLASSIFICA_MIN}
 
 
 # ------------------- I CODICI INVITO (set 2026) ----------------------
@@ -57636,6 +57727,26 @@ async def passa_serie(x_tg_init_data: str = Header(""),
     finally:
         con.close()
     return {"ok": True, "serie": serie}
+
+
+@app.get("/api/serie/classifica")
+def classifica_della_serie(x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """LA CLASSIFICA DELLA SERIE 🔥 (17 nov 2026): chi apre Barattolo da
+    piu' giorni di fila, dal Profilo. VUOLE L'IDENTITA' — la vede chi e'
+    entrato, non il web aperto — e a leva spenta risponde 404 come le
+    sorelle. Non scrive niente e non timbra: il passaggio di oggi lo
+    contano /api/me e `POST /api/me/serie`, qui si guarda soltanto. Chi
+    ha scelto «Non mostrarmi in classifica» non esce (`serie_classifica`,
+    coi perche')."""
+    if not SERIE_GIORNI_ATTIVA:
+        raise HTTPException(404, "Funzione non attiva")
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        return dict(serie_classifica(con, user["id"]), ok=True)
+    finally:
+        con.close()
 
 
 @app.post("/api/me/invito")
