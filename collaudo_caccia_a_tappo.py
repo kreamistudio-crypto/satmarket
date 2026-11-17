@@ -449,7 +449,7 @@ def main():
     print("\n[le missioni di Tappo]")
     st = c.get(B, headers=COMPRA).json()
     prova("sei missioni, la prima la piu' facile, nessuna finita; il tabellone legge l'insieme vuoto",
-          (["sats", "lucchetto", "quaderno", "staffetta", "parole", "halving"], [0] * 6, set()),
+          (["sats", "lucchetto", "quaderno", "parole", "staffetta", "halving"], [0] * 6, set()),
           ([x["id"] for x in st["missioni"]], [x["stelle"] for x in st["missioni"]],
            S.missioni_superate(S.db(), 111)))
     M = f"{B}/missione"

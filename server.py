@@ -113864,9 +113864,18 @@ def tappe_stradina(f: dict, scala: list, impara_link: str = "",
         if sue:
             caselle = t[inizio:]
             del t[inizio:]
+            # `prima` (17 nov, Andrea: «i minigame devono rispecchiare le
+            # caselle»): la missione che INSEGNA una casella le sta subito
+            # davanti — si impara giocando, poi la si fa davvero. Senza
+            # `prima` (o con una casella che nella zona non c'e') resta
+            # sparsa come prima
+            ids = [c["id"] for c in caselle]
             dopo = {}
             for k in range(len(sue)):
-                dopo.setdefault(-(-(k + 1) * len(caselle) // len(sue)), []).append(k)
+                prima = str(sue[k][2].get("prima") or "")
+                j = (ids.index(prima) if prima in ids
+                     else -(-(k + 1) * len(caselle) // len(sue)))
+                dopo.setdefault(j, []).append(k)
             for j in range(len(caselle) + 1):
                 if j:
                     t.append(caselle[j - 1])
@@ -120570,7 +120579,8 @@ GIOCO_TAPPO_EVIDENZA_POSTI = 3
 # LE MISSIONI DI TAPPO (17 nov 2026): piccoli giochi da uno a tre minuti
 # dove una cosa di Bitcoin si impara FACENDOLA (lo studio approvato da
 # Andrea: «Studio: le missioni di Tappo su Bitcoin»). Il tabellone dei
-# livelli le mette nelle sue zone, subito prima del gradino, e le legge da
+# livelli le mette nelle sue zone, subito prima della casella che
+# insegnano (`prima`), e le legge da
 # qui (`MISSIONI_TAPPO` e `missioni_superate`, il patto col thread della
 # stradina): `zona` e' la SUA zona, 0-7 (otto zone dal 17 nov; una zona
 # fuori di li' il tabellone la ignora). Gli id sono per sempre.
@@ -120579,20 +120589,26 @@ GIOCO_TAPPO_EVIDENZA_POSTI = 3
 MISSIONI_TAPPO = (
     # (17 nov 2026, Andrea: «le prime missioni devono essere facili,
     # semplici... basta che la storia sia semplice») la prima e' la piu'
-    # facile — raccogliere i sats e metterli nel wallet — e il quaderno,
-    # che chiede di confrontare, scala alla terza zona
+    # facile — raccogliere i sats e metterli nel wallet.
+    # OGNI MISSIONE INSEGNA UNA CASELLA VERA (Andrea, 17 nov: «i minigame
+    # devono rispecchiare» le caselle-competenza del tabellone): `prima` e'
+    # l'id della casella di STRADINA_CASELLE che la missione precede, nella
+    # stessa `zona`; il gioco finisce col bottone per farla davvero.
     dict(id="sats", emoji="👛", nome="Raccogli i sats", zona=0,
-         bulloni=10, cosa="I sats e il tuo wallet"),
+         prima="wallet", bulloni=10, cosa="I sats e il tuo wallet"),
     dict(id="lucchetto", emoji="🔒", nome="Il barattolo col lucchetto",
-         zona=1, bulloni=20, cosa="Il deposito di garanzia"),
+         zona=1, prima="acquisto", bulloni=20,
+         cosa="Il deposito di garanzia"),
     dict(id="quaderno", emoji="📓", nome="Il quaderno di tutti", zona=2,
-         bulloni=15, cosa="Bitcoin è un registro che tengono in tanti"),
+         prima="onchain", ordine=1, bulloni=15,
+         cosa="Bitcoin è un registro che tengono in tanti"),
+    dict(id="parole", emoji="🗝️", nome="Le dodici parole", zona=2,
+         prima="onchain", ordine=2, bulloni=30,
+         cosa="La frase di recupero e la custodia"),
     dict(id="staffetta", emoji="⚡", nome="La staffetta del fulmine", zona=3,
-         bulloni=25, cosa="Lightning: canali e strade"),
-    dict(id="parole", emoji="🗝️", nome="Le dodici parole", zona=5,
-         bulloni=30, cosa="La frase di recupero e la custodia"),
+         prima="incasso10k", bulloni=25, cosa="Lightning: canali e strade"),
     dict(id="halving", emoji="🌕", nome="L'ultimo bullone", zona=7,
-         bulloni=40, cosa="Il dimezzamento e i 21 milioni"),
+         prima="halving", bulloni=40, cosa="Il dimezzamento e i 21 milioni"),
 )
 # il tempo minimo fra la partenza e la fine perche' una missione valga:
 # chi la gioca davvero ci mette di piu', uno script deve aspettare
