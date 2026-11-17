@@ -3802,7 +3802,10 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `-bar5` NON esiste, ed è la ragione per cui il rollback lo toglie.
   Dal 17 nov 2026 la lista vuole anche «Contante per posta», il nono
   metodo: `["Contanti", "Contante per posta"]`, voce per voce a parola
-  intera — DA-FARE-ANDREA, voce 18, finché non è fatto.)
+  intera — DA-FARE-ANDREA, voce 18, finché non è fatto. Ma SOLO quando
+  la leva del client `P2P_POSTA_ATTIVO` sarà accesa in produzione: oggi è
+  spenta di serie e Andrea la vuole spenta anche dopo la promozione, la
+  si accende solo sul collaudo, dal suo config.)
   Poi si rilegge: `grep -n -A7 "^\[anti_abuse_bond\]" ~/nodo/mostro/settings.toml`
   e `grep -n "hold_invoice_expiration_window" ~/nodo/mostro/settings.toml`
   → il blocco di sette righe e `= 900`. ⚠️ Il blocco vale dall'`up -d`

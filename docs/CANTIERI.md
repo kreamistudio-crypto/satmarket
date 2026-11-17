@@ -87645,3 +87645,62 @@ compare sotto il velo. Il primo giorno in produzione tutti partono da 1
 (nessuno storico da cui ricostruire). NOTATO E NON TOCCATO: il censimento
 della fusione in `prove.py` legge anche i commenti (lo dice lui stesso):
 la serie è coperta dal collaudo con la fusione vera.
+## La leva del contante per posta, spenta di serie (17 nov 2026, cantiere leva-posta; Andrea: «Lasciala spenta la leva per questa funzione. Quando la porto in produzione, la leva lasciala spenta»)
+
+COSA SI È DECISO. Il nono metodo del P2P (voce sopra, «Il contante per
+posta») era nato senza leva, come vuole la regola delle leve nuove
+accese di serie. Un'ora dopo il push Andrea ha chiesto l'opposto: la
+funzione deve esistere nel codice ma NON comparire in produzione, e
+restarci spenta anche dopo la promozione. Quindi una leva,
+`P2P_POSTA_ATTIVO`, SPENTA di serie nel codice (`False` sia nel default
+sia in `config_esempio.py`), letta col solito import morbido (un valore
+che non è True/False si legge come spento e lo dice a voce), in busta
+come `posta` (ventesima chiave di `_p2p_leve`) e nel pannello «⚙️ Stato
+delle leve» («Contante per posta nel P2P»). È un'ECCEZIONE VOLUTA alla
+regola «le leve nuove nascono accese»: la ragione è la parola di Andrea,
+non una prudenza mia; se un giorno la vorrà accesa in produzione, è una
+riga `P2P_POSTA_ATTIVO = True` nel config del VPS e il riavvio, più la
+riga del nodo (DA-FARE-ANDREA, voce 18, parte B).
+
+COSA CHIUDE LA LEVA, E COSA NO. Spenta, la voce sparisce da quel che si
+OFFRE: `metodiOffertiP2P(lista, attiva)` la toglie dalle liste di
+`metodiPubblicabiliP2P` (il foglio Pubblica, anche in franchi) e di
+`metodiValutaP2P` (il filtro del libro), e `renderP2PInfo` nasconde la
+sezione `#p2pInfoPosta` di Info P2P e la leva via dalla riga dei metodi.
+Il client lo sa da `postaAttivaP2P()`, cioè `p2pCoord().posta`. NON la
+guardano i giudici degli ordini (`scambioInPostaP2P`, `recapitoInPostaP2P`,
+le regole, gli stati, il form del recapito): un ordine che porta il
+metodo — pubblicato dal collaudo, o da un client di un'altra istanza
+sullo stesso nodo — si legge, si prende e si racconta lo stesso. La
+scelta è la stessa fatta per il CHF e per gli USDT: la leva decide cosa
+si propone, mai cosa si capisce.
+
+STRADE SCARTATE. Togliere la voce da `P2P_METODI` a leva spenta: avrebbe
+rotto i giudici e le prove che contano nove voci, e un ordine arrivato
+con quel metodo sarebbe diventato «metodo sconosciuto». Una leva lato
+server che filtra gli ordini del libro: il libro arriva dal relay, non
+dal server, e nascondere ordini veri è peggio che mostrarne uno con un
+metodo che qui non si offre. Un'altra chiave «solo admin» come per il
+CHF: Andrea ha chiesto spenta e basta, una leva sola.
+
+COSA È STATO PROVATO. `prove_contante_per_posta` allungata: il default
+False nel codice e nell'esempio, la chiave in busta, la riga del
+pannello, un banco Node che con la leva spenta trova la voce assente dal
+foglio, dal filtro e dalla lista CHF (8 voci) e con la leva accesa la
+ritrova (9 voci), mentre una lista senza la voce passa intatta;
+`renderP2PInfo` che legge la leva e il `div` nascosto nel sorgente.
+`prove_p2p_server` conta venti chiavi in busta (i quattro ambienti di
+prova che ricostruiscono `_p2p_leve` hanno la leva). I banchi Node che
+estraggono `metodiPubblicabiliP2P` o `metodiValutaP2P` da soli (eth-xmr,
+usde, tabacchino, lista corta) restano in piedi: le due funzioni usano
+`metodiOffertiP2P` solo se c'è (`typeof`), sennò la lista intera, come
+prima. NOVITA: la voce passa a `pubblico: no` con la leva scritta;
+sapere.md dice a Tappo che il metodo c'è solo dove la leva è accesa
+(conoscenza.md rigenerato); DA-FARE-ANDREA voce 18 ha la parte A (la
+riga nel config del collaudo, coi comandi) e la parte B (il nodo, solo
+quando la leva sarà accesa in produzione); PRODUZIONE e ARCHITETTURA
+aggiornate. Il verbale della suite e dei collaudi sta in fondo.
+
+RESTA DA GUARDARE. Sul collaudo, dopo la riga: «Altri metodi ▾» con la
+voce e Info P2P con la sezione; in produzione, dopo la promozione: la
+voce assente e il pannello che dice «spento». La riga del nodo aspetta.

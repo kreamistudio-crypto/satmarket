@@ -37456,6 +37456,17 @@ def _leve_stato():
                   spento="gli scambi on-chain si pagano solo in euro",
                   allarme=bool(P2P_ONCHAIN_USDT_ATTIVO) and not (
                       P2P_ONCHAIN_ATTIVO and P2P_USDT_ATTIVO)),
+            # IL CONTANTE PER POSTA (17 nov 2026, cantiere leva-posta):
+            # spenta di serie per parola di Andrea
+            _leva("Contante per posta nel P2P", "P2P_POSTA_ATTIVO",
+                  bool(P2P_POSTA_ATTIVO),
+                  acceso="nel foglio «Pubblica» (sotto «Altri metodi ▾») e "
+                         "nel filtro del libro c'è la voce «Contante per "
+                         "posta», e Info P2P ne dice le regole; la cauzione "
+                         "la chiede il nodo solo se la voce sta nella sua "
+                         "lista (DA-FARE-ANDREA, voce 18)",
+                  spento="la voce non si offre a nessuno; un ordine che la "
+                         "porta si legge e si paga lo stesso"),
             # GLI ORDINI P2P IN FRANCHI (14 nov 2026, cantiere p2p-chf)
             _leva("Ordini P2P in franchi svizzeri", "P2P_CHF_ATTIVO",
                   bool(P2P_CHF_ATTIVO),
@@ -58859,6 +58870,23 @@ try:
     P2P_CAUZIONE_SUL_METODO = P2P_CAUZIONE_SUL_METODO is True
 except ImportError:
     P2P_CAUZIONE_SUL_METODO = False
+# IL CONTANTE PER POSTA (17 nov 2026, cantiere leva-posta, Andrea:
+# «lasciala spenta la leva per questa funzione. Quando la porto in
+# produzione, la leva lasciala spenta»): SPENTA DI SERIE, contro la
+# regola delle leve nuove accese, per sua parola. Accesa, il foglio
+# «Pubblica» e il filtro del libro offrono la voce «Contante per
+# posta» e Info P2P mostra la sua sezione; spenta, la voce non si
+# offre — ma un ordine che la porta (un altro client, o il collaudo)
+# si legge e si paga come sempre. Si accende sul collaudo (DA-FARE).
+# Solo True accende.
+try:
+    from config import P2P_POSTA_ATTIVO
+    if not isinstance(P2P_POSTA_ATTIVO, bool):
+        print("[p2p] P2P_POSTA_ATTIVO non e' True/False: il contante per "
+              "posta resta spento")
+    P2P_POSTA_ATTIVO = P2P_POSTA_ATTIVO is True
+except ImportError:
+    P2P_POSTA_ATTIVO = False
 # IL TEMPO DI CHI PUBBLICA (12 ott 2026, cantiere tempo-di-chi-pubblica):
 # spenta di serie. Accesa, il server e l'app mettono in campo il
 # pacchetto — la pausa degli ordini, il badge «⚡ risponde in fretta», i
@@ -59246,6 +59274,9 @@ def _p2p_leve() -> dict:
             "cauzione": bool(P2P_CAUZIONE),
             # ...e sul metodo scelto (11 ott 2026): solo col nodo alla -bar7
             "cauzioneSulMetodo": bool(P2P_CAUZIONE_SUL_METODO),
+            # il contante per posta (17 nov 2026): la voce si offre solo
+            # con questa; spenta di serie per parola di Andrea
+            "posta": bool(P2P_POSTA_ATTIVO),
             # il tempo di chi pubblica (12 ott 2026): pausa degli ordini,
             # badge e regole nuove; il client le mostra solo con questa
             "tempoPubblica": bool(P2P_TEMPO_DI_CHI_PUBBLICA),

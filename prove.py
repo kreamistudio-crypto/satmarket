@@ -73945,8 +73945,12 @@ def prove_nav_p2p():
     prova("...le finestre vengono dal 38385, coi ripieghi dichiarati",
           True, "p2pInfo.oreVita" in _rp and "p2pInfo.scadenzaSec" in _rp
           and "P2P_ORIZZONTE_S" in _rp)
+    # (17 nov 2026, cantiere leva-posta) i metodi passano da
+    # `metodiOffertiP2P(P2P_METODI, ...)`: sempre il catalogo di casa,
+    # meno la voce «Contante per posta» a leva spenta
     prova("...e la fascia del premio e i metodi dai cataloghi di casa",
-          True, "P2P_PREMIO_MAX" in _rp and "P2P_METODI.join" in _rp)
+          True, "P2P_PREMIO_MAX" in _rp
+          and "metodiOffertiP2P(P2P_METODI, postaAttivaP2P()).join" in _rp)
     # `expiration_hours` si LEGGE come le altre: era l'unica finestra
     # che il lettore del 38385 buttava via, e la pagina la dice.
     prova("infoDaEvento legge anche la vita nel libro", True,
@@ -87454,6 +87458,7 @@ def prove_p2p_server():
              # la cauzione di chi prende (1 ott 2026), in busta
              "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
+             "P2P_POSTA_ATTIVO": False,            # (17 nov 2026) il contante per posta, spento di serie
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
              "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
@@ -87492,10 +87497,11 @@ def prove_p2p_server():
     # (13 ott 2026) DICIASSETTE: il paracadute degli ordini, spento di serie
     # (20 ott 2026) DICIOTTO: il tetto del collaudo, 0 in produzione
     # (16 nov 2026) DICIANNOVE: la ripubblica degli ordini scaduti
-    prova("le chiavi sono diciannove e sono sempre quelle",
+    # (17 nov 2026) VENTI: il contante per posta, spento di serie (Andrea)
+    prova("le chiavi sono venti e sono sempre quelle",
           ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "cauzioneSulMetodo", "chat", "commissione",
            "conferma", "indirizziNo", "maxEuro", "maxEuroContanti", "maxSatsProva", "minEuroBz", "mostro",
-           "paracadute",
+           "paracadute", "posta",
            "relay", "ripubblica", "specchio", "tempoPubblica"],
           sorted(piena.keys()))
     # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
@@ -119791,6 +119797,7 @@ def prove_avvisi_nuovi_ordini():
              "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
              "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
+             "P2P_POSTA_ATTIVO": False,            # (17 nov 2026) il contante per posta, spento di serie
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
              "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
@@ -144969,6 +144976,7 @@ def prove_contanti_a_mano():
              # la cauzione (1 ott 2026), entrata in busta il giorno dopo
              "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
+             "P2P_POSTA_ATTIVO": False,            # (17 nov 2026) il contante per posta, spento di serie
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
              "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
@@ -156067,6 +156075,7 @@ def prove_indirizzo_non_verificato():
              "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
              "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
+             "P2P_POSTA_ATTIVO": False,            # (17 nov 2026) il contante per posta, spento di serie
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
              "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
@@ -160318,6 +160327,49 @@ def prove_contante_per_posta():
           ("Contante per posta (metodo «Contante per posta»" in libro, "Poste Italiane per denaro e valori" in libro,
            "apre il pacco filmando" in libro, "blocca la stessa piccola cauzione del contanti di persona" in libro))
     prova("NOVITA ha la voce", True, "## 2026-11-17 · contante-per-posta" in open("NOVITA.md", encoding="utf-8").read())
+    # LA LEVA, SPENTA DI SERIE (17 nov 2026, cantiere leva-posta, Andrea:
+    # «quando la porto in produzione, la leva lasciala spenta»): nel
+    # codice False, nel config d'esempio False, in busta come `posta`;
+    # spenta, il foglio e il filtro non offrono la voce e Info P2P
+    # nasconde la sezione; accesa, tutto torna. Un ordine che la porta
+    # si giudica lo stesso (i giudici non guardano la leva).
+    src = _SORGENTE
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("la leva P2P_POSTA_ATTIVO e' spenta di serie nel codice e nel config d'esempio, e viaggia in busta",
+          (True, True, True, True),
+          ("    P2P_POSTA_ATTIVO = False" in src.split("def _p2p_leve(")[0],
+           "P2P_POSTA_ATTIVO = P2P_POSTA_ATTIVO is True" in src,
+           "\nP2P_POSTA_ATTIVO = False\n" in esempio,
+           '"posta": bool(P2P_POSTA_ATTIVO),' in src))
+    prova("...e sta nel pannello «Stato delle leve»", True,
+          '_leva("Contante per posta nel P2P", "P2P_POSTA_ATTIVO",' in src)
+    leva_js = (_riga_js(mini, "const P2P_METODI = [") + _riga_js(mini, "const P2P_METODI_CHF = [")
+               + _riga_js(mini, "const P2P_METODI_USDT = ").replace("P2P_RETI_USDT.map(r => r.metodo)", "[]")
+               + _riga_js(mini, "const P2P_POSTA = 'Contante per posta';")
+               + "let LEVA = false;\nfunction p2pCoord(){return {posta: LEVA}}\n"
+               + "function valutaFoglioP2P(){return 'EUR'}\n"
+               + _fn_js(mini, "function postaAttivaP2P(){")
+               + _fn_js(mini, "function metodiOffertiP2P(lista, attiva){")
+               + _fn_js(mini, "function metodiValutaP2P(cod){")
+               + _fn_js(mini, "function metodiPubblicabiliP2P(lato){")
+               + "const giro = () => [metodiPubblicabiliP2P('vendo').indexOf(P2P_POSTA) >= 0, metodiValutaP2P('EUR').indexOf(P2P_POSTA) >= 0,"
+               + " metodiValutaP2P('CHF').indexOf(P2P_POSTA) >= 0, metodiValutaP2P('EUR').length];\n"
+               + "const spenta = giro(); LEVA = true; const accesa = giro();\n"
+               + "console.log(JSON.stringify({spenta, accesa, altri: metodiOffertiP2P(['SEPA', 'Contanti'], false)}));\n")
+    ol = _node_banco(leva_js)
+    if ol is None:
+        salta("la leva del contante per posta, sul banco", "node non c'e'")
+    else:
+        prova("a leva spenta la voce non si offre (foglio, filtro, franchi) e restano otto; accesa torna, nove",
+              [[False, False, False, 8], [True, True, True, 9], ["SEPA", "Contanti"]],
+              [(ol or {}).get("spenta"), (ol or {}).get("accesa"), (ol or {}).get("altri")])
+    rinfo = _fn_js(mini, "function renderP2PInfo(){")
+    prova("Info P2P: l'elenco dei metodi passa dal filtro della leva e la sezione si nasconde a leva spenta",
+          (True, True, True, True),
+          ("metodiOffertiP2P(P2P_METODI, postaAttivaP2P()).join(', ')" in rinfo,
+           "sezPosta.hidden = !postaAttivaP2P();" in rinfo,
+           '<div id="p2pInfoPosta" hidden>\n      <h3 id="p2pinfo-posta">' in mini,
+           mini.index('<div id="p2pInfoPosta" hidden>') < mini.index("</div>", mini.index('<h3 id="p2pinfo-posta">'))))
 
 
 def prove_revolut_tre_modi():

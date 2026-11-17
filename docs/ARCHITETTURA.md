@@ -32691,7 +32691,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'apertura filmata. LA CAUZIONE LA DECIDE IL NODO: `only_payment_methods`
   del suo settings.toml, letta dal 38385 (`cauzioneInfoP2P`); il client
   cambia solo le parole («non hai spedito» al posto di «non ti sei
-  presentato»). Prove: `prove_contante_per_posta`.
+  presentato»). LA LEVA (17 nov 2026, cantiere leva-posta, Andrea: «quando
+  la porto in produzione, la leva lasciala spenta»): `P2P_POSTA_ATTIVO`,
+  letta col solito import morbido, SPENTA di serie nel codice (eccezione
+  voluta alla regola delle leve nuove accese), in busta come `posta` e
+  nel pannello delle leve. Spenta, `metodiOffertiP2P(lista, attiva)`
+  toglie la voce da quel che il foglio e il filtro offrono
+  (`metodiPubblicabiliP2P`, `metodiValutaP2P`, anche in CHF) e
+  `renderP2PInfo` nasconde `#p2pInfoPosta`; i giudici degli ordini
+  (`scambioInPostaP2P` e compagni) NON la guardano, così un ordine che
+  porta il metodo si legge lo stesso. Il client la sa da `postaAttivaP2P()`
+  (`p2pCoord().posta`). Prove: `prove_contante_per_posta`.
 
 - LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, I TENTATIVI, IL
   FILTRO DI CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, perché

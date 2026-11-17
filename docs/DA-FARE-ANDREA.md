@@ -663,7 +663,44 @@ virgola separa): «Contante per posta» va scritto così, intero. Il perché:
 CANTIERI, «Il contante per posta: la nona voce del P2P». Va fatto DOPO la
 promozione (prima, nessun client la manda), e a LIBRO FERMO.
 
-**Sola lettura (NODO):**
+**A. LA LEVA DEL CLIENT, SOLO SUL COLLAUDO (17 nov 2026, cantiere
+leva-posta; Andrea: «Lasciala spenta la leva per questa funzione. Quando
+la porto in produzione, la leva lasciala spenta»).** Il metodo sta dietro
+`P2P_POSTA_ATTIVO`, spenta di serie nel codice: in PRODUZIONE NON SI
+TOCCA (nessuna riga da aggiungere al config del VPS, la voce non compare
+e il pannello «⚙️ Stato delle leve» dice «spento»). Si accende solo
+sulla VM di collaudo, dopo che il collaudo ha tirato il commit.
+
+Sola lettura (VM di collaudo):
+```
+sudo grep -c "^P2P_POSTA_ATTIVO" /srv/collaudo/barattolo/config.py
+```
+Atteso `0`. Se dice `1`, la riga c'è già: si guarda il valore con
+`sudo grep -n "^P2P_POSTA_ATTIVO" /srv/collaudo/barattolo/config.py`.
+
+Scrive (VM di collaudo): la copia, la riga in fondo, il controllo, il riavvio.
+```
+sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-posta-$(date +%F)
+```
+```
+printf '\n# il contante per posta nel P2P (17 nov 2026): solo qui, in produzione resta spenta\nP2P_POSTA_ATTIVO = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
+```
+Atteso `ok` e `200`. Poi nell'app del collaudo:
+P2P → «Pubblica» → «Altri metodi ▾» mostra «Contante per posta», e Info
+P2P ha la voce. Senza la riga, la voce non c'è: è il comportamento della
+produzione.
+
+**B. LA CAUZIONE, SUL NODO.** Va fatto solo quando la leva si accenderà
+in produzione (oggi no): finché la voce non si offre a nessuno, la riga
+del nodo non serve, e aggiungerla prima non fa danni ma non prova niente.
+
+Sola lettura (NODO):
 ```
 grep -n "only_payment_methods" ~/nodo/mostro/settings.toml
 ```

@@ -1138,6 +1138,13 @@ P2P_CAUZIONE = False
 # accesa prima, un nodo senza la 0010 rifiuterebbe le prese sugli
 # intervalli e chiederebbe la cauzione a chi aveva letto «niente».
 P2P_CAUZIONE_SUL_METODO = False
+# IL CONTANTE PER POSTA (17 nov 2026): la nona voce dei metodi P2P (la
+# busta di banconote spedita). SPENTA DI SERIE per parola di Andrea
+# («quando la porto in produzione, la leva lasciala spenta»): accesa, la
+# voce si offre nel foglio «Pubblica» e nel filtro del libro, e Info P2P
+# mostra le regole. La cauzione la chiede il nodo, se la voce sta in
+# `only_payment_methods` del suo settings.toml.
+P2P_POSTA_ATTIVO = False
 # IL TEMPO DI CHI PUBBLICA (12 ott 2026): spenta di serie. Accesa, mette in
 # campo la pausa degli ordini (ricorrente e una volta sola), il badge «⚡
 # risponde in fretta», i quattro avvisi a chi pubblica quando gli prendono

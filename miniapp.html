@@ -13937,6 +13937,7 @@ document.getElementById('cartello')?.remove();</script>
            cash by mail»). Le frasi sono le costanti del client
            (REGOLA_POSTA_*, CONSIGLI_POSTA, REGOLA_DISPUTA_POSTA): una
            prova le confronta. -->
+      <div id="p2pInfoPosta" hidden>
       <h3 id="p2pinfo-posta">Contante per posta</h3>
       <p>Il metodo «Contante per posta» è la <b>busta di banconote spedita</b>: chi compra sats la manda a chi li vende, chi vende la apre e libera i sats. È il metodo più facile da contestare, quindi le regole sono scritte prima, e in disputa valgono solo le prove.</p>
       <ol class="sicu-passi">
@@ -13946,6 +13947,7 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>La cauzione.</b> Chi prende un ordine scegliendo «Contante per posta» blocca la stessa piccola cauzione del contanti di persona: torna a fine scambio, e si perde solo se un moderatore decide che non ha spedito.</li>
       </ol>
       <p><b>In disputa, sulla posta.</b> In disputa contano le prove: il tracciamento consegnato e i due video. Chi spedisce senza tracciamento non può provare di aver spedito; chi apre senza filmare non può provare che la busta era vuota. La posta ordinaria e i corrieri il denaro lo escludono dal rimborso: un pacco perso è perso; solo il servizio di Poste per denaro e valori lo rimborsa, fino a 3.000 €.</p>
+      </div>
 
       <h3>I tempi</h3>
       <!-- gli stessi segnaposto, per la stessa ragione: le finestre
@@ -72448,8 +72450,12 @@ function renderP2PInfo(){
   document.querySelectorAll('[data-p2pinfo]').forEach(e => {
     const q = e.getAttribute('data-p2pinfo');
     if (q === 'premio') e.textContent = String(P2P_PREMIO_MAX);
-    if (q === 'metodi') e.textContent = P2P_METODI.join(', ');
+    /* ...senza il contante per posta a leva spenta (17 nov 2026) */
+    if (q === 'metodi') e.textContent = metodiOffertiP2P(P2P_METODI, postaAttivaP2P()).join(', ');
   });
+  /* LA SEZIONE DEL CONTANTE PER POSTA c'e' solo a leva accesa (17 nov 2026) */
+  const sezPosta = el('p2pInfoPosta');
+  if (sezPosta) sezPosta.hidden = !postaAttivaP2P();
   /* IL TETTO DEL CONTANTI, VIVO (30 set 2026): la leva del server, e a
      leva spenta la voce lo dice invece di inventare un numero */
   const tettoC = el('p2pInfoContantiTetto');
@@ -78573,6 +78579,22 @@ function cauzioneAccesaP2P(){
 function cauzioneSulMetodoP2P(){
   const c = p2pCoord();
   return !!(c && c.cauzioneSulMetodo === true);
+}
+/* IL CONTANTE PER POSTA HA LA SUA LEVA (17 nov 2026, cantiere leva-posta,
+   Andrea: «quando la porto in produzione, la leva lasciala spenta»):
+   `P2P_POSTA_ATTIVO` del server, in busta come `posta`, spenta di serie.
+   Spenta, la voce non si OFFRE (foglio Pubblica, filtro del libro, Info
+   P2P); un ordine che la porta si legge e si paga lo stesso, perche' i
+   giudici guardano il metodo dell'ordine, non la leva. */
+function postaAttivaP2P(){
+  const c = p2pCoord();
+  return !!(c && c.posta === true);
+}
+/* PURA: una lista di metodi senza «Contante per posta», se la leva e'
+   spenta; `attiva` e' la leva, che il chiamante legge dal contesto */
+function metodiOffertiP2P(lista, attiva){
+  if (attiva || typeof P2P_POSTA === 'undefined') return lista;
+  return (lista || []).filter(m => m !== P2P_POSTA);
 }
 /* PURA, e ricalca la regola del coordinatore (patch 0008,
    `bond_applies_to_order`): fra i metodi dell'ORDINE — non quello
@@ -85474,13 +85496,17 @@ function valutaOrdineP2P(o){
 }
 function metodiValutaP2P(cod){
   if (String(cod || '').toUpperCase() === 'USDT') return P2P_METODI_USDT;
-  if (String(cod || '').toUpperCase() === 'CHF') return P2P_METODI_CHF;
+  /* ...e senza il contante per posta a leva spenta (17 nov 2026, leva-posta) */
+  const senzaPosta = typeof metodiOffertiP2P === 'function'
+    ? (l => metodiOffertiP2P(l, typeof postaAttivaP2P === 'function' && postaAttivaP2P()))
+    : (l => l);
+  if (String(cod || '').toUpperCase() === 'CHF') return senzaPosta(P2P_METODI_CHF);
   /* ETH, Monero e USDe hanno la LORO lista (16 nov 2026, cantiere
      p2p-monete-valute, Andrea: «ognuno deve avere la sua lista»): le
      reti di quella moneta; e in euro tornano i metodi dell'euro e basta
      (dal 13 nov ci stavano anche loro, come metodi di un ordine in euro) */
   if (typeof valutaCoinP2P === 'function' && valutaCoinP2P(cod)) return metodiCoinValutaP2P(cod);
-  return P2P_METODI;
+  return senzaPosta(P2P_METODI);
 }
 function segnoValutaP2P(cod){
   const c = String(cod || P2P_VALUTA).toUpperCase();
@@ -89311,15 +89337,19 @@ function metodiPubblicabiliP2P(lato){
   if (typeof valutaFoglioP2P === 'function' && valutaFoglioP2P() === 'USDT'
       && typeof P2P_METODI_USDT !== 'undefined') return P2P_METODI_USDT;
   /* in franchi i metodi svizzeri (14 nov 2026, cantiere p2p-chf) */
+  /* ...senza il contante per posta a leva spenta (17 nov 2026, leva-posta) */
+  const senzaPosta = typeof metodiOffertiP2P === 'function'
+    ? (l => metodiOffertiP2P(l, typeof postaAttivaP2P === 'function' && postaAttivaP2P()))
+    : (l => l);
   if (typeof valutaFoglioP2P === 'function' && valutaFoglioP2P() === 'CHF'
-      && typeof P2P_METODI_CHF !== 'undefined') return P2P_METODI_CHF;
+      && typeof P2P_METODI_CHF !== 'undefined') return senzaPosta(P2P_METODI_CHF);
   /* ETH, MONERO E USDe HANNO LA LORO VALUTA (16 nov 2026, cantiere
      p2p-monete-valute, che rovescia il «in fondo all'euro» del 13 nov):
      in una moneta le sue reti, e l'euro torna ai metodi dell'euro */
   const vc = typeof valutaCoinP2P === 'function' && typeof valutaFoglioP2P === 'function'
     ? valutaCoinP2P(valutaFoglioP2P()) : null;
   if (vc) return metodiCoinValutaP2P(vc.cod);
-  return P2P_METODI;
+  return senzaPosta(P2P_METODI);
 }
 /* la riga d'aiuto sotto la fascia, nel foglio «Pubblica» in compra */
 const NOTA_FASCIA_BZ_COMPRO = 'Con Barattozon scrivi una fascia, per esempio da 30 a 80 €: chi vende sceglie dentro l\'importo del suo ordine Amazon e ti manda PayCode e scadenza. Tu lo paghi in contanti al tabacchino e ricevi i sats.';
