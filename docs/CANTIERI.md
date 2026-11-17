@@ -85997,3 +85997,112 @@ DA GUARDARE. Sul telefono di Andrea dopo il deploy: le due card on-chain
 con «4% meno conveniente per te», e una card USDT o in moneta presa. Non
 toccato, da decidere: il conto del dettaglio di uno scambio in moneta
 preso a sats fissi resta senza la riga della convenienza.
+
+## Lo scambio on-chain come quello Lightning: recensione, netto nel bot, reputazione e tempo per pagare (17 nov 2026, cantiere convenienza-monete, seconda parte; Andrea: «A scambio concluso non c'è la possibilità di mettere una recensione», «tutto deve essere come la parte lighting. Fai un giro su tutto», «uno mi ha preso l'ordine, ma quanto tempo ho io per inviare USDE? Non viene indicato», e sulla scheda «24 ore monete, 72 ore euro»)
+
+IL GIRO. Confronto passo per passo Lightning ↔ on-chain, mandato ad
+Andrea in otto righe: card (convenienza, netto) e Copia, chiusi nella
+prima parte; poi recensione, netto nell'avviso «concluso», reputazione,
+chat, sollecito, tempo per pagare. Qui i quattro di questo giro; chat e
+sollecito sono il giro dopo (detto ad Andrea: «più grossi»).
+
+LA RECENSIONE. Le rotte di Lightning (`/api/p2p/recensibile`,
+`/recensione`, `/modifica`, `/cancella`) restano UNE: la forma
+dell'ordine (`FORMA_ORDINE_P2P`) gia' accettava «bar-onchain-…», e a
+leggere lo scambio adesso e' una porta sola, `_riga_recensione_p2p`:
+il prefisso manda al libro on-chain (chi deposita e chi riceve come i
+due posti di `_parti_recensione_p2p`, che e' simmetrica), il resto a
+`p2p_ordini` come prima. LA STESSA CONNESSIONE, apposta: la tabella
+on-chain sta nel database di sempre (`_onchain_db` e' `db()`) e la rotta
+che scrive tiene un BEGIN IMMEDIATE — una seconda connessione che
+prepara le tabelle aspetterebbe il suo stesso lucchetto. Il giudice e'
+`_recensibile_onchain_p2p`, le due strade di Lightning: i sats arrivati
+(`rilasciato`, anche dopo una disputa) o un rimborso deciso da un
+moderatore; un rimborso d'accordo o a tempo no, come l'annullo di la'.
+La pagina dello scambio ha il riquadro di Lightning coi suoi pezzi
+(`riquadroRecensioneOcP2P`: `.payout`, `stelleSceltaP2P`, modifica e
+cancella con `gestiFeedbackHTML`), riempito dalla risposta del server e
+ridisegnato da solo (la bozza del commento sopravvive al rinfresco); le
+sorelle esistono perche' quelle di Lightning leggono `p2pOrdineAperto`
+e la riga in localStorage, che l'on-chain non ha. L'avviso «concluso»
+porta la riga di Lightning «Lascia una recensione: la trovi nella
+pagina dello scambio», dove il giudice la ammette.
+
+IL NETTO. `_p2p_onchain_quanto(o, netti=True)`: a chi RICEVE i sats
+meno la sua meta' della commissione (`quota_ricevente_sats`), «736.596
+sats netti» invece di 744.036, la cifra della card. Negli avvisi a chi
+riceve: deposito confermato, sats liberati, concluso, tempo finito.
+Gli altri avvisi (presa, disputa, annullo) restano col prezzo: dicono
+cosa si scambia, non cosa arriva.
+
+LA REPUTAZIONE. Alla firma che chiude (`p2p_onchain_firma`, l'unico
+posto che scrive `rilasciato`) `_p2p_onchain_segna_esiti` scrive
+`completato` in `p2p_esiti` (giro 0, dettaglio «onchain», la PK fa
+l'idempotenza): a tutte e due le parti, chi deposita «vende» e chi
+riceve «compra». Dopo una disputa decisa SOLO a chi ha ricevuto: di
+la' chi perde con colpa non se lo vede contare, qui una colpa scritta
+non c'e', e si sta dal lato prudente. Un rimborso non conta. Il badge
+del tempo di chi pubblica (`_veloci_p2p`) non le vede: fa la JOIN con
+`p2p_ordini`, ed e' giusto, la cronaca dei tempi e' di Mostro.
+
+IL TEMPO PER PAGARE (scelta di Andrea fra tre: «24 ore monete, 72 ore
+euro»). Dal deposito confermato: 24 ore in USDT e nelle monete
+(arrivano in minuti, a ogni ora), 72 in euro e franchi (un bonifico puo'
+cadere nel fine settimana) — `P2P_ONCHAIN_ORE_PAGAMENTO_MONETE/SOLDI`,
+`p2p_onchain_paga_entro`, nella riga dello scambio come `paga_entro` e
+`ore_pagamento`. ALLA SCADENZA NON SI ANNULLA NIENTE: i sats stanno nel
+2-di-3 e non scadono, a differenza della garanzia di Lightning; la
+ronda (`_p2p_onchain_passata_tempo_pagare`) timbra
+`pagamento_scaduto_il`, una volta sola anche con due ronde in volo, e
+avvisa: a chi vende la strada (libera se i soldi sono arrivati, disputa
+se no), a chi compra «Ho inviato». LA DISPUTA RESTA APRIBILE ANCHE
+PRIMA, come oggi: chiuderla a chi vende prima della scadenza sarebbe
+una regola nuova che nessuno ha chiesto. La card dice quanto resta
+nella riga dello stato e ha la barra del libro sul bordo di sotto
+(`barraScadenzaP2P`); la pagina la riga «Tempo per pagare» di
+`anelloneP2P` col conto che scorre, colla proporzione delle vite corte
+(24 ore non nascono rosse: il battito legge `data-scala`).
+
+I CONTI DI /ADMIN (Andrea, guardando le statistiche: «Perché questi
+errori nel pannello Admin?»). Lo scambio da 500 USDT dava «Euro
+scambiati € 0,00 (1 scambio senza cifra in euro)», commissioni «≈ € 0,00
+(1 scambio senza cambio)» e scambio medio «—»: `_conti_onchain_p2p`
+dava gli euro ai soli scambi in euro. Adesso USDT e franchi passano da
+`_euro_conti_onchain_p2p`: la cifra per il rapporto fra il cambio di
+bitcoin in euro e quello in dollari (o franchi) di ADESSO — il passo
+valuta→euro si muove di decimi in una settimana, e il valore storico
+non c'e' (il cambio della presa on-chain e' nella valuta dell'ordine, e
+solo a mercato); senza i due cambi resta «senza cifra» come prima. Da
+quella cifra nascono anche il cambio delle commissioni e lo scambio
+medio. I sats erano gia' giusti: 744.036 e' la cifra dello scambio (come
+il `sats` di Lightning), 18.601 = 11.161 (1,5% di chi deposita) + 7.440
+(1% del pioniere che riceve). Gli scambi Lightning in USDT o franchi
+restano «senza cifra» come prima: non toccato, non chiesto.
+
+SCARTATO. Annullare da soli alla scadenza (i sats sono gia' nel 2-di-3:
+rimborsarli senza la firma di chi compra vorrebbe dire una decisione di
+Barattolo senza un moderatore); un tempo solo per tutti (48 ore, la
+seconda opzione della scheda); le funzioni di recensione di Lightning
+riusate cosi' com'erano (leggono l'ordine Lightning aperto); una seconda
+connessione nella rotta che scrive.
+
+PROVATO. `prove_onchain_come_lightning` (nuova): il giudice, la porta
+unica su un database vero in memoria (on-chain, Lightning, ignoto,
+tabella che non c'e'), gli esiti, il netto dello scambio di Andrea, le
+ore per valuta, l'avviso, la ronda su quattro righe (una volta sola), le
+cuciture del server; in node il tempo a parole, la card, la riga della
+pagina (24 ore non rosse), il riquadro in sei stati, le cuciture del
+telefono. `collaudo_p2p_onchain` allungato sul giro vero: le 72 ore
+nell'avviso e nella riga, l'invito, gli esiti (due, poi uno solo dopo la
+disputa, nessuno al rimborso d'accordo), la recensione lasciata via
+rotta e un terzo che non la vede, la ronda del tempo finito una volta
+sola. `prove_statistiche_p2p`: l'USDT in euro (e senza cambio come
+prima). Dodici controprove rosse. Suite severa e collaudi della CI
+senza coincurve sull'albero del commit.
+DA GUARDARE. Sul telefono di Andrea: lo scambio USDe preso stamattina
+mostra il conto (il deposito confermato prima del deploy ha gia'
+`depositato_il`, quindi il tempo parte da li': se e' piu' vecchio di 24
+ore l'avviso «tempo finito» parte alla prima ronda); la recensione sullo
+scambio USDT concluso; il «✅ N scambi P2P» non conta gli scambi on-chain
+chiusi PRIMA del deploy (nessuna riga in `p2p_esiti`: da recuperare con
+una query a mano se Andrea lo chiede).

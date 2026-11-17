@@ -62426,6 +62426,59 @@ def _numero_scambio_p2p(ordine: str) -> int:
     return -(firma or 1)
 
 
+def _recensibile_onchain_p2p(stato, decisione_da, disputa_il=0) -> bool:
+    """PURA: uno scambio P2P ON-CHAIN si recensisce? (17 nov 2026,
+    cantiere convenienza-monete, Andrea: «A scambio concluso non c'è la
+    possibilità di mettere una recensione».) Le stesse due strade del
+    Lightning (`_scambio_concluso_p2p`): i sats arrivati a chi compra
+    (`rilasciato`, anche dopo una disputa), o la DISPUTA chiusa da un
+    moderatore da qualunque parte siano andati (`rimborsato` con la
+    firma di Barattolo e una disputa aperta). Un rimborso d'accordo, a
+    tempo, o il moderatore che rimanda indietro i sats arrivati dopo un
+    annullo (lo scambio non e' mai cominciato) NON aprono la recensione,
+    come l'annullo di la'."""
+    if str(stato or "") == "rilasciato":
+        return True
+    return (str(stato or "") == "rimborsato" and int(decisione_da or 0) > 0
+            and int(disputa_il or 0) > 0)
+
+
+def _riga_recensione_p2p(con, ordine: str):
+    """`{tg_id, preso_da, concluso}` dello scambio da recensire, o None.
+    UNA SOLA PORTA PER LE DUE ROTTE, Lightning e on-chain: il Lightning
+    legge `p2p_ordini` (chi ha pubblicato, chi ha preso, il giudice
+    `_scambio_concluso_p2p`); l'on-chain, riconosciuto dal prefisso,
+    legge il SUO libro (`p2p_onchain_ordini`), dove le due parti il
+    server le sa sempre — chi deposita e chi riceve — e i due posti
+    valgono come «chi ha pubblicato» e «chi ha preso» per
+    `_parti_recensione_p2p`, che e' simmetrica. Prima del 17 nov 2026
+    l'on-chain qui non c'era, e il bottone non compariva mai.
+    LA STESSA CONNESSIONE, apposta: la tabella sta nel database di
+    sempre (`_onchain_db` e' `db()`), e la rotta che scrive tiene un
+    BEGIN IMMEDIATE — una seconda connessione che prepara le tabelle
+    aspetterebbe il suo stesso lucchetto. Un database senza la tabella
+    (i banchi di ieri) vale «scambio che non c'e'», mai un errore."""
+    if str(ordine).startswith(P2P_ONCHAIN_PREFISSO):
+        try:
+            o = con.execute("SELECT depositante_id, ricevente_id, stato, decisione_da, "
+                            "disputa_il FROM p2p_onchain_ordini WHERE ordine=?",
+                            (ordine,)).fetchone()
+        except sqlite3.OperationalError:
+            return None
+        if not o:
+            return None
+        return {"tg_id": int(o["depositante_id"] or 0),
+                "preso_da": int(o["ricevente_id"] or 0),
+                "concluso": _recensibile_onchain_p2p(o["stato"], o["decisione_da"],
+                                                     o["disputa_il"])}
+    r = con.execute("SELECT tg_id, preso_da, stato FROM p2p_ordini "
+                    "WHERE ordine=?", (ordine,)).fetchone()
+    if not r:
+        return None
+    return {"tg_id": r["tg_id"], "preso_da": r["preso_da"],
+            "concluso": _scambio_concluso_p2p(con, ordine, r["stato"])}
+
+
 def _mia_recensione_p2p(con, ordine: str, chi: int):
     """La recensione che quella persona ha gia' lasciato su quello
     scambio, o None. Sta sul SERVER e non nel browser apposta: la riga
@@ -62460,10 +62513,9 @@ async def recensibile_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Ordine in una forma sconosciuta")
     con = db()
     try:
-        r = con.execute("SELECT tg_id, preso_da, stato FROM p2p_ordini "
-                        "WHERE ordine=?", (ordine,)).fetchone()
+        r = _riga_recensione_p2p(con, ordine)
         mia = _mia_recensione_p2p(con, ordine, user["id"])
-        concluso = bool(r) and _scambio_concluso_p2p(con, ordine, r["stato"])
+        concluso = bool(r) and r["concluso"]
         # (14 nov 2026) la recensione che ho cancellato io: la lapide
         ritirata = _ritirato_feedback(con, _numero_scambio_p2p(ordine),
                                       user["id"])
@@ -62568,8 +62620,7 @@ async def recensione_p2p(req: Request, x_tg_init_data: str = Header(""),
     con = db()
     try:
         con.execute("BEGIN IMMEDIATE")
-        r = con.execute("SELECT tg_id, preso_da, stato FROM p2p_ordini "
-                        "WHERE ordine=?", (ordine,)).fetchone()
+        r = _riga_recensione_p2p(con, ordine)
         if not r:
             con.rollback()
             raise HTTPException(404, "Scambio non trovato")
@@ -62578,7 +62629,7 @@ async def recensione_p2p(req: Request, x_tg_init_data: str = Header(""),
         if motivo == "estraneo":
             con.rollback()
             raise HTTPException(403, "Operazione non permessa")
-        if not _scambio_concluso_p2p(con, ordine, r["stato"]):
+        if not r["concluso"]:
             con.rollback()
             raise HTTPException(400, "La recensione si lascia a scambio "
                                      "concluso")
@@ -68104,19 +68155,43 @@ def _iniziali_p2p(nome, tg_id) -> str:
 # la quota e le fette si dividono come su Lightning. Lo sconto di una
 # meta' e' DEDOTTO dalla persona di adesso (`_sconto_p2p`), come dice la
 # pagina. IL ROUTING non c'e' (0, noto): l'uscita la paga la rete dentro
-# la transazione. GLI EURO solo dove lo scambio e' in euro (anche in
-# moneta, il cui `euro_cent` e' il controvalore): USDT e franchi stanno
-# fra i «senza cifra in euro». Le commissioni nate prima del 16 nov sono
-# 0: allora l'on-chain del P2P non ne prendeva.
+# la transazione. GLI EURO dove lo scambio e' in euro (anche in moneta,
+# il cui `euro_cent` e' il controvalore); USDT e franchi, dal 17 nov 2026
+# (cantiere convenienza-monete, Andrea guardando /admin: «Perché questi
+# errori nel pannello Admin?», il suo scambio da 500 USDT dava «€ 0,00»,
+# commissioni «senza cambio» e scambio medio «—»), si traducono in euro
+# col passo dollaro→euro o franco→euro di ADESSO (`_euro_conti_onchain_p2p`:
+# il rapporto fra i due cambi di bitcoin, che si muove di decimi in una
+# settimana); senza i cambi restano fra i «senza cifra», come prima. Da
+# quella cifra nasce anche il cambio delle commissioni in euro, come per
+# uno scambio in euro. Le commissioni nate prima del 16 nov sono 0:
+# allora l'on-chain del P2P non ne prendeva.
 P2P_RETI_CONTI = ("tutti", "ln", "oc")
 
 
-def _conti_onchain_p2p(con, ordini: list) -> dict:
+def _euro_conti_onchain_p2p(o, valuta: str, cambi: dict) -> float:
+    """PURA: la cifra di uno scambio on-chain in euro, per i conti. In
+    euro (e in moneta) `euro_cent`; in USDT e franchi la cifra per il
+    rapporto fra il cambio di bitcoin in euro e quello nella sua valuta
+    (1 USDT = 1 dollaro); 0 se un cambio manca — un numero che non c'e'
+    non diventa euro."""
+    cifra = int(o.get("euro_cent") or 0) / 100
+    if valuta == "EUR":
+        return cifra
+    metro = {"USDT": "usd", "CHF": "chf"}.get(valuta, "")
+    e, m = float((cambi or {}).get("eur") or 0), float((cambi or {}).get(metro) or 0)
+    return round(cifra * e / m, 2) if e > 0 and m > 0 else 0
+
+
+def _conti_onchain_p2p(con, ordini: list, cambi: dict = None) -> dict:
     """Le righe di `p2p_onchain_ordini` (tutte, di ogni tempo) come righe
     di `p2p_conti` per `_statistiche_p2p`. PURA sulla connessione (che
-    serve solo allo sconto dedotto). Torna {righe: chiusi, in_corso,
-    pubblicati: [(creato, euro o None, a mercato)], conclusi: [(quando,
-    chi pubblica, chi prende)]}."""
+    serve solo allo sconto dedotto) e sui cambi (`{eur, usd, chf}` per
+    bitcoin; di serie quelli che sappiamo adesso, per USDT e franchi).
+    Torna {righe: chiusi, in_corso, pubblicati: [(creato, euro o None, a
+    mercato)], conclusi: [(quando, chi pubblica, chi prende)]}."""
+    if cambi is None:
+        cambi = {v: cambio_noto_ora(v) for v in ("eur", "usd", "chf")}
     righe, in_corso, pubblicati, conclusi = [], [], [], []
     for o in ordini:
         o = dict(o)
@@ -68147,7 +68222,7 @@ def _conti_onchain_p2p(con, ordini: list) -> dict:
         else:
             esito, motivo = "ritirato", ""
         chiuso = int(o.get("chiuso_il") or o.get("aggiornato") or 0)
-        euro = (int(o.get("euro_cent") or 0) / 100) if valuta == "EUR" else 0
+        euro = _euro_conti_onchain_p2p(o, valuta, cambi)
 
         def sconto(tg, meta):
             if not meta or not tg:
@@ -104889,6 +104964,19 @@ P2P_ONCHAIN_PREFISSO = "bar-onchain-"   # il `d` del 38383: nostro, riconoscibil
 # 2-di-3 nasce alla presa
 P2P_ONCHAIN_ORE_LIBRO = 168
 P2P_ONCHAIN_ORE_DEPOSITO = 6    # dalla presa: entro quando il deposito va confermato
+# IL TEMPO PER PAGARE (17 nov 2026, cantiere convenienza-monete; Andrea:
+# «uno mi ha preso l'ordine, ma quanto tempo ho io per inviare USDE? Non
+# viene indicato», e sulla scheda ha scelto «24 ore monete, 72 ore
+# euro»). Dal deposito confermato, chi compra bitcoin ha questo tempo
+# per mandare i soldi e toccare «Ho inviato»: 24 ore se paga in USDT o
+# in una moneta (arrivano in minuti, a qualunque ora), 72 per euro e
+# franchi (un bonifico puo' cadere in un fine settimana). Il Lightning
+# ha la sua finestra, quella della garanzia del coordinatore; qui i sats
+# stanno nel 2-di-3 e non scadono, quindi alla scadenza NON si annulla
+# niente da solo: lo si dice alle due parti, e chi vende sa che puo'
+# aprire la disputa. La disputa resta apribile anche prima, come oggi.
+P2P_ONCHAIN_ORE_PAGAMENTO_MONETE = 24
+P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI = 72
 P2P_ONCHAIN_MIN_SATS = 10_000   # sotto, la commissione di rete mangia lo scambio
 P2P_ONCHAIN_METODI_MAX = 5
 P2P_ONCHAIN_METODO_MAX = 40
@@ -104992,6 +105080,21 @@ def p2p_onchain_valuta(o) -> str:
     if p2p_onchain_usdt(o):
         return "USDT"
     return "CHF" if p2p_onchain_chf(o) else "EUR"
+
+
+def p2p_onchain_ore_pagamento(o) -> int:
+    """PURA: le ore che chi compra bitcoin ha per pagare, dal deposito
+    confermato: 24 in USDT e nelle monete, 72 in euro e franchi."""
+    if p2p_onchain_usdt(o) or p2p_onchain_coin(o):
+        return P2P_ONCHAIN_ORE_PAGAMENTO_MONETE
+    return P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI
+
+
+def p2p_onchain_paga_entro(o) -> int:
+    """PURA: l'epoch entro cui chi compra paga (0 = il deposito non e'
+    ancora confermato, e il tempo non e' partito)."""
+    dal = int(_p2p_onchain_campo(o, "depositato_il", 0) or 0)
+    return dal + p2p_onchain_ore_pagamento(o) * 3600 if dal > 0 else 0
 
 
 def _p2p_onchain_metro(o) -> str:
@@ -105286,7 +105389,11 @@ def _p2p_onchain_prepara(con):
                       # 16 nov 2026, cantiere ricevi-mercato: 'CHF' per
                       # uno scambio in franchi, '' per tutto il resto (gli
                       # USDT e le monete li dicono i metodi)
-                      ("fiat", "TEXT DEFAULT ''")):
+                      ("fiat", "TEXT DEFAULT ''"),
+                      # 17 nov 2026, cantiere convenienza-monete: quando la
+                      # ronda ha detto alle due parti che il tempo per
+                      # pagare e' finito (0 = non ancora): una volta sola
+                      ("pagamento_scaduto_il", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -105362,17 +105469,25 @@ def _p2p_onchain_bottone(o) -> tuple:
     return (P2P_ONCHAIN_BOTTONE, f"{LINK_LIBRO_P2P}?scambio={o['ordine']}")
 
 
-def _p2p_onchain_quanto(o) -> str:
+def _p2p_onchain_quanto(o, netti: bool = False) -> str:
     """PURA: «10.000 sats per 9,00 € via Revolut», come `quanto` negli
     avvisi del Lightning; in moneta «per 0,0153 ETH via ETH (Ethereum)»,
-    coi nomi senza la cifra (16 nov 2026)."""
+    coi nomi senza la cifra (16 nov 2026).
+    `netti` (17 nov 2026, cantiere convenienza-monete, Andrea: «dovrebbe
+    esserci scritto ciò che ricevo al netto della fee»): per chi RICEVE
+    i bitcoin, i sats meno la SUA meta' della commissione
+    (`quota_ricevente_sats`), cioe' quel che arriva al suo wallet — la
+    stessa cifra della card e del conto. Senza commissione resta uguale."""
     c = p2p_onchain_coin(o)
     try:
         metodi = ", ".join(html.escape(str(m)) for m in
                            (c["metodi"] if c else json.loads(o["metodi"] or "[]")))
     except Exception:
         metodi = ""
-    return (f"{_fmt_sats(int(o['prezzo_sats']))} sats per "
+    sats = int(o['prezzo_sats'])
+    tolti = int(_p2p_onchain_campo(o, "quota_ricevente_sats", 0) or 0) if netti else 0
+    return (f"{_fmt_sats(max(0, sats - tolti))} sats"
+            + (" netti" if tolti > 0 else "") + " per "
             + (f"{c['cifra']} {c['moneta']}" if c else f"{_fmt_eur(int(o['euro_cent']) / 100)} €")
             + (f" via {metodi}" if metodi else ""))
 
@@ -105754,6 +105869,9 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "scade": int(o["scade"]), "preso_il": int(o["preso_il"] or 0),
         "deposito_entro": int(o["deposito_entro"] or 0),
         "depositato_il": int(o["depositato_il"] or 0),
+        # (17 nov 2026) il tempo per pagare: la card e la pagina lo contano
+        "paga_entro": p2p_onchain_paga_entro(o),
+        "ore_pagamento": p2p_onchain_ore_pagamento(o),
         "euro_inviati_il": int(o["euro_inviati_il"] or 0),
         "disputa": ({"da": "io" if int(o["disputa_da"] or 0) == tg_id else "altro",
                      "il": int(o["disputa_il"] or 0),
@@ -106513,15 +106631,18 @@ async def _p2p_onchain_controlla(oid: int) -> str:
             if cur.rowcount:
                 stato = "depositato"
                 euro = _fmt_eur(int(o["euro_cent"]) / 100)
+                ore = p2p_onchain_ore_pagamento(o)
                 avvisi = [
                     (o["ricevente_id"], "🔒 <b>Chi vende ha messo i sats nel deposito di "
-                     f"garanzia 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o)}.\n\n"
+                     f"garanzia 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
                      f"Apri Barattolo: ora manda <b>{euro} €</b> a chi vende, poi tocca "
-                     "«Ho inviato gli euro». Il recapito è nello scambio."),
+                     "«Ho inviato gli euro». Il recapito è nello scambio."
+                     f"\n\n⏳ <b>Hai {ore} ore</b>, poi chi vende può aprire una disputa."),
                     (o["depositante_id"], "🔒 <b>Deposito confermato ✓:</b> aspetta gli euro. "
                      f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
                      f"Chi compra sta per mandarti {euro} €: quando li vedi sul tuo "
-                     "conto, apri lo scambio e tocca «Ricevuti: libera i sats». Mai prima.")]
+                     "conto, apri lo scambio e tocca «Ricevuti: libera i sats». Mai prima."
+                     f"\n\n⏳ Chi compra ha <b>{ore} ore</b> per pagare.")]
         con.commit()
     finally:
         con.close()
@@ -106802,7 +106923,7 @@ async def p2p_onchain_proposta(oid: int, req: Request, x_tg_init_data: str = Hea
         con.close()
     await _notifica_p2p_onchain(o, altro, (
         "🔓 <b>Sats liberati!</b> Chi vende ha confermato gli euro e ha firmato. "
-        f"Compri {_p2p_onchain_quanto(o)}.\n\n"
+        f"Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
         "Apri Barattolo: il tuo telefono mette la seconda firma e i sats "
         "arrivano al tuo wallet."
         if verso == "venditore" else
@@ -106811,6 +106932,53 @@ async def p2p_onchain_proposta(oid: int, req: Request, x_tg_init_data: str = Hea
         "Apri Barattolo: il tuo telefono mette la seconda firma e i sats "
         "tornano a te."), _p2p_onchain_bottone(o))
     return {"ok": True}
+
+
+def _p2p_onchain_esiti(o, stato) -> list:
+    """PURA: `[(tg_id, ruolo)]` a cui uno scambio P2P on-chain chiuso
+    conta come COMPLETATO nella reputazione (17 nov 2026, cantiere
+    convenienza-monete, il giro «tutto come il Lightning»: fino a oggi
+    l'on-chain non scriveva in `p2p_esiti`, e il numero accanto alle
+    stelline non lo contava mai). La regola del Lightning
+    (`_esiti_p2p`, momento `concluso`): i sats arrivati a chi compra
+    valgono per tutte e due le parti — chi deposita «vende», chi riceve
+    «compra». Dopo una DISPUTA decisa dal moderatore conta solo per chi
+    ha vinto, cioe' chi ha ricevuto: di la' chi perde con colpa non se
+    lo vede contare, e qui una colpa scritta non c'e', quindi si sta dal
+    lato prudente. Un rimborso (annullo, tempo, disputa persa da chi
+    compra) non e' uno scambio completato per nessuno."""
+    if str(stato or "") != "rilasciato":
+        return []
+    dep = int(_p2p_onchain_campo(o, "depositante_id", 0) or 0)
+    ric = int(_p2p_onchain_campo(o, "ricevente_id", 0) or 0)
+    if int(_p2p_onchain_campo(o, "decisione_da", 0) or 0):
+        coppie = [(ric, "compra")]
+    else:
+        coppie = [(dep, "vende"), (ric, "compra")]
+    return [(tg, ruolo) for tg, ruolo in coppie if tg]
+
+
+def _p2p_onchain_segna_esiti(o, stato, adesso: int):
+    """Scrive gli esiti di `_p2p_onchain_esiti` nella tabella di
+    sempre, giro 0, dettaglio «onchain». La PK fa l'idempotenza, come
+    il retry di mostrod. Un errore qui non ferma la chiusura dello
+    scambio: i sats sono gia' partiti, e la reputazione e' un conto."""
+    righe = _p2p_onchain_esiti(o, stato)
+    if not righe:
+        return
+    try:
+        con = db()
+        try:
+            for tg, ruolo in righe:
+                con.execute(
+                    "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, "
+                    "ruolo, quando, dettaglio) VALUES(?,?,0,'completato',?,?,'onchain')",
+                    (tg, o["ordine"], ruolo, int(adesso)))
+            con.commit()
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Reputazione P2P on-chain: {o['ordine'][:20]} non scritta ({e})", flush=True)
 
 
 @app.post("/api/p2p/onchain/{oid}/firma")
@@ -106890,11 +107058,13 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
     finally:
         con.close()
     asyncio.create_task(_p2p_onchain_pubblica(oid))
+    _p2p_onchain_segna_esiti(o, stato, adesso)
     tx = f"\n\nTransazione {(txid or arrivato)[:12]}…"
     quanto = _p2p_onchain_quanto(o)
     if verso == "venditore":
         testi = {o["depositante_id"]: f"✅ <b>Scambio on-chain concluso!</b> Hai venduto {quanto}.",
-                 o["ricevente_id"]: f"✅ <b>Scambio on-chain concluso!</b> Hai comprato {quanto}: "
+                 o["ricevente_id"]: "✅ <b>Scambio on-chain concluso!</b> Hai comprato "
+                                    f"{_p2p_onchain_quanto(o, netti=True)}: "
                                     + ("i bitcoin vanno allo swap, e SATS Routing paga la "
                                        "tua richiesta Lightning dopo una conferma."
                                        if o["incasso_tipo"] == "cambio" else
@@ -106903,8 +107073,13 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
         testi = {o["depositante_id"]: f"↩️ <b>Scambio on-chain annullato:</b> i sats tornano a te. Era {quanto}.",
                  o["ricevente_id"]: f"↩️ <b>Scambio on-chain annullato:</b> i sats sono tornati a chi "
                                     f"li aveva depositati. Era {quanto}."}
+    # L'INVITO ALLA RECENSIONE (17 nov 2026), la stessa riga del
+    # Lightning, dove la recensione si puo' lasciare davvero: lo dice
+    # lo stesso giudice della rotta che la scrive
+    invito = ("\n\nLascia una recensione: la trovi nella pagina dello scambio."
+              if _recensibile_onchain_p2p(stato, o["decisione_da"], o["disputa_il"]) else "")
     for chi, testo in testi.items():
-        await _notifica_p2p_onchain(o, chi, testo + tx, _p2p_onchain_bottone(o))
+        await _notifica_p2p_onchain(o, chi, testo + tx + invito, _p2p_onchain_bottone(o))
     return {"ok": True, "stato": stato, "txid": txid or arrivato}
 
 
@@ -107924,6 +108099,52 @@ def _p2p_onchain_testo_ripubblica(a: dict) -> str:
             "degli ordini.")
 
 
+def _p2p_onchain_testi_tempo_scaduto(o) -> dict:
+    """PURA: `{tg_id: testo}` dell'avviso del TEMPO PER PAGARE FINITO
+    (17 nov 2026, cantiere convenienza-monete): chi compra non ha
+    toccato «Ho inviato» entro le sue ore. Non si annulla niente — i
+    sats restano nel 2-di-3 — e a chi vende si dice la strada: libera
+    se i soldi sono arrivati, disputa se no. Scritto per gli euro: le
+    parole della valuta le mette `_notifica_p2p_onchain`."""
+    S = P2P_ONCHAIN_SEGNO
+    ore = p2p_onchain_ore_pagamento(o)
+    return {
+        int(o["depositante_id"]): (
+            f"{S} ⏰ <b>Il tempo per pagare è finito.</b> Chi compra non ha segnato "
+            f"«Ho inviato gli euro» entro {ore} ore. Vendi {_p2p_onchain_quanto(o)}.\n\n"
+            "Se gli euro sono arrivati, apri lo scambio e libera i sats. Se non sono "
+            "arrivati, apri una disputa: decide un moderatore. I sats restano al "
+            "sicuro nel 2-di-3."),
+        int(o["ricevente_id"]): (
+            f"{S} ⏰ <b>Il tempo per pagare è finito.</b> Compri "
+            f"{_p2p_onchain_quanto(o, netti=True)}.\n\n"
+            "Se hai già mandato gli euro, apri lo scambio e tocca «Ho inviato gli "
+            "euro». Da adesso chi vende può aprire una disputa."),
+    }
+
+
+def _p2p_onchain_passata_tempo_pagare(con, adesso: int) -> list:
+    """Gli scambi depositati col tempo per pagare finito e non ancora
+    detto: li timbra (`pagamento_scaduto_il`, una volta sola, anche con
+    due ronde in volo) e torna le righe da avvisare."""
+    fuori = []
+    for o in con.execute(
+            "SELECT * FROM p2p_onchain_ordini WHERE stato='depositato' AND "
+            "depositato_il>0 AND COALESCE(pagamento_scaduto_il, 0)=0 "
+            "ORDER BY id LIMIT 200").fetchall():
+        entro = p2p_onchain_paga_entro(o)
+        if not entro or entro > adesso:
+            continue
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET pagamento_scaduto_il=? WHERE id=? AND "
+            "stato='depositato' AND COALESCE(pagamento_scaduto_il, 0)=0",
+            (int(adesso), o["id"]))
+        if cur.rowcount:
+            fuori.append(o)
+    con.commit()
+    return fuori
+
+
 async def _p2p_onchain_ronda() -> None:
     """Il battito del libro on-chain, dentro `orologio_onchain` (ogni due
     minuti): gli scambi presi si guardano su mempool; gli ordini nel
@@ -107956,8 +108177,21 @@ async def _p2p_onchain_ronda() -> None:
             "stato='preso' OR (stato IN ('annullato','scaduto') AND ricevuti_sats=0"
             " AND chiuso_il>?)) ORDER BY id LIMIT 50",
             (adesso - P2P_ONCHAIN_RITARDATARI_S,))]
+        # IL TEMPO PER PAGARE (17 nov 2026)
+        senza_pagamento = _p2p_onchain_passata_tempo_pagare(con, adesso)
     finally:
         con.close()
+    for o in senza_pagamento:
+        for chi, testo in _p2p_onchain_testi_tempo_scaduto(o).items():
+            if not chi:
+                continue
+            try:
+                await _notifica_p2p_onchain(o, chi, testo, _p2p_onchain_bottone(o))
+            except Exception as e:
+                print(f"⚠️ P2P on-chain: avviso del tempo per pagare {o['id']} "
+                      f"saltato: {e}", flush=True)
+        print(f"⏰ P2P on-chain: scambio {o['id']}, tempo per pagare finito "
+              f"({p2p_onchain_ore_pagamento(o)} ore): avvisate le due parti", flush=True)
     if scaduti:
         _p2p_onchain_rifai_foto()
     for oid in scaduti:

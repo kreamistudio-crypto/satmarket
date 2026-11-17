@@ -127038,8 +127038,11 @@ def prove_statistiche_p2p():
     amb["P2P_ONCHAIN_RETI_USDT"] = {"USDT (Tron)": {}}
     for f in ("_p2p_onchain_campo", "_p2p_onchain_metodi",
               "p2p_onchain_metodi_usdt", "p2p_onchain_usdt", "p2p_onchain_chf",
-              "p2p_onchain_valuta", "_conti_onchain_p2p"):
+              "p2p_onchain_valuta", "_euro_conti_onchain_p2p", "_conti_onchain_p2p"):
         exec(pezzo(f), amb)
+    # i cambi di bitcoin di adesso (17 nov 2026): l'USDT diventa euro
+    CAMBI_OC = {"eur": 60000.0, "usd": 66000.0, "chf": 56000.0}
+    amb["cambio_noto_ora"] = lambda v="eur": CAMBI_OC.get(v, 0.0)
     oc_righe = [
         # concluso oggi, in euro: prezzo 100.000, commissione 1.000 + 1.000
         # (chi deposita e' 333, livello 5: la sua meta' e' dedotta «livello»)
@@ -127104,9 +127107,23 @@ def prove_statistiche_p2p():
     prova("...l'on-chain non paga routing: le nette ci sono e sono le "
           "lorde", ({"stato": "ok", "sats": 0, "abbinati": 0, "mancanti": 0}, 3000),
           (solo_oc["commissioni"]["routing"], solo_oc["commissioni"]["nette_sats"]))
-    prova("...gli euro solo dove lo scambio e' in euro: l'USDT sta fra i "
-          "senza cifra", (80.0, 1), (solo_oc["volume"]["euro"],
-                                     solo_oc["volume"]["senza_euro"]))
+    prova("...GLI EURO ANCHE DEGLI USDT (17 nov 2026, Andrea: «Perché questi "
+          "errori nel pannello Admin?»): 40 USDT al passo dollaro→euro di adesso "
+          "(60.000/66.000) sono 36,36 €, nessuno scambio senza cifra, e le "
+          "commissioni tutte in euro (2.000 sats a 0,8 € per mille + 1.000 a "
+          "0,7273)", (116.36, 0, 0, 2.33),
+          (solo_oc["volume"]["euro"], solo_oc["volume"]["senza_euro"],
+           solo_oc["commissioni"]["senza_cambio"], solo_oc["commissioni"]["euro"]))
+    senza = conti(con, inizio("oggi", ORA), ORA, [], rete="oc",
+                  oc=amb["_conti_onchain_p2p"](con, oc_righe, {"eur": 60000.0}))
+    E = amb["_euro_conti_onchain_p2p"]
+    prova("...senza il cambio del dollaro l'USDT resta fra i senza cifra, come "
+          "prima; i franchi col loro; l'euro e la moneta la loro cifra",
+          (80.0, 1, 1, 21.43, 15.0, 0),
+          (senza["volume"]["euro"], senza["volume"]["senza_euro"],
+           senza["commissioni"]["senza_cambio"],
+           E({"euro_cent": 2000}, "CHF", CAMBI_OC), E({"euro_cent": 1500}, "EUR", {}),
+           E({"euro_cent": 2000}, "CHF", {"eur": 60000.0})))
     prova("...le meta' si dividono come su Lightning: chi deposita al "
           "livello 5 (333) e' «livello», il pioniere (111) «pioniere», le "
           "altre piene",
@@ -133560,13 +133577,20 @@ def prove_recensione_p2p():
     # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P»): il giudice
     # dello stato ha due fonti — il libro E il pagamento riuscito detto
     # da mostrod (patch 0007) — e le due rotte chiedono a lui
+    # ⚠️ EMENDATA ANCORA (17 nov 2026, cantiere convenienza-monete): le
+    # due rotte leggono lo scambio dalla porta unica `_riga_recensione_p2p`
+    # (Lightning o on-chain, dal prefisso), e il giudice di Lightning sta
+    # li' dentro
+    _porta = codice(pezzo("_riga_recensione_p2p"))
     prova("il gate passa dai due giudici", True,
           "_parti_recensione_p2p(r[\"tg_id\"], r[\"preso_da\"]," in rec
-          and "_scambio_concluso_p2p(con, ordine, r[\"stato\"])" in rec
+          and "_riga_recensione_p2p(con, ordine)" in rec
+          and "if not r[\"concluso\"]:" in rec
+          and "_scambio_concluso_p2p(con, ordine, r[\"stato\"])" in _porta
           and "_ammette_recensione_p2p(" not in rec)
     prova("...e la domanda che apre il riquadro chiede allo stesso", True,
-          "_scambio_concluso_p2p(con, ordine, r[\"stato\"])"
-          in codice(pezzo("recensibile_p2p"))
+          "_riga_recensione_p2p(con, ordine)" in codice(pezzo("recensibile_p2p"))
+          and "concluso = bool(r) and r[\"concluso\"]" in codice(pezzo("recensibile_p2p"))
           and "_ammette_recensione_p2p(" not in codice(pezzo("recensibile_p2p")))
     _sc = codice(pezzo("_scambio_concluso_p2p"))
     prova("...che guarda il libro E la cronaca di mostrod", True,
@@ -200748,6 +200772,237 @@ console.log(JSON.stringify(out));
           and rs.index("+ righe") < rs.index("premioOcMioP2P(o)") < rs.index("p2p-scambio-stato"))
 
 
+def prove_onchain_come_lightning():
+    """LO SCAMBIO ON-CHAIN COME QUELLO LIGHTNING (17 nov 2026, cantiere
+    convenienza-monete, Andrea: «tutto deve essere come la parte lighting.
+    Fai un giro su tutto»). Quattro buchi chiusi, coi pezzi veri:
+    1. LA RECENSIONE: le rotte di Lightning riconoscono l'ordine on-chain
+       dal prefisso (`_riga_recensione_p2p`), col giudice suo
+       (`_recensibile_onchain_p2p`: sats arrivati, o disputa decisa), e la
+       pagina dello scambio ha il riquadro (`riquadroRecensioneOcP2P`);
+       l'avviso «concluso» invita a lasciarla;
+    2. IL NETTO negli avvisi a chi riceve (`_p2p_onchain_quanto(netti=True)`);
+    3. LA REPUTAZIONE: lo scambio concluso conta «completato» a tutte e
+       due le parti, dopo una disputa solo a chi ha vinto;
+    4. IL TEMPO PER PAGARE (scelta di Andrea, «24 ore monete, 72 ore
+       euro»): l'ora dal server, il conto su card e pagina, l'avviso una
+       volta sola alla scadenza."""
+    print("\n[lo scambio on-chain come quello Lightning]")
+    import sqlite3
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    # --- 1) il server ---
+    amb = {"json": json, "re": __import__("re"), "html": __import__("html"),
+           "sqlite3": sqlite3, "time": time}
+    i = src.index("P2P_COIN_METODI = {")
+    exec(src[i:src.index("\n}\n", i) + 3], amb)
+    i = src.index("P2P_ONCHAIN_RETI_USDT = {")
+    exec(src[i:src.index("\n}\n", i) + 3], amb)
+    for riga in ("P2P_ONCHAIN_PREFISSO = ", "P2P_ONCHAIN_ORE_PAGAMENTO_MONETE = ",
+                 "P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI = ", 'P2P_ONCHAIN_SEGNO = '):
+        j = src.index("\n" + riga) + 1
+        exec(src[j:src.index("\n", j)], amb)
+    amb["_fmt_eur"] = lambda e: f"{e:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    amb["_fmt_sats"] = lambda n: f"{int(n):,}".replace(",", ".")
+    amb["_scambio_concluso_p2p"] = lambda con, ordine, stato: stato == "success"
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
+              "p2p_onchain_usdt", "_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin",
+              "p2p_onchain_chf", "p2p_onchain_valuta", "p2p_onchain_ore_pagamento",
+              "p2p_onchain_paga_entro", "_p2p_onchain_quanto", "_recensibile_onchain_p2p",
+              "_riga_recensione_p2p", "_p2p_onchain_esiti", "_p2p_onchain_testi_tempo_scaduto",
+              "_p2p_onchain_passata_tempo_pagare"):
+        exec(pezzo(f), amb)
+    R = amb["_recensibile_onchain_p2p"]
+    prova("SI RECENSISCE come su Lightning: sats arrivati (anche dopo una disputa), o "
+          "disputa decisa da un moderatore; non un rimborso d'accordo, non i sats tardivi "
+          "rimandati dal moderatore senza disputa, non a meta' strada",
+          [True, True, True, False, False, False, False, False],
+          [R("rilasciato", 0), R("rilasciato", 999), R("rimborsato", 999, 1234),
+           R("rimborsato", 999), R("rimborsato", 0, 1234),
+           R("euro_inviati", 0), R("annullato", 999, 1234), R("disputa", 999, 1234)])
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    riga = amb["_riga_recensione_p2p"]
+    prova("un database senza la tabella on-chain (i banchi di ieri) vale «scambio che non c'e'»",
+          None, riga(con, "bar-onchain-00aa11bb22cc33dd"))
+    con.execute("CREATE TABLE p2p_onchain_ordini(ordine TEXT, depositante_id INT, "
+                "ricevente_id INT, stato TEXT, decisione_da INT, disputa_il INT)")
+    con.execute("CREATE TABLE p2p_ordini(ordine TEXT, tg_id INT, preso_da INT, stato TEXT)")
+    con.executemany("INSERT INTO p2p_onchain_ordini VALUES(?,?,?,?,?,?)", [
+        ("bar-onchain-0000000000000001", 222, 111, "rilasciato", 0, 0),
+        ("bar-onchain-0000000000000002", 222, 111, "rimborsato", 0, 0),
+        ("bar-onchain-0000000000000003", 222, 111, "rimborsato", 999, 1234)])
+    con.execute("INSERT INTO p2p_ordini VALUES('ab12cd34-ln', 333, 444, 'success')")
+    prova("LA PORTA UNICA: l'on-chain dal suo libro (chi deposita e chi riceve come i due "
+          "posti, il suo giudice), il Lightning da `p2p_ordini` come prima, l'ignoto None",
+          [{"tg_id": 222, "preso_da": 111, "concluso": True},
+           {"tg_id": 222, "preso_da": 111, "concluso": False},
+           {"tg_id": 222, "preso_da": 111, "concluso": True},
+           {"tg_id": 333, "preso_da": 444, "concluso": True}, None, None],
+          [riga(con, "bar-onchain-0000000000000001"), riga(con, "bar-onchain-0000000000000002"),
+           riga(con, "bar-onchain-0000000000000003"), dict(riga(con, "ab12cd34-ln")),
+           riga(con, "bar-onchain-00000000000000ff"), riga(con, "nessuno-qui")])
+    E = amb["_p2p_onchain_esiti"]
+    base = {"depositante_id": 222, "ricevente_id": 111, "decisione_da": 0}
+    prova("LA REPUTAZIONE: concluso conta a tutte e due le parti (chi deposita vende, chi "
+          "riceve compra); dopo una disputa solo a chi ha ricevuto; un rimborso a nessuno",
+          [[(222, "vende"), (111, "compra")], [(111, "compra")], [], []],
+          [E(base, "rilasciato"), E(dict(base, decisione_da=999), "rilasciato"),
+           E(base, "rimborsato"), E(dict(base, decisione_da=999), "rimborsato")])
+    Q = amb["_p2p_onchain_quanto"]
+    usdt = {"metodi": '["USDT (Tron)"]', "euro_cent": 50000, "prezzo_sats": 744036,
+            "quota_ricevente_sats": 7440}
+    prova("IL NETTO a chi riceve: lo scambio di Andrea dice 736.596 sats netti, non 744.036; "
+          "senza `netti`, o senza commissione, la cifra di prima",
+          ["736.596 sats netti per 500,00 € via USDT (Tron)",
+           "744.036 sats per 500,00 € via USDT (Tron)",
+           "744.036 sats per 500,00 € via USDT (Tron)"],
+          [Q(usdt, netti=True), Q(usdt), Q(dict(usdt, quota_ricevente_sats=0), netti=True)])
+    O, F = amb["p2p_onchain_ore_pagamento"], amb["p2p_onchain_paga_entro"]
+    eth = {"metodi": '["ETH (Ethereum) 0.0153"]', "euro_cent": 4590, "prezzo_sats": 45900}
+    eur = {"metodi": '["SEPA"]', "euro_cent": 5000, "prezzo_sats": 50000}
+    chf = {"metodi": '["TWINT"]', "euro_cent": 5000, "fiat": "CHF", "prezzo_sats": 50000}
+    prova("IL TEMPO PER PAGARE: 24 ore in USDT e nelle monete, 72 in euro e franchi; parte "
+          "dal deposito confermato, prima non c'e'",
+          [[24, 24, 72, 72], 1000 + 24 * 3600, 1000 + 72 * 3600, 0],
+          [[O(x) for x in (usdt, eth, eur, chf)], F(dict(eth, depositato_il=1000)),
+           F(dict(eur, depositato_il=1000)), F(eur)])
+    T = amb["_p2p_onchain_testi_tempo_scaduto"]
+    t = T(dict(eth, depositante_id=222, ricevente_id=111, quota_ricevente_sats=0))
+    prova("l'avviso del tempo finito: a chi vende la strada (libera o disputa), a chi "
+          "compra «Ho inviato»; dice le ore, e niente si annulla",
+          [True, True, True, True, False],
+          ["disputa" in t[222] and "libera i sats" in t[222], "Ho inviato" in t[111],
+           "entro 24 ore" in t[222], "al sicuro nel 2-di-3" in t[222],
+           "annull" in (t[222] + t[111]).lower()])
+    con.execute("CREATE TABLE p2p_onchain_ordini2(id INTEGER PRIMARY KEY, stato TEXT, "
+                "depositato_il INT, pagamento_scaduto_il INT DEFAULT 0, metodi TEXT, "
+                "euro_cent INT, fiat TEXT DEFAULT '')")
+    con.execute("ALTER TABLE p2p_onchain_ordini RENAME TO vecchia")
+    con.execute("ALTER TABLE p2p_onchain_ordini2 RENAME TO p2p_onchain_ordini")
+    adesso = 10_000_000
+    con.executemany("INSERT INTO p2p_onchain_ordini(id, stato, depositato_il, metodi, euro_cent) "
+                    "VALUES(?,?,?,?,?)", [
+        (1, "depositato", adesso - 25 * 3600, '["USDe (Base) 50"]', 4300),   # 24 ore: finito
+        (2, "depositato", adesso - 25 * 3600, '["SEPA"]', 5000),             # 72 ore: no
+        (3, "euro_inviati", adesso - 99 * 3600, '["SEPA"]', 5000),           # ha pagato
+        (4, "depositato", adesso - 73 * 3600, '["SEPA"]', 5000)])            # 72 ore: finito
+    P = amb["_p2p_onchain_passata_tempo_pagare"]
+    prima = [int(o["id"]) for o in P(con, adesso)]
+    seconda = [int(o["id"]) for o in P(con, adesso + 60)]
+    prova("LA RONDA: avvisa gli scambi depositati col tempo finito (USDe a 25 ore, euro a "
+          "73), non quello in euro a 25 ore ne' chi ha gia' pagato; e UNA VOLTA SOLA",
+          [[1, 4], []], [prima, seconda])
+    # --- le cuciture nel server ---
+    firma = src[src.index('async def p2p_onchain_firma('):src.index('@app.post("/api/p2p/onchain/{oid}/disputa")')]
+    ronda = pezzo("_p2p_onchain_ronda")
+    controlla = pezzo("_p2p_onchain_controlla")
+    rec_si = src[src.index("async def recensibile_p2p("):src.index('@app.post("/api/p2p/recensione")')]
+    rec_scrivi = src[src.index("async def recensione_p2p("):src.index("# LE GEMELLE DEGLI SCAMBI")]
+    prova("cuciture: la firma che chiude scrive gli esiti e invita alla recensione col giudice "
+          "della rotta, il netto a chi compra; le due rotte della recensione passano dalla porta "
+          "unica; la ronda avvisa il tempo finito; il deposito confermato dice le ore; la riga "
+          "dello scambio porta l'ora",
+          [True, True, True, True, True, True, True, True],
+          ["_p2p_onchain_segna_esiti(o, stato, adesso)" in firma,
+           "_recensibile_onchain_p2p(stato, o[\"decisione_da\"], o[\"disputa_il\"])" in firma
+           and "testo + tx + invito" in firma,
+           "_p2p_onchain_quanto(o, netti=True)" in firma,
+           "_riga_recensione_p2p(con, ordine)" in rec_si and "_riga_recensione_p2p(con, ordine)" in rec_scrivi
+           and "FROM p2p_ordini" not in rec_si and "FROM p2p_ordini" not in rec_scrivi,
+           "_p2p_onchain_passata_tempo_pagare(con, adesso)" in ronda,
+           "Hai {ore} ore</b>, poi chi vende può aprire una disputa" in controlla,
+           '"paga_entro": p2p_onchain_paga_entro(o)' in pezzo("_p2p_onchain_per"),
+           '("pagamento_scaduto_il", "INTEGER DEFAULT 0")' in pezzo("_p2p_onchain_prepara")])
+    # --- 2) il telefono ---
+    banco = ("const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\"/g,'&quot;');\n"
+             "let p2pStellaScelta = 0, p2pOcRecModifica = '';\n"
+             "const P2P_VITA_SOGLIE_S = 7 * 86400, P2P_ULTIMO_GIORNO_S = 86400, P2P_ANELLO_VICINA_S = 3 * 86400;\n"
+             "const daFirmareOnchainP2P = () => false, depositoVistoOnchainP2P = () => false;\n"
+             "const testoFinestraFeedback = () => 'Si modifica una volta.';\n"
+             "const gestiFeedbackHTML = g => g && g.cancella ? '<div class=\"fb-gesti\">🗑</div>' : '';\n"
+             "const scadeTestoP2P = () => 'scade fra 23 h';\n"
+             + "".join(_fn_js(mini, f) for f in (
+                 "function tempoPagareOcP2P(o, adesso){", "function statoOnchainCardP2P(o){",
+                 "function recensibileOcP2P(o){", "function riquadroRecensioneOcP2P(o, rec){",
+                 "function stelleSceltaP2P(){", "function statoAnelloP2P(manca){",
+                 "function contoRimastoP2P(sec){", "function larghezzaTempoP2P(resta){",
+                 "function frazioneVitaP2P(o, adesso){", "function tempoPagareRigaOcP2P(o, adesso){"))
+             + r"""
+const nudo = h => String(h).replace(/<[^>]+>/g, '');
+const ora = Math.floor(Date.now() / 1000);
+const out = {};
+const T = (o, a) => { const t = tempoPagareOcP2P(o, a); return t ? [t.finito, t.quanto] : null; };
+out.tempo = [T({stato: 'depositato', paga_entro: 1000 + 5 * 3600 + 120}, 1000),
+  T({stato: 'depositato', paga_entro: 1000 + 600}, 1000),
+  T({stato: 'depositato', paga_entro: 1000}, 1000),
+  T({stato: 'euro_inviati', paga_entro: 9999}, 1000), T({stato: 'depositato'}, 1000)];
+const dep = {stato: 'depositato', paga_entro: ora + 23 * 3600 + 630, depositato_il: ora + 630 - 3600, ore_pagamento: 24};
+out.card = [statoOnchainCardP2P(Object.assign({ruolo: 'venditore'}, dep)).d,
+  statoOnchainCardP2P(Object.assign({ruolo: 'compratore'}, dep)).d,
+  statoOnchainCardP2P(Object.assign({ruolo: 'venditore'}, dep, {paga_entro: ora - 5})).d,
+  statoOnchainCardP2P(Object.assign({ruolo: 'compratore'}, dep, {paga_entro: ora - 5})).d,
+  statoOnchainCardP2P({ruolo: 'venditore', stato: 'depositato'}).d,
+  statoOnchainCardP2P({ruolo: 'compratore', stato: 'depositato'}).d];
+const riga = tempoPagareRigaOcP2P(Object.assign({ruolo: 'venditore'}, dep));
+out.riga = [nudo(riga).indexOf('Tempo per pagare') >= 0, /data-scala="7\.000"/.test(riga),
+  /p2p-tempo-barra (ultimo-giorno|vicina)/.test(riga), /p2p-anellone/.test(riga),
+  tempoPagareRigaOcP2P({stato: 'euro_inviati', paga_entro: ora + 100})];
+const fatto = {ruolo: 'venditore', stato: 'rilasciato', ordine: 'bar-onchain-0000000000000001', altro: 'Jj'};
+out.rec = [recensibileOcP2P(fatto), recensibileOcP2P(Object.assign({}, fatto, {stato: 'rimborsato'})),
+  recensibileOcP2P(Object.assign({}, fatto, {stato: 'rimborsato', decisione: {verso: 'compratore'}, disputa: {da: 'io'}})),
+  recensibileOcP2P(Object.assign({}, fatto, {stato: 'rimborsato', decisione: {verso: 'compratore'}})),
+  recensibileOcP2P(Object.assign({}, fatto, {ruolo: 'moderatore'})),
+  riquadroRecensioneOcP2P(fatto, null),
+  /Lascia una recensione/.test(riquadroRecensioneOcP2P(fatto, {si: true}))
+    && /data-ordine="bar-onchain-0000000000000001"/.test(riquadroRecensioneOcP2P(fatto, {si: true}))
+    && /Jj/.test(riquadroRecensioneOcP2P(fatto, {si: true})),
+  nudo(riquadroRecensioneOcP2P(fatto, {gia: true, voto: 4, commento: 'ok <b>'})).indexOf('★★★★ — ok &lt;b>') >= 0,
+  /Recensione cancellata/.test(riquadroRecensioneOcP2P(fatto, {si: false, motivo: 'ritirata'})),
+  riquadroRecensioneOcP2P(fatto, {si: false, motivo: 'ignota'}),
+  riquadroRecensioneOcP2P(Object.assign({}, fatto, {stato: 'euro_inviati'}), {si: true}),
+  /🗑/.test(riquadroRecensioneOcP2P(fatto, {gia: true, voto: 5, gesti: {cancella: true, fino: 9}}))];
+console.log(JSON.stringify(out));
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("lo scambio on-chain come quello Lightning (telefono)", "node non c'e'")
+        return
+    prova("il tempo per pagare a parole: ore e minuti, minuti nell'ultima ora, finito; "
+          "fuori dal deposito o senza l'ora niente",
+          [[False, "5 h 2 min"], [False, "10 min"], [True, ""], None, None], r.get("tempo"))
+    prova("LA CARD: chi paga legge quanto gli resta, chi vende quanto resta all'altro; a "
+          "tempo finito la disputa; senza l'ora del server le frasi di prima",
+          ["Hai ancora 23 h 10 min, poi tocca «Ho inviato gli euro»",
+           "Chi compra ha ancora 23 h 10 min per pagare",
+           "Tempo per pagare finito: chi vende può aprire una disputa",
+           "Tempo per pagare finito: puoi aprire una disputa",
+           "Poi tocca «Ho inviato gli euro»", "Chi compra ti manda gli euro"], r.get("card"))
+    prova("LA PAGINA: la riga «Tempo per pagare» col battito di sempre, e 24 ore NON nascono "
+          "rosse ne' arancio (la proporzione delle vite corte); fuori dal deposito niente",
+          [True, True, False, True, ""], r.get("riga"))
+    prova("LA RECENSIONE nella pagina: dove la ammette il giudice (non un rimborso "
+          "d'accordo, non al moderatore), dalla risposta del server — da compilare col nome "
+          "e l'ordine, lasciata (scappata), cancellata, nessun posto, a meta' strada niente, "
+          "i gesti di modifica",
+          [True, False, True, False, False, "", True, True, True, "", "", True], r.get("rec"))
+    # le cuciture della pagina
+    scheda = _fn_js(mini, "function schedaOnchainP2P(o){")
+    card = _fn_js(mini, "function rigaScambioOnchainP2P(o){")
+    render = _fn_js(mini, "async function renderP2POnchain(){")
+    battito = _fn_js(mini, "function battitoAnelloneP2P(){")
+    prova("cuciture del telefono: la scheda porta il riquadro e la riga del tempo, la card la "
+          "barra del tempo, la pagina chiede la recensione e tiene la bozza, il battito legge "
+          "la proporzione",
+          [True, True, True, True, True, True],
+          ['<div id="p2pOcRecensione" data-ordine="' in scheda,
+           "tempoPagareRigaOcP2P(o)" in scheda,
+           "barraScadenzaP2P({scade: Number(o.paga_entro)" in card,
+           "chiediRecensibileOcP2P(o)" in render,
+           "el('p2pOcRecCommento').value = bozzaV" in render,
+           "statoAnelloP2P(manca * (Number(box.dataset.scala) || 1))" in battito])
+
+
 def prove_indirizzo_resta_dove_sta():
     """«MOSTRA L'INDIRIZZO» NON RIPORTA IN CIMA (16 nov 2026, cantiere
     indirizzo-resta, Andrea: «se premo mostra indirizzo in un ordine il
@@ -202259,7 +202514,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -202965,6 +203220,7 @@ def main():
     prove_card_p2p_monete,
     prove_usdt_cifra_copia,
     prove_convenienza_monete,
+    prove_onchain_come_lightning,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
     prove_scelta_rete_mercatino,

@@ -36109,6 +36109,31 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `ONCHAIN_QUOTA_TETTO`). Il conto (`contoOnchainP2P`, `commissioneOnchainP2P`)
   ha la riga «Fee P2P» di Lightning, stimata col «≈» prima della presa
   e dai fatti dopo, ed entra anche nel foglio di chi prende.
+- LO SCAMBIO ON-CHAIN COME QUELLO LIGHTNING (17 nov 2026, cantiere
+  convenienza-monete; il perché in CANTIERI, «Lo scambio on-chain come
+  quello Lightning…»). RECENSIONE: le quattro rotte `/api/p2p/recensione*`
+  leggono lo scambio da `_riga_recensione_p2p(con, ordine)`, porta unica:
+  col prefisso `P2P_ONCHAIN_PREFISSO` la riga di `p2p_onchain_ordini`
+  sulla STESSA connessione (depositante e ricevente come i due posti),
+  giudice `_recensibile_onchain_p2p(stato, decisione_da)`; senza, la riga
+  di `p2p_ordini` e `_scambio_concluso_p2p` come prima. Nella pagina
+  `riquadroRecensioneOcP2P` con `chiediRecensibileOcP2P` e
+  `gestoRecensioneOcP2P` (invia, modifica, cancella), stato in `p2pOcRec`
+  per ordine. REPUTAZIONE: `p2p_onchain_firma` chiama
+  `_p2p_onchain_segna_esiti(o, stato, adesso)` → `p2p_esiti` `completato`
+  (giro 0, dettaglio «onchain») dalle coppie di `_p2p_onchain_esiti`.
+  NETTO: `_p2p_onchain_quanto(o, netti=True)` toglie
+  `quota_ricevente_sats`. TEMPO PER PAGARE:
+  `p2p_onchain_ore_pagamento(o)` (24 USDT/monete, 72 euro/franchi),
+  `p2p_onchain_paga_entro(o)` da `depositato_il`, in `_p2p_onchain_per`
+  come `paga_entro`/`ore_pagamento`; colonna `pagamento_scaduto_il`, la
+  timbra `_p2p_onchain_passata_tempo_pagare` nella ronda, che avvisa con
+  `_p2p_onchain_testi_tempo_scaduto`. Nessun annullo automatico. Nel
+  telefono `tempoPagareOcP2P` (card, riga dello stato e
+  `barraScadenzaP2P`) e `tempoPagareRigaOcP2P` (pagina, `data-scala` per
+  il battito). CONTI DI /ADMIN: `_conti_onchain_p2p(con, ordini, cambi)`
+  da' agli scambi in USDT e franchi la cifra in euro di
+  `_euro_conti_onchain_p2p` (cambi di adesso, `cambio_noto_ora`).
 - I DUE TASTI DELLA RETE NEL FOGLIO DELL'ORDINE (16 nov 2026, cantiere
   coin-quasi; il perché in CANTIERI, «I due tasti della rete nel foglio
   dell'ordine…»). `tastiReteFoglioP2P` disegna «⚡ Lightning» / «₿
