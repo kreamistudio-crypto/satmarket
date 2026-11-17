@@ -1,0 +1,89 @@
+MISSIONI A CARTE DI TAPPO — disegni Google Flow (17/11/2026)
+Nano Banana 2.1 (0 crediti), 2 versioni per prompt, tenuta la migliore. Disegnati apposta, niente pezzi di mappa.
+Riferimenti di stile (solo tecnica: contorni scuri, cel shading morbido, palette ambra/arancio/marrone):
+- scene: zona1.webp della stradina
+- carte e dorso: ico-wallet.webp + ico-acquisti.webp
+Nessun testo, lettera, numero, logo o marchio vero. Nessun personaggio nelle scene.
+Formati: scene 2752x1536 (download 2K), carte 1024x1024, dorso 1792x2400 (2K, formato 3:4 con la carta 2:3 dentro).
+Fondo delle carte e del dorso: verde misurato circa RGB(12,247,6), uniforme (scarto ~2-3).
+Le versioni scartate restano in _1k\ (anteprime 1K, anche quelle scelte); i JPG 2K originali in originali-jpg\.
+
+SCENE (16:9, angoli in basso a sinistra e a destra lasciati liberi per i personaggi)
+scena-sats.png
+  Banco del mercato all'alba: capra col sacco di grano, conchiglie, monete antiche, banconote senza scritte
+  e in fondo il wallet arancione col fulmine che brilla. Colline e tetti del villaggio sullo sfondo.
+scena-lucchetto.png
+  Bancarella di sera con le lanterne: grande barattolo di vetro pieno di monete chiuso da un lucchetto d'ottone,
+  accanto un frullatore in una scatola aperta. Altre bancarelle sfocate dietro.
+scena-parole.png
+  Stanzetta del faro: tavolo con la piastra di metallo incisa (solo righe ondulate), cassaforte aperta,
+  libro e fogli; dall'oblò il porto al tramonto, luce calda della lampada.
+scena-staffetta.png
+  Bosco di notte con fili ambra luminosi tesi fra gli alberi come una rete, sentiero che porta
+  al chiosco del caffè illuminato in fondo, lucciole.
+scena-oblo.png
+  Cabina di un razzo bianca e argento, grande oblò scuro al centro con le stelle, pannelli con
+  bottoni ambra (un piccolo schermo scuro senza scritte), pavimento libero.
+scena-quaderno.png
+  Rifugio di montagna in legno: cinque leggii ad arco con lo stesso quaderno aperto, camino acceso,
+  lanterne, finestre con le cime innevate.
+scena-antenna.png
+  Cima di collina sopra le nuvole al tramonto, tre antenne-relay luminose con archi di segnale
+  che le collegano.
+scena-halving.png
+  Luna: macchina di ottone e rame su una pedana che versa monete d'oro col fulmine in un grande barattolo
+  che si riempie; crateri, cielo nero stellato, la Terra in alto.
+
+CARTE (oggetto singolo centrato su verde)
+sats
+carta-capra-grano.png       capretta bianca accanto a un sacco di grano.
+carta-conchiglie.png        mucchietto di conchiglie (cipree e capesante).
+carta-monete-antiche.png    tre monete antiche (bronzo, sole inciso, argento a cerchi), senza lettere.
+carta-banconote.png         mazzetta di banconote vecchie legate con lo spago, solo cornicette.
+carta-moneta-sats.png       moneta d'oro col fulmine in rilievo.
+carta-sveglia.png           sveglia arancione a due campanelli, quadrante solo con le tacche.
+carta-wallet-acceso.png     portafoglio arancione aperto con un fulmine dorato che esce.
+lucchetto
+carta-soldi-in-privato.png  borsellino passato da una mano all'altra (solo mani e maniche arancioni;
+                            le maniche escono dal bordo dell'immagine).
+carta-barattolo-lucchetto.png barattolo ambrato pieno di monete chiuso col lucchetto d'ottone.
+carta-pacco-spedito.png     pacco di cartone con lo spago che vola via (righe di velocità).
+carta-frullatore.png        frullatore con base arancione e caraffa ambrata.
+carta-lucchetto-aperto.png  lucchetto d'ottone aperto.
+carta-etichetta-spedizione.png etichetta di carta con spago, codice a barre a righe e righe vuote.
+carta-foto-pacco.png        polaroid con un pacco chiuso.
+carta-mani-fidati.png       stretta di mano (solo mani, maniche marroni e arancioni).
+carta-nuvola-arrabbiata.png nuvola grigia arrabbiata con un fulmine sotto.
+parole
+carta-telefono-foto.png     smartphone che scatta col flash, mirino sullo schermo.
+carta-nuvola-cloud.png      nuvola bianco-azzurra con la freccia in su (cloud).
+carta-fumetto-messaggio.png fumetto da chat con tre puntini.
+carta-cassetto-foglio.png   comodino di legno col cassetto aperto e un foglio dentro.
+carta-casa-nonna.png        casetta antica col tetto di coppi, comignolo che fuma, fiori alle finestre.
+carta-piastra-metallo.png   piastra di metallo con quattro viti e incisioni ondulate.
+oblo
+carta-busta-email.png       busta color crema chiusa con sigillo arancione.
+carta-targhetta-nome.png    targhetta vuota con fascia arancione e clip.
+carta-password.png          lucchetto d'ottone con cinque asterischi davanti.
+carta-telefono-cornetta.png cornetta arancione col filo a spirale.
+carta-carta-identita.png    tessera con sagoma generica e righe vuote, senza scritte.
+carta-chiave-viola.png      chiave viola con l'anello lavorato e una gemma ambra.
+carta-schedario.png         schedario arancione col cassetto aperto pieno di cartelline.
+carta-scopa.png             scopa di saggina.
+antenna
+carta-antenna-porto.png     antenna-relay su un pontile di legno con salvagente, acqua del porto.
+carta-antenna-bosco.png     antenna-relay fra tre alberelli autunnali arancioni.
+carta-antenna-vetta.png     antenna-relay in cima a una roccia innevata.
+carta-cartello-vuoto.png    cartello di legno vuoto su un palo.
+carta-annuncio-pacco.png    pacco con un foglietto bianco appuntato con lo spillo rosso.
+carta-palazzo-azienda.png   palazzo di uffici alto con le finestre ambra.
+carta-chiave-dorata.png     chiave d'oro con l'anello lavorato.
+
+DORSO
+dorso.png
+  Carta verticale crema col bordo ambra e cornicetta interna, al centro un barattolino di vetro ambrato
+  col tappo di sughero e il fulmine dorato. Su verde.
+
+DA SAPERE
+- Le ombre di contatto sotto alcuni oggetti sono disegnate sull'oggetto, non sul verde.
+- Le scene hanno qualche dettaglio in più di quanto chiesto (libro e fogli nel faro, schermo spento nella cabina).
