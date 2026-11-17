@@ -116,10 +116,17 @@ def main():
     con.commit()
     con.close()
 
-    def posta(tg, corpo):
+    def posta(tg, corpo, timbri=None):
         mandati.clear()
         S._SECCHI.clear()
         S._CANALE_POSTATI.clear()
+        # (17 nov 2026) uno a settimana su Subito Crypto: ogni giro parte
+        # coi timbri scelti (di serie, mai postato)
+        c2 = S.db()
+        c2.execute("UPDATE utenti SET promo_canale_il=?, promo_vetrina_p2p_il=? "
+                   "WHERE tg_id=?", (*(timbri or (0, 0)), tg))
+        c2.commit()
+        c2.close()
         S.verifica_utente = lambda *a, **k: {"id": tg}
         r = c.post("/api/p2p/canale", json=corpo)
         return r.status_code, r.json().get("postato"), [d for d, _ in mandati], \
@@ -162,6 +169,38 @@ def main():
         prova("chi entra da Nostr: in casa e su BitcoinPodcast, mai su Subito Crypto",
               (200, True, ["@casa", "@podcast"]), (st, ok, dove))
         S.canale_bitcoin_podcast = lambda: ""
+        # UNO A SETTIMANA PER PERSONA SU SUBITO CRYPTO (17 nov 2026)
+        import time as _t
+        ora = int(_t.time())
+        prima_ritmo = S.ritmo_vetrina
+        S.ritmo_vetrina = lambda: (7, 99, 99)
+        try:
+            st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50, "metodo": "SEPA"})
+            c3 = S.db()
+            timbro = c3.execute("SELECT promo_vetrina_p2p_il FROM utenti WHERE tg_id=4401").fetchone()[0]
+            c3.close()
+            prova("il primo ordine della settimana va su Subito Crypto, e si timbra",
+                  (["@casa", "@subito_crypto_vetrina"], True), (dove, abs(timbro - ora) < 60))
+            st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50, "metodo": "SEPA"},
+                                      (0, ora - 3 * 86400))
+            prova("un ordine P2P su Subito Crypto tre giorni fa: il secondo resta in casa",
+                  (["@casa"], True), (dove, ok))
+            prova("...e la risposta lo dice", "settimana",
+                  c.post("/api/p2p/canale", json={"lato": "vendo", "euro": 50,
+                                                  "metodo": "SEPA"}).json().get("subito_crypto"))
+            st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50, "metodo": "SEPA"},
+                                      (ora - 2 * 86400, 0))
+            prova("...lo stesso se in settimana e' uscito un suo ANNUNCIO", ["@casa"], dove)
+            st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50, "metodo": "SEPA"},
+                                      (ora - 8 * 86400, ora - 8 * 86400))
+            prova("passati sette giorni torna su Subito Crypto",
+                  ["@casa", "@subito_crypto_vetrina"], dove)
+            S.ritmo_vetrina = lambda: (0, 99, 99)
+            st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50, "metodo": "SEPA"},
+                                      (ora - 3600, ora - 3600))
+            prova("a ritmo «tutto» (zero giorni) nessun freno", ["@casa", "@subito_crypto_vetrina"], dove)
+        finally:
+            S.ritmo_vetrina = prima_ritmo
         S.canale_id = lambda: ""
         st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50, "metodo": "SEPA"})
         prova("a canale di casa spento Subito Crypto va lo stesso, per conto suo",

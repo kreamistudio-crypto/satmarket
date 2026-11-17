@@ -86150,3 +86150,30 @@ tornano. Il video sta nella Library del progetto:
 `novita-scorrimento/banner-progressivo.mp4`.
 DA GUARDARE: dal telefono di Andrea (webview Android di Telegram) che la
 salita sia liscia come nel banco.
+## Subito Crypto: anche gli ordini P2P uno a settimana per persona (17 nov 2026, cantiere vetrina-p2p-convenienza, Andrea: «gli annunci della vetrina di subito crypto p2p devono comunque rispettare la regola di non piu di uno a settimana per persona»)
+
+COSA SI È DECISO. Il post di un ordine P2P va su Subito Crypto
+(`canale_vetrina()`) solo se in quei giorni la stessa persona non ci è
+già passata: il freno è quello degli annunci, `ritmo_vetrina()` coi suoi
+giorni (7 a «settimana», niente freno a «tutto»), e conta due timbri,
+`promo_canale_il` (un suo annuncio uscito in canale) e la colonna nuova
+`promo_vetrina_p2p_il` (un suo ordine P2P uscito su Subito Crypto). Il
+timbro si scrive PRIMA dell'invio, come per le campagne: un guasto può
+perdere un post, mai raddoppiarlo. Il resto del post esce lo stesso (il
+nostro canale e BitcoinPodcast), e la risposta della rotta lo dice
+(`"subito_crypto": "settimana"`).
+
+PERCHÉ UNA COLONNA NUOVA. `promo_canale_il` frena gli annunci in TUTTI i
+canali, il nostro compreso: timbrarla con un ordine P2P toglierebbe a
+chi vende il turno di casa per il suo prossimo annuncio.
+
+SCARTATI. La coda «la settimana dopo» degli annunci (`coda_vetrina`)
+anche per il P2P: un ordine dura ore, fra sette giorni è già preso o
+scaduto. Far contare l'ordine P2P anche contro il prossimo ANNUNCIO su
+Subito Crypto: vorrebbe toccare la coda degli annunci, e non è stato
+chiesto.
+
+PROVATO. `collaudo_freni` sul server vero: il primo ordine della
+settimana esce e si timbra; un ordine su Subito Crypto tre giorni fa, o
+un annuncio due giorni fa, lo tengono in casa (e la risposta lo dice);
+dopo otto giorni torna; a ritmo «tutto» nessun freno.
