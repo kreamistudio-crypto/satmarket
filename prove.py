@@ -204637,7 +204637,7 @@ for (let k = 0; k < 4 && arena === a; k++) {
 }
 passi(3);
 const arenaEsito = {prova2, errMaggioranza, prova3, decise, saldi: a.dati.saldi, finita, chiusa: arena === null, errori: mq.errori,
-  cartello: cartello.includes('<b>' + quadernoRigheArena()[a.dati ? 0 : 0][2] * 10 + '</b>') || cartello.includes('0</b>'), azione};
+  cartello, azione};
 const L2 = staffettaLivelli()[1];
 const lista = cacciaMissioniHTML(s);
 console.log(JSON.stringify({
@@ -204723,8 +204723,8 @@ console.log(JSON.stringify({
     ae = r.get("arenaEsito") or {}
     prova("il quaderno giocato muovendo Tappo: la copia sbagliata costa un errore, quella giusta porta alla seconda prova "
           "(sette leggii, un Tarlo)", [1, 7, 1, 1], ae.get("prova2"))
-    prova("...il cartello del leggio dice le righe e il tasto propone la correzione", "✏️ Questa copia è sbagliata: correggila",
-          ae.get("azione"))
+    prova("...il cartello del quaderno cambiato dice il numero diverso, e il tasto propone la correzione",
+          (True, "✏️ Correggi questo quaderno"), ("Tappo ha <b>40 🔩</b>" in (ae.get("cartello") or ""), ae.get("azione")))
     prova("...con Tappo fermo il Tarlo prende la maggioranza (un errore), standogli addosso si arriva alla terza prova",
           (2, [2, 2]), (ae.get("errMaggioranza"), ae.get("prova3")))
     prova("...le quattro buste: scritte quelle col conto che torna, strappata la doppia spesa",

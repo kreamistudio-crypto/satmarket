@@ -4053,15 +4053,21 @@
     .arena-hud i{font-style:normal;color:rgba(255,255,255,.2)}
     .arena-hud .caldo{background:#7F1D1D}
     .arena-hud .mano{background:rgba(247,147,26,.94);color:#1C1F24}
-    .arena-fumetto{position:absolute;left:8px;right:8px;top:44px;pointer-events:none;opacity:0;
+    .arena-obiettivo{position:absolute;left:8px;right:8px;top:42px;padding:9px 12px;border-radius:14px;
+      background:rgba(247,147,26,.95);color:#1C1F24;font-size:15px;font-weight:800;line-height:1.3;
+      pointer-events:none;box-shadow:0 8px 20px rgba(0,0,0,.35)}
+    .arena-obiettivo:empty{display:none}
+    .arena-obiettivo.nuovo{animation:caccia-entra .35s cubic-bezier(.2,1.3,.4,1) both}
+    .arena-fumetto{position:absolute;left:8px;right:8px;top:94px;pointer-events:none;opacity:0;
       transform:translateY(-8px);transition:opacity .25s ease,transform .25s ease}
     .arena-fumetto.su{opacity:1;transform:none}
     .arena-fumetto .miss-fumetto{margin:0;animation:none}
-    .arena-cartello{position:absolute;left:8px;right:8px;top:44px;padding:10px 12px;border-radius:14px;
+    .arena-cartello{position:absolute;left:8px;right:8px;top:94px;padding:10px 12px;border-radius:14px;
       background:#FFF6DC;color:#3A2A12;font-size:14.5px;line-height:1.45;pointer-events:none;
       box-shadow:0 10px 24px rgba(0,0,0,.4)}
     .arena-cartello[hidden]{display:none}
     .arena-cartello ul{margin:4px 0 0;padding:0;list-style:none}
+    .arena-cartello .grande{margin-top:2px;font-size:22px}
     .arena-cartello ul.due{display:grid;grid-template-columns:1fr 1fr;column-gap:10px}
     .arena-banner{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%) scale(.8);width:max-content;
       max-width:calc(100% - 32px);padding:12px 20px;border-radius:18px;background:rgba(10,15,31,.88);color:#FFF6E3;
@@ -61755,7 +61761,7 @@ let arena = null;     /* il minigioco in corso: tutto quel che tiene in mano, o 
 /* PURA: l'impalcatura della tela, nel foglio della missione */
 function arenaHTML(nome){
   return `<div class="arena-box" id="arenaBox"><canvas class="arena-tela" id="arenaTela" role="img" aria-label="${esc(nome)}: Tappo si muove dove tocchi o dove lo guidi col dito"></canvas>`
-    + `<div class="arena-hud" id="arenaHud"></div><div class="arena-fumetto" id="arenaFumetto"></div>`
+    + `<div class="arena-hud" id="arenaHud"></div><div class="arena-obiettivo" id="arenaObiettivo"></div><div class="arena-fumetto" id="arenaFumetto"></div>`
     + `<div class="arena-cartello" id="arenaCartello" hidden></div><div class="arena-banner" id="arenaBanner"></div>`
     + `<div class="caccia-leva" id="arenaLeva"><i></i></div></div>`
     + `<button type="button" class="caccia-btn arena-azione" id="arenaAzione" onclick="arenaFai()" disabled>Tocca dove vuoi andare</button>`;
@@ -61775,7 +61781,7 @@ function arenaApri(m){
     x: def.scena.via[0], y: def.scena.via[1], vx: 0, vy: 0, verso: 1, fase: 0, salto: 0, cammina: 0,
     schiaccia: 0, meta: null, metaNata: 0, guida: null, tasti: {}, dito: null, blocco: 0, sbuffo: 0, ultimoPasso: 0,
     pianta: def.scena, cose: [], nemici: [], polvere: [], scoppi: [], prova: -1, dice: null, vicino: null, scossa: 0,
-    banner: 0, attesa: null, hud: '', cartello: '', azione: '', tappo, tappoPronto: false};
+    banner: 0, attesa: null, hud: '', obiettivo: '', cartello: '', azione: '', tappo, tappoPronto: false};
   tappo.decoding = 'async';
   tappo.onload = () => { if (arena && arena.tappo === tappo) arena.tappoPronto = true; };
   tappo.src = '/assets/caccia-tappo.webp';
@@ -61971,6 +61977,13 @@ function arenaPannelli(a, tutto){
   const st = missioneStelle(a.m.errori);
   const hud = `<span>${[1, 2, 3].map(i => i <= st ? '★' : '<i>★</i>').join('')}</span>` + (p.hud ? p.hud(a) : '');
   if (tutto || hud !== a.hud) { a.hud = hud; const h = el('arenaHud'); if (h) h.innerHTML = hud; }
+  /* L'OBIETTIVO: una frase sola, sempre in vista, che dice cosa fare
+     adesso (Andrea, 17 nov: «non si capisce che cosa deve fare») */
+  const ob = (p.obiettivo && p.obiettivo(a)) || '';
+  if (tutto || ob !== a.obiettivo) {
+    a.obiettivo = ob;
+    const o = el('arenaObiettivo'); if (o) { o.innerHTML = ob ? '🎯 ' + ob : ''; o.classList.remove('nuovo'); void o.offsetWidth; o.classList.add('nuovo'); }
+  }
   const cart = (a.vicino && p.cartello && p.cartello(a, a.vicino)) || '';
   if (tutto || cart !== a.cartello) {
     a.cartello = cart;
@@ -62045,7 +62058,18 @@ function arenaDisegna(a){
     g.beginPath(); g.arc(p.x + Math.cos(p.a) * t * p.v, p.y + Math.sin(p.a) * t * p.v - t * 50, 7 * (0.5 + p.vita), 0, 6.2832); g.fill();
   });
   if (a.def.sopra) a.def.sopra(g, a);
+  /* LE FRECCE: dove andare, sopra la cosa giusta, che molleggiano */
+  const pr = a.def.prove[a.prova], frecce = (pr && pr.freccia && pr.freccia(a)) || [];
+  frecce.forEach(f => arenaFreccia(g, f[0], f[1], a.tempo, fermo));
   a.camCss = {k: c.k / dpr, x0: (c.x0) / dpr, y0: c.y0 / dpr};
+}
+/* una freccia ambra che punta in giu' su (x, y) */
+function arenaFreccia(g, x, y, tempo, fermo){
+  const su = fermo ? 0 : Math.abs(Math.sin(tempo * 4)) * 16;
+  g.save(); g.translate(x, y - su);
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(-30, -34); g.lineTo(-12, -34); g.lineTo(-12, -70); g.lineTo(12, -70); g.lineTo(12, -34); g.lineTo(30, -34); g.closePath();
+  g.fillStyle = '#FFB24A'; g.strokeStyle = '#3A2408'; g.lineWidth = 5; g.lineJoin = 'round';
+  g.stroke(); g.fill(); g.restore();
 }
 /* TAPPO: il disegno ufficiale, che molleggia appena — un saltello e una
    schiacciata leggera all'atterraggio. Quando arrivano i passi dipinti
@@ -62169,8 +62193,9 @@ const QUAD_SCENA = {L: 900, A: 1500, muri: [124, 372, 776, 1440], via: [450, 133
 const QUAD_POSTI_5 = [[450, 600], [690, 800], [600, 1110], [300, 1110], [210, 800]];
 const QUAD_POSTI_7 = [[450, 560], [670, 660], [700, 930], [585, 1180], [315, 1180], [200, 930], [230, 660]];
 const QUAD_AMICI = ['topo', 'ape', 'rana', 'riccio', 'gufo', 'lumaca', 'tappo'];
-/* PURA: le quattro righe del quaderno (chi, a chi, quanto) */
-function quadernoRigheArena(){ return [['Topo', 'Ape', 3], ['Ape', 'Rana', 2], ['Rana', 'Tappo', 4], ['Riccio', 'Topo', 1]]; }
+/* PURA: il numero scritto nel quaderno — uguale in tutti, dieci volte
+   tanto in quello cambiato dal Tarlo (una cosa sola da guardare) */
+function quadernoNumero(cambiato){ return cambiato ? 40 : 4; }
 /* i saldi di partenza della terza prova e le buste, in ordine */
 const QUAD_SALDI = {tarlo: 5, rana: 4, topo: 1, ape: 0, riccio: 2, tappo: 0};
 const QUAD_BUSTE = [['rana', 'topo', 2], ['tarlo', 'ape', 5], ['tarlo', 'riccio', 5], ['ape', 'tappo', 3]];
@@ -62199,39 +62224,35 @@ const ARENA_QUADERNO = {
   prove: [
     {nome: 'La copia diversa',
      nasci(a){
-       const truccato = Math.floor(Math.random() * 5), riga = Math.floor(Math.random() * 4);
-       a.dati = {truccato, riga, letti: 0, aiuto: false};
+       a.dati = {truccato: Math.floor(Math.random() * 5)};
        a.cose = QUAD_POSTI_5.map((p, i) => quadLeggio(p, i));
-       arenaDice(a, 'tappo', 'Ognuno dei miei amici ha una copia del quaderno dei conti. Stanotte il Tarlo ne ha rosicchiata <b>una</b>. Vai ai leggii, leggi e trova quella diversa!', 6.5);
+       arenaDice(a, 'tappo', 'Cinque amici hanno lo stesso quaderno dei conti. Il Tarlo ne ha cambiato <b>uno</b>!', 4.5);
      },
-     hud(a){ return `<span>📖 lette ${a.cose.filter(c => c.letto).length}/5</span>`; },
+     obiettivo(a){
+       const letti = a.cose.filter(c => c.letto).length;
+       return letti < 5 ? `Leggi i 5 quaderni (${letti}/5): uno dice un numero diverso` : 'Torna al quaderno col numero diverso e correggilo';
+     },
+     freccia(a){ return a.cose.filter(c => !c.letto).map(c => [c.x, c.y - 150]); },
      passa(a){
        const v = a.vicino;
-       if (v && v.tipo === 'leggio' && !v.letto) {
-         v.letto = true; arenaSuono('raccogli');
-         const letti = a.cose.filter(c => c.letto).length;
-         if (letti === 3 && a.liv.aiuti && !a.dati.aiuto) { a.dati.aiuto = true; arenaDice(a, 'tappo', 'Confronta le cifre: quella che hanno <b>quasi tutti</b> è quella vera.', 4.5); }
-       }
+       if (v && v.tipo === 'leggio' && !v.letto) { v.letto = true; arenaSuono('raccogli'); }
      },
      cartello(a, c){
        if (c.tipo !== 'leggio') return '';
-       const d = a.dati, righe = quadernoRigheArena().map((r, k) => {
-         const falso = a.cose.indexOf(c) === d.truccato && k === d.riga;
-         return `<li>${esc(r[0])} → ${esc(r[1])}: <b>${falso ? r[2] * 10 : r[2]}</b> 🔩</li>`;
-       }).join('');
-       return `<b>📓 La copia di ${esc(quadNome(c.chi))}</b><ul>${righe}</ul>`;
+       const n = quadernoNumero(a.cose.indexOf(c) === a.dati.truccato);
+       return `<b>📓 Il quaderno di ${esc(quadNome(c.chi))}</b><div class="grande">Tappo ha <b>${n} 🔩</b></div>`;
      },
-     invito(a){ return a.cose.some(c => c.letto) ? 'Vai a leggere un altro leggio' : 'Tocca un leggio per andarci'; },
+     invito(){ return 'Tocca un quaderno per andarci'; },
      azione(a, c){
        if (c.tipo !== 'leggio' || c.giusto) return null;
-       return ['✏️ Questa copia è sbagliata: correggila', () => {
+       return ['✏️ Correggi questo quaderno', () => {
          if (a.cose.indexOf(c) === a.dati.truccato) {
            c.giusto = true; arenaScoppio(a, c.x, c.y - 120);
-           arenaBene(a, 'Trovata! Quattro copie su cinque dicevano un\'altra cifra: vince la maggioranza.');
+           arenaBene(a, 'Giusto! Quattro quaderni dicevano ' + quadernoNumero(false) + ': vince quello che dicono quasi tutti.');
            const t = arenaTarloNasci(c.x + 40, c.y + 10); t.stato = 'fugge'; a.nemici = [t];
            arenaDice(a, 'tarlo', 'Uffa, scoperto! Va bene… allora ne rosicchio TANTE insieme!', 3.2);
            arenaDopo(a, 2.6, () => arenaProva(1));
-         } else arenaErrore(a, 'Questa copia è uguale alla maggioranza: confrontala con le altre.');
+         } else arenaErrore(a, 'No: questo dice ' + quadernoNumero(false) + ' come quasi tutti gli altri.');
        }];
      }},
     {nome: 'Ferma il Tarlo',
@@ -62246,7 +62267,12 @@ const ARENA_QUADERNO = {
        const q = quadernoMaggioranza(a.cose);
        return `<span>⏱ ${Math.max(0, Math.ceil(a.dati.resta))} s</span><span${q.rotti * 2 + 2 > q.tot ? ' class="caldo"' : ''}>📓 giuste ${q.tot - q.rotti}/${q.tot}</span>`;
      },
-     invito(){ return 'Acchiappa il Tarlo e ripara le copie rosse'; },
+     obiettivo(a){ return a.cose.some(c => c.rotto) ? 'Passa sui quaderni rossi per aggiustarli' : 'Tocca il Tarlo prima che rovini i quaderni!'; },
+     freccia(a){
+       const rossi = a.cose.filter(c => c.rotto).map(c => [c.x, c.y - 150]);
+       return rossi.length ? rossi : a.nemici.filter(n => n.stato === 'va' || n.stato === 'morde').map(n => [n.x, n.y - 70]);
+     },
+     invito(){ return 'Tocca il Tarlo e i quaderni rossi'; },
      passa(a, dt){
        const d = a.dati, liv = a.liv;
        if (d.finita) return;
@@ -62316,7 +62342,22 @@ const ARENA_QUADERNO = {
        const d = a.dati;
        return `<span>✉️ ${d.fatte}/${QUAD_BUSTE.length}</span>` + (d.mano ? `<span class="mano">In mano: ${esc(quadBustaTesto(d.mano))}</span>` : '');
      },
-     invito(a){ return a.dati.mano ? 'Portala al quaderno o al cestino' : 'Prendi la busta: camminaci sopra'; },
+     obiettivo(a){
+       const b = a.dati.mano;
+       if (!b) return a.cose.some(c => c.tipo === 'busta') ? 'Prendi la busta' : 'Aspetta la prossima busta…';
+       const ha = Number(a.dati.saldi[b[0]]) || 0;
+       return `${esc(quadNome(b[0]))} ha <b>${ha} 🔩</b>: può pagarne ${b[2]}? `
+         + (!a.liv.aiuti ? 'Quaderno o cestino?' : ha >= b[2] ? 'Sì → scrivila nel quaderno' : 'No → strappala nel cestino');
+     },
+     freccia(a){
+       const b = a.dati.mano;
+       if (!b) return a.cose.filter(c => c.tipo === 'busta').map(c => [c.x, c.y - 50 - (c.z || 0)]);
+       /* con gli aiuti (le zone basse) la freccia dice anche la risposta */
+       const ok = quadernoBustaValida(a.dati.saldi, b);
+       return a.cose.filter(c => (c.tipo === 'grande' && (ok || !a.liv.aiuti)) || (c.tipo === 'cestino' && (!ok || !a.liv.aiuti)))
+         .map(c => [c.x, c.y - (c.tipo === 'grande' ? 230 : 120)]);
+     },
+     invito(a){ return a.dati.mano ? 'Segui la freccia' : 'Prendi la busta: camminaci sopra'; },
      tocca(a, c){
        if (c.tipo !== 'busta' || a.dati.mano || c.z > 30) return;
        c.via = true; a.dati.mano = c.busta; arenaSuono('raccogli'); haptic();
