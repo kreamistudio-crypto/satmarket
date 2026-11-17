@@ -368,3 +368,9 @@ frase: Prima del tuo primo scambio P2P on-chain, se le tue 12 parole non hanno a
 dove: Il P2P, quando pubblichi o prendi un ordine on-chain; Profilo → «₿ On-chain» → «Le ho scritte su carta».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-17 · onchain-come-lightning
+frase: Negli scambi P2P on-chain, quando i bitcoin sono nel deposito di garanzia, chi compra ha 24 ore per pagare in USDT, ETH, Monero o USDe e 72 ore in euro o franchi, col conto alla rovescia su card e pagina. A scambio concluso si lascia la recensione come negli scambi Lightning, il bot dice i sats netti, e lo scambio conta nei «✅ scambi P2P».
+dove: «I miei scambi», la card on-chain e la pagina dello scambio (riga «Tempo per pagare», riquadro «⭐ Lascia una recensione»); il messaggio del bot «Scambio on-chain concluso!».
+leva: nessuna
+pubblico: sì

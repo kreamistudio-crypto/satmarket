@@ -65000,9 +65000,16 @@ function statoOnchainCardP2P(o){
         : {t: 'Deposita i sats', d: 'Nell\'indirizzo 2-di-3' + (o.deposito_entro ? ', entro le ' + ora(o.deposito_entro) : '')};
       if (ricevo && !o.incasso) return {t: 'Scegli dove ricevere', d: 'Incolla un tuo indirizzo bitcoin'};
       return {t: 'Si aspetta il deposito', d: 'Chi vende mette i sats nel 2-di-3'};
-    case 'depositato':
-      if (ricevo) return {t: 'Manda gli euro', d: 'Poi tocca «Ho inviato gli euro»'};
-      return {t: 'Sats depositati', d: 'Chi compra ti manda gli euro'};
+    case 'depositato': {
+      /* il tempo per pagare (17 nov 2026): quanto resta, o che e' finito */
+      const tp = typeof tempoPagareOcP2P === 'function' ? tempoPagareOcP2P(o, Date.now() / 1000) : null;
+      if (ricevo) return {t: 'Manda gli euro', d: !tp ? 'Poi tocca «Ho inviato gli euro»'
+        : tp.finito ? 'Tempo per pagare finito: chi vende può aprire una disputa'
+        : 'Hai ancora ' + tp.quanto + ', poi tocca «Ho inviato gli euro»'};
+      return {t: 'Sats depositati', d: !tp ? 'Chi compra ti manda gli euro'
+        : tp.finito ? 'Tempo per pagare finito: puoi aprire una disputa'
+        : 'Chi compra ha ancora ' + tp.quanto + ' per pagare'};
+    }
     case 'euro_inviati':
       if (deposito) return {t: 'Euro inviati', d: 'Controlla il conto e libera i sats'};
       if (ricevo && !o.incasso) return {t: 'Scegli dove ricevere', d: 'Incolla un tuo indirizzo bitcoin'};
@@ -65013,6 +65020,44 @@ function statoOnchainCardP2P(o){
     case 'scaduto': return {t: 'Scaduto nel libro', d: ''};
     default: return {t: 'Annullato', d: ''};
   }
+}
+/* IL TEMPO PER PAGARE (17 nov 2026, cantiere convenienza-monete; Andrea:
+   «uno mi ha preso l'ordine, ma quanto tempo ho io per inviare USDE? Non
+   viene indicato», e sulla scheda «24 ore monete, 72 ore euro»). Dal
+   deposito confermato chi compra bitcoin ha `ore_pagamento` ore; l'ora
+   la dice il server (`paga_entro`, da `p2p_onchain_paga_entro`), mai un
+   numero scritto qui. Alla scadenza non si annulla niente — i sats
+   restano nel 2-di-3 — e chi vende sa che puo' aprire la disputa.
+   PURA (l'orologio si passa): null fuori dal deposito o senza l'ora. */
+function tempoPagareOcP2P(o, adesso){
+  const fine = Number(o && o.paga_entro) || 0;
+  if (!o || o.stato !== 'depositato' || !(fine > 0)) return null;
+  const resta = fine - Number(adesso || 0);
+  if (resta <= 0) return {resta: resta, finito: true, quanto: ''};
+  const h = Math.floor(resta / 3600), m = Math.floor((resta % 3600) / 60);
+  return {resta: resta, finito: false,
+          quanto: h >= 1 ? h + ' h' + (m ? ' ' + m + ' min' : '') : Math.max(1, Math.ceil(resta / 60)) + ' min'};
+}
+/* ...nella pagina dello scambio: la riga del tempo di Lightning
+   (`anelloneP2P`: «Tempo rimasto» col conto che scorre e la barra), col
+   titolo suo e la PROPORZIONE delle vite corte (`barraScadenzaP2P`): 24
+   ore non nascono rosse. Batte col battito di sempre
+   (`battitoAnelloneP2P`, che legge `data-scala`). PURA. */
+function tempoPagareRigaOcP2P(o, adesso){
+  const ora = adesso || Math.floor(Date.now() / 1000);
+  if (!tempoPagareOcP2P(o, ora) || typeof contoRimastoP2P !== 'function') return '';
+  const fine = Number(o.paga_entro), inizio = Number(o.depositato_il) || 0;
+  const vita = fine - inizio;
+  const scala = vita > 0 && vita < P2P_VITA_SOGLIE_S ? P2P_VITA_SOGLIE_S / vita : 1;
+  const manca = Math.max(0, fine - ora);
+  const resta = frazioneVitaP2P({scade: fine, creato: inizio}, ora);
+  return '<div class="p2p-tempone p2p-tempone-riga">'
+    + '<div class="p2p-tempo"><span>Tempo per pagare</span><b class="p2p-tempo-conto">'
+      + esc(contoRimastoP2P(manca)) + '</b></div>'
+    + '<div class="p2p-anellone p2p-tempo-barra ' + statoAnelloP2P(manca * scala) + '" data-fine="' + fine
+      + '" data-inizio="' + inizio + '" data-scala="' + scala.toFixed(3) + '" role="img" aria-label="'
+      + esc((scadeTestoP2P(fine) || '') + ' (' + (Number(o.ore_pagamento) || 0) + ' ore per pagare)')
+      + '"><i style="width:' + larghezzaTempoP2P(Math.max(0, resta)) + '"></i></div></div>';
 }
 /* la tinta della casella, nella tavolozza del Lightning (`P2P_TINTA_STATO`):
    arancio il gesto mio, viola l'attesa, rosso la disputa */
@@ -65103,6 +65148,10 @@ function rigaScambioOnchainP2P(o){
     + (st.d ? '<span class="p2p-aspetta-riga">' + esc(st.d) + '</span>' : '') + '</div>'
     + (typeof pagaReteCardP2P === 'function' ? pagaReteCardP2P : x => x)(metodi.length ? '<div class="p2p-box p2p-paga" title="' + esc(metodi.join(', ')) + '">'
        + iconaMetodiP2P(metodi) + metodi.map(m => marchioMetodoP2P(m)).join(', ') + '</div>' : '', 'btc')
+    /* il tempo per pagare come bordo di sotto, la barra delle card del
+       libro (17 nov 2026): solo a deposito confermato */
+    + (o.stato === 'depositato' && Number(o.paga_entro) > 0 && typeof barraScadenzaP2P === 'function'
+       ? barraScadenzaP2P({scade: Number(o.paga_entro), creato: Number(o.depositato_il) || 0}) : '')
     + '</div>';
 }
 /* LA CONVENIENZA SULLA CARD ON-CHAIN DI «I MIEI SCAMBI» (17 nov 2026,
@@ -65168,7 +65217,12 @@ async function renderP2POnchain(){
     if (!o) { p2pOnchainAperto = 0; return renderP2POnchain(); }
     /* uno scambio aperto si chiama come quello di Lightning */
     if (tit) tit.innerHTML = P2P_OC_MONETA + 'Nel dettaglio';
+    /* la bozza della recensione sopravvive al ridisegno (17 nov 2026) */
+    const bozza = el('p2pOcRecCommento');
+    const bozzaV = bozza && bozza.dataset.ordine === o.ordine ? bozza.value : null;
     box.innerHTML = schedaOnchainP2P(o);
+    if (bozzaV !== null && el('p2pOcRecCommento')) el('p2pOcRecCommento').value = bozzaV;
+    if (typeof chiediRecensibileOcP2P === 'function') chiediRecensibileOcP2P(o);
     /* il QR dell'indirizzo USDT di chi vende, a chi paga (2 nov 2026) */
     /* ...e quello dell'indirizzo della moneta (16 nov 2026), stesso posto */
     const qu = el('p2pOcUsdtQr');
@@ -65796,6 +65850,8 @@ function schedaOnchainP2P(o){
     + '<div class="trust-note nota-scambio"><span><b>' + esc(paroleOc(o, P2P_ONCHAIN_STATI[o.stato] || o.stato)) + '</b>'
       + (tocca ? '<span class="p2p-tocca">👉 tocca a te</span>' : (finito || mod ? '' : '<span class="p2p-aspetta">✋ Aspetta</span>'))
       + '<br>' + testo + '</span></div>'
+    /* il tempo per pagare, sotto la nota (17 nov 2026) */
+    + (typeof tempoPagareRigaOcP2P === 'function' ? tempoPagareRigaOcP2P(o) : '')
     /* chi compra senza un posto dove ricevere lo scrive qui (thread del
        2-di-3, richiesta di Alan): subito sotto la nota, ben in vista */
     + `${incassoMancanteOnchainP2P(o)}`
@@ -65806,9 +65862,150 @@ function schedaOnchainP2P(o){
     + (usdt && mod ? modUsdtOcP2P(o) : '')
     + indirizzoBox
     + uscita
+    /* la recensione a scambio concluso (17 nov 2026): il riquadro lo
+       riempie la risposta del server, `chiediRecensibileOcP2P` */
+    + (typeof recensibileOcP2P === 'function' && recensibileOcP2P(o)
+       ? '<div id="p2pOcRecensione" data-ordine="' + esc(o.ordine) + '">'
+         + riquadroRecensioneOcP2P(o, p2pOcRec[o.ordine]) + '</div>' : '')
     + (gesti.includes("'disputa'") ? '<input id="p2pOcMotivo" maxlength="500" placeholder="Per una disputa: cosa è successo? (lo leggono i moderatori)">' : '')
     + '<div class="p2p-onchain-gesti">' + gesti + '</div>'
     + decidi;
+}
+
+/* ---- LA RECENSIONE DI UNO SCAMBIO ON-CHAIN (17 nov 2026, cantiere
+   convenienza-monete, Andrea: «A scambio concluso non c'è la possibilità
+   di mettere una recensione», e «tutto deve essere come la parte
+   lighting») ----
+   Il riquadro di Lightning (`riquadroRecensioneP2P`), coi suoi pezzi —
+   `.payout`, le stelle `stelleSceltaP2P`, la casella `.fb-commento`, i
+   gesti `gestiFeedbackHTML` — e le STESSE rotte del server: l'ordine
+   on-chain ha il suo nome pubblico («bar-onchain-…»), e il server lo
+   riconosce dal prefisso (`_riga_recensione_p2p`). Si recensisce dove lo
+   dice lo stesso giudice del server (`_recensibile_onchain_p2p`): i sats
+   arrivati a chi compra, o una disputa decisa da un moderatore. Le
+   funzioni di Lightning leggono `p2pOrdineAperto` e la riga in
+   localStorage, che l'on-chain non ha: per questo le sorelle qui sotto,
+   che parlano con le stesse rotte e tengono la risposta per ordine. */
+let p2pOcRec = {};                 // ordine -> la risposta di /p2p/recensibile
+const p2pOcRecChieste = new Set(); // una domanda per ordine e per sessione
+let p2pOcRecModifica = '';         // l'ordine la cui recensione sto modificando
+/* PURA: lo scambio on-chain e' arrivato dove si recensisce? */
+function recensibileOcP2P(o){
+  return !!(o && o.ruolo !== 'moderatore' && o.ordine
+    && (o.stato === 'rilasciato' || (o.stato === 'rimborsato' && o.decisione && o.disputa)));
+}
+/* PURA: il riquadro, dalla risposta del server; senza risposta niente */
+function riquadroRecensioneOcP2P(o, rec){
+  if (!recensibileOcP2P(o) || !rec) return '';
+  const ordine = esc(o.ordine);
+  if (rec.gia) {
+    const stelle = Math.max(0, Math.min(5, rec.voto | 0));
+    if (rec.gesti && rec.gesti.modifica && p2pOcRecModifica === o.ordine)
+      return '<div class="payout"><h4>✏️ Modifica la recensione</h4>'
+        + '<div class="hint">Puoi cambiare stelle e commento <b>una volta sola</b>: dopo resta così.</div>'
+        + stelleSceltaP2P()
+        + '<textarea id="p2pOcRecCommento" class="fb-commento" maxlength="200" data-ordine="' + ordine + '" '
+        + 'placeholder="Commento (facoltativo, max 200 caratteri)">' + esc(rec.commento || '') + '</textarea>'
+        + '<button class="btn primary fb-invia" data-ordine="' + ordine + '" onclick="gestoRecensioneOcP2P(this, \'modifica\')">✏️ Salva la modifica</button>'
+        + '<button class="btn ghost fb-invia" onclick="modificaRecensioneOcP2P(\'\')">Lascia com\'è</button></div>';
+    return '<div class="payout"><h4>⭐ Recensione lasciata</h4>'
+      + (stelle || rec.commento
+         ? '<div class="hint">' + (stelle ? '<span class="stars">' + '★'.repeat(stelle) + '</span>' : '')
+           + (rec.commento ? (stelle ? ' — ' : '') + esc(rec.commento) : '')
+           + (rec.modificato ? ' <span class="fb-modificato">· modificata</span>' : '') + '</div>'
+         : '')
+      + (typeof gestiFeedbackHTML === 'function'
+         ? gestiFeedbackHTML(rec.gesti, 'modificaRecensioneOcP2P(\'' + ordine + '\')',
+                             'gestoRecensioneOcP2P(this, \'cancella\', \'' + ordine + '\')', 'f') : '')
+      + '</div>';
+  }
+  if (rec.motivo === 'ritirata')
+    return '<div class="payout"><h4>⭐ Recensione cancellata</h4>'
+      + '<div class="hint">Hai cancellato la tua recensione su questo scambio: non se ne può lasciare un\'altra.</div></div>';
+  if (!rec.si) return '';
+  return '<div class="payout"><h4>⭐ Lascia una recensione</h4>'
+    + '<div class="hint">Com\'è andata con ' + esc(o.altro || 'chi ha scambiato con te')
+    + '? Le stelle e il commento vanno sul suo profilo di Barattolo, nella stessa media del mercatino. '
+    + (typeof testoFinestraFeedback === 'function' ? testoFinestraFeedback(rec.giorni, 'f') : '') + '</div>'
+    + stelleSceltaP2P()
+    + '<textarea id="p2pOcRecCommento" class="fb-commento" maxlength="200" data-ordine="' + ordine + '" '
+    + 'placeholder="Commento (facoltativo, max 200 caratteri)"></textarea>'
+    + '<button class="btn primary fb-invia" data-ordine="' + ordine + '" onclick="gestoRecensioneOcP2P(this, \'invia\')">⭐ Invia la recensione</button>'
+    + '</div>';
+}
+/* ridisegna SOLO il riquadro, mai la pagina: un commento a meta' non
+   sparisce sotto le dita */
+function ridisegnaRecensioneOcP2P(ordine){
+  const box = el('p2pOcRecensione');
+  if (!box || box.dataset.ordine !== ordine) return;
+  const o = p2pOnchainMiei.find(x => x.ordine === ordine);
+  if (o) box.innerHTML = riquadroRecensioneOcP2P(o, p2pOcRec[ordine]);
+}
+/* la domanda al server, in sottofondo e una volta per ordine */
+async function chiediRecensibileOcP2P(o, ancora){
+  if (DEMO || VETRINA || !myTgId || !recensibileOcP2P(o)) return;
+  if (p2pOcRecChieste.has(o.ordine) && !ancora) return;
+  p2pOcRecChieste.add(o.ordine);
+  let esito;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/recensibile`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordine: o.ordine})});
+    esito = r.ok ? await r.json() : null;
+  } catch(e) { esito = null; }
+  /* il muto non e' un no: la prossima apertura richiede */
+  if (!esito) { p2pOcRecChieste.delete(o.ordine); return; }
+  p2pOcRec[o.ordine] = esito;
+  ridisegnaRecensioneOcP2P(o.ordine);
+}
+function modificaRecensioneOcP2P(ordine){
+  haptic();
+  p2pOcRecModifica = ordine || '';
+  const rec = p2pOcRec[ordine];
+  p2pStellaScelta = ordine && rec ? Math.max(0, Math.min(5, rec.voto | 0)) : 0;
+  const box = el('p2pOcRecensione');
+  ridisegnaRecensioneOcP2P(ordine || (box && box.dataset.ordine) || '');
+}
+/* I TRE GESTI, le stesse rotte e le stesse domande di Lightning */
+function gestoRecensioneOcP2P(btn, cosa, ordine){
+  if (DEMO || VETRINA || !myTgId) return;
+  haptic();
+  ordine = ordine || (btn && btn.dataset.ordine) || '';
+  if (!ordine) return;
+  const voto = p2pStellaScelta;
+  if (cosa !== 'cancella' && !voto) { toast('Scegli da 1 a 5 stelle'); return; }
+  const commento = ((el('p2pOcRecCommento') || {}).value || '').trim();
+  const rotta = {invia: '/p2p/recensione', modifica: '/p2p/recensione/modifica',
+                 cancella: '/p2p/recensione/cancella'}[cosa];
+  const domanda = {
+    invia: {titolo: 'Invii questa recensione?', etichetta: '⭐ Invia',
+            corpo: typeof testoFinestraFeedback === 'function'
+              ? testoFinestraFeedback((p2pOcRec[ordine] || {}).giorni, 'f') : ''},
+    modifica: {titolo: 'Salvi la modifica?', etichetta: '✏️ Salva',
+               corpo: 'La recensione si modifica una volta sola: dopo resta così.'},
+    cancella: {titolo: 'Cancelli la tua recensione?', etichetta: '🗑 Cancella', vestito: 'allarme',
+               corpo: 'Sparisce dal profilo e dalla media, per sempre: su questo scambio non potrai lasciarne un\'altra.'}
+  }[cosa];
+  chiediConferma(Object.assign({}, domanda, {poi: async () => {
+    const ripristina = bottoneInAttesa(btn, cosa === 'cancella' ? '🗑 Cancello…' : '⭐ Invio…');
+    let d = {}, ok = false;
+    try {
+      const r = await fetch(API_BASE + rotta, {method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+        body: JSON.stringify(cosa === 'cancella' ? {ordine} : {ordine, voto, commento})});
+      d = await r.json().catch(() => ({}));
+      ok = r.ok;
+    } catch(e) { d = {}; }
+    ripristina();
+    if (!ok) { toast(d.detail || 'Operazione non riuscita, riprova', 7000); return; }
+    p2pStellaScelta = 0;
+    p2pOcRecModifica = '';
+    toast(cosa === 'invia' ? '⭐ Grazie per la recensione!'
+          : cosa === 'modifica' ? '✏️ Recensione modificata' : '🗑 Recensione cancellata');
+    /* i gesti veri (fino a quando, cosa resta) li dice il server */
+    const o = p2pOnchainMiei.find(x => x.ordine === ordine);
+    if (o) chiediRecensibileOcP2P(o, true);
+  }}));
 }
 
 /* PURA: il conto dello scambio, nel vestito di quello di Lightning
@@ -78505,7 +78702,9 @@ function battitoAnelloneP2P(){
   const larga = larghezzaTempoP2P(resta);
   const i = box.querySelector('i');
   if (i && i.style.width !== larga) i.style.width = larga;
-  const st = statoAnelloP2P(manca);
+  /* (17 nov 2026) la riga del tempo per pagare on-chain porta la sua
+     proporzione: una vita di 24 ore non diventa rossa appena nata */
+  const st = statoAnelloP2P(manca * (Number(box.dataset.scala) || 1));
   box.classList.toggle('vicina', st === 'vicina');
   box.classList.toggle('ultimo-giorno', st === 'ultimo-giorno');
 }

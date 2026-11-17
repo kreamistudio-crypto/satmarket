@@ -460,6 +460,12 @@ def main():
     prova("...chi compra sa di mandare gli euro, chi vende di aspettarli",
           (True, True), (detto_a(888, "deposito di garanzia 2-di-3"),
                          detto_a(999, "Deposito confermato")))
+    od = uno(888, oid)
+    prova("IL TEMPO PER PAGARE (17 nov 2026): in euro 72 ore dal deposito "
+          "confermato, e tutt'e due lo leggono nell'avviso",
+          (72, od["depositato_il"] + 72 * 3600, True, True),
+          (od["ore_pagamento"], od["paga_entro"], detto_a(888, "Hai 72 ore"),
+           detto_a(999, "Chi compra ha <b>72 ore</b>")))
 
     # ---- 5) gli euro e le due firme --------------------------------------
     print("\n[gli euro, poi la prima e la seconda firma]")
@@ -517,6 +523,34 @@ def main():
            r.json()["txid"] == uno(999, oid)["txid_uscita"]))
     prova("...chiuso per tutt'e due, avvisati", ("rilasciato", True, True),
           (uno(888, oid)["stato"], detto_a(999, "concluso"), detto_a(888, "concluso")))
+    # LO SCAMBIO ON-CHAIN COME QUELLO LIGHTNING (17 nov 2026)
+    prova("...l'avviso invita tutt'e due alla recensione, come su Lightning",
+          (True, True), (detto_a(888, "Lascia una recensione"),
+                         detto_a(999, "Lascia una recensione")))
+    ordine1 = uno(999, oid)["ordine"]
+    con = SRV.db()
+    esiti = sorted(tuple(r) for r in con.execute(
+        "SELECT tg_id, esito, ruolo FROM p2p_esiti WHERE ordine=?", (ordine1,)))
+    con.close()
+    prova("...e conta nella reputazione di tutt'e due: chi deposita vende, chi "
+          "riceve compra", [(888, "completato", "compra"), (999, "completato", "vende")],
+          esiti)
+    come(888)
+    r1 = c.post("/api/p2p/recensibile", json={"ordine": ordine1}).json()
+    r2 = c.post("/api/p2p/recensione", json={"ordine": ordine1, "voto": 5,
+                                             "commento": "Tutto liscio"})
+    r3 = c.post("/api/p2p/recensibile", json={"ordine": ordine1}).json()
+    con = SRV.db()
+    fb = con.execute("SELECT da_tg_id, per_tg_id, voto FROM feedback WHERE scambio=?",
+                     (ordine1,)).fetchone()
+    con.close()
+    prova("LA RECENSIONE ON-CHAIN: Alan puo', la lascia (va ad Andrea), poi "
+          "risulta lasciata", (True, 200, True, False, (888, 999, 5)),
+          (r1["si"], r2.status_code, r3["gia"], r3["si"], tuple(fb) if fb else None))
+    come(777)
+    prova("...un terzo non c'entra: per lui lo scambio non esiste", (False, "ignota"),
+          (lambda d: (d["si"], d["motivo"]))(
+              c.post("/api/p2p/recensibile", json={"ordine": ordine1}).json()))
     prova("dopo: niente da co-firmare, niente da liberare", [409, 409],
           [gesto(888, oid, "firma", tx=cofirma(888, ob)).status_code,
            gesto(999, oid, "proposta", verso="venditore",
@@ -566,6 +600,14 @@ def main():
     prova("...tutto torna al rimborso di Andrea, meno la rete",
           [(oa["rimborso"], 51080 - 300)],
           [(script.Script(v.script_pubkey.data).address(N), v.value) for v in tx.vout])
+    come(888)
+    prova("...un rimborso d'accordo non apre la recensione (come l'annullo di "
+          "Lightning) e non conta fra i completati", (False, "non_conclusa", 0),
+          (lambda d: (d["si"], d["motivo"],
+                      (lambda k: (k.execute("SELECT COUNT(*) FROM p2p_esiti WHERE ordine=?",
+                                            (uno(999, oid2)["ordine"],)).fetchone()[0],
+                                  k.close())[0])(SRV.db())))(
+              c.post("/api/p2p/recensibile", json={"ordine": uno(999, oid2)["ordine"]}).json()))
 
     # ---- 7) la disputa e la firma di Barattolo ----------------------------
     print("\n[la disputa: decide un moderatore, firma Barattolo]")
@@ -626,6 +668,12 @@ def main():
     r = gesto(888, oid3, "firma", tx=cofirma(888, ob))
     prova("Alan co-firma la firma di Barattolo: rilasciato", (200, "rilasciato", 1),
           (r.status_code, r.json()["stato"], len(INVIATE)))
+    con = SRV.db()
+    esiti = sorted(tuple(r) for r in con.execute(
+        "SELECT tg_id, esito FROM p2p_esiti WHERE ordine=?", (uno(999, oid3)["ordine"],)))
+    con.close()
+    prova("...dopo una disputa conta solo a chi ha vinto e ricevuto", [(888, "completato")],
+          esiti)
     tx = Transaction.from_string(INVIATE[0])
     # l'indirizzo di Alan e' il TERZO del suo wallet (0 e 1 li hanno presi i
     # due scambi prima: la fila e' una sola), la rete e' la misura di
@@ -702,6 +750,35 @@ def main():
     asyncio.run(SRV._p2p_onchain_ronda())
     prova("...e la ronda lo marca scaduto", "scaduto", uno(999, o7["id"])["stato"])
     prova("prendere uno scaduto: 409", 409, gesto(888, o7["id"], "prendi").status_code)
+
+    # IL TEMPO PER PAGARE FINITO (17 nov 2026): la ronda avvisa, una volta
+    print("\n[la ronda: il tempo per pagare finito]")
+    o8 = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
+    gesto(888, o8["id"], "prendi")
+    paga(uno(999, o8["id"]))
+    gesto(999, o8["id"], "controlla")
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET depositato_il=? WHERE id=?",
+                (int(time.time()) - 73 * 3600, o8["id"]))
+    con.commit()
+    con.close()
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("73 ore dopo il deposito, senza «Ho inviato»: la ronda avvisa tutt'e "
+          "due, e lo scambio resta depositato (niente si annulla)",
+          (True, True, "depositato"),
+          (detto_a(999, "Il tempo per pagare è finito"),
+           detto_a(888, "Il tempo per pagare è finito"), uno(999, o8["id"])["stato"]))
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("...la ronda dopo non lo ripete", (False, False),
+          (detto_a(999, "tempo per pagare"), detto_a(888, "tempo per pagare")))
+    # fuori dai piedi: i tetti qui sotto contano gli scambi aperti
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET stato='rimborsato', chiuso_il=? WHERE id=?",
+                (int(time.time()), o8["id"]))
+    con.commit()
+    con.close()
 
     # ---- 10) i tetti ---------------------------------------------------------
     print("\n[i tetti: ordini aperti, euro]")
@@ -907,9 +984,12 @@ def main():
 
     # ---- 12) gli avvisi, tutti ----------------------------------------------
     print("\n[ogni avviso a una parte porta il bottone del suo scambio]")
+    # (17 nov 2026) l'avviso della recensione ricevuta e' quello di sempre,
+    # del mercatino e di Lightning: non e' un avviso dello scambio
     nudi = [t[:60] for chi, t, b in BOTTONI
             if chi in (999, 888) and not (b and b[0] == "🟠 Apri lo scambio"
-                                          and "?scambio=bar-onchain-" in b[1])]
+                                          and "?scambio=bar-onchain-" in b[1])
+            and "Hai ricevuto una recensione" not in t]
     prova("in tutto il giro nessun avviso alle parti parte senza il bottone, "
           "e il segno della catena ⛓️ non c'e' piu' in nessuno",
           ([], [], True),
