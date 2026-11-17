@@ -67710,6 +67710,12 @@ function rigaOnchainP2P(o){
     ? `<div class="p2p-box p2p-paga" title="${esc(metodi.join(', '))}">`
       + metodi.map(m => typeof marchioMetodoP2P === 'function' ? marchioMetodoP2P(m) : esc(m)).join(', ')
       + '</div>' : '';
+  /* LA ZONA DI SCAMBIO DEL CONTANTI, come sulla card di Lightning (17 nov
+     2026, cantiere onchain-contanti, Andrea con la foto di una card
+     on-chain «Contanti»: «non c'è neanche il luogo dello scambio»):
+     «📍 Milano centro» sotto i metodi. La porta la riga del server; gli
+     ordini pubblicati prima di oggi non ce l'hanno e non mostrano niente */
+  const zona = typeof rigaZonaP2P === 'function' ? rigaZonaP2P({metodi: metodi, zona: o.zona}) : '';
   return `<div class="p2p-ord p2p-onchain${paghiEuro ? ' lato-compro' : ' lato-vendo'}${barra ? ' con-barra' : ''}${mio ? ' p2p-mio' : ''}${fermo ? ' p2p-in-pausa' : ''}" data-id="${Number(o.id)}" role="button" tabindex="0"${fermo ? ' aria-disabled="true"' : ''}
     onclick="apriOnchainP2P(Number(this.dataset.id))">
     ${fermo}
@@ -67717,6 +67723,7 @@ function rigaOnchainP2P(o){
     ${paghiEuro ? rigaSats : rigaEuro}
     ${badge ? '<div class="p2p-badge-riga">' + badge + '</div>' : ''}
     ${paga}
+    ${zona}
     ${filtro}
     <div class="p2p-box p2p-rep">${volto}${o.nome ? '<span class="p2p-rep-testo">' + esc(o.nome) + '</span>' : ''}</div>
     ${mio && pausa ? '<div class="p2p-box p2p-pausa">⏸ In pausa fino ' + esc(quandoPausaP2P(pausa)) + '</div>' : ''}
@@ -67800,6 +67807,15 @@ function apriOnchainP2P(id, modo){
       + (o.mercato ? '<br><small>A prezzo di mercato: i sats si contano quando prendi l\'ordine.</small>' : '')
       + (Number(o.filtro) > 0 ? '<br><small>🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '</small>' : '')
       + (o.nome ? '<br><small>Pubblicato da ' + esc(o.nome) + '</small>' : '') + '</div>'
+      /* IL LUOGO E LA REGOLA DEL CONTANTI, come nel dettaglio Lightning
+         (17 nov 2026, cantiere onchain-contanti): la zona se «Contanti» e'
+         fra i metodi; la regola col tetto quando e' l'UNICO metodo (con
+         piu' metodi Lightning la mostra scegliendo «Contanti», e qui la
+         scelta del metodo non c'e' ancora) */
+      + (typeof zonaDettP2P === 'function' ? zonaDettP2P({metodi: o.metodi || [], zona: o.zona}) : '')
+      + (typeof regolaContantiFoglioP2P === 'function' && (o.metodi || []).length === 1
+        ? regolaContantiFoglioP2P(o.metodi, typeof maxEuroContantiP2P === 'function' ? maxEuroContantiP2P() : 0,
+                                  vendeLui ? 'compro' : 'vendo') : '')
       /* IL TEMPO CHE SCORRE, come nel dettaglio Lightning (16 nov 2026,
          Andrea: «se prendo un ordine on-chain non c'è più il riquadro del
          tempo che scorre. Puoi metterlo anche lì?») */
@@ -69111,7 +69127,8 @@ function cambioDaFirmareOnchainP2P(o){
    pausa e il paracadute sono le sezioni di Lightning, le stesse funzioni.
    Le differenze sono quelle della rete: niente Barattozon (il PayCode
    vive nella garanzia del coordinatore), niente intervallo (un importo
-   solo), niente zona del contanti, e «Dove vuoi gli euro» per chi vende
+   solo), e «Dove vuoi gli euro» per chi vende (la zona del contanti c'e'
+   dal 17 nov 2026, cantiere onchain-contanti: il 30 ott era rimasta fuori)
    (sul Lightning lo porta la chat dello scambio); in fondo il riquadro
    della rete al posto di quello della commissione del coordinatore. */
 let p2pNuovoOc = false;       // il foglio «Pubblica» e' on-chain
@@ -69600,6 +69617,9 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
     /* i franchi li dice la valuta: i loro metodi esistono anche in euro */
     valuta: String(campi.valuta || 'EUR').toUpperCase() === 'CHF' ? 'CHF' : '',
     recapito: vendo ? String(p2pOcRecapito).trim() : '',
+    /* la zona di scambio del contanti, come su Lightning (17 nov 2026,
+       cantiere onchain-contanti): '' senza «Contanti»; il server la rigiudica */
+    zona: typeof zonaDaCampiP2P === 'function' ? zonaDaCampiP2P(campi) : '',
     filtro: campi.filtro || 0, paracadute: campi.paracadute || 0};
   /* la ripubblica (16 nov 2026): qui la rifa' la ronda del server */
   const ripOc = typeof ripubblicaDaCampiP2P === 'function' ? ripubblicaDaCampiP2P(campi) : null;
@@ -93081,7 +93101,9 @@ function valeNuovoOrdineP2P(v){
      persona, al massimo 40 caratteri — la frase e' di `giudiceZonaP2P`,
      che vive nel blocco del contanti (da qui il typeof). Senza
      «Contanti» il campo non c'e' e il giudice tace. */
-  const zonaNo = !v.oc && typeof giudiceZonaP2P === 'function' ? giudiceZonaP2P(v.zona, v.metodi) : '';
+  /* ANCHE ON-CHAIN (17 nov 2026, cantiere onchain-contanti, Andrea: «non
+     c'è neanche il luogo dello scambio»): fino a ieri `!v.oc` la saltava */
+  const zonaNo = typeof giudiceZonaP2P === 'function' ? giudiceZonaP2P(v.zona, v.metodi) : '';
   if (zonaNo) return {ok: false, manca: zonaNo, campo: 'p2pNuovoZona'};
   /* IL TABACCHINO (set 2026): i tre dati sono OBBLIGATORI e la
      scadenza sta dentro la finestra della garanzia letta VIVA —
@@ -93895,7 +93917,10 @@ function renderNuovoOrdineP2P(){
   /* LA ZONA DI SCAMBIO (10 ott 2026): la sua sezione, subito sotto i
      metodi, solo quando «Contanti» e' scelto — vedi
      `sezioneZonaNuovoP2P` */
-  const zona = !oc && typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';
+  /* ...anche nel foglio on-chain (17 nov 2026, cantiere onchain-contanti):
+     il 30 ott era nato senza, e la card on-chain in contanti usciva
+     senza il luogo */
+  const zona = typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';
   /* CHI PUO' PRENDERE L'ORDINE (10 ott 2026, reputazione-p2p): la sua
      sezione, dopo il premio e prima dei limiti — vedi `sezioneAccessoNuovoP2P` */
   const accesso = typeof sezioneAccessoNuovoP2P === 'function' ? sezioneAccessoNuovoP2P() : '';

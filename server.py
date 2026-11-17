@@ -108206,7 +108206,12 @@ def _p2p_onchain_prepara(con):
                       # chiusura (0 = a nessuno), e perche' ('onchain-
                       # rinuncia' apre la recensione a chi aveva depositato)
                       ("mancato_a", "INTEGER DEFAULT 0"),
-                      ("mancato_perche", "TEXT DEFAULT ''")):
+                      ("mancato_perche", "TEXT DEFAULT ''"),
+                      # 17 nov 2026 sera, cantiere onchain-contanti: la zona
+                      # di scambio del contanti di persona, come la card di
+                      # Lightning («📍 Milano centro»). La scrive chi
+                      # pubblica, solo con «Contanti» fra i metodi
+                      ("zona", "TEXT DEFAULT ''")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -108438,7 +108443,25 @@ def _p2p_onchain_riga_pubblica(o, nome: str = "") -> dict:
          "rete": ONCHAIN_RETE, "onchain": True, **_p2p_onchain_foglio(o, pubblico=True)}
     if nome:
         r["nome"] = nome
+    # LA ZONA DEL CONTANTI ESCE A TUTTI, come quella di Lightning (17 nov
+    # 2026, cantiere onchain-contanti): chi l'ha scritta l'ha scritta per
+    # la card
+    zona = _p2p_onchain_zona(o)
+    if zona:
+        r["zona"] = zona
     return r
+
+
+def _p2p_onchain_zona(o) -> str:
+    """PURA: la zona di scambio di un ordine on-chain, o '' — solo se
+    «Contanti» e' fra i suoi metodi, e ripulita anche in uscita."""
+    try:
+        metodi = json.loads(o["metodi"] or "[]")
+    except Exception:
+        metodi = []
+    if "Contanti" not in _metodi_libro(metodi if isinstance(metodi, list) else []):
+        return ""
+    return _zona_pulita_p2p(str(_p2p_onchain_campo(o, "zona", "") or ""))
 
 
 def _p2p_onchain_foglio(o, pubblico: bool = False) -> dict:
@@ -108669,6 +108692,8 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "mio": int(o["maker_id"]) == tg_id,
         "sats": int(o["prezzo_sats"]), "prezzo_sats": int(o["prezzo_sats"]),
         "euro": int(o["euro_cent"]) / 100, "metodi": metodi,
+        # la zona di scambio del contanti (17 nov 2026, onchain-contanti)
+        "zona": _p2p_onchain_zona(o),
         # il foglio di Lightning (30 ott 2026): a mercato `sats` e' 0
         # finche' nessuno prende, e `stima` dice quanti al cambio di adesso
         **_p2p_onchain_foglio(o),
@@ -108928,6 +108953,34 @@ def _p2p_onchain_porta_presa(con, o, tg_id: int, adesso: int) -> str:
     return P2P_ONCHAIN_NO_FILTRO.get(motivo, P2P_ONCHAIN_NO_FILTRO["filtro"]).format(n=soglia)
 
 
+def p2p_onchain_giudica_contanti(metodi, euro_cent, zona, tetto_contanti: int,
+                                 valuta: str = "EUR") -> str:
+    """PURA: IL CONTANTI DI PERSONA ON-CHAIN HA LE REGOLE DEL LIGHTNING
+    (17 nov 2026, cantiere onchain-contanti, Andrea: «dovrebbe funzionare
+    esattamente come Lightning anche l'on-chain contanti», «non c'è
+    neanche il luogo dello scambio»). Con «Contanti» fra i metodi: il
+    tetto del contanti (`P2P_CONTANTI_MAX_EURO`, gia' tradotto se in
+    franchi; 0 = spento) e la ZONA DI SCAMBIO obbligatoria, pulita dallo
+    stesso giudice di Lightning. Le frasi sono quelle del telefono
+    (`giudiceContantiP2P`, `giudiceZonaP2P`). Senza «Contanti» tace."""
+    if "Contanti" not in _metodi_libro(metodi if isinstance(metodi, list) else []):
+        return ""
+    try:
+        t, cent = int(tetto_contanti or 0), int(euro_cent or 0)
+    except (TypeError, ValueError):
+        t, cent = 0, 0
+    if t > 0 and cent > t * 100:
+        return (f"In contanti di persona il massimo è {_fmt_sats(t)} "
+                f"{'CHF' if valuta == 'CHF' else '€'} per scambio: sopra, "
+                "si divide in più ordini")
+    if not _zona_pulita_p2p(zona):
+        scritta = " ".join(str(zona or "").split())
+        return (f"La zona di scambio è troppo lunga: al massimo {P2P_ZONA_MAX} caratteri"
+                if len(scritta) > P2P_ZONA_MAX else
+                "Scrivi la zona di scambio: una città o una zona, come «Milano centro»")
+    return ""
+
+
 def p2p_onchain_giudica_nuovo(lato, sats, euro_cent, metodi, recapito,
                               tetto_euro: int, tetto_sats: int,
                               tipo: str = "fisso", premio=0, cambio=0,
@@ -109156,6 +109209,18 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             lato, metodi, euro_cent, "USDT" if usdt else "CHF" if chf else
             (coin[0] if coin else "EUR"), d.get("tabacchino"), int(time.time()),
             BARATTOZON_MIN_EURO)
+    # IL CONTANTI DI PERSONA (17 nov 2026, cantiere onchain-contanti): il
+    # suo tetto e la zona di scambio, come su Lightning. La zona si tiene
+    # SOLO con «Contanti» fra i metodi
+    zona = ""
+    if not perche:
+        tetto_c = int(P2P_CONTANTI_MAX_EURO or 0)
+        if chf:
+            tetto_c = p2p_onchain_tetto_usdt(tetto_c, cambio_noto_ora("eur"), cambio)
+        perche = p2p_onchain_giudica_contanti(metodi, euro_cent, d.get("zona"),
+                                              tetto_c, "CHF" if chf else "EUR")
+        if not perche and "Contanti" in _metodi_libro(metodi):
+            zona = _zona_pulita_p2p(d.get("zona"))
     if perche:
         raise HTTPException(400, perche)
     # a mercato i sats nascono alla presa: nel libro 0, il `amt` di NIP-69
@@ -109198,8 +109263,8 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             "INSERT INTO p2p_onchain_ordini(ordine, lato, maker_id, prezzo_sats,"
             " euro_cent, metodi, recapito, scade, creato, aggiornato,"
             " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura,"
-            " rip_minimo, rip_massimo, fiat, paycode)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " rip_minimo, rip_massimo, fiat, paycode, zona)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ordine, lato, user["id"], sats, int(euro_cent),
              json.dumps(metodi, ensure_ascii=False), recapito,
              p2p_onchain_scade_libro(adesso, tab["scade"] if tab else 0),
@@ -109207,7 +109272,7 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
              "mercato" if tipo == "mercato" else "fisso", premio, filtro,
              para, para_da, para_letto,
              rip[0] if rip else 0, rip[1] if rip else 0, "CHF" if chf else "",
-             json.dumps(tab) if tab else ""))
+             json.dumps(tab) if tab else "", zona))
         con.commit()
         oid = cur.lastrowid
         riga = _p2p_onchain_carica(con, oid)
