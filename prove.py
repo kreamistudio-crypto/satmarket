@@ -206202,6 +206202,14 @@ console.log(JSON.stringify({
           "tranne l'halving finiscono col bottone per farla davvero", (True, ["halving"]),
           (all((x["zona"], x.get("prima")) in caselle for x in missioni),
            [x["id"] for x in missioni if "fai: [" not in righe[x["id"]].split("\n  },")[0].split("},\n  ")[0]]))
+    # IL RAZZO DI BULLONI (Andrea, 17 nov: la storia unica): un pezzo per
+    # missione, nello stesso ordine dei pezzi delle zone del tabellone
+    # (piedini 0, serbatoio 1, motore 2, ali 3; l'halving lo fa partire)
+    prova("ogni missione monta un pezzo del razzo della sua zona, e il finale lo dice", 
+          (["piedini", "serbatoio", "motore", "motore", "ali", "parte per la Luna"], True),
+          ([next(p for p in ("piedini", "serbatoio", "motore", "ali", "parte per la Luna")
+                 if p in righe[x["id"]].split("razzo: '")[1].split("', nome")[0]) for x in missioni],
+           "Con questi bulloni Tappo monta ${esc(g.razzo)}" in mini))
     prova("...il bottone chiude il gioco e porta alla casella", True,
           "missioneChiudi();\n  if (g && g.fai) { try { g.fai[1](); }" in mini
           and 'onclick="missioneFai()"' in mini)
@@ -206226,6 +206234,20 @@ console.log(JSON.stringify({
     prova("le illustrazioni del mondo: una rotta con la sua whitelist, nessun percorso dal nome", (1, True, False),
           (src.count('@app.get("/assets/mondo/{nome}")'), 'if slug not in MONDO_ASSET:' in src,
            "os.path.join(\"assets\", \"mondo\", nome" in src))
+    i_ma = src.index("\nMONDO_ASSET = frozenset(")
+    amb_ma = {}
+    exec(src[i_ma:src.index("\n\n", i_ma)], amb_ma)
+    cartella = os.path.join(qui, "assets", "mondo")
+    presenti = {f[:-5] for f in os.listdir(cartella) if f.endswith(".webp")} if os.path.isdir(cartella) else set()
+    prova("i dipinti dei minigiochi: ogni file della cartella e' nella whitelist, e ci sono la stanza "
+          "e le cose di sats e quaderno piu' le quattro pose di Tappo",
+          (set(), set()),
+          (presenti - amb_ma["MONDO_ASSET"],
+           {"miss-sats", "miss-sat", "miss-wallet", "miss-gazza", "miss-gazza-ferma", "miss-quaderno",
+            "miss-leggio", "miss-grande", "miss-cestino", "miss-busta", "miss-tarlo",
+            "tappo-passo-1", "tappo-passo-2", "tappo-passo-3", "tappo-passo-4"} - presenti))
+    prova("...leggeri: nessun dipinto sopra i 300 KB", [],
+          [f for f in sorted(presenti) if os.path.getsize(os.path.join(cartella, f + ".webp")) > 300_000])
     # (il mondo e le missioni stanno gia' nel pezzo di pagina del banco
     # di sopra: qui si spengono solo l'orologio e la riga in basso)
     prova("...e il pezzo di pagina del banco li contiene tutti e due", (True, True, True),
@@ -206355,6 +206377,12 @@ console.log(JSON.stringify({
   livelli: [0, 1, 2, 3, 5, 7, 9, -1, 'x'].map(z => ARENA_LIVELLI.indexOf(arenaLivello(z))),
   muovi: [arenaMuovi(QUAD_SCENA, 450, 400, 0, -300, 34), arenaMuovi({muri: [0, 0, 900, 1500], ostacoli: [{x: 400, y: 400, r: 30}]}, 300, 400, 80, 0, 34),
           arenaMuovi({muri: [0, 0, 900, 1500], ostacoli: [{x: 400, y: 300, w: 100, h: 200}]}, 300, 400, 80, 0, 34)].map(p => p.map(Math.round)),
+  strada: (() => {
+    const sc = SATS_SCENA, r = 34, t = arenaStrada(sc, 450, 700, 450, 1060, r), pt = [[450, 700], ...t, [450, 1060]];
+    let ok = true;
+    for (let i = 1; i < pt.length; i++) if (!arenaVedo(sc, pt[i - 1][0], pt[i - 1][1], pt[i][0], pt[i][1], r * 0.9)) ok = false;
+    return [t.length > 0, ok, arenaStrada(sc, 150, 1300, 150, 1400, r).length, arenaLibero(sc, 450, 900, r), arenaLibero(sc, 450, 1060, r)];
+  })(),
   inquadra: [arenaInquadra(390, 700, QUAD_SCENA), arenaInquadra(1200, 700, QUAD_SCENA)].map(c => [Math.round(c.k * 1000) / 1000, Math.round(c.x0), Math.round(c.y0)]),
   vicina: [(arenaVicina([{x: 0, y: 0, r: 100, n: 1}, {x: 50, y: 0, r: 100, n: 2}, {x: 40, y: 0, r: 100, n: 3, via: true}], 45, 0) || {}).n,
            arenaVicina([{x: 0, y: 0, r: 0}], 0, 0)],
@@ -206408,8 +206436,11 @@ console.log(JSON.stringify({
     # del tabellone, piu' devono essere difficili»)
     prova("l'arena: la difficolta' sale a coppie di zone, e una zona storta e' la piu' facile",
           [0, 0, 1, 1, 2, 3, 3, 0, 0], r.get("livelli"))
+    prova("LA STRADA INTORNO AI MOBILI: dietro il tavolo del forno a davanti si gira intorno (tappe libere, "
+          "nessun tratto che lo tocca), dove si vede la meta si va dritti, il tavolo e' occupato e davanti no",
+          [True, True, 0, False, True], r.get("strada"))
     prova("...Tappo non buca il muro di fondo e si ferma contro un cerchio e contro un rettangolo",
-          [[450, 389], [336, 400], [366, 400]], r.get("muovi"))
+          [[450, 467], [336, 400], [366, 400]], r.get("muovi"))
     prova("...la stanza intera nella tela, al centro", [[0.433, 0, 25], [0.467, 390, 0]], r.get("inquadra"))
     prova("...il tasto si accende per la cosa piu' vicina, mai per una sparita o senza raggio", [2, None], r.get("vicina"))
     prova("la doppia spesa: i bulloni che ci sono si spendono, gli stessi una seconda volta no",
