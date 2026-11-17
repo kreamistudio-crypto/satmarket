@@ -90187,3 +90187,39 @@ verde col rimedio. `collaudo_onchain_ordine` finge anche
 consiglia. Insieme: `prove_incasso_annuncio` esegue anche i due pezzi
 nuovi di `onchain_modo_ordine`, e la nota di chi vende non ha più la
 catenina ⛓️ (la regola del 9 nov).
+
+## La Rotta per la Luna nasce spenta (17 nov 2026 sera, cantiere stradina; Andrea alle 19:34, poco prima di una promozione: «anche il tabellone lascialo spento per il momento»)
+
+Il tabellone (develop b498c42) era senza leva: con la promozione sarebbe
+comparso a tutti nel Profilo. Nasce `STRADINA_ATTIVA`, SPENTA di serie nel
+codice e in `config_esempio.py`: è un'eccezione, decisa da Andrea, alla
+regola del 14 nov che vuole le leve nuove accese. Spenta, `/api/me` manda
+`stradina: false`, `renderLivello` non fa nascere la voce «🚀 Rotta per la
+Luna», `apriStradina` non parte (anche dalla cronologia e dal ritorno
+automatico dopo il «Vai»), e `/api/me/stradina` e `/api/me/stradina/prova`
+rispondono 404 come una rotta che non c'è. Il client crede la leva solo se
+arriva proprio `true`: un server di ieri tace, e tacere vuol dire spenta.
+Le caselle di prova degli admin restano salvate. La riga sta nel pannello
+«⚙️ Stato delle leve», gruppo «🚀 Rotta per la Luna».
+
+Il resto che lo spegnimento si porta dietro: la voce di `NOVITA.md`
+(`stradina-obiettivi`) passa a `leva: STRADINA_ATTIVA spenta di serie` e
+`pubblico: no`, così la promozione non ne fa un post; nel sapere di Tappo
+la Rotta è «per ora spenta», perché Tappo non descriva una voce che nel
+Profilo non c'è. Sul collaudo si accende a mano (DA-FARE-ANDREA, voce 22).
+
+Provato: in `prove_stradina` le prove della leva (spenta nel codice e
+nell'esempio, i due 404, `/api/me`, il client, il pannello); in
+`collaudo_stradina_prova` la sezione 6 accende e spegne la leva sul server
+vero (TestClient) e guarda i 404 e `/api/me`. La mappa 3D del mondo di
+Tappo continua a parte, come prova fuori dall'app.
+
+VERBALE: suite `PROVE_SEVERE` 29.935 passate, 0 fallite, 2 saltate
+(nostr-tools, che il cloud non ha) sull'albero 2cfd4160 + il mio commit;
+collaudi della CI 152/1 sull'albero 4afcc8c8 + il mio commit, dove il
+rosso era `collaudo_piu_account`, rosso anche su 4afcc8c8 senza di me e
+curato da 0e02b7d8 (onchain-grossi-uscita, non mio); dopo l'ultimo rebase
+su 0e02b7d8 rigirati `collaudo_stradina_prova`, `collaudo_piu_account`,
+`collaudo_serie_giorni` e `collaudo_lingua`. Commit non miei sotto il mio:
+4afcc8c8 (gioco spento), b91ef35d (inglese), la classifica dei giorni di
+fila e i tre di onchain-grossi-uscita.

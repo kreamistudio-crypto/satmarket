@@ -879,3 +879,32 @@ sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py')
 sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/lingua/en.js
 ```
 Atteso: `200`. Poi l'app con `?lingua=en` parla inglese.
+
+## 22. La Rotta per la Luna: la leva sul collaudo (17 nov 2026, cantiere stradina; Andrea: «anche il tabellone lascialo spento per il momento»)
+
+**Perché.** Il tabellone arriva in produzione SPENTO (`STRADINA_ATTIVA =
+False` nel codice, eccezione decisa da te alla regola delle leve nuove
+accese). Sul collaudo lo accendi per provarlo; in produzione resta spento
+finché non dici tu. Il perché: CANTIERI, «La Rotta per la Luna nasce spenta».
+
+**Il collaudo, la leva** (dopo che il collaudo ha tirato `develop` col
+cantiere). Sola lettura, deve dire `0`:
+```
+sudo grep -c "^STRADINA_ATTIVA" /srv/collaudo/barattolo/config.py
+```
+Scrive: la copia, la riga, il controllo, il riavvio.
+```
+sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-rotta
+```
+```
+printf '\nSTRADINA_ATTIVA = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
+```
+Atteso 200. Poi nel bot di collaudo: Profilo → «Livello e recensioni» →
+«🚀 Rotta per la Luna». **In produzione** la stessa riga nel config del VPS
+la accende per tutti, quando decidi tu.

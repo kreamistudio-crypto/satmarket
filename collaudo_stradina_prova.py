@@ -65,6 +65,7 @@ def avvio():
     cfg.GIORNI_AUTO_SBLOCCO = 10
     cfg.MODELLO_RICERCA = "claude-haiku-4-5-20251001"
     cfg.DB = db
+    cfg.STRADINA_ATTIVA = True        # spenta di serie (17 nov 2026): qui si prova accesa
     sys.modules["config"] = cfg
     sys.path.insert(0, QUI)
     os.chdir(QUI)
@@ -146,6 +147,20 @@ def main():
     for storto in ("FOTO", "x" * 41, "foto; DROP", "", 7, None):
         prova(f"id storto {storto!r}: 400", 400,
               segna(ADMIN, {"tappa": storto, "fatto": True}).status_code)
+
+    print("\n[6) la leva spenta (17 nov 2026, Andrea: «lascialo spento»)]")
+    prova("/api/me la manda accesa", True,
+          c.get("/api/me", headers=chi(ADMIN)).json().get("stradina"))
+    SRV.STRADINA_ATTIVA = False
+    try:
+        prova("spenta: il tabellone e' un 404", 404,
+              c.get("/api/me/stradina", headers=chi(ADMIN)).status_code)
+        prova("spenta: anche la prova dell'admin e' un 404", 404,
+              segna(ADMIN, {"tappa": "foto", "fatto": True}).status_code)
+        prova("spenta: /api/me la manda spenta", False,
+              c.get("/api/me", headers=chi(ADMIN)).json().get("stradina"))
+    finally:
+        SRV.STRADINA_ATTIVA = True
 
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

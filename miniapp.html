@@ -43954,7 +43954,7 @@ function renderLivello(){
   if (!box) return;
   // la porta della stradina: c'e' dove c'e' un cammino vero (17 nov 2026)
   const vs = el('vocStradina');
-  if (vs) vs.style.display = (DEMO || VETRINA || !myLivello) ? 'none' : '';
+  if (vs) vs.style.display = (DEMO || VETRINA || !myLivello || !stradinaAccesa) ? 'none' : '';
   if (DEMO || !myLivello) {
     if (sez) sez.style.display = 'none';
     box.innerHTML = ''; return;
@@ -44173,6 +44173,7 @@ function livCarCentra(){
    `stradinaDisegno` e `stradinaHTML` sono PURE (dati, larghezza → posti
    e HTML): il banco node le fa girare. */
 let stradinaDati = null;
+var stradinaAccesa = false;      /* la leva viva STRADINA_ATTIVA (me.stradina) */
 let stradinaScelta = -1;
 /* TAPPO SPIEGA OGNI CASELLA (17 nov, Andrea: «che cosa serve? C'è uno che
    entra lì e… perché devo attivare l'incasso automatico? Non viene
@@ -44887,7 +44888,7 @@ window.addEventListener('tappo:missione', () => {
   if (v && v.classList.contains('active')) apriStradina(true);
 });
 async function apriStradina(resta){
-  if (DEMO || VETRINA) return;
+  if (DEMO || VETRINA || !stradinaAccesa) return;
   if (!resta) go('stradina');
   const box = el('stradinaCorpo');
   if (box && !stradinaDati) box.innerHTML = '<div class="hint">Preparo il tuo tabellone…</div>';
@@ -115793,6 +115794,9 @@ async function avvia(){
        un link nella forma t.me/<bot> (un server di ieri non lo manda) */
     tappoLink = linkTappoValido(me.tappo_link);
     if (el('vocTappo')) el('vocTappo').style.display = tappoLink ? '' : 'none';
+    /* LA ROTTA PER LA LUNA (17 nov 2026): la leva viva (un server di
+       ieri non la manda: spenta) */
+    stradinaAccesa = me.stradina === true;
     assistenzaNuove = Number(me.assistenza_nuove) || 0;
     vestiAssistenza();
     /* LA CACCIA A TAPPO (17 nov 2026): la leva viva, e se OGGI c'e' una

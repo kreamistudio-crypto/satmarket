@@ -1220,6 +1220,11 @@ AVVISI_BARATTOLO_ORE = 24
 # vedono. Accesa di serie; a False niente fiamma e nessun giorno contato
 # (riaccendendola chi ha saltato dei giorni riparte da 1, il record resta).
 SERIE_GIORNI_ATTIVA = True
+# LA ROTTA PER LA LUNA 🚀 (17 nov 2026): nel Profilo il tabellone delle
+# caselle fino all'halving del 2028, con Tappo pedina. Non da' XP ne'
+# sats. SPENTA di serie per decisione di Andrea («anche il tabellone
+# lascialo spento per il momento»): True la accende (sul collaudo si).
+STRADINA_ATTIVA = False
 # L'APP IN INGLESE 🌍 (17 nov 2026, tappa 1): chi ha Telegram (o il
 # browser) in una lingua che non e' l'italiano legge in inglese le parti
 # gia' tradotte — vetrina, scheda dell'annuncio, carrello, cassa, foglio

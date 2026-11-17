@@ -37978,6 +37978,17 @@ def _leve_stato():
                          "contato; riaccendendola chi ha saltato dei "
                          "giorni riparte da 1, il record resta"),
         ]},
+        {"gruppo": "🚀 Rotta per la Luna", "voci": [
+            # IL TABELLONE (17 nov 2026, cantiere stradina): spento di
+            # serie per decisione di Andrea, nessun segreto
+            _leva("Rotta per la Luna nel Profilo", "STRADINA_ATTIVA",
+                  STRADINA_ATTIVA,
+                  acceso="nel Profilo (Livello e recensioni) c'è «🚀 Rotta "
+                         "per la Luna», il tabellone delle caselle fino "
+                         "all'halving; non dà XP né sats",
+                  spento="la voce non c'è e le rotte del tabellone "
+                         "rispondono 404; le caselle di prova restano"),
+        ]},
         {"gruppo": "🌍 Lingua", "voci": [
             # L'INGLESE (17 nov 2026, cantiere inglese-tappa-1): accesa
             # di serie, nessun segreto; il server serve solo il dizionario
@@ -52529,6 +52540,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # perche' il bottone in «I tuoi annunci» nasca solo quando le sue
     # rotte rispondono.
     profilo["modifica_massiva"] = MODIFICA_MASSIVA_ATTIVA
+    # La Rotta per la Luna (17 nov 2026): la leva VIVA, perche' la voce nel
+    # Profilo nasca solo quando /api/me/stradina risponde.
+    profilo["stradina"] = STRADINA_ATTIVA
     # L'etichetta degli alimenti (17 nov 2026): la leva VIVA, perche' il
     # form non disegni una sezione che il server non scriverebbe.
     profilo["etichetta_alimenti"] = ETICHETTA_ALIMENTI
@@ -113850,6 +113864,17 @@ try:
     from config import IMPARA_BITCOIN_NOME
 except ImportError:
     IMPARA_BITCOIN_NOME = "Villaggio Bitcoin"
+# LA LEVA DELLA ROTTA: STRADINA_ATTIVA (17 nov 2026, Andrea alle 19:34:
+# «anche il tabellone lascialo spento per il momento»). SPENTA di serie,
+# eccezione decisa da lui alla regola delle leve nuove accese: sul
+# collaudo si accende a mano nel config. Spenta, /api/me manda
+# `stradina: false`, la voce nel Profilo non nasce e le due rotte
+# /api/me/stradina rispondono 404; le caselle di prova restano salvate.
+try:
+    from config import STRADINA_ATTIVA
+except ImportError:
+    STRADINA_ATTIVA = False
+STRADINA_ATTIVA = bool(STRADINA_ATTIVA)
 STRADINA_AMICI_MAX = 12      # quanti amici si mostrano, i piu' alti
 
 # LE ZONE DEL TABELLONE, dal basso (la Terra) verso l'alto (la Luna):
@@ -114259,6 +114284,8 @@ async def prova_stradina(req: Request, x_tg_init_data: str = Header(""),
                          barattolo_sessione: str = Cookie("")):
     """Segna (o toglie) una casella di prova, o le azzera tutte. Solo admin:
     a chiunque altro un 403, e la tabella non si tocca."""
+    if not STRADINA_ATTIVA:
+        raise HTTPException(404, "Non trovato")
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Solo gli amministratori possono provare il tabellone.")
@@ -114297,6 +114324,8 @@ def mia_stradina(x_tg_init_data: str = Header(""),
     """LA PORTA DELLA STRADINA: le tappe, il livello, i sats e gli amici
     di CHI BUSSA, mai di un altro (il tg_id viene dall'identita', non da
     un parametro). L'anonimo prende il 401 di `verifica_utente`."""
+    if not STRADINA_ATTIVA:
+        raise HTTPException(404, "Non trovato")
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     try:

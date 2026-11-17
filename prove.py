@@ -129649,16 +129649,33 @@ def prove_stradina():
     prova("la nav la conta come Profilo e la riapre dalla cronologia", True,
           "else if (view === 'stradina') view = 'profilo';" in mini
           and "if (v === 'stradina') { apriStradina(); return ''; }" in mini)
-    prova("la voce si vede solo a chi e' dentro (mai in demo o vetrina)", True,
-          "vs.style.display = (DEMO || VETRINA || !myLivello) ? 'none' : '';"
+    prova("la voce si vede solo a chi e' dentro (mai in demo o vetrina) e "
+          "solo a leva accesa", True,
+          "vs.style.display = (DEMO || VETRINA || !myLivello || !stradinaAccesa) ? 'none' : '';"
           in pezzo_js(mini, "function renderLivello(){", "\n}\n"))
+    # LA LEVA (17 nov 2026, Andrea: «anche il tabellone lascialo spento per
+    # il momento»): spenta di serie nel codice e nell'esempio, le due rotte
+    # rispondono 404 a leva spenta, /api/me la manda viva e il client la
+    # legge solo se e' proprio true (un server di ieri tace: spenta)
+    prova("la leva STRADINA_ATTIVA nasce SPENTA nel codice e nell'esempio",
+          True, "    STRADINA_ATTIVA = False\n" in _SORGENTE
+          and "\nSTRADINA_ATTIVA = False\n" in open("config_esempio.py", encoding="utf-8").read())
+    prova("a leva spenta le due rotte del tabellone rispondono 404", True,
+          all("    if not STRADINA_ATTIVA:\n        raise HTTPException(404" in pezzo(f)
+              for f in ("prova_stradina", "mia_stradina")))
+    prova("/api/me manda la leva viva, il client la crede solo se true", True,
+          'profilo["stradina"] = STRADINA_ATTIVA' in _SORGENTE
+          and "stradinaAccesa = me.stradina === true;" in mini
+          and "var stradinaAccesa = false;" in mini)
+    prova("la leva sta nel pannello «Stato delle leve»", True,
+          '"STRADINA_ATTIVA",' in _SORGENTE and '"gruppo": "🚀 Rotta per la Luna"' in _SORGENTE)
     ap = pezzo_js(mini, "async function apriStradina(resta){", "\n}\n")
     prova("a missione finita (l'evento del gioco) il tabellone aperto si "
           "ricarica senza spingere un'altra pagina nella storia", True,
           "window.addEventListener('tappo:missione'" in mini
           and "apriStradina(true);" in mini and "if (!resta) go('stradina');" in ap)
     prova("la pagina chiede /me/stradina con l'identita', e in demo non parte",
-          True, "if (DEMO || VETRINA) return;" in ap
+          True, "if (DEMO || VETRINA || !stradinaAccesa) return;" in ap
           and "fetch(`${API_BASE}/me/stradina`" in ap
           and "'X-Tg-Init-Data': authHdr()" in ap)
     vt = pezzo_js(mini, "function vaiTappa(btn){", "\n}\n")
