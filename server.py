@@ -5437,14 +5437,16 @@ SERIE_GIORNI_ATTIVA = bool(SERIE_GIORNI_ATTIVA)
 # pagina chiede da sola a chi ha Telegram (o il browser) in un'altra
 # lingua e applica ai testi mentre compaiono (miniapp.html, «L'INGLESE»).
 # Il server non traduce niente: serve il file, e basta.
-# LA LEVA: LINGUA_INGLESE, accesa di serie (regola del 14 nov 2026: le
-# leve nuove nascono accese). Spenta, `/lingua/en.js` risponde 404 e
-# l'app parla italiano a tutti — e' l'interruttore d'emergenza, una riga
-# nel config. Solo True accende.
+# LA LEVA: LINGUA_INGLESE, SPENTA di serie (17 nov 2026 sera, Andrea:
+# «L'inglese della prima parte lascialo spento» — eccezione sua alla
+# regola del 14 nov sulle leve nuove accese: l'inglese arriva in
+# produzione spento e si accende dal config, dopo la prova sul collaudo).
+# Spenta, `/lingua/en.js` risponde 404 e l'app parla italiano a tutti.
+# Solo True accende.
 try:
     from config import LINGUA_INGLESE
 except ImportError:
-    LINGUA_INGLESE = True
+    LINGUA_INGLESE = False
 LINGUA_INGLESE = LINGUA_INGLESE is True
 # la lista CHIUSA dei dizionari (regola ferrea 3: il nome arriva dal
 # client); oggi uno solo
@@ -31983,6 +31985,18 @@ def numeri_negozio(con, v, adesso: int | None = None) -> dict:
 _CAMPI_NUMERI = ("SELECT tg_id, negozio, nome, vendite_ok, acquisti_ok, "
                  "rating, n_feedback, n_recensori FROM utenti ")
 
+# GLI ACQUISTI RESTANO FUORI DAL PROFILO (17 nov 2026 sera, Andrea: «il
+# fatto che nel profilo si veda quanto hai comprato, quanto hai venduto,
+# secondo me e' un problema per la privacy», e poi: «le vendite
+# lasciale, rimetti come era prima. Gli acquisti non li aggiungere»).
+# Con la leva ACQUISTI_NEL_PROFILO spenta (di serie, scelta di Andrea)
+# le due porte non mandano piu' i totali degli acquisti, e chi ha solo
+# comprato non ha il cassetto: tutto com'era prima del 17 nov. Le
+# vendite restano come dal 24 set. I contatori `vendite_ok` e
+# `acquisti_ok` NON si toccano: servono a livello e distintivi.
+_CHIAVI_ACQUISTI = ("acquisti_30", "sats_acq_30", "acquisti_tot",
+                    "sats_acq_tot")
+
 
 @app.get("/api/me/negozio/numeri")
 def miei_numeri_negozio(x_tg_init_data: str = Header(""),
@@ -32009,10 +32023,15 @@ def miei_numeri_negozio(x_tg_init_data: str = Header(""),
         ha = v and con.execute(
             "SELECT 1 FROM annunci WHERE venditore_id=? LIMIT 1",
             (user["id"],)).fetchone()
-        if not ha and not (v and (v["acquisti_ok"] or 0) > 0):
+        # chi ha solo comprato entra solo con gli acquisti nel Profilo
+        if not ha and (not ACQUISTI_NEL_PROFILO
+                       or not (v and (v["acquisti_ok"] or 0) > 0)):
             return {"mostra": False}
-        return dict(numeri_negozio(con, v), mostra=True,
-                    venditore=bool(ha))
+        n = numeri_negozio(con, v)
+        if not ACQUISTI_NEL_PROFILO:
+            for k in _CHIAVI_ACQUISTI:
+                n.pop(k, None)
+        return dict(n, mostra=True, venditore=bool(ha))
     finally:
         con.close()
 
@@ -32038,9 +32057,12 @@ def numeri_negozio_admin(codice: str, x_tg_init_data: str = Header(""),
         if not v:
             raise HTTPException(404, "Negozio non trovato")
         # `venditore: True`: il moderatore guarda un NEGOZIO, e la
-        # tabella intera — anche gli acquisti, se ce ne sono
-        return dict(numeri_negozio(con, v), mostra=True, venditore=True,
-                    nome=v["nome"] or "")
+        # tabella intera — gli acquisti solo con ACQUISTI_NEL_PROFILO
+        n = numeri_negozio(con, v)
+        if not ACQUISTI_NEL_PROFILO:
+            for k in _CHIAVI_ACQUISTI:
+                n.pop(k, None)
+        return dict(n, mostra=True, venditore=True, nome=v["nome"] or "")
     finally:
         con.close()
 
@@ -37486,7 +37508,7 @@ def _leve_stato():
                   acceso="il foglio Pubblica rifiuta gli importi sopra "
                          "questa cifra; il tetto in sats del "
                          "coordinatore resta valido sotto (gli scambi "
-                         "on-chain seguono ONCHAIN_MAX_EURO)",
+                         "on-chain seguono P2P_ONCHAIN_MAX_EURO)",
                   spento="nessun tetto in euro: vale solo il tetto in "
                          "sats del coordinatore (38385)"),
             _leva("Minimo PayCode Barattozon (€)", "BARATTOZON_MIN_EURO",
@@ -37728,6 +37750,16 @@ def _leve_stato():
                   spento="gli scambi on-chain si pagano solo in euro",
                   allarme=bool(P2P_ONCHAIN_USDT_ATTIVO) and not (
                       P2P_ONCHAIN_ATTIVO and P2P_USDT_ATTIVO)),
+            # L'INDIRIZZO DI CHI COMPRA (17 nov 2026, cantiere
+            # avviso-indirizzo): accesa di serie, nessun segreto
+            _leva("Avviso «indirizzo scelto» negli scambi on-chain",
+                  "P2P_ONCHAIN_AVVISO_INCASSO", P2P_ONCHAIN_AVVISO_INCASSO,
+                  acceso="chi ha depositato riceve un messaggio quando chi "
+                         "compra sceglie dove ricevere i sats, e se preme "
+                         "«Ricevuti» prima può toccare «🔔 Ricordaglielo» "
+                         "(un sollecito all'ora)",
+                  spento="niente avviso né sollecito: «Ricevuti» senza "
+                         "l'indirizzo di chi compra dice solo di riprovare"),
             # IL CONTANTE PER POSTA (17 nov 2026, cantiere leva-posta):
             # spenta di serie per parola di Andrea
             _leva("Contante per posta nel P2P", "P2P_POSTA_ATTIVO",
@@ -37799,10 +37831,18 @@ def _leve_stato():
                   allarme=bool(ONCHAIN_RETE_TRATTENUTA)),
             _leva("Tetto ordini on-chain (€)", "ONCHAIN_MAX_EURO",
                   ONCHAIN_MAX_EURO,
-                  acceso="un ordine on-chain sopra questa cifra non si "
-                         "paga on-chain: resta il Lightning; vale anche "
-                         "per gli scambi P2P on-chain",
+                  acceso="un acquisto del mercatino sopra questa cifra non "
+                         "si paga on-chain: resta il Lightning. Gli scambi "
+                         "P2P on-chain hanno il loro tetto, qui sotto",
                   spento="nessun tetto: l'on-chain vale per qualunque cifra"),
+            # (17 nov 2026, Andrea: «separalo») il tetto del P2P on-chain
+            _leva("Tetto scambi P2P on-chain (€)", "P2P_ONCHAIN_MAX_EURO",
+                  P2P_ONCHAIN_MAX_EURO,
+                  acceso="uno scambio P2P on-chain (a tre chiavi) sopra questa "
+                         "cifra non si pubblica, e il foglio Pubblica lo "
+                         "scrive; il P2P Lightning segue P2P_MAX_EURO",
+                  spento="nessun tetto: gli scambi P2P on-chain vanno a "
+                         "qualunque cifra"),
             # (17 nov 2026, cantiere onchain-importi-grossi) la soglia del
             # consiglio: sopra, la cassa propone l'on-chain da sola
             _leva("On-chain consigliato sopra (€)", "ONCHAIN_CONSIGLIATO_SOPRA_EURO",
@@ -37967,6 +38007,29 @@ def _leve_stato():
                   spento="niente fiamma nel Profilo e nessun giorno "
                          "contato; riaccendendola chi ha saltato dei "
                          "giorni riparte da 1, il record resta"),
+        ]},
+        {"gruppo": "🛍️ Acquisti nel Profilo", "voci": [
+            # LA PRIVACY DI CHI COMPRA (17 nov 2026 sera): spenta di
+            # serie per decisione di Andrea, nessun segreto
+            _leva("Totali degli acquisti nel Profilo",
+                  "ACQUISTI_NEL_PROFILO", ACQUISTI_NEL_PROFILO,
+                  acceso="nel cassetto 📊 del Profilo ci sono anche gli "
+                         "acquisti conclusi coi sats pagati, e chi ha "
+                         "solo comprato ha il cassetto «I tuoi acquisti»",
+                  spento="nel cassetto solo visite, vendite e recensioni, "
+                         "come prima; i moderatori non vedono gli acquisti; "
+                         "i contatori di livello e distintivi non cambiano"),
+        ]},
+        {"gruppo": "🚀 Rotta per la Luna", "voci": [
+            # IL TABELLONE (17 nov 2026, cantiere stradina): spento di
+            # serie per decisione di Andrea, nessun segreto
+            _leva("Rotta per la Luna nel Profilo", "STRADINA_ATTIVA",
+                  STRADINA_ATTIVA,
+                  acceso="nel Profilo (Livello e recensioni) c'è «🚀 Rotta "
+                         "per la Luna», il tabellone delle caselle fino "
+                         "all'halving; non dà XP né sats",
+                  spento="la voce non c'è e le rotte del tabellone "
+                         "rispondono 404; le caselle di prova restano"),
         ]},
         {"gruppo": "🌍 Lingua", "voci": [
             # L'INGLESE (17 nov 2026, cantiere inglese-tappa-1): accesa
@@ -52519,6 +52582,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # perche' il bottone in «I tuoi annunci» nasca solo quando le sue
     # rotte rispondono.
     profilo["modifica_massiva"] = MODIFICA_MASSIVA_ATTIVA
+    # La Rotta per la Luna (17 nov 2026): la leva VIVA, perche' la voce nel
+    # Profilo nasca solo quando /api/me/stradina risponde.
+    profilo["stradina"] = STRADINA_ATTIVA
     # L'etichetta degli alimenti (17 nov 2026): la leva VIVA, perche' il
     # form non disegni una sezione che il server non scriverebbe.
     profilo["etichetta_alimenti"] = ETICHETTA_ALIMENTI
@@ -59250,6 +59316,24 @@ except (TypeError, ValueError):
     ONCHAIN_MAX_EURO = 250
     print("[onchain] ONCHAIN_MAX_EURO non e' un numero intero: il tetto "
           "resta 250 €")
+# IL TETTO DEGLI SCAMBI P2P ON-CHAIN, A PARTE (17 nov 2026, cantiere
+# onchain-grossi-uscita, Andrea: «separalo»). Dal 12 nov gli scambi P2P a
+# tre chiavi giudicavano con ONCHAIN_MAX_EURO, lo stesso del mercatino: e
+# alzare il mercatino per una croce da 3000 € avrebbe alzato anche loro.
+# 999 di serie perche' era il valore vivo in produzione quel giorno (riga
+# del 16 nov): con la promozione niente cambia per il P2P anche senza una
+# riga nuova. 0 = nessun tetto; storta = 999, mai spento da un refuso.
+try:
+    from config import P2P_ONCHAIN_MAX_EURO
+    P2P_ONCHAIN_MAX_EURO = int(P2P_ONCHAIN_MAX_EURO)
+    if P2P_ONCHAIN_MAX_EURO < 0:
+        raise ValueError("un tetto negativo non e' un tetto")
+except ImportError:
+    P2P_ONCHAIN_MAX_EURO = 999
+except (TypeError, ValueError):
+    P2P_ONCHAIN_MAX_EURO = 999
+    print("[onchain] P2P_ONCHAIN_MAX_EURO non e' un numero intero: il tetto "
+          "resta 999 €")
 # L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026, cantiere
 # onchain-importi-grossi, Andrea: «per importi grossi deve venire proposto
 # l'on-chain da solo»; la soglia l'ha detta lui, 500 €). Il caso: una croce
@@ -59327,15 +59411,18 @@ def onchain_consigliato(prezzo_sats: int, cambio_eur: float) -> bool:
     return int(prezzo_sats or 0) * cambio_eur / 100_000_000 > soglia
 
 
-async def _avviso_importo_grosso(fuori):
+async def _avviso_importo_grosso(fuori):  # async: le tre uscite la aspettano gia'
     """La fattura Lightning del mercatino che e' sopra la soglia lo dice
     (17 nov 2026): `importo_grosso` e la soglia nella risposta, e il
     foglio della fattura scrive l'avviso. Vale anche dove l'on-chain non
     si offre (carrello, offerta accettata, codice sconto): li' l'avviso
     e' l'unica cosa che si puo' dire."""
     if isinstance(fuori, dict) and fuori.get("invoice"):
+        # il cambio che si sa ADESSO, senza la rete (17 nov 2026 sera:
+        # l'await di CoinGecko qui bussava fuori dalla gabbia dei collaudi,
+        # collaudo_piu_account rosso in CI); senza cambio nessun avviso
         fuori["importo_grosso"] = onchain_consigliato(
-            int(fuori.get("prezzo_sats") or 0), await cambio_btc_eur())
+            int(fuori.get("prezzo_sats") or 0), cambio_noto_ora())
         fuori["consigliato_sopra_euro"] = _onchain_soglia_consiglio()
     return fuori
 
@@ -92389,6 +92476,10 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
                     # vende, e il cambio nato (le parti pubbliche)
                     "incasso_tipo": oc["incasso_tipo"] or "",
                     "modo_venditore": onchain_modo_ordine(con, oc),
+                    # (17 nov 2026) la cifra grossa che esce on-chain
+                    # anche verso chi aveva scelto Lightning
+                    "grosso_ln_tolto": _onchain_grosso(oc)
+                    and _onchain_modo_scelto(con, oc) != "onchain",
                     "cambio": _onchain_cambio_letto(oc),
                     "prezzo_sats": int(oc["prezzo_sats"]),
                 } if oc else None)
@@ -104613,7 +104704,7 @@ async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
         _onchain_prepara_ordini(con)
         riempiti = _onchain_riempi_incassi(con, user["id"])
         # ...e gli scambi P2P on-chain presi senza destinazione (30 ott 2026)
-        _p2p_onchain_riempi_incassi(con, user["id"])
+        riempiti_p2p = _p2p_onchain_riempi_incassi(con, user["id"])
         # ...e i RIMBORSI di quando ha messo lui i sats (10 nov 2026)
         _p2p_onchain_prepara(con)
         _onchain_riempi_rimborsi(con, user["id"])
@@ -104623,6 +104714,8 @@ async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     await _p2p_onchain_avvisa_rinunce(sbloccate)
+    # chi ha depositato lo sa (17 nov 2026, cantiere avviso-indirizzo)
+    await _p2p_onchain_avvisa_riempiti(riempiti_p2p)
     for o in riempiti:
         if o["rilascio_chiesto_il"]:
             await notifica(o["compratore_id"],
@@ -105355,7 +105448,14 @@ def _onchain_prepara_ordini(con):
                       # PayJoin di questo ordine (`/api/payjoin/<gettone>`),
                       # a caso e una per ordine — il numero dell'ordine
                       # si indovina, questa no. Vuota = un ordine di prima
-                      ("payjoin_gettone", "TEXT DEFAULT ''")):
+                      ("payjoin_gettone", "TEXT DEFAULT ''"),
+                      # 17 nov 2026, cantiere onchain-grossi-uscita: 1 se
+                      # alla nascita l'ordine stava sopra la soglia degli
+                      # acquisti grossi (`onchain_consigliato`). Fissato
+                      # QUI e non rifatto col cambio di domani: chi vende
+                      # riceve on-chain anche se aveva scelto Lightning
+                      # (`onchain_modo_ordine`). 0 = un ordine di prima
+                      ("grosso", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -105484,9 +105584,17 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
     margine = onchain_margine(await onchain_mempool_tariffa())
     # il tetto della beta, sul prezzo (27 ott 2026): prima di ogni
     # scrittura, come il resto dei no
-    troppo = onchain_sopra_il_tetto(prezzo, await cambio_btc_eur())
+    cambio = await cambio_btc_eur()
+    troppo = onchain_sopra_il_tetto(prezzo, cambio)
     if troppo:
         raise HTTPException(400, troppo)
+    # L'ACQUISTO GROSSO ESCE ON-CHAIN ANCHE VERSO CHI VENDE (17 nov 2026,
+    # cantiere onchain-grossi-uscita, Andrea: «se vuole ricevere in
+    # lighting, sì, bisogna mettere anche verso di lui il limite»): sopra la
+    # soglia il cambio in Lightning a fine ordine non regge, quindi
+    # l'ordine nasce col segno `grosso` e riceve on-chain. Col cambio di
+    # ADESSO, e fissato: lo stesso cambio che ha deciso il tetto
+    grosso = 1 if onchain_consigliato(prezzo, cambio) else 0
     # la quota fissa di Barattolo (0 di serie): la paga chi compra, e
     # l'ha vista alla cassa (`/api/onchain/pronto`)
     quota = onchain_quota_sats()
@@ -105523,7 +105631,8 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
         # decide allo sblocco: l'incasso resta vuoto anche se ha un wallet
         # (9 nov 2026) il modo dell'ORDINE: la scelta dell'annuncio vince
         if onchain_modo_ordine(con, {"venditore_id": venditore,
-                                     "annuncio_id": a["id"]}) != "onchain":
+                                     "annuncio_id": a["id"],
+                                     "grosso": grosso}) != "onchain":
             dest = None
         if dest:
             d_tipo, d_valore, d_firma = dest["tipo"], dest["valore"], dest["firma"]
@@ -105550,8 +105659,8 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
             " scade, creato, aggiornato, incasso_tipo, incasso_valore,"
             " incasso_firma, incasso_indice, quota_sats, quota_indirizzo,"
             " rimborso_tipo, rimborso_valore, rimborso_firma, rimborso_indice,"
-            " payjoin_gettone)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " payjoin_gettone, grosso)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ind_id, a["id"], user["id"], venditore, richiesti,
              r["titolo"] or "", prezzo, margine, prezzo + quota + margine,
              incasso, rimborso,
@@ -105561,7 +105670,7 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
              r_tipo, r_valore, r_firma, r_indice,
              # la porta del PayJoin (16 nov 2026): nasce sempre, anche a
              # leva spenta, cosi' riaccenderla vale per gli ordini aperti
-             secrets.token_urlsafe(18)))
+             secrets.token_urlsafe(18), grosso))
         con.execute("UPDATE onchain_indirizzi SET ordine_id=? WHERE id=?",
                     (cur.lastrowid, ind_id))
         con.commit()
@@ -105634,6 +105743,9 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
         "rilascio_firma": o["rilascio_firma"] or "",
         "cambio": _onchain_cambio_letto(o),
         "modo_venditore": onchain_modo_ordine(con, o),
+        # (17 nov 2026) chi vende avrebbe ricevuto in Lightning, ma la cifra
+        # e' grossa e riceve on-chain: la pagina glielo dice
+        "grosso_ln_tolto": _onchain_grosso(o) and _onchain_modo_scelto(con, o) != "onchain",
         "scade": o["scade"], "creato": o["creato"],
         "pagato_il": o["pagato_il"], "chiuso_il": o["chiuso_il"],
         "tariffa": _ONCHAIN_TARIFFA["sat_vb"] or 2.0,
@@ -106060,8 +106172,9 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
     # L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026): detto in
     # OGNI risposta, anche nei no, perche' a on-chain impossibile la cassa
     # avvisi almeno che una cifra cosi' in Lightning spesso non passa
-    cambio = await cambio_btc_eur() if sats > 0 else 0.0
-    sopra = {"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio),
+    # col cambio che si sa ADESSO, senza la rete: la domanda a CoinGecko
+    # resta dov'era, solo per il tetto (17 nov 2026 sera, la gabbia)
+    sopra = {"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio_noto_ora()),
              "consigliato_sopra_euro": _onchain_soglia_consiglio()}
     if not EMBIT:
         return {**sopra, "pronto": False, "motivo": "manca la libreria embit"}
@@ -106095,7 +106208,7 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
     # che col Lightning sarebbe la fattura): la porta ⛓️ si spegne PRIMA
     # del tocco, invece di chiudere la fattura e poi dire di no
     if sats > 0:
-        troppo = onchain_sopra_il_tetto(int(sats), cambio)
+        troppo = onchain_sopra_il_tetto(int(sats), await cambio_btc_eur())
         if troppo:
             return {**sopra, "pronto": False, "motivo": troppo}
     # la quota fissa di Barattolo, detta PRIMA di pagare (regola ferrea
@@ -106250,7 +106363,10 @@ async def onchain_rilascio_chiesto(oid: int, req: Request,
         await notifica(o["venditore_id"],
             f"₿ <b>{tit}:</b> chi ha comprato ha confermato di averlo "
             "ricevuto. Scegli dove ricevere i sats (Profilo → «Incassi "
-            "on-chain») e partono." if modo == "onchain" else
+            "on-chain») e partono." + (
+                " Per una cifra così ricevi on-chain, anche se avevi scelto "
+                "Lightning." if _onchain_grosso(o) else "")
+            if modo == "onchain" else
             f"⚡ <b>{tit}:</b> chi ha comprato ha confermato di averlo "
             "ricevuto. Apri l'ordine: ti mostriamo quanto costa lo swap "
             "in Lightning e, se confermi, i sats partono."
@@ -106532,6 +106648,25 @@ def onchain_modo_ordine(con, o) -> str:
     Profilo — 'ln' diventa «lightning», 'onchain' resta — ma solo se il
     cambio c'e' per lui; a leva spenta «onchain», come ieri. `o` ha
     `venditore_id` e `annuncio_id`."""
+    if _onchain_grosso(o):
+        return "onchain"
+    return _onchain_modo_scelto(con, o)
+
+
+def _onchain_grosso(o) -> bool:
+    """L'ordine e' nato sopra la soglia degli acquisti grossi (17 nov
+    2026)? `o` puo' essere la riga o il dizionario della cassa; senza la
+    chiave (un banco di prima) no."""
+    try:
+        return bool(int(o["grosso"] or 0))
+    except (KeyError, IndexError, TypeError, ValueError):
+        return False
+
+
+def _onchain_modo_scelto(con, o) -> str:
+    """Come VORREBBE ricevere chi vende, senza il segno dell'acquisto
+    grosso: la scelta dell'annuncio, sennò quella del Profilo, e solo se
+    il cambio c'e' per lui."""
     if not onchain_ln_per(o["venditore_id"]):
         return "onchain"
     a = incasso_annuncio(con, o["annuncio_id"])
@@ -106622,6 +106757,11 @@ def _onchain_da_sbloccare(con, oid: int, tg_id: int):
         raise HTTPException(409, "Su questo ordine non c'è niente da "
                                  "scegliere adesso")
     _onchain_ordine_permette(con, o, "venditore")
+    # l'acquisto grosso esce on-chain (17 nov 2026): niente cambio in
+    # Lightning, e lo si dice invece di «non ha ancora confermato»
+    if _onchain_grosso(o):
+        raise HTTPException(409, "Per una cifra così ricevi on-chain: scegli "
+                                 "dove in Profilo → «Incassi on-chain»")
     ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
                       (o["indirizzo_id"],)).fetchone()
     if not _onchain_puo_firmare_prima(con, o, ind):
@@ -106714,7 +106854,7 @@ async def onchain_incasso_modo(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Scelta sconosciuta")
     if modo != "onchain" and not onchain_ln_per(user["id"]):
         raise HTTPException(403, "Lo swap in Lightning non è disponibile")
-    riempiti = []
+    riempiti, riempiti_p2p = [], []
     con = _onchain_db()
     try:
         if modo == "onchain":
@@ -106728,10 +106868,11 @@ async def onchain_incasso_modo(req: Request, x_tg_init_data: str = Header(""),
         if modo == "onchain":
             _onchain_prepara_ordini(con)
             riempiti = _onchain_riempi_incassi(con, user["id"])
-            _p2p_onchain_riempi_incassi(con, user["id"])   # gli scambi P2P (30 ott)
+            riempiti_p2p = _p2p_onchain_riempi_incassi(con, user["id"])   # gli scambi P2P (30 ott)
             con.commit()
     finally:
         con.close()
+    await _p2p_onchain_avvisa_riempiti(riempiti_p2p)   # (17 nov 2026, avviso-indirizzo)
     for o in riempiti:
         if o["rilascio_chiesto_il"]:
             await notifica(o["compratore_id"],
@@ -107969,6 +108110,23 @@ if not isinstance(P2P_ONCHAIN_USDT_ATTIVO, bool):
 # le reti, coi nomi del metodo e il contratto del vero USDT (contro i
 # token falsi che si chiamano «USDT» anche loro); gemelle di
 # `P2P_RETI_USDT` del telefono
+# L'INDIRIZZO DI CHI COMPRA, DETTO A CHI LIBERA (17 nov 2026, cantiere
+# avviso-indirizzo; un utente: «hai liberato i sats prima che abbia
+# inserito l'indirizzo [...] magari metto una notifica per quando il
+# compratore ha inserito l'indirizzo e che il venditore prima di
+# rilasciare i sats sollecita il compratore ad indicare dove inviarli»).
+# Due pezzi: chi ha depositato riceve un avviso quando chi compra sceglie
+# dove ricevere a deposito fatto (`_p2p_onchain_avvisa_confermato`), e
+# davanti a «Ricevuti» senza indirizzo ha «🔔 Ricordaglielo»
+# (`sollecita-incasso`, uno all'ora). ACCESA di serie (regola delle leve
+# nuove, 14 nov): False toglie l'avviso e il bottone, e il rilascio senza
+# indirizzo resta fermo come prima (il no in parole del telefono).
+try:
+    from config import P2P_ONCHAIN_AVVISO_INCASSO
+except ImportError:
+    P2P_ONCHAIN_AVVISO_INCASSO = True
+P2P_ONCHAIN_AVVISO_INCASSO = bool(P2P_ONCHAIN_AVVISO_INCASSO)
+P2P_ONCHAIN_INCASSO_RIAVVISO = 3600   # un sollecito all'ora, al massimo
 P2P_ONCHAIN_RETI_USDT = {
     "USDT (Tron)": {"rete": "tron", "nome": "Tron",
                     "contratto": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"},
@@ -108698,6 +108856,10 @@ def _p2p_onchain_prepara(con):
                       # l'ultimo avviso e' partito (0 = nessuna rinuncia
                       # che aspetta): si azzera appena l'indirizzo c'e'
                       ("rinuncia_chiesta_il", "INTEGER DEFAULT 0"),
+                      # 17 nov 2026, cantiere avviso-indirizzo: quando chi
+                      # ha depositato ha ricordato a chi compra di scegliere
+                      # dove ricevere (0 = mai): uno all'ora, al massimo
+                      ("incasso_sollecito_il", "INTEGER DEFAULT 0"),
                       # 17 nov 2026 sera: quando la ronda ha detto alle due
                       # parti che le 48 ore del bonifico sono passate (0 =
                       # non ancora): una volta sola
@@ -109135,7 +109297,7 @@ def _p2p_onchain_libro(chi: int) -> dict:
              # il tetto in euro degli scambi on-chain (12 nov 2026, Andrea:
              # «p2p onchain metti 500»): quello dell'on-chain, non del P2P
              # Lightning; lo giudica il foglio Pubblica, 0 = spento
-             "maxEuro": int(ONCHAIN_MAX_EURO or 0),
+             "maxEuro": int(P2P_ONCHAIN_MAX_EURO or 0),
              # Barattozon anche on-chain (17 nov 2026): la leva, per il foglio
              "barattozon": bool(P2P_ONCHAIN_BARATTOZON)}
     if chi:
@@ -109311,6 +109473,10 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         # (17 nov 2026, onchain-rimborso-liscio) chi compra vuole
         # rinunciare e il rimborso aspetta l'indirizzo di chi ha depositato
         "rinuncia_chiesta_il": int(_p2p_onchain_campo(o, "rinuncia_chiesta_il", 0) or 0),
+        # (17 nov 2026, avviso-indirizzo) «🔔 Ricordaglielo» davanti a
+        # «Ricevuti» senza l'indirizzo di chi compra, e l'ultimo sollecito
+        "sollecito_incasso": bool(P2P_ONCHAIN_AVVISO_INCASSO and ruolo == "compratore"),
+        "incasso_sollecito_il": int(_p2p_onchain_campo(o, "incasso_sollecito_il", 0) or 0),
         # (17 nov 2026 sera, onchain-ritiro) il «non completato» di chi si
         # ritira dopo il deposito: se una rinuncia ADESSO conterebbe (il
         # telefono lo dice prima della firma), e a chi e' stato contato
@@ -109724,7 +109890,8 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     deve avere la sua chiave on-chain (la xpub dedicata): e' una delle
     tre del 2-di-3 che nascera' alla presa, e senza non c'e' niente da
     promettere. Il tetto in euro e' quello dell'on-chain
-    (`ONCHAIN_MAX_EURO`, dal 12 nov 2026: prima era quello del P2P
+    (`P2P_ONCHAIN_MAX_EURO` dal 17 nov 2026; dal 12 nov era quello del
+    mercatino on-chain, `ONCHAIN_MAX_EURO`, e prima quello del P2P
     Lightning, `P2P_MAX_EURO`), quello in sats dell'istanza di prova. L'ordine nasce nel nostro
     libro e parte verso i relay; la risposta non aspetta i relay."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
@@ -109770,9 +109937,9 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             raise HTTPException(503, f"Il cambio di {coin[0]} adesso non c'è: "
                                      "riprova fra un minuto")
     # IL TETTO DEGLI SCAMBI ON-CHAIN (12 nov 2026, Andrea: «p2p onchain
-    # metti 500»): lo stesso dell'on-chain del mercatino, non quello del
-    # P2P Lightning; sul VPS e' gia' 500, nessuna riga nuova
-    tetto = int(ONCHAIN_MAX_EURO or 0)
+    # metti 500»): non quello del P2P Lightning. Dal 17 nov 2026 nemmeno
+    # quello del mercatino on-chain (Andrea: «separalo»): il suo, a parte
+    tetto = int(P2P_ONCHAIN_MAX_EURO or 0)
     if usdt or chf:
         # in franchi lo stesso conto dei dollari: il tetto in euro al cambio
         tetto = p2p_onchain_tetto_usdt(tetto, cambio_noto_ora("eur"), cambio)
@@ -111413,6 +111580,60 @@ async def p2p_onchain_incasso_qui(oid: int, req: Request, x_tg_init_data: str = 
     return risposta
 
 
+@app.post("/api/p2p/onchain/{oid}/sollecita-incasso")
+async def p2p_onchain_sollecita_incasso(oid: int, x_tg_init_data: str = Header(""),
+                                        barattolo_sessione: str = Cookie("")):
+    """«🔔 RICORDAGLIELO» (17 nov 2026, cantiere avviso-indirizzo). Chi ha
+    depositato vuole liberare, ma chi compra non ha ancora scelto dove
+    ricevere: il bot glielo ricorda, col bottone che apre lo scambio. Uno
+    all'ora (`incasso_sollecito_il`, scritto PRIMA dell'invio, come ogni
+    avviso). `pronto` = nel frattempo l'indirizzo e' arrivato: si libera
+    come sempre. Chi riceve in Lightning non serve: li' «Ricevuti» e' la
+    conferma firmata, e lo swap lo fa lui."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    if not P2P_ONCHAIN_AVVISO_INCASSO:
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_firma", user["id"])
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if _p2p_onchain_ruolo(o, user["id"]) != "compratore":
+            raise HTTPException(403, "Lo ricorda chi ha depositato i sats")
+        if o["stato"] not in ("depositato", "euro_inviati"):
+            raise HTTPException(409, "Si ricorda a deposito confermato")
+        if o["decisione_da"] or o["proposta_psbt"]:
+            raise HTTPException(409, "Su questo scambio c'è già una firma")
+        if o["incasso"]:
+            return {"ok": True, "pronto": True, "avvisato": False, "prossimo": 0}
+        if _p2p_onchain_campo(o, "incasso_ln", 0):
+            raise HTTPException(409, "Chi compra riceve in Lightning: "
+                                     "conferma gli euro con «Ricevuti»")
+        ultimo = int(_p2p_onchain_campo(o, "incasso_sollecito_il", 0) or 0)
+        if ultimo and adesso - ultimo < P2P_ONCHAIN_INCASSO_RIAVVISO:
+            return {"ok": True, "pronto": False, "avvisato": False,
+                    "prossimo": ultimo + P2P_ONCHAIN_INCASSO_RIAVVISO}
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET incasso_sollecito_il=?, aggiornato=?"
+            " WHERE id=? AND incasso='' AND COALESCE(incasso_sollecito_il,0)=?",
+            (adesso, adesso, oid, ultimo))
+        con.commit()
+        if not cur.rowcount:
+            return {"ok": True, "pronto": False, "avvisato": False,
+                    "prossimo": adesso + P2P_ONCHAIN_INCASSO_RIAVVISO}
+    finally:
+        con.close()
+    await _notifica_p2p_onchain(o, o["ricevente_id"],
+        "📍 <b>Chi vende vuole liberarti i sats</b> dello scambio di "
+        f"{_p2p_onchain_quanto(o, netti=True)}, ma non sa dove mandarli.\n\n"
+        "Apri lo scambio e incolla un indirizzo del tuo wallet Bitcoin nel "
+        "riquadro «Dove ricevi i bitcoin?».",
+        _p2p_onchain_bottone(o))
+    return {"ok": True, "pronto": False, "avvisato": True,
+            "prossimo": adesso + P2P_ONCHAIN_INCASSO_RIAVVISO}
+
+
 # ---- IL RIMBORSO CHE NON SI INCAGLIA (17 nov 2026, cantiere
 # onchain-rimborso-liscio; un utente all'assistenza: «la persona che ha
 # depositato deve indicare dove ricevere di ritorno i sats [...] mi
@@ -112111,15 +112332,43 @@ def _p2p_onchain_confermato(con, o, ind=None) -> bool:
 
 
 async def _p2p_onchain_avvisa_confermato(o) -> None:
-    """Chi compra ha appena scelto un incasso on-chain su uno scambio in cui
-    chi vende aveva gia' confermato gli euro: il telefono di chi vende ora
-    puo' firmare il rilascio, e glielo si dice."""
-    if o["incasso"] and o["rilascio_chiesto_il"] and not o["proposta_psbt"]:
+    """Chi compra ha appena scelto un incasso on-chain. Se chi vende aveva
+    gia' confermato gli euro, il suo telefono ora puo' firmare il rilascio,
+    e glielo si dice. Se no (17 nov 2026, cantiere avviso-indirizzo), a
+    deposito fatto gli si dice che adesso «Ricevuti» ha dove mandare i
+    sats: prima del deposito non serve, la pagina lo mostra da sola."""
+    if not o["incasso"] or o["proposta_psbt"]:
+        return
+    if o["rilascio_chiesto_il"]:
         await _notifica_p2p_onchain(o, o["depositante_id"],
             "🔓 <b>Chi compra ha scelto dove ricevere</b> (on-chain) sullo scambio "
             f"di {_p2p_onchain_quanto(o)}.\n\nApri Barattolo: il tuo telefono firma "
             "il rilascio che avevi confermato, e i sats partono.",
             _p2p_onchain_bottone(o))
+    elif (P2P_ONCHAIN_AVVISO_INCASSO and o["stato"] in ("depositato", "euro_inviati")
+          and not int(_p2p_onchain_campo(o, "decisione_da", 0) or 0)):
+        await _notifica_p2p_onchain(o, o["depositante_id"],
+            "📍 <b>Chi compra ha scelto dove ricevere</b> i sats dello scambio "
+            f"di {_p2p_onchain_quanto(o)}.\n\nQuando hai ricevuto il pagamento, "
+            "«Ricevuti: libera i sats» adesso li manda lì.",
+            _p2p_onchain_bottone(o))
+
+
+async def _p2p_onchain_avvisa_riempiti(righe) -> None:
+    """Gli scambi che hanno appena preso l'incasso dal Profilo
+    (`_p2p_onchain_riempi_incassi` torna le righe di PRIMA): si rileggono
+    e chi ha depositato lo sa, come dal riquadro dello scambio."""
+    if not righe:
+        return
+    con = _p2p_onchain_db()
+    try:
+        fresche = [_p2p_onchain_carica(con, int(o["id"])) for o in righe]
+    except HTTPException:
+        return
+    finally:
+        con.close()
+    for o in fresche:
+        await _p2p_onchain_avvisa_confermato(o)
 
 
 def _p2p_onchain_testi_deposito_tab(o, euro: str) -> list:
@@ -113767,6 +114016,27 @@ try:
     from config import IMPARA_BITCOIN_NOME
 except ImportError:
     IMPARA_BITCOIN_NOME = "Villaggio Bitcoin"
+# LA LEVA DELLA ROTTA: STRADINA_ATTIVA (17 nov 2026, Andrea alle 19:34:
+# «anche il tabellone lascialo spento per il momento»). SPENTA di serie,
+# eccezione decisa da lui alla regola delle leve nuove accese: sul
+# collaudo si accende a mano nel config. Spenta, /api/me manda
+# `stradina: false`, la voce nel Profilo non nasce e le due rotte
+# /api/me/stradina rispondono 404; le caselle di prova restano salvate.
+try:
+    from config import STRADINA_ATTIVA
+except ImportError:
+    STRADINA_ATTIVA = False
+STRADINA_ATTIVA = bool(STRADINA_ATTIVA)
+# LA LEVA DEGLI ACQUISTI NEL PROFILO: ACQUISTI_NEL_PROFILO (17 nov 2026
+# sera, privacy). SPENTA di serie, eccezione decisa da Andrea («gli
+# acquisti non li aggiungere»): nel cassetto 📊 restano le vendite come
+# prima, e i totali degli acquisti non escono da nessuna porta. True li
+# rimette. Il perche' accanto a `_CAMPI_NUMERI`.
+try:
+    from config import ACQUISTI_NEL_PROFILO
+except ImportError:
+    ACQUISTI_NEL_PROFILO = False
+ACQUISTI_NEL_PROFILO = bool(ACQUISTI_NEL_PROFILO)
 STRADINA_AMICI_MAX = 12      # quanti amici si mostrano, i piu' alti
 
 # LE ZONE DEL TABELLONE, dal basso (la Terra) verso l'alto (la Luna):
@@ -114176,6 +114446,8 @@ async def prova_stradina(req: Request, x_tg_init_data: str = Header(""),
                          barattolo_sessione: str = Cookie("")):
     """Segna (o toglie) una casella di prova, o le azzera tutte. Solo admin:
     a chiunque altro un 403, e la tabella non si tocca."""
+    if not STRADINA_ATTIVA:
+        raise HTTPException(404, "Non trovato")
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Solo gli amministratori possono provare il tabellone.")
@@ -114214,6 +114486,8 @@ def mia_stradina(x_tg_init_data: str = Header(""),
     """LA PORTA DELLA STRADINA: le tappe, il livello, i sats e gli amici
     di CHI BUSSA, mai di un altro (il tg_id viene dall'identita', non da
     un parametro). L'anonimo prende il 401 di `verifica_utente`."""
+    if not STRADINA_ATTIVA:
+        raise HTTPException(404, "Non trovato")
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     try:
@@ -120749,15 +121023,17 @@ async def cancella_account(req: Request, response: Response,
 # database: dal client arrivano solo nomi, mai una cifra. Piu' account
 # non rendono niente che valga: i bulloni non si passano.
 #
-# LA LEVA NASCE ACCESA (decisione di Andrea del 14 nov 2026: le leve
-# nuove sono accese di serie, e restano come interruttore d'emergenza).
-# Spenta — `GIOCO_TAPPO_ATTIVO = False` nel config — le rotte rispondono
-# 404 e la voce nel Profilo non c'e'; quel che uno ha gia' preso resta.
+# LA LEVA NASCE SPENTA (17 nov 2026 sera, Andrea dopo averlo provato
+# sul collaudo: «il gioco non mi piace... non puoi spegnerlo con una
+# leva e via»): eccezione alla regola delle leve accese di serie. Spenta,
+# le rotte rispondono 404, la voce nel Profilo non c'e' e il tabellone
+# non mostra le missioni; quel che uno ha gia' preso resta.
+# `GIOCO_TAPPO_ATTIVO = True` nel config la riaccende.
 
 try:
     from config import GIOCO_TAPPO_ATTIVO
 except ImportError:
-    GIOCO_TAPPO_ATTIVO = True
+    GIOCO_TAPPO_ATTIVO = False
 if not isinstance(GIOCO_TAPPO_ATTIVO, bool):
     print("[gioco] GIOCO_TAPPO_ATTIVO non e' True/False: la Caccia a "
           "Tappo resta spenta", flush=True)

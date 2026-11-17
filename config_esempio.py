@@ -1220,16 +1220,28 @@ AVVISI_BARATTOLO_ORE = 24
 # vedono. Accesa di serie; a False niente fiamma e nessun giorno contato
 # (riaccendendola chi ha saltato dei giorni riparte da 1, il record resta).
 SERIE_GIORNI_ATTIVA = True
+# LA ROTTA PER LA LUNA 🚀 (17 nov 2026): nel Profilo il tabellone delle
+# caselle fino all'halving del 2028, con Tappo pedina. Non da' XP ne'
+# sats. SPENTA di serie per decisione di Andrea («anche il tabellone
+# lascialo spento per il momento»): True la accende (sul collaudo si).
+STRADINA_ATTIVA = False
+# GLI ACQUISTI NEL PROFILO 🛍️ (17 nov 2026 sera, privacy): i totali di
+# quanto hai comprato nel cassetto 📊. SPENTA di serie per decisione di
+# Andrea («gli acquisti non li aggiungere»): nel cassetto restano le
+# vendite, come prima. True li mostra; i contatori non cambiano mai.
+ACQUISTI_NEL_PROFILO = False
 # L'APP IN INGLESE 🌍 (17 nov 2026, tappa 1): chi ha Telegram (o il
 # browser) in una lingua che non e' l'italiano legge in inglese le parti
 # gia' tradotte — vetrina, scheda dell'annuncio, carrello, cassa, foglio
 # del pagamento, «Il pagamento protetto» — e in italiano il resto, finche'
 # le tappe dopo non lo traducono. Il server non traduce niente: serve il
-# dizionario `lingua/en.js`, che la pagina chiede da sola. Accesa di
-# serie; a False il dizionario risponde 404 e l'app parla italiano a
-# tutti. Solo True accende. Per provare l'inglese con Telegram in
-# italiano: ?lingua=en nell'indirizzo (si ricorda; ?lingua=it per tornare).
-LINGUA_INGLESE = True
+# dizionario `lingua/en.js`, che la pagina chiede da sola. SPENTA di
+# serie (Andrea, 17 nov 2026: in produzione arriva spenta); a True il
+# dizionario si serve e l'app parla inglese a chi ha Telegram o il
+# browser in un'altra lingua. Sul collaudo sta accesa. Per provare
+# l'inglese con Telegram in italiano: ?lingua=en nell'indirizzo (si
+# ricorda; ?lingua=it per tornare).
+LINGUA_INGLESE = False
 # GLI AVVISI DEL MERCATINO (9 ott 2026): chi lo chiede dal cassetto Avvisi
 # del Profilo riceve un messaggio quando nel mercatino compaiono annunci
 # nuovi — TUTTI i nuovi, con un filtro facoltativo di categorie e prezzo
@@ -1424,6 +1436,13 @@ ONCHAIN_QUOTA_FISSA_SATS = 0
 # la rete) non si paga on-chain, resta il Lightning. 0 = nessun tetto.
 # Il valore del codice e' gia' 250: la riga serve il giorno che sale.
 ONCHAIN_MAX_EURO = 250
+# IL TETTO DEGLI SCAMBI P2P ON-CHAIN, A PARTE (17 nov 2026, Andrea:
+# «separalo»): fino a oggi gli scambi P2P a tre chiavi seguivano la riga
+# qui sopra, e alzare il mercatino alzava anche loro. Adesso hanno la
+# loro: 999 di serie (quel che valeva in produzione), 0 = nessun tetto.
+# Il P2P Lightning di Mostro resta a P2P_MAX_EURO. Si cambia anche dal
+# pannello.
+P2P_ONCHAIN_MAX_EURO = 999
 # L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026, Andrea:
 # «per importi grossi deve venire proposto l'on-chain da solo», dal caso
 # di una croce da 3000 €): sopra questa cifra in euro la cassa del
@@ -1484,6 +1503,12 @@ P2P_USDT_SOLO_ADMIN = True
 # Vale solo per chi ha P2P_ONCHAIN_ATTIVO e gli USDT (P2P_USDT_ATTIVO,
 # con P2P_USDT_SOLO_ADMIN). Spento di serie; sul collaudo si accende.
 P2P_ONCHAIN_USDT_ATTIVO = False
+# L'INDIRIZZO DI CHI COMPRA, DETTO A CHI LIBERA (17 nov 2026, un utente:
+# «hai liberato i sats prima che abbia inserito l'indirizzo»). Negli
+# scambi on-chain chi ha depositato riceve un messaggio quando chi compra
+# sceglie dove ricevere, e davanti a «Ricevuti» senza quell'indirizzo ha
+# «🔔 Ricordaglielo» (un sollecito all'ora). Accesa di serie; False li toglie.
+P2P_ONCHAIN_AVVISO_INCASSO = True
 # BARATTOZON ANCHE ON-CHAIN (17 nov 2026, «si» di Andrea al piano). Chi
 # VENDE bitcoin col 2-di-3 puo' farsi pagare un PayCode Amazon al
 # tabacchino: un metodo solo, euro, PayCode che scade fra almeno 12 ore,
@@ -2237,10 +2262,10 @@ ASSISTENZA_ATTIVA = False
 # barattolo con dentro Tappo»): nel Profilo → Livello la voce «🔩 Caccia
 # a Tappo». Ogni giorno Tappo si nasconde in un annuncio vero, diverso
 # per ognuno: la dispensa a sei scaffali, sei gradi, le sfide, lo zaino.
-# Si vincono BULLONI, che non sono sats e non danno XP. ACCESA di serie
-# (decisione del 14 nov 2026 sulle leve nuove): False la spegne — le
-# rotte rispondono 404, quel che uno ha gia' preso resta.
-GIOCO_TAPPO_ATTIVO = True
+# Si vincono BULLONI, che non sono sats e non danno XP. SPENTA di serie
+# (17 nov 2026 sera, Andrea: «il gioco non mi piace... spegnerlo con una
+# leva»): True la accende, con le missioni a carte nel tabellone.
+GIOCO_TAPPO_ATTIVO = False
 
 # ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot): sul web e
 # nella PWA «Entra con Telegram» apre il bot con un codice monouso, e

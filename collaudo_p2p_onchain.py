@@ -241,6 +241,9 @@ def main():
           [pubblica(999).status_code,
            c.post("/api/p2p/onchain/1/prendi", json={}).status_code,
            c.get("/api/p2p/onchain/moderazione/aperte").status_code])
+    # il tetto di prova scritto: 250 € (17 nov 2026, il P2P on-chain ha il
+    # suo tetto, 999 di serie; questo collaudo misura i suoi no a 250)
+    SRV.P2P_ONCHAIN_MAX_EURO = 250
     SRV.P2P_ONCHAIN_ATTIVO = True
     SRV.ONCHAIN_ATTIVO = False
     prova("leva P2P accesa ma on-chain spento: non esiste lo stesso "
@@ -293,9 +296,11 @@ def main():
            pubblica(999, euro_cent=30000).status_code,
            pubblica(999, metodi=[]).status_code])
     # IL TETTO E' QUELLO DELL'ON-CHAIN (12 nov 2026, Andrea: «p2p onchain
-    # metti 500»): ONCHAIN_MAX_EURO, non P2P_MAX_EURO del Lightning
-    vecchi = (SRV.ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.p2p_onchain_giudica_nuovo)
-    SRV.ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO = 500, 250
+    # metti 500»): non P2P_MAX_EURO del Lightning, e dal 17 nov 2026
+    # (Andrea: «separalo») nemmeno ONCHAIN_MAX_EURO del mercatino
+    vecchi = (SRV.P2P_ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.p2p_onchain_giudica_nuovo,
+              SRV.ONCHAIN_MAX_EURO)
+    SRV.P2P_ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.ONCHAIN_MAX_EURO = 500, 250, 3000
     visti = []
     def spia(*a, **k):
         visti.append(a[5])
@@ -305,9 +310,11 @@ def main():
         r6 = pubblica(999, euro_cent=60000)
         busta = libro()["onchain"]
     finally:
-        SRV.ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.p2p_onchain_giudica_nuovo = vecchi
-    prova("il tetto degli scambi on-chain e' ONCHAIN_MAX_EURO (500), non "
-          "quello del P2P Lightning (250): 600 € no «fino a 500 €», e il "
+        (SRV.P2P_ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.p2p_onchain_giudica_nuovo,
+         SRV.ONCHAIN_MAX_EURO) = vecchi
+    prova("il tetto degli scambi on-chain e' P2P_ONCHAIN_MAX_EURO (500), non "
+          "quello del P2P Lightning (250) ne' quello del mercatino (3000): "
+          "600 € no «fino a 500 €», e il "
           "libro lo dice al foglio", ([500], 400, True, 500),
           (visti, r6.status_code, "fino a 500 €" in r6.json().get("detail", ""),
            busta.get("maxEuro")))
@@ -1271,6 +1278,124 @@ def main():
           "moderatori lo sanno", (200, qua, True),
           (r.status_code, uno(888, oid9)["rimborso"],
            any("dove riavere i sats" in str(a) for a in banco.AVVISI)))
+    SRV.P2P_ONCHAIN_APERTI_MAX = tetto
+
+    # ---- 11-sexies-bis) l'indirizzo di chi compra, detto a chi libera (17
+    # nov 2026, cantiere avviso-indirizzo; un utente: «hai liberato i sats
+    # prima che abbia inserito l'indirizzo») -------------------------------------
+    print("\n[l'indirizzo di chi compra: il sollecito di chi libera, e "
+          "l'avviso quando arriva]")
+    SRV.P2P_ONCHAIN_APERTI_MAX = 100
+    prova("la leva nasce accesa", True, SRV.P2P_ONCHAIN_AVVISO_INCASSO)
+    come(999)
+    c.post("/api/onchain/incasso", json={"tipo": "barattolo"})   # Andrea senza wallet
+    come(888)
+    c.post("/api/onchain/incasso", json={
+        "tipo": "indirizzo", "valore": dal_wallet(40),
+        "firma": firma_dest(888, "indirizzo", dal_wallet(40))})   # i resti di Alan
+
+    def depositato(sats):
+        oid_ = pubblica(888, sats=sats, euro_cent=sats * 9 // 100,
+                        metodi=["Bonifico"]).json()["id"]
+        gesto(999, oid_, "prendi")
+        paga(uno(888, oid_))
+        gesto(888, oid_, "controlla")
+        return oid_
+
+    oid10 = pubblica(888, sats=50000, euro_cent=4500, metodi=["Bonifico"]).json()["id"]
+    gesto(999, oid10, "prendi")
+    o10 = uno(888, oid10)
+    prova("Andrea compra senza un wallet: incasso vuoto, e chi deposita vede "
+          "«Ricordaglielo» (chi compra no)", ("", True, False, 0),
+          (o10["incasso"], o10["sollecito_incasso"],
+           uno(999, oid10)["sollecito_incasso"], o10["incasso_sollecito_il"]))
+    prova("prima del deposito non si sollecita: 409", 409,
+          gesto(888, oid10, "sollecita-incasso").status_code)
+    paga(o10)
+    gesto(888, oid10, "controlla")
+    prova("...a deposito fatto lo sollecita solo chi ha depositato: 403 a chi compra",
+          ("depositato", 403),
+          (uno(888, oid10)["stato"], gesto(999, oid10, "sollecita-incasso").status_code))
+    banco.DETTO.clear()
+    n_bottoni = len(BOTTONI)
+    r = gesto(888, oid10, "sollecita-incasso")
+    prova("Alan tocca «🔔 Ricordaglielo»: Andrea lo sa dal bot, col bottone "
+          "dello scambio, e lo scambio se lo ricorda",
+          (200, False, True, True, True, True),
+          (r.status_code, r.json()["pronto"], r.json()["avvisato"],
+           detto_a(999, "Chi vende vuole liberarti i sats")
+           and detto_a(999, "Dove ricevi i bitcoin?"),
+           any(chi == 999 and b and "?scambio=bar-onchain-" in b[1]
+               for chi, t, b in BOTTONI[n_bottoni:]),
+           uno(888, oid10)["incasso_sollecito_il"] > 0))
+    banco.DETTO.clear()
+    r = gesto(888, oid10, "sollecita-incasso")
+    prova("un secondo tocco entro l'ora non manda niente, e dice da quando si "
+          "puo' rifare", (200, False, [], True),
+          (r.status_code, r.json()["avvisato"], [t[:30] for chi, t in banco.DETTO],
+           r.json()["prossimo"] > time.time() + 3000))
+    con = SRV._p2p_onchain_db()
+    try:
+        con.execute("UPDATE p2p_onchain_ordini SET incasso_sollecito_il="
+                    "incasso_sollecito_il-? WHERE id=?",
+                    (SRV.P2P_ONCHAIN_INCASSO_RIAVVISO + 5, oid10))
+        con.commit()
+    finally:
+        con.close()
+    prova("...passata l'ora si' (un sollecito, non una raffica)", (True, True),
+          (gesto(888, oid10, "sollecita-incasso").json()["avvisato"],
+           detto_a(999, "Chi vende vuole liberarti i sats")))
+    SRV.P2P_ONCHAIN_AVVISO_INCASSO = False
+    prova("leva spenta: il bottone non c'e' e la rotta non esiste (404)",
+          (False, 404),
+          (uno(888, oid10)["sollecito_incasso"],
+           gesto(888, oid10, "sollecita-incasso").status_code))
+    SRV.P2P_ONCHAIN_AVVISO_INCASSO = True
+    banco.DETTO.clear()
+    qui10 = dal_wallet(41)
+    r = gesto(999, oid10, "incasso", valore=qui10,
+              firma=firma_dest(999, "indirizzo", qui10))
+    prova("Andrea incolla l'indirizzo nello scambio: Alan lo sa dal bot, una "
+          "volta, col bottone", (200, qui10, 1),
+          (r.status_code, uno(888, oid10)["incasso"],
+           sum(1 for chi, t in banco.DETTO
+               if chi == 888 and "Chi compra ha scelto dove ricevere" in t)))
+    r = gesto(888, oid10, "sollecita-incasso")
+    prova("...e adesso «Ricordaglielo» risponde `pronto`, senza avvisi", (200, True, False),
+          (r.status_code, r.json()["pronto"], r.json()["avvisato"]))
+    o10 = uno(888, oid10)
+    prova("...e «Ricevuti: libera i sats» trova dove mandarli: la prima firma passa",
+          200, gesto(888, oid10, "proposta", verso="venditore",
+                     psbt=psbt_di(o10, [(qui10, 50000), (o10["rimborso"], 51080 - 50000 - 300)],
+                                  888).to_string()).status_code)
+    # a leva spenta l'indirizzo arriva in silenzio, come prima
+    oid11 = depositato(30000)
+    SRV.P2P_ONCHAIN_AVVISO_INCASSO = False
+    banco.DETTO.clear()
+    qui11 = dal_wallet(42)
+    gesto(999, oid11, "incasso", valore=qui11, firma=firma_dest(999, "indirizzo", qui11))
+    prova("leva spenta: l'indirizzo arriva e chi ha depositato non riceve niente",
+          (qui11, 0), (uno(888, oid11)["incasso"],
+                       sum(1 for chi, t in banco.DETTO if chi == 888)))
+    SRV.P2P_ONCHAIN_AVVISO_INCASSO = True
+    # dal Profilo: avvisa chi ha depositato, non chi deve ancora depositare
+    oid12 = depositato(20000)
+    oid13 = pubblica(888, sats=25000, euro_cent=2250, metodi=["Bonifico"]).json()["id"]
+    gesto(999, oid13, "prendi")
+    banco.DETTO.clear()
+    come(999)
+    r = c.post("/api/onchain/incasso", json={
+        "tipo": "indirizzo", "valore": RIMBORSO_999,
+        "firma": firma_dest(999, "indirizzo", RIMBORSO_999)})
+    prova("Andrea sceglie il wallet dal Profilo: i due scambi lo prendono, e "
+          "Alan riceve un avviso solo per quello gia' depositato",
+          (200, RIMBORSO_999, RIMBORSO_999, 1, True),
+          (r.status_code, uno(888, oid12)["incasso"], uno(888, oid13)["incasso"],
+           sum(1 for chi, t in banco.DETTO
+               if chi == 888 and "Chi compra ha scelto dove ricevere" in t),
+           detto_a(888, "20.000 sats")))
+    come(888)
+    c.post("/api/onchain/incasso", json={"tipo": "barattolo"})   # Alan come prima
     SRV.P2P_ONCHAIN_APERTI_MAX = tetto
 
     # ---- 11-septies) il contanti di persona col luogo, come su Lightning (17

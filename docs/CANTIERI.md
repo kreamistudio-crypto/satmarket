@@ -89986,6 +89986,8 @@ Da guardare: «carta-soldi-in-privato» ha le maniche tagliate dal bordo
 del disegno (si vede poco: le mani entrano dai lati). Provato a schermo
 sulle otto missioni.
 
+E il gioco SPENTO (19:15-19:47, Andrea dopo averlo visto sul collaudo: «il gioco non mi piace, quindi leva tutto quanto», poi alla domanda se cancellarlo: «Questo di eliminarlo così non puoi spegnerlo con una leva e via»). Non si cancella: `GIOCO_TAPPO_ATTIVO` nasce SPENTA (server.py e config d'esempio), eccezione dichiarata alla regola del 14 nov sulle leve accese di serie. Spenta, le rotte del gioco rispondono 404, la voce «🔩 Caccia a Tappo» nel Profilo non c'e' e il tabellone non mostra le missioni a carte (le legge solo a leva accesa); le due voci di Novità passano a `pubblico: no`, e il sapere di Tappo parlava del gioco gia' solo «se nelle REGOLAZIONI è accesa». SCARTATO: il revert dei dieci commit (pronto e verde, mai pushato): Andrea vuole poterlo riaccendere. Se il config della VM di collaudo ha la riga `GIOCO_TAPPO_ATTIVO = True`, va tolta a mano. LA LEZIONE: un gioco dentro un'app di scambio ha senso solo se l'utente lo sente utile; la grafica bella non basta («perdita di tempo», «cavolatina senza valore» già alle 16:07), e il tabellone che porta ai gesti veri l'ha battuto.
+
 ## L'on-chain consigliato per gli acquisti grossi (17 nov 2026 sera, cantiere onchain-importi-grossi; Andrea, con lo screenshot di una croce da 3000 € «Preferisce ricevere in Lightning»: «Non si possono ricevere importi così grossi in lighting o sbaglio», poi «per importi grossi deve venire proposto l'on-chain da solo», «metti una soglia di 500 euro»)
 
 IL CASO. Un annuncio da 3000 €, circa 5,2M sats. Il nodo, letto da
@@ -90045,6 +90047,7 @@ carrello senza giudice, il bollino anche a on-chain impossibile e
 l'avviso che resta a foglio chiuso fanno rosso, uno per uno.
 NON PROVATO dal vivo: nessun acquisto vero sopra 500 €; il foglio si
 guarda sul collaudo, che segue develop.
+## L'inglese, tappa 2: tutto il resto dell'app (17 nov 2026, cantiere inglese-tappa-2; Andrea, dopo aver visto la tappa 1 mista: «Vai, prosegui con tutto il resto, devi farlo in inglese»). COSA C'È DENTRO: il dizionario `lingua/en.js` passa da ~680 a ~9.200 voci e copre Ordini (elenco, filtri, la scheda in ogni stato: deposito, spedizione, consegna, conferma, disputa, reso, rimborso, incasso), il P2P intero (libro, pubblica, presa, passi, chat, cauzione, paracadute, ripubblica, Barattozon/PayCode, USDT/USDe/ETH/XMR, incontro con presenza e QR, dispute e la pagina dei moderatori con le chiavi), Vendi (oggetto, servizio, digitale, asta, set, importazione CSV/ZIP), il Profilo (livelli, distintivi, stradina, serie, inviti, identità Nostr con firma/bunker/estensione, spedizioni e punti, codici sconto, premi fedeltà, negozio con statistiche/banner/widget, account multipli, cancellazione), aste e offerte, raccolte fondi, la cassa in negozio, gli swap e l'on-chain 2-di-3, gli avvisi, l'assistenza, la privacy, Tor, i tour, i popup di Telegram e i `confirm`/`alert`, e anche i pannelli admin (leve, cassaforte, chiavi, moderazione) — tradurli costava poco e risparmia un cantiere dopo; li vedono solo Andrea e Alan. COME SI È FATTO: un estrattore ha tirato fuori dal sorgente le ~9.000 stringhe italiane (HTML, template, concatenazioni), ordinate in 61 lotti da 150, tradotte lotto per lotto con un glossario fisso (deposito di garanzia → escrow deposit, garanzia del P2P → escrow, cauzione → bond, vetrina → marketplace, barattolo → jar, presa → take, chi compra/chi vende → the buyer/the seller, Da riscuotere → To collect, tabacchino → tobacconist), e un montatore le ha scritte nel dizionario controllando i segnaposto, i doppioni e le entità HTML (`&nbsp;` nel sorgente è uno spazio nel DOM: le prime chiavi con l'entità dentro non avrebbero mai combaciato). Poi TRE GIRI DAL VIVO in Chromium a 390 px (`?lingua=en`, database seminato con ordini in sei stati, le tre identità del collaudo) su Ordini, Vendi, Profilo (fisarmoniche aperte), avvisi, account, Nostr, guide, stradina, raccolte, classifica, privacy, assistenza, on-chain, swap, Esplora, P2P (libro, pubblica, i miei, l'info aperta), Tappo, il negozio del venditore e le pagine admin (leve, moderazione P2P, assistenza): ogni giro cercava le parole italiane rimaste e ne sono entrate ~330 chiavi che l'estrazione non vedeva — testi concatenati nel JS (il tour del P2P, l'assistenza, le fisarmoniche dell'info P2P), e soprattutto i TESTI CHE ARRIVANO DAL SERVER (le caselle e le zone della stradina, i distintivi col loro titolo «Nome: descrizione», i livelli, i gruppi del pannello delle leve). LE TRE REGOLE NUOVE DEL TRADUTTORE, nate dai giri: (1) la FORMA CORTA — una chiave che comincia col segnaposto e ha meno di tre parole sue («{} annunci», «{} giorni») accetta al più due parole nel primo buco: senza questo «Pubblica il primo annuncio» usciva «Pubblica il primo listing(s)» e «🔥 Serie dei giorni» diventava «Serie dei days»; (2) UN BUCO NON INGOIA UNA FRASE — niente `. ? ! ;` seguiti da spazio (o `: `) dentro una cattura, sennò la frase lunga del campo quantità, che finisce con «annunci», passava per «{} annunci» e usciva mezza inglese; (3) QUEL CHE IL BUCO CATTURA SI TRADUCE A SUA VOLTA, un livello solo («Casella 7: Fai il primo acquisto» è «Casella {}: {}» col titolo dentro). SCARTATO: le forme-frammento da una parola («di {}», «del {}», «via {}», «sats {}») — «di {}» serviva alla riga «di Bottega di Bruno» della cassa e si mangiava « di spedizione in Italia»; la riga della cassa (e il «di» delle raccolte) ora passa da `diChi()` / `raccDiChi()`, che chiamano `t('di {nome}', …)`: chiave secca senza `{}`, e reggono nei banchi delle prove dove il traduttore non c'è. LE DESCRIZIONI DELLE 314 LEVE del pannello restano italiane per scelta: sono testo tecnico per Andrea, in italiano. RESTA ITALIANO anche quel che non è testo dell'app: i titoli degli annunci e i nomi dei negozi (dati), i mesi brevi del P2P («15 nov 16:33»), i messaggi del bot e le frasi degli errori del server (i 400/409 arrivano in italiano, ~1.300), e la lingua non è ancora salvata sul server. PROVATO: `prove_lingua_inglese` estesa (la forma corta, il buco con la punteggiatura, la traduzione dentro la cattura, il popup riga per riga; i segnaposto in meno nella resa sono ammessi, le parole delle chiavi si cercano anche in server.py), suite intera e collaudi della CI nel worktree, più i giri dal vivo di cui sopra e il giro della tappa 1 rifatto (vetrina, scheda, cassa, pagamento). TAPPA 3, da aprire: l'interruttore IT/EN nel Profilo salvato sul server, il bot e gli errori del server in inglese, i dettagli dei servizi nella scheda («Di persona · 1 ora»), i mesi brevi. LA QUARTA REGOLA, DOPO IL REBASE (17 nov 2026, sera): mentre il cantiere era aperto develop ha preso tre cantieri (contanti on-chain con cauzione e appuntamento, rimborso on-chain liscio coi tempi del bonifico, le 12 parole chieste nello scambio) e ~190 frasi nuove; guardandole da vicino è uscito il limite dell'estrattore: un paragrafo che il codice COMPONE a pezzi («Deposito confermato. Quando vi vedete, …» più una coda scelta da un ternario) finisce nel DOM come un nodo solo, e nel dizionario c'erano i suoi frammenti, mai il nodo intero — chiavi vere ma mute. Ora `traduci`, se non trova né la chiave intera né una forma, PROVA UNA FRASE ALLA VOLTA (il taglio è `. ? ! ;` seguiti da spazio), riscrive quelle che sa e lascia italiane le altre; un livello solo, senza lookbehind (le WebView vecchie rifiuterebbero l'intero file all'analisi). Le frasi nuove dei tre cantieri stanno nel dizionario come FRASI (e, dove il nodo è uno, anche come nodo intero): cauzione in Lightning per chi prende in contanti, «Brucia la cauzione» e la metà a mano, «Dove tornano i sats?», le 12 parole, i passi della consegna di persona, l'appuntamento, i tempi del bonifico, il foglio «Quanto» (Cifre rapide, Minimo, Massimo). Provata al banco (`prove_lingua_inglese`) e con un banco a parte sui paragrafi composti dei tre cantieri. LA LEVA ARRIVA SPENTA (17 nov 2026, sera, Andrea: «L'inglese della prima parte lascialo spento», con una promozione in partenza): `LINGUA_INGLESE` nasce False in `server.py` e nel config d'esempio — eccezione sua alla regola delle leve accese —, sul collaudo si accende dal config (voce in DA-FARE-ANDREA) e in produzione quando lo dice lui. Spenta, `/lingua/en.js` è un 404 e l'app resta italiana per tutti, anche con `?lingua=en`.
 
 ## La classifica della serie 🔥 (17 nov 2026 sera, cantiere serie-classifica; Andrea: «nel profilo dove c'è lo streak, metti anche una classifica degli utenti che accedono a barattolo ogni giorno, e ogni utente può verificare questa classifica», poi «aggiungila e includila nella promozione di adesso»)
 
@@ -90102,5 +90105,281 @@ senza rete esterna, 375 e 320 px, chiaro e scuro, nove persone e poi
 trentaquattro (la mia riga a parte): nessun errore di pagina, niente
 che sfora, il foglio si chiude con l'indietro. Scatti in
 /mnt/project-files/serie-giorni/classifica-dal-vivo.png.
+SUITE E COLLAUDI, SU QUALE ALBERO: la suite severa intera sull'albero
+di e88d86b0 più il mio ha dato 2 rossi MIEI (il volto delle righe fuori
+dal censimento di `prove_volto_unico`; la nota del foglio a 12,5px in
+--muted, ora 13px in --ink-soft), corretti. Dopo il rebase su b91ef35d
+(«L'inglese, tappa 2», non mio) la suite severa intera, senza proxy:
+29.966 passate, 0 fallite. Collaudi della CI nella gabbia senza proxy:
+82 sull'albero di prima del rebase e gli altri 70 più
+`collaudo_serie_giorni` su quello di dopo, tutti verdi tranne
+`collaudo_piu_account`, ROSSO NON MIO: bussa a CoinGecko anche su
+develop pulito, verde fino al commit prima di e88d86b0 («L'on-chain
+consigliato per gli acquisti grossi») e rosso da lì. Segnalato al
+thread della promozione, non toccato.
 NON PROVATO: un telefono vero; la classifica con persone vere (in
 produzione la serie è nata oggi: fino a domani la lista è vuota).
+
+## L'acquisto grosso esce on-chain anche verso chi vende, e il tetto del P2P on-chain a parte (17 nov 2026 sera, cantiere onchain-grossi-uscita, seguito di onchain-importi-grossi; Andrea: «se vuole ricevere in lighting, sì, bisogna mettere anche verso di lui il limite», poi sul tetto: «separalo, va, separalo»)
+
+IL BUCO. Il cantiere di prima consigliava l'on-chain a chi COMPRA sopra
+500 €; ma se chi vende aveva scelto «ricevi in Lightning», a fine
+ordine i bitcoin andavano al cambio di SATS Routing verso una fattura
+del suo wallet: la stessa cifra grossa, in Lightning, che non regge.
+
+LA DECISIONE. Sopra la soglia l'ordine on-chain nasce col segno
+`grosso` (colonna nuova di `onchain_ordini`, fissata alla nascita col
+cambio che ha deciso il tetto: un cambio diverso a fine ordine non la
+rigira) e `onchain_modo_ordine`, il giudice unico di come riceve chi
+vende, lo guarda per primo: «onchain», qualunque cosa dica l'annuncio o
+il Profilo. Così l'incasso si riempie col wallet di chi vende come
+negli ordini on-chain di sempre (subito, o quando lo sceglie), e il
+cambio in Lightning dell'ordine dice di no col suo perché («Per una
+cifra così ricevi on-chain…») invece di «chi compra non ha ancora
+confermato». Chi vende lo legge nell'ordine (`grosso_ln_tolto`, nelle
+due righe che raccontano l'ordine on-chain: `/api/orders` e
+`_onchain_ordine_per`) e nell'avviso della conferma.
+
+SCARTATE. Rifare il giudizio col cambio di fine ordine (un ordine da
+510 € potrebbe cambiare strada a metà). Un tetto in sats sul cambio
+in Lightning (la soglia è una sola, in euro, e un secondo numero
+sarebbe un secondo giudice).
+
+NON FATTO, E PERCHÉ. Un acquisto grosso pagato in LIGHTNING (il
+compratore che ignora il consiglio) paga chi vende dal nodo come
+sempre: là la cifra è già passata una volta, e lo swap automatico verso
+l'on-chain ha il tetto di `SWAP_MAX_SATS`. Resta com'era.
+
+IL TETTO DEL P2P ON-CHAIN A PARTE. Dal 12 nov gli scambi P2P a tre
+chiavi giudicavano con `ONCHAIN_MAX_EURO`, lo stesso del mercatino: e
+Andrea stava per alzarlo per la croce da 3000 €. Leva nuova
+`P2P_ONCHAIN_MAX_EURO`, 999 di serie perché era il valore vivo in
+produzione (riga del 16 nov): con la promozione il P2P resta dov'è
+anche senza righe nuove, e `ONCHAIN_MAX_EURO` da adesso vale solo per
+il mercatino. La usano la pubblicazione e il libro on-chain (`maxEuro`
+al foglio Pubblica, che legge il tetto vivo e non un numero fisso:
+controllato, il 999 scritto nell'app è solo quello di Amazon per
+Barattozon). Nel pannello, riga sua sotto quella del mercatino.
+
+PROVATO: `prove_onchain_consigliato` (il segno nella cassa, la colonna,
+il giudice del modo eseguito, il no del cambio, le righe e l'avviso),
+`prove_onchain_tetto` (la cassa col cambio del tetto),
+`prove_p2p_onchain_tetto` (la leva nuova, non le altre due);
+`collaudo_onchain_verso_lightning` 6-bis (da «sempre Lightning»
+l'ordine grosso riceve on-chain col wallet già scritto, chi vende legge
+il perché, il preventivo del cambio è 409, anche senza wallet col
+perché giusto), `collaudo_p2p_onchain` (500 € del P2P on-chain con 250
+del Lightning e 3000 del mercatino: vince 500). Controprova: tolto il
+segno da `onchain_modo_ordine`, il 6-bis è rosso.
+NON PROVATO dal vivo: un ordine on-chain vero sopra 500 €.
+
+LA GABBIA, LO STESSO GIORNO. `e88d86b0` ha fatto rosso
+`collaudo_piu_account` in CI («GABBIA: bussata fuori — DNS
+api.coingecko.com»): `_avviso_importo_grosso` aspettava
+`cambio_btc_eur()`, che a cambio vuoto bussa a CoinGecko, e in cloud
+il proxy nascondeva la bussata (la lezione del 2 nov, di nuovo). Cura:
+il consiglio legge `cambio_noto_ora()`, il cambio che si sa senza la
+rete (senza, nessun avviso), sia nella fattura sia in `/onchain/pronto`,
+dove la domanda alla rete resta solo per il tetto, al suo posto di
+prima. Riprodotto senza le variabili del proxy: rosso su develop,
+verde col rimedio. `collaudo_onchain_ordine` finge anche
+`cambio_noto_ora` per le sue righe, e prova che senza cambio non si
+consiglia. Insieme: `prove_incasso_annuncio` esegue anche i due pezzi
+nuovi di `onchain_modo_ordine`, e la nota di chi vende non ha più la
+catenina ⛓️ (la regola del 9 nov).
+
+## La Rotta per la Luna nasce spenta (17 nov 2026 sera, cantiere stradina; Andrea alle 19:34, poco prima di una promozione: «anche il tabellone lascialo spento per il momento»)
+
+Il tabellone (develop b498c42) era senza leva: con la promozione sarebbe
+comparso a tutti nel Profilo. Nasce `STRADINA_ATTIVA`, SPENTA di serie nel
+codice e in `config_esempio.py`: è un'eccezione, decisa da Andrea, alla
+regola del 14 nov che vuole le leve nuove accese. Spenta, `/api/me` manda
+`stradina: false`, `renderLivello` non fa nascere la voce «🚀 Rotta per la
+Luna», `apriStradina` non parte (anche dalla cronologia e dal ritorno
+automatico dopo il «Vai»), e `/api/me/stradina` e `/api/me/stradina/prova`
+rispondono 404 come una rotta che non c'è. Il client crede la leva solo se
+arriva proprio `true`: un server di ieri tace, e tacere vuol dire spenta.
+Le caselle di prova degli admin restano salvate. La riga sta nel pannello
+«⚙️ Stato delle leve», gruppo «🚀 Rotta per la Luna».
+
+Il resto che lo spegnimento si porta dietro: la voce di `NOVITA.md`
+(`stradina-obiettivi`) passa a `leva: STRADINA_ATTIVA spenta di serie` e
+`pubblico: no`, così la promozione non ne fa un post; nel sapere di Tappo
+la Rotta è «per ora spenta», perché Tappo non descriva una voce che nel
+Profilo non c'è. Sul collaudo si accende a mano (DA-FARE-ANDREA, voce 22).
+
+Provato: in `prove_stradina` le prove della leva (spenta nel codice e
+nell'esempio, i due 404, `/api/me`, il client, il pannello); in
+`collaudo_stradina_prova` la sezione 6 accende e spegne la leva sul server
+vero (TestClient) e guarda i 404 e `/api/me`. La mappa 3D del mondo di
+Tappo continua a parte, come prova fuori dall'app.
+
+VERBALE: suite `PROVE_SEVERE` 29.935 passate, 0 fallite, 2 saltate
+(nostr-tools, che il cloud non ha) sull'albero 2cfd4160 + il mio commit;
+collaudi della CI 152/1 sull'albero 4afcc8c8 + il mio commit, dove il
+rosso era `collaudo_piu_account`, rosso anche su 4afcc8c8 senza di me e
+curato da 0e02b7d8 (onchain-grossi-uscita, non mio); dopo l'ultimo rebase
+su 0e02b7d8 rigirati `collaudo_stradina_prova`, `collaudo_piu_account`,
+`collaudo_serie_giorni` e `collaudo_lingua`. Commit non miei sotto il mio:
+4afcc8c8 (gioco spento), b91ef35d (inglese), la classifica dei giorni di
+fila e i tre di onchain-grossi-uscita.
+
+## La seconda firma on-chain e i sats versati in più (17 nov 2026 sera, cantiere cofirma-sats-in-piu; scambio P2P on-chain #14 di Darnok833, 745.565 sats, fermo all'ultima firma col toast «⚠️ scambio #14: non co-firmato — la commissione esce dal margine»)
+LA CAUSA: dal 14 nov (audit, «DEPOSITO ON-CHAIN DEL MERCATINO. 26») il
+giudice del server (`_onchain_psbt_giudica`) lascia alla rete il
+margine PIÙ i pochi sats versati oltre la cifra chiesta, finché stanno
+sotto la polvere (`min(_onchain_sats_in_piu, ONCHAIN_POLVERE - 1)`):
+sotto i 546 sats non possono tornare indietro. Quella cura è entrata
+SOLO nel server: il telefono che mette la seconda firma
+(`onchainCofirma`, uno per mercatino e P2P) teneva il tetto di prima,
+`rete > o.margine_sats`. Così, quando chi deposita manda qualche sats in
+più e il resto per lui scende sotto la polvere (tariffa salita), il
+server accetta la proposta e il telefono di chi riceve la rifiuta: lo
+scambio resta fermo con la prima firma messa e i sats al sicuro nel
+2-di-3.
+LA CURA: il telefono usa lo stesso tetto del server (margine + sats in
+più fino a 545; `importo_sats` assente o zero = tetto di prima). Non
+allarga niente: è quello che il server accetta già, e il prezzo a chi
+riceve resta controllato al sats.
+PROVATO: `prove_ordine_onchain`, la prova doppia in node (il telefono
+propone, il telefono co-firma, embit legge) con due casi nuovi: 300
+sats in più a tariffa 5 (alla rete 1380 su margine 1080) → co-firma; 600
+in più a tariffa 7 (1680, oltre 1080 + 545) → «la commissione esce dal
+margine». CONTROPROVA: col tetto di prima il primo caso torna rosso col
+toast esatto dello scambio #14. Suite severa intera e collaudi on-chain
+nel worktree.
+NON PROVATO: i numeri veri dello scambio #14 (importo chiesto, sats
+arrivati, margine) non li ho visti: la causa è la sola strada del codice
+che dà quel toast su una proposta che il server ha già accettato, ma la
+conferma sta nella riga del database, sola lettura. Dopo il deploy
+Darnok833 apre la Mini App e il telefono co-firma da solo.
+SU QUALE ALBERO: suite severa intera (29.938 passate, 0 fallite, 2
+saltate d'ambiente: nostr-tools) e gli 11 collaudi on-chain della CI in
+un venv senza coincurve e senza proxy sull'albero di 2cfd4160 più il
+mio. Dopo il rebase su 71e546c5 (non miei: 78e4fe2c, 411b15c5, 0e02b7d8
+di onchain-grossi-uscita e 71e546c5 della stradina, nessuno tocca
+`onchainCofirma`) rigirati `prove_ordine_onchain`, le sezioni che
+leggono i documenti e gli 11 collaudi on-chain.
+
+## Gli acquisti fuori dal Profilo (17 nov 2026 sera, cantiere totali-tolti; Andrea: «il fatto che nel profilo si veda quanto hai comprato, quanto hai venduto, secondo me è un problema per la privacy»)
+
+Chi vedeva i totali, guardato prima di toccare: il cassetto «📊 I numeri
+del negozio» (vendite dal 24 set, in produzione; acquisti da stamattina,
+6de747a6, solo su develop) li riceveva SOLO dal proprietario
+(`/api/me/negozio/numeri`, identità dal login) e dai moderatori
+(`/api/admin/negozio/{codice}/numeri`, anche gli acquisti di chiunque).
+Il profilo pubblico dà «N vendite concluse» senza sats e cancella
+`acquisti_ok`; il bot non manda totali. Il rischio vero era il telefono:
+uno sguardo da dietro o uno screenshot.
+
+La strada, in tre giri con Andrea: sulla card (cifre coperte con un
+tocco, solo i sats via, tutto via) ha scelto «Togliere tutto»; poi,
+saputo che le vendite c'erano da settembre e gli acquisti erano di
+stamattina: «le vendite lasciale, rimetti come era prima. Gli acquisti
+non li aggiungere», e i contatori sotto «non li toccare», perché servono
+a livello e distintivi. Nasce `ACQUISTI_NEL_PROFILO`, SPENTA di serie
+(eccezione decisa da lui alla regola delle leve accese, come la Rotta).
+Spenta: le due porte tolgono `_CHIAVI_ACQUISTI`, chi ha solo comprato
+non ha il cassetto, il client (che salta gli acquisti senza
+`acquisti_tot`) non cambia di una riga. Il Profilo torna com'era prima
+di stamattina; il pannello pure. La riga nel pannello delle leve, gruppo
+«🛍️ Acquisti nel Profilo». La voce NOVITA `totali-acquisti` passa a
+`pubblico: no`; il sapere di Tappo dice che gli acquisti si leggono uno
+per uno in «Ordini».
+
+Scartate: le cifre coperte e il «togliere tutto» (preparati e buttati ai
+due cambi di idea); cancellare il codice degli acquisti (la leva costa
+meno, e una riga del config li rimette se un giorno li si vuole).
+Non toccata, da guardare se si accende: la Rotta per la Luna (spenta)
+legge `sats_acq_tot` dal giudice per chi bussa — i sats spesi sul
+tabellone sono la stessa domanda di privacy.
+
+Provato: in `prove_numeri_negozio` la leva spenta nel codice e
+nell'esempio, le chiavi tolte da tutte e due le porte, il cassetto
+chiuso a chi ha solo comprato, nessun UPDATE nelle porte, il pannello,
+e nel banco node la tabella senza acquisti con le vendite di prima;
+controprova (leva accesa di serie, porta dei moderatori che non toglie)
+due rosse in prove e una nel collaudo. `collaudo_numeri_negozio` gira il
+giro di prima a leva accesa e poi `giro_acquisti_spenti` a leva spenta
+sul server vero, col contatore `acquisti_ok` intatto.
+
+## Il passo «Oggetto spedito» al futuro prima della spedizione (17 nov 2026, cantiere passo-spedito; il «correggi» di Andrea sulla voce notata in «Spedisci entro il…»)
+Prima che il pacco partisse il passo diceva già «Hai consegnato al
+corriere» a chi vende (e «Il venditore ha consegnato al corriere» a chi
+compra): un fatto al passato su una cosa ancora da fare. Ora, su
+`creato` e `locked`, il passo parla al futuro come quello del digitale:
+a chi vende l'istruzione «Consegni il pacco al corriere e lo segni qui»,
+a chi compra e al moderatore l'attesa «Il venditore consegnerà il pacco
+al corriere». Dalla spedizione in poi resta il passato di sempre (anche
+per «Consegna a mano»). PROVATO: in `prove_spedisci_entro` lo stepper
+vero in node su quattro casi (da spedire e spedito, chi vende e chi
+compra); in `prove_dettaglio_ordine` la coppia nuova nelle terze
+persone. Controprova: tolto il ramo al futuro, la prova del banco è
+rossa.
+
+## L'indirizzo di chi compra, detto a chi libera (17 nov 2026 sera, cantiere avviso-indirizzo; un utente: «hai liberato i sats prima che abbia inserito l'indirizzo [...] magari metto una notifica per quando il compratore ha inserito l'indirizzo e che il venditore prima di rilasciare i sats sollecita il compratore ad indicare dove inviarli»)
+
+Il caso: in uno scambio P2P on-chain chi vende ha premuto «Ricevuti»
+mentre chi compra non aveva ancora scelto dove ricevere. Dal cantiere
+rilascio-senza-incasso di stamattina il telefono dice il no in parole e
+non manda niente, ma chi vende restava senza un gesto (e la pagina di chi
+vende prometteva «glielo ricordiamo noi nella sua pagina»), e quando chi
+compra sceglieva il wallet nessuno lo diceva a chi vende, salvo il caso
+del Lightning confermato. Era la voce «RESTA» di quel cantiere.
+
+Due pezzi, dietro la leva nuova `P2P_ONCHAIN_AVVISO_INCASSO`, accesa di
+serie (regola delle leve del 14 nov, nessun segreto):
+- «🔔 RICORDAGLIELO»: `POST /api/p2p/onchain/{oid}/sollecita-incasso`, il
+  gemello di `rinuncia-chiesta` dall'altra parte. Solo chi ha depositato,
+  solo a deposito confermato (prima non c'è niente da liberare), mai con
+  una firma già messa o col Lightning scelto (lì «Ricevuti» è la conferma
+  firmata e lo swap lo fa chi compra). Il bot scrive a chi compra di
+  incollare un indirizzo nel riquadro «Dove ricevi i bitcoin?», col
+  bottone dello scambio. Uno all'ora: `incasso_sollecito_il` scritto
+  PRIMA dell'invio, con l'UPDATE condizionato sul valore letto (due tocchi
+  in volo ne mandano uno). Sul telefono: «Ricevuti» senza indirizzo
+  rilegge lo scambio (`incassoAttesoOnchainP2P`) e, se manca ancora, apre
+  il foglio «⏳ Chi compra non ha scelto dove ricevere» col bottone; lo
+  stesso bottone sta nella pagina di chi ha depositato, accanto alla riga
+  «⏳», che dice anche quando l'ha ricordato l'ultima volta.
+- L'AVVISO QUANDO L'INDIRIZZO ARRIVA: «📍 Chi compra ha scelto dove
+  ricevere», a chi ha depositato, solo a deposito fatto (prima la pagina
+  basta). È un ramo nuovo di `_p2p_onchain_avvisa_confermato`, che c'era
+  già per il Lightning confermato, quindi parte da tutte le porte da cui
+  l'incasso arriva: il riquadro dello scambio, «ricevi on-chain» dopo il
+  Lightning, il Profilo e la scelta del modo (queste due passano da
+  `_p2p_onchain_avvisa_riempiti`, perché `_p2p_onchain_riempi_incassi`
+  torna le righe di prima del riempimento). Ogni scambio prende l'incasso
+  una volta sola, quindi l'avviso non si ripete.
+
+A leva spenta tutto torna a ieri: niente avviso, la rotta è 404, il
+foglio di «Ricevuti» è quello di sempre e il no in parole di
+`onchainFirmaProposta` resta il cancello finale (c'è anche a leva
+accesa).
+
+Scartati: il sollecito automatico del bot al primo «Ricevuti» senza
+indirizzo (il gesto lo vuole chi vende, come ha scritto l'utente, e il
+promemoria a tempo per chi compra non esiste per l'incasso);
+l'avviso anche prima del deposito (rumore: chi vende deve ancora
+depositare). Non toccato il mercatino on-chain, dove chi riceve è chi
+vende e la rotta `rilascio-chiesto` ha già il suo avviso.
+
+Notato e non fatto: i promemoria della ronda a chi vende («controlla e
+libera i sats» dopo «Ho inviato») partono anche quando chi compra non ha
+ancora l'indirizzo.
+
+Provato, nel cloud (Andrea dormiva, il PC forse spento): suite severa
+intera nel venv delle prove 29.960 passate, 2 rosse mie (il conto dei
+fogli «chiediConferma» passa a 126, conoscenza.md da rifare: curate e
+rigirate le loro sezioni, 111/0) e 2 saltate d'ambiente (nostr-tools);
+i 153 collaudi della CI verdi senza coincurve e senza proxy. Albero:
+develop 3de12ff5 (rimesso uguale a main come 24874f5a, stesso albero)
+più questo cantiere. Controprove: il sollecito senza il freno dell'ora
+e il Profilo che non avvisa fanno rosse due righe del collaudo; il foglio
+che non rilegge e la leva spenta di serie una riga ciascuno in prove.
+Dopo il rebase su 8c7d9c8 (non mio: il passo «Oggetto spedito»,
+cantiere passo-spedito, nessun simbolo in comune) rigirate la suite
+severa intera (29.965/0, le stesse 2 saltate) e i 4 collaudi on-chain
+vicini (verdi).
+RESTA da guardare dal vivo sul collaudo: il foglio a 390px e i due
+messaggi del bot.

@@ -60,9 +60,17 @@ def main():
     cat = SRV.RACCONTI_NEGOZI[PAGINA]
     salvato = {k: cat.get(k) for k in ("negozio", "venditore_tg")}
     cat["negozio"], cat["venditore_tg"] = "", 222
+    # il giro con gli acquisti nel Profilo (la strada resta, dietro la
+    # leva); in fondo `giro_acquisti_spenti` prova la leva spenta, quella
+    # di serie dal 17 nov 2026 sera
+    prima = SRV.ACQUISTI_NEL_PROFILO
     try:
+        SRV.ACQUISTI_NEL_PROFILO = True
         giro(c, SRV)
+        SRV.ACQUISTI_NEL_PROFILO = False
+        giro_acquisti_spenti(c, SRV)
     finally:
+        SRV.ACQUISTI_NEL_PROFILO = prima
         for k, v in salvato.items():
             if v is None:
                 cat.pop(k, None)
@@ -242,6 +250,37 @@ def giro(c, SRV):
     prova("...e anche di un negozio senza annunci (tutto a zero)",
           (200, True, 0), (r.status_code, r.json().get("mostra"),
                            r.json().get("visite_30")))
+
+
+
+def giro_acquisti_spenti(c, SRV):
+    """🛍️ GLI ACQUISTI FUORI DAL PROFILO (17 nov 2026 sera, Andrea: «le
+    vendite lasciale, rimetti come era prima. Gli acquisti non li
+    aggiungere»), a leva ACQUISTI_NEL_PROFILO spenta, sul database che
+    `giro` ha lasciato: 222 ha venduto, 111 ha solo comprato."""
+    print("\n[🛍️ gli acquisti fuori dal Profilo (leva spenta, di serie)]")
+    r = c.get("/api/me/negozio/numeri", headers=VENDITORE)
+    d = r.json()
+    prova("il venditore ha il cassetto con le vendite di prima",
+          (200, True, 2, 14000), (r.status_code, d.get("mostra"),
+                                  d.get("vendite_tot"), d.get("sats_tot")))
+    prova("...e senza acquisti", [], sorted(k for k in d if "acq" in k))
+    prova("chi ha SOLO comprato non ha il cassetto, come prima",
+          (200, {"mostra": False}),
+          (lambda r: (r.status_code, r.json()))(
+              c.get("/api/me/negozio/numeri", headers=COMPRATORE)))
+    con = SRV.db()
+    cod111 = con.execute("SELECT negozio FROM utenti WHERE tg_id=111"
+                         ).fetchone()["negozio"]
+    acq = con.execute("SELECT acquisti_ok FROM utenti WHERE tg_id=111"
+                      ).fetchone()["acquisti_ok"]
+    con.close()
+    adm = c.get(f"/api/admin/negozio/{cod111}/numeri",
+                headers=MODERATORE).json()
+    prova("il moderatore non vede gli acquisti di chi ha comprato", [],
+          sorted(k for k in adm if "acq" in k))
+    prova("il contatore acquisti_ok resta com'era (livello e distintivi)",
+          2, acq)
 
 
 if __name__ == "__main__":

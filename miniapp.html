@@ -7496,6 +7496,27 @@
     border:1px solid var(--line);border-radius:var(--radius);
     padding:12px 14px}
   .serie-cl-porta .cl-fr{font-size:18px}
+  .serie-cl-porta .serie-f{width:18px;height:18px;margin:0;flex:0 0 auto}
+  /* IL BOTTONE LUCIDO (17 nov 2026 notte, Andrea: «fammi il bottone di un
+     colore particolare, tipo il lucido grafite del p2p ma non grafite»):
+     lo stesso riflesso chiaro nell'angolo in alto a sinistra della carta
+     del prezzo P2P (`--valore-lucido`) e la stessa discesa verso lo
+     scuro, ma nel colore scelto fra quattro scatti dall'app vera. Uguale
+     di giorno e di sera, come la carta: sta sempre sul suo fondo. Le
+     scritte e la fiamma sono crema e bianco (sul punto piu' chiaro la
+     scritta resta oltre il 4,5:1); il bordo e' il filo bianco della
+     carta. Il colore sta in UNA riga, `--streak-lucido`. */
+  :root{--streak-fondo:#7A1F05;
+    --streak-lucido:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%),
+      linear-gradient(160deg,#C2410C 0%,#7A1F05 100%)}
+  .serie-cl-porta{background:var(--streak-lucido),var(--streak-fondo);
+    border-color:rgba(255,255,255,.14);color:#FFF7EC}
+  .serie-cl-porta .cl-fr{color:rgba(255,247,236,.82)}
+  .serie-cl-porta .serie-f .f-fuori{fill:#fff}
+  .serie-cl-porta .serie-f .f-cuore{fill:#FFE7C2}
+  .serie-cl-porta:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+  #serieClassificaFiamma .serie-f{width:22px;height:22px;margin:0 6px 0 0;
+    vertical-align:-.16em}
   .serie-cl-lista{max-height:56vh;overflow-y:auto;margin-top:10px}
   .serie-cl-riga{display:flex;align-items:center;gap:10px;padding:8px 6px;
     border-bottom:1px solid var(--line)}
@@ -7511,7 +7532,7 @@
   .serie-cl-g{flex:0 0 auto;font-family:var(--mono);font-weight:800;
     font-size:14px;color:var(--sats-text);white-space:nowrap}
   .serie-cl-g .serie-f{width:15px;height:15px}
-  .serie-cl-nota{font-size:12.5px;font-weight:600;color:var(--muted);
+  .serie-cl-nota{font-size:13px;font-weight:600;color:var(--ink-soft);
     line-height:1.45;margin-top:10px}
   .serie-festa{position:fixed;left:50%;bottom:156px;z-index:60;
     transform:translateX(-50%) translateY(14px) scale(.92);opacity:0;
@@ -14034,7 +14055,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = '320d44d6cf';
+const LINGUA_VER = '4e3a739f0f';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -15550,7 +15571,7 @@ document.getElementById('cartello')?.remove();</script>
         <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo. Se non vuoi comparire, nel Profilo («Livello e titolo») c'è <b>Non mostrarmi in classifica</b>: il tuo livello resta sul profilo, perché a chi scambia con te serve per fidarsi. E se la tua reputazione la pubblichiamo su Nostr (vedi sotto), smettiamo e chiediamo ai relay di ritirarla.</li>
         <!-- LA SERIE DEI GIORNI (17 nov 2026): un dato nuovo — quando
              apri l'app — e si dichiara come gli altri, con chi lo vede. -->
-        <li>I tuoi <b>giorni di fila</b>: contiamo i giorni consecutivi in cui apri Barattolo — il numero di adesso, il tuo record e la data dell'ultimo giorno, non le ore né le volte. Dal secondo giorno di fila entri nella <b>classifica dei giorni di fila</b>, che vede solo chi è entrato in Barattolo: lì di te si leggono nome, foto e giorni. <b>Non mostrarmi in classifica</b> ti toglie anche da lì.</li>
+        <li>I tuoi <b>giorni di fila</b>: contiamo i giorni consecutivi in cui apri Barattolo — il numero di adesso, il tuo record e la data dell'ultimo giorno, non le ore né le volte. Dal secondo giorno di fila entri nella <b>Classifica Streak</b> (la classifica dei giorni di fila), che vede solo chi è entrato in Barattolo: lì di te si leggono nome, foto e giorni. <b>Non mostrarmi in classifica</b> ti toglie anche da lì.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
         <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
         <!-- GLI AVVISI DEL MERCATINO (9 ott 2026): le preferenze e i
@@ -18663,7 +18684,7 @@ document.getElementById('cartello')?.remove();</script>
   <!-- ============ SHEET CLASSIFICA DELLA SERIE 🔥 (17 nov 2026) ====== -->
   <div class="sheet" id="serieClassificaSheet">
     <div class="grab"></div>
-    <h3>🏆 Giorni di fila: la classifica</h3>
+    <h3><span id="serieClassificaFiamma"></span>Classifica Streak</h3>
     <div style="font-size:13px;color:var(--muted);font-weight:600">
       Chi apre Barattolo ogni giorno, senza saltarne uno. Non dà punti né premi.
     </div>
@@ -21660,7 +21681,7 @@ function serieSettimanaHTML(s){
    lui. I pezzi che disegnano sono PURI, come quelli della serie. */
 function serieClassificaPortaHTML(s){
   if (!serieBusta(s)) return '';
-  return `<button type="button" class="serie-cl-porta" onclick="apriSerieClassifica()">🏆 <span style="flex:1;min-width:0">Classifica dei giorni di fila</span><span class="cl-fr" aria-hidden="true">›</span></button>`;
+  return `<button type="button" class="serie-cl-porta" onclick="apriSerieClassifica()">${SERIE_FIAMMA}<span style="flex:1;min-width:0">Classifica Streak</span><span class="cl-fr" aria-hidden="true">›</span></button>`;
 }
 function serieClassificaRigaHTML(v){
   const g = Math.floor(Number(v && v.giorni)) || 0;
@@ -21702,6 +21723,10 @@ async function apriSerieClassifica(){
   const box = el('serieClassificaCorpo');
   if (!box) return;
   box.innerHTML = '<div class="hint">Preparo la classifica…</div>';
+  /* la fiamma del titolo e' quella DISEGNATA, la stessa della serie: il
+     foglio e' HTML fermo, e il disegno vive in un posto solo */
+  const fiamma = el('serieClassificaFiamma');
+  if (fiamma && !fiamma.firstChild) fiamma.innerHTML = SERIE_FIAMMA;
   el('sheetBg').classList.add('open');
   el('serieClassificaSheet').classList.add('open');
   if (DEMO) { box.innerHTML = '<div class="hint">In demo la classifica non è quella vera 🙂</div>'; return; }
@@ -22206,12 +22231,24 @@ function caricaDizionario(diz){
                                       .replace(/\\\{\\\}/g, '([\\s\\S]+?)') + '$');
     const prima = chiave.split(' ', 1)[0];
     const secchio = prima.includes('{}') ? '' : prima;
+    /* il pezzo letterale piu' lungo fra i segnaposto: un `includes` prima
+       della regex, e le forme piu' lunghe (piu' specifiche) provate prima */
+    const pezzo = chiave.split('{}').reduce((a, b) => b.length > a.length ? b : a, '');
+    /* LA FORMA CORTA (17 nov 2026, tappa 2): una chiave che comincia col
+       segnaposto e ha meno di tre parole sue («{} annunci», «{} giorni»)
+       e' un conteggio, e il suo buco vuole un numero o un nome breve:
+       senza questo freno «Pubblica il primo annuncio» usciva «Pubblica
+       il primo listing(s)» e «🔥 Serie dei giorni» diventava «Serie dei
+       days». Al piu' due parole nel primo buco, sennò la forma non vale. */
+    const corta = secchio === '' && chiave.replace(/\{\}/g, ' ').trim().split(/\s+/).filter(Boolean).length < 3;
     if (!TRADUZIONI_FORME.has(secchio)) TRADUZIONI_FORME.set(secchio, []);
-    TRADUZIONI_FORME.get(secchio).push({re, resa: v});
+    const forme = TRADUZIONI_FORME.get(secchio);
+    forme.push({re, resa: v, pezzo, corta});
+    forme.sort((a, b) => b.pezzo.length - a.pezzo.length);
   }
 }
 /* la frase inglese, o null se il dizionario non la sa (o non c'e') */
-function traduci(testo){
+function traduci(testo, fondo){
   if (!traduttoreArmato) return null;
   const chiave = String(testo).replace(T_SPAZI, ' ').trim();
   if (!chiave) return null;
@@ -22221,10 +22258,39 @@ function traduci(testo){
   for (const forme of [TRADUZIONI_FORME.get(prima), TRADUZIONI_FORME.get('')]) {
     if (!forme) continue;
     for (const f of forme) {
+      if (f.pezzo && !chiave.includes(f.pezzo)) continue;
       const m = f.re.exec(chiave);
       if (!m) continue;
+      /* un buco non ingoia una frase intera: niente punto, due punti,
+         punto interrogativo o esclamativo seguiti da spazio (o in coda)
+         dentro quel che cattura — sennò una frase lunga che finisce con
+         «annunci» passava per «{} annunci» e usciva mezza inglese */
+      if (m.slice(1).some(g => /[.?!;](\s|$)|:\s/.test(g))) continue;
+      if (f.corta && m[1].trim().split(/\s+/).length > 2) continue;
       let i = 0;
-      return f.resa.replace(/\{(\d*)\}/g, (_, n) => m[n ? +n : ++i] ?? '');
+      /* quel che il buco cattura si prova a tradurre a sua volta, un
+         livello solo: «Casella 7: Fai il primo acquisto» e' la forma
+         «Casella {}: {}» col titolo dentro, che ha la sua voce */
+      const dentro = g => (g == null) ? '' : (fondo ? g : (traduci(g, true) ?? g));
+      return f.resa.replace(/\{(\d*)\}/g, (_, n) => dentro(m[n ? +n : ++i]));
+    }
+  }
+  /* FRASE PER FRASE (17 nov 2026, tappa 2): un testo che il codice
+     compone a pezzi — «Deposito confermato. Quando vi vedete, …» più
+     la coda scelta da un ternario — non e' mai una chiave intera, e le
+     sue frasi si'. Senza chiave intera si prova una frase alla volta
+     (il taglio e' punto, ?, !, ; seguiti da spazio) e si riscrive quel
+     che si sa; la frase ignota resta italiana, come ovunque. Un livello
+     solo: una frase sola non si ritaglia piu'. Niente lookbehind: le
+     WebView vecchie lo rifiutano all'analisi dell'intero file. */
+  if (!fondo) {
+    const pezzi = []; const taglio = /[.!?;…]+\s+(?=\S)/g; let da = 0, c;
+    while ((c = taglio.exec(chiave))) { pezzi.push(chiave.slice(da, c.index + c[0].trimEnd().length)); da = c.index + c[0].length; }
+    if (pezzi.length) {
+      pezzi.push(chiave.slice(da));
+      let note = 0;
+      const resa = pezzi.map(p => { const r = traduci(p, false); if (r != null) note++; return r ?? p; });
+      if (note) return resa.join(' ');
     }
   }
   return null;
@@ -22232,6 +22298,12 @@ function traduci(testo){
 /* per i testi che non passano dal DOM (popup di Telegram, titolo
    della finestra): la frase inglese se c'e', sennò quella italiana,
    coi segnaposto {nome} riempiti */
+/* «di Anna» → «by Anna»: la riga di chi vende (cassa) e di chi raccoglie
+   (raccolte). Una chiave secca, non una forma «di {}»: quella ingoiava
+   « di spedizione in Italia». Regge anche dove il traduttore non c'e'. */
+function diChi(nome){
+  return (typeof t === 'function') ? t('di {nome}', {nome}) : 'di ' + nome;
+}
 function t(frase, valori){
   let resa = traduci(frase) ?? frase;
   if (valori) for (const k of Object.keys(valori)) resa = resa.split('{' + k + '}').join(valori[k]);
@@ -22265,6 +22337,30 @@ function traduciAlbero(radice){
 }
 /* i numeri e le date all'inglese, con una mappa sola sui metodi che
    le 79 righe di questo file gia' chiamano con 'it-IT' */
+/* i testi che non passano dal DOM: le finestre di Telegram e del browser.
+   Si avvolgono una volta sola, e la frase passa da traduci() — intera,
+   o col pezzo prima dei due punti/del primo a capo se e' composta */
+function fraseInglese(testo){
+  if (typeof testo !== 'string' || !testo) return testo;
+  const intera = traduci(testo);
+  if (intera != null) return intera;
+  return testo.split('\n').map(r => traduci(r) ?? r).join('\n');
+}
+function finestreInglesi(){
+  const w = globalThis;
+  if (typeof w.confirm === 'function') { const c = w.confirm.bind(w); w.confirm = m => c(fraseInglese(m)); }
+  if (typeof w.alert === 'function') { const a = w.alert.bind(w); w.alert = m => a(fraseInglese(m)); }
+  const tg = w.Telegram && w.Telegram.WebApp;
+  if (!tg) return;
+  const popup = p => (p && typeof p === 'object') ? {...p,
+    title: fraseInglese(p.title), message: fraseInglese(p.message),
+    buttons: Array.isArray(p.buttons) ? p.buttons.map(b => b && b.text ? {...b, text: fraseInglese(b.text)} : b) : p.buttons} : p;
+  for (const nome of ['showPopup', 'showConfirm', 'showAlert']) {
+    if (typeof tg[nome] !== 'function') continue;
+    const orig = tg[nome].bind(tg);
+    tg[nome] = (a, ...r) => orig(nome === 'showPopup' ? popup(a) : fraseInglese(a), ...r);
+  }
+}
 function numeriInglesi(){
   const mappa = f => function(loc, opt){ return f.call(this, loc === 'it-IT' ? 'en-GB' : loc, opt); };
   Number.prototype.toLocaleString = mappa(Number.prototype.toLocaleString);
@@ -22280,6 +22376,7 @@ function registraTraduzioni(codice){
   caricaDizionario(diz);
   traduttoreArmato = true;
   numeriInglesi();
+  finestreInglesi();
   document.documentElement.lang = codice;
   traduciAlbero(document.documentElement);
   new MutationObserver(records => {
@@ -32870,7 +32967,7 @@ function renderAcquisto(){
     ? listings.find(x=>setScelte.has(x.id))
     : (listings.find(x=>x.id===d.annuncioId)
        || myListings.find(x=>x.id===d.annuncioId));
-  el('acqSub').textContent = primo ? `di ${primo.seller}` : '';
+  el('acqSub').textContent = primo ? diChi(primo.seller) : '';   // «by Anna» in inglese (tappa 2)
   /* IL TITOLO DICE QUALE DEI DUE ACQUISTI E' (ago 2026): sul carrello
      resta «Controlla il carrello», che e' quel che il bottone della
      barra promette — e la pagina fa davvero tutte e due le cose. */
@@ -40732,6 +40829,15 @@ function openOrder(id){
                 ? `Posta senza tracciamento: il pacco non si può seguire${filaTracking(o, false)}`
             :(o.corriere && o.corriere!=='Consegna a mano'
                 ? `${esc(o.corriere)} — senza numero di tracciamento${filaTracking(o, false)}`
+                /* IL PASSO CHE DEVE ANCORA SUCCEDERE PARLA AL FUTURO
+                   anche qui (17 nov 2026, cantiere passo-spedito, dal
+                   «correggi» di Andrea): prima della spedizione diceva
+                   «Hai consegnato al corriere» a chi non aveva ancora
+                   spedito. Come il digitale qui sopra: a chi vende
+                   l'istruzione, a chi compra e al moderatore l'attesa;
+                   il fatto al passato resta quello di sempre */
+                : ['creato','locked'].includes(s)
+                ? (o.role==='seller'?'Consegni il pacco al corriere e lo segni qui':'Il venditore consegnerà il pacco al corriere')
                 : (o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere')),
            ora: rigaSpedito(o)},
       {t:(s==='delivered' && !inPagamento(o)) ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')
@@ -41509,6 +41615,9 @@ async function fineMancia(){
    Il giudice di tutto e' il server: qui si disegna e si riferisce. Zero
    XP. Il lessico: «deposito di garanzia», come nel mercatino. */
 const RACC_ZAP_PILLOLE = [1000, 2100, 5000, 21000];
+/* «di Anna» → «by Anna» in inglese; il banco delle prove ritaglia questo
+   blocco da solo, senza il traduttore, e la mano regge lo stesso */
+const raccDiChi = n => (typeof diChi === 'function') ? diChi(n) : 'di ' + n;
 const RACC_DEP_PILLOLE = [50, 100, 200];
 const RACC_GIORNI = [15, 30, 60];
 const RACC_BATTITO_ZAP_MS = 5000;
@@ -41568,7 +41677,7 @@ function raccStato(r){
 function cardRaccolta(r){
   return `<button type="button" class="racc-card" onclick="apriRaccolta(${Number(r.id)})">
       <div class="racc-card-testa"><b>🎯 ${esc(r.titolo)}</b>${raccStato(r)}</div>
-      <div class="racc-chi">di ${esc(raccChi(r))}${r.garantita ? ' · 🛡️ con garanzia' : ''}</div>
+      <div class="racc-chi">${raccDiChi(esc(raccChi(r)))}${r.garantita ? ' · 🛡️ con garanzia' : ''}</div>
       ${raccBarra(r)}${raccNumeri(r)}
     </button>`;
 }
@@ -41669,7 +41778,7 @@ function renderSchedaRaccolta(){
   box.innerHTML = `${torna}
     <div class="sicu-hero" style="text-align:left">
       <h2 style="margin:0 0 4px">🎯 ${esc(r.titolo)}</h2>
-      <p class="occhiello" style="margin:0">di ${esc(raccChi(r))} · ${raccStato(r)}</p>
+      <p class="occhiello" style="margin:0">${raccDiChi(esc(raccChi(r)))} · ${raccStato(r)}</p>
     </div>
     ${perche}
     ${raccBarra(r)}${raccNumeri(r)}
@@ -43879,7 +43988,7 @@ function renderLivello(){
   if (!box) return;
   // la porta della stradina: c'e' dove c'e' un cammino vero (17 nov 2026)
   const vs = el('vocStradina');
-  if (vs) vs.style.display = (DEMO || VETRINA || !myLivello) ? 'none' : '';
+  if (vs) vs.style.display = (DEMO || VETRINA || !myLivello || !stradinaAccesa) ? 'none' : '';
   if (DEMO || !myLivello) {
     if (sez) sez.style.display = 'none';
     box.innerHTML = ''; return;
@@ -44098,6 +44207,7 @@ function livCarCentra(){
    `stradinaDisegno` e `stradinaHTML` sono PURE (dati, larghezza → posti
    e HTML): il banco node le fa girare. */
 let stradinaDati = null;
+var stradinaAccesa = false;      /* la leva viva STRADINA_ATTIVA (me.stradina) */
 let stradinaScelta = -1;
 /* TAPPO SPIEGA OGNI CASELLA (17 nov, Andrea: «che cosa serve? C'è uno che
    entra lì e… perché devo attivare l'incasso automatico? Non viene
@@ -44812,7 +44922,7 @@ window.addEventListener('tappo:missione', () => {
   if (v && v.classList.contains('active')) apriStradina(true);
 });
 async function apriStradina(resta){
-  if (DEMO || VETRINA) return;
+  if (DEMO || VETRINA || !stradinaAccesa) return;
   if (!resta) go('stradina');
   const box = el('stradinaCorpo');
   if (box && !stradinaDati) box.innerHTML = '<div class="hint">Preparo il tuo tabellone…</div>';
@@ -45021,7 +45131,7 @@ function rigaClassificaNascosta(){
       <div style="min-width:0;flex:1">
         <div style="font-size:13.5px;font-weight:800">🏆 Non mostrarmi in classifica</div>
         <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
-          Il nome esce dalle classifiche (anche quella dei giorni di fila) e non si pubblica più su Nostr. Il livello resta.</div>
+          Il nome esce dalle classifiche (anche dalla Classifica Streak, i giorni di fila) e non si pubblica più su Nostr. Il livello resta.</div>
       </div>
       <button onclick="setClassificaNascosta(${myClassificaNascosta ? 'false' : 'true'}, this)"
         aria-pressed="${myClassificaNascosta ? 'true' : 'false'}"
@@ -51607,6 +51717,11 @@ function pannelloOnchainOrdine(o, s){
   const allaFine = o.role === 'seller' && oc.modo_venditore && oc.modo_venditore !== 'onchain';
   let dove = o.role === 'seller'
     ? ' I sats arrivano dove hai scelto in Profilo → «Incassi on-chain».' : '';
+  /* L'ACQUISTO GROSSO ESCE ON-CHAIN (17 nov 2026): chi avrebbe ricevuto in
+     Lightning lo legge, perche' la sua scelta qui non vale (lo decide il
+     server, `grosso_ln_tolto`; il resto della pagina segue `modo_venditore`) */
+  const grossoNota = o.role === 'seller' && oc.grosso_ln_tolto
+    ? ' <b>Cifra grossa: ricevi on-chain</b>, anche se avevi scelto Lightning: con cifre così il Lightning spesso non passa.' : '';
   let cambio = '';
   if (senzaDove && allaFine && !p && !oc.txid_uscita) {
     dove = oc.rilascio_chiesto
@@ -51628,7 +51743,7 @@ function pannelloOnchainOrdine(o, s){
   const fatto = (oc.indirizzo && oc.indirizzo.indirizzo)
     ? onchainComeEFatto(Object.assign({}, oc, {ruolo: o.role === 'buyer' ? 'compratore' : o.role === 'seller' ? 'venditore' : ''}), {})
     : '';
-  return `<div class="trust-note">${P2P_OC_MONETA}<span>${riga ? riga + '<br>' : ''}Pagato <b>on-chain</b>, in un 2-di-3: tu, l'altra parte e Barattolo.${dove}${tx}</span></div>${cambio}${fatto}${gesto}`;
+  return `<div class="trust-note">${P2P_OC_MONETA}<span>${riga ? riga + '<br>' : ''}Pagato <b>on-chain</b>, in un 2-di-3: tu, l'altra parte e Barattolo.${grossoNota}${dove}${tx}</span></div>${cambio}${fatto}${gesto}`;
 }
 
 async function annullaOrdine(){
@@ -71247,8 +71362,18 @@ async function onchainCofirma(o, parole){
     if (o.ruolo !== 'compratore' || !o.rimborso || o.rimborso !== mio) return 'non è il tuo rimborso';
     if (uscite.some(([a]) => a !== mio)) return 'c\'è un\'uscita estranea';
   }
-  const rete = o.utxo.reduce((s, u) => s + u.value, 0) - uscite.reduce((s, [, v]) => s + v, 0);
-  if (rete <= 0 || rete > o.margine_sats) return 'la commissione esce dal margine';
+  const tot = o.utxo.reduce((s, u) => s + u.value, 0);
+  const rete = tot - uscite.reduce((s, [, v]) => s + v, 0);
+  /* IL TETTO DELLA RETE E' QUELLO DEL SERVER (17 nov 2026, scambio P2P
+     on-chain #14 di Darnok833 fermo all'ultima firma): il margine, piu' i
+     pochi sats versati oltre la cifra chiesta finche' stanno sotto la
+     polvere — non possono tornare indietro e finiscono alla rete. Il
+     giudice del server li ammette dal 14 nov (`_onchain_psbt_giudica`,
+     audit); il telefono no, e rifiutava una proposta gia' accettata. */
+  const chiesto = Number(o.importo_sats) || 0;
+  const inPiu = chiesto > 0 ? Math.max(0, tot - chiesto) : 0;
+  const tetto = Number(o.margine_sats) + Math.min(inPiu, ONCHAIN_POLVERE - 1);
+  if (rete <= 0 || rete > tetto) return 'la commissione esce dal margine';
   for (let i = 0; i < tx.inputsLength; i++) tx.signIdx(io.firma.privateKey, i);
   tx.finalize();
   const r = await fetch(`${API_BASE}${o.rotta || '/onchain/ordini/' + o.id}/firma`, {method: 'POST',
@@ -75076,9 +75201,21 @@ function schedaOnchainP2P(o){
   /* (17 nov 2026, rilascio-senza-incasso) chi compra non ha ancora detto
      dove ricevere: chi vende lo legge PRIMA di premere «Ricevuti» */
   if (deposito && !o.incasso && !o.incasso_ln && !o.proposta
-      && (o.stato === 'depositato' || o.stato === 'euro_inviati'))
-    testo += '<br>⏳ Chi compra non ha ancora scelto il wallet dove ricevere i sats: '
-      + 'puoi liberarli appena lo fa (glielo ricordiamo noi nella sua pagina dello scambio).';
+      && (o.stato === 'depositato' || o.stato === 'euro_inviati')) {
+    /* (17 nov 2026, avviso-indirizzo; un utente: «il venditore prima di
+       rilasciare i sats sollecita il compratore ad indicare dove
+       inviarli») il sollecito lo manda chi vende, e quando chi compra
+       sceglie il bot glielo dice */
+    if (o.sollecito_incasso) {
+      testo += '<br>⏳ Chi compra non ha ancora scelto il wallet dove ricevere i sats: '
+        + 'puoi liberarli appena lo fa, e ti avvisiamo noi.'
+        + (Number(o.incasso_sollecito_il) > 0 ? ' Gliel\'hai ricordato (' + quando(o.incasso_sollecito_il) + ').' : '');
+      gesti += bott('ghost', `sollecitaIncassoOnchainP2P(this, ${o.id})`, '🔔 Ricordaglielo');
+    } else {
+      testo += '<br>⏳ Chi compra non ha ancora scelto il wallet dove ricevere i sats: '
+        + 'puoi liberarli appena lo fa (glielo ricordiamo noi nella sua pagina dello scambio).';
+    }
+  }
   /* la seconda firma, quando tocca a me: lo stesso bottone in ogni stato */
   if (daFirmareOnchainP2P(o) && !mod) {
     gesti = bott('orange', `cofirmaOnchainP2P(this, ${o.id})`,
@@ -76329,6 +76466,11 @@ function liberaOnchainP2P(btn, id){
   const o = p2pOnchainMiei.find(x => x.id === id);
   /* le frasi nella valuta dello scambio (2 nov 2026) */
   const pa = t => o ? paroleOc(o, t) : t;
+  /* (17 nov 2026, avviso-indirizzo) chi compra non ha ancora scelto dove
+     ricevere: prima di chiedere «Liberi i sats?» si rilegge, e se manca
+     ancora il foglio lo dice e offre «🔔 Ricordaglielo» */
+  if (o && !o.incasso && !o.incasso_ln && o.sollecito_incasso
+      && typeof incassoAttesoOnchainP2P === 'function') return incassoAttesoOnchainP2P(id);
   if (o && o.incasso_ln && !o.incasso) return chiediConferma({titolo: pa('🔓 Hai ricevuto gli euro?'),
     etichetta: 'Sì, li ho ricevuti',
     corpo: pa('Chi compra riceve in Lightning: con la tua conferma, firmata dal tuo seme, fa lo swap e i sats '
@@ -76339,6 +76481,38 @@ function liberaOnchainP2P(btn, id){
     corpo: pa('Hai VISTO gli euro sul tuo conto? Liberando, i sats partono verso chi compra e non tornano.')
       + (o && usdtOc(o) ? ' Controlla sull\'explorer che siano arrivati sulla rete giusta.' : ''),
     poi: () => firmaOnchainP2P(id, 'venditore')});
+}
+
+/* L'INDIRIZZO CHE MANCA DAVANTI A «RICEVUTI» (17 nov 2026, cantiere
+   avviso-indirizzo). Chi compra lo sceglie spesso proprio mentre chi
+   vende aspetta: lo scambio si rilegge, e se c'e' si torna al foglio di
+   sempre; se no il foglio dice cosa manca e il bottone glielo ricorda. */
+async function incassoAttesoOnchainP2P(id){
+  const o = (await leggiMieiOnchainP2P()).find(x => x.id === id);
+  if (!o) return;
+  if (o.incasso || o.incasso_ln || !o.sollecito_incasso) return liberaOnchainP2P(null, id);
+  chiediConferma({titolo: '⏳ Chi compra non ha scelto dove ricevere', etichetta: '🔔 Ricordaglielo',
+    corpo: 'Senza il suo indirizzo i sats non possono partire: restano al sicuro nel 2-di-3. '
+      + 'Gli scriviamo su Telegram, e quando lo sceglie ti avvisiamo: allora potrai liberarli.',
+    poi: () => sollecitaIncassoOnchainP2P(null, id)});
+}
+async function sollecitaIncassoOnchainP2P(btn, id){
+  haptic();
+  const rip = btn ? onchainAttesa(btn, '…') : () => {};
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(id)}/sollecita-incasso`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()}, body: '{}'});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non mandato');
+    if (d.pronto) toast('✅ Chi compra ha appena scelto dove ricevere: ora puoi liberare', 6000);
+    else if (d.avvisato) toast('🔔 Gliel\'abbiamo scritto su Telegram. Ti avvisiamo quando sceglie', 6000);
+    else toast('🔔 Gliel\'hai già ricordato: puoi rifarlo dopo le '
+      + new Date((Number(d.prossimo) || 0) * 1000).toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'}), 6000);
+  } catch(e) {
+    toast('⚠️ ' + (e.message && e.message.length < 120 ? e.message : 'non mandato'), 6000);
+  } finally { rip(); }
+  await leggiMieiOnchainP2P();
+  if (vistaAttivaP2P() === 'view-p2ponchain') renderP2POnchain();
 }
 
 function rinunciaOnchainP2P(btn, id){
@@ -115713,6 +115887,9 @@ async function avvia(){
        un link nella forma t.me/<bot> (un server di ieri non lo manda) */
     tappoLink = linkTappoValido(me.tappo_link);
     if (el('vocTappo')) el('vocTappo').style.display = tappoLink ? '' : 'none';
+    /* LA ROTTA PER LA LUNA (17 nov 2026): la leva viva (un server di
+       ieri non la manda: spenta) */
+    stradinaAccesa = me.stradina === true;
     assistenzaNuove = Number(me.assistenza_nuove) || 0;
     vestiAssistenza();
     /* LA CACCIA A TAPPO (17 nov 2026): la leva viva, e se OGGI c'e' una

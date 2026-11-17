@@ -3960,6 +3960,14 @@
   netto). La porta del venditore apre il cassetto anche a chi ha solo
   comprato e glielo dice con `venditore: false`: il client mostra i
   soli acquisti, col titolo «I tuoi acquisti».
+  GLI ACQUISTI DIETRO UNA LEVA SPENTA (17 nov 2026 sera, privacy;
+  Andrea: «le vendite lasciale, rimetti come era prima. Gli acquisti
+  non li aggiungere»): con `ACQUISTI_NEL_PROFILO` spenta, di serie, le
+  DUE porte tolgono `_CHIAVI_ACQUISTI` dalla risposta e chi ha solo
+  comprato riceve `mostra: false`; il client salta gli acquisti da solo
+  (`acquisti_tot` assente vale zero). Il giudice resta intero e i
+  contatori `vendite_ok`/`acquisti_ok` (livello, distintivi) non si
+  toccano: si chiude la PORTA, e la leva accesa rimette tutto.
   LA ROTTA DEGLI ASSET E' UNA WHITELIST DI FORMA e non un elenco
   (`FORMA_RACCONTO` + `SLUG_SPONSOR`): le foto di un racconto sono tre
   oggi e cinque domani, e un elenco a mano sarebbe l'ennesima lista da
@@ -35761,6 +35769,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `renderSceltaPagaRete`, le porte e l'interruttore in `renderPayMetodo`,
   la riga `#payGrossoNota` da `payAvvisoGrosso` (spenta da
   `payMetodoSpegni` e passando a On-chain). Consiglia, non vieta.
+  Verso chi vende (stesso giorno, cantiere onchain-grossi-uscita):
+  l'ordine on-chain nasce con `grosso` (colonna di `onchain_ordini`,
+  fissata col cambio del tetto) e `onchain_modo_ordine` lo guarda per
+  primo: riceve on-chain anche da «sempre Lightning»; il cambio in
+  Lightning dell'ordine dice 409 (`_onchain_da_sbloccare`). Il tetto
+  degli scambi P2P on-chain è a parte: `P2P_ONCHAIN_MAX_EURO` (999 di
+  serie); `ONCHAIN_MAX_EURO` vale solo per il mercatino.
 - LA CASSA A DUE PORTE E L'INCASSO SOLO SU UN WALLET TUO (27 ott 2026,
   cantiere onchain-cassa; perché in CANTIERI, «La cassa a due porte»).
   Il foglio del pagamento (`#paySheet`) ha in cima `#payMetodo` (⚡ giallo
@@ -36614,6 +36629,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che poi fa ripartire il gesto; `closeSheet` lo annulla. Prove:
   `prove_onchain_rimborso_liscio`, `collaudo_p2p_onchain` (sezione
   11-sexies).
+- L'INDIRIZZO DI CHI COMPRA, DETTO A CHI LIBERA (17 nov 2026, cantiere
+  avviso-indirizzo; CANTIERI, «L'indirizzo di chi compra, detto a chi
+  libera»). Leva `P2P_ONCHAIN_AVVISO_INCASSO`, accesa di serie. Il
+  gemello di `rinuncia-chiesta`, dall'altra parte: `POST
+  /api/p2p/onchain/{oid}/sollecita-incasso` (solo chi ha depositato, solo
+  `depositato`/`euro_inviati`, senza proposta né decisione, mai con
+  `incasso_ln`; 404 a leva spenta) avvisa chi compra col bottone dello
+  scambio; colonna `incasso_sollecito_il`, scritta PRIMA dell'invio, un
+  riavviso ogni `P2P_ONCHAIN_INCASSO_RIAVVISO`; risponde `pronto` se
+  l'incasso c'è già, `prossimo` quando si può rifare. L'avviso a chi ha
+  depositato quando l'incasso arriva sta in `_p2p_onchain_avvisa_confermato`
+  (il ramo nuovo, accanto a quello della conferma del Lightning: solo a
+  deposito fatto), chiamato dalle porte che riempiono l'incasso: la rotta
+  `incasso`, `ricevi-lightning` col no, e via
+  `_p2p_onchain_avvisa_riempiti` (rilegge le righe che
+  `_p2p_onchain_riempi_incassi` torna vecchie) da `onchain_incasso_scegli`
+  e dalla scelta del modo. In `_p2p_onchain_per`: `sollecito_incasso`
+  (leva accesa e ruolo «compratore») e `incasso_sollecito_il`. Nel
+  telefono: `liberaOnchainP2P` passa da `incassoAttesoOnchainP2P` (rilegge,
+  e se manca ancora il foglio «⏳ Chi compra non ha scelto dove ricevere»
+  con «🔔 Ricordaglielo»), `sollecitaIncassoOnchainP2P`, e il bottone
+  «🔔 Ricordaglielo» nella pagina di chi ha depositato. Il no in parole di
+  `onchainFirmaProposta` resta il cancello finale. Prove:
+  `prove_p2p_onchain` (in fondo), `collaudo_p2p_onchain` (11-sexies-bis).
 - IL TEMPO DEL BONIFICO NEL P2P ON-CHAIN (17 nov 2026 sera, stesso
   cantiere; CANTIERI, «24 ore per pagare, 48 per il bonifico»). Due
   tempi in fila, nessuno dei due annulla o libera: PAGARE, dal deposito
@@ -37193,7 +37232,9 @@ mai il kind 0 di nessuno: regola ferrea 2).
   volta, senza toccare `fmt`/`fmtEur` (che le prove cercano per testo):
   «1,234.50», «19,601», «14 Nov». Per chi legge in italiano non cambia
   NIENTE: nessun fetch, `traduttoreArmato` resta falso, `traduci()`
-  risponde null. La leva `LINGUA_INGLESE` (accesa di serie, gruppo
+  risponde null. La leva `LINGUA_INGLESE` (SPENTA di serie dal 17 nov
+  sera, scelta di Andrea — «lascialo spento» — e accesa dal config, sul
+  collaudo prima e in produzione quando lo dirà lui; gruppo
   «🌍 Lingua» del pannello) spenta fa rispondere 404 alla rotta: l'app
   torna italiana per tutti, l'interruttore d'emergenza. Il pannello
   admin resta italiano per scelta. Coperto in questa tappa: la
@@ -37374,3 +37415,32 @@ mai il kind 0 di nessuno: regola ferrea 2).
   niente giro. I file stanno in assets/mondo/ e nella whitelist
   `MONDO_ASSET` (la prova confronta whitelist, cartella e chiavi: un
   testo di bottone ritoccato senza ritoccare la chiave fa rosso).
+- L'INGLESE, TAPPA 2: TUTTA L'APP (17 nov 2026, cantiere
+  inglese-tappa-2). Il dizionario `lingua/en.js` ha ~9.200 voci (la
+  sezione «TAPPA 2» in coda) e copre Ordini, P2P, Vendi, Profilo, aste,
+  raccolte, cassa in negozio, swap, on-chain, avvisi, assistenza,
+  privacy, tour, popup e pannelli admin. Tre regole in piu' nel
+  traduttore: la FORMA CORTA (`corta` in `caricaDizionario`: chiave che
+  comincia con `{}` e ha meno di tre parole sue → al piu' due parole
+  nel primo buco), il BUCO CHE NON INGOIA UNA FRASE (in `traduci`,
+  nessun `. ? ! ;` seguito da spazio ne' `: ` dentro una cattura) e la
+  TRADUZIONE DENTRO LA CATTURA (`traduci(g, true)`: un livello solo,
+  cosi' «Casella 7: Fai il primo acquisto» esce intero). Dalla sera
+  dello stesso giorno la quarta: FRASE PER FRASE — un nodo che non
+  e' una chiave intera ne' una forma si taglia a `. ? ! ;` + spazio e
+  ogni frase si cerca da sola (i paragrafi composti dal codice a pezzi);
+  un livello, senza lookbehind. I testi che
+  arrivano DAL SERVER e finiscono nel DOM (caselle e zone della
+  stradina, distintivi e il loro `title` «Nome: descrizione», livelli,
+  gruppi delle leve) stanno nel dizionario come chiavi secche: una
+  frase cambiata in `server.py` si cambia anche li' (la prova cerca le
+  parole delle chiavi in miniapp.html E in server.py). I `confirm`,
+  `alert` e i popup di Telegram passano da `fraseInglese` /
+  `finestreInglesi` (riga per riga se la frase intera manca). La riga
+  «di <venditore>» della cassa e delle raccolte usa `diChi()` /
+  `raccDiChi()`, che chiamano `t('di {nome}', …)` (chiave secca, non
+  una forma) e reggono senza traduttore. Le chiavi del dizionario
+  NON hanno entita' HTML: `&nbsp;` nel sorgente e' uno spazio nel DOM.
+  Restano italiani: le descrizioni delle leve (testo per Andrea), i
+  dati (titoli, negozi), i mesi brevi del P2P, il bot e gli errori del
+  server (tappa 3, con l'interruttore della lingua salvato sul server).

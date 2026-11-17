@@ -384,8 +384,8 @@ pubblico: sì
 ## 2026-11-17 · totali-acquisti
 frase: Nel Profilo ora vedi anche quanto hai comprato: negli ultimi 30 giorni e da sempre, quanti acquisti e quanti sats hai pagato in tutto, spedizione compresa. Se non hai annunci il cassetto si chiama «I tuoi acquisti».
 dove: Profilo → «Negozio e spedizioni» → «📊 Il tuo negozio» (o «📊 I tuoi acquisti»), sezione «🛍️ Acquisti conclusi».
-leva: nessuna
-pubblico: sì
+leva: ACQUISTI_NEL_PROFILO spenta di serie (17 nov sera, privacy: Andrea «gli acquisti non li aggiungere»)
+pubblico: no
 
 ## 2026-11-17 · etichetta-alimenti
 frase: Chi vende alimenti e bevande può aggiungere all'annuncio l'etichetta: peso netto, ingredienti, allergeni e tabella dei valori nutrizionali, come sulla confezione. Chi compra la legge nella pagina dell'annuncio prima di comprare, uguale per tutti, con gli allergeni in grassetto. È facoltativa, ma la legge europea la chiede per gli alimenti venduti online.
@@ -444,8 +444,8 @@ pubblico: sì
 ## 2026-11-17 · stradina-obiettivi
 frase: Nel Profilo c'è «🚀 Rotta per la Luna»: un tabellone lunghissimo dalla Terra alla Luna, su una mappa in otto zone raccontate da Tappo, fino all'halving del 2028. Ogni casella è una competenza (l'incasso automatico in Lightning, il wallet on-chain, la doppia configurazione Telegram + Nostr, il primo acquisto…): fatta, diventa una moneta d'oro e Tappo avanza. I tuoi amici sono pedine sul tabellone.
 dove: Profilo → «Livello e recensioni» → «🚀 Rotta per la Luna».
-leva: nessuna
-pubblico: sì
+leva: STRADINA_ATTIVA spenta di serie
+pubblico: no
 
 ## 2026-11-17 · contante-per-posta
 frase: Nel P2P c'è un metodo in più, «Contante per posta»: chi compra sats spedisce le banconote a chi le vende, in una busta sigillata nascosta in un pacco, con un servizio tracciato. Le regole sono scritte nello scambio: chi spedisce filma l'imballo col numero di tracciamento in vista, chi riceve filma l'apertura prima di liberare i sats, e chi prende l'ordine blocca una piccola cauzione.
@@ -480,14 +480,14 @@ pubblico: sì
 ## 2026-11-17 · caccia-a-tappo
 frase: È arrivata la Caccia a Tappo, il gioco di Barattolo. Ogni giorno Tappo si nasconde in un annuncio vero, diverso per ognuno: leggi gli indizi, apri gli annunci e tocca «Tappo è qui?». Chi lo trova vince i bulloni 🔩, accende i barattoli della dispensa, sale di grado e completa le sfide. Coi bulloni prendi cappellini, attrezzi e 5 posti in più nei preferiti. Si gioca gratis: i bulloni non sono sats.
 dove: Profilo → «Livello e recensioni» → «🔩 Caccia a Tappo», nella Mini App, nell'app e sul sito; il tasto «Tappo è qui?» nella scheda di ogni annuncio, quando la caccia del giorno è aperta.
-leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
-pubblico: sì
+leva: GIOCO_TAPPO_ATTIVO spenta di serie
+pubblico: no
 
 ## 2026-11-17 · mondo-di-tappo
 frase: Sul tabellone dei livelli arrivano le missioni di Tappo: otto scene brevi a carte sulla storia del denaro, il deposito di garanzia, le tue chiavi, Lightning, la privacy e Nostr, ognuna col bottone per farlo davvero. Danno bulloni 🔩 e montano il razzo con cui Tappo vuole arrivare sulla Luna. E nella Caccia a Tappo c'è il Mondo: la dispensa da girare, coi barattoli da aprire.
 dove: Profilo → «Livello e recensioni» → «🚀 Rotta per la Luna»: la missione sta subito prima della casella che insegna; tutte anche nella «🔩 Caccia a Tappo», lì accanto, schede «Sfide» e «Mondo».
-leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
-pubblico: sì
+leva: GIOCO_TAPPO_ATTIVO spenta di serie
+pubblico: no
 
 ## 2026-11-17 · profilo-semplice
 frase: Il Profilo è più semplice da leggere: ogni casella dice cosa c'è dentro. Ci sono «Annunci», «Il tuo negozio», «Spedizioni e sconti», «Quando compri», «Wallet e incassi», «Livello e recensioni», «Impostazioni» e «Aiuto».
@@ -504,7 +504,7 @@ pubblico: no
 ## 2026-11-17 · inglese-tappa-1
 frase: Barattolo si legge anche in inglese: se il tuo Telegram o il tuo browser non sono in italiano, la vetrina, gli annunci e l'acquisto compaiono in inglese da soli, coi prezzi all'inglese (1,234.50 €). Ordini, P2P, Profilo e bot arrivano nelle prossime tappe. Per provarlo da un telefono italiano apri barattolo.store/?lingua=en (?lingua=it per tornare).
 dove: tutta la Mini App e il sito per chi ha Telegram o il browser in una lingua diversa dall'italiano; la pagina «Il pagamento protetto» (barattolo.store/sicurezza) anche lei.
-leva: LINGUA_INGLESE (accesa di serie; spenta, l'app torna italiana per tutti)
+leva: LINGUA_INGLESE (spenta di serie dal 17 nov sera, scelta di Andrea: in produzione arriva spenta e si accende dal config; accesa sul collaudo)
 pubblico: sì
 
 ## 2026-11-17 · assistenza-screenshot
@@ -579,8 +579,26 @@ dove: Mercatino: un oggetto sopra 500 €, «Acquista», foglio «Come vuoi paga
 leva: ONCHAIN_CONSIGLIATO_SOPRA_EURO accesa di serie (500)
 pubblico: sì
 
+## 2026-11-17 · inglese-tappa-2
+frase: Barattolo è tutto in inglese: ordini, scambio P2P, Vendi, Profilo, aste, raccolte, avvisi e assistenza compaiono in inglese da soli se il tuo Telegram o il tuo browser non sono in italiano, coi prezzi all'inglese (1,234.50 €). Mancano solo i messaggi del bot e l'interruttore della lingua nel Profilo, in arrivo. Da un telefono italiano apri barattolo.store/?lingua=en (?lingua=it per tornare).
+dove: tutta la Mini App e il sito, per chi ha Telegram o il browser in una lingua diversa dall'italiano: Ordini, P2P, Vendi, Profilo, aste, raccolte, cassa in negozio, swap, on-chain, avvisi, assistenza, privacy.
+leva: LINGUA_INGLESE (spenta di serie dal 17 nov sera, scelta di Andrea: in produzione arriva spenta e si accende dal config; accesa sul collaudo)
+pubblico: no
+
 ## 2026-11-17 · serie-classifica
 frase: I giorni di fila adesso hanno una classifica: chi apre Barattolo da più giorni senza saltarne uno. Ci entri dal secondo giorno di fila, e a pari giorni si è a pari merito. La vede solo chi è entrato in Barattolo; se non vuoi comparire accendi «Non mostrarmi in classifica». Non dà punti né premi.
-dove: Profilo, sotto la fila dei sette giorni, il bottone «🏆 Classifica dei giorni di fila». Per non comparire: Profilo, cassetto «Livello e recensioni», «🏆 Non mostrarmi in classifica».
+dove: Profilo, sotto la fila dei sette giorni, il bottone «Classifica Streak», con la fiamma. Per non comparire: Profilo, cassetto «Livello e recensioni», «🏆 Non mostrarmi in classifica».
 leva: SERIE_GIORNI_ATTIVA (quella della serie, già accesa)
+pubblico: sì
+
+## 2026-11-17 · onchain-grossi-uscita
+frase: Negli acquisti on-chain sopra 500 € chi vende riceve on-chain anche se aveva scelto Lightning, perché con cifre così il Lightning spesso non passa. L'ordine glielo dice con «Cifra grossa: ricevi on-chain».
+dove: Ordini → una vendita pagata on-chain sopra 500 €, riquadro «Pagato on-chain»; il messaggio del bot quando chi compra conferma.
+leva: ONCHAIN_CONSIGLIATO_SOPRA_EURO accesa di serie (500)
+pubblico: sì
+
+## 2026-11-17 · avviso-indirizzo
+frase: Negli scambi on-chain chi vende sa quando chi compra ha scelto dove ricevere i sats: arriva un messaggio dal bot. E se tocca «Ricevuti» prima, Barattolo glielo dice e c'è «🔔 Ricordaglielo», che manda un promemoria a chi compra.
+dove: P2P → «I miei scambi» → uno scambio on-chain con i sats nel deposito: la riga «⏳ Chi compra non ha ancora scelto il wallet» col bottone «🔔 Ricordaglielo», e il foglio di «Ricevuti: libera i sats»; il messaggio del bot «📍 Chi compra ha scelto dove ricevere».
+leva: P2P_ONCHAIN_AVVISO_INCASSO accesa di serie
 pubblico: sì

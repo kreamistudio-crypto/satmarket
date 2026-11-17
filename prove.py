@@ -14604,6 +14604,11 @@ def prove_dettaglio_ordine():
              "Disputa risolta a favore dell\\'acquirente"),
             ("la consegna al corriere", "Hai consegnato al corriere",
              "Il venditore ha consegnato al corriere"),
+            # ...e prima della spedizione al futuro (17 nov 2026,
+            # passo-spedito): l'istruzione a chi vende, l'attesa agli altri
+            ("la consegna al corriere da fare",
+             "Consegni il pacco al corriere e lo segni qui",
+             "Il venditore consegnerà il pacco al corriere"),
             ("il contenuto digitale", "Hai consegnato il contenuto",
              "Il venditore ha consegnato il contenuto"),
             ("la spedizione offerta", "'hai':'il venditore ha'", ""),
@@ -19958,6 +19963,40 @@ def prove_spedisci_entro():
           ["", "", ""], v["daPagare"])
     prova("la riga piccola e' quella dei passi P2P", True,
           v["riga"] == '<small class="step-ora">Pagato ieri 10:00</small>')
+
+    # --- 4) il passo «Oggetto spedito» parla al futuro finche' il pacco
+    # non e' partito (17 nov 2026, cantiere passo-spedito): lo stepper
+    # vero, il ramo di sempre, quattro casi
+    oo = mini[mini.index("function openOrder(id){"):]
+    oo = oo[:oo.index("\n}\n")]
+    blocco = oo[oo.index("  const passoDeposito = s==='creato'"):
+                oo.index("  /* Le frasi di chiusura parlano a CHI legge")]
+    js = ("const esc = x => String(x);\n"
+          "const codiceTracking = (o, s) => o.tracking;\n"
+          "const rigaCorretto = () => '', filaTracking = () => '', "
+          "copiaTracking = () => '';\n"
+          "const inPagamento = () => false, dataAppuntamento = () => '';\n"
+          "const rigaPagato = () => '', rigaSpedito = () => '';\n"
+          "const annulloVenditore = () => false, annullataPagata = () => false;\n"
+          "const TEMPI = {confermaDig: 72};\n"
+          + _riga_js(mini, "const CORRIERE_SENZA_TRACCIA = ")
+          + "function stepper(o){ const s = o.state;\n" + blocco
+          + "\n  return steps[1].d; }\n"
+          + "console.log(JSON.stringify(JSON.parse(process.argv[1]).map(stepper)));\n")
+    casi = [{"state": st, "role": r, "corriere": c, "tracking": ""}
+            for st, c in (("locked", ""), ("shipped", "Consegna a mano"))
+            for r in ("seller", "buyer")]
+    r = _sp.run([node, "-e", js, _json.dumps(casi)], capture_output=True,
+                encoding="utf-8", timeout=60)
+    try:
+        detti = _json.loads(r.stdout)
+    except Exception:
+        detti = r.stderr[-400:]
+    prova("il passo della spedizione: al futuro prima, al passato dopo",
+          ["Consegni il pacco al corriere e lo segni qui",
+           "Il venditore consegnerà il pacco al corriere",
+           "Hai consegnato al corriere",
+           "Il venditore ha consegnato al corriere"], detti)
 
 
 def prove_notifica_fail_open():
@@ -47163,7 +47202,7 @@ def prove_fogli_di_casa():
     # (`pubblicaOnchainDalFoglioP2P`), gemello di quello di Lightning.
     # CENTOVENTI (17 nov 2026, cantiere stradina): «Esci da Barattolo?»
     # sulla casella che porta al partner dell'educazione (`vaiTappa`).
-    prova("i gesti che passano dalla domanda unica sono centoventicinque (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoventisei (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47178,8 +47217,9 @@ def prove_fogli_di_casa():
           "Barattolo?» della stradina; «Annulli il deposito?» e «Fermi la "
           "raccolta?» delle raccolte; «Hai consegnato i contanti?» del "
           "contanti on-chain; «Brucia la cauzione» e «Metà mandata» del "
-          "moderatore sulla cauzione on-chain)",
-          125, solo_codice(mini).count("chiediConferma({"))
+          "moderatore sulla cauzione on-chain; «Chi compra non ha scelto dove "
+          "ricevere» davanti a «Ricevuti» on-chain)",
+          126, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -54128,6 +54168,32 @@ def prove_numeri_negozio():
     prova("...il «da sempre» degli acquisti e' acquisti_ok", True,
           '"acquisti_tot": int(v["acquisti_ok"] or 0)' in _pr)
 
+    # ---- 4c. 🛍️ gli acquisti fuori dal Profilo (17 nov 2026 sera) ----
+    import ast as _ast
+    prova("la leva ACQUISTI_NEL_PROFILO nasce SPENTA nel codice e "
+          "nell'esempio", True, "    ACQUISTI_NEL_PROFILO = False\n" in src
+          and "\nACQUISTI_NEL_PROFILO = False\n" in open(
+              "config_esempio.py", encoding="utf-8").read())
+    _acq = _ast.literal_eval(re.search(
+        r"_CHIAVI_ACQUISTI = (\([^)]*\))", src).group(1))
+    prova("le chiavi tolte sono tutte e quattro quelle degli acquisti del "
+          "giudice, e nessuna delle vendite",
+          sorted(k for k in d if "acq" in k), sorted(_acq))
+    for _porta in ("miei_numeri_negozio", "numeri_negozio_admin"):
+        _cp = codice(pezzo(_porta))
+        prova(f"{_porta}: a leva spenta toglie gli acquisti", True,
+              "if not ACQUISTI_NEL_PROFILO:" in _cp
+              and "for k in _CHIAVI_ACQUISTI:" in _cp)
+    prova("...e chi ha solo comprato, a leva spenta, non ha il cassetto",
+          True, "if not ha and (not ACQUISTI_NEL_PROFILO" in codice(
+              pezzo("miei_numeri_negozio")))
+    prova("i contatori non si toccano: nessuna porta scrive acquisti_ok",
+          False, "UPDATE" in codice(pezzo("miei_numeri_negozio"))
+          + codice(pezzo("numeri_negozio_admin")))
+    prova("la leva sta nel pannello delle leve", True,
+          '"ACQUISTI_NEL_PROFILO", ACQUISTI_NEL_PROFILO,' in src
+          and '"gruppo": "🛍️ Acquisti nel Profilo"' in src)
+
     # ---- 5. lo spazio in vetrina: solo acceso, solo il suo -----------
     prova("spento, lo spazio non esce", [], d["sponsor"])
     accesi.update({"to-the-moon": ora + 86400})
@@ -54173,9 +54239,11 @@ def prove_numeri_negozio():
           0 <= _ad.find("re.fullmatch(") < _ad.find("con.execute("))
     prova("le due porte passano dallo stesso giudice", (True, True),
           ("numeri_negozio(con, v)" in _me, "numeri_negozio(con, v)" in _ad))
-    prova("chi ha solo comprato entra, e la porta dice che non vende",
-          True, 'if not ha and not (v and (v["acquisti_ok"] or 0) > 0):'
-          in _me and "venditore=bool(ha)" in _me)
+    # dal 17 nov 2026 sera entra solo con ACQUISTI_NEL_PROFILO accesa
+    prova("chi ha solo comprato entra (con ACQUISTI_NEL_PROFILO), e la "
+          "porta dice che non vende", True,
+          'or not (v and (v["acquisti_ok"] or 0) > 0)):' in _me
+          and "venditore=bool(ha)" in _me)
     prova("...il moderatore guarda sempre un negozio intero", True,
           "venditore=True" in _ad)
     prova("i campi letti portano acquisti_ok", True,
@@ -54302,6 +54370,12 @@ const pieno = {mostra: true, negozio: 'ab12cd34', visite_7: 12,
   out.due = tabellaNumeriNegozio(Object.assign({}, pieno, {sponsor:
     [{slug: 'to-the-moon', fino: 1792000000, aperture_30: 7},
      {slug: '<b>x', fino: 1792000000, aperture_30: 1}]}), false);
+  /* 🛍️ a leva spenta (17 nov 2026 sera) la porta non manda gli
+     acquisti: la tabella e' quella di prima, vendite comprese */
+  const senzaAcq = Object.assign({}, pieno);
+  for (const k of ['acquisti_30', 'sats_acq_30', 'acquisti_tot',
+                   'sats_acq_tot']) delete senzaAcq[k];
+  out.senzaAcq = tabellaNumeriNegozio(senzaAcq, false);
   chiesti.length = 0;
   await apriNegozio('ab12cd34');
   await caricaAltriNegozio();
@@ -54386,6 +54460,11 @@ const pieno = {mostra: true, negozio: 'ab12cd34', visite_7: 12,
     prova("...con due spazi ognuno ha il suo nome, passato da esc()", True,
           "· To The Mooon!" in o["due"] and "&lt;b&gt;x" in o["due"]
           and "<b>x" not in o["due"])
+    prova("🛍️ senza acquisti dal server: niente sezione acquisti, le "
+          "vendite come prima", (False, True), (
+              "Acquisti" in o["senzaAcq"],
+              "<span>Da sempre</span><b>14 · 150\u202f000 sats</b>"
+              in o["senzaAcq"]))
     prova("aprire il negozio conta una visita; la pagina dopo, il "
           "ridisegno e l'anteprima no",
           ["/api/negozio/ab12cd34?limit=12&vista=1",
@@ -129649,16 +129728,33 @@ def prove_stradina():
     prova("la nav la conta come Profilo e la riapre dalla cronologia", True,
           "else if (view === 'stradina') view = 'profilo';" in mini
           and "if (v === 'stradina') { apriStradina(); return ''; }" in mini)
-    prova("la voce si vede solo a chi e' dentro (mai in demo o vetrina)", True,
-          "vs.style.display = (DEMO || VETRINA || !myLivello) ? 'none' : '';"
+    prova("la voce si vede solo a chi e' dentro (mai in demo o vetrina) e "
+          "solo a leva accesa", True,
+          "vs.style.display = (DEMO || VETRINA || !myLivello || !stradinaAccesa) ? 'none' : '';"
           in pezzo_js(mini, "function renderLivello(){", "\n}\n"))
+    # LA LEVA (17 nov 2026, Andrea: «anche il tabellone lascialo spento per
+    # il momento»): spenta di serie nel codice e nell'esempio, le due rotte
+    # rispondono 404 a leva spenta, /api/me la manda viva e il client la
+    # legge solo se e' proprio true (un server di ieri tace: spenta)
+    prova("la leva STRADINA_ATTIVA nasce SPENTA nel codice e nell'esempio",
+          True, "    STRADINA_ATTIVA = False\n" in _SORGENTE
+          and "\nSTRADINA_ATTIVA = False\n" in open("config_esempio.py", encoding="utf-8").read())
+    prova("a leva spenta le due rotte del tabellone rispondono 404", True,
+          all("    if not STRADINA_ATTIVA:\n        raise HTTPException(404" in pezzo(f)
+              for f in ("prova_stradina", "mia_stradina")))
+    prova("/api/me manda la leva viva, il client la crede solo se true", True,
+          'profilo["stradina"] = STRADINA_ATTIVA' in _SORGENTE
+          and "stradinaAccesa = me.stradina === true;" in mini
+          and "var stradinaAccesa = false;" in mini)
+    prova("la leva sta nel pannello «Stato delle leve»", True,
+          '"STRADINA_ATTIVA",' in _SORGENTE and '"gruppo": "🚀 Rotta per la Luna"' in _SORGENTE)
     ap = pezzo_js(mini, "async function apriStradina(resta){", "\n}\n")
     prova("a missione finita (l'evento del gioco) il tabellone aperto si "
           "ricarica senza spingere un'altra pagina nella storia", True,
           "window.addEventListener('tappo:missione'" in mini
           and "apriStradina(true);" in mini and "if (!resta) go('stradina');" in ap)
     prova("la pagina chiede /me/stradina con l'identita', e in demo non parte",
-          True, "if (DEMO || VETRINA) return;" in ap
+          True, "if (DEMO || VETRINA || !stradinaAccesa) return;" in ap
           and "fetch(`${API_BASE}/me/stradina`" in ap
           and "'X-Tg-Init-Data': authHdr()" in ap)
     vt = pezzo_js(mini, "function vaiTappa(btn){", "\n}\n")
@@ -143047,9 +143143,14 @@ def prove_volto_unico():
         # (17 nov 2026) gli amici della stradina: pedine e gara fra amici
         "amici della stradina": ("voltoHTML(a, 'str-av'",
                                  "function voltoAmicoStradina(a){"),
+        # (17 nov 2026 sera) le righe della classifica dei giorni di fila:
+        # senza negozio, quindi senza chiave e senza porta
+        "classifica dei giorni di fila": (
+            "voltoHTML({nome: v.nome, avatar: v.avatar, ignoto: true}, 'avatar serie-cl-volto'",
+            "function serieClassificaRigaHTML(v){"),
     }
-    prova("il volto si disegna da dodici posti, ognuno col suo nome nel censimento",
-          [12, [1] * 12], [fuori.count("voltoHTML("),
+    prova("il volto si disegna da tredici posti, ognuno col suo nome nel censimento",
+          [13, [1] * 13], [fuori.count("voltoHTML("),
                            [fuori.count(v[0]) for v in POSTI.values()]])
     prova("...e ogni chiamata sta nella funzione del suo posto", [],
           [k for k, (pref, fn) in POSTI.items()
@@ -159818,8 +159919,10 @@ def prove_onchain_tetto():
     prova("...a tetto 0 nessun no, nemmeno senza cambio", ["", ""],
           [t(10**9, 100_000.0), t(10**9, 0)])
     compra = pezzo("_onchain_compra")
-    prova("la cassa giudica il tetto PRIMA di aprire il database", True,
-          compra.index("onchain_sopra_il_tetto(prezzo, await cambio_btc_eur())")
+    prova("la cassa giudica il tetto PRIMA di aprire il database, col "
+          "cambio di adesso", True,
+          compra.index("cambio = await cambio_btc_eur()")
+          < compra.index("onchain_sopra_il_tetto(prezzo, cambio)")
           < compra.index("con = _onchain_db_ordini()"))
     prova("il codice dice 250, anche con una riga storta", 2,
           _SORGENTE.count("    ONCHAIN_MAX_EURO = 250\n"))
@@ -159870,10 +159973,13 @@ def prove_onchain_consigliato():
     exec(pezzo("_onchain_soglia_consiglio"), amb)
     exec(pezzo("onchain_consigliato"), amb)
 
-    async def cambio_btc_eur():
-        return 100_000.0
-    amb["cambio_btc_eur"] = cambio_btc_eur
+    # il cambio che si sa ADESSO, mai la rete (17 nov 2026 sera: l'await di
+    # CoinGecko qui bussava fuori dalla gabbia, collaudo_piu_account rosso)
+    amb["cambio_noto_ora"] = lambda valuta="eur": 100_000.0
     exec("async " + pezzo("_avviso_importo_grosso"), amb)
+    prova("l'avviso della fattura non chiede il cambio alla rete", (False, True),
+          ("cambio_btc_eur" in pezzo("_avviso_importo_grosso"),
+           "cambio_noto_ora()" in pezzo("_avviso_importo_grosso")))
     a = amb["_avviso_importo_grosso"]
     grossa = asyncio.run(a({"invoice": "lnbc1", "prezzo_sats": 900_000}))
     piccola = asyncio.run(a({"invoice": "lnbc1", "prezzo_sats": 20_000}))
@@ -159893,11 +159999,11 @@ def prove_onchain_consigliato():
     pronto = srv[srv.index('@app.get("/api/onchain/pronto/{venditore_id}")'):]
     pronto = pronto[:pronto.index("\n@app.", 10)]
     prova("/onchain/pronto dice il consiglio in OGNI risposta, anche nei no, "
-          "e il tetto usa lo stesso cambio",
-          (6, 0, True, True),
+          "col cambio che si sa (senza rete); la rete solo per il tetto, dov'era",
+          (6, 0, True, 1),
           (pronto.count('return {**sopra, "pronto"'), pronto.count('return {"pronto"'),
-           '"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio)' in pronto,
-           "onchain_sopra_il_tetto(int(sats), cambio)" in pronto))
+           '"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio_noto_ora())' in pronto,
+           pronto.count("await cambio_btc_eur()")))
     prova("leva ONCHAIN_CONSIGLIATO_SOPRA_EURO: 500 di serie (anche storta), "
           "nell'esempio, nel pannello",
           (2, True, True),
@@ -159985,6 +160091,42 @@ console.log(JSON.stringify(out));
           "c'e'; a chi non lo vede solo l'avviso; sotto soglia niente",
           (True, [True, False], "none"),
           (out["carrello"], out["senzaOc"], out["piccolaFattura"]))
+    # L'ACQUISTO GROSSO ESCE ON-CHAIN ANCHE VERSO CHI VENDE (17 nov 2026,
+    # cantiere onchain-grossi-uscita, Andrea: «se vuole ricevere in
+    # lighting, sì, bisogna mettere anche verso di lui il limite»)
+    compra = pezzo("_onchain_compra")
+    prova("la cassa on-chain segna l'ordine grosso col cambio del tetto, "
+          "prima del database, e lo scrive nella riga",
+          (True, True, True),
+          (compra.index("grosso = 1 if onchain_consigliato(prezzo, cambio) else 0")
+           < compra.index("con = _onchain_db_ordini()"),
+           '"grosso": grosso}) != "onchain":' in compra,
+           "secrets.token_urlsafe(18), grosso))" in compra))
+    prova("la colonna nasce con le altre, 0 per gli ordini di prima", True,
+          '("grosso", "INTEGER DEFAULT 0")' in pezzo("_onchain_prepara_ordini"))
+    amb = {}
+    exec(pezzo("_onchain_grosso"), amb)
+    g = amb["_onchain_grosso"]
+
+    def scelto(con, o):
+        return "lightning"
+    amb2 = {"_onchain_grosso": g, "_onchain_modo_scelto": scelto}
+    exec(pezzo("onchain_modo_ordine"), amb2)
+    m = amb2["onchain_modo_ordine"]
+    prova("il giudice del modo: grosso = on-chain anche da «sempre Lightning»; "
+          "senza segno (o senza la chiave) la scelta di chi vende",
+          ["onchain", "lightning", "lightning", "lightning"],
+          [m(None, {"grosso": 1}), m(None, {"grosso": 0}), m(None, {}),
+           m(None, {"grosso": None})])
+    sb = pezzo("_onchain_da_sbloccare")
+    prova("il cambio in Lightning dell'ordine grosso dice di no col perche', "
+          "prima del «non ha ancora confermato»", True,
+          sb.index("if _onchain_grosso(o):") < sb.index("_onchain_puo_firmare_prima(con, o, ind)"))
+    prova("chi vende lo legge nell'ordine (le due righe che lo raccontano) e "
+          "nell'avviso", (2, True, True),
+          (srv.count('"grosso_ln_tolto": _onchain_grosso('),
+           "const grossoNota = o.role === 'seller' && oc.grosso_ln_tolto" in mini,
+           "Per una cifra così ricevi on-chain, anche se avevi scelto" in srv))
 
 
 def _pezzi_incasso_js(mini):
@@ -163204,6 +163346,109 @@ console.log(JSON.stringify([
     prova("il collaudo del giro vero sta nelle due liste della CI", (True, True),
           ("\ncollaudo_p2p_onchain\n" in open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read(),
            "\ncollaudo_p2p_onchain.py\n" in open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()))
+
+    # L'INDIRIZZO DI CHI COMPRA, DETTO A CHI LIBERA (17 nov 2026, cantiere
+    # avviso-indirizzo; un utente: «hai liberato i sats prima che abbia
+    # inserito l'indirizzo»). Il giro col server sta in collaudo_p2p_onchain
+    # (11-sexies-bis); qui la leva, la forma e il foglio del telefono.
+    prova("la leva P2P_ONCHAIN_AVVISO_INCASSO nasce ACCESA nel codice e "
+          "nell'esempio, e sta nel pannello", (True, True, True),
+          ("    P2P_ONCHAIN_AVVISO_INCASSO = True\n" in src,
+           "\nP2P_ONCHAIN_AVVISO_INCASSO = True\n" in esempio,
+           '"P2P_ONCHAIN_AVVISO_INCASSO", P2P_ONCHAIN_AVVISO_INCASSO,' in src))
+    _sol = codice(pezzo("p2p_onchain_sollecita_incasso"))
+    prova("il sollecito: solo chi ha depositato, solo a deposito fatto, il "
+          "segno scritto PRIMA dell'invio, e a leva spenta non esiste",
+          (True, True, True, True),
+          ('!= "compratore"' in _sol,
+           'o["stato"] not in ("depositato", "euro_inviati")' in _sol,
+           _sol.index("SET incasso_sollecito_il=?") < _sol.index("await _notifica_p2p_onchain("),
+           _sol.index("if not P2P_ONCHAIN_AVVISO_INCASSO:") < _sol.index("con = _p2p_onchain_db()")))
+    _conf = codice(pezzo("_p2p_onchain_avvisa_confermato"))
+    prova("l'avviso «Chi compra ha scelto dove ricevere» parte solo a "
+          "deposito fatto e con la leva accesa", (True, True),
+          ("P2P_ONCHAIN_AVVISO_INCASSO and" in _conf,
+           'o["stato"] in ("depositato", "euro_inviati")' in _conf))
+    prova("...anche quando l'indirizzo arriva dal Profilo (le due porte che "
+          "riempiono gli scambi)", 2,
+          src.count("await _p2p_onchain_avvisa_riempiti(riempiti_p2p)"))
+    import json as _jsA, os as _osA, shutil as _shA, tempfile as _tfA
+    if not _shA.which("node"):
+        salta("il foglio di «Ricevuti» senza indirizzo, in node", "node non installato")
+        return
+    _banco = r"""
+let P2P = {miei: [], fresche: [], chieste: [], toast: [], fetch: [], firme: [], risposta: {}};
+let p2pOnchainMiei = [];
+const API_BASE = '/api', haptic = () => {}, authHdr = () => 'x';
+const fmtEur = x => String(x);
+const toast = t => { P2P.toast.push(t); };
+const chiediConferma = c => { P2P.chieste.push(c); };
+const firmaOnchainP2P = (id, verso) => { P2P.firme.push(verso); };
+const euroRicevutiOnchainP2P = () => {};
+const onchainAttesa = () => () => {};
+const vistaAttivaP2P = () => '';
+const renderP2POnchain = () => {};
+async function leggiMieiOnchainP2P(){ p2pOnchainMiei = P2P.fresche; return p2pOnchainMiei; }
+async function fetch(u, o){ P2P.fetch.push([u, (o || {}).method]);
+  return {ok: true, json: async () => P2P.risposta}; }
+""" + "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function liberaOnchainP2P(btn, id){",
+        "async function incassoAttesoOnchainP2P(id){",
+        "async function sollecitaIncassoOnchainP2P(btn, id){")) + r"""
+const vuoto = {id: 7, incasso: '', incasso_ln: false, sollecito_incasso: true};
+const pieno = Object.assign({}, vuoto, {incasso: 'tb1qxyz'});
+const giro = async (prima, dopo, risposta) => {
+  P2P.chieste = []; P2P.toast = []; P2P.fetch = []; P2P.firme = [];
+  p2pOnchainMiei = [prima]; P2P.fresche = [dopo]; P2P.risposta = risposta || {};
+  await liberaOnchainP2P(null, 7);
+  await new Promise(r => setTimeout(r, 0));
+  const c = P2P.chieste[0] || {};
+  return {titolo: c.titolo || '', etichetta: c.etichetta || '', c};
+};
+(async () => {
+  const out = {};
+  let g = await giro(vuoto, vuoto, {ok: true, avvisato: true});
+  out.manca = [g.titolo, g.etichetta];
+  await g.c.poi(); await new Promise(r => setTimeout(r, 0));
+  out.mandato = [P2P.fetch[0], P2P.toast[0], P2P.firme.length];
+  g = await giro(vuoto, pieno);
+  out.arrivato = g.titolo;
+  g = await giro(Object.assign({}, vuoto, {sollecito_incasso: false}), vuoto);
+  out.spenta = [g.titolo, P2P.fetch.length];
+  g = await giro(vuoto, vuoto, {ok: true, pronto: true});
+  await g.c.poi(); await new Promise(r => setTimeout(r, 0));
+  out.pronto = P2P.toast[0];
+  g = await giro(vuoto, vuoto, {ok: true, avvisato: false, prossimo: 1794950000});
+  await g.c.poi(); await new Promise(r => setTimeout(r, 0));
+  out.presto = P2P.toast[0];
+  console.log(JSON.stringify(out));
+})();
+"""
+    with _tfA.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as _f:
+        _f.write(_banco)
+        _pf = _f.name
+    try:
+        _r = subprocess.run(["node", _pf], capture_output=True, text=True,
+                            encoding="utf-8", timeout=60)
+    finally:
+        _osA.unlink(_pf)
+    _o = _jsA.loads(_r.stdout) if _r.returncode == 0 else {}
+    prova("il banco del foglio gira", "", "" if _o else _r.stderr[-300:])
+    if not _o:
+        return
+    prova("«Ricevuti» senza l'indirizzo di chi compra (riletto dal server): "
+          "il foglio lo dice e offre «🔔 Ricordaglielo»",
+          ["⏳ Chi compra non ha scelto dove ricevere", "🔔 Ricordaglielo"], _o["manca"])
+    prova("...il bottone manda il sollecito, lo dice, e non firma niente",
+          [["/api/p2p/onchain/7/sollecita-incasso", "POST"], True, 0],
+          [_o["mandato"][0], "Telegram" in (_o["mandato"][1] or ""), _o["mandato"][2]])
+    prova("se rileggendo l'indirizzo c'e', torna il foglio di sempre",
+          "🔓 Liberi i sats?", _o["arrivato"])
+    prova("a leva spenta il foglio e' quello di prima, senza rileggere",
+          ["🔓 Liberi i sats?", 0], _o["spenta"])
+    prova("`pronto` e il sollecito gia' mandato si dicono in parole",
+          (True, True), (_o["pronto"].startswith("✅"),
+                         "Gliel'hai già ricordato: puoi rifarlo dopo le" in _o["presto"]))
 
 
 def prove_scelta_rete_mercatino():
@@ -168021,8 +168266,23 @@ __PEZZI__
   const noStorto = await onchainCofirma(storto, PAROLE);
   const dopoStorto = MANDATI.length;
   const noSeme = await onchainCofirma(o, D.semi[2]);
+  // (17 nov 2026, scambio #14) i sats versati in piu' sotto la polvere:
+  // la tariffa e' salita, il resto e' sceso sotto la polvere ed e' andato
+  // alla rete. Il server l'ammette, e il telefono deve co-firmare; oltre
+  // la polvere no, ne' l'uno ne' l'altro
+  const piu = async (k) => {
+    MANDATI.length = 0;
+    PAROLE = D.semi[0]; onchainOrdini = [D[k + 'C']];
+    await onchainProponi(null, 7);
+    const pp = MANDATI.pop();
+    PAROLE = D.semi[1];
+    const motivo = await onchainCofirma({...D[k + 'V'], proposta: {verso: 'venditore',
+      mia: false, psbt: pp[1].psbt}}, PAROLE);
+    return [motivo, MANDATI.length];
+  };
+  const inPiu = await piu('piu'), oltre = await piu('oltre');
   console.log(JSON.stringify({proposta, no, firmata, noStorto, dopoStorto,
-                              noSeme}));
+                              noSeme, inPiu, oltre}));
 })().catch(e => console.log(JSON.stringify({errore: String(e)})));
 '''.replace("__PEZZI__", pezzi)
     casa = _tf.mkdtemp(prefix="onchain-tappa3-")
@@ -168030,8 +168290,20 @@ __PEZZI__
         f_js = os.path.join(casa, "banco.js")
         f_dati = os.path.join(casa, "dati.json")
         open(f_js, "w", encoding="utf-8").write(banco)
+        def in_piu(ruolo, sats, tariffa):
+            o = ordine(ruolo, None)
+            o["utxo"] = [{"txid": "ab" * 32, "vout": 1, "value": 51080 + sats}]
+            o["tariffa"] = tariffa
+            return o
         json.dump({"semi": semi, "compratore": ordine("compratore", None),
                    "venditore": ordine("venditore", None),
+                   # 300 in piu', tariffa 5: rete 890, resto 490 sotto la
+                   # polvere → alla rete 1380 (margine 1080 + 300)
+                   "piuC": in_piu("compratore", 300, 5),
+                   "piuV": in_piu("venditore", 300, 5),
+                   # 600 in piu', tariffa 7: alla rete 1680, oltre 1080 + 545
+                   "oltreC": in_piu("compratore", 600, 7),
+                   "oltreV": in_piu("venditore", 600, 7),
                    "altro": ESC.p2wpkh(chiave(semi[2], 1, 0)).address(N)},
                   open(f_dati, "w", encoding="utf-8"))
         r = _sp.run([node, f_js, f_dati], capture_output=True, text=True,
@@ -168061,6 +168333,14 @@ __PEZZI__
           [[k.sec().hex() for k in i.partial_sigs] for i in p.inputs])
     prova("il telefono del venditore co-firma senza obiezioni", "",
           o.get("no"))
+    # (17 nov 2026, scambio P2P on-chain #14 fermo all'ultima firma) lo
+    # stesso tetto del giudice del server: margine + i sats in piu' sotto
+    # la polvere; oltre, il no resta
+    prova("...anche quando chi ha depositato ha messo qualche sats in piu' "
+          "e il resto sotto la polvere va alla rete (come il server)",
+          ["", 1], o.get("inPiu"))
+    prova("...ma non oltre la polvere: lì la commissione esce dal margine",
+          ["la commissione esce dal margine", 0], o.get("oltre"))
     url, corpo = (o.get("firmata") or ["", {}])
     t = ETx.from_string(corpo.get("tx") or "00" * 10) if corpo.get("tx") else None
     prova("...embit ritrova la STESSA transazione, con due firme e lo script",
@@ -199100,7 +199380,10 @@ for (const [k, v] of Object.entries(d)) {
   const numerati = segn.filter(x => x !== '{}').map(x => +x.slice(1, -1));
   if (numerati.length && (segn.length !== numerati.length || Math.max(...numerati) > nk || Math.min(...numerati) < 1))
     guai.push('segnaposto numerati storti: ' + k);
-  if (!numerati.length && segn.length !== nk) guai.push('segnaposto non in pari: ' + k);
+  /* una resa puo' usare MENO buchi della chiave (prende i primi, in fila:
+     «{} annunc{}» → «{} listing(s)»), mai di piu', e mai nessuno se la
+     chiave ne ha */
+  if (!numerati.length && (segn.length > nk || (nk && !segn.length))) guai.push('segnaposto non in pari: ' + k);
 }
 console.log(JSON.stringify({quante: Object.keys(d).length, guai}));
 """.replace("__EN__", testo)
@@ -199115,18 +199398,20 @@ console.log(JSON.stringify({quante: Object.keys(d).length, guai}));
 
     # --- 3. le chiavi stanno nella pagina ---
     import html as _html
-    piatto = re.sub(r"\s+", " ", _html.unescape(mini)).replace("\\'", "'")
+    # (tappa 2) anche server.py: le caselle della stradina, i distintivi,
+    # i livelli e i gruppi delle leve arrivano al DOM dal server
+    piatto = re.sub(r"\s+", " ", _html.unescape(mini + "\n" + src)).replace("\\'", "'").lower()
     senza = []
     for k in dict.fromkeys(chiavi_testo):
         k = k.replace('\\"', '"').replace("\\\\", "\\")
-        if "{}" not in k and k in piatto:
+        if "{}" not in k and k.lower() in piatto:
             continue
-        parole = [w for w in re.findall(r"[A-Za-zÀ-ÿ']+", k) if len(w) >= 4]
+        parole = [w.lower() for w in re.findall(r"[A-Za-zÀ-ÿ']+", k) if len(w) >= 4]
         if all(w[:-1] in piatto for w in parole):
             continue
         senza.append(k)
     prova("inglese: ogni chiave del dizionario ha le sue parole in "
-          "miniapp.html (una frase cambiata la' si cambia anche qui)",
+          "miniapp.html o in server.py (una frase cambiata la' si cambia anche qui)",
           [], senza)
 
     # --- 4. il traduttore ---
@@ -199158,7 +199443,9 @@ location.search = '?lingua=it&x=1'; out.paramIt = linguaApp();
 location.search = ''; out.ricordato = [linguaApp(), scatola.barattolo_lingua];
 scatola.barattolo_lingua = 'en'; out.ricordatoEn = linguaApp();
 caricaDizionario({"Ciao": "Hello", "{} oggetti": "{} items", "da {} a {}": "from {2} to {1}",
-                  "· {} offerenti · si chiude tra": "· {} bidders · closes in", "Nuovo": "New"});
+                  "· {} offerenti · si chiude tra": "· {} bidders · closes in", "Nuovo": "New",
+                  "{} annunci": "{} listings", "Casella {}: {}": "Square {}: {}",
+                  "Fai il primo acquisto": "Make your first purchase"});
 out.spento = traduci("Ciao");
 traduttoreArmato = true;
 out.secca = traduci("  Ciao\n ");
@@ -199167,6 +199454,13 @@ out.ordine = traduci("da 1 a 9");
 out.punto = traduci("· 3 offerenti · si chiude tra");
 out.manca = traduci("Arrivederci");
 out.vuota = traduci("   ");
+/* tappa 2: la forma corta vuole un buco breve, un buco non ingoia una
+   frase con la punteggiatura, e quel che cattura si traduce a sua volta */
+out.corta = [traduci("3 annunci"), traduci("Metti i tuoi annunci")];
+out.frase = traduci("da Roma. Poi a Milano");
+out.dentro = traduci("Casella 7: Fai il primo acquisto");
+out.popup = fraseInglese("Ciao\nArrivederci");
+out.frasi = [traduci("Metti i tuoi annunci. Casella 7: Fai il primo acquisto"), traduci("Titolo. Con un punto")];
 out.tManca = t("Arrivederci {n}", {n: 2});
 out.tOk = t("Ciao");
 const opz = {minimumFractionDigits: 2, maximumFractionDigits: 2};
@@ -199197,6 +199491,17 @@ console.log(JSON.stringify(out));
         prova("inglese: t() — la frase che manca resta italiana coi "
               "segnaposto riempiti, quella che c'e' esce inglese",
               ["Arrivederci 2", "Hello"], [o.get("tManca"), o.get("tOk")])
+        prova("inglese (tappa 2): la forma corta prende «3 annunci» e lascia "
+              "«Metti i tuoi annunci»; un buco non ingoia «Roma. Poi»; il "
+              "titolo dentro «Casella 7: …» si traduce; il popup riga per riga",
+              [["3 listings", None], None, "Square 7: Make your first purchase",
+               "Hello\nArrivederci"],
+              [o.get("corta"), o.get("frase"), o.get("dentro"), o.get("popup")])
+        prova("inglese (tappa 2, sera): frase per frase — il paragrafo "
+              "composto si riscrive dove si sa, e un testo senza chiavi "
+              "resta nullo",
+              ["Metti i tuoi annunci. Square 7: Make your first purchase", None],
+              o.get("frasi"))
         # (l'it-IT non raggruppa a quattro cifre: «1234,50», e' noto)
         prova("inglese: i numeri all'italiana PRIMA di numeriInglesi",
               ["1234,50", "19 601", "1 234"], o.get("prima"))
@@ -199213,12 +199518,15 @@ console.log(JSON.stringify(out));
            'LINGUE_FILE = ("en",)' in src,
            "if codice not in LINGUE_FILE or not LINGUA_INGLESE:" in src,
            'FileResponse(f"lingua/{codice}.js"' in src))
-    prova("inglese: la leva LINGUA_INGLESE nasce accesa, solo True accende, "
+    # SPENTA di serie dal 17 nov 2026 sera (Andrea: «L'inglese della prima
+    # parte lascialo spento»): in produzione arriva spenta, si accende dal
+    # config; sul collaudo sta accesa
+    prova("inglese: la leva LINGUA_INGLESE nasce SPENTA, solo True accende, "
           "e sta nel pannello e nel config d'esempio", (True, True, True),
           ("    from config import LINGUA_INGLESE\nexcept ImportError:\n"
-           "    LINGUA_INGLESE = True\nLINGUA_INGLESE = LINGUA_INGLESE is True" in src,
+           "    LINGUA_INGLESE = False\nLINGUA_INGLESE = LINGUA_INGLESE is True" in src,
            '"LINGUA_INGLESE", LINGUA_INGLESE,' in src,
-           "\nLINGUA_INGLESE = True\n" in open("config_esempio.py", encoding="utf-8").read()))
+           "\nLINGUA_INGLESE = False\n" in open("config_esempio.py", encoding="utf-8").read()))
     prova("inglese: il traduttore guarda il DOM (osservatore sulla radice, "
           "testi e attributi) e linguaSwap legge la lingua dell'app",
           (True, True, True),
@@ -200175,7 +200483,9 @@ def prove_incasso_annuncio():
     exec("SWAP_AUTO_MODI = " + re.search(r"\nSWAP_AUTO_MODI = ([^\n]+)\n", src).group(1), amb)
     for nome in ("_swap_auto_pref_prepara", "swap_auto_modo", "swap_auto_preferisce",
                  "incasso_da_payload", "incasso_annuncio", "incasso_ln_ordine",
-                 "swap_auto_aspetta", "_onchain_modo_salvato", "onchain_modo_ordine"):
+                 "swap_auto_aspetta", "_onchain_modo_salvato", "onchain_modo_ordine",
+                 # (17 nov 2026) il segno dell'acquisto grosso e la scelta senza
+                 "_onchain_grosso", "_onchain_modo_scelto"):
         exec(pezzo(nome), amb)
     con = _sq.connect(":memory:")
     con.row_factory = _sq.Row
@@ -201597,12 +201907,21 @@ def prove_p2p_onchain_tetto():
     src = open("server.py", encoding="utf-8").read().replace("\r\n", "\n")
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     rotta = pezzo_js(src, "async def p2p_onchain_pubblica_rotta(", "\n\n\n")
-    prova("la pubblicazione on-chain giudica con ONCHAIN_MAX_EURO, non "
-          "con P2P_MAX_EURO", (True, False),
-          ("tetto = int(ONCHAIN_MAX_EURO or 0)" in rotta,
-           "tetto = int(P2P_MAX_EURO or 0)" in rotta))
+    # (17 nov 2026, Andrea: «separalo») il suo tetto, a parte da quello
+    # del mercatino on-chain e da quello del P2P Lightning
+    prova("la pubblicazione on-chain giudica con P2P_ONCHAIN_MAX_EURO, non "
+          "con P2P_MAX_EURO ne' con ONCHAIN_MAX_EURO", (True, False, False),
+          ("tetto = int(P2P_ONCHAIN_MAX_EURO or 0)" in rotta,
+           "tetto = int(P2P_MAX_EURO or 0)" in rotta,
+           "tetto = int(ONCHAIN_MAX_EURO or 0)" in rotta))
     prova("il libro on-chain porta il tetto al telefono", True,
-          '"maxEuro": int(ONCHAIN_MAX_EURO or 0)' in src)
+          '"maxEuro": int(P2P_ONCHAIN_MAX_EURO or 0)' in src)
+    es = open("config_esempio.py", encoding="utf-8").read()
+    prova("la leva: 999 di serie (anche storta), nell'esempio e nel pannello",
+          (2, True, True),
+          (src.count("    P2P_ONCHAIN_MAX_EURO = 999\n"),
+           "\nP2P_ONCHAIN_MAX_EURO = 999\n" in es,
+           '_leva("Tetto scambi P2P on-chain (€)", "P2P_ONCHAIN_MAX_EURO"' in src))
     accogli = pezzo_js(mini, "function accogliLibroOnchainP2P(", "\n}\n")
     prova("il telefono lo tiene quando legge il libro (null se il server "
           "non lo dice)", True, "maxEuro: busta.maxEuro == null ? null" in accogli)
@@ -208807,6 +209126,26 @@ def prove_serie_classifica():
     mini = open("miniapp.html", encoding="utf-8").read()
     prova("la porta sta nel Profilo, sotto la settimana", True,
           "    ${serieSettimanaHTML(mySerie)}\n    ${serieClassificaPortaHTML(mySerie)}\n" in mini)
+    prova("il nome e' «Classifica Streak» (17 nov notte, scelta di Andrea), con "
+          "la fiamma DISEGNATA sul bottone e nel titolo del foglio: nessuna coppa",
+          [True, True, True, False],
+          ['${SERIE_FIAMMA}<span style="flex:1;min-width:0">Classifica Streak</span>' in mini,
+           '<h3><span id="serieClassificaFiamma"></span>Classifica Streak</h3>' in mini,
+           "fiamma.innerHTML = SERIE_FIAMMA;" in mini,
+           "🏆" in mini[mini.index('id="serieClassificaSheet"'):mini.index("La pastiglia del gesto «tira")]
+           or "🏆" in pezzo_js(mini, "function serieClassificaPortaHTML(s){", "\n}\n")])
+    _css = re.sub(r"/\*[\s\S]*?\*/", "", mini[mini.index("<style"):mini.index("</style>")])
+    prova("il bottone e' LUCIDO come la carta del prezzo P2P (riflesso chiaro "
+          "in alto a sinistra, discesa verso lo scuro) ma non grafite; il "
+          "colore sta in una riga, e scritte e fiamma sono chiare sul fondo",
+          [True, True, True, True, False],
+          [bool(re.search(r"--streak-lucido:radial-gradient\(120% 140% at 0% 0%,rgba\(255,255,255,\.18\) 0%,"
+                          r"rgba\(255,255,255,0\) 55%\),\s*linear-gradient\(160deg,#[0-9A-F]{6} 0%,#[0-9A-F]{6} 100%\)", _css)),
+           ".serie-cl-porta{background:var(--streak-lucido),var(--streak-fondo);" in _css,
+           "border-color:rgba(255,255,255,.14);color:#FFF7EC}" in _css,
+           ".serie-cl-porta .serie-f .f-fuori{fill:#fff}" in _css,
+           # non e' la grafite della carta: i due colori del gradiente sono altri
+           bool(re.search(r"--streak-lucido:[^;}]*#(2A2E35|121417)", _css))])
     prova("il foglio esiste, e' registrato in closeSheet e si chiude con "
           "l'indietro", [True, True, True],
           ['<div class="sheet" id="serieClassificaSheet">' in mini,
@@ -208824,7 +209163,7 @@ def prove_serie_classifica():
           "serie accesa, e dice che vale per i giorni di fila",
           [True, True],
           ["if (!myClassifica && !(typeof mySerie !== 'undefined' && mySerie)) return '';" in riga,
-           "anche quella dei giorni di fila" in riga])
+           "anche dalla Classifica Streak, i giorni di fila" in riga])
     prova("«I tuoi dati» dichiara il dato nuovo e chi lo vede", True,
           "<li>I tuoi <b>giorni di fila</b>:" in mini
           and "che vede solo chi è entrato in Barattolo" in mini)
@@ -208861,7 +209200,7 @@ console.log(JSON.stringify(out));
         salta("il banco del foglio della classifica", "node assente")
         return
     prova("la porta: niente senza serie, c'e' dal primo giorno, e dice cos'e'",
-          ["", True, "🏆 Classifica dei giorni di fila ›"], o.get("porta"))
+          ["", True, "🔥 Classifica Streak ›"], o.get("porta"))
     prova("le righe: medaglia ai primi tre posti, poi il numero; il nome, «tu» "
           "sulla propria, i giorni con la fiamma",
           ["🥇 Ada 🔥9", "🥉 Bruno 🔥5", "4° Carla tu 🔥5", "21° — 🔥2"], o.get("righe"))
@@ -209255,9 +209594,9 @@ def prove_caccia_a_tappo():
           [t for t in tabelle_gioco
            if f'"{t}"' not in fus and f"FROM {t} " not in fus and f"UPDATE {t} SET" not in fus
            or f'("{t}", "tg_id")' not in src]))
-    prova("la leva nasce ACCESA, e sta nel config d'esempio", (True, True),
-          ("except ImportError:\n    GIOCO_TAPPO_ATTIVO = True" in blocco,
-           bool(re.search(r"^GIOCO_TAPPO_ATTIVO = True$",
+    prova("la leva nasce SPENTA (Andrea, 17 nov sera), e sta nel config d'esempio", (True, True),
+          ("except ImportError:\n    GIOCO_TAPPO_ATTIVO = False" in blocco,
+           bool(re.search(r"^GIOCO_TAPPO_ATTIVO = False$",
                           open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                             "config_esempio.py"), encoding="utf-8").read(), re.M))))
 
@@ -209288,7 +209627,12 @@ def prove_caccia_a_tappo():
     js += _fn_js(mini, "function cacciaCoriandoliHTML(){") + _fn_js(mini, "function cacciaFestaHTML(d, fermo){") \
         + _fn_js(mini, "function cacciaBigliettoHTML(d){")
     cattivo = '<img src=x onerror=alert(1)>'
+    # IL CASO CON UN SEME (17 nov sera): la Gazza che vola a caso e i sats
+    # che cadono a caso facevano rossa una giocata su dieci (un sat caduto
+    # proprio sotto Tappo si riprendeva subito); il banco tira sempre gli
+    # stessi numeri
     banco = r"""
+Math.random = (() => { let s = 42; return () => (s = s * 16807 % 2147483647) / 2147483647; })();
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = n => String(n);
 const EMOJI_CAT = {Elettronica: '🔌'}, CATS = ['Tutto', 'Elettronica'];
