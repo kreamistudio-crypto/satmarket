@@ -9725,7 +9725,16 @@
      vince per specificita': quel verde e' dichiarato, non ereditato
      per caso. */
   .fine-frase{white-space:nowrap}
-  .guida-wallet-riga{font-size:12.5px;color:var(--ink-soft);font-weight:600;margin:8px 0 10px}
+  .guida-wallet-btn{margin:8px 0 12px}
+  /* la casella del Profilo, sotto i sette giorni: verde fiducia, non
+     l'arancio della serie (quinto giro, 17 nov 2026) */
+  .guida-wallet-box{margin-top:10px;background:var(--trust-soft);
+    border:1px solid var(--trust);border-radius:var(--radius);
+    padding:14px;display:flex;flex-direction:column;gap:10px}
+  .gwb-testo{display:flex;flex-direction:column;gap:3px;font-size:13px;
+    line-height:1.35;color:var(--ink)}
+  .gwb-testo b{font-family:var(--font-tit);font-size:15px;color:var(--trust)}
+  .guida-wallet-box .btn{margin:0}
   /* LA GUIDA «IL TUO PRIMO WALLET» (17 nov 2026): tre passi col pallino
      arancio di .sicu-passi, nelle misure di un foglio; il bottone di un
      passo sta DENTRO il passo, cosi' «cosa fare» e «con cosa» sono una
@@ -16301,7 +16310,7 @@ document.getElementById('cartello')?.remove();</script>
     <!-- la porta della guida «Il tuo primo wallet» (17 nov 2026): e' di
          Lightning, quindi la porta on-chain la spegne e il ritorno alla
          fattura la riaccende (`payGuidaWalletVista`) -->
-    <div id="payGuidaWallet" class="guida-wallet-riga" style="text-align:center;margin:-6px 0 12px">Non hai un wallet? <button type="button" class="scopri-link" onclick="apriGuidaWallet('paga')">Te lo spieghiamo in tre passi</button></div>
+    <button type="button" id="payGuidaWallet" class="btn ghost guida-wallet-btn" style="margin:0 0 12px" onclick="apriGuidaWallet('paga')">👛 Non hai un wallet? Ti spieghiamo come fare</button>
     <!-- LA SCADENZA E LA PORTA DEL WALLET (24 set 2026, «Paga ora»):
          una riga sola, accesa da mostraQr per OGNI flusso che apre il
          foglio. A sinistra il conto alla rovescia letto dalla bolt11;
@@ -41795,7 +41804,8 @@ function renderProfilo(){
       </div>
       ${tondi}
     </div>
-    ${serieSettimanaHTML(mySerie)}`;
+    ${serieSettimanaHTML(mySerie)}
+    ${guidaWalletBoxHTML()}`;
   /* LA FOTO DELLA TESTATA APRE «I TUOI ACCOUNT» (16 ott 2026, dal campo:
      «il doppio tocco sulla foto non fa niente»): sul telefono il tappo
      nel Profilo non c'e', e il secondo tocco cadeva qui, sulla foto, che
@@ -71328,8 +71338,25 @@ function apriLinkGuida(quale){
 let guidaWalletScopo = 'incassa';
 function rigaGuidaWallet(scopo){
   const sc = scopo === 'paga' ? 'paga' : 'incassa';
-  return '<div class="guida-wallet-riga">Non hai un wallet? '
-    + '<button type="button" class="scopri-link" onclick="apriGuidaWallet(\'' + sc + '\')">Te lo spieghiamo in tre passi</button></div>';
+  /* UN BOTTONE VERO, non un link nel testo (17 nov 2026, quarto giro,
+     Andrea dalla produzione: «è troppo nascosta, mettila con un tasto
+     visibile»): la porta e' alta quanto le altre, e si vede. */
+  return '<button type="button" class="btn ghost guida-wallet-btn" onclick="apriGuidaWallet(\'' + sc + '\')">👛 Non hai un wallet? Ti spieghiamo come fare</button>';
+}
+/* LA CASELLA NEL PROFILO (17 nov 2026, quinto giro, Andrea: «mettimelo
+   sotto una casella apposita sotto lo streak, colorata in un certo
+   modo»): sotto la fila dei sette giorni, una carta VERDE — il verde
+   della fiducia (--trust-soft), non l'arancio della serie, cosi' non
+   sembra un pezzo della serie e si vede che e' un'altra cosa. Solo a chi
+   non ha ancora un indirizzo: con l'indirizzo salvato la casella
+   sparisce, e la guida resta accanto al campo del Profilo. */
+function guidaWalletBoxHTML(){
+  if (myLnAddress) return '';
+  return `<div class="guida-wallet-box">
+    <div class="gwb-testo"><b>👛 Il tuo primo wallet</b>
+      <span>Non ne hai ancora uno? Tre passi, gratis, e incassi da solo.</span></div>
+    <button type="button" class="btn primary" onclick="apriGuidaWallet('incassa')">Ti spieghiamo come fare</button>
+  </div>`;
 }
 function apriGuidaWallet(scopo){
   haptic();

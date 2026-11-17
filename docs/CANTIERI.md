@@ -86520,6 +86520,39 @@ giro mirato: undici sezioni (362 verdi) e tre collaudi vicini
 (indirizzo-lightning, regali-livello, pionieri); un secondo rebase su
 28d4e262 (chiedi-locker, stesso controllo) e lo stesso giro mirato.
 
+IL QUARTO GIRO (Andrea, dalla produzione: «la guida del wallet è troppo
+nascosta. Mettila con un tasto visibile»). La porta era una riga di
+testo piccola con un link sottolineato, sotto il QR: nel foglio della
+fattura, fra QR, scadenza e «Ho pagato», spariva. Ora è un BOTTONE
+(`.btn.ghost.guida-wallet-btn`, «👛 Non hai un wallet? Ti spieghiamo come
+fare»), alto quanto gli altri, nelle stesse cinque porte: sotto la nota
+del QR nel foglio della fattura, sopra il campo dell'indirizzo nei
+pannelli d'incasso e rimborso, sotto il campo nel Profilo. Il testo
+cambia di una parola perché ora sta su un bottone. Prova: la porta e'
+un `.btn` in `rigaGuidaWallet` e nel markup, e nessun `scopri-link` apre
+piu' la guida.
+
+IL QUINTO GIRO (Andrea, subito dopo: «mettimelo sotto una casella
+apposita sotto lo streak, colorata in un certo modo»). Nel Profilo,
+sotto la fila dei sette giorni della serie 🔥, una casella sua:
+`.guida-wallet-box`, titolo «👛 Il tuo primo wallet», una riga («Non ne
+hai ancora uno? Tre passi, gratis, e incassi da solo.») e il bottone
+pieno «Ti spieghiamo come fare» che apre la guida con lo scopo
+«incassa». IL COLORE: verde fiducia (`--trust-soft` col bordo `--trust`),
+NON l'arancio della serie: con l'arancio sembrava un pezzo della serie,
+e il verde e' quello che in casa dice «i tuoi sats restano tuoi». SOLO
+A CHI NON HA L'INDIRIZZO (`guidaWalletBoxHTML()` torna '' con
+`myLnAddress`): a chi incassa gia' da solo la casella non serve, e la
+porta accanto al campo del Profilo resta per chi vuole rileggerla.
+Scartato: metterla nella carta del nome (e' gia' piena: stelle, titolo,
+serie) e la stessa casella anche nel foglio della fattura (li' il
+bottone del quarto giro basta, e lo scopo e' «paga»). Prove: la casella
+sta dopo `serieSettimanaHTML` nel markup di `renderProfilo`, e' verde e
+senza `--sats`, apre `apriGuidaWallet('incassa')`, e sotto node sparisce
+con l'indirizzo; la prova della testata del Profilo (serie-giorni) ora
+la aspetta dopo la settimana. Schermate chiare e scure in
+/mnt/project-files/wallet-guida/.
+
 DA GUARDARE. I nomi dei bottoni dentro Wallet of Satoshi («Ricevi») sono
 quelli del suo menu oggi: se cambiano, la guida va ritoccata. Se i
 neofiti si fermano ancora al wallet, la strada C dello studio.
