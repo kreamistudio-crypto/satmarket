@@ -162926,7 +162926,7 @@ def prove_p2p_onchain():
           "del libro on-chain e' accogliLibroOnchainP2P, prendere e' prendiOnchainP2P)",
           ([], 1, 1),
           (doppi, mini.count("function accogliLibroOnchainP2P(busta){"),
-           mini.count("async function prendiOnchainP2P(id){")))
+           mini.count("async function prendiOnchainP2P(id, extra){")))
     prova("...e le due fotografie del libro accolgono la busta, non prendono nulla",
           (1, 1, 0),
           (mini.count("const onchain = typeof accogliLibroOnchainP2P === 'function' "
@@ -162964,7 +162964,9 @@ def prove_p2p_onchain():
     # (2 nov 2026, p2p-onchain-usdt) il `f` dice la valuta dello scambio
     amb["P2P_ONCHAIN_RETI_USDT"] = {"USDT (Tron)": {}, "USDT (Ethereum)": {}}
     for _n in ("_p2p_onchain_metodi", "p2p_onchain_metodi_usdt", "p2p_onchain_usdt",
-               "p2p_onchain_chf", "p2p_onchain_valuta"):
+               "p2p_onchain_chf", "p2p_onchain_valuta",
+               # (17 nov 2026 sera) un Barattozon in «Compra BTC» dice la fascia
+               "p2p_onchain_tab_dati", "p2p_onchain_tab_compra"):
         exec(pezzo(_n), amb)
     exec(pezzo("p2p_onchain_tags"), amb)
     o = {"ordine": "bar-onchain-abc", "lato": "sell", "stato": "pending",
@@ -164221,8 +164223,9 @@ def prove_p2p_onchain_valute():
            # (17 nov 2026, barattozon-onchain) dopo `fiat` viene il PayCode
            # (17 nov 2026 sera, onchain-contanti) ...e dopo il PayCode la zona
            # (17 nov 2026 sera, paracadute-su-giu) ...e dopo la zona le due soglie
+           # (17 nov 2026 sera, barattozon-oc-compra) ...e dopo le soglie la fascia
            '"CHF" if chf else "",\n             json.dumps(tab) if tab else "", zona, para_su, '
-           'para_giu))' in pub
+           'para_giu,\n             fascia[0] if fascia else 0))' in pub
            and '("fiat", "TEXT DEFAULT \'\'")' in pezzo("_p2p_onchain_prepara"),
            'if coin_o and not p2p_coin_ammesso(user["id"]):' in pre
            and 'if p2p_onchain_chf(o) and not p2p_chf_ammesso(user["id"]):' in pre,
@@ -164323,9 +164326,10 @@ console.log(JSON.stringify(out));
            and "valuta: String(campi.valuta || 'EUR').toUpperCase() === 'CHF' ? 'CHF' : ''," in pub,
            "busta.eventi.map(vestiOcP2P)" in mini and "((await r.json()).ordini || []).map(vestiOcP2P)" in mini
            and "o = vestiOcP2P(await r.json());" in mini,
-           # (17 nov 2026, barattozon-onchain) il tabacchino solo in vendita e a leva accesa
+           # (17 nov 2026, barattozon-onchain) il tabacchino a leva accesa,
+           # dalla sera nei due lati
            "return metodiPubblicabiliP2P(lato).filter(m => m !== P2P_TABACCHINO\n"
-           "    || (lato === 'vendo' && typeof bzOnchainP2P === 'function' && bzOnchainP2P()));" in mini,
+           "    || (typeof bzOnchainP2P === 'function' && bzOnchainP2P()));" in mini,
            "if (ricevo && rCoin) {" in pezzo_js(mini, "function schedaOnchainP2P(o){", "\n}\n")])
 
 
@@ -164599,7 +164603,7 @@ def prove_tasti_rete_foglio():
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     src = _SORGENTE
     a = mini.index("/* ══ I DUE TASTI DELLA RETE IN CIMA AL FOGLIO DELL'ORDINE")
-    b = mini.index("async function prendiOnchainP2P(id){")
+    b = mini.index("async function prendiOnchainP2P(id, extra){")
     banco = r"""
 const esc = s => String(s == null ? '' : s).replace(/"/g, '&quot;');
 const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -164781,7 +164785,7 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
                 True, True], {"rete": "oc", "nota": "no dep"}, "ln"],
               [o.get("swapNo"), o.get("swapNoDep"), o.get("swapDiNuovo")])
     presa = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
-    prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
+    prendi = pezzo_js(mini, "async function prendiOnchainP2P(id, extra){", "\n}\n")
     dett = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
     fine = pezzo_js(mini, "function fineTutorialCoinP2P(finito){", "\n}\n")
     # (16 nov 2026, ricevi-mercato) il banner solo non c'e' piu': le stablecoin
@@ -166479,7 +166483,7 @@ const P2P_METODI = ['SEPA', 'Revolut', 'Contanti', P2P_TABACCHINO];
 const P2P_VALUTE = [{cod: 'EUR', bandiera: 'EU'}];
 const LOGO_BZ_HTML = '<img class="logo-bz">';
 let p2pOnchainLibro = {eventi: [], miei: [], quando: 0, rete: 'signet', minSats: 10000};
-const metodiPubblicabiliP2P = l => l === 'vendo' ? ['SEPA', P2P_TABACCHINO] : ['SEPA'];
+const metodiPubblicabiliP2P = l => ['SEPA', P2P_TABACCHINO];
 const vesteMetodoP2P = () => false, marchioMetodoP2P = m => m;
 const nomeMetodiP2P = l => l === 'compro' ? 'Come vuoi inviare' : 'Come vuoi ricevere';
 const sezioneNuovoP2P = o => '<sez ico="' + (o.ico || '') + '">' + o.titolo + '|' + o.corpo + (o.sotto || '') + '</sez>';
@@ -166566,12 +166570,13 @@ LOG.length = 0; p2pNuovoOc = true;
 cambiaReteP2P('onchain'); out.stessaRete = LOG.slice();
 cambiaReteP2P('ln'); out.versoLn = [LOG.slice(), p2pNuovoOc];
 LOG.length = 0; p2pLato = 'compro';
-// col tabacchino in «Compra BTC» l'on-chain non si accende: li' Barattozon
-// resta solo via Lightning (dal 17 nov 2026 in «Vendi BTC» passa, a leva accesa)
-p2pNuovoMetodi = ['SEPA', P2P_TABACCHINO];
+// col tabacchino in «Compra BTC» l'on-chain si accende dal 17 nov 2026 sera,
+// e la fascia resta (prima Barattozon in compra era solo via Lightning)
+p2pNuovoMetodi = ['SEPA', P2P_TABACCHINO]; p2pNuovoEuroMax = '90'; p2pNuovoDue = true;
 cambiaReteP2P('onchain');
-out.bzFisso = [LOG.slice(), p2pNuovoOc, p2pNuovoMetodi.slice()];
-LOG.length = 0; p2pLato = 'vendo'; p2pOnchainLibro.barattozon = false;
+out.bzFisso = [LOG.slice(), p2pNuovoOc, p2pNuovoMetodi.slice(), p2pNuovoEuroMax, p2pNuovoDue];
+LOG.length = 0; p2pNuovoOc = false; p2pNuovoEuroMax = ''; p2pNuovoDue = false;
+p2pLato = 'vendo'; p2pOnchainLibro.barattozon = false;
 cambiaReteP2P('onchain');
 out.bzSpento = [LOG.slice(), p2pNuovoOc];
 LOG.length = 0; delete p2pOnchainLibro.barattozon;
@@ -166698,10 +166703,11 @@ console.log(JSON.stringify(out));
         # BARATTOZON ANCHE ON-CHAIN (17 nov 2026, «si» di Andrea al piano):
         # in «Vendi BTC», a leva accesa, il tabacchino passa e resta; in
         # «Compra BTC» o a leva spenta vale ancora il solo Lightning di sopra
-        prova("...ma col tabacchino in «Compra BTC» non si accende: lo dice e il "
-              "foglio resta Barattozon; in cima c'e' il solo Lightning",
-              ([["toast:Barattozon in acquisto si scambia solo via Lightning ⚡"], False,
-                ["SEPA", "Contanti al tabacchino"]], [False, True, True]),
+        # (17 nov 2026 sera, «Si costruiscilo») anche in «Compra BTC», con la fascia
+        prova("...col tabacchino in «Compra BTC» si accende e tiene la fascia; "
+              "l'interruttore fisso resta per la leva spenta",
+              ([["disegno:oc"], True, ["SEPA", "Contanti al tabacchino"], "90", True],
+               [False, True, True]),
               (out["bzFisso"], out["spento"]))
         prova("...in «Vendi BTC» a leva spenta nemmeno; a leva accesa si accende "
               "e il tabacchino resta fra i metodi",
@@ -166712,9 +166718,9 @@ console.log(JSON.stringify(out));
               "Lightning, col fulmine", [True, True, True], out["interruttore"])
         prova("...e a chi non e' ammesso l'interruttore non c'e', e on-chain non si accende",
               ("", [[], False]), (out["chiuso"], out["chiusoOc"]))
-        prova("i metodi on-chain sono quelli del lato; il tabacchino solo in "
-              "«Vendi BTC» e a leva accesa",
-              ([["SEPA", "Contanti al tabacchino"], ["SEPA"]], ["SEPA"]),
+        prova("i metodi on-chain sono quelli del lato; il tabacchino a leva "
+              "accesa, nei due lati",
+              ([["SEPA", "Contanti al tabacchino"], ["SEPA", "Contanti al tabacchino"]], ["SEPA"]),
               (out["metodi"], out["metodiSpento"]))
         prova("«Dove vuoi gli euro» e il riquadro della rete: il minimo, il tetto, "
               "la rete di prova (e su mainnet niente)",
@@ -167076,7 +167082,7 @@ console.log(JSON.stringify(out));
     porta = pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto, senzaCarte){", "\n}\n")
     dett = pezzo_js(mini, "function apriDettaglioOnchainP2P(id){", "\n}\n")
     pubb = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
-    prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
+    prendi = pezzo_js(mini, "async function prendiOnchainP2P(id, extra){", "\n}\n")
     apri = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
     # (17:29) il «Novità» apre il tutorial, e l'ultima tappa apre la
     # scelta del + sotto il velo; alla fine se ne vanno card finte e scelta
@@ -167097,8 +167103,8 @@ console.log(JSON.stringify(out));
     nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
     prova("il foglio di Lightning ha il suo posto in cima per l'interruttore, e lo riempie",
           (True, True), ('id="p2pNuovoRete"' in mini,
-                         "interruttoreReteP2P(oc ? 'onchain' : 'ln', tabMetodo && (compro || "
-                         "!(typeof bzOnchainP2P === 'function' && bzOnchainP2P())))" in nuovo))
+                         "interruttoreReteP2P(oc ? 'onchain' : 'ln', tabMetodo && "
+                         "!(typeof bzOnchainP2P === 'function' && bzOnchainP2P()))" in nuovo))
     # IL FOGLIO ON-CHAIN E' QUELLO DI LIGHTNING (30 ott 2026 sera, cantiere
     # oc-identico, Andrea: «di deve essere la possibilita di pubblicare a
     # prezzo di mercato o a prezzo fisso la domanda chi puo prendere l
@@ -167119,7 +167125,9 @@ console.log(JSON.stringify(out));
           # «Vendi BTC» a leva accesa (17 nov 2026), e li' niente recapito;
           # l'intervallo: il secondo importo non si svela
           ("(oc ? metodiOnchainP2P(compro ? 'compro' : 'vendo') : metodiPubblicabiliP2P(" in nuovo,
-           "  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) return;\n"
+           # (17 nov 2026 sera) Barattozon in «Compra BTC» on-chain tiene la fascia
+           "  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc\n"
+           "      && !(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')) return;\n"
            "  if (p2pNuovoDue || p2pNuovoFisso || (tabacchinoP2P(p2pNuovoMetodi) && p2pLato !== 'compro')) return;"
            in pezzo_js(mini, "function svelaSecondoImportoP2P(){", "\n}\n"),
            # (17 nov 2026, onchain-contanti) la zona c'e' anche on-chain
@@ -192742,7 +192750,9 @@ def prove_barattozon_onchain():
     for n in ("_p2p_onchain_campo", "_importo_paycode_valido", "_paycode_sopra_minimo",
               "p2p_onchain_tab_dati", "p2p_onchain_tab_scade", "p2p_onchain_giudica_tabacchino",
               "p2p_onchain_scade_libro", "p2p_onchain_ore_pagamento", "p2p_onchain_paga_entro",
-              "_p2p_onchain_testi_deposito_tab"):
+              "_p2p_onchain_testi_deposito_tab", "_p2p_onchain_tab_codice",
+              "p2p_onchain_giudica_tab_compra", "p2p_onchain_tab_compra",
+              "p2p_onchain_giudica_tab_presa", "_p2p_onchain_euro_testo"):
         exec(pezzo(n), amb)
     prova("le costanti vere: 12 ore di vita minima, 8 di margine (le 6 del deposito + 2), 72 ore e 10 minuti al massimo",
           [True, True, True, True],
@@ -192783,6 +192793,50 @@ def prove_barattozon_onchain():
     amb["P2P_ONCHAIN_BARATTOZON"] = False
     prova("a leva spenta il server rifiuta e dice di passare da Lightning", True,
           "Lightning" in G("sell", TAB, 3999, "EUR", buono, ORA, 25)[0])
+    amb["P2P_ONCHAIN_BARATTOZON"] = True
+    # --- «Compra BTC» col tabacchino (17 nov 2026 sera, Andrea: «Si
+    # costruiscilo»): la fascia alla pubblicazione, il PayCode alla presa
+    amb["P2P_ONCHAIN_ORE_DEPOSITO"] = 6
+    C = amb["p2p_onchain_giudica_tab_compra"]
+    TABC = ["Contanti al tabacchino"]
+    prova("in compra la fascia buona passa (min, max in centesimi); senza tabacchino non e' affar suo",
+          [("", (2500, 25000)), ("", None)],
+          [C(TABC, 2500, 25000, "EUR", True, 25), C(["Revolut"], 2500, 25000, "EUR", True, 25)])
+    noc = lambda *a: bool(C(*a)[0]) and C(*a)[1] is None
+    prova("i rifiuti in compra: due metodi, in USDT, prezzo fisso, senza fascia, fascia rovescia, "
+          "oltre 999 €, sotto il minimo",
+          [True] * 7,
+          [noc(TABC + ["Revolut"], 2500, 25000, "EUR", True, 25),
+           noc(TABC, 2500, 25000, "USDT", True, 25),
+           noc(TABC, 2500, 25000, "EUR", False, 25),
+           noc(TABC, 0, 25000, "EUR", True, 25),
+           noc(TABC, 25000, 2500, "EUR", True, 25),
+           noc(TABC, 2500, 99901, "EUR", True, 25),
+           noc(TABC, 2000, 25000, "EUR", True, 25)])
+    oc = {"lato": "buy", "tab_min_cent": 2500, "euro_cent": 25000, "paycode": ""}
+    T = amb["p2p_onchain_tab_compra"]
+    prova("un Barattozon in compra nel libro: fascia e niente PayCode; col PayCode o in vendita no",
+          [True, False, False, False],
+          [T(oc), T(dict(oc, paycode=json.dumps(ok[1]))), T(dict(oc, lato="sell")),
+           T(dict(oc, tab_min_cent=0))])
+    P = amb["p2p_onchain_giudica_tab_presa"]
+    presa = {"paycode": "212-802-988", "scade": ORA + 20 * 3600, "barre": "", "euro_cent": 4730}
+    prova("la presa buona: PayCode pulito, scadenza, importo in centesimi",
+          ["", {"pc": "212802988", "scade": ORA + 20 * 3600, "barre": ""}, 4730],
+          list(P(oc, presa, ORA)))
+    prova("i rifiuti alla presa: senza importo, fuori fascia sotto e sopra, scade sotto le 8 ore, "
+          "PayCode corto; 24,50 € passa in una fascia da 25 (l'intero per eccesso, come il telefono)",
+          [True, True, True, True, True, True, ""],
+          [bool(P(oc, dict(presa, euro_cent=0), ORA)[0]),
+           "da 25 a 250" in P(oc, dict(presa, euro_cent=2300), ORA)[0],
+           bool(P(oc, dict(presa, euro_cent=25001), ORA)[0]),
+           "8 ore" in P(oc, dict(presa, scade=ORA + 8 * 3600 - 1), ORA)[0],
+           bool(P(oc, dict(presa, paycode="21280298"), ORA)[0]),
+           P(oc, presa, ORA)[1] is not None and P(oc, dict(presa, scade=ORA + 8 * 3600), ORA)[0] == "",
+           P(oc, dict(presa, euro_cent=2450), ORA)[0]])
+    amb["P2P_ONCHAIN_BARATTOZON"] = False
+    prova("a leva spenta niente compra col tabacchino, ne' alla pubblicazione ne' alla presa",
+          [True, True], [bool(C(TABC, 2500, 25000, "EUR", True, 25)[0]), bool(P(oc, presa, ORA)[0])])
     amb["P2P_ONCHAIN_BARATTOZON"] = True
     L = amb["p2p_onchain_scade_libro"]
     prova("la vita nel libro: 8 ore prima del PayCode, mai oltre i 7 giorni, e senza PayCode quella di sempre",
@@ -192828,24 +192882,28 @@ def prove_barattozon_onchain():
           "la vita del libro dal PayCode, e la colonna `paycode`",
           [True, True, True, True, True],
           ["perche, tab = p2p_onchain_giudica_tabacchino(" in pub,
+           # (17 nov 2026 sera, barattozon-oc-compra) anche la fascia di «Compra BTC»
+           "if tab or fascia:\n" in pub and
            "rip, recapito = None, \"\"\n        para, para_da, para_letto = 0, 0.0, 0\n"
            "        para_su = para_giu = 0" in pub,
            'p2p_onchain_scade_libro(adesso, tab["scade"] if tab else 0)' in pub,
            # (17 nov 2026 sera, onchain-contanti) dopo il PayCode viene la zona,
            # e dopo la zona le due soglie del paracadute (paracadute-su-giu)
-           'json.dumps(tab) if tab else "", zona, para_su, para_giu))' in pub,
+           # (17 nov 2026 sera, barattozon-oc-compra) e in coda la fascia di «Compra BTC»
+           'json.dumps(tab) if tab else "", zona, para_su, para_giu,\n             fascia[0] if fascia else 0))' in pub,
            '("paycode", "TEXT DEFAULT \'\'")' in src])
     prova("il recapito di un Barattozon non si scrive, e un Barattozon in pausa si prende lo stesso",
           [True, True, True],
           ["if p2p_onchain_tab_scade(o):\n            # (17 nov 2026) in un Barattozon il recapito e' il PayCode" in src,
            "fino = 0 if tab else _fine_pausa_p2p(" in pezzo("_p2p_onchain_porta_presa"),
-           'and not p2p_onchain_tab_scade(o):' in pezzo("_p2p_onchain_libro")])
+           'and not p2p_onchain_tab_scade(o) \\\n                and not p2p_onchain_tab_compra(o):' in pezzo("_p2p_onchain_libro")])
     # --- il telefono ---
-    prova("il foglio: l'interruttore non e' piu' fisso in «Vendi BTC», il cambio di rete lo lascia "
+    prova("il foglio: l'interruttore non e' piu' fisso col tabacchino (dal 17 nov 2026 sera anche in "
+          "«Compra BTC»), il cambio di rete lo lascia "
           "passare a leva accesa, e il recapito lascia il posto al PayCode",
           [1, 1, 1, 0],
-          [mini.count("interruttoreReteP2P(oc ? 'onchain' : 'ln', tabMetodo && (compro || !(typeof bzOnchainP2P === 'function' && bzOnchainP2P())))"),
-           mini.count("if (oc && tabacchinoP2P(p2pNuovoMetodi) && (p2pLato === 'compro' || !bzOnchainP2P())) {"),
+          [mini.count("interruttoreReteP2P(oc ? 'onchain' : 'ln', tabMetodo && !(typeof bzOnchainP2P === 'function' && bzOnchainP2P()))"),
+           mini.count("if (oc && tabacchinoP2P(p2pNuovoMetodi) && !bzOnchainP2P()) {"),
            # (17 nov 2026, onchain-contanti) fra le due meta' c'e' ora anche
            # il SOLO «Contanti», che al posto del recapito ha la zona
            mini.count("return (p2pLato !== 'compro' && !tabacchinoP2P(p2pNuovoMetodi)\n"
@@ -192912,9 +192970,10 @@ console.log(JSON.stringify(r));
     prova("il banco di Barattozon on-chain gira in node", True, bool(out))
     if not out:
         return
-    prova("la lista dei metodi on-chain: senza leva niente tabacchino; con la leva solo in «Vendi BTC»; "
-          "col libro non ancora letto vale accesa (l'interruttore non nasce fisso)",
-          [[["Revolut"], False], [["Revolut", "Contanti al tabacchino"], ["Revolut"]], True],
+    prova("la lista dei metodi on-chain: senza leva niente tabacchino; con la leva in «Vendi BTC» e, "
+          "dal 17 nov 2026 sera, anche in «Compra BTC»; col libro non ancora letto vale accesa "
+          "(l'interruttore non nasce fisso)",
+          [[["Revolut"], False], [["Revolut", "Contanti al tabacchino"], ["Revolut", "Contanti al tabacchino"]], True],
           [out["spenta"], out["accesa"], out["nonLetta"]])
     prova("la vita nel libro del telefono e' quella del server: 8 ore prima, mai oltre i 7 giorni",
           [1000 + 16 * 3600, 1000 + 168 * 3600], out["vita"])
@@ -205870,8 +205929,9 @@ def prove_onchain_contanti():
           ("perche = p2p_onchain_giudica_contanti(metodi, euro_cent, d.get(\"zona\")," in rotta,
            "if not perche and \"Contanti\" in _metodi_libro(metodi):\n            zona = _zona_pulita_p2p(d.get(\"zona\"))" in rotta,
            # (17 nov 2026 sera, paracadute-su-giu) dopo la zona le due soglie
-           "\" rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu)\"" in rotta
-           and "json.dumps(tab) if tab else \"\", zona, para_su, para_giu))" in rotta,
+           # (17 nov 2026 sera, barattozon-oc-compra) e in coda la fascia di «Compra BTC»
+           "\" rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu,\"" in rotta
+           and "json.dumps(tab) if tab else \"\", zona, para_su, para_giu,\n             fascia[0] if fascia else 0))" in rotta,
            "tetto_c = p2p_onchain_tetto_usdt(tetto_c, cambio_noto_ora(\"eur\"), cambio)" in rotta))
     prova("la colonna nasce da sola, e la zona esce nel libro e nella scheda dello scambio",
           (True, True, True),
@@ -206442,7 +206502,7 @@ def prove_onchain_cauzione():
            and "cz = _p2p_onchain_cauzione_di(con, o, tg_id, admin)" in pezzo("_p2p_onchain_per"),
            "if not mia and not admin:\n        return None" in pezzo("_p2p_onchain_cauzione_di")))
     # --- il telefono ---
-    prendi = _fn_js(mini, "async function prendiOnchainP2P(id){")
+    prendi = _fn_js(mini, "async function prendiOnchainP2P(id, extra){")
     apri = _fn_js(mini, "async function apriCauzioneOcP2P(id, metodo){")
     prova("il telefono: senza metodo scelto non prende e riapre il foglio; in contanti con la "
           "leva accesa apre PRIMA il foglio della cauzione; il metodo viaggia nella presa",
@@ -206451,7 +206511,8 @@ def prove_onchain_cauzione():
            and "return apriOnchainP2P(id);" in prendi,
            prendi.index("if (riga && !conCauzione && cauzioneOcServeP2P(riga)) return apriCauzioneOcP2P(id, metodo);")
            < prendi.index("/prendi`"),
-           "body: JSON.stringify(metodo ? {metodo} : {})});" in prendi))
+           # (17 nov 2026 sera) con il PayCode di un Barattozon in «Compra BTC» accanto
+           "body: JSON.stringify(Object.assign(metodo ? {metodo} : {}, extra || {}))});" in prendi))
     prova("il foglio della cauzione: il QR della richiesta, il battito che si ferma a foglio "
           "chiuso, e a cauzione tenuta chiude e prende da solo",
           (True, True, True, True),

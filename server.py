@@ -108240,8 +108240,12 @@ STATI_P2P_ONCHAIN_CON_SATS = ("depositato", "euro_inviati", "disputa")
 # al moderatore, mai nel libro, mai negli avvisi ne' nel journal. E' un
 # cancello piu' duro di quello del telefono (14 nov, paycode-dopo-garanzia):
 # lo tiene il server, non l'app di chi vende.
-# SOLO «VENDI BTC», IN EURO, UN METODO SOLO: Barattozon in compra (31 ott)
-# vuole il PayCode scritto da chi prende, ed e' un'altra strada.
+# IN EURO, UN METODO SOLO. In «Vendi BTC» il PayCode lo scrive chi
+# pubblica. IN «COMPRA BTC» (17 nov 2026 sera, Andrea: «Si costruiscilo»)
+# chi pubblica scrive solo la fascia (`tab_min_cent` .. `euro_cent`) a
+# prezzo di mercato, e il PayCode coi suoi dati lo scrive chi prende,
+# alla presa (`p2p_onchain_giudica_tab_presa`, almeno le 8 ore del
+# margine): da li' in poi la riga e' identica a quella di «Vendi BTC».
 # Dietro la sua leva, accesa di serie: spenta, il server rifiuta e il
 # foglio torna a «solo Lightning».
 try:
@@ -108309,6 +108313,19 @@ def p2p_onchain_giudica_tabacchino(lato, metodi, euro_cent, valuta, tab,
         return "Un PayCode di Amazon va da 0,01 a 999,00 €", None
     if not _paycode_sopra_minimo(cent / 100, minimo_euro):
         return f"Con Barattozon il minimo è {int(minimo_euro)} €", None
+    return _p2p_onchain_tab_codice(
+        tab, adesso, P2P_ONCHAIN_TAB_MIN_S,
+        "Su on-chain serve un PayCode che scade fra almeno 12 ore: il deposito "
+        "si conferma in rete, e poi bisogna andare al tabacchino. Con meno "
+        "tempo pubblicalo via Lightning ⚡")
+
+
+def _p2p_onchain_tab_codice(tab, adesso: int, minimo_s: int, presto: str) -> tuple:
+    """PURA: i tre dati del PayCode (nove cifre, scadenza, codice a barre
+    facoltativo), giudicati: `(perche, {pc, scade, barre})`. La scadenza
+    sta fra `minimo_s` (la frase `presto` se manca) e le 72 ore. La usano
+    chi pubblica in «Vendi BTC» e, dal 17 nov 2026 sera, chi prende un
+    Barattozon in «Compra BTC» (`p2p_onchain_giudica_tab_presa`)."""
     t = tab if isinstance(tab, dict) else {}
     pc = re.sub(r"[\s-]", "", str(t.get("paycode") or ""))
     if not re.fullmatch(r"\d{9}", pc):
@@ -108319,10 +108336,8 @@ def p2p_onchain_giudica_tabacchino(lato, metodi, euro_cent, valuta, tab,
         scade = 0
     if scade <= adesso:
         return "La scadenza del PayCode è già passata: serve un PayCode nuovo", None
-    if scade < adesso + P2P_ONCHAIN_TAB_MIN_S:
-        return ("Su on-chain serve un PayCode che scade fra almeno 12 ore: "
-                "il deposito si conferma in rete, e poi bisogna andare al "
-                "tabacchino. Con meno tempo pubblicalo via Lightning ⚡"), None
+    if scade < adesso + minimo_s:
+        return presto, None
     if scade > adesso + P2P_ONCHAIN_TAB_MAX_S:
         return "Troppo lontana: un PayCode vale al massimo 72 ore", None
     barre = re.sub(r"\s", "", str(t.get("barre") or ""))
@@ -108330,6 +108345,80 @@ def p2p_onchain_giudica_tabacchino(lato, metodi, euro_cent, valuta, tab,
                   or pc not in barre[18:]):
         return "Il codice a barre non è quello di questo PayCode", None
     return "", {"pc": pc, "scade": scade, "barre": barre}
+
+
+# BARATTOZON ON-CHAIN ANCHE IN «COMPRA BTC» (17 nov 2026 sera, Andrea: «Si
+# costruiscilo»). Chi pubblica compra sats e scrive la FASCIA che pagherebbe
+# al tabacchino, a prezzo di mercato (`tab_min_cent` il primo capo,
+# `euro_cent` il massimo); chi prende vende sats, e PRENDENDO scrive il suo
+# PayCode: importo dentro la fascia, nove cifre, scadenza, codice a barre.
+# Da li' e' la strada di «Vendi BTC»: il PayCode nella colonna, `euro_cent`
+# diventa quello del PayCode, i sats si contano su quello, e chi paga lo
+# vede solo coi sats confermati. La scadenza alla presa deve coprire il
+# deposito (6 ore) e il tabacchino (2): le stesse 8 ore del margine.
+def p2p_onchain_giudica_tab_compra(metodi, euro_min_cent, euro_cent, valuta,
+                                   mercato: bool, minimo_euro=0) -> tuple:
+    """PURA: un ordine nuovo in «Compra BTC» col tabacchino, giudicato.
+    `(perche, (min, max) in centesimi | None)`; ('', None) se il metodo
+    non c'e'."""
+    if not isinstance(metodi, list) or not any(
+            "Contanti al tabacchino" in str(m or "") for m in metodi):
+        return "", None
+    if not P2P_ONCHAIN_BARATTOZON:
+        return "Barattozon on-chain adesso è spento: pubblicalo via Lightning ⚡", None
+    if len(metodi) != 1:
+        return "Col tabacchino nessun altro metodo nello stesso ordine", None
+    if str(valuta or "EUR").upper() != "EUR":
+        return "Il PayCode di Amazon si paga in euro: scegli la valuta €", None
+    if not mercato:
+        return ("Con Barattozon in acquisto il prezzo è di mercato: i sats si "
+                "fissano alla presa"), None
+    try:
+        lo, hi = int(euro_min_cent or 0), int(euro_cent or 0)
+    except (TypeError, ValueError):
+        lo, hi = 0, 0
+    if not (0 < lo < hi):
+        return ("Scrivi la fascia, da quanto a quanto: chi vende sceglie dentro "
+                "l'importo del suo ordine Amazon"), None
+    if not _importo_paycode_valido(hi / 100):
+        return "Un PayCode di Amazon va da 0,01 a 999,00 €", None
+    if not _paycode_sopra_minimo(lo / 100, minimo_euro):
+        return f"Con Barattozon il minimo è {int(minimo_euro)} €", None
+    return "", (lo, hi)
+
+
+def p2p_onchain_tab_compra(o) -> bool:
+    """PURA: un Barattozon in «Compra BTC» ancora senza PayCode (nel libro)."""
+    return (o["lato"] == "buy" and int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0) > 0
+            and not p2p_onchain_tab_dati(o))
+
+
+def p2p_onchain_giudica_tab_presa(o, tab, adesso: int) -> tuple:
+    """PURA: il PayCode di chi prende un Barattozon in «Compra BTC».
+    `(perche, dati, cent)`: l'importo (centesimi, `tab['euro_cent']`)
+    dentro la fascia e dentro Amazon, poi i tre dati del codice con
+    almeno le 8 ore del margine."""
+    if not P2P_ONCHAIN_BARATTOZON:
+        return "Barattozon on-chain adesso è spento", None, 0
+    t = tab if isinstance(tab, dict) else {}
+    lo = int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0)
+    hi = int(o["euro_cent"] or 0)
+    try:
+        cent = int(t.get("euro_cent") or 0)
+    except (TypeError, ValueError):
+        cent = 0
+    if not cent > 0:
+        return "Scrivi l'importo del tuo PayCode", None, 0
+    # l'intero per eccesso dentro la fascia, come la giudica il telefono
+    # (`valePresaBzP2P`): 24,50 € in una fascia da 25 passa
+    if not (lo <= -(-cent // 100) * 100 <= hi) or not _importo_paycode_valido(cent / 100):
+        return (f"Quest'ordine accetta PayCode da {_p2p_onchain_euro_testo(lo).replace('.', ',')} "
+                f"a {_p2p_onchain_euro_testo(hi).replace('.', ',')} €"), None, 0
+    perche, dati = _p2p_onchain_tab_codice(
+        t, adesso, P2P_ONCHAIN_TAB_MARGINE_S,
+        f"Scade troppo presto: su on-chain servono almeno {P2P_ONCHAIN_TAB_MARGINE_S // 3600} "
+        f"ore ({P2P_ONCHAIN_ORE_DEPOSITO} per il deposito, 2 per il tabacchino)")
+    return perche, dati, (cent if dati else 0)
 
 
 def p2p_onchain_scade_libro(adesso: int, tab_scade: int) -> int:
@@ -108853,6 +108942,9 @@ def _p2p_onchain_prepara(con):
                       # di un Barattozon, JSON {pc, scade, barre}; '' per
                       # tutto il resto. Esce solo da `_p2p_onchain_per`
                       ("paycode", "TEXT DEFAULT ''"),
+                      # 17 nov 2026 sera: il primo capo della fascia di un
+                      # Barattozon in «Compra BTC» (il massimo e' euro_cent)
+                      ("tab_min_cent", "INTEGER DEFAULT 0"),
                       # 17 nov 2026, cantiere onchain-rimborso-liscio: chi
                       # compra ha toccato «Rinuncio» ma chi ha depositato
                       # non ha ancora scritto dove riavere i sats. Quando
@@ -109047,7 +109139,8 @@ def _p2p_onchain_testi_presa(o, nome: str = "") -> dict:
               f"\n\n⏳ <b>Hai {P2P_ONCHAIN_ORE_DEPOSITO} ore</b>, poi chi compra può rinunciare."),
         ric: (testa(ric) + f"Compri {quanto}.\n\n"
               "Apri Barattolo: appena chi vende deposita i sats e la rete li "
-              "conferma, tocca a te mandare gli euro."),
+              + ("conferma, vedi il PayCode da pagare al tabacchino."
+                 if p2p_onchain_tab_scade(o) else "conferma, tocca a te mandare gli euro.")),
     }
 
 
@@ -109069,7 +109162,9 @@ def p2p_onchain_tags(o, adesso: int = None) -> list:
             ["f", p2p_onchain_valuta(o)],
             ["s", P2P_ONCHAIN_STATO_LIBRO.get(stato, "canceled")],
             ["amt", str(int(o["prezzo_sats"]))],
-            ["fa", _p2p_onchain_euro_testo(o["euro_cent"])],
+            ["fa", *([_p2p_onchain_euro_testo(_p2p_onchain_campo(o, "tab_min_cent", 0))]
+                     if p2p_onchain_tab_compra(o) else []),
+             _p2p_onchain_euro_testo(o["euro_cent"])],
             ["pm", *[str(m) for m in metodi]],
             # a mercato il premio di chi pubblica (e `amt` 0 finche' i sats
             # non nascono alla presa), come gli ordini a mercato di Mostro
@@ -109187,6 +109282,10 @@ def _p2p_onchain_foglio(o, pubblico: bool = False) -> dict:
     mercato = _p2p_onchain_mercato(o)
     d = {"mercato": mercato, "premio": int(_p2p_onchain_campo(o, "premio", 0) or 0),
          "filtro": _soglia_filtro_p2p(_p2p_onchain_campo(o, "filtro", 0))}
+    # Barattozon in «Compra BTC» (17 nov 2026 sera): il primo capo della
+    # fascia, finche' nessuno l'ha preso (`euro` e' il massimo)
+    if p2p_onchain_tab_compra(o):
+        d["euro_min"] = int(_p2p_onchain_campo(o, "tab_min_cent", 0)) / 100
     if mercato and not int(o["prezzo_sats"] or 0):
         d["stima"] = p2p_onchain_sats_mercato(p2p_onchain_cent_mercato(o), d["premio"],
                                               _p2p_onchain_cambio(o))
@@ -109284,7 +109383,8 @@ def _p2p_onchain_libro(chi: int) -> dict:
             riga["staff"] = True
         # in pausa fino a quell'ora: la card grigia, e da qui non si prende
         # (un Barattozon no, come su Lightning: il PayCode corre anche in pausa)
-        if int(o.get("_pausa_fino") or 0) > adesso and not p2p_onchain_tab_scade(o):
+        if int(o.get("_pausa_fino") or 0) > adesso and not p2p_onchain_tab_scade(o) \
+                and not p2p_onchain_tab_compra(o):
             riga["pausa_fino"] = int(o["_pausa_fino"])
         eventi.append(riga)
         if chi and maker == int(chi):
@@ -109682,7 +109782,8 @@ def _p2p_onchain_porta_presa(con, o, tg_id: int, adesso: int) -> str:
     chiudono la porta a nessuno. UN BARATTOZON (17 nov 2026) si prende
     anche in pausa, come su Lightning: il PayCode scade comunque."""
     try:
-        tab = globals().get("p2p_onchain_tab_scade", lambda x: 0)(o)
+        tab = globals().get("p2p_onchain_tab_scade", lambda x: 0)(o) \
+            or globals().get("p2p_onchain_tab_compra", lambda x: False)(o)
         fino = 0 if tab else _fine_pausa_p2p(_pausa_p2p(con, o["maker_id"]), adesso)
     except Exception:
         fino = 0
@@ -109954,8 +110055,13 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
         # chi vende bitcoin scrive dove vuole gli USDT: la rete giusta
         perche = p2p_onchain_giudica_recapito_usdt(recapito, metodi)
     # BARATTOZON ON-CHAIN (17 nov 2026): il PayCode, giudicato qui
-    tab = None
-    if not perche:
+    tab, fascia = None, None
+    if not perche and lato == "buy":
+        # ...e in «Compra BTC» la fascia, a mercato (17 nov 2026 sera)
+        perche, fascia = p2p_onchain_giudica_tab_compra(
+            metodi, d.get("euro_min_cent"), euro_cent, "USDT" if usdt else "CHF" if chf
+            else (coin[0] if coin else "EUR"), tipo == "mercato", BARATTOZON_MIN_EURO)
+    elif not perche:
         perche, tab = p2p_onchain_giudica_tabacchino(
             lato, metodi, euro_cent, "USDT" if usdt else "CHF" if chf else
             (coin[0] if coin else "EUR"), d.get("tabacchino"), int(time.time()),
@@ -109992,10 +110098,11 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     # LA RIPUBBLICA (16 nov 2026): l'intervallo, se c'e'; qui il nuovo
     # ordine lo rifa' la ronda, il libro e' del server
     rip = _intervallo_ripubblica_p2p(d.get("ripubblica")) if P2P_RIPUBBLICA else None
-    if tab:
+    if tab or fascia:
         # col PayCode niente ripubblica (rimetterebbe nel libro un codice
         # che sta per scadere), niente paracadute (come su Lightning:
         # decisione di Andrea) e niente recapito: il recapito E' il PayCode
+        # (in «Compra BTC» lo stesso: il PayCode arriva con chi prende)
         rip, recapito = None, ""
         para, para_da, para_letto = 0, 0.0, 0
         para_su = para_giu = 0
@@ -110018,8 +110125,9 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             "INSERT INTO p2p_onchain_ordini(ordine, lato, maker_id, prezzo_sats,"
             " euro_cent, metodi, recapito, scade, creato, aggiornato,"
             " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura,"
-            " rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu,"
+            " tab_min_cent)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ordine, lato, user["id"], sats, int(euro_cent),
              json.dumps(metodi, ensure_ascii=False), recapito,
              p2p_onchain_scade_libro(adesso, tab["scade"] if tab else 0),
@@ -110027,7 +110135,8 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
              "mercato" if tipo == "mercato" else "fisso", premio, filtro,
              para, para_da, para_letto,
              rip[0] if rip else 0, rip[1] if rip else 0, "CHF" if chf else "",
-             json.dumps(tab) if tab else "", zona, para_su, para_giu))
+             json.dumps(tab) if tab else "", zona, para_su, para_giu,
+             fascia[0] if fascia else 0))
         con.commit()
         oid = cur.lastrowid
         riga = _p2p_onchain_carica(con, oid)
@@ -110964,6 +111073,14 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
         perche = _p2p_onchain_porta_presa(con, o, user["id"], adesso)
         if perche:
             raise HTTPException(409, perche)
+        # BARATTOZON IN «COMPRA BTC» (17 nov 2026 sera): chi prende porta il
+        # suo PayCode, e i sats si contano sul SUO importo
+        tab_presa, cent_presa = None, 0
+        if p2p_onchain_tab_compra(o):
+            perche, tab_presa, cent_presa = p2p_onchain_giudica_tab_presa(
+                o, d.get("tabacchino"), adesso)
+            if perche:
+                raise HTTPException(400, perche)
         prezzo, cambio_presa = int(o["prezzo_sats"]), 0.0
         if _p2p_onchain_mercato(o):
             # in USDT il metro e' il dollaro (1 USDT = 1 $), in franchi il
@@ -110974,7 +111091,7 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
             if not cambio_presa > 0 or eta is None or eta > P2P_ONCHAIN_CAMBIO_FRESCO_S:
                 raise HTTPException(503, "Il cambio di adesso non c'è: è un ordine "
                                          "a prezzo di mercato, riprova fra un minuto")
-            cent = p2p_onchain_cent_mercato(o)
+            cent = cent_presa or p2p_onchain_cent_mercato(o)
             if not cent > 0:
                 raise HTTPException(503, f"Il cambio di {coin_o.get('moneta', '')} adesso "
                                          "non c'è: riprova fra un minuto")
@@ -111027,6 +111144,8 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
                                      "tocca «🔐 Blocca la cauzione»")
         if piu_metodi and scelto == "Contanti":
             rec = ""
+        if tab_presa:
+            rec = ""    # il recapito e' il PayCode
         # LA COMMISSIONE, uguale a quella di Lightning (16 nov 2026): la
         # meta' di chi deposita entra nell'importo, quella di chi riceve
         # esce dal suo incasso, e le due vanno a Barattolo su `/1/n` della
@@ -111058,6 +111177,11 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
              adesso + P2P_ONCHAIN_ORE_DEPOSITO * 3600, adesso, prezzo,
              cambio_presa, r_tipo, r_valore, r_firma, r_indice, quota,
              quota_dove, q_ric, scelto if piu_metodi else "", oid))
+        if cur.rowcount and tab_presa:
+            # nella stessa scrittura della presa: l'importo e' quello del
+            # PayCode, e il PayCode sta nella sua colonna
+            con.execute("UPDATE p2p_onchain_ordini SET euro_cent=?, paycode=? WHERE id=?",
+                        (int(cent_presa), json.dumps(tab_presa), oid))
         con.commit()
         if not cur.rowcount:
             raise HTTPException(409, "Qualcun altro l'ha preso un attimo fa")

@@ -90433,3 +90433,33 @@ vicine e `collaudo_serie_giorni`; dal vivo sul server vero del worktree
 in collaudo, 375 e 320 px, chiaro e scuro, nessun errore di pagina.
 Scatto in /mnt/project-files/serie-giorni/classifica-streak-oro.png.
 NON PROVATO: un telefono vero.
+
+## Barattozon on-chain anche in «Compra BTC» (17 nov 2026 sera, cantiere barattozon-oc-compra; Andrea: «Se pubblico un ordine compra btc in barattozon perché non posso selezionare onchain ma solo lighting?», poi «Si costruiscilo» e «Ok» a farlo in questo cantiere)
+In «Compra BTC» il tabacchino era solo Lightning. Ora c'è anche on-chain,
+con la stessa forma di Lightning: chi pubblica scrive una FASCIA (es.
+25–250 €) a prezzo di mercato; chi prende scrive importo dentro la
+fascia, PayCode, scadenza (almeno 8 ore: 6 per il deposito, 2 per il
+tabacchino) e codice a barre facoltativo. Alla presa la riga prende
+l'importo esatto e il PayCode, i sats al mercato di quel momento, e da lì
+è uguale a «Vendi BTC»: chi prende deposita, chi ha pubblicato vede il
+PayCode solo col deposito confermato e paga al tabacchino. DECISO: il
+PayCode alla presa e non dopo il deposito, perché riusa tutta la
+macchina di «Vendi BTC» (il cancello del server, le ore per pagare
+uguali alla scadenza, gli avvisi senza codice) e perché su Lightning il
+compro lo chiede già alla presa. Solo mercato: un prezzo fisso su una
+fascia non direbbe quanti sats. Niente ripubblica, paracadute,
+recapito; la pausa non ferma la presa (come Lightning). Il giudice dei
+tre dati è uno solo (`_p2p_onchain_tab_codice`), con 12 ore di vita
+alla pubblicazione e 8 alla presa. Il fuori-fascia si giudica
+sull'intero per eccesso, come il telefono. SCARTATO: il PayCode dopo il
+deposito (una fase nuova, con la garanzia ferma senza codice). PROVATO:
+`prove_barattozon_onchain` (i giudici di pubblicazione e presa, i
+rifiuti, la leva spenta, la lista dei metodi del telefono anche in
+compra); `collaudo_p2p_onchain_barattozon` sezione 7 sul server vero
+(rifiuti alla pubblicazione, il libro con fascia e tag `fa`, rifiuti
+alla presa, presa a 47,30 € con 20 ore, riga scritta, cancello prima e
+dopo il deposito); i sentinella toccati in `prove_p2p_onchain`,
+`prove_onchain_cauzione`, `prove_deposito_p2p_onchain`,
+`prove_onchain_contanti`. DA GUARDARE: alla presa il conto (sats e
+commissioni) non si vede finché non c'è l'importo; la card mostra la
+stima sul massimo della fascia.

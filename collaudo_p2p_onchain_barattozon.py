@@ -263,10 +263,11 @@ def main():
     SRV.P2P_ONCHAIN_BARATTOZON = False
     r_spenta = bz()
     SRV.P2P_ONCHAIN_BARATTOZON = True
-    prova("meno di 12 ore, in compra, con un altro metodo, a leva spenta: 400 coi perche'",
+    # (17 nov 2026 sera) in compra Barattozon on-chain c'e', ma solo a mercato
+    prova("meno di 12 ore, in compra a prezzo fisso, con un altro metodo, a leva spenta: 400 coi perche'",
           [(400, True), (400, True), 400, (400, True)],
           [(r_corto.status_code, "12 ore" in r_corto.json()["detail"]),
-           (r_compra.status_code, "Vendi BTC" in r_compra.json()["detail"]),
+           (r_compra.status_code, "mercato" in r_compra.json()["detail"]),
            r_due.status_code,
            (r_spenta.status_code, "Lightning" in r_spenta.json()["detail"])])
     prova("...e il libro non ha preso niente", [], libro(888).get("onchain", {}).get("eventi", []))
@@ -353,6 +354,77 @@ def main():
     r = gesto(888, oid2, "prendi")
     prova("13 ore di PayCode: 5 nel libro; passate quelle, la presa dice di no",
           [adesso + 5 * 3600, 409], [scade2, r.status_code])
+
+    # ---- 7) Barattozon in «Compra BTC» (17 nov 2026 sera) ---------------------
+    print("\n[Barattozon in «Compra BTC»: la fascia, e il PayCode di chi prende]")
+    SRV.P2P_ONCHAIN_APERTI_MAX = 100
+    SRV._cambio_cache["valori"]["eur"] = 50000.0
+    SRV._cambio_cache["quando"] = time.time()
+
+    def compra(**d):
+        base = {"lato": "buy", "tipo": "mercato", "premio": 0, "euro_min_cent": 2500,
+                "euro_cent": 25000, "metodi": ["Contanti al tabacchino"], "recapito": "",
+                "tabacchino": None}
+        base.update(d)
+        base.pop("sats", None)
+        return pubblica(888, **base)
+
+    r_fisso = compra(tipo="fisso", sats=50000)
+    r_senza = compra(euro_min_cent=0)
+    r_poco = compra(euro_min_cent=500)
+    prova("in compra: a prezzo fisso, senza fascia, sotto il minimo di Barattozon: 400",
+          [400, 400, 400], [r_fisso.status_code, r_senza.status_code, r_poco.status_code])
+    r = compra()
+    prova("la fascia da 25 a 250 € a mercato: 200", 200, r.status_code)
+    oc = r.json()["id"]
+    lib = libro(999)
+    ev = [e for e in lib["onchain"]["eventi"] if int(e["id"]) == oc]
+    con = SRV.db()
+    rc = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?", (oc,)).fetchone()
+    con.close()
+    prova("nel libro la fascia (euro_min e euro), nel 38383 i due capi, niente PayCode nella colonna",
+          [25.0, 250.0, ["fa", "25", "250"], ""],
+          [ev[0].get("euro_min") if ev else None, ev[0].get("euro") if ev else None,
+           [t for t in SRV.p2p_onchain_tags(rc) if t[0] == "fa"][0], rc["paycode"]])
+    adesso = int(time.time())
+    no_pc = gesto(999, oc, "prendi")
+    no_fuori = gesto(999, oc, "prendi", tabacchino={"paycode": PC, "scade": adesso + 24 * 3600,
+                                                   "barre": "", "euro_cent": 30000})
+    no_presto = gesto(999, oc, "prendi", tabacchino={"paycode": PC, "scade": adesso + 7 * 3600,
+                                                    "barre": "", "euro_cent": 4730})
+    prova("chi prende senza PayCode, fuori dalla fascia, o con meno di 8 ore: 400 coi perche'",
+          [400, (400, True), (400, True)],
+          [no_pc.status_code, (no_fuori.status_code, "da 25 a 250" in no_fuori.json()["detail"]),
+           (no_presto.status_code, "8 ore" in no_presto.json()["detail"])])
+    scade_c = adesso + 20 * 3600
+    banco.DETTO.clear()
+    r = gesto(999, oc, "prendi", tabacchino={"paycode": "212-802-988", "scade": scade_c,
+                                             "barre": N, "euro_cent": 4730})
+    prova("col PayCode da 47,30 € e 20 ore: 200", 200, r.status_code)
+    con = SRV.db()
+    rc = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?", (oc,)).fetchone()
+    con.close()
+    # 47,30 € a 50.000 €/BTC = 94.600 sats
+    prova("la riga: l'importo e' quello del PayCode, i sats contati su quello, il PayCode nella "
+          "colonna, chi prende deposita e chi ha pubblicato riceve",
+          [4730, 94600, {"pc": PC, "scade": scade_c, "barre": N}, 999, 888, ""],
+          [int(rc["euro_cent"]), int(rc["prezzo_sats"]), json.loads(rc["paycode"]),
+           int(rc["depositante_id"]), int(rc["ricevente_id"]), rc["recapito"]])
+    prova("chi prende rivede il suo PayCode; chi paga (chi ha pubblicato) e il moderatore no, "
+          "prima del deposito; l'avviso a chi paga dice il PayCode, non gli euro",
+          [PC, {"scade": scade_c}, True, True],
+          [(uno(999, oc).get("tabacchino") or {}).get("paycode"), uno(888, oc).get("tabacchino"),
+           nessun_codice(json.dumps(uno(777, oc))),
+           detto_a(888, "vedi il PayCode da pagare al tabacchino")])
+    paga(uno(999, oc))
+    prova("deposito confermato", "depositato", gesto(999, oc, "controlla").json()["stato"])
+    o888 = uno(888, oc)
+    prova("ora chi paga vede PayCode e codice a barre, e il tempo finisce col PayCode",
+          [PC, N, scade_c],
+          [(o888.get("tabacchino") or {}).get("paycode"), (o888.get("tabacchino") or {}).get("barre"),
+           o888.get("paga_entro")])
+    prova("...e il libro non ha piu' la fascia (euro_min) dello scambio preso",
+          False, any(int(e["id"]) == oc for e in libro(999)["onchain"]["eventi"]))
 
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")

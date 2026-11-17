@@ -29102,6 +29102,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Le prove: `prove_barattozon_onchain`; il collaudo:
   `collaudo_p2p_onchain_barattozon`. Il verbale: CANTIERI, «Barattozon
   anche on-chain».
+  BARATTOZON ON-CHAIN ANCHE IN «COMPRA BTC» (17 nov 2026 sera, cantiere
+  barattozon-oc-compra, Andrea: «Si costruiscilo»). Chi pubblica scrive
+  solo la fascia, a prezzo di mercato: `p2p_onchain_giudica_tab_compra`
+  (un metodo, euro, mercato, min < max, max dentro Amazon, min sopra il
+  minimo di Barattozon) e la colonna `tab_min_cent` accanto a `euro_cent`
+  (il max). Nel libro `p2p_onchain_tab_compra(o)` (lato buy, fascia, niente
+  PayCode) apre il tag `fa` a due cifre e salta la pausa. Chi prende manda
+  `tabacchino` {paycode, scade, barre, euro_cent} alla presa:
+  `p2p_onchain_giudica_tab_presa` vuole l'importo dentro la fascia (intero
+  per eccesso, come `valePresaBzP2P` del telefono) e almeno le 8 ore del
+  margine (`_p2p_onchain_tab_codice`, lo stesso giudice dei tre dati di
+  «Vendi BTC»). La presa scrive `euro_cent` = l'importo esatto e `paycode`;
+  i sats al mercato della presa. Da li' la riga e' identica a quella di
+  «Vendi BTC»: chi prende deposita, chi ha pubblicato vede il PayCode solo
+  col deposito confermato e paga al tabacchino. Telefono:
+  `bzOcInCompraP2P`, `corpoPresaBzOcP2P` e `prendiBzOcP2P` nel foglio di
+  presa, `prendiOnchainP2P(id, extra)`. Prove: `prove_barattozon_onchain`;
+  collaudo: `collaudo_p2p_onchain_barattozon` (sezione 7).
+
   COMPRA CON BARATTOZON (17 nov 2026, cantiere compra-con-bz, richiesta
   di Andrea dopo il giro guidato su amazon.it). La stessa estensione
   (0.2.0) mette il percorso INTERO col marchio Barattozon: sotto
