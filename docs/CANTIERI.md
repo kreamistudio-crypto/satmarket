@@ -87910,3 +87910,61 @@ accesa» nel journal. Se il blocco torna: le righe «🧊 Sentinella» con
 la pila vanno al thread, e la causa vera si cura allora. Su develop
 questo commit arriva come cherry-pick: alla prossima promozione è un
 doppione da togliere.
+
+## Tappo e l'annullo prima della garanzia (17 nov 2026, cantiere tappo-annullo-subito; un utente in privato a Tappo: «per annullare devo aspettare che i sats vengano messi in garanzia? Non si può far tornare il tutto nel libro subito?», e Andrea: «Non si può annullare subito?»)
+
+IL CASO. Tappo ha risposto di sì, che si aspetta la garanzia e poi
+serve l'annullo d'accordo, e che prima «non c'è niente da annullare».
+È falso: dal 7 ott 2026 («testi P2P che confondono») nei quattro stati
+prima di «Sats in garanzia» (`P2P_ANNULLA_DA_SOLO` in miniapp.html) il
+bottone «✕ Annulla» annulla subito, senza il sì dell'altro, perché
+`cancel_action` di mostrod manda `waiting-payment` e
+`waiting-buyer-invoice` a `cancel_not_active_order`. Se annulla chi ha
+preso l'ordine torna nel libro (avviso «🔄 … Il tuo ordine è tornato in
+vetrina», `collaudo_annullo_venditore`); se annulla chi ha pubblicato,
+l'ordine si chiude. La guida dei passi lo dice (GUIDA-P2P-PASSI, §8,
+«Dopo la presa, prima della garanzia»); il libro di Tappo no: diceva
+solo «I tempi» e l'annullo d'accordo coi sats in garanzia, e Tappo ha
+riempito il buco a modo suo.
+
+LA DECISIONE. Nessun codice dell'app: la funzione c'è già. Un paragrafo
+in `assistente/sapere.md`, nella sezione del P2P subito dopo «I tempi»,
+coi testi esatti dei bottoni, i due esiti (chi ha preso → torna nel
+libro; chi ha pubblicato → si chiude, si ripubblica) e il confine con
+l'annullo d'accordo e con «Ho inviato gli euro». `conoscenza.md`
+rigenerato (`python assistente/conoscenza.py`).
+
+LO SCREENSHOT DELL'UTENTE (stessa mattina). Detto all'utente che il tasto
+c'era, ha mandato la sua pagina: «Preso: si aspetta il deposito», 250 €,
+«Firma e usa questo indirizzo» — uno scambio ON-CHAIN, dove chi compra
+fino a quel momento non aveva il tasto prima che scadessero le 6 ore
+del deposito. Lo stesso messaggio, arrivato anche a un altro thread, ha
+fatto il cantiere onchain-controparte (voce sopra, 2438e21): «✕ Annulla»
+a chi riceve finché la rete non vede sats. Qui, in parallelo, era nato
+un tasto «↩️ Chiedi di annullare» (chi compra chiede, chi vende annulla
+col suo «Annulla (non deposito)»), scelto da Andrea su una card prima
+di sapere dell'altro cantiere; trovati i due rami, Andrea ha tenuto
+l'annullo subito e il tasto è stato buttato (resta sul ramo locale
+`cantiere/tappo-annullo-b-salvo` fino alla pulizia, mai pushato). Al
+libro di Tappo resta una sola frase on-chain in più, accanto a quella
+dell'altro cantiere: un annullo on-chain mette `annullato`, quindi
+l'ordine NON torna nel libro come su Lightning, si ripubblica.
+
+STRADE SCARTATE. Riscrivere anche il tempo che scade senza annullare
+(«l'ordine resta riservato mezz'ora»): «I tempi» lo dice già, e il
+dettaglio di chi torna nel libro allo scadere non serviva alla domanda.
+
+PROVATO. Due righe nuove in `prove_testi_p2p_confondono` (Lightning e
+on-chain), indipendenti da node; controprova sul libro di origin/develop
+di stamattina (8b63e4e): le frasi cercate non ci sono, le due righe
+sarebbero rosse. GIRATO: la suite severa intera sul primo albero
+(8b63e4e più questo cantiere, venv con requirements.txt tranne
+coincurve, nostr-tools in ~/wdk-prova) 29026 passate, 0 fallite; sul
+ramo col tasto, poi buttato, 29283 su 1042eb3. Sull'albero finale
+(origin/develop 1042eb3 più questo solo commit) il giro mirato: le
+categorie «infrastruttura» e «p2p» della suite severa (i numeri nel
+verbale del thread). Collaudi non girati: nessuno legge sapere.md o
+conoscenza.md.
+
+DA SAPERE. Tappo legge `conoscenza.md` da MAIN: la correzione arriva a
+Tappo con la promozione (o con un cherry-pick), non col push su develop.
