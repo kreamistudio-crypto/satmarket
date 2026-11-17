@@ -21,5 +21,20 @@ Riferimenti: piazza-ref-zona6 + piazza-ref-zona1 (stile notte calda), piazza-ref
 - terra-4: razzo in cima a una torre (sbagliato). Scartata.
 Il 2K (terra-3_2K) è stato confrontato con l'anteprima 1K (scarto 2.5 = stessa immagine, niente fantasmi).
 
-PROSSIMO PASSO: Andrea guarda la guida-D; poi griglia di almeno 8x8 pezzi quadrati che combaciano,
-poi le sette facciate su verde e (solo se a 0 crediti) il video del decollo.
+FACCIATE (facciate\negozio-*.png, 1024x1024, su verde uniforme ~RGB(12,247,5), scarto 1,5-2,8)
+Riferimento: piazza-guida-D (per avere lo stesso stile della mappa). 2 versioni ciascuna, anteprime in facciate\1k\
+(confronti _conf_bottega.jpg e _conf_posta.jpg). Scelte:
+- negozio-bottega  (b) bottega dei mercanti a graticcio, pacchi legati con lo spago, parete di locker.
+- negozio-mercato  (a) padiglione coi tendoni a righe arancio/crema e la cassaforte col lucchetto d'ottone davanti.
+- negozio-torre    (b) torre in pietra col tetto a punta e il quadrante grande pulito (solo tacche, niente numeri).
+- negozio-studio   (b) studio fotografico con la macchina fotografica gigante sul tetto, vetrina con softbox.
+- negozio-posta    (b) casa col tetto a busta, pile di lettere, cassetta rossa, statua dello struzzo viola.
+- negozio-banca    (b) caveau scavato nella roccia, porta blindata rotonda socchiusa, monete col fulmine.
+- negozio-cambio   (a) chiosco del porto sul pontile, insegna con le due frecce verde e rossa.
+ATTENZIONE: il «2K» di Flow per queste facciate ha RIMESSO NELLO SFONDO la mappa usata come riferimento
+(cielo, Luna e porto sopra e sotto l'edificio): 2K scartati, tenute le 1K originali. Per i 2K futuri fatti con
+un riferimento: confrontare sempre col 1K prima di usarli.
+Fondo verde: per scontornare, chiave sul verde (G>200, R<60, B<60) e un pixel di bordo morbido.
+
+PROSSIMO PASSO: Andrea guarda la guida-D; poi griglia di almeno 8x8 pezzi quadrati che combaciano
+e (solo se a 0 crediti) il video del decollo.
