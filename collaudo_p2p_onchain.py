@@ -241,6 +241,9 @@ def main():
           [pubblica(999).status_code,
            c.post("/api/p2p/onchain/1/prendi", json={}).status_code,
            c.get("/api/p2p/onchain/moderazione/aperte").status_code])
+    # il tetto di prova scritto: 250 € (17 nov 2026, il P2P on-chain ha il
+    # suo tetto, 999 di serie; questo collaudo misura i suoi no a 250)
+    SRV.P2P_ONCHAIN_MAX_EURO = 250
     SRV.P2P_ONCHAIN_ATTIVO = True
     SRV.ONCHAIN_ATTIVO = False
     prova("leva P2P accesa ma on-chain spento: non esiste lo stesso "
@@ -293,9 +296,11 @@ def main():
            pubblica(999, euro_cent=30000).status_code,
            pubblica(999, metodi=[]).status_code])
     # IL TETTO E' QUELLO DELL'ON-CHAIN (12 nov 2026, Andrea: «p2p onchain
-    # metti 500»): ONCHAIN_MAX_EURO, non P2P_MAX_EURO del Lightning
-    vecchi = (SRV.ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.p2p_onchain_giudica_nuovo)
-    SRV.ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO = 500, 250
+    # metti 500»): non P2P_MAX_EURO del Lightning, e dal 17 nov 2026
+    # (Andrea: «separalo») nemmeno ONCHAIN_MAX_EURO del mercatino
+    vecchi = (SRV.P2P_ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.p2p_onchain_giudica_nuovo,
+              SRV.ONCHAIN_MAX_EURO)
+    SRV.P2P_ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.ONCHAIN_MAX_EURO = 500, 250, 3000
     visti = []
     def spia(*a, **k):
         visti.append(a[5])
@@ -305,9 +310,11 @@ def main():
         r6 = pubblica(999, euro_cent=60000)
         busta = libro()["onchain"]
     finally:
-        SRV.ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.p2p_onchain_giudica_nuovo = vecchi
-    prova("il tetto degli scambi on-chain e' ONCHAIN_MAX_EURO (500), non "
-          "quello del P2P Lightning (250): 600 € no «fino a 500 €», e il "
+        (SRV.P2P_ONCHAIN_MAX_EURO, SRV.P2P_MAX_EURO, SRV.p2p_onchain_giudica_nuovo,
+         SRV.ONCHAIN_MAX_EURO) = vecchi
+    prova("il tetto degli scambi on-chain e' P2P_ONCHAIN_MAX_EURO (500), non "
+          "quello del P2P Lightning (250) ne' quello del mercatino (3000): "
+          "600 € no «fino a 500 €», e il "
           "libro lo dice al foglio", ([500], 400, True, 500),
           (visti, r6.status_code, "fino a 500 €" in r6.json().get("detail", ""),
            busta.get("maxEuro")))

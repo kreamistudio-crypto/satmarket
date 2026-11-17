@@ -201668,12 +201668,21 @@ def prove_p2p_onchain_tetto():
     src = open("server.py", encoding="utf-8").read().replace("\r\n", "\n")
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     rotta = pezzo_js(src, "async def p2p_onchain_pubblica_rotta(", "\n\n\n")
-    prova("la pubblicazione on-chain giudica con ONCHAIN_MAX_EURO, non "
-          "con P2P_MAX_EURO", (True, False),
-          ("tetto = int(ONCHAIN_MAX_EURO or 0)" in rotta,
-           "tetto = int(P2P_MAX_EURO or 0)" in rotta))
+    # (17 nov 2026, Andrea: «separalo») il suo tetto, a parte da quello
+    # del mercatino on-chain e da quello del P2P Lightning
+    prova("la pubblicazione on-chain giudica con P2P_ONCHAIN_MAX_EURO, non "
+          "con P2P_MAX_EURO ne' con ONCHAIN_MAX_EURO", (True, False, False),
+          ("tetto = int(P2P_ONCHAIN_MAX_EURO or 0)" in rotta,
+           "tetto = int(P2P_MAX_EURO or 0)" in rotta,
+           "tetto = int(ONCHAIN_MAX_EURO or 0)" in rotta))
     prova("il libro on-chain porta il tetto al telefono", True,
-          '"maxEuro": int(ONCHAIN_MAX_EURO or 0)' in src)
+          '"maxEuro": int(P2P_ONCHAIN_MAX_EURO or 0)' in src)
+    es = open("config_esempio.py", encoding="utf-8").read()
+    prova("la leva: 999 di serie (anche storta), nell'esempio e nel pannello",
+          (2, True, True),
+          (src.count("    P2P_ONCHAIN_MAX_EURO = 999\n"),
+           "\nP2P_ONCHAIN_MAX_EURO = 999\n" in es,
+           '_leva("Tetto scambi P2P on-chain (€)", "P2P_ONCHAIN_MAX_EURO"' in src))
     accogli = pezzo_js(mini, "function accogliLibroOnchainP2P(", "\n}\n")
     prova("il telefono lo tiene quando legge il libro (null se il server "
           "non lo dice)", True, "maxEuro: busta.maxEuro == null ? null" in accogli)

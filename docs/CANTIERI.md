@@ -90119,3 +90119,56 @@ consigliato per gli acquisti grossi») e rosso da lì. Segnalato al
 thread della promozione, non toccato.
 NON PROVATO: un telefono vero; la classifica con persone vere (in
 produzione la serie è nata oggi: fino a domani la lista è vuota).
+
+## L'acquisto grosso esce on-chain anche verso chi vende, e il tetto del P2P on-chain a parte (17 nov 2026 sera, cantiere onchain-grossi-uscita, seguito di onchain-importi-grossi; Andrea: «se vuole ricevere in lighting, sì, bisogna mettere anche verso di lui il limite», poi sul tetto: «separalo, va, separalo»)
+
+IL BUCO. Il cantiere di prima consigliava l'on-chain a chi COMPRA sopra
+500 €; ma se chi vende aveva scelto «ricevi in Lightning», a fine
+ordine i bitcoin andavano al cambio di SATS Routing verso una fattura
+del suo wallet: la stessa cifra grossa, in Lightning, che non regge.
+
+LA DECISIONE. Sopra la soglia l'ordine on-chain nasce col segno
+`grosso` (colonna nuova di `onchain_ordini`, fissata alla nascita col
+cambio che ha deciso il tetto: un cambio diverso a fine ordine non la
+rigira) e `onchain_modo_ordine`, il giudice unico di come riceve chi
+vende, lo guarda per primo: «onchain», qualunque cosa dica l'annuncio o
+il Profilo. Così l'incasso si riempie col wallet di chi vende come
+negli ordini on-chain di sempre (subito, o quando lo sceglie), e il
+cambio in Lightning dell'ordine dice di no col suo perché («Per una
+cifra così ricevi on-chain…») invece di «chi compra non ha ancora
+confermato». Chi vende lo legge nell'ordine (`grosso_ln_tolto`, nelle
+due righe che raccontano l'ordine on-chain: `/api/orders` e
+`_onchain_ordine_per`) e nell'avviso della conferma.
+
+SCARTATE. Rifare il giudizio col cambio di fine ordine (un ordine da
+510 € potrebbe cambiare strada a metà). Un tetto in sats sul cambio
+in Lightning (la soglia è una sola, in euro, e un secondo numero
+sarebbe un secondo giudice).
+
+NON FATTO, E PERCHÉ. Un acquisto grosso pagato in LIGHTNING (il
+compratore che ignora il consiglio) paga chi vende dal nodo come
+sempre: là la cifra è già passata una volta, e lo swap automatico verso
+l'on-chain ha il tetto di `SWAP_MAX_SATS`. Resta com'era.
+
+IL TETTO DEL P2P ON-CHAIN A PARTE. Dal 12 nov gli scambi P2P a tre
+chiavi giudicavano con `ONCHAIN_MAX_EURO`, lo stesso del mercatino: e
+Andrea stava per alzarlo per la croce da 3000 €. Leva nuova
+`P2P_ONCHAIN_MAX_EURO`, 999 di serie perché era il valore vivo in
+produzione (riga del 16 nov): con la promozione il P2P resta dov'è
+anche senza righe nuove, e `ONCHAIN_MAX_EURO` da adesso vale solo per
+il mercatino. La usano la pubblicazione e il libro on-chain (`maxEuro`
+al foglio Pubblica, che legge il tetto vivo e non un numero fisso:
+controllato, il 999 scritto nell'app è solo quello di Amazon per
+Barattozon). Nel pannello, riga sua sotto quella del mercatino.
+
+PROVATO: `prove_onchain_consigliato` (il segno nella cassa, la colonna,
+il giudice del modo eseguito, il no del cambio, le righe e l'avviso),
+`prove_onchain_tetto` (la cassa col cambio del tetto),
+`prove_p2p_onchain_tetto` (la leva nuova, non le altre due);
+`collaudo_onchain_verso_lightning` 6-bis (da «sempre Lightning»
+l'ordine grosso riceve on-chain col wallet già scritto, chi vende legge
+il perché, il preventivo del cambio è 409, anche senza wallet col
+perché giusto), `collaudo_p2p_onchain` (500 € del P2P on-chain con 250
+del Lightning e 3000 del mercatino: vince 500). Controprova: tolto il
+segno da `onchain_modo_ordine`, il 6-bis è rosso.
+NON PROVATO dal vivo: un ordine on-chain vero sopra 500 €.

@@ -237,6 +237,9 @@ def main():
 
     SRV.P2P_USDT_ATTIVO = True
     SRV.P2P_USDT_SOLO_ADMIN = True
+    # il tetto di prova scritto: 250 € (17 nov 2026, il P2P on-chain ha il
+    # suo tetto, 999 di serie; questo collaudo misura i suoi no a 250)
+    SRV.P2P_ONCHAIN_MAX_EURO = 250
     SRV.P2P_ONCHAIN_ATTIVO = True
     SRV.P2P_ONCHAIN_USDT_ATTIVO = False
     for tg in (999, 888):

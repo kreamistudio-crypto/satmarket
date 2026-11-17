@@ -37488,7 +37488,7 @@ def _leve_stato():
                   acceso="il foglio Pubblica rifiuta gli importi sopra "
                          "questa cifra; il tetto in sats del "
                          "coordinatore resta valido sotto (gli scambi "
-                         "on-chain seguono ONCHAIN_MAX_EURO)",
+                         "on-chain seguono P2P_ONCHAIN_MAX_EURO)",
                   spento="nessun tetto in euro: vale solo il tetto in "
                          "sats del coordinatore (38385)"),
             _leva("Minimo PayCode Barattozon (€)", "BARATTOZON_MIN_EURO",
@@ -37801,10 +37801,18 @@ def _leve_stato():
                   allarme=bool(ONCHAIN_RETE_TRATTENUTA)),
             _leva("Tetto ordini on-chain (€)", "ONCHAIN_MAX_EURO",
                   ONCHAIN_MAX_EURO,
-                  acceso="un ordine on-chain sopra questa cifra non si "
-                         "paga on-chain: resta il Lightning; vale anche "
-                         "per gli scambi P2P on-chain",
+                  acceso="un acquisto del mercatino sopra questa cifra non "
+                         "si paga on-chain: resta il Lightning. Gli scambi "
+                         "P2P on-chain hanno il loro tetto, qui sotto",
                   spento="nessun tetto: l'on-chain vale per qualunque cifra"),
+            # (17 nov 2026, Andrea: «separalo») il tetto del P2P on-chain
+            _leva("Tetto scambi P2P on-chain (€)", "P2P_ONCHAIN_MAX_EURO",
+                  P2P_ONCHAIN_MAX_EURO,
+                  acceso="uno scambio P2P on-chain (a tre chiavi) sopra questa "
+                         "cifra non si pubblica, e il foglio Pubblica lo "
+                         "scrive; il P2P Lightning segue P2P_MAX_EURO",
+                  spento="nessun tetto: gli scambi P2P on-chain vanno a "
+                         "qualunque cifra"),
             # (17 nov 2026, cantiere onchain-importi-grossi) la soglia del
             # consiglio: sopra, la cassa propone l'on-chain da sola
             _leva("On-chain consigliato sopra (€)", "ONCHAIN_CONSIGLIATO_SOPRA_EURO",
@@ -59252,6 +59260,24 @@ except (TypeError, ValueError):
     ONCHAIN_MAX_EURO = 250
     print("[onchain] ONCHAIN_MAX_EURO non e' un numero intero: il tetto "
           "resta 250 €")
+# IL TETTO DEGLI SCAMBI P2P ON-CHAIN, A PARTE (17 nov 2026, cantiere
+# onchain-grossi-uscita, Andrea: «separalo»). Dal 12 nov gli scambi P2P a
+# tre chiavi giudicavano con ONCHAIN_MAX_EURO, lo stesso del mercatino: e
+# alzare il mercatino per una croce da 3000 € avrebbe alzato anche loro.
+# 999 di serie perche' era il valore vivo in produzione quel giorno (riga
+# del 16 nov): con la promozione niente cambia per il P2P anche senza una
+# riga nuova. 0 = nessun tetto; storta = 999, mai spento da un refuso.
+try:
+    from config import P2P_ONCHAIN_MAX_EURO
+    P2P_ONCHAIN_MAX_EURO = int(P2P_ONCHAIN_MAX_EURO)
+    if P2P_ONCHAIN_MAX_EURO < 0:
+        raise ValueError("un tetto negativo non e' un tetto")
+except ImportError:
+    P2P_ONCHAIN_MAX_EURO = 999
+except (TypeError, ValueError):
+    P2P_ONCHAIN_MAX_EURO = 999
+    print("[onchain] P2P_ONCHAIN_MAX_EURO non e' un numero intero: il tetto "
+          "resta 999 €")
 # L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026, cantiere
 # onchain-importi-grossi, Andrea: «per importi grossi deve venire proposto
 # l'on-chain da solo»; la soglia l'ha detta lui, 500 €). Il caso: una croce
@@ -109187,7 +109213,7 @@ def _p2p_onchain_libro(chi: int) -> dict:
              # il tetto in euro degli scambi on-chain (12 nov 2026, Andrea:
              # «p2p onchain metti 500»): quello dell'on-chain, non del P2P
              # Lightning; lo giudica il foglio Pubblica, 0 = spento
-             "maxEuro": int(ONCHAIN_MAX_EURO or 0),
+             "maxEuro": int(P2P_ONCHAIN_MAX_EURO or 0),
              # Barattozon anche on-chain (17 nov 2026): la leva, per il foglio
              "barattozon": bool(P2P_ONCHAIN_BARATTOZON)}
     if chi:
@@ -109776,7 +109802,8 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     deve avere la sua chiave on-chain (la xpub dedicata): e' una delle
     tre del 2-di-3 che nascera' alla presa, e senza non c'e' niente da
     promettere. Il tetto in euro e' quello dell'on-chain
-    (`ONCHAIN_MAX_EURO`, dal 12 nov 2026: prima era quello del P2P
+    (`P2P_ONCHAIN_MAX_EURO` dal 17 nov 2026; dal 12 nov era quello del
+    mercatino on-chain, `ONCHAIN_MAX_EURO`, e prima quello del P2P
     Lightning, `P2P_MAX_EURO`), quello in sats dell'istanza di prova. L'ordine nasce nel nostro
     libro e parte verso i relay; la risposta non aspetta i relay."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
@@ -109822,9 +109849,9 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             raise HTTPException(503, f"Il cambio di {coin[0]} adesso non c'è: "
                                      "riprova fra un minuto")
     # IL TETTO DEGLI SCAMBI ON-CHAIN (12 nov 2026, Andrea: «p2p onchain
-    # metti 500»): lo stesso dell'on-chain del mercatino, non quello del
-    # P2P Lightning; sul VPS e' gia' 500, nessuna riga nuova
-    tetto = int(ONCHAIN_MAX_EURO or 0)
+    # metti 500»): non quello del P2P Lightning. Dal 17 nov 2026 nemmeno
+    # quello del mercatino on-chain (Andrea: «separalo»): il suo, a parte
+    tetto = int(P2P_ONCHAIN_MAX_EURO or 0)
     if usdt or chf:
         # in franchi lo stesso conto dei dollari: il tetto in euro al cambio
         tetto = p2p_onchain_tetto_usdt(tetto, cambio_noto_ora("eur"), cambio)

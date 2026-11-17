@@ -1426,6 +1426,13 @@ ONCHAIN_QUOTA_FISSA_SATS = 0
 # la rete) non si paga on-chain, resta il Lightning. 0 = nessun tetto.
 # Il valore del codice e' gia' 250: la riga serve il giorno che sale.
 ONCHAIN_MAX_EURO = 250
+# IL TETTO DEGLI SCAMBI P2P ON-CHAIN, A PARTE (17 nov 2026, Andrea:
+# «separalo»): fino a oggi gli scambi P2P a tre chiavi seguivano la riga
+# qui sopra, e alzare il mercatino alzava anche loro. Adesso hanno la
+# loro: 999 di serie (quel che valeva in produzione), 0 = nessun tetto.
+# Il P2P Lightning di Mostro resta a P2P_MAX_EURO. Si cambia anche dal
+# pannello.
+P2P_ONCHAIN_MAX_EURO = 999
 # L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026, Andrea:
 # «per importi grossi deve venire proposto l'on-chain da solo», dal caso
 # di una croce da 3000 €): sopra questa cifra in euro la cassa del

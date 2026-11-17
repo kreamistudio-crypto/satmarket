@@ -590,3 +590,9 @@ frase: I giorni di fila adesso hanno una classifica: chi apre Barattolo da più 
 dove: Profilo, sotto la fila dei sette giorni, il bottone «🏆 Classifica dei giorni di fila». Per non comparire: Profilo, cassetto «Livello e recensioni», «🏆 Non mostrarmi in classifica».
 leva: SERIE_GIORNI_ATTIVA (quella della serie, già accesa)
 pubblico: sì
+
+## 2026-11-17 · onchain-grossi-uscita
+frase: Negli acquisti on-chain sopra 500 € chi vende riceve on-chain anche se aveva scelto Lightning, perché con cifre così il Lightning spesso non passa. L'ordine glielo dice con «Cifra grossa: ricevi on-chain».
+dove: Ordini → una vendita pagata on-chain sopra 500 €, riquadro «Pagato on-chain»; il messaggio del bot quando chi compra conferma.
+leva: ONCHAIN_CONSIGLIATO_SOPRA_EURO accesa di serie (500)
+pubblico: sì

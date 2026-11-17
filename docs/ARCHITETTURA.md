@@ -35761,6 +35761,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `renderSceltaPagaRete`, le porte e l'interruttore in `renderPayMetodo`,
   la riga `#payGrossoNota` da `payAvvisoGrosso` (spenta da
   `payMetodoSpegni` e passando a On-chain). Consiglia, non vieta.
+  Verso chi vende (stesso giorno, cantiere onchain-grossi-uscita):
+  l'ordine on-chain nasce con `grosso` (colonna di `onchain_ordini`,
+  fissata col cambio del tetto) e `onchain_modo_ordine` lo guarda per
+  primo: riceve on-chain anche da «sempre Lightning»; il cambio in
+  Lightning dell'ordine dice 409 (`_onchain_da_sbloccare`). Il tetto
+  degli scambi P2P on-chain è a parte: `P2P_ONCHAIN_MAX_EURO` (999 di
+  serie); `ONCHAIN_MAX_EURO` vale solo per il mercatino.
 - LA CASSA A DUE PORTE E L'INCASSO SOLO SU UN WALLET TUO (27 ott 2026,
   cantiere onchain-cassa; perché in CANTIERI, «La cassa a due porte»).
   Il foglio del pagamento (`#paySheet`) ha in cima `#payMetodo` (⚡ giallo
