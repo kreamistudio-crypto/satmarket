@@ -36485,6 +36485,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   id del foglio dei recapiti di Lightning, che per questo si svuota).
   Prove: `prove_onchain_contanti`, `prove_onchain_contanti_scambio`,
   `collaudo_p2p_onchain` 11-septies e 11-octies.
+  IL METODO SCELTO E LA CAUZIONE (terzo pezzo; CANTIERI, «…terzo pezzo:
+  il metodo scelto alla presa e la cauzione in Lightning col QR»). La
+  presa porta `metodo`; `p2p_onchain_metodo_presa` lo tiene solo se è
+  dell'ordine, e la colonna `metodo_scelto` lo ricorda.
+  `_p2p_onchain_contanti` resta l'UNICO giudice: il solo «Contanti», o
+  «Contanti» scelto. La cauzione è una hold invoice di LND dal ponte,
+  col macaroon `LND_PONTE_MACAROON_CAUZIONE` (`_lnd_cauzione`: solo
+  `POST /v2/invoices/hodl`, `POST /v2/invoices/cancel` e
+  `GET /v1/invoice/{hash}`); tabella `p2p_onchain_cauzioni` (hash,
+  preimage, bolt11, sats, stato attesa | tenuta | tornata | scaduta,
+  `in_gioco`). Rotte: `POST /api/p2p/onchain/{oid}/cauzione` (conia, o
+  ridà la viva) e `GET …/cauzione` (rilegge LND). La presa chiama
+  `_p2p_onchain_cauzione_per_presa` PRIMA della connessione e mette la
+  cauzione `in_gioco` solo a presa riuscita. Il ritorno è
+  `p2p_onchain_cauzioni_passata` (ogni 30 s da `_ciclo_cauzioni_onchain`,
+  giudice puro `p2p_onchain_cauzione_sorte`). La leva:
+  `p2p_onchain_cauzione_accesa(tg_id)` = `P2P_ONCHAIN_CAUZIONE` più il
+  macaroon e, finché `P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN` non è un `False`
+  scritto (di serie è chiusa), solo se chi prende è un moderatore
+  (`e_admin`); si chiede sempre per la persona, mai a vuoto. La busta
+  del libro on-chain la porta come `cauzione` {accesa, pct, base,
+  finestra}, già giudicata per chi guarda. Sul telefono: `metodiPresaOcHtmlP2P`
+  (pillole, zona, regola, riga della cauzione), `apriCauzioneOcP2P`
+  (foglio `p2pOcCauzSheet`, il QR e il battito), `riquadroCauzioneOcP2P`
+  nella pagina dello scambio. Prove: `prove_onchain_cauzione`,
+  `collaudo_p2p_onchain` 11-novies.
 - IL RIMBORSO ON-CHAIN CHE NON SI INCAGLIA (17 nov 2026, cantiere
   onchain-rimborso-liscio; CANTIERI, «Il rimborso on-chain che non si
   incaglia»). La regola del 10 nov non cambia (un rimborso vuoto non è

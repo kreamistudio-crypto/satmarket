@@ -3123,6 +3123,7 @@ FRENI = {
     # suona ai moderatori
     "p2p_onchain_pubblica": (10, 3600),  # un ordine on-chain nel libro, per persona
     "p2p_onchain_prendi": (10, 3600),    # una presa (nasce un 2-di-3), per persona
+    "p2p_onchain_cauzione": (10, 3600),  # una cauzione chiesta (nasce una hold su LND), per persona
     # il battito della pagina di chi deposita (30 ott 2026): uno ogni 15
     # secondi mentre guarda lo scambio, piu' i tocchi di «controlla»
     "p2p_onchain_controlla": (300, 3600),  # mempool per uno scambio preso, per persona
@@ -37201,6 +37202,25 @@ def _leve_stato():
                   spento="come ieri: la cauzione dell'ordine intero, "
                          "anche a chi sceglie SEPA su un ordine con i "
                          "contanti; da accendere dopo la -bar7"),
+            # LA CAUZIONE DEL CONTANTI ON-CHAIN (17 nov 2026 sera): la
+            # chiede Barattolo, con una hold invoice del nostro LND
+            _leva("Cauzione nel contanti on-chain (in Lightning)",
+                  "P2P_ONCHAIN_CAUZIONE", P2P_ONCHAIN_CAUZIONE,
+                  acceso="chi prende in contanti un ordine on-chain blocca "
+                         "prima una cauzione in Lightning (3%, minimo 1000 "
+                         "sats) che torna a fine scambio; vale solo se nel "
+                         "config c'e' anche LND_PONTE_MACAROON_CAUZIONE",
+                  spento="il contanti on-chain si prende senza cauzione; "
+                         "per accenderla servono la riga nel config e il "
+                         "macaroon LND_PONTE_MACAROON_CAUZIONE"),
+            _leva("Cauzione on-chain solo ai moderatori",
+                  "P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN",
+                  P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN,
+                  acceso="la cauzione del contanti on-chain la vede e la "
+                         "mette solo un moderatore che prende: per tutti "
+                         "gli altri e' come spenta",
+                  spento="la cauzione del contanti on-chain vale per "
+                         "chiunque prenda in contanti (se la leva e' accesa)"),
             # IL TEMPO DI CHI PUBBLICA (12 ott 2026): il pacchetto di
             # Barattolo; le ore le decide il nodo (settings.toml,
             # `maker_expiration_seconds`, patch 0011) e le annuncia nel 38385
@@ -108200,9 +108220,39 @@ def _p2p_onchain_prepara(con):
                       # di scambio del contanti di persona, come la card di
                       # Lightning («📍 Milano centro»). La scrive chi
                       # pubblica, solo con «Contanti» fra i metodi
-                      ("zona", "TEXT DEFAULT ''")):
+                      ("zona", "TEXT DEFAULT ''"),
+                      # 17 nov 2026 sera, cantiere onchain-contanti (terzo
+                      # pezzo): il metodo scelto da chi PRENDE un ordine
+                      # con piu' metodi ('' = nessuna scelta, o un metodo
+                      # solo). «Contanti» scelto qui fa lo scambio in
+                      # contanti di persona (`_p2p_onchain_contanti`)
+                      ("metodo_scelto", "TEXT DEFAULT ''")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
+    # LE CAUZIONI DEL CONTANTI ON-CHAIN (17 nov 2026 sera): una riga per
+    # ogni hold invoice chiesta a LND. `preimage` resta qui perche' la
+    # cauzione la tiene Barattolo (decisione di Andrea): senza, non si
+    # potrebbe mai dare torto a nessuno. `in_gioco` = la presa e' riuscita
+    # con questa cauzione. Stati: attesa (coniata, non pagata) | tenuta
+    # (l'HTLC e' fermo sul nodo) | tornata | scaduta (mai pagata)
+    con.execute("""CREATE TABLE IF NOT EXISTS p2p_onchain_cauzioni(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ordine_id INTEGER NOT NULL,
+        tg_id INTEGER NOT NULL,
+        hash TEXT NOT NULL UNIQUE,
+        preimage TEXT NOT NULL,
+        bolt11 TEXT NOT NULL,
+        sats INTEGER NOT NULL,
+        stato TEXT NOT NULL DEFAULT 'attesa',
+        in_gioco INTEGER NOT NULL DEFAULT 0,
+        creata INTEGER NOT NULL,
+        scade INTEGER NOT NULL,
+        tenuta_il INTEGER NOT NULL DEFAULT 0,
+        guardata_il INTEGER NOT NULL DEFAULT 0,
+        chiusa_il INTEGER NOT NULL DEFAULT 0,
+        perche TEXT NOT NULL DEFAULT '')""")
+    con.execute("CREATE INDEX IF NOT EXISTS p2p_onchain_cauzioni_ordine "
+                "ON p2p_onchain_cauzioni(ordine_id, tg_id)")
 
 
 def _p2p_onchain_campo(o, nome: str, vuoto=None):
@@ -108562,6 +108612,12 @@ def _p2p_onchain_libro(chi: int) -> dict:
             miei.append(o["ordine"])
     fuori = {"eventi": eventi, "quando": F["quando"], "rete": ONCHAIN_RETE,
              "minSats": P2P_ONCHAIN_MIN_SATS, "oreDeposito": P2P_ONCHAIN_ORE_DEPOSITO,
+             # la cauzione di chi prende in contanti (17 nov 2026 sera): la
+             # leva e la regola, per la riga e il bottone del foglio
+             "cauzione": {"accesa": p2p_onchain_cauzione_accesa(chi),
+                          "pct": P2P_ONCHAIN_CAUZIONE_PCT,
+                          "base": P2P_ONCHAIN_CAUZIONE_BASE_SATS,
+                          "finestra": P2P_ONCHAIN_CAUZIONE_FINESTRA_S},
              # il tetto in euro degli scambi on-chain (12 nov 2026, Andrea:
              # «p2p onchain metti 500»): quello dell'on-chain, non del P2P
              # Lightning; lo giudica il foglio Pubblica, 0 = spento
@@ -108812,6 +108868,12 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
     # presenze (la mia, e l'ora dell'altra: mai la sua posizione), al
     # moderatore che non e' una parte il confronto, come nel Lightning
     d["contanti"] = _p2p_onchain_contanti(o)
+    # (17 nov 2026 sera) il metodo scelto alla presa e la cauzione in
+    # gioco: a chi l'ha messa, e a un moderatore
+    d["metodo_scelto"] = str(_p2p_onchain_campo(o, "metodo_scelto", "") or "")
+    cz = _p2p_onchain_cauzione_di(con, o, tg_id, admin)
+    if cz:
+        d["cauzione"] = cz
     if d["contanti"] and dep and ric:
         lato_i = _p2p_onchain_lato_incontro(o, tg_id)
         if lato_i and _tabella_p2p(con, "p2p_sono_qui"):
@@ -109393,6 +109455,501 @@ def _p2p_onchain_commissioni(con, dep: int, ric: int, prezzo: int, fee) -> tuple
     return fd, fr
 
 
+# ---- LA CAUZIONE DEL CONTANTI ON-CHAIN, IN LIGHTNING (17 nov 2026 sera) ----
+# IL CASO (cantiere onchain-contanti, terzo pezzo; Andrea: «Quando ci
+# clicco poi non mi fa mettere la cauzione. Dovrebbe funzionare
+# esattamente come Lightning anche l'on-chain contanti», «Anche la
+# questione QR, tutto quanto»). Su Lightning la cauzione la chiede il
+# coordinatore Mostro; un ordine on-chain a Mostro non passa, quindi qui
+# la chiede Barattolo, con la STESSA regola letta sul nodo (NODO-MOSTRO,
+# «LA CAUZIONE DI CHI PRENDE»): solo a chi PRENDE scegliendo «Contanti»,
+# il 3% dei sats con un minimo di 1000, quindici minuti per pagarla, e
+# non si perde MAI per un tempo scaduto.
+# LE DUE DECISIONI DI ANDREA (card del 17 nov): la cauzione si blocca IN
+# LIGHTNING col QR, la tiene Barattolo e torna a fine scambio (scartate:
+# dentro il 2-di-3, lenta e gia' bocciata da Alan; e «niente cauzione»);
+# e si perde «come su Lightning», solo per decisione di un moderatore,
+# meta' all'altra persona (quel gesto e' il pezzo dopo: qui la cauzione
+# TORNA SEMPRE).
+# COM'E' FATTA: una HOLD invoice del nostro LND, chiesta dal ponte come
+# le hold di prova (`POST /v2/invoices/hodl`), ma con un macaroon SUO,
+# `LND_PONTE_MACAROON_CAUZIONE`: quello delle hold di prova non sa
+# saldare per costruzione e deve restare cosi'. Chi paga vede il
+# pagamento «in sospeso» nel wallet: i sats non entrano nel nodo, sono
+# fermi a meta' strada. LA CAUZIONE VIENE PRIMA DELLA PRESA: l'ordine
+# resta nel libro finche' LND non dice ACCEPTED, poi il telefono prende
+# e la rotta della presa lo richiede a LND un'ultima volta. Cosi' non
+# nasce uno stato nuovo e un ordine on-chain non «torna nel libro» mai
+# (il giro 0 delle presenze resta vero). Una cauzione tenuta ma non
+# usata (app chiusa, ordine preso da un altro) torna da sola entro un
+# quarto d'ora; una in gioco torna quando lo scambio si chiude, in
+# qualunque modo. Il giro e' `p2p_onchain_cauzioni_passata`, ogni mezzo
+# minuto. IL LIMITE: l'HTLC vive 576 blocchi (quattro giorni, come su
+# Mostro); uno scambio in disputa piu' a lungo vede la cauzione tornare
+# da sola, e la passata lo scrive.
+# LA LEVA: `P2P_ONCHAIN_CAUZIONE = True` nel config PIU' il macaroon.
+# Spenta (di serie), il contanti on-chain funziona senza cauzione.
+# ...E LA PORTICINA DEGLI ADMIN: `P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN`, True di
+# serie (decisione di Andrea, card del 17 nov: si prova IN PRODUZIONE,
+# «solo tu e Alan»; e a voce: «Lo vediamo solo noi con una leva spenta?»).
+# Finche' e' True la cauzione la vede e la mette SOLO un moderatore che
+# prende: per chiunque altro e' come se la leva fosse spenta, nel libro,
+# nella richiesta e nella presa. Si apre a tutti scrivendo False.
+P2P_ONCHAIN_CAUZIONE_PCT = 3            # per cento dei sats dello scambio
+P2P_ONCHAIN_CAUZIONE_BASE_SATS = 1000   # il minimo
+P2P_ONCHAIN_CAUZIONE_FINESTRA_S = 900   # il tempo per pagare la richiesta
+P2P_ONCHAIN_CAUZIONE_CLTV = 576         # i blocchi dell'HTLC, come Mostro
+P2P_ONCHAIN_CAUZIONE_PRESA_S = 900      # tenuta ma non usata: poi torna
+P2P_ONCHAIN_CAUZIONE_GUARDA_S = 600     # ogni quanto si richiede a LND una in gioco
+P2P_ONCHAIN_CAUZIONE_MEMO = ("Barattolo: cauzione dello scambio in contanti. "
+                             "Resta in sospeso e torna a fine scambio")
+P2P_ONCHAIN_STATI_CHIUSI = ("rilasciato", "rimborsato", "annullato", "scaduto")
+try:
+    from config import P2P_ONCHAIN_CAUZIONE
+    P2P_ONCHAIN_CAUZIONE = P2P_ONCHAIN_CAUZIONE is True
+except ImportError:
+    P2P_ONCHAIN_CAUZIONE = False
+try:
+    from config import P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN
+    # solo un False scritto apre a tutti: una riga storta resta chiusa
+    P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN is not False
+except ImportError:
+    P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True
+try:
+    from config import LND_PONTE_MACAROON_CAUZIONE
+except ImportError:
+    LND_PONTE_MACAROON_CAUZIONE = ""
+
+
+def _p2p_onchain_cauzione_macaroon() -> bool:
+    """Il macaroon delle cauzioni c'e' ed e' esadecimale?"""
+    m = str(LND_PONTE_MACAROON_CAUZIONE or "").strip()
+    return bool(m) and re.fullmatch(r"[0-9a-fA-F]{40,}", m) is not None
+
+
+def p2p_onchain_cauzione_accesa(tg_id=0) -> bool:
+    """La leva PER QUESTA PERSONA (chi prende): la riga nel config E il
+    macaroon — una senza l'altro e' spenta, e nessuno bussa a LND — e,
+    finche' la porticina `P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN` e' chiusa,
+    solo per un moderatore. Senza persona (un ospite, il giornale
+    dell'avvio) a porticina chiusa e' spenta."""
+    if not (P2P_ONCHAIN_CAUZIONE is True and _p2p_onchain_cauzione_macaroon()):
+        return False
+    if P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN is not False:
+        try:
+            return bool(tg_id) and e_admin(int(tg_id))
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
+def p2p_onchain_cauzione_sats(sats) -> int:
+    """PURA: quanti sats di cauzione su uno scambio di `sats`, con la
+    formula del coordinatore (`compute_bond_amount`): max(round(pct ×
+    sats), base). In interi, col mezzo che sale. 0 = cifra storta."""
+    try:
+        s = int(sats or 0)
+    except (TypeError, ValueError):
+        return 0
+    if s <= 0:
+        return 0
+    return max((P2P_ONCHAIN_CAUZIONE_PCT * s + 50) // 100,
+               P2P_ONCHAIN_CAUZIONE_BASE_SATS)
+
+
+def p2p_onchain_metodo_presa(o, chiesto) -> str:
+    """PURA: il metodo con cui si prende. Un metodo solo: quello, senza
+    chiedere. Piu' metodi: quello chiesto SE e' dell'ordine (come lo
+    dice il libro), sennò '' = nessuna scelta, e lo scambio va come ieri."""
+    metodi = _metodi_libro(_p2p_onchain_metodi(o))
+    if len(metodi) == 1:
+        return metodi[0]
+    c = str(chiesto or "").strip()
+    return c if c and c in metodi else ""
+
+
+def p2p_onchain_cauzione_serve(o, scelto: str, accesa: bool) -> bool:
+    """PURA: a chi prende QUEST'ordine con QUESTO metodo si chiede la
+    cauzione? Solo con la leva accesa e «Contanti» scelto (o unico)."""
+    return bool(accesa) and str(scelto or "") == "Contanti" \
+        and "Contanti" in _metodi_libro(_p2p_onchain_metodi(o))
+
+
+def richiesta_hold_cauzione(hash_bytes: bytes, sats: int) -> dict:
+    """PURA: il corpo di AddHoldInvoice per una cauzione. I numeri come
+    stringhe e l'hash in base64, come vuole la REST di LND."""
+    return {"hash": base64.b64encode(bytes(hash_bytes)).decode(),
+            "value": str(int(sats)),
+            "memo": P2P_ONCHAIN_CAUZIONE_MEMO,
+            "expiry": str(P2P_ONCHAIN_CAUZIONE_FINESTRA_S),
+            "cltv_expiry": str(P2P_ONCHAIN_CAUZIONE_CLTV)}
+
+
+def p2p_onchain_cauzione_sorte(riga, stato_ordine: str, adesso: int) -> str:
+    """PURA: cosa fa la passata di UNA cauzione viva. Torna:
+    'aspetta' (niente da fare), 'guarda' (chiedere a LND a che punto e'),
+    'annulla' (rimandarla indietro). Una in ATTESA si lascia al telefono
+    finche' la richiesta e' viva, poi si guarda (pagata all'ultimo → e'
+    tenuta; sennò si annulla). Una TENUTA e non usata torna se l'ordine
+    non e' piu' nel libro o dopo `P2P_ONCHAIN_CAUZIONE_PRESA_S`. Una IN
+    GIOCO torna a scambio chiuso; a scambio vivo (disputa compresa) si
+    tiene, e ogni tanto si guarda se il nodo l'ha gia' rimandata."""
+    stato = str(riga["stato"] or "")
+    adesso = int(adesso)
+    if stato == "attesa":
+        return "aspetta" if adesso <= int(riga["scade"] or 0) else "guarda"
+    if stato != "tenuta":
+        return "aspetta"
+    if not int(riga["in_gioco"] or 0):
+        if str(stato_ordine or "") != "pending":
+            return "annulla"
+        if adesso - int(riga["tenuta_il"] or 0) > P2P_ONCHAIN_CAUZIONE_PRESA_S:
+            return "annulla"
+        return "aspetta"
+    if str(stato_ordine or "") in P2P_ONCHAIN_STATI_CHIUSI or not stato_ordine:
+        return "annulla"
+    if adesso - int(riga["guardata_il"] or 0) >= P2P_ONCHAIN_CAUZIONE_GUARDA_S:
+        return "guarda"
+    return "aspetta"
+
+
+async def _lnd_cauzione(metodo: str, percorso: str, corpo: dict | None = None,
+                        params: dict | None = None):
+    """Una chiamata a LND col macaroon delle CAUZIONI, dal ponte: SOLO
+    `hodl`, `cancel` e la lettura di UNA fattura per hash ci passano.
+    Torna (json, '') o (None, perche'). NON ALZA MAI, e del guasto dice
+    il tipo e il `message` di LND, mai l'URL coi suoi header."""
+    if not ((metodo == "POST" and percorso in ("/v2/invoices/hodl",
+                                                 "/v2/invoices/cancel"))
+            or (metodo == "GET"
+                and re.fullmatch(r"/v1/invoice/[0-9a-f]{64}", percorso))):
+        return None, "strada non prevista"
+    if not _p2p_onchain_cauzione_macaroon():
+        return None, "cauzioni non attive su questo server"
+    try:
+        url = str(LND_PONTE_URL)
+        verifica = (ssl.create_default_context(cafile=LND_PONTE_CERT)
+                    if url.lower().startswith("https") else True)
+        testa = {"Grpc-Metadata-macaroon": str(LND_PONTE_MACAROON_CAUZIONE).strip()}
+        async with httpx.AsyncClient(timeout=20, verify=verifica) as c:
+            if metodo == "GET":
+                r = await c.get(f"{url}{percorso}", params=params or {}, headers=testa)
+            else:
+                r = await c.post(f"{url}{percorso}", json=corpo or {}, headers=testa)
+    except Exception as e:
+        return None, f"LND non risponde ({type(e).__name__})"
+    try:
+        d = r.json()
+    except ValueError:
+        d = None
+    if r.status_code != 200:
+        msg = ""
+        if isinstance(d, dict):
+            msg = str(d.get("message") or d.get("error") or "")[:120]
+        return None, f"LND ha risposto {r.status_code}" + (f": {msg}" if msg else "")
+    if not isinstance(d, dict):
+        return None, "LND ha risposto senza JSON"
+    return d, ""
+
+
+async def _p2p_onchain_cauzione_lnd(hash_hex: str) -> str:
+    """A che punto e' la hold su LND: 'OPEN' (non pagata), 'ACCEPTED'
+    (pagata e ferma: e' TENUTA), 'CANCELED', 'SETTLED', o '' se LND non
+    l'ha detto. E' LookupInvoice (`GET /v1/invoice/{hash}`), con l'hash
+    in esadecimale nel percorso: la stessa lettura che il macaroon delle
+    hold di prova ha gia' nella sua ricetta."""
+    h = str(hash_hex or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", h):
+        return ""
+    d, _perche = await _lnd_cauzione("GET", f"/v1/invoice/{h}")
+    return str((d or {}).get("state") or "").upper()
+
+
+async def _p2p_onchain_cauzione_annulla(hash_hex: str) -> bool:
+    """CancelInvoice: l'HTLC fermo torna a chi ha pagato. Vero se LND
+    l'ha annullata adesso o l'aveva gia' annullata."""
+    try:
+        corpo = {"payment_hash": base64.b64encode(bytes.fromhex(hash_hex)).decode()}
+    except ValueError:
+        return False
+    d, perche = await _lnd_cauzione("POST", "/v2/invoices/cancel", corpo)
+    ok = d is not None or "already" in perche.lower()
+    print(f"🔐 cauzione on-chain: cancel {hash_hex[:12]}… → "
+          f"{'ok' if ok else perche}", flush=True)
+    return ok
+
+
+def _p2p_onchain_cauzione_viva(con, oid: int, tg_id: int):
+    """L'ultima cauzione viva (in attesa o tenuta) di QUESTA persona su
+    QUEST'ordine, o None."""
+    return con.execute(
+        "SELECT * FROM p2p_onchain_cauzioni WHERE ordine_id=? AND tg_id=?"
+        " AND stato IN ('attesa','tenuta')"
+        " ORDER BY (stato='tenuta') DESC, id DESC LIMIT 1",
+        (int(oid), int(tg_id))).fetchone()
+
+
+def _p2p_onchain_cauzione_fuori(r, adesso: int) -> dict:
+    """PURA: quel che il telefono di chi l'ha messa vede di una cauzione.
+    La richiesta (bolt11) solo finche' e' da pagare."""
+    stato = str(r["stato"] or "")
+    d = {"stato": stato, "sats": int(r["sats"] or 0),
+         "scade": int(r["scade"] or 0), "in_gioco": bool(int(r["in_gioco"] or 0))}
+    if stato == "attesa" and int(adesso) <= int(r["scade"] or 0):
+        d["bolt11"] = str(r["bolt11"] or "")
+    return d
+
+
+def _p2p_onchain_cauzione_di(con, o, tg_id: int, admin: bool = False) -> dict | None:
+    """La cauzione IN GIOCO di uno scambio, per chi l'ha messa (e per un
+    moderatore, senza richiesta): {stato, sats, mia}. None se non c'e'."""
+    try:
+        r = con.execute(
+            "SELECT * FROM p2p_onchain_cauzioni WHERE ordine_id=? AND in_gioco=1"
+            " ORDER BY id DESC LIMIT 1", (int(o["id"]),)).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    if not r:
+        return None
+    mia = int(r["tg_id"]) == int(tg_id or 0)
+    if not mia and not admin:
+        return None
+    return {"stato": str(r["stato"]), "sats": int(r["sats"] or 0), "mia": mia}
+
+
+def _p2p_onchain_cauzione_base_sats(o) -> int:
+    """I sats su cui si conta la cauzione: quelli dell'ordine, o a
+    prezzo di mercato quelli al cambio di ADESSO (0 = il cambio non c'e')."""
+    if not _p2p_onchain_mercato(o):
+        return int(o["prezzo_sats"] or 0)
+    cambio = cambio_noto_ora(_p2p_onchain_metro(o))
+    cent = p2p_onchain_cent_mercato(o)
+    if not cambio > 0 or not cent > 0:
+        return 0
+    return int(p2p_onchain_sats_mercato(cent, o["premio"], cambio) or 0)
+
+
+@app.post("/api/p2p/onchain/{oid}/cauzione")
+async def p2p_onchain_cauzione_chiedi(oid: int, req: Request,
+                                      x_tg_init_data: str = Header(""),
+                                      barattolo_sessione: str = Cookie("")):
+    """LA RICHIESTA DELLA CAUZIONE, prima di prendere in contanti: conia
+    la hold invoice (o ridà quella ancora viva) e la consegna al
+    telefono, che ne fa il QR. Non prende niente: l'ordine resta nel
+    libro finche' la cauzione non e' ferma sul nodo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("p2p_onchain_cauzione", user["id"])
+    d = await leggi_json(req)
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if int(o["maker_id"]) == int(user["id"]):
+            raise HTTPException(409, "È il tuo ordine: non puoi prenderlo")
+        if o["stato"] != "pending" or int(o["scade"]) <= adesso:
+            raise HTTPException(409, "Quest'ordine non è più nel libro")
+        scelto = p2p_onchain_metodo_presa(o, d.get("metodo"))
+        if not p2p_onchain_cauzione_serve(o, scelto,
+                                          p2p_onchain_cauzione_accesa(user["id"])):
+            raise HTTPException(409, "Per quest'ordine non serve nessuna cauzione")
+        if _p2p_onchain_vivi_di(con, user["id"]) >= P2P_ONCHAIN_APERTI_MAX:
+            raise HTTPException(409, f"Hai già {P2P_ONCHAIN_APERTI_MAX} scambi "
+                                     "on-chain aperti: chiudine uno prima")
+        perche = _p2p_onchain_porta_presa(con, o, user["id"], adesso)
+        if perche:
+            raise HTTPException(409, perche)
+        viva = _p2p_onchain_cauzione_viva(con, oid, user["id"])
+        if viva and (viva["stato"] == "tenuta" or adesso <= int(viva["scade"]) - 60):
+            return {"ok": True, "cauzione": _p2p_onchain_cauzione_fuori(viva, adesso)}
+        sats = p2p_onchain_cauzione_sats(_p2p_onchain_cauzione_base_sats(o))
+        if not sats > 0:
+            raise HTTPException(503, "Il cambio di adesso non c'è: è un ordine a "
+                                     "prezzo di mercato, riprova fra un minuto")
+    finally:
+        con.close()
+    # la hold nasce fuori dalla connessione: e' una chiamata di rete
+    preimage = secrets.token_bytes(32)
+    hash_bytes = hashlib.sha256(preimage).digest()
+    r, perche = await _lnd_cauzione("POST", "/v2/invoices/hodl",
+                                    richiesta_hold_cauzione(hash_bytes, sats))
+    bolt11 = str((r or {}).get("payment_request") or "").strip()
+    if not bolt11.lower().startswith("ln"):
+        print(f"⚠️ cauzione on-chain #{oid}: non coniata "
+              f"({perche or 'senza fattura'})", flush=True)
+        raise HTTPException(503, "La richiesta della cauzione adesso non si può "
+                                 "creare: riprova fra un minuto")
+    con = _p2p_onchain_db()
+    try:
+        con.execute(
+            "INSERT INTO p2p_onchain_cauzioni(ordine_id, tg_id, hash, preimage,"
+            " bolt11, sats, stato, creata, scade) VALUES(?,?,?,?,?,?,'attesa',?,?)",
+            (int(oid), int(user["id"]), hash_bytes.hex(), preimage.hex(), bolt11,
+             sats, adesso, adesso + P2P_ONCHAIN_CAUZIONE_FINESTRA_S))
+        con.commit()
+        riga = _p2p_onchain_cauzione_viva(con, oid, user["id"])
+        return {"ok": True, "cauzione": _p2p_onchain_cauzione_fuori(riga, adesso)}
+    finally:
+        con.close()
+
+
+async def _p2p_onchain_cauzione_aggiorna(oid: int, tg_id: int) -> dict | None:
+    """Rilegge su LND la cauzione viva di questa persona su quest'ordine
+    e, se e' ferma sul nodo, la scrive TENUTA. Torna la riga com'e'
+    adesso (dict), o None se non ce n'e' una viva."""
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        r = _p2p_onchain_cauzione_viva(con, oid, tg_id)
+    finally:
+        con.close()
+    if not r:
+        return None
+    r = dict(r)
+    if r["stato"] != "attesa":
+        return r
+    stato = await _p2p_onchain_cauzione_lnd(r["hash"])
+    if stato != "ACCEPTED":
+        return r
+    con = _p2p_onchain_db()
+    try:
+        con.execute("UPDATE p2p_onchain_cauzioni SET stato='tenuta', tenuta_il=?,"
+                    " guardata_il=? WHERE id=? AND stato='attesa'",
+                    (adesso, adesso, r["id"]))
+        con.commit()
+    finally:
+        con.close()
+    r.update(stato="tenuta", tenuta_il=adesso, guardata_il=adesso)
+    return r
+
+
+@app.get("/api/p2p/onchain/{oid}/cauzione")
+async def p2p_onchain_cauzione_stato(oid: int, x_tg_init_data: str = Header(""),
+                                     barattolo_sessione: str = Cookie("")):
+    """A che punto e' la MIA cauzione su quest'ordine: il foglio col QR
+    lo chiede ogni pochi secondi, e quando dice «tenuta» prende."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    r = await _p2p_onchain_cauzione_aggiorna(oid, user["id"])
+    if not r:
+        return {"ok": True, "cauzione": None}
+    return {"ok": True, "cauzione": _p2p_onchain_cauzione_fuori(r, int(time.time()))}
+
+
+async def _p2p_onchain_cauzione_per_presa(oid: int, tg_id: int, chiesto) -> tuple:
+    """PRIMA DELLA PRESA: (id della cauzione tenuta, '') se serve e c'e';
+    (0, '') se non serve; (0, perche') se serve e non e' ferma sul nodo.
+    L'ordine che non esiste o non e' piu' nel libro lo dice la presa."""
+    con = _p2p_onchain_db()
+    try:
+        o = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                        (int(oid),)).fetchone()
+    finally:
+        con.close()
+    if not o or o["stato"] != "pending":
+        return 0, ""
+    scelto = p2p_onchain_metodo_presa(o, chiesto)
+    if not p2p_onchain_cauzione_serve(o, scelto, p2p_onchain_cauzione_accesa(tg_id)):
+        return 0, ""
+    r = await _p2p_onchain_cauzione_aggiorna(oid, tg_id)
+    if not r:
+        return 0, ("Per prendere in contanti serve la cauzione: tocca "
+                   "«🔐 Blocca la cauzione»")
+    if r["stato"] != "tenuta":
+        return 0, ("La cauzione non risulta ancora bloccata: paga la richiesta "
+                   "dal tuo wallet, poi riprova")
+    return int(r["id"]), ""
+
+
+async def p2p_onchain_cauzioni_passata(adesso: int | None = None) -> dict:
+    """IL GIRO DELLE CAUZIONI: ogni cauzione viva passa dal giudice
+    (`p2p_onchain_cauzione_sorte`) e si guarda o si annulla. Una cancel
+    che non passa si riprova al giro dopo. Gira anche a leva spenta, se
+    il macaroon c'e': una cauzione gia' presa deve poter tornare. Torna
+    il conto {tenute, tornate, scadute}."""
+    conto = {"tenute": 0, "tornate": 0, "scadute": 0}
+    if not _p2p_onchain_cauzione_macaroon():
+        return conto
+    t = int(time.time() if adesso is None else adesso)
+    con = _p2p_onchain_db()
+    try:
+        righe = [dict(r) for r in con.execute(
+            "SELECT c.*, o.stato AS stato_ordine FROM p2p_onchain_cauzioni c"
+            " LEFT JOIN p2p_onchain_ordini o ON o.id=c.ordine_id"
+            " WHERE c.stato IN ('attesa','tenuta') ORDER BY c.id LIMIT 200")]
+    finally:
+        con.close()
+    for r in righe:
+        sorte = p2p_onchain_cauzione_sorte(r, r["stato_ordine"] or "", t)
+        if sorte == "aspetta":
+            continue
+        nuovo, perche = "", ""
+        if sorte == "guarda":
+            lnd = await _p2p_onchain_cauzione_lnd(r["hash"])
+            if r["stato"] == "attesa":
+                if lnd == "ACCEPTED":
+                    nuovo = "tenuta"
+                elif lnd == "CANCELED" or (lnd == "OPEN" and
+                                           await _p2p_onchain_cauzione_annulla(r["hash"])):
+                    nuovo, perche = "scaduta", "mai pagata"
+            elif lnd == "CANCELED":
+                nuovo, perche = "tornata", "tornata da sola dal nodo"
+            elif lnd:
+                nuovo = "guardata"
+        elif await _p2p_onchain_cauzione_annulla(r["hash"]):
+            nuovo = "tornata"
+            perche = ("scambio chiuso" if int(r["in_gioco"] or 0) else "non usata")
+        if not nuovo:
+            continue
+        con = _p2p_onchain_db()
+        try:
+            if nuovo == "tenuta":
+                con.execute("UPDATE p2p_onchain_cauzioni SET stato='tenuta',"
+                            " tenuta_il=?, guardata_il=? WHERE id=? AND stato='attesa'",
+                            (t, t, r["id"]))
+                conto["tenute"] += 1
+            elif nuovo == "guardata":
+                con.execute("UPDATE p2p_onchain_cauzioni SET guardata_il=? WHERE id=?",
+                            (t, r["id"]))
+            else:
+                con.execute("UPDATE p2p_onchain_cauzioni SET stato=?, chiusa_il=?,"
+                            " perche=? WHERE id=? AND stato IN ('attesa','tenuta')",
+                            (nuovo, t, perche, r["id"]))
+                conto["tornate" if nuovo == "tornata" else "scadute"] += 1
+            con.commit()
+        finally:
+            con.close()
+    return conto
+
+
+async def _ciclo_cauzioni_onchain():
+    """Il giro ogni mezzo minuto, finche' il processo vive."""
+    while True:
+        try:
+            await p2p_onchain_cauzioni_passata()
+        except Exception as e:   # mai far morire il giro per una riga storta
+            print(f"⚠️ cauzione on-chain: giro saltato ({type(e).__name__}: {e})",
+                  flush=True)
+        await asyncio.sleep(30)
+
+
+@app.on_event("startup")
+async def avvia_cauzioni_onchain():
+    """Col macaroon nel config il giro parte (anche a leva spenta: le
+    cauzioni gia' prese devono poter tornare). Senza, non nasce niente."""
+    if not _p2p_onchain_cauzione_macaroon():
+        print("🔐 Cauzione del contanti on-chain: non attiva "
+              "(manca LND_PONTE_MACAROON_CAUZIONE nel config)", flush=True)
+        return
+    print("🔐 Cauzione del contanti on-chain: "
+          + ("leva spenta, solo il giro dei ritorni" if P2P_ONCHAIN_CAUZIONE is not True
+             else "ACCESA SOLO PER I MODERATORI" if P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN is not False
+             else "ACCESA PER TUTTI")
+          + f", {P2P_ONCHAIN_CAUZIONE_PCT}% con minimo "
+          f"{P2P_ONCHAIN_CAUZIONE_BASE_SATS} sats", flush=True)
+    asyncio.create_task(_ciclo_cauzioni_onchain())
+
+
 @app.post("/api/p2p/onchain/{oid}/prendi")
 async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Header(""),
                              barattolo_sessione: str = Cookie("")):
@@ -109414,6 +109971,12 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
         raise HTTPException(503, str(e))
     # l'unico await prima delle scritture, come nella cassa on-chain
     margine = onchain_margine(await onchain_mempool_tariffa())
+    # ...e il secondo (17 nov 2026 sera): la cauzione di chi prende in
+    # contanti si richiede a LND QUI, prima di aprire la connessione
+    cauzione_id, senza_cauzione = await _p2p_onchain_cauzione_per_presa(
+        oid, user["id"], d.get("metodo"))
+    if senza_cauzione:
+        raise HTTPException(409, senza_cauzione)
     adesso = int(time.time())
     con = _p2p_onchain_db()
     try:
@@ -109503,6 +110066,21 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
         rec = o["recapito"] or ""
         if dep == int(user["id"]) and recapito and not rec:
             rec = recapito
+        # IL METODO SCELTO (17 nov 2026 sera): su un ordine con piu' metodi
+        # chi prende dice con quale paga. «Contanti» scelto fa lo scambio in
+        # contanti di persona: il recapito scritto per i metodi online (un
+        # IBAN) non serve piu' e lascia il posto all'appuntamento. La
+        # cauzione si ricontrolla qui: fra il primo sguardo e adesso la
+        # leva o l'ordine possono essere cambiati
+        scelto = p2p_onchain_metodo_presa(o, d.get("metodo"))
+        piu_metodi = len(_metodi_libro(_p2p_onchain_metodi(o))) > 1
+        if p2p_onchain_cauzione_serve(o, scelto,
+                                      p2p_onchain_cauzione_accesa(user["id"])) \
+                and not cauzione_id:
+            raise HTTPException(409, "Per prendere in contanti serve la cauzione: "
+                                     "tocca «🔐 Blocca la cauzione»")
+        if piu_metodi and scelto == "Contanti":
+            rec = ""
         # LA COMMISSIONE, uguale a quella di Lightning (16 nov 2026): la
         # meta' di chi deposita entra nell'importo, quella di chi riceve
         # esce dal suo incasso, e le due vanno a Barattolo su `/1/n` della
@@ -109527,16 +110105,22 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
             " preso_il=?, deposito_entro=?, aggiornato=?, prezzo_sats=?,"
             " cambio_presa=?, rimborso_tipo=?, rimborso_valore=?,"
             " rimborso_firma=?, rimborso_indice=?, quota_sats=?,"
-            " quota_indirizzo=?, quota_ricevente_sats=?"
+            " quota_indirizzo=?, quota_ricevente_sats=?, metodo_scelto=?"
             " WHERE id=? AND stato='pending'",
             (user["id"], dep, ric, ind_id, margine, prezzo + margine + q_dep,
              incasso, i_tipo, i_val, i_firma, i_ind, rimborso, rec, adesso,
              adesso + P2P_ONCHAIN_ORE_DEPOSITO * 3600, adesso, prezzo,
              cambio_presa, r_tipo, r_valore, r_firma, r_indice, quota,
-             quota_dove, q_ric, oid))
+             quota_dove, q_ric, scelto if piu_metodi else "", oid))
         con.commit()
         if not cur.rowcount:
             raise HTTPException(409, "Qualcun altro l'ha preso un attimo fa")
+        if cauzione_id:
+            # la cauzione entra in gioco con la presa riuscita: da qui torna
+            # solo a scambio chiuso (`p2p_onchain_cauzioni_passata`)
+            con.execute("UPDATE p2p_onchain_cauzioni SET in_gioco=1 WHERE id=?"
+                        " AND stato='tenuta'", (cauzione_id,))
+            con.commit()
         con.execute("UPDATE onchain_indirizzi SET ordine_id=? WHERE id=?",
                     (-int(oid), ind_id))   # negativo: e' un ordine del P2P, non di `ordini`
         con.commit()
@@ -109789,8 +110373,13 @@ P2P_ONCHAIN_STATI_INCONTRO = ("depositato", "euro_inviati")
 
 
 def _p2p_onchain_contanti(o) -> bool:
-    """PURA: lo scambio e' in contanti di persona?"""
-    return _p2p_onchain_solo_contanti(o)
+    """PURA: lo scambio e' in contanti di persona? Il SOLO metodo
+    «Contanti», o «Contanti» scelto alla presa su un ordine con piu'
+    metodi (`metodo_scelto`, terzo pezzo del cantiere)."""
+    if _p2p_onchain_solo_contanti(o):
+        return True
+    scelto = str(_p2p_onchain_campo(o, "metodo_scelto", "") or "").strip()
+    return scelto == "Contanti" and "Contanti" in _metodi_libro(_p2p_onchain_metodi(o))
 
 
 def _p2p_onchain_lato_incontro(o, tg_id) -> str:
@@ -111809,7 +112398,7 @@ def _p2p_onchain_sollecito_dovuto(o, adesso: int):
                     _p2p_onchain_campo(o, "sollecito_libera", 0))
         if n:
             testi = (P2P_ONCHAIN_RILASCIO_TAB_TESTI if p2p_onchain_tab_scade(o)
-                     else SOLLECITO_RILASCIO_CONTANTI_TESTI if _p2p_onchain_solo_contanti(o)
+                     else SOLLECITO_RILASCIO_CONTANTI_TESTI if _p2p_onchain_contanti(o)
                      else SOLLECITO_RILASCIO_TESTI)
             return ("sollecito_libera", n, int(o["depositante_id"]),
                     f"{P2P_ONCHAIN_SEGNO} {testi[n]}")
@@ -118805,6 +119394,9 @@ CANCELLA_ANONIMIZZA = (
     ("p2p_onchain_ordini", "proposta_da"),
     ("p2p_onchain_ordini", "decisione_da"),
     ("p2p_onchain_ordini", "disputa_da"),
+    # (17 nov 2026 sera) le cauzioni del contanti on-chain: la riga resta
+    # (una hold viva deve poter tornare indietro), il nome no
+    ("p2p_onchain_cauzioni", "tg_id"),
     # l'assistenza in app (3 nov 2026): le risposte di un admin che se ne
     # va restano nelle conversazioni degli altri, senza il suo nome
     ("assistenza", "autore"),

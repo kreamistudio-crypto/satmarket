@@ -16835,6 +16835,16 @@ document.getElementById('cartello')?.remove();</script>
     <div id="p2pOcAppCorpo"></div>
   </div>
 
+  <!-- «🔐 BLOCCA LA CAUZIONE» DEL CONTANTI ON-CHAIN (17 nov 2026 sera,
+       cantiere onchain-contanti, terzo pezzo): il gemello del foglio
+       della cauzione di Lightning, con la richiesta che conia Barattolo.
+       Lo riempie `renderCauzioneOcP2P`. -->
+  <div class="sheet" id="p2pOcCauzSheet" role="dialog" aria-modal="true" aria-labelledby="p2pOcCauzTit">
+    <div class="grab"></div>
+    <h3 id="p2pOcCauzTit">🔐 Blocca la cauzione</h3>
+    <div id="p2pOcCauzCorpo"></div>
+  </div>
+
   <!-- LA META' DELLA CAUZIONE BRUCIATA ALL'ALTRA PERSONA (1 ott 2026):
        una fattura dell'importo esatto, dal wallet o incollata -->
   <div class="sheet" id="p2pCauzioneSheet" role="dialog" aria-modal="true" aria-labelledby="p2pCauzioneTit">
@@ -37209,6 +37219,7 @@ function closeSheet(){
   el('p2pOcDepositoSheet').classList.remove('open');
   el('p2pOcParoleSheet').classList.remove('open');
   el('p2pOcAppSheet').classList.remove('open');
+  el('p2pOcCauzSheet').classList.remove('open');
   paroleOnchainP2PAnnulla();   // il gesto che aspettava la chiave non parte
   el('backupObbligoSheet').classList.remove('open');
   backupObbligoAnnulla();   // il gesto che aspettava le parole non parte
@@ -66243,7 +66254,12 @@ function accogliLibroOnchainP2P(busta){
     /* i due tasti della rete nel foglio di chi prende (16 nov 2026) */
     lnPossibile: !!busta.lnPossibile, depositoLnPossibile: !!busta.depositoLnPossibile,
     /* Barattozon anche on-chain (17 nov 2026): la leva del server */
-    barattozon: busta.barattozon !== false};
+    barattozon: busta.barattozon !== false,
+    /* la cauzione di chi prende in contanti (17 nov 2026 sera): la leva
+       e la regola del server; null = spenta, o server di ieri */
+    cauzione: busta.cauzione && busta.cauzione.accesa === true
+      ? {accesa: true, pct: Number(busta.cauzione.pct) || 0, base: Number(busta.cauzione.base) || 0,
+         finestra: Number(busta.cauzione.finestra) || 900} : null};
   p2pOnchainLetto = Date.now();
   return p2pOnchainLibro.eventi.length > 0;
 }
@@ -67491,6 +67507,9 @@ function apriOnchainP2P(id, modo){
   }
   const vendeLui = o.lato === 'sell';
   const metodi = (o.metodi || []).join(', ');
+  /* il metodo scelto e' di QUELL'ordine: aprendone un altro si riparte */
+  if (typeof p2pOcPresaMetodo !== 'undefined' && Number(p2pOcPresaMetodo.id) !== Number(o.id))
+    p2pOcPresaMetodo = {id: Number(o.id), metodo: ''};
   /* LE 12 PAROLE PRIMA (16 nov 2026, backup-obbligato): senza una copia
      non si prende; scritte e controllate, la presa riparte da qui */
   if (typeof backupOnchainPrima === 'function' && !backupOnchainPrima(() => apriOnchainP2P(id, modo))) return;
@@ -67516,10 +67535,15 @@ function apriOnchainP2P(id, modo){
          fra i metodi; la regola col tetto quando e' l'UNICO metodo (con
          piu' metodi Lightning la mostra scegliendo «Contanti», e qui la
          scelta del metodo non c'e' ancora) */
-      + (typeof zonaDettP2P === 'function' ? zonaDettP2P({metodi: o.metodi || [], zona: o.zona}) : '')
-      + (typeof regolaContantiFoglioP2P === 'function' && (o.metodi || []).length === 1
-        ? regolaContantiFoglioP2P(o.metodi, typeof maxEuroContantiP2P === 'function' ? maxEuroContantiP2P() : 0,
-                                  vendeLui ? 'compro' : 'vendo') : '')
+      /* (17 nov 2026 sera, terzo pezzo) LA SCELTA DEL METODO C'E': con
+         «Contanti» fra piu' metodi le pillole, e zona, regola e cauzione
+         compaiono scegliendolo (`metodiPresaOcHtmlP2P`, che si ridisegna) */
+      + (typeof metodiPresaOcHtmlP2P === 'function'
+        ? '<div id="p2pOcPresaMetodi">' + metodiPresaOcHtmlP2P(o, vendeLui) + '</div>'
+        : (typeof zonaDettP2P === 'function' ? zonaDettP2P({metodi: o.metodi || [], zona: o.zona}) : '')
+          + (typeof regolaContantiFoglioP2P === 'function' && (o.metodi || []).length === 1
+            ? regolaContantiFoglioP2P(o.metodi, typeof maxEuroContantiP2P === 'function' ? maxEuroContantiP2P() : 0,
+                                      vendeLui ? 'compro' : 'vendo') : ''))
       /* IL TEMPO CHE SCORRE, come nel dettaglio Lightning (16 nov 2026,
          Andrea: «se prendo un ordine on-chain non c'è più il riquadro del
          tempo che scorre. Puoi metterlo anche lì?») */
@@ -67761,7 +67785,8 @@ function corpoPresaOcP2P(o, vendeLui){
   const ln = (p2pOcPresaRete[o.id] || {}).rete === 'ln';
   /* in contanti di persona (17 nov 2026, onchain-contanti): l'incontro,
      non il conto. Qui l'ordine e' quello del libro: vale il solo metodo */
-  const cont = typeof soloContantiP2P === 'function' && soloContantiP2P(o.metodi);
+  const cont = typeof metodoPresaOcP2P === 'function' ? metodoPresaOcP2P(o) === 'Contanti'
+    : typeof soloContantiP2P === 'function' && soloContantiP2P(o.metodi);
   return paroleOc(o, vendeLui
       ? 'Chi vende deposita i sats in un indirizzo 2-di-3 (sue, tue e di Barattolo: ne servono due). '
         + (cont ? 'Quando sono confermati vi vedete dove ti scrive lui, consegni i contanti e tocchi «Ho consegnato i contanti»; '
@@ -67858,15 +67883,205 @@ async function applicaReteOcPresaP2P(id, ruolo){
   } catch(e) { toast('⚡ Lightning non scelto: riprova dallo scambio', 6000); }
 }
 
+/* ══ IL METODO SCELTO ALLA PRESA E LA CAUZIONE DEL CONTANTI ON-CHAIN
+   (17 nov 2026 sera, cantiere onchain-contanti, terzo pezzo; Andrea:
+   «Quando ci clicco poi non mi fa mettere la cauzione. Dovrebbe
+   funzionare esattamente come Lightning anche l'on-chain contanti»,
+   «Anche la questione QR, tutto quanto») ══
+   Su un ordine con «Contanti» fra piu' metodi chi prende sceglie con le
+   pillole, come nel dettaglio di Lightning; scegliendo «Contanti» lo
+   scambio diventa in contanti di persona (zona, regola, appuntamento,
+   «Sono qui»). Con la leva del server accesa (`p2pOnchainLibro.cauzione`)
+   chi prende in contanti blocca PRIMA una cauzione in Lightning: il
+   bottone apre il foglio col QR, il foglio chiede al server ogni tre
+   secondi, e quando la cauzione e' ferma prende da solo. La regola e'
+   quella di Lightning: 3%, almeno 1000 sats, torna a fine scambio. */
+let p2pOcPresaMetodo = {id: 0, metodo: ''};
+/* PURA: su quest'ordine si sceglie il metodo? Solo con «Contanti» fra piu' metodi */
+function sceltaMetodoOcP2P(o){
+  const m = (o && o.metodi) || [];
+  return m.length > 1 && m.indexOf('Contanti') >= 0;
+}
+/* il metodo con cui si prende: l'unico, o quello delle pillole ('' = non scelto) */
+function metodoPresaOcP2P(o){
+  const m = (o && o.metodi) || [];
+  if (m.length === 1) return m[0];
+  const s = Number(p2pOcPresaMetodo.id) === Number(o && o.id) ? p2pOcPresaMetodo.metodo : '';
+  return s && m.indexOf(s) >= 0 ? s : '';
+}
+/* PURA: i sats della cauzione, con la formula del server
+   (`p2p_onchain_cauzione_sats`): max(round(pct × sats), base) */
+function cauzioneOcSatsP2P(sats, c){
+  const s = Math.floor(Number(sats) || 0);
+  if (!c || !(s > 0)) return 0;
+  return Math.max(Math.floor((c.pct * s + 50) / 100), c.base);
+}
+/* a chi prende QUEST'ordine col metodo scelto serve la cauzione? */
+function cauzioneOcServeP2P(o){
+  const c = p2pOnchainLibro.cauzione;
+  return !!(c && c.accesa && metodoPresaOcP2P(o) === 'Contanti');
+}
+/* PURA: la riga della cauzione nel foglio di chi sta per prendere */
+function rigaCauzioneOcP2P(o, c){
+  if (!c) return '';
+  const stima = cauzioneOcSatsP2P(Number(o.sats) > 0 ? o.sats : o.stima, c);
+  return '<div class="hint cauzione-regola">🔐 <b>La cauzione di chi prende.</b> '
+    + 'Per prendere quest\'ordine in contanti blocchi una piccola cauzione in Lightning'
+    + (stima > 0 ? ' di circa <b>' + fmt(stima) + ' sats</b>' : '')
+    + ' (il ' + esc(String(c.pct).replace('.', ',')) + '%' + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats' : '') + ')'
+    + ': resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>. La perdi solo se un moderatore '
+    + 'decide che non ti sei presentato all\'incontro.'
+    + ' Finché non è bloccata, l\'ordine resta nel libro e qualcun altro può prenderlo.</div>';
+}
+/* il riquadro dei metodi nel foglio della presa: le pillole (se c'e' da
+   scegliere), la zona, la regola del contanti e la cauzione */
+function metodiPresaOcHtmlP2P(o, vendeLui){
+  const scelta = sceltaMetodoOcP2P(o);
+  const m = metodoPresaOcP2P(o);
+  const pillole = !scelta ? '' :
+    '<div class="hint" style="margin-top:10px"><b>Come paghi?</b> Scegli il metodo.</div>'
+    + '<div class="p2p-metodi">' + (o.metodi || []).map(x =>
+      '<button type="button" class="tema-pill' + (x === m ? ' active' : '')
+      + (typeof vesteMetodoP2P === 'function' && vesteMetodoP2P(x) ? ' p2p-pill-marchio' : '')
+      + '" data-m="' + esc(x) + '" onclick="scegliMetodoPresaOcP2P(' + Number(o.id) + ', this.dataset.m)">'
+      + (typeof marchioMetodoP2P === 'function' ? marchioMetodoP2P(x) : esc(x)) + '</button>').join('') + '</div>'
+    + (typeof P2P_METODO_FISSO !== 'undefined' ? '<div class="hint p2p-metodo-fisso">' + esc(P2P_METODO_FISSO) + '</div>' : '');
+  /* zona e regola: con la scelta solo a «Contanti» scelto, sennò come ieri */
+  const perZona = scelta ? (m ? [m] : []) : (o.metodi || []);
+  const zona = typeof zonaDettP2P === 'function' ? zonaDettP2P({metodi: perZona, zona: o.zona}) : '';
+  const regola = typeof regolaContantiFoglioP2P === 'function' && m
+    && (scelta ? m === 'Contanti' : (o.metodi || []).length === 1)
+    ? regolaContantiFoglioP2P([m], typeof maxEuroContantiP2P === 'function' ? maxEuroContantiP2P() : 0,
+                              vendeLui ? 'compro' : 'vendo') : '';
+  return pillole + zona + regola + (cauzioneOcServeP2P(o) ? rigaCauzioneOcP2P(o, p2pOnchainLibro.cauzione) : '');
+}
+function scegliMetodoPresaOcP2P(id, m){
+  haptic();
+  p2pOcPresaMetodo = {id: Number(id), metodo: String(m || '')};
+  const o = (p2pOnchainLibro.eventi || []).find(x => +x.id === +id);
+  const box = el('p2pOcPresaMetodi');
+  if (box && o) box.innerHTML = metodiPresaOcHtmlP2P(o, o.lato === 'sell');
+  const corpo = el('confCorpo');
+  if (box && o && corpo) corpo.textContent = corpoPresaOcP2P(o, o.lato === 'sell');
+}
+/* ---- il foglio «🔐 Blocca la cauzione» ---- */
+let p2pOcCauz = null;          // {id, metodo, c: {stato, sats, scade, bolt11}}
+let p2pOcCauzPronta = 0;       // l'ordine la cui cauzione e' ferma: la prossima presa non la richiede
+let p2pOcCauzBattito = null;
+function fermaCauzioneOcP2P(){
+  if (p2pOcCauzBattito) { clearInterval(p2pOcCauzBattito); p2pOcCauzBattito = null; }
+}
+function renderCauzioneOcP2P(){
+  const box = el('p2pOcCauzCorpo');
+  const c = p2pOcCauz && p2pOcCauz.c;
+  if (!box || !c) return;
+  const quanti = c.sats > 0 ? fmt(c.sats) + ' sats' : '';
+  const resta = c.scade - Math.floor(Date.now() / 1000);
+  const min = resta > 0 ? Math.max(1, Math.round(resta / 60)) : 0;
+  box.innerHTML =
+    '<div class="hint">' + (quanti ? 'Paga <b>' + esc(quanti) + '</b> dal tuo wallet Lightning: ' : 'Paga dal tuo wallet Lightning: ')
+      + 'è la <b>cauzione</b> dello scambio in contanti. Resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>; la perdi solo se un moderatore decide che non ti sei presentato.'
+      + (min ? ' Hai circa ' + min + (min === 1 ? ' minuto' : ' minuti') + ': scaduta, l\'ordine resta nel libro e va ripreso.' : '') + '</div>'
+    + '<div class="qr" id="p2pOcCauzQr"></div>'
+    + '<div class="invoice" id="p2pOcCauzInvoice"></div>'
+    + '<div class="pay-scade" id="p2pOcCauzScadeRiga" style="display:none">'
+      + '<span id="p2pOcCauzScade"></span>'
+      + '<a class="btn mini" id="p2pOcCauzWallet" href="#">⚡ Apri nel wallet</a></div>'
+    + (typeof rigaWosHoldP2P === 'function' ? rigaWosHoldP2P('cauzione') : '')
+    + '<button class="btn primary" onclick="copiaCauzioneOcP2P()">📋 Copia la richiesta</button>'
+    + '<div class="hint">Quando la cauzione è bloccata questo foglio si chiude da solo e l\'ordine viene preso: non c\'è niente da confermare.</div>'
+    + (typeof rigaPhoenixHoldP2P === 'function' ? rigaPhoenixHoldP2P() : '');
+  el('p2pOcCauzInvoice').textContent = c.bolt11 || '';
+  if (typeof portaWallet === 'function') portaWallet(el('p2pOcCauzWallet'), c.bolt11 || '', null);
+}
+function copiaCauzioneOcP2P(){
+  const c = p2pOcCauz && p2pOcCauz.c;
+  if (c && c.bolt11) copiaLink(c.bolt11, 'Richiesta di pagamento copiata 📋');
+}
+async function leggiCauzioneOcP2P(id, metodo){
+  /* senza metodo si CHIEDE a che punto e' (GET); col metodo si crea, o torna quella viva (POST) */
+  const r = await fetch(`${API_BASE}/p2p/onchain/${id}/cauzione`, metodo == null
+    ? {headers: {'X-Tg-Init-Data': authHdr()}}
+    : {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+       body: JSON.stringify({metodo})});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.detail || 'la cauzione adesso non si può chiedere');
+  return d.cauzione || null;
+}
+async function apriCauzioneOcP2P(id, metodo){
+  let c;
+  try { c = await leggiCauzioneOcP2P(id, metodo); }
+  catch(e) { toast('🔐 ' + (e.message || 'errore'), 6000); return; }
+  if (!c) { toast('🔐 La richiesta della cauzione non è arrivata: riprova', 5000); return; }
+  /* gia' ferma (app chiusa dopo aver pagato): si prende subito */
+  if (c.stato === 'tenuta') { p2pOcCauzPronta = Number(id); return prendiOnchainP2P(id); }
+  p2pOcCauz = {id: Number(id), metodo, c};
+  renderCauzioneOcP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pOcCauzSheet').classList.add('open');
+  if (c.bolt11 && typeof disegnaQr === 'function')
+    disegnaQr(el('p2pOcCauzQr'), ('lightning:' + c.bolt11.trim()).toUpperCase(), 'Alphanumeric');
+  fermaCauzioneOcP2P();
+  let giro = 0;
+  p2pOcCauzBattito = setInterval(async () => {
+    const foglio = el('p2pOcCauzSheet');
+    if (!foglio || !foglio.classList.contains('open') || !p2pOcCauz) return fermaCauzioneOcP2P();
+    const viva = typeof vestiScadenzaFattura !== 'function' ? true
+      : vestiScadenzaFattura(foglio, el('p2pOcCauzScadeRiga'), el('p2pOcCauzScade'),
+                             el('p2pOcCauzWallet'), p2pOcCauz.c.scade);
+    /* ogni tre secondi si chiede al server; a richiesta morta ancora un
+       poco (un pagamento dell'ultimo secondo), poi basta */
+    if (++giro % 3) return;
+    if (!viva && Math.floor(Date.now() / 1000) - p2pOcCauz.c.scade > 60) return fermaCauzioneOcP2P();
+    let ora = null;
+    try { ora = await leggiCauzioneOcP2P(p2pOcCauz.id, null); } catch(e) { return; }
+    if (ora && ora.stato === 'tenuta' && p2pOcCauz) {
+      const idPreso = p2pOcCauz.id;
+      fermaCauzioneOcP2P();
+      p2pOcCauz = null;
+      chiudiFoglioP2P('p2pOcCauzSheet');
+      toast('🔐 Cauzione bloccata ✓', 3000);
+      p2pOcCauzPronta = idPreso;
+      prendiOnchainP2P(idPreso);
+    }
+  }, 1000);
+}
+/* PURA: il riquadro della cauzione nella pagina dello scambio on-chain:
+   a chi l'ha messa le parole del riquadro di Lightning, al moderatore
+   una riga. `c` = {stato, sats, mia} del server. */
+function riquadroCauzioneOcP2P(o){
+  const c = o && o.cauzione;
+  if (!c || !(c.sats > 0)) return '';
+  const stato = c.stato === 'tenuta' ? 'bloccata' : c.stato === 'tornata' ? 'restituita' : '';
+  if (!stato) return '';
+  if (c.mia && typeof riquadroCauzioneP2P === 'function')
+    return riquadroCauzioneP2P({stato: '', cauzione: {sats: c.sats, stato}});
+  return '<div class="p2p-box cauzione-box"><b>🔐 Cauzione di chi ha preso:</b> ' + fmt(c.sats) + ' sats, '
+    + (stato === 'bloccata' ? 'bloccata in Lightning. Torna a fine scambio.' : 'già tornata nel suo wallet.') + '</div>';
+}
 async function prendiOnchainP2P(id){
   haptic();
+  /* dal foglio della cauzione si torna qui con la cauzione gia' ferma:
+     lo dice `p2pOcCauzPronta`, che vale per UNA presa di QUELL'ordine */
+  const conCauzione = Number(p2pOcCauzPronta) === Number(id);
+  p2pOcCauzPronta = 0;
+  /* il metodo scelto e la cauzione (17 nov 2026 sera): senza scelta il
+     foglio si riapre a chiederla; in contanti con la leva accesa prima
+     si blocca la cauzione, e da li' si torna qui con `conCauzione` */
+  const riga = (p2pOnchainLibro.eventi || []).find(x => +x.id === +id);
+  const metodo = riga ? metodoPresaOcP2P(riga) : '';
+  if (riga && sceltaMetodoOcP2P(riga) && !metodo) {
+    toast('Scegli prima come paghi: tocca un metodo', 4000);
+    return apriOnchainP2P(id);
+  }
   try {
     /* la chiave sul dispositivo e la sua meta' pubblica al server, come
        all'apertura: senza non c'e' niente con cui firmare */
     await onchainAccendiDaSolo();
+    if (riga && !conCauzione && cauzioneOcServeP2P(riga)) return apriCauzioneOcP2P(id, metodo);
     const r = await fetch(`${API_BASE}/p2p/onchain/${id}/prendi`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({})});
+      body: JSON.stringify(metodo ? {metodo} : {})});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non si è potuto prendere');
     await applicaReteOcPresaP2P(id, d.ruolo);
@@ -69605,6 +69820,8 @@ function schedaOnchainP2P(o){
        al moderatore il confronto delle presenze (17 nov 2026) */
     : contOc ? (typeof riquadroAppuntamentoOcP2P === 'function' ? riquadroAppuntamentoOcP2P(o) : '')
       + (typeof riquadroContantiOcP2P === 'function' ? riquadroContantiOcP2P(o, gesti) : '')
+      /* la cauzione di chi ha preso in contanti (17 nov 2026 sera): a lui e al moderatore */
+      + (typeof riquadroCauzioneOcP2P === 'function' ? riquadroCauzioneOcP2P(o) : '')
       + (mod && typeof confrontoModOcP2P === 'function' ? confrontoModOcP2P(o) : '')
     : recapito && ['pending', 'preso', 'depositato'].includes(o.stato) && rCoinR
     ? '<div class="p2p-box"><label>Il tuo indirizzo ' + esc(rCoinR.coin) + ' (' + esc(rCoinR.nome) + ')</label>'
