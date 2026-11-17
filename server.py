@@ -4644,6 +4644,18 @@ DISTINTIVI = [
     dict(id="fulmine", emoji="🚀", nome="Fulmine", fiducia=False,
          descrizione="3 spedizioni partite entro un giorno dal pagamento",
          criterio=lambda d: d["lampo"] >= 3),
+    # IL PRIMO PASSO DI CHI VENDE (17 nov 2026, cantiere primo-wallet,
+    # sì di Andrea): un indirizzo Lightning nel Profilo. Niente XP — gli
+    # XP sono SOLO commercio (vedi «GLI XP (ago 2026)») e questo e' un
+    # gesto gratuito e ripetibile — ma un distintivo si': e' il gesto
+    # che toglie l'ostacolo piu' grosso ai neofiti, e vale la pena
+    # dirglielo. `fiducia=False`: dice un passo fatto, non che ci si
+    # fida. Resta anche a indirizzo tolto (append-only, come tutti).
+    dict(id="pronto_a_incassare", emoji="📥", nome="Pronto a incassare",
+         fiducia=False,
+         descrizione="Lightning address impostato: gli incassi arrivano "
+                     "da soli",
+         criterio=lambda d: d["ln_address"]),
     # ⚠️ `fiducia=False`, ed e' una decisione e non una svista: quel
     # flag manda il distintivo in TESTA alla sfilza, cioe' dice a chi
     # guarda «di questo ci si fida». Ospitare un punto e' un RUOLO che
@@ -4740,7 +4752,10 @@ def _dati_distintivi(con, tg_id: int) -> dict | None:
         # perche' quella lettura e' pigra. `punti_barattolo_vivi()`
         # legge la CACHE (`_PUNTI`), quindi qui dentro non si apre
         # nessuna seconda connessione mentre questa ha gia' la sua.
-        punto_barattolo=_e_punto_barattolo(u["negozio"]))
+        punto_barattolo=_e_punto_barattolo(u["negozio"]),
+        # un indirizzo Lightning impostato (17 nov 2026): il fatto nudo,
+        # vero o falso — l'indirizzo stesso qui non serve
+        ln_address=bool((u["ln_address"] or "").strip()))
 
 
 def controlla_distintivi(con, tg_id: int) -> list[str]:
@@ -52571,6 +52586,10 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
         r = await _paga_rimborso(rid)
         if r.get("ok"):
             sbloccati += 1
+    # il distintivo «Pronto a incassare» (17 nov 2026): il gancio dal
+    # vivo, con la sua notifica 🏅; fail-open come tutti i ganci
+    if addr:
+        await premia_distintivi(user["id"])
     return {"ok": True, "ln_address": addr, "incassi_sbloccati": sbloccati}
 
 

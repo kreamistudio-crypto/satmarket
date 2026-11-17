@@ -9402,18 +9402,20 @@
      arancio di .sicu-passi, nelle misure di un foglio; il bottone di un
      passo sta DENTRO il passo, cosi' «cosa fare» e «con cosa» sono una
      riga sola */
+  .pw-sotto{font-size:13px;color:var(--muted);font-weight:600;line-height:1.5;margin-top:2px}
   .pw-passi{list-style:none;margin:14px 0 0;padding:0;counter-reset:pw}
-  .pw-passi li{counter-increment:pw;position:relative;padding:0 0 14px 38px;min-height:30px}
-  .pw-passi li:last-child{padding-bottom:4px}
-  .pw-passi li::before{content:counter(pw);position:absolute;left:0;top:0;
-    width:26px;height:26px;border-radius:999px;background:var(--sats);color:#fff;
-    font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;
+  .pw-passi li{counter-increment:pw;position:relative;margin-bottom:10px;
+    padding:14px 14px 14px 54px;background:var(--bg);border:1px solid var(--line);
+    border-radius:16px}
+  .pw-passi li::before{content:counter(pw);position:absolute;left:14px;top:14px;
+    width:28px;height:28px;border-radius:999px;background:var(--sats);color:#fff;
+    font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:800;
     display:flex;align-items:center;justify-content:center}
-  .pw-passi li>b{display:block;font-size:14.5px;line-height:26px}
+  .pw-passi li>b{display:block;font-size:15px;line-height:28px}
   .pw-riga{font-size:13px;color:var(--muted);font-weight:600;line-height:1.5;margin-top:2px}
   .pw-passi .btn{margin-top:10px}
   .pw-passi .field{margin-top:10px}
-  .pw-altri{margin-top:6px}
+  .pw-altri{margin-top:4px}
   .pw-altri summary{cursor:pointer;font-weight:800;font-size:13.5px;padding:6px 0;list-style:none}
   .pw-altri summary::before{content:'▸ ';color:var(--muted)}
   .pw-altri[open] summary::before{content:'▾ '}
@@ -17161,16 +17163,16 @@ document.getElementById('cartello')?.remove();</script>
   <div class="sheet" id="walletGuidaSheet" role="dialog" aria-modal="true" aria-labelledby="walletGuidaTit">
     <div class="grab"></div>
     <h3 id="walletGuidaTit">👛 Il tuo primo wallet</h3>
-    <div class="trust-note" style="margin-top:6px"><span>🫙</span><span>I sats stanno <b>nel tuo wallet</b>, non su Barattolo: noi li teniamo solo il tempo di un affare, nel deposito di garanzia.</span></div>
+    <div class="pw-sotto">I sats restano <b>nel tuo wallet</b>, non su Barattolo: li teniamo solo il tempo di un affare.</div>
     <ol class="pw-passi">
       <li>
         <b>Scarica Wallet of Satoshi</b>
-        <div class="pw-riga">Gratis, e i sats restano <b>sul tuo telefono</b>.</div>
-        <button class="btn ghost" onclick="apriLinkGuidaWallet('wos')">⚡ Scarica Wallet of Satoshi</button>
+        <div class="pw-riga">Gratis. I sats restano sul tuo telefono.</div>
+        <button class="btn ghost" onclick="apriLinkGuidaWallet('wos')">⚡ Scarica l'app</button>
       </li>
       <li>
         <b>Salva le parole di recupero</b>
-        <div class="pw-riga">Se il wallet te le chiede, scrivile <b>su carta</b>: sono l'unico modo per riavere i sats se perdi il telefono.</div>
+        <div class="pw-riga">Scrivile su carta: servono se perdi il telefono.</div>
       </li>
       <li id="walletGuidaPasso3">
         <!-- il terzo passo lo scrive renderGuidaWallet, secondo lo scopo -->
@@ -17179,8 +17181,8 @@ document.getElementById('cartello')?.remove();</script>
     <details class="pw-altri">
       <summary>Hai già un altro wallet?</summary>
       <div class="pw-riga">Va bene qualsiasi wallet con un indirizzo Lightning (<span class="mono">nome@dominio</span>). Quello di <b>Phoenix</b> Barattolo non lo sa ancora pagare: con Phoenix, a ogni vendita incolli una fattura.</div>
+      <div class="pw-nota">Wallet of Satoshi è un'app di altri, non di Barattolo: non ci dà niente per consigliarla.</div>
     </details>
-    <div class="pw-nota">Wallet of Satoshi è un'app di altri, non di Barattolo: non ci dà niente per consigliarla.</div>
     <button class="btn primary" id="walletGuidaChiudi" style="margin-top:14px" onclick="navIndietro()">Ho capito</button>
   </div>
 
@@ -69911,20 +69913,20 @@ function renderGuidaWallet(){
     const p2p = !DEMO && !VETRINA && typeof p2pAcceso === 'function' && p2pAcceso();
     box.innerHTML = `
       <b>Metti qualche sats e paga</b>
-      <div class="pw-riga">Te li può mandare un amico${p2p ? ', oppure li compri in euro nel <b>P2P</b> di Barattolo' : ''}. Poi torna qui e <b>inquadra il QR</b> dal wallet.</div>
+      <div class="pw-riga">Da un amico${p2p ? ', o in euro nel <b>P2P</b>' : ''}. Poi <b>inquadra il QR</b> dal wallet.</div>
       ${p2p ? '<button class="btn ghost" onclick="navIndietro();vaiP2P()">🤝 Compra sats nel P2P</button>' : ''}`;
     return;
   }
-  const dove = `<div class="pw-riga">Nel wallet tocca <b>«Ricevi»</b>: in alto c'è il tuo indirizzo, tipo <span class="mono">nome@walletofsatoshi.com</span>.`;
-  if (DEMO) { box.innerHTML = `<b>Copia il tuo indirizzo</b>${dove} Incollalo nel Profilo e gli incassi arrivano da soli.</div>`; return; }
+  const dove = `<div class="pw-riga">Nel wallet tocca <b>«Ricevi»</b>: in alto c'è <span class="mono">nome@walletofsatoshi.com</span>.`;
+  if (DEMO) { box.innerHTML = `<b>Incolla il tuo indirizzo</b>${dove} Incollalo nel Profilo: gli incassi arrivano da soli.</div>`; return; }
   if (myLnAddress) {
     box.innerHTML = `
-      <b>Copia il tuo indirizzo</b>
+      <b>Incolla il tuo indirizzo</b>
       <div class="pw-riga" style="color:var(--trust);font-weight:800">✅ Fatto: <span class="mono">${esc(myLnAddress)}</span></div>`;
     return;
   }
   box.innerHTML = `
-    <b>Copia il tuo indirizzo</b>${dove} Incollalo qui:</div>
+    <b>Incolla il tuo indirizzo</b>${dove}</div>
     <div class="field"><label>Il tuo indirizzo</label>
       <input id="lnAddrGuida" placeholder="nome@walletofsatoshi.com" autocomplete="off"
              autocapitalize="none" spellcheck="false"></div>

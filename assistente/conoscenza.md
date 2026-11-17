@@ -49,7 +49,7 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 - NWC (Nostr Wallet Connect): se colleghi il wallet dal Profilo, «⚡ Compra subito» paga in un tocco, e nel P2P la fattura per ricevere la fa il wallet da solo. La connessione resta solo sul tuo dispositivo, non arriva ai nostri server, e nel wallet le puoi dare un tetto di spesa.
 - Per incassare: l'indirizzo Lightning (quello con la @, tipo nome@dominio) si imposta una volta nel Profilo e non scade. Se non ce l'hai, quando l'affare si chiude ti avvisiamo e incolli una fattura nell'ordine in quel momento (prima no: una fattura scade).
 - Nel P2P l'indirizzo di Wallet of Satoshi non passa la verifica: lì si incolla una fattura del wallet, che invece funziona. Lo stesso vale per qualunque indirizzo che il servizio di scambio non riesce a verificare.
-- Chi non ha ancora un wallet trova la guida «👛 Il tuo primo wallet»: si apre dal link «Non hai un wallet? Te lo spieghiamo in tre passi», che sta sotto la fattura da pagare, nel riquadro dell'incasso o del rimborso di un ordine e nel Profilo accanto al Lightning address. Sono tre passi: 1) scarica Wallet of Satoshi (gratis, in Europa i sats restano sul telefono di chi lo usa); 2) salva le parole di recupero su carta; 3) dipende da cosa stavi facendo: se devi pagare, metti qualche sats (te li manda un amico o li compri in euro nel P2P) e inquadri il QR dal wallet; se devi incassare, tocchi «Ricevi» nel wallet, copi il tuo indirizzo nome@walletofsatoshi.com e lo incolli nel campo della guida. Nella tendina «Hai già un altro wallet?»: va bene qualsiasi wallet che dia un indirizzo con la @, ma quello di Phoenix Barattolo non lo sa ancora pagare, quindi con Phoenix a ogni vendita si incolla una fattura. Barattolo non ha un wallet suo e non tiene i sats di nessuno: se qualcuno chiede un «conto su Barattolo», la risposta è questa guida.
+- Chi non ha ancora un wallet trova la guida «👛 Il tuo primo wallet»: si apre dal link «Non hai un wallet? Te lo spieghiamo in tre passi», che sta sotto la fattura da pagare, nel riquadro dell'incasso o del rimborso di un ordine e nel Profilo accanto al Lightning address. Sono tre passi: 1) scarica Wallet of Satoshi (gratis, in Europa i sats restano sul telefono di chi lo usa); 2) salva le parole di recupero su carta; 3) dipende da cosa stavi facendo: se devi pagare, metti qualche sats (te li manda un amico o li compri in euro nel P2P) e inquadri il QR dal wallet; se devi incassare, tocchi «Ricevi» nel wallet, copi il tuo indirizzo nome@walletofsatoshi.com e lo incolli nel campo della guida. La prima volta che salvi il tuo Lightning address (dalla guida o dal Profilo) ricevi il distintivo «📥 Pronto a incassare»: non dà punti (i punti si fanno solo con gli affari), è un distintivo. Nella tendina «Hai già un altro wallet?»: va bene qualsiasi wallet che dia un indirizzo con la @, ma quello di Phoenix Barattolo non lo sa ancora pagare, quindi con Phoenix a ogni vendita si incolla una fattura. Barattolo non ha un wallet suo e non tiene i sats di nessuno: se qualcuno chiede un «conto su Barattolo», la risposta è questa guida.
 
 <!-- pezzo libro-005 | libro -->
 ## Libro · Comprare nel mercatino (1/3)
@@ -1326,12 +1326,12 @@ Annulla
  qualsiasi app, non solo qui.
 Ho capito, torno all'accesso
 ## 👛 Il tuo primo wallet
-🫙I sats stanno nel tuo wallet, non su Barattolo: noi li teniamo solo il tempo di un affare, nel deposito di garanzia.
+I sats restano nel tuo wallet, non su Barattolo: li teniamo solo il tempo di un affare.
  Scarica Wallet of Satoshi
-Gratis, e i sats restano sul tuo telefono.
-⚡ Scarica Wallet of Satoshi
+Gratis. I sats restano sul tuo telefono.
+⚡ Scarica l'app
  Salva le parole di recupero
-Se il wallet te le chiede, scrivile su carta: sono l'unico modo per riavere i sats se perdi il telefono.
+Scrivile su carta: servono se perdi il telefono.
  Hai già un altro wallet?
 Va bene qualsiasi wallet con un indirizzo Lightning (nome@dominio). Quello di Phoenix Barattolo non lo sa ancora pagare: con Phoenix, a ogni vendita incolli una fattura.
 Wallet of Satoshi è un'app di altri, non di Barattolo: non ci dà niente per consigliarla.
@@ -1802,7 +1802,7 @@ pubblico: sì
 <!-- pezzo novita-057 | novita -->
 ## Novità · 2026-11-17 · primo-wallet
 
-frase: Chi non ha ancora un wallet adesso trova una guida in tre passi: scarica Wallet of Satoshi, salva le parole di recupero, e poi il passo che ti serve: se stai pagando, come mettere i primi sats e inquadrare il QR; se stai incassando, dove trovare il tuo indirizzo Lightning e incollarlo subito lì dentro. I sats restano nel tuo wallet, non su Barattolo.
+frase: Chi non ha ancora un wallet trova una guida in tre passi: scarica Wallet of Satoshi, salva le parole di recupero, poi il passo che ti serve: come mettere i primi sats e inquadrare il QR se stai pagando, dove trovare il tuo indirizzo Lightning se stai incassando. I sats restano nel tuo wallet, non su Barattolo. Al primo indirizzo salvato arriva il distintivo «📥 Pronto a incassare».
 dove: il link «Non hai un wallet? Te lo spieghiamo in tre passi» sotto la fattura da pagare, nel riquadro «💰 Come ricevi i tuoi sats» di un ordine e nel Profilo accanto al Lightning address.
 leva: nessuna
 pubblico: sì

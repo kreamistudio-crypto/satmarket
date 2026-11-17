@@ -201959,11 +201959,11 @@ def prove_guida_wallet():
            "Barattolo non lo sa ancora pagare" in guida,
            "Scarica Phoenix" in guida or "phoenixwallet.me'" in mini,
            guida.index("<details") < guida.index("Phoenix")))
-    prova("...dice dove stanno i sats (nella nota verde, per prima) e che "
-          "il wallet non e' nostro", (True, True, True),
+    prova("...dice dove stanno i sats (nel sottotitolo, per primo) e che "
+          "il wallet non e' nostro (nella tendina)", (True, True, True),
           ("nel tuo wallet</b>, non su Barattolo" in guida,
-           guida.index("trust-note") < guida.index("pw-passi"),
-           "non di Barattolo" in guida))
+           guida.index("pw-sotto") < guida.index("pw-passi"),
+           guida.index("<details") < guida.index("non di Barattolo")))
     _lk = pezzo_js(mini, "const LINK_GUIDA_WALLET = {", "\n};")
     prova("...e il suo link e' uno, nostro e https", ["https://www.walletofsatoshi.com"],
           re.findall(r"'(https?://[^']+)'", _lk))
@@ -202010,7 +202010,7 @@ def prove_guida_wallet():
              "VETRINA = true; renderGuidaWallet(); g.push(h().includes('vaiP2P'));\n"
              # DEMO, incassa: niente campo, ma il passo c'e'
              "VETRINA = false; DEMO = true; apriGuidaWallet('incassa');\n"
-             "g.push([h().includes('lnAddrGuida'), h().includes('Copia il tuo indirizzo')]);\n"
+             "g.push([h().includes('lnAddrGuida'), h().includes('Incolla il tuo indirizzo')]);\n"
              # uno scopo sconosciuto vale «incassa»
              "DEMO = false; apriGuidaWallet('boh'); g.push(guidaWalletScopo);\n"
              "payGuidaWalletVista(false); g.push(el('payGuidaWallet').style.display);\n"
@@ -202025,6 +202025,42 @@ def prove_guida_wallet():
            [True, False, False, "Torno a pagare"], True, False,
            [False, True], "incassa", "none", ""],
           json.loads(r.stdout or "null") if r.returncode == 0 else r.stderr)
+
+    # --- il distintivo «📥 Pronto a incassare» (sì di Andrea, 17 nov) ---
+    # NIENTE XP: gli XP sono solo commercio, e la regola in server.py
+    # non si rovescia da qui. Un distintivo, non di fiducia, al primo
+    # indirizzo salvato — col gancio dal vivo nella rotta.
+    src = _SORGENTE
+    _dist = src[src.index("DISTINTIVI = ["):]
+    _dist = _dist[:_dist.index("\n]\n")]
+    _voce = _dist[_dist.index('id="pronto_a_incassare"'):]
+    prova("il distintivo c'e', non e' di fiducia e guarda il suo fatto",
+          (True, True, True),
+          ('id="pronto_a_incassare"' in _dist, "fiducia=False" in _voce[:200],
+           'd["ln_address"]' in _voce[:400]))
+    _dd = codice(pezzo("_dati_distintivi"))
+    prova("...il fatto vive nei dati, come vero/falso", True,
+          'ln_address=bool((u["ln_address"] or "").strip())' in _dd)
+    _amb = {}
+    _i = src.index("DISTINTIVI = [")
+    exec(src[_i:src.index(chr(10) + "]" + chr(10), _i) + 2], {"dict": dict}, _amb)
+    _crit = {d["id"]: d["criterio"] for d in _amb["DISTINTIVI"]}
+    _tutto = dict(npub_verificata=1, tg_id=1, npub_accesso="npub1x",
+                  vendite=99, acquisti=99, dispute_perse=0, coorte="pioniere",
+                  annunci=99, fb_ricevuti=99, fb_media=5.0, fb_lasciati=99,
+                  lampo=99, punto_barattolo=True, ln_address=False)
+    prova("...il criterio: si' con l'indirizzo, no senza, anche a chi ha "
+          "tutto il resto", (True, False),
+          (bool(_crit["pronto_a_incassare"](dict(_tutto, ln_address=True))),
+           bool(_crit["pronto_a_incassare"](_tutto))))
+    _rotta = codice(pezzo("salva_ln_address"))
+    prova("la rotta premia dal vivo SOLO se c'e' un indirizzo, dopo il "
+          "commit e prima del return", (True, True),
+          ("if addr:\n        await premia_distintivi(user[\"id\"])" in _rotta,
+           _rotta.index("con.commit()") < _rotta.index("await premia_distintivi(")
+           < _rotta.rindex("return {")))
+    prova("...e nessun XP per quel gesto", False,
+          "premia_xp(" in _rotta or "assegna_xp(" in _rotta)
 
 
 def prove_onchain_txid_moneta():

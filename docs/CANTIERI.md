@@ -86482,6 +86482,44 @@ comune, controllato per nome) e il giro mirato: le undici sezioni che
 leggono il foglio, il Profilo o i documenti (628 verdi, 0 saltate) e tre
 collaudi vicini nel venv (indirizzo-lightning e i due nuovi).
 
+IL TERZO GIRO (Andrea, dopo le foto: «Fai una grafica un po' più carina,
+più semplice»). Via la nota verde: un sottotitolo di una riga. I tre
+passi diventano SCHEDE (sfondo `--bg`, bordo `--line`, raggio 16, il
+pallino dentro la scheda), ogni riga di testo tagliata all'osso
+(«Gratis. I sats restano sul tuo telefono.», «Scrivile su carta: servono
+se perdi il telefono.»), il bottone «⚡ Scarica l'app». La nota «non ci
+dà niente» entra nella tendina con Phoenix. Il terzo passo di chi
+incassa si chiama «Incolla il tuo indirizzo» (è quel che fa).
+
+IL DISTINTIVO «📥 PRONTO A INCASSARE» (Andrea: «questa operazione gli fa
+guadagnare dei punti?» — no, e il sì alla proposta del distintivo).
+NIENTE XP, per la regola scritta in server.py («GLI XP (ago 2026)»: solo
+commercio; un gesto gratuito e ripetibile non ne dà) — e non la si
+rovescia per un indirizzo. Un distintivo sì: `pronto_a_incassare`,
+`fiducia=False` (dice un passo fatto, non che ci si fida), criterio sul
+fatto nudo `ln_address` (vero/falso in `_dati_distintivi`, mai
+l'indirizzo). Il gancio dal vivo sta in fondo a `salva_ln_address`, solo
+con un indirizzo, dopo il commit: notifica 🏅 e badge Nostr come i
+fratelli. La passata silenziosa di `init_db` lo dà al primo riavvio a
+chi l'indirizzo ce l'ha già, senza notifiche (è la regola della
+passata): nessun avviso di massa al deploy. Resta anche a indirizzo
+tolto (append-only, come tutti).
+
+PROVATO (in coda a `prove_guida_wallet`): la voce nel catalogo, non di
+fiducia, sul suo fatto; il fatto nei dati; il criterio eseguito (sì con
+l'indirizzo, no senza, anche a chi ha tutto il resto); la rotta premia
+solo con un indirizzo, dopo il commit; nessun `premia_xp`/`assegna_xp`
+nella rotta. Controprove: criterio aperto a tutti, gancio senza `if
+addr`, `fiducia=True`: tre rosse. GIRATO sull'albero di origin/develop
+a4f63637 più questo giro: suite severa 29036 passate, 0 fallite, 0
+saltate (una rossa a metà giro — la frase di NOVITA oltre i 400
+caratteri di n8n — accorciata e rigirata la sezione); collaudi della CI
+nel venv senza coincurve, 142 verdi e 0 rossi. Poi il rebase su 37950a43
+(regali per livello: nessun simbolo in comune, controllato per nome) e il
+giro mirato: undici sezioni (362 verdi) e tre collaudi vicini
+(indirizzo-lightning, regali-livello, pionieri); un secondo rebase su
+28d4e262 (chiedi-locker, stesso controllo) e lo stesso giro mirato.
+
 DA GUARDARE. I nomi dei bottoni dentro Wallet of Satoshi («Ricevi») sono
 quelli del suo menu oggi: se cambiano, la guida va ritoccata. Se i
 neofiti si fermano ancora al wallet, la strada C dello studio.
