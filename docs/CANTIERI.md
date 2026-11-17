@@ -86520,6 +86520,39 @@ giro mirato: undici sezioni (362 verdi) e tre collaudi vicini
 (indirizzo-lightning, regali-livello, pionieri); un secondo rebase su
 28d4e262 (chiedi-locker, stesso controllo) e lo stesso giro mirato.
 
+IL QUARTO GIRO (Andrea, dalla produzione: «la guida del wallet è troppo
+nascosta. Mettila con un tasto visibile»). La porta era una riga di
+testo piccola con un link sottolineato, sotto il QR: nel foglio della
+fattura, fra QR, scadenza e «Ho pagato», spariva. Ora è un BOTTONE
+(`.btn.ghost.guida-wallet-btn`, «👛 Non hai un wallet? Ti spieghiamo come
+fare»), alto quanto gli altri, nelle stesse cinque porte: sotto la nota
+del QR nel foglio della fattura, sopra il campo dell'indirizzo nei
+pannelli d'incasso e rimborso, sotto il campo nel Profilo. Il testo
+cambia di una parola perché ora sta su un bottone. Prova: la porta e'
+un `.btn` in `rigaGuidaWallet` e nel markup, e nessun `scopri-link` apre
+piu' la guida.
+
+IL QUINTO GIRO (Andrea, subito dopo: «mettimelo sotto una casella
+apposita sotto lo streak, colorata in un certo modo»). Nel Profilo,
+sotto la fila dei sette giorni della serie 🔥, una casella sua:
+`.guida-wallet-box`, titolo «👛 Il tuo primo wallet», una riga («Non ne
+hai ancora uno? Tre passi, gratis, e incassi da solo.») e il bottone
+pieno «Ti spieghiamo come fare» che apre la guida con lo scopo
+«incassa». IL COLORE: verde fiducia (`--trust-soft` col bordo `--trust`),
+NON l'arancio della serie: con l'arancio sembrava un pezzo della serie,
+e il verde e' quello che in casa dice «i tuoi sats restano tuoi». SOLO
+A CHI NON HA L'INDIRIZZO (`guidaWalletBoxHTML()` torna '' con
+`myLnAddress`): a chi incassa gia' da solo la casella non serve, e la
+porta accanto al campo del Profilo resta per chi vuole rileggerla.
+Scartato: metterla nella carta del nome (e' gia' piena: stelle, titolo,
+serie) e la stessa casella anche nel foglio della fattura (li' il
+bottone del quarto giro basta, e lo scopo e' «paga»). Prove: la casella
+sta dopo `serieSettimanaHTML` nel markup di `renderProfilo`, e' verde e
+senza `--sats`, apre `apriGuidaWallet('incassa')`, e sotto node sparisce
+con l'indirizzo; la prova della testata del Profilo (serie-giorni) ora
+la aspetta dopo la settimana. Schermate chiare e scure in
+/mnt/project-files/wallet-guida/.
+
 DA GUARDARE. I nomi dei bottoni dentro Wallet of Satoshi («Ricevi») sono
 quelli del suo menu oggi: se cambiano, la guida va ritoccata. Se i
 neofiti si fermano ancora al wallet, la strada C dello studio.
@@ -88160,6 +88193,46 @@ proxy. Tutto girato in cloud sull'albero riallineato a develop 9537d26
 RESTA DA GUARDARE. I pezzi della mappa da Flow; le missioni vere dal
 gioco; gli amici da Nostr; il menù per livello (aspetta Andrea); il link
 di Villaggio Bitcoin nel config del VPS se accettano.
+
+
+## Il nome verificato su Nostr, gratis dal livello 2 (17 nov 2026, cantiere nip05-utenti; Andrea: «attivare verifica NIP-05, gratis per utenti da lv2 in su»)
+
+**COSA.** Dopo il NIP-05 di casa (16 nov, `_@barattolo.store`), ogni
+utente con una chiave Nostr PROVATA e almeno il livello «Bottega
+avviata» sceglie gratis nome@barattolo.store nel Profilo (Privacy → «🆔 Identità»,
+riga «✔️ Nome verificato su Nostr»), lo copia e lo incolla nel campo
+NIP-05 della sua app Nostr: lì compare la spunta. Il disegno sta in
+ARCHITETTURA, «I NOMI NIP-05 DEGLI UTENTI». Leva `NIP05_UTENTI_ATTIVO`
+accesa di serie (regola del 14 nov) e `NIP05_UTENTI_LIVELLO = "avviato"`.
+
+**DECISIONI E PERCHÉ.** (1) SOLO LA CHIAVE PROVATA (firma o nota di
+verifica, il giudice `_npub_avvisi`): con la npub solo dichiarata
+chiunque legherebbe un nostro nome alla chiave di un altro. (2) IL NOME
+IN COLONNA, LA CHIAVE NO: il giudice la ricalcola a ogni domanda, così
+chi scende di livello, perde la verifica o vede la leva spenta smette di
+rispondere da solo, e torna da solo; nessuna ronda di pulizia. (3)
+NOSTR.JSON NON ELENCA GLI UTENTI: senza `?name=` solo i nomi di casa (la
+prova di `prove_leva_rgb` «non legge il database» resta vera per la
+rotta: il database lo apre il giudice). (4) NIENTE DOPPIONI CON ALTRI
+NOMI DI BARATTOLO: lo username Telegram o il link del negozio di un
+altro non si prendono, è il modo più facile di spacciarsi per lui. (5)
+IL PROFILO NOSTR LO SCRIVE L'UTENTE: il server non firma kind 0 altrui
+(regola ferrea 2); la riga dà il tasto «Copia» e dice dove incollarlo.
+SCARTATE: il nome automatico uguale allo username (non tutti lo hanno, e
+un nome è una scelta: resta come PROPOSTA nel campo); un prezzo (Andrea
+lo vuole gratis); elencare tutti i nomi in nostr.json.
+
+**PROVATO.** `collaudo_nip05_utenti.py` (52 prove, server vero con la
+TestClient, anche nel venv senza coincurve, e nella gabbia di
+`collaudi_ci.py`): migrazione, le tre porte, la rotta pubblica, forma e
+doppioni, lo spegnersi da solo, scala e pannello, fusione e
+cancellazione vere, leva spenta, database rotto. Controprove: tolto il
+controllo del livello e quello dei doppioni, la chiave presa dalla npub
+dichiarata, gli utenti messi nell'elenco: le prove diventano rosse.
+`prove_leva_rgb` ritoccata (il giudice di cartone, il nome d'utente,
+l'elenco senza utenti). NON VISTO DAL VIVO: la spunta in un client Nostr
+vero (Damus, Primal, Amethyst) su collaudo.barattolo.store; e la riga
+del Profilo su un telefono.
 
 ## Il rimborso on-chain che non si incaglia (17 nov 2026, cantiere onchain-rimborso-liscio; Andrea: «Ok, sì, vai, correggi tutto»)
 

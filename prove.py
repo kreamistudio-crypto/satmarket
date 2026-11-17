@@ -128717,7 +128717,9 @@ def prove_vantaggi_livelli():
                         SLUG_NEGOZIO_LIVELLO="avviato",
                         SLUG_NEGOZIO_PREZZO_SATS=5000, P2P_ATTIVO=True,
                         P2P_SCONTO_FEDELTA_PERCENTO=0.5,
-                        P2P_SCONTO_LIVELLO=5))
+                        P2P_SCONTO_LIVELLO=5,
+                        NIP05_UTENTI_ATTIVO=True,
+                        NIP05_UTENTI_LIVELLO="avviato"))
         amb.update(k)
         return amb["scala_livelli"]()
 
@@ -128741,6 +128743,14 @@ def prove_vantaggi_livelli():
     prova("P2P spento, o sconto a zero: nessuno", ([0] * 5, [0] * 5),
           ([x["p2p_sconto"] for x in leve(P2P_ATTIVO=False)],
            [x["p2p_sconto"] for x in leve(P2P_SCONTO_FEDELTA_PERCENTO=0)]))
+    # IL NOME VERIFICATO SU NOSTR (17 nov 2026, cantiere nip05-utenti):
+    # gratis dal gradino della leva, mai a leva spenta o con un id storto
+    prova("il nome verificato su Nostr dal gradino 2, gratis",
+          [False, True, True, True, True], [x["nip05"] for x in leve()])
+    prova("...nessuno a leva spenta, o col livello scritto storto",
+          ([False] * 5, [False] * 5),
+          ([x["nip05"] for x in leve(NIP05_UTENTI_ATTIVO=False)],
+           [x["nip05"] for x in leve(NIP05_UTENTI_LIVELLO="boh")]))
     prova("uno sconto del banner scritto storto non passa il 99", 99,
           leve(BANNER_SCONTI_LIVELLO={"maestro": 150})[4]["banner_sconto"])
     me = pezzo("mio_profilo")
@@ -128806,9 +128816,13 @@ console.log(JSON.stringify({
     o = _js.loads(r.stdout)
     # (17 nov 2026, cantiere premi-fedelta) i regali di Barattolo per
     # livello sono stati tolti: il server non manda piu' `regalo`
+    # (17 nov 2026, cantiere nip05-utenti) dal gradino 2 anche il nome
+    # verificato su Nostr, gratis: una riga in piu' per gradino
     prova("le righe dicono i vantaggi di ogni gradino",
-          [[], ["−10% sul banner del negozio", "il link del negozio a scelta"],
+          [[], ["−10% sul banner del negozio", "il link del negozio a scelta",
+                "il nome verificato su Nostr, gratis"],
            ["−20% sul banner del negozio", "il link del negozio a scelta",
+            "il nome verificato su Nostr, gratis",
             "il titolo «🧺 Mercante pratico»"]],
           o["righe"][:3])
     prova("...il quinto anche lo sconto P2P, detto come sconto", True,
@@ -128834,10 +128848,11 @@ console.log(JSON.stringify({
     prova("un pannello solo e' visibile, il mio; gli altri quattro nascosti",
           (['<div class="liv-vant" data-n="3">'], 4),
           (o["visibile"], o["nascosti"]))
-    # i pannelli 1-3 sono aperti (1+2+3 righe), i pannelli 4-5 chiusi:
-    # spunte e lucchetti contano le righe, non i gradini
+    # i pannelli 1-3 sono aperti, i pannelli 4-5 chiusi: spunte e
+    # lucchetti contano le righe, non i gradini (dal 17 nov 2026 il nome
+    # verificato su Nostr ne aggiunge una ai gradini dal 2: 6+2, 7+2)
     prova("spunte sui vantaggi gia' miei, lucchetti su quelli davanti",
-          (6, 7), (o["spunte"], o["lucchetti"]))
+          (8, 9), (o["spunte"], o["lucchetti"]))
     prova("al massimo: la frase del massimo e il barattolo nell'anello",
           ("Hai raggiunto il livello massimo. 🫙", True),
           (o["massimo"], o["massimo_dentro"]))
@@ -128846,7 +128861,8 @@ console.log(JSON.stringify({
     # il regalo del livello (accordo col cantiere del merch): la chiave
     # `regalo` del server, quando c'e', diventa l'ultima riga, scappata
     prova("un regalo nel gradino e' una riga in piu', e il testo e' scappato",
-          (4, "🎁 un regalo: la borsa &lt;Un tempo per te&gt;"),
+          (len(o["senza_regalo"]) + 1,
+           "🎁 un regalo: la borsa &lt;Un tempo per te&gt;"),
           (len(o["regalo"]), o["regalo"][-1]))
     prova("...senza regalo (o chiave vuota) la riga del regalo non c'e'",
           [r for r in o["righe"][3] if not r.startswith("🎁")],
@@ -168040,14 +168056,23 @@ def prove_leva_rgb():
     i = src.index("def nip05_nostr_json(")
     j = src.find("\n\n\n", i)
     rotta = codice(src[i:j if j > 0 else len(src)])
-    prova("...e non fa redirect ne' legge il database", True,
+    # I NOMI DEGLI UTENTI (17 nov 2026, cantiere nip05-utenti): la rotta
+    # non apre il database DA SE'; un nome che non e' di casa lo chiede
+    # a `nip05_chiave_utente` (il giudice: leva, livello, chiave provata,
+    # e il suo collaudo e' collaudo_nip05_utenti). Qui la si sostituisce
+    # con una di cartone che conosce un solo utente.
+    prova("...e non fa redirect ne' legge il database da se'", True,
           "Redirect" not in rotta and "db()" not in rotta and "con." not in rotta)
+    prova("...i nomi degli utenti li chiede al giudice, dopo quelli di casa",
+          True, "nip05_chiave_utente(" in rotta
+          and rotta.index("in NIP05_NOMI") < rotta.index("nip05_chiave_utente("))
 
     class Cartone:
         def __init__(self, corpo, headers=None):
             self.corpo, self.headers = corpo, headers or {}
     amb = {"__builtins__": __builtins__, "JSONResponse": Cartone,
            "NIP05_NOMI": {"usdb": HEX_A, "tothemooon": HEX_B},
+           "nip05_chiave_utente": lambda n: "c" * 64 if n == "mario" else "",
            "app": types.SimpleNamespace(get=lambda *_: (lambda f: f),
                                         head=lambda *_: (lambda f: f))}
     exec(rotta, amb)
@@ -168061,6 +168086,10 @@ def prove_leva_rgb():
           amb["nip05_nostr_json"]("usdb").corpo)
     prova("?name=sconosciuto risponde «qui nessuno», non 404",
           {"names": {}}, amb["nip05_nostr_json"]("nessuno").corpo)
+    prova("?name=mario (un utente) risponde la chiave che dice il giudice",
+          {"names": {"mario": "c" * 64}}, amb["nip05_nostr_json"]("mario").corpo)
+    prova("...ma senza ?name= gli utenti non escono", False,
+          "mario" in amb["nip05_nostr_json"]().corpo["names"])
     amb["NIP05_NOMI"] = {}
     prova("config vuoto: {\"names\": {}}", {"names": {}},
           amb["nip05_nostr_json"]().corpo)
@@ -204125,9 +204154,33 @@ def prove_guida_wallet():
           "(scopo «incassa»), piu' il foglio della fattura (scopo «paga», "
           "nel markup)",
           (4, True), (porte, """onclick="apriGuidaWallet('paga')\"""" in mini))
+    # UN BOTTONE VERO (17 nov 2026, quarto giro, Andrea dalla produzione:
+    # «troppo nascosta, mettila con un tasto visibile»): la porta e' un
+    # .btn come gli altri, in tutte e cinque le porte, mai un link nel testo
+    _rg = pezzo_js(mini, "function rigaGuidaWallet(scopo){", "\n}\n")
+    prova("...e ogni porta e' un BOTTONE visibile, non un link nel testo",
+          (True, False, True),
+          ('class="btn ghost guida-wallet-btn"' in _rg,
+           "scopri-link" in _rg or 'class="scopri-link" onclick="apriGuidaWallet' in mini,
+           '<button type="button" id="payGuidaWallet" class="btn ghost guida-wallet-btn"' in mini))
     _pl = pezzo_js(mini, "function renderLnAddress(){", "\n}\n")
     prova("...nel Profilo solo nel ramo SENZA indirizzo", True,
           _pl.index("${rigaGuidaWallet()}") > _pl.index("if (myLnAddress && !lnAddrModifica)"))
+    # LA CASELLA SOTTO LA SERIE (17 nov 2026, quinto giro, Andrea:
+    # «mettimelo sotto una casella apposita sotto lo streak colorata in
+    # un certo modo»): nel Profilo, dopo i sette giorni, verde e non
+    # arancio, solo a chi non ha l'indirizzo
+    _bx = pezzo_js(mini, "function guidaWalletBoxHTML(){", "\n}\n")
+    _bc = mini[mini.index(".guida-wallet-box{"):mini.index("}", mini.index(".guida-wallet-box{"))]
+    prova("nel Profilo la casella «Il tuo primo wallet» sta SOTTO i sette "
+          "giorni della serie, e' verde (--trust-soft, non l'arancio della "
+          "serie), apre la guida «incassa» e compare solo senza indirizzo",
+          (True, True, True, True, True),
+          (mini.index("${serieSettimanaHTML(mySerie)}") < mini.index("${guidaWalletBoxHTML()}"),
+           "background:var(--trust-soft)" in _bc and "--sats" not in _bc,
+           "apriGuidaWallet('incassa')" in _bx,
+           "if (myLnAddress) return '';" in _bx,
+           "Il tuo primo wallet" in _bx))
     prova("la porta on-chain spegne la riga, il ritorno al Lightning la "
           "riaccende", (1, 2),
           (mini.count("payGuidaWalletVista(false);"), mini.count("payGuidaWalletVista(true);")))
@@ -204149,6 +204202,7 @@ def prove_guida_wallet():
              + pezzo_js(mini, "function apriGuidaWallet(scopo){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function renderGuidaWallet(){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function payGuidaWalletVista(si){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function guidaWalletBoxHTML(){", "\n}\n") + "\n}\n"
              "const g = [];\nconst h = () => el('walletGuidaPasso3').innerHTML;\n"
              "const ch = () => el('walletGuidaChiudi').textContent;\n"
              # incassa, senza indirizzo: il campo
@@ -204168,6 +204222,8 @@ def prove_guida_wallet():
              "DEMO = false; apriGuidaWallet('boh'); g.push(guidaWalletScopo);\n"
              "payGuidaWalletVista(false); g.push(el('payGuidaWallet').style.display);\n"
              "payGuidaWalletVista(true); g.push(el('payGuidaWallet').style.display);\n"
+             # la casella del Profilo: c'e' senza indirizzo, sparisce con
+             "g.push(guidaWalletBoxHTML().includes('guida-wallet-box')); myLnAddress = 'a@b.c'; g.push(guidaWalletBoxHTML());\n"
              "console.log(JSON.stringify(g));")
     r = _sp.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
     prova("sotto node: «incassa» ha il campo (o la riga verde con l'indirizzo), "
@@ -204176,7 +204232,7 @@ def prove_guida_wallet():
           "incassa; la riga della fattura si spegne e si riaccende",
           [[True, "Ho capito"], True,
            [True, False, False, "Torno a pagare"], True, False,
-           [False, True], "incassa", "none", ""],
+           [False, True], "incassa", "none", "", True, ""],
           json.loads(r.stdout or "null") if r.returncode == 0 else r.stderr)
 
     # --- il distintivo «📥 Pronto a incassare» (sì di Andrea, 17 nov) ---
@@ -206285,7 +206341,10 @@ def prove_serie_giorni():
     prova("la testata del Profilo: la riga dentro la carta, sotto le stelle, "
           "e la settimana subito sotto la carta", True, bool(re.search(
               r'<div class="rep">\$\{rep\}</div>\s*\$\{serieRigaHTML\(mySerie\)\}\s*</div>\s*'
-              r'\$\{tondi\}\s*</div>\s*\$\{serieSettimanaHTML\(mySerie\)\}`;', rp)))
+              # (17 nov 2026, primo-wallet, quinto giro) sotto la settimana
+              # sta la casella verde della guida al wallet, e poi basta
+              r'\$\{tondi\}\s*</div>\s*\$\{serieSettimanaHTML\(mySerie\)\}\s*'
+              r'\$\{guidaWalletBoxHTML\(\)\}`;', rp)))
     prova("la busta arriva da /api/me, e l'orecchio del ritorno si accende li'",
           True, "    serieArrivata(me.serie, 1600);\n    serieAscolta();\n" in mini)
     prova("in pubblico non c'e': il negozio e il riquadro del venditore non "

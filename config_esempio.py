@@ -1492,6 +1492,15 @@ RGB_PROVA_IDS = []
 # la rotta risponde {"names": {}}, cioe' «qui nessuno».
 #     NIP05_NOMI = {"usdb": "<hex>", "tothemooon": "<hex>"}
 NIP05_NOMI = {}
+# I NOMI NIP-05 DEGLI UTENTI (17 nov 2026): chi ha una chiave Nostr provata
+# (firma o nota di verifica) e almeno il livello qui sotto sceglie GRATIS
+# nel Profilo un nome@barattolo.store, e la rotta qui sopra lo conferma ai
+# client Nostr (la spunta accanto al nome). Accesa di serie; a False la
+# rotta torna ai soli nomi di casa e i nomi scelti restano salvati.
+NIP05_UTENTI_ATTIVO = True
+# ...gratis da questo livello (l'id del gradino: nuovo, avviato, pratico,
+# esperto, maestro). Storto o sconosciuto: porta chiusa per tutti.
+NIP05_UTENTI_LIVELLO = "avviato"
 
 # --- I relay Nostr ----------------------------------------------------
 # Dove Barattolo scrive e legge su Nostr. Erano cinque elenchi scritti

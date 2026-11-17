@@ -6126,6 +6126,8 @@ def scala_livelli() -> list:
     p2p = float(P2P_SCONTO_FEDELTA_PERCENTO or 0) if P2P_ATTIVO else 0.0
     titoli = {t["serve"][1]: t["nome"] for t in TITOLI
               if t["serve"][0] == "livello"}
+    nip05_da = (_gradino_livello(NIP05_UTENTI_LIVELLO)
+                if NIP05_UTENTI_ATTIVO else 0)
     scala = []
     for n, (xp, affari, lid, nome) in enumerate(LIVELLI, 1):
         try:
@@ -6137,6 +6139,8 @@ def scala_livelli() -> list:
             "affari": affari,
             "banner_sconto": sconto if banner else 0,
             "link_negozio": bool(slug_da) and n >= slug_da,
+            # il nome verificato su Nostr, gratis (17 nov 2026)
+            "nip05": bool(nip05_da) and n >= nip05_da,
             "titolo": titoli.get(lid, ""),
             "p2p_sconto": p2p if (p2p > 0 and n >= P2P_SCONTO_LIVELLO)
                           else 0})
@@ -9564,6 +9568,11 @@ def init_db():
                     # contro `username` e `negozio`, due colonne che una
                     # UNIQUE su questa sola non potrebbe mai coprire.
                     "negozio_slug TEXT DEFAULT ''",
+                    # IL NOME VERIFICATO SU NOSTR (17 nov 2026): '' =
+                    # nessuno. Solo il nome, mai la chiave: quella la
+                    # dice ogni volta il giudice (`_nip05_chiave_hex`).
+                    # Unicita' dell'applicazione, come `negozio_slug`.
+                    "nip05_nome TEXT DEFAULT ''",
                     # L'INTERRUTTORE DEGLI AVVISI P2P (16 set 2026): 1 =
                     # accesi, di serie. Chi lo spegne non riceve NIENTE
                     # dello scambio, ne' la frase precisa ne' la generica
@@ -21790,6 +21799,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         if _sbl_n and (not _sbl_p or _sbl_n < _sbl_p):
             con.execute("UPDATE utenti SET banner_sbloccato_il=? "
                         "WHERE tg_id=?", (_sbl_n, id_telegram))
+        # IL NOME VERIFICATO SU NOSTR (17 nov 2026) passa solo se di la'
+        # non ce n'e' gia' uno: quello di Telegram resta.
+        if n and "nip05_nome" in n.keys() and n["nip05_nome"]:
+            con.execute("UPDATE utenti SET nip05_nome=? WHERE tg_id=? "
+                        "AND nip05_nome=''", (n["nip05_nome"], id_telegram))
         # Le offerte seguono l'utente da entrambi i lati del banco;
         # le trattative tra le due meta' (auto-offerte, dopo la
         # fusione) muoiono qui, come i feedback degli auto-scambi.
@@ -37538,6 +37552,20 @@ def _leve_stato():
         {"gruppo": "🎁 Mancia al venditore", "voci": _mancia_leve()},
         # LA CASSA IN NEGOZIO (15 nov 2026): accesa di serie
         {"gruppo": "🏪 Cassa in negozio", "voci": _cassa_leve()},
+        {"gruppo": "✔️ Nome verificato su Nostr", "voci": [
+            # I NOMI NIP-05 DEGLI UTENTI (17 nov 2026, cantiere
+            # nip05-utenti): accesa di serie, nessun segreto
+            _leva("Nome verificato su Nostr (NIP-05)",
+                  "NIP05_UTENTI_ATTIVO", bool(NIP05_UTENTI_ATTIVO),
+                  acceso="chi ha una chiave Nostr provata e il livello "
+                         "qui sotto sceglie gratis il suo nome@dominio nel "
+                         "Profilo, e nostr.json lo conferma",
+                  spento="la rotta risponde i soli nomi di casa e il "
+                         "Profilo non mostra la riga; i nomi scelti "
+                         "restano salvati"),
+            _leva("...gratis dal livello", "NIP05_UTENTI_LIVELLO",
+                  NIP05_UTENTI_LIVELLO or "(storto: porta chiusa)"),
+        ]},
         {"gruppo": "🔥 Serie dei giorni", "voci": [
             # LA SERIE DEI GIORNI (17 nov 2026, cantiere serie-giorni):
             # accesa di serie, nessun segreto
@@ -52445,6 +52473,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # LA CASSA IN NEGOZIO (15 nov 2026): la voce nel Profilo solo a leva
     # accesa. Il FATTO, dalla leva viva.
     profilo["cassa_attiva"] = bool(CASSA_ATTIVA)
+    # IL NOME VERIFICATO SU NOSTR (17 nov 2026): la riga del Profilo solo
+    # a leva accesa; null = il client non disegna niente
+    profilo["nip05"] = nip05_stato(u) if (NIP05_UTENTI_ATTIVO and u) \
+        else None
     # LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026): il client mostra la voce
     # nel Profilo solo a leva accesa. Il FATTO, dalla leva viva.
     profilo["account_cancellabile"] = bool(ACCOUNT_CANCELLABILE)
@@ -56941,6 +56973,61 @@ async def scegli_titolo(req: Request,
     return {"ok": True, "titolo": scelto}
 
 
+@app.post("/api/me/nip05")
+async def scegli_nip05(req: Request,
+                       x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """IL NOME VERIFICATO SU NOSTR (17 nov 2026, cantiere nip05-utenti):
+    `{"nome": "mario"}` lo prende, `{"nome": ""}` lo lascia. Gratis,
+    niente fattura. Le guardie in fila: la leva (404 a leva spenta,
+    come le sorelle), una chiave Nostr PROVATA, il livello, la forma,
+    nessun altro col nome. LASCIARLO non chiede ne' chiave ne' livello:
+    chi non ne ha piu' il diritto deve poter sempre togliere il suo.
+    Il controllo «libero» e la scrittura stanno nello STESSO lock, o due
+    persone che scelgono lo stesso nome nello stesso istante lo
+    prenderebbero tutte e due. La risposta e' lo stato intero, riletto."""
+    if not NIP05_UTENTI_ATTIVO:
+        raise HTTPException(404, "Funzione non attiva")
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    grezzo = str((d or {}).get("nome") or "").strip()
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        if not u:
+            raise HTTPException(404, "Profilo non trovato")
+        if not grezzo:
+            con.execute("UPDATE utenti SET nip05_nome='' WHERE tg_id=?",
+                        (user["id"],))
+        else:
+            st = nip05_stato(u)
+            if not st["chiave"]:
+                raise HTTPException(400, "Prima collega la tua chiave "
+                                         "Nostr con una firma")
+            if not st["sblocca"]:
+                raise HTTPException(400, "Si sblocca dal livello «"
+                                         f"{st['livello_nome']}»")
+            nome, motivo = _nip05_nome_forma(grezzo)
+            if not nome:
+                raise HTTPException(400, motivo)
+            if not _nip05_nome_libero(con, nome, user["id"]):
+                raise HTTPException(400, "Questo nome è già preso: "
+                                         "scegline un altro")
+            con.execute("UPDATE utenti SET nip05_nome=? WHERE tg_id=?",
+                        (nome, user["id"]))
+        con.commit()
+        u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    return {"ok": True, "nip05": nip05_stato(u)}
+
+
 @app.post("/api/me/serie")
 async def passa_serie(x_tg_init_data: str = Header(""),
                       barattolo_sessione: str = Cookie("")):
@@ -58585,6 +58672,156 @@ for _n in _nip05_storti:
     del NIP05_NOMI[_n]
     print(f"[nip05] «{_n}»: nome o chiave non nella forma del NIP-05, scartato")
 del _nip05_storti
+
+
+# I NOMI NIP-05 DEGLI UTENTI (17 nov 2026, cantiere nip05-utenti;
+# Andrea: «attivare verifica NIP-05, gratis per utenti da lv2 in su»).
+# Chi ha una chiave Nostr PROVATA e almeno il livello di
+# NIP05_UTENTI_LIVELLO («avviato», il gradino 2) sceglie un nome, e
+# /.well-known/nostr.json risponde «mario@barattolo.store e' questa
+# chiave»: il suo client Nostr mostra la spunta accanto al nome. GRATIS,
+# niente fattura: e' un vantaggio del livello come il titolo.
+# LA CHIAVE E' SOLO QUELLA PROVATA, mai la npub solo dichiarata: lo
+# stesso giudice dei DM degli avvisi (`_npub_avvisi`: la credenziale
+# d'accesso, o il badge verificato con la nota). Con una npub
+# dichiarata e basta, chiunque potrebbe legare un nome di barattolo.store
+# alla chiave di un altro.
+# NIENTE COLONNA CON LA CHIAVE: in `utenti.nip05_nome` sta il solo nome,
+# e la chiave si chiede ogni volta al giudice. Cosi' il nome segue la
+# chiave se cambia, e SI SPEGNE DA SOLO se la chiave sparisce, se il
+# livello non c'e' piu' o se la leva si spegne: nessuna riga da
+# ripulire, nessun nome che risponde per chi non lo merita piu'.
+# LA LEVA: NIP05_UTENTI_ATTIVO, accesa di serie (regola delle leve nuove,
+# 14 nov 2026). Spenta, la rotta risponde i soli nomi di casa, il
+# Profilo non mostra la riga e i nomi scelti restano salvati per quando
+# si riaccende.
+try:
+    from config import NIP05_UTENTI_ATTIVO
+except ImportError:
+    NIP05_UTENTI_ATTIVO = True
+NIP05_UTENTI_ATTIVO = bool(NIP05_UTENTI_ATTIVO)
+# il gradino da cui e' gratis: un id della scala (LIVELLI); storto o
+# sconosciuto chiude la porta (`_gradino_livello` e' fail-closed)
+try:
+    from config import NIP05_UTENTI_LIVELLO
+except ImportError:
+    NIP05_UTENTI_LIVELLO = "avviato"
+if not isinstance(NIP05_UTENTI_LIVELLO, str):
+    print("[nip05] NIP05_UTENTI_LIVELLO non e' l'id di un livello: la "
+          "porta resta chiusa", flush=True)
+    NIP05_UTENTI_LIVELLO = ""
+MIN_NIP05_NOME = 3
+MAX_NIP05_NOME = 30
+# I NOMI CHE NESSUNO PRENDE: quelli che si leggono come la voce di
+# Barattolo. Si aggiungono a quelli di casa (`NIP05_NOMI`), che sono
+# gia' presi per costruzione.
+NIP05_RISERVATI = frozenset((
+    "admin", "amministratore", "assistenza", "aiuto", "barattolo",
+    "help", "info", "moderatore", "moderazione", "mostro", "nostr",
+    "official", "root", "staff", "support", "supporto", "swap", "tappo",
+    "ufficiale", "www", "zap"))
+
+
+def _nip05_nome_forma(grezzo) -> tuple:
+    """La FORMA di un nome, prima di chiedere se e' libero: (nome, "")
+    se passa, ("", motivo) se no. Minuscolo per costruzione e
+    nell'alfabeto del NIP-05 (a-z0-9 . _ -), senza segni ai bordi ne'
+    due di fila, che si leggono come un refuso. Chi incolla l'indirizzo
+    intero («mario@barattolo.store») o con la chiocciola davanti si
+    vede tenere il solo nome."""
+    s = str(grezzo or "").strip().lower().lstrip("@")
+    if "@" in s:
+        s = s.split("@", 1)[0]
+    if not (MIN_NIP05_NOME <= len(s) <= MAX_NIP05_NOME):
+        return "", (f"Ci vogliono fra {MIN_NIP05_NOME} e "
+                    f"{MAX_NIP05_NOME} caratteri")
+    if not re.fullmatch(r"[a-z0-9._-]+", s):
+        return "", "Solo lettere minuscole, cifre, punto, trattino e _"
+    if not re.fullmatch(r"[a-z0-9]+(?:[._-][a-z0-9]+)*", s):
+        return "", "Niente segni all'inizio, alla fine o due di fila"
+    if s in NIP05_RISERVATI or s in NIP05_NOMI:
+        return "", "Questo nome è riservato: scegline un altro"
+    return s, ""
+
+
+def _nip05_nome_libero(con, nome: str, tg_id: int) -> bool:
+    """Nessun altro tiene gia' quel nome, ne' si chiama cosi' altrove
+    su Barattolo: lo username Telegram o il link del negozio di un ALTRO
+    sono la stessa persona agli occhi di chi legge, e un nome NIP-05
+    uguale sarebbe il modo piu' facile di spacciarsi per lui."""
+    return not con.execute(
+        "SELECT 1 FROM utenti WHERE tg_id!=? AND ("
+        "nip05_nome=? OR (username=? COLLATE NOCASE AND username!='') "
+        "OR (negozio_slug=? COLLATE NOCASE AND negozio_slug!=''))",
+        (tg_id, nome, nome, nome)).fetchone()
+
+
+def _nip05_chiave_hex(u) -> str:
+    """La chiave (hex) a cui il nome di QUESTA riga puo' rispondere
+    adesso, o '' se non puo': leva accesa, livello raggiunto, chiave
+    provata. Il giudice unico, per la rotta e per il Profilo."""
+    if not (NIP05_UTENTI_ATTIVO and u):
+        return ""
+    affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
+    if livello_utente(u["xp"] or 0, affari)["numero"] < _gradino_livello(
+            NIP05_UTENTI_LIVELLO):
+        return ""
+    npub = _npub_avvisi(u)
+    if not npub:
+        return ""
+    try:
+        return npub_to_hex(npub)
+    except Exception:
+        return ""
+
+
+_NIP05_CAMPI = ("SELECT tg_id, nip05_nome, npub, npub_verificata, "
+                "npub_accesso, xp, vendite_ok, acquisti_ok FROM utenti ")
+
+
+def nip05_chiave_utente(nome: str) -> str:
+    """Per la rotta pubblica: la chiave di chi tiene `nome`, se oggi il
+    giudice la lascia rispondere; '' altrimenti. FAIL-CLOSED: un
+    database che non risponde vale «qui nessuno», mai un 500 a un
+    client Nostr che chiede."""
+    if not (NIP05_UTENTI_ATTIVO and nome):
+        return ""
+    try:
+        con = db()
+        try:
+            u = con.execute(_NIP05_CAMPI + "WHERE nip05_nome=? LIMIT 1",
+                            (nome,)).fetchone()
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"[nip05] lettura del nome non riuscita ({e})", flush=True)
+        return ""
+    return _nip05_chiave_hex(u)
+
+
+def nip05_stato(u) -> dict:
+    """La riga del Profilo: i FATTI, la prosa la scrive il client."""
+    nome = (u["nip05_nome"] or "") if u else ""
+    affari = ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0
+    return {
+        "nome": nome,
+        "dominio": DOMINIO_PUBBLICO,
+        "chiave": bool(_npub_avvisi(u)) if u else False,
+        "sblocca": bool(u) and livello_utente(
+            u["xp"] or 0, affari)["numero"] >= _gradino_livello(
+                NIP05_UTENTI_LIVELLO),
+        "livello_nome": next((l[3] for l in LIVELLI
+                              if l[2] == NIP05_UTENTI_LIVELLO),
+                             NIP05_UTENTI_LIVELLO),
+        # il nome RISPONDE davvero adesso (tutti e tre i cancelli)
+        "attivo": bool(nome) and bool(_nip05_chiave_hex(u)),
+        # un nome proposto a chi non ne ha ancora uno: il suo
+        # username o il suo link del negozio, se hanno gia' la forma
+        "proposta": "" if nome else next(
+            (p for p in ((u["username"] or "").lower() if u else "",
+                         (u["negozio_slug"] or "") if u else "")
+             if p and _nip05_nome_forma(p)[0] == p), ""),
+    }
 
 
 # LO SCAMBIO P2P (set 2026): Barattolo diventa un CLIENT del coordinator
@@ -113014,10 +113251,21 @@ def nip05_nostr_json(name: str = ""):
     asset RGB dell'hackathon (vedi la leva), ma non dipende da
     RGB_ATTIVO: un'identita' non e' una funzione del mercatino. Stesso
     patto di `assetlinks.json`: rotta esplicita (regola ferrea 3), HEAD
-    con la sua riga, cache di un'ora."""
+    con la sua riga, cache di un'ora.
+    I NOMI DEGLI UTENTI (17 nov 2026, cantiere nip05-utenti): un `?name=`
+    che non e' di casa si chiede a `nip05_chiave_utente`, che risponde
+    solo se oggi il giudice lo lascia (leva, livello, chiave provata).
+    La rotta NON li elenca: senza `?name=` escono i soli nomi di casa,
+    perche' l'elenco intero sarebbe l'anagrafe di chi ha una chiave
+    Nostr su Barattolo, regalata a chiunque bussi. I nomi di casa
+    vincono sempre: un utente non puo' prenderne uno (vedi la forma)."""
     nomi = NIP05_NOMI
     if name:
-        nomi = {name: NIP05_NOMI[name]} if name in NIP05_NOMI else {}
+        if name in NIP05_NOMI:
+            nomi = {name: NIP05_NOMI[name]}
+        else:
+            chiave = nip05_chiave_utente(name.lower())
+            nomi = {name: chiave} if chiave else {}
     return JSONResponse({"names": nomi},
                         headers={"Cache-Control": "public, max-age=3600",
                                  "Access-Control-Allow-Origin": "*"})

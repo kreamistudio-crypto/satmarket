@@ -201,3 +201,4 @@ collaudo_spedisci_entro
 collaudo_chiedi_locker
 collaudo_serie_giorni
 collaudo_sentinella
+collaudo_nip05_utenti

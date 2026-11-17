@@ -9729,7 +9729,16 @@
      vince per specificita': quel verde e' dichiarato, non ereditato
      per caso. */
   .fine-frase{white-space:nowrap}
-  .guida-wallet-riga{font-size:12.5px;color:var(--ink-soft);font-weight:600;margin:8px 0 10px}
+  .guida-wallet-btn{margin:8px 0 12px}
+  /* la casella del Profilo, sotto i sette giorni: verde fiducia, non
+     l'arancio della serie (quinto giro, 17 nov 2026) */
+  .guida-wallet-box{margin-top:10px;background:var(--trust-soft);
+    border:1px solid var(--trust);border-radius:var(--radius);
+    padding:14px;display:flex;flex-direction:column;gap:10px}
+  .gwb-testo{display:flex;flex-direction:column;gap:3px;font-size:13px;
+    line-height:1.35;color:var(--ink)}
+  .gwb-testo b{font-family:var(--font-tit);font-size:15px;color:var(--trust)}
+  .guida-wallet-box .btn{margin:0}
   /* LA GUIDA «IL TUO PRIMO WALLET» (17 nov 2026): tre passi col pallino
      arancio di .sicu-passi, nelle misure di un foglio; il bottone di un
      passo sta DENTRO il passo, cosi' «cosa fare» e «con cosa» sono una
@@ -16305,7 +16314,7 @@ document.getElementById('cartello')?.remove();</script>
     <!-- la porta della guida «Il tuo primo wallet» (17 nov 2026): e' di
          Lightning, quindi la porta on-chain la spegne e il ritorno alla
          fattura la riaccende (`payGuidaWalletVista`) -->
-    <div id="payGuidaWallet" class="guida-wallet-riga" style="text-align:center;margin:-6px 0 12px">Non hai un wallet? <button type="button" class="scopri-link" onclick="apriGuidaWallet('paga')">Te lo spieghiamo in tre passi</button></div>
+    <button type="button" id="payGuidaWallet" class="btn ghost guida-wallet-btn" style="margin:0 0 12px" onclick="apriGuidaWallet('paga')">👛 Non hai un wallet? Ti spieghiamo come fare</button>
     <!-- LA SCADENZA E LA PORTA DEL WALLET (24 set 2026, «Paga ora»):
          una riga sola, accesa da mostraQr per OGNI flusso che apre il
          foglio. A sinistra il conto alla rovescia letto dalla bolt11;
@@ -41690,6 +41699,11 @@ let myScalaLivelli = [];         // i gradini coi loro vantaggi (ott 2026)
 let myClassifica = false;        // la leva della classifica, dal server
 let myClassificaNascosta = false; // «Non mostrarmi in classifica», dal server
 let myAnnunciSulProfilo = true;  // «Pubblica i miei annunci anche sul mio profilo Nostr», dal server (di serie si')
+/* IL NOME VERIFICATO SU NOSTR (17 nov 2026, cantiere nip05-utenti): lo
+   stato da /api/me (`nip05`), null a leva spenta o con un server di ieri
+   = nessuna riga. I FATTI li dice il server (nome, chiave provata,
+   livello, se risponde davvero); qui si scrive solo la prosa. */
+let myNip05 = null;
 let myTitoli = [], myTitolo = '';  // catalogo dei titoli + quello indossato
 let myDoppioni = [];     // coppie importato/nativo sospette, da /api/me
 
@@ -41806,7 +41820,8 @@ function renderProfilo(){
       </div>
       ${tondi}
     </div>
-    ${serieSettimanaHTML(mySerie)}`;
+    ${serieSettimanaHTML(mySerie)}
+    ${guidaWalletBoxHTML()}`;
   /* LA FOTO DELLA TESTATA APRE «I TUOI ACCOUNT» (16 ott 2026, dal campo:
      «il doppio tocco sulla foto non fa niente»): sul telefono il tappo
      nel Profilo non c'e', e il secondo tocco cadeva qui, sulla foto, che
@@ -42034,6 +42049,7 @@ function vantaggiLivello(g){
   const v = [];
   if (g.banner_sconto > 0) v.push(`−${fmt(g.banner_sconto)}% sul banner del negozio`);
   if (g.link_negozio) v.push('il link del negozio a scelta');
+  if (g.nip05) v.push('il nome verificato su Nostr, gratis');
   if (g.titolo) v.push(`il titolo «${esc(g.titolo)}»`);
   const p2p = scontoFedeltaTestoP2P(g.p2p_sconto);
   if (p2p) v.push(`${p2p} sulle commissioni P2P`);
@@ -43588,6 +43604,74 @@ function aggiornaContattoHint(){
   if (h) h.style.display = nonContattabile() ? '' : 'none';
 }
 
+/* — riga «Nome verificato su Nostr» (17 nov 2026, cantiere nip05-utenti):
+   solo con una chiave provata, come la riga degli annunci, perché il
+   nome risponde solo per quella. Tre stati: livello non ancora
+   raggiunto (si dice da quale), nessun nome (il campo e il bottone),
+   nome preso (l'indirizzo da copiare e dove scriverlo). */
+function nip05RigaHTML(riga, sub){
+  const n = myNip05;
+  if (!n || !n.chiave || DEMO || VETRINA) return '';
+  const dominio = esc(n.dominio || 'barattolo.store');
+  if (!n.sblocca && !n.nome)
+    return riga('✔️', 'Nome verificato su Nostr',
+      `Gratis dal livello «${esc(n.livello_nome || '')}»: un nome come <b style="color:var(--ink)">tuonome@${dominio}</b>, con la spunta accanto al tuo nome nelle app Nostr.`);
+  if (!n.nome)
+    return riga('✔️', 'Nome verificato su Nostr',
+      `Scegli il tuo nome@${dominio}: le app Nostr mostrano la spunta accanto al tuo nome. È gratis.`)
+      + `<div style="display:flex;gap:6px;align-items:center;margin:-2px 0 8px">
+          <input id="nip05Campo" type="text" maxlength="40" autocapitalize="none" autocomplete="off" spellcheck="false"
+            value="${esc(n.proposta || '')}" placeholder="tuonome"
+            style="flex:1;min-width:0;font:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)">
+          <span style="font-size:13px;color:var(--muted);font-weight:700">@${dominio}</span></div>
+        <button class="btn" style="margin:0 0 8px" onclick="scegliNip05()">✔️ Prendi questo nome</button>`
+      + sub('Lettere minuscole, cifre, punto, trattino o _. Puoi cambiarlo quando vuoi.');
+  const indirizzo = `${esc(n.nome)}@${dominio}`;
+  const stato = n.attivo
+    ? `<b style="color:var(--ink)">${indirizzo}</b> ✓ attivo.`
+    : `<b style="color:var(--ink)">${indirizzo}</b> — in pausa: torna attivo quando hai di nuovo il livello «${esc(n.livello_nome || '')}» e la chiave Nostr firmata.`;
+  return riga('✔️', 'Nome verificato su Nostr', stato)
+    + (n.attivo
+      ? `<button class="btn ghost" style="margin:0 0 2px" onclick="copiaNip05()">📋 Copia ${indirizzo}</button>`
+        + sub('Incollalo nel campo «NIP-05» (o «Indirizzo Nostr») del tuo profilo, nella tua app Nostr: la spunta compare lì.')
+      : '')
+    + `<button class="btn danger-ghost" style="margin:0 0 2px" onclick="lasciaNip05()">Lascia questo nome</button>`
+    + sub('Il nome torna libero. Ricordati di toglierlo anche dal tuo profilo Nostr.');
+}
+function copiaNip05(){
+  if (!myNip05 || !myNip05.nome) return;
+  haptic();
+  copiaLink(`${myNip05.nome}@${myNip05.dominio || 'barattolo.store'}`,
+            '📋 Copiato: incollalo nel campo NIP-05 del tuo profilo Nostr');
+}
+async function mandaNip05(nome){
+  let d;
+  try {
+    const r = await fetch(`${API_BASE}/me/nip05`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({nome})});
+    d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return false; }
+  } catch(e) { toast('Rete assente: riprova'); return false; }
+  myNip05 = d.nip05 || null;
+  renderIdentita();
+  return true;
+}
+async function scegliNip05(){
+  haptic();
+  const nome = (el('nip05Campo')?.value || '').trim();
+  if (!nome) { toast('Scrivi il nome che vuoi'); return; }
+  if (await mandaNip05(nome))
+    toast('✔️ Fatto: ora copialo nel campo NIP-05 del tuo profilo Nostr', 6000);
+}
+/* Niente domanda unica: la frase sotto il bottone dice già cosa
+   succede, e un nome lasciato si riprende con un tocco se è ancora
+   libero. */
+async function lasciaNip05(){
+  haptic();
+  if (await mandaNip05('')) toast('Nome lasciato: ora è di nuovo libero', 3500);
+}
+
 function renderIdentita(){
   const box = el('identitaBlocco');
   if (!box) return;
@@ -43724,7 +43808,7 @@ function renderIdentita(){
       + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px">
           ${pillAnn(true, 'Sì')}${pillAnn(false, 'No, tienili separati')}</div>`
     : '';
-  box.innerHTML = tgRiga + nsRiga + annRiga + fotoRiga;
+  box.innerHTML = tgRiga + nsRiga + annRiga + nip05RigaHTML(riga, sub) + fotoRiga;
   renderConnettori();
   renderAvvisi();
   renderSpedizioniere();
@@ -71565,8 +71649,25 @@ function apriLinkGuida(quale){
 let guidaWalletScopo = 'incassa';
 function rigaGuidaWallet(scopo){
   const sc = scopo === 'paga' ? 'paga' : 'incassa';
-  return '<div class="guida-wallet-riga">Non hai un wallet? '
-    + '<button type="button" class="scopri-link" onclick="apriGuidaWallet(\'' + sc + '\')">Te lo spieghiamo in tre passi</button></div>';
+  /* UN BOTTONE VERO, non un link nel testo (17 nov 2026, quarto giro,
+     Andrea dalla produzione: «è troppo nascosta, mettila con un tasto
+     visibile»): la porta e' alta quanto le altre, e si vede. */
+  return '<button type="button" class="btn ghost guida-wallet-btn" onclick="apriGuidaWallet(\'' + sc + '\')">👛 Non hai un wallet? Ti spieghiamo come fare</button>';
+}
+/* LA CASELLA NEL PROFILO (17 nov 2026, quinto giro, Andrea: «mettimelo
+   sotto una casella apposita sotto lo streak, colorata in un certo
+   modo»): sotto la fila dei sette giorni, una carta VERDE — il verde
+   della fiducia (--trust-soft), non l'arancio della serie, cosi' non
+   sembra un pezzo della serie e si vede che e' un'altra cosa. Solo a chi
+   non ha ancora un indirizzo: con l'indirizzo salvato la casella
+   sparisce, e la guida resta accanto al campo del Profilo. */
+function guidaWalletBoxHTML(){
+  if (myLnAddress) return '';
+  return `<div class="guida-wallet-box">
+    <div class="gwb-testo"><b>👛 Il tuo primo wallet</b>
+      <span>Non ne hai ancora uno? Tre passi, gratis, e incassi da solo.</span></div>
+    <button type="button" class="btn primary" onclick="apriGuidaWallet('incassa')">Ti spieghiamo come fare</button>
+  </div>`;
 }
 function apriGuidaWallet(scopo){
   haptic();
@@ -108316,6 +108417,7 @@ async function avvia(){
     vestiAssistenza();
     myClassificaNascosta = !!me.classifica_nascosta;
     myAnnunciSulProfilo = me.annunci_su_profilo_nostr == null ? true : !!me.annunci_su_profilo_nostr;
+    myNip05 = (me.nip05 && typeof me.nip05 === 'object') ? me.nip05 : null;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
     myTitoli = me.titoli || []; myTitolo = me.titolo || '';
     myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';

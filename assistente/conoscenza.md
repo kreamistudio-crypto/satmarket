@@ -51,7 +51,7 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 - NWC (Nostr Wallet Connect): se colleghi il wallet dal Profilo, «⚡ Compra subito» paga in un tocco, e nel P2P la fattura per ricevere la fa il wallet da solo. La connessione resta solo sul tuo dispositivo, non arriva ai nostri server, e nel wallet le puoi dare un tetto di spesa.
 - Per incassare: l'indirizzo Lightning (quello con la @, tipo nome@dominio) si imposta una volta nel Profilo e non scade. Se non ce l'hai, quando l'affare si chiude ti avvisiamo e incolli una fattura nell'ordine in quel momento (prima no: una fattura scade).
 - Nel P2P l'indirizzo di Wallet of Satoshi non passa la verifica: lì si incolla una fattura del wallet, che invece funziona. Lo stesso vale per qualunque indirizzo che il servizio di scambio non riesce a verificare.
-- Chi non ha ancora un wallet trova la guida «👛 Il tuo primo wallet»: si apre dal link «Non hai un wallet? Te lo spieghiamo in tre passi», che sta sotto la fattura da pagare, nel riquadro dell'incasso o del rimborso di un ordine e nel Profilo accanto al Lightning address. Sono tre passi: 1) scarica Wallet of Satoshi (gratis, in Europa i sats restano sul telefono di chi lo usa); 2) salva le parole di recupero su carta; 3) dipende da cosa stavi facendo: se devi pagare, metti qualche sats (te li manda un amico o li compri in euro nel P2P) e inquadri il QR dal wallet; se devi incassare, tocchi «Ricevi» nel wallet, copi il tuo indirizzo nome@walletofsatoshi.com e lo incolli nel campo della guida. La prima volta che salvi il tuo Lightning address (dalla guida o dal Profilo) ricevi il distintivo «📥 Pronto a incassare»: non dà punti (i punti si fanno solo con gli affari), è un distintivo. Nella tendina «Hai già un altro wallet?»: va bene qualsiasi wallet che dia un indirizzo con la @, ma quello di Phoenix Barattolo non lo sa ancora pagare, quindi con Phoenix a ogni vendita si incolla una fattura. Barattolo non ha un wallet suo e non tiene i sats di nessuno: se qualcuno chiede un «conto su Barattolo», la risposta è questa guida.
+- Chi non ha ancora un wallet trova la guida «👛 Il tuo primo wallet»: si apre dalla casella verde «👛 Il tuo primo wallet» nel Profilo, subito sotto la fila dei giorni di fila (c'è solo finché non hai un Lightning address), e dal bottone «👛 Non hai un wallet? Ti spieghiamo come fare» che sta sotto la fattura da pagare, nel riquadro dell'incasso o del rimborso di un ordine e nel Profilo accanto al Lightning address. Sono tre passi: 1) scarica Wallet of Satoshi (gratis, in Europa i sats restano sul telefono di chi lo usa); 2) salva le parole di recupero su carta; 3) dipende da cosa stavi facendo: se devi pagare, metti qualche sats (te li manda un amico o li compri in euro nel P2P) e inquadri il QR dal wallet; se devi incassare, tocchi «Ricevi» nel wallet, copi il tuo indirizzo nome@walletofsatoshi.com e lo incolli nel campo della guida. La prima volta che salvi il tuo Lightning address (dalla guida o dal Profilo) ricevi il distintivo «📥 Pronto a incassare»: non dà punti (i punti si fanno solo con gli affari), è un distintivo. Nella tendina «Hai già un altro wallet?»: va bene qualsiasi wallet che dia un indirizzo con la @, ma quello di Phoenix Barattolo non lo sa ancora pagare, quindi con Phoenix a ogni vendita si incolla una fattura. Barattolo non ha un wallet suo e non tiene i sats di nessuno: se qualcuno chiede un «conto su Barattolo», la risposta è questa guida.
 
 <!-- pezzo libro-005 | libro -->
 ## Libro · Comprare nel mercatino (1/3)
@@ -406,6 +406,8 @@ La privacy dello Swap, cioè chi vede cosa:
 ## Libro · Nostr
 
 Gli annunci di Barattolo vengono pubblicati anche su Nostr, una rete aperta: esistono sui relay anche indipendentemente da Barattolo. Se colleghi una tua chiave Nostr dal Profilo, i tuoi annunci escono firmati da te (la firma la fa il tuo browser) e restano tuoi. Gli avvisi possono arrivarti anche su Nostr, oltre che su Telegram. La chiave privata (nsec) non va mai data a nessuno, nemmeno a Barattolo.
+
+Il nome verificato su Nostr (se nelle REGOLAZIONI del pannello «Nome verificato su Nostr» è accesa): dal livello «Bottega avviata» chi ha una chiave Nostr collegata CON UNA FIRMA (non basta averla solo scritta nel profilo) può scegliere gratis un nome come mario@barattolo.store. Si fa nel Profilo, gruppo «Privacy», cassetto «🆔 Identità», alla riga «✔️ Nome verificato su Nostr»: si scrive il nome (lettere minuscole, cifre, punto, trattino o _, da 3 a 30 caratteri) e si tocca «Prendi questo nome». Poi bisogna copiarlo («📋 Copia») e incollarlo nella propria app Nostr (Damus, Primal, Amethyst...), nel campo «NIP-05» o «Indirizzo Nostr» del profilo: Barattolo non lo può scrivere al posto tuo. Le app mostrano allora la spunta accanto al nome. Non si possono prendere un nome già preso, lo username Telegram di un altro, né nomi come «admin», «staff» o «barattolo». Si può cambiare o lasciare quando si vuole. Se scendi sotto il livello o togli la chiave, il nome resta salvato ma va in pausa finché non torna tutto a posto.
 
 Su Nostr risponde anche Tappo: si può scrivere un DM al profilo «Barattolo» (npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy) oppure rispondere sotto le sue note, e Tappo risponde come su Telegram. Ai bot e allo spam non risponde, e se qualcuno dello staff sta già seguendo quella conversazione lascia parlare lui. Per un problema con un ordine, in pubblico Tappo invita a scrivergli in privato.
 
@@ -1112,8 +1114,7 @@ Info P2P
  Paga con qualsiasi wallet Lightning. I sats restano bloccati e al sicuro finché non confermi di aver ricevuto l'oggetto.
 lnbc…
 inquadra il QR col wallet, o tocca la invoice per copiarla
-Non hai un wallet? 
-Te lo spieghiamo in tre passi
+👛 Non hai un wallet? Ti spieghiamo come fare
  ⚡ Apri nel wallet
 ⚡ Generane una nuova
 ✓ Ho pagato
@@ -1852,7 +1853,7 @@ pubblico: sì
 ## Novità · 2026-11-17 · primo-wallet
 
 frase: Chi non ha ancora un wallet trova una guida in tre passi: scarica Wallet of Satoshi, salva le parole di recupero, poi il passo che ti serve: come mettere i primi sats e inquadrare il QR se stai pagando, dove trovare il tuo indirizzo Lightning se stai incassando. I sats restano nel tuo wallet, non su Barattolo. Al primo indirizzo salvato arriva il distintivo «📥 Pronto a incassare».
-dove: il link «Non hai un wallet? Te lo spieghiamo in tre passi» sotto la fattura da pagare, nel riquadro «💰 Come ricevi i tuoi sats» di un ordine e nel Profilo accanto al Lightning address.
+dove: Profilo, la casella verde «👛 Il tuo primo wallet» sotto i giorni di fila (finché non hai un Lightning address); e il bottone «👛 Non hai un wallet? Ti spieghiamo come fare» sotto la fattura da pagare, nel riquadro «💰 Come ricevi i tuoi sats» di un ordine e nel Profilo accanto al Lightning address.
 leva: nessuna
 pubblico: sì
 
@@ -1977,6 +1978,14 @@ leva: PREMI_FEDELTA_ATTIVI (accesa di serie)
 pubblico: sì
 
 <!-- pezzo novita-073 | novita -->
+## Novità · 2026-11-17 · nip05-utenti
+
+frase: Dal livello «Bottega avviata» puoi avere gratis il tuo nome verificato su Nostr, tipo mario@barattolo.store. Lo scegli nel Profilo, lo incolli nel campo NIP-05 del tuo profilo Nostr e le app Nostr mostrano la spunta accanto al tuo nome. Serve una chiave Nostr collegata con una firma.
+dove: Profilo → «Privacy» → «🆔 Identità» → riga «✔️ Nome verificato su Nostr» → «Prendi questo nome» e poi «📋 Copia»; nella scala dei livelli, tra i vantaggi di «Bottega avviata».
+leva: NIP05_UTENTI_ATTIVO (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-074 | novita -->
 ## Novità · 2026-11-17 · onchain-rimborso-liscio
 
 frase: Rinunciare a uno scambio P2P on-chain è più semplice. Chi vende bitcoin scrive dove riavere i sats nel foglio stesso, prima di bloccarli. Se quell'indirizzo manca, il «Rinuncio» di chi compra non dà più errore: viene registrato e il bot avvisa chi vende col tasto che apre lo scambio. E se firmi da un dispositivo senza la chiave del wallet, Barattolo la cerca da solo o ti chiede lì le 12 parole.
@@ -1984,7 +1993,7 @@ dove: P2P on-chain: il foglio «🔒 Blocca i sats» col riquadro «Dove tornano
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-074 | novita -->
+<!-- pezzo novita-075 | novita -->
 ## Novità · 2026-11-17 · onchain-tempo-bonifico
 
 frase: Negli scambi P2P on-chain in euro e franchi il tempo per pagare scende da 72 a 24 ore, come per USDT e monete. In cambio, da «Ho inviato» chi vende ha 48 ore per veder arrivare il bonifico e liberare i sats: se passano senza rilascio, il bot avvisa tutti e due e indica la disputa. Niente si annulla da solo: i bitcoin restano nel deposito di garanzia.
@@ -1992,7 +2001,7 @@ dove: P2P on-chain: la card in «I miei scambi» e la riga «Tempo per pagare» 
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-075 | novita -->
+<!-- pezzo novita-076 | novita -->
 ## Novità · 2026-11-17 · annullo-registrato
 
 frase: Se prendi un ordine P2P, tocchi «Annulla» e l'annullo non arriva al coordinatore, alla scadenza del tempo non ti viene più contato uno scambio non completato: il bot te lo scrive nel messaggio.
@@ -2000,7 +2009,7 @@ dove: P2P Lightning: la pagina dello scambio appena preso, «✕ Annulla» e «S
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-076 | novita -->
+<!-- pezzo novita-077 | novita -->
 ## Novità · 2026-11-17 · onchain-ritiro
 
 frase: Negli scambi P2P on-chain, chi si ritira dopo che l'altro ha già bloccato i sats si vede contare uno «scambio non completato», come negli scambi Lightning, e chi aveva bloccato i sats può lasciargli una recensione. Nessuna cauzione e nessuna penale in denaro. Il foglio di «Rinuncio» lo dice prima della firma. Non conta se chi vende non aveva ancora scritto dove pagare.
@@ -2008,7 +2017,7 @@ dove: P2P on-chain: il foglio «↩️ Rinunci allo scambio?»; la pagina dello 
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-077 | novita -->
+<!-- pezzo novita-078 | novita -->
 ## Novità · 2026-11-17 · quanto-vuoto
 
 frase: Quando prendi un ordine P2P con un intervallo (per esempio da 50 a 276 €), il campo dell'importo ora è vuoto: scrivi subito la cifra che vuoi, senza cancellare il minimo che prima c'era già scritto. Sotto ci sono i tasti «Minimo» e «Massimo» per metterla con un tocco.
@@ -2016,7 +2025,7 @@ dove: P2P: tocca un ordine con un intervallo, poi «Scegli»; foglio «Quanto vu
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-078 | novita -->
+<!-- pezzo novita-079 | novita -->
 ## Novità · 2026-11-17 · onchain-contanti-luogo
 
 frase: Gli ordini P2P on-chain in contanti ora hanno il luogo dello scambio, come quelli Lightning: chi pubblica scrive la zona, e la card la mostra con «📍». Vale anche lo stesso tetto in euro del contanti.

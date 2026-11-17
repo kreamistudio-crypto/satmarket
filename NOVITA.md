@@ -377,7 +377,7 @@ pubblico: sì
 
 ## 2026-11-17 · primo-wallet
 frase: Chi non ha ancora un wallet trova una guida in tre passi: scarica Wallet of Satoshi, salva le parole di recupero, poi il passo che ti serve: come mettere i primi sats e inquadrare il QR se stai pagando, dove trovare il tuo indirizzo Lightning se stai incassando. I sats restano nel tuo wallet, non su Barattolo. Al primo indirizzo salvato arriva il distintivo «📥 Pronto a incassare».
-dove: il link «Non hai un wallet? Te lo spieghiamo in tre passi» sotto la fattura da pagare, nel riquadro «💰 Come ricevi i tuoi sats» di un ordine e nel Profilo accanto al Lightning address.
+dove: Profilo, la casella verde «👛 Il tuo primo wallet» sotto i giorni di fila (finché non hai un Lightning address); e il bottone «👛 Non hai un wallet? Ti spieghiamo come fare» sotto la fattura da pagare, nel riquadro «💰 Come ricevi i tuoi sats» di un ordine e nel Profilo accanto al Lightning address.
 leva: nessuna
 pubblico: sì
 
@@ -469,6 +469,12 @@ pubblico: sì
 frase: I negozi possono premiare chi torna a comprare: nel Profilo, «🎀 Premi fedeltà», chi vende scrive fino a quattro soglie in euro col suo regalo («da 100 € la borsa, da 200 € la tazza»). Barattolo conta quanto ogni cliente ha speso lì e, passata la soglia, il premio compare sul suo ordine successivo: il venditore lo mette nel pacco. Sulla pagina del negozio vedi i premi e quanto hai già speso.
 dove: Profilo → «🎀 Premi fedeltà»; la pagina di un negozio, riga «🎀 Premi fedeltà» sotto le promesse; il dettaglio dell'ordine, riga «🎀 Premio fedeltà»; il messaggio del bot «Premio fedeltà!».
 leva: PREMI_FEDELTA_ATTIVI (accesa di serie)
+pubblico: sì
+
+## 2026-11-17 · nip05-utenti
+frase: Dal livello «Bottega avviata» puoi avere gratis il tuo nome verificato su Nostr, tipo mario@barattolo.store. Lo scegli nel Profilo, lo incolli nel campo NIP-05 del tuo profilo Nostr e le app Nostr mostrano la spunta accanto al tuo nome. Serve una chiave Nostr collegata con una firma.
+dove: Profilo → «Privacy» → «🆔 Identità» → riga «✔️ Nome verificato su Nostr» → «Prendi questo nome» e poi «📋 Copia»; nella scala dei livelli, tra i vantaggi di «Bottega avviata».
+leva: NIP05_UTENTI_ATTIVO (accesa di serie)
 pubblico: sì
 
 ## 2026-11-17 · onchain-rimborso-liscio
