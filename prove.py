@@ -204052,6 +204052,327 @@ def prove_onchain_promemoria():
            "await _notifica_p2p_onchain(o, chi, testo, _p2p_onchain_bottone(o))" in ronda))
 
 
+def prove_onchain_rimborso_liscio():
+    """IL RIMBORSO ON-CHAIN CHE NON SI INCAGLIA (17 nov 2026, cantiere
+    onchain-rimborso-liscio; un utente all'assistenza: «la persona che ha
+    depositato deve indicare dove ricevere di ritorno i sats [...] mi
+    appare un po' macchinosa la procedura»; Andrea: «Ok, sì, vai, correggi
+    tutto»). Tre pezzi: l'indirizzo del rimborso chiesto a chi deposita
+    PRIMA del QR (e nella pagina a deposito fatto), «Rinuncio» che senza
+    quell'indirizzo si registra invece di dare errore, e le 12 parole
+    chieste li' quando la chiave non e' sul dispositivo. Il telefono gira
+    in node con finte minime; il giro vero sta in `collaudo_p2p_onchain`."""
+    print("\n[il rimborso on-chain che non si incaglia]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    # --- il server: i fili ---
+    rimb = pezzo("p2p_onchain_rimborso_qui")
+    chiesta = pezzo("p2p_onchain_rinuncia_chiesta")
+    sblocca = pezzo("_p2p_onchain_rinunce_sbloccate")
+    profilo = pezzo("onchain_incasso_scegli")
+    prova("le due rotte ci sono, col loro freno, e la colonna nasce da sola",
+          (True, True, True, True, True),
+          ('@app.post("/api/p2p/onchain/{oid}/rimborso")' in src,
+           '@app.post("/api/p2p/onchain/{oid}/rinuncia-chiesta")' in src,
+           '_frena("onchain_incasso", user["id"])' in rimb,
+           '_frena("onchain_firma", user["id"])' in chiesta,
+           '("rinuncia_chiesta_il", "INTEGER DEFAULT 0")' in src))
+    prova("l'indirizzo al volo ha lo stesso giudice e la stessa firma del seme "
+          "di quello di chi compra, e si scrive solo a rimborso vuoto e senza "
+          "proposta",
+          (True, True, True, True),
+          ('onchain_destinazione_motivo("indirizzo", valore, r["xpub"])' in rimb,
+           'onchain_firma_valida(r["xpub"], "indirizzo", valore, firma)' in rimb,
+           "WHERE id=? AND rimborso='' AND proposta_psbt=''" in rimb,
+           'if _p2p_onchain_ruolo(o, user["id"]) != "compratore":' in rimb))
+    prova("la rinuncia registrata scrive PRIMA di avvisare, e mai in disputa o "
+          "con una firma gia' messa",
+          (True, True, True),
+          ("SET rinuncia_chiesta_il=?" in chiesta.split("await _notifica_p2p_onchain(")[0],
+           'if o["stato"] == "disputa":' in chiesta,
+           'if o["decisione_da"] or o["proposta_psbt"]:' in chiesta))
+    prova("l'indirizzo che arriva sblocca la rinuncia da tutt'e due le porte "
+          "(lo scambio e il Profilo), e il segno si toglie prima dell'avviso",
+          (True, True, True),
+          ("_p2p_onchain_rinunce_sbloccate(con, user[\"id\"])" in rimb,
+           "_p2p_onchain_rinunce_sbloccate(con, user[\"id\"])" in profilo,
+           "SET rinuncia_chiesta_il=0" in sblocca))
+    amb = {}
+    exec(pezzo("_p2p_onchain_rinuncia_possibile"), amb)
+    puo = amb["_p2p_onchain_rinuncia_possibile"]
+    prova("la rinuncia si puo' chiedere dove si puo' proporre il rimborso: a "
+          "sats depositati, o a sats arrivati su uno scambio preso o annullato",
+          [True, True, False, True, True, False, False],
+          [puo({"stato": "depositato", "ricevuti_sats": 0}),
+           puo({"stato": "euro_inviati", "ricevuti_sats": 5}),
+           puo({"stato": "preso", "ricevuti_sats": 0}),
+           puo({"stato": "preso", "ricevuti_sats": 9}),
+           puo({"stato": "annullato", "ricevuti_sats": 9}),
+           puo({"stato": "disputa", "ricevuti_sats": 9}),
+           puo({"stato": "rilasciato", "ricevuti_sats": 9})])
+    # --- il telefono: i fili ---
+    chiudi = pezzo_js(mini, "function closeSheet(){", "\n}\n")
+    guarda = pezzo_js(mini, "async function onchainIncassoGuarda(pref){", "\n}\n")
+    deposito = pezzo_js(mini, "function renderDepositoOnchainP2P(){", "\n}\n")
+    scheda = pezzo_js(mini, "function schedaOnchainP2P(o){", "\n}\n")
+    pagina = pezzo_js(mini, "async function renderP2POnchain(){", "\n}\n")
+    cerca = pezzo_js(mini, "async function onchainCercaSemeP2P(){", "\n}\n")
+    prova("il foglio delle 12 parole c'e', closeSheet lo chiude e ANNULLA il "
+          "gesto che aspettava la chiave",
+          (True, True, True),
+          ('<div class="sheet" id="p2pOcParoleSheet" role="dialog" aria-modal="true" '
+           'aria-labelledby="p2pOcParoleTit">' in mini,
+           "el('p2pOcParoleSheet').classList.remove('open');" in chiudi,
+           "paroleOnchainP2PAnnulla();" in chiudi))
+    prova("nello scambio il campo accetta solo un indirizzo, per ogni modulo "
+          "`ocP2p…`; il foglio del deposito chiede l'indirizzo PRIMA del QR "
+          "e non tocca il campo gia' aperto; la pagina tiene quel che si scrive",
+          (True, True, True, True),
+          ("String(pref).indexOf('ocP2p') === 0 && tipo !== 'indirizzo'" in guarda,
+           "rimborsoPrimaDelDepositoOnchainP2P(o)" in deposito.split('class="qr"')[0],
+           "if (!el('ocP2pDepValore')) box.innerHTML = rimborsoMancanteOnchainP2P(o, 'ocP2pDep');" in deposito,
+           "el('ocP2pRimbValore').value = rimbV" in pagina))
+    prova("la chiave si cerca senza farne nascere una: `onchainSemeAssicurato` "
+          "solo se il server dice che un wallet c'e' gia'",
+          (True, True),
+          ("if (!st || !st.impronta) return;" in cerca.split("await onchainSemeAssicurato()")[0],
+           "nuovoPrincipale" not in cerca))
+    # --- il telefono: in node ---
+    js = """
+const NODI = {};
+const nodo = () => ({innerHTML: '', textContent: '', value: '', href: '#', style: {}, dataset: {},
+  scrollIntoView(){}, focus(){},
+  classList: {s: new Set(), add(c){ this.s.add(c); }, remove(c){ this.s.delete(c); }, contains(c){ return this.s.has(c); }}});
+const FISSI = ['p2pOcDepositoCorpo', 'p2pOcDepositoSheet', 'sheetBg', 'p2pOcParoleCorpo', 'p2pOcParoleSheet',
+  'p2pOcDepositoIndirizzo', 'p2pOcDepositoWallet', 'p2pOcDepositoQr', 'p2pOcDepositoScadeRiga', 'p2pOcDepositoScade'];
+let CAMPI = {};
+function el(id){
+  if (FISSI.includes(id)) return NODI[id] || (NODI[id] = nodo());
+  if (id === 'ocP2pDepValore') return el('p2pOcDepositoCorpo').innerHTML.includes('id="ocP2pDepValore"') ? (CAMPI[id] || (CAMPI[id] = nodo())) : null;
+  if (id === 'p2pOcParoleCampo') return el('p2pOcParoleCorpo').innerHTML.includes('id="p2pOcParoleCampo"') ? (CAMPI[id] || (CAMPI[id] = nodo())) : null;
+  return CAMPI[id] || null;
+}
+const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n), haptic = () => {};
+const fmtSoldiP2P = e => String(e);
+const TOAST = [];
+const toast = t => TOAST.push(String(t));
+const disegnaQr = () => {};
+const onchainRete = () => ({prova: true, nome: 'signet', indirizzo: 'tb1', conto: 'vpub', xpub: 'tpub'});
+const daFirmareOnchainP2P = () => false, cambioDaFirmareOnchainP2P = () => false;
+const incassoMancanteOnchainP2P = () => '', incassoLnOnchainP2P = () => '';
+const cardParte = () => '';
+const API_BASE = '', authHdr = () => 'x';
+const attesaP2P = () => () => {}, onchainAttesa = () => () => {};
+const spuntaAttesaP2P = async () => {};
+const P2P_TORNA_MS = 0;
+let p2pOnchainAperto = 7;
+const go = () => {};
+let RIDISEGNI = 0;
+const renderP2POnchain = () => { RIDISEGNI++; };
+const vistaAttivaP2P = () => 'view-p2ponchain';
+let CHIUSI = 0;
+function closeSheet(){ CHIUSI++; el('p2pOcParoleSheet').classList.remove('open'); el('p2pOcDepositoSheet').classList.remove('open'); paroleOnchainP2PAnnulla(); }
+/* il seme di cartone: la «chiave» di uno scambio e' la parola stessa */
+let SEME = '';
+const COMPRA = 'uno due tre quattro cinque sei sette otto nove dieci undici dodici';
+const VENDE = 'alfa beta gamma delta epsilon zeta eta theta iota kappa lambda mi';
+const onchainSemeLocale = () => SEME;
+const caricaBitcoin = async () => ({hex: {encode: x => x}});
+const onchainMieChiavi = (B, p, o) => ({firma: {publicKey: p}});
+const walletParolePrima = () => [];
+let IMPRONTA = 'aabbccdd', NUVOLA = '', ASSICURATO = 0, MUTO = false;
+const walletUnicoLeggi = async () => { if (MUTO) throw new Error('muto'); return {impronta: IMPRONTA}; };
+const onchainSemeAssicurato = async () => { ASSICURATO++; if (NUVOLA) { SEME = NUVOLA; return SEME; } throw new Error('altrove'); };
+const walletUsaParoleDi = async t => { if (String(t).trim().split(' ').length !== 12) throw new Error('Non sono 12 parole valide'); SEME = String(t).trim(); };
+const FIRMATE = [];
+const onchainFirmaProposta = async (o, verso) => { FIRMATE.push([o.id, verso]); return verso; };
+const onchainCofirma = async () => '';
+let RISPOSTE = [], CHIAMATE = [];
+const fetch = async (url, opz) => { CHIAMATE.push(url); const r = RISPOSTE.shift() || {ok: true, d: {}}; return {ok: r.ok, json: async () => r.d}; };
+let p2pOnchainMiei = [];
+const leggiMieiOnchainP2P = async () => { p2pOnchainMiei.forEach(x => { if (x.id === 7 && ARRIVA) x.rimborso = 'tb1qcasa'; }); return p2pOnchainMiei; };
+let ARRIVA = false;
+""" + pezzo_js(mini, "const P2P_ONCHAIN_VIVI = ", ";\n") + ";\n" \
+        + pezzo_js(mini, "const P2P_ONCHAIN_STATI = {", "};\n") + "};\n" \
+        + _fn_js(mini, "function minutiSecondi(sec){") \
+        + _fn_js(mini, "function onchainUriPagamento(o){") \
+        + _fn_js(mini, "function satsInBtc(sats, punto){") \
+        + _fn_js(mini, "function cifraBtcCopiabile(sats){") \
+        + _fn_js(mini, "function rigaCifraBtc(sats){") \
+        + _fn_js(mini, "function onchainParolePerOrdine(B, parole, o){") \
+        + mini[mini.index("function schedaOnchainP2P(o){"):mini.index("function copiaOnchainP2P(")] \
+        + mini[mini.index("let p2pOcDeposito = null"):mini.index("/* I GESTI SEMPLICI")] \
+        + mini[mini.index("/* PURA: a chi deposita manca il posto dove riavere i sats? */"):
+               mini.index("/* ====== CHI COMPRA BITCOIN RICEVE IN LIGHTNING")] \
+        + _fn_js(mini, "async function fattoOnchainP2P(rip){") \
+        + _fn_js(mini, "async function firmaOnchainP2P(id, verso){") \
+        + _fn_js(mini, "async function cofirmaOnchainP2P(btn, id){") + """
+(async () => {
+const out = {};
+const ind = {indirizzo: 'tb1qdueditre', chiavi: {compratore: VENDE, venditore: COMPRA}};
+const base = {id: 7, sats: 10000, margine_sats: 540, importo_sats: 10540, euro: 7, metodi: ['SEPA'],
+              indirizzo: ind, deposito_entro: Math.floor(Date.now() / 1000) + 3600, visti_sats: 0,
+              rimborso: '', proposta: null, rinuncia_chiesta_il: 0};
+const vende = x => Object.assign({}, base, {ruolo: 'compratore', parte: 'vendo', stato: 'preso'}, x);
+const compra = x => Object.assign({}, base, {ruolo: 'venditore', parte: 'compro', stato: 'depositato'}, x);
+out.daChiedere = [rimborsoDaChiedereOnchainP2P(vende()), rimborsoDaChiedereOnchainP2P(vende({rimborso: 'tb1qx'})),
+  rimborsoDaChiedereOnchainP2P(compra()), rimborsoDaChiedereOnchainP2P(vende({stato: 'disputa'})),
+  rimborsoDaChiedereOnchainP2P(vende({stato: 'depositato', proposta: {verso: 'venditore'}})),
+  rimborsoDaChiedereOnchainP2P(vende({stato: 'rilasciato'})), rimborsoDaChiedereOnchainP2P(null)];
+out.prima = [rimborsoPrimaDelDepositoOnchainP2P(vende()), rimborsoPrimaDelDepositoOnchainP2P(vende({visti_sats: 10540})),
+  rimborsoPrimaDelDepositoOnchainP2P(vende({stato: 'depositato'}))];
+const q = rimborsoMancanteOnchainP2P(vende({stato: 'depositato'}));
+const qc = rimborsoMancanteOnchainP2P(vende({stato: 'depositato', rinuncia_chiesta_il: 5}));
+out.riquadro = [/id="ocP2pRimbValore"/.test(q), /onchainIncassoGuardaPresto\\('ocP2pRimb'\\)/.test(q),
+  /id="ocP2pRimbSalva" disabled onclick="rimborsoQuiOnchainP2P\\(this, 7, 'ocP2pRimb'\\)"/.test(q),
+  /Dove tornano i sats\\?/.test(q), /Chi compra vuole rinunciare/.test(q), /Chi compra vuole rinunciare/.test(qc),
+  rimborsoMancanteOnchainP2P(vende({rimborso: 'tb1qx'}))];
+/* il foglio del deposito: prima l'indirizzo, poi il QR */
+apriDepositoOnchainP2P(7, vende());
+let c = el('p2pOcDepositoCorpo').innerHTML;
+out.foglioPrima = [el('p2pOcDepositoSheet').classList.contains('open'), /id="ocP2pDepValore"/.test(c),
+  /rimborsoQuiOnchainP2P\\(this, 7, 'ocP2pDep'\\)/.test(c), /class="qr"/.test(c), /Prima di bloccare i sats/.test(c)];
+el('ocP2pDepValore').value = 'tb1qsto';
+el('p2pOcDepositoCorpo').innerHTML += '<!--vivo-->';
+renderDepositoOnchainP2P();
+out.foglioTiene = [/<!--vivo-->/.test(el('p2pOcDepositoCorpo').innerHTML), el('ocP2pDepValore').value];
+CAMPI = {};
+apriDepositoOnchainP2P(7, vende({rimborso: 'tb1qcasa'}));
+c = el('p2pOcDepositoCorpo').innerHTML;
+out.foglioDopo = [/id="ocP2pDepValore"/.test(c), /class="qr"/.test(c)];
+clearInterval(p2pOcDepositoOrologio);
+apriDepositoOnchainP2P(7, vende({visti_sats: 10540}));
+out.foglioVisti = [/id="ocP2pDepValore"/.test(el('p2pOcDepositoCorpo').innerHTML), /class="qr"/.test(el('p2pOcDepositoCorpo').innerHTML)];
+clearInterval(p2pOcDepositoOrologio);
+/* la pagina */
+const sc = x => schedaOnchainP2P(x);
+out.pagina = [/ocP2pRimbValore/.test(sc(vende())), /ocP2pRimbValore/.test(sc(vende({visti_sats: 10540}))),
+  /ocP2pRimbValore/.test(sc(vende({stato: 'depositato'}))), /ocP2pRimbValore/.test(sc(vende({stato: 'depositato', rimborso: 'tb1qx'}))),
+  /ocP2pRimbValore/.test(sc(compra()))];
+out.frase = [/Hai chiesto di rinunciare/.test(sc(compra({rinuncia_chiesta_il: 5}))), /Hai chiesto di rinunciare/.test(sc(compra())),
+  /Hai chiesto di rinunciare/.test(sc(compra({rinuncia_chiesta_il: 5, rimborso: 'tb1qx'}))),
+  /Hai chiesto di rinunciare/.test(sc(vende({stato: 'depositato', rinuncia_chiesta_il: 5})))];
+/* «Rinuncio» senza l'indirizzo: si registra, non si firma */
+SEME = COMPRA;
+p2pOnchainMiei = [compra()];
+RISPOSTE = [{ok: true, d: {ok: true, pronto: false, avvisato: true}}];
+await firmaOnchainP2P(7, 'compratore');
+out.registrata = [CHIAMATE.slice(-1)[0], FIRMATE.length, p2pOnchainMiei[0].rinuncia_chiesta_il > 0,
+  /Rinuncia registrata/.test(TOAST.slice(-1)[0]), RIDISEGNI > 0];
+/* ...il server dice di no: lo dice, e non firma */
+RISPOSTE = [{ok: false, d: {detail: 'Non c\\'è niente da rimborsare adesso'}}];
+await firmaOnchainP2P(7, 'compratore');
+out.rifiutata = [/niente da rimborsare/.test(TOAST.slice(-1)[0]), FIRMATE.length];
+/* ...l'indirizzo e' arrivato nel frattempo: rilegge e firma */
+ARRIVA = true;
+RISPOSTE = [{ok: true, d: {ok: true, pronto: true, avvisato: false}}];
+await firmaOnchainP2P(7, 'compratore');
+out.pronta = [FIRMATE.slice(-1)[0], FIRMATE.length];
+/* la chiave non e' qui: prima si cerca (cloud, relay), senza nascite */
+FIRMATE.length = 0; SEME = ''; NUVOLA = COMPRA; ASSICURATO = 0;
+await firmaOnchainP2P(7, 'compratore');
+out.trovata = [FIRMATE.length, ASSICURATO, el('p2pOcParoleSheet').classList.contains('open')];
+/* ...nessun wallet registrato: non si rischia una nascita, si chiede */
+FIRMATE.length = 0; SEME = ''; NUVOLA = ''; IMPRONTA = ''; ASSICURATO = 0;
+await firmaOnchainP2P(7, 'compratore');
+out.senzaImpronta = [FIRMATE.length, ASSICURATO, el('p2pOcParoleSheet').classList.contains('open'),
+  /id="p2pOcParoleCampo"/.test(el('p2pOcParoleCorpo').innerHTML), /Mostra le 12 parole/.test(el('p2pOcParoleCorpo').innerHTML)];
+/* ...parole storte: resta aperto e lo dice; parole di un altro wallet: lo dice */
+el('p2pOcParoleCampo').value = 'tre parole sole';
+await usaParoleOnchainP2P(null);
+out.storte = [/12 parole valide/.test(TOAST.slice(-1)[0]), FIRMATE.length, el('p2pOcParoleSheet').classList.contains('open')];
+el('p2pOcParoleCampo').value = 'a b c d e f g h i l m n';
+await usaParoleOnchainP2P(null);
+out.altroWallet = [/nato con un altro wallet/.test(TOAST.slice(-1)[0]), FIRMATE.length];
+/* ...quelle giuste: il foglio si chiude e il gesto riparte da solo */
+el('p2pOcParoleCampo').value = '  ' + COMPRA + ' ';
+await usaParoleOnchainP2P(null);
+await new Promise(r => setTimeout(r, 20));
+out.giuste = [SEME === COMPRA, FIRMATE.slice(-1)[0], el('p2pOcParoleSheet').classList.contains('open'),
+  /Chiave pronta/.test(TOAST.join('|'))];
+/* ...«Non adesso»: closeSheet annulla il gesto che aspettava */
+SEME = ''; FIRMATE.length = 0;
+await firmaOnchainP2P(7, 'compratore');
+const aspettava = typeof p2pOcParolePoi;
+closeSheet();
+out.annullato = [aspettava, p2pOcParolePoi, FIRMATE.length];
+/* il server muto non e' un no: decide il foglio */
+MUTO = true; IMPRONTA = 'aabbccdd'; ASSICURATO = 0;
+await firmaOnchainP2P(7, 'compratore');
+out.muto = [ASSICURATO, el('p2pOcParoleSheet').classList.contains('open')];
+closeSheet(); MUTO = false;
+/* chi libera senza un posto per il resto: il riquadro, non il Profilo */
+SEME = VENDE; FIRMATE.length = 0;
+p2pOnchainMiei = [vende({stato: 'depositato'})];
+await firmaOnchainP2P(7, 'venditore');
+out.libera = [FIRMATE.length, /Dove tornano i sats\\?/.test(TOAST.slice(-1)[0])];
+p2pOnchainMiei = [vende({stato: 'depositato', rimborso: 'tb1qcasa'})];
+await firmaOnchainP2P(7, 'venditore');
+out.liberaDopo = FIRMATE.slice(-1)[0];
+/* la seconda firma senza chiave: lo stesso foglio */
+SEME = ''; NUVOLA = ''; IMPRONTA = '';
+p2pOnchainMiei = [vende({stato: 'depositato', rimborso: 'tb1qcasa', proposta: {verso: 'compratore', psbt: 'x'}})];
+await cofirmaOnchainP2P(null, 7);
+out.cofirma = [el('p2pOcParoleSheet').classList.contains('open'), typeof p2pOcParolePoi];
+console.log(JSON.stringify(out));
+})().catch(e => { console.error(e && e.stack || e); process.exit(1); });
+"""
+    out = _node_banco(js)
+    if out is None:
+        salta("onchain_rimborso_liscio", "node non c'e': il telefono non si prova")
+        return
+    if not out:
+        prova("il banco del rimborso on-chain gira", True, False)
+        return
+    prova("l'indirizzo del rimborso si chiede solo a chi deposita, a rimborso "
+          "vuoto, senza proposta, a scambio vivo (disputa compresa)",
+          [True, False, False, True, False, False, False], out["daChiedere"])
+    prova("...nel foglio «Blocca i sats» solo prima del deposito e finche' "
+          "nessun sats e' visto", [True, False, False], out["prima"])
+    prova("il riquadro: il campo col suo prefisso, il giudice, «Firma e usa "
+          "questo indirizzo»; il titolo cambia se chi compra ha chiesto di "
+          "rinunciare; con l'indirizzo non c'e'",
+          [True, True, True, True, False, True, ""], out["riquadro"])
+    prova("il foglio del deposito, senza indirizzo: si apre, chiede "
+          "l'indirizzo e NON mostra il QR", [True, True, True, False, True], out["foglioPrima"])
+    prova("...un ridisegno non tocca il campo che si sta scrivendo",
+          [True, "tb1qsto"], out["foglioTiene"])
+    prova("...con l'indirizzo (o a sats gia' visti) il QR di sempre",
+          ([False, True], [False, True]), (out["foglioDopo"], out["foglioVisti"]))
+    prova("la pagina: il riquadro a deposito fatto o a sats visti, mai prima "
+          "(lo chiede il foglio), mai con l'indirizzo, mai a chi compra",
+          [False, True, True, False, False], out["pagina"])
+    prova("chi compra legge «Hai chiesto di rinunciare» solo finche' "
+          "l'indirizzo manca; chi vende no",
+          [True, False, False, False], out["frase"])
+    prova("«Rinuncio» senza indirizzo: una domanda al server, nessuna firma, "
+          "il segno sullo scambio, il toast che lo spiega, la pagina rifatta",
+          ["/p2p/onchain/7/rinuncia-chiesta", 0, True, True, True], out["registrata"])
+    prova("...il no del server si legge, e non si firma", [True, 0], out["rifiutata"])
+    prova("...se l'indirizzo e' arrivato nel frattempo si rilegge e si firma",
+          [[7, "compratore"], 1], out["pronta"])
+    prova("la chiave che non e' qui si cerca dov'e' gia': trovata, si firma "
+          "senza fogli", [1, 1, False], out["trovata"])
+    prova("...senza un wallet registrato NON si chiama la strada che ne fa "
+          "nascere uno: si apre il foglio delle 12 parole",
+          [0, 0, True, True, True], out["senzaImpronta"])
+    prova("...parole storte: lo dice, non firma, il foglio resta",
+          [True, 0, True], out["storte"])
+    prova("...parole valide ma di un altro wallet: lo dice, non firma",
+          [True, 0], out["altroWallet"])
+    prova("...quelle giuste: la chiave c'e', il gesto riparte da solo, il "
+          "foglio si chiude", [True, [7, "compratore"], False, True], out["giuste"])
+    prova("...chiudere il foglio annulla il gesto che aspettava",
+          ["function", None, 0], out["annullato"])
+    prova("...il server muto non fa nascere niente: decide il foglio",
+          [0, True], out["muto"])
+    prova("chi libera senza un posto per il resto e' mandato al riquadro "
+          "dello scambio, e con l'indirizzo libera",
+          ([0, True], [7, "venditore"]), (out["libera"], out["liberaDopo"]))
+    prova("la seconda firma senza chiave apre lo stesso foglio",
+          [True, "function"], out["cofirma"])
+
+
 def prove_guida_wallet():
     """LA GUIDA «👛 IL TUO PRIMO WALLET» (17 nov 2026, cantiere
     primo-wallet). Andrea voleva un wallet custodial per i neofiti; dallo
@@ -207820,6 +208141,7 @@ def main():
     prove_onchain_promemoria,
     prove_onchain_txid_moneta,
     prove_chat_onchain,
+    prove_onchain_rimborso_liscio,
     prove_guida_wallet,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
