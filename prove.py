@@ -62577,7 +62577,11 @@ def prove_feedback_tre_e_tondi():
           True, "const tondi = tondiVenditore('', '', '', "
           "(myUsername||myNegozio) ? 'mio' : '');" in rp and bool(re.search(
               r'<div class="seller\$\{tondi \? \' con-tondi\' : \'\'\}"[^>]*>'
-              r'[\s\S]*?<div class="rep">\$\{rep\}</div>\s*</div>\s*'
+              # (17 nov 2026, serie-giorni) fra le stelle e la chiusura
+              # del riquadro del nome puo' starci la riga della serie:
+              # i tondi restano DOPO, in fondo alla card
+              r'[\s\S]*?<div class="rep">\$\{rep\}</div>\s*'
+              r'(?:\$\{serieRigaHTML\(mySerie\)\}\s*)?</div>\s*'
               r'\$\{tondi\}\s*</div>', rp)))
     prova("tondi: ...e il bottone grande del link non c'e' piu'", False,
           "condividiMioNegozio()" in rp)
@@ -204475,6 +204479,368 @@ def prove_avvisi_barattolo():
               {"spuntate": 2, "righe": 4, "aperti": ["sheetBg", "jarAvvisiSheet"], "id": 7}, o)
 
 
+def prove_serie_giorni():
+    """LA SERIE DEI GIORNI 🔥 (17 nov 2026, cantiere serie-giorni): i
+    giorni di fila in cui si apre Barattolo, nel Profilo e solo per chi
+    la fa. Il banco gira i giudici puri (il giorno italiano senza tzdata,
+    il passo della serie), poi il timbro VERO su un database di cartone
+    con l'orologio finto, la fusione, i fili (/api/me, la rotta del
+    ritorno, la leva, il pannello, la cancellazione) e il client in node.
+    Ogni giudice ha la sua controprova."""
+    print("\n[la serie dei giorni: giorno italiano, passo, timbro, pagina]")
+    import sqlite3, time as _time, calendar as _cal
+    amb = {"time": _time, "SERIE_TAPPE": (7, 30, 100, 365)}
+    for nome in ("_giorno_roma", "_giorno_prima", "serie_passo",
+                 "timbra_serie", "_serie_unisci"):
+        exec(pezzo(nome), amb)
+    gr = amb["_giorno_roma"]
+    utc = lambda *a: _cal.timegm(a + (0,) * (6 - len(a)))
+    # ---- il giorno italiano, senza tzdata ----
+    prova("d'inverno l'Italia e' un'ora avanti: le 22:59 UTC sono ancora oggi, "
+          "le 23:00 gia' domani", ["2026-11-17", "2026-11-18"],
+          [gr(utc(2026, 11, 17, 22, 59, 59)), gr(utc(2026, 11, 17, 23, 0, 0))])
+    prova("d'estate due: le 21:59 UTC oggi, le 22:00 domani",
+          ["2026-07-10", "2026-07-11"],
+          [gr(utc(2026, 7, 10, 21, 59, 59)), gr(utc(2026, 7, 10, 22, 0, 0))])
+    prova("il cambio di marzo (domenica 29 mar 2026, 01:00 UTC): il sabato "
+          "sera alle 22:30 UTC e' ancora sabato, la domenica sera gia' lunedi'",
+          ["2026-03-28", "2026-03-30"],
+          [gr(utc(2026, 3, 28, 22, 30)), gr(utc(2026, 3, 29, 22, 30))])
+    prova("il cambio di ottobre (domenica 25 ott 2026): il sabato alle 22:30 "
+          "UTC e' gia' domenica, la domenica alle 22:30 UTC ancora domenica",
+          ["2026-10-25", "2026-10-25"],
+          [gr(utc(2026, 10, 24, 22, 30)), gr(utc(2026, 10, 25, 22, 30))])
+    prova("capodanno: le 23:30 UTC del 31 dicembre sono gia' l'anno nuovo",
+          "2027-01-01", gr(utc(2026, 12, 31, 23, 30)))
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime
+        roma = ZoneInfo("Europe/Rome")
+        storti = [e for e in range(utc(2026, 1, 1), utc(2028, 1, 1), 1801)
+                  if gr(e) != datetime.fromtimestamp(e, roma).strftime("%Y-%m-%d")]
+        prova("due anni interi, ogni mezz'ora, contro tzdata: mai un giorno "
+              "diverso", [], storti[:3])
+    except Exception as e:
+        salta("il giorno italiano contro tzdata", f"zoneinfo non c'e' ({e})")
+    prova("il giorno prima e' aritmetica di date (anche a capodanno e il 1° marzo)",
+          ["2026-12-31", "2028-02-29"],
+          [amb["_giorno_prima"]("2027-01-01"), amb["_giorno_prima"]("2028-03-01")])
+
+    # ---- il giudice puro ----
+    passo = amb["serie_passo"]
+    prova("la prima volta: 1 giorno, record 1, ed e' nuova",
+          (1, 1, "2026-11-17", True), passo(0, 0, "", "2026-11-17"))
+    prova("la seconda apertura dello stesso giorno non conta",
+          (1, 1, "2026-11-17", False), passo(1, 1, "2026-11-17", "2026-11-17"))
+    prova("il giorno dopo: uno in piu', e il record sale con lei",
+          (2, 2, "2026-11-18", True), passo(1, 1, "2026-11-17", "2026-11-18"))
+    prova("un giorno saltato: riparte da 1, il record RESTA",
+          (1, 12, "2026-11-20", True), passo(12, 12, "2026-11-18", "2026-11-20"))
+    prova("sotto il record la serie sale senza toccarlo",
+          (5, 12, "2026-11-25", True), passo(4, 12, "2026-11-24", "2026-11-25"))
+    prova("a cavallo del mese e dell'anno resta di fila",
+          [(8, 8, "2026-12-01", True), (3, 9, "2027-01-01", True)],
+          [passo(7, 7, "2026-11-30", "2026-12-01"),
+           passo(2, 9, "2026-12-31", "2027-01-01")])
+    prova("un ultimo passaggio nel FUTURO (orologio tornato indietro) non "
+          "si tocca", (4, 6, "2026-11-19", False),
+          passo(4, 6, "2026-11-19", "2026-11-17"))
+    prova("valori storti in colonna non fanno danni: si riparte da 1",
+          (1, 1, "2026-11-17", True), passo(None, -3, None, "2026-11-17"))
+    # controprove
+    rotto = pezzo("serie_passo").replace(
+        "ultimo == _giorno_prima(oggi) and giorni > 0", "giorni > 0", 1)
+    prova("controprova: il giudice rotto si e' davvero rotto", True,
+          rotto != pezzo("serie_passo"))
+    amb_r = dict(amb); exec(rotto, amb_r)
+    prova("controprova: senza il confronto con ieri un giorno saltato "
+          "continuerebbe la serie", 13,
+          amb_r["serie_passo"](12, 12, "2026-11-18", "2026-11-20")[0])
+    rotto = pezzo("serie_passo").replace(
+        "if ultimo >= oggi and giorni > 0:", "if False:", 1)
+    amb_r = dict(amb); exec(rotto, amb_r)
+    prova("controprova: senza la guardia del giorno gia' contato, riaprire "
+          "l'app lo stesso giorno azzererebbe la serie", 1,
+          amb_r["serie_passo"](9, 9, "2026-11-17", "2026-11-17")[0])
+    rotto = pezzo("_giorno_roma").replace(
+        "ore = 2 if inizio <= utc < fine else 1", "ore = 0", 1)
+    amb_r = dict(amb); exec(rotto, amb_r)
+    prova("controprova: col giorno in UTC mezzanotte e mezza italiana sarebbe "
+          "ancora ieri", "2026-11-17",
+          amb_r["_giorno_roma"](utc(2026, 11, 17, 23, 30)))
+
+    # ---- il timbro vero, su un database di cartone ----
+    m = re.search(r"    CREATE TABLE IF NOT EXISTS serie_giorni\((?:.|\n)*?\n    \);\n",
+                  _SORGENTE)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(m.group(0))
+    timbra = amb["timbra_serie"]
+    G = lambda g, h=12: utc(2026, 11, g, h)          # un giorno di novembre, a mezzogiorno UTC
+    b = timbra(con, 111, G(16))
+    prova("la busta del primo passaggio: tutto quel che serve alla pagina",
+          {"giorni": 1, "record": 1, "oggi_contato": True, "nuova": True,
+           "oggi": "2026-11-16", "feriale": 0, "tappe": [7, 30, 100, 365]}, b)
+    prova("la seconda apertura: stessa busta, ma non e' piu' nuova",
+          dict(b, nuova=False), timbra(con, 111, G(16, 20)))
+    prova("...e mezz'ora dopo mezzanotte ITALIANA (le 23:30 UTC) e' gia' il "
+          "giorno dopo: 2 di fila, martedi'", (2, True, 1),
+          (lambda x: (x["giorni"], x["nuova"], x["feriale"]))(timbra(con, 111, G(16, 23) + 1800)))
+    for g in (18, 19, 20):
+        timbra(con, 111, G(g))
+    prova("cinque giorni di fila", 5, timbra(con, 111, G(20, 21))["giorni"])
+    b = timbra(con, 111, G(23))
+    prova("due giorni di buco: riparte da 1, il record resta 5, ed e' nuova",
+          (1, 5, True), (b["giorni"], b["record"], b["nuova"]))
+    prova("una riga a persona, e chi non e' mai passato non ne ha",
+          [(111, 1, 5, "2026-11-23")],
+          [tuple(r) for r in con.execute("SELECT * FROM serie_giorni")])
+    prima = con.total_changes
+    timbra(con, 111, G(23, 15))
+    prova("una apertura in piu' nello stesso giorno NON scrive", prima,
+          con.total_changes)
+    # ---- la fusione: resta la serie migliore, il record piu' alto ----
+    unisci = amb["_serie_unisci"]
+    con.execute("INSERT INTO serie_giorni VALUES(-7, 9, 30, '2026-11-23')")
+    unisci(con, 111, -7)
+    prova("la fusione: a pari giorno vince la serie piu' lunga, col record "
+          "piu' alto, e la riga dell'altro se ne va",
+          [(111, 9, 30, "2026-11-23")],
+          [tuple(r) for r in con.execute("SELECT * FROM serie_giorni")])
+    con.execute("INSERT INTO serie_giorni VALUES(-8, 40, 40, '2026-10-01')")
+    unisci(con, 111, -8)
+    prova("...una serie vecchia non scalza quella viva, ma lascia il suo record",
+          [(111, 9, 40, "2026-11-23")],
+          [tuple(r) for r in con.execute("SELECT * FROM serie_giorni")])
+    con.execute("INSERT INTO serie_giorni VALUES(-9, 3, 3, '2026-11-23')")
+    unisci(con, 500, -9)
+    prova("...e chi resta senza riga eredita quella dell'altro",
+          (500, 3, 3, "2026-11-23"),
+          tuple(con.execute("SELECT * FROM serie_giorni WHERE tg_id=500").fetchone()))
+    unisci(con, 111, -99)
+    prova("...niente da unire: niente cambia", 2,
+          con.execute("SELECT COUNT(*) FROM serie_giorni").fetchone()[0])
+
+    # ---- i fili nel server ----
+    me = pezzo("mio_profilo")
+    prova("/api/me timbra a leva accesa, dentro `if u:` e PRIMA del commit",
+          [True, True],
+          ["        if SERIE_GIORNI_ATTIVA:\n            try:\n"
+           "                serie_mia = timbra_serie(con, user[\"id\"])" in me,
+           me.index("serie_mia = timbra_serie(") < me.index("con.commit()")])
+    prova("...fail-open: un errore nel contatore non costa il profilo", True,
+          "            except Exception as e:\n"
+          "                print(f\"⚠️ Serie dei giorni saltata" in me)
+    prova("...e la chiave parte solo se la busta c'e' (leva spenta: niente chiave)",
+          True, "    if serie_mia:\n        profilo[\"serie\"] = serie_mia\n" in me)
+    i = _SORGENTE.index('@app.post("/api/me/serie")')
+    rotta = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+    prova("la rotta del ritorno: leva, identita', profilo che esiste, lo "
+          "STESSO timbro, commit", [True, True, True, True, True],
+          ["if not SERIE_GIORNI_ATTIVA:\n        raise HTTPException(404" in rotta,
+           "verifica_utente(x_tg_init_data, barattolo_sessione)" in rotta,
+           "SELECT 1 FROM utenti WHERE tg_id=?" in rotta,
+           "serie = timbra_serie(con, user[\"id\"])" in rotta,
+           "con.commit()" in rotta])
+    prova("...e non legge un corpo: il giorno lo decide il server", False,
+          "leggi_json" in rotta or "Request" in rotta)
+    prova("la leva e' accesa di serie, nel codice e nel config d'esempio",
+          [True, True],
+          ["    SERIE_GIORNI_ATTIVA = True\n" in _SORGENTE,
+           re.search(r"^SERIE_GIORNI_ATTIVA = True$",
+                     open("config_esempio.py", encoding="utf-8").read(), re.M) is not None])
+    prova("il pannello ha la leva", True,
+          '"SERIE_GIORNI_ATTIVA", bool(SERIE_GIORNI_ATTIVA)' in _SORGENTE)
+    prova("la fusione chiama l'unione, la cancellazione porta via la riga",
+          [True, True],
+          ["_serie_unisci(con, id_telegram, id_nostr)" in pezzo("esegui_fusione"),
+           '("serie_giorni", "tg_id")' in
+           _SORGENTE[_SORGENTE.index("CANCELLA_TOGLI = ("):
+                     _SORGENTE.index("CANCELLA_ORDINE_COMPRATORE = (")]])
+    prova("SOLO PER CHI LA FA: la serie esce da /api/me e dalla sua rotta, "
+          "da nessun'altra risposta", 2,
+          len(re.findall(r"timbra_serie\(con, user\[\"id\"\]\)", _SORGENTE)))
+    prova("la lapide `xp_ultimo_giorno` non si riusa: nessuno la scrive", [],
+          re.findall(r"SET[^\n]*xp_ultimo_giorno\s*=", _SORGENTE))
+
+    # ---- il client ----
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    rp = pezzo_js(mini, "function renderProfilo(){", "\n}\n")
+    prova("la testata del Profilo: la riga dentro la carta, sotto le stelle, "
+          "e la settimana subito sotto la carta", True, bool(re.search(
+              r'<div class="rep">\$\{rep\}</div>\s*\$\{serieRigaHTML\(mySerie\)\}\s*</div>\s*'
+              r'\$\{tondi\}\s*</div>\s*\$\{serieSettimanaHTML\(mySerie\)\}`;', rp)))
+    prova("la busta arriva da /api/me, e l'orecchio del ritorno si accende li'",
+          True, "    serieArrivata(me.serie, 1600);\n    serieAscolta();\n" in mini)
+    prova("in pubblico non c'e': il negozio e il riquadro del venditore non "
+          "la disegnano", 1, mini.count("${serieRigaHTML("))
+    prova("il guscio del saluto c'e', fuori dal tocco", [True, True],
+          ['<div class="serie-festa" id="serieFesta" role="status" aria-live="polite"></div>' in mini,
+           bool(re.search(r"\.serie-festa\{[^}]*pointer-events:none", mini))])
+    prova("la fiamma e' disegnata, non e' l'emoji: nessun 🔥 nei pezzi che "
+          "disegnano", False,
+          "🔥" in mini[mini.index("const SERIE_FIAMMA = "):mini.index("let serieFestaTimer")])
+    css = mini[:mini.index("</style>")]
+    prova("i colori della serie sono le leve di casa (nessun arancio a mano "
+          "nei testi)", [True, True, True],
+          [".serie-n{color:var(--sats-text)}" in css,
+           ".serie-f .f-fuori{fill:var(--sats)}" in css,
+           ".serie-rec{color:var(--muted);font-weight:600}" in css])
+    prova("chi ha chiesto meno movimento non vede il guizzo", True,
+          bool(re.search(r"@media \(prefers-reduced-motion: reduce\)\{\s*\.serie-festa\{transition:none\}"
+                         r"\s*\.serie-festa\.show \.serie-f\{animation:none\}\}", css)))
+    i = mini.index("const SERIE_FIAMMA = ")
+    pezzi_serie = mini[i:mini.index("/* IL GIORNO ITALIANO VISTO DAL TELEFONO", i)]
+    banco = (pezzo_js(mini, "const esc = s =>", "));") + "));\n"
+             "const BOX = {innerHTML: '', classi: new Set(),\n"
+             "  classList: {add: c => BOX.classi.add(c), remove: c => BOX.classi.delete(c),\n"
+             "    toggle: (c, si) => si ? BOX.classi.add(c) : BOX.classi.delete(c)}};\n"
+             "const el = id => id === 'serieFesta' ? BOX : null;\n"
+             "let disegni = 0; function renderProfilo(){ disegni++; }\n"
+             "const attese = []; let GIRA = false, ultima = null;\n"
+             "globalThis.setTimeout = (f, ms) => { attese.push(ms); ultima = f; if (GIRA) f(); return 1; };\n"
+             "globalThis.clearTimeout = () => {};\n"
+             + pezzi_serie + """
+const B = (giorni, record, altro) => Object.assign({giorni, record, oggi_contato: true,
+  nuova: false, feriale: 1, tappe: [7, 30, 100, 365], oggi: '2026-11-17'}, altro || {});
+const testo = h => h.replace(/<svg[\\s\\S]*?<\\/svg>/g, '🔥').replace(/<[^>]+>/g, '').replace(/\\s+/g, ' ').trim();
+const celle = h => (h.match(/<div class="serie-g[^"]*"><i>[\\s\\S]*?<\\/i>[^<]*<\\/div>/g) || []).map(c =>
+  [/serie-g oggi/.test(c) ? 'oggi' : /serie-g ok/.test(c) ? 'ok' : '-', /<svg/.test(c), c.replace(/<i>[\\s\\S]*?<\\/i>/, '').replace(/<[^>]+>/g, '')]);
+const out = {};
+out.riga5 = testo(serieRigaHTML(B(5, 12)));
+out.riga_record = testo(serieRigaHTML(B(12, 12)));
+out.riga1 = testo(serieRigaHTML(B(1, 1)));
+out.riga1_record = testo(serieRigaHTML(B(1, 9)));
+out.riga_mille = testo(serieRigaHTML(B(1000, 1000)));
+out.niente = [serieRigaHTML(null), serieRigaHTML({}), serieRigaHTML(B(0, 4)), serieSettimanaHTML(null),
+              serieSettimanaHTML(B(3, 3, {feriale: undefined})), serieSettimanaHTML(B(3, 3, {feriale: 9}))];
+out.storta = serieRigaHTML({giorni: '3<img src=x onerror=alert(1)>', record: '<b>'}) + serieRigaHTML({giorni: 2.9, record: '<script>'});
+out.sett5 = celle(serieSettimanaHTML(B(5, 12)));
+out.sett1 = celle(serieSettimanaHTML(B(1, 1, {feriale: 0})));
+out.sett30 = celle(serieSettimanaHTML(B(30, 30, {feriale: 6}))).map(c => c[0] + c[2]);
+out.aria = (serieSettimanaHTML(B(30, 30)).match(/aria-label="([^"]*)"/) || [])[1];
+out.tappe = [7, 30, 100, 365, 8, 1].map(n => serieTappa(B(n, n)));
+out.tappa_ignota = serieTappa(B(50, 50, {tappe: [50]}));
+// il saluto
+const festa = b => { BOX.innerHTML = ''; BOX.classi.clear(); attese.length = 0;
+  const r = serieFesta(b); return [r, testo(BOX.innerHTML), [...BOX.classi].sort(), attese.slice()]; };
+out.festa_no_vecchia = festa(B(5, 5));
+out.festa_no_primo = festa(B(1, 1, {nuova: true}));
+out.festa6 = festa(B(6, 6, {nuova: true}));
+out.festa7 = festa(B(7, 7, {nuova: true}));
+ultima(); out.festa_via = [...BOX.classi].includes('show');
+// la busta arrivata
+GIRA = true;
+serieArrivata(B(4, 4, {nuova: true}), 1600);
+out.arrivata = [mySerie.giorni, disegni, attese.includes(1600)];
+serieArrivata(B(4, 4), 600, true);
+out.ritorno_ridisegna = disegni;
+serieArrivata(undefined, 0);
+out.server_di_ieri = mySerie;
+console.log(JSON.stringify(out));
+""")
+    o = _node_banco(banco)
+    if o is None:
+        salta("il banco della serie dei giorni", "node assente")
+        return
+    prova("la riga: i giorni di fila e il record, quando e' piu' alto",
+          "🔥5 giorni di fila · record 12", o.get("riga5"))
+    prova("...quando la serie di adesso E' il record, lo dice",
+          "🔥12 giorni di fila · è il tuo record", o.get("riga_record"))
+    prova("...al primo giorno non c'e' ancora una fila: «torna domani»",
+          "🔥1 giorno · torna domani", o.get("riga1"))
+    prova("...e chi riparte da 1 rivede il suo record", "🔥1 giorno · record 9",
+          o.get("riga1_record"))
+    prova("...i numeri grandi restano numeri", "🔥1000 giorni di fila · è il tuo record",
+          o.get("riga_mille"))
+    prova("senza busta, a zero giorni o senza il giorno della settimana non "
+          "si disegna niente", [""] * 6, o.get("niente"))
+    prova("una busta storta non porta markup nella pagina: i numeri si "
+          "rifanno interi", [False, False, True],
+          ["<img" in o.get("storta", "<img"), "<script" in o.get("storta", "<script"),
+           ">2</span>" in o.get("storta", "")])
+    prova("la settimana di martedi' con 5 di fila: giovedi' e venerdi' vuoti, "
+          "poi quattro accesi e oggi",
+          [["-", False, "M"], ["-", False, "G"], ["ok", True, "V"], ["ok", True, "S"],
+           ["ok", True, "D"], ["ok", True, "L"], ["oggi", True, "oggi"]], o.get("sett5"))
+    prova("al primo giorno (un lunedi') e' acceso solo oggi, e le lettere "
+          "girano giuste",
+          [["-", False, "M"], ["-", False, "M"], ["-", False, "G"], ["-", False, "V"],
+           ["-", False, "S"], ["-", False, "D"], ["oggi", True, "oggi"]], o.get("sett1"))
+    prova("oltre la settimana sono tutti accesi (di domenica: da lunedi' a sabato)",
+          ["okL", "okM", "okM", "okG", "okV", "okS", "oggioggi"], o.get("sett30"))
+    prova("...e chi non vede legge «7 di fila», non 30 cerchi", 
+          "Ultimi sette giorni: 7 di fila", o.get("aria"))
+    prova("le tappe hanno un nome, gli altri giorni no",
+          ["Una settimana di fila", "Un mese di fila", "Cento giorni di fila",
+           "Un anno di fila", "", ""], o.get("tappe"))
+    prova("una tappa nuova dal server senza parole qui prende quelle di tutti "
+          "i giorni", "", o.get("tappa_ignota"))
+    prova("il saluto NON parte se il passaggio non e' nuovo",
+          [False, "", [], []], o.get("festa_no_vecchia"))
+    prova("...ne' al primo giorno («1 giorno di fila» non e' una fila)",
+          [False, "", [], []], o.get("festa_no_primo"))
+    prova("...parte al primo passaggio del giorno, dal secondo in su, e se "
+          "ne va da solo", [True, "🔥6 giorni di fila", ["show"], [2800]],
+          o.get("festa6"))
+    prova("...alla tappa dice il nome, prende il bordo e resta un po' di piu'",
+          [True, "🔥Una settimana di fila7 giorni, uno dopo l'altro",
+           ["show", "tappa"], [4200]], o.get("festa7"))
+    prova("...e allo scadere del tempo la pastiglia scende", False,
+          o.get("festa_via", "manca"))
+    prova("all'avvio la busta si tiene e si saluta dopo che la pagina si e' "
+          "posata, SENZA ridisegnare il Profilo a meta' di /api/me",
+          [4, 0, True], o.get("arrivata"))
+    prova("al ritorno in primo piano invece la testata si ridisegna", 1,
+          o.get("ritorno_ridisegna"))
+    prova("un server di ieri (nessuna chiave): niente serie", None,
+          o.get("server_di_ieri", "manca"))
+    # il ritorno in primo piano: bussa solo se in Italia e' cambiato il giorno
+    j = mini.index("function serieGiornoRoma(")
+    ritorno = mini[j:mini.index("let serieInAscolto", j)]
+    banco2 = ("let DEMO = false, VETRINA = false, API_BASE = '/api';\n"
+              "const document = {hidden: false}; const authHdr = () => 'x';\n"
+              "let mySerie = {oggi: '2026-11-17'}; const bussi = [];\n"
+              "let arrivate = []; function serieArrivata(s, r, d){ arrivate.push([s.giorni, r, d]); mySerie = s; }\n"
+              "const fetch = async (u, o) => { bussi.push([u, o.method]); return {ok: true, json: async () => ({serie: {giorni: 6, oggi: '2026-11-18'}})}; };\n"
+              "let ORA = 0; Date.now = () => ORA;\n"
+              + ritorno + """
+(async () => {
+  const out = {};
+  out.roma = [serieGiornoRoma(new Date(Date.UTC(2026, 10, 17, 22, 59))), serieGiornoRoma(new Date(Date.UTC(2026, 10, 17, 23, 0)))];
+  const vero = serieGiornoRoma;
+  let OGGI = '2026-11-17';
+  serieGiornoRoma = () => OGGI;
+  ORA = 10_000_000; await serieRitorno(); out.stesso_giorno = bussi.length;
+  OGGI = '2026-11-18'; document.hidden = true; await serieRitorno(); out.nascosta = bussi.length;
+  document.hidden = false; await serieRitorno();
+  out.giorno_nuovo = [bussi.slice(), arrivate.slice()];
+  mySerie = {oggi: '2026-11-17'}; ORA += 60000; await serieRitorno(); out.troppo_presto = bussi.length;
+  ORA += 600000; await serieRitorno(); out.dopo_dieci_minuti = bussi.length;
+  mySerie = {oggi: '2026-11-17'}; ORA += 700000; DEMO = true; await serieRitorno(); out.demo = bussi.length;
+  DEMO = false; OGGI = ''; await serieRitorno(); out.senza_intl = bussi.length;
+  OGGI = '2026-11-18'; mySerie = null; await serieRitorno(); out.senza_serie = bussi.length;
+  console.log(JSON.stringify(out));
+})();
+""").replace("function serieGiornoRoma(", "let serieGiornoRoma = function(", 1)
+    o = _node_banco(banco2)
+    if o is None:
+        salta("il banco del ritorno in primo piano", "node assente")
+        return
+    prova("il giorno italiano visto dal telefono: le 23:59 e le 00:00 di Roma",
+          ["2026-11-17", "2026-11-18"], o.get("roma"))
+    prova("al ritorno nello stesso giorno non si bussa; a pagina nascosta nemmeno",
+          [0, 0], [o.get("stesso_giorno"), o.get("nascosta")])
+    prova("a giorno cambiato si bussa UNA volta alla rotta, in POST, e la "
+          "busta nuova ridisegna la testata",
+          [[["/api/me/serie", "POST"]], [[6, 600, True]]], o.get("giorno_nuovo"))
+    prova("un orologio storto non martella: non prima di dieci minuti",
+          [1, 2], [o.get("troppo_presto"), o.get("dopo_dieci_minuti")])
+    prova("in demo, senza l'ora di Roma o senza serie non si bussa mai",
+          [2, 2, 2], [o.get("demo"), o.get("senza_intl"), o.get("senza_serie")])
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -204724,7 +205090,7 @@ CATEGORIE = {
     link_descrizione foto_vuota foto_metadati connettori connettori_sync
     connettori_woo connettori_registro connettori_ingresso
     titoli_importati connettori_varianti connettore_interrompibile
-    famiglie connettori_cassetto connettori_categoria avvisi_barattolo finestra ordini_prova tutorial
+    famiglie connettori_cassetto connettori_categoria avvisi_barattolo serie_giorni finestra ordini_prova tutorial
     timbri_visti effetti_ridotti morfosi_vendi copertura_home
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
     db_contesa_negozi negozi_grandi pc_tema_e_ricerca schermo_largo
@@ -205842,6 +206208,7 @@ def main():
               prove_connettori_categoria,
               prove_filtro_onchain_tutto,
               prove_avvisi_barattolo,
+              prove_serie_giorni,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:

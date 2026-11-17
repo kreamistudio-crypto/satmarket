@@ -87550,3 +87550,98 @@ Il video sta nella Library: `novita-scorrimento/banner-risalita.mp4`.
 DA GUARDARE: nel webview del telefono l'ultimo passo, quando tornano
 appesi: se lo scorrimento corre più veloce del JavaScript può esserci un
 fotogramma oltre il posto prima dello scatto indietro.
+
+## La serie dei giorni 🔥 (17 nov 2026, cantiere serie-giorni; Andrea: «una icona con scritto i giorni di connessione successiva, "streak": non aumenta exp, non dà nulla. Solo la soddisfazione personale di un contatore che non si ferma», sul modello di Ditto)
+ROVESCIA UNA DECISIONE D'AGOSTO, SAPENDOLO. In `/api/me` e in
+Architettura stava scritto «NIENTE serie consecutiva: in un mercatino
+non c'è nulla da fare ogni giorno, e una fiammella che si spegne
+punisce chi ha lavorato invece di aprire l'app; se servirà, si contano
+i giorni totali». Detto ad Andrea prima di scrivere codice; ha
+confermato la serie. Il motivo di allora è rimasto DENTRO le regole:
+chi salta un giorno riparte da 1 in silenzio (nessun «hai perso»),
+nessun promemoria del bot che rincorre, il record non scende mai, e
+nella settimana un giorno saltato è un cerchio vuoto, mai una croce.
+DECISO (piano approvato, grafica scelta da Andrea fra tre bozze montate
+sull'app vera: A riga nella carta, B pastiglia a destra, C riga +
+settimana — ha scelto C, io consigliavo B): (1) nel Profilo, dentro la
+carta col nome, sotto le stelle, «5 giorni di fila · record 12», e
+subito sotto gli ultimi sette giorni con oggi per ultimo; (2) conta
+aprire Barattolo da dentro il proprio account, una volta al giorno;
+(3) il giorno è quello ITALIANO per tutti, da mezzanotte a mezzanotte;
+(4) si vede dal primo giorno («1 giorno · torna domani»); (5) la
+fiamma è DISEGNATA (SVG nell'arancio di casa), non l'emoji, che cambia
+faccia da un telefono all'altro; (6) un saluto al primo passaggio del
+giorno, dal secondo giorno, più evidente a 7, 30, 100 e 365; (7) solo
+privata: né nel negozio né nel riquadro venditore; (8) niente XP,
+livelli o premi; (9) leva `SERIE_GIORNI_ATTIVA`, accesa di serie.
+COME È FATTO: tabella `serie_giorni` (una riga a persona), giudice puro
+`serie_passo`, giorno italiano senza tzdata (`_giorno_roma`), un timbro
+(`timbra_serie`) con due porte — `/api/me`, fail-open, e
+`POST /api/me/serie` per l'app che torna in primo piano dopo la
+mezzanotte senza riaprirsi. Fusione (`_serie_unisci`: la serie viva
+più lunga, il record più alto) e cancellazione dell'account
+(`CANCELLA_TOGLI`). Nel client tre pezzi puri e riusabili
+(`serieRigaHTML`, `serieSettimanaHTML`, `SERIE_FIAMMA`): li userà la
+«stradina» degli obiettivi del cantiere dei livelli a carosello, che
+legge la stessa chiave `serie` di `/api/me` (accordo fra i due thread,
+nessuna rotta in più per lei). Il dettaglio in Architettura, «LA SERIE
+DEI GIORNI 🔥».
+SCARTATE: l'avviso «la serie finisce tra X ore» di Ditto (là conta
+PUBBLICARE; qui conta aprire, e chi ha l'app aperta ha già contato:
+dentro l'app non comparirebbe mai, e come messaggio del bot la sera
+sarebbe il promemoria che rincorre); la colonna `utenti.xp_ultimo_giorno`
+(è una lapide: un rollback la riscriverebbe); il giorno nel fuso del
+telefono (cambiare fuso regalerebbe o toglierebbe un giorno); il conto
+derivato da `xp_eventi` (la visita non si registra più da agosto);
+l'emoji 🔥; il saluto al primo giorno (al lancio avrebbe salutato tutti
+con «1 giorno di fila»); una rotta GET (scrive: è una POST, e non legge
+un corpo — il giorno lo decide il server).
+PROVATO, nel venv SENZA coincurve. `develop` è corso tre volte mentre
+le prove giravano, e ogni volta ho rifatto il rebase (conflitti solo
+nei file «in coda»: NOVITA, CANTIERI, i due elenchi della CI, la base
+di Tappo; la prima volta anche lo schema e le rotte `/api/me/…` in
+`server.py`, coi regali per livello — tutti «tieni entrambi»). COSA È
+GIRATO SU QUALE ALBERO: la suite severa INTERA (`PROVE_SEVERE=1`) e
+`collaudi_ci.py --elenco ci/collaudi.txt` (senza le variabili del
+proxy) tre volte, tutte verdi — sull'albero nato da 6c6f1934 (29.094 e
+143), dopo il rebase su 37950a43 (29.134 e 144) e dopo quello su
+924b1631 (29.254 e 146). Sull'albero di QUESTO commit, rebasato su
+bbe63055 (quattro commit non miei arrivati dopo: 2de6fdd1 il relay
+Zapstore dal vivo, db98430e i regali per livello spenti, 9f8b294b la
+chat dello scambio on-chain, bbe63055 i «Novità» del P2P; nessun
+simbolo in comune coi miei, controllato per nome), il giro mirato:
+`prove_serie_giorni`, le sezioni che leggono i documenti e gli elenchi,
+e i collaudi vicini (serie, cancellazione e fusione dell'account, leve
+del pannello, rotte). I commit non miei entrati nei rebase di prima:
+7b19e7c8, 8b63e4e8, a4f63637, 37950a43, 28d4e262, c63bdd4c, 868f797e,
+c4aae3f2, 2b1af588, 6e92ae61, 924b1631. Dentro: `prove_serie_giorni` (73: il giorno italiano
+ai due cambi d'ora, a capodanno e contro tzdata ogni mezz'ora per due
+anni; il giudice caso per caso; il timbro su cartone con l'orologio
+finto; la fusione; i fili; in node la riga, la settimana, le tappe, il
+saluto, la busta storta che non porta markup, il ritorno in primo
+piano) e `collaudo_serie_giorni` (33, nella gabbia e in
+`ci/collaudi.txt`: il database di ieri, /api/me giorno dopo giorno,
+mezz'ora dopo la mezzanotte di Roma d'inverno e d'estate, la rotta che
+ignora quel che dichiara il client, il negozio pubblico che non la
+porta, `esegui_fusione` ed `esegui_cancellazione` vere, la leva spenta,
+il timbro che esplode senza costare il profilo). CONTROPROVE: diciotto
+mutazioni, tutte rosse (il giorno in UTC, il buco che non azzera, la
+riapertura che azzera, il record che scende, fusione e cancellazione
+dimenticate, la leva ignorata nelle due porte, il fail-open tolto, il
+commit tolto, il saluto al primo giorno e a ogni apertura, la settimana
+sfasata di un giorno e di lettere, i numeri non ripuliti, il ritorno
+senza le sue due guardie, la riga nel negozio pubblico). Adattata UNA
+sentinella altrui: `tondi: nel Profilo il solo link` ammette la riga
+della serie fra le stelle e la chiusura del riquadro (i tondi restano
+dopo). VISTO DAL VIVO: il server vero del worktree in collaudo, su
+loopback, con Chromium senza rete esterna (nessun relay), a 375 e 320
+px nei due temi: la riga e la settimana a 5 giorni, il primo giorno, il
+saluto a 5 e la tappa a 7, zero errori di pagina.
+DA GUARDARE: dal telefono vero (dentro Telegram su Android e iPhone, e
+nell'app di Zapstore) — la fiamma, la settimana, il saluto; il ritorno
+in primo piano dopo la mezzanotte NON è provato su un telefono vero
+(solo in node); il saluto, se all'apertura c'è un foglio o il tour, gli
+compare sotto il velo. Il primo giorno in produzione tutti partono da 1
+(nessuno storico da cui ricostruire). NOTATO E NON TOCCATO: il censimento
+della fusione in `prove.py` legge anche i commenti (lo dice lui stesso):
+la serie è coperta dal collaudo con la fusione vera.

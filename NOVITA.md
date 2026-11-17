@@ -446,3 +446,9 @@ frase: Anche negli scambi P2P on-chain adesso c'è la chat fra chi compra e chi 
 dove: la pagina di uno scambio on-chain preso, riquadro «💬 Chat con …» in fondo (il richiamo «💬 Chat» in cima porta giù); il messaggio del bot «Hai un nuovo messaggio nello scambio on-chain» col bottone «🟠 Apri lo scambio».
 leva: P2P_CHAT_SCAMBIO (la stessa della chat del Lightning, accesa di serie)
 pubblico: sì
+
+## 2026-11-17 · serie-giorni
+frase: Nel tuo Profilo c'è una fiamma che conta quanti giorni di fila hai aperto Barattolo, col tuo record e gli ultimi sette giorni. Basta entrare una volta al giorno. Se salti un giorno riparte da 1 e il record resta. Non dà punti né premi e la vedi solo tu: è solo la soddisfazione di non fermarla.
+dove: Profilo, nel riquadro col tuo nome (riga «5 giorni di fila · record 12») e la fila dei sette giorni subito sotto; al primo accesso del giorno il saluto che compare in basso per un paio di secondi.
+leva: SERIE_GIORNI_ATTIVA (accesa di serie)
+pubblico: sì

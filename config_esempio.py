@@ -1198,6 +1198,12 @@ AVVISI_BARATTOLO_ATTIVI = True
 # passano almeno queste ore (quel che cade nel mezzo arriva dopo, se e'
 # ancora vero). Intero; storto vale 24.
 AVVISI_BARATTOLO_ORE = 24
+# LA SERIE DEI GIORNI 🔥 (17 nov 2026): nel Profilo ognuno vede quanti
+# giorni DI FILA ha aperto Barattolo (giorno italiano, da mezzanotte a
+# mezzanotte) e il suo record. Non da' XP ne' premi, e gli altri non la
+# vedono. Accesa di serie; a False niente fiamma e nessun giorno contato
+# (riaccendendola chi ha saltato dei giorni riparte da 1, il record resta).
+SERIE_GIORNI_ATTIVA = True
 # GLI AVVISI DEL MERCATINO (9 ott 2026): chi lo chiede dal cassetto Avvisi
 # del Profilo riceve un messaggio quando nel mercatino compaiono annunci
 # nuovi — TUTTI i nuovi, con un filtro facoltativo di categorie e prezzo

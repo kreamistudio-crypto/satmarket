@@ -10954,10 +10954,12 @@
   ACCESA e oggi è SOSPESA: la CLASSIFICA aspetta quel giorno (finché
   farmare è gratis misurerebbe il tempo libero, non il commercio), e
   il «da N persone» qui sotto va tenuto, o nessuno può accorgersi di
-  niente. NIENTE streak consecutivo: in un mercatino non c'è nulla da
-  fare ogni giorno, e una fiammella che si spegne punisce chi ha
-  lavorato invece di aprire l'app; se servirà, si contano i giorni
-  TOTALI, che salgono e basta.
+  niente. NIENTE streak consecutivo NEGLI XP: in un mercatino non c'è
+  nulla da fare ogni giorno, e una fiammella che si spegne punisce chi
+  ha lavorato invece di aprire l'app. (ROVESCIATO IN PARTE il 17 nov
+  2026, su richiesta di Andrea: la serie dei giorni di fila ESISTE, ma
+  fuori dagli XP — è un contatore che non dà niente, riparte in
+  silenzio e tiene il record. Vedi «LA SERIE DEI GIORNI 🔥».)
   COORTI: `COORTI` generalizza il distintivo Pioniere (posizione
   ≤100) in una scala — pioniere 100 · fondatore 500 · veterano 2000 ·
   bottegaio 10000. Chi entra oltre l'ultima soglia NON ha coorte, ed
@@ -36669,3 +36671,48 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   spedire entro …» / «Il venditore spedisce entro …» / «Spedito …» sul
   passo della spedizione (`rigaSpedito`). Prove: `prove_spedisci_entro`
   e `collaudo_spedisci_entro`.
+
+- LA SERIE DEI GIORNI 🔥 (17 nov 2026, cantiere serie-giorni; richiesta
+  di Andrea, sul modello di Ditto). Quanti giorni DI FILA una persona
+  ha aperto Barattolo: un contatore e basta — niente XP, niente premi,
+  e la vede solo chi la fa (mai nel negozio né nel riquadro venditore).
+  ROVESCIA IL «NIENTE STREAK» D'AGOSTO sapendolo: il motivo di allora
+  (la fiammella che si spegne punisce chi ha lavorato) resta dentro le
+  regole — chi salta un giorno riparte da 1 IN SILENZIO, nessun «hai
+  perso», nessun promemoria del bot, e il RECORD non scende mai.
+  I DATI: tabella `serie_giorni` (tg_id PK, `giorni`, `record`,
+  `ultimo` = giorno italiano «AAAA-MM-GG»), una riga a persona. La
+  lapide `utenti.xp_ultimo_giorno` NON si riusa. IL GIORNO È QUELLO
+  ITALIANO per tutti (`_giorno_roma`, senza tzdata: la regola dell'ora
+  legale europea, gemella di `_epoch_roma`), così il fuso del telefono
+  non regala e non toglie. IL GIUDICE è `serie_passo`, puro: già
+  passato oggi = niente; passato ieri = +1; un buco o la prima volta =
+  1; un `ultimo` nel futuro (orologio tornato indietro) non si tocca.
+  `_giorno_prima` è aritmetica di DATE (il giorno del cambio d'ora dura
+  23 o 25 ore). DUE PORTE, UN TIMBRO (`timbra_serie`, una scrittura al
+  giorno a testa): `/api/me` — dentro `if u:`, prima del commit,
+  FAIL-OPEN come gli XP — e `POST /api/me/serie` per l'app lasciata in
+  tasca (PWA, Mini App) che torna in primo piano senza rifare /api/me;
+  la rotta non legge un corpo, il giorno lo decide il server. LA BUSTA
+  (`/api/me` → `serie`): `giorni`, `record`, `oggi_contato`, `nuova`
+  (è il primo passaggio di oggi), `oggi`, `feriale` (0 = lunedì, in
+  Italia) e `tappe` (`SERIE_TAPPE`: 7, 30, 100, 365). FUSIONE:
+  `_serie_unisci` in `esegui_fusione` — resta la serie viva più lunga,
+  col record più alto dei due. CANCELLAZIONE: `serie_giorni` in
+  `CANCELLA_TOGLI`. IL CLIENT: tre pezzi PURI (busta → HTML), fatti per
+  essere riusati dalla stradina degli obiettivi: `serieRigaHTML` (la
+  riga «5 giorni di fila · record 12» dentro la carta del Profilo,
+  sotto le stelle), `serieSettimanaHTML` (gli ultimi sette giorni, oggi
+  per ultimo, accesi quelli della serie: mai una croce su un giorno
+  saltato) e `SERIE_FIAMMA` (SVG nell'arancio di casa: l'emoji cambia
+  faccia da un telefono all'altro). `serieBusta` rifà interi i numeri
+  prima che finiscano nella pagina. `serieFesta`: il saluto del primo
+  passaggio del giorno (solo con `nuova`, dal SECONDO giorno, fuori dal
+  tocco, 2,8 s; alle tappe il nome, il bordo e 4,2 s). `serieRitorno`
+  (visibilitychange): bussa alla rotta solo se il giorno italiano visto
+  dal telefono è diverso da quello dell'ultima busta, al più una volta
+  ogni dieci minuti. All'avvio la busta NON ridisegna il Profilo (a
+  metà di /api/me); al ritorno sì. Leva `SERIE_GIORNI_ATTIVA`, accesa
+  di serie: spenta, niente timbro, niente chiave in /api/me, rotta 404,
+  le righe restano. Prove: `prove_serie_giorni`,
+  `collaudo_serie_giorni`.

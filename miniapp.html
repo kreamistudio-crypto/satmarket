@@ -6500,6 +6500,69 @@
      bruno di casa, e mai piu' forte del nome che gli sta sopra. */
   .titolo-riga{font-family:var(--font-tit);font-size:12.5px;
     font-weight:700;color:var(--carton);margin-top:1px}
+  /* LA SERIE DEI GIORNI 🔥 (17 nov 2026, cantiere serie-giorni): i
+     giorni di fila in cui si e' aperto Barattolo. Tre pezzi, una
+     fiamma sola. LA FIAMMA E' DISEGNATA e non e' l'emoji: 🔥 cambia
+     faccia da un telefono all'altro (e dentro Telegram ancora), qui
+     e' la stessa ovunque e prende l'arancio di casa nei due temi.
+     - `.serie-riga`: la riga nella carta del Profilo, sotto le stelle.
+       Il numero nell'arancio dei testi (--sats-text, quello tarato
+       per il 4,5:1), il record in grigio come la riga sopra.
+     - `.serie-sett`: gli ultimi sette giorni, oggi per ultimo. Accesi
+       quelli della serie, oggi pieno; i giorni fuori dalla serie
+       restano un cerchio vuoto e basta — niente croci, niente rosso:
+       un giorno saltato non e' una colpa.
+     - `.serie-festa`: il saluto al primo passaggio del giorno, sopra
+       il toast (che ha il suo posto a 100px) e fuori dal tocco. */
+  .serie-f{width:15px;height:15px;flex:none;vertical-align:-2.5px;
+    margin-right:3px}
+  .serie-f .f-fuori{fill:var(--sats)}
+  .serie-f .f-cuore{fill:#FFD9A0}
+  .serie-riga{font-size:12.5px;font-weight:700;color:var(--ink);
+    margin-top:3px}
+  .serie-n{color:var(--sats-text)}
+  .serie-rec{color:var(--muted);font-weight:600}
+  .serie-sett{display:flex;justify-content:space-between;gap:6px;
+    margin-top:10px;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:12px 14px}
+  .serie-g{flex:1;min-width:0;text-align:center;font-size:10.5px;
+    font-weight:700;color:var(--muted)}
+  .serie-g i{display:flex;align-items:center;justify-content:center;
+    width:28px;height:28px;margin:0 auto 4px;border-radius:50%;
+    border:1.5px solid var(--line);font-style:normal}
+  .serie-g i .serie-f{width:16px;height:16px;margin:0;vertical-align:0}
+  .serie-g.ok i{background:var(--sats-soft);border-color:transparent}
+  .serie-g.oggi{color:var(--ink)}
+  .serie-g.oggi i{background:var(--sats);border-color:transparent;
+    box-shadow:0 0 0 3px var(--sats-soft)}
+  .serie-g.oggi .f-fuori{fill:#fff}
+  .serie-g.oggi .f-cuore{fill:#FFE7C2}
+  .serie-festa{position:fixed;left:50%;bottom:156px;z-index:60;
+    transform:translateX(-50%) translateY(14px) scale(.92);opacity:0;
+    pointer-events:none;display:flex;align-items:center;gap:10px;
+    width:max-content;max-width:min(92vw,420px);
+    background:var(--card);color:var(--ink);border:1px solid var(--line);
+    border-radius:99px;padding:10px 18px 10px 12px;
+    box-shadow:0 10px 26px rgba(0,0,0,.2);
+    transition:opacity .25s ease,transform .35s cubic-bezier(.2,1.4,.4,1)}
+  .serie-festa.show{opacity:1;transform:translateX(-50%)}
+  .serie-festa .serie-f{width:26px;height:26px;margin:0;vertical-align:0}
+  .serie-festa.show .serie-f{animation:serie-guizzo .9s ease-in-out 2}
+  .serie-festa-t{font-family:var(--font-tit);font-weight:800;
+    font-size:15px;line-height:1.2}
+  .serie-festa-t small{display:block;font-family:inherit;font-size:12px;
+    font-weight:700;color:var(--muted)}
+  .serie-festa.tappa{border-color:var(--sats);
+    box-shadow:0 0 0 4px var(--sats-soft),0 10px 26px rgba(0,0,0,.2)}
+  @keyframes serie-guizzo{
+    0%,100%{transform:scale(1) rotate(0)}
+    30%{transform:scale(1.18) rotate(-6deg)}
+    60%{transform:scale(1.08) rotate(5deg)}}
+  /* chi ha chiesto meno movimento la vede comparire e basta (gli
+     «Effetti ridotti» dell'app lo fanno gia' con la regola universale) */
+  @media (prefers-reduced-motion: reduce){
+    .serie-festa{transition:none}
+    .serie-festa.show .serie-f{animation:none}}
   /* La faccina di chi ha lasciato il feedback (ago 2026): il cerchio
      dell'avatar rimpicciolito, che qui accompagna il nome e non lo
      comanda — e' un francobollo, non un ritratto. */
@@ -17296,6 +17359,9 @@ document.getElementById('cartello')?.remove();</script>
   <!-- La pastiglia del gesto «tira giù per aggiornare» -->
   <div class="ptr" id="ptr" aria-hidden="true"><span>↻</span></div>
   <div class="toast" id="toast"></div>
+  <!-- il saluto della serie dei giorni (17 nov 2026): lo scrive
+       serieFesta() al primo passaggio del giorno, e se ne va da solo -->
+  <div class="serie-festa" id="serieFesta" role="status" aria-live="polite"></div>
   <!-- «Un attimo, riprovo…»: il server che si riavvia (vedi fetchCheRiprova) -->
   <div class="riprovo" id="riprovo" role="status">Un attimo, riprovo…</div>
   <!-- L'avvio che non parte (cantiere logout-apk): «Manca la rete» o l'errore, mai la vetrina -->
@@ -20201,6 +20267,133 @@ const titoloRiga = (nome, liv, n = Math.max(0, Math.floor(Number(liv)) || 0)) =>
    /api/me.titolo, che e' quello che si scrive scegliendolo): il nome
    si pesca dal catalogo gia' in pagina, senza un secondo giro. */
 const nomeTitolo = id => (myTitoli.find(t=>t.id===id)||{}).nome || '';
+/* LA SERIE DEI GIORNI 🔥 (17 nov 2026, cantiere serie-giorni): i giorni
+   di fila in cui si e' aperto Barattolo. Non da' XP ne' premi e la vede
+   solo chi la fa. La busta arriva da /api/me (`serie`: giorni, record,
+   oggi_contato, nuova, feriale, tappe, oggi) e il conto e' TUTTO del
+   server: qui si disegna soltanto. Un server di ieri o la leva spenta
+   non mandano la chiave, e non si disegna niente.
+   I TRE PEZZI CHE DISEGNANO SONO PURI — prendono la busta, tornano HTML
+   — perche' li usa anche la stradina degli obiettivi: `serieRigaHTML`
+   (la riga), `serieSettimanaHTML` (i sette giorni) e `SERIE_FIAMMA`. */
+const SERIE_FIAMMA = '<svg class="serie-f" viewBox="0 0 24 24" aria-hidden="true"><path class="f-fuori" d="M12.9 2.2c.5 3.2-.9 5-2.500 6.800C8.700 10.900 7 12.800 7 15.600 7 19 9.300 21.800 12.300 21.800c3.300 0 5.700-2.600 5.700-6 0-2.200-.9-3.800-1.900-5.200-.5 1.300-1.100 2-2 2.500.4-3.600-.2-7.700-1.200-10.900z"/><path class="f-cuore" d="M12.300 21.800c-1.700 0-3-1.400-3-3.200 0-1.700 1.200-2.700 2.200-4 .5-.7.800-1.400.9-2.200 1.600 1.500 2.900 3.300 2.900 5.700 0 2.100-1.300 3.700-3 3.700z"/></svg>';
+const SERIE_GIORNI_SETT = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
+/* La busta ripulita, o null se non c'e' niente da disegnare. I numeri
+   si rifanno interi QUI, una volta: i pezzi sotto li scrivono nella
+   pagina, e un valore storto non deve poterci portare altro. */
+function serieBusta(s){
+  const n = Math.floor(Number(s && s.giorni)) || 0;
+  if (!s || n < 1) return null;
+  const f = Math.floor(Number(s.feriale));
+  return {giorni: n, record: Math.max(n, Math.floor(Number(s.record)) || 0),
+          oggi_contato: !!s.oggi_contato, nuova: !!s.nuova,
+          feriale: (f >= 0 && f <= 6) ? f : null,
+          tappe: Array.isArray(s.tappe) ? s.tappe.map(Number).filter(t => t > 0) : [],
+          oggi: /^\d{4}-\d\d-\d\d$/.test(s.oggi || '') ? s.oggi : ''};
+}
+/* La riga: «5 giorni di fila · record 12». Al primo giorno non c'e'
+   ancora una fila, e si dice cosa la fa partire; quando la serie di
+   adesso E' il record lo si dice, invece di ripetere lo stesso numero. */
+function serieRigaHTML(s){
+  const b = serieBusta(s);
+  if (!b) return '';
+  const coda = b.record > b.giorni ? `record ${b.record}`
+    : (b.giorni === 1 ? 'torna domani' : 'è il tuo record');
+  return `<div class="serie-riga">${SERIE_FIAMMA}<span class="serie-n">${b.giorni}</span> ${
+    b.giorni === 1 ? 'giorno' : 'giorni di fila'} <span class="serie-rec">· ${coda}</span></div>`;
+}
+/* Gli ultimi sette giorni, oggi per ultimo: accesi quelli DELLA SERIE
+   (oggi e i giorni di fila prima), gli altri un cerchio vuoto. Che
+   giorno e' oggi lo dice il server (`feriale`, 0 = lunedi', in Italia):
+   senza, la settimana non si disegna — meglio niente che le lettere
+   sbagliate di un telefono in un altro fuso. */
+function serieSettimanaHTML(s){
+  const b = serieBusta(s);
+  if (!b || b.feriale === null) return '';
+  let celle = '';
+  for (let i = 6; i >= 0; i--) {          // i = quanti giorni fa
+    const acceso = i < b.giorni;
+    celle += `<div class="serie-g${i === 0 ? ' oggi' : (acceso ? ' ok' : '')}"><i>${
+      acceso ? SERIE_FIAMMA : ''}</i>${
+      i === 0 ? 'oggi' : SERIE_GIORNI_SETT[(b.feriale - i + 7) % 7]}</div>`;
+  }
+  return `<div class="serie-sett" role="img" aria-label="Ultimi sette giorni: ${
+    Math.min(b.giorni, 7)} di fila">${celle}</div>`;
+}
+/* Il nome di una tappa, o '' se il numero non e' una tappa. Le tappe le
+   manda il server: qui ci sono solo le parole di quelle che conosciamo,
+   e una tappa nuova senza parole prende quelle di tutti i giorni. */
+const SERIE_TAPPE_NOMI = {7: 'Una settimana di fila', 30: 'Un mese di fila',
+                          100: 'Cento giorni di fila', 365: 'Un anno di fila'};
+function serieTappa(s){
+  const b = serieBusta(s);
+  return (b && b.tappe.includes(b.giorni) && SERIE_TAPPE_NOMI[b.giorni]) || '';
+}
+/* IL SALUTO DEL PRIMO PASSAGGIO DEL GIORNO: una pastiglia che sale, dice
+   il numero e se ne va. Solo quando il server dice `nuova` (una volta
+   al giorno per account, non per dispositivo) e solo dal SECONDO giorno:
+   «1 giorno di fila» non e' una fila, e al lancio saluterebbe tutti per
+   niente. Non si tocca e non copre niente: chi ha altro da fare non la
+   deve chiudere. Alle tappe resta un secondo in piu' e prende il bordo. */
+let serieFestaTimer = 0;
+function serieFesta(s){
+  const b = serieBusta(s), box = el('serieFesta');
+  if (!b || !box || !b.nuova || b.giorni < 2) return false;
+  const tappa = serieTappa(b);
+  box.innerHTML = `${SERIE_FIAMMA}<div class="serie-festa-t">${
+    tappa ? `${esc(tappa)}<small>${b.giorni} giorni, uno dopo l'altro</small>`
+          : `${b.giorni} giorni di fila`}</div>`;
+  box.classList.toggle('tappa', !!tappa);
+  box.classList.add('show');
+  clearTimeout(serieFestaTimer);
+  serieFestaTimer = setTimeout(() => box.classList.remove('show'), tappa ? 4200 : 2800);
+  return true;
+}
+/* La busta arrivata (da /api/me o dal ritorno in primo piano): si tiene
+   e si saluta se e' il caso. La testata la ridisegna solo il ritorno
+   (`ridisegna`): all'avvio /api/me e' ancora a meta', e renderProfilo
+   gira da solo in fondo, con tutto il resto gia' letto. */
+let mySerie = null;
+function serieArrivata(s, ritardo, ridisegna){
+  mySerie = serieBusta(s);
+  if (ridisegna) renderProfilo();
+  if (mySerie && mySerie.nuova) setTimeout(() => serieFesta(mySerie), ritardo || 0);
+}
+/* IL GIORNO ITALIANO VISTO DAL TELEFONO, solo per decidere se vale la
+   pena bussare al server (che poi decide lui): «AAAA-MM-GG», o '' dove
+   il telefono non sa dire l'ora di Roma — e allora non si bussa. */
+function serieGiornoRoma(adesso){
+  try {
+    return new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Rome',
+      year: 'numeric', month: '2-digit', day: '2-digit'}).format(adesso || new Date());
+  } catch(e) { return ''; }
+}
+/* L'APP LASCIATA IN TASCA: una PWA o una Mini App che torna in primo
+   piano non rifa' /api/me, e chi la guarda cosi' ogni giorno non
+   conterebbe mai. Al ritorno, se in Italia e' cambiato il giorno
+   rispetto all'ultima busta, si bussa a POST /api/me/serie — al piu'
+   una volta ogni dieci minuti, cosi' un orologio storto non martella. */
+let serieUltimoBusso = 0;
+async function serieRitorno(){
+  if (document.hidden || DEMO || VETRINA || !mySerie || !mySerie.oggi) return;
+  const oggi = serieGiornoRoma();
+  if (!oggi || oggi === mySerie.oggi) return;
+  if (Date.now() - serieUltimoBusso < 600000) return;
+  serieUltimoBusso = Date.now();
+  try {
+    const r = await fetch(`${API_BASE}/me/serie`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    if (!r.ok) return;
+    const d = await r.json().catch(() => ({}));
+    if (d && d.serie) serieArrivata(d.serie, 600, true);
+  } catch(e){}
+}
+let serieInAscolto = false;
+function serieAscolta(){
+  if (serieInAscolto) return;
+  serieInAscolto = true;
+  document.addEventListener('visibilitychange', serieRitorno);
+}
 function toast(msg, ms){ const t = el('toast'); t.textContent = msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), ms||2200); }
 /* Quanto sta a schermo un messaggio che si LEGGE invece di sbirciarsi.
@@ -41337,9 +41530,11 @@ function renderProfilo(){
       <div class="who"><b>${esc(nome)}${badge}</b>
         ${titoloRiga(nomeTitolo(myTitolo), myLivello && myLivello.numero)}
         <div class="rep">${rep}</div>
+        ${serieRigaHTML(mySerie)}
       </div>
       ${tondi}
-    </div>`;
+    </div>
+    ${serieSettimanaHTML(mySerie)}`;
   /* LA FOTO DELLA TESTATA APRE «I TUOI ACCOUNT» (16 ott 2026, dal campo:
      «il doppio tocco sulla foto non fa niente»): sul telefono il tappo
      nel Profilo non c'e', e il secondo tocco cadeva qui, sulla foto, che
@@ -106930,6 +107125,12 @@ async function avvia(){
     myNRecensori = me.n_recensori || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
     myXp = me.xp || 0; myLivello = me.livello || null;
+    /* la serie dei giorni 🔥 (17 nov 2026): la busta, il saluto del primo
+       passaggio di oggi (dopo che la pagina si e' posata) e l'orecchio
+       per l'app che torna in primo piano. Un server di ieri non manda
+       la chiave: niente fiamma. */
+    serieArrivata(me.serie, 1600);
+    serieAscolta();
     myScalaLivelli = Array.isArray(me.livelli_scala) ? me.livelli_scala : [];
     myRegali = Array.isArray(me.regali_livello) ? me.regali_livello : [];
     myXpRuoli = me.xp_ruoli || null;

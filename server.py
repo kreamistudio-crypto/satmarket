@@ -5393,6 +5393,137 @@ def xp_ordine(prezzo_sats: int, cambio_eur: float, ruolo: str) -> int:
                * XP_RUOLO.get(ruolo, 1.0))
 
 
+# ------------------ LA SERIE DEI GIORNI 🔥 (17 nov 2026) ------------------
+# Quanti giorni DI FILA una persona ha aperto Barattolo. Non da' XP, non
+# sblocca niente e non la vede nessun altro: e' un contatore, e basta
+# (richiesta di Andrea, sul modello di Ditto).
+# ROVESCIA UNA DECISIONE D'AGOSTO, e lo fa sapendolo. Qui era scritto
+# «niente serie consecutiva: in un mercatino non c'e' nulla da fare ogni
+# giorno, e una fiammella che si spegne punisce chi ha lavorato invece
+# di aprire l'app». Il motivo resta vero, e la serie lo porta dentro:
+# chi salta un giorno riparte da 1 IN SILENZIO — nessun «hai perso»,
+# nessun avviso del bot che rincorre — e il RECORD non scende mai.
+# COSA CONTA: un passaggio da /api/me (l'app la chiede a ogni apertura)
+# o dal ritorno in primo piano dopo la mezzanotte (`POST /api/me/serie`),
+# da chi e' entrato. Contano i GIORNI, non le volte.
+# IL GIORNO E' QUELLO ITALIANO, da mezzanotte a mezzanotte, per tutti:
+# uno solo, cosi' cambiare il fuso del telefono non regala e non toglie
+# niente. Il VPS vive in UTC e Windows non ha tzdata: la regola dell'ora
+# legale sta scritta qui, la stessa di `_epoch_roma`.
+# LA COLONNA `utenti.xp_ultimo_giorno` NON SI RIUSA: e' una lapide (vedi
+# la'), e un server vecchio tornato in un rollback la riscriverebbe. La
+# serie ha la sua tabella, `serie_giorni`, una riga a persona.
+# LA LEVA: SERIE_GIORNI_ATTIVA, accesa di serie. Spenta, il timbro non si
+# scrive, /api/me non manda la chiave e il client non disegna niente; le
+# righe restano, e riaccendendo chi ha saltato dei giorni riparte da 1.
+try:
+    from config import SERIE_GIORNI_ATTIVA
+except ImportError:
+    SERIE_GIORNI_ATTIVA = True
+SERIE_GIORNI_ATTIVA = bool(SERIE_GIORNI_ATTIVA)
+# le tappe che il client festeggia un filo di piu': una settimana, un
+# mese, cento giorni, un anno. Viaggiano con la risposta, cosi' non ne
+# esiste una seconda copia nella pagina.
+SERIE_TAPPE = (7, 30, 100, 365)
+
+
+def _giorno_roma(epoch) -> str:
+    """Il giorno di calendario in Italia («AAAA-MM-GG») di un istante.
+    Senza tzdata: CET d'inverno, CEST dall'ultima domenica di marzo
+    all'ultima di ottobre, il cambio alle 01:00 UTC (la regola europea,
+    ferma dal 1996 — la stessa di `_epoch_roma`, nel verso opposto)."""
+    from datetime import datetime, timedelta, timezone
+    utc = datetime.fromtimestamp(int(epoch), timezone.utc).replace(tzinfo=None)
+
+    def ultima_domenica(mese):
+        d = datetime(utc.year, mese, 31)
+        return d - timedelta(days=(d.weekday() + 1) % 7)
+    inizio = ultima_domenica(3).replace(hour=1)
+    fine = ultima_domenica(10).replace(hour=1)
+    ore = 2 if inizio <= utc < fine else 1
+    return (utc + timedelta(hours=ore)).strftime("%Y-%m-%d")
+
+
+def _giorno_prima(giorno: str) -> str:
+    """Il giorno di calendario prima di «AAAA-MM-GG». E' aritmetica di
+    DATE e non di secondi: il giorno del cambio d'ora dura 23 o 25 ore,
+    e «86400 secondi fa» una volta l'anno sarebbe l'altro ieri."""
+    from datetime import date, timedelta
+    return (date.fromisoformat(giorno) - timedelta(days=1)).isoformat()
+
+
+def serie_passo(giorni: int, record: int, ultimo: str, oggi: str):
+    """IL GIUDICE DELLA SERIE, puro: lo stato di ieri e il giorno di oggi
+    danno (giorni, record, ultimo, nuova). `nuova` = questo passaggio ha
+    contato un giorno in piu' (e' il primo di oggi).
+    Gia' passato oggi: niente cambia. Passato ieri: uno in piu'. Un buco
+    di un giorno o piu', o la prima volta: si riparte da 1. Un `ultimo`
+    nel FUTURO (orologio del server tornato indietro) non si tocca: si
+    aspetta che il calendario lo raggiunga, senza regalare e senza
+    togliere. Il record non scende mai."""
+    giorni, record = max(0, int(giorni or 0)), max(0, int(record or 0))
+    ultimo = str(ultimo or "")
+    if ultimo >= oggi and giorni > 0:
+        return giorni, max(record, giorni), ultimo, False
+    giorni = giorni + 1 if ultimo == _giorno_prima(oggi) and giorni > 0 else 1
+    return giorni, max(record, giorni), oggi, True
+
+
+def timbra_serie(con, tg_id: int, adesso=None) -> dict:
+    """Il passaggio di oggi di una persona: legge la sua riga, chiede al
+    giudice, scrive SOLO se il giorno e' nuovo (una scrittura al giorno a
+    testa, le altre aperture sono una SELECT sulla chiave primaria).
+    Ritorna la busta per il client: `giorni`, `record`, `oggi_contato`,
+    `nuova` (questo e' il primo passaggio di oggi: e' il momento della
+    festa), `oggi` (il giorno italiano di questa busta: il client lo
+    confronta al ritorno in primo piano), `feriale` (0 = lunedi': che
+    giorno e' oggi IN ITALIA, per disegnare la settimana senza chiederlo
+    al telefono) e le `tappe`.
+    Non fa commit: lo fa chi chiama, con le sue altre scritture."""
+    from datetime import date
+    oggi = _giorno_roma(time.time() if adesso is None else adesso)
+    r = con.execute("SELECT giorni, record, ultimo FROM serie_giorni "
+                    "WHERE tg_id=?", (tg_id,)).fetchone()
+    giorni, record, ultimo, nuova = serie_passo(
+        r["giorni"] if r else 0, r["record"] if r else 0,
+        r["ultimo"] if r else "", oggi)
+    if nuova:
+        con.execute(
+            "INSERT INTO serie_giorni(tg_id, giorni, record, ultimo) "
+            "VALUES(?,?,?,?) ON CONFLICT(tg_id) DO UPDATE SET "
+            "giorni=excluded.giorni, record=excluded.record, "
+            "ultimo=excluded.ultimo", (tg_id, giorni, record, ultimo))
+    return {"giorni": giorni, "record": record, "oggi_contato": ultimo == oggi,
+            "nuova": nuova, "oggi": oggi,
+            "feriale": date.fromisoformat(oggi).weekday(),
+            "tappe": list(SERIE_TAPPE)}
+
+
+def _serie_unisci(con, resta: int, va_via: int):
+    """LA FUSIONE DI DUE ACCOUNT: la stessa persona aveva due righe, e ne
+    resta una. Vince la serie VIVA piu' lunga (l'ultimo passaggio piu'
+    recente; a pari giorno, quella con piu' giorni), e il record e' il
+    piu' alto dei due: fondersi non deve mai costare una fiammella."""
+    righe = {r["tg_id"]: r for r in con.execute(
+        "SELECT tg_id, giorni, record, ultimo FROM serie_giorni "
+        "WHERE tg_id IN (?,?)", (resta, va_via))}
+    a, b = righe.get(resta), righe.get(va_via)
+    if not b:
+        return
+    if not a or (b["ultimo"], b["giorni"]) > (a["ultimo"], a["giorni"]):
+        meglio = b
+    else:
+        meglio = a
+    record = max(int(b["record"] or 0), int(a["record"] or 0) if a else 0)
+    con.execute("DELETE FROM serie_giorni WHERE tg_id=?", (va_via,))
+    con.execute(
+        "INSERT INTO serie_giorni(tg_id, giorni, record, ultimo) "
+        "VALUES(?,?,?,?) ON CONFLICT(tg_id) DO UPDATE SET "
+        "giorni=excluded.giorni, record=excluded.record, "
+        "ultimo=excluded.ultimo",
+        (resta, meglio["giorni"], record, meglio["ultimo"]))
+
+
 # ------------------- I CODICI INVITO (set 2026) ----------------------
 # Ogni persona ha UN codice, e un link t.me/<bot>?start=<codice>: chi
 # arriva da li' si collega da solo a chi l'ha invitato, al primo /start
@@ -7118,6 +7249,18 @@ def init_db():
         richiesto_il INTEGER,
         spedito_il INTEGER,
         UNIQUE(tg_id, livello)
+    );
+    CREATE TABLE IF NOT EXISTS serie_giorni(
+        -- LA SERIE DEI GIORNI 🔥 (17 nov 2026): una riga a persona.
+        -- `giorni` e' la serie in corso, `record` la piu' lunga di
+        -- sempre (non scende mai), `ultimo` il giorno ITALIANO
+        -- dell'ultimo passaggio, «AAAA-MM-GG». Il giudice e'
+        -- `serie_passo`; la serie mostrata si calcola da qui a ogni
+        -- lettura, quindi una riga vecchia non mente: dice solo quando.
+        tg_id INTEGER PRIMARY KEY,
+        giorni INTEGER NOT NULL DEFAULT 0,
+        record INTEGER NOT NULL DEFAULT 0,
+        ultimo TEXT NOT NULL DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS firme_nostr(
         -- LA CODA DELLE FIRME (ago 2026). Un doppio cittadino che
@@ -21548,6 +21691,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE preferiti SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM preferiti WHERE tg_id=?", (id_nostr,))
+        # La serie dei giorni 🔥 (17 nov 2026), tabella `serie_giorni`:
+        # non e' un UPDATE secco come le sorelle, perche' le due righe
+        # vanno CONFRONTATE — resta la serie migliore e il record piu'
+        # alto, e la riga di chi muore se ne va (`_serie_unisci`).
+        _serie_unisci(con, id_telegram, id_nostr)
         # Il carrello salvato (ott 2026) segue l'utente, ma qui la PK E'
         # il tg_id: uno solo per persona. Se tutt'e due le meta' ne
         # avevano uno resta quello dell'account Telegram (l'OR IGNORE
@@ -37499,6 +37647,18 @@ def _leve_stato():
         {"gruppo": "🎁 Mancia al venditore", "voci": _mancia_leve()},
         # LA CASSA IN NEGOZIO (15 nov 2026): accesa di serie
         {"gruppo": "🏪 Cassa in negozio", "voci": _cassa_leve()},
+        {"gruppo": "🔥 Serie dei giorni", "voci": [
+            # LA SERIE DEI GIORNI (17 nov 2026, cantiere serie-giorni):
+            # accesa di serie, nessun segreto
+            _leva("Serie dei giorni di fila nel Profilo",
+                  "SERIE_GIORNI_ATTIVA", bool(SERIE_GIORNI_ATTIVA),
+                  acceso="nel Profilo ognuno vede i SUOI giorni di fila "
+                         "(giorno italiano) e il record; non dà XP né "
+                         "premi, e gli altri non la vedono",
+                  spento="niente fiamma nel Profilo e nessun giorno "
+                         "contato; riaccendendola chi ha saltato dei "
+                         "giorni riparte da 1, il record resta"),
+        ]},
         {"gruppo": "🫙 Avvisi del barattolo", "voci": [
             # GLI AVVISI SUI PREFERITI (17 nov 2026, cantiere
             # avvisi-barattolo): accesa di serie, nessun segreto
@@ -51795,6 +51955,7 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     con = db()
     u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
+    serie_mia = None      # la serie dei giorni: la scrive il timbro, sotto
     # Rinfresco opportunistico del francobollo (e del nome, per i
     # nativi Nostr): alla prima apertura e poi al piu' una volta a
     # settimana, in sottofondo (fail-open: questa risposta non lo
@@ -51810,17 +51971,14 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         # e' cio' che rende il sistema auto-riparante. Niente notifiche
         # qui: quelle spettano ai ganci dal vivo.
         controlla_distintivi(con, user["id"])
-        # LA VISITA GIORNALIERA, timbrata qui perche' qui si passa
-        # comunque a ogni apertura — e il precedente c'e' gia': su
-        # questa GET si scrive da sempre (rinfresco avatar, passata
-        # dei distintivi). Il giorno LOCALE in colonna serve solo a
-        # non tentare la scrittura a ogni chiamata: a impedire il
-        # doppio punto ci pensa la UNIQUE del registro, che e' il vero
-        # giudice. NIENTE serie consecutiva, e non e' una svista: in
-        # un mercatino non c'e' nulla da fare ogni giorno, e una
-        # fiammella che si spegne punisce chi ha lavorato invece di
-        # aprire l'app. Se un giorno si vorra' premiare la costanza,
-        # si contano i giorni TOTALI, che salgono e basta.
+        # LA VISITA GIORNALIERA si timbrava qui, quando dava XP (ago
+        # 2026): qui si passa comunque a ogni apertura, e su questa GET
+        # si scrive da sempre (rinfresco avatar, passata dei
+        # distintivi). Dal 17 nov 2026 qui si timbra LA SERIE DEI
+        # GIORNI 🔥, piu' sotto, prima del commit — che rovescia il
+        # «niente serie consecutiva» scritto in questo punto: vedi il
+        # blocco «LA SERIE DEI GIORNI», col motivo di allora e come la
+        # serie lo rispetta (riparte in silenzio, il record resta).
         # La coorte al primo sguardo, per chi e' entrato dopo l'avvio
         # (il backfill di init_db copre solo chi c'era). Congelata.
         if not u["coorte"]:
@@ -51836,9 +51994,17 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         # in basso coi suoi vicini: il codice nasce la prima volta che
         # serve, cioe' e' una scrittura, e deve stare prima del commit.
         inviti_miei = stato_inviti(con, user["id"], u["registrato"])
-        # (Qui si timbrava la visita del giorno. Il commit RESTA: serve
-        # ad assegna_coorte, al titolo dei fondatori e al codice invito,
-        # qui sopra.)
+        # LA SERIE DEI GIORNI 🔥 (17 nov 2026): il passaggio di oggi,
+        # scritto una volta al giorno a testa. FAIL-OPEN come gli XP: un
+        # errore in un contatore non deve MAI costare il profilo a chi
+        # apre l'app — la chiave non parte e il client non disegna.
+        if SERIE_GIORNI_ATTIVA:
+            try:
+                serie_mia = timbra_serie(con, user["id"])
+            except Exception as e:
+                print(f"⚠️ Serie dei giorni saltata per {user['id']}: {e}")
+        # (Il commit serve ad assegna_coorte, al titolo dei fondatori,
+        # al codice invito e alla serie, qui sopra.)
         con.commit()
     presi = {r["badge_id"]: r["ottenuto_il"] for r in con.execute(
         "SELECT badge_id, ottenuto_il FROM badge_utente WHERE tg_id=?",
@@ -52005,6 +52171,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # la leva degli avvisi del barattolo (17 nov 2026): il client apre il
     # foglietto e mostra la 🔔 solo se e' accesa
     profilo["avvisi_barattolo"] = bool(AVVISI_BARATTOLO_ATTIVI)
+    # LA SERIE DEI GIORNI 🔥 (17 nov 2026): giorni di fila, record e se
+    # questo e' il primo passaggio di oggi (`nuova`: il client fa festa
+    # una volta). A leva spenta la chiave NON c'e', e la pagina non
+    # disegna niente — lo stesso patto di un server di ieri.
+    if serie_mia:
+        profilo["serie"] = serie_mia
     # La modifica di piu' annunci insieme (16 ott 2026): la leva VIVA,
     # perche' il bottone in «I tuoi annunci» nasca solo quando le sue
     # rotte rispondono.
@@ -56731,6 +56903,32 @@ async def regalo_spedito_admin(rid: int, x_tg_init_data: str = Header(""),
     except Exception as e:
         print(f"⚠️ Avviso di spedizione del regalo saltato: {e}")
     return {"ok": True, "stato": "spedito"}
+
+
+@app.post("/api/me/serie")
+async def passa_serie(x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """LA SERIE DEI GIORNI 🔥 quando l'app NON si riapre (17 nov 2026):
+    una PWA o una Mini App lasciata in tasca torna in primo piano senza
+    rifare /api/me, e chi la guarda ogni giorno cosi' non conterebbe
+    mai. Il client bussa qui al ritorno, solo se in Italia e' cambiato
+    il giorno. Stesso timbro e stessa busta di /api/me (`timbra_serie`):
+    due porte, un giudice. A leva spenta risponde 404, come le sorelle.
+    Niente corpo: non c'e' niente che il client possa dichiarare — il
+    giorno lo decide l'orologio del server."""
+    if not SERIE_GIORNI_ATTIVA:
+        raise HTTPException(404, "Funzione non attiva")
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        if not con.execute("SELECT 1 FROM utenti WHERE tg_id=?",
+                           (user["id"],)).fetchone():
+            raise HTTPException(404, "Profilo non trovato")
+        serie = timbra_serie(con, user["id"])
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True, "serie": serie}
 
 
 @app.post("/api/me/invito")
@@ -115015,6 +115213,8 @@ CANCELLA_TOGLI = (
     ("wallet_unico", "tg_id"), ("swap_auto_preferenze", "tg_id"),
     ("unioni_semi", "tg_id"), ("unioni_semi", "da_id"),
     ("unioni_registro", "tg_id"), ("unioni_registro", "da_id"),
+    # la serie dei giorni 🔥 (17 nov 2026): era sua, se ne va con lui
+    ("serie_giorni", "tg_id"),
 )
 # Le colonne personali di chi COMPRA, svuotate negli ordini chiusi che
 # restano: l'indirizzo, l'email per il corriere, la busta di ritiro, il

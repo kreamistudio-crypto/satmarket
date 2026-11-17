@@ -35,6 +35,8 @@ Un account nato con Telegram può collegare anche una chiave Nostr dal Profilo, 
 
 Nel Profilo si impostano le cose che servono a vendere e a scambiare: soprattutto l'indirizzo Lightning per incassare (voce «Lightning address»), il wallet collegato con NWC (facoltativo) e gli avvisi. Chi usa anche i bitcoin on-chain trova altre due voci: «📥 Come ricevi» e «₿ On-chain» (vedi «Bitcoin on-chain»).
 
+La serie dei giorni (se nelle REGOLAZIONI del pannello «Serie dei giorni» è accesa): nel Profilo, sotto le stelle, c'è una fiamma con scritto quanti giorni di fila hai aperto Barattolo e il tuo record, per esempio «5 giorni di fila · record 12»; subito sotto ci sono gli ultimi sette giorni, accesi quelli della serie. Conta aprire Barattolo da dentro il tuo account, almeno una volta al giorno, da Telegram, dal sito o dall'app: contano i giorni, non quante volte. Il giorno è quello italiano, da mezzanotte a mezzanotte. Se salti un giorno la serie riparte da 1 e il record resta. È solo un contatore: non dà XP, livelli, sconti né premi, e la vedi solo tu (sul tuo negozio e sul profilo che vedono gli altri non compare). Al primo accesso del giorno, dal secondo giorno di fila, compare per un attimo un saluto con il numero. Il bot non manda promemoria per non farla scadere.
+
 <!-- pezzo libro-003 | libro -->
 ## Libro · Entrare e il profilo (2/2)
 
@@ -1910,4 +1912,12 @@ pubblico: sì
 frase: Anche negli scambi P2P on-chain adesso c'è la chat fra chi compra e chi vende, come nel Lightning: cifrata, con foto e PDF, da quando l'ordine è preso a quando i sats vengono liberati. Quando l'altra persona ti scrive, il bot te lo dice col tasto che apre dritto la chat; in una disputa il moderatore la può leggere, e a scambio finito si cancella.
 dove: la pagina di uno scambio on-chain preso, riquadro «💬 Chat con …» in fondo (il richiamo «💬 Chat» in cima porta giù); il messaggio del bot «Hai un nuovo messaggio nello scambio on-chain» col bottone «🟠 Apri lo scambio».
 leva: P2P_CHAT_SCAMBIO (la stessa della chat del Lightning, accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-069 | novita -->
+## Novità · 2026-11-17 · serie-giorni
+
+frase: Nel tuo Profilo c'è una fiamma che conta quanti giorni di fila hai aperto Barattolo, col tuo record e gli ultimi sette giorni. Basta entrare una volta al giorno. Se salti un giorno riparte da 1 e il record resta. Non dà punti né premi e la vedi solo tu: è solo la soddisfazione di non fermarla.
+dove: Profilo, nel riquadro col tuo nome (riga «5 giorni di fila · record 12») e la fila dei sette giorni subito sotto; al primo accesso del giorno il saluto che compare in basso per un paio di secondi.
+leva: SERIE_GIORNI_ATTIVA (accesa di serie)
 pubblico: sì

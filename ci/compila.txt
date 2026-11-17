@@ -214,3 +214,4 @@ collaudo_avvisi_barattolo.py
 collaudo_spedisci_entro.py
 collaudo_regali_livello.py
 collaudo_chiedi_locker.py
+collaudo_serie_giorni.py
