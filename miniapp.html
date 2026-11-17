@@ -66762,39 +66762,57 @@ function vitaLibroOcTabP2P(scade, adesso){
 }
 /* PURA: il riquadro del PayCode di uno scambio on-chain, per la scheda.
    Chi l'ha scritto lo rivede; chi paga lo vede solo col deposito
-   confermato (il server non glielo manda prima), e prima vede il tempo
-   con la frase di Lightning. Riusa il riquadro di Lightning
-   (`riquadroPayCodeP2P`) con una riga fatta apposta: il testo composto
-   coi due campi che quella scatola sa leggere. */
+   confermato (il server non glielo manda prima).
+   CORTO (17 nov 2026, Andrea: «i testi però sono troppo lunghi,
+   semplificali, anche la grafica semplifica un po'»): non riusa piu' la
+   scatola di Lightning (quattro gesti, il buono, due righe di
+   spiegazione) ma una sua, da strumento di cassa: il codice, il codice a
+   barre, l'importo, il tempo e tre gesti di una riga. Il tempo resta
+   `#p2pTabPayResta` dentro `.p2p-paycode`, che `battitoControlloTabP2P`
+   riscrive ogni secondo. */
 function payCodeOcP2P(o){
   const t = (o && o.tabacchino) || null;
   if (!t || !tabacchinoP2P(o.metodi)) return '';
-  const riga = {metodi: o.metodi, euro: o.euro, lato: 'compro', mio: false,
-    stato: ['depositato', 'euro_inviati', 'disputa'].indexOf(o.stato) >= 0 ? 'attivo' : o.stato,
-    tabacchino: {scade: Number(t.scade) || 0},
-    campiLoro: {euro: {testo: t.paycode ? 'PayCode: ' + payCodeP2P(t.paycode)
-      + (t.barre ? '\nCodice a barre: ' + t.barre : '') : ''}}};
+  const scade = Number(t.scade) || 0;
+  const manca = Math.max(0, scade - Math.floor(Date.now() / 1000));
+  const tempo = scade > 0
+    ? '<div class="p2p-paycode-resta' + (manca <= 0 ? ' scaduto' : manca <= P2P_TAB_ULTIMA_S ? ' ultima' : '') + '">⏱ '
+      + '<b id="p2pTabPayResta">' + esc(manca > 0 ? contoRimastoP2P(manca) : 'Scaduto: non si può più pagare') + '</b></div>'
+    : '';
   if (o.ruolo === 'venditore') {
-    if (!t.paycode) return ['annullato', 'scaduto', 'rimborsato'].indexOf(o.stato) >= 0 ? ''
-      : riquadroScadenzaPayCodeP2P(riga, 0, true).replace('La scadenza è quella scritta nel libro pubblico dell\'ordine.',
-        'La scadenza l\'ha scritta chi vende, insieme al PayCode.');
-    return riquadroPayCodeP2P(riga).replace(P2P_PAYCODE_CIFRATO_HTML, P2P_PAYCODE_SERVER_HTML)
-      .replace(esc(testoBarattozonP2P(false, true)), esc(testoBarattozonOcP2P(false)));
+    if (!t.paycode) return ['annullato', 'scaduto', 'rimborsato'].indexOf(o.stato) >= 0 || !(scade > 0) ? ''
+      : '<div class="p2p-paycode" data-fine="' + scade + '"><div class="p2p-paycode-tit">🧾 Il PayCode arriva coi sats confermati</div>'
+        + tempo + '</div>';
+    const pc = payCodeP2P(t.paycode);
+    return '<div class="p2p-paycode" data-fine="' + scade + '">'
+      + '<div class="p2p-paycode-tit">🧾 PayCode da pagare</div>'
+      + '<div class="p2p-paycode-cod"><b class="da-toccare" onpointerdown="this._giu=Date.now()" onclick="toccaDatoP2P(this)">' + esc(pc) + '</b>'
+      + '<button type="button" class="p2p-paycode-copia" data-v="' + esc(pc) + '" data-msg="PayCode copiato 📋" data-fatto="✓" '
+      + 'onclick="copiaRecapitoP2P(this)" aria-label="Copia il PayCode">📋</button></div>'
+      + (t.barre
+        ? '<button type="button" class="btn orange p2p-barre-mostra" data-n="' + esc(t.barre) + '" data-pc="' + esc(pc) + '" '
+          + 'data-imp="' + esc(fmtEur(o.euro) + ' €') + '" data-sc="' + esc(scade > 0 ? dataTabacchinoP2P(scade) : '') + '" '
+          + 'onclick="apriBarreP2P(this.dataset)">📊 Mostra il codice alla cassa</button>'
+        : '')
+      + '<div class="p2p-paycode-riga"><span>Importo</span><b>' + attrImportoP2P(o.euro, fmtEur(o.euro) + ' € in contanti') + '</b></div>'
+      + tempo
+      + '<ol class="p2p-paycode-passi">'
+      + '<li>Vai in un <button type="button" class="scopri-link" onclick="apriMappaPayCodeP2P()">punto abilitato</button> '
+      + '(o cerca su <button type="button" class="scopri-link" onclick="apriPuntoLisPayCodeP2P()">PuntoLis</button>).</li>'
+      + '<li>Alla cassa: <b>«pago un ordine Amazon con PayCode»</b>. Un buono regalo non vale.</li>'
+      + '<li>Tieni lo scontrino e tocca <b>«Ho pagato al tabacchino»</b>.</li>'
+      + '</ol></div>';
   }
   /* chi l'ha scritto: il codice e la scadenza, corti, senza i gesti della cassa */
   if (!t.paycode) return '';
   return '<div class="p2p-paycode"><div class="p2p-paycode-tit">🧾 Il tuo PayCode</div>'
     + '<div class="p2p-paycode-riga"><span>PayCode</span><b>' + esc(payCodeP2P(t.paycode)) + '</b></div>'
     + '<div class="p2p-paycode-riga"><span>Importo</span><b>' + esc(fmtEur(o.euro)) + ' €</b></div>'
-    + (Number(t.scade) > 0 ? '<div class="p2p-paycode-riga"><span>Scade il</span><b>'
-      + esc(dataTabacchinoP2P(Number(t.scade))) + '</b></div>' : '')
-    + '<div class="hint">Chi prende lo vede solo quando il tuo deposito è confermato. '
-    + 'Libera i sats solo quando su Amazon l\'ordine risulta pagato.</div></div>';
+    + (scade > 0 ? '<div class="p2p-paycode-riga"><span>Scade il</span><b>'
+      + esc(dataTabacchinoP2P(scade)) + '</b></div>' : '')
+    + (['pending', 'preso'].indexOf(o.stato) >= 0 ? '<div class="hint">Chi compra lo vede solo a deposito confermato.</div>' : '')
+    + '</div>';
 }
-/* la riga in fondo al riquadro di Lightning dice che il codice viaggia
-   cifrato: on-chain non e' vero, e si dice com'e' */
-const P2P_PAYCODE_CIFRATO_HTML = '<div class="hint">Il codice resta tuo e di chi vende: viaggia cifrato, e Barattolo non lo legge.</div>';
-const P2P_PAYCODE_SERVER_HTML = '<div class="hint">Negli scambi on-chain il PayCode lo custodisce Barattolo, e te lo mostra solo coi sats confermati nel 2-di-3.</div>';
 
 /* ═══ GLI USDT NEGLI SCAMBI ON-CHAIN (2 nov 2026, cantiere
    p2p-onchain-usdt, Andrea: «usdt onchain assolutamente è da fare»; la
@@ -67245,9 +67263,9 @@ function schedaOnchainP2P(o){
         ? `Deposita <b>${fmt(o.importo_sats)} sats</b> (${fmt(o.sats)} + ${fmt(o.margine_sats)} di margine per la rete`
           + (Number(o.quota_sats) > 0 ? ` + ${fmt(Number(o.quota_sats) - (Number(o.quota_ricevente_sats) || 0))} di commissione` : '') + ') '
           + `nel 2-di-3 entro le ${quando(o.deposito_entro)}: tocca «🔒 Blocca i sats». Con una conferma lo scambio va avanti.`
+        : tabOc ? `Chi vende sta depositando i sats (entro le ${quando(o.deposito_entro)}). Poi vedi il PayCode.`
         : `Chi vende sta depositando ${fmt(o.importo_sats)} sats nell'indirizzo 2-di-3 (entro le ${quando(o.deposito_entro)}). `
-          + (tabOc ? 'Ti avvisiamo appena sono confermati: allora vedi il PayCode e vai al tabacchino.'
-                   : 'Ti avvisiamo appena sono confermati: allora mandi gli euro.');
+          + 'Ti avvisiamo appena sono confermati: allora mandi gli euro.';
       /* il foglio del deposito, come «🔒 Blocca i sats» di Lightning
          (30 ott 2026): il suo tasto e' quello in evidenza */
       gesti = (deposito ? bott('orange', `apriDepositoOnchainP2P(${o.id})`, '🔒 Blocca i sats')
@@ -67262,10 +67280,8 @@ function schedaOnchainP2P(o){
          Amazon invece del conto */
       if (tabOc) {
         testo = ricevo
-          ? `I <b>${fmt(o.sats)} sats</b> sono nel 2-di-3. Paga il PayCode qui sotto al tabacchino `
-            + `(<b>${esc(fmtEur(o.euro))} € in contanti</b>), poi tocca «Ho pagato al tabacchino».`
-          : 'Deposito confermato. Chi compra adesso vede il PayCode e va al tabacchino: quando su Amazon '
-            + 'l\'ordine risulta <b>pagato</b>, libera i sats. Mai prima.';
+          ? 'Sats confermati. Paga il PayCode qui sotto, poi tocca «Ho pagato al tabacchino».'
+          : 'Deposito confermato. Libera i sats solo quando su Amazon l\'ordine risulta <b>pagato</b>.';
         gesti = (ricevo ? g('euro-inviati', '🧾 Ho pagato al tabacchino', 'orange') : bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'))
           + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
           + g('disputa', '⚖️ Apri una disputa');
@@ -67310,10 +67326,9 @@ function schedaOnchainP2P(o){
     case 'euro_inviati':
       if (tabOc) {
         testo = deposito
-          ? `Chi compra dice di aver pagato il PayCode al tabacchino (${quando(o.euro_inviati_il)}). `
-            + 'Guarda su Amazon: se l\'ordine risulta pagato, libera i sats; se no, apri una disputa.'
-          : `Hai detto di aver pagato il PayCode (${quando(o.euro_inviati_il)}). Chi vende lo controlla su Amazon `
-            + 'e libera i sats sul tuo wallet. Tieni lo scontrino: in una disputa è la tua prova.';
+          ? `Chi compra dice di aver pagato (${quando(o.euro_inviati_il)}). Se su Amazon l'ordine risulta pagato, `
+            + 'libera i sats; se no, apri una disputa.'
+          : `Hai pagato il PayCode (${quando(o.euro_inviati_il)}). Chi vende controlla Amazon e libera i sats. Tieni lo scontrino.`;
         gesti = (deposito ? bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats') : '')
           + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
           + g('disputa', '⚖️ Apri una disputa');
@@ -86843,9 +86858,8 @@ function scadenzaPayCodeDaLibroP2P(scadeLibro, nato){
    gemello di `testoBarattozonP2P`, senza lo scontrino (lo dicono i gesti) */
 function testoBarattozonOcP2P(mio){
   return (mio
-    ? 'Con Barattozon fai pagare in contanti alla cassa del tabacchino un tuo ordine Amazon. On-chain il PayCode lo custodisce Barattolo: chi prende l\'ordine lo vede solo quando il tuo deposito è confermato nel 2-di-3, e paga solo allora. Non vede nome, indirizzo né cosa hai comprato.'
-    : 'Paghi in contanti alla cassa del tabacchino un ordine Amazon di chi vende, e paghi solo coi sats confermati nel 2-di-3. Non vedi nome, indirizzo né cosa ha comprato.')
-    + ' Per pagare non serve alcun documento.';
+    ? 'Chi prende l\'ordine paga in contanti al tabacchino un tuo ordine Amazon. Vede il PayCode solo a deposito confermato, mai nome, indirizzo o cosa hai comprato.'
+    : 'Paghi in contanti al tabacchino un ordine Amazon di chi vende, solo a sats confermati. Non vedi nome, indirizzo o cosa ha comprato.');
 }
 function testoBarattozonP2P(mio, senzaScontrino){
   const cosa = mio
@@ -91811,7 +91825,7 @@ function riepilogoTabacchinoP2P(v){
     + '\nPrezzo: ' + (fisso ? 'fisso, sats calcolati adesso' : 'di mercato, sats calcolati alla presa')
     + '\nPremio: ' + premioTestoTabP2P(pr)
     + '\n\n' + rigaPremioTabP2P(v.euro, v.cambio, v.premioTab, fisso)
-    + (v.oc ? '\nRete: on-chain. Chi prende vede il PayCode solo quando il tuo deposito è confermato.' : '')
+    + (v.oc ? '\nRete: on-chain (il PayCode si vede a deposito confermato).' : '')
     + (fisso
       ? '\nTu blocchi ' + fmt(netto) + ' sats in garanzia, e l\'ordine Amazon lo paga chi li riceve.'
       : (differenza > 0

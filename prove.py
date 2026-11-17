@@ -95498,7 +95498,10 @@ DOM = null;
     prova("...la pagina dello scambio la monta una volta, sotto il gesto e l'avviso del recapito", [1, True],
           [_renPc.count("promemoriaMappaVendoP2P(o)"),
            0 < _renPc.find("avvisoRecapitoFermoP2P(o) +") < _renPc.find("promemoriaMappaVendoP2P(o) +")])
-    prova("...e la mappa la chiamano tre posti: chi paga, chi vende, «Info P2P»", 3,
+    # (17 nov 2026, barattozon-oc-corto) il quarto posto e' il riquadro
+    # corto di chi paga un Barattozon on-chain (`payCodeOcP2P`), e PuntoLis
+    # con lui
+    prova("...e la mappa la chiamano quattro posti: chi paga (Lightning e on-chain), chi vende, «Info P2P»", 4,
           mini.count('onclick="apriMappaPayCodeP2P()"'))
     # PUNTOLIS (secondo cantiere): l'indirizzo pubblico, scritto una
     # volta, con la stessa scala; lo chiamano chi paga e «Info P2P»
@@ -95506,7 +95509,7 @@ DOM = null;
           [mini.count("const LINK_PUNTOLIS_PAYCODE = 'https://www.puntolis.it/it/servizi-al-cittadino.html';"),
            mini.count("puntolis.it")])
     _pl = pezzo_js(mini, "function apriPuntoLisPayCodeP2P(){", "\n}\n")
-    prova("...si apre con la stessa scala della mappa, e lo chiamano due posti: chi paga e «Info P2P»", [True, 2],
+    prova("...si apre con la stessa scala della mappa, e lo chiamano tre posti: chi paga (Lightning e on-chain) e «Info P2P»", [True, 3],
           ["if (tg?.initData && tg.openLink) { try { tg.openLink(LINK_PUNTOLIS_PAYCODE); return; } catch(e){} }" in _pl
            and "window.open(LINK_PUNTOLIS_PAYCODE, '_blank', 'noopener');" in _pl
            and "chiediConferma" not in _pl,
@@ -190990,34 +190993,28 @@ def prove_barattozon_onchain():
            mini.count("corpo.euro_cent = Math.round(eTab * 100);"),
            mini.count("corpo.metodi = [metodoTabacchinoP2P(eTab)];"),
            mini.count("corpo.tabacchino = {paycode: payCodeP2P(tB.ordine).replace(/-/g, ''),")])
-    prova("il cappello di Barattozon on-chain non dice «cifrati»: nel foglio e nel riquadro di chi paga",
-          [1, 1, False],
+    prova("il cappello di Barattozon on-chain non dice «cifrati», ed e' corto (17 nov 2026, «troppo lungo»)",
+          [1, False, True],
           [mini.count("p2pNuovoOc && typeof testoBarattozonOcP2P === 'function' ? testoBarattozonOcP2P(true) : testoBarattozonP2P(true))"),
-           mini.count(".replace(esc(testoBarattozonP2P(false, true)), esc(testoBarattozonOcP2P(false)));"),
-           "cifrat" in pezzo_js(mini, "function testoBarattozonOcP2P(mio){", "\n}\n")])
+           "cifrat" in pezzo_js(mini, "function testoBarattozonOcP2P(mio){", "\n}\n"),
+           len(pezzo_js(mini, "function testoBarattozonOcP2P(mio){", "\n}\n")) < 420])
     prova("la scheda: «Ho pagato al tabacchino» al posto degli euro, il riquadro del PayCode al posto "
           "del recapito, il terzo passo e' il PayCode",
           [1, 1, 1],
           [mini.count("gesti = (ricevo ? g('euro-inviati', '🧾 Ho pagato al tabacchino', 'orange')"),
            mini.count("const recapitoBox = tabOc ? (typeof payCodeOcP2P === 'function' ? payCodeOcP2P(o) : '')"),
            mini.count("passi[2] = {t: 'PayCode pagato', d: vendo ? 'Al tabacchino, da chi compra'")])
-    prog = (pezzo_js(mini, "const P2P_OC_TAB_MIN_S = 12 * 3600;", "\n/* la riga in fondo al riquadro")
-            + "\n" + pezzo_js(mini, "const P2P_PAYCODE_CIFRATO_HTML =", "\n")
-            + "\n" + pezzo_js(mini, "const P2P_PAYCODE_SERVER_HTML =", "\n")
+    prog = (pezzo_js(mini, "const P2P_OC_TAB_MIN_S = 12 * 3600;", "\n/* ═══ GLI USDT NEGLI SCAMBI ON-CHAIN")
             + "\n" + pezzo_js(mini, "function metodiOnchainP2P(lato){", "\n}\n") + "\n}\n"
             + r"""
-const P2P_TABACCHINO = 'Contanti al tabacchino';
+const P2P_TABACCHINO = 'Contanti al tabacchino', P2P_TAB_ULTIMA_S = 3600;
 const metodiPubblicabiliP2P = l => ['Revolut', P2P_TABACCHINO];
 const tabacchinoP2P = m => (m || []).some(x => String(x).indexOf(P2P_TABACCHINO) === 0);
 const payCodeP2P = t => { const m = /^(\d{3})[-\s]?(\d{3})[-\s]?(\d{3})$/.exec(String(t || '').trim());
   return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; };
 const esc = s => String(s), fmtEur = n => Number(n).toFixed(2).replace('.', ',');
-const dataTabacchinoP2P = t => 'il ' + t;
-const testoBarattozonP2P = (mio, senza) => 'CAPPELLO-LN';
-const testoBarattozonOcP2P = mio => 'CAPPELLO-OC';
-const CHIAMATE = [];
-const riquadroPayCodeP2P = r => { CHIAMATE.push(['pay', r]); return '<x>' + r.campiLoro.euro.testo + '</x>' + P2P_PAYCODE_CIFRATO_HTML + 'CAPPELLO-LN'; };
-const riquadroScadenzaPayCodeP2P = (r, a, prima) => { CHIAMATE.push(['tempo', r, prima]); return '<tempo>'; };
+const dataTabacchinoP2P = t => 'il ' + t, contoRimastoP2P = s => s + 's';
+const attrImportoP2P = (e, t) => '<imp>' + t + '</imp>';
 let p2pOnchainLibro = {};
 const r = {};
 r.nonLetta = bzOnchainP2P();
@@ -191026,16 +191023,15 @@ r.spenta = [metodiOnchainP2P('vendo'), bzOnchainP2P()];
 p2pOnchainLibro = {barattozon: true};
 r.accesa = [metodiOnchainP2P('vendo'), metodiOnchainP2P('compro')];
 r.vita = [vitaLibroOcTabP2P(1000 + 24 * 3600, 1000), vitaLibroOcTabP2P(1000 + 900 * 3600, 1000)];
+const fine = Math.floor(Date.now() / 1000) + 7200;
 const base = {metodi: ['Contanti al tabacchino 39.99'], euro: 39.99, stato: 'preso'};
-r.primaDelDeposito = payCodeOcP2P(Object.assign({}, base, {ruolo: 'venditore', tabacchino: {scade: 5000}}));
-r.chiamataPrima = [CHIAMATE[0][0], CHIAMATE[0][2], CHIAMATE[0][1].tabacchino.scade];
-r.annullato = payCodeOcP2P(Object.assign({}, base, {stato: 'annullato', ruolo: 'venditore', tabacchino: {scade: 5000}}));
+r.primaDelDeposito = payCodeOcP2P(Object.assign({}, base, {ruolo: 'venditore', tabacchino: {scade: fine}}));
+r.annullato = payCodeOcP2P(Object.assign({}, base, {stato: 'annullato', ruolo: 'venditore', tabacchino: {scade: fine}}));
 r.coDeposito = payCodeOcP2P(Object.assign({}, base, {stato: 'depositato', ruolo: 'venditore',
-  tabacchino: {scade: 5000, paycode: '212802988', barre: '0100860003622209216085740002128029880'}}));
-r.statoRiga = CHIAMATE[CHIAMATE.length - 1][1].stato;
+  tabacchino: {scade: fine, paycode: '212802988', barre: '0100860003622209216085740002128029880'}}));
 r.chiVende = payCodeOcP2P(Object.assign({}, base, {stato: 'pending', ruolo: 'maker',
-  tabacchino: {scade: 5000, paycode: '212802988', barre: ''}}));
-r.senzaTab = payCodeOcP2P(Object.assign({}, base, {metodi: ['Revolut'], ruolo: 'venditore', tabacchino: {scade: 5000}}));
+  tabacchino: {scade: fine, paycode: '212802988', barre: ''}}));
+r.senzaTab = payCodeOcP2P(Object.assign({}, base, {metodi: ['Revolut'], ruolo: 'venditore', tabacchino: {scade: fine}}));
 console.log(JSON.stringify(r));
 """)
     out = _node_banco(prog)
@@ -191051,14 +191047,22 @@ console.log(JSON.stringify(r));
           [out["spenta"], out["accesa"], out["nonLetta"]])
     prova("la vita nel libro del telefono e' quella del server: 8 ore prima, mai oltre i 7 giorni",
           [1000 + 16 * 3600, 1000 + 168 * 3600], out["vita"])
-    prova("a chi paga, prima del deposito: il tempo con la frase «arriva coi sats in garanzia», niente codice",
-          ["<tempo>", ["tempo", True, 5000]], [out["primaDelDeposito"], out["chiamataPrima"]])
-    prova("...a scambio annullato niente; col deposito il riquadro di Lightning col PayCode e il codice "
-          "a barre, in stato «attivo», e la riga che dice che il codice lo custodisce Barattolo",
-          ["", True, True, False, "attivo", True, False],
-          [out["annullato"], "PayCode: 212-802-988\nCodice a barre: 0100860003622209216085740002128029880" in out["coDeposito"],
-           "lo custodisce Barattolo" in out["coDeposito"], "viaggia cifrato" in out["coDeposito"],
-           out["statoRiga"], "CAPPELLO-OC" in out["coDeposito"], "CAPPELLO-LN" in out["coDeposito"]])
+    prova("a chi paga, prima del deposito: un titolo e il tempo che batte, niente codice",
+          [True, True, False], ["arriva coi sats confermati" in out["primaDelDeposito"],
+                                'id="p2pTabPayResta"' in out["primaDelDeposito"],
+                                "212" in out["primaDelDeposito"]])
+    # CORTO (17 nov 2026, Andrea: «i testi però sono troppo lunghi,
+    # semplificali, anche la grafica»): la scatola di cassa sua, tre
+    # gesti, niente spiegazioni in fondo
+    cd = out["coDeposito"]
+    prova("...a scambio annullato niente; col deposito il codice, il 📋, il codice alla cassa, "
+          "l'importo, il tempo e TRE gesti (mappa, cassa senza buono, scontrino e «Ho pagato»), "
+          "senza le spiegazioni di Lightning",
+          ["", True, True, True, True, True, 3, True, True, False, False, False],
+          [out["annullato"], "212-802-988" in cd, "copiaRecapitoP2P(this)" in cd,
+           "apriBarreP2P(this.dataset)" in cd, "39,99 € in contanti" in cd,
+           'id="p2pTabPayResta"' in cd, cd.count("<li>"), "apriMappaPayCodeP2P()" in cd,
+           "buono regalo" in cd, "cifrat" in cd, "class=\"hint\"" in cd, len(cd) > 2200])
     prova("chi l'ha scritto rivede il suo PayCode, e un ordine senza tabacchino non ha riquadro",
           [True, True, ""],
           ["212-802-988" in out["chiVende"], "Il tuo PayCode" in out["chiVende"], out["senzaTab"]])
@@ -202436,7 +202440,8 @@ def prove_onchain_promemoria():
                  "SOLLECITI_PAYCODE_S = ", "SOLLECITI_RILASCIO_S = "):
         j = src.index("\n" + riga) + 1
         exec(src[j:src.index("\n", j)], amb)
-    for diz in ("SOLLECITO_RILASCIO_TESTI = {", "SOLLECITO_RILASCIO_CONTANTI_TESTI = {"):
+    for diz in ("SOLLECITO_RILASCIO_TESTI = {", "SOLLECITO_RILASCIO_CONTANTI_TESTI = {",
+                "P2P_ONCHAIN_RILASCIO_TAB_TESTI = {"):
         i = src.index("\n" + diz) + 1
         exec(src[i:src.index("\n}\n", i) + 3], amb)
     amb["_metodi_libro"] = lambda m: [str(x).strip() for x in m or []]
@@ -202444,6 +202449,7 @@ def prove_onchain_promemoria():
               "p2p_onchain_usdt", "_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin",
               "p2p_onchain_ore_pagamento", "_p2p_onchain_intervalli_pagare",
               "_p2p_onchain_testi_pagare", "_p2p_onchain_solo_contanti",
+              "p2p_onchain_tab_dati", "p2p_onchain_tab_scade", "_p2p_onchain_promemoria_tab",
               "_p2p_onchain_sollecito_dovuto", "_p2p_onchain_passata_solleciti"):
         exec(pezzo(f), amb)
     D = amb["_p2p_onchain_sollecito_dovuto"]
@@ -202487,6 +202493,24 @@ def prove_onchain_promemoria():
     prova("...niente a disputa aperta, ne' a scambio concluso",
           [0, 0], [liv(dict(inv, disputa_il=T0 + 5), 2 * H),
                    liv(dict(inv, stato="rilasciato"), 2 * H)])
+    # BARATTOZON ON-CHAIN (17 nov 2026, «Ok» di Andrea): niente recapito,
+    # il tempo e' quello del PayCode; i promemoria oltre la scadenza non ci
+    # sono, e a chi libera si parla di Amazon
+    tab = lambda ore: dict(base, recapito="", metodi='["Contanti al tabacchino 39.99"]',
+                           paycode=json.dumps({"pc": "212802988", "scade": T0 + ore * H, "barre": ""}))
+    t20, t3 = tab(20), tab(3)
+    prova("BARATTOZON a chi paga, senza recapito: col PayCode a 20 ore 1/2/3 a un'ora, sei "
+          "e sedici; col PayCode a 3 ore uno solo, a un'ora (gli altri cadrebbero dopo)",
+          [1, 2, 3, [1, 1]],
+          [liv(t20, H), liv(t20, 6 * H), liv(t20, 16 * H), [liv(t3, H), liv(t3, 2 * H)]])
+    prova("...e i testi dicono il PayCode e «Ho pagato al tabacchino», mai gli euro",
+          [True, True, False],
+          ["«Ho pagato al tabacchino»" in D(t20, T0 + H)[3],
+           "scade fra quattro ore" in D(t20, T0 + 16 * H)[3],
+           any("euro" in D(t20, T0 + h * H)[3] for h in (1, 6, 16))])
+    itab = dict(t20, stato="euro_inviati", euro_inviati_il=T0)
+    prova("...e a chi libera le parole di Amazon",
+          True, D(itab, T0 + H)[3].endswith(amb["P2P_ONCHAIN_RILASCIO_TAB_TESTI"][1]))
     con = sqlite3.connect(":memory:")
     con.row_factory = sqlite3.Row
     con.execute("CREATE TABLE p2p_onchain_ordini(id INTEGER PRIMARY KEY, stato TEXT, "

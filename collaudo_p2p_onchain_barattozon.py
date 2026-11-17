@@ -327,7 +327,7 @@ def main():
     prova("gli avvisi: a chi paga «il PayCode è nello scambio» e il tabacchino, a chi vende Amazon; "
           "in nessun avviso il codice",
           [True, True, True],
-          [detto_a(888, "il <b>PayCode</b> adesso è nello scambio") and detto_a(888, "tabacchino"),
+          [detto_a(888, "Il <b>PayCode</b> adesso è nello scambio") and detto_a(888, "tabacchino"),
            detto_a(999, "su Amazon l'ordine risulta <b>pagato</b>"),
            all(nessun_codice(t) for _, t in banco.DETTO)])
 

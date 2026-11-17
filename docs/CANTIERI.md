@@ -87704,3 +87704,40 @@ aggiornate. Il verbale della suite e dei collaudi sta in fondo.
 RESTA DA GUARDARE. Sul collaudo, dopo la riga: «Altri metodi ▾» con la
 voce e Info P2P con la sezione; in produzione, dopo la promozione: la
 voce assente e il pannello che dice «spento». La riga del nodo aspetta.
+
+
+## Barattozon on-chain, più corto (17 nov 2026, cantiere barattozon-oc-corto; Andrea alle 12:38: «Ok, i testi però sono troppo lunghi, semplificali, anche la grafica semplifica un po', troppo lungo»)
+
+COSA. La scheda di chi paga non riusa più la scatola di Lightning
+(`riquadroPayCodeP2P`: quattro gesti, il riquadro del buono, due righe di
+spiegazione in fondo): `payCodeOcP2P` ha la sua, da strumento di cassa.
+Il codice col 📋, «📊 Mostra il codice alla cassa», l'importo, il tempo
+(`⏱` sul `#p2pTabPayResta` di sempre, che il battito riscrive) e tre
+gesti di una riga: il punto abilitato (mappa o PuntoLis), la frase alla
+cassa col buono che «non vale», lo scontrino e «Ho pagato al tabacchino».
+Prima del deposito un titolo e il tempo; chi ha pubblicato vede codice,
+importo e scadenza, e la riga «chi compra lo vede...» solo finché il
+deposito non c'è. Corti anche le note della scheda (preso, depositato,
+euro_inviati), il cappello del foglio, la riga «Rete» del riepilogo e i
+due avvisi del bot al deposito confermato.
+
+I DUE PROMEMORIA (l'«Ok» di Andrea alla lista del cantiere di prima). A
+chi paga un Barattozon on-chain non partiva niente (il promemoria voleva
+un recapito): ora `_p2p_onchain_promemoria_tab` dà un'ora, sei ore e
+quattro ore prima della scadenza del PayCode, togliendo quelli che
+cadrebbero dopo (un PayCode a tre ore ne ha uno solo) e con testi che non
+contano l'uno sull'altro. A chi libera, `P2P_ONCHAIN_RILASCIO_TAB_TESTI`
+parla di Amazon invece che del conto.
+
+PROVATO. Suite severa 29.200/0 (prove_barattozon_onchain riscritta sulla
+scatola nuova; prove_onchain_promemoria con tre controlli del
+Barattozon; la mappa e PuntoLis contati un posto in più),
+collaudo_p2p_onchain_barattozon con l'avviso nuovo. Screenshot della
+scheda prima, dopo il deposito e di chi ha pubblicato. Rebasato su
+886cca37 (la serie dei giorni, i «Novità» che riescono: non miei): le
+sezioni toccate e i collaudi on-chain e della serie; poi su 1cb0b906
+(contante per posta, non mio) le sezioni on-chain prima del push.
+
+DA GUARDARE. Il riquadro «Dove ricevi i bitcoin?» resta quello di tutti
+gli scambi on-chain, e nel conto «Totale da inviare» resta la parola di
+sempre.

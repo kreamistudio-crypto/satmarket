@@ -109317,15 +109317,12 @@ def _p2p_onchain_testi_deposito_tab(o, euro: str) -> list:
     # le ore che restano, e non l'ora: il server non sa il fuso di chi legge
     ore = max(0, -(-(scade - int(time.time())) // 3600))
     return [
-        (o["ricevente_id"], "🔒 <b>Chi vende ha messo i sats nel deposito di "
-         f"garanzia 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
-         "Apri Barattolo: il <b>PayCode</b> adesso è nello scambio. Pagalo al "
-         f"tabacchino (<b>{euro} € in contanti</b>) prima che scada, fra circa {ore} ore, "
-         "poi tocca «Ho pagato al tabacchino»."),
-        (o["depositante_id"], "🔒 <b>Deposito confermato ✓:</b> chi compra adesso "
-         f"vede il PayCode e va al tabacchino. Vendi {_p2p_onchain_quanto(o)}.\n\n"
-         "Quando su Amazon l'ordine risulta <b>pagato</b>, apri lo scambio e "
-         "tocca «Ricevuti: libera i sats». Mai prima.")]
+        # corti (17 nov 2026, Andrea: «i testi però sono troppo lunghi»)
+        (o["ricevente_id"], f"🔒 <b>Sats nel 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
+         "Il <b>PayCode</b> adesso è nello scambio: pagalo al tabacchino "
+         f"(<b>{euro} € in contanti</b>) entro circa {ore} ore, poi tocca «Ho pagato al tabacchino»."),
+        (o["depositante_id"], f"🔒 <b>Deposito confermato ✓</b> Vendi {_p2p_onchain_quanto(o)}.\n\n"
+         "Quando su Amazon l'ordine risulta <b>pagato</b>, tocca «Ricevuti: libera i sats». Mai prima.")]
 
 
 def _p2p_onchain_mio_ln(con, oid: int, tg_id: int, confermato: bool = False):
@@ -110221,6 +110218,36 @@ def _p2p_onchain_testi_pagare(o) -> dict:
     }
 
 
+def _p2p_onchain_promemoria_tab(o) -> list:
+    """PURA: i promemoria a chi paga un BARATTOZON on-chain (17 nov 2026,
+    Andrea: «Ok» ai due ritocchi): `[(secondi dal deposito, testo)]` in
+    ordine di tempo. Il tempo e' quello del PayCode, che puo' essere di
+    poche ore: un promemoria che cadrebbe dopo la scadenza non c'e', e
+    ogni testo dice il suo momento senza contare sugli altri."""
+    S = P2P_ONCHAIN_SEGNO
+    fine = p2p_onchain_tab_scade(o) - int(o["depositato_il"] or 0)
+    tutti = [(3600, f"{S} 🧾 Promemoria: i sats sono nel 2-di-3. Paga il PayCode al "
+                    "tabacchino e tocca «Ho pagato al tabacchino»."),
+             (6 * 3600, f"{S} 🧾 Il PayCode non risulta ancora pagato. Se non puoi "
+                        "più, tocca «↩️ Rinuncio: rimborsa chi vende»."),
+             (fine - 4 * 3600, f"{S} ⏰ Il PayCode scade fra quattro ore. Pagalo e "
+                               "tocca «Ho pagato al tabacchino».")]
+    return sorted(t for t in tutti if 0 < t[0] < fine)
+
+
+# ...e a chi libera, con le parole di Amazon invece di quelle del conto
+P2P_ONCHAIN_RILASCIO_TAB_TESTI = {
+    1: "🧾 Promemoria: un'ora fa chi compra ha detto di aver pagato il tuo "
+       "PayCode. Se su Amazon l'ordine risulta pagato, libera i sats; se no, "
+       "apri una disputa.",
+    2: "🧾 Sei ore da quando chi compra ha detto di aver pagato il PayCode, e i "
+       "sats sono ancora nel 2-di-3. Controlla Amazon e decidi: libera, o apri "
+       "una disputa.",
+    3: "⏰ Venti ore da quando chi compra ha detto di aver pagato il PayCode. "
+       "Controlla Amazon e decidi: libera, o apri una disputa.",
+}
+
+
 def _p2p_onchain_solo_contanti(o) -> bool:
     """PURA: i metodi sono il SOLO «Contanti» (le parole di «consegnato»)."""
     return _metodi_libro(_p2p_onchain_metodi(o)) == ["Contanti"]
@@ -110242,6 +110269,14 @@ def _p2p_onchain_sollecito_dovuto(o, adesso: int):
     if stato == "depositato":
         if int(_p2p_onchain_campo(o, "pagamento_scaduto_il", 0) or 0):
             return None
+        # BARATTOZON (17 nov 2026): niente recapito, il tempo del PayCode
+        if p2p_onchain_tab_scade(o):
+            if not int(o["ricevente_id"] or 0):
+                return None
+            passi = _p2p_onchain_promemoria_tab(o)
+            n = livello(int(o["depositato_il"] or 0), [fra for fra, _ in passi],
+                        _p2p_onchain_campo(o, "sollecito_pagare", 0))
+            return ("sollecito_pagare", n, int(o["ricevente_id"]), passi[n - 1][1]) if n else None
         if not str(o["recapito"] or "").strip() or not int(o["ricevente_id"] or 0):
             return None
         if "Contanti" in _metodi_libro(_p2p_onchain_metodi(o)):
@@ -110256,7 +110291,8 @@ def _p2p_onchain_sollecito_dovuto(o, adesso: int):
         n = livello(int(o["euro_inviati_il"] or 0), SOLLECITI_RILASCIO_S,
                     _p2p_onchain_campo(o, "sollecito_libera", 0))
         if n:
-            testi = (SOLLECITO_RILASCIO_CONTANTI_TESTI if _p2p_onchain_solo_contanti(o)
+            testi = (P2P_ONCHAIN_RILASCIO_TAB_TESTI if p2p_onchain_tab_scade(o)
+                     else SOLLECITO_RILASCIO_CONTANTI_TESTI if _p2p_onchain_solo_contanti(o)
                      else SOLLECITO_RILASCIO_TESTI)
             return ("sollecito_libera", n, int(o["depositante_id"]),
                     f"{P2P_ONCHAIN_SEGNO} {testi[n]}")
