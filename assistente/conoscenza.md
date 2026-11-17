@@ -393,6 +393,8 @@ La privacy dello Swap, cioè chi vede cosa:
 
 Gli annunci di Barattolo vengono pubblicati anche su Nostr, una rete aperta: esistono sui relay anche indipendentemente da Barattolo. Se colleghi una tua chiave Nostr dal Profilo, i tuoi annunci escono firmati da te (la firma la fa il tuo browser) e restano tuoi. Gli avvisi possono arrivarti anche su Nostr, oltre che su Telegram. La chiave privata (nsec) non va mai data a nessuno, nemmeno a Barattolo.
 
+Il nome verificato su Nostr (se nelle REGOLAZIONI del pannello «Nome verificato su Nostr» è accesa): dal livello «Bottega avviata» chi ha una chiave Nostr collegata CON UNA FIRMA (non basta averla solo scritta nel profilo) può scegliere gratis un nome come mario@barattolo.store. Si fa nel Profilo, gruppo «Privacy», cassetto «🆔 Identità», alla riga «✔️ Nome verificato su Nostr»: si scrive il nome (lettere minuscole, cifre, punto, trattino o _, da 3 a 30 caratteri) e si tocca «Prendi questo nome». Poi bisogna copiarlo («📋 Copia») e incollarlo nella propria app Nostr (Damus, Primal, Amethyst...), nel campo «NIP-05» o «Indirizzo Nostr» del profilo: Barattolo non lo può scrivere al posto tuo. Le app mostrano allora la spunta accanto al nome. Non si possono prendere un nome già preso, lo username Telegram di un altro, né nomi come «admin», «staff» o «barattolo». Si può cambiare o lasciare quando si vuole. Se scendi sotto il livello o togli la chiave, il nome resta salvato ma va in pausa finché non torna tutto a posto.
+
 Su Nostr risponde anche Tappo: si può scrivere un DM al profilo «Barattolo» (npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy) oppure rispondere sotto le sue note, e Tappo risponde come su Telegram. Ai bot e allo spam non risponde, e se qualcuno dello staff sta già seguendo quella conversazione lascia parlare lui. Per un problema con un ordine, in pubblico Tappo invita a scrivergli in privato.
 
 <!-- pezzo libro-035 | libro -->
@@ -1959,4 +1961,12 @@ pubblico: sì
 frase: I negozi possono premiare chi torna a comprare: nel Profilo, «🎀 Premi fedeltà», chi vende scrive fino a quattro soglie in euro col suo regalo («da 100 € la borsa, da 200 € la tazza»). Barattolo conta quanto ogni cliente ha speso lì e, passata la soglia, il premio compare sul suo ordine successivo: il venditore lo mette nel pacco. Sulla pagina del negozio vedi i premi e quanto hai già speso.
 dove: Profilo → «🎀 Premi fedeltà»; la pagina di un negozio, riga «🎀 Premi fedeltà» sotto le promesse; il dettaglio dell'ordine, riga «🎀 Premio fedeltà»; il messaggio del bot «Premio fedeltà!».
 leva: PREMI_FEDELTA_ATTIVI (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-073 | novita -->
+## Novità · 2026-11-17 · nip05-utenti
+
+frase: Dal livello «Bottega avviata» puoi avere gratis il tuo nome verificato su Nostr, tipo mario@barattolo.store. Lo scegli nel Profilo, lo incolli nel campo NIP-05 del tuo profilo Nostr e le app Nostr mostrano la spunta accanto al tuo nome. Serve una chiave Nostr collegata con una firma.
+dove: Profilo → «Privacy» → «🆔 Identità» → riga «✔️ Nome verificato su Nostr» → «Prendi questo nome» e poi «📋 Copia»; nella scala dei livelli, tra i vantaggi di «Bottega avviata».
+leva: NIP05_UTENTI_ATTIVO (accesa di serie)
 pubblico: sì

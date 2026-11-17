@@ -31742,7 +31742,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    anche i nomi della casa, `_` e `barattolo`, scritti nel CODICE
    (`NIP05_DI_CASA`, la chiave di `ZAP_NPUB`): l'account Nostr
    ufficiale si verifica come `_@barattolo.store` senza righe nel
-   config — vedi CANTIERI, «L'account Nostr di Barattolo verificato»),
+   config — vedi CANTIERI, «L'account Nostr di Barattolo verificato»;
+   dal 17 nov 2026 un `?name=` che non è di casa si chiede a
+   `nip05_chiave_utente`, i nomi scelti dagli utenti, che rispondono
+   solo con leva `NIP05_UTENTI_ATTIVO`, livello da
+   `NIP05_UTENTI_LIVELLO` e chiave PROVATA; senza `?name=` gli utenti
+   non escono mai — vedi «I NOMI NIP-05 DEGLI UTENTI»),
    `/.well-known/lnurlp/zap` e `/api/lnurl/zap` (10 ott 2026,
    l'indirizzo Lightning di casa `zap@barattolo.store`: il citofono
    LUD-16 e il callback che conia la fattura; JSON, CORS aperto, mai un
@@ -36776,3 +36781,39 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `setPremiFedelta`), la riga `premiNegozioRiga` dopo le due promesse
   sorelle in `#negozioPromesse`, e `notaPremioFedelta(o)` nel dettaglio
   dell'ordine. Prove: `prove_premi_fedelta` e `collaudo_premi_fedelta`.
+
+
+## I NOMI NIP-05 DEGLI UTENTI (17 nov 2026, cantiere nip05-utenti)
+
+Chi ha una chiave Nostr PROVATA e almeno il livello `NIP05_UTENTI_LIVELLO`
+(«avviato», il gradino 2) sceglie gratis nel Profilo, Privacy → «🆔 Identità»,
+riga «✔️ Nome verificato su Nostr», un nome@barattolo.store; poi lo
+scrive lui nel campo NIP-05 del suo profilo Nostr (il server non firma
+mai il kind 0 di nessuno: regola ferrea 2).
+
+- LA COLONNA: `utenti.nip05_nome`, il solo nome ('' = nessuno). La
+  chiave NON si salva: la dice ogni volta il giudice `_nip05_chiave_hex`
+  (leva accesa, livello raggiunto, chiave di `_npub_avvisi`, cioè la
+  credenziale d'accesso o il badge verificato con la nota). Così il nome
+  segue la chiave se cambia e si spegne da solo quando un cancello si
+  chiude, senza righe da ripulire; resta salvato e torna quando il
+  cancello si riapre. Una npub solo DICHIARATA non basta: legherebbe un
+  nome di barattolo.store alla chiave di un altro.
+- LA ROTTA PUBBLICA: `/.well-known/nostr.json?name=x` guarda prima i nomi
+  di casa (`NIP05_NOMI`, che vincono sempre), poi `nip05_chiave_utente`.
+  Senza `?name=` escono i soli nomi di casa: l'elenco degli utenti
+  sarebbe l'anagrafe di chi ha una chiave Nostr qui. Un database che non
+  risponde vale `{"names": {}}`, mai un 500.
+- LA SCELTA: `POST /api/me/nip05` `{"nome": "mario"}` (vuoto = lascia;
+  lasciare non chiede né chiave né livello). Forma: 3-30 caratteri
+  `a-z0-9._-`, senza segni ai bordi o doppi; chi incolla
+  `mario@barattolo.store` si vede tenere `mario`. Fuori: `NIP05_RISERVATI`
+  (le voci che sembrano Barattolo), i nomi di casa, il nome di un altro,
+  lo username Telegram o il link del negozio di un altro
+  (`_nip05_nome_libero`, nello stesso `BEGIN IMMEDIATE` della scrittura).
+- `/api/me` porta `nip05` (null a leva spenta): nome, dominio, chiave,
+  sblocca, livello_nome, attivo, proposta. La scala dei livelli porta
+  `nip05` per gradino, il pannello delle leve il gruppo «✔️ Nome
+  verificato su Nostr». La fusione porta il nome della metà Nostr se la
+  metà Telegram non ne ha uno; la cancellazione lo libera con la riga.
+- Il collaudo: `collaudo_nip05_utenti.py` (in `ci/collaudi.txt`).

@@ -88160,3 +88160,43 @@ proxy. Tutto girato in cloud sull'albero riallineato a develop 9537d26
 RESTA DA GUARDARE. I pezzi della mappa da Flow; le missioni vere dal
 gioco; gli amici da Nostr; il menù per livello (aspetta Andrea); il link
 di Villaggio Bitcoin nel config del VPS se accettano.
+
+
+## Il nome verificato su Nostr, gratis dal livello 2 (17 nov 2026, cantiere nip05-utenti; Andrea: «attivare verifica NIP-05, gratis per utenti da lv2 in su»)
+
+**COSA.** Dopo il NIP-05 di casa (16 nov, `_@barattolo.store`), ogni
+utente con una chiave Nostr PROVATA e almeno il livello «Bottega
+avviata» sceglie gratis nome@barattolo.store nel Profilo (Privacy → «🆔 Identità»,
+riga «✔️ Nome verificato su Nostr»), lo copia e lo incolla nel campo
+NIP-05 della sua app Nostr: lì compare la spunta. Il disegno sta in
+ARCHITETTURA, «I NOMI NIP-05 DEGLI UTENTI». Leva `NIP05_UTENTI_ATTIVO`
+accesa di serie (regola del 14 nov) e `NIP05_UTENTI_LIVELLO = "avviato"`.
+
+**DECISIONI E PERCHÉ.** (1) SOLO LA CHIAVE PROVATA (firma o nota di
+verifica, il giudice `_npub_avvisi`): con la npub solo dichiarata
+chiunque legherebbe un nostro nome alla chiave di un altro. (2) IL NOME
+IN COLONNA, LA CHIAVE NO: il giudice la ricalcola a ogni domanda, così
+chi scende di livello, perde la verifica o vede la leva spenta smette di
+rispondere da solo, e torna da solo; nessuna ronda di pulizia. (3)
+NOSTR.JSON NON ELENCA GLI UTENTI: senza `?name=` solo i nomi di casa (la
+prova di `prove_leva_rgb` «non legge il database» resta vera per la
+rotta: il database lo apre il giudice). (4) NIENTE DOPPIONI CON ALTRI
+NOMI DI BARATTOLO: lo username Telegram o il link del negozio di un
+altro non si prendono, è il modo più facile di spacciarsi per lui. (5)
+IL PROFILO NOSTR LO SCRIVE L'UTENTE: il server non firma kind 0 altrui
+(regola ferrea 2); la riga dà il tasto «Copia» e dice dove incollarlo.
+SCARTATE: il nome automatico uguale allo username (non tutti lo hanno, e
+un nome è una scelta: resta come PROPOSTA nel campo); un prezzo (Andrea
+lo vuole gratis); elencare tutti i nomi in nostr.json.
+
+**PROVATO.** `collaudo_nip05_utenti.py` (52 prove, server vero con la
+TestClient, anche nel venv senza coincurve, e nella gabbia di
+`collaudi_ci.py`): migrazione, le tre porte, la rotta pubblica, forma e
+doppioni, lo spegnersi da solo, scala e pannello, fusione e
+cancellazione vere, leva spenta, database rotto. Controprove: tolto il
+controllo del livello e quello dei doppioni, la chiave presa dalla npub
+dichiarata, gli utenti messi nell'elenco: le prove diventano rosse.
+`prove_leva_rgb` ritoccata (il giudice di cartone, il nome d'utente,
+l'elenco senza utenti). NON VISTO DAL VIVO: la spunta in un client Nostr
+vero (Damus, Primal, Amethyst) su collaudo.barattolo.store; e la riga
+del Profilo su un telefono.

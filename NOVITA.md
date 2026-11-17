@@ -470,3 +470,9 @@ frase: I negozi possono premiare chi torna a comprare: nel Profilo, «🎀 Premi
 dove: Profilo → «🎀 Premi fedeltà»; la pagina di un negozio, riga «🎀 Premi fedeltà» sotto le promesse; il dettaglio dell'ordine, riga «🎀 Premio fedeltà»; il messaggio del bot «Premio fedeltà!».
 leva: PREMI_FEDELTA_ATTIVI (accesa di serie)
 pubblico: sì
+
+## 2026-11-17 · nip05-utenti
+frase: Dal livello «Bottega avviata» puoi avere gratis il tuo nome verificato su Nostr, tipo mario@barattolo.store. Lo scegli nel Profilo, lo incolli nel campo NIP-05 del tuo profilo Nostr e le app Nostr mostrano la spunta accanto al tuo nome. Serve una chiave Nostr collegata con una firma.
+dove: Profilo → «Privacy» → «🆔 Identità» → riga «✔️ Nome verificato su Nostr» → «Prendi questo nome» e poi «📋 Copia»; nella scala dei livelli, tra i vantaggi di «Bottega avviata».
+leva: NIP05_UTENTI_ATTIVO (accesa di serie)
+pubblico: sì

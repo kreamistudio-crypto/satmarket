@@ -216,3 +216,4 @@ collaudo_spedisci_entro.py
 collaudo_chiedi_locker.py
 collaudo_serie_giorni.py
 collaudo_sentinella.py
+collaudo_nip05_utenti.py
