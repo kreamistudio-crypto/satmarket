@@ -71202,9 +71202,51 @@ def prove_p2p_dettaglio():
     prova("...e la presa parte dal foglio con la chiamata di sempre", True,
           "eseguiPresaP2P(id, g ? g.euro : (gc ? gc.euro : 0), p2pDettMetodo);" in cd
           and "const g = o.euroMax ? quantoValeP2P(o, String(p2pDettImporto)) : null;" in cd)
-    prova("...e chi torna a cambiare la cifra ritrova la sua", True,
-          "esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || riga.euro))"
-          in pezzo_js(mini, "function renderQuantoP2P(){", "\n}\n"))
+    # (17 nov 2026, cantiere quanto-vuoto) ...ma la PRIMA volta il campo
+    # e' vuoto: il minimo scritto dentro era una cifra che nessuno aveva
+    # scelto, e chi voleva altro doveva prima cancellarla
+    _rq = pezzo_js(mini, "function renderQuantoP2P(){", "\n}\n")
+    prova("...e chi torna a cambiare la cifra ritrova la sua; la prima volta il campo e' vuoto",
+          (True, False),
+          ("esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || ''))" in _rq,
+           "|| riga.euro))" in _senza_commenti_js(_rq)))
+    prova("...la fascia sta nel segnaposto, e i due capi sono due tasti che non confermano",
+          (True, True, True, False),
+          ("placeholder=\"' + esc(String(riga.euro)) + ' \\u2013 '" in _rq,
+           "onclick=\"mettiQuantoP2P(\\'min\\')\">Minimo · ' + capo(riga.euro)" in _rq,
+           "onclick=\"mettiQuantoP2P(\\'max\\')\">Massimo · ' + capo(riga.euroMax)" in _rq,
+           "confermaQuantoP2P(" in _senza_commenti_js(
+               pezzo_js(mini, "function mettiQuantoP2P(quale){", "\n}\n"))))
+    _bq = (_fn_js(mini, "function stimaQuantoP2P(){")
+           + _fn_js(mini, "function mettiQuantoP2P(quale){") + r"""
+const NODI = {p2pQuantoInp: {value: ''}, p2pQuantoStima: {textContent: 'vecchia'}};
+const el = id => NODI[id];
+const ripuliCifreP2P = i => String(i.value).replace(/[^0-9]/g, '');
+const R = {id: 'r', euro: 20, euroMax: 100};
+const quantoValeP2P = (r, v) => { const n = Number(v);
+  return (n >= r.euro && n <= r.euroMax) ? {ok: true, euro: n, dillo: 'vale ' + n}
+                                         : {ok: false, euro: 0, dillo: 'fuori'}; };
+let p2pQuantoOrdine = 'r';
+const rigaLibroP2P = id => id === 'r' ? R : null;
+const out = {};
+stimaQuantoP2P(); out.vuoto = NODI.p2pQuantoStima.textContent;
+mettiQuantoP2P('min'); out.min = [NODI.p2pQuantoInp.value, NODI.p2pQuantoStima.textContent];
+mettiQuantoP2P('max'); out.max = [NODI.p2pQuantoInp.value, NODI.p2pQuantoStima.textContent];
+NODI.p2pQuantoInp.value = '5'; stimaQuantoP2P(); out.fuori = NODI.p2pQuantoStima.textContent;
+p2pQuantoOrdine = 'sparito'; NODI.p2pQuantoInp.value = '7'; mettiQuantoP2P('max');
+out.senza = NODI.p2pQuantoInp.value;
+console.log(JSON.stringify(out));
+""")
+    _oq = _node_banco(_bq)
+    if _oq is None:
+        salta("i tasti «Minimo» e «Massimo» del foglio «Quanto» in node", "node non c'e'")
+    else:
+        prova("a campo vuoto la stima tace: nessuno ha ancora sbagliato", "", _oq.get("vuoto"))
+        prova("«Minimo» e «Massimo» scrivono il capo e rifanno la stima",
+              [["20", "vale 20"], ["100", "vale 100"]], [_oq.get("min"), _oq.get("max")])
+        prova("...una cifra fuori fascia scritta a mano lo dice subito, come prima",
+              "fuori", _oq.get("fuori"))
+        prova("...e senza l'ordine sotto i tasti non toccano il campo", "7", _oq.get("senza"))
     prova("...la stima di «Quanto» la sente anche il lettore vocale", True,
           '<div class="hint" id="p2pQuantoStima" aria-live="polite"></div>' in mini)
     prova("...e un ordine nuovo riparte senza cifra", True,
@@ -164367,6 +164409,16 @@ console.log(JSON.stringify(out));
           '>Quanti USDT</label>' in out.get("foglioCompra", "")
           and "vuoi ricevere" in out.get("foglioCompra", ""))
     fe = out.get("foglioEuro", "")
+    # (17 nov 2026, cantiere quanto-vuoto) il campo nasce vuoto, la fascia
+    # nel segnaposto, e i due capi nella moneta dell'ordine
+    prova("il campo nasce vuoto, con la fascia nel segnaposto e i due capi a un tocco",
+          (True, True, True, True),
+          tuple(x in fe for x in
+                ('value="" onbeforeinput', 'placeholder="50 \u2013 276"',
+                 '>Minimo · 50 €</button>', '>Massimo · 276 €</button>')))
+    prova("...in USDT i capi parlano USDT", (True, True, False),
+          ('>Minimo · 50 USDT</button>' in f, '>Massimo · 276 USDT</button>' in f,
+           '€</button>' in f))
     prova("su un ordine in euro il foglio resta com'era: €, «Quanti euro»",
           (True, True, True, False),
           ("va da <b>50,00 €</b> a <b>276,00 €</b>" in fe,
