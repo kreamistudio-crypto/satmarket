@@ -108266,6 +108266,18 @@ def _p2p_onchain_prepara(con):
         perche TEXT NOT NULL DEFAULT '')""")
     con.execute("CREATE INDEX IF NOT EXISTS p2p_onchain_cauzioni_ordine "
                 "ON p2p_onchain_cauzioni(ordine_id, tg_id)")
+    # LA CAUZIONE PERSA (17 nov 2026 sera, quarto pezzo): due stati in piu',
+    # `saldando` (il moderatore l'ha bruciata e si sta chiedendo a LND di
+    # saldarla: nessun altro la tocca) e `persa`. `persa_da` = il
+    # moderatore; `meta_sats` e `meta_a` = la meta' che spetta all'altra
+    # persona, che un moderatore manda A MANO (decisione di Andrea);
+    # `meta_mandata_il/da` = quando e chi ha detto «mandata».
+    gia_c = {r[1] for r in con.execute("PRAGMA table_info(p2p_onchain_cauzioni)")}
+    for col in ("saldando_il", "persa_da", "meta_sats", "meta_a",
+                "meta_mandata_il", "meta_mandata_da"):
+        if col not in gia_c:
+            con.execute(f"ALTER TABLE p2p_onchain_cauzioni ADD COLUMN {col} "
+                        "INTEGER NOT NULL DEFAULT 0")
 
 
 def _p2p_onchain_campo(o, nome: str, vuoto=None):
@@ -108887,6 +108899,10 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
     cz = _p2p_onchain_cauzione_di(con, o, tg_id, admin)
     if cz:
         d["cauzione"] = cz
+    # la meta' di una cauzione persa, a chi spetta (quarto pezzo)
+    meta = _p2p_onchain_cauzione_meta_di(con, o, tg_id) if tg_id else None
+    if meta:
+        d["cauzione_meta"] = meta
     if d["contanti"] and dep and ric:
         lato_i = _p2p_onchain_lato_incontro(o, tg_id)
         if lato_i and _tabella_p2p(con, "p2p_sono_qui"):
@@ -109478,12 +109494,14 @@ def _p2p_onchain_commissioni(con, dep: int, ric: int, prezzo: int, fee) -> tuple
 # «LA CAUZIONE DI CHI PRENDE»): solo a chi PRENDE scegliendo «Contanti»,
 # il 3% dei sats con un minimo di 1000, quindici minuti per pagarla, e
 # non si perde MAI per un tempo scaduto.
-# LE DUE DECISIONI DI ANDREA (card del 17 nov): la cauzione si blocca IN
+# LE DECISIONI DI ANDREA (card del 17 nov): la cauzione si blocca IN
 # LIGHTNING col QR, la tiene Barattolo e torna a fine scambio (scartate:
 # dentro il 2-di-3, lenta e gia' bocciata da Alan; e «niente cauzione»);
 # e si perde «come su Lightning», solo per decisione di un moderatore,
-# meta' all'altra persona (quel gesto e' il pezzo dopo: qui la cauzione
-# TORNA SEMPRE).
+# meta' all'altra persona: e' `p2p_onchain_cauzione_brucia`, piu' sotto,
+# l'UNICA strada che salda una hold. La meta' la manda A MANO un
+# moderatore (terza card: scartate la cassaforte in automatico e un
+# wallet a parte).
 # COM'E' FATTA: una HOLD invoice del nostro LND, chiesta dal ponte come
 # le hold di prova (`POST /v2/invoices/hodl`), ma con un macaroon SUO,
 # `LND_PONTE_MACAROON_CAUZIONE`: quello delle hold di prova non sa
@@ -109514,6 +109532,7 @@ P2P_ONCHAIN_CAUZIONE_FINESTRA_S = 900   # il tempo per pagare la richiesta
 P2P_ONCHAIN_CAUZIONE_CLTV = 576         # i blocchi dell'HTLC, come Mostro
 P2P_ONCHAIN_CAUZIONE_PRESA_S = 900      # tenuta ma non usata: poi torna
 P2P_ONCHAIN_CAUZIONE_GUARDA_S = 600     # ogni quanto si richiede a LND una in gioco
+P2P_ONCHAIN_CAUZIONE_SALDANDO_S = 120   # una «saldando» appesa: poi si chiede a LND
 P2P_ONCHAIN_CAUZIONE_MEMO = ("Barattolo: cauzione dello scambio in contanti. "
                              "Resta in sospeso e torna a fine scambio")
 P2P_ONCHAIN_STATI_CHIUSI = ("rilasciato", "rimborsato", "annullato", "scaduto")
@@ -109611,6 +109630,11 @@ def p2p_onchain_cauzione_sorte(riga, stato_ordine: str, adesso: int) -> str:
     adesso = int(adesso)
     if stato == "attesa":
         return "aspetta" if adesso <= int(riga["scade"] or 0) else "guarda"
+    if stato == "saldando":
+        # il moderatore la stava bruciando e il processo e' morto a meta':
+        # dopo due minuti si chiede a LND com'e' finita
+        return ("guarda" if adesso - int(_p2p_onchain_campo(riga, "saldando_il", 0) or 0)
+                > P2P_ONCHAIN_CAUZIONE_SALDANDO_S else "aspetta")
     if stato != "tenuta":
         return "aspetta"
     if not int(riga["in_gioco"] or 0):
@@ -109629,11 +109653,13 @@ def p2p_onchain_cauzione_sorte(riga, stato_ordine: str, adesso: int) -> str:
 async def _lnd_cauzione(metodo: str, percorso: str, corpo: dict | None = None,
                         params: dict | None = None):
     """Una chiamata a LND col macaroon delle CAUZIONI, dal ponte: SOLO
-    `hodl`, `cancel` e la lettura di UNA fattura per hash ci passano.
+    `hodl`, `cancel`, `settle` (il solo gesto del moderatore) e la lettura
+    di UNA fattura per hash ci passano.
     Torna (json, '') o (None, perche'). NON ALZA MAI, e del guasto dice
     il tipo e il `message` di LND, mai l'URL coi suoi header."""
     if not ((metodo == "POST" and percorso in ("/v2/invoices/hodl",
-                                                 "/v2/invoices/cancel"))
+                                                 "/v2/invoices/cancel",
+                                                 "/v2/invoices/settle"))
             or (metodo == "GET"
                 and re.fullmatch(r"/v1/invoice/[0-9a-f]{64}", percorso))):
         return None, "strada non prevista"
@@ -109686,10 +109712,27 @@ async def _p2p_onchain_cauzione_annulla(hash_hex: str) -> bool:
     except ValueError:
         return False
     d, perche = await _lnd_cauzione("POST", "/v2/invoices/cancel", corpo)
-    ok = d is not None or "already" in perche.lower()
+    # «already canceled» e' un si'; «already settled» NO: una cauzione
+    # saldata non e' tornata (quarto pezzo)
+    ok = d is not None or "already cancel" in perche.lower()
     print(f"🔐 cauzione on-chain: cancel {hash_hex[:12]}… → "
           f"{'ok' if ok else perche}", flush=True)
     return ok
+
+
+async def _p2p_onchain_cauzione_salda(preimage_hex: str) -> tuple:
+    """SettleInvoice: l'HTLC fermo si INCASSA sul nodo, e non torna piu'.
+    L'UNICA strada che salda una cauzione, e la chiama SOLO il gesto del
+    moderatore (`p2p_onchain_cauzione_brucia`). Torna (True, '') o
+    (False, perche'). Il preimage non si stampa mai."""
+    try:
+        corpo = {"preimage": base64.b64encode(bytes.fromhex(str(preimage_hex))).decode()}
+    except ValueError:
+        return False, "preimage storto"
+    d, perche = await _lnd_cauzione("POST", "/v2/invoices/settle", corpo)
+    ok = d is not None or "already settled" in perche.lower()
+    print(f"🔐 cauzione on-chain: settle → {'ok' if ok else perche}", flush=True)
+    return ok, ("" if ok else perche)
 
 
 def _p2p_onchain_cauzione_viva(con, oid: int, tg_id: int):
@@ -109727,7 +109770,67 @@ def _p2p_onchain_cauzione_di(con, o, tg_id: int, admin: bool = False) -> dict | 
     mia = int(r["tg_id"]) == int(tg_id or 0)
     if not mia and not admin:
         return None
-    return {"stato": str(r["stato"]), "sats": int(r["sats"] or 0), "mia": mia}
+    # «saldando» dura un attimo: al telefono e' ancora «tenuta»
+    stato = "tenuta" if str(r["stato"]) == "saldando" else str(r["stato"])
+    d = {"stato": stato, "sats": int(r["sats"] or 0), "mia": mia}
+    if stato == "persa" and admin and not mia:
+        # LA META' DA MANDARE A MANO: al moderatore quanto, a chi e dove
+        a = int(_p2p_onchain_campo(r, "meta_a", 0) or 0)
+        u = con.execute("SELECT nome, ln_address FROM utenti WHERE tg_id=?",
+                        (a,)).fetchone() if a else None
+        d["meta"] = {"sats": int(_p2p_onchain_campo(r, "meta_sats", 0) or 0),
+                     "a": a, "nome": str(u["nome"] or "") if u else "",
+                     "ln_address": str(u["ln_address"] or "") if u else "",
+                     "mandata": bool(int(_p2p_onchain_campo(r, "meta_mandata_il", 0) or 0))}
+    return d
+
+
+def _p2p_onchain_cauzione_meta_di(con, o, tg_id: int) -> dict | None:
+    """La META' di una cauzione persa, per la persona a cui spetta:
+    {sats, mandata, ln}. `ln` = nel suo Profilo c'e' un indirizzo
+    Lightning a cui il moderatore puo' mandarla. None se non c'e'."""
+    try:
+        r = con.execute(
+            "SELECT * FROM p2p_onchain_cauzioni WHERE ordine_id=? AND stato='persa'"
+            " AND meta_a=? AND meta_sats>0 ORDER BY id DESC LIMIT 1",
+            (int(o["id"]), int(tg_id or 0))).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    if not r:
+        return None
+    u = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                    (int(tg_id),)).fetchone()
+    return {"sats": int(r["meta_sats"] or 0),
+            "mandata": bool(int(r["meta_mandata_il"] or 0)),
+            "ln": bool(u and str(u["ln_address"] or "").strip())}
+
+
+def p2p_onchain_cauzione_meta(sats) -> int:
+    """PURA: la meta' che va all'altra persona, arrotondata in giu' (il
+    sat spaiato resta al servizio). «Meta' e meta'», come su Lightning."""
+    try:
+        return max(int(sats), 0) // 2
+    except (TypeError, ValueError):
+        return 0
+
+
+def p2p_onchain_cauzione_bruciabile(riga, stato_ordine: str) -> str:
+    """PURA: perche' questa cauzione NON si puo' bruciare, o '' se si
+    puo'. Solo una cauzione IN GIOCO e TENUTA, e solo a scambio IN
+    DISPUTA: fuori dalla disputa non c'e' un moderatore che decide, e a
+    scambio chiuso la cauzione sta gia' tornando."""
+    if not riga:
+        return "Su questo scambio non c'è nessuna cauzione"
+    stato = str(riga["stato"] or "")
+    if stato == "persa":
+        return "Questa cauzione è già stata bruciata"
+    if stato == "saldando":
+        return "Un altro moderatore la sta bruciando adesso: riapri fra un minuto"
+    if stato != "tenuta" or not int(riga["in_gioco"] or 0):
+        return "La cauzione non è più bloccata: è già tornata a chi l'aveva messa"
+    if str(stato_ordine or "") != "disputa":
+        return "La cauzione si brucia solo a scambio in disputa"
+    return ""
 
 
 def _p2p_onchain_cauzione_base_sats(o) -> int:
@@ -109874,6 +109977,167 @@ async def _p2p_onchain_cauzione_per_presa(oid: int, tg_id: int, chiesto) -> tupl
     return int(r["id"]), ""
 
 
+async def _p2p_onchain_cauzione_chiudi_saldando(cid: int, lnd: str, adesso: int) -> str:
+    """Una cauzione «saldando» esce da li' secondo quel che dice LND:
+    SETTLED → persa (con la meta' dell'altra persona scritta), ACCEPTED →
+    di nuovo tenuta (la saldatura non e' passata), CANCELED → tornata.
+    Torna lo stato scritto, o '' se la riga non era piu' «saldando»."""
+    con = _p2p_onchain_db()
+    try:
+        r = con.execute(
+            "SELECT c.*, o.maker_id AS maker FROM p2p_onchain_cauzioni c"
+            " LEFT JOIN p2p_onchain_ordini o ON o.id=c.ordine_id WHERE c.id=?",
+            (int(cid),)).fetchone()
+        if not r or r["stato"] != "saldando":
+            return ""
+        if lnd == "SETTLED":
+            cur = con.execute(
+                "UPDATE p2p_onchain_cauzioni SET stato='persa', chiusa_il=?,"
+                " perche='decisione del moderatore', meta_sats=?, meta_a=?"
+                " WHERE id=? AND stato='saldando'",
+                (int(adesso), p2p_onchain_cauzione_meta(r["sats"]),
+                 int(r["maker"] or 0), int(cid)))
+            nuovo = "persa"
+        elif lnd == "CANCELED":
+            cur = con.execute(
+                "UPDATE p2p_onchain_cauzioni SET stato='tornata', chiusa_il=?,"
+                " perche='tornata da sola dal nodo', persa_da=0"
+                " WHERE id=? AND stato='saldando'", (int(adesso), int(cid)))
+            nuovo = "tornata"
+        else:
+            cur = con.execute(
+                "UPDATE p2p_onchain_cauzioni SET stato='tenuta', saldando_il=0,"
+                " persa_da=0 WHERE id=? AND stato='saldando'", (int(cid),))
+            nuovo = "tenuta"
+        con.commit()
+        return nuovo if cur.rowcount else ""
+    finally:
+        con.close()
+
+
+@app.post("/api/p2p/onchain/{oid}/cauzione/brucia")
+async def p2p_onchain_cauzione_brucia(oid: int, x_tg_init_data: str = Header(""),
+                                      barattolo_sessione: str = Cookie("")):
+    """IL MODERATORE BRUCIA LA CAUZIONE di chi ha preso in contanti e non
+    ha fatto la sua parte (decisione di Andrea, 17 nov 2026: «come su
+    Lightning», solo per decisione di un moderatore, mai per un tempo
+    scaduto). Solo a scambio IN DISPUTA, e mai da un moderatore che e'
+    parte dello scambio. La hold si SALDA sul nodo (SettleInvoice col
+    preimage della riga): e' l'unica strada del server che salda, e non
+    si disfa. Meta' spetta all'altra persona e gliela manda A MANO un
+    moderatore (seconda decisione dello stesso giorno: la hold saldata
+    finisce sul nodo, fuori da LNbits, e la cassaforte e' il wallet dei
+    depositi di tutti); l'altra meta' resta al servizio.
+    L'ORDINE DEI GESTI: prima la riga passa a «saldando» (cosi' il giro
+    dei ritorni non la rimanda indietro nello stesso istante), poi LND,
+    poi «persa». Se LND dice di no la riga torna «tenuta»."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]) or not p2p_onchain_leva():
+        raise HTTPException(404, "Non esiste")
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if int(user["id"]) in (int(o["depositante_id"] or 0), int(o["ricevente_id"] or 0),
+                               int(o["maker_id"] or 0), int(o["taker_id"] or 0)):
+            raise HTTPException(403, "Un moderatore non decide il proprio scambio")
+        r = con.execute(
+            "SELECT * FROM p2p_onchain_cauzioni WHERE ordine_id=? AND in_gioco=1"
+            " ORDER BY id DESC LIMIT 1", (int(oid),)).fetchone()
+        perche = p2p_onchain_cauzione_bruciabile(r, o["stato"])
+        if perche:
+            raise HTTPException(409, perche)
+        cur = con.execute(
+            "UPDATE p2p_onchain_cauzioni SET stato='saldando', saldando_il=?, persa_da=?"
+            " WHERE id=? AND stato='tenuta' AND in_gioco=1",
+            (adesso, int(user["id"]), int(r["id"])))
+        con.commit()
+        if not cur.rowcount:
+            raise HTTPException(409, "La cauzione è cambiata un attimo fa: riapri")
+        cid, preimage, sats, messa_da = int(r["id"]), str(r["preimage"]), int(r["sats"]), int(r["tg_id"])
+        altro = int(o["maker_id"] or 0)
+    finally:
+        con.close()
+    ok, perche = await _p2p_onchain_cauzione_salda(preimage)
+    if not ok:
+        await _p2p_onchain_cauzione_chiudi_saldando(cid, "ACCEPTED", adesso)
+        raise HTTPException(503, "Il nodo non ha saldato la cauzione (" + perche
+                                 + "): è ancora bloccata, riprova fra poco")
+    await _p2p_onchain_cauzione_chiudi_saldando(cid, "SETTLED", adesso)
+    meta = p2p_onchain_cauzione_meta(sats)
+    con = _p2p_onchain_db()
+    try:
+        u = con.execute("SELECT nome, ln_address FROM utenti WHERE tg_id=?",
+                        (altro,)).fetchone()
+    finally:
+        con.close()
+    ln = str(u["ln_address"] or "").strip() if u else ""
+    await _notifica_p2p_onchain(o, messa_da,
+        "🔐 <b>Cauzione persa:</b> " + f"{_fmt_sats(sats)} sats.\n\n"
+        "Un moderatore ha deciso che non hai fatto la tua parte nello scambio "
+        "in contanti: la cauzione non torna. Se pensi che ci sia un errore, "
+        "scrivi ai moderatori.", _p2p_onchain_bottone(o))
+    if altro and meta:
+        await _notifica_p2p_onchain(o, altro,
+            "🔐 <b>Metà della cauzione dell'altra persona è tua:</b> "
+            + f"{_fmt_sats(meta)} sats.\n\n"
+            + ("Te li manda un moderatore al tuo indirizzo Lightning del Profilo."
+               if ln else
+               "Te li manda un moderatore: scrivi il tuo indirizzo Lightning nel "
+               "Profilo, lo legge da lì."),
+            _p2p_onchain_bottone(o))
+    await notifica_admin(argomento="dispute", testo=
+        f"🔐 <b>Cauzione bruciata</b> sullo scambio P2P on-chain #{int(oid)} dal "
+        f"moderatore {int(user['id'])}: {_fmt_sats(sats)} sats incassati sul nodo.\n\n"
+        + (f"<b>DA MANDARE A MANO: {_fmt_sats(meta)} sats</b> a "
+           f"{html.escape(str(u['nome'] or '') if u else '')} ({altro})"
+           + (f", indirizzo Lightning <code>{html.escape(ln)}</code>" if ln
+              else ": non ha un indirizzo Lightning nel Profilo, va chiesta una fattura")
+           + ". Poi nella scheda dello scambio: «✅ Metà mandata»."
+           if altro and meta else "Nessuna metà da mandare."))
+    print(f"🔐 cauzione on-chain: scambio #{int(oid)}, {sats} sats BRUCIATI dal "
+          f"moderatore {int(user['id'])}; metà da mandare a mano: {meta}", flush=True)
+    return {"ok": True, "sats": sats, "meta": meta}
+
+
+@app.post("/api/p2p/onchain/{oid}/cauzione/meta-mandata")
+async def p2p_onchain_cauzione_meta_mandata(oid: int, x_tg_init_data: str = Header(""),
+                                            barattolo_sessione: str = Cookie("")):
+    """Il moderatore dice «la metà l'ho mandata»: e' un TIMBRO, non un
+    pagamento (i sats li ha mandati lui, dal suo wallet). Una volta sola."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]) or not p2p_onchain_leva():
+        raise HTTPException(404, "Non esiste")
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        r = con.execute(
+            "SELECT * FROM p2p_onchain_cauzioni WHERE ordine_id=? AND stato='persa'"
+            " AND meta_sats>0 ORDER BY id DESC LIMIT 1", (int(oid),)).fetchone()
+        if not r:
+            raise HTTPException(409, "Su questo scambio non c'è una metà da mandare")
+        if int(r["meta_a"] or 0) == int(user["id"]):
+            raise HTTPException(403, "La metà è tua: la segna un altro moderatore")
+        cur = con.execute(
+            "UPDATE p2p_onchain_cauzioni SET meta_mandata_il=?, meta_mandata_da=?"
+            " WHERE id=? AND meta_mandata_il=0", (adesso, int(user["id"]), int(r["id"])))
+        con.commit()
+        if not cur.rowcount:
+            return {"ok": True, "gia": True}
+        a, meta = int(r["meta_a"] or 0), int(r["meta_sats"] or 0)
+    finally:
+        con.close()
+    if a:
+        await _notifica_p2p_onchain(o, a,
+            "🔐 <b>Metà della cauzione mandata:</b> un moderatore ti ha inviato "
+            + f"{_fmt_sats(meta)} sats. Controlla il tuo wallet.", _p2p_onchain_bottone(o))
+    await notifica_admin(argomento="dispute", testo=
+        f"🔐 Scambio P2P on-chain #{int(oid)}: la metà della cauzione "
+        f"({_fmt_sats(meta)} sats) segnata come MANDATA dal moderatore {int(user['id'])}.")
+    return {"ok": True}
+
+
 async def p2p_onchain_cauzioni_passata(adesso: int | None = None) -> dict:
     """IL GIRO DELLE CAUZIONI: ogni cauzione viva passa dal giudice
     (`p2p_onchain_cauzione_sorte`) e si guarda o si annulla. Una cancel
@@ -109889,7 +110153,7 @@ async def p2p_onchain_cauzioni_passata(adesso: int | None = None) -> dict:
         righe = [dict(r) for r in con.execute(
             "SELECT c.*, o.stato AS stato_ordine FROM p2p_onchain_cauzioni c"
             " LEFT JOIN p2p_onchain_ordini o ON o.id=c.ordine_id"
-            " WHERE c.stato IN ('attesa','tenuta') ORDER BY c.id LIMIT 200")]
+            " WHERE c.stato IN ('attesa','tenuta','saldando') ORDER BY c.id LIMIT 200")]
     finally:
         con.close()
     for r in righe:
@@ -109899,6 +110163,11 @@ async def p2p_onchain_cauzioni_passata(adesso: int | None = None) -> dict:
         nuovo, perche = "", ""
         if sorte == "guarda":
             lnd = await _p2p_onchain_cauzione_lnd(r["hash"])
+            if r["stato"] == "saldando":
+                # il gesto del moderatore morto a meta': decide LND
+                if lnd in ("SETTLED", "ACCEPTED", "CANCELED"):
+                    await _p2p_onchain_cauzione_chiudi_saldando(r["id"], lnd, t)
+                continue
             if r["stato"] == "attesa":
                 if lnd == "ACCEPTED":
                     nuovo = "tenuta"
