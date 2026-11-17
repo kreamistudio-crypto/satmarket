@@ -47144,7 +47144,9 @@ def prove_fogli_di_casa():
     # CENTODICIANNOVE (17 nov 2026, cantiere barattozon-onchain): «Il tuo
     # PayCode, in breve» prima di pubblicare un Barattozon on-chain
     # (`pubblicaOnchainDalFoglioP2P`), gemello di quello di Lightning.
-    prova("i gesti che passano dalla domanda unica sono centodiciannove (dal 30 ott "
+    # CENTOVENTI (17 nov 2026, cantiere stradina): «Esci da Barattolo?»
+    # sulla casella che porta al partner dell'educazione (`vaiTappa`).
+    prova("i gesti che passano dalla domanda unica sono centoventi (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47155,8 +47157,9 @@ def prove_fogli_di_casa():
           "ETH/XMR?»; dal 14 nov via il foglio della fee dinamica, e le "
           "quattro della modifica e cancellazione dei feedback; dal 16 nov "
           "le quattro dei codici uno alla volta; dal 17 nov «Hai inviato gli "
-          "USDe?» on-chain e il riepilogo di Barattozon on-chain)",
-          119, solo_codice(mini).count("chiediConferma({"))
+          "USDe?» on-chain e il riepilogo di Barattozon on-chain; «Esci da "
+          "Barattolo?» della stradina)",
+          120, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -123703,7 +123706,8 @@ def prove_profilo_elegante():
                       "vocSicurezza"],
         "grpIncassi": ["accLnAddress", "accComeRicevi", "accOnchainIncasso", "accNwc", "vocEsporta"],
         # (14 nov 2026) le recensioni ricevute, prima del livello
-        "grpLivello": ["accRecensioni", "accLivello", "accInviti", "accDistintivi"],
+        # (17 nov 2026) ...e la porta della stradina degli obiettivi
+        "grpLivello": ["accRecensioni", "accLivello", "accInviti", "accDistintivi", "vocStradina"],
         "grpAspetto": ["accAvvisi", "accAspetto"],
         "grpPrivacy": ["accIdentita", "vocPrivacy", "vocCancella", "accTor"],
         # (16 nov 2026, Andrea: «un menu a parte») Tappo e l'assistenza in
@@ -128769,14 +128773,14 @@ console.log(JSON.stringify({
           "sconto dello 0,5% sulle commissioni P2P" in " · ".join(o["righe"][4]))
     prova("il primo gradino si dice punto di partenza, e il mio si "
           "riconosce", (True, 1),
-          ("da subito: il punto di partenza" in o["html"],
+          ("Il punto di partenza" in o["html"],
            o["html"].count("sei qui")))
     prova("una scala che non c'e' non disegna niente", "", o["vuota"])
     # --- il carosello (17 nov 2026) -------------------------------------
     prova("cinque tessere: le passate «Già tuo», la mia dice cosa manca, "
           "le davanti la soglia",
           ["Già tuo", "Già tuo",
-           "Mancano 480 XP e 8 affari conclusi al livello 4 (<b>Mercante esperto</b>)",
+           "Ancora 480 XP e 8 affari",
            "Da 800 XP e 15 affari", "Da %s XP e 40 affari" % o["tremila"]],
           o["frasi"])
     # 320 XP sul gradino 200→800: un quinto del tratto, cioe' un quinto
@@ -128796,8 +128800,7 @@ console.log(JSON.stringify({
           ("Hai raggiunto il livello massimo. 🫙", True),
           (o["massimo"], o["massimo_dentro"]))
     prova("senza xp e affari (un chiamante vecchio) non si rompe: conta "
-          "da zero", "Mancano 800 XP e 15 affari conclusi al livello 4 "
-          "(<b>Mercante esperto</b>)", o["senza_numeri"])
+          "da zero", "Ancora 800 XP e 15 affari", o["senza_numeri"])
     # il regalo del livello (accordo col cantiere del merch): la chiave
     # `regalo` del server, quando c'e', diventa l'ultima riga, scappata
     prova("un regalo nel gradino e' una riga in piu', e il testo e' scappato",
@@ -128811,6 +128814,479 @@ console.log(JSON.stringify({
           True, "livCarAlCentro(car)" in car
           and "p.hidden = p.dataset.n !== n;" in car
           and "p.classList.toggle('on', p.dataset.n === n);" in car)
+
+
+def prove_stradina():
+    """LA STRADINA DEGLI OBIETTIVI (17 nov 2026, cantiere stradina): un
+    TABELLONE lunghissimo da scorrere, dalla Terra alla Luna, in otto
+    zone con la loro mappa disegnata, fino all'halving del 2028; le caselle sono fatti gia' scritti
+    altrove (letti, mai timbrati), i gradini della scala chiudono le
+    zone, le MISSIONI di Tappo (cantiere del gioco) fanno da cancello.
+    Qui girano i GIUDICI PURI (le caselle dai numeri, gli amici, il
+    cappellino) su un database in memoria, e il banco node disegna la
+    tavola; il resto sono sentinelle. NIENTE XP DALLE CASELLE: la regola
+    «GLI XP» (ago 2026) non si rovescia da qui."""
+    import json as _js, shutil as _sh, subprocess as _sp, sqlite3 as _sq
+    print("\n[la stradina degli obiettivi]")
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    # 1. la porta «Impara bitcoin»: INERTE finche' il config non ha il link
+    prova("il link del partner si legge dal config col pattern di casa, "
+          "e nasce vuoto", True,
+          "try:\n    from config import IMPARA_BITCOIN_LINK\nexcept ImportError:\n"
+          "    IMPARA_BITCOIN_LINK = \"\"" in _SORGENTE)
+    prova("...e il config d'esempio lo porta vuoto, col nome accanto", True,
+          '\nIMPARA_BITCOIN_LINK = ""\nIMPARA_BITCOIN_NOME = "Villaggio Bitcoin"\n' in cfg)
+    # 2. le caselle dai numeri (giudice puro)
+    amb = {"LIVELLI": _livelli_dal_sorgente()}
+    i = _SORGENTE.index("STRADINA_ZONE = (")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\ndef fatti_stradina", i)], amb)
+    exec(pezzo("livello_utente"), amb)
+    exec(pezzo("tappe_stradina"), amb)
+    exec(pezzo("emoji_oggetto_tappo"), amb)
+    ZONE, CAS = amb["STRADINA_ZONE"], amb["STRADINA_CASELLE"]
+    prova("otto zone dalla Terra alla Luna, coi nomi di casa",
+          ["Primi passi", "Il mercatino", "Il porto", "Il bosco dei sats",
+           "La scala d'oro", "La vetta", "In orbita", "Verso la Luna"],
+          [z["nome"] for z in ZONE])
+    prova("L'HALVING DEL 2028 e' l'ultima casella, in cima all'ultima zona "
+          "(nessuno arriva alla Luna prima), e la data cade nell'aprile 2028",
+          ("halving", len(ZONE) - 1, "2028-04"),
+          (CAS[-1][1], CAS[-1][0], __import__("time").strftime(
+              "%Y-%m", __import__("time").gmtime(amb["STRADINA_HALVING_2028"]))))
+    prova("il tabellone e' lungo: almeno 60 caselle", True, len(CAS) >= 60)
+    soglie = {}
+    for (z, tid, em, nome, chiave, soglia, vai) in CAS:
+        soglie.setdefault(chiave, []).append((z, soglia))
+    prova("per ogni fatto le soglie crescono di zona in zona (mai una "
+          "casella piu' facile dopo una piu' difficile)", [],
+          [k for k, v in soglie.items()
+           if v != sorted(v) or len({s for _z, s in v}) != len(v)])
+    prova("gli id delle caselle sono unici", len(CAS), len({c[1] for c in CAS}))
+    scala = [{"numero": i + 1, "nome": g[3], "xp": g[0]}
+             for i, g in enumerate(amb["LIVELLI"])]
+    zero = {k: 0 for k in ("xp", "vendite", "acquisti", "wallet", "foto",
+                           "nostr", "annunci", "preferiti", "recensioni",
+                           "seguiti", "p2p", "incassati", "inviti", "tappo",
+                           "onchain", "nostr_verificata", "doppia",
+                           "giorni", "halving")}
+    t0 = amb["tappe_stradina"](zero, scala)
+    n_gradini = len(scala) - 1
+    prova("un nuovo iscritto: tabellone lungo (benvenuto + caselle + "
+          "gradini), fatto solo il benvenuto", (1 + len(CAS) + n_gradini, [0]),
+          (len(t0), [i for i, t in enumerate(t0) if t["fatto"]]))
+    prova("le zone salgono e non tornano mai indietro", True,
+          all(t0[i]["zona"] <= t0[i + 1]["zona"] for i in range(len(t0) - 1)))
+    fine = {}
+    for t in t0:
+        fine[t["zona"]] = t
+    ZG = amb["STRADINA_ZONE_GRADINO"]
+    prova("le zone dei gradini finiscono col loro gradino, l'ultima con la "
+          "Luna; le altre con una casella",
+          (["gradino"] * (len(ZG) - 1) + ["luna"], "🌕", "livello_%d" % len(scala),
+           True, len(ZONE) - 1),
+          ([fine[z]["tipo"] for z in ZG], t0[-1]["emoji"], t0[-1]["id"],
+           all(fine[z]["tipo"] == "casella" for z in range(len(ZONE))
+               if z not in ZG), ZG[-1]))
+    conti = {t["id"]: (t["n"], t["di"]) for t in t0}
+    prova("le soglie sopra 1 portano il conto, le prime volte no",
+          ((0, 5), (None, None), (0, 1_000_000)),
+          (conti["annunci5"], conti["annuncio"], conti["incasso1m"]))
+    prova("ogni casella dice dove si va a farla", True,
+          all(t["vai"] for t in t0))
+    pieno = dict(zero, xp=5000, vendite=200, acquisti=200, wallet=1, foto=1,
+                 nostr=1, annunci=60, preferiti=4, recensioni=60, seguiti=2,
+                 p2p=60, incassati=20_000_000, inviti=60, tappo=1, onchain=1,
+                 nostr_verificata=1, doppia=1, giorni=800, halving=1)
+    liv = amb["livello_utente"](5000, 42)["numero"]
+    mis = [{"id": "catena", "emoji": "⛓", "nome": "La catena", "zona": 0},
+           {"id": "lampo", "emoji": "⚡", "nome": "Il lampo", "zona": 3},
+           {"id": "storta", "zona": "sette"}, {"nome": "senza id", "zona": 1},
+           "non un dizionario"]
+    t1 = amb["tappe_stradina"](pieno, scala, "https://esempio.test/corso",
+                               "Scuola", True, [m for m in mis if isinstance(m, dict)],
+                               {"catena"})
+    ids1 = [t["id"] for t in t1]
+    prova("un veterano: tutte le caselle a soglia fatte, i gradini fino "
+          "al suo", (True, liv - 1),
+          (all(t["fatto"] for t in t1 if t["tipo"] == "casella"),
+           sum(1 for t in t1 if t["id"].startswith("livello_") and t["fatto"])))
+    tg = amb["tappe_stradina"](pieno, scala, "", "", True)
+    gi = [t for t in tg if t["id"] == "gioco"]
+    prova("con la leva del gioco (e senza missioni) c'e' «Gioca con Tappo», "
+          "verso la caccia; con le missioni no, l'ingresso sono loro",
+          ([("🎩", "caccia", True)], False),
+          ([(t["emoji"], t["vai"], t["fatto"]) for t in gi], "gioco" in ids1))
+    im = t1[ids1.index("impara")]
+    prova("col link c'e' la porta del partner: non si spunta (None), porta "
+          "il link e il nome del config", (None, "https://esempio.test/corso",
+                                           "Impara bitcoin con Scuola", "porta"),
+          (im["fatto"], im["link"], im["nome"], im["tipo"]))
+    prova("un link che non e' https non apre la porta", False,
+          any(t["id"] == "impara" for t in
+              amb["tappe_stradina"](zero, scala, "http://esempio.test", "X")))
+    # 3. le missioni di Tappo: nella loro zona, prima del gradino
+    m1, m2 = t1[ids1.index("missione_catena")], t1[ids1.index("missione_lampo")]
+    prova("le missioni stanno nella loro zona, coi campi del patto", 
+          ((0, "missione", "catena", "caccia", True), (3, "missione", "lampo", False)),
+          ((m1["zona"], m1["tipo"], m1["missione"], m1["vai"], m1["fatto"]),
+           (m2["zona"], m2["tipo"], m2["missione"], m2["fatto"])))
+    prova("...la missione della zona 3 sta subito prima del suo gradino",
+          "livello_3", ids1[ids1.index("missione_lampo") + 1])
+    tre = [{"id": "c", "zona": 3, "ordine": 3}, {"id": "a", "zona": 3, "ordine": 1},
+           {"id": "b", "zona": 3, "ordine": 2}]
+    t3 = amb["tappe_stradina"](zero, scala, "", "", True, tre, set())
+    z3 = [t["id"] for t in t3 if t["zona"] == 3]
+    prova("TRE MISSIONI IN UNA ZONA: in ordine, sparse fra le caselle (non "
+          "in mucchio), l'ultima subito prima del gradino", True,
+          [x for x in z3 if x.startswith("missione_")]
+          == ["missione_a", "missione_b", "missione_c"]
+          and z3.index("missione_b") - z3.index("missione_a") > 1
+          and z3[z3.index("missione_c") + 1] == "livello_3"
+          and not z3[0].startswith("missione_"))
+    prova("...e le voci storte (zona non numero, senza id) non entrano", 2,
+          sum(1 for t in t1 if t["tipo"] == "missione"))
+    prova("senza elenco nessuna missione", 0,
+          sum(1 for t in t0 if t["tipo"] == "missione"))
+    # 4. il cappellino: l'elenco del gioco puo' mancare o avere piu' forme
+    prova("senza l'elenco del gioco, nessun cappellino", "",
+          amb["emoji_oggetto_tappo"]("cilindro"))
+    amb["GIOCO_TAPPO_OGGETTI"] = {"cilindro": "🎩"}
+    prova("elenco id->emoji", "🎩", amb["emoji_oggetto_tappo"]("cilindro"))
+    amb["GIOCO_TAPPO_OGGETTI"] = {"cilindro": {"emoji": "🎩", "nome": "Cilindro"}}
+    prova("elenco di schede", "🎩", amb["emoji_oggetto_tappo"]("cilindro"))
+    amb["GIOCO_TAPPO_OGGETTI"] = [{"id": "cilindro", "emoji": "🎩"}]
+    prova("lista di schede; un id ignoto o vuoto non mostra niente",
+          ("🎩", "", ""),
+          (amb["emoji_oggetto_tappo"]("cilindro"),
+           amb["emoji_oggetto_tappo"]("corona"), amb["emoji_oggetto_tappo"]("")))
+    # 5. i fatti dal database: letture e basta, una tabella che manca vale zero
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.executescript("""
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, xp INTEGER DEFAULT 0,
+        vendite_ok INTEGER DEFAULT 0, acquisti_ok INTEGER DEFAULT 0,
+        ln_address TEXT DEFAULT '', registrato INTEGER DEFAULT 0,
+        avatar TEXT DEFAULT '', avatar_scelta TEXT DEFAULT '',
+        npub TEXT DEFAULT '', classifica_nascosta INTEGER DEFAULT 0);
+      CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INTEGER, stato TEXT);
+      CREATE TABLE preferiti(tg_id INTEGER, annuncio_id INTEGER);
+      CREATE TABLE feedback(id INTEGER PRIMARY KEY, da_tg_id INTEGER);
+      CREATE TABLE venditori_seguiti(tg_id INTEGER, venditore_id INTEGER);
+      CREATE TABLE ordini(id INTEGER PRIMARY KEY, venditore_id INTEGER,
+        compratore_id INTEGER, stato TEXT, prova INTEGER DEFAULT 0);
+      INSERT INTO utenti(tg_id, xp, vendite_ok, acquisti_ok, ln_address, avatar, npub)
+        VALUES (111, 350, 2, 1, ' io@wallet.test ', 'foto.jpg', 'npub1x'),
+               (222, 0, 0, 0, '', 'foto.jpg', ''),
+               (333, 900, 5, 5, '', '', ''), (444, 20, 0, 1, '', '', ''),
+               (555, 4000, 30, 10, '', '', '');
+      UPDATE utenti SET avatar_scelta='nessuna' WHERE tg_id=222;
+      UPDATE utenti SET classifica_nascosta=1 WHERE tg_id=555;
+      INSERT INTO annunci(venditore_id, stato) VALUES (111,'attivo'),(111,'rimosso');
+      INSERT INTO preferiti VALUES (111, 1), (111, 2);
+      INSERT INTO feedback(da_tg_id) VALUES (111);
+      INSERT INTO venditori_seguiti VALUES (111, 333), (111, 555), (111, 111);
+      INSERT INTO ordini(venditore_id, compratore_id, stato, prova)
+        VALUES (444, 111, 'released', 0), (222, 111, 'released', 1),
+               (111, 222, 'locked', 0);
+    """)
+    amb["stato_inviti"] = lambda c, tg, reg: {"persone": 2}
+    amb["time"] = __import__("time")
+    exec(pezzo("fatti_stradina"), amb)
+    f = amb["fatti_stradina"](con, 111)
+    prova("i fatti di chi legge (la tabella del P2P che non c'e' vale "
+          "zero, i seguiti senza se stesso)",
+          {"xp": 350, "vendite": 2, "acquisti": 1, "wallet": 1, "foto": 1,
+           "nostr": 1, "annunci": 1, "preferiti": 2, "recensioni": 1,
+           "seguiti": 2, "p2p": 0, "incassati": 0, "inviti": 2, "tappo": 0,
+           "onchain": 0, "nostr_verificata": 0, "doppia": 0,
+           "giorni": 0, "halving": 0}, f)
+    prova("la foto scartata con «nessuna» non vale come foto", 0,
+          amb["fatti_stradina"](con, 222)["foto"])
+    con.executescript("""
+      CREATE TABLE p2p_esiti(tg_id INTEGER, esito TEXT);
+      INSERT INTO p2p_esiti VALUES (111,'completato'),(111,'completato'),
+        (111,'annullato'),(222,'completato');
+      ALTER TABLE utenti ADD COLUMN tappo_oggetto TEXT DEFAULT '';
+      UPDATE utenti SET tappo_oggetto='cilindro' WHERE tg_id=111;
+      CREATE TABLE wallet_unico(tg_id INTEGER PRIMARY KEY, impronta TEXT);
+      CREATE TABLE onchain_xpub(tg_id INTEGER PRIMARY KEY, xpub TEXT);
+      INSERT INTO wallet_unico VALUES (111, 'abcd1234');
+      INSERT INTO onchain_xpub VALUES (222, 'xpub6x');
+      ALTER TABLE utenti ADD COLUMN npub_verificata INTEGER DEFAULT 0;
+      ALTER TABLE utenti ADD COLUMN npub_accesso TEXT DEFAULT '';
+      UPDATE utenti SET npub_verificata=1, npub_accesso='npub1x' WHERE tg_id=111;
+      INSERT INTO utenti(tg_id, npub_accesso) VALUES (-77, 'npub1nativo');
+    """)
+    f2 = amb["fatti_stradina"](con, 111)
+    prova("...e quando le tabelle ci sono si leggono: scambi completati "
+          "e cappellino", (2, 1), (f2["p2p"], f2["tappo"]))
+    import time as _tm
+    con.execute("UPDATE utenti SET registrato=? WHERE tg_id=111",
+                (int(_tm.time()) - 40 * 86400 - 60,))
+    prova("i giorni con Barattolo dalla prima entrata (chi non l'ha "
+          "segnata vale zero, mai un numero enorme)", (40, 0),
+          (amb["fatti_stradina"](con, 111)["giorni"],
+           amb["fatti_stradina"](con, 333)["giorni"]))
+    amb["STRADINA_HALVING_2028"] = 0
+    prova("il giorno dell'halving accende la sua casella", 1,
+          amb["fatti_stradina"](con, 111)["halving"])
+    amb["STRADINA_HALVING_2028"] = 1839369600
+    prova("le competenze: wallet on-chain (il wallet di Barattolo o una "
+          "xpub), Nostr verificata, doppia configurazione Telegram+Nostr; "
+          "un account solo-Nostr non e' «doppio»",
+          ((1, 1, 1), (1, 0, 0), 0),
+          ((f2["onchain"], f2["nostr_verificata"], f2["doppia"]),
+           (lambda g: (g["onchain"], g["nostr_verificata"], g["doppia"]))(
+               amb["fatti_stradina"](con, 222)),
+           amb["fatti_stradina"](con, -77)["doppia"]))
+    pos = {c[1]: k for k, c in enumerate(CAS)}
+    prova("PROGRESSIVA: prima i gesti gratis, poi la prima spesa; la "
+          "recensione dopo l'acquisto, la vendita dopo l'annuncio, la "
+          "verifica Nostr dopo la chiave, la doppia dopo la verifica", True,
+          pos["barattolo"] == 0 and pos["wallet"] < pos["acquisto"]
+          < pos["recensione"] and pos["annuncio"] < pos["vendita"]
+          and pos["nostr"] < pos["nostr_verificata"] < pos["doppia"])
+    prova("le competenze chieste da Andrea stanno nelle prime tre zone",
+          {"wallet": 0, "onchain": 2, "nostr": 1, "acquisto": 1,
+           "nostr_verificata": 2, "doppia": 2},
+          {c[1]: c[0] for c in CAS if c[1] in ("wallet", "onchain", "nostr",
+           "acquisto", "nostr_verificata", "doppia")})
+    amb["stato_inviti"] = lambda c, tg, reg: 1 / 0
+    prova("gli inviti che non si leggono valgono zero, non un errore", 0,
+          amb["fatti_stradina"](con, 111)["inviti"])
+    prova("un tg_id sconosciuto: tutto a zero", (0, 0, 0),
+          (lambda g: (g["xp"], g["wallet"], g["annunci"]))(
+              amb["fatti_stradina"](con, 9)))
+    # 6. gli amici: chi segui e chi ha scambiato con te, mai io, mai i nascosti
+    def volti_finti(c, ids, adesso):
+        return {i: {"nome": "U%d" % i, "avatar": "", "negozio": "n%d" % i,
+                    "livello": "Lv", "livello_numero": {333: 3, 444: 1}.get(i, 1)}
+                for i in ids}
+    amb.update(_volti_persone=volti_finti, STRADINA_AMICI_MAX=12)
+    exec(pezzo("amici_stradina"), amb)
+    am = amb["amici_stradina"](con, 111, 0)
+    prova("gli amici: il venditore seguito e la controparte dell'ordine "
+          "concluso; fuori io, il nascosto, l'ordine di prova e quello "
+          "non concluso; dal livello piu' alto",
+          [("U333", 3, "n333"), ("U444", 1, "n444")],
+          [(a["nome"], a["livello_numero"], a["negozio"]) for a in am])
+    prova("di un amico escono SOLO nome, faccia, negozio e livello: mai "
+          "xp o sats", {"nome", "avatar", "negozio", "livello", "livello_numero"},
+          set(am[0]))
+    prova("chi non ha nessuno: lista vuota", [],
+          amb["amici_stradina"](con, 222, 0))
+    # 7. la rotta: identita' da verifica_utente; le missioni solo a leva
+    #    accesa; niente scritture; gli asset sono rotte esplicite
+    ms = pezzo("mia_stradina")
+    prova("/api/me/stradina legge chi bussa da verifica_utente", True,
+          '@app.get("/api/me/stradina")' in _SORGENTE
+          and "user = verifica_utente(x_tg_init_data, barattolo_sessione)" in ms
+          and 'fatti_stradina(con, user["id"])' in ms
+          and "tg_id: int" not in ms.split("):")[0])
+    prova("...manda le zone e il cappellino gia' tradotto in emoji", True,
+          '"zone": list(STRADINA_ZONE)' in ms
+          and '"tappo_emoji": emoji_oggetto_tappo(tappo)' in ms)
+    prova("...le missioni le legge dal gioco SOLO a leva accesa, e una "
+          "lettura rotta vale «nessuna superata»", True,
+          'if gioco and isinstance(globals().get("MISSIONI_TAPPO"), (list, tuple)):' in ms
+          and 'superate = set(globals()["missioni_superate"](con, user["id"]))' in ms
+          and ms.index("except Exception:\n                superate = set()") > 0)
+    blocco = _SORGENTE[_SORGENTE.index("LA STRADINA DEGLI OBIETTIVI (17 nov 2026)"):
+                       _SORGENTE.index("def asset_mappa_stradina")]
+    prova("il cantiere non scrive niente: ne' xp, ne' tabelle", True,
+          "UPDATE " not in blocco and "INSERT " not in blocco
+          and "CREATE TABLE" not in blocco)
+    am_s = pezzo("asset_mappa_stradina")
+    prova("la mappa e la pedina sono una rotta esplicita (whitelist a "
+          "tupla), non un mount", True,
+          '@app.get("/assets/stradina/{nome}")' in _SORGENTE
+          and "if nome not in FILE_MAPPA_STRADINA:" in am_s
+          and os.path.exists("assets/stradina/tappo-pedina.webp"))
+    i = _SORGENTE.index("FILE_MAPPA_STRADINA = (")
+    elenco = _SORGENTE[i:_SORGENTE.index(")\n", i)]
+    prova("...e ogni pezzo in whitelist che c'e' sul disco e' leggero "
+          "(sotto i 400 KB)", [],
+          [n for n in re.findall(r'"([\w.-]+\.webp)"', elenco)
+           if os.path.exists(os.path.join("assets", "stradina", n))
+           and os.path.getsize(os.path.join("assets", "stradina", n)) > 400_000])
+    prova("ogni famiglia di caselle ha la sua icona disegnata in whitelist, "
+          "e ogni casella del tabellone dice la sua icona", ([], True),
+          ([k for k in amb["STRADINA_ICONE"]
+            if '"ico-%s.webp"' % k not in elenco],
+           all(t["icona"] in amb["STRADINA_ICONE"] for t in t0
+               if t["tipo"] == "casella")))
+    # 8. il client: la vista, la voce, i ganci, i suoni
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la vista privata c'e', con la voce nel cassetto del livello "
+          "che la apre", True,
+          '<div class="view" id="view-stradina">' in mini
+          and 'id="vocStradina" style="display:none"' in mini
+          and 'onclick="apriStradina()"' in mini)
+    prova("la nav la conta come Profilo e la riapre dalla cronologia", True,
+          "else if (view === 'stradina') view = 'profilo';" in mini
+          and "if (v === 'stradina') { apriStradina(); return ''; }" in mini)
+    prova("la voce si vede solo a chi e' dentro (mai in demo o vetrina)", True,
+          "vs.style.display = (DEMO || VETRINA || !myLivello) ? 'none' : '';"
+          in pezzo_js(mini, "function renderLivello(){", "\n}\n"))
+    ap = pezzo_js(mini, "async function apriStradina(resta){", "\n}\n")
+    prova("a missione finita (l'evento del gioco) il tabellone aperto si "
+          "ricarica senza spingere un'altra pagina nella storia", True,
+          "window.addEventListener('tappo:missione'" in mini
+          and "apriStradina(true);" in mini and "if (!resta) go('stradina');" in ap)
+    prova("la pagina chiede /me/stradina con l'identita', e in demo non parte",
+          True, "if (DEMO || VETRINA) return;" in ap
+          and "fetch(`${API_BASE}/me/stradina`" in ap
+          and "'X-Tg-Init-Data': authHdr()" in ap)
+    vt = pezzo_js(mini, "function vaiTappa(btn){", "\n}\n")
+    prova("un link fuori chiede conferma; una missione la apre il gioco "
+          "(se c'e'); le altre vanno alla loro vista", True,
+          "chiediConferma({" in vt and "titolo: 'Esci da Barattolo?'" in vt
+          and "if (btn.dataset.missione && typeof apriMissione === 'function')" in vt
+          and "if (vai && el('view-' + vai)) go(vai);" in vt)
+    sv = pezzo_js(mini, "function suonoTappo(nome){", "\n}\n")
+    prova("i suoni veri: un MP3 per nome dalla rotta della stradina; un file "
+          "rotto passa al bip e non si riprova, il rifiuto del browser no",
+          True, "new Audio(`/assets/stradina/suoni/${nome}.mp3`)" in sv
+          and "return suonoSintetico(nome);" in sv
+          and "if (e && e.name === 'NotAllowedError') return;" in sv
+          and "if (suoniMuti()) return;" in sv)
+    i = _SORGENTE.index("FILE_SUONI_STRADINA = (")
+    elenco_s = _SORGENTE[i:_SORGENTE.index(")\n", i)]
+    i = mini.index("const SUONI_FILE = [")
+    nomi_c = re.findall(r"'(\w+)'", mini[i:mini.index("];", i)])
+    prova("...i nomi del client sono la whitelist del server, uno a uno, e "
+          "ogni suono che c'e' sul disco e' leggero (sotto 60 KB)", ([], []),
+          ([n for n in nomi_c if '"%s.mp3"' % n not in elenco_s]
+           + [n for n in re.findall(r'"(\w+)\.mp3"', elenco_s) if n not in nomi_c],
+           [n for n in nomi_c if os.path.exists("assets/stradina/suoni/%s.mp3" % n)
+            and os.path.getsize("assets/stradina/suoni/%s.mp3" % n) > 60_000]))
+    as_s = pezzo("asset_suoni_stradina")
+    prova("...e la rotta dei suoni e' esplicita, con whitelist a tupla", True,
+          '@app.get("/assets/stradina/suoni/{nome}")' in _SORGENTE
+          and "if nome not in FILE_SUONI_STRADINA:" in as_s
+          and 'media_type="audio/mpeg"' in as_s)
+    st = pezzo_js(mini, "function suonoSintetico(nome){", "\n}\n")
+    prova("i suoni: WebAudio sintetizzato, zitto se muto o senza WebAudio, "
+          "mai un errore", True,
+          "if (!note || suoniMuti()) return;" in st
+          and "window.AudioContext || window.webkitAudioContext" in st
+          and "} catch(e){}" in st)
+    prova("...il muto si ricorda in questo browser, sempre dentro un try",
+          True, "try { return localStorage.getItem('suoniMuti') === '1'; } catch(e){ return false; }"
+          in mini and "try { localStorage.setItem('suoniMuti', muta ? '1' : '0'); } catch(e){}" in mini)
+    sc = pezzo_js(mini, "function strScegli(i){", "\n}\n")
+    prova("...e il tocco su una casella fa il suo suono: la moneta se fatta, "
+          "la magia se missione, il tonfo se chiusa", True,
+          "suonoTappo(!tq ? 'tocco' : tq.fatto === true ? 'moneta'" in sc
+          and "'magia'" in sc and "'chiusa'" in sc)
+    node = _sh.which("node")
+    if not node:
+        salta("il tabellone della stradina gira", "node non installato")
+        return
+    dati = {"tappe": [dict(t) for t in t1], "zone": list(ZONE),
+            "livello": {"numero": 2, "nome": "Bottega avviata"},
+            "sats": {"incassati": 12345, "spesi": 678},
+            "amici": [{"nome": "Ugo <b>", "avatar": "", "negozio": "ugo",
+                       "livello": "x", "livello_numero": 4},
+                      {"nome": "Ada", "avatar": "", "negozio": "",
+                       "livello": "x", "livello_numero": 1}],
+            "tappo_emoji": "🎩"}
+    dati["tappe"][1]["nome"] = "Metti <un> articolo"
+    a = mini.index("let stradinaDati = null;")
+    b = mini.index("function strScegli(i){")
+    banco = "\n".join([
+        pezzo_js(mini, "const esc = s =>", "));") + "));",
+        mini[a:b]]) + """
+const fmt = n => Number(n).toLocaleString('it-IT');
+const voltoHTML = (a, cl) => `<span class="${cl}">${esc(a.nome)}</span>`;
+const suoniMuti = () => true;
+const d = %s;
+const h = stradinaHTML(d, 340);
+const g = stradinaDisegno(d.tappe, 340);
+const u = stradinaUltimaFatta(d.tappe);
+const cls = s => (h.match(new RegExp('class="str-casella ' + s + '[ "]', 'g')) || []).length;
+const ped = /class="str-tappo"[^>]*style="left:(\\d+)px;top:(-?\\d+)px"/.exec(h) || [];
+const nuovo = Object.assign({}, d, {tappe: d.tappe.map((t, i) => Object.assign({}, t, {fatto: t.fatto === null ? null : i === 0}))});
+const iMis = d.tappe.findIndex(t => t.id === 'missione_lampo');
+console.log(JSON.stringify({
+  n: d.tappe.length, caselle: (h.match(/<button type="button" class="str-casella /g) || []).length,
+  fatte: cls('fatta'), ora: cls('ora'), porte: cls('porta'),
+  vasi: (h.match(/<img class="vaso" src="\\/assets\\/barattolo-hero.png"/g) || []).length,
+  icone: (h.match(/<img class="ico" src="\\/assets\\/stradina\\/ico-[a-z0-9_]+\\.webp"/g) || []).length,
+  n_caselle: d.tappe.filter(t => t.tipo === 'casella' && t.icona).length,
+  bande: (h.match(/class="str-banda"/g) || []).length,
+  mappe: (h.match(/src="\\/assets\\/stradina\\/zona\\d.webp"/g) || []).length,
+  u: u, iMis: iMis, pedina: [Number(ped[1]), Number(ped[2])],
+  attesa: [g.posti[u].x, g.posti[u].y - 58],
+  cappello: h.includes('class="str-cappello"') && h.includes('>🎩</span>'),
+  dentro: g.posti.every(p => p.x > 0 && p.x < g.largo && p.y > 0 && p.y < g.alto),
+  sale: g.posti.every((p, i) => !i || p.y < g.posti[i - 1].y),
+  cuciture: g.zone.map(z => [Math.round(z.sotto), Math.round(z.sopra)]), alto: g.alto,
+  scappato: h.includes('Metti &lt;un&gt; articolo') && !h.includes('Metti <un>'),
+  sats: h.includes(fmt(12345) + '</b> sats incassati'),
+  frase: stradinaFraseAmici(d), fila: (h.match(/<span class="nome">([^<]*)<\\/span><span class="lv">/g) || []).map(x => x.replace(/<[^>]+>/g, '')),
+  pedine_ugo: /class="str-pedine"[^>]*>[^]*?Ugo &lt;b&gt;/.test(h),
+  scheda_missione: stradinaSchedaHTML(d, iMis),
+  scheda_fatta: stradinaSchedaHTML(d, 0),
+  nuovo_ora: (/class="str-casella ora"[^>]*aria-label="([^"]*)"/.exec(stradinaHTML(nuovo, 340)) || [])[1],
+  nuovo_u: stradinaUltimaFatta(nuovo.tappe),
+  in_fila: stradinaUltimaFatta([{fatto: true}, {fatto: null}, {fatto: true},
+                                {fatto: false}, {fatto: true}]),
+  vuota: stradinaHTML({tappe: []}, 340) + stradinaHTML(null, 340)}));
+""" % _js.dumps(dati)
+    import tempfile as _tfm
+    cart = _tfm.mkdtemp(prefix="stradina_")
+    pf = os.path.join(cart, "stradina.js")
+    open(pf, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, pf], capture_output=True, text=True, encoding="utf-8")
+    prova("il tabellone della stradina gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    o = _js.loads(r.stdout)
+    prova("un bottone per casella, una casella «tocca a te», la porta, "
+          "un barattolo per gradino", (o["n"], 1, 1, n_gradini),
+          (o["caselle"], o["ora"], o["porte"], o["vasi"]))
+    prova("le caselle hanno la loro icona disegnata (l'emoji resta sotto, "
+          "per quando l'immagine manca)", o["n_caselle"], o["icone"])
+    prova("otto cartelli di zona e otto pezzi di mappa", (8, 8),
+          (o["bande"], o["mappe"]))
+    prova("LA MISSIONE NON SUPERATA E' UN CANCELLO: Tappo si ferma prima, "
+          "anche se piu' su ci sono caselle fatte", True,
+          o["u"] < o["iMis"] and o["fatte"] > o["u"] + 1)
+    prova("TAPPO CAMMINA IN FILA: si ferma prima della prima casella da "
+          "fare (la porta inerte non lo ferma), anche se piu' su ce n'e' "
+          "di fatte", 2, o["in_fila"])
+    prova("Tappo sta sulla sua casella, col cappellino vinto",
+          (o["attesa"], True), (o["pedina"], o["cappello"]))
+    prova("i posti stanno dentro la tavola e la strada sale sempre", (True, True),
+          (o["dentro"], o["sale"]))
+    c = o["cuciture"]
+    prova("i pezzi di mappa si toccano senza buchi: dal fondo alla cima",
+          (0, o["alto"], True),
+          (c[0][0], c[-1][1], all(c[k][1] == c[k + 1][0] for k in range(len(c) - 1))))
+    prova("i nomi sono scappati e i sats stanno in cima", (True, True),
+          (o["scappato"], o["sats"]))
+    prova("la gara fra amici: in fila per livello, io al mio posto, la "
+          "frase giusta", (["Ugo &lt;b&gt;", "Tu", "Ada"],
+                           "Sei sotto di 2 livelli rispetto a <b>Ugo &lt;b&gt;</b>."),
+          (o["fila"], o["frase"]))
+    prova("...e gli amici stanno come pedine sul loro gradino", True,
+          o["pedine_ugo"])
+    prova("la scheda di una missione: «Gioca ›» con l'id per il gioco", True,
+          'data-missione="lampo"' in o["scheda_missione"]
+          and "Gioca ›" in o["scheda_missione"])
+    prova("...una casella fatta non ha bottone", (True, False),
+          ("✅ Fatta" in o["scheda_fatta"], 'class="btn"' in o["scheda_fatta"]))
+    prova("un nuovo iscritto: Tappo sul benvenuto, tocca alla seconda",
+          (0, "Casella 2: Metti &lt;un&gt; articolo"), (o["nuovo_u"], o["nuovo_ora"]))
+    prova("senza caselle la pagina lo dice", 2,
+          o["vuota"].count("La stradina non è ancora pronta."))
+    css = mini[mini.index("  .str-hero{"):mini.index("  .str-amico.io{")]
+    prova("niente !important ne' backdrop-filter nella tavola (regola "
+          "degli effetti ridotti)", (0, 0),
+          (css.count("!important"), css.count("backdrop-filter")))
+    prova("le due animazioni hanno i loro keyframes", True,
+          "@keyframes strTocca{" in css and "@keyframes strGalleggia{" in css)
 
 
 def prove_livello_accanto_al_titolo():
@@ -128851,9 +129327,15 @@ def prove_livello_accanto_al_titolo():
     rl = pezzo_js(mini, "function renderLivello(){", "\n}\n")
     prova("il cassetto scrive «· Lv. N» accanto al grado", True,
           "${esc(myLivello.nome)}${numLiv ? ` · Lv.&nbsp;${numLiv}` : ''}" in rl)
-    prova("...e chiede la riga del vantaggio al suo giudice, solo a P2P acceso",
+    prova("...e chiede la riga del vantaggio al suo giudice, solo a P2P acceso "
+          "e solo senza carosello (il carosello lo dice gia': «troppo testo»)",
           True, "rigaVantaggioLivello(myLivello," in rl
-          and "p2pAcceso()) ? p2pSconto : null" in rl)
+          and "p2pAcceso()) ? p2pSconto : null" in rl
+          and "${carosello || `" in rl
+          and rl.index("${vantaggio ?") < rl.index("`}\n    <div style=\"margin-top:16px\"><b>Il tuo titolo</b>"))
+    prova("...e la riga degli XP sta in fondo, in un «Come si contano gli XP» chiuso",
+          True, '<details class="liv-info"><summary>Come si contano gli XP</summary>' in rl
+          and rl.index("<details") < rl.index("${fraseXp(myXpRuoli)}"))
     # IL LIVELLO DELLO SCONTO E' UNO: il gemello del client combacia col
     # server, come SOGLIE_LIV con LIVELLI
     m = _re.search(r"^P2P_SCONTO_LIVELLO = (\d+)", _SORGENTE, _re.M)
@@ -134766,7 +135248,8 @@ def prove_guscio_apertura():
           "'/assets/barattolo-hero.png'," in swjs)
     prova("...e ha la sua rotta esplicita (regola ferrea 3)", 1,
           _SORGENTE.count('@app.get("/assets/barattolo-hero.png")'))
-    prova("...e il guscio non e' fra quei tre", 3,
+    # (17 nov 2026) il quarto e' il barattolo dei gradini della stradina
+    prova("...e il guscio non e' fra quei quattro", 4,
           mini.count('src="/assets/barattolo-hero.png"'))
 
 
@@ -141851,9 +142334,12 @@ def prove_volto_unico():
         # cima al blocco, nella loro funzione)
         "venditori seguiti": ("voltoHTML({nome: s.nome, avatar: s.avatar, negozio: cod",
                               "function seguitiAvvisiMercatino(){"),
+        # (17 nov 2026) gli amici della stradina: pedine e gara fra amici
+        "amici della stradina": ("voltoHTML(a, 'str-av'",
+                                 "function voltoAmicoStradina(a){"),
     }
-    prova("il volto si disegna da undici posti, ognuno col suo nome nel censimento",
-          [11, [1] * 11], [fuori.count("voltoHTML("),
+    prova("il volto si disegna da dodici posti, ognuno col suo nome nel censimento",
+          [12, [1] * 12], [fuori.count("voltoHTML("),
                            [fuori.count(v[0]) for v in POSTI.values()]])
     prova("...e ogni chiamata sta nella funzione del suo posto", [],
           [k for k, (pref, fn) in POSTI.items()
@@ -205483,7 +205969,7 @@ CATEGORIE = {
     dettaglio_ordine card_ordini righe_ordine niente_ai_nella_ricerca
     tracking_corretto tracking_venditore tracking_facoltativo
     posta_senza_traccia spedisci_entro
-    vantaggi_livelli cruscotto_admin cruscotto_semplice buoni_cumulabili
+    vantaggi_livelli stradina cruscotto_admin cruscotto_semplice buoni_cumulabili
     barattolo savers_proprietario visualizzazioni barattolo_in_striscia
     interesse barattolo_filtra barattolo_condiviso notifica_fail_open
     messaggio_admin avviso_contatto forma_tracking bip353 conta_feedback
@@ -206228,7 +206714,8 @@ def main():
               prove_tracking_corretto, prove_tracking_venditore,
               prove_tracking_facoltativo, prove_posta_senza_traccia,
               prove_spedisci_entro,
-              prove_vantaggi_livelli, prove_cruscotto_admin,
+              prove_vantaggi_livelli, prove_stradina,
+              prove_cruscotto_admin,
               prove_statistiche_p2p, prove_dispute_cruscotto_p2p,
               prove_cruscotto_semplice,
               prove_buoni_cumulabili,

@@ -31874,7 +31874,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    letterali li timbra `_timbra_asset_pagina`, quindi max-age di un
    giorno; vedi CANTIERI, «L'icona del carrello in Esplora per
    categorie»),
-   `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
+   `/assets/tappo.jpeg`, `/assets/stradina/{nome}` (whitelist a
+   tupla `FILE_MAPPA_STRADINA`: gli otto pezzi di mappa del tabellone,
+   le diciotto icone delle caselle e Tappo-pedina),
+   `/assets/stradina/suoni/{nome}` (whitelist a tupla
+   `FILE_SUONI_STRADINA`: i venti effetti MP3 del tabellone e del gioco), le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
    `/assets/icona-192-maskable.png`, `/assets/icona-512-maskable.png`,
    `/assets/apple-touch-icon.png`) — tutti file singoli, rotte

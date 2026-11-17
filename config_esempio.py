@@ -2322,6 +2322,17 @@ CLASSIFICA_KD = 0               # quante persone servono perche' il bonus
                                 # di `classifica_prova.py` affianca le
                                 # tarature sulla classifica vera.
 
+# --- La stradina degli obiettivi (17 nov 2026) ------------------------
+# La tappa «📖 Impara bitcoin con …» della stradina (Profilo → Livello e
+# titolo → La tua stradina) e' una PORTA verso un partner dell'educazione
+# bitcoin. Nasce SPENTA: senza link la tappa non compare e nessuno viene
+# nominato nell'app. Si accende scrivendo qui il link ufficiale (solo
+# https://), quando il partner e' d'accordo (Andrea, 17 nov 2026:
+# Villaggio Bitcoin, da proporre a loro). Il nome e' quello che si
+# legge sulla tappa.
+IMPARA_BITCOIN_LINK = ""
+IMPARA_BITCOIN_NOME = "Villaggio Bitcoin"
+
 # --- Collaudo ---------------------------------------------------------
 # False = com'e' giusto che sia online: nessuna identita' finta.
 # True  = test locale con gli utenti finti (Compratore/Venditore/Admin),

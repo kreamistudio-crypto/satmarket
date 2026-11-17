@@ -6487,6 +6487,206 @@
   .liv-vant .liv-riga .ic{flex:0 0 18px;text-align:center}
   .liv-vant .liv-riga.no{color:var(--ink-soft)}
   @media (prefers-reduced-motion: reduce){.liv-anello svg .pieno{transition:none}}
+  /* IL TABELLONE DELLA STRADINA (17 nov 2026, rifatto dopo il «voglio
+     una roba fatta bene» di Andrea): una mappa lunghissima da scorrere,
+     dalla Terra in basso alla Luna in cima, disegnata a pezzi (uno per
+     zona, assets/stradina/) con sopra la strada luminosa, le caselle
+     numerate come monete, i gradini come gemme, Tappo-pedina che parla
+     e gli amici come pedine sui livelli. La tavola e' SEMPRE notte, in
+     tutti e due i temi: e' un tabellone da gioco, ha il suo colore. Le
+     due animazioni (la casella che tocca a te, Tappo che galleggia) le
+     spegne la regola universale degli effetti ridotti. */
+  .str-hero{position:relative;border-radius:18px;overflow:hidden;margin:8px 0 12px;
+    padding:14px 14px 12px;color:#FFF6E6;
+    background:radial-gradient(120% 90% at 100% 0%,rgba(247,147,26,.35),transparent 60%),
+      linear-gradient(160deg,#2B2112,#171008);
+    box-shadow:0 10px 24px rgba(0,0,0,.25),inset 0 0 0 1px rgba(255,214,150,.14)}
+  .str-hero-riga{display:flex;align-items:center;gap:12px}
+  .str-hero-tappo{width:58px;height:58px;border-radius:50%;object-fit:cover;flex:0 0 58px;
+    box-shadow:0 0 0 3px #F7931A,0 0 18px rgba(247,147,26,.55)}
+  .str-hero-tit{font-family:'Baloo 2',var(--font-tit),system-ui,sans-serif;font-weight:800;font-size:22px;line-height:1.05;letter-spacing:.2px}
+  .str-hero-tit small{display:block;font-family:system-ui,sans-serif;font-weight:700;font-size:12.5px;
+    line-height:1.3;color:rgba(255,246,230,.72);letter-spacing:0;margin-top:3px}
+  .str-barra{height:10px;border-radius:99px;background:rgba(255,255,255,.12);
+    margin:12px 0 10px;overflow:hidden}
+  .str-barra i{display:block;height:100%;border-radius:99px;
+    background:linear-gradient(90deg,#FFD27A,#F7931A);box-shadow:0 0 12px rgba(247,147,26,.7)}
+  .str-chip-riga{display:flex;flex-wrap:wrap;gap:6px}
+  .str-chip{font-size:12px;font-weight:800;padding:5px 10px;border-radius:99px;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,214,150,.18)}
+  .str-chip b{color:#FFC164}
+  .str-hero .serie-riga{margin:8px 0 0}
+  .str-tavola{position:relative;border-radius:22px;overflow:hidden;margin:0 -4px;
+    background:#0B0A12;box-shadow:inset 0 0 0 1px rgba(255,214,150,.12)}
+  .str-zona{position:absolute;left:0;right:0;overflow:hidden}
+  .str-zona.z0{background:linear-gradient(to top,#1E3D2C 0%,#2C2A16 55%,#2B2112 100%)}
+  .str-zona.z1{background:radial-gradient(60% 40% at 20% 60%,rgba(247,147,26,.22),transparent 70%),
+    radial-gradient(50% 30% at 85% 30%,rgba(255,193,100,.16),transparent 70%),
+    linear-gradient(to top,#2B2112,#3A2611)}
+  .str-zona.z2{background:radial-gradient(55% 35% at 75% 55%,rgba(247,147,26,.25),transparent 70%),
+    linear-gradient(to top,#3A2611,#2A1D33 70%,#1C1D3A)}
+  .str-zona.z3{background:radial-gradient(50% 30% at 25% 40%,rgba(120,110,255,.18),transparent 70%),
+    linear-gradient(to top,#1C1D3A,#11132E)}
+  .str-zona.z4{background:radial-gradient(70% 30% at 50% 75%,rgba(247,147,26,.16),transparent 70%),
+    linear-gradient(to top,#11132E,#07070F)}
+  .str-zona.z2::after,.str-zona.z3::after,.str-zona.z4::after{content:"";position:absolute;inset:0;
+    background-image:radial-gradient(1.5px 1.5px at 12% 18%,#fff,transparent),
+      radial-gradient(1px 1px at 33% 72%,#fff,transparent),
+      radial-gradient(1.5px 1.5px at 58% 34%,#FFE6B8,transparent),
+      radial-gradient(1px 1px at 81% 61%,#fff,transparent),
+      radial-gradient(1.2px 1.2px at 92% 12%,#fff,transparent),
+      radial-gradient(1px 1px at 7% 88%,#FFE6B8,transparent);
+    background-size:150px 170px;opacity:.75}
+  .str-zona.z2::after{opacity:.3}
+  /* le giunture fra due pezzi di mappa sfumano nel fondo dipinto: sopra la
+     cucitura sta il cartello della zona, e la sfumatura gli fa da letto */
+  .str-mappa{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;
+    -webkit-mask-image:linear-gradient(to bottom,transparent,#000 64px,#000 calc(100% - 64px),transparent);
+    mask-image:linear-gradient(to bottom,transparent,#000 64px,#000 calc(100% - 64px),transparent)}
+  .str-zona.prima .str-mappa{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 64px);
+    mask-image:linear-gradient(to bottom,transparent,#000 64px)}
+  .str-zona.ultima .str-mappa{-webkit-mask-image:linear-gradient(to top,transparent,#000 64px);
+    mask-image:linear-gradient(to top,transparent,#000 64px)}
+  .str-terra{position:absolute;left:-35%;right:-35%;bottom:-62%;aspect-ratio:1;border-radius:50%;
+    background:radial-gradient(circle at 50% 30%,#4FA3E8,#2A6FB8 40%,#1D4E86 70%);
+    box-shadow:0 0 50px 10px rgba(79,163,232,.35);overflow:hidden}
+  .str-terra::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(18% 9% at 30% 12%,#58A85A 60%,transparent 62%),
+      radial-gradient(14% 7% at 66% 8%,#58A85A 60%,transparent 62%),
+      radial-gradient(10% 6% at 52% 20%,#6DB86A 60%,transparent 62%)}
+  .str-luna{position:absolute;left:50%;top:26px;width:190px;height:190px;margin-left:-95px;
+    border-radius:50%;background:radial-gradient(circle at 38% 35%,#F4EFE4,#CFC6B4 55%,#9C9384);
+    box-shadow:0 0 60px 14px rgba(255,236,200,.28)}
+  .str-luna::before{content:"";position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(13% 13% at 30% 60%,rgba(120,110,95,.45) 60%,transparent 64%),
+      radial-gradient(9% 9% at 65% 30%,rgba(120,110,95,.4) 60%,transparent 64%),
+      radial-gradient(7% 7% at 70% 70%,rgba(120,110,95,.4) 60%,transparent 64%),
+      radial-gradient(5% 5% at 45% 25%,rgba(120,110,95,.35) 60%,transparent 64%)}
+  .str-via{position:absolute;left:0;top:0;z-index:2;pointer-events:none;overflow:visible}
+  .str-via .letto{fill:none;stroke:rgba(10,7,4,.55);stroke-width:22;stroke-linecap:round;stroke-linejoin:round}
+  .str-via .bordo{fill:none;stroke:rgba(255,230,190,.28);stroke-width:2;stroke-dasharray:2 9;stroke-linecap:round}
+  .str-via .alone{fill:none;stroke:rgba(247,147,26,.38);stroke-width:16;stroke-linecap:round;stroke-linejoin:round}
+  .str-via .fatto{fill:none;stroke:#FFB547;stroke-width:6;stroke-linecap:round;stroke-linejoin:round}
+  .str-partenza{position:absolute;z-index:3;transform:translate(-50%,-50%);
+    font-family:'Baloo 2',var(--font-tit),system-ui,sans-serif;font-weight:800;font-size:12px;line-height:1;letter-spacing:1.5px;color:#FFF6E6;text-transform:uppercase;
+    padding:7px 12px;border-radius:99px;background:rgba(10,7,4,.7);
+    box-shadow:0 0 0 2px #F7931A,0 6px 14px rgba(0,0,0,.4)}
+  .str-banda{position:absolute;left:50%;z-index:4;transform:translate(-50%,-50%);text-align:center;
+    white-space:nowrap;padding:8px 16px 7px;border-radius:14px;color:#FFF6E6;
+    background:linear-gradient(180deg,rgba(43,33,18,.92),rgba(23,16,8,.92));
+    box-shadow:0 0 0 1.5px rgba(255,193,100,.55),0 8px 20px rgba(0,0,0,.45)}
+  .str-banda small{display:block;font-size:9.5px;font-weight:800;line-height:1;letter-spacing:2px;color:#FFC164;
+    text-transform:uppercase;margin-bottom:3px}
+  .str-banda b{font-family:'Baloo 2',var(--font-tit),system-ui,sans-serif;font-weight:800;font-size:18px;line-height:1.05;letter-spacing:.3px}
+  .str-banda em{font-style:normal;font-size:11px;font-weight:800;color:rgba(255,246,230,.7);margin-left:6px}
+  .str-casella{position:absolute;z-index:5;width:54px;height:54px;margin:-27px 0 0 -27px;
+    border-radius:50%;border:0;padding:0;font:inherit;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:23px;
+    background:radial-gradient(circle at 50% 35%,#3A3226,#1A150E);color:#fff;
+    box-shadow:0 0 0 2.5px rgba(255,230,190,.35),0 6px 14px rgba(0,0,0,.5)}
+  .liv-info{margin-top:14px}
+  .liv-info summary{cursor:pointer;font-size:13px;font-weight:800;color:var(--muted)}
+  .liv-info .hint{margin-top:6px}
+  .str-casella .em{filter:grayscale(1);opacity:.5}
+  .str-casella .ico{width:46px;height:46px;border-radius:50%;object-fit:cover;pointer-events:none;
+    filter:grayscale(1) brightness(.55)}
+  .str-casella .ico + .em{display:none}
+  .str-casella.fatta .ico,.str-casella.ora .ico{filter:none}
+  .str-casella .num{position:absolute;left:-5px;top:-5px;min-width:20px;height:20px;padding:0 4px;
+    border-radius:99px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:800;font-size:11px;line-height:20px;text-align:center;
+    background:#171008;color:#FFE6B8;box-shadow:0 0 0 1.5px rgba(255,230,190,.45)}
+  .str-casella.fatta{background:radial-gradient(circle at 40% 30%,#FFF1C9,#FFC65A 38%,#F7931A 70%,#B8650A);
+    box-shadow:0 0 0 3px #FFE3A3,0 0 18px rgba(247,147,26,.65),0 6px 14px rgba(0,0,0,.45)}
+  .str-casella.fatta .em{filter:none;opacity:1}
+  .str-casella.fatta .num{background:#B8650A;color:#fff;box-shadow:0 0 0 1.5px #FFE3A3}
+  .str-casella.fatta::after{content:"✓";position:absolute;right:-4px;bottom:-4px;width:20px;height:20px;
+    border-radius:50%;background:#2E9E5B;color:#fff;font:900 12px/20px system-ui,sans-serif;
+    text-align:center;box-shadow:0 0 0 2px #171008}
+  .str-casella.ora{background:radial-gradient(circle at 50% 35%,#FFFDF7,#F3E6CF);
+    box-shadow:0 0 0 4px #F7931A,0 0 0 9px rgba(247,147,26,.25),0 8px 18px rgba(0,0,0,.5);
+    animation:strTocca 1.6s ease-in-out infinite}
+  .str-casella.ora .em{filter:none;opacity:1}
+  .str-casella.porta{box-shadow:0 0 0 3px #A58BFF,0 0 18px rgba(165,139,255,.55),0 6px 14px rgba(0,0,0,.5)}
+  /* la casella-missione: Tappo ti aspetta li', e finche' non la superi la strada si ferma */
+  .str-casella.missione{width:60px;height:60px;margin:-30px 0 0 -30px;
+    background:radial-gradient(circle at 50% 35%,#2D6F6A,#123B38);
+    box-shadow:0 0 0 3px #3FD2C0,0 0 0 7px rgba(63,210,192,.22),0 0 20px rgba(63,210,192,.5),0 6px 14px rgba(0,0,0,.5)}
+  .str-casella.missione .em{filter:none;opacity:1}
+  .str-casella.missione.fatta{background:radial-gradient(circle at 40% 30%,#FFF1C9,#FFC65A 38%,#F7931A 70%,#B8650A)}
+  .str-nome.missione{color:#BFF5EC;box-shadow:0 0 0 1.5px rgba(63,210,192,.6)}
+  .str-nome.missione::before{content:"MISSIONE";display:block;font-size:9px;letter-spacing:1.6px;color:#3FD2C0;margin-bottom:2px}
+  .str-casella.porta .em{filter:none;opacity:1}
+  /* i gradini sono BARATTOLI (il disegno del logo): spenti finche' non
+     li raggiungi, accesi e col bagliore quando sono tuoi */
+  .str-casella.gradino,.str-casella.luna{width:70px;height:70px;margin:-35px 0 0 -35px;border-radius:50%;
+    background:radial-gradient(circle at 50% 40%,rgba(255,214,150,.18),rgba(10,7,4,.75) 70%)}
+  .str-casella.gradino .em,.str-casella.luna .em{display:none}
+  .str-casella .vaso{width:62px;height:62px;object-fit:contain;filter:grayscale(1) brightness(.6);pointer-events:none}
+  .str-casella.fatta .vaso{filter:none}
+  .str-casella.gradino.fatta,.str-casella.luna.fatta{background:radial-gradient(circle at 50% 45%,rgba(255,198,90,.55),rgba(247,147,26,.15) 60%,transparent 72%);
+    box-shadow:0 0 0 3px #FFE3A3,0 0 26px rgba(247,147,26,.7)}
+  .str-casella.gradino.fatta::after,.str-casella.luna.fatta::after{right:2px;bottom:2px}
+  .str-casella.luna{width:84px;height:84px;margin:-42px 0 0 -42px}
+  .str-casella.luna .vaso{width:74px;height:74px}
+  .str-muto{position:absolute;right:10px;top:10px;width:34px;height:34px;border-radius:50%;border:0;
+    font-size:16px;cursor:pointer;background:rgba(255,255,255,.1);color:#fff;
+    box-shadow:inset 0 0 0 1px rgba(255,214,150,.25)}
+  .str-casella.scelta{outline:3px solid #fff;outline-offset:4px}
+  @keyframes strTocca{0%,100%{box-shadow:0 0 0 4px #F7931A,0 0 0 9px rgba(247,147,26,.25),0 8px 18px rgba(0,0,0,.5)}
+    50%{box-shadow:0 0 0 4px #F7931A,0 0 0 15px rgba(247,147,26,.08),0 8px 18px rgba(0,0,0,.5)}}
+  .str-nome{position:absolute;z-index:4;transform:translateY(-50%);max-width:130px;
+    font-size:11.5px;font-weight:800;line-height:1.22;color:#FFF6E6;
+    padding:5px 8px;border-radius:10px;background:rgba(10,7,4,.62);
+    text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  .str-nome.chiusa{color:rgba(255,246,230,.66)}
+  .str-nome b{display:block;color:#FFC164;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;margin-top:2px}
+  .str-nome img{display:block;height:18px;width:auto;margin-top:4px;background:#fff;border-radius:5px;padding:2px 5px}
+  .str-nome.gradino{font-size:12.5px;color:#FFE3A3;box-shadow:0 0 0 1.5px rgba(255,193,100,.6)}
+  .str-tappo{position:absolute;z-index:7;width:62px;height:62px;margin-left:-31px;border-radius:50%;
+    object-fit:cover;pointer-events:none;
+    box-shadow:0 0 0 3px #F7931A,0 0 20px rgba(247,147,26,.7),0 10px 16px rgba(0,0,0,.5);
+    animation:strGalleggia 2.4s ease-in-out infinite}
+  @keyframes strGalleggia{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  .str-cappello{position:absolute;z-index:8;font-size:22px;line-height:1;margin-left:-4px;
+    pointer-events:none;transform:rotate(-12deg)}
+  .str-fumetto{position:absolute;z-index:9;transform:translate(-50%,-100%);max-width:200px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;
+    background:#FFFDF7;color:#2B2112;font-size:12px;font-weight:800;line-height:1.25;
+    padding:7px 10px;border-radius:12px;box-shadow:0 8px 18px rgba(0,0,0,.4);pointer-events:none}
+  .str-fumetto::after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;
+    border:6px solid transparent;border-bottom:0;border-top-color:#FFFDF7}
+  .str-pedine{position:absolute;z-index:6;display:flex;transform:translate(0,-50%)}
+  .str-pedine .str-av{width:26px;height:26px;border-radius:50%;margin-left:-8px;
+    box-shadow:0 0 0 2px #171008,0 0 0 3.5px #A58BFF}
+  .str-pedine .str-av:first-child{margin-left:0}
+  .str-pedine em{font-style:normal;font-size:11px;font-weight:800;color:#fff;margin-left:4px;
+    align-self:center;text-shadow:0 1px 2px #000}
+  .str-scheda{position:fixed;left:0;right:0;z-index:31;max-width:520px;margin:0 auto;
+    bottom:calc(66px + env(safe-area-inset-bottom));padding:0 12px}
+  .str-scheda-in{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;
+    color:#FFF6E6;background:linear-gradient(160deg,#2B2112,#171008);
+    box-shadow:0 12px 30px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,214,150,.2)}
+  .str-scheda-em{font-size:28px;flex:0 0 auto}
+  .str-scheda-ico{width:44px;height:44px;border-radius:50%;flex:0 0 auto;object-fit:cover;
+    box-shadow:0 0 0 2px rgba(255,198,90,.6)}
+  .str-scheda-ico + .str-scheda-em{display:none}
+  .str-scheda-tx{flex:1;min-width:0}
+  .str-scheda-tx small{display:block;font-size:10.5px;font-weight:800;letter-spacing:1.2px;
+    text-transform:uppercase;color:#FFC164}
+  .str-scheda-tx b{display:block;font-family:'Baloo 2',var(--font-tit),system-ui,sans-serif;font-weight:800;font-size:16px;line-height:1.2}
+  .str-scheda-tx span{display:block;font-size:12px;font-weight:700;color:rgba(255,246,230,.75);margin-top:1px}
+  .str-scheda .btn{width:auto;margin:0;padding:10px 14px;white-space:nowrap}
+  .str-amici{margin:14px 0 120px;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:12px 14px}
+  .str-amici h3{margin:0 0 2px;font-family:'Baloo 2',var(--font-tit),system-ui,sans-serif;font-weight:800;font-size:18px;line-height:1.2}
+  .str-amico{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .str-amico:last-child{border-bottom:0}
+  .str-amico .pos{width:22px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:800;font-size:13px;color:var(--ink-soft);text-align:center}
+  .str-amico .str-av{width:30px;height:30px;border-radius:50%;flex:0 0 30px}
+  .str-amico .nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-size:14px;font-weight:700}
+  .str-amico .lv{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--ink-soft)}
+  .str-amico.io{color:var(--sats)}
   /* I titoli: pillole come il tema, ma quelle non ancora sbloccate
      restano IN ELENCO e spente, col perche' scritto — e' la molla,
      la stessa dei distintivi mancanti in grigio. */
@@ -14745,6 +14945,22 @@ document.getElementById('cartello')?.remove();</script>
     </div>
   </div>
 
+  <!-- ============ VISTA: LA STRADINA ============ -->
+  <!-- La stradina degli obiettivi (17 nov 2026): vista INTERNA come la
+       classifica (fuori da RADICI, l'indietro funziona gratis; voceNav
+       la fa ricadere sul Profilo). Un GUSCIO: la pista la scrive
+       renderStradina() con quel che manda /api/me/stradina. -->
+  <div class="view" id="view-stradina">
+    <button class="back" onclick="navIndietro()">← Torna</button>
+    <div class="sicu">
+      <div class="sicu-hero">
+        <h2>🧭 La tua stradina</h2>
+        <p class="occhiello">Il tuo tabellone dalla Terra alla Luna: lo vedi solo tu</p>
+      </div>
+      <div id="stradinaCorpo"></div>
+    </div>
+  </div>
+
   <!-- ============ VISTA: I CONSIGLIATI ============ -->
   <!-- I negozi che ci piacciono (set 2026). Vista INTERNA come la
        classifica: fuori da RADICI, quindi navRiflette la spinge e il
@@ -15570,6 +15786,13 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc" id="accDistintivi">
         <button class="acc-h" onclick="toggleAcc('accDistintivi')"><span class="em">🏅</span>Distintivi <span class="conta" id="distintiviConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="distintiviBlocco"></div></div>
+      </div>
+
+      <!-- LA STRADINA (17 nov 2026): la porta della pagina privata degli
+           obiettivi. Nasce SPENTA in DEMO e in vetrina (renderLivello
+           la accende): la' non c'e' un cammino vero da mostrare. -->
+      <div class="acc voce-porta" id="vocStradina" style="display:none">
+        <button type="button" class="acc-h" onclick="apriStradina()"><span class="em">🧭</span><span class="tit2">La tua stradina<small>Le tappe fatte e quelle davanti, con Tappo che avanza.</small></span><span class="fr">›</span></button>
       </div>
         </div>
       </div>
@@ -20521,6 +20744,8 @@ function voceNav(view){
   if (['dettaglio','negozio','sicurezza','privacy','pacco',
        'acquisto','classifica','consigliati'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
+  // la stradina e' una pagina del Profilo: la nav lo dice (17 nov 2026)
+  else if (view === 'stradina') view = 'profilo';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
   else if (view === 'astepresto') view = cellaSwap() ? 'esplora' : 'aste';
@@ -22953,6 +23178,7 @@ async function rifaiPaginaRicordata(b){
   /* la classifica si chiede al server: la sua porta (in vetrina e in
      DEMO non c'e', e si resta in Esplora) */
   if (v === 'classifica') { apriClassifica(); return ''; }
+  if (v === 'stradina') { apriStradina(); return ''; }
   if (v === 'p2pmiei') rimettiFiltroMieiP2P(b.f);
   const manca = v === 'ordine' ? !VETRINA && !orders.some(x => x.id === k)
               : v === 'p2pordine' ? !ordiniP2P()[k] : false;
@@ -41711,6 +41937,9 @@ function renderDistintivi(){
 function renderLivello(){
   const box = el('livelloBlocco'), sez = el('accLivello');
   if (!box) return;
+  // la porta della stradina: c'e' dove c'e' un cammino vero (17 nov 2026)
+  const vs = el('vocStradina');
+  if (vs) vs.style.display = (DEMO || VETRINA || !myLivello) ? 'none' : '';
   if (DEMO || !myLivello) {
     if (sez) sez.style.display = 'none';
     box.innerHTML = ''; return;
@@ -41742,17 +41971,19 @@ function renderLivello(){
     (typeof p2pAcceso === 'function' && p2pAcceso()) ? p2pSconto : null);
   /* IL CAROSELLO (17 nov 2026) prende il posto della barra e della
      frase «mancano…»: le dice lui, sulla tessera del gradino. La barra
-     resta SOLO per un server di ieri che la scala non la manda. */
+     resta SOLO per un server di ieri che la scala non la manda.
+     MENO TESTO (17 nov, Andrea: «c'è troppo testo, è troppo
+     confusionario»): la riga degli XP scende in un «Come si contano gli
+     XP» chiuso in fondo, la riga dello sconto P2P la dice gia' il
+     carosello (e resta solo per il server di ieri), via le frasi sotto
+     i titoli. */
   const carosello = scalaLivelliHTML(myScalaLivelli, numLiv, myXp, myAffari);
   box.innerHTML = `
     <div class="grado">${esc(myLivello.nome)}${numLiv ? ` · Lv.&nbsp;${numLiv}` : ''}</div>
     <div class="grado-xp">${fmt(myXp)} XP · ${fmt(myAffari)} affari conclusi</div>
-    <div class="hint" style="margin-top:6px">${fraseXp(myXpRuoli)}</div>
     ${carosello || `<div class="barra-xp"><i style="width:${q}%"></i></div>
-    <div class="hint">${manca}</div>`}
-    ${vantaggio ? `<div class="hint" style="margin-top:6px">${vantaggio}</div>` : ''}
+    <div class="hint">${manca}</div>${vantaggio ? `<div class="hint" style="margin-top:6px">${vantaggio}</div>` : ''}`}
     <div style="margin-top:16px"><b>Il tuo titolo</b></div>
-    <div class="hint">Compare sotto il tuo nome, dove ti vedono gli altri.</div>
     <div class="titoli">
       <button class="titolo-pill ${myTitolo?'':'active'}"
               onclick="setTitolo('')">Nessuno</button>
@@ -41762,7 +41993,9 @@ function renderLivello(){
                 onclick="setTitolo(this.dataset.tit)">${esc(t.nome)}</button>`
       ).join('')}
     </div>
-    ${rigaClassificaNascosta()}`;
+    ${rigaClassificaNascosta()}
+    <details class="liv-info"><summary>Come si contano gli XP</summary>
+      <div class="hint">${fraseXp(myXpRuoli)}</div></details>`;
   livCarCentra();
 }
 
@@ -41836,9 +42069,15 @@ function scalaLivelliHTML(scala, mio, xp, affari){
         ? `<b>${fmt(xp)}</b><small>su ${fmt(a)} XP</small>`
         : '<b>🫙</b>';
       anello = anelloLivelloHTML(q, dentro, 'mio');
-      frase = fraseManca({numero: n, xp_prossimo: pross ? pross.xp : 0,
-                          affari_prossimo: pross ? pross.affari : 0,
-                          nome_prossimo: pross ? pross.nome : ''}, xp, affari);
+      /* corta (17 nov, «troppo testo»): il nome del prossimo sta gia'
+         sulla tessera accanto, qui solo cosa manca */
+      const dx = pross ? Math.max(0, (Number(pross.xp) || 0) - xp) : 0;
+      const dA = pross ? Math.max(0, (Number(pross.affari) || 0) - affari) : 0;
+      const pezzi = [];
+      if (dx) pezzi.push(`${fmt(dx)} XP`);
+      if (dA) pezzi.push(`${fmt(dA)} ${dA === 1 ? 'affare' : 'affari'}`);
+      frase = !pross ? fraseManca(null, xp, affari)
+        : pezzi.length ? `Ancora ${pezzi.join(' e ')}` : 'Al prossimo ci sei';
     } else {
       anello = anelloLivelloHTML(0, '🔒', 'chiuso');
       frase = soglia[0].toUpperCase() + soglia.slice(1);
@@ -41849,18 +42088,13 @@ function scalaLivelliHTML(scala, mio, xp, affari){
       + `<div class="liv-frase">${frase}</div></div>`);
     const v = vantaggiLivello(g);
     const aperti = n <= mio;
-    const sotto = aperti
-      ? (n <= 1 ? `Si apre ${soglia}: il punto di partenza.` : 'Questi vantaggi sono già tuoi.')
-      : `Si apre ${soglia}.`;
     const righe = (v.length ? v : ['il punto di partenza']).map(t =>
       `<div class="liv-riga ${aperti ? 'si' : 'no'}"><span class="ic">${aperti ? '✅' : '🔒'}</span><span>${t[0].toUpperCase() + t.slice(1)}</span></div>`).join('');
     pannelli.push(`<div class="liv-vant" data-n="${n}"${qui ? '' : ' hidden'}>`
-      + `<b>Vantaggi del livello ${esc(g.nome)}</b>`
-      + `<div class="hint" style="margin-top:2px">${sotto}</div>${righe}</div>`);
+      + `<b>Vantaggi del livello ${esc(g.nome)}</b>${righe}</div>`);
     punti.push(`<i class="${qui ? 'on' : ''}" data-n="${n}"></i>`);
   });
-  return `<div style="margin-top:16px"><b>I vantaggi di ogni livello</b></div>`
-    + `<div class="liv-car" id="livCar" data-mio="${mio}" onscroll="livCarScorri(this)">${tessere.join('')}</div>`
+  return `<div class="liv-car" id="livCar" data-mio="${mio}" onscroll="livCarScorri(this)">${tessere.join('')}</div>`
     + `<div class="liv-punti" id="livPunti">`
     + `<button type="button" onclick="livCarVai(-1)" aria-label="Livello precedente">‹</button>`
     + punti.join('')
@@ -41912,6 +42146,395 @@ function livCarCentra(){
   if (dest) car.scrollLeft = dest.offsetLeft - (car.clientWidth - dest.offsetWidth) / 2;
 }
 
+/* ============ 🧭 LA STRADINA DEGLI OBIETTIVI (17 nov 2026) ============
+   Un TABELLONE lunghissimo da scorrere, dalla Terra (in basso) alla Luna
+   (in cima): le caselle sono fatti gia' scritti altrove, letti dal
+   server (/api/me/stradina), divise in otto zone, ognuna col suo pezzo
+   di mappa disegnato; i gradini della scala ne chiudono quattro. Tappo-
+   pedina cammina in fila e si ferma prima della prima casella da fare; gli amici stanno
+   come pedine sul loro livello. NIENTE XP DALLE CASELLE: una casella
+   fatta e' una spunta (regola «GLI XP», e parola di Andrea del 17 nov).
+   `stradinaDisegno` e `stradinaHTML` sono PURE (dati, larghezza → posti
+   e HTML): il banco node le fa girare. */
+let stradinaDati = null;
+let stradinaScelta = -1;
+const STRADINA_PASSO = 96;      // fra una casella e la prossima, in px
+const STRADINA_BANDA = 92;      // lo spazio in piu' dove una zona finisce e l'altra comincia
+const STRADINA_BASE = 150;      // la Terra e la partenza, sotto la prima casella
+const STRADINA_CIMA = 250;      // la Luna, sopra l'ultima
+/* i pezzi di mappa, zona per zona dal basso (8 zone dal 17 nov: i tre
+   nuovi — porto, vetta, orbita — stanno fra i cinque di prima, e la
+   Luna resta in cima); sotto ognuno il suo ripiego dipinto (z0-z4) */
+const STRADINA_MAPPE = ['zona1', 'zona2', 'zona6', 'zona3', 'zona4', 'zona7', 'zona8', 'zona5'];
+const STRADINA_FONDI = [0, 1, 1, 2, 2, 3, 3, 4];
+/* I POSTI, dal basso in alto: ogni casella sale di un passo, ogni zona
+   nuova lascia la sua banda (dove sta il cartello della zona, proprio
+   sulla cucitura fra due pezzi di mappa), e la strada ondeggia a destra
+   e a sinistra come un sentiero. Torna i posti in px dall'ALTO (come
+   li vuole il CSS), le zone con la loro fascia e l'altezza totale. */
+function stradinaDisegno(tappe, largo){
+  tappe = Array.isArray(tappe) ? tappe : [];
+  largo = Math.max(260, Math.floor(Number(largo)) || 340);
+  const amp = Math.min(largo * 0.3, 118), mezzo = largo / 2;
+  const dalBasso = [];
+  let zona = -1, bande = 0;
+  tappe.forEach((t, i) => {
+    const z = Math.floor(Number(t && t.zona)) || 0;
+    if (z !== zona) { bande++; zona = z; }
+    dalBasso.push({x: Math.round(mezzo + amp * Math.sin(i * 0.82 + 0.35)),
+                   yb: STRADINA_BASE + bande * STRADINA_BANDA + i * STRADINA_PASSO, z: z});
+  });
+  const alto = (dalBasso.length ? dalBasso[dalBasso.length - 1].yb : STRADINA_BASE) + STRADINA_CIMA;
+  const posti = dalBasso.map(p => ({x: p.x, y: alto - p.yb, z: p.z, lato: p.x < mezzo ? 'destra' : 'sinistra'}));
+  /* le zone: dalla cucitura sotto alla cucitura sopra (la prima tocca il
+     fondo, l'ultima la cima); il cartello sta sulla cucitura di sotto */
+  const zone = [];
+  dalBasso.forEach((p, i) => {
+    if (i && dalBasso[i - 1].z === p.z) return;
+    const sotto = i ? (dalBasso[i - 1].yb + p.yb) / 2 : 0;
+    if (zone.length) zone[zone.length - 1].sopra = sotto;
+    zone.push({z: p.z, sotto: sotto, sopra: alto, primo: i,
+               banda: i ? sotto : Math.max(STRADINA_BASE - 4, p.yb - STRADINA_BANDA * 0.75)});
+  });
+  zone.forEach(z => { z.top = alto - z.sopra; z.alto = z.sopra - z.sotto; z.bandaY = alto - z.banda; });
+  return {largo: largo, alto: alto, posti: posti, zone: zone,
+          partenza: {x: Math.round(mezzo), y: alto - 72}};
+}
+/* la strada: una curva morbida (Catmull-Rom girata in Bézier) che passa
+   per la partenza e per tutte le caselle, fino all'indice `fino` */
+function stradinaCurva(punti){
+  if (!punti.length) return '';
+  let d = `M${punti[0].x},${punti[0].y}`;
+  for (let i = 0; i < punti.length - 1; i++) {
+    const p0 = punti[i - 1] || punti[i], p1 = punti[i], p2 = punti[i + 1], p3 = punti[i + 2] || p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x},${p2.y}`;
+  }
+  return d;
+}
+/* l'indice dell'ultima casella fatta (la pedina sta li'); le porte
+   (fatto null) non contano, ne' come fatte ne' come da fare. UNA
+   MISSIONE NON SUPERATA E' UN CANCELLO (Andrea: «devi giocare con Tappo
+   per proseguire»): Tappo si ferma li' davanti, anche se piu' su ci sono
+   caselle gia' fatte — i fatti restano accesi, la pedina aspetta. */
+/* TAPPO CAMMINA IN FILA (Andrea, 17 nov: «Tappo fara' questo percorso,
+   come se fosse il tuo giocatore»): si ferma sull'ultima casella fatta
+   PRIMA della prima da fare — una casella saltata e' un cancello, come
+   una missione. Quelle fatte piu' su restano accese: nessun merito si
+   perde, ma per avanzare bisogna imparare il passo che manca. La porta
+   inerte (fatto null) non ferma nessuno. */
+function stradinaUltimaFatta(tappe){
+  let u = -1;
+  for (let i = 0; i < tappe.length; i++) {
+    const t = tappe[i];
+    if (t.fatto === false || (t.tipo === 'missione' && t.fatto !== true)) break;
+    if (t.fatto === true) u = i;
+  }
+  return u;
+}
+function stradinaProssima(tappe){
+  return tappe.findIndex(t => t.fatto === false);
+}
+function stradinaFraseAmici(d){
+  const mio = Math.floor(Number(d.livello && d.livello.numero)) || 1;
+  const amici = Array.isArray(d.amici) ? d.amici : [];
+  if (!amici.length)
+    return 'Ancora nessun amico sul tabellone: segui un venditore o concludi uno scambio, e lo vedrai qui.';
+  const sopra = amici.filter(a => (a.livello_numero || 1) > mio);
+  if (!sopra.length) return '🏆 Sei primo fra i tuoi amici.';
+  const top = sopra[0], d_ = (top.livello_numero || 1) - mio;
+  return `Sei sotto di ${d_} livell${d_ === 1 ? 'o' : 'i'} rispetto a <b>${esc(top.nome || 'un amico')}</b>.`;
+}
+/* il volto di un amico (pedina sul tabellone e riga della gara): passa
+   dal volto unico, con la chiave del suo negozio */
+function voltoAmicoStradina(a){
+  return voltoHTML(a, 'str-av', {chiave: a && a.negozio ? 'n:' + a.negozio : ''});
+}
+/* la scheda in basso: la casella scelta (di serie la prossima), coi
+   suoi numeri e il bottone per andare a farla */
+function stradinaSchedaHTML(d, i){
+  const tappe = (d && Array.isArray(d.tappe)) ? d.tappe : [];
+  const t = tappe[i];
+  if (!t) return '';
+  const zone = Array.isArray(d.zone) ? d.zone : [];
+  const zona = zone[t.zona] || {};
+  const prossima = stradinaProssima(tappe);
+  const stato = t.fatto === true ? '✅ Fatta'
+    : t.fatto === null ? 'Una porta: fuori da Barattolo'
+    : t.tipo === 'missione' ? (i === prossima ? '▶ Tocca a te: gioca con Tappo per andare avanti' : '🔒 Una missione con Tappo')
+    : (t.n != null && t.di) ? `${i === prossima ? '▶ Tocca a te · ' : '🔒 '}${fmt(t.n)} su ${fmt(t.di)}`
+    : i === prossima ? '▶ Tocca a te' : '🔒 Da fare';
+  const bott = t.link ? `<button type="button" class="btn" data-link="${esc(t.link)}" data-vai="" onclick="vaiTappa(this)">Apri ›</button>`
+    : (t.tipo === 'missione' && t.fatto !== true) ? `<button type="button" class="btn" data-vai="${esc(t.vai || '')}" data-link="" data-missione="${esc(t.missione || '')}" onclick="vaiTappa(this)">Gioca ›</button>`
+    : (t.fatto !== true && t.vai) ? `<button type="button" class="btn" data-vai="${esc(t.vai)}" data-link="" onclick="vaiTappa(this)">Vai ›</button>` : '';
+  /* anche qui l'icona disegnata, se la casella ce l'ha (l'emoji se manca) */
+  const em = /^[a-z0-9_]+$/.test(t.icona || '')
+    ? `<img class="str-scheda-ico" src="/assets/stradina/ico-${t.icona}.webp" alt="" onerror="this.remove()">` : '';
+  return `<div class="str-scheda-in">${em}<span class="str-scheda-em">${t.emoji || '•'}</span>`
+    + `<span class="str-scheda-tx"><small>Casella ${i + 1} · ${esc(zona.nome || '')}</small>`
+    + `<b>${esc(t.nome)}</b><span>${stato}</span></span>${bott}</div>`;
+}
+function stradinaHTML(d, largo){
+  const tappe = Array.isArray(d && d.tappe) ? d.tappe : [];
+  if (!tappe.length) return '<div class="hint">La stradina non è ancora pronta.</div>';
+  const zone = Array.isArray(d.zone) ? d.zone : [];
+  const g = stradinaDisegno(tappe, largo);
+  const ultima = stradinaUltimaFatta(tappe), prossima = stradinaProssima(tappe);
+  const fatte = tappe.filter(t => t.fatto === true).length;
+  const contabili = tappe.filter(t => t.fatto !== null).length;
+  /* in cima: Tappo, a che casella sei, la barra, i sats e la serie */
+  const sats = d.sats || {};
+  const serie = (typeof serieRigaHTML === 'function' && typeof mySerie !== 'undefined' && mySerie)
+    ? serieRigaHTML(mySerie) : '';
+  const hero = `<div class="str-hero"><button type="button" class="str-muto" id="strMuto" onclick="strSuoniTasto()" aria-label="Suoni">${suoniMuti() ? '🔇' : '🔊'}</button><div class="str-hero-riga">`
+    + `<img class="str-hero-tappo" src="/assets/stradina/tappo-pedina.webp" alt="" onerror="this.remove()">`
+    + `<div class="str-hero-tit">Casella ${Math.max(1, ultima + 1)} di ${tappe.length}`
+    + `<small>${fatte} caselle fatte su ${contabili} · Livello ${Math.floor(Number(d.livello && d.livello.numero)) || 1}</small></div></div>`
+    + `<div class="str-barra"><i style="width:${contabili ? Math.round(fatte / contabili * 100) : 0}%"></i></div>`
+    + `<div class="str-chip-riga"><span class="str-chip">⚡ <b>${fmt(sats.incassati || 0)}</b> sats incassati</span>`
+    + `<span class="str-chip">🛒 <b>${fmt(sats.spesi || 0)}</b> spesi</span></div>${serie}</div>`;
+  /* i pezzi di mappa: il disegno se c'e', sotto il ripiego dipinto */
+  const fasce = g.zone.map(z => {
+    const n = z.z;
+    const disegno = STRADINA_MAPPE[n]
+      ? `<img class="str-mappa" src="/assets/stradina/${STRADINA_MAPPE[n]}.webp" alt="" loading="lazy" onerror="this.remove()">` : '';
+    const terra = n === 0 ? '<div class="str-terra"></div>' : '';
+    const ultima = n === g.zone[g.zone.length - 1].z;
+    const luna = ultima ? '<div class="str-luna"></div>' : '';
+    const fondo = STRADINA_FONDI[n] != null ? STRADINA_FONDI[n] : 4;
+    return `<div class="str-zona z${fondo}${n === 0 ? ' prima' : ''}${ultima ? ' ultima' : ''}" style="top:${z.top}px;height:${z.alto}px">${terra}${luna}${disegno}</div>`;
+  }).join('');
+  /* la strada: il letto scuro, il bordo tratteggiato, il tratto fatto acceso */
+  const punti = [g.partenza].concat(g.posti);
+  const tutta = stradinaCurva(punti);
+  const fatta = ultima >= 0 ? stradinaCurva(punti.slice(0, ultima + 2)) : '';
+  const via = `<svg class="str-via" viewBox="0 0 ${g.largo} ${g.alto}" width="${g.largo}" height="${g.alto}" aria-hidden="true">`
+    + `<path class="letto" d="${tutta}"></path><path class="bordo" d="${tutta}"></path>`
+    + (fatta ? `<path class="alone" d="${fatta}"></path><path class="fatto" d="${fatta}"></path>` : '')
+    + `</svg>`;
+  const partenza = `<span class="str-partenza" style="left:${g.partenza.x}px;top:${g.partenza.y}px">🚀 Partenza</span>`;
+  /* i cartelli delle zone, ciascuno col suo conto */
+  const bande = g.zone.map(z => {
+    const info = zone[z.z] || {};
+    const sue = tappe.filter(t => t.zona === z.z && t.fatto !== null);
+    return `<div class="str-banda" style="top:${z.bandaY}px"><small>Zona ${z.z + 1}</small>`
+      + `<b>${info.emoji || ''} ${esc(info.nome || '')}</b><em>${sue.filter(t => t.fatto === true).length}/${sue.length}</em></div>`;
+  }).join('');
+  /* le caselle, il loro nome accanto, e il logo sulla porta del partner */
+  const caselle = tappe.map((t, i) => {
+    const p = g.posti[i];
+    const tipo = t.tipo === 'gradino' || t.tipo === 'luna' ? t.tipo : '';
+    const stato = t.fatto === true ? 'fatta' : t.fatto === null ? 'porta' : i === prossima ? 'ora' : 'chiusa';
+    const conto = (t.n != null && t.di && t.fatto !== true) ? `<b>${fmt(t.n)}/${fmt(t.di)}</b>` : '';
+    const logo = '';
+    /* il nome sta dalla parte dove c'e' piu' posto, e non esce mai dalla tavola */
+    const scosta = tipo ? (t.tipo === 'luna' ? 48 : 42) : 36;
+    const spazio = Math.max(70, Math.min(140, p.lato === 'destra' ? g.largo - p.x - scosta - 6 : p.x - scosta - 6));
+    const lato = p.lato === 'destra' ? `left:${p.x + scosta}px` : `right:${g.largo - p.x + scosta}px`;
+    const nome = `<span class="str-nome${tipo ? ' gradino' : ''}${t.tipo === 'missione' ? ' missione' : ''}${stato === 'chiusa' ? ' chiusa' : ''}" style="${lato};top:${p.y}px;max-width:${spazio}px">${esc(t.nome)}${conto}${logo}</span>`;
+    const vaso = tipo ? '<img class="vaso" src="/assets/barattolo-hero.png" alt="" onerror="this.remove()">' : '';
+    /* l'icona disegnata in Flow (una per famiglia); se manca, resta l'emoji */
+    const ico = (!tipo && /^[a-z0-9_]+$/.test(t.icona || ''))
+      ? `<img class="ico" src="/assets/stradina/ico-${t.icona}.webp" alt="" loading="lazy" onerror="this.remove()">` : '';
+    const classe = tipo || (t.tipo === 'missione' ? 'missione' : '');
+    return `<button type="button" class="str-casella ${stato}${classe ? ' ' + classe : ''}" data-i="${i}" style="left:${p.x}px;top:${p.y}px"`
+      + ` onclick="strScegli(${i})" aria-label="Casella ${i + 1}: ${esc(t.nome)}${t.fatto === true ? ', fatta' : ''}">`
+      + `${vaso}${ico}<span class="em">${t.emoji || '•'}</span><span class="num">${i + 1}</span></button>${nome}`;
+  }).join('');
+  /* Tappo sull'ultima fatta (o alla partenza). Il fumetto «Prossima: …»
+     c'era e copriva la casella successiva (Tappo cammina in fila, quindi
+     la prossima gli sta sempre addosso): la dice gia' la scheda in basso.
+     Resta solo alla Luna, dove sopra non c'e' piu' niente. */
+  const dove = ultima >= 0 ? g.posti[ultima] : g.partenza;
+  const pedina = `<img class="str-tappo" src="/assets/stradina/tappo-pedina.webp" alt="Tappo" style="left:${dove.x}px;top:${dove.y - 58}px" onerror="this.remove()">`
+    + (d.tappo_emoji ? `<span class="str-cappello" style="left:${dove.x}px;top:${dove.y - 76}px">${esc(d.tappo_emoji)}</span>` : '');
+  const fx = Math.min(g.largo - 100, Math.max(100, dove.x));
+  const fumetto = prossima >= 0 ? ''
+    : `<span class="str-fumetto" style="left:${fx}px;top:${dove.y - 66}px">Sei sulla Luna! 🌕</span>`;
+  /* gli amici: pedine sul gradino del loro livello (il livello 1 alla partenza) */
+  const amici = Array.isArray(d.amici) ? d.amici : [];
+  const perLivello = {};
+  amici.forEach(a => { const n = Math.floor(Number(a.livello_numero)) || 1; (perLivello[n] = perLivello[n] || []).push(a); });
+  const pedine = Object.keys(perLivello).map(n => {
+    const i = tappe.findIndex(t => t.id === 'livello_' + n);
+    const p = i >= 0 ? g.posti[i] : g.partenza;
+    const qui = perLivello[n];
+    /* sul gradino stanno appena sotto il barattolo, al centro; alla partenza accanto al cartello */
+    const larghe = Math.min(qui.length, 3) * 18 + 8 + (qui.length > 3 ? 22 : 0);
+    const sx = i >= 0 ? p.x - larghe / 2 : p.x + 74, sy = i >= 0 ? p.y + 50 : p.y;
+    return `<span class="str-pedine" style="left:${Math.round(sx)}px;top:${sy}px">`
+      + qui.slice(0, 3).map(voltoAmicoStradina).join('')
+      + (qui.length > 3 ? `<em>+${qui.length - 3}</em>` : '') + `</span>`;
+  }).join('');
+  const tavola = `<div class="str-tavola" style="height:${g.alto}px">${fasce}${via}${partenza}${bande}${caselle}${pedine}${pedina}${fumetto}</div>`;
+  /* sotto: la classifica fra amici, io dentro al mio posto */
+  const mio = Math.floor(Number(d.livello && d.livello.numero)) || 1;
+  const fila = amici.map(a => ({a: a, n: Math.floor(Number(a.livello_numero)) || 1}));
+  fila.push({io: true, n: mio});
+  fila.sort((x, y) => y.n - x.n || (x.io ? -1 : y.io ? 1 : 0));
+  const righe = fila.map((r, k) => r.io
+    ? `<div class="str-amico io"><span class="pos">${k + 1}</span><span class="str-av" style="display:flex;align-items:center;justify-content:center">🫵</span>`
+      + `<span class="nome">Tu</span><span class="lv">Lv. ${mio}</span></div>`
+    : `<div class="str-amico"><span class="pos">${k + 1}</span>${voltoAmicoStradina(r.a)}`
+      + `<span class="nome">${esc(r.a.nome || '')}</span><span class="lv">Lv. ${r.n}</span></div>`).join('');
+  const classifica = `<div class="str-amici"><h3>🏁 La gara fra amici</h3>`
+    + `<div class="hint" style="margin:2px 0 6px">${stradinaFraseAmici(d)}</div>${righe}</div>`;
+  const scelta = prossima >= 0 ? prossima : Math.max(0, ultima);
+  return hero + tavola + classifica
+    + `<div class="str-scheda" id="strScheda">${stradinaSchedaHTML(d, scelta)}</div>`;
+}
+function strScegli(i){
+  haptic();
+  const tq = stradinaDati && Array.isArray(stradinaDati.tappe) ? stradinaDati.tappe[i] : null;
+  suonoTappo(!tq ? 'tocco' : tq.fatto === true ? 'moneta'
+    : tq.tipo === 'missione' ? 'magia'
+    : i === stradinaProssima(stradinaDati.tappe) || tq.fatto === null ? 'tocco' : 'chiusa');
+  stradinaScelta = i;
+  document.querySelectorAll('.str-casella.scelta').forEach(b => b.classList.remove('scelta'));
+  const b = document.querySelector(`.str-casella[data-i="${i}"]`);
+  if (b) b.classList.add('scelta');
+  const s = el('strScheda');
+  if (s && stradinaDati) s.innerHTML = stradinaSchedaHTML(stradinaDati, i);
+}
+function vaiTappa(btn){
+  const vai = btn.dataset.vai, link = btn.dataset.link;
+  haptic();
+  suonoTappo(btn.dataset.missione ? 'magia' : 'via');
+  if (link) {
+    let dominio = link;
+    try { dominio = new URL(link).hostname; } catch(e){}
+    chiediConferma({
+      titolo: 'Esci da Barattolo?',
+      testata: `🔗 <b>${esc(dominio)}</b>`,
+      corpo: 'Questo sito non è di Barattolo: è un posto dove imparare, e lì non ci sono i nostri depositi di garanzia.',
+      etichetta: 'Esci da Barattolo',
+      poi: () => {
+        if (tg?.initData && tg.openLink) tg.openLink(link);
+        else window.open(link, '_blank', 'noopener');
+      }});
+    return;
+  }
+  /* la missione la apre il gioco di Tappo, se c'e' gia' (cantiere parallelo) */
+  if (btn.dataset.missione && typeof apriMissione === 'function') { apriMissione(btn.dataset.missione); return; }
+  if (vai && el('view-' + vai)) go(vai);
+}
+/* a missione finita il gioco di Tappo lancia 'tappo:missione' (patto col
+   suo cantiere): se il tabellone e' aperto si ricarica, e Tappo avanza */
+window.addEventListener('tappo:missione', () => {
+  const v = el('view-stradina');
+  if (v && v.classList.contains('active')) apriStradina(true);
+});
+async function apriStradina(resta){
+  if (DEMO || VETRINA) return;
+  if (!resta) go('stradina');
+  const box = el('stradinaCorpo');
+  if (box && !stradinaDati) box.innerHTML = '<div class="hint">Preparo il tuo tabellone…</div>';
+  try {
+    const r = await fetch(`${API_BASE}/me/stradina`,
+                          {headers:{'X-Tg-Init-Data': authHdr()}});
+    stradinaDati = r.ok ? await r.json() : null;
+  } catch(e){ stradinaDati = null; }
+  renderStradina();
+}
+function renderStradina(){
+  const box = el('stradinaCorpo');
+  if (!box) return;
+  if (!stradinaDati) {
+    box.innerHTML = '<div class="hint">Non riesco a leggere la tua stradina adesso: riprova fra poco.</div>';
+    return;
+  }
+  box.innerHTML = stradinaHTML(stradinaDati, box.clientWidth);
+  /* si apre su Tappo: il tabellone e' lungo, e la tua casella e' quella che conta */
+  const t = box.querySelector('.str-tappo');
+  if (t && t.scrollIntoView) t.scrollIntoView({block: 'center'});
+  /* il suono di arrivo: un passo di Tappo, o la fanfara se dall'ultima
+     visita hai passato un gradino (il conto si ricorda in questo browser) */
+  const tappe = stradinaDati.tappe || [];
+  const gradini = tappe.filter(x => (x.tipo === 'gradino' || x.tipo === 'luna') && x.fatto === true).length;
+  let prima = -1;
+  try { prima = parseInt(localStorage.getItem('stradinaGradini') || '-1', 10); } catch(e){}
+  try { localStorage.setItem('stradinaGradini', String(gradini)); } catch(e){}
+  suonoTappo(prima >= 0 && gradini > prima ? 'traguardo' : 'passo');
+}
+/* ---- I SUONI DI TAPPO (nati col tabellone, li riusa il gioco di Tappo:
+   un effetto nuovo e' una riga in SUONI_TAPPO): tre effetti sintetizzati al volo (WebAudio,
+   niente file da scaricare), un tasto 🔊/🔇 che si ricorda in questo
+   browser. Partono solo dopo un tocco (aprire la pagina e' un tocco),
+   come vogliono i browser; un browser senza WebAudio resta muto. ---- */
+let audioTappo = null;
+function suoniMuti(){
+  try { return localStorage.getItem('suoniMuti') === '1'; } catch(e){ return false; }
+}
+function strSuoniTasto(){
+  const muta = !suoniMuti();
+  try { localStorage.setItem('suoniMuti', muta ? '1' : '0'); } catch(e){}
+  const b = el('strMuto');
+  if (b) b.textContent = muta ? '🔇' : '🔊';
+  if (!muta) suonoTappo('tocco');
+}
+/* le note di ogni effetto: [frequenza Hz, inizio s, durata s, forma] */
+const SUONI_TAPPO = {
+  tocco: [[880, 0, 0.07, 'triangle']],
+  passo: [[523, 0, 0.09, 'triangle'], [784, 0.09, 0.14, 'triangle']],
+  traguardo: [[523, 0, 0.12, 'square'], [659, 0.12, 0.12, 'square'], [784, 0.24, 0.12, 'square'], [1047, 0.36, 0.34, 'triangle']],
+  /* (17 nov, Andrea: «devi metterci anche i suoni») ogni casella ha la
+     sua voce: la moneta di una fatta, il tonfo di una chiusa, la magia di
+     una missione, lo slancio del «Vai» */
+  moneta: [[1319, 0, 0.06, 'square'], [1976, 0.06, 0.16, 'triangle']],
+  chiusa: [[196, 0, 0.09, 'sine'], [147, 0.08, 0.12, 'sine']],
+  magia: [[784, 0, 0.07, 'triangle'], [988, 0.06, 0.07, 'triangle'], [1175, 0.12, 0.07, 'triangle'], [1568, 0.18, 0.2, 'sine']],
+  via: [[392, 0, 0.06, 'triangle'], [587, 0.05, 0.06, 'triangle'], [880, 0.1, 0.12, 'triangle']]
+};
+/* I SUONI VERI (17 nov, Andrea: «puoi scaricarli su Artlist»): effetti
+   brevi in MP3, uno per nome, uguali per tabellone, gioco e minigiochi
+   (il gioco chiama solo nomi, dietro typeof). Un file che manca o non si
+   apre passa al bip sintetizzato qui sotto, e non si riprova; un rifiuto
+   del browser (l'audio prima del primo tocco) non e' un file rotto. */
+const SUONI_FILE = ['tocco', 'passo', 'traguardo', 'moneta', 'chiusa', 'magia', 'via', 'apri',
+  'salto', 'atterra', 'raccogli', 'giusto', 'sbagliato', 'stella', 'vittoria', 'sconfitta',
+  'tarlo', 'gazza', 'porta', 'conto'];
+const suoniAudio = {}, suoniRotti = {};
+function suonoTappo(nome){
+  if (suoniMuti()) return;
+  if (SUONI_FILE.indexOf(nome) < 0 || suoniRotti[nome] || typeof Audio !== 'function')
+    return suonoSintetico(nome);
+  try {
+    let au = suoniAudio[nome];
+    if (!au) {
+      au = suoniAudio[nome] = new Audio(`/assets/stradina/suoni/${nome}.mp3`);
+      au.preload = 'auto';
+      au.addEventListener('error', () => { suoniRotti[nome] = true; });
+    }
+    au.currentTime = 0;
+    const p = au.play();
+    if (p && p.catch) p.catch(e => {
+      if (e && e.name === 'NotAllowedError') return;
+      suoniRotti[nome] = true;
+      suonoSintetico(nome);
+    });
+  } catch(e){ suoniRotti[nome] = true; suonoSintetico(nome); }
+}
+function suonoSintetico(nome){
+  const note = SUONI_TAPPO[nome];
+  if (!note || suoniMuti()) return;
+  try {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return;
+    audioTappo = audioTappo || new C();
+    const a = audioTappo, ora = a.currentTime;
+    note.forEach(([f, t0, dur, forma]) => {
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = forma; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, ora + t0);
+      g.gain.exponentialRampToValueAtTime(forma === 'square' ? 0.05 : 0.12, ora + t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ora + t0 + dur);
+      o.connect(g); g.connect(a.destination);
+      o.start(ora + t0); o.stop(ora + t0 + dur + 0.02);
+    });
+  } catch(e){}
+}
+
 /* «🏆 Non mostrarmi in classifica» (set 2026, ritocchi piccoli,
    decisione di Andrea): il nome esce dalla classifica pubblica, il
    LIVELLO resta — sul profilo, dove chi scambia lo guarda per fidarsi.
@@ -41928,9 +42551,7 @@ function rigaClassificaNascosta(){
       <div style="min-width:0;flex:1">
         <div style="font-size:13.5px;font-weight:800">🏆 Non mostrarmi in classifica</div>
         <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
-          Se lo accendi il tuo nome esce dalla classifica, e la tua
-          reputazione non si pubblica più su Nostr. Il livello resta sul
-          tuo profilo: a chi scambia con te serve per fidarsi.</div>
+          Il nome esce dalla classifica e non si pubblica più su Nostr. Il livello resta.</div>
       </div>
       <button onclick="setClassificaNascosta(${myClassificaNascosta ? 'false' : 'true'}, this)"
         aria-pressed="${myClassificaNascosta ? 'true' : 'false'}"
