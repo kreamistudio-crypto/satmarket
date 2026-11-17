@@ -15542,11 +15542,7 @@ document.getElementById('cartello')?.remove();</script>
 
       <div class="acc" id="accLivello">
         <button class="acc-h" onclick="toggleAcc('accLivello')"><span class="em">🎖</span>Livello e titolo <span class="conta" id="livelloConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="livelloBlocco"></div>
-          <!-- I REGALI PER LIVELLO (17 nov 2026): il regalo sbloccato e il
-               campo del recapito; vuoto finche' non c'e' niente da chiedere
-               o da seguire (la scala sopra dice gia' cosa danno i gradini) -->
-          <div id="regaliBlocco"></div></div>
+        <div class="acc-b"><div id="livelloBlocco"></div></div>
       </div>
 
       <!-- I TUOI INVITI (set 2026): il codice, il link da condividere e
@@ -41416,7 +41412,6 @@ let myXpRuoli = null;            // {vendite, acquisti}, o null se i conti non t
 let myInviti = null;             // il cassetto «I tuoi inviti» dal server (null = niente)
 let myLivello = null;            // il grado DERIVATO dal server
 let myScalaLivelli = [];         // i gradini coi loro vantaggi (ott 2026)
-let myRegali = [];               // i regali dei gradini, con lo stato (17 nov 2026)
 let myClassifica = false;        // la leva della classifica, dal server
 let myClassificaNascosta = false; // «Non mostrarmi in classifica», dal server
 let myAnnunciSulProfilo = true;  // «Pubblica i miei annunci anche sul mio profilo Nostr», dal server (di serie si')
@@ -41584,7 +41579,6 @@ function renderProfilo(){
     hintAttivi() ? '' : 'none';
   renderLnAddress();
   renderLivello();
-  renderRegali();
   renderInviti();
   renderDistintivi();
   renderDoppioni();
@@ -42223,52 +42217,6 @@ async function setTitolo(id){
   renderLivello();
   renderProfilo();          // il titolo vive sotto il nome, in testata
   toast(id ? 'Titolo scelto ✅' : 'Titolo tolto');
-}
-
-/* ---- 🎁 I REGALI PER LIVELLO (17 nov 2026, il merch «Un tempo per
-   te»). La lista arriva da /api/me (`regali_livello`: livello, regalo,
-   stato) e qui si disegna soltanto: lo SBLOCCATO ha il campo del
-   recapito e il bottone, il RICHIESTO e lo SPEDITO una riga di stato,
-   il DA_SBLOCCARE non compare — lo dice gia' la scala dei vantaggi.
-   Senza niente da mostrare il blocco e' vuoto: un server di ieri, o la
-   leva spenta, non mandano la lista e il cassetto resta com'era. ---- */
-function regaliDaMostrare(lista){
-  return (Array.isArray(lista) ? lista : [])
-    .filter(r => r && ['sbloccato', 'richiesto', 'spedito'].includes(r.stato));
-}
-function regaloHTML(r){
-  const nome = esc(r.regalo || '');
-  if (r.stato === 'spedito')
-    return `<div style="padding:6px 0;border-top:1px solid var(--line)">📦 <b>${nome}</b><div class="hint">Spedito al recapito che ci hai dato.</div></div>`;
-  if (r.stato === 'richiesto')
-    return `<div style="padding:6px 0;border-top:1px solid var(--line)">⏳ <b>${nome}</b><div class="hint">Richiesto: sta per partire, ti avvisiamo quando e' in viaggio.</div></div>`;
-  return `<div style="padding:6px 0;border-top:1px solid var(--line)">🎁 <b>${nome}</b> e' tuo!
-      <div class="hint">Scrivi dove mandarlo: un locker (nome e indirizzo del punto) o nome, via, CAP e citta'.</div>
-      <textarea id="regaloRecapito-${esc(r.livello)}" maxlength="500" style="min-height:64px;margin-top:6px" placeholder="Es. Mario Rossi, via Roma 1, 20100 Milano"></textarea>
-      <button class="btn primary" style="margin-top:8px" data-liv="${esc(r.livello)}" onclick="chiediRegalo(this.dataset.liv, this)">Mandamelo 🎁</button></div>`;
-}
-function renderRegali(){
-  const box = el('regaliBlocco');
-  if (!box) return;
-  const da = DEMO ? [] : regaliDaMostrare(myRegali);
-  if (!da.length) { box.innerHTML = ''; return; }
-  box.innerHTML = `<div style="margin-top:16px"><b>I tuoi regali</b></div>
-    <div style="margin-top:6px">${da.map(regaloHTML).join('')}</div>`;
-}
-async function chiediRegalo(livello, btn){
-  haptic();
-  const campo = el('regaloRecapito-' + livello);
-  const recapito = (campo ? campo.value : '').trim();
-  if (recapito.length < 10) { toast('Scrivi il recapito completo: almeno 10 caratteri'); return; }
-  if (btn) btn.disabled = true;
-  const r = await fetch(`${API_BASE}/me/regali/${encodeURIComponent(livello)}/richiedi`,
-    {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-     body: JSON.stringify({recapito})}).catch(() => null);
-  const d = r ? await r.json().catch(()=>({})) : {};
-  if (!r || !r.ok) { if (btn) btn.disabled = false; toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
-  myRegali = myRegali.map(x => x.livello === livello ? {...x, stato: 'richiesto'} : x);
-  renderRegali();
-  toast('Richiesto! Ti avvisiamo quando parte 🎁');
 }
 
 /* ---- 🔁 Doppioni su Nostr: lo stesso oggetto due volte sui relay,
@@ -107201,7 +107149,6 @@ async function avvia(){
     serieArrivata(me.serie, 1600);
     serieAscolta();
     myScalaLivelli = Array.isArray(me.livelli_scala) ? me.livelli_scala : [];
-    myRegali = Array.isArray(me.regali_livello) ? me.regali_livello : [];
     myXpRuoli = me.xp_ruoli || null;
     /* il cassetto degli inviti: un server di ieri non manda la chiave,
        e il cassetto resta spento invece di mostrare un codice vuoto */

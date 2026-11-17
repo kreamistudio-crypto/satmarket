@@ -200,10 +200,6 @@
        sta in fondo ad «Altro», nel suo gruppo, che nasce nascosto e si
        mostra solo quando la rotta ha detto di si'. -->
   <details class="grp" id="p2pBox" hidden><summary>🔁 Scambi P2P</summary><div class="grp-b"><div id="p2p"></div></div></details>
-  <!-- I REGALI PER LIVELLO (17 nov 2026): chi ha chiesto il suo regalo
-       e dove mandarlo. Il recapito esce SOLO qui. Si legge all'apertura:
-       un elenco che cambia di rado non merita una chiamata a ogni giro. -->
-  <details class="grp" id="regaliBox" ontoggle="if (this.open) caricaRegali()"><summary>🎁 Regali per livello</summary><div class="grp-b"><div id="regali"><div class="stato">Apri per leggere l'elenco.</div></div></div></details>
 </main>
 <script>
 const tg = window.Telegram && window.Telegram.WebApp;
@@ -245,37 +241,6 @@ async function carica(){
   if (D.p2p_statistiche) caricaSettimanaP2P();
 }
 function stato(t){ el('sub').textContent = ''; el('corpo').innerHTML = `<div class="stato">${esc(t)}</div>`; }
-
-/* ---- 🎁 i regali per livello: la coda di chi aspetta, poi gli spediti.
-   «Spedito» e' un gesto solo e si conferma, perche' avvisa la persona. */
-async function caricaRegali(){
-  const box = el('regali');
-  let r;
-  try {
-    r = await fetch('/api/admin/regali', {credentials: 'same-origin', headers: {'X-Tg-Init-Data': intestazione()}});
-  } catch(e) { r = null; }
-  if (!r || !r.ok) { box.innerHTML = `<div class="stato">Non riesco a leggere i regali${r ? ` (il server ha risposto ${r.status})` : ''}: riprova fra poco.</div>`; return; }
-  const righe = await r.json();
-  if (!righe.length) { box.innerHTML = '<div class="stato">Nessun regalo chiesto finora.</div>'; return; }
-  const quando = t => t ? new Date(t * 1000).toLocaleDateString('it-IT', {day: 'numeric', month: 'short'}) : '';
-  box.innerHTML = righe.map(g => `<div class="card" style="margin-top:10px">
-    <h2>${g.stato === 'richiesto' ? '⏳' : '📦'} ${esc(g.regalo)}</h2>
-    <div>${esc(g.nome || '')} <span style="color:var(--muted)">(tg ${esc(g.tg_id)}, livello ${esc(g.livello)})</span></div>
-    <div style="margin-top:6px;white-space:pre-wrap">${esc(g.recapito)}</div>
-    <div style="margin-top:6px;color:var(--muted)">${g.stato === 'richiesto' ? `chiesto il ${quando(g.richiesto_il)}` : `spedito il ${quando(g.spedito_il)}`}</div>
-    ${g.stato === 'richiesto' ? `<div class="filtri" style="margin:10px 0 0"><button onclick="regaloSpedito(${Number(g.id)}, this)">📦 Spedito</button></div>` : ''}
-  </div>`).join('');
-}
-async function regaloSpedito(id, btn){
-  if (!confirm('Segno questo regalo come spedito? La persona riceve subito l\'avviso.')) return;
-  btn.disabled = true;
-  let r;
-  try {
-    r = await fetch('/api/admin/regali/' + id + '/spedito', {method: 'POST', credentials: 'same-origin', headers: {'X-Tg-Init-Data': intestazione()}});
-  } catch(e) { r = null; }
-  if (!r || !r.ok) { btn.disabled = false; alert('Non ci sono riuscito' + (r ? ` (il server ha risposto ${r.status})` : '') + ': riprova.'); return; }
-  caricaRegali();
-}
 
 /* ---- il tempo: i giorni del server diventano secchi ---- */
 const GIORNO = 86400000;

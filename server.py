@@ -1695,33 +1695,6 @@ try:
 except ImportError:
     BANNER_SCONTI_LIVELLO = {"nuovo": 0, "avviato": 10, "pratico": 20,
                              "esperto": 35, "maestro": 50}
-# ==== I REGALI PER LIVELLO (17 nov 2026, il merch «Un tempo per te») ====
-# Decisione di Andrea: il merch (borsa, tazza, maglietta, quaderno) si
-# stampa su richiesta e si REGALA a chi sale di livello, invece di una
-# campagna di preordini. I livelli esistono gia' (LIVELLI) e sono gia'
-# la scala del commercio: qui si appende un oggetto a ogni gradino.
-# NON MUOVE GLI XP: un regalo non e' un'azione, e il perimetro («gli XP
-# sono il commercio e nient'altro», vedi GLI XP) resta intero.
-# Leva ACCESA di serie (regola del 14 nov 2026): e' l'interruttore
-# d'emergenza, si spegne con una riga nel config. Spenta, la scala non
-# promette niente (`regalo` vuoto), nessuno sblocca, nessuno chiede.
-try:
-    from config import REGALI_LIVELLO_ATTIVI
-except ImportError:
-    REGALI_LIVELLO_ATTIVI = True
-# Chiave = l'id del livello, valore = il regalo in una riga, con la sua
-# emoji davanti: e' il testo che la scala mostra e che il bot scrive.
-# «nuovo» non c'e' apposta: il punto di partenza non si premia.
-try:
-    from config import REGALI_LIVELLO
-except ImportError:
-    REGALI_LIVELLO = {"avviato": "👜 la borsa di tela «Un tempo per te»",
-                      "pratico": "☕ la tazza «Un tempo per te»",
-                      "esperto": "👕 la maglietta «Un tempo per te»",
-                      "maestro": "📓 il quaderno «Un tempo per te»"}
-# Quanto puo' essere lungo il recapito scritto da chi riceve: un
-# indirizzo o un locker stanno in tre righe, non in una pagina.
-RECAPITO_REGALO_MAX = 500
 # IL PREZZO DELLA PORTA (ago 2026, tappa 2): chi non ha il livello la
 # apre pagando. E' il PRIMO incasso che Barattolo fa per se' — finora
 # ogni invoice in entrata era escrow per conto di terzi — e per questo
@@ -6139,100 +6112,8 @@ def scala_livelli() -> list:
             "link_negozio": bool(slug_da) and n >= slug_da,
             "titolo": titoli.get(lid, ""),
             "p2p_sconto": p2p if (p2p > 0 and n >= P2P_SCONTO_LIVELLO)
-                          else 0,
-            # il sesto vantaggio (17 nov 2026): il regalo del gradino,
-            # '' a leva spenta — la regola della scala, come gli altri
-            "regalo": regalo_del_livello(lid)})
+                          else 0})
     return scala
-
-
-def regalo_del_livello(lid: str) -> str:
-    """Il regalo che quel gradino da', in una riga: '' se la leva e'
-    spenta, se il gradino non ne ha, o se il config lo scrive storto
-    (un numero, una lista). Giudice unico: la scala, il bot, la rotta
-    che riceve la richiesta e il pannello passano tutti di qui."""
-    if not REGALI_LIVELLO_ATTIVI:
-        return ""
-    try:
-        r = REGALI_LIVELLO.get(lid, "")
-    except Exception:
-        return ""
-    return r.strip()[:120] if isinstance(r, str) else ""
-
-
-def livelli_raggiunti(xp: int, affari: int) -> list[str]:
-    """Gli id dei gradini attraversati, dal primo a quello attuale: chi
-    e' «pratico» ha attraversato «nuovo» e «avviato». E' la stessa
-    lettura di `titoli_disponibili` (i livelli sono una scala), e sta
-    qui perche' il regalo di un gradino sotto non si perde salendo
-    due gradini in un colpo (un ordine grosso)."""
-    liv = livello_utente(xp, affari)["id"]
-    out = []
-    for l in LIVELLI:
-        out.append(l[2])
-        if l[2] == liv:
-            break
-    return out
-
-
-def sblocca_regali_livello(con, tg_id: int) -> list[tuple[str, str]]:
-    """Il giudice dei regali: segna «sbloccato» ogni regalo dei gradini
-    raggiunti che non era ancora scritto (INSERT OR IGNORE: idempotente,
-    mai doppioni, come i distintivi). Niente commit, e' del chiamante.
-    Ritorna le coppie (livello, regalo) appena sbloccate, per l'avviso.
-    A leva spenta non scrive e non promette: lista vuota. Un account
-    cancellato (il fantasma in [2^52, 2^53)) non riceve regali."""
-    if not REGALI_LIVELLO_ATTIVI or 2 ** 52 <= int(tg_id or 0) < 2 ** 53:
-        return []
-    u = con.execute("SELECT xp, vendite_ok, acquisti_ok FROM utenti "
-                    "WHERE tg_id=?", (tg_id,)).fetchone()
-    if not u:
-        return []
-    affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
-    nuovi = []
-    for lid in livelli_raggiunti(u["xp"] or 0, affari):
-        regalo = regalo_del_livello(lid)
-        if not regalo:
-            continue
-        r = con.execute(
-            "INSERT OR IGNORE INTO regali_livello"
-            "(tg_id, livello, regalo, stato, sbloccato_il) "
-            "VALUES(?,?,?,'sbloccato',?)",
-            (tg_id, lid, regalo, int(time.time())))
-        if r.rowcount:
-            nuovi.append((lid, regalo))
-    return nuovi
-
-
-def regali_livello_di(con, tg_id: int) -> list[dict]:
-    """La lista per /api/me: un regalo per gradino che ne ha uno, con lo
-    stato di CHI LEGGE — da_sbloccare | sbloccato | richiesto | spedito.
-    E' una LETTURA e non scrive: chi ha gia' il livello ma nessuna riga
-    (il deploy l'ha trovato gia' «pratico») lo vede «sbloccato» lo
-    stesso, e la riga nasce quando chiede (la rotta sblocca prima).
-    Lista vuota a leva spenta: il client non mostra niente."""
-    if not REGALI_LIVELLO_ATTIVI:
-        return []
-    u = con.execute("SELECT xp, vendite_ok, acquisti_ok FROM utenti "
-                    "WHERE tg_id=?", (tg_id,)).fetchone()
-    raggiunti = set(livelli_raggiunti(
-        (u["xp"] or 0) if u else 0,
-        ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0))
-    righe = {r["livello"]: r for r in con.execute(
-        "SELECT livello, regalo, stato FROM regali_livello WHERE tg_id=?",
-        (tg_id,))}
-    fuori = []
-    for _xp, _aff, lid, nome in LIVELLI:
-        regalo = regalo_del_livello(lid)
-        if not regalo:
-            continue
-        r = righe.get(lid)
-        stato = r["stato"] if r else (
-            "sbloccato" if lid in raggiunti else "da_sbloccare")
-        fuori.append({"livello": lid, "livello_nome": nome,
-                      "regalo": (r["regalo"] if r else regalo),
-                      "stato": stato})
-    return fuori
 
 
 def banner_porta_aperta(sbloccato_il: int) -> bool:
@@ -7226,24 +7107,6 @@ def init_db():
         badge_id TEXT NOT NULL,
         ottenuto_il INTEGER,
         PRIMARY KEY(tg_id, badge_id)
-    );
-    CREATE TABLE IF NOT EXISTS regali_livello(
-        -- I REGALI PER LIVELLO (17 nov 2026): una riga per persona e
-        -- gradino, come badge_utente. `regalo` e' il testo del giorno
-        -- dello sblocco (il config puo' cambiare, la promessa fatta no).
-        -- stato: sbloccato -> richiesto (col recapito) -> spedito.
-        -- Il recapito e' un dato personale: esce SOLO nel pannello
-        -- admin, mai in un avviso di canale.
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tg_id INTEGER NOT NULL,
-        livello TEXT NOT NULL,
-        regalo TEXT NOT NULL,
-        stato TEXT NOT NULL DEFAULT 'sbloccato',
-        recapito TEXT NOT NULL DEFAULT '',
-        sbloccato_il INTEGER,
-        richiesto_il INTEGER,
-        spedito_il INTEGER,
-        UNIQUE(tg_id, livello)
     );
     CREATE TABLE IF NOT EXISTS serie_giorni(
         -- LA SERIE DEI GIORNI 🔥 (17 nov 2026): una riga a persona.
@@ -21129,36 +20992,6 @@ async def premia_distintivi(tg_id: int):
         except Exception as e:
             print(f"⚠️ Badge Nostr del distintivo saltato per {tg_id}/"
                   f"{did}: {e}")
-    # I REGALI PER LIVELLO (17 nov 2026) viaggiano sullo stesso gancio:
-    # ogni posto che puo' aver mosso gli XP passa gia' di qui.
-    await premia_regali_livello(tg_id)
-
-
-async def premia_regali_livello(tg_id: int):
-    """Il gemello di `premia_distintivi` per i regali: valuta, committa
-    e POI avvisa (mai una notifica dentro una transazione). Fail-open
-    totale: un regalo non deve mai fermare il flusso che stava
-    chiudendo un ordine. L'avviso dice COSA e DOVE andare a chiederlo:
-    il recapito lo scrive la persona nel Profilo, non si chiede in chat."""
-    try:
-        con = db()
-        nuovi = sblocca_regali_livello(con, tg_id)
-        con.commit()
-        con.close()
-    except Exception as e:
-        print(f"⚠️ Regali per livello saltati per {tg_id}: {e}")
-        return
-    nomi = {l[2]: l[3] for l in LIVELLI}
-    for lid, regalo in nuovi:
-        try:
-            await notifica(
-                tg_id,
-                f"🎁 <b>Hai sbloccato un regalo: "
-                f"{html.escape(regalo)}!</b>\n"
-                f"Sei {html.escape(nomi.get(lid, lid))}: apri il tuo "
-                f"Profilo, «🎖 Livello e titolo», e dimmi dove mandarlo. 🫙")
-        except Exception as e:
-            print(f"⚠️ Avviso del regalo saltato per {tg_id}/{lid}: {e}")
 
 
 # ---------------- IL CAMPANELLO DEL BOT (webhook) --------------------
@@ -21601,13 +21434,6 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE badge_utente SET tg_id=? "
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM badge_utente WHERE tg_id=?", (id_nostr,))
-        # I regali per livello (17 nov 2026) migrano come i distintivi:
-        # UNIQUE(tg_id, livello) tiene una riga sola per gradino, e
-        # resta quella dell'account Telegram (che puo' gia' portare un
-        # recapito o uno «spedito»); il doppione Nostr muore sotto.
-        con.execute("UPDATE OR IGNORE regali_livello SET tg_id=? "
-                    "WHERE tg_id=?", (id_telegram, id_nostr))
-        con.execute("DELETE FROM regali_livello WHERE tg_id=?", (id_nostr,))
         # L'ultimo 30382 pubblicato segue l'utente come i distintivi:
         # e' solo una CACHE (la prova resta l'evento sui relay), quindi
         # se sopravvive quella di Telegram va bene com'e' — diventera'
@@ -37064,23 +36890,6 @@ def _leve_stato():
                          "recensore solo: è la classifica di prima "
                          "dello smorzamento"),
         ]},
-        # I REGALI PER LIVELLO (17 nov 2026, il merch «Un tempo per te»):
-        # accesa di serie, l'interruttore d'emergenza
-        {"gruppo": "🎁 Regali per livello", "voci": [
-            _leva("Regali per livello", "REGALI_LIVELLO_ATTIVI",
-                  bool(REGALI_LIVELLO_ATTIVI),
-                  acceso="chi sale di livello sblocca il regalo del "
-                         "gradino, lo chiede dal Profilo col recapito, e "
-                         "l'avviso arriva qui: si spedisce a mano dal sito "
-                         "di stampa e si segna «spedito» nel pannello",
-                  spento="la scala non promette regali, nessuno ne "
-                         "sblocca né ne chiede; le righe già scritte "
-                         "restano nel pannello"),
-            _leva("I regali, per gradino", "REGALI_LIVELLO",
-                  _elenco(f"{lid}: {regalo_del_livello(lid)}"
-                          for _x, _a, lid, _n in LIVELLI
-                          if regalo_del_livello(lid)) or "nessuno"),
-        ]},
         {"gruppo": "🔁 Scambio P2P (Mostro)", "voci": [
             # LA RIGA DICE IL FATTO E NON LA COSTANTE — la trappola che
             # questo pannello esiste per non far ricadere: una leva
@@ -52526,17 +52335,6 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0)
     # ...e la scala intera coi vantaggi di ogni gradino (ott 2026)
     profilo["livelli_scala"] = scala_livelli()
-    # ...e i regali dei gradini, con lo stato di chi legge (17 nov 2026):
-    # lista vuota a leva spenta, e il cassetto non ne parla. Una
-    # connessione sua, breve: quella di sopra e' gia' chiusa qui, e un
-    # regalo non deve mai far cadere /api/me (fail-open, lista vuota).
-    try:
-        _cr = db()
-        profilo["regali_livello"] = regali_livello_di(_cr, user["id"])
-        _cr.close()
-    except Exception as e:
-        print(f"⚠️ Regali per livello non letti per /api/me: {e}")
-        profilo["regali_livello"] = []
     # ...e da che lato vengono quegli XP, che e' la meta' che il numero
     # da solo non dice. None quando i conti non tornano (vedi
     # `xp_per_ruolo`): chiave vuota = il cassetto dice la frase di
@@ -56799,116 +56597,6 @@ async def scegli_titolo(req: Request,
     finally:
         con.close()
     return {"ok": True, "titolo": scelto}
-
-
-# ---- I REGALI PER LIVELLO: chiedere, elencare, spedire (17 nov 2026) ----
-@app.post("/api/me/regali/{livello}/richiedi")
-async def richiedi_regalo_livello(livello: str, req: Request,
-                                  x_tg_init_data: str = Header(""),
-                                  barattolo_sessione: str = Cookie("")):
-    """Chi ha sbloccato un regalo dice DOVE mandarlo: un locker o un
-    indirizzo, in testo libero (il regalo lo spedisce Andrea a mano dal
-    sito di stampa, non un venditore del mercatino). Il giudice del
-    diritto e' `sblocca_regali_livello`, lo stesso del gancio dal vivo:
-    si chiama PRIMA, cosi' chi era gia' «pratico» il giorno del deploy
-    trova la riga nata qui. Un regalo si chiede UNA volta (409 al
-    secondo giro) e mai per un gradino non raggiunto (403)."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    if not REGALI_LIVELLO_ATTIVI:
-        raise HTTPException(404, "I regali per livello sono spenti")
-    if not regalo_del_livello(livello):
-        raise HTTPException(404, "Questo livello non ha un regalo")
-    d = await leggi_json(req)
-    recapito = " ".join(str(d.get("recapito") or "").split())
-    if len(recapito) < 10:
-        raise HTTPException(400, "Scrivi dove mandarlo: un locker o un "
-                                 "indirizzo completo (almeno 10 caratteri)")
-    recapito = recapito[:RECAPITO_REGALO_MAX]
-    con = db()
-    try:
-        sblocca_regali_livello(con, user["id"])
-        r = con.execute("SELECT id, regalo, stato FROM regali_livello "
-                        "WHERE tg_id=? AND livello=?",
-                        (user["id"], livello)).fetchone()
-        if not r:
-            raise HTTPException(403, "Questo regalo non l'hai ancora "
-                                     "sbloccato")
-        if r["stato"] != "sbloccato":
-            raise HTTPException(409, "L'hai gia' chiesto: e' in viaggio "
-                                     "o sta per partire")
-        con.execute("UPDATE regali_livello SET stato='richiesto', "
-                    "recapito=?, richiesto_il=? WHERE id=?",
-                    (recapito, int(time.time()), r["id"]))
-        con.commit()
-        nome = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
-                           (user["id"],)).fetchone()
-    finally:
-        con.close()
-    # L'avviso ai moderatori: COSA e A CHI, mai il recapito (sta nel
-    # pannello, dove entra solo un admin). Fail-open: la richiesta e'
-    # gia' scritta, un bot muto non la perde.
-    try:
-        chi = html.escape(str((nome["nome"] if nome else "") or user["id"]))
-        await notifica_admin(
-            f"🎁 <b>Regalo da spedire</b>: {html.escape(r['regalo'])} "
-            f"a {chi} (livello {html.escape(livello)}).\n"
-            f"Il recapito e' nel pannello admin, «🎁 Regali per livello».",
-            argomento="riepiloghi")
-    except Exception as e:
-        print(f"⚠️ Avviso admin del regalo saltato: {e}")
-    return {"ok": True, "stato": "richiesto"}
-
-
-@app.get("/api/admin/regali")
-def lista_regali_admin(x_tg_init_data: str = Header(""),
-                       barattolo_sessione: str = Cookie("")):
-    """SOLO ADMIN: i regali chiesti e non ancora spediti per primi, dal
-    piu' vecchio (chi aspetta da piu' si vede per primo, come i banner),
-    poi gli ultimi spediti. QUI esce il recapito, ed e' l'unico posto."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    if not e_admin(user["id"]):
-        raise HTTPException(403, "Riservato ai moderatori")
-    con = db()
-    righe = con.execute(
-        "SELECT r.id, r.tg_id, r.livello, r.regalo, r.stato, r.recapito, "
-        "r.richiesto_il, r.spedito_il, u.nome "
-        "FROM regali_livello r LEFT JOIN utenti u ON u.tg_id=r.tg_id "
-        "WHERE r.stato IN ('richiesto','spedito') "
-        "ORDER BY CASE r.stato WHEN 'richiesto' THEN 0 ELSE 1 END, "
-        "         COALESCE(r.richiesto_il, 0) ASC LIMIT 100").fetchall()
-    con.close()
-    return [dict(r) for r in righe]
-
-
-@app.post("/api/admin/regali/{rid}/spedito")
-async def regalo_spedito_admin(rid: int, x_tg_init_data: str = Header(""),
-                               barattolo_sessione: str = Cookie("")):
-    """SOLO ADMIN: il pacco e' partito. Una volta sola (409 se non era
-    «richiesto»), e chi lo riceve lo sa subito."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    if not e_admin(user["id"]):
-        raise HTTPException(403, "Riservato ai moderatori")
-    con = db()
-    try:
-        r = con.execute("SELECT tg_id, regalo, stato FROM regali_livello "
-                        "WHERE id=?", (rid,)).fetchone()
-        if not r:
-            raise HTTPException(404, "Regalo non trovato")
-        if r["stato"] != "richiesto":
-            raise HTTPException(409, "Questo regalo non e' in attesa")
-        con.execute("UPDATE regali_livello SET stato='spedito', "
-                    "spedito_il=? WHERE id=?", (int(time.time()), rid))
-        con.commit()
-    finally:
-        con.close()
-    try:
-        await notifica(r["tg_id"],
-                       f"📦 <b>Il tuo regalo e' partito!</b>\n"
-                       f"{html.escape(r['regalo'])} e' in viaggio verso il "
-                       f"recapito che ci hai dato. Grazie di essere qui. 🫙")
-    except Exception as e:
-        print(f"⚠️ Avviso di spedizione del regalo saltato: {e}")
-    return {"ok": True, "stato": "spedito"}
 
 
 @app.post("/api/me/serie")
@@ -115440,7 +115128,6 @@ CANCELLA_TOGLI = (
     ("avvisi_app", "tg_id"), ("avvisi_notificati", "tg_id"),
     ("push_iscrizioni", "tg_id"),
     ("avvisi_ricerca", "tg_id"), ("badge_utente", "tg_id"),
-    ("regali_livello", "tg_id"),     # col recapito: un dato personale
     ("barattoli_condivisi", "tg_id"),
     ("carrello_salvato", "tg_id"), ("carrello_salvato", "venditore_id"),
     ("chiavi_p2p", "tg_id"), ("p2p_indice", "tg_id"),

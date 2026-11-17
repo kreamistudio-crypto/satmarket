@@ -501,20 +501,6 @@ BANNER_NEGOZIO_ATTIVO = False   # interruttore generale (False = spento)
 # stesso prezzo — il banner resta comunque a pagamento in ogni caso.
 BANNER_SCONTI_LIVELLO = {"nuovo": 0, "avviato": 10, "pratico": 20,
                          "esperto": 35, "maestro": 50}
-# I REGALI PER LIVELLO (17 nov 2026): il merch «Un tempo per te» si
-# stampa su richiesta e si REGALA a chi sale di gradino, invece di una
-# campagna di preordini (decisione di Andrea). Accesa di serie: e' il
-# freno d'emergenza, si spegne con False. Spenta, la scala non promette
-# niente e nessuno sblocca o chiede. Chi riceve scrive il recapito nel
-# Profilo, l'avviso arriva nel canale admin e si segna «spedito» dal
-# pannello: la spedizione la fa Andrea a mano, dal sito di stampa.
-REGALI_LIVELLO_ATTIVI = True
-# Un regalo per gradino, con l'emoji davanti: e' il testo che la scala
-# mostra e che il bot scrive. «nuovo» non c'e' apposta.
-REGALI_LIVELLO = {"avviato": "👜 la borsa di tela «Un tempo per te»",
-                  "pratico": "☕ la tazza «Un tempo per te»",
-                  "esperto": "👕 la maglietta «Un tempo per te»",
-                  "maestro": "📓 il quaderno «Un tempo per te»"}
 # Il PREZZO della porta (tappa 2): si paga UNA VOLTA e vale per
 # sempre. E' il primo incasso che Barattolo fa per se', quindi ogni
 # sblocco lascia una riga nella tabella `pagamenti`: senza, sembrerebbe

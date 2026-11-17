@@ -79,8 +79,6 @@ Tutti i tuoi acquisti e le tue vendite stanno nella scheda «Ordini», con lo st
 
 Il feedback: ad affare concluso, dalla pagina dell'ordine, compratore e venditore si lasciano a vicenda un voto da 1 a 5 stelle con un commento breve (chi compra può aggiungere fino a 3 foto). Lo stesso vale per la recensione a fine scambio P2P, che va nella stessa media del profilo. Chi l'ha lasciato può modificarlo una volta sola (stelle e commento; le foto restano) oppure cancellarlo, entro 7 giorni da quando l'ha scritto: sotto il voto ci sono «✏️ Modifica» e «🗑 Cancella», con la data fino a cui valgono. Dopo diventa definitivo. Chi ha ricevuto il feedback viene avvisato del cambio, e sul profilo la riga porta la scritta «modificato». Cancellato è per sempre: su quell'affare non se ne può lasciare un altro. Il feedback lasciato da un altro non si può cambiare: se è offensivo o falso, lo può togliere solo un moderatore (scrivi allo staff). Nessuno può chiederti di cambiare un voto in cambio di qualcosa: se succede, segnalalo allo staff. Le recensioni che hai ricevuto le trovi tutte in un posto: Profilo → «Livello e inviti» → «⭐ Recensioni ricevute» (oppure tocca le stelle sotto il tuo nome in cima al Profilo). Ci sono le ultime 50, del mercatino e degli scambi P2P insieme, come le vedono gli altri nel tuo negozio.
 
-I livelli e i regali: comprare e vendere fa salire di livello (Nuovo arrivato, Bottega avviata, Mercante pratico, Mercante esperto, Maestro del banco: contano i punti XP del commercio E gli affari conclusi, due chiavi insieme). Dal 17 novembre 2026 ogni gradino, tranne il primo, regala un oggetto vero col logo «Un tempo per te»: la borsa di tela alla Bottega avviata, la tazza al Mercante pratico, la maglietta all'esperto, il quaderno al Maestro. Quando lo sblocchi il bot te lo dice; poi vai nel Profilo → «🎖 Livello e titolo» → «I tuoi regali», scrivi dove mandarlo (un locker oppure nome, via, CAP e città) e premi «Mandamelo 🎁». Lo spedisce lo staff di Barattolo, una volta sola per gradino, e quando parte ricevi un avviso. I punti non cambiano: un regalo non dà e non toglie XP. La scala dei vantaggi nello stesso cassetto dice cosa dà ogni livello.
-
 Per un contenuto digitale il venditore può chiederti qualche informazione prima di pagare (per esempio nome, cognome o email, una scelta da un elenco, un sì o un no): rispondi alla cassa. Le risposte viaggiano cifrate dentro l'ordine, le leggete solo tu e il venditore, e si cancellano come l'indirizzo. Il numero di telefono non si può chiedere.
 
 <!-- pezzo libro-008 | libro -->
@@ -1879,8 +1877,8 @@ pubblico: sì
 
 frase: Salire di livello adesso regala qualcosa di vero: alla «Bottega avviata» la borsa di tela «Un tempo per te», al «Mercante pratico» la tazza, all'«esperto» la maglietta, al «Maestro del banco» il quaderno. Quando sblocchi un regalo il bot te lo dice: apri il Profilo, scrivi dove mandarlo (un locker o il tuo indirizzo) e te lo spediamo noi. Ogni regalo una volta sola, e i punti non cambiano.
 dove: il messaggio del bot «🎁 Hai sbloccato un regalo»; Profilo → «🎖 Livello e titolo» → «I tuoi regali» (il campo del recapito e «Mandamelo 🎁»); i regali di ogni gradino nella scala dei vantaggi.
-leva: REGALI_LIVELLO_ATTIVI (accesa di serie)
-pubblico: sì
+leva: REGALI_LIVELLO_ATTIVI (spenta di serie: si accende quando «Un tempo per te» aderisce)
+pubblico: no
 
 <!-- pezzo novita-064 | novita -->
 ## Novità · 2026-11-17 · chiedi-locker
