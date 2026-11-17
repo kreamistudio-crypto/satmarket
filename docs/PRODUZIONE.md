@@ -4858,6 +4858,49 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   deve dire 2. Si revoca da solo con `lncli deletemacaroonid 4` sul
   nodo (e la riga via dal config). Finito l'esperimento la riga puo'
   sparire: G e H tornano «non attive» senza altro da fare.
+- LA CAUZIONE DEL CONTANTI ON-CHAIN, IL MACAROON `root_key_id 5` (17 nov
+  2026, cantiere onchain-contanti; perché in CANTIERI, «…terzo pezzo: il
+  metodo scelto alla presa e la cauzione in Lightning col QR»). Chi
+  prende in contanti un ordine P2P on-chain blocca una cauzione in
+  Lightning: una hold invoice del nostro LND, chiesta dal ponte di
+  sempre (`LND_PONTE_URL`, `LND_PONTE_CERT`) con un macaroon SUO,
+  `LND_PONTE_MACAROON_CAUZIONE`. NON è quello delle hold di prova (il 4,
+  che non sa saldare e deve restare così). La leva sono DUE righe del
+  config: il macaroon e `P2P_ONCHAIN_CAUZIONE = True`; una senza l'altra
+  è spenta. E C'È LA PORTICINA: `P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN`, True
+  di serie SENZA nessuna riga: con le due righe la cauzione la vede e la
+  mette solo un moderatore (`ADMIN_IDS`) che prende, per tutti gli altri
+  è spenta. FUNZIONE COI SOLDI: si prova così, in produzione ma solo
+  Andrea e Alan (card di Andrea del 17 nov: la VM di collaudo non ha un
+  LND). PER APRIRLA A TUTTI, a prova fatta e col sì di Andrea: la riga
+  `P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = False` in coda al config e il
+  riavvio. LA PROCEDURA, un comando alla volta, li esegue Andrea (i
+  comandi pronti, con le copie e i controlli: DA-FARE-ANDREA, voce 20).
+  Sul NODO (`~/nodo`), prima si guarda: `docker compose exec lnd lncli listmacaroonids`
+  Se il 5 è libero, si cuoce:
+  `docker compose exec lnd lncli bakemacaroon --root_key_id 5 --save_to /tmp/barattolo-cauzione.macaroon uri:/invoicesrpc.Invoices/AddHoldInvoice uri:/invoicesrpc.Invoices/CancelInvoice uri:/lnrpc.Lightning/LookupInvoice uri:/invoicesrpc.Invoices/SettleInvoice`
+  (SettleInvoice serve al gesto del moderatore che fa perdere la
+  cauzione: finché quel pezzo non c'è il server non la chiama mai, e
+  cuocerla adesso evita un secondo macaroon). Si legge in esadecimale:
+  `docker compose exec lnd xxd -p -c 9999 /tmp/barattolo-cauzione.macaroon`
+  poi `docker compose exec lnd rm /tmp/barattolo-cauzione.macaroon`.
+  L'esadecimale non passa da chat né da canali: si incolla nel config
+  con `read -s`. Sul server, controllo PRIMA:
+  `grep -c "^LND_PONTE_MACAROON_CAUZIONE\|^P2P_ONCHAIN_CAUZIONE" /srv/barattolo/config.py`
+  deve dire 0; poi le due righe in coda al config e il riavvio.
+  Controllo DOPO: `journalctl -u barattolo -n 80 | grep 🔐` deve dire
+  «Cauzione del contanti on-chain: ACCESA SOLO PER I MODERATORI, 3% con
+  minimo 1000 sats» («ACCESA PER TUTTI» solo dopo il `False` della
+  porticina; «leva spenta, solo il giro dei ritorni» col solo macaroon),
+  e il pannello «⚙️ Stato delle leve» le voci «Cauzione nel contanti
+  on-chain (in Lightning)» e «Cauzione on-chain solo ai moderatori»
+  accese. PER SPEGNERE: via la riga
+  `P2P_ONCHAIN_CAUZIONE` e riavvio, LASCIANDO il macaroon finché ci sono
+  cauzioni vive (il giro dei ritorni gira col solo macaroon); a cauzioni
+  finite, via anche lui e `lncli deletemacaroonid 5` sul nodo. Le
+  cauzioni vive si contano dal server con
+  `sqlite3 /srv/barattolo/satmarket.db "SELECT stato, COUNT(*) FROM p2p_onchain_cauzioni GROUP BY stato"`
+  (in sola lettura; la tabella sta nel database di sempre).
 - L'INDIRIZZO LIGHTNING DI CASA (10 ott 2026; perché in CANTIERI,
   «L'indirizzo Lightning di casa: zap@barattolo.store»; com'è fatto in
   ARCHITETTURA, stesso titolo). `zap@barattolo.store`, per ricevere gli

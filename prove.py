@@ -16372,8 +16372,9 @@ def prove_foto_scarti():
     # stringa) un oggetto sarebbe stato truthy SEMPRE, e la foto rotta
     # sarebbe entrata dappertutto
     # (ott 2026: il quarto e' il modulo del feedback con le foto)
-    prova("sentinella: tutti e quattro i chiamanti leggono l'esito",
-          (4, 4), (mini.count("await ridimensiona("),
+    # (17 nov 2026: il quinto e' il ripiego degli screenshot dell'assistenza)
+    prova("sentinella: tutti e cinque i chiamanti leggono l'esito",
+          (5, 5), (mini.count("await ridimensiona("),
                    mini.count("esito = await ridimensiona(")))
 
     # ---- LA MINIATURA NON E' MAI NERA, E L'AVVISO DICE QUALE FOTO ----
@@ -47151,7 +47152,7 @@ def prove_fogli_di_casa():
     # (`pubblicaOnchainDalFoglioP2P`), gemello di quello di Lightning.
     # CENTOVENTI (17 nov 2026, cantiere stradina): «Esci da Barattolo?»
     # sulla casella che porta al partner dell'educazione (`vaiTappa`).
-    prova("i gesti che passano dalla domanda unica sono centoventidue (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoventitre' (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47164,8 +47165,9 @@ def prove_fogli_di_casa():
           "le quattro dei codici uno alla volta; dal 17 nov «Hai inviato gli "
           "USDe?» on-chain e il riepilogo di Barattozon on-chain; «Esci da "
           "Barattolo?» della stradina; «Annulli il deposito?» e «Fermi la "
-          "raccolta?» delle raccolte)",
-          122, solo_codice(mini).count("chiediConferma({"))
+          "raccolta?» delle raccolte; «Hai consegnato i contanti?» del "
+          "contanti on-chain)",
+          123, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -56212,7 +56214,8 @@ def prove_ci_leggera():
     # segreti girano interi a ogni giro, senza condizioni nuove
     passo_prove = job_prove[job_prove.index("- name: Le prove\n"):]
     passo_prove = passo_prove[:passo_prove.index("\n      - name:", 1)]
-    prova("prove.py gira intero a ogni giro: nessuna condizione sul suo passo",
+    prova("il passo di prove.py resta senza condizioni: la scelta la fa "
+          "prove.py da se' (ci-mirata, `_argomenti_della_ci`)",
           [False, True],
           ["if:" in passo_prove, "run: python prove.py" in passo_prove])
     prova("...e il confronto coi documenti non entra nei segreti ne' nel semaforo",
@@ -56300,6 +56303,26 @@ def prove_ci_leggera():
         scrivi(clone, "lista.txt", "collaudo_sempre_rosso\n\n")
         committa(clone, "un .txt")
         con_txt = lancia("--salvo-solo-documenti-da", "pronto")
+        # ci-mirata (17 nov 2026): un file che il collaudo non vede non
+        # lo fa girare; il collaudo stesso, o un file che nomina, si'
+        scrivi(clone, "deploy/zz-script.sh", "echo ciao\n")
+        committa(clone, "uno script che nessun collaudo nomina")
+        non_visto = lancia("--salvo-solo-documenti-da", "pronto")
+        scrivi(clone, "collaudo_sempre_rosso.py",
+               "DATI = 'dati/zz.json'\n"
+               "print('  ✗ rosso apposta')\nraise SystemExit(1)\n")
+        committa(clone, "il collaudo stesso")
+        se_stesso = lancia("--salvo-solo-documenti-da", "pronto")
+        git(origine, "fetch", "-q", clone, "+HEAD:refs/heads/pronto")
+        scrivi(clone, "dati/zz.json", "{}\n")
+        committa(clone, "un file che il collaudo nomina")
+        nominato = lancia("--salvo-solo-documenti-da", "pronto")
+        git(origine, "fetch", "-q", clone, "+HEAD:refs/heads/pronto")
+        scrivi(clone, "collaudo_nuovo_verde.py", "print('  ✓ verde')\n")
+        scrivi(clone, "lista.txt",
+               "collaudo_sempre_rosso\ncollaudo_nuovo_verde\n")
+        committa(clone, "un collaudo nuovo nell'elenco")
+        nuovo = lancia("--salvo-solo-documenti-da", "pronto")
     finally:
         import shutil
         shutil.rmtree(radice, ignore_errors=True)
@@ -56312,8 +56335,60 @@ def prove_ci_leggera():
     prova("...lo stesso albero senza l'opzione gira tutto, come sempre", 1, senza_opzione[0])
     prova("...un ramo che non c'e' gira tutto", [1, True],
           [ramo_che_manca[0], "confronto non riuscito, si gira tutto" in ramo_che_manca[1]])
-    prova("...e un .txt accanto ai documenti gira tutto", [1, True],
-          [con_txt[0], "non solo documenti: si gira tutto" in con_txt[1]])
+    prova("...l'elenco ritoccato senza nomi nuovi non fa girare niente, e lo dice",
+          [0, True, True],
+          [con_txt[0], "lista.txt: nessun nome nuovo" in con_txt[1],
+           "::notice::collaudi saltati" in con_txt[1]])
+    prova("...uno script che nessun collaudo nomina: niente collaudi (ci-mirata)",
+          [0, True], [non_visto[0], "nessun collaudo lo vede" in non_visto[1]])
+    prova("...il collaudo stesso cambiato: gira", [1, True],
+          [se_stesso[0], "rosso apposta" in se_stesso[1]])
+    prova("...un file che il collaudo nomina fra virgolette: gira", [1, True],
+          [nominato[0], "rosso apposta" in nominato[1]])
+    prova("...un nome nuovo nell'elenco: gira il nuovo e basta", [0, True, False],
+          [nuovo[0], "collaudo_nuovo_verde nuovi" in nuovo[1],
+           "rosso apposta" in nuovo[1]])
+
+    # IL GIUDICE DEI COLLAUDI coi file di cartone (ci-mirata): chi vede chi
+    sc = amb.get("scegli_collaudi")
+    tre = "'" * 3
+    fs = {"server.py": ("import os\nPAGINA = 'miniapp.html'\n# vedi prove.py\n"
+                        "SQL = " + tre + "\n  -- prove.py conta qui\n" + tre + "\n"),
+          "collaudo_a.py": "import server\n",
+          "collaudo_b.py": "import collaudo_a as banco\n",
+          "collaudo_c.py": "import json\nX = open('deploy/zz/conf').read()\n",
+          "miniapp.html": "", "prove.py": "", "deploy/zz/conf": "",
+          "estensione/manifest.json": "", "manifest.json": "",
+          "ci/lista.txt": "", "server_rotto.py": "def (:\n"}
+    nomi3 = ["collaudo_a", "collaudo_b", "collaudo_c"]
+
+    def giudica(cambiati, base=nomi3, nomi=nomi3):
+        return sc(cambiati, nomi, "ci/lista.txt", fs.__getitem__,
+                  fs.__contains__, base)[0] if callable(sc) else "manca"
+    prova("giudice collaudi: server.py tocca chi lo importa, anche per interposto "
+          "collaudo; chi non lo importa no", ["collaudo_a", "collaudo_b"],
+          giudica(["server.py"]))
+    prova("...una pagina che il server nomina: come il server",
+          ["collaudo_a", "collaudo_b"], giudica(["miniapp.html"]))
+    prova("...prove.py nominato solo in un commento e nell'SQL di una stringa: nessuno",
+          [], giudica(["prove.py"]))
+    prova("...un file nominato da un collaudo solo: quello", ["collaudo_c"],
+          giudica(["deploy/zz/conf"]))
+    fs["server.py"] += "MANIFESTO = 'manifest.json'\n"
+    prova("...estensione/manifest.json non e' il manifest.json di casa", [],
+          giudica(["estensione/manifest.json"]))
+    prova("...il lanciatore, requirements, il config d'esempio, il workflow: TUTTI",
+          [None] * 4, [giudica([f]) for f in
+                       ("collaudi_ci.py", "requirements.txt", "config_esempio.py",
+                        ".github/workflows/prove.yml")])
+    prova("...un file sparito: TUTTI", None, giudica(["zz_sparito.py"]))
+    prova("...l'elenco: i soli nomi nuovi; quello di prima illeggibile: TUTTI",
+          [["collaudo_c"], None],
+          [giudica(["ci/lista.txt"], base=["collaudo_a", "collaudo_b"]),
+           giudica(["ci/lista.txt"], base=None)])
+    fs["collaudo_x.py"] = "import server_rotto\n"
+    prova("...un import che non si legge come Python: TUTTI", None,
+          giudica(["deploy/zz/conf"], nomi=["collaudo_x", "collaudo_a"]))
 
     # IL PARALLELO, dal vero e d'ORDINE, non di cronometro: il primo
     # collaudo aspetta un file che scrive il SECONDO. In fila il primo
@@ -60002,11 +60077,15 @@ def prove_link_dentro_telegram():
            "_link_dentro_telegram" in dm])
     # (17 nov 2026, chiedi-locker) il quarto: il bottone «📦 Come spedisci»
     # dell'avviso «qualcuno vorrebbe un locker», che traduce /?corrieri=1
-    prova("la traduzione ha QUATTRO chiamanti: il bottone del ramo Telegram, lo "
+    # (17 nov 2026, assistenza-screenshot) il quinto: il bottone sotto lo
+    # screenshot che arriva agli admin nel bot (`_foto_al_bot`)
+    prova("la traduzione ha CINQUE chiamanti: il bottone del ramo Telegram, lo "
           "stesso bottone nel gruppo degli admin (12 ott 2026), il link di testo "
-          "dell'avviso dei nuovi ordini e il bottone di «chiedi al venditore»",
-          [4, True, True, True],
+          "dell'avviso dei nuovi ordini, il bottone di «chiedi al venditore» e "
+          "quello sotto lo screenshot dell'assistenza",
+          [5, True, True, True, True],
           [codice(src).count("_link_dentro_telegram(") - 1,
+           '"url": _link_dentro_telegram(bottone[1])' in pezzo("_foto_al_bot"),
            '"url": str(_link_dentro_telegram(bottone[1]))' in pezzo("_al_gruppo_admin"),
            # (13 ott 2026) uno o piu' bottoni: ognuno passa dalla traduzione
            "(b[0], _link_dentro_telegram(b[1])) for b in _bottoni_avviso(bottone)"
@@ -106493,9 +106572,11 @@ def prove_telegram_simulato_collaudo():
     # il gruppo degli admin. Ha la sua guardia in cima, come gli altri.
     # ...E SETTE dal 27 ott 2026: `leve_backup_telegram`, il backup delle
     # leve come file dal bot (sendDocument). Anche lui si ferma in collaudo.
-    prova("il censimento trova i sette indirizzi di oggi",
-          ["_foto_profilo_telegram", "_getme_telegram", "_manda_telegram",
-           "_posta_gruppo_admin", "_registra", "bot_api",
+    # ...E OTTO dal 17 nov 2026: `_foto_al_bot`, lo screenshot
+    # dell'assistenza agli admin (sendPhoto coi byte). Guardia in cima.
+    prova("il censimento trova gli otto indirizzi di oggi",
+          ["_foto_al_bot", "_foto_profilo_telegram", "_getme_telegram",
+           "_manda_telegram", "_posta_gruppo_admin", "_registra", "bot_api",
            "leve_backup_telegram"], sorted(trovati))
     for nome, ok in sorted(trovati.items()):
         prova(f"{nome}: in collaudo si ferma prima di Telegram", True, ok)
@@ -145710,6 +145791,10 @@ def prove_contanti_a_mano():
               "_appuntamento_in_vigore_p2p", "_presenze_per_parte_p2p", "_registra_sono_qui_p2p",
               "_registra_appuntamento_p2p", "_confronto_presenze_p2p", "_confronto_giro_p2p",
               "_incontro_da_riga_p2p", "_incontro_p2p", "_scorda_posizioni_presenza_p2p",
+              # (17 nov 2026, onchain-contanti) la scopa chiama anche lo
+              # scordo degli scambi on-chain chiusi: qui la tabella degli
+              # ordini on-chain non c'e', e risponde 0
+              "_p2p_onchain_scorda_incontri",
               "_scopa_presenze_p2p", "_dimentica_presenze_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
     ORA = 1_790_000_000
@@ -153038,6 +153123,7 @@ def prove_freni():
            # prendere 10 all'ora, una disputa 5 all'ora; il battito della
            # pagina di chi deposita (uno ogni 15 s) 300 all'ora
            "p2p_onchain_pubblica": (10, 3600), "p2p_onchain_prendi": (10, 3600),
+           "p2p_onchain_cauzione": (10, 3600),
            "p2p_onchain_controlla": (300, 3600), "p2p_onchain_disputa": (5, 3600),
            # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
            # un login con la sua coda sta largo in 60 al minuto per IP
@@ -163060,7 +163146,7 @@ process.stdout.write(JSON.stringify(out));
            "                                                    _P2P_INFO[\"fee\"])" in src,
            "La commissione del P2P adesso non si \"\n                                     \"legge: riprova fra un minuto" in src,
            "(user[\"id\"], dep, ric, ind_id, margine, prezzo + margine + q_dep," in src,
-           "quota_dove, q_ric, oid))" in src,
+           "quota_dove, q_ric, scelto if piu_metodi else \"\", oid))" in src,
            "if [v for d, v in uscite if d == o[\"incasso\"]] != [_onchain_incasso_sats(o)]:" in src,
            "uscite = [(oc[\"incasso\"], _onchain_incasso_sats(oc))]" in src,
            "p = await _onchain_preventivo_cambio(_onchain_incasso_sats(o))" in src])
@@ -166966,8 +167052,20 @@ __PEZZI__
   const dopo = MANDATI.length;
   const no = await onchainCofirma(ven, D.semi[1]);
   const firmata = MANDATI.pop();
+  /* (17 nov 2026, rilascio-senza-incasso) chi libera uno scambio P2P
+     mentre chi riceve non ha ancora un indirizzo: un no in parole, non
+     «Invalid address length», e niente parte */
+  PAROLE = D.semi[0];
+  const primaVuoto = MANDATI.length;
+  let noVuoto = '';
+  try {
+    await onchainFirmaProposta({...D.compratore, destinazione: dest, incasso: '',
+                                rotta: '/p2p/onchain/8'}, 'venditore');
+  } catch(e) { noVuoto = e.message; }
+  const dopoVuoto = MANDATI.length - primaVuoto;
   console.log(JSON.stringify({firma, esternoTel, proposta, no, firmata,
-                              noFalsa, noQuota, noTetto, dopo}));
+                              noFalsa, noQuota, noTetto, dopo,
+                              noVuoto, dopoVuoto}));
 })().catch(e => console.log(JSON.stringify({errore: String(e)})));
 """.replace("__PEZZI__", pezzi)
     casa = _tf.mkdtemp(prefix="onchain-incasso-")
@@ -167034,6 +167132,18 @@ __PEZZI__
           o.get("no"))
     prova("...e manda la transazione finita", "/api/onchain/ordini/8/firma",
           (o.get("firmata") or [""])[0])
+    # (17 nov 2026, rilascio-senza-incasso: scambio vero da 500 €)
+    prova("«Ricevuti: libera i sats» senza l'indirizzo di chi compra: il no "
+          "in parole (non «Invalid address length») e niente parte",
+          [True, 0],
+          [str(o.get("noVuoto", "")).startswith("chi compra non ha ancora scelto "
+                                                "dove ricevere i sats"),
+           o.get("dopoVuoto")])
+    fp2p = pezzo_js(mini, "async function firmaOnchainP2P(id, verso){", "\n}\n")
+    prova("...e prima di firmare lo scambio si rilegge dal server, se "
+          "l'incasso manca (chi compra lo sceglie spesso in quel momento)",
+          True, "leggiMieiOnchainP2P()" in fp2p
+          and fp2p.index("leggiMieiOnchainP2P()") < fp2p.index("await onchainFirmaProposta(o, verso);"))
 
 
 def prove_ordine_onchain():
@@ -172362,9 +172472,10 @@ def prove_apri_nel_wallet():
     # (14 nov 2026) il quinto QR e' quello della mancia al venditore
     # (15 nov 2026) il sesto e' quello della cassa in negozio
     # (17 nov 2026) il settimo e' quello dello zap a una raccolta
-    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei sette QR "
+    # (17 nov 2026 sera) l'ottavo e' quello della cauzione del contanti on-chain
+    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, negli otto QR "
           "e nel Riprova, e in nessuna navigazione da script",
-          [0, 8],
+          [0, 9],
           [len([l for l in mini.splitlines()
                 if re.search(r"""location(\.href)?\s*=\s*['"`]lightning:""", l)]),
            mini.count("('lightning:' + ")])
@@ -191551,7 +191662,11 @@ def prove_barattozon_onchain():
           [1, 1, 1, 0],
           [mini.count("interruttoreReteP2P(oc ? 'onchain' : 'ln', tabMetodo && (compro || !(typeof bzOnchainP2P === 'function' && bzOnchainP2P())))"),
            mini.count("if (oc && tabacchinoP2P(p2pNuovoMetodi) && (p2pLato === 'compro' || !bzOnchainP2P())) {"),
-           mini.count("(p2pLato !== 'compro' && !tabacchinoP2P(p2pNuovoMetodi) ? sezioneRecapitoOnchainP2P() : '')"),
+           # (17 nov 2026, onchain-contanti) fra le due meta' c'e' ora anche
+           # il SOLO «Contanti», che al posto del recapito ha la zona
+           mini.count("return (p2pLato !== 'compro' && !tabacchinoP2P(p2pNuovoMetodi)\n"
+                      "            && !(typeof soloContantiP2P === 'function' && soloContantiP2P(p2pNuovoMetodi))\n"
+                      "            ? sezioneRecapitoOnchainP2P() : '') + riquadroOnchainP2P();"),
            mini.count("if (oc && tabacchinoP2P(p2pNuovoMetodi)) { toast('Barattozon si scambia solo via Lightning ⚡'); return; }")])
     prova("il giudice del foglio on-chain: almeno 12 ore, e la finestra della garanzia di Lightning non conta",
           [1, 1, 1],
@@ -197109,8 +197224,9 @@ def prove_raccolte():
     # --- le sentinelle sul server ---
     prova("la garantita nasce SPENTA (prima il collaudo, regola di Alan)", True,
           "    RACCOLTA_GARANTITA_ATTIVA = False\n" in srv)
-    prova("le raccolte semplici nascono accese", True,
-          "    RACCOLTE_ATTIVE = True\n" in srv)
+    # (17 nov 2026, sera) spente di serie anche loro: il lancio e' di Andrea
+    prova("anche le raccolte semplici nascono spente (il lancio e' di Andrea)", True,
+          "    RACCOLTE_ATTIVE = False\n" in srv)
     for leva in ("RACCOLTE_ATTIVE", "RACCOLTA_GARANTITA_ATTIVA", "RACCOLTA_MAX_EURO",
                  "RACCOLTA_GIORNI_MAX", "RACCOLTA_MIN_GARANTITA_EURO",
                  "RACCOLTA_VENDITE_MIN", "RACCOLTA_ZAP_MAX_SATS"):
@@ -198031,6 +198147,200 @@ def types_tempo(adesso):
 def types_ns(**k):
     import types as _t
     return _t.SimpleNamespace(**k)
+
+
+def prove_lingua_inglese():
+    """L'INGLESE (17 nov 2026, cantiere inglese-tappa-1, Andrea: «la
+    traduzione dell'app intera, la versione inglese»; tappa 1: vetrina,
+    scheda, carrello, cassa, foglio del pagamento, «Il pagamento
+    protetto»). L'app resta scritta in italiano: l'inglese e' il
+    dizionario `lingua/en.js` (frase italiana → frase inglese) che la
+    pagina chiede da sola a chi legge in un'altra lingua, e un traduttore
+    che guarda il DOM — ogni testo che compare si cerca nel dizionario
+    cosi' com'e', spazi ripiegati; le frasi con `{}` sono forme.
+    QUATTRO GUARDIE:
+    1. LA VERSIONE: `LINGUA_VER` nella pagina e' l'inizio dello sha256 del
+       dizionario (righe LF, .gitattributes), come SWAP_TELEFONO_VER.
+    2. IL DIZIONARIO E' SANO (in node): un oggetto frase → frase, nessun
+       doppione, segnaposto in pari fra chiave e resa, niente spazi ai
+       bordi delle chiavi.
+    3. LE CHIAVI STANNO NELLA PAGINA: cambiare una frase in miniapp.html
+       senza aggiornare il dizionario lascia un inglese che non compare
+       piu'. La sentinella guarda le PAROLE (quattro lettere e piu', meno
+       l'ultima: «pezz${'o':'i'}» e' scritto a pezzi) e non la frase
+       intera: una frase riscritta con le stesse parole passa, una parola
+       nuova no. La frase intera la vede il giro dal vivo.
+    4. IL TRADUTTORE (in node, pezzi veri): la frase secca, la forma col
+       `{}`, i pezzi riordinati con `{1}` `{2}`, la frase che manca resta
+       italiana; `linguaApp` in tutti i suoi rami; i numeri e le date
+       all'inglese DOPO `numeriInglesi` e non prima, e solo per 'it-IT'.
+    Piu' le sentinelle del contorno: la rotta chiusa e la leva, il
+    pannello, il config d'esempio, il collaudo negli elenchi della CI."""
+    print("\n[l'inglese]")
+    import hashlib as _hl
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    grezzo = open(os.path.join("lingua", "en.js"), "rb").read()
+    testo = grezzo.decode("utf-8")
+    src = open("server.py", encoding="utf-8").read()
+
+    # --- 1. la versione ---
+    ver = re.search(r"const LINGUA_VER = '([0-9a-f]+)';", mini)
+    prova("inglese: LINGUA_VER e' l'inizio dello sha256 di lingua/en.js",
+          _hl.sha256(grezzo).hexdigest()[:10], ver and ver.group(1))
+    prova("inglese: la pagina chiede il dizionario con quella versione, "
+          "solo a chi legge in inglese", (True, True, True),
+          ("s.src = '/lingua/en.js?v=' + LINGUA_VER;" in mini,
+           "if (linguaApp() === 'en') {" in mini,
+           "\nlingua/en.js text eol=lf" in open(".gitattributes", encoding="utf-8").read()))
+
+    # --- 2. il dizionario ---
+    chiavi_testo = re.findall(r'^\s*"((?:[^"\\]|\\.)*)":', testo, re.M)
+    doppie = sorted({k for k in chiavi_testo if chiavi_testo.count(k) > 1})
+    prova("inglese: nessuna chiave scritta due volte nel dizionario", [], doppie)
+    banco = r"""
+globalThis.self = globalThis;
+__EN__
+const d = globalThis.BARATTOLO_LINGUE.en;
+const guai = [];
+for (const [k, v] of Object.entries(d)) {
+  if (typeof v !== 'string' || !v) guai.push('resa non testo: ' + k);
+  if (k !== k.replace(/\s+/g, ' ').trim()) guai.push('spazi ai bordi: ' + k);
+  const nk = (k.match(/\{\}/g) || []).length;
+  const segn = v.match(/\{\d*\}/g) || [];
+  const numerati = segn.filter(x => x !== '{}').map(x => +x.slice(1, -1));
+  if (numerati.length && (segn.length !== numerati.length || Math.max(...numerati) > nk || Math.min(...numerati) < 1))
+    guai.push('segnaposto numerati storti: ' + k);
+  if (!numerati.length && segn.length !== nk) guai.push('segnaposto non in pari: ' + k);
+}
+console.log(JSON.stringify({quante: Object.keys(d).length, guai}));
+""".replace("__EN__", testo)
+    esito = _node_banco(banco)
+    if esito is None:
+        salta("il dizionario inglese in node", "node non c'e'")
+    else:
+        prova("inglese: il dizionario e' un oggetto frase → frase, con "
+              "almeno trecento voci", True, esito.get("quante", 0) >= 300)
+        prova("inglese: segnaposto in pari, rese piene, chiavi senza "
+              "spazi ai bordi", [], esito.get("guai"))
+
+    # --- 3. le chiavi stanno nella pagina ---
+    import html as _html
+    piatto = re.sub(r"\s+", " ", _html.unescape(mini)).replace("\\'", "'")
+    senza = []
+    for k in dict.fromkeys(chiavi_testo):
+        k = k.replace('\\"', '"').replace("\\\\", "\\")
+        if "{}" not in k and k in piatto:
+            continue
+        parole = [w for w in re.findall(r"[A-Za-zÀ-ÿ']+", k) if len(w) >= 4]
+        if all(w[:-1] in piatto for w in parole):
+            continue
+        senza.append(k)
+    prova("inglese: ogni chiave del dizionario ha le sue parole in "
+          "miniapp.html (una frase cambiata la' si cambia anche qui)",
+          [], senza)
+
+    # --- 4. il traduttore ---
+    trad = pezzo_js(mini, "let LINGUA = (typeof linguaApp === 'function')",
+                    "if (globalThis.BARATTOLO_LINGUE && globalThis.BARATTOLO_LINGUE[LINGUA])")
+    lingua = pezzo_js(mini, "function linguaApp(){", "\n}") + "\n}\n"
+    fmt_riga = re.search(r"^const fmt = n => .*$", mini, re.M).group(0)
+    banco = r"""
+globalThis.self = globalThis;
+globalThis.location = {search: ''};
+const scatola = {};
+globalThis.localStorage = {getItem: k => scatola[k] ?? null, setItem: (k, v) => { scatola[k] = v; }};
+globalThis.window = {};
+/* in node 21+ `navigator` e' un globale di sola lettura: si ridefinisce */
+Object.defineProperty(globalThis, 'navigator', {value: {language: ''}, configurable: true, writable: true});
+__LINGUA__
+__TRAD__
+__FMT__
+const out = {};
+out.nulla = linguaApp();
+navigator.language = 'en-US'; out.browserEn = linguaApp();
+navigator.language = 'it-IT'; out.browserIt = linguaApp();
+window.Telegram = {WebApp: {initData: 'x', initDataUnsafe: {user: {language_code: 'de'}}}};
+out.tgDe = linguaApp();
+window.Telegram.WebApp.initDataUnsafe.user.language_code = 'it';
+out.tgIt = linguaApp();
+window.Telegram.WebApp.initDataUnsafe.user.language_code = 'en';
+location.search = '?lingua=it&x=1'; out.paramIt = linguaApp();
+location.search = ''; out.ricordato = [linguaApp(), scatola.barattolo_lingua];
+scatola.barattolo_lingua = 'en'; out.ricordatoEn = linguaApp();
+caricaDizionario({"Ciao": "Hello", "{} oggetti": "{} items", "da {} a {}": "from {2} to {1}",
+                  "· {} offerenti · si chiude tra": "· {} bidders · closes in", "Nuovo": "New"});
+out.spento = traduci("Ciao");
+traduttoreArmato = true;
+out.secca = traduci("  Ciao\n ");
+out.forma = traduci("12 oggetti");
+out.ordine = traduci("da 1 a 9");
+out.punto = traduci("· 3 offerenti · si chiude tra");
+out.manca = traduci("Arrivederci");
+out.vuota = traduci("   ");
+out.tManca = t("Arrivederci {n}", {n: 2});
+out.tOk = t("Ciao");
+const opz = {minimumFractionDigits: 2, maximumFractionDigits: 2};
+out.prima = [(1234.5).toLocaleString('it-IT', opz), fmt(19601), fmt(1234)];
+numeriInglesi();
+out.dopo = [(1234.5).toLocaleString('it-IT', opz), fmt(19601), fmt(1234), fmt(999)];
+out.data = new Date(Date.UTC(2026, 10, 14, 12)).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', timeZone: 'UTC'});
+out.altre = (1234.5).toLocaleString('de-DE');
+console.log(JSON.stringify(out));
+""".replace("__LINGUA__", lingua).replace("__TRAD__", trad).replace("__FMT__", fmt_riga)
+    o = _node_banco(banco)
+    if o is None:
+        salta("il traduttore in node", "node non c'e'")
+    else:
+        prova("inglese: linguaApp — niente = it, browser en/it, Telegram "
+              "de/it, ?lingua= vince e si ricorda, la scelta ricordata vince",
+              ["it", "en", "it", "en", "it", "it", ["it", "it"], "en"],
+              [o.get("nulla"), o.get("browserEn"), o.get("browserIt"),
+               o.get("tgDe"), o.get("tgIt"), o.get("paramIt"),
+               o.get("ricordato"), o.get("ricordatoEn")])
+        prova("inglese: traduci — spento tace; la frase secca (spazi "
+              "ripiegati), la forma, i pezzi riordinati, la forma con la "
+              "punteggiatura, la frase che manca, la frase vuota",
+              [None, "Hello", "12 items", "from 9 to 1",
+               "· 3 bidders · closes in", None, None],
+              [o.get("spento"), o.get("secca"), o.get("forma"),
+               o.get("ordine"), o.get("punto"), o.get("manca"), o.get("vuota")])
+        prova("inglese: t() — la frase che manca resta italiana coi "
+              "segnaposto riempiti, quella che c'e' esce inglese",
+              ["Arrivederci 2", "Hello"], [o.get("tManca"), o.get("tOk")])
+        # (l'it-IT non raggruppa a quattro cifre: «1234,50», e' noto)
+        prova("inglese: i numeri all'italiana PRIMA di numeriInglesi",
+              ["1234,50", "19 601", "1 234"], o.get("prima"))
+        prova("inglese: ...e all'inglese dopo — fmtEur, fmt a cinque e a "
+              "quattro cifre, a tre nessuna virgola",
+              ["1,234.50", "19,601", "1,234", "999"], o.get("dopo"))
+        prova("inglese: le date in inglese, le altre lingue non si toccano",
+              ("14 Nov", "1.234,5"), (o.get("data"), o.get("altre")))
+
+    # --- il contorno ---
+    prova("inglese: la rotta /lingua/{codice}.js con la lista chiusa e la "
+          "leva, e nessun mount", (True, True, True, True),
+          ('@app.get("/lingua/{codice}.js")' in src,
+           'LINGUE_FILE = ("en",)' in src,
+           "if codice not in LINGUE_FILE or not LINGUA_INGLESE:" in src,
+           'FileResponse(f"lingua/{codice}.js"' in src))
+    prova("inglese: la leva LINGUA_INGLESE nasce accesa, solo True accende, "
+          "e sta nel pannello e nel config d'esempio", (True, True, True),
+          ("    from config import LINGUA_INGLESE\nexcept ImportError:\n"
+           "    LINGUA_INGLESE = True\nLINGUA_INGLESE = LINGUA_INGLESE is True" in src,
+           '"LINGUA_INGLESE", LINGUA_INGLESE,' in src,
+           "\nLINGUA_INGLESE = True\n" in open("config_esempio.py", encoding="utf-8").read()))
+    prova("inglese: il traduttore guarda il DOM (osservatore sulla radice, "
+          "testi e attributi) e linguaSwap legge la lingua dell'app",
+          (True, True, True),
+          ("}).observe(document.documentElement, {childList: true, subtree: true, characterData: true," in mini,
+           "const T_ATTRIBUTI = ['placeholder', 'title', 'aria-label', 'alt'];" in mini,
+           "function linguaSwap(){\n  /* (17 nov 2026, inglese-tappa-1)" in mini
+           and "  if (typeof linguaApp === 'function') return linguaApp();" in mini))
+    lista = open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read()
+    compila = open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()
+    prova("inglese: il collaudo sta negli elenchi della CI", (True, True),
+          ("\ncollaudo_lingua\n" in "\n" + lista + "\n",
+           "collaudo_lingua.py" in compila))
 
 
 def prove_swap_fornitori():
@@ -203599,6 +203909,7 @@ def prove_onchain_promemoria():
               "p2p_onchain_usdt", "_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin",
               "p2p_onchain_ore_pagamento", "_p2p_onchain_intervalli_pagare",
               "_p2p_onchain_testi_pagare", "_p2p_onchain_solo_contanti",
+              "_p2p_onchain_contanti",
               "p2p_onchain_tab_dati", "p2p_onchain_tab_scade", "_p2p_onchain_promemoria_tab",
               "_p2p_onchain_sollecito_dovuto", "_p2p_onchain_passata_solleciti"):
         exec(pezzo(f), amb)
@@ -204340,7 +204651,7 @@ def prove_onchain_contanti():
            "tetto_c = p2p_onchain_tetto_usdt(tetto_c, cambio_noto_ora(\"eur\"), cambio)" in rotta))
     prova("la colonna nasce da sola, e la zona esce nel libro e nella scheda dello scambio",
           (True, True, True),
-          ('("zona", "TEXT DEFAULT \'\'")):' in src,
+          ('("zona", "TEXT DEFAULT \'\'"),' in src,
            "zona = _p2p_onchain_zona(o)\n    if zona:\n        r[\"zona\"] = zona"
            in pezzo("_p2p_onchain_riga_pubblica"),
            "\"zona\": _p2p_onchain_zona(o)," in pezzo("_p2p_onchain_per")))
@@ -204354,8 +204665,13 @@ def prove_onchain_contanti():
           ("zona: typeof zonaDaCampiP2P === 'function' ? zonaDaCampiP2P(campi) : ''," in pubb,
            "rigaZonaP2P({metodi: metodi, zona: o.zona})" in riga
            and riga.index("${paga}") < riga.index("${zona}") < riga.index("${filtro}"),
-           "zonaDettP2P({metodi: o.metodi || [], zona: o.zona})" in apri,
-           "(o.metodi || []).length === 1\n        ? regolaContantiFoglioP2P(o.metodi," in apri))
+           # (17 nov 2026 sera, terzo pezzo) zona e regola stanno nel riquadro
+           # dei metodi, che si ridisegna scegliendo «Contanti»
+           "'<div id=\"p2pOcPresaMetodi\">' + metodiPresaOcHtmlP2P(o, vendeLui) + '</div>'" in apri
+           and "zonaDettP2P({metodi: perZona, zona: o.zona})"
+           in _fn_js(mini, "function metodiPresaOcHtmlP2P(o, vendeLui){"),
+           "(scelta ? m === 'Contanti' : (o.metodi || []).length === 1)\n    ? regolaContantiFoglioP2P([m],"
+           in _fn_js(mini, "function metodiPresaOcHtmlP2P(o, vendeLui){")))
     banco = "\n".join(_fn_js(mini, f) for f in (
         "function metodoBaseP2P(m){", "function contantiAManoP2P(metodi){",
         "function zonaPulitaP2P(t){", "function zonaOrdineP2P(o){", "function rigaZonaP2P(o){",
@@ -204650,6 +204966,300 @@ console.log(JSON.stringify(out));
           "senza la riga delle firme; le parti no",
           [True, True, True, True, False, True, ""], out["moderatore"])
 
+
+
+def prove_onchain_cauzione():
+    """IL CONTANTI DI PERSONA ON-CHAIN, TERZO PEZZO: IL METODO SCELTO ALLA
+    PRESA E LA CAUZIONE IN LIGHTNING (17 nov 2026 sera, cantiere onchain-
+    contanti; Andrea: «Quando ci clicco poi non mi fa mettere la cauzione.
+    Dovrebbe funzionare esattamente come Lightning anche l'on-chain
+    contanti», «Anche la questione QR, tutto quanto»; le due card: la
+    cauzione in Lightning col QR tenuta da Barattolo, e persa solo per
+    decisione del moderatore). Qui i giudici puri (quanti sats, a chi
+    serve, cosa fa il giro di ogni cauzione), le sentinelle (la cauzione
+    si guarda PRIMA della presa, nessuna strada la salda, il macaroon
+    delle hold di prova non c'entra) e il foglio della presa in node. Il
+    giro vero contro un LND di cartone sta in collaudo_p2p_onchain
+    (11-novies)."""
+    print("\n[on-chain: il metodo scelto alla presa e la cauzione in Lightning]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    amb = {"json": json, "re": re, "base64": __import__("base64"),
+           "_euro_tabacchino": lambda m: 0}
+    for riga in ("\nP2P_ONCHAIN_CAUZIONE_PCT = ", "\nP2P_ONCHAIN_CAUZIONE_BASE_SATS = ",
+                 "\nP2P_ONCHAIN_CAUZIONE_FINESTRA_S = ", "\nP2P_ONCHAIN_CAUZIONE_CLTV = ",
+                 "\nP2P_ONCHAIN_CAUZIONE_PRESA_S = ", "\nP2P_ONCHAIN_CAUZIONE_GUARDA_S = ",
+                 "\nP2P_ONCHAIN_STATI_CHIUSI = "):
+        k = src.index(riga) + 1
+        exec(src[k:src.index("\n", k)], amb)
+    k = src.index("\nP2P_ONCHAIN_CAUZIONE_MEMO = ") + 1
+    exec(src[k:src.index("\n", src.index("\n", k) + 1)], amb)
+    for f in ("_metodi_libro", "_p2p_onchain_campo", "_p2p_onchain_metodi", "_p2p_onchain_solo_contanti",
+              "_p2p_onchain_contanti", "p2p_onchain_cauzione_sats", "p2p_onchain_metodo_presa",
+              "p2p_onchain_cauzione_serve", "richiesta_hold_cauzione", "p2p_onchain_cauzione_sorte",
+              "_p2p_onchain_cauzione_fuori"):
+        exec(pezzo(f), amb)
+    S, M, V = amb["p2p_onchain_cauzione_sats"], amb["p2p_onchain_metodo_presa"], amb["p2p_onchain_cauzione_serve"]
+    prova("la regola e' quella letta sul nodo: 3%, almeno 1000 sats, quindici minuti, 576 blocchi",
+          (3, 1000, 900, 576),
+          (amb["P2P_ONCHAIN_CAUZIONE_PCT"], amb["P2P_ONCHAIN_CAUZIONE_BASE_SATS"],
+           amb["P2P_ONCHAIN_CAUZIONE_FINESTRA_S"], amb["P2P_ONCHAIN_CAUZIONE_CLTV"]))
+    prova("quanti sats: il 3% col mezzo che sale, mai sotto il minimo, e una cifra storta fa 0",
+          [3000, 1000, 1000, 1001, 30000, 0, 0, 0],
+          [S(100000), S(10000), S(33334), S(33350), S(1000000), S(0), S(-5), S("x")])
+    solo = {"metodi": '["Contanti"]'}
+    misto = {"metodi": '["Bonifico", "Contanti"]'}
+    online = {"metodi": '["Bonifico", "Revolut"]'}
+    prova("il metodo della presa: l'unico senza chiedere; fra piu' metodi quello chiesto se e' "
+          "dell'ordine, sennò nessuna scelta",
+          ["Contanti", "Contanti", "Bonifico", "", "", "Contanti"],
+          [M(solo, ""), M(misto, "Contanti"), M(misto, " Bonifico "), M(misto, ""),
+           M(misto, "Satispay"), M(solo, "Bonifico")])
+    prova("la cauzione serve solo con la leva accesa e «Contanti» scelto (o unico)",
+          [True, True, False, False, False, False],
+          [V(solo, "Contanti", True), V(misto, "Contanti", True), V(misto, "Bonifico", True),
+           V(misto, "", True), V(solo, "Contanti", False), V(online, "Contanti", True)])
+    C = amb["_p2p_onchain_contanti"]
+    prova("il giudice unico del contanti si allarga al metodo scelto: il solo «Contanti», o "
+          "«Contanti» scelto su un ordine che ce l'ha; mai su un ordine che non ce l'ha",
+          [True, True, False, False, False],
+          [C(solo), C({**misto, "metodo_scelto": "Contanti"}), C({**misto, "metodo_scelto": "Bonifico"}),
+           C(misto), C({**online, "metodo_scelto": "Contanti"})])
+    corpo = amb["richiesta_hold_cauzione"](bytes(range(32)), 3000)
+    prova("la hold chiesta a LND: i sats, quindici minuti, 576 blocchi, l'hash in base64, numeri "
+          "come stringhe, e un memo che dice che torna",
+          ("3000", "900", "576", bytes(range(32)), True),
+          (corpo["value"], corpo["expiry"], corpo["cltv_expiry"],
+           __import__("base64").b64decode(corpo["hash"]), "torna a fine scambio" in corpo["memo"]))
+    G = amb["p2p_onchain_cauzione_sorte"]
+    def cz(**k):
+        base = {"stato": "attesa", "scade": 1000, "in_gioco": 0, "tenuta_il": 0, "guardata_il": 0}
+        base.update(k)
+        return base
+    prova("il giro di una cauzione IN ATTESA: finche' la richiesta e' viva si lascia al telefono, "
+          "scaduta si guarda (pagata all'ultimo o da annullare)",
+          ["aspetta", "aspetta", "guarda"],
+          [G(cz(), "pending", 500), G(cz(), "pending", 1000), G(cz(), "pending", 1001)])
+    prova("TENUTA e non usata: torna se l'ordine non e' piu' nel libro, o dopo un quarto d'ora",
+          ["aspetta", "annulla", "annulla", "aspetta", "annulla"],
+          [G(cz(stato="tenuta", tenuta_il=1000), "pending", 1100),
+           G(cz(stato="tenuta", tenuta_il=1000), "preso", 1100),
+           G(cz(stato="tenuta", tenuta_il=1000), "annullato", 1100),
+           G(cz(stato="tenuta", tenuta_il=1000), "pending", 1900),
+           G(cz(stato="tenuta", tenuta_il=1000), "pending", 1901)])
+    viva = cz(stato="tenuta", in_gioco=1, tenuta_il=1000, guardata_il=1000)
+    prova("IN GIOCO: a scambio vivo (disputa compresa) si tiene e ogni dieci minuti si guarda; "
+          "torna SOLO a scambio chiuso, in qualunque modo; il tempo da solo non la brucia mai",
+          ["aspetta", "aspetta", "aspetta", "aspetta", "guarda",
+           "annulla", "annulla", "annulla", "annulla", "annulla"],
+          [G(viva, "preso", 1100), G(viva, "depositato", 1100), G(viva, "euro_inviati", 1100),
+           G(viva, "disputa", 1500), G(viva, "disputa", 1600),
+           G(viva, "rilasciato", 1100), G(viva, "rimborsato", 1100), G(viva, "annullato", 1100),
+           G(viva, "scaduto", 1100), G(viva, "", 1100)])
+    prova("...e una gia' chiusa non si tocca piu'",
+          ["aspetta", "aspetta"],
+          [G(cz(stato="tornata", in_gioco=1), "rilasciato", 9999), G(cz(stato="scaduta"), "pending", 9999)])
+    FU = amb["_p2p_onchain_cauzione_fuori"]
+    riga = {"stato": "attesa", "sats": 3000, "scade": 1000, "in_gioco": 0, "bolt11": "lnbc1x",
+            "preimage": "aa" * 32, "hash": "bb" * 32}
+    prova("al telefono esce la richiesta solo finche' e' da pagare; preimage e hash MAI",
+          ({"stato": "attesa", "sats": 3000, "scade": 1000, "in_gioco": False, "bolt11": "lnbc1x"},
+           False, False),
+          (FU(riga, 900), "bolt11" in FU(riga, 1001), "bolt11" in FU({**riga, "stato": "tenuta"}, 900)))
+    # --- le sentinelle del server ---
+    lnd = pezzo("_lnd_cauzione")
+    presa = pezzo("p2p_onchain_prendi")
+    chiedi = pezzo("p2p_onchain_cauzione_chiedi")
+    prova("a LND, per le cauzioni, passano SOLO hodl, cancel e la lettura di una fattura per "
+          "hash; il macaroon e' il SUO, e quello delle hold di prova (che non sa saldare) qui "
+          "non entra",
+          (True, True, False),
+          ('(metodo == "POST" and percorso in ("/v2/invoices/hodl",' in lnd
+           and '"/v2/invoices/cancel"))' in lnd
+           and 're.fullmatch(r"/v1/invoice/[0-9a-f]{64}", percorso)' in lnd
+           and lnd.count("/v2/invoices/") == 2,
+           "str(LND_PONTE_MACAROON_CAUZIONE).strip()" in lnd,
+           "LND_PONTE_MACAROON_HOLD" in lnd))
+    prova("nessuna strada del server salda una hold (la cauzione persa e' un pezzo a parte, "
+          "con la sua decisione)", 0, src.count("/v2/invoices/settle"))
+    accesa = pezzo("p2p_onchain_cauzione_accesa")
+    prova("la leva e' SPENTA di serie, e accesa vuole la riga del config E il macaroon",
+          (True, True),
+          ("except ImportError:\n    P2P_ONCHAIN_CAUZIONE = False\n" in src,
+           "if not (P2P_ONCHAIN_CAUZIONE is True and _p2p_onchain_cauzione_macaroon()):\n"
+           "        return False" in accesa))
+    # LA PORTICINA DEI MODERATORI (17 nov 2026, Andrea: «In produzione, solo
+    # tu e Alan», «Lo vediamo solo noi con una leva spenta?»)
+    prova("la porticina dei moderatori e' CHIUSA di serie (anche senza la riga), si apre "
+          "solo con un False scritto, e a porticina chiusa giudica `e_admin` sulla persona",
+          (True, True, True, True),
+          ("except ImportError:\n    P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True\n" in src,
+           "P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN is not False" in src,
+           "if P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN is not False:" in accesa
+           and "return bool(tg_id) and e_admin(int(tg_id))" in accesa,
+           accesa.index("P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN is not False")
+           < accesa.rindex("return True")))
+    prova("...e la leva si chiede SEMPRE per la persona: nella busta del libro, nella "
+          "richiesta, prima della presa e dentro la presa; mai a vuoto",
+          (True, True, True, True, 0),
+          ('"cauzione": {"accesa": p2p_onchain_cauzione_accesa(chi),' in pezzo("_p2p_onchain_libro"),
+           'p2p_onchain_cauzione_accesa(user["id"])' in chiedi,
+           "p2p_onchain_cauzione_accesa(tg_id)" in pezzo("_p2p_onchain_cauzione_per_presa"),
+           'p2p_onchain_cauzione_accesa(user["id"])' in presa,
+           src.count("p2p_onchain_cauzione_accesa()")))
+    prova("...e il config di esempio la porta chiusa",
+          True, "\nP2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True\n" in open("config_esempio.py", encoding="utf-8").read())
+    prova("la presa guarda la cauzione su LND PRIMA di aprire la connessione, la ricontrolla "
+          "dentro, scrive il metodo scelto e mette la cauzione in gioco solo a presa riuscita",
+          (True, True, True, True),
+          (presa.index("await _p2p_onchain_cauzione_per_presa(") < presa.index("con = _p2p_onchain_db()"),
+           presa.index("and not cauzione_id:") < presa.index('"UPDATE p2p_onchain_ordini SET stato=\'preso\''),
+           "quota_indirizzo=?, quota_ricevente_sats=?, metodo_scelto=?" in presa,
+           presa.index("Qualcun altro l'ha preso un attimo fa")
+           < presa.index("UPDATE p2p_onchain_cauzioni SET in_gioco=1 WHERE id=?")))
+    prova("...e «Contanti» scelto fra piu' metodi toglie il recapito dei metodi online",
+          True, 'if piu_metodi and scelto == "Contanti":\n            rec = ""' in presa)
+    prova("la richiesta della cauzione: ha il SUO freno, non prende niente, passa dalle porte "
+          "della presa, e la hold nasce fuori dalla connessione",
+          (True, True, False, True, True),
+          ('"p2p_onchain_cauzione": (10, 3600),' in src,
+           '_frena("p2p_onchain_cauzione", user["id"])' in chiedi,
+           "UPDATE p2p_onchain_ordini" in chiedi,
+           "_p2p_onchain_porta_presa(con, o, user[\"id\"], adesso)" in chiedi
+           and "_p2p_onchain_vivi_di(con, user[\"id\"]) >= P2P_ONCHAIN_APERTI_MAX" in chiedi,
+           chiedi.index("con.close()") < chiedi.index('await _lnd_cauzione("POST", "/v2/invoices/hodl"')))
+    passata = pezzo("p2p_onchain_cauzioni_passata")
+    prova("il giro gira anche a leva spenta se il macaroon c'e' (una cauzione presa deve poter "
+          "tornare), e una cancel che non passa lascia la riga viva per il giro dopo",
+          (True, False, True),
+          ("if not _p2p_onchain_cauzione_macaroon():\n        return conto" in passata,
+           "p2p_onchain_cauzione_accesa()" in passata,
+           "elif await _p2p_onchain_cauzione_annulla(r[\"hash\"]):" in passata))
+    i_a = src.index("CANCELLA_ANONIMIZZA = (")
+    prova("chi cancella l'account non porta via la riga di una cauzione (una hold viva deve "
+          "poter tornare): resta, senza il suo nome",
+          True, '("p2p_onchain_cauzioni", "tg_id")' in src[i_a:src.index("\n)\n", i_a)])
+    prova("la scheda dello scambio dice il metodo scelto e la cauzione in gioco a chi l'ha messa "
+          "e al moderatore, mai all'altra parte",
+          (True, True),
+          ('d["metodo_scelto"] = ' in pezzo("_p2p_onchain_per")
+           and "cz = _p2p_onchain_cauzione_di(con, o, tg_id, admin)" in pezzo("_p2p_onchain_per"),
+           "if not mia and not admin:\n        return None" in pezzo("_p2p_onchain_cauzione_di")))
+    # --- il telefono ---
+    prendi = _fn_js(mini, "async function prendiOnchainP2P(id){")
+    apri = _fn_js(mini, "async function apriCauzioneOcP2P(id, metodo){")
+    prova("il telefono: senza metodo scelto non prende e riapre il foglio; in contanti con la "
+          "leva accesa apre PRIMA il foglio della cauzione; il metodo viaggia nella presa",
+          (True, True, True),
+          ("if (riga && sceltaMetodoOcP2P(riga) && !metodo) {" in prendi
+           and "return apriOnchainP2P(id);" in prendi,
+           prendi.index("if (riga && !conCauzione && cauzioneOcServeP2P(riga)) return apriCauzioneOcP2P(id, metodo);")
+           < prendi.index("/prendi`"),
+           "body: JSON.stringify(metodo ? {metodo} : {})});" in prendi))
+    prova("il foglio della cauzione: il QR della richiesta, il battito che si ferma a foglio "
+          "chiuso, e a cauzione tenuta chiude e prende da solo",
+          (True, True, True, True),
+          ("disegnaQr(el('p2pOcCauzQr'), ('lightning:' + c.bolt11.trim()).toUpperCase(), 'Alphanumeric');" in apri,
+           "if (!foglio || !foglio.classList.contains('open') || !p2pOcCauz) return fermaCauzioneOcP2P();" in apri,
+           "if (ora && ora.stato === 'tenuta' && p2pOcCauz) {" in apri
+           and "p2pOcCauzPronta = idPreso;\n      prendiOnchainP2P(idPreso);" in apri,
+           "if (c.stato === 'tenuta') { p2pOcCauzPronta = Number(id); return prendiOnchainP2P(id); }" in apri))
+    prova("...e il foglio c'e', si chiude con gli altri, e le righe di WoS e Phoenix sono quelle "
+          "della cauzione di Lightning",
+          (1, True, True),
+          (mini.count('<div class="sheet" id="p2pOcCauzSheet"'),
+           "el('p2pOcCauzSheet').classList.remove('open');" in _fn_js(mini, "function closeSheet(){"),
+           "rigaWosHoldP2P('cauzione')" in _fn_js(mini, "function renderCauzioneOcP2P(){")
+           and "rigaPhoenixHoldP2P()" in _fn_js(mini, "function renderCauzioneOcP2P(){")))
+    banco = "\n".join(_fn_js(mini, f) for f in (
+        "function sceltaMetodoOcP2P(o){", "function metodoPresaOcP2P(o){",
+        "function cauzioneOcSatsP2P(sats, c){", "function cauzioneOcServeP2P(o){",
+        "function rigaCauzioneOcP2P(o, c){", "function metodiPresaOcHtmlP2P(o, vendeLui){",
+        "function riquadroCauzioneOcP2P(o){", "function riquadroCauzioneP2P(o){",
+        "function cauzioneAFineP2P(o){")) + "\n" \
+        + "".join(_riga_js(mini, r) for r in ("const P2P_METODO_FISSO = ",)) + r"""
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const fmt = n => String(n);
+const P2P_FINALI = ['concluso', 'annullato'];
+let p2pOcPresaMetodo = {id: 0, metodo: ''};
+let p2pOnchainLibro = {cauzione: null};
+const zonaDettP2P = o => (o.metodi || []).indexOf('Contanti') >= 0 && o.zona ? '[zona ' + o.zona + ']' : '';
+const regolaContantiFoglioP2P = (m, max, lato) => '[regola ' + lato + ' ' + max + ']';
+const maxEuroContantiP2P = () => 250;
+const REGOLA = {accesa: true, pct: 3, base: 1000, finestra: 900};
+const solo = {id: 1, metodi: ['Contanti'], zona: 'Milano centro', sats: 100000, lato: 'sell'};
+const misto = {id: 2, metodi: ['Bonifico', 'Contanti'], zona: 'Milano centro', sats: 100000, lato: 'sell'};
+const online = {id: 3, metodi: ['Bonifico', 'Revolut'], sats: 100000, lato: 'sell'};
+const out = {};
+out.scelta = [sceltaMetodoOcP2P(solo), sceltaMetodoOcP2P(misto), sceltaMetodoOcP2P(online)];
+out.sats = [cauzioneOcSatsP2P(100000, REGOLA), cauzioneOcSatsP2P(10000, REGOLA), cauzioneOcSatsP2P(33334, REGOLA),
+            cauzioneOcSatsP2P(33350, REGOLA), cauzioneOcSatsP2P(1000000, REGOLA), cauzioneOcSatsP2P(0, REGOLA),
+            cauzioneOcSatsP2P(100000, null)];
+out.metodo0 = [metodoPresaOcP2P(solo), metodoPresaOcP2P(misto)];
+/* leva spenta: le pillole ci sono, la cauzione no */
+const h0 = metodiPresaOcHtmlP2P(misto, true);
+out.spenta = [h0.split('tema-pill').length - 1, h0.includes('active'), h0.includes('[zona'), h0.includes('[regola'),
+              h0.includes('cauzione-regola'), h0.includes(esc(P2P_METODO_FISSO))];
+p2pOcPresaMetodo = {id: 2, metodo: 'Contanti'};
+const h1 = metodiPresaOcHtmlP2P(misto, true);
+out.contanti = [metodoPresaOcP2P(misto), h1.includes('tema-pill active'), h1.includes('[zona Milano centro]'),
+                h1.includes('[regola compro 250]'), h1.includes('cauzione-regola'), cauzioneOcServeP2P(misto)];
+/* la scelta e' di QUELL'ordine: su un altro non vale */
+out.altro = metodoPresaOcP2P({...misto, id: 9});
+p2pOnchainLibro = {cauzione: REGOLA};
+const h2 = metodiPresaOcHtmlP2P(misto, true);
+out.accesa = [cauzioneOcServeP2P(misto), h2.includes('cauzione-regola'), h2.includes('<b>3000 sats</b>'),
+              h2.includes('il 3%, almeno 1000 sats'), h2.includes('torna a fine scambio'),
+              h2.includes('solo se un moderatore')];
+p2pOcPresaMetodo = {id: 2, metodo: 'Bonifico'};
+const h3 = metodiPresaOcHtmlP2P(misto, true);
+out.bonifico = [cauzioneOcServeP2P(misto), h3.includes('cauzione-regola'), h3.includes('[zona'), h3.includes('[regola')];
+/* un metodo solo: niente pillole, la regola e la cauzione subito */
+const h4 = metodiPresaOcHtmlP2P(solo, false);
+out.solo = [h4.includes('tema-pill'), h4.includes('[zona Milano centro]'), h4.includes('[regola vendo 250]'),
+            h4.includes('cauzione-regola'), cauzioneOcServeP2P(solo), cauzioneOcServeP2P(online)];
+/* a mercato senza sats: la riga c'e', la cifra no */
+out.mercato = [rigaCauzioneOcP2P({sats: 0, stima: 0}, REGOLA).includes('di circa'),
+               rigaCauzioneOcP2P({sats: 0, stima: 50000}, REGOLA).includes('<b>1500 sats</b>')];
+/* la pagina dello scambio */
+const mia = riquadroCauzioneOcP2P({cauzione: {stato: 'tenuta', sats: 3000, mia: true}});
+const tornata = riquadroCauzioneOcP2P({cauzione: {stato: 'tornata', sats: 3000, mia: true}});
+const mod = riquadroCauzioneOcP2P({cauzione: {stato: 'tenuta', sats: 3000, mia: false}});
+out.scambio = [mia.includes('Cauzione bloccata') && mia.includes('3000 sats') && mia.includes('Torna a fine scambio'),
+               tornata.includes('Cauzione restituita'), mod.includes('Cauzione di chi ha preso') && mod.includes('3000 sats'),
+               riquadroCauzioneOcP2P({}), riquadroCauzioneOcP2P({cauzione: {stato: 'scaduta', sats: 3000, mia: true}})];
+console.log(JSON.stringify(out));
+"""
+    out = _node_banco(banco)
+    if out is None:
+        salta("onchain_cauzione", "node non c'e': il foglio della presa on-chain col metodo e la cauzione non si disegna")
+        return
+    prova("le pillole del metodo solo con «Contanti» fra piu' metodi",
+          [False, True, False], out.get("scelta"))
+    prova("i sats della cauzione sul telefono sono quelli del server, cifra per cifra",
+          [S(100000), S(10000), S(33334), S(33350), S(1000000), 0, 0], out.get("sats"))
+    prova("un metodo solo e' gia' scelto; fra piu' metodi si parte senza scelta",
+          ["Contanti", ""], out.get("metodo0"))
+    prova("senza scelta: due pillole spente, la frase del metodo fisso, e ne' zona ne' regola ne' cauzione",
+          [2, False, False, False, False, True], out.get("spenta"))
+    prova("«Contanti» scelto a leva spenta: la pillola accesa, la zona e la regola col tetto; cauzione no",
+          ["Contanti", True, True, True, False, False], out.get("contanti"))
+    prova("la scelta vale per QUELL'ordine: su un altro si riparte", "", out.get("altro"))
+    prova("a leva accesa «Contanti» porta la riga della cauzione: la cifra, il 3% col minimo, "
+          "che torna, e che si perde solo per un moderatore",
+          [True, True, True, True, True, True], out.get("accesa"))
+    prova("...e «Bonifico» no: niente cauzione, niente zona, niente regola del contanti",
+          [False, False, False, False], out.get("bonifico"))
+    prova("con il solo «Contanti»: niente pillole, zona, regola e cauzione subito; un ordine "
+          "senza contanti non ne ha mai una",
+          [False, True, True, True, True, False], out.get("solo"))
+    prova("a prezzo di mercato la cifra si dice solo se c'e' una stima",
+          [False, True], out.get("mercato"))
+    prova("la pagina dello scambio: a chi l'ha messa «bloccata» e poi «restituita» con le parole "
+          "di Lightning, al moderatore una riga; senza cauzione, o mai pagata, niente",
+          [True, True, True, "", ""], out.get("scambio"))
 
 def prove_guida_wallet():
     """LA GUIDA «👛 IL TUO PRIMO WALLET» (17 nov 2026, cantiere
@@ -207224,8 +207834,35 @@ def prove_categorie_delle_prove():
     prova("--categoria swap: le sezioni dello swap e le sentinelle, e basta",
           sorted(["prove_" + n for n in CATEGORIE["swap"] + SEMPRE]),
           sorted(f.__name__ for f in scelte))
-    prova("senza argomenti gira tutto, come in CI", None,
+    prova("senza argomenti gira tutto, fuori dalla CI", None,
           _scelta_da_riga_di_comando([], finte)[0])
+    ci = {"GITHUB_ACTIONS": "true", "GITHUB_EVENT_NAME": "push",
+          "GITHUB_REF": "refs/heads/main"}
+    prova("la CI sul push a main sceglie dai file contro `pronto` (ci-mirata)",
+          ["--dai-file=origin/pronto"], _argomenti_della_ci([], ci))
+    prova("...a mano («Run workflow»), su un ramo, con PROVE_INTERE o in "
+          "locale: tutto", [[], [], [], []],
+          [_argomenti_della_ci([], dict(ci, GITHUB_EVENT_NAME="workflow_dispatch")),
+           _argomenti_della_ci([], dict(ci, GITHUB_REF="refs/heads/develop")),
+           _argomenti_della_ci([], dict(ci, PROVE_INTERE="1")),
+           _argomenti_della_ci([], {})])
+    prova("...e gli argomenti scritti vincono sempre; --mostra da solo no",
+          [["--categoria=swap"], ["--dai-file=origin/pronto", "--mostra"]],
+          [_argomenti_della_ci(["--categoria=swap"], ci),
+           _argomenti_della_ci(["--mostra"], ci)])
+    vero_git = globals()["_cambi_da_git"]
+
+    def esplode(base=None):
+        raise RuntimeError("git di cartone che non risponde")
+    try:
+        globals()["_cambi_da_git"] = lambda base=None: ({}, "origin/pronto")
+        vuoto = _scelta_da_riga_di_comando(["--dai-file=origin/pronto"], finte)[0]
+        globals()["_cambi_da_git"] = esplode
+        rotto = _scelta_da_riga_di_comando(["--dai-file=origin/pronto"], finte)[0]
+    finally:
+        globals()["_cambi_da_git"] = vero_git
+    prova("...lo stesso albero di `pronto` (un giro rifatto): tutto", None, vuoto)
+    prova("...un confronto che non riesce: tutto, mai un giro a meta'", None, rotto)
 
     # il giudice dei file, con un server e una miniapp di cartone
     server = ("import os\n\n\ndef p2p_motore_finto():\n    return 1\n\n\n"
@@ -207376,7 +208013,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -207475,7 +208112,7 @@ CATEGORIE = {
     bundle_bitcoin journal_senza_buffer istanza_prova
     collaudo_segue_develop avvisi_nostr_arrivano notifiche_telefono filtro_10050
     semina_collaudo relay_risolti certificati_relay config_esempio
-    assistente_bot sentinella_server_fermo
+    assistente_bot sentinella_server_fermo lingua_inglese
     """.split(),
     "swap": """
     swap_cella swap_preventivo swap_telefono swap_fornitori
@@ -207785,7 +208422,22 @@ def _cambi_da_git(base=None):
             raise RuntimeError("nessun ramo base trovato (manca git fetch?)")
         _, mb, ramo = migliore
     else:
-        mb, ramo = git("merge-base", "HEAD", base).strip(), base
+        ramo = base
+        if base.startswith("origin/") and subprocess.run(
+                ["git", "rev-parse", "--verify", "-q", base + "^{commit}"],
+                capture_output=True).returncode != 0:
+            # in CI il checkout e' corto e `pronto` non c'e': si prende la
+            # sola punta, come fanno i collaudi
+            nome = base[len("origin/"):]
+            git("fetch", "--quiet", "--depth=1", "origin",
+                f"+refs/heads/{nome}:refs/remotes/{base}")
+        try:
+            mb = git("merge-base", "HEAD", base).strip()
+        except subprocess.CalledProcessError:
+            # senza la storia in mezzo (il checkout corto della CI) si
+            # confrontano gli ALBERI: quel che differisce da `base` e' tutto
+            # quel che conta, e su main `pronto` e' comunque un antenato
+            mb = git("rev-parse", "--verify", base + "^{commit}").strip()
     cambi = {}
     for riga in git("diff", "--name-status", "--no-renames", mb).splitlines():
         st, p = riga.split("\t", 1)
@@ -207802,6 +208454,33 @@ def _cambi_da_git(base=None):
             cambi[corrente][1].extend(range(inizio, inizio + quante)
                                       if quante else [max(inizio, 1)])
     return cambi, ramo
+
+
+# LA CI SCEGLIE DA SE' (17 nov 2026, cantiere ci-mirata, richiesta di
+# Andrea: «le CI sono decisamente troppo lente, quelle inutili devono
+# essere saltate, cioe' se tocco qualcosa di quella categoria si,
+# altrimenti [...] saltalo»). Sul push a main la CI lancia `python
+# prove.py` nudo, e qui diventa `--dai-file=origin/pronto`: le categorie
+# dei file in cui l'albero differisce dall'ULTIMO ALBERO VERDE, non dal
+# push di prima — con la coda un giro puo' essere saltato, e il suo
+# codice lo deve provare il giro dopo (lo stesso perche' di
+# `cambiati_da` in collaudi_ci.py). Il workflow NON si tocca, ed e'
+# voluto: un commit che lo cambia puo' lasciare `pronto` indietro.
+# Il lancio a mano («Run workflow», anche su main) e ogni altro posto
+# girano TUTTO, come prima; `PROVE_INTERE=1` lo forza.
+def _argomenti_della_ci(argv, env):
+    """Gli argomenti veri di prove.py: quelli scritti, oppure — solo sul
+    push a main della CI, senza argomenti — la scelta dai file contro
+    `pronto`."""
+    # `--mostra` da solo non e' una scelta: cosi' si vede in anticipo
+    # cosa farebbe la CI (le tre variabili di GitHub + --mostra)
+    if [a for a in argv if a != "--mostra"] or env.get("PROVE_INTERE") == "1":
+        return list(argv)
+    if (env.get("GITHUB_ACTIONS") == "true"
+            and env.get("GITHUB_EVENT_NAME") == "push"
+            and env.get("GITHUB_REF") == "refs/heads/main"):
+        return ["--dai-file=origin/pronto"] + list(argv)
+    return list(argv)
 
 
 def _scelta_da_riga_di_comando(argv, tutte):
@@ -207832,7 +208511,17 @@ def _scelta_da_riga_di_comando(argv, tutte):
               f"(ci sono: {', '.join(CATEGORIE)})")
         sys.exit(2)
     if dai_file:
-        cambi, ramo = _cambi_da_git(base)
+        try:
+            cambi, ramo = _cambi_da_git(base)
+        except Exception as e:
+            # git che non risponde, un ramo che non c'e': nel dubbio, tutto
+            print(f"  --dai-file: il confronto non e' riuscito ({e}) → tutto")
+            return None, "tutto (il confronto coi file non e' riuscito)"
+        if not cambi:
+            # lo stesso albero del ramo base: e' un giro rifatto (un rosso
+            # da ricontrollare), e chi rifà un giro lo vuole intero
+            print(f"  --dai-file: nessun file cambiato rispetto a {ramo} → tutto")
+            return None, "tutto (lo stesso albero: un giro rifatto)"
         scelte, extra, perche = scegli_dai_cambi(
             cambi, lambda p: open(p, encoding="utf-8").read(),
             open(__file__, encoding="utf-8").read())
@@ -208345,6 +209034,7 @@ def main():
     prove_onchain_ritiro,
     prove_onchain_contanti,
     prove_onchain_contanti_scambio,
+    prove_onchain_cauzione,
     prove_guida_wallet,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
@@ -208398,6 +209088,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
+              prove_lingua_inglese,
               prove_swap_auto, prove_swap_auto_schermate, prove_swap_auto_tasto,
               prove_incasso_annuncio,
               prove_swap_auto_scalini,
@@ -208563,7 +209254,8 @@ def main():
               prove_serie_giorni,
               prove_sentinella_server_fermo,
               prove_categorie_delle_prove)
-    sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
+    sezioni, titolo = _scelta_da_riga_di_comando(
+        _argomenti_della_ci(sys.argv[1:], os.environ), tutte)
     if "--mostra" in sys.argv[1:]:
         quali = tutte if sezioni is None else sezioni
         print(f"  Girerebbero {len(quali)} sezioni su {len(tutte)} ({titolo}):")

@@ -212,6 +212,18 @@ LND_PONTE_URL = "https://127.0.0.1:18080"      # lnd-ponte (socat + tor)
 # Vuoto = G e H «non attive», e la pagina esce lo stesso. Vedi
 # docs/PRODUZIONE.md, «LE HOLD DI PROVA».
 LND_PONTE_MACAROON_HOLD = ""             # esadecimale, tutto su una riga
+# LA CAUZIONE DEL CONTANTI ON-CHAIN (17 nov 2026, cantiere onchain-contanti):
+# chi prende in contanti un ordine P2P on-chain blocca una cauzione in
+# Lightning (3%, minimo 1000 sats), una hold invoice del nodo che torna a
+# fine scambio. Vuole un macaroon SUO (`root_key_id 5`), diverso da quello
+# delle hold di prova, e la leva: una riga senza l'altra e' spenta. Vedi
+# docs/PRODUZIONE.md, «LA CAUZIONE DEL CONTANTI ON-CHAIN».
+LND_PONTE_MACAROON_CAUZIONE = ""         # esadecimale, tutto su una riga
+P2P_ONCHAIN_CAUZIONE = False
+# ...e la porticina: True (di serie, anche senza la riga) = la cauzione la
+# vede e la mette SOLO un moderatore (ADMIN_IDS) che prende, per tutti gli
+# altri e' come spenta. Si apre a tutti scrivendo False, dopo la prova.
+P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True
 
 # --- Regole del mercatino --------------------------------------------
 COMMISSIONE_PERCENTO = 0     # trattenuta a vendita conclusa (0 = sospesa: cifra da decidere)
@@ -1208,6 +1220,16 @@ AVVISI_BARATTOLO_ORE = 24
 # vedono. Accesa di serie; a False niente fiamma e nessun giorno contato
 # (riaccendendola chi ha saltato dei giorni riparte da 1, il record resta).
 SERIE_GIORNI_ATTIVA = True
+# L'APP IN INGLESE 🌍 (17 nov 2026, tappa 1): chi ha Telegram (o il
+# browser) in una lingua che non e' l'italiano legge in inglese le parti
+# gia' tradotte — vetrina, scheda dell'annuncio, carrello, cassa, foglio
+# del pagamento, «Il pagamento protetto» — e in italiano il resto, finche'
+# le tappe dopo non lo traducono. Il server non traduce niente: serve il
+# dizionario `lingua/en.js`, che la pagina chiede da sola. Accesa di
+# serie; a False il dizionario risponde 404 e l'app parla italiano a
+# tutti. Solo True accende. Per provare l'inglese con Telegram in
+# italiano: ?lingua=en nell'indirizzo (si ricorda; ?lingua=it per tornare).
+LINGUA_INGLESE = True
 # GLI AVVISI DEL MERCATINO (9 ott 2026): chi lo chiede dal cassetto Avvisi
 # del Profilo riceve un messaggio quando nel mercatino compaiono annunci
 # nuovi — TUTTI i nuovi, con un filtro facoltativo di categorie e prezzo
@@ -2109,8 +2131,9 @@ CASSA_MAX_SATS = 0
 # vendite confermate e un indirizzo Lightning apre una raccolta (obiettivo,
 # scadenza, barra); va in vetrina col via di un admin. Gli zap vanno DRITTI
 # al wallet di chi raccoglie (il motore della mancia: niente fee, niente
-# rimborso). Nasce ACCESA; False e riavvia (o il pannello) per spegnerla.
-RACCOLTE_ATTIVE = True
+# rimborso). Nasce SPENTA (scelta di Andrea, 17 nov): True e riavvia (o il
+# pannello) per accenderla.
+RACCOLTE_ATTIVE = False
 # I depositi di garanzia 2-di-3 on-chain nelle raccolte: a scadenza vanno a
 # chi raccoglie se i depositi raggiungono l'obiettivo, sennò tornano a chi li
 # ha messi. Servono l'on-chain e la terza chiave vera. SPENTA nel codice

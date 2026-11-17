@@ -3692,6 +3692,10 @@
        moderatore, con la lista piu' alta (e' la pagina intera) e le
        righe dell'elenco degli admin, una per utente */
     .assist-lista{max-height:none;min-height:120px}
+    /* gli screenshot nel messaggio (17 nov 2026): verticali come il
+       telefono che li ha fatti, interi e non ritagliati al quadrato */
+    .fb-foto.assist-foto img{width:auto;height:120px;max-width:100%;object-fit:contain;
+      border:1px solid var(--field-line)}
     .assist-conv{display:block;width:100%;text-align:left;margin:8px 0;padding:10px 12px;
       border-radius:14px;border:1px solid var(--field-line);background:var(--card);
       color:var(--ink);font:inherit;cursor:pointer}
@@ -13238,6 +13242,48 @@ function barreDellApp(){
   if (scala >= 0.5 && scala <= 2) barre.push(scala);
   return barre;
 }
+/* ══ LA LINGUA, PRIMA DEL PRIMO PAINT (17 nov 2026, cantiere
+   inglese-tappa-1, Andrea: «la traduzione dell'app intera, la versione
+   inglese») ════════════════════════════════════════════════════════
+   L'app e' scritta in italiano, e in italiano resta: l'inglese e' un
+   DIZIONARIO a parte (`lingua/en.js`, frase italiana → frase inglese)
+   che il traduttore in fondo alla pagina (vedi «L'INGLESE») applica
+   ai testi mentre compaiono. Qui si decide SOLO che lingua si parla,
+   e si chiede il dizionario subito, in parallelo col resto della
+   pagina: chi legge in inglese lo vuole prima delle card, chi legge
+   in italiano non scarica un byte in piu'.
+   CHI DECIDE, in ordine: `?lingua=it|en` nell'indirizzo (e si
+   ricorda), la scelta ricordata (`barattolo_lingua`, la scrivera' il
+   tasto nel Profilo di una tappa prossima), la lingua di Telegram
+   dentro la Mini App, la lingua del browser fuori. Italiano se e'
+   italiano, inglese per tutti gli altri — la regola che la pagina
+   «Cambio» segue dal 20 ott 2026 (`linguaSwap`, che da oggi legge
+   da qui). Senza il dizionario (leva LINGUA_INGLESE spenta sul
+   server, rete che manca) l'app resta in italiano: la lingua
+   DESIDERATA e' una cosa, quella PARLATA la decide l'arrivo del file.
+   LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
+   come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
+   dizionario cambiato non resta nella cache di un giorno. */
+const LINGUA_VER = '320d44d6cf';
+function linguaApp(){
+  const italiano = l => !l || String(l).toLowerCase().startsWith('it');
+  let scelta = '';
+  try {
+    const q = new URLSearchParams(location.search).get('lingua');
+    if (q === 'it' || q === 'en') { scelta = q; localStorage.setItem('barattolo_lingua', q); }
+    else scelta = localStorage.getItem('barattolo_lingua') || '';
+  } catch(e){}
+  if (scelta === 'it' || scelta === 'en') return scelta;
+  const tw = window.Telegram && window.Telegram.WebApp;
+  if (tw && tw.initData)
+    return italiano(tw.initDataUnsafe && tw.initDataUnsafe.user && tw.initDataUnsafe.user.language_code) ? 'it' : 'en';
+  return italiano(navigator.language) ? 'it' : 'en';
+}
+if (linguaApp() === 'en') {
+  const s = document.createElement('script');
+  s.src = '/lingua/en.js?v=' + LINGUA_VER;
+  document.head.appendChild(s);
+}
 </script>
 </head>
 <body>
@@ -16787,6 +16833,16 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pOcAppTit">📍 Dove vedervi</h3>
     <div id="p2pOcAppCorpo"></div>
+  </div>
+
+  <!-- «🔐 BLOCCA LA CAUZIONE» DEL CONTANTI ON-CHAIN (17 nov 2026 sera,
+       cantiere onchain-contanti, terzo pezzo): il gemello del foglio
+       della cauzione di Lightning, con la richiesta che conia Barattolo.
+       Lo riempie `renderCauzioneOcP2P`. -->
+  <div class="sheet" id="p2pOcCauzSheet" role="dialog" aria-modal="true" aria-labelledby="p2pOcCauzTit">
+    <div class="grab"></div>
+    <h3 id="p2pOcCauzTit">🔐 Blocca la cauzione</h3>
+    <div id="p2pOcCauzCorpo"></div>
   </div>
 
   <!-- LA META' DELLA CAUZIONE BRUCIATA ALL'ALTRA PERSONA (1 ott 2026):
@@ -21182,10 +21238,143 @@ const SWAP_TESTI = {
               rete_invio: 'Bitcoin network: departure',
               rete_ritiro: 'Bitcoin network: arrival to you (estimate)'}}};
 function linguaSwap(){
+  /* (17 nov 2026, inglese-tappa-1) la lingua di tutta l'app, decisa
+     in testa alla pagina; il ramo sotto resta per i banchi di prove.py,
+     che eseguono questa funzione da sola */
+  if (typeof linguaApp === 'function') return linguaApp();
   let l = '';
   try { l = String(tg?.initDataUnsafe?.user?.language_code || ''); } catch(e){}
   return (!l || l.toLowerCase().startsWith('it')) ? 'it' : 'en';
 }
+/* ══ L'INGLESE (17 nov 2026, cantiere inglese-tappa-1) ══════════════
+   IL TRADUTTORE GUARDA IL DOM, NON IL CODICE. Tremila frasi italiane
+   vivono in questo file, dentro il markup e dentro i template delle
+   funzioni che disegnano: avvolgerle una per una in una chiamata
+   sarebbe stato un diff di migliaia di righe, e ogni frase nuova
+   avrebbe dovuto ricordarselo. Qui invece ogni TESTO che compare
+   nella pagina — all'avvio e a ogni innerHTML, textContent o
+   attributo che arriva dopo (un MutationObserver sulla radice) — si
+   cerca nel dizionario cosi' com'e', spazi ripiegati: se c'e', si
+   riscrive in inglese; se non c'e', resta italiano. Chi legge in
+   italiano non paga niente: il traduttore non si arma nemmeno.
+   LE CHIAVI SONO LE FRASI ITALIANE, e questo e' il patto: cambiare
+   una frase qui vuol dire aggiornare `lingua/en.js`, e
+   `prove_lingua_inglese` lo ricorda — una chiave che non si trova piu'
+   nella pagina e' rossa. Le frasi con un numero dentro («3 oggetti»,
+   «si chiude tra 2h») stanno nel dizionario con `{}` al posto del
+   pezzo che cambia: diventano un'espressione regolare, e l'inglese
+   puo' riordinare i pezzi con `{1}`, `{2}`. I testi scritti dagli
+   utenti (titoli, descrizioni, chat) non sono mai una chiave intera,
+   e un titolo che per caso fosse «Nuovo» uscirebbe «New»: innocuo.
+   I NUMERI SEGUONO LE PAROLE: in inglese «1.234,50» si legge male.
+   Le 79 righe che formattano con 'it-IT' (fmt, fmtEur, le date) non
+   si toccano — una decina di banchi di prove.py le ritaglia per
+   testo — e il dizionario che arriva mappa 'it-IT' su 'en-GB' nei
+   metodi toLocale* di Number e Date, una volta sola: «1,234.50 €»,
+   «14 Nov». Scartato: cambiare fmt e fmtEur (i banchi) e una
+   riscrittura dei numeri nel DOM (avrebbe toccato anche le cifre
+   scritte dagli utenti). */
+let LINGUA = (typeof linguaApp === 'function') ? linguaApp() : 'it';
+const TRADUZIONI = new Map();          // frase italiana → inglese
+const TRADUZIONI_FORME = new Map();    // prima parola → [{re, resa}], le chiavi con {}
+const T_ATTRIBUTI = ['placeholder', 'title', 'aria-label', 'alt'];
+const T_SPAZI = /\s+/g;
+let traduttoreArmato = false;
+function caricaDizionario(diz){
+  for (const [k, v] of Object.entries(diz)) {
+    const chiave = k.replace(T_SPAZI, ' ').trim();
+    if (!chiave || typeof v !== 'string') continue;
+    if (!chiave.includes('{}')) { TRADUZIONI.set(chiave, v); continue; }
+    const re = new RegExp('^' + chiave.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                                      .replace(/\\\{\\\}/g, '([\\s\\S]+?)') + '$');
+    const prima = chiave.split(' ', 1)[0];
+    const secchio = prima.includes('{}') ? '' : prima;
+    if (!TRADUZIONI_FORME.has(secchio)) TRADUZIONI_FORME.set(secchio, []);
+    TRADUZIONI_FORME.get(secchio).push({re, resa: v});
+  }
+}
+/* la frase inglese, o null se il dizionario non la sa (o non c'e') */
+function traduci(testo){
+  if (!traduttoreArmato) return null;
+  const chiave = String(testo).replace(T_SPAZI, ' ').trim();
+  if (!chiave) return null;
+  const secca = TRADUZIONI.get(chiave);
+  if (secca !== undefined) return secca;
+  const prima = chiave.split(' ', 1)[0];
+  for (const forme of [TRADUZIONI_FORME.get(prima), TRADUZIONI_FORME.get('')]) {
+    if (!forme) continue;
+    for (const f of forme) {
+      const m = f.re.exec(chiave);
+      if (!m) continue;
+      let i = 0;
+      return f.resa.replace(/\{(\d*)\}/g, (_, n) => m[n ? +n : ++i] ?? '');
+    }
+  }
+  return null;
+}
+/* per i testi che non passano dal DOM (popup di Telegram, titolo
+   della finestra): la frase inglese se c'e', sennò quella italiana,
+   coi segnaposto {nome} riempiti */
+function t(frase, valori){
+  let resa = traduci(frase) ?? frase;
+  if (valori) for (const k of Object.keys(valori)) resa = resa.split('{' + k + '}').join(valori[k]);
+  return resa;
+}
+function traduciTesto(nodo){
+  const s = nodo.nodeValue;
+  if (!s || !/[A-Za-zÀ-ÿ]/.test(s)) return;
+  const p = nodo.parentNode;
+  if (p && (p.nodeName === 'SCRIPT' || p.nodeName === 'STYLE' || p.nodeName === 'TEXTAREA')) return;
+  const resa = traduci(s);
+  if (resa == null) return;
+  const nuovo = (/^\s/.test(s) ? ' ' : '') + resa + (/\s$/.test(s) ? ' ' : '');
+  if (nuovo !== s) nodo.nodeValue = nuovo;
+}
+function traduciAttributo(e, nome){
+  const v = e.getAttribute && e.getAttribute(nome);
+  if (!v) return;
+  const resa = traduci(v);
+  if (resa != null && resa !== v) e.setAttribute(nome, resa);
+}
+function traduciAlbero(radice){
+  if (radice.nodeType === 3) { traduciTesto(radice); return; }
+  if (radice.nodeType !== 1 && radice.nodeType !== 9 && radice.nodeType !== 11) return;
+  const w = document.createTreeWalker(radice, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) traduciTesto(n);
+  if (radice.nodeType === 1) T_ATTRIBUTI.forEach(a => traduciAttributo(radice, a));
+  if (radice.querySelectorAll)
+    radice.querySelectorAll('[' + T_ATTRIBUTI.join('],[') + ']')
+      .forEach(e => T_ATTRIBUTI.forEach(a => traduciAttributo(e, a)));
+}
+/* i numeri e le date all'inglese, con una mappa sola sui metodi che
+   le 79 righe di questo file gia' chiamano con 'it-IT' */
+function numeriInglesi(){
+  const mappa = f => function(loc, opt){ return f.call(this, loc === 'it-IT' ? 'en-GB' : loc, opt); };
+  Number.prototype.toLocaleString = mappa(Number.prototype.toLocaleString);
+  for (const m of ['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString'])
+    Date.prototype[m] = mappa(Date.prototype[m]);
+}
+/* la chiama il dizionario appena arriva (`lingua/en.js`), o l'avvio se
+   il dizionario e' arrivato prima di questo script: i due ordini sono
+   possibili tutti e due, e vanno bene tutti e due */
+function registraTraduzioni(codice){
+  const diz = (globalThis.BARATTOLO_LINGUE || {})[codice];
+  if (!diz || traduttoreArmato || LINGUA !== codice) return;
+  caricaDizionario(diz);
+  traduttoreArmato = true;
+  numeriInglesi();
+  document.documentElement.lang = codice;
+  traduciAlbero(document.documentElement);
+  new MutationObserver(records => {
+    for (const r of records) {
+      if (r.type === 'characterData') traduciTesto(r.target);
+      else if (r.type === 'attributes') traduciAttributo(r.target, r.attributeName);
+      else r.addedNodes.forEach(traduciAlbero);
+    }
+  }).observe(document.documentElement, {childList: true, subtree: true, characterData: true,
+                                        attributes: true, attributeFilter: T_ATTRIBUTI});
+}
+if (globalThis.BARATTOLO_LINGUE && globalThis.BARATTOLO_LINGUE[LINGUA]) registraTraduzioni(LINGUA);
 /* LA TAPPA 2, IL PREVENTIVO (19 ott 2026, cantiere swap-preventivo). A
    ordine confermato, nel pannello dell'incasso, chi vende sceglie
    «⚡ Lightning» (di serie: il pannello di sempre) o «₿ On-chain (swap)»:
@@ -29600,9 +29789,14 @@ function mostraTappa(){
   if (!b || b.offsetParent === null) { tourAvanti(); return; }  // sparito nel frattempo
   el('tourLuce').classList.toggle('centro', !!t.centro);
   const ultima = tourTappa === tourTappe.length - 1;
+  /* «1 di 4» passa dal traduttore (17 nov 2026): `globalThis.t` perche' qui
+     `t` e' la tappa, e col typeof perche' i banchi di node non lo hanno */
+  const passo = typeof globalThis.t === 'function'
+    ? globalThis.t('{n} di {tot}', {n: tourTappa + 1, tot: tourTappe.length})
+    : `${tourTappa + 1} di ${tourTappe.length}`;
   el('tourFumetto').innerHTML = `<span>${t.testo}</span>
     <div class="tour-az">
-      <span class="tour-passo">${tourTappa + 1} di ${tourTappe.length}</span>
+      <span class="tour-passo">${passo}</span>
       <button class="tour-salta" onclick="navIndietro()">Salta</button>
       <button class="tour-avanti" onclick="tourAvanti()">${ultima ? 'Fine 🎉' : 'Avanti'}</button>
     </div>`;
@@ -37025,6 +37219,7 @@ function closeSheet(){
   el('p2pOcDepositoSheet').classList.remove('open');
   el('p2pOcParoleSheet').classList.remove('open');
   el('p2pOcAppSheet').classList.remove('open');
+  el('p2pOcCauzSheet').classList.remove('open');
   paroleOnchainP2PAnnulla();   // il gesto che aspettava la chiave non parte
   el('backupObbligoSheet').classList.remove('open');
   backupObbligoAnnulla();   // il gesto che aspettava le parole non parte
@@ -61505,6 +61700,16 @@ function apriTappo(){
 let assistenzaMsgs = null, assistenzaMax = 2000;
 let assistenzaAdmLista = null, assistenzaAdmAperta = null;
 let assistenzaInvio = false;
+/* GLI SCREENSHOT ALL'ASSISTENZA (17 nov 2026, richiesta di Andrea): chi
+   scrive allo staff allega fino a ASSISTENZA_IMG_MAX immagini per
+   messaggio. Si preparano qui (lato lungo 1600, come la chat dello
+   scambio: in uno screenshot il testo deve leggersi) e partono col
+   messaggio, in data URL. Si leggono da /assistenza/immagine/<nome>,
+   che vuole chi sei: quindi fetch con l'intestazione e un objectURL,
+   tenuto in `assistenzaImgUrl` per non riscaricarle a ogni ridisegno. */
+const ASSISTENZA_IMG_MAX = 3;
+let assistenzaAllegati = [];        // [{dati: dataURL} | {caricando: true}]
+const assistenzaImgUrl = {};        // nome -> objectURL
 /* IL TASTO DELL'AVVISO (5 nov 2026, passo 2): `/?assistenza=mia` apre
    la propria chat, `/?assistenza=<utente>` la conversazione per un
    admin. Una volta sola, dopo /api/me (serve sapere leva e admin). */
@@ -61571,14 +61776,114 @@ function messaggiAssistenzaHTML(lista, perAdmin, nomeUtente){
     const chi = m.staff
       ? (perAdmin ? esc(m.chi || 'Staff') + ' ' + bollinoStaff() : bollinoStaff())
       : (perAdmin ? esc(nomeUtente || 'Utente') : 'Tu');
+    const imgs = Array.isArray(m.immagini) ? m.immagini : [];
     return '<div class="chatmod-msg' + (mio ? ' mio' : '') + '"><small>' + chi
       + (m.quando ? ' · ' + esc(quandoAssistenza(m.quando)) : '') + '</small>'
-      + esc(m.testo) + '</div>';
+      + esc(m.testo)
+      + (imgs.length ? '<div class="fb-foto assist-foto">' + imgs.map((n, j) =>
+          '<img alt="Screenshot ' + (j + 1) + '" data-assist-img="' + esc(n) + '" '
+          + 'onclick="apriScreenshotAssistenza(this)">').join('') + '</div>' : '')
+      + '</div>';
   }).join('');
 }
-function casellaAssistenzaHTML(id, invia, segnaposto){
+/* le miniature di una lista appena disegnata: ognuna si scarica UNA
+   volta (con chi sei), poi resta l'objectURL */
+async function caricaScreenshotAssistenza(id){
+  const box = el(id);
+  if (!box) return;
+  for (const img of box.querySelectorAll('img[data-assist-img]')) {
+    const n = img.getAttribute('data-assist-img');
+    if (!assistenzaImgUrl[n]) {
+      try {
+        const r = await fetch(`${API_BASE}/assistenza/immagine/${encodeURIComponent(n)}`,
+          {headers:{'X-Tg-Init-Data':authHdr()}});
+        if (!r.ok) { img.alt = 'Screenshot non disponibile'; continue; }
+        assistenzaImgUrl[n] = URL.createObjectURL(await r.blob());
+      } catch(e) { continue; }
+    }
+    img.src = assistenzaImgUrl[n];
+  }
+}
+/* tocco su una miniatura: il visore di casa (zoom e scorrimento), con
+   gli screenshot dello stesso messaggio */
+function apriScreenshotAssistenza(img){
+  const tutte = [...img.parentNode.querySelectorAll('img[data-assist-img]')];
+  const lista = tutte.map(i => assistenzaImgUrl[i.getAttribute('data-assist-img')]).filter(Boolean);
+  if (!lista.length) return;
+  apriLightbox(Math.max(0, lista.indexOf(assistenzaImgUrl[img.getAttribute('data-assist-img')])), lista);
+}
+/* le scelte sotto la casella, con la ✕ per toglierle prima dell'invio */
+function allegatiAssistenzaHTML(){
+  const scelte = assistenzaAllegati.map((a, j) => a.caricando
+    ? '<div class="fb-scelta" aria-label="Preparo lo screenshot">⏳</div>'
+    : '<div class="fb-scelta"><img src="' + esc(a.dati) + '" alt="Screenshot ' + (j + 1) + '">'
+      + '<button type="button" aria-label="Togli lo screenshot ' + (j + 1) + '" '
+      + 'onclick="togliAllegatoAssistenza(' + j + ')">✕</button></div>').join('');
+  return scelte + (assistenzaAllegati.length < ASSISTENZA_IMG_MAX
+    ? '<button type="button" class="btn ghost mini" onclick="haptic();el(\'assistenzaFile\').click()">📎 '
+      + (assistenzaAllegati.length ? 'Un altro screenshot'
+         : 'Allega screenshot (facoltativi, max ' + ASSISTENZA_IMG_MAX + ')') + '</button>'
+    : '');
+}
+function ridisegnaAllegatiAssistenza(){
+  const b = el('assistenzaAllegati');
+  if (b) b.innerHTML = allegatiAssistenzaHTML();
+}
+function togliAllegatoAssistenza(j){
+  haptic();
+  assistenzaAllegati.splice(j, 1);
+  ridisegnaAllegatiAssistenza();
+}
+/* PURA quanto basta: i byte pronti come data URL */
+function dataUrlDaByteAssistenza(dati, tipo){
+  return new Promise((ok, ko) => {
+    const fr = new FileReader();
+    fr.onload = () => ok(String(fr.result || ''));
+    fr.onerror = () => ko(new Error('lo screenshot non si legge'));
+    fr.readAsDataURL(new Blob([dati], {type: tipo}));
+  });
+}
+async function screenshotAssistenzaScelti(input){
+  const files = [...(input.files || [])];
+  input.value = '';            // cosi' si puo' riscegliere lo stesso file
+  if (!files.length) {
+    toast(tg?.initData
+      ? 'Non ho ricevuto nessuna immagine: controlla che Telegram possa accedere alla galleria'
+      : 'Non ho ricevuto nessuna immagine: controlla i permessi della galleria', 8000);
+    return;
+  }
+  for (const file of files) {
+    if (assistenzaAllegati.length >= ASSISTENZA_IMG_MAX) {
+      toast('Al massimo ' + ASSISTENZA_IMG_MAX + ' screenshot per messaggio'); break;
+    }
+    const segno = {caricando: true};
+    assistenzaAllegati.push(segno);
+    ridisegnaAllegatiAssistenza();
+    let dati = '';
+    try {
+      const p = await preparaFotoChatScP2P(file, 'image/jpeg');
+      dati = await dataUrlDaByteAssistenza(p.dati, p.tipo);
+    } catch(e) {
+      /* la strada robusta delle foto degli annunci (1200 px, i ripieghi
+         dei telefoni difficili e del server) */
+      const esito = await ridimensiona(file) || {};
+      dati = esito.foto || '';
+      if (!dati) toast(esito.motivo || '«' + file.name + '» non è entrata: riprova con un\'altra immagine', 7000);
+    }
+    const j = assistenzaAllegati.indexOf(segno);   // puo' essersi spostato (✕ su altre)
+    if (j >= 0) {
+      if (dati) assistenzaAllegati[j] = {dati}; else assistenzaAllegati.splice(j, 1);
+    }
+    ridisegnaAllegatiAssistenza();
+  }
+}
+function casellaAssistenzaHTML(id, invia, segnaposto, conAllegati){
   return '<div class="assist-casella"><textarea id="' + id + '" rows="3" maxlength="' + Number(assistenzaMax) + '" '
     + 'placeholder="' + esc(segnaposto) + '"></textarea>'
+    + (conAllegati
+      ? '<input type="file" id="assistenzaFile" accept="image/*" multiple hidden onchange="screenshotAssistenzaScelti(this)">'
+        + '<div class="fb-scelte" id="assistenzaAllegati">' + allegatiAssistenzaHTML() + '</div>'
+      : '')
     + '<button class="btn orange" id="' + id + 'Btn" onclick="' + invia + '">Invia</button></div>';
 }
 function scorriInFondoAssistenza(id){
@@ -61592,12 +61897,14 @@ async function renderAssistenza(){
   const disegna = () => {
     box.innerHTML = '<div class="hint">Hai un dubbio su un ordine, un pagamento o il tuo profilo? '
       + 'Scrivi allo staff di Barattolo: risponde una persona vera, col bollino ' + bollinoStaff() + '. '
+      + 'Se serve, allega uno screenshot. '
       + 'Non chiederemo mai la tua frase segreta, una chiave o un pagamento.</div>'
       + '<div class="chatmod-lista assist-lista" id="assistenzaLista">'
       + (assistenzaMsgs ? messaggiAssistenzaHTML(assistenzaMsgs, false)
                         : '<div class="hint">Carico la conversazione…</div>') + '</div>'
-      + casellaAssistenzaHTML('assistenzaTesto', 'inviaAssistenza()', 'Scrivi allo staff…');
+      + casellaAssistenzaHTML('assistenzaTesto', 'inviaAssistenza()', 'Scrivi allo staff…', true);
     scorriInFondoAssistenza('assistenzaLista');
+    caricaScreenshotAssistenza('assistenzaLista');
   };
   disegna();
   if (DEMO || !assistenzaAttiva) return;
@@ -61616,24 +61923,31 @@ async function renderAssistenza(){
 async function inviaAssistenza(){
   const t = el('assistenzaTesto');
   const testo = t ? t.value.trim() : '';
-  if (!testo || assistenzaInvio) return;
+  if (assistenzaAllegati.some(a => a.caricando)) { toast('Un momento: sto preparando lo screenshot'); return; }
+  const immagini = assistenzaAllegati.map(a => a.dati).filter(Boolean);
+  if ((!testo && !immagini.length) || assistenzaInvio) return;
   haptic();
   assistenzaInvio = true;
+  const btn = el('assistenzaTestoBtn');
+  if (btn && immagini.length) btn.disabled = true;
   try {
     const r = await fetch(`${API_BASE}/assistenza`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({testo})});
+       body: JSON.stringify(immagini.length ? {testo, immagini} : {testo})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Messaggio non mandato, riprova', 6000); return; }
     assistenzaMsgs = d.messaggi || [];
     if (el('assistenzaLista')) {
       el('assistenzaLista').innerHTML = messaggiAssistenzaHTML(assistenzaMsgs, false);
       scorriInFondoAssistenza('assistenzaLista');
+      caricaScreenshotAssistenza('assistenzaLista');
     }
     if (t) t.value = '';
+    assistenzaAllegati = [];
+    ridisegnaAllegatiAssistenza();
     toast('Mandato allo staff');
   } catch(e) { toast('Rete assente: riprova'); }
-  finally { assistenzaInvio = false; }
+  finally { assistenzaInvio = false; if (btn) btn.disabled = false; }
 }
 /* LA PAGINA DEGLI ADMIN: l'elenco (una riga per utente, dall'ultima che
    si e' mossa, «da rispondere» in evidenza), o la conversazione aperta.
@@ -61695,6 +62009,7 @@ async function renderConversazioneAdmin(){
                               'Rispondi come staff…')
       + '<button class="btn ghost" onclick="indietroAssistenzaAdmin()">← Tutte le conversazioni</button>';
     scorriInFondoAssistenza('assistenzaAdmLista');
+    caricaScreenshotAssistenza('assistenzaAdmLista');
   };
   disegna();
   try {
@@ -65613,6 +65928,12 @@ async function onchainFirmaProposta(oid, verso){
      compra, e `onchainUsciteVersoVenditore` controlla il tetto */
   if (verso === 'compratore' && !o.rimborso)
     throw new Error('chi ha messo i sats non ha ancora scelto dove riceverli: il rimborso aspetta il suo wallet');
+  /* (17 nov 2026, rilascio-senza-incasso) senza l'indirizzo di chi
+     riceve la libreria direbbe «Invalid address length» */
+  if (verso === 'venditore' && !o.incasso)
+    throw new Error(o.rotta
+      ? 'chi compra non ha ancora scelto dove ricevere i sats. Chiedigli di incollare un suo indirizzo nello scambio (o nel Profilo), poi riprova'
+      : 'il venditore non ha ancora scelto dove ricevere i sats: riprova quando l\'ha fatto');
   const uscite = verso === 'venditore' ? onchainUsciteVersoVenditore(o, o.incasso, 0)
     : [[o.rimborso, tot - Math.ceil(vb(1) * tar)]];
   const r = await fetch(`${API_BASE}${o.rotta || '/onchain/ordini/' + o.id}/proposta`, {method: 'POST',
@@ -65933,7 +66254,12 @@ function accogliLibroOnchainP2P(busta){
     /* i due tasti della rete nel foglio di chi prende (16 nov 2026) */
     lnPossibile: !!busta.lnPossibile, depositoLnPossibile: !!busta.depositoLnPossibile,
     /* Barattozon anche on-chain (17 nov 2026): la leva del server */
-    barattozon: busta.barattozon !== false};
+    barattozon: busta.barattozon !== false,
+    /* la cauzione di chi prende in contanti (17 nov 2026 sera): la leva
+       e la regola del server; null = spenta, o server di ieri */
+    cauzione: busta.cauzione && busta.cauzione.accesa === true
+      ? {accesa: true, pct: Number(busta.cauzione.pct) || 0, base: Number(busta.cauzione.base) || 0,
+         finestra: Number(busta.cauzione.finestra) || 900} : null};
   p2pOnchainLetto = Date.now();
   return p2pOnchainLibro.eventi.length > 0;
 }
@@ -67181,6 +67507,9 @@ function apriOnchainP2P(id, modo){
   }
   const vendeLui = o.lato === 'sell';
   const metodi = (o.metodi || []).join(', ');
+  /* il metodo scelto e' di QUELL'ordine: aprendone un altro si riparte */
+  if (typeof p2pOcPresaMetodo !== 'undefined' && Number(p2pOcPresaMetodo.id) !== Number(o.id))
+    p2pOcPresaMetodo = {id: Number(o.id), metodo: ''};
   /* LE 12 PAROLE PRIMA (16 nov 2026, backup-obbligato): senza una copia
      non si prende; scritte e controllate, la presa riparte da qui */
   if (typeof backupOnchainPrima === 'function' && !backupOnchainPrima(() => apriOnchainP2P(id, modo))) return;
@@ -67206,10 +67535,15 @@ function apriOnchainP2P(id, modo){
          fra i metodi; la regola col tetto quando e' l'UNICO metodo (con
          piu' metodi Lightning la mostra scegliendo «Contanti», e qui la
          scelta del metodo non c'e' ancora) */
-      + (typeof zonaDettP2P === 'function' ? zonaDettP2P({metodi: o.metodi || [], zona: o.zona}) : '')
-      + (typeof regolaContantiFoglioP2P === 'function' && (o.metodi || []).length === 1
-        ? regolaContantiFoglioP2P(o.metodi, typeof maxEuroContantiP2P === 'function' ? maxEuroContantiP2P() : 0,
-                                  vendeLui ? 'compro' : 'vendo') : '')
+      /* (17 nov 2026 sera, terzo pezzo) LA SCELTA DEL METODO C'E': con
+         «Contanti» fra piu' metodi le pillole, e zona, regola e cauzione
+         compaiono scegliendolo (`metodiPresaOcHtmlP2P`, che si ridisegna) */
+      + (typeof metodiPresaOcHtmlP2P === 'function'
+        ? '<div id="p2pOcPresaMetodi">' + metodiPresaOcHtmlP2P(o, vendeLui) + '</div>'
+        : (typeof zonaDettP2P === 'function' ? zonaDettP2P({metodi: o.metodi || [], zona: o.zona}) : '')
+          + (typeof regolaContantiFoglioP2P === 'function' && (o.metodi || []).length === 1
+            ? regolaContantiFoglioP2P(o.metodi, typeof maxEuroContantiP2P === 'function' ? maxEuroContantiP2P() : 0,
+                                      vendeLui ? 'compro' : 'vendo') : ''))
       /* IL TEMPO CHE SCORRE, come nel dettaglio Lightning (16 nov 2026,
          Andrea: «se prendo un ordine on-chain non c'è più il riquadro del
          tempo che scorre. Puoi metterlo anche lì?») */
@@ -67451,7 +67785,8 @@ function corpoPresaOcP2P(o, vendeLui){
   const ln = (p2pOcPresaRete[o.id] || {}).rete === 'ln';
   /* in contanti di persona (17 nov 2026, onchain-contanti): l'incontro,
      non il conto. Qui l'ordine e' quello del libro: vale il solo metodo */
-  const cont = typeof soloContantiP2P === 'function' && soloContantiP2P(o.metodi);
+  const cont = typeof metodoPresaOcP2P === 'function' ? metodoPresaOcP2P(o) === 'Contanti'
+    : typeof soloContantiP2P === 'function' && soloContantiP2P(o.metodi);
   return paroleOc(o, vendeLui
       ? 'Chi vende deposita i sats in un indirizzo 2-di-3 (sue, tue e di Barattolo: ne servono due). '
         + (cont ? 'Quando sono confermati vi vedete dove ti scrive lui, consegni i contanti e tocchi «Ho consegnato i contanti»; '
@@ -67548,15 +67883,205 @@ async function applicaReteOcPresaP2P(id, ruolo){
   } catch(e) { toast('⚡ Lightning non scelto: riprova dallo scambio', 6000); }
 }
 
+/* ══ IL METODO SCELTO ALLA PRESA E LA CAUZIONE DEL CONTANTI ON-CHAIN
+   (17 nov 2026 sera, cantiere onchain-contanti, terzo pezzo; Andrea:
+   «Quando ci clicco poi non mi fa mettere la cauzione. Dovrebbe
+   funzionare esattamente come Lightning anche l'on-chain contanti»,
+   «Anche la questione QR, tutto quanto») ══
+   Su un ordine con «Contanti» fra piu' metodi chi prende sceglie con le
+   pillole, come nel dettaglio di Lightning; scegliendo «Contanti» lo
+   scambio diventa in contanti di persona (zona, regola, appuntamento,
+   «Sono qui»). Con la leva del server accesa (`p2pOnchainLibro.cauzione`)
+   chi prende in contanti blocca PRIMA una cauzione in Lightning: il
+   bottone apre il foglio col QR, il foglio chiede al server ogni tre
+   secondi, e quando la cauzione e' ferma prende da solo. La regola e'
+   quella di Lightning: 3%, almeno 1000 sats, torna a fine scambio. */
+let p2pOcPresaMetodo = {id: 0, metodo: ''};
+/* PURA: su quest'ordine si sceglie il metodo? Solo con «Contanti» fra piu' metodi */
+function sceltaMetodoOcP2P(o){
+  const m = (o && o.metodi) || [];
+  return m.length > 1 && m.indexOf('Contanti') >= 0;
+}
+/* il metodo con cui si prende: l'unico, o quello delle pillole ('' = non scelto) */
+function metodoPresaOcP2P(o){
+  const m = (o && o.metodi) || [];
+  if (m.length === 1) return m[0];
+  const s = Number(p2pOcPresaMetodo.id) === Number(o && o.id) ? p2pOcPresaMetodo.metodo : '';
+  return s && m.indexOf(s) >= 0 ? s : '';
+}
+/* PURA: i sats della cauzione, con la formula del server
+   (`p2p_onchain_cauzione_sats`): max(round(pct × sats), base) */
+function cauzioneOcSatsP2P(sats, c){
+  const s = Math.floor(Number(sats) || 0);
+  if (!c || !(s > 0)) return 0;
+  return Math.max(Math.floor((c.pct * s + 50) / 100), c.base);
+}
+/* a chi prende QUEST'ordine col metodo scelto serve la cauzione? */
+function cauzioneOcServeP2P(o){
+  const c = p2pOnchainLibro.cauzione;
+  return !!(c && c.accesa && metodoPresaOcP2P(o) === 'Contanti');
+}
+/* PURA: la riga della cauzione nel foglio di chi sta per prendere */
+function rigaCauzioneOcP2P(o, c){
+  if (!c) return '';
+  const stima = cauzioneOcSatsP2P(Number(o.sats) > 0 ? o.sats : o.stima, c);
+  return '<div class="hint cauzione-regola">🔐 <b>La cauzione di chi prende.</b> '
+    + 'Per prendere quest\'ordine in contanti blocchi una piccola cauzione in Lightning'
+    + (stima > 0 ? ' di circa <b>' + fmt(stima) + ' sats</b>' : '')
+    + ' (il ' + esc(String(c.pct).replace('.', ',')) + '%' + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats' : '') + ')'
+    + ': resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>. La perdi solo se un moderatore '
+    + 'decide che non ti sei presentato all\'incontro.'
+    + ' Finché non è bloccata, l\'ordine resta nel libro e qualcun altro può prenderlo.</div>';
+}
+/* il riquadro dei metodi nel foglio della presa: le pillole (se c'e' da
+   scegliere), la zona, la regola del contanti e la cauzione */
+function metodiPresaOcHtmlP2P(o, vendeLui){
+  const scelta = sceltaMetodoOcP2P(o);
+  const m = metodoPresaOcP2P(o);
+  const pillole = !scelta ? '' :
+    '<div class="hint" style="margin-top:10px"><b>Come paghi?</b> Scegli il metodo.</div>'
+    + '<div class="p2p-metodi">' + (o.metodi || []).map(x =>
+      '<button type="button" class="tema-pill' + (x === m ? ' active' : '')
+      + (typeof vesteMetodoP2P === 'function' && vesteMetodoP2P(x) ? ' p2p-pill-marchio' : '')
+      + '" data-m="' + esc(x) + '" onclick="scegliMetodoPresaOcP2P(' + Number(o.id) + ', this.dataset.m)">'
+      + (typeof marchioMetodoP2P === 'function' ? marchioMetodoP2P(x) : esc(x)) + '</button>').join('') + '</div>'
+    + (typeof P2P_METODO_FISSO !== 'undefined' ? '<div class="hint p2p-metodo-fisso">' + esc(P2P_METODO_FISSO) + '</div>' : '');
+  /* zona e regola: con la scelta solo a «Contanti» scelto, sennò come ieri */
+  const perZona = scelta ? (m ? [m] : []) : (o.metodi || []);
+  const zona = typeof zonaDettP2P === 'function' ? zonaDettP2P({metodi: perZona, zona: o.zona}) : '';
+  const regola = typeof regolaContantiFoglioP2P === 'function' && m
+    && (scelta ? m === 'Contanti' : (o.metodi || []).length === 1)
+    ? regolaContantiFoglioP2P([m], typeof maxEuroContantiP2P === 'function' ? maxEuroContantiP2P() : 0,
+                              vendeLui ? 'compro' : 'vendo') : '';
+  return pillole + zona + regola + (cauzioneOcServeP2P(o) ? rigaCauzioneOcP2P(o, p2pOnchainLibro.cauzione) : '');
+}
+function scegliMetodoPresaOcP2P(id, m){
+  haptic();
+  p2pOcPresaMetodo = {id: Number(id), metodo: String(m || '')};
+  const o = (p2pOnchainLibro.eventi || []).find(x => +x.id === +id);
+  const box = el('p2pOcPresaMetodi');
+  if (box && o) box.innerHTML = metodiPresaOcHtmlP2P(o, o.lato === 'sell');
+  const corpo = el('confCorpo');
+  if (box && o && corpo) corpo.textContent = corpoPresaOcP2P(o, o.lato === 'sell');
+}
+/* ---- il foglio «🔐 Blocca la cauzione» ---- */
+let p2pOcCauz = null;          // {id, metodo, c: {stato, sats, scade, bolt11}}
+let p2pOcCauzPronta = 0;       // l'ordine la cui cauzione e' ferma: la prossima presa non la richiede
+let p2pOcCauzBattito = null;
+function fermaCauzioneOcP2P(){
+  if (p2pOcCauzBattito) { clearInterval(p2pOcCauzBattito); p2pOcCauzBattito = null; }
+}
+function renderCauzioneOcP2P(){
+  const box = el('p2pOcCauzCorpo');
+  const c = p2pOcCauz && p2pOcCauz.c;
+  if (!box || !c) return;
+  const quanti = c.sats > 0 ? fmt(c.sats) + ' sats' : '';
+  const resta = c.scade - Math.floor(Date.now() / 1000);
+  const min = resta > 0 ? Math.max(1, Math.round(resta / 60)) : 0;
+  box.innerHTML =
+    '<div class="hint">' + (quanti ? 'Paga <b>' + esc(quanti) + '</b> dal tuo wallet Lightning: ' : 'Paga dal tuo wallet Lightning: ')
+      + 'è la <b>cauzione</b> dello scambio in contanti. Resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>; la perdi solo se un moderatore decide che non ti sei presentato.'
+      + (min ? ' Hai circa ' + min + (min === 1 ? ' minuto' : ' minuti') + ': scaduta, l\'ordine resta nel libro e va ripreso.' : '') + '</div>'
+    + '<div class="qr" id="p2pOcCauzQr"></div>'
+    + '<div class="invoice" id="p2pOcCauzInvoice"></div>'
+    + '<div class="pay-scade" id="p2pOcCauzScadeRiga" style="display:none">'
+      + '<span id="p2pOcCauzScade"></span>'
+      + '<a class="btn mini" id="p2pOcCauzWallet" href="#">⚡ Apri nel wallet</a></div>'
+    + (typeof rigaWosHoldP2P === 'function' ? rigaWosHoldP2P('cauzione') : '')
+    + '<button class="btn primary" onclick="copiaCauzioneOcP2P()">📋 Copia la richiesta</button>'
+    + '<div class="hint">Quando la cauzione è bloccata questo foglio si chiude da solo e l\'ordine viene preso: non c\'è niente da confermare.</div>'
+    + (typeof rigaPhoenixHoldP2P === 'function' ? rigaPhoenixHoldP2P() : '');
+  el('p2pOcCauzInvoice').textContent = c.bolt11 || '';
+  if (typeof portaWallet === 'function') portaWallet(el('p2pOcCauzWallet'), c.bolt11 || '', null);
+}
+function copiaCauzioneOcP2P(){
+  const c = p2pOcCauz && p2pOcCauz.c;
+  if (c && c.bolt11) copiaLink(c.bolt11, 'Richiesta di pagamento copiata 📋');
+}
+async function leggiCauzioneOcP2P(id, metodo){
+  /* senza metodo si CHIEDE a che punto e' (GET); col metodo si crea, o torna quella viva (POST) */
+  const r = await fetch(`${API_BASE}/p2p/onchain/${id}/cauzione`, metodo == null
+    ? {headers: {'X-Tg-Init-Data': authHdr()}}
+    : {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+       body: JSON.stringify({metodo})});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.detail || 'la cauzione adesso non si può chiedere');
+  return d.cauzione || null;
+}
+async function apriCauzioneOcP2P(id, metodo){
+  let c;
+  try { c = await leggiCauzioneOcP2P(id, metodo); }
+  catch(e) { toast('🔐 ' + (e.message || 'errore'), 6000); return; }
+  if (!c) { toast('🔐 La richiesta della cauzione non è arrivata: riprova', 5000); return; }
+  /* gia' ferma (app chiusa dopo aver pagato): si prende subito */
+  if (c.stato === 'tenuta') { p2pOcCauzPronta = Number(id); return prendiOnchainP2P(id); }
+  p2pOcCauz = {id: Number(id), metodo, c};
+  renderCauzioneOcP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pOcCauzSheet').classList.add('open');
+  if (c.bolt11 && typeof disegnaQr === 'function')
+    disegnaQr(el('p2pOcCauzQr'), ('lightning:' + c.bolt11.trim()).toUpperCase(), 'Alphanumeric');
+  fermaCauzioneOcP2P();
+  let giro = 0;
+  p2pOcCauzBattito = setInterval(async () => {
+    const foglio = el('p2pOcCauzSheet');
+    if (!foglio || !foglio.classList.contains('open') || !p2pOcCauz) return fermaCauzioneOcP2P();
+    const viva = typeof vestiScadenzaFattura !== 'function' ? true
+      : vestiScadenzaFattura(foglio, el('p2pOcCauzScadeRiga'), el('p2pOcCauzScade'),
+                             el('p2pOcCauzWallet'), p2pOcCauz.c.scade);
+    /* ogni tre secondi si chiede al server; a richiesta morta ancora un
+       poco (un pagamento dell'ultimo secondo), poi basta */
+    if (++giro % 3) return;
+    if (!viva && Math.floor(Date.now() / 1000) - p2pOcCauz.c.scade > 60) return fermaCauzioneOcP2P();
+    let ora = null;
+    try { ora = await leggiCauzioneOcP2P(p2pOcCauz.id, null); } catch(e) { return; }
+    if (ora && ora.stato === 'tenuta' && p2pOcCauz) {
+      const idPreso = p2pOcCauz.id;
+      fermaCauzioneOcP2P();
+      p2pOcCauz = null;
+      chiudiFoglioP2P('p2pOcCauzSheet');
+      toast('🔐 Cauzione bloccata ✓', 3000);
+      p2pOcCauzPronta = idPreso;
+      prendiOnchainP2P(idPreso);
+    }
+  }, 1000);
+}
+/* PURA: il riquadro della cauzione nella pagina dello scambio on-chain:
+   a chi l'ha messa le parole del riquadro di Lightning, al moderatore
+   una riga. `c` = {stato, sats, mia} del server. */
+function riquadroCauzioneOcP2P(o){
+  const c = o && o.cauzione;
+  if (!c || !(c.sats > 0)) return '';
+  const stato = c.stato === 'tenuta' ? 'bloccata' : c.stato === 'tornata' ? 'restituita' : '';
+  if (!stato) return '';
+  if (c.mia && typeof riquadroCauzioneP2P === 'function')
+    return riquadroCauzioneP2P({stato: '', cauzione: {sats: c.sats, stato}});
+  return '<div class="p2p-box cauzione-box"><b>🔐 Cauzione di chi ha preso:</b> ' + fmt(c.sats) + ' sats, '
+    + (stato === 'bloccata' ? 'bloccata in Lightning. Torna a fine scambio.' : 'già tornata nel suo wallet.') + '</div>';
+}
 async function prendiOnchainP2P(id){
   haptic();
+  /* dal foglio della cauzione si torna qui con la cauzione gia' ferma:
+     lo dice `p2pOcCauzPronta`, che vale per UNA presa di QUELL'ordine */
+  const conCauzione = Number(p2pOcCauzPronta) === Number(id);
+  p2pOcCauzPronta = 0;
+  /* il metodo scelto e la cauzione (17 nov 2026 sera): senza scelta il
+     foglio si riapre a chiederla; in contanti con la leva accesa prima
+     si blocca la cauzione, e da li' si torna qui con `conCauzione` */
+  const riga = (p2pOnchainLibro.eventi || []).find(x => +x.id === +id);
+  const metodo = riga ? metodoPresaOcP2P(riga) : '';
+  if (riga && sceltaMetodoOcP2P(riga) && !metodo) {
+    toast('Scegli prima come paghi: tocca un metodo', 4000);
+    return apriOnchainP2P(id);
+  }
   try {
     /* la chiave sul dispositivo e la sua meta' pubblica al server, come
        all'apertura: senza non c'e' niente con cui firmare */
     await onchainAccendiDaSolo();
+    if (riga && !conCauzione && cauzioneOcServeP2P(riga)) return apriCauzioneOcP2P(id, metodo);
     const r = await fetch(`${API_BASE}/p2p/onchain/${id}/prendi`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({})});
+      body: JSON.stringify(metodo ? {metodo} : {})});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non si è potuto prendere');
     await applicaReteOcPresaP2P(id, d.ruolo);
@@ -69259,6 +69784,12 @@ function schedaOnchainP2P(o){
         + 'col tuo seme e lui fa lo swap.';
     }
   }
+  /* (17 nov 2026, rilascio-senza-incasso) chi compra non ha ancora detto
+     dove ricevere: chi vende lo legge PRIMA di premere «Ricevuti» */
+  if (deposito && !o.incasso && !o.incasso_ln && !o.proposta
+      && (o.stato === 'depositato' || o.stato === 'euro_inviati'))
+    testo += '<br>⏳ Chi compra non ha ancora scelto il wallet dove ricevere i sats: '
+      + 'puoi liberarli appena lo fa (glielo ricordiamo noi nella sua pagina dello scambio).';
   /* la seconda firma, quando tocca a me: lo stesso bottone in ogni stato */
   if (daFirmareOnchainP2P(o) && !mod) {
     gesti = bott('orange', `cofirmaOnchainP2P(this, ${o.id})`,
@@ -69289,6 +69820,8 @@ function schedaOnchainP2P(o){
        al moderatore il confronto delle presenze (17 nov 2026) */
     : contOc ? (typeof riquadroAppuntamentoOcP2P === 'function' ? riquadroAppuntamentoOcP2P(o) : '')
       + (typeof riquadroContantiOcP2P === 'function' ? riquadroContantiOcP2P(o, gesti) : '')
+      /* la cauzione di chi ha preso in contanti (17 nov 2026 sera): a lui e al moderatore */
+      + (typeof riquadroCauzioneOcP2P === 'function' ? riquadroCauzioneOcP2P(o) : '')
       + (mod && typeof confrontoModOcP2P === 'function' ? confrontoModOcP2P(o) : '')
     : recapito && ['pending', 'preso', 'depositato'].includes(o.stato) && rCoinR
     ? '<div class="p2p-box"><label>Il tuo indirizzo ' + esc(rCoinR.coin) + ' (' + esc(rCoinR.nome) + ')</label>'
@@ -70548,8 +71081,15 @@ async function fattoOnchainP2P(rip){
   p2pOnchainAperto = 0;
   go('p2pmiei');
 }
+/* L'INDIRIZZO DI CHI COMPRA SI RILEGGE (17 nov 2026, cantiere
+   rilascio-senza-incasso; scambio vero da 500 €): chi vende ha premuto
+   «Ricevuti» mentre chi compra non aveva ancora scelto dove ricevere, e
+   la libreria ha risposto «Invalid address length» per un indirizzo
+   VUOTO. Chi compra lo sceglie spesso proprio in quel momento (Profilo o
+   riquadro dello scambio): prima di firmare lo scambio si rilegge dal
+   server, e se l'incasso manca ancora lo si dice in parole. */
 async function firmaOnchainP2P(id, verso){
-  const o = p2pOnchainMiei.find(x => x.id === id);
+  let o = p2pOnchainMiei.find(x => x.id === id);
   if (!o) return;
   /* (17 nov 2026, onchain-rimborso-liscio) il rimborso non ha ancora
      dove andare: la rinuncia si registra, e chi ha depositato lo sa */
@@ -70572,6 +71112,8 @@ async function firmaOnchainP2P(id, verso){
     if (!pronta) { rip(); return; }
   }
   try {
+    if (verso === 'venditore' && !o.incasso)
+      o = (await leggiMieiOnchainP2P()).find(x => x.id === id) || o;
     await onchainFirmaProposta(o, verso);
   } catch(e) {
     rip();

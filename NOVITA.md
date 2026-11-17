@@ -486,7 +486,19 @@ pubblico: sì
 ## 2026-11-17 · raccolta
 frase: Su Barattolo si può aprire una raccolta fondi in sats: un obiettivo, una scadenza fino a 60 giorni e una barra che si riempie. Chi vuole sostenerla manda uno zap, che va dritto al wallet di chi raccoglie, senza commissioni. Per aprirne una servono tre vendite concluse e un indirizzo Lightning; ogni raccolta la guardano i moderatori prima della vetrina.
 dove: Profilo → «Il tuo negozio» → «🎯 Raccolte fondi» (lì il bottone «🎯 Apri una raccolta»); in vetrina la tessera «Raccolte» accanto ad Aste, quando c'è almeno una raccolta; nella scheda di una raccolta il bottone «⚡ Sostieni con uno zap».
-leva: RACCOLTE_ATTIVE (accesa di serie; i depositi di garanzia, RACCOLTA_GARANTITA_ATTIVA, spenti di serie)
+leva: RACCOLTE_ATTIVE spenta di serie (e i depositi di garanzia, RACCOLTA_GARANTITA_ATTIVA, spenti di serie)
+pubblico: no
+
+## 2026-11-17 · inglese-tappa-1
+frase: Barattolo si legge anche in inglese: se il tuo Telegram o il tuo browser non sono in italiano, la vetrina, gli annunci e l'acquisto compaiono in inglese da soli, coi prezzi all'inglese (1,234.50 €). Ordini, P2P, Profilo e bot arrivano nelle prossime tappe. Per provarlo da un telefono italiano apri barattolo.store/?lingua=en (?lingua=it per tornare).
+dove: tutta la Mini App e il sito per chi ha Telegram o il browser in una lingua diversa dall'italiano; la pagina «Il pagamento protetto» (barattolo.store/sicurezza) anche lei.
+leva: LINGUA_INGLESE (accesa di serie; spenta, l'app torna italiana per tutti)
+pubblico: sì
+
+## 2026-11-17 · assistenza-screenshot
+frase: Nella chat con l'assistenza di Barattolo ora puoi allegare anche degli screenshot, fino a tre per messaggio: lo staff vede subito cosa vedi tu. Li vedono solo lo staff e chi li ha mandati.
+dove: Profilo → «Aiuto» → «💬 Assistenza», il bottone «📎 Allega screenshot» sotto la casella.
+leva: ASSISTENZA_ATTIVA (quella dell'assistenza, già accesa)
 pubblico: sì
 
 ## 2026-11-17 · onchain-rimborso-liscio
@@ -528,5 +540,11 @@ pubblico: no
 ## 2026-11-17 · onchain-contanti-scambio
 frase: Lo scambio P2P on-chain in contanti ora va come quello Lightning: chi vende scrive dove e quando vedervi, chi compra apre il navigatore, ognuno può segnare «📍 Sono qui» quando arriva, e il bottone è «Ho consegnato i contanti».
 dove: P2P on-chain con metodo «Contanti»: la pagina dello scambio, riquadro «📍 Dove vedervi» e, a sats bloccati, il riquadro con «📍 Sono qui»; il bottone «💵 Ho consegnato i contanti».
+leva: nessuna
+pubblico: no
+
+## 2026-11-17 · onchain-contanti-metodo
+frase: Negli ordini P2P on-chain con «Contanti» insieme ad altri metodi ora scegli come pagare prima di prendere: con «Contanti» lo scambio va di persona, con appuntamento e «📍 Sono qui».
+dove: P2P on-chain, tocca un ordine con più metodi fra cui «Contanti»: sotto il riassunto ci sono le pillole dei metodi.
 leva: nessuna
 pubblico: no

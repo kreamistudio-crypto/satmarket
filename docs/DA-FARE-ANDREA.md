@@ -758,3 +758,94 @@ address apre una raccolta con «🛡️ Accetta anche depositi di garanzia»,
 un admin le dà il via (Profilo → pannello), un secondo account deposita
 50 € dalla scheda, poi si lascia scadere (o la si ferma): il telefono di
 chi riceve mette la seconda firma da solo all'apertura dell'app.
+
+## 20. La cauzione del contanti on-chain: il macaroon sul nodo, due righe sul VPS, la prova con Alan (17 nov 2026, cantiere onchain-contanti; Andrea sulla scheda: «In produzione, solo tu e Alan»)
+
+**Perché.** Chi prende in contanti un ordine P2P on-chain blocca prima una
+cauzione in Lightning col QR (3%, minimo 1000 sats), che Barattolo tiene
+sul nodo e rimanda a fine scambio. Nel codice è SPENTA, e anche accesa la
+vede solo un moderatore che prende (`P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN`,
+chiusa di serie SENZA nessuna riga da scrivere): per tutti gli altri non
+cambia niente. Il perché: CANTIERI, «…terzo pezzo: il metodo scelto alla
+presa e la cauzione in Lightning col QR». Va fatto DOPO la promozione
+(prima, il server non conosce le righe). Per ora la cauzione TORNA
+SEMPRE: il gesto del moderatore che la fa perdere è il pezzo dopo.
+
+**A. SUL NODO (`~/nodo`): il macaroon delle cauzioni, numero 5.**
+
+Sola lettura: gli id già usati (il 5 non deve esserci).
+```
+docker compose exec lnd lncli listmacaroonids
+```
+Scrive: cuoce il macaroon (sa coniare, annullare, leggere e saldare una
+hold; non sa pagare né aprire canali).
+```
+docker compose exec lnd lncli bakemacaroon --root_key_id 5 --save_to /tmp/barattolo-cauzione.macaroon uri:/invoicesrpc.Invoices/AddHoldInvoice uri:/invoicesrpc.Invoices/CancelInvoice uri:/lnrpc.Lightning/LookupInvoice uri:/invoicesrpc.Invoices/SettleInvoice
+```
+Lo mostra in esadecimale: una riga lunga, da COPIARE dal terminale (non
+va in chat, in un canale o in un file).
+```
+docker compose exec lnd xxd -p -c 9999 /tmp/barattolo-cauzione.macaroon
+```
+(Se manca `xxd`: `docker compose exec lnd sh -c "od -An -tx1 -v /tmp/barattolo-cauzione.macaroon | tr -d ' \n'"`.)
+Toglie la copia dal container, e riguarda gli id (ora c'è anche il 5).
+```
+docker compose exec lnd rm /tmp/barattolo-cauzione.macaroon
+```
+```
+docker compose exec lnd lncli listmacaroonids
+```
+
+**B. SUL VPS: le due righe.**
+
+Sola lettura, deve dire `0`:
+```
+sudo grep -c "^LND_PONTE_MACAROON_CAUZIONE\|^P2P_ONCHAIN_CAUZIONE" /srv/barattolo/config.py
+```
+Scrive: la copia di riserva.
+```
+sudo cp -p /srv/barattolo/config.py /root/config-prima-cauzione-onchain-$(date +%F).py
+```
+Scrive: il macaroon. Chiede prima la password di sudo, poi il macaroon,
+che non si vede mentre si incolla. Deve dire «Scritto».
+```
+sudo -v && read -rsp "Macaroon delle cauzioni (esadecimale): " K && echo && if [[ ! "$K" =~ ^[0-9a-fA-F]{40,}$ ]]; then echo "Non è esadecimale: non scrivo niente"; else printf '\n# la cauzione del contanti on-chain (17 nov 2026): macaroon root_key_id 5\nLND_PONTE_MACAROON_CAUZIONE = %s%s%s\n' '"' "$K" '"' | sudo tee -a /srv/barattolo/config.py > /dev/null && echo "Scritto"; fi; unset K
+```
+Scrive: la leva.
+```
+printf 'P2P_ONCHAIN_CAUZIONE = True\n' | sudo tee -a /srv/barattolo/config.py > /dev/null
+```
+Sola lettura: il file si legge ancora (`ok`) e le righe sono due (`2`).
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo grep -c "^LND_PONTE_MACAROON_CAUZIONE\|^P2P_ONCHAIN_CAUZIONE" /srv/barattolo/config.py
+```
+Scrive: il riavvio, e la salute (atteso `200`).
+```
+sudo systemctl restart barattolo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://barattolo.store/api/salute
+```
+Sola lettura: il journal deve dire «🔐 Cauzione del contanti on-chain:
+ACCESA SOLO PER I MODERATORI, 3% con minimo 1000 sats».
+```
+sudo journalctl -u barattolo -n 200 --no-pager | grep "Cauzione del contanti"
+```
+
+**C. LA PROVA, tu e Alan** (uno pubblica, l'altro prende; chi PRENDE deve
+essere uno di voi due):
+1. Uno pubblica un ordine P2P on-chain col solo metodo «Contanti».
+2. L'altro lo apre: nel foglio c'è la riga della cauzione, e il bottone
+   apre «🔐 Blocca la cauzione» col QR. Si paga col wallet: il foglio si
+   chiude da solo e l'ordine è preso.
+3. Nella pagina dello scambio chi l'ha messa vede il riquadro della
+   cauzione. Si chiude lo scambio (o lo si annulla): entro un minuto la
+   cauzione torna nel wallet.
+4. Da un account NON moderatore: lo stesso ordine non mostra nessuna
+   cauzione.
+
+Da guardare e riferire: il wallet ha pagato la hold dal QR? È tornata?
+
+**PER SPEGNERE:** via la riga `P2P_ONCHAIN_CAUZIONE` e riavvio, LASCIANDO
+il macaroon finché ci sono cauzioni vive. **PER APRIRE A TUTTI** (a prova
+fatta): la riga `P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = False` e riavvio.

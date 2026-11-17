@@ -88310,7 +88310,7 @@ moderatore rimanda indietro tutti i depositi, gli zap no. (7) La seconda
 firma non guarda la leva: spenta, i sats non restano chiusi. (8) Le
 parole di finanza (interessi, rendimento, quote, token, «%»…) si
 SEGNANO al moderatore, non bloccano: il giudice è lui. (9) Leve:
-`RACCOLTE_ATTIVE` accesa di serie, `RACCOLTA_GARANTITA_ATTIVA` SPENTA di
+`RACCOLTE_ATTIVE` accesa di serie (poi spenta, vedi sotto), `RACCOLTA_GARANTITA_ATTIVA` SPENTA di
 serie finché Alan non la prova sul collaudo (regola del 17 nov sulle
 funzioni coi soldi). Zero XP. Nessun segreto nuovo sul VPS.
 STRADE SCARTATE: la raccolta come annuncio speciale; il timelock (secondo
@@ -88349,6 +88349,206 @@ RESTA DA GUARDARE. La prova di Alan sul collaudo con la garantita accesa
 (DA-FARE-ANDREA, voce 19): un deposito vero su signet, la scadenza e le
 seconde firme dai telefoni; poi, col suo ok, la leva nel config del VPS.
 La fase 2 su Nostr (NIP-75).
+RITOCCO DELLA SERA (17 nov 2026, 16:19; Andrea sulla scheda: «Spente nel
+codice»): anche `RACCOLTE_ATTIVE` nasce SPENTA. Con la promozione in
+produzione non si vede niente; il lancio lo fa Andrea con una riga nel
+config del VPS (`RACCOLTE_ATTIVE = True`). La voce di NOVITA diventa
+`pubblico: no`: il giorno del lancio se ne scrive una nuova. Sul collaudo
+la garantita resta accesa (riga 2148); le semplici, spente di serie, si
+accendono lì con una riga se servono alla prova di Alan. Provato: suite
+severa 29.483 verdi, 0 rosse, 2 saltate di sempre, sull'albero di
+2cf9335 (commit non mio: l'inglese, tappa 1), collaudi della CI 150/150
+prima; dopo il rebase su c247c34 (commit non mio: gli screenshot
+all'assistenza) le sezioni toccate (raccolte, leve, NOVITA, config
+d'esempio, libro di Tappo) 208/0 e i collaudi raccolta e assistenza 2/2.
+
+## L'inglese, tappa 1: il traduttore, la lingua automatica, vetrina + annuncio + acquisto (17 nov 2026, cantiere inglese-tappa-1; Andrea, 14 nov: «la traduzione dell'app intera, la versione inglese», sospeso e riaperto il 17: «Puoi far la prima tappa?»). LA SCELTA DI FONDO: non si riscrive la pagina. `miniapp.html` è un file da 6 MB con ~3.300 frasi italiane dentro template, stringhe e HTML, e avvolgerle una a una in una `t()` sarebbe un refactoring di massa (regola 7), un diff che nessuno rilegge, e ogni cantiere futuro dovrebbe ricordarsi di farlo. Al suo posto un TRADUTTORE SUL DOM: la pagina nasce italiana com'è sempre nata, e quando la lingua è l'inglese un `MutationObserver` traduce i nodi di testo e gli attributi man mano che i render li disegnano, con un dizionario a parte (`lingua/en.js`, chiave = frase italiana). Il costo è UNA passata in più per nodo; il guadagno è che il codice italiano non cambia e una frase che manca nel dizionario resta italiana invece di rompere qualcosa. L'alternativa a metà — tradurre solo le stringhe «grosse» a mano — è stata scartata perché lascia la stessa regola non scritta ai cantieri dopo. LA LINGUA la decide `linguaApp()`: `?lingua=` vince e si ricorda (così Andrea prova l'inglese dal suo Telegram italiano), poi la scelta ricordata, poi il `language_code` di Telegram, poi il browser; italiano se comincia per «it», tutto il resto inglese (un tedesco legge inglese, non italiano). L'interruttore nel Profilo salvato sul server è la tappa dopo. I NUMERI: Andrea li vuole all'inglese («1,234.50 €»), e le 79 chiamate `toLocaleString('it-IT')` stanno in `fmt`, `fmtEur` e altrove, funzioni che `prove.py` ritaglia per testo (`pezzo_js`): toccarle rompeva i banchi. Si è messa una mappa sola sui prototipi (`numeriInglesi()`: `it-IT` → `en-GB`), accesa solo in inglese; SCARTATO riscrivere le cifre nel DOM a posteriori (un «1.234» può essere un prezzo o un codice). IL FILE SERVITO: rotta esplicita `/lingua/{codice}.js` con lista chiusa (regola ferrea 3), cache di un giorno e `?v=` con l'inizio dello sha256 del file, controllato dalla prova e tenuto uguale su Windows da `.gitattributes` (la lezione dei due bundle). Lo chiede solo chi legge in inglese: per l'italiano zero byte in più e zero lavoro. LA LEVA `LINGUA_INGLESE` (accesa di serie, come tutte le leve nuove) spenta fa 404 la rotta e l'app torna italiana per tutti: è il freno se una traduzione fa danni in produzione. Il pannello admin resta italiano. LE TRAPPOLE TROVATE: il contatore «1 di 4» del tour non può essere una forma `{} di {}` (prenderebbe «Bottega di prova di Bruno»), quindi passa da `self.t('{n} di {tot}')` — `self.` perché dentro `mostraTappa` la `t` è la tappa; `globalThis.navigator` in node 22 si sovrascrive solo con `defineProperty`; `it-IT` non raggruppa le migliaia sotto le cinque cifre («1234,50»), e la prova lo sa. PROVATO: `prove_lingua_inglese` (16: la versione, il caricatore solo in inglese, `.gitattributes`, il dizionario senza doppioni, coi segnaposto in pari e con le parole in pagina, in node i rami di `linguaApp`, `traduci`/`t`, i numeri prima e dopo e il `de-DE` lasciato stare, le sentinelle del server e del pannello, il collaudo nelle due liste della CI); `collaudo_lingua` (15, sul server vero: la rotta coi suoi header e il file byte per byte, i 404 dei nomi storti, la pagina con la versione giusta e `<html lang="it">`, la leva spenta e riaccesa); e il GIRO DAL VIVO in Chromium a 390 px con `?lingua=en` su un database seminato: vetrina, filtri, ordinamento, le quattro tappe del tour, la scheda, la cassa col ritiro e con la spedizione a casa (indirizzo e casella), il foglio del pagamento con la fattura, «Il pagamento protetto», e il controllo che in italiano il dizionario non venga nemmeno chiesto; da quel giro sono entrate ~70 chiavi che l'estrazione a tavolino non vedeva (le vie della consegna, l'indirizzo, il tour, le card «Da scoprire», «Prezzo», «Totale da pagare»). RESTA, per le tappe dopo: Ordini e dettaglio dell'ordine, il P2P, Vendi e Profilo (con l'interruttore della lingua salvato sul server), il bot e i messaggi del server (i 409/400 arrivano in italiano, tranne quello del «qualcun altro sta pagando» che la cassa mostra), i dettagli dei servizi nella scheda («Di persona · 1 ora»), e il libro di Tappo che risponda nella lingua di chi scrive.
+
+## Gli screenshot all'assistenza (17 nov 2026, cantiere assistenza-screenshot, richiesta di Andrea)
+
+**LA RICHIESTA.** «Nell'assistenza clienti, il messaggio che riceviamo
+all'interno del bot, dai la possibilità di aggiungere anche degli
+screenshot.» Chi scrive allo staff allega delle immagini; gli admin le
+ricevono, nel bot e nel pannello.
+
+**COSA C'È.** Sotto la casella dell'assistenza il bottone «📎 Allega
+screenshot (facoltativi, max 3)», le miniature con la ✕ prima
+dell'invio; col primo screenshot si può mandare anche senza testo. Nel
+messaggio le miniature sono verticali e intere (uno screenshot è alto),
+e il tocco apre il visore di casa con lo zoom. Agli admin: l'avviso di
+sempre dice «📎 N screenshot allegati», e ogni screenshot arriva nel bot
+come foto, con chi l'ha mandato e il tasto «💬 Apri la conversazione»;
+nel pannello «💬 Assistenza clienti» le miniature stanno nel messaggio.
+
+**LE DECISIONI, COI PERCHÉ.**
+1. *I file in `buste/assistenza`, non in una cartella nuova.* In
+   produzione il servizio gira da `barattolo` e scrive SOLO nelle sue
+   cartelle (`SUE=` di `deploy/utente/cambio-utente.sh`, con la
+   sentinella che le conta): una `assistenza_img/` accanto a server.py
+   non sarebbe nata e il server non sarebbe partito. L'ha detto la
+   sentinella «ogni cartella in cui il server scrive è fra le sue» al
+   primo giro della suite, ed è la ragione per cui c'è. buste/ è già
+   sua, 700, mai servita, e `backup-fuori.sh` la copia intera.
+2. *Cifrati e con nome imprevedibile*, come il documento di ritiro: uno
+   screenshot dell'app può avere dentro un saldo, un ordine, un nome.
+   La rotta che li legge vuole chi sei (il padrone della conversazione o
+   un admin) e a tutti gli altri dà lo stesso 404 del nome che non
+   esiste; niente cache, `nosniff`, `sandbox`.
+3. *Agli admin nel bot SEMPRE, anche dentro la pausa dei dieci minuti*:
+   la pausa evita tre squilli per tre righe di testo, ma lo screenshot è
+   il contenuto, e chi lo manda subito dopo il testo è il caso più
+   comune. A tenere il conto c'è il freno di sempre (20 messaggi l'ora,
+   3 screenshot l'uno). La foto viaggia in multipart coi byte, perché un
+   URL privato Telegram non lo sa aprire. Va a chi ha un id Telegram;
+   l'admin che ha scelto solo Nostr vede «📎 N screenshot» nell'avviso e
+   li apre nell'app.
+4. *Il vaglio prima di scrivere*: tutte le immagini si guardano prima
+   del primo file (tipo dai byte, 6 MB, `_e_immagine`, la bomba, i
+   metadati via), così un 400 a metà non lascia orfani; se il database
+   dice di no dopo i file, i file se ne vanno.
+5. *Preparati sul telefono a 1600 px* con `preparaFotoChatScP2P` (la
+   chat dello scambio): a 1200, come le foto degli annunci, il testo di
+   uno screenshot si legge peggio. Se quella strada non va, `ridimensiona`
+   coi suoi ripieghi.
+6. *La cancellazione dell'account porta via i file*: la riga se ne va
+   con `CANCELLA_TOGLI`, i nomi si leggono prima e `_dopo_cancellazione`
+   li toglie dal disco. La fusione degli account non ha bisogno di
+   niente: i nomi viaggiano con le righe.
+
+**STRADE SCARTATE.** Le immagini nel database (gonfierebbero il backup
+che va su Telegram, che ha un tetto); una cartella nuova (vedi 1); gli
+screenshot anche nelle risposte dello staff (non chiesto: in fondo alla
+risposta come proposta); il gruppo degli admin al posto delle chat
+private (il passo 2 l'aveva già escluso, per richiesta di Andrea).
+
+**PROVATO.** `collaudo_assistenza` 70/70 (29 nuove): l'invio con uno e
+con due screenshot, il testo vuoto ammesso solo con lo screenshot, il
+file cifrato sul disco, chi legge e chi no (l'altro utente, il nome
+storto, il nome giusto che non esiste: 404), le intestazioni, l'avviso
+che li conta, le foto all'admin anche dentro la pausa e mai a chi
+scrive, l'elenco degli admin, quattro immagini, un testo travestito da
+PNG, uno buono e uno cattivo senza orfani, il JPEG col GPS che esce
+nudo, la cancellazione dell'account che toglie il file e lascia quelli
+degli altri, la leva spenta. CONTROPROVE ROSSE, quattro: la rotta senza
+il controllo del padrone, la cancellazione che non toglie i file, il
+JPEG non spogliato, le foto all'admin solo fuori dalla pausa.
+DAL VIVO: il server in collaudo (relay morti) e Playwright a 400 px:
+l'utente sceglie uno screenshot 1080×2340, scrive, manda; la miniatura
+compare, il visore la apre; l'admin 999 la vede nella conversazione, e
+il journal dice «📨 [foto simulata per l'utente 999] 📎 Screenshot
+all'assistenza da Compratore (n. 111)».
+
+IL VERBALE: suite intera severa sull'albero del cantiere (sopra develop
+6f28209), 29.471 verdi, 2 rosse, 2 saltate di sempre (nostr-tools non
+c'è in cloud). Le due rosse erano sentinelle da aggiornare e lo sono:
+`conoscenza.md` da rigenerare (sapere.md toccato) e il censimento degli
+indirizzi Telegram, che ora ne conta otto (`_foto_al_bot`, guardia in
+cima); rigirate le due sezioni, 25/25. Prima ancora, al primo giro, le
+altre due sentinelle che contano i chiamanti (`ridimensiona`, cinque;
+`_link_dentro_telegram`, cinque) e quella delle cartelle (vedi 1).
+Collaudi della CI nella gabbia, in un venv SENZA coincurve, 150/150.
+Tutto girato in cloud.
+
+**RESTA DA GUARDARE.** La prima foto vera nel bot degli admin, sul
+collaudo: è l'unico pezzo che in cloud non esce (Telegram è simulato).
+
+### «Ricevuti: libera i sats» con l'indirizzo di chi compra vuoto (17 nov 2026, cantiere rilascio-senza-incasso)
+
+Scambio P2P on-chain vero da 500 € (Darnok833): chi vende ha premuto «🔓 Ricevuti: libera i sats» e ha visto il toast «⚠️ Invalid address length». IL PERCHÉ: l'errore è di `Address.decode` del bundle (`vendor/btc.bundle.js`, lunghezza fuori da 14-74), e l'unico indirizzo del PSBT che può arrivare VUOTO è `o.incasso`: chi compra bitcoin non aveva ancora scelto dove ricevere (al momento della presa `_p2p_onchain_incasso_di` lascia `''`, e `_p2p_onchain_riempi_incassi` lo riempie quando la scelta arriva dal Profilo o dal riquadro dello scambio). Il resto (`o.rimborso`) aveva già il suo cancello in parole dal 10 nov, la quota nasce col suo `/1/n`, e una rete sbagliata direbbe «wrong bech32 prefix». Il bottone invece non guardava l'incasso, e `onchainUsciteVersoVenditore` metteva `''` fra le uscite. L'indirizzo di chi compra (bc1q… di 42) non c'entrava: lo ha salvato DOPO, e il server l'ha copiato nello scambio da solo. LA CORREZIONE, tutta nel telefono: `firmaOnchainP2P` rilegge gli scambi dal server prima di firmare se l'incasso manca (chi compra lo sceglie spesso proprio mentre chi vende aspetta, e una lista vecchia di pochi minuti faceva il resto); `onchainFirmaProposta` rifiuta in parole un rilascio senza incasso, prima di costruire il PSBT; e la pagina di chi vende lo dice prima del bottone («⏳ Chi compra non ha ancora scelto il wallet…»). SCARTATO nascondere il bottone: è anche il gesto che rilegge, e chi vende resterebbe davanti a una pagina ferma. PROVATO: in `prove_incasso_esterno_onchain`, col codice vero sotto node e il bundle vero, il rilascio P2P con incasso vuoto dà il no in parole e non manda niente (senza il cancello la prova è rossa), e la rilettura sta prima della firma. RESTA: un avviso Telegram a chi compra quando chi vende preme «Ricevuti» senza il suo indirizzo (oggi lo vede solo sulla card, «Scegli dove ricevere»).
+
+## La CI mirata: prove.py e i collaudi scelti dai file cambiati da `pronto` (17 nov 2026, cantiere ci-mirata, richiesta di Andrea)
+
+**LA RICHIESTA.** Andrea: «le CI sono decisamente troppo lente, quelle
+inutili devono essere saltate, cioè se tocco qualcosa di quella
+categoria sì, altrimenti se sai già a prescindere che non l'ho
+modificato saltalo». Un giro su main durava ~31 minuti in fila:
+prove.py ~13,5 e collaudi ~16,5, sulla vm-2050.
+
+**COSA C'È.** Due scelte, tutte e due contro `pronto` (l'ultimo albero
+verde, non il push di prima: con la coda un giro può saltare, e il suo
+codice lo deve provare il giro dopo — il perché di `cambiati_da`):
+- `prove.py` nudo, SOLO sul push a main della CI (le tre variabili di
+  GitHub: `GITHUB_ACTIONS`, `GITHUB_EVENT_NAME=push`,
+  `GITHUB_REF=refs/heads/main`), diventa `--dai-file=origin/pronto`
+  (`_argomenti_della_ci`): le categorie del giudice del 5 nov. Prende
+  da sé la punta di `pronto` (`--depth=1`) e, senza la storia in mezzo
+  (il checkout corto), confronta gli ALBERI. Fail-closed in tre punti
+  nuovi: un confronto che non riesce → tutto; lo stesso albero di
+  `pronto` (un giro rifatto) → tutto; il resto come il giudice (nel
+  dubbio, tutto). Il lancio a mano («Run workflow», anche su main), i
+  rami e il locale girano TUTTO come prima; `PROVE_INTERE=1` lo forza.
+  Per vedere prima cosa farebbe la CI: le tre variabili +
+  `python prove.py --mostra`.
+- `collaudi_ci.py --salvo-solo-documenti-da pronto` (il nome è rimasto
+  per non toccare il workflow) adesso salta anche i collaudi che NON
+  VEDONO i file cambiati (`scegli_collaudi`). Un collaudo «vede» un file
+  se lo importa a qualunque profondità (quasi tutti importano il server,
+  anche passando da un altro collaudo) o se il file è NOMINATO nel
+  codice di quel che importa — il percorso, il nome, il modulo fra
+  virgolette, la cartella fra virgolette — tolti commenti, docstring e
+  i `-- ` dell'SQL nelle stringhe (`senza_commenti`). Quindi server.py
+  fa girare TUTTI i 148 (anche i due che lo leggono con `ast`), e ogni
+  file che il server nomina (miniapp.html, sw.js, vendor/…) 146.
+  Girano TUTTI anche per il lanciatore,
+  `requirements.txt`, `config_esempio.py`, `.github/` e un file
+  sparito; l'elenco fa girare i soli nomi NUOVI rispetto a quello di
+  `pronto` (illeggibile → tutto); un import che non si legge → tutto.
+
+**IL WORKFLOW NON SI TOCCA, ed è voluto.** Dopo un commit che cambia
+`.github/workflows/` il robot può non spostare `pronto` e il deploy
+resta fermo (la lezione dell'elenco in `ci/`, 13 ott). Perciò la scelta
+vive in prove.py e in collaudi_ci.py, e il passo resta `python prove.py`.
+
+**QUANTO SI RISPARMIA, MISURATO** sui commit di main dal 14 al 17 nov,
+uno per uno (`--dai-file=<sha>^`): prove.py — 9 su 24 fra il 40 e il
+65% delle sezioni, 1 di soli documenti con le sole 8 sentinelle, il
+resto (14) quasi tutto o tutto, perché toccano server.py e miniapp.html
+in funzioni di più categorie. Collaudi — chi tocca server.py li
+gira tutti, miniapp.html 146 su 148 (fuori `collaudo_canale_admin` e
+`collaudo_verita_lnd`, che il server lo leggono con `ast`); commit di soli prove.py, deploy/,
+estensione/ o LICENSE ne girano 14–16 su 148 invece di 148 (i 14 sono
+quelli che importano `giudice_deploy`, che nomina prove.py in una
+stringa: una menzione in più, mai una in meno). La scelta costa ~9 s.
+ONESTAMENTE: la promozione unica, che porta il lavoro di più thread,
+tocca quasi sempre server.py, e lì il giro resta intero. Il guadagno
+grosso viene dai push piccoli (un ritocco di testi, uno script del
+nodo, l'estensione, un documento con la sua sezione).
+
+**LA RETE, che resta.** Il giudice di prove.py è un'euristica (lo diceva
+già la voce del 5 nov): può scegliere meno del necessario quando una
+funzione cambia comportamento per una sezione che non la nomina. La
+suite intera `PROVE_SEVERE=1 python prove.py` e i collaudi della CI
+restano obbligatori nel worktree prima di ogni push su develop (regola
+di CLAUDE.md, invariata): la CI di main diventa il secondo controllo,
+non più l'unico intero.
+
+**LE STRADE SCARTATE.** I collaudi scelti per FUNZIONE toccata in
+server.py: un collaudo gira un flusso intero del server vero, e una
+funzione non dice quali flussi attraversa. Due job paralleli (prove.py
+e collaudi): sulla vm-2050 c'è UN runner, i job andrebbero in fila lo
+stesso, e il giudice del VPS chiede `prove` per nome. Il diff col push
+di prima: vedi sopra, la coda. Il passo condizionato nel workflow: il
+`pronto` fermo.
+
+**PROVATO.** Le sezioni `prove_ci_leggera` e
+`prove_categorie_delle_prove`, allargate: il giudice dei collaudi su
+file di cartone (chi importa per interposto collaudo, la pagina nominata
+dal server, prove.py nominato solo in commento e nell'SQL, il manifest
+dell'estensione che non è quello di casa, i quattro «tutti», lo
+sparito, l'elenco coi nomi nuovi, l'import illeggibile) e DAL VERO su un
+repo di cartone (lo script che nessuno vede: zero collaudi; il collaudo
+stesso cambiato; un file nominato; un nome nuovo nell'elenco gira da
+solo); gli argomenti della CI (push su main sì; a mano, ramo,
+PROVE_INTERE, locale no; `--mostra` da solo non è una scelta) e il
+fail-closed del confronto (vuoto e rotto: tutto). `--mostra` con le
+variabili della CI in un clone `--depth=1` di develop: prende `pronto`
+da solo e sceglie. NON visto dal vivo: il primo giro vero su main (il
+registro dirà «I file toccati rispetto a origin/pronto» e «girano N
+collaudi su 148»).
+
+**COSA RESTA.** Se un giorno serve un giro intero su main senza commit:
+Actions → prove → «Run workflow» su main (non sposta `pronto`).
+
 
 ## Il rimborso on-chain che non si incaglia (17 nov 2026, cantiere onchain-rimborso-liscio; Andrea: «Ok, sì, vai, correggi tutto»)
 
@@ -88866,3 +89066,129 @@ foglio è nuovo): è la prima cosa da guardare sul collaudo.
 RESTA il terzo pezzo: la scelta del metodo alla presa e la cauzione in
 Lightning col QR tenuta da Barattolo, da provare sul collaudo prima
 della produzione.
+
+## Il contanti di persona on-chain come su Lightning, terzo pezzo: il metodo scelto alla presa e la cauzione in Lightning col QR
+
+17 nov 2026 sera, cantiere `onchain-contanti`, terzo pezzo. Andrea:
+«Quando ci clicco poi non mi fa mettere la cauzione. Dovrebbe funzionare
+esattamente come Lightning anche l'on-chain contanti», «Anche la
+questione QR, tutto quanto».
+
+LE TRE DECISIONI DI ANDREA (card del 17 nov, non riaprire). Uno: la
+cauzione del contanti on-chain si blocca IN LIGHTNING col QR, la tiene
+Barattolo e torna a fine scambio, e si prova prima di darla a tutti.
+Scartate: la cauzione on-chain dentro il 2-di-3 (lenta, una
+transazione in più, ed è quella che Alan aveva bocciato lo stesso
+giorno) e «niente cauzione». Due: la cauzione si PERDE «come su
+Lightning», solo per decisione di un moderatore, metà all'altra persona
+e metà al servizio; mai per un tempo scaduto. Tre: la prova si fa IN
+PRODUZIONE, «solo tu e Alan» (e subito dopo, a voce: «Lo vediamo solo
+noi con una leva spenta?»). Scartato: dare alla VM di collaudo una
+strada verso il nodo vero (la VM non ha un LND, i pagamenti lì sono
+FakeWallet).
+
+COSA FA QUESTO PEZZO. (a) LA SCELTA DEL METODO: su un ordine on-chain con
+«Contanti» fra più metodi chi prende sceglie con le pillole, come nel
+dettaglio di Lightning; la scelta viaggia nella presa (`metodo`) e resta
+nella colonna `metodo_scelto`. «Contanti» scelto fa lo scambio in
+contanti di persona (il giudice unico `_p2p_onchain_contanti` si allarga:
+il solo «Contanti», o «Contanti» scelto), e il recapito scritto per i
+metodi online (un IBAN) si svuota per lasciare il posto all'appuntamento.
+Zona, regola col tetto e cauzione nel foglio compaiono scegliendo
+«Contanti», come su Lightning. (b) LA CAUZIONE: con la leva accesa chi
+prende in contanti blocca prima una cauzione del 3% dei sats, minimo
+1000 (la regola letta sul nodo: NODO-MOSTRO, «LA CAUZIONE DI CHI
+PRENDE»). È una HOLD invoice del nostro LND, chiesta dal ponte come le
+hold di prova, con un macaroon SUO (`LND_PONTE_MACAROON_CAUZIONE`).
+Il telefono mostra il foglio «🔐 Blocca la cauzione» col QR (le righe di
+WoS e di Phoenix sono quelle della cauzione di Lightning), chiede al
+server ogni tre secondi, e quando LND dice ACCEPTED chiude il foglio e
+prende l'ordine da solo. (c) IL RITORNO: una passata ogni mezzo minuto
+(`p2p_onchain_cauzioni_passata`, giudice puro
+`p2p_onchain_cauzione_sorte`) rimanda indietro con CancelInvoice la
+cauzione di uno scambio chiuso in qualunque modo, quella tenuta ma non
+usata (ordine uscito dal libro, o un quarto d'ora senza presa) e
+annulla la richiesta mai pagata. A scambio vivo, disputa compresa, la
+cauzione resta ferma. IN QUESTO PEZZO LA CAUZIONE TORNA SEMPRE: il gesto
+del moderatore che la fa perdere è il pezzo dopo.
+
+LE SCELTE, COI PERCHÉ. La cauzione viene PRIMA della presa: l'ordine
+resta nel libro finché la hold non è ferma sul nodo, poi la rotta della
+presa lo richiede a LND un'ultima volta prima di aprire la connessione
+(e lo ricontrolla dentro). Scartato lo stato «preso, aspetta la
+cauzione» con ritorno nel libro: avrebbe aggiunto uno stato (regola
+ferrea 4 vale per gli ordini del mercatino, ma il principio è lo
+stesso), e un ordine on-chain che torna nel libro romperebbe il «giro
+0» su cui il secondo pezzo appoggia presenze e appuntamenti. Il
+macaroon è NUOVO e non quello delle hold di prova: quello non sa
+saldare per costruzione, e deve restare così. Il preimage resta nella
+riga (`p2p_onchain_cauzioni.preimage`): la cauzione la tiene Barattolo,
+e senza preimage non si potrebbe mai dare torto a nessuno; al telefono
+non esce mai (né preimage né hash). La lettura dello stato è
+LookupInvoice (`GET /v1/invoice/{hash}`): scartata `/v2/invoices/lookup`,
+che vuole i byte in base64 url-safe nella query e non ha niente in più
+per noi. Il freno della richiesta è suo (`p2p_onchain_cauzione`), per
+non mangiare le prese. Chi cancella l'account non porta via la riga
+(lista delle anonimizzate): una hold viva deve poter tornare. La
+passata gira anche a leva spenta, se il macaroon c'è: spegnere la leva
+non deve lasciare cauzioni appese.
+
+I LIMITI, DETTI. L'HTLC vive 576 blocchi (circa quattro giorni, come su
+Mostro): uno scambio in disputa più a lungo vede la cauzione tornare da
+sola, e la passata lo scrive («tornata da sola dal nodo»). La scelta del
+metodo c'è solo con «Contanti» fra più metodi: fra soli metodi online
+on-chain non si sceglie, come ieri. Un telefono con la pagina di ieri
+prende senza dire il metodo: lo scambio va come ieri, non in contanti,
+e nessuna cauzione. La leva è SPENTA di serie (`P2P_ONCHAIN_CAUZIONE`
+più il macaroon): a leva spenta il contanti on-chain si prende senza
+cauzione.
+
+LA PORTICINA DEI MODERATORI (la terza decisione). Accanto alla leva c'è
+`P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN`, True di serie anche senza la riga nel
+config: finché è chiusa la cauzione la vede e la mette SOLO un
+moderatore (`e_admin`, cioè `ADMIN_IDS`) che prende. Per chiunque altro
+è come se la leva fosse spenta, in tutti e tre i posti dove conta: la
+busta del libro (`cauzione.accesa` falso, quindi nessuna riga e nessun
+foglio), la richiesta (409) e la presa (passa senza cauzione, come
+oggi). Il giudice è uno, `p2p_onchain_cauzione_accesa(tg_id)`, e si
+chiede sempre PER LA PERSONA che prende: mai a vuoto (una sentinella
+conta zero chiamate senza persona). Si apre a tutti solo con un `False`
+scritto: una riga storta resta chiusa. È la forma delle altre leve
+nuove (`ONCHAIN_SOLO_ADMIN`, `SWAP_AUTO_SOLO_ADMIN`). CONSEGUENZA DA
+SAPERE: durante la prova la cauzione dipende da CHI PRENDE, non
+dall'ordine: Andrea che prende un ordine in contanti di un utente la
+mette, un utente che prende quello di Andrea no.
+
+PROVATO: `prove_onchain_cauzione` (37 prove: la regola, i sats cifra per
+cifra uguali fra server e telefono, a chi serve, il giudice della
+passata stato per stato, le sentinelle sull'ordine dei controlli nella
+presa e sul fatto che nessuna strada salda una hold, il foglio della
+presa in node, la porticina chiusa di serie e chiesta sempre per la
+persona), `collaudo_p2p_onchain` sezione 11-novies (il giro vero
+contro un LND di cartone su 127.0.0.1: leva spenta e accesa, la
+porticina chiusa col 111 che non la vede, non la può chiedere e prende
+senza, poi aperta e richiusa, richiesta,
+stessa richiesta due volte, pagata, presa, scheda delle tre parti,
+disputa, ritorno a scambio chiuso, mai pagata, pagata all'ultimo, non
+usata, rimandata dal nodo, LND muto, macaroon sbagliato).
+IL GIRO INTERO SUL PC SUI PRIMI DUE PEZZI (ba8e484c, suite severa e
+collaudi della CI) ha trovato tre prove rimaste indietro, tutte mie e
+tutte fuori dall'elenco di sezioni che giravo qui: il conto dei gesti
+di `prove_fogli_di_casa` (122, sono 123: commit a parte), l'elenco
+degli `exec` di `prove_contanti_a_mano` (la scopa delle presenze chiama
+`_p2p_onchain_scorda_incontri`) e la sentinella del foglio in
+`prove_barattozon_onchain` (la riga del recapito ha ora anche il solo
+«Contanti»). Corrette qui, nessuna toccava il comportamento. LA
+LEZIONE: un elenco di sezioni «vicine» non basta quando si tocca una
+riga che altre sezioni citano parola per parola; prima del push il giro
+intero resta l'unica prova.
+NON PROVATO: niente di questo ha ancora parlato con un LND vero. Il
+conio e la cancel hanno la forma delle hold di prova, che in produzione
+funzionano; la lettura `GET /v1/invoice/{hash}` col macaroon nuovo e un
+wallet vero che paga la hold dal QR sono la prima cosa da guardare.
+
+RESTA: la cauzione persa per decisione del moderatore (SettleInvoice,
+la metà all'altra persona con una fattura sua, come `add-bond-invoice`
+di Mostro), e la prova di Andrea e Alan in produzione (DA-FARE-ANDREA,
+voce 20: il macaroon sul nodo, le due righe sul VPS, i passi).
+

@@ -28452,6 +28452,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   giusto e fa MORDERE la gabbia (un DNS e un connect, fermati e
   segnati): un sitecustomize che non si carica lascerebbe passare
   tutto in silenzio.
+  LA CI MIRATA (17 nov 2026, cantiere ci-mirata): sul push a main
+  `prove.py` sceglie le categorie dei file cambiati da `pronto`
+  (`_argomenti_della_ci` → `--dai-file=origin/pronto`) e
+  `collaudi_ci.py` gira solo i collaudi che VEDONO quei file
+  (`scegli_collaudi`: importati a ogni profondità o nominati nel codice;
+  server.py e quel che nomina → tutti). Nel dubbio tutto; il lancio a
+  mano gira tutto; il workflow non cambia. Perché e numeri: CANTIERI,
+  «La CI mirata».
   I DUE ELENCHI STANNO IN `ci/`, FUORI DAL WORKFLOW (13 ott 2026,
   cantiere «pronto-libero»): `ci/collaudi.txt` — una riga per collaudo,
   `#` per i commenti, in fondo i `fuori:` che la CI non gira — e
@@ -31796,6 +31804,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    acceso; vedi «LO SWAP, TAPPA 3» e «LO SWAP, L'INSTRADATORE»),
    `/vendor/pdf.mjs` e `/vendor/pdf.worker.mjs` (16 ott 2026: pdf.js
    4.10.38, per disegnare i PDF della chat; vedi «GLI ALLEGATI»),
+   `/lingua/{codice}.js` (17 nov 2026, inglese-tappa-1: il dizionario
+   inglese `lingua/en.js`, lista chiusa `LINGUE_FILE`, cache di un
+   giorno, `?v=` l'inizio del suo sha256; 404 a leva `LINGUA_INGLESE`
+   spenta e per ogni nome fuori lista — vedi «L'INGLESE: IL
+   TRADUTTORE NELLA PAGINA»),
    `/vendor/font/{nome}` (i sei .woff2 del brand, whitelist `FILE_FONT`:
    da ago 2026 i font stanno in casa e non li chiede più nessuno a
    Google — vedi «I FONT VENGONO IN CASA»),
@@ -35221,6 +35234,33 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   per gli account solo-Nostr); per Telegram `_startapp_da_link` li fa
   `assistenza` e `assistenza_<utente>`, `percorsoDaStartapp` li rilegge
   e `apriAssistenzaDaUrl` li apre dopo /api/me.
+  GLI SCREENSHOT (17 nov 2026, cantiere assistenza-screenshot; perché
+  in CANTIERI, «Gli screenshot all'assistenza»): `POST /api/assistenza`
+  accetta `immagini`, al più `ASSISTENZA_IMMAGINI_MAX` (3) data URL; col
+  primo screenshot il testo può essere vuoto. Il vaglio
+  (`_immagini_assistenza` → `_immagine_assistenza`) guarda TUTTE le
+  immagini prima di scrivere: tipo dai byte (JPG, PNG, WebP), 6 MB l'una,
+  `_e_immagine`, `_foto_anomala`, metadati via (`spoglia_metadati`, o
+  `converti_in_jpeg`). I file stanno CIFRATI (`_cifra_blob`) in
+  `ASSISTENZA_IMG_DIR` = `buste/assistenza` — dentro buste/ perché è
+  già una cartella del servizio (`SUE=` di cambio-utente.sh), privata e
+  nel backup fuori — con nomi imprevedibili `as<24 hex>.<est>`
+  (`NOME_IMG_ASSISTENZA`). La riga li nomina nella colonna
+  `assistenza.immagini` (separati da virgola); `_righe_assistenza` li dà
+  come `immagini`. Si leggono SOLO da `GET
+  /api/assistenza/immagine/{nome}`: il padrone della conversazione o un
+  admin, per tutti gli altri (e per un nome storto o inesistente) lo
+  stesso 404; `no-store`, `nosniff`, CSP `sandbox`. Agli admin arrivano
+  nel bot con `_foto_al_bot` (sendPhoto multipart, i byte nel corpo,
+  simulato in collaudo), uno per screenshot e ANCHE dentro la pausa
+  degli avvisi; l'avviso col testo dice «📎 N screenshot». La fusione
+  degli account li porta con le righe; la cancellazione li nomina
+  (`assistenza_img` nell'esito) e `_dopo_cancellazione` li toglie dal
+  disco. Client: `casellaAssistenzaHTML(..., conAllegati)`,
+  `screenshotAssistenzaScelti` (preparati con `preparaFotoChatScP2P` a
+  1600 px, ripiego `ridimensiona`), `caricaScreenshotAssistenza` (fetch
+  con chi sei → objectURL in `assistenzaImgUrl`), il tocco apre
+  `apriLightbox`. Le risposte dello staff restano solo testo.
 - LO SWAP, L'INSTRADATORE (20 ott 2026, cantiere swap-instradatore;
   perché in CANTIERI, «Lo swap, l'instradatore»). La tappa 3 qui sopra è
   divisa: `swap/boltz.js` (il TIPO «boltz»: il motore della tappa 3 —
@@ -36445,6 +36485,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   id del foglio dei recapiti di Lightning, che per questo si svuota).
   Prove: `prove_onchain_contanti`, `prove_onchain_contanti_scambio`,
   `collaudo_p2p_onchain` 11-septies e 11-octies.
+  IL METODO SCELTO E LA CAUZIONE (terzo pezzo; CANTIERI, «…terzo pezzo:
+  il metodo scelto alla presa e la cauzione in Lightning col QR»). La
+  presa porta `metodo`; `p2p_onchain_metodo_presa` lo tiene solo se è
+  dell'ordine, e la colonna `metodo_scelto` lo ricorda.
+  `_p2p_onchain_contanti` resta l'UNICO giudice: il solo «Contanti», o
+  «Contanti» scelto. La cauzione è una hold invoice di LND dal ponte,
+  col macaroon `LND_PONTE_MACAROON_CAUZIONE` (`_lnd_cauzione`: solo
+  `POST /v2/invoices/hodl`, `POST /v2/invoices/cancel` e
+  `GET /v1/invoice/{hash}`); tabella `p2p_onchain_cauzioni` (hash,
+  preimage, bolt11, sats, stato attesa | tenuta | tornata | scaduta,
+  `in_gioco`). Rotte: `POST /api/p2p/onchain/{oid}/cauzione` (conia, o
+  ridà la viva) e `GET …/cauzione` (rilegge LND). La presa chiama
+  `_p2p_onchain_cauzione_per_presa` PRIMA della connessione e mette la
+  cauzione `in_gioco` solo a presa riuscita. Il ritorno è
+  `p2p_onchain_cauzioni_passata` (ogni 30 s da `_ciclo_cauzioni_onchain`,
+  giudice puro `p2p_onchain_cauzione_sorte`). La leva:
+  `p2p_onchain_cauzione_accesa(tg_id)` = `P2P_ONCHAIN_CAUZIONE` più il
+  macaroon e, finché `P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN` non è un `False`
+  scritto (di serie è chiusa), solo se chi prende è un moderatore
+  (`e_admin`); si chiede sempre per la persona, mai a vuoto. La busta
+  del libro on-chain la porta come `cauzione` {accesa, pct, base,
+  finestra}, già giudicata per chi guarda. Sul telefono: `metodiPresaOcHtmlP2P`
+  (pillole, zona, regola, riga della cauzione), `apriCauzioneOcP2P`
+  (foglio `p2pOcCauzSheet`, il QR e il battito), `riquadroCauzioneOcP2P`
+  nella pagina dello scambio. Prove: `prove_onchain_cauzione`,
+  `collaudo_p2p_onchain` 11-novies.
 - IL RIMBORSO ON-CHAIN CHE NON SI INCAGLIA (17 nov 2026, cantiere
   onchain-rimborso-liscio; CANTIERI, «Il rimborso on-chain che non si
   incaglia»). La regola del 10 nov non cambia (un rimborso vuoto non è
@@ -36986,7 +37052,7 @@ mai il kind 0 di nessuno: regola ferrea 2).
   e avvisa. I depositi entrano in `_onchain_prossimo_esterno` e
   `_onchain_rimborsi_usati`, così gli indici esterni non si ripetono.
   LE LEVE (gruppo «🎯 Raccolte in sats» del pannello, `_raccolte_leve`):
-  `RACCOLTE_ATTIVE` accesa di serie, `RACCOLTA_GARANTITA_ATTIVA` SPENTA
+  `RACCOLTE_ATTIVE` SPENTA di serie (dal 17 nov sera, scelta di Andrea), `RACCOLTA_GARANTITA_ATTIVA` SPENTA
   di serie (prima il collaudo), `RACCOLTA_MAX_EURO` 1000,
   `RACCOLTA_GIORNI_MAX` 60, `RACCOLTA_MIN_GARANTITA_EURO` 50,
   `RACCOLTA_VENDITE_MIN` 3, `RACCOLTA_ZAP_MAX_SATS` 100.000. In `/api/me`
@@ -36999,3 +37065,45 @@ mai il kind 0 di nessuno: regola ferrea 2).
   della fila), le seconde firme in `onchainCofirmeInSottofondo`
   (`raccolteCofirmeInAttesa`), il link `/?raccolta=<id>` e il pannello
   `boxRaccolteAdmin`. Prove: `prove_raccolte` e `collaudo_raccolta`.
+- L'INGLESE: IL TRADUTTORE NELLA PAGINA (17 nov 2026, cantiere
+  inglese-tappa-1). La pagina resta scritta in italiano — un file solo,
+  ~3.300 frasi — e l'inglese lo mette un traduttore che lavora sul DOM:
+  all'avvio passa ogni nodo di testo e i quattro attributi
+  (`placeholder`, `title`, `aria-label`, `alt`) e poi un
+  `MutationObserver` su `documentElement` (childList, characterData,
+  attributi) traduce quel che i render disegnano dopo. Il dizionario
+  `lingua/en.js` (~680 voci) ha per chiave la frase italiana con gli
+  spazi normalizzati; una chiave con `{}` diventa una forma (regex,
+  nel secchio della prima parola; l'inglese può riordinare con `{1}`,
+  `{2}`), e una frase che il dizionario non sa resta italiana: niente
+  si rompe, si legge in italiano. `t(frase, valori)` è per i testi che
+  non passano dal DOM (popup di Telegram, titolo della finestra, il
+  contatore «1 di 4» del tour). La lingua la decide `linguaApp()`
+  nello script di testa: `?lingua=it|en` (ricordato in localStorage
+  `barattolo_lingua`) > la scelta ricordata > `language_code` di
+  Telegram (solo con `initData`) > `navigator.language`; italiano se
+  comincia per «it», sennò inglese. `linguaSwap()` lo delega. Il
+  dizionario lo chiede solo chi legge in inglese
+  (`/lingua/en.js?v=LINGUA_VER`, `LINGUA_VER` = i primi 10 esadecimali
+  dello sha256 del file, tenuto uguale su ogni macchina da
+  `.gitattributes` `eol=lf`); si registra da solo in
+  `self.BARATTOLO_LINGUE.en` e chiama `registraTraduzioni('en')`, che
+  carica, arma, mette `<html lang="en">`, traduce il documento e
+  accende l'osservatore — e i due ordini di arrivo (dizionario prima o
+  dopo lo script grande) sono entrambi gestiti. I numeri e le date:
+  `numeriInglesi()` mappa `it-IT` → `en-GB` su
+  `Number.prototype.toLocaleString` e i tre `toLocale*` di `Date`, una
+  volta, senza toccare `fmt`/`fmtEur` (che le prove cercano per testo):
+  «1,234.50», «19,601», «14 Nov». Per chi legge in italiano non cambia
+  NIENTE: nessun fetch, `traduttoreArmato` resta falso, `traduci()`
+  risponde null. La leva `LINGUA_INGLESE` (accesa di serie, gruppo
+  «🌍 Lingua» del pannello) spenta fa rispondere 404 alla rotta: l'app
+  torna italiana per tutti, l'interruttore d'emergenza. Il pannello
+  admin resta italiano per scelta. Coperto in questa tappa: la
+  struttura (tab, testa, banner), la vetrina coi filtri, l'ordinamento
+  e il tour di benvenuto, le categorie, la scheda dell'annuncio, il
+  carrello, la cassa con le vie e l'indirizzo, il foglio del pagamento
+  e la pagina «Il pagamento protetto». Prove: `prove_lingua_inglese`
+  (la versione, il caricatore, il dizionario senza doppioni e con le
+  parole che stanno in pagina, il traduttore e i numeri in node, le
+  sentinelle del server) e `collaudo_lingua` (la rotta vera, la leva).
