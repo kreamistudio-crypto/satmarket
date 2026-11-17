@@ -554,3 +554,9 @@ frase: Negli ordini P2P on-chain con «Contanti» insieme ad altri metodi ora sc
 dove: P2P on-chain, tocca un ordine con più metodi fra cui «Contanti»: sotto il riassunto ci sono le pillole dei metodi.
 leva: nessuna
 pubblico: no
+
+## 2026-11-17 · paracadute-su-giu
+frase: Il paracadute degli ordini P2P adesso ha due scelte: una se BTC sale e una se BTC scende, ognuna 5%, 10%, 20% o nessuna. Così puoi tenere l'ordine se BTC sale e toglierlo se scende, o il contrario. Gli ordini già pubblicati restano come sono.
+dove: P2P, foglio «Pubblica» → «🪂 Paracadute», le righe «📈 Se BTC sale» e «📉 Se BTC scende»; sulla card del tuo ordine «🪂 Paracadute ↑10% ↓5%».
+leva: P2P_PARACADUTE (quella del paracadute, già accesa)
+pubblico: sì

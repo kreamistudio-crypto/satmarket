@@ -233,6 +233,8 @@ I tempi: se il tempo scade prima che i sats siano bloccati non perde niente ness
 
 Annullare uno scambio Lightning appena preso (quelli on-chain, con la ₿ arancio, hanno regole diverse: vedi più sotto): prima che i sats siano in garanzia NON serve aspettare. Chi ha preso l'ordine o chi l'ha pubblicato tocca «✕ Annulla» nella pagina dello scambio e poi «Sì, annulla»: lo scambio si annulla subito, senza il sì dell'altra persona, e nessuno perde niente. Se chi vende aveva già bloccato i sats (succede quando chi vende prende un ordine di acquisto), tornano subito a lui. Se annulla chi aveva preso, l'ordine torna subito nel libro, e chi l'aveva pubblicato riceve «Il tuo ordine è tornato in vetrina: non devi fare niente.». Se annulla chi l'aveva pubblicato, l'ordine si chiude: per rimetterlo nel libro va pubblicato di nuovo. Solo dopo, coi sats in garanzia, annullare da soli non si può più: serve l'annullo d'accordo, uno lo propone con «✕ Annulla» e l'altro accetta con «🤝 Accetta di annullare». Dopo «Ho inviato gli euro» il bottone «✕ Annulla» non c'è più: resta «⚠️ Apri una disputa». Se chi ha preso l'ordine ha toccato «✕ Annulla» ma l'annullo non è arrivato (la rete, la pagina chiusa a metà) e poi il tempo scade, il bot scrive «Non hai proseguito in tempo» con sotto «Avevi chiesto di annullare: questo non conta come scambio non completato.» (dal 17 novembre 2026): nessuna penalità.
 
+Il paracadute degli ordini P2P: nel foglio «Pubblica», dopo la pausa, la sezione «🪂 Paracadute» ha due righe (dal 17 novembre 2026), «📈 Se BTC sale» e «📉 Se BTC scende», ognuna Nessuna, 5%, 10% o 20%. Se prima che qualcuno prenda l'ordine il prezzo di BTC si muove più di così in quel verso rispetto al momento della pubblicazione, l'ordine esce dal libro da solo, senza penalità, e il bot avvisa col tasto «🔁 Ripubblica al prezzo nuovo». Esempio: «sale: Nessuna» e «scende: 5%» tengono l'ordine se BTC sale e lo tolgono se scende più del 5%. Servono due letture di fila oltre la soglia, a un minuto l'una dall'altra. Di serie le due righe sono su «Nessuna», e il foglio non ricorda la scelta di prima. Sulla card del proprio ordine si legge «🪂 Paracadute ↑10% ↓5%» (freccia in su = salita, in giù = discesa). Gli ordini pubblicati prima del 17 novembre avevano una soglia sola, e vale nei due versi. Uno scambio già preso va avanti come sempre. Non c'è sugli ordini Barattozon in «Vendi BTC». Vale anche per gli ordini on-chain.
+
 <!-- pezzo libro-021 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (5/17)
 
@@ -853,7 +855,7 @@ Dal 10 ottobre 2026 teniamo, legato al tuo account, come sono finiti i tuoi scam
 ## Schermata «I tuoi dati» · Il profilo di scambio P2P (12/17)
 
 La pausa degli ordini, se la imposti, sta legata al tuo account: i giorni, le ore e il nome del tuo fuso orario (per esempio «Europe/Rome»), e niente altro. Serve a non far prendere i tuoi ordini dal libro di Barattolo nelle ore che hai scelto (restano visibili, in grigio), e a non contarti una presa arrivata mentre eri in pausa. Non esce da Barattolo, resta finché non la togli, e se ne va subito se dimentichi il profilo.
-Il paracadute, se lo apri pubblicando un ordine, sta su quell'ordine: la soglia che hai scelto, il prezzo di BTC che avevamo in quel momento e, se si apre, quando e a che prezzo. Serve a togliere l'ordine dal libro di Barattolo se il prezzo si muove oltre la soglia; l'annullamento vero lo firma il tuo telefono, noi quella firma non la facciamo. Se dimentichi il profilo di scambio lo cancelliamo.
+Il paracadute, se lo apri pubblicando un ordine, sta su quell'ordine: le soglie che hai scelto (se BTC sale, se scende), il prezzo di BTC che avevamo in quel momento e, se si apre, quando e a che prezzo. Serve a togliere l'ordine dal libro di Barattolo se il prezzo si muove oltre la soglia; l'annullamento vero lo firma il tuo telefono, noi quella firma non la facciamo. Se dimentichi il profilo di scambio lo cancelliamo.
 Se togli uno scambio chiuso con la ✕, il server ricorda il numero dell'ordine e quando l'hai tolto, così sparisce anche dagli altri tuoi dispositivi. Si cancella da solo dopo quaranta giorni, e subito se dimentichi il profilo.
 Dal 17 settembre 2026, quando un ordine viene preso, le due parti si vedono: chi ha pubblicato e chi ha preso vedono il profilo l'uno dell'altra — lo stesso che sta già sotto ogni annuncio del mercatino: nome, foto, stelline, livello e titolo — e i bottoni per scriversi su Telegram o su Nostr, ma solo dove quei canali esistono davvero (la npub soltanto se ne hai dimostrato il possesso). Prima della presa non si vede niente, e non c'è nessun altro modo di chiederlo: a questa domanda il server risponde solo a una delle due parti di quello scambio. Il perché è che dall'altra parte c'è una persona a cui stai per mandare dei soldi veri, e un volto con una reputazione è quello che rende pesabile la fiducia — la stessa ragione per cui nel mercatino chi vende ha un nome. Te lo diciamo prima: nel foglio dove pubblichi e in quello dove prendi. Al posto dei campi dove prima ci si scriveva il proprio contatto a mano, che non erano verificati da nessuno.
 
@@ -2129,3 +2131,11 @@ frase: Negli ordini P2P on-chain con «Contanti» insieme ad altri metodi ora sc
 dove: P2P on-chain, tocca un ordine con più metodi fra cui «Contanti»: sotto il riassunto ci sono le pillole dei metodi.
 leva: nessuna
 pubblico: no
+
+<!-- pezzo novita-087 | novita -->
+## Novità · 2026-11-17 · paracadute-su-giu
+
+frase: Il paracadute degli ordini P2P adesso ha due scelte: una se BTC sale e una se BTC scende, ognuna 5%, 10%, 20% o nessuna. Così puoi tenere l'ordine se BTC sale e toglierlo se scende, o il contrario. Gli ordini già pubblicati restano come sono.
+dove: P2P, foglio «Pubblica» → «🪂 Paracadute», le righe «📈 Se BTC sale» e «📉 Se BTC scende»; sulla card del tuo ordine «🪂 Paracadute ↑10% ↓5%».
+leva: P2P_PARACADUTE (quella del paracadute, già accesa)
+pubblico: sì

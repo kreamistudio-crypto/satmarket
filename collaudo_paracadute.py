@@ -70,6 +70,9 @@ E = "9a7a0000-1212-4a2b-9c3d-000000000012"      # vendita di 111, soglia 5: la p
 F = "9a7a0000-1313-4a2b-9c3d-000000000013"      # vendita di 111, soglia 5: annullata a mano
 G = "9a7a0000-1414-4a2b-9c3d-000000000014"      # vendita di 111, soglia 5: scaduta nel libro
 H = "9a7a0000-1515-4a2b-9c3d-000000000015"      # vendita di 111, soglia 5: il libro non letto
+# (17 nov 2026, cantiere paracadute-su-giu) le due soglie, una per verso
+GIU = "9a7a0000-1616-4a2b-9c3d-000000000016"    # vendita di 111, solo «se scende 5%»
+SU = "9a7a0000-1717-4a2b-9c3d-000000000017"     # vendita di 111, solo «se sale 10%»
 _TAG = re.compile(r"</?[bi]>")
 BOTTONI = []                                    # (destinatario, bottone) di ogni notifica
 
@@ -208,7 +211,8 @@ def semina_ordini():
             (M, PUBBLICA, "sell", ["SEPA"]), (C, PUBBLICA, "sell", ["SEPA"]),
             (D, PUBBLICA, "sell", ["SEPA"]), (E, PUBBLICA, "sell", ["SEPA"]),
             (F, PUBBLICA, "sell", ["SEPA"]), (G, PUBBLICA, "sell", ["SEPA"]),
-            (H, PUBBLICA, "sell", ["SEPA"])):
+            (H, PUBBLICA, "sell", ["SEPA"]), (GIU, PUBBLICA, "sell", ["SEPA"]),
+            (SU, PUBBLICA, "sell", ["SEPA"])):
         con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,euro,"
                     "metodi) VALUES(?,?,?,'pending',?,1,50000,'50,00 €',?)",
                     (ordine, chi, adesso, lato, json.dumps(metodi)))
@@ -251,8 +255,10 @@ async def giro_intero():
     m = miei(PUBBLICA)
     prova("chi ha pubblicato li legge dalla sua rotta: la soglia e il prezzo di partenza, "
           "`no-store` — e non quelli degli altri",
-          (True, {"soglia": 5, "partenza": 100000.0, "aperto": 0, "arrivo": 0.0},
-           {"soglia": 10, "partenza": 100000.0, "aperto": 0, "arrivo": 0.0}, False),
+          (True, {"soglia": 5, "su": 5, "giu": 5, "partenza": 100000.0, "aperto": 0,
+                  "arrivo": 0.0},
+           {"soglia": 10, "su": 10, "giu": 10, "partenza": 100000.0, "aperto": 0,
+            "arrivo": 0.0}, False),
           (m["attivo"], m["ordini"].get(A), m["ordini"].get(B), ALTRUI in m["ordini"]))
     prova("...e chi non ne ha riceve la mappa vuota", {"attivo": True, "ordini": {}},
           miei(PRENDE))
@@ -453,6 +459,34 @@ async def giro_intero():
            sum(G in b for b in bottoni)))
     f = await facce(PRENDE, [F, G, H])
     prova("...e fra gli ordini «col paracadute aperto» c'e' solo H", [H], f["paracadute"])
+
+    print("\n8-ter) due soglie, una per verso (17 nov 2026)")
+    prezzo(100000)
+    await intesta(PUBBLICA, {GIU: {"su": 0, "giu": 5}, SU: {"su": 10, "giu": 0}})
+    con = banco.con_db()
+    versi = [tuple(con.execute("SELECT soglia, su, giu, partenza FROM p2p_paracadute "
+                               "WHERE ordine=?", (o,)).fetchone()) for o in (GIU, SU)]
+    con.close()
+    prova("dalla rotta vera le due soglie si scrivono una per verso, al prezzo di adesso",
+          [(5, 0, 5, 100000.0), (10, 10, 0, 100000.0)], versi)
+    m = miei(PUBBLICA)["ordini"]
+    prova("...e chi le ha pubblicate le rilegge dalla sua rotta",
+          [(0, 5), (10, 0)], [(m[GIU]["su"], m[GIU]["giu"]), (m[SU]["su"], m[SU]["giu"])])
+    await giro(112000)
+    await giro(112000)
+    prova("BTC +12% per due giri: si apre «se sale 10%», NON «se scende 5%» — che resta nel "
+          "libro e si prende", (True, 0, [SU], True),
+          (riga(SU)[3] > 0, riga(GIU)[3],
+           [o for o in (await facce(PRENDE, [GIU, SU]))["paracadute"]],
+           (await posso(PRENDE, [GIU]))["ordini"][GIU]["ok"]))
+    prova("...e l'avviso dice la salita", True,
+          "(+12,0%)" in detto(PUBBLICA, "Il paracadute si è aperto"))
+    await giro(94000)
+    await giro(94000)
+    prova("BTC −6% per due giri: ora si apre «se scende 5%»", (True, [GIU, SU]),
+          (riga(GIU)[3] > 0, sorted((await facce(PRENDE, [GIU, SU]))["paracadute"])))
+    prova("...e l'avviso dice la discesa", True,
+          "(−6,0%)" in detto(PUBBLICA, "Il paracadute si è aperto"))
 
     print("\n9) dimentica il profilo")
     prova("prima ci sono", True, len(miei(PUBBLICA)["ordini"]) > 0)

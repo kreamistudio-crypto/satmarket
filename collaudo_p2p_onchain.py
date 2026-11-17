@@ -1096,6 +1096,32 @@ def main():
     prova("...e quello al 20% resta nel libro", "pending", riga_db(o20["id"])["stato"])
     prova("...la scheda dice perche' si e' chiuso", "paracadute",
           uno(999, o5["id"]).get("chiuso_perche"))
+    # (17 nov 2026, cantiere paracadute-su-giu) due soglie, una per verso
+    cambio(100000)
+    o_giu = pubblica(999, paracadute={"su": 0, "giu": 5}).json()
+    o_su = pubblica(999, paracadute={"su": 10, "giu": 0}).json()
+    prova("DUE SOGLIE: la scheda di chi pubblica le porta una per verso, e la riga le "
+          "tiene", [(0, 5), (10, 0), (0, 5, 5), (10, 0, 10)],
+          [(uno(999, o_giu["id"])["paracadute_su"], uno(999, o_giu["id"])["paracadute_giu"]),
+           (uno(999, o_su["id"])["paracadute_su"], uno(999, o_su["id"])["paracadute_giu"]),
+           tuple(riga_db(o_giu["id"])[k] for k in ("para_su", "para_giu", "paracadute")),
+           tuple(riga_db(o_su["id"])[k] for k in ("para_su", "para_giu", "paracadute"))])
+    prova("...e l'ordine di prima (una soglia sola) le ha uguali", (5, 5),
+          (uno(999, o5["id"])["paracadute_su"], uno(999, o5["id"])["paracadute_giu"]))
+    cambio(112000)
+    SRV._cambio_cache["quando"] = time.time() + 3
+    asyncio.run(SRV._p2p_onchain_ronda())
+    SRV._cambio_cache["quando"] = time.time() + 4
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("BTC +12% due volte: si annulla «se sale 10%», NON «se scende 5%»",
+          ("annullato", "pending"), (riga_db(o_su["id"])["stato"], riga_db(o_giu["id"])["stato"]))
+    cambio(94000)
+    SRV._cambio_cache["quando"] = time.time() + 5
+    asyncio.run(SRV._p2p_onchain_ronda())
+    SRV._cambio_cache["quando"] = time.time() + 6
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("BTC −6% due volte: ora si annulla «se scende 5%»", ("annullato", "paracadute"),
+          (riga_db(o_giu["id"])["stato"], riga_db(o_giu["id"])["chiuso_perche"]))
     SRV.P2P_PARACADUTE = False
     SRV.P2P_ONCHAIN_APERTI_MAX = tetto
 

@@ -89573,3 +89573,77 @@ senza proxy. Dopo il rebase su develop e7258df5 (nessun simbolo in
 comune, solo CANTIERI in conflitto d'accodamento): giro mirato, vedi
 il rapporto. Tutto girato in cloud. NON provato dal telefono:
 dopo la produzione, Andrea riapre il dettaglio dello scambio USDT preso.
+
+## Il paracadute diviso: una soglia se BTC sale, una se scende (17 nov 2026, cantiere paracadute-su-giu, richiesta di Andrea)
+
+**IL PROBLEMA.** La parola di Andrea: «questa percentuale è intesa se
+Bitcoin sale o scende, però bisognerebbe suddividere le cose, perché
+magari io voglio tenere l'annuncio se Bitcoin sale di una tot
+percentuale, ma voglio toglierlo se Bitcoin scende della stessa
+percentuale». Il paracadute del 13 ott aveva UNA soglia nei due versi.
+Ma il danno ha un verso solo: a prezzo fisso chi VENDE ci rimette se BTC
+sale, chi COMPRA se scende; e c'è chi vuole uscire solo da un lato.
+
+**LA REGOLA (piano in dieci righe, ok di Andrea alle 18:04).** Nel
+foglio due righe, «📈 Se BTC sale» e «📉 Se BTC scende», ognuna
+«Nessuna · 5% · 10% · 20%»; tutte e due partono da «Nessuna» e il foglio
+non ricorda la scelta di prima (la decisione del 13 ott sera vale per
+ognuna). Sulla card «🪂 Paracadute ↑10% ↓5%», coi soli versi scelti.
+GLI ORDINI DI PRIMA RESTANO COM'ERANO: la soglia unica vale nei due versi,
+e nessuno perde la protezione che aveva. Lightning, on-chain e
+ripubblica uguali; tutto il resto (due letture di fila, fonte muta,
+Barattozon fuori, avviso col «Ripubblica») non cambia. Nessuna leva
+nuova: l'interruttore resta `P2P_PARACADUTE`.
+
+**COM'È FATTO** (ARCHITETTURA, «IL PARACADUTE», «DUE SOGLIE»). Due
+colonne `su`, `giu` in `p2p_paracadute` (`para_su`, `para_giu`
+sull'on-chain), aggiunte a -1: -1 vuol dire «riga di prima», e lì vale
+la `soglia` unica. Le righe nuove le scrivono sempre, e `soglia` diventa
+la più grande delle due: resta vera la domanda «c'è un paracadute?» per
+tutti i posti che la fanno (la passata on-chain, `paracadute>0`). Il
+telefono manda `{su, giu}`; un numero solo — un'app rimasta nella
+cache — vale nei due versi. Il giudice sceglie la soglia dal segno dello
+scarto.
+
+**LE SCELTE DI DISEGNO, coi perché.**
+- -1 E NON 0 PER LE RIGHE DI PRIMA: 0 vuol dire già «in quel verso
+  niente», e una riga vecchia letta così perderebbe il paracadute in
+  silenzio. La controprova lo tiene (mutazione 3: 11 rosse).
+- UNA LETTURA OLTRE NEL VERSO SENZA SOGLIA VALE «DENTRO»: −6%, +12%,
+  −6% con «scende 5%» non apre — due letture DI FILA nello stesso verso,
+  come la regola dei numeri impazziti del 13 ott.
+- STESSA SOGLIA NEI DUE VERSI = LA FRASE DI SEMPRE: «se BTC sale o
+  scende più del 5%»; il segno corto invece dice sempre le frecce
+  («↑5% ↓5%»), perché «5%» da solo ora non direbbe più il verso.
+- L'AVVISO E IL GIORNALE dicono la soglia del verso che è scattato, non
+  la più grande.
+
+**LE STRADE SCARTATE.**
+- UN NUMERO SOLO CHE IMPACCHETTA LE DUE (es. 10005): zero colonne nuove,
+  ma un `soglia` che non è più una soglia, e ogni «Paracadute N%»
+  dimenticato avrebbe scritto «10005%».
+- LE SOGLIE LEGATE AL LATO («chi vende: solo in salita»): Andrea ha
+  chiesto la scelta, non una regola; e a mercato il danno non ha un lato.
+
+**PROVATO** (albero: develop 31f72777 + questo cantiere, prima del
+rebase). `prove_paracadute_p2p` parte 6 (16 controlli: le due porte
+pure, solo-giù, solo-su, i due insieme, il filo esatto in ogni verso, il
+verso senza soglia che azzera, nessuna delle due, la riga di prima nei
+due versi, l'intestazione dalla mappa, `_miei`, l'orologio sul banco
+con la soglia del verso scattato, la riga senza colonne nuove a -1, LA
+MIGRAZIONE su un database vecchio rifatta due volte, l'on-chain);
+`prove_paracadute_app` (le due righe del foglio, il tocco che cambia il
+solo suo verso, il verso storto, il click fantasma, dai campi,
+l'intestazione, il server che vince e quello che dice la sola `soglia`,
+segno, pagina, frasi, l'on-chain); `collaudo_paracadute` «8-ter» sulle
+rotte vere (+12% apre il «sale 10%» e non il «scende 5%», che si
+prende; −6% poi sì; l'avviso dice il verso); `collaudo_p2p_onchain`
+(la scheda le porta, la riga le tiene, l'ordine di prima le ha uguali,
+la ronda annulla nel verso giusto). LA TORTURA: 20 mutazioni (11 server,
+9 app), tutte uccise; una (la soglia scattata nell'avviso) era viva al
+primo giro perché il banco usava «scende 5%» da solo, dove la più
+grande e quella del verso coincidono: il banco ora usa «sale 20%,
+scende 5%».
+
+**DA GUARDARE.** Il foglio a 390×844 col dito vero: due righe di
+quattro pillole sotto la pausa, non provate dal vivo in questo cantiere.

@@ -8382,6 +8382,14 @@ def init_db():
         -- chiuso), `arrivo` il prezzo di quel momento. `superato` e'
         -- l'ora in cui un'apertura e' stata disfatta, perche' l'ordine
         -- risultava preso un attimo prima.
+        -- `su` e `giu` (17 nov 2026, cantiere paracadute-su-giu, Andrea:
+        -- «magari io voglio tenere l'annuncio se Bitcoin sale ... ma
+        -- toglierlo se scende») sono le DUE soglie, una per verso, ognuna
+        -- del catalogo o 0 (= in quel verso nessun paracadute). -1 vuol
+        -- dire «riga di prima»: la soglia unica vale nei due versi
+        -- (`_versi_riga_paracadute_p2p`). Le righe nuove le scrivono
+        -- sempre tutte e due, e `soglia` e' la piu' grande: dice solo che
+        -- un paracadute c'e'.
         -- ⚠️ A DIFFERENZA DELLA PAUSA, QUI SI SCRIVE SULL'ORDINE: la
         -- pausa finisce da sola con l'orologio, un paracadute aperto
         -- resta aperto. E VALE DENTRO BARATTOLO finche' il telefono di
@@ -8397,7 +8405,9 @@ def init_db():
         lettura INTEGER DEFAULT 0,
         aperto INTEGER DEFAULT 0,
         arrivo REAL DEFAULT 0,
-        superato INTEGER DEFAULT 0
+        superato INTEGER DEFAULT 0,
+        su INTEGER DEFAULT -1,
+        giu INTEGER DEFAULT -1
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_paracadute_tg ON p2p_paracadute(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_ripubblica(
@@ -9832,6 +9842,14 @@ def init_db():
         con.execute("ALTER TABLE p2p_pause ADD COLUMN salta_fino INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    # il paracadute diviso fra salita e discesa (17 nov 2026, cantiere
+    # paracadute-su-giu): vedi lo schema di `p2p_paracadute`. Le righe gia'
+    # scritte nascono a -1, cioe' la loro soglia unica vale nei due versi
+    for colonna in ("su INTEGER DEFAULT -1", "giu INTEGER DEFAULT -1"):
+        try:
+            con.execute(f"ALTER TABLE p2p_paracadute ADD COLUMN {colonna}")
+        except sqlite3.OperationalError:
+            pass
     # (le quattro colonne del gate e dell'eco su `chiavi_p2p` non si
     # aggiungono piu': dalla patch 0007 non le legge nessuno. Dove ci
     # sono gia' restano, morte — vedi lo schema)
@@ -61723,6 +61741,13 @@ def _presa_in_pausa_p2p(con, tg_id, quando: int) -> bool:
 # di nuovo armato, col prezzo della pubblicazione.
 # LA FONTE E' IL CAMBIO DI TUTTA L'APP (`cambio_noto_ora`, riletto ogni
 # CAMBIO_RINFRESCO_S): nessuna chiamata nuova, e mai la rete da qui.
+# DUE SOGLIE, UNA PER VERSO (17 nov 2026, cantiere paracadute-su-giu,
+# Andrea: «magari io voglio tenere l'annuncio se Bitcoin sale di una tot
+# percentuale, ma voglio toglierlo se scende»): «se BTC sale piu' di X%»
+# e «se scende piu' di Y%», ognuna del catalogo o nessuna. Gli ordini di
+# prima, con la soglia unica, restano com'erano: vale nei due versi
+# (`_versi_riga_paracadute_p2p`), e un'app rimasta nella cache che manda
+# un numero solo dice lo stesso (`_soglie_paracadute_p2p`).
 P2P_PARACADUTE_SOGLIE = (5, 10, 20)
 P2P_PARACADUTE_LETTURE = 2        # letture di fila oltre la soglia
 P2P_PARACADUTE_FRESCO_S = 300     # una lettura piu' vecchia non si conta
@@ -61746,6 +61771,35 @@ def _soglia_paracadute_p2p(v) -> int:
     return n if n in P2P_PARACADUTE_SOGLIE else 0
 
 
+def _soglie_paracadute_p2p(v) -> tuple:
+    """PURA: le DUE soglie dette dal telefono, `(su, giu)` (17 nov 2026,
+    cantiere paracadute-su-giu). `{"su": 10, "giu": 5}` e' la forma di
+    adesso, un verso alla volta, ognuno del catalogo o 0 (= in quel verso
+    niente); un NUMERO solo e' la forma di prima — un'app rimasta nella
+    cache — e vale nei due versi, come ha sempre valso. Una storta, o
+    nessuna delle due, e' `(0, 0)`: nessun paracadute."""
+    if isinstance(v, dict):
+        return (_soglia_paracadute_p2p(v.get("su")), _soglia_paracadute_p2p(v.get("giu")))
+    n = _soglia_paracadute_p2p(v)
+    return (n, n)
+
+
+def _versi_riga_paracadute_p2p(soglia, su, giu) -> tuple:
+    """PURA: le due soglie di una RIGA scritta, `(su, giu)`. Le colonne
+    `su` e `giu` a -1 (o mancanti) sono le righe di PRIMA del 17 nov 2026:
+    la loro soglia unica vale nei due versi, e nessuno perde la
+    protezione che aveva scelto."""
+    def verso(v):
+        try:
+            v = int(v)
+        except (TypeError, ValueError):
+            return None
+        return None if v < 0 else _soglia_paracadute_p2p(v)
+    a, b = verso(su), verso(giu)
+    unica = _soglia_paracadute_p2p(soglia)
+    return (unica if a is None else a, unica if b is None else b)
+
+
 def _scarto_paracadute_p2p(partenza, prezzo) -> float:
     """PURA: di quanto si e' mosso il prezzo dalla partenza, in percento
     col segno (+ salito, − sceso). 0 se uno dei due manca o e' storto: un
@@ -61764,6 +61818,11 @@ def _passo_paracadute_p2p(riga: dict, prezzo, letto, adesso) -> dict:
     `soglia`, `partenza`, `oltre`, `lettura`; `prezzo` e' il cambio noto
     (euro per bitcoin, 0 = non c'e'), `letto` l'ora in cui la fonte l'ha
     dato. Torna `{partenza, oltre, lettura, apre, scarto, cambia}`.
+    LE DUE SOGLIE (17 nov 2026, cantiere paracadute-su-giu): `riga` porta
+    anche `su` e `giu` — se BTC SALE conta la prima, se SCENDE la seconda,
+    e un verso a 0 non guarda niente (una lettura oltre in quel verso e'
+    come una dentro: riporta il conto a zero). Senza le due colonne, o a
+    -1, la `soglia` unica vale nei due versi: le righe di prima.
     • FONTE MUTA (prezzo che manca, o lettura piu' vecchia di
       P2P_PARACADUTE_FRESCO_S): non cambia niente — non apre e non azzera;
     • LA STESSA LETTURA non si conta due volte: sono DUE LETTURE di fila,
@@ -61772,7 +61831,8 @@ def _passo_paracadute_p2p(riga: dict, prezzo, letto, adesso) -> dict:
     • OLTRE la soglia, in su o in giu' — al filo esatto no: «piu' del
       5%» dice il foglio — `oltre` sale, e a P2P_PARACADUTE_LETTURE si
       apre; una lettura dentro la soglia lo riporta a zero."""
-    soglia = _soglia_paracadute_p2p(riga.get("soglia"))
+    su, giu = _versi_riga_paracadute_p2p(riga.get("soglia"), riga.get("su", -1),
+                                         riga.get("giu", -1))
     try:
         partenza = float(riga.get("partenza") or 0)
     except (TypeError, ValueError):
@@ -61784,22 +61844,25 @@ def _passo_paracadute_p2p(riga: dict, prezzo, letto, adesso) -> dict:
         prezzo, letto = float(prezzo or 0), int(float(letto or 0))
     except (TypeError, ValueError):
         return fermo
-    if not soglia or not prezzo > 0 or letto <= 0 \
+    if not (su or giu) or not prezzo > 0 or letto <= 0 \
             or int(adesso) - letto > P2P_PARACADUTE_FRESCO_S or letto <= lettura:
         return fermo
     if not partenza > 0:
         return {"partenza": prezzo, "oltre": 0, "lettura": letto,
                 "apre": False, "scarto": 0.0, "cambia": True}
     scarto = _scarto_paracadute_p2p(partenza, prezzo)
-    oltre = oltre + 1 if round(abs(scarto), 6) > soglia else 0
+    # il verso della lettura sceglie la soglia: in su `su`, in giu' `giu`
+    soglia = su if scarto > 0 else giu
+    oltre = oltre + 1 if soglia and round(abs(scarto), 6) > soglia else 0
     return {"partenza": partenza, "oltre": oltre, "lettura": letto,
             "apre": oltre >= P2P_PARACADUTE_LETTURE, "scarto": scarto,
             "cambia": True}
 
 
 def _dichiara_paracadute_p2p(con, tg_id: int, mappa, adesso: int, cambio) -> int:
-    """Scrive i paracadute dichiarati, `{ordine: soglia}`, e torna quanti
-    ne ha scritti. La porta della zona e del filtro: SOLO sulla riga di
+    """Scrive i paracadute dichiarati, `{ordine: {su, giu}}` (o la forma
+    di prima, `{ordine: soglia}`, che vale nei due versi:
+    `_soglie_paracadute_p2p`), e torna quanti ne ha scritti. La porta della zona e del filtro: SOLO sulla riga di
     chi l'ordine l'ha PUBBLICATO (`maker` acceso), e LA PRIMA RESTA — la
     soglia e il prezzo di partenza non si spostano dopo. LA PARTENZA E' IL
     CAMBIO DEL SERVER di questo momento (`cambio`, 0 = non lo sa: la
@@ -61816,8 +61879,8 @@ def _dichiara_paracadute_p2p(con, tg_id: int, mappa, adesso: int, cambio) -> int
     for ordine, v in list(mappa.items())[:MAX_ORDINI_P2P]:
         if not isinstance(ordine, str) or not FORMA_ORDINE_P2P.fullmatch(ordine):
             continue
-        soglia = _soglia_paracadute_p2p(v)
-        if not soglia:
+        su, giu = _soglie_paracadute_p2p(v)
+        if not (su or giu):
             continue
         r = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=? AND tg_id=? "
                         "AND maker=1", (ordine, int(tg_id))).fetchone()
@@ -61825,9 +61888,9 @@ def _dichiara_paracadute_p2p(con, tg_id: int, mappa, adesso: int, cambio) -> int
             continue
         scritti += con.execute(
             "INSERT OR IGNORE INTO p2p_paracadute(ordine, tg_id, soglia, partenza, "
-            "creato) VALUES(?,?,?,?,?)",
-            (ordine, int(tg_id), soglia, cambio if cambio > 0 else 0,
-             int(adesso))).rowcount
+            "creato, su, giu) VALUES(?,?,?,?,?,?,?)",
+            (ordine, int(tg_id), max(su, giu), cambio if cambio > 0 else 0,
+             int(adesso), su, giu)).rowcount
     if scritti:
         con.commit()
     return scritti
@@ -61853,21 +61916,26 @@ def _paracadute_p2p(con, ordini) -> list:
 
 def _miei_paracadute_p2p(con, tg_id) -> dict:
     """I paracadute degli ordini VIVI di chi chiede, per la sua card e per
-    il `cancel` che firma il suo telefono: `{ordine: {soglia, partenza,
-    aperto, arrivo}}`. Un ordine gia' concluso, annullato o scaduto non
-    c'e' piu'. Pura sulla connessione."""
+    il `cancel` che firma il suo telefono: `{ordine: {soglia, su, giu,
+    partenza, aperto, arrivo}}` — `su` e `giu` le due soglie, una per
+    verso (17 nov 2026), `soglia` la piu' grande. Un ordine gia' concluso,
+    annullato o scaduto non c'e' piu'. Pura sulla connessione."""
     try:
         righe = con.execute(
-            "SELECT p.ordine, p.soglia, p.partenza, p.aperto, p.arrivo "
+            "SELECT p.ordine, p.soglia, p.partenza, p.aperto, p.arrivo, p.su, p.giu "
             "FROM p2p_paracadute p JOIN p2p_ordini o ON o.ordine = p.ordine "
             "AND o.tg_id = p.tg_id WHERE p.tg_id=? AND o.stato NOT IN "
             "('success','canceled','expired') ORDER BY p.creato DESC LIMIT ?",
             (int(tg_id or 0), MAX_ORDINI_P2P)).fetchall()
     except sqlite3.OperationalError:
         return {}
-    return {r[0]: {"soglia": int(r[1] or 0), "partenza": float(r[2] or 0),
-                   "aperto": int(r[3] or 0), "arrivo": float(r[4] or 0)}
-            for r in righe}
+    fuori = {}
+    for r in righe:
+        su, giu = _versi_riga_paracadute_p2p(r[1], r[5], r[6])
+        fuori[r[0]] = {"soglia": max(su, giu), "su": su, "giu": giu,
+                       "partenza": float(r[2] or 0), "aperto": int(r[3] or 0),
+                       "arrivo": float(r[4] or 0)}
+    return fuori
 
 
 def _preso_adesso_p2p(con, ordine: str) -> bool:
@@ -61953,7 +62021,7 @@ def _passata_paracadute_p2p(con, prezzo, letto, adesso: int) -> list:
     try:
         righe = con.execute(
             "SELECT p.ordine, p.tg_id, p.soglia, p.partenza, p.oltre, p.lettura, "
-            "o.metodi, o.lato, o.euro, o.stato FROM p2p_paracadute p "
+            "o.metodi, o.lato, o.euro, o.stato, p.su, p.giu FROM p2p_paracadute p "
             "JOIN p2p_ordini o ON o.ordine = p.ordine AND o.tg_id = p.tg_id "
             "WHERE p.aperto = 0 AND o.maker = 1 AND o.stato NOT IN "
             "('success','canceled','expired')").fetchall()
@@ -61969,7 +62037,8 @@ def _passata_paracadute_p2p(con, prezzo, letto, adesso: int) -> list:
                     "UPDATE p2p_paracadute SET oltre=0 WHERE ordine=? AND aperto=0",
                     (r[0],)).rowcount
             continue
-        p = _passo_paracadute_p2p({"soglia": r[2], "partenza": r[3], "oltre": r[4],
+        p = _passo_paracadute_p2p({"soglia": r[2], "su": r[10], "giu": r[11],
+                                   "partenza": r[3], "oltre": r[4],
                                    "lettura": r[5]}, prezzo, letto, adesso)
         if not p["cambia"]:
             continue
@@ -61980,7 +62049,10 @@ def _passata_paracadute_p2p(con, prezzo, letto, adesso: int) -> list:
              int(adesso) if p["apre"] else 0, float(prezzo) if p["apre"] else 0,
              r[0])).rowcount
         if p["apre"]:
-            aperti.append({"ordine": r[0], "tg_id": int(r[1]), "soglia": int(r[2]),
+            # la soglia che e' scattata: quella del verso in cui BTC e' andato
+            su, giu = _versi_riga_paracadute_p2p(r[2], r[10], r[11])
+            aperti.append({"ordine": r[0], "tg_id": int(r[1]),
+                           "soglia": su if p["scarto"] > 0 else giu,
                            "partenza": p["partenza"], "arrivo": float(prezzo),
                            "lato": r[7] or "", "euro": r[8] or ""})
     if toccati:
@@ -108239,7 +108311,13 @@ def _p2p_onchain_prepara(con):
                       # con piu' metodi ('' = nessuna scelta, o un metodo
                       # solo). «Contanti» scelto qui fa lo scambio in
                       # contanti di persona (`_p2p_onchain_contanti`)
-                      ("metodo_scelto", "TEXT DEFAULT ''")):
+                      ("metodo_scelto", "TEXT DEFAULT ''"),
+                      # 17 nov 2026, cantiere paracadute-su-giu: le due
+                      # soglie, una per verso (come `su` e `giu` di
+                      # `p2p_paracadute`); -1 = ordine di prima, la soglia
+                      # unica `paracadute` vale nei due versi
+                      ("para_su", "INTEGER DEFAULT -1"),
+                      ("para_giu", "INTEGER DEFAULT -1")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
     # LE CAUZIONI DEL CONTANTI ON-CHAIN (17 nov 2026 sera): una riga per
@@ -108542,6 +108620,10 @@ def _p2p_onchain_foglio(o, pubblico: bool = False) -> dict:
                                               _p2p_onchain_cambio(o))
     if not pubblico:
         d["paracadute"] = int(_p2p_onchain_campo(o, "paracadute", 0) or 0)
+        # ...e le sue due soglie, una per verso (17 nov 2026)
+        d["paracadute_su"], d["paracadute_giu"] = _versi_riga_paracadute_p2p(
+            d["paracadute"], _p2p_onchain_campo(o, "para_su", -1),
+            _p2p_onchain_campo(o, "para_giu", -1))
         # la ripubblica (16 nov 2026): come il paracadute, solo a lui
         if int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0) > 0:
             d["ripubblica"] = {"minimo": int(_p2p_onchain_campo(o, "rip_minimo", 0) or 0),
@@ -109230,7 +109312,8 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     """PUBBLICA: `{lato, sats, euro_cent, metodi, recapito}`, e dal 30 ott
     2026 (il foglio di Lightning) `tipo` ('fisso' | 'mercato', di serie
     fisso), `premio` (a mercato), `filtro` (1, 3, 5: chi puo' prendere) e
-    `paracadute` (5, 10, 20, solo a leva accesa). Chi pubblica
+    `paracadute` (`{su, giu}`, ognuna 5, 10, 20 o 0, solo a leva accesa;
+    un numero solo vale nei due versi). Chi pubblica
     deve avere la sua chiave on-chain (la xpub dedicata): e' una delle
     tre del 2-di-3 che nascera' alla presa, e senza non c'e' niente da
     promettere. Il tetto in euro e' quello dell'on-chain
@@ -109319,8 +109402,11 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     premio = int(premio) if tipo == "mercato" else 0
     filtro = _soglia_filtro_p2p(d.get("filtro"))
     # IL PARACADUTE parte dal cambio di ADESSO, scritto dal server come nel
-    # Lightning: il telefono manda la sola soglia
-    para = _soglia_paracadute_p2p(d.get("paracadute")) if P2P_PARACADUTE else 0
+    # Lightning: il telefono manda le sole soglie, una per verso (17 nov
+    # 2026; un numero solo, l'app di prima, vale nei due versi)
+    para_su, para_giu = _soglie_paracadute_p2p(d.get("paracadute")) \
+        if P2P_PARACADUTE else (0, 0)
+    para = max(para_su, para_giu)
     # (anche in USDT si misura in euro: la ronda legge l'euro, e il
     # paracadute guarda quanto si e' mosso BTC, non la valuta)
     cambio_eur = cambio_noto_ora()
@@ -109335,6 +109421,7 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
         # decisione di Andrea) e niente recapito: il recapito E' il PayCode
         rip, recapito = None, ""
         para, para_da, para_letto = 0, 0.0, 0
+        para_su = para_giu = 0
     try:
         onchain_xpub_barattolo()
     except ValueError as e:
@@ -109354,8 +109441,8 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             "INSERT INTO p2p_onchain_ordini(ordine, lato, maker_id, prezzo_sats,"
             " euro_cent, metodi, recapito, scade, creato, aggiornato,"
             " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura,"
-            " rip_minimo, rip_massimo, fiat, paycode, zona)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ordine, lato, user["id"], sats, int(euro_cent),
              json.dumps(metodi, ensure_ascii=False), recapito,
              p2p_onchain_scade_libro(adesso, tab["scade"] if tab else 0),
@@ -109363,7 +109450,7 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
              "mercato" if tipo == "mercato" else "fisso", premio, filtro,
              para, para_da, para_letto,
              rip[0] if rip else 0, rip[1] if rip else 0, "CHF" if chf else "",
-             json.dumps(tab) if tab else "", zona))
+             json.dumps(tab) if tab else "", zona, para_su, para_giu))
         con.commit()
         oid = cur.lastrowid
         riga = _p2p_onchain_carica(con, oid)
@@ -112339,7 +112426,11 @@ def _p2p_onchain_passata_paracadute(con, prezzo, letto, adesso: int) -> list:
         " AND scade>? LIMIT 200", (int(adesso),)).fetchall()
     aperti, toccati = [], 0
     for o in righe:
-        p = _passo_paracadute_p2p({"soglia": o["paracadute"], "partenza": o["para_partenza"],
+        su, giu = _versi_riga_paracadute_p2p(o["paracadute"],
+                                             _p2p_onchain_campo(o, "para_su", -1),
+                                             _p2p_onchain_campo(o, "para_giu", -1))
+        p = _passo_paracadute_p2p({"soglia": o["paracadute"], "su": su, "giu": giu,
+                                   "partenza": o["para_partenza"],
                                    "oltre": o["para_oltre"], "lettura": o["para_lettura"]},
                                   prezzo, letto, adesso)
         if not p["cambia"]:
@@ -112355,7 +112446,8 @@ def _p2p_onchain_passata_paracadute(con, prezzo, letto, adesso: int) -> list:
             if cur.rowcount:
                 aperti.append({"id": int(o["id"]), "ordine": o["ordine"],
                                "maker_id": int(o["maker_id"]),
-                               "soglia": int(o["paracadute"]), "partenza": p["partenza"],
+                               "soglia": su if p["scarto"] > 0 else giu,
+                               "partenza": p["partenza"],
                                "arrivo": float(prezzo), "lato": o["lato"],
                                "euro_cent": int(o["euro_cent"]),
                                "metodi": o["metodi"],

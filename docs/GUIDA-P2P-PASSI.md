@@ -1555,22 +1555,32 @@ delle leve»). A leva spenta niente di questa sezione esiste.
 
 **Pubblicando.**
 - 📱 Nel foglio «Vuoi vendere Bitcoin» / «Vuoi comprare Bitcoin», dopo
-  «Pausa degli ordini»: la sezione «**🪂 Paracadute**» con quattro
-  scelte, «**Spento**» · «**5%**» · «**10%**» · «**20%**». Di serie è
-  accesa «Spento», e sotto: «Se BTC sale o scende oltre la soglia che
-  scegli, l'ordine si annulla da solo. Senza penalità.» Toccato il 5%:
-  «Se BTC sale o scende più del 5% da adesso, l'ordine si annulla da
-  solo. Senza penalità.» La volta dopo il foglio riparte da «Spento»:
-  la scelta vale per un ordine solo (dal 13 ott sera). Con un ordine
-  Barattozon la sezione non c'è.
+  «Pausa degli ordini»: la sezione «**🪂 Paracadute**» con DUE righe
+  (dal 17 nov 2026), «**📈 Se BTC sale**» e sotto «**📉 Se BTC
+  scende**», ognuna con quattro scelte, «**Nessuna**» · «**5%**» ·
+  «**10%**» · «**20%**». Di serie è accesa «Nessuna» in tutte e due, e
+  sotto: «Scegli se togliere l'ordine quando BTC sale, quando scende, o
+  tutte e due. Senza penalità.» Toccato «Se BTC scende» 5%: «Se BTC
+  scende più del 5% da adesso, l'ordine si annulla da solo. Senza
+  penalità.» Con «sale» 10% e «scende» 5%: «Se BTC sale più del 10% o
+  scende più del 5% da adesso, …»; con lo stesso numero nelle due righe
+  la frase è quella di sempre, «Se BTC sale o scende più del 5% da
+  adesso, …». La volta dopo il foglio riparte da «Nessuna»: la scelta
+  vale per un ordine solo (dal 13 ott sera). Con un ordine Barattozon la
+  sezione non c'è.
 - 📱 In «I miei scambi», sulla card dell'ordine pubblicato, sotto
-  «Ordine pubblicato»: «**🪂 Paracadute 5%**». Lo vede solo chi l'ha
+  «Ordine pubblicato»: «**🪂 Paracadute ↓5%**» (con le due righe
+  «**🪂 Paracadute ↑10% ↓5%**»: la freccia in su è la salita, quella in
+  giù la discesa; gli ordini di prima del 17 nov, con una soglia sola,
+  dicono «↑5% ↓5%»). Lo vede solo chi l'ha
   pubblicato. La stessa riga sta sulla SUA card nel libro (una vendita
   si trova nel tab «Compra BTC»), sopra «È il tuo ordine — tocca per
   aprirlo».
-- 📱 Nella pagina del suo ordine: «🪂 Paracadute 5%: se BTC sale o
-  scende più del 5% da 100.000 €, l'ordine si annulla da solo. Senza
-  penalità.» (il prezzo è quello del momento della pubblicazione).
+- 📱 Nella pagina del suo ordine: «🪂 Paracadute ↓5%: se BTC scende più
+  del 5% da 100.000 €, l'ordine si annulla da solo. Senza penalità.» (il
+  prezzo è quello del momento della pubblicazione; con le due soglie
+  uguali «🪂 Paracadute ↑5% ↓5%: se BTC sale o scende più del 5% da
+  100.000 €, …»).
 
 **Quando il prezzo si muove oltre la soglia** (due letture di fila, a
 un minuto l'una dall'altra, e solo se nessuno l'ha ancora preso).

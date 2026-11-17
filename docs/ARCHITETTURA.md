@@ -33343,6 +33343,29 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   prende. Chiudere quel buco a telefono spento vuole una patch del nodo:
   rimandata (CANTIERI). Prove: `prove_paracadute_p2p`,
   `prove_paracadute_app`, `collaudo_paracadute` (gabbia della CI).
+  • DUE SOGLIE, UNA PER VERSO (17 nov 2026, cantiere
+  `paracadute-su-giu`; il perché in CANTIERI, «Il paracadute diviso»).
+  Il paracadute è `{su, giu}`: «se BTC sale più di X%» e «se scende più
+  di Y%», ognuna del catalogo o 0 (= in quel verso niente). LA RIGA:
+  `p2p_paracadute.su` e `.giu` (e sull'on-chain `para_su`, `para_giu`),
+  -1 = riga di PRIMA, la cui `soglia` unica vale nei due versi
+  (`_versi_riga_paracadute_p2p`); le righe nuove le scrivono sempre, e
+  `soglia` è la più grande (dice solo «un paracadute c'è»). LA PORTA:
+  `_soglie_paracadute_p2p` legge `{su, giu}` o un numero solo (l'app
+  rimasta nella cache), che vale nei due versi. IL GIUDICE:
+  `_passo_paracadute_p2p` sceglie la soglia dal segno dello scarto; una
+  lettura oltre nel verso senza soglia vale «dentro» e azzera il conto.
+  L'avviso dice la soglia del verso scattato. LE ROTTE: `_miei_paracadute_p2p`
+  e la scheda on-chain (`paracadute_su`, `paracadute_giu`) dicono le due.
+  L'APP: `p2pNuovoParacadute` è `{su, giu}`; `versiParacaduteP2P`,
+  `haParacaduteP2P`, `etichettaParacaduteP2P` («↑10% ↓5%», i soli versi
+  scelti), `versiFraseParacaduteP2P` («sale più del 10% o scende più del
+  5%»; con lo stesso numero la frase di sempre, «sale o scende più del
+  5%»), `versiDaServerParacaduteP2P`, `versiParacaduteOcP2P`; il foglio
+  ha due righe, `scegliParacaduteNuovoP2P(verso, n)` tocca il solo verso
+  toccato. Prove: la parte 6 di `prove_paracadute_p2p`, le righe nuove
+  di `prove_paracadute_app`, «8-ter» di `collaudo_paracadute` e le due
+  soglie di `collaudo_p2p_onchain`.
 
 - LA RIPUBBLICA DEGLI ORDINI SCADUTI (16 nov 2026, cantiere
   `ripubblica`; il perché in CANTIERI, «La ripubblica degli ordini P2P

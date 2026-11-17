@@ -163752,7 +163752,9 @@ def prove_p2p_onchain_valute():
            'euro_cent = p2p_onchain_cent_mercato({"metodi": json.dumps(metodi)})' in pub,
            # (17 nov 2026, barattozon-onchain) dopo `fiat` viene il PayCode
            # (17 nov 2026 sera, onchain-contanti) ...e dopo il PayCode la zona
-           '"CHF" if chf else "",\n             json.dumps(tab) if tab else "", zona))' in pub
+           # (17 nov 2026 sera, paracadute-su-giu) ...e dopo la zona le due soglie
+           '"CHF" if chf else "",\n             json.dumps(tab) if tab else "", zona, para_su, '
+           'para_giu))' in pub
            and '("fiat", "TEXT DEFAULT \'\'")' in pezzo("_p2p_onchain_prepara"),
            'if coin_o and not p2p_coin_ammesso(user["id"]):' in pre
            and 'if p2p_onchain_chf(o) and not p2p_chf_ammesso(user["id"]):' in pre,
@@ -166674,7 +166676,10 @@ console.log(JSON.stringify(out));
           ("const g = valeNuovoOrdineP2P(campi);" in pubb, "fermaPerPausaP2P()" in pubb,
            "tipo: campi.fisso ? 'fisso' : 'mercato'" in pubb,
            "else corpo.premio = Number(campi.premio) || 0;" in pubb,
-           "filtro: campi.filtro || 0, paracadute: campi.paracadute || 0" in pubb,
+           # (17 nov 2026, paracadute-su-giu) il paracadute e' `{su, giu}`
+           "filtro: campi.filtro || 0,\n    /* le due soglie, una per verso (17 nov 2026) */\n"
+           "    paracadute: typeof versiParacaduteP2P === 'function' ? "
+           "versiParacaduteP2P(campi.paracadute) : {su: 0, giu: 0}};" in pubb,
            "/p2p/onchain/pubblica" in pubb))
     # la card del libro: i sats a mercato col «≈», la pausa di chi pubblica
     banco_card = ("const fmt = n => String(n);\n"
@@ -186216,7 +186221,8 @@ def prove_paracadute_p2p():
               "_colpa_disputa_p2p", "_esiti_dopo_garanzia_p2p", "_marchi_dispute_p2p",
               "_euro_sospesi_p2p", "_sollecito_euro_p2p_fermo", "_stato_scambio_p2p",
               "_metodi_lista_p2p", "_blocco_dispute_fino_p2p", "_riga_disputa_persa_p2p",
-              "_soglia_paracadute_p2p", "_scarto_paracadute_p2p", "_passo_paracadute_p2p",
+              "_soglia_paracadute_p2p", "_soglie_paracadute_p2p",
+              "_versi_riga_paracadute_p2p", "_scarto_paracadute_p2p", "_passo_paracadute_p2p",
               "_dichiara_paracadute_p2p", "_paracadute_p2p", "_miei_paracadute_p2p",
               "_preso_adesso_p2p", "_fuori_per_cronaca_p2p", "_libro_letto_p2p",
               "_passata_paracadute_p2p", "_presa_a_paracadute_p2p",
@@ -186382,8 +186388,10 @@ def prove_paracadute_p2p():
           posso(con, P, [o1], t[0])["ordini"][o1]["motivo"] != "paracadute")
     miei = amb["_miei_paracadute_p2p"]
     prova("...e lui lo legge fra i suoi: la soglia, i due prezzi, l'ora dell'apertura",
-          [{"soglia": 5, "partenza": 100000.0, "aperto": t[0], "arrivo": 94000.0},
-           {"soglia": 10, "partenza": 99000.0, "aperto": 0, "arrivo": 0.0}, [o1, o2]],
+          [{"soglia": 5, "su": 5, "giu": 5, "partenza": 100000.0, "aperto": t[0],
+            "arrivo": 94000.0},
+           {"soglia": 10, "su": 10, "giu": 10, "partenza": 99000.0, "aperto": 0,
+            "arrivo": 0.0}, [o1, o2]],
           [miei(con, P)[o1], miei(con, P)[o2], sorted(miei(con, P))])
     prova("...un ordine gia' aperto non si riapre e non si riavvisa", [[], []],
           [giro(90000), giro(90000)])
@@ -186646,6 +186654,105 @@ def prove_paracadute_p2p():
     prova("...e il giro dell'orologio lo chiede PRIMA di leggere il prezzo e di avvisare",
           True, 0 < giro_src.find('_libro_letto_p2p(_P2P_CONTO.get("libro"))')
           < giro_src.find("_passata_paracadute_p2p("))
+
+    # --- 6) DUE SOGLIE, UNA PER VERSO (17 nov 2026, cantiere
+    # paracadute-su-giu, Andrea: «magari io voglio tenere l'annuncio se
+    # Bitcoin sale ... ma voglio toglierlo se scende») ----------------------
+    soglie, versi = amb["_soglie_paracadute_p2p"], amb["_versi_riga_paracadute_p2p"]
+    prova("LE SOGLIE DETTE DAL TELEFONO: `{su, giu}` un verso alla volta; un NUMERO solo "
+          "(l'app di prima) vale nei due versi; una storta, un booleano, fuori catalogo = 0",
+          [(10, 5), (0, 5), (20, 0), (5, 5), (0, 0), (0, 0), (0, 0), (10, 10), (0, 0)],
+          [soglie({"su": 10, "giu": 5}), soglie({"giu": 5}), soglie({"su": "20", "giu": None}),
+           soglie(5), soglie({"su": True, "giu": 7}), soglie(None), soglie({"su": -5}),
+           soglie("10"), soglie([5, 5])])
+    prova("LE SOGLIE DI UNA RIGA: -1 (o niente) e' una riga di PRIMA, e la soglia unica "
+          "vale nei due versi; 0 in un verso e' «in quel verso niente»",
+          [(5, 5), (10, 10), (0, 10), (20, 0), (0, 0), (10, 5), (5, 0)],
+          [versi(5, -1, -1), versi(10, None, None), versi(10, 0, 10), versi(20, 20, 7),
+           versi(0, -1, -1), versi(10, "10", "5"), versi(5, -1, 0)])
+
+    def corsa(letture, su, giu, soglia_=None):
+        """Una fila di letture a un minuto l'una dall'altra su una riga con
+        le due soglie: a quale giro si apre (0 = mai)."""
+        r = {"soglia": max(su, giu) if soglia_ is None else soglia_, "su": su, "giu": giu,
+             "partenza": 100000.0, "oltre": 0, "lettura": 0}
+        for n, prezzo in enumerate(letture, 1):
+            adesso = ORA + 60 * n
+            p = passo(r, prezzo, adesso - 5, adesso)
+            r = dict(r, partenza=p["partenza"], oltre=p["oltre"], lettura=p["lettura"])
+            if p["apre"]:
+                return n
+        return 0
+    prova("SOLO IN DISCESA, 5%: BTC +12% due volte NON apre, −6% due volte si'",
+          [0, 2], [corsa([112000, 112000], 0, 5), corsa([94000, 94000], 0, 5)])
+    prova("SOLO IN SALITA, 10%: −30% due volte NON apre, +12% due volte si'",
+          [0, 2], [corsa([70000, 70000], 10, 0), corsa([112000, 112000], 10, 0)])
+    prova("SU 10% E GIU' 5%: +7% non apre (dentro la salita), −6% si'; +11% si'",
+          [0, 2, 2], [corsa([107000, 107000], 10, 5), corsa([94000, 94000], 10, 5),
+                      corsa([111000, 111000], 10, 5)])
+    prova("AL FILO ESATTO NO, in ogni verso: +10,0% e −5,0% non aprono, un euro oltre si'",
+          [0, 0, 2, 2], [corsa([110000, 110000], 10, 5), corsa([95000, 95000], 10, 5),
+                         corsa([110001, 110001], 10, 5), corsa([94999, 94999], 10, 5)])
+    prova("UNA LETTURA OLTRE NEL VERSO SENZA SOGLIA VALE «DENTRO»: −6%, +12%, −6% non "
+          "apre (il conto riparte), la quarta di fila in giu' si'",
+          [0, 4], [corsa([94000, 112000, 94000], 0, 5),
+                   corsa([94000, 112000, 94000, 94000], 0, 5)])
+    prova("NESSUNA DELLE DUE: non guarda niente, nemmeno a −50%", 0,
+          corsa([50000, 50000, 50000], 0, 0, soglia_=20))
+    prova("UNA RIGA DI PRIMA (su e giu' a -1) col 5% resta com'era: apre in salita E in "
+          "discesa", [2, 2], [corsa([106000, 106000], -1, -1, soglia_=5),
+                              corsa([94000, 94000], -1, -1, soglia_=5)])
+
+    def para2(o):
+        r = con.execute("SELECT soglia, su, giu, partenza FROM p2p_paracadute WHERE ordine=?",
+                        (o,)).fetchone()
+        return tuple(r) if r else None
+    g1, g2, g3, g4, g5 = ordine(), ordine(lato="buy"), ordine(), ordine(), ordine()
+    prova("L'INTESTAZIONE scrive le due soglie e la piu' grande in `soglia`; un numero solo "
+          "le scrive uguali; `{su: 0, giu: 0}` e una storta non scrivono",
+          [3, (20, 20, 5, 100000.0), (10, 10, 0, 100000.0), (20, 20, 20, 100000.0), None, None],
+          [dich(con, P, {g1: {"su": 20, "giu": 5}, g2: {"su": 10, "giu": 0}, g3: 20,
+                         g4: {"su": 0, "giu": 0}, g5: {"su": 7, "giu": "x"}}, t[0], 100000),
+           para2(g1), para2(g2), para2(g3), para2(g4), para2(g5)])
+    prova("...e chi l'ha pubblicato le rilegge fra i suoi, una per verso",
+          [{"soglia": 20, "su": 20, "giu": 5}, {"soglia": 10, "su": 10, "giu": 0}],
+          [{k: miei(con, P)[g1][k] for k in ("soglia", "su", "giu")},
+           {k: miei(con, P)[g2][k] for k in ("soglia", "su", "giu")}])
+    passati = [g1, g2]
+    prova("SUL BANCO, l'orologio: BTC +12% per due giri apre «se sale 10%» (g2) e non "
+          "«sale 20%, scende 5%» (g1)", [[], [g2], 0],
+          [giro(112000, solo=passati), giro(112000, solo=passati), para(g1)[3]])
+    t[0] += 60
+    scattati = passata(con, 94000, t[0] - 5, t[0])
+    t[0] += 60
+    scattati += passata(con, 94000, t[0] - 5, t[0])
+    prova("...e −6% per due giri apre la discesa di g1, con la soglia del verso che e' "
+          "scattato (il 5%, non il 20% della salita)",
+          [[g1], [5]], [[a["ordine"] for a in scattati if a["ordine"] in passati],
+                        [a["soglia"] for a in scattati if a["ordine"] == g1]])
+    g6 = ordine()
+    con.execute("INSERT INTO p2p_paracadute(ordine, tg_id, soglia, partenza, creato) "
+                "VALUES(?,?,10,100000,?)", (g6, P, t[0]))
+    prova("UNA RIGA DI PRIMA scritta senza le colonne nuove nasce a -1 e vale nei due versi: "
+          "si apre in salita col suo 10%", [(10, -1, -1, 100000.0), [], [g6]],
+          [para2(g6), giro(112000, solo=[g6]), giro(112000, solo=[g6])])
+    vecchia = sqlite3.connect(":memory:")
+    vecchia.execute("CREATE TABLE p2p_paracadute(ordine TEXT PRIMARY KEY, tg_id INTEGER, "
+                    "soglia INTEGER)")
+    vecchia.execute("INSERT INTO p2p_paracadute VALUES('x', 1, 5)")
+    j = src.index("    # il paracadute diviso fra salita e discesa (17 nov 2026")
+    blocco_alter = src[j:src.index("            pass\n", j) + len("            pass\n")]
+    exec(textwrap.dedent(blocco_alter), {"con": vecchia, "sqlite3": sqlite3})
+    exec(textwrap.dedent(blocco_alter), {"con": vecchia, "sqlite3": sqlite3})
+    prova("LA MIGRAZIONE: sul database di produzione le due colonne si aggiungono a -1 "
+          "(le righe di prima restano a due versi), e rifarla non rompe niente",
+          (5, -1, -1), vecchia.execute("SELECT soglia, su, giu FROM p2p_paracadute").fetchone())
+    prova("...e l'ON-CHAIN ha le sue due colonne, a -1 per gli ordini di prima, e le "
+          "scrive alla nascita dalle soglie del telefono",
+          [True, True, True, True],
+          ['("para_su", "INTEGER DEFAULT -1")' in src, '("para_giu", "INTEGER DEFAULT -1")' in src,
+           "para_su, para_giu = _soglie_paracadute_p2p(d.get(\"paracadute\"))" in src,
+           '"su": su, "giu": giu,' in pezzo("_p2p_onchain_passata_paracadute")])
     con.close()
 
 
@@ -186967,7 +187074,9 @@ function segnoValutaP2P(c){ return {EUR: '€', CHF: 'CHF', USDT: 'USDT'}[String
 let VALUTA_FOGLIO = 'EUR';
 function valutaFoglioP2P(){ return VALUTA_FOGLIO; }
 function valutaOrdineP2P(o){ return (o && o.fiat) || 'EUR'; }
-function sogliaParacaduteP2P(n){ return [5, 10, 20].indexOf(Number(n)) >= 0 ? Number(n) : 0; }
+const P2P_PARACADUTE_SOGLIE = [5, 10, 20];
+""" + _fn_js(m, "function sogliaParacaduteP2P(n){") + _fn_js(m, "function versiParacaduteP2P(v){") \
+        + _fn_js(m, "function haParacaduteP2P(v){") + _fn_js(m, "function versiDaServerParacaduteP2P(v){") + r"""
 let LEVE = {ripubblica: true};
 function p2pCoord(){ return LEVE; }
 let MIE = {};
@@ -186993,7 +187102,7 @@ function preseChiuseP2P(){ return PRESE_CHIUSE; }
 function vistaAttivaP2P(){ return 'view-home'; }
 function renderP2P(){} function renderOrdineP2P(){}
 let p2pOrdineAperto = '';
-function paracaduteDaCampiP2P(c){ return sogliaParacaduteP2P(c.paracadute); }
+function paracaduteDaCampiP2P(c){ return haParacaduteP2P(c.paracadute) ? versiParacaduteP2P(c.paracadute) : null; }
 function maxEuroP2P(){ return 250; } function tettoValutaP2P(){ return 250; }
 function minEuroBzP2P(){ return 0; } function maxEuroContantiP2P(){ return 250; }
 function finestraGaranziaP2P(){ return 0; }
@@ -187110,7 +187219,7 @@ console.log(JSON.stringify(c));
     prova("L'ORDINE RIFATTO E' UGUALE: a prezzo fisso gli stessi sats per gli stessi euro, col "
           "filtro, il paracadute e l'intervallo di prima; un intervallo resta a mercato col "
           "suo premio e la sua valuta",
-          [True, "50000", "50", 0, 3, 10, "90000", "100000", "vendo",
+          [True, "50000", "50", 0, 3, {"su": 10, "giu": 10}, "90000", "100000", "vendo",
            False, "", "100", 2, "CHF", "compro"], c.get("uguale"))
     prova("il battito guarda solo le mie righe con la ripubblica aperta", sorted([ID, ID3]),
           c.get("righe"))
@@ -187197,8 +187306,9 @@ def prove_paracadute_app():
     # tolta: si riparte sempre da «Spento», e in memoria non si scrive niente)
     prova("IL FOGLIO SI APRE SEMPRE DA «SPENTO»: nessuna scelta di prima, i campi portano "
           "quella di adesso e la riga la tiene", [True, True, True],
-          ["p2pNuovoParacadute = 0;" in fn("function apriNuovoOrdineP2P(metodo){"),
-           "paracadute: typeof p2pNuovoParacadute === 'number' ? p2pNuovoParacadute : 0,"
+          ["p2pNuovoParacadute = {su: 0, giu: 0};" in fn("function apriNuovoOrdineP2P(metodo){"),
+           "paracadute: typeof versiParacaduteP2P === 'function' ? "
+           "versiParacaduteP2P(p2pNuovoParacadute) : {su: 0, giu: 0},"
            in fn("function campiNuovoP2P(){"),
            "if (paraOrd) ord.paracadute = paraOrd;" in fn("async function inviaNuovoOrdineP2P(confermato){")])
     prova("...e la scelta NON SI RICORDA da nessuna parte: via le due funzioni, via la "
@@ -187214,7 +187324,7 @@ def prove_paracadute_app():
           "coordinatore non sa niente del paracadute, e scegliere la soglia non tocca il "
           "premio", [False, False],
           ["aracadute" in fn("function ordineDaCampiP2P(v, lato){"),
-           "remio" in fn("function scegliParacaduteNuovoP2P(n){")])
+           "remio" in fn("function scegliParacaduteNuovoP2P(verso, n){")])
     reg = fn("async function registraOrdiniP2P(ids, pubblicati, presi){")
     prova("l'intestazione lo dichiara dalla stessa porta della zona e del filtro, e NON "
           "manda nessun prezzo: la partenza la scrive il server",
@@ -187275,9 +187385,9 @@ def prove_paracadute_app():
     prova("IL CLICK CHE ARRIVA DOPO IL TOCCO SUL + non sceglie una soglia: stesso orologio "
           "di `toccaPiu`, e PRIMA di ogni altra cosa", [True, True],
           ["if (typeof p2pPiuGestoAt === 'number' && performance.now() - p2pPiuGestoAt < 700) "
-           "return;" in fn("function scegliParacaduteNuovoP2P(n){"),
-           0 < fn("function scegliParacaduteNuovoP2P(n){").find("p2pPiuGestoAt < 700")
-           < fn("function scegliParacaduteNuovoP2P(n){").find("p2pNuovoParacadute =")])
+           "return;" in fn("function scegliParacaduteNuovoP2P(verso, n){"),
+           0 < fn("function scegliParacaduteNuovoP2P(verso, n){").find("p2pPiuGestoAt < 700")
+           < fn("function scegliParacaduteNuovoP2P(verso, n){").find("p2pNuovoParacadute =")])
     # (13 ott 2026, richiesta di Andrea: «fa uscire ordini ristretti senza che
     # chi pubblica lo sappia») ...e nemmeno il FILTRO di chi puo' prendere:
     # a 390×844 lo stesso click accendeva «3+ scambi» a ogni apertura del foglio
@@ -187359,7 +187469,7 @@ function setLatoP2P(lato, senzaScossa){ p2pLato = lato; SENZA_SCOSSA = senzaScos
 let p2pNuovoMetodi = [], p2pNuovoEuro = '', p2pNuovoEuroMax = '', p2pNuovoDue = false,
     p2pNuovoFisso = false, p2pNuovoSats = '', p2pNuovoPremio = 0, p2pNuovoZona = '', p2pNuovoFiltro = 0;
 function vaiP2P(){ ANDATO++; }
-function apriNuovoOrdineP2P(){ APERTO_FOGLIO++; p2pNuovoMetodi = []; p2pNuovoEuro = ''; p2pNuovoParacadute = 0; }
+function apriNuovoOrdineP2P(){ APERTO_FOGLIO++; p2pNuovoMetodi = []; p2pNuovoEuro = ''; p2pNuovoParacadute = {su: 0, giu: 0}; }
 """ + _fn_js(m, "function idMostroVero(id){") + _fn_js(m, "function scegliFiltroNuovoP2P(n){") + blocco \
         + _fn_js(m, "function testoParacaduteInfoP2P(acceso, conTitolo){") + chiede + r"""
 (async () => {
@@ -187368,28 +187478,40 @@ const ID = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001', ID2 = '0199b7c1-2d3e-4f50-a1b
       ID3 = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60003';
 c.soglia = [5, '10', 20, 7, 0, null, true, '5%'].map(sogliaParacaduteP2P);
 c.frasi = [fraseParacaduteP2P(5), fraseParacaduteP2P(20), fraseParacaduteP2P(0), fraseParacaduteP2P(7)];
-/* la sezione del foglio */
-p2pNuovoParacadute = 0;
+/* la sezione del foglio: DUE RIGHE, una per verso (17 nov 2026) */
+p2pNuovoParacadute = {su: 0, giu: 0};
 const sez = sezioneParacaduteNuovoP2P(false);
+const accesi = h => (h.match(/class="p2p-accesso-chip on" aria-pressed="true" data-verso="(su|giu)" data-n="(\d+)"/g) || [])
+  .map(x => x.replace(/.*data-verso="(su|giu)" data-n="(\d+)"/, '$1$2'));
 c.sezione = [sez.split('§')[0], (sez.match(/<button/g) || []).length,
-             /data-n="0"[^>]*>Spento</.test(sez), ['5%', '10%', '20%'].every(x => sez.indexOf('>' + x + '<') > 0),
-             /class="p2p-accesso-chip on" aria-pressed="true" data-n="0"/.test(sez),
-             sez.split('§')[2]];
-p2pNuovoParacadute = 10;
+             (sez.match(/data-n="0"[^>]*>Nessuna</g) || []).length,
+             ['5%', '10%', '20%'].every(x => sez.split('>' + x + '<').length === 3),
+             accesi(sez), sez.split('§')[2],
+             sez.indexOf('📈 Se BTC sale') > 0 && sez.indexOf('📈 Se BTC sale') < sez.indexOf('📉 Se BTC scende'),
+             sez.indexOf('id="p2pNuovoParacaduteSu"') > 0 && sez.indexOf('id="p2pNuovoParacaduteGiu"') > 0];
+p2pNuovoParacadute = 10;              /* la forma di prima: un numero, nei due versi */
 const sez10 = sezioneParacaduteNuovoP2P(false);
-c.sezione10 = [/class="p2p-accesso-chip on" aria-pressed="true" data-n="10"/.test(sez10),
-               (sez10.match(/aria-pressed="true"/g) || []).length, sez10.split('§')[2]];
+c.sezione10 = [accesi(sez10), (sez10.match(/aria-pressed="true"/g) || []).length, sez10.split('§')[2]];
+p2pNuovoParacadute = {su: 0, giu: 5};
+const sezGiu = sezioneParacaduteNuovoP2P(false);
+p2pNuovoParacadute = {su: 20, giu: 10};
+const sezDue = sezioneParacaduteNuovoP2P(false);
+c.sezioneVersi = [accesi(sezGiu), sezGiu.split('§')[2], accesi(sezDue), sezDue.split('§')[2]];
 c.sezioneNo = [sezioneParacaduteNuovoP2P(true), (LEVE = {paracadute: false}, sezioneParacaduteNuovoP2P(false)),
                (LEVE = {}, sezioneParacaduteNuovoP2P(false)), (LEVE = {paracadute: 'si'}, sezioneParacaduteNuovoP2P(false))];
 LEVE = {paracadute: true};
-scegliParacaduteNuovoP2P(20); const s20 = p2pNuovoParacadute;
-scegliParacaduteNuovoP2P(7);
-c.scegli = [s20, p2pNuovoParacadute, RIDISEGNI];
+p2pNuovoParacadute = {su: 0, giu: 0};
+scegliParacaduteNuovoP2P('giu', 20); const s20 = Object.assign({}, p2pNuovoParacadute);
+scegliParacaduteNuovoP2P('su', 10); const s10 = Object.assign({}, p2pNuovoParacadute);
+scegliParacaduteNuovoP2P('giu', 7); const s7 = Object.assign({}, p2pNuovoParacadute);
+scegliParacaduteNuovoP2P('lato', 5); scegliParacaduteNuovoP2P(5);
+c.scegli = [s20, s10, s7, p2pNuovoParacadute, RIDISEGNI];
 /* il click che arriva subito dopo il tocco sul + non sceglie niente */
+p2pNuovoParacadute = {su: 0, giu: 0};
 p2pPiuGestoAt = performance.now();
-scegliParacaduteNuovoP2P(10); const subito = [p2pNuovoParacadute, RIDISEGNI];
+scegliParacaduteNuovoP2P('giu', 10); const subito = [Object.assign({}, p2pNuovoParacadute), RIDISEGNI];
 p2pPiuGestoAt = performance.now() - 900;
-scegliParacaduteNuovoP2P(10);
+scegliParacaduteNuovoP2P('giu', 10);
 c.fantasma = [subito, [p2pNuovoParacadute, RIDISEGNI]];
 /* ...e lo stesso click sul filtro di chi puo' prendere: il pezzo VERO */
 p2pNuovoFiltro = 0;
@@ -187405,14 +187527,17 @@ p2pPiuGestoAt = -1e9;
 c.memoria = Object.keys(MEMORIA);
 /* dai campi, e all'intestazione */
 c.daCampi = [paracaduteDaCampiP2P({paracadute: 5, metodi: ['SEPA']}),
+             paracaduteDaCampiP2P({paracadute: {su: 0, giu: 10}, metodi: ['SEPA']}),
+             paracaduteDaCampiP2P({paracadute: {su: 0, giu: 0}, metodi: ['SEPA']}),
              paracaduteDaCampiP2P({paracadute: 5, metodi: ['Contanti al tabacchino 23.47']}),
              paracaduteDaCampiP2P({paracadute: 7, metodi: ['SEPA']}), paracaduteDaCampiP2P(null),
              (LEVE = {paracadute: false}, paracaduteDaCampiP2P({paracadute: 5, metodi: ['SEPA']}))];
 LEVE = {paracadute: true};
 MIE = {[ID]: {id: ID, mio: true, paracadute: 5}, [ID2]: {id: ID2, mio: false, paracadute: 10},
        [ID3]: {id: ID3, mio: true, tabacchino: true, paracadute: 5},
-       a: {id: 'a', mio: true, paracadute: 7}, b: {id: 'b', mio: true}};
-c.daDichiarare = paracaduteDaDichiarareP2P([ID, ID2, ID3, 'a', 'b', 'manca']);
+       a: {id: 'a', mio: true, paracadute: 7}, b: {id: 'b', mio: true},
+       g: {id: 'g', mio: true, paracadute: {su: 20, giu: 0}}, z: {id: 'z', mio: true, paracadute: {su: 0, giu: 0}}};
+c.daDichiarare = paracaduteDaDichiarareP2P([ID, ID2, ID3, 'a', 'b', 'g', 'z', 'manca']);
 /* quel che dice il server */
 c.prendi = [prendiParacaduteP2P([ID, 'nuovo:x', 7]), Object.keys(p2pParacaduteAperti),
             prendiParacaduteP2P([ID]), prendiParacaduteP2P([ID2]), Object.keys(p2pParacaduteAperti),
@@ -187443,6 +187568,23 @@ c.segno = [segnoParacaduteP2P(MIE[ID2]), segnoParacaduteP2P(MIE[ID]), segnoParac
            segnoParacaduteP2P({id: 'x', stato: 'pubblicato'}),
            (LEVE = {paracadute: false}, segnoParacaduteP2P(MIE[ID2]))];
 LEVE = {paracadute: true};
+/* LE DUE SOGLIE dal server e dalla riga (17 nov 2026) */
+MIE.v1 = {id: 'v1', mio: true, stato: 'pubblicato'};
+MIE.v2 = {id: 'v2', mio: true, stato: 'pubblicato', paracadute: {su: 10, giu: 0}};
+p2pMieiParacadute.v1 = {soglia: 5, su: 0, giu: 5, partenza: 98000, aperto: 0, arrivo: 0};
+c.versiMio = [mioParacaduteP2P(MIE.v1), mioParacaduteP2P(MIE.v2), segnoParacaduteP2P(MIE.v1),
+              segnoParacaduteP2P(MIE.v2), riquadroParacaduteP2P(Object.assign({metodi: ['SEPA']}, MIE.v1)).replace(/<[^>]+>/g, '|'),
+              riquadroParacaduteP2P(Object.assign({metodi: ['SEPA']}, MIE.v2)).replace(/<[^>]+>/g, '|')];
+delete MIE.v1; delete MIE.v2; delete p2pMieiParacadute.v1;
+c.etichette = [etichettaParacaduteP2P({su: 10, giu: 5}), etichettaParacaduteP2P({su: 0, giu: 5}),
+               etichettaParacaduteP2P({su: 20, giu: 0}), etichettaParacaduteP2P(10), etichettaParacaduteP2P({su: 0, giu: 0}),
+               etichettaParacaduteP2P(null)];
+c.versiFrase = [fraseParacaduteP2P({su: 10, giu: 5}), fraseParacaduteP2P({su: 0, giu: 5}), fraseParacaduteP2P({su: 20, giu: 0}),
+                fraseParacaduteP2P({su: 0, giu: 0})];
+c.versiOc = [versiParacaduteOcP2P({paracadute: 10, paracadute_su: 10, paracadute_giu: 0}),
+             versiParacaduteOcP2P({paracadute: 5}), versiParacaduteOcP2P({}), versiParacaduteOcP2P(null)];
+c.daServer = [versiDaServerParacaduteP2P({soglia: 10, su: 0, giu: 10}), versiDaServerParacaduteP2P({soglia: 5}),
+              versiDaServerParacaduteP2P(null), versiDaServerParacaduteP2P(7)];
 /* LA CARD DEL LIBRO (13 ott 2026, sera: il difetto trovato da Andrea sul
    telefono): l'ordine del libro arriva con lo stato del 38383 — 'pending' —
    e non con quello della mia riga ('pubblicato') */
@@ -187478,7 +187620,7 @@ c.fraseArmato = typeof fraseArmatoParacaduteP2P === 'function'
 /* il tasto: il foglio coi campi di prima, al prezzo nuovo */
 p2pOrdineAperto = ID3;
 MIE[ID3] = Object.assign(MIE[ID3], {lato: 'vendo', sats: 50000, euro: 50, premium: 0});
-p2pNuovoParacadute = 0;               /* come lo lascia `apriNuovoOrdineP2P`, che qui e' di cartone */
+p2pNuovoParacadute = {su: 0, giu: 0}; /* come lo lascia `apriNuovoOrdineP2P`, che qui e' di cartone */
 ripubblicaParacaduteP2P();
 c.tasto = [p2pLato, ANDATO, APERTO_FOGLIO, p2pNuovoMetodi, p2pNuovoEuro, p2pNuovoFisso, p2pNuovoSats,
            p2pNuovoParacadute, CANCEL.length, SENZA_SCOSSA];
@@ -187517,8 +187659,8 @@ CHIESTE = []; p2pParacaduteBattito = 0;
 MIE = {[ID2]: {id: ID2, mio: true, stato: 'attesa_mia_garanzia'}, b: {id: 'b', mio: false, stato: 'pubblicato'}};
 c.battitoNiente = [battitoParacaduteP2P(), CHIESTE.length];
 MIE = {[ID]: {id: ID, mio: true, stato: 'pubblicato', metodi: ['SEPA']}};
-RISPOSTA = {attivo: true, ordini: {[ID]: {soglia: 5, partenza: 100000, aperto: 1900, arrivo: 93000},
-                                   'storto': {soglia: 5}, [ID2]: {soglia: 7}}};
+RISPOSTA = {attivo: true, ordini: {[ID]: {soglia: 5, su: 0, giu: 5, partenza: 100000, aperto: 1900, arrivo: 93000},
+                                   'storto': {soglia: 5}, [ID2]: {soglia: 7}, [ID3]: {soglia: 10, su: 0, giu: 0}}};
 p2pMieiParacadute = {}; p2pParacaduteTentato = {}; CANCEL = [];
 const partito = battitoParacaduteP2P();
 await aspetta();
@@ -187550,7 +187692,8 @@ c.fuoriLibro = [altrove, spenta, primo, dopoPrimo, secondo, tirata, [FOTO, FERMO
 /* «Info P2P» */
 const inf = testoParacaduteInfoP2P(true, false);
 c.info = [testoParacaduteInfoP2P(false, true), inf.indexOf('<h3') < 0, testoParacaduteInfoP2P(true, true).indexOf('<h3 id="p2pinfo-pubblica">Se pubblichi un ordine</h3>') === 0,
-          ['5%, 10%, 20%', 'senza penalità', 'due letture di fila', 'il tuo telefono', 'Barattozon'].every(x => inf.indexOf(x) > 0)];
+          ['5%, 10%, 20%', 'senza penalità', 'due letture di fila', 'il tuo telefono', 'Barattozon',
+           'se BTC sale', 'se BTC scende'].every(x => inf.indexOf(x) > 0)];
 console.log(JSON.stringify(c));
 })().catch(e => { console.error(e && e.stack || e); process.exit(1); });
 """
@@ -187561,39 +187704,53 @@ console.log(JSON.stringify(c));
     ID, ID2, ID3 = ("0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000" + n for n in "123")
     prova("la soglia: solo le tre del catalogo, anche scritte come testo; il resto vale 0",
           [5, 10, 20, 0, 0, 0, 0, 0], c.get("soglia"))
-    prova("la riga sotto le scelte: una frase sola, con la soglia; a «Spento» dice cosa fa",
+    spento = ("Scegli se togliere l'ordine quando BTC sale, quando scende, o tutte e due. "
+              "Senza penalità.")
+    prova("la riga sotto le scelte: una frase sola, con la soglia (un numero solo vale nei "
+          "due versi, e la frase e' quella di sempre); a «Nessuna» dice cosa fa",
           ["Se BTC sale o scende più del 5% da adesso, l'ordine si annulla da solo. Senza penalità.",
            "Se BTC sale o scende più del 20% da adesso, l'ordine si annulla da solo. Senza penalità.",
-           "Se BTC sale o scende oltre la soglia che scegli, l'ordine si annulla da solo. "
-           "Senza penalità."] * 1
-          + ["Se BTC sale o scende oltre la soglia che scegli, l'ordine si annulla da solo. "
-             "Senza penalità."], c.get("frasi"))
+           spento, spento], c.get("frasi"))
     prova("...corta: nessuna passa i cento caratteri", True,
           all(len(x) <= 100 for x in c.get("frasi") or ["x" * 999]))
-    prova("LA SEZIONE: «🪂 Paracadute», quattro scelte — Spento · 5% · 10% · 20% — e di serie "
-          "e' accesa «Spento»",
-          ["🪂 Paracadute", 4, True, True, True,
-           '<div class="hint">Se BTC sale o scende oltre la soglia che scegli, l\'ordine si '
-           'annulla da solo. Senza penalità.</div>'], c.get("sezione"))
-    prova("...scelto il 10% e' accesa quella sola, e la frase lo dice",
-          [True, 1, '<div class="hint">Se BTC sale o scende più del 10% da adesso, l\'ordine '
-                    'si annulla da solo. Senza penalità.</div>'], c.get("sezione10"))
+    prova("LA SEZIONE: «🪂 Paracadute» con DUE RIGHE, «📈 Se BTC sale» sopra e «📉 Se BTC "
+          "scende» sotto, ognuna Nessuna · 5% · 10% · 20% — e di serie e' accesa «Nessuna» "
+          "in tutte e due",
+          ["🪂 Paracadute", 8, 2, True, ["su0", "giu0"],
+           '<div class="hint">' + spento + '</div>', True, True], c.get("sezione"))
+    prova("...un numero solo (la forma di prima) accende il 10% nelle due righe, e la frase "
+          "lo dice",
+          [["su10", "giu10"], 2, '<div class="hint">Se BTC sale o scende più del 10% da '
+                                 'adesso, l\'ordine si annulla da solo. Senza penalità.</div>'],
+          c.get("sezione10"))
+    prova("...«sale: Nessuna, scende: 5%» accende quelle due, e la frase dice il verso solo; "
+          "«sale 20%, scende 10%» le dice tutte e due",
+          [["su0", "giu5"], '<div class="hint">Se BTC scende più del 5% da adesso, l\'ordine '
+                            'si annulla da solo. Senza penalità.</div>',
+           ["su20", "giu10"], '<div class="hint">Se BTC sale più del 20% o scende più del 10% '
+                              'da adesso, l\'ordine si annulla da solo. Senza penalità.</div>'],
+          c.get("sezioneVersi"))
     prova("...con BARATTOZON non c'e', e a leva spenta (o storta) nemmeno", ["", "", "", ""],
           c.get("sezioneNo"))
-    prova("il tocco su una scelta la prende e ridisegna il foglio; una fuori catalogo spegne",
-          [20, 0, 2], c.get("scegli"))
+    prova("il tocco su una scelta la prende NEL SUO VERSO, lascia l'altro com'era, e "
+          "ridisegna il foglio; una fuori catalogo spegne quel verso; un verso storto non "
+          "tocca niente", [{"su": 0, "giu": 20}, {"su": 10, "giu": 20}, {"su": 10, "giu": 0},
+                           {"su": 10, "giu": 0}, 3], c.get("scegli"))
     prova("IL CLICK FANTASMA: entro 700 ms dal gesto del + la scelta non entra e il foglio "
           "non si ridisegna; dopo, un tocco vero la prende",
-          [[0, 2], [10, 3]], c.get("fantasma"))
+          [[{"su": 0, "giu": 0}, 3], [{"su": 0, "giu": 10}, 4]], c.get("fantasma"))
     prova("IL CLICK FANTASMA SUL FILTRO: entro 700 ms dal gesto del + «3+ scambi» NON si "
           "accende (e il foglio non si ridisegna); dopo, un tocco vero lo sceglie, e «Tutti» "
           "lo toglie", [[0, 0], [3, 1], 0], c.get("fantasmaFiltro"))
     prova("LA SCELTA NON SI RICORDA: dopo tutti i tocchi sul foglio, in memoria non c'e' "
           "niente", [], c.get("memoria"))
-    prova("dai campi: la soglia parte con l'ordine; mai con Barattozon, mai fuori catalogo, "
-          "mai a leva spenta", [5, 0, 0, 0, 0], c.get("daCampi"))
-    prova("all'intestazione si dichiarano i soli MIEI ordini con una soglia buona, e non "
-          "quelli Barattozon", {ID: 5}, c.get("daDichiarare"))
+    prova("dai campi: le due soglie partono con l'ordine (un numero vale nei due versi); "
+          "nessuna, Barattozon, fuori catalogo o leva spenta: niente",
+          [{"su": 5, "giu": 5}, {"su": 0, "giu": 10}, None, None, None, None, None],
+          c.get("daCampi"))
+    prova("all'intestazione si dichiarano i soli MIEI ordini con una soglia buona, una per "
+          "verso, e non quelli Barattozon",
+          {ID: {"su": 5, "giu": 5}, "g": {"su": 20, "giu": 0}}, c.get("daDichiarare"))
     prova("quel che dice il server: la lista intera prende il posto di quella di prima, con "
           "gli id si giudicano solo quelli; una forma storta non e' una lista",
           [True, [ID], False, True, [ID2], False, [ID2], True, [ID, ID2], True, [], False],
@@ -187603,30 +187760,31 @@ console.log(JSON.stringify(c));
     prova("...il MIO resta: lo devo poter aprire", False, c.get("nascostoMio"))
     prova("il mio paracadute, dalla riga: la soglia scritta pubblicando, e l'apertura che la "
           "riga si e' annotata",
-          [{"soglia": 5, "aperto": 0, "partenza": 0, "arrivo": 0}, None,
-           {"soglia": 10, "aperto": 1700, "partenza": 100000, "arrivo": 88000}, None],
+          [{"su": 5, "giu": 5, "aperto": 0, "partenza": 0, "arrivo": 0}, None,
+           {"su": 10, "giu": 10, "aperto": 1700, "partenza": 100000, "arrivo": 88000}, None],
           c.get("mio"))
-    prova("...e VINCE IL SERVER: anche sul telefono che l'ordine non l'ha scritto",
-          [{"soglia": 5, "aperto": 1800, "partenza": 100000, "arrivo": 94000},
-           {"soglia": 10, "aperto": 0, "partenza": 99000, "arrivo": 0}], c.get("mioServer"))
+    prova("...e VINCE IL SERVER: anche sul telefono che l'ordine non l'ha scritto (e un "
+          "server che dice la sola `soglia` vale nei due versi)",
+          [{"su": 5, "giu": 5, "aperto": 1800, "partenza": 100000, "arrivo": 94000},
+           {"su": 10, "giu": 10, "aperto": 0, "partenza": 99000, "arrivo": 0}], c.get("mioServer"))
     prova("lo stato: aperto, armato, annullato dal paracadute; su un ordine PRESO non c'e' "
           "niente da dire, e un annullato a mano non e' «dal paracadute»",
           ["aperto", "armato", "annullato", "", "", "", ""], c.get("stato"))
     prova("IL SEGNO sulla mia card: «🪂 Paracadute 10%», poi come sta; senza paracadute o a "
           "leva spenta niente",
-          ['<div class="p2p-box p2p-paracadute">🪂 Paracadute 10%</div>',
+          ['<div class="p2p-box p2p-paracadute">🪂 Paracadute ↑10% ↓10%</div>',
            '<div class="p2p-box p2p-paracadute">🪂 Paracadute aperto: l\'ordine è uscito dal '
            'libro</div>',
            '<div class="p2p-box p2p-paracadute">🪂 Annullato dal paracadute</div>', "", ""],
           c.get("segno"))
-    arm = '<div class="p2p-box p2p-paracadute">🪂 Paracadute %d%%</div>'
+    arm = '<div class="p2p-box p2p-paracadute">🪂 Paracadute ↑%d%% ↓%d%%</div>'
     prova("IL SEGNO SULLA CARD DEL LIBRO, dove l'ordine arriva `pending` e non "
           "«pubblicato»: «🪂 Paracadute 10%» sul mio; come sta, se si e' aperto; anche sul "
           "telefono che l'ordine non l'ha scritto; MAI su quello di un altro, MAI su uno "
           "preso — e sul mio gia' annullato vale la mia riga",
-          [arm % 10,
+          [arm % (10, 10),
            '<div class="p2p-box p2p-paracadute">🪂 Paracadute aperto: l\'ordine è uscito dal '
-           'libro</div>', arm % 20, "", "",
+           'libro</div>', arm % (20, 20), "", "",
            '<div class="p2p-box p2p-paracadute">🪂 Annullato dal paracadute</div>'],
           c.get("segnoLibro"))
     prova("i prezzi come si leggono", ["98.450 €", "100.000 €", "—", "—"], c.get("euro"))
@@ -187637,13 +187795,13 @@ console.log(JSON.stringify(c));
     prova("RIPUBBLICARE A PREZZO FISSO: gli stessi euro, i sats rifatti al prezzo nuovo "
           "tenendo lo scarto di prima — 50.000 sats a 100.000 € diventano 53.191 a 94.000",
           {"metodi": ["SEPA"], "euro": "50", "euroMax": "", "fisso": True, "sats": "53191",
-           "premio": 0, "zona": "Milano", "filtro": 3, "paracadute": 5}, r[0])
+           "premio": 0, "zona": "Milano", "filtro": 3, "paracadute": {"su": 5, "giu": 5}}, r[0])
     prova("...in salita ne servono meno; e senza uno dei due prezzi restano quelli di prima "
           "(il foglio aperto li fa vedere)", ["47170", "50000", "50000"],
           [r[5].get("sats"), r[1].get("sats"), r[2].get("sats")])
     prova("RIPUBBLICARE A MERCATO: gli stessi campi, il premio di prima; un intervallo resta "
           "un intervallo",
-          [(False, "", 2, 10), (False, "200", -1, ["SEPA", "Revolut"])],
+          [(False, "", 2, {"su": 10, "giu": 10}), (False, "200", -1, ["SEPA", "Revolut"])],
           [(r[3].get("fisso"), r[3].get("sats"), r[3].get("premio"), r[3].get("paracadute")),
            (r[4].get("fisso"), r[4].get("euroMax"), r[4].get("premio"), r[4].get("metodi"))])
     q = c.get("riquadro") or [""] * 7
@@ -187663,11 +187821,11 @@ console.log(JSON.stringify(c));
     # nessuna dicitura» — la pagina parlava solo a paracadute APERTO)
     prova("...E A PARACADUTE ANCORA CHIUSO LA PAGINA LO DICE, con la frase intera: e' una "
           "soglia sul prezzo di BTC, col prezzo di partenza — non uno sconto",
-          "||🪂 Paracadute 10%: se BTC sale o scende più del 10% da 99.000 €, l'ordine si "
+          "||🪂 Paracadute ↑10% ↓10%: se BTC sale o scende più del 10% da 99.000 €, l'ordine si "
           "annulla da solo. Senza penalità.||", q[4])
     prova("...su un ordine non mio, o a leva spenta, non c'e'", ["", ""], q[5:7])
     prova("...e senza il prezzo di partenza (il server non l'ha ancora detto) la frase "
-          "resta vera", ["🪂 Paracadute 5%: se BTC sale o scende più del 5% dal prezzo di "
+          "resta vera", ["🪂 Paracadute ↑5% ↓5%: se BTC sale o scende più del 5% dal prezzo di "
                          "quando l'hai pubblicato, l'ordine si annulla da solo. Senza penalità.",
                          ""],
           c.get("fraseArmato"))
@@ -187679,7 +187837,8 @@ console.log(JSON.stringify(c));
     prova("IL TASTO «🔁 Ripubblica al prezzo nuovo» apre il foglio dal libro, sul lato "
           "dell'ordine, coi campi di prima e i sats nuovi — NON pubblica da solo, e "
           "RITROVA LA SOGLIA DELL'ORDINE VECCHIO (10%), accesa nel foglio",
-          ["vendo", 1, 1, ["SEPA"], "50", True, "53191", 10, 0, True], c.get("tasto"))
+          ["vendo", 1, 1, ["SEPA"], "50", True, "53191", {"su": 10, "giu": 10}, 0, True],
+          c.get("tasto"))
     prova("IL CANCEL NON PARTE su un ordine PRESO, su uno senza le chiavi qui, su uno che "
           "non c'e'", [False, False, False, 0], c.get("cancelPreso"))
     prova("...ne' a prese chiuse", [False, 0], c.get("cancelChiuse"))
@@ -187705,7 +187864,7 @@ console.log(JSON.stringify(c));
     prova("...a chi ce l'ha: UNA lettura della sua rotta, le righe buone prese, e il "
           "`cancel` dell'ordine che il server dice aperto",
           [True, [["/api/p2p/paracadute", "GET"]], [ID],
-           {"soglia": 5, "partenza": 100000, "aperto": 1900, "arrivo": 93000},
+           {"su": 0, "giu": 5, "partenza": 100000, "aperto": 1900, "arrivo": 93000},
            [[ID, "cancel"]], "annullato"], b)
     prova("...una volta al minuto; a pagina nascosta, a leva spenta o senza sessione tace",
           [False, 1, False, False, False, 1], c.get("battitoFreno"))
@@ -187715,6 +187874,30 @@ console.log(JSON.stringify(c));
           "la fotografia, e ridisegna perche' un ordine e' uscito; nel minuto non richiede; "
           "la tirata si', e senza novita' non ridisegna",
           [False, False, True, [1, 1, [ID]], False, True, [2, 1]], c.get("fuoriLibro"))
+    prova("LE DUE SOGLIE SUL MIO ORDINE: dal server «scende 5%», dalla riga «sale 10%»; il "
+          "segno dice i soli versi scelti, e la pagina la frase intera del verso",
+          [{"su": 0, "giu": 5, "aperto": 0, "partenza": 98000, "arrivo": 0},
+           {"su": 10, "giu": 0, "aperto": 0, "partenza": 0, "arrivo": 0},
+           '<div class="p2p-box p2p-paracadute">🪂 Paracadute ↓5%</div>',
+           '<div class="p2p-box p2p-paracadute">🪂 Paracadute ↑10%</div>',
+           "||🪂 Paracadute ↓5%: se BTC scende più del 5% da 98.000 €, l'ordine si annulla da "
+           "solo. Senza penalità.||",
+           "||🪂 Paracadute ↑10%: se BTC sale più del 10% dal prezzo di quando l'hai "
+           "pubblicato, l'ordine si annulla da solo. Senza penalità.||"], c.get("versiMio"))
+    prova("l'etichetta corta coi soli versi scelti", ["↑10% ↓5%", "↓5%", "↑20%", "↑10% ↓10%", "", ""],
+          c.get("etichette"))
+    prova("la frase coi versi", ["Se BTC sale più del 10% o scende più del 5% da adesso, l'ordine "
+                                 "si annulla da solo. Senza penalità.",
+                                 "Se BTC scende più del 5% da adesso, l'ordine si annulla da "
+                                 "solo. Senza penalità.",
+                                 "Se BTC sale più del 20% da adesso, l'ordine si annulla da "
+                                 "solo. Senza penalità.", spento], c.get("versiFrase"))
+    prova("l'ordine ON-CHAIN: le due colonne del server; senza, la soglia unica nei due versi",
+          [{"su": 10, "giu": 0}, {"su": 5, "giu": 5}, {"su": 0, "giu": 0}, {"su": 0, "giu": 0}],
+          c.get("versiOc"))
+    prova("quel che dice il server: `su` e `giu` se ci sono, sennò la `soglia` nei due versi",
+          [{"su": 0, "giu": 10}, {"su": 5, "giu": 5}, {"su": 0, "giu": 0}, {"su": 0, "giu": 0}],
+          c.get("daServer"))
     prova("«Info P2P»: spento non scrive niente; acceso sta nella sezione di chi pubblica, "
           "col suo titolo quando serve, e dice le cinque cose",
           ["", True, True, True], c.get("info"))
@@ -192142,10 +192325,12 @@ def prove_barattozon_onchain():
           "la vita del libro dal PayCode, e la colonna `paycode`",
           [True, True, True, True, True],
           ["perche, tab = p2p_onchain_giudica_tabacchino(" in pub,
-           "rip, recapito = None, \"\"\n        para, para_da, para_letto = 0, 0.0, 0" in pub,
+           "rip, recapito = None, \"\"\n        para, para_da, para_letto = 0, 0.0, 0\n"
+           "        para_su = para_giu = 0" in pub,
            'p2p_onchain_scade_libro(adesso, tab["scade"] if tab else 0)' in pub,
-           # (17 nov 2026 sera, onchain-contanti) dopo il PayCode viene la zona
-           'json.dumps(tab) if tab else "", zona))' in pub,
+           # (17 nov 2026 sera, onchain-contanti) dopo il PayCode viene la zona,
+           # e dopo la zona le due soglie del paracadute (paracadute-su-giu)
+           'json.dumps(tab) if tab else "", zona, para_su, para_giu))' in pub,
            '("paycode", "TEXT DEFAULT \'\'")' in src])
     prova("il recapito di un Barattozon non si scrive, e un Barattozon in pausa si prende lo stesso",
           [True, True, True],
@@ -205142,8 +205327,9 @@ def prove_onchain_contanti():
           (True, True, True, True),
           ("perche = p2p_onchain_giudica_contanti(metodi, euro_cent, d.get(\"zona\")," in rotta,
            "if not perche and \"Contanti\" in _metodi_libro(metodi):\n            zona = _zona_pulita_p2p(d.get(\"zona\"))" in rotta,
-           "\" rip_minimo, rip_massimo, fiat, paycode, zona)\"" in rotta
-           and "json.dumps(tab) if tab else \"\", zona))" in rotta,
+           # (17 nov 2026 sera, paracadute-su-giu) dopo la zona le due soglie
+           "\" rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu)\"" in rotta
+           and "json.dumps(tab) if tab else \"\", zona, para_su, para_giu))" in rotta,
            "tetto_c = p2p_onchain_tetto_usdt(tetto_c, cambio_noto_ora(\"eur\"), cambio)" in rotta))
     prova("la colonna nasce da sola, e la zona esce nel libro e nella scheda dello scambio",
           (True, True, True),
