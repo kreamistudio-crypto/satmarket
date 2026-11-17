@@ -281,6 +281,10 @@ def giro_acquisti_spenti(c, SRV):
           sorted(k for k in adm if "acq" in k))
     prova("il contatore acquisti_ok resta com'era (livello e distintivi)",
           2, acq)
+    me = c.get("/api/me", headers=COMPRATORE).json()
+    prova("/api/me: la testata non mostra gli acquisti, ma il numero "
+          "arriva per il livello", (False, 2),
+          (me.get("acquisti_nel_profilo"), me.get("acquisti_ok")))
 
 
 if __name__ == "__main__":

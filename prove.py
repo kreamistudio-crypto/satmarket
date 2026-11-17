@@ -54190,6 +54190,20 @@ def prove_numeri_negozio():
     prova("i contatori non si toccano: nessuna porta scrive acquisti_ok",
           False, "UPDATE" in codice(pezzo("miei_numeri_negozio"))
           + codice(pezzo("numeri_negozio_admin")))
+    prova("/api/me manda la leva viva alla testata del Profilo", True,
+          'profilo["acquisti_nel_profilo"] = ACQUISTI_NEL_PROFILO' in
+          pezzo("mio_profilo"))
+    prova("...il client la crede solo se arriva proprio true", True,
+          "myAcquistiVisibili = me.acquisti_nel_profilo === true;" in mini
+          and "let myAcquistiVisibili = false;" in mini)
+    _testata = pezzo_js(mini, "function renderProfilo(){", "\n}\n")
+    prova("...e la testata, spenta, scrive le sole vendite", True,
+          "(myAcquistiVisibili\n       ? `${myVenditeOk} vendite · "
+          "${myAcquistiOk} acquisti conclusi`\n       : `${myVenditeOk} "
+          "vendite concluse`)" in _testata)
+    prova("...con la frase gia' nel dizionario inglese", True,
+          '"{} vendite concluse":' in open(
+              os.path.join("lingua", "en.js"), encoding="utf-8").read())
     prova("la leva sta nel pannello delle leve", True,
           '"ACQUISTI_NEL_PROFILO", ACQUISTI_NEL_PROFILO,' in src
           and '"gruppo": "🛍️ Acquisti nel Profilo"' in src)

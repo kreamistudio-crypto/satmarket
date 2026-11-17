@@ -43672,6 +43672,7 @@ let myAvvisiP2P = true;   // «⚡ Avvisi sugli scambi P2P»: accesi di serie
    chi-e-l-altro, decisione di Andrea con Alan): chi scambia da Barattolo
    e' riconosciuto dalla controparte con qualunque login, e chi vuole
    l'anonimato entra con una chiave Nostr nuova. */
+let myAcquistiVisibili = false;  // la leva ACQUISTI_NEL_PROFILO, da /api/me
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecensori = 0, myNegozio = '';
 let myScambiP2P = 0;   // gli scambi P2P completati (da /api/me, `scambi_completati`)
 /* il francobollo della propria foto profilo e il suo selettore
@@ -43783,7 +43784,13 @@ function renderProfilo(){
      tocco apre «Recensioni ricevute», dove c'e' il cassetto */
   const rep = (myRating>0
     ? `<span class="rep-recensioni" role="button" tabindex="0" onclick="apriRecensioniRicevute()"><span class="stars">${'★'.repeat(Math.round(myRating))}</span> ${myRating}${contaFeedback(myNFeedback, myNRecensori)}</span> · ` : '')
-    + `${myVenditeOk} vendite · ${myAcquistiOk} acquisti conclusi`
+    /* GLI ACQUISTI NELLA TESTATA solo con la leva ACQUISTI_NEL_PROFILO
+       (17 nov 2026 sera, privacy; Andrea, sullo scatto del Profilo: gli
+       acquisti non si devono vedere). Spenta, di serie, la riga dice le
+       sole vendite; il numero arriva lo stesso, perche' serve al livello. */
+    + (myAcquistiVisibili
+       ? `${myVenditeOk} vendite · ${myAcquistiOk} acquisti conclusi`
+       : `${myVenditeOk} vendite concluse`)
     /* GLI SCAMBI P2P ANCHE QUI (12 ott 2026, voto-dopo-concluso, dal
        campo: «nel mio profilo non compare lo scambio»): la stessa
        frase del negozio, da uno in su */
@@ -115820,6 +115827,7 @@ async function avvia(){
     bozzaCodice = null;     // e la bozza si butta, o resterebbe fissata
     codiceInModifica = 0;   // a una regola letta prima di questo giro
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
+    myAcquistiVisibili = me.acquisti_nel_profilo === true;
     myScambiP2P = Number(me.scambi_completati) || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNRecensori = me.n_recensori || 0;

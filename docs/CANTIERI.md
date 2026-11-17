@@ -90383,3 +90383,24 @@ severa intera (29.965/0, le stesse 2 saltate) e i 4 collaudi on-chain
 vicini (verdi).
 RESTA da guardare dal vivo sul collaudo: il foglio a 390px e i due
 messaggi del bot.
+
+## Gli acquisti fuori anche dalla testata del Profilo (17 nov 2026 notte, cantiere acquisti-testata; dallo scatto di Andrea in produzione: «1 vendite · 16 acquisti conclusi» sotto il nome)
+
+Il cantiere totali-tolti aveva chiuso il cassetto 📊 ma non la riga sotto
+il nome nella testata del Profilo (`renderProfilo`), che da prima di
+oggi scriveva «N vendite · N acquisti conclusi» al proprietario. Mancata
+perché la prima ricerca guardava i totali con i sats, e questa riga
+legge `acquisti_ok` da `/api/me`. Ora la stessa leva
+`ACQUISTI_NEL_PROFILO` (spenta) arriva viva da `/api/me`
+(`acquisti_nel_profilo`), il client la crede solo se è proprio `true`, e
+spenta la riga dice «N vendite concluse» (frase già nel dizionario
+inglese). `acquisti_ok` continua ad arrivare: serve al livello.
+Ricontrollato il resto: il profilo pubblico cancella `acquisti_ok` dalla risposta, il bot non
+lo scrive.
+
+Provato: quattro prove nuove in `prove_numeri_negozio` (la leva in
+`/api/me`, il client che la crede solo vera, la testata, il dizionario)
+e una nel collaudo (`/api/me` con la leva spenta e il numero presente);
+controprova (client che la crede sempre, server che non la manda) tre
+rosse.
+

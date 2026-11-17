@@ -165,7 +165,7 @@ Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraff
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere.
 
-I numeri del negozio: nel Profilo, gruppo «Il tuo negozio», il cassetto «📊 I numeri del negozio» mostra le visite alla pagina del negozio, le vendite concluse (ultimi 30 giorni e da sempre, coi sats che ha incassato: spedizione compresa, commissione tolta) e le recensioni. Contano gli ordini del mercatino conclusi, non gli scambi P2P. Quanto hai comprato NON si vede nel Profilo, per la privacy (scelta del 17 novembre 2026): i tuoi acquisti li trovi uno per uno in «Ordini». Chi ha solo comprato e non ha annunci non ha questo cassetto.
+I numeri del negozio: nel Profilo, gruppo «Il tuo negozio», il cassetto «📊 I numeri del negozio» mostra le visite alla pagina del negozio, le vendite concluse (ultimi 30 giorni e da sempre, coi sats che ha incassato: spedizione compresa, commissione tolta) e le recensioni. Contano gli ordini del mercatino conclusi, non gli scambi P2P. Quanto hai comprato NON si vede nel Profilo, per la privacy (scelta del 17 novembre 2026): né in questo cassetto né nella riga sotto il nome, che dice solo «N vendite concluse». I tuoi acquisti li trovi uno per uno in «Ordini». Chi ha solo comprato e non ha annunci non ha questo cassetto.
 
 <!-- pezzo libro-014 | libro -->
 ## Libro · Vendere nel mercatino (4/5)

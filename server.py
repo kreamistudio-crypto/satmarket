@@ -38013,11 +38013,11 @@ def _leve_stato():
             # serie per decisione di Andrea, nessun segreto
             _leva("Totali degli acquisti nel Profilo",
                   "ACQUISTI_NEL_PROFILO", ACQUISTI_NEL_PROFILO,
-                  acceso="nel cassetto 📊 del Profilo ci sono anche gli "
-                         "acquisti conclusi coi sats pagati, e chi ha "
+                  acceso="nel cassetto 📊 e nella testata del Profilo ci "
+                         "sono anche gli acquisti conclusi, e chi ha "
                          "solo comprato ha il cassetto «I tuoi acquisti»",
-                  spento="nel cassetto solo visite, vendite e recensioni, "
-                         "come prima; i moderatori non vedono gli acquisti; "
+                  spento="nel cassetto e nella testata del Profilo solo "
+                         "le vendite; i moderatori non vedono gli acquisti; "
                          "i contatori di livello e distintivi non cambiano"),
         ]},
         {"gruppo": "🚀 Rotta per la Luna", "voci": [
@@ -52585,6 +52585,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # La Rotta per la Luna (17 nov 2026): la leva VIVA, perche' la voce nel
     # Profilo nasca solo quando /api/me/stradina risponde.
     profilo["stradina"] = STRADINA_ATTIVA
+    # Gli acquisti nella testata del Profilo (17 nov 2026 sera, privacy):
+    # la leva VIVA. `acquisti_ok` esce lo stesso, serve al livello.
+    profilo["acquisti_nel_profilo"] = ACQUISTI_NEL_PROFILO
     # L'etichetta degli alimenti (17 nov 2026): la leva VIVA, perche' il
     # form non disegni una sezione che il server non scriverebbe.
     profilo["etichetta_alimenti"] = ETICHETTA_ALIMENTI
