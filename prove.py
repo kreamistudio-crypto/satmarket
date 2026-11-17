@@ -163654,7 +163654,8 @@ def prove_p2p_onchain_valute():
            and 'if coin and not p2p_coin_ammesso(user["id"]):' in pub,
            'euro_cent = p2p_onchain_cent_mercato({"metodi": json.dumps(metodi)})' in pub,
            # (17 nov 2026, barattozon-onchain) dopo `fiat` viene il PayCode
-           '"CHF" if chf else "",\n             json.dumps(tab) if tab else ""))' in pub
+           # (17 nov 2026 sera, onchain-contanti) ...e dopo il PayCode la zona
+           '"CHF" if chf else "",\n             json.dumps(tab) if tab else "", zona))' in pub
            and '("fiat", "TEXT DEFAULT \'\'")' in pezzo("_p2p_onchain_prepara"),
            'if coin_o and not p2p_coin_ammesso(user["id"]):' in pre
            and 'if p2p_onchain_chf(o) and not p2p_chf_ammesso(user["id"]):' in pre,
@@ -166554,7 +166555,9 @@ console.log(JSON.stringify(out));
            "  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) return;\n"
            "  if (p2pNuovoDue || p2pNuovoFisso || (tabacchinoP2P(p2pNuovoMetodi) && p2pLato !== 'compro')) return;"
            in pezzo_js(mini, "function svelaSecondoImportoP2P(){", "\n}\n"),
-           "const zona = !oc && typeof sezioneZonaNuovoP2P" in nuovo,
+           # (17 nov 2026, onchain-contanti) la zona c'e' anche on-chain
+           "const zona = typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';" in nuovo
+           and "const zona = !oc &&" not in nuovo,
            "(oc ? '<span class=\"p2p-invia-oc\">' + P2P_OC_MONETA + (tab ? 'Rileggi e pubblica' : 'Pubblica ordine') + '</span></button>'" in nuovo,
            "return (p2pLato !== 'compro' && !tabacchinoP2P(p2pNuovoMetodi) ? sezioneRecapitoOnchainP2P() : '') + riquadroOnchainP2P();"
            in pezzo_js(mini, "function riquadroLimitiP2P(){", "\n}\n")))
@@ -166604,7 +166607,9 @@ console.log(JSON.stringify(out));
            < apri.find("titolo: vendeLui ? 'Stai comprando sats' : 'Stai vendendo sats',")))
     campi = pezzo_js(mini, "function campiNuovoP2P(){", "\n}\n")
     vale = pezzo_js(mini, "function valeNuovoOrdineP2P(v){", "\n}\n")
-    prova("...e il giudice usa il minimo on-chain e non chiede la zona", (True, True),
+    # (17 nov 2026, onchain-contanti) la zona la chiede anche on-chain:
+    # era `!v.oc &&`, e la card in contanti usciva senza il luogo
+    prova("...e il giudice usa il minimo on-chain, e la zona la chiede come su Lightning", (True, False),
           ("? (p2pOnchainLibro.minSats || 0)" in campi,
            "const zonaNo = !v.oc &&" in vale))
 
@@ -171392,8 +171397,9 @@ def prove_contanti_zona():
     vale = fn("function valeNuovoOrdineP2P(v){")
     prova("il giudice del foglio chiede la zona dopo i metodi e prima del tabacchino, col suo campo",
           True,
-          # (30 ott 2026, oc-identico) a rete on-chain niente zona: `!v.oc &&`
-          "const zonaNo = !v.oc && typeof giudiceZonaP2P === 'function' ? giudiceZonaP2P(v.zona, v.metodi) : '';" in vale
+          # (30 ott 2026, oc-identico) a rete on-chain niente zona: `!v.oc &&`;
+          # dal 17 nov 2026 (onchain-contanti) la zona vale anche li'
+          "const zonaNo = typeof giudiceZonaP2P === 'function' ? giudiceZonaP2P(v.zona, v.metodi) : '';" in vale
           and "if (zonaNo) return {ok: false, manca: zonaNo, campo: 'p2pNuovoZona'};" in vale
           and vale.index("'Scegli almeno un metodo di pagamento'") < vale.index("const zonaNo = ")
           < vale.index("if (tabacchinoP2P(v.metodi) && v.lato === 'compro') {"))
@@ -171401,7 +171407,8 @@ def prove_contanti_zona():
           "zona: typeof p2pNuovoZona === 'string' ? p2pNuovoZona : ''," in fn("function campiNuovoP2P(){"))
     fog = fn("function renderNuovoOrdineP2P(){")
     prova("il foglio monta la sezione della zona subito sotto i metodi", True,
-          "const zona = !oc && typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';" in fog
+          # (17 nov 2026, onchain-contanti) senza piu' `!oc &&`: anche on-chain
+          "const zona = typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';" in fog
           and "valuta + metodi + zona + importo + " in fog)
     prova("...e riparte vuoto a ogni apertura, come gli altri campi", True,
           "  p2pNuovoMetodi = [];\n  p2pNuovoZona = '';\n" in fn("function apriNuovoOrdineP2P(metodo){"))
@@ -192020,7 +192027,8 @@ def prove_barattozon_onchain():
           ["perche, tab = p2p_onchain_giudica_tabacchino(" in pub,
            "rip, recapito = None, \"\"\n        para, para_da, para_letto = 0, 0.0, 0" in pub,
            'p2p_onchain_scade_libro(adesso, tab["scade"] if tab else 0)' in pub,
-           'json.dumps(tab) if tab else ""))' in pub,
+           # (17 nov 2026 sera, onchain-contanti) dopo il PayCode viene la zona
+           'json.dumps(tab) if tab else "", zona))' in pub,
            '("paycode", "TEXT DEFAULT \'\'")' in src])
     prova("il recapito di un Barattozon non si scrive, e un Barattozon in pausa si prende lo stesso",
           [True, True, True],
@@ -204962,6 +204970,111 @@ console.log(JSON.stringify({
            "o.non_completato === 'altro' ? ' A chi comprava è stato contato" in scheda))
 
 
+def prove_onchain_contanti():
+    """IL CONTANTI DI PERSONA ON-CHAIN COME SU LIGHTNING, PRIMO PEZZO: IL
+    LUOGO E LE REGOLE (17 nov 2026 sera, cantiere onchain-contanti; Andrea
+    con la foto di una card on-chain «Contanti»: «Perché la card on-chain
+    contanti non è come la card Lightning?», «non c'è neanche il luogo
+    dello scambio»). Il foglio «Pubblica» on-chain era nato il 30 ott
+    SENZA la zona: adesso la chiede come quello di Lightning, il server
+    la rigiudica col tetto del contanti e la tiene sulla riga, e la card
+    e il foglio della presa la mostrano con «📍»."""
+    print("\n[on-chain: il contanti di persona col luogo, come su Lightning]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    amb = {"json": json, "re": re, "_euro_tabacchino":
+           lambda m: 23.47 if str(m).startswith("Contanti al tabacchino ") else 0}
+    for riga in ("\nP2P_ZONA_MAX = ", "\n_ZONA_VIA_P2P = "):
+        j = src.index(riga) + 1
+        exec(src[j:src.index("\n", j)], amb)
+    for f in ("_fmt_sats", "_metodi_libro", "_zona_pulita_p2p", "_p2p_onchain_campo",
+              "p2p_onchain_giudica_contanti", "_p2p_onchain_zona"):
+        exec(pezzo(f), amb)
+    G, Z = amb["p2p_onchain_giudica_contanti"], amb["_p2p_onchain_zona"]
+    prova("senza «Contanti» il giudice tace, zona o non zona; il tabacchino non e' il contanti di persona",
+          ["", "", ""],
+          [G(["SEPA"], 90000, "", 250), G(["SEPA", "Revolut"], 90000, "Milano", 250),
+           G(["Contanti al tabacchino 23.47"], 2347, "", 250)])
+    prova("con «Contanti» la zona e' obbligatoria, anche fra piu' metodi, e ha il tetto dei 40",
+          ["", "Scrivi la zona di scambio: una città o una zona, come «Milano centro»",
+           "Scrivi la zona di scambio: una città o una zona, come «Milano centro»",
+           "La zona di scambio è troppo lunga: al massimo 40 caratteri"],
+          [G(["Contanti"], 10000, "Milano centro", 250), G(["Contanti"], 10000, "", 250),
+           G(["SEPA", "Contanti"], 10000, "   ", 250), G(["Contanti"], 10000, "x" * 41, 250)])
+    prova("...e il tetto del contanti vale anche on-chain, con la frase del telefono; spento non parla",
+          ["In contanti di persona il massimo è 250 € per scambio: sopra, si divide in più ordini",
+           "", "", "In contanti di persona il massimo è 230 CHF per scambio: sopra, si divide in più ordini"],
+          [G(["Contanti"], 25001, "Milano", 250), G(["Contanti"], 25000, "Milano", 250),
+           G(["Contanti"], 50000, "Milano", 0), G(["Contanti"], 23001, "Lugano", 230, "CHF")])
+    prova("la frase del tetto e' la stessa del telefono", True,
+          "return 'In contanti di persona il massimo è ' + fmt(t) + (inChf ? ' CHF' : ' €') + ' per scambio: sopra, si divide in più ordini';"
+          in pezzo_js(mini, "function giudiceContantiP2P(euro, metodi, tetto, cod){", "\n}\n"))
+    prova("la zona esce ripulita e solo con «Contanti» fra i metodi; una riga di ieri non ha niente",
+          ["Milano centro", "", "", "Roma"],
+          [Z({"metodi": '["Contanti"]', "zona": "  Milano \n centro "}),
+           Z({"metodi": '["SEPA"]', "zona": "Milano"}), Z({"metodi": '["Contanti"]'}),
+           Z({"metodi": '["SEPA", "Contanti"]', "zona": "Roma"})])
+    rotta = src[src.index('@app.post("/api/p2p/onchain/pubblica")'):
+                src.index('@app.post("/api/p2p/onchain/{oid}/annulla")')]
+    prova("la rotta giudica il contanti dopo il resto, tiene la zona solo col contanti e la scrive",
+          (True, True, True, True),
+          ("perche = p2p_onchain_giudica_contanti(metodi, euro_cent, d.get(\"zona\")," in rotta,
+           "if not perche and \"Contanti\" in _metodi_libro(metodi):\n            zona = _zona_pulita_p2p(d.get(\"zona\"))" in rotta,
+           "\" rip_minimo, rip_massimo, fiat, paycode, zona)\"" in rotta
+           and "json.dumps(tab) if tab else \"\", zona))" in rotta,
+           "tetto_c = p2p_onchain_tetto_usdt(tetto_c, cambio_noto_ora(\"eur\"), cambio)" in rotta))
+    prova("la colonna nasce da sola, e la zona esce nel libro e nella scheda dello scambio",
+          (True, True, True),
+          ('("zona", "TEXT DEFAULT \'\'")):' in src,
+           "zona = _p2p_onchain_zona(o)\n    if zona:\n        r[\"zona\"] = zona"
+           in pezzo("_p2p_onchain_riga_pubblica"),
+           "\"zona\": _p2p_onchain_zona(o)," in pezzo("_p2p_onchain_per")))
+    # --- il telefono ---
+    pubb = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
+    apri = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
+    riga = pezzo_js(mini, "function rigaOnchainP2P(o){", "\n}\n")
+    prova("il foglio on-chain manda la zona, la card la mostra sotto i metodi e il foglio della presa "
+          "la dice con la regola del contanti",
+          (True, True, True, True),
+          ("zona: typeof zonaDaCampiP2P === 'function' ? zonaDaCampiP2P(campi) : ''," in pubb,
+           "rigaZonaP2P({metodi: metodi, zona: o.zona})" in riga
+           and riga.index("${paga}") < riga.index("${zona}") < riga.index("${filtro}"),
+           "zonaDettP2P({metodi: o.metodi || [], zona: o.zona})" in apri,
+           "(o.metodi || []).length === 1\n        ? regolaContantiFoglioP2P(o.metodi," in apri))
+    banco = "\n".join(_fn_js(mini, f) for f in (
+        "function metodoBaseP2P(m){", "function contantiAManoP2P(metodi){",
+        "function zonaPulitaP2P(t){", "function zonaOrdineP2P(o){", "function rigaZonaP2P(o){",
+        "function ordineVoltoOnchainP2P(o){", "function satsCardOnchainP2P(o){",
+        "function pausaOnchainP2P(o, adesso){", "function rigaOnchainP2P(o){")) + "\n" \
+        + _riga_js(mini, "const P2P_TABACCHINO = ") + _riga_js(mini, "const P2P_TABACCHINO_PM = ") \
+        + _riga_js(mini, "const P2P_CONTANTI = ") + _riga_js(mini, "const P2P_ZONA_MAX = ") + r"""
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const fmt = n => String(n);
+const fmtEur = e => Number(e).toFixed(2).replace('.', ',');
+let p2pZone = {};
+const p2pOnchainLibro = {miei: [], eventi: []};
+const base = {id: 7, ordine: 'oc-x', lato: 'sell', sats: 300000, euro: 250, scade: 9999999999, creato: 1, nome: 'Giorgio'};
+const zona = h => (/<div class="p2p-box p2p-zona"[^>]*>([^<]*)<\/div>/.exec(h) || [])[1] || '';
+const out = {};
+out.contanti = zona(rigaOnchainP2P(Object.assign({}, base, {metodi: ['Contanti'], zona: 'Milano centro'})));
+out.misto = zona(rigaOnchainP2P(Object.assign({}, base, {metodi: ['SEPA', 'Contanti'], zona: 'Roma <b>'})));
+out.diIeri = zona(rigaOnchainP2P(Object.assign({}, base, {metodi: ['Contanti']})));
+out.sepa = zona(rigaOnchainP2P(Object.assign({}, base, {metodi: ['SEPA'], zona: 'Milano'})));
+out.tab = zona(rigaOnchainP2P(Object.assign({}, base, {metodi: ['Contanti al tabacchino 23.47'], zona: 'Milano'})));
+console.log(JSON.stringify(out));
+"""
+    out = _node_banco(banco)
+    if out is None:
+        salta("onchain_contanti", "node non c'e': la card on-chain non si disegna")
+        return
+    prova("LA CARD VERA: «📍 Milano centro» col contanti, anche fra piu' metodi e scappata; niente "
+          "su un ordine di ieri, su un SEPA, sul tabacchino",
+          {"contanti": "📍 Milano centro", "misto": "📍 Roma &lt;b&gt;", "diIeri": "", "sepa": "", "tab": ""},
+          out)
+
+
 def prove_guida_wallet():
     """LA GUIDA «👛 IL TUO PRIMO WALLET» (17 nov 2026, cantiere
     primo-wallet). Andrea voleva un wallet custodial per i neofiti; dallo
@@ -207714,7 +207827,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -208733,6 +208846,7 @@ def main():
     prove_onchain_rimborso_liscio,
     prove_onchain_tempo_bonifico,
     prove_onchain_ritiro,
+    prove_onchain_contanti,
     prove_guida_wallet,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
