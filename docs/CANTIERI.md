@@ -88317,6 +88317,70 @@ pedina resta ferma col solo contorno arancio. (11) Lo svelamento si
 chiama `si-svela` (il nome `svela` era del tour P2P di settembre, e
 `prove_libro_subito` lo vuole sparito) e non usa più `filter:blur`
 (il censimento di `prove_effetti_ridotti` ne ammette due). PROVATO:
+(12) L'ANIMA (17 nov, 17:22, Andrea: «appena apri non si capisce
+niente, non c'è anima… Tappo non si presenta, a cosa serve la prima
+casella?», «non ci sono step dove spieghi Barattolo», «perché devo
+attivare l'incasso automatico? Non viene raccontato»): (a) L'APERTURA,
+quattro pagine di Tappo (chi è, il razzo, cosa sono le caselle, si parte
+dalla prima) la prima volta in questo browser (`stradinaIntro`) e dal
+chip «❓ Come funziona»; «Partiamo!» porta alla casella da fare con la
+scheda aperta. (b) TAPPO SPIEGA OGNI CASELLA: `STRADINA_SPIEGA`, una
+riga per famiglia (l'`icona` della casella, o il tipo per gradini,
+missioni, porte) col perché e i passi di «Come funziona?»; il primo
+acquisto spiega il deposito di garanzia passo passo. Testi presi da
+`assistente/sapere.md`, e una prova vuole che ogni casella ne abbia uno.
+(c) LA FESTA DEL RAZZO: quando lo stadio cresce (`stradinaRazzo`
+ricordato in questo browser) un velo col razzo vecchio che sfuma nel
+nuovo e il pezzo arrivato; toccando il razzo in cima lo si rivede.
+(13) La scheda in basso esce SOLO sulla casella da fare (e sulle porte):
+«le caselle già fatte le vedo nel nome laterale». (14) TAPPO CAMMINA e
+sta sulla casella DA FARE, non sull'ultima fatta: prima del ridisegno ci
+si segna casella e punto dello schermo, dopo la pagina resta ferma e
+Tappo scivola (transizione CSS, niente requestAnimationFrame: il
+censimento degli effetti ridotti li conta). Prima la pagina saltava al
+centro ogni volta («va a scatti, torna verso il basso»). (15) IL «VAI»
+COL TUTORIAL E IL RITORNO A CASA («deve portare esattamente lì… e
+quando l'ha fatto torna in automatico nel tabellone», «come i tutorial
+nell'app»): `STRADINA_GUIDE` dice per famiglia dove andare (il cassetto
+del Profilo, la vetrina, il negozio con più vendite da seguire, Vendi) e
+cosa illuminare; il riflettore è lo stesso motore del benvenuto
+(`avviaTour`, una tappa). La casella resta in `sessionStorage`
+(`stradinaRitorno`, 20 minuti) e il ritorno lo decide il SERVER: dopo
+ogni gesto riuscito che non è un GET (lo segnala il portinaio dei fetch,
+`fetchColConto`, che resta l'unico montaggio: un secondo `window.fetch =`
+lo vieta `prove_server_che_si_riavvia`) e al ritorno nell'app da
+un'altra, si chiede `/api/me/stradina`; se la casella è fatta, «✅ Fatto!»
+e si torna alla rotta. Niente giri a vuoto senza casella in sospeso.
+SCARTATI: un aggancio in ogni funzione (preferito, foto, indirizzo…),
+una ventina di punti da tenere allineati; il controllo a tempo. Provato
+dal vivo su un server di collaudo locale con la semina della demo:
+«Vai» su «Metti un articolo nel barattolo» → vetrina col riflettore sul
+barattolino → tocco → di nuovo sul tabellone, casella fatta e Tappo sulla
+3; «Vai» sulla foto → cassetto Identità col riflettore sulla scelta.
+(16) Il suono «apri» (l'apertura di «Vedi tutta») era l'ultima molla:
+rifatto qui, due note dolci in mezzo secondo. La musica: anche «Aurora»
+(DaniHaDani, synth) bocciata alle 17:45, «troppo drammatica, serve più
+avventura»: si cerca un brano da viaggio allegro.
+(17) «Il tasto Come funziona? è troppo piccolo» (Andrea 17:57): il
+`summary` di `.str-come` diventa un bottone pieno, 46px di bersaglio.
+Rossi miei del giro intero, curati: `.str-intro-img.tondo` faceva leggere
+alla prova dei tondi la regola sbagliata (`\.tondo\{` la prendeva per il
+tondo vero) → classe `cerchio`; il `max-height` in vh della scheda non si
+divideva per `--fs-zoom`; il secondo `visibilitychange` della rotta,
+scritto `() => {` come quello della fotocamera, veniva ritagliato al suo
+posto dal banco della fotocamera → funzione con nome. La musica
+d'avventura («Adventures», djnoone, ramo claude/flow-musica-3) NON entra
+in questo commit: la sente prima Andrea nella prova della piazza.
+
+VERBALE 2 (17 nov sera, cloud, senza proxy): sull'albero 042f8f3 (sopra
+develop d49f7f6) suite severa 29.535 passate, 0 fallite, 2 saltate (le
+solite di nostr-tools) e collaudi della CI 152 verdi, 0 rossi.
+Poi develop è corso di undici commit (contanti on-chain, premio nel
+dettaglio, intervallo P2P): rebase su 6bd853e e di nuovo la suite severa
+intera, 29.714 passate, 0 fallite, 2 saltate (nostr-tools), più
+`collaudo_stradina_prova`, `collaudo_raccolta` e `collaudo_csp` verdi.
+Commit non miei nell'albero: quelli di develop.
+
 VERBALE (17 nov, cloud, venv dei collaudi, senza proxy): sull'albero
 94ed127 (ribasato su develop c247c34) `PROVE_SEVERE=1 python prove.py`
 29.506 passate, 0 fallite, 2 saltate (le due che cercano nostr-tools

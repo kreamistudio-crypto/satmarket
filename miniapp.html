@@ -6722,6 +6722,8 @@
     box-shadow:0 0 0 3px #F7931A,0 0 20px rgba(247,147,26,.7),0 10px 16px rgba(0,0,0,.5);
     animation:strGalleggia 2.4s ease-in-out infinite}
   @keyframes strGalleggia{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  .str-tappo.cammina{transition:left .8s ease-in-out,top .8s ease-in-out}
+  @media (prefers-reduced-motion: reduce){.str-tappo.cammina{transition:none}}
   .str-cappello{position:absolute;z-index:8;font-size:22px;line-height:1;margin-left:-4px;
     pointer-events:none;transform:rotate(-12deg)}
   .str-fumetto{position:absolute;z-index:9;transform:translate(-50%,-100%);max-width:200px;white-space:nowrap;
@@ -6751,6 +6753,44 @@
   .str-scheda-tx b{display:block;font-family:'Baloo 2',var(--font-tit),system-ui,sans-serif;font-weight:800;font-size:16px;line-height:1.2}
   .str-scheda-tx span{display:block;font-size:12px;font-weight:700;color:rgba(255,246,230,.75);margin-top:1px}
   .str-scheda .btn{width:auto;margin:0;padding:10px 14px;white-space:nowrap}
+  .str-scheda[hidden]{display:none}
+  .str-scheda-in{flex-wrap:wrap;max-height:calc((70vh - 66px) / var(--fs-zoom,1));overflow-y:auto}
+  .str-perche{flex:1 0 100%;display:flex;align-items:flex-start;gap:8px;margin-top:2px;padding:8px 10px;border-radius:12px;
+    background:rgba(255,193,100,.08);font-size:13px;line-height:1.35;color:#FFF6E6}
+  .str-perche img{width:26px;height:26px;border-radius:50%;object-fit:cover;flex:0 0 26px;box-shadow:0 0 0 1.5px #F7931A}
+  .str-come{flex:1 0 100%;font-size:13px;line-height:1.4;color:rgba(255,246,230,.9)}
+  .str-come summary{cursor:pointer;font-weight:800;font-size:15px;color:#FFC164;list-style:none;display:flex;align-items:center;justify-content:center;min-height:46px;margin:6px 0 2px;padding:10px 14px;border-radius:14px;background:rgba(247,147,26,.14);box-shadow:inset 0 0 0 1.5px rgba(255,193,100,.55)}
+  .str-come summary::-webkit-details-marker{display:none}
+  .str-come summary::before{content:'▸ '}
+  .str-come[open] summary::before{content:'▾ '}
+  .str-come ol{margin:4px 0 2px;padding-left:20px}
+  .str-come li{margin:3px 0}
+  .str-chip-tasto{cursor:pointer;font-family:inherit;color:inherit;border:0}
+  .str-hero-razzo-tasto{border:0;padding:0;background:none;cursor:pointer;flex:0 0 40px}
+  .str-intro{position:fixed;inset:0;z-index:46;display:flex;align-items:center;justify-content:center;
+    background:rgba(10,7,4,.92);padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))}
+  .str-intro[hidden]{display:none}
+  .str-intro-in{width:100%;max-width:380px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;
+    color:#FFF6E6;padding:22px 18px;border-radius:22px;background:linear-gradient(160deg,#2B2112,#171008);
+    box-shadow:0 18px 40px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,214,150,.22);animation:strIntroEntra .35s ease-out}
+  .str-intro-in b{font-family:'Baloo 2',var(--font-tit),system-ui,sans-serif;font-size:22px;font-weight:800;line-height:1.15}
+  .str-intro-in span{font-size:14.5px;line-height:1.45;color:rgba(255,246,230,.85)}
+  .str-intro-in small{font-size:12px;font-weight:800;color:#FFC164;letter-spacing:1px}
+  .str-intro-in .btn{width:100%;margin-top:4px}
+  .str-intro-img{height:150px;max-width:70%;object-fit:contain;filter:drop-shadow(0 8px 16px rgba(0,0,0,.5))}
+  .str-intro-img.cerchio{width:120px;height:120px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 4px #F7931A,0 0 26px rgba(247,147,26,.55)}
+  .str-intro-punti{display:flex;gap:6px}
+  .str-intro-punti i{width:7px;height:7px;border-radius:50%;background:rgba(255,246,230,.25)}
+  .str-intro-punti i.on{background:#F7931A}
+  .str-intro-salta{border:0;background:none;color:rgba(255,246,230,.6);font:inherit;font-size:13px;cursor:pointer;padding:4px}
+  .str-razzo-in{position:relative}
+  .str-razzo-nuovo,.str-razzo-vecchio{height:190px;width:110px;object-fit:contain;filter:drop-shadow(0 10px 22px rgba(247,147,26,.35))}
+  .str-razzo-vecchio{position:absolute;top:22px;left:50%;margin-left:-55px;animation:strRazzoVa 1s ease-in .3s forwards}
+  .str-razzo-nuovo.cresce{animation:strRazzoViene 1s ease-out .6s both}
+  @keyframes strIntroEntra{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+  @keyframes strRazzoVa{to{opacity:0;transform:scale(.9)}}
+  @keyframes strRazzoViene{0%{opacity:0;transform:scale(.8)}60%{opacity:1;transform:scale(1.08)}100%{opacity:1;transform:scale(1)}}
+  @media (prefers-reduced-motion: reduce){.str-intro-in,.str-razzo-vecchio,.str-razzo-nuovo.cresce{animation:none}}
   .str-amici{margin:14px 0 120px;background:var(--card);border:1px solid var(--line);
     border-radius:var(--radius);padding:12px 14px}
   .str-amici h3{margin:0 0 2px;font-family:'Baloo 2',var(--font-tit),system-ui,sans-serif;font-weight:800;font-size:18px;line-height:1.2}
@@ -18230,7 +18270,7 @@ function diCasaApi(input){
   } catch(e){ return false; }
 }
 function fetchColConto(fetchVero){
-  return async function(input, init){
+  const colConto = async function(input, init){
     if (!CONTO_MINI || !diCasaApi(input)) return fetchVero(input, init);
     let r;
     if (eUnaRichiesta(input) && !(init && init.headers)) {
@@ -18257,6 +18297,20 @@ function fetchColConto(fetchVero){
         }
       } catch(e){}
     }
+    return r;
+  };
+  return async function(input, init){
+    const r = await colConto(input, init);
+    /* L'ORECCHIO DELLA ROTTA PER LA LUNA (17 nov): un gesto verso il
+       server andato a buon fine (non un GET) e' il segno che forse la
+       casella lasciata col «Vai» e' fatta; la rotta controlla da sola
+       (`stradinaControllaRitorno`, che senza casella in sospeso non fa
+       niente). Ascolta e basta: la risposta torna intatta. */
+    try {
+      const m = String((init && init.method) || (eUnaRichiesta(input) ? input.method : 'GET')).toUpperCase();
+      if (r && r.ok && m !== 'GET' && diCasaApi(input) && typeof stradinaControllaRitorno === 'function')
+        stradinaControllaRitorno();
+    } catch(e){}
     return r;
   };
 }
@@ -43240,6 +43294,129 @@ function livCarCentra(){
    e HTML): il banco node le fa girare. */
 let stradinaDati = null;
 let stradinaScelta = -1;
+/* TAPPO SPIEGA OGNI CASELLA (17 nov, Andrea: «che cosa serve? C'è uno che
+   entra lì e… perché devo attivare l'incasso automatico? Non viene
+   descritto, non viene raccontato»): per ogni famiglia di caselle una
+   frase di Tappo sul PERCHÉ e i passi del «Come funziona?». La chiave e'
+   l'`icona` della casella (la sua famiglia), o il suo tipo per gradini,
+   missioni e porte. Testi controllati su assistente/sapere.md: se cambia
+   come si fa una cosa nell'app, si ritocca anche qui. */
+const STRADINA_SPIEGA = {
+  benvenuto: ['Benvenuto! Barattolo è un mercatino dove si paga solo in sats, i pezzettini di bitcoin.',
+    ['Compri e vendi oggetti, servizi e codici digitali, pagando in sats.',
+     'Quando compri, i sats restano fermi nel deposito di garanzia finché non confermi che è arrivato.',
+     'Ogni casella qui sopra ti insegna un pezzo di Barattolo: falle in fila, una alla volta.']],
+  preferiti: ['Il barattolo 🫙 è la tua lista dei desideri: ci metti quello che ti piace.',
+    ['Su un annuncio che ti piace tocca il 🫙.',
+     'Lo ritrovi nel Profilo, in «Nel tuo barattolo».',
+     'Così non lo perdi, e quando sei pronto lo compri.']],
+  foto: ['Una faccia vera dà fiducia: si compra e si vende più volentieri con chi si vede.',
+    ['Apri il Profilo e metti la tua foto, o quella del tuo negozio.']],
+  seguiti: ['Segui i venditori che ti piacciono: non ti perdi le loro novità.',
+    ['Apri il negozio di un venditore e tocca la campanella 🔔.',
+     'Quando pubblica qualcosa di nuovo, ti avviso io.',
+     'Lo ritrovi anche qui sulla mappa, nella gara fra amici.']],
+  wallet: ['Quando vendi, i sats arrivano da soli al tuo wallet. Senza, a ogni vendita devi incollare una fattura a mano.',
+    ['Prendi un wallet Lightning gratis: la guida «👛 Il tuo primo wallet» nel Profilo ti aiuta.',
+     'Nel wallet copi il tuo indirizzo, quello con la @ (tipo nome@walletofsatoshi.com).',
+     'Lo incolli nel Profilo, nel campo del Lightning address: da lì incassi da solo.']],
+  annunci: ['Quello che non usi più diventa sats: bastano una foto e un prezzo.',
+    ['Tocca «Vendi» in basso.',
+     'Metti le foto, il titolo, il prezzo e come lo consegni.',
+     'Pubblica: l\'annuncio va in vetrina.']],
+  acquisti: ['Su Barattolo compri sicuro, grazie al deposito di garanzia.',
+    ['Tocchi «🔒 Compra in sicurezza» e paghi la fattura Lightning col tuo wallet.',
+     'I sats si fermano nel deposito di garanzia: il venditore sa che ci sono, ma non sono ancora suoi.',
+     'Lui spedisce. Quando l\'oggetto arriva ed è come promesso, confermi nella scheda «Ordini».',
+     'Solo allora i sats passano a lui. Se qualcosa va storto, apri una disputa e decide un moderatore.']],
+  recensioni: ['Le stelle dicono agli altri di chi fidarsi: lascia le tue dopo ogni affare.',
+    ['Ad affare concluso apri l\'ordine.',
+     'Dai da 1 a 5 stelle e scrivi due parole (puoi aggiungere fino a 3 foto).']],
+  nostr: ['Nostr è un social libero: con la tua chiave, negozio e annunci viaggiano anche fuori da Barattolo.',
+    ['Se hai un profilo Nostr, collega la tua chiave pubblica (npub) nel Profilo.',
+     'La chiave segreta (nsec) non te la chiediamo mai: resta solo tua.']],
+  inviti: ['Più persone, più affari per tutti: porta un amico col tuo link.',
+    ['Nel Profilo trovi il tuo link d\'invito.',
+     'Mandalo a chi vuoi: quando entra, risulta invitato da te.',
+     'Quando lui fa affari, una parte di XP arriva anche a te.']],
+  vendite: ['Vendere e incassare in sats è il cuore di Barattolo.',
+    ['Qualcuno compra: i sats entrano nel deposito di garanzia e ti arriva l\'avviso.',
+     'Spedisci e scrivi il tracciamento, oppure vi accordate per il ritiro.',
+     'Quando chi compra conferma, i sats arrivano al tuo wallet.']],
+  onchain: ['Un wallet on-chain tutto tuo, con le tue parole di recupero: per i sats da tenere al sicuro a lungo.',
+    ['Dal Profilo crei il wallet on-chain.',
+     'Scrivi le parole di recupero su carta e tienile nascoste.',
+     'Con quelle parole i sats sono solo tuoi: nessuno li può toccare, nemmeno Barattolo.']],
+  nostr_verificata: ['Una nota pubblica su Nostr prova che quella chiave è proprio tua: chi ti guarda si fida di più.',
+    ['Nel Profilo trovi il testo di verifica.',
+     'Lo pubblichi con la tua app Nostr, e Barattolo lo riconosce.']],
+  doppia: ['Entri sia da Telegram sia con Nostr: se un giorno una porta non va, hai sempre l\'altra.',
+    ['Nel Profilo colleghi Telegram e la tua chiave Nostr allo stesso account.']],
+  p2p: ['Nel P2P compri o vendi bitcoin con un\'altra persona, per euro, senza una banca in mezzo.',
+    ['Tocca «P2P» in basso e scegli un ordine nel «Libro ordini».',
+     'I sats restano bloccati in garanzia mentre gli euro viaggiano fra voi due.',
+     'Quando gli euro sono arrivati, i sats si sbloccano.']],
+  giorni: ['Il tempo conta: chi resta si fa conoscere, e la fiducia cresce.',
+    ['Questa casella si spunta da sola: basta restare con noi.']],
+  incassati: ['Ogni sats incassato vendendo è un bullone in più per il razzo.',
+    ['Vendi: quando chi compra conferma, i sats arrivano al tuo wallet e il conto sale da solo.']],
+  halving: ['Ogni quattro anni bitcoin dimezza i sats nuovi che nascono: è l\'halving. Il prossimo è nel 2028, e lì il razzo parte!',
+    ['Si spunta da sola quando arriva il giorno, verso aprile 2028.']],
+  gradino: ['Un livello nuovo: sale con gli acquisti e le vendite concluse, e sul tuo profilo lo vedono tutti.',
+    ['Gli XP li danno solo gli affari conclusi, più una parte per chi inviti.']],
+  missione: ['Una sfida con Tappo: giocando impari un segreto di bitcoin.', []],
+  porta: ['Una lezione fuori da Barattolo, per capire bitcoin da zero.', []],
+};
+function stradinaSpiega(t){
+  if (!t) return null;
+  const k = t.tipo === 'missione' ? 'missione' : t.tipo === 'porta' ? 'porta'
+    : (t.tipo === 'gradino' || t.tipo === 'luna') ? 'gradino' : (t.icona || '');
+  return Object.prototype.hasOwnProperty.call(STRADINA_SPIEGA, k) ? STRADINA_SPIEGA[k] : null;
+}
+/* i pezzi del razzo, uno per zona finita (la stessa storia dei `racconto`) */
+const STRADINA_PEZZI = ['i piedini', 'il serbatoio', 'il motore', 'le ali', 'l\'oblò', 'la punta', 'l\'antenna'];
+/* L'APERTURA (17 nov, Andrea: «appena apri non si capisce niente… Tappo
+   non si presenta»): quattro pagine, la prima volta in questo browser e
+   dal chip «❓ Come funziona». PURA: dal numero di pagina all'HTML. */
+const STRADINA_INTRO = [
+  ['tappo-pedina.webp', 'cerchio', 'Ciao, sono Tappo! 👋', 'Il robottino di Barattolo. Ho un sogno grande grande…'],
+  ['razzo-8.webp', '', 'Andare sulla Luna con un razzo di bulloni 🚀', 'Parte all\'halving del 2028. Mi aiuti a costruirlo?'],
+  ['razzo-1.webp', '', 'Ogni casella è una cosa che impari su Barattolo', 'Comprare sicuro, vendere, incassare in sats. Finisci una zona e il razzo prende un pezzo nuovo.'],
+  ['tappo-pedina.webp', 'cerchio', 'Si parte dalla prima, la più facile', 'Toccala: ti spiego a cosa serve e ti porto dove si fa. Occhio al Tarlo e alla Gazza, che rubano i bulloni!'],
+];
+function stradinaIntroHTML(p){
+  const n = Math.max(0, Math.min(STRADINA_INTRO.length - 1, Math.floor(Number(p)) || 0));
+  const [img, cl, tit, tx] = STRADINA_INTRO[n];
+  const ultima = n === STRADINA_INTRO.length - 1;
+  const punti = STRADINA_INTRO.map((_, k) => `<i class="${k === n ? 'on' : ''}"></i>`).join('');
+  return `<div class="str-intro-in" data-p="${n}">`
+    + `<img class="str-intro-img ${cl}" src="/assets/stradina/${img}" alt="" onerror="this.remove()">`
+    + `<b>${tit}</b><span>${tx}</span><div class="str-intro-punti">${punti}</div>`
+    + `<button type="button" class="btn orange" onclick="${ultima ? 'strIntroFine()' : `strIntro(${n + 1})`}">${ultima ? 'Partiamo! 🚀' : 'Avanti ›'}</button>`
+    + (ultima ? '' : `<button type="button" class="str-intro-salta" onclick="strIntroFine()">Salta</button>`)
+    + `</div>`;
+}
+/* LA FESTA DEL RAZZO (17 nov, Andrea: «man mano che raggiunge delle
+   caselle bisogna far vedere questo razzo che si costruisce»): da uno
+   stadio all'altro, il pezzo nuovo e la zona finita. PURA. */
+function stradinaRazzoHTML(da, a, zone){
+  const b = Math.max(1, Math.min(8, Math.floor(Number(a)) || 1));
+  const p = Math.max(1, Math.min(8, Math.floor(Number(da)) || b));
+  const finita = b - 2;
+  /* il razzo vecchio che sfuma c'e' solo se gli effetti non sono ridotti:
+     fermo, starebbe sopra quello nuovo */
+  const muovi = b > p && !(typeof effettiRidotti === 'function' && effettiRidotti());
+  const zona = (Array.isArray(zone) && zone[finita]) ? zone[finita].nome : '';
+  const tit = b > p && STRADINA_PEZZI[finita] ? `Il razzo ha ${STRADINA_PEZZI[finita]}!` : 'Il razzo di Tappo';
+  const tx = b > p && zona ? `Hai finito «${esc(zona)}»: un pezzo nuovo, e si apre la strada dopo.`
+    : b >= 8 ? 'Il razzo è pronto: manca solo il conto alla rovescia dell\'halving.'
+    : `Ha ${b} pezzi su 8. Finisci la zona dove sei e arriva ${STRADINA_PEZZI[b - 1] || 'il prossimo'}.`;
+  return `<div class="str-intro-in str-razzo-in">`
+    + (muovi ? `<img class="str-razzo-vecchio" src="/assets/stradina/razzo-${p}.webp" alt="" onerror="this.remove()">` : '')
+    + `<img class="str-razzo-nuovo${muovi ? ' cresce' : ''}" src="/assets/stradina/razzo-${b}.webp" alt="Il razzo di Tappo" onerror="this.remove()">`
+    + `<b>${tit}</b><span>${tx}</span><small>🚀 ${b}/8</small>`
+    + `<button type="button" class="btn orange" onclick="strChiudiRazzo()">Avanti ›</button></div>`;
+}
 const STRADINA_PASSO = 96;      // fra una casella e la prossima, in px
 const STRADINA_BANDA = 124;     // lo spazio in piu' dove una zona finisce e l'altra comincia
                                 // (124 dal 17 nov: il cartello porta anche la frase di Tappo)
@@ -43354,7 +43531,7 @@ function stradinaSchedaHTML(d, i){
     : i === prossima ? '▶ Tocca a te' : '🔒 Da fare';
   const bott = t.link ? `<button type="button" class="btn" data-link="${esc(t.link)}" data-vai="" onclick="vaiTappa(this)">Apri ›</button>`
     : (t.tipo === 'missione' && t.fatto !== true) ? `<button type="button" class="btn" data-vai="${esc(t.vai || '')}" data-link="" data-missione="${esc(t.missione || '')}" onclick="vaiTappa(this)">Gioca ›</button>`
-    : (t.fatto !== true && t.vai) ? `<button type="button" class="btn" data-vai="${esc(t.vai)}" data-link="" onclick="vaiTappa(this)">Vai ›</button>` : '';
+    : (t.fatto !== true && t.vai) ? `<button type="button" class="btn" data-vai="${esc(t.vai)}" data-link="" data-tappa="${esc(t.id || '')}" data-fam="${esc(t.icona || '')}" onclick="vaiTappa(this)">Vai ›</button>` : '';
   /* anche qui l'icona disegnata, se la casella ce l'ha (l'emoji se manca) */
   const em = /^[a-z0-9_]+$/.test(t.icona || '')
     ? `<img class="str-scheda-ico" src="/assets/stradina/ico-${t.icona}.webp" alt="" onerror="this.remove()">` : '';
@@ -43364,9 +43541,13 @@ function stradinaSchedaHTML(d, i){
     ? (t.finta ? `<button type="button" class="str-prova" onclick="strProva('${t.id}', false)">↩ Togli la prova</button>`
       : t.fatto !== true ? `<button type="button" class="str-prova" onclick="strProva('${t.id}', true)">🧪 Segna fatta (prova)</button>` : '')
     : '';
+  /* Tappo spiega a cosa serve, e i passi dietro «Come funziona?» */
+  const sp = stradinaSpiega(t);
+  const come = sp ? `<div class="str-perche"><img src="/assets/stradina/tappo-pedina.webp" alt="" onerror="this.remove()"><span>${esc(sp[0])}</span></div>`
+    + (sp[1].length ? `<details class="str-come"><summary>Come funziona?</summary><ol>${sp[1].map(x => `<li>${esc(x)}</li>`).join('')}</ol></details>` : '') : '';
   return `<div class="str-scheda-in">${em}<span class="str-scheda-em">${t.emoji || '•'}</span>`
     + `<span class="str-scheda-tx"><small>Casella ${i + 1} · ${esc(zona.nome || '')}${t.finta ? ' · 🧪 prova' : ''}</small>`
-    + `<b>${esc(t.nome)}</b><span>${stato}</span>${finta}</span>${bott}</div>`;
+    + `<b>${esc(t.nome)}</b><span>${stato}</span>${finta}</span>${bott}${come}</div>`;
 }
 /* fin dove si vede: la zona della prossima casella da fare (`qui`), piu'
    una (spenta); `fine` e' la prima casella nascosta. Tutto fatto: tutto
@@ -43429,8 +43610,9 @@ function stradinaHTML(d, largo){
     + `<small>${fatte} caselle fatte su ${contabili} · Livello ${Math.floor(Number(d.livello && d.livello.numero)) || 1}</small></div></div>`
     /* il razzo di Tappo in fondo alla barra: cresce con le zone */
     + `<div class="str-barra-riga"><div class="str-barra"><i style="width:${contabili ? Math.round(fatte / contabili * 100) : 0}%"></i></div>`
-    + `<img class="str-hero-razzo" src="/assets/stradina/razzo-${stradinaRazzo(tappe)}.webp" alt="Il razzo di Tappo" onerror="this.remove()"></div>`
-    + `<div class="str-chip-riga"><span class="str-chip">🚀 Razzo <b>${stradinaRazzo(tappe)}/8</b></span>`
+    + `<button type="button" class="str-hero-razzo-tasto" onclick="strMostraRazzo()" aria-label="Il razzo di Tappo"><img class="str-hero-razzo" src="/assets/stradina/razzo-${stradinaRazzo(tappe)}.webp" alt="" onerror="this.remove()"></button></div>`
+    + `<div class="str-chip-riga"><button type="button" class="str-chip str-chip-tasto" onclick="strMostraRazzo()">🚀 Razzo <b>${stradinaRazzo(tappe)}/8</b></button>`
+    + `<button type="button" class="str-chip str-chip-tasto" onclick="strIntro(0)">❓ Come funziona</button>`
     + (d.prova === true ? `<button type="button" class="str-chip str-prova-chip" onclick="strProva('', false, true)">🧪 Prova: ${tappe.filter(t => t.finta).length} · azzera</button>` : '')
     + `<span class="str-chip">⚡ <b>${fmt(sats.incassati || 0)}</b> sats incassati</span>`
     + `<span class="str-chip">🛒 <b>${fmt(sats.spesi || 0)}</b> spesi</span></div>${serie}</div>`;
@@ -43496,8 +43678,12 @@ function stradinaHTML(d, largo){
      c'era e copriva la casella successiva (Tappo cammina in fila, quindi
      la prossima gli sta sempre addosso): la dice gia' la scheda in basso.
      Resta solo alla Luna, dove sopra non c'e' piu' niente. */
-  const dove = ultima >= 0 ? g.posti[ultima] : g.partenza;
-  const pedina = `<img class="str-tappo" src="/assets/stradina/tappo-pedina.webp" alt="Tappo" style="left:${dove.x}px;top:${dove.y - 58}px" onerror="this.remove()">`
+  /* (17 nov, Andrea: «Tappo si dovrebbe sempre trovare sulla casella su
+     cui deve eseguire un'azione, non sulla precedente») sulla prossima
+     da fare; in cima, a tutto fatto, sull'ultima */
+  const qui = prossima >= 0 ? prossima : ultima;
+  const dove = qui >= 0 && g.posti[qui] ? g.posti[qui] : g.partenza;
+  const pedina = `<img class="str-tappo" data-u="${qui}" src="/assets/stradina/tappo-pedina.webp" alt="Tappo" style="left:${dove.x}px;top:${dove.y - 58}px" onerror="this.remove()">`
     + (d.tappo_emoji ? `<span class="str-cappello" style="left:${dove.x}px;top:${dove.y - 76}px">${esc(d.tappo_emoji)}</span>` : '');
   const fx = Math.min(g.largo - 100, Math.max(100, dove.x));
   const fumetto = prossima >= 0 ? ''
@@ -43544,6 +43730,7 @@ function stradinaHTML(d, largo){
   const vediTutta = `<button type="button" class="str-tutta" onclick="strVediTutta()" aria-label="Vedi tutta la mappa">🗺 Vedi tutta</button>`;
   return hero + tavola + classifica + vediTutta
     + `<div class="str-pano" id="strPano" hidden></div>`
+    + `<div class="str-intro" id="strIntro" hidden></div>`
     + `<div class="str-scheda" id="strScheda">${stradinaSchedaHTML(d, scelta)}</div>`;
 }
 /* LA MAPPA INTERA, DA LONTANO: le otto zone in una schermata, dalla
@@ -43610,6 +43797,39 @@ function strChiudiTutta(){
   const p = el('strPano');
   if (p) p.hidden = true;
 }
+/* l'apertura di Tappo e la festa del razzo: lo stesso velo, due contenuti */
+function strIntro(n){
+  const v = el('strIntro');
+  if (!v) return;
+  haptic(); suonoTappo(n ? 'tocco' : 'stella');
+  v.innerHTML = stradinaIntroHTML(n);
+  v.hidden = false;
+}
+function strIntroFine(){
+  try { localStorage.setItem('stradinaIntro', '1'); } catch(e){}
+  const v = el('strIntro');
+  if (v) v.hidden = true;
+  if (!stradinaDati) return;
+  /* si va alla prima casella da fare, con la sua scheda aperta */
+  const i = stradinaProssima(stradinaDati.tappe || []);
+  if (i < 0) return;
+  strScegli(i);
+  const b = document.querySelector(`.str-casella[data-i="${i}"]`);
+  if (b && b.scrollIntoView) b.scrollIntoView({block: 'center', behavior: tourRidotto() ? 'auto' : 'smooth'});
+}
+function strMostraRazzo(da){
+  const v = el('strIntro');
+  if (!v || !stradinaDati) return;
+  const a = stradinaRazzo(stradinaDati.tappe || []);
+  const festa = da && a > da;
+  haptic(); suonoTappo(festa ? 'traguardo' : 'tocco');
+  v.innerHTML = stradinaRazzoHTML(festa ? da : a, a, stradinaDati.zone);
+  v.hidden = false;
+}
+function strChiudiRazzo(){
+  const v = el('strIntro');
+  if (v) v.hidden = true;
+}
 /* dalla gara fra amici alla pedina dell'amico: la sua fila lampeggia; se
    sta su un gradino che per te e' ancora chiuso, si va al lucchetto */
 function strVaiAmico(n){
@@ -43642,8 +43862,15 @@ function strScegli(i){
   document.querySelectorAll('.str-casella.scelta').forEach(b => b.classList.remove('scelta'));
   const b = document.querySelector(`.str-casella[data-i="${i}"]`);
   if (b) b.classList.add('scelta');
+  /* LA SCHEDA SOLO DOVE C'E' DA FARE (17 nov, Andrea: «quando clicco
+     sulle caselle già fatte non c'è bisogno che mi esce fuori il
+     messaggio sotto… solamente quando clicco sulla prossima casella»):
+     la «tocca a te» e le porte; sulle altre basta il suono e il nome */
   const s = el('strScheda');
-  if (s && stradinaDati) s.innerHTML = stradinaSchedaHTML(stradinaDati, i);
+  if (!s || !stradinaDati) return;
+  const apri = tq && (i === stradinaProssima(stradinaDati.tappe) || tq.fatto === null);
+  s.hidden = !apri;
+  if (apri) s.innerHTML = stradinaSchedaHTML(stradinaDati, i);
 }
 function vaiTappa(btn){
   const vai = btn.dataset.vai, link = btn.dataset.link;
@@ -43665,8 +43892,114 @@ function vaiTappa(btn){
   }
   /* la missione la apre il gioco di Tappo, se c'e' gia' (cantiere parallelo) */
   if (btn.dataset.missione && typeof apriMissione === 'function') { apriMissione(btn.dataset.missione); return; }
+  /* DRITTI AL POSTO, E POI A CASA (17 nov, Andrea: «quando clicco su
+     vai… deve portare esattamente lì. Poi quando ho svolto quel tipo di
+     azione, lui torna in automatico nel tabellone»): la casella si
+     ricorda in questa scheda del browser, e appena il server la da' per
+     fatta si torna alla rotta, dove si accende la prossima */
+  const tappa = btn.dataset.tappa || '';
+  if (/^[a-z0-9_]{1,40}$/.test(tappa)) {
+    try { sessionStorage.setItem('stradinaRitorno', JSON.stringify({id: tappa, fino: Date.now() + 20 * 60000})); } catch(e){}
+  }
+  if (stradinaVaiAlPosto(btn.dataset.fam || '')) return;
   if (vai && el('view-' + vai)) go(vai);
 }
+/* il posto esatto di ogni famiglia di caselle (il cassetto del Profilo,
+   il negozio da seguire, la pagina con l'avviso di cosa toccare); false
+   = nessun posto speciale, va bene la vista della casella */
+function stradinaVaiAlPosto(fam){
+  const g = STRADINA_GUIDE[fam];
+  if (!g) return false;
+  if (g.cassetto) {
+    if (!el(g.cassetto)) return false;
+    apriCassettoProfilo(g.cassetto);
+  } else if (g.negozio) {
+    /* il negozio con piu' vendite fra quelli in vetrina, non il mio */
+    const altri = (Array.isArray(vetrina) ? vetrina : [])
+      .filter(a => a && a.negozio && String(a.sellerId) !== String(myTgId))
+      .sort((a, b) => (b.sales || 0) - (a.sales || 0));
+    if (altri.length) apriNegozio(altri[0].negozio);
+    else go('esplora');
+  } else if (g.vista && el('view-' + g.vista)) go(g.vista);
+  else return false;
+  /* IL RIFLETTORE DEI TUTORIAL (17 nov, Andrea: «gli fa fare tramite un
+     tutorial quell'azione lì, come funzionano adesso i tutorial
+     nell'app»): lo stesso motore del benvenuto (`avviaTour`), una tappa
+     sola sul posto da toccare. Se il posto non c'e' (vetrina vuota,
+     negozio senza campanella) resta l'avviso di una riga. */
+  setTimeout(() => {
+    const ok = g.trova && avviaTour([{trova: g.trova, testo: g.testo, tondo: !!g.tondo}]);
+    if (!ok) toast(g.riserva || g.testo.replace(/<[^>]+>/g, ''), 4500);
+  }, g.negozio ? 1200 : 700);
+  return true;
+}
+/* dove porta il «Vai» di ogni famiglia di caselle, e cosa illumina */
+const STRADINA_GUIDE = {
+  preferiti: {vista: 'esplora', tondo: true, trova: () => document.querySelector('#grid .card-jar'),
+    testo: `Tocca il <b>barattolino</b> su un articolo che ti piace: finisce fra i tuoi preferiti. Poi torni da solo alla rotta 🚀`},
+  acquisti: {vista: 'esplora', trova: () => document.querySelector('#grid .card'),
+    testo: `Apri un articolo e tocca <b>🔒 Compra in sicurezza</b>: i sats restano nel deposito di garanzia finché non confermi che è arrivato.`},
+  seguiti: {negozio: true, tondo: true,
+    trova: () => [...document.querySelectorAll('.tondo.segui')].find(b => b.offsetParent !== null),
+    testo: `Tocca la <b>campanella</b>: segui questo negozio e ti avviso quando pubblica qualcosa di nuovo.`,
+    riserva: 'Apri un annuncio, tocca il negozio del venditore e poi la campanella'},
+  foto: {cassetto: 'accIdentita',
+    trova: () => el('accIdentita')?.querySelector('button[onclick^="setFotoScelta"]')?.parentElement,
+    testo: `Scegli qui la <b>foto</b> del tuo profilo: con una faccia vera si fidano di più.`},
+  wallet: {cassetto: 'accLnAddress', trova: () => el('lnAddrProfilo'),
+    testo: `Incolla qui il tuo <b>Lightning address</b>, quello con la @, e salva: da lì le vendite arrivano da sole al tuo wallet.`},
+  nostr: {cassetto: 'accIdentita', trova: () => el('accIdentita')?.querySelector('button[onclick^="collegaNostrFirmato"]'),
+    testo: `Tocca <b>🔑 Entra anche con Nostr</b> e firma: la chiave segreta resta solo sul tuo telefono.`},
+  nostr_verificata: {cassetto: 'accIdentita', trova: () => el('accIdentita')?.querySelector('button[onclick^="collegaNostrFirmato"]'),
+    testo: `Tocca <b>🔑 Entra anche con Nostr</b> e firma: così la chiave risulta tua, verificata.`},
+  doppia: {cassetto: 'accIdentita',
+    trova: () => el('accIdentita')?.querySelector('button[onclick^="collegaNostrFirmato"], button[onclick^="collegaTelegram"]'),
+    testo: `Collega qui la porta che ti manca: così entri sia da Telegram sia con Nostr.`},
+  inviti: {cassetto: 'accInviti', trova: () => el('invitiBlocco')?.querySelector('button') || el('invitiBlocco'),
+    testo: `Qui c'è il tuo <b>link d'invito</b>: copialo e mandalo a un amico.`},
+  onchain: {cassetto: 'accOnchainIncasso', trova: () => el('accOnchainIncasso')?.querySelector('.acc-b .btn'),
+    testo: `Crea qui il tuo <b>wallet on-chain</b>, e scrivi le parole di recupero su carta.`},
+  annunci: {vista: 'vendi', trova: () => el('sellFotoDrop'),
+    testo: `Parti dalle <b>foto</b>: poi titolo, prezzo e come lo consegni, e pubblica.`},
+  recensioni: {vista: 'affari', testo: 'Apri un ordine concluso e lascia le stelle'},
+  p2p: {vista: 'p2p', testo: 'Scegli un ordine nel «Libro ordini»'},
+};
+/* il controllo del ritorno: dopo ogni gesto andato a buon fine verso il
+   server (lo segnala il portinaio dei fetch, `fetchColConto`) e quando
+   si torna nell'app da un'altra (per esempio dal wallet), si chiede alla
+   rotta se la casella e' fatta. Niente giri a
+   vuoto: senza una casella in sospeso non parte nessuna domanda. */
+let stradinaRitornoTimer = null;
+function stradinaRitornoAttivo(){
+  try {
+    const r = JSON.parse(sessionStorage.getItem('stradinaRitorno') || 'null');
+    if (r && r.id && Number(r.fino) > Date.now()) return r;
+    if (r) sessionStorage.removeItem('stradinaRitorno');
+  } catch(e){}
+  return null;
+}
+function stradinaControllaRitorno(){
+  if (!stradinaRitornoAttivo()) return;
+  clearTimeout(stradinaRitornoTimer);
+  stradinaRitornoTimer = setTimeout(async () => {
+    const r = stradinaRitornoAttivo();
+    const v = el('view-stradina');
+    if (!r || (v && v.classList.contains('active'))) return;
+    try {
+      const x = await fetch(`${API_BASE}/me/stradina`, {headers:{'X-Tg-Init-Data': authHdr()}});
+      if (!x.ok) return;
+      const d = await x.json();
+      const t = (d.tappe || []).find(y => y.id === r.id);
+      if (!t || t.fatto !== true) return;
+      try { sessionStorage.removeItem('stradinaRitorno'); } catch(e){}
+      toast('✅ Fatto! Torno alla Rotta per la Luna 🚀', 2500);
+      setTimeout(() => { closeSheet(); apriStradina(); }, 1300);
+    } catch(e){}
+  }, 900);
+}
+document.addEventListener('visibilitychange', function stradinaAlRitornoVisibile(){
+  if (document.visibilityState === 'visible') stradinaControllaRitorno();
+});
 /* a missione finita il gioco di Tappo lancia 'tappo:missione' (patto col
    suo cantiere): se il tabellone e' aperto si ricarica, e Tappo avanza */
 window.addEventListener('tappo:missione', () => {
@@ -43692,6 +44025,14 @@ function renderStradina(){
     box.innerHTML = '<div class="hint">Non riesco ad aprire la rotta adesso: riprova fra poco.</div>';
     return;
   }
+  /* TAPPO CAMMINA (17 nov, Andrea: «quando completo una casella il gioco
+     va a scatti, torna verso il basso… dovrebbe fare un'animazione e
+     Tappo dovrebbe avanzare di una casella»): prima di ridisegnare ci si
+     segna dov'era Tappo (la casella e il punto dello schermo); dopo, la
+     pagina resta ferma lì e Tappo scivola fino alla casella nuova */
+  const vecchia = box.querySelector('.str-tappo');
+  const uPrima = vecchia ? parseInt(vecchia.dataset.u, 10) : NaN;
+  const yPrima = vecchia ? vecchia.getBoundingClientRect().top : 0;
   box.innerHTML = stradinaHTML(stradinaDati, box.clientWidth);
   /* la musica parte col primo tocco qui dentro (ed e' gia' partita se
      si arriva qui da un tocco: aprire la pagina lo e') */
@@ -43702,7 +44043,22 @@ function renderStradina(){
   }
   /* si apre su Tappo: il tabellone e' lungo, e la tua casella e' quella che conta */
   const t = box.querySelector('.str-tappo');
-  if (t && t.scrollIntoView) t.scrollIntoView({block: 'center'});
+  const uOra = t ? parseInt(t.dataset.u, 10) : NaN;
+  const da = uPrima >= 0 && uOra !== uPrima ? box.querySelector(`.str-casella[data-i="${uPrima}"]`) : null;
+  if (t && da) {
+    const meta = {left: t.style.left, top: t.style.top};
+    t.style.left = da.style.left;
+    t.style.top = (parseFloat(da.style.top) - 58) + 'px';
+    window.scrollBy(0, t.getBoundingClientRect().top - yPrima);
+    /* la lettura dell'altezza fissa il punto di partenza: poi la
+       transizione del CSS porta Tappo alla meta (niente fotogrammi
+       contati a mano, e con gli effetti ridotti ci arriva secco) */
+    void t.offsetWidth;
+    t.classList.add('cammina');
+    t.style.left = meta.left;
+    t.style.top = meta.top;
+    setTimeout(() => { if (t.scrollIntoView) t.scrollIntoView({block: 'center', behavior: tourRidotto() ? 'auto' : 'smooth'}); }, 750);
+  } else if (t && t.scrollIntoView) t.scrollIntoView({block: 'center'});
   /* il suono di arrivo: un passo di Tappo, o la fanfara se dall'ultima
      visita hai passato un gradino (il conto si ricorda in questo browser) */
   const tappe = stradinaDati.tappe || [];
@@ -43726,6 +44082,16 @@ function renderStradina(){
       x.classList.add('si-svela');
     });
   });
+  /* il razzo: lo stadio visto l'ultima volta si ricorda qui; se e'
+     cresciuto, la festa del pezzo nuovo (che porta il suo suono) */
+  const razzo = stradinaRazzo(tappe);
+  let razzoPrima = 0;
+  try { razzoPrima = parseInt(localStorage.getItem('stradinaRazzo') || '0', 10) || 0; } catch(e){}
+  try { localStorage.setItem('stradinaRazzo', String(razzo)); } catch(e){}
+  let introVista = true;
+  try { introVista = localStorage.getItem('stradinaIntro') === '1'; } catch(e){}
+  if (!introVista) { strIntro(0); return; }
+  if (razzoPrima && razzo > razzoPrima) { strMostraRazzo(razzoPrima); return; }
   suonoTappo(prima >= 0 && gradini > prima ? 'traguardo' : sv.caselle.length ? 'stella' : 'passo');
 }
 /* ---- I SUONI DI TAPPO (nati col tabellone, li riusa il gioco di Tappo:

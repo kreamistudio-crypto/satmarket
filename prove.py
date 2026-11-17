@@ -129776,7 +129776,7 @@ console.log(JSON.stringify({
   racconto_scappato: !h.includes('Tappo <i>dice') && h.includes('Tappo &lt;i&gt;dice'),
   mappe: (h.match(/src="\\/assets\\/stradina\\/zona\\d.webp"/g) || []).length,
   u: u, iMis: iMis, pedina: [Number(ped[1]), Number(ped[2])],
-  attesa: [g.posti[u].x, g.posti[u].y - 58],
+  attesa: (q => [g.posti[q].x, g.posti[q].y - 58])(stradinaProssima(d.tappe) >= 0 ? stradinaProssima(d.tappe) : u),
   cappello: h.includes('class="str-cappello"') && h.includes('>🎩</span>'),
   dentro: g.posti.every(p => p.x > 0 && p.x < g.largo && p.y > 0 && p.y < g.alto),
   sale: g.posti.every((p, i) => !i || p.y < g.posti[i - 1].y),
@@ -129796,7 +129796,15 @@ console.log(JSON.stringify({
   nuovo_u: stradinaUltimaFatta(nuovo.tappe),
   in_fila: stradinaUltimaFatta([{fatto: true}, {fatto: null}, {fatto: true},
                                 {fatto: false}, {fatto: true}]),
-  vuota: stradinaHTML({tappe: []}, 340) + stradinaHTML(null, 340)}));
+  vuota: stradinaHTML({tappe: []}, 340) + stradinaHTML(null, 340),
+  spiega_mancanti: [...new Set(d.tappe.map(t => stradinaSpiega(t) ? '' : (t.tipo + ':' + t.icona)))].filter(Boolean),
+  spiega_scheda: (h2 => [h2.includes('class="str-perche"'), h2.includes('<details class="str-come">'),
+                         (h2.match(/<li>/g) || []).length])(stradinaSchedaHTML(d, d.tappe.findIndex(t => t.icona === 'acquisti'))),
+  spiega_scappa: stradinaSchedaHTML({zone: d.zone, tappe: [{id: 'x', zona: 0, nome: 'x', fatto: false, tipo: 'casella', icona: 'wallet', vai: 'profilo'}]}, 0).includes('nome@walletofsatoshi.com'),
+  intro: [0, 1, 2, 3, 9, -1].map(n => (h3 => [h3.includes('Partiamo!'), h3.includes('Avanti ›'), (/data-p="(\d)"/.exec(h3) || [])[1]])(stradinaIntroHTML(n))),
+  razzo_festa: stradinaRazzoHTML(1, 2, d.zone),
+  razzo_fermo: stradinaRazzoHTML(3, 3, d.zone),
+  pedina_u: Number((/class="str-tappo" data-u="(-?\d+)"/.exec(h) || [])[1])}));
 """ % _js.dumps(dati)
     import tempfile as _tfm
     cart = _tfm.mkdtemp(prefix="stradina_")
@@ -129807,6 +129815,37 @@ console.log(JSON.stringify({
     if r.returncode:
         return
     o = _js.loads(r.stdout)
+    # TAPPO SPIEGA OGNI CASELLA (17 nov, Andrea: «che cosa serve? non
+    # viene descritto, non viene raccontato»): ogni famiglia ha la sua
+    # frase e i passi del «Come funziona?», scappati
+    prova("ogni casella del tabellone ha la spiegazione di Tappo", [],
+          o["spiega_mancanti"])
+    prova("...la scheda la mostra, coi passi (il primo acquisto: il deposito di garanzia)",
+          [True, True, True], o["spiega_scheda"][:2] + [o["spiega_scheda"][2] >= 1])
+    prova("...e l'incasso automatico dice a cosa serve e dove si prende l'indirizzo",
+          True, o["spiega_scappa"])
+    _sp_js = pezzo_js(mini, "const STRADINA_SPIEGA = {", "\n};\n")
+    prova("...nei testi il lessico di casa: deposito di garanzia, mai escrow "
+          "né assicurato, la nsec mai chiesta", (True, False, False, True),
+          ("deposito di garanzia" in _sp_js, "escrow" in _sp_js.lower(),
+           "assicurat" in _sp_js.lower(), "non te la chiediamo mai" in _sp_js))
+    # L'APERTURA E IL RAZZO CHE CRESCE (17 nov, Andrea: «Tappo non si
+    # presenta», «far vedere questo razzo che si costruisce»)
+    prova("l'apertura: quattro pagine, «Avanti» fino all'ultima che dice "
+          "«Partiamo!», e un numero storto resta dentro",
+          [[False, True, "0"], [False, True, "1"], [False, True, "2"],
+           [True, False, "3"], [True, False, "3"], [False, True, "0"]], o["intro"])
+    prova("la festa del razzo: dallo stadio 1 al 2 arrivano i piedini, "
+          "col razzo vecchio che sfuma e la zona finita",
+          [True, True, True, True],
+          ["Il razzo ha i piedini!" in o["razzo_festa"], "razzo-1.webp" in o["razzo_festa"],
+           "razzo-2.webp" in o["razzo_festa"], "Primi passi" in o["razzo_festa"]])
+    prova("...e da fermo dice quanti pezzi ha e qual è il prossimo",
+          [True, True, False],
+          ["3 pezzi su 8" in o["razzo_fermo"], "il motore" in o["razzo_fermo"],
+           "str-razzo-vecchio" in o["razzo_fermo"]])
+    prova("Tappo sta sulla casella da fare (17 nov, Andrea)",
+          o["u"] + 1 if o["u"] + 1 < len(dati["tappe"]) else o["u"], o["pedina_u"])
     prova("un bottone per casella visibile, una casella «tocca a te», la "
           "porta, un barattolo per gradino visibile",
           (o["fine"], 1, 1, o["n_gradini_vis"]),
@@ -129870,7 +129909,8 @@ console.log(JSON.stringify({
     prova("TAPPO CAMMINA IN FILA: si ferma prima della prima casella da "
           "fare (la porta inerte non lo ferma), anche se piu' su ce n'e' "
           "di fatte", 2, o["in_fila"])
-    prova("Tappo sta sulla sua casella, col cappellino vinto",
+    # (17 nov, Andrea) Tappo sta sulla casella DA FARE, non sull'ultima fatta
+    prova("Tappo sta sulla casella da fare, col cappellino vinto",
           (o["attesa"], True), (o["pedina"], o["cappello"]))
     prova("i posti stanno dentro la tavola e la strada sale sempre", (True, True),
           (o["dentro"], o["sale"]))
