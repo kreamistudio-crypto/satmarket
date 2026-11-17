@@ -16892,6 +16892,16 @@ document.getElementById('cartello')?.remove();</script>
     <div id="p2pOcParoleCorpo"></div>
   </div>
 
+  <!-- «📍 DOVE VEDERVI» NELLO SCAMBIO ON-CHAIN IN CONTANTI (17 nov 2026,
+       cantiere onchain-contanti): l'appuntamento che scrive chi vende,
+       coi campi del foglio dei recapiti di Lightning. Lo riempie
+       `apriAppuntamentoOcP2P`. -->
+  <div class="sheet" id="p2pOcAppSheet" role="dialog" aria-modal="true" aria-labelledby="p2pOcAppTit">
+    <div class="grab"></div>
+    <h3 id="p2pOcAppTit">📍 Dove vedervi</h3>
+    <div id="p2pOcAppCorpo"></div>
+  </div>
+
   <!-- LA META' DELLA CAUZIONE BRUCIATA ALL'ALTRA PERSONA (1 ott 2026):
        una fattura dell'importo esatto, dal wallet o incollata -->
   <div class="sheet" id="p2pCauzioneSheet" role="dialog" aria-modal="true" aria-labelledby="p2pCauzioneTit">
@@ -28635,6 +28645,8 @@ setInterval(() => {
   battitoCambioLibroP2P();
   /* «📍 Sono qui» dell'altra parte, a pagina del contanti aperta (1 ott 2026) */
   try { battitoContantiP2P(); } catch(e) {}
+  /* ...e nello scambio on-chain in contanti (17 nov 2026, onchain-contanti) */
+  try { if (typeof battitoContantiOcP2P === 'function') battitoContantiOcP2P(); } catch(e) {}
   /* il paracadute dei miei ordini (13 ott 2026): su ogni vista, una volta al minuto */
   try { if (typeof battitoParacaduteP2P === 'function') battitoParacaduteP2P(); } catch(e) {}
   /* ...e la ripubblica dei miei ordini scaduti (16 nov 2026): stessa cadenza */
@@ -37273,6 +37285,7 @@ function closeSheet(){
   el('p2pHoldSheet').classList.remove('open');
   el('p2pOcDepositoSheet').classList.remove('open');
   el('p2pOcParoleSheet').classList.remove('open');
+  el('p2pOcAppSheet').classList.remove('open');
   paroleOnchainP2PAnnulla();   // il gesto che aspettava la chiave non parte
   el('backupObbligoSheet').classList.remove('open');
   backupObbligoAnnulla();   // il gesto che aspettava le parole non parte
@@ -68055,18 +68068,25 @@ function corpoPresaOcP2P(o, vendeLui){
   const usdtOc = typeof usdtOcP2P === 'function' ? usdtOcP2P : () => false;
   const paroleOc = typeof paroleOcP2P === 'function' ? paroleOcP2P : (x, t) => t;
   const ln = (p2pOcPresaRete[o.id] || {}).rete === 'ln';
+  /* in contanti di persona (17 nov 2026, onchain-contanti): l'incontro,
+     non il conto. Qui l'ordine e' quello del libro: vale il solo metodo */
+  const cont = typeof soloContantiP2P === 'function' && soloContantiP2P(o.metodi);
   return paroleOc(o, vendeLui
       ? 'Chi vende deposita i sats in un indirizzo 2-di-3 (sue, tue e di Barattolo: ne servono due). '
-        + 'Quando sono confermati mandi gli euro col metodo scritto e tocchi «Ho inviato gli euro»; '
+        + (cont ? 'Quando sono confermati vi vedete dove ti scrive lui, consegni i contanti e tocchi «Ho consegnato i contanti»; '
+           : 'Quando sono confermati mandi gli euro col metodo scritto e tocchi «Ho inviato gli euro»; ')
         + (ln
           ? 'lui li libera e, con lo swap, ti arrivano in Lightning, meno la tua metà della commissione e il costo dello swap. '
           : 'lui li libera e arrivano sul TUO wallet on-chain, meno la tua metà della commissione. ')
         + 'Se qualcosa va storto decide un moderatore.'
       : 'Se prendi, depositi tu ' + satsCardOnchainP2P(o) + ' più la tua metà della commissione e il margine di rete '
         + 'nell\'indirizzo 2-di-3 entro ' + p2pOnchainLibro.oreDeposito + ' ore'
-        + (ln ? ', pagando da Lightning con lo swap' : '') + '. Chi compra ti manda '
-        + esc(fmtSoldiP2P(o.euro, o)) + ' € e tu liberi i sats SOLO quando li vedi sul tuo conto. '
-        + 'Se non arrivano, apri una disputa: decide un moderatore.')
+        + (ln ? ', pagando da Lightning con lo swap' : '') + '. '
+        + (cont ? 'Poi scrivi nello scambio dove vedervi: chi compra ti consegna ' + esc(fmtSoldiP2P(o.euro, o))
+                  + ' € in contanti e tu liberi i sats SOLO dopo averli contati, lì davanti a lui. '
+                  + 'Se non te li dà, apri una disputa: decide un moderatore.'
+           : 'Chi compra ti manda ' + esc(fmtSoldiP2P(o.euro, o)) + ' € e tu liberi i sats SOLO quando li vedi sul tuo conto. '
+             + 'Se non arrivano, apri una disputa: decide un moderatore.'))
     + (usdtOc(o) ? ' ⚠️ Gli USDT viaggiano solo su ' + (o.metodi || []).map(m => (reteUsdtDaMetodoP2P(m) || {}).nome).filter(Boolean).join(' o ')
       + (vendeLui ? '.' : ': dopo la presa scrivi nello scambio il tuo indirizzo USDT.') : '');
 }
@@ -68812,6 +68832,10 @@ function statoOnchainCardP2P(o){
     case 'depositato': {
       /* il tempo per pagare (17 nov 2026): quanto resta, o che e' finito */
       const tp = typeof tempoPagareOcP2P === 'function' ? tempoPagareOcP2P(o, Date.now() / 1000) : null;
+      /* in contanti di persona si parla dell'incontro (17 nov 2026, onchain-contanti) */
+      if (typeof contantiOcP2P === 'function' && contantiOcP2P(o))
+        return ricevo ? {t: 'Consegna i contanti', d: 'Quando vi vedete, poi tocca «Ho consegnato i contanti»'}
+          : {t: 'Sats depositati', d: 'Quando vi vedete, chi compra ti consegna i contanti'};
       if (ricevo) return {t: 'Manda gli euro', d: !tp ? 'Poi tocca «Ho inviato gli euro»'
         : tp.finito ? 'Tempo per pagare finito: chi vende può aprire una disputa'
         : 'Hai ancora ' + tp.quanto + ', poi tocca «Ho inviato gli euro»'};
@@ -68819,10 +68843,14 @@ function statoOnchainCardP2P(o){
         : tp.finito ? 'Tempo per pagare finito: puoi aprire una disputa'
         : 'Chi compra ha ancora ' + tp.quanto + ' per pagare'};
     }
-    case 'euro_inviati':
-      if (deposito) return {t: 'Euro inviati', d: 'Controlla il conto e libera i sats'};
+    case 'euro_inviati': {
+      const contanti = typeof contantiOcP2P === 'function' && contantiOcP2P(o);
+      if (deposito) return contanti ? {t: 'Contanti consegnati', d: 'Contali e libera i sats'}
+        : {t: 'Euro inviati', d: 'Controlla il conto e libera i sats'};
       if (ricevo && !o.incasso) return {t: 'Scegli dove ricevere', d: 'Incolla un tuo indirizzo bitcoin'};
-      return {t: 'Euro inviati', d: 'Chi vende li controlla e libera i sats'};
+      return contanti ? {t: 'Contanti consegnati', d: 'Chi vende li conta e libera i sats'}
+        : {t: 'Euro inviati', d: 'Chi vende li controlla e libera i sats'};
+    }
     case 'disputa': return {t: 'In disputa', d: 'Decide un moderatore di Barattolo'};
     case 'rilasciato': return {t: 'Scambio concluso', d: ''};
     case 'rimborsato': return {t: 'Rimborsato', d: 'I sats sono tornati a chi li aveva depositati'};
@@ -69616,7 +69644,8 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
     metodi: vcP ? campi.metodi.map(m => metodoPmCoinP2P(m, qP, vcP.cod)) : campi.metodi.slice(),
     /* i franchi li dice la valuta: i loro metodi esistono anche in euro */
     valuta: String(campi.valuta || 'EUR').toUpperCase() === 'CHF' ? 'CHF' : '',
-    recapito: vendo ? String(p2pOcRecapito).trim() : '',
+    recapito: vendo && !(typeof soloContantiP2P === 'function' && soloContantiP2P(campi.metodi))
+      ? String(p2pOcRecapito).trim() : '',
     /* la zona di scambio del contanti, come su Lightning (17 nov 2026,
        cantiere onchain-contanti): '' senza «Contanti»; il server la rigiudica */
     zona: typeof zonaDaCampiP2P === 'function' ? zonaDaCampiP2P(campi) : '',
@@ -69672,6 +69701,9 @@ function schedaOnchainP2P(o){
   const paroleOc = typeof paroleOcP2P === 'function' ? paroleOcP2P : (x, t) => t;
   /* Barattozon on-chain (17 nov 2026): si paga il PayCode al tabacchino */
   const tabOc = !!(o.tabacchino && typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi));
+  /* in contanti di persona (17 nov 2026, onchain-contanti): le parole di
+     «Ho consegnato i contanti», l'appuntamento e «📍 Sono qui» */
+  const contOc = typeof contantiOcP2P === 'function' && contantiOcP2P(o);
   const vendo = o.parte === 'vendo';
   const deposito = o.ruolo === 'compratore';   // chi vende bitcoin
   const ricevo = o.ruolo === 'venditore';      // chi compra bitcoin
@@ -69699,7 +69731,8 @@ function schedaOnchainP2P(o){
           + `nel 2-di-3 entro le ${quando(o.deposito_entro)}: tocca «🔒 Blocca i sats». Con una conferma lo scambio va avanti.`
         : tabOc ? `Chi vende sta depositando i sats (entro le ${quando(o.deposito_entro)}). Poi vedi il PayCode.`
         : `Chi vende sta depositando ${fmt(o.importo_sats)} sats nell'indirizzo 2-di-3 (entro le ${quando(o.deposito_entro)}). `
-          + 'Ti avvisiamo appena sono confermati: allora mandi gli euro.';
+          + (contOc ? 'Ti avvisiamo appena sono confermati: allora vi vedete e consegni i contanti.'
+             : 'Ti avvisiamo appena sono confermati: allora mandi gli euro.');
       /* il foglio del deposito, come «🔒 Blocca i sats» di Lightning
          (30 ott 2026): il suo tasto e' quello in evidenza */
       gesti = (deposito ? bott('orange', `apriDepositoOnchainP2P(${o.id})`, '🔒 Blocca i sats')
@@ -69721,6 +69754,20 @@ function schedaOnchainP2P(o){
           ? 'Sats confermati. Paga il PayCode qui sotto, poi tocca «Ho pagato al tabacchino».'
           : 'Deposito confermato. Libera i sats solo quando su Amazon l\'ordine risulta <b>pagato</b>.';
         gesti = (ricevo ? g('euro-inviati', '🧾 Ho pagato al tabacchino', 'orange') : bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'))
+          + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
+          + g('disputa', '⚖️ Apri una disputa');
+        break;
+      }
+      /* IN CONTANTI DI PERSONA (17 nov 2026, onchain-contanti): le frasi
+         del Lightning (`STATI_CONTANTI_P2P`), «Ho consegnato i contanti»
+         con la sua conferma, e niente conto da guardare */
+      if (contOc) {
+        testo = ricevo
+          ? `I <b>${fmt(o.sats)} sats</b> sono nel 2-di-3. Quando vi vedete, consegna <b>${esc(fmtSoldiP2P(o.euro, o))} €</b> in contanti e dillo qui.`
+          : `Deposito confermato. Quando vi vedete, chi compra ti consegna <b>${esc(fmtSoldiP2P(o.euro, o))} €</b> in contanti: `
+            + 'contali davanti a lui, poi libera i sats. Mai prima.';
+        gesti = (ricevo ? bott('orange', `contantiConsegnatiOcP2P(${o.id})`, '💵 Ho consegnato i contanti')
+                        : bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'))
           + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
           + g('disputa', '⚖️ Apri una disputa');
         break;
@@ -69767,6 +69814,17 @@ function schedaOnchainP2P(o){
           ? `Chi compra dice di aver pagato (${quando(o.euro_inviati_il)}). Se su Amazon l'ordine risulta pagato, `
             + 'libera i sats; se no, apri una disputa.'
           : `Hai pagato il PayCode (${quando(o.euro_inviati_il)}). Chi vende controlla Amazon e libera i sats. Tieni lo scontrino.`;
+        gesti = (deposito ? bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats') : '')
+          + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
+          + g('disputa', '⚖️ Apri una disputa');
+        break;
+      }
+      if (contOc) {
+        testo = deposito
+          ? `Chi compra dice di averti consegnato <b>${esc(fmtSoldiP2P(o.euro, o))} €</b> in contanti (${quando(o.euro_inviati_il)}). `
+            + 'Contali davanti a lui, poi libera i sats. Se non li hai ricevuti, apri una disputa.'
+          : `Hai detto di aver consegnato ${esc(fmtSoldiP2P(o.euro, o))} € in contanti (${quando(o.euro_inviati_il)}). `
+            + 'Chi vende li conta e libera i sats davanti a te. Se non lo fa, apri una disputa.';
         gesti = (deposito ? bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats') : '')
           + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
           + g('disputa', '⚖️ Apri una disputa');
@@ -69851,6 +69909,12 @@ function schedaOnchainP2P(o){
   const rCoinR = typeof reteOcCoinP2P === 'function' ? reteOcCoinP2P(o) : null;
   /* col tabacchino al posto del recapito c'e' il PayCode (17 nov 2026) */
   const recapitoBox = tabOc ? (typeof payCodeOcP2P === 'function' ? payCodeOcP2P(o) : '')
+    /* in contanti al posto del recapito c'e' l'appuntamento «📍 Dove
+       vedervi» e, coi sats nel 2-di-3, il riquadro di «📍 Sono qui»;
+       al moderatore il confronto delle presenze (17 nov 2026) */
+    : contOc ? (typeof riquadroAppuntamentoOcP2P === 'function' ? riquadroAppuntamentoOcP2P(o) : '')
+      + (typeof riquadroContantiOcP2P === 'function' ? riquadroContantiOcP2P(o, gesti) : '')
+      + (mod && typeof confrontoModOcP2P === 'function' ? confrontoModOcP2P(o) : '')
     : recapito && ['pending', 'preso', 'depositato'].includes(o.stato) && rCoinR
     ? '<div class="p2p-box"><label>Il tuo indirizzo ' + esc(rCoinR.coin) + ' (' + esc(rCoinR.nome) + ')</label>'
       + '<input id="p2pOcRecapitoVivo" maxlength="120" autocapitalize="off" spellcheck="false" value="' + esc(o.recapito || '')
@@ -69914,7 +69978,8 @@ function schedaOnchainP2P(o){
         return '<div class="step ' + cl + '"><span class="dot"></span><b>' + esc(p.t) + '</b><small>' + esc(p.d) + '</small></div>';
       }).join('')
     + '</div></div>'
-    + '<div class="trust-note nota-scambio"><span><b>' + esc(paroleOc(o, P2P_ONCHAIN_STATI[o.stato] || o.stato)) + '</b>'
+    + '<div class="trust-note nota-scambio"><span><b>' + esc(contOc && o.stato === 'euro_inviati' ? 'Contanti consegnati'
+        : paroleOc(o, P2P_ONCHAIN_STATI[o.stato] || o.stato)) + '</b>'
       + (tocca ? '<span class="p2p-tocca">👉 tocca a te</span>' : (finito || mod ? '' : '<span class="p2p-aspetta">✋ Aspetta</span>'))
       + '<br>' + testo + '</span></div>'
     /* il tempo per pagare, sotto la nota (17 nov 2026) */
@@ -69943,10 +70008,257 @@ function schedaOnchainP2P(o){
        ? '<div id="p2pOcRecensione" data-ordine="' + esc(o.ordine) + '">'
          + riquadroRecensioneOcP2P(o, p2pOcRec[o.ordine]) + '</div>' : '')
     + (gesti.includes("'disputa'") ? '<input id="p2pOcMotivo" maxlength="500" placeholder="Per una disputa: cosa è successo? (lo leggono i moderatori)">' : '')
+    /* il passo 2 del contanti, subito sopra il gesto (come nel Lightning) */
+    + (contOc && typeof passoDueContantiOcP2P === 'function' ? passoDueContantiOcP2P(o, gesti) : '')
     + '<div class="p2p-onchain-gesti">' + gesti + '</div>'
     + decidi
     + (typeof chatOcBloccoHTML === 'function' ? chatOcBloccoHTML(o) : '')
     + (typeof chatOcModHTML === 'function' ? chatOcModHTML(o) : '');
+}
+
+/* ---- IL CONTANTI DI PERSONA NELLO SCAMBIO ON-CHAIN (17 nov 2026,
+   cantiere onchain-contanti, secondo pezzo; Andrea: «Dovrebbe funzionare
+   esattamente come Lightning anche l'on-chain contanti») ----
+   I PEZZI SONO QUELLI DEL LIGHTNING, non una seconda copia: le frasi
+   (`REGOLA_BREVE_CONTANTI_*`, `SPIEGA_SONO_QUI`, `REGOLA_DISPUTA_*`,
+   `consigliIncontroP2P`), le due righe delle presenze
+   (`righePresenzeP2P`), l'appuntamento che viaggia come testo composto
+   nel recapito (`testoAppuntamentoP2P` / `appuntamentoDaTestoP2P`), i
+   campi del foglio coi suggerimenti degli indirizzi (`campoRecapitoP2P`)
+   e il confronto del moderatore (`righeConfrontoModP2P`). COSA CAMBIA:
+   qui le due parti le conosce il server, quindi «📍 Sono qui» non firma
+   una nota — manda la posizione alla rotta dello scambio — e l'ora e il
+   punto dell'appuntamento viaggiano ACCANTO al recapito, nella stessa
+   richiesta. E' «in contanti» lo scambio che il server dice tale
+   (`contanti`): oggi quello il cui solo metodo e' «Contanti». */
+function soloContantiP2P(metodi){
+  const m = (metodi || []).map(x => String(x || '').trim()).filter(Boolean);
+  return m.length === 1 && typeof contantiAManoP2P === 'function' && contantiAManoP2P(m);
+}
+function contantiOcP2P(o){
+  if (!o) return false;
+  return typeof o.contanti === 'boolean' ? o.contanti : soloContantiP2P(o.metodi);
+}
+/* la riga dello scambio on-chain coi nomi che le righe del Lightning si
+   aspettano: il lato e le presenze */
+function vistaContantiOcP2P(o){
+  return {id: 'oc' + o.id, lato: o.ruolo === 'compratore' ? 'vendo' : 'compro', presenze: o.presenze || null};
+}
+/* il bottone pieno della pagina e' quello del pagamento? (i numeri «1» e
+   «2» ci sono solo allora, come nel Lightning) */
+function gestoPagamentoOcP2P(gesti){
+  const g = String(gesti || '');
+  return g.includes('contantiConsegnatiOcP2P') ? 'euro-inviati'
+    : g.includes('btn orange" onclick="liberaOnchainP2P') ? 'rilascia' : '';
+}
+function passoDueContantiOcP2P(o, gesti){
+  if (!contantiOcP2P(o) || ['depositato', 'euro_inviati'].indexOf(o.stato) < 0) return '';
+  const a = gestoPagamentoOcP2P(gesti);
+  if (!a) return '';
+  return '<div class="contanti-poi"><span class="contanti-num">2</span>'
+    + (a === 'rilascia' ? 'Poi, contati i contanti' : 'Poi, al momento di pagare') + '</div>';
+}
+/* IL RIQUADRO DEL CONTANTI: la gemella di `riquadroContantiP2P`, coi
+   sats nel 2-di-3; a disputa aperta le due righe, senza gesti */
+function riquadroContantiOcP2P(o, gesti){
+  if (!contantiOcP2P(o)) return '';
+  const vendo = o.ruolo === 'compratore', compro = o.ruolo === 'venditore';
+  if (!vendo && !compro) return '';
+  const vivo = o.stato === 'depositato' || o.stato === 'euro_inviati';
+  if (!vivo && o.stato !== 'disputa') return '';
+  const v = vistaContantiOcP2P(o);
+  if (!vivo) return '<div class="p2p-box contanti-box contanti-ridotto">' + righePresenzeP2P(v) + '</div>';
+  const mia = !!(o.presenze && o.presenze.mia);
+  const qui = 'sonoQuiOcP2P(' + Number(o.id) + ')';
+  return '<div class="p2p-box contanti-box">'
+    + '<div class="contanti-regola-forte">' + P2P_CONTANTI_ICO + ' ' + esc(vendo ? REGOLA_BREVE_CONTANTI_VENDE : REGOLA_BREVE_CONTANTI_COMPRA) + '</div>'
+    + '<div class="contanti-incontro">'
+      + '<div class="contanti-passo">' + (gestoPagamentoOcP2P(gesti) ? '<span class="contanti-num">1</span>' : '')
+        + '<b>📍 Sono qui</b><span class="contanti-quando">quando arrivi · facoltativo</span></div>'
+      + (mia ? '' : '<div class="contanti-spiega">' + esc(SPIEGA_SONO_QUI) + '</div>')
+      + (mia ? '' : '<button type="button" class="btn primary contanti-qui" onclick="' + qui + '">📍 Sono qui</button>')
+      + '<div class="contanti-righe">' + righePresenzeP2P(v) + '</div>'
+      + (mia ? '<button type="button" class="scopri-link contanti-ancora" onclick="' + qui + '">📍 Segna di nuovo</button>' : '')
+    + '</div>'
+    + '<div class="contanti-disputa">⚖️ ' + esc(REGOLA_DISPUTA_CONTANTI) + ' ' + esc(REGOLA_DISPUTA_ECCEZIONE) + '</div>'
+    + '<details class="contanti-consigli" data-o="' + esc(v.id) + '"' + (p2pConsigliAperti[v.id] ? ' open' : '')
+    + ' ontoggle="p2pConsigliAperti[this.dataset.o] = this.open">'
+    + '<summary>Consigli per l\'incontro<span class="freccia">›</span></summary><ul>'
+    + consigliIncontroP2P(v.lato).map(c => '<li>' + esc(c) + '</li>').join('')
+    + '</ul></details></div>';
+}
+/* L'APPUNTAMENTO, per tutti e due: l'ora, il luogo e — se l'indirizzo e'
+   stato riconosciuto — «🧭 Apri nel navigatore»; a chi vende «Scrivi» o
+   «Cambia», finche' i contanti non sono consegnati. Si legge dal
+   recapito dello scambio, che il server da' alle sole due parti. */
+function riquadroAppuntamentoOcP2P(o){
+  if (!contantiOcP2P(o)) return '';
+  const vende = o.ruolo === 'compratore' || (o.ruolo === 'maker' && o.lato === 'sell');
+  const compra = o.ruolo === 'venditore';
+  if (!vende && !compra) return '';
+  if (['pending', 'preso', 'depositato', 'euro_inviati', 'disputa'].indexOf(o.stato) < 0) return '';
+  const a = o.recapito ? appuntamentoDaTestoP2P(o.recapito) : null;
+  const cambia = vende && ['pending', 'preso', 'depositato'].indexOf(o.stato) >= 0;
+  const apri = 'apriAppuntamentoOcP2P(' + Number(o.id) + ')';
+  if (!a || !a.luogo) {
+    if (cambia)
+      return '<div class="p2p-appuntamento"><div class="app-tit">📍 <b>Dove vedervi</b></div>'
+        + '<div class="hint app-mano">Scrivi a chi compra dove e quando vi vedete.</div>'
+        + '<button type="button" class="btn primary app-naviga" onclick="' + apri + '">📍 Scrivi dove vedervi</button></div>';
+    return compra && (o.stato === 'preso' || o.stato === 'depositato')
+      ? '<div class="p2p-appuntamento"><div class="app-tit">📍 <b>Dove vedervi</b></div>'
+        + '<div class="hint app-mano">Chi vende deve ancora scrivere dove vedervi: ti avvisiamo appena lo fa.</div></div>' : '';
+  }
+  return '<div class="p2p-appuntamento">'
+    + (a.quando > 0
+       ? '<div class="app-tit">🕒 Appuntamento: <b>' + esc(quandoAppuntamentoP2P(a.quando)) + '</b></div>'
+       : '<div class="app-tit">📍 <b>Dove vedervi</b></div>')
+    + '<div class="app-luogo">📍 ' + esc(a.luogo) + '</div>'
+    + (a.punto
+       ? '<button type="button" class="btn ghost app-naviga" data-lat="' + esc(a.punto.lat) + '" data-lon="'
+         + esc(a.punto.lon) + '" data-nome="' + esc(a.luogo) + '" '
+         + 'onclick="apriNavigatoreP2P(this.dataset.lat, this.dataset.lon, this.dataset.nome)">🧭 Apri nel navigatore</button>'
+       : '<div class="hint app-mano">' + esc(vende
+           ? 'Indirizzo scritto a mano: chi compra lo legge così com\'è, senza il link al navigatore.'
+           : 'Indirizzo scritto a mano: niente link al navigatore. Se non lo trovi, chiedi a chi vende.') + '</div>')
+    + (cambia ? '<button type="button" class="scopri-link app-cambia" onclick="' + apri + '">✏️ Cambia l\'appuntamento</button>' : '')
+    + '</div>';
+}
+/* il confronto delle presenze, al moderatore: le righe e la regola del
+   caso sono quelle della card di Lightning */
+function confrontoModOcP2P(o){
+  if (!contantiOcP2P(o) || o.ruolo !== 'moderatore') return '';
+  const righe = righeConfrontoModP2P(o.confronto || null);
+  const regola = o.stato === 'disputa' ? regolaDisputaModP2P(o.confronto || null) : '';
+  const riga = r => '<div class="mod-riga mod-incontro">' + esc(r) + '</div>';
+  return '<div class="p2p-box">' + (righe.length ? righe.map(riga).join('') : riga('📍 Nessuna prova d\'incontro'))
+    + (regola ? riga(regola) : '')
+    /* la cautela di Lightning senza le firme: qui le parti le dice la sessione */
+    + (righe.length ? '<div class="hint">Le ore sono quelle del server di Barattolo all\'arrivo di ogni presenza. La posizione viene dal GPS dei telefoni e si può falsificare: è una conferma, non una prova assoluta.</div>' : '')
+    + '</div>';
+}
+/* «💵 HO CONSEGNATO I CONTANTI»: la conferma porta la regola intera, e
+   senza «📍 Sono qui» lo dice prima — come `euroInviatiP2P` nel Lightning */
+function contantiConsegnatiOcP2P(id){
+  const o = p2pOnchainMiei.find(x => x.id === Number(id));
+  if (!o) return;
+  const senzaPresenza = !(o.presenze && o.presenze.mia);
+  chiediConferma({
+    titolo: 'Hai consegnato i contanti?',
+    corpo: (senzaPresenza ? '📍 Non hai segnato «Sono qui». ' + REGOLA_DISPUTA_CONTANTI
+                            + ' Puoi tornare indietro e segnarlo adesso, o proseguire.\n\n' : '')
+      + 'Dillo quando consegni ' + fmtSoldiP2P(o.euro, o) + ' € a chi vende, lì di persona. ' + REGOLA_CONTANTI_COMPRA
+      + ' Da qui non potrai più rinunciare da solo: se qualcosa va storto, resta la disputa.',
+    etichetta: 'Sì, li ho consegnati',
+    indietro: senzaPresenza ? 'Indietro' : '',
+    poi: () => eseguiGestoOnchainP2P(o.id, 'euro-inviati', {contanti: true})});
+}
+/* «📍 SONO QUI»: la posizione (se il telefono la da'), il server, e la
+   pagina ridisegnata con le due righe. Si puo' ripremere. */
+let p2pOcSonoQuiInVolo = false;
+async function sonoQuiOcP2P(id){
+  if (p2pOcSonoQuiInVolo) return;
+  haptic();
+  p2pOcSonoQuiInVolo = true;
+  const rip = attesaP2P('Registro ora e posizione…');
+  try {
+    const geo = await posizioneP2P();
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(id)}/sono-qui`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({geo: geo})});
+    let d = null;
+    try { d = await r.json(); } catch(e) {}
+    if (!r.ok) throw new Error((d && d.detail) || 'Il server ha detto di no');
+    const o = p2pOnchainMiei.find(x => x.id === Number(id));
+    if (o && d && d.presenze) o.presenze = d.presenze;
+    /* LA POSIZIONE NEGATA SI DICE CHIARO: la presenza c'e', con la sola ora */
+    if (d && d.posizione) toast('📍 Presenza registrata ' + oraPresenzaP2P(d.ora));
+    else toast('📍 Presenza registrata ' + oraPresenzaP2P(d && d.ora)
+               + ', SENZA posizione: il telefono non l\'ha data', 6000);
+  } catch(e) {
+    toast('Presenza non registrata: ' + String(e && e.message || e));
+  } finally { rip(); p2pOcSonoQuiInVolo = false; }
+  renderP2POnchain();
+}
+/* LA PRESENZA DELL'ALTRO SI VEDE PRESTO, come nel Lightning: con la pagina
+   di uno scambio on-chain in contanti aperta e i sats nel 2-di-3, ogni
+   P2P_CONTANTI_OGNI_MS si chiede lo scambio al server, finche' l'altra
+   parte non ha segnato la sua. La pagina si ridisegna SOLO se e' cambiato
+   qualcosa: un motivo di disputa che si sta scrivendo non si perde. */
+let p2pOcContantiBattito = 0;
+function battitoContantiOcP2P(){
+  const adesso = Date.now();
+  if (adesso - p2pOcContantiBattito < P2P_CONTANTI_OGNI_MS) return;
+  if (document.visibilityState === 'hidden' || vistaAttivaP2P() !== 'view-p2ponchain') return;
+  const o = p2pOnchainAperto && p2pOnchainMiei.find(x => x.id === p2pOnchainAperto);
+  if (!o || !contantiOcP2P(o) || ['depositato', 'euro_inviati'].indexOf(o.stato) < 0) return;
+  if (o.presenze && o.presenze.altra) return;
+  p2pOcContantiBattito = adesso;
+  fetch(`${API_BASE}/p2p/onchain/${o.id}`, {headers: {'X-Tg-Init-Data': authHdr()}})
+    .then(r => r.ok ? r.json() : null).then(d => {
+      if (!d) return;
+      const cambiato = !!(d.presenze && d.presenze.altra) || d.stato !== o.stato;
+      if (cambiato && p2pOnchainAperto === o.id && vistaAttivaP2P() === 'view-p2ponchain') renderP2POnchain();
+    }).catch(() => {});
+}
+/* IL FOGLIO «📍 DOVE VEDERVI»: i campi sono quelli della forma «contanti»
+   del foglio dei recapiti di Lightning (luogo coi suggerimenti, quando,
+   punto), con gli STESSI id — i suggerimenti li cercano per id. Per
+   questo il foglio dei recapiti di Lightning, che da chiuso tiene i suoi
+   campi nella pagina, qui si svuota: si ridisegna da solo alla prossima
+   apertura. */
+let p2pOcAppId = 0;
+function apriAppuntamentoOcP2P(id){
+  const o = p2pOnchainMiei.find(x => x.id === Number(id));
+  const box = el('p2pOcAppCorpo');
+  if (!o || !box) return;
+  haptic();
+  p2pOcAppId = o.id;
+  const altro = el('p2pCampiCorpo');
+  if (altro) altro.innerHTML = '';
+  box.innerHTML = formaRecapito('Contanti').campi.map(campoRecapitoP2P).join('')
+    + '<div class="hint">Lo legge solo chi compra. ' + esc(CONSIGLI_CONTANTI) + '</div>'
+    + '<button type="button" class="btn orange" onclick="salvaAppuntamentoOcP2P(this)">Salva l\'appuntamento</button>';
+  const a = o.recapito ? appuntamentoDaTestoP2P(o.recapito) : null;
+  const metti = (k, v) => { const i = el('p2pCampoEuro_' + k); if (i) i.value = v; };
+  if (a) {
+    metti('luogo', a.luogo || '');
+    metti('quando', a.quando > Date.now() / 1000 ? valoreQuandoP2P(a.quando) : '');
+    metti('punto', a.punto ? 'i:' + a.punto.lat + ',' + a.punto.lon : '');
+  }
+  p2pLuoghiSeq++;
+  p2pLuoghiUltimi = [];
+  if (typeof selettoreCasaAllineaTutti === 'function') selettoreCasaAllineaTutti();
+  aggiornaPuntoLuogoP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pOcAppSheet').classList.add('open');
+}
+async function salvaAppuntamentoOcP2P(btn){
+  const o = p2pOnchainMiei.find(x => x.id === p2pOcAppId);
+  if (!o) return;
+  const leggi = k => String((el('p2pCampoEuro_' + k) || {}).value || '');
+  const luogo = leggi('luogo').replace(/\s+/g, ' ').trim();
+  if (!luogo) { toast('Scrivi dove proponi di vedervi'); const i = el('p2pCampoEuro_luogo'); if (i) i.focus(); return; }
+  const quando = quandoDaCampoP2P(leggi('quando'));
+  const no = giudiceQuandoP2P(quando, Math.floor(Date.now() / 1000));
+  if (no) { toast(no); const i = el('p2pCampoEuro_quando_btn') || el('p2pCampoEuro_quando'); if (i) i.focus(); return; }
+  const punto = puntoDaCampoP2P(leggi('punto'));
+  const testo = testoAppuntamentoP2P(luogo, quando, punto);
+  if (testo.length > 300) { toast('L\'indirizzo è troppo lungo: accorcialo', 5000); return; }
+  const rip = bottoneInAttesa(btn, '…');
+  let fatto = false;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${o.id}/recapito`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({recapito: testo, appuntamento: {ora: quando,
+        geo: punto ? {lat: Number(punto.lat), lon: Number(punto.lon)} : null}})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non salvato');
+    fatto = true;
+    toast('📍 Appuntamento salvato: chi compra lo vede nello scambio', 4000);
+  } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
+  finally { rip(); }
+  if (fatto) { chiudiFoglioP2P('p2pOcAppSheet'); renderP2POnchain(); }
 }
 
 /* ---- CHI E' L'ALTRA PARTE NELLO SCAMBIO ON-CHAIN (17 nov 2026,
@@ -70266,6 +70578,9 @@ function passiOnchainP2P(o){
   /* Barattozon on-chain (17 nov 2026): il terzo passo e' il tabacchino */
   if (o.tabacchino && typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi))
     passi[2] = {t: 'PayCode pagato', d: vendo ? 'Al tabacchino, da chi compra' : 'Al tabacchino, in contanti'};
+  /* in contanti di persona il terzo passo e' la consegna (17 nov 2026) */
+  if (typeof contantiOcP2P === 'function' && contantiOcP2P(o))
+    passi[2] = {t: 'Contanti consegnati', d: vendo ? 'Di persona, da chi compra' : 'Di persona, a chi vende'};
   const euroPartiti = !!o.euro_inviati_il;
   const PROG = {pending: 0, preso: 0, depositato: 2, euro_inviati: 3, rilasciato: 4,
                 disputa: euroPartiti ? 3 : 2};
@@ -70760,6 +71075,7 @@ async function eseguiGestoOnchainP2P(id, cosa, corpo, btn){
     if (cosa === 'controlla') toast(d.stato === 'depositato' ? '₿ Deposito confermato' : d.visti_sats
       ? `₿ Visti ${fmt(d.visti_sats)} sats, aspetto la conferma` : '₿ Niente ancora sull\'indirizzo', 5000);
     else if (cosa === 'euro-inviati') toast(corpo && corpo.txid ? '💵 Detto a chi vende, con l\'id della transazione'
+      : corpo && corpo.contanti ? '💵 Detto a chi vende: conta i contanti e libera i sats'
       : '💶 Detto a chi vende: controlla il conto e libera i sats', 5000);
     else if (cosa === 'disputa') toast('⚖️ Disputa aperta: un moderatore guarderà', 5000);
     else toast('₿ Fatto', 3000);
@@ -93963,7 +94279,11 @@ function riquadroLimitiP2P(){
      2-di-3 al posto del tetto e della fee di Lightning */
   if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc && myP2POnchain)
     /* col tabacchino il recapito e' il PayCode, gia' nel percorso (17 nov 2026) */
-    return (p2pLato !== 'compro' && !tabacchinoP2P(p2pNuovoMetodi) ? sezioneRecapitoOnchainP2P() : '') + riquadroOnchainP2P();
+    /* ...e col SOLO «Contanti» il recapito e' l'appuntamento, che chi vende
+       scrive nello scambio (17 nov 2026, onchain-contanti): qui c'e' la zona */
+    return (p2pLato !== 'compro' && !tabacchinoP2P(p2pNuovoMetodi)
+            && !(typeof soloContantiP2P === 'function' && soloContantiP2P(p2pNuovoMetodi))
+            ? sezioneRecapitoOnchainP2P() : '') + riquadroOnchainP2P();
   const riga = rigaTettoFeeP2P();
   return riga ? sezioneNuovoP2P({
     ico: '', titolo: 'Quanto si può, e quanto costa', corpo: riga}) : '';

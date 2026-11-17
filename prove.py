@@ -166559,7 +166559,11 @@ console.log(JSON.stringify(out));
            "const zona = typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';" in nuovo
            and "const zona = !oc &&" not in nuovo,
            "(oc ? '<span class=\"p2p-invia-oc\">' + P2P_OC_MONETA + (tab ? 'Rileggi e pubblica' : 'Pubblica ordine') + '</span></button>'" in nuovo,
-           "return (p2pLato !== 'compro' && !tabacchinoP2P(p2pNuovoMetodi) ? sezioneRecapitoOnchainP2P() : '') + riquadroOnchainP2P();"
+           # (17 nov 2026, onchain-contanti) ...e col solo «Contanti» nemmeno:
+           # l'appuntamento si scrive nello scambio
+           "return (p2pLato !== 'compro' && !tabacchinoP2P(p2pNuovoMetodi)\n"
+           "            && !(typeof soloContantiP2P === 'function' && soloContantiP2P(p2pNuovoMetodi))\n"
+           "            ? sezioneRecapitoOnchainP2P() : '') + riquadroOnchainP2P();"
            in pezzo_js(mini, "function riquadroLimitiP2P(){", "\n}\n")))
     invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
     pubb = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
@@ -205075,6 +205079,267 @@ console.log(JSON.stringify(out));
           out)
 
 
+def prove_onchain_contanti_scambio():
+    """IL CONTANTI DI PERSONA ON-CHAIN, SECONDO PEZZO: LA PAGINA DELLO
+    SCAMBIO (17 nov 2026 sera, cantiere onchain-contanti; Andrea:
+    «Dovrebbe funzionare esattamente come Lightning anche l'on-chain
+    contanti»). Le parole di «Ho consegnato i contanti», l'appuntamento
+    «📍 Dove vedervi» col navigatore, «📍 Sono qui» con le due righe e il
+    confronto del moderatore. I pezzi sono QUELLI del Lightning (frasi,
+    righe, tabelle, giudici): qui si prova che l'on-chain li usa, che la
+    posizione dell'altro non esce mai, e che le posizioni si scordano a
+    scambio chiuso. Il giro vero sta in collaudo_p2p_onchain (11-octies)."""
+    print("\n[on-chain: lo scambio in contanti di persona, come su Lightning]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    # --- il server ---
+    import sqlite3 as _sq
+    amb = {"json": json, "re": re, "math": __import__("math"), "time": time,
+           "_euro_tabacchino": lambda m: 0}
+    for riga in ("\nP2P_SONO_QUI_MAX = ", "\nP2P_APPUNTAMENTO_MAX = ", "\nP2P_APPUNTAMENTO_PASSATO_S = ",
+                 "\nP2P_APPUNTAMENTO_FUTURO_S = ", "\nP2P_ONCHAIN_STATI_INCONTRO = "):
+        j = src.index(riga) + 1
+        exec(src[j:src.index("\n", j)], amb)
+    for f in ("_metodi_libro", "_p2p_onchain_campo", "_p2p_onchain_metodi", "_p2p_onchain_solo_contanti",
+              "_geo_presenza_p2p", "_distanza_metri_p2p", "_tabella_p2p", "_appuntamento_in_vigore_p2p",
+              "_presenze_per_parte_p2p", "_p2p_onchain_contanti", "_p2p_onchain_lato_incontro",
+              "_p2p_onchain_registra_sono_qui", "_p2p_onchain_registra_appuntamento",
+              "_p2p_onchain_scorda_incontri"):
+        exec(pezzo(f), amb)
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    schema = src[src.index("    CREATE TABLE IF NOT EXISTS p2p_sono_qui("):
+                 src.index("    CREATE TABLE IF NOT EXISTS p2p_indice(")]
+    con.executescript(schema + "CREATE TABLE p2p_onchain_ordini(id INTEGER, ordine TEXT, stato TEXT);")
+    def riga(**k):
+        base = {"id": 7, "ordine": "bar-onchain-aaaa", "metodi": '["Contanti"]', "stato": "depositato",
+                "depositante_id": 888, "ricevente_id": 999, "maker_id": 888}
+        base.update(k)
+        return base
+    Q, A = amb["_p2p_onchain_registra_sono_qui"], amb["_p2p_onchain_registra_appuntamento"]
+    ora = 1_800_000_000
+    prova("«Sono qui» on-chain: non in contanti 409, un terzo 404, prima del deposito e a scambio chiuso 409",
+          [409, 404, 409, 409, 409],
+          [Q(con, riga(metodi='["SEPA"]'), 999, {}, ora)[0], Q(con, riga(), 777, {}, ora)[0],
+           Q(con, riga(stato="preso"), 999, {}, ora)[0], Q(con, riga(stato="disputa"), 999, {}, ora)[0],
+           Q(con, riga(stato="rilasciato"), 999, {}, ora)[0]])
+    prova("l'appuntamento: senza ora ne' punto non fa versioni; un'ora storta o fuori misura e' un no; "
+          "uno buono fa UNA versione, e ripetuto no",
+          ["", True, True, "", "", 1],
+          [A(con, riga(), 888, {"ora": 0}, ora), bool(A(con, riga(), 888, {"ora": "domani"}, ora)),
+           bool(A(con, riga(), 888, {"ora": ora + 30 * 86400}, ora)),
+           A(con, riga(), 888, {"ora": ora + 3600, "geo": {"lat": 45.4642, "lon": 9.19}}, ora),
+           A(con, riga(), 888, {"ora": ora + 3600, "geo": {"lat": 45.4642, "lon": 9.19}}, ora + 5),
+           con.execute("SELECT COUNT(*) FROM p2p_appuntamenti").fetchone()[0]])
+    c1, d1 = Q(con, riga(), 999, {"geo": {"lat": 45.4643, "lon": 9.1901, "acc": 12}}, ora + 3500)
+    c2, d2 = Q(con, riga(stato="euro_inviati"), 888, {"geo": {"lat": "x"}}, ora + 3600)
+    r1 = dict(con.execute("SELECT * FROM p2p_sono_qui WHERE lato='compra'").fetchone())
+    prova("chi compra segna la presenza con la posizione: il lato lo dice il ruolo, la distanza dal "
+          "luogo si calcola all'arrivo, niente nota firmata",
+          (200, True, "compra", 999, "", "", True, True),
+          (c1, d1["posizione"], r1["lato"], r1["caricata_da"], r1["chiave"], r1["prova"],
+           r1["appuntamento"] > 0, r1["dist_luogo"] is not None and r1["dist_luogo"] < 50))
+    prova("chi vende la segna anche a contanti detti consegnati, e una posizione storta e' una presenza "
+          "senza posizione; ognuno vede la SUA riga e dell'altro solo l'ora",
+          (200, False, {"ora": ora + 3600, "posizione": False, "volte": 1}, {"ora": ora + 3500}, False),
+          (c2, d2["posizione"], d2["presenze"]["mia"], d2["presenze"]["altra"],
+           "lat" in json.dumps(d2) or "45.46" in json.dumps(d2)))
+    for i in range(4):
+        Q(con, riga(), 999, {}, ora + 3501 + i)
+    prova("al sesto tocco dello stesso lato: 429", 429, Q(con, riga(), 999, {}, ora + 3600)[0])
+    con.execute("INSERT INTO p2p_onchain_ordini VALUES(7, 'bar-onchain-aaaa', 'disputa')")
+    via_aperto = amb["_p2p_onchain_scorda_incontri"](con, ora + 9000)
+    con.execute("UPDATE p2p_onchain_ordini SET stato='rilasciato'")
+    via_chiuso = amb["_p2p_onchain_scorda_incontri"](con, ora + 9000)
+    resto = con.execute("SELECT COUNT(*), SUM(lat IS NOT NULL), SUM(dist_luogo IS NOT NULL), "
+                        "SUM(posizione) FROM p2p_sono_qui").fetchone()
+    punto = con.execute("SELECT lat, punto, posizione_via FROM p2p_appuntamenti").fetchone()
+    prova("LE POSIZIONI SI SCORDANO A SCAMBIO CHIUSO (in disputa no: il moderatore guarda): restano "
+          "le righe, le ore e la distanza dal luogo; il punto dell'appuntamento se ne va",
+          (0, True, (6, 0, 1, 1), (None, 1, ora + 9000)),
+          (via_aperto, via_chiuso >= 2, tuple(resto), tuple(punto)))
+    con.close()
+    prova("la scopa di tutti i giorni chiama anche quella dell'on-chain", True,
+          "n += _p2p_onchain_scorda_incontri(con, adesso)" in pezzo("_scopa_presenze_p2p"))
+    per = pezzo("_p2p_onchain_per")
+    prova("la scheda: `contanti` a tutti, le due righe alle parti, il confronto SOLO al moderatore "
+          "che non e' una parte",
+          (True, True, True),
+          ('d["contanti"] = _p2p_onchain_contanti(o)' in per,
+           'd["presenze"] = _presenze_per_parte_p2p(con, str(o["ordine"]), 0, lato_i)' in per,
+           'elif admin and not parte_vera:\n            d["confronto"] = _confronto_giro_p2p(con, str(o["ordine"]), 0)'
+           in per))
+    rec = src[src.index('@app.post("/api/p2p/onchain/{oid}/recapito")'):
+              src.index('@app.post("/api/p2p/onchain/{oid}/incasso")')]
+    inv = src[src.index('@app.post("/api/p2p/onchain/{oid}/euro-inviati")'):
+              src.index("# ---- IL CONTANTI DI PERSONA ON-CHAIN: «📍 SONO QUI»")]
+    prova("il recapito in contanti porta l'appuntamento PRIMA di scriversi (un no non salva niente), e "
+          "gli avvisi parlano dell'incontro: «dove vedervi», «consegnato … in contanti», il deposito",
+          (True, True, True, True),
+          (0 < rec.find("_p2p_onchain_registra_appuntamento(") < rec.find("UPDATE p2p_onchain_ordini SET recapito=?"),
+           "Chi vende ha scritto dove vedervi." in rec,
+           "elif _p2p_onchain_contanti(o):" in inv and "in contanti.</b>" in inv,
+           "_p2p_onchain_testi_deposito_contanti(o, euro, ore)" in src))
+    rotta = src[src.index('@app.post("/api/p2p/onchain/{oid}/sono-qui")'):
+                src.index('@app.post("/api/p2p/onchain/{oid}/recapito")')]
+    prova("la rotta di «Sono qui» passa dal cancello dell'on-chain e dal ruolo, e non stampa niente",
+          (True, True, False),
+          ("_p2p_onchain_serve(user)" in rotta, "_p2p_onchain_ruolo(o, user[\"id\"])" in rotta,
+           "print(" in rotta))
+    # --- il telefono ---
+    scheda = pezzo_js(mini, "function schedaOnchainP2P(o){", "\n}\n")
+    prova("la pagina: in contanti il bottone e' «💵 Ho consegnato i contanti» con la sua conferma, lo "
+          "stato «Contanti consegnati», e al posto del recapito l'appuntamento e il riquadro",
+          (True, True, True, True, True),
+          ("bott('orange', `contantiConsegnatiOcP2P(${o.id})`, '💵 Ho consegnato i contanti')" in scheda,
+           "contOc && o.stato === 'euro_inviati' ? 'Contanti consegnati'" in scheda,
+           ": contOc ? (typeof riquadroAppuntamentoOcP2P === 'function' ? riquadroAppuntamentoOcP2P(o) : '')" in scheda,
+           "riquadroContantiOcP2P(o, gesti)" in scheda and "confrontoModOcP2P(o)" in scheda,
+           "passoDueContantiOcP2P(o, gesti)" in scheda))
+    cons = _fn_js(mini, "function contantiConsegnatiOcP2P(id){")
+    prova("...la conferma porta la regola intera e, senza «Sono qui», lo dice prima — le frasi del Lightning",
+          (True, True, True),
+          ("'📍 Non hai segnato «Sono qui». ' + REGOLA_DISPUTA_CONTANTI" in cons,
+           "REGOLA_CONTANTI_COMPRA" in cons,
+           "eseguiGestoOnchainP2P(o.id, 'euro-inviati', {contanti: true})" in cons))
+    salva = _fn_js(mini, "async function salvaAppuntamentoOcP2P(btn){")
+    apri = _fn_js(mini, "function apriAppuntamentoOcP2P(id){")
+    prova("il foglio «📍 Dove vedervi» usa i campi della forma «contanti» del Lightning, svuota il foglio "
+          "gemello (stessi id) e manda testo composto, ora e punto insieme; e si chiude con gli altri",
+          (True, True, True, True, True, True),
+          ("formaRecapito('Contanti').campi.map(campoRecapitoP2P)" in apri,
+           "if (altro) altro.innerHTML = '';" in apri,
+           "const testo = testoAppuntamentoP2P(luogo, quando, punto);" in salva,
+           "const no = giudiceQuandoP2P(quando, Math.floor(Date.now() / 1000));" in salva,
+           "body: JSON.stringify({recapito: testo, appuntamento: {ora: quando," in salva,
+           "el('p2pOcAppSheet').classList.remove('open');" in mini
+           and '<div class="sheet" id="p2pOcAppSheet"' in mini))
+    qui = _fn_js(mini, "async function sonoQuiOcP2P(id){")
+    prova("«📍 Sono qui» manda la posizione alla rotta dello scambio (niente nota), e la pagina guarda "
+          "ogni tanto se l'altro e' arrivato, ridisegnando solo se cambia",
+          (True, True, True, True),
+          ("const geo = await posizioneP2P();" in qui,
+           "/sono-qui`, {method: 'POST'," in qui and "finalizeEvent" not in qui,
+           "try { if (typeof battitoContantiOcP2P === 'function') battitoContantiOcP2P(); } catch(e) {}" in mini,
+           "if (cambiato && p2pOnchainAperto === o.id" in _fn_js(mini, "function battitoContantiOcP2P(){")))
+    pubb = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
+    prova("il foglio «Pubblica» col solo «Contanti» non manda un recapito scritto prima di cambiare metodo",
+          True, "recapito: vendo && !(typeof soloContantiP2P === 'function' && soloContantiP2P(campi.metodi))" in pubb)
+    passi = _fn_js(mini, "function passiOnchainP2P(o){")
+    prova("il terzo passo in contanti e' «Contanti consegnati»", True,
+          "passi[2] = {t: 'Contanti consegnati', d: vendo ? 'Di persona, da chi compra' : 'Di persona, a chi vende'};" in passi)
+    card = _fn_js(mini, "function statoOnchainCardP2P(o){")
+    presa = _fn_js(mini, "function corpoPresaOcP2P(o, vendeLui){")
+    prova("la card in «I miei scambi» e la domanda della presa parlano dell'incontro, non del conto",
+          (True, True, True, True),
+          ("{t: 'Consegna i contanti', d: 'Quando vi vedete, poi tocca «Ho consegnato i contanti»'}" in card,
+           "{t: 'Contanti consegnati', d: 'Contali e libera i sats'}" in card,
+           "consegni i contanti e tocchi «Ho consegnato i contanti»; " in presa,
+           "tu liberi i sats SOLO dopo averli contati, lì davanti a lui. " in presa))
+    banco = "\n".join(_fn_js(mini, f) for f in (
+        "function contantiAManoP2P(metodi){", "function soloContantiP2P(metodi){",
+        "function contantiOcP2P(o){", "function vistaContantiOcP2P(o){",
+        "function gestoPagamentoOcP2P(gesti){", "function passoDueContantiOcP2P(o, gesti){",
+        "function riquadroContantiOcP2P(o, gesti){", "function riquadroAppuntamentoOcP2P(o){",
+        "function confrontoModOcP2P(o){", "function consigliIncontroP2P(lato){",
+        "function oraPresenzaP2P(ts, adesso){", "function righePresenzeP2P(o, adesso){",
+        "function dataBreveP2P(ts){", "function testoAppuntamentoP2P(luogo, quando, punto){",
+        "function appuntamentoDaTestoP2P(testo){", "function quandoAppuntamentoP2P(ts){",
+        "function puntoDaLuogoP2P(l){", "function dataTabacchinoP2P(epoch){",
+        "function leggiDataTabacchinoP2P(testo){", "function durataModP2P(s){",
+        "function metriModP2P(m){", "function rigaAppuntamentoModP2P(c){",
+        "function righeConfrontoModP2P(c){", "function regolaDisputaModP2P(c){")) + "\n" \
+        + "".join(_riga_js(mini, r) for r in (
+            "const P2P_CONTANTI = ", "const P2P_CONTANTI_ICO = ", "const REGOLA_CONTANTI_COMPRA = ",
+            "const REGOLA_CONTANTI_VENDE = ", "const CONSIGLI_CONTANTI = ",
+            "const REGOLA_BREVE_CONTANTI_COMPRA = ", "const REGOLA_BREVE_CONTANTI_VENDE = ",
+            "const SPIEGA_SONO_QUI = ", "const REGOLA_DISPUTA_CONTANTI = ",
+            "const REGOLA_DISPUTA_ECCEZIONE = ", "let p2pConsigliAperti = ",
+            "const P2P_APPUNTAMENTO_TESTA = ", "const P2P_GIORNI_BREVI = ", "const P2P_MESI_BREVI = ",
+            "const REGOLA_DISPUTA_MOD_DECIDE = ", "const REGOLA_DISPUTA_MOD_SENZA = ")) + r"""
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const fmt = n => String(n);
+const out = {};
+const LIBERA = '<button type="button" class="btn orange" onclick="liberaOnchainP2P(this, 7)">x</button>';
+const CONSEGNA = '<button type="button" class="btn orange" onclick="contantiConsegnatiOcP2P(7)">x</button>';
+const base = {id: 7, metodi: ['Contanti'], contanti: true, stato: 'depositato', lato: 'sell', recapito: ''};
+const vende = x => Object.assign({}, base, {ruolo: 'compratore'}, x);
+const compra = x => Object.assign({}, base, {ruolo: 'venditore'}, x);
+out.giudice = [contantiOcP2P(compra()), contantiOcP2P({metodi: ['Contanti']}), contantiOcP2P({metodi: ['SEPA', 'Contanti']}),
+  contantiOcP2P({metodi: ['Contanti'], contanti: false}), contantiOcP2P(null), soloContantiP2P(['Contanti', ' ']),
+  soloContantiP2P(['Contanti al tabacchino 23.47'])];
+const r = riquadroContantiOcP2P(compra(), CONSEGNA);
+out.riquadroCompra = [r.includes(esc(REGOLA_BREVE_CONTANTI_COMPRA)), r.includes('onclick="sonoQuiOcP2P(7)">📍 Sono qui</button>'),
+  r.includes(esc(SPIEGA_SONO_QUI)), r.includes('Non hai ancora segnato la presenza'), r.includes('Chi vende non ha ancora segnato la presenza'),
+  r.includes(esc(REGOLA_DISPUTA_CONTANTI)), r.includes(esc(REGOLA_DISPUTA_ECCEZIONE)), r.includes('<span class="contanti-num">1</span>'),
+  r.includes('Segna di nuovo')];
+const rv = riquadroContantiOcP2P(vende({stato: 'euro_inviati', presenze: {mia: {ora: 1800000000, posizione: true, volte: 2}, altra: {ora: 1800000100}}}), LIBERA);
+out.riquadroVende = [rv.includes(esc(REGOLA_BREVE_CONTANTI_VENDE)), rv.includes('>📍 Sono qui</button>'), rv.includes('Segna di nuovo'),
+  /✓ Hai segnato la presenza alle \d\d:\d\d:\d\d/.test(rv), rv.includes('· con la posizione'),
+  /✓ Chi compra ha segnato la presenza alle/.test(rv), rv.includes(esc(SPIEGA_SONO_QUI))];
+out.quando = [riquadroContantiOcP2P(compra({stato: 'preso'}), ''), riquadroContantiOcP2P(compra({stato: 'rilasciato'}), ''),
+  riquadroContantiOcP2P(compra({contanti: false}), ''), riquadroContantiOcP2P(Object.assign({}, base, {ruolo: 'moderatore'}), ''),
+  /contanti-ridotto/.test(riquadroContantiOcP2P(compra({stato: 'disputa'}), '')),
+  /sonoQuiOcP2P/.test(riquadroContantiOcP2P(compra({stato: 'disputa'}), ''))];
+out.passoDue = [/>2<\/span>Poi, al momento di pagare/.test(passoDueContantiOcP2P(compra(), CONSEGNA)),
+  />2<\/span>Poi, contati i contanti/.test(passoDueContantiOcP2P(vende(), LIBERA)),
+  passoDueContantiOcP2P(compra({stato: 'euro_inviati'}), ''), passoDueContantiOcP2P(compra({stato: 'preso'}), CONSEGNA),
+  riquadroContantiOcP2P(compra({stato: 'euro_inviati'}), '').includes('contanti-num')];
+const fra = Math.floor(Date.now() / 1000) + 86400;
+const testo = testoAppuntamentoP2P('Bar Sport, piazza <Duomo>', fra, {lat: '45.46420', lon: '9.19000'});
+const ac = riquadroAppuntamentoOcP2P(compra({recapito: testo}));
+const av = riquadroAppuntamentoOcP2P(vende({recapito: testo}));
+out.appuntamento = [ac.includes('🕒 Appuntamento: <b>' + quandoAppuntamentoP2P(fra - fra % 60) + '</b>'),
+  ac.includes('📍 Bar Sport, piazza &lt;Duomo&gt;'), ac.includes('data-lat="45.46420" data-lon="9.19000"'),
+  ac.includes('🧭 Apri nel navigatore'), ac.includes('Cambia'), av.includes('onclick="apriAppuntamentoOcP2P(7)">✏️ Cambia l\'appuntamento</button>'),
+  riquadroAppuntamentoOcP2P(vende({recapito: testo, stato: 'euro_inviati'})).includes('Cambia')];
+const mano = riquadroAppuntamentoOcP2P(compra({recapito: 'Davanti alla stazione'}));
+out.aMano = [mano.includes('📍 Davanti alla stazione'), mano.includes('Apri nel navigatore'), mano.includes('niente link al navigatore')];
+out.vuoto = [riquadroAppuntamentoOcP2P(vende()).includes('onclick="apriAppuntamentoOcP2P(7)">📍 Scrivi dove vedervi</button>'),
+  riquadroAppuntamentoOcP2P(Object.assign({}, base, {ruolo: 'maker', stato: 'pending'})).includes('Scrivi dove vedervi'),
+  riquadroAppuntamentoOcP2P(compra()).includes('Chi vende deve ancora scrivere dove vedervi'),
+  riquadroAppuntamentoOcP2P(compra({stato: 'euro_inviati'})), riquadroAppuntamentoOcP2P(Object.assign({}, base, {ruolo: 'maker', lato: 'buy', stato: 'pending'})),
+  riquadroAppuntamentoOcP2P(Object.assign({}, base, {ruolo: 'moderatore', recapito: testo})), riquadroAppuntamentoOcP2P(vende({contanti: false, recapito: testo})),
+  riquadroAppuntamentoOcP2P(vende({stato: 'rilasciato', recapito: testo}))];
+const mod = x => Object.assign({}, base, {ruolo: 'moderatore', stato: 'disputa'}, x);
+const m0 = confrontoModOcP2P(mod());
+const m1 = confrontoModOcP2P(mod({confronto: {esito: 'solo_compra', regola: 'decide_moderatore', compra: {ora: 1800000000, posizione: true, acc: 10, volte: 1, appuntamento: null}, vende: null, distanza: null, posizioni_via: false, appuntamento: null}}));
+out.moderatore = [m0.includes('📍 Nessuna prova d&#39;incontro'), m0.includes(esc(REGOLA_DISPUTA_MOD_SENZA)),
+  m1.includes('📍 Presente solo chi compra'), m1.includes(esc(REGOLA_DISPUTA_MOD_DECIDE)), /firme sono verificate/.test(m1),
+  /si può falsificare/.test(m1), confrontoModOcP2P(compra({stato: 'disputa'}))];
+console.log(JSON.stringify(out));
+"""
+    out = _node_banco(banco)
+    if out is None:
+        salta("onchain_contanti_scambio", "node non c'e': il riquadro del contanti on-chain non si disegna")
+        return
+    prova("IL GIUDICE: lo dice il server; senza la sua parola, il solo «Contanti» (mai il tabacchino)",
+          [True, True, False, False, False, True, False], out["giudice"])
+    prova("IL RIQUADRO VERO di chi compra: la regola breve dal suo lato, «📍 Sono qui» con la frase che lo "
+          "spiega, le due righe vuote, la regola della disputa con la sua eccezione, il passo «1»",
+          [True, True, True, True, True, True, True, True, False], out["riquadroCompra"])
+    prova("...di chi vende a presenza segnata: niente bottone pieno, «Segna di nuovo», la sua ora con la "
+          "posizione e l'ora dell'altro; la spiegazione non serve piu'",
+          [True, False, True, True, True, True, False], out["riquadroVende"])
+    prova("...c'e' solo coi sats nel 2-di-3 e solo alle due parti; in disputa le due righe, senza gesti",
+          ["", "", "", "", True, False], out["quando"])
+    prova("...e il passo «2» sopra il bottone del pagamento, solo quando quel bottone c'e'",
+          [True, True, "", "", False], out["passoDue"])
+    prova("L'APPUNTAMENTO: l'ora, il luogo scappato e «🧭 Apri nel navigatore» a tutti e due; «Cambia» "
+          "solo a chi vende, e non dopo la consegna",
+          [True, True, True, True, False, True, False], out["appuntamento"])
+    prova("...un recapito scritto a mano (anche di ieri) si legge com'e', senza il navigatore",
+          [True, False, True], out["aMano"])
+    prova("...senza appuntamento chi vende ha «📍 Scrivi dove vedervi» (anche dal libro), chi compra sa "
+          "che arrivera'; e niente a chi non c'entra, fuori dal contanti o a scambio finito",
+          [True, True, True, "", "", "", "", ""], out["vuoto"])
+    prova("IL MODERATORE legge il confronto con le parole della card di Lightning e la regola del caso, "
+          "senza la riga delle firme; le parti no",
+          [True, True, True, True, False, True, ""], out["moderatore"])
+
+
 def prove_guida_wallet():
     """LA GUIDA «👛 IL TUO PRIMO WALLET» (17 nov 2026, cantiere
     primo-wallet). Andrea voleva un wallet custodial per i neofiti; dallo
@@ -207827,7 +208092,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -208847,6 +209112,7 @@ def main():
     prove_onchain_tempo_bonifico,
     prove_onchain_ritiro,
     prove_onchain_contanti,
+    prove_onchain_contanti_scambio,
     prove_guida_wallet,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
