@@ -65888,6 +65888,12 @@ async function onchainFirmaProposta(oid, verso){
      compra, e `onchainUsciteVersoVenditore` controlla il tetto */
   if (verso === 'compratore' && !o.rimborso)
     throw new Error('chi ha messo i sats non ha ancora scelto dove riceverli: il rimborso aspetta il suo wallet');
+  /* (17 nov 2026, rilascio-senza-incasso) senza l'indirizzo di chi
+     riceve la libreria direbbe «Invalid address length» */
+  if (verso === 'venditore' && !o.incasso)
+    throw new Error(o.rotta
+      ? 'chi compra non ha ancora scelto dove ricevere i sats. Chiedigli di incollare un suo indirizzo nello scambio (o nel Profilo), poi riprova'
+      : 'il venditore non ha ancora scelto dove ricevere i sats: riprova quando l\'ha fatto');
   const uscite = verso === 'venditore' ? onchainUsciteVersoVenditore(o, o.incasso, 0)
     : [[o.rimborso, tot - Math.ceil(vb(1) * tar)]];
   const r = await fetch(`${API_BASE}${o.rotta || '/onchain/ordini/' + o.id}/proposta`, {method: 'POST',
@@ -69253,6 +69259,12 @@ function schedaOnchainP2P(o){
         + 'col tuo seme e lui fa lo swap.';
     }
   }
+  /* (17 nov 2026, rilascio-senza-incasso) chi compra non ha ancora detto
+     dove ricevere: chi vende lo legge PRIMA di premere «Ricevuti» */
+  if (deposito && !o.incasso && !o.incasso_ln && !o.proposta
+      && (o.stato === 'depositato' || o.stato === 'euro_inviati'))
+    testo += '<br>⏳ Chi compra non ha ancora scelto il wallet dove ricevere i sats: '
+      + 'puoi liberarli appena lo fa (glielo ricordiamo noi nella sua pagina dello scambio).';
   /* la seconda firma, quando tocca a me: lo stesso bottone in ogni stato */
   if (daFirmareOnchainP2P(o) && !mod) {
     gesti = bott('orange', `cofirmaOnchainP2P(this, ${o.id})`,
@@ -70251,11 +70263,20 @@ async function fattoOnchainP2P(rip){
   p2pOnchainAperto = 0;
   go('p2pmiei');
 }
+/* L'INDIRIZZO DI CHI COMPRA SI RILEGGE (17 nov 2026, cantiere
+   rilascio-senza-incasso; scambio vero da 500 €): chi vende ha premuto
+   «Ricevuti» mentre chi compra non aveva ancora scelto dove ricevere, e
+   la libreria ha risposto «Invalid address length» per un indirizzo
+   VUOTO. Chi compra lo sceglie spesso proprio in quel momento (Profilo o
+   riquadro dello scambio): prima di firmare lo scambio si rilegge dal
+   server, e se l'incasso manca ancora lo si dice in parole. */
 async function firmaOnchainP2P(id, verso){
-  const o = p2pOnchainMiei.find(x => x.id === id);
+  let o = p2pOnchainMiei.find(x => x.id === id);
   if (!o) return;
   const rip = attesaP2P(verso === 'venditore' ? 'Libero i sats…' : 'Firmo il rimborso…');
   try {
+    if (verso === 'venditore' && !o.incasso)
+      o = (await leggiMieiOnchainP2P()).find(x => x.id === id) || o;
     await onchainFirmaProposta(o, verso);
   } catch(e) {
     rip();

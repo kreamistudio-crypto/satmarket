@@ -166908,8 +166908,20 @@ __PEZZI__
   const dopo = MANDATI.length;
   const no = await onchainCofirma(ven, D.semi[1]);
   const firmata = MANDATI.pop();
+  /* (17 nov 2026, rilascio-senza-incasso) chi libera uno scambio P2P
+     mentre chi riceve non ha ancora un indirizzo: un no in parole, non
+     «Invalid address length», e niente parte */
+  PAROLE = D.semi[0];
+  const primaVuoto = MANDATI.length;
+  let noVuoto = '';
+  try {
+    await onchainFirmaProposta({...D.compratore, destinazione: dest, incasso: '',
+                                rotta: '/p2p/onchain/8'}, 'venditore');
+  } catch(e) { noVuoto = e.message; }
+  const dopoVuoto = MANDATI.length - primaVuoto;
   console.log(JSON.stringify({firma, esternoTel, proposta, no, firmata,
-                              noFalsa, noQuota, noTetto, dopo}));
+                              noFalsa, noQuota, noTetto, dopo,
+                              noVuoto, dopoVuoto}));
 })().catch(e => console.log(JSON.stringify({errore: String(e)})));
 """.replace("__PEZZI__", pezzi)
     casa = _tf.mkdtemp(prefix="onchain-incasso-")
@@ -166976,6 +166988,18 @@ __PEZZI__
           o.get("no"))
     prova("...e manda la transazione finita", "/api/onchain/ordini/8/firma",
           (o.get("firmata") or [""])[0])
+    # (17 nov 2026, rilascio-senza-incasso: scambio vero da 500 €)
+    prova("«Ricevuti: libera i sats» senza l'indirizzo di chi compra: il no "
+          "in parole (non «Invalid address length») e niente parte",
+          [True, 0],
+          [str(o.get("noVuoto", "")).startswith("chi compra non ha ancora scelto "
+                                                "dove ricevere i sats"),
+           o.get("dopoVuoto")])
+    fp2p = pezzo_js(mini, "async function firmaOnchainP2P(id, verso){", "\n}\n")
+    prova("...e prima di firmare lo scambio si rilegge dal server, se "
+          "l'incasso manca (chi compra lo sceglie spesso in quel momento)",
+          True, "leggiMieiOnchainP2P()" in fp2p
+          and fp2p.index("leggiMieiOnchainP2P()") < fp2p.index("await onchainFirmaProposta(o, verso);"))
 
 
 def prove_ordine_onchain():
