@@ -88527,3 +88527,66 @@ NOTATO E NON FATTO: la card in «I miei scambi», nello stato «Euro
 inviati», non dice le 48 ore (le dice solo la pagina); la voce
 «onchain-come-lightning» di NOVITA parla ancora di 72 ore (e' storia:
 la voce nuova la corregge).
+
+## L'annullo chiesto che non arriva (17 nov 2026, cantiere annullo-registrato, terzo commit del ramo onchain-rimborso-liscio; Andrea: «Levagli la penalità», «tu in effetti hai richiesto l'annullamento», e alla proposta «si»)
+
+DA DOVE VIENE. Un utente con uno scambio on-chain fermo ha preso un
+ordine Lightning alle 13:26 e alle 13:56 ha ricevuto «Non hai
+proseguito in tempo […] Questo conta come scambio non completato».
+Andrea ha tolto la riga a mano dal VPS (una `DELETE` su `p2p_esiti`,
+col comando scritto qui e l'output incollato: `tolte: 1`). Nel registro
+di quel giro c'erano solo la presa e il `taker-timeout`: nessun
+tentativo, nessun annullo arrivato al coordinatore. Che l'utente avesse
+toccato «Annulla» su QUELL'ordine non si puo' dire: il server vede un
+annullo solo se il `cancel` arriva a mostrod, e il tocco non lo
+registrava nessuno. E' questo il buco.
+
+COSA SI E' DECISO. «Annulla» e' un messaggio Nostr del telefono al
+coordinatore. Se non arriva (rete, relay muto, pagina chiusa a meta')
+il tempo scade e a chi si stava RITIRANDO si contava un «mancato», che
+e' il contrario della regola del 10 ott («mai a chi si ritira prima»).
+Adesso il telefono dichiara il tocco al server PRIMA di mandare il
+`cancel` (`inviaAnnulloP2P`, solo il gesto «chiedi»: non il ritiro di
+un ordine mai preso, non l'accettare l'annullo dell'altro), sulla rotta
+dei tentativi che c'era gia', col gesto nuovo `annullo_chiesto`. Al
+`taker-timeout` `_segna_esiti_p2p` lo guarda prima della scusa
+(`_ha_chiesto_annullo_p2p`): il giro NON si conta e non si scrive
+niente. Il messaggio «Non hai proseguito in tempo» porta in coda
+«Avevi chiesto di annullare: questo non conta come scambio non
+completato.».
+
+PERCHE' NON E' LA SCUSA DEL TENTATIVO. La scusa («ci hai provato») vale
+una volta ogni 30 giorni perche' aprire il foglio della garanzia e'
+gratis e senza limite scuserebbe sempre. L'annullo no: quando arriva,
+l'ordine torna subito in vetrina, ed e' un gesto permesso ogni volta.
+Chi lo tocca non tiene fermo nessuno piu' di quanto la regola gia'
+consenta; quindi niente `scusato`, niente finestra. Per lo stesso
+motivo `_ha_provato_p2p` quel gesto NON lo guarda: la scusa e la regola
+di chi pubblica (`_esito_chi_pubblica_p2p`) restano identiche.
+
+I LIMITI, DETTI. Vale per quel giro (il tentativo ha la presa come
+inizio: un annullo del giro prima non copre il giro dopo) e solo per
+chi l'ha toccato (l'annullo dell'altra parte non scusa). Chi usa un
+altro client Mostro non dichiara niente, come per gli altri tentativi.
+La dichiarazione e' del telefono: una pagina modificata potrebbe
+mandarla senza annullare davvero, e guadagnerebbe solo quel che
+l'annullo vero gia' da'.
+
+STRADE SCARTATE. (1) Far passare l'annullo come un tentativo qualsiasi:
+consumerebbe la scusa dei 30 giorni e alla seconda volta conterebbe.
+(2) Non contare il timeout a chi ha un altro scambio aperto o in
+disputa: non c'entra col ritirarsi, e si presterebbe a tenere fermi gli
+ordini. (3) Mettere la riga anche nell'archivio (`_conto_esito_p2p`):
+comparirebbe su ogni scambio annullato normalmente.
+
+PROVATO. `prove_reputazione_p2p` (caso r, 5 controlli: il gesto e il
+suo giudice, il timeout non contato e senza `scusato`, il giro dopo che
+si conta, l'annullo dell'altra parte che non scusa, la riga nel
+messaggio; piu' il telefono: dichiarato prima del `cancel`, solo
+«chiedi»); `collaudo_reputazione_p2p`, passo 5-bis (la rotta vera).
+`prove_malus_p2p`, `prove_tempo_di_chi_pubblica` e
+`prove_paracadute_p2p` verdi coi giudici nuovi nel banco.
+
+NOTATO E NON FATTO: l'archivio dello scambio non dice «avevi chiesto di
+annullare»; Tappo non aveva una voce sugli scambi non completati (c'e'
+solo la riga aggiunta qui sull'annullo).
