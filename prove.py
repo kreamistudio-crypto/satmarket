@@ -155583,7 +155583,7 @@ console.log(JSON.stringify(out));
     # ore (lo screenshot dell'utente era proprio quello): Tappo lo dice
     prova("Tappo sa che sull'on-chain chi compra chiede a chi vende di annullare",
           [True] * 2,
-          ["chi compra NON ha un tasto per annullare" in _libro,
+          ["tocca «↩️ Chiedi di annullare» nella pagina dello scambio" in _libro,
            "a differenza di Lightning non torna nel libro" in _libro])
     out = _node_banco(js)
     if out is None:
@@ -165234,6 +165234,14 @@ const r = Object.assign({}, base, {ruolo: 'venditore', parte: 'compro', stato: '
 const sr = schedaOnchainP2P(r);
 out.schedaRiceve = [/apriDepositoOnchainP2P/.test(sr), /✋ Aspetta/.test(sr), /step now/.test(sr),
   /Ricevi.*10000/.test(sr), /tb1qdueditre/.test(sr)];
+/* (17 nov 2026, tappo-annullo-subito) «Chiedi di annullare» */
+const scc = x => schedaOnchainP2P(Object.assign({}, r, x));
+out.chiedi = [/chiedi-annullo'\\)">↩️ Chiedi di annullare/.test(sr), /Rinuncia/.test(sr),
+  /Hai chiesto a chi vende di annullare/.test(scc({annullo_chiesto_il: 5})),
+  /chiedi-annullo/.test(scc({annullo_chiesto_il: 5})),
+  /Chi compra ti chiede di annullare/.test(schedaOnchainP2P(Object.assign({}, o, {annullo_chiesto_il: 5}))),
+  /chiedi-annullo|Chi compra ti chiede/.test(sc),
+  /chiedi-annullo/.test(scc({deposito_entro: 1})), /chiedi-annullo/.test(scc({visti_sats: 5}))];
 const m = Object.assign({}, base, {ruolo: 'moderatore', stato: 'disputa', parti: {vende: 'a', compra: 'b'}});
 const sm = schedaOnchainP2P(m);
 out.schedaMod = [/tb1qdueditre/.test(sm), /explorer/.test(sm), /tocca a te|Aspetta/.test(sm)];
@@ -165253,6 +165261,10 @@ console.log(JSON.stringify(out));
     if out is None:
         prova("il banco del deposito on-chain gira", "", (r.stderr or "")[-600:])
         return
+    prova("chi compra, nella finestra del deposito: «↩️ Chiedi di annullare» al posto "
+          "della rinuncia, una volta sola; chi vende legge la richiesta; finita la "
+          "finestra o coi sats visti il tasto non c'e'",
+          [True, False, True, False, True, False, False, False], out["chiedi"])
     prova("il foglio del deposito e' solo di chi deposita, a scambio preso e con l'indirizzo",
           [True, False, False, False], out["daFare"])
     prova("la riga del tempo: in ore finche' sono ore, poi come l'orologio di Lightning; "

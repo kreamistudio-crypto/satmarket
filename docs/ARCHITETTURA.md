@@ -36003,7 +36003,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `{oid}/annulla`, `{oid}/controlla`, `{oid}/euro-inviati`,
   `{oid}/recapito`, `{oid}/proposta` (prima firma, giudice unico),
   `{oid}/firma` (seconda firma, stesso txid, trasmissione),
-  `{oid}/disputa`; per gli admin GET `moderazione/aperte` e POST
+  `{oid}/disputa`, `{oid}/chiedi-annullo` (17 nov 2026, cantiere
+  tappo-annullo-subito: chi compra, dentro la finestra del deposito,
+  dove non annulla da solo, CHIEDE a chi vende di annullare; una volta
+  sola, timbro `annullo_chiesto_il`, avviso a chi vende col suo «Annulla
+  (non deposito)»; non muove e non annulla niente — la regola delle 6
+  ore resta com'è); per gli admin GET `moderazione/aperte` e POST
   `{oid}/decidi` (Barattolo firma con la terza chiave). Freni:
   `p2p_onchain_pubblica` 10/h, `p2p_onchain_prendi` 10/h,
   `p2p_onchain_disputa` 5/h, più quelli dell'on-chain per controlla e

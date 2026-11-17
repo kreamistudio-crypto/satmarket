@@ -87302,14 +87302,50 @@ deposita invece annulla quando vuole finché la rete non vede sats
 torna nel libro, chiunque annulli. Il libro di Tappo ora lo dice (frase
 nel punto della rinuncia, coi due tasti e il «chiedi a chi vende in
 chat»), e il paragrafo di Lightning rimanda all'on-chain. Se e come dare
-a chi compra un gesto prima delle 6 ore lo decide Andrea (card nel
-thread): codice NON toccato qui.
+a chi compra un gesto prima delle 6 ore l'ha deciso Andrea sulla card
+del thread (11:07 UTC): «Tasto 'Chiedi di annullare'».
+
+IL TASTO (stesso giorno, secondo commit). POST
+`/api/p2p/onchain/{oid}/chiedi-annullo`: solo chi compra (ruolo
+`venditore`), solo in `preso`, senza sats visti o ricevuti, solo DENTRO
+la finestra del deposito (dopo c'è già «Rinuncia»), una volta sola
+(colonna `annullo_chiesto_il`, timbrata con un UPDATE condizionato:
+due tocchi di fila danno un avviso solo). Chi vende riceve «↩️ Chi
+compra ti chiede di annullare lo scambio on-chain», col suo «Annulla
+(non deposito)» e il «se li hai già mandati, non annullare: scriviglielo
+in chat». Non muove e non annulla niente: annulla sempre chi deposita,
+l'unico che sa se il deposito è partito. La pagina (`schedaOnchainP2P`,
+caso 'preso'): a chi compra «↩️ Chiedi di annullare» finché non l'ha
+chiesto, poi la frase «Hai chiesto a chi vende di annullare»; a chi
+vende la frase «Chi compra ti chiede di annullare». Domanda unica di
+casa (`chiediConferma`) prima della richiesta. Nessuna leva: un bottone
+che chiede, senza soldi né firme.
+
+STRADE SCARTATE (dalla card). L'annullo subito anche per chi compra,
+come su Lightning: un deposito partito nello stesso istante finirebbe
+in uno scambio chiuso, da recuperare col rimborso a due firme. Lasciare
+com'era e correggere solo Tappo: l'utente restava appeso alla chat.
+Rimettere nel libro l'ordine annullato on-chain (come fa Mostro quando
+annulla chi ha preso): non chiesto, resta com'è.
+
 
 STRADE SCARTATE. Riscrivere anche il tempo che scade senza annullare
 («l'ordine resta riservato mezz'ora»): «I tempi» lo dice già, e il
 dettaglio di chi torna nel libro allo scadere non serviva alla domanda.
 
-PROVATO. Due righe nuove in `prove_testi_p2p_confondono` (Lightning e
+PROVATO (il tasto). Otto righe nuove in `collaudo_p2p_onchain` (la
+gabbia col server vero): chi compra non annulla dentro la finestra
+(409), chi deposita non «chiede» (403), la richiesta (200) arriva a chi
+vende col suo tasto e non a chi compra, la pagina la mostra a tutt'e
+due e lo stato resta `preso`, la seconda richiesta è 409 senza avviso,
+chi vende annulla, a finestra finita si rinuncia, coi sats visti 409.
+Controprova: tolti il «una volta sola» e il controllo del ruolo, due
+righe rosse. Una riga in `prove_deposito_p2p_onchain` (in node): il
+tasto a chi compra, la frase dopo la richiesta, la frase a chi vende,
+niente tasto a finestra finita o coi sats visti; controprova col tasto
+tolto: rossa.
+
+PROVATO (il libro). Due righe nuove in `prove_testi_p2p_confondono` (Lightning e
 on-chain), indipendenti da node; controprova sul libro di origin/develop
 8b63e4e: le cinque frasi cercate non ci sono, le due righe sarebbero
 rosse. GIRATO sull'albero di origin/develop 8b63e4e più questo cantiere,

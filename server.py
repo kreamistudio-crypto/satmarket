@@ -106978,7 +106978,11 @@ def _p2p_onchain_prepara(con):
                       # 17 nov 2026, cantiere barattozon-onchain: il PayCode
                       # di un Barattozon, JSON {pc, scade, barre}; '' per
                       # tutto il resto. Esce solo da `_p2p_onchain_per`
-                      ("paycode", "TEXT DEFAULT ''")):
+                      ("paycode", "TEXT DEFAULT ''"),
+                      # 17 nov 2026, cantiere tappo-annullo-subito: quando
+                      # chi compra ha chiesto a chi vende di annullare
+                      # prima del deposito (0 = mai): una volta sola
+                      ("annullo_chiesto_il", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -107461,6 +107465,9 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "paga_entro": p2p_onchain_paga_entro(o),
         "ore_pagamento": p2p_onchain_ore_pagamento(o),
         "euro_inviati_il": int(o["euro_inviati_il"] or 0),
+        # (17 nov 2026, tappo-annullo-subito) chi compra ha chiesto di
+        # annullare: la pagina lo dice a tutt'e due
+        "annullo_chiesto_il": int(_p2p_onchain_campo(o, "annullo_chiesto_il", 0) or 0),
         "disputa": ({"da": "io" if int(o["disputa_da"] or 0) == tg_id else "altro",
                      "il": int(o["disputa_il"] or 0),
                      "motivo": o["disputa_motivo"] or ""}
@@ -108021,6 +108028,64 @@ async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
         await _notifica_p2p_onchain(o, altro, "❌ <b>L'altra parte ha annullato lo scambio on-chain.</b> "
                               f"Era {_p2p_onchain_quanto(o)}.\n\nNessun sats si è mosso.",
                        _p2p_onchain_bottone(o))
+    return {"ok": True}
+
+
+@app.post("/api/p2p/onchain/{oid}/chiedi-annullo")
+async def p2p_onchain_chiedi_annullo(oid: int, x_tg_init_data: str = Header(""),
+                                     barattolo_sessione: str = Cookie("")):
+    """«CHIEDI DI ANNULLARE» (17 nov 2026, cantiere tappo-annullo-subito;
+    un utente che voleva tirarsi indietro da uno scambio on-chain appena
+    preso, e Andrea sulla card: «Tasto 'Chiedi di annullare'»). Chi
+    compra non annulla da solo prima che scada la finestra del deposito
+    (`p2p_onchain_annulla`: il deposito di chi vende puo' essere gia'
+    partito senza che la rete lo veda ancora), e quella regola NON si
+    tocca. Qui chi compra CHIEDE: la riga si timbra e chi vende riceve
+    l'avviso col suo «Annulla (non deposito)», il gesto che solo lui puo'
+    fare sapendo se ha mandato i bitcoin. Non muove niente e non annulla
+    niente. Una volta sola per scambio (niente raffiche di avvisi); dopo
+    la finestra del deposito non serve, c'e' gia' «Rinuncia»."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        ruolo = _p2p_onchain_ruolo(o, user["id"])
+        if o["stato"] != "preso":
+            raise HTTPException(409, "Questo scambio non si annulla più "
+                                     "con una richiesta")
+        if ruolo != "venditore":
+            raise HTTPException(403, "Lo chiede chi compra: chi deve "
+                                     "depositare annulla da sé")
+        if int(o["visti_sats"] or 0) or int(o["ricevuti_sats"] or 0):
+            raise HTTPException(409, "Ci sono già dei sats sull'indirizzo: "
+                                     "ora si esce solo col rimborso o con "
+                                     "una disputa")
+        if adesso >= int(o["deposito_entro"] or 0):
+            raise HTTPException(409, "Il tempo del deposito è finito: "
+                                     "puoi rinunciare da solo")
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET annullo_chiesto_il=?, aggiornato=?"
+            " WHERE id=? AND stato='preso' AND visti_sats=0"
+            " AND COALESCE(annullo_chiesto_il, 0)=0",
+            (adesso, adesso, oid))
+        con.commit()
+        if not cur.rowcount:
+            raise HTTPException(409, "Hai già chiesto di annullare: ora "
+                                     "tocca a chi vende")
+        chi_vende = int(o["depositante_id"] or 0)
+    finally:
+        con.close()
+    if chi_vende:
+        await _notifica_p2p_onchain(
+            o, chi_vende,
+            "↩️ <b>Chi compra ti chiede di annullare lo scambio on-chain.</b> "
+            f"Era {_p2p_onchain_quanto(o)}.\n\nSe non hai ancora mandato i "
+            "bitcoin, apri lo scambio e tocca «Annulla (non deposito)»: nessun "
+            "sats si è mosso. Se li hai già mandati, non annullare: scriviglielo "
+            "nella chat dello scambio.",
+            _p2p_onchain_bottone(o))
     return {"ok": True}
 
 

@@ -66970,6 +66970,18 @@ function schedaOnchainP2P(o){
                           + g('controlla', '🔎 Ho depositato: controlla') : g('controlla', '🔎 Controlla la rete'))
         + ((deposito && !o.visti_sats) || (ricevo && Date.now() / 1000 > o.deposito_entro && !o.visti_sats)
            ? g('annulla', deposito ? 'Annulla (non deposito)' : 'Rinuncia: il deposito non è arrivato') : '');
+      /* «CHIEDI DI ANNULLARE» (17 nov 2026, cantiere tappo-annullo-subito,
+         la scelta di Andrea sulla card): chi compra, prima che scada la
+         finestra del deposito, non annulla da solo (il deposito puo' gia'
+         essere partito) ma CHIEDE a chi vende, una volta sola; chi vende
+         legge la richiesta qui e annulla col suo tasto */
+      if (!o.visti_sats && Date.now() / 1000 <= o.deposito_entro) {
+        if (ricevo && o.annullo_chiesto_il) testo += ' <b>Hai chiesto a chi vende di annullare.</b> '
+          + 'Se non ha ancora mandato i bitcoin può farlo con un tocco; se non lo fa, allo scadere del deposito puoi rinunciare tu.';
+        else if (ricevo) gesti += g('chiedi-annullo', '↩️ Chiedi di annullare');
+        else if (deposito && o.annullo_chiesto_il) testo += ' <b>Chi compra ti chiede di annullare.</b> '
+          + 'Se non hai ancora mandato i bitcoin, tocca «Annulla (non deposito)»; se li hai già mandati, non annullare e diglielo in chat.';
+      }
       break;
     case 'depositato':
       /* BARATTOZON ON-CHAIN (17 nov 2026): il PayCode nel riquadro qui
@@ -67923,6 +67935,13 @@ function gestoOnchainP2P(btn, id, cosa){
       corpo: 'Nessun sats si è mosso: lo scambio si chiude qui e l\'altra parte lo sa subito.',
       poi: () => eseguiGestoOnchainP2P(id, 'annulla', {})});
   }
+  /* (17 nov 2026, tappo-annullo-subito) chi compra chiede, non annulla */
+  if (cosa === 'chiedi-annullo') {
+    return chiediConferma({titolo: '↩️ Chiedi di annullare?', etichetta: 'Chiedi di annullare',
+      corpo: 'Chi vende riceve un avviso e può annullare con un tocco, se non ha ancora mandato i bitcoin. '
+        + 'Si chiede una volta sola. Se non lo fa, allo scadere del deposito puoi rinunciare tu.',
+      poi: () => eseguiGestoOnchainP2P(id, 'chiedi-annullo', {})});
+  }
   if (cosa === 'disputa') {
     const motivo = String((el('p2pOcMotivo') || {}).value || '').trim().slice(0, 500);
     return chiediConferma({titolo: '⚖️ Apri una disputa?', etichetta: 'Apri la disputa',
@@ -67948,6 +67967,7 @@ async function eseguiGestoOnchainP2P(id, cosa, corpo, btn){
     else if (cosa === 'euro-inviati') toast(corpo && corpo.txid ? '💵 Detto a chi vende, con l\'id della transazione'
       : '💶 Detto a chi vende: controlla il conto e libera i sats', 5000);
     else if (cosa === 'disputa') toast('⚖️ Disputa aperta: un moderatore guarderà', 5000);
+    else if (cosa === 'chiedi-annullo') toast('↩️ Chiesto a chi vende di annullare', 5000);
     else toast('₿ Fatto', 3000);
   } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }

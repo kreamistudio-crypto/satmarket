@@ -434,3 +434,9 @@ frase: I tuoi livelli adesso si sfogliano: nel Profilo, sotto «Livello e titolo
 dove: Profilo → «🎖 Livello e titolo» → «I vantaggi di ogni livello».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-17 · tappo-annullo-subito
+frase: Hai preso uno scambio P2P on-chain per comprare bitcoin e vuoi tirarti indietro prima che chi vende depositi? Adesso nella pagina dello scambio c'è «↩️ Chiedi di annullare»: chi vende riceve un avviso e, se non ha ancora mandato i bitcoin, annulla con un tocco. Negli scambi Lightning, prima della garanzia, si annulla già subito da soli con «✕ Annulla».
+dove: Il P2P, «I miei scambi» → uno scambio on-chain preso, in attesa del deposito (stato «Preso: si aspetta il deposito»), in fondo alla pagina.
+leva: nessuna
+pubblico: sì

@@ -725,6 +725,59 @@ def main():
     prova("Andrea co-firma: rimborsato, e la coda si svuota", ("rimborsato", 0),
           (gesto(999, oid5, "firma", tx=cofirma(999, uno(999, oid5))).json()["stato"],
            (come(777), len(c.get("/api/p2p/onchain/moderazione/aperte").json()["dispute"]))[1]))
+    # «CHIEDI DI ANNULLARE» (17 nov 2026, cantiere tappo-annullo-subito):
+    # chi compra, dentro la finestra del deposito, non annulla da solo ma
+    # chiede; chi vende legge e annulla col suo tasto
+    oc = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
+    gesto(888, oc["id"], "prendi")
+    banco.DETTO.clear()
+    prova("chi compra, nella finestra del deposito, non annulla da solo (409)",
+          409, gesto(888, oc["id"], "annulla").status_code)
+    prova("...chi deve depositare non 'chiede': annulla da se' (403)",
+          403, gesto(999, oc["id"], "chiedi-annullo").status_code)
+    prova("chi compra chiede di annullare: 200, e chi vende lo sa col suo tasto",
+          (200, True, True),
+          (gesto(888, oc["id"], "chiedi-annullo").status_code,
+           detto_a(999, "Chi compra ti chiede di annullare"),
+           detto_a(999, "Annulla (non deposito)")))
+    prova("...a chi compra non arriva niente (l'ha chiesto lui)", False,
+          detto_a(888, "chiede di annullare"))
+    prova("la richiesta si vede nella pagina di tutt'e due, lo stato resta preso",
+          (True, True, "preso"),
+          (uno(888, oc["id"])["annullo_chiesto_il"] > 0,
+           uno(999, oc["id"])["annullo_chiesto_il"] > 0, uno(999, oc["id"])["stato"]))
+    banco.DETTO.clear()
+    prova("una volta sola: la seconda richiesta e' 409, e nessun avviso nuovo",
+          (409, False),
+          (gesto(888, oc["id"], "chiedi-annullo").status_code,
+           detto_a(999, "chiede di annullare")))
+    prova("chi vende annulla: annullato, e chi compra lo sa", (200, "annullato", True),
+          (gesto(999, oc["id"], "annulla").status_code, uno(888, oc["id"])["stato"],
+           detto_a(888, "annullato")))
+    prova("...a scambio annullato la richiesta non c'e' piu' (409)", 409,
+          gesto(888, oc["id"], "chiedi-annullo").status_code)
+    od = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
+    gesto(888, od["id"], "prendi")
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET deposito_entro=? WHERE id=?",
+                (int(time.time()) - 1, od["id"]))
+    con.commit()
+    con.close()
+    prova("finita la finestra non si chiede: si rinuncia (409, poi 200)", (409, 200),
+          (gesto(888, od["id"], "chiedi-annullo").status_code,
+           gesto(888, od["id"], "annulla").status_code))
+    oe = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
+    gesto(888, oe["id"], "prendi")
+    paga(uno(999, oe["id"]), confermata=False)
+    asyncio.run(SRV._p2p_onchain_controlla(oe["id"]))
+    prova("coi sats visti sull'indirizzo non si chiede (409)", 409,
+          gesto(888, oe["id"], "chiedi-annullo").status_code)
+    # ...e si toglie dal conto degli scambi aperti di 999 (il tetto dei
+    # cinque, piu' sotto, li conta): coi sats visti nessun gesto lo chiude
+    con = SRV.db()
+    con.execute("DELETE FROM p2p_onchain_ordini WHERE id=?", (oe["id"],))
+    con.commit()
+    con.close()
     o6 = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
     gesto(888, o6["id"], "prendi")
     con = SRV.db()
