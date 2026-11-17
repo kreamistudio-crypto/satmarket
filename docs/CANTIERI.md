@@ -89450,6 +89450,12 @@ stessa cifra nel journal del gesto che brucia. Il terzo rosso di quel
 giro, `prove_node_fisso` («otto minuti da adesso»), da solo è verde su
 develop e sul ramo: è una prova d'orologio sotto carico, non del
 cantiere.
+IL SETTIMO GIRO INTERO SUL PC (5dd7efb8, tutti e quattro i pezzi su
+develop d49f7f69): un rosso solo fuori da quelli noti di Windows,
+`prove_prova_wallet`, che vietava `/v2/invoices/settle` in TUTTO il
+server per proteggere le hold di prova. Il divieto resta intero per
+loro; la prova ora conta zero saldature FUORI dalle due funzioni della
+cauzione, e che lì non entri il macaroon delle hold di prova.
 NON PROVATO: come tutto il terzo pezzo, niente ha
 ancora parlato con un LND vero: la prima SettleInvoice vera è la prova
 di Andrea e Alan (DA-FARE-ANDREA, voce 20, passo 5).

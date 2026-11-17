@@ -173218,8 +173218,19 @@ def prove_prova_wallet():
           [True, True, True, True],
           ['PROVA_HOLD_CLTV = {"G": 40, "H": 576}' in src, "PROVA_HOLD_VITA_S = 180" in src,
            '"value": "1",' in codice(pezzo("richiesta_hold_prova")), "PROVA_HOLD_EXPIRY_S = 600" in src])
-    prova("MAI settle: ne' la parola nel CODICE del blocco (i commenti lo nominano per dire che non c'e'), ne' la rotta in tutto il server",
-          [False, False], ["settle" in re.sub(r'"""[\s\S]*?"""', "", cod).lower(), "/v2/invoices/settle" in src])
+    # (17 nov 2026 sera, onchain-contanti) FINO A IERI la rotta non esisteva
+    # in tutto il server. Adesso la cauzione del contanti on-chain si puo'
+    # bruciare (decisione di Andrea, «come su Lightning»), e la salda UNA
+    # funzione sola, col macaroon delle CAUZIONI: il divieto resta intero
+    # per le hold di prova, e fuori da quelle due funzioni per chiunque.
+    prova("MAI settle: ne' la parola nel CODICE del blocco (i commenti lo nominano per dire che non c'e'), "
+          "ne' la rotta nel server fuori dalle due funzioni della cauzione on-chain, che il macaroon "
+          "delle hold di prova non lo usano",
+          [False, 0, False],
+          ["settle" in re.sub(r'"""[\s\S]*?"""', "", cod).lower(),
+           src.count("/v2/invoices/settle") - pezzo("_lnd_cauzione").count("/v2/invoices/settle")
+           - pezzo("_p2p_onchain_cauzione_salda").count("/v2/invoices/settle"),
+           "LND_PONTE_MACAROON_HOLD" in pezzo("_lnd_cauzione") + pezzo("_p2p_onchain_cauzione_salda")])
     prova("le due POST a LND sono solo hodl e cancel, dal tubo delle hold, col macaroon HOLD e mai quello di lettura",
           [1, 1, True, False],
           [cod.count('"/v2/invoices/hodl"'), cod.count('"/v2/invoices/cancel"'),
