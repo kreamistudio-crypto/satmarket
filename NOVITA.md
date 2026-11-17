@@ -440,3 +440,9 @@ frase: Nel P2P c'è un metodo in più, «Contante per posta»: chi compra sats s
 dove: P2P → «Pubblica» → «Altri metodi ▾» → «Contante per posta»; la pagina dello scambio con le regole; «Info P2P», voce «Contante per posta».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-17 · chat-onchain
+frase: Anche negli scambi P2P on-chain adesso c'è la chat fra chi compra e chi vende, come nel Lightning: cifrata, con foto e PDF, da quando l'ordine è preso a quando i sats vengono liberati. Quando l'altra persona ti scrive, il bot te lo dice col tasto che apre dritto la chat; in una disputa il moderatore la può leggere, e a scambio finito si cancella.
+dove: la pagina di uno scambio on-chain preso, riquadro «💬 Chat con …» in fondo (il richiamo «💬 Chat» in cima porta giù); il messaggio del bot «Hai un nuovo messaggio nello scambio on-chain» col bottone «🟠 Apri lo scambio».
+leva: P2P_CHAT_SCAMBIO (la stessa della chat del Lightning, accesa di serie)
+pubblico: sì

@@ -164571,8 +164571,9 @@ console.log(JSON.stringify(out));
     rend = _fn_js(mini, "function renderOrdineP2P(){")
     prova("la pagina dello scambio riprova la scelta e mostra la riga sotto il conto", [True, True],
           ["pianificaMetodoP2P(o.id);" in rend, "rigaMetodoSceltoP2P(o) +\n    riquadroCauzioneP2P(o) +" in rend])
+    # (17 nov 2026, chat-onchain) `server`: ne' il mercatino ne' l'on-chain
     prova("la chat porta la riga del metodo (non nel mercatino)", True,
-          "(!merc && typeof rigaChatMetodoP2P === 'function' ? rigaChatMetodoP2P(o) : '')"
+          "(!server && typeof rigaChatMetodoP2P === 'function' ? rigaChatMetodoP2P(o) : '')"
           in _fn_js(mini, "function chatScBloccoHTML(o, c, sa){"))
     prova("il foglio del recapito, senza scelta arrivata, dice di chiederla in chat", True,
           "ha scelto: chiediglielo in chat prima di inviare." in _fn_js(mini, "function renderCampiP2P(){"))
@@ -192474,8 +192475,13 @@ def prove_chat_mercatino():
     prova("LA CHAT DEL MERCATINO NON CHIEDE IL P2P ATTIVO: il suo ramo viene prima, con la sua leva",
           True, 0 < chiede.find("if FORMA_CHAT_MERCATINO.fullmatch(ordine):")
           < chiede.find("if not MERCATINO_CHAT_ORDINI:") < chiede.find('_p2p_per(user["id"])'))
+    # (17 nov 2026, chat-onchain) la leva del P2P vale per l'on-chain e per Mostro, che
+    # vengono DOPO il ramo del mercatino
     prova("...e la leva del P2P non spegne il mercatino (ne' il contrario)", True,
-          chiede.find("if not P2P_CHAT_SCAMBIO:") > chiede.find("    else:"))
+          chiede.find("if not MERCATINO_CHAT_ORDINI:")
+          < chiede.find("elif FORMA_CHAT_ONCHAIN.fullmatch(ordine):")
+          < chiede.find("if not P2P_CHAT_SCAMBIO:")
+          and chiede.rfind("if not P2P_CHAT_SCAMBIO:") > chiede.find("    else:"))
     stato = codice(pezzo("_chat_p2p_stato"))
     prova("IL GIUDICE DELLE PARTI e' uno: `_parti_chat`, che per un `m<numero>` chiede alla riga di `ordini`",
           (True, True, True),
@@ -192520,11 +192526,12 @@ def prove_chat_mercatino():
                           "chiavi_ordine" in pezzo("init_db", "\n\n\ndef ")))
 
     # --- 2) IL SERVER: I GIUDICI VERI, su sqlite in memoria ------------
-    amb = {"re": re, "time": time}
+    amb = {"re": re, "time": time, "sqlite3": sqlite3}
     i_f = blocco.index("\nFORMA_CHAT_MERCATINO = ")
     exec(blocco[i_f:blocco.index("\n\n\ndef _parti_ordine_mercatino(", i_f)], amb)
     amb["FORMA_PUBKEY_P2P"] = re.compile(r"[0-9a-f]{64}")
-    for f in ("_parti_ordine_mercatino", "_chat_mercatino_vista", "_chat_mercatino_chiavi",
+    # (17 nov 2026, chat-onchain) il giudice del moderatore passa da `_parti_chat`
+    for f in ("_parti_ordine_mercatino", "_parti_ordine_onchain_chat", "_parti_chat", "_chat_mercatino_vista", "_chat_mercatino_chiavi",
               "_chat_mercatino_dichiara", "_chat_mercatino_per_moderatore"):
         exec(_senza_prosa(pezzo(f)), amb)
     vista = amb["_chat_mercatino_vista"]
@@ -192631,7 +192638,8 @@ def prove_chat_mercatino():
     i_p = src.index("# ═══ LA CHAT NELLO SCAMBIO: IL SERVER FA IL POSTINO")
     postino = codice(src[i_p:src.index("# ═══ IL CONTROLLO DELLA FATTURA PRIMA DEL COORDINATORE", i_p)])
     prova("...nessuna riga del journal della chat dice piu' «scambio {ordine[:8]}» a mano: tutte dal giudice",
-          ([], 6), ([r.strip()[:60] for r in postino.split("\n")
+          # (17 nov 2026, chat-onchain) sette: anche «vuole scriverti» passa dal giudice
+          ([], 7), ([r.strip()[:60] for r in postino.split("\n")
                      if "print(" in r and "scambio {ordine[:8]}" in r],
                     postino.count("j = _chat_nel_journal(ordine)")))
     # 2. I TESTI DEI TETTI: «in questo ordine» / «in questo scambio»
@@ -193211,7 +193219,7 @@ def prove_chat_dalla_notifica():
 
     # --- 1) IL SERVER: LA SCORTA, PURA, su un cassetto vero in memoria ---
     amb = {"re": re, "sqlite3": sqlite3, "secrets": __import__("secrets")}
-    for nome in ("FORMA_PUBKEY_P2P", "FORMA_CHAT_MERCATINO", "FORMA_SEME_SCORTA"):
+    for nome in ("FORMA_PUBKEY_P2P", "FORMA_CHAT_MERCATINO", "FORMA_CHAT_ONCHAIN", "FORMA_SEME_SCORTA"):
         m = re.search(r"\n%s = (re\.compile\([^\n]+\))\n" % nome, src)
         amb[nome] = eval(m.group(1), {"re": re})
     for nome in ("CHAT_SCORTA_PIENA", "CHAT_SCORTA_RICARICA", "P2P_CHAT_PRESENTE_S"):
@@ -193295,13 +193303,16 @@ def prove_chat_dalla_notifica():
     chiama = pezzo("chat_chiama_p2p")
     prova("LA CHIAMATA: solo negli ordini del mercatino, chat aperta e non ferma, prima un lucchetto, "
           "col tasto dritto alla chat", (True, True, True, True),
-          ("if not FORMA_CHAT_MERCATINO.fullmatch(ordine):" in chiama,
+          # (17 nov 2026, chat-onchain) ...e negli scambi on-chain: il giudice comune
+          ("if not _chat_chiavi_dal_server(ordine):" in chiama,
            "if st.get(\"ferma\"):" in chiama,
            chiama.find("_chat_scorta_assegna(") < chiama.find("_chat_mercatino_chiamata("),
-           'CHAT_MERCATINO_CHIAMA_BOTTONE, f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}&chat=1"' in chiama))
+           'bottone = (CHAT_MERCATINO_CHIAMA_BOTTONE,\n                   f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}&chat=1")' in chiama))
     scorta_r = pezzo("chat_scorta_p2p")
     prova("LA ROTTA DELLA SCORTA ha la leva della chat degli ordini, e non chiede il P2P attivo", (True, False),
-          ("if not MERCATINO_CHAT_ORDINI:" in scorta_r, "_p2p_per(" in scorta_r))
+          # (17 nov 2026, chat-onchain) ...o quella dell'on-chain, che usa gli stessi lucchetti
+          ("if not (MERCATINO_CHAT_ORDINI or (P2P_CHAT_SCAMBIO and p2p_onchain_leva())):" in scorta_r,
+           "_p2p_per(" in scorta_r))
     avvisa = pezzo("_chat_p2p_avvisa")
     prova("IL TASTO DI «HAI UN NUOVO MESSAGGIO» porta `&chat=1`, nei due mondi", (True, True),
           ('f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}&chat=1"' in avvisa,
@@ -202639,6 +202650,136 @@ def prove_onchain_txid_moneta():
            "txid_coin=?, chiave_tx_coin=?" in rotta))
 
 
+def prove_chat_onchain():
+    """LA CHAT DELLO SCAMBIO ON-CHAIN (17 nov 2026, cantiere
+    onchain-chat-sollecito, Andrea: «tutto deve essere come la parte
+    lighting»). Il motore del mercatino — le chiavi d'ordine le presenta il
+    server, perche' nell'on-chain non c'e' un coordinatore che dia quelle
+    dello scambio — con la leva, le frasi e il bottone dello scambio. Qui i
+    giudici estratti, i fili nelle rotte, e il telefono in node sulla riga
+    di «I miei scambi»; il giro vero sta in `collaudo_chat_onchain`."""
+    print("\n[la chat dello scambio on-chain]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    amb = {"re": __import__("re")}
+    for riga in ("FORMA_CHAT_MERCATINO = ", "FORMA_CHAT_ONCHAIN = ", "CHAT_ONCHAIN_APERTA = "):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)], amb)
+    for f in ("_chat_chiavi_dal_server", "_p2p_onchain_chat_vista", "_chat_nel_journal",
+              "_chat_chiama_testo"):
+        exec(pezzo(f), amb)
+    K, VI = amb["_chat_chiavi_dal_server"], amb["_p2p_onchain_chat_vista"]
+    oc = "bar-onchain-" + "0123456789abcdef"
+    prova("LE CHIAVI DAL SERVER: il mercatino e lo scambio on-chain si', Mostro e gli id storti no",
+          [True, True, False, False, False, False],
+          [K("m42"), K(oc), K("c4a70000-c2c2-4a2b-9c3d-000000000001"), K(oc.upper()),
+           K(oc[:-1]), K("bar-onchain-" + "g" * 16)])
+    prova("LA RIGA DICE: 'aperta' alle parti dalla presa alla disputa, 'moderazione' al "
+          "moderatore solo in disputa, niente prima, dopo, o a leva spenta",
+          ["", "aperta", "aperta", "aperta", "aperta", "", "", "", "moderazione", "", ""],
+          [VI("pending", True, False, True), VI("preso", True, False, True),
+           VI("depositato", True, False, True), VI("euro_inviati", True, False, True),
+           VI("disputa", True, False, True), VI("rilasciato", True, False, True),
+           VI("rimborsato", True, False, True), VI("annullato", True, False, True),
+           VI("disputa", False, True, True), VI("euro_inviati", False, True, True),
+           VI("preso", True, False, False)])
+    j = amb["_chat_nel_journal"](oc)
+    prova("IL JOURNAL la chiama «Chat on-chain», con le ultime otto cifre (mai il nome intero)",
+          ("Chat on-chain", "sullo scambio on-chain 89abcdef", False),
+          (j["etichetta"], j["su"], oc in " ".join(j.values())))
+    t = amb["_chat_chiama_testo"](oc, "compra")
+    prova("«VUOLE SCRIVERTI» dice lo scambio on-chain, e il mercatino resta col numero",
+          (True, True), ("nello scambio on-chain" in t,
+                         "nell'ordine #42" in amb["_chat_chiama_testo"]("m42", "vende")))
+    # I FILI NELLE ROTTE: dove il mercatino guardava la sua forma, adesso il giudice comune
+    leggi, invia = pezzo("chat_leggi_p2p"), pezzo("chat_invia_p2p")
+    chiama, mod = pezzo("chat_chiama_p2p"), pezzo("_chat_mercatino_per_moderatore")
+    prova("LE ROTTE: ritiro, invio, chiamata, moderatore e allegato del moderatore chiedono al "
+          "giudice comune; la chiave al moderatore parte solo a stato 'disputa'",
+          (True, True, True, True, True, True),
+          ("if _chat_chiavi_dal_server(ordine):" in leggi,
+           "mercatino = _chat_chiavi_dal_server(ordine)" in invia,
+           'bool(pc.get("disputa")) if pc["fonte"] == "onchain"' in invia,
+           "if not _chat_chiavi_dal_server(ordine):" in chiama,
+           'if not p.get("disputa"):' in mod,
+           "if _chat_chiavi_dal_server(ordine):" in pezzo("moderazione_chat_allegato_p2p")))
+    chiede = pezzo("_chat_p2p_chiede")
+    prova("LA LEVA: l'on-chain del P2P acceso, e la chat del Lightning (`P2P_CHAT_SCAMBIO`)",
+          True, chiede.index("elif FORMA_CHAT_ONCHAIN.fullmatch(ordine):")
+          < chiede.index("if not p2p_onchain_leva():") < chiede.index("if not P2P_CHAT_SCAMBIO:")
+          < chiede.index("else:\n        if not _p2p_per("))
+    av = pezzo("_chat_p2p_avvisa")
+    prova("L'AVVISO: il bottone «🟠 Apri lo scambio» dritto alla chat; la scorta si riempie "
+          "anche con la sola leva dell'on-chain; la riga dello scambio porta la chat",
+          (True, True, True),
+          ('P2P_ONCHAIN_BOTTONE, f"{LINK_LIBRO_P2P}?scambio={ordine}&chat=1"' in av,
+           "if not (MERCATINO_CHAT_ORDINI or (P2P_CHAT_SCAMBIO and p2p_onchain_leva())):"
+           in pezzo("chat_scorta_p2p"),
+           'd["chat"] = _p2p_onchain_chat_vista(' in pezzo("_p2p_onchain_per")))
+    # IL TELEFONO: la riga dalla lista «I miei scambi», e le stesse forme del server
+    js = (_riga_js(mini, "const CHATSC_MERC_RE = ")
+          + _riga_js(mini, "const CHATSC_MERC_DISPUTA = ")
+          + _riga_js(mini, "const CHATSC_MERC_APERTA = ")
+          + _riga_js(mini, "const CHATSC_OC_RE = ")
+          + _riga_js(mini, "const CHATSC_OC_APERTA = ")
+          + _riga_js(mini, "function chatScMercP2P(id){")
+          + _riga_js(mini, "function chatScOcP2P(id){")
+          + _riga_js(mini, "function chatScServerP2P(id){")
+          + _fn_js(mini, "function chatOcOrdineP2P(id){")
+          + _fn_js(mini, "function chatScRigaP2P(id){")
+          + _fn_js(mini, "function chatScServeP2P(o){")
+          + "let p2pChatMercInfo = {}; const ordiniP2P = () => ({});\n"
+          + "function idMostroVero(){ return false; } const P2P_FINALI = [], CHATSC_DOPO = [];\n"
+          + "let p2pOnchainMiei = [{id: 7, ordine: " + json.dumps(oc) + ", ruolo: 'venditore', "
+            "parte: 'compro', stato: 'depositato', chat: 'aperta', altro: 'Vera Rossi'},\n"
+            "  {id: 8, ordine: 'bar-onchain-00000000000000aa', ruolo: 'maker', parte: 'vendo', "
+            "stato: 'pending', chat: '', altro: ''}];\n"
+          + "p2pChatMercInfo[" + json.dumps(oc) + "] = {peers: ['" + "a" * 64 + "', 'zz'], mie: ['" + "b" * 64 + "']};\n"
+          + "const r = chatScRigaP2P(" + json.dumps(oc) + ");\n"
+          + "const serve = ['preso','depositato','euro_inviati','disputa','rilasciato','pending']"
+            ".map(st => chatScServeP2P(Object.assign({}, r, {stato: st})));\n"
+          + "console.log(JSON.stringify({r, serve, chiusa: chatScServeP2P(Object.assign({}, r, {chat: ''})),"
+            " maker: chatScRigaP2P('bar-onchain-00000000000000aa'), estranea: chatScRigaP2P('bar-onchain-00000000000000bb'),"
+            " server: [chatScServerP2P('m3'), chatScServerP2P(" + json.dumps(oc) + "), chatScServerP2P('c4a70000-x')],"
+            " aperta: CHATSC_OC_APERTA, forma: CHATSC_OC_RE.source}));\n")
+    out = _node_banco(js)
+    if out is None:
+        salta("chat_onchain", "node non c'e': la riga del telefono non si prova")
+    else:
+        r = out.get("r") or {}
+        prova("LA RIGA DEL TELEFONO: la forma di quella del mercatino, col motore del server "
+              "(`mercatino`), segnata `onchain`, mai ferma, il lato dei bitcoin, solo chiavi buone",
+              (True, True, 7, "depositato", "aperta", "a" * 64, ["b" * 64], False, False, "Vera", "compro"),
+              (r.get("mercatino"), r.get("onchain"), r.get("numero"), r.get("stato"), r.get("chat"),
+               r.get("peer"), r.get("mie"), r.get("disputa"), r.get("ferma"), r.get("nome"), r.get("lato")))
+        prova("...la chat serve dalla presa alla disputa, e solo se il server la dice aperta",
+              ([True, True, True, True, False, False], False), (out.get("serve"), out.get("chiusa")))
+        prova("...uno scambio non preso (maker) o non mio non ha riga; il giudice comune "
+              "riconosce mercatino e on-chain, non Mostro",
+              (None, None, [True, True, False]),
+              (out.get("maker"), out.get("estranea"), out.get("server")))
+        prova("IL TELEFONO E IL SERVER: gli stessi stati aperti e la stessa forma dell'id",
+              (list(amb["CHAT_ONCHAIN_APERTA"]), amb["FORMA_CHAT_ONCHAIN"].pattern),
+              (out.get("aperta"), out.get("forma")))
+    sc = _fn_js(mini, "function schedaOnchainP2P(o){")
+    prova("LA PAGINA DELLO SCAMBIO: il richiamo «💬 Chat» in cima, il riquadro in fondo, e al "
+          "moderatore la chat delle parti (col typeof, per i banchi che la ritagliano)",
+          (True, True, True),
+          (sc.index("chatOcRichiamoHTML(o)") < sc.index("+ parti"),
+           sc.index("chatOcBloccoHTML(o)") > sc.index("+ decidi"),
+           "typeof chatOcModHTML === 'function' ? chatOcModHTML(o)" in sc))
+    bl = _fn_js(mini, "function chatScBloccoHTML(o, c, sa){")
+    prova("...e il riquadro on-chain parla di SCAMBIO: l'avviso e il patto del Lightning, non "
+          "quelli dell'ordine, e niente riga del metodo",
+          (True, True, True),
+          ("const merc = server && !o.onchain;" in bl,
+           "esc(merc ? CHATSC_MERC_AVVISO : CHATSC_AVVISO)" in bl,
+           "(!server && typeof rigaChatMetodoP2P" in bl))
+    ar = mini[mini.index("apriScambioOnchainDaAvvisoP2P(P2P_SCAMBIO_URL).then("):][:400]
+    prova("IL TASTO DELL'AVVISO (`&chat=1`) apre lo scambio on-chain e porta dritti alla chat",
+          True, "chatDaAvvisoP2P(P2P_SCAMBIO_URL)" in ar and "esito === 'aperto'" in ar)
+
+
 def prove_indirizzo_resta_dove_sta():
     """«MOSTRA L'INDIRIZZO» NON RIPORTA IN CIMA (16 nov 2026, cantiere
     indirizzo-resta, Andrea: «se premo mostra indirizzo in un ordine il
@@ -204488,7 +204629,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -205451,6 +205592,7 @@ def main():
     prove_onchain_come_lightning,
     prove_onchain_promemoria,
     prove_onchain_txid_moneta,
+    prove_chat_onchain,
     prove_guida_wallet,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,

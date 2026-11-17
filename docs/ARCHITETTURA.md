@@ -36341,6 +36341,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Lightning, `giudiceTxidCoinP2P` e `giudiceChiaveTxXmrP2P`) e
   `txCoinOcP2P` (copia ed explorer). Le due tabelle delle forme, server e
   `P2P_RETI_COIN`, le confronta `prove_onchain_txid_moneta`.
+- LA CHAT DELLO SCAMBIO ON-CHAIN (17 nov 2026, cantiere
+  onchain-chat-sollecito; CANTIERI, «La chat dello scambio on-chain»). Il
+  motore della chat del mercatino (chiavi d'ordine presentate dal server,
+  scorta, chiamata) sull'id pubblico dello scambio, `FORMA_CHAT_ONCHAIN`
+  («bar-onchain-» e 16 esadecimali). `_chat_chiavi_dal_server(ordine)`
+  (mercatino o on-chain) decide nelle rotte `leggi`, `invia`, `chiama`,
+  in `_chat_mercatino_per_moderatore` (a stato `disputa`) e
+  nell'allegato del moderatore; `_parti_chat` passa a
+  `_parti_ordine_onchain_chat` (compratore = `ricevente_id`, venditore =
+  `depositante_id`, viva in `CHAT_ONCHAIN_APERTA`, `disputa`).
+  `_chat_p2p_chiede` vuole `p2p_onchain_leva()` e risponde a
+  `P2P_CHAT_SCAMBIO`; la scorta si riempie con `MERCATINO_CHAT_ORDINI` o
+  con quella. La chiave `mod` parte solo a `disputa`. Avviso e chiamata
+  col bottone `P2P_ONCHAIN_BOTTONE` su `?scambio=<id>&chat=1`.
+  `_p2p_onchain_per` da' `chat` con `_p2p_onchain_chat_vista` ('aperta'
+  alle parti, 'moderazione' al moderatore in disputa). Nel telefono
+  `chatScOcP2P`, `chatScServerP2P`, la riga `chatScRigaP2P` da
+  `p2pOnchainMiei` (`mercatino: true, onchain: true`), `chatOcBloccoHTML`
+  / `chatOcRichiamoHTML` / `chatOcModHTML` in `schedaOnchainP2P`,
+  `ridisegnaOnchainChatP2P`; le frasi del riquadro sono quelle del
+  Lightning. Prove: `prove_chat_onchain`, `collaudo_chat_onchain`.
 - I DUE TASTI DELLA RETE NEL FOGLIO DELL'ORDINE (16 nov 2026, cantiere
   coin-quasi; il perché in CANTIERI, «I due tasti della rete nel foglio
   dell'ordine…»). `tastiReteFoglioP2P` disegna «⚡ Lightning» / «₿

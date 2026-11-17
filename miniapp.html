@@ -67154,7 +67154,11 @@ function schedaOnchainP2P(o){
   const ps = passiOnchainP2P(o);
   const tocca = !mod && gesti.includes('btn orange');
   const finito = !P2P_ONCHAIN_VIVI.has(o.stato);
-  return parti
+  /* IL RICHIAMO «💬 Chat» in cima e LA CHAT in fondo (17 nov 2026, «come
+     la parte lighting»), col typeof per i banchi che ritagliano questa
+     funzione da sola; al moderatore la chat delle parti in lettura */
+  return (typeof chatOcRichiamoHTML === 'function' ? chatOcRichiamoHTML(o) : '')
+    + parti
     + '<div class="p2p-ord lato-' + (vendo ? 'vendo' : 'compro') + '">' + contoOnchainP2P(o) + '</div>'
     + '<div class="p2p-passi"><div class="steps">'
     + ps.passi.map((p, i) => {
@@ -67187,7 +67191,9 @@ function schedaOnchainP2P(o){
          + riquadroRecensioneOcP2P(o, p2pOcRec[o.ordine]) + '</div>' : '')
     + (gesti.includes("'disputa'") ? '<input id="p2pOcMotivo" maxlength="500" placeholder="Per una disputa: cosa è successo? (lo leggono i moderatori)">' : '')
     + '<div class="p2p-onchain-gesti">' + gesti + '</div>'
-    + decidi;
+    + decidi
+    + (typeof chatOcBloccoHTML === 'function' ? chatOcBloccoHTML(o) : '')
+    + (typeof chatOcModHTML === 'function' ? chatOcModHTML(o) : '');
 }
 
 /* ---- LA RECENSIONE DI UNO SCAMBIO ON-CHAIN (17 nov 2026, cantiere
@@ -103362,6 +103368,26 @@ let p2pChatMercInfo = {};         // ordine -> {peers, mie}: le chiavi d'ordine 
 let p2pChatMercProfilo = null;    // il profilo di scambio, cercato UNA volta per pagina
 /* PURA: questo id e' un ordine del mercatino? */
 function chatScMercP2P(id){ return CHATSC_MERC_RE.test(String(id || '')); }
+/* ---- LA CHAT DELLO SCAMBIO ON-CHAIN (17 nov 2026, cantiere
+   onchain-chat-sollecito, Andrea: «tutto deve essere come la parte
+   lighting») ----
+   Lo stesso motore del mercatino: nell'on-chain non c'e' un coordinatore
+   che dia le chiavi dello scambio, e le chiavi d'ordine le presenta il
+   server (`_chat_chiavi_dal_server`). L'id e' il nome pubblico dello
+   scambio («bar-onchain-…»), la riga viene da «I miei scambi»
+   (`p2pOnchainMiei`), la leva e' quella del Lightning
+   (`P2P_CHAT_SCAMBIO`) e le frasi sono quelle dello scambio. */
+const CHATSC_OC_RE = /^bar-onchain-[0-9a-f]{16}$/;
+const CHATSC_OC_APERTA = ['preso', 'depositato', 'euro_inviati', 'disputa'];
+/* PURA: questo id e' uno scambio on-chain? */
+function chatScOcP2P(id){ return CHATSC_OC_RE.test(String(id || '')); }
+/* PURA: in questa chat le chiavi d'ordine le presenta il server? */
+function chatScServerP2P(id){ return chatScMercP2P(id) || chatScOcP2P(id); }
+/* lo scambio di «I miei scambi» che sta dietro un «bar-onchain-…» */
+function chatOcOrdineP2P(id){
+  if (typeof p2pOnchainMiei === 'undefined' || !Array.isArray(p2pOnchainMiei)) return null;
+  return p2pOnchainMiei.find(x => x && String(x.ordine) === String(id)) || null;
+}
 /* l'ordine della lista del mercatino che sta dietro un `m<numero>` */
 function chatMercOrdineP2P(id){
   if (typeof orders === 'undefined' || !Array.isArray(orders)) return null;
@@ -103379,6 +103405,20 @@ function chatMercNomeP2P(om){
    tutte (i saluti di prima si riaprono con quelle), `mie` le mie che il
    server conosce. Uno scambio P2P resta la sua riga di sempre. */
 function chatScRigaP2P(id){
+  /* uno scambio on-chain (17 nov 2026): la riga di «I miei scambi», con
+     la forma di quella del mercatino; mai ferma, e il lato e' quello dei
+     bitcoin (`parte`) */
+  if (chatScOcP2P(id)) {
+    const oc = chatOcOrdineP2P(id);
+    if (!oc || (oc.ruolo !== 'compratore' && oc.ruolo !== 'venditore')) return null;
+    const info = p2pChatMercInfo[id] || {};
+    const peers = (info.peers || []).filter(k => /^[0-9a-f]{64}$/.test(k));
+    return {id: String(id), mercatino: true, onchain: true, numero: oc.id, stato: oc.stato, chat: oc.chat || '',
+            peer: peers.length ? peers[peers.length - 1] : '', peers: peers,
+            mie: (info.mie || []).filter(k => /^[0-9a-f]{64}$/.test(k)),
+            disputa: oc.stato === 'disputa', nome: oc.altro ? String(oc.altro).split(' ')[0] : '',
+            ferma: false, lato: oc.parte === 'vendo' ? 'vendo' : 'compro'};
+  }
   if (!chatScMercP2P(id)) return ordiniP2P()[id];
   const om = chatMercOrdineP2P(id);
   if (!om || (om.role !== 'buyer' && om.role !== 'seller')) return null;
@@ -103408,6 +103448,13 @@ function chatScApertoP2P(){
   if (typeof document === 'undefined') return p2pOrdineAperto || '';
   const v = vistaAttivaP2P();
   if (v === 'view-p2pordine') return p2pOrdineAperto || '';
+  /* la pagina di uno scambio on-chain di cui sono una parte (17 nov 2026) */
+  if (v === 'view-p2ponchain' && typeof p2pOnchainAperto !== 'undefined' && p2pOnchainAperto) {
+    const oc = (typeof p2pOnchainMiei !== 'undefined' && Array.isArray(p2pOnchainMiei))
+      ? p2pOnchainMiei.find(x => x && Number(x.id) === Number(p2pOnchainAperto)) : null;
+    return oc && (oc.ruolo === 'compratore' || oc.ruolo === 'venditore') && chatScOcP2P(oc.ordine)
+      ? String(oc.ordine) : '';
+  }
   if (v === 'view-ordine' && typeof currentOrder !== 'undefined' && currentOrder
       && (currentOrder.role === 'buyer' || currentOrder.role === 'seller'))
     return 'm' + currentOrder.id;
@@ -103442,12 +103489,34 @@ function chatScSegnaColonnaP2P(box){
 /* LA PAGINA INTERA SI RIDISEGNA: quella dello scambio, o quella
    dell'ordine del mercatino */
 function chatScRifaiP2P(id){
+  /* lo scambio on-chain: la sua pagina, se e' quella davanti */
+  if (chatScOcP2P(id)) { ridisegnaOnchainChatP2P(); return; }
   if (chatScMercP2P(id)) {
     const om = chatMercOrdineP2P(id);
     if (om && typeof ridisegnaOrdine === 'function') ridisegnaOrdine(om);
     return;
   }
   renderOrdineP2P();
+}
+/* la pagina dello scambio on-chain si ridisegna, se e' davanti */
+function ridisegnaOnchainChatP2P(){
+  if (typeof document === 'undefined' || vistaAttivaP2P() !== 'view-p2ponchain') return;
+  if (typeof renderP2POnchain === 'function') renderP2POnchain();
+}
+/* PURA (sulla riga e su quel che il server ha detto): il riquadro della
+   chat e il richiamo nella pagina di uno scambio on-chain (17 nov 2026);
+   '' dove la chat non c'e' — prima della presa, a scambio finito, a leva
+   spenta, o per chi non e' una delle due parti */
+function chatOcBloccoHTML(o){
+  if (!o || o.chat !== 'aperta' || !chatScOcP2P(o.ordine)) return '';
+  if ((p2pChatScSapere[o.ordine] || {}).chiusa) return '';
+  const r = chatScRigaP2P(o.ordine);
+  return r ? bloccoChatScambioP2P(r) : '';
+}
+function chatOcRichiamoHTML(o){
+  if (!o || o.chat !== 'aperta' || !chatScOcP2P(o.ordine)) return '';
+  const r = chatScRigaP2P(o.ordine);
+  return r ? chatScRichiamoP2P(r) : '';
 }
 /* PURA (a parte la crittografia): la chiave dell'ordine dal segreto del
    profilo — HMAC-SHA256 con un'etichetta sua, come `chiaveScambio`; un
@@ -103705,6 +103774,10 @@ function chatScServeP2P(o){
      non essersi ancora presentata: il riquadro c'e' lo stesso, e il
      piede dice che si apre appena lei apre l'ordine */
   /* ...o ferma (19 ott 2026): deciso, riapribile, in sola lettura */
+  /* uno scambio on-chain (17 nov 2026): dalla presa alla fine, quando il
+     server dice che la chat c'e' */
+  if (o && o.onchain)
+    return o.chat === 'aperta' && CHATSC_OC_APERTA.indexOf(o.stato) >= 0;
   if (o && o.mercatino)
     return (o.chat === 'aperta' || o.chat === 'ferma')
       && (CHATSC_MERC_APERTA.indexOf(o.stato) >= 0 || !!o.ferma);
@@ -103740,8 +103813,9 @@ function chatScPotaP2P(finite){
    c'e', non si ritira e non si spedisce; chiave e messaggi restano nel
    cassetto e se ne vanno come sempre, a scambio finito. */
 function chatScAccesaP2P(o){
-  /* il mercatino ha la sua leva (`MERCATINO_CHAT_ORDINI`) */
-  if (o && o.mercatino) return !p2pChatMercSpenta;
+  /* il mercatino ha la sua leva (`MERCATINO_CHAT_ORDINI`); l'on-chain
+     (17 nov 2026) risponde a quella del Lightning */
+  if (o && o.mercatino && !o.onchain) return !p2pChatMercSpenta;
   if (p2pChatScSpenta) return false;
   return !(typeof p2pLeve !== 'undefined' && p2pLeve && p2pLeve.chat === false);
 }
@@ -103750,6 +103824,7 @@ function chatScSpegniP2P(){
   p2pChatScSpenta = true;
   chatScSegnaP2P();
   if (typeof document !== 'undefined' && vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
+  if (chatScOcP2P(chatScApertoP2P())) ridisegnaOnchainChatP2P();
 }
 /* IN QUESTO SCAMBIO LA CHAT C'E' (o sta per aprirsi)? La leva accesa,
    lo scambio fra la presa e la fine, e il server non ha detto ne' che
@@ -103888,10 +103963,16 @@ function chatScNovitaP2P(){
   /* ...gli ordini del mercatino con la chat aperta (16 ott 2026)... */
   const merc = (!p2pChatMercSpenta && typeof orders !== 'undefined' && Array.isArray(orders))
     ? orders.filter(x => x && (x.chat === 'aperta' || x.chat === 'ferma')).map(x => 'm' + x.id) : [];
+  /* ...gli scambi on-chain con la chat aperta (17 nov 2026), con la leva
+     del Lightning... */
+  const oc = (chatScAccesaP2P() && typeof p2pOnchainMiei !== 'undefined' && Array.isArray(p2pOnchainMiei))
+    ? p2pOnchainMiei.filter(x => x && x.chat === 'aperta' && chatScOcP2P(x.ordine)).map(x => String(x.ordine)) : [];
   /* ...e OGNI voce del cassetto, per sapere dal server se il suo
      scambio e' finito: e' l'unica cosa che fa buttare una chiave */
-  const ids = vivi.concat(merc.filter(id => vivi.indexOf(id) < 0)).concat(Object.keys(chatScTutteP2P())
-    .filter(id => (idMostroVero(id) || chatScMercP2P(id)) && vivi.indexOf(id) < 0 && merc.indexOf(id) < 0)).slice(0, 30);
+  const vm = vivi.concat(merc.filter(id => vivi.indexOf(id) < 0));
+  const vmo = vm.concat(oc.filter(id => vm.indexOf(id) < 0));
+  const ids = vmo.concat(Object.keys(chatScTutteP2P())
+    .filter(id => (idMostroVero(id) || chatScServerP2P(id)) && vmo.indexOf(id) < 0)).slice(0, 30);
   if (!ids.length) return Promise.resolve();
   p2pChatScNovitaInVolo = chatScFetch('novita', {ordini: ids}).then(d => {
     chatScPotaP2P(d.finite);
@@ -104272,7 +104353,8 @@ function chatScRitiraP2P(id){
     /* le chiavi d'ordine che il server presenta (mercatino) */
     if (merc && d.aperta)
       p2pChatMercInfo[id] = {peers: Array.isArray(d.peers) ? d.peers : [], mie: Array.isArray(d.mie) ? d.mie : [],
-                             ferma: !!d.ferma, stato: (chatMercOrdineP2P(id) || {}).state || '',
+                             ferma: !!d.ferma,
+                             stato: o0.onchain ? String(o0.stato || '') : ((chatMercOrdineP2P(id) || {}).state || ''),
                              /* (20 ott 2026) i semi dei miei lucchetti, e se l'altra
                                 parte non ha nessuna chiave (si puo' chiamarla) */
                              semi: (d.semi && typeof d.semi === 'object') ? d.semi : {},
@@ -104285,7 +104367,7 @@ function chatScRitiraP2P(id){
     const ieri = p2pChatScSapere[id] || {};
     /* la leva e' stata spenta a pagina aperta: il riquadro se ne va,
        il cassetto resta fino alla fine dello scambio */
-    if (d.spenta) { if (merc) chatMercSpegniP2P(); else chatScSpegniP2P(); return; }
+    if (d.spenta) { if (merc && !o0.onchain) chatMercSpegniP2P(); else chatScSpegniP2P(); return; }
     /* la fine la dice il server anche a un dispositivo senza chiave */
     if (merc && !d.aperta && d.finita) {
       if (prima) { scrivi('ordine concluso per il server, chiave e messaggi buttati'); chatScButtaP2P(id); }
@@ -104425,7 +104507,7 @@ async function inviaChatScambioP2P(){
    tocco su «🔔 Avvisa …». Il server manda un avviso, uno per ordine */
 async function chiamaChatScP2P(){
   const id = chatScApertoP2P();
-  if (!id || !chatScMercP2P(id)) return;
+  if (!id || !chatScServerP2P(id)) return;
   haptic();
   const btn = chatScEl('p2pChatScChiama');
   if (btn) btn.disabled = true;
@@ -104446,7 +104528,7 @@ async function continuaChatScambioP2P(){
   try {
     /* nel mercatino, su un dispositivo senza la chiave dell'ordine: se ne
        dichiara una qui, e si rilegge tutto */
-    if (chatScMercP2P(id) && !chatScTradeP2P(chatScRigaP2P(id))) {
+    if (chatScServerP2P(id) && !chatScTradeP2P(chatScRigaP2P(id))) {
       await caricaNostrTools();
       await chatMercDichiaraP2P(id, true);
       await chatScRitiraP2P(id);
@@ -105007,7 +105089,7 @@ function chatScMessaggiHTML(c, altro, o){
       + (li.altri.length ? '<div class="chatsc-copie">' + li.altri.map(x => '<button type="button" class="chatsc-copia" data-l="' + esc(x) + '" '
           + 'onclick="copiaLink(this.dataset.l, \'Link copiato 📋\')">📋 Copia link</button>').join('') + '</div>' : '')
       + (al.link ? '<div class="chatsc-allarme">⚠️ ' + esc(CHATSC_RIGA_LINK) + '</div>' : '')
-      + (al.fuori ? '<div class="chatsc-allarme">⚠️ ' + esc((o && o.mercatino) ? CHATSC_MERC_RIGA_FUORI : CHATSC_RIGA_FUORI) + '</div>' : '')
+      + (al.fuori ? '<div class="chatsc-allarme">⚠️ ' + esc((o && o.mercatino && !o.onchain) ? CHATSC_MERC_RIGA_FUORI : CHATSC_RIGA_FUORI) + '</div>' : '')
       + '</div>';
   }).join('');
 }
@@ -105047,7 +105129,7 @@ function chatScPiedeP2P(o, c){
   if (!chatScProntaP2P(c, o))
     return {modo: 'attesa', html:
       '<div class="hint">Si apre appena ' + esc(chatScNomeP2P(o, o.mercatino ? (o.lato === 'compro' ? 'chi vende' : 'chi compra') : 'l\'altra persona'))
-      + (o.mercatino ? ' apre l\'ordine.' : ' apre lo scambio.') + '</div>'};
+      + (o.mercatino && !o.onchain ? ' apre l\'ordine.' : ' apre lo scambio.') + '</div>'};
   return {modo: 'scrivi', html:
     '<textarea id="p2pChatScTesto" rows="2" maxlength="' + CHATSC_MAX_TESTO + '" '
     + 'placeholder="Scrivi un messaggio…" oninput="chatScContaP2P()">'
@@ -105093,12 +105175,15 @@ function chatScBloccoHTML(o, c, sa){
     return '<div class="trust-note"><span>💬</span><span>Per scrivere all\'altra persona apri lo scambio '
       + 'dal dispositivo da cui l\'hai fatto.</span></div>';
   const piede = chatScPiedeP2P(o, c);
-  const merc = !!o.mercatino;
+  /* lo scambio on-chain (17 nov 2026) ha il motore del mercatino e le
+     frasi dello scambio: `merc` qui vuol dire le frasi dell'ordine */
+  const server = !!o.mercatino;
+  const merc = server && !o.onchain;
   return '<div class="chatmod chatsc" id="p2pChatSc">'
-    + '<b>💬 Chat con ' + esc(chatScNomeP2P(o, merc ? (o.lato === 'compro' ? 'chi vende' : 'chi compra') : 'l\'altra persona')) + '</b>'
+    + '<b>💬 Chat con ' + esc(chatScNomeP2P(o, server ? (o.lato === 'compro' ? 'chi vende' : 'chi compra') : 'l\'altra persona')) + '</b>'
     + '<div class="chatsc-avviso"><span>🛡️</span><span>' + esc(merc ? CHATSC_MERC_AVVISO : CHATSC_AVVISO) + '</span></div>'
     /* il metodo scelto in testa alla chat (13 nov 2026, cantiere rete-scelta) */
-    + (!merc && typeof rigaChatMetodoP2P === 'function' ? rigaChatMetodoP2P(o) : '')
+    + (!server && typeof rigaChatMetodoP2P === 'function' ? rigaChatMetodoP2P(o) : '')
     + '<div class="chatmod-lista" id="p2pChatScLista">' + chatScListaP2P(o, c) + '</div>'
     + '<div id="p2pChatScPiede" data-modo="' + piede.modo + '">' + piede.html + '</div>'
     + '<div class="hint">🔒 ' + esc(merc ? (o.ferma ? CHATSC_MERC_PATTO_FERMA : CHATSC_MERC_PATTO) : CHATSC_PATTO) + '</div>'
@@ -105424,11 +105509,13 @@ async function leggiChatPartiModP2P(ordine){
   const k = chiaveModeratoreP2P();
   /* un ordine del mercatino: le chiavi d'ordine delle due parti le dice
      il server (`lati`), non l'archivio del moderatore */
-  const merc = chatScMercP2P(ordine);
+  /* ...e uno scambio on-chain (17 nov 2026): lo stesso, dal server */
+  const merc = chatScServerP2P(ordine);
   const arch = merc ? null : archivioModP2P()[ordine];
   if (!k || (!merc && !arch)) return;
   const ridisegna = () => {
-    if (merc) { const om = chatMercOrdineP2P(ordine); if (om && typeof ridisegnaOrdine === 'function') ridisegnaOrdine(om); }
+    if (chatScOcP2P(ordine)) ridisegnaOnchainChatP2P();
+    else if (merc) { const om = chatMercOrdineP2P(ordine); if (om && typeof ridisegnaOrdine === 'function') ridisegnaOrdine(om); }
     else if (vistaAttivaP2P() === 'view-p2pmod') renderModerazioneP2P();
   };
   p2pModChatParti[ordine] = Object.assign({}, p2pModChatParti[ordine], {stato: 'leggo', quando: Date.now()});
@@ -105456,6 +105543,7 @@ function chatPartiModP2P(d){
   else if (!s.conChiave)
     corpo = '<div class="hint">Ci sono ' + s.buste + ' messaggi, ma la chiave per leggerli non è ancora arrivata: '
       + (chatScMercP2P(d.ordine) ? 'la consegna il telefono di una delle due parti, appena riapre l\'ordine.</div>'
+        : chatScOcP2P(d.ordine) ? 'la consegna il telefono di una delle due parti, appena riapre lo scambio.</div>'
         : 'la consegna il telefono di chi ha aperto la disputa, appena riapre lo scambio.</div>');
   else corpo = '<div class="chatmod-lista">' + s.msgs.map(m =>
       '<div class="chatmod-msg' + (m.lato === 'vende' ? ' mio' : '') + '"><small>'
@@ -105472,11 +105560,24 @@ function chatPartiModP2P(d){
          decisione che non e' andata a segno: si cancella quando i sats
          arrivano, non alla decisione */
       ? '<div class="hint">La leggi perché in disputa una delle parti ti ha dato la chiave. Qui non si scrive. Si cancella quando i sats arrivano.</div>'
+      /* lo scambio on-chain (17 nov 2026): la chiave la danno tutte e due */
+      : chatScOcP2P(d.ordine)
+      ? '<div class="hint">La leggi perché in disputa una delle parti ti ha dato la chiave. Qui non si scrive. A disputa chiusa si cancella.</div>'
       : '<div class="hint">La leggi perché chi ha aperto la disputa ti ha dato la chiave. Qui non si scrive: '
         + 'alle parti rispondi nei due riquadri qui sopra. A disputa chiusa si cancella.</div>')
     + corpo
     + '<button class="btn ghost" data-o="' + esc(d.ordine) + '" onclick="leggiChatPartiModP2P(this.dataset.o)">↻ Rileggi la chat</button>'
     + '</div>';
+}
+/* LA CHAT DI UNO SCAMBIO ON-CHAIN IN DISPUTA, per il moderatore (17 nov
+   2026): dalla pagina dello scambio, con la SUA chiave di moderatore su
+   questo dispositivo, come per il mercatino */
+function chatOcModHTML(o){
+  if (!o || o.ruolo !== 'moderatore' || o.chat !== 'moderazione' || !chatScOcP2P(o.ordine)) return '';
+  if (!chiaveModeratoreP2P())
+    return '<div class="trust-note"><span>💬</span><span>Questo scambio ha la chat delle parti: per leggerla '
+      + 'serve la tua chiave da moderatore su questo dispositivo.</span></div>';
+  return '<div class="chatsc-mod">' + chatPartiModP2P({ordine: String(o.ordine)}) + '</div>';
 }
 /* LA CHAT DI UN ORDINE DEL MERCATINO IN DISPUTA, per il moderatore
    (16 ott 2026): dalla pagina dell'ordine, con la SUA chiave di
@@ -106064,7 +106165,11 @@ function apriP2PDaUrl(){
   if (typeof P2P_ONCHAIN_PREFISSO === 'string' && String(P2P_SCAMBIO_URL || '').startsWith(P2P_ONCHAIN_PREFISSO)) {
     arrivoP2PFatto();
     if (p2pAcceso() && typeof apriScambioOnchainDaAvvisoP2P === 'function')
-      apriScambioOnchainDaAvvisoP2P(P2P_SCAMBIO_URL).catch(() => {});
+      apriScambioOnchainDaAvvisoP2P(P2P_SCAMBIO_URL).then(esito => {
+        /* il tasto di «Hai un nuovo messaggio» (17 nov 2026): dritti alla chat */
+        if (esito === 'aperto' && typeof CHAT_DA_AVVISO !== 'undefined' && CHAT_DA_AVVISO)
+          chatDaAvvisoP2P(P2P_SCAMBIO_URL);
+      }).catch(() => {});
     return;
   }
   if (P2P_SCAMBIO_URL && p2pAcceso() && typeof apriOrdineP2P === 'function') {

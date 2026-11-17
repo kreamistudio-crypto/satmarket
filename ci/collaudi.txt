@@ -105,6 +105,7 @@ collaudo_recapito_aggiornato
 collaudo_chat_scambio
 collaudo_allegati_chat
 collaudo_chat_mercatino
+collaudo_chat_onchain
 collaudo_garanzia_lunga
 collaudo_promemoria_gesto
 collaudo_x_risonanza

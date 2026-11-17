@@ -87429,3 +87429,81 @@ PROVATO. `prove_regali_livello` (la sentinella della leva ora chiede
 False nel codice e nel config d'esempio); `collaudo_regali_livello`
 prova che nasce spenta, che il gancio a leva spenta non esplode, poi la
 accende come farebbe il config e rifà il giro intero.
+
+## La chat dello scambio on-chain (17 nov 2026, cantiere onchain-chat-sollecito, terza parte; Andrea: «tutto deve essere come la parte lighting. Fai un giro su tutto», punto 6 della lista di parità)
+
+Nel P2P Lightning le due parti si scrivono in una chat cifrata dalla
+presa alla fine; nell'on-chain no: chi aveva mandato gli euro e chi li
+aspettava non avevano dove dirselo, se non fuori da Barattolo.
+
+DECISO. Lo stesso motore, con le chiavi del MERCATINO e non quelle del
+Lightning. Nel Lightning la chiave dello scambio la dà il coordinatore
+Mostro alle due parti, e la chat firma i saluti con quella; nell'on-chain
+il coordinatore non c'è, ed è esattamente il caso degli ordini del
+mercatino: le chiavi d'ordine le presenta il server (`chiavi_ordine`, la
+scorta di lucchetti di «fai come Signal», «Continua la chat qui», la
+chiamata «vuole scriverti»). Strada scartata: una terza famiglia di
+chiavi apposta, che avrebbe raddoppiato il codice delicato per niente.
+Un solo giudice nuovo, `_chat_chiavi_dal_server` (mercatino o on-chain),
+al posto della forma del mercatino dovunque il motore chiedeva «le chiavi
+le dà il server?»: ritiro, invio, chiamata, moderatore, allegato del
+moderatore. L'id nel cassetto è il nome pubblico dello scambio
+(`FORMA_CHAT_ONCHAIN`, «bar-onchain-» e sedici esadecimali: passa già per
+la forma del P2P, e il pallino lo prende senza ritocchi); le parti le dice
+la riga di `p2p_onchain_ordini` (`_parti_ordine_onchain_chat`: compra chi
+riceve i sats, vende chi li deposita). La chat c'è da `preso` alla fine,
+disputa compresa (`CHAT_ONCHAIN_APERTA`), e a sats rilasciati, rimborsati,
+o a scambio annullato o scaduto la scopa porta via tutto. LA LEVA è quella
+del Lightning, `P2P_CHAT_SCAMBIO` (accesa di serie), più l'on-chain del
+P2P acceso: «come la parte lighting», e niente leva nuova nel config del
+VPS. La scorta dei lucchetti si riempie con una delle due leve accese
+(mercatino o on-chain). LE FRASI sono quelle dello SCAMBIO: l'avviso e il
+patto del Lightning nel riquadro (non «Non pagare fuori dall'ordine»),
+«Si apre appena … apre lo scambio», «💬 Hai un nuovo messaggio nello
+scambio on-chain» senza il testo, col bottone «🟠 Apri lo scambio» che
+porta DRITTO alla chat (`&chat=1`, dentro Telegram `scambio_…_chat`). IN
+DISPUTA come nel mercatino: la chiave di lettura al moderatore la danno i
+telefoni di TUTTE E DUE le parti, e solo a stato `disputa` (il server
+rifiuta prima); il moderatore la legge dalla pagina dello scambio
+(`chatOcModHTML`, la riga dice `chat: 'moderazione'`). Sulla pagina il
+richiamo «💬 Chat» in cima e il riquadro in fondo, sotto i gesti; il
+telefono legge la riga da «I miei scambi» (`chatScRigaP2P` su
+`p2pOnchainMiei`, segnata `onchain`, mai «ferma»).
+
+PROVATO. `prove_chat_onchain` (14): i giudici puri (le chiavi dal server,
+la vista della riga per stato e per chi guarda, il journal con le sole
+ultime otto cifre, «vuole scriverti»), i fili nelle cinque rotte e nella
+leva, la riga del telefono in node e le stesse forme del server, la
+pagina, il riquadro che parla di scambio, il tasto dell'avviso.
+`collaudo_chat_onchain` (56, nuovo, in CI): le leve, l'accensione alla
+presa (prima no, estraneo 403), le chiavi d'ordine e la scorta a chat del
+mercatino spenta, il messaggio con l'avviso e il bottone, la chiamata una
+volta sola, la disputa (prima 409, poi le due chiavi, il moderatore legge,
+l'estraneo no), il pallino e la cancellazione dal file a rilasciato,
+rimborsato, annullato e scaduto; e IL CLIENT VERO IN NODE contro il server
+vero: chi compra col profilo, chi vende senza, i messaggi cifrati nei due
+sensi, in disputa le due chiavi al moderatore che legge col motore vero, e
+alla fine il telefono butta chiave e messaggi. Controprove su quattro
+mutazioni (il ritiro senza le chiavi dal server, la chiave al moderatore
+fuori disputa, il telefono senza il ramo on-chain, l'avviso senza il suo
+bottone): tutte rosse. Suite severa intera 28.996 verdi e 5 rosse, tutte
+prove vecchie che leggevano il testo di prima (la riga del metodo, la
+leva nel ramo del mercatino, due banchi senza `FORMA_CHAT_ONCHAIN` e
+`_parti_chat`, la mappa delle categorie, il conto dei giudici del
+journal da 6 a 7): ritoccate, e rigirate le sezioni toccate più tutte
+quelle che leggono documenti ed elenchi della CI, 1.976/0. Collaudi della
+CI nella gabbia, senza proxy, 145/0. Girati in cloud: il PC era già
+stato spento a fine giro di produzione.
+Poi develop è corso di cinque commit (Barattozon on-chain, i livelli a
+carosello, il contante per posta, la pesca della scheda Zapstore, i
+regali per livello spenti; l'ultimo tocca solo la sua leva):
+conflitti solo nelle code di NOVITA e CANTIERI, `conoscenza.md`
+rigenerato; sull'albero rebasato ventuno sezioni (le mie, quelle della
+chat, dell'on-chain, delle due novità e dei documenti) 664/0 e otto
+collaudi vicini (chat e P2P on-chain, Barattozon on-chain compreso) 8/0.
+
+DA GUARDARE DAL VIVO sul collaudo: due telefoni veri su uno scambio
+on-chain preso (la chat dentro Telegram e dal sito), l'avviso del bot col
+bottone che apre la chat, la lettura del moderatore in una disputa. La
+rete dei 30 giorni sotto la scopa vale anche qui: una disputa on-chain
+più lunga perderebbe i messaggi più vecchi (nel mercatino non la tocca).

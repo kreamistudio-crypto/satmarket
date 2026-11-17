@@ -64955,6 +64955,25 @@ try:
 except ImportError:
     MERCATINO_CHAT_ORDINI = False
 FORMA_CHAT_MERCATINO = re.compile(r"^m[1-9][0-9]{0,11}$")
+# LA CHAT DELLO SCAMBIO ON-CHAIN (17 nov 2026, cantiere
+# onchain-chat-sollecito, Andrea: «tutto deve essere come la parte
+# lighting»). Lo stesso motore, con le chiavi presentate dal SERVER come
+# nel mercatino: nell'on-chain non c'e' un coordinatore che dia le chiavi
+# dello scambio. L'id e' il nome pubblico dello scambio («bar-onchain-» e
+# sedici esadecimali), le parti le dice la riga di `p2p_onchain_ordini`
+# (chi deposita vende, chi riceve compra), e la chat c'e' dalla presa
+# alla fine, disputa compresa: a sats rilasciati o rimborsati se ne va.
+FORMA_CHAT_ONCHAIN = re.compile(r"^bar-onchain-[0-9a-f]{16}$")
+CHAT_ONCHAIN_APERTA = ("preso", "depositato", "euro_inviati", "disputa")
+
+
+def _chat_chiavi_dal_server(ordine) -> bool:
+    """PURA: in questa chat le chiavi d'ordine le presenta il server (il
+    mercatino e lo scambio on-chain), non il coordinatore."""
+    o = str(ordine or "")
+    return bool(FORMA_CHAT_MERCATINO.fullmatch(o) or FORMA_CHAT_ONCHAIN.fullmatch(o))
+
+
 # gli stati in cui la chat c'e': dal pagamento alla decisione
 CHAT_MERCATINO_APERTA = ("locked", "shipped", "delivered", "dispute",
                          "return_pending", "return_shipped")
@@ -65020,6 +65039,11 @@ def _chat_nel_journal(ordine: str) -> dict:
     42», «Chat degli ordini»), uno scambio P2P come sempre («sullo scambio
     c4a70000», «Chat P2P») — per il P2P le righe restano identiche."""
     o = str(ordine or "")
+    if FORMA_CHAT_ONCHAIN.fullmatch(o):
+        c = o[-8:]
+        return {"etichetta": "Chat on-chain", "su": f"sullo scambio on-chain {c}",
+                "di": f"dello scambio on-chain {c}",
+                "fine": f"lo scambio on-chain {c} e' finito"}
     if FORMA_CHAT_MERCATINO.fullmatch(o):
         n = int(o[1:])
         return {"etichetta": "Chat degli ordini", "su": f"sull'ordine {n}",
@@ -65061,11 +65085,39 @@ def _parti_ordine_mercatino(con, ordine: str) -> dict:
             "fonte": "mercatino", "stato": stato, "ferma": ferma}
 
 
+def _parti_ordine_onchain_chat(con, ordine: str) -> dict:
+    """CHI COMPRA E CHI VENDE IN UNO SCAMBIO ON-CHAIN, E SE LA SUA CHAT E'
+    APERTA (17 nov 2026). Pura sulla connessione (la tabella sta nel
+    database di tutti). La forma di `_parti_ordine_mercatino`, piu'
+    `disputa`: compra chi riceve i sats, vende chi li deposita. `fonte`
+    vuota = la riga non c'e' (o non c'e' ancora la tabella)."""
+    vuoto = {"compratore": 0, "venditore": 0, "giro": 0, "vivo": False,
+             "fonte": "", "stato": "", "ferma": False, "disputa": False}
+    if not FORMA_CHAT_ONCHAIN.fullmatch(str(ordine or "")):
+        return vuoto
+    try:
+        r = con.execute("SELECT depositante_id, ricevente_id, stato FROM "
+                        "p2p_onchain_ordini WHERE ordine=?", (ordine,)).fetchone()
+    except sqlite3.OperationalError:
+        return vuoto
+    if not r:
+        return vuoto
+    stato = str(r["stato"] or "")
+    return {"compratore": int(r["ricevente_id"] or 0),
+            "venditore": int(r["depositante_id"] or 0),
+            "giro": 0, "vivo": stato in CHAT_ONCHAIN_APERTA,
+            "fonte": "onchain", "stato": stato, "ferma": False,
+            "disputa": stato == "disputa"}
+
+
 def _parti_chat(con, ordine: str) -> dict:
     """IL GIUDICE DELLE PARTI PER LA CHAT: la forma `m<numero>` e' un
-    ordine del mercatino, tutto il resto uno scambio P2P."""
+    ordine del mercatino, «bar-onchain-…» uno scambio on-chain (17 nov
+    2026), tutto il resto uno scambio P2P."""
     if FORMA_CHAT_MERCATINO.fullmatch(str(ordine or "")):
         return _parti_ordine_mercatino(con, ordine)
+    if FORMA_CHAT_ONCHAIN.fullmatch(str(ordine or "")):
+        return _parti_ordine_onchain_chat(con, ordine)
     return _parti_scambio_p2p(con, ordine)
 
 
@@ -65229,8 +65281,12 @@ def _chat_mercatino_chiamata(cc, ordine: str, giro: int, io: int, altro: int,
 
 def _chat_chiama_testo(ordine: str, lato: str) -> str:
     """PURA: l'avviso «vuole scriverti» (20 ott 2026). Come ogni avviso
-    della chat: chi e l'ordine, mai un testo di nessuno."""
+    della chat: chi e l'ordine, mai un testo di nessuno. Nell'on-chain
+    (17 nov 2026) lo scambio, senza numero: il bottone porta li'."""
     chi = "Chi compra" if lato == "compra" else "Chi vende"
+    if FORMA_CHAT_ONCHAIN.fullmatch(str(ordine or "")):
+        return (f"💬 <b>{chi} vuole scriverti nello scambio on-chain.</b>\n"
+                "Apri la chat dello scambio: si apre appena entri, ed è cifrata fra voi due.")
     return (f"💬 <b>{chi} vuole scriverti nell'ordine #{int(ordine[1:])}.</b>\n"
             "Apri la chat dell'ordine: si apre appena entri, ed è cifrata fra voi due.")
 
@@ -65244,13 +65300,19 @@ def _chat_mercatino_per_moderatore(con, cc, io: int, ordine: str) -> tuple:
     `mod` chiuse per quella chiave dai telefoni delle parti; e le chiavi
     d'ordine di ogni parte (`lati`), che nel P2P il moderatore ha dal
     coordinatore e qui ha dal server — e' con quelle che verifica chi ha
-    scritto cosa. Non sposta nessun segnalibro."""
-    p = _parti_ordine_mercatino(con, ordine)
+    scritto cosa. Non sposta nessun segnalibro.
+    LO SCAMBIO ON-CHAIN (17 nov 2026) passa di qui uguale: le chiavi le
+    presenta il server anche li', e si legge solo a stato 'disputa'."""
+    p = _parti_chat(con, ordine) if _chat_chiavi_dal_server(ordine) \
+        else {"fonte": ""}
     if not p["fonte"]:
         return (404, "Ordine non trovato")
+    if p["fonte"] == "onchain":
+        if not p.get("disputa"):
+            return (409, "La chat si legge solo a disputa aperta")
     # ...anche a ordine FERMO (19 ott 2026): e' in coda per essere
     # ridecisa, e prima di ridecidere si rilegge
-    if p["stato"] not in CHAT_MERCATINO_DISPUTA and not p.get("ferma"):
+    elif p["stato"] not in CHAT_MERCATINO_DISPUTA and not p.get("ferma"):
         return (409, "La chat si legge solo a disputa aperta")
     r = con.execute("SELECT chiave FROM p2p_moderatori WHERE tg_id=?",
                     (int(io),)).fetchone()
@@ -65595,6 +65657,12 @@ def _chat_p2p_avviso(cc, ordine: str, giro: int, altro: int, n: int,
             f"💬 <b>Hai un nuovo messaggio nell'ordine #{int(ordine[1:])}.</b>\n"
             "Apri l'ordine nella Mini App per leggerlo: è cifrato fra voi due, "
             "e di qui il testo non passa.")
+    # nell'on-chain (17 nov 2026) lo scambio non ha un numero breve che la
+    # gente veda: il bottone sotto porta dritto alla sua pagina
+    if FORMA_CHAT_ONCHAIN.fullmatch(ordine):
+        return int(altro), (
+            f"💬 <b>Hai un nuovo messaggio nello scambio on-chain.</b>\n"
+            "Aprilo per leggerlo: è cifrato fra voi due, e di qui il testo non passa.")
     return int(altro), (
         f"💬 <b>Hai un nuovo messaggio nello scambio #{html.escape(ordine[:4])}.</b>\n"
         "Aprilo per leggerlo: è cifrato fra voi due, e di qui il testo non passa.")
@@ -65645,6 +65713,9 @@ async def _chat_p2p_avvisa(ordine: str, giro: int, altro: int, n: int,
             if mercatino:
                 esito = await notifica(a_chi, testo, (
                     CHAT_MERCATINO_BOTTONE, f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}&chat=1"))
+            elif FORMA_CHAT_ONCHAIN.fullmatch(ordine):
+                esito = await notifica(a_chi, testo, (
+                    P2P_ONCHAIN_BOTTONE, f"{LINK_LIBRO_P2P}?scambio={ordine}&chat=1"))
             else:
                 esito = await notifica(a_chi, testo, (P2P_BOTTONE_SCAMBIO,
                                                       f"{LINK_LIBRO_P2P}?scambio={ordine}&chat=1"))
@@ -65774,10 +65845,18 @@ def _chat_p2p_chiede(d: dict, user: dict) -> tuple:
     stato per chi chiede. Torna `(ordine, stato)`; un estraneo e' 403.
     UN ORDINE DEL MERCATINO (`m<numero>`, 16 ott 2026) non chiede il
     P2P attivo e ha la SUA leva, `MERCATINO_CHAT_ORDINI`: le due chat si
-    accendono e si spengono ognuna per conto suo."""
+    accendono e si spengono ognuna per conto suo.
+    UNO SCAMBIO ON-CHAIN («bar-onchain-…», 17 nov 2026) chiede l'on-chain
+    del P2P acceso (`p2p_onchain_leva`) e risponde alla leva della chat
+    del Lightning, `P2P_CHAT_SCAMBIO`: «come la parte lighting»."""
     ordine = str((d or {}).get("ordine") or "").strip()
     if FORMA_CHAT_MERCATINO.fullmatch(ordine):
         if not MERCATINO_CHAT_ORDINI:
+            return ordine, {"aperta": False, "giro": 0, "altro": 0, "perche": "spenta"}
+    elif FORMA_CHAT_ONCHAIN.fullmatch(ordine):
+        if not p2p_onchain_leva():
+            raise HTTPException(409, "Lo scambio on-chain non e' attivo")
+        if not P2P_CHAT_SCAMBIO:
             return ordine, {"aperta": False, "giro": 0, "altro": 0, "perche": "spenta"}
     else:
         if not _p2p_per(user["id"])["attivo"]:
@@ -65835,9 +65914,10 @@ async def chat_leggi_p2p(req: Request, x_tg_init_data: str = Header(""),
         # il segno di nascita del cassetto (19 ott 2026): il telefono vede
         # se il file e' rinato anche quando `perso` non lo vede
         corpo["cassetto"] = _chat_nascita(cc)
-        # nel mercatino le chiavi d'ordine le presenta il server: le mie
-        # e quelle dell'altra parte, nell'ordine in cui sono nate
-        if FORMA_CHAT_MERCATINO.fullmatch(ordine):
+        # nel mercatino (e nell'on-chain, 17 nov 2026) le chiavi d'ordine
+        # le presenta il server: le mie e quelle dell'altra parte,
+        # nell'ordine in cui sono nate
+        if _chat_chiavi_dal_server(ordine):
             # LA SCORTA (20 ott 2026): l'altra parte non si e' ancora
             # presentata? Il suo lucchetto in scorta diventa la sua chiave
             # d'ordine, e si scrive subito. A chat ferma niente di nuovo
@@ -65877,8 +65957,8 @@ async def chat_invia_p2p(req: Request, x_tg_init_data: str = Header(""),
     if st.get("ferma"):
         raise HTTPException(409, CHAT_MERCATINO_FERMA_TESTO)
     tipo, busta, per = d.get("tipo"), d.get("busta"), d.get("per") or ""
-    mercatino = bool(FORMA_CHAT_MERCATINO.fullmatch(ordine))
-    # LA CHIAVE D'ORDINE (mercatino, 16 ott 2026): la sola parte pubblica,
+    mercatino = _chat_chiavi_dal_server(ordine)
+    # LA CHIAVE D'ORDINE (mercatino, 16 ott 2026; on-chain, 17 nov): la sola parte pubblica,
     # che il server presenta all'altra parte. Non e' una busta
     if tipo == "chiave_ordine" and mercatino:
         cc = db_chat()
@@ -65909,12 +65989,14 @@ async def chat_invia_p2p(req: Request, x_tg_init_data: str = Header(""),
         if not noto:
             raise HTTPException(400, "Richiesta non valida")
         # NEL MERCATINO la chiave al moderatore parte SOLO a ordine in
-        # disputa: prima della disputa non legge nessuno, nemmeno l'admin
+        # disputa: prima della disputa non legge nessuno, nemmeno l'admin.
+        # Nell'on-chain lo stesso, a stato 'disputa' (17 nov 2026)
         if mercatino:
             con = db()
             try:
-                in_disputa = _parti_ordine_mercatino(con, ordine)["stato"] \
-                    in CHAT_MERCATINO_DISPUTA
+                pc = _parti_chat(con, ordine)
+                in_disputa = bool(pc.get("disputa")) if pc["fonte"] == "onchain" \
+                    else pc["stato"] in CHAT_MERCATINO_DISPUTA
             finally:
                 con.close()
             if not in_disputa:
@@ -65944,10 +66026,12 @@ async def chat_scorta_p2p(req: Request, x_tg_init_data: str = Header(""),
     """LA SCORTA DI LUCCHETTI (20 ott 2026, cantiere chat-dalla-notifica).
     Nel corpo `{lucchetti: [{pub, seme}]}`, anche vuoto: torna quanti ne
     ho in scorta, quali tiene il server, e le due soglie. Non chiede il
-    P2P attivo: e' della chat degli ordini, con la sua leva."""
+    P2P attivo: e' della chat degli ordini, con la sua leva — e dal 17 nov
+    2026 anche di quella dello scambio on-chain, che usa gli stessi
+    lucchetti: basta una delle due accesa."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    if not MERCATINO_CHAT_ORDINI:
+    if not (MERCATINO_CHAT_ORDINI or (P2P_CHAT_SCAMBIO and p2p_onchain_leva())):
         return JSONResponse({"ok": True, "spenta": True},
                             headers={"Cache-Control": "no-store"})
     cc = db_chat()
@@ -65973,7 +66057,7 @@ async def chat_chiama_p2p(req: Request, x_tg_init_data: str = Header(""),
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     ordine, st = _chat_p2p_chiede(d, user)
-    if not FORMA_CHAT_MERCATINO.fullmatch(ordine):
+    if not _chat_chiavi_dal_server(ordine):
         raise HTTPException(400, "Richiesta non valida")
     if not st["aperta"]:
         raise HTTPException(409, f"La chat di {_chat_questo(ordine)} non e' aperta")
@@ -65981,7 +66065,7 @@ async def chat_chiama_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(409, CHAT_MERCATINO_FERMA_TESTO)
     con = db()
     try:
-        p = _parti_ordine_mercatino(con, ordine)
+        p = _parti_chat(con, ordine)
     finally:
         con.close()
     lato = "compra" if int(p["compratore"]) == int(user["id"]) else "vende"
@@ -65996,13 +66080,18 @@ async def chat_chiama_p2p(req: Request, x_tg_init_data: str = Header(""),
     if esito != "nuova":
         return JSONResponse({"ok": True, "gia": esito == "gia", "serve": esito != "ha_chiave"},
                             headers={"Cache-Control": "no-store"})
+    if FORMA_CHAT_ONCHAIN.fullmatch(ordine):
+        bottone = (P2P_ONCHAIN_BOTTONE, f"{LINK_LIBRO_P2P}?scambio={ordine}&chat=1")
+    else:
+        bottone = (CHAT_MERCATINO_CHIAMA_BOTTONE,
+                   f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}&chat=1")
     try:
-        e = await notifica(st["altro"], _chat_chiama_testo(ordine, lato), (
-            CHAT_MERCATINO_CHIAMA_BOTTONE, f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}&chat=1"))
+        e = await notifica(st["altro"], _chat_chiama_testo(ordine, lato), bottone)
     except Exception as x:
         e = f"SALTATO ({type(x).__name__}: {x})"
-    print(f"💬 Chat degli ordini: {'chi compra' if lato == 'compra' else 'chi vende'} vuole "
-          f"scrivere sull'ordine {int(ordine[1:])}, avvisato {st['altro']}", flush=True)
+    j = _chat_nel_journal(ordine)
+    print(f"💬 {j['etichetta']}: {'chi compra' if lato == 'compra' else 'chi vende'} vuole "
+          f"scrivere {j['su']}, avvisato {st['altro']}", flush=True)
     _esiti_p2p_dice("💬", [(st["altro"], e)])
     return JSONResponse({"ok": True, "avvisato": True}, headers={"Cache-Control": "no-store"})
 
@@ -66173,9 +66262,10 @@ async def moderazione_chat_allegato_p2p(req: Request, x_tg_init_data: str = Head
     user = _moderatore_o_403(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     ordine = str(d.get("ordine") or "").strip()
-    # UN ORDINE DEL MERCATINO (16 ott 2026): a ordine in disputa, con la
-    # chiave di moderatore dichiarata — lo stesso giudice delle buste
-    if FORMA_CHAT_MERCATINO.fullmatch(ordine):
+    # UN ORDINE DEL MERCATINO (16 ott 2026), o uno scambio on-chain (17
+    # nov): a ordine in disputa, con la chiave di moderatore dichiarata —
+    # lo stesso giudice delle buste
+    if _chat_chiavi_dal_server(ordine):
         con, cc = db(), db_chat()
         try:
             codice, corpo = _chat_mercatino_per_moderatore(con, cc, user["id"], ordine)
@@ -66318,7 +66408,7 @@ def _chat_p2p_per_moderatore(con, cc, io: int, ordine: str) -> tuple:
     ritirato.
     Un ordine del mercatino (`m<numero>`, 16 ott 2026) ha il suo giudice:
     `_chat_mercatino_per_moderatore`."""
-    if FORMA_CHAT_MERCATINO.fullmatch(str(ordine or "")):
+    if _chat_chiavi_dal_server(ordine):
         return _chat_mercatino_per_moderatore(con, cc, io, ordine)
     if not FORMA_ORDINE_P2P.fullmatch(ordine):
         return (400, "Richiesta non valida")
@@ -107390,6 +107480,20 @@ def _p2p_onchain_recapiti_prima(con, oid: int) -> list:
         return []
 
 
+def _p2p_onchain_chat_vista(stato, parte: bool, moderatore: bool, accesa: bool) -> str:
+    """PURA: cosa dice di se' la chat di uno scambio on-chain a chi guarda
+    (17 nov 2026). 'aperta' alle due parti finche' lo scambio e' in corso
+    (`CHAT_ONCHAIN_APERTA`), 'moderazione' a un moderatore che non e' una
+    parte a disputa aperta, '' altrimenti o a leva spenta: a sats
+    rilasciati o rimborsati la chat non c'e' piu'."""
+    if not accesa:
+        return ""
+    stato = str(stato or "")
+    if parte:
+        return "aperta" if stato in CHAT_ONCHAIN_APERTA else ""
+    return "moderazione" if moderatore and stato == "disputa" else ""
+
+
 def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
     """Un ordine come lo vede UNA parte (o un moderatore): la forma di
     `_onchain_ordine_per`, con gli stessi nomi, perche' il codice delle
@@ -107529,6 +107633,12 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         if admin and not parte_vera:
             d["coin_tx"]["indirizzo"] = o["recapito"] or ""
             d["coin_tx"]["indirizzi_prima"] = _p2p_onchain_recapiti_prima(con, int(o["id"]))
+    # LA CHAT (17 nov 2026, «come la parte lighting»): 'aperta' alle due
+    # parti dalla presa alla fine (disputa compresa), 'moderazione' al
+    # moderatore che non e' una parte a disputa aperta, '' altrimenti
+    d["chat"] = _p2p_onchain_chat_vista(o["stato"], bool(dep and ric and tg_id in (dep, ric)),
+                                        bool(admin and not parte_vera),
+                                        bool(P2P_CHAT_SCAMBIO))
     if admin and not parte_vera:
         # il moderatore vede chi sono le due parti (deve poterle sentire)
         d["parti"] = {"vende": _onchain_nome(con, dep) if dep else "",
