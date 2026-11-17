@@ -51686,7 +51686,7 @@ function pannelloOnchainOrdine(o, s){
      Lightning lo legge, perche' la sua scelta qui non vale (lo decide il
      server, `grosso_ln_tolto`; il resto della pagina segue `modo_venditore`) */
   const grossoNota = o.role === 'seller' && oc.grosso_ln_tolto
-    ? ' ⛓️ <b>Cifra grossa: ricevi on-chain</b>, anche se avevi scelto Lightning: con cifre così il Lightning spesso non passa.' : '';
+    ? ' <b>Cifra grossa: ricevi on-chain</b>, anche se avevi scelto Lightning: con cifre così il Lightning spesso non passa.' : '';
   let cambio = '';
   if (senzaDove && allaFine && !p && !oc.txid_uscita) {
     dove = oc.rilascio_chiesto

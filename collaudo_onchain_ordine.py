@@ -734,7 +734,11 @@ def main():
 
     # l'on-chain consigliato per gli acquisti grossi (17 nov 2026, cantiere
     # onchain-importi-grossi): sopra la soglia la cassa lo propone. Al cambio
-    # finto 300.000 sats sono 300 €: sotto i 500 di serie no, sotto 200 si'
+    # finto 300.000 sats sono 300 €: sotto i 500 di serie no, sotto 200 si'.
+    # Il consiglio legge il cambio che si sa ADESSO, senza la rete
+    # (`cambio_noto_ora`, 17 nov 2026 sera): qui lo stesso numero finto
+    cambio_vero = SRV.cambio_noto_ora
+    SRV.cambio_noto_ora = lambda valuta="eur": 100_000.0
     come(999)
     x = c.get("/api/onchain/pronto/888?sats=300000").json()
     prova("300 € sotto la soglia di serie: nessun consiglio, la soglia detta",
@@ -761,6 +765,13 @@ def main():
           (r2.json().get("ripresa"), r2.json().get("importo_grosso")))
     SRV.ONCHAIN_CONSIGLIATO_SOPRA_EURO = 0
     prova("...a soglia 0 nessun avviso", False, compra(999, caro).json().get("importo_grosso"))
+    SRV.ONCHAIN_CONSIGLIATO_SOPRA_EURO = 500
+    SRV.cambio_noto_ora = cambio_vero
+    SRV.ONCHAIN_CONSIGLIATO_SOPRA_EURO = 200
+    come(999)
+    prova("...e senza un cambio conosciuto nessun consiglio, e nessuna "
+          "domanda alla rete (la gabbia la fermerebbe)", False,
+          c.get("/api/onchain/pronto/888?sats=300000").json()["consigliato"])
     SRV.ONCHAIN_CONSIGLIATO_SOPRA_EURO = 500
 
     # ---- 7) la leva ---------------------------------------------------------

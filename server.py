@@ -59355,15 +59355,18 @@ def onchain_consigliato(prezzo_sats: int, cambio_eur: float) -> bool:
     return int(prezzo_sats or 0) * cambio_eur / 100_000_000 > soglia
 
 
-async def _avviso_importo_grosso(fuori):
+async def _avviso_importo_grosso(fuori):  # async: le tre uscite la aspettano gia'
     """La fattura Lightning del mercatino che e' sopra la soglia lo dice
     (17 nov 2026): `importo_grosso` e la soglia nella risposta, e il
     foglio della fattura scrive l'avviso. Vale anche dove l'on-chain non
     si offre (carrello, offerta accettata, codice sconto): li' l'avviso
     e' l'unica cosa che si puo' dire."""
     if isinstance(fuori, dict) and fuori.get("invoice"):
+        # il cambio che si sa ADESSO, senza la rete (17 nov 2026 sera:
+        # l'await di CoinGecko qui bussava fuori dalla gabbia dei collaudi,
+        # collaudo_piu_account rosso in CI); senza cambio nessun avviso
         fuori["importo_grosso"] = onchain_consigliato(
-            int(fuori.get("prezzo_sats") or 0), await cambio_btc_eur())
+            int(fuori.get("prezzo_sats") or 0), cambio_noto_ora())
         fuori["consigliato_sopra_euro"] = _onchain_soglia_consiglio()
     return fuori
 
@@ -106111,8 +106114,9 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
     # L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026): detto in
     # OGNI risposta, anche nei no, perche' a on-chain impossibile la cassa
     # avvisi almeno che una cifra cosi' in Lightning spesso non passa
-    cambio = await cambio_btc_eur() if sats > 0 else 0.0
-    sopra = {"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio),
+    # col cambio che si sa ADESSO, senza la rete: la domanda a CoinGecko
+    # resta dov'era, solo per il tetto (17 nov 2026 sera, la gabbia)
+    sopra = {"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio_noto_ora()),
              "consigliato_sopra_euro": _onchain_soglia_consiglio()}
     if not EMBIT:
         return {**sopra, "pronto": False, "motivo": "manca la libreria embit"}
@@ -106146,7 +106150,7 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
     # che col Lightning sarebbe la fattura): la porta ⛓️ si spegne PRIMA
     # del tocco, invece di chiudere la fattura e poi dire di no
     if sats > 0:
-        troppo = onchain_sopra_il_tetto(int(sats), cambio)
+        troppo = onchain_sopra_il_tetto(int(sats), await cambio_btc_eur())
         if troppo:
             return {**sopra, "pronto": False, "motivo": troppo}
     # la quota fissa di Barattolo, detta PRIMA di pagare (regola ferrea

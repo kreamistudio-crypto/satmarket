@@ -159877,10 +159877,13 @@ def prove_onchain_consigliato():
     exec(pezzo("_onchain_soglia_consiglio"), amb)
     exec(pezzo("onchain_consigliato"), amb)
 
-    async def cambio_btc_eur():
-        return 100_000.0
-    amb["cambio_btc_eur"] = cambio_btc_eur
+    # il cambio che si sa ADESSO, mai la rete (17 nov 2026 sera: l'await di
+    # CoinGecko qui bussava fuori dalla gabbia, collaudo_piu_account rosso)
+    amb["cambio_noto_ora"] = lambda valuta="eur": 100_000.0
     exec("async " + pezzo("_avviso_importo_grosso"), amb)
+    prova("l'avviso della fattura non chiede il cambio alla rete", (False, True),
+          ("cambio_btc_eur" in pezzo("_avviso_importo_grosso"),
+           "cambio_noto_ora()" in pezzo("_avviso_importo_grosso")))
     a = amb["_avviso_importo_grosso"]
     grossa = asyncio.run(a({"invoice": "lnbc1", "prezzo_sats": 900_000}))
     piccola = asyncio.run(a({"invoice": "lnbc1", "prezzo_sats": 20_000}))
@@ -159900,11 +159903,11 @@ def prove_onchain_consigliato():
     pronto = srv[srv.index('@app.get("/api/onchain/pronto/{venditore_id}")'):]
     pronto = pronto[:pronto.index("\n@app.", 10)]
     prova("/onchain/pronto dice il consiglio in OGNI risposta, anche nei no, "
-          "e il tetto usa lo stesso cambio",
-          (6, 0, True, True),
+          "col cambio che si sa (senza rete); la rete solo per il tetto, dov'era",
+          (6, 0, True, 1),
           (pronto.count('return {**sopra, "pronto"'), pronto.count('return {"pronto"'),
-           '"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio)' in pronto,
-           "onchain_sopra_il_tetto(int(sats), cambio)" in pronto))
+           '"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio_noto_ora())' in pronto,
+           pronto.count("await cambio_btc_eur()")))
     prova("leva ONCHAIN_CONSIGLIATO_SOPRA_EURO: 500 di serie (anche storta), "
           "nell'esempio, nel pannello",
           (2, True, True),
@@ -200246,7 +200249,9 @@ def prove_incasso_annuncio():
     exec("SWAP_AUTO_MODI = " + re.search(r"\nSWAP_AUTO_MODI = ([^\n]+)\n", src).group(1), amb)
     for nome in ("_swap_auto_pref_prepara", "swap_auto_modo", "swap_auto_preferisce",
                  "incasso_da_payload", "incasso_annuncio", "incasso_ln_ordine",
-                 "swap_auto_aspetta", "_onchain_modo_salvato", "onchain_modo_ordine"):
+                 "swap_auto_aspetta", "_onchain_modo_salvato", "onchain_modo_ordine",
+                 # (17 nov 2026) il segno dell'acquisto grosso e la scelta senza
+                 "_onchain_grosso", "_onchain_modo_scelto"):
         exec(pezzo(nome), amb)
     con = _sq.connect(":memory:")
     con.row_factory = _sq.Row

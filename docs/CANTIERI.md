@@ -90172,3 +90172,18 @@ perché giusto), `collaudo_p2p_onchain` (500 € del P2P on-chain con 250
 del Lightning e 3000 del mercatino: vince 500). Controprova: tolto il
 segno da `onchain_modo_ordine`, il 6-bis è rosso.
 NON PROVATO dal vivo: un ordine on-chain vero sopra 500 €.
+
+LA GABBIA, LO STESSO GIORNO. `e88d86b0` ha fatto rosso
+`collaudo_piu_account` in CI («GABBIA: bussata fuori — DNS
+api.coingecko.com»): `_avviso_importo_grosso` aspettava
+`cambio_btc_eur()`, che a cambio vuoto bussa a CoinGecko, e in cloud
+il proxy nascondeva la bussata (la lezione del 2 nov, di nuovo). Cura:
+il consiglio legge `cambio_noto_ora()`, il cambio che si sa senza la
+rete (senza, nessun avviso), sia nella fattura sia in `/onchain/pronto`,
+dove la domanda alla rete resta solo per il tetto, al suo posto di
+prima. Riprodotto senza le variabili del proxy: rosso su develop,
+verde col rimedio. `collaudo_onchain_ordine` finge anche
+`cambio_noto_ora` per le sue righe, e prova che senza cambio non si
+consiglia. Insieme: `prove_incasso_annuncio` esegue anche i due pezzi
+nuovi di `onchain_modo_ordine`, e la nota di chi vende non ha più la
+catenina ⛓️ (la regola del 9 nov).
