@@ -5793,6 +5793,10 @@
      solo: in WebKit uscivano con le grazie (visto negli scatti del
      9 ott 2026) */
   .p2p-scade-chip .chip{font-family:inherit}
+  /* i due capi di un intervallo sotto il campo «Quanto» (17 nov 2026) */
+  .p2p-quanto-capi{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+  .p2p-quanto-capi .chip{font-family:inherit}
+  .p2p-quanto-capi .chip:focus-visible{outline:2px solid var(--sats);outline-offset:2px}
   .p2p-scade-griglia{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
   .p2p-scade-cella{min-width:0;border:1.5px solid var(--field-line);background:var(--card);
     border-radius:10px;padding:9px 0;font:inherit;font-weight:700;font-size:14px;
@@ -82603,17 +82607,33 @@ function renderQuantoP2P(){
      stesso della riga «Importo scelto»; su un ordine in euro non cambia
      una lettera. */
   const segno = quantoSegnoP2P(riga);
+  /* IL CAMPO NASCE VUOTO, COI DUE CAPI A UN TOCCO (17 nov 2026, cantiere
+     quanto-vuoto; un utente: «di default prende l'importo minore e quindi
+     per impostare la somma desiderata occorre prima cancellare importo di
+     default e ridigitarlo», e proponeva «come Mostro» o «il campo
+     libero»). Il minimo scritto nel campo era una cifra che nessuno
+     aveva scelto: chi voleva altro doveva prima toglierla. Ora il campo
+     e' vuoto, la fascia sta nel segnaposto, e «Minimo» e «Massimo» la
+     scrivono con un tocco. Chi torna a cambiare ritrova ANCORA la sua:
+     quella l'ha scelta lui. */
+  const capo = n => esc(String(n)) + ' ' + segno;
   box.innerHTML =
     '<div class="hint">Quest\'offerta va da <b>' + esc(fmtSoldiP2P(riga.euro, riga)) + ' ' + segno + '</b> a <b>' +
       esc(fmtSoldiP2P(riga.euroMax, riga)) + ' ' + segno + '</b>: scegli tu quanto ' +
       (paghiEuro ? 'vuoi inviare' : 'vuoi ricevere') + '.</div>' +
     '<div class="field"><label for="p2pQuantoInp">Quanti ' + quantoNomeP2P(riga) + '</label>' +
     '<div class="campo-pre"><span class="pre' + (segno.length > 1 ? ' pre-parola' : '') + '">' + segno + '</span>' +
-    /* chi torna a cambiare la cifra ritrova la sua, non il minimo */
+    /* chi torna a cambiare la cifra ritrova la sua; la prima volta niente */
     '<input id="p2pQuantoInp" type="text" inputmode="numeric" value="' +
-      esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || riga.euro)) +
+      esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || '')) +
       '" onbeforeinput="soloCifreP2P(event)"' +
-      ' oninput="stimaQuantoP2P()"></div></div>' +
+      /* il segnaposto sta attaccato al segno: «€50 – 276», non «€da 50 a 276» */
+      ' oninput="stimaQuantoP2P()" placeholder="' + esc(String(riga.euro)) + ' \u2013 ' +
+      esc(String(riga.euroMax)) + '"></div></div>' +
+    '<div class="p2p-quanto-capi" role="group" aria-label="Cifre rapide">' +
+      '<button type="button" class="chip" onclick="mettiQuantoP2P(\'min\')">Minimo · ' + capo(riga.euro) + '</button>' +
+      '<button type="button" class="chip" onclick="mettiQuantoP2P(\'max\')">Massimo · ' + capo(riga.euroMax) + '</button>' +
+    '</div>' +
     '<div class="hint" id="p2pQuantoStima" aria-live="polite"></div>' +
     '<button class="btn orange" onclick="confermaQuantoP2P()">Continua</button>';
   stimaQuantoP2P();
@@ -82657,7 +82677,21 @@ function stimaQuantoP2P(){
   const riga = rigaLibroP2P(p2pQuantoOrdine);
   const inp = el('p2pQuantoInp'), av = el('p2pQuantoStima');
   if (!riga || !inp || !av) return;
-  av.textContent = quantoValeP2P(riga, ripuliCifreP2P(inp)).dillo;
+  /* a campo vuoto niente «Scegli una cifra fra…»: la fascia e' gia'
+     scritta sopra e nel segnaposto, e nessuno ha ancora sbagliato */
+  const g = quantoValeP2P(riga, ripuliCifreP2P(inp));
+  av.textContent = inp.value ? g.dillo : '';
+}
+/* «Minimo» e «Massimo»: scrivono il capo nel campo e rifanno la stima.
+   Non confermano: «Continua» resta il gesto che sceglie, col tetto del
+   contanti guardato li' come su una cifra scritta a mano. */
+function mettiQuantoP2P(quale){
+  const riga = rigaLibroP2P(p2pQuantoOrdine);
+  const inp = el('p2pQuantoInp');
+  if (!riga || !riga.euroMax || !inp) return;
+  if (typeof haptic === 'function') haptic();
+  inp.value = String(quale === 'max' ? riga.euroMax : riga.euro);
+  stimaQuantoP2P();
 }
 function confermaQuantoP2P(){
   const riga = rigaLibroP2P(p2pQuantoOrdine);

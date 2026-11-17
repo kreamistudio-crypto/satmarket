@@ -89029,3 +89029,47 @@ rimborsato, dal lato di chi aveva depositato.
 NOTATO E NON FATTO: il moderatore on-chain non ha la spunta della
 «colpa» che ha quello del Lightning; la card in «I miei scambi» di uno
 scambio rimborsato non dice «non completato» (lo dice la pagina).
+
+## Il campo «Quanto» che nasce vuoto (17 nov 2026 sera, cantiere quanto-vuoto, quinto commit del ramo onchain-rimborso-liscio; Andrea, girando il messaggio di un utente: «Questa cosa ha senso o no?»)
+
+DA DOVE VIENE. Un utente: «di default prende l'importo minore e quindi
+per impostare la somma desiderata occorre prima cancellare importo di
+default e ridigitarlo. Il mio suggerimento è fare come Mostro nella
+fase di scelta oppure lasciare il campo libero». Aveva ragione: su un
+ordine con un intervallo il foglio «Quanto vuoi scambiare?» si apriva
+col MINIMO già scritto nel campo, cioè con una cifra che nessuno aveva
+scelto. Chi voleva il minimo risparmiava un tocco, tutti gli altri ne
+spendevano di più per toglierla.
+
+COSA SI È FATTO, solo in `miniapp.html`:
+- il campo nasce vuoto; la fascia sta nel segnaposto («50 – 276»,
+  attaccato al segno della moneta: «da 50 a 276» si leggeva «€da 50…»);
+- sotto, due tasti «Minimo · 50 €» e «Massimo · 276 €» (`mettiQuantoP2P`):
+  scrivono il capo nel campo e rifanno la stima, NON confermano.
+  «Continua» resta il solo gesto che sceglie, e il tetto del contanti si
+  guarda lì come su una cifra scritta a mano;
+- a campo vuoto la stima tace (prima avrebbe detto «Scegli una cifra
+  fra…» a chi non aveva ancora scritto niente); «Continua» a campo vuoto
+  lo dice col toast di sempre;
+- chi torna da «Cambia» ritrova ANCORA la sua cifra: quella l'ha scelta
+  lui, ed è la regola del 7 ott che resta.
+
+LIGHTNING E ON-CHAIN INSIEME. Il foglio è uno solo: lo usa la presa
+Lightning e la usa chi prende dalla rete on-chain (lo swap), che legge
+la stessa `p2pDettImporto`. Gli ordini del 2-di-3 on-chain non hanno un
+intervallo (una cifra sola, `euro_cent`), quindi lì non c'è niente da
+scegliere. Il validatore della fascia (`quantoValeP2P`) non è cambiato,
+e il coordinatore resta il giudice vero.
+
+STRADE SCARTATE. I tasti che prendono subito (un tocco su «Massimo» e
+via): salterebbero il conto della cifra, che dal 7 ott si vede PRIMA di
+premere. Una fila di cifre intermedie o un cursore: l'utente chiedeva il
+campo libero, e una fascia 20-1000 non ha «cifre tonde» giuste per tutti.
+
+PROVATO: `prove_p2p_dettaglio` (il campo vuoto, il segnaposto, i due
+tasti, e in node la stima che tace, i due capi scritti, il fuori fascia
+detto, il tasto senza ordine che non tocca niente),
+`prove_usdt_foglio_presa` (il foglio vero disegnato in node: vuoto,
+segnaposto, capi in € e in USDT), `prove_p2p_pubblica`; due scatti del
+foglio coi fogli di stile veri, chiaro e scuro. NON provato dal vivo sul
+telefono: la tastiera che si apre sul campo vuoto è quella di prima.
