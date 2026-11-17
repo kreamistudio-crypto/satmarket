@@ -76713,6 +76713,8 @@ def _scopa_presenze_p2p(con, adesso: int) -> int:
             "UPDATE p2p_appuntamenti SET lat=NULL, lon=NULL, prova='', posizione_via=? "
             "WHERE posizione_via=0 AND quando<?", (int(adesso), vecchie)).rowcount
         n += con.execute("DELETE FROM p2p_appuntamenti WHERE quando<?", (morte,)).rowcount
+    # ...e gli scambi on-chain chiusi scordano le posizioni (17 nov 2026)
+    n += _p2p_onchain_scorda_incontri(con, adesso)
     return n
 
 
@@ -108818,6 +108820,17 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
     # LA CHAT (17 nov 2026, «come la parte lighting»): 'aperta' alle due
     # parti dalla presa alla fine (disputa compresa), 'moderazione' al
     # moderatore che non e' una parte a disputa aperta, '' altrimenti
+    # IL CONTANTI DI PERSONA (17 nov 2026, onchain-contanti): `contanti`
+    # accende le parole e il riquadro; alle due parti le DUE righe delle
+    # presenze (la mia, e l'ora dell'altra: mai la sua posizione), al
+    # moderatore che non e' una parte il confronto, come nel Lightning
+    d["contanti"] = _p2p_onchain_contanti(o)
+    if d["contanti"] and dep and ric:
+        lato_i = _p2p_onchain_lato_incontro(o, tg_id)
+        if lato_i and _tabella_p2p(con, "p2p_sono_qui"):
+            d["presenze"] = _presenze_per_parte_p2p(con, str(o["ordine"]), 0, lato_i)
+        elif admin and not parte_vera:
+            d["confronto"] = _confronto_giro_p2p(con, str(o["ordine"]), 0)
     d["chat"] = _p2p_onchain_chat_vista(o["stato"], bool(dep and ric and tg_id in (dep, ric)),
                                         bool(admin and not parte_vera),
                                         bool(P2P_CHAT_SCAMBIO))
@@ -109596,7 +109609,9 @@ async def _p2p_onchain_controlla(oid: int) -> str:
                 stato = "depositato"
                 euro = _fmt_eur(int(o["euro_cent"]) / 100)
                 ore = p2p_onchain_ore_pagamento(o)
-                avvisi = _p2p_onchain_testi_deposito_tab(o, euro) or [
+                avvisi = _p2p_onchain_testi_deposito_tab(o, euro) or (
+                    _p2p_onchain_testi_deposito_contanti(o, euro, ore)
+                    if _p2p_onchain_contanti(o) else None) or [
                     (o["ricevente_id"], "🔒 <b>Chi vende ha messo i sats nel deposito di "
                      f"garanzia 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
                      f"Apri Barattolo: ora manda <b>{euro} €</b> a chi vende, poi tocca "
@@ -109733,6 +109748,13 @@ async def p2p_onchain_euro_inviati(oid: int, req: Request, x_tg_init_data: str =
                  "Controlla il tuo wallet sulla rete giusta: quando li vedi, apri "
                  "lo scambio e tocca «Ricevuti: libera i sats». Se non arrivano, "
                  "apri una disputa.")
+    elif _p2p_onchain_contanti(o):
+        # in contanti di persona (17 nov 2026, onchain-contanti): le
+        # parole di «Ho consegnato i contanti», come nel Lightning
+        testo = (f"💵 <b>Chi compra dice di averti consegnato {euro} € in contanti.</b> "
+                 f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
+                 "Contali davanti a lui, poi apri lo scambio e tocca «Ricevuti: libera "
+                 "i sats» lì, davanti a lui. Se non li hai ricevuti, apri una disputa.")
     elif p2p_onchain_tab_scade(o):
         # Barattozon on-chain (17 nov 2026): i soldi vanno ad Amazon
         testo = (f"🧾 <b>Chi compra dice di aver pagato il PayCode al tabacchino "
@@ -109751,6 +109773,168 @@ async def p2p_onchain_euro_inviati(oid: int, req: Request, x_tg_init_data: str =
                     else "Se non arrivano, apri una disputa."))
     await _notifica_p2p_onchain(o, o["depositante_id"], testo, _p2p_onchain_bottone(o))
     return {"ok": True}
+
+
+# ---- IL CONTANTI DI PERSONA ON-CHAIN: «📍 SONO QUI» E L'APPUNTAMENTO (17
+# nov 2026, cantiere onchain-contanti, secondo pezzo; Andrea: «Dovrebbe
+# funzionare esattamente come Lightning anche l'on-chain contanti») ----
+# LE STESSE DUE TABELLE DEL LIGHTNING (`p2p_sono_qui`, `p2p_appuntamenti`)
+# e gli stessi giudici: cosi' la scopa della privacy (`_scopa_presenze_p2p`),
+# la cancellazione dell'account, le due righe che vedono le parti
+# (`_presenze_per_parte_p2p`) e il confronto del moderatore
+# (`_confronto_giro_p2p`) valgono anche qui, senza una seconda copia da
+# tenere allineata. COSA CAMBIA: qui le due parti le conosce il server
+# (l'ordine on-chain e' nostro, e la sessione dice chi sei), quindi NON
+# c'e' una nota firmata — `chiave` e `prova` restano vuote, `caricata_da`
+# e' chi ha premuto e il LATO lo dice il ruolo: chi ha depositato i sats
+# «vende», chi li riceve «compra». L'`ordine` e' il nome pubblico
+# (`bar-onchain-…`), che nel libro di Mostro non puo' esistere: la rotta
+# del Lightning su quel nome non trova le due chiavi e dice di no. IL
+# GIRO E' 0: una riga on-chain ha una vita sola (dopo la presa non torna
+# nel libro). LE POSIZIONI SI SCORDANO alla chiusura dello scambio
+# (`_p2p_onchain_scorda_incontri`, chiamata dalla scopa: gli stati finali
+# dell'on-chain nascono in troppi posti per un gancio a testa) e comunque
+# dopo P2P_PRESENZA_POSIZIONI_S, come nel Lightning.
+# OGGI E' «IN CONTANTI» lo scambio il cui SOLO metodo e' «Contanti»
+# (`_p2p_onchain_contanti`, l'unico giudice: il terzo pezzo, con la scelta
+# del metodo alla presa, allarga quello e basta).
+P2P_ONCHAIN_STATI_INCONTRO = ("depositato", "euro_inviati")
+
+
+def _p2p_onchain_contanti(o) -> bool:
+    """PURA: lo scambio e' in contanti di persona?"""
+    return _p2p_onchain_solo_contanti(o)
+
+
+def _p2p_onchain_lato_incontro(o, tg_id) -> str:
+    """PURA: 'vende' per chi ha depositato i sats, 'compra' per chi li
+    riceve, '' per chiunque altro (i lati di `p2p_sono_qui`)."""
+    tg_id = int(tg_id or 0)
+    if tg_id and tg_id == int(o["depositante_id"] or 0):
+        return "vende"
+    if tg_id and tg_id == int(o["ricevente_id"] or 0):
+        return "compra"
+    return ""
+
+
+def _p2p_onchain_registra_sono_qui(con, o, tg_id, d, adesso: int) -> tuple:
+    """«📍 SONO QUI» on-chain, giudicato: `(codice, corpo)`. Solo le due
+    parti, solo in contanti, solo coi sats nel 2-di-3 e lo scambio aperto;
+    una riga per tocco, fino a P2P_SONO_QUI_MAX per lato. Le distanze si
+    calcolano QUI, all'arrivo, come nel Lightning. Il corpo non si stampa
+    mai: porta una posizione."""
+    if not _p2p_onchain_contanti(o):
+        return 409, "Questo scambio non e' in contanti di persona"
+    lato = _p2p_onchain_lato_incontro(o, tg_id)
+    if not lato:
+        return 404, "Ordine non trovato"
+    if o["stato"] not in P2P_ONCHAIN_STATI_INCONTRO:
+        return 409, ("La presenza si segna quando i sats sono nel deposito di garanzia"
+                     if o["stato"] == "preso"
+                     else "Questo scambio e' chiuso: la presenza non serve piu'")
+    ordine = str(o["ordine"])
+    fatte = con.execute("SELECT COUNT(*) FROM p2p_sono_qui WHERE ordine=? AND giro=0 AND lato=?",
+                        (ordine, lato)).fetchone()[0]
+    if fatte >= P2P_SONO_QUI_MAX:
+        return 429, f"Hai gia' segnato la presenza {P2P_SONO_QUI_MAX} volte in questo scambio"
+    geo = _geo_presenza_p2p(d.get("geo") if isinstance(d, dict) else None)
+    app = _appuntamento_in_vigore_p2p(con, ordine, 0, adesso)
+    dist_luogo = None
+    if geo and app is not None and app["lat"] is not None and app["lon"] is not None:
+        dist_luogo = _distanza_metri_p2p(geo, {"lat": app["lat"], "lon": app["lon"]})
+    vicine = {}
+    if geo:
+        for r in con.execute("SELECT id, lat, lon FROM p2p_sono_qui WHERE ordine=? AND giro=0 "
+                             "AND lato<>? AND lat IS NOT NULL AND lon IS NOT NULL",
+                             (ordine, lato)):
+            vicine[str(r["id"])] = _distanza_metri_p2p(geo, {"lat": r["lat"], "lon": r["lon"]})
+    con.execute(
+        "INSERT INTO p2p_sono_qui(ordine, giro, lato, chiave, ora, ora_firmata, lat, lon, acc, "
+        "posizione, posizione_via, appuntamento, dist_luogo, vicine, prova, caricata_da) "
+        "VALUES(?,0,?,'',?,?,?,?,?,?,0,?,?,?,'',?)",
+        (ordine, lato, int(adesso), int(adesso),
+         geo["lat"] if geo else None, geo["lon"] if geo else None, geo["acc"] if geo else None,
+         int(bool(geo)), int(app["id"]) if app is not None else 0, dist_luogo,
+         json.dumps(vicine, separators=(",", ":")) if vicine else "", int(tg_id or 0)))
+    con.commit()
+    return 200, {"ok": True, "ora": int(adesso), "posizione": bool(geo),
+                 "presenze": _presenze_per_parte_p2p(con, ordine, 0, lato)}
+
+
+def _p2p_onchain_registra_appuntamento(con, o, tg_id, app, adesso: int) -> str:
+    """L'APPUNTAMENTO on-chain: l'ora e il punto che il telefono di chi
+    vende manda ACCANTO al recapito «📍 Dove vedervi» (il testo sta nel
+    recapito; qui solo quel che serve al confronto con le presenze, come
+    nel Lightning). Torna '' o la frase del no; non fa commit. Una
+    versione uguale all'ultima non ne fa una nuova; oltre
+    P2P_APPUNTAMENTO_MAX versioni, no."""
+    if not isinstance(app, dict):
+        return ""
+    ora = app.get("ora") or 0
+    if isinstance(ora, bool) or not isinstance(ora, int) or ora < 0:
+        return "L'ora dell'incontro e' illeggibile"
+    if ora and not (int(adesso) - P2P_APPUNTAMENTO_PASSATO_S <= ora
+                    <= int(adesso) + P2P_APPUNTAMENTO_FUTURO_S):
+        return "L'ora dell'incontro e' fuori misura: gia' passata, o troppo lontana"
+    punto = _geo_presenza_p2p(app.get("geo"))
+    if not ora and not punto:
+        return ""
+    ordine = str(o["ordine"])
+    lat, lon = (punto["lat"], punto["lon"]) if punto else (None, None)
+    ultimo = con.execute("SELECT ora_incontro, lat, lon FROM p2p_appuntamenti WHERE ordine=? "
+                         "AND giro=0 ORDER BY quando DESC, id DESC LIMIT 1", (ordine,)).fetchone()
+    if ultimo and int(ultimo["ora_incontro"] or 0) == ora \
+            and ultimo["lat"] == lat and ultimo["lon"] == lon:
+        return ""
+    versioni = con.execute("SELECT COUNT(*) FROM p2p_appuntamenti WHERE ordine=? AND giro=0",
+                           (ordine,)).fetchone()[0]
+    if versioni >= P2P_APPUNTAMENTO_MAX:
+        return "L'appuntamento e' gia' cambiato troppe volte in questo scambio"
+    con.execute(
+        "INSERT INTO p2p_appuntamenti(ordine, giro, chiave, ora_incontro, lat, lon, punto, "
+        "posizione_via, prova, caricata_da, quando) VALUES(?,0,'',?,?,?,?,0,'',?,?)",
+        (ordine, ora, lat, lon, int(bool(punto)), int(tg_id or 0), int(adesso)))
+    return ""
+
+
+def _p2p_onchain_scorda_incontri(con, adesso: int) -> int:
+    """Gli scambi on-chain CHIUSI scordano le posizioni delle presenze e
+    il punto dell'appuntamento, come fa il Lightning all'evento di
+    chiusura: restano le ore e le distanze gia' calcolate. La disputa
+    non chiude (il moderatore deve ancora guardare). Non fa commit."""
+    if not _tabella_p2p(con, "p2p_onchain_ordini"):
+        return 0
+    n = 0
+    for tabella in ("p2p_sono_qui", "p2p_appuntamenti"):
+        if not _tabella_p2p(con, tabella):
+            continue
+        n += con.execute(
+            f"UPDATE {tabella} SET lat=NULL, lon=NULL, prova='', posizione_via=? "
+            "WHERE posizione_via=0 AND ordine IN (SELECT ordine FROM p2p_onchain_ordini "
+            "WHERE stato IN ('rilasciato','rimborsato','annullato','scaduto'))",
+            (int(adesso),)).rowcount
+    return n
+
+
+@app.post("/api/p2p/onchain/{oid}/sono-qui")
+async def p2p_onchain_sono_qui(oid: int, req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """«📍 Sono qui» nello scambio on-chain in contanti: la presenza di
+    una delle due parti, con l'ora NOSTRA e — se il telefono la da' — la
+    posizione. Il corpo non si stampa mai."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    d = await leggi_json(req)
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        _p2p_onchain_ruolo(o, user["id"])     # 404 a chi non c'entra
+        codice, corpo = _p2p_onchain_registra_sono_qui(con, o, user["id"], d, int(time.time()))
+    finally:
+        con.close()
+    if codice != 200:
+        raise HTTPException(codice, corpo)
+    return corpo
 
 
 @app.post("/api/p2p/onchain/{oid}/recapito")
@@ -109792,6 +109976,14 @@ async def p2p_onchain_recapito(oid: int, req: Request, x_tg_init_data: str = Hea
         cambiato_dopo = (o["stato"] == "depositato" and prima and prima != testo)
         if cambiato_dopo:
             _p2p_onchain_recapito_storia(con, oid, prima, user["id"])
+        # IN CONTANTI il recapito e' «📍 Dove vedervi» (17 nov 2026,
+        # onchain-contanti): l'ora e il punto viaggiano accanto al testo
+        contanti = _p2p_onchain_contanti(o)
+        if contanti:
+            perche = _p2p_onchain_registra_appuntamento(
+                con, o, user["id"], d.get("appuntamento"), int(time.time()))
+            if perche:
+                raise HTTPException(400, perche)
         con.execute("UPDATE p2p_onchain_ordini SET recapito=?, aggiornato=? WHERE id=?",
                     (testo, int(time.time()), oid))
         con.commit()
@@ -109804,9 +109996,12 @@ async def p2p_onchain_recapito(oid: int, req: Request, x_tg_init_data: str = Hea
             "dello scambio: se si apre una disputa, guardate anche quello.",
             argomento="moderazione")
     if o["stato"] in ("preso", "depositato") and o["ricevente_id"]:
-        await _notifica_p2p_onchain(o, o["ricevente_id"], "💶 <b>Chi vende ha scritto dove vuole gli "
-                                          "euro.</b>\n\nLo trovi nello scambio.",
-                       _p2p_onchain_bottone(o))
+        await _notifica_p2p_onchain(
+            o, o["ricevente_id"],
+            ("📍 <b>Chi vende ha scritto dove vedervi.</b>\n\nL'appuntamento è nello scambio."
+             if contanti else
+             "💶 <b>Chi vende ha scritto dove vuole gli euro.</b>\n\nLo trovi nello scambio."),
+            _p2p_onchain_bottone(o))
     return {"ok": True}
 
 
@@ -111567,6 +111762,25 @@ P2P_ONCHAIN_RILASCIO_TAB_TESTI = {
 def _p2p_onchain_solo_contanti(o) -> bool:
     """PURA: i metodi sono il SOLO «Contanti» (le parole di «consegnato»)."""
     return _metodi_libro(_p2p_onchain_metodi(o)) == ["Contanti"]
+
+
+def _p2p_onchain_testi_deposito_contanti(o, euro: str, ore: int) -> list:
+    """PURA: i due avvisi del deposito confermato quando lo scambio e' in
+    contanti di persona (17 nov 2026, onchain-contanti): si parla
+    dell'incontro, non del conto. `[(tg_id, testo)]`."""
+    return [
+        (o["ricevente_id"], "🔒 <b>Chi vende ha messo i sats nel deposito di "
+         f"garanzia 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
+         f"Ora vi vedete: porta <b>{euro} €</b> in contanti. L'appuntamento è nello "
+         "scambio. Consegna i contanti solo quando chi vende libera i sats davanti "
+         "a te, poi tocca «Ho consegnato i contanti»."
+         f"\n\n⏳ <b>Avete {ore} ore</b>, poi chi vende può aprire una disputa."),
+        (o["depositante_id"], "🔒 <b>Deposito confermato ✓:</b> ora vi vedete. "
+         f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
+         f"Chi compra ti porta {euro} € in contanti. Scrivi nello scambio dove "
+         "vedervi, se non l'hai fatto. Contali davanti a lui, poi tocca «Ricevuti: "
+         "libera i sats» lì, davanti a lui. Mai prima."
+         f"\n\n⏳ Avete <b>{ore} ore</b> per l'incontro.")]
 
 
 def _p2p_onchain_sollecito_dovuto(o, adesso: int):

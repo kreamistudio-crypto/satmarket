@@ -1277,6 +1277,120 @@ def main():
           (200, "Milano centro", "Milano centro", 200, None, ""),
           (r.status_code, nel.get(oc_c, {}).get("zona"), uno(888, oc_c)["zona"],
            r2.status_code, nel.get(oc_s, {}).get("zona"), uno(888, oc_s)["zona"]))
+
+    # ---- 11-octies) lo scambio in contanti: l'appuntamento, «📍 Sono qui», le
+    # parole di «Ho consegnato i contanti» e il confronto del moderatore (17 nov
+    # 2026, onchain-contanti secondo pezzo; Andrea: «Dovrebbe funzionare
+    # esattamente come Lightning anche l'on-chain contanti») --------------------
+    print("\n[lo scambio in contanti: appuntamento, «Sono qui», consegna, moderatore]")
+    prova("la scheda dice se lo scambio e' in contanti: il solo «Contanti» si', un bonifico no",
+          (True, False), (uno(888, oc_c)["contanti"], uno(888, oc_s)["contanti"]))
+    banco.DETTO.clear()
+    gesto(999, oc_c, "prendi")
+    prova("prima del deposito la presenza non si segna: 409 con la frase",
+          (409, True), (lambda r: (r.status_code, "quando i sats sono nel deposito" in r.text))(
+              gesto(999, oc_c, "sono-qui", geo={"lat": 45.4642, "lon": 9.19, "acc": 10})))
+    fra_un_ora = int(time.time()) + 3600
+    testo_app = ("Contanti alla mano — propongo di vederci: Bar Sport, piazza Duomo\n"
+                 "Quando: 01/01/2030 alle 18:30\nCoordinate: 45.46420, 9.19000")
+    prova("un'ora dell'incontro fuori misura non passa: 400, e il recapito non cambia",
+          (400, ""), (gesto(888, oc_c, "recapito", recapito=testo_app,
+                            appuntamento={"ora": int(time.time()) + 30 * 86400}).status_code,
+                      uno(888, oc_c)["recapito"]))
+    r = gesto(888, oc_c, "recapito", recapito=testo_app,
+              appuntamento={"ora": fra_un_ora, "geo": {"lat": 45.4642, "lon": 9.19}})
+    prova("chi vende scrive dove vedervi: 200, chi compra lo legge e l'avviso dice «dove vedervi»",
+          (200, testo_app, True, False),
+          (r.status_code, uno(999, oc_c)["recapito"], detto_a(999, "ha scritto dove vedervi"),
+           detto_a(999, "dove vuole gli euro")))
+    con = SRV.db()
+    try:
+        app_n = con.execute("SELECT COUNT(*) FROM p2p_appuntamenti WHERE ordine=?",
+                            (uno(888, oc_c)["ordine"],)).fetchone()[0]
+    finally:
+        con.close()
+    gesto(888, oc_c, "recapito", recapito=testo_app,
+          appuntamento={"ora": fra_un_ora, "geo": {"lat": 45.4642, "lon": 9.19}})
+    con = SRV.db()
+    try:
+        app_n2 = con.execute("SELECT COUNT(*) FROM p2p_appuntamenti WHERE ordine=?",
+                             (uno(888, oc_c)["ordine"],)).fetchone()[0]
+    finally:
+        con.close()
+    prova("l'appuntamento e' una versione, e lo stesso salvato due volte non ne fa una seconda",
+          (1, 1), (app_n, app_n2))
+    banco.DETTO.clear()
+    paga(uno(888, oc_c))
+    gesto(888, oc_c, "controlla")
+    prova("a deposito confermato i due avvisi parlano dell'incontro, non del conto",
+          ("depositato", True, True, False),
+          (uno(888, oc_c)["stato"], detto_a(999, "in contanti"),
+           detto_a(888, "Contali davanti a lui"), detto_a(888, "sul tuo conto")))
+    prova("un terzo non segna niente: 404; su uno scambio non in contanti: 409",
+          (404, 409), (gesto(777, oc_c, "sono-qui").status_code,
+                       (lambda: (gesto(999, oc_s, "prendi"),
+                                 gesto(999, oc_s, "sono-qui").status_code)[1])()))
+    r = gesto(999, oc_c, "sono-qui", geo={"lat": 45.4643, "lon": 9.1901, "acc": 10})
+    d = r.json()
+    prova("chi compra segna «Sono qui» con la posizione: 200, la sua riga con l'ora",
+          (200, True, True, 1, None),
+          (r.status_code, d["posizione"], d["presenze"]["mia"]["posizione"],
+           d["presenze"]["mia"]["volte"], d["presenze"]["altra"]))
+    vista_v = uno(888, oc_c)
+    prova("chi vende vede SOLO l'ora dell'altro: mai una coordinata nella sua scheda",
+          (True, None, False, False),
+          (vista_v["presenze"]["altra"]["ora"] > 0, vista_v["presenze"]["mia"],
+           "45.4643" in json.dumps(vista_v["presenze"]), "lat" in json.dumps(vista_v["presenze"])))
+    r = gesto(888, oc_c, "sono-qui")
+    prova("chi vende la segna senza posizione: 200, e lo dice",
+          (200, False, True), (r.status_code, r.json()["posizione"],
+                               r.json()["presenze"]["altra"]["ora"] > 0))
+    for _ in range(4):
+        gesto(999, oc_c, "sono-qui", geo={"lat": 45.4643, "lon": 9.1901, "acc": 10})
+    prova("al sesto tocco dello stesso lato: 429", 429, gesto(999, oc_c, "sono-qui").status_code)
+    banco.DETTO.clear()
+    r = gesto(999, oc_c, "euro-inviati", contanti=True)
+    prova("«Ho consegnato i contanti»: a chi vende le parole della consegna, non del conto",
+          (200, True, False),
+          (r.status_code, detto_a(888, "consegnato 90,00 € in contanti")
+           or detto_a(888, "consegnato 90 € in contanti"), detto_a(888, "Controlla il tuo conto")))
+    prova("...e la presenza si segna ancora (i contanti si stanno contando)", 200,
+          gesto(888, oc_c, "sono-qui").status_code)
+    gesto(888, oc_c, "disputa", motivo="Non mi ha dato i contanti")
+    come(777)
+    ap = [x for x in c.get("/api/p2p/onchain/moderazione/aperte").json()["dispute"]
+          if x["id"] == oc_c]
+    cf = (ap[0].get("confronto") or {}) if ap else {}
+    prova("in disputa il moderatore terzo ha il confronto delle presenze, con l'appuntamento "
+          "e la distanza dal luogo di chi compra; le parti no",
+          (1, "probabile", "incontro", True, True, False, False),
+          (len(ap), cf.get("esito"), cf.get("regola"),
+           ((cf.get("compra") or {}).get("appuntamento") or {}).get("dist_luogo") is not None,
+           (cf.get("appuntamento") or {}).get("punto"),
+           "presenze" in (ap[0] if ap else {}), "confronto" in uno(888, oc_c)))
+    prova("a disputa aperta la presenza non si segna piu': 409", 409,
+          gesto(999, oc_c, "sono-qui").status_code)
+    con = SRV.db()
+    try:
+        nome = uno(888, oc_c)["ordine"]
+        prima = con.execute("SELECT COUNT(*) FROM p2p_sono_qui WHERE ordine=? AND lat IS NOT NULL",
+                            (nome,)).fetchone()[0]
+        via0 = SRV._p2p_onchain_scorda_incontri(con, int(time.time()))
+        con.execute("UPDATE p2p_onchain_ordini SET stato='rimborsato' WHERE id=?", (oc_c,))
+        SRV._scopa_presenze_p2p(con, int(time.time()))
+        dopo = con.execute("SELECT COUNT(*), SUM(posizione), SUM(posizione_via>0), "
+                           "SUM(dist_luogo IS NOT NULL) FROM p2p_sono_qui WHERE ordine=? "
+                           "AND lat IS NULL", (nome,)).fetchone()
+        punto = con.execute("SELECT lat, punto, posizione_via>0 FROM p2p_appuntamenti "
+                            "WHERE ordine=?", (nome,)).fetchone()
+        con.execute("UPDATE p2p_onchain_ordini SET stato='disputa' WHERE id=?", (oc_c,))
+        con.commit()
+    finally:
+        con.close()
+    prova("a scambio aperto (anche in disputa) le posizioni restano; chiuso, la scopa le "
+          "scorda e restano le ore e la distanza dal luogo; il punto dell'appuntamento pure",
+          (True, 0, True, True, True, (None, 1, 1)),
+          (prima >= 1, via0, dopo[0] >= 7, dopo[1] >= 1, dopo[3] >= 1, tuple(punto)))
     SRV.P2P_CONTANTI_MAX_EURO = tetto_c
     SRV.P2P_ONCHAIN_APERTI_MAX = tetto
 
