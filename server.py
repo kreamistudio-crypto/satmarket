@@ -110701,6 +110701,32 @@ def _file_con_etag(percorso: str, media_type: str, cache: str,
 # cosi' l'insieme dei file servibili resta chiuso e derivato, e nessun
 # percorso puo' uscire dalla cartella — lo spirito della regola ferrea
 # 3, senza StaticFiles.
+# LE ILLUSTRAZIONI DEL MONDO DI TAPPO (17 nov 2026, Andrea sulla scheda:
+# «Mondo dipinto con Flow»): le sei zone dipinte e i quattro oggetti
+# (barattolo, bullone, bancarella, chiosco), in assets/mondo/. I NOMI
+# AMMESSI sono questi e solo questi: la parte variabile dell'indirizzo
+# passa da qui, mai da un percorso costruito col nome che arriva.
+MONDO_ASSET = frozenset([f"zona-{n}" for n in range(1, 7)]
+                        + ["barattolo", "bullone", "bancarella", "chiosco"])
+
+
+@app.get("/assets/mondo/{nome}")
+def asset_mondo(nome: str, if_none_match: str = Header("")):
+    """Un'illustrazione del mondo di Tappo. Rotta esplicita con la sua
+    whitelist (regola 3: nessun mount). Senza il file (un server senza
+    le illustrazioni) e' un 404, e la pagina disegna la zona da sola.
+    Revalidazione con l'ETag come le illustrazioni delle categorie: un
+    dipinto rifatto deve arrivare subito, senza aspettare un giorno."""
+    slug = nome[:-5] if nome.endswith(".webp") else ""
+    if slug not in MONDO_ASSET:
+        raise HTTPException(404, "immagine non trovata")
+    percorso = os.path.join("assets", "mondo", slug + ".webp")
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "immagine non trovata")
+    return _file_con_etag(percorso, "image/webp", "public, no-cache",
+                          if_none_match)
+
+
 @app.get("/assets/categorie/{nome}")
 def asset_categoria(nome: str, if_none_match: str = Header("")):
     slug = nome[:-5] if nome.endswith(".webp") else ""
