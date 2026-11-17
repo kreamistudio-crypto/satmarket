@@ -88952,3 +88952,80 @@ messaggio; piu' il telefono: dichiarato prima del `cancel`, solo
 NOTATO E NON FATTO: l'archivio dello scambio non dice «avevi chiesto di
 annullare»; Tappo non aveva una voce sugli scambi non completati (c'e'
 solo la riga aggiunta qui sull'annullo).
+
+## Chi si ritira dopo il deposito (17 nov 2026 sera, cantiere onchain-ritiro, quarto commit del ramo onchain-rimborso-liscio; Andrea: «Quindi piuttosto si prende la penalità e il rischio di un giudizio negativo, punto.»)
+
+DA DOVE VIENE. Un utente: «quando qualcuno si tira indietro dopo aver
+accettato un ordine e aver fatto bloccare i sats alla controparte
+dovrebbe accollarsi fee ed una piccola penale, altrimenti fa perdere
+tempo e fee a chi vuole scambiare seriamente». Vero: nel 2-di-3 ci sono
+solo i sats di chi vende, che a rinuncia fatta ha pagato due commissioni
+di rete (deposito e rimborso) per niente, e a chi si ritirava non
+succedeva nulla.
+
+LE DUE STRADE, E QUELLA SCELTA. (1) Una CAUZIONE Lightning di chi
+prende (~1%, minimo le due commissioni), data a chi vende se l'altro si
+ritira. (2) Solo reputazione. Alan sulla prima: «come esperienza è
+pessima […] se anche la controparte deve allocare i fondi è una cosa
+lentissima; piuttosto si prende la penalità e il rischio di un giudizio
+negativo». Andrea: la seconda, «punto». La cauzione e' SCARTATA: un
+passo in piu' alla presa, e Barattolo dovrebbe custodirla per giorni
+(24 ore per pagare piu' 48 del bonifico).
+
+LA REGOLA. A chi compra bitcoin si conta uno «scambio non completato»
+(`p2p_esiti`, `mancato`: la reputazione e' UNA, quindi stessa
+tolleranza del primo, stesso marchio da due in 90 giorni, stesso blocco
+sugli ordini con filtro) in due casi, tutti e due fatti che il server
+sa senza chiedere a nessuno:
+- «Rinuncio» firmato da lui a deposito CONFERMATO (`onchain-rinuncia`).
+  E chi aveva depositato puo' lasciargli una recensione: a SENSO UNICO,
+  perche' il danno e' di una parte sola e una recensione di ritorno
+  sarebbe solo una ritorsione.
+- il tempo per pagare finito senza «Ho inviato», poi la disputa, e il
+  moderatore che rimanda i sats a chi li aveva depositati
+  (`onchain-non-pagato`). Senza questo secondo caso la regola punirebbe
+  solo chi rinuncia pulito e risparmierebbe chi sta zitto. La recensione
+  dopo una disputa decisa c'era gia', per tutti e due.
+MAI se chi vende non aveva scritto il recapito (o messo il PayCode):
+non c'era dove pagare, e ritirarsi e' l'unica cosa sensata — e' la
+regola del Lightning, «senza recapito non si conta a nessuno». MAI prima del deposito
+confermato: li' c'e' «✕ Annulla», che non costa niente a nessuno.
+
+SI DICE PRIMA. Il foglio di «↩️ Rinuncio» porta la riga «rinunciare
+adesso ti conta come scambio non completato (il primo è tollerato), e
+chi vende potrà lasciarti una recensione» quando il server dice che
+conterebbe (`rinuncia_conta`). Dopo, il bot gli dice la riga del conto
+del Lightning, e a chi aveva depositato che puo' recensire; la pagina
+dello scambio rimborsato lo dice a tutti e due.
+
+UNA DECISIONE DI IERI ROVESCIATA SAPENDOLO. `_recensibile_onchain_p2p`
+(cantiere convenienza-monete, stamattina) diceva «un rimborso d'accordo
+NON apre la recensione, come l'annullo di la'», e il collaudo lo
+provava. Resta vero per i rimborsi non contati; la rinuncia contata e'
+l'eccezione, e sta in `_riga_recensione_p2p` (che ora sa chi chiede),
+non nel giudice puro, perche' vale per una parte sola.
+
+I LIMITI, DETTI. (a) Conta anche quando i due si sono messi d'accordo
+di annullare: il server non lo sa, il primo e' tollerato, e chi vende
+semplicemente non lascia la recensione. (b) In disputa non c'e' una
+«colpa» scritta dal moderatore come nel Lightning: per questo si conta
+solo il fatto certo (tempo finito, mai «Ho inviato»), e una disputa
+aperta DENTRO il tempo non conta mai a nessuno. (c) Chi vende e non
+libera non ha un «non completato»: li' c'e' la disputa.
+
+PROVATO. `prove_onchain_ritiro` (12: i due casi e i loro contrari, il
+preavviso, la recensione a senso unico sulla riga vera, le cuciture, e
+in node il riquadro e l'avviso del telefono).
+`collaudo_p2p_onchain`, sezione 6 (il giro vero: la rinuncia firmata,
+il «mancato» a lui solo, i due messaggi, la rotta `recensibile` dai due
+lati, la riga dello scambio); la prova che diceva il contrario e'
+riscritta li'. `prove_onchain_come_lightning` segue la firma nuova
+della porta delle recensioni.
+
+DA GUARDARE DAL VIVO: il foglio di «Rinuncio» con la riga in piu' a
+375 px; il riquadro della recensione sulla pagina di uno scambio
+rimborsato, dal lato di chi aveva depositato.
+
+NOTATO E NON FATTO: il moderatore on-chain non ha la spunta della
+«colpa» che ha quello del Lightning; la card in «I miei scambi» di uno
+scambio rimborsato non dice «non completato» (lo dice la pagina).
