@@ -88715,3 +88715,102 @@ c'è in cloud); collaudi della CI nella gabbia, venv senza coincurve,
 ## Le chiavi P2P dalle 12 parole (17 nov 2026, cantiere chiavi-dalle-parole)
 
 Dal campo, Andrea davanti a «🔑 Le chiavi di questo scambio non sono in questo browser»: «Non va bene, ovunque apro barattolo devo avere le stesse chiavi, similmente all'onchain, queste devono essere backuppate su telegram o nostr. E possono anche essere le stesse 12 parole del wallet onchain». LA DIAGNOSI: il profilo ATTUALE era già lo stesso ovunque (Telegram: il seme del server `/api/p2p/seme`; Nostr: la copia NIP-44 sui relay o la nsec). Il buco erano i profili DI PRIMA — nati su un dispositivo, o da un seme che non si rifà più — che vivevano solo nel localStorage dove erano nati: `chiaveScambioDaServerP2P` prova solo il mazzo vivo, e la riga dall'archivio nasceva `soloVista`. LA SCELTA (card a tre, Andrea ha scelto la terza, «sì, per tutti», con le sue parole: «gli ordini attivi rimangono quelli che sono, i prossimi, di utenti nuovi o non, devono usare quelle chiavi. Tanto il profilo barattolo è lo stesso, il profilo mostro chissenefrega»). COSA SI È FATTO: l'identità Mostro nasce dalle 12 parole on-chain sulla strada STANDARD di Mostro, `m/44'/1237'/38383'/0/0` (`skDaParoleP2P`), le trade key da lei come sempre (`chiaveScambio`). Le parole hanno già le loro case e il loro giudice: il render le cerca SENZA farle nascere (`paroleTrovateP2P`: qui, cloud di Telegram, relay), il GESTO passa da `onchainSemeAssicurato`, che sa farle nascere e che, se il wallet esiste altrove e qui non si raggiunge, NON ne fa un secondo: il gesto si ferma con `P2P_SENZA_PAROLE` («incollale dal Profilo»), mai un profilo a caso. `assicuraMazzo` — la porta di pubblicare e prendere — vuole il mazzo col segno `parole: 1` (serializzato e riletto) e altrimenti passa da `gestoDalleParoleP2P`. Il mazzo di prima VA IN PENSIONE: la meccanica del cantiere profilo-unico del 2 nov (PR #29, rimasta sul ramo senza on-chain e mai arrivata su develop) portata qui — `barattolo_mostro_pensione@conto`, `mazzoRigaP2P` per i dieci posti che derivano la trade key di UNA riga (messaggi del coordinatore, chat, moderatore, presenze, «non è tuo»), la porta dei gesti che firma col mazzo della riga TRANNE `take-*` e `new-order`, l'archivio del server che prova anche i pensionati, la restore che li chiede (`conPensioneP2P`), il «dimentica» che li scorda. Il giudice: un seme di RIPIEGO (le parole non raggiunte in silenzio) non scalza un mazzo delle parole; verso le parole un mazzo con una storia va in pensione, verso il seme di ieri resta la regola di ieri ('tenuto'). Il cloud di Telegram che porta il profilo di prima NON si sovrascrive: è la copia che porta la pensione a un secondo dispositivo Telegram (che lo adotta, lo giudica e lo pensiona a sua volta), e il foglio lo dice (`mazzoNuvola` 'pensione'). L'ECCEZIONE resta la strada sovrana (`origine 'mia'`, la chiave messa dall'utente). STRADE SCARTATE: il «portachiavi» cifrato con tutti i profili di prima (la mia prima proposta) — Andrea non lo vuole, gli scambi aperti si finiscono da dove sono; tenere il profilo di oggi e derivare dalle parole solo i nuovi utenti — bocciata dalla scelta. IL PREZZO, detto: la reputazione sul coordinatore riparte (quella di Barattolo è dell'account); e Barattolo NON sa più rifare il profilo di chi entra da Telegram — il patto sui dati dice ancora «il tuo profilo di scambio lo ricava il server» (frase di Andrea, parola per parola, sorvegliata in `prove.py`): per gli scambi nuovi non è più vero nel verso buono, e la frase nuova la decide lui. PROVATO: `prove_chiavi_dalle_parole` (27, coi due bundle veri: la strada di Mostro rifatta a mano, stabilità e forma, il render che non fa nascere e il gesto che sì, la nuvola, il wallet altrove detto e non inventato, la pensione per conto, il mazzo di una riga per derivazione e per restore; mutazione su `mazzoRigaP2P` uccisa), le prove P2P e la suite intera nel worktree. NON PROVATO DAL VIVO: il giro vero con un profilo vecchio con uno scambio aperto e il passaggio sul telefono e sul Desktop. RESTA: la frase del patto sui dati; il backup obbligatorio delle parole prima del primo gesto P2P (oggi la nascita le mette al sicuro fail-open, come l'on-chain fuori dalla cassa).
+
+## Il rimborso on-chain che non si incaglia (17 nov 2026, cantiere onchain-rimborso-liscio; Andrea: «Ok, sì, vai, correggi tutto»)
+
+DA DOVE VIENE. Un utente all'assistenza (scambio on-chain #13, contanti):
+ha preso un ordine, chi vendeva ha depositato, lui ha toccato «Rinuncio».
+L'app gli ha chiesto «la chiave» (il wallet era nato su un altro
+telefono: ha ricaricato le 12 parole dal Profilo), e poi ha detto «chi ha
+messo i sats non ha ancora scelto dove riceverli: il rimborso aspetta il
+suo wallet». Chi vendeva non sapeva di dover fare niente, il posto dove
+scriverlo era solo nel Profilo, e nel provarci ha cambiato due volte il
+recapito degli EURO (gli avvisi «🔁 ha cambiato il recapito DOPO il
+deposito» ai moderatori). Parole dell'utente: «Mi appare un po'
+macchinosa la procedura». Nessun sats a rischio: è la regola del 10 nov
+(«Il rimborso di chi mette i sats aspetta il suo wallet») che lavorava
+come deve, ma senza una strada per arrivarci.
+
+COSA SI È DECISO. La regola NON cambia: un rimborso vuoto non è mai
+un'uscita permessa, e i sats non tornano mai su un seme di Barattolo.
+Cambia come ci si arriva, in tre pezzi (le tre voci che Andrea ha
+approvato; la quarta, «✕ Annulla» prima del deposito, l'aveva già fatta
+il cantiere onchain-controparte, 2438e21e):
+1. DOVE TORNANO I SATS, CHIESTO PRIMA. A chi deposita senza un wallet
+   suo il foglio «🔒 Blocca i sats» chiede un indirizzo PRIMA del QR; a
+   deposito già fatto lo stesso riquadro sta nella pagina dello scambio
+   («Dove tornano i sats?»). È il gemello dell'indirizzo al volo di chi
+   compra (30 ott, parola di Andrea: «se manca si inserisce l'indirizzo
+   al volo con lo stesso controllo che c'è ora»): stesso giudice, stessa
+   firma del seme, vale per lo scambio, il Profilo non si tocca. Rotta
+   nuova `POST /api/p2p/onchain/{oid}/rimborso`.
+2. «RINUNCIO» NON È PIÙ UN ERRORE. Senza quell'indirizzo la rinuncia si
+   REGISTRA (`…/rinuncia-chiesta`, colonna `rinuncia_chiesta_il`) e il
+   bot lo dice a chi ha depositato, col bottone dello scambio: «Chi
+   compra vuole rinunciare […] manca una cosa sola: dove mandarteli».
+   Quando l'indirizzo arriva (dallo scambio o dal Profilo) chi compra
+   legge «Ora puoi rinunciare» e tocca di nuovo «Rinuncio». Un riavviso
+   all'ora al massimo.
+3. LA CHIAVE CHIESTA LÌ. «Rinuncio», «Libera» e la seconda firma, se la
+   chiave dello scambio non è sul dispositivo, prima la cercano dov'è
+   già (cloud di Telegram, relay) e poi aprono il foglio «🔑 Serve la
+   chiave del tuo wallet» con le 12 parole da incollare; incollate
+   quelle giuste, il gesto riparte da solo. Prima era il toast «su
+   questo dispositivo non c'è la tua chiave», e basta.
+In più, perché ci si inciampava nello stesso punto: chi LIBERA senza un
+posto per il resto non è più mandato al Profilo ma al riquadro dello
+scambio; in disputa, quando l'indirizzo arriva, i moderatori lo sanno
+(senza non potevano rimborsare).
+
+LE STRADE SCARTATE.
+- LA RINUNCIA CHE SI FIRMA DA SOLA quando l'indirizzo arriva (come il
+  rilascio confermato, `rilascioDaFirmareOnchainP2P`). No: quel
+  rilascio parte da una conferma FIRMATA dal seme di chi libera, che il
+  telefono rilegge. Qui la rinuncia sarebbe solo una riga del server, e
+  un telefono che firma un rimborso sulla parola del server firmerebbe
+  anche dopo aver mandato gli euro. Farla bene vuol dire una rinuncia
+  firmata dal seme: un altro cantiere, e un tocco in più («Ora puoi
+  rinunciare») costa poco.
+- IL RIMBORSO AL SEME DI BARATTOLO come ripiego (`/1/n`): è quel che il
+  10 nov ha tolto, per decisione di Andrea.
+- BLOCCARE IL DEPOSITO SUL SERVER finché manca l'indirizzo: il deposito
+  è un pagamento in rete verso un indirizzo, il server non lo ferma. Il
+  cancello è nel foglio (il QR non si vede), e chi deposita lo stesso
+  trova il riquadro nella pagina.
+- LA CHIAVE DEL CONTO (xpub) NEL RIQUADRO: resta una scelta del Profilo,
+  come per chi compra (30 ott).
+- CERCARE LA CHIAVE CON `onchainSemeAssicurato` e basta: in fondo alla
+  sua strada fa NASCERE un wallet nuovo. `onchainCercaSemeP2P` la chiama
+  solo se il server dice che un wallet c'è già (là si ferma con
+  «altrove» prima della nascita); server muto o nessun wallet
+  registrato = decide il foglio.
+
+LE LEZIONI.
+- Una regola giusta senza una strada per rispettarla si legge come un
+  guasto: il 10 nov aveva scritto il «no» e non il «come».
+- Due riquadri con un campo e «Salva» nella stessa pagina (il recapito
+  degli euro e l'indirizzo dei sats) si scambiano: il nuovo dice nel
+  titolo cosa torna («Dove tornano i sats?») e Tappo sa la differenza.
+- Il libro di Tappo aveva ancora «la chat […] per ora non c'è» nella
+  voce della card dell'altra parte, due righe sopra la voce della chat:
+  due cantieri dello stesso giorno, una fusione che le tiene tutte e
+  due. Tolta qui.
+
+PROVATO. `prove_onchain_rimborso_liscio` (28: i fili del server, il
+giudice estratto, e il telefono in node: il foglio del deposito con e
+senza indirizzo, la pagina, «Rinuncio» registrato / rifiutato / pronto,
+la chiave trovata, il foglio delle parole con parole storte, di un altro
+wallet e giuste, l'annullo, il server muto, chi libera, la seconda
+firma). `collaudo_p2p_onchain`, sezione 11-sexies (22: il giro vero con
+firme e PSBT, il rimborso che torna all'indirizzo scritto lì, il
+Profilo che sblocca, il riavviso dopo un'ora, la disputa).
+
+DA GUARDARE DAL VIVO: il foglio «🔒 Blocca i sats» senza wallet a
+375 px (campo, esito del controllo, tasto), il foglio delle 12 parole, e
+uno scambio vero in cui chi compra rinuncia prima che chi vende abbia
+scritto l'indirizzo.
+
+NOTATO E NON FATTO: lo stesso toast «su questo dispositivo non c'è la
+tua chiave» resta nell'on-chain del MERCATINO (ordini, cassa, swap) e
+nell'indirizzo al volo di chi compra; la pagina del moderatore non dice
+che a un rimborso manca l'indirizzo finché non prova a decidere.

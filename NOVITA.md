@@ -506,3 +506,9 @@ frase: Le chiavi degli scambi P2P adesso nascono dalle 12 parole del tuo wallet 
 dove: lo scambio P2P (pubblicare o prendere un ordine); il foglio «Il tuo profilo di scambio» lo dice; se su un dispositivo le parole non ci sono, il primo gesto chiede di incollarle da Profilo → «Wallet e incassi».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-17 · onchain-rimborso-liscio
+frase: Rinunciare a uno scambio P2P on-chain è più semplice. Chi vende bitcoin scrive dove riavere i sats nel foglio stesso, prima di bloccarli. Se quell'indirizzo manca, il «Rinuncio» di chi compra non dà più errore: viene registrato e il bot avvisa chi vende col tasto che apre lo scambio. E se firmi da un dispositivo dove la chiave del wallet non c'è, Barattolo la cerca da solo o ti chiede lì le 12 parole.
+dove: P2P on-chain: il foglio «🔒 Blocca i sats» col riquadro «Dove tornano i sats?»; la pagina dello scambio, tasto «↩️ Rinuncio: rimborsa chi vende»; il foglio «🔑 Serve la chiave del tuo wallet»; i messaggi del bot «Chi compra vuole rinunciare» e «Ora puoi rinunciare».
+leva: nessuna
+pubblico: no
