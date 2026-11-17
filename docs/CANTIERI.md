@@ -88972,3 +88972,97 @@ appuntamento, parole), il terzo (scelta del metodo alla presa e cauzione
 Lightning tenuta da Barattolo, collaudo prima). NOTATO E NON FATTO: la
 mappa del contanti conta solo gli ordini Lightning; `_zona_ultima_p2p`
 (la zona proposta nel campo) guarda solo gli ordini Lightning.
+
+## Il contanti di persona on-chain come su Lightning, secondo pezzo: la pagina dello scambio, «📍 Sono qui» e l'appuntamento (17 nov 2026 sera, cantiere onchain-contanti; Andrea: «Dovrebbe funzionare esattamente come Lightning anche l'on-chain contanti», «Anche la questione QR, tutto quanto»)
+
+COSA MANCAVA. Dopo il primo pezzo la card aveva il luogo, ma lo scambio
+on-chain in contanti si svolgeva con le parole del bonifico: «manda gli
+euro», «Dove vuoi gli euro (IBAN, nome Revolut…)», «controlla il tuo
+conto», «Euro inviati». Niente appuntamento, niente «📍 Sono qui»,
+niente regola dell'incontro, niente da guardare per il moderatore.
+
+LA SCELTA DI FONDO: NON UNA SECONDA COPIA. Il contanti di Lightning ha
+due tabelle (`p2p_sono_qui`, `p2p_appuntamenti`), una scopa della
+privacy, due righe per le parti, un confronto per il moderatore, frasi
+tenute uguali da prove. L'on-chain usa QUELLE: stesse tabelle, stessi
+giudici, stesse frasi e stesse funzioni del telefono. La strada scartata
+era una coppia di tabelle sue (`p2p_onchain_sono_qui`…): avrebbe voluto
+la sua scopa, la sua riga nella cancellazione dell'account, il suo
+confronto, e alla prima modifica del Lightning i due si sarebbero
+separati di nuovo, che è il difetto da cui nasce questo cantiere.
+COSA CAMBIA DAVVERO fra le due reti è una cosa sola: nel Lightning le
+due parti le conosce solo il coordinatore, quindi la presenza è una nota
+FIRMATA con la chiave usa-e-getta dello scambio; on-chain l'ordine è
+nostro e la sessione dice chi sei, quindi niente nota: `chiave` e
+`prova` restano vuote, `caricata_da` è chi ha premuto, e il LATO lo dice
+il ruolo (chi ha depositato i sats «vende», chi li riceve «compra»).
+L'`ordine` nelle due tabelle è il nome pubblico `bar-onchain-…`: nel
+libro di Mostro non può esistere, e la rotta del Lightning su quel nome
+non trova le due chiavi e dice di no. Il giro è 0: una riga on-chain ha
+una vita sola (dopo la presa non torna nel libro; verificato cercando
+ogni `stato='pending'` scritto).
+
+COSA C'È ADESSO, come nel Lightning:
+- LE PAROLE. Con «Contanti» come solo metodo (`_p2p_onchain_contanti`,
+  l'unico giudice; il telefono legge `contanti` dalla scheda): «Quando
+  vi vedete, consegna X € in contanti e dillo qui», il bottone «💵 Ho
+  consegnato i contanti» con la conferma che porta la regola intera (e,
+  senza «Sono qui», lo dice prima), lo stato e il passo «Contanti
+  consegnati», gli avvisi del bot al deposito («Ora vi vedete»), alla
+  consegna («dice di averti consegnato … in contanti. Contali davanti a
+  lui») e al recapito («ha scritto dove vedervi»). Il gesto sul server
+  resta `euro-inviati`: cambiano solo le parole.
+- L'APPUNTAMENTO «📍 Dove vedervi». Lo scrive chi vende dalla pagina
+  dello scambio, in un foglio suo (`p2pOcAppSheet`) coi campi della
+  forma «contanti» del foglio dei recapiti di Lightning: il luogo coi
+  suggerimenti degli indirizzi, «📍 Usa la mia posizione», giorno e ora.
+  Viaggia come nel Lightning: TESTO COMPOSTO nel recapito dello scambio
+  (`testoAppuntamentoP2P`), e accanto, nella stessa richiesta
+  (`appuntamento: {ora, geo}`), l'ora e il punto che servono al
+  confronto — una versione per cambio in `p2p_appuntamenti`. Tutti e due
+  lo vedono in un riquadro con «🧭 Apri nel navigatore»; chi vende ha
+  «Cambia» finché i contanti non sono detti consegnati. Nel foglio
+  «Pubblica» col solo «Contanti» il campo «Dove vuoi gli euro» non c'è
+  più (c'è la zona): l'appuntamento si fissa con chi ha preso.
+- «📍 SONO QUI». Coi sats nel 2-di-3 (stati `depositato` e
+  `euro_inviati`) ognuno segna la sua presenza, fino a 5 volte; il
+  telefono manda la posizione se la dà, il server scrive la SUA ora e
+  calcola all'arrivo la distanza dal luogo e dalle presenze dell'altro.
+  Ognuno vede la sua riga e dell'altro SOLO l'ora, mai una posizione.
+  La pagina aperta chiede ogni 20 secondi se l'altro è arrivato e si
+  ridisegna solo se è cambiato qualcosa (un motivo di disputa che si sta
+  scrivendo non si perde).
+- IL MODERATORE in disputa legge il confronto (`_confronto_giro_p2p`,
+  lo stesso) con le parole della card di Lightning e la regola del caso.
+  Senza la riga «le firme sono verificate»: qui non ci sono firme, e
+  dirlo sarebbe falso.
+- LA PRIVACY. Le posizioni e il punto dell'appuntamento si scordano a
+  scambio chiuso (`_p2p_onchain_scorda_incontri`, chiamata dalla scopa
+  di tutti i giorni: gli stati finali dell'on-chain nascono in troppi
+  posti per un gancio a testa) e comunque dopo i 15 giorni di sempre;
+  in disputa restano, perché il moderatore deve guardare. La
+  cancellazione dell'account toglie le righe come per il Lightning
+  (`caricata_da` era già nell'elenco), e svuota il recapito come prima.
+
+I LIMITI, detti. (1) È «in contanti» solo lo scambio il cui UNICO metodo
+è «Contanti»: con più metodi on-chain oggi non si sceglie alla presa, e
+la scelta arriva col terzo pezzo. (2) Il testo dell'appuntamento sta nel
+recapito dello scambio, che resta con la riga come un IBAN (non si
+scorda a scambio chiuso; le sue coordinate nelle due tabelle sì). (3)
+Gli scambi in contanti nati prima, con un recapito scritto a mano, lo
+mostrano com'è, senza navigatore.
+
+PROVATO: `prove_onchain_contanti_scambio` (25: i giudici su un database
+in memoria — ruoli, stati, versioni, tetto dei 5 tocchi, la posizione
+che non esce all'altro, le posizioni scordate a scambio chiuso e non in
+disputa — e in node i riquadri veri dai due lati, l'appuntamento, il
+moderatore), `collaudo_p2p_onchain` sezione 11-octies (il giro intero:
+presa, appuntamento, deposito, presenze dei due, sesto tocco, consegna,
+disputa, confronto del moderatore, scopa), `prove_sintassi_client`.
+NON PROVATO DAL VIVO: il GPS e i suggerimenti degli indirizzi dentro il
+foglio nuovo su un telefono vero (sono le funzioni del Lightning, ma il
+foglio è nuovo): è la prima cosa da guardare sul collaudo.
+
+RESTA il terzo pezzo: la scelta del metodo alla presa e la cauzione in
+Lightning col QR tenuta da Barattolo, da provare sul collaudo prima
+della produzione.
