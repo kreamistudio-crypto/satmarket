@@ -88160,3 +88160,213 @@ proxy. Tutto girato in cloud sull'albero riallineato a develop 9537d26
 RESTA DA GUARDARE. I pezzi della mappa da Flow; le missioni vere dal
 gioco; gli amici da Nostr; il menù per livello (aspetta Andrea); il link
 di Villaggio Bitcoin nel config del VPS se accettano.
+
+
+## La Caccia a Tappo: il gioco dentro Barattolo (17 nov 2026, cantiere caccia-a-tappo; Andrea: «un gioco di barattolo con dentro Tappo... l'utente giocando ne trae vantaggio», sulla scheda «Solo Caccia a Tappo», e poi a voce: «graficamente bellissimo, fluido», «anche nella web app... anche nel browser», «bello complesso... deve durare anche tra vent'anni... sfide difficili, progressive», «una mappa originale... un inventario»)
+
+IL GIOCO. Ogni giorno Tappo scappa dal barattolo e si nasconde in un
+annuncio VERO della vetrina, diverso per ogni persona. Dal Profilo,
+«Livello e inviti» → «🔩 Caccia a Tappo», si apre la DISPENSA DI TAPPO:
+sei scaffali e ventinove barattoli, uno per categoria
+(`GIOCO_TAPPO_SCAFFALI`). Si sceglie lo scaffale e il grado, si leggono
+gli indizi e si va a cercare:
+in ogni scheda c'è «Tappo è qui?», e il server risponde sì o no. Le
+occhiate del giorno sono contate; a mezzanotte, ora italiana, si
+ricomincia. Chi lo trova prende i BULLONI 🔩 e accende il barattolo di
+quella categoria (bronzo, argento a 5, oro a 20).
+
+QUEL CHE LO FA DURARE (il «vent'anni» di Andrea). I SEI GRADI, da
+Curioso a Leggenda (`GIOCO_TAPPO_GRADI`): gli indizi si fanno vaghi (tre
+barattoli invece di uno, la fascia di prezzo larga, l'anagramma al posto
+della parola), le occhiate calano da 12 a 8, dal quarto sparisce il
+«fuochino» e la caccia diventa una PISTA A TAPPE (lo trovi e ha lasciato
+un biglietto: 2 tappe, 3 alla Leggenda). Un grado si apre trovando Tappo
+5, 10, 15, 20, 30 volte a quello prima. LE SFIDE: otto famiglie a soglie
+crescenti, 51 in tutto (`GIOCO_TAPPO_SFIDE`), fino ai 7.300 ritrovamenti;
+si pagano da sole quando la soglia è passata. LO ZAINO: tre attrezzi che
+si consumano (torcia +3 occhiate, lampadina un indizio senza calo,
+calamita il fuochino dove non c'è) e quel che resta (sette cappellini,
+tre sfondi del palco, il titolo «🔩 Amico di Tappo», +5 posti nel
+barattolo dei preferiti, la coppa). Chi arriva trova un attrezzo per
+tipo già nello zaino (`_tappo_corredo`).
+
+I BULLONI NON SONO SATS E NON SONO XP. Non sats: non si comprano, non si
+passano, non si incassano, nessuno paga per giocare; un premio in denaro
+qui è una decisione di Andrea e del legale (azzardo, concorso a premi),
+mai un ritocco. Non XP: la regola dell'ago 2026 («GLI XP» sono il
+commercio, e nessuna azione ripetibile a costo zero ne dà) vale anche
+qui, e la prima proposta dello studio, «+5 XP al giorno», è stata
+ritirata per questo. Il blocco non tocca `xp_eventi`, i livelli né la
+classifica: lo guardano una prova e il collaudo.
+
+A CHI SERVE: AI VENDITORI. Chi caccia apre schede vere. Per questo il
+nascondiglio si pesca in due passi, prima il VENDITORE e poi un suo
+annuncio (`_tappo_pesca`): pescando fra gli annunci, un negozio da
+duecento articoli ospiterebbe Tappo duecento volte più di chi ne ha uno.
+Per questo è diverso per ognuno (niente «sta lì» scritto in chat). E il
+venditore lo viene a sapere: un avviso ANONIMO («qualcuno ha trovato
+Tappo nel tuo annuncio»), al più uno ogni 3 giorni.
+
+CONTRO I FURBI. Il nascondiglio non esce mai dal server prima di essere
+trovato: gli indizi si scrivono lì, la risposta a un'occhiata è un sì o
+un no (al più il calore). Tetto del giorno e freno dell'ora
+(`tappo_guarda` 60/h, `tappo_oggetto` 40/h); il proprio annuncio non
+ospita Tappo e non si guarda. Grado, premio, sfide e saldo si contano
+sul database: dal client arrivano solo nomi, mai una cifra. Il saldo non
+è una colonna: è cacce + sfide − spese, ricontato a ogni lettura. Più
+account non rendono niente: i bulloni non si passano (e la fusione di
+due account somma gli attrezzi e tiene una riga sola per giorno).
+
+DOVE STA. Server: il blocco in fondo a `server.py` («LA CACCIA A
+TAPPO»), quattro tabelle (`gioco_tappo`, una riga per persona e per
+giorno; `gioco_tappo_oggetti`, `_attrezzi`, `_sfide`), due colonne in
+`utenti` (`tappo_oggetto`, `tappo_palco`: il cappellino e lo sfondo
+indossati), sei rotte sotto `/api/gioco/tappo`, la leva
+`GIOCO_TAPPO_ATTIVO` (accesa di serie; spenta, 404 e la voce sparisce,
+quel che uno ha preso resta). Client: la vista `#view-caccia` in
+`miniapp.html`, un mondo a parte coi suoi colori (`--c-*`), quattro
+schede (Oggi, Sfide, Zaino, Bottega), due colonne da 900px in su; le
+animazioni toccano solo `transform` e `opacity` e si fermano con
+«riduci movimento». Tappo è `/assets/caccia-tappo.webp`, l'ufficiale
+scontornato. Funziona uguale in Mini App, web app e browser: è una vista
+della stessa pagina, senza niente di Telegram dentro.
+
+STRADE SCARTATE. Premi in sats, anche piccoli (azzardo, e un rubinetto
+da mungere con più account). XP dal gioco (sopra). Un nascondiglio
+uguale per tutti (basta uno che lo scrive in chat). Un gioco d'azione
+in canvas: bello un mese, e non porta nessuno sugli annunci. Copiare un
+gioco esistente con Craft Anything: Andrea l'aveva offerto, il gioco è
+originale e resta così. Le altre quattro idee dello studio («Quanti
+sats?», «La lista di Tappo», «Il barattolone», «Bullone d'oro») restano
+nel cassetto: la scelta è stata «Solo Caccia a Tappo».
+
+CON LA STRADINA DEI LIVELLI (cantiere a parte, la pagina dei livelli a
+carosello): i nomi sono concordati. Il cappellino che Tappo porta sta in
+`utenti.tappo_oggetto`, `/api/me` dà `gioco_tappo` e `tappo_caccia`; la
+tappa «Gioca con Tappo» della stradina non dà XP.
+
+PROVATO. `prove_caccia_a_tappo` (85): i giudici puri (pesca in due
+passi, indizi per grado, premio e calo, occhiate, calore, metalli,
+gradi aperti, soglie delle sfide), ogni categoria su uno scaffale e uno
+solo, il nascondiglio che non esce dal payload prima del ritrovamento,
+niente XP, la leva, l'asset, e sotto node il client (le quattro schede,
+il tasto nella scheda dell'annuncio, i testi che arrivano dal server
+passati da `esc`, `__proto__` come calore). `collaudo_caccia_a_tappo`
+(70) sul server vero: leva spenta 404, dispensa, parti, occhiate e
+calore, indizi e attrezzi, trovato con sfide e avviso anonimo, bottega,
+gradi e pista a tappe, niente XP, il nascondiglio sparito che si ripara,
+la mezzanotte, il freno. Guardato dal vivo su telefono (390x844) e su
+schermo grande (1366x900), relay morti, zero errori di pagina: le
+schermate sono andate ad Andrea prima del push.
+
+CONTROPROVE: sei mutazioni, sei rosse (il premio senza calo, il
+nascondiglio che esce prima del ritrovamento, la pesca fra gli annunci
+invece che fra i venditori, il calore senza `hasOwnProperty`,
+l'occhiata nel proprio annuncio, la leva spenta che non spegne): le
+prime quattro le ferma la sezione, le prime due e le ultime due il
+collaudo.
+
+I CENSIMENTI CHE IL PRIMO GIRO HA FATTO ARROSSIRE, e cosa hanno
+insegnato. Il 🎓 è SOLO il reparto «Lezioni e corsi»: il cappellino
+«tocco» è diventato le cuffie 🎧. Gli effetti ridotti hanno UNA regola
+di casa (`html.fx-ridotti`): il gioco non scrive un suo blocco con
+`!important`, non sfoca (la barra appiccicata ha il fondo pieno), ogni
+animazione parte dallo stato fermo giusto e i coriandoli, coi movimenti
+ridotti, non nascono (`cacciaFestaHTML(d, fermo)`); la scorsa chiede a
+`tourRidotto()`. L'altezza in `vh` si divide per `var(--fs-zoom,1)`. Il
+tetto del barattolo adesso è di QUELLA persona (`max_barattolo_di`, la
+leva più i posti del gioco): ritoccate le due prove che leggevano
+`MAX_PREFERITI` nella porta e il banco che la monta da sola. I due
+freni nuovi sono nel censimento dei numeri concordati.
+
+GIRATO, sull'albero di origin/develop 868f797e più questo cantiere:
+`PROVE_SEVERE=1 python prove.py` 29211 passate e 2 fallite, tutte e due
+su carta (la frase di NOVITA oltre i 400 caratteri, e `conoscenza.md`
+da rigenerare): corrette e rigirate le due sezioni, verdi, senza toccare
+codice; `collaudi_ci.py --elenco ci/collaudi.txt` in un venv senza
+coincurve, 145 verdi e 0 rossi (nostr-tools 2.25.2 fuori dal repo, come
+sul PC).
+
+DA GUARDARE. Dal vivo sul collaudo: una caccia intera dal telefono
+dentro Telegram (parti, occhiate, trovato, bottega), l'avviso del bot
+al venditore, il cappellino indossato. I numeri (premi, prezzi, soglie)
+sono una prima taratura: si ritoccano nei cataloghi, senza migrazioni.
+Proposta aperta con Andrea, NON costruita: le «Ere» a ogni halving. Se
+un giorno si vuole un premio in sats, prima il legale.
+
+## Il Mondo di Tappo e le missioni su Bitcoin (17 nov 2026, stesso cantiere caccia-a-tappo; Andrea: «voglio che sia più figo possibile in assoluto», sulla scheda «Mondo dipinto con Flow», sull'evidenza «Solo dentro il gioco», su gioco e tabellone «Sì, tutti e due»; dal thread della stradina: «ogni tanto nel tabellone devi giocare con Tappo per proseguire... missioni originali, educative su Bitcoin, simpatiche, emozionanti», e sullo studio «lo studio delle missioni mi va bene»)
+
+IL ROVESCIO, SAPENDOLO. La voce di sopra scartava «un gioco d'azione in
+canvas: bello un mese, e non porta nessuno sugli annunci». Andrea l'ha
+chiesto lui il giorno stesso («una mappa originale», poi «più figo
+possibile»), e il mondo è costruito PER portare sugli annunci: i
+barattoli del mondo aprono le categorie vere, il palco mostra annunci
+veri, il Banco del cambio apre il P2P. Il gioco di prima resta tutto
+(scheda «Caccia»): il mondo è una scheda in più, la prima.
+
+IL MONDO. Sei zone, una per scaffale, impilate come una dispensa:
+Tappo cammina (tocco, dito trascinato, frecce o WASD), passa da una
+zona all'altra sui ponticelli, raccoglie i bulloni sparsi (dieci posti
+per zona, il server dice solo «zona 2, posto 7» e paga una volta
+sola: `/raccogli`), apre i barattoli, legge il cartello (la caccia del
+giorno), entra in bottega. Le zone si aprono coi ritrovamenti
+(`_tappo_zone_aperte`). Il Banco del cambio, nella prima zona, apre gli
+scambi P2P e ha le sue sfide da Cambiavalute.
+
+LA GRAFICA: IL 3D BOCCIATO. La prima versione era un mondo WebGL in 3D
+disegnato dal codice; Andrea, visto il video: «la grafica è orrenda...
+fa pietà». La strada scelta sulla scheda è il MONDO DIPINTO: sei scene
+illustrate con Google Flow (una per zona, vista dall'alto a 50 gradi,
+nessuna scritta né personaggio) e quattro oggetti scontornati
+(barattolo, bullone, bancarella, chiosco), serviti da
+`/assets/mondo/{nome}` con la whitelist `MONDO_ASSET`. Il motore è 2D
+(canvas): la scena è una PIANTA per zona (`MONDO_PIANTA`, i ritocchi del
+singolo dipinto in `MONDO_PIANTE`) con il pavimento come poligono, i
+posti, i luoghi e gli ostacoli; la profondità è finta (più piccolo in
+fondo). Senza i dipinti la zona si disegna da sola, così il gioco
+funziona anche su un server che non li ha. Scartati: rifare il 3D
+meglio (il problema era il disegno, non la tecnica); Anycraft/Craft
+Anything per «copiare il meccanismo» di un gioco (crea un'app a parte, e
+copiare un gioco esistente non si fa: regola di casa).
+
+L'EVIDENZA COI BULLONI, SOLO NEL GIOCO. Un venditore spende 40 bulloni
+e il suo annuncio sta un giorno sul palco della sua zona (al più 3 per
+zona, uno al giorno a testa, uno al giorno per annuncio, solo annunci
+in vetrina: uno venduto scende da solo). Andrea ha scelto «Solo dentro
+il gioco»: niente posto in Esplora, che resta della vetrina vera.
+
+LE MISSIONI (lo studio approvato, Claude Doc «Studio: le missioni di
+Tappo su Bitcoin»). Cinque al lancio, nelle zone del tabellone dei
+livelli: il quaderno di tutti (registro condiviso e doppia spesa), il
+barattolo col lucchetto (deposito di garanzia), la staffetta del
+fulmine (canali e liquidità di Lightning), le dodici parole (la frase di
+recupero, la custodia, la truffa dell'«assistenza»), l'ultimo bullone
+(il dimezzamento e i 21 milioni). Ognuna in tre tempi: il guaio (due
+fumetti), il gioco (la cosa si impara facendola, mai un quiz), il succo
+(una frase col nome vero). Stelle da 1 a 3 dagli errori; una basta per
+passare il gradino del tabellone. I guastafeste dello studio (la Gazza,
+il Tarlo, il signor Fidati) parlano con un'emoji finché non hanno un
+disegno. Niente dati veri: le parole e i conti sono finti, e Tappo lo
+dice.
+
+CONTRO I FURBI, NELLE MISSIONI. Il gioco lo fa il client, quindi il
+server paga solo la PRIMA volta (bulloni del catalogo, mai dal client),
+tiene le stelle migliori, e una fine vale solo dopo
+`GIOCO_TAPPO_MISSIONE_SECONDI` (30) dalla partenza segnata da lui:
+`/missione {azione: inizia|finisci, stelle}`, freno `tappo_oggetto`.
+Rigiocare per le tre stelle non paga di nuovo.
+
+IL PATTO CON LA STRADINA (il tabellone dei livelli, cantiere a parte).
+Il server espone `MISSIONI_TAPPO` (id, emoji, nome, zona del tabellone
+0-7: le cinque stanno su 0, 1, 3, 5 e 7, l'halving del 2028 per ultimo) e
+`missioni_superate(con, tg_id)` (fail-open al vuoto); il client
+`apriMissione(id)`, che apre un foglio a tutto schermo sul body (si
+apre anche fuori dal gioco), e a missione finita l'evento
+`tappo:missione` {id, stelle}. Una missione non superata è un cancello
+del tabellone, mai un premio in XP: caselle e missioni SENZA XP
+(decisione di Andrea). Nel gioco le missioni stanno in cima alla scheda
+«Sfide», con le stelle.
+
+DA GUARDARE. I dipinti di Flow (in coda dopo la mappa del tabellone):
+quando arrivano, la pianta di ogni zona si prende guardando il dipinto.
+Le «Ere» a ogni halving (approvate, non ancora costruite).
