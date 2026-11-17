@@ -20373,10 +20373,18 @@ def prove_barattolo():
     coda = _SORGENTE[i:i + 200]
     prova("il tetto nasce a 10", True, "MAX_PREFERITI = 10" in coda)
     tp = pezzo("toggle_preferito")
+    # (17 nov 2026, cantiere caccia-a-tappo) il tetto e' di QUELLA
+    # persona: la leva piu' i posti presi coi bulloni del gioco. Il
+    # giudice e' `max_barattolo_di`, letto UNA volta subito prima del
+    # conteggio: il numero del 400 e quello del confronto sono lo stesso.
     prova("il 400 del pieno dice il numero", True,
-          "{MAX_PREFERITI}" in tp)
+          "{_tetto}" in tp)
     prova("il tetto si legge senza await in mezzo", True,
-          "_conta_barattolo(con, user[\"id\"]) >= MAX_PREFERITI" in tp)
+          "_tetto = max_barattolo_di(con, user[\"id\"])\n"
+          "        if _conta_barattolo(con, user[\"id\"]) >= _tetto" in tp)
+    prova("...e senza i posti del gioco resta la leva, da sola", True,
+          "return int(MAX_PREFERITI) + (int(GIOCO_TAPPO_POSTI) if presi "
+          "else 0)" in pezzo("max_barattolo_di"))
     prova("la risposta porta il conteggio pubblico", True,
           '"barattoli": barattoli' in tp)
 
@@ -20555,6 +20563,9 @@ def prove_savers_proprietario():
                # sezione: qui la riga nasce come ieri
                "AVVISI_BARATTOLO_ATTIVI": False,
                "AVVISI_BARATTOLO_TIPI": ("prezzo", "lampo", "ultimo", "rientro"),
+               # (17 nov 2026) il tetto di quella persona: qui la leva e
+               # basta, il banco prova la porta e non i posti del gioco
+               "max_barattolo_di": lambda _con, _tg: 10,
                "accoda_colpo": lambda a: colpi.append(a),
                "time": type("t", (), {"time": staticmethod(lambda: 1)}),
                "app": type("a", (), {"post": lambda *a, **k:
@@ -124082,8 +124093,9 @@ def prove_profilo_elegante():
         "grpCompri": ["accPreferiti", "accRicerche", "accPuntiRitiro"],
         "grpIncassi": ["accLnAddress", "accComeRicevi", "accOnchainIncasso", "accNwc"],
         # (14 nov 2026) le recensioni ricevute, prima del livello
-        # (17 nov 2026) ...e la porta della stradina degli obiettivi
-        "grpLivello": ["accRecensioni", "accLivello", "accInviti", "accDistintivi", "vocStradina"],
+        # (17 nov 2026) ...e la porta della stradina degli obiettivi, poi quella
+        # della Caccia a Tappo
+        "grpLivello": ["accRecensioni", "accLivello", "accInviti", "accDistintivi", "vocStradina", "vocCaccia"],
         # (17 nov 2026) «Avvisi e aspetto» e «Privacy» sono una sola
         # «Impostazioni», con dentro anche l'export dei dati
         "grpImpostazioni": ["accAvvisi", "accAspetto", "accIdentita", "vocPrivacy",
@@ -134413,8 +134425,11 @@ def prove_dati_spedizione_copia():
     # (5 ott 2026) i francobolli di «Controlla e paga» e la loro
     # sbirciata: FOTO, non dati — il tocco lungo li' apre la foto in
     # grande (prove_sbirciata), e un menu «Salva immagine» lo coprirebbe
+    # (17 nov 2026) la tela del Mondo di Tappo: un gioco che si guida col
+    # dito trascinato, senza un testo dentro — una selezione lì
+    # coprirebbe la guida a ogni tocco lungo
     prova("user-select:none solo su bottoni, stelle, foto e card: mai sopra un dato",
-          ["#sbirciata img", ".cat-cella", ".ctrl-mini", ".fb-stelle",
+          ["#sbirciata img", ".caccia-tela-box", ".cat-cella", ".ctrl-mini", ".fb-stelle",
            ".lb-slide img", ".p2p-recapito-copia",
            ".qta-mini .qm-btn"], censo(r"user-select\s*:\s*none"))
     prova("...il richiamo del tocco lungo spento solo sulla card del reparto "
@@ -137427,6 +137442,20 @@ def prove_effetti_ridotti():
     #   zoomQuiMappaP2P (3 nov 2026, mappa-contanti): segue le DITA e la
     #     rotellina sulla mappa del contanti, un ridisegno per fotogramma
     #     — come lbApplica, non e' un'animazione
+    #   mondoAccendi, mondoGiro (17 nov 2026, il Mondo di Tappo): il giro
+    #     del gioco, un fotogramma per volta SOLO con la scheda «Mondo» in
+    #     vista (`mondoDavanti`); muove Tappo dove lo guida il dito, come
+    #     lbApplica. Quel che si muove da solo (bulloni che girano,
+    #     barattoli che dondolano, la dissolvenza fra le zone) con gli
+    #     effetti ridotti sta fermo: `fermo = effettiRidotti()`
+    #   apriMissione (17 nov 2026): un'attesa di fotogramma prima della
+    #     classe `aperto` del foglio delle missioni; la dissolvenza e' del
+    #     CSS, e la classe la spegne
+    #   arenaAccendi, arenaGiro (17 nov 2026, i minigiochi delle
+    #     missioni): il giro dell'arena, solo col foglio della missione
+    #     aperto e in vista (`arenaDavanti`); muove Tappo dove lo guida il
+    #     dito, come mondoGiro. Saltelli, polvere, scintille e scosse con
+    #     gli effetti ridotti stanno fermi: `fermo = effettiRidotti()`
     chi = collections.Counter()
     for m in re.finditer(r"requestAnimationFrame", js):
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
@@ -137434,7 +137463,9 @@ def prove_effetti_ridotti():
     prova("chi chiama requestAnimationFrame e' censito, col suo perche'",
           {"togliGuscio": 2, "decodificaInVista": 2, "navArrivoSecco": 2,
            "avviaTour": 2, "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1,
-           "passo": 2, "zoomQuiMappaP2P": 1},
+           "passo": 2, "mondoAccendi": 1, "mondoGiro": 1, "apriMissione": 1,
+           "arenaAccendi": 1, "arenaGiro": 1,
+           "zoomQuiMappaP2P": 1},
           dict(chi))
 
     # --- 5) PRIMA DEL PRIMO PAINT, E DOPO /me -----------------------
@@ -153625,7 +153656,11 @@ def prove_freni():
            # fatture di zap, 10 depositi aperti e 10 segnalazioni all'ora
            # per persona (i battiti passano dai freni della mancia e del P2P)
            "raccolta_apri": (5, 3600), "raccolta_zap": (30, 3600),
-           "raccolta_deposito": (10, 3600), "raccolta_segnala": (10, 3600)}, F)
+           "raccolta_deposito": (10, 3600), "raccolta_segnala": (10, 3600),
+           # la Caccia a Tappo (17 nov 2026): 60 occhiate all'ora (un
+           # giorno ne da' al piu' 15: e' il freno di chi martella la
+           # rotta, non di chi gioca) e 40 gesti all'ora fra bottega e zaino
+           "tappo_guarda": (60, 3600), "tappo_oggetto": (40, 3600)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------
@@ -208580,6 +208615,586 @@ def prove_sentinella_server_fermo():
           "SENTINELLA_ATTIVA = True" in _SORGENTE)
 
 
+def prove_caccia_a_tappo():
+    """LA CACCIA A TAPPO (17 nov 2026, cantiere caccia-a-tappo, richiesta
+    di Andrea: «un gioco di barattolo con dentro Tappo... bello
+    complesso, deve durare anche tra vent'anni»). Qui le PURE del server
+    — il giorno italiano, la pesca in due passi, le fasce, gli indizi, il
+    premio, il calore, i gradi, le sfide — coi conti fatti a mano; le
+    sentinelle delle tabelle (ogni categoria ha il suo scaffale, la scala
+    delle sfide sale, gli id passano dal filtro della pagina); la regola
+    che conta — I BULLONI NON SONO SATS E NON SONO XP: il blocco non
+    nomina `xp_eventi` ne' un pagamento; e la pagina, in node: niente
+    HTML dai testi altrui, niente tasto per un id che non e' un nome di
+    casa, e animazioni di soli transform e opacity. Il giro vero —
+    partire, guardare, la pista a tappe, la bottega — sta in
+    collaudo_caccia_a_tappo.py."""
+    print("\n[la Caccia a Tappo: le pure, le tabelle, niente XP, la pagina]")
+    import calendar as _cal, hashlib as _hl, random as _rnd, sqlite3 as _sq
+    src = _SORGENTE
+    blocco = src[src.index("# LA CACCIA A TAPPO (17 nov 2026, cantiere caccia-a-tappo"):
+                 src.index("# (Qui finisce il blocco della Caccia a Tappo.")]
+    amb = {"re": re, "hashlib": _hl, "sqlite3": _sq}
+    exec(pezzo("_fmt_sats"), amb)
+    exec(src[src.index("\nCATEGORIE = (") + 1:src.index("\n\n", src.index("\nCATEGORIE = ("))], amb)
+    exec(blocco[blocco.index("GIOCO_TAPPO_POSTI = 5"):blocco.index("# Dove Tappo puo' nascondersi:")], amb)
+    for nome in ("_giorno_roma", "_tappo_pesca", "_tappo_fascia", "_tappo_fascia_larga",
+                 "_tappo_parola", "_tappo_dado", "_tappo_mescola", "_tappo_anagramma",
+                 "_tappo_scaffale_di", "_tappo_barattolo_di", "_tappo_grado",
+                 "_tappo_prezzo_di", "_tappo_indizio", "_tappo_indizi", "_tappo_premio",
+                 "_tappo_occhiate_max", "_tappo_calore", "_tappo_metallo",
+                 "_tappo_gradi_aperti", "_tappo_sfide_raggiunte", "_tappo_e_qui",
+                 "_tappo_numeri", "_completati_p2p"):
+        exec(pezzo(nome), amb)
+    G = amb
+
+    # --- il giorno e' quello ITALIANO
+    ora = lambda *a: _cal.timegm(a + (0,) * (9 - len(a)))
+    prova("d'inverno la caccia cambia alle 23:00 UTC", ("2026-11-17", "2026-11-18"),
+          (G["_giorno_roma"](ora(2026, 11, 17, 22, 59, 59)), G["_giorno_roma"](ora(2026, 11, 17, 23, 0, 0))))
+    prova("d'estate alle 22:00 UTC (ora legale)", ("2026-07-01", "2026-07-02"),
+          (G["_giorno_roma"](ora(2026, 7, 1, 21, 59, 59)), G["_giorno_roma"](ora(2026, 7, 1, 22, 0, 0))))
+    prova("l'ora legale comincia l'ultima domenica di marzo alle 01:00 UTC",
+          ("2026-03-28", "2026-03-29"),
+          (G["_giorno_roma"](ora(2026, 3, 28, 22, 30, 0)), G["_giorno_roma"](ora(2026, 3, 28, 23, 0, 0))))
+
+    # --- la pesca: prima il venditore, poi un suo annuncio
+    grosso = [(i, 1) for i in range(1, 201)] + [(900, 2)]
+    prova("senza candidati non si pesca niente", 0, G["_tappo_pesca"]([], lambda n: 0))
+    prova("il dado a zero prende il primo venditore e il suo primo annuncio", 1,
+          G["_tappo_pesca"](grosso, lambda n: 0))
+    prova("il dado al massimo prende l'ultimo venditore", 900,
+          G["_tappo_pesca"](grosso, lambda n: n - 1))
+    dado = _rnd.Random(7)
+    piccolo = sum(1 for _ in range(400) if G["_tappo_pesca"](grosso, dado.randrange) == 900)
+    prova("chi ha UN annuncio ospita Tappo quanto chi ne ha duecento (meta' delle volte, non 1 su 201)",
+          True, 150 <= piccolo <= 250)
+
+    # --- le fasce
+    prova("la fascia 1-2-5", [(10000, 20000), (20, 50), (5, 10), (50000, 100000), (100000, 200000)],
+          [G["_tappo_fascia"](p) for p in (15000, 35, 5, 99999, 100000)])
+    prova("...senza prezzo, sotto l'unita' e la robaccia", [(0, 0), (0, 1), (0, 0), (0, 0)],
+          [G["_tappo_fascia"](p) for p in (0, 0.5, None, "abc")])
+    prova("la fascia larga e' la decina intera", [(10000, 100000), (10, 100), (1, 10), (0, 0), (0, 1)],
+          [G["_tappo_fascia_larga"](p) for p in (15000, 35, 5, 0, 0.5)])
+
+    # --- la parola e l'anagramma
+    prova("la parola dell'indizio e' la piu' lunga del titolo", ["bluetooth", "", "caffè"],
+          [G["_tappo_parola"](t) for t in ("Cuffie bluetooth Sony", "TV 4K", "Il caffè")])
+    ana = G["_tappo_anagramma"]("bluetooth", "42:2026-11-17")
+    prova("l'anagramma ha le stesse lettere, in maiuscolo", sorted("BLUETOOTH"), sorted(ana))
+    prova("...non e' la parola stessa", True, ana != "BLUETOOTH")
+    prova("...ed e' lo stesso a ogni apertura (stesso annuncio, stesso giorno)", ana,
+          G["_tappo_anagramma"]("bluetooth", "42:2026-11-17"))
+    prova("...ma cambia col giorno o con l'annuncio", True,
+          len({G["_tappo_anagramma"]("bluetooth", f"42:2026-11-{g}") for g in range(10, 30)}) > 5)
+    prova("una parola che non si puo' rimescolare resta com'e'", "AAAA", G["_tappo_anagramma"]("aaaa", "x"))
+    prova("due lettere uguali all'originale si girano lo stesso", True,
+          all(G["_tappo_anagramma"]("casa", s) != "CASA" for s in range(40)))
+
+    # --- la dispensa: ogni categoria ha il suo scaffale, uno solo
+    sugli_scaffali = [c for s in G["GIOCO_TAPPO_SCAFFALI"] for c in s["categorie"]]
+    prova("ogni categoria del catalogo sta su UNO scaffale (una nuova senza scaffale e' un barattolo che nessuno accende)",
+          sorted(G["CATEGORIE"]), sorted(sugli_scaffali))
+    prova("gli scaffali sono numerati da 1, senza buchi", list(range(1, len(G["GIOCO_TAPPO_SCAFFALI"]) + 1)),
+          [s["n"] for s in G["GIOCO_TAPPO_SCAFFALI"]])
+    prova("nessuno scaffale con piu' di cinque barattoli (la riga della pagina ne tiene cinque)", True,
+          all(len(s["categorie"]) <= 5 for s in G["GIOCO_TAPPO_SCAFFALI"]))
+    prova("una categoria sconosciuta cade nel barattolo «Altro», sul suo scaffale",
+          ("Altro", G["_tappo_scaffale_di"]("Altro")),
+          (G["_tappo_barattolo_di"]("Robe di ieri"), G["_tappo_scaffale_di"]("Robe di ieri")))
+    prova("...e una di casa sta dove dice la tabella", (1, 5),
+          (G["_tappo_scaffale_di"]("Bitcoin"), G["_tappo_scaffale_di"](" Motori ")))
+
+    # --- gli indizi
+    a = {"id": 4242, "titolo": "Cuffie bluetooth Sony", "categoria": "Elettronica",
+         "valuta": "sats", "prezzo_sats": 15000, "prezzo_eur": 0}
+    seme = "4242:2026-11-17"
+    prova("da Curioso il primo indizio e' il barattolo, e uno solo", ["barattolo"],
+          [i["tipo"] for i in G["_tappo_indizi"](a, 1, 1, seme)])
+    prova("...i tre, in ordine", [
+        "Mi sono nascosto nel barattolo «Elettronica».",
+        "Sul cartellino c'è scritto tra 10.000 e 20.000 sats.",
+        "Nel titolo c'è la parola «bluetooth»."],
+          [i["testo"] for i in G["_tappo_indizi"](a, 1, 3, seme)])
+    prova("chiederne nove ne da' tre, chiederne zero ne da' uno", (3, 1),
+          (len(G["_tappo_indizi"](a, 1, 9, seme)), len(G["_tappo_indizi"](a, 1, 0, seme))))
+    prova("un listino in euro si legge in euro", "Sul cartellino c'è scritto tra 20 e 50 €.",
+          G["_tappo_indizio"]("fascia", dict(a, valuta="eur", prezzo_eur=35), seme))
+    prova("senza prezzo lo dice", True,
+          "senza prezzo" in G["_tappo_indizio"]("fascia", dict(a, prezzo_sats=0), seme))
+    tre = G["_tappo_indizio"]("tre_barattoli", a, seme)
+    nominati = re.findall(r"«([^»]+)»", tre)
+    prova("i tre barattoli: quello vero e due dello STESSO scaffale", (3, True, True),
+          (len(nominati), "Elettronica" in nominati,
+           all(G["_tappo_scaffale_di"](c) == 1 for c in nominati)))
+    prova("...gli stessi a ogni apertura", tre, G["_tappo_indizio"]("tre_barattoli", a, seme))
+    prova("l'iniziale e le parole", "Il titolo comincia per «C» e ha 3 parole.",
+          G["_tappo_indizio"]("iniziale", a, seme))
+    tutti = [G["_tappo_indizio"](t, a, seme) for g in G["GIOCO_TAPPO_GRADI"] for t in g["indizi"]]
+    prova("ogni tipo d'indizio di ogni grado ha la sua frase", True, all(tutti))
+    prova("NESSUN indizio dice il titolo intero ne' il numero dell'annuncio", [],
+          [t for t in tutti if "Cuffie bluetooth Sony" in t or "4242" in t])
+
+    # --- il premio, le occhiate, il calore, il metallo
+    prova("il premio: pieno, meno il calo per ogni indizio pagato, mai meno di uno",
+          [3, 2, 1, 1, 30, 22, 6], [G["_tappo_premio"](g, k) for g, k in
+                                    ((1, 0), (1, 1), (1, 2), (1, 9), (6, 0), (6, 2), (6, 6))])
+    prova("un grado che non esiste vale il primo", 3, G["_tappo_premio"](99, 0))
+    prova("le occhiate: quelle del grado, tre in piu' con la torcia", [12, 15, 9, 12],
+          [G["_tappo_occhiate_max"](g, s) for g, s in
+           ((1, ""), (1, "torcia"), (4, "calamita"), (4, "calamita,torcia"))])
+    vicino = lambda **k: G["_tappo_calore"](a, dict(a, **k))
+    prova("il calore: fuoco, fuochino, tiepido, acqua", ["fuoco", "fuochino", "tiepido", "acqua"],
+          [vicino(prezzo_sats=19000), vicino(prezzo_sats=40000), vicino(categoria="Telefonia"),
+           vicino(categoria="Motori")])
+    prova("...stesso numero ma valuta diversa non e' fuoco", "fuochino",
+          vicino(valuta="eur", prezzo_eur=15000))
+    prova("il metallo di un barattolo", ["", "bronzo", "bronzo", "argento", "argento", "oro"],
+          [G["_tappo_metallo"](n) for n in (0, 1, 4, 5, 19, 20)])
+    prova("lo stesso annuncio e la sua sorella di famiglia sono «qui», un altro no", [True, True, False, False],
+          [G["_tappo_e_qui"](x, y) for x, y in (
+              ({"id": 1, "famiglia": ""}, {"id": 1, "famiglia": ""}),
+              ({"id": 1, "famiglia": "f1"}, {"id": 2, "famiglia": "f1"}),
+              ({"id": 1, "famiglia": ""}, {"id": 2, "famiglia": ""}),
+              (None, {"id": 2, "famiglia": ""}))])
+
+    # --- i gradi
+    gradi = G["GIOCO_TAPPO_GRADI"]
+    prova("i gradi sono sei, numerati di fila", [1, 2, 3, 4, 5, 6], [g["n"] for g in gradi])
+    prova("...ognuno chiede piu' ritrovamenti e paga di piu' di quello prima", True,
+          all(x["serve"] < y["serve"] and x["premio"] < y["premio"] for x, y in zip(gradi, gradi[1:])))
+    prova("...e ha tre indizi, tanti quanti GIOCO_TAPPO_INDIZI", True,
+          all(len(g["indizi"]) == G["GIOCO_TAPPO_INDIZI"] for g in gradi))
+    prova("...anche pagando tutti gli indizi di tutte le tappe non si va sotto zero", True,
+          all(G["_tappo_premio"](g["n"], 2 * g["tappe"]) >= 1 for g in gradi))
+    prova("la scala si sale un gradino alla volta", [1, 1, 2, 2, 3, 4, 6],
+          [G["_tappo_gradi_aperti"](d) for d in
+           ({}, {1: 4}, {1: 5}, {1: 500}, {2: 10}, {3: 15}, {5: 30})])
+
+    # --- le sfide
+    sfide = G["GIOCO_TAPPO_SFIDE"]
+    prova("le soglie di ogni famiglia salgono, e i bulloni non scendono", [],
+          [f["id"] for f in sfide
+           if any(x[0] >= y[0] or x[1] > y[1] for x, y in zip(f["soglie"], f["soglie"][1:]))])
+    prova("la scala piu' lunga arriva a vent'anni di cacce", 7300, sfide[0]["soglie"][-1][0])
+    tutte_le_sfide = G["_tappo_sfide_raggiunte"]({f["conta"]: 10 ** 6 for f in sfide})
+    prova("le sfide sono una cinquantina, e nessun id si ripete", (56, 56),
+          (len(tutte_le_sfide), len({s for s, _b in tutte_le_sfide})))
+    prova("con cinque ritrovamenti: le prime due soglie del collezionista, e basta",
+          [("tappi:1", 2), ("tappi:5", 4)], G["_tappo_sfide_raggiunte"]({"trovate": 5}))
+    prova("a zero niente", [], G["_tappo_sfide_raggiunte"]({}))
+    prova("«In cima alla scala» ha una soglia per grado, dal secondo", [2, 3, 4, 5, 6],
+          [n for n, _b in next(f for f in sfide if f["id"] == "scala")["soglie"]])
+    # i numeri veri, da una tabella vera (lo schema e' quello del server)
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    i_tab = src.index("CREATE TABLE IF NOT EXISTS gioco_tappo(")
+    con.executescript(src[i_tab:src.index(");", i_tab) + 2])
+    riga = ("INSERT INTO gioco_tappo(tg_id, giorno, grado, tappe, aiuti, attrezzi, sbagli, "
+            "partito, trovato, categoria) VALUES(7,?,?,?,?,?,?,?,?,?)")
+    con.execute(riga, ("2026-01-01", 1, 1, 0, "", 0, 1000, 1100, "Bitcoin"))       # naso, secco, fulmine
+    con.execute(riga, ("2026-01-02", 4, 2, 1, "torcia", 2, 1000, 5000, "Bitcoin"))  # pista
+    con.execute(riga, ("2026-01-03", 2, 1, 0, "lampadina", 0, 1000, 1180, "Robe di ieri"))  # secco, fulmine
+    con.execute(riga, ("2026-01-04", 6, 3, 0, "", 0, 1000, 0, "Motori"))            # NON trovato
+    con.execute(riga.replace("VALUES(7,", "VALUES(8,"), ("2026-01-01", 1, 1, 0, "", 0, 1, 2, "Arte"))
+    numeri = G["_tappo_numeri"](con, 7)
+    prova("i numeri di una persona: solo le SUE cacce finite",
+          dict(trovate=3, naso=1, secco=2, fulmine=2, piste=1, grado=4, barattoli=2, oro=0),
+          {k: numeri[k] for k in ("trovate", "naso", "secco", "fulmine", "piste", "grado", "barattoli", "oro")})
+    prova("...per grado e per barattolo (la categoria sconosciuta e' «Altro»)",
+          ({1: 1, 4: 1, 2: 1}, {"Bitcoin": 2, "Altro": 1}),
+          (numeri["per_grado"], numeri["per_barattolo"]))
+    prova("ogni famiglia di sfide guarda un numero che ESISTE", [],
+          sorted({f["conta"] for f in sfide} - set(numeri)))
+    con.close()
+
+    # --- la bottega: gli id passano dal filtro della pagina
+    cose = list(G["GIOCO_TAPPO_OGGETTI"]) + list(G["GIOCO_TAPPO_ATTREZZI"])
+    prova("ogni oggetto e ogni attrezzo ha un id che la pagina accetta (solo lettere minuscole), e nessuno si ripete",
+          (True, len(cose)),
+          (all(re.fullmatch(r"[a-z]{2,20}", c["id"]) for c in cose), len({c["id"] for c in cose})))
+    prova("i tipi degli oggetti sono quelli che il server sa trattare", [],
+          sorted({o["tipo"] for o in G["GIOCO_TAPPO_OGGETTI"]}
+                 - {"cappello", "palco", "titolo", "posti", "trofeo"}))
+    prova("tutto costa almeno un bullone (niente regali che si ricomprano a zero)", True,
+          all(c["bulloni"] >= 1 for c in cose))
+
+    # --- I BULLONI NON SONO SATS E NON SONO XP
+    vivo = codice(blocco)
+    prova("il blocco del gioco non tocca gli XP, i distintivi, ne' un pagamento", [],
+          [p for p in ("xp_eventi", "premia_xp", "premia_distintivi", "SET xp", "XP_COMMERCIO",
+                       "crea_invoice", "paga_venditore", "payout", "LNBITS", "lnbits", "bolt11")
+           if p in vivo])
+    prova("le nove rotte sono tutte dietro la leva, PRIMA di guardare chi e'", (9, 9),
+          (vivo.count("@app."), vivo.count("    _tappo_acceso()\n    user = verifica_utente(")))
+    prova("...e tutte `async` (nel server mono-processo, senza await in mezzo, leggi-e-scrivi e' atomico)", 9,
+          len(re.findall(r'@app\.(?:get|post)\("/api/gioco/tappo[a-z/]*"\)\nasync def ', vivo)))
+    prova("il nascondiglio esce dallo stato in UN punto solo, sotto «trovato»", 1,
+          pezzo("_tappo_stato").count('stato["caccia"]["annuncio"]'))
+    prova("...e quel punto sta sotto la condizione", True,
+          'if riga["trovato"] and nascondiglio:\n            stato["caccia"]["annuncio"]'
+          in pezzo("_tappo_stato"))
+    fus = pezzo("esegui_fusione")
+    tabelle_gioco = re.findall(r"CREATE TABLE IF NOT EXISTS (gioco_tappo[a-z_]*)", src)
+    prova("le sette tabelle del gioco seguono la fusione degli account e la cancellazione",
+          (7, []), (len(tabelle_gioco),
+          [t for t in tabelle_gioco
+           if f'"{t}"' not in fus and f"FROM {t} " not in fus and f"UPDATE {t} SET" not in fus
+           or f'("{t}", "tg_id")' not in src]))
+    prova("la leva nasce ACCESA, e sta nel config d'esempio", (True, True),
+          ("except ImportError:\n    GIOCO_TAPPO_ATTIVO = True" in blocco,
+           bool(re.search(r"^GIOCO_TAPPO_ATTIVO = True$",
+                          open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                            "config_esempio.py"), encoding="utf-8").read(), re.M))))
+
+    # --- la pagina
+    qui = os.path.dirname(os.path.abspath(__file__))
+    mini = open(os.path.join(qui, "miniapp.html"), encoding="utf-8").read()
+    prova("la vista c'e', la porta nel Profilo pure, e go() la disegna", (1, 1, 1, 1),
+          (mini.count('<div class="view" id="view-caccia">'), mini.count('id="vocCaccia"'),
+           mini.count("if (view==='caccia') renderCaccia();"), mini.count("cacciaNellaScheda(l);")))
+    quadri = re.findall(r"@keyframes (caccia-[a-z]+)\{(.*?)\}\}", mini.replace("\n", " "))
+    mosse = {p for _n, corpo in quadri for p in re.findall(r"[{;]\s*([a-z-]+)\s*:", corpo)}
+    prova("le animazioni del gioco muovono SOLO transform e opacity (niente che ridisegni la pagina a ogni fotogramma)",
+          (True, []), (len(quadri) >= 8, sorted(mosse - {"transform", "opacity"})))
+    # GLI EFFETTI RIDOTTI li spegne la regola di casa (`html.fx-ridotti *`,
+    # censita da `prove_effetti_ridotti`): il gioco non scrive un suo
+    # `!important` (la batterebbe) e non sfoca niente (vorrebbe il suo
+    # colore pieno)
+    _righe_gioco = [r for r in mini[:mini.index("</style>")].split("\n") if "caccia-" in r]
+    prova("...e con gli effetti ridotti le ferma la regola di casa: nel "
+          "foglio del gioco nessun `!important` e nessuna sfocatura",
+          (True, []), (len(_righe_gioco) > 100,
+                       [r.strip()[:50] for r in _righe_gioco
+                        if "!important" in r or "backdrop-filter" in r]))
+    peso = os.path.getsize(os.path.join(qui, "assets", "caccia-tappo.webp"))
+    prova("il Tappo del gioco e' un file solo, leggero, con la sua rotta", (True, 1),
+          (10_000 < peso < 120_000, src.count('@app.get("/assets/caccia-tappo.webp")')))
+    js = mini[mini.index("let cacciaAttiva = false;"):mini.index("/* IL VELO: un velo nostro a tutto schermo")]
+    js += _fn_js(mini, "function cacciaCoriandoliHTML(){") + _fn_js(mini, "function cacciaFestaHTML(d, fermo){") \
+        + _fn_js(mini, "function cacciaBigliettoHTML(d){")
+    cattivo = '<img src=x onerror=alert(1)>'
+    banco = r"""
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => String(n);
+const EMOJI_CAT = {Elettronica: '🔌'}, CATS = ['Tutto', 'Elettronica'];
+let DEMO = false, VETRINA = false, MAX_PREFERITI = 10, myTitoli = [], myTgId = 111;
+const el = () => null, toast = () => {}, haptic = () => {}, effettiRidotti = () => true;
+""" + js + r"""
+const C = """ + json.dumps(cattivo) + r""";
+const stato = (caccia) => ({giorno: '2026-11-17', saldo: 20, trovate: 3, grado_max: 2,
+  gradi: [{n: 1, emoji: '🐣', nome: 'Curioso' + C, occhiate: 12, tappe: 1, premio: 3, aperto: true, mancano: 0},
+          {n: 2, emoji: '🐕', nome: 'Segugio', occhiate: 10, tappe: 1, premio: 5, aperto: true, mancano: 0},
+          {n: 3, emoji: '🧭', nome: 'Esploratore', occhiate: 9, tappe: 1, premio: 8, aperto: false, mancano: 7}],
+  scaffali: [{n: 1, emoji: '🔌', nome: 'Il banco' + C, annunci: 4,
+              barattoli: [{categoria: 'Elettronica', volte: 6, metallo: 'argento'},
+                          {categoria: 'Brutta' + C, volte: 0, metallo: 'oro" onmouseover="x'}]},
+             {n: 2, emoji: '🎮', nome: 'Lo svago', annunci: 0, barattoli: []}],
+  barattoli_accesi: 1, barattoli_totale: 29, caccia,
+  attrezzi: [{id: 'torcia', emoji: '🔦', nome: 'Torcia', cosa: 'tre' + C, bulloni: 4, quanti: 1, usato_oggi: false},
+             {id: "x');alert(1)//", emoji: '💣', nome: 'Bomba', cosa: '', bulloni: 1, quanti: 9, usato_oggi: false}],
+  oggetti: [{id: 'berretto', tipo: 'cappello', emoji: '🧢', nome: 'Berretto' + C, bulloni: 6, mio: true},
+            {id: 'corona', tipo: 'cappello', emoji: '👑', nome: 'Corona', bulloni: 100, mio: false},
+            {id: "y');alert(2)//", tipo: 'cappello', emoji: '💣', nome: 'Bomba', bulloni: 1, mio: true}],
+  indossato: 'berretto', palco: 'aurora" onload="x', max_barattolo: 15,
+  sfide: [{id: 'tappi', emoji: '🔩', nome: 'Collezionista' + C, valore: 3,
+           soglie: [{n: 1, bulloni: 2, fatta: true, cosa: 'Trova Tappo 1 volte'},
+                    {n: 5, bulloni: 4, fatta: false, cosa: 'Trova Tappo 5 volte' + C}]},
+          {id: 'scala', emoji: '🪜', nome: 'In cima', valore: 6, soglie: [{n: 2, bulloni: 5, fatta: true, cosa: 'x'}]}],
+  sfide_fatte: 2, sfide_totale: 51});
+const aperta = {scaffale: 1, grado: 1, tappa: 1, tappe: 1, trovato: false, vuoto: false, bulloni: 0,
+  indizi: [{tipo: 'barattolo', testo: 'Nel barattolo' + C}], indizi_max: 3, premio: 3, calo: 1,
+  occhiate: 9, occhiate_max: 12, sbagli: 3, attrezzi: [], calore: true, categoria: 'Elettronica', secondi: 0, barattolo: ''};
+const trovata = Object.assign({}, aperta, {trovato: true, bulloni: 2, indizi: [], secondi: 134, sbagli: 0,
+  annuncio: {id: 7, titolo: 'Cuffie' + C}, barattolo: 'Elettronica'});
+const pagine = [];
+for (const c of [null, aperta, trovata, Object.assign({}, aperta, {vuoto: true}), Object.assign({}, aperta, {occhiate: 0})])
+  for (const scheda of ['caccia', 'sfide', 'zaino', 'bottega', 'inventata'])
+    pagine.push(cacciaHTML(stato(c), {scheda, scaffale: 1, grado: 3}));
+const festa = cacciaFestaHTML(Object.assign(stato(trovata), {sfide_nuove: [{id: 'tappi:1', emoji: '🔩', nome: 'Collezionista' + C, bulloni: 2}]}));
+const biglietto = cacciaBigliettoHTML(stato(Object.assign({}, aperta, {tappa: 2, tappe: 3})));
+const tutto = pagine.join('') + festa + biglietto;
+const prima = cacciaHTML(stato(null), {scheda: 'caccia', scaffale: 1, grado: 3});
+const durante = cacciaHTML(stato(aperta), {scheda: 'caccia', scaffale: 0, grado: 0});
+console.log(JSON.stringify({
+  bulloni: [bulloniCaccia(1), bulloniCaccia(3), bulloniCaccia('x')],
+  tempo: [tempoCaccia(45), tempoCaccia(134), tempoCaccia(120), tempoCaccia(3900), tempoCaccia(-5)],
+  aperta: [cacciaApertaDa(stato(null)), cacciaApertaDa(stato(aperta)), cacciaApertaDa(stato(trovata)),
+           cacciaApertaDa(stato(Object.assign({}, aperta, {occhiate: 0}))), cacciaApertaDa(null)],
+  nomi: [nomeVasoCaccia('Elettrodomestici'), nomeVasoCaccia('Casa e giardino'), nomeVasoCaccia('Supercalifragilistico')],
+  grado: [gradoCaccia(stato(null), 1), gradoCaccia(stato(null), 3), gradoCaccia(stato(null), 0)],
+  palco: [palcoCaccia({palco: 'luna'}), palcoCaccia({palco: 'aurora" onload="x'}), palcoCaccia(null)],
+  no: [cacciaTestoNo('fuoco'), cacciaTestoNo(''), cacciaTestoNo('__proto__')],
+  tagVivi: (tutto.match(/<img src=x/g) || []).length,
+  bombe: (tutto.match(/alert\([12]\)\/\//g) || []).length,
+  attributi: (tutto.match(/onmouseover|onload/g) || []).length,
+  metalloFinto: tutto.includes('caccia-vaso oro"'),
+  vuoteAttesa: cacciaHTML(null, null).includes('Cerco Tappo'),
+  primaParti: prima.includes('onclick="cacciaParti()"'), primaScale: (prima.match(/class="caccia-grado/g) || []).length,
+  primaChiuso: prima.includes('🔒 ancora 7 ritrovamenti'),
+  primaScaffaliTasto: (prima.match(/<button type="button" class="caccia-scaffale/g) || []).length,
+  duranteScaffaliTasto: (durante.match(/<button type="button" class="caccia-scaffale/g) || []).length,
+  duranteIndizi: (durante.match(/class="caccia-indizio/g) || []).length,
+  duranteApri: (durante.match(/cacciaIndizio\(\)/g) || []).length,
+  duranteOcchi: [(durante.match(/<i><\/i>/g) || []).length, (durante.match(/<i class="no"><\/i>/g) || []).length],
+  schedaInventata: cacciaHTML(stato(null), {scheda: 'inventata'}).includes('Dove lo cerchi oggi?'),
+  festaPremio: festa.includes('+2 🔩'), festaTempo: festa.includes('2 min 14 s'),
+  coriandoli: [(festa.match(/class="caccia-coriandolo"/g) || []).length,
+               (cacciaFestaHTML(stato(trovata), true).match(/caccia-coriandolo/g) || []).length],
+  bigliettoTappa: biglietto.includes('Tappa 2 di 3'),
+  cifreNeiTasti: (tutto.match(/onclick="cacciaOggetto\([^)]*\d/g) || []).length
+    + (tutto.match(/onclick="cacciaAttrezzo\([^)]*\d/g) || []).length,
+}));
+"""
+    r = _node_banco(banco)
+    if r is None:
+        salta("la pagina della Caccia a Tappo", "node non c'e'")
+        return
+    prova("«1 bullone», «3 bulloni», e la robaccia e' zero", ["1 bullone", "3 bulloni", "0 bulloni"], r.get("bulloni"))
+    prova("il tempo si legge da persona", ["45 s", "2 min 14 s", "2 min", "1 h 5 min", "0 s"], r.get("tempo"))
+    prova("la caccia e' aperta solo se partita, non trovata e con occhiate",
+          [False, True, False, False, False], r.get("aperta"))
+    prova("i nomi lunghi sotto i barattoli vanno a capo dove si legge",
+          ["Elettro\u00ADdomestici", "Casa e giardino", "Supercalifr\u00ADagilistico"], r.get("nomi"))
+    prova("il grado proposto: quello scelto se e' aperto, sennò il piu' alto aperto", [1, 2, 2], r.get("grado"))
+    prova("lo sfondo del palco e' un nome di casa o niente", ["luna", "", ""], r.get("palco"))
+    # GLI EFFETTI RIDOTTI: la regola di casa spegne le animazioni, ma i
+    # coriandoli fermi resterebbero macchie sopra la scatola — non nascono
+    prova("la festa ha i suoi coriandoli, e coi movimenti ridotti nessuno",
+          [22, 0], r.get("coriandoli"))
+    prova("...e a dirglielo e' il giudice di casa", True,
+          "cacciaVelo(cacciaFestaHTML(d, effettiRidotti())," in mini)
+    prova("Tappo che sbircia parte gia' a meta': fermo, si vede lo stesso",
+          True, ".caccia-tappo.sbircia{margin-bottom:-22px;"
+                "transform:translateY(52%);" in mini)
+    prova("il tasto dopo un'occhiata a vuoto", ["🔥 Qui non c'è", "🔩 Qui Tappo non c'è", "🔩 Qui Tappo non c'è"],
+          r.get("no"))
+    prova("in venti pagine, la festa e il biglietto: nessun tag vivo dai testi altrui", 0, r.get("tagVivi"))
+    prova("...nessun tasto per un id che non e' un nome di casa", 0, r.get("bombe"))
+    prova("...nessun attributo infilato da un metallo o da uno sfondo finti", (0, False),
+          (r.get("attributi"), r.get("metalloFinto")))
+    prova("...e nei tasti della bottega viaggia solo un nome, mai una cifra", 0, r.get("cifreNeiTasti"))
+    prova("senza stato la pagina aspetta", True, r.get("vuoteAttesa"))
+    prova("prima di partire: i gradi, gli scaffali da toccare, «Caccia su…» per quello scelto",
+          (True, 3, True, 2), (r.get("primaParti"), r.get("primaScale"), r.get("primaChiuso"),
+                               r.get("primaScaffaliTasto")))
+    prova("a caccia partita gli scaffali non si toccano piu'", 0, r.get("duranteScaffaliTasto"))
+    prova("...tre righe d'indizio, e UN solo «Apri»", (3, 1), (r.get("duranteIndizi"), r.get("duranteApri")))
+    prova("...un pallino per occhiata: nove accesi, tre spenti", [9, 3], r.get("duranteOcchi"))
+    prova("una scheda inventata e' la Caccia", True, r.get("schedaInventata"))
+    prova("la festa dice il premio e il tempo, il biglietto la tappa", (True, True, True),
+          (r.get("festaPremio"), r.get("festaTempo"), r.get("bigliettoTappa")))
+
+    # --- IL MONDO E LE MISSIONI (17 nov 2026: il mondo dipinto, le
+    # missioni su Bitcoin dello studio approvato). Il server: il catalogo
+    # delle missioni, chi le ha superate (lo legge il tabellone dei
+    # livelli), il saldo dalle sette tabelle. La pagina: la scena del
+    # mondo, il passo che scivola, la telecamera, e le cinque missioni
+    # giocate fino in fondo in node.
+    missioni = G["MISSIONI_TAPPO"]
+    prova("cinque missioni al lancio, sulle zone 0, 1, 3, 5 e 7 degli otto del tabellone, id di casa e bulloni veri",
+          (5, [0, 1, 3, 5, 7], True, True),
+          (len(missioni), sorted(x["zona"] for x in missioni),
+           all(re.fullmatch(r"[a-z]{3,20}", x["id"]) for x in missioni),
+           all(isinstance(x["bulloni"], int) and x["bulloni"] >= 1 for x in missioni)))
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    for tab in tabelle_gioco:
+        i_tab = src.index(f"CREATE TABLE IF NOT EXISTS {tab}")
+        con.executescript(src[i_tab:src.index(");", i_tab) + 2])
+    for nome in ("missioni_superate", "_tappo_saldo"):
+        exec(pezzo(nome), amb)
+    prova("senza la tabella le missioni superate sono nessuna (mai un errore sul tabellone)", set(),
+          G["missioni_superate"](_sq.connect(":memory:"), 7))
+    con.execute("INSERT INTO gioco_tappo_missioni(tg_id, missione, iniziata, stelle, bulloni, finita) "
+                "VALUES(7,'quaderno',0,2,15,100), (7,'lucchetto',90,0,0,0), (8,'parole',0,3,30,100)")
+    prova("superata vuol dire almeno una stella, e solo le SUE", {"quaderno"}, G["missioni_superate"](con, 7))
+    con.execute(riga, ("2026-01-01", 1, 1, 0, "", 0, 1000, 1100, "Bitcoin"))
+    con.execute("UPDATE gioco_tappo SET bulloni=10 WHERE tg_id=7")
+    con.execute("INSERT INTO gioco_tappo_evidenza(giorno, annuncio_id, tg_id, zona, bulloni, creato) "
+                "VALUES('2026-01-01', 5, 7, 1, 4, 0)")
+    prova("il saldo: cacce piu' missioni, meno i giorni in evidenza", 10 + 15 - 4, G["_tappo_saldo"](con, 7))
+    con.close()
+    prova("le illustrazioni del mondo: una rotta con la sua whitelist, nessun percorso dal nome", (1, True, False),
+          (src.count('@app.get("/assets/mondo/{nome}")'), 'if slug not in MONDO_ASSET:' in src,
+           "os.path.join(\"assets\", \"mondo\", nome" in src))
+    # (il mondo e le missioni stanno gia' nel pezzo di pagina del banco
+    # di sopra: qui si spengono solo l'orologio e la riga in basso)
+    prova("...e il pezzo di pagina del banco li contiene tutti e due", (True, True, True),
+          ("const MONDO_L = 900" in js, "const MISS_CHI = {" in js, "function cacciaMissioniHTML(s){" in js))
+    banco2 = banco[:banco.index("const C = ")] + r"""
+const C = """ + json.dumps(cattivo) + r""";
+missioneTimer = () => {}; missioneRiga = () => {};
+const s = {scaffali: [{n: 1, nome: 'Il banco', emoji: '🔌', barattoli: [{categoria: 'Elettronica', metallo: 'oro', volte: 3},
+                                                                      {categoria: 'Telefonia' + C, metallo: 'x"y', volte: 0}]},
+                      {n: 2, nome: 'Lo svago', emoji: '🎮', barattoli: []}],
+  caccia: null,
+  mondo: {zone: [{n: 1, aperta: true}, {n: 2, aperta: false, mancano: 1}],
+          pezzi: [{n: 1, zona: 1, posto: 2, preso: false}, {n: 2, zona: 2, posto: 1}, {n: 3, zona: 1, posto: 99}],
+          cambio: {attivo: true, scambi: 2},
+          evidenza: {palchi: [{annuncio: 7, zona: 1, titolo: 'Cuffie bluetooth molto belle e nuove', mio: true}, {annuncio: 0, zona: 1}]}},
+  missioni: [{id: 'quaderno', emoji: '📓', nome: 'Il quaderno' + C, cosa: 'x', bulloni: 15, stelle: 2},
+             {id: "z');alert(1)//", emoji: '💣', nome: 'Bomba', cosa: '', bulloni: 1, stelle: 0},
+             {id: 'parole', emoji: '🗝️', nome: 'Parole', cosa: 'y', bulloni: 30, stelle: 0}]};
+const sc = mondoScena(s), z1 = sc.zone[0], z2 = sc.zone[1];
+const azioni = z1.luoghi.map(l => (mondoAzione(l, s) || [''])[0]);
+const muro = mondoMuovi(z1, 450, 520, 0, -200);
+const cam = [mondoInquadra(390, 700, 800, 450), mondoInquadra(1366, 700, 800, 450)];
+/* le cinque missioni giocate fino in fondo, scena dopo scena, senza esplodere */
+const giocate = {};
+for (const id of Object.keys(MISSIONI_GIOCO)) {
+  const g = MISSIONI_GIOCO[id];
+  missione = {id, passo: 0, errori: 0, dati: id === 'parole' ? {scelti: []} : {}};
+  let scene = 0, fine = false;
+  const guarda = () => { scene++; const h = g.html(missione); if (h.includes('missioneFine()')) fine = true; return h; };
+  guarda();
+  if (id === 'quaderno') { quadernoTocca(3); guarda(); missione.dati.respinto = true; missione.passo = 2; missione.dati = {}; guarda(); quadernoNulla(true); guarda(); quadernoRipara(); guarda(); }
+  if (id === 'lucchetto') { lucchettoPrima(true); guarda(); [0, 1, 2, 3].forEach(lucchettoPasso); guarda(); lucchettoProva(0); lucchettoProva(1); lucchettoDecidi(); guarda(); }
+  if (id === 'staffetta') { ['A', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); ['R', 'I', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); ['A', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); }
+  if (id === 'parole') { paroleScegli(3); paroleScegli(5); paroleNotte(); guarda(); PAROLE_FINTE.forEach(paroleMetti); guarda(); paroleAssistenza(true); guarda(); }
+  if (id === 'halving') { for (let i = 0; i < 5; i++) { halvingRaccogli(); guarda(); if (i === 2) { halvingTarlo(true); guarda(); } if (i < 4) halvingIndovina(true); } halvingAvanti(); guarda(); }
+  giocate[id] = [scene >= 4, fine, missione.errori];
+}
+/* L'ARENA: il quaderno giocato muovendo Tappo, a passi di tempo finti */
+let finita = 0;
+missioneFine = () => { finita++; };
+const mq = {id: 'quaderno', info: {zona: 0, nome: 'Q'}, fase: 'gioco', errori: 0};
+missione = mq;
+arena = {def: ARENA_QUADERNO, m: mq, sc: QUAD_SCENA, pianta: QUAD_SCENA, liv: arenaLivello(0), tempo: 0, dt: 0.016,
+  x: 450, y: 1330, vx: 0, vy: 0, verso: 1, fase: 0, salto: 0, cammina: 0, schiaccia: 0, meta: null, guida: null,
+  tasti: {}, blocco: 0, ultimoPasso: 0, cose: [], nemici: [], polvere: [], scoppi: [], prova: -1, dice: null, vicino: null,
+  scossa: 0, banner: 0, attesa: null, hud: '', cartello: '', azione: ''};
+const a = arena, passi = (sec) => { for (let i = 0; i < sec * 60 && arena === a; i++) arenaPassa(a, 1 / 60); };
+const vai = (x, y) => { a.x = x; a.y = y; arenaPassa(a, 1 / 60); };
+arenaProva(0);
+const tr = a.dati.truccato, altro = (tr + 1) % 5;
+vai(a.cose[altro].x, a.cose[altro].y + 60); arenaFai();
+vai(a.cose[tr].x, a.cose[tr].y + 60);
+const cartello = a.def.prove[0].cartello(a, a.vicino), azione = a.def.prove[0].azione(a, a.vicino)[0];
+arenaFai(); passi(3);
+const prova2 = [a.prova, a.cose.length, a.nemici.length, mq.errori];
+a.x = 450; a.y = 1400; a.dati.resta = 999;            /* Tappo fermo (a orologio fermo): il Tarlo prende la maggioranza */
+for (let i = 0; i < 120 * 60 && mq.errori < 2; i++) arenaPassa(a, 1 / 60);
+const errMaggioranza = mq.errori;
+a.dati.resta = 12;
+for (let i = 0; i < 40 * 60 && a.prova === 1; i++) {    /* poi Tappo gli sta addosso */
+  const n = a.nemici.find(x => x.stato === 'va' || x.stato === 'morde'), r = a.cose.find(c => c.rotto);
+  if (r) { a.x = r.x; a.y = r.y + 60; } else if (n) { a.x = n.x; a.y = n.y; }
+  arenaPassa(a, 1 / 60);
+}
+const prova3 = [a.prova, mq.errori];
+const decise = [];
+for (let k = 0; k < 4 && arena === a; k++) {
+  for (let i = 0; i < 300 && !a.cose.some(c => c.tipo === 'busta' && !c.z); i++) arenaPassa(a, 1 / 60);
+  const b = a.cose.find(c => c.tipo === 'busta');
+  vai(b.x, b.y);
+  const valida = quadernoBustaValida(a.dati.saldi, a.dati.mano);
+  const dove = a.cose.find(c => c.tipo === (valida ? 'grande' : 'cestino'));
+  vai(dove.x, dove.y + 90);
+  decise.push([valida, a.def.prove[2].azione(a, a.vicino)[0]]);
+  arenaFai(); passi(1);
+}
+passi(3);
+const arenaEsito = {prova2, errMaggioranza, prova3, decise, saldi: a.dati.saldi, finita, chiusa: arena === null, errori: mq.errori,
+  cartello, azione};
+const L2 = staffettaLivelli()[1];
+const lista = cacciaMissioniHTML(s);
+console.log(JSON.stringify({
+  stelle: [missioneStelle(0), missioneStelle(1), missioneStelle(2), missioneStelle(9), missioneStelle('x')],
+  paga: [staffettaPaga(L2.fili, ['T', 'A', 'C'], 4).errore || '', !!staffettaPaga(L2.fili, ['T', 'R', 'I', 'C'], 4).fili,
+         staffettaPaga(L2.fili, ['T', 'C'], 1).errore || ''],
+  spostate: staffettaPaga([{a: 'T', b: 'A', pa: 4, pb: 0}], ['T', 'A'], 3).fili[0],
+  parole: [paroleEsito([0]), paroleEsito([3]), paroleEsito([5]), paroleEsito([3, 4]), paroleEsito([3, 1]), paroleEsito([])],
+  pieno: [halvingPieno(0), halvingPieno(1), halvingPieno(5), Math.round(halvingPieno(33) * 1000) / 1000],
+  giocate,
+  stessiId: Object.keys(MISSIONI_GIOCO).sort(),
+  listaTasti: (lista.match(/onclick="apriMissione\('[a-z]+'\)"/g) || []).length,
+  listaBombe: (lista.match(/apriMissione\([^)]*alert/g) || []).length, listaTag: (lista.match(/<img src=x/g) || []).length,
+  listaStelle: lista.includes('★★<i>★</i>'), listaBulloni: lista.includes('+30 🔩'),
+  zone: [sc.zone.length, z1.aperta, z2.aperta, z1.vasi.length, z1.vasi[1].metallo, z1.pezzi.length, z2.pezzi.length],
+  azioni, muro: [Math.round(muro[0]), Math.round(muro[1])],
+  terra: [mondoTerra(z1, 450, 960), mondoTerra(z1, 10, 10), mondoTerra(z2, 450, 960), mondoTerra(z1, 220, 670)],
+  cam: cam.map(c => [Math.round(c.k * 1000) / 1000, Math.round(c.x0), Math.round(c.cima)]),
+  profondo: [mondoProfondo(0), mondoProfondo(1600), mondoProfondo(9999)],
+  livelli: [0, 1, 2, 3, 5, 7, 9, -1, 'x'].map(z => ARENA_LIVELLI.indexOf(arenaLivello(z))),
+  muovi: [arenaMuovi(QUAD_SCENA, 450, 400, 0, -300, 34), arenaMuovi({muri: [0, 0, 900, 1500], ostacoli: [{x: 400, y: 400, r: 30}]}, 300, 400, 80, 0, 34),
+          arenaMuovi({muri: [0, 0, 900, 1500], ostacoli: [{x: 400, y: 300, w: 100, h: 200}]}, 300, 400, 80, 0, 34)].map(p => p.map(Math.round)),
+  inquadra: [arenaInquadra(390, 700, QUAD_SCENA), arenaInquadra(1200, 700, QUAD_SCENA)].map(c => [Math.round(c.k * 1000) / 1000, Math.round(c.x0), Math.round(c.y0)]),
+  vicina: [(arenaVicina([{x: 0, y: 0, r: 100, n: 1}, {x: 50, y: 0, r: 100, n: 2}, {x: 40, y: 0, r: 100, n: 3, via: true}], 45, 0) || {}).n,
+           arenaVicina([{x: 0, y: 0, r: 0}], 0, 0)],
+  buste: [quadernoBustaValida(QUAD_SALDI, ['tarlo', 'ape', 5]), quadernoBustaValida(quadernoScrivi(QUAD_SALDI, ['tarlo', 'ape', 5]), ['tarlo', 'riccio', 5]),
+          quadernoBustaValida({}, ['x', 'y', 1])],
+  maggioranza: [quadernoMaggioranza([{tipo: 'leggio', rotto: true}, {tipo: 'leggio', rotto: true}, {tipo: 'leggio'}]),
+                quadernoMaggioranza([{tipo: 'leggio', rotto: true}, {tipo: 'leggio'}, {tipo: 'grande', rotto: true}])],
+  arenaEsito,
+}));
+"""
+    r = _node_banco(banco2)
+    if r is None:
+        salta("il mondo e le missioni di Tappo", "node non c'e'")
+        return
+    prova("le stelle dagli errori: nessuno tre, uno due, di piu' una", [3, 2, 1, 1, 3], r.get("stelle"))
+    prova("la staffetta: la strada corta del secondo livello non regge, quella lunga si', e senza filo non si passa",
+          ["Il filo A–C ha solo 1 perline dal tuo lato", True, "Fra T e C non c'è un filo"], r.get("paga"))
+    prova("...e pagando le perline passano dall'altra parte", {"a": "T", "b": "A", "pa": 1, "pb": 3}, r.get("spostate"))
+    prova("le dodici parole: in rete le ruba la Gazza, una copia sola si perde, due su carta o metallo sono salve",
+          [{"rubate": True, "sola": False, "metallo": False, "salve": False},
+           {"rubate": False, "sola": True, "metallo": False, "salve": False},
+           {"rubate": False, "sola": True, "metallo": True, "salve": False},
+           {"rubate": False, "sola": False, "metallo": False, "salve": True},
+           {"rubate": True, "sola": False, "metallo": False, "salve": False},
+           {"rubate": False, "sola": True, "metallo": False, "salve": False}], r.get("parole"))
+    prova("il barattolone: vuoto, meta', 96,875% dopo cinque ere, e mai oltre i 21 milioni",
+          [0, 50, 96.875, 100.0], r.get("pieno"))
+    prova("le cinque missioni si giocano fino al «Avanti», senza errori, scena dopo scena",
+          {x: [True, True, 0] for x in ("quaderno", "lucchetto", "staffetta", "parole", "halving")}, r.get("giocate"))
+    prova("ogni missione del server ha il suo gioco nella pagina, e viceversa",
+          sorted(x["id"] for x in missioni), r.get("stessiId"))
+    prova("l'elenco nelle sfide: un tasto per missione conosciuta, nessuna bomba, nessun tag vivo",
+          (2, 0, 0, True, True), (r.get("listaTasti"), r.get("listaBombe"), r.get("listaTag"),
+                                  r.get("listaStelle"), r.get("listaBulloni")))
+    prova("la scena: sei zone, la seconda chiusa, due barattoli (metallo finto spento), il bullone fuori pianta e quello della zona chiusa non ci sono",
+          [6, True, False, 2, "", 1, 0], r.get("zone"))
+    prova("i tasti dei luoghi della prima zona",
+          ["🫙 Elettronica: guarda gli annunci", "🫙 Telefonia" + cattivo + ": guarda gli annunci",
+           "🔩 Caccia qui, su «Il banco»", "🛍️ Entra in bottega", "💱 Banco del cambio: apri gli scambi P2P",
+           "⭐ In evidenza: Cuffie bluetooth molto be…", "🔒 «Lo svago» si apre con un altro ritrovamento"],
+          r.get("azioni"))
+    prova("contro il bordo in alto Tappo si ferma sul pavimento, non lo buca", [450, 520], r.get("muro"))
+    prova("dove si sta: il pavimento si', fuori no, una zona chiusa no, dentro un barattolo no",
+          [True, False, False, False], r.get("terra"))
+    prova("la telecamera: in piedi il dipinto riempie la larghezza e segue Tappo, sullo schermo largo sta quasi intero al centro",
+          [[0.542, -49, 89], [0.561, 431, 114]], r.get("cam"))
+    prova("la profondita' finta: piu' piccolo in fondo, piu' grande davanti, mai oltre", [0.8, 1.1, 1.1],
+          r.get("profondo"))
+    # L'ARENA DEI MINIGIOCHI (17 nov 2026, Andrea: «piu' si va avanti
+    # del tabellone, piu' devono essere difficili»)
+    prova("l'arena: la difficolta' sale a coppie di zone, e una zona storta e' la piu' facile",
+          [0, 0, 1, 1, 2, 3, 3, 0, 0], r.get("livelli"))
+    prova("...Tappo non buca il muro di fondo e si ferma contro un cerchio e contro un rettangolo",
+          [[450, 389], [336, 400], [366, 400]], r.get("muovi"))
+    prova("...la stanza intera nella tela, al centro", [[0.433, 0, 25], [0.467, 390, 0]], r.get("inquadra"))
+    prova("...il tasto si accende per la cosa piu' vicina, mai per una sparita o senza raggio", [2, None], r.get("vicina"))
+    prova("la doppia spesa: i bulloni che ci sono si spendono, gli stessi una seconda volta no",
+          [True, False, False], r.get("buste"))
+    prova("...e il Tarlo vince solo con piu' della meta' delle copie (il quaderno grande non conta)",
+          [{"rotti": 2, "tot": 3, "vinta": True}, {"rotti": 1, "tot": 2, "vinta": False}], r.get("maggioranza"))
+    ae = r.get("arenaEsito") or {}
+    prova("il quaderno giocato muovendo Tappo: la copia sbagliata costa un errore, quella giusta porta alla seconda prova "
+          "(sette leggii, un Tarlo)", [1, 7, 1, 1], ae.get("prova2"))
+    prova("...il cartello del quaderno cambiato dice il numero diverso, e il tasto propone la correzione",
+          (True, "✏️ Correggi questo quaderno"), ("Tappo ha <b>40 🔩</b>" in (ae.get("cartello") or ""), ae.get("azione")))
+    prova("...con Tappo fermo il Tarlo prende la maggioranza (un errore), standogli addosso si arriva alla terza prova",
+          (2, [2, 2]), (ae.get("errMaggioranza"), ae.get("prova3")))
+    prova("...le quattro buste: scritte quelle col conto che torna, strappata la doppia spesa",
+          [[True, "📓 Scrivi nel quaderno"], [True, "📓 Scrivi nel quaderno"], [False, "🗑️ Strappa: è una doppia spesa"],
+           [True, "📓 Scrivi nel quaderno"]], ae.get("decise"))
+    prova("...i saldi alla fine, e la missione finisce una volta sola, con l'arena chiusa",
+          ({"tarlo": 0, "rana": 2, "topo": 3, "ape": 2, "riccio": 2, "tappo": 3}, 1, True, 2),
+          (ae.get("saldi"), ae.get("finita"), ae.get("chiusa"), ae.get("errori")))
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -208857,6 +209472,7 @@ CATEGORIE = {
     connettori_woo connettori_registro connettori_ingresso
     titoli_importati connettori_varianti connettore_interrompibile
     famiglie connettori_cassetto connettori_categoria avvisi_barattolo serie_giorni finestra ordini_prova tutorial
+    caccia_a_tappo
     timbri_visti effetti_ridotti morfosi_vendi copertura_home
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
     db_contesa_negozi negozi_grandi pc_tema_e_ricerca schermo_largo
@@ -210038,6 +210654,7 @@ def main():
               prove_avvisi_barattolo,
               prove_serie_giorni,
               prove_sentinella_server_fermo,
+              prove_caccia_a_tappo,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)

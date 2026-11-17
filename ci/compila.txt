@@ -198,6 +198,7 @@ collaudo_assistente_bot.py
 collaudo_cancella_account.py
 collaudo_wallet_unico.py
 collaudo_assistenza.py
+collaudo_caccia_a_tappo.py
 collaudo_unione_seme.py
 collaudo_domande_compratore.py
 collaudo_widget_prova.py
