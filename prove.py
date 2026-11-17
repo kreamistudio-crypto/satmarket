@@ -136816,6 +136816,11 @@ def prove_effetti_ridotti():
     #     aperto e in vista (`arenaDavanti`); muove Tappo dove lo guida il
     #     dito, come mondoGiro. Saltelli, polvere, scintille e scosse con
     #     gli effetti ridotti stanno fermi: `fermo = effettiRidotti()`
+    #   latoApri / latoGiro (17 nov 2026, il platform di lato): il giro
+    #     del minigioco a scorrimento, vivo solo col foglio della missione
+    #     aperto (si ferma con `latoFerma`, chiamato da `arenaFerma` in
+    #     ogni uscita); passo fisso a 120 al secondo. Polvere, lampeggio e
+    #     respiro con gli effetti ridotti stanno fermi
     chi = collections.Counter()
     for m in re.finditer(r"requestAnimationFrame", js):
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
@@ -136824,7 +136829,7 @@ def prove_effetti_ridotti():
           {"togliGuscio": 2, "decodificaInVista": 2, "navArrivoSecco": 2,
            "avviaTour": 2, "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1,
            "passo": 2, "mondoAccendi": 1, "mondoGiro": 1, "apriMissione": 1,
-           "arenaAccendi": 1, "arenaGiro": 1,
+           "arenaAccendi": 1, "arenaGiro": 1, "latoApri": 1, "latoGiro": 2,
            "zoomQuiMappaP2P": 1},
           dict(chi))
 
@@ -206377,6 +206382,23 @@ console.log(JSON.stringify({
   livelli: [0, 1, 2, 3, 5, 7, 9, -1, 'x'].map(z => ARENA_LIVELLI.indexOf(arenaLivello(z))),
   muovi: [arenaMuovi(QUAD_SCENA, 450, 400, 0, -300, 34), arenaMuovi({muri: [0, 0, 900, 1500], ostacoli: [{x: 400, y: 400, r: 30}]}, 300, 400, 80, 0, 34),
           arenaMuovi({muri: [0, 0, 900, 1500], ostacoli: [{x: 400, y: 300, w: 100, h: 200}]}, 300, 400, 80, 0, 34)].map(p => p.map(Math.round)),
+  lato: (() => {
+    const liv = {lungo: 3000, suolo: 760, terra: [[0, 1000], [1200, 3000]], pedane: [{x: 300, y: 600, w: 200}],
+      casse: [{x: 700, y: 650, w: 100, h: 110}], molle: [{x: 1500, y: 760}]};
+    const nuovo = x => ({x, y: 760, vx: 0, vy: 0, verso: 1, aterra: true, grazia: 0, prenota: 0});
+    const corri = (s, c, n) => { let ev = []; for (let i = 0; i < n; i++) ev = ev.concat(latoFisica(s, c, liv, 1 / 120)); return ev; };
+    const cima = c => { const s = nuovo(100); let t = 760; for (let i = 0; i < 150; i++) { latoFisica(s, c, liv, 1 / 120); t = Math.min(t, s.y); } return Math.round(760 - t); };
+    const alto = cima({salta: true, tiene: true}), basso = cima({salta: true, tiene: false});
+    let s = nuovo(560); corri(s, {dx: true}, 120); const cassa = Math.round(s.x);
+    s = nuovo(1500); s.y = 740; s.aterra = false; s.vy = 300; const molla = corri(s, {}, 20).includes('molla');
+    s = nuovo(985); s.vx = 520; corri(s, {dx: true}, 6); const sospeso = !s.aterra;
+    const grazia = corri(s, {dx: true, salta: true, tiene: true}, 1).includes('salto');
+    s = nuovo(1100); s.y = 600; s.aterra = false; const cade = corri(s, {}, 120).includes('cade');
+    s = nuovo(400); s.y = 500; s.aterra = false; corri(s, {}, 120); const pedana = Math.round(s.y);
+    s = nuovo(100); s.y = 740; s.aterra = false; s.vy = 300; const c = {salta: true, tiene: true}; corri(s, {}, 1);
+    const prenotato = corri(s, c, 30).includes('salto');
+    return [alto, basso, cassa, molla, sospeso, grazia, cade, pedana, prenotato];
+  })(),
   strada: (() => {
     const sc = SATS_SCENA, r = 34, t = arenaStrada(sc, 450, 700, 450, 1060, r), pt = [[450, 700], ...t, [450, 1060]];
     let ok = true;
@@ -206436,6 +206458,10 @@ console.log(JSON.stringify({
     # del tabellone, piu' devono essere difficili»)
     prova("l'arena: la difficolta' sale a coppie di zone, e una zona storta e' la piu' facile",
           [0, 0, 1, 1, 2, 3, 3, 0, 0], r.get("livelli"))
+    prova("IL PLATFORM DI LATO, la fisica passo per passo: il salto tenuto va piu' in alto di quello lasciato, "
+          "la cassa ferma la corsa, la molla lancia, appena caduti dal bordo si salta ancora (la grazia), nel buco "
+          "si cade, sulla pedana si atterra da sopra, il salto premuto poco prima di toccare terra vale",
+          [240, 126, 670, True, True, True, True, 600, True], r.get("lato"))
     prova("LA STRADA INTORNO AI MOBILI: dietro il tavolo del forno a davanti si gira intorno (tappe libere, "
           "nessun tratto che lo tocca), dove si vede la meta si va dritti, il tavolo e' occupato e davanti no",
           [True, True, 0, False, True], r.get("strada"))
