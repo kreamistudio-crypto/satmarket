@@ -4389,32 +4389,54 @@
   /* I «NOVITÀ» IN UNO SOLO, SCORRENDO (16 nov 2026, Andrea: «quando scorro
      rimanga in alto solamente un banner novità con dentro tutte le monete»,
      «senza scritte dentro, a parte novità»): a pila chiusa il primo resta
-     appeso con la faccia unica, gli altri gli scivolano sotto (qui sotto,
-     «SI INFILANO SOTTO»). Nessuna misura cambia, quindi niente salta. La faccia unica
+     appeso con la faccia unica, gli altri gli scivolano sotto uno alla volta
+     (qui sotto, «SI FORMA COL DITO»). La faccia unica
      e' quella delle card (`--card` col filo), le monete accavallate col
      filo del fondo, «Novità» in arancio accanto alla freccia. */
-  .p2p-novita-unica{display:none}
-  /* SI INFILANO SOTTO, NON SALTANO (16 nov 2026 sera, Andrea col video:
-     «c'è un problema di animazione quando scorri in giù»): fino a qui gli
-     altri tornavano `relative`, cioe' al loro posto nel flusso, che a
-     pagina scesa sta gia' 40 px e piu' sopra — saltavano su di colpo e,
-     venendo dopo nel DOM allo stesso z-index, passavano SOPRA la faccia
-     unica, che si vedeva solo quando se n'erano andati. Adesso restano
-     appesi ma col `top` del capo, cosi' scivolano SOTTO di lui (z-index
-     piu' basso, e il capo e' alto 62 px contro i loro 52): la stessa
-     corsa in su e in giu', senza salti. Le card ci passano sotto come
-     prima. */
-  .p2p-oc-novita.appeso{transition:top .22s ease-out}
-  #view-p2p.novita-compatte .p2p-oc-novita.appeso:not(.capo-pila){top:var(--p2p-testa-alta,0px);z-index:1}
-  @media (prefers-reduced-motion: reduce){ .p2p-oc-novita.appeso{transition:none} }
-  #view-p2p.novita-compatte .p2p-oc-novita.capo-pila > .p2p-oc-faccia:not(.p2p-novita-unica){visibility:hidden}
-  #view-p2p.novita-compatte .p2p-oc-novita.capo-pila > .p2p-novita-unica{display:flex;
-    background:var(--card);box-shadow:inset 0 0 0 1px var(--line-soft);color:var(--ink)}
-  .p2p-novita-unica .p2p-novita-monete{flex:1;min-width:0}
+  /* SI FORMA COL DITO (17 nov 2026, Andrea, dopo il video della sera
+     prima: «deve essere progressivo e fluido il movimento ... quando io
+     scorro in giù, entra nel banner la moneta USDT e on-chain. Quando
+     continuo a scorrere, entra poi successivamente nel banner anche ETH e
+     Monero, non tutto assieme», «il banner unico si deve formare man mano
+     che scrolli»). Alla chiusura gli altri smettono di essere appesi ma
+     restano DOVE SONO: `relative` con uno scarto (`--pila-su`, misurato una
+     volta da `chiudiPilaNovitaP2P`) che li tiene al punto in cui erano
+     appesi; da li' salgono col dito come le card — lo scorrimento vero,
+     niente JavaScript a ogni passo — e passano SOTTO il capo (z-index piu'
+     basso; il capo e' alto 62 px, loro 52). Ognuno, appena e' sparito
+     sotto, porta le sue monete nella faccia unica (`.dentro`, col piccolo
+     salto d'entrata): prima USDT e USDe, poi ETH e Monero. La faccia unica
+     compare col primo che entra, in dissolvenza; risalendo i tre tornano
+     subito, con le facce che si riaccendono. Storia: la sera del 16 gli
+     altri tornavano `relative` senza scarto e saltavano su (il primo
+     video); poi scivolavano sotto tutti e due insieme (il secondo). */
+  .p2p-oc-novita .p2p-oc-faccia.p2p-novita-unica{display:flex;visibility:hidden;opacity:0;
+    background:var(--card);box-shadow:inset 0 0 0 1px var(--line-soft);color:var(--ink);
+    transition:opacity .18s ease,visibility 0s linear .18s}
+  #view-p2p.novita-compatte .p2p-oc-novita.appeso:not(.capo-pila){position:relative;top:var(--pila-su,0px);z-index:1}
+  .p2p-oc-novita.capo-pila > .p2p-oc-faccia:not(.p2p-novita-unica){
+    transition:opacity .18s ease,visibility 0s,background-color .25s ease,box-shadow .25s ease,color .25s ease}
+  #view-p2p.novita-compatte .p2p-oc-novita.capo-pila.pila-dentro > .p2p-oc-faccia:not(.p2p-novita-unica){
+    opacity:0;visibility:hidden;transition:opacity .18s ease,visibility 0s linear .18s}
+  #view-p2p.novita-compatte .p2p-oc-novita.capo-pila.pila-dentro > .p2p-oc-faccia.p2p-novita-unica{
+    visibility:visible;opacity:1;transition:opacity .18s ease,visibility 0s}
+  .p2p-novita-unica .p2p-novita-monete{flex:1;min-width:0;display:flex;align-items:center}
+  .p2p-pila-gruppo{display:none;align-items:center}
+  .p2p-pila-gruppo.dentro{display:inline-flex}
+  .p2p-pila-gruppo.dentro ~ .p2p-pila-gruppo.dentro,.p2p-pila-gruppo > * + *{margin-left:-5px}
+  .p2p-pila-gruppo.entra > *{animation:p2pPilaEntra .3s cubic-bezier(.3,1.45,.55,1)}
+  @keyframes p2pPilaEntra{0%{opacity:0;transform:translateY(10px) scale(.5)}100%{opacity:1;transform:none}}
+  /* risalendo: il fondo torna subito (copre le card come prima), la
+     faccia si riaccende. MAI l'opacita' o un transform sull'appeso
+     intero: vedi il divieto nella card del prezzo, qui sotto */
+  #view-p2p.riaperta .p2p-oc-novita.appeso:not(.capo-pila) > .p2p-oc-faccia{animation:p2pPilaRiscende .2s ease-out}
+  @keyframes p2pPilaRiscende{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion: reduce){
+    .p2p-pila-gruppo.entra > *,#view-p2p.riaperta .p2p-oc-novita.appeso > .p2p-oc-faccia{animation:none}
+  }
   .p2p-novita-monete .p2p-coin-svg,.p2p-novita-monete .cambio-moneta.p2p-oc-moneta{width:26px;height:26px;
     flex:0 0 auto;border-radius:50%;box-shadow:0 0 0 2px var(--card)}
   .p2p-novita-monete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:15px;height:15px}
-  .p2p-novita-monete > * + *{margin-left:-5px}
   .p2p-novita-unica .p2p-oc-novita-tag{color:#E8870F}
   /* LA CARD DEL PREZZO (13 nov 2026, cantiere prezzo-btc-p2p, la «A» scelta
      da Andrea sulle foto): sotto i «Novità», sopra gli ordini, NON appesa —
@@ -63809,28 +63831,38 @@ function novitaCoinLibroP2P(){
    NIENTE SI SPOSTA NEL FLUSSO: gli appesi sono `sticky`, e un sticky non
    occupa posto diverso da appeso o no. Scorrendo in giu' il PRIMO della
    pila (`capo-pila`) resta appeso e cambia faccia — le monete di tutti,
-   accavallate, e «Novità» —, gli altri gli scivolano sotto (dal 16 nov
-   sera: prima tornavano nel flusso e saltavano, vedi il CSS). In su, o in
-   cima alla pagina, riscendono i tre. Il tocco sulla faccia unica li riapre. Durante un tutorial (un
+   accavallate, e «Novità» —, gli altri salgono col dito e gli spariscono
+   sotto uno alla volta, portandogli le loro monete (17 nov, vedi «SI
+   FORMA COL DITO» nel CSS). In su, o in cima alla pagina, tornano i tre. Il tocco sulla faccia unica li riapre. Durante un tutorial (un
    «Novità» acceso) la pila resta aperta: il giro guarda il suo banner.
    La classe vive sulla vista (`novita-compatte`), cosi' un ridisegno del
    libro a pila chiusa nasce gia' chiuso. */
 let p2pNovitaUltimoY = 0;
+let p2pPilaRiapertaT = null;
 /* dopo ogni disegno del libro: con due o piu' «Novità» appesi, il primo
-   prende la faccia unica (nascosta finche' la pila e' aperta) */
+   prende la faccia unica (nascosta finche' nessun altro gli e' entrato
+   sotto). Le monete stanno in gruppi, uno per «Novità» (`data-pila` = il
+   suo posto nella pila): quello del capo c'e' sempre, gli altri entrano
+   quando il loro banner sparisce sotto (`dentroPilaNovitaP2P`). */
 function segnaPilaNovitaP2P(box){
   if (!box || !box.querySelectorAll) return;
   const appesi = [...box.querySelectorAll('.p2p-oc-novita.appeso')];
   if (appesi.length < 2) return;
   const capo = appesi[0];
   capo.classList.add('capo-pila');
-  const monete = appesi.map(a => {
+  const monete = appesi.map((a, i) => {
     const f = a.querySelector('.p2p-oc-faccia');
-    if (!f) return '';
-    const trio = f.querySelector('.p2p-coin-trio');
-    if (trio) return [...trio.querySelectorAll('svg')].map(x => x.outerHTML).join('');
-    const m = f.querySelector('.cambio-moneta');
-    return m ? m.outerHTML : '';
+    let dentro = '';
+    if (f) {
+      const trio = f.querySelector('.p2p-coin-trio');
+      if (trio) dentro = [...trio.querySelectorAll('svg')].map(x => x.outerHTML).join('');
+      else {
+        const m = f.querySelector('.cambio-moneta');
+        dentro = m ? m.outerHTML : '';
+      }
+    }
+    return '<span class="p2p-pila-gruppo' + (i === 0 ? ' dentro' : '') + '" data-pila="' + i + '">'
+      + dentro + '</span>';
   }).join('');
   const b = document.createElement('button');
   b.type = 'button';
@@ -63841,10 +63873,58 @@ function segnaPilaNovitaP2P(box){
     + '<span class="p2p-oc-novita-tag">Novità</span>'
     + '<span class="p2p-oc-freccia" aria-hidden="true"></span>';
   capo.appendChild(b);
+  /* un ridisegno a pila chiusa: i banner nuovi nascono al loro posto nel
+     flusso (gia' scappato in su), e le monete li seguono subito */
+  const v = el('view-p2p');
+  if (v && v.classList.contains('novita-compatte')) dentroPilaNovitaP2P(v);
+}
+/* PURA: quali degli altri «Novità» sono gia' spariti sotto il capo? Il
+   fondo di ognuno contro il fondo del capo (1 px di tolleranza, i
+   decimali dello schermo) */
+function dentroPilaP2P(fondoCapo, fondi){
+  return (fondi || []).map(f => Number.isFinite(f) && f <= fondoCapo + 1);
+}
+/* le monete della faccia unica seguono i banner spariti sotto; con la
+   prima che entra, la faccia unica prende il posto di quella del capo */
+function dentroPilaNovitaP2P(v){
+  const capo = v && v.querySelector('.p2p-oc-novita.appeso.capo-pila');
+  if (!capo) return;
+  const altri = [...v.querySelectorAll('.p2p-oc-novita.appeso:not(.capo-pila)')];
+  const dentro = v.classList.contains('novita-compatte')
+    ? dentroPilaP2P(capo.getBoundingClientRect().bottom, altri.map(a => a.getBoundingClientRect().bottom))
+    : altri.map(() => false);
+  capo.classList[dentro.some(Boolean) ? 'add' : 'remove']('pila-dentro');
+  dentro.forEach((d, i) => {
+    const g = capo.querySelector('.p2p-pila-gruppo[data-pila="' + (i + 1) + '"]');
+    if (!g) return;
+    if (d && !g.classList.contains('dentro')) g.classList.add('dentro', 'entra');
+    else if (!d) g.classList.remove('dentro', 'entra');
+  });
+}
+/* la chiusura: gli altri smettono di essere appesi ma restano dove sono —
+   lo scarto fra dove si vedevano appesi e il loro posto nel flusso, letto
+   una volta qui; da li' in poi li muove lo scorrimento vero */
+function chiudiPilaNovitaP2P(v){
+  const altri = [...v.querySelectorAll('.p2p-oc-novita.appeso:not(.capo-pila)')];
+  const prima = altri.map(a => a.getBoundingClientRect().top);
+  altri.forEach(a => a.style.removeProperty('--pila-su'));
+  v.classList.add('novita-compatte');
+  const flusso = altri.map(a => a.getBoundingClientRect().top);
+  altri.forEach((a, i) => a.style.setProperty('--pila-su', Math.round(prima[i] - flusso[i]) + 'px'));
 }
 function apriPilaNovitaP2P(){
   const v = el('view-p2p');
-  if (v) v.classList.remove('novita-compatte');
+  if (!v) return;
+  const era = v.classList.contains('novita-compatte');
+  v.classList.remove('novita-compatte');
+  v.querySelectorAll('.p2p-oc-novita.appeso').forEach(a => a.style.removeProperty('--pila-su'));
+  dentroPilaNovitaP2P(v);
+  if (!era) return;
+  v.classList.remove('riaperta');
+  void v.offsetWidth;            // la dissolvenza riparte anche a una riapertura ravvicinata
+  v.classList.add('riaperta');
+  clearTimeout(p2pPilaRiapertaT);
+  p2pPilaRiapertaT = setTimeout(() => v.classList.remove('riaperta'), 260);
 }
 /* PURA: la pila si chiude, si apre o resta com'e' (null)? `dy` lo
    spostamento dall'ultima volta, `y` dove sta la pagina, `appeso` se il
@@ -63864,9 +63944,15 @@ function scorriPilaNovitaP2P(){
   const alta = parseFloat(getComputedStyle(v).getPropertyValue('--p2p-testa-alta')) || 0;
   const tutorial = !!v.querySelector('.p2p-oc-novita.acceso');
   const verso = versoPilaNovitaP2P(dy, y, capo.getBoundingClientRect().top <= alta + 1, tutorial);
-  if (verso === null && Math.abs(dy) < 8) return;
-  p2pNovitaUltimoY = y;
-  if (verso !== null) v.classList[verso ? 'add' : 'remove']('novita-compatte');
+  if (verso !== null || Math.abs(dy) >= 8) {
+    p2pNovitaUltimoY = y;
+    const chiusa = v.classList.contains('novita-compatte');
+    if (verso === true && !chiusa) chiudiPilaNovitaP2P(v);
+    else if (verso === false && chiusa) apriPilaNovitaP2P();
+  }
+  /* a ogni passo, anche i piccoli: le monete entrano quando il loro
+     banner e' sparito, non a scatti di 8 px */
+  if (v.classList.contains('novita-compatte')) dentroPilaNovitaP2P(v);
 }
 if (typeof window !== 'undefined' && window.addEventListener)
   window.addEventListener('scroll', scorriPilaNovitaP2P, {passive: true});

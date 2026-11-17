@@ -161923,6 +161923,9 @@ const fmt = n => String(n);
             _fn_js(mini, "function partiSwapP2P(d, totale){"),
             _fn_js(mini, "function righeSwapContoP2P(r, sw, swap, cifra){"),
             _fn_js(mini, "function versoPilaNovitaP2P(dy, y, appeso, tutorial){"),
+            _fn_js(mini, "function dentroPilaP2P(fondoCapo, fondi){"),
+            _fn_js(mini, "function dentroPilaNovitaP2P(v){"),
+            _fn_js(mini, "function chiudiPilaNovitaP2P(v){"),
             _fn_js(mini, "function pausaOnchainP2P(o, adesso){"),
             _fn_js(mini, "function ordiniOnchainVetrinaP2P(lib, adesso){"),
         ]) + r"""
@@ -161936,6 +161939,41 @@ const r = (et, v) => '[' + et + '|' + v + ']';
 const c = n => '-' + n;
 out.due = righeSwapContoP2P(r, 724, {nome: 'SATS Routing', parti: out.parti}, c);
 out.una = righeSwapContoP2P(r, 724, {nome: 'SATS Routing', parti: null}, c);
+// LA PILA CHE SI FORMA COL DITO (17 nov): finte minime di DOM
+const CL = () => { const k = new Set(); return {add: (...x) => x.forEach(y => k.add(y)),
+  remove: (...x) => x.forEach(y => k.delete(y)), contains: x => k.has(x), _k: k}; };
+const gruppo = i => ({classList: CL(), i});
+const finto = (fondo, top) => { const st = {}; return {classList: CL(), r: {bottom: fondo, top},
+  getBoundingClientRect() { return this.r; }, style: {setProperty: (k, x) => { st[k] = x; },
+  removeProperty: k => { delete st[k]; }}, st}; };
+const vistaPila = (fCapo, fondi) => {
+  const capo = finto(fCapo, fCapo - 62); const gr = [1, 2].map(gruppo);
+  capo.querySelector = q => gr.find(g => q.indexOf('"' + g.i + '"') >= 0) || null;
+  const altri = fondi.map(f => finto(f, f - 52));
+  const v = {classList: CL(), capo, gr, altri,
+    querySelector: q => q.indexOf('capo-pila') >= 0 && q.indexOf(':not') < 0 ? capo : null,
+    querySelectorAll: () => altri};
+  return v;
+};
+out.dentroPuro = [dentroPilaP2P(161, [150, 210]), dentroPilaP2P(161, [163, 214]), dentroPilaP2P(161, [-300, -250]),
+                  dentroPilaP2P(161, [NaN]), dentroPilaP2P(161, null)];
+const pass = [];
+const vp = vistaPila(161, [213, 265]); vp.classList.add('novita-compatte');
+for (const d of [0, 52, 60, 104, 30]) {
+  vp.altri[0].r.bottom = 213 - d; vp.altri[1].r.bottom = 265 - d;
+  dentroPilaNovitaP2P(vp);
+  pass.push([vp.capo.classList.contains('pila-dentro'), vp.gr[0].classList.contains('dentro'),
+             vp.gr[1].classList.contains('dentro')]);
+}
+out.passi = pass;
+const vq = vistaPila(161, [-100, -50]); dentroPilaNovitaP2P(vq);
+out.aperta = [vq.capo.classList.contains('pila-dentro'), vq.gr[0].classList.contains('dentro')];
+const vc = vistaPila(161, [215, 267]);
+const orig = vc.classList.add;
+vc.classList.add = (...x) => { orig(...x); vc.altri[0].r.top = 120; vc.altri[1].r.top = 172; };
+vc.altri[0].r.top = 163; vc.altri[1].r.top = 215;
+chiudiPilaNovitaP2P(vc);
+out.scarto = [vc.classList.contains('novita-compatte'), vc.altri[0].st['--pila-su'], vc.altri[1].st['--pila-su']];
 out.verso = [versoPilaNovitaP2P(30, 400, true, false), versoPilaNovitaP2P(30, 400, false, false),
              versoPilaNovitaP2P(-30, 400, true, false), versoPilaNovitaP2P(3, 400, true, false),
              versoPilaNovitaP2P(30, 20, true, false), versoPilaNovitaP2P(30, 400, true, true)];
@@ -161976,6 +162014,18 @@ process.stdout.write(JSON.stringify(out));
                   "in su, resta com'e' coi piccoli scatti o col capo non ancora in alto; in "
                   "cima alla pagina o durante un tutorial resta aperta",
                   [True, None, False, None, False, False], o["verso"])
+            prova("la pila che si forma col dito: un «Novità» e' dentro quando il suo fondo "
+                  "sta sotto quello del capo (1 px di tolleranza), anche se e' scappato in su",
+                  [[True, False], [False, False], [True, True], [False], []], o["dentroPuro"])
+            prova("...le monete entrano a turno mentre si scende: prima USDT (52 px), poi "
+                  "ETH e Monero (104 px), la faccia unica col primo; risalendo escono",
+                  [[False, False, False], [True, True, False], [True, True, False],
+                   [True, True, True], [False, False, False]], o["passi"])
+            prova("...a pila aperta nessuna moneta entra, anche coi banner lontani",
+                  [False, False], o["aperta"])
+            prova("...e la chiusura tiene ognuno dove si vedeva appeso: lo scarto e' "
+                  "appeso meno flusso, letto una volta",
+                  [True, "43px", "43px"], o["scarto"])
             prova("la fila della home prende gli ordini on-chain vivi degli altri: non i "
                   "miei, non gli scaduti, non quelli in pausa, non i presi",
                   [[1, 6], []], [o["fila"], o["vuota"]])
@@ -162025,23 +162075,25 @@ process.stdout.write(JSON.stringify(out));
     rp = _fn_js(mini, "function renderP2P(){")
     prova("il libro segna la pila dei Novità dopo ogni disegno",
           True, "segnaPilaNovitaP2P(box);" in rp)
-    prova("la pila chiusa: gli altri restano appesi col `top` del capo e gli scivolano "
-          "SOTTO (z-index piu' basso), il capo cambia faccia",
-          [True, True, True],
-          ["#view-p2p.novita-compatte .p2p-oc-novita.appeso:not(.capo-pila){top:var(--p2p-testa-alta,0px);z-index:1}" in mini,
-           "#view-p2p.novita-compatte .p2p-oc-novita.capo-pila > .p2p-oc-faccia:not(.p2p-novita-unica){visibility:hidden}" in mini,
-           "window.addEventListener('scroll', scorriPilaNovitaP2P, {passive: true});" in mini])
-    # IL SALTO DEL 16 NOV SERA (Andrea, col video: «c'è un problema di
-    # animazione quando scorri in giù»): tornando `relative` gli altri
-    # saltavano al loro posto nel flusso, gia' scappato in su, e passavano
-    # SOPRA la faccia unica. Mai piu' fuori dall'appeso, e la corsa del
-    # `top` addolcita (ferma per chi chiede meno movimento).
-    prova("...e non tornano mai nel flusso (il salto del video), la corsa del `top` "
-          "e' addolcita e si ferma con «meno movimento»",
-          [False, True, True],
-          [bool(re.search(r"novita-compatte[^{]*\{[^}]*position:\s*relative", mini)),
-           "  .p2p-oc-novita.appeso{transition:top .22s ease-out}" in mini,
-           "@media (prefers-reduced-motion: reduce){ .p2p-oc-novita.appeso{transition:none} }" in mini])
+    prova("la pila chiusa: gli altri restano DOVE SONO (relative con lo scarto) e "
+          "salgono col dito sotto il capo; la faccia unica compare col primo entrato",
+          [True, True, True, True],
+          ["#view-p2p.novita-compatte .p2p-oc-novita.appeso:not(.capo-pila){position:relative;top:var(--pila-su,0px);z-index:1}" in mini,
+           "#view-p2p.novita-compatte .p2p-oc-novita.capo-pila.pila-dentro > .p2p-oc-faccia.p2p-novita-unica{" in mini,
+           "window.addEventListener('scroll', scorriPilaNovitaP2P, {passive: true});" in mini,
+           "if (v.classList.contains('novita-compatte')) dentroPilaNovitaP2P(v);\n}" in _fn_js(mini, "function scorriPilaNovitaP2P(){")])
+    # IL SALTO DEL 16 NOV SERA e il «tutto assieme» del 17 (Andrea: «deve
+    # essere progressivo e fluido ... non tutto assieme»): niente piu'
+    # `top` che corre (muoveva i due insieme), il `relative` senza scarto
+    # (il salto del primo video) non torna, le animazioni si fermano con
+    # «meno movimento» e non toccano MAI l'appeso intero.
+    prova("...niente corsa del `top` ne' `relative` senza scarto, «meno movimento» "
+          "rispettato, animazioni solo sulle facce e sulle monete",
+          [False, False, True, False],
+          [".p2p-oc-novita.appeso{transition:top" in mini,
+           "novita-compatte .p2p-oc-novita.appeso:not(.capo-pila){position:relative;top:auto}" in mini,
+           ".p2p-pila-gruppo.entra > *,#view-p2p.riaperta .p2p-oc-novita.appeso > .p2p-oc-faccia{animation:none}" in mini,
+           bool(re.search(r"riaperta \.p2p-oc-novita\.appeso:not\(\.capo-pila\)\{animation", mini))])
     rso = _fn_js(mini, "function rigaScambioOnchainP2P(o){")
     prova("«I miei scambi»: a mercato prima della presa i sats della card del libro "
           "(«≈ X sats»), mai lo zero di `o.sats` (dal canale Todo: «Vuoi ricevere 0 sats»)",
@@ -162049,10 +162101,12 @@ process.stdout.write(JSON.stringify(out));
           True, ": typeof satsCardOnchainP2P === 'function' ? satsCardOnchainP2P(o)" in rso)
     spn = _fn_js(mini, "function segnaPilaNovitaP2P(box){")
     prova("la faccia unica: solo le monete e «Novità» (Andrea: «senza scritte dentro, "
-          "a parte novità»), e il tocco riapre la pila",
-          [True, False, True],
+          "a parte novità»), e il tocco riapre la pila; le monete in gruppi, uno per "
+          "«Novità», e solo quello del capo dentro dall'inizio",
+          [True, False, True, True],
           ['<span class="p2p-oc-novita-tag">Novità</span>' in spn, "p2p-oc-novita-testo" in spn,
-           "apriPilaNovitaP2P()" in spn])
+           "apriPilaNovitaP2P()" in spn,
+           "'<span class=\"p2p-pila-gruppo' + (i === 0 ? ' dentro' : '') + '\" data-pila=\"' + i + '\">'" in spn])
     prova("il bollino della rete nella tendina della valuta non si mozza (Andrea: "
           "«Simbolino mozzato»): la riga allarga il margine di taglio senza crescere, "
           "e il bollino si stacca dalla sigla",

@@ -86106,3 +86106,47 @@ ore l'avviso «tempo finito» parte alla prima ronda); la recensione sullo
 scambio USDT concluso; il «✅ N scambi P2P» non conta gli scambi on-chain
 chiusi PRIMA del deploy (nessuna riga in `p2p_esiti`: da recuperare con
 una query a mano se Andrea lo chiede).
+
+## Il banner unico dei «Novità» che si forma col dito, una moneta alla volta (17 nov 2026, cantiere pila-progressiva; Andrea dal telefono, sulla correzione della sera prima già in produzione: «deve essere progressivo e fluido il movimento ... quando io scorro in giù, entra nel banner la moneta USDT e on-chain. Quando continuo a scorrere, entra poi successivamente nel banner anche ETH e Monero, non tutto assieme», «il banner unico si deve formare man mano che scrolli»)
+PRIMA: con la cura del 16 sera («I «Novità» che scorrendo saltavano»)
+gli altri due restavano appesi e il loro `top` correva in .22 s verso
+quello del capo: sparivano sotto TUTTI E DUE INSIEME, in un colpo, e la
+faccia unica nasceva già con tutte le monete.
+ADESSO: alla chiusura della pila gli altri smettono di essere appesi ma
+restano DOVE SI VEDEVANO: `position:relative` con uno scarto
+(`--pila-su`) che `chiudiPilaNovitaP2P` legge una volta sola — dove
+stava appeso meno dove starebbe nel flusso. Da lì li muove lo
+scorrimento vero, come le card: niente JavaScript che rincorre il dito
+(un `top` aggiornato a ogni evento, nel webview, resta un fotogramma
+indietro e trema). Salgono sotto il capo (z-index 1 contro 2, 52 px
+contro 62) uno dopo l'altro; `dentroPilaNovitaP2P`, a ogni evento di
+scorrimento, guarda chi è sparito (`dentroPilaP2P`, pura: il fondo
+sotto quello del capo, 1 px di tolleranza) e ne fa entrare le monete
+nella faccia unica col piccolo salto (`.entra`): USDT e USDe dopo 52
+px, ETH e Monero dopo 104. La faccia unica compare col PRIMO entrato,
+in dissolvenza; fino ad allora il capo resta «On-Chain». Le monete nella
+faccia stanno in gruppi, uno per «Novità» (`data-pila`); quello del capo
+c'è sempre. Risalendo (8 px in su, o sotto i 40 dalla cima, o il tocco)
+i tre tornano subito al loro posto appeso e le facce si riaccendono in
+.2 s; le monete escono. Un ridisegno del libro a pila chiusa fa nascere
+i banner al loro posto nel flusso e le monete li seguono subito.
+REGOLA RISPETTATA: nessuna animazione sull'appeso intero — né opacità
+né transform (il divieto della card del prezzo, 14 nov: nel webview il
+rettangolo appeso col `clip-path` restava mezzo); si animano solo le
+facce e le monete dentro. «Meno movimento» le ferma tutte.
+SCARTATE: il `top` guidato da JavaScript a ogni passo (vedi sopra: in
+ritardo di un fotogramma); le animazioni CSS legate allo scorrimento
+(`animation-timeline`): misurano dalla cima della pagina, non da dove
+si è chiusa la pila, e non ci sono in ogni webview; l'opacità sui banner
+che salgono (il divieto).
+PROVATO: in node (`prove_ritocchi_sera_p2p`) la pura e, con finte minime
+di DOM, i cinque passi (0, 52, 60, 104 px e risalita), la pila aperta e
+lo scarto della chiusura; le stringhe del CSS (mai più `transition:top`
+sugli appesi né `relative` senza scarto). Controprove: con tutte le
+monete dentro insieme due rosse, con lo scarto a zero una rossa. Nel
+banco (Chromium, CSS e funzioni veri, 360 px, scorrimento a 3 px) un
+video: sale USDT e la sua moneta entra, poi ETH·XMR, e risalendo i tre
+tornano. Il video sta nella Library del progetto:
+`novita-scorrimento/banner-progressivo.mp4`.
+DA GUARDARE: dal telefono di Andrea (webview Android di Telegram) che la
+salita sia liscia come nel banco.
