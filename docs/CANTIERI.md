@@ -86568,3 +86568,42 @@ coincurve, il nuovo anche senza le variabili del proxy.
 DA GUARDARE. Gli import (CSV, negozi collegati, Nostr) non la portano:
 chi carica alimenti in blocco la scrive a mano annuncio per annuncio. In
 modalità DEMO la scheda non la mostra (non c'è il server che la rilegge).
+
+## La licenza AGPL-3.0 e il repository che diventa pubblico (17 nov 2026, cantiere licenza-agpl; Andrea, per la candidatura a OpenSats: «Sì, apro tutto il repo», e Alan d'accordo: «va benissimo renderlo pubblico»)
+
+PERCHÉ. OpenSats finanzia solo software libero sviluppato in pubblico
+(«Anything that is closed source is off the table»): il modulo
+https://opensats.org/apply/grant chiede il repository e la sua licenza, e
+il repository era privato e senza licenza. Bozza della domanda nella
+Library: `opensats/candidatura-opensats-2026-11.md`.
+LA SCELTA. AGPL-3.0 e non MIT: Barattolo è un server, e con la MIT chiunque
+potrebbe rimetterlo online chiuso con le sue modifiche; la AGPL obbliga chi
+lo offre in rete a pubblicare le modifiche. OpenSats accetta entrambe. Il
+testo è quello SPDX (`AGPL-3.0-only`, paragrafi senza a-capo forzati: il
+riconoscimento di GitHub normalizza gli spazi). Le librerie di `vendor/`
+(MIT, ISC, Apache, OFL per i font) e le icone di `assets/` restano sotto le
+loro licenze, già scritte accanto ai file: tutte compatibili con la AGPL.
+IL CONTROLLO PRIMA DI APRIRE. Tutti gli oggetti di tutti gli 80 rami (3.168
+commit) passati con ripgrep sulle forme di nsec, token Telegram, chiavi age,
+chiavi PEM, token GitHub/Anthropic/OpenAI/AWS, macaroon LND, chiavi private
+WireGuard, xprv, seed e chiavi LNbits assegnate: nessun segreto. Gli unici
+xprv sono i vettori pubblici di BIP32 in `vendor/vettori-bip.json`. Restano
+visibili, ed è accettato: l'email dei commit, gli IP e i nomi delle macchine
+e i comandi ssh nei documenti, i punti aperti dell'audit. Sul VPS
+`sshd -T` dice `passwordauthentication no` (letto da Andrea). La CI
+(`prove.yml`) parte solo sui push a main e a mano, mai su `pull_request`:
+un fork non può far girare codice sul runner della vm-2050.
+IL GESTO. Rendere pubblico il repository lo fa Andrea da GitHub (Settings,
+Danger Zone, Change visibility): non lo fa una sessione.
+PROVATO. Solo testi (LICENSE, README, questa voce), nessun simbolo toccato.
+Sull'albero del cantiere (da develop c6042b89): suite severa 28.840/0 e
+collaudi della CI nella gabbia 139/0. Dopo il primo rebase (su f0b2a6b3,
+tre commit P2P, conflitto solo nella coda di questo file): suite severa
+28.869/0. Poi develop è corso ancora (6953edaa e 6de747a6, il primo wallet
+e i totali del negozio: né LICENSE né README): rebasato, stesso conflitto
+di coda, suite severa 28.891/0. Al momento del push develop era già a
+922faccf (l'etichetta degli alimenti: né LICENSE né README): rebasato
+senza altro giro. Le due saltate di sempre sono nostr-tools, che in questa
+macchina non c'è.
+DA GUARDARE: dopo il cambio di visibilità, che GitHub mostri «AGPL-3.0»
+nella pagina del repository (la licenza arriva su main con la promozione).

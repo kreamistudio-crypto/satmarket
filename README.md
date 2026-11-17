@@ -56,6 +56,14 @@ pip install fastapi uvicorn httpx anthropic websocket-client
 Senza backend attivo, `miniapp.html` gira in **modalità demo** con
 dati finti: utile per lavorare sulla UX.
 
+## Licenza
+
+Barattolo è software libero: il codice sta sotto la **GNU Affero
+General Public License v3.0** (file `LICENSE`). Chi lo copia, lo
+cambia e lo mette online deve pubblicare anche le sue modifiche, con
+la stessa licenza. Le librerie in `vendor/` e le icone e i font in
+`assets/` restano sotto le loro licenze, scritte accanto ai file.
+
 ## ⚠️ Avvertenze
 
 - **`config.py` non va MAI committato**: contiene la admin key di
