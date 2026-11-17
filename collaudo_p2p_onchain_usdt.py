@@ -444,6 +444,53 @@ def main():
           [gesto(888, oid2, "euro-inviati", txid=TXID_TRON).status_code,
            gesto(888, oid2, "euro-inviati", txid=TXID_ETH).status_code])
 
+    # ---- 6) IN MONETA: l'id della transazione (17 nov 2026, Andrea:
+    # «Perché per usde non si può incollare id transazione?») ---------------
+    print("\n[in moneta: l'id della transazione, come gli USDT]")
+    SRV.P2P_COIN_ATTIVO = True
+    SRV._cambio_coin_cache.update(eth=3000.0, xmr=150.0, usde=0.92, quando=time.time())
+    r = pubblica(999, metodi=["USDe (Ethereum) 50.00"], recapito=ETH, euro_cent=None)
+    prova("chi vende bitcoin per USDe su Ethereum pubblica", 200, r.status_code)
+    oid3 = r.json()["id"]
+    come(888)
+    gesto(888, oid3, "prendi")
+    paga(uno(999, oid3))
+    gesto(888, oid3, "controlla")
+    r = gesto(888, oid3, "euro-inviati")
+    prova("«Ho inviato gli USDe» senza l'id: 400", (400, True),
+          (r.status_code, "id della transazione" in r.json()["detail"]))
+    r = gesto(888, oid3, "euro-inviati", txid=TXID_TRON[:40])
+    prova("...con un id storto: 400", (400, True),
+          (r.status_code, "non sembra l'id" in r.json()["detail"]))
+    banco.DETTO.clear()
+    r = gesto(888, oid3, "euro-inviati", txid="c" * 64)
+    prova("...con l'id senza 0x: passa, si salva col suo 0x, e chi vende lo "
+          "riceve con la cifra in USDe", (200, "euro_inviati", "0x" + "c" * 64, True, True),
+          (r.status_code, uno(999, oid3)["stato"], uno(999, oid3)["coin_tx"]["txid"],
+           detto_a(999, "0x" + "c" * 64), detto_a(999, "50,00 USDe su Ethereum")))
+    prova("...l'id lo vede anche chi l'ha mandato", "0x" + "c" * 64,
+          uno(888, oid3)["coin_tx"]["txid"])
+    come(777)
+    t = c.get(f"/api/p2p/onchain/{oid3}").json()
+    prova("il moderatore vede l'id e l'indirizzo di chi riceveva", ("0x" + "c" * 64, ETH),
+          (t["coin_tx"]["txid"], t["coin_tx"].get("indirizzo")))
+    # Monero vuole anche la chiave della transazione
+    XMR = ("4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge")
+    r = pubblica(999, metodi=["XMR (Monero) 0.300000"], recapito=XMR, euro_cent=None)
+    if r.status_code == 200:
+        oid4 = r.json()["id"]
+        gesto(888, oid4, "prendi")
+        paga(uno(999, oid4))
+        gesto(888, oid4, "controlla")
+        prova("in Monero l'id da solo non basta: serve la chiave; con tutt'e due passa",
+              [400, 200, "d" * 64],
+              [gesto(888, oid4, "euro-inviati", txid="e" * 64).status_code,
+               gesto(888, oid4, "euro-inviati", txid="e" * 64, chiave="d" * 64).status_code,
+               uno(999, oid4)["coin_tx"]["chiave"]])
+    else:
+        prova("l'ordine in Monero nasce (indirizzo di prova valido)", 200,
+              (r.status_code, r.json().get("detail")))
+
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
     print("=" * 58)

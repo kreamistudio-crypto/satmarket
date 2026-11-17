@@ -46818,7 +46818,9 @@ def prove_fogli_di_casa():
     # «Il codice k funziona?» (`codiceFunziona`, l'ultimo libera i sats),
     # «Il codice k non funziona?» (`codiceNonFunziona`, la disputa sul
     # solo codice) e «Consegni gli N codici?» (`consegnaCodici`).
-    prova("i gesti che passano dalla domanda unica sono centodiciassette (dal 30 ott "
+    # CENTODICIOTTO (17 nov 2026, cantiere onchain-chat-sollecito): «Hai
+    # inviato gli USDe/ETH/XMR?» on-chain (`coinInviatiOcP2P`), l'id prima.
+    prova("i gesti che passano dalla domanda unica sono centodiciotto (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -46828,8 +46830,9 @@ def prove_fogli_di_casa():
           "un wallet nuovo?» del wallet unico; dal 13 nov «Hai inviato gli "
           "ETH/XMR?»; dal 14 nov via il foglio della fee dinamica, e le "
           "quattro della modifica e cancellazione dei feedback; dal 16 nov "
-          "le quattro dei codici uno alla volta)",
-          117, solo_codice(mini).count("chiediConferma({"))
+          "le quattro dei codici uno alla volta; dal 17 nov «Hai inviato gli "
+          "USDe?» on-chain)",
+          118, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -201161,6 +201164,95 @@ def prove_onchain_promemoria():
            "await _notifica_p2p_onchain(o, chi, testo, _p2p_onchain_bottone(o))" in ronda))
 
 
+def prove_onchain_txid_moneta():
+    """L'ID DELLA TRANSAZIONE IN MONETA NELLO SCAMBIO ON-CHAIN (17 nov
+    2026, cantiere onchain-chat-sollecito, Andrea: «Perché per usde non si
+    può incollare id transazione?»). Come gli USDT: prima di «Ho inviato
+    gli ETH/XMR/USDe» l'id (con Monero anche la chiave), giudicato dal
+    server con le stesse regole del telefono (`giudiceTxidCoinP2P`,
+    `giudiceChiaveTxXmrP2P`): qui i due giudici sullo stesso banco di
+    casi, la forma rete per rete uguale, e la pagina che usa il gesto nuovo."""
+    print("\n[l'id della transazione in moneta, nello scambio on-chain]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    amb = {"re": __import__("re")}
+    for diz in ("P2P_COIN_FORMA = {",):
+        i = src.index("\n" + diz) + 1
+        exec(src[i:src.index("\n}\n", i) + 3], amb)
+    j = src.index("\n_BASE58_ALFABETO = ") + 1
+    exec(src[j:src.index("\n", j)], amb)
+    for f in ("_base58_byte", "p2p_onchain_giudica_txid_coin", "p2p_onchain_giudica_chiave_xmr"):
+        exec(pezzo(f), amb)
+    G, K = amb["p2p_onchain_giudica_txid_coin"], amb["p2p_onchain_giudica_chiave_xmr"]
+    # una firma Solana vera nella forma: 64 byte in Base58
+    alfa = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    n = int.from_bytes(bytes(range(1, 65)), "big")
+    sol = ""
+    while n:
+        n, r = divmod(n, 58)
+        sol = alfa[r] + sol
+    casi = [("ETH (Ethereum)", "0x" + "a" * 64), ("ETH (Ethereum)", "b" * 64),
+            ("ETH (Ethereum)", "0x" + "a" * 63), ("USDe (Arbitrum)", " 0x" + "c" * 64 + " "),
+            ("XMR (Monero)", "d" * 64), ("XMR (Monero)", "0x" + "d" * 64),
+            ("USDe (Solana)", sol), ("USDe (Solana)", "e" * 64), ("USDe (Solana)", sol[:-3]),
+            ("USDe (Ethereum)", ""), ("XMR (Monero)", "zz")]
+    server = [[G(t, m)[0] == "", G(t, m)[1]] for m, t in casi]
+    prova("IL GIUDICE DEL SERVER: EVM con e senza 0x (lo rimette), Monero nudo, la firma "
+          "Solana di 64 byte; no alla forma di un'altra rete, ai monchi e al vuoto",
+          [[True, "0x" + "a" * 64], [True, "0x" + "b" * 64], [False, ""],
+           [True, "0x" + "c" * 64], [True, "d" * 64], [False, ""], [True, sol],
+           [False, ""], [False, ""], [False, ""], [False, ""]], server)
+    prova("...e le frasi dicono la rete giusta",
+          (True, True, True),
+          ("forma di Ethereum" in G("0x" + "d" * 64, "XMR (Monero)")[0],
+           "Solana" in G("e" * 64, "USDe (Solana)")[0],
+           "transazione Arbitrum" in G("xyz", "USDe (Arbitrum)")[0]))
+    prova("LA CHIAVE DI MONERO: vuota no, 64 cifre si', piu' chiavi di fila si', storta no",
+          [False, True, True, False],
+          [K("") == "", K("f" * 64) == "", K("f" * 128) == "", K("f" * 63) == ""])
+    # i due giudici sullo stesso banco (il telefono in node)
+    js = ("const P2P_RETI_COIN = " + mini[mini.index("const P2P_RETI_COIN = [") + len("const P2P_RETI_COIN = "):
+                                         mini.index("\n];\n", mini.index("const P2P_RETI_COIN = [")) + 2] + ";\n"
+          + _riga_js(mini, "const ALFABETO_B58_P2P = ")
+          + _fn_js(mini, "function base58P2P(s){")
+          + _fn_js(mini, "function giudiceTxidCoinP2P(testo, r){")
+          + _fn_js(mini, "function txidCoinNormaleP2P(testo, r){")
+          + "const casi = " + json.dumps(casi) + ";\n"
+          + "const forme = {}; for (const r of P2P_RETI_COIN) forme[r.metodo] = r.forma;\n"
+          + "console.log(JSON.stringify({forme, esiti: casi.map(([m, t]) => { const r = "
+            "P2P_RETI_COIN.find(x => x.metodo === m); const n = txidCoinNormaleP2P(t, r); "
+            "return giudiceTxidCoinP2P(n, r) === '' ? [true, n] : [false, '']; })}));\n")
+    out = _node_banco(js)
+    if out is None:
+        salta("onchain_txid_moneta", "node non c'e': i due giudici non si confrontano")
+    else:
+        prova("IL TELEFONO E IL SERVER DICONO LO STESSO su ogni caso, e la forma di ogni "
+              "rete e' la stessa", (server, amb["P2P_COIN_FORMA"]),
+              (out.get("esiti"), out.get("forme")))
+    sc = _fn_js(mini, "function schedaOnchainP2P(o){")
+    prova("LA PAGINA: in moneta il gesto e' `coinInviatiOcP2P` (mai piu' il nudo "
+          "'euro-inviati'), col campo dell'id sopra e l'id mandato sotto",
+          (True, False, True, True),
+          ("bott('orange', `coinInviatiOcP2P(this, ${o.id})`" in sc,
+           "gesti = (o.recapito ? g('euro-inviati'" in sc[sc.index("if (ricevo && rCoin)"):
+                                                            sc.index("break;", sc.index("if (ricevo && rCoin)"))],
+           "campoTxidCoinOcP2P(o)" in sc, "txCoinOcP2P(o)" in sc))
+    f = _fn_js(mini, "function coinInviatiOcP2P(btn, id){")
+    prova("...e il gesto giudica l'id (e la chiave di Monero) prima di chiedere conferma",
+          (True, True, True, True),
+          (f.index("giudiceTxidCoinP2P(txid, r)") < f.index("chiediConferma("),
+           f.count("if (no) { toast(no, 7000);") == 2
+           and f.index("if (no) { toast(no, 7000); if (iT)") < f.index("const chiave"),
+           f.index("giudiceChiaveTxXmrP2P(chiave)") < f.index("chiediConferma("),
+           "{txid, chiave}" in f))
+    rotta = pezzo("p2p_onchain_euro_inviati")
+    prova("LA ROTTA: in moneta vuole l'id giudicato e, con Monero, la chiave",
+          (True, True, True),
+          ("p2p_onchain_giudica_txid_coin(d.get(\"txid\"), metodo)" in rotta,
+           "p2p_onchain_giudica_chiave_xmr(chiave)" in rotta,
+           "txid_coin=?, chiave_tx_coin=?" in rotta))
+
+
 def prove_indirizzo_resta_dove_sta():
     """«MOSTRA L'INDIRIZZO» NON RIPORTA IN CIMA (16 nov 2026, cantiere
     indirizzo-resta, Andrea: «se premo mostra indirizzo in un ordine il
@@ -202886,7 +202978,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -203595,6 +203687,7 @@ def main():
     prove_convenienza_monete,
     prove_onchain_come_lightning,
     prove_onchain_promemoria,
+    prove_onchain_txid_moneta,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
     prove_scelta_rete_mercatino,
