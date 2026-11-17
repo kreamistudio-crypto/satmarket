@@ -88681,3 +88681,32 @@ collaudi su 148»).
 
 **COSA RESTA.** Se un giorno serve un giro intero su main senza commit:
 Actions → prove → «Run workflow» su main (non sposta `pronto`).
+
+## Gli screenshot all'assistenza, seconda parte: anche lo staff risponde con uno screenshot (17 nov 2026, sera, cantiere assistenza-screenshot-staff; Andrea: «Sì, anche lo staff può rispondere con uno screenshot»)
+
+**COSA C'È.** La casella «Rispondi come staff…» del pannello ha il suo
+«📎 Allega screenshot», con le stesse regole di chi scrive: fino a tre,
+il testo può mancare se c'è uno screenshot, vaglio prima del disco, file
+cifrati in `buste/assistenza`. La riga sta nella conversazione
+dell'utente, quindi la rotta delle immagini la apre a lui e agli admin
+senza toccare niente. All'utente l'avviso di sempre («ti ha risposto»,
+senza il contenuto: la risposta si legge in app), niente foto nel bot.
+
+**LE DECISIONI.** Due mucchi di scelte nel client (`mio` e `adm`) e non
+uno: un admin che allega nella propria chat e poi apre il pannello non
+deve trovarsi quello screenshot nella risposta a un altro; per la stessa
+ragione il mucchio dello staff si svuota quando si apre o si lascia una
+conversazione. Nel server i file si scrivono DOPO il controllo che
+l'utente esista: rispondere a chi non c'è non lascia orfani.
+
+**PROVATO.** `collaudo_assistenza` 80/80 (10 nuove: il 403 al non-admin
+senza file scritti, la risposta fatta solo di uno screenshot, l'avviso
+all'utente, l'utente che la trova e la apre, l'altro utente 404, lo
+screenshot storto e l'utente inesistente senza orfani, il vuoto senza
+screenshot). CONTROPROVA ROSSA: la rotta dello staff che ignora gli
+screenshot. DAL VIVO in Playwright: l'admin 999 allega e risponde, le
+scelte si svuotano, il compratore 111 vede la miniatura dello staff.
+IL VERBALE: suite intera severa sull'albero del cantiere (sopra develop
+88de13e), 29.509 verdi, 0 rosse, 2 saltate di sempre (nostr-tools non
+c'è in cloud); collaudi della CI nella gabbia, venv senza coincurve,
+151/151. Tutto girato in cloud.

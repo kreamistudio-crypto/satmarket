@@ -61959,7 +61959,14 @@ let assistenzaInvio = false;
    che vuole chi sei: quindi fetch con l'intestazione e un objectURL,
    tenuto in `assistenzaImgUrl` per non riscaricarle a ogni ridisegno. */
 const ASSISTENZA_IMG_MAX = 3;
-let assistenzaAllegati = [];        // [{dati: dataURL} | {caricando: true}]
+/* le scelte prima dell'invio, per casella: `mio` (chi scrive allo staff)
+   e `adm` (la risposta dello staff, dal 17 nov 2026 sera: il sì di
+   Andrea). Due mucchi e non uno: un admin che allega nella sua chat e
+   poi apre il pannello non deve trovarsi lo screenshot nella risposta
+   a un altro. Ogni voce: {dati: dataURL} | {caricando: true} */
+const assistenzaAllegati = {mio: [], adm: []};
+const ASSISTENZA_CASELLA = {mio: {file: 'assistenzaFile', box: 'assistenzaAllegati'},
+                            adm: {file: 'assistenzaAdmFile', box: 'assistenzaAdmAllegati'}};
 const assistenzaImgUrl = {};        // nome -> objectURL
 /* IL TASTO DELL'AVVISO (5 nov 2026, passo 2): `/?assistenza=mia` apre
    la propria chat, `/?assistenza=<utente>` la conversazione per un
@@ -62063,27 +62070,29 @@ function apriScreenshotAssistenza(img){
   if (!lista.length) return;
   apriLightbox(Math.max(0, lista.indexOf(assistenzaImgUrl[img.getAttribute('data-assist-img')])), lista);
 }
-/* le scelte sotto la casella, con la ✕ per toglierle prima dell'invio */
-function allegatiAssistenzaHTML(){
-  const scelte = assistenzaAllegati.map((a, j) => a.caricando
+/* le scelte sotto la casella, con la ✕ per toglierle prima dell'invio.
+   `chi`: 'mio' o 'adm' (vedi ASSISTENZA_CASELLA) */
+function allegatiAssistenzaHTML(chi){
+  const l = assistenzaAllegati[chi] || [];
+  const scelte = l.map((a, j) => a.caricando
     ? '<div class="fb-scelta" aria-label="Preparo lo screenshot">⏳</div>'
     : '<div class="fb-scelta"><img src="' + esc(a.dati) + '" alt="Screenshot ' + (j + 1) + '">'
       + '<button type="button" aria-label="Togli lo screenshot ' + (j + 1) + '" '
-      + 'onclick="togliAllegatoAssistenza(' + j + ')">✕</button></div>').join('');
-  return scelte + (assistenzaAllegati.length < ASSISTENZA_IMG_MAX
-    ? '<button type="button" class="btn ghost mini" onclick="haptic();el(\'assistenzaFile\').click()">📎 '
-      + (assistenzaAllegati.length ? 'Un altro screenshot'
+      + 'onclick="togliAllegatoAssistenza(\'' + chi + '\',' + j + ')">✕</button></div>').join('');
+  return scelte + (l.length < ASSISTENZA_IMG_MAX
+    ? '<button type="button" class="btn ghost mini" onclick="haptic();el(\'' + ASSISTENZA_CASELLA[chi].file + '\').click()">📎 '
+      + (l.length ? 'Un altro screenshot'
          : 'Allega screenshot (facoltativi, max ' + ASSISTENZA_IMG_MAX + ')') + '</button>'
     : '');
 }
-function ridisegnaAllegatiAssistenza(){
-  const b = el('assistenzaAllegati');
-  if (b) b.innerHTML = allegatiAssistenzaHTML();
+function ridisegnaAllegatiAssistenza(chi){
+  const b = el(ASSISTENZA_CASELLA[chi].box);
+  if (b) b.innerHTML = allegatiAssistenzaHTML(chi);
 }
-function togliAllegatoAssistenza(j){
+function togliAllegatoAssistenza(chi, j){
   haptic();
-  assistenzaAllegati.splice(j, 1);
-  ridisegnaAllegatiAssistenza();
+  assistenzaAllegati[chi].splice(j, 1);
+  ridisegnaAllegatiAssistenza(chi);
 }
 /* PURA quanto basta: i byte pronti come data URL */
 function dataUrlDaByteAssistenza(dati, tipo){
@@ -62094,7 +62103,8 @@ function dataUrlDaByteAssistenza(dati, tipo){
     fr.readAsDataURL(new Blob([dati], {type: tipo}));
   });
 }
-async function screenshotAssistenzaScelti(input){
+async function screenshotAssistenzaScelti(input, chi){
+  const l = assistenzaAllegati[chi];
   const files = [...(input.files || [])];
   input.value = '';            // cosi' si puo' riscegliere lo stesso file
   if (!files.length) {
@@ -62104,12 +62114,12 @@ async function screenshotAssistenzaScelti(input){
     return;
   }
   for (const file of files) {
-    if (assistenzaAllegati.length >= ASSISTENZA_IMG_MAX) {
+    if (l.length >= ASSISTENZA_IMG_MAX) {
       toast('Al massimo ' + ASSISTENZA_IMG_MAX + ' screenshot per messaggio'); break;
     }
     const segno = {caricando: true};
-    assistenzaAllegati.push(segno);
-    ridisegnaAllegatiAssistenza();
+    l.push(segno);
+    ridisegnaAllegatiAssistenza(chi);
     let dati = '';
     try {
       const p = await preparaFotoChatScP2P(file, 'image/jpeg');
@@ -62121,19 +62131,21 @@ async function screenshotAssistenzaScelti(input){
       dati = esito.foto || '';
       if (!dati) toast(esito.motivo || '«' + file.name + '» non è entrata: riprova con un\'altra immagine', 7000);
     }
-    const j = assistenzaAllegati.indexOf(segno);   // puo' essersi spostato (✕ su altre)
+    const j = l.indexOf(segno);   // puo' essersi spostato (✕ su altre)
     if (j >= 0) {
-      if (dati) assistenzaAllegati[j] = {dati}; else assistenzaAllegati.splice(j, 1);
+      if (dati) l[j] = {dati}; else l.splice(j, 1);
     }
-    ridisegnaAllegatiAssistenza();
+    ridisegnaAllegatiAssistenza(chi);
   }
 }
-function casellaAssistenzaHTML(id, invia, segnaposto, conAllegati){
+/* `chi`: 'mio' o 'adm', la casella e il suo mucchio di screenshot */
+function casellaAssistenzaHTML(id, invia, segnaposto, chi){
+  const c = ASSISTENZA_CASELLA[chi];
   return '<div class="assist-casella"><textarea id="' + id + '" rows="3" maxlength="' + Number(assistenzaMax) + '" '
     + 'placeholder="' + esc(segnaposto) + '"></textarea>'
-    + (conAllegati
-      ? '<input type="file" id="assistenzaFile" accept="image/*" multiple hidden onchange="screenshotAssistenzaScelti(this)">'
-        + '<div class="fb-scelte" id="assistenzaAllegati">' + allegatiAssistenzaHTML() + '</div>'
+    + (c
+      ? '<input type="file" id="' + c.file + '" accept="image/*" multiple hidden onchange="screenshotAssistenzaScelti(this,\'' + chi + '\')">'
+        + '<div class="fb-scelte" id="' + c.box + '">' + allegatiAssistenzaHTML(chi) + '</div>'
       : '')
     + '<button class="btn orange" id="' + id + 'Btn" onclick="' + invia + '">Invia</button></div>';
 }
@@ -62153,7 +62165,7 @@ async function renderAssistenza(){
       + '<div class="chatmod-lista assist-lista" id="assistenzaLista">'
       + (assistenzaMsgs ? messaggiAssistenzaHTML(assistenzaMsgs, false)
                         : '<div class="hint">Carico la conversazione…</div>') + '</div>'
-      + casellaAssistenzaHTML('assistenzaTesto', 'inviaAssistenza()', 'Scrivi allo staff…', true);
+      + casellaAssistenzaHTML('assistenzaTesto', 'inviaAssistenza()', 'Scrivi allo staff…', 'mio');
     scorriInFondoAssistenza('assistenzaLista');
     caricaScreenshotAssistenza('assistenzaLista');
   };
@@ -62174,8 +62186,8 @@ async function renderAssistenza(){
 async function inviaAssistenza(){
   const t = el('assistenzaTesto');
   const testo = t ? t.value.trim() : '';
-  if (assistenzaAllegati.some(a => a.caricando)) { toast('Un momento: sto preparando lo screenshot'); return; }
-  const immagini = assistenzaAllegati.map(a => a.dati).filter(Boolean);
+  if (assistenzaAllegati.mio.some(a => a.caricando)) { toast('Un momento: sto preparando lo screenshot'); return; }
+  const immagini = assistenzaAllegati.mio.map(a => a.dati).filter(Boolean);
   if ((!testo && !immagini.length) || assistenzaInvio) return;
   haptic();
   assistenzaInvio = true;
@@ -62194,8 +62206,8 @@ async function inviaAssistenza(){
       caricaScreenshotAssistenza('assistenzaLista');
     }
     if (t) t.value = '';
-    assistenzaAllegati = [];
-    ridisegnaAllegatiAssistenza();
+    assistenzaAllegati.mio = [];
+    ridisegnaAllegatiAssistenza('mio');
     toast('Mandato allo staff');
   } catch(e) { toast('Rete assente: riprova'); }
   finally { assistenzaInvio = false; if (btn) btn.disabled = false; }
@@ -62204,6 +62216,8 @@ async function inviaAssistenza(){
    si e' mossa, «da rispondere» in evidenza), o la conversazione aperta.
    La ✕ dalla conversazione torna all'elenco, dall'elenco esce. */
 function indietroAssistenzaAdmin(){
+  /* gli screenshot scelti erano per QUELLA conversazione */
+  assistenzaAllegati.adm = [];
   if (assistenzaAdmAperta) { assistenzaAdmAperta = null; renderAssistenzaAdmin(); return; }
   navIndietro();
 }
@@ -62237,6 +62251,7 @@ async function renderAssistenzaAdmin(){
 }
 function apriConversazioneAdmin(utente){
   haptic();
+  assistenzaAllegati.adm = [];
   assistenzaAdmAperta = {utente: Number(utente), dati: null};
   renderConversazioneAdmin();
   window.scrollTo(0, 0);
@@ -62257,7 +62272,7 @@ async function renderConversazioneAdmin(){
       + (d ? messaggiAssistenzaHTML(d.messaggi, true, d.nome)
            : '<div class="hint">Carico la conversazione…</div>') + '</div>'
       + casellaAssistenzaHTML('assistenzaAdmTesto', 'rispondiAssistenzaAdmin()',
-                              'Rispondi come staff…')
+                              'Rispondi come staff…', 'adm')
       + '<button class="btn ghost" onclick="indietroAssistenzaAdmin()">← Tutte le conversazioni</button>';
     scorriInFondoAssistenza('assistenzaAdmLista');
     caricaScreenshotAssistenza('assistenzaAdmLista');
@@ -62280,17 +62295,20 @@ async function rispondiAssistenzaAdmin(){
   const a = assistenzaAdmAperta;
   const t = el('assistenzaAdmTesto');
   const testo = t ? t.value.trim() : '';
-  if (!a || !testo || assistenzaInvio) return;
+  if (assistenzaAllegati.adm.some(x => x.caricando)) { toast('Un momento: sto preparando lo screenshot'); return; }
+  const immagini = assistenzaAllegati.adm.map(x => x.dati).filter(Boolean);
+  if (!a || (!testo && !immagini.length) || assistenzaInvio) return;
   haptic();
   assistenzaInvio = true;
   try {
     const r = await fetch(`${API_BASE}/admin/assistenza/${Number(a.utente)}`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({testo})});
+       body: JSON.stringify(immagini.length ? {testo, immagini} : {testo})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Risposta non mandata, riprova', 6000); return; }
     if (a.dati) a.dati.messaggi = d.messaggi || a.dati.messaggi;
     if (t) t.value = '';
+    assistenzaAllegati.adm = [];
     if (assistenzaAdmAperta === a) renderConversazioneAdmin();
     toast('Risposta mandata: l\'utente riceve l\'avviso');
   } catch(e) { toast('Rete assente: riprova'); }

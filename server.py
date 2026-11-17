@@ -53421,18 +53421,31 @@ async def assistenza_rispondi_admin(utente: int, req: Request,
     admin = _solo_admin_assistenza(x_tg_init_data, barattolo_sessione)
     _frena("assistenza_staff", admin["id"])
     d = await leggi_json(req)
-    testo = _testo_assistenza(d.get("testo"))
+    # GLI SCREENSHOT ANCHE DALLO STAFF (17 nov 2026, il sì di Andrea alla
+    # proposta): le stesse regole di chi scrive — vaglio prima del disco,
+    # testo vuoto solo con uno screenshot, file cifrati in buste/assistenza.
+    # La riga sta nella conversazione dell'UTENTE, quindi la rotta delle
+    # immagini la apre a lui e agli admin, come le sue.
+    pronte = _immagini_assistenza(d.get("immagini"))
+    testo = _testo_assistenza(d.get("testo"), vuoto_ok=bool(pronte))
     con = db()
+    nomi = []
     try:
         _utente_assistenza(con, utente)
+        nomi = _scrivi_immagini_assistenza(pronte)
         con.execute("INSERT INTO assistenza(utente, autore, admin, testo, "
-                    "quando) VALUES(?,?,1,?,?)",
-                    (int(utente), admin["id"], testo, int(time.time())))
+                    "quando, immagini) VALUES(?,?,1,?,?,?)",
+                    (int(utente), admin["id"], testo, int(time.time()),
+                     ",".join(nomi)))
         # lo staff ha risposto: il prossimo messaggio riavvisa subito
         con.execute("DELETE FROM assistenza_avvisi WHERE utente=?",
                     (int(utente),))
         con.commit()
         righe = _righe_assistenza(con, utente, True)
+    except Exception:
+        # la riga non e' nata (o l'utente non c'e'): via i file
+        _togli_immagini_assistenza(nomi)
+        raise
     finally:
         con.close()
     # dopo il commit, mai dentro: notifica e' fail-open e non alza

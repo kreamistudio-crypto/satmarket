@@ -35257,7 +35257,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `screenshotAssistenzaScelti` (preparati con `preparaFotoChatScP2P` a
   1600 px, ripiego `ridimensiona`), `caricaScreenshotAssistenza` (fetch
   con chi sei → objectURL in `assistenzaImgUrl`), il tocco apre
-  `apriLightbox`. Le risposte dello staff restano solo testo.
+  `apriLightbox`. DALLA SERA DEL 17 NOV anche `POST
+  /api/admin/assistenza/{utente}` accetta `immagini`, con le stesse
+  regole: la riga sta nella conversazione dell'utente, quindi lui e gli
+  admin la aprono; nel client due mucchi di scelte
+  (`assistenzaAllegati.mio` e `.adm`, `ASSISTENZA_CASELLA`), e quello
+  dello staff si svuota cambiando conversazione.
 - LO SWAP, L'INSTRADATORE (20 ott 2026, cantiere swap-instradatore;
   perché in CANTIERI, «Lo swap, l'instradatore»). La tappa 3 qui sopra è
   divisa: `swap/boltz.js` (il TIPO «boltz»: il motore della tappa 3 —
