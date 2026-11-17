@@ -128950,6 +128950,19 @@ console.log(JSON.stringify({
           and "p.classList.toggle('on', p.dataset.n === n);" in car)
 
 
+def _picco_mp3(percorso):
+    """Il picco di un MP3 in dB (ffmpeg volumedetect); senza ffmpeg -99,
+    cioe' «non misurato», e la prova non si accende."""
+    import shutil as _sh, subprocess as _sp
+    if not _sh.which("ffmpeg"):
+        return -99.0
+    r = _sp.run(["ffmpeg", "-hide_banner", "-i", percorso, "-af",
+                 "volumedetect", "-f", "null", "-"],
+                capture_output=True, text=True)
+    m = re.search(r"max_volume: (-?[\d.]+) dB", r.stderr or "")
+    return float(m.group(1)) if m else -99.0
+
+
 def prove_stradina():
     """LA STRADINA DEGLI OBIETTIVI (17 nov 2026, cantiere stradina): un
     TABELLONE lunghissimo da scorrere, dalla Terra alla Luna, in otto
@@ -128988,6 +129001,44 @@ def prove_stradina():
           (CAS[-1][1], CAS[-1][0], __import__("time").strftime(
               "%Y-%m", __import__("time").gmtime(amb["STRADINA_HALVING_2028"]))))
     prova("il tabellone e' lungo: almeno 60 caselle", True, len(CAS) >= 60)
+    # LE CASELLE DI PROVA degli admin (17 nov, Andrea: «fammelo provare
+    # tutto ... almeno me e Alan che siamo amministratori»)
+    exec(pezzo("stradina_finte"), amb)
+    exec(pezzo("applica_finte"), amb)
+    _cp = __import__("sqlite3").connect(":memory:")
+    prova("senza la tabella delle prove nessuna casella finta (mai un errore)",
+          set(), amb["stradina_finte"](_cp, 1))
+    _cp.execute("CREATE TABLE stradina_prova (tg_id INTEGER NOT NULL, tappa "
+                "TEXT NOT NULL, quando INTEGER NOT NULL, PRIMARY KEY (tg_id, tappa))")
+    _cp.executemany("INSERT INTO stradina_prova VALUES (?,?,0)",
+                    [(1, "foto"), (1, "porta"), (1, "gia"), (2, "segui")])
+    _tf = amb["applica_finte"](
+        [{"id": "foto", "fatto": False}, {"id": "porta", "fatto": None},
+         {"id": "gia", "fatto": True}, {"id": "segui", "fatto": False}],
+        amb["stradina_finte"](_cp, 1))
+    prova("una casella di prova si accende e porta `finta`; la porta resta "
+          "porta, la fatta davvero non diventa finta, quelle di un altro "
+          "admin non contano",
+          [(True, True), (None, False), (True, False), (False, False)],
+          [(t["fatto"], bool(t.get("finta"))) for t in _tf])
+    pp = pezzo("prova_stradina")
+    ms_ = pezzo("mia_stradina")
+    prova("...la porta delle prove e' SOLO per gli admin (403 agli altri, "
+          "prima di toccare la tabella), l'id passa da una forma stretta, "
+          "c'e' un tetto, e si azzera intera", True,
+          pp.index('if not e_admin(user["id"]):') < pp.index("con = db()")
+          and "raise HTTPException(403" in pp
+          and "STRADINA_ID_TAPPA.match(tappa)" in pp
+          and "STRADINA_PROVA_MAX" in pp
+          and 'DELETE FROM stradina_prova WHERE tg_id=?", (user["id"],)' in pp)
+    prova("...e il tabellone accende le prove solo a un admin, e lo dice al "
+          "client (`prova`)", True,
+          'prova = e_admin(user["id"])' in ms_
+          and 'tappe = applica_finte(tappe, stradina_finte(con, user["id"]))' in ms_
+          and '"prova": prova' in ms_)
+    prova("...le caselle di prova non danno XP: il giudice degli XP non le "
+          "legge mai", False, "stradina_prova" in pezzo("livello_utente")
+          + pezzo("fatti_stradina"))
     # IL RACCONTO (17 nov, Andrea: «deve essere una storia»): ogni zona ha
     # la sua frase di Tappo, corta (sta in tre righe sul cartello), e la
     # frase nomina una cosa che si fa davvero in quella zona
@@ -129248,9 +129299,15 @@ def prove_stradina():
           and ms.index("except Exception:\n                superate = set()") > 0)
     blocco = _SORGENTE[_SORGENTE.index("LA STRADINA DEGLI OBIETTIVI (17 nov 2026)"):
                        _SORGENTE.index("def asset_mappa_stradina")]
-    prova("il cantiere non scrive niente: ne' xp, ne' tabelle", True,
-          "UPDATE " not in blocco and "INSERT " not in blocco
-          and "CREATE TABLE" not in blocco)
+    # l'unica scrittura e' la prova degli admin, nella SUA tabella
+    _pp = pezzo("prova_stradina")
+    _resto = blocco.replace(_pp, "")
+    prova("il cantiere non scrive niente: ne' xp, ne' tabelle (fuori dalla "
+          "prova degli admin, che scrive solo `stradina_prova`)", True,
+          "UPDATE " not in _resto and "INSERT " not in _resto
+          and "CREATE TABLE" not in _resto
+          and "UPDATE " not in _pp
+          and set(re.findall(r"(?:INSERT OR IGNORE INTO|DELETE FROM|CREATE TABLE IF NOT EXISTS) (\w+)", _pp)) == {"stradina_prova"})
     am_s = pezzo("asset_mappa_stradina")
     prova("la mappa e la pedina sono una rotta esplicita (whitelist a "
           "tupla), non un mount", True,
@@ -129320,6 +129377,24 @@ def prove_stradina():
           '@app.get("/assets/stradina/suoni/{nome}")' in _SORGENTE
           and "if nome not in FILE_SUONI_STRADINA:" in as_s
           and 'media_type="audio/mpeg"' in as_s)
+    mu = pezzo_js(mini, "function musicaStradinaParti(){", "\n}\n")
+    prova("LA MUSICA DEL TABELLONE: un brano in loop, basso, zitto se muto o "
+          "se il file manca; si ferma uscendo dalla pagina e col 🔇", True,
+          "new Audio('/assets/stradina/musica/mappa.mp3')" in mu
+          and "musicaStradina.loop = true;" in mu
+          and "if (suoniMuti() || musicaRotta || typeof Audio !== 'function') return;" in mu
+          and "if (view !== 'stradina' && typeof musicaStradinaFerma === 'function') musicaStradinaFerma();" in mini
+          and "if (muta) musicaStradinaFerma();" in mini)
+    am = pezzo("asset_musica_stradina")
+    prova("...e la sua rotta e' esplicita, con whitelist a tupla", True,
+          '@app.get("/assets/stradina/musica/{nome}")' in _SORGENTE
+          and 'FILE_MUSICA_STRADINA = ("mappa.mp3",)' in _SORGENTE
+          and "if nome not in FILE_MUSICA_STRADINA:" in am
+          and 'media_type="audio/mpeg"' in am)
+    prova("i suoni sono sotto le dita, non in faccia: nessun effetto oltre "
+          "-9 dB di picco (Andrea, 17 nov: «alcuni suoni sono troppo invasivi»)",
+          [], [n for n in nomi_c if os.path.exists("assets/stradina/suoni/%s.mp3" % n)
+               and _picco_mp3("assets/stradina/suoni/%s.mp3" % n) > -9.0])
     st = pezzo_js(mini, "function suonoSintetico(nome){", "\n}\n")
     prova("i suoni: WebAudio sintetizzato, zitto se muto o senza WebAudio, "
           "mai un errore", True,
@@ -129359,19 +129434,55 @@ const voltoHTML = (a, cl) => `<span class="${cl}">${esc(a.nome)}</span>`;
 const suoniMuti = () => true;
 const d = %s;
 const h = stradinaHTML(d, 340);
-const g = stradinaDisegno(d.tappe, 340);
+const vv = stradinaVisibili(d.tappe);
+const vis = d.tappe.slice(0, vv.fine);
+const g = stradinaDisegno(vis, 340);
 const u = stradinaUltimaFatta(d.tappe);
+const tutte = Object.assign({}, d, {tappe: d.tappe.map(t => Object.assign({}, t, {fatto: t.fatto === null ? null : true}))});
+const ht = stradinaHTML(tutte, 340);
+const pano = stradinaPanoramicaHTML(d), pano_tutte = stradinaPanoramicaHTML(tutte);
 const cls = s => (h.match(new RegExp('class="str-casella ' + s + '[ "]', 'g')) || []).length;
 const ped = /class="str-tappo"[^>]*style="left:(\\d+)px;top:(-?\\d+)px"/.exec(h) || [];
 const nuovo = Object.assign({}, d, {tappe: d.tappe.map((t, i) => Object.assign({}, t, {fatto: t.fatto === null ? null : i === 0}))});
 const iMis = d.tappe.findIndex(t => t.id === 'missione_lampo');
 console.log(JSON.stringify({
-  n: d.tappe.length, caselle: (h.match(/<button type="button" class="str-casella /g) || []).length,
+  n: d.tappe.length, fine: vv.fine, qui: vv.qui, chiusa: vv.chiusa,
+  n_gradini_vis: vis.filter(t => t.tipo === 'gradino' || t.tipo === 'luna').length,
+  caselle: (h.match(/<button type="button" class="str-casella /g) || []).length,
+  zona_dopo: vis.length ? vis[vis.length - 1].zona : -1, zona_oltre: d.tappe[vv.fine] ? d.tappe[vv.fine].zona : -1,
+  spente: (h.match(/class="str-zona [^"]*spenta/g) || []).length,
+  muro: (h.match(/class="str-chiusa"/g) || []).length,
+  muro_nome: h.includes('Finisci «' + esc(d.zone[vv.qui].nome) + '»'),
+  tutte_caselle: (ht.match(/<button type="button" class="str-casella /g) || []).length,
+  tutte_bande: (ht.match(/class="str-banda/g) || []).length,
+  tutte_muro: ht.includes('class="str-chiusa"'), tutte_luna: ht.includes('class="str-luna"'),
+  luna_nascosta: h.includes('class="str-luna"'),
+  misteri: (h.match(/class="str-casella chiusa mistero"/g) || []).length,
+  in_spenta: vis.filter(t => t.zona > vv.qui).length,
+  nomi_spenta: vis.map((t, i) => t.zona > vv.qui && h.includes('data-n="' + i + '"')).filter(Boolean).length,
+  scheda_mistero: stradinaSchedaHTML(d, vis.findIndex(t => t.zona > vv.qui)),
+  pross: stradinaProssima(d.tappe),
+  sv_prima: stradinaSvelate(null, d.tappe).caselle,
+  sv_stessa: stradinaSvelate(stradinaSvelate(null, d.tappe).adesso, d.tappe).caselle,
+  sv_passo: stradinaSvelate({p: stradinaProssima(d.tappe) - 1, q: vv.qui}, d.tappe).caselle,
+  sv_zona: stradinaSvelate({p: 0, q: vv.qui - 1}, d.tappe).caselle.length,
+  sv_zona_attese: d.tappe.filter(t => t.zona === vv.qui && t.fatto !== true).length,
+  razzo: [stradinaRazzo(nuovo.tappe), stradinaRazzo(d.tappe), stradinaRazzo(tutte.tappe), stradinaRazzo([])],
+  razzo_hero: h.includes('src="/assets/stradina/razzo-' + (vv.qui + 1) + '.webp"'),
+  razzo_pano: pano.includes('Pezzo ' + (vv.qui + 1) + ' di 8'),
+  pano_zone: (pano.match(/class="str-pano-zona/g) || []).length,
+  pano_nascoste: (pano.match(/class="str-pano-zona nascosta"/g) || []).length,
+  pano_qui: (pano.match(/class="str-pano-zona z\\d qui"/g) || []).length,
+  pano_tappo: (pano.match(/class="str-pano-tappo"/g) || []).length,
+  pano_tutte_nascoste: (pano_tutte.match(/nascosta/g) || []).length,
+  pano_luna_in_cima: pano.indexOf('La Luna') < pano.indexOf('Il razzo di Tappo')
+    && pano.indexOf('strVaiZona(' + vv.qui + ')') > pano.indexOf('aria-label="Zona ' + d.zone.length),
   fatte: cls('fatta'), ora: cls('ora'), porte: cls('porta'),
   vasi: (h.match(/<img class="vaso" src="\\/assets\\/barattolo-hero.png"/g) || []).length,
   icone: (h.match(/<img class="ico" src="\\/assets\\/stradina\\/ico-[a-z0-9_]+\\.webp"/g) || []).length,
-  n_caselle: d.tappe.filter(t => t.tipo === 'casella' && t.icona).length,
-  bande: (h.match(/class="str-banda"/g) || []).length,
+  n_caselle: vis.filter(t => t.tipo === 'casella' && t.icona && t.zona <= vv.qui).length,
+  fatte_oltre: d.tappe.some((t, i) => i > u + 1 && t.fatto === true),
+  bande: (h.match(/class="str-banda/g) || []).length,
   racconti: (h.match(/<span class="str-racconto"/g) || []).length,
   racconto_scappato: !h.includes('Tappo <i>dice') && h.includes('Tappo &lt;i&gt;dice'),
   mappe: (h.match(/src="\\/assets\\/stradina\\/zona\\d.webp"/g) || []).length,
@@ -129387,6 +129498,9 @@ console.log(JSON.stringify({
   pedine_ugo: /class="str-pedine"[^>]*>[^]*?Ugo &lt;b&gt;/.test(h),
   scheda_missione: stradinaSchedaHTML(d, iMis),
   scheda_fatta: stradinaSchedaHTML(d, 0),
+  scheda_prova: stradinaSchedaHTML(Object.assign({}, d, {prova: true}), stradinaProssima(d.tappe)),
+  scheda_noprova: stradinaSchedaHTML(d, stradinaProssima(d.tappe)),
+  scheda_finta: stradinaSchedaHTML({prova: true, zone: d.zone, tappe: [Object.assign({}, d.tappe[1], {fatto: true, finta: true})]}, 0),
   nuovo_ora: (/class="str-casella ora"[^>]*aria-label="([^"]*)"/.exec(stradinaHTML(nuovo, 340)) || [])[1],
   nuovo_u: stradinaUltimaFatta(nuovo.tappe),
   in_fila: stradinaUltimaFatta([{fatto: true}, {fatto: null}, {fatto: true},
@@ -129402,18 +129516,62 @@ console.log(JSON.stringify({
     if r.returncode:
         return
     o = _js.loads(r.stdout)
-    prova("un bottone per casella, una casella «tocca a te», la porta, "
-          "un barattolo per gradino", (o["n"], 1, 1, n_gradini),
+    prova("un bottone per casella visibile, una casella «tocca a te», la "
+          "porta, un barattolo per gradino visibile",
+          (o["fine"], 1, 1, o["n_gradini_vis"]),
           (o["caselle"], o["ora"], o["porte"], o["vasi"]))
+    # LA STRADA SI APRE ANDANDO (17 nov, Andrea): la zona dove sei, la
+    # dopo grigia e spenta, e sopra il muro col lucchetto
+    prova("LA STRADA SI APRE ANDANDO: si vede fino alla zona dopo la tua "
+          "(spenta), poi il muro col lucchetto che nomina la tua zona",
+          (True, o["qui"] + 1, o["qui"] + 2, 1, 1, True, False),
+          (o["chiusa"], o["zona_dopo"], o["zona_oltre"], o["spente"],
+           o["muro"], o["muro_nome"], o["luna_nascosta"]))
+    prova("...e con tutto fatto si vede tutto: le 8 zone, la Luna, nessun muro",
+          (o["n"], 8, False, True),
+          (o["tutte_caselle"], o["tutte_bande"], o["tutte_muro"], o["tutte_luna"]))
+    prova("LA ZONA SPENTA E' UN MISTERO: solo il cerchio col «?», nessuna "
+          "scritta accanto, e la scheda dice «Da scoprire» senza il nome",
+          (o["in_spenta"], 0, True),
+          (o["misteri"], o["nomi_spenta"],
+           "Da scoprire" in o["scheda_mistero"] and "Vai ›" not in o["scheda_mistero"]))
+    prova("LO SVELAMENTO: alla prima visita niente, rivedendo lo stesso "
+          "niente; un passo avanti accende la nuova «tocca a te»; una zona "
+          "nuova accende tutte le sue caselle da fare",
+          ([], [], [o["pross"]], o["sv_zona_attese"]),
+          (o["sv_prima"], o["sv_stessa"], o["sv_passo"][:1], o["sv_zona"]))
+    prova("IL RAZZO DI BULLONI: uno stadio per zona (chi comincia ha la "
+          "pedana, tutto fatto i motori accesi), in cima al tabellone e nel "
+          "viaggio intero", ([1, o["qui"] + 1, 8, 8], True, True),
+          (o["razzo"], o["razzo_hero"], o["razzo_pano"]))
+    razzi = ["razzo-%d.webp" % k for k in range(1, 9)]
+    prova("...gli otto stadi stanno nella whitelist della mappa, sul disco e "
+          "leggeri (sotto 40 KB)", ([], []),
+          ([r for r in razzi if '"%s"' % r not in _SORGENTE[
+              _SORGENTE.index("FILE_MAPPA_STRADINA = ("):_SORGENTE.index(
+                  '@app.get("/assets/stradina/{nome}")')]],
+           [r for r in razzi if not os.path.exists("assets/stradina/" + r)
+            or os.path.getsize("assets/stradina/" + r) > 40_000]))
+    prova("🧪 sulla scheda di un admin «Segna fatta (prova)»; a chi non e' "
+          "admin niente; una finta si puo' togliere", (True, False, True),
+          ("Segna fatta (prova)" in o["scheda_prova"],
+           "strProva(" in o["scheda_noprova"],
+           "Togli la prova" in o["scheda_finta"] and "🧪 prova" in o["scheda_finta"]))
+    prova("🗺 VEDI TUTTA: otto zone in una schermata, la Luna in cima, Tappo "
+          "sulla sua, le zone oltre la spenta col lucchetto (tutto fatto: "
+          "nessun lucchetto)",
+          (8, 8 - (o["qui"] + 2), 1, 1, True, 0),
+          (o["pano_zone"], o["pano_nascoste"], o["pano_qui"], o["pano_tappo"],
+           o["pano_luna_in_cima"], o["pano_tutte_nascoste"]))
     prova("le caselle hanno la loro icona disegnata (l'emoji resta sotto, "
           "per quando l'immagine manca)", o["n_caselle"], o["icone"])
-    prova("otto cartelli di zona e otto pezzi di mappa", (8, 8),
-          (o["bande"], o["mappe"]))
+    prova("un cartello e un pezzo di mappa per ogni zona visibile",
+          (o["qui"] + 2, o["qui"] + 2), (o["bande"], o["mappe"]))
     prova("ogni cartello porta la frase di Tappo, passata da esc",
-          (8, True), (o["racconti"], o["racconto_scappato"]))
+          (o["qui"] + 2, True), (o["racconti"], o["racconto_scappato"]))
     prova("LA MISSIONE NON SUPERATA E' UN CANCELLO: Tappo si ferma prima, "
           "anche se piu' su ci sono caselle fatte", True,
-          o["u"] < o["iMis"] and o["fatte"] > o["u"] + 1)
+          o["u"] < o["iMis"] and o["fatte_oltre"])
     prova("TAPPO CAMMINA IN FILA: si ferma prima della prima casella da "
           "fare (la porta inerte non lo ferma), anche se piu' su ce n'e' "
           "di fatte", 2, o["in_fila"])

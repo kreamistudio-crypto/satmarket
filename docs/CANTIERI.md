@@ -88225,6 +88225,74 @@ collaudi 148/148. Girato in cloud sull'albero sopra develop 29c493c.
 RESTA: il razzo che cresce sul tabellone, coi pezzi razzo-1..8 che il
 thread del gioco fa in Flow.
 
+LA STRADA SI APRE ANDANDO, LA MAPPA INTERA, I SUONI PIÙ BASSI E LA MUSICA
+(stesso giorno, Andrea provando la prima versione sul collaudo). (1) «La
+gente quando sale vede la zona dove non è arrivata tutta grigia e spenta,
+e poi non può più andare su»: `stradinaVisibili` dice fin dove si vede,
+cioè la zona della prossima casella da fare più UNA, spenta (mappa e
+cartello in grigio); sopra, al posto della Luna, il muro «🔒 Più su la
+strada è chiusa — Finisci «zona» e si apre un altro pezzo di viaggio».
+Con tutto fatto si vede tutto. Le caselle nascoste non si disegnano
+proprio (la tavola è più corta: scorrendo ci si ferma lì), e un amico su
+un gradino nascosto non compare. (2) «Un tasto per vedere tutta la mappa
+da lontano»: «🗺 Vedi tutta», fisso in alto a destra (il tabellone si apre
+su Tappo, a metà pagina: un tasto nell'intestazione non si vedrebbe),
+apre «Il viaggio intero», le otto zone in una schermata, due per riga
+dalla Terra alla Luna, col pezzo di mappa, il conto, la spunta, Tappo
+sulla sua; la zona spenta in grigio e le altre col lucchetto, coerenti
+col punto (1). Toccando una zona si torna al tabellone, lì. Scartato: il
+tabellone intero rimpicciolito (7.000 px in una schermata sono una
+striscia larga trenta). (3) «Alcuni suoni sono troppo invasivi»: i venti
+MP3 abbassati di circa 13 dB (picco a -12 dB, media verso -30 dB), «passo»
+accorciato a 0,4 s e «apri» a 1,5 s, con una dissolvenza in coda; una
+prova misura il picco con ffmpeg e boccia un effetto oltre -9 dB. NON
+ASCOLTATI da me: li ha da sentire Andrea. Lui li ha sentiti sul collaudo
+(ancora quelli forti) e ha bocciato «il passo, il Boeing e la molla»:
+il «Classic Boing» di Artlist che era il passo, lo swoosh del «Vai» e il
+boing del salto. Sostituiti con suoni fatti qui, morbidi e corti: il
+passo è il colpo di legno del tocco, più grave e più basso; il «Vai» due
+note dolci che salgono (mi e si); il salto un «pop» che sale. Picco
+intorno a -19 dB. (4) «Non c'è la musica nella
+mappa»: il lettore c'è (`musicaStradinaParti`, loop, volume 0,35, parte
+col primo tocco, si spegne col 🔊 e uscendo dalla pagina) e la rotta
+`/assets/stradina/musica/{nome}` con la sua whitelist; il brano no: lo
+scarica da Artlist la sessione sul PC del thread del gioco appena finisce
+Flow, insieme a quello del gioco, nello stesso stile. Finché manca, la
+rotta dà 404 e la pagina resta in silenzio (niente musica sintetizzata). (5) IL RAZZO CHE CRESCE: gli otto
+stadi del thread del gioco (Flow, 297x520, trasparenti, stesso riquadro:
+pedana e gambe, serbatoio, motore, ali, oblò, punta, antenna, motori
+accesi), in whitelist con la mappa. `stradinaRazzo` dà lo stadio della
+zona dove sei (quello che stai costruendo; tutto fatto: 8); si vede in
+fondo alla barra in cima al tabellone, nel chip «🚀 Razzo 3/8» e in piedi
+al «viaggio intero». Scartato: il razzo sulla tavola alla partenza (il
+cartello della prima zona gli sta addosso, e il tabellone si apre su
+Tappo, lontano dalla partenza). I MINIGIOCHI sul tabellone restano fuori
+finché Andrea non sceglie col thread del gioco se tenerli lì. (6) LA
+ZONA SPENTA È UN MISTERO («gli obiettivi non si vedono: solo il cerchio
+grigio, non la scritta a fianco»): le sue caselle sono un cerchio col «?»
+senza nome, e la scheda dice solo «Da scoprire» (`stradinaMistero`). (7)
+LO SVELAMENTO («quando completo la casella prima, l'altra si illumina e
+compare la scritta in maniera scenografica, con un effetto grafico e
+anche sonoro»): il browser ricorda la «tocca a te» e la zona dell'ultima
+visita (`stradinaVista`); `stradinaSvelate` dice cosa è cambiato, cioè la
+nuova «tocca a te» e, entrando in una zona, tutte le sue caselle da fare;
+quelle scoppiano di luce, il nome entra di lato sfocato, in fila, col
+suono «stella». Alla prima visita niente (non c'è un prima); chi chiede
+meno movimento non ha l'animazione. Lo svelamento si vede RIAPRENDO il
+tabellone dopo aver fatto la cosa, perché le caselle sono fatti letti dal
+server. (8) LE CASELLE DI PROVA DEGLI ADMIN («fammelo provare tutto ...
+almeno me e Alan che siamo amministratori»): sulla scheda di un admin
+(`e_admin`) «🧪 Segna fatta (prova)» e «↩ Togli la prova», in cima «🧪
+Prova: N · azzera». `POST /api/me/stradina/prova` scrive SOLO la tabella
+`stradina_prova` (nasce alla prima scrittura), 403 prima di aprirla a chi
+non è admin, id in forma stretta, tetto 200; `/api/me/stradina` le accende
+solo sul tabellone dell'admin (`applica_finte`, mai una porta né una
+casella già fatta davvero) e marca `finta`. Niente XP, niente livello,
+nessun altro le vede. Vale anche in produzione per gli admin: è lì che
+Andrea e Alan proveranno il giro intero. Collaudo nuovo
+`collaudo_stradina_prova` (18 verdi: 403 senza tabella, accesa e `finta`,
+Tappo avanti, XP fermi, Anna non la vede, togli, azzera, id storti).
+
 ## Il nome verificato su Nostr, gratis dal livello 2 (17 nov 2026, cantiere nip05-utenti; Andrea: «attivare verifica NIP-05, gratis per utenti da lv2 in su»)
 
 **COSA.** Dopo il NIP-05 di casa (16 nov, `_@barattolo.store`), ogni

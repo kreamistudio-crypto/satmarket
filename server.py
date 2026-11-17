@@ -112010,6 +112010,73 @@ def amici_stradina(con, tg_id: int, adesso: int) -> list:
     return amici[:STRADINA_AMICI_MAX]
 
 
+# LE CASELLE DI PROVA (17 nov 2026, Andrea: «prima di metterlo in
+# produzione voglio provarlo tutto: lo segnerò come raggiunto in maniera
+# fittizia, così proseguo e vedo cosa succede; almeno me e Alan che siamo
+# amministratori»). Solo per chi e' ADMIN (`e_admin`): una casella segnata
+# qui si accende sul SUO tabellone e basta. Non e' un fatto: niente XP,
+# niente livello, niente premi, nessun altro la vede, e porta `finta`.
+# Una tabella sua, che si crea alla prima scrittura; si azzera intera.
+STRADINA_PROVA_MAX = 200     # caselle di prova per admin, piu' che abbastanza
+STRADINA_ID_TAPPA = re.compile(r"^[a-z0-9_]{1,40}$")
+
+
+def stradina_finte(con, tg_id: int) -> set:
+    """Le caselle di prova di un admin; tabella che non c'e' = nessuna."""
+    try:
+        return {r[0] for r in con.execute(
+            "SELECT tappa FROM stradina_prova WHERE tg_id=?", (tg_id,))}
+    except Exception:
+        return set()
+
+
+def applica_finte(tappe: list, finte: set) -> list:
+    """Accende le caselle di prova ancora da fare (mai una porta, mai una
+    gia' fatta davvero) e le marca `finta`. PURA."""
+    for t in tappe:
+        if t.get("id") in finte and t.get("fatto") is False:
+            t["fatto"] = True
+            t["finta"] = True
+    return tappe
+
+
+@app.post("/api/me/stradina/prova")
+async def prova_stradina(req: Request, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """Segna (o toglie) una casella di prova, o le azzera tutte. Solo admin:
+    a chiunque altro un 403, e la tabella non si tocca."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Solo gli amministratori possono provare il tabellone.")
+    d = await leggi_json(req)
+    con = db()
+    try:
+        con.execute("CREATE TABLE IF NOT EXISTS stradina_prova ("
+                    "tg_id INTEGER NOT NULL, tappa TEXT NOT NULL, "
+                    "quando INTEGER NOT NULL, PRIMARY KEY (tg_id, tappa))")
+        if d.get("azzera") is True:
+            con.execute("DELETE FROM stradina_prova WHERE tg_id=?", (user["id"],))
+        else:
+            tappa = d.get("tappa")
+            if not isinstance(tappa, str) or not STRADINA_ID_TAPPA.match(tappa):
+                raise HTTPException(400, "Casella sconosciuta.")
+            if d.get("fatto") is False:
+                con.execute("DELETE FROM stradina_prova WHERE tg_id=? AND tappa=?",
+                            (user["id"], tappa))
+            else:
+                n = con.execute("SELECT COUNT(*) FROM stradina_prova WHERE tg_id=?",
+                                (user["id"],)).fetchone()[0]
+                if n >= STRADINA_PROVA_MAX:
+                    raise HTTPException(400, "Troppe caselle di prova: azzerale.")
+                con.execute("INSERT OR IGNORE INTO stradina_prova "
+                            "(tg_id, tappa, quando) VALUES (?, ?, ?)",
+                            (user["id"], tappa, int(time.time())))
+        con.commit()
+        return {"ok": True, "finte": sorted(stradina_finte(con, user["id"]))}
+    finally:
+        con.close()
+
+
 @app.get("/api/me/stradina")
 def mia_stradina(x_tg_init_data: str = Header(""),
                  barattolo_sessione: str = Cookie("")):
@@ -112046,6 +112113,10 @@ def mia_stradina(x_tg_init_data: str = Header(""),
                 superate = set()
         tappe = tappe_stradina(f, scala_livelli(), IMPARA_BITCOIN_LINK,
                                IMPARA_BITCOIN_NOME, gioco, missioni, superate)
+        # le caselle di prova: solo sul tabellone di un admin
+        prova = e_admin(user["id"])
+        if prova:
+            tappe = applica_finte(tappe, stradina_finte(con, user["id"]))
         liv = livello_utente(f["xp"], f["vendite"] + f["acquisti"])
         try:
             amici = amici_stradina(con, user["id"], adesso)
@@ -112059,7 +112130,7 @@ def mia_stradina(x_tg_init_data: str = Header(""),
         except Exception:
             tappo = ""
         return {"tappe": tappe, "zone": list(STRADINA_ZONE),
-                "livello": liv, "sats": sats,
+                "livello": liv, "sats": sats, "prova": prova,
                 "amici": amici, "tappo_oggetto": tappo,
                 "tappo_emoji": emoji_oggetto_tappo(tappo),
                 "impara": {"nome": IMPARA_BITCOIN_NOME,
@@ -112095,7 +112166,13 @@ FILE_MAPPA_STRADINA = ("zona1.webp", "zona2.webp", "zona3.webp",
                        "ico-p2p.webp", "ico-incassati.webp",
                        "ico-giorni.webp", "ico-halving.webp",
                        # i tre pezzi di mappa nuovi (8 zone, 17 nov)
-                       "zona6.webp", "zona7.webp", "zona8.webp")
+                       "zona6.webp", "zona7.webp", "zona8.webp",
+                       # IL RAZZO DI BULLONI (17 nov, la storia unica col
+                       # gioco): otto stadi nello stesso riquadro, uno per
+                       # zona, dalla pedana ai motori accesi (Flow, 297x520)
+                       "razzo-1.webp", "razzo-2.webp", "razzo-3.webp",
+                       "razzo-4.webp", "razzo-5.webp", "razzo-6.webp",
+                       "razzo-7.webp", "razzo-8.webp")
 
 
 @app.get("/assets/stradina/{nome}")
@@ -112128,6 +112205,23 @@ def asset_suoni_stradina(nome: str):
     percorso = os.path.join("assets", "stradina", "suoni", nome)
     if not os.path.exists(percorso):
         raise HTTPException(404, "suono non trovato")
+    return FileResponse(percorso, media_type="audio/mpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+# LA MUSICA DEL TABELLONE (17 nov 2026, Andrea: «non c'è la musica nella
+# mappa»): un brano leggero in loop, da Artlist come gli effetti. Whitelist
+# a tupla; finche' il file non c'e' e' un 404 e il client resta in silenzio.
+FILE_MUSICA_STRADINA = ("mappa.mp3",)
+
+
+@app.get("/assets/stradina/musica/{nome}")
+def asset_musica_stradina(nome: str):
+    if nome not in FILE_MUSICA_STRADINA:
+        raise HTTPException(404, "musica non trovata")
+    percorso = os.path.join("assets", "stradina", "musica", nome)
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "musica non trovata")
     return FileResponse(percorso, media_type="audio/mpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
 
