@@ -209044,9 +209044,9 @@ def prove_caccia_a_tappo():
           [t for t in tabelle_gioco
            if f'"{t}"' not in fus and f"FROM {t} " not in fus and f"UPDATE {t} SET" not in fus
            or f'("{t}", "tg_id")' not in src]))
-    prova("la leva nasce ACCESA, e sta nel config d'esempio", (True, True),
-          ("except ImportError:\n    GIOCO_TAPPO_ATTIVO = True" in blocco,
-           bool(re.search(r"^GIOCO_TAPPO_ATTIVO = True$",
+    prova("la leva nasce SPENTA (Andrea, 17 nov sera), e sta nel config d'esempio", (True, True),
+          ("except ImportError:\n    GIOCO_TAPPO_ATTIVO = False" in blocco,
+           bool(re.search(r"^GIOCO_TAPPO_ATTIVO = False$",
                           open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                             "config_esempio.py"), encoding="utf-8").read(), re.M))))
 
@@ -209077,7 +209077,12 @@ def prove_caccia_a_tappo():
     js += _fn_js(mini, "function cacciaCoriandoliHTML(){") + _fn_js(mini, "function cacciaFestaHTML(d, fermo){") \
         + _fn_js(mini, "function cacciaBigliettoHTML(d){")
     cattivo = '<img src=x onerror=alert(1)>'
+    # IL CASO CON UN SEME (17 nov sera): la Gazza che vola a caso e i sats
+    # che cadono a caso facevano rossa una giocata su dieci (un sat caduto
+    # proprio sotto Tappo si riprendeva subito); il banco tira sempre gli
+    # stessi numeri
     banco = r"""
+Math.random = (() => { let s = 42; return () => (s = s * 16807 % 2147483647) / 2147483647; })();
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = n => String(n);
 const EMOJI_CAT = {Elettronica: '🔌'}, CATS = ['Tutto', 'Elettronica'];

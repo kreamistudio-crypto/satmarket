@@ -120640,15 +120640,17 @@ async def cancella_account(req: Request, response: Response,
 # database: dal client arrivano solo nomi, mai una cifra. Piu' account
 # non rendono niente che valga: i bulloni non si passano.
 #
-# LA LEVA NASCE ACCESA (decisione di Andrea del 14 nov 2026: le leve
-# nuove sono accese di serie, e restano come interruttore d'emergenza).
-# Spenta — `GIOCO_TAPPO_ATTIVO = False` nel config — le rotte rispondono
-# 404 e la voce nel Profilo non c'e'; quel che uno ha gia' preso resta.
+# LA LEVA NASCE SPENTA (17 nov 2026 sera, Andrea dopo averlo provato
+# sul collaudo: «il gioco non mi piace... non puoi spegnerlo con una
+# leva e via»): eccezione alla regola delle leve accese di serie. Spenta,
+# le rotte rispondono 404, la voce nel Profilo non c'e' e il tabellone
+# non mostra le missioni; quel che uno ha gia' preso resta.
+# `GIOCO_TAPPO_ATTIVO = True` nel config la riaccende.
 
 try:
     from config import GIOCO_TAPPO_ATTIVO
 except ImportError:
-    GIOCO_TAPPO_ATTIVO = True
+    GIOCO_TAPPO_ATTIVO = False
 if not isinstance(GIOCO_TAPPO_ATTIVO, bool):
     print("[gioco] GIOCO_TAPPO_ATTIVO non e' True/False: la Caccia a "
           "Tappo resta spenta", flush=True)

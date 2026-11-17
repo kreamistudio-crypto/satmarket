@@ -2057,16 +2057,16 @@ pubblico: sì
 
 frase: È arrivata la Caccia a Tappo, il gioco di Barattolo. Ogni giorno Tappo si nasconde in un annuncio vero, diverso per ognuno: leggi gli indizi, apri gli annunci e tocca «Tappo è qui?». Chi lo trova vince i bulloni 🔩, accende i barattoli della dispensa, sale di grado e completa le sfide. Coi bulloni prendi cappellini, attrezzi e 5 posti in più nei preferiti. Si gioca gratis: i bulloni non sono sats.
 dove: Profilo → «Livello e recensioni» → «🔩 Caccia a Tappo», nella Mini App, nell'app e sul sito; il tasto «Tappo è qui?» nella scheda di ogni annuncio, quando la caccia del giorno è aperta.
-leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
-pubblico: sì
+leva: GIOCO_TAPPO_ATTIVO spenta di serie
+pubblico: no
 
 <!-- pezzo novita-075 | novita -->
 ## Novità · 2026-11-17 · mondo-di-tappo
 
 frase: Sul tabellone dei livelli arrivano le missioni di Tappo: otto scene brevi a carte sulla storia del denaro, il deposito di garanzia, le tue chiavi, Lightning, la privacy e Nostr, ognuna col bottone per farlo davvero. Danno bulloni 🔩 e montano il razzo con cui Tappo vuole arrivare sulla Luna. E nella Caccia a Tappo c'è il Mondo: la dispensa da girare, coi barattoli da aprire.
 dove: Profilo → «Livello e recensioni» → «🚀 Rotta per la Luna»: la missione sta subito prima della casella che insegna; tutte anche nella «🔩 Caccia a Tappo», lì accanto, schede «Sfide» e «Mondo».
-leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
-pubblico: sì
+leva: GIOCO_TAPPO_ATTIVO spenta di serie
+pubblico: no
 
 <!-- pezzo novita-076 | novita -->
 ## Novità · 2026-11-17 · profilo-semplice
