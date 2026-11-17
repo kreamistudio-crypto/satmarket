@@ -162793,6 +162793,8 @@ const fmt = n => String(n);
             _fn_js(mini, "function dentroPilaP2P(fondoCapo, fondi){"),
             _fn_js(mini, "function dentroPilaNovitaP2P(v){"),
             _fn_js(mini, "function chiudiPilaNovitaP2P(v){"),
+            _fn_js(mini, "function risalitaPilaP2P(capoAlto, capoH, altezze, cime, y){"),
+            _fn_js(mini, "function arrivataPilaNovitaP2P(v){"),
             _fn_js(mini, "function pausaOnchainP2P(o, adesso){"),
             _fn_js(mini, "function ordiniOnchainVetrinaP2P(lib, adesso){"),
         ]) + r"""
@@ -162841,6 +162843,16 @@ vc.classList.add = (...x) => { orig(...x); vc.altri[0].r.top = 120; vc.altri[1].
 vc.altri[0].r.top = 163; vc.altri[1].r.top = 215;
 chiudiPilaNovitaP2P(vc);
 out.scarto = [vc.classList.contains('novita-compatte'), vc.altri[0].st['--pila-su'], vc.altri[1].st['--pila-su']];
+// LA RISALITA (17 nov): il capo appeso a 99, alto 62; gli altri 52 e 52
+const ris = (cime, y) => risalitaPilaP2P(99, 62, [52, 52], cime, y);
+out.risalita = [ris([-400, -348], 2000), ris([-400, -348], 50), ris([150, 202], 2000),
+                ris([161, 213], 2000), ris([170, 222], 2000), risalitaPilaP2P(99, 62, [52], [-300], 900),
+                risalitaPilaP2P(99, 62, [], [], 900), ris([-400, -348], 0)];
+const va = vistaPila(161, [213, 265]);
+va.altri.forEach(a => { a.offsetHeight = 52; });
+const arr = [];
+for (const t of [109, 200, 212, 213, 230]) { va.altri[1].r.top = t; arr.push(arrivataPilaNovitaP2P(va)); }
+out.arrivata = arr;
 out.verso = [versoPilaNovitaP2P(30, 400, true, false), versoPilaNovitaP2P(30, 400, false, false),
              versoPilaNovitaP2P(-30, 400, true, false), versoPilaNovitaP2P(3, 400, true, false),
              versoPilaNovitaP2P(30, 20, true, false), versoPilaNovitaP2P(30, 400, true, true)];
@@ -162893,6 +162905,20 @@ process.stdout.write(JSON.stringify(out));
             prova("...e la chiusura tiene ognuno dove si vedeva appeso: lo scarto e' "
                   "appeso meno flusso, letto una volta",
                   [True, "43px", "43px"], o["scarto"])
+            prova("la risalita: da lontano tutti appena nascosti (l'ultimo col fondo sul "
+                  "fondo del capo, 104 px di corsa); mai piu' di quanto la pagina puo' salire; "
+                  "un banner a meta' riparte da dov'e'; gia' al posto, corsa zero",
+                  [{"posti": [161, 213], "mete": [57, 109], "corsa": 104},
+                   {"posti": [161, 213], "mete": [111, 163], "corsa": 50},
+                   {"posti": [161, 213], "mete": [150, 202], "corsa": 11},
+                   {"posti": [161, 213], "mete": [161, 213], "corsa": 0},
+                   {"posti": [161, 213], "mete": [161, 213], "corsa": 0},
+                   {"posti": [161], "mete": [109], "corsa": 52},
+                   {"posti": [], "mete": [], "corsa": 0},
+                   {"posti": [161, 213], "mete": [161, 213], "corsa": 0}], o["risalita"])
+            prova("...e la pila e' arrivata quando l'ultimo tocca il suo posto appeso "
+                  "(1 px di tolleranza), non prima",
+                  [False, False, True, True, True], o["arrivata"])
             prova("la fila della home prende gli ordini on-chain vivi degli altri: non i "
                   "miei, non gli scaduti, non quelli in pausa, non i presi",
                   [[1, 6], []], [o["fila"], o["vuota"]])
@@ -162949,6 +162975,16 @@ process.stdout.write(JSON.stringify(out));
            "#view-p2p.novita-compatte .p2p-oc-novita.capo-pila.pila-dentro > .p2p-oc-faccia.p2p-novita-unica{" in mini,
            "window.addEventListener('scroll', scorriPilaNovitaP2P, {passive: true});" in mini,
            "if (v.classList.contains('novita-compatte')) dentroPilaNovitaP2P(v);\n}" in _fn_js(mini, "function scorriPilaNovitaP2P(){")])
+    scp = _fn_js(mini, "function scorriPilaNovitaP2P(){")
+    prova("risalendo (Andrea: «la stessa animazione all'incontrario») la pila non si "
+          "riapre di colpo: riescono col dito e tornano appesi all'arrivo; di colpo solo "
+          "col tocco o con un tutorial",
+          [True, True, False, True, True],
+          ["} else if (verso === false && chiusa && !risale) risaliPilaNovitaP2P(v, y);" in scp,
+           "if (v.classList.contains('pila-risale') && arrivataPilaNovitaP2P(v)) apriPilaNovitaP2P(true);" in scp,
+           "v.classList[verso ? 'add' : 'remove']('novita-compatte')" in scp,
+           "if (tutorial && v.classList.contains('novita-compatte')) { apriPilaNovitaP2P();" in scp,
+           "if (!era || dolce === true) return;" in _fn_js(mini, "function apriPilaNovitaP2P(dolce){")])
     # IL SALTO DEL 16 NOV SERA e il «tutto assieme» del 17 (Andrea: «deve
     # essere progressivo e fluido ... non tutto assieme»): niente piu'
     # `top` che corre (muoveva i due insieme), il `relative` senza scarto

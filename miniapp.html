@@ -4406,8 +4406,11 @@
      basso; il capo e' alto 62 px, loro 52). Ognuno, appena e' sparito
      sotto, porta le sue monete nella faccia unica (`.dentro`, col piccolo
      salto d'entrata): prima USDT e USDe, poi ETH e Monero. La faccia unica
-     compare col primo che entra, in dissolvenza; risalendo i tre tornano
-     subito, con le facce che si riaccendono. Storia: la sera del 16 gli
+     compare col primo che entra, in dissolvenza; risalendo riescono da sotto
+     allo stesso modo, al contrario (la «RISALITA», nel JavaScript: di
+     nuovo `relative`, rimessi appena nascosti, scendono col dito e tornano
+     appesi al loro posto); il tocco sulla faccia unica li riporta di colpo,
+     con le facce che si riaccendono. Storia: la sera del 16 gli
      altri tornavano `relative` senza scarto e saltavano su (il primo
      video); poi scivolavano sotto tutti e due insieme (il secondo). */
   .p2p-oc-novita .p2p-oc-faccia.p2p-novita-unica{display:flex;visibility:hidden;opacity:0;
@@ -64872,7 +64875,8 @@ function novitaCoinLibroP2P(){
    pila (`capo-pila`) resta appeso e cambia faccia — le monete di tutti,
    accavallate, e «Novità» —, gli altri salgono col dito e gli spariscono
    sotto uno alla volta, portandogli le loro monete (17 nov, vedi «SI
-   FORMA COL DITO» nel CSS). In su, o in cima alla pagina, tornano i tre. Il tocco sulla faccia unica li riapre. Durante un tutorial (un
+   FORMA COL DITO» nel CSS). In su riescono da sotto col dito, al contrario
+   (vedi «LA RISALITA»). Il tocco sulla faccia unica li riapre di colpo. Durante un tutorial (un
    «Novità» acceso) la pila resta aperta: il giro guarda il suo banner.
    La classe vive sulla vista (`novita-compatte`), cosi' un ridisegno del
    libro a pila chiusa nasce gia' chiuso. */
@@ -64915,7 +64919,14 @@ function segnaPilaNovitaP2P(box){
   /* un ridisegno a pila chiusa: i banner nuovi nascono al loro posto nel
      flusso (gia' scappato in su), e le monete li seguono subito */
   const v = el('view-p2p');
-  if (v && v.classList.contains('novita-compatte')) dentroPilaNovitaP2P(v);
+  if (v && v.classList.contains('novita-compatte')) {
+    /* ...e se stavano risalendo, ripartono dal punto di partenza giusto */
+    if (v.classList.contains('pila-risale')) {
+      v.classList.remove('pila-risale');
+      risaliPilaNovitaP2P(v, window.scrollY || 0);
+    }
+    dentroPilaNovitaP2P(v);
+  }
 }
 /* PURA: quali degli altri «Novità» sono gia' spariti sotto il capo? Il
    fondo di ognuno contro il fondo del capo (1 px di tolleranza, i
@@ -64947,23 +64958,76 @@ function chiudiPilaNovitaP2P(v){
   const altri = [...v.querySelectorAll('.p2p-oc-novita.appeso:not(.capo-pila)')];
   const prima = altri.map(a => a.getBoundingClientRect().top);
   altri.forEach(a => a.style.removeProperty('--pila-su'));
+  v.classList.remove('pila-risale');
   v.classList.add('novita-compatte');
   const flusso = altri.map(a => a.getBoundingClientRect().top);
   altri.forEach((a, i) => a.style.setProperty('--pila-su', Math.round(prima[i] - flusso[i]) + 'px'));
 }
-function apriPilaNovitaP2P(){
+/* la riapertura: col tocco sulla faccia unica (o un tutorial) di colpo, con
+   la dissolvenza delle facce; a fine risalita (`dolce`) senza, perche' i
+   banner sono gia' arrivati al loro posto appeso col dito */
+function apriPilaNovitaP2P(dolce){
   const v = el('view-p2p');
   if (!v) return;
   const era = v.classList.contains('novita-compatte');
-  v.classList.remove('novita-compatte');
+  v.classList.remove('novita-compatte', 'pila-risale');
   v.querySelectorAll('.p2p-oc-novita.appeso').forEach(a => a.style.removeProperty('--pila-su'));
   dentroPilaNovitaP2P(v);
-  if (!era) return;
+  if (!era || dolce === true) return;
   v.classList.remove('riaperta');
   void v.offsetWidth;            // la dissolvenza riparte anche a una riapertura ravvicinata
   v.classList.add('riaperta');
   clearTimeout(p2pPilaRiapertaT);
   p2pPilaRiapertaT = setTimeout(() => v.classList.remove('riaperta'), 260);
+}
+/* LA RISALITA (17 nov 2026, Andrea, sul banner progressivo appena in
+   produzione: «quando cambio direzione e scorro dall'altra parte mi
+   compaiono di nuovo i banner di colpo, invece dovrebbe esserci la stessa
+   animazione all'incontrario»). PURA: dove mettere gli altri «Novità»
+   quando il dito torna su. `posti` sono i loro posti appesi (sotto il
+   capo, uno dopo l'altro); la `corsa` e' quanto devono scendere per
+   arrivarci: tutta (l'ultimo col fondo appena sotto il fondo del capo,
+   cioe' tutti ancora nascosti), ma mai piu' di quanto la pagina puo'
+   ancora salire (`y`: arrivano al posto al piu' in cima alla pagina) ne'
+   piu' di dove gia' stanno (un banner a meta' non torna indietro). Le
+   `mete` sono i posti meno la corsa: da li' li muove lo scorrimento. */
+function risalitaPilaP2P(capoAlto, capoH, altezze, cime, y){
+  const posti = [];
+  let t = capoAlto + capoH;
+  (altezze || []).forEach(h => { posti.push(t); t += h; });
+  if (!posti.length) return {posti, mete: [], corsa: 0};
+  const n = posti.length - 1;
+  const tutta = posti[n] + altezze[n] - (capoAlto + capoH);
+  const qui = Number.isFinite(cime && cime[n]) ? posti[n] - cime[n] : tutta;
+  const corsa = Math.max(0, Math.min(tutta, Math.max(0, y || 0), qui));
+  return {posti, mete: posti.map(p => p - corsa), corsa};
+}
+/* al cambio di direzione in su: gli altri restano `relative`, rimessi
+   alle mete; scendono col dito, ETH e Monero per primi (sono i piu'
+   vicini al bordo), e le monete escono dalla faccia unica man mano che
+   i banner ne riescono. Arrivati al posto, tornano appesi (`scorri`). */
+function risaliPilaNovitaP2P(v, y){
+  const capo = v.querySelector('.p2p-oc-novita.appeso.capo-pila');
+  const altri = [...v.querySelectorAll('.p2p-oc-novita.appeso:not(.capo-pila)')];
+  if (!capo || !altri.length) { apriPilaNovitaP2P(true); return; }
+  const rc = capo.getBoundingClientRect();
+  const r = risalitaPilaP2P(rc.top, rc.height, altri.map(a => a.offsetHeight),
+                            altri.map(a => a.getBoundingClientRect().top), y);
+  if (r.corsa < 1) { apriPilaNovitaP2P(true); return; }
+  altri.forEach(a => a.style.removeProperty('--pila-su'));
+  const flusso = altri.map(a => a.getBoundingClientRect().top);
+  altri.forEach((a, i) => a.style.setProperty('--pila-su', Math.round(r.mete[i] - flusso[i]) + 'px'));
+  v.classList.add('pila-risale');
+}
+/* l'ultimo della pila e' arrivato al suo posto appeso? (allora ci sono
+   tutti: scendono insieme, alla stessa distanza) */
+function arrivataPilaNovitaP2P(v){
+  const capo = v.querySelector('.p2p-oc-novita.appeso.capo-pila');
+  const altri = [...v.querySelectorAll('.p2p-oc-novita.appeso:not(.capo-pila)')];
+  if (!capo || !altri.length) return true;
+  let posto = capo.getBoundingClientRect().bottom;
+  altri.slice(0, -1).forEach(a => { posto += a.offsetHeight; });
+  return altri[altri.length - 1].getBoundingClientRect().top >= posto - 1;
 }
 /* PURA: la pila si chiude, si apre o resta com'e' (null)? `dy` lo
    spostamento dall'ultima volta, `y` dove sta la pagina, `appeso` se il
@@ -64979,18 +65043,27 @@ function scorriPilaNovitaP2P(){
   if (!v || !v.classList.contains('active')) return;
   const y = window.scrollY || 0, dy = y - p2pNovitaUltimoY;
   const capo = v.querySelector('.p2p-oc-novita.appeso.capo-pila');
-  if (!capo) { v.classList.remove('novita-compatte'); p2pNovitaUltimoY = y; return; }
+  if (!capo) { v.classList.remove('novita-compatte', 'pila-risale'); p2pNovitaUltimoY = y; return; }
   const alta = parseFloat(getComputedStyle(v).getPropertyValue('--p2p-testa-alta')) || 0;
   const tutorial = !!v.querySelector('.p2p-oc-novita.acceso');
+  /* un tutorial acceso vuole il suo banner subito, senza aspettare il dito */
+  if (tutorial && v.classList.contains('novita-compatte')) { apriPilaNovitaP2P(); p2pNovitaUltimoY = y; return; }
   const verso = versoPilaNovitaP2P(dy, y, capo.getBoundingClientRect().top <= alta + 1, tutorial);
   if (verso !== null || Math.abs(dy) >= 8) {
     p2pNovitaUltimoY = y;
     const chiusa = v.classList.contains('novita-compatte');
-    if (verso === true && !chiusa) chiudiPilaNovitaP2P(v);
-    else if (verso === false && chiusa) apriPilaNovitaP2P();
+    const risale = v.classList.contains('pila-risale');
+    if (verso === true) {
+      if (!chiusa) chiudiPilaNovitaP2P(v);
+      /* di nuovo in giu' a meta' risalita: i banner continuano col dito,
+         e rientrano sotto come alla scesa */
+      else if (risale) v.classList.remove('pila-risale');
+    } else if (verso === false && chiusa && !risale) risaliPilaNovitaP2P(v, y);
   }
-  /* a ogni passo, anche i piccoli: le monete entrano quando il loro
-     banner e' sparito, non a scatti di 8 px */
+  /* arrivati al posto, tornano appesi: da qui in su restano fermi */
+  if (v.classList.contains('pila-risale') && arrivataPilaNovitaP2P(v)) apriPilaNovitaP2P(true);
+  /* a ogni passo, anche i piccoli: le monete entrano ed escono quando il
+     loro banner sparisce o riesce, non a scatti di 8 px */
   if (v.classList.contains('novita-compatte')) dentroPilaNovitaP2P(v);
 }
 if (typeof window !== 'undefined' && window.addEventListener)

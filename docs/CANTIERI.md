@@ -87507,3 +87507,46 @@ on-chain preso (la chat dentro Telegram e dal sito), l'avviso del bot col
 bottone che apre la chat, la lettura del moderatore in una disputa. La
 rete dei 30 giorni sotto la scopa vale anche qui: una disputa on-chain
 più lunga perderebbe i messaggi più vecchi (nel mercatino non la tocca).
+
+## La risalita dei «Novità»: la stessa animazione al contrario (17 nov 2026, cantiere pila-risale; Andrea dal telefono, col banner progressivo appena in produzione: «Bellissima l'animazione, però mi piacerebbe vederla anche all'incontrario ... quando cambio direzione e scorro dall'altra parte mi compaiono di nuovo i banner di colpo, invece dovrebbe esserci la stessa animazione all'incontrario»)
+PRIMA: scendendo i banner salivano col dito sotto il capo e le loro
+monete entravano a turno («Il banner unico dei «Novità» che si forma col
+dito»); al primo scatto in su (8 px) la pila si riapriva DI COLPO, i tre
+di nuovo appesi con la dissolvenza delle facce.
+ADESSO, LA RISALITA: al cambio di direzione gli altri restano
+`relative` e `risaliPilaNovitaP2P` li rimette, una volta, alle «mete»
+calcolate dalla pura `risalitaPilaP2P`: i loro posti appesi (sotto il
+capo, uno dopo l'altro) meno una CORSA — tutta, cioè l'ultimo col fondo
+appena sotto il fondo del capo, tutti ancora nascosti (104 px con due
+banner, 52 con uno); mai più di quanto la pagina può ancora salire
+(arrivano al posto al più in cima, anche se la pila si era chiusa a 50
+px); mai più di dove già stanno (un banner a metà riparte da lì, non
+torna indietro). Da lì li porta giù lo scorrimento vero: esce per primo
+ETH·XMR (è il più vicino al bordo), 52 px dopo USDT·USDe, e le monete
+escono dalla faccia unica nello stesso ordine; sparite tutte, torna la
+faccia «On-Chain». Quando l'ultimo tocca il suo posto
+(`arrivataPilaNovitaP2P`, 1 px di tolleranza) la pila si riapre
+`dolce`: tornano appesi lì dove sono, senza dissolvenza. Di nuovo in giù
+a metà: continuano col dito e rientrano sotto come alla scesa. Di colpo
+resta solo il tocco sulla faccia unica, e un tutorial acceso (vuole il
+suo banner subito). Un ridisegno del libro durante la risalita la fa
+ripartire dalle mete giuste.
+SCARTATE: i margini negativi compensati per far ripartire lo `sticky`
+da più in alto (si fermerebbero da soli, senza il cambio di classe, ma i
+margini collassano con quelli della card del prezzo e il libro
+scatterebbe di 10 px); la corsa sempre intera (con la pila chiusa vicino
+alla cima resterebbero a metà, la pagina finisce prima).
+PROVATO: in node (`prove_ritocchi_sera_p2p`) la pura in otto casi
+(lontani, vicino alla cima, a metà, già al posto, sotto il posto, un
+banner solo, nessuno, in cima) e l'arrivo con le finte di DOM; le
+stringhe dello scorrimento (risalita al cambio, riapertura all'arrivo, di
+colpo solo col tocco e col tutorial). Controprove: con la riapertura di
+colpo al cambio di direzione una rossa, senza il tetto della pagina una
+rossa. Nel banco (Chromium, 360 px, a passi di 3-4 px): giù fino a 260,
+su fino a 120, giù... il registro delle posizioni dice USDT a 57 ed ETH a
+109 al cambio (nascosti), 9 px a passo col dito, le monete di ETH fuori
+al primo passo e quelle di USDT 52 px dopo, appesi a 161/213 all'arrivo.
+Il video sta nella Library: `novita-scorrimento/banner-risalita.mp4`.
+DA GUARDARE: nel webview del telefono l'ultimo passo, quando tornano
+appesi: se lo scorrimento corre più veloce del JavaScript può esserci un
+fotogramma oltre il posto prima dello scatto indietro.
