@@ -1,0 +1,37 @@
+IL RAZZO DI TAPPO — 8 stadi, immagini Flow (17/11/2026)
+Nano Banana 2.1 (0 crediti), 9:16, x2 per ogni passo. PNG 1536x2752 (download «2K» di Flow), fondo verde ~[7,247,3]-[12,242,2].
+JPG originali 2K in originali-jpg\, anteprime 1K in _1k\ (scarti\ = le varianti non scelte).
+Prima prova in stile artigianale (lamiere, bulloni) scartata per la correzione di Andrea («super moderno»): vecchio-artigianale\.
+
+CONSIGLIATA: serie «b» (razzo-1-b … razzo-8-b).
+- b: gambe uguali dallo stadio 1 al 7, il serbatoio cresce in modo coerente, fiamma del razzo-8 più grande e bella.
+- a: anche lei buona, razzo un po' più tozzo; nel razzo-8-a la fiamma è piccola.
+
+COME SONO FATTI
+Prima il razzo-7 completo (due serie, a e b); poi ogni stadio è una MODIFICA del precedente in Flow (ingrediente = immagine dello stadio prima),
+togliendo un pezzo alla volta: 7 → 6 (via l'antenna) → 5 (via la punta) → 4 (via l'oblò) → 3 (via le ali) → 2 (via motore e scudo) → 1 (via il serbatoio).
+Il razzo-8 è il razzo-7 con i motori accesi.
+Allineamento controllato: pedana e gambe restano allo stesso pixel in tutti gli stadi della stessa serie (scarto misurato < 2 px, scala 1,000).
+Quindi nel gioco basta sovrapporli nella stessa posizione.
+
+ATTENZIONE
+- razzo-1-a e razzo-1-b: il «2K» di Flow ci rimetteva dentro un serbatoio sbiadito (errore dell'ingranditore), quindi sono il 1K ingrandito 2x in locale (un po' più morbidi).
+- razzo-6-a: tolto a mano un alone verde chiaro rimasto dove c'era l'antenna.
+- Ombra: negli stadi 1-2 sulla pedana resta un'ombra larga come il razzo intero (si vede poco, ma c'è).
+- Stadi 2-4: sul serbatoio resta un cerchio sottile dove andrà l'oblò; stadi 2-3 hanno due piccole fessure dove andranno le ali (voluto).
+- Razzo-8: fumo e fiamma sono dentro la pedana nella serie a; nella b il fumo esce un po' dai bordi (lo scontorno resta facile, niente verde sul fumo).
+
+PROMPT
+Riferimenti allegati al razzo-7: il pezzo di mappa della stradina «Village houses and bitcoi…» (zona1) e alto-1 («Robot walking on wooden shelf»), solo per tecnica e angolo.
+
+razzo-7 (completo, spento):
+Use the two reference images ONLY for the drawing technique and the camera angle, do NOT copy their objects or their materials: same game-art drawing with clean dark outlines and soft cel shading, seen in diagonal three-quarter view from slightly above like the second reference. A single game object for a level map, vertical: an ULTRA-MODERN, futuristic, sleek ROCKET, the only high-tech object of a cozy hand-drawn map, so it must look premium and cutting-edge: clean smooth aerodynamic lines, glossy pearl-white and polished silver surfaces, glowing bitcoin-amber LED light strips, NO rust, NO patches, NO visible rivets or bolts, NO scrap parts. COMPLETE but switched OFF, standing upright on a small round, sleek dark-graphite launch pad with a thin glowing amber LED ring around its edge. The rocket from bottom to top: three slim futuristic landing legs in polished silver with small gold joints, standing on the pad; at the bottom a modern rocket engine with a dark metallic nozzle, protected by a smooth curved brushed-silver heat shield skirt with a thin amber light line; a long glossy white cylindrical main tank body with one thin vertical amber LED stripe; two swept-back sleek white fins with glowing amber edges; one round porthole window of dark smoked glass with a glowing amber ring; a sharp pointed polished silver nose cone; on the very tip a thin silver antenna with a small amber LED. Reflections on the metal and glass are warm white and amber only. The rocket is centered with generous margin on all sides, the whole object and pad fully visible, occupying about the middle 70 percent of the height. Background: a completely flat, uniform, pure chroma-key green (#00FF00), no shadow on the background, no gradient, no floor beyond the small pad, absolutely no green reflections or green tint on the metal or glass. No flames, no smoke. No text, no letters, no numbers, no logos, no characters.
+
+Modifiche (tutte iniziano con «Edit the attached image. Keep EVERYTHING exactly the same: … same position, same size, same framing, same camera angle, same style, same colors, same flat pure green #00FF00 background. Change ONLY this: …  Nothing else changes.»):
+- razzo-6: remove the thin antenna and its small amber LED from the tip of the rocket, so the polished silver nose cone ends in a clean sharp point.
+- razzo-5: remove the polished silver nose cone from the top of the rocket. The rocket is still under construction: the glossy white tank now ends at the top with a flat, clean circular opening with a thin polished silver rim and a dark interior with a soft amber glow, ready for the nose to be mounted later.
+- razzo-4: remove the round porthole window and its glowing amber ring. Where the porthole was, the tank is smooth glossy pearl-white surface, continuous and clean, with only a faint thin circular panel line marking where the window will be installed later.
+- razzo-3: remove the two swept-back white fins with their amber edges completely. The sides of the rocket are now smooth and clean, with only two small thin silver mounting slots where the fins will be attached later. Show the green background where the fins were.
+- razzo-2: remove the rocket engine nozzle and the curved brushed-silver heat shield skirt at the bottom of the rocket. The white tank now ends at its bottom with a clean, flat, rounded base with a thin polished silver rim, and the same three slim landing legs attach directly to the underside of the tank, holding it above the pad. Under the tank you see the empty dark pad.
+- razzo-1: remove the white tank body completely (b: and also its shadow on the pad). Only the three landing legs remain, standing on the pad, their upper ends joined together by a small thin polished silver mounting ring (where the tank will be placed later), floating at the same height where the bottom of the tank was. Above and inside the ring you see the green background. This is the very first stage of a rocket under construction.
+- razzo-8 (dal 7): the rocket is now SWITCHED ON and ready for launch: all its amber LED stripes, the porthole ring and the antenna LED glow much brighter; the engine is ignited with a powerful bright flame coming out of the nozzle, white-hot at the center and bitcoin-amber and orange at the edges, pointing straight down onto the pad, with small puffs of white and warm-grey smoke spreading on the pad around the legs; the pad LED ring glows bright. The rocket has NOT lifted off yet, it is still standing on its legs in the same place. Keep the background flat pure green #00FF00 around the flame and smoke, no glow tinting the background, no green in the flame or smoke.
