@@ -39,10 +39,10 @@ Un account nato con Telegram può collegare anche una chiave Nostr dal Profilo, 
 
 Nel Profilo si impostano le cose che servono a vendere e a scambiare: soprattutto l'indirizzo Lightning per incassare (voce «Lightning address»), il wallet collegato con NWC (facoltativo) e gli avvisi. Chi usa anche i bitcoin on-chain trova altre due voci: «📥 Come ricevi» e «₿ On-chain» (vedi «Bitcoin on-chain»).
 
-La serie dei giorni (se nelle REGOLAZIONI del pannello «Serie dei giorni» è accesa): nel Profilo, sotto le stelle, c'è una fiamma con scritto quanti giorni di fila hai aperto Barattolo e il tuo record, per esempio «5 giorni di fila · record 12»; subito sotto ci sono gli ultimi sette giorni, accesi quelli della serie. Conta aprire Barattolo da dentro il tuo account, almeno una volta al giorno, da Telegram, dal sito o dall'app: contano i giorni, non quante volte. Il giorno è quello italiano, da mezzanotte a mezzanotte. Se salti un giorno la serie riparte da 1 e il record resta. È solo un contatore: non dà XP, livelli, sconti né premi, e la vedi solo tu (sul tuo negozio e sul profilo che vedono gli altri non compare). Al primo accesso del giorno, dal secondo giorno di fila, compare per un attimo un saluto con il numero. Il bot non manda promemoria per non farla scadere.
-
 <!-- pezzo libro-003 | libro -->
 ## Libro · Entrare e il profilo (2/2)
+
+La serie dei giorni (se nelle REGOLAZIONI del pannello «Serie dei giorni» è accesa): nel Profilo, sotto le stelle, c'è una fiamma con scritto quanti giorni di fila hai aperto Barattolo e il tuo record, per esempio «5 giorni di fila · record 12»; subito sotto ci sono gli ultimi sette giorni, accesi quelli della serie. Conta aprire Barattolo da dentro il tuo account, almeno una volta al giorno, da Telegram, dal sito o dall'app: contano i giorni, non quante volte. Il giorno è quello italiano, da mezzanotte a mezzanotte. Se salti un giorno la serie riparte da 1 e il record resta. È solo un contatore: non dà XP, livelli, sconti né premi, e sul tuo negozio e sul profilo che vedono gli altri non compare. Sotto i sette giorni c'è il bottone «🏆 Classifica dei giorni di fila»: mostra chi ha la fila più lunga ancora accesa (nome, foto e giorni), la vede solo chi è entrato in Barattolo, ci si entra dal secondo giorno di fila e a pari giorni la posizione è la stessa; escono le prime 20 righe, e chi sta più giù vede la sua posizione a parte. Chi non vuole comparire accende «🏆 Non mostrarmi in classifica» nel Profilo (dove c'è il livello): esce da questa classifica e da quella del mercatino, e la sua serie continua a vederla lui. Al primo accesso del giorno, dal secondo giorno di fila, compare per un attimo un saluto con il numero. Il bot non manda promemoria per non farla scadere.
 
 Le notifiche sul telefono (se nelle REGOLAZIONI del pannello «Notifiche sul telefono» è accesa): nell'app di Barattolo per Android (quella di Zapstore), nel sito aggiunto alla schermata Home e nel browser del computer, gli avvisi degli ordini, degli scambi P2P e dei messaggi possono arrivare come notifica normale, tipo WhatsApp, anche con l'app chiusa. Si accendono dal Profilo → «🔔 Avvisi» → «📲 Notifiche sul telefono» → «Attiva», e il telefono chiede il permesso: va detto sì. Poi «🔔 Mandami una notifica di prova» fa vedere subito se arrivano. Vale per quel telefono (su un altro si accende di nuovo), e arrivano in più rispetto a Telegram o ai messaggi Nostr, che restano come sono. Si spengono dallo stesso tasto; uscendo dall'account smettono di arrivare su quel telefono. Dentro Telegram il tasto non c'è, perché gli avvisi arrivano già dal bot. NON arrivano: sui telefoni senza i servizi Google (per esempio GrapheneOS), con Tor Browser o sul sito .onion; sull'iPhone solo se Barattolo è aggiunto alla schermata Home (Condividi → «Aggiungi alla schermata Home», da iOS 16.4) e aperto da lì. Se le hai bloccate per sbaglio, si riaprono dalle impostazioni del telefono, alla voce Notifiche. Toccando una notifica si apre la pagina di cui parla: l'ordine, lo scambio o l'annuncio (dal 16 nov 2026 anche gli avvisi degli annunci aprono l'annuncio e non la home); lo stesso vale per i link degli avvisi del bot.
 
@@ -771,13 +771,14 @@ La fattura che incolli per incassare, se l'address non lo usi: si incolla solo a
 La tua reputazione: voti ricevuti, distintivi, il livello, e gli XP, che contano il commercio — quanto hai comprato e venduto, più una piccola parte di quello delle persone che hai invitato, da quando quelle che commerciano sono almeno tre.
 Gli inviti: il tuo codice e, se sei arrivato con un invito, chi ti ha invitato. A chi ti ha invitato non diciamo mai chi sei: vede quante persone ha portato, e i punti che gli hanno fruttato tutte insieme gli arrivano — nel cassetto, nel suo totale, nel livello e in classifica — solo quando quelle che commerciano sono almeno tre: prima restano da parte, e lui vede soltanto che ci sono, senza la cifra. Un limite onesto: se ha invitato soltanto te, la riga «punti in attesa» gli dice che hai cominciato a commerciare — non quanto.
 La tua posizione in classifica, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il punteggio. Il punteggio mette insieme la media e il commercio, quindi da lì si può ricavare quanto hai commerciato — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo. Se non vuoi comparire, nel Profilo («Livello e titolo») c'è Non mostrarmi in classifica: il tuo livello resta sul profilo, perché a chi scambia con te serve per fidarsi. E se la tua reputazione la pubblichiamo su Nostr (vedi sotto), smettiamo e chiediamo ai relay di ritirarla.
+I tuoi giorni di fila: contiamo i giorni consecutivi in cui apri Barattolo — il numero di adesso, il tuo record e la data dell'ultimo giorno, non le ore né le volte. Dal secondo giorno di fila entri nella classifica dei giorni di fila, che vede solo chi è entrato in Barattolo: lì di te si leggono nome, foto e giorni. Non mostrarmi in classifica ti toglie anche da lì.
 Il tuo barattolo, cioè gli annunci che hai messo da parte. Di questi si vede quanti l'hanno salvato, mai chi: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.
 I tuoi avvisi di ricerca, se ne crei: cosa cerchi, dove, entro che prezzo.
-Gli avvisi del mercatino, se li accendi (sono spenti di serie): le categorie e il prezzo massimo che hai scelto per «🛒 Avvisami dei nuovi annunci», e i venditori che segui — che non lo sanno: nessuno vede chi lo segue, né quanti. E per ogni annuncio di cui ti abbiamo avvisato, il suo numero accanto al tuo, per non avvisarti due volte: se ne va da solo dopo un mese.
 
 <!-- pezzo schermata-020 | schermata -->
 ## Schermata «I tuoi dati» · Cosa nasce mentre usi il mercatino (3/17)
 
+Gli avvisi del mercatino, se li accendi (sono spenti di serie): le categorie e il prezzo massimo che hai scelto per «🛒 Avvisami dei nuovi annunci», e i venditori che segui — che non lo sanno: nessuno vede chi lo segue, né quanti. E per ogni annuncio di cui ti abbiamo avvisato, il suo numero accanto al tuo, per non avvisarti due volte: se ne va da solo dopo un mese.
 Il tuo carrello, se ne componi uno: quali oggetti e quanti, di un venditore solo, così lo ritrovi quando rientri. Dentro non c'è l'indirizzo né la consegna — quelli nascono nella cassa — e chi vende non lo vede.
 ## Il barattolo condiviso
 Il barattolo resta privato finché non decidi tu: dal Profilo puoi creare un link che mostra la lista delle cose che hai messo da parte. È come pubblicare una lista di desideri — chi apre il link vede cosa ti interessa comprare, anche un venditore con cui stai trattando se il link gli arriva. Va fatto sapendolo, e te lo diciamo lì, prima del tocco che crea il link.
@@ -1459,6 +1460,9 @@ Annulla
 ## ✍️ Prima scrivi le 12 parole
 ## 🏅 Distintivi guadagnati
  Si guadagnano usando Barattolo: affari conclusi, feedback, identità verificate.
+Chiudi
+## 🏆 Giorni di fila: la classifica
+ Chi apre Barattolo ogni giorno, senza saltarne uno. Non dà punti né premi.
 Chiudi
 ↻
 Un attimo, riprovo…
@@ -2195,3 +2199,11 @@ frase: Barattolo è tutto in inglese: ordini, scambio P2P, Vendi, Profilo, aste,
 dove: tutta la Mini App e il sito, per chi ha Telegram o il browser in una lingua diversa dall'italiano: Ordini, P2P, Vendi, Profilo, aste, raccolte, cassa in negozio, swap, on-chain, avvisi, assistenza, privacy.
 leva: LINGUA_INGLESE (spenta di serie dal 17 nov sera, scelta di Andrea: in produzione arriva spenta e si accende dal config; accesa sul collaudo)
 pubblico: no
+
+<!-- pezzo novita-092 | novita -->
+## Novità · 2026-11-17 · serie-classifica
+
+frase: I giorni di fila adesso hanno una classifica: chi apre Barattolo da più giorni senza saltarne uno. Ci entri dal secondo giorno di fila, e a pari giorni si è a pari merito. La vede solo chi è entrato in Barattolo; se non vuoi comparire accendi «Non mostrarmi in classifica». Non dà punti né premi.
+dove: Profilo, sotto la fila dei sette giorni, il bottone «🏆 Classifica dei giorni di fila». Per non comparire: Profilo, cassetto «Livello e recensioni», «🏆 Non mostrarmi in classifica».
+leva: SERIE_GIORNI_ATTIVA (quella della serie, già accesa)
+pubblico: sì

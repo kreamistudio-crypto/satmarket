@@ -4,7 +4,8 @@ IL COLLAUDO DELLA SERIE DEI GIORNI 🔥 (17 nov 2026, cantiere
 serie-giorni).
 
 Nel Profilo ognuno vede quanti giorni DI FILA ha aperto Barattolo, e il
-suo record. Non da' XP ne' premi, e gli altri non la vedono. Qui il
+suo record. Non da' XP ne' premi; gli altri la vedono solo nella
+classifica dei giorni di fila (punto 8), mai sul profilo pubblico. Qui il
 server VERO, per HTTP con la TestClient e l'identita' di collaudo
 nell'header, e un orologio finto che il collaudo sposta:
   1) la migrazione: un database di ieri, senza la tabella, si apre e la
@@ -20,7 +21,11 @@ nell'header, e un orologio finto che il collaudo sposta:
      di uno non tocca quella di un altro;
   6) la fusione di due account (la funzione vera, `esegui_fusione`) e la
      cancellazione dell'account (`esegui_cancellazione`);
-  7) a leva spenta: niente chiave, niente timbro, la rotta risponde 404.
+  7) a leva spenta: niente chiave, niente timbro, la rotta risponde 404;
+  8) LA CLASSIFICA (17 nov sera, cantiere serie-classifica): `GET
+     /api/serie/classifica` vuole l'identita', mette in fila le serie
+     VIVE dal secondo giorno, non timbra, non manda id, e chi accende
+     «Non mostrarmi in classifica» (la rotta vera) ne esce subito.
 
 NON TOCCA NIENTE DI VERO: il `config` finto si installa PRIMA
 dell'import di server, il database e' usa-e-getta, nessuna rete.
@@ -99,7 +104,8 @@ def avvio():
         return None
 
     for nome in ("notifica", "notifica_admin", "annuncio_su_nostr",
-                 "premia_distintivi", "premia_xp", "aggiorna_profilo_social"):
+                 "premia_distintivi", "premia_xp", "aggiorna_profilo_social",
+                 "premia_reputazione_nostr"):
         if hasattr(server, nome):
             setattr(server, nome, zitto)
     # L'OROLOGIO FINTO: il timbro vero, con l'istante che dice il
@@ -112,6 +118,9 @@ def avvio():
         return vero(con, tg_id, OROLOGIO[0])
 
     server.timbra_serie = timbro_con_orologio
+    # ...e la classifica guarda lo stesso orologio
+    vera = server.serie_classifica
+    server.serie_classifica = lambda con, io, adesso=None: vera(con, io, OROLOGIO[0])
     return db
 
 
@@ -249,6 +258,58 @@ def main():
     prova("l'account cancellato porta via la sua riga", None, riga(BRUNO))
 
     # ------------------------------------------------------------------
+    print("\n[8) la classifica dei giorni di fila]")
+    DINO = 444
+    alle(26)
+    timbri, righe_prima = len(TIMBRI), (riga(ANNA), riga(CARLA))
+    cl = lambda t: c.get("/api/serie/classifica", headers=chi(t))
+    r = cl(ANNA)
+    d = r.json()
+    prova("risponde a chi e' entrato: Carla (8) prima, Anna (4) seconda e "
+          "segnata come «io»",
+          (200, [(1, 8, False), (2, 4, True)], 2, None, False, 2),
+          (r.status_code,
+           [(v["posizione"], v["giorni"], v["io"]) for v in d["voci"]],
+           d["totale"], d["mia"], d["nascosto"], d["minimo"]))
+    prova("i campi di una riga sono cinque: l'id non esce",
+          {"posizione", "nome", "avatar", "giorni", "io"}, set(d["voci"][0]))
+    prova("il nome e' quello dell'anagrafe", True,
+          all(isinstance(v["nome"], str) and v["nome"] for v in d["voci"]))
+    prova("senza identita' non si guarda", True,
+          c.get("/api/serie/classifica").status_code in (401, 403))
+    r = cl(DINO)
+    prova("chi non ha ancora una serie guarda lo stesso, e guardare NON "
+          "timbra: nessuna riga per lui, nessun timbro in piu', le altre ferme",
+          (200, None, timbri, righe_prima, False),
+          (r.status_code, riga(DINO), len(TIMBRI), (riga(ANNA), riga(CARLA)),
+           any(v["io"] for v in r.json()["voci"])))
+    # Carla accende «Non mostrarmi in classifica», dalla rotta vera
+    r = c.post("/api/me/classifica-nascosta", headers=chi(CARLA),
+               json={"nascosta": True})
+    prova("Carla accende «Non mostrarmi in classifica»", (200, True),
+          (r.status_code, r.json().get("nascosta")))
+    d = cl(ANNA).json()
+    prova("...e sparisce SUBITO: Anna sale al primo posto, in gara resta lei",
+          ([(1, 4, True)], 1),
+          ([(v["posizione"], v["giorni"], v["io"]) for v in d["voci"]], d["totale"]))
+    d = cl(CARLA).json()
+    prova("...a Carla si dice che non compare, e la sua riga non c'e'",
+          (True, None, False),
+          (d["nascosto"], d["mia"], any(v["io"] for v in d["voci"])))
+    prova("...ma la sua serie nel Profilo resta la sua", (8, 21, False),
+          corta(serie(CARLA)))
+    c.post("/api/me/classifica-nascosta", headers=chi(CARLA),
+           json={"nascosta": False})
+    prova("spento l'interruttore, torna in testa", [(1, 8), (2, 4)],
+          [(v["posizione"], v["giorni"]) for v in cl(ANNA).json()["voci"]])
+    alle(27)
+    prova("il giorno dopo, senza che nessuno apra, le file sono ancora in "
+          "piedi (ieri vale)", 2, cl(DINO).json()["totale"])
+    alle(28)
+    prova("due giorni dopo non c'e' piu' nessuno: una fila finita non si "
+          "mostra", ([], 0), (lambda x: (x["voci"], x["totale"]))(cl(DINO).json()))
+
+    # ------------------------------------------------------------------
     print("\n[7) a leva spenta]")
     SRV.SERIE_GIORNI_ATTIVA = False
     alle(27)
@@ -260,6 +321,8 @@ def main():
           (prima, (4, 5, "2026-11-26")), (len(TIMBRI), riga(ANNA)))
     prova("la rotta del ritorno risponde 404", 404,
           c.post("/api/me/serie", headers=chi(ANNA)).status_code)
+    prova("...e la classifica pure", 404,
+          c.get("/api/serie/classifica", headers=chi(ANNA)).status_code)
     SRV.SERIE_GIORNI_ATTIVA = True
     alle(29)
     prova("riaccesa dopo due giorni di buio: riparte da 1, il record resta",

@@ -208516,8 +208516,11 @@ def prove_serie_giorni():
           "e la settimana subito sotto la carta", True, bool(re.search(
               r'<div class="rep">\$\{rep\}</div>\s*\$\{serieRigaHTML\(mySerie\)\}\s*</div>\s*'
               # (17 nov 2026, primo-wallet, quinto giro) sotto la settimana
-              # sta la casella verde della guida al wallet, e poi basta
+              # sta la casella verde della guida al wallet, e poi basta;
+              # (17 nov sera, serie-classifica) fra le due la porta della
+              # classifica dei giorni di fila
               r'\$\{tondi\}\s*</div>\s*\$\{serieSettimanaHTML\(mySerie\)\}\s*'
+              r'\$\{serieClassificaPortaHTML\(mySerie\)\}\s*'
               r'\$\{guidaWalletBoxHTML\(\)\}`;', rp)))
     prova("la busta arriva da /api/me, e l'orecchio del ritorno si accende li'",
           True, "    serieArrivata(me.serie, 1600);\n    serieAscolta();\n" in mini)
@@ -208687,6 +208690,242 @@ console.log(JSON.stringify(out));
           [1, 2], [o.get("troppo_presto"), o.get("dopo_dieci_minuti")])
     prova("in demo, senza l'ora di Roma o senza serie non si bussa mai",
           [2, 2, 2], [o.get("demo"), o.get("senza_intl"), o.get("senza_serie")])
+
+def prove_serie_classifica():
+    """LA CLASSIFICA DELLA SERIE 🔥 (17 nov 2026, sera, cantiere
+    serie-classifica; Andrea: «una classifica degli utenti che accedono
+    a barattolo ogni giorno, e ogni utente puo' verificare questa
+    classifica»). Il giudice puro (pari merito, il taglio, chi guarda),
+    la lettura VERA su un database di cartone (file vive, chi non vuole
+    comparire, la foto scelta), i fili (identita', leva, niente
+    scritture, niente id in uscita) e il foglio in node."""
+    print("\n[la classifica della serie: giudice, lettura, rotta, foglio]")
+    import sqlite3, time as _time, calendar as _cal
+    amb = {"time": _time, "SERIE_TAPPE": (7, 30, 100, 365)}
+    exec("SERIE_CLASSIFICA_TOP = 20\nSERIE_CLASSIFICA_MIN = 2\n", amb)
+    for nome in ("_giorno_roma", "_giorno_prima", "serie_podio",
+                 "serie_classifica"):
+        exec(pezzo(nome), amb)
+    prova("le due misure stanno scritte nel server: 20 righe, dal 2° giorno",
+          True, "\nSERIE_CLASSIFICA_TOP = 20\nSERIE_CLASSIFICA_MIN = 2\n" in _SORGENTE)
+    podio = amb["serie_podio"]
+    # ---- il giudice ----
+    e = podio([(1, 5), (2, 9), (3, 5), (4, 2), (5, 1)], (), 3)
+    prova("in ordine di giorni, e a pari giorni la STESSA posizione (1, 2, 2, "
+          "4): un giorno solo non entra",
+          [(2, 9, 1), (1, 5, 2), (3, 5, 2), (4, 2, 4)],
+          [(r["id"], r["giorni"], r["posizione"]) for r in e["voci"]])
+    prova("...in gara sono in quattro, e chi guarda trova la sua riga",
+          (4, {"id": 3, "giorni": 5, "posizione": 2}), (e["totale"], e["mia"]))
+    e = podio([(1, 5), (2, 9), (3, 5), (4, 2)], {2}, 2)
+    prova("chi ha detto di non comparire non c'e', chi gli stava dietro sale "
+          "(1, 1, 3), e lui non ha una posizione",
+          ([(1, 5, 1), (3, 5, 1), (4, 2, 3)], 3, None),
+          ([(r["id"], r["giorni"], r["posizione"]) for r in e["voci"]],
+           e["totale"], e["mia"]))
+    e = podio([(i, 100 - i) for i in range(1, 31)], (), 30)
+    prova("fuori escono le prime 20; chi sta dopo ha la sua riga a parte",
+          (20, 30, {"id": 30, "giorni": 70, "posizione": 30}),
+          (len(e["voci"]), e["totale"], e["mia"]))
+    prova("al lancio partono tutti insieme: trenta persone a 3 giorni sono "
+          "tutte prime", {1},
+          {r["posizione"] for r in podio([(i, 3) for i in range(30)])["voci"]})
+    prova("nessuno in gara: lista vuota, nessuna riga mia", ([], 0, None),
+          (lambda x: (x["voci"], x["totale"], x["mia"]))(podio([(1, 1)], (), 1)))
+    prova("la lista non balla: fra pari l'ordine e' fermo, comunque arrivino "
+          "le righe", True,
+          podio([(9, 4), (3, 4), (7, 4)])["voci"] == podio([(7, 4), (9, 4), (3, 4)])["voci"])
+    rotto = pezzo("serie_podio").replace("posizione = i\n", "posizione = i\n        posizione = i\n", 1).replace(
+        "        if i == 1 or g != in_gara[i - 2][0]:\n", "        if True:\n", 1)
+    amb_r = dict(amb); exec(rotto, amb_r)
+    prova("controprova: senza il pari merito tre persone a 4 giorni sarebbero "
+          "1, 2, 3", [1, 2, 3],
+          [r["posizione"] for r in amb_r["serie_podio"]([(9, 4), (3, 4), (7, 4)])["voci"]])
+
+    # ---- la lettura vera, su un database di cartone ----
+    m = re.search(r"    CREATE TABLE IF NOT EXISTS serie_giorni\((?:.|\n)*?\n    \);\n",
+                  _SORGENTE)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(m.group(0))
+    con.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT, "
+                "avatar TEXT DEFAULT '', avatar_scelta TEXT DEFAULT '', "
+                "classifica_nascosta INTEGER DEFAULT 0)")
+    utc = lambda *a: _cal.timegm(a + (0,) * (6 - len(a)))
+    ADESSO = utc(2026, 11, 20, 12)                  # venerdi' 20 nov, mezzogiorno UTC
+    gente = [  # id, nome, avatar, scelta, nascosta, giorni, record, ultimo
+        (1, "Ada", "a.jpg", "", 0, 6, 6, "2026-11-20"),        # viva, oggi
+        (2, "Bruno", "b.jpg", "nessuna", 0, 6, 9, "2026-11-19"),  # viva, ieri; foto spenta
+        (3, "Carla", "", "", 1, 30, 30, "2026-11-20"),         # non vuole comparire
+        (4, "Dino", "", "", 0, 40, 40, "2026-11-18"),          # fila FINITA (l'altro ieri)
+        (5, "Elsa", "", "", 0, 1, 12, "2026-11-20"),           # un giorno solo
+        (6, "", "", "", 0, 3, 3, "2026-11-20"),                # senza nome
+        (7, "Futuro", "", "", 0, 4, 4, "2026-11-25")]          # orologio tornato indietro
+    for g in gente:
+        con.execute("INSERT INTO utenti VALUES(?,?,?,?,?)", g[:5])
+        con.execute("INSERT INTO serie_giorni VALUES(?,?,?,?)", (g[0],) + g[5:])
+    con.execute("INSERT INTO serie_giorni VALUES(99, 50, 50, '2026-11-20')")  # riga orfana
+    con.commit()
+    leggi = amb["serie_classifica"]
+    prima = con.total_changes
+    c = leggi(con, 6, ADESSO)
+    prova("la classifica di adesso: le file VIVE (oggi o ieri) dal 2° giorno, "
+          "senza chi si e' nascosto, senza la fila finita, senza gli orfani",
+          [(1, "Ada", 6), (1, "Bruno", 6), (3, "Futuro", 4), (4, "—", 3)],
+          [(v["posizione"], v["nome"], v["giorni"]) for v in c["voci"]])
+    prova("...chi guarda e' segnato sulla SUA riga e non riceve una riga in "
+          "piu'; il totale conta chi e' in gara",
+          ([False, False, False, True], None, 4, False, 2),
+          ([v["io"] for v in c["voci"]], c["mia"], c["totale"], c["nascosto"], c["minimo"]))
+    prova("la foto esce con la scelta dell'utente: «nessuna» = niente foto",
+          ["a.jpg", ""], [c["voci"][0]["avatar"], c["voci"][1]["avatar"]])
+    prova("in uscita i campi sono cinque, e l'id non c'e'",
+          [{"posizione", "nome", "avatar", "giorni", "io"}],
+          list({frozenset(v) for v in c["voci"]}) and [set(c["voci"][0])])
+    prova("LEGGE E BASTA: nessuna scrittura", prima, con.total_changes)
+    c = leggi(con, 3, ADESSO)
+    prova("chi ha detto «Non mostrarmi in classifica» se lo sente dire, e la "
+          "sua fila da 30 non esce a nessuno",
+          (True, None, False), (c["nascosto"], c["mia"], any(v["giorni"] == 30 for v in c["voci"])))
+    c = leggi(con, 5, ADESSO)
+    prova("chi e' al primo giorno guarda ma non e' in gara",
+          (None, False, False), (c["mia"], c["nascosto"], any(v["io"] for v in c["voci"])))
+    con.execute("UPDATE utenti SET classifica_nascosta=0 WHERE tg_id=3")
+    prova("spento l'interruttore torna subito, in testa (niente cache)",
+          ("Carla", 30, 1), (lambda v: (v["nome"], v["giorni"], v["posizione"]))(leggi(con, 3, ADESSO)["voci"][0]))
+    prova("il giorno dopo la fila di chi ieri non e' passato non c'e' piu'",
+          False, any(v["nome"] == "Bruno" for v in leggi(con, 1, ADESSO + 86400)["voci"]))
+    for i in range(100, 125):
+        con.execute("INSERT INTO utenti(tg_id, nome) VALUES(?,?)", (i, "U%d" % i))
+        con.execute("INSERT INTO serie_giorni VALUES(?,?,?,?)", (i, 8, 8, "2026-11-20"))
+    c = leggi(con, 6, ADESSO)
+    prova("oltre le venti: venti righe fuori, e a chi guarda da sotto la SUA "
+          "riga a parte, col suo posto vero",
+          (20, 30, {"posizione": 30, "nome": "—", "avatar": "", "giorni": 3, "io": True}),
+          (len(c["voci"]), c["totale"], c["mia"]))
+    con.close()
+
+    # ---- i fili ----
+    rotta = pezzo("classifica_della_serie")
+    cod = codice(rotta)
+    prova("la rotta e' GET /api/serie/classifica", True,
+          '@app.get("/api/serie/classifica")\ndef classifica_della_serie(' in _SORGENTE)
+    prova("vuole l'identita' (non e' una pagina del web aperto), e la leva "
+          "spenta risponde 404 PRIMA di tutto",
+          [True, True],
+          ["verifica_utente(x_tg_init_data, barattolo_sessione)" in cod,
+           -1 < cod.find("if not SERIE_GIORNI_ATTIVA:\n        raise HTTPException(404")
+           < cod.find("verifica_utente(")])
+    prova("non timbra e non scrive: nessun commit, nessun timbra_serie",
+          [False, False, False],
+          ["commit" in cod, "timbra_serie" in cod,
+           bool(re.search(r"\b(INSERT|UPDATE|DELETE)\b", codice(pezzo("serie_classifica"))))])
+    prova("la lettura passa dal giudice, e chi non vuole comparire e' "
+          "l'interruttore che c'e' gia' (`classifica_nascosta`)",
+          [True, True],
+          ["serie_podio(vive, nascosti, io)" in codice(pezzo("serie_classifica")),
+           "u.classifica_nascosta" in pezzo("serie_classifica")])
+    prova("il profilo pubblico continua a non dire la serie: `serie_giorni` "
+          "si legge solo nel timbro, nella fusione, nella cancellazione e qui",
+          ["_serie_unisci", "serie_classifica", "timbra_serie"],
+          sorted({nome for nome in re.findall(r"\ndef (\w+)\(", _SORGENTE)
+                  if re.search(r"\b(FROM|INTO) serie_giorni\b", pezzo(nome))}))
+
+    # ---- il client ----
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la porta sta nel Profilo, sotto la settimana", True,
+          "    ${serieSettimanaHTML(mySerie)}\n    ${serieClassificaPortaHTML(mySerie)}\n" in mini)
+    prova("il foglio esiste, e' registrato in closeSheet e si chiude con "
+          "l'indietro", [True, True, True],
+          ['<div class="sheet" id="serieClassificaSheet">' in mini,
+           "el('serieClassificaSheet').classList.remove('open');"
+           in pezzo_js(mini, "function closeSheet(){", "\n}"),
+           'onclick="navIndietro()">Chiudi</button>'
+           in mini[mini.index('id="serieClassificaSheet"'):mini.index("La pastiglia del gesto «tira")]])
+    apri = pezzo_js(mini, "async function apriSerieClassifica(){", "\n}\n")
+    prova("il foglio chiede al server con l'identita', e in demo non bussa",
+          [True, True],
+          ["fetch(`${API_BASE}/serie/classifica`, {headers:{'X-Tg-Init-Data':authHdr()}})" in apri,
+           -1 < apri.find("if (DEMO)") < apri.find("fetch(")])
+    riga = pezzo_js(mini, "function rigaClassificaNascosta(){", "\n}\n")
+    prova("l'interruttore «Non mostrarmi in classifica» c'e' anche con la sola "
+          "serie accesa, e dice che vale per i giorni di fila",
+          [True, True],
+          ["if (!myClassifica && !(typeof mySerie !== 'undefined' && mySerie)) return '';" in riga,
+           "anche quella dei giorni di fila" in riga])
+    prova("«I tuoi dati» dichiara il dato nuovo e chi lo vede", True,
+          "<li>I tuoi <b>giorni di fila</b>:" in mini
+          and "che vede solo chi è entrato in Barattolo" in mini)
+    i = mini.index("function serieClassificaPortaHTML(")
+    pezzi = mini[i:mini.index("async function apriSerieClassifica(", i)]
+    banco = (pezzo_js(mini, "const esc = s =>", "));") + "));\n"
+             "const SERIE_FIAMMA = '<svg></svg>';\n"
+             "const serieBusta = s => (s && s.giorni >= 1) ? s : null;\n"
+             "const volti = []; function voltoHTML(p, cls, o){ volti.push([p.nome, p.avatar, cls]); return '<i class=\"' + cls + '\"></i>'; }\n"
+             + pezzi + """
+const testo = h => h.replace(/<svg><\\/svg>/g, '🔥').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim();
+const V = (posizione, nome, giorni, io) => ({posizione, nome, avatar: '', giorni, io: !!io});
+const out = {};
+out.porta = [serieClassificaPortaHTML(null), /onclick="apriSerieClassifica\\(\\)"/.test(serieClassificaPortaHTML({giorni: 1})),
+             testo(serieClassificaPortaHTML({giorni: 3}))];
+out.righe = [testo(serieClassificaRigaHTML(V(1, 'Ada', 9))), testo(serieClassificaRigaHTML(V(3, 'Bruno', 5))),
+             testo(serieClassificaRigaHTML(V(4, 'Carla', 5, true))), testo(serieClassificaRigaHTML(V(21, '', 2)))];
+out.io = [/serie-cl-riga io/.test(serieClassificaRigaHTML(V(4, 'Carla', 5, true))), /serie-cl-riga io/.test(serieClassificaRigaHTML(V(4, 'Carla', 5)))];
+out.storta = serieClassificaRigaHTML({posizione: 2.9, nome: '<img src=x onerror=alert(1)><script>', avatar: '', giorni: '7'})
+  + serieClassificaRigaHTML({posizione: '2<img src=x>', nome: 'x', giorni: '7<script>'})
+  + serieClassificaRigaHTML({posizione: 0, nome: 'x', giorni: 3}) + serieClassificaRigaHTML({posizione: 1, nome: 'x', giorni: 0});
+out.piena = testo(serieClassificaHTML({voci: [V(1, 'Ada', 9), V(2, 'Bruno', 5, true)], totale: 2, mia: null, nascosto: false, minimo: 2}));
+out.sotto = testo(serieClassificaHTML({voci: [V(1, 'Ada', 9)], totale: 31, mia: V(30, 'Io', 2, true), nascosto: false, minimo: 2}));
+out.uno_in_piu = testo(serieClassificaHTML({voci: [V(1, 'Ada', 9)], totale: 2, mia: null, nascosto: false, minimo: 2}));
+out.fuori = testo(serieClassificaHTML({voci: [V(1, 'Ada', 9)], totale: 1, mia: null, nascosto: false, minimo: 2}));
+out.nascosto = testo(serieClassificaHTML({voci: [V(1, 'Ada', 9)], totale: 1, mia: null, nascosto: true, minimo: 2}));
+out.vuota = testo(serieClassificaHTML({voci: [], totale: 0, mia: null, nascosto: false, minimo: 2}));
+out.rotta = [testo(serieClassificaHTML(null)), testo(serieClassificaHTML({ok: true}))];
+out.volto = volti[0];
+console.log(JSON.stringify(out));
+""")
+    o = _node_banco(banco)
+    if o is None:
+        salta("il banco del foglio della classifica", "node assente")
+        return
+    prova("la porta: niente senza serie, c'e' dal primo giorno, e dice cos'e'",
+          ["", True, "🏆 Classifica dei giorni di fila ›"], o.get("porta"))
+    prova("le righe: medaglia ai primi tre posti, poi il numero; il nome, «tu» "
+          "sulla propria, i giorni con la fiamma",
+          ["🥇 Ada 🔥9", "🥉 Bruno 🔥5", "4° Carla tu 🔥5", "21° — 🔥2"], o.get("righe"))
+    prova("la riga di chi guarda e' accesa, le altre no", [True, False], o.get("io"))
+    prova("un nome o un numero storto non porta markup nella pagina, e una "
+          "riga senza posizione o senza giorni non si disegna",
+          [False, False, True],
+          ["<img" in o.get("storta", "<img"), "<script" in o.get("storta", "<script"),
+           o.get("storta", "").count("serie-cl-riga") == 1])
+    prova("la lista piena: le righe e come uscirne",
+          "🥇 Ada 🔥9 🥈 Bruno tu 🔥5 A pari giorni la posizione è la stessa. Se non "
+          "vuoi comparire: Profilo, «Livello e titolo», «Non mostrarmi in classifica».",
+          o.get("piena"))
+    prova("chi sta sotto le prime vede la SUA posizione a parte, e quanti "
+          "altri hanno una fila accesa (senza contare se stesso)", True,
+          o.get("sotto", "").startswith("🥇 Ada 🔥9 La tua posizione 30° Io tu 🔥2 "
+                                        "E altre 29 persone hanno una fila accesa."))
+    prova("...al singolare", True,
+          "E un'altra persona ha una fila accesa." in o.get("uno_in_piu", ""))
+    prova("chi non e' ancora in gara legge come si entra, mai «hai perso»",
+          [True, False],
+          ["Si entra dal secondo giorno di fila: torna domani e ci sei anche tu." in o.get("fuori", ""),
+           "pers" in o.get("fuori", "pers").replace("persone", "").replace("persona", "")])
+    prova("chi si e' nascosto legge perche' non compare, e non «torna domani»",
+          [True, False],
+          ["Tu qui non compari: hai acceso «Non mostrarmi in classifica»" in o.get("nascosto", ""),
+           "ci sei anche tu" in o.get("nascosto", "ci sei anche tu")])
+    prova("nessuno in gara: si dice come si entra",
+          "Ancora nessuno in classifica: si entra dal secondo giorno di fila. Torna domani.",
+          o.get("vuota"))
+    prova("server che non risponde o risposta storta: una frase, non una "
+          "pagina rotta",
+          ["La classifica adesso non risponde: riprova fra poco."] * 2, o.get("rotta"))
+    prova("il volto passa dal volto unico, senza negozio (nessuna porta)",
+          ["Ada", "", "avatar serie-cl-volto"], o.get("volto"))
+
 
 def prove_sentinella_server_fermo():
     """LA SENTINELLA DEL SERVER FERMO (17 nov 2026, dal campo: il blocco
@@ -209804,7 +210043,7 @@ CATEGORIE = {
     link_descrizione foto_vuota foto_metadati connettori connettori_sync
     connettori_woo connettori_registro connettori_ingresso
     titoli_importati connettori_varianti connettore_interrompibile
-    famiglie connettori_cassetto connettori_categoria avvisi_barattolo serie_giorni finestra ordini_prova tutorial
+    famiglie connettori_cassetto connettori_categoria avvisi_barattolo serie_giorni serie_classifica finestra ordini_prova tutorial
     caccia_a_tappo
     timbri_visti effetti_ridotti morfosi_vendi copertura_home
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
@@ -210987,6 +211226,7 @@ def main():
               prove_filtro_onchain_tutto,
               prove_avvisi_barattolo,
               prove_serie_giorni,
+              prove_serie_classifica,
               prove_sentinella_server_fermo,
               prove_caccia_a_tappo,
               prove_categorie_delle_prove)

@@ -90049,3 +90049,63 @@ NON PROVATO dal vivo: nessun acquisto vero sopra 500 €; il foglio si
 guarda sul collaudo, che segue develop.
 ## L'inglese, tappa 2: tutto il resto dell'app (17 nov 2026, cantiere inglese-tappa-2; Andrea, dopo aver visto la tappa 1 mista: «Vai, prosegui con tutto il resto, devi farlo in inglese»). COSA C'È DENTRO: il dizionario `lingua/en.js` passa da ~680 a ~9.200 voci e copre Ordini (elenco, filtri, la scheda in ogni stato: deposito, spedizione, consegna, conferma, disputa, reso, rimborso, incasso), il P2P intero (libro, pubblica, presa, passi, chat, cauzione, paracadute, ripubblica, Barattozon/PayCode, USDT/USDe/ETH/XMR, incontro con presenza e QR, dispute e la pagina dei moderatori con le chiavi), Vendi (oggetto, servizio, digitale, asta, set, importazione CSV/ZIP), il Profilo (livelli, distintivi, stradina, serie, inviti, identità Nostr con firma/bunker/estensione, spedizioni e punti, codici sconto, premi fedeltà, negozio con statistiche/banner/widget, account multipli, cancellazione), aste e offerte, raccolte fondi, la cassa in negozio, gli swap e l'on-chain 2-di-3, gli avvisi, l'assistenza, la privacy, Tor, i tour, i popup di Telegram e i `confirm`/`alert`, e anche i pannelli admin (leve, cassaforte, chiavi, moderazione) — tradurli costava poco e risparmia un cantiere dopo; li vedono solo Andrea e Alan. COME SI È FATTO: un estrattore ha tirato fuori dal sorgente le ~9.000 stringhe italiane (HTML, template, concatenazioni), ordinate in 61 lotti da 150, tradotte lotto per lotto con un glossario fisso (deposito di garanzia → escrow deposit, garanzia del P2P → escrow, cauzione → bond, vetrina → marketplace, barattolo → jar, presa → take, chi compra/chi vende → the buyer/the seller, Da riscuotere → To collect, tabacchino → tobacconist), e un montatore le ha scritte nel dizionario controllando i segnaposto, i doppioni e le entità HTML (`&nbsp;` nel sorgente è uno spazio nel DOM: le prime chiavi con l'entità dentro non avrebbero mai combaciato). Poi TRE GIRI DAL VIVO in Chromium a 390 px (`?lingua=en`, database seminato con ordini in sei stati, le tre identità del collaudo) su Ordini, Vendi, Profilo (fisarmoniche aperte), avvisi, account, Nostr, guide, stradina, raccolte, classifica, privacy, assistenza, on-chain, swap, Esplora, P2P (libro, pubblica, i miei, l'info aperta), Tappo, il negozio del venditore e le pagine admin (leve, moderazione P2P, assistenza): ogni giro cercava le parole italiane rimaste e ne sono entrate ~330 chiavi che l'estrazione non vedeva — testi concatenati nel JS (il tour del P2P, l'assistenza, le fisarmoniche dell'info P2P), e soprattutto i TESTI CHE ARRIVANO DAL SERVER (le caselle e le zone della stradina, i distintivi col loro titolo «Nome: descrizione», i livelli, i gruppi del pannello delle leve). LE TRE REGOLE NUOVE DEL TRADUTTORE, nate dai giri: (1) la FORMA CORTA — una chiave che comincia col segnaposto e ha meno di tre parole sue («{} annunci», «{} giorni») accetta al più due parole nel primo buco: senza questo «Pubblica il primo annuncio» usciva «Pubblica il primo listing(s)» e «🔥 Serie dei giorni» diventava «Serie dei days»; (2) UN BUCO NON INGOIA UNA FRASE — niente `. ? ! ;` seguiti da spazio (o `: `) dentro una cattura, sennò la frase lunga del campo quantità, che finisce con «annunci», passava per «{} annunci» e usciva mezza inglese; (3) QUEL CHE IL BUCO CATTURA SI TRADUCE A SUA VOLTA, un livello solo («Casella 7: Fai il primo acquisto» è «Casella {}: {}» col titolo dentro). SCARTATO: le forme-frammento da una parola («di {}», «del {}», «via {}», «sats {}») — «di {}» serviva alla riga «di Bottega di Bruno» della cassa e si mangiava « di spedizione in Italia»; la riga della cassa (e il «di» delle raccolte) ora passa da `diChi()` / `raccDiChi()`, che chiamano `t('di {nome}', …)`: chiave secca senza `{}`, e reggono nei banchi delle prove dove il traduttore non c'è. LE DESCRIZIONI DELLE 314 LEVE del pannello restano italiane per scelta: sono testo tecnico per Andrea, in italiano. RESTA ITALIANO anche quel che non è testo dell'app: i titoli degli annunci e i nomi dei negozi (dati), i mesi brevi del P2P («15 nov 16:33»), i messaggi del bot e le frasi degli errori del server (i 400/409 arrivano in italiano, ~1.300), e la lingua non è ancora salvata sul server. PROVATO: `prove_lingua_inglese` estesa (la forma corta, il buco con la punteggiatura, la traduzione dentro la cattura, il popup riga per riga; i segnaposto in meno nella resa sono ammessi, le parole delle chiavi si cercano anche in server.py), suite intera e collaudi della CI nel worktree, più i giri dal vivo di cui sopra e il giro della tappa 1 rifatto (vetrina, scheda, cassa, pagamento). TAPPA 3, da aprire: l'interruttore IT/EN nel Profilo salvato sul server, il bot e gli errori del server in inglese, i dettagli dei servizi nella scheda («Di persona · 1 ora»), i mesi brevi. LA QUARTA REGOLA, DOPO IL REBASE (17 nov 2026, sera): mentre il cantiere era aperto develop ha preso tre cantieri (contanti on-chain con cauzione e appuntamento, rimborso on-chain liscio coi tempi del bonifico, le 12 parole chieste nello scambio) e ~190 frasi nuove; guardandole da vicino è uscito il limite dell'estrattore: un paragrafo che il codice COMPONE a pezzi («Deposito confermato. Quando vi vedete, …» più una coda scelta da un ternario) finisce nel DOM come un nodo solo, e nel dizionario c'erano i suoi frammenti, mai il nodo intero — chiavi vere ma mute. Ora `traduci`, se non trova né la chiave intera né una forma, PROVA UNA FRASE ALLA VOLTA (il taglio è `. ? ! ;` seguiti da spazio), riscrive quelle che sa e lascia italiane le altre; un livello solo, senza lookbehind (le WebView vecchie rifiuterebbero l'intero file all'analisi). Le frasi nuove dei tre cantieri stanno nel dizionario come FRASI (e, dove il nodo è uno, anche come nodo intero): cauzione in Lightning per chi prende in contanti, «Brucia la cauzione» e la metà a mano, «Dove tornano i sats?», le 12 parole, i passi della consegna di persona, l'appuntamento, i tempi del bonifico, il foglio «Quanto» (Cifre rapide, Minimo, Massimo). Provata al banco (`prove_lingua_inglese`) e con un banco a parte sui paragrafi composti dei tre cantieri. LA LEVA ARRIVA SPENTA (17 nov 2026, sera, Andrea: «L'inglese della prima parte lascialo spento», con una promozione in partenza): `LINGUA_INGLESE` nasce False in `server.py` e nel config d'esempio — eccezione sua alla regola delle leve accese —, sul collaudo si accende dal config (voce in DA-FARE-ANDREA) e in produzione quando lo dice lui. Spenta, `/lingua/en.js` è un 404 e l'app resta italiana per tutti, anche con `?lingua=en`.
 
+
+
+## La classifica della serie 🔥 (17 nov 2026 sera, cantiere serie-classifica; Andrea: «nel profilo dove c'è lo streak, metti anche una classifica degli utenti che accedono a barattolo ogni giorno, e ogni utente può verificare questa classifica», poi «aggiungila e includila nella promozione di adesso»)
+
+COSA: sotto i sette giorni del Profilo un bottone, «🏆 Classifica dei
+giorni di fila», che apre un foglio: chi ha la fila VIVA più lunga —
+posizione, foto, nome, giorni — con la propria riga accesa. Rotta nuova
+`GET /api/serie/classifica`, giudice puro `serie_podio`, lettura
+`serie_classifica`. Nessuna tabella nuova, nessuna leva nuova: vive
+sotto `SERIE_GIORNI_ATTIVA`.
+
+ROVESCIA UNA RIGA DELLA MATTINA, e lo fa sapendolo: la serie era nata
+«solo di chi la fa», ed è già in produzione da oggi con quella frase
+(NOVITA `serie-giorni`: «la vedi solo tu»). Da qui nome, foto e giorni
+di chi è in classifica li vede chiunque sia entrato. I contrappesi: la
+rotta vuole l'identità (non è una pagina del web aperto, e negozio e
+profilo pubblico continuano a tacere la serie); chi non vuole comparire
+ha l'interruttore che c'è già, «Non mostrarmi in classifica»
+(`classifica_nascosta`), che ora vale per tutte e due le classifiche e
+si vede anche dove quella del mercatino è spenta; «I tuoi dati»
+dichiara il dato nuovo e chi lo vede; la NOVITA nuova lo dice chiaro.
+SEGNALATO AD ANDREA nella risposta: chi ha letto «la vedi solo tu» oggi
+si ritrova in lista senza averlo scelto, finché non spegne.
+
+LE DECISIONI (prese da me per fare presto, «falla semplice»):
+- VIVA = ultimo passaggio di oggi o di ieri. Chi ieri c'era e oggi non
+  ha ancora aperto è in gara col numero di ieri; una fila finita non si
+  mostra a nessuno (mai «ha perso»).
+- SI ENTRA DAL SECONDO GIORNO: un giorno solo non è una fila, come per
+  il saluto. Il giorno del lancio la lista è vuota e dice «torna
+  domani».
+- A PARI GIORNI, PARI POSIZIONE (1, 1, 3). La serie è partita oggi per
+  tutti: per giorni la testa sarà un grande pari merito, e un ordine
+  fra pari sarebbe inventato. L'ordine di scrittura fra pari è per id,
+  solo perché la lista non balli.
+- 20 RIGHE FUORI; chi sta sotto riceve la SUA a parte («La tua
+  posizione»), e una riga dice quanti altri hanno una fila accesa.
+- IL RECORD NON ENTRA IN GARA: si guarda chi c'è adesso.
+- NIENTE ID, NIENTE NEGOZIO nella riga: non è una vetrina, la riga non
+  si tocca.
+- NIENTE CACHE: una lettura con una riga a persona.
+SCARTATE: una classifica pubblica senza accesso (Andrea dice «ogni
+utente»: chi è entrato basta, e costa meno riservatezza); un secondo
+interruttore solo per i giorni (due domande per la stessa cosa); la
+gara sui record; il pannello con una leva sua (si spegne con la serie).
+
+PROVATO: `prove_serie_classifica` (40 prove: giudice con controprova,
+lettura vera su database di cartone — file vive, nascosti, fila finita,
+orfani, foto «nessuna», oltre le venti — fili e foglio in node);
+`prove_serie_giorni` ritoccata (la porta fra settimana e casella del
+wallet); `collaudo_serie_giorni` punto 8 nella gabbia e senza proxy
+(rotta vera, identità, guardare non timbra, l'interruttore vero toglie
+e rimette subito, ieri vale, due giorni dopo vuota, leva spenta 404).
+DAL VIVO: server vero del worktree in collaudo su loopback, Chromium
+senza rete esterna, 375 e 320 px, chiaro e scuro, nove persone e poi
+trentaquattro (la mia riga a parte): nessun errore di pagina, niente
+che sfora, il foglio si chiude con l'indietro. Scatti in
+/mnt/project-files/serie-giorni/classifica-dal-vivo.png.
+NON PROVATO: un telefono vero; la classifica con persone vere (in
+produzione la serie è nata oggi: fino a domani la lista è vuota).
