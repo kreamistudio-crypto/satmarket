@@ -398,3 +398,9 @@ frase: Quando metti un articolo nel tuo barattolo 🫙 puoi scegliere cosa farti
 dove: il barattolino 🫙 sulla foto di un annuncio, poi il foglietto «🔔 Avvisami se…»; per cambiare idea, Profilo → «Nel tuo barattolo» → la 🔔 accanto all'articolo.
 leva: AVVISI_BARATTOLO_ATTIVI (accesa di serie)
 pubblico: sì
+
+## 2026-11-17 · spedisci-entro
+frase: Quando vendi un oggetto da spedire, il messaggio del bot ti dice entro che giorno spedirlo, col tasto per aprire l'ordine. Nell'ordine trovi la stessa data e «📖 Come si spedisce?», una guida in quattro passi dall'imballo al tracciamento. Chi compra vede entro quando parte il pacco, e nei passi dell'ordine compaiono l'ora del pagamento e quella della spedizione.
+dove: il messaggio «Hai venduto!» del bot; l'ordine del venditore, riquadro «📦 Spedisci» (riga «⏳ Spedisci entro…» e link «📖 Come si spedisce?»); i passi dell'ordine, per chi vende e per chi compra.
+leva: nessuna
+pubblico: sì

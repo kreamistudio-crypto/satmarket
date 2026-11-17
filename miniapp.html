@@ -10065,6 +10065,13 @@
   .step small{color:var(--muted);font-size:12px;font-weight:600}  /* l'ora del passo dello scambio P2P (16 ott 2026, orari-passi): una
      riga sua, piu' piccola e piu' leggera della frase, cifre in colonna */
   .step small.step-ora{display:block;font-size:11px;font-weight:500;margin-top:1px;font-variant-numeric:tabular-nums}
+  /* «COME SI SPEDISCE?» (17 nov 2026): la guida a passi numerati, e la
+     riga del dopo sotto, piu' piccola */
+  .guida-sped{margin:0 0 10px;padding-left:20px;font-size:13.5px;color:var(--desc);
+    font-weight:600;line-height:1.55}
+  .guida-sped li{margin-bottom:8px}
+  .guida-sped li b{color:var(--ink)}
+  .guida-sped-poi{font-size:13px;color:var(--desc);font-weight:600;margin-bottom:14px}
 
   .step.todo{opacity:.45}
   /* il passo su cui uno scambio si e' fermato (27 set 2026): la ✕ spenta
@@ -16423,6 +16430,37 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn ghost" onclick="trasportoScopri()">Come funziona il deposito</button>
   </div>
 
+  <!-- ============ SHEET: COME SI SPEDISCE? (17 nov 2026) ============ -->
+  <!-- La guida passo per passo di chi vende, dal link «📖 Come si
+       spedisce?» del pannello «📦 Spedisci» (cantiere spedisci-entro,
+       spunto preso dal FLUSSO di un altro mercatino, non dai testi).
+       Si apre solo a richiesta, quante volte si vuole: e' il manuale,
+       non l'avviso una-tantum qui sopra. Quattro passi nell'ordine in
+       cui si fanno, e in fondo cosa succede dopo. -->
+  <div class="sheet" id="guidaSpedSheet" role="dialog" aria-modal="true"
+       aria-labelledby="guidaSpedTit">
+    <div class="grab"></div>
+    <h3 id="guidaSpedTit">📖 Come si spedisce?</h3>
+    <ol class="guida-sped">
+      <li><b>Imballa bene.</b> Una scatola robusta, i vuoti riempiti
+        (carta, pluriball) e il nastro sulle chiusure. Fai una foto
+        all'oggetto e al pacco chiuso: in caso di disputa è una prova.</li>
+      <li><b>Compra l'etichetta.</b> Dal sito o dall'app del corriere, o
+        allo sportello. L'indirizzo o il locker di chi compra sono in
+        cima all'ordine, in <b>«📦 Spedisci a»</b>. Per le cose di valore
+        aggiungi la copertura del corriere.</li>
+      <li><b>Consegna il pacco</b> al corriere, al locker o all'ufficio
+        postale, e conserva la ricevuta.</li>
+      <li><b>Segna come spedito</b> qui nell'ordine, col numero di
+        tracciamento: chi compra lo vede e segue il pacco. Puoi anche
+        scegliere «Posta senza tracciamento», ma se il pacco si perde il
+        rischio è tuo.</li>
+    </ol>
+    <div class="guida-sped-poi">Quando il pacco arriva, chi compra
+      conferma e i sats passano a te.</div>
+    <button class="btn orange" onclick="navIndietro()">Ho capito</button>
+  </div>
+
   <!-- ============ SHEET: I CORRIERI DEL NEGOZIO ============ -->
   <!-- L'invito a dichiarare i corrieri, a chi pubblica una spedizione
        senza averli detti (ago 2026, dal campo: il compratore sceglie un
@@ -18836,6 +18874,12 @@ function mapOrder(o){
        `aggiornato`, che il venditore sposta ri-salvando la sua
        invoice d'incasso (la trappola della gemella automatica) */
     creato:o.creato||0,
+    /* «SPEDISCI ENTRO IL…» (17 nov 2026, cantiere spedisci-entro): quando
+       i sats sono arrivati (0 = ordini di prima del timbro: vale
+       `creato`) e il giorno entro cui spedire, deciso dal server
+       (`spedire_entro`, il giorno del primo promemoria; 0 = nessuno) */
+    pagatoIl:o.pagato_il||0,
+    spedireEntro:o.spedire_entro||0,
     sollecitiManuali:o.solleciti_manuali||0,
     sollecitoManualeIl:o.sollecito_manuale_il||0,
     /* la SECONDA FASE del promemoria a comando (cantiere 44): su
@@ -38541,7 +38585,12 @@ function openOrder(id){
      :                     'Sats nel deposito di garanzia',
     /* on-chain i sats non li custodisce nessuno: stanno nel 2-di-3 */
     d: o.onchain ? 'I sats sono on-chain, in un 2-di-3: nessuno li muove da solo'
-                 : 'Il pagamento è custodito dalla piattaforma'};
+                 : 'Il pagamento è custodito dalla piattaforma',
+    /* L'ORA DEL PAGAMENTO (17 nov 2026, cantiere spedisci-entro): la
+       riga piccola dei passi del P2P, «Pagato oggi 15:14». Senza un
+       timbro (DEMO) la riga non c'e': un'ora inventata e' peggio di
+       nessuna */
+    ora: rigaPagato(o)};
   /* IL TRACCIAMENTO E' UNA PROVA, e la riga che lo scrive e' UNA per
      tutti i rami dello stepper: in disputa serve piu' che altrove —
      e' quello che dice se il pacco e' partito e dov'e' finito — e due
@@ -38724,7 +38773,8 @@ function openOrder(id){
                 ? `Posta senza tracciamento: il pacco non si può seguire${filaTracking(o, false)}`
             :(o.corriere && o.corriere!=='Consegna a mano'
                 ? `${esc(o.corriere)} — senza numero di tracciamento${filaTracking(o, false)}`
-                : (o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere'))},
+                : (o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere')),
+           ora: rigaSpedito(o)},
       {t:(s==='delivered' && !inPagamento(o)) ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')
                          : (digitale?'Rivelato e confermato':'Ricevuto e confermato'),
        /* L'ATTESA E' DI CHI COMPRA (ago 2026): la finestra per
@@ -38907,7 +38957,7 @@ function openOrder(id){
         <div class="steps">
           ${steps.map((st,i)=>`
             <div class="step ${i<progress?'done':i===progress?'now':'todo'}">
-              <span class="dot"></span><b>${st.t}</b><small>${st.d}</small>
+              <span class="dot"></span><b>${st.t}</b><small>${st.d}</small>${rigaOraPassoP2P(st.ora||'')}
             </div>`).join('')}
         </div>
       </div>
@@ -39024,6 +39074,13 @@ function openOrder(id){
         </div>` : o.consegnaScelta==='servizio' ? pannelloServizioVenditore(o) : `
         <div class="payout">
           <h4>📦 Spedisci ${o.righe.length ? 'il set (un pacco solo)' : 'l\'oggetto'}</h4>
+          ${/* «SPEDISCI ENTRO IL…» E «COME SI SPEDISCE?» (17 nov 2026,
+                cantiere spedisci-entro): la data in testa, dove chi vende
+                guarda per prima cosa, e accanto la guida passo per passo.
+                La data la decide il server (`spedire_entro`), e senza
+                data (punto contestato, ordini senza timbro) resta la
+                guida da sola. */''}
+          <div class="hint" id="shipEntro">${o.spedireEntro ? `⏳ Spedisci entro <b>${esc(giornoEntro(o.spedireEntro))}</b>. ` : ''}<button type="button" class="scopri-link" onclick="apriGuidaSpedizione()">📖 Come si spedisce?</button></div>
           <div class="hint">I sats sono al sicuro in cassaforte. Spedisci e inserisci il tracciamento (l'acquirente lo vedrà e potrà seguire il pacco). Per la consegna di persona scegli "Consegna a mano".</div>
           <!-- Il deposito garantisce la transazione, non il pacco: qui il
                venditore sta per andare a spedire, ed e' l'ultimo momento
@@ -40295,6 +40352,47 @@ function forseAvvisoTrasporto(o){
      un avviso in piu' che un avviso perso. */
   fetch(`${API_BASE}/me/avviso-trasporto`, {method:'POST',
     headers:{'X-Tg-Init-Data':authHdr()}}).catch(()=>{});
+}
+
+/* ---- «SPEDISCI ENTRO IL…» E «COME SI SPEDISCE?» (17 nov 2026) ----
+   Cantiere spedisci-entro. Il GIUDICE della data e' il server
+   (`spedire_entro`: il giorno del primo promemoria, mai un timer che
+   muove sats); qui si decide solo come scriverla, col fuso del
+   telefono. */
+/* PURA: «sabato 22 novembre», '' senza data */
+function giornoEntro(ts){
+  const n = Math.floor(Number(ts) || 0);
+  if (n <= 0) return '';
+  return new Date(n * 1000).toLocaleDateString('it-IT',
+    {weekday:'long', day:'numeric', month:'long'});
+}
+/* PURA: la riga piccola del passo del deposito, «Pagato oggi 15:14».
+   L'ancora e' `pagatoIl`, e `creato` sugli ordini di prima del timbro
+   (li' la fattura e il pagamento distano al piu' la sua vita). Prima
+   del pagamento, e su un ordine chiuso senza pagare, niente. */
+function rigaPagato(o){
+  if (!o || o.state==='creato' || o.state==='annullato') return '';
+  const t = oraPassoP2P(o.pagatoIl || o.creato, Date.now() / 1000);
+  return t ? 'Pagato ' + t : '';
+}
+/* PURA: la riga piccola del passo «Oggetto spedito». Da spedire: il
+   giorno entro cui, girato a chi legge (a chi compra e al moderatore la
+   terza persona). Spedito: quando. Altrimenti niente. */
+function rigaSpedito(o){
+  if (!o) return '';
+  if (o.state==='locked'){
+    const g = giornoEntro(o.spedireEntro);
+    if (!g) return '';
+    return o.role==='seller' ? 'Da spedire entro ' + g
+                             : 'Il venditore spedisce entro ' + g;
+  }
+  const t = o.speditoIl ? oraPassoP2P(o.speditoIl, Date.now() / 1000) : '';
+  return t ? 'Spedito ' + t : '';
+}
+function apriGuidaSpedizione(){
+  haptic();
+  el('sheetBg').classList.add('open');
+  el('guidaSpedSheet').classList.add('open');
 }
 
 /* Dal foglio alla pagina: chiusura MIRATA (mai closeSheet, che

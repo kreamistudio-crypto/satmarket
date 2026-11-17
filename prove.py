@@ -2979,10 +2979,15 @@ def prove_disarmo():
     # apposta nella docstring, ed e' li' che si spiega perche' non c'e')
     prova("venditore fermo: gira anche a leva riaccesa", False,
           "if AUTO_SBLOCCO_ATTIVO" in ven)
-    # 24: l'ancora e' `creato`, immutabile — con `aggiornato` il
-    # venditore sposterebbe il proprio squillo da deposita_invoice
+    # 24: l'ancora e' immutabile — con `aggiornato` il venditore
+    # sposterebbe il proprio squillo da deposita_invoice. Dal 17 nov
+    # 2026 (spedisci-entro) e' `pagato_il`, scritto una volta dal CAS
+    # dell'incasso, e `creato` sugli ordini di prima del timbro: la
+    # stessa di `spedire_entro`, il giorno promesso a chi vende
     prova("venditore fermo: ancora immutabile, non `aggiornato`", True,
-          "o.creato + ?" in ven and "o.aggiornato" not in ven)
+          "(CASE WHEN o.pagato_il > 0 THEN o.pagato_il \"\n"
+          "            \"ELSE o.creato END) + ?" in ven
+          and "o.aggiornato" not in ven)
     # 25: contatore SUO, o al primo giro dopo la spedizione il
     # compratore si troverebbe la sua popolazione gia' al tetto
     prova("venditore fermo: contatore suo, mai quello del compratore", True,
@@ -13968,6 +13973,9 @@ def prove_nascondi_ordine():
                # i codici uno alla volta (16 nov 2026) hanno le loro
                # prove in `collaudo_codici_uno_alla_volta`
                "codici_uno_alla_volta": lambda o: False,
+               # «spedisci entro il…» (17 nov 2026) ha le sue prove in
+               # `collaudo_spedisci_entro` e `prove_spedisci_entro`
+               "spedire_entro": lambda *a: 0,
                "time": __import__("time"),
                "json": __import__("json"), **ambiente_in_pagamento()}
         exec(pezzo("_titolo_ordine"), amb)
@@ -19811,6 +19819,143 @@ def prove_tracking_facoltativo():
           [True, True, True, False, "", "", ""], v["pan"])
 
 
+def prove_spedisci_entro():
+    """«SPEDISCI ENTRO IL…» E «COME SI SPEDISCE?» (17 nov 2026, cantiere
+    spedisci-entro, spunto dal FLUSSO delle card di vendita di un altro
+    mercatino, non dai suoi testi). Il giro col server vero sta in
+    `collaudo_spedisci_entro`; qui il giudice della data preso dal
+    sorgente, e il client in node: il giorno scritto col fuso del
+    telefono, le righe piccole dei passi, la guida e il link."""
+    print("\n[spedisci entro il…]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+
+    # --- 1) il giudice della data --------------------------------
+    G = 86400
+    amb = {"PROMEMORIA_SPEDIZIONE_GIORNI": 5}
+    exec(pezzo("spedire_entro"), amb)
+    se = amb["spedire_entro"]
+    prova("spedizione pagata: il pagamento piu' i giorni del promemoria",
+          5000 + 5 * G, se("locked", "spedizione", 5000, 1000))
+    prova("...e senza timbro torna a `creato`, come ieri", 1000 + 5 * G,
+          se("locked", "spedizione", 0, 1000))
+    prova("ritiro, digitale, servizio e strada non scelta non promettono "
+          "niente", [0, 0, 0, 0],
+          [se("locked", c, 5000, 1000)
+           for c in ("ritiro", "digitale", "servizio", "")])
+    prova("...ne' prima del pagamento ne' dopo la spedizione", [0, 0, 0],
+          [se(st, "spedizione", 5000, 1000)
+           for st in ("creato", "shipped", "dispute")])
+    prova("...ne' col punto di ritiro contestato (la palla e' di chi "
+          "compra)", 0, se("locked", "spedizione", 5000, 1000, 77))
+    amb["PROMEMORIA_SPEDIZIONE_GIORNI"] = 0
+    prova("...ne' con la leva del promemoria spenta", 0,
+          se("locked", "spedizione", 5000, 1000))
+    prova("il promemoria al venditore usa la STESSA ancora", True,
+          "(CASE WHEN o.pagato_il > 0 THEN o.pagato_il \"\n"
+          "            \"ELSE o.creato END) + ?"
+          in pezzo("sollecita_venditori_fermi"))
+    inc = pezzo("_incassa_ordine")
+    prova("il timbro del pagamento sta nel CAS dell'incasso", True,
+          "UPDATE ordini SET stato='locked', pagato_il=?, aggiornato=? "
+          "\"\n        \"WHERE id=? AND stato='creato'" in inc)
+    prova("...e l'ordine lo porta (migrazione)", True,
+          '"pagato_il INTEGER DEFAULT 0"' in _SORGENTE)
+
+    # --- 2) il client: i pezzi al loro posto ---------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la riga dell'ordine legge timbro e data dal server", True,
+          "pagatoIl:o.pagato_il||0," in mini
+          and "spedireEntro:o.spedire_entro||0," in mini)
+    prova("i passi del mercatino scrivono la riga piccola dei passi P2P",
+          True, "<small>${st.d}</small>${rigaOraPassoP2P(st.ora||'')}"
+          in mini)
+    prova("...il deposito con l'ora del pagamento, la spedizione con la "
+          "sua", (True, True),
+          ("ora: rigaPagato(o)};" in mini, "ora: rigaSpedito(o)}," in mini))
+    i_pan = mini.index("<h4>📦 Spedisci ${o.righe.length")
+    i_entro = mini.index('id="shipEntro"')
+    prova("nel pannello di chi vende la data e la guida stanno IN TESTA, "
+          "prima del selettore", True,
+          i_pan < i_entro < mini.index("selettoreCorriere('shipCorriere'",
+                                       i_pan))
+    prova("...e il link apre la guida", True,
+          'onclick="apriGuidaSpedizione()">📖 Come si spedisce?</button>'
+          in mini[i_entro:i_entro + 400])
+    i_sh = mini.index('<div class="sheet" id="guidaSpedSheet"')
+    guida = " ".join(mini[i_sh:mini.index("</div>\n\n", i_sh)].split())
+    prova("la guida e' un foglio coi quattro passi in ordine", True,
+          guida.count("<li>") == 4
+          and guida.index("Imballa") < guida.index("Compra l'etichetta")
+          < guida.index("Consegna il pacco") < guida.index("Segna come spedito"))
+    prova("...dice la posta senza tracciamento e di chi e' il rischio",
+          True, "Posta senza tracciamento" in guida
+          and "il rischio è tuo" in guida)
+    prova("...e non promette annullamenti: la data e' un impegno", False,
+          "annull" in guida.lower())
+
+    # --- 3) il client in node ------------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("spedisci entro, nel banco", "node non c'e'")
+        return
+    banco = (_riga_js(mini, "const P2P_MESI_BREVI = ")
+             + _fn_js(mini, "function oraPassoP2P(ts, adesso){")
+             + _fn_js(mini, "function rigaOraPassoP2P(testo){")
+             + _fn_js(mini, "function giornoEntro(ts){")
+             + _fn_js(mini, "function rigaPagato(o){")
+             + _fn_js(mini, "function rigaSpedito(o){")
+             + "const esc = x => String(x);\n" + r"""
+      const T = Date.UTC(2026, 10, 22, 11, 0, 0) / 1000;  // dom 22 nov, 12:00 a Roma
+      const ieri = Math.floor(Date.now() / 1000) - 86400;
+      const out = {
+        giorno: giornoEntro(T),
+        nessuno: [giornoEntro(0), giornoEntro(null)],
+        vende: rigaSpedito({state:'locked', role:'seller', spedireEntro:T}),
+        compra: rigaSpedito({state:'locked', role:'buyer', spedireEntro:T}),
+        modera: rigaSpedito({state:'locked', role:'admin', spedireEntro:T}),
+        senzaData: rigaSpedito({state:'locked', role:'seller', spedireEntro:0}),
+        spedito: rigaSpedito({state:'shipped', role:'buyer', speditoIl:ieri}),
+        speditoSenza: rigaSpedito({state:'shipped', role:'buyer', speditoIl:0}),
+        pagato: rigaPagato({state:'locked', pagatoIl:ieri, creato:ieri - 3*86400}),
+        pagatoVecchio: rigaPagato({state:'locked', pagatoIl:0, creato:ieri}),
+        daPagare: [rigaPagato({state:'creato', creato:ieri}),
+                   rigaPagato({state:'annullato', creato:ieri}),
+                   rigaPagato({state:'locked'})],
+        riga: rigaOraPassoP2P('Pagato ieri 10:00'),
+      };
+      console.log(JSON.stringify(out));
+    """)
+    r = _sp.run([node, "-e", banco], capture_output=True, encoding="utf-8",
+                timeout=60, env=dict(os.environ, TZ="Europe/Rome"))
+    try:
+        v = _json.loads(r.stdout)
+    except Exception:
+        prova("spedisci entro: il banco gira", "json", r.stderr[-400:])
+        return
+    prova("il giorno si scrive da persona, col fuso del telefono",
+          "domenica 22 novembre", v["giorno"])
+    prova("...e senza data non si scrive niente", ["", ""], v["nessuno"])
+    prova("la riga del passo da spedire parla a chi legge",
+          ["Da spedire entro domenica 22 novembre",
+           "Il venditore spedisce entro domenica 22 novembre",
+           "Il venditore spedisce entro domenica 22 novembre"],
+          [v["vende"], v["compra"], v["modera"]])
+    prova("...senza data tace", "", v["senzaData"])
+    prova("spedito: «Spedito ieri hh:mm»; senza timbro niente",
+          (True, ""), (v["spedito"].startswith("Spedito ieri "),
+                       v["speditoSenza"]))
+    prova("il deposito dice quando sono arrivati i sats (il timbro, non "
+          "la fattura)", True, v["pagato"].startswith("Pagato ieri "))
+    prova("...e sugli ordini senza timbro torna a `creato`", True,
+          v["pagatoVecchio"].startswith("Pagato ieri "))
+    prova("...prima del pagamento, chiuso senza pagare o senza ora: niente",
+          ["", "", ""], v["daPagare"])
+    prova("la riga piccola e' quella dei passi P2P", True,
+          v["riga"] == '<small class="step-ora">Pagato ieri 10:00</small>')
+
+
 def prove_notifica_fail_open():
     """LA NOTIFICA CHE NON FERMA LE ALTRE (set 2026, ordine 151).
 
@@ -19894,10 +20039,10 @@ def prove_notifica_fail_open():
         "indirizzo_il INT, indirizzo_atteso INT, nota_compratore TEXT, "
         "email_corriere_il INT, payment_hash TEXT, creato INT, "
         "aggiornato INT, zona_sped TEXT, paese_sped TEXT, "
-        "domestico_sped TEXT)")
+        "domestico_sped TEXT, pagato_il INT DEFAULT 0)")
     vero.execute(
         "INSERT INTO ordini VALUES(151,7,111,222,7338,0,0,0,1,'creato',"
-        "'spedizione','',0,1,0,'',0,'hash',1000,1000,'dom','IT','IT')")
+        "'spedizione','',0,1,0,'',0,'hash',1000,1000,'dom','IT','IT',0)")
     vero.execute("CREATE TABLE annunci(id INT, venditore_id INT, "
                  "titolo TEXT, quantita INT, stato TEXT, "
                  "contatto_nostr TEXT, taglia_pacco TEXT)")
@@ -19961,6 +20106,9 @@ def prove_notifica_fail_open():
               # (14 nov 2026, audit-offerte) qui nessun ordine nasce da
               # un'offerta: l'accordo sciolto ha la sua sezione
               "_offerte_dell_ordine": lambda o: [],
+              # (17 nov 2026, spedisci-entro) la data e il tasto hanno
+              # la loro prova in `collaudo_spedisci_entro`: qui tacciono
+              "spedire_entro": lambda *a: 0,
               "WEB_PUSH_ATTIVO": False,
               "print": lambda s: None}
     exec(pezzo_async("notifica"), catena)
@@ -40140,6 +40288,9 @@ def prove_ricevuta_compratore():
               zona_sped TEXT DEFAULT '', paese_sped TEXT DEFAULT '',
               domestico_sped TEXT DEFAULT '',
               indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
+              -- «spedisci entro il…» (17 nov 2026): l'incasso timbra
+              -- `pagato_il` e legge `creato` per la data
+              creato INT DEFAULT 0, pagato_il INT DEFAULT 0,
               aggiornato INT DEFAULT 0);
             CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
               annuncio_id INT, quantita INT, unitario_sats INT, titolo TEXT);
@@ -40212,6 +40363,9 @@ def prove_ricevuta_compratore():
                # (14 nov 2026, audit-offerte) nessun ordine di questo
                # banco nasce da un'offerta
                "_offerte_dell_ordine": lambda o: [],
+               # (17 nov 2026) la data e il tasto di «Hai venduto»
+               # hanno la loro prova in `collaudo_spedisci_entro`
+               "spedire_entro": lambda *a: 0,
                # il registro dei negozi collegati (tappa 4) passa dal
                # funnel: `reale()` non basta da solo, che questa
                # funzione ha delle dipendenze sue — chi estrae un
@@ -62972,6 +63126,9 @@ def prove_card_parte_ordine():
     amb["mance_di_ordini"] = lambda con, righe, uid: None
     # i codici uno alla volta (16 nov 2026): la loro prova e' `collaudo_codici_uno_alla_volta`
     amb["codici_uno_alla_volta"] = lambda o: False
+    # «spedisci entro il…» (17 nov 2026): le sue prove sono
+    # `collaudo_spedisci_entro` e `prove_spedisci_entro`
+    amb["spedire_entro"] = lambda *a: 0
     # i gesti del feedback (14 nov 2026, feedback-modificabile): la loro
     # prova e' `prove_feedback_modificabile`; qui girano i giudici veri
     amb["FEEDBACK_MODIFICABILE"] = True
@@ -150254,6 +150411,10 @@ def prove_spunta_rimborso():
           "const copiaTracking = () => '';\n"
           "const inPagamento = () => false;\n"
           "const dataAppuntamento = () => '';\n"
+          # le righe piccole dei passi (17 nov 2026, spedisci-entro):
+          # le prova la loro sezione, qui tacciono
+          "const rigaPagato = () => '';\n"
+          "const rigaSpedito = () => '';\n"
           "const TEMPI = {confermaDig: 72};\n"
           + pezzo_js(mini, "const MOTIVI_ANNULLO_VENDITORE = {", "};\n") + "};\n"
           + pezzo_js(mini, "function annulloVenditore(o){", "\n}\n") + "\n}\n"
@@ -186653,6 +186814,10 @@ def prove_annullata_pagata():
           "const copiaTracking = () => '';\n"
           "const inPagamento = () => false;\n"
           "const dataAppuntamento = () => '';\n"
+          # le righe piccole dei passi (17 nov 2026, spedisci-entro):
+          # le prova la loro sezione, qui tacciono
+          "const rigaPagato = () => '';\n"
+          "const rigaSpedito = () => '';\n"
           "const TEMPI = {confermaDig: 72};\n"
           + pezzo_js(mini, "const CONCLUSI = [", "\n") + "\n"
           + pezzo_js(mini, "const MOTIVI_ANNULLO_VENDITORE = {", "};\n")
@@ -203566,7 +203731,7 @@ CATEGORIE = {
     email_corriere nota_compratore nascondi_ordine lista_ordini
     dettaglio_ordine card_ordini righe_ordine niente_ai_nella_ricerca
     tracking_corretto tracking_venditore tracking_facoltativo
-    posta_senza_traccia
+    posta_senza_traccia spedisci_entro
     vantaggi_livelli cruscotto_admin cruscotto_semplice buoni_cumulabili
     barattolo savers_proprietario visualizzazioni barattolo_in_striscia
     interesse barattolo_filtra barattolo_condiviso notifica_fail_open
@@ -204064,6 +204229,7 @@ def main():
               prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
               prove_tracking_corretto, prove_tracking_venditore,
               prove_tracking_facoltativo, prove_posta_senza_traccia,
+              prove_spedisci_entro,
               prove_vantaggi_livelli, prove_cruscotto_admin,
               prove_statistiche_p2p, prove_dispute_cruscotto_p2p,
               prove_cruscotto_semplice,

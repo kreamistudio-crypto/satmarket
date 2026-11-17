@@ -194,3 +194,4 @@ collaudo_elimina_esauriti
 collaudo_codici_uno_alla_volta
 collaudo_etichetta_alimenti
 collaudo_avvisi_barattolo
+collaudo_spedisci_entro

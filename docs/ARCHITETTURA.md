@@ -1897,7 +1897,15 @@
   scrittori sono l'INSERT e la resurrezione di `controlla_annullati`,
   che avviene prima) ed è il pagamento a meno di mezz'ora (vita della
   invoice più la finestra del reaper). Niente colonna nuova per
-  questo, niente backfill. Colonne NUOVE invece per il contatore —
+  questo, niente backfill. ⚠️ DAL 17 NOV 2026 (cantiere
+  spedisci-entro) l'ancora è `pagato_il`, e `creato` solo sugli ordini
+  di prima del timbro: «il pagamento a meno di mezz'ora» non valeva
+  per l'on-chain (la fattura nasce prima, il pagamento arriva con la
+  rete) né per un saldo riacciuffato, e il primo squillo deve cadere
+  nel giorno che «Hai venduto» promette. `pagato_il` lo scrive il CAS
+  di `_incassa_ordine`, una volta sola, e nessun altro: immutabile
+  come `creato`. Il giudice della data è `spedire_entro` (vedi «SPEDISCI
+  ENTRO IL…» più sotto). Colonne NUOVE invece per il contatore —
   `sollecito_venditore_il`/`solleciti_venditore` —: dicono CHI
   aspettiamo (`_conferma` il compratore, `_venditore` il venditore), e
   un contatore ereditato manderebbe al tetto la popolazione 'shipped'
@@ -36466,3 +36474,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   cassetto. Leva `AVVISI_BARATTOLO_ATTIVI`, accesa di serie: spenta, niente
   foglio né 🔔, il giro tace, la riga nasce NULL e la lampo va a tutti.
   Le prove: `prove_avvisi_barattolo`, `collaudo_avvisi_barattolo`.
+
+- SPEDISCI ENTRO IL… E COME SI SPEDISCE? (17 nov 2026, cantiere
+  spedisci-entro). Il giorno entro cui chi vende spedisce lo decide UN
+  giudice, `spedire_entro(stato, consegna, pagato_il, creato,
+  obiettato)` in server.py: solo `locked` con la spedizione dichiarata,
+  muto col punto di ritiro contestato e con
+  `PROMEMORIA_SPEDIZIONE_GIORNI` a 0; vale `pagato_il` (o `creato` sugli
+  ordini senza timbro) più quei giorni, cioè il GIORNO DEL PRIMO
+  PROMEMORIA di `sollecita_venditori_fermi`, che usa la stessa ancora.
+  È un impegno e non una scadenza: passata la data non si annulla
+  niente e nessun timer muove sats. Lo leggono tre posti: «Hai venduto»
+  in `_incassa_ordine` (`riga_entro`, il giorno da `giorno_entro`, e il
+  tasto `BOTTONE_ORDINE_VENDUTO` verso `/?ordine=N`, solo dove c'è la
+  data), `/api/orders` (`spedire_entro`, accanto a `pagato_il` che esce
+  con `o.*`) e il telefono, che lo riscrive col SUO fuso (`giornoEntro`).
+  Nel telefono: in testa al pannello «📦 Spedisci» la riga `#shipEntro`
+  con la data e il link «📖 Come si spedisce?» (`apriGuidaSpedizione`,
+  il foglio `#guidaSpedSheet`, quattro passi, si apre quante volte si
+  vuole — non è l'avviso una-tantum `#trasportoSheet`); nei passi del
+  mercatino la riga piccola dei passi P2P (`rigaOraPassoP2P`, il campo
+  `ora` del passo): «Pagato …» sul deposito (`rigaPagato`), «Da
+  spedire entro …» / «Il venditore spedisce entro …» / «Spedito …» sul
+  passo della spedizione (`rigaSpedito`). Prove: `prove_spedisci_entro`
+  e `collaudo_spedisci_entro`.

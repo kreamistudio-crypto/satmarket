@@ -1409,6 +1409,37 @@ except ImportError:
     PROMEMORIA_SPEDIZIONE_GIORNI = 5   # piu' lunga di uno spedisci-e-
                                        # segna col weekend in mezzo, piu'
                                        # corta dei 10 giorni di ieri
+
+
+def spedire_entro(stato: str, consegna: str, pagato_il, creato,
+                  obiettato=0) -> int:
+    """«SPEDISCI ENTRO IL…» (17 nov 2026, cantiere spedisci-entro,
+    spunto dalle card di vendita di un altro mercatino): il GIUDICE
+    UNICO della data che chi vende legge nella notifica e nell'ordine,
+    e chi compra nei passi. 0 = nessuna data da dire.
+    LA DATA E' IL GIORNO DEL PRIMO PROMEMORIA, e non un numero nuovo:
+    dire «entro sabato» e poi sollecitare venerdi' sarebbe una bugia, e
+    sollecitare lunedi' una promessa a vuoto. Per questo l'ancora e'
+    la stessa di `sollecita_venditori_fermi`: `pagato_il`, e `creato`
+    sugli ordini di prima del timbro.
+    E' UN IMPEGNO, NON UNA SCADENZA: passata la data non si annulla
+    niente e nessun timer muove sats (il disarmo dell'auto-sblocco).
+    Restano il promemoria, il sollecito di chi compra e la disputa.
+    Solo la SPEDIZIONE dichiarata e solo su 'locked': il ritiro, il
+    digitale e il servizio hanno i loro tempi, e la strada non scelta
+    (l'asta senza scelta, gli storici) non promette niente. Col punto
+    di ritiro contestato tace, come il promemoria: la palla e' di chi
+    compra, e chi vende non puo' spedire."""
+    if PROMEMORIA_SPEDIZIONE_GIORNI <= 0:
+        return 0
+    if stato != "locked" or consegna != "spedizione" or obiettato:
+        return 0
+    ancora = int(pagato_il or 0) or int(creato or 0)
+    if ancora <= 0:
+        return 0
+    return ancora + PROMEMORIA_SPEDIZIONE_GIORNI * 86400
+
+
 try:
     from config import PROMEMORIA_DIGITALE_ORE
 except ImportError:
@@ -10951,7 +10982,16 @@ def init_db():
                     # questa colonna invece resta, ed e' quel che fa
                     # ritrovare l'accordo a una lapide pagata in
                     # ritardo. Vedi `_offerte_dell_ordine`.
-                    "da_offerte TEXT DEFAULT ''"):
+                    "da_offerte TEXT DEFAULT ''",
+                    # QUANDO I SATS SONO ARRIVATI (17 nov 2026, cantiere
+                    # spedisci-entro): il timbro del passaggio a 'locked',
+                    # scritto UNA volta dal CAS di `_incassa_ordine` e mai
+                    # piu' toccato. `creato` e' il momento in cui e' nata
+                    # la fattura, e su un pagamento on-chain o su un saldo
+                    # riacciuffato puo' stare ore o giorni prima. 0 = gli
+                    # ordini di prima: li' vale `creato`, come ieri. Vedi
+                    # `spedire_entro`.
+                    "pagato_il INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -18961,6 +19001,18 @@ def data_ferie(ts: int) -> str:
     l'anno non disambigua niente e allunga soltanto."""
     t = time.localtime(ts)
     return f"{t.tm_mday} {MESI_IT[t.tm_mon - 1]}"
+
+
+def giorno_entro(ts: int) -> str:
+    """Il giorno di `spedire_entro` come lo legge una persona: «sabato
+    22 novembre». Senza l'ora, la lezione di `giorno_scadenza`: l'ora
+    e' quella del server e non di chi legge, e il giorno della
+    settimana e' quello che si controlla per primo. Il client la
+    riscrive col fuso del telefono; qui serve alla notifica."""
+    if not ts:
+        return ""
+    t = time.localtime(ts)
+    return f"{GIORNI_IT[t.tm_wday]} {t.tm_mday} {MESI_IT[t.tm_mon - 1]}"
 
 
 def guardia_ferie(con, venditore_id: int):
@@ -47294,6 +47346,9 @@ def _coda_ricevuta(consegna: str, via_punto: int, punto_scritto: bool,
             "nella Mini App.")
 
 
+BOTTONE_ORDINE_VENDUTO = "📦 Apri l'ordine"
+
+
 async def _incassa_ordine(ordine_id: int) -> dict:
     """I sats sono in cassaforte: l'ordine passa a LOCKED, lo stock
     scala, le offerte si chiudono, le notifiche partono. Estratto da
@@ -47312,10 +47367,13 @@ async def _incassa_ordine(ordine_id: int) -> dict:
         stato = o["stato"] if o else "annullato"
         con.close()
         return {"stato": stato}
+    # `pagato_il` nello STESSO update del CAS: lo scrive solo chi flippa
+    # davvero la riga, quindi una volta sola (vedi `spedire_entro`)
+    adesso_pag = int(time.time())
     cur = con.execute(
-        "UPDATE ordini SET stato='locked', aggiornato=? "
+        "UPDATE ordini SET stato='locked', pagato_il=?, aggiornato=? "
         "WHERE id=? AND stato='creato'",
-        (int(time.time()), ordine_id))
+        (adesso_pag, adesso_pag, ordine_id))
     if cur.rowcount == 0:
         con.commit()
         con.close()
@@ -47424,12 +47482,24 @@ async def _incassa_ordine(ordine_id: int) -> dict:
                                               solo_aggiornamento=True))
         # ...e il post nel canale si aggiorna col ✅ Venduto
         asyncio.create_task(promo_venduto(e["annuncio_id"]))
+    # «SPEDISCI ENTRO IL…» (17 nov 2026, cantiere spedisci-entro): sulla
+    # spedizione la frase operativa porta il GIORNO, quello del primo
+    # promemoria (il giudice e' `spedire_entro`), e rimanda alla guida
+    # nell'ordine. Gli altri rami restano parola per parola quelli di ieri.
+    entro = spedire_entro("locked", o["consegna_scelta"], adesso_pag,
+                          o["creato"])
+    riga_entro = (f"📦 <b>Spedisci entro {giorno_entro(entro)}</b> e "
+                  f"segna l'ordine come spedito nella Mini App: "
+                  f"nell'ordine trovi «Come si spedisce?», passo per "
+                  f"passo." if entro else "")
     if e_set:
         msg = (f"🔒 <b>Hai venduto un set di {len(righe)} oggetti"
                + (f" ({pezzi} pezzi)" if pezzi > len(righe) else "")
                + "!</b> I sats dell'acquirente sono bloccati nel "
-               "deposito di garanzia. Prepara un pacco solo e segna "
-               "l'ordine come spedito nella Mini App. 📦\n")
+               "deposito di garanzia. "
+               + (f"Prepara un pacco solo.\n\n{riga_entro}\n" if entro
+                  else "Prepara un pacco solo e segna "
+                  "l'ordine come spedito nella Mini App. 📦\n"))
         for r in righe:
             msg += (f"\n• {r['titolo'][:40]}"
                     + (f" × {r['quantita']}" if r["quantita"] > 1
@@ -47452,7 +47522,8 @@ async def _incassa_ordine(ordine_id: int) -> dict:
                f"🔒 <b>Hai venduto {pezzi} pezzi!</b> ")
         msg += ("I sats dell'acquirente sono bloccati nel deposito di "
                 "garanzia. "
-                "Spedisci l'oggetto e segna l'ordine come spedito nella Mini App. 📦")
+                + (f"\n\n{riga_entro}" if entro else
+                   "Spedisci l'oggetto e segna l'ordine come spedito nella Mini App. 📦"))
         if not esaurito:
             msg += (f"\n\n🏷 L'annuncio resta in vetrina: "
                     f"{a['quantita']} ancora {'disponibile' if a['quantita'] == 1 else 'disponibili'}.")
@@ -47524,7 +47595,14 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     # uscire da Barattolo. Vuota per tutti gli altri.
     if magazzino:
         msg += "\n\n" + _coda_magazzino(magazzino)
-    await notifica(o["venditore_id"], msg)
+    # ...e sotto, il tasto che apre l'ordine (dove stanno la data e la
+    # guida): solo dove c'e' la data, gli altri avvisi restano quelli di ieri
+    if entro:
+        await notifica(o["venditore_id"], msg,
+                       (BOTTONE_ORDINE_VENDUTO,
+                        f"{URL_PUBBLICO}/?ordine={int(ordine_id)}"))
+    else:
+        await notifica(o["venditore_id"], msg)
     # LA RICEVUTA DEL COMPRATORE, su OGNI strada dell'accredito: da qui
     # ci passano il poll della Mini App e le due funzioni dell'orologio,
     # e proprio in quelle lui non e' davanti allo schermo. Il titolo e'
@@ -90094,6 +90172,11 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # deve consegnare a riquadri (prima che i riquadri esistano, a
         # dirlo e' la leva coi pezzi: `codici_uno_alla_volta`)
         r["codici_riquadri"] = codici_uno_alla_volta(r)
+        # «SPEDISCI ENTRO IL…» (17 nov 2026): la data la decide il
+        # giudice, il telefono la scrive col suo fuso. 0 = nessuna.
+        r["spedire_entro"] = spedire_entro(
+            r["stato"], r["consegna_scelta"], r.get("pagato_il"),
+            r["creato"], r.get("punto_obiettato_il"))
         r["contenuto_presente"] = bool(r.pop("contenuto_digitale", ""))
         # I PUNTI PROPOSTI escono come LISTA e non come stringa JSON:
         # in colonna sono JSON perche' SQLite non ha un tipo lista, ma
@@ -92660,7 +92743,12 @@ async def sollecita_venditori_fermi():
             # Sul ramo 'digitale' e' innocua per costruzione: li'
             # `via_punto` e' 0, quindi il campo vale sempre 0.
             "AND o.punto_obiettato_il = 0 "
-            "AND MAX(o.creato + ?, o.sollecito_venditore_il + ?) < ?",
+            # L'ANCORA E' QUELLA DI `spedire_entro` (17 nov 2026): il
+            # primo squillo cade il giorno che la notifica di vendita ha
+            # promesso. `pagato_il` e' immutabile come `creato`, e sugli
+            # ordini di prima del timbro si torna a lui.
+            "AND MAX((CASE WHEN o.pagato_il > 0 THEN o.pagato_il "
+            "ELSE o.creato END) + ?, o.sollecito_venditore_il + ?) < ?",
             (strada, PROMEMORIA_CONFERMA_MAX, finestra, passo, adesso))]
     if not righe:
         con.close()

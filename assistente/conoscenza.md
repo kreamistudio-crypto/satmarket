@@ -143,16 +143,16 @@ Quando qualcuno chiede delle commissioni, tieni sempre separati il mercatino (ze
 
 Le donazioni: chi vuole sostenere Barattolo con qualche sats può mandarli all'indirizzo Lightning zap@barattolo.store (si incolla nel wallet come destinatario, si sceglie l'importo e si invia), oppure con uno zap al profilo Nostr «Barattolo», che accetta anche bitcoin on-chain. Sono un regalo libero: non danno vantaggi nell'app e non sono mai obbligatorie. Se qualcuno chiede come donare, dai questo indirizzo e ringrazia di cuore.
 
-Quando arriva un ordine il bot ti avvisa. Spedisci, segna il corriere e il codice di tracciamento nell'ordine, e aspetta la conferma di chi compra. Se spedisci una busta senza codice scegli «✉️ Posta senza tracciamento» fra i corrieri: non serve fingere una consegna a mano. Hai scritto un codice sbagliato, o hai segnato «Consegna a mano» su un ordine che invece hai spedito? Nell'ordine c'è il bottone per correggerlo, e chi compra viene avvisato. L'indirizzo di chi compra lo vedi solo tu, per stampare l'etichetta: non usarlo per altro.
+Quando arriva un ordine il bot ti avvisa. Spedisci, segna il corriere e il codice di tracciamento nell'ordine, e aspetta la conferma di chi compra. Se spedisci una busta senza codice scegli «✉️ Posta senza tracciamento» fra i corrieri: non serve fingere una consegna a mano. Hai scritto un codice sbagliato, o hai segnato «Consegna a mano» su un ordine che invece hai spedito? Nell'ordine c'è il bottone per correggerlo, e chi compra viene avvisato. L'indirizzo di chi compra lo vedi solo tu, per stampare l'etichetta: non usarlo per altro. Nel messaggio «Hai venduto» e in cima al riquadro «📦 Spedisci» dell'ordine c'è il giorno entro cui spedire: cinque giorni dal pagamento, il giorno in cui parte il promemoria (non si annulla niente da solo: è un impegno con chi ha comprato). Accanto c'è «📖 Come si spedisce?», la guida in quattro passi: imballa, compra l'etichetta, consegna il pacco, segna come spedito. Nei passi dell'ordine compaiono anche l'ora del pagamento e quella della spedizione, e chi compra legge entro quando il venditore spedisce.
 
 Le prestazioni si possono vendere, ma devono essere definite: quanto durano, che cosa comprendono, a che prezzo. «Un'ora di lezione di inglese» sì; «ti faccio quello che ti serve» no.
+
+<!-- pezzo libro-012 | libro -->
+## Libro · Vendere nel mercatino (3/4)
 
 Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraffazioni, documenti, dati personali, farmaci, animali protetti.
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere.
-
-<!-- pezzo libro-012 | libro -->
-## Libro · Vendere nel mercatino (3/4)
 
 I numeri del negozio: nel Profilo, gruppo «Negozio e spedizioni», il cassetto «📊 Il tuo negozio» mostra le visite alla pagina del negozio, le vendite concluse (ultimi 30 giorni e da sempre, coi sats che ha incassato: spedizione compresa, commissione tolta) e le recensioni. Dal 17 novembre 2026 ci sono anche gli «🛍️ Acquisti conclusi», ultimi 30 giorni e da sempre, coi sats del totale pagato (prodotti, spedizione e protezione acquisti). Chi ha solo comprato e non ha annunci vede lo stesso cassetto col nome «📊 I tuoi acquisti». Contano gli ordini del mercatino conclusi, non gli scambi P2P.
 
@@ -1137,6 +1137,27 @@ Annulla
  quella di base, verso i punti di ritiro, è molto bassa.
 Ho capito
 Come funziona il deposito
+
+<!-- pezzo schermata-038 | schermata -->
+## Schermata «On-chain e finestre della Mini App» · 📖 Come si spedisce? (2/4)
+
+## 📖 Come si spedisce?
+Imballa bene. Una scatola robusta, i vuoti riempiti
+ (carta, pluriball) e il nastro sulle chiusure. Fai una foto
+ all'oggetto e al pacco chiuso: in caso di disputa è una prova.
+Compra l'etichetta. Dal sito o dall'app del corriere, o
+ allo sportello. L'indirizzo o il locker di chi compra sono in
+ cima all'ordine, in «📦 Spedisci a». Per le cose di valore
+ aggiungi la copertura del corriere.
+Consegna il pacco al corriere, al locker o all'ufficio
+ postale, e conserva la ricevuta.
+Segna come spedito qui nell'ordine, col numero di
+ tracciamento: chi compra lo vede e segue il pacco. Puoi anche
+ scegliere «Posta senza tracciamento», ma se il pacco si perde il
+ rischio è tuo.
+Quando il pacco arriva, chi compra
+ conferma e i sats passano a te.
+Ho capito
 ## 📦 Come spedirai?
  Seleziona con quali corrieri spedirai. Non è
  obbligatorio, ma con Poste Italiane, SDA o InPost chi
@@ -1151,10 +1172,6 @@ Pubblica lo stesso
 ✕
  sats
 💰 Offri
-
-<!-- pezzo schermata-038 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · 🎁 Lascia una mancia (2/4)
-
 ## 🎁 Lascia una mancia
 ✕
  sats
@@ -1210,6 +1227,10 @@ L'altezza è quella che vedi nel codice: cambiala se ti serve. Il widget si adat
 📋 Copia il codice del widget
 👁 Guarda come viene
 Chiudi
+
+<!-- pezzo schermata-039 | schermata -->
+## Schermata «On-chain e finestre della Mini App» · 🔨 Rilancia l'asta (3/4)
+
 ## 🔨 Rilancia l'asta
 Per quanto tempo
 L'asta riparte dalla stessa base, col cronometro a nuovo. Chi guardava riceve l'avviso quando manca un'ora.
@@ -1242,10 +1263,6 @@ Inquadralo col telefono: entra l'account aperto nel Telegram del telefono.
 Chiudi
 ## 🧪 Collaudo privato
 Un attimo…
-
-<!-- pezzo schermata-039 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · Entra con Nostr (3/4)
-
 ## Entra con Nostr
  Dimostri di possedere la tua chiave firmando una sfida.
  La chiave privata non viene mai inviata a nessuno.
@@ -1269,6 +1286,10 @@ Scrivilo prima di entrare, in qualunque modo entri: si collega da solo.
  Non hai ancora un profilo Nostr?
 Creane uno
 Annulla
+
+<!-- pezzo schermata-040 | schermata -->
+## Schermata «On-chain e finestre della Mini App» · 🌱 Crea il tuo profilo Nostr (4/4)
+
 ## 🌱 Crea il tuo profilo Nostr
  Su Nostr non c'è un account con email e password: c'è una
  chiave. La parte pubblica è il tuo nome (la npub), quella
@@ -1299,10 +1320,6 @@ Annulla
  del mondo Nostr, e la chiave che creano è tua e funziona con
  qualsiasi app, non solo qui.
 Ho capito, torno all'accesso
-
-<!-- pezzo schermata-040 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · 👛 Il tuo primo wallet (4/4)
-
 ## 👛 Il tuo primo wallet
  Per pagare e per incassare su Barattolo serve un wallet
  Lightning: un'app gratuita sul telefono dove tieni i tuoi sats.
@@ -1821,4 +1838,12 @@ pubblico: sì
 frase: Quando metti un articolo nel tuo barattolo 🫙 puoi scegliere cosa farti dire dal bot su quell'articolo: se il prezzo scende, se arriva uno sconto lampo, se ne resta solo uno, se torna disponibile. Al massimo un avviso al giorno per articolo, con il tasto che apre l'annuncio.
 dove: il barattolino 🫙 sulla foto di un annuncio, poi il foglietto «🔔 Avvisami se…»; per cambiare idea, Profilo → «Nel tuo barattolo» → la 🔔 accanto all'articolo.
 leva: AVVISI_BARATTOLO_ATTIVI (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-061 | novita -->
+## Novità · 2026-11-17 · spedisci-entro
+
+frase: Quando vendi un oggetto da spedire, il messaggio del bot ti dice entro che giorno spedirlo, col tasto per aprire l'ordine. Nell'ordine trovi la stessa data e «📖 Come si spedisce?», una guida in quattro passi dall'imballo al tracciamento. Chi compra vede entro quando parte il pacco, e nei passi dell'ordine compaiono l'ora del pagamento e quella della spedizione.
+dove: il messaggio «Hai venduto!» del bot; l'ordine del venditore, riquadro «📦 Spedisci» (riga «⏳ Spedisci entro…» e link «📖 Come si spedisce?»); i passi dell'ordine, per chi vende e per chi compra.
+leva: nessuna
 pubblico: sì

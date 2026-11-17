@@ -209,3 +209,4 @@ collaudo_elimina_esauriti.py
 collaudo_codici_uno_alla_volta.py
 collaudo_etichetta_alimenti.py
 collaudo_avvisi_barattolo.py
+collaudo_spedisci_entro.py

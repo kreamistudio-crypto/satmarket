@@ -86675,3 +86675,64 @@ sul telefono (push e DM Nostr ricevono lo stesso testo col link nel
 titolo). Il giro legge tutte le righe con avvisi a ogni battito: con il
 barattolo a 10 pezzi per persona è poco, ma se `MAX_PREFERITI` salisse
 molto andrebbe guardato.
+
+## «Spedisci entro il…» e «Come si spedisce?» (17 nov 2026, cantiere spedisci-entro; Andrea allega lo screenshot di una chat di vendita di un altro mercatino — card «articolo venduto, crea l'etichetta entro 48 ore», «procedi alla spedizione entro il…» col link alla guida, «ordine spedito» — e chiede di prenderne spunto per le istruzioni di spedizione; piano in cinque punti, «ok» delle 10:39)
+LO SPUNTO È IL FLUSSO, NON I TESTI: niente parole né grafica di quel
+mercatino. COSA MANCAVA: chi vende riceveva «🔒 Hai venduto!… spedisci e
+segna come spedito» senza un giorno e senza un «come si fa»; il primo
+promemoria arrivava dopo 5 giorni senza che nessuno l'avesse detto prima;
+nei passi dell'ordine nessuna ora. DECISO (i cinque punti approvati):
+(1) «Hai venduto», sulla SOLA spedizione dichiarata, dice «📦 Spedisci
+entro <giorno>» e rimanda a «Come si spedisce?» nell'ordine, col tasto
+«📦 Apri l'ordine» (`BOTTONE_ORDINE_VENDUTO`, `/?ordine=N`); gli altri
+rami restano parola per parola quelli di ieri. (2) In testa al pannello
+«📦 Spedisci» la riga `#shipEntro` con la data e il link. (3) La guida
+`#guidaSpedSheet`: quattro passi (imballa con una foto del pacco chiuso,
+compra l'etichetta verso «📦 Spedisci a», consegna e tieni la ricevuta,
+segna come spedito col tracciamento o con la posta senza tracciamento a
+rischio tuo) e il «dopo»; si apre quante volte si vuole, non è l'avviso
+una-tantum del trasporto. (4) A chi compra il passo «Oggetto spedito»
+dice «Il venditore spedisce entro <giorno>». (5) Le ore nei passi del
+mercatino con la riga piccola dei passi P2P (`rigaOraPassoP2P`):
+«Pagato oggi 15:14», «Spedito …» — nella pagina dell'ordine e non nella
+chat, perché la chat è cifrata fra le parti e il server non ci scrive.
+LA DATA È IL GIORNO DEL PRIMO PROMEMORIA, non un numero nuovo: dire
+«entro sabato» e sollecitare venerdì sarebbe una bugia. Il giudice è
+`spedire_entro` (muto fuori da `locked`+spedizione, col punto contestato
+e con `PROMEMORIA_SPEDIZIONE_GIORNI` a 0). È UN IMPEGNO, NON UNA SCADENZA:
+passata la data nessun annullamento e nessun timer che muove sats (il
+disarmo dell'auto-sblocco); restano promemoria, sollecito e disputa. LA
+COLONNA NUOVA `pagato_il`: l'ancora del promemoria era `creato`, «il
+pagamento a meno di mezz'ora» — falso per l'on-chain e per un saldo
+riacciuffato, dove la fattura nasce ore o giorni prima e la data
+promessa sarebbe già passata al momento della vendita. `pagato_il` lo
+scrive solo il CAS di `_incassa_ordine` (una volta, immutabile come
+`creato`); promemoria e data leggono `pagato_il`, e `creato` sugli
+ordini di prima. SCARTATE: le card dentro la chat (cifrata, e il server
+non può scriverci); una scadenza con annullamento automatico come
+nello screenshot (muoverebbe sats senza un gesto umano); una leva nuova
+(la data segue la leva del promemoria, che c'è già). PROVATO:
+`collaudo_spedisci_entro` (27, nella gabbia e in `ci/collaudi.txt`): il
+timbro e un secondo incasso che non lo riscrive, «Hai venduto» con
+giorno, guida e tasto in una notifica sola, la stessa data a chi vende e
+a chi compra da `/api/orders`, il promemoria che tace un minuto prima
+della data (con l'ancora di ieri avrebbe suonato: la fattura era nata
+otto giorni prima) e suona un minuto dopo, gli ordini senza timbro su
+`creato`, il ritiro senza data e col testo di ieri, la data che sparisce
+dopo la spedizione, la leva a 0. `prove_spedisci_entro` (26): il giudice
+caso per caso, la stessa ancora nel promemoria, il timbro nel CAS, il
+pannello, la guida (quattro passi in ordine, il rischio della posta
+senza tracciamento, nessun annullamento promesso) e in node, con
+TZ=Europe/Rome, `giornoEntro`, `rigaPagato`, `rigaSpedito`. Adattate
+cinque prove che montano `_incassa_ordine` o `miei_ordini` su cartone
+(la colonna e il giudice muto) e l'ancora di `prove_disarmo`.
+Controprove, otto mutazioni tutte rosse: l'ancora vecchia nel
+promemoria, il timbro tolto dal CAS, il tasto tolto, la data anche sul
+ritiro, `rigaPagato` su `creato`, il testo di chi vende a chi compra, la
+riga tolta dal render, l'obiezione ignorata. Visto in DEMO a 390 px in
+tema scuro: pannello, guida, passi di chi vende, di chi compra e dello
+spedito. DA GUARDARE: il tasto «📦 Apri l'ordine» dentro Telegram dal
+telefono; la guida su iPhone. NOTATO E NON TOCCATO: sul passo «Oggetto
+spedito» ancora da fare chi vende legge «Hai consegnato al corriere»
+(e chi compra «Il venditore ha consegnato al corriere») al passato.
+
