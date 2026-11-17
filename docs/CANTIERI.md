@@ -88548,3 +88548,103 @@ collaudi su 148»).
 
 **COSA RESTA.** Se un giorno serve un giro intero su main senza commit:
 Actions → prove → «Run workflow» su main (non sposta `pronto`).
+
+
+## Il rimborso on-chain che non si incaglia (17 nov 2026, cantiere onchain-rimborso-liscio; Andrea: «Ok, sì, vai, correggi tutto»)
+
+DA DOVE VIENE. Un utente all'assistenza (scambio on-chain #13, contanti):
+ha preso un ordine, chi vendeva ha depositato, lui ha toccato «Rinuncio».
+L'app gli ha chiesto «la chiave» (il wallet era nato su un altro
+telefono: ha ricaricato le 12 parole dal Profilo), e poi ha detto «chi ha
+messo i sats non ha ancora scelto dove riceverli: il rimborso aspetta il
+suo wallet». Chi vendeva non sapeva di dover fare niente, il posto dove
+scriverlo era solo nel Profilo, e nel provarci ha cambiato due volte il
+recapito degli EURO (gli avvisi «🔁 ha cambiato il recapito DOPO il
+deposito» ai moderatori). Parole dell'utente: «Mi appare un po'
+macchinosa la procedura». Nessun sats a rischio: è la regola del 10 nov
+(«Il rimborso di chi mette i sats aspetta il suo wallet») che lavorava
+come deve, ma senza una strada per arrivarci.
+
+COSA SI È DECISO. La regola NON cambia: un rimborso vuoto non è mai
+un'uscita permessa, e i sats non tornano mai su un seme di Barattolo.
+Cambia come ci si arriva, in tre pezzi (le tre voci che Andrea ha
+approvato; la quarta, «✕ Annulla» prima del deposito, l'aveva già fatta
+il cantiere onchain-controparte, 2438e21e):
+1. DOVE TORNANO I SATS, CHIESTO PRIMA. A chi deposita senza un wallet
+   suo il foglio «🔒 Blocca i sats» chiede un indirizzo PRIMA del QR; a
+   deposito già fatto lo stesso riquadro sta nella pagina dello scambio
+   («Dove tornano i sats?»). È il gemello dell'indirizzo al volo di chi
+   compra (30 ott, parola di Andrea: «se manca si inserisce l'indirizzo
+   al volo con lo stesso controllo che c'è ora»): stesso giudice, stessa
+   firma del seme, vale per lo scambio, il Profilo non si tocca. Rotta
+   nuova `POST /api/p2p/onchain/{oid}/rimborso`.
+2. «RINUNCIO» NON È PIÙ UN ERRORE. Senza quell'indirizzo la rinuncia si
+   REGISTRA (`…/rinuncia-chiesta`, colonna `rinuncia_chiesta_il`) e il
+   bot lo dice a chi ha depositato, col bottone dello scambio: «Chi
+   compra vuole rinunciare […] manca una cosa sola: dove mandarteli».
+   Quando l'indirizzo arriva (dallo scambio o dal Profilo) chi compra
+   legge «Ora puoi rinunciare» e tocca di nuovo «Rinuncio». Un riavviso
+   all'ora al massimo.
+3. LA CHIAVE CHIESTA LÌ. «Rinuncio», «Libera» e la seconda firma, se la
+   chiave dello scambio non è sul dispositivo, prima la cercano dov'è
+   già (cloud di Telegram, relay) e poi aprono il foglio «🔑 Serve la
+   chiave del tuo wallet» con le 12 parole da incollare; incollate
+   quelle giuste, il gesto riparte da solo. Prima era il toast «su
+   questo dispositivo non c'è la tua chiave», e basta.
+In più, perché ci si inciampava nello stesso punto: chi LIBERA senza un
+posto per il resto non è più mandato al Profilo ma al riquadro dello
+scambio; in disputa, quando l'indirizzo arriva, i moderatori lo sanno
+(senza non potevano rimborsare).
+
+LE STRADE SCARTATE.
+- LA RINUNCIA CHE SI FIRMA DA SOLA quando l'indirizzo arriva (come il
+  rilascio confermato, `rilascioDaFirmareOnchainP2P`). No: quel
+  rilascio parte da una conferma FIRMATA dal seme di chi libera, che il
+  telefono rilegge. Qui la rinuncia sarebbe solo una riga del server, e
+  un telefono che firma un rimborso sulla parola del server firmerebbe
+  anche dopo aver mandato gli euro. Farla bene vuol dire una rinuncia
+  firmata dal seme: un altro cantiere, e un tocco in più («Ora puoi
+  rinunciare») costa poco.
+- IL RIMBORSO AL SEME DI BARATTOLO come ripiego (`/1/n`): è quel che il
+  10 nov ha tolto, per decisione di Andrea.
+- BLOCCARE IL DEPOSITO SUL SERVER finché manca l'indirizzo: il deposito
+  è un pagamento in rete verso un indirizzo, il server non lo ferma. Il
+  cancello è nel foglio (il QR non si vede), e chi deposita lo stesso
+  trova il riquadro nella pagina.
+- LA CHIAVE DEL CONTO (xpub) NEL RIQUADRO: resta una scelta del Profilo,
+  come per chi compra (30 ott).
+- CERCARE LA CHIAVE CON `onchainSemeAssicurato` e basta: in fondo alla
+  sua strada fa NASCERE un wallet nuovo. `onchainCercaSemeP2P` la chiama
+  solo se il server dice che un wallet c'è già (là si ferma con
+  «altrove» prima della nascita); server muto o nessun wallet
+  registrato = decide il foglio.
+
+LE LEZIONI.
+- Una regola giusta senza una strada per rispettarla si legge come un
+  guasto: il 10 nov aveva scritto il «no» e non il «come».
+- Due riquadri con un campo e «Salva» nella stessa pagina (il recapito
+  degli euro e l'indirizzo dei sats) si scambiano: il nuovo dice nel
+  titolo cosa torna («Dove tornano i sats?») e Tappo sa la differenza.
+- Il libro di Tappo aveva ancora «la chat […] per ora non c'è» nella
+  voce della card dell'altra parte, due righe sopra la voce della chat:
+  due cantieri dello stesso giorno, una fusione che le tiene tutte e
+  due. Tolta qui.
+
+PROVATO. `prove_onchain_rimborso_liscio` (28: i fili del server, il
+giudice estratto, e il telefono in node: il foglio del deposito con e
+senza indirizzo, la pagina, «Rinuncio» registrato / rifiutato / pronto,
+la chiave trovata, il foglio delle parole con parole storte, di un altro
+wallet e giuste, l'annullo, il server muto, chi libera, la seconda
+firma). `collaudo_p2p_onchain`, sezione 11-sexies (22: il giro vero con
+firme e PSBT, il rimborso che torna all'indirizzo scritto lì, il
+Profilo che sblocca, il riavviso dopo un'ora, la disputa).
+
+DA GUARDARE DAL VIVO: il foglio «🔒 Blocca i sats» senza wallet a
+375 px (campo, esito del controllo, tasto), il foglio delle 12 parole, e
+uno scambio vero in cui chi compra rinuncia prima che chi vende abbia
+scritto l'indirizzo.
+
+NOTATO E NON FATTO: lo stesso toast «su questo dispositivo non c'è la
+tua chiave» resta nell'on-chain del MERCATINO (ordini, cassa, swap) e
+nell'indirizzo al volo di chi compra; la pagina del moderatore non dice
+che a un rimborso manca l'indirizzo finché non prova a decidere.
