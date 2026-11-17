@@ -7496,6 +7496,27 @@
     border:1px solid var(--line);border-radius:var(--radius);
     padding:12px 14px}
   .serie-cl-porta .cl-fr{font-size:18px}
+  .serie-cl-porta .serie-f{width:18px;height:18px;margin:0;flex:0 0 auto}
+  /* IL BOTTONE LUCIDO (17 nov 2026 notte, Andrea: «fammi il bottone di un
+     colore particolare, tipo il lucido grafite del p2p ma non grafite»):
+     lo stesso riflesso chiaro nell'angolo in alto a sinistra della carta
+     del prezzo P2P (`--valore-lucido`) e la stessa discesa verso lo
+     scuro, ma nel colore scelto fra quattro scatti dall'app vera. Uguale
+     di giorno e di sera, come la carta: sta sempre sul suo fondo. Le
+     scritte e la fiamma sono crema e bianco (sul punto piu' chiaro la
+     scritta resta oltre il 4,5:1); il bordo e' il filo bianco della
+     carta. Il colore sta in UNA riga, `--streak-lucido`. */
+  :root{--streak-fondo:#7A1F05;
+    --streak-lucido:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%),
+      linear-gradient(160deg,#C2410C 0%,#7A1F05 100%)}
+  .serie-cl-porta{background:var(--streak-lucido),var(--streak-fondo);
+    border-color:rgba(255,255,255,.14);color:#FFF7EC}
+  .serie-cl-porta .cl-fr{color:rgba(255,247,236,.82)}
+  .serie-cl-porta .serie-f .f-fuori{fill:#fff}
+  .serie-cl-porta .serie-f .f-cuore{fill:#FFE7C2}
+  .serie-cl-porta:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+  #serieClassificaFiamma .serie-f{width:22px;height:22px;margin:0 6px 0 0;
+    vertical-align:-.16em}
   .serie-cl-lista{max-height:56vh;overflow-y:auto;margin-top:10px}
   .serie-cl-riga{display:flex;align-items:center;gap:10px;padding:8px 6px;
     border-bottom:1px solid var(--line)}
@@ -15550,7 +15571,7 @@ document.getElementById('cartello')?.remove();</script>
         <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo. Se non vuoi comparire, nel Profilo («Livello e titolo») c'è <b>Non mostrarmi in classifica</b>: il tuo livello resta sul profilo, perché a chi scambia con te serve per fidarsi. E se la tua reputazione la pubblichiamo su Nostr (vedi sotto), smettiamo e chiediamo ai relay di ritirarla.</li>
         <!-- LA SERIE DEI GIORNI (17 nov 2026): un dato nuovo — quando
              apri l'app — e si dichiara come gli altri, con chi lo vede. -->
-        <li>I tuoi <b>giorni di fila</b>: contiamo i giorni consecutivi in cui apri Barattolo — il numero di adesso, il tuo record e la data dell'ultimo giorno, non le ore né le volte. Dal secondo giorno di fila entri nella <b>classifica dei giorni di fila</b>, che vede solo chi è entrato in Barattolo: lì di te si leggono nome, foto e giorni. <b>Non mostrarmi in classifica</b> ti toglie anche da lì.</li>
+        <li>I tuoi <b>giorni di fila</b>: contiamo i giorni consecutivi in cui apri Barattolo — il numero di adesso, il tuo record e la data dell'ultimo giorno, non le ore né le volte. Dal secondo giorno di fila entri nella <b>Classifica Streak</b> (la classifica dei giorni di fila), che vede solo chi è entrato in Barattolo: lì di te si leggono nome, foto e giorni. <b>Non mostrarmi in classifica</b> ti toglie anche da lì.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
         <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
         <!-- GLI AVVISI DEL MERCATINO (9 ott 2026): le preferenze e i
@@ -18663,7 +18684,7 @@ document.getElementById('cartello')?.remove();</script>
   <!-- ============ SHEET CLASSIFICA DELLA SERIE 🔥 (17 nov 2026) ====== -->
   <div class="sheet" id="serieClassificaSheet">
     <div class="grab"></div>
-    <h3>🏆 Giorni di fila: la classifica</h3>
+    <h3><span id="serieClassificaFiamma"></span>Classifica Streak</h3>
     <div style="font-size:13px;color:var(--muted);font-weight:600">
       Chi apre Barattolo ogni giorno, senza saltarne uno. Non dà punti né premi.
     </div>
@@ -21660,7 +21681,7 @@ function serieSettimanaHTML(s){
    lui. I pezzi che disegnano sono PURI, come quelli della serie. */
 function serieClassificaPortaHTML(s){
   if (!serieBusta(s)) return '';
-  return `<button type="button" class="serie-cl-porta" onclick="apriSerieClassifica()">🏆 <span style="flex:1;min-width:0">Classifica dei giorni di fila</span><span class="cl-fr" aria-hidden="true">›</span></button>`;
+  return `<button type="button" class="serie-cl-porta" onclick="apriSerieClassifica()">${SERIE_FIAMMA}<span style="flex:1;min-width:0">Classifica Streak</span><span class="cl-fr" aria-hidden="true">›</span></button>`;
 }
 function serieClassificaRigaHTML(v){
   const g = Math.floor(Number(v && v.giorni)) || 0;
@@ -21702,6 +21723,10 @@ async function apriSerieClassifica(){
   const box = el('serieClassificaCorpo');
   if (!box) return;
   box.innerHTML = '<div class="hint">Preparo la classifica…</div>';
+  /* la fiamma del titolo e' quella DISEGNATA, la stessa della serie: il
+     foglio e' HTML fermo, e il disegno vive in un posto solo */
+  const fiamma = el('serieClassificaFiamma');
+  if (fiamma && !fiamma.firstChild) fiamma.innerHTML = SERIE_FIAMMA;
   el('sheetBg').classList.add('open');
   el('serieClassificaSheet').classList.add('open');
   if (DEMO) { box.innerHTML = '<div class="hint">In demo la classifica non è quella vera 🙂</div>'; return; }
@@ -45106,7 +45131,7 @@ function rigaClassificaNascosta(){
       <div style="min-width:0;flex:1">
         <div style="font-size:13.5px;font-weight:800">🏆 Non mostrarmi in classifica</div>
         <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
-          Il nome esce dalle classifiche (anche quella dei giorni di fila) e non si pubblica più su Nostr. Il livello resta.</div>
+          Il nome esce dalle classifiche (anche dalla Classifica Streak, i giorni di fila) e non si pubblica più su Nostr. Il livello resta.</div>
       </div>
       <button onclick="setClassificaNascosta(${myClassificaNascosta ? 'false' : 'true'}, this)"
         aria-pressed="${myClassificaNascosta ? 'true' : 'false'}"
