@@ -56213,7 +56213,8 @@ def prove_ci_leggera():
     # segreti girano interi a ogni giro, senza condizioni nuove
     passo_prove = job_prove[job_prove.index("- name: Le prove\n"):]
     passo_prove = passo_prove[:passo_prove.index("\n      - name:", 1)]
-    prova("prove.py gira intero a ogni giro: nessuna condizione sul suo passo",
+    prova("il passo di prove.py resta senza condizioni: la scelta la fa "
+          "prove.py da se' (ci-mirata, `_argomenti_della_ci`)",
           [False, True],
           ["if:" in passo_prove, "run: python prove.py" in passo_prove])
     prova("...e il confronto coi documenti non entra nei segreti ne' nel semaforo",
@@ -56301,6 +56302,26 @@ def prove_ci_leggera():
         scrivi(clone, "lista.txt", "collaudo_sempre_rosso\n\n")
         committa(clone, "un .txt")
         con_txt = lancia("--salvo-solo-documenti-da", "pronto")
+        # ci-mirata (17 nov 2026): un file che il collaudo non vede non
+        # lo fa girare; il collaudo stesso, o un file che nomina, si'
+        scrivi(clone, "deploy/zz-script.sh", "echo ciao\n")
+        committa(clone, "uno script che nessun collaudo nomina")
+        non_visto = lancia("--salvo-solo-documenti-da", "pronto")
+        scrivi(clone, "collaudo_sempre_rosso.py",
+               "DATI = 'dati/zz.json'\n"
+               "print('  ✗ rosso apposta')\nraise SystemExit(1)\n")
+        committa(clone, "il collaudo stesso")
+        se_stesso = lancia("--salvo-solo-documenti-da", "pronto")
+        git(origine, "fetch", "-q", clone, "+HEAD:refs/heads/pronto")
+        scrivi(clone, "dati/zz.json", "{}\n")
+        committa(clone, "un file che il collaudo nomina")
+        nominato = lancia("--salvo-solo-documenti-da", "pronto")
+        git(origine, "fetch", "-q", clone, "+HEAD:refs/heads/pronto")
+        scrivi(clone, "collaudo_nuovo_verde.py", "print('  ✓ verde')\n")
+        scrivi(clone, "lista.txt",
+               "collaudo_sempre_rosso\ncollaudo_nuovo_verde\n")
+        committa(clone, "un collaudo nuovo nell'elenco")
+        nuovo = lancia("--salvo-solo-documenti-da", "pronto")
     finally:
         import shutil
         shutil.rmtree(radice, ignore_errors=True)
@@ -56313,8 +56334,60 @@ def prove_ci_leggera():
     prova("...lo stesso albero senza l'opzione gira tutto, come sempre", 1, senza_opzione[0])
     prova("...un ramo che non c'e' gira tutto", [1, True],
           [ramo_che_manca[0], "confronto non riuscito, si gira tutto" in ramo_che_manca[1]])
-    prova("...e un .txt accanto ai documenti gira tutto", [1, True],
-          [con_txt[0], "non solo documenti: si gira tutto" in con_txt[1]])
+    prova("...l'elenco ritoccato senza nomi nuovi non fa girare niente, e lo dice",
+          [0, True, True],
+          [con_txt[0], "lista.txt: nessun nome nuovo" in con_txt[1],
+           "::notice::collaudi saltati" in con_txt[1]])
+    prova("...uno script che nessun collaudo nomina: niente collaudi (ci-mirata)",
+          [0, True], [non_visto[0], "nessun collaudo lo vede" in non_visto[1]])
+    prova("...il collaudo stesso cambiato: gira", [1, True],
+          [se_stesso[0], "rosso apposta" in se_stesso[1]])
+    prova("...un file che il collaudo nomina fra virgolette: gira", [1, True],
+          [nominato[0], "rosso apposta" in nominato[1]])
+    prova("...un nome nuovo nell'elenco: gira il nuovo e basta", [0, True, False],
+          [nuovo[0], "collaudo_nuovo_verde nuovi" in nuovo[1],
+           "rosso apposta" in nuovo[1]])
+
+    # IL GIUDICE DEI COLLAUDI coi file di cartone (ci-mirata): chi vede chi
+    sc = amb.get("scegli_collaudi")
+    tre = "'" * 3
+    fs = {"server.py": ("import os\nPAGINA = 'miniapp.html'\n# vedi prove.py\n"
+                        "SQL = " + tre + "\n  -- prove.py conta qui\n" + tre + "\n"),
+          "collaudo_a.py": "import server\n",
+          "collaudo_b.py": "import collaudo_a as banco\n",
+          "collaudo_c.py": "import json\nX = open('deploy/zz/conf').read()\n",
+          "miniapp.html": "", "prove.py": "", "deploy/zz/conf": "",
+          "estensione/manifest.json": "", "manifest.json": "",
+          "ci/lista.txt": "", "server_rotto.py": "def (:\n"}
+    nomi3 = ["collaudo_a", "collaudo_b", "collaudo_c"]
+
+    def giudica(cambiati, base=nomi3, nomi=nomi3):
+        return sc(cambiati, nomi, "ci/lista.txt", fs.__getitem__,
+                  fs.__contains__, base)[0] if callable(sc) else "manca"
+    prova("giudice collaudi: server.py tocca chi lo importa, anche per interposto "
+          "collaudo; chi non lo importa no", ["collaudo_a", "collaudo_b"],
+          giudica(["server.py"]))
+    prova("...una pagina che il server nomina: come il server",
+          ["collaudo_a", "collaudo_b"], giudica(["miniapp.html"]))
+    prova("...prove.py nominato solo in un commento e nell'SQL di una stringa: nessuno",
+          [], giudica(["prove.py"]))
+    prova("...un file nominato da un collaudo solo: quello", ["collaudo_c"],
+          giudica(["deploy/zz/conf"]))
+    fs["server.py"] += "MANIFESTO = 'manifest.json'\n"
+    prova("...estensione/manifest.json non e' il manifest.json di casa", [],
+          giudica(["estensione/manifest.json"]))
+    prova("...il lanciatore, requirements, il config d'esempio, il workflow: TUTTI",
+          [None] * 4, [giudica([f]) for f in
+                       ("collaudi_ci.py", "requirements.txt", "config_esempio.py",
+                        ".github/workflows/prove.yml")])
+    prova("...un file sparito: TUTTI", None, giudica(["zz_sparito.py"]))
+    prova("...l'elenco: i soli nomi nuovi; quello di prima illeggibile: TUTTI",
+          [["collaudo_c"], None],
+          [giudica(["ci/lista.txt"], base=["collaudo_a", "collaudo_b"]),
+           giudica(["ci/lista.txt"], base=None)])
+    fs["collaudo_x.py"] = "import server_rotto\n"
+    prova("...un import che non si legge come Python: TUTTI", None,
+          giudica(["deploy/zz/conf"], nomi=["collaudo_x", "collaudo_a"]))
 
     # IL PARALLELO, dal vero e d'ORDINE, non di cronometro: il primo
     # collaudo aspetta un file che scrive il SECONDO. In fila il primo
@@ -206356,8 +206429,35 @@ def prove_categorie_delle_prove():
     prova("--categoria swap: le sezioni dello swap e le sentinelle, e basta",
           sorted(["prove_" + n for n in CATEGORIE["swap"] + SEMPRE]),
           sorted(f.__name__ for f in scelte))
-    prova("senza argomenti gira tutto, come in CI", None,
+    prova("senza argomenti gira tutto, fuori dalla CI", None,
           _scelta_da_riga_di_comando([], finte)[0])
+    ci = {"GITHUB_ACTIONS": "true", "GITHUB_EVENT_NAME": "push",
+          "GITHUB_REF": "refs/heads/main"}
+    prova("la CI sul push a main sceglie dai file contro `pronto` (ci-mirata)",
+          ["--dai-file=origin/pronto"], _argomenti_della_ci([], ci))
+    prova("...a mano («Run workflow»), su un ramo, con PROVE_INTERE o in "
+          "locale: tutto", [[], [], [], []],
+          [_argomenti_della_ci([], dict(ci, GITHUB_EVENT_NAME="workflow_dispatch")),
+           _argomenti_della_ci([], dict(ci, GITHUB_REF="refs/heads/develop")),
+           _argomenti_della_ci([], dict(ci, PROVE_INTERE="1")),
+           _argomenti_della_ci([], {})])
+    prova("...e gli argomenti scritti vincono sempre; --mostra da solo no",
+          [["--categoria=swap"], ["--dai-file=origin/pronto", "--mostra"]],
+          [_argomenti_della_ci(["--categoria=swap"], ci),
+           _argomenti_della_ci(["--mostra"], ci)])
+    vero_git = globals()["_cambi_da_git"]
+
+    def esplode(base=None):
+        raise RuntimeError("git di cartone che non risponde")
+    try:
+        globals()["_cambi_da_git"] = lambda base=None: ({}, "origin/pronto")
+        vuoto = _scelta_da_riga_di_comando(["--dai-file=origin/pronto"], finte)[0]
+        globals()["_cambi_da_git"] = esplode
+        rotto = _scelta_da_riga_di_comando(["--dai-file=origin/pronto"], finte)[0]
+    finally:
+        globals()["_cambi_da_git"] = vero_git
+    prova("...lo stesso albero di `pronto` (un giro rifatto): tutto", None, vuoto)
+    prova("...un confronto che non riesce: tutto, mai un giro a meta'", None, rotto)
 
     # il giudice dei file, con un server e una miniapp di cartone
     server = ("import os\n\n\ndef p2p_motore_finto():\n    return 1\n\n\n"
@@ -206917,7 +207017,22 @@ def _cambi_da_git(base=None):
             raise RuntimeError("nessun ramo base trovato (manca git fetch?)")
         _, mb, ramo = migliore
     else:
-        mb, ramo = git("merge-base", "HEAD", base).strip(), base
+        ramo = base
+        if base.startswith("origin/") and subprocess.run(
+                ["git", "rev-parse", "--verify", "-q", base + "^{commit}"],
+                capture_output=True).returncode != 0:
+            # in CI il checkout e' corto e `pronto` non c'e': si prende la
+            # sola punta, come fanno i collaudi
+            nome = base[len("origin/"):]
+            git("fetch", "--quiet", "--depth=1", "origin",
+                f"+refs/heads/{nome}:refs/remotes/{base}")
+        try:
+            mb = git("merge-base", "HEAD", base).strip()
+        except subprocess.CalledProcessError:
+            # senza la storia in mezzo (il checkout corto della CI) si
+            # confrontano gli ALBERI: quel che differisce da `base` e' tutto
+            # quel che conta, e su main `pronto` e' comunque un antenato
+            mb = git("rev-parse", "--verify", base + "^{commit}").strip()
     cambi = {}
     for riga in git("diff", "--name-status", "--no-renames", mb).splitlines():
         st, p = riga.split("\t", 1)
@@ -206934,6 +207049,33 @@ def _cambi_da_git(base=None):
             cambi[corrente][1].extend(range(inizio, inizio + quante)
                                       if quante else [max(inizio, 1)])
     return cambi, ramo
+
+
+# LA CI SCEGLIE DA SE' (17 nov 2026, cantiere ci-mirata, richiesta di
+# Andrea: «le CI sono decisamente troppo lente, quelle inutili devono
+# essere saltate, cioe' se tocco qualcosa di quella categoria si,
+# altrimenti [...] saltalo»). Sul push a main la CI lancia `python
+# prove.py` nudo, e qui diventa `--dai-file=origin/pronto`: le categorie
+# dei file in cui l'albero differisce dall'ULTIMO ALBERO VERDE, non dal
+# push di prima — con la coda un giro puo' essere saltato, e il suo
+# codice lo deve provare il giro dopo (lo stesso perche' di
+# `cambiati_da` in collaudi_ci.py). Il workflow NON si tocca, ed e'
+# voluto: un commit che lo cambia puo' lasciare `pronto` indietro.
+# Il lancio a mano («Run workflow», anche su main) e ogni altro posto
+# girano TUTTO, come prima; `PROVE_INTERE=1` lo forza.
+def _argomenti_della_ci(argv, env):
+    """Gli argomenti veri di prove.py: quelli scritti, oppure — solo sul
+    push a main della CI, senza argomenti — la scelta dai file contro
+    `pronto`."""
+    # `--mostra` da solo non e' una scelta: cosi' si vede in anticipo
+    # cosa farebbe la CI (le tre variabili di GitHub + --mostra)
+    if [a for a in argv if a != "--mostra"] or env.get("PROVE_INTERE") == "1":
+        return list(argv)
+    if (env.get("GITHUB_ACTIONS") == "true"
+            and env.get("GITHUB_EVENT_NAME") == "push"
+            and env.get("GITHUB_REF") == "refs/heads/main"):
+        return ["--dai-file=origin/pronto"] + list(argv)
+    return list(argv)
 
 
 def _scelta_da_riga_di_comando(argv, tutte):
@@ -206964,7 +207106,17 @@ def _scelta_da_riga_di_comando(argv, tutte):
               f"(ci sono: {', '.join(CATEGORIE)})")
         sys.exit(2)
     if dai_file:
-        cambi, ramo = _cambi_da_git(base)
+        try:
+            cambi, ramo = _cambi_da_git(base)
+        except Exception as e:
+            # git che non risponde, un ramo che non c'e': nel dubbio, tutto
+            print(f"  --dai-file: il confronto non e' riuscito ({e}) → tutto")
+            return None, "tutto (il confronto coi file non e' riuscito)"
+        if not cambi:
+            # lo stesso albero del ramo base: e' un giro rifatto (un rosso
+            # da ricontrollare), e chi rifà un giro lo vuole intero
+            print(f"  --dai-file: nessun file cambiato rispetto a {ramo} → tutto")
+            return None, "tutto (lo stesso albero: un giro rifatto)"
         scelte, extra, perche = scegli_dai_cambi(
             cambi, lambda p: open(p, encoding="utf-8").read(),
             open(__file__, encoding="utf-8").read())
@@ -207691,7 +207843,8 @@ def main():
               prove_serie_giorni,
               prove_sentinella_server_fermo,
               prove_categorie_delle_prove)
-    sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
+    sezioni, titolo = _scelta_da_riga_di_comando(
+        _argomenti_della_ci(sys.argv[1:], os.environ), tutte)
     if "--mostra" in sys.argv[1:]:
         quali = tutte if sezioni is None else sezioni
         print(f"  Girerebbero {len(quali)} sezioni su {len(tutte)} ({titolo}):")

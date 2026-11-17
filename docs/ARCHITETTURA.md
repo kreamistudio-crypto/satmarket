@@ -28452,6 +28452,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   giusto e fa MORDERE la gabbia (un DNS e un connect, fermati e
   segnati): un sitecustomize che non si carica lascerebbe passare
   tutto in silenzio.
+  LA CI MIRATA (17 nov 2026, cantiere ci-mirata): sul push a main
+  `prove.py` sceglie le categorie dei file cambiati da `pronto`
+  (`_argomenti_della_ci` → `--dai-file=origin/pronto`) e
+  `collaudi_ci.py` gira solo i collaudi che VEDONO quei file
+  (`scegli_collaudi`: importati a ogni profondità o nominati nel codice;
+  server.py e quel che nomina → tutti). Nel dubbio tutto; il lancio a
+  mano gira tutto; il workflow non cambia. Perché e numeri: CANTIERI,
+  «La CI mirata».
   I DUE ELENCHI STANNO IN `ci/`, FUORI DAL WORKFLOW (13 ott 2026,
   cantiere «pronto-libero»): `ci/collaudi.txt` — una riga per collaudo,
   `#` per i commenti, in fondo i `fuori:` che la CI non gira — e

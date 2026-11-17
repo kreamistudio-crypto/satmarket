@@ -39,7 +39,10 @@ Uso:  python collaudi_ci.py --elenco ci/collaudi.txt     (quel che fa la CI)
 Opzioni (16 ott 2026, la CI leggera; senza, si gira come sempre):
       --paralleli N                 N collaudi alla volta (la CI: 2)
       --salvo-solo-documenti-da R   niente collaudi se HEAD differisce
-                                    dal ramo R di origin solo per dei .md
+                                    dal ramo R di origin solo per dei .md;
+                                    e dal 17 nov solo i collaudi che VEDONO
+                                    i file cambiati (`scegli_collaudi`; il
+                                    nome resta per non toccare il workflow)
 """
 import os
 import re
@@ -283,6 +286,211 @@ def cambiati_da(base):
     return [r for r in d.stdout.splitlines() if r.strip()]
 
 
+# ------------- I COLLAUDI SCELTI DAI FILE (17 nov 2026, cantiere ci-mirata)
+# Andrea: «le CI sono decisamente troppo lente, quelle inutili devono
+# essere saltate». Oltre ai soli documenti, adesso si saltano i collaudi
+# che NON POSSONO vedere i file cambiati da `pronto`. Il criterio e'
+# volutamente grosso, perche' un collaudo gira il SERVER VERO da cima a
+# fondo e una funzione toccata non dice quali flussi attraversa:
+# - un collaudo «vede» un file se lo importa (anche passando per un
+#   altro collaudo o per il server, a qualunque profondita'), oppure se
+#   il file e' NOMINATO nel testo di quel che importa (il nome, il
+#   percorso, il modulo fra virgolette, la sua cartella fra virgolette:
+#   cosi' si prendono anche le pagine servite, le letture e i
+#   sottoprocessi). Quasi tutti importano server.py, quindi server.py e
+#   ogni file che server.py nomina (miniapp.html, sw.js, vendor/...)
+#   fanno girare TUTTO, come oggi;
+# - fanno girare TUTTO anche i file che cambiano l'AMBIENTE di tutti:
+#   il lanciatore stesso, il workflow, requirements.txt, il config
+#   d'esempio; e un file sparito (chi lo leggeva ora esplode);
+# - l'elenco (`ci/collaudi.txt`) fa girare i soli nomi NUOVI rispetto a
+#   `pronto`; se l'elenco di `pronto` non si legge, tutto;
+# - i .md restano fuori come dal 16 ott.
+# Restano saltati, per esempio, i commit di soli prove.py, deploy/,
+# estensione/, documenti e disegni che il server non nomina. Nel dubbio
+# (un import che non si legge, un confronto non riuscito), TUTTO.
+SEMPRE_TUTTO = ("collaudi_ci.py", "requirements.txt", "config_esempio.py")
+CARTELLE_SEMPRE_TUTTO = (".github/",)
+
+
+def _moduli_locali(testo, esiste):
+    """I file del repo che `testo` importa (import e from, a ogni
+    livello del file, anche dentro una funzione). None se non si legge
+    come Python: chi chiama gira tutto."""
+    import ast
+    try:
+        albero = ast.parse(testo)
+    except (SyntaxError, ValueError):
+        return None
+    nomi = set()
+    for n in ast.walk(albero):
+        if isinstance(n, ast.Import):
+            nomi.update(a.name for a in n.names)
+        elif isinstance(n, ast.ImportFrom) and n.module and not n.level:
+            nomi.add(n.module)
+            nomi.update(f"{n.module}.{a.name}" for a in n.names)
+    out = set()
+    for nome in nomi:
+        base = nome.replace(".", "/")
+        for cand in (base + ".py", base + "/__init__.py"):
+            if esiste(cand):
+                out.add(cand)
+    return out
+
+
+def senza_commenti(testo):
+    """Il Python senza i commenti e senza le docstring: un «vedi
+    prove.py» in un commento del server non vuol dire che il server
+    legga prove.py (e nemmeno un `-- prove.py` nello schema SQL di una
+    stringa). Restano il codice e le stringhe vere (i nomi dei
+    file serviti, letti, lanciati). Se non si legge, il testo intero:
+    una menzione in piu', mai una in meno."""
+    import io
+    import tokenize
+    fuori, prima = [], tokenize.NEWLINE
+    try:
+        for t in tokenize.generate_tokens(io.StringIO(testo).readline):
+            if t.type == tokenize.COMMENT:
+                continue
+            if t.type == tokenize.STRING and prima in (
+                    tokenize.NEWLINE, tokenize.NL, tokenize.INDENT,
+                    tokenize.DEDENT):
+                prima = t.type  # una docstring (o una stringa da sola)
+                continue
+            if t.type not in (tokenize.NL, tokenize.INDENT, tokenize.DEDENT,
+                              tokenize.NEWLINE) or t.type == tokenize.NEWLINE:
+                prima = t.type
+            fuori.append(t.string)
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return testo
+    # ...e i commenti dell'SQL dentro le stringhe (`-- ...` a inizio riga)
+    return re.sub(r"(?m)^\s*--.*$", "", " ".join(fuori))
+
+
+def _nominato(testo, percorso, esiste=lambda p: False):
+    """Vero se `testo` nomina il file: il percorso, il nome del file, il
+    modulo fra virgolette, o una sua cartella fra virgolette. Il solo
+    nome non basta quando in cima al repo c'e' un file che si chiama
+    uguale (estensione/manifest.json e manifest.json): li' serve il
+    percorso."""
+    nome = percorso.rsplit("/", 1)[-1]
+    if percorso in testo:
+        return True
+    if (nome == percorso or not esiste(nome)) and nome in testo:
+        return True
+    if nome.endswith(".py") and re.search(
+            r"""["']%s["']""" % re.escape(nome[:-3]), testo):
+        return True
+    parti = percorso.split("/")[:-1]
+    for k in range(1, len(parti) + 1):
+        cartella = "/".join(parti[:k])
+        if re.search(r"""["']%s(?:/|["'])""" % re.escape(cartella), testo):
+            return True
+    return False
+
+
+def scegli_collaudi(cambiati, nomi, elenco, leggi, esiste, nomi_base):
+    """IL GIUDICE, senza git dentro (cosi' si prova). `cambiati` i file
+    diversi da `pronto` (non vuoto, non solo .md: quelli li guarda gia'
+    `solo_documenti`), `nomi` i collaudi dell'elenco, `elenco` il suo
+    percorso, `leggi(p)` il testo di un file del repo, `esiste(p)`,
+    `nomi_base` l'elenco di `pronto` (None se non si legge).
+    Torna (scelti, perche'): scelti None vuol dire TUTTI."""
+    perche = []
+    resto = [f for f in cambiati if not FORMA_DOCUMENTO.fullmatch(f)]
+    for f in resto:
+        if f in SEMPRE_TUTTO or f.startswith(CARTELLE_SEMPRE_TUTTO):
+            return None, [f"{f}: cambia l'ambiente di tutti → tutti"]
+        if f != elenco and not esiste(f):
+            return None, [f"{f}: sparito → tutti"]
+    scelti = set()
+    if elenco in resto:
+        if nomi_base is None:
+            return None, [f"{elenco}: l'elenco di prima non si legge → tutti"]
+        nuovi = [n for n in nomi if n not in set(nomi_base)]
+        scelti.update(nuovi)
+        perche.append(f"{elenco}: " + (", ".join(nuovi) + " nuovi"
+                                       if nuovi else "nessun nome nuovo"))
+        resto = [f for f in resto if f != elenco]
+    if not resto:
+        return [n for n in nomi if n in scelti], perche
+    # chi vede chi: ogni collaudo con quel che importa, a ogni profondita'
+    cache_testo, cache_import = {}, {}
+
+    def testo(p):
+        if p not in cache_testo:
+            cache_testo[p] = leggi(p)
+        return cache_testo[p]
+
+    cache_codice = {}
+
+    def codice(p):
+        if p not in cache_codice:
+            cache_codice[p] = (senza_commenti(testo(p)) if p.endswith(".py")
+                               else testo(p))
+        return cache_codice[p]
+
+    def importa(p):
+        if p not in cache_import:
+            cache_import[p] = _moduli_locali(testo(p), esiste)
+        return cache_import[p]
+
+    cache_nomina = {}
+
+    def nomina(p, f):
+        if (p, f) not in cache_nomina:
+            cache_nomina[p, f] = _nominato(codice(p), f, esiste)
+        return cache_nomina[p, f]
+
+    nominati = {}
+    for nome in nomi:
+        visti, coda = set(), [nome + ".py"]
+        while coda:
+            p = coda.pop()
+            if p in visti:
+                continue
+            visti.add(p)
+            try:
+                dentro = importa(p)
+            except OSError:
+                return None, perche + [f"{p}: non si legge → tutti"]
+            if dentro is None:
+                return None, perche + [f"{p}: non si legge come Python → tutti"]
+            coda.extend(dentro - visti)
+        for f in resto:
+            if f in visti or any(nomina(p, f) for p in visti):
+                nominati.setdefault(f, set()).add(nome)
+    for f in resto:
+        chi = nominati.get(f, set())
+        scelti |= chi
+        perche.append(f"{f}: " + ("tutti" if len(chi) == len(nomi) else
+                                  f"{len(chi)} collaudi" if chi else
+                                  "nessun collaudo lo vede"))
+    if len(scelti) == len(nomi):
+        return None, perche
+    return [n for n in nomi if n in scelti], perche
+
+
+def nomi_elenco_da(base, elenco):
+    """I collaudi dell'elenco com'era su `base` (gia' preso da
+    `cambiati_da`), o None se non si legge."""
+    try:
+        r = subprocess.run(["git", "show",
+                            f"refs/remotes/origin/{base}:{elenco}"],
+                           cwd=QUI, capture_output=True, encoding="utf-8",
+                           errors="replace", timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0:
+        return None
+    dentro = []
+    for riga in r.stdout.splitlines():
+        x = riga.split("#")[0].strip()
+        if x and not x.startswith("fuori:"):
+            dentro.append(x)
+    return dentro
+
+
 def gira(nome, gabbia, segni):
     """Un collaudo, nella gabbia. Torna (ok, secondi, uscita)."""
     percorso = os.path.join(QUI, nome + ".py")
@@ -373,6 +581,7 @@ def main(nomi):
               "16, --salvo-solo-documenti-da il nome di un ramo")
         return 2
     paralleli, base, nomi = opzioni
+    elenco = None
     if nomi[:1] == ["--elenco"]:
         # DAL FILE, che e' quel che fa la CI. Un elenco che non si
         # legge, vuoto o con una riga storta e' ROSSO, mai «0 verdi, 0
@@ -380,6 +589,7 @@ def main(nomi):
         if len(nomi) != 2:
             print("Uso: python collaudi_ci.py --elenco ci/collaudi.txt")
             return 2
+        elenco = nomi[1].replace("\\", "/")
         try:
             nomi, _fuori, storte = leggi_elenco(nomi[1])
         except OSError as e:
@@ -409,11 +619,36 @@ def main(nomi):
             print(f"::notice::collaudi saltati: rispetto a {base} solo "
                   f"documenti ({len(cambiati)} file .md)")
             return 0
-        print(f"rispetto a `{base}`: "
-              + ("confronto non riuscito, si gira tutto" if cambiati is None
-                 else "lo stesso albero, si gira tutto" if not cambiati
-                 else f"{len(cambiati)} file, non solo documenti: si gira "
-                      "tutto"), flush=True)
+        if not cambiati:
+            print(f"rispetto a `{base}`: "
+                  + ("confronto non riuscito, si gira tutto" if cambiati is None
+                     else "lo stesso albero, si gira tutto"), flush=True)
+        else:
+            def leggi(p):
+                with open(os.path.join(QUI, p), encoding="utf-8",
+                          errors="replace") as f:
+                    return f.read()
+            scelti, perche = scegli_collaudi(
+                cambiati, nomi, elenco, leggi,
+                lambda p: os.path.isfile(os.path.join(QUI, p)),
+                nomi_elenco_da(base, elenco) if elenco else None)
+            print(f"rispetto a `{base}`: {len(cambiati)} file")
+            print("\n".join("    " + r for r in perche[:40]))
+            if scelti is None:
+                print("si gira tutto", flush=True)
+            elif not scelti:
+                print(f"⏭ nessuno dei {len(nomi)} collaudi vede i file "
+                      "cambiati: non gira niente. prove.py e i segreti "
+                      "fanno la loro parte.")
+                print(f"::notice::collaudi saltati: rispetto a {base} "
+                      "nessun collaudo vede i file cambiati")
+                return 0
+            else:
+                print(f"⏭ girano {len(scelti)} collaudi su {len(nomi)}, "
+                      "quelli che vedono i file cambiati", flush=True)
+                print(f"::notice::{len(scelti)} collaudi su {len(nomi)}: "
+                      f"rispetto a {base} gli altri non vedono i file cambiati")
+                nomi = scelti
     gabbia = tempfile.mkdtemp(prefix="gabbia-collaudi-")
     with open(os.path.join(gabbia, "sitecustomize.py"), "w",
               encoding="utf-8") as f:
