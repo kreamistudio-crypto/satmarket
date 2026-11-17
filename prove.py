@@ -168084,8 +168084,23 @@ __PEZZI__
   const noStorto = await onchainCofirma(storto, PAROLE);
   const dopoStorto = MANDATI.length;
   const noSeme = await onchainCofirma(o, D.semi[2]);
+  // (17 nov 2026, scambio #14) i sats versati in piu' sotto la polvere:
+  // la tariffa e' salita, il resto e' sceso sotto la polvere ed e' andato
+  // alla rete. Il server l'ammette, e il telefono deve co-firmare; oltre
+  // la polvere no, ne' l'uno ne' l'altro
+  const piu = async (k) => {
+    MANDATI.length = 0;
+    PAROLE = D.semi[0]; onchainOrdini = [D[k + 'C']];
+    await onchainProponi(null, 7);
+    const pp = MANDATI.pop();
+    PAROLE = D.semi[1];
+    const motivo = await onchainCofirma({...D[k + 'V'], proposta: {verso: 'venditore',
+      mia: false, psbt: pp[1].psbt}}, PAROLE);
+    return [motivo, MANDATI.length];
+  };
+  const inPiu = await piu('piu'), oltre = await piu('oltre');
   console.log(JSON.stringify({proposta, no, firmata, noStorto, dopoStorto,
-                              noSeme}));
+                              noSeme, inPiu, oltre}));
 })().catch(e => console.log(JSON.stringify({errore: String(e)})));
 '''.replace("__PEZZI__", pezzi)
     casa = _tf.mkdtemp(prefix="onchain-tappa3-")
@@ -168093,8 +168108,20 @@ __PEZZI__
         f_js = os.path.join(casa, "banco.js")
         f_dati = os.path.join(casa, "dati.json")
         open(f_js, "w", encoding="utf-8").write(banco)
+        def in_piu(ruolo, sats, tariffa):
+            o = ordine(ruolo, None)
+            o["utxo"] = [{"txid": "ab" * 32, "vout": 1, "value": 51080 + sats}]
+            o["tariffa"] = tariffa
+            return o
         json.dump({"semi": semi, "compratore": ordine("compratore", None),
                    "venditore": ordine("venditore", None),
+                   # 300 in piu', tariffa 5: rete 890, resto 490 sotto la
+                   # polvere → alla rete 1380 (margine 1080 + 300)
+                   "piuC": in_piu("compratore", 300, 5),
+                   "piuV": in_piu("venditore", 300, 5),
+                   # 600 in piu', tariffa 7: alla rete 1680, oltre 1080 + 545
+                   "oltreC": in_piu("compratore", 600, 7),
+                   "oltreV": in_piu("venditore", 600, 7),
                    "altro": ESC.p2wpkh(chiave(semi[2], 1, 0)).address(N)},
                   open(f_dati, "w", encoding="utf-8"))
         r = _sp.run([node, f_js, f_dati], capture_output=True, text=True,
@@ -168124,6 +168151,14 @@ __PEZZI__
           [[k.sec().hex() for k in i.partial_sigs] for i in p.inputs])
     prova("il telefono del venditore co-firma senza obiezioni", "",
           o.get("no"))
+    # (17 nov 2026, scambio P2P on-chain #14 fermo all'ultima firma) lo
+    # stesso tetto del giudice del server: margine + i sats in piu' sotto
+    # la polvere; oltre, il no resta
+    prova("...anche quando chi ha depositato ha messo qualche sats in piu' "
+          "e il resto sotto la polvere va alla rete (come il server)",
+          ["", 1], o.get("inPiu"))
+    prova("...ma non oltre la polvere: lì la commissione esce dal margine",
+          ["la commissione esce dal margine", 0], o.get("oltre"))
     url, corpo = (o.get("firmata") or ["", {}])
     t = ETx.from_string(corpo.get("tx") or "00" * 10) if corpo.get("tx") else None
     prova("...embit ritrova la STESSA transazione, con due firme e lo script",

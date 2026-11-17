@@ -90223,3 +90223,40 @@ su 0e02b7d8 rigirati `collaudo_stradina_prova`, `collaudo_piu_account`,
 `collaudo_serie_giorni` e `collaudo_lingua`. Commit non miei sotto il mio:
 4afcc8c8 (gioco spento), b91ef35d (inglese), la classifica dei giorni di
 fila e i tre di onchain-grossi-uscita.
+
+## La seconda firma on-chain e i sats versati in più (17 nov 2026 sera, cantiere cofirma-sats-in-piu; scambio P2P on-chain #14 di Darnok833, 745.565 sats, fermo all'ultima firma col toast «⚠️ scambio #14: non co-firmato — la commissione esce dal margine»)
+LA CAUSA: dal 14 nov (audit, «DEPOSITO ON-CHAIN DEL MERCATINO. 26») il
+giudice del server (`_onchain_psbt_giudica`) lascia alla rete il
+margine PIÙ i pochi sats versati oltre la cifra chiesta, finché stanno
+sotto la polvere (`min(_onchain_sats_in_piu, ONCHAIN_POLVERE - 1)`):
+sotto i 546 sats non possono tornare indietro. Quella cura è entrata
+SOLO nel server: il telefono che mette la seconda firma
+(`onchainCofirma`, uno per mercatino e P2P) teneva il tetto di prima,
+`rete > o.margine_sats`. Così, quando chi deposita manda qualche sats in
+più e il resto per lui scende sotto la polvere (tariffa salita), il
+server accetta la proposta e il telefono di chi riceve la rifiuta: lo
+scambio resta fermo con la prima firma messa e i sats al sicuro nel
+2-di-3.
+LA CURA: il telefono usa lo stesso tetto del server (margine + sats in
+più fino a 545; `importo_sats` assente o zero = tetto di prima). Non
+allarga niente: è quello che il server accetta già, e il prezzo a chi
+riceve resta controllato al sats.
+PROVATO: `prove_ordine_onchain`, la prova doppia in node (il telefono
+propone, il telefono co-firma, embit legge) con due casi nuovi: 300
+sats in più a tariffa 5 (alla rete 1380 su margine 1080) → co-firma; 600
+in più a tariffa 7 (1680, oltre 1080 + 545) → «la commissione esce dal
+margine». CONTROPROVA: col tetto di prima il primo caso torna rosso col
+toast esatto dello scambio #14. Suite severa intera e collaudi on-chain
+nel worktree.
+NON PROVATO: i numeri veri dello scambio #14 (importo chiesto, sats
+arrivati, margine) non li ho visti: la causa è la sola strada del codice
+che dà quel toast su una proposta che il server ha già accettato, ma la
+conferma sta nella riga del database, sola lettura. Dopo il deploy
+Darnok833 apre la Mini App e il telefono co-firma da solo.
+SU QUALE ALBERO: suite severa intera (29.938 passate, 0 fallite, 2
+saltate d'ambiente: nostr-tools) e gli 11 collaudi on-chain della CI in
+un venv senza coincurve e senza proxy sull'albero di 2cfd4160 più il
+mio. Dopo il rebase su 71e546c5 (non miei: 78e4fe2c, 411b15c5, 0e02b7d8
+di onchain-grossi-uscita e 71e546c5 della stradina, nessuno tocca
+`onchainCofirma`) rigirati `prove_ordine_onchain`, le sezioni che
+leggono i documenti e gli 11 collaudi on-chain.

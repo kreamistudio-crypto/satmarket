@@ -71328,8 +71328,18 @@ async function onchainCofirma(o, parole){
     if (o.ruolo !== 'compratore' || !o.rimborso || o.rimborso !== mio) return 'non è il tuo rimborso';
     if (uscite.some(([a]) => a !== mio)) return 'c\'è un\'uscita estranea';
   }
-  const rete = o.utxo.reduce((s, u) => s + u.value, 0) - uscite.reduce((s, [, v]) => s + v, 0);
-  if (rete <= 0 || rete > o.margine_sats) return 'la commissione esce dal margine';
+  const tot = o.utxo.reduce((s, u) => s + u.value, 0);
+  const rete = tot - uscite.reduce((s, [, v]) => s + v, 0);
+  /* IL TETTO DELLA RETE E' QUELLO DEL SERVER (17 nov 2026, scambio P2P
+     on-chain #14 di Darnok833 fermo all'ultima firma): il margine, piu' i
+     pochi sats versati oltre la cifra chiesta finche' stanno sotto la
+     polvere — non possono tornare indietro e finiscono alla rete. Il
+     giudice del server li ammette dal 14 nov (`_onchain_psbt_giudica`,
+     audit); il telefono no, e rifiutava una proposta gia' accettata. */
+  const chiesto = Number(o.importo_sats) || 0;
+  const inPiu = chiesto > 0 ? Math.max(0, tot - chiesto) : 0;
+  const tetto = Number(o.margine_sats) + Math.min(inPiu, ONCHAIN_POLVERE - 1);
+  if (rete <= 0 || rete > tetto) return 'la commissione esce dal margine';
   for (let i = 0; i < tx.inputsLength; i++) tx.signIdx(io.firma.privateKey, i);
   tx.finalize();
   const r = await fetch(`${API_BASE}${o.rotta || '/onchain/ordini/' + o.id}/firma`, {method: 'POST',
