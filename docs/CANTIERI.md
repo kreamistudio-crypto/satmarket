@@ -87931,3 +87931,34 @@ banchi che eseguono `_sblocca_sats` e `miei_ordini` hanno il loro
 DA GUARDARE DAL VIVO: il cassetto «🎀 Premi fedeltà» a 375 px (quattro
 righe con soglia e regalo), la riga sulla pagina del negozio, e un
 ordine vero di «Un tempo per te» che passa la soglia.
+
+## Compra con Barattozon, secondo giro: i contanti scelti da soli e la commissione (17 nov 2026, cantiere compra-con-bz; Andrea: «barattozon deve inserire da
+solo come metodo di pagamento i contanti, deve chiedermi anche quali sono
+le commissioni dell'ordine e poterlo inserire in automatico su
+barattolo»). (1) ALLA CASSA LA SCELTA: trovata la riga della frase «Paga
+in contanti», l'estensione preme il SUO pallino (`input[type=radio]`:
+quello della label, o l'unico della riga; con due pallini non preme
+niente), una volta per pagina e solo se non e' gia' scelto; il primo passo
+del cartello diventa «✓ Ho scelto io…». La conferma del metodo («Usa
+questo metodo di pagamento») e l'ordine restano a chi compra: la loro
+forma non l'abbiamo vista, e un clic su un bottone indovinato e' il modo
+di premere quello sbagliato. (2) LA COMMISSIONE: letta come il PREMIO del
+passo 4 di Barattozon, l'unica «commissione» che l'ordine ha (Barattolo
+non ne prende). Il riquadro del PayCode la chiede ogni volta (niente
+memoria): «Commissione a chi paga», intero da 0 a 20 %, il vuoto vale 0,
+storta spegne il link; viaggia come `premio=-N` dopo il «#»
+(`commissioneBz`, `premioBz`). Di la' la dogana la passa dal giudice del
+passo 4 (`premioTabacchinoP2P`), il ricordo dell'ingresso la porta, e
+`apriNuovoOrdineP2P` la scrive in `p2pNuovoPremioTab`. (3) «IN
+AUTOMATICO»: con PayCode, importo, scadenza e premio buoni il percorso si
+apre gia' al passo 5, e manca UN tocco, «Pubblica». La pubblicazione da
+sola, all'arrivo del link, e' SCARTATA: chiunque potrebbe mandare un link
+col suo PayCode e far pubblicare a un altro un ordine che vende i suoi
+sats; il tocco resta di chi pubblica, con la chiave del suo dispositivo.
+PROVATO: `prove_estensione_barattozon` (la scelta del solo pallino, la
+commissione e il link spento, il premio nel foglio; in node commissioni,
+link, dogana coi premi storti, il giro della memoria col premio) e dal
+vivo in Chromium: alla cassa disegnata il pallino del contanti scelto e
+la carta tolta; sulla pagina del PayCode la commissione 3 apre
+`…&premio=-3`. NON visto dal vivo: il foglio di Barattolo aperto al
+passo 5 (provato in node sul pezzo vero).

@@ -115,9 +115,24 @@ function linkBarattozonBz(d){
   if (d && d.importo) q.set('importo', d.importo);
   if (d && d.scade) q.set('scade', String(d.scade));
   if (d && d.barre) q.set('barre', d.barre);
+  if (d && d.premio) q.set('premio', String(d.premio));
   const s = q.toString();
   return BARATTOLO_P2P + '#barattozon' + (s ? '?' + s : '');
 }
+
+/* PURA: la commissione che chi pubblica offre a chi paga il PayCode
+   (17 nov 2026, «deve chiedermi anche quali sono le commissioni
+   dell'ordine»): un intero da 0 a 20, il vuoto vale 0, il resto e'
+   storto. Su Barattolo diventa il premio del passo 4 col segno meno
+   (`premioBz`): chi paga riceve tanti sats in piu' del cambio */
+const COMMISSIONE_MAX_BZ = 20;
+function commissioneBz(testo){
+  const t = String(testo == null ? '' : testo).replace(/\s*%\s*$/, '').trim();
+  if (t === '') return {n: 0, storto: false};
+  if (!/^\d{1,2}$/.test(t) || Number(t) > COMMISSIONE_MAX_BZ) return {n: 0, storto: true};
+  return {n: Number(t), storto: false};
+}
+function premioBz(commissione){ return commissione > 0 ? -commissione : 0; }
 
 /* PURA: dai link e dal testo di una pagina, i dati migliori o null.
    Il link del PDF vince sul testo: porta tutto, e l'ha scritto Amazon */
@@ -142,7 +157,8 @@ function datiDaPaginaBz(hrefs, testo, adesso){
    «Aggiungi al carrello» sul prodotto, «Procedi all'ordine» nel carrello
    — e MAI «Acquista ora» (con l'1-Click ordinerebbe da solo) ne'
    l'invio dell'ordine: una sentinella di prove.py lo tiene. Alla cassa
-   non si clicca niente: si indica la riga del contanti e basta.
+   (dal 17 nov, sera) si sceglie il pallino della riga del contanti e
+   basta: la conferma del metodo e l'ordine li preme chi compra.
    I selettori sono quelli VISTI sulle pagine vere salvate il 17 nov 2026
    (giro guidato, /mnt/project-files/amazon-contanti/): la cassa no,
    perche' chiede l'accesso; li' si cerca la frase, non un id. */
@@ -195,39 +211,84 @@ const BLU_BZ = '#191D29';
     if (d) { mostra(d); occhio.disconnect(); }
   }
 
+  /* (17 nov 2026) il riquadro chiede anche LA COMMISSIONE per chi paga
+     il PayCode, ogni volta (l'estensione non ricorda niente): il link si
+     riscrive a ogni tasto, e una commissione storta lo spegne finche'
+     non torna buona. Su Barattolo diventa il premio del passo 4 */
+  let dati = null, campo = null, riga = null;
+
+  function aggiorna(){
+    const c = commissioneBz(campo.value);
+    if (c.storto) {
+      link.removeAttribute('href');
+      link.setAttribute('aria-disabled', 'true');
+      riga.textContent = 'Scrivi un numero intero da 0 a ' + COMMISSIONE_MAX_BZ + '.';
+      riga.className = 'storto';
+      return;
+    }
+    link.removeAttribute('aria-disabled');
+    link.href = linkBarattozonBz(Object.assign({}, dati, {premio: premioBz(c.n)}));
+    riga.textContent = c.n
+      ? 'Chi paga il PayCode riceve il ' + c.n + '% di sats in più del cambio.'
+      : 'Nessuna commissione: chi paga riceve i sats al cambio pieno.';
+    riga.className = '';
+  }
+
   function mostra(d){
     if (!ospite) {
       ospite = document.createElement('div');
       ospite.setAttribute('data-barattolo', '');
-      ospite.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:2147483647';
+      ospite.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:2147483647;max-width:320px';
       const ombra = ospite.attachShadow({mode: 'closed'});
       const stile = document.createElement('style');
       stile.textContent =
-        'a{display:flex;align-items:center;gap:8px;padding:12px 16px;border-radius:14px;'
-        + 'background:' + BLU_BZ + ';color:#fff;font:700 15px/1.2 system-ui,sans-serif;text-decoration:none;'
-        + 'box-shadow:0 6px 24px rgba(0,0,0,.35);border:2px solid #F7931A}'
-        + 'a:hover{background:#1c2638}a:focus-visible{outline:3px solid #F7931A;outline-offset:2px}'
-        + 'small{display:block;font-weight:600;font-size:12px;opacity:.8;margin-top:2px}';
+        'section{background:' + BLU_BZ + ';color:#fff;border:2px solid #F7931A;border-radius:14px;padding:12px 14px;'
+        + 'box-shadow:0 6px 24px rgba(0,0,0,.35);font:13px/1.4 system-ui,sans-serif}'
+        + 'section>img{height:28px;width:auto;display:block;margin-bottom:4px}'
+        + 'small{display:block;font-weight:600;font-size:12px;opacity:.8}'
+        + 'label{display:flex;align-items:center;gap:8px;margin:10px 0 2px;font-weight:700}'
+        + 'input{width:52px;padding:6px 8px;border-radius:8px;border:1px solid #F7931A;background:#fff;color:#111;'
+        + 'font:700 15px system-ui,sans-serif;text-align:center}'
+        + 'p{margin:2px 0 10px;font-size:12px;opacity:.85}p.storto{color:#ff9b8a;opacity:1}'
+        + 'a{display:block;text-align:center;padding:10px 14px;border-radius:20px;background:#F7931A;color:' + BLU_BZ + ';'
+        + 'font:700 15px/1.2 system-ui,sans-serif;text-decoration:none;cursor:pointer}'
+        + 'a:hover{background:#ffa733}a:focus-visible{outline:3px solid #fff;outline-offset:2px}'
+        + 'a[aria-disabled]{opacity:.45;cursor:not-allowed}';
+      const s = document.createElement('section');
+      const icona = document.createElement('img');
+      icona.src = LOGO_BZ;
+      icona.alt = 'Barattozon';
+      sotto = document.createElement('small');
+      const etichetta = document.createElement('label');
+      const parola = document.createElement('span');
+      parola.textContent = 'Commissione a chi paga';
+      campo = document.createElement('input');
+      campo.type = 'text';
+      campo.inputMode = 'numeric';
+      campo.maxLength = 3;
+      campo.placeholder = '0';
+      campo.setAttribute('aria-label', 'Commissione a chi paga il PayCode, in percento da 0 a ' + COMMISSIONE_MAX_BZ);
+      const pc = document.createElement('span');
+      pc.textContent = '%';
+      etichetta.append(parola, campo, pc);
+      riga = document.createElement('p');
+      riga.setAttribute('aria-live', 'polite');
       const a = document.createElement('a');
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
-      const icona = document.createElement('img');
-      icona.src = LOGO_BZ;
-      icona.alt = '';
-      icona.style.cssText = 'height:28px;width:auto;display:block';
-      const parole = document.createElement('span');
-      const titolo = document.createElement('span');
-      titolo.textContent = 'Pubblica su Barattozon';
-      sotto = document.createElement('small');
-      parole.append(titolo, sotto);
-      a.append(icona, parole);
-      ombra.append(stile, a);
+      a.textContent = 'Pubblica su Barattozon';
+      /* un link spento non apre niente, nemmeno col tocco */
+      a.addEventListener('click', ev => { if (a.hasAttribute('aria-disabled')) ev.preventDefault(); });
+      campo.addEventListener('input', aggiorna);
+      s.append(icona, sotto, etichetta, riga, a);
+      ombra.append(stile, s);
       document.documentElement.appendChild(ospite);
       link = a;
     }
-    link.href = linkBarattozonBz(d);
+    dati = d;
     sotto.textContent = 'PayCode ' + d.pc + (d.importo ? ' · ' + d.importo + ' €' : '');
     link.setAttribute('aria-label', 'Pubblica il PayCode ' + d.pc + ' su Barattozon, in una scheda nuova');
+    aggiorna();
   }
 
   const occhio = new MutationObserver(() => {
@@ -249,7 +310,7 @@ const BLU_BZ = '#191D29';
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
   const tipo = paginaBz(location.pathname);
   if (!tipo || tipo === 'grazie') return;
-  let messo = null, attesa = 0, segnata = null;
+  let messo = null, attesa = 0, segnata = null, scelto = false, primoPasso = null;
 
   function vesti(ombra, extra){
     const stile = document.createElement('style');
@@ -325,6 +386,7 @@ const BLU_BZ = '#191D29';
       const li = document.createElement('li');
       li.textContent = r;
       ol.append(li);
+      if (!primoPasso) primoPasso = li;
     }
     s.append(x, marchio(), titolo, ol);
     ombra.append(s);
@@ -333,9 +395,25 @@ const BLU_BZ = '#191D29';
   }
 
   /* la riga del contanti: la frase piu' piccola che la contiene, e il
-     suo contenitore cliccabile; solo un contorno, mai un clic */
+     suo contenitore; il contorno, e (17 nov 2026, «barattozon deve
+     inserire da solo come metodo di pagamento i contanti») la SCELTA:
+     si preme il SOLO pallino (`input[type=radio]`) che sta dentro quella
+     riga, una volta per pagina e solo se non e' gia' scelto. Mai altro:
+     la conferma del metodo e l'ordine restano a chi compra */
+  function scegliContanti(r){
+    if (scelto) return;
+    /* il pallino della label, o l'UNICO della riga: con due pallini nella
+       stessa riga non si sa quale sia, e non si preme niente */
+    const tutti = r.querySelectorAll('input[type="radio"]');
+    const pallino = (r.control && r.control.type === 'radio') ? r.control : (tutti.length === 1 ? tutti[0] : null);
+    if (!pallino || pallino.disabled) return;
+    scelto = true;
+    if (!pallino.checked) pallino.click();
+    if (primoPasso) primoPasso.textContent = '✓ Ho scelto io «Paga in Contanti nel Punto Vendita più vicino»: controlla e conferma il metodo di pagamento.';
+  }
+
   function segnaContanti(){
-    if (segnata && document.contains(segnata)) return;
+    if (segnata && document.contains(segnata)) { scegliContanti(segnata); return; }
     const giro = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     for (let n = giro.nextNode(); n; n = giro.nextNode()) {
       if (!rigaContantiBz(n.nodeValue)) continue;
@@ -346,6 +424,7 @@ const BLU_BZ = '#191D29';
       riga.style.outlineOffset = '3px';
       riga.style.borderRadius = '6px';
       segnata = riga;
+      scegliContanti(riga);
       return;
     }
   }

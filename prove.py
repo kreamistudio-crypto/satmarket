@@ -191008,11 +191008,23 @@ def prove_estensione_barattozon():
                        "submitOrder", "requestSubmit", ".submit(")
            if x.lower() in ext_codice.lower()])
     prova("...preme solo «Aggiungi al carrello» sul prodotto e «Procedi all'ordine» nel carrello, per id",
-          [True, True, 1],
+          [True, True, 2],
           ["() => document.getElementById('add-to-cart-button')" in ext_codice,
            "() => document.querySelector('input[name=\"proceedToRetailCheckout\"]')" in ext_codice,
            ext_codice.count(".click()")])
-    prova("...alla cassa nessun clic: il cartello e un contorno sulla riga del contanti", True,
+    prova("...alla cassa preme SOLO il pallino della riga del contanti: quello della label o l'unico, una volta, se non e' gia' scelto",
+          True, _in_ordine(ext_codice, "function scegliContanti(r){", "if (scelto) return;",
+                           "(r.control && r.control.type === 'radio') ? r.control : (tutti.length === 1 ? tutti[0] : null);",
+                           "if (!pallino || pallino.disabled) return;", "scelto = true;",
+                           "if (!pallino.checked) pallino.click();"))
+    prova("...il riquadro del PayCode chiede la commissione e la manda come premio col meno; storta, il link si spegne",
+          True, _in_ordine(ext_codice, "function aggiorna(){", "const c = commissioneBz(campo.value);",
+                           "if (c.storto) {", "link.removeAttribute('href');",
+                           "link.href = linkBarattozonBz(Object.assign({}, dati, {premio: premioBz(c.n)}));"))
+    prova("...e Barattolo la mette nel premio del passo 4, dopo l'importo", True,
+          _in_ordine(pezzo_js(mini, "function apriNuovoOrdineP2P(metodo){", "\n}\n"),
+                     "p2pNuovoEuro = pre.importo || '';", "p2pNuovoPremioTab = pre.premio || '';"))
+    prova("...alla cassa il cartello, poi il contorno e la scelta sulla riga del contanti", True,
           "if (tipo === 'cassa') {\n      if (!messo) messo = cartello();\n      segnaContanti();\n      return;\n    }"
           in ext_codice)
     _logo = re.search(r"const LOGO_BZ = 'data:image/webp;base64,([A-Za-z0-9+/=]+)';", ext_codice)
@@ -191070,6 +191082,8 @@ def prove_estensione_barattozon():
     porta = (barre_paycode_js(mini)
              + "\nfunction senzaEuroP2P(t){ return String(t == null ? '' : t).replace(/\\s*€\\s*/g, '').trim(); }\n"
              + re.search(r"const P2P_BZ_LINK_MAX = [^\n]*", mini).group(0) + "\n"
+             + re.search(r"const P2P_PREMIO_TAB_MAX = [^\n]*", mini).group(0) + "\n"
+             + pezzo_js(mini, "function premioTabacchinoP2P(testo){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function datiBzDaFrammentoP2P(frammento){", "\n}\n") + "\n}\n"
              + re.search(r"const P2P_BZ_SESSIONE = [^\n]*", mini).group(0) + "\n"
              + re.search(r"const P2P_BZ_SESSIONE_S = [^\n]*", mini).group(0) + "\n"
@@ -191119,6 +191133,12 @@ r.testo = ['Il tuo PayCode: 479 868 518, da pagare entro', 'PAYCODE 479-868-518'
 r.pagina = [datiDaPaginaBz(['https://www.amazon.it/gp/css/order-details', LINK], 'PayCode: 479-868-518', ORA).pc,
             datiDaPaginaBz([], 'Il tuo PayCode: 479868518', ORA), datiDaPaginaBz([], 'niente', ORA)];
 r.importi = ['39,99', '39.9', '39', '€ 39,99', '0', '39,999', '-5', '1e3', ''].map(importoBz);
+r.commissioni = ['', '3', '3 %', '20', '21', '-2', '2,5', 'abc', '05'].map(commissioneBz);
+r.premi = [premioBz(0), premioBz(3)];
+r.linkPremio = linkBarattozonBz(Object.assign({}, pdf, {premio: premioBz(3)}));
+r.arrivoPremio = datiBzDaFrammentoP2P(r.linkPremio.slice(r.linkPremio.indexOf('#')));
+r.premiStorti = ['premio=-21', 'premio=2,5', 'premio=0', 'premio=abc', 'premio=%2B4'].map(x =>
+  datiBzDaFrammentoP2P('#barattozon?paycode=479868518&' + x).premio);
 r.pagine = ['/Pampers-Baby-Dry-Pannolini/dp/B0FQCDRHFQ/ref=sr_1_6', '/dp/B0FQCDRHFQ', '/gp/product/B0FQCDRHFQ?th=1',
             '/gp/cart/view.html', '/cart/smart-wagon', '/cart', '/checkout/entry/cart', '/gp/buy/spc/handlers/display.html',
             '/gp/buy/thankyou/handlers/display.html', '/checkout/p/p-123/thankyou', '/ap/signin', '/s', '/',
@@ -191158,6 +191178,9 @@ p2pBzDavanti = {stato: 'volo', visto: false}; r.davanti.push(bzDavantiP2P());
 p2pBzDavanti = {stato: 'aperto', visto: false}; r.davanti.push(bzDavantiP2P());
 APERTO = true; r.davanti.push(bzDavantiP2P());
 APERTO = false; r.davanti.push(bzDavantiP2P(), bzDavantiP2P(), p2pBzDavanti.stato);
+/* la commissione fa il giro intero, anche dalla memoria dell'ingresso */
+MEM_ROTTA = false; MEM = {};
+r.portaPremio = [giro(r.linkPremio.slice(r.linkPremio.indexOf('#'))).d, giro('').d];
 console.log(JSON.stringify(r));
 """)
     out = _node_banco(prog)
@@ -191174,7 +191197,18 @@ console.log(JSON.stringify(r));
     prova("il link che apre Barattolo: tutto dopo il «#», il PayCode senza trattini",
           "https://barattolo.store/p2p#barattozon?paycode=212802988&importo=39%2C99&scade="
           + str(out["pdf"].get("scade")) + "&barre=0100860003622209216085740002128029880", out["link"])
-    prova("...e dall'altra parte la dogana di Barattolo legge gli stessi quattro campi", out["pdf"], out["arrivo"])
+    pdfP = dict(out["pdf"], premio="")   # dall'altra parte c'e' anche il premio, vuoto se non viaggia
+    prova("...e dall'altra parte la dogana di Barattolo legge gli stessi quattro campi", pdfP, out["arrivo"])
+    prova("la commissione: intero da 0 a 20, il % tollerato, il resto storto",
+          [[0, False], [3, False], [3, False], [20, False], [0, True], [0, True], [0, True], [0, True], [5, False]],
+          [[c["n"], c["storto"]] for c in out["commissioni"]])
+    prova("...diventa il premio col meno, nel link dopo il «#», e Barattolo lo legge",
+          [[0, -3], True, dict(pdfP, premio="-3")],
+          [out["premi"], out["linkPremio"].endswith("&premio=-3"), out["arrivoPremio"]])
+    prova("...un premio storto o zero dal link resta vuoto (fuori fascia, decimale, zero, lettere); il + passa",
+          ["", "", "", "", "4"], out["premiStorti"])
+    prova("...e regge il giro dell'ingresso: torna dalla memoria col suo premio",
+          [dict(pdfP, premio="-3")] * 2, out["portaPremio"])
     prova("un link del PDF storto non si crede: http, host finto, porta, percorso, credenziali, PayCode corto",
           [None] * 8, out["pdfNo"])
     prova("un pezzo storto del PDF resta vuoto, gli altri restano buoni (importo, mese, oltre 5 giorni, barre)",
@@ -191192,17 +191226,17 @@ console.log(JSON.stringify(r));
     prova("gli importi: centesimi con la virgola, il € tollerato, il resto vuoto",
           ["39,99", "39,90", "39,00", "39,99", "", "", "", "", ""], out["importi"])
     prova("la dogana di Barattolo: i campi buoni passano, gli storti restano vuoti, il frammento altrui e' null",
-          [{"pc": "479-868-518", "importo": "39,99", "scade": 1792326720, "barre": ""},
+          [{"pc": "479-868-518", "importo": "39,99", "scade": 1792326720, "barre": "", "premio": ""},
            None,
-           {"pc": "479-868-518", "importo": "", "scade": 0, "barre": ""},
+           {"pc": "479-868-518", "importo": "", "scade": 0, "barre": "", "premio": ""},
            None, None, None, None,
-           {"pc": "", "importo": "39,99", "scade": 0, "barre": ""}],
+           {"pc": "", "importo": "39,99", "scade": 0, "barre": "", "premio": ""}],
           out["dogana"])
     prova("la porta: legge, toglie il frammento dalla barra (resta l'indirizzo nudo), tiene in memoria per l'ingresso",
-          [out["pdf"], ["/p2p"], "", ["barattolo-bz-link"]],
+          [pdfP, ["/p2p"], "", ["barattolo-bz-link"]],
           [out["porta"]["d"], out["porta"]["storia"], out["porta"]["hash"], out["porta"]["mem"]])
     prova("...in memoria gli stessi campi, e dopo la ricarica dell'ingresso tornano uguali",
-          [out["pdf"], out["pdf"]], [out["memTenuta"], out["ricarica"]])
+          [pdfP, pdfP], [out["memTenuta"], out["ricarica"]])
     prova("dopo mezz'ora non tornano piu', e la memoria si svuota", [None, 0], out["scaduta"])
     prova("una memoria scritta da altri ripassa dalla dogana: niente di storto entra", [None, None],
           [out["memoriaStorta"], out["memoriaRotta"]])
@@ -191211,7 +191245,7 @@ console.log(JSON.stringify(r));
           [[out["altroFrammento"]["d"], out["altroFrammento"]["storia"], out["altroFrammento"]["hash"]],
            [out["fragStorto"]["d"], out["fragStorto"]["storia"], out["fragStorto"]["hash"]]])
     prova("senza memoria della scheda (navigazione privata) il link vale lo stesso per questa apertura",
-          out["pdf"], out["senzaMemoria"])
+          pdfP, out["senzaMemoria"])
     prova("il tour aspetta: niente link no; in volo si'; nella morfosi si'; aperto si'; chiuso no, e la bandierina cade",
           [False, True, True, True, False, False, ""], out["davanti"])
 

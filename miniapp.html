@@ -90117,6 +90117,9 @@ function apriNuovoOrdineP2P(metodo){
     p2pNuovoTab.barre = pre.pc ? (pre.barre || '') : '';
     p2pNuovoTab.scade = pre.scade ? campoDaScadeP2P(pre.scade) : '';
     p2pNuovoEuro = pre.importo || '';
+    /* la commissione scelta nell'estensione: col PayCode, l'importo e la
+       scadenza buoni il percorso si apre gia' al passo 5, «Pubblica» */
+    p2pNuovoPremioTab = pre.premio || '';
   }
   /* LA RETE (30 ott 2026, cantiere oc-identico): 'onchain', chiesta da
      `apriPubblicaOnchainP2P` per questa sola apertura, apre questo stesso
@@ -92596,8 +92599,15 @@ function datiBzDaFrammentoP2P(frammento){
   const s = String(q.get('scade') || '');
   const scade = /^[1-9][0-9]{8,10}$/.test(s) ? Number(s) : 0;
   const gb = pc ? giudizioBarrePayCodeP2P(q.get('barre') || '', pc) : {stato: 'vuoto', numero: ''};
+  /* LA COMMISSIONE (17 nov 2026, cantiere compra-con-bz: «deve chiedermi
+     anche quali sono le commissioni dell'ordine»): l'estensione la chiede
+     a chi pubblica e la manda come `premio`, il premio del passo 4 col suo
+     segno (una commissione del 3% a chi paga = premio −3). Passa dal
+     giudice del passo 4, `premioTabacchinoP2P`: storto o zero = vuoto */
+  const pr = premioTabacchinoP2P(q.get('premio') || '');
   const d = {pc, importo: (!imp.storto && imp.n > 0) ? centesimiTestoP2P(imp.n) : '',
-             scade, barre: gb.stato === 'buono' ? gb.numero : ''};
+             scade, barre: gb.stato === 'buono' ? gb.numero : '',
+             premio: (!pr.storto && pr.n) ? String(pr.n) : ''};
   return (d.pc || d.importo || d.scade) ? d : null;
 }
 /* PURE: le due righe dal valore com'e' nel foglio */
@@ -106531,6 +106541,7 @@ function prendiBzDaLinkP2P(){
     if (v.d && v.d.importo) q.set('importo', String(v.d.importo));
     if (v.d && v.d.scade) q.set('scade', String(v.d.scade));
     if (v.d && v.d.barre) q.set('barre', String(v.d.barre));
+    if (v.d && v.d.premio) q.set('premio', String(v.d.premio));
     return datiBzDaFrammentoP2P('barattozon?' + q.toString());
   } catch(e) { return null; }
 }

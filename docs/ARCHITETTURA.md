@@ -29078,7 +29078,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   MAI «Acquista ora» (l'1-Click ordinerebbe) ne' l'invio dell'ordine:
   sentinella in `prove_estensione_barattozon`. Il logo e' un data: URL
   dentro `amazon.js` (`LOGO_BZ`, assets/barattozon.webp a 178x56): niente
-  `web_accessible_resources`, niente permessi nuovi. Il verbale: CANTIERI,
+  `web_accessible_resources`, niente permessi nuovi. Dal secondo giro
+  (17 nov, sera): alla cassa `scegliContanti` preme il SOLO pallino di
+  quella riga (della label o l'unico), una volta; il riquadro del PayCode
+  chiede la commissione a chi paga (0-20 %, `commissioneBz`) e la manda
+  come `premio=-N`, che `datiBzDaFrammentoP2P` passa da
+  `premioTabacchinoP2P` e `apriNuovoOrdineP2P` scrive in
+  `p2pNuovoPremioTab`: il foglio si apre al passo 5, un tocco a
+  «Pubblica» (mai da solo). Il verbale: CANTIERI,
   «Compra con Barattozon: il bottone col marchio su prodotto, carrello e cassa».
   IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea, rifatto due volte;
   il terzo giro il 24): nel libro, su «Vendi BTC», dal fondo del + rosso
