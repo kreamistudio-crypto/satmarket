@@ -448,8 +448,8 @@ def main():
 
     print("\n[le missioni di Tappo]")
     st = c.get(B, headers=COMPRA).json()
-    prova("sei missioni, la prima la piu' facile, nessuna finita; il tabellone legge l'insieme vuoto",
-          (["sats", "lucchetto", "quaderno", "parole", "staffetta", "halving"], [0] * 6, set()),
+    prova("otto missioni, una per zona, la prima la piu' facile, nessuna finita; il tabellone legge l'insieme vuoto",
+          (["sats", "lucchetto", "parole", "staffetta", "oblo", "quaderno", "antenna", "halving"], [0] * 8, set()),
           ([x["id"] for x in st["missioni"]], [x["stelle"] for x in st["missioni"]],
            S.missioni_superate(S.db(), 111)))
     M = f"{B}/missione"
@@ -472,7 +472,7 @@ def main():
     r = c.post(M, json={"missione": "quaderno", "azione": "finisci", "stelle": 2},
                headers=COMPRA).json()
     prova("finita: 15 bulloni la prima volta, due stelle, e il tabellone la vede",
-          (15, st["saldo"] + 15, 2, {"quaderno"}),
+          (30, st["saldo"] + 30, 2, {"quaderno"}),
           (r["bulloni_nuovi"], r["saldo"], next(x["stelle"] for x in r["missioni"] if x["id"] == "quaderno"),
            S.missioni_superate(S.db(), 111)))
     c.post(M, json={"missione": "quaderno", "azione": "inizia"}, headers=COMPRA)
@@ -483,7 +483,7 @@ def main():
     r = c.post(M, json={"missione": "quaderno", "azione": "finisci", "stelle": 3},
                headers=COMPRA).json()
     prova("rigiocata: nessun bullone in piu', le stelle salgono a tre",
-          (0, st["saldo"] + 15, 3), (r["bulloni_nuovi"], r["saldo"], next(x["stelle"] for x in r["missioni"] if x["id"] == "quaderno")))
+          (0, st["saldo"] + 30, 3), (r["bulloni_nuovi"], r["saldo"], next(x["stelle"] for x in r["missioni"] if x["id"] == "quaderno")))
     prova("...e niente XP nemmeno qui", xp_prima, conta("SELECT COUNT(*) FROM xp_eventi"))
 
     print("\n[il freno delle occhiate]")

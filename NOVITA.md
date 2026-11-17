@@ -479,13 +479,13 @@ pubblico: sì
 
 ## 2026-11-17 · caccia-a-tappo
 frase: È arrivata la Caccia a Tappo, il gioco di Barattolo. Ogni giorno Tappo si nasconde in un annuncio vero, diverso per ognuno: leggi gli indizi, apri gli annunci e tocca «Tappo è qui?». Chi lo trova vince i bulloni 🔩, accende i barattoli della dispensa, sale di grado e completa le sfide. Coi bulloni prendi cappellini, attrezzi e 5 posti in più nei preferiti. Si gioca gratis: i bulloni non sono sats.
-dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», nella Mini App, nell'app e sul sito; il tasto «Tappo è qui?» nella scheda di ogni annuncio, quando la caccia del giorno è aperta.
+dove: Profilo → «Livello e recensioni» → «🔩 Caccia a Tappo», nella Mini App, nell'app e sul sito; il tasto «Tappo è qui?» nella scheda di ogni annuncio, quando la caccia del giorno è aperta.
 leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
 pubblico: sì
 
 ## 2026-11-17 · mondo-di-tappo
-frase: Nella Caccia a Tappo arriva il Mondo di Tappo: guidi Tappo dentro la dispensa, raccogli i bulloni 🔩, apri i barattoli e sali di zona. E ci sono i minigiochi di Tappo, sul tabellone dei livelli subito prima delle caselle che insegnano: si corre, si salta e si impara Bitcoin, e alla fine un bottone ti porta a fare la cosa vera. Ogni minigioco monta un pezzo del razzo con cui Tappo vuole arrivare sulla Luna. Chi vende può mettere un annuncio sul palco del mondo per un giorno, coi bulloni.
-dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo»: scheda «Mondo» per camminare, scheda «Sfide» per le missioni.
+frase: Sul tabellone dei livelli arrivano le missioni di Tappo: otto scene brevi a carte sulla storia del denaro, il deposito di garanzia, le tue chiavi, Lightning, la privacy e Nostr, ognuna col bottone per farlo davvero. Danno bulloni 🔩 e montano il razzo con cui Tappo vuole arrivare sulla Luna. E nella Caccia a Tappo c'è il Mondo: la dispensa da girare, coi barattoli da aprire.
+dove: Profilo → «Livello e recensioni» → «🧭 La tua stradina»: la missione sta subito prima della casella che insegna; tutte anche nella «🔩 Caccia a Tappo», lì accanto, schede «Sfide» e «Mondo».
 leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
 pubblico: sì
 

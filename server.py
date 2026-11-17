@@ -120598,24 +120598,33 @@ GIOCO_TAPPO_EVIDENZA_POSTI = 3
 MISSIONI_TAPPO = (
     # (17 nov 2026, Andrea: «le prime missioni devono essere facili,
     # semplici... basta che la storia sia semplice») la prima e' la piu'
-    # facile — raccogliere i sats e metterli nel wallet.
+    # facile — le forme del denaro in fila, dal baratto ai sats.
     # OGNI MISSIONE INSEGNA UNA CASELLA VERA (Andrea, 17 nov: «i minigame
     # devono rispecchiare» le caselle-competenza del tabellone): `prima` e'
     # l'id della casella di STRADINA_CASELLE che la missione precede, nella
     # stessa `zona`; il gioco finisce col bottone per farla davvero.
-    dict(id="sats", emoji="👛", nome="Raccogli i sats", zona=0,
-         prima="wallet", bulloni=10, cosa="I sats e il tuo wallet"),
+    # UNA PER ZONA, OGNUNA SUL VANTAGGIO (Andrea, 17 nov: «ogni pezzettino
+    # del tabellone deve far capire il vantaggio di usare Barattolo e questa
+    # tecnologia»): il denaro, la garanzia, le chiavi, Lightning, la
+    # privacy, il registro che nessuno trucca, Nostr, l'halving. Ognuna
+    # monta un pezzo del razzo di bulloni, nell'ordine della sua zona.
+    dict(id="sats", emoji="🐐", nome="Dal baratto ai sats", zona=0,
+         prima="wallet", bulloni=10, cosa="La storia del denaro"),
     dict(id="lucchetto", emoji="🔒", nome="Il barattolo col lucchetto",
          zona=1, prima="acquisto", bulloni=20,
          cosa="Il deposito di garanzia"),
-    dict(id="quaderno", emoji="📓", nome="Il quaderno di tutti", zona=2,
-         prima="onchain", ordine=1, bulloni=15,
-         cosa="Bitcoin è un registro che tengono in tanti"),
     dict(id="parole", emoji="🗝️", nome="Le dodici parole", zona=2,
-         prima="onchain", ordine=2, bulloni=30,
-         cosa="La frase di recupero e la custodia"),
+         prima="onchain", bulloni=20,
+         cosa="Le chiavi sono tue: la frase di recupero"),
     dict(id="staffetta", emoji="⚡", nome="La staffetta del fulmine", zona=3,
-         prima="incasso10k", bulloni=25, cosa="Lightning: canali e strade"),
+         prima="incasso10k", bulloni=25, cosa="Lightning: pagare in un attimo"),
+    dict(id="oblo", emoji="🕶️", nome="L'oblò scuro", zona=4,
+         prima="p2p5", bulloni=30, cosa="La privacy: cosa sa Barattolo di te"),
+    dict(id="quaderno", emoji="📓", nome="Il quaderno di tutti", zona=5,
+         prima="incasso250k", bulloni=30,
+         cosa="Bitcoin è un registro che nessuno può truccare"),
+    dict(id="antenna", emoji="📡", nome="L'antenna di Tappo", zona=6,
+         prima="annunci50", bulloni=35, cosa="Nostr: un nome che nessuno ti toglie"),
     dict(id="halving", emoji="🌕", nome="L'ultimo bullone", zona=7,
          prima="halving", bulloni=40, cosa="Il dimezzamento e i 21 milioni"),
 )
@@ -120774,22 +120783,8 @@ _TAPPO_SQL_VETRINA = (f"a.stato='attivo' AND {SQL_CAPOFILA} "
                       "AND TRIM(COALESCE(a.titolo,''))<>''")
 
 
-def _giorno_roma(adesso) -> str:
-    """PURA: il giorno «AAAA-MM-GG» in ORA ITALIANA di un istante epoch.
-    La caccia cambia a mezzanotte di chi gioca, non a quella di
-    Greenwich. Senza zoneinfo, come `_epoch_roma` e per la stessa
-    ragione (su Windows «Europe/Rome» non c'e'): la regola dell'ora
-    legale europea — dall'ultima domenica di marzo all'ultima di
-    ottobre, alle 01:00 UTC — e' ferma dal 1996."""
-    from datetime import datetime, timedelta, timezone
-    utc = datetime.fromtimestamp(int(adesso), timezone.utc).replace(tzinfo=None)
-
-    def ultima_domenica(mese):
-        d = datetime(utc.year, mese, 31)
-        return d - timedelta(days=(d.weekday() + 1) % 7)
-    legale = (ultima_domenica(3).replace(hour=1) <= utc
-              < ultima_domenica(10).replace(hour=1))
-    return (utc + timedelta(hours=2 if legale else 1)).strftime("%Y-%m-%d")
+# Il giorno «AAAA-MM-GG» in ora italiana: `_giorno_roma`, piu' su (lo
+# stesso calcolo della serie dei giorni di fila, una funzione sola).
 
 
 def _tappo_pesca(candidati, caso) -> int:

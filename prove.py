@@ -134443,10 +134443,11 @@ def prove_dati_spedizione_copia():
     # grande (prove_sbirciata), e un menu «Salva immagine» lo coprirebbe
     # (17 nov 2026) la tela del Mondo di Tappo: un gioco che si guida col
     # dito trascinato, senza un testo dentro — una selezione lì
-    # coprirebbe la guida a ogni tocco lungo
+    # coprirebbe la guida a ogni tocco lungo; e i tasti del platform di
+    # lato (17 nov 2026): bottoni tenuti premuti, mai un dato
     prova("user-select:none solo su bottoni, stelle, foto e card: mai sopra un dato",
           ["#sbirciata img", ".caccia-tela-box", ".cat-cella", ".ctrl-mini", ".fb-stelle",
-           ".lb-slide img", ".p2p-recapito-copia",
+           ".lato-tasto", ".lb-slide img", ".p2p-recapito-copia",
            ".qta-mini .qm-btn"], censo(r"user-select\s*:\s*none"))
     prova("...il richiamo del tocco lungo spento solo sulla card del reparto "
           "e sui francobolli della cassa",
@@ -209014,9 +209015,11 @@ console.log(JSON.stringify({
     # mondo, il passo che scivola, la telecamera, e le cinque missioni
     # giocate fino in fondo in node.
     missioni = G["MISSIONI_TAPPO"]
-    prova("sei missioni al lancio, la prima la piu' facile (i sats), sulle zone 0, 1, 2, 2, 3 e 7 degli otto del tabellone, "
+    # (17 nov 2026, Andrea: «ogni pezzettino del tabellone deve far capire
+    # il vantaggio»): una missione a carte per zona, ognuna sul suo tema
+    prova("otto missioni, una per zona del tabellone, la prima la piu' facile (dal baratto ai sats), "
           "id di casa e bulloni veri",
-          (6, "sats", [0, 1, 2, 2, 3, 7], True, True),
+          (8, "sats", [0, 1, 2, 3, 4, 5, 6, 7], True, True),
           (len(missioni), missioni[0]["id"], [x["zona"] for x in missioni],
            all(re.fullmatch(r"[a-z]{3,20}", x["id"]) for x in missioni),
            all(isinstance(x["bulloni"], int) and x["bulloni"] >= 1 for x in missioni)))
@@ -209034,10 +209037,11 @@ console.log(JSON.stringify({
            [x["id"] for x in missioni if "fai: [" not in righe[x["id"]].split("\n  },")[0].split("},\n  ")[0]]))
     # IL RAZZO DI BULLONI (Andrea, 17 nov: la storia unica): un pezzo per
     # missione, nello stesso ordine dei pezzi delle zone del tabellone
-    # (piedini 0, serbatoio 1, motore 2, ali 3; l'halving lo fa partire)
+    # (piedini 0, serbatoio 1, motore 2, ali 3, oblò 4, punta 5, antenna 6;
+    # l'halving lo fa partire)
     prova("ogni missione monta un pezzo del razzo della sua zona, e il finale lo dice", 
-          (["piedini", "serbatoio", "motore", "motore", "ali", "parte per la Luna"], True),
-          ([next(p for p in ("piedini", "serbatoio", "motore", "ali", "parte per la Luna")
+          (["piedini", "serbatoio", "motore", "ali", "oblò", "punta", "antenna", "parte per la Luna"], True),
+          ([next(p for p in ("piedini", "serbatoio", "motore", "ali", "oblò", "punta", "antenna", "parte per la Luna")
                  if p in righe[x["id"]].split("razzo: '")[1].split("', nome")[0]) for x in missioni],
            "Con questi bulloni Tappo monta ${esc(g.razzo)}" in mini))
     prova("...il bottone chiude il gioco e porta alla casella", True,
@@ -209108,7 +209112,9 @@ for (const id of Object.keys(MISSIONI_GIOCO)) {
   let scene = 0, fine = false;
   const guarda = () => { scene++; const h = g.html(missione); if (h.includes('missioneFine()')) fine = true; return h; };
   guarda();
-  if (id === 'sats') { for (let i = 0; i < SATS_QUANTI; i++) satsPrendi(i); guarda(); }
+  if (id === 'sats') { satsStoria(2); guarda(); [0, 1, 2, 3, 4].forEach(satsStoria); guarda(); satsNotte(false); satsNotte(true); guarda(); }
+  if (id === 'oblo') { obloTocca(0); guarda(); obloTocca(1); obloTocca(5); guarda(); obloIndirizzo(true); guarda(); }
+  if (id === 'antenna') { [0, 1, 2].forEach(antennaAccendi); guarda(); antennaChiuso(true); guarda(); antennaChiave(false); antennaChiave(true); guarda(); }
   if (id === 'quaderno') { quadernoTocca(3); guarda(); missione.dati.respinto = true; missione.passo = 2; missione.dati = {}; guarda(); quadernoNulla(true); guarda(); quadernoRipara(); guarda(); }
   if (id === 'lucchetto') { lucchettoPrima(true); guarda(); [0, 1, 2, 3].forEach(lucchettoPasso); guarda(); lucchettoProva(0); lucchettoProva(1); lucchettoDecidi(); guarda(); }
   if (id === 'staffetta') { ['A', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); ['R', 'I', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); ['A', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); }
@@ -209257,9 +209263,9 @@ console.log(JSON.stringify({
            {"rubate": False, "sola": True, "metallo": False, "salve": False}], r.get("parole"))
     prova("il barattolone: vuoto, meta', 96,875% dopo cinque ere, e mai oltre i 21 milioni",
           [0, 50, 96.875, 100.0], r.get("pieno"))
-    prova("le missioni si giocano fino al «Avanti», senza errori, scena dopo scena",
+    prova("le missioni si giocano fino al «Avanti», scena dopo scena, e ogni sbaglio voluto si conta",
           {**{x: [True, True, 0] for x in ("quaderno", "lucchetto", "staffetta", "parole", "halving")},
-           "sats": [False, True, 0]}, r.get("giocate"))
+           "sats": [True, True, 2], "oblo": [True, True, 1], "antenna": [True, True, 1]}, r.get("giocate"))
     prova("ogni missione del server ha il suo gioco nella pagina, e viceversa",
           sorted(x["id"] for x in missioni), r.get("stessiId"))
     prova("l'elenco nelle sfide: un tasto per missione conosciuta, nessuna bomba, nessun tag vivo",

@@ -65691,19 +65691,123 @@ function satsDisegnaCosa(g, a, c){
     if (c.pieno) arenaEmoji(g, '⚡', c.x - 22 * sc, c.y - 106 * sc, 34 * sc);
   }
 }
-/* la versione senza tela (un browser che non disegna): si toccano i
-   sats e si mettono nel wallet, con gli stessi fumetti */
+/* ============ LE MISSIONI A CARTE SUL VANTAGGIO (17 nov 2026, Andrea:
+   «ogni pezzettino del tabellone deve far capire il vantaggio di usare
+   Barattolo e questa tecnologia»: la storia del denaro, Bitcoin, la
+   privacy). Ogni missione e' una scena breve: Tappo ha un problema,
+   Barattolo lo risolve, e alla fine il bottone per farlo davvero. ============ */
+
+/* «DAL BARATTO AI SATS» (zona 0, prima dell'incasso automatico): le
+   forme del denaro in fila, poi i sats che arrivano anche di notte */
+const SATS_STORIA = ['🐐 Il baratto: una capra per un sacco di grano', '🐚 Le conchiglie', '🪙 Le monete', '💶 Le banconote', '⚡ I sats'];
 function satsHTML(m){
-  const d = m.dati, presi = d.presi || (d.presi = []);
-  if (presi.length < SATS_QUANTI)
-    return missFumettoHTML('tappo', 'Tocca i sats per raccoglierli (' + presi.length + '/' + SATS_QUANTI + ').')
-      + `<div class="miss-scelte miss-mucchio">${Array.from({length: SATS_QUANTI}, (_, i) => presi.includes(i) ? '<span></span>' : `<button type="button" class="miss-scelta" onclick="satsPrendi(${i})">⚡</button>`).join('')}</div>`;
-  return missFumettoHTML('tappo', 'Presi tutti! Mettiamoli al sicuro.') + `<button type="button" class="caccia-btn" onclick="missioneFine()">👛 Metti i sats nel wallet</button>`;
+  const d = m.dati;
+  if (m.passo === 0) {
+    const fatti = d.fatti || [], mescolati = d.mescolati || (d.mescolati = missMescola(SATS_STORIA)), resto = mescolati.filter(t => !fatti.includes(t));
+    return missPassiHTML(0, 2) + missFumettoHTML('tappo', 'Il denaro ha cambiato forma tante volte. <b>Tocca le sue forme dalla più antica alla più nuova.</b>')
+      + `<ol class="miss-ordine">${fatti.map(t => `<li class="fatto">${esc(t)}</li>`).join('')}</ol>`
+      + `<div class="miss-scelte">${resto.map(t => `<button type="button" class="miss-scelta" onclick="satsStoria(${SATS_STORIA.indexOf(t)})">${esc(t)}</button>`).join('')}</div>`;
+  }
+  if (m.passo === 1)
+    return missPassiHTML(1, 2) + missFumettoHTML('tappo', 'Stanotte qualcuno compra il mio barattolo più bello, mentre dormo. Come mi arrivano i sats?')
+      + `<div class="miss-due"><button type="button" class="caccia-btn piano" onclick="satsNotte(false)">⏰ Mi sveglio e chiedo il pagamento</button>`
+      + `<button type="button" class="caccia-btn" onclick="satsNotte(true)">⚡ Arrivano da soli</button></div>`;
+  return missFumettoHTML('tappo', 'Con l\'incasso automatico i sats arrivano da soli nel <b>mio</b> wallet, anche alle tre di notte, in un attimo. Nessuna banca chiusa, nessun bonifico che aspetta il lunedì.')
+    + `<button type="button" class="caccia-btn" onclick="missioneFine()">Avanti</button>`;
 }
-function satsPrendi(i){
-  const m = missione; if (!m || m.id !== 'sats') return;
-  const p = m.dati.presi || (m.dati.presi = []);
-  if (!p.includes(i)) { p.push(i); haptic(); }
+function satsStoria(i){
+  const m = missione; if (!m || m.id !== 'sats' || m.passo !== 0) return;
+  const fatti = m.dati.fatti || (m.dati.fatti = []);
+  if (i === fatti.length) {
+    fatti.push(SATS_STORIA[i]); haptic();
+    if (fatti.length === SATS_STORIA.length) { missioneBene('Dal baratto ai sats: Barattolo porta lo stesso nome!'); m.passo = 1; m.dati = {}; }
+  } else { m.errori++; missioneMale('Non ancora: cosa è venuto prima?'); }
+  missioneDisegna();
+}
+function satsNotte(giusto){
+  const m = missione; if (!m || m.id !== 'sats' || m.passo !== 1) return;
+  if (giusto) { missioneBene('Proprio così: dormi, e i sats arrivano.'); m.passo = 2; }
+  else { m.errori++; missioneMale('Non serve svegliarsi: c\'è l\'incasso automatico.'); }
+  missioneDisegna();
+}
+
+/* «L'OBLÒ SCURO» (zona 4): la privacy. Cosa sa Barattolo di te, e dove
+   finisce l'indirizzo di spedizione. Le risposte sono quelle della
+   pagina «I tuoi dati» (barattolo.store/privacy). */
+const OBLO_DATI = [['La tua email', false], ['Il nome che hai su Telegram', true], ['Una password', false],
+  ['Il tuo numero di telefono', false], ['Un documento d\'identità', false], ['La tua chiave pubblica Nostr', true]];
+function obloHTML(m){
+  const d = m.dati;
+  if (m.passo === 0) {
+    const sc = d.scelte || (d.scelte = []), giusti = OBLO_DATI.filter(x => x[1]).length;
+    return missPassiHTML(0, 2) + missFumettoHTML('gazza', 'Dimmi tutto di te! Email, telefono, documenti… li colleziono!')
+      + missFumettoHTML('tappo', 'Barattolo invece sa pochissimo. <b>Tocca le sole cose che sa di me</b> (' + sc.length + '/' + giusti + ').')
+      + `<div class="miss-scelte">${OBLO_DATI.map((x, i) => `<button type="button" class="miss-scelta${sc.includes(i) ? ' presa' : ''}" onclick="obloTocca(${i})">${esc(x[0])}</button>`).join('')}</div>`;
+  }
+  if (m.passo === 1)
+    return missPassiHTML(1, 2) + missFumettoHTML('tappo', 'Ho comprato un libro e ho dato l\'indirizzo per la spedizione. Quando il pacco arriva e confermo, l\'indirizzo…')
+      + `<div class="miss-due"><button type="button" class="caccia-btn piano" onclick="obloIndirizzo(false)">🗄 Resta per sempre in archivio</button>`
+      + `<button type="button" class="caccia-btn" onclick="obloIndirizzo(true)">🧹 Viene cancellato</button></div>`;
+  return missFumettoHTML('tappo', 'Come l\'oblò di vetro scuro del mio razzo: da dentro vedo fuori, da fuori nessuno guarda dentro. Niente email, niente pubblicità che ti segue. E nello scambio P2P compri sats da una persona, senza una banca in mezzo.')
+    + `<button type="button" class="caccia-btn" onclick="missioneFine()">Avanti</button>`;
+}
+function obloTocca(i){
+  const m = missione; if (!m || m.id !== 'oblo' || m.passo !== 0) return;
+  const sc = m.dati.scelte || (m.dati.scelte = []);
+  if (sc.includes(i)) return;
+  if (!OBLO_DATI[i][1]) { m.errori++; missioneMale('No: ' + OBLO_DATI[i][0].toLowerCase() + ' Barattolo non te la chiede mai.'); missioneDisegna(); return; }
+  sc.push(i); haptic();
+  if (sc.length === OBLO_DATI.filter(x => x[1]).length) { missioneBene('Tutto qui: un nome e una chiave pubblica.'); m.passo = 1; m.dati = {}; }
+  missioneDisegna();
+}
+function obloIndirizzo(giusto){
+  const m = missione; if (!m || m.id !== 'oblo' || m.passo !== 1) return;
+  if (giusto) { missioneBene('Cifrato finché serve, poi cancellato.'); m.passo = 2; }
+  else { m.errori++; missioneMale('No: è cifrato, e quando confermi di averlo ricevuto si cancella.'); }
+  missioneDisegna();
+}
+
+/* «L'ANTENNA DI TAPPO» (zona 6): Nostr. Il Tarlo chiude una piazza, ma
+   l'annuncio parte su tanti relay insieme, e il nome e' una chiave tua */
+const ANTENNA_RELAY = ['📡 Relay del porto', '📡 Relay del bosco', '📡 Relay della vetta'];
+function antennaHTML(m){
+  const d = m.dati;
+  if (m.passo === 0) {
+    const sc = d.accesi || (d.accesi = []);
+    return missPassiHTML(0, 3) + missFumettoHTML('tappo', 'Voglio far vedere il mio annuncio a più gente possibile. <b>Accendi le antenne</b> dove trasmetterlo (' + sc.length + '/' + ANTENNA_RELAY.length + ').')
+      + `<div class="miss-scelte">${ANTENNA_RELAY.map((x, i) => `<button type="button" class="miss-scelta${sc.includes(i) ? ' presa' : ''}" onclick="antennaAccendi(${i})">${esc(x)}</button>`).join('')}</div>`;
+  }
+  if (m.passo === 1)
+    return missPassiHTML(1, 3) + missFumettoHTML('tarlo', 'Ah ah! Ho chiuso il relay del bosco! Il tuo annuncio è sparito!')
+      + missFumettoHTML('tappo', 'Davvero? Cosa vede chi passa dal porto e dalla vetta?')
+      + `<div class="miss-due"><button type="button" class="caccia-btn piano" onclick="antennaChiuso(false)">😢 Più niente</button>`
+      + `<button type="button" class="caccia-btn" onclick="antennaChiuso(true)">📦 Il mio annuncio</button></div>`;
+  if (m.passo === 2)
+    return missPassiHTML(2, 3) + missFumettoHTML('tarlo', 'Allora ti rubo il nome! Da domani il negozio di Tappo è mio!')
+      + missFumettoHTML('tappo', 'Su Nostr il mio nome è una chiave. Chi la tiene?')
+      + `<div class="miss-due"><button type="button" class="caccia-btn piano" onclick="antennaChiave(false)">🏢 Un'azienda, che me la presta</button>`
+      + `<button type="button" class="caccia-btn" onclick="antennaChiave(true)">🗝 Io, e solo io</button></div>`;
+  return missFumettoHTML('tappo', 'Barattolo pubblica i miei annunci anche su Nostr: partono su tanti relay insieme e si leggono con qualunque app Nostr. Se una piazza chiude, le altre li mostrano ancora. E il mio nome è una chiave che tengo io.')
+    + `<button type="button" class="caccia-btn" onclick="missioneFine()">Avanti</button>`;
+}
+function antennaAccendi(i){
+  const m = missione; if (!m || m.id !== 'antenna' || m.passo !== 0) return;
+  const sc = m.dati.accesi || (m.dati.accesi = []);
+  if (sc.includes(i)) return;
+  sc.push(i); haptic();
+  if (sc.length === ANTENNA_RELAY.length) { missioneBene('Trasmesso su tre relay insieme!'); m.passo = 1; m.dati = {}; }
+  missioneDisegna();
+}
+function antennaChiuso(giusto){
+  const m = missione; if (!m || m.id !== 'antenna' || m.passo !== 1) return;
+  if (giusto) { missioneBene('Gli altri relay lo mostrano ancora.'); m.passo = 2; }
+  else { m.errori++; missioneMale('Guarda meglio: l\'annuncio era partito su tre relay, non su uno.'); }
+  missioneDisegna();
+}
+function antennaChiave(giusto){
+  const m = missione; if (!m || m.id !== 'antenna' || m.passo !== 2) return;
+  if (giusto) { missioneBene('Nessuno può toglierti il nome.'); m.passo = 3; }
+  else { m.errori++; missioneMale('No: la chiave la tieni tu, nessuno te la presta e nessuno te la toglie.'); }
   missioneDisegna();
 }
 
@@ -65846,7 +65950,6 @@ function latoComandi(tela){
       b.classList.add('premuto'); if (t === 'salta') { lato.c.salta = true; lato.c.tiene = true; } else lato.c[t] = true; };
     const su = e => { if (!lato) return; b.classList.remove('premuto'); if (t === 'salta') lato.c.tiene = false; else lato.c[t] = false; };
     b.addEventListener('pointerdown', giu); b.addEventListener('pointerup', su); b.addEventListener('pointercancel', su);
-    b.addEventListener('contextmenu', e => e.preventDefault());
   });
   /* toccare la tela a destra o a sinistra di Tappo: correre di la' */
   tela.addEventListener('pointerdown', e => { if (!lato) return; e.preventDefault(); });
@@ -66101,13 +66204,20 @@ function latoPannelli(L){
 }
 
 /* ---------- il telaio comune ---------- */
+/* LE MISSIONI A CARTE (Andrea, 17 nov 2026): nel tabellone una missione
+   e' una pausa breve prima della cosa vera, non un gioco lungo che la
+   rallenta. Per questo si giocano a carte; il platform di lato e la
+   stanza dall'alto restano pronti per il gioco «vetrina» fuori
+   dall'app (per far conoscere Tappo, o con un partner educativo) e si
+   riaccendono solo qui, con un si' di Andrea. */
+const MISSIONI_IN_MOVIMENTO = false;
 const MISSIONI_GIOCO = {
-  sats: {html: satsHTML, lato: LATO_SATS, arena: ARENA_SATS, guaio: [['tappo', 'Il vento ha aperto la finestra del forno e ha sparso tutti i miei sats!'], ['gazza', 'Sats luccicanti per terra? Arrivo!']],
-    succo: 'Un bitcoin si divide in cento milioni di sats. I sats si tengono nel tuo wallet: lì sono tuoi e al sicuro, non in tasca.', razzo: 'i piedini del razzo', nome: 'sats e wallet',
+  sats: {html: satsHTML, lato: LATO_SATS, arena: ARENA_SATS, guaio: [['tappo', 'Una volta non c\'erano i soldi: per avere il grano davi una capra. E se il fornaio la capra non la voleva?'], ['gazza', 'Io il problema non ce l\'ho: le cose luccicanti me le prendo e basta!']],
+    succo: 'Il denaro ha cambiato forma tante volte: baratto, conchiglie, monete, banconote. I sats sono l\'ultima: cento milioni fanno un bitcoin, e arrivano nel tuo wallet in un attimo, anche di notte.', razzo: 'i piedini del razzo', nome: 'la storia del denaro',
     fai: ['⚡ Attiva l\'incasso automatico', () => apriCassettoProfilo('accLnAddress')]},
   quaderno: {html: quadernoHTML, arena: ARENA_QUADERNO, guaio: [['tappo', 'Nella dispensa i conti li teneva uno solo, in un quaderno.'], ['tarlo', 'E io stanotte gliel\'ho rosicchiato! Adesso risulto ricchissimo. Gnam gnam.']],
-    succo: 'Bitcoin è un quaderno dei conti che tengono in tantissimi: per barare bisognerebbe ingannarli tutti insieme.', razzo: 'il motore del razzo', nome: 'registro condiviso e doppia spesa',
-    fai: ['₿ Crea il tuo wallet on-chain', () => apriCassettoProfilo('accOnchainIncasso')]},
+    succo: 'Bitcoin è un quaderno dei conti che tengono in tantissimi: per barare bisognerebbe ingannarli tutti insieme.', razzo: 'la punta del razzo', nome: 'registro condiviso e doppia spesa',
+    fai: ['💰 Vendi e incassa in sats', () => go('vendi')]},
   lucchetto: {html: lucchettoHTML, guaio: [['tappo', 'Voglio comprare un frullatore da uno sconosciuto. Chi si muove per primo?'], ['tappo', 'Se pago prima rischio io. Se lui spedisce prima rischia lui. Come si fa?']],
     succo: 'I sats aspettano in mezzo finché tutti e due hanno fatto la loro parte: è il deposito di garanzia di Barattolo.', razzo: 'il serbatoio del razzo', nome: 'deposito di garanzia (escrow)',
     fai: ['🛒 Cerca il tuo primo acquisto', () => go('esplora')]},
@@ -66115,8 +66225,14 @@ const MISSIONI_GIOCO = {
     succo: 'Lightning è una rete di fili fra persone: i sats corrono di filo in filo in un attimo, senza scrivere ogni pagamento nella catena.', razzo: 'le ali del razzo', nome: 'canali, instradamento e liquidità',
     fai: ['💰 Vendi e incassa in Lightning', () => go('vendi')]},
   parole: {html: paroleHTML, guaio: [['tappo', 'Ho un portafoglio nuovo! Mi ha dato 12 parole…'], ['gazza', 'Dodici parole luccicanti? Le voglio! Le voglio!']],
-    succo: 'Le 12 parole sono il portafoglio: su carta o metallo, in due posti, mai in foto, mai a nessuno. Nemmeno a Barattolo.', razzo: 'lo scudo del motore, a prova di Tarlo', nome: 'frase di recupero',
+    succo: 'Le 12 parole sono il portafoglio: su carta o metallo, in due posti, mai in foto, mai a nessuno. Nemmeno a Barattolo.', razzo: 'il motore del razzo', nome: 'frase di recupero',
     fai: ['₿ Crea il tuo wallet on-chain', () => apriCassettoProfilo('accOnchainIncasso')]},
+  oblo: {html: obloHTML, guaio: [['tappo', 'Il mio razzo ha bisogno di un oblò: voglio guardare fuori senza che tutti guardino dentro.'], ['gazza', 'Io invece voglio sapere tutto di te! Dove abiti, come ti chiami, cosa compri!']],
+    succo: 'Barattolo sa di te pochissimo: niente email, password o telefono, e l\'indirizzo di spedizione si cancella quando il pacco arriva. La privacy è tua.', razzo: 'l\'oblò del razzo, di vetro scuro', nome: 'privacy',
+    fai: ['🔁 Prova lo scambio P2P', () => go('p2p')]},
+  antenna: {html: antennaHTML, guaio: [['tarlo', 'La piazza è mia: se voglio, il tuo banchetto lo chiudo!'], ['tappo', 'Allora mi serve un\'antenna, per parlare a tutti senza chiedere il permesso a nessuno.']],
+    succo: 'Su Nostr il tuo nome è una chiave che tieni tu, e i tuoi annunci partono su tanti relay insieme: se uno chiude, gli altri li mostrano ancora.', razzo: 'l\'antenna del razzo', nome: 'Nostr e relay',
+    fai: ['📦 Metti un annuncio', () => go('vendi')]},
   halving: {html: halvingHTML, guaio: [['tappo', 'Ho trovato la macchina che sforna i bitcoin nuovi!'], ['tarlo', 'Una macchina dei soldi? Allora si può far girare più veloce, vero? Vero?']],
     succo: 'I bitcoin saranno al massimo 21 milioni: ne escono la metà ogni quattro anni circa, fino al 2140. Nessuno può stamparne di più.', razzo: 'l\'ultimo bullone: il razzo parte per la Luna!', nome: 'dimezzamento (halving)'},
 };
@@ -66186,7 +66302,7 @@ async function missioneVia(){
   /* dove c'e' l'arena (e la tela 2D), si gioca muovendo Tappo; se no la
      versione a fumetti, che resta */
   const gm = MISSIONI_GIOCO[m.id];
-  if (!((gm.lato && mondoPossibile() && latoApri(m)) || (gm.arena && mondoPossibile() && arenaApri(m)))) missioneDisegna();
+  if (!(MISSIONI_IN_MOVIMENTO && ((gm.lato && mondoPossibile() && latoApri(m)) || (gm.arena && mondoPossibile() && arenaApri(m))))) missioneDisegna();
   try { await cacciaChiama('/missione', {missione: m.id, azione: 'inizia'}); } catch(e) {}
 }
 function missioneDaCapo(){ const m = missione; if (m) { arenaFerma(); m.fase = 'guaio'; m.bulloni = 0; missioneDisegna(); } }

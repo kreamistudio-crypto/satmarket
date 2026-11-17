@@ -89916,3 +89916,43 @@ che corre di profilo in otto pose, Gazza in volo) e gli otto stadi del
 razzo sono in coda a Flow sul PC: finche' non arrivano il platform usa i
 disegni a mano. Le altre missioni come platform o stanza, una alla
 volta, sempre piu' difficili salendo.
+
+LA SVOLTA DELLA SERA: LE MISSIONI A CARTE SUL VANTAGGIO (17 nov 2026,
+16:07-16:14). Provata la demo, Andrea: la grafica «mi piace
+particolarmente», il suono «un po' troppo fastidioso», ma i minigiochi
+lunghi nel tabellone «sono solo una perdita di tempo... una cavolatina
+buttata lì senza un valore vero», se lo scopo e' far attivare
+l'incasso automatico; poi «nel tabellone ha senso mettere dei mini
+giochi... a forme di carte, come l'avevi impostato tu all'inizio», e
+«ogni pezzettino del tabellone deve far capire il vantaggio di usare
+Barattolo e questa tecnologia: la storia del denaro, Bitcoin, la
+privacy»; sui temi proposti «fai tu, costruisci tu la storia», e
+«raccogliere i bulloni per arrivare al razzo, l'idea mi piace». Quindi:
+`MISSIONI_IN_MOVIMENTO = false` (platform e stanza fuori dal tabellone,
+pronti per un gioco vetrina fuori dall'app o con un partner educativo),
+e OTTO MISSIONI A CARTE, UNA PER ZONA, ognuna una scena breve — Tappo
+ha un problema, Barattolo lo risolve, il bottone per farlo davvero:
+«Dal baratto ai sats» (nuova, zona 0, prima dell'incasso automatico:
+le forme del denaro in fila, e il nome di Barattolo viene da li'), «Il
+barattolo col lucchetto» (1), «Le dodici parole» (2, prima del wallet
+on-chain; il quaderno lascia la zona), «La staffetta del fulmine» (3),
+«L'oblò scuro» (nuova, 4, prima dei 5 scambi P2P: cosa sa Barattolo di
+te — solo il nome di Telegram e la chiave pubblica Nostr, mai email,
+password, telefono, documenti — e l'indirizzo che si cancella alla
+consegna, come dice barattolo.store/privacy), «Il quaderno di tutti»
+(5, prima dei 250.000 sats incassati: nessuno trucca il registro), «L'antenna
+di Tappo» (nuova, 6, prima dei 50 annunci: gli annunci partono su
+tanti relay Nostr e il nome e' una chiave tua), «L'ultimo bullone» (7,
+l'halving: il razzo parte). Bulloni da 10 a 40 salendo. SCARTATE: le
+missioni dove non c'e' un gesto vero da fare dopo (ogni scena deve
+finire su un vantaggio provabile, tranne l'halving che chiude la
+storia); una missione Nostr davanti alla casella «Collega la chiave
+Nostr» (sta in zona 1, gia' presa dal lucchetto: l'antenna parla dei
+relay a chi ha gia' la chiave). Il razzo super moderno di Flow (serie b,
+otto stadi allineati al pixel, scontornati a 297x520) e' passato al
+thread della stradina, che lo monta. I suoni del tabellone li ha
+abbassati la stradina (circa 13 dB), e le missioni usano quelli. PROVATO:
+caccia, stradina, novita', i due censimenti (388/0), il collaudo, e le
+tre missioni nuove giocate a schermo fino al bottone finale. DA GUARDARE:
+la musica del tabellone e del gioco (da Artlist, quando il PC finisce
+Flow); il gioco vetrina, se Andrea lo vuole.

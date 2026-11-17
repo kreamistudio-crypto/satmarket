@@ -420,7 +420,7 @@ La privacy dello Swap, cioè chi vede cosa:
 <!-- pezzo libro-038 | libro -->
 ## Libro · La Caccia a Tappo (il gioco) (1/2)
 
-La Caccia a Tappo è il gioco di Barattolo (se nelle REGOLAZIONI del pannello «Caccia a Tappo (il gioco)» è accesa). Si apre dal Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», e funziona uguale nella Mini App di Telegram, nell'app e sul sito.
+La Caccia a Tappo è il gioco di Barattolo (se nelle REGOLAZIONI del pannello «Caccia a Tappo (il gioco)» è accesa). Si apre dal Profilo → «Livello e recensioni» → «🔩 Caccia a Tappo», e funziona uguale nella Mini App di Telegram, nell'app e sul sito.
 
 Come si gioca: ogni giorno Tappo scappa dal barattolo e si nasconde in un annuncio vero della vetrina, diverso per ogni persona (quindi chiedere a un amico dov'è non serve). Nella pagina del gioco c'è la dispensa di Tappo: sei scaffali, con un barattolo per ogni categoria. Scegli lo scaffale dove cercare e il grado della caccia, leggi il primo indizio (per esempio il barattolo, cioè la categoria, la fascia di prezzo o una parola del titolo) e vai fra gli annunci: in ogni scheda c'è il tasto «🔩 Tappo è qui?», che risponde sì o no. Ogni tocco è un'occhiata, e le occhiate del giorno sono contate. A mezzanotte (ora italiana) la caccia ricomincia con un nascondiglio nuovo. Dov'è nascosto Tappo oggi non lo sa nessuno, nemmeno l'assistente: non si può dire.
 
@@ -437,7 +437,7 @@ Per chi vende: se Tappo si nasconde in un tuo annuncio e qualcuno lo trova, il b
 
 Il Mondo di Tappo (scheda «Mondo», la prima): Tappo cammina dentro la dispensa, sei zone una sopra l'altra, una per scaffale. Si guida toccando dove andare o trascinando il dito (dal computer anche frecce o WASD). Nel mondo si raccolgono i bulloni sparsi (ognuno si prende una volta), si aprono i barattoli (portano agli annunci di quella categoria), si legge il cartello con la caccia del giorno, si entra in bottega e, nella prima zona, il Banco del cambio porta agli scambi P2P. Le zone più in alto si aprono trovando Tappo più volte. Sul palco di ogni zona ci sono gli annunci in evidenza: chi vende può metterci un suo annuncio in vetrina per un giorno spendendo 40 bulloni (uno al giorno a testa, al massimo 3 annunci per zona). L'evidenza vale solo dentro il gioco, non in Esplora.
 
-Le missioni di Tappo: giochi brevi per capire Bitcoin, in cima alla scheda «Sfide» e nel tabellone dei livelli, ognuna subito prima della casella che insegna (per esempio «Raccogli i sats» prima di «Attiva l'incasso automatico in Lightning»): finito il gioco, un bottone porta a fare la cosa vera nell'app. Alcune si giocano di lato, correndo e saltando, col telefono in orizzontale; altre in una stanza vista dall'alto. Ogni missione monta un pezzo del razzo con cui Tappo vuole arrivare sulla Luna, all'halving del 2028. Tra le missioni ci sono «Raccogli i sats» (i sats e il tuo wallet), «Il quaderno di tutti» (Bitcoin è un registro che tengono in tanti, e un bullone si spende una volta sola), «Il barattolo col lucchetto» (il deposito di garanzia), «La staffetta del fulmine» (come corrono i pagamenti Lightning di canale in canale), «Le dodici parole» (dove tenere la frase di recupero, e che nessuno, nemmeno Barattolo, la chiede mai) e «L'ultimo bullone» (il dimezzamento e i 21 milioni). Danno da una a tre stelle: la prima volta pagano bulloni, rigiocarle per le tre stelle si può ma non paga di nuovo. Non danno XP. Le parole e i conti dentro le missioni sono finti.
+Le missioni di Tappo: otto scene brevi a carte, una per zona del tabellone dei livelli (e tutte in cima alla scheda «Sfide» della Caccia a Tappo), ognuna subito prima della casella che insegna: Tappo ha un problema, Barattolo lo risolve, e alla fine un bottone porta a fare la cosa vera nell'app. Sono «Dal baratto ai sats» (la storia del denaro, prima di «Attiva l'incasso automatico in Lightning»), «Il barattolo col lucchetto» (il deposito di garanzia), «Le dodici parole» (le chiavi sono tue: dove tenere la frase di recupero, e nessuno, nemmeno Barattolo, la chiede mai), «La staffetta del fulmine» (Lightning), «L'oblò scuro» (la privacy: cosa sa Barattolo di te), «Il quaderno di tutti» (Bitcoin è un registro che tengono in tanti, e nessuno lo trucca), «L'antenna di Tappo» (Nostr: gli annunci su tanti relay e un nome che è una chiave tua) e «L'ultimo bullone» (il dimezzamento e i 21 milioni). Ogni missione monta un pezzo del razzo con cui Tappo vuole arrivare sulla Luna, all'halving del 2028. Danno da una a tre stelle: la prima volta pagano bulloni, rigiocarle per le tre stelle si può ma non paga di nuovo. Non danno XP. Le parole e i conti dentro le missioni sono finti.
 
 <!-- pezzo libro-040 | libro -->
 ## Libro · Nostr
@@ -2055,15 +2055,15 @@ pubblico: sì
 ## Novità · 2026-11-17 · caccia-a-tappo
 
 frase: È arrivata la Caccia a Tappo, il gioco di Barattolo. Ogni giorno Tappo si nasconde in un annuncio vero, diverso per ognuno: leggi gli indizi, apri gli annunci e tocca «Tappo è qui?». Chi lo trova vince i bulloni 🔩, accende i barattoli della dispensa, sale di grado e completa le sfide. Coi bulloni prendi cappellini, attrezzi e 5 posti in più nei preferiti. Si gioca gratis: i bulloni non sono sats.
-dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», nella Mini App, nell'app e sul sito; il tasto «Tappo è qui?» nella scheda di ogni annuncio, quando la caccia del giorno è aperta.
+dove: Profilo → «Livello e recensioni» → «🔩 Caccia a Tappo», nella Mini App, nell'app e sul sito; il tasto «Tappo è qui?» nella scheda di ogni annuncio, quando la caccia del giorno è aperta.
 leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
 pubblico: sì
 
 <!-- pezzo novita-075 | novita -->
 ## Novità · 2026-11-17 · mondo-di-tappo
 
-frase: Nella Caccia a Tappo arriva il Mondo di Tappo: guidi Tappo dentro la dispensa, raccogli i bulloni 🔩, apri i barattoli e sali di zona. E ci sono i minigiochi di Tappo, sul tabellone dei livelli subito prima delle caselle che insegnano: si corre, si salta e si impara Bitcoin, e alla fine un bottone ti porta a fare la cosa vera. Ogni minigioco monta un pezzo del razzo con cui Tappo vuole arrivare sulla Luna. Chi vende può mettere un annuncio sul palco del mondo per un giorno, coi bulloni.
-dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo»: scheda «Mondo» per camminare, scheda «Sfide» per le missioni.
+frase: Sul tabellone dei livelli arrivano le missioni di Tappo: otto scene brevi a carte sulla storia del denaro, il deposito di garanzia, le tue chiavi, Lightning, la privacy e Nostr, ognuna col bottone per farlo davvero. Danno bulloni 🔩 e montano il razzo con cui Tappo vuole arrivare sulla Luna. E nella Caccia a Tappo c'è il Mondo: la dispensa da girare, coi barattoli da aprire.
+dove: Profilo → «Livello e recensioni» → «🧭 La tua stradina»: la missione sta subito prima della casella che insegna; tutte anche nella «🔩 Caccia a Tappo», lì accanto, schede «Sfide» e «Mondo».
 leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
 pubblico: sì
 

@@ -37302,3 +37302,16 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `arenaFoto` li disegna coi piedi a terra, e senza file ogni cosa ha
   il suo disegno a mano. `arenaFerma` ferma anche il platform: ogni
   uscita passa da li'.
+  LE MISSIONI A CARTE (17 nov 2026, sera): `MISSIONI_IN_MOVIMENTO =
+  false` in testa a `MISSIONI_GIOCO` spegne i primi due motori, e nel
+  tabellone (come nella Caccia) ogni missione si gioca col fumetto. Il
+  platform e la stanza restano nel codice per il gioco «vetrina» fuori
+  dall'app; si riaccendono solo con quella costante, col si' di Andrea.
+  Otto missioni, UNA PER ZONA, ognuna su un vantaggio: `sats` («Dal
+  baratto ai sats», le forme del denaro in fila e i sats che arrivano
+  di notte), `lucchetto`, `parole`, `staffetta`, `oblo` (la privacy:
+  cosa sa Barattolo di te, le risposte di barattolo.store/privacy),
+  `quaderno`, `antenna` (Nostr: i relay e la chiave tua), `halving`;
+  i pezzi del razzo nell'ordine delle zone (piedini, serbatoio, motore,
+  ali, oblo', punta, antenna, partenza), gli stessi degli otto stadi
+  `assets/stradina/razzo-1..8.webp` del tabellone.
