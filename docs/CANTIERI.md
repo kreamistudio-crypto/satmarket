@@ -88194,6 +88194,36 @@ RESTA DA GUARDARE. I pezzi della mappa da Flow; le missioni vere dal
 gioco; gli amici da Nostr; il menù per livello (aspetta Andrea); il link
 di Villaggio Bitcoin nel config del VPS se accettano.
 
+IL RACCONTO (stesso giorno, Andrea: «aggiungi una frase di Tappo
+all'inizio di ogni zona, deve essere una storia»). Ogni voce di
+`STRADINA_ZONE` porta `racconto`: una frase di Tappo che sta sul
+cartello della zona sotto il nome, con la pedina di Tappo accanto. La
+storia è UNA SOLA col gioco: «il razzo di bulloni», scelta da Andrea
+sulla proposta del thread del gioco (Tappo costruisce un razzo per la
+Luna, il Tarlo e la Gazza dispettosi rubano i bulloni, all'halving del
+2028 il razzo parte). Un pezzo di razzo per zona, gli stessi che i
+minigiochi danno nel loro finale: piedini (e lo zaino: barattolo e
+wallet Lightning), serbatoio (il mercatino), motore (il porto: on-chain
+e Nostr, al riparo dal Tarlo), ali (il bosco, i primi diecimila), oblò
+(la scala d'oro, sei mesi e centomila), punta (la vetta, un anno,
+mezzo milione), antenna (l'orbita, i milioni), il conto alla rovescia (la
+Luna, l'halving). REGOLA: ogni frase
+nomina solo quel che si fa DAVVERO nelle caselle della sua zona, così la
+storia non promette altro; chi sposta una casella di zona rilegge la
+frase. Il cartello è cresciuto (107 px), quindi la banda fra due zone
+passa da 92 a 124 px e il cartello della prima zona sta a metà fra la
+partenza e la prima casella. Scartato: il fumetto sopra Tappo che
+cambia a ogni zona (copriva le caselle, già tolto una volta).
+PROVATO: `prove_stradina` +4 (frasi presenti, corte, diverse, coerenti
+con le caselle, un pezzo di razzo per zona; otto cartelli con la frase passata da `esc`), sezioni
+stradina, vantaggi e livello accanto al titolo 150/0; controllo visivo
+degli otto cartelli a 360 px. IL VERBALE: suite intera severa 29.385
+verdi e 1 rossa (la frase di NOVITA a 414 caratteri sul tetto di 400:
+accorciata, e NOVITA, conoscenza di Tappo, stradina, vantaggi e livello
+rigirate verdi, 175/0), 2 saltate per nostr-tools che in cloud non c'è;
+collaudi 148/148. Girato in cloud sull'albero sopra develop 29c493c.
+RESTA: il razzo che cresce sul tabellone, coi pezzi razzo-1..8 che il
+thread del gioco fa in Flow.
 
 ## Il nome verificato su Nostr, gratis dal livello 2 (17 nov 2026, cantiere nip05-utenti; Andrea: «attivare verifica NIP-05, gratis per utenti da lv2 in su»)
 

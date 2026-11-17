@@ -128988,6 +128988,27 @@ def prove_stradina():
           (CAS[-1][1], CAS[-1][0], __import__("time").strftime(
               "%Y-%m", __import__("time").gmtime(amb["STRADINA_HALVING_2028"]))))
     prova("il tabellone e' lungo: almeno 60 caselle", True, len(CAS) >= 60)
+    # IL RACCONTO (17 nov, Andrea: «deve essere una storia»): ogni zona ha
+    # la sua frase di Tappo, corta (sta in tre righe sul cartello), e la
+    # frase nomina una cosa che si fa davvero in quella zona
+    prova("ogni zona ha la sua frase di Tappo, corta, e le frasi sono tutte "
+          "diverse", (True, True, len(ZONE)),
+          (all(z.get("racconto") for z in ZONE),
+           all(len(z.get("racconto") or "") <= 110 for z in ZONE),
+           len({z.get("racconto") for z in ZONE})))
+    prova("il racconto racconta le caselle: wallet Lightning all'inizio, "
+          "on-chain e Nostr al porto, l'halving in cima",
+          (True, True, True),
+          ("Lightning" in ZONE[0]["racconto"],
+           "on-chain" in ZONE[2]["racconto"] and "Nostr" in ZONE[2]["racconto"],
+           "halving" in ZONE[-1]["racconto"]))
+    prova("...ed e' la storia del razzo di bulloni, la stessa del gioco: "
+          "un pezzo per zona, dai piedini alla partenza all'halving",
+          ["piedini", "serbatoio", "motore", "ali", "oblò", "punta",
+           "antenna", "parte"],
+          [w if w in z["racconto"] else "" for w, z in zip(
+              ["piedini", "serbatoio", "motore", "ali", "oblò", "punta",
+               "antenna", "parte"], ZONE)])
     soglie = {}
     for (z, tid, em, nome, chiave, soglia, vai) in CAS:
         soglie.setdefault(chiave, []).append((z, soglia))
@@ -129326,6 +129347,8 @@ def prove_stradina():
                        "livello": "x", "livello_numero": 1}],
             "tappo_emoji": "🎩"}
     dati["tappe"][1]["nome"] = "Metti <un> articolo"
+    dati["zone"] = [dict(z) for z in ZONE]
+    dati["zone"][1]["racconto"] = "Tappo <i>dice</i>"
     a = mini.index("let stradinaDati = null;")
     b = mini.index("function strScegli(i){")
     banco = "\n".join([
@@ -129349,6 +129372,8 @@ console.log(JSON.stringify({
   icone: (h.match(/<img class="ico" src="\\/assets\\/stradina\\/ico-[a-z0-9_]+\\.webp"/g) || []).length,
   n_caselle: d.tappe.filter(t => t.tipo === 'casella' && t.icona).length,
   bande: (h.match(/class="str-banda"/g) || []).length,
+  racconti: (h.match(/<span class="str-racconto"/g) || []).length,
+  racconto_scappato: !h.includes('Tappo <i>dice') && h.includes('Tappo &lt;i&gt;dice'),
   mappe: (h.match(/src="\\/assets\\/stradina\\/zona\\d.webp"/g) || []).length,
   u: u, iMis: iMis, pedina: [Number(ped[1]), Number(ped[2])],
   attesa: [g.posti[u].x, g.posti[u].y - 58],
@@ -129384,6 +129409,8 @@ console.log(JSON.stringify({
           "per quando l'immagine manca)", o["n_caselle"], o["icone"])
     prova("otto cartelli di zona e otto pezzi di mappa", (8, 8),
           (o["bande"], o["mappe"]))
+    prova("ogni cartello porta la frase di Tappo, passata da esc",
+          (8, True), (o["racconti"], o["racconto_scappato"]))
     prova("LA MISSIONE NON SUPERATA E' UN CANCELLO: Tappo si ferma prima, "
           "anche se piu' su ci sono caselle fatte", True,
           o["u"] < o["iMis"] and o["fatte"] > o["u"] + 1)

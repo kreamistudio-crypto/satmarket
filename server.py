@@ -111650,15 +111650,39 @@ STRADINA_AMICI_MAX = 12      # quanti amici si mostrano, i piu' alti
 # LE ZONE DEL TABELLONE, dal basso (la Terra) verso l'alto (la Luna):
 # ognuna ha il suo pezzo di mappa disegnato (assets/stradina/) e finisce
 # con un GRADINO della scala. Nomi di casa, mai quelli del gioco.
+# IL RACCONTO (Andrea, 17 nov: «deve essere una storia»): all'ingresso di
+# ogni zona Tappo dice una frase, e lette in fila fanno il viaggio dalla
+# Terra alla Luna. E' la storia del RAZZO DI BULLONI, la stessa del gioco
+# (scelta di Andrea, 17 nov): un pezzo di razzo per zona, gli stessi
+# del finale dei minigiochi (piedini, serbatoio, motore, ali, oblò,
+# punta, antenna, poi il conto alla rovescia); il Tarlo e la Gazza sono
+# dispettosi, mai cattivi veri; all'halving del 2028 il razzo parte. Ogni frase nomina quel che si fa DAVVERO in quella
+# zona (le caselle qui sotto), cosi' la storia non promette altro.
 STRADINA_ZONE = (
-    {"id": "primi", "emoji": "🫙", "nome": "Primi passi"},
-    {"id": "mercatino", "emoji": "🧺", "nome": "Il mercatino"},
-    {"id": "porto", "emoji": "⚓", "nome": "Il porto"},
-    {"id": "bosco", "emoji": "🌲", "nome": "Il bosco dei sats"},
-    {"id": "scala", "emoji": "🪜", "nome": "La scala d'oro"},
-    {"id": "vetta", "emoji": "🏔", "nome": "La vetta"},
-    {"id": "orbita", "emoji": "🛰", "nome": "In orbita"},
-    {"id": "luna", "emoji": "🌕", "nome": "Verso la Luna"},
+    {"id": "primi", "emoji": "🫙", "nome": "Primi passi",
+     "racconto": "Sogno la Luna con un razzo di bulloni! Primi pezzi: i piedini, "
+                 "il tuo barattolo e un wallet Lightning."},
+    {"id": "mercatino", "emoji": "🧺", "nome": "Il mercatino",
+     "racconto": "Al mercatino si compra e si vende in sats, e il razzo ha il "
+                 "serbatoio. Occhio alla Gazza dispettosa!"},
+    {"id": "porto", "emoji": "⚓", "nome": "Il porto",
+     "racconto": "Al porto mettiamo al sicuro i sats, on-chain e con la firma "
+                 "Nostr: il motore è al riparo dal Tarlo."},
+    {"id": "bosco", "emoji": "🌲", "nome": "Il bosco dei sats",
+     "racconto": "Nel bosco i sats crescono piano, come le ali del razzo: "
+                 "arriviamo ai primi diecimila."},
+    {"id": "scala", "emoji": "🪜", "nome": "La scala d'oro",
+     "racconto": "La scala d'oro si sale un gradino alla volta: sei mesi di "
+                 "affari, centomila sats, e il razzo ha l'oblò."},
+    {"id": "vetta", "emoji": "🏔", "nome": "La vetta",
+     "racconto": "Dalla vetta si vede la Luna: un anno di scambi, mezzo milione "
+                 "di sats, e montiamo la punta."},
+    {"id": "orbita", "emoji": "🛰", "nome": "In orbita",
+     "racconto": "In orbita si conta a milioni: un anno e mezzo di scambi, e sul "
+                 "razzo gira l'antenna."},
+    {"id": "luna", "emoji": "🌕", "nome": "Verso la Luna",
+     "racconto": "Conto alla rovescia: all'halving del 2028 il razzo parte per "
+                 "la Luna. Ci arriviamo insieme!"},
 )
 # dove stanno i gradini della scala dei livelli: in fondo a queste zone
 # (il primo gradino chiude il mercatino, l'ultimo — la Luna — l'ultima
