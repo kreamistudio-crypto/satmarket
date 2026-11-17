@@ -30402,7 +30402,7 @@ def prove_punti_salvati():
           "luogo pubblico" in priv)
     prova("...e per quanto lo teniamo, con la strada per toglierlo",
           True, "finché non li togli" in priv
-          and "Punti di ritiro" in priv)
+          and "I tuoi punti di ritiro" in priv)
 
     # Il Lightning address e' il dato piu' longevo del profilo —
     # nome@dominio, in CHIARO, senza scadenza — e fino all'ago 2026 la
@@ -30425,7 +30425,7 @@ def prove_punti_salvati():
           True, "ti mandiamo i sats" in _voce)
     prova("...e per quanto, con la strada per toglierlo", True,
           "finché non lo togli" in priv
-          and "Incassi e pagamenti" in priv)
+          and "Wallet e incassi" in priv)
     # La riga che diceva il falso non deve tornare: la promessa e' sulla
     # CONNESSIONE (NWC), mai sul wallet nudo.
     prova("la promessa sul wallet parla della connessione", True,
@@ -54196,7 +54196,7 @@ def prove_numeri_negozio():
           True, _gi < _ac < _sp)
     prova("...col titolo chiesto", True,
           '<span class="em">📊</span><span id="numeriNegozioTitolo">'
-          'Il tuo negozio</span>' in mini[_ac:_sp])
+          'I numeri del negozio</span>' in mini[_ac:_sp])
     _ri = pezzo_js(mini, "function renderIdentita(){", "\n}\n")
     prova("la catena del Profilo lo disegna", True,
           "renderNumeriNegozio();" in _ri)
@@ -54342,8 +54342,8 @@ const pieno = {mostra: true, negozio: 'ab12cd34', visite_7: 12,
                           "Visite" in o["solo"], "Vendite" in o["solo"],
                           "Recensioni" in o["solo"]))
     prova("...e il cassetto si chiama «I tuoi acquisti»; al venditore "
-          "resta «Il tuo negozio»",
-          ["I tuoi acquisti", "", "Il tuo negozio"],
+          "«I numeri del negozio»",
+          ["I tuoi acquisti", "", "I numeri del negozio"],
           o["titoloSolo"] + [o["titoloVend"]])
     prova("storia di un anno: niente «si contano dal»", False,
           "si contano dal" in _h)
@@ -57999,7 +57999,7 @@ def prove_conoscenza_tappo():
     prova("nessun pezzo enorme (si sceglie a pezzi, non a libri)", True,
               max(len(c) for c in corpi) < 2 * cz.PEZZO_MAX)
     prova("le schermate ci sono, bottoni compresi", True,
-              "Importa in blocco" in atteso)
+              "Carica tanti annunci insieme" in atteso)
     prova("niente commenti del codice dalle schermate", True,
               "<script" not in atteso and "function " not in atteso)
     # CONTROPROVA: una riga cambiata nel libro deve cambiare il file
@@ -66337,7 +66337,7 @@ def prove_card_p2p_vetrina():
            bool(_via) and 'onclick="setFilaP2P(true)">Mostra</button>' in _via.group(1)])
     prova("l'interruttore vive in «Aspetto», sotto gli effetti ridotti", True,
           0 < mini.index('<div id="fxRiga"></div>') < mini.index('<div id="filaP2PRiga"></div>')
-          < mini.index('id="grpPrivacy"'))
+          < mini.index('id="accIdentita"'))
     prova("...e ne' un evento vivo del libro ne' la sua fotografia passano dalla fila",
           [False, False],
           ["renderVetrinaP2P" in pezzo_js(mini, "function arrivaLibroP2P(ev){", "\n}\n"),
@@ -123686,8 +123686,8 @@ def prove_profilo_elegante():
     # --- 1) L'ORDINE DEI CASSETTI, deciso con Andrea ---
     ordine = re.findall(r'<div class="grp" id="([^"]+)"', vista)
     prova("i cassetti principali, nell'ordine deciso",
-          ["grpChecklist", "grpCatalogo", "grpNegozio", "grpCompri",
-           "grpIncassi", "grpLivello", "grpAspetto", "grpPrivacy",
+          ["grpChecklist", "grpCatalogo", "grpNegozio", "grpSpedizioni",
+           "grpCompri", "grpIncassi", "grpLivello", "grpImpostazioni",
            "grpSupporto", "grpAdmin"], ordine)
     prova("...e nessuno nasce aperto", 0, len(re.findall(
         r'<div class="grp[^"]*\bopen\b', vista)))
@@ -123696,23 +123696,28 @@ def prove_profilo_elegante():
     # prima (gli id non cambiano, tranne `walletBlocco` diviso in tre)
     # e le porte che erano bottoni a tutta larghezza ---
     CASSETTI = {
-        "grpCatalogo": ["accAnnunci", "accImport", "accPunto", "accDoppioni"],
-        # (15 nov 2026) la cassa in negozio, prima della vetrina
-        "grpNegozio": ["accNumeriNegozio", "vocCassa", "vocMioNegozio", "vocWidgetNegozio",
-                       "accSpedizioniere", "accSpedGratis", "accScontoPacco",
-                       "accCodici", "accPremiFedelta", "accBanner",
-                       "accSlugNegozio", "accFerie"],
-        "grpCompri": ["accPreferiti", "accRicerche", "accPuntiRitiro",
-                      "vocSicurezza"],
-        "grpIncassi": ["accLnAddress", "accComeRicevi", "accOnchainIncasso", "accNwc", "vocEsporta"],
+        # (17 nov 2026, «otto cassetti che si spiegano da soli») i pacchi
+        # al tuo punto passano al negozio, che si divide in due: «Il tuo
+        # negozio» e «Spedizioni e sconti»
+        "grpCatalogo": ["accAnnunci", "accImport", "accDoppioni"],
+        "grpNegozio": ["accNumeriNegozio", "vocMioNegozio", "accBanner",
+                       "accSlugNegozio", "accFerie", "vocCassa", "vocWidgetNegozio",
+                       "accPunto"],
+        "grpSpedizioni": ["accSpedizioniere", "accSpedGratis", "accScontoPacco",
+                          "accCodici", "accPremiFedelta"],
+        "grpCompri": ["accPreferiti", "accRicerche", "accPuntiRitiro"],
+        "grpIncassi": ["accLnAddress", "accComeRicevi", "accOnchainIncasso", "accNwc"],
         # (14 nov 2026) le recensioni ricevute, prima del livello
         # (17 nov 2026) ...e la porta della stradina degli obiettivi
         "grpLivello": ["accRecensioni", "accLivello", "accInviti", "accDistintivi", "vocStradina"],
-        "grpAspetto": ["accAvvisi", "accAspetto"],
-        "grpPrivacy": ["accIdentita", "vocPrivacy", "vocCancella", "accTor"],
+        # (17 nov 2026) «Avvisi e aspetto» e «Privacy» sono una sola
+        # «Impostazioni», con dentro anche l'export dei dati
+        "grpImpostazioni": ["accAvvisi", "accAspetto", "accIdentita", "vocPrivacy",
+                            "vocEsporta", "accTor", "vocCancella"],
         # (16 nov 2026, Andrea: «un menu a parte») Tappo e l'assistenza in
-        # app, che prima stava in «Privacy» con «I tuoi dati»
-        "grpSupporto": ["vocTappo", "vocAssistenza"],
+        # app, che prima stava in «Privacy» con «I tuoi dati»; dal 17 nov
+        # si chiama «Aiuto» e accoglie il pagamento protetto
+        "grpSupporto": ["vocTappo", "vocAssistenza", "vocSicurezza"],
     }
     fuori = []
     for g, voci in CASSETTI.items():
@@ -123729,11 +123734,11 @@ def prove_profilo_elegante():
     # sempre: la porta che era un bottone chiama la STESSA funzione ---
     GESTI = [
         ("apriMioNegozio()", "grpNegozio"), ("apriWidget('negozio')", "grpNegozio"),
-        ("apriSicurezza()", "grpCompri"), ("apriPrivacy()", "grpPrivacy"),
+        ("apriSicurezza()", "grpSupporto"), ("apriPrivacy()", "grpImpostazioni"),
         ("apriTappo()", "grpSupporto"), ("go('assistenza')", "grpSupporto"),
-        ("esportaDati()", "grpIncassi"), ("collegaWallet()", "grpIncassi"),
+        ("esportaDati()", "grpImpostazioni"), ("collegaWallet()", "grpIncassi"),
         ("scaricaModelloImport()", "grpCatalogo"), ("importPrepara(this)", "grpCatalogo"),
-        ("setTema('auto')", "grpAspetto"), ("riavviaTour()", "piede"),
+        ("setTema('auto')", "grpImpostazioni"), ("riavviaTour()", "piede"),
         ("esciWeb()", "piede"),
     ]
     persi = []
@@ -123857,11 +123862,34 @@ def prove_profilo_elegante():
           True, "Wallet NWC (facoltativo)" in inc)
     prova("...e il nome di prima non c'e' piu' da nessuna parte", 0,
           mini.count("Wallet Lightning (facoltativo)"))
-    com = vista[campate["grpCompri"][0]:campate["grpCompri"][1]]
-    prova("«Come funziona il pagamento protetto» sta in «Quando compri»", True,
-          "Come funziona il pagamento protetto" in com)
-    pri = vista[campate["grpPrivacy"][0]:campate["grpPrivacy"][1]]
-    prova("«I tuoi dati» sta in «Privacy»", True, '</span>I tuoi dati<' in pri)
+    aiu = vista[campate["grpSupporto"][0]:campate["grpSupporto"][1]]
+    prova("«Come funziona il pagamento protetto» sta in «Aiuto»", True,
+          "Come funziona il pagamento protetto" in aiu)
+    imp = vista[campate["grpImpostazioni"][0]:campate["grpImpostazioni"][1]]
+    prova("«I tuoi dati» sta in «Impostazioni»", True, '</span>I tuoi dati<' in imp)
+
+    # --- 6b) I TITOLI DICONO COSA C'E' DENTRO (17 nov 2026, Andrea: «il
+    # tuo catalogo che cosa vuol dire?»): i nomi scelti sulle foto, e
+    # quelli di prima spariti dalle intestazioni ---
+    TITOLI = {"grpCatalogo": "Annunci", "grpNegozio": "Il tuo negozio",
+              "grpSpedizioni": "Spedizioni e sconti", "grpCompri": "Quando compri",
+              "grpIncassi": "Wallet e incassi", "grpLivello": "Livello e recensioni",
+              "grpImpostazioni": "Impostazioni", "grpSupporto": "Aiuto"}
+    letti = {}
+    for gid in TITOLI:
+        mt = re.search(r'<div class="grp" id="%s">\s*<button[^>]*class="grp-h"[^>]*>([^<]*)<' % gid, vista)
+        letti[gid] = mt.group(1).strip() if mt else None
+    prova("ogni cassetto porta il titolo deciso con Andrea", TITOLI, letti)
+    prova("...e i titoli di prima non ci sono piu'", [], [t for t in (
+        "Il tuo catalogo", "Negozio e spedizioni", "Incassi e pagamenti",
+        "Livello e inviti", "Avvisi e aspetto", "Privacy", "Supporto")
+        if any(re.sub(r"<[^>]+>|▾", "", x).strip() == t for x in teste)])
+    prova("le voci rinominate parlano chiaro", True, all(x in vista for x in (
+        '<span id="importTitolo">Carica tanti annunci insieme</span>',
+        '</span>Guarda il tuo negozio<span class="fr">',
+        '</span>Mettilo sul tuo sito<span class="fr">',
+        '</span>I tuoi punti di ritiro <span class="conta"',
+        '<span class="em">🆔</span>Nostr e identità<span class="fr">')))
     prova("il titolo «Il tuo profilo» sta in alto, al centro", True,
           vista.find('<h2 class="profilo-tit">Il tuo profilo</h2>')
           < vista.find('id="profiloTestata"')
@@ -136814,9 +136842,10 @@ def prove_effetti_ridotti():
           bool(_ado and _app and _ado.start() < _app.start()))
     i_asp = mini.index('id="accAspetto"')
     # il confine era il cassetto dopo, «Livello e titolo»: dal set 2026
-    # «Aspetto» chiude «Avvisi e aspetto» e dopo viene «Privacy»
+    # «Aspetto» chiudeva «Avvisi e aspetto» e dopo veniva «Privacy»; dal
+    # 17 nov 2026 stanno tutte in «Impostazioni», e dopo viene «Identità»
     prova("l'interruttore sta in «🌗 Aspetto»", True,
-          '<div id="fxRiga"></div>' in mini[i_asp:mini.index('id="grpPrivacy"', i_asp)])
+          '<div id="fxRiga"></div>' in mini[i_asp:mini.index('id="accIdentita"', i_asp)])
     i_tel = mini.index("<h3>Quello che resta sul tuo telefono</h3>")
     prova("«I tuoi dati» dice che la scelta sta nel profilo", True,
           "effetti ridotti" in mini[i_tel:mini.index("<h3>", i_tel + 10)])
@@ -137073,14 +137102,14 @@ def prove_catalogo_esterno():
           "database nuovo l'ALTER non cade nel vuoto", True, 0 <= _cr < _al)
     _err = codice(pezzo("_connettore_in_errore"))
     prova("l'avviso del negozio muto manda al posto nuovo", [True, False],
-          ["«📥 Importa in blocco / catalogo esterno»" in _err,
+          ["«📥 Carica tanti annunci insieme / catalogo esterno»" in _err,
            "«🏪 Il tuo negozio»" in _err])
 
     # ---- 3) il client: il posto ---------------------------------------
     _ai = mini.find('<div class="acc" id="accImport">')
     _ac = mini.find('id="accConnettori"')
     _fine = mini.find('<div class="acc" ', _ai + 10)
-    prova("la sezione vive DENTRO «Importa in blocco»", True,
+    prova("la sezione vive DENTRO «Carica tanti annunci insieme»", True,
           0 <= _ai < _ac < _fine)
     prova("...ed e' una sezione, non un cassetto nel cassetto", False,
           '<div class="acc" id="accConnettori"' in mini
@@ -137089,7 +137118,7 @@ def prove_catalogo_esterno():
           'id="importTitolo"' in mini)
     rc = pezzo_js(mini, "async function renderConnettori(", "\n}\n")
     prova("...e dice «/ catalogo esterno» solo a chi la vede", True,
-          "'Importa in blocco / catalogo esterno' : 'Importa in blocco'"
+          "'Carica tanti annunci insieme / catalogo esterno' : 'Carica tanti annunci insieme'"
           in rc)
     prova("il client cuce la risposta per persona nelle leve", True,
           "visibile: !!me.connettori_visibile" in mini)
@@ -137225,12 +137254,12 @@ async function caso(nome, prep){
         prova("...mentre una riga attiva il suo 🔄 ce l'ha", True,
               'title="Aggiorna ora"' in h("riga_attiva"))
         prova("la sezione si vede, e il titolo la nomina",
-              ["", "Importa in blocco / catalogo esterno"],
+              ["", "Carica tanti annunci insieme / catalogo esterno"],
               [(o.get("nuovo") or {}).get("display"),
                (o.get("nuovo") or {}).get("titolo")])
         for k in ("nascosta", "ponte_spento", "demo"):
             prova(f"«{k}»: nascosta, e il titolo resta quello di sempre",
-                  ["none", "Importa in blocco", ""],
+                  ["none", "Carica tanti annunci insieme", ""],
                   [(o.get(k) or {}).get("display"),
                    (o.get(k) or {}).get("titolo"),
                    (o.get(k) or {}).get("html")])
@@ -202272,7 +202301,7 @@ def prove_assistente_bot():
     # rispondeva «uno alla volta» con l'import da CSV e i negozi
     # collegati gia' aperti a tutti
     prova("l'import in blocco da CSV c'e' sempre, col suo posto e il tetto",
-          True, "«📥 Importa in blocco»" in n0 and "fino a 500" in n0)
+          True, "«📥 Carica tanti annunci insieme»" in n0 and "fino a 500" in n0)
     prova("...il catalogo esterno a ponte spento si dice spento", True,
           "Shopify o WooCommerce (catalogo esterno, nella stessa sezione): "
           "SPENTO" in n0)
@@ -206650,11 +206679,11 @@ def prove_richiesta_punti():
           "rami dell'avvio, dopo l'assistenza", 2,
           mini.count("    apriAssistenzaDaUrl();\n    apriCorrieriDaUrl();\n"))
     porta = pezzo_js(mini, "function apriCorrieriDaUrl(){", "\n}\n")
-    prova("...e apre il Profilo sulla sezione «Negozio e spedizioni» e sul "
+    prova("...e apre il Profilo sulla sezione «Spedizioni e sconti» e sul "
           "cassetto «Come spedisci»", True,
           "go('profilo')" in porta and "el('accSpedizioniere')" in porta
-          and "toggleGrp('grpNegozio')" in porta
-          and porta.index("toggleGrp('grpNegozio')") < porta.index("classList.add('open')"))
+          and "toggleGrp('grpSpedizioni')" in porta
+          and porta.index("toggleGrp('grpSpedizioni')") < porta.index("classList.add('open')"))
 
     # --- la cassa: la riga spenta e il tasto -------------------------
     prova("la riga spenta: il nome di sempre della via, il fatto, il tasto "

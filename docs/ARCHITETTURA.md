@@ -26139,6 +26139,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'intestazione prima e dopo e scorre della differenza, così quella
   toccata resta sotto il dito. Le voci (`toggleAcc`) restano
   indipendenti. Vedi CANTIERI, «Il profilo più elegante».
+  OTTO CASSETTI CHE SI SPIEGANO DA SOLI (17 nov 2026, Andrea: «il tuo
+  catalogo che cosa vuol dire?»). Oggi, nell'ordine: «Completa il
+  profilo» · «Annunci» (`grpCatalogo`: annunci, «Carica tanti annunci
+  insieme», doppioni) · «Il tuo negozio» (`grpNegozio`: «I numeri del
+  negozio», «Guarda il tuo negozio», banner, link, ferie, cassa, «Mettilo
+  sul tuo sito», pacchi al tuo punto) · «Spedizioni e sconti»
+  (`grpSpedizioni`, nuovo: come spedisci, spedizione gratis, sconto,
+  codici, premi fedeltà) · «Quando compri» (barattolo, avvisi di ricerca,
+  «I tuoi punti di ritiro») · «Wallet e incassi» (`grpIncassi`: Lightning
+  address, Come ricevi, On-chain, NWC) · «Livello e recensioni»
+  (`grpLivello`) · «Impostazioni» (`grpImpostazioni`, nuovo, prende il
+  posto di `grpAspetto` e `grpPrivacy`: avvisi, aspetto, «Nostr e
+  identità», I tuoi dati, Esporta, Sito Tor, Cancella) · «Aiuto»
+  (`grpSupporto`, id di sempre: Tappo, Assistenza, pagamento protetto) ·
+  Amministrazione. Le voci hanno gli id di sempre: `apriCassettoProfilo`
+  trova il gruppo con `closest`, e solo `apriCorrieriDaUrl` nomina il suo
+  (`grpSpedizioni`). La pagina «I tuoi dati» nomina «Wallet e incassi» e
+  «Quando compri» → «I tuoi punti di ritiro». Il censimento sta in
+  `prove_profilo_elegante`, coi titoli decisi.
   PWA installabile (lug 2026, Fase 1 del percorso PWA→APK→Zapstore;
   percorso ormai completo: Fase 2 = icona adattiva, Fase 3 =
   «Distribuzione dell'APK», più sotto): `manifest.json` (id/

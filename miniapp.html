@@ -14736,14 +14736,14 @@ document.getElementById('cartello')?.remove();</script>
         <!-- L'unica voce di questa lista che l'utente ci ha messo LUI, e
              l'unica senza scadenza: per questo la strada per toglierla
              sta nella stessa riga, invece che da qualche altra parte. -->
-        <li><b>I punti di ritiro che salvi</b>: <b>finché non li togli</b>. Li trovi nel Profilo, in «📍 Punti di ritiro», con una ✕ accanto a ognuno.</li>
+        <li><b>I punti di ritiro che salvi</b>: <b>finché non li togli</b>. Li trovi nel Profilo, in «Quando compri» → «📍 I tuoi punti di ritiro», con una ✕ accanto a ognuno.</li>
         <!-- Terza voce senza scadenza, e la ragione e' quella delle
              altre due: ce l'ha messo LUI. ⚠️ Questa riga si e' potuta
              scrivere solo dall'ago 2026, quando il bottone per
              toglierlo e' nato: prima il server la stringa vuota la
              accettava ma dal client non si arrivava, e «finche' non lo
              togli» sarebbe stata una porta che non si apre. -->
-        <li><b>Il tuo Lightning address</b>, se l'hai impostato: <b>finché non lo togli</b>. Sta nel Profilo, in «Incassi e pagamenti», col suo bottone.</li>
+        <li><b>Il tuo Lightning address</b>, se l'hai impostato: <b>finché non lo togli</b>. Sta nel Profilo, in «Wallet e incassi», col suo bottone.</li>
         <!-- Ricade sotto «tutto il resto non ha una scadenza», ma si
              nomina lo stesso: e' testo LIBERO scritto da una persona, e
              chi lo scrive ha diritto di sapere che resta. La strada per
@@ -15412,9 +15412,23 @@ document.getElementById('cartello')?.remove();</script>
            «la porta chiusa si dice, non si nasconde». E il giudice
            «questo utente vende» non esiste: myListings arriva DOPO il
            render, e /api/me non ha un campo che lo dica. ============ -->
+      <!-- ============ OTTO CASSETTI CHE SI SPIEGANO DA SOLI (17 nov 2026) ============
+           Andrea: «troppo confusionario, i titoli non si capiscono — il
+           tuo catalogo che cosa vuol dire? Negozio, spedizioni...». Il
+           titolo adesso dice COSA C'E' DENTRO, con le parole di chi usa
+           l'app: «Il tuo catalogo» -> «Annunci»; «Negozio e spedizioni»
+           (dodici voci) si divide in «Il tuo negozio» e «Spedizioni e
+           sconti»; «Incassi e pagamenti» -> «Wallet e incassi»; «Livello e
+           inviti» -> «Livello e recensioni»; «Avvisi e aspetto» e
+           «Privacy» diventano una sola «Impostazioni» (con l'export, che
+           e' un dato tuo); «Supporto» -> «Aiuto», con dentro anche «Come
+           funziona il pagamento protetto». Scelta di Andrea sulle foto
+           prima/dopo (17 nov, 14:53). Le voci si spostano INTERE, coi loro
+           commenti e gli id di sempre: cambia solo in che cassetto stanno.
+           ============ -->
       <div class="grp" id="grpCatalogo">
         <button type="button" class="grp-h" onclick="toggleGrp('grpCatalogo')"
-                aria-expanded="false">Il tuo catalogo<span class="fr">▾</span></button>
+                aria-expanded="false">Annunci<span class="fr">▾</span></button>
         <div class="grp-b">
       <div class="acc" id="accAnnunci">
         <button class="acc-h" onclick="toggleAcc('accAnnunci')"><span class="em">📋</span>I tuoi annunci<span class="fr">▾</span></button>
@@ -15430,7 +15444,7 @@ document.getElementById('cartello')?.remove();</script>
         <!-- il titolo dice «/ catalogo esterno» solo a chi la sezione
              qui sotto la vede (renderConnettori): per tutti gli altri
              sarebbe la promessa di una cosa che non c'e' -->
-        <button class="acc-h" onclick="toggleAcc('accImport')"><span class="em">📥</span><span id="importTitolo">Importa in blocco</span><span class="fr">▾</span></button>
+        <button class="acc-h" onclick="toggleAcc('accImport')"><span class="em">📥</span><span id="importTitolo">Carica tanti annunci insieme</span><span class="fr">▾</span></button>
         <div class="acc-b">
           <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
             Hai un catalogo grande? Compila il modello CSV (una riga = un
@@ -15473,19 +15487,6 @@ document.getElementById('cartello')?.remove();</script>
         </div>
       </div>
 
-      <!-- I PACCHI AL TUO PUNTO (ago 2026, la rete di casa): compare
-           SOLO a chi tiene un punto di Barattolo, cioe' oggi a
-           nessuno e domani a uno — per tutti gli altri il cassetto
-           non esiste, il patto di «Doppioni su Nostr».
-           STA QUI e non fra le impostazioni di negozio: quelle sono
-           LEVE che si girano una volta, questa e' una lista di
-           LAVORO — i pacchi da segnare — cioe' la stessa famiglia
-           degli annunci, dell'import e del negozio collegato. -->
-      <div class="acc" id="accPunto" style="display:none">
-        <button class="acc-h" onclick="toggleAcc('accPunto')"><span class="em">🏪</span>Pacchi al tuo punto <span class="conta" id="puntoConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="puntoBlocco"></div></div>
-      </div>
-
       <!-- Doppioni su Nostr: compare SOLO se /api/me trova coppie
            sospette (doppio cittadino con lo stesso oggetto due volte
            sui relay). Per tutti gli altri il cassetto non esiste. -->
@@ -15498,7 +15499,7 @@ document.getElementById('cartello')?.remove();</script>
 
       <div class="grp" id="grpNegozio">
         <button type="button" class="grp-h" onclick="toggleGrp('grpNegozio')"
-                aria-expanded="false">Negozio e spedizioni<span class="fr">▾</span></button>
+                aria-expanded="false">Il tuo negozio<span class="fr">▾</span></button>
         <div class="grp-b">
       <!-- 📊 IL TUO NEGOZIO (24 set 2026): i numeri della bottega —
            visite alla pagina, aperture dallo spazio in vetrina,
@@ -15510,8 +15511,38 @@ document.getElementById('cartello')?.remove();</script>
            patto del wallet. Il disegno e' `tabellaNumeriNegozio`, lo
            stesso del pannello dei moderatori. -->
       <div class="acc" id="accNumeriNegozio" style="display:none">
-        <button class="acc-h" onclick="toggleAcc('accNumeriNegozio')"><span class="em">📊</span><span id="numeriNegozioTitolo">Il tuo negozio</span> <span class="conta" id="numeriNegozioConta"></span><span class="fr">▾</span></button>
+        <button class="acc-h" onclick="toggleAcc('accNumeriNegozio')"><span class="em">📊</span><span id="numeriNegozioTitolo">I numeri del negozio</span> <span class="conta" id="numeriNegozioConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="numeriNegozioBlocco"></div></div>
+      </div>
+      <div class="acc voce-porta" id="vocMioNegozio" style="display:none">
+        <button type="button" class="acc-h" onclick="apriMioNegozio()"><span class="em">👁</span>Guarda il tuo negozio<span class="fr">›</span></button>
+      </div>
+
+      <!-- Il banner del negozio (ago 2026): l'insegna sopra il
+           catalogo, una foto e un link al proprio sito. Ogni banner —
+           e ogni sua modifica — passa da un moderatore: qui dentro
+           si carica e si vede a che punto sta. -->
+      <div class="acc" id="accBanner">
+        <button class="acc-h" onclick="toggleAcc('accBanner')"><span class="em">🖼</span>Banner del negozio <span class="conta" id="bannerConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="bannerBlocco"></div></div>
+      </div>
+
+      <!-- Il link del negozio a scelta (set 2026): SUBITO DOPO il
+           banner nella scala delle personalizzazioni — un indirizzo
+           leggibile al posto del codice casuale, a pagamento a ogni
+           cambio. Stessa forma del cassetto del banner. -->
+      <div class="acc" id="accSlugNegozio">
+        <button class="acc-h" onclick="toggleAcc('accSlugNegozio')"><span class="em">🔗</span>Link del negozio <span class="conta" id="slugNegozioConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="slugNegozioBlocco"></div></div>
+      </div>
+
+      <!-- Il negozio in ferie (ago 2026): si chiude la bottega con la
+           data di rientro. Gli annunci RESTANO in vetrina — si
+           guardano, non si comprano — e al rientro tornano
+           comprabili da soli. In DEMO sparisce, il patto del wallet. -->
+      <div class="acc" id="accFerie">
+        <button class="acc-h" onclick="toggleAcc('accFerie')"><span class="em">🌴</span>Negozio in ferie <span class="conta" id="ferieConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="ferieBlocco"></div></div>
       </div>
 
       <!-- LE DUE PORTE DEL NEGOZIO (set 2026): erano i due bottoni a
@@ -15526,12 +15557,29 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc voce-porta" id="vocCassa" style="display:none">
         <button type="button" class="acc-h" onclick="entraAppNegozio()"><span class="em">🏪</span>Cassa in negozio<span class="fr">›</span></button>
       </div>
-      <div class="acc voce-porta" id="vocMioNegozio" style="display:none">
-        <button type="button" class="acc-h" onclick="apriMioNegozio()"><span class="em">👁</span>Guarda il tuo negozio come lo vedono tutti<span class="fr">›</span></button>
-      </div>
       <div class="acc voce-porta" id="vocWidgetNegozio" style="display:none">
-        <button type="button" class="acc-h" onclick="apriWidget('negozio')"><span class="em em-testo">&lt;/&gt;</span>Widget per il web<span class="fr">›</span></button>
+        <button type="button" class="acc-h" onclick="apriWidget('negozio')"><span class="em em-testo">&lt;/&gt;</span>Mettilo sul tuo sito<span class="fr">›</span></button>
       </div>
+
+      <!-- I PACCHI AL TUO PUNTO (ago 2026, la rete di casa): compare
+           SOLO a chi tiene un punto di Barattolo, cioe' oggi a
+           nessuno e domani a uno — per tutti gli altri il cassetto
+           non esiste, il patto di «Doppioni su Nostr».
+           STA QUI e non fra le impostazioni di negozio: quelle sono
+           LEVE che si girano una volta, questa e' una lista di
+           LAVORO — i pacchi da segnare — cioe' la stessa famiglia
+           degli annunci, dell'import e del negozio collegato. -->
+      <div class="acc" id="accPunto" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accPunto')"><span class="em">🏪</span>Pacchi al tuo punto <span class="conta" id="puntoConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="puntoBlocco"></div></div>
+      </div>
+        </div>
+      </div>
+
+      <div class="grp" id="grpSpedizioni">
+        <button type="button" class="grp-h" onclick="toggleGrp('grpSpedizioni')"
+                aria-expanded="false">Spedizioni e sconti<span class="fr">▾</span></button>
+        <div class="grp-b">
 
       <!-- I corrieri del negozio (ago 2026, al PLURALE dal cantiere
            «chi spedisce dichiara»): con quali reti di punti di ritiro
@@ -15591,33 +15639,6 @@ document.getElementById('cartello')?.remove();</script>
         <button class="acc-h" onclick="toggleAcc('accPremiFedelta')"><span class="em">🎀</span>Premi fedeltà <span class="conta" id="premiFedeltaConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="premiFedeltaBlocco"></div></div>
       </div>
-
-      <!-- Il banner del negozio (ago 2026): l'insegna sopra il
-           catalogo, una foto e un link al proprio sito. Ogni banner —
-           e ogni sua modifica — passa da un moderatore: qui dentro
-           si carica e si vede a che punto sta. -->
-      <div class="acc" id="accBanner">
-        <button class="acc-h" onclick="toggleAcc('accBanner')"><span class="em">🖼</span>Banner del negozio <span class="conta" id="bannerConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="bannerBlocco"></div></div>
-      </div>
-
-      <!-- Il link del negozio a scelta (set 2026): SUBITO DOPO il
-           banner nella scala delle personalizzazioni — un indirizzo
-           leggibile al posto del codice casuale, a pagamento a ogni
-           cambio. Stessa forma del cassetto del banner. -->
-      <div class="acc" id="accSlugNegozio">
-        <button class="acc-h" onclick="toggleAcc('accSlugNegozio')"><span class="em">🔗</span>Link del negozio <span class="conta" id="slugNegozioConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="slugNegozioBlocco"></div></div>
-      </div>
-
-      <!-- Il negozio in ferie (ago 2026): si chiude la bottega con la
-           data di rientro. Gli annunci RESTANO in vetrina — si
-           guardano, non si comprano — e al rientro tornano
-           comprabili da soli. In DEMO sparisce, il patto del wallet. -->
-      <div class="acc" id="accFerie">
-        <button class="acc-h" onclick="toggleAcc('accFerie')"><span class="em">🌴</span>Negozio in ferie <span class="conta" id="ferieConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="ferieBlocco"></div></div>
-      </div>
         </div>
       </div>
 
@@ -15650,24 +15671,15 @@ document.getElementById('cartello')?.remove();</script>
            arriva precompilato, «Cambia» lo riapre, «Aggiorna» lo
            sostituisce. -->
       <div class="acc" id="accPuntiRitiro">
-        <button class="acc-h" onclick="toggleAcc('accPuntiRitiro')"><span class="em">📍</span>Punti di ritiro <span class="conta" id="puntiRitiroConta"></span><span class="fr">▾</span></button>
+        <button class="acc-h" onclick="toggleAcc('accPuntiRitiro')"><span class="em">📍</span>I tuoi punti di ritiro <span class="conta" id="puntiRitiroConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="puntiRitiroBlocco"></div></div>
-      </div>
-
-      <!-- La porta alla pagina del pagamento protetto (le altre due
-           sono il recinto del dettaglio e la riga di fiducia della
-           vetrina): qui la si cerca a mente fredda, non davanti a un
-           acquisto. Era un bottone a tutta larghezza in fondo alla
-           pagina; dal set 2026 e' una voce-porta di «Quando compri». -->
-      <div class="acc voce-porta" id="vocSicurezza">
-        <button type="button" class="acc-h" onclick="apriSicurezza()"><span class="em">🔒</span>Come funziona il pagamento protetto<span class="fr">›</span></button>
       </div>
         </div>
       </div>
 
       <div class="grp" id="grpIncassi">
         <button type="button" class="grp-h" onclick="toggleGrp('grpIncassi')"
-                aria-expanded="false">Incassi e pagamenti<span class="fr">▾</span></button>
+                aria-expanded="false">Wallet e incassi<span class="fr">▾</span></button>
         <div class="grp-b">
       <!-- ⚡ INCASSI E PAGAMENTI (set 2026): era UN cassetto con dentro
            tre cose — il Lightning address, il wallet NWC e l'export —
@@ -15750,16 +15762,12 @@ document.getElementById('cartello')?.remove();</script>
           </div>
         </div>
       </div>
-
-      <div class="acc voce-porta" id="vocEsporta">
-        <button type="button" class="acc-h" onclick="esportaDati()"><span class="em">📄</span><span class="tit2">Esporta i tuoi dati<small>Il CSV dei tuoi affari conclusi, comodo per la contabilità.</small></span><span class="fr">›</span></button>
-      </div>
         </div>
       </div>
 
       <div class="grp" id="grpLivello">
         <button type="button" class="grp-h" onclick="toggleGrp('grpLivello')"
-                aria-expanded="false">Livello e inviti<span class="fr">▾</span></button>
+                aria-expanded="false">Livello e recensioni<span class="fr">▾</span></button>
         <div class="grp-b">
       <!-- LE RECENSIONI RICEVUTE (14 nov 2026, cantiere recensioni-ricevute,
            Andrea: «non trovo il modo di vedere un elenco delle recensioni
@@ -15806,9 +15814,9 @@ document.getElementById('cartello')?.remove();</script>
         </div>
       </div>
 
-      <div class="grp" id="grpAspetto">
-        <button type="button" class="grp-h" onclick="toggleGrp('grpAspetto')"
-                aria-expanded="false">Avvisi e aspetto<span class="fr">▾</span></button>
+      <div class="grp" id="grpImpostazioni">
+        <button type="button" class="grp-h" onclick="toggleGrp('grpImpostazioni')"
+                aria-expanded="false">Impostazioni<span class="fr">▾</span></button>
         <div class="grp-b">
       <div class="acc" id="accAvvisi">
         <button class="acc-h" onclick="toggleAcc('accAvvisi')"><span class="em">🔔</span>Avvisi<span class="fr">▾</span></button>
@@ -15837,15 +15845,8 @@ document.getElementById('cartello')?.remove();</script>
           <div id="filaP2PRiga"></div>
         </div>
       </div>
-        </div>
-      </div>
-
-      <div class="grp" id="grpPrivacy">
-        <button type="button" class="grp-h" onclick="toggleGrp('grpPrivacy')"
-                aria-expanded="false">Privacy<span class="fr">▾</span></button>
-        <div class="grp-b">
       <div class="acc" id="accIdentita">
-        <button class="acc-h" onclick="toggleAcc('accIdentita')"><span class="em">🆔</span>Identità<span class="fr">▾</span></button>
+        <button class="acc-h" onclick="toggleAcc('accIdentita')"><span class="em">🆔</span>Nostr e identità<span class="fr">▾</span></button>
         <div class="acc-b">
           <!-- Niente piu' campo a mano, verifica con nota pubblica, ne'
                invito NIP-85 separato (set 2026, decisione di Andrea):
@@ -15863,14 +15864,8 @@ document.getElementById('cartello')?.remove();</script>
         <button type="button" class="acc-h" onclick="apriPrivacy()"><span class="em">🔐</span>I tuoi dati<span class="fr">›</span></button>
       </div>
 
-      <!-- 🗑 CANCELLA IL MIO ACCOUNT (1 nov 2026, cantiere cancella-account,
-           leva ACCOUNT_CANCELLABILE). Nasce SPENTA come il sito Tor qui
-           sotto: la accende la lettura di /api/me solo se il server dice
-           `account_cancellabile`. Sta in «Privacy» accanto a «I tuoi dati»
-           perche' e' la stessa domanda — che fine fanno i miei dati — col
-           gesto in mano invece del racconto. -->
-      <div class="acc voce-porta" id="vocCancella" style="display:none">
-        <button type="button" class="acc-h" onclick="apriCancellaAccount()"><span class="em">🗑</span>Cancella il mio account<span class="fr">›</span></button>
+      <div class="acc voce-porta" id="vocEsporta">
+        <button type="button" class="acc-h" onclick="esportaDati()"><span class="em">📄</span><span class="tit2">Esporta i tuoi dati<small>Il CSV dei tuoi affari conclusi, comodo per la contabilità.</small></span><span class="fr">›</span></button>
       </div>
 
       <!-- 🧅 IL SITO TOR. Il servizio nascosto ESISTE da prima di questo
@@ -15891,6 +15886,16 @@ document.getElementById('cartello')?.remove();</script>
         <button class="acc-h" onclick="toggleAcc('accTor')"><span class="em">🧅</span>Sito Tor<span class="fr">▾</span></button>
         <div class="acc-b"><div id="torBlocco"></div></div>
       </div>
+
+      <!-- 🗑 CANCELLA IL MIO ACCOUNT (1 nov 2026, cantiere cancella-account,
+           leva ACCOUNT_CANCELLABILE). Nasce SPENTA come il sito Tor qui
+           sotto: la accende la lettura di /api/me solo se il server dice
+           `account_cancellabile`. Sta in «Privacy» accanto a «I tuoi dati»
+           perche' e' la stessa domanda — che fine fanno i miei dati — col
+           gesto in mano invece del racconto. -->
+      <div class="acc voce-porta" id="vocCancella" style="display:none">
+        <button type="button" class="acc-h" onclick="apriCancellaAccount()"><span class="em">🗑</span>Cancella il mio account<span class="fr">›</span></button>
+      </div>
         </div>
       </div>
 
@@ -15902,7 +15907,7 @@ document.getElementById('cartello')?.remove();</script>
            spente (aggiornaGruppiProfilo). -->
       <div class="grp" id="grpSupporto">
         <button type="button" class="grp-h" onclick="toggleGrp('grpSupporto')"
-                aria-expanded="false">Supporto<span class="fr">▾</span></button>
+                aria-expanded="false">Aiuto<span class="fr">▾</span></button>
         <div class="grp-b">
       <!-- TAPPO NEL PROFILO (16 nov 2026, Andrea: «Nella Mini App, nel
            Profilo»): chi e' gia' iscritto il benvenuto del bot non lo
@@ -15917,6 +15922,15 @@ document.getElementById('cartello')?.remove();</script>
            server dice `assistenza: true` (la leva ASSISTENZA_ATTIVA). -->
       <div class="acc voce-porta" id="vocAssistenza" style="display:none">
         <button type="button" class="acc-h" onclick="go('assistenza')"><span class="em">💬</span>Assistenza<span id="assistenzaPallino"></span><span class="fr">›</span></button>
+      </div>
+
+      <!-- La porta alla pagina del pagamento protetto (le altre due
+           sono il recinto del dettaglio e la riga di fiducia della
+           vetrina): qui la si cerca a mente fredda, non davanti a un
+           acquisto. Era un bottone a tutta larghezza in fondo alla
+           pagina; dal set 2026 e' una voce-porta di «Quando compri». -->
+      <div class="acc voce-porta" id="vocSicurezza">
+        <button type="button" class="acc-h" onclick="apriSicurezza()"><span class="em">🔒</span>Come funziona il pagamento protetto<span class="fr">›</span></button>
       </div>
         </div>
       </div>
@@ -26983,8 +26997,7 @@ function copiaMessaggioVenditore(slug){
     + `è pronta in anteprima: per ora la vedi solo tu.\n`
     + `Aprila da qui: ${link}\n`
     + `(se te lo chiede, entra con Telegram). La trovi anche nell'app, `
-    + `sul tuo negozio: Profilo → «Guarda il tuo negozio come lo vedono `
-    + `tutti».\n`
+    + `sul tuo negozio: Profilo → «Il tuo negozio» → «Guarda il tuo negozio».\n`
     + `Se va bene, scrivici e la pubblichiamo!`;
   copiaLink(testo, '📋 Messaggio per il venditore copiato');
 }
@@ -29867,7 +29880,7 @@ const rigaAvvisiApp = () => !soloNostr() ? '' : `
       non dice dove ricevere i messaggi</b> (la lista dei relay dei messaggi, kind
       10050): i nostri DM possono non comparire nel tuo client. Impostala nel
       client (in Amethyst: «DM Inbox Relays») oppure collega Telegram dal
-      blocco 🆔 Identità.</div>` : ''}
+      blocco 🆔 Nostr e identità.</div>` : ''}
   </div>`;
 
 /* IL CASSETTO «🧅 Sito Tor» (ago 2026). NON RISPIEGA NIENTE, ed e' la
@@ -41769,7 +41782,7 @@ function renderProfilo(){
   const badge = myNpub
     ? (myNpubVerified
         ? badgeNostr('Npub verificata')
-        : badgeNostr('Npub da verificare: solo tu vedi questo badge, verificala dalla sezione 🆔 Identità', true))
+        : badgeNostr('Npub da verificare: solo tu vedi questo badge, verificala dalla sezione 🆔 Nostr e identità', true))
     : '';
   /* Stelle solo con un rating vero: "0 ★" farebbe solo danno
      (stessa regola della vista negozio) */
@@ -43984,7 +43997,7 @@ function renderAvvisi(){
   } else if (tgOk) {
     dentro = `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:6px">
       Arrivano nella chat del bot Telegram. Verifica una npub nella
-      sezione 🆔 Identità e potrai riceverli anche come DM
+      sezione 🆔 Nostr e identità e potrai riceverli anche come DM
       Nostr cifrati.</div>`;
   } else {
     dentro = `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:6px">
@@ -46295,7 +46308,7 @@ async function renderNumeriNegozio(){
      porta il nome di quel che contiene */
   const titolo = el('numeriNegozioTitolo');
   if (titolo) titolo.textContent = d.venditore === false
-    ? 'I tuoi acquisti' : 'Il tuo negozio';
+    ? 'I tuoi acquisti' : 'I numeri del negozio';
   box.innerHTML = tabellaNumeriNegozio(d, false);
   aggiornaGruppiProfilo();
 }
@@ -46570,7 +46583,7 @@ async function renderConnettori(){
   const mostra = !DEMO && !VETRINA && !!(connettoriLeve
     && connettoriLeve.attivo && connettoriLeve.visibile);
   if (el('importTitolo')) el('importTitolo').textContent = mostra
-    ? 'Importa in blocco / catalogo esterno' : 'Importa in blocco';
+    ? 'Carica tanti annunci insieme / catalogo esterno' : 'Carica tanti annunci insieme';
   if (!mostra){
     if (sez) sez.style.display = 'none';
     box.innerHTML = ''; return;
@@ -60497,7 +60510,7 @@ function barraWeb(nome){
       + ` i tuoi Ordini di tanto in tanto`
     : myTgId < 0
     ? `sei entrato con Nostr: per gli avvisi in chat collega Telegram`
-      + ` dalla scheda Profilo (sezione «🆔 Identità»), oppure ricontrolla`
+      + ` dalla scheda Profilo (sezione «🆔 Nostr e identità»), oppure ricontrolla`
       + ` i tuoi Ordini di tanto in tanto`
     : `Per ricevere gli avvisi sugli ordini apri una volta `
       + `<a href="https://t.me/${BOT_TG}" target="_blank"`
@@ -60734,11 +60747,11 @@ function apriCorrieriDaUrl(){
   go('profilo');
   const acc = el('accSpedizioniere');
   if (!acc) return;
-  /* il cassetto vive dentro la sezione «Negozio e spedizioni», che
+  /* il cassetto vive dentro la sezione «Spedizioni e sconti», che
      da chiusa lo nasconde: si apre prima lei (col gesto di sempre,
      che chiude le altre), poi il cassetto */
-  const grp = el('grpNegozio');
-  if (grp && !grp.classList.contains('open')) toggleGrp('grpNegozio');
+  const grp = el('grpSpedizioni');
+  if (grp && !grp.classList.contains('open')) toggleGrp('grpSpedizioni');
   acc.classList.add('open');
   setTimeout(() => acc.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'start'}), 150);
 }

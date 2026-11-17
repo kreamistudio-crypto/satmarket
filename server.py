@@ -24086,7 +24086,7 @@ def numeri_assistente() -> str:
         # leva (sparisce solo in demo); il catalogo esterno ne ha due —
         # il ponte acceso e la porta aperta a tutti — e a porta chiusa lo
         # vedono solo i negozi gia' collegati e i moderatori
-        "- Import in blocco da CSV (Profilo → «📥 Importa in blocco»: il "
+        "- Import in blocco da CSV (Profilo → «📥 Carica tanti annunci insieme»: il "
         "modello CSV, una riga per annuncio, fino a 500 per volta, almeno "
         "una foto per riga con un link o uno ZIP): disponibile.",
         "- Collegare un negozio Shopify o WooCommerce (catalogo esterno, "
@@ -32983,7 +32983,7 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
         raise HTTPException(400, "Per modificare un annuncio importato serve "
                                  "l'accesso Nostr con la STESSA chiave che "
                                  "l'ha pubblicato: abilitalo dal Profilo "
-                                 "(cassetto 🆔 Identità)")
+                                 "(cassetto 🆔 Nostr e identità)")
     if ChiavePubblicaNostr is None:
         raise HTTPException(503, "Firma Nostr non disponibile: sul server "
                                  "manca il pacchetto coincurve")
@@ -36074,7 +36074,7 @@ def _leve_stato():
             _leva("Negozi collegati: la porta per tutti",
                   "CONNETTORI_NEGOZIO_PER_TUTTI",
                   bool(CONNETTORI_NEGOZIO_PER_TUTTI),
-                  spento="la sezione dentro «📥 Importa in blocco» la "
+                  spento="la sezione dentro «📥 Carica tanti annunci insieme» la "
                          "vedono solo i negozi già collegati e i "
                          "moderatori: gli altri venditori non la trovano, "
                          "e chi è collegato non perde niente",
@@ -41585,7 +41585,7 @@ async def fai_puntata(annuncio_id: int, req: Request,
         raise HTTPException(400, "Per puntare serve il tuo Lightning "
                                  "address (per l'eventuale rimborso): "
                                  "lo imposti nel Profilo, sotto "
-                                 "«Incassi e pagamenti»")
+                                 "«Wallet e incassi»")
     mia = con.execute("SELECT * FROM puntate WHERE annuncio_id=? AND tg_id=?",
                       (annuncio_id, user["id"])).fetchone()
     if mia and mia["stato"] == "chiusa":
@@ -97511,7 +97511,7 @@ async def _connettore_in_errore(c: dict, errore: str):
             f"{html.escape(c['url_negozio'])} e non ci sono riuscito.\n\n"
             f"I tuoi annunci restano dove sono, ma non si aggiornano "
             f"più. Controlla il collegamento dal Profilo, in "
-            f"«📥 Importa in blocco / catalogo esterno»: se il token è "
+            f"«📥 Carica tanti annunci insieme / catalogo esterno»: se il token è "
             f"scaduto basta rifarlo.")
 
 

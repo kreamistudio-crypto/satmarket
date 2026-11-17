@@ -88233,3 +88233,43 @@ dichiarata, gli utenti messi nell'elenco: le prove diventano rosse.
 l'elenco senza utenti). NON VISTO DAL VIVO: la spunta in un client Nostr
 vero (Damus, Primal, Amethyst) su collaudo.barattolo.store; e la riga
 del Profilo su un telefono.
+
+## Il Profilo con otto cassetti che si spiegano da soli (17 nov 2026, cantiere profilo-semplice; Andrea: «sono troppo confusionario, anche i titoli non si capisce. Per esempio, il tuo catalogo che cosa vuol dire? Negozio, spedizioni, è tutto confusionario. Il titolo deve far capire subito che cosa c'è dentro»)
+DECISO sulle foto prima/dopo (Andrea, 14:53 «Sì, così va bene»): il
+titolo di ogni cassetto dice COSA C'È DENTRO, con le parole di chi usa
+l'app. «Il tuo catalogo» → «Annunci»; «Negozio e spedizioni», che aveva
+dodici voci, si divide in «Il tuo negozio» (numeri, vetrina, banner,
+link, ferie, cassa, widget, pacchi al tuo punto) e «Spedizioni e
+sconti» (come spedisci, spedizione gratis, sconto, codici, premi
+fedeltà); «Incassi e pagamenti» → «Wallet e incassi»; «Livello e
+inviti» → «Livello e recensioni»; «Avvisi e aspetto» e «Privacy» →
+una sola «Impostazioni», con dentro anche «Esporta i tuoi dati» (è un
+dato tuo, non un incasso); «Supporto» → «Aiuto», che accoglie «Come
+funziona il pagamento protetto» (è una pagina che spiega, non una cosa
+da impostare quando compri). Voci rinominate: «Importa in blocco» →
+«Carica tanti annunci insieme» (anche col «/ catalogo esterno», e nei
+testi del server e di Tappo), «📊 Il tuo negozio» → «I numeri del
+negozio» (a chi ha solo comprato resta «I tuoi acquisti»), «Guarda il
+tuo negozio come lo vedono tutti» → «Guarda il tuo negozio», «Widget per
+il web» → «Mettilo sul tuo sito» (il foglio che apre si chiama ancora
+«Widget per il web»), «Punti di ritiro» → «I tuoi punti di ritiro»,
+«Identità» → «Nostr e identità».
+COME: le voci si spostano INTERE, coi loro commenti e gli id di sempre
+(uno script che le taglia per id e conta che non manchi niente: unica
+differenza nelle righe, le intestazioni). Gruppi nuovi `grpSpedizioni` e
+`grpImpostazioni`; spariscono `grpAspetto` e `grpPrivacy`. Tocca anche
+`apriCorrieriDaUrl` (apre `grpSpedizioni`), la pagina «I tuoi dati»
+(i nomi nuovi), cinque testi del server, `assistente/sapere.md`.
+SCARTATO: meno di otto cassetti. Unire ancora vuol dire rifare il
+lenzuolo da dodici voci che Andrea trovava confuso; il conto resta otto
+(come prima), ma ogni titolo si legge da solo.
+LE VOCI VECCHIE DI NOVITA.md NON SI TOCCANO (regola del file): i loro
+«dove» con i nomi di prima restano, e Tappo li legge; la voce nuova di
+oggi dice i nomi nuovi.
+PROVATO: `prove_profilo_elegante` col censimento nuovo e i titoli decisi
+(controprova: «Aiuto» rimesso a «Supporto» fa due rosse), le sezioni
+che leggevano i nomi vecchi (I tuoi dati, numeri del negozio, catalogo
+esterno, effetti ridotti, fila P2P, corrieri da link). Dal vivo in
+Chromium a 390 px sul server locale in collaudo: le otto intestazioni e
+il contenuto di ognuna. DA GUARDARE: chi ha imparato «Privacy» o
+«Supporto» li trova in «Impostazioni» e «Aiuto».
