@@ -87385,3 +87385,29 @@ i documenti, 0 fallite; i collaudi della CI di nuovo, 144 verdi, 0 rossi.
 RESTA DA GUARDARE. Il nodo: la riga di DA-FARE-ANDREA (voce 18), e poi
 dal telefono la riga della cauzione che compare scegliendo «Contante per
 posta» e tace con SEPA. Uno scambio vero per posta non c'è ancora stato.
+
+DAL VIVO, 17 NOV 2026, 12:10-12:17 Rome, con Andrea sul relay. Tre cose
+che la stesura non sapeva. (1) LO SPECCHIO NON RECUPERA LO STORICO: dopo
+il riavvio si è collegato a relay.zapstore.dev in 90 ms ma lo scan
+restava vuoto; letto `cmd_router.cpp` di strfry, la REQ del router porta
+`"limit": 0` — chiede solo quel che arriva da quel momento. La riga nel
+commento di `router.conf` sul flusso di Mostro («rifà la REQ senza
+since, quindi il relay serve quel che ha in magazzino») era SBAGLIATA
+da settembre: corretta. `strfry sync` non serve, relay.zapstore.dev non
+parla negentropy («the message type must be one between EVENT, REQ,
+CLOSE, COUNT and AUTH»). Scritto `deploy/relay/pesca-eventi.py` (solo
+libreria standard, gira nel container): UNA REQ, JSONL su stdout,
+`strfry import`. Pescati 8 eventi, 8 added: la scheda 32267, tre 30063
+(v1.3, v1.4, v1.5), tre 3063, un 30509. Il 1063 non c'era: resta nel
+filtro, non costa. (2) POWERSHELL: `git show … > file` scrive UTF-16 con
+CRLF; il file è arrivato sul relay doppio e illeggibile per `grep`, e
+riparato con `iconv -f UTF-16 -t UTF-8 | tr -d '\r'`. I valori sono
+giusti, le emoji dei commenti no: la copia pulita si porta con
+`cmd /c "git show … > %TEMP%\…"`, scritto in PRODUZIONE. (3) Il
+`router.conf` vivo era di 2593 byte contro i 6280 del repo: la macchina
+e la copia divergevano già (commenti), e nessuno lo diceva. Sul relay
+serve `sudo` (cartella di root), `jq` non c'è, e `docker compose exec`
+in una pipe vuole `-T` o non stampa. La riga di PRODUZIONE «se non
+arriva niente … relay.zapstore.dev non serve lo storico» è sostituita
+dalla procedura vera. Prova in più: `pesca-eventi.py` compila e non
+porta 64-hex. Questo giro è un secondo commit sopra a4f63637.

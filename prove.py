@@ -135693,6 +135693,23 @@ def prove_app_android():
            bool(piattaforma) and piattaforma.group(1) in zap])
     prova("...e in `chiavi.txt` non entra: il plugin non la conosce",
           0, testo_plugin.count(hex_release[:16]))
+    # LO STORICO NON LO TIRA LO SPECCHIO (17 nov 2026, dal vivo): la REQ
+    # del router porta `limit: 0`. Per le release gia' uscite c'e' la
+    # pesca, una volta: deve compilare, stare sulla sola libreria
+    # standard e non portare nessuna chiave per esteso.
+    pesca = open(os.path.join("deploy", "relay", "pesca-eventi.py"),
+                 encoding="utf-8").read()
+    compile(pesca, "pesca-eventi.py", "exec")
+    prova("la pesca dello storico c'e', dice il perche' (limit 0), usa solo "
+          "la libreria standard e non porta chiavi", [True, True, 0],
+          ['"limit": 0' in pesca and "strfry import" in pesca,
+           not re.search(r"^(import|from) (websocket|websockets|requests|httpx)\b",
+                         pesca, re.M),
+           len(re.findall(r"\b[0-9a-f]{64}\b", pesca))])
+    prova("...e il commento dello specchio non promette piu' il recupero "
+          "dello storico", True,
+          '"limit": 0' in router and "pesca-eventi.py" in router
+          and "serve quel che ha in magazzino), mentre" not in router)
 
 
 # I DUE MODELLI DI BUBBLEWRAP 1.24.1 su cui le sezioni dell'APK girano

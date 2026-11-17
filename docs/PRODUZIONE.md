@@ -3246,12 +3246,34 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   (HEX = l'autore del flusso `zapstore` di `router.conf`, cioè la npub
   fredda qui sopra in esadecimale; per esteso non sta in questo
   documento perché lo scanner della CI prende ogni 64-hex nudo)
-  — almeno la scheda (32267) e la release della v1.5 (30063 e il suo
-  3063). Se non arriva niente, il router non ha ancora fatto la REQ o
-  relay.zapstore.dev non serve lo storico: si rilegge il log. PER
-  TORNARE INDIETRO: `cp router.conf.prima-di-zapstore router.conf` e
-  lo stesso `up -d --force-recreate specchio`; le copie già prese
-  restano nel db finché non si tolgono con `strfry delete`.
+  — la scheda (32267), le release (30063) coi loro file (3063) e la
+  prova del certificato (30509): otto eventi il 17 nov 2026.
+  FATTO IL 17 NOV 2026, e con tre lezioni. (1) IL FILE SI PORTA CON
+  `cmd`, NON con `>` di PowerShell: `git show … > file` in PowerShell
+  5.1 scrive UTF-16 con CRLF e storpia le emoji dei commenti — il
+  `grep` sul relay non trovava niente. La riga giusta dal PC:
+  `cmd /c "git show origin/develop:deploy/relay/router.conf > %TEMP%\router.conf"`
+  poi `scp -i $env:USERPROFILE\.ssh\lnvps $env:TEMP\router.conf debian@vm-1957.lnvps.cloud:/tmp/router.conf`;
+  sul relay serve `sudo` (la cartella è di root) e `jq` non c'è: lo
+  scan si legge con `| grep -o '"kind":[0-9]*\|"created_at":[0-9]*' | paste - -`,
+  e SEMPRE con `exec -T` quando l'uscita va in una pipe (senza, non
+  stampa niente). (2) LO SPECCHIO NON TIRA LO STORICO: la sua REQ porta
+  `limit: 0` (sorgente di strfry), quindi copia solo quel che viene
+  pubblicato DOPO; le release vecchie si pescano una volta con
+  `deploy/relay/pesca-eventi.py` (`strfry sync` no: relay.zapstore.dev
+  non parla negentropy). Il rito, se mai servisse di nuovo:
+  `cmd /c "git show origin/develop:deploy/relay/pesca-eventi.py > %TEMP%\pesca-eventi.py"`
+  + scp come sopra in `/tmp/`, poi sul relay
+  `sudo docker cp /tmp/pesca-eventi.py relay:/tmp/pesca-eventi.py` e
+  `cd /opt/relay && sudo docker compose exec -T relay sh -c "python3 /tmp/pesca-eventi.py wss://relay.zapstore.dev '{\"kinds\":[32267,30063,3063,1063,30509],\"authors\":[\"HEX\"]}' | /app/strfry import"`
+  (esce «pescati N eventi» e «N added»; un doppione non fa danno).
+  (3) Il `router.conf` vivo sul relay era di 2593 byte, più corto della
+  copia del repo: ora è quella del repo, coi commenti storpiati dal
+  passaggio in PowerShell (i valori no); la copia pulita si rimette col
+  `cmd /c` qui sopra, quando capita. PER TORNARE INDIETRO:
+  `sudo cp router.conf.prima-di-zapstore router.conf` e lo stesso
+  `up -d --force-recreate specchio`; le copie già prese restano nel db
+  finché non si tolgono con `strfry delete`.
 - DOVE SI LEGGE IL GIRO DEI NEGOZI COLLEGATI (set 2026): il giro
   dell'ora stampa una riga per annuncio nato (`🏪 Titolo — prezzo €
   [categoria]`, con ` · digitale` sui virtuali), una per consegna
