@@ -448,13 +448,13 @@ def main():
 
     print("\n[le missioni di Tappo]")
     st = c.get(B, headers=COMPRA).json()
-    prova("cinque missioni, nessuna finita; il tabellone legge l'insieme vuoto",
-          (["quaderno", "lucchetto", "staffetta", "parole", "halving"], [0] * 5, set()),
+    prova("sei missioni, la prima la piu' facile, nessuna finita; il tabellone legge l'insieme vuoto",
+          (["sats", "lucchetto", "quaderno", "staffetta", "parole", "halving"], [0] * 6, set()),
           ([x["id"] for x in st["missioni"]], [x["stelle"] for x in st["missioni"]],
            S.missioni_superate(S.db(), 111)))
     M = f"{B}/missione"
     prova("una missione che non c'e': 400", 400,
-          c.post(M, json={"missione": "sats", "azione": "inizia"}, headers=COMPRA).status_code)
+          c.post(M, json={"missione": "tesoro", "azione": "inizia"}, headers=COMPRA).status_code)
     prova("finire senza essere partiti: 400", 400,
           c.post(M, json={"missione": "quaderno", "azione": "finisci", "stelle": 3},
                  headers=COMPRA).status_code)
@@ -473,7 +473,7 @@ def main():
                headers=COMPRA).json()
     prova("finita: 15 bulloni la prima volta, due stelle, e il tabellone la vede",
           (15, st["saldo"] + 15, 2, {"quaderno"}),
-          (r["bulloni_nuovi"], r["saldo"], r["missioni"][0]["stelle"],
+          (r["bulloni_nuovi"], r["saldo"], next(x["stelle"] for x in r["missioni"] if x["id"] == "quaderno"),
            S.missioni_superate(S.db(), 111)))
     c.post(M, json={"missione": "quaderno", "azione": "inizia"}, headers=COMPRA)
     con = S.db()
@@ -483,7 +483,7 @@ def main():
     r = c.post(M, json={"missione": "quaderno", "azione": "finisci", "stelle": 3},
                headers=COMPRA).json()
     prova("rigiocata: nessun bullone in piu', le stelle salgono a tre",
-          (0, st["saldo"] + 15, 3), (r["bulloni_nuovi"], r["saldo"], r["missioni"][0]["stelle"]))
+          (0, st["saldo"] + 15, 3), (r["bulloni_nuovi"], r["saldo"], next(x["stelle"] for x in r["missioni"] if x["id"] == "quaderno")))
     prova("...e niente XP nemmeno qui", xp_prima, conta("SELECT COUNT(*) FROM xp_eventi"))
 
     print("\n[il freno delle occhiate]")
