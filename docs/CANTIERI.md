@@ -86393,3 +86393,68 @@ moderatore lo vedono; Monero senza chiave 400, con la chiave passa.
 
 DA GUARDARE. Gli scambi in moneta già in «Ho inviato» al deploy restano
 senza id (nessuno l'ha chiesto allora).
+
+## Il tuo primo wallet: la guida al posto del wallet custodial (17 nov 2026, cantiere primo-wallet; Andrea dal canale Todo: «Potremo anche pensare di dare un wallet custodial per i neofiti. Lo mettiamo con un warning, spiegando che i fondi stanno su barattolo ma che si possono spostare quando si vuole», poi «b» sullo studio e «Solo Wallet of Satoshi» sulla card)
+
+LO STUDIO PRIMA (project files, `wallet-custodial/STUDIO-WALLET-NEOFITI-2026-11-17.md`).
+Tre strade. A, un saldo Barattolo vero (ricarica, paga, incassa,
+`nome@barattolo.store`): la cassaforte diventa un deposito fisso, cioè il
+bersaglio più grosso del progetto (l'attacco LNbits dell'8 nov avrebbe
+preso anche i saldi), sats fermi sul nodo e custodia piena. B, nessuna
+custodia: una guida a un wallet di terzi. C, un borsellino di passaggio
+con tetto per persona e tetto totale, che esce da solo appena c'è un
+indirizzo. Raccomandata e scelta: B. C resta l'idea di riserva se la
+guida non basta. Se un giorno si fa, i saldi stanno nel NOSTRO database
+coperti dal wallet unico della cassaforte, mai wallet LNbits per utente
+(la porta usata l'8 nov era proprio l'iscrizione libera).
+
+DECISO. Un foglio, «👛 Il tuo primo wallet» (`walletGuidaSheet`, sul calco
+della guida Nostr): dove stanno i sats (nel tuo wallet, non su Barattolo,
+che li tiene solo il tempo di un affare), Wallet of Satoshi in tre passi
+(installa, salva il backup, «Ricevi» e copia `nome@walletofsatoshi.com`),
+il campo per incollarlo lì (`salvaLnAddressGuida`, lo stesso endpoint e la
+stessa guardia del Profilo: è una terza porta, non una strada nuova), i
+primi sats da un amico o in euro nel P2P, e l'ultima riga: il wallet non è
+nostro e non ci dà niente. Le porte sono una riga sola,
+`rigaGuidaWallet()`: i due pannelli dell'incasso, il rimborso, il Profilo
+senza indirizzo, e nel markup sotto il QR del foglio della fattura (la
+porta on-chain la spegne, `payGuidaWalletVista`: la guida parla di un
+wallet Lightning). Niente leva, niente dato nuovo sul server.
+
+PERCHÉ SOLO WALLET OF SATOSHI. È quello che l'app consiglia già ovunque
+(`CONSIGLIO_LNURL`), è quello che i venditori usano di più (i payout verso
+Spark nello studio dell'instradamento), e in UE da gennaio 2026 è
+self-custodial (su Spark): facile e tuo insieme. PHOENIX SCARTATO: il suo
+indirizzo è BIP-353 (DNS + offerta BOLT12) e il nodo non lo sa pagare,
+il server lo rifiuta già (`DOMINI_BIP353`); consigliarlo a un neofita
+voleva dire mandarlo dritto al rifiuto. Misty Breez guardato e lasciato
+fuori: indirizzo LNURL sì, ma Liquid sotto e mai provato nel P2P.
+
+FUORI, apposta. Il P2P: lì le fatture da pagare sono hold, e i wallet
+hanno già le loro righe (WoS, Phoenix); una guida generica lì direbbe
+cose non vere. L'indirizzo di Wallet of Satoshi nel P2P non passa la
+verifica (sapere.md lo dice già).
+
+PROVATO. `prove_guida_wallet` (9): il foglio dopo quello della fattura e
+in `closeSheet`, Wallet of Satoshi sì e Phoenix no, i tre avvisi, il link
+unico https, le cinque porte, il Profilo solo senza indirizzo, la riga
+on-chain, il campo sull'endpoint di sempre; sotto node il riquadro nei tre
+stati (campo, indirizzo già lì, DEMO vuoto) e la riga della fattura.
+Controprove: quattro mutazioni (guardia DEMO, spegnimento on-chain,
+`closeSheet`, una porta tolta), quattro rosse. Ritoccate le prove
+vecchie che il primo giro ha fatto arrossire: quattro banchi node che
+estraggono `payoutPanel` o `refundPanel` (fattura-solo-incasso, rimborso
+meno spese, annullata pagata, preventivo dello swap) hanno la riga finta;
+i gesti col velo «Invio sats» sono sette (la guida, come le due sorelle,
+può far partire gli incassi in attesa); la riga è in `--ink-soft` e non in
+`--muted` (a 12,5px il grigio chiaro resta a controlli e dati); la
+sezione sta nella categoria «mercatino». GIRATO, sull'albero di
+origin/develop f0b2a6b3 più questo cantiere: `PROVE_SEVERE=1 python
+prove.py` 28908 passate, 0 fallite, 0 saltate (nostr-tools 2.25.2 fuori
+dal repo come sul PC); `collaudi_ci.py --elenco ci/collaudi.txt` in un
+venv senza coincurve, 139 verdi e 0 rossi (girato prima dei ritocchi a
+prove e colore, che i collaudi non leggono).
+
+DA GUARDARE. I nomi dei bottoni dentro Wallet of Satoshi («Ricevi») sono
+quelli del suo menu oggi: se cambiano, la guida va ritoccata. Se i
+neofiti si fermano ancora al wallet, la strada C dello studio.

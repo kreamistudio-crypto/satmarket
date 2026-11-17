@@ -374,3 +374,9 @@ frase: Negli scambi P2P on-chain, quando i bitcoin sono nel deposito di garanzia
 dove: «I miei scambi», la card on-chain e la pagina dello scambio (riga «Tempo per pagare», riquadro «⭐ Lascia una recensione»); il messaggio del bot «Scambio on-chain concluso!».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-17 · primo-wallet
+frase: Chi non ha ancora un wallet adesso trova una guida in tre passi: quale scaricare (Wallet of Satoshi, il più facile), come salvare il backup e dove trovare il proprio indirizzo Lightning, da incollare subito lì dentro per incassare. I sats restano nel tuo wallet, non su Barattolo.
+dove: il link «Non hai un wallet? Te lo spieghiamo in tre passi» sotto la fattura da pagare, nel riquadro «💰 Come ricevi i tuoi sats» di un ordine e nel Profilo accanto al Lightning address.
+leva: nessuna
+pubblico: sì

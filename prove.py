@@ -6808,6 +6808,9 @@ def prove_fattura_solo_incasso():
           # server), SPENTO per la stessa ragione: acceso lo prova
           # `prove_swap_auto_schermate`, e il giro vero `collaudo_swap_auto`
           "const swapAutoAcceso = () => false, swapAuto = () => ({});\n"
+          # ...e la porta della guida «Il tuo primo wallet» (17 nov
+          # 2026): una riga fissa, la prova `prove_guida_wallet`
+          "const rigaGuidaWallet = () => '';\n"
           + pezzo_js(mini, "function importoBolt11(pr){", "\n}\n") + "\n}\n"
           + pezzo_js(mini, "function leggiBolt11(pr){", "\n}\n") + "\n}\n"
           + pp +
@@ -10611,9 +10614,12 @@ def prove_busta_ritiro():
     # corso…», quindi il default puo' restare SOLO a chi i sats li
     # muove davvero — e' cosi' che quella frase e' finita sopra il
     # salvataggio di un feedback (ago 2026, dal campo).
-    prova("il default dei sats resta ai sei gesti che li muovono",
-          {"saveLnAddress", "salvaLnAddressProfilo", "adminResolve",
-           "saveSellerInvoice", "confirmReceived", "resoRicevuto"},
+    # (17 nov 2026, primo-wallet) il settimo e' la terza porta del
+    # Lightning address, il campo della guida «Il tuo primo wallet»:
+    # come le sue due sorelle puo' far partire gli incassi in attesa
+    prova("il default dei sats resta ai sette gesti che li muovono",
+          {"saveLnAddress", "salvaLnAddressProfilo", "salvaLnAddressGuida",
+           "adminResolve", "saveSellerInvoice", "confirmReceived", "resoRicevuto"},
           _chi_chiama("bottoneInAttesa(btn);"))
     # e l'etichetta del bottone e' la stessa frase del velo: due
     # posti da tenere in pari sono un posto che un giorno diverge
@@ -28576,6 +28582,8 @@ const fetch = async (u, o) => { chiamate.push([u, o.method, o.body]);
                 "function pulisciFattura(t){",
                 "function refundPanel(o){",
                 "async function adminResolve(esito, btn){"))
+            # la porta della guida «Il tuo primo wallet» (17 nov 2026)
+            + "const rigaGuidaWallet = () => '';\n"
             + "const CASI = " + json.dumps([c[1:4] for c in CASI]) + ";\n"
             + r"""
 const ord = x => Object.assign({id:7, role:'admin', state:'dispute',
@@ -186433,6 +186441,8 @@ def prove_annullata_pagata():
           + fn("function chiusoDalTimer(")
           + fn("function decidibileDalModeratore(")
           + fn("function puoiLasciareFeedback(o){")
+          # la porta della guida «Il tuo primo wallet» (17 nov 2026)
+          + "const rigaGuidaWallet = () => '';\n"
           + fn("function refundPanel(o){")
           + "function stepper(o){ const s = o.state;\n" + blocco
           + "\n  return steps.map((st,i) => [i<progress?'done':"
@@ -193639,6 +193649,7 @@ function el(){ return null; }
 function haptic(){}
 function leggiBolt11(){ return null; }
 function nettoVenditore(o){ return o.listing.price; }
+const rigaGuidaWallet = () => '';   // la guida «Il tuo primo wallet» (17 nov 2026)
 let myLnAddress = '', currentOrder = null, swapLeve = null;
 const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
 /* (20 ott 2026, tappa 3) lo swap si fa dal telefono: il file suo e'
@@ -201296,6 +201307,80 @@ def prove_onchain_promemoria():
            "await _notifica_p2p_onchain(o, chi, testo, _p2p_onchain_bottone(o))" in ronda))
 
 
+def prove_guida_wallet():
+    """LA GUIDA «👛 IL TUO PRIMO WALLET» (17 nov 2026, cantiere
+    primo-wallet). Andrea voleva un wallet custodial per i neofiti; dallo
+    studio ha scelto la strada SENZA custodia: una guida a un wallet di
+    terzi, e fra i wallet SOLO Wallet of Satoshi (l'indirizzo di Phoenix
+    e' BIP-353, il nodo non lo sa pagare: consigliarlo sarebbe una
+    trappola). Qui: il foglio al posto giusto nella pila, le cinque porte,
+    la riga che la porta on-chain spegne, il campo che usa l'endpoint di
+    sempre, e — sotto node — il riquadro dell'indirizzo nei suoi tre
+    stati."""
+    print("\n[la guida «Il tuo primo wallet»]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    i_g = mini.index('<div class="sheet" id="walletGuidaSheet"')
+    guida = mini[i_g:mini.index("\n  </div>\n", i_g)]
+    prova("il foglio sta DOPO quello della fattura (l'indietro chiude "
+          "prima la guida, la fattura resta sotto) ed e' in closeSheet",
+          (True, True),
+          (0 < mini.index('<div class="sheet" id="paySheet"') < i_g,
+           "el('walletGuidaSheet').classList.remove('open');" in mini))
+    prova("...consiglia Wallet of Satoshi e NON Phoenix (lo nomina solo "
+          "per dire che il suo indirizzo non si paga)",
+          (True, True, False),
+          ("Wallet of Satoshi, il più facile" in guida,
+           "Barattolo non lo sa ancora pagare" in guida,
+           "Scarica Phoenix" in guida or "phoenixwallet.me'" in mini))
+    prova("...dice dove stanno i sats, il backup e che il wallet non e' "
+          "nostro", (True, True, True),
+          ("nel tuo wallet</b>, non su Barattolo" in guida,
+           "<b>backup</b>" in guida,
+           "non è di Barattolo" in guida))
+    _lk = pezzo_js(mini, "const LINK_GUIDA_WALLET = {", "\n};")
+    prova("...e il suo link e' uno, nostro e https", ["https://www.walletofsatoshi.com"],
+          re.findall(r"'(https?://[^']+)'", _lk))
+    porte = mini.count("${rigaGuidaWallet()}")
+    prova("le porte: i due pannelli dell'incasso, il rimborso e il Profilo "
+          "(con la funzione), piu' il foglio della fattura (nel markup)",
+          (4, True), (porte, 'id="payGuidaWallet"' in mini))
+    _pl = pezzo_js(mini, "function renderLnAddress(){", "\n}\n")
+    prova("...nel Profilo solo nel ramo SENZA indirizzo", True,
+          _pl.index("${rigaGuidaWallet()}") > _pl.index("if (myLnAddress && !lnAddrModifica)"))
+    prova("la porta on-chain spegne la riga, il ritorno al Lightning la "
+          "riaccende", (1, 2),
+          (mini.count("payGuidaWalletVista(false);"), mini.count("payGuidaWalletVista(true);")))
+    _sg = pezzo_js(mini, "async function salvaLnAddressGuida(btn){", "\n}\n")
+    prova("il campo della guida usa l'endpoint e la guardia di sempre, e "
+          "ridisegna Profilo e ordine aperto", (True, True, True, True),
+          ("`${API_BASE}/me/ln-address`" in _sg,
+           "!addr.split('@')[1]?.includes('.')" in _sg,
+           "renderLnAddress();" in _sg, "ridisegnaOrdine(viva)" in _sg))
+    import shutil as _sh, subprocess as _sp
+    if not _sh.which("node"):
+        salta("il riquadro dell'indirizzo sotto node", "node non c'e'")
+        return
+    banco = ("const nodi = {};\nconst el = id => (nodi[id] ||= {style: {}, innerHTML: ''});\n"
+             "const esc = x => String(x).replace(/</g, '&lt;');\n"
+             "let DEMO = false, myLnAddress = '';\n"
+             + pezzo_js(mini, "function renderGuidaWallet(){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function payGuidaWalletVista(si){", "\n}\n") + "\n}\n"
+             "const g = [];\nconst h = () => el('walletGuidaIndirizzo').innerHTML;\n"
+             "renderGuidaWallet(); g.push(h().includes('id=\"lnAddrGuida\"'));\n"
+             "myLnAddress = 'mario@walletofsatoshi.com'; renderGuidaWallet();\n"
+             "g.push(h().includes('mario@walletofsatoshi.com') && !h().includes('lnAddrGuida'));\n"
+             "DEMO = true; renderGuidaWallet(); g.push(h());\n"
+             "payGuidaWalletVista(false); g.push(el('payGuidaWallet').style.display);\n"
+             "payGuidaWalletVista(true); g.push(el('payGuidaWallet').style.display);\n"
+             "console.log(JSON.stringify(g));")
+    r = _sp.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+    prova("sotto node: senza indirizzo il campo, con l'indirizzo la riga "
+          "verde senza campo, in DEMO niente; la riga della fattura si "
+          "spegne e si riaccende",
+          [True, True, "", "none", ""],
+          json.loads(r.stdout or "null") if r.returncode == 0 else r.stderr)
+
+
 def prove_onchain_txid_moneta():
     """L'ID DELLA TRANSAZIONE IN MONETA NELLO SCAMBIO ON-CHAIN (17 nov
     2026, cantiere onchain-chat-sollecito, Andrea: «Perché per usde non si
@@ -202988,7 +203073,7 @@ CATEGORIE = {
     filtro_onchain_tutto
     """.split(),
     "mercatino": """
-    mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore app_negozio
+    guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore app_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     ricategorizza collaudo_ricategorizza asta proxy_asta annullo
@@ -203692,6 +203777,7 @@ def main():
     prove_onchain_come_lightning,
     prove_onchain_promemoria,
     prove_onchain_txid_moneta,
+    prove_guida_wallet,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
     prove_scelta_rete_mercatino,

@@ -9364,6 +9364,7 @@
      vince per specificita': quel verde e' dichiarato, non ereditato
      per caso. */
   .fine-frase{white-space:nowrap}
+  .guida-wallet-riga{font-size:12.5px;color:var(--ink-soft);font-weight:600;margin:8px 0 10px}
   .scopri-link{border:0;background:none;padding:0;margin:0;
     font:inherit;font-weight:800;color:inherit;
     text-decoration:underline;text-underline-offset:3px;
@@ -15852,6 +15853,10 @@ document.getElementById('cartello')?.remove();</script>
     <div class="qr" id="payQr"></div>
     <div class="invoice" id="payInvoice" onclick="copiaInvoice()" style="cursor:pointer" title="Tocca per copiare">lnbc…</div>
     <div id="payQrNota" style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">inquadra il QR col wallet, o tocca la invoice per copiarla</div>
+    <!-- la porta della guida «Il tuo primo wallet» (17 nov 2026): e' di
+         Lightning, quindi la porta on-chain la spegne e il ritorno alla
+         fattura la riaccende (`payGuidaWalletVista`) -->
+    <div id="payGuidaWallet" class="guida-wallet-riga" style="text-align:center;margin:-6px 0 12px">Non hai un wallet? <button type="button" class="scopri-link" onclick="apriGuidaWallet()">Te lo spieghiamo in tre passi</button></div>
     <!-- LA SCADENZA E LA PORTA DEL WALLET (24 set 2026, «Paga ora»):
          una riga sola, accesa da mostraQr per OGNI flusso che apre il
          foglio. A sinistra il conto alla rovescia letto dalla bolt11;
@@ -17025,6 +17030,58 @@ document.getElementById('cartello')?.remove();</script>
       qualsiasi app, non solo qui.
     </div>
     <button class="btn primary" style="margin-top:14px" onclick="navIndietro()">Ho capito, torno all'accesso</button>
+  </div>
+
+  <!-- ============ SHEET GUIDA «IL TUO PRIMO WALLET» ============
+       (17 nov 2026, cantiere primo-wallet, scelta di Andrea sullo studio
+       del wallet custodial: la strada B, NIENTE CUSTODIA — una guida a
+       un wallet di terzi, e i sats restano di chi li ha.) Sta DOPO il
+       foglio del pagamento nel markup, per la stessa ragione della guida
+       Nostr: navPila ordina gli strati per posizione, quindi aperta dal
+       foglio della fattura l'indietro chiude prima la guida e la fattura
+       resta sotto. Markup fisso (nessun dato utente dentro): l'unica
+       parte viva e' il riquadro dell'indirizzo, che scrive
+       `renderGuidaWallet`. L'ELENCO DEI WALLET E' QUI E SOLO QUI (piu'
+       i link in LINK_GUIDA_WALLET): si cambia in un punto. -->
+  <div class="sheet" id="walletGuidaSheet" role="dialog" aria-modal="true" aria-labelledby="walletGuidaTit">
+    <div class="grab"></div>
+    <h3 id="walletGuidaTit">👛 Il tuo primo wallet</h3>
+    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.6">
+      Per pagare e per incassare su Barattolo serve un <b>wallet
+      Lightning</b>: un'app gratuita sul telefono dove tieni i tuoi sats.
+      I sats stanno <b>nel tuo wallet</b>, non su Barattolo: noi li
+      teniamo solo il tempo di un affare, nel deposito di garanzia.
+    </div>
+
+    <div style="font-weight:800;font-size:14px;margin-top:16px">⚡ Wallet of Satoshi, il più facile</div>
+    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.6">
+      In Europa i sats restano <b>sul tuo telefono</b>, non sui loro server.
+      <br>1. Installa Wallet of Satoshi.
+      <br>2. Aprilo. Se ti chiede di salvare il <b>backup</b> (le parole
+      di recupero), fallo subito: se perdi il telefono, è l'unico modo
+      per riavere i tuoi sats.
+      <br>3. Tocca <b>«Ricevi»</b>: in alto c'è il tuo indirizzo, tipo
+      <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>.
+      Copialo e incollalo qui sotto.
+    </div>
+    <button class="btn ghost" style="margin-top:8px" onclick="apriLinkGuidaWallet('wos')">⚡ Scarica Wallet of Satoshi</button>
+    <div id="walletGuidaIndirizzo"></div>
+
+    <div style="font-weight:800;font-size:14px;margin-top:16px">💶 I primi sats</div>
+    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.6">
+      Te li può mandare un amico al tuo indirizzo, oppure li compri in
+      euro nel <b>P2P</b> di Barattolo.
+    </div>
+
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:14px">
+      Hai già un altro wallet? Va bene qualsiasi wallet che ti dia un
+      indirizzo Lightning (<span class="mono" style="font-size:11px">nome@dominio</span>).
+      Quello di Phoenix Barattolo non lo sa ancora pagare: con Phoenix, a
+      ogni vendita incolli una fattura.
+      <br>Wallet of Satoshi non è di Barattolo: è un'app di altri, e non
+      ci dà niente per consigliarla.
+    </div>
+    <button class="btn primary" style="margin-top:14px" onclick="navIndietro()">Ho capito</button>
   </div>
 
   <!-- ============ SHEET COLLEGAMENTO (npub già verificata) ============ -->
@@ -36005,6 +36062,7 @@ function closeSheet(){
   chiudiAppuntamentoNip46('foglio chiuso');   // la cassetta non aspetta i suoi dieci minuti
   salaNip46Chiudi();                          // e la sala d'attesa non resta appesa al foglio
   el('nostrGuidaSheet').classList.remove('open');
+  el('walletGuidaSheet').classList.remove('open');
   el('collegaSheet').classList.remove('open');
   el('nwcConfermaSheet').classList.remove('open');
   el('installSheet').classList.remove('open');
@@ -40527,6 +40585,7 @@ function payoutPanel(o){
         <br><br><b>⚡ Imposta il tuo Lightning address</b> (lo trovi nel tuo wallet,
         tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>):
         <b>non scade mai</b>, lo usiamo al momento del pagamento, e lo fai <b>una volta sola</b> per tutte le vendite.</div>
+      ${rigaGuidaWallet()}
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
       <button class="btn orange" onclick="saveLnAddress(this)">⚡ Attiva incassi automatici</button>
       <div class="hint" style="margin-top:14px">Non hai un Lightning address? Va bene lo stesso: quando l'acquirente conferma
@@ -40580,6 +40639,7 @@ function payoutPanel(o){
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address (lo trovi nel tuo wallet,
         tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>):
         <b>non scade mai</b>, lo fai <b>una volta sola</b> e tutti gli incassi, di ogni vendita, saranno automatici.</div>
+      ${rigaGuidaWallet()}
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
       <button class="btn orange" onclick="saveLnAddress(this)">⚡ Attiva incassi automatici</button>
       <div class="hint" style="margin-top:14px"><b>Oppure</b>, solo per questo ordine: genera <b>adesso</b> nel tuo wallet
@@ -40695,7 +40755,8 @@ function renderLnAddress(){
       al momento del pagamento, e lo imposti una volta sola per tutte
       le vendite. È l'unico metodo che si salva qui: senza, a ogni
       vendita ti avvisiamo quando tocca a te e incolli una fattura
-      nell'ordine.</div>`;
+      nell'ordine.</div>
+    ${rigaGuidaWallet()}`;
 }
 
 async function salvaLnAddressProfilo(btn){
@@ -46890,6 +46951,7 @@ function refundPanel(o){
       <h4>↩️ Ricevi il tuo rimborso</h4>
       <div class="hint">${(annulloVenditore(o) || annullataPagata(o)) ? `${perche}` : o.speseReseSats ? `Il moderatore ha deciso il <b>rimborso meno ${nomeQuotaVenditore(o)}</b>` : 'La disputa è stata risolta <b>a tuo favore</b>'}: ti aspettano <b class="net">${sats}<span class="unit">sats</span></b> (${o.codiciVenditore ? `il totale meno ${fmt(o.speseReseSats)} sats per ${nomeQuotaVenditore(o)}, che restano al venditore` : o.speseReseSats ? `il totale meno ${fmt(o.speseReseSats)} sats di spedizione, che restano al venditore` : `rimborso integrale${annulloVenditore(o) ? ', spedizione compresa' : ''}`}).
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address per riceverli subito (e per tutti gli incassi futuri).</div>
+      ${rigaGuidaWallet()}
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
       <button class="btn orange" onclick="saveLnAddress(this)">⚡ Ricevi con Lightning address</button>
       <div class="hint" style="margin-top:14px"><b>Oppure</b> genera nel tuo wallet una invoice di <b>esattamente ${sats} sats</b> e incollala qui.</div>
@@ -62237,10 +62299,17 @@ let payMetodoOccupato = false;   // un passaggio e' in corso
 let payNotaLn = null;            // la nota del Lightning, per il ritorno
 let payOffAcc = null;            // l'accordo del foglio (qui sempre nessuno), per il ritorno
 
+/* la riga della guida al wallet nel foglio della fattura: Lightning si',
+   on-chain no (la guida parla di un wallet Lightning) */
+function payGuidaWalletVista(si){
+  const r = el('payGuidaWallet');
+  if (r) r.style.display = si ? '' : 'none';
+}
 function payMetodoSpegni(){
   if (payOcTimer) { clearInterval(payOcTimer); payOcTimer = null; }
   if (payOc && el('payQrNota'))
     el('payQrNota').textContent = 'inquadra il QR col wallet, o tocca la invoice per copiarla';
+  payGuidaWalletVista(true);
   payOc = null; payOcPronto = null; payMetodoAcceso = false;
   acqMetodo = 'ln';
   const box = el('payMetodo'), nota = el('payMetodoNota');
@@ -62410,6 +62479,7 @@ async function payPassaA(m){
       if (payOcTimer) { clearInterval(payOcTimer); payOcTimer = null; }
       payOc = null;
       el('payQrNota').textContent = 'inquadra il QR col wallet, o tocca la invoice per copiarla';
+      payGuidaWalletVista(true);
       aggiornaPayHint();
       acqMetodo = 'ln'; renderPayMetodo(); payMetodoNota('');
       el('payAmount').textContent = '…';
@@ -62510,6 +62580,7 @@ async function payDisegnaOnchain(){
   porta.onclick = null;
   porta.style.display = payOc.ok ? '' : 'none';
   el('payQrNota').textContent = 'inquadra il QR col wallet Bitcoin, o tocca l\'indirizzo per copiarlo';
+  payGuidaWalletVista(false);
   el('payHint').innerHTML = '';   /* il wallet NWC e' Lightning: qui non c'entra */
   const hoPagato = el('payHoPagato');
   if (hoPagato) { hoPagato.disabled = false; hoPagato.removeAttribute('aria-busy'); }
@@ -69195,6 +69266,94 @@ const LINK_GUIDA = {
 };
 function apriLinkGuida(quale){
   const url = LINK_GUIDA[quale];
+  if (!url) return;
+  if (tg?.initData && tg.openLink) { try { tg.openLink(url); return; } catch(e){} }
+  window.open(url, '_blank', 'noopener');
+}
+
+/* ---------------- la guida «👛 Il tuo primo wallet» ----------------
+   (17 nov 2026, cantiere primo-wallet.) Andrea pensava a un wallet
+   custodial per i neofiti; lo studio (project files,
+   wallet-custodial/) ha messo in fila tre strade e lui ha scelto la B:
+   NESSUNA CUSTODIA, una guida a un wallet di terzi. Il perche' in
+   Cantieri, «Il tuo primo wallet». Si apre SOPRA quel che c'e' (il
+   pattern della guida Nostr): dal foglio della fattura, dal pannello
+   dell'incasso e dal Profilo, e l'indietro riporta dove si era.
+   La porta e' una riga sola, `rigaGuidaWallet()`, uguale ovunque. */
+function rigaGuidaWallet(){
+  return '<div class="guida-wallet-riga">Non hai un wallet? '
+    + '<button type="button" class="scopri-link" onclick="apriGuidaWallet()">Te lo spieghiamo in tre passi</button></div>';
+}
+function apriGuidaWallet(){
+  haptic();
+  renderGuidaWallet();
+  el('sheetBg').classList.add('open');
+  el('walletGuidaSheet').classList.add('open');
+}
+/* Il riquadro dell'indirizzo, l'unica parte viva della guida. In DEMO
+   non c'e' (come il blocco del Profilo: niente account, niente
+   indirizzo da salvare); chi l'indirizzo ce l'ha gia' lo legge, e non
+   gli si propone un campo vuoto. */
+function renderGuidaWallet(){
+  const box = el('walletGuidaIndirizzo');
+  if (!box) return;
+  if (DEMO) { box.innerHTML = ''; return; }
+  if (myLnAddress) {
+    box.innerHTML = `
+      <div style="margin-top:12px;font-size:13px;font-weight:800;color:var(--trust)">
+        ✅ Il tuo indirizzo c'è già: <span class="mono">${esc(myLnAddress)}</span></div>`;
+    return;
+  }
+  box.innerHTML = `
+    <div class="field" style="margin-top:12px"><label>Il tuo Lightning address</label>
+      <input id="lnAddrGuida" placeholder="nome@walletofsatoshi.com" autocomplete="off"
+             autocapitalize="none" spellcheck="false"></div>
+    <button class="btn orange" style="margin-top:0" onclick="salvaLnAddressGuida(this)">⚡ Attiva incassi automatici</button>`;
+}
+/* Lo stesso endpoint e la stessa guardia del Profilo
+   (`salvaLnAddressProfilo`): la guida e' una terza porta, non una
+   strada nuova. Dopo, si ridisegna quel che c'e' sotto — il Profilo
+   sempre, l'ordine se e' lui la vista aperta (gli incassi in attesa
+   possono essere appena partiti: si rileggono, come fa `saveLnAddress`). */
+async function salvaLnAddressGuida(btn){
+  haptic();
+  const addr = (el('lnAddrGuida')?.value || '').trim().toLowerCase();
+  if (!addr.includes('@') || !addr.split('@')[1]?.includes('.')) {
+    toast('Formato non valido: dev\'essere tipo nome@wallet.com'); return;
+  }
+  const ripristina = bottoneInAttesa(btn);
+  let r = null, d = {};
+  try {
+    r = await fetch(`${API_BASE}/me/ln-address`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({ln_address: addr})});
+    d = await r.json().catch(()=>({}));
+  } catch(e) { r = null; }
+  ripristina();
+  if (!r) { toast('Non è partito, riprova'); return; }
+  if (!r.ok) { toast(d.detail || 'Indirizzo non accettato, ricontrolla'); return; }
+  myLnAddress = d.ln_address;
+  lnAddrModifica = false;
+  renderGuidaWallet();
+  renderLnAddress();
+  toast(d.incassi_sbloccati > 0
+    ? '⚡ Attivato! E gli incassi in attesa sono partiti da soli 🔓'
+    : '⚡ Incassi automatici attivati!');
+  if (d.incassi_sbloccati > 0) { try { await loadOrders(); renderOrders(); } catch(e){} }
+  if (currentOrder && el('view-ordine')?.classList.contains('active')) {
+    const viva = orders.find(x => x.id === currentOrder.id) || currentOrder;
+    ridisegnaOrdine(viva);
+  }
+}
+/* Il link e' NOSTRO (la scala di apriLinkGuida): il sito del wallet,
+   che manda allo store giusto per il telefono — un id di store scritto
+   qui invecchierebbe in silenzio. */
+const LINK_GUIDA_WALLET = {
+  wos: 'https://www.walletofsatoshi.com',
+};
+function apriLinkGuidaWallet(quale){
+  const url = LINK_GUIDA_WALLET[quale];
   if (!url) return;
   if (tg?.initData && tg.openLink) { try { tg.openLink(url); return; } catch(e){} }
   window.open(url, '_blank', 'noopener');

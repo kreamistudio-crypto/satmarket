@@ -49,6 +49,7 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 - NWC (Nostr Wallet Connect): se colleghi il wallet dal Profilo, «⚡ Compra subito» paga in un tocco, e nel P2P la fattura per ricevere la fa il wallet da solo. La connessione resta solo sul tuo dispositivo, non arriva ai nostri server, e nel wallet le puoi dare un tetto di spesa.
 - Per incassare: l'indirizzo Lightning (quello con la @, tipo nome@dominio) si imposta una volta nel Profilo e non scade. Se non ce l'hai, quando l'affare si chiude ti avvisiamo e incolli una fattura nell'ordine in quel momento (prima no: una fattura scade).
 - Nel P2P l'indirizzo di Wallet of Satoshi non passa la verifica: lì si incolla una fattura del wallet, che invece funziona. Lo stesso vale per qualunque indirizzo che il servizio di scambio non riesce a verificare.
+- Chi non ha ancora un wallet trova la guida «👛 Il tuo primo wallet»: si apre dal link «Non hai un wallet? Te lo spieghiamo in tre passi», che sta sotto la fattura da pagare, nel riquadro dell'incasso o del rimborso di un ordine e nel Profilo accanto al Lightning address. Consiglia Wallet of Satoshi, il più facile (in Europa i sats restano sul telefono di chi lo usa), in tre passi: installalo, salva il backup se te lo chiede, tocca «Ricevi» e copia l'indirizzo nome@walletofsatoshi.com nel campo della guida. I primi sats si ricevono da un amico o si comprano in euro nel P2P. Va bene anche qualsiasi altro wallet che dia un indirizzo con la @; quello di Phoenix Barattolo non lo sa ancora pagare, quindi con Phoenix a ogni vendita si incolla una fattura. Barattolo non ha un wallet suo e non tiene i sats di nessuno: se qualcuno chiede un «conto su Barattolo», la risposta è questa guida.
 
 <!-- pezzo libro-005 | libro -->
 ## Libro · Comprare nel mercatino (1/2)
@@ -1018,7 +1019,7 @@ Tutorial
 Esci
 
 <!-- pezzo schermata-037 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · On-chain (1/3)
+## Schermata «On-chain e finestre della Mini App» · On-chain (1/4)
 
 ## On-chain
 ✕
@@ -1049,6 +1050,8 @@ Info P2P
  Paga con qualsiasi wallet Lightning. I sats restano bloccati e al sicuro finché non confermi di aver ricevuto l'oggetto.
 lnbc…
 inquadra il QR col wallet, o tocca la invoice per copiarla
+Non hai un wallet? 
+Te lo spieghiamo in tre passi
  ⚡ Apri nel wallet
 ⚡ Generane una nuova
 ✓ Ho pagato
@@ -1140,7 +1143,7 @@ Pubblica lo stesso
 💰 Offri
 
 <!-- pezzo schermata-038 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · 🎁 Lascia una mancia (2/3)
+## Schermata «On-chain e finestre della Mini App» · 🎁 Lascia una mancia (2/4)
 
 ## 🎁 Lascia una mancia
 ✕
@@ -1231,7 +1234,7 @@ Chiudi
 Un attimo…
 
 <!-- pezzo schermata-039 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · Entra con Nostr (3/3)
+## Schermata «On-chain e finestre della Mini App» · Entra con Nostr (3/4)
 
 ## Entra con Nostr
  Dimostri di possedere la tua chiave firmando una sfida.
@@ -1286,6 +1289,35 @@ Annulla
  del mondo Nostr, e la chiave che creano è tua e funziona con
  qualsiasi app, non solo qui.
 Ho capito, torno all'accesso
+
+<!-- pezzo schermata-040 | schermata -->
+## Schermata «On-chain e finestre della Mini App» · 👛 Il tuo primo wallet (4/4)
+
+## 👛 Il tuo primo wallet
+ Per pagare e per incassare su Barattolo serve un wallet
+ Lightning: un'app gratuita sul telefono dove tieni i tuoi sats.
+ I sats stanno nel tuo wallet, non su Barattolo: noi li
+ teniamo solo il tempo di un affare, nel deposito di garanzia.
+⚡ Wallet of Satoshi, il più facile
+ In Europa i sats restano sul tuo telefono, non sui loro server.
+1. Installa Wallet of Satoshi.
+2. Aprilo. Se ti chiede di salvare il backup (le parole
+ di recupero), fallo subito: se perdi il telefono, è l'unico modo
+ per riavere i tuoi sats.
+3. Tocca «Ricevi»: in alto c'è il tuo indirizzo, tipo
+ nome@walletofsatoshi.com.
+ Copialo e incollalo qui sotto.
+⚡ Scarica Wallet of Satoshi
+💶 I primi sats
+ Te li può mandare un amico al tuo indirizzo, oppure li compri in
+ euro nel P2P di Barattolo.
+ Hai già un altro wallet? Va bene qualsiasi wallet che ti dia un
+ indirizzo Lightning (nome@dominio).
+ Quello di Phoenix Barattolo non lo sa ancora pagare: con Phoenix, a
+ ogni vendita incolli una fattura.
+Wallet of Satoshi non è di Barattolo: è un'app di altri, e non
+ ci dà niente per consigliarla.
+Ho capito
 ## Ti conosciamo già!
 Usa l'account esistente
 Annulla
@@ -1746,5 +1778,13 @@ pubblico: sì
 
 frase: Negli scambi P2P on-chain, quando i bitcoin sono nel deposito di garanzia, chi compra ha 24 ore per pagare in USDT, ETH, Monero o USDe e 72 ore in euro o franchi, col conto alla rovescia su card e pagina. A scambio concluso si lascia la recensione come negli scambi Lightning, il bot dice i sats netti, e lo scambio conta nei «✅ scambi P2P».
 dove: «I miei scambi», la card on-chain e la pagina dello scambio (riga «Tempo per pagare», riquadro «⭐ Lascia una recensione»); il messaggio del bot «Scambio on-chain concluso!».
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-057 | novita -->
+## Novità · 2026-11-17 · primo-wallet
+
+frase: Chi non ha ancora un wallet adesso trova una guida in tre passi: quale scaricare (Wallet of Satoshi, il più facile), come salvare il backup e dove trovare il proprio indirizzo Lightning, da incollare subito lì dentro per incassare. I sats restano nel tuo wallet, non su Barattolo.
+dove: il link «Non hai un wallet? Te lo spieghiamo in tre passi» sotto la fattura da pagare, nel riquadro «💰 Come ricevi i tuoi sats» di un ordine e nel Profilo accanto al Lightning address.
 leva: nessuna
 pubblico: sì
