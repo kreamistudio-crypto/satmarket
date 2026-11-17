@@ -486,8 +486,8 @@ pubblico: sì
 ## 2026-11-17 · raccolta
 frase: Su Barattolo si può aprire una raccolta fondi in sats: un obiettivo, una scadenza fino a 60 giorni e una barra che si riempie. Chi vuole sostenerla manda uno zap, che va dritto al wallet di chi raccoglie, senza commissioni. Per aprirne una servono tre vendite concluse e un indirizzo Lightning; ogni raccolta la guardano i moderatori prima della vetrina.
 dove: Profilo → «Il tuo negozio» → «🎯 Raccolte fondi» (lì il bottone «🎯 Apri una raccolta»); in vetrina la tessera «Raccolte» accanto ad Aste, quando c'è almeno una raccolta; nella scheda di una raccolta il bottone «⚡ Sostieni con uno zap».
-leva: RACCOLTE_ATTIVE (accesa di serie; i depositi di garanzia, RACCOLTA_GARANTITA_ATTIVA, spenti di serie)
-pubblico: sì
+leva: RACCOLTE_ATTIVE spenta di serie (e i depositi di garanzia, RACCOLTA_GARANTITA_ATTIVA, spenti di serie)
+pubblico: no
 
 ## 2026-11-17 · inglese-tappa-1
 frase: Barattolo si legge anche in inglese: se il tuo Telegram o il tuo browser non sono in italiano, la vetrina, gli annunci e l'acquisto compaiono in inglese da soli, coi prezzi all'inglese (1,234.50 €). Ordini, P2P, Profilo e bot arrivano nelle prossime tappe. Per provarlo da un telefono italiano apri barattolo.store/?lingua=en (?lingua=it per tornare).

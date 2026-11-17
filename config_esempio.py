@@ -2119,8 +2119,9 @@ CASSA_MAX_SATS = 0
 # vendite confermate e un indirizzo Lightning apre una raccolta (obiettivo,
 # scadenza, barra); va in vetrina col via di un admin. Gli zap vanno DRITTI
 # al wallet di chi raccoglie (il motore della mancia: niente fee, niente
-# rimborso). Nasce ACCESA; False e riavvia (o il pannello) per spegnerla.
-RACCOLTE_ATTIVE = True
+# rimborso). Nasce SPENTA (scelta di Andrea, 17 nov): True e riavvia (o il
+# pannello) per accenderla.
+RACCOLTE_ATTIVE = False
 # I depositi di garanzia 2-di-3 on-chain nelle raccolte: a scadenza vanno a
 # chi raccoglie se i depositi raggiungono l'obiettivo, sennò tornano a chi li
 # ha messi. Servono l'on-chain e la terza chiave vera. SPENTA nel codice

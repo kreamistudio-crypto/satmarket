@@ -196989,8 +196989,9 @@ def prove_raccolte():
     # --- le sentinelle sul server ---
     prova("la garantita nasce SPENTA (prima il collaudo, regola di Alan)", True,
           "    RACCOLTA_GARANTITA_ATTIVA = False\n" in srv)
-    prova("le raccolte semplici nascono accese", True,
-          "    RACCOLTE_ATTIVE = True\n" in srv)
+    # (17 nov 2026, sera) spente di serie anche loro: il lancio e' di Andrea
+    prova("anche le raccolte semplici nascono spente (il lancio e' di Andrea)", True,
+          "    RACCOLTE_ATTIVE = False\n" in srv)
     for leva in ("RACCOLTE_ATTIVE", "RACCOLTA_GARANTITA_ATTIVA", "RACCOLTA_MAX_EURO",
                  "RACCOLTA_GIORNI_MAX", "RACCOLTA_MIN_GARANTITA_EURO",
                  "RACCOLTA_VENDITE_MIN", "RACCOLTA_ZAP_MAX_SATS"):

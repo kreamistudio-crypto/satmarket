@@ -114881,9 +114881,10 @@ def _mancia_leve() -> list:
 #   · ZERO XP da tutte e due le parti, niente distintivi: «gli XP sono
 #     il commercio e nient'altro». Nostr (zap goal NIP-75) e' la fase 2.
 #
-# LE LEVE (la regola di Andrea del 14 nov 2026: accese di serie; la
-# garantita SPENTA nel codice finche' Alan non la prova sul collaudo,
-# la regola del 17 nov sulle funzioni coi soldi):
+# LE LEVE (tutte e due SPENTE nel codice: la garantita finche' Alan non
+# la prova sul collaudo, la regola del 17 nov sulle funzioni coi soldi; le
+# semplici per scelta di Andrea del 17 nov sera, «Spente nel codice»: il
+# lancio lo fa lui con una riga nel config del VPS):
 #   RACCOLTE_ATTIVE               le raccolte, la vetrina, gli zap; spenta
 #                                 = 404 ovunque e niente in vetrina (le
 #                                 uscite gia' firmate restano firmabili)
@@ -114898,7 +114899,9 @@ def _mancia_leve() -> list:
 try:
     from config import RACCOLTE_ATTIVE
 except ImportError:
-    RACCOLTE_ATTIVE = True
+    # (17 nov 2026, sera) SPENTA di serie anche lei, scelta di Andrea: il
+    # lancio lo decide lui, con una riga nel config del VPS
+    RACCOLTE_ATTIVE = False
 try:
     from config import RACCOLTA_GARANTITA_ATTIVA
 except ImportError:

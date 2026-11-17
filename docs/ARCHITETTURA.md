@@ -36918,7 +36918,7 @@ mai il kind 0 di nessuno: regola ferrea 2).
   e avvisa. I depositi entrano in `_onchain_prossimo_esterno` e
   `_onchain_rimborsi_usati`, così gli indici esterni non si ripetono.
   LE LEVE (gruppo «🎯 Raccolte in sats» del pannello, `_raccolte_leve`):
-  `RACCOLTE_ATTIVE` accesa di serie, `RACCOLTA_GARANTITA_ATTIVA` SPENTA
+  `RACCOLTE_ATTIVE` SPENTA di serie (dal 17 nov sera, scelta di Andrea), `RACCOLTA_GARANTITA_ATTIVA` SPENTA
   di serie (prima il collaudo), `RACCOLTA_MAX_EURO` 1000,
   `RACCOLTA_GIORNI_MAX` 60, `RACCOLTA_MIN_GARANTITA_EURO` 50,
   `RACCOLTA_VENDITE_MIN` 3, `RACCOLTA_ZAP_MAX_SATS` 100.000. In `/api/me`
