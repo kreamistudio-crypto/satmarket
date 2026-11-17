@@ -88875,7 +88875,10 @@ def prove_p2p_card_scambio():
     prova("il numero e' senza segno, e non passa da premioTestoP2P", True,
           "premioTestoP2P(" not in _mio
           and "Math.abs(Math.round(p)) + '%</b> '" in _mio
-          and "const p = o.sats > 0 ? convenienzaFissaP2P(o, metroFissoP2P(o)) : (o.premium || 0);" in _mio)
+          # (17 nov 2026, convenienza-monete) col premio i sats non sono
+          # fissi, e la presa in un'altra valuta passa da `convenienzaPresaP2P`
+          and "const fisso = o.sats > 0 && !Math.round(Number(o.premium) || 0);" in _mio
+          and "convenienzaPresaP2P(o)" in _mio and ": (o.premium || 0);" in _mio)
     # ⚠️ LA CARD E IL CAPPELLO NON CONDIVIDONO PIU' NIENTE DI TESTO
     # (set 2026, due ritocchi di Andrea in fila). Il primo aveva
     # spezzato il verbo — «Vuoi comprare/vendere» nella lista, «Stai
@@ -161816,7 +161819,12 @@ out.rete = [(reteOcCoinP2P(eth) || {}).nome, reteOcCoinP2P(chf)];
 const q = riquadroCoinOcP2P(eth);
 out.riquadro = [/Manda ETH su Ethereum/.test(q), /\[Da mandare:0\.0153:0,0153 ETH\]/.test(q),
   /ethereum:0x52908400098527886E0F7030069857D2E4169EE7@1\?value=15300000000000000/.test(q),
-  riquadroCoinOcP2P(riga({metodi: ['ETH (Ethereum) 0.0153']})) === ''];
+  riquadroCoinOcP2P(riga({metodi: ['ETH (Ethereum) 0.0153']})) === '',
+  /* l'indirizzo nella sua riga col Copia, prima della cifra, e nessun
+     tasto in fondo (17 nov 2026, cantiere convenienza-monete) */
+  q.indexOf('[Indirizzo di destinazione:0x52908400098527886E0F7030069857D2E4169EE7:') >= 0
+    && q.indexOf('[Indirizzo di destinazione:') < q.indexOf('[Da mandare:'),
+  q.includes('<button')];
 out.recapito = [giudiceRecapitoOcCoinP2P('', ['ETH (Ethereum)']),
   /bitcoin/.test(giudiceRecapitoOcCoinP2P('bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', ['ETH (Ethereum)'])),
   giudiceRecapitoOcCoinP2P('qualcosa', ['SEPA'])];
@@ -161843,7 +161851,9 @@ console.log(JSON.stringify(out));
            "Dove vuoi gli euro", "🪙 Ho inviato gli ETH"], o["parole"])
     prova("la rete della moneta dello scambio, e niente in franchi", ["Ethereum", None], o["rete"])
     prova("IL RIQUADRO DI CHI PAGA: la rete, la cifra da copiare col punto, il QR EIP-681 con la "
-          "catena e i wei; senza indirizzo niente", [True, True, True, True], o["riquadro"])
+          "catena e i wei; senza indirizzo niente; l'indirizzo nella sua riga col «📋 Copia» "
+          "prima della cifra, e nessun tasto in fondo (17 nov 2026)",
+          [True, True, True, True, True, False], o["riquadro"])
     prova("il giudice dell'indirizzo di chi vende: vuoto va (si scrive dopo), un bitcoin no, "
           "fuori moneta tace", ["", True, ""], o["recapito"])
     prova("IL FILTRO DELLA VALUTA VALE ANCHE ON-CHAIN: «solo franchi», «ETH ed euro», solo "
@@ -162011,7 +162021,8 @@ process.stdout.write(JSON.stringify(out));
     rso = _fn_js(mini, "function rigaScambioOnchainP2P(o){")
     prova("«I miei scambi»: a mercato prima della presa i sats della card del libro "
           "(«≈ X sats»), mai lo zero di `o.sats` (dal canale Todo: «Vuoi ricevere 0 sats»)",
-          True, "const sats = typeof satsCardOnchainP2P === 'function' ? satsCardOnchainP2P(o)" in rso)
+          # (17 nov 2026) dopo il netto della fee (`satsNettiOnchainP2P`), il ripiego
+          True, ": typeof satsCardOnchainP2P === 'function' ? satsCardOnchainP2P(o)" in rso)
     spn = _fn_js(mini, "function segnaPilaNovitaP2P(box){")
     prova("la faccia unica: solo le monete e «Novità» (Andrea: «senza scritte dentro, "
           "a parte novità»), e il tocco riapre la pila",
@@ -200583,11 +200594,17 @@ out.senza = [riquadroRecapitoP2P(T), riquadroRecapitoP2P(T, '', {fiat: 'EUR', me
   riquadroRecapitoP2P(T, '', U({euro: 0})), riquadroRecapitoP2P(T, '', U({euro: null})),
   riquadroRecapitoP2P('Bonifico SEPA\nIBAN: IT60X0542811101000000123456', '', U())]
   .map(h => h.includes('Da mandare'));
-/* l'ordine dei pezzi on-chain: indirizzo, cifra, QR, poi il tasto dell'indirizzo */
+/* l'ordine dei pezzi on-chain: l'indirizzo col SUO «📋 Copia» accanto,
+   la cifra, il QR, il contratto; e in fondo, sotto il contratto, nessun
+   tasto (17 nov 2026, cantiere convenienza-monete: sembrava il Copia del
+   contratto) */
 const oc = riquadroUsdtOcP2P(U({recapito: TRON, euro: 9}));
-const a = oc.indexOf('>' + TRON + '</div>'), c = oc.indexOf('<span>Da mandare</span>'),
-      q = oc.indexOf('id="p2pOcUsdtQr"'), b = oc.indexOf('📋 Copia l\'indirizzo');
-out.oc = [copie(oc), a >= 0 && a < c && c < q && q < b, oc.includes('>9,00 USDT</b>')];
+const a = oc.indexOf('<span>Indirizzo di destinazione</span>'), ca = oc.indexOf('data-v="' + TRON + '"'),
+      c = oc.indexOf('<span>Da mandare</span>'), q = oc.indexOf('id="p2pOcUsdtQr"'),
+      k = oc.indexOf('Contratto del vero USDT');
+out.oc = [copie(oc), a >= 0 && a < ca && ca < c && c < q && q < k, oc.includes('>9,00 USDT</b>'),
+  oc.slice(k).includes('<button'), oc.includes('Copia l\'indirizzo'),
+  oc.includes('aria-label="Copia Indirizzo di destinazione">📋 Copia</button>')];
 out.ocSenza = [riquadroUsdtOcP2P(U({recapito: TRON, euro: 0})).includes('Da mandare'),
   riquadroUsdtOcP2P(U({recapito: '', euro: 9}))];
 console.log(JSON.stringify(out));
@@ -200607,10 +200624,128 @@ console.log(JSON.stringify(out));
           [[TRON, "12345.50"], True], [r.get("migliaia"), r.get("migliaiaVista")])
     prova("niente riga senza lo scambio, in euro, a cifra zero o vuota, su un IBAN",
           [False, False, False, False, False], r.get("senza"))
-    prova("on-chain: la cifra col suo «📋 Copia» fra l'indirizzo e il QR",
-          [["9.00"], True, True], r.get("oc"))
+    prova("on-chain: l'indirizzo col suo «📋 Copia» ACCANTO, poi la cifra col suo, poi il QR "
+          "e il contratto; sotto il contratto nessun tasto (17 nov 2026: il «Copia "
+          "l'indirizzo» in fondo sembrava quello del contratto)",
+          [[TRON, "9.00"], True, True, False, False, True], r.get("oc"))
     prova("...e senza cifra niente riga; senza indirizzo niente riquadro",
           [False, ""], r.get("ocSenza"))
+
+
+def prove_convenienza_monete():
+    """LA CONVENIENZA NELLE CARD USDT, IN MONETA E ON-CHAIN DI «I MIEI
+    SCAMBI» (17 nov 2026, cantiere convenienza-monete, Andrea: «nelle card
+    USDT, cioè nelle card con le altre monete, in quelle on-chain, non c'è
+    la convenienza. In tutte le altre card c'è»). Tre buchi:
+    1. un premio vuol dire MERCATO anche se la riga si porta dietro i sats
+       ripubblicati da mostrod alla presa (la card credeva fossero fissi);
+    2. a sats fissi, PRESO, in USDT, franchi o moneta il metro della presa
+       era zero apposta: adesso in moneta si conta sull'euro del filo
+       (`euroNodo`) col cambio della presa, in USDT e franchi col bitcoin
+       della presa e il passo euro→valuta di adesso;
+    3. la card on-chain non aveva la riga: adesso «X% più conveniente per
+       te» come quella di Lightning (premio a mercato, convenienza di
+       adesso a sats fissi nel libro, muta se fisso e preso)."""
+    print("\n[la convenienza nelle card USDT, in moneta e on-chain]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    banco = ("var cambioVivo = true, eurPerSat = 0.0005, usdPerSat = 0.00055;\n"
+             "const usdtP2P = o => o.fiat === 'USDT', chfP2P = o => o.fiat === 'CHF';\n"
+             "const coinP2P = o => ['ETH', 'XMR', 'USDE'].indexOf(String(o.fiat || '').toUpperCase()) >= 0 ? {cod: o.fiat} : null;\n"
+             "const perSatP2P = o => usdtP2P(o) ? usdPerSat : coinP2P(o) ? eurPerSat / 3000 : eurPerSat;\n"
+             + "".join(_fn_js(mini, f) for f in (
+                 "function affareP2P(o){", "function premioImplicitoTabacchinoP2P(euro, sats, cambio){",
+                 "function convenienzaFissaP2P(o, metro){", "function metroFissoP2P(o){",
+                 "function comeLibroP2P(o){", "function convenienzaPresaP2P(o){",
+                 "function premioMioP2P(o){", "function premioOcMioP2P(o){"))
+             + r"""
+const nudo = h => String(h).replace(/<[^>]+>/g, '');
+const mio = x => nudo(premioMioP2P(comeLibroP2P(x)));
+const out = {};
+out.ln = [
+  /* USDT a mercato, preso: i sats ripubblicati non lo fanno fisso */
+  mio({lato: 'compro', fiat: 'USDT', euro: 100, sats: 180000, premium: -3, satsMiei: 175000, cambioPresa: 50000}),
+  /* USDT a sats fissi, preso: il bitcoin della presa, il dollaro di adesso */
+  mio({lato: 'compro', fiat: 'USDT', euro: 100, sats: 200000, premium: 0, satsMiei: 199000, cambioPresa: 50000}),
+  /* ETH a sats fissi, preso: l'euro del filo col cambio della presa */
+  mio({lato: 'vendo', fiat: 'ETH', euro: 0.0153, euroNodo: 45.9, sats: 90000, premium: 0, satsMiei: 90500, cambioPresa: 50000}),
+  /* preso senza il cambio della presa: tace */
+  mio({lato: 'vendo', fiat: 'ETH', euro: 0.0153, euroNodo: 45.9, sats: 90000, premium: 0, satsMiei: 90500}),
+  /* in euro come sempre */
+  mio({lato: 'vendo', euro: 20, sats: 40000, premium: 0, satsMiei: 40200, cambioPresa: 50000}),
+  mio({lato: 'compro', euro: 20, sats: 0, premium: 4})];
+const oc = x => nudo(premioOcMioP2P(Object.assign({parte: 'compro', stato: 'preso', metodi: []}, x)));
+out.oc = [oc({mercato: true, premio: -2, sats: 0, euro: 20}),
+  oc({mercato: true, premio: 3, sats: 41000, euro: 20, parte: 'vendo', stato: 'rilasciato'}),
+  oc({mercato: false, premio: 0, sats: 42000, euro: 20, stato: 'pending'}),
+  oc({mercato: false, premio: 0, sats: 42000, euro: 20}),
+  oc({mercato: false, premio: 0, sats: 40000, euro: 22, fiat: 'USDT', stato: 'pending'}),
+  premioOcMioP2P(null)];
+console.log(JSON.stringify(out));
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("la convenienza nelle card USDT, in moneta e on-chain", "node non c'e'")
+        return
+    prova("Lightning: USDT a mercato preso col suo premio, USDT e ETH a sats fissi "
+          "presi contati alla presa, muta senza il cambio della presa, l'euro come "
+          "sempre",
+          ["3% più conveniente per te", "10% più conveniente per te",
+           "2% più conveniente per te", "", "al prezzo di mercato",
+           "4% meno conveniente per te"], r.get("ln"))
+    prova("on-chain: il premio a mercato (prima e dopo la presa, col verso di chi "
+          "legge), la convenienza di adesso a sats fissi nel libro, muta se fisso e "
+          "preso, nella valuta dell'ordine",
+          ["2% più conveniente per te", "3% più conveniente per te",
+           "5% più conveniente per te", "", "al prezzo di mercato", ""], r.get("oc"))
+    # I SATS AL NETTO DELLA FEE SULLA CARD ON-CHAIN (17 nov 2026, Andrea:
+    # «dovrebbe esserci scritto ciò che ricevo al netto della fee»): la cifra
+    # della card e' il totale del conto, confrontati sugli stessi casi
+    banco2 = ("const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n);\n"
+              "const feeMiaP2P = () => 0.01, commissioneVivaP2P = () => 0.02;\n"
+              + "".join(_fn_js(mini, f) for f in (
+                  "function commissioneOnchainP2P(o, deposito){", "function satsNettiOnchainP2P(o){",
+                  "function contoOnchainP2P(o){"))
+              + r"""
+const ricevi = h => { const m = /<span>(Ricevi|Deposita)<\/span><span class="mono"><span class="num">(≈ )?(-?\d+)/.exec(h);
+                      return m ? [m[1], !!m[2], Number(m[3])] : null; };
+const casi = [
+  /* lo scambio di Andrea: riceve, preso, la sua meta' 7.440 */
+  {parte: 'compro', ruolo: 'venditore', preso_il: 9, mercato: true, premio: 4, sats: 744036, quota_sats: 14880, quota_ricevente_sats: 7440},
+  /* chi deposita: l'importo col margine */
+  {parte: 'vendo', ruolo: 'compratore', preso_il: 9, mercato: true, sats: 744036, importo_sats: 760000, quota_sats: 14880, quota_ricevente_sats: 7440},
+  /* nel libro, a mercato: la stima e la fee stimata */
+  {parte: 'compro', ruolo: 'maker', mercato: true, sats: 0, stima: 40000},
+  /* nel libro, a sats fissi, chi vende */
+  {parte: 'vendo', mercato: false, sats: 50000},
+  /* con lo swap scelto */
+  {parte: 'compro', ruolo: 'venditore', preso_il: 9, sats: 100000, quota_sats: 2000, quota_ricevente_sats: 1000, swap: {sats: 700}}];
+const out = casi.map(o => { const n = satsNettiOnchainP2P(o); return [n && n.sats, n && n.circa, ricevi(contoOnchainP2P(o))]; });
+out.push(satsNettiOnchainP2P({parte: 'compro', mercato: true, sats: 0, stima: 0}));
+console.log(JSON.stringify(out));
+""")
+    r2 = _node_banco(banco2)
+    if r2 is None:
+        salta("i sats al netto sulla card on-chain", "node non c'e'")
+    else:
+        prova("la card on-chain dice i sats AL NETTO, la stessa cifra del conto: 736.596 "
+              "per lo scambio di Andrea, l'importo col margine per chi deposita, la stima "
+              "col ≈ nel libro, i sats fissi con la fee sopra, lo swap tolto; senza base "
+              "niente",
+              [[736596, False, ["Ricevi", False, 736596]],
+               [760000, False, ["Deposita", False, 760000]],
+               [39800, True, ["Ricevi", True, 39800]],
+               [50250, True, ["Deposita", True, 50250]],
+               [98300, True, ["Ricevi", True, 98300]], None], r2)
+    rs0 = _fn_js(mini, "function rigaScambioOnchainP2P(o){")
+    prova("...e la card la usa prima della stima lorda di ieri", True,
+          "satsNettiOnchainP2P(o)" in rs0
+          and rs0.index("satsNettiOnchainP2P(o)") < rs0.index("satsCardOnchainP2P(o)"))
+    rs = _fn_js(mini, "function rigaScambioOnchainP2P(o){")
+    prova("...e la card on-chain la scrive sotto le cifre e sopra lo stato, come "
+          "quella di Lightning",
+          True, "premioOcMioP2P(o)" in rs
+          and rs.index("+ righe") < rs.index("premioOcMioP2P(o)") < rs.index("p2p-scambio-stato"))
 
 
 def prove_indirizzo_resta_dove_sta():
@@ -202124,7 +202259,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -202829,6 +202964,7 @@ def main():
     prove_rete_scelta_p2p,
     prove_card_p2p_monete,
     prove_usdt_cifra_copia,
+    prove_convenienza_monete,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
     prove_scelta_rete_mercatino,

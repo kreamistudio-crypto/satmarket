@@ -85939,3 +85939,61 @@ hex di ZAP_NPUB».
 LA LEZIONE. Su develop la CI non gira, quindi il job «segreti» lo vede
 per la prima volta la promozione. Un cantiere che scrive una hex di 64
 (chiave pubblica, sha256, vettore di prova) la spezza in due da subito.
+
+## La convenienza nelle card USDT, in moneta e on-chain, e il «Copia» accanto all'indirizzo (17 nov 2026, cantiere convenienza-monete; Andrea dal telefono, appena dopo la promozione 031be30b: «Nei miei scambi, nelle card USDT, cioè nelle card con le altre monete, in quelle on-chain, non c'è la convenienza [...] da quando abbiamo fatto queste modifiche non c'è più la percentuale», poi sullo scambio USDT on-chain: «Non c'è il copia affianco all'indirizzo», «Sembra che quel tasto copi l'indirizzo del contratto piuttosto che l'indirizzo di destinazione»)
+
+LA CAUSA, TRE BUCHI. (1) La card on-chain di «I miei scambi»
+(`rigaScambioOnchainP2P`, 30 ott) non ha MAI avuto la riga della
+convenienza: le due card della foto di Andrea (500 USDT e 500 USDe, col
+₿) erano on-chain. (2) Sulla card di Lightning `premioMioP2P` guardava
+`o.sats > 0` per dire «sats fissi», e una riga che si porta dietro i sats
+ripubblicati da mostrod alla presa sembrava fissa anche col premio: la
+regola del coordinatore (`contoDettP2P`, 14 nov) dice che col premio
+l'ordine e' a mercato. (3) A sats fissi e PRESO, in USDT, franchi o
+moneta `metroFissoP2P` da' zero apposta (il cambio della presa timbrato
+dal server e' in euro): da quando ETH, XMR e USDe sono valute a sats
+fissi (16 nov, p2p-monete-valute) quelle card prese tacevano tutte.
+
+COSA FA. `premioMioP2P` tratta come mercato un premio diverso da zero;
+a sats fissi passa da `convenienzaPresaP2P`: quella di sempre, e quando
+tace su uno scambio preso in un'altra valuta, in moneta la si conta
+sull'euro del filo (`euroNodo`, che `comeLibroP2P` adesso porta) col
+cambio della presa — fermo per sempre, come un ordine in euro —, in
+USDT e franchi col bitcoin della presa e il passo euro→dollaro/franco di
+adesso (si muove di decimi al giorno, la percentuale e' intera). Senza
+cambio della presa tace. La card on-chain ha `premioOcMioP2P`, la stessa
+riga «X% più conveniente per te» sotto le cifre e sopra lo stato: a
+mercato il premio scelto (esatto anche dopo la presa: i sats li fa il
+server con quello), a sats fissi nel libro la convenienza di adesso
+nella valuta dell'ordine (`perSatP2P`), muta se fisso e preso (per i
+prezzi fissi on-chain il server non timbra un cambio della presa).
+IL COPIA: nei riquadri di chi paga on-chain (`riquadroUsdtOcP2P`,
+`riquadroCoinOcP2P`) l'indirizzo e' una `rigaDato` «Indirizzo di
+destinazione» col suo «📋 Copia» accanto, come la cifra; il tasto grande
+«Copia l'indirizzo» in fondo, SOTTO il contratto del vero USDT, se ne va.
+Copiava l'indirizzo giusto (verificato in Chromium: l'onclick passa
+`o.recapito`), ma stava attaccato al contratto, e chi incolla il
+contratto come destinazione perde i fondi.
+
+SCARTATO. Un cambio della presa in dollari, franchi e monete timbrato dal
+server (cambio di server e di database per una riga di card, e gli
+scambi gia' presi resterebbero muti); usare per le monete il cambio di
+ADESSO dopo la presa (la card di uno scambio chiuso si muoverebbe con
+ETH: la promessa di «Info P2P»); tenere anche il tasto in fondo (due
+Copia per la stessa cosa, e quello resta il piu' ambiguo).
+
+PROVATO. `prove_convenienza_monete` (nuova): USDT a mercato preso coi
+sats ripubblicati, USDT ed ETH a sats fissi presi, muto senza cambio
+della presa, l'euro come sempre; on-chain a mercato prima e dopo la
+presa, a sats fissi nel libro in euro e in USDT, muto fisso e preso; la
+riga al suo posto nella card. Ritoccate `prove_usdt_cifra_copia` e
+`prove_p2p_onchain_valute` (il Copia accanto all'indirizzo, nessun tasto
+sotto il contratto). Controprove rosse: il vecchio `o.sats > 0`, il
+ripiego della presa tolto, la riga tolta dalla card, l'indirizzo nudo.
+Il conto del premio dello scambio di Andrea (744.036 sats per 500 USDT,
++4%) torna col BTC a ~64.500 $ di quella mattina. Suite severa e
+collaudi della CI senza coincurve sull'albero del commit.
+DA GUARDARE. Sul telefono di Andrea dopo il deploy: le due card on-chain
+con «4% meno conveniente per te», e una card USDT o in moneta presa. Non
+toccato, da decidere: il conto del dettaglio di uno scambio in moneta
+preso a sats fissi resta senza la riga della convenienza.
