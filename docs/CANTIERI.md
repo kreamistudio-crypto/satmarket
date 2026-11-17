@@ -88711,3 +88711,64 @@ detto, il tasto senza ordine che non tocca niente),
 segnaposto, capi in € e in USDT), `prove_p2p_pubblica`; due scatti del
 foglio coi fogli di stile veri, chiaro e scuro. NON provato dal vivo sul
 telefono: la tastiera che si apre sul campo vuoto è quella di prima.
+
+## Il contanti di persona on-chain come su Lightning, primo pezzo: il luogo e le regole (17 nov 2026 sera, cantiere onchain-contanti; Andrea con la foto di una card on-chain «Contanti»: «Perché la card on-chain contanti non è come la card Lightning? Quando ci clicco poi non mi fa mettere la cauzione. Dovrebbe funzionare esattamente come Lightning anche l'on-chain contanti», «non c'è neanche il luogo dello scambio», «Anche la questione QR, tutto quanto»)
+
+DA DOVE VIENE. Il contanti negli scambi on-chain (2-di-3) era un metodo
+come un altro. Il foglio «Pubblica» on-chain era nato il 30 ott (cantiere
+oc-identico) SENZA la zona del contanti, scritto fra le «differenze della
+rete»: non lo era, era una dimenticanza diventata regola. E tutto il
+resto del contanti di Lightning (il riquadro delle regole nella pagina
+dello scambio, «📍 Sono qui», l'appuntamento «Dove vedervi», la cauzione)
+on-chain non è mai esistito: su Lightning le presenze si firmano con le
+chiavi usa-e-getta dello scambio di Mostro e la cauzione la tiene
+mostrod, e on-chain Mostro non c'è.
+
+IL CONFRONTO, pezzo per pezzo (Lightning → on-chain prima di oggi):
+zona nel foglio Pubblica → no; «📍» sulla card e nel dettaglio → no;
+tetto del contanti → solo nel telefono; regola nel foglio di chi prende
+→ no; scelta del metodo alla presa → no; cauzione col QR → no; riquadro
+del contanti, «📍 Sono qui», appuntamento e navigatore nella pagina dello
+scambio → no; parole «Ho consegnato i contanti» → solo in alcuni avvisi
+del bot (`_p2p_onchain_solo_contanti`); presenze nella card del
+moderatore → no; la mappa del contanti → solo ordini Lightning.
+
+LA DECISIONE SULLA CAUZIONE (card, Andrea, 17 nov 15:39 Rome): si blocca
+in LIGHTNING col QR, come oggi; la tiene Barattolo e torna a fine
+scambio; si prova prima sul collaudo. Scartate la cauzione on-chain
+dentro il 2-di-3 (lenta: è quella che Alan aveva bocciato lo stesso
+giorno, «come esperienza è pessima») e «niente cauzione».
+
+TRE PEZZI. Questo è il PRIMO, e non tocca soldi:
+- server: colonna `zona` su `p2p_onchain_ordini`; il giudice puro
+  `p2p_onchain_giudica_contanti` (con «Contanti» fra i metodi: il tetto
+  `P2P_CONTANTI_MAX_EURO`, tradotto in franchi, e la zona obbligatoria,
+  pulita da `_zona_pulita_p2p`, con le STESSE frasi del telefono); la
+  rotta `/pubblica` lo chiama dopo gli altri giudici e tiene la zona solo
+  col contanti; `_p2p_onchain_zona` la fa uscire nel libro (a tutti, come
+  quella di Lightning) e nella scheda dello scambio. La ripubblica rifà
+  la STESSA riga, quindi la zona resta;
+- telefono: il foglio «Pubblica» on-chain monta la sezione «Zona di
+  scambio» e il giudice la chiede (erano `!oc &&` e `!v.oc &&`); il corpo
+  porta `zona`; la card on-chain ha la riga «📍» sotto i metodi; il foglio
+  della presa dice la zona e, se «Contanti» è l'unico metodo, la regola
+  col tetto (con più metodi Lightning la mostra scegliendo «Contanti», e
+  on-chain la scelta del metodo arriva col terzo pezzo).
+
+IL SUO LIMITE, detto ad Andrea: gli ordini on-chain in contanti già nel
+libro non hanno la zona e restano senza (chi li ha pubblicati può
+ritirarli e rifarli). La zona non viaggia nel 38383, come su Lightning.
+
+PROVATO: `prove_onchain_contanti` (il giudice, la zona in uscita, la
+rotta, e in node la card vera: «📍» col contanti, niente su SEPA,
+tabacchino e ordini di ieri), `prove_contanti_zona`,
+`prove_deposito_p2p_onchain` (le tre sentinelle rovesciate sapendolo),
+`collaudo_p2p_onchain` sezione 11-septies (400 senza zona, 400 sopra il
+tetto del contanti, la zona ripulita nel libro e nella scheda); uno
+scatto della card e del foglio coi fogli di stile veri, tema scuro.
+
+RESTANO: il secondo pezzo (pagina dello scambio: riquadro, «📍 Sono qui»,
+appuntamento, parole), il terzo (scelta del metodo alla presa e cauzione
+Lightning tenuta da Barattolo, collaudo prima). NOTATO E NON FATTO: la
+mappa del contanti conta solo gli ordini Lightning; `_zona_ultima_p2p`
+(la zona proposta nel campo) guarda solo gli ordini Lightning.
