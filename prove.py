@@ -37010,6 +37010,11 @@ def _censimento(acceso, dopo=None):
               # la cassa in negozio (15 nov 2026): `_cassa_leve()` e il
               # suo giudice del tetto — la trappola, un'altra volta
               "cassa_max_sats", "_cassa_leve",
+              # le raccolte in sats (17 nov 2026): `_raccolte_leve()` e i
+              # suoi giudici dei numeri — la trappola, di nuovo
+              "_raccolta_intero", "raccolta_max_euro", "raccolta_giorni_max",
+              "raccolta_min_garantita_euro", "raccolta_vendite_min",
+              "raccolta_zap_max_sats", "_raccolte_leve",
               "_leve_stato"):
         exec(pezzo(f), amb)
     # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
@@ -47146,7 +47151,7 @@ def prove_fogli_di_casa():
     # (`pubblicaOnchainDalFoglioP2P`), gemello di quello di Lightning.
     # CENTOVENTI (17 nov 2026, cantiere stradina): «Esci da Barattolo?»
     # sulla casella che porta al partner dell'educazione (`vaiTappa`).
-    prova("i gesti che passano dalla domanda unica sono centoventi (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoventidue (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47158,8 +47163,9 @@ def prove_fogli_di_casa():
           "quattro della modifica e cancellazione dei feedback; dal 16 nov "
           "le quattro dei codici uno alla volta; dal 17 nov «Hai inviato gli "
           "USDe?» on-chain e il riepilogo di Barattozon on-chain; «Esci da "
-          "Barattolo?» della stradina)",
-          120, solo_codice(mini).count("chiediConferma({"))
+          "Barattolo?» della stradina; «Annulli il deposito?» e «Fermi la "
+          "raccolta?» delle raccolte)",
+          122, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -98526,7 +98532,9 @@ def prove_ricarica_resta():
     # (16 nov 2026, app-negozio) la quattordicesima: `apriAppNegozioDaUrl`,
     # la porta diretta di Barattolo Negozio (`/?app=negozio`)
     # (17 nov 2026, chiedi-locker) la quindicesima: `apriCorrieriDaUrl`
-    prova("le porte dei link d'arrivo sono quindici, ognuna con la sua bandierina", [15, []],
+    # (17 nov 2026, raccolta) la sedicesima: `apriRaccoltaDaUrl`, il tasto
+    # «🎯 Apri la raccolta» degli avvisi
+    prova("le porte dei link d'arrivo sono sedici, ognuna con la sua bandierina", [16, []],
           [len(porte), [p for p, b in bandiere.items() if not b]])
     prova("...e spegniLinkDaUrl le alza tutte", [],
           [b for b in bandiere.values() if not re.search(r"\b%s = " % b, sp)])
@@ -123701,7 +123709,9 @@ def prove_profilo_elegante():
         # negozio» e «Spedizioni e sconti»
         "grpCatalogo": ["accAnnunci", "accImport", "accDoppioni"],
         "grpNegozio": ["accNumeriNegozio", "vocMioNegozio", "accBanner",
-                       "accSlugNegozio", "accFerie", "vocCassa", "vocWidgetNegozio",
+                       "accSlugNegozio", "accFerie", "vocCassa",
+                       # (17 nov 2026) le raccolte fondi, subito dopo la cassa
+                       "vocRaccolte", "vocWidgetNegozio",
                        "accPunto"],
         "grpSpedizioni": ["accSpedizioniere", "accSpedGratis", "accScontoPacco",
                           "accCodici", "accPremiFedelta"],
@@ -152999,7 +153009,12 @@ def prove_freni():
            "mancia": (20, 3600), "mancia_guarda": (240, 3600),
            # la cassa in negozio (15 nov 2026): 300 conti e QR all'ora
            # per persona — un bar ne batte tanti, una raffica no
-           "cassa": (300, 3600)}, F)
+           "cassa": (300, 3600),
+           # le raccolte in sats (17 nov 2026): 5 raccolte scritte, 30
+           # fatture di zap, 10 depositi aperti e 10 segnalazioni all'ora
+           # per persona (i battiti passano dai freni della mancia e del P2P)
+           "raccolta_apri": (5, 3600), "raccolta_zap": (30, 3600),
+           "raccolta_deposito": (10, 3600), "raccolta_segnala": (10, 3600)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------
@@ -172279,9 +172294,10 @@ def prove_apri_nel_wallet():
     # «Apri nel wallet» nasce con href `#`: lo schema lo scrive la porta.
     # (14 nov 2026) il quinto QR e' quello della mancia al venditore
     # (15 nov 2026) il sesto e' quello della cassa in negozio
-    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei sei QR "
+    # (17 nov 2026) il settimo e' quello dello zap a una raccolta
+    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei sette QR "
           "e nel Riprova, e in nessuna navigazione da script",
-          [0, 7],
+          [0, 8],
           [len([l for l in mini.splitlines()
                 if re.search(r"""location(\.href)?\s*=\s*['"`]lightning:""", l)]),
            mini.count("('lightning:' + ")])
@@ -181021,8 +181037,11 @@ def prove_canale_admin():
           # on-chain pagato oltre un'ora dopo la scadenza del prezzo
           # (17 nov 2026, sentinella-loop) il server riavviato dalla
           # sentinella dopo un blocco, negli errori
-          {"assistenza": 1, "dispute": 6, "dm": 1, "errori": 36,
-           "liquidita": 5, "moderazione": 20, "riepiloghi": 27}, per_stanza)
+          # (17 nov 2026, raccolta) le raccolte: la nuova da approvare, la
+          # segnalata e la fermata nella moderazione, le uscite firmate a
+          # scadenza nelle dispute (sono soldi che si muovono)
+          {"assistenza": 1, "dispute": 7, "dm": 1, "errori": 36,
+           "liquidita": 5, "moderazione": 23, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -181057,7 +181076,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "105 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "109 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -181073,7 +181092,9 @@ def prove_canale_admin():
           "14 nov sera il pagamento uscito verso l'altra parte, la fattura "
           "con due hash e la chiave on-chain cambiata; e il recapito P2P "
           "on-chain cambiato dopo il deposito e l'acquisto on-chain pagato "
-          "tardi; dal 17 nov il server riavviato dalla sentinella)", 105,
+          "tardi; dal 17 nov il server riavviato dalla sentinella; e delle "
+          "raccolte la nuova da approvare, la segnalata, la fermata e le "
+          "uscite firmate)", 109,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -196746,9 +196767,11 @@ def prove_mancia_venditore():
                  if "invoice_da_ln_address(" in r and "def " not in r
                  and not r.lstrip().startswith("#")]
     # (15 nov 2026) ...e la cassa in negozio, che sa «pagato» allo
-    # stesso modo: gli incassi restano senza
-    prova("l'extra di LUD-21 lo passano solo la mancia e la cassa", True,
-          sum("extra" in r for r in chiamanti) == 2
+    # stesso modo: gli incassi restano senza. (17 nov 2026) ...e lo zap
+    # delle raccolte, che e' il motore della mancia: la sua prova e'
+    # `prove_raccolte`
+    prova("l'extra di LUD-21 lo passano solo la mancia, le raccolte e la cassa", True,
+          sum("extra" in r for r in chiamanti) == 3
           and any("invoice_da_ln_address(ln, sats, extra)" in r
                   for r in chiamanti)
           and any("invoice_da_ln_address(ln, int(v[\"sats\"]), extra)" in r
@@ -196842,6 +196865,232 @@ def prove_mancia_venditore():
     prova("...e le mance gia' ricevute restano", True,
           "700" in r.get("vendeSenzaMance", "")
           and "Aggiungilo dal Profilo" in r.get("vendeSenzaMance", ""))
+
+
+def prove_raccolte():
+    """LE RACCOLTE IN SATS (17 nov 2026, cantiere raccolta, Andrea: «Tutte
+    e due» e «ok» al piano). Qui i pezzi veri, eseguiti; il giro sulle
+    rotte vere, coi depositi 2-di-3 firmati da embit, e' `collaudo_raccolta`:
+     · i giudici puri: chi apre, i campi, le parole da guardare, i sats
+       dall'obiettivo in euro, l'esito, dove va un deposito;
+     · le sentinelle: la garantita SPENTA di serie (prima il collaudo), il
+       motore della mancia e il 2-di-3 riusati (nessun secondo motore di
+       firme), la seconda firma che non dipende dalla leva, zero XP;
+     · il client in node: la barra, «manca la tua firma», la card che
+       scappa i testi, la tessera solo con una raccolta viva."""
+    print("\n[le raccolte in sats: giudici, sentinelle, client]")
+    import re as _re
+    srv = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i = srv.index("# ---------- LE RACCOLTE IN SATS (17 nov 2026")
+    blocco_srv = srv[i:srv.index("# (Qui finisce il blocco delle raccolte.)", i)]
+
+    amb = {"re": _re, "_fmt_eur": lambda n: f"{n:,}".replace(",", "."),
+           "RACCOLTE_ATTIVE": True, "RACCOLTA_MAX_EURO": 1000,
+           "RACCOLTA_GIORNI_MAX": 60, "RACCOLTA_MIN_GARANTITA_EURO": 50,
+           "RACCOLTA_VENDITE_MIN": 3, "RACCOLTA_ZAP_MAX_SATS": 100_000}
+    for riga in ("RACCOLTA_GIORNI_MIN", "RACCOLTA_EURO_MIN", "RACCOLTA_TITOLO_MAX",
+                 "RACCOLTA_RACCONTO_MAX", "RACCOLTA_ZAP_MIN_SATS"):
+        m = _re.search(rf"^{riga} = .*$", srv, _re.M)
+        exec(m.group(0), amb)
+    i = srv.index("RACCOLTA_PAROLE_SOSPETTE = (")
+    exec(srv[i:srv.index(")\n", i) + 2], amb)
+    for nome in ("_raccolta_intero", "raccolta_max_euro", "raccolta_giorni_max",
+                 "raccolta_min_garantita_euro", "raccolta_vendite_min",
+                 "raccolta_zap_max_sats", "raccolta_perche_non_apre",
+                 "raccolta_giudica_campi", "raccolta_parole_sospette",
+                 "raccolta_sats_da_euro", "raccolta_esito",
+                 "raccolta_verso_deposito"):
+        exec(pezzo(nome), amb)
+
+    # --- chi apre ---
+    pna = amb["raccolta_perche_non_apre"]
+    prova("tre vendite, Lightning address, nessuna viva: apre", "",
+          pna(True, 3, "a@b.example", False))
+    prova("a leva spenta no", True, "non ci sono" in pna(False, 9, "a@b.example", False))
+    prova("una alla volta", True, "una alla volta" in pna(True, 9, "a@b.example", True))
+    prova("senza Lightning address no (gli zap vanno li')", True,
+          "indirizzo Lightning" in pna(True, 9, "", False))
+    prova("due vendite no, e lo dice coi numeri", True,
+          "almeno 3" in pna(True, 2, "a@b.example", False)
+          and "ne hai 2" in pna(True, 2, "a@b.example", False))
+    amb["RACCOLTA_VENDITE_MIN"] = "storta"
+    prova("una leva storta vale il valore di serie (3)", True,
+          "almeno 3" in pna(True, 0, "a@b.example", False))
+    amb["RACCOLTA_VENDITE_MIN"] = 3
+
+    # --- i campi ---
+    gc = amb["raccolta_giudica_campi"]
+    buono = "Un forno nuovo per il laboratorio di quartiere, per tutti."
+    v, no = gc("  Un   forno ", buono, "500", "30")
+    prova("campi buoni: il titolo ripulito, i numeri interi", True,
+          no == "" and v == {"titolo": "Un forno", "racconto": buono,
+                             "euro": 500, "giorni": 30})
+    prova("titolo corto no", True, gc("Uno", buono, 500, 30)[0] is None)
+    prova("racconto corto no", True, gc("Un forno", "corto", 500, 30)[0] is None)
+    prova("sotto i 10 € no (e' una mancia)", True, gc("Un forno", buono, 9, 30)[0] is None)
+    prova("oltre il tetto di 1.000 € no, e lo dice", True,
+          gc("Un forno", buono, 1001, 30)[0] is None
+          and "1.000" in gc("Un forno", buono, 1001, 30)[1])
+    prova("esattamente 1.000 € si'", 1000, (gc("Un forno", buono, 1000, 30)[0] or {}).get("euro"))
+    prova("oltre 60 giorni no", True, gc("Un forno", buono, 500, 61)[0] is None)
+    prova("sotto 7 giorni no", True, gc("Un forno", buono, 500, 6)[0] is None)
+    prova("numeri storti no, senza esplodere", True, gc("Un forno", buono, "tanti", 30)[0] is None)
+
+    # --- le parole da guardare ---
+    ps = amb["raccolta_parole_sospette"]
+    prova("interessi e rendimento si vedono", True,
+          {"interess", "rendiment"} <= set(ps("Ti do il 5% di interessi", "rendimento sicuro")))
+    prova("...e il «%»", True, "%" in ps("10% a chi entra"))
+    prova("un racconto pulito: niente", [], ps("Un forno per il quartiere", buono))
+    prova("«token» anche in maiuscolo", True, "token" in ps("Ricevi un TOKEN"))
+    prova("una parola che contiene «roi» in mezzo non conta (eroi)", False,
+          "roi" in ps("Siamo gli eroi del quartiere"))
+
+    # --- i sats ---
+    sd = amb["raccolta_sats_da_euro"]
+    prova("100 € a 100.000 €/BTC = 100.000 sats", 100_000, sd(10_000, 100_000))
+    prova("cambio assente = 0 (non si apre a caso)", 0, sd(10_000, 0))
+    prova("cambio infinito = 0", 0, sd(10_000, float("inf")))
+    prova("euro negativi = 0", 0, sd(-5, 100_000))
+
+    # --- l'esito ---
+    es = amb["raccolta_esito"]
+    prova("garantita: contano SOLO i depositi", "mancata", es(True, 1000, 999, 10_000))
+    prova("...e a obiettivo pieno si'", "raggiunta", es(True, 1000, 1000, 0))
+    prova("semplice: depositi + zap", "raggiunta", es(False, 1000, 0, 1000))
+    prova("obiettivo zero non e' mai raggiunto", "mancata", es(False, 0, 5, 5))
+
+    # --- dove va un deposito ---
+    vd = amb["raccolta_verso_deposito"]
+    prova("chiusa e raggiunta, confermato prima: a chi raccoglie", "venditore",
+          vd("depositato", "chiusa", "raggiunta", 100, 200))
+    prova("chiusa e mancata: indietro", "compratore",
+          vd("depositato", "chiusa", "mancata", 100, 200))
+    prova("CONTROPROVA: confermato DOPO la chiusura torna indietro anche se raggiunta",
+          "compratore", vd("depositato", "chiusa", "raggiunta", 300, 200))
+    prova("fermata: indietro anche a raccolta viva", "compratore",
+          vd("depositato", "fermata", "", 100, 0))
+    prova("incompleto: indietro sempre", "compratore",
+          vd("incompleto", "attiva", "", 0, 0))
+    prova("raccolta viva: non ancora", "", vd("depositato", "attiva", "", 100, 0))
+    prova("un deposito senza sats non va da nessuna parte", "",
+          vd("attesa", "chiusa", "raggiunta", 0, 200))
+    prova("senza data di conferma non va a chi raccoglie", "compratore",
+          vd("depositato", "chiusa", "raggiunta", 0, 200))
+
+    # --- le sentinelle sul server ---
+    prova("la garantita nasce SPENTA (prima il collaudo, regola di Alan)", True,
+          "    RACCOLTA_GARANTITA_ATTIVA = False\n" in srv)
+    prova("le raccolte semplici nascono accese", True,
+          "    RACCOLTE_ATTIVE = True\n" in srv)
+    for leva in ("RACCOLTE_ATTIVE", "RACCOLTA_GARANTITA_ATTIVA", "RACCOLTA_MAX_EURO",
+                 "RACCOLTA_GIORNI_MAX", "RACCOLTA_MIN_GARANTITA_EURO",
+                 "RACCOLTA_VENDITE_MIN", "RACCOLTA_ZAP_MAX_SATS"):
+        prova(f"la leva {leva} sta nel config d'esempio", True,
+              f"\n{leva} = " in open("config_esempio.py", encoding="utf-8").read())
+    cb = codice(blocco_srv)
+    prova("lo zap passa dal motore della mancia (il Lightning address, LUD-21)", True,
+          "invoice_da_ln_address(" in cb and "mancia_verifica_lud21(" in cb
+          and "preimage_giusta(" in cb)
+    prova("il 2-di-3 e' quello del mercatino: indirizzo e firma di Barattolo", True,
+          "onchain_nuovo_indirizzo(" in cb and "_onchain_psbt_barattolo(" in cb)
+    prova("nessun secondo motore di firme: niente chiavi nuove nel blocco", True,
+          "PrivateKey" not in cb and "HDKey" not in cb and "sign(" not in cb)
+    prova("zero XP dalle raccolte", True,
+          "assegna_xp(" not in cb and "premia_xp(" not in cb)
+    firma = codice(pezzo("raccolta_deposito_firma"))
+    prova("la seconda firma non dipende dalla leva (i sats non restano chiusi)", True,
+          "_raccolte_serve()" not in firma and "RACCOLTA_GARANTITA_ATTIVA" not in firma)
+    prova("...e la mette solo chi riceve: il rimborso SOLO chi ha depositato", True,
+          'if dep["proposta_verso"] != ruolo' in firma)
+    prova("un deposito vuole il wallet del rimborso di chi deposita", True,
+          "_onchain_rimborso_di(" in codice(pezzo("raccolta_deposito")))
+    prova("le raccolte nuove passano dai moderatori (nascono in revisione)", True,
+          "'revisione'" in codice(pezzo("raccolta_apri")) or
+          '"revisione"' in codice(pezzo("raccolta_apri")))
+    prova("chi raccoglie non approva la propria raccolta", True,
+          "403" in codice(pezzo("raccolta_admin_gesto")))
+    prova("la vista pubblica non porta mai il Lightning address", True,
+          "ln_address" not in codice(pezzo("_raccolta_vista")))
+    prova("la ronda delle raccolte parte all'avvio", True,
+          "orologio_raccolte()" in srv)
+    prova("gli indici esterni contano anche i depositi delle raccolte", True,
+          "raccolta_depositi" in pezzo("_onchain_prossimo_esterno")
+          and "raccolta_depositi" in pezzo("_onchain_rimborsi_usati"))
+    testi = " ".join(_re.findall(r'"([^"\n]{12,})"', blocco_srv)).lower()
+    prova("lessico: mai «assicurat» nei testi delle raccolte", False,
+          "assicurat" in testi)
+
+    # --- il client ---
+    prova("i tre fogli si chiudono con gli altri", True,
+          all(f"el('{f}').classList.remove('open');" in mini
+              for f in ("raccNuovaSheet", "raccZapSheet", "raccDepSheet")))
+    prova("la vista ricade su «esplora» nella nav", True,
+          "else if (view === 'raccolte') view = 'esplora';" in mini)
+    prova("le seconde firme in sottofondo passano anche dalle raccolte", True,
+          "fatte.push(...await raccolteCofirmeInAttesa(parole));" in mini)
+    prova("il pannello dei moderatori ha le raccolte", True,
+          "${boxRaccolteAdmin(admRaccolte)}" in mini)
+    prova("la tessera della vetrina entra nella firma della fila", True,
+          "const firma = voci.join('|') + '#' + activeCat + (racc ? '#R' : '')" in mini
+          and "(racc ? cardRaccolteVetrina() : '')" in mini)
+    jsb = pezzo_js(mini, "/* ═══ LE RACCOLTE IN SATS",
+                   "/* ═══ LA CASSA IN NEGOZIO (15 nov 2026")
+    prova("il client non chiede mai il Lightning address", True,
+          "ln_address" not in jsb)
+    # (il nome della funzione del seme, `onchainSemeAssicurato`, non e' un testo)
+    parole_js = codice_js_senza_commenti(jsb).replace("onchainSemeAssicurato", "").lower()
+    prova("lessico: mai «assicurat» ne' «escrow» nei testi del client", True,
+          "assicurat" not in parole_js and "escrow" not in parole_js)
+    prova("si co-firma col codice del mercatino (onchainCofirma)", True,
+          "await onchainCofirma(o, parole)" in jsb)
+    js = ("const fmt = n => String(n);\nconst fmtEur = n => String(n);\n"
+          "const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');\n"
+          "let DEMO = false, VETRINA = false;\n"
+          + jsb +
+          "\nconst f = {};\n"
+          "f.mezzo = raccBarraPezzi({obiettivo_sats: 1000, garantiti_sats: 300, zap_sats: 200});\n"
+          "f.oltre = raccBarraPezzi({obiettivo_sats: 1000, garantiti_sats: 900, zap_sats: 900});\n"
+          "f.card = cardRaccolta({id: 7, titolo: '<img src=x>', stato: 'attiva',"
+          " secondi_rimasti: 3*86400, autore: {nome: 'Sato <b>'}, obiettivo_sats: 1000,"
+          " obiettivo_euro: 10, garantiti_sats: 0, zap_sats: 0, garantita: true});\n"
+          "f.firmaMia = raccDaFirmare({stato: 'depositato', ruolo: 'compratore',"
+          " proposta: {verso: 'compratore', mia: false}});\n"
+          "f.firmaAltrui = raccDaFirmare({stato: 'depositato', ruolo: 'venditore',"
+          " proposta: {verso: 'compratore', mia: false}});\n"
+          "f.firmaGiaMia = raccDaFirmare({stato: 'depositato', ruolo: 'compratore',"
+          " proposta: {verso: 'compratore', mia: true}});\n"
+          "f.oreRimaste = raccGiorniRimasti({stato: 'attiva', secondi_rimasti: 5*3600});\n"
+          "f.finita = raccGiorniRimasti({stato: 'chiusa', secondi_rimasti: 0});\n"
+          "f.filaSpenta = raccolteSullaFila();\n"
+          "raccolteAttive = true; f.filaVuota = raccolteSullaFila();\n"
+          "raccolteVive = 2; f.filaPiena = raccolteSullaFila();\n"
+          "VETRINA = true; f.filaVetrina = raccolteSullaFila();\n"
+          "console.log(JSON.stringify(f));\n")
+    r = _node_banco(js)
+    if r is None:
+        salta("le raccolte in node", "node non c'e'")
+        return
+    prova("la barra: 30% depositi, 20% zap, 50 in tutto", True,
+          r.get("mezzo", {}).get("pg") == 30 and r.get("mezzo", {}).get("pz") == 20
+          and r.get("mezzo", {}).get("tot") == 50)
+    prova("oltre l'obiettivo la barra resta piena, il numero no", True,
+          r.get("oltre", {}).get("pg") == 90 and r.get("oltre", {}).get("pz") == 10
+          and r.get("oltre", {}).get("tot") == 180)
+    prova("la card scappa titolo e nome", True,
+          "<img" not in r.get("card", "") and "&lt;img" in r.get("card", "")
+          and "Sato &lt;b>" in r.get("card", ""))
+    prova("...e dice i giorni e la garanzia", True,
+          "ancora 3 giorni" in r.get("card", "") and "con garanzia" in r.get("card", ""))
+    prova("«manca la tua firma» solo a chi riceve", [True, False, False],
+          [r.get("firmaMia"), r.get("firmaAltrui"), r.get("firmaGiaMia")])
+    prova("l'ultimo giorno si conta in ore", "ancora 5 ore", r.get("oreRimaste"))
+    prova("una raccolta chiusa non conta i giorni", "", r.get("finita"))
+    prova("la tessera: solo a leva accesa, con una raccolta viva, fuori dalla vetrina",
+          [False, False, True, False],
+          [r.get("filaSpenta"), r.get("filaVuota"), r.get("filaPiena"),
+           r.get("filaVetrina")])
 
 
 def prove_premi_fedelta():
@@ -206040,7 +206289,7 @@ CATEGORIE = {
     filtro_onchain_tutto
     """.split(),
     "mercatino": """
-    guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore premi_fedelta app_negozio
+    guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore raccolte premi_fedelta app_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     ricategorizza collaudo_ricategorizza asta proxy_asta annullo
@@ -207189,6 +207438,7 @@ def main():
               prove_avvisi_nostr_arrivano,
               prove_notifiche_telefono,
               prove_mancia_venditore,
+              prove_raccolte,
               prove_premi_fedelta,
               prove_app_negozio,
               prove_filtro_10050,

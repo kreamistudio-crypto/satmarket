@@ -8930,6 +8930,33 @@
   .cassa-riga{display:flex;justify-content:space-between;gap:10px;padding:10px 0;
     border-bottom:1px solid var(--line);font-size:14px}
   .cassa-riga small{display:block;color:var(--muted);font-size:12px}
+  /* LE RACCOLTE IN SATS (17 nov 2026, cantiere raccolta): la barra in
+     due colori (depositi di garanzia scuri, zap chiari), le card, la
+     scheda. Grafica semplice, richiesta di Andrea. */
+  .racc-lista{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+  .racc-card{display:block;width:100%;text-align:left;background:var(--card);
+    border:1px solid var(--line);border-radius:16px;padding:12px 14px;color:var(--ink);
+    font:inherit;cursor:pointer}
+  .racc-card-testa{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;font-size:15px}
+  .racc-chi{font-size:13px;color:var(--muted);font-weight:600;margin:2px 0 8px}
+  .racc-barra{display:flex;height:12px;border-radius:999px;background:var(--sats-soft);
+    overflow:hidden;margin:6px 0 4px}
+  .racc-g{background:var(--sats-deep,#D97706)}
+  .racc-z{background:var(--sats)}
+  .racc-numeri{font-size:12.5px;font-weight:600}
+  .racc-tag{flex:0 0 auto;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:999px;
+    background:var(--sats-soft);color:var(--ink);white-space:nowrap}
+  .racc-tag.si{background:#1F9D55;color:#fff}
+  .racc-tag.no{background:var(--line);color:var(--muted)}
+  .racc-racconto{white-space:pre-wrap;word-break:break-word;font-size:14.5px;line-height:1.5;
+    margin:16px 0 0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+  .racc-dep,.racc-zap{display:flex;justify-content:space-between;align-items:center;gap:10px;
+    padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .racc-dep .btn.mini{flex:0 0 auto;margin:0}
+  .racc-segnala{margin-top:16px;font-size:13px}
+  .racc-segnala summary{cursor:pointer;color:var(--muted);font-weight:700}
+  .racc-segnala textarea{width:100%;margin:8px 0}
+  .racc-adm{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
   /* la scelta della rete al «Paga» e l'interruttore in cima al foglio
      (2 nov 2026): quelli del P2P; sbiadito On-chain dove non si paga */
   .pay-rete{margin:4px 0 10px}
@@ -14970,6 +14997,21 @@ document.getElementById('cartello')?.remove();</script>
     </div>
   </div>
 
+  <!-- ============ VISTA: LE RACCOLTE IN SATS (17 nov 2026) ============
+       Vista INTERNA come la stradina: l'elenco e la scheda li scrive
+       renderRaccolte() con quel che manda /api/raccolte, con esc() su
+       ogni testo. voceNav la fa ricadere su «esplora». -->
+  <div class="view" id="view-raccolte">
+    <button class="back" onclick="navIndietro()">← Torna</button>
+    <div class="sicu">
+      <div class="sicu-hero">
+        <h2>🎯 Raccolte fondi</h2>
+        <p class="occhiello">Sostieni un progetto in sats: uno zap, o un deposito di garanzia</p>
+      </div>
+      <div id="raccolteCorpo"></div>
+    </div>
+  </div>
+
   <!-- ============ VISTA: I CONSIGLIATI ============ -->
   <!-- I negozi che ci piacciono (set 2026). Vista INTERNA come la
        classifica: fuori da RADICI, quindi navRiflette la spinge e il
@@ -15556,6 +15598,12 @@ document.getElementById('cartello')?.remove();</script>
            e in vetrina sparisce, il patto del wallet. -->
       <div class="acc voce-porta" id="vocCassa" style="display:none">
         <button type="button" class="acc-h" onclick="entraAppNegozio()"><span class="em">🏪</span>Cassa in negozio<span class="fr">›</span></button>
+      </div>
+      <!-- 🎯 LE RACCOLTE IN SATS (17 nov 2026): la porta c'e' a leva
+           accesa (`raccolteAttive` da /api/me), anche senza raccolte vive:
+           da qui se ne apre una. In DEMO e in vetrina sparisce. -->
+      <div class="acc voce-porta" id="vocRaccolte" style="display:none">
+        <button type="button" class="acc-h" onclick="apriRaccolte()"><span class="em">🎯</span>Raccolte fondi<span class="fr">›</span></button>
       </div>
       <div class="acc voce-porta" id="vocWidgetNegozio" style="display:none">
         <button type="button" class="acc-h" onclick="apriWidget('negozio')"><span class="em em-testo">&lt;/&gt;</span>Mettilo sul tuo sito<span class="fr">›</span></button>
@@ -17006,6 +17054,96 @@ document.getElementById('cartello')?.remove();</script>
       <a class="btn ghost" id="manciaWallet" href="#" style="display:block;text-align:center;text-decoration:none">⚡ Apri nel wallet</a>
       <button class="btn primary" id="manciaFatto" onclick="manciaPagata(this)">✓ L'ho pagata</button>
       <button class="btn ghost" id="manciaSalta" style="display:none" onclick="manciaSaltaZap()">Salta lo zap a Barattolo</button>
+    </div>
+  </div>
+
+  <!-- ============ SHEET LE RACCOLTE (17 nov 2026) ============
+       Tre fogli: APRIRE una raccolta (va ai moderatori), lo ZAP (il
+       foglio della mancia: dritto al wallet di chi raccoglie) e il
+       DEPOSITO DI GARANZIA (il 2-di-3: indirizzo, QR, stato). Chiudono
+       con navIndietro(), il patto del motore di navigazione. -->
+  <div class="sheet" id="raccNuovaSheet" role="dialog" aria-modal="true"
+       aria-labelledby="raccNuovaTit">
+    <div class="grab"></div>
+    <div class="sheet-testa">
+      <h3 id="raccNuovaTit">🎯 Apri una raccolta</h3>
+      <button type="button" class="pacco-x" onclick="navIndietro()"
+              title="Chiudi" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="field" style="margin:0 0 10px"><input id="raccNuovaTitolo" maxlength="80" autocomplete="off" placeholder="Il titolo, es. Un forno per il laboratorio"></div>
+    <div class="field" style="margin:0 0 10px"><textarea id="raccNuovaRacconto" maxlength="2000" rows="5" placeholder="Racconta chi sei, a cosa servono i sats e come lo saprà chi ti sostiene"></textarea></div>
+    <div class="field" style="display:flex;gap:10px;align-items:center;margin:0 0 10px">
+      <input id="raccNuovaEuro" inputmode="numeric" autocomplete="off" style="flex:1" aria-label="Obiettivo in euro">
+      <span style="font-weight:800;color:var(--muted)">€</span>
+    </div>
+    <div class="hint" style="margin:0 0 6px">Quanto dura</div>
+    <div class="consegna-scelta" id="raccNuovaGiorni" style="margin:0 0 12px"></div>
+    <div id="raccNuovaGarBox" style="display:none;margin:0 0 10px">
+      <label style="display:flex;gap:8px;align-items:center;font-weight:800;font-size:14px"><input type="checkbox" id="raccNuovaGarantita"> 🛡️ Accetta anche depositi di garanzia</label>
+      <div class="hint" id="raccNuovaGarNota" style="margin:4px 0 0"></div>
+    </div>
+    <div class="hint">💡 L'obiettivo si fissa in sats al cambio di oggi. La guardano i moderatori prima della vetrina: <b>niente quote, interessi, rendimenti o token</b>, una raccolta è un sostegno. Gli zap arrivano dritti al tuo Lightning address.</div>
+    <button class="btn orange" style="margin-top:12px" onclick="mandaNuovaRaccolta(this)">🎯 Manda ai moderatori</button>
+  </div>
+
+  <div class="sheet" id="raccZapSheet" role="dialog" aria-modal="true"
+       aria-labelledby="raccZapTit">
+    <div class="grab"></div>
+    <div class="sheet-testa">
+      <h3 id="raccZapTit">⚡ Sostieni con uno zap</h3>
+      <button type="button" class="pacco-x" onclick="navIndietro()"
+              title="Chiudi" aria-label="Chiudi">✕</button>
+    </div>
+    <div id="raccZapScelta">
+      <div class="hint" id="raccZapPerChi" style="margin:0 0 10px"></div>
+      <div class="consegna-scelta" id="raccZapChips" style="margin:0 0 10px"></div>
+      <div class="field" style="display:flex;gap:10px;align-items:center">
+        <input id="raccZapImporto" inputmode="numeric" autocomplete="off" placeholder="Un'altra cifra" style="flex:1" oninput="zapRaccoltaScritta()">
+        <span style="font-weight:800;color:var(--muted)">sats</span>
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13.5px;font-weight:700;margin-top:8px"><input type="checkbox" id="raccZapAnonimo"> Non mostrare il mio nome</label>
+      <div id="raccZapRiga" style="font-size:13px;font-weight:700;margin-top:10px;min-height:18px"></div>
+      <div class="hint" style="margin-top:6px">💡 Lo zap va <b>dritto al wallet di chi raccoglie</b>: Barattolo non lo tocca e non prende commissioni, quindi <b>non si rimborsa</b>.</div>
+      <button class="btn orange" style="margin-top:12px" id="raccZapManda" onclick="mandaZapRaccolta(this)">⚡ Manda lo zap</button>
+    </div>
+    <div id="raccZapPaga" style="display:none">
+      <h3 style="margin:4px 0 8px"><span class="mono" id="raccZapCifra" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span></h3>
+      <div class="qr" id="raccZapQr"></div>
+      <div class="invoice" id="raccZapInvoice" onclick="copiaFatturaZapRaccolta()" style="cursor:pointer" title="Tocca per copiare"></div>
+      <div style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">inquadra il QR col wallet, o tocca la fattura per copiarla</div>
+      <a class="btn ghost" id="raccZapWallet" href="#" style="display:block;text-align:center;text-decoration:none">⚡ Apri nel wallet</a>
+      <button class="btn primary" onclick="zapRaccoltaPagato(this)">✓ L'ho pagata</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="raccDepSheet" role="dialog" aria-modal="true"
+       aria-labelledby="raccDepTit">
+    <div class="grab"></div>
+    <div class="sheet-testa">
+      <h3 id="raccDepTit">🛡️ Sostieni con garanzia</h3>
+      <button type="button" class="pacco-x" onclick="navIndietro()"
+              title="Chiudi" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="hint" id="raccDepPerChi" style="margin:0 0 10px"></div>
+    <div id="raccDepScelta">
+      <div class="consegna-scelta" id="raccDepChips" style="margin:0 0 10px"></div>
+      <div class="field" style="display:flex;gap:10px;align-items:center">
+        <input id="raccDepImporto" inputmode="numeric" autocomplete="off" placeholder="Un'altra cifra" style="flex:1" oninput="depositoRaccoltaScritto()">
+        <span style="font-weight:800;color:var(--muted)">€</span>
+      </div>
+      <div id="raccDepRiga" style="font-size:13px;font-weight:700;margin-top:10px;min-height:18px"></div>
+      <div class="hint" style="margin-top:6px">💡 I sats restano in un <b>deposito di garanzia 2-di-3</b> (tu, chi raccoglie, Barattolo) fino alla scadenza: vanno a chi raccoglie solo se i depositi arrivano all'obiettivo, sennò <b>tornano al tuo wallet</b>. Si paga on-chain, e la rete la paghi tu.</div>
+      <button class="btn primary" style="margin-top:12px" id="raccDepCrea" onclick="creaDepositoRaccolta(this)">🛡️ Prepara il deposito</button>
+    </div>
+    <div id="raccDepPaga" style="display:none">
+      <h3 style="margin:4px 0 2px"><span class="mono" id="raccDepCifra" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span></h3>
+      <div class="hint" id="raccDepBtc" style="margin:0 0 8px"></div>
+      <div class="qr" id="raccDepQr"></div>
+      <div class="invoice mono" id="raccDepIndirizzo" onclick="copiaIndirizzoDepositoRaccolta()" style="cursor:pointer" title="Tocca per copiare"></div>
+      <div class="hint" id="raccDepNota" style="margin:0 0 8px"></div>
+      <div class="cassa-stato" id="raccDepStato"></div>
+      <button class="btn primary" onclick="controllaDepositoRaccolta(this)">🔎 Ho pagato, controlla</button>
+      <button class="btn ghost" onclick="annullaDepositoRaccolta()">Annulla il deposito</button>
     </div>
   </div>
 
@@ -20769,6 +20907,8 @@ function voceNav(view){
   else if (view === 'ordine') view = 'affari';
   // la stradina e' una pagina del Profilo: la nav lo dice (17 nov 2026)
   else if (view === 'stradina') view = 'profilo';
+  // le raccolte si aprono dalla tessera della vetrina (17 nov 2026)
+  else if (view === 'raccolte') view = 'esplora';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
   else if (view === 'astepresto') view = cellaSwap() ? 'esplora' : 'aste';
@@ -23202,6 +23342,7 @@ async function rifaiPaginaRicordata(b){
      DEMO non c'e', e si resta in Esplora) */
   if (v === 'classifica') { apriClassifica(); return ''; }
   if (v === 'stradina') { apriStradina(); return ''; }
+  if (v === 'raccolte') { apriRaccolte(true); return ''; }
   if (v === 'p2pmiei') rimettiFiltroMieiP2P(b.f);
   const manca = v === 'ordine' ? !VETRINA && !orders.some(x => x.id === k)
               : v === 'p2pordine' ? !ordiniP2P()[k] : false;
@@ -24071,7 +24212,9 @@ function renderStriscia(){
      prima pagina — non farebbe nascere la card fino al primo cambio di
      reparto. */
   const carr = statoIconaCarrello();
-  const firma = voci.join('|') + '#' + activeCat
+  /* ...e LA TESSERA DELLE RACCOLTE (17 nov 2026): c'e' o non c'e' */
+  const racc = typeof raccolteSullaFila === 'function' && raccolteSullaFila();
+  const firma = voci.join('|') + '#' + activeCat + (racc ? '#R' : '')
     + '#' + (jarCard ? 'J' : '') + (vistaBarattolo ? 'B' : '')
     + '#' + cons.map(v => v.slug + ':' + giuLogoConsigliato(v.giu)).join(',')
     + '#' + (carr ? `C${carr.pezzi}${carr.cambiato ? '!' : ''}:${carr.nome}` : '');
@@ -24195,7 +24338,11 @@ function renderStriscia(){
            alt="" loading="lazy" decoding="async" onerror="this.remove()"
         ><span class="cat-emoji" aria-hidden="true">🔨</span></span>
       <span class="cat-eti">Aste</span>
-    </a>` + voci.map(c => `
+    </a>` +
+    /* LA TESSERA «RACCOLTE» (17 nov 2026): dopo le Aste, solo a leva
+       accesa e con almeno una raccolta in vetrina (una porta su un
+       elenco vuoto e' un muro); non si accende mai */
+    (racc ? cardRaccolteVetrina() : '') + voci.map(c => `
     <a class="cat-cella${c === activeCat && !vistaBarattolo ? ' attiva' : ''}" data-cat="${esc(c)}"
        href="/categoria/${slugCat(c)}"
        onclick="apriCategoriaDaTocco(event, this.dataset.cat)">
@@ -36812,6 +36959,12 @@ function closeSheet(){
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
   el('manciaSheet').classList.remove('open');
+  /* le raccolte (17 nov 2026): i tre fogli, e i battiti che aspettano
+     uno zap o un deposito non restano appesi a un foglio chiuso */
+  el('raccNuovaSheet').classList.remove('open');
+  el('raccZapSheet').classList.remove('open');
+  el('raccDepSheet').classList.remove('open');
+  fermaBattitoZapRaccolta(); fermaBattitoDepositoRaccolta();
   /* in Barattolo Negozio la cassa e' la pagina e non un foglio: un
      altro foglio che si chiude non la porta via, ne' ferma il battito
      del conto che aspetta (16 nov 2026) */
@@ -40181,6 +40334,603 @@ async function fineMancia(){
       && el('view-ordine').classList.contains('active')) openOrder(oid);
 }
 
+/* ═══ LE RACCOLTE IN SATS (17 nov 2026, cantiere raccolta) ═══
+   Andrea: «Tutte e due» (semplice + garantita nella stessa raccolta), ok
+   ai parametri e al piano. Una raccolta ha un obiettivo in sats (fissato
+   all'apertura), una scadenza, una barra in due colori:
+   · ⚡ LO ZAP va dritto al wallet di chi raccoglie: e' il motore della
+     mancia (la fattura la conia il SUO Lightning address, il server la
+     chiede; preimage, LUD-21 o la parola). Barattolo non lo tocca, quindi
+     non si rimborsa: il foglio lo dice prima;
+   · 🛡️ IL DEPOSITO DI GARANZIA e' il 2-di-3 del mercatino: a scadenza
+     Barattolo firma, verso chi raccoglie se i DEPOSITI hanno raggiunto
+     l'obiettivo, sennò indietro; la seconda firma la mette il telefono di
+     chi riceve, con `onchainCofirma` (lo stesso del P2P: rilegge incasso e
+     rimborso firmati dal SUO seme prima di firmare).
+   Il giudice di tutto e' il server: qui si disegna e si riferisce. Zero
+   XP. Il lessico: «deposito di garanzia», come nel mercatino. */
+const RACC_ZAP_PILLOLE = [1000, 2100, 5000, 21000];
+const RACC_DEP_PILLOLE = [50, 100, 200];
+const RACC_GIORNI = [15, 30, 60];
+const RACC_BATTITO_ZAP_MS = 5000;
+const RACC_BATTITO_DEP_MS = 15000;
+let raccolteAttive = false, raccolteVive = 0;
+let raccolteDati = null, raccoltaScheda = null, raccoltaAperta = 0;
+let raccNuovaGiorni = 30;
+let raccZap = {sats: 2100, anonimo: false, p: null, battito: null};
+let raccDep = {euro: 50, d: null, battito: null};
+
+/* chi raccoglie, col nome che manda il server (mai un'iniziale a mano:
+   il volto, se un giorno servira', e' quello unico) */
+function raccChi(r){
+  const n = r && r.autore && r.autore.nome;
+  return n ? String(n) : '?';
+}
+/* i giorni che restano, a parole */
+function raccGiorniRimasti(r){
+  const s = Number(r.secondi_rimasti) || 0;
+  if (r.stato !== 'attiva') return '';
+  if (s <= 0) return 'finisce adesso';
+  const g = Math.floor(s / 86400);
+  if (g >= 2) return `ancora ${g} giorni`;
+  const h = Math.max(1, Math.floor(s / 3600));
+  return g === 1 ? 'ancora 1 giorno' : `ancora ${h} ${h === 1 ? 'ora' : 'ore'}`;
+}
+/* LA BARRA: i depositi confermati (scuri) e gli zap arrivati (chiari),
+   sull'obiettivo. Oltre il 100% la barra resta piena, i numeri no. PURA */
+function raccBarraPezzi(r){
+  const ob = Math.max(1, Number(r.obiettivo_sats) || 0);
+  const g = Math.max(0, Number(r.garantiti_sats) || 0);
+  const z = Math.max(0, Number(r.zap_sats) || 0);
+  const pg = Math.min(100, g / ob * 100);
+  const pz = Math.min(100 - pg, z / ob * 100);
+  return {pg, pz, tot: Math.round((g + z) / ob * 100)};
+}
+function raccBarra(r){
+  const b = raccBarraPezzi(r);
+  return `<div class="racc-barra" role="img" aria-label="${b.tot}% dell'obiettivo">
+      <span class="racc-g" style="width:${b.pg.toFixed(1)}%"></span><span class="racc-z" style="width:${b.pz.toFixed(1)}%"></span>
+    </div>`;
+}
+function raccNumeri(r){
+  const pezzi = [];
+  if (r.garantita || r.garantiti_sats) pezzi.push(`🛡️ <b class="mono">${fmt(r.garantiti_sats || 0)}</b> garantiti`);
+  pezzi.push(`⚡ <b class="mono">${fmt(r.zap_sats || 0)}</b> in zap`);
+  return `<div class="racc-numeri">${pezzi.join(' · ')} su <b class="mono">${fmt(r.obiettivo_sats)}</b> sats <span style="color:var(--muted)">(${fmtEur(r.obiettivo_euro)} €)</span></div>`;
+}
+function raccStato(r){
+  if (r.stato === 'revisione') return '<span class="racc-tag">⏳ aspetta il via dei moderatori</span>';
+  if (r.stato === 'rifiutata') return '<span class="racc-tag no">non approvata</span>';
+  if (r.stato === 'fermata') return '<span class="racc-tag no">fermata dai moderatori</span>';
+  if (r.stato === 'chiusa') return r.esito === 'raggiunta'
+    ? '<span class="racc-tag si">🎉 obiettivo raggiunto</span>' : '<span class="racc-tag">finita</span>';
+  return `<span class="racc-tag">${esc(raccGiorniRimasti(r))}</span>`;
+}
+function cardRaccolta(r){
+  return `<button type="button" class="racc-card" onclick="apriRaccolta(${Number(r.id)})">
+      <div class="racc-card-testa"><b>🎯 ${esc(r.titolo)}</b>${raccStato(r)}</div>
+      <div class="racc-chi">di ${esc(raccChi(r))}${r.garantita ? ' · 🛡️ con garanzia' : ''}</div>
+      ${raccBarra(r)}${raccNumeri(r)}
+    </button>`;
+}
+
+/* LA PORTA: dalla tessera della vetrina e dalla voce del Profilo */
+function apriRaccolte(resta){
+  if (DEMO || VETRINA) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  raccoltaAperta = 0; raccoltaScheda = null;
+  if (!resta) go('raccolte');
+  caricaRaccolte();
+}
+async function caricaRaccolte(){
+  const box = el('raccolteCorpo');
+  if (box && !raccolteDati) box.innerHTML = '<div class="hint">Carico le raccolte…</div>';
+  try {
+    const r = await fetch(`${API_BASE}/raccolte`, {headers:{'X-Tg-Init-Data': authHdr()}});
+    raccolteDati = r.ok ? await r.json() : null;
+  } catch(e) { raccolteDati = null; }
+  if (raccolteDati) raccolteVive = (raccolteDati.raccolte || []).length;
+  if (!raccoltaAperta) renderRaccolte();
+}
+function renderRaccolte(){
+  const box = el('raccolteCorpo');
+  if (!box) return;
+  if (raccoltaAperta) { renderSchedaRaccolta(); return; }
+  const d = raccolteDati;
+  if (!d) { box.innerHTML = '<div class="hint">Le raccolte adesso non si caricano: riprova fra poco.</div>'; return; }
+  const io = d.io || {};
+  const apri = io.puo_aprire
+    ? '<button class="btn orange" onclick="apriNuovaRaccolta()">🎯 Apri una raccolta</button>'
+    : (io.perche ? `<div class="trust-note">🎯 <span>Per aprire una raccolta: ${esc(io.perche)}.</span></div>` : '');
+  const mie = (d.mie || []).filter(r => r.stato !== 'chiusa' || r.esito);
+  box.innerHTML = `${apri}
+    ${mie.length ? `<div class="section-label" style="padding:22px 0 0">Le tue raccolte</div>
+      <div class="racc-lista">${mie.map(cardRaccolta).join('')}</div>` : ''}
+    <div class="section-label" style="padding:22px 0 0">In corso</div>
+    ${(d.raccolte || []).length ? `<div class="racc-lista">${d.raccolte.map(cardRaccolta).join('')}</div>`
+      : '<div class="hint" style="margin-top:8px">Nessuna raccolta in corso, per ora.</div>'}
+    <div class="hint" style="margin-top:18px">💡 Uno <b>zap</b> va dritto al wallet di chi raccoglie: Barattolo non lo tocca e non prende commissioni, quindi non si rimborsa. Un <b>deposito di garanzia</b> resta in un 2-di-3 fino alla scadenza: va a chi raccoglie solo se i depositi arrivano all'obiettivo, sennò torna a te.</div>`;
+}
+
+/* LA SCHEDA */
+async function apriRaccolta(id){
+  if (DEMO || VETRINA) return;
+  if (!el('view-raccolte').classList.contains('active')) go('raccolte');
+  raccoltaAperta = Number(id) || 0;
+  const box = el('raccolteCorpo');
+  if (box && (!raccoltaScheda || raccoltaScheda.id !== raccoltaAperta))
+    box.innerHTML = '<div class="hint">Carico la raccolta…</div>';
+  try {
+    const r = await fetch(`${API_BASE}/raccolte/${raccoltaAperta}`, {headers:{'X-Tg-Init-Data': authHdr()}});
+    raccoltaScheda = r.ok ? await r.json() : null;
+  } catch(e) { raccoltaScheda = null; }
+  renderSchedaRaccolta();
+}
+function tornaAlleRaccolte(){
+  haptic();
+  raccoltaAperta = 0; raccoltaScheda = null;
+  caricaRaccolte();
+}
+function raccDaFirmare(o){
+  return !!o.proposta && !o.proposta.mia && o.proposta.verso === o.ruolo
+    && (o.stato === 'depositato' || o.stato === 'incompleto');
+}
+function rigaMioDeposito(o){
+  const quanto = `<b class="mono">${fmt(o.prezzo_sats)}</b> sats (${fmtEur(o.euro)} €)`;
+  let cosa = '', gesto = '';
+  if (o.stato === 'attesa') {
+    cosa = o.visti_sats ? '⏳ visto in rete, aspetta la conferma' : '⏳ da pagare';
+    gesto = `<button class="btn mini" onclick="riapriDepositoRaccolta(${Number(o.id)})">Paga</button>`;
+  } else if (raccDaFirmare(o)) {
+    cosa = '↩️ torna a te: manca la tua firma';
+    gesto = `<button class="btn mini orange" onclick="raccolteFirmaOra(this)">✍️ Firma</button>`;
+  } else if (o.stato === 'depositato') cosa = o.proposta ? '✍️ firmato da Barattolo' : '🛡️ confermato, nel deposito di garanzia';
+  else if (o.stato === 'incompleto') cosa = '↩️ arrivato meno o tardi: torna a te';
+  else if (o.stato === 'rilasciato') cosa = '✅ arrivato a chi raccoglie';
+  else if (o.stato === 'rimborsato') cosa = '↩️ tornato al tuo wallet';
+  return `<div class="racc-dep"><div>${quanto}<div class="hint" style="margin:2px 0 0">${cosa}</div></div>${gesto}</div>`;
+}
+function renderSchedaRaccolta(){
+  const box = el('raccolteCorpo');
+  if (!box) return;
+  const r = raccoltaScheda;
+  const torna = '<button class="btn ghost mini" style="margin-bottom:12px" onclick="tornaAlleRaccolte()">← Tutte le raccolte</button>';
+  if (!r) { box.innerHTML = torna + '<div class="hint">Questa raccolta non c\'è, o non si carica adesso.</div>'; return; }
+  const sost = Number(r.sostenitori) || 0;
+  const perche = r.perche ? `<div class="trust-note">🎯 <span>${esc(r.perche)}</span></div>` : '';
+  const gesti = [];
+  if (r.puo_zap) gesti.push('<button class="btn orange" onclick="apriZapRaccolta()">⚡ Sostieni con uno zap</button>');
+  if (r.puo_depositare) gesti.push(`<button class="btn primary" onclick="apriDepositoRaccolta()">🛡️ Sostieni con garanzia (da ${fmt(r.min_garantita_euro)} €)</button>`);
+  const firmeAutore = r.mia && r.garantita && (r.stato === 'chiusa' || r.stato === 'fermata')
+    ? `<div class="trust-note">🛡️ <span>${r.esito === 'raggiunta' && r.stato === 'chiusa'
+        ? 'I depositi di garanzia sono tuoi: il tuo telefono mette la seconda firma su ognuno e partono verso il tuo wallet.'
+        : 'I depositi di garanzia tornano a chi li aveva messi: non devi fare niente.'}</span></div>
+      ${r.esito === 'raggiunta' && r.stato === 'chiusa' ? '<button class="btn primary" onclick="raccolteFirmaOra(this)">✍️ Metti le seconde firme</button>' : ''}` : '';
+  const miei = (r.miei_depositi || []);
+  const zap = (r.zap || []);
+  box.innerHTML = `${torna}
+    <div class="sicu-hero" style="text-align:left">
+      <h2 style="margin:0 0 4px">🎯 ${esc(r.titolo)}</h2>
+      <p class="occhiello" style="margin:0">di ${esc(raccChi(r))} · ${raccStato(r)}</p>
+    </div>
+    ${perche}
+    ${raccBarra(r)}${raccNumeri(r)}
+    <div class="hint" style="margin:4px 0 14px">${sost ? `${sost} ${sost === 1 ? 'persona l\'ha sostenuta' : 'persone l\'hanno sostenuta'}` : 'Ancora nessun sostegno'}${r.garantita ? ` · 🛡️ ${Number(r.depositi_n) || 0} depositi di garanzia` : ''}</div>
+    ${gesti.join('')}
+    ${firmeAutore}
+    <div class="racc-racconto">${esc(r.racconto)}</div>
+    ${miei.length ? `<div class="section-label" style="padding:20px 0 0">I tuoi depositi di garanzia</div>${miei.map(rigaMioDeposito).join('')}` : ''}
+    ${zap.length ? `<div class="section-label" style="padding:20px 0 0">Gli zap</div>
+      ${zap.map(z => `<div class="racc-zap"><span>⚡ <b class="mono">${fmt(z.sats)}</b></span><span>${z.nome ? esc(z.nome) : 'Anonimo'}${z.stato === 'dichiarata' ? ' <span style="color:var(--muted)">(dichiarato)</span>' : ''}</span></div>`).join('')}` : ''}
+    <div class="hint" style="margin-top:18px">💡 ${r.garantita
+      ? 'Lo <b>zap</b> va dritto al wallet di chi raccoglie e non si rimborsa. Il <b>deposito di garanzia</b> resta in un 2-di-3 (tu, chi raccoglie, Barattolo): a scadenza va a chi raccoglie solo se i depositi arrivano all\'obiettivo, sennò torna al tuo wallet. La rete la paghi tu, pochi sats.'
+      : 'Lo zap va dritto al wallet di chi raccoglie: Barattolo non lo tocca e non prende commissioni, quindi <b>non si rimborsa</b>.'}
+      Una raccolta non promette quote, interessi né rendimenti: è un sostegno, e l'eventuale ricompensa è un grazie, non un acquisto.</div>
+    ${r.stato === 'attiva' && !r.mia ? `<details class="racc-segnala"><summary>🚩 Segnala questa raccolta</summary>
+      <textarea id="raccSegnalaTesto" maxlength="300" rows="2" placeholder="Cosa non ti torna? (facoltativo)"></textarea>
+      <button class="btn ghost mini" onclick="segnalaRaccolta(this)">Manda ai moderatori</button></details>` : ''}`;
+}
+async function segnalaRaccolta(btn){
+  haptic();
+  const r = raccoltaScheda; if (!r) return;
+  const rip = bottoneInAttesa(btn, 'Mando…');
+  try {
+    const q = await fetch(`${API_BASE}/raccolte/${r.id}/segnala`, {method:'POST',
+      headers:{'Content-Type':'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({motivo: (el('raccSegnalaTesto') || {}).value || ''})});
+    const d = await q.json().catch(()=>({}));
+    toast(q.ok ? '🚩 Grazie: i moderatori la guardano' : (d.detail || 'Non è partita: riprova'), 5000);
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { rip(); }
+}
+
+/* APRIRE UNA RACCOLTA: il foglio. Il server rifa' tutti i conti. */
+function apriNuovaRaccolta(){
+  haptic();
+  const d = raccolteDati || {}, reg = d.regole || {}, io = d.io || {};
+  raccNuovaGiorni = Math.min(30, Number(reg.giorni_max) || 30);
+  el('raccNuovaTitolo').value = '';
+  el('raccNuovaRacconto').value = '';
+  el('raccNuovaEuro').value = '';
+  el('raccNuovaEuro').placeholder = `da ${reg.min_euro || 10} a ${fmt(reg.max_euro || 1000)}`;
+  el('raccNuovaGarantita').checked = false;
+  el('raccNuovaGarBox').style.display = io.garantita_possibile ? '' : 'none';
+  el('raccNuovaGarNota').textContent = `Chi sostiene può mettere da ${reg.min_garantita_euro || 50} € in un deposito di garanzia 2-di-3: se a scadenza i depositi non arrivano all'obiettivo, tornano indietro. Ti servono il wallet on-chain e un tuo wallet dove ricevere (Profilo).`;
+  disegnaGiorniRaccolta();
+  el('sheetBg').classList.add('open');
+  el('raccNuovaSheet').classList.add('open');
+}
+function disegnaGiorniRaccolta(){
+  const max = Number(((raccolteDati || {}).regole || {}).giorni_max) || 60;
+  el('raccNuovaGiorni').innerHTML = RACC_GIORNI.filter(g => g <= max).map(g =>
+    `<button type="button" class="consegna-pill${raccNuovaGiorni === g ? ' attiva' : ''}" onclick="raccNuovaGiorni=${g};disegnaGiorniRaccolta()">${g} giorni</button>`).join('');
+}
+async function mandaNuovaRaccolta(btn){
+  haptic();
+  const corpo = {titolo: el('raccNuovaTitolo').value, racconto: el('raccNuovaRacconto').value,
+                 euro: parseInt(el('raccNuovaEuro').value.replace(/\D/g, ''), 10) || 0,
+                 giorni: raccNuovaGiorni, garantita: !!el('raccNuovaGarantita').checked};
+  const rip = bottoneInAttesa(btn, 'Mando…');
+  try {
+    const r = await fetch(`${API_BASE}/raccolte`, {method:'POST',
+      headers:{'Content-Type':'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify(corpo)});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non è partita: riprova', 7000); return; }
+    if (el('raccNuovaSheet').classList.contains('open')) navIndietro();
+    toast('🎯 Inviata: la guardano i moderatori, e ti avvisiamo appena è in vetrina', 6000);
+    raccolteDati = null;
+    caricaRaccolte();
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { rip(); }
+}
+
+/* ⚡ LO ZAP: il foglio della mancia, per una raccolta */
+function apriZapRaccolta(){
+  haptic();
+  const r = raccoltaScheda;
+  if (!r || !r.puo_zap) return;
+  raccZap = {sats: 2100, anonimo: false, p: null, battito: null};
+  el('raccZapImporto').value = '';
+  el('raccZapAnonimo').checked = false;
+  el('raccZapPerChi').innerHTML = `Per <b>${esc(r.titolo)}</b>, da 1 a ${fmt(r.zap_max)} sats.`;
+  el('raccZapScelta').style.display = '';
+  el('raccZapPaga').style.display = 'none';
+  disegnaZapRaccolta();
+  el('sheetBg').classList.add('open');
+  el('raccZapSheet').classList.add('open');
+}
+function disegnaZapRaccolta(){
+  const r = raccoltaScheda, max = (r && r.zap_max) || 0;
+  const scritta = !!el('raccZapImporto').value.trim();
+  el('raccZapChips').innerHTML = RACC_ZAP_PILLOLE.map(v =>
+    `<button type="button" class="consegna-pill${!scritta && raccZap.sats === v ? ' attiva' : ''}" onclick="raccZap.sats=${v};el('raccZapImporto').value='';disegnaZapRaccolta()">${fmt(v)}</button>`).join('');
+  const btn = el('raccZapManda');
+  btn.disabled = !(raccZap.sats >= 1) || (max && raccZap.sats > max);
+  el('raccZapRiga').innerHTML = !(raccZap.sats >= 1) ? 'Scegli quanti sats'
+    : (max && raccZap.sats > max) ? `<span style="color:var(--sats-text)">Al massimo ${fmt(max)} sats per uno zap</span>`
+    : `Zap di <b class="mono">${fmt(raccZap.sats)}</b> sats${r && r.cambio ? ` <span style="color:var(--muted)">≈ ${fmtEur(raccZap.sats * r.cambio / 1e8)} €</span>` : ''}`;
+}
+function zapRaccoltaScritta(){
+  const cifre = el('raccZapImporto').value.replace(/\D/g, '');
+  raccZap.sats = cifre ? parseInt(cifre, 10) : 0;
+  disegnaZapRaccolta();
+}
+async function mandaZapRaccolta(btn){
+  haptic();
+  const r = raccoltaScheda;
+  if (!r || !(raccZap.sats >= 1)) return;
+  const rip = bottoneInAttesa(btn, 'Chiedo la fattura…');
+  try {
+    const q = await fetch(`${API_BASE}/raccolte/${r.id}/zap`, {method:'POST',
+      headers:{'Content-Type':'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({sats: raccZap.sats, anonimo: !!el('raccZapAnonimo').checked})});
+    const d = await q.json().catch(()=>({}));
+    if (!q.ok) { toast(d.detail || 'Fattura non arrivata: riprova', 7000); return; }
+    raccZap.p = {id: d.id, invoice: d.invoice, sats: d.sats, verificabile: !!d.verificabile, rid: r.id};
+    if (walletNwcPaga()) { await pagaZapRaccoltaNwc(); return; }
+    passoZapRaccolta();
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { rip(); }
+}
+async function esitoZapRaccolta(p, corpo){
+  const q = await fetch(`${API_BASE}/raccolte/${p.rid}/zap/${p.id}/esito`, {method:'POST',
+    headers:{'Content-Type':'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify(corpo || {})});
+  const d = await q.json().catch(()=>({}));
+  return q.ok ? (d.stato || '') : '';
+}
+async function pagaZapRaccoltaNwc(){
+  let cliente = null;
+  const p = raccZap.p;
+  try {
+    cliente = await clientNwc(walletNwcPaga());
+    const res = await cliente.paga(p.invoice);
+    await esitoZapRaccolta(p, {preimage: (res && res.preimage) || ''}).catch(()=>{});
+    await fineZapRaccolta();
+  } catch(e) {
+    toast(`Il wallet non ha pagato (${(e && e.message) || 'non risponde'}): puoi pagare a mano da qui`, 6000);
+    passoZapRaccolta();
+  } finally { if (cliente) cliente.chiudi(); }
+}
+function fermaBattitoZapRaccolta(){
+  if (raccZap.battito) { clearInterval(raccZap.battito); raccZap.battito = null; }
+}
+function passoZapRaccolta(){
+  fermaBattitoZapRaccolta();
+  const p = raccZap.p; if (!p) return;
+  el('raccZapScelta').style.display = 'none';
+  el('raccZapPaga').style.display = '';
+  el('raccZapCifra').textContent = fmt(p.sats);
+  el('raccZapInvoice').textContent = p.invoice;
+  portaWallet(el('raccZapWallet'), p.invoice);
+  disegnaQr(el('raccZapQr'), ('lightning:' + p.invoice).toUpperCase(), 'Alphanumeric');
+  if (p.verificabile) {
+    raccZap.battito = setInterval(async () => {
+      if (!el('raccZapSheet').classList.contains('open') || raccZap.p !== p) { fermaBattitoZapRaccolta(); return; }
+      const stato = await esitoZapRaccolta(p, {}).catch(()=>'');
+      if (stato === 'arrivata' && raccZap.p === p) fineZapRaccolta();
+    }, RACC_BATTITO_ZAP_MS);
+  }
+}
+function copiaFatturaZapRaccolta(){
+  const p = raccZap.p; if (!p) return;
+  haptic();
+  copiaLink(p.invoice, 'Fattura copiata 📋');
+}
+async function zapRaccoltaPagato(btn){
+  haptic();
+  const p = raccZap.p; if (!p) return;
+  const rip = bottoneInAttesa(btn, 'Lo dico a chi raccoglie…');
+  try { await esitoZapRaccolta(p, {dichiarata: true}); } catch(e) {}
+  finally { rip(); }
+  fineZapRaccolta();
+}
+async function fineZapRaccolta(){
+  fermaBattitoZapRaccolta();
+  raccZap.p = null;
+  if (el('raccZapSheet').classList.contains('open')) navIndietro();
+  toast('⚡ Grazie per lo zap!', 4000);
+  if (raccoltaAperta) apriRaccolta(raccoltaAperta);
+}
+
+/* 🛡️ IL DEPOSITO DI GARANZIA */
+function apriDepositoRaccolta(){
+  haptic();
+  const r = raccoltaScheda;
+  if (!r || !r.puo_depositare) return;
+  const daPagare = (r.miei_depositi || []).find(o => o.stato === 'attesa');
+  if (daPagare) { riapriDepositoRaccolta(daPagare.id); return; }
+  raccDep = {euro: Math.max(RACC_DEP_PILLOLE[0], Number(r.min_garantita_euro) || 50), d: null, battito: null};
+  el('raccDepImporto').value = '';
+  el('raccDepPerChi').innerHTML = `Per <b>${esc(r.titolo)}</b>, da ${fmt(r.min_garantita_euro)} €.`;
+  el('raccDepScelta').style.display = '';
+  el('raccDepPaga').style.display = 'none';
+  disegnaDepositoRaccolta();
+  el('sheetBg').classList.add('open');
+  el('raccDepSheet').classList.add('open');
+}
+function disegnaDepositoRaccolta(){
+  const r = raccoltaScheda || {}, min = Number(r.min_garantita_euro) || 50;
+  const scritta = !!el('raccDepImporto').value.trim();
+  el('raccDepChips').innerHTML = RACC_DEP_PILLOLE.filter(v => v >= min).map(v =>
+    `<button type="button" class="consegna-pill${!scritta && raccDep.euro === v ? ' attiva' : ''}" onclick="raccDep.euro=${v};el('raccDepImporto').value='';disegnaDepositoRaccolta()">${v} €</button>`).join('');
+  const ok = raccDep.euro >= min;
+  el('raccDepCrea').disabled = !ok;
+  const sats = r.cambio > 0 ? Math.round(raccDep.euro / r.cambio * 1e8) : 0;
+  el('raccDepRiga').innerHTML = !ok ? `<span style="color:var(--sats-text)">Il deposito parte da ${min} €: per meno, manda uno zap</span>`
+    : `${raccDep.euro} €${sats ? ` ≈ <b class="mono">${fmt(sats)}</b> sats` : ''}, più pochi sats per la rete`;
+}
+function depositoRaccoltaScritto(){
+  const cifre = el('raccDepImporto').value.replace(/\D/g, '');
+  raccDep.euro = cifre ? parseInt(cifre, 10) : 0;
+  disegnaDepositoRaccolta();
+}
+async function creaDepositoRaccolta(btn){
+  haptic();
+  const r = raccoltaScheda;
+  if (!r) return;
+  const rip = bottoneInAttesa(btn, 'Preparo il 2-di-3…');
+  try {
+    /* il 2-di-3 vuole la MIA chiave on-chain: se il server non ce l'ha
+       ancora, l'app la accende da sola (il seme nasce nel telefono) */
+    if (typeof onchainAccendiDaSolo === 'function') await onchainAccendiDaSolo();
+    const q = await fetch(`${API_BASE}/raccolte/${r.id}/deposito`, {method:'POST',
+      headers:{'Content-Type':'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({euro: raccDep.euro})});
+    const d = await q.json().catch(()=>({}));
+    if (!q.ok) { toast(d.detail || 'Il deposito non è nato: riprova', 8000); return; }
+    raccDep.d = d;
+    passoDepositoRaccolta();
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { rip(); }
+}
+function riapriDepositoRaccolta(id){
+  haptic();
+  const r = raccoltaScheda;
+  const o = r && (r.miei_depositi || []).find(x => x.id === id);
+  if (!o) return;
+  raccDep = {euro: o.euro, d: o, battito: null};
+  el('raccDepPerChi').innerHTML = `Per <b>${esc(r.titolo)}</b>.`;
+  el('sheetBg').classList.add('open');
+  el('raccDepSheet').classList.add('open');
+  passoDepositoRaccolta();
+}
+function fermaBattitoDepositoRaccolta(){
+  if (raccDep.battito) { clearInterval(raccDep.battito); raccDep.battito = null; }
+}
+function passoDepositoRaccolta(){
+  fermaBattitoDepositoRaccolta();
+  const o = raccDep.d; if (!o || !o.indirizzo) return;
+  el('raccDepScelta').style.display = 'none';
+  el('raccDepPaga').style.display = '';
+  el('raccDepCifra').textContent = fmt(o.importo_sats);
+  el('raccDepBtc').innerHTML = rigaCifraBtc(o.importo_sats);
+  el('raccDepIndirizzo').textContent = o.indirizzo.indirizzo;
+  el('raccDepNota').innerHTML = `Dentro ci sono <b class="mono">${fmt(o.prezzo_sats)}</b> sats per la raccolta e <b class="mono">${fmt(o.margine_sats)}</b> per la rete: quel che la rete non usa torna a te. Hai tempo fino a ${new Date(o.scade * 1000).toLocaleString('it-IT', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}.`;
+  el('raccDepStato').textContent = o.visti_sats ? '⏳ Visto in rete: aspetto la conferma (di solito 10-60 minuti)' : '⏳ Aspetto il pagamento';
+  disegnaQr(el('raccDepQr'), `bitcoin:${o.indirizzo.indirizzo}?amount=${satsInBtc(o.importo_sats, true)}`, 'Byte');
+  raccDep.battito = setInterval(() => {
+    if (!el('raccDepSheet').classList.contains('open') || raccDep.d !== o) { fermaBattitoDepositoRaccolta(); return; }
+    controllaDepositoRaccolta(null, true);
+  }, RACC_BATTITO_DEP_MS);
+}
+function copiaIndirizzoDepositoRaccolta(){
+  const o = raccDep.d; if (!o || !o.indirizzo) return;
+  haptic();
+  copiaLink(o.indirizzo.indirizzo, '📋 Indirizzo copiato');
+}
+async function controllaDepositoRaccolta(btn, zitto){
+  const o = raccDep.d; if (!o) return;
+  const rip = btn ? bottoneInAttesa(btn, 'Guardo…') : () => {};
+  try {
+    const q = await fetch(`${API_BASE}/raccolte/depositi/${o.id}/controlla`, {method:'POST',
+      headers:{'X-Tg-Init-Data': authHdr()}});
+    const d = await q.json().catch(()=>({}));
+    if (!q.ok) { if (!zitto) toast(d.detail || 'Non riesco a guardare: riprova', 5000); return; }
+    if (raccDep.d !== o) return;
+    if (d.stato === 'depositato') {
+      fermaBattitoDepositoRaccolta();
+      raccDep.d = null;
+      if (el('raccDepSheet').classList.contains('open')) navIndietro();
+      toast('🛡️ Deposito confermato: grazie per il sostegno!', 5000);
+      if (raccoltaAperta) apriRaccolta(raccoltaAperta);
+      return;
+    }
+    raccDep.d = d;
+    el('raccDepStato').textContent = d.visti_sats ? '⏳ Visto in rete: aspetto la conferma (di solito 10-60 minuti)'
+      : (d.stato === 'attesa' ? '⏳ Aspetto il pagamento' : 'Questo deposito è chiuso');
+    if (!zitto) toast(d.visti_sats ? '⏳ Visto: aspetto la conferma' : 'Ancora niente in rete', 3000);
+  } catch(e) { if (!zitto) toast('Rete assente: riprova'); }
+  finally { rip(); }
+}
+function annullaDepositoRaccolta(){
+  const o = raccDep.d; if (!o) return;
+  chiediConferma({titolo: '🛡️ Annulli il deposito?', etichetta: 'Annulla il deposito', vestito: 'allarme',
+    corpo: 'Solo se non hai ancora pagato: se i sats sono già partiti, il deposito resta e, se l\'obiettivo non arriva, tornano a te.',
+    poi: async () => {
+      const q = await fetch(`${API_BASE}/raccolte/depositi/${o.id}/annulla`, {method:'POST',
+        headers:{'X-Tg-Init-Data': authHdr()}}).catch(()=>null);
+      const d = q ? await q.json().catch(()=>({})) : {};
+      if (!q || !q.ok) { toast((d && d.detail) || 'Non si annulla: riprova', 6000); return; }
+      fermaBattitoDepositoRaccolta();
+      raccDep.d = null;
+      if (el('raccDepSheet').classList.contains('open')) navIndietro();
+      toast('Deposito annullato', 3000);
+      if (raccoltaAperta) apriRaccolta(raccoltaAperta);
+    }});
+}
+
+/* LE SECONDE FIRME: i depositi che aspettano il MIO telefono — chi
+   raccoglie sul rilascio, chi ha depositato sul ritorno. Si co-firma
+   con `onchainCofirma`, il codice del mercatino e del P2P: firma solo se
+   le monete sono quelle del deposito e l'uscita va al wallet che il MIO
+   seme ha firmato. In sottofondo (all'apertura) e dal bottone. */
+async function raccolteCofirmeInAttesa(parole){
+  const fatte = [];
+  if (!raccolteAttive || !parole) return fatte;
+  let deps = [];
+  try {
+    const q = await fetch(`${API_BASE}/raccolte/mie-firme`, {headers:{'X-Tg-Init-Data': authHdr()}});
+    deps = q.ok ? ((await q.json()).depositi || []) : [];
+  } catch(e) { return fatte; }
+  for (const o of deps) {
+    if (!raccDaFirmare(o)) continue;
+    try {
+      const no = await onchainCofirma(o, parole);
+      fatte.push(no ? `⚠️ raccolta, deposito #${o.id}: non firmato — ${no}`
+                    : `✅ raccolta, deposito #${o.id}: firmato, i sats sono partiti`);
+    } catch(e) { fatte.push(`⚠️ raccolta, deposito #${o.id}: ${(e && e.message) || 'errore'}`); }
+  }
+  return fatte;
+}
+async function raccolteFirmaOra(btn){
+  haptic();
+  const rip = bottoneInAttesa(btn, 'Firmo…');
+  try {
+    const parole = await onchainSemeAssicurato();
+    const fatte = await raccolteCofirmeInAttesa(parole);
+    toast(fatte.length ? '₿ ' + fatte.join(' · ') : 'Niente da firmare adesso', 7000);
+  } catch(e) { toast('⚠️ ' + ((e && e.message) || 'errore'), 6000); }
+  finally { rip(); }
+  if (raccoltaAperta) apriRaccolta(raccoltaAperta);
+}
+
+/* IL PANNELLO DEI MODERATORI: da approvare, segnalate, vive */
+let admRaccolte = null;
+function rigaRaccoltaAdmin(r){
+  const sosp = (r.sospette || []).length
+    ? `<div style="color:var(--sats-text);font-weight:700;font-size:12.5px;margin-top:4px">⚠️ Parole da guardare: ${esc(r.sospette.join(', '))}</div>` : '';
+  const segn = r.segnalazioni
+    ? `<div style="color:var(--sats-text);font-weight:700;font-size:12.5px;margin-top:4px">🚩 ${Number(r.segnalazioni.n)} segnalazioni${r.segnalazioni.motivi ? ': ' + esc(r.segnalazioni.motivi) : ''}</div>` : '';
+  const id = Number(r.id);
+  const gesti = r.stato === 'revisione'
+    ? `<button class="btn mini primary" onclick="gestoRaccoltaAdmin(this, ${id}, 'via')">✓ Via</button>
+       <button class="btn mini ghost" onclick="gestoRaccoltaAdmin(this, ${id}, 'rifiuta')">✕ No</button>`
+    : `<button class="btn mini ghost" onclick="gestoRaccoltaAdmin(this, ${id}, 'ferma')">⏹ Ferma</button>`
+      + (r.segnalazioni ? `<button class="btn mini ghost" onclick="gestoRaccoltaAdmin(this, ${id}, 'guardata')">Letto</button>` : '');
+  return `<div class="racc-adm">
+      <b>🎯 ${esc(r.titolo)}</b> <span style="color:var(--muted);font-size:13px">#${id}</span>
+      <div class="hint" style="margin:2px 0 0">di ${esc(raccChi(r))} (${Number(r.vendite_ok) || 0} vendite) · ${fmtEur(r.obiettivo_euro)} € = ${fmt(r.obiettivo_sats)} sats · ${Number(r.giorni)} giorni${r.garantita ? ' · 🛡️ garantita' : ''}</div>
+      ${sosp}${segn}
+      <div class="racc-racconto" style="max-height:140px;overflow:auto">${esc(r.racconto)}</div>
+      <input id="admRaccPerche${id}" maxlength="300" placeholder="Il perché (per No e Ferma: lo legge chi raccoglie)" style="width:100%;margin:6px 0">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${gesti}</div>
+    </div>`;
+}
+function boxRaccolteAdmin(lista){
+  if (!Array.isArray(lista) || !lista.length) return '';
+  const rev = lista.filter(r => r.stato === 'revisione');
+  const segn = lista.filter(r => r.stato === 'attiva' && r.segnalazioni);
+  const vive = lista.filter(r => r.stato === 'attiva' && !r.segnalazioni);
+  return (rev.length ? `
+      <div class="section-label" style="padding:26px 0 0">🎯 Raccolte da approvare (${rev.length})</div>
+      <div class="sub" style="margin-top:6px">Niente quote, interessi, rendimenti o token: una raccolta è un sostegno. Guarda chi è e cosa promette.</div>
+      <div style="margin-top:10px">${rev.map(rigaRaccoltaAdmin).join('')}</div>` : '')
+    + (segn.length ? `
+      <div class="section-label" style="padding:26px 0 0">🚩 Raccolte segnalate (${segn.length})</div>
+      <div style="margin-top:10px">${segn.map(rigaRaccoltaAdmin).join('')}</div>` : '')
+    + (vive.length ? cassettoAdm('accAdmRaccolte', '🎯', 'Raccolte in corso', vive.length, `
+        <div class="sub">«Ferma» chiude la raccolta adesso: i depositi di garanzia tornano a chi li ha messi, gli zap no.</div>
+        <div style="margin-top:10px">${vive.map(rigaRaccoltaAdmin).join('')}</div>`) : '');
+}
+async function gestoRaccoltaAdmin(btn, id, gesto){
+  haptic();
+  const perche = String((el('admRaccPerche' + id) || {}).value || '').trim();
+  if ((gesto === 'rifiuta' || gesto === 'ferma') && perche.length < 5) {
+    toast('Scrivi il perché: lo legge chi raccoglie', 4000); return;
+  }
+  const fai = async () => {
+    const rip = bottoneInAttesa(btn, '…');
+    try {
+      const q = await fetch(`${API_BASE}/admin/raccolte/${id}/${gesto}`, {method:'POST',
+        headers:{'Content-Type':'application/json', 'X-Tg-Init-Data': authHdr()},
+        body: JSON.stringify({perche})});
+      const d = await q.json().catch(()=>({}));
+      toast(q.ok ? '🎯 Fatto' : (d.detail || 'Non è andata: riprova'), 5000);
+    } catch(e) { toast('Rete assente: riprova'); }
+    finally { rip(); }
+    loadAdminStats();
+  };
+  if (gesto === 'ferma') return chiediConferma({titolo: '⏹ Fermi la raccolta?', etichetta: 'Ferma la raccolta',
+    vestito: 'allarme', corpo: 'Si chiude adesso: i depositi di garanzia tornano a chi li ha messi, e chi raccoglie legge il perché.',
+    poi: fai});
+  fai();
+}
+
+/* la tessera della vetrina: c'e' solo con almeno una raccolta viva */
+function raccolteSullaFila(){
+  return raccolteAttive && raccolteVive > 0 && !DEMO && !VETRINA;
+}
+function cardRaccolteVetrina(){
+  return `
+    <a class="cat-cella cella-raccolte" role="button" tabindex="0"
+       title="Raccolte fondi" aria-label="Raccolte fondi" onclick="apriRaccolte()"
+       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriRaccolte()}">
+      <span class="cat-quad"><span class="cat-fig"><span class="cat-emoji" aria-hidden="true">🎯</span></span></span>
+      <span class="cat-eti">Raccolte</span>
+    </a>`;
+}
+
 /* ═══ LA CASSA IN NEGOZIO (15 nov 2026, cantiere cassa-negozio) ═══
    Andrea: «una modalità locale per i negozi [...] senza escrow [...]
    funge da POS [...] si può vendere anche senza che il compratore abbia
@@ -41847,6 +42597,8 @@ function renderProfilo(){
     (Number(myNFeedback) || 0) > 0 ? `(${Number(myNFeedback)})` : '';
   if (el('vocCassa')) el('vocCassa').style.display =
     cassaAttiva&&!DEMO&&!VETRINA ? '' : 'none';
+  if (el('vocRaccolte')) el('vocRaccolte').style.display =
+    raccolteAttive&&!DEMO&&!VETRINA ? '' : 'none';
   if (el('vocWidgetNegozio')) el('vocWidgetNegozio').style.display =
     (myNegozio)&&!DEMO&&!VETRINA ? '' : 'none';
   /* «Esci» dice cosa fa: con piu' account aperti esce da QUESTO e
@@ -54859,6 +55611,12 @@ async function loadAdminStats(){
         {headers:{'X-Tg-Init-Data':authHdr()}});
       admUnioni = ru.ok ? await ru.json() : null;
     } catch(e) { admUnioni = null; }
+    /* le raccolte da approvare, segnalate e vive (17 nov 2026) */
+    try {
+      const rr = await fetch(`${API_BASE}/admin/raccolte`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      admRaccolte = rr.ok ? ((await rr.json()).raccolte || []) : null;
+    } catch(e) { admRaccolte = null; }
     let rev = [];
     if (s.in_revisione) {
       try {
@@ -55003,6 +55761,7 @@ async function loadAdminStats(){
       ${boxSponsor(admSponsor)}
       ${boxInsieme(admInsieme)}
       ${boxUnioni(admUnioni)}
+      ${boxRaccolteAdmin(admRaccolte)}
       ${decisi.length ? cassettoAdm('accAdmDecisi', '↩︎',
         'Decisi di recente', decisi.length, `
         <div class="sub">Si può ancora ripensarci: rimette l'annuncio in attesa.</div>
@@ -65016,6 +65775,10 @@ async function onchainCofirmeInSottofondo(){
        stesso seme, stessa `onchainCofirma`, l'elenco e' il loro */
     if (typeof p2pOnchainCofirmeInAttesa === 'function')
       fatte.push(...await p2pOnchainCofirmeInAttesa(parole));
+    /* ...e quelle dei depositi delle raccolte (17 nov 2026): stesso
+       seme, stessa `onchainCofirma`, la rotta e' la loro */
+    if (typeof raccolteCofirmeInAttesa === 'function')
+      fatte.push(...await raccolteCofirmeInAttesa(parole));
     if (fatte.length) {
       toast('₿ ' + fatte.join(' · '), 7000);
       /* l'ordine di sempre si e' chiuso sul server: «Ordini» lo dice */
@@ -107482,6 +108245,20 @@ function apriOrdineDaUrl(){
   }
   else go('affari');
 }
+
+/* /?raccolta=<numero> — UNA RACCOLTA, dal tasto degli avvisi e dai link
+   condivisi. Solo dalla porta di casa, una volta. */
+const RACCOLTA_URL = /^\/(miniapp\.html)?$/.test(location.pathname)
+  ? (location.search.match(/[?&]raccolta=([1-9][0-9]{0,11})(?:&|$)/) || [])[1] || '' : '';
+let raccoltaUrlAperta = false;
+function apriRaccoltaDaUrl(){
+  /* si consuma solo a utente entrato e leva accesa: l'avvio di chi non
+     e' ancora entrato non se lo mangia */
+  if (DEMO || VETRINA || !raccolteAttive) return;
+  if (!RACCOLTA_URL || raccoltaUrlAperta) return;
+  raccoltaUrlAperta = true;
+  apriRaccolta(Number(RACCOLTA_URL));
+}
 /* DRITTI ALL'INCASSO DAL TASTO DELL'AVVISO (6 nov 2026, cantiere
    swap-auto-tasto, richiesta di Andrea: «nel messaggio del bot voglio un
    tasto che riporti esattamente dove l'utente deve compiere l'azione»).
@@ -107672,7 +108449,7 @@ function spegniLinkDaUrl(){
   categoriaAperta = p2pApertoDaUrl = consigliatiApertiDaUrl = true;
   offertaAperta = barattoloAperto = invitoDaUrlMostrato = true;
   bozzaAperta = ordineUrlAperto = assistenzaUrlAperta = true;
-  appNegozioUrlAperto = corrieriUrlAperto = true;
+  appNegozioUrlAperto = corrieriUrlAperto = raccoltaUrlAperta = true;
   /* ...e la porta del P2P non si aprira': il velo d'apertura non la
      aspetta (vedi IL LINK DEL P2P SENZA IL LAMPO DELLA HOME) */
   arrivoP2PFatto();
@@ -107739,6 +108516,7 @@ async function avviaVetrina(){
     apriOrdineDaUrl();
     apriAssistenzaDaUrl();
     apriCorrieriDaUrl();
+    apriRaccoltaDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();
     apriInvitoDaUrl();
@@ -108057,6 +108835,10 @@ async function avvia(){
     /* LA CASSA IN NEGOZIO (15 nov 2026): la leva viva (un server di ieri
        non la manda, e la voce resta spenta) */
     cassaAttiva = !!me.cassa_attiva;
+    /* LE RACCOLTE (17 nov 2026): la leva viva e quante sono in vetrina
+       (la tessera c'e' solo con almeno una); un server di ieri tace */
+    raccolteAttive = !!me.raccolte;
+    raccolteVive = (me.raccolte && Number(me.raccolte.vive)) || 0;
     /* LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026): la leva viva — un
        server di ieri non la manda, e la voce resta spenta */
     myCancellabile = !!me.account_cancellabile && !DEMO && !VETRINA;
@@ -108261,6 +109043,7 @@ async function avvia(){
     apriOrdineDaUrl();
     apriAssistenzaDaUrl();
     apriCorrieriDaUrl();
+    apriRaccoltaDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();
     /* chi ha toccato «Swap» da fuori ed e' appena entrato (16 nov 2026) */
