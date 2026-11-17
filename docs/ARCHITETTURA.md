@@ -3945,6 +3945,13 @@
   suo negozio sul server con `NEGOZIO_SPONSOR_CASA`, in pari col
   `RACCONTI` del client per una prova. Il disegno e'
   `tabellaNumeriNegozio`, lo stesso nel Profilo e nel pannello.
+  GLI ACQUISTI (17 nov 2026): lo stesso giudice da' anche il lato di
+  chi compra — «da sempre» = `acquisti_ok`, 30 giorni = ordini
+  `released` da compratore con lo stesso orologio, sats = `prezzo_sats`
+  INTERO (il totale pagato, decisione di Andrea; le vendite restano il
+  netto). La porta del venditore apre il cassetto anche a chi ha solo
+  comprato e glielo dice con `venditore: false`: il client mostra i
+  soli acquisti, col titolo «I tuoi acquisti».
   LA ROTTA DEGLI ASSET E' UNA WHITELIST DI FORMA e non un elenco
   (`FORMA_RACCONTO` + `SLUG_SPONSOR`): le foto di un racconto sono tre
   oggi e cinque domani, e un elenco a mano sarebbe l'ennesima lista da

@@ -144,6 +144,8 @@ Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraff
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere.
 
+I numeri del negozio: nel Profilo, gruppo «Negozio e spedizioni», il cassetto «📊 Il tuo negozio» mostra le visite alla pagina del negozio, le vendite concluse (ultimi 30 giorni e da sempre, coi sats che ha incassato: spedizione compresa, commissione tolta) e le recensioni. Dal 17 novembre 2026 ci sono anche gli «🛍️ Acquisti conclusi», ultimi 30 giorni e da sempre, coi sats del totale pagato (prodotti, spedizione e protezione acquisti). Chi ha solo comprato e non ha annunci vede lo stesso cassetto col nome «📊 I tuoi acquisti». Contano gli ordini del mercatino conclusi, non gli scambi P2P.
+
 <!-- pezzo libro-011 | libro -->
 ## Libro · Vendere nel mercatino (3/4)
 
@@ -1786,5 +1788,13 @@ pubblico: sì
 
 frase: Chi non ha ancora un wallet adesso trova una guida in tre passi: quale scaricare (Wallet of Satoshi, il più facile), come salvare il backup e dove trovare il proprio indirizzo Lightning, da incollare subito lì dentro per incassare. I sats restano nel tuo wallet, non su Barattolo.
 dove: il link «Non hai un wallet? Te lo spieghiamo in tre passi» sotto la fattura da pagare, nel riquadro «💰 Come ricevi i tuoi sats» di un ordine e nel Profilo accanto al Lightning address.
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-058 | novita -->
+## Novità · 2026-11-17 · totali-acquisti
+
+frase: Nel Profilo ora vedi anche quanto hai comprato: negli ultimi 30 giorni e da sempre, quanti acquisti e quanti sats hai pagato in tutto, spedizione compresa. Se non hai annunci il cassetto si chiama «I tuoi acquisti».
+dove: Profilo → «Negozio e spedizioni» → «📊 Il tuo negozio» (o «📊 I tuoi acquisti»), sezione «🛍️ Acquisti conclusi».
 leva: nessuna
 pubblico: sì

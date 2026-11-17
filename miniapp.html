@@ -15069,11 +15069,13 @@ document.getElementById('cartello')?.remove();</script>
            visite alla pagina, aperture dallo spazio in vetrina,
            vendite, recensioni. Compare SOLO a chi ha almeno un
            annuncio, e a deciderlo e' il SERVER (`mostra` di
-           /api/me/negozio/numeri). In DEMO e in vetrina sparisce, il
+           /api/me/negozio/numeri). Dal 17 nov 2026 anche a chi ha
+           almeno un acquisto concluso: i suoi totali, e a chi ha solo
+           comprato il titolo diventa «I tuoi acquisti». In DEMO e in vetrina sparisce, il
            patto del wallet. Il disegno e' `tabellaNumeriNegozio`, lo
            stesso del pannello dei moderatori. -->
       <div class="acc" id="accNumeriNegozio" style="display:none">
-        <button class="acc-h" onclick="toggleAcc('accNumeriNegozio')"><span class="em">📊</span>Il tuo negozio <span class="conta" id="numeriNegozioConta"></span><span class="fr">▾</span></button>
+        <button class="acc-h" onclick="toggleAcc('accNumeriNegozio')"><span class="em">📊</span><span id="numeriNegozioTitolo">Il tuo negozio</span> <span class="conta" id="numeriNegozioConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="numeriNegozioBlocco"></div></div>
       </div>
 
@@ -44911,6 +44913,11 @@ async function renderNumeriNegozio(){
   if (sez) sez.style.display = '';
   const conta = el('numeriNegozioConta');
   if (conta) conta.textContent = '';
+  /* CHI HA SOLO COMPRATO (17 nov 2026) non ha un negozio: il cassetto
+     porta il nome di quel che contiene */
+  const titolo = el('numeriNegozioTitolo');
+  if (titolo) titolo.textContent = d.venditore === false
+    ? 'I tuoi acquisti' : 'Il tuo negozio';
   box.innerHTML = tabellaNumeriNegozio(d, false);
   aggiornaGruppiProfilo();
 }
@@ -44966,10 +44973,23 @@ function tabellaNumeriNegozio(d, perModeratore){
           ? ` da ${n(persone)} ${persone === 1 ? 'persona' : 'persone'}` : ''))
         + riga('Media', `<span class="stars">${'★'.repeat(Math.round(media))}</span> ${media}`)
       : riga('Ricevute', 'ancora nessuna'));
+  /* GLI ACQUISTI (17 nov 2026, chiesto da Andrea): lo specchio delle
+     vendite dal lato di chi compra, e i sats sono il TOTALE PAGATO —
+     spedizione e protezione comprese. Compaiono solo se ce n'e' almeno
+     uno: a un venditore che non ha mai comprato non serve uno zero.
+     Chi ha SOLO comprato (`venditore: false`) vede questi e basta. */
+  const acquisti = (Number(d.acquisti_tot) || 0) > 0
+    ? `<div class="nn-sez">🛍️ Acquisti conclusi</div>`
+      + riga('Ultimi 30 giorni', `${n(d.acquisti_30)} · ${n(d.sats_acq_30)} sats`)
+      + riga('Da sempre', `${n(d.acquisti_tot)} · ${n(d.sats_acq_tot)} sats`)
+      + `<div class="nn-nota">Il totale pagato: prodotti, spedizione e protezione acquisti, se c'erano.</div>`
+    : '';
+  if (d.venditore === false)
+    return `<div class="numeri-neg">${acquisti}</div>`;
   const loro = perModeratore
     ? 'Le visite del venditore al suo negozio non si contano.'
     : 'Le tue visite al tuo negozio non si contano.';
-  return `<div class="numeri-neg">${visite}${sponsor}${vendite}${recensioni}
+  return `<div class="numeri-neg">${visite}${sponsor}${vendite}${acquisti}${recensioni}
     <div class="nn-nota">Numeri indicativi: le visite contano le aperture della pagina, non le persone. ${loro}</div></div>`;
 }
 

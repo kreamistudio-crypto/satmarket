@@ -86458,3 +86458,46 @@ prove e colore, che i collaudi non leggono).
 DA GUARDARE. I nomi dei bottoni dentro Wallet of Satoshi («Ricevi») sono
 quelli del suo menu oggi: se cambiano, la guida va ritoccata. Se i
 neofiti si fermano ancora al wallet, la strada C dello studio.
+
+## I totali acquistati nel cassetto «📊 Il tuo negozio» (17 nov 2026, cantiere totali-acquisti; Andrea: «sarebbe bello vedere anche nel caso abbia fatto acquisti i totali dei prodotti acquistati»)
+
+La domanda di Andrea prima del codice: i sats delle «Vendite concluse»
+sono netti o con la spedizione? Dal codice (`numeri_negozio`): sono
+`netto_venditore(prezzo_sats − protezione_sats)`, cioè prodotti meno
+sconto PIÙ spedizione, tolte protezione e commissione (che oggi si
+calcola anche sulla spedizione). Solo ordini del mercatino `released`.
+
+DECISO (card, Andrea: «Totale pagato»). Gli acquisti sono lo specchio
+delle vendite dal lato di chi compra, nello stesso giudice
+(`numeri_negozio`) e nella stessa tabella: «🛍️ Acquisti conclusi»,
+ultimi 30 giorni e da sempre. Il «da sempre» è `acquisti_ok`, il
+gemello di `vendite_ok` che lo stesso rilascio incrementa; i 30 giorni
+contano gli ordini `released` dove è compratore, con lo stesso orologio
+della chiusura (passo «arrivato», sennò `aggiornato`). I sats sono
+`prezzo_sats` INTERO: quel che è uscito dal wallet, spedizione e
+protezione comprese. La sezione compare solo con almeno un acquisto.
+Il cassetto ora c'è anche per chi ha SOLO comprato (`acquisti_ok > 0`,
+nessun annuncio): la porta risponde `venditore: false`, il client mostra
+i soli acquisti e chiama il cassetto «I tuoi acquisti». Il moderatore
+guarda sempre un negozio intero (`venditore: true`).
+
+SCARTATE. Due righe prodotti / «di cui spedizione» (opzione della card
+non scelta). Contare gli acquisti dagli ordini invece che da
+`acquisti_ok`: il «da sempre» delle vendite usa il contatore, e due
+fonti diverse per due numeri gemelli direbbero un giorno cifre diverse.
+
+PROVATO. `prove_numeri_negozio` (73): il giudice su un database in
+memoria (30 giorni col passo e senza, protezione compresa con la
+commissione al 5%, annullato e altro compratore fuori, le vendite che
+non cambiano), le due porte, il banco node (sezione solo con acquisti,
+posto fra vendite e recensioni, solo-compratore senza visite né vendite,
+i due titoli). Controprove su quattro mutazioni (netto al posto del
+pagato, colonna venditore al posto di compratore, finestra tolta, ramo
+del client tolto): tutte rosse. `collaudo_numeri_negozio`: 111 che ha
+solo comprato ha il cassetto con `venditore: false`, 1 · 10 000 nei 30
+giorni e 2 · 15 000 da sempre (il venditore ne ha incassati 14 000);
+controprova sulla porta: rossa.
+
+DA GUARDARE. Gli acquisti on-chain e del P2P non entrano, come per le
+vendite. La commissione sulla spedizione nel netto delle vendite è la
+regola del pagamento di oggi: non toccata.

@@ -30818,7 +30818,15 @@ def numeri_negozio(con, v, adesso: int | None = None) -> dict:
     LO SPAZIO IN VETRINA esce solo ACCESO, con la sua scadenza e le
     aperture degli ultimi 30 giorni: lo stesso numero di `/sponsor`.
     LE RECENSIONI sono le colonne del profilo, quelle che il negozio
-    mostra a tutti."""
+    mostra a tutti.
+    GLI ACQUISTI (17 nov 2026, chiesto da Andrea): lo specchio delle
+    vendite dal lato di chi compra. Il «da sempre» e' `acquisti_ok`, il
+    contatore gemello di `vendite_ok` che lo stesso rilascio incrementa;
+    i 30 giorni contano gli ordini `released` dove e' COMPRATORE, con lo
+    stesso orologio della chiusura. I SATS sono il TOTALE PAGATO
+    (decisione di Andrea): `prezzo_sats` intero, cioe' prodotti meno
+    sconto, PIU' spedizione e protezione — quel che e' uscito dal suo
+    wallet, senza commissioni da togliere."""
     adesso = int(adesso if adesso is not None else time.time())
     cod = v["negozio"] or ""
 
@@ -30838,6 +30846,14 @@ def numeri_negozio(con, v, adesso: int | None = None) -> dict:
     netto = [(netto_venditore((r["prezzo_sats"] or 0)
                               - (r["protezione_sats"] or 0)),
               int(r["chiuso"] or 0)) for r in righe]
+    # GLI ACQUISTI: stessa chiusura, ma il TOTALE PAGATO, intero
+    pagato = [(int(r["prezzo_sats"] or 0), int(r["chiuso"] or 0))
+              for r in con.execute(
+        "SELECT o.prezzo_sats, COALESCE((SELECT MAX(p.quando) FROM "
+        "payout_passi p WHERE p.tabella='ordini' AND p.riga_id=o.id "
+        "AND p.passo=?), o.aggiornato, 0) AS chiuso FROM ordini o "
+        "WHERE o.compratore_id=? AND o.stato='released'",
+        (PASSO_ARRIVATO, v["tg_id"])).fetchall()]
     spazi = []
     for s in sponsor_del_negozio(cod, v["tg_id"]):
         fino = sponsor_fino(s, adesso)
@@ -30853,14 +30869,18 @@ def numeri_negozio(con, v, adesso: int | None = None) -> dict:
         "sats_30": sum(x for x, q in netto if q >= dal30),
         "vendite_tot": int(v["vendite_ok"] or 0),
         "sats_tot": sum(x for x, _ in netto),
+        "acquisti_30": sum(1 for _, q in pagato if q >= dal30),
+        "sats_acq_30": sum(x for x, q in pagato if q >= dal30),
+        "acquisti_tot": int(v["acquisti_ok"] or 0),
+        "sats_acq_tot": sum(x for x, _ in pagato),
         "rating": v["rating"] or 0,
         "n_feedback": int(v["n_feedback"] or 0),
         "n_recensori": int(v["n_recensori"] or 0),
     }
 
 
-_CAMPI_NUMERI = ("SELECT tg_id, negozio, nome, vendite_ok, rating, "
-                 "n_feedback, n_recensori FROM utenti ")
+_CAMPI_NUMERI = ("SELECT tg_id, negozio, nome, vendite_ok, acquisti_ok, "
+                 "rating, n_feedback, n_recensori FROM utenti ")
 
 
 @app.get("/api/me/negozio/numeri")
@@ -30874,6 +30894,10 @@ def miei_numeri_negozio(x_tg_init_data: str = Header(""),
     con una storia da leggere; chi non ne ha mai pubblicato uno non ha
     niente da contare. Senza, `{"mostra": false}` e basta — la domanda
     e' «cosa c'e' di mio?», e a chi non ha niente la risposta e' niente.
+    ...O ALMENO UN ACQUISTO CONCLUSO (17 nov 2026): chi ha solo comprato
+    ha i suoi totali da leggere, e `venditore: false` dice al client di
+    mostrargli quelli e basta — niente visite e vendite di un negozio
+    che non ha.
     L'anonimo prende il 401 di `verifica_utente`, come in tutte le porte
     `/api/me`."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
@@ -30884,9 +30908,10 @@ def miei_numeri_negozio(x_tg_init_data: str = Header(""),
         ha = v and con.execute(
             "SELECT 1 FROM annunci WHERE venditore_id=? LIMIT 1",
             (user["id"],)).fetchone()
-        if not ha:
+        if not ha and not (v and (v["acquisti_ok"] or 0) > 0):
             return {"mostra": False}
-        return dict(numeri_negozio(con, v), mostra=True)
+        return dict(numeri_negozio(con, v), mostra=True,
+                    venditore=bool(ha))
     finally:
         con.close()
 
@@ -30911,7 +30936,9 @@ def numeri_negozio_admin(codice: str, x_tg_init_data: str = Header(""),
                         (codice,)).fetchone()
         if not v:
             raise HTTPException(404, "Negozio non trovato")
-        return dict(numeri_negozio(con, v), mostra=True,
+        # `venditore: True`: il moderatore guarda un NEGOZIO, e la
+        # tabella intera — anche gli acquisti, se ce ne sono
+        return dict(numeri_negozio(con, v), mostra=True, venditore=True,
                     nome=v["nome"] or "")
     finally:
         con.close()

@@ -53785,7 +53785,8 @@ def prove_numeri_negozio():
                          re.I)))
     con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
                 "venditore_id INTEGER, stato TEXT, prezzo_sats INTEGER, "
-                "protezione_sats INTEGER DEFAULT 0, aggiornato INTEGER)")
+                "protezione_sats INTEGER DEFAULT 0, aggiornato INTEGER, "
+                "compratore_id INTEGER DEFAULT 0)")
     con.execute("CREATE TABLE payout_passi(id INTEGER PRIMARY KEY, "
                 "tabella TEXT, riga_id INTEGER, passo TEXT, quando INTEGER)")
 
@@ -53840,7 +53841,8 @@ def prove_numeri_negozio():
     con.execute("INSERT INTO negozio_visite VALUES(?,?,?)",
                 ("altro000", giorno(0), 77777))
     v = {"tg_id": 222, "negozio": "ab12cd34", "vendite_ok": 4,
-         "rating": 4.5, "n_feedback": 3, "n_recensori": 2}
+         "acquisti_ok": 0, "rating": 4.5, "n_feedback": 3,
+         "n_recensori": 2}
     d = amb["numeri_negozio"](con, v, ora)
     prova("7 giorni sono oggi e i sei prima: il settimo giorno fa no",
           11, d["visite_7"])
@@ -53862,7 +53864,9 @@ def prove_numeri_negozio():
              (4, 222, "refunded", 99999, 0, ora),
              (5, 333, "released", 88888, 0, ora),
              (6, 222, "locked", 55555, 0, ora))
-    con.executemany("INSERT INTO ordini VALUES(?,?,?,?,?,?)", righe)
+    con.executemany("INSERT INTO ordini(id, venditore_id, stato, "
+                    "prezzo_sats, protezione_sats, aggiornato) "
+                    "VALUES(?,?,?,?,?,?)", righe)
     con.execute("INSERT INTO payout_passi(tabella, riga_id, passo, quando) "
                 "VALUES('ordini', 1, 'arrivato', ?)", (ora - 10 * 86400,))
     con.execute("INSERT INTO payout_passi(tabella, riga_id, passo, quando) "
@@ -53885,6 +53889,38 @@ def prove_numeri_negozio():
     _pr = codice(pezzo("numeri_negozio"))
     prova("il «da sempre» e' vendite_ok, non un conteggio parallelo", True,
           '"vendite_tot": int(v["vendite_ok"] or 0)' in _pr)
+
+    # ---- 4b. gli acquisti (17 nov 2026): il TOTALE PAGATO -------------
+    prova("chi non ha mai comprato: acquisti tutti a zero", (0, 0, 0, 0),
+          (d["acquisti_30"], d["sats_acq_30"], d["acquisti_tot"],
+           d["sats_acq_tot"]))
+    # 222 compra da 333: 5 giorni fa (passo «arrivato»), 50 giorni fa
+    # senza linea (vale `aggiornato`), con protezione e spedizione nel
+    # prezzo; un annullato e uno di un altro compratore che non contano
+    for oid, ven, com, st, prz, prot, agg in (
+            (11, 333, 222, "released", 3000, 300, ora),
+            (12, 333, 222, "released", 7000, 700, ora - 50 * 86400),
+            (13, 333, 222, "annullato", 40404, 0, ora),
+            (14, 333, 444, "released", 50505, 0, ora)):
+        con.execute("INSERT INTO ordini(id, venditore_id, compratore_id, "
+                    "stato, prezzo_sats, protezione_sats, aggiornato) "
+                    "VALUES(?,?,?,?,?,?,?)",
+                    (oid, ven, com, st, prz, prot, agg))
+    con.execute("INSERT INTO payout_passi(tabella, riga_id, passo, quando) "
+                "VALUES('ordini', 11, 'arrivato', ?)", (ora - 5 * 86400,))
+    amb["COMMISSIONE_PERCENTO"] = 5
+    d = amb["numeri_negozio"](con, dict(v, acquisti_ok=2), ora)
+    amb["COMMISSIONE_PERCENTO"] = 0
+    prova("negli ultimi 30 giorni: l'acquisto di 5 giorni fa, INTERO "
+          "(protezione compresa, nessuna commissione tolta)",
+          (1, 3000), (d["acquisti_30"], d["sats_acq_30"]))
+    prova("...da sempre: acquisti_ok e il totale pagato di tutti e due",
+          (2, 10000), (d["acquisti_tot"], d["sats_acq_tot"]))
+    prova("...e le vendite non cambiano per gli acquisti", (1, 4, 16000),
+          (d["vendite_30"], d["vendite_tot"],
+           amb["numeri_negozio"](con, v, ora)["sats_tot"]))
+    prova("...il «da sempre» degli acquisti e' acquisti_ok", True,
+          '"acquisti_tot": int(v["acquisti_ok"] or 0)' in _pr)
 
     # ---- 5. lo spazio in vetrina: solo acceso, solo il suo -----------
     prova("spento, lo spazio non esce", [], d["sponsor"])
@@ -53931,6 +53967,14 @@ def prove_numeri_negozio():
           0 <= _ad.find("re.fullmatch(") < _ad.find("con.execute("))
     prova("le due porte passano dallo stesso giudice", (True, True),
           ("numeri_negozio(con, v)" in _me, "numeri_negozio(con, v)" in _ad))
+    prova("chi ha solo comprato entra, e la porta dice che non vende",
+          True, 'if not ha and not (v and (v["acquisti_ok"] or 0) > 0):'
+          in _me and "venditore=bool(ha)" in _me)
+    prova("...il moderatore guarda sempre un negozio intero", True,
+          "venditore=True" in _ad)
+    prova("i campi letti portano acquisti_ok", True,
+          "acquisti_ok" in re.search(r'^_CAMPI_NUMERI = \([^)]*\)', src,
+                                     re.M).group())
 
     # ---- 7. la rotta del negozio conta l'apertura e basta ------------
     _neg = pezzo("negozio")
@@ -53965,7 +54009,8 @@ def prove_numeri_negozio():
     prova("il cassetto sta in «Negozio e spedizioni», per primo, spento",
           True, _gi < _ac < _sp)
     prova("...col titolo chiesto", True,
-          '<span class="em">📊</span>Il tuo negozio' in mini[_ac:_sp])
+          '<span class="em">📊</span><span id="numeriNegozioTitolo">'
+          'Il tuo negozio</span>' in mini[_ac:_sp])
     _ri = pezzo_js(mini, "function renderIdentita(){", "\n}\n")
     prova("la catena del Profilo lo disegna", True,
           "renderNumeriNegozio();" in _ri)
@@ -54011,7 +54056,8 @@ async function fetch(u){ chiesti.push(u);
 const pieno = {mostra: true, negozio: 'ab12cd34', visite_7: 12,
   visite_30: 12345, visite_dal: '2020-01-01', sponsor: [],
   vendite_30: 2, sats_30: 21000, vendite_tot: 14, sats_tot: 150000,
-  rating: 4.8, n_feedback: 12, n_recensori: 9};
+  rating: 4.8, n_feedback: 12, n_recensori: 9, venditore: true,
+  acquisti_30: 0, sats_acq_30: 0, acquisti_tot: 0, sats_acq_tot: 0};
 (async () => {
   const out = {};
   risposta = {mostra: false};
@@ -54030,6 +54076,18 @@ const pieno = {mostra: true, negozio: 'ab12cd34', visite_7: 12,
   DEMO = false; myNumeriNegozio = null; risposta = 'giu';
   await renderNumeriNegozio();
   out.giu = el('accNumeriNegozio').style.display;
+  out.titoloVend = el('numeriNegozioTitolo').textContent;
+  out.compra = tabellaNumeriNegozio(Object.assign({}, pieno,
+    {acquisti_30: 1, sats_acq_30: 3000, acquisti_tot: 3,
+     sats_acq_tot: 12500}), false);
+  const solo = {mostra: true, venditore: false, negozio: 'cc', visite_7: 4,
+    vendite_tot: 0, acquisti_30: 1, sats_acq_30: 3000, acquisti_tot: 3,
+    sats_acq_tot: 12500};
+  out.solo = tabellaNumeriNegozio(solo, false);
+  myNumeriNegozio = null; risposta = solo; myTgId = 224;
+  await renderNumeriNegozio();
+  out.titoloSolo = [el('numeriNegozioTitolo').textContent,
+                    el('accNumeriNegozio').style.display];
   out.mod = tabellaNumeriNegozio(pieno, true);
   out.vuota = tabellaNumeriNegozio({mostra: true, visite_dal:
     new Date(Date.now() - 86400000).toISOString().slice(0, 10)}, false);
@@ -54081,6 +54139,26 @@ const pieno = {mostra: true, negozio: 'ab12cd34', visite_7: 12,
           "Le tue visite al tuo negozio non si contano." in _h)
     prova("senza spazio acceso, niente riga di «Da scoprire»", False,
           "Da scoprire" in _h)
+    prova("il venditore che non ha mai comprato: niente sezione acquisti",
+          False, "Acquisti conclusi" in _h)
+    prova("con gli acquisti: 30 giorni e da sempre, col totale pagato",
+          True, "🛍️ Acquisti conclusi" in o["compra"]
+          and "<b>1 · 3 000 sats</b>" in o["compra"]
+          and "<span>Da sempre</span><b>3 · 12 500 sats</b>" in o["compra"]
+          and "Il totale pagato: prodotti, spedizione e protezione "
+              "acquisti" in o["compra"])
+    prova("...dopo le vendite e prima delle recensioni", True,
+          o["compra"].index("Vendite concluse")
+          < o["compra"].index("Acquisti conclusi")
+          < o["compra"].index("Recensioni"))
+    prova("chi ha solo comprato vede gli acquisti e basta", (True, False,
+          False, False), ("Acquisti conclusi" in o["solo"],
+                          "Visite" in o["solo"], "Vendite" in o["solo"],
+                          "Recensioni" in o["solo"]))
+    prova("...e il cassetto si chiama «I tuoi acquisti»; al venditore "
+          "resta «Il tuo negozio»",
+          ["I tuoi acquisti", "", "Il tuo negozio"],
+          o["titoloSolo"] + [o["titoloVend"]])
     prova("storia di un anno: niente «si contano dal»", False,
           "si contano dal" in _h)
     prova("un minuto di memoria: il secondo giro non richiede", 2,

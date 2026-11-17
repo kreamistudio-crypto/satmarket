@@ -184,6 +184,27 @@ def giro(c, SRV):
     r = c.get(f"/api/negozio/{cod}", headers=ANONIMO).json()["venditore"]
     prova("...e il «da sempre» e' il numero che il negozio mostra a tutti",
           r["vendite_ok"], d["vendite_tot"])
+    prova("il venditore che non ha mai comprato: acquisti a zero",
+          (True, 0, 0, 0, 0), (d["venditore"], d["acquisti_30"],
+                               d["sats_acq_30"], d["acquisti_tot"],
+                               d["sats_acq_tot"]))
+
+    print("\n[gli acquisti (17 nov 2026)]")
+    # 111 ha comprato le due concluse qui sopra: il contatore come lo
+    # scrive il rilascio, e nessun annuncio suo
+    con = SRV.db()
+    con.execute("UPDATE utenti SET acquisti_ok=2 WHERE tg_id=111")
+    con.commit()
+    con.close()
+    s, d = numeri(COMPRATORE)
+    prova("chi ha SOLO comprato ha il cassetto, da compratore",
+          (200, True, False), (s, d.get("mostra"), d.get("venditore")))
+    prova("30 giorni: l'acquisto di 10 giorni fa, il totale pagato",
+          (1, 10000), (d["acquisti_30"], d["sats_acq_30"]))
+    prova("da sempre: acquisti_ok e il TOTALE PAGATO, protezione compresa "
+          "(il venditore ne ha incassati 14 000)", (2, 15000),
+          (d["acquisti_tot"], d["sats_acq_tot"]))
+    prova("...e il rimborso non conta", False, "7777" in repr(d))
 
     print("\n[lo spazio in vetrina]")
     prova("spento, il cassetto non lo nomina", [], d["sponsor"])
