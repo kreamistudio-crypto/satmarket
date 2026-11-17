@@ -1247,6 +1247,39 @@ def main():
            any("dove riavere i sats" in str(a) for a in banco.AVVISI)))
     SRV.P2P_ONCHAIN_APERTI_MAX = tetto
 
+    # ---- 11-septies) il contanti di persona col luogo, come su Lightning (17
+    # nov 2026, cantiere onchain-contanti; Andrea: «non c'è neanche il luogo
+    # dello scambio») -----------------------------------------------------------
+    print("\n[il contanti di persona: la zona di scambio e il suo tetto]")
+    tetto = SRV.P2P_ONCHAIN_APERTI_MAX
+    SRV.P2P_ONCHAIN_APERTI_MAX = 100
+    tetto_c, SRV.P2P_CONTANTI_MAX_EURO = SRV.P2P_CONTANTI_MAX_EURO, 250
+    r = pubblica(888, metodi=["Contanti"], recapito="")
+    prova("in contanti senza la zona non si pubblica: 400 con la frase del foglio",
+          (400, True), (r.status_code, "Scrivi la zona di scambio" in r.text))
+    # il tetto del contanti sta SOTTO quello generale: qui lo si abbassa a
+    # 50 €, cosi' i 90 € di sempre passano il primo e inciampano nel secondo
+    SRV.P2P_CONTANTI_MAX_EURO = 50
+    r = pubblica(888, metodi=["Contanti"], recapito="", zona="Milano centro")
+    rb = pubblica(888, metodi=["Bonifico"])
+    prova("...e sopra il tetto del contanti nemmeno: 400 col tetto; un bonifico della "
+          "stessa cifra passa", (400, True, 200),
+          (r.status_code, "In contanti di persona il massimo è 50 €" in r.text,
+           rb.status_code))
+    SRV.P2P_CONTANTI_MAX_EURO = 250
+    r = pubblica(888, metodi=["Contanti"], recapito="", zona="  Milano \n centro ")
+    oc_c = r.json().get("id")
+    r2 = pubblica(888, metodi=["Bonifico"], zona="Roma")
+    oc_s = r2.json().get("id")
+    nel = {x["id"]: x for x in libro(999)["onchain"]["eventi"]}
+    prova("con la zona si pubblica, e la zona esce ripulita nel libro e nella scheda; "
+          "senza «Contanti» la zona non si tiene",
+          (200, "Milano centro", "Milano centro", 200, None, ""),
+          (r.status_code, nel.get(oc_c, {}).get("zona"), uno(888, oc_c)["zona"],
+           r2.status_code, nel.get(oc_s, {}).get("zona"), uno(888, oc_s)["zona"]))
+    SRV.P2P_CONTANTI_MAX_EURO = tetto_c
+    SRV.P2P_ONCHAIN_APERTI_MAX = tetto
+
     # ---- 12) gli avvisi, tutti ----------------------------------------------
     print("\n[ogni avviso a una parte porta il bottone del suo scambio]")
     # (17 nov 2026) l'avviso della recensione ricevuta e' quello di sempre,
