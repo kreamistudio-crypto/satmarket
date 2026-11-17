@@ -209140,6 +209140,38 @@ def prove_serie_classifica():
     mini = open("miniapp.html", encoding="utf-8").read()
     prova("la porta sta nel Profilo, sotto la settimana", True,
           "    ${serieSettimanaHTML(mySerie)}\n    ${serieClassificaPortaHTML(mySerie)}\n" in mini)
+    prova("il nome e' «Classifica Streak» (17 nov notte, scelta di Andrea), con "
+          "la fiamma DISEGNATA sul bottone e nel titolo del foglio: nessuna coppa",
+          [True, True, True, False],
+          ['${SERIE_FIAMMA}<span style="flex:1;min-width:0">Classifica Streak</span>' in mini,
+           '<h3><span id="serieClassificaFiamma"></span>Classifica Streak</h3>' in mini,
+           "fiamma.innerHTML = SERIE_FIAMMA;" in mini,
+           "🏆" in mini[mini.index('id="serieClassificaSheet"'):mini.index("La pastiglia del gesto «tira")]
+           or "🏆" in pezzo_js(mini, "function serieClassificaPortaHTML(s){", "\n}\n")])
+    _css = re.sub(r"/\*[\s\S]*?\*/", "", mini[mini.index("<style"):mini.index("</style>")])
+    prova("il bottone e' LUCIDO come la carta del prezzo P2P (riflesso chiaro "
+          "in alto a sinistra, discesa verso lo scuro) ma non grafite; il "
+          "colore sta in una riga, e scritte e fiamma sono chiare sul fondo",
+          [True, True, True, True, False],
+          [bool(re.search(r"--streak-lucido:radial-gradient\(120% 140% at 0% 0%,rgba\(255,255,255,\.18\) 0%,"
+                          r"rgba\(255,255,255,0\) 55%\),\s*linear-gradient\(160deg,#[0-9A-F]{6} 0%,#[0-9A-F]{6} 100%\)", _css)),
+           ".serie-cl-porta{background:var(--streak-lucido),var(--streak-fondo);" in _css,
+           "border-color:rgba(255,255,255,.14);color:#FFF7EC}" in _css,
+           ".serie-cl-porta .serie-f .f-fuori{fill:#fff}" in _css,
+           # non e' la grafite della carta: i due colori del gradiente sono altri
+           bool(re.search(r"--streak-lucido:[^;}]*#(2A2E35|121417)", _css))])
+    prova("...ed e' ORO, la scelta di Andrea fra i quattro scatti", True,
+          "linear-gradient(160deg,#9A650C 0%,#573505 100%)" in _css
+          and ":root{--streak-fondo:#573505;" in _css)
+
+    def _lum(esa):
+        c = [int(esa[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    _m = re.search(r"--streak-lucido:[^;}]*linear-gradient\(160deg,#([0-9A-F]{6}) 0%", _css)
+    prova("la scritta crema regge il 4,5:1 anche sul punto piu' chiaro del "
+          "gradiente", True,
+          bool(_m) and (_lum("FFF7EC") + 0.05) / (_lum(_m.group(1)) + 0.05) >= 4.5)
     prova("il foglio esiste, e' registrato in closeSheet e si chiude con "
           "l'indietro", [True, True, True],
           ['<div class="sheet" id="serieClassificaSheet">' in mini,
@@ -209157,7 +209189,7 @@ def prove_serie_classifica():
           "serie accesa, e dice che vale per i giorni di fila",
           [True, True],
           ["if (!myClassifica && !(typeof mySerie !== 'undefined' && mySerie)) return '';" in riga,
-           "anche quella dei giorni di fila" in riga])
+           "anche dalla Classifica Streak, i giorni di fila" in riga])
     prova("«I tuoi dati» dichiara il dato nuovo e chi lo vede", True,
           "<li>I tuoi <b>giorni di fila</b>:" in mini
           and "che vede solo chi è entrato in Barattolo" in mini)
@@ -209194,7 +209226,7 @@ console.log(JSON.stringify(out));
         salta("il banco del foglio della classifica", "node assente")
         return
     prova("la porta: niente senza serie, c'e' dal primo giorno, e dice cos'e'",
-          ["", True, "🏆 Classifica dei giorni di fila ›"], o.get("porta"))
+          ["", True, "🔥 Classifica Streak ›"], o.get("porta"))
     prova("le righe: medaglia ai primi tre posti, poi il numero; il nome, «tu» "
           "sulla propria, i giorni con la fiamma",
           ["🥇 Ada 🔥9", "🥉 Bruno 🔥5", "4° Carla tu 🔥5", "21° — 🔥2"], o.get("righe"))

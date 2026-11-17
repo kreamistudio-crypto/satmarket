@@ -587,7 +587,7 @@ pubblico: no
 
 ## 2026-11-17 · serie-classifica
 frase: I giorni di fila adesso hanno una classifica: chi apre Barattolo da più giorni senza saltarne uno. Ci entri dal secondo giorno di fila, e a pari giorni si è a pari merito. La vede solo chi è entrato in Barattolo; se non vuoi comparire accendi «Non mostrarmi in classifica». Non dà punti né premi.
-dove: Profilo, sotto la fila dei sette giorni, il bottone «🏆 Classifica dei giorni di fila». Per non comparire: Profilo, cassetto «Livello e recensioni», «🏆 Non mostrarmi in classifica».
+dove: Profilo, sotto la fila dei sette giorni, il bottone «Classifica Streak», con la fiamma. Per non comparire: Profilo, cassetto «Livello e recensioni», «🏆 Non mostrarmi in classifica».
 leva: SERIE_GIORNI_ATTIVA (quella della serie, già accesa)
 pubblico: sì
 

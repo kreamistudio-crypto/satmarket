@@ -90404,3 +90404,32 @@ e una nel collaudo (`/api/me` con la leva spenta e il numero presente);
 controprova (client che la crede sempre, server che non la manda) tre
 rosse.
 
+## «Classifica Streak», col bottone oro lucido (17 nov 2026 notte, cantiere serie-nome; Andrea, con lo scatto del Profilo: «La classifica dei giorni di fila chiamala in un modo più carino», «Classifica strike day? Si dice?», «fammi il bottone di un colore particolare, tipo il lucido grafite del p2p ma non grafite però»)
+
+IL NOME: «Classifica Streak». Andrea aveva proposto «strike day»: la
+parola giusta è «streak» («strike» è lo sciopero, e «streak day» in
+inglese non si dice), detto a lui prima di scriverla. Avevo offerto
+quattro nomi in italiano su una scheda («Chi non molla», «I sempre
+accesi», «Gli instancabili», «Hall of Fame»): ha risposto col suo, e la
+scheda è stata ritirata. Cambiano SOLO il bottone e il titolo del
+foglio; la riga della serie resta «6 giorni di fila», e i testi che
+spiegano («I tuoi dati», l'interruttore) dicono tutti e due i nomi.
+LA FIAMMA AL POSTO DELLA COPPA: sul bottone e nel titolo c'è la fiamma
+disegnata della serie (`SERIE_FIAMMA`), non un'emoji — la regola della
+mattina (l'emoji cambia faccia da un telefono all'altro).
+IL BOTTONE: lucido come la carta del prezzo P2P, stesso riflesso e
+stessa discesa, in ORO. Scelto da Andrea fra quattro scatti dall'app
+vera (A brace, B oro, C viola, D petrolio; consigliavo la brace, ha
+preso l'oro). L'oro dello scatto aveva la scritta crema a 3,96:1 sul
+punto più chiaro: la punta del gradiente è scesa da #A8700F a #9A650C
+(4,66:1), il resto è quello scelto. Il colore sta in una riga
+(`--streak-lucido`), uguale di giorno e di sera.
+NOVITA: la voce `serie-classifica` è già su main col nome vecchio; il
+`dove` ora dice «Classifica Streak». Se il post era già in bozza, porta
+ancora il nome di prima.
+PROVATO: `prove_serie_classifica` (45: il nome, la fiamma disegnata,
+nessuna coppa, il lucido, l'oro, il contrasto calcolato), le sezioni
+vicine e `collaudo_serie_giorni`; dal vivo sul server vero del worktree
+in collaudo, 375 e 320 px, chiaro e scuro, nessun errore di pagina.
+Scatto in /mnt/project-files/serie-giorni/classifica-streak-oro.png.
+NON PROVATO: un telefono vero.
