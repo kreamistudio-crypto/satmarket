@@ -369,9 +369,10 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
      scambio non completato negli ultimi 30 giorni e nessuna disputa
      persa negli ultimi 90»;
    - «Tempo rimasto: <6g 23:47:17>»;
-   - il **conto**: «Controvalore di **50 €**», poi (se c'è) «Premio
-     richiesto dall'utente» o «Sconto offerto dall'utente» e
-     «Subtotale», poi «Fee P2P **1,5%**» col cartellino («beta», «🌱
+   - il **conto**: «Controvalore di **50 €**», poi (se c'è) «<N>% più
+     conveniente» / «<N>% meno conveniente» con sotto «Premio richiesto
+     dall'utente», «Premio offerto dall'utente», «Sconto offerto
+     dall'utente» o «Sconto richiesto dall'utente», e «Subtotale», poi «Fee P2P **1,5%**» col cartellino («beta», «🌱
      Pioniere», «Lv. 5»), e in fondo «Ricevi <sats>» e «Totale da
      inviare 50 €»;
    - «Come funziona»: «Indichi dove ricevere i sats» → «Chi vende li
@@ -1934,9 +1935,13 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
 - Sulla card: «<N>% più conveniente» / «<N>% meno conveniente» per chi
   guarda, «al prezzo di mercato» a zero; dal 10% «⚡ Ottimo affare», oltre
   il 15% «⚡⚡ Super affare».
-- Nel conto di chi prende: «Premio richiesto dall'utente» o «Sconto
-  offerto dall'utente», poi «Subtotale». Nel conto di chi ha pubblicato:
-  «Premio che hai richiesto» / «Sconto che hai offerto». Sugli ordini a
+- Nel conto di chi prende, anche nel dettaglio dello scambio già preso
+  (17 nov 2026): «Premio richiesto dall'utente» / «Premio offerto
+  dall'utente» / «Sconto offerto dall'utente» / «Sconto richiesto
+  dall'utente» (premio o sconto dal segno, offerto se conviene a chi
+  guarda), poi «Subtotale». Nel conto di chi ha pubblicato: «Premio che
+  hai richiesto» / «Premio che hai offerto» / «Sconto che hai offerto» /
+  «Sconto che hai richiesto». Sugli ordini a
   sats fissi: «Premio scelto: …» · «Al prezzo di adesso: …» (dopo la
   presa: «della presa»).
 - In «Info P2P»: «Sopra il mercato si chiama **premio** e conviene a chi

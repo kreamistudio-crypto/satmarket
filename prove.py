@@ -65911,7 +65911,7 @@ def prove_ritocchi_prova_alan():
         "function giroCadutoP2P(o){", "function ordineMioP2P(id){",
         "function provvisorioDelLibroP2P(o){", "function ordineTuoP2P(id, o){",
         "function prendiOrdineP2P(id){", "function affareP2P(o){",
-        "function etichettaPremioP2P(mio, prem, affare){", "function notaPremioP2P(mio, affare){",
+        "function etichettaPremioP2P(mio, prem, affare){", "function notaPremioP2P(mio, affare, prem){",
         # (14 nov 2026, sconto-fisso-decimale) l'etichetta scrive al decimo
         "function decimoP2P(n){",
         "function articoloPercentoP2P(testo){", "function articoloDetPercentoP2P(testo){")) + r"""
@@ -65982,8 +65982,11 @@ out.nomi = {
   mioVendoPiu: N(true, 'buy', 2), mioVendoMeno: N(true, 'buy', -2),
   mioComproPiu: N(true, 'sell', 2), mioComproMeno: N(true, 'sell', -2),
 };
-out.note = [notaPremioP2P(false, true), notaPremioP2P(false, false),
-            notaPremioP2P(true, true), notaPremioP2P(true, false)];
+out.note = [notaPremioP2P(false, true, -2), notaPremioP2P(false, false, 4),
+            notaPremioP2P(true, true, 4), notaPremioP2P(true, false, -2),
+            /* (17 nov 2026, premio-dettaglio) i due versi che mancavano:
+               la parola dal segno, il verbo dal giudice */
+            notaPremioP2P(false, true, 4), notaPremioP2P(false, false, -2)];
 out.articoli = ['0,5', '1', '1,5', '2', '3', '8', '11', '80', '0,75']
   .map(q => articoloDetPercentoP2P(q) + q + '%');
 console.log(JSON.stringify(out));
@@ -66039,7 +66042,8 @@ console.log(JSON.stringify(out));
     # altri una nota: da dove viene, dallo stesso giudice del colore
     prova("LA NOTA SOTTO IL PREMIO degli altri: sconto offerto se conviene, premio "
           "richiesto se no; sul mio niente",
-          ["Sconto offerto dall'utente", "Premio richiesto dall'utente", "", ""], o["note"])
+          ["Sconto offerto dall'utente", "Premio richiesto dall'utente", "", "",
+           "Premio offerto dall'utente", "Sconto richiesto dall'utente"], o["note"])
     css = mini[mini.index("<style"):mini.index("</style>")]
     prova("...su una riga sola, piccola e nell'inchiostro delle note", True,
           ".conto-p2p .ctrl-riga .premio-nota{flex:0 0 100%;margin-top:-5px;\n"
@@ -71547,7 +71551,7 @@ console.log(JSON.stringify(out));
         # (14 nov 2026, sconto-fisso-decimale) la percentuale al decimo,
         # nell'etichetta e nella riga in cima: senza, il banco esplode
         "function decimoP2P(n){", "function premioDecimoTestoP2P(n){",
-        "function notaPremioP2P(mio, affare){",
+        "function notaPremioP2P(mio, affare, prem){",
         "function conNotaPremioP2P(riga, nota){",
         "function articoloPercentoP2P(testo){",
         "function articoloDetPercentoP2P(testo){",
@@ -71877,6 +71881,17 @@ out.premioMioVendo = contoMio(mio({lato: 'vendo', premium: 4}));
 out.scontoMioVendo = contoMio(mio({lato: 'vendo', premium: -2}));
 out.premioMioCompro = contoMio(mio({lato: 'compro', premium: 4}));
 out.scontoMioCompro = contoMio(mio({lato: 'compro', premium: -2}));
+/* ---- L'ORDINE PRESO NON E' MIO (17 nov 2026, premio-dettaglio) ----
+   Fra i miei scambi ci sono anche quelli PRESI, e la pagina passa
+   `mio: !!o.mio`: chi ha preso il «vendo sats col +4%» di un altro non
+   l'ha offerto lui, quel premio. Il lato della riga e' gia' il mio. */
+const contoPreso = o => contoDettP2P(Object.assign(
+  comeLibroP2P(o), {satsDetti: o.satsNetti || 0, mio: !!o.mio}));
+out.presoCompro = contoPreso(mio({lato: 'compro', premium: 4, satsNetti: 7301}));
+out.presoVendo = contoPreso(mio({lato: 'vendo', premium: 4, satsNetti: 7301}));
+out.presoComproSconto = contoPreso(mio({lato: 'compro', premium: -2, satsNetti: 7301}));
+out.presoVendoSconto = contoPreso(mio({lato: 'vendo', premium: -2, satsNetti: 7301}));
+out.presoMio = contoPreso(mio({lato: 'compro', premium: 4, satsNetti: 7301, mio: true}));
 out.scorporo = [scorporaPremioP2P(7301, 4), scorporaPremioP2P(7301, -2),
                 scorporaPremioP2P(7301, 0), scorporaPremioP2P(0, 4),
                 scorporaPremioP2P(7301, 100)];
@@ -72859,9 +72874,40 @@ console.log(JSON.stringify(out));
     prova("...e sotto, dentro la voce, la nota di da dove viene", [True, True, True, False],
           ['<span class="premio-nota">Premio richiesto dall\'utente</span></div>' in o["contoPremio"],
            '<span class="premio-nota">Sconto offerto dall\'utente</span></div>' in o["contoSconto"],
-           '<span class="premio-nota">Sconto offerto dall\'utente</span></div>' in o["contoVendi"],
+           # (17 nov 2026, premio-dettaglio) il «compra BTC» col +4%: chi
+           # compra paga il 4% IN PIU', e' un PREMIO che offre — prima la
+           # nota diceva «Sconto offerto»
+           '<span class="premio-nota">Premio offerto dall\'utente</span></div>' in o["contoVendi"],
            any("premio-nota" in o[k] for k in ("premioMioVendo", "scontoMioVendo",
                                                 "premioMioCompro", "scontoMioCompro"))])
+    # ══ L'ORDINE PRESO NON E' MIO (17 nov 2026, cantiere premio-dettaglio,
+    # Andrea su un USDT col +4%: «non e' un premio che ho offerto io, e'
+    # il premio che ha richiesto il venditore») ══ La pagina dello scambio
+    # passava `mio: true` a tutti; adesso il giudice di sempre, `o.mio`.
+    prova("L'ORDINE PRESO: chi ha preso il +4% di chi vende legge la riga "
+          "del libro, mai «che hai offerto»", [True, True, False],
+          ['<b class="p2p-avviso">4%</b> meno conveniente' in o["presoCompro"],
+           '<span class="premio-nota">Premio richiesto dall\'utente</span></div>' in o["presoCompro"],
+           "che hai" in o["presoCompro"]])
+    prova("...e il segno e i sats dal SUO verso: riceve meno sats, cifra col meno",
+          [True, True],
+          ['<span class="num meno">≈ −' in o["presoCompro"],
+           "Ricevi" in o["presoCompro"]])
+    prova("...chi ha preso il «compra» col +4% vende: gli conviene, ed e' "
+          "un premio OFFERTO da chi compra", [True, True, False],
+          ['<b class="p2p-affare">4%</b> più conveniente' in o["presoVendo"],
+           '<span class="premio-nota">Premio offerto dall\'utente</span></div>' in o["presoVendo"],
+           "che hai" in o["presoVendo"]])
+    prova("...e gli sconti: offerto da chi vende, richiesto da chi compra",
+          [True, True],
+          ['<span class="premio-nota">Sconto offerto dall\'utente</span></div>' in o["presoComproSconto"],
+           '<span class="premio-nota">Sconto richiesto dall\'utente</span></div>' in o["presoVendoSconto"]])
+    prova("...e sul MIO ordine pubblicato resta «Premio che hai offerto»", [True, False],
+          ["Premio che hai offerto" in o["presoMio"], "premio-nota" in o["presoMio"]])
+    pagina = mini[mini.index("function renderOrdineP2P("):]
+    pagina = pagina[:pagina.index("const azione = azioniDisponibili(o);")]
+    prova("...e la pagina dello scambio passa `mio` dalla riga, non `mio: true`",
+          [True, False], ["mio: !!o.mio," in pagina, "mio: true," in pagina])
 
     prova("senza volto il riquadro della reputazione non c'e' proprio",
           "", o["repSenza"])
@@ -164722,7 +164768,7 @@ def prove_sconto_fisso_decimale():
                   "function decimoP2P(n){", "function premioDecimoTestoP2P(n){",
                   "function premioTestoP2P(n){",
                   "function etichettaPremioP2P(mio, prem, affare){",
-                  "function notaPremioP2P(mio, affare){", "function conNotaPremioP2P(riga, nota){",
+                  "function notaPremioP2P(mio, affare, prem){", "function conNotaPremioP2P(riga, nota){",
                   "function rigaConvenienzaFissaP2P(o, conv){", "function rigaTassoContoP2P(o, detto){",
                   "function contoDettP2P(o){"):
         pezzi.append(_fn_js(mini, firma))

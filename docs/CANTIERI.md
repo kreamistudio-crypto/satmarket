@@ -89459,3 +89459,53 @@ cauzione, e che lì non entri il macaroon delle hold di prova.
 NON PROVATO: come tutto il terzo pezzo, niente ha
 ancora parlato con un LND vero: la prima SettleInvoice vera è la prova
 di Andrea e Alan (DA-FARE-ANDREA, voce 20, passo 5).
+
+## Il premio nel dettaglio di uno scambio preso: «che hai offerto» a chi non l'aveva offerto (17 nov 2026, cantiere premio-dettaglio; Andrea, su un ordine USDT preso col +4%: «non è un premio che ho offerto io, è il premio che ha richiesto il venditore»)
+
+**IL FATTO.** Nella pagina «Nel dettaglio» di uno scambio P2P PRESO, la
+riga del premio diceva «Premio che hai offerto 4%», la frase di chi
+l'ordine l'ha pubblicato. Causa: `renderOrdineP2P` chiamava
+`contoDettP2P` con `mio: true` per ogni riga di «I miei scambi», e lì
+dentro ci sono anche gli ordini presi. Adesso passa `mio: !!o.mio`, il
+giudice di sempre (lo stesso dei passi «Ordine pubblicato» / «Ordine
+preso»): chi ha preso legge la riga del libro, «4% meno conveniente» in
+rosso con sotto la nota «Premio richiesto dall'utente», la stessa che
+aveva visto prima di prendere.
+
+**IL SEGNO E IL CALCOLO** erano già giusti dal verso di chi guarda: la
+riga dello scambio porta il lato di chi legge e `comeLibroP2P` lo
+traduce, quindi tinta (`affareP2P`) e cifra («≈ −6 227 sats», meno sats
+ricevuti) non cambiano. Era sbagliata invece una PAROLA della nota sotto
+il premio, che arriva con questa correzione anche nel dettaglio: la
+nota pescava «Premio» o «Sconto» dal giudice e non dal segno, e sul
+«compra BTC» di un altro col +4% (chi compra paga il 4% in più: un
+premio che offre) diceva «Sconto offerto dall'utente»; col −1%
+«Premio richiesto». Ora è lo specchio della riga del proprio ordine: la
+parola dal segno, il verbo dal giudice — «Premio richiesto / Premio
+offerto / Sconto offerto / Sconto richiesto dall'utente». Tocca anche la
+stessa nota del conto dal libro (è la stessa funzione), che sui «vendo
+sats» dice quel che diceva.
+
+**ON-CHAIN** niente da correggere: il conto on-chain (`contoOnchainP2P`)
+non ha una riga del premio (i sats dello scambio lo contengono già), e
+la card usa il badge «X% più/meno conveniente» col lato di chi legge.
+
+**SCARTATO** per ora: «Premio chiesto dal venditore / dal compratore» al
+posto di «dall'utente» (il ruolo detto per nome): cambierebbe un testo
+deciso da Andrea il 28 set anche nel libro; resta una proposta.
+
+**PROVATO.** `prove_p2p_dettaglio`: cinque prove nuove sull'ordine preso
+(il +4% di chi vende visto da chi compra: «meno conveniente», nota
+«Premio richiesto», niente «che hai», cifra col meno; il +4% di chi
+compra visto da chi vende: «più conveniente», «Premio offerto»; i due
+sconti; il proprio ordine che resta «Premio che hai offerto»; la pagina
+che passa `mio: !!o.mio`), `contoVendi` ora «Premio offerto»;
+`prove_ritocchi_prova_alan` coi due versi che mancavano. CONTROPROVE
+ROSSE: `mio: true` rimesso (1 rossa) e la nota vecchia (4 rosse).
+IL VERBALE: suite intera severa sull'albero del cantiere sopra develop
+d49f7f69, 29.532 verdi, 0 rosse, 2 saltate di sempre (nostr-tools non
+c'è in cloud); collaudi della CI 152/152 nel venv senza coincurve e
+senza proxy. Dopo il rebase su develop e7258df5 (nessun simbolo in
+comune, solo CANTIERI in conflitto d'accodamento): giro mirato, vedi
+il rapporto. Tutto girato in cloud. NON provato dal telefono:
+dopo la produzione, Andrea riapre il dettaglio dello scambio USDT preso.

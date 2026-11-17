@@ -84414,7 +84414,7 @@ function contoDettP2P(o){
   const premio = ((!fisso && o.premium) || premioTab)
     ? conNotaPremioP2P(r(etichettaPremioP2P(o.mio, prem, affare),
         cifra('premio', prem > 0 ? '−' : '+'), 'premio'),
-        notaPremioP2P(o.mio, affare))
+        notaPremioP2P(o.mio, affare, prem))
     : '';
   /* ⚠️ SOTTO IL CONTO NON C'E' PIU' NIENTE, e ci sono voluti due
      giri (set 2026, decisione di Andrea). Qui stavano due frasi:
@@ -84509,14 +84509,23 @@ function contoDettP2P(o){
    parole. */
 /* LA NOTA SOTTO LA RIGA DEL PREMIO (28 set 2026, ritocco di Andrea a
    cd264a9): sugli ordini degli altri, sotto «X% più/meno conveniente»,
-   una riga piccola dice da dove viene — «Sconto offerto dall'utente»
-   quando conviene a chi guarda, «Premio richiesto dall'utente» quando
-   no. La decide lo STESSO giudice del colore (`affare`), quindi nota e
-   tinta non si scollano. Sui propri ordini niente: «che hai richiesto /
-   offerto» dice gia' tutto. PURA. */
-function notaPremioP2P(mio, affare){
+   una riga piccola dice da dove viene — «offerto dall'utente» quando
+   conviene a chi guarda, «richiesto dall'utente» quando no. Il verbo lo
+   decide lo STESSO giudice del colore (`affare`), quindi nota e tinta non
+   si scollano; la parola, premio o sconto, il segno (vedi sotto). Sui
+   propri ordini niente: «che hai richiesto / offerto» dice gia' tutto.
+   PURA. */
+/* ⚠️ «PREMIO» O «SCONTO» LO DICE IL SEGNO, «OFFERTO» O «RICHIESTO» IL
+   GIUDICE (17 nov 2026, cantiere premio-dettaglio): la nota pescava anche
+   la parola da `affare`, e sul «compra BTC» di un altro col +4% — chi
+   compra paga il 4% IN PIU', un premio che offre — diceva «Sconto offerto
+   dall'utente»; col −1% «Premio richiesto», che era uno sconto. Adesso e'
+   lo specchio esatto della riga del mio ordine (`etichettaPremioP2P`):
+   la parola dal segno, il verbo da chi ci guadagna. */
+function notaPremioP2P(mio, affare, prem){
   if (mio) return '';
-  return affare ? 'Sconto offerto dall\'utente' : 'Premio richiesto dall\'utente';
+  return (Number(prem) > 0 ? 'Premio' : 'Sconto')
+    + (affare ? ' offerto' : ' richiesto') + ' dall\'utente';
 }
 /* ...e la nota sta DENTRO la voce del conto, a tutta larghezza in coda
    (la voce va gia' a capo, `flex-wrap`): il filo fra le voci resta dov'e' */
@@ -86567,7 +86576,19 @@ function renderOrdineP2P(){
     : contoDettP2P(Object.assign(comeLibroP2P(o),
                                            {satsDetti: o.satsNetti || 0,
                                             scontoMancato: !!o.scontoMancato,
-                                            mio: true,
+                                            /* ⚠️ «MIO» SOLO SE L'HO PUBBLICATO IO (17 nov 2026,
+                                               cantiere premio-dettaglio, Andrea: «non e' un premio
+                                               che ho offerto io, e' il premio che ha richiesto il
+                                               venditore»). Qui stava `mio: true` per tutti, e chi
+                                               aveva PRESO un ordine col +4% leggeva «Premio che hai
+                                               offerto 4%». Fra i miei scambi ci sono anche quelli
+                                               presi: `o.mio` e' il giudice di sempre (lo stesso di
+                                               «Ordine pubblicato» / «Ordine preso» nei passi), e chi
+                                               ha preso legge la riga del libro — «4% meno
+                                               conveniente» con la sua nota sotto. Il lato e' gia'
+                                               quello di chi guarda (`comeLibroP2P`), quindi tinta e
+                                               segno della cifra non cambiano. */
+                                            mio: !!o.mio,
                                             /* (19 ott 2026) la cifra da pagare si tocca */
                                             toccaImporto: o.lato === 'compro',
                                             consegna: typeof pagaInContantiP2P === 'function'

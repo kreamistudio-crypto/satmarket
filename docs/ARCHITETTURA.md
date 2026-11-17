@@ -7852,9 +7852,11 @@
   memoria volti, autori e cambi della fotografia
   (`_rinfresca_volti_foto_p2p`). La riga del premio nel conto dice
   l'effetto per chi guarda con la frase del badge («X% più/meno
-  conveniente», colore sul numero, e sotto la nota «Sconto offerto /
-  Premio richiesto dall'utente» dallo stesso giudice, `notaPremioP2P`),
-  e sul mio ordine, senza nota, quel
+  conveniente», colore sul numero, e sotto la nota «Premio/Sconto
+  offerto/richiesto dall'utente», `notaPremioP2P`: la parola dal segno, il
+  verbo dallo stesso giudice del colore), e sul mio ordine — quello che HO
+  PUBBLICATO, `o.mio`: nella pagina di uno scambio PRESO la riga e' quella
+  di chi prende (17 nov 2026, premio-dettaglio) —, senza nota, quel
   che ho scelto: «Premio/Sconto che hai richiesto» se pende verso di me,
   «che hai offerto» se pende verso l'altro (`etichettaPremioP2P`). Verbale: CANTIERI,
   «I ritocchi P2P dalla prova di Alan».
