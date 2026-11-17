@@ -36421,6 +36421,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   / `chatOcRichiamoHTML` / `chatOcModHTML` in `schedaOnchainP2P`,
   `ridisegnaOnchainChatP2P`; le frasi del riquadro sono quelle del
   Lightning. Prove: `prove_chat_onchain`, `collaudo_chat_onchain`.
+- IL CONTANTI DI PERSONA ON-CHAIN (17 nov 2026, cantiere
+  onchain-contanti; CANTIERI, «Il contanti di persona on-chain come su
+  Lightning», primo e secondo pezzo). La zona: colonna `zona`,
+  `p2p_onchain_giudica_contanti`, `_p2p_onchain_zona`. Lo scambio:
+  `_p2p_onchain_contanti(o)` è l'UNICO giudice (oggi il solo metodo
+  «Contanti»); `POST /api/p2p/onchain/{oid}/sono-qui` →
+  `_p2p_onchain_registra_sono_qui` scrive in `p2p_sono_qui` (le tabelle
+  del Lightning: `ordine` = il nome `bar-onchain-…`, giro 0, `chiave` e
+  `prova` vuote, lato dal ruolo, stati `P2P_ONCHAIN_STATI_INCONTRO`,
+  al più `P2P_SONO_QUI_MAX` per lato); `…/recapito` accetta accanto al
+  testo `appuntamento: {ora, geo}` → `_p2p_onchain_registra_appuntamento`
+  (una versione in `p2p_appuntamenti`, prima di scrivere il recapito).
+  `_p2p_onchain_per` dà `contanti`, alle parti `presenze`
+  (`_presenze_per_parte_p2p`), al moderatore terzo `confronto`
+  (`_confronto_giro_p2p`). `_p2p_onchain_scorda_incontri`, chiamata da
+  `_scopa_presenze_p2p`, scorda le posizioni degli scambi chiusi. Nel
+  telefono: `contantiOcP2P`, `riquadroContantiOcP2P`,
+  `riquadroAppuntamentoOcP2P`, `passoDueContantiOcP2P`,
+  `confrontoModOcP2P`, `contantiConsegnatiOcP2P`, `sonoQuiOcP2P`,
+  `battitoContantiOcP2P`, il foglio `p2pOcAppSheet`
+  (`apriAppuntamentoOcP2P` / `salvaAppuntamentoOcP2P`, coi campi e gli
+  id del foglio dei recapiti di Lightning, che per questo si svuota).
+  Prove: `prove_onchain_contanti`, `prove_onchain_contanti_scambio`,
+  `collaudo_p2p_onchain` 11-septies e 11-octies.
 - IL RIMBORSO ON-CHAIN CHE NON SI INCAGLIA (17 nov 2026, cantiere
   onchain-rimborso-liscio; CANTIERI, «Il rimborso on-chain che non si
   incaglia»). La regola del 10 nov non cambia (un rimborso vuoto non è
