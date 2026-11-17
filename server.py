@@ -7358,6 +7358,13 @@ def init_db():
         tg_id INTEGER NOT NULL,
         annuncio_id INTEGER NOT NULL,
         creato INTEGER,
+        -- GLI AVVISI SCELTI (17 nov 2026, cantiere avvisi-barattolo):
+        -- NULL = riga di prima, che riceve solo la lampo come sempre;
+        -- '' = nessun avviso; sennò i tipi con la virgola. La fotografia
+        -- e l'ultimo avviso li usa il giro: vedi «GLI AVVISI DEL BARATTOLO».
+        avvisi TEXT DEFAULT NULL,
+        avvisi_foto TEXT DEFAULT '',
+        avvisato INTEGER DEFAULT 0,
         PRIMARY KEY(tg_id, annuncio_id)
     );
     -- La PK e' (tg_id, annuncio_id): senza questo indice il conteggio
@@ -10195,6 +10202,17 @@ def init_db():
                     # i codici gia' in giro restano CUMULABILI (ott 2026)
                     "codici_sconto ADD COLUMN cumulabile INTEGER "
                     "NOT NULL DEFAULT 1"):
+        try:
+            con.execute(f"ALTER TABLE {tab_col}")
+        except sqlite3.OperationalError:
+            pass
+    # GLI AVVISI DEL BARATTOLO (17 nov 2026): la prima migrazione su
+    # `preferiti`. Additiva e senza backfill: il NULL delle righe di ieri
+    # E' la regola (solo la lampo, come prima), e il default va ripetuto
+    # qui perche' SQLite scrive quello della CREATE solo sui DB nuovi.
+    for tab_col in ("preferiti ADD COLUMN avvisi TEXT DEFAULT NULL",
+                    "preferiti ADD COLUMN avvisi_foto TEXT DEFAULT ''",
+                    "preferiti ADD COLUMN avvisato INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE {tab_col}")
         except sqlite3.OperationalError:
@@ -30253,6 +30271,245 @@ def _conta_savers(con, annuncio_id: int) -> int:
                        (annuncio_id,)).fetchone()[0]
 
 
+# ---- GLI AVVISI DEL BARATTOLO (17 nov 2026, voce #99 del Todo) ------
+# Chi mette un articolo nel barattolo sceglie, se vuole, cosa sentirsi
+# dire di LUI: il prezzo che scende, lo sconto lampo, «ne resta solo
+# uno», il ritorno in vetrina. Le spunte nascono tutte accese (il
+# foglietto che si apre all'aggiunta le mostra, e chiuderlo le tiene).
+# UN GIRO SOLO, NON UN GANCIO PER STRADA: prezzo e pezzi cambiano da
+# troppe porte (modifica, modifica massiva, negozi collegati, rimborsi,
+# annulli, la quantita' a mano, le ferie che finiscono da sole) e un
+# gancio dimenticato su una di loro sarebbe un avviso che non arriva
+# mai. Il giro dell'orologio confronta ogni riga con la SUA fotografia
+# (`avvisi_foto`, l'articolo com'era all'ultimo sguardo) e parla solo
+# dei passaggi — come il bollino «ultimo», che e' una notizia e non uno
+# stato. La lampo resta immediata (ha una scadenza: dirla dieci minuti
+# dopo sarebbe rubarle tempo) e passa dalla stessa scelta.
+# IL TETTO: un avviso per articolo ogni AVVISI_BARATTOLO_ORE, a persona;
+# piu' passaggi insieme fanno UN messaggio. Quel che cade dentro il
+# tetto NON si perde: la fotografia resta quella vecchia e il giro dopo
+# il tetto lo ridice, se e' ancora vero (il prezzo risalito nel mezzo
+# non dice niente, ed e' giusto). Col barattolo a MAX_PREFERITI pezzi,
+# il peggio che puo' arrivare a una persona in un giorno e' quel numero.
+# LE RIGHE DI PRIMA (avvisi NULL) ricevono solo la lampo, com'era: un
+# avviso nuovo nasce da un gesto, mai da un deploy.
+# Il prezzo SALITO non avvisa (decisione di Andrea, 17 nov 2026): alza
+# solo la fotografia, cosi' un calo dopo si misura dal prezzo vero.
+try:
+    from config import AVVISI_BARATTOLO_ATTIVI
+except ImportError:
+    AVVISI_BARATTOLO_ATTIVI = True
+try:
+    from config import AVVISI_BARATTOLO_ORE
+except ImportError:
+    AVVISI_BARATTOLO_ORE = 24
+try:                       # storto vale 24, sotto zero vale zero
+    AVVISI_BARATTOLO_ORE = max(0, int(AVVISI_BARATTOLO_ORE))
+except (TypeError, ValueError):
+    AVVISI_BARATTOLO_ORE = 24
+# il calo minimo che e' una notizia, in percento: sotto, un ritocco di
+# un sat o di un centesimo non disturba nessuno
+AVVISI_BARATTOLO_CALO_MIN = 1
+# L'ordine e' quello del foglietto e del messaggio. Il client li ha in
+# copia per le etichette: la verita' sui nomi ammessi e' questa tupla.
+AVVISI_BARATTOLO_TIPI = ("prezzo", "lampo", "ultimo", "rientro")
+
+
+def avvisi_barattolo_leggi(testo):
+    """PURA: la colonna `avvisi` come lista ordinata, o None per le
+    righe di prima (NULL). I nomi sconosciuti cadono in silenzio: una
+    colonna scritta da un client futuro non rompe il giro di oggi."""
+    if testo is None:
+        return None
+    voluti = set(str(testo).split(","))
+    return [t for t in AVVISI_BARATTOLO_TIPI if t in voluti]
+
+
+def avvisi_barattolo_scrivi(lista) -> str:
+    """PURA: da quel che arriva dal client alla colonna. Solo i nomi
+    della tupla, ognuno una volta, nel suo ordine; tutto il resto cade."""
+    if not isinstance(lista, (list, tuple)):
+        return ""
+    voluti = {str(x) for x in lista}
+    return ",".join(t for t in AVVISI_BARATTOLO_TIPI if t in voluti)
+
+
+def vuole_avviso_lampo(testo) -> bool:
+    """La lampo va a questa riga? Le righe di prima (NULL) si', come
+    sempre; le nuove solo con la spunta."""
+    scelti = avvisi_barattolo_leggi(testo)
+    return scelti is None or "lampo" in scelti
+
+
+def foto_barattolo(a, adesso: int) -> dict:
+    """PURA: l'articolo come lo vede chi ce l'ha nel barattolo.
+    `p` e' il prezzo NELLA VALUTA DEL LISTINO (gli annunci in euro non
+    «scendono» perche' sale il bitcoin), 0 sulle aste — il loro prezzo
+    lo fanno le puntate, non il venditore. `u` e' il bollino «ultimo»
+    (ultimo_pezzo, il giudice della vetrina), `c` se oggi si compra:
+    attivo e negozio non in ferie."""
+    eur = a["valuta"] == "eur" and (a["prezzo_eur"] or 0) > 0
+    if (a["asta_base_sats"] or 0) > 0:
+        prezzo = 0
+    else:
+        prezzo = round(float(a["prezzo_eur"]), 2) if eur \
+            else int(a["prezzo_sats"] or 0)
+    return {"v": "eur" if eur else "sats", "p": prezzo,
+            "u": bool(ultimo_pezzo(a["quantita"] or 0,
+                                   a["quantita_max"] or 0)),
+            "c": a["stato"] == "attivo"
+                 and not in_ferie(a["ferie_fino"] or 0, adesso)}
+
+
+def eventi_barattolo(vecchia: dict, nuova: dict, scelti) -> list:
+    """PURA: i passaggi da dire, nell'ordine del messaggio. Solo se
+    oggi si compra (di un esaurito non si annuncia il prezzo) e solo
+    quelli scelti."""
+    if not nuova.get("c"):
+        return []
+    eventi = []
+    if "rientro" in scelti and not vecchia.get("c"):
+        eventi.append("rientro")
+    if ("prezzo" in scelti and nuova.get("v") == vecchia.get("v")
+            and nuova.get("p") and vecchia.get("p")
+            and nuova["p"] <= vecchia["p"] * (100 - AVVISI_BARATTOLO_CALO_MIN) / 100):
+        eventi.append("prezzo")
+    if "ultimo" in scelti and nuova.get("u") and not vecchia.get("u"):
+        eventi.append("ultimo")
+    return eventi
+
+
+def foto_barattolo_dopo(vecchia: dict, nuova: dict) -> dict:
+    """PURA: cosa resta in fotografia dopo il giro (senza tetto in
+    mezzo). Se oggi si compra, l'articolo di adesso; se no si annota
+    solo che non si compra, e prezzo e pezzi restano quelli dell'ultima
+    volta: al rientro il confronto e' con cio' che la persona aveva
+    visto, non con un ritocco fatto a scaffale vuoto."""
+    if nuova.get("c"):
+        return dict(nuova)
+    return dict(vecchia, c=False)
+
+
+def testo_avviso_barattolo(titolo: str, link: str, vecchia: dict,
+                           nuova: dict, eventi: list) -> str:
+    """PURA: un messaggio per tutti i passaggi dello stesso articolo.
+    Il titolo porta il link (il tocco sulla notifica del telefono apre
+    l'annuncio: push_carico prende il primo link del testo)."""
+    def cifra(f):
+        return (f"{_fmt_eur(f['p'])} €" if f.get("v") == "eur"
+                else f"{_fmt_sats(int(f['p']))} sats")
+    righe = ["🫙 <b>Novità su un articolo del tuo barattolo</b>",
+             f"«<a href=\"{html.escape(link)}\">"
+             f"{html.escape(str(titolo or '')[:60])}</a>»"]
+    for e in eventi:
+        if e == "rientro":
+            righe.append("🔁 È di nuovo disponibile!")
+        elif e == "prezzo":
+            calo = round(100 - nuova["p"] * 100 / vecchia["p"])
+            righe.append(f"📉 Il prezzo è sceso: <s>{cifra(vecchia)}</s> → "
+                         f"<b>{cifra(nuova)}</b>"
+                         + (f" (−{calo}%)" if calo >= 1 else ""))
+        elif e == "ultimo":
+            righe.append("☝️ Ne resta solo uno!")
+    righe.append("<i>Gli avvisi di questo articolo li cambi dalla 🔔 "
+                 "nel tuo barattolo.</i>")
+    return "\n".join(righe)
+
+
+_SQL_RIGHE_AVVISI_BARATTOLO = (
+    "SELECT p.tg_id, p.annuncio_id, p.avvisi, p.avvisi_foto, p.avvisato, "
+    "a.titolo, a.venditore_id, a.stato, a.valuta, a.prezzo_sats, "
+    "a.prezzo_eur, a.quantita, a.quantita_max, a.asta_base_sats, "
+    "u.ferie_fino FROM preferiti p "
+    "JOIN annunci a ON a.id = p.annuncio_id "
+    "LEFT JOIN utenti u ON u.tg_id = a.venditore_id ")
+
+
+def _foto_barattolo_ora(con, annuncio_id: int, adesso: int) -> str:
+    """La fotografia di adesso di un annuncio, gia' in JSON: per la riga
+    che nasce e per chi accende gli avvisi su una riga di prima."""
+    a = con.execute(
+        "SELECT a.stato, a.valuta, a.prezzo_sats, a.prezzo_eur, a.quantita, "
+        "a.quantita_max, a.asta_base_sats, u.ferie_fino FROM annunci a "
+        "LEFT JOIN utenti u ON u.tg_id = a.venditore_id WHERE a.id=?",
+        (annuncio_id,)).fetchone()
+    return json.dumps(foto_barattolo(a, adesso), separators=(",", ":")) \
+        if a else ""
+
+
+def raccogli_avvisi_barattolo(con, adesso: int) -> list:
+    """Il giro: per ogni riga con avvisi scelti, i passaggi dall'ultima
+    fotografia. Torna [(tg_id, annuncio_id, testo, bottone)] e COMMITTA
+    PRIMA che parta qualsiasi messaggio (il patto della campagna
+    spedizioniere: un errore di rete puo' perdere un avviso di
+    cortesia, mai raddoppiarlo). Le righe di annunci rimossi o in
+    revisione restano ferme: tornando in vetrina si confrontano con
+    l'ultima fotografia buona."""
+    fuori = []
+    tetto = AVVISI_BARATTOLO_ORE * 3600
+    for r in con.execute(
+            _SQL_RIGHE_AVVISI_BARATTOLO
+            + "WHERE p.avvisi IS NOT NULL AND p.avvisi<>'' "
+            "AND a.stato IN ('attivo','venduto')").fetchall():
+        if r["venditore_id"] == r["tg_id"]:
+            continue                      # mai per i suoi (righe di ieri)
+        nuova = foto_barattolo(r, adesso)
+        try:
+            vecchia = json.loads(r["avvisi_foto"] or "")
+        except ValueError:
+            vecchia = None
+        if not isinstance(vecchia, dict):
+            # prima volta che il giro la vede: si fotografa e basta
+            con.execute("UPDATE preferiti SET avvisi_foto=? WHERE tg_id=? "
+                        "AND annuncio_id=?",
+                        (json.dumps(nuova, separators=(",", ":")),
+                         r["tg_id"], r["annuncio_id"]))
+            continue
+        eventi = eventi_barattolo(vecchia, nuova,
+                                  avvisi_barattolo_leggi(r["avvisi"]) or [])
+        if eventi and adesso - int(r["avvisato"] or 0) < tetto:
+            continue                      # dentro il tetto: lo ridira' dopo
+        dopo = foto_barattolo_dopo(vecchia, nuova)
+        if eventi:
+            con.execute("UPDATE preferiti SET avvisi_foto=?, avvisato=? "
+                        "WHERE tg_id=? AND annuncio_id=?",
+                        (json.dumps(dopo, separators=(",", ":")), adesso,
+                         r["tg_id"], r["annuncio_id"]))
+            link = link_telegram("annuncio", r["annuncio_id"])
+            fuori.append((int(r["tg_id"]), int(r["annuncio_id"]),
+                          testo_avviso_barattolo(r["titolo"], link,
+                                                 vecchia, nuova, eventi),
+                          ("🫙 Apri l'annuncio", link)))
+        elif dopo != vecchia:
+            con.execute("UPDATE preferiti SET avvisi_foto=? WHERE tg_id=? "
+                        "AND annuncio_id=?",
+                        (json.dumps(dopo, separators=(",", ":")),
+                         r["tg_id"], r["annuncio_id"]))
+    con.commit()
+    return fuori
+
+
+async def giro_avvisi_barattolo():
+    """Il battito dell'orologio grande (dieci minuti). Esce a leva
+    spenta; fail-open come le sorelle, una riga di journal per invio."""
+    if not AVVISI_BARATTOLO_ATTIVI:
+        return
+    con = db()
+    try:
+        avvisi = raccogli_avvisi_barattolo(con, int(time.time()))
+    finally:
+        con.close()
+    for tg_id, annuncio_id, testo, bottone in avvisi:
+        try:
+            esito = await notifica(tg_id, testo, bottone=bottone)
+            print(f"🫙 Avviso del barattolo: annuncio {annuncio_id} a {tg_id}"
+                  + (f" ({esito})" if esito else ""), flush=True)
+        except Exception as e:
+            print(f"⚠️ Avviso del barattolo saltato (annuncio {annuncio_id}"
+                  f" a {tg_id}): {type(e).__name__}: {e}", flush=True)
+        await asyncio.sleep(0.2)
+
+
 @app.post("/api/listings/{annuncio_id}/preferito")
 async def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
                            barattolo_sessione: str = Cookie("")):
@@ -30301,9 +30558,18 @@ async def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
             raise HTTPException(400, f"Il barattolo è pieno ({MAX_PREFERITI} "
                                      f"oggetti)! Togline qualcuno o compra "
                                      f"qualcosa che c'è dentro 🫙")
-        con.execute("INSERT INTO preferiti(tg_id, annuncio_id, creato) "
-                    "VALUES(?,?,?)",
-                    (user["id"], annuncio_id, int(time.time())))
+        # GLI AVVISI (17 nov 2026): la riga nasce con tutte le spunte
+        # accese e la fotografia di adesso — il foglietto che si apre al
+        # client le mostra, e chiuderlo senza toccare niente le tiene. A
+        # leva spenta nasce come ieri (NULL: solo la lampo).
+        adesso = int(time.time())
+        con.execute("INSERT INTO preferiti(tg_id, annuncio_id, creato, "
+                    "avvisi, avvisi_foto) VALUES(?,?,?,?,?)",
+                    (user["id"], annuncio_id, adesso,
+                     ",".join(AVVISI_BARATTOLO_TIPI)
+                     if AVVISI_BARATTOLO_ATTIVI else None,
+                     _foto_barattolo_ora(con, annuncio_id, adesso)
+                     if AVVISI_BARATTOLO_ATTIVI else ""))
         # L'avviso «ha fatto colpo» parte solo per i salvataggi veri:
         # annuncio attivo e MAI il proprio (il venditore che si salva
         # da solo non si applaude da solo).
@@ -30321,8 +30587,46 @@ async def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
     # toccano lo stesso annuncio).
     barattoli = _conta_savers(con, annuncio_id)
     con.close()
-    return {"ok": True, "salvato": not tolto, "conteggio": conteggio,
-            "barattoli": barattoli}
+    risposta = {"ok": True, "salvato": not tolto, "conteggio": conteggio,
+                "barattoli": barattoli}
+    # le spunte con cui la riga e' nata: il foglietto le disegna da qui
+    if not tolto and AVVISI_BARATTOLO_ATTIVI:
+        risposta["avvisi"] = list(AVVISI_BARATTOLO_TIPI)
+    return risposta
+
+
+@app.post("/api/listings/{annuncio_id}/preferito/avvisi")
+async def avvisi_preferito(annuncio_id: int, req: Request,
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Le spunte degli avvisi di UN articolo del proprio barattolo
+    (17 nov 2026). Body {avvisi: ["prezzo", ...]}; la lista vuota spegne
+    tutto. Solo su una riga che c'e' (404 se l'articolo non e' nel
+    barattolo: questa rotta non mette niente nel barattolo).
+    LA FOTOGRAFIA SI RIFA' SOLO SE NON C'ERA: chi riapre la 🔔 e salva
+    non deve cancellare un passaggio che il tetto sta tenendo da parte;
+    chi accende gli avvisi su una riga di prima parte da adesso, non da
+    un ritocco di settimane fa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not AVVISI_BARATTOLO_ATTIVI:
+        raise HTTPException(400, "Gli avvisi del barattolo non sono attivi")
+    d = await leggi_json(req)
+    scelti = avvisi_barattolo_scrivi(d.get("avvisi"))
+    con = db()
+    try:
+        r = con.execute("SELECT avvisi_foto FROM preferiti WHERE tg_id=? "
+                        "AND annuncio_id=?", (user["id"], annuncio_id)).fetchone()
+        if not r:
+            raise HTTPException(404, "Questo articolo non è nel tuo barattolo")
+        foto = r["avvisi_foto"] or _foto_barattolo_ora(
+            con, annuncio_id, int(time.time()))
+        con.execute("UPDATE preferiti SET avvisi=?, avvisi_foto=? "
+                    "WHERE tg_id=? AND annuncio_id=?",
+                    (scelti, foto, user["id"], annuncio_id))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True, "avvisi": avvisi_barattolo_leggi(scelti)}
 
 
 # ------------------ IL LIKE SULLE FUNZIONI IN ARRIVO -----------------
@@ -30422,13 +30726,22 @@ def miei_preferiti(x_tg_init_data: str = Header(""),
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     righe = [dict(r) for r in con.execute(
-        f"SELECT {CAMPI_VETRINA}, a.stato, a.venditore_id "
+        f"SELECT {CAMPI_VETRINA}, a.stato, a.venditore_id, "
+        "p.avvisi AS avvisi_scelti "
         "FROM preferiti p "
         "JOIN annunci a ON a.id = p.annuncio_id "
         "JOIN utenti u ON u.tg_id = a.venditore_id "
         "WHERE p.tg_id=? ORDER BY p.creato DESC LIMIT 100",
         (user["id"],))]
     con.close()
+    # GLI AVVISI DI OGNI RIGA (17 nov 2026): la 🔔 del cassetto li
+    # disegna da qui. Le righe di prima dicono quel che ricevono davvero
+    # — la sola lampo —, cosi' il foglietto non promette avvisi che il
+    # giro non manderebbe.
+    avvisi_righe = {}
+    for r in righe:
+        scelti = avvisi_barattolo_leggi(r.pop("avvisi_scelti", None))
+        avvisi_righe[r["id"]] = ["lampo"] if scelti is None else scelti
     # (14 nov 2026, audit) di un annuncio non piu' in vista (rimosso, o
     # tornato in revisione dopo una modifica) il cassetto tiene titolo e
     # foto per dire «non piu' disponibile», ma non la descrizione: quella
@@ -30436,7 +30749,10 @@ def miei_preferiti(x_tg_init_data: str = Header(""),
     for r in righe:
         if r.get("stato") not in ("attivo", "venduto"):
             r["descrizione"] = ""
-    return arricchisci_righe_vetrina(righe)
+    righe = arricchisci_righe_vetrina(righe)
+    for r in righe:
+        r["avvisi_barattolo"] = avvisi_righe.get(r.get("id"), [])
+    return righe
 
 
 # ------------------ IL CARRELLO SALVATO (6 ott 2026) ------------------
@@ -36789,6 +37105,24 @@ def _leve_stato():
         {"gruppo": "🎁 Mancia al venditore", "voci": _mancia_leve()},
         # LA CASSA IN NEGOZIO (15 nov 2026): accesa di serie
         {"gruppo": "🏪 Cassa in negozio", "voci": _cassa_leve()},
+        {"gruppo": "🫙 Avvisi del barattolo", "voci": [
+            # GLI AVVISI SUI PREFERITI (17 nov 2026, cantiere
+            # avvisi-barattolo): accesa di serie, nessun segreto
+            _leva("Avvisi sugli articoli del barattolo",
+                  "AVVISI_BARATTOLO_ATTIVI", bool(AVVISI_BARATTOLO_ATTIVI),
+                  acceso="chi mette un articolo nel barattolo sceglie gli "
+                         "avvisi (prezzo sceso, lampo, ne resta uno, di "
+                         "nuovo disponibile); il bot li manda, al più "
+                         f"uno ogni {AVVISI_BARATTOLO_ORE} ore per articolo",
+                  spento="niente foglietto né 🔔; la lampo va a tutti i "
+                         "barattoli come prima, e le scelte restano salvate"),
+            _leva("Avvisi del barattolo — tetto (ore)",
+                  "AVVISI_BARATTOLO_ORE", AVVISI_BARATTOLO_ORE,
+                  acceso="fra due avvisi sullo stesso articolo alla stessa "
+                         "persona passano almeno queste ore; quel che cade "
+                         "nel mezzo arriva dopo, se è ancora vero",
+                  spento="(a 0 nessun tetto: sconsigliato)"),
+        ]},
         {"gruppo": "🆕 Avvisi del mercatino", "voci": [
             # GLI AVVISI DEI NUOVI ANNUNCI E DEI VENDITORI SEGUITI (9 ott
             # 2026): la leva globale e le due finestre del raggruppamento;
@@ -43166,9 +43500,25 @@ async def lancia_lampo(annuncio_id: int, req: Request,
     con.commit()
     # I destinatari si leggono ORA (la lista e' gia' vera), l'invio va
     # in create_task: i relay Nostr sono lenti e la risposta no.
-    savers = [r["tg_id"] for r in con.execute(
-        "SELECT tg_id FROM preferiti WHERE annuncio_id=? AND tg_id!=?",
-        (annuncio_id, user["id"]))]
+    # LA SCELTA DEGLI AVVISI (17 nov 2026): a leva accesa la lampo va
+    # solo a chi l'ha spuntata (le righe di prima si', come sempre) e
+    # dentro il tetto di un avviso al giorno per articolo, timbrato
+    # PRIMA dell'invio. A leva spenta, a tutti come ieri.
+    righe_savers = con.execute(
+        "SELECT tg_id, avvisi, avvisato FROM preferiti "
+        "WHERE annuncio_id=? AND tg_id!=?",
+        (annuncio_id, user["id"])).fetchall()
+    if AVVISI_BARATTOLO_ATTIVI:
+        tetto = AVVISI_BARATTOLO_ORE * 3600
+        savers = [r["tg_id"] for r in righe_savers
+                  if vuole_avviso_lampo(r["avvisi"])
+                  and adesso - int(r["avvisato"] or 0) >= tetto]
+        con.executemany("UPDATE preferiti SET avvisato=? WHERE tg_id=? "
+                        "AND annuncio_id=?",
+                        [(adesso, tg, annuncio_id) for tg in savers])
+        con.commit()
+    else:
+        savers = [r["tg_id"] for r in righe_savers]
     con.close()
     if savers:
         asyncio.create_task(
@@ -51208,6 +51558,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # Il tetto del barattolo, che dall'ago 2026 e' una leva: il client
     # non ne tiene una copia a memoria (divergerebbe al primo ritocco).
     profilo["max_barattolo"] = MAX_PREFERITI
+    # la leva degli avvisi del barattolo (17 nov 2026): il client apre il
+    # foglietto e mostra la 🔔 solo se e' accesa
+    profilo["avvisi_barattolo"] = bool(AVVISI_BARATTOLO_ATTIVI)
     # La modifica di piu' annunci insieme (16 ott 2026): la leva VIVA,
     # perche' il bottone in «I tuoi annunci» nasca solo quando le sue
     # rotte rispondono.
@@ -97289,6 +97642,12 @@ async def orologio():
             scadenze_lampo()
         except Exception as e:
             print(f"⚠️ Scadenze lampo saltate: {e}")
+        try:
+            # gli avvisi del barattolo (17 nov 2026): prezzo sceso, ne
+            # resta uno, di nuovo disponibile — a leva spenta esce subito
+            await giro_avvisi_barattolo()
+        except Exception as e:
+            print(f"⚠️ Avvisi del barattolo saltati: {e}")
         try:
             await avvisa_rientro_ferie()   # prima: legge le ferie ancora vive
             await avvisa_scadenza_sponsor()

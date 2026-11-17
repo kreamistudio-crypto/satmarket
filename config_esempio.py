@@ -1164,6 +1164,16 @@ P2P_AVVISI_NUOVI_ORDINI = True
 # mezzo escono insieme nel prossimo (quanti per tipo, il piu' conveniente
 # per lei). Un intero da 1 in su; storto o sotto 1 vale 15.
 P2P_AVVISI_NUOVI_MINUTI = 15
+# GLI AVVISI DEL BARATTOLO (17 nov 2026): chi mette un articolo nel
+# barattolo 🫙 sceglie cosa farsi dire dal bot su quell'articolo (prezzo
+# sceso, sconto lampo, ne resta solo uno, di nuovo disponibile). Accesa di
+# serie; a False niente foglietto né 🔔, e la lampo torna a tutti i
+# barattoli come prima. Le scelte restano salvate.
+AVVISI_BARATTOLO_ATTIVI = True
+# ...e il tetto: fra due avvisi sullo stesso articolo alla stessa persona
+# passano almeno queste ore (quel che cade nel mezzo arriva dopo, se e'
+# ancora vero). Intero; storto vale 24.
+AVVISI_BARATTOLO_ORE = 24
 # GLI AVVISI DEL MERCATINO (9 ott 2026): chi lo chiede dal cassetto Avvisi
 # del Profilo riceve un messaggio quando nel mercatino compaiono annunci
 # nuovi — TUTTI i nuovi, con un filtro facoltativo di categorie e prezzo

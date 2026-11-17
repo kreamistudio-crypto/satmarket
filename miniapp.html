@@ -15956,6 +15956,17 @@ document.getElementById('cartello')?.remove();</script>
     <div id="jarShareCorpo"></div>
   </div>
 
+  <!-- ============ SHEET: GLI AVVISI DI UN ARTICOLO DEL BARATTOLO ============
+       (17 nov 2026) Si apre da solo quando metti un articolo nel
+       barattolo, e dalla 🔔 di ogni riga del cassetto. Il corpo lo
+       disegna apriJarAvvisi: le spunte vere le dice il server. -->
+  <div class="sheet" id="jarAvvisiSheet" role="dialog" aria-modal="true"
+       aria-labelledby="jarAvvisiTit">
+    <div class="grab"></div>
+    <h3 id="jarAvvisiTit">🔔 Avvisami se…</h3>
+    <div id="jarAvvisiCorpo"></div>
+  </div>
+
   <!-- ============ SHEET: SVUOTA IL PACCO (ago 2026) ============
        La ✕ della pagina del pacco non chiude e basta: BUTTA VIA la
        composizione, e una cosa che non si puo' annullare si chiede
@@ -36120,6 +36131,7 @@ function closeSheet(){
   el('offertaCarrelloSheet').classList.remove('open');
   el('confermaSheet').classList.remove('open');
   el('jarShareSheet').classList.remove('open');
+  el('jarAvvisiSheet').classList.remove('open');
   el('p2pProfiloSheet').classList.remove('open');
   el('p2pPausaSheet').classList.remove('open');
   el('modChiaveSheet').classList.remove('open');
@@ -52933,7 +52945,14 @@ async function caricaPreferiti(){
     const r = await fetch(`${API_BASE}/me/preferiti`,
       {headers:{'X-Tg-Init-Data':authHdr()}});
     if (!r.ok) return;
-    myPreferiti = (await r.json()).map(mapListing);
+    const righe = await r.json();
+    /* le spunte degli avvisi di ogni riga (17 nov 2026), prima di
+       mapListing: e' un dato del barattolo, non dell'annuncio */
+    avvisiBarattolo = {};
+    righe.forEach(x => {
+      if (Array.isArray(x.avvisi_barattolo)) avvisiBarattolo[x.id] = x.avvisi_barattolo;
+    });
+    myPreferiti = righe.map(mapListing);
     preferiti = new Set(myPreferiti.map(l=>l.id));
     /* entrano nel catalogo: openDetail li trova anche oltre le pagine
        caricate della vetrina. Anche gli ESAURITI (ago 2026), o la
@@ -53045,8 +53064,16 @@ async function togglePreferito(id){
       });
       haptic('success');
       toast('Messo nel barattolo! 🫙');
+      /* GLI AVVISI (17 nov 2026): la riga e' nata con le spunte che
+         dice il server, e il foglietto le mostra subito. Chiuderlo le
+         tiene: scegliere e' facoltativo. */
+      if (AVVISI_BARATTOLO && Array.isArray(d.avvisi)) {
+        avvisiBarattolo[id] = d.avvisi;
+        apriJarAvvisi(id);
+      }
     } else {
       preferiti.delete(id);
+      delete avvisiBarattolo[id];
       myPreferiti = myPreferiti.filter(x=>x.id!==id);
       if (b) { b.classList.remove('salvato'); b.title = 'Metti nel barattolo'; }
       toast('Tolto dal barattolo');
@@ -53124,12 +53151,73 @@ function renderPreferiti(){
         <b ${apre?`onclick="openDetail(${l.id})" style="cursor:pointer;`:'style="'}display:flex;align-items:center;gap:8px;min-width:0">${th}<span style="overflow:hidden;text-overflow:ellipsis${vivo?'':';color:var(--muted)'}">${esc(l.title)}</span></b>
         <span style="white-space:nowrap">
           ${vivo?'':`<span class="badge" style="background:var(--off-bg);color:var(--muted)">${esaurito(l)?'per ora esaurito':'non più disponibile'}</span>`}
+          ${AVVISI_BARATTOLO ? `<span class="badge" onclick="apriJarAvvisi(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Avvisi di questo articolo" aria-label="Avvisi di questo articolo">${(avvisiBarattolo[l.id]||[]).length ? '🔔' : '🔕'}</span>` : ''}
           <span class="badge" onclick="togglePreferito(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Togli dal barattolo">🫙 Togli</span>
         </span>
       </div>
       <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${luogoPunto(l)}</div>
     </div>`;
   }).join('') + btnShare;
+}
+
+/* ---- GLI AVVISI DEL BARATTOLO (17 nov 2026) ----
+   Per ogni articolo messo da parte, cosa farsi dire dal bot. Le
+   etichette stanno qui, i NOMI ammessi li decide il server
+   (AVVISI_BARATTOLO_TIPI): una spunta che il server non conosce cade
+   al salvataggio. Il giro, il tetto di un avviso al giorno e le righe
+   di prima (solo la lampo) sono tutti del server. */
+let AVVISI_BARATTOLO = false;   /* la leva, da /api/me */
+let avvisiBarattolo = {};       /* id → spunte, dette dal server */
+let jarAvvisiId = 0;
+const AVVISI_BARATTOLO_VOCI = [
+  ['prezzo',  '📉', 'Il prezzo scende', 'quando il venditore lo abbassa'],
+  ['lampo',   '⚡', 'Arriva uno sconto lampo', 'lo sconto a tempo del venditore'],
+  ['ultimo',  '☝️', 'Ne resta solo uno', 'quando dei tanti pezzi ne rimane uno'],
+  ['rientro', '🔁', 'È di nuovo disponibile', 'se era esaurito, o il negozio torna dalle ferie'],
+];
+function apriJarAvvisi(id){
+  const box = el('jarAvvisiCorpo');
+  if (!AVVISI_BARATTOLO || !box) return;
+  jarAvvisiId = id;
+  const scelti = avvisiBarattolo[id] || [];
+  /* niente testo utente qui dentro: etichette nostre e nomi fissi */
+  box.innerHTML = `
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5">
+      Ti scrive il bot, al massimo una volta al giorno per questo
+      articolo. Puoi cambiare idea quando vuoi dalla 🔔 nel tuo barattolo.</div>
+    <div class="field" style="margin-top:4px">${AVVISI_BARATTOLO_VOCI.map(([k, ico, tit, sub]) => `
+      <label class="cons-riga"><input type="checkbox" data-avviso="${k}"${scelti.includes(k) ? ' checked' : ''}> <span><span class="cons-ico" aria-hidden="true">${ico}</span>${tit}<span class="cons-sub">${sub}</span></span></label>`).join('')}
+    </div>
+    <button class="btn orange" onclick="salvaJarAvvisi(this)">Va bene</button>`;
+  el('sheetBg').classList.add('open');
+  el('jarAvvisiSheet').classList.add('open');
+}
+/* Si scrive solo se qualcosa e' cambiato: «Va bene» sulle spunte di
+   serie e' gia' la verita' del server, e una richiesta in piu' non
+   serve a nessuno. */
+async function salvaJarAvvisi(btn){
+  haptic();
+  const id = jarAvvisiId;
+  const scelti = [...document.querySelectorAll('#jarAvvisiCorpo input[data-avviso]')]
+    .filter(i => i.checked).map(i => i.dataset.avviso);
+  const firma = a => a.slice().sort().join(',');
+  if (firma(scelti) === firma(avvisiBarattolo[id] || [])) { navIndietro(); return; }
+  const fine = bottoneInAttesa(btn, 'Salvo…');
+  try {
+    const r = await fetch(`${API_BASE}/listings/${id}/preferito/avvisi`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json',
+                'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({avvisi: scelti})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci siamo riusciti: riprova'); return; }
+    avvisiBarattolo[id] = Array.isArray(d.avvisi) ? d.avvisi : [];
+    navIndietro();
+    renderPreferiti();
+    toast(avvisiBarattolo[id].length ? 'Avvisi salvati 🔔'
+                                     : 'Nessun avviso per questo articolo 🔕');
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { fine(); }
 }
 
 /* ---- il barattolo condiviso: il foglio del link (ago 2026) ---- */
@@ -105937,6 +106025,9 @@ async function avvia(){
        adotta, non si indovina (un server di ieri non manda la chiave
        e resta il valore di partenza) */
     if (me.max_barattolo > 0) MAX_PREFERITI = Number(me.max_barattolo);
+    /* la leva degli avvisi del barattolo (17 nov 2026): senza, niente
+       foglietto all'aggiunta e niente 🔔 nel cassetto */
+    AVVISI_BARATTOLO = !!me.avvisi_barattolo;
     /* la modifica di piu' annunci insieme: la leva VIVA del server (un
        server di ieri non manda la chiave, e il bottone resta spento) */
     modificaMassivaAttiva = me.modifica_massiva === true;

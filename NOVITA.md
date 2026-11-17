@@ -392,3 +392,9 @@ frase: Chi vende alimenti e bevande può aggiungere all'annuncio l'etichetta: pe
 dove: Vendi → categoria «Alimenti e bevande» → riquadro «🏷️ Etichetta dell'alimento» sotto la descrizione; nella pagina dell'annuncio, la sezione «Etichetta» sotto la descrizione.
 leva: ETICHETTA_ALIMENTI (accesa di serie)
 pubblico: sì
+
+## 2026-11-17 · avvisi-barattolo
+frase: Quando metti un articolo nel tuo barattolo 🫙 puoi scegliere cosa farti dire dal bot su quell'articolo: se il prezzo scende, se arriva uno sconto lampo, se ne resta solo uno, se torna disponibile. Al massimo un avviso al giorno per articolo, con il tasto che apre l'annuncio.
+dove: il barattolino 🫙 sulla foto di un annuncio, poi il foglietto «🔔 Avvisami se…»; per cambiare idea, Profilo → «Nel tuo barattolo» → la 🔔 accanto all'articolo.
+leva: AVVISI_BARATTOLO_ATTIVI (accesa di serie)
+pubblico: sì

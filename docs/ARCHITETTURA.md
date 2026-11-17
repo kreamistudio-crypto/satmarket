@@ -36434,3 +36434,35 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   gesto. «Le ho scritte su carta» del Profilo (`walletParoleSuCarta`)
   apre lo stesso foglio senza gesto dietro. Le prove:
   `prove_backup_obbligato`.
+- GLI AVVISI DEL BARATTOLO (17 nov 2026, cantiere avvisi-barattolo,
+  voce #99 del Todo). Per ogni riga di `preferiti` tre colonne: `avvisi`
+  (NULL = riga di prima, solo la lampo; '' = niente; sennò i nomi di
+  `AVVISI_BARATTOLO_TIPI` con la virgola: prezzo, lampo, ultimo,
+  rientro), `avvisi_foto` (JSON {v, p, u, c}: valuta e prezzo NELLA
+  VALUTA DEL LISTINO, il bollino `ultimo_pezzo`, comprabile = attivo e
+  non in ferie; `foto_barattolo`) e `avvisato` (l'ultimo avviso). La riga
+  nasce in `toggle_preferito` con tutte le spunte e la fotografia; le
+  spunte si cambiano da `POST /api/listings/{id}/preferito/avvisi` (solo
+  righe che ci sono, giudice `avvisi_barattolo_scrivi`, la fotografia si
+  rifà solo se mancava). UN GIRO E NON DEI GANCI: `giro_avvisi_barattolo`
+  nell'orologio grande (dieci minuti) chiama `raccogli_avvisi_barattolo`,
+  che confronta ogni riga con la sua fotografia (`eventi_barattolo`:
+  calo ≥ `AVVISI_BARATTOLO_CALO_MIN`%, ultimo pezzo, ritorno in vetrina;
+  il prezzo salito alza solo la fotografia), timbra e committa PRIMA
+  degli invii, e ne esce UN messaggio per articolo
+  (`testo_avviso_barattolo`, titolo col link + tasto «🫙 Apri
+  l'annuncio»). Così lo prendono tutte le porte che cambiano prezzo e
+  pezzi (modifica, modifica massiva, connettori, rimborsi, annulli,
+  quantità, ferie) senza toccarne nessuna. Il tetto: uno ogni
+  `AVVISI_BARATTOLO_ORE` per articolo e persona; dentro il tetto la riga
+  si salta e la fotografia resta vecchia, così il passaggio si ridice
+  dopo se è ancora vero (`foto_barattolo_dopo`: a scaffale vuoto si
+  annota solo `c`). La lampo resta immediata in `lancia_lampo`, ma a leva
+  accesa va solo a `vuole_avviso_lampo` e dentro lo stesso tetto,
+  timbrato prima. Il client: `/api/me` dà `avvisi_barattolo`,
+  `/api/me/preferiti` le spunte per riga (`avvisi_barattolo`; le righe di
+  prima dicono ["lampo"]), il foglio `jarAvvisiSheet` (`apriJarAvvisi`,
+  `salvaJarAvvisi`) si apre all'aggiunta e dalla 🔔/🔕 di ogni riga del
+  cassetto. Leva `AVVISI_BARATTOLO_ATTIVI`, accesa di serie: spenta, niente
+  foglio né 🔔, il giro tace, la riga nasce NULL e la lampo va a tutti.
+  Le prove: `prove_avvisi_barattolo`, `collaudo_avvisi_barattolo`.

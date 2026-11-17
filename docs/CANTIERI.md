@@ -86607,3 +86607,71 @@ senza altro giro. Le due saltate di sempre sono nostr-tools, che in questa
 macchina non c'è.
 DA GUARDARE: dopo il cambio di visibilità, che GitHub mostri «AGPL-3.0»
 nella pagina del repository (la licenza arriva su main con la promozione).
+
+## Gli avvisi sugli articoli del barattolo (17 nov 2026, cantiere avvisi-barattolo; voce #99 del Todo, Andrea: «al momento di aggiunta di un articolo al proprio barattolo l'utente potrebbe scegliere facoltativamente le tipologie di notifiche che vuole ricevere su quel prodotto: variazioni di prezzo, sconto e promozioni, ne resta solo uno!, articolo rientrato in vetrina»)
+
+DECISO (piano in dieci righe, ok di Andrea alle 10:21). Quattro spunte nel
+foglietto «🔔 Avvisami se…» che si apre quando metti un articolo nel
+barattolo, tutte accese di serie: il prezzo scende, lo sconto lampo, ne
+resta solo uno, di nuovo disponibile. Chiuderlo le tiene. La 🔔 di ogni
+riga del cassetto le cambia (🔕 = nessuna). Avviso dal bot con il tasto
+che apre l'annuncio, al massimo uno al giorno per articolo, più passaggi
+in un messaggio solo. Il prezzo SALITO non avvisa: Andrea non l'ha
+voluto, e alza solo la fotografia, così un calo dopo si misura dal prezzo
+vero. «Di nuovo disponibile» vale anche per il negozio che torna dalle
+ferie. «Ne resta uno» è il bollino che c'era (`ultimo_pezzo`): su un pezzo
+unico non è una notizia. I preferiti di prima ricevono solo la lampo, come
+prima: un avviso nuovo nasce da un gesto, mai da un deploy. Leva nuova
+`AVVISI_BARATTOLO_ATTIVI`, accesa di serie (regola del 14 nov), più il
+tetto `AVVISI_BARATTOLO_ORE` = 24; nessun gesto sul VPS.
+
+PERCHÉ UN GIRO E NON DEI GANCI. Prezzo e pezzi cambiano da almeno otto
+porte (modifica, modifica massiva, sync dei negozi collegati, rimborso di
+una disputa, annullo del venditore, quantità a mano, fine ferie che
+arriva da sola col tempo, revisione che torna attiva). Un gancio per
+porta sarebbe stato un avviso che manca il giorno che se ne aggiunge una
+nona. Il giro dei dieci minuti confronta ogni riga con la SUA fotografia
+e parla solo dei passaggi; in più fa da freno naturale: cinque ritocchi
+del prezzo in un quarto d'ora sono un messaggio, col prezzo finale.
+SCARTATO: avvisare subito dalla rotta di modifica (veloce, ma cieco sulle
+altre porte); una tabella a parte per le scelte (tre colonne su
+`preferiti` viaggiano già con la fusione degli account e con la
+cancellazione, che lavorano per `tg_id`); il calo misurato in sats su un
+annuncio in euro (scatterebbe a ogni salita del bitcoin).
+
+IL TETTO NON PERDE NIENTE. Dentro le 24 ore la riga si salta e la
+fotografia resta quella dell'ultimo avviso: passato il tetto il giro
+ridice quel che è ancora vero (calato e risalito nel mezzo: niente, ed è
+giusto). Il timbro si scrive e si committa PRIMA dell'invio, il patto
+della campagna spedizioniere: un errore di rete può perdere un avviso di
+cortesia, mai raddoppiarlo. La lampo resta immediata (ha una scadenza)
+ma passa dalla spunta e dallo stesso tetto; uno sconto lampo che cade
+dentro il tetto non si ridice (scadrebbe prima).
+
+PROVATO. `prove_avvisi_barattolo` (56): i giudici puri (nomi ammessi,
+fotografia in sats/euro/ferie/asta, i passaggi con le soglie e l'1%
+esatto, la valuta cambiata, l'esaurito muto, il «dopo»), il messaggio
+(HTML scappato nel titolo, euro e sats), il giro vero su un database di
+cartone (un messaggio per due passaggi, righe di prima e spente mute, il
+tetto che tiene e poi ridice dal prezzo giusto, rifornimento, ferie, mai
+al venditore), i fili (rotte, orologio, lampo che timbra prima di
+inviare, /api/me, pannello, colonne, leva accesa nel codice e in
+config_esempio), il client e il foglietto in node. Controprove: tre
+mutazioni (guardia dello scaffale vuoto, tetto, giudice), rosse.
+`collaudo_avvisi_barattolo` (32) sul server vero, nella gabbia e nel venv
+senza coincurve: la MIGRAZIONE da un database di ieri (la riga di prima
+resta NULL), la riga nuova con spunte e fotografia, il cassetto, la rotta
+delle spunte (404 su una riga che non c'è, nomi sporchi ripuliti, la
+fotografia non rifatta), il giro col calo, il vaso in euro, l'esaurito e
+il rifornimento dalla rotta vera della quantità, il tetto, la lampo dalla
+rotta vera (a chi l'ha spuntata e alla riga di prima, non a chi l'ha
+tolta, con il timbro), la leva spenta. Controprova: lampo senza spunta e
+tetto tolto, quattro rosse.
+
+DA GUARDARE. Dal vivo sul collaudo: mettere un articolo nel barattolo,
+vedere il foglietto, abbassare il prezzo dall'altro account e aspettare
+fino a dieci minuti il messaggio del bot. Non provati dal vivo: il tasto
+sul telefono (push e DM Nostr ricevono lo stesso testo col link nel
+titolo). Il giro legge tutte le righe con avvisi a ogni battito: con il
+barattolo a 10 pezzi per persona è poco, ma se `MAX_PREFERITI` salisse
+molto andrebbe guardato.

@@ -20384,6 +20384,8 @@ def prove_savers_proprietario():
         CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
           stato TEXT);
         CREATE TABLE preferiti(tg_id INT, annuncio_id INT, creato INT,
+          avvisi TEXT DEFAULT NULL, avvisi_foto TEXT DEFAULT '',
+          avvisato INT DEFAULT 0,
           PRIMARY KEY(tg_id, annuncio_id));
         INSERT INTO annunci VALUES(7,222,'attivo'),(8,333,'attivo');
         """)
@@ -20397,6 +20399,10 @@ def prove_savers_proprietario():
                "_conta_barattolo": reale("_conta_barattolo"),
                "_conta_savers": reale("_conta_savers"),
                "MAX_PREFERITI": 10, "MSG_BARATTOLO_MIO": "MIO!",
+               # gli avvisi del barattolo (17 nov 2026) hanno la loro
+               # sezione: qui la riga nasce come ieri
+               "AVVISI_BARATTOLO_ATTIVI": False,
+               "AVVISI_BARATTOLO_TIPI": ("prezzo", "lampo", "ultimo", "rientro"),
                "accoda_colpo": lambda a: colpi.append(a),
                "time": type("t", (), {"time": staticmethod(lambda: 1)}),
                "app": type("a", (), {"post": lambda *a, **k:
@@ -20431,7 +20437,7 @@ def prove_savers_proprietario():
     prova("...e la riga c'e'", 1, righe())
     # la riga di un client di ieri si toglie ANCORA: il rifiuto sta
     # nel ramo dell'INSERT, dopo il DELETE
-    con.execute("INSERT INTO preferiti VALUES(222,7,1)")
+    con.execute("INSERT INTO preferiti(tg_id, annuncio_id, creato) VALUES(222,7,1)")
     try:
         d, _ = gira(con, 222, 7)
         esito = (d["ok"], d["salvato"])
@@ -203094,6 +203100,259 @@ console.log(JSON.stringify(out));
           ["passaFiltroOcP2P(o, p2pFiltro)" in lib, "passaFiltroOcP2P(o, p2pFiltro)" in pila])
 
 
+def prove_avvisi_barattolo():
+    """GLI AVVISI DEL BARATTOLO (17 nov 2026, cantiere avvisi-barattolo,
+    voce #99 del Todo). Chi mette un articolo nel barattolo sceglie cosa
+    farsi dire: prezzo sceso, lampo, ne resta uno, di nuovo disponibile.
+    Il banco gira i giudici puri, poi il giro VERO su un database di
+    cartone: i passaggi, il tetto di un avviso al giorno che tiene da
+    parte e ridice dopo, le righe di prima che restano mute, la leva.
+    Poi i fili (rotta, orologio, lampo, /api/me, pannello) e il client.
+    Ogni giudice ha la sua controprova."""
+    print("\n[gli avvisi del barattolo: spunte, giro, tetto, lampo]")
+    import sqlite3, json as _json, html as _html, time as _time
+    amb = {"json": _json, "html": _html, "time": _time,
+           "AVVISI_BARATTOLO_CALO_MIN": 1,
+           "AVVISI_BARATTOLO_TIPI": ("prezzo", "lampo", "ultimo", "rientro"),
+           "AVVISI_BARATTOLO_ORE": 24,
+           "LINK_BOT": "https://t.me/ilbarattolobot"}
+    for nome in ("in_ferie", "ultimo_pezzo", "_fmt_sats", "_fmt_eur",
+                 "link_telegram", "avvisi_barattolo_leggi",
+                 "avvisi_barattolo_scrivi", "vuole_avviso_lampo",
+                 "foto_barattolo", "eventi_barattolo", "foto_barattolo_dopo",
+                 "testo_avviso_barattolo", "raccogli_avvisi_barattolo"):
+        exec(pezzo(nome), amb)
+    m = re.search(r"^_SQL_RIGHE_AVVISI_BARATTOLO = \((?:.|\n)*?\)\n", _SORGENTE, re.M)
+    exec(m.group(0), amb)
+    leggi, scrivi = amb["avvisi_barattolo_leggi"], amb["avvisi_barattolo_scrivi"]
+    prova("la colonna NULL e' una riga di prima (None), '' nessun avviso",
+          [None, []], [leggi(None), leggi("")])
+    prova("i nomi sconosciuti cadono, l'ordine e' quello della tupla",
+          ["prezzo", "ultimo"], leggi("ultimo,boh,prezzo"))
+    prova("dal client: solo i nomi ammessi, una volta, in ordine",
+          "lampo,rientro", scrivi(["rientro", "lampo", "lampo", "<x>", 3]))
+    prova("una forma storta dal client vale nessun avviso", "", scrivi("prezzo"))
+    vl = amb["vuole_avviso_lampo"]
+    prova("la lampo: righe di prima si', spunta si', senza spunta no, '' no",
+          [True, True, False, False],
+          [vl(None), vl("lampo"), vl("prezzo,ultimo"), vl("")])
+
+    foto, ev, dopo = amb["foto_barattolo"], amb["eventi_barattolo"], amb["foto_barattolo_dopo"]
+    ADESSO = 2_000_000_000
+    base = {"stato": "attivo", "valuta": "sats", "prezzo_sats": 100000,
+            "prezzo_eur": 0, "quantita": 3, "quantita_max": 3,
+            "asta_base_sats": 0, "ferie_fino": 0}
+    f0 = foto(base, ADESSO)
+    prova("la fotografia: valuta, prezzo nella sua valuta, ultimo, comprabile",
+          {"v": "sats", "p": 100000, "u": False, "c": True}, f0)
+    prova("un annuncio in euro si fotografa in euro (il cambio non conta)",
+          {"v": "eur", "p": 25.5, "u": False, "c": True},
+          foto(dict(base, valuta="eur", prezzo_eur=25.5, prezzo_sats=999), ADESSO))
+    prova("le ferie del negozio: si vede ma non si compra",
+          False, foto(dict(base, ferie_fino=ADESSO + 60), ADESSO)["c"])
+    prova("l'asta non ha un prezzo da seguire", 0,
+          foto(dict(base, asta_base_sats=5000), ADESSO)["p"])
+    tutti = ["prezzo", "lampo", "ultimo", "rientro"]
+    f_calo = foto(dict(base, prezzo_sats=90000, quantita=1), ADESSO)
+    prova("prezzo sceso e ne resta uno: due passaggi, nell'ordine del messaggio",
+          ["prezzo", "ultimo"], ev(f0, f_calo, tutti))
+    prova("...ma solo quelli scelti", ["ultimo"], ev(f0, f_calo, ["ultimo", "lampo"]))
+    prova("IL PREZZO SALITO NON AVVISA (decisione di Andrea)", [],
+          ev(f0, foto(dict(base, prezzo_sats=120000), ADESSO), tutti))
+    prova("sotto l'1% non e' una notizia", [],
+          ev(f0, foto(dict(base, prezzo_sats=99500), ADESSO), tutti))
+    prova("esattamente l'1% si'", ["prezzo"],
+          ev(f0, foto(dict(base, prezzo_sats=99000), ADESSO), tutti))
+    prova("la valuta cambiata non e' un calo", [],
+          ev(f0, foto(dict(base, valuta="eur", prezzo_eur=1.0), ADESSO), tutti))
+    f_esaurito = foto(dict(base, stato="venduto", quantita=0), ADESSO)
+    prova("di un esaurito non si dice niente, nemmeno il prezzo", [],
+          ev(f0, dict(f_esaurito, p=1), tutti))
+    prova("da esaurito a di nuovo disponibile: «rientro»", ["rientro"],
+          ev(dict(f0, c=False), f0, tutti))
+    prova("anche il negozio che torna dalle ferie", ["rientro"],
+          ev(foto(dict(base, ferie_fino=ADESSO + 60), ADESSO), f0, tutti))
+    prova("dopo il giro, a scaffale vuoto prezzo e pezzi restano quelli visti",
+          dict(f0, c=False), dopo(f0, dict(f_esaurito, p=5)))
+    prova("dopo il giro, se si compra, l'articolo di adesso", f_calo, dopo(f0, f_calo))
+    t = amb["testo_avviso_barattolo"]("Bici <rossa>", "https://t.me/x?startapp=annuncio_7",
+                                      f0, f_calo, ["prezzo", "ultimo"])
+    prova("il messaggio: titolo col link, prezzo barrato, sconto, ultimo",
+          [True, True, True, True, True],
+          ["«<a href=\"https://t.me/x?startapp=annuncio_7\">Bici &lt;rossa&gt;</a>»" in t,
+           "<s>100.000 sats</s> → <b>90.000 sats</b> (−10%)" in t,
+           "Ne resta solo uno" in t, "di nuovo" not in t,
+           t.startswith("🫙 <b>")])
+    t_eur = amb["testo_avviso_barattolo"]("Lampada", "https://t.me/x", 
+                                          {"v": "eur", "p": 20.0}, {"v": "eur", "p": 15.5, "c": True}, ["prezzo"])
+    prova("in euro si scrive in euro", True, "<s>20,00 €</s> → <b>15,50 €</b> (−22%)" in t_eur)
+
+    # ---- il giro vero, su un database di cartone ----
+    def cartone():
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+          CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, ferie_fino INTEGER DEFAULT 0);
+          CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT, venditore_id INTEGER,
+            stato TEXT, valuta TEXT, prezzo_sats INTEGER, prezzo_eur REAL,
+            quantita INTEGER, quantita_max INTEGER, asta_base_sats INTEGER DEFAULT 0);
+          CREATE TABLE preferiti(tg_id INTEGER, annuncio_id INTEGER, creato INTEGER,
+            avvisi TEXT DEFAULT NULL, avvisi_foto TEXT DEFAULT '', avvisato INTEGER DEFAULT 0,
+            PRIMARY KEY(tg_id, annuncio_id));
+          INSERT INTO utenti VALUES(222, 0);
+          INSERT INTO annunci VALUES(1,'Bici',222,'attivo','sats',100000,0,3,3,0);
+          INSERT INTO annunci VALUES(2,'Lampada',222,'attivo','sats',50000,0,1,1,0);
+        """)
+        return con
+    giro = amb["raccogli_avvisi_barattolo"]
+    con = cartone()
+    fj = lambda **k: _json.dumps(foto(dict(base, **k), ADESSO), separators=(",", ":"))
+    con.execute("INSERT INTO preferiti VALUES(111,1,0,'prezzo,lampo,ultimo,rientro',?,0)", (fj(),))
+    con.execute("INSERT INTO preferiti VALUES(333,1,0,NULL,'',0)")          # riga di prima
+    con.execute("INSERT INTO preferiti VALUES(444,1,0,'',?,0)", (fj(),))      # tutto spento
+    con.execute("INSERT INTO preferiti VALUES(555,2,0,'rientro',NULL,0)")     # mai fotografata
+    con.commit()
+    prova("niente e' cambiato: nessun avviso", [], giro(con, ADESSO))
+    prova("la riga mai fotografata si fotografa e basta", True,
+          bool(con.execute("SELECT avvisi_foto FROM preferiti WHERE tg_id=555").fetchone()[0]))
+    con.execute("UPDATE annunci SET prezzo_sats=80000, quantita=1 WHERE id=1")
+    out = giro(con, ADESSO + 600)
+    prova("il calo e l'ultimo pezzo: UN messaggio, a chi l'ha scelto e basta",
+          [(111, 1)], [(o[0], o[1]) for o in out])
+    prova("...col tasto che apre l'annuncio", ("🫙 Apri l'annuncio",
+          "https://t.me/ilbarattolobot?startapp=annuncio_1"), out[0][3] if out else None)
+    prova("la riga di prima e quella spenta restano mute e senza timbro",
+          [0, 0], [con.execute("SELECT avvisato FROM preferiti WHERE tg_id=?", (t_,)).fetchone()[0]
+                   for t_ in (333, 444)])
+    prova("il timbro si scrive (prima dell'invio: e' gia' committato)", ADESSO + 600,
+          con.execute("SELECT avvisato FROM preferiti WHERE tg_id=111").fetchone()[0])
+    prova("un secondo giro non ridice la stessa cosa", [], giro(con, ADESSO + 1200))
+    # IL TETTO: dentro le 24 ore un nuovo calo aspetta, e non si perde
+    con.execute("UPDATE annunci SET prezzo_sats=60000 WHERE id=1")
+    prova("dentro il tetto il nuovo calo aspetta", [], giro(con, ADESSO + 3600))
+    prova("...e la fotografia resta quella vecchia (80.000)", 80000,
+          _json.loads(con.execute("SELECT avvisi_foto FROM preferiti WHERE tg_id=111").fetchone()[0])["p"])
+    out = giro(con, ADESSO + 600 + 24 * 3600)
+    prova("passato il tetto lo ridice, se e' ancora vero", [(111, 1)], [(o[0], o[1]) for o in out])
+    prova("...misurato dall'ultimo prezzo detto", True,
+          bool(out) and "<s>80.000 sats</s> → <b>60.000 sats</b>" in out[0][2])
+    # risalito nel mezzo: niente
+    con.execute("UPDATE annunci SET prezzo_sats=50000 WHERE id=1")
+    con.execute("UPDATE preferiti SET avvisato=? WHERE tg_id=111", (ADESSO + 90000,))
+    con.commit()
+    giro(con, ADESSO + 90100)
+    con.execute("UPDATE annunci SET prezzo_sats=60000 WHERE id=1")
+    prova("calato e risalito dentro il tetto: passato il tetto non c'e' niente da dire",
+          [], giro(con, ADESSO + 90000 + 25 * 3600))
+    # rientro: esaurito e poi rifornito
+    con.execute("UPDATE annunci SET stato='venduto', quantita=0 WHERE id=2")
+    prova("l'esaurito non avvisa", [], giro(con, ADESSO + 200000))
+    con.execute("UPDATE annunci SET stato='attivo', quantita=1 WHERE id=2")
+    out = giro(con, ADESSO + 200600)
+    prova("il rifornimento: «di nuovo disponibile» a chi l'ha scelto",
+          [(555, 2, True)], [(o[0], o[1], "di nuovo disponibile" in o[2]) for o in out])
+    # le ferie
+    con.execute("UPDATE utenti SET ferie_fino=? WHERE tg_id=222", (ADESSO + 400000,))
+    giro(con, ADESSO + 300000)
+    con.execute("UPDATE utenti SET ferie_fino=0 WHERE tg_id=222")
+    out = giro(con, ADESSO + 300000 + 25 * 3600)
+    prova("il negozio torna dalle ferie: «di nuovo disponibile» su tutti e due i suoi "
+          "articoli, a chi li aspetta", [(111, 1, True), (555, 2, True)],
+          sorted((o[0], o[1], "di nuovo disponibile" in o[2]) for o in out))
+    # il venditore che ha il suo annuncio (righe di ieri): mai
+    con.execute("INSERT INTO preferiti VALUES(222,1,0,'prezzo',?,0)", (fj(),))
+    con.execute("UPDATE annunci SET prezzo_sats=1000 WHERE id=1")
+    prova("mai un avviso al venditore sul suo annuncio", False,
+          any(o[0] == 222 for o in giro(con, ADESSO + 900000)))
+    # CONTROPROVE: giudici rotti, il banco se ne accorge
+    rotto = pezzo("eventi_barattolo").replace(
+        "if not nuova.get(\"c\"):\n        return []", "if False:\n        return []", 1)
+    prova("controprova: il giudice rotto si e' davvero rotto", True,
+          rotto != pezzo("eventi_barattolo"))
+    amb_r = dict(amb); exec(rotto, amb_r)
+    prova("controprova: senza la guardia dello scaffale vuoto un esaurito parlerebbe",
+          ["prezzo"], amb_r["eventi_barattolo"](f0, dict(f_esaurito, p=1), tutti))
+    rotto2 = pezzo("raccogli_avvisi_barattolo").replace(
+        "if eventi and adesso - int(r[\"avvisato\"] or 0) < tetto:", "if False:", 1)
+    amb_t = dict(amb); exec(rotto2, amb_t)
+    con2 = cartone()
+    con2.execute("INSERT INTO preferiti VALUES(111,1,0,'prezzo',?,?)", (fj(), ADESSO))
+    con2.execute("UPDATE annunci SET prezzo_sats=50000 WHERE id=1")
+    prova("controprova: senza il tetto il calo partirebbe subito dopo un avviso",
+          [[], 1], [giro(con2, ADESSO + 60), len(amb_t["raccogli_avvisi_barattolo"](con2, ADESSO + 60))])
+
+    # ---- i fili nel server ----
+    def corpo_rotta(firma):
+        i = _SORGENTE.index(firma)
+        return _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+    tog = corpo_rotta("async def toggle_preferito(")
+    prova("la riga nasce con tutte le spunte e la fotografia, a leva accesa",
+          [True, True, True],
+          ["\",\".join(AVVISI_BARATTOLO_TIPI)" in tog, "_foto_barattolo_ora(con, annuncio_id, adesso)" in tog,
+           "risposta[\"avvisi\"] = list(AVVISI_BARATTOLO_TIPI)" in tog])
+    rot = corpo_rotta("async def avvisi_preferito(")
+    prova("la rotta delle spunte: leva, giudice dei nomi, solo righe che ci sono, "
+          "fotografia rifatta solo se mancava", [True, True, True, True],
+          ["if not AVVISI_BARATTOLO_ATTIVI" in rot, "avvisi_barattolo_scrivi(d.get(\"avvisi\"))" in rot,
+           "raise HTTPException(404" in rot, "r[\"avvisi_foto\"] or _foto_barattolo_ora(" in rot])
+    lampo = corpo_rotta("async def lancia_lampo(")
+    prova("la lampo passa dalla scelta e dal tetto, timbrando prima dell'invio",
+          [True, True, True],
+          ["vuole_avviso_lampo(r[\"avvisi\"])" in lampo,
+           "adesso - int(r[\"avvisato\"] or 0) >= tetto" in lampo,
+           lampo.index("UPDATE preferiti SET avvisato=?") < lampo.index("_avvisa_savers_lampo(")])
+    oro = corpo_rotta("async def orologio(")
+    prova("l'orologio grande chiama il giro", True, "await giro_avvisi_barattolo()" in oro)
+    prova("il giro esce a leva spenta", True,
+          "if not AVVISI_BARATTOLO_ATTIVI:\n        return" in pezzo("giro_avvisi_barattolo"))
+    prova("/api/me dice la leva al client", True,
+          'profilo["avvisi_barattolo"] = bool(AVVISI_BARATTOLO_ATTIVI)' in _SORGENTE)
+    prova("il pannello ha la leva e il tetto", [True, True],
+          ['"AVVISI_BARATTOLO_ATTIVI", bool(AVVISI_BARATTOLO_ATTIVI)' in _SORGENTE,
+           '"AVVISI_BARATTOLO_ORE", AVVISI_BARATTOLO_ORE' in _SORGENTE])
+    prova("la leva e' accesa di serie nel codice", [True, True],
+          ["    AVVISI_BARATTOLO_ATTIVI = True\n" in _SORGENTE,
+           re.search(r"^AVVISI_BARATTOLO_ATTIVI = True$",
+                     open("config_esempio.py", encoding="utf-8").read(), re.M) is not None])
+    prova("le colonne nascono nella CREATE e nella migrazione", [True, True, True],
+          ["avvisi TEXT DEFAULT NULL,\n        avvisi_foto TEXT DEFAULT ''," in _SORGENTE,
+           '"preferiti ADD COLUMN avvisi TEXT DEFAULT NULL"' in _SORGENTE,
+           '"preferiti ADD COLUMN avvisato INTEGER DEFAULT 0"' in _SORGENTE])
+    mie = corpo_rotta("def miei_preferiti(")
+    prova("il cassetto riceve le spunte di ogni riga (le righe di prima: la sola lampo)",
+          [True, True], ['r["avvisi_barattolo"] = avvisi_righe.get(' in mie,
+                         '["lampo"] if scelti is None else scelti' in mie])
+
+    # ---- il client ----
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    tp = pezzo_js(mini, "async function togglePreferito(id){", "\n}\n")
+    prova("all'aggiunta il foglietto si apre, a leva accesa e con le spunte del server",
+          True, "if (AVVISI_BARATTOLO && Array.isArray(d.avvisi)) {" in tp and "apriJarAvvisi(id);" in tp)
+    prova("il foglio c'e' e si chiude coi fratelli", [True, True],
+          ['id="jarAvvisiSheet"' in mini, "el('jarAvvisiSheet').classList.remove('open');" in mini])
+    prova("la 🔔 nel cassetto, solo a leva accesa", True,
+          "${AVVISI_BARATTOLO ? `<span class=\"badge\" onclick=\"apriJarAvvisi(${l.id})\"" in mini)
+    prova("le etichette del client sono i nomi del server", ["prezzo", "lampo", "ultimo", "rientro"],
+          re.findall(r"^  \['(\w+)',", mini[mini.index("const AVVISI_BARATTOLO_VOCI = ["):
+                                         mini.index("];", mini.index("const AVVISI_BARATTOLO_VOCI = ["))], re.M))
+    banco = ("let AVVISI_BARATTOLO = true, avvisiBarattolo = {7: ['prezzo','rientro']}, jarAvvisiId = 0;\n"
+             "const box = {innerHTML: ''}; const classi = [];\n"
+             "const el = id => id === 'jarAvvisiCorpo' ? box : {classList: {add: c => classi.push(id)}};\n"
+             + mini[mini.index("const AVVISI_BARATTOLO_VOCI = ["):mini.index("/* Si scrive solo se qualcosa")]
+               .replace("let AVVISI_BARATTOLO = false;", "").replace("let avvisiBarattolo = {};", "")
+               .replace("let jarAvvisiId = 0;", "")
+             + "\napriJarAvvisi(7);\n"
+             "console.log(JSON.stringify({spuntate: (box.innerHTML.match(/data-avviso=\"(\\w+)\" checked/g)||[]).length,"
+             " righe: (box.innerHTML.match(/data-avviso=/g)||[]).length, aperti: classi, id: jarAvvisiId}));\n")
+    o = _node_banco(banco)
+    if o is None:
+        salta("il banco del foglietto degli avvisi", "node assente")
+    else:
+        prova("il foglietto: quattro spunte, accese quelle del server, foglio aperto",
+              {"spuntate": 2, "righe": 4, "aperti": ["sheetBg", "jarAvvisiSheet"], "id": 7}, o)
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -203343,7 +203602,7 @@ CATEGORIE = {
     link_descrizione foto_vuota foto_metadati connettori connettori_sync
     connettori_woo connettori_registro connettori_ingresso
     titoli_importati connettori_varianti connettore_interrompibile
-    famiglie connettori_cassetto connettori_categoria finestra ordini_prova tutorial
+    famiglie connettori_cassetto connettori_categoria avvisi_barattolo finestra ordini_prova tutorial
     timbri_visti effetti_ridotti morfosi_vendi copertura_home
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
     db_contesa_negozi negozi_grandi pc_tema_e_ricerca schermo_largo
@@ -204207,6 +204466,7 @@ def main():
               prove_ripubblica_p2p,
               prove_connettori_categoria,
               prove_filtro_onchain_tutto,
+              prove_avvisi_barattolo,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:
