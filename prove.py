@@ -5641,6 +5641,7 @@ def prove_pagamenti_in_volo(attrezzi=False):
             "_titolo_ordine": lambda righe: "una cosa",
             "cambio_btc_eur": _niente, "notifica": _niente,
             "notifica_admin": _avvisa, "premia_distintivi": _niente,
+            "premia_fedelta_negozio": _niente,
             "polso_ordini_admin": _niente, "premia_xp": _niente,
             "xp_ordine": lambda *a: 0, "premia_reputazione_nostr": _niente,
             "PAGATO": "pagato", "NON_PAGATO": "non_pagato",
@@ -8843,6 +8844,7 @@ def prove_pagamento_incerto():
                "_titolo_ordine": lambda righe: "una cosa",
                "cambio_btc_eur": _niente, "notifica": _dice,
                "premia_distintivi": _niente, "polso_ordini_admin": _niente,
+               "premia_fedelta_negozio": _niente,
                "notifica_admin": _niente, "_payment_hash": _niente,
                # Gli XP dell'affare concluso (ago 2026): qui non si
                # misurano, ma _sblocca_sats li chiama — e senza questi
@@ -13970,6 +13972,7 @@ def prove_nascondi_ordine():
                # la mancia al venditore (14 nov 2026) ha le sue prove
                # in `collaudo_mancia` e `prove_mancia_venditore`
                "mance_di_ordini": lambda con, righe, uid: None,
+               "premi_di_ordini": lambda con, righe, uid: None,
                # i codici uno alla volta (16 nov 2026) hanno le loro
                # prove in `collaudo_codici_uno_alla_volta`
                "codici_uno_alla_volta": lambda o: False,
@@ -25877,7 +25880,9 @@ def prove_valuta_soglia():
               "MSG_CLIENT_VECCHIO" in c2)
     prova("il messaggio del client vecchio e' scritto UNA volta", 1,
           src.count("MSG_CLIENT_VECCHIO = ("))
-    prova("...e lo usano tutti e due gli endpoint", 2,
+    # (17 nov 2026) ...e i premi fedelta' del negozio, il terzo: la
+    # lista assente e' un 400, mai uno spegnimento muto
+    prova("...e lo usano i due endpoint e quello dei premi fedeltà", 3,
           src.count("raise HTTPException(400, MSG_CLIENT_VECCHIO)"))
     # ...e dice cosa fare, che un 400 che dice la cosa sbagliata manda a
     # cercare il guasto dalla parte opposta
@@ -36756,6 +36761,7 @@ def _censimento(acceso, dopo=None):
     for nome in ("MODALITA_COLLAUDO", "AUTO_SBLOCCO_ATTIVO",
                  "ASTA_ABILITATA", "ASTA_PROXY_ATTIVO", "LAMPO_ATTIVE",
                  "SCONTO_PACCO_ATTIVO", "CODICI_SCONTO_ATTIVI",
+                 "PREMI_FEDELTA_ATTIVI",
                  "CODICI_SCONTO_TENTATIVI_ORA", "FERIE_ATTIVE", "BANNER_TEST",
                  "BANNER_TEST_LINK", "CONTATORE_UTENTI", "POST_AUTOMATICI",
                  "IMPORT_NOSTR_APERTO", "RICATEGORIZZA_AUTO",
@@ -53504,7 +53510,8 @@ def prove_sponsor():
     # la lezione gia' pagata dal padding della sezione del Profilo:
     # una sentinella si ancora al FATTO, non alla forma di ieri.
     _reg = [r for r in mini.split("}") if "{background:var(--chip-bg)" in r]
-    prova("le due righe non sono piu' verdi", (2, True),
+    # (17 nov 2026) la terza, i premi fedelta', con la stessa veste
+    prova("le tre righe non sono piu' verdi", (3, True),
           (_neg.count('class="trust-note nota-promessa"'),
            any(".trust-note.nota-promessa" in r.split("{")[0] for r in _reg)))
     # ...E SONO CORTE: via il prefisso, che ripeteva a ogni riga una
@@ -63148,6 +63155,8 @@ def prove_card_parte_ordine():
     amb["swap_auto_per"] = lambda t: False   # (9 nov 2026, incasso-annuncio)
     # la mancia al venditore (14 nov 2026): la sua prova e' `prove_mancia_venditore`
     amb["mance_di_ordini"] = lambda con, righe, uid: None
+    # i premi fedelta' del negozio (17 nov 2026): la loro prova e' `prove_premi_fedelta`
+    amb["premi_di_ordini"] = lambda con, righe, uid: None
     # i codici uno alla volta (16 nov 2026): la loro prova e' `collaudo_codici_uno_alla_volta`
     amb["codici_uno_alla_volta"] = lambda o: False
     # «spedisci entro il…» (17 nov 2026): le sue prove sono
@@ -106298,6 +106307,8 @@ def prove_introduzioni_leggibili():
         "${stato}",                    # gli stati
         "<span>oppure</span>",         # la riga di un campo
         "<input id=\"codUsi\"",        # la riga di un campo
+        "da</span> <input type=\"number\"",   # la riga di un premio
+        "€</span> <input type=\"text\"",      # fedelta' (17 nov 2026)
         "— ${da}",                     # il mittente: un dato
         "${esaurito(l)",               # uno stato dell'annuncio
         "Nessun codice, per ora.",     # righe vuote
@@ -123686,7 +123697,8 @@ def prove_profilo_elegante():
         # (15 nov 2026) la cassa in negozio, prima della vetrina
         "grpNegozio": ["accNumeriNegozio", "vocCassa", "vocMioNegozio", "vocWidgetNegozio",
                        "accSpedizioniere", "accSpedGratis", "accScontoPacco",
-                       "accCodici", "accBanner", "accSlugNegozio", "accFerie"],
+                       "accCodici", "accPremiFedelta", "accBanner",
+                       "accSlugNegozio", "accFerie"],
         "grpCompri": ["accPreferiti", "accRicerche", "accPuntiRitiro",
                       "vocSicurezza"],
         "grpIncassi": ["accLnAddress", "accComeRicevi", "accOnchainIncasso", "accNwc", "vocEsporta"],
@@ -128746,12 +128758,12 @@ console.log(JSON.stringify({
     if r.returncode:
         return
     o = _js.loads(r.stdout)
-    # dal 17 nov il regalo del gradino (cantiere del merch) e' l'ultima riga
-    prova("le righe dicono i vantaggi di ogni gradino, regalo compreso",
-          [[], ["−10% sul banner del negozio", "il link del negozio a scelta",
-                "🎁 un regalo: 👜 la borsa"],
+    # (17 nov 2026, cantiere premi-fedelta) i regali di Barattolo per
+    # livello sono stati tolti: il server non manda piu' `regalo`
+    prova("le righe dicono i vantaggi di ogni gradino",
+          [[], ["−10% sul banner del negozio", "il link del negozio a scelta"],
            ["−20% sul banner del negozio", "il link del negozio a scelta",
-            "il titolo «🧺 Mercante pratico»", "🎁 un regalo: ☕ la tazza"]],
+            "il titolo «🧺 Mercante pratico»"]],
           o["righe"][:3])
     prova("...il quinto anche lo sconto P2P, detto come sconto", True,
           "sconto dello 0,5% sulle commissioni P2P" in " · ".join(o["righe"][4]))
@@ -128776,11 +128788,10 @@ console.log(JSON.stringify({
     prova("un pannello solo e' visibile, il mio; gli altri quattro nascosti",
           (['<div class="liv-vant" data-n="3">'], 4),
           (o["visibile"], o["nascosti"]))
-    # i pannelli 1-3 sono aperti (1+3+4 righe, regalo compreso dal 2), i
-    # pannelli 4-5 chiusi (4+5 righe): spunte e lucchetti contano le
-    # righe, non i gradini
+    # i pannelli 1-3 sono aperti (1+2+3 righe), i pannelli 4-5 chiusi:
+    # spunte e lucchetti contano le righe, non i gradini
     prova("spunte sui vantaggi gia' miei, lucchetti su quelli davanti",
-          (8, 9), (o["spunte"], o["lucchetti"]))
+          (6, 7), (o["spunte"], o["lucchetti"]))
     prova("al massimo: la frase del massimo e il barattolo nell'anello",
           ("Hai raggiunto il livello massimo. 🫙", True),
           (o["massimo"], o["massimo_dentro"]))
@@ -196255,6 +196266,275 @@ def prove_mancia_venditore():
           and "Aggiungilo dal Profilo" in r.get("vendeSenzaMance", ""))
 
 
+def prove_premi_fedelta():
+    """I PREMI FEDELTA' DEL NEGOZIO (17 nov 2026, cantiere premi-fedelta,
+    scelta di Andrea sulla scheda: «Sì, premi del negozio»). Qui i pezzi
+    veri, eseguiti su un database in memoria; il giro sulle rotte vere e'
+    `collaudo_premi_fedelta`:
+     · il giudice unico delle soglie (`premi_fedelta_leggi`);
+     · il conto: solo affari conclusi, in euro, mai le prove ne' i
+       cambi sconosciuti;
+     · la maturazione una volta sola, il premio fotografato;
+     · l'aggancio al primo ordine pagato e non spedito, lo stacco
+       dagli ordini morti, un premio per ordine;
+     · la lista ordini: il premio solo alle due parti;
+     · la leva spenta; il client in node."""
+    print("\n[i premi fedeltà del negozio: soglie, conto, aggancio, client]")
+    import asyncio as _aio
+    import html
+    import sqlite3
+    srv = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    amb = {"json": json, "re": re, "time": time,
+           "PREMI_FEDELTA_ATTIVI": True, "PREMI_FEDELTA_MAX": 4,
+           "PREMI_FEDELTA_MIN_EUR": 10, "PREMI_FEDELTA_MAX_EUR": 100_000,
+           "PREMIO_TESTO_MAX": 60,
+           "PREMI_STATI_AGGANCIO": ("locked",),
+           "PREMI_STATI_MORTI": ("annullato", "refunded")}
+    prova("le costanti degli stati sono quelle del server", True,
+          'PREMI_STATI_AGGANCIO = ("locked",)' in srv
+          and 'PREMI_STATI_MORTI = ("annullato", "refunded")' in srv)
+    for nome in ("premi_fedelta_leggi", "speso_nel_negozio",
+                 "matura_premi_fedelta", "aggancia_premi_fedelta",
+                 "premi_di_ordini"):
+        exec(pezzo(nome), amb)
+    leggi = amb["premi_fedelta_leggi"]
+
+    # --- il giudice delle soglie ---
+    prova("JSON rotto: lista vuota", [], leggi("{non json"))
+    prova("vuoto: lista vuota", [], leggi(""))
+    prova("niente: lista vuota", [], leggi(None))
+    prova("un oggetto invece di una lista: vuota", [], leggi('{"a":1}'))
+    prova("in ordine di soglia, testo ripulito", [
+        {"soglia": 100, "premio": "la borsa"},
+        {"soglia": 200, "premio": "la tazza"}],
+        leggi('[{"soglia":200,"premio":" la  tazza "},'
+              '{"soglia":100,"premio":"la\\nborsa"}]'))
+    prova("fuori misura, senza premio e doppioni cadono", [
+        {"soglia": 50, "premio": "x"}],
+        leggi([{"soglia": 5, "premio": "poco"},
+               {"soglia": 50, "premio": "x"}, {"soglia": 50, "premio": "y"},
+               {"soglia": 70, "premio": "  "},
+               {"soglia": 200_000, "premio": "troppo"},
+               {"soglia": "abc", "premio": "z"}, "stringa"]))
+    prova("al massimo quattro gradini", 4, len(leggi(
+        [{"soglia": 10 * (i + 1), "premio": f"p{i}"} for i in range(6)])))
+    prova("il regalo si tronca a PREMIO_TESTO_MAX", 60,
+          len(leggi([{"soglia": 10, "premio": "a" * 99}])[0]["premio"]))
+
+    # --- il database di cartone, con lo schema VERO della tabella ---
+    i = srv.index("CREATE TABLE IF NOT EXISTS premi_fedelta_maturati(")
+    schema = srv[i:srv.index(");", i) + 2]
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(
+        "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT, "
+        "premi_fedelta TEXT DEFAULT '');"
+        "CREATE TABLE ordini(id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "compratore_id INTEGER, venditore_id INTEGER, prezzo_sats INTEGER, "
+        "stato TEXT, cambio_eur REAL DEFAULT 0, prova INTEGER DEFAULT 0);"
+        + schema)
+    premi = [{"soglia": 100, "premio": "la borsa"},
+             {"soglia": 200, "premio": "la tazza"}]
+    con.execute("INSERT INTO utenti VALUES(222,'Un tempo per te',?)",
+                (json.dumps(premi),))
+    con.execute("INSERT INTO utenti VALUES(111,'Compratore','')")
+
+    def ordine(stato, euro, cambio=50_000.0, prova_=0, c=111, v=222):
+        sats = int(euro / cambio * 100_000_000) if cambio else 1000
+        return con.execute(
+            "INSERT INTO ordini(compratore_id, venditore_id, prezzo_sats, "
+            "stato, cambio_eur, prova) VALUES(?,?,?,?,?,?)",
+            (c, v, sats, stato, cambio, prova_)).lastrowid
+
+    speso = amb["speso_nel_negozio"]
+    matura = amb["matura_premi_fedelta"]
+    aggancia = amb["aggancia_premi_fedelta"]
+    ordine("released", 60)
+    ordine("locked", 500)                  # pagato ma non concluso
+    ordine("released", 500, prova_=1)      # ordine di prova
+    ordine("released", 500, cambio=0)      # cambio sconosciuto
+    ordine("released", 500, c=333)         # un altro cliente
+    prova("il conto: solo i conclusi veri di QUELLA coppia", 60,
+          round(speso(con, 111, 222)))
+    prova("sotto la prima soglia non matura niente", [],
+          matura(con, 111, 222))
+    ordine("released", 50)
+    prova("a 110 € matura la borsa, e lo restituisce", [premi[0]],
+          matura(con, 111, 222))
+    prova("...una volta sola", [], matura(con, 111, 222))
+    prova("a se stessi niente", [], matura(con, 222, 222))
+    con.execute("UPDATE utenti SET premi_fedelta=? WHERE tg_id=222",
+                (json.dumps([{"soglia": 100, "premio": "un'altra cosa"}]),))
+    matura(con, 111, 222)
+    prova("il premio maturato resta fotografato anche se il negozio "
+          "cambia regalo", "la borsa", con.execute(
+              "SELECT premio FROM premi_fedelta_maturati").fetchone()[0])
+    con.execute("UPDATE utenti SET premi_fedelta=? WHERE tg_id=222",
+                (json.dumps(premi),))
+
+    # --- l'aggancio ---
+    def premio_di(oid):
+        r = con.execute("SELECT premio FROM premi_fedelta_maturati WHERE "
+                        "ordine_id=?", (oid,)).fetchone()
+        return r[0] if r else None
+    aggancia(con, 111, 222)
+    locked = con.execute("SELECT id FROM ordini WHERE stato='locked' AND "
+                         "compratore_id=111").fetchone()[0]
+    prova("la borsa va sul primo ordine pagato e non spedito", "la borsa",
+          premio_di(locked))
+    nuovo = ordine("locked", 30)
+    aggancia(con, 111, 222)
+    prova("un premio per ordine: il secondo resta senza", None,
+          premio_di(nuovo))
+    spedito = ordine("shipped", 30)
+    aggancia(con, 111, 222)
+    prova("mai su un ordine gia' spedito", None, premio_di(spedito))
+    con.execute("UPDATE ordini SET stato='annullato' WHERE id=?", (locked,))
+    aggancia(con, 111, 222)
+    prova("l'ordine muore: il premio si stacca e passa al prossimo",
+          ("la borsa", None), (premio_di(nuovo), premio_di(locked)))
+    con.execute("UPDATE ordini SET stato='released' WHERE id=?", (nuovo,))
+    aggancia(con, 111, 222)
+    prova("consegnato, il premio resta scritto sull'ordine", "la borsa",
+          premio_di(nuovo))
+    # 110 + 30 = 140: la tazza (200) non c'e' ancora; un ordine grande sì
+    ordine("released", 100)
+    terzo = ordine("locked", 20)
+    aggancia(con, 111, 222)
+    prova("passata la seconda soglia, la tazza sul prossimo ordine",
+          "la tazza", premio_di(terzo))
+
+    # --- la lista ordini: solo alle due parti ---
+    righe = [{"id": terzo, "compratore_id": 111, "venditore_id": 222,
+              "stato": "locked"}]
+    amb["premi_di_ordini"](con, righe, 111)
+    prova("chi compra lo vede", {"soglia": 200, "premio": "la tazza"},
+          righe[0].get("premio_fedelta"))
+    righe = [{"id": terzo, "compratore_id": 111, "venditore_id": 222,
+              "stato": "locked"}]
+    amb["premi_di_ordini"](con, righe, 222)
+    prova("chi vende lo vede", "la tazza",
+          (righe[0].get("premio_fedelta") or {}).get("premio"))
+    righe = [{"id": terzo, "compratore_id": 111, "venditore_id": 222,
+              "stato": "locked"}]
+    amb["premi_di_ordini"](con, righe, 999)
+    prova("un estraneo (o il moderatore) no", None,
+          righe[0].get("premio_fedelta"))
+
+    # --- la leva spenta ---
+    amb["PREMI_FEDELTA_ATTIVI"] = False
+    ordine("released", 5000)
+    prova("a leva spenta non matura niente", [], matura(con, 111, 222))
+    quarto = ordine("locked", 20)
+    amb["aggancia_premi_fedelta"](con, 111, 222)
+    prova("...e non attacca niente di nuovo", None, premio_di(quarto))
+    prova("...ma quelli gia' attaccati restano scritti", "la tazza",
+          premio_di(terzo))
+    amb["PREMI_FEDELTA_ATTIVI"] = True
+
+    # --- l'avviso dopo lo sblocco ---
+    detti = []
+
+    async def notifica(tg, testo, bottone=None):
+        detti.append((tg, testo))
+    con2 = sqlite3.connect(":memory:")
+    con2.row_factory = sqlite3.Row
+    con2.executescript(
+        "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT, "
+        "premi_fedelta TEXT DEFAULT '');"
+        "CREATE TABLE ordini(id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "compratore_id INTEGER, venditore_id INTEGER, prezzo_sats INTEGER, "
+        "stato TEXT, cambio_eur REAL DEFAULT 0, prova INTEGER DEFAULT 0);"
+        + schema)
+    con2.execute("INSERT INTO utenti VALUES(222,'Bottega <b>',?)",
+                 (json.dumps([{"soglia": 1000, "premio": "la <tazza>"}]),))
+    con2.execute("INSERT INTO ordini(compratore_id, venditore_id, "
+                 "prezzo_sats, stato, cambio_eur) VALUES(111,222,"
+                 "2000000,'released',60000)")
+
+    class _Con:
+        def __getattr__(self, n):
+            return getattr(con2, n)
+
+        def close(self):
+            pass
+    amb.update(db=lambda: _Con(), notifica=notifica, html=html,
+               _fmt_sats=lambda n: f"{n:,}".replace(",", "."))
+    exec("async " + pezzo("premia_fedelta_negozio"), amb)
+    _aio.run(amb["premia_fedelta_negozio"](111, 222))
+    prova("dopo lo sblocco l'avviso arriva a tutti e due", [111, 222],
+          [t for t, _ in detti])
+    prova("...con la cifra in formato italiano e il regalo scappato", True,
+          all("1.000 €" in t and "la &lt;tazza&gt;" in t for _, t in detti)
+          and "Bottega &lt;b&gt;" in detti[0][1])
+    detti.clear()
+    _aio.run(amb["premia_fedelta_negozio"](111, 222))
+    prova("...e una volta sola", [], detti)
+
+    # --- le sentinelle sul server ---
+    prova("la leva nasce ACCESA (regola di Andrea del 14 nov)", True,
+          "    PREMI_FEDELTA_ATTIVI = True\n" in srv)
+    sb = codice(pezzo("_sblocca_sats"))
+    prova("lo sblocco chiama i premi dopo i distintivi", True,
+          sb.index('await premia_distintivi(o["compratore_id"])')
+          < sb.index("await premia_fedelta_negozio(") < sb.index("premia_xp("))
+    mo = codice(pezzo("miei_ordini"))
+    prova("/api/orders attacca il premio con la connessione aperta", True,
+          mo.index('premi_di_ordini(con, righe, user["id"])')
+          < mo.index("con.close()", mo.index("premi_di_ordini(")))
+    neg = codice(pezzo("negozio"))
+    prova("la vetrina passa dal giudice, mai il JSON grezzo", True,
+          'premi_fedelta_leggi(v["premi_fedelta"])' in neg
+          and 'venditore["premi_fedelta"] = ' in neg)
+    me = codice(pezzo("mio_profilo"))
+    prova("/api/me: lista pulita e misure del cassetto", True,
+          'profilo["premi_fedelta"] = premi_fedelta_leggi(' in me
+          and 'profilo["premi_fedelta_leve"]' in me)
+    fus = codice(pezzo("esegui_fusione"))
+    prova("la fusione porta i premi con gli ordini", True,
+          "UPDATE OR IGNORE premi_fedelta_maturati" in fus)
+    prova("la cancellazione dell'account li toglie", True,
+          '("premi_fedelta_maturati", "compratore_id")' in srv
+          and '("premi_fedelta_maturati", "venditore_id")' in srv)
+    rot = codice(pezzo("imposta_premi_fedelta"))
+    prova("la rotta vuole la chiave `premi` (mai un'assenza = spento)", True,
+          "MSG_CLIENT_VECCHIO" in rot and "isinstance(grezzi, list)" in rot)
+    prova("nessun sat si muove: niente fatture ne' escrow nei premi", True,
+          all(p not in codice(pezzo(n)) for n in (
+              "matura_premi_fedelta", "aggancia_premi_fedelta",
+              "premia_fedelta_negozio") for p in ("invoice", "paga_", "sats=")))
+
+    # --- il client ---
+    prova("il cassetto sta nel Profilo, con le altre promesse", True,
+          'id="accPremiFedelta"' in mini and "renderPremiFedelta();" in mini)
+    prova("la riga dell'ordine porta il premio", True,
+          "premioFedelta:o.premio_fedelta||null," in mini)
+    prova("la riga del negozio viene dopo le due sorelle", True,
+          "${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}"
+          "${premiNegozioRiga(v)}" in mini)
+    nota = pezzo_js(mini, "function notaPremioFedelta(o){", "\n}\n") + "\n}\n"
+    js = ("const fmt = n => String(n);\n"
+          "const esc = s => String(s).replace(/</g,'&lt;');\n"
+          + nota +
+          "const p = {soglia:100, premio:'la <borsa>'};\n"
+          "console.log(JSON.stringify({"
+          "vende: notaPremioFedelta({role:'seller', premioFedelta:p}),"
+          "compra: notaPremioFedelta({role:'buyer', premioFedelta:p}),"
+          "niente: notaPremioFedelta({role:'buyer', premioFedelta:null})}));\n")
+    r = _node_banco(js)
+    if r is None:
+        salta("la riga del premio in node", "node non c'e'")
+        return
+    prova("chi vende: «nel pacco metti», regalo scappato", True,
+          "Nel pacco metti" in r.get("vende", "")
+          and "la &lt;borsa>" in r.get("vende", ""))
+    prova("chi compra: «nel pacco trovi»", True,
+          "Nel pacco trovi" in r.get("compra", ""))
+    prova("senza premio niente riga", "", r.get("niente"))
+
+
 def prove_notifiche_telefono():
     """LE NOTIFICHE SUL TELEFONO (14 nov 2026, cantiere web-push, Andrea:
     «si puo' fare: notifiche web app» — l'app di Zapstore, il sito sulla
@@ -205152,7 +205432,7 @@ CATEGORIE = {
     filtro_onchain_tutto
     """.split(),
     "mercatino": """
-    guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore app_negozio
+    guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore premi_fedelta app_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     ricategorizza collaudo_ricategorizza asta proxy_asta annullo
@@ -206300,6 +206580,7 @@ def main():
               prove_avvisi_nostr_arrivano,
               prove_notifiche_telefono,
               prove_mancia_venditore,
+              prove_premi_fedelta,
               prove_app_negozio,
               prove_filtro_10050,
               prove_semina_collaudo, prove_leva_mercato_lavoro,

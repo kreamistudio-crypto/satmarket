@@ -672,6 +672,13 @@ SPED_GRATIS_MIN_EUR = 1         # una cintura contro lo zero travestito:
                                 # prezzo dell'annuncio (costo 0)
 SPED_GRATIS_MIN_SATS = 1        # idem, in sats
 
+# --- Premi fedeltà del negozio (17 nov 2026) ---------------------------
+# «Da 100 € spesi da me, nel pacco dopo trovi la borsa»: le soglie e i
+# regali li scrive il venditore nel Profilo (fino a 4), Barattolo conta
+# quanto ha speso ogni cliente in quel negozio (affari conclusi, in euro)
+# e attacca il premio al suo ordine successivo. Nessun sat si muove.
+PREMI_FEDELTA_ATTIVI = True     # interruttore generale (False = spento)
+
 # --- Codici sconto del venditore -------------------------------------
 # «SATOSHI10» scritto alla cassa vale -X% sugli articoli. E' la TERZA
 # leva accanto allo sconto sugli articoli e alla spedizione gratis, ma
