@@ -179468,7 +179468,9 @@ def prove_canale_admin():
           # (14 nov 2026, audit-tornata-tutto) due nella moderazione: il
           # recapito P2P on-chain cambiato dopo il deposito e l'acquisto
           # on-chain pagato oltre un'ora dopo la scadenza del prezzo
-          {"assistenza": 1, "dispute": 6, "dm": 1, "errori": 35,
+          # (17 nov 2026, sentinella-loop) il server riavviato dalla
+          # sentinella dopo un blocco, negli errori
+          {"assistenza": 1, "dispute": 6, "dm": 1, "errori": 36,
            "liquidita": 5, "moderazione": 20, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -179504,7 +179506,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "104 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "105 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -179520,7 +179522,7 @@ def prove_canale_admin():
           "14 nov sera il pagamento uscito verso l'altra parte, la fattura "
           "con due hash e la chiave on-chain cambiata; e il recapito P2P "
           "on-chain cambiato dopo il deposito e l'acquisto on-chain pagato "
-          "tardi)", 104,
+          "tardi; dal 17 nov il server riavviato dalla sentinella)", 105,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -202463,6 +202465,135 @@ console.log(JSON.stringify(out));
           ["passaFiltroOcP2P(o, p2pFiltro)" in lib, "passaFiltroOcP2P(o, p2pFiltro)" in pila])
 
 
+def prove_sentinella_server_fermo():
+    """LA SENTINELLA DEL SERVER FERMO (17 nov 2026, dal campo: il blocco
+    delle 08:07 dopo la promozione, quattro minuti di produzione muta e
+    nessuna riga che dicesse dove). I giudici si GIRANO — l'indirizzo
+    dagli argomenti di uvicorn, il passo che decide pila/uscita —; il
+    colpo bussa DAVVERO a un server di cartone su loopback (muto,
+    sano, 503, porta chiusa); il resto si legge per forma: il filo
+    suo, lo spegnimento che non conta, l'uscita solo dopo il passo."""
+    print("\n[la sentinella del server fermo]")
+    import http.server
+    import socket as _socket
+    import threading as _threading
+    import urllib.request as _ur
+    import urllib.error  # noqa: F401  (serve all'exec qui sotto)
+    i = _SORGENTE.index("def sentinella_indirizzo(")
+    f = _SORGENTE.index("def _sentinella_percorso_segno(")
+    amb = {"urllib": urllib, "socket": _socket, "sys": sys, "os": os,
+           "time": time, "faulthandler": __import__("faulthandler"),
+           "SENTINELLA_USCITA_S": 180, "SENTINELLA_TETTO_S": 0.6,
+           "_APRITORE_SENTINELLA": _ur.build_opener(_ur.ProxyHandler({}))}
+    exec(_SORGENTE[i:f], amb)
+    indirizzo, passo, bussa = (amb["sentinella_indirizzo"],
+                               amb["sentinella_passo"],
+                               amb["_sentinella_bussa"])
+
+    # --- l'indirizzo: lo dicono gli argomenti, mai un numero scritto ---
+    prova("produzione: uvicorn --host 127.0.0.1 --port 8080",
+          "http://127.0.0.1:8080/api/salute",
+          indirizzo(["/usr/bin/uvicorn", "server:app", "--host",
+                     "127.0.0.1", "--port", "8080"]))
+    prova("collaudo: python -m uvicorn ... --port 8090",
+          "http://127.0.0.1:8090/api/salute",
+          indirizzo(["/srv/collaudo/venv/lib/uvicorn/__main__.py",
+                     "server:app", "--host", "127.0.0.1", "--port", "8090"]))
+    prova("--host 0.0.0.0 si bussa da loopback, --port= attaccato vale",
+          "http://127.0.0.1:8080/api/salute",
+          indirizzo(["uvicorn", "server:app", "--host=0.0.0.0",
+                     "--port=8080"]))
+    prova("un host IPv6 va fra quadre", "http://[::1]:8080/api/salute",
+          indirizzo(["uvicorn", "--host", "::1", "--port", "8080"]))
+    prova("senza --port (prove, script, TestClient): niente sentinella", "",
+          indirizzo(["prove.py"]))
+    prova("una porta storta non e' una porta", "",
+          indirizzo(["uvicorn", "--port", "80a"]))
+    prova("--port in fondo senza numero: niente", "",
+          indirizzo(["uvicorn", "--port"]))
+
+    # --- il passo: conta SOLO il silenzio ---
+    prova("tutto bene: niente da fare", ("", None), passo(None, "ok", 100))
+    prova("il primo silenzio: la pila, e si segna da quando",
+          ("pila", 100), passo(None, "muto", 100))
+    prova("silenzio che continua sotto i 3 minuti: zitto", ("", 100),
+          passo(100, "muto", 279))
+    prova("silenzio da 3 minuti: si esce", ("esci", 100),
+          passo(100, "muto", 280))
+    prova("risponde di nuovo dopo un silenzio: lo dice", ("guarito", None),
+          passo(100, "ok", 200))
+    prova("un 503 o una porta chiusa NON e' un server fermo", ("", None),
+          passo(None, "altro", 100))
+    prova("...e non allunga un silenzio: lo chiude", ("guarito", None),
+          passo(100, "altro", 400))
+
+    # --- il colpo, vero, contro un server di cartone ---
+    modo = {"c": "ok"}
+    sveglia = _threading.Event()
+
+    class _Cartone(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if modo["c"] == "muto":
+                sveglia.wait(3)
+                return
+            codice = 503 if modo["c"] == "503" else 200
+            self.send_response(codice)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Cartone)
+    srv.daemon_threads = True
+    filo = _threading.Thread(target=srv.serve_forever, daemon=True)
+    filo.start()
+    url = f"http://127.0.0.1:{srv.server_address[1]}/api/salute"
+    try:
+        prova("il colpo: server sano = ok", "ok", bussa(url))
+        modo["c"] = "503"
+        prova("il colpo: 503 = altro (ha risposto)", "altro", bussa(url))
+        modo["c"] = "muto"
+        t0 = time.monotonic()
+        prova("il colpo: server che non risponde = muto", "muto", bussa(url))
+        prova("...e il colpo si ferma al suo tetto", True,
+              time.monotonic() - t0 < 2.5)
+    finally:
+        sveglia.set()
+        srv.shutdown()
+        srv.server_close()
+    s = _socket.socket()
+    s.bind(("127.0.0.1", 0))
+    porta_morta = s.getsockname()[1]
+    s.close()
+    prova("il colpo: porta chiusa = altro (non un ciclo fermo)", "altro",
+          bussa(f"http://127.0.0.1:{porta_morta}/api/salute"))
+
+    # --- la forma ---
+    corpo = _SORGENTE[_SORGENTE.index("def _sentinella_filo("):
+                      _SORGENTE.index("async def avvia_sentinella(")]
+    prova("la sentinella e' un FILO suo, daemon (un task in un ciclo "
+          "fermo non girerebbe mai)", True,
+          'name="sentinella", daemon=True' in _SORGENTE)
+    prova("lo spegnimento non e' un server fermo: si guarda dopo il colpo",
+          True, 0 <= corpo.find("_SI_CHIUDE.is_set():\n            return")
+          < corpo.find("sentinella_passo("))
+    prova("os._exit solo nel ramo 'esci', dopo la pila e il segno", True,
+          0 <= corpo.find('azione == "esci"') < corpo.find(
+              "_sentinella_percorso_segno()") < corpo.find("os._exit("))
+    prova("os._exit compare una volta sola nel server", 1,
+          _SORGENTE.count("os._exit("))
+    prova("kill -USR1 scrive la pila a mano (faulthandler.register)", True,
+          "faulthandler.register(signal.SIGUSR1" in _SORGENTE)
+    prova("il riavvio diventa un avviso nella stanza errori", True,
+          'riavviato alle {ora}' in _SORGENTE
+          and 'argomento="errori")' in _SORGENTE[
+              _SORGENTE.index("async def avvia_sentinella("):])
+    prova("la leva e' di serie accesa", True,
+          "SENTINELLA_ATTIVA = True" in _SORGENTE)
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -202751,7 +202882,7 @@ CATEGORIE = {
     bundle_bitcoin journal_senza_buffer istanza_prova
     collaudo_segue_develop avvisi_nostr_arrivano notifiche_telefono filtro_10050
     semina_collaudo relay_risolti certificati_relay config_esempio
-    assistente_bot
+    assistente_bot sentinella_server_fermo
     """.split(),
     "swap": """
     swap_cella swap_preventivo swap_telefono swap_fornitori
@@ -203570,6 +203701,7 @@ def main():
               prove_ripubblica_p2p,
               prove_connettori_categoria,
               prove_filtro_onchain_tutto,
+              prove_sentinella_server_fermo,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(sys.argv[1:], tutte)
     if "--mostra" in sys.argv[1:]:
