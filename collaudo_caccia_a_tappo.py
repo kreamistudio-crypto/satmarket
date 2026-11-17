@@ -28,6 +28,9 @@ database usa-e-getta:
   · L'EVIDENZA NEL MONDO: solo un annuncio proprio e in vetrina, uno al
     giorno, coi bulloni contati sul server, palco pieno = 400, l'annuncio
     venduto scende dal palco da solo;
+  · LE MISSIONI: valgono solo dopo il tempo minimo dalla partenza, le
+    stelle da 1 a 3, i bulloni la prima volta sola, e il tabellone le
+    legge da `missioni_superate`;
   · il freno delle occhiate morde.
 
 NON TOCCA NIENTE DI VERO: il config finto lo installa `avvio()` del banco,
@@ -97,7 +100,8 @@ def main():
                     "VALUES(?,?,?,1)", (tg, nome, f"neg{tg}"))
     con.execute("DELETE FROM annunci")
     for t in ("gioco_tappo", "gioco_tappo_oggetti", "gioco_tappo_attrezzi",
-              "gioco_tappo_sfide", "gioco_tappo_mondo", "gioco_tappo_evidenza"):
+              "gioco_tappo_sfide", "gioco_tappo_mondo", "gioco_tappo_evidenza",
+              "gioco_tappo_missioni"):
         con.execute(f"DELETE FROM {t}")
     con.commit()
     con.close()
@@ -111,10 +115,10 @@ def main():
     print("\n[a leva spenta il gioco non esiste]")
     S.GIOCO_TAPPO_ATTIVO = False
     prova("GET della pagina: 404", 404, c.get(B, headers=COMPRA).status_code)
-    prova("le sette POST: 404", [404] * 7,
+    prova("le otto POST: 404", [404] * 8,
           [c.post(f"{B}/{r}", json={}, headers=COMPRA).status_code
            for r in ("parti", "indizio", "attrezzo", "guarda", "oggetto",
-                     "raccogli", "evidenza")])
+                     "raccogli", "evidenza", "missione")])
     prova("/api/me dice gioco_tappo: false", (False, False),
           (c.get("/api/me", headers=COMPRA).json().get("gioco_tappo"),
            c.get("/api/me", headers=COMPRA).json().get("tappo_caccia")))
@@ -441,6 +445,46 @@ def main():
     con.close()
     prova("venduto l'annuncio, scende dal palco da solo", [],
           c.get(B, headers=COMPRA).json()["mondo"]["evidenza"]["palchi"])
+
+    print("\n[le missioni di Tappo]")
+    st = c.get(B, headers=COMPRA).json()
+    prova("cinque missioni, nessuna finita; il tabellone legge l'insieme vuoto",
+          (["quaderno", "lucchetto", "staffetta", "parole", "halving"], [0] * 5, set()),
+          ([x["id"] for x in st["missioni"]], [x["stelle"] for x in st["missioni"]],
+           S.missioni_superate(S.db(), 111)))
+    M = f"{B}/missione"
+    prova("una missione che non c'e': 400", 400,
+          c.post(M, json={"missione": "sats", "azione": "inizia"}, headers=COMPRA).status_code)
+    prova("finire senza essere partiti: 400", 400,
+          c.post(M, json={"missione": "quaderno", "azione": "finisci", "stelle": 3},
+                 headers=COMPRA).status_code)
+    c.post(M, json={"missione": "quaderno", "azione": "inizia"}, headers=COMPRA)
+    r = c.post(M, json={"missione": "quaderno", "azione": "finisci", "stelle": 3}, headers=COMPRA)
+    prova("finire subito dopo la partenza: 400, troppo presto", (400, True),
+          (r.status_code, "presto" in r.text))
+    con = S.db()
+    con.execute("UPDATE gioco_tappo_missioni SET iniziata=iniziata-60 WHERE tg_id=111")
+    con.commit()
+    con.close()
+    prova("le stelle vanno da 1 a 3", 400,
+          c.post(M, json={"missione": "quaderno", "azione": "finisci", "stelle": 4},
+                 headers=COMPRA).status_code)
+    r = c.post(M, json={"missione": "quaderno", "azione": "finisci", "stelle": 2},
+               headers=COMPRA).json()
+    prova("finita: 15 bulloni la prima volta, due stelle, e il tabellone la vede",
+          (15, st["saldo"] + 15, 2, {"quaderno"}),
+          (r["bulloni_nuovi"], r["saldo"], r["missioni"][0]["stelle"],
+           S.missioni_superate(S.db(), 111)))
+    c.post(M, json={"missione": "quaderno", "azione": "inizia"}, headers=COMPRA)
+    con = S.db()
+    con.execute("UPDATE gioco_tappo_missioni SET iniziata=iniziata-60 WHERE tg_id=111")
+    con.commit()
+    con.close()
+    r = c.post(M, json={"missione": "quaderno", "azione": "finisci", "stelle": 3},
+               headers=COMPRA).json()
+    prova("rigiocata: nessun bullone in piu', le stelle salgono a tre",
+          (0, st["saldo"] + 15, 3), (r["bulloni_nuovi"], r["saldo"], r["missioni"][0]["stelle"]))
+    prova("...e niente XP nemmeno qui", xp_prima, conta("SELECT COUNT(*) FROM xp_eventi"))
 
     print("\n[il freno delle occhiate]")
     S._SECCHI.clear()

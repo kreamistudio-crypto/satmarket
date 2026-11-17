@@ -3711,7 +3711,7 @@
        SI MUOVE SOLO CON transform E opacity (Tappo che dondola, le
        stelle, la festa): niente che ridisegni la pagina a ogni
        fotogramma. Con gli effetti ridotti sta tutto fermo. */
-    #view-caccia,.caccia-velo{--c-notte:#0A0F1F;--c-notte2:#141B36;--c-carta:rgba(255,255,255,.065);
+    #view-caccia,.caccia-velo,.miss-velo{--c-notte:#0A0F1F;--c-notte2:#141B36;--c-carta:rgba(255,255,255,.065);
       --c-riga:rgba(255,255,255,.13);--c-ink:#F5F0E6;--c-muto:#A7AFC8;--c-ambra:#F7931A;
       --c-ambra2:#FFC56B;--c-legno:#8A5A33;--c-legno2:#55361D;--c-bronzo:#D9905A;
       --c-argento:#DCE3EC;--c-oro:#FFD25A;--c-verde:#5BE3A4;
@@ -4025,6 +4025,121 @@
     @keyframes caccia-foglio{from{opacity:0;transform:translateY(-30px) rotate(8deg)}to{opacity:1;transform:rotate(-1.5deg)}}
     @keyframes caccia-piove{0%{transform:translateY(0) rotate(0);opacity:0}12%{opacity:1}
       100%{transform:translateY(115vh) rotate(540deg);opacity:.9}}
+    /* LE MISSIONI DI TAPPO (17 nov 2026): un foglio a tutto schermo sul
+       body (si apre anche dal tabellone dei livelli, fuori dal gioco),
+       scuro nei due temi come il gioco. Fumetti, rompicapi, stelle. Le
+       animazioni partono dallo stato fermo giusto: con gli effetti
+       ridotti la regola di casa le spegne e resta tutto leggibile. */
+    .miss-voce{width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer}
+    .miss-stelline{color:#FFD25A;letter-spacing:1px}
+    .miss-stelline i{font-style:normal;color:rgba(255,255,255,.18)}
+    .miss-velo{position:fixed;inset:0;z-index:4001;overflow-y:auto;overscroll-behavior:contain;
+      padding:14px 12px 30px;background:radial-gradient(120% 50% at 50% -5%,#28346A 0%,rgba(40,52,106,0) 60%),#0A0F1F;
+      color:#F5F0E6;opacity:0;transition:opacity .2s ease}
+    .miss-velo[hidden]{display:none}
+    .miss-velo.aperto{opacity:1}
+    .miss-carta{position:relative;width:min(100%,480px);margin:0 auto}
+    .miss-testa{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+    .miss-testa span{font-size:30px;line-height:1}
+    .miss-testa h3{flex:1;margin:0;font-size:19px;font-weight:800;line-height:1.2}
+    .miss-testa button{flex:none;width:40px;height:40px;border:1px solid var(--c-riga);border-radius:50%;
+      background:var(--c-carta);color:var(--c-ink);font:inherit;font-size:17px;cursor:pointer}
+    .miss-cosa{margin:0 0 12px;padding:8px 12px;border-radius:14px;background:rgba(247,147,26,.14);
+      color:var(--c-ambra2);font-size:13.5px;font-weight:700}
+    .miss-fumetto{display:flex;gap:9px;align-items:flex-end;margin:0 0 10px;animation:caccia-entra .4s cubic-bezier(.2,1.3,.4,1) both}
+    .miss-fumetto.altro{flex-direction:row-reverse}
+    .miss-volto{flex:none;width:46px;height:56px;display:flex;align-items:flex-end;justify-content:center}
+    .miss-volto img{width:44px;height:56px;object-fit:contain}
+    .miss-volto span{font-size:34px;line-height:1}
+    .miss-nuvola{flex:1;padding:10px 12px;border-radius:18px 18px 18px 6px;background:#FFF6DC;color:#3A2A12;
+      font-size:15px;line-height:1.4}
+    .miss-fumetto.altro .miss-nuvola{border-radius:18px 18px 6px 18px;background:#E7ECFF;color:#1C2240}
+    .miss-nuvola b:first-child{display:block;margin-bottom:2px;font-size:12px;letter-spacing:.02em;color:#B0631A}
+    .miss-fumetto.altro .miss-nuvola b:first-child{color:#4B57A8}
+    .miss-passi{display:flex;justify-content:center;gap:6px;margin:0 0 12px}
+    .miss-passi i{width:26px;height:6px;border-radius:3px;background:var(--c-riga)}
+    .miss-passi i.fatto{background:var(--c-verde)}
+    .miss-passi i.ora{background:var(--c-ambra)}
+    .miss-libri{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:7px;margin:0 0 10px}
+    .miss-libro{padding:8px 9px;border:1px solid rgba(138,90,51,.6);border-radius:6px 12px 12px 6px;
+      background:linear-gradient(90deg,#E9D3A6 0 6px,#FFF6DC 6px);color:#3A2A12;font:inherit;text-align:left;cursor:pointer;
+      transition:transform .15s ease}
+    .miss-libro:active{transform:scale(.97)}
+    .miss-libro ul{margin:4px 0 0;padding:0 0 0 4px;list-style:none;font-size:12.5px;line-height:1.45}
+    .miss-libro-chi{display:block;font-size:12.5px;font-weight:800;color:#8A5A33}
+    .miss-libro.rotto{filter:grayscale(1) contrast(.6);opacity:.55;border-style:dashed}
+    .miss-libro.scelto{outline:3px solid var(--c-ambra)}
+    .miss-doppio{display:grid;gap:7px;margin:0 0 8px}
+    .miss-paga{padding:10px 12px;border-radius:14px;border:1px solid var(--c-riga);background:var(--c-carta);font-size:17px;font-weight:800}
+    .miss-paga small{display:block;margin-top:2px;font-size:12.5px;font-weight:600;color:var(--c-muto)}
+    .miss-paga.ok{border-color:rgba(91,227,164,.6)}
+    .miss-paga.no{border-color:rgba(255,107,107,.7);text-decoration:line-through;text-decoration-thickness:2px}
+    .miss-paga.attesa{border-color:rgba(247,147,26,.7)}
+    .miss-tempo{height:6px;margin:4px 0 2px;border-radius:3px;background:var(--c-riga);overflow:hidden}
+    .miss-tempo i{display:block;height:100%;background:var(--c-ambra);transform-origin:left;animation:miss-tempo linear both}
+    .miss-due{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .miss-due .caccia-btn{font-size:14.5px;padding:13px 10px}
+    .miss-scelte{display:grid;gap:7px;margin:0 0 6px}
+    .miss-scelta{padding:12px 13px;border:1px solid var(--c-riga);border-radius:14px;background:var(--c-carta);
+      color:var(--c-ink);font:inherit;font-size:15px;font-weight:700;text-align:left;cursor:pointer;
+      animation:caccia-entra .35s cubic-bezier(.2,1.3,.4,1) both;transition:transform .15s ease,background .15s ease}
+    .miss-scelta:active{transform:scale(.98)}
+    .miss-scelta.presa{border-color:var(--c-ambra);background:rgba(247,147,26,.2)}
+    .miss-ordine{margin:0 0 8px;padding:0 0 0 22px;font-size:14px;line-height:1.4}
+    .miss-ordine li{margin:0 0 4px;color:var(--c-verde)}
+    .miss-rete{display:block;width:100%;height:auto;margin:0 0 6px;border-radius:18px;background:rgba(0,0,0,.28)}
+    .miss-rete line{stroke:#55617F;stroke-width:5;stroke-linecap:round}
+    .miss-rete line.usato{stroke:var(--c-ambra)}
+    .miss-rete .perle circle{fill:#141B36;stroke:#FFC56B;stroke-width:2}
+    .miss-rete text{fill:#F5F0E6;font-size:15px;font-weight:800;text-anchor:middle}
+    .miss-rete .nodo{cursor:pointer}
+    .miss-rete .nodo circle{fill:#1B2550;stroke:#A7AFC8;stroke-width:2.5}
+    .miss-rete .nodo text{font-size:24px}
+    .miss-rete .nodo.dentro circle{stroke:var(--c-ambra);fill:#3A2A12}
+    .miss-rete .nodo.ultimo circle{stroke-width:5}
+    .miss-via{margin:0 0 4px;font-size:13.5px;font-weight:700;text-align:center;color:var(--c-ambra2)}
+    .miss-parole{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:0 0 10px}
+    .miss-parole span{padding:7px 6px;border-radius:10px;background:#FFF6DC;color:#3A2A12;font-size:14px;font-weight:700;text-align:center}
+    .miss-parole small{margin-right:4px;font-size:11px;color:#9A7A4A}
+    .miss-parole span.fatta{background:#DDF7EA;color:#14532D}
+    .miss-foglio{display:grid;grid-template-columns:repeat(4,1fr);gap:2px 8px;margin:0 4px 12px;padding:10px 12px;
+      border-radius:4px 12px 6px 10px;background:#FFF6DC;color:#3A2A12;font-size:13px;transform:rotate(-1deg);
+      box-shadow:0 10px 20px rgba(0,0,0,.4)}
+    .miss-foglio small{margin-right:3px;font-size:10px;color:#9A7A4A}
+    .miss-mucchio{grid-template-columns:repeat(3,1fr)}
+    .miss-mucchio .miss-scelta{text-align:center;padding:10px 4px;font-size:14px}
+    .miss-messaggio{margin:0 0 10px;padding:12px 13px;border-radius:16px;background:#F1F4FA;color:#1C2240;font-size:14.5px;line-height:1.4}
+    .miss-messaggio p{margin:4px 0 0}
+    .miss-era{display:flex;align-items:baseline;justify-content:center;gap:10px;margin:0 0 8px}
+    .miss-era b{font-size:34px;font-weight:800;color:var(--c-ambra2)}
+    .miss-era span{font-size:14px;color:var(--c-muto)}
+    .miss-barattolone{position:relative;width:110px;height:136px;margin:0 auto 12px;border:3px solid rgba(220,227,236,.7);
+      border-top-width:12px;border-radius:12px 12px 26px 26px;overflow:hidden;background:rgba(255,255,255,.05)}
+    .miss-barattolone i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(180deg,#FFC56B,#F7931A);
+      transition:height .9s cubic-bezier(.2,1,.4,1)}
+    .miss-quanto{margin:-4px 0 12px;font-size:14px;text-align:center;color:var(--c-muto)}
+    .miss-quanto b{font-size:22px;color:var(--c-ambra2)}
+    .miss-fine{text-align:center}
+    .miss-stelle{margin:4px 0 8px;font-size:46px;letter-spacing:6px;line-height:1}
+    .miss-stelle span{color:rgba(255,255,255,.15)}
+    .miss-stelle span.si{color:#FFD25A;animation:caccia-pop .6s cubic-bezier(.2,1.6,.4,1) both}
+    .miss-stelle span.si:nth-child(2){animation-delay:.15s}
+    .miss-stelle span.si:nth-child(3){animation-delay:.3s}
+    .miss-succo{margin:0 0 6px;font-size:17px;font-weight:700;line-height:1.4}
+    .miss-nome{margin:0 0 12px;font-size:13.5px;color:var(--c-muto)}
+    .miss-figurina{display:inline-flex;flex-direction:column;align-items:center;gap:3px;width:150px;padding:14px 10px;
+      border-radius:14px;border:2px solid #FFD25A;background:linear-gradient(160deg,#2B2F6B,#141B36);
+      transform:rotate(-3deg);box-shadow:0 14px 28px rgba(0,0,0,.45);animation:caccia-foglio .6s cubic-bezier(.2,1.4,.4,1) both}
+    .miss-figurina span{font-size:40px;line-height:1}
+    .miss-figurina b{font-size:14px}
+    .miss-figurina small{font-size:11px;color:#FFC56B;text-transform:uppercase;letter-spacing:.06em}
+    .miss-premio{margin:12px 0 0;font-size:30px;font-weight:800;color:#FFC56B;animation:caccia-pop .7s cubic-bezier(.2,1.6,.4,1) both}
+    .miss-riga{position:fixed;left:50%;bottom:18px;z-index:4002;width:min(calc(100% - 24px),456px);padding:11px 14px;
+      border-radius:14px;font-size:14.5px;font-weight:700;line-height:1.35;text-align:center;
+      transform:translate(-50%,140%);opacity:0;pointer-events:none;transition:transform .25s ease,opacity .25s ease}
+    .miss-riga.bene{background:#14532D;color:#DDF7EA;transform:translate(-50%,0);opacity:1}
+    .miss-riga.male{background:#7F1D1D;color:#FFE4E4;transform:translate(-50%,0);opacity:1}
+    @keyframes miss-tempo{from{transform:scaleX(1)}to{transform:scaleX(0)}}
     /* SUGLI SCHERMI GRANDI (web app e browser): due colonne — a sinistra
        Tappo, le schede e la caccia; a destra la dispensa, sempre li'. */
     @media (min-width:900px){
@@ -14385,6 +14500,21 @@ document.getElementById('cartello')?.remove();</script>
         </div>
       </div>
     </div>
+  </div>
+  <!-- ============ LE MISSIONI DI TAPPO (17 nov 2026) ============
+       Il foglio a tutto schermo delle missioni su Bitcoin: sta sul body
+       perche' si apre anche dal tabellone dei livelli. Lo riempie
+       `missioneDisegna()`, coi testi tutti nostri. -->
+  <div class="miss-velo" id="missioneVelo" hidden role="dialog" aria-modal="true" aria-labelledby="missioneTitolo">
+    <div class="miss-carta">
+      <div class="miss-testa">
+        <span id="missioneEmoji" aria-hidden="true"></span>
+        <h3 id="missioneTitolo"></h3>
+        <button type="button" onclick="missioneChiudi()" title="Chiudi" aria-label="Chiudi">&#10005;</button>
+      </div>
+      <div id="missioneCorpo"></div>
+    </div>
+    <div class="miss-riga" id="missioneRiga" role="status" aria-live="polite"></div>
   </div>
   <div class="view" id="view-assistenza">
     <div class="sicu">
@@ -60332,8 +60462,27 @@ function cacciaOggiHTML(s, ui){
 }
 /* PURA: la scheda «Sfide» — una famiglia per riga, con la prossima
    soglia, la barra e una tacca per ogni soglia */
+/* PURA: le missioni su Bitcoin in cima alle sfide, con le stelle
+   migliori. Negli onclick viaggia SOLO un id che sta in MISSIONI_GIOCO
+   (il catalogo del client): un id che il client non conosce non si
+   mostra. I bulloni si vedono finche' la missione non e' fatta. */
+function cacciaMissioniHTML(s){
+  const tutte = (s.missioni || []).filter(x => x && Object.prototype.hasOwnProperty.call(MISSIONI_GIOCO, x.id));
+  if (!tutte.length) return '';
+  const fatte = tutte.filter(x => Number(x.stelle) > 0).length;
+  return '<div class="caccia-h">Le missioni di Tappo</div><div class="caccia-sotto">Giochi brevi per capire Bitcoin. Ne hai fatte <b>'
+    + fmt(fatte) + '</b> di ' + fmt(tutte.length) + '.</div>'
+    + tutte.map(x => {
+      const st = Math.max(0, Math.min(3, Number(x.stelle) || 0));
+      return '<button type="button" class="caccia-sfida miss-voce' + (st ? ' finita' : '') + '" onclick="apriMissione(\'' + x.id + '\')">'
+        + '<span class="em" aria-hidden="true">' + esc(x.emoji) + '</span><div class="co">'
+        + (st ? '<span class="pr miss-stelline">' + '★'.repeat(st) + '<i>' + '★'.repeat(3 - st) + '</i></span>'
+              : '<span class="pr">+' + fmt(Number(x.bulloni) || 0) + ' 🔩</span>')
+        + '<b>' + esc(x.nome) + '</b><div class="ch">' + esc(x.cosa) + '</div></div></button>';
+    }).join('');
+}
 function cacciaSfideHTML(s){
-  return '<div class="caccia-h">Le sfide</div><div class="caccia-sotto">Si pagano da sole, in bulloni, appena ci arrivi. Ne hai fatte <b>'
+  return cacciaMissioniHTML(s) + '<div class="caccia-h">Le sfide</div><div class="caccia-sotto">Si pagano da sole, in bulloni, appena ci arrivi. Ne hai fatte <b>'
     + fmt(Number(s.sfide_fatte) || 0) + '</b> di ' + fmt(Number(s.sfide_totale) || 0) + '.</div>'
     + (s.sfide || []).filter(f => f && Array.isArray(f.soglie)).map(f => {
       const prossima = f.soglie.find(x => x && !x.fatta);
@@ -61112,6 +61261,484 @@ function mondoDisegna(){
 }
 /* PURA: un numero «a caso» ma sempre lo stesso per lo stesso seme */
 function mondoCaso(seme){ const v = Math.sin(seme * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); }
+/* ============ LE MISSIONI DI TAPPO (17 nov 2026) ============
+   Andrea: «ogni tanto nel tabellone devi giocare con Tappo per
+   proseguire... missioni originali, educative su Bitcoin, simpatiche,
+   emozionanti». Lo studio approvato («Studio: le missioni di Tappo su
+   Bitcoin») da' a ogni missione TRE TEMPI: il guaio (due fumetti), il
+   gioco (dove la cosa si impara facendola, mai un quiz) e il succo (una
+   frase, col nome vero della cosa). Una sola idea per missione, un colpo
+   di scena, stelle da 1 a 3 (una basta per passare il gradino).
+   Si aprono da `apriMissione(id)`: dal tabellone dei livelli (il patto
+   con la stradina) e dal gioco. Il server paga i bulloni la prima volta
+   e tiene le stelle (`/missione`); qui si gioca e basta. A missione
+   finita parte l'evento `tappo:missione` ({id, stelle}), che il
+   tabellone ascolta per rileggersi.
+   I PERSONAGGI: Tappo e i tre guastafeste dello studio — la Gazza (i
+   furti e le truffe), il signor Fidati (la custodia altrui), il Tarlo
+   (chi bara sulle regole). Finche' non hanno un disegno loro parlano
+   con un'emoji. NIENTE DATI VERI: le parole, i conti e i nomi sono
+   finti, e Tappo lo dice. */
+const MISS_CHI = {
+  tappo: {nome: 'Tappo', img: '/assets/caccia-tappo.webp'},
+  tarlo: {nome: 'Il Tarlo', em: '🐛'},
+  gazza: {nome: 'La Gazza', em: '🐦'},
+  fidati: {nome: 'Il signor Fidati', em: '🦚'},
+  topo: {nome: 'Topo', em: '🐭'}, ape: {nome: 'Ape', em: '🐝'}, rana: {nome: 'Rana', em: '🐸'}, riccio: {nome: 'Riccio', em: '🦔'},
+};
+let missione = null;     /* la missione aperta: {id, passo, errori, dati, scheda}, o null */
+
+/* PURA: le stelle dagli errori — nessuno tre, uno due, di piu' una */
+function missioneStelle(errori){
+  const e = Number(errori) || 0;
+  return e <= 0 ? 3 : e === 1 ? 2 : 1;
+}
+/* PURA: un fumetto (testo gia' nostro, mai dal server) */
+function missFumettoHTML(chi, testo){
+  const c = MISS_CHI[chi] || MISS_CHI.tappo;
+  const volto = c.img ? `<img src="${c.img}" alt="" width="44" height="56">` : `<span>${c.em}</span>`;
+  return `<div class="miss-fumetto${chi === 'tappo' ? '' : ' altro'}"><div class="miss-volto">${volto}</div>`
+    + `<div class="miss-nuvola"><b>${esc(c.nome)}</b>${testo}</div></div>`;
+}
+/* PURA: i pallini dei passi in cima al gioco */
+function missPassiHTML(n, tot){
+  let h = '<div class="miss-passi" aria-hidden="true">';
+  for (let i = 0; i < tot; i++) h += `<i class="${i < n ? 'fatto' : i === n ? 'ora' : ''}"></i>`;
+  return h + '</div>';
+}
+
+/* ---------- 1. IL QUADERNO DI TUTTI (il registro condiviso) ---------- */
+/* PURA: i cinque quaderni dello stesso conto. `cambiato` = l'indice del
+   quaderno dove il Tarlo ha rosicchiato una riga */
+function quadernoRighe(){
+  return [['Topo', 'Ape', 3], ['Ape', 'Rana', 2], ['Rana', 'Tappo', 4], ['Riccio', 'Topo', 1]];
+}
+function quadernoHTML(m){
+  const d = m.dati, righe = quadernoRighe();
+  const chi = ['tappo', 'topo', 'ape', 'rana', 'riccio'];
+  const libro = (i, r) => {
+    const roba = righe.map((x, k) => {
+      const truccata = r.truccato === i && k === r.riga;
+      return `<li class="${truccata ? 'truccata' : ''}">${esc(x[0])} → ${esc(x[1])}: <b>${truccata ? r.falso : x[2]}</b> 🔩</li>`;
+    }).join('') + (r.extra && r.extra[i] ? `<li class="truccata">${r.extra[i]}</li>` : '');
+    const c = MISS_CHI[chi[i]];
+    return `<button type="button" class="miss-libro${r.rotto === i ? ' rotto' : ''}${d.scelto === i ? ' scelto' : ''}" onclick="quadernoTocca(${i})">`
+      + `<span class="miss-libro-chi">${c.img ? '🫙' : c.em} ${esc(c.nome)}</span><ul>${roba}</ul></button>`;
+  };
+  if (m.passo === 0) {
+    return missPassiHTML(0, 3) + missFumettoHTML('tappo', 'Ho dato una copia del quaderno a tutti. Stanotte il Tarlo ne ha rosicchiato uno e ha cambiato una cifra. <b>Tocca il quaderno che non è uguale agli altri.</b>')
+      + `<div class="miss-libri">${[0, 1, 2, 3, 4].map(i => libro(i, {truccato: 3, riga: 0, falso: 30})).join('')}</div>`;
+  }
+  if (m.passo === 1) {
+    const ok = d.respinto;
+    return missPassiHTML(1, 3) + missFumettoHTML('tarlo', 'Ho UN bullone solo. Lo do ad Ape... e anche a Rana, contemporaneamente! Ehehe.')
+      + `<div class="miss-doppio"><div class="miss-paga ok">🐛 → 🐝 1 🔩<small>arrivato per primo: scritto in tutti i quaderni</small></div>`
+      + `<div class="miss-paga ${ok ? 'no' : 'attesa'}">🐛 → 🐸 1 🔩<small>${ok ? 'respinto: quel bullone è già speso' : 'lo stesso bullone, un attimo dopo'}</small></div></div>`
+      + (ok ? '' : `<div class="miss-tempo"><i style="animation-duration:${d.secondi || 7}s"></i></div>`
+        + `<div class="miss-due"><button type="button" class="caccia-btn" onclick="quadernoDoppio(true)">✋ Respingi: già speso</button>`
+        + `<button type="button" class="caccia-btn piano" onclick="quadernoDoppio(false)">✍️ Scrivilo pure</button></div>`);
+  }
+  if (m.passo === 2) {
+    return missPassiHTML(2, 3) + missFumettoHTML('tarlo', 'Ultimo trucco: nel MIO quaderno scrivo che ho ricevuto 100 bulloni. Da chi? Dal nulla!')
+      + `<div class="miss-libri">${[0, 1, 2, 3, 4].map(i => libro(i, {extra: {3: '✨ dal nulla → Tarlo: <b>100</b> 🔩'}})).join('')}</div>`
+      + `<div class="miss-due"><button type="button" class="caccia-btn" onclick="quadernoNulla(true)">🚫 Non c'è negli altri quattro: respinto</button>`
+      + `<button type="button" class="caccia-btn piano" onclick="quadernoNulla(false)">👍 Se lo dice lui…</button></div>`;
+  }
+  /* il colpo di scena */
+  return missFumettoHTML('tarlo', 'E allora rosicchio il TUO quaderno! Gnam.')
+    + `<div class="miss-libri">${[0, 1, 2, 3, 4].map(i => libro(i, {rotto: d.riparato ? -1 : 0})).join('')}</div>`
+    + missFumettoHTML('tappo', d.riparato ? 'Visto? Gli altri quattro dicevano tutti la stessa cosa: il mio quaderno si è <b>ricopiato da loro</b> e il Tarlo è rimasto a bocca asciutta.' : 'Oh no, il mio quaderno è a pezzi…')
+    + (d.riparato ? `<button type="button" class="caccia-btn" onclick="missioneFine()">Avanti</button>`
+      : `<button type="button" class="caccia-btn" onclick="quadernoRipara()">📚 Chiedi agli altri quattro</button>`);
+}
+function quadernoTocca(i){
+  const m = missione;
+  if (!m || m.id !== 'quaderno' || m.passo !== 0) return;
+  if (i === 3) { missioneBene('Trovato! Bastava confrontarlo con gli altri.'); m.passo = 1; m.dati = {secondi: 7}; missioneDisegna(); missioneTimer(7, () => quadernoDoppio(false, true)); }
+  else { m.errori++; missioneMale('Questo è uguale agli altri: guarda le cifre.'); }
+}
+function quadernoDoppio(respingi, scaduto){
+  const m = missione;
+  if (!m || m.id !== 'quaderno' || m.passo !== 1 || m.dati.respinto) return;
+  missioneTimer();
+  if (respingi) { m.dati.respinto = true; missioneBene('Giusto: un bullone si spende una volta sola.'); missioneDisegna(); setTimeout(() => { if (missione === m) { m.passo = 2; m.dati = {}; missioneDisegna(); } }, 1400); }
+  else { m.errori++; missioneMale(scaduto ? 'Troppo tardi: riproviamo.' : 'Così il Tarlo avrebbe speso due volte lo stesso bullone!'); m.dati = {secondi: 7}; missioneDisegna(); missioneTimer(7, () => quadernoDoppio(false, true)); }
+}
+function quadernoNulla(respingi){
+  const m = missione;
+  if (!m || m.id !== 'quaderno' || m.passo !== 2) return;
+  if (respingi) { missioneBene('Esatto: vale solo quello che c\'è in tutti i quaderni.'); m.passo = 3; m.dati = {}; missioneDisegna(); }
+  else { m.errori++; missioneMale('Nessun altro quaderno ce l\'ha: non può essere vero.'); }
+}
+function quadernoRipara(){
+  const m = missione;
+  if (!m || m.id !== 'quaderno') return;
+  m.dati.riparato = true; haptic('success'); missioneDisegna();
+}
+
+/* ---------- 2. IL BARATTOLO COL LUCCHETTO (il deposito di garanzia) ---------- */
+const LUCCHETTO_ORDINE = ['Metto i sats nel barattolo col lucchetto', 'Il venditore vede i sats, ma non può toccarli, e spedisce', 'Arriva il frullatore', 'Confermo, e il lucchetto si apre per il venditore'];
+const LUCCHETTO_PROVE = [['📦 Il codice di spedizione', true], ['📸 La foto del pacco chiuso', true], ['🙏 «Fidati, l\'ho mandato»', false], ['😡 Gli insulti in chat', false]];
+function lucchettoHTML(m){
+  const d = m.dati;
+  if (m.passo === 0) {
+    if (d.truffato) return missPassiHTML(0, 3) + missFumettoHTML('gazza', 'Grazie dei sats! Il frullatore? Quale frullatore? Ciao ciao! 🪶')
+      + missFumettoHTML('tappo', 'Pagando subito e fuori dall\'app, se il venditore sparisce i sats sono persi. Riproviamo col barattolo.')
+      + `<button type="button" class="caccia-btn" onclick="lucchettoRiprova()">Riprova</button>`;
+    return missPassiHTML(0, 3) + missFumettoHTML('tappo', 'Voglio comprare un frullatore da uno sconosciuto. Lui dice: «pagami subito, in privato, così facciamo prima».')
+      + `<div class="miss-due"><button type="button" class="caccia-btn piano" onclick="lucchettoPrima(false)">💸 Pago subito, in privato</button>`
+      + `<button type="button" class="caccia-btn" onclick="lucchettoPrima(true)">🔒 Uso il barattolo col lucchetto</button></div>`;
+  }
+  if (m.passo === 1) {
+    const fatti = d.fatti || [], resto = d.mescolati.filter(t => !fatti.includes(t));
+    return missPassiHTML(1, 3) + missFumettoHTML('tappo', 'Il barattolo col lucchetto tiene i sats IN MEZZO. <b>Tocca i passi nell\'ordine giusto.</b>')
+      + `<ol class="miss-ordine">${fatti.map(t => `<li class="fatto">${esc(t)}</li>`).join('')}</ol>`
+      + `<div class="miss-scelte">${resto.map(t => `<button type="button" class="miss-scelta" onclick="lucchettoPasso(${LUCCHETTO_ORDINE.indexOf(t)})">${esc(t)}</button>`).join('')}</div>`;
+  }
+  if (m.passo === 2) {
+    const sc = d.scelte || [];
+    return missPassiHTML(2, 3) + missFumettoHTML('tappo', 'Colpo di scena: stavolta il venditore sono io! Il compratore giura che il pacco non è mai arrivato e apre una contestazione.')
+      + missFumettoHTML('tappo', '<b>Scegli le due prove giuste</b> da mostrare a chi decide.')
+      + `<div class="miss-scelte">${LUCCHETTO_PROVE.map((p, i) => `<button type="button" class="miss-scelta${sc.includes(i) ? ' presa' : ''}" onclick="lucchettoProva(${i})">${esc(p[0])}</button>`).join('')}</div>`
+      + (sc.length === 2 ? `<button type="button" class="caccia-btn" onclick="lucchettoDecidi()">⚖️ Mostra le prove</button>` : '');
+  }
+  return missFumettoHTML('tappo', 'Il codice dice «consegnato», la foto mostra il pacco: la contestazione la vinco io, e i sats che aspettavano nel barattolo arrivano a me. Il deposito di garanzia protegge <b>tutti e due</b>.')
+    + `<button type="button" class="caccia-btn" onclick="missioneFine()">Avanti</button>`;
+}
+function lucchettoPrima(giusto){
+  const m = missione; if (!m || m.id !== 'lucchetto' || m.passo !== 0) return;
+  if (giusto) { missioneBene('Bravo: così i sats aspettano in mezzo.'); m.passo = 1; m.dati = {mescolati: missMescola(LUCCHETTO_ORDINE), fatti: []}; }
+  else { m.errori++; m.dati.truffato = true; missioneMale('La Gazza era travestita da venditore!'); }
+  missioneDisegna();
+}
+function lucchettoRiprova(){ const m = missione; if (m && m.id === 'lucchetto') { m.dati = {}; missioneDisegna(); } }
+function lucchettoPasso(i){
+  const m = missione; if (!m || m.id !== 'lucchetto' || m.passo !== 1) return;
+  const fatti = m.dati.fatti;
+  if (i === fatti.length) {
+    fatti.push(LUCCHETTO_ORDINE[i]); haptic();
+    if (fatti.length === LUCCHETTO_ORDINE.length) { missioneBene('Perfetto: nessuno dei due ha dovuto fidarsi.'); m.passo = 2; m.dati = {scelte: []}; }
+  } else { m.errori++; missioneMale('Non ancora: cosa succede prima?'); }
+  missioneDisegna();
+}
+function lucchettoProva(i){
+  const m = missione; if (!m || m.id !== 'lucchetto' || m.passo !== 2) return;
+  const sc = m.dati.scelte, k = sc.indexOf(i);
+  if (k >= 0) sc.splice(k, 1); else if (sc.length < 2) sc.push(i);
+  haptic(); missioneDisegna();
+}
+function lucchettoDecidi(){
+  const m = missione; if (!m || m.id !== 'lucchetto' || m.passo !== 2) return;
+  if (m.dati.scelte.every(i => LUCCHETTO_PROVE[i][1])) { m.passo = 3; missioneBene('Prove vere: chi decide guarda i fatti.'); }
+  else { m.errori++; m.dati.scelte = []; missioneMale('Le parole e gli insulti non provano niente: servono i fatti.'); }
+  missioneDisegna();
+}
+
+/* ---------- 3. LA STAFFETTA DEL FULMINE (Lightning) ---------- */
+/* PURA: i tre livelli del rompicapo. Ogni filo ha le perline divise fra
+   i due capi: {a, b, pa, pb} = pa perline dal lato di a, pb da quello di b */
+function staffettaLivelli(){
+  return [
+    {paga: 3, nodi: {T: [60, 150], A: [200, 60], R: [200, 240], C: [340, 150]},
+     fili: [{a: 'T', b: 'A', pa: 5, pb: 1}, {a: 'A', b: 'C', pa: 4, pb: 2}, {a: 'T', b: 'R', pa: 2, pb: 4}, {a: 'R', b: 'C', pa: 1, pb: 5}]},
+    {paga: 4, nodi: {T: [45, 150], A: [175, 55], R: [125, 250], I: [275, 250], C: [355, 135]},
+     fili: [{a: 'T', b: 'A', pa: 6, pb: 0}, {a: 'A', b: 'C', pa: 1, pb: 6}, {a: 'T', b: 'R', pa: 5, pb: 2}, {a: 'R', b: 'I', pa: 6, pb: 1}, {a: 'I', b: 'C', pa: 4, pb: 3}]},
+    {paga: 3, ritorno: true, nodi: {T: [60, 150], A: [200, 60], C: [340, 150]},
+     fili: [{a: 'T', b: 'A', pa: 4, pb: 0}, {a: 'A', b: 'C', pa: 3, pb: 0}]},
+  ];
+}
+/* PURA: la strada `via` (lista di nodi da T a C) regge il pagamento `n`?
+   Torna i fili aggiornati, o null col primo filo che non ce la fa */
+function staffettaPaga(fili, via, n){
+  const nuovi = fili.map(f => Object.assign({}, f));
+  for (let i = 0; i + 1 < via.length; i++) {
+    const x = via[i], y = via[i + 1];
+    const f = nuovi.find(q => (q.a === x && q.b === y) || (q.a === y && q.b === x));
+    if (!f) return {errore: 'Fra ' + x + ' e ' + y + ' non c\'è un filo'};
+    const lato = f.a === x ? 'pa' : 'pb', altro = f.a === x ? 'pb' : 'pa';
+    if (f[lato] < n) return {errore: 'Il filo ' + x + '–' + y + ' ha solo ' + f[lato] + ' perline dal tuo lato'};
+    f[lato] -= n; f[altro] += n;
+  }
+  return {fili: nuovi};
+}
+const STAFFETTA_NOMI = {T: 'Tappo', A: 'Ape', R: 'Rana', I: 'Riccio', C: '☕ Caffè'};
+function staffettaHTML(m){
+  const d = m.dati, liv = staffettaLivelli()[m.passo];
+  if (!liv) return missFumettoHTML('tappo', 'Guarda i fili adesso: pagando, le perline sono passate <b>dall\'altra parte</b>. Fra Ape e il caffè, dal lato di Ape non ne resta nessuna: un altro caffè da qui non passa… ma ora il caffè può mandarne indietro! Ogni pagamento sposta le perline.')
+    + staffettaSvg(staffettaLivelli()[2].nodi, d.fili || [], [])
+    + missFumettoHTML('tappo', 'E il caffè l\'ho pagato in un attimo, senza scrivere niente nella grande pila dei barattoli: i sats sono corsi <b>di filo in filo</b>.')
+    + `<button type="button" class="caccia-btn" onclick="missioneFine()">Avanti</button>`;
+  const via = d.via || ['T'];
+  const testo = m.passo === 0 ? `Devo pagare <b>${liv.paga}</b> perline al caffè. Ogni filo ha le perline divise fra i due capi: si passa solo se dal lato da cui parti ce ne sono abbastanza. <b>Tocca gli amici dalla mia parte fino al caffè.</b>`
+    : m.passo === 1 ? `Ora <b>${liv.paga}</b> perline. Attento: la strada più corta non sempre va bene.`
+    : `Ultimo: <b>${liv.paga}</b> perline, ma guarda bene i fili dopo che avrai pagato.`;
+  return missPassiHTML(m.passo, 3) + missFumettoHTML('tappo', testo) + staffettaSvg(liv.nodi, d.fili || liv.fili, via, true)
+    + `<div class="miss-via">${via.map(v => esc(STAFFETTA_NOMI[v])).join(' → ')}</div>`
+    + `<div class="miss-due"><button type="button" class="caccia-btn piano" onclick="staffettaDaCapo()">↺ Da capo</button>`
+    + `<button type="button" class="caccia-btn" onclick="staffettaManda()"${via[via.length - 1] === 'C' ? '' : ' disabled'}>⚡ Manda</button></div>`;
+}
+/* PURA: la rete disegnata (SVG coi nostri numeri). `tocca` = i nodi si toccano */
+function staffettaSvg(pos, fili, via, tocca){
+  let svg = `<svg class="miss-rete" viewBox="0 0 400 300" role="img" aria-label="La rete dei fili">`;
+  fili.forEach(f => {
+    const [x1, y1] = pos[f.a], [x2, y2] = pos[f.b], usato = via.some((v, i) => i + 1 < via.length && ((via[i] === f.a && via[i + 1] === f.b) || (via[i] === f.b && via[i + 1] === f.a)));
+    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${usato ? 'usato' : ''}"/>`;
+    const tx = (x, y, X, Y, k) => [x + (X - x) * k, y + (Y - y) * k];
+    const [ax, ay] = tx(x1, y1, x2, y2, 0.3), [bx, by] = tx(x1, y1, x2, y2, 0.7);
+    svg += `<g class="perle"><circle cx="${ax}" cy="${ay}" r="13"/><text x="${ax}" y="${ay + 5}">${f.pa}</text>`
+      + `<circle cx="${bx}" cy="${by}" r="13"/><text x="${bx}" y="${by + 5}">${f.pb}</text></g>`;
+  });
+  Object.entries(pos).forEach(([k, [x, y]]) => {
+    const dentro = via.includes(k), ultimo = via[via.length - 1] === k;
+    svg += `<g class="nodo${dentro ? ' dentro' : ''}${ultimo ? ' ultimo' : ''}"${tocca ? ` onclick="staffettaTocca('${k}')" role="button" tabindex="0"` : ''} aria-label="${STAFFETTA_NOMI[k]}">`
+      + `<circle cx="${x}" cy="${y}" r="27"/><text x="${x}" y="${y + 6}">${k === 'C' ? '☕' : k === 'T' ? '🫙' : MISS_CHI[{A: 'ape', R: 'rana', I: 'riccio'}[k]].em}</text></g>`;
+  });
+  return svg + '</svg>';
+}
+function staffettaTocca(k){
+  const m = missione; if (!m || m.id !== 'staffetta') return;
+  const liv = staffettaLivelli()[m.passo]; if (!liv) return;
+  const via = m.dati.via || (m.dati.via = ['T']), ult = via[via.length - 1];
+  if (via.includes(k)) return;
+  const fili = m.dati.fili || liv.fili;
+  if (!fili.some(f => (f.a === ult && f.b === k) || (f.b === ult && f.a === k))) { missioneMale('Da ' + STAFFETTA_NOMI[ult] + ' a ' + STAFFETTA_NOMI[k] + ' non c\'è un filo'); return; }
+  via.push(k); haptic(); missioneDisegna();
+}
+function staffettaDaCapo(){ const m = missione; if (m && m.id === 'staffetta') { m.dati.via = ['T']; missioneDisegna(); } }
+function staffettaManda(){
+  const m = missione; if (!m || m.id !== 'staffetta') return;
+  const liv = staffettaLivelli()[m.passo], r = staffettaPaga(m.dati.fili || liv.fili, m.dati.via || ['T'], liv.paga);
+  if (r.errore) { m.errori++; missioneMale(r.errore + ': prova un\'altra strada.'); m.dati.via = ['T']; missioneDisegna(); return; }
+  missioneBene('⚡ Pagato in un lampo!');
+  if (liv.ritorno) { m.dati = {fili: r.fili, via: ['T']}; m.passo = 3; }
+  else { m.passo++; m.dati = {}; }
+  missioneDisegna();
+}
+
+/* ---------- 4. LE DODICI PAROLE (la frase di recupero) ---------- */
+const PAROLE_FINTE = ['mela', 'treno', 'volpe', 'sale', 'lampada', 'nuvola', 'ponte', 'zucca', 'gatto', 'fiume', 'chiave', 'sole'];
+const PAROLE_POSTI = [['📱 Foto sul telefono', 'online'], ['☁️ Nota nel cloud', 'online'], ['💬 Messaggio a me stesso', 'online'],
+                      ['🗄️ Foglio nel cassetto', 'casa'], ['🏡 Foglio dalla nonna', 'altrove'], ['🔩 Piastra di metallo', 'metallo']];
+/* PURA: com'e' andata coi posti scelti. `rubate`: c'era un posto in
+   rete, e la Gazza le ha copiate; `sola`: una copia sola, che si perde
+   (`metallo` dice se era la piastra, che il fuoco non brucia); `salve`:
+   due copie, nessuna in rete */
+function paroleEsito(scelti){
+  const s = (scelti || []).map(i => PAROLE_POSTI[i] && PAROLE_POSTI[i][1]).filter(Boolean);
+  const rubate = s.includes('online');
+  const salve = !rubate && s.length >= 2;
+  return {rubate, sola: !rubate && !salve, metallo: s.includes('metallo'), salve};
+}
+function paroleHTML(m){
+  const d = m.dati;
+  if (m.passo === 0) {
+    const sc = d.scelti || [];
+    return missPassiHTML(0, 3) + missFumettoHTML('tappo', 'Il mio portafoglio nuovo mi ha dato 12 parole (queste sono finte, di prova). «Con queste rifai tutto, anche se perdi il telefono. Chi le ha, ha i tuoi bitcoin.»')
+      + `<div class="miss-parole">${PAROLE_FINTE.map((p, i) => `<span><small>${i + 1}</small>${p}</span>`).join('')}</div>`
+      + missFumettoHTML('tappo', '<b>Scegli dove le scrivo: al massimo due posti.</b>')
+      + `<div class="miss-scelte">${PAROLE_POSTI.map((p, i) => `<button type="button" class="miss-scelta${sc.includes(i) ? ' presa' : ''}" onclick="paroleScegli(${i})">${p[0]}</button>`).join('')}</div>`
+      + (sc.length ? `<button type="button" class="caccia-btn" onclick="paroleNotte()">🌙 Passa la notte…</button>` : '');
+  }
+  if (m.passo === 1) {
+    const fatte = d.fatte || 0;
+    return missPassiHTML(1, 3) + missFumettoHTML('tappo', 'Il telefono mi è caduto nella marmellata! Per fortuna ho il foglio. Il portafoglio nuovo chiede le parole <b>nell\'ordine giusto</b>, dalla 1 alla 12.')
+      + `<div class="miss-foglio">${PAROLE_FINTE.map((p, i) => `<span><small>${i + 1}</small>${p}</span>`).join('')}</div>`
+      + `<div class="miss-parole">${PAROLE_FINTE.slice(0, fatte).map((p, i) => `<span class="fatta"><small>${i + 1}</small>${p}</span>`).join('')}</div>`
+      + `<div class="miss-scelte miss-mucchio">${d.mucchio.filter(p => !PAROLE_FINTE.slice(0, fatte).includes(p)).map(p => `<button type="button" class="miss-scelta" onclick="paroleMetti('${p}')">${p}</button>`).join('')}</div>`;
+  }
+  if (m.passo === 2) {
+    return missPassiHTML(2, 3) + `<div class="miss-messaggio"><b>📩 Assistenza Portafoglio ✅</b><p>Gentile cliente, il suo conto è a rischio! Per proteggerlo ci scriva subito le sue 12 parole.</p></div>`
+      + missFumettoHTML('tappo', 'Oddio, cosa faccio?')
+      + `<div class="miss-due"><button type="button" class="caccia-btn piano" onclick="paroleAssistenza(false)">✍️ Mando le parole</button>`
+      + `<button type="button" class="caccia-btn" onclick="paroleAssistenza(true)">🚫 Blocco e ignoro</button></div>`;
+  }
+  return missFumettoHTML('gazza', 'Uffa! Era il mio travestimento migliore…')
+    + missFumettoHTML('tappo', 'Nessuna assistenza vera chiede mai le 12 parole: <b>nemmeno Barattolo</b>. Chi te le chiede è sempre un ladro.')
+    + `<button type="button" class="caccia-btn" onclick="missioneFine()">Avanti</button>`;
+}
+function paroleScegli(i){
+  const m = missione; if (!m || m.id !== 'parole' || m.passo !== 0) return;
+  const sc = m.dati.scelti || (m.dati.scelti = []), k = sc.indexOf(i);
+  if (k >= 0) sc.splice(k, 1); else if (sc.length < 2) sc.push(i); else { sc.shift(); sc.push(i); }
+  haptic(); missioneDisegna();
+}
+function paroleNotte(){
+  const m = missione; if (!m || m.id !== 'parole' || m.passo !== 0) return;
+  const e = paroleEsito(m.dati.scelti);
+  if (e.rubate) { m.errori++; m.dati.scelti = []; missioneMale('🐦 La Gazza è entrata nel telefono e nel cloud e ha copiato le parole! Online non sono mai al sicuro.', 5200); }
+  else if (!e.salve) { m.errori++; m.dati.scelti = []; missioneMale((e.metallo ? '📦 Col trasloco la piastra è finita chissà dove.' : '🔥 Un incendio ha bruciato quell\'unico foglio.') + ' Con una copia sola si perde tutto: ne servono due, in due posti.', 5200); }
+  else { missioneBene('Notte tranquilla: su carta o metallo, in due posti. Perfetto.'); m.passo = 1; m.dati = {fatte: 0, mucchio: missMescola(PAROLE_FINTE)}; }
+  missioneDisegna();
+}
+function paroleMetti(p){
+  const m = missione; if (!m || m.id !== 'parole' || m.passo !== 1) return;
+  if (PAROLE_FINTE[m.dati.fatte] === p) { m.dati.fatte++; haptic(); if (m.dati.fatte === 12) { missioneBene('Portafoglio rifatto: i bulloni sono tutti lì!'); m.passo = 2; m.dati = {}; } }
+  else { m.errori = Math.min(m.errori + 1, 9); missioneMale('Non è la parola numero ' + (m.dati.fatte + 1) + '.'); }
+  missioneDisegna();
+}
+function paroleAssistenza(blocca){
+  const m = missione; if (!m || m.id !== 'parole' || m.passo !== 2) return;
+  if (blocca) { m.passo = 3; missioneBene('Giusto!'); }
+  else { m.errori++; missioneMale('Era la Gazza! Le 12 parole non si danno a NESSUNO.'); }
+  missioneDisegna();
+}
+
+/* ---------- 5. L'ULTIMO BULLONE, ANNO 2140 (il dimezzamento) ---------- */
+/* PURA: le ere, coi bitcoin nuovi per barattolo (blocco) */
+const HALVING_ERE = [[2009, 50], [2012, 25], [2016, 12.5], [2020, 6.25], [2024, 3.125]];
+/* PURA: quanto del barattolone da 21 milioni e' pieno dopo `n` ere
+   (ognuna dura 210.000 barattoli), in percento */
+function halvingPieno(n){
+  let tot = 0;
+  for (let i = 0; i < n; i++) tot += 210000 * 50 / Math.pow(2, i);
+  return tot / 21000000 * 100;
+}
+function halvingHTML(m){
+  const d = m.dati, era = HALVING_ERE[m.passo];
+  const pieno = halvingPieno(Math.min(m.passo + (d.raccolto ? 1 : 0), 33));
+  const barra = `<div class="miss-barattolone"><i style="height:${Math.min(100, pieno).toFixed(1)}%"></i></div>`
+    + `<div class="miss-quanto"><b>${pieno.toFixed(pieno > 99 ? 2 : 1).replace('.', ',')}%</b> dei 21 milioni</div>`;
+  if (era) {
+    if (!d.raccolto) return missPassiHTML(m.passo, 5) + `<div class="miss-era"><b>${era[0]}</b><span>${fmtBtc(era[1])} bitcoin a barattolo</span></div>` + barra
+      + missFumettoHTML('tappo', m.passo === 0 ? 'La macchina sforna 50 bitcoin per ogni barattolo, e ha un cartello: «mi dimezzo ogni 210.000 barattoli». Raccogli quello che esce!' : 'Nuova era! Il rubinetto si è stretto.')
+      + `<button type="button" class="caccia-btn" onclick="halvingRaccogli()">🫙 Raccogli i bitcoin di quest'era</button>`;
+    if (m.passo === 2 && !d.tarlo) return missFumettoHTML('tarlo', 'Psst… e se la macchina ne facesse un po\' di più? Magari 22 milioni, chi se ne accorge!')
+      + `<div class="miss-due"><button type="button" class="caccia-btn" onclick="halvingTarlo(true)">🚫 Respingi: le regole le controllano tutti</button>`
+      + `<button type="button" class="caccia-btn piano" onclick="halvingTarlo(false)">🤷 Vabbè, uno in più</button></div>`;
+    const prossima = HALVING_ERE[m.passo + 1];
+    if (!prossima) return missPassiHTML(m.passo, 5) + barra + missFumettoHTML('tappo', 'Dopo cinque ere il barattolone è pieno per più del 96%! Andiamo avanti veloce…')
+      + `<button type="button" class="caccia-btn" onclick="halvingAvanti()">⏩ Fino al 2140</button>`;
+    if (!d.scelte) d.scelte = missMescola([era[1] * 2, era[1], era[1] / 2]);
+    return missPassiHTML(m.passo, 5) + barra + missFumettoHTML('tappo', `Nel ${prossima[0]} quanti bitcoin sfornerà la macchina per ogni barattolo?`)
+      + `<div class="miss-scelte">${d.scelte.map(x => `<button type="button" class="miss-scelta" onclick="halvingIndovina(${x === era[1] / 2})">${fmtBtc(x)} bitcoin</button>`).join('')}</div>`;
+  }
+  return `<div class="miss-era"><b>2140</b><span>la macchina si ferma</span></div>` + `<div class="miss-barattolone"><i style="height:100%"></i></div><div class="miss-quanto"><b>21 milioni</b> e nemmeno uno di più</div>`
+    + missFumettoHTML('tappo', 'Nel 2140 esce l\'ultimo pezzettino. Da lì chi fa girare la rete vivrà delle commissioni. E nessuno, mai, potrà stamparne di più.')
+    + `<button type="button" class="caccia-btn" onclick="missioneFine()">Avanti</button>`;
+}
+/* i bitcoin con la virgola italiana e senza zeri inutili */
+function fmtBtc(x){ return String(Math.round(x * 1000) / 1000).replace('.', ','); }
+function halvingRaccogli(){ const m = missione; if (m && m.id === 'halving') { m.dati.raccolto = true; haptic('success'); missioneDisegna(); } }
+function halvingTarlo(respingi){
+  const m = missione; if (!m || m.id !== 'halving') return;
+  if (respingi) { m.dati.tarlo = true; missioneBene('Ogni nodo controlla: un bitcoin oltre il tetto non lo accetta nessuno.'); }
+  else { m.errori++; missioneMale('I nodi l\'avrebbero rifiutato comunque: le regole sono le stesse per tutti.'); m.dati.tarlo = true; }
+  missioneDisegna();
+}
+function halvingIndovina(giusto){
+  const m = missione; if (!m || m.id !== 'halving') return;
+  if (giusto) missioneBene('Esatto: la metà.'); else { m.errori++; missioneMale('Si dimezza sempre: la metà di prima.'); }
+  m.passo++; m.dati = {}; missioneDisegna();
+}
+function halvingAvanti(){ const m = missione; if (m && m.id === 'halving') { m.passo = HALVING_ERE.length; m.dati = {}; missioneDisegna(); } }
+
+/* ---------- il telaio comune ---------- */
+const MISSIONI_GIOCO = {
+  quaderno: {html: quadernoHTML, guaio: [['tappo', 'Nella dispensa i conti li teneva uno solo, in un quaderno.'], ['tarlo', 'E io stanotte gliel\'ho rosicchiato! Adesso risulto ricchissimo. Gnam gnam.']],
+    succo: 'Bitcoin è un quaderno dei conti che tengono in tantissimi: per barare bisognerebbe ingannarli tutti insieme.', nome: 'registro condiviso e doppia spesa'},
+  lucchetto: {html: lucchettoHTML, guaio: [['tappo', 'Voglio comprare un frullatore da uno sconosciuto. Chi si muove per primo?'], ['tappo', 'Se pago prima rischio io. Se lui spedisce prima rischia lui. Come si fa?']],
+    succo: 'I sats aspettano in mezzo finché tutti e due hanno fatto la loro parte: è il deposito di garanzia di Barattolo.', nome: 'deposito di garanzia (escrow)'},
+  staffetta: {html: staffettaHTML, guaio: [['tappo', 'Devo pagare un caffè dall\'altra parte della dispensa, subito e quasi gratis.'], ['tappo', 'Scrivere ogni caffè nella grande pila dei barattoli sarebbe lento e caro. Ci vuole il fulmine!']],
+    succo: 'Lightning è una rete di fili fra persone: i sats corrono di filo in filo in un attimo, senza scrivere ogni pagamento nella catena.', nome: 'canali, instradamento e liquidità'},
+  parole: {html: paroleHTML, guaio: [['tappo', 'Ho un portafoglio nuovo! Mi ha dato 12 parole…'], ['gazza', 'Dodici parole luccicanti? Le voglio! Le voglio!']],
+    succo: 'Le 12 parole sono il portafoglio: su carta o metallo, in due posti, mai in foto, mai a nessuno. Nemmeno a Barattolo.', nome: 'frase di recupero'},
+  halving: {html: halvingHTML, guaio: [['tappo', 'Ho trovato la macchina che sforna i bitcoin nuovi!'], ['tarlo', 'Una macchina dei soldi? Allora si può far girare più veloce, vero? Vero?']],
+    succo: 'I bitcoin saranno al massimo 21 milioni: ne escono la metà ogni quattro anni circa, fino al 2140. Nessuno può stamparne di più.', nome: 'dimezzamento (halving)'},
+};
+/* PURA (a parte il caso): una copia mescolata */
+function missMescola(a){
+  const b = a.slice();
+  for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; }
+  return b.join('|') === a.join('|') ? b.reverse() : b;
+}
+/* APRE UNA MISSIONE: dal tabellone dei livelli (il patto con la
+   stradina) e dal gioco. Se il gioco e' spento o la missione non c'e'
+   lo dice, e non apre niente. */
+async function apriMissione(id){
+  const g = MISSIONI_GIOCO[id];
+  if (!g) { toast('Questa missione non c\'è ancora'); return; }
+  if (!cacciaStato) {
+    const d = await cacciaChiama('').catch(() => null);
+    if (!d) return;
+    cacciaAdotta(d);
+  }
+  const info = (cacciaStato.missioni || []).find(x => x.id === id);
+  if (!info) { toast('Questa missione non c\'è ancora'); return; }
+  missione = {id, info, fase: 'guaio', passo: 0, errori: 0, dati: {}, scheda: 0, bulloni: 0};
+  el('missioneEmoji').textContent = info.emoji;
+  el('missioneTitolo').textContent = info.nome;
+  const v = el('missioneVelo');
+  v.hidden = false;
+  requestAnimationFrame(() => v.classList.add('aperto'));
+  missioneDisegna();
+}
+function missioneDisegna(){
+  const m = missione, corpo = el('missioneCorpo');
+  if (!m || !corpo) return;
+  const g = MISSIONI_GIOCO[m.id];
+  let h = '';
+  if (m.fase === 'guaio') {
+    h = `<div class="miss-cosa">🎯 ${esc(m.info.cosa)}</div>` + g.guaio.map(x => missFumettoHTML(x[0], esc(x[1]))).join('')
+      + `<button type="button" class="caccia-btn" onclick="missioneVia()">▶️ Gioca</button>`;
+  } else if (m.fase === 'gioco') h = g.html(m);
+  else {
+    const st = missioneStelle(m.errori);
+    h = `<div class="miss-fine"><div class="miss-stelle">${[1, 2, 3].map(i => `<span class="${i <= st ? 'si' : ''}">★</span>`).join('')}</div>`
+      + `<p class="miss-succo">«${esc(g.succo)}»</p><p class="miss-nome">Questa si chiama: <b>${esc(g.nome)}</b></p>`
+      + `<div class="miss-figurina"><span>${m.info.emoji}</span><b>${esc(m.info.nome)}</b><small>Figurina del sapere</small></div>`
+      + (m.bulloni ? `<p class="miss-premio">+${fmt(m.bulloni)} 🔩</p>` : '')
+      + `<button type="button" class="caccia-btn" onclick="missioneChiudi()">Fatto</button>`
+      + (st < 3 ? `<button type="button" class="caccia-btn piano" onclick="missioneDaCapo()">↺ Rigioca per le tre stelle</button>` : '') + '</div>';
+  }
+  corpo.innerHTML = h;
+}
+/* Si parte: il server segna l'ora (la fine vale solo dopo un po') */
+async function missioneVia(){
+  const m = missione; if (!m) return;
+  m.fase = 'gioco'; m.passo = 0; m.dati = {}; m.errori = 0;
+  if (m.id === 'parole') m.dati = {scelti: []};
+  missioneDisegna();
+  try { await cacciaChiama('/missione', {missione: m.id, azione: 'inizia'}); } catch(e) {}
+}
+function missioneDaCapo(){ const m = missione; if (m) { m.fase = 'guaio'; m.bulloni = 0; missioneDisegna(); } }
+/* La fine: le stelle al server, che paga i bulloni la prima volta */
+async function missioneFine(){
+  const m = missione; if (!m || m.fase !== 'gioco') return;
+  m.fase = 'fine'; missioneTimer();
+  const stelle = missioneStelle(m.errori);
+  if (typeof suonoTappo === 'function') { try { suonoTappo('traguardo'); } catch(e) {} }
+  haptic('success');
+  missioneDisegna();
+  const d = await cacciaChiama('/missione', {missione: m.id, azione: 'finisci', stelle}).catch(() => null);
+  if (d) {
+    cacciaAdotta(d); cacciaSaldoMostra();
+    if (missione === m) { m.bulloni = Number(d.bulloni_nuovi) || 0; missioneDisegna(); }
+    try { window.dispatchEvent(new CustomEvent('tappo:missione', {detail: {id: m.id, stelle}})); } catch(e) {}
+  }
+}
+function missioneChiudi(){
+  missioneTimer();
+  const v = el('missioneVelo');
+  if (v) { v.classList.remove('aperto'); v.hidden = true; }
+  missione = null;
+  if (el('view-caccia') && el('view-caccia').classList.contains('active')) disegnaCaccia();
+}
+/* un conto alla rovescia per i passi a tempo (uno alla volta) */
+let missioneOrologio = 0;
+function missioneTimer(secondi, poi){
+  clearTimeout(missioneOrologio); missioneOrologio = 0;
+  if (secondi && poi) missioneOrologio = setTimeout(() => { missioneOrologio = 0; if (missione) poi(); }, secondi * 1000);
+}
+/* il bravo e il quasi: una riga in basso, che sparisce da sola */
+function missioneBene(t){ haptic('success'); missioneRiga(t, 'bene', 2200); }
+function missioneMale(t, ms){ haptic('error'); missioneRiga(t, 'male', ms || 3200); }
+function missioneRiga(t, tipo, ms){
+  const r = el('missioneRiga'); if (!r) return;
+  r.textContent = t; r.className = 'miss-riga ' + tipo;
+  clearTimeout(missioneRiga.via); missioneRiga.via = setTimeout(() => { r.className = 'miss-riga'; }, ms);
+}
+
+
 /* PURA: la pagina intera. Due colonne (una sul telefono): a sinistra
    Tappo, le schede e la scheda aperta; a destra la dispensa. */
 function cacciaHTML(s, ui){

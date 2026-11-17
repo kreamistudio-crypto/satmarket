@@ -7700,6 +7700,22 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_gioco_tappo_evidenza_tg
       ON gioco_tappo_evidenza(tg_id, giorno);
+    CREATE TABLE IF NOT EXISTS gioco_tappo_missioni(
+        -- LE MISSIONI DI TAPPO (17 nov 2026, Andrea: «ogni tanto nel
+        -- tabellone devi giocare con Tappo per proseguire... missioni
+        -- originali, educative su Bitcoin»): una riga per persona e
+        -- missione. `iniziata` e' l'ora dell'ultima partenza (la fine
+        -- vale solo se e' passato il tempo minimo da li'), `stelle` le
+        -- migliori (0 = mai finita), `bulloni` quelli pagati la PRIMA
+        -- volta che l'ha finita — rigiocarla serve solo per le stelle.
+        tg_id INTEGER NOT NULL,
+        missione TEXT NOT NULL,
+        iniziata INTEGER NOT NULL DEFAULT 0,
+        stelle INTEGER NOT NULL DEFAULT 0,
+        bulloni INTEGER NOT NULL DEFAULT 0,
+        finita INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(tg_id, missione)
+    );
     CREATE TABLE IF NOT EXISTS carrello_salvato(
         -- il carrello che si ritrova rientrando (6 ott 2026). UNO per
         -- persona per costruzione: la chiave e' il tg_id, quindi due
@@ -21687,7 +21703,7 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # persona sola, e ha giocato due volte), e lo stesso oggetto
         # preso (o la stessa sfida pagata) da entrambe e' una riga sola.
         for tab in ("gioco_tappo", "gioco_tappo_oggetti", "gioco_tappo_sfide",
-                    "gioco_tappo_mondo"):
+                    "gioco_tappo_mondo", "gioco_tappo_missioni"):
             con.execute(f"UPDATE OR IGNORE {tab} SET tg_id=? WHERE tg_id=?",
                         (id_telegram, id_nostr))
             con.execute(f"DELETE FROM {tab} WHERE tg_id=?", (id_nostr,))
@@ -115153,6 +115169,7 @@ CANCELLA_TOGLI = (
     ("gioco_tappo", "tg_id"), ("gioco_tappo_oggetti", "tg_id"),
     ("gioco_tappo_attrezzi", "tg_id"), ("gioco_tappo_sfide", "tg_id"),
     ("gioco_tappo_mondo", "tg_id"), ("gioco_tappo_evidenza", "tg_id"),
+    ("gioco_tappo_missioni", "tg_id"),
 )
 # Le colonne personali di chi COMPRA, svuotate negli ordini chiusi che
 # restano: l'indirizzo, l'email per il corriere, la busta di ritiro, il
@@ -115505,6 +115522,29 @@ GIOCO_TAPPO_ZONE_SOGLIE = (0, 1, 3, 6, 10, 15)
 # giorno per persona: il palco e' di tutti, non di chi ha piu' bulloni.
 GIOCO_TAPPO_EVIDENZA_BULLONI = 40
 GIOCO_TAPPO_EVIDENZA_POSTI = 3
+# LE MISSIONI DI TAPPO (17 nov 2026): piccoli giochi da uno a tre minuti
+# dove una cosa di Bitcoin si impara FACENDOLA (lo studio approvato da
+# Andrea: «Studio: le missioni di Tappo su Bitcoin»). Il tabellone dei
+# livelli ne mette una per zona, subito prima del gradino, e la legge da
+# qui (`MISSIONI_TAPPO` e `missioni_superate`, il patto col thread della
+# stradina): `zona` e' la SUA zona, 0-4. Gli id sono per sempre.
+# `bulloni` si pagano UNA volta, la prima che la si finisce. Niente XP,
+# niente sats (regole di Andrea).
+MISSIONI_TAPPO = (
+    dict(id="quaderno", emoji="📓", nome="Il quaderno di tutti", zona=0,
+         bulloni=15, cosa="Bitcoin è un registro che tengono in tanti"),
+    dict(id="lucchetto", emoji="🔒", nome="Il barattolo col lucchetto",
+         zona=1, bulloni=20, cosa="Il deposito di garanzia"),
+    dict(id="staffetta", emoji="⚡", nome="La staffetta del fulmine", zona=2,
+         bulloni=25, cosa="Lightning: canali e strade"),
+    dict(id="parole", emoji="🗝️", nome="Le dodici parole", zona=3,
+         bulloni=30, cosa="La frase di recupero e la custodia"),
+    dict(id="halving", emoji="🌕", nome="L'ultimo bullone", zona=4,
+         bulloni=40, cosa="Il dimezzamento e i 21 milioni"),
+)
+# il tempo minimo fra la partenza e la fine perche' una missione valga:
+# chi la gioca davvero ci mette di piu', uno script deve aspettare
+GIOCO_TAPPO_MISSIONE_SECONDI = 30
 # LA DISPENSA: sei scaffali, e su ognuno i barattoli delle sue categorie.
 # Ogni categoria di CATEGORIE sta su UNO scaffale e uno solo (una prova
 # lo guarda: una categoria nuova senza scaffale e' un barattolo che
@@ -116084,9 +116124,9 @@ def _tappo_oggetti_di(con, tg_id: int) -> set:
 
 
 def _tappo_saldo(con, tg_id: int) -> int:
-    """I bulloni da spendere: quelli vinti (cacce e sfide) e raccolti
-    (nel mondo) meno quelli spesi (oggetti, attrezzi e giorni in
-    evidenza). Il conto si rifa' ogni volta dalle sei tabelle — non c'e' una colonna «saldo»
+    """I bulloni da spendere: quelli vinti (cacce, sfide e missioni) e
+    raccolti (nel mondo) meno quelli spesi (oggetti, attrezzi e giorni
+    in evidenza). Il conto si rifa' ogni volta dalle sette tabelle — non c'e' una colonna «saldo»
     che possa dire un numero diverso."""
     def somma(tabella):
         return int(con.execute(
@@ -116094,6 +116134,7 @@ def _tappo_saldo(con, tg_id: int) -> int:
             (int(tg_id),)).fetchone()[0] or 0)
     return (somma("gioco_tappo") + somma("gioco_tappo_sfide")
             + somma("gioco_tappo_mondo")
+            + somma("gioco_tappo_missioni")
             - somma("gioco_tappo_oggetti") - somma("gioco_tappo_attrezzi")
             - somma("gioco_tappo_evidenza"))
 
@@ -116196,6 +116237,30 @@ def _tappo_mondo(con, tg_id: int, giorno: str, trovate, in_vetrina) -> dict:
         "pezzi_presi": sum(1 for n, _z, _p in pezzi if n in presi),
         "pezzi_totale": len(pezzi),
     }
+
+
+def missioni_superate(con, tg_id) -> set:
+    """Gli id delle missioni di Tappo che quella persona ha finito
+    almeno una volta. La legge il tabellone dei livelli (il patto con la
+    stradina): sola lettura, fail-open al vuoto (un banco di prova senza
+    la tabella)."""
+    try:
+        return {r[0] for r in con.execute(
+            "SELECT missione FROM gioco_tappo_missioni WHERE tg_id=? AND "
+            "stelle>0", (int(tg_id or 0),))}
+    except sqlite3.Error:
+        return set()
+
+
+def _tappo_missioni(con, tg_id: int) -> list:
+    """Le missioni come le vede quella persona: il catalogo con le sue
+    stelle migliori (0 = mai finita)."""
+    stelle = {r[0]: int(r[1]) for r in con.execute(
+        "SELECT missione, stelle FROM gioco_tappo_missioni WHERE tg_id=?",
+        (int(tg_id),))}
+    return [dict(id=x["id"], emoji=x["emoji"], nome=x["nome"], zona=x["zona"],
+                 cosa=x["cosa"], bulloni=x["bulloni"],
+                 stelle=stelle.get(x["id"], 0)) for x in MISSIONI_TAPPO]
 
 
 def _tappo_evidenza(con, tg_id: int, giorno: str) -> dict:
@@ -116320,6 +116385,7 @@ def _tappo_stato(con, tg_id: int, adesso: int) -> dict:
         "scambi": numeri["scambi"]}
     # i palchi dell'evidenza: chi c'e' oggi, e cosa potrebbe metterci lei
     stato["mondo"]["evidenza"] = _tappo_evidenza(con, tg_id, giorno)
+    stato["missioni"] = _tappo_missioni(con, tg_id)
     stato["sfide_fatte"] = sum(1 for f in stato["sfide"]
                                for s in f["soglie"] if s["fatta"])
     stato["sfide_totale"] = sum(len(f["soglie"]) for f in stato["sfide"])
@@ -116517,6 +116583,60 @@ async def gioco_tappo_raccogli(req: Request, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     return {"preso": preso, **stato}
+
+
+@app.post("/api/gioco/tappo/missione")
+async def gioco_tappo_missione(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """Una missione di Tappo: `azione` 'inizia' (segna l'ora) o 'finisci'
+    con `stelle` 1-3. La fine vale solo se la missione e' partita da
+    almeno GIOCO_TAPPO_MISSIONE_SECONDI: il gioco lo fa il client e il
+    server non finge di vederlo, ma uno script non puo' passarle tutte
+    in un colpo, e al piu' prenderebbe qualche bullone. I bulloni si
+    pagano la PRIMA volta; dopo restano solo le stelle migliori."""
+    _tappo_acceso()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("tappo_oggetto", user["id"])
+    d = await leggi_json(req)
+    m = next((x for x in MISSIONI_TAPPO
+              if x["id"] == str(d.get("missione") or "")), None)
+    azione = str(d.get("azione") or "")
+    if not m or azione not in ("inizia", "finisci"):
+        raise HTTPException(400, "Questa missione non c'è")
+    con = db()
+    try:
+        adesso = int(time.time())
+        r = con.execute("SELECT * FROM gioco_tappo_missioni WHERE tg_id=? AND "
+                        "missione=?", (user["id"], m["id"])).fetchone()
+        nuove = 0
+        if azione == "inizia":
+            con.execute("INSERT INTO gioco_tappo_missioni(tg_id, missione, "
+                        "iniziata) VALUES(?,?,?) ON CONFLICT(tg_id, missione) "
+                        "DO UPDATE SET iniziata=excluded.iniziata",
+                        (user["id"], m["id"], adesso))
+        else:
+            try:
+                stelle = int(d.get("stelle") or 0)
+            except (TypeError, ValueError):
+                stelle = 0
+            if stelle not in (1, 2, 3):
+                raise HTTPException(400, "Le stelle vanno da 1 a 3")
+            if not r or not r["iniziata"] or (
+                    adesso - int(r["iniziata"]) < GIOCO_TAPPO_MISSIONE_SECONDI):
+                raise HTTPException(400, "Questa missione non è ancora "
+                                         "partita, o è finita troppo presto")
+            prima = not int(r["stelle"] or 0)
+            nuove = m["bulloni"] if prima else 0
+            con.execute("UPDATE gioco_tappo_missioni SET iniziata=0, "
+                        "stelle=MAX(stelle, ?), bulloni=bulloni+?, "
+                        "finita=CASE WHEN finita=0 THEN ? ELSE finita END "
+                        "WHERE tg_id=? AND missione=?",
+                        (stelle, nuove, adesso, user["id"], m["id"]))
+        stato = _tappo_stato(con, user["id"], adesso)
+        con.commit()
+    finally:
+        con.close()
+    return {"bulloni_nuovi": nuove, **stato}
 
 
 @app.post("/api/gioco/tappo/evidenza")
