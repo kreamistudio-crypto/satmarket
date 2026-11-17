@@ -44,9 +44,8 @@ _RIGHE = [
     "ORE_CONFERMA = 72",
     "GIORNI_AUTO_SBLOCCO = 10",
     "MODELLO_RICERCA = 'claude-haiku-4-5-20251001'",
-    # La leva NON si scrive: deve nascere SPENTA da sola («Un tempo per
-    # te» non ha ancora aderito, Andrea 17 nov 2026); il giro lo prova
-    # leggendola dal server, e poi la accende come farebbe il config.
+    # La leva NON si scrive: deve nascere accesa da sola (regola del 14
+    # nov 2026), e il giro lo prova leggendola dal server.
 ]
 with open(_conf, "w", encoding="utf-8") as f:
     f.write(chr(10).join(_RIGHE) + chr(10))
@@ -141,10 +140,8 @@ def chiedi(livello, recapito):
 def main():
     server.init_db()
     print("\n=== I REGALI PER LIVELLO ===\n")
-    prova("la leva nasce SPENTA senza una riga nel config", False,
+    prova("la leva nasce ACCESA senza una riga nel config", True,
           server.REGALI_LIVELLO_ATTIVI)
-    asyncio.run(server.premia_distintivi(2 ** 40))   # nessuno: non esplode
-    server.REGALI_LIVELLO_ATTIVI = True   # la riga del config, il giorno dell'accordo
 
     # 1 = nuovo arrivato, 2 = pratico (5000 xp, 9 vendite), 3 = tanti
     # xp ma zero affari (resta nuovo: le due chiavi), 4 = pratico senza

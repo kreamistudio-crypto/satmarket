@@ -87412,24 +87412,6 @@ arriva niente … relay.zapstore.dev non serve lo storico» è sostituita
 dalla procedura vera. Prova in più: `pesca-eventi.py` compila e non
 porta 64-hex. Questo giro è un secondo commit sopra a4f63637.
 
-## I regali per livello nascono spenti (17 nov 2026, cantiere regali-spenti; Andrea: «mica ha aderito un tempo per te… un negozio un tempo per te»)
-
-DECISO. «Un tempo per te» è un NEGOZIO di altri e non ha ancora
-aderito: il cantiere di stamattina partiva dall'idea che il marchio
-fosse di Andrea. Quindi `REGALI_LIVELLO_ATTIVI` passa a False nel codice
-e in config_esempio — ECCEZIONE dichiarata alla regola del 14 nov (leve
-nuove accese di serie), perché una promozione non deve promettere in
-produzione oggetti col logo di qualcuno che non ha detto sì. Il giorno
-dell'accordo si accende con una riga nel config del VPS. La voce di
-NOVITA passa a «pubblico: no», o n8n la annuncerebbe a leva spenta.
-Il collaudo segue develop e quindi anche lì si spegne: per provarla si
-aggiunge la riga True al config della VM.
-
-PROVATO. `prove_regali_livello` (la sentinella della leva ora chiede
-False nel codice e nel config d'esempio); `collaudo_regali_livello`
-prova che nasce spenta, che il gancio a leva spenta non esplode, poi la
-accende come farebbe il config e rifà il giro intero.
-
 ## La chat dello scambio on-chain (17 nov 2026, cantiere onchain-chat-sollecito, terza parte; Andrea: «tutto deve essere come la parte lighting. Fai un giro su tutto», punto 6 della lista di parità)
 
 Nel P2P Lightning le due parti si scrivono in una chat cifrata dalla
