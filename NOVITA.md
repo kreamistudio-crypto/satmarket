@@ -476,3 +476,9 @@ frase: Negli scambi P2P on-chain in euro e franchi il tempo per pagare scende da
 dove: P2P on-chain: la card in «I miei scambi» e la riga «Tempo per pagare» nella pagina dello scambio; nello stato «Euro inviati» la frase con le 48 ore; i messaggi del bot «Il tempo per pagare è finito» e «Sono passate 48 ore da «Ho inviato gli euro»».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-17 · annullo-registrato
+frase: Se prendi un ordine P2P, tocchi «Annulla» e l'annullo non arriva al coordinatore, alla scadenza del tempo non ti viene più contato uno scambio non completato: il bot te lo scrive nel messaggio.
+dove: P2P Lightning: la pagina dello scambio appena preso, «✕ Annulla» e «Sì, annulla»; il messaggio del bot «Non hai proseguito in tempo» con la riga «Avevi chiesto di annullare».
+leva: nessuna
+pubblico: no
