@@ -88332,3 +88332,82 @@ NOTATO E NON FATTO: lo stesso toast «su questo dispositivo non c'è la
 tua chiave» resta nell'on-chain del MERCATINO (ordini, cassa, swap) e
 nell'indirizzo al volo di chi compra; la pagina del moderatore non dice
 che a un rimborso manca l'indirizzo finché non prova a decidere.
+
+24 ORE PER PAGARE, 48 PER IL BONIFICO (17 nov 2026 sera, stesso
+cantiere onchain-rimborso-liscio, secondo commit; Alan in chat: «come
+mai hai messo 72 ore di tempo per gli scambi in fiat nel p2p? mentre per
+le crypto 24 ore? [...] uno può aspettare 72 ore per pagare, dire di
+aver pagato e poi comunque dovere attendere altre 48 ore»; proposta
+«24 ore per pagare, poi 48 a chi vende per vedere il bonifico, poi la
+disputa», Andrea: «si»).
+
+COSA CAMBIA. Le 72 ore del mattino (cantiere convenienza-monete, «IL
+TEMPO PER PAGARE») mettevano nello stesso tempo due cose diverse: far
+PARTIRE il bonifico e farlo ARRIVARE. Ma il viaggio comincia dopo «Ho
+inviato», e quel tempo non lo copriva nessuno: nel caso peggiore i sats
+di chi vende restavano fermi tre giorni prima ancora che il bonifico
+partisse. Adesso i tempi sono due, in fila:
+- PAGARE: 24 ore dal deposito confermato anche in euro e franchi
+  (`P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI` da 72 a 24), come le monete e come
+  il Lightning. I promemoria a chi paga seguono da soli: un'ora, sei, e
+  venti (quattro prima della fine).
+- IL BONIFICO: da «Ho inviato» chi vende ha 48 ore
+  (`P2P_ONCHAIN_ORE_BONIFICO`) per vederlo arrivare. Lo dicono l'avviso
+  di «Ho inviato» e la pagina dello scambio, a tutti e due, con l'ora.
+  Passate senza rilascio, la ronda lo dice alle due parti una volta
+  (`bonifico_scaduto_il`) e a tutte e due indica la disputa.
+NIENTE SI ANNULLA E NIENTE SI LIBERA DA SOLO, come al mattino: i sats
+stanno nel 2-di-3 e un automatismo che li muove senza una firma non
+esiste e non deve nascere. La disputa resta apribile anche prima.
+
+DOVE NON VALE. Il tempo del bonifico e' 0 per USDT e monete (arrivano
+in minuti, e c'e' l'id della transazione), per il PayCode di Barattozon
+(si vede su Amazon) e per il SOLO «Contanti» di persona (i soldi passano
+di mano): per loro restano i tre promemoria a chi libera. Coi metodi
+misti («SEPA» e «Contanti») vale: un bonifico e' possibile.
+
+IL PAYCODE NON SI TOCCA. `p2p_onchain_ore_pagamento` usava la costante
+dei soldi come tetto del PayCode (72 ore, quanto Amazon lo fa valere):
+abbassandola a 24 un PayCode da 60 ore avrebbe avuto 24 ore per essere
+pagato. Il tetto ha adesso la sua costante,
+`P2P_ONCHAIN_ORE_PAGAMENTO_TAB = 72` (provato: un PayCode a 70 ore
+resta 70).
+
+GLI SCAMBI GIA' APERTI. `paga_entro` si calcola al volo: uno scambio in
+euro depositato da piu' di 24 ore e non ancora pagato riceve l'avviso
+«Il tempo per pagare è finito» alla prima ronda dopo il deploy, e uno
+con «Ho inviato» da piu' di 48 ore riceve subito quello del bonifico.
+Sono avvisi, non annulli: nessuno perde niente.
+
+STRADE SCARTATE. (1) Lasciare 72 ore e aggiungere le 48: e' proprio il
+caso di Alan, cinque giorni coi sats fermi. (2) Aprire la disputa da
+soli allo scadere delle 48 ore: una disputa e' un gesto di una parte,
+con un motivo; aperta dalla ronda arriverebbe ai moderatori anche
+quando chi vende ha solo dimenticato di toccare il tasto. (3) Liberare
+da soli: mai, i soldi potrebbero non essere arrivati. (4) 24 ore solo
+per i metodi di banca e 72 per i contanti di persona: una regola in
+piu' da spiegare, e nel Lightning i contanti hanno lo stesso giorno;
+alla scadenza arriva solo un avviso.
+
+PROVATO. `prove_onchain_tempo_bonifico` (9: i numeri, i due giudici
+puri, i testi, la passata con sette scambi e una volta sola, le
+cuciture, la pagina e il giudice del telefono in node);
+`prove_onchain_come_lightning`, `prove_onchain_promemoria` e
+`prove_barattozon_onchain` ritoccate dove dicevano 72;
+`collaudo_p2p_onchain` (le 24 ore nell'avviso e nella riga, le 48 da
+«Ho inviato», la ronda a 47 e a 49 ore, e la seconda ronda muta).
+
+I CINQUE ROSSI DEL PRIMO COMMIT, trovati dalla suite intera (su
+307d50b6) e corretti qui: il censimento degli avvisi agli admin (la
+rotta `rimborso` in disputa: moderazione 21, 106 punti), la frase di
+NOVITA oltre i 400 caratteri, la sezione nuova senza categoria, e la
+prova dell'indirizzo al volo che cercava la riga di prima in
+`onchainIncassoGuarda`.
+
+DA GUARDARE DAL VIVO: uno scambio in euro con «Ho inviato»: la frase
+con le 48 ore e l'ora nella pagina, a 375 px, dai due lati.
+
+NOTATO E NON FATTO: la card in «I miei scambi», nello stato «Euro
+inviati», non dice le 48 ore (le dice solo la pagina); la voce
+«onchain-come-lightning» di NOVITA parla ancora di 72 ore (e' storia:
+la voce nuova la corregge).

@@ -107110,13 +107110,32 @@ P2P_ONCHAIN_ORE_DEPOSITO = 6    # dalla presa: entro quando il deposito va confe
 # stanno nel 2-di-3 e non scadono, quindi alla scadenza NON si annulla
 # niente da solo: lo si dice alle due parti, e chi vende sa che puo'
 # aprire la disputa. La disputa resta apribile anche prima, come oggi.
+# 24 ORE ANCHE PER EURO E FRANCHI (17 nov 2026 sera, cantiere
+# onchain-rimborso-liscio; Alan: «uno può aspettare 72 ore per pagare,
+# dire di aver pagato e poi comunque dovere attendere altre 48 ore», e
+# Andrea: «si»). Le 72 ore coprivano il viaggio del bonifico, ma quel
+# viaggio comincia DOPO «Ho inviato»: per farlo partire un giorno basta,
+# come nel Lightning. Il viaggio ha adesso il suo tempo, qui sotto.
 P2P_ONCHAIN_ORE_PAGAMENTO_MONETE = 24
-P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI = 72
+P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI = 24
+# ...e il PayCode di Barattozon resta col suo tetto: Amazon lo fa valere
+# 72 ore, e il tempo per pagarlo e' la sua scadenza
+P2P_ONCHAIN_ORE_PAGAMENTO_TAB = 72
+# IL TEMPO DEL BONIFICO (17 nov 2026 sera, stessa decisione). Da «Ho
+# inviato gli euro» chi vende ha 48 ore per vederli arrivare: un
+# bonifico ordinario ci sta dentro anche col fine settimana di mezzo.
+# Passate quelle senza che abbia liberato, la ronda lo dice alle due
+# parti e a tutte e due indica la disputa. NON si annulla e NON si
+# libera niente da solo: i sats restano nel 2-di-3, e la disputa resta
+# apribile anche prima. Solo per euro e franchi che viaggiano: gli USDT
+# e le monete arrivano in minuti, il PayCode si vede su Amazon, i
+# contanti di persona passano di mano (per loro restano i tre promemoria).
+P2P_ONCHAIN_ORE_BONIFICO = 48
 # I PROMEMORIA (17 nov 2026, cantiere onchain-chat-sollecito, «tutto
 # deve essere come la parte Lightning»). Gli stessi due del Lightning
 # (`SOLLECITI_EURO_S`, `SOLLECITI_RILASCIO_S`), battuti dalla ronda:
 # • a chi PAGA, dal deposito confermato: un'ora, sei ore, e quattro ore
-#   prima della fine del suo tempo (20 ore in moneta, 68 in euro) — al
+#   prima della fine del suo tempo (20 ore, in moneta e in euro) — al
 #   posto del «un giorno» del Lightning, che in moneta cadrebbe proprio
 #   sulla scadenza. Solo se chi vende ha gia' scritto il recapito (senza,
 #   «invia» sarebbe una frase falsa) e mai col contanti di persona fra i
@@ -107361,7 +107380,8 @@ def p2p_onchain_valuta(o) -> str:
 
 def p2p_onchain_ore_pagamento(o) -> int:
     """PURA: le ore che chi compra bitcoin ha per pagare, dal deposito
-    confermato: 24 in USDT e nelle monete, 72 in euro e franchi. COL
+    confermato: 24, in USDT e nelle monete come in euro e franchi (per
+    questi erano 72 fino al 17 nov 2026 sera). COL
     PAYCODE (17 nov 2026, barattozon-onchain) le ore fino alla sua
     scadenza, contate dal deposito (o, prima, dalla presa), mai meno di
     una ne' piu' di 72: dopo, al tabacchino non si paga piu'."""
@@ -107370,7 +107390,7 @@ def p2p_onchain_ore_pagamento(o) -> int:
         dal = int(_p2p_onchain_campo(o, "depositato_il", 0) or 0) \
             or int(_p2p_onchain_campo(o, "preso_il", 0) or 0) \
             or int(_p2p_onchain_campo(o, "creato", 0) or 0)
-        return max(1, min(P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI,
+        return max(1, min(P2P_ONCHAIN_ORE_PAGAMENTO_TAB,
                           -(-(tab_scade - dal) // 3600)))
     if p2p_onchain_usdt(o) or p2p_onchain_coin(o):
         return P2P_ONCHAIN_ORE_PAGAMENTO_MONETE
@@ -107387,6 +107407,29 @@ def p2p_onchain_paga_entro(o) -> int:
     entro = dal + p2p_onchain_ore_pagamento(o) * 3600
     tab_scade = globals().get("p2p_onchain_tab_scade", lambda x: 0)(o)
     return min(entro, tab_scade) if tab_scade else entro
+
+
+def p2p_onchain_ore_bonifico(o) -> int:
+    """PURA: le ore che chi vende ha per VEDERE ARRIVARE i soldi, da «Ho
+    inviato» (17 nov 2026 sera): 48 per euro e franchi che viaggiano in
+    banca, 0 (nessun tempo) per USDT e monete, per il PayCode e per il
+    solo «Contanti» di persona."""
+    if globals().get("p2p_onchain_tab_scade", lambda x: 0)(o):
+        return 0
+    if p2p_onchain_usdt(o) or p2p_onchain_coin(o):
+        return 0
+    if _metodi_libro(_p2p_onchain_metodi(o)) == ["Contanti"]:
+        return 0
+    return P2P_ONCHAIN_ORE_BONIFICO
+
+
+def p2p_onchain_bonifico_entro(o) -> int:
+    """PURA: l'epoch entro cui chi vende vede arrivare il bonifico (0 =
+    «Ho inviato» non c'e' ancora, o lo scambio non ha un tempo del
+    bonifico)."""
+    dal = int(_p2p_onchain_campo(o, "euro_inviati_il", 0) or 0)
+    ore = p2p_onchain_ore_bonifico(o)
+    return dal + ore * 3600 if dal > 0 and ore else 0
 
 
 def _p2p_onchain_metro(o) -> str:
@@ -107768,7 +107811,11 @@ def _p2p_onchain_prepara(con):
                       # non ha ancora scritto dove riavere i sats. Quando
                       # l'ultimo avviso e' partito (0 = nessuna rinuncia
                       # che aspetta): si azzera appena l'indirizzo c'e'
-                      ("rinuncia_chiesta_il", "INTEGER DEFAULT 0")):
+                      ("rinuncia_chiesta_il", "INTEGER DEFAULT 0"),
+                      # 17 nov 2026 sera: quando la ronda ha detto alle due
+                      # parti che le 48 ore del bonifico sono passate (0 =
+                      # non ancora): una volta sola
+                      ("bonifico_scaduto_il", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -108265,6 +108312,9 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "paga_entro": p2p_onchain_paga_entro(o),
         "ore_pagamento": p2p_onchain_ore_pagamento(o),
         "euro_inviati_il": int(o["euro_inviati_il"] or 0),
+        # (17 nov 2026 sera) il tempo del bonifico, da «Ho inviato»
+        "bonifico_entro": p2p_onchain_bonifico_entro(o),
+        "ore_bonifico": p2p_onchain_ore_bonifico(o),
         "disputa": ({"da": "io" if int(o["disputa_da"] or 0) == tg_id else "altro",
                      "il": int(o["disputa_il"] or 0),
                      "motivo": o["disputa_motivo"] or ""}
@@ -109225,10 +109275,14 @@ async def p2p_onchain_euro_inviati(oid: int, req: Request, x_tg_init_data: str =
                  "scambio e tocca «Ricevuti: libera i sats». Se non risulta, apri "
                  "una disputa.")
     else:
+        ore_b = p2p_onchain_ore_bonifico(o)
         testo = (f"💶 <b>Chi compra dice di averti inviato {euro} €.</b> "
                  f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
                  "Controlla il tuo conto: quando li vedi, apri lo scambio e tocca "
-                 "«Ricevuti: libera i sats». Se non arrivano, apri una disputa.")
+                 "«Ricevuti: libera i sats». "
+                 + (f"Un bonifico può metterci fino a {ore_b} ore: se dopo non "
+                    "sono arrivati, apri una disputa." if ore_b
+                    else "Se non arrivano, apri una disputa."))
     await _notifica_p2p_onchain(o, o["depositante_id"], testo, _p2p_onchain_bottone(o))
     return {"ok": True}
 
@@ -110840,6 +110894,53 @@ def _p2p_onchain_passata_tempo_pagare(con, adesso: int) -> list:
     return fuori
 
 
+def _p2p_onchain_testi_bonifico_scaduto(o) -> dict:
+    """PURA: `{tg_id: testo}` dell'avviso delle 48 ORE DEL BONIFICO
+    PASSATE (17 nov 2026 sera): chi compra ha detto «Ho inviato», chi
+    vende non ha liberato. Non si annulla e non si libera niente: a
+    tutti e due si indica la disputa. Scritto per gli euro: le parole
+    della valuta le mette `_notifica_p2p_onchain`."""
+    S = P2P_ONCHAIN_SEGNO
+    ore = p2p_onchain_ore_bonifico(o)
+    return {
+        int(o["depositante_id"]): (
+            f"{S} ⏰ <b>Sono passate {ore} ore da «Ho inviato gli euro».</b> "
+            f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
+            "Un bonifico a quest'ora è arrivato: controlla il conto. Se gli euro "
+            "ci sono, apri lo scambio e libera i sats. Se non ci sono, apri una "
+            "disputa: decide un moderatore. I sats restano al sicuro nel 2-di-3."),
+        int(o["ricevente_id"]): (
+            f"{S} ⏰ <b>Sono passate {ore} ore da «Ho inviato gli euro»</b> e chi "
+            f"vende non ha ancora liberato i sats. Compri "
+            f"{_p2p_onchain_quanto(o, netti=True)}.\n\n"
+            "Apri lo scambio e tocca «⚖️ Apri una disputa»: decide un moderatore. "
+            "Tieni pronta la ricevuta del pagamento."),
+    }
+
+
+def _p2p_onchain_passata_tempo_bonifico(con, adesso: int) -> list:
+    """Gli scambi con «Ho inviato» da piu' delle ore del bonifico, non
+    liberati e non ancora detti: li timbra (`bonifico_scaduto_il`, una
+    volta sola, anche con due ronde in volo) e torna le righe da
+    avvisare. La disputa aperta cambia lo stato, quindi qui non entra."""
+    fuori = []
+    for o in con.execute(
+            "SELECT * FROM p2p_onchain_ordini WHERE stato='euro_inviati' AND "
+            "euro_inviati_il>0 AND COALESCE(bonifico_scaduto_il, 0)=0 "
+            "ORDER BY id LIMIT 200").fetchall():
+        entro = p2p_onchain_bonifico_entro(o)
+        if not entro or entro > adesso:
+            continue
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET bonifico_scaduto_il=? WHERE id=? AND "
+            "stato='euro_inviati' AND COALESCE(bonifico_scaduto_il, 0)=0",
+            (int(adesso), o["id"]))
+        if cur.rowcount:
+            fuori.append(o)
+    con.commit()
+    return fuori
+
+
 def _p2p_onchain_intervalli_pagare(o) -> tuple:
     """PURA: i tre promemoria a chi paga, in secondi dal deposito: un'ora,
     sei, e quattro ore prima della fine del suo tempo."""
@@ -111003,6 +111104,8 @@ async def _p2p_onchain_ronda() -> None:
             (adesso - P2P_ONCHAIN_RITARDATARI_S,))]
         # IL TEMPO PER PAGARE (17 nov 2026)
         senza_pagamento = _p2p_onchain_passata_tempo_pagare(con, adesso)
+        # IL TEMPO DEL BONIFICO (17 nov 2026 sera): 48 ore da «Ho inviato»
+        senza_rilascio = _p2p_onchain_passata_tempo_bonifico(con, adesso)
         # I PROMEMORIA (17 nov 2026, dopo il tempo finito: chi l'ha appena
         # avuto non riceve anche il terzo)
         promemoria = _p2p_onchain_passata_solleciti(con, adesso)
@@ -111025,6 +111128,17 @@ async def _p2p_onchain_ronda() -> None:
                       f"saltato: {e}", flush=True)
         print(f"⏰ P2P on-chain: scambio {o['id']}, tempo per pagare finito "
               f"({p2p_onchain_ore_pagamento(o)} ore): avvisate le due parti", flush=True)
+    for o in senza_rilascio:
+        for chi, testo in _p2p_onchain_testi_bonifico_scaduto(o).items():
+            if not chi:
+                continue
+            try:
+                await _notifica_p2p_onchain(o, chi, testo, _p2p_onchain_bottone(o))
+            except Exception as e:
+                print(f"⚠️ P2P on-chain: avviso del tempo del bonifico {o['id']} "
+                      f"saltato: {e}", flush=True)
+        print(f"⏰ P2P on-chain: scambio {o['id']}, {p2p_onchain_ore_bonifico(o)} ore "
+              "da «Ho inviato» senza rilascio: avvisate le due parti", flush=True)
     if scaduti:
         _p2p_onchain_rifai_foto()
     for oid in scaduti:
