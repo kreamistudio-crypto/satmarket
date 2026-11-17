@@ -61164,7 +61164,25 @@ P2P_ESITI_MEMORIA_S = 400 * 86400     # oltre un anno gli esiti se ne vanno
 P2P_TENTATIVO_MARGINE_S = 60
 P2P_GESTI_TENTATIVO = ("garanzia_aperta", "garanzia_copiata", "garanzia_wallet",
                        "cauzione_aperta", "cauzione_copiata", "cauzione_wallet",
-                       "fattura_inviata", "fattura_rifiutata", "fattura_scartata")
+                       "fattura_inviata", "fattura_rifiutata", "fattura_scartata",
+                       "annullo_chiesto")
+# L'ANNULLO CHIESTO (17 nov 2026, cantiere annullo-registrato; un utente
+# col «non completato» dopo mezz'ora, Andrea: «tu in effetti hai richiesto
+# l'annullamento», e alla proposta «si»). «Annulla» e' un messaggio del
+# telefono al coordinatore: se non arriva (la rete, un relay muto, la
+# pagina chiusa a meta') il server non ne sa niente, il tempo scade e a
+# chi aveva preso si contava uno scambio non completato per essersi
+# ritirato — che e' proprio quel che la regola non punisce («mai a chi si
+# ritira prima»). Il telefono dichiara il tocco PRIMA di mandare il
+# `cancel`, come gli altri tentativi, col gesto `annullo_chiesto`; e alla
+# scadenza di chi ha preso quel giro NON si conta. Non e' la scusa del
+# tentativo: non si scrive `scusato` e non ha la finestra dei 30 giorni,
+# perche' annullare e' un gesto permesso ogni volta (se arriva, l'ordine
+# torna subito in vetrina). E NON e' un «ci ha provato»: `_ha_provato_p2p`
+# non lo guarda, cosi' la scusa e la regola di chi pubblica restano com'erano.
+P2P_GESTO_ANNULLO = "annullo_chiesto"
+P2P_RIGA_ANNULLO_CHIESTO = ("Avevi chiesto di annullare: questo non conta come "
+                            "scambio non completato.")
 P2P_MOTIVI_PRESA = ("filtro", "mancati", "prese", "sospesi", "dispute", "pausa",
                     "paracadute")
 # ═══ I MALUS DOPO LA GARANZIA (10 ott 2026, cantiere malus-p2p, richiesta
@@ -62749,8 +62767,20 @@ def _ha_provato_p2p(con, tg_id, ordine: str, dal: int) -> bool:
     il margine dei due orologi)?"""
     return con.execute(
         "SELECT 1 FROM p2p_tentativi WHERE tg_id=? AND ordine=? AND quando>=? "
-        "LIMIT 1", (int(tg_id or 0), ordine,
-                    int(dal or 0) - P2P_TENTATIVO_MARGINE_S)).fetchone() is not None
+        "AND gesto!=? LIMIT 1",
+        (int(tg_id or 0), ordine, int(dal or 0) - P2P_TENTATIVO_MARGINE_S,
+         P2P_GESTO_ANNULLO)).fetchone() is not None
+
+
+def _ha_chiesto_annullo_p2p(con, tg_id, ordine: str, dal: int) -> bool:
+    """Pura sulla connessione: questa persona ha toccato «Annulla» su
+    quest'ordine da `dal` in poi (17 nov 2026, annullo-registrato)? Lo
+    dichiara il telefono prima di mandare il `cancel` al coordinatore."""
+    return con.execute(
+        "SELECT 1 FROM p2p_tentativi WHERE tg_id=? AND ordine=? AND quando>=? "
+        "AND gesto=? LIMIT 1",
+        (int(tg_id or 0), ordine, int(dal or 0) - P2P_TENTATIVO_MARGINE_S,
+         P2P_GESTO_ANNULLO)).fetchone() is not None
 
 
 def _colpa_disputa_p2p(con, ordine: str, giro: int, esito: str) -> bool:
@@ -62992,6 +63022,15 @@ def _segna_esiti_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         "SELECT MAX(quando) FROM p2p_momenti WHERE ordine=? AND giro=? "
         "AND momento='preso' AND fonte='mostro'", (ordine, giro)).fetchone()[0]
     dettaglio = ev.get("dettaglio") or ""
+    # L'ANNULLO CHIESTO E NON ARRIVATO (17 nov 2026, annullo-registrato):
+    # chi ha toccato «Annulla» si stava ritirando, e non si conta. Prima
+    # della scusa: non la consuma
+    if _ha_chiesto_annullo_p2p(con, tg, ordine,
+                               int(presa or 0) or int(ev["ts"]) - P2P_PRESA_APERTA_S):
+        righe.append(f"· Reputazione P2P: {ordine[:8]} tornato in vetrina, ma {tg} "
+                     "aveva chiesto di annullare e l'annullo non era arrivato al "
+                     "coordinatore: non si conta")
+        return righe
     if _ha_provato_p2p(con, tg, ordine, int(presa or 0) or int(ev["ts"]) - P2P_PRESA_APERTA_S):
         # LA SCUSA VALE UNA VOLTA OGNI P2P_SCUSA_FINESTRA_S (10 ott 2026, «I
         # MALUS DOPO LA GARANZIA», c): la prima si scrive, e scusa; se
@@ -74692,6 +74731,19 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
                 dati["conto"] = _conto_esito_p2p(con, chi_preso, ordine, giro, adesso)["riga"]
             except Exception:
                 dati["conto"] = ""
+            # L'ANNULLO CHIESTO, DETTO (17 nov 2026, annullo-registrato): chi
+            # legge «Non hai proseguito in tempo» dopo aver toccato «Annulla»
+            # deve sapere che non gli e' stato contato. Solo qui, sul SUO
+            # timeout: l'archivio e gli altri avvisi non cambiano
+            try:
+                if not dati["conto"] and con.execute(
+                        "SELECT 1 FROM p2p_tentativi WHERE tg_id=? AND ordine=? AND "
+                        "giro=? AND gesto=?",
+                        (int(chi_preso), ordine, int(giro or 0),
+                         P2P_GESTO_ANNULLO)).fetchone():
+                    dati["conto"] = P2P_RIGA_ANNULLO_CHIESTO
+            except Exception:
+                pass
     # LA DISPUTA PERSA, A CHI L'HA PERSA (10 ott 2026, malus-p2p, decisione
     # di Andrea): quando la chiusura e' di un moderatore, a chi su questo
     # giro ha la riga `disputa_persa` (`_segna_esiti_p2p` gira prima di
