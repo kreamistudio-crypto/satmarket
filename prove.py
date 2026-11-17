@@ -162298,7 +162298,9 @@ console.log(JSON.stringify(casi.map(depositoVistoOnchainP2P)));
           ("${incassoMancanteOnchainP2P(o)}" in pezzo_js(mini, "function schedaOnchainP2P(o){", "\n}\n"),
            "if (!o || o.ruolo !== 'venditore' || o.incasso || o.proposta) return '';" in casella,
            "onchainIncassoGuardaPresto(\\'ocP2p\\')" in casella and "onchainModuloIncasso" not in casella,
-           "if (pref === 'ocP2p' && tipo !== 'indirizzo')" in guarda,
+           # (17 nov 2026, onchain-rimborso-liscio) anche i due moduli del
+           # rimborso (`ocP2pRimb`, `ocP2pDep`) prendono solo un indirizzo
+           "if (String(pref).indexOf('ocP2p') === 0 && tipo !== 'indirizzo')" in guarda,
            "onchainFirmaDestinazione(await caricaBitcoin(), parole, 'indirizzo', valore)" in qui,
            "/p2p/onchain/${Number(id)}/incasso" in qui and "/onchain/incasso`" not in qui,
            "if (vistaAttivaP2P() === 'view-p2ponchain') renderP2POnchain();"
@@ -181144,8 +181146,11 @@ def prove_canale_admin():
           # (17 nov 2026, raccolta) le raccolte: la nuova da approvare, la
           # segnalata e la fermata nella moderazione, le uscite firmate a
           # scadenza nelle dispute (sono soldi che si muovono)
+          # (17 nov 2026, onchain-rimborso-liscio) chi ha depositato scrive
+          # dove riavere i sats A DISPUTA APERTA: nella moderazione, perche'
+          # chi decide deve sapere che il rimborso adesso ha una strada
           {"assistenza": 1, "dispute": 7, "dm": 1, "errori": 36,
-           "liquidita": 5, "moderazione": 23, "riepiloghi": 27}, per_stanza)
+           "liquidita": 5, "moderazione": 24, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -181180,7 +181185,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "109 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "110 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -181196,9 +181201,10 @@ def prove_canale_admin():
           "14 nov sera il pagamento uscito verso l'altra parte, la fattura "
           "con due hash e la chiave on-chain cambiata; e il recapito P2P "
           "on-chain cambiato dopo il deposito e l'acquisto on-chain pagato "
-          "tardi; dal 17 nov il server riavviato dalla sentinella; e delle "
+          "tardi; dal 17 nov il server riavviato dalla sentinella; delle "
           "raccolte la nuova da approvare, la segnalata, la fermata e le "
-          "uscite firmate)", 109,
+          "uscite firmate; e l'indirizzo del rimborso P2P on-chain scritto "
+          "a disputa aperta)", 110,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -191421,8 +191427,8 @@ def prove_barattozon_onchain():
     amb = {"json": json, "re": re, "time": time, "P2P_ONCHAIN_BARATTOZON": True,
            "P2P_ONCHAIN_ORE_LIBRO": 168, "P2P_ONCHAIN_TAB_MIN_S": 12 * 3600,
            "P2P_ONCHAIN_TAB_MARGINE_S": 8 * 3600, "P2P_ONCHAIN_TAB_MAX_S": 72 * 3600 + 600,
-           "PAYCODE_EURO_MAX": 999.0, "P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI": 72,
-           "P2P_ONCHAIN_ORE_PAGAMENTO_MONETE": 24,
+           "PAYCODE_EURO_MAX": 999.0, "P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI": 24,
+           "P2P_ONCHAIN_ORE_PAGAMENTO_MONETE": 24, "P2P_ONCHAIN_ORE_PAGAMENTO_TAB": 72,
            "p2p_onchain_usdt": lambda o: False, "p2p_onchain_coin": lambda o: None,
            "_p2p_onchain_quanto": lambda o, netti=False: "100.000 sats per 39,99 €"}
     for n in ("_p2p_onchain_campo", "_importo_paycode_valido", "_paycode_sopra_minimo",
@@ -191477,8 +191483,9 @@ def prove_barattozon_onchain():
     riga = {"paycode": json.dumps(ok[1]), "depositato_il": ORA + 3600, "preso_il": ORA,
             "creato": ORA - 60, "euro_cent": 3999, "ricevente_id": 111, "depositante_id": 222}
     prova("le ore per pagare col PayCode: fino alla sua scadenza dal deposito (23), e l'ora entro "
-          "e' proprio la scadenza; senza PayCode le 72 di sempre",
-          [23, ORA + 24 * 3600, 72, ORA + 3600 + 72 * 3600],
+          "e' proprio la scadenza; senza PayCode le 24 di ogni scambio in euro (erano 72 "
+          "fino al 17 nov 2026 sera)",
+          [23, ORA + 24 * 3600, 24, ORA + 3600 + 24 * 3600],
           [amb["p2p_onchain_ore_pagamento"](riga), amb["p2p_onchain_paga_entro"](riga),
            amb["p2p_onchain_ore_pagamento"](dict(riga, paycode="")),
            amb["p2p_onchain_paga_entro"](dict(riga, paycode=""))])
@@ -203530,7 +203537,8 @@ def prove_onchain_come_lightning():
     i = src.index("P2P_ONCHAIN_RETI_USDT = {")
     exec(src[i:src.index("\n}\n", i) + 3], amb)
     for riga in ("P2P_ONCHAIN_PREFISSO = ", "P2P_ONCHAIN_ORE_PAGAMENTO_MONETE = ",
-                 "P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI = ", 'P2P_ONCHAIN_SEGNO = '):
+                 "P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI = ", "P2P_ONCHAIN_ORE_PAGAMENTO_TAB = ",
+                 'P2P_ONCHAIN_SEGNO = '):
         j = src.index("\n" + riga) + 1
         exec(src[j:src.index("\n", j)], amb)
     amb["_fmt_eur"] = lambda e: f"{e:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -203593,9 +203601,10 @@ def prove_onchain_come_lightning():
     eth = {"metodi": '["ETH (Ethereum) 0.0153"]', "euro_cent": 4590, "prezzo_sats": 45900}
     eur = {"metodi": '["SEPA"]', "euro_cent": 5000, "prezzo_sats": 50000}
     chf = {"metodi": '["TWINT"]', "euro_cent": 5000, "fiat": "CHF", "prezzo_sats": 50000}
-    prova("IL TEMPO PER PAGARE: 24 ore in USDT e nelle monete, 72 in euro e franchi; parte "
-          "dal deposito confermato, prima non c'e'",
-          [[24, 24, 72, 72], 1000 + 24 * 3600, 1000 + 72 * 3600, 0],
+    prova("IL TEMPO PER PAGARE: 24 ore in USDT e nelle monete, e 24 anche in euro e franchi "
+          "(erano 72 fino al 17 nov 2026 sera: il viaggio del bonifico ha il suo tempo, dopo "
+          "«Ho inviato»); parte dal deposito confermato, prima non c'e'",
+          [[24, 24, 24, 24], 1000 + 24 * 3600, 1000 + 24 * 3600, 0],
           [[O(x) for x in (usdt, eth, eur, chf)], F(dict(eth, depositato_il=1000)),
            F(dict(eur, depositato_il=1000)), F(eur)])
     T = amb["_p2p_onchain_testi_tempo_scaduto"]
@@ -203615,14 +203624,14 @@ def prove_onchain_come_lightning():
     con.executemany("INSERT INTO p2p_onchain_ordini(id, stato, depositato_il, metodi, euro_cent) "
                     "VALUES(?,?,?,?,?)", [
         (1, "depositato", adesso - 25 * 3600, '["USDe (Base) 50"]', 4300),   # 24 ore: finito
-        (2, "depositato", adesso - 25 * 3600, '["SEPA"]', 5000),             # 72 ore: no
+        (2, "depositato", adesso - 23 * 3600, '["SEPA"]', 5000),             # 24 ore: no
         (3, "euro_inviati", adesso - 99 * 3600, '["SEPA"]', 5000),           # ha pagato
-        (4, "depositato", adesso - 73 * 3600, '["SEPA"]', 5000)])            # 72 ore: finito
+        (4, "depositato", adesso - 25 * 3600, '["SEPA"]', 5000)])            # 24 ore: finito
     P = amb["_p2p_onchain_passata_tempo_pagare"]
     prima = [int(o["id"]) for o in P(con, adesso)]
     seconda = [int(o["id"]) for o in P(con, adesso + 60)]
     prova("LA RONDA: avvisa gli scambi depositati col tempo finito (USDe a 25 ore, euro a "
-          "73), non quello in euro a 25 ore ne' chi ha gia' pagato; e UNA VOLTA SOLA",
+          "25), non quello in euro a 23 ore ne' chi ha gia' pagato; e UNA VOLTA SOLA",
           [[1, 4], []], [prima, seconda])
     # --- le cuciture nel server ---
     firma = src[src.index('async def p2p_onchain_firma('):src.index('@app.post("/api/p2p/onchain/{oid}/disputa")')]
@@ -203752,6 +203761,7 @@ def prove_onchain_promemoria():
     i = src.index("P2P_ONCHAIN_RETI_USDT = {")
     exec(src[i:src.index("\n}\n", i) + 3], amb)
     for riga in ("P2P_ONCHAIN_ORE_PAGAMENTO_MONETE = ", "P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI = ",
+                 "P2P_ONCHAIN_ORE_PAGAMENTO_TAB = ",
                  "P2P_ONCHAIN_SOLLECITI_PAGARE_PRIMA_S = ", "P2P_ONCHAIN_SEGNO = ",
                  "SOLLECITI_PAYCODE_S = ", "SOLLECITI_RILASCIO_S = "):
         j = src.index("\n" + riga) + 1
@@ -203777,16 +203787,16 @@ def prove_onchain_promemoria():
     usdt = dict(base, metodi='["USDT (Tron)"]')
     liv = lambda o, dopo: (D(o, T0 + dopo) or (None, 0))[1]
     H = 3600
-    prova("A CHI PAGA in euro (72 ore): niente prima di un'ora, poi 1 a un'ora, 2 a sei, "
-          "3 a 68 ore (quattro prima della fine)",
+    prova("A CHI PAGA in euro (24 ore dal 17 nov 2026 sera): niente prima di un'ora, poi 1 "
+          "a un'ora, 2 a sei, 3 a 20 ore (quattro prima della fine)",
           [0, 1, 1, 2, 2, 3], [liv(base, 59 * 60), liv(base, H), liv(base, 6 * H - 1),
-                               liv(base, 6 * H), liv(base, 68 * H - 1), liv(base, 68 * H)])
+                               liv(base, 6 * H), liv(base, 20 * H - 1), liv(base, 20 * H)])
     prova("...in USDT e nelle monete (24 ore) il terzo a 20 ore",
           [2, 3], [liv(usdt, 20 * H - 1), liv(usdt, 20 * H)])
     prova("UNA RONDA IN RITARDO manda solo l'ultimo dovuto, e un livello gia' mandato non "
           "riparte",
-          [3, 0, 3], [liv(base, 70 * H), liv(dict(base, sollecito_pagare=3), 70 * H),
-                      liv(dict(base, sollecito_pagare=1), 70 * H)])
+          [3, 0, 3], [liv(base, 22 * H), liv(dict(base, sollecito_pagare=3), 22 * H),
+                      liv(dict(base, sollecito_pagare=1), 22 * H)])
     prova("NIENTE a chi paga senza il recapito, col contanti fra i metodi, a disputa aperta "
           "o a tempo finito",
           [0, 0, 0, 0], [liv(dict(base, recapito=" "), 7 * H),
@@ -203796,7 +203806,7 @@ def prove_onchain_promemoria():
     d = D(base, T0 + H)
     prova("il promemoria va a chi paga, nella sua colonna, e dice le ore",
           ("sollecito_pagare", 1, 111, True),
-          (d[0], d[1], d[2], "Hai 72 ore in tutto" in d[3] and "«Ho inviato gli euro»" in d[3]))
+          (d[0], d[1], d[2], "Hai 24 ore in tutto" in d[3] and "«Ho inviato gli euro»" in d[3]))
     inv = dict(base, stato="euro_inviati", euro_inviati_il=T0)
     d = D(inv, T0 + 20 * H)
     prova("A CHI LIBERA, dal «Ho inviato»: 1/2/3 a un'ora, sei, venti, coi testi del "
@@ -204175,6 +204185,142 @@ console.log(JSON.stringify(out));
           ([0, True], [7, "venditore"]), (out["libera"], out["liberaDopo"]))
     prova("la seconda firma senza chiave apre lo stesso foglio",
           [True, "function"], out["cofirma"])
+
+
+def prove_onchain_tempo_bonifico():
+    """24 ORE PER PAGARE ANCHE IN EURO, POI 48 PER IL BONIFICO (17 nov
+    2026 sera, cantiere onchain-rimborso-liscio; Alan: «uno può aspettare
+    72 ore per pagare, dire di aver pagato e poi comunque dovere attendere
+    altre 48 ore», Andrea: «si»). Il tempo per pagare in euro e franchi
+    scende da 72 a 24 ore; da «Ho inviato» chi vende ha 48 ore per veder
+    arrivare il bonifico, e passate quelle la ronda indica la disputa a
+    tutti e due, una volta. Niente si annulla e niente si libera da solo.
+    Il giro vero sta in `collaudo_p2p_onchain`."""
+    print("\n[on-chain: 24 ore per pagare, 48 per il bonifico]")
+    import sqlite3
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    amb = {"json": json, "re": __import__("re"), "html": __import__("html"),
+           "sqlite3": sqlite3, "time": time}
+    i = src.index("P2P_COIN_METODI = {")
+    exec(src[i:src.index("\n}\n", i) + 3], amb)
+    i = src.index("P2P_ONCHAIN_RETI_USDT = {")
+    exec(src[i:src.index("\n}\n", i) + 3], amb)
+    for riga in ("P2P_ONCHAIN_ORE_PAGAMENTO_MONETE = ", "P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI = ",
+                 "P2P_ONCHAIN_ORE_PAGAMENTO_TAB = ", "P2P_ONCHAIN_ORE_BONIFICO = ",
+                 "P2P_ONCHAIN_SEGNO = "):
+        j = src.index("\n" + riga) + 1
+        exec(src[j:src.index("\n", j)], amb)
+    prova("i numeri: 24 ore per pagare in moneta e in euro, 72 il tetto del PayCode, 48 il "
+          "bonifico", (24, 24, 72, 48),
+          (amb["P2P_ONCHAIN_ORE_PAGAMENTO_MONETE"], amb["P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI"],
+           amb["P2P_ONCHAIN_ORE_PAGAMENTO_TAB"], amb["P2P_ONCHAIN_ORE_BONIFICO"]))
+    amb["_fmt_eur"] = lambda e: f"{e:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    amb["_fmt_sats"] = lambda n: f"{int(n):,}".replace(",", ".")
+    amb["_metodi_libro"] = lambda m: [str(x).strip() for x in m or []]
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
+              "p2p_onchain_usdt", "_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin",
+              "p2p_onchain_tab_dati", "p2p_onchain_tab_scade", "p2p_onchain_ore_pagamento",
+              "p2p_onchain_paga_entro", "p2p_onchain_ore_bonifico",
+              "p2p_onchain_bonifico_entro", "_p2p_onchain_quanto",
+              "_p2p_onchain_testi_bonifico_scaduto", "_p2p_onchain_passata_tempo_bonifico"):
+        exec(pezzo(f), amb)
+    O, B, E = (amb["p2p_onchain_ore_pagamento"], amb["p2p_onchain_ore_bonifico"],
+               amb["p2p_onchain_bonifico_entro"])
+    T0, H = 1_000_000, 3600
+    sepa = {"metodi": '["SEPA"]', "euro_cent": 5000, "prezzo_sats": 50000}
+    chf = {"metodi": '["TWINT"]', "euro_cent": 5000, "fiat": "CHF", "prezzo_sats": 50000}
+    usdt = {"metodi": '["USDT (Tron)"]', "euro_cent": 50000, "prezzo_sats": 744036}
+    eth = {"metodi": '["ETH (Ethereum) 0.0153"]', "euro_cent": 4590, "prezzo_sats": 45900}
+    cont = {"metodi": '["Contanti"]', "euro_cent": 5000, "prezzo_sats": 50000}
+    misto = {"metodi": '["SEPA", "Contanti"]', "euro_cent": 5000, "prezzo_sats": 50000}
+    tab = {"metodi": '["Contanti al tabacchino 39.99"]', "euro_cent": 3999, "prezzo_sats": 40000,
+           "depositato_il": T0,
+           "paycode": json.dumps({"pc": "212802988", "scade": T0 + 70 * H, "barre": ""})}
+    prova("IL TEMPO PER PAGARE in euro e franchi e' 24 ore come le monete; il PayCode tiene "
+          "il suo (70 ore restano 70: il tetto e' ancora 72, non 24)",
+          [24, 24, 24, 24, 70], [O(x) for x in (sepa, chf, usdt, eth, tab)])
+    prova("IL TEMPO DEL BONIFICO: 48 ore per euro e franchi che viaggiano (anche col contanti "
+          "fra gli altri metodi); nessuno per USDT, monete, PayCode e solo contanti",
+          [48, 48, 48, 0, 0, 0, 0], [B(x) for x in (sepa, chf, misto, usdt, eth, tab, cont)])
+    prova("...parte da «Ho inviato»: prima non c'e', dopo e' quell'ora piu' 48; dove il "
+          "bonifico non c'e' resta zero",
+          [0, T0 + 48 * H, 0, 0],
+          [E(sepa), E(dict(sepa, euro_inviati_il=T0)), E(dict(usdt, euro_inviati_il=T0)),
+           E(dict(cont, euro_inviati_il=T0))])
+    t = amb["_p2p_onchain_testi_bonifico_scaduto"](
+        dict(sepa, depositante_id=222, ricevente_id=111, quota_ricevente_sats=0))
+    prova("l'avviso delle 48 ore passate: a chi vende «libera, o disputa», a chi compra la "
+          "disputa e la ricevuta; dice le ore, e niente si annulla",
+          [True, True, True, True, True, False],
+          ["libera i sats" in t[222] and "apri una disputa" in t[222],
+           "«⚖️ Apri una disputa»" in t[111] and "ricevuta" in t[111],
+           "Sono passate 48 ore da «Ho inviato gli euro»" in t[222],
+           "Sono passate 48 ore da «Ho inviato gli euro»" in t[111],
+           "al sicuro nel 2-di-3" in t[222],
+           "annull" in (t[222] + t[111]).lower()])
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE p2p_onchain_ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                "euro_inviati_il INT, bonifico_scaduto_il INT DEFAULT 0, metodi TEXT, "
+                "euro_cent INT, fiat TEXT DEFAULT '', paycode TEXT DEFAULT '')")
+    adesso = 10_000_000
+    con.executemany("INSERT INTO p2p_onchain_ordini(id, stato, euro_inviati_il, metodi, "
+                    "euro_cent) VALUES(?,?,?,?,?)", [
+        (1, "euro_inviati", adesso - 49 * H, '["SEPA"]', 5000),          # 48 passate
+        (2, "euro_inviati", adesso - 47 * H, '["SEPA"]', 5000),          # non ancora
+        (3, "euro_inviati", adesso - 99 * H, '["USDT (Tron)"]', 5000),   # non e' un bonifico
+        (4, "disputa", adesso - 99 * H, '["SEPA"]', 5000),               # gia' in disputa
+        (5, "rilasciato", adesso - 99 * H, '["SEPA"]', 5000),            # liberato
+        (6, "euro_inviati", adesso - 99 * H, '["Contanti"]', 5000),      # di persona
+        (7, "euro_inviati", adesso - 60 * H, '["TWINT"]', 5000)])        # franchi: si'
+    P = amb["_p2p_onchain_passata_tempo_bonifico"]
+    prima = [int(o["id"]) for o in P(con, adesso)]
+    seconda = [int(o["id"]) for o in P(con, adesso + 60)]
+    dopo = [int(o["id"]) for o in P(con, adesso + 2 * H)]
+    prova("LA RONDA: avvisa gli scambi con «Ho inviato» da piu' di 48 ore e non liberati "
+          "(euro e franchi), non quello a 47 ore, ne' USDT, disputa, liberato o contanti; UNA "
+          "VOLTA SOLA; e quello a 47 ore arriva al suo momento",
+          [[1, 7], [], [2]], [prima, seconda, dopo])
+    ronda = pezzo("_p2p_onchain_ronda")
+    inviati = pezzo("p2p_onchain_euro_inviati")
+    passata = pezzo("_p2p_onchain_passata_tempo_bonifico")
+    prova("cuciture: la ronda fa la passata e manda i due testi, la passata timbra e basta "
+          "(mai uno stato cambiato), la riga dello scambio porta l'ora, la colonna nasce da "
+          "sola, e l'avviso di «Ho inviato» dice le 48 ore a chi vende",
+          (True, True, True, True, True, True),
+          ("senza_rilascio = _p2p_onchain_passata_tempo_bonifico(con, adesso)" in ronda,
+           "_p2p_onchain_testi_bonifico_scaduto(o).items()" in ronda,
+           "SET bonifico_scaduto_il=?" in passata and "SET stato" not in passata,
+           '"bonifico_entro": p2p_onchain_bonifico_entro(o)' in pezzo("_p2p_onchain_per")
+           and '"ore_bonifico": p2p_onchain_ore_bonifico(o)' in pezzo("_p2p_onchain_per"),
+           '("bonifico_scaduto_il", "INTEGER DEFAULT 0")' in pezzo("_p2p_onchain_prepara"),
+           "Un bonifico può metterci fino a {ore_b} ore" in inviati))
+    # --- il telefono ---
+    scheda = pezzo_js(mini, "function schedaOnchainP2P(o){", "\n}\n")
+    prova("la pagina dello scambio dice le 48 ore a tutti e due, e a tempo passato la "
+          "disputa; l'ora la dice il server, mai un numero scritto li'",
+          (True, True, True, True, False),
+          ("tempoBonificoOcP2P(o, Math.floor(Date.now() / 1000))" in scheda,
+           "se dopo non sono arrivati, apri una disputa." in scheda,
+           "e non l'ha fatto: apri una disputa." in scheda,
+           "ha ${tb.ore} ore per veder arrivare il bonifico" in scheda,
+           "48 ore" in scheda))
+    r = _node_banco(_fn_js(mini, "function tempoBonificoOcP2P(o, adesso){") + """
+const T = (o, a) => { const t = tempoBonificoOcP2P(o, a); return t ? [t.fine, t.ore, t.finito] : null; };
+console.log(JSON.stringify([
+  T({stato: 'euro_inviati', bonifico_entro: 5000, ore_bonifico: 48}, 1000),
+  T({stato: 'euro_inviati', bonifico_entro: 5000, ore_bonifico: 48}, 5000),
+  T({stato: 'euro_inviati', bonifico_entro: 0, ore_bonifico: 0}, 1000),
+  T({stato: 'depositato', bonifico_entro: 5000}, 1000),
+  T({stato: 'disputa', bonifico_entro: 5000}, 9000), T(null, 1)]));
+""")
+    if r is None:
+        salta("onchain_tempo_bonifico", "node non c'e': il giudice del telefono non si prova")
+    else:
+        prova("il giudice del telefono: dentro le 48 ore, a tempo passato, e null dove il "
+              "bonifico non c'e' (USDT, monete, contanti), fuori da «euro inviati» e senza riga",
+              [[5000, 48, False], [5000, 48, True], None, None, None, None], r)
 
 
 def prove_guida_wallet():
@@ -206929,7 +207075,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -207946,6 +208092,7 @@ def main():
     prove_onchain_txid_moneta,
     prove_chat_onchain,
     prove_onchain_rimborso_liscio,
+    prove_onchain_tempo_bonifico,
     prove_guida_wallet,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,

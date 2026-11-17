@@ -68503,7 +68503,8 @@ function statoOnchainCardP2P(o){
 }
 /* IL TEMPO PER PAGARE (17 nov 2026, cantiere convenienza-monete; Andrea:
    «uno mi ha preso l'ordine, ma quanto tempo ho io per inviare USDE? Non
-   viene indicato», e sulla scheda «24 ore monete, 72 ore euro»). Dal
+   viene indicato», e sulla scheda «24 ore monete, 72 ore euro»; dalla
+   sera dello stesso giorno 24 ore anche in euro, vedi `tempoBonificoOcP2P`). Dal
    deposito confermato chi compra bitcoin ha `ore_pagamento` ore; l'ora
    la dice il server (`paga_entro`, da `p2p_onchain_paga_entro`), mai un
    numero scritto qui. Alla scadenza non si annulla niente — i sats
@@ -68517,6 +68518,18 @@ function tempoPagareOcP2P(o, adesso){
   const h = Math.floor(resta / 3600), m = Math.floor((resta % 3600) / 60);
   return {resta: resta, finito: false,
           quanto: h >= 1 ? h + ' h' + (m ? ' ' + m + ' min' : '') : Math.max(1, Math.ceil(resta / 60)) + ' min'};
+}
+/* IL TEMPO DEL BONIFICO (17 nov 2026 sera, Alan e Andrea: 24 ore per
+   pagare anche in euro, poi 48 ore a chi vende per vedere arrivare il
+   bonifico, poi la disputa). Da «Ho inviato» il server dice l'ora
+   (`bonifico_entro`, 0 dove il bonifico non c'e': USDT, monete, PayCode,
+   solo contanti). Alla scadenza non si annulla e non si libera niente:
+   la pagina e il bot indicano la disputa a tutti e due.
+   PURA (l'orologio si passa): null fuori da «euro inviati» o senza l'ora. */
+function tempoBonificoOcP2P(o, adesso){
+  const fine = Number(o && o.bonifico_entro) || 0;
+  if (!o || o.stato !== 'euro_inviati' || !(fine > 0)) return null;
+  return {fine: fine, ore: Number(o.ore_bonifico) || 48, finito: fine <= Number(adesso || 0)};
 }
 /* ...nella pagina dello scambio: la riga del tempo di Lightning
    (`anelloneP2P`: «Tempo rimasto» col conto che scorre e la barra), col
@@ -69426,11 +69439,19 @@ function schedaOnchainP2P(o){
           + g('disputa', '⚖️ Apri una disputa');
         break;
       }
+      /* (17 nov 2026 sera) il tempo del bonifico, da «Ho inviato»: poi
+         la disputa. Le ore le dice il server. Col typeof: i banchi ritagliano questa funzione */
+      const tb = typeof tempoBonificoOcP2P === 'function'
+        ? tempoBonificoOcP2P(o, Math.floor(Date.now() / 1000)) : null;
       testo = deposito
         ? `Chi compra dice di averti mandato <b>${esc(fmtSoldiP2P(o.euro, o))} €</b> (${quando(o.euro_inviati_il)}). `
-          + 'Controlla il tuo conto: se ci sono, libera i sats; se non arrivano, apri una disputa.'
+          + (!tb ? 'Controlla il tuo conto: se ci sono, libera i sats; se non arrivano, apri una disputa.'
+             : tb.finito ? `Sono passate ${tb.ore} ore: controlla il tuo conto. Se ci sono, libera i sats; se non ci sono, apri una disputa.`
+             : `Controlla il tuo conto: se ci sono, libera i sats. Un bonifico può metterci fino a ${tb.ore} ore (fino al ${quando(tb.fine)}): se dopo non sono arrivati, apri una disputa.`)
         : `Hai detto di aver mandato ${esc(fmtSoldiP2P(o.euro, o))} € (${quando(o.euro_inviati_il)}). Chi vende li controlla e libera i sats `
-          + 'sul tuo wallet. Se non lo fa, apri una disputa.';
+          + (!tb ? 'sul tuo wallet. Se non lo fa, apri una disputa.'
+             : tb.finito ? `sul tuo wallet. Sono passate ${tb.ore} ore e non l'ha fatto: apri una disputa.`
+             : `sul tuo wallet: ha ${tb.ore} ore per veder arrivare il bonifico (fino al ${quando(tb.fine)}). Se dopo non libera, apri una disputa.`);
       gesti = (deposito ? bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats') : '')
         + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
         + g('disputa', '⚖️ Apri una disputa');
