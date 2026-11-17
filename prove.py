@@ -204602,7 +204602,7 @@ missioneFine = () => { finita++; };
 const mq = {id: 'quaderno', info: {zona: 0, nome: 'Q'}, fase: 'gioco', errori: 0};
 missione = mq;
 arena = {def: ARENA_QUADERNO, m: mq, sc: QUAD_SCENA, pianta: QUAD_SCENA, liv: arenaLivello(0), tempo: 0, dt: 0.016,
-  x: 450, y: 1330, vx: 0, vy: 0, verso: 1, gira: 1, fase: 0, salto: 0, cammina: 0, schiaccia: 0, meta: null, guida: null,
+  x: 450, y: 1330, vx: 0, vy: 0, verso: 1, fase: 0, salto: 0, cammina: 0, schiaccia: 0, meta: null, guida: null,
   tasti: {}, blocco: 0, ultimoPasso: 0, cose: [], nemici: [], polvere: [], scoppi: [], prova: -1, dice: null, vicino: null,
   scossa: 0, banner: 0, attesa: null, hud: '', cartello: '', azione: ''};
 const a = arena, passi = (sec) => { for (let i = 0; i < sec * 60 && arena === a; i++) arenaPassa(a, 1 / 60); };

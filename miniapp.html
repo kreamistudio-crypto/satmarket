@@ -61772,7 +61772,7 @@ function arenaApri(m){
   if (!g) { v.classList.remove('arena'); return false; }
   const tappo = new Image();
   arena = {def, m, tela, g, sc: def.scena, liv: arenaLivello(m.info.zona), tempo: 0, prima: 0, giro: 0, dt: 0.016,
-    x: def.scena.via[0], y: def.scena.via[1], vx: 0, vy: 0, verso: 1, gira: 1, fase: 0, salto: 0, cammina: 0,
+    x: def.scena.via[0], y: def.scena.via[1], vx: 0, vy: 0, verso: 1, fase: 0, salto: 0, cammina: 0,
     schiaccia: 0, meta: null, metaNata: 0, guida: null, tasti: {}, dito: null, blocco: 0, sbuffo: 0, ultimoPasso: 0,
     pianta: def.scena, cose: [], nemici: [], polvere: [], scoppi: [], prova: -1, dice: null, vicino: null, scossa: 0,
     banner: 0, attesa: null, hud: '', cartello: '', azione: '', tappo, tappoPronto: false};
@@ -61936,12 +61936,11 @@ function arenaPassa(a, dt){
   const va = fatto > passo * 0.15;
   a.cammina += ((va ? 1 : 0) - a.cammina) * Math.min(1, dt * 9);
   if (Math.abs(a.vx) > 0.15) a.verso = a.vx > 0 ? 1 : -1;
-  a.gira += (a.verso - a.gira) * Math.min(1, dt * 14);
   if (va) {
     const prima = Math.floor(a.fase / Math.PI);
     a.fase += dt * 12;
     if (Math.floor(a.fase / Math.PI) !== prima) {          /* un saltello che atterra */
-      a.schiaccia = fermo ? 0 : 0.14;
+      a.schiaccia = fermo ? 0 : 0.06;
       if (a.tempo - a.ultimoPasso > 0.26) { a.ultimoPasso = a.tempo; arenaSuono('passo'); }
       if (!fermo) a.polvere.push({x: a.x - a.vx * 22, y: a.y + 3, vita: 0.45});
     }
@@ -62048,9 +62047,10 @@ function arenaDisegna(a){
   if (a.def.sopra) a.def.sopra(g, a);
   a.camCss = {k: c.k / dpr, x0: (c.x0) / dpr, y0: c.y0 / dpr};
 }
-/* TAPPO: il disegno ufficiale, che molleggia — si allunga sul salto, si
-   schiaccia all'atterraggio, si piega verso dove va, si gira passando
-   di taglio. Con gli effetti ridotti sta dritto e scivola. */
+/* TAPPO: il disegno ufficiale, che molleggia appena — un saltello e una
+   schiacciata leggera all'atterraggio. Quando arrivano i passi dipinti
+   da Flow, al posto della figurina ci vanno i fotogrammi. Con gli
+   effetti ridotti sta dritto e scivola. */
 function arenaTappo(g, a, fermo){
   const sc = arenaProfondo(a.sc, a.y), ond = fermo ? 0 : Math.sin(a.fase) * 0.05 * a.cammina;
   const resp = fermo ? 0 : Math.sin(a.tempo * 2.6) * 0.018 * (1 - a.cammina);
@@ -62058,9 +62058,7 @@ function arenaTappo(g, a, fermo){
   arenaOmbra(g, a.x, a.y + 2, 62 * sc * (1 - a.salto / 60), 0.55);
   g.save();
   g.translate(a.x, a.y - a.salto);
-  if (!fermo) g.rotate(a.vx * 0.09 * a.cammina);
-  const giro = Math.sign(a.gira || 1) * Math.max(0.12, Math.abs(a.gira));
-  g.scale(giro, 1);
+  g.scale(a.verso, 1);              /* si gira di colpo: girato di taglio sembrava di carta (Andrea, 17 nov) */
   if (a.tappoPronto) g.drawImage(a.tappo, -largo / 2, -alto, largo, alto);
   else {                                    /* finche' il disegno non arriva: un barattolino */
     g.fillStyle = 'rgba(200,235,255,.75)'; g.strokeStyle = '#fff'; g.lineWidth = 4;
