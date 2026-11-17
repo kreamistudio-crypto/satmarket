@@ -47152,7 +47152,7 @@ def prove_fogli_di_casa():
     # (`pubblicaOnchainDalFoglioP2P`), gemello di quello di Lightning.
     # CENTOVENTI (17 nov 2026, cantiere stradina): «Esci da Barattolo?»
     # sulla casella che porta al partner dell'educazione (`vaiTappa`).
-    prova("i gesti che passano dalla domanda unica sono centoventitre' (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoventicinque (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47166,8 +47166,9 @@ def prove_fogli_di_casa():
           "USDe?» on-chain e il riepilogo di Barattozon on-chain; «Esci da "
           "Barattolo?» della stradina; «Annulli il deposito?» e «Fermi la "
           "raccolta?» delle raccolte; «Hai consegnato i contanti?» del "
-          "contanti on-chain)",
-          123, solo_codice(mini).count("chiediConferma({"))
+          "contanti on-chain; «Brucia la cauzione» e «Metà mandata» del "
+          "moderatore sulla cauzione on-chain)",
+          125, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -181274,7 +181275,10 @@ def prove_canale_admin():
           # (17 nov 2026, onchain-rimborso-liscio) chi ha depositato scrive
           # dove riavere i sats A DISPUTA APERTA: nella moderazione, perche'
           # chi decide deve sapere che il rimborso adesso ha una strada
-          {"assistenza": 1, "dispute": 7, "dm": 1, "errori": 36,
+          # (17 nov 2026 sera, onchain-contanti) la cauzione on-chain
+          # bruciata, con la meta' da mandare a mano, e il timbro «Metà
+          # mandata»: nelle dispute (sono soldi, e li muove un moderatore)
+          {"assistenza": 1, "dispute": 9, "dm": 1, "errori": 36,
            "liquidita": 5, "moderazione": 24, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -181310,7 +181314,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "110 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "112 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -181328,8 +181332,9 @@ def prove_canale_admin():
           "on-chain cambiato dopo il deposito e l'acquisto on-chain pagato "
           "tardi; dal 17 nov il server riavviato dalla sentinella; delle "
           "raccolte la nuova da approvare, la segnalata, la fermata e le "
-          "uscite firmate; e l'indirizzo del rimborso P2P on-chain scritto "
-          "a disputa aperta)", 110,
+          "uscite firmate; l'indirizzo del rimborso P2P on-chain scritto "
+          "a disputa aperta; e la cauzione on-chain bruciata con la sua "
+          "meta' mandata)", 112,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -204989,7 +204994,7 @@ def prove_onchain_cauzione():
     for riga in ("\nP2P_ONCHAIN_CAUZIONE_PCT = ", "\nP2P_ONCHAIN_CAUZIONE_BASE_SATS = ",
                  "\nP2P_ONCHAIN_CAUZIONE_FINESTRA_S = ", "\nP2P_ONCHAIN_CAUZIONE_CLTV = ",
                  "\nP2P_ONCHAIN_CAUZIONE_PRESA_S = ", "\nP2P_ONCHAIN_CAUZIONE_GUARDA_S = ",
-                 "\nP2P_ONCHAIN_STATI_CHIUSI = "):
+                 "\nP2P_ONCHAIN_CAUZIONE_SALDANDO_S = ", "\nP2P_ONCHAIN_STATI_CHIUSI = "):
         k = src.index(riga) + 1
         exec(src[k:src.index("\n", k)], amb)
     k = src.index("\nP2P_ONCHAIN_CAUZIONE_MEMO = ") + 1
@@ -204997,7 +205002,8 @@ def prove_onchain_cauzione():
     for f in ("_metodi_libro", "_p2p_onchain_campo", "_p2p_onchain_metodi", "_p2p_onchain_solo_contanti",
               "_p2p_onchain_contanti", "p2p_onchain_cauzione_sats", "p2p_onchain_metodo_presa",
               "p2p_onchain_cauzione_serve", "richiesta_hold_cauzione", "p2p_onchain_cauzione_sorte",
-              "_p2p_onchain_cauzione_fuori"):
+              "_p2p_onchain_cauzione_fuori", "p2p_onchain_cauzione_meta",
+              "p2p_onchain_cauzione_bruciabile"):
         exec(pezzo(f), amb)
     S, M, V = amb["p2p_onchain_cauzione_sats"], amb["p2p_onchain_metodo_presa"], amb["p2p_onchain_cauzione_serve"]
     prova("la regola e' quella letta sul nodo: 3%, almeno 1000 sats, quindici minuti, 576 blocchi",
@@ -205070,18 +205076,89 @@ def prove_onchain_cauzione():
     lnd = pezzo("_lnd_cauzione")
     presa = pezzo("p2p_onchain_prendi")
     chiedi = pezzo("p2p_onchain_cauzione_chiedi")
-    prova("a LND, per le cauzioni, passano SOLO hodl, cancel e la lettura di una fattura per "
-          "hash; il macaroon e' il SUO, e quello delle hold di prova (che non sa saldare) qui "
+    prova("a LND, per le cauzioni, passano SOLO hodl, cancel, settle e la lettura di una fattura "
+          "per hash; il macaroon e' il SUO, e quello delle hold di prova (che non sa saldare) qui "
           "non entra",
           (True, True, False),
           ('(metodo == "POST" and percorso in ("/v2/invoices/hodl",' in lnd
-           and '"/v2/invoices/cancel"))' in lnd
+           and '"/v2/invoices/cancel",' in lnd and '"/v2/invoices/settle"))' in lnd
            and 're.fullmatch(r"/v1/invoice/[0-9a-f]{64}", percorso)' in lnd
-           and lnd.count("/v2/invoices/") == 2,
+           and lnd.count("/v2/invoices/") == 3,
            "str(LND_PONTE_MACAROON_CAUZIONE).strip()" in lnd,
            "LND_PONTE_MACAROON_HOLD" in lnd))
-    prova("nessuna strada del server salda una hold (la cauzione persa e' un pezzo a parte, "
-          "con la sua decisione)", 0, src.count("/v2/invoices/settle"))
+    # LA CAUZIONE PERSA (quarto pezzo; Andrea: «come su Lightning», e la meta'
+    # «a mano, la manda un moderatore»)
+    brucia = pezzo("p2p_onchain_cauzione_brucia")
+    salda = pezzo("_p2p_onchain_cauzione_salda")
+    prova("UNA sola strada salda una hold, e la chiama SOLO il gesto del moderatore",
+          (2, 1, 2, True),
+          (src.count("/v2/invoices/settle"), salda.count('"/v2/invoices/settle"'),
+           src.count("_p2p_onchain_cauzione_salda("),
+           "await _p2p_onchain_cauzione_salda(preimage)" in brucia))
+    prova("il gesto: solo un moderatore, mai parte dello scambio; la riga passa a «saldando» "
+          "PRIMA di LND (il giro non la rimanda nello stesso istante) e se LND dice no torna tenuta",
+          (True, True, True, True),
+          ('if not e_admin(user["id"]) or not p2p_onchain_leva():\n        raise HTTPException(404' in brucia,
+           'int(o["maker_id"] or 0), int(o["taker_id"] or 0)):\n'
+           '            raise HTTPException(403, "Un moderatore non decide il proprio scambio")' in brucia,
+           brucia.index("SET stato='saldando', saldando_il=?, persa_da=?")
+           < brucia.index("await _p2p_onchain_cauzione_salda(preimage)"),
+           'await _p2p_onchain_cauzione_chiudi_saldando(cid, "ACCEPTED", adesso)\n        raise HTTPException(503'
+           in brucia))
+    prova("...e NON PAGA NESSUNO: la meta' la manda a mano un moderatore, nessuna uscita dalla "
+          "cassaforte ne' dal binario dei rimborsi; «Metà mandata» e' un timbro",
+          (False, False, False, False, False),
+          ("paga_venditore" in brucia, "rimborsi_asta" in brucia, "_paga_rimborso" in brucia,
+           "paga_venditore" in pezzo("p2p_onchain_cauzione_meta_mandata"),
+           "_lnd_cauzione" in pezzo("p2p_onchain_cauzione_meta_mandata")))
+    prova("una cancel che LND rifiuta perche' la hold e' gia' SALDATA non vale «tornata»",
+          (True, False),
+          ('"already cancel" in perche.lower()' in pezzo("_p2p_onchain_cauzione_annulla"),
+           '"already" in perche.lower()' in pezzo("_p2p_onchain_cauzione_annulla")))
+    META, BRUC = amb["p2p_onchain_cauzione_meta"], amb["p2p_onchain_cauzione_bruciabile"]
+    prova("la meta' dell'altra persona: in giu', il sat spaiato resta al servizio; storta = 0",
+          (1500, 500, 0, 0, 0), (META(3000), META(1001), META(1), META(-5), META("x")))
+    rb = {"stato": "tenuta", "in_gioco": 1}
+    prova("si brucia solo una cauzione IN GIOCO e TENUTA, a scambio IN DISPUTA",
+          ["", True, True, True, True, True, True, True],
+          [BRUC(rb, "disputa"), bool(BRUC(None, "disputa")),
+           "già stata bruciata" in BRUC({**rb, "stato": "persa"}, "disputa"),
+           "sta bruciando" in BRUC({**rb, "stato": "saldando"}, "disputa"),
+           "già tornata" in BRUC({**rb, "stato": "tornata"}, "disputa"),
+           "già tornata" in BRUC({**rb, "in_gioco": 0}, "disputa"),
+           "solo a scambio in disputa" in BRUC(rb, "euro_inviati"),
+           "solo a scambio in disputa" in BRUC(rb, "rilasciato")])
+    SORTE4 = amb["p2p_onchain_cauzione_sorte"]
+    rs = {"stato": "saldando", "in_gioco": 1, "saldando_il": 1000, "scade": 0, "tenuta_il": 0,
+          "guardata_il": 0}
+    prova("il giro: una «saldando» fresca si lascia, dopo due minuti si chiede a LND; una "
+          "«persa» non si tocca mai, nemmeno a scambio chiuso",
+          ["aspetta", "guarda", "aspetta", "aspetta"],
+          [SORTE4(rs, "disputa", 1000 + 120), SORTE4(rs, "disputa", 1000 + 121),
+           SORTE4({**rs, "stato": "persa"}, "rilasciato", 10**9),
+           SORTE4({**rs, "stato": "persa"}, "disputa", 10**9)])
+    chiudi = pezzo("_p2p_onchain_cauzione_chiudi_saldando")
+    prova("da «saldando» si esce come dice LND: SETTLED persa con la meta' scritta, CANCELED "
+          "tornata, altrimenti di nuovo tenuta; e sempre e solo da «saldando»",
+          (True, True, True, 3),
+          ("SET stato='persa', chiusa_il=?" in chiudi and "meta_sats=?, meta_a=?" in chiudi,
+           "SET stato='tornata', chiusa_il=?" in chiudi,
+           "SET stato='tenuta', saldando_il=0" in chiudi,
+           chiudi.count("AND stato='saldando'")))
+    riq = _fn_js(mini, "function riquadroCauzioneOcP2P(o){")
+    prova("il telefono: «Brucia la cauzione» solo al moderatore, a cauzione bloccata e scambio "
+          "in disputa, con la domanda unica e le parole di Lightning; «Metà mandata» idem",
+          (True, True, True, True, True),
+          ("if (stato === 'bloccata' && o.stato === 'disputa')" in riq
+           and riq.index("if (c.mia && typeof riquadroCauzioneP2P === 'function')")
+           < riq.index("bruciaCauzioneOcP2P("),
+           "chiediConferma({titolo: '🔐 Brucia la cauzione', vestito: 'allarme'"
+           in _fn_js(mini, "function bruciaCauzioneOcP2P(id){"),
+           "nessun suo «📍 Sono qui»" in _fn_js(mini, "function bruciaCauzioneOcP2P(id){")
+           and "Non si può annullare" in _fn_js(mini, "function bruciaCauzioneOcP2P(id){"),
+           "/cauzione/brucia`" in _fn_js(mini, "async function eseguiBruciaCauzioneOcP2P(id){"),
+           "chiediConferma({titolo: '✅ Metà mandata'" in _fn_js(mini, "function metaMandataOcP2P(id){")
+           and "/cauzione/meta-mandata`" in _fn_js(mini, "async function eseguiMetaMandataOcP2P(id){")))
     accesa = pezzo("p2p_onchain_cauzione_accesa")
     prova("la leva e' SPENTA di serie, e accesa vuole la riga del config E il macaroon",
           (True, True),
@@ -205176,6 +205253,7 @@ def prove_onchain_cauzione():
         "function cauzioneOcSatsP2P(sats, c){", "function cauzioneOcServeP2P(o){",
         "function rigaCauzioneOcP2P(o, c){", "function metodiPresaOcHtmlP2P(o, vendeLui){",
         "function riquadroCauzioneOcP2P(o){", "function riquadroCauzioneP2P(o){",
+        "function metaCauzioneOcP2P(o){",
         "function cauzioneAFineP2P(o){")) + "\n" \
         + "".join(_riga_js(mini, r) for r in ("const P2P_METODO_FISSO = ",)) + r"""
 const esc = s => String(s == null ? '' : s)
@@ -205230,6 +205308,28 @@ const mod = riquadroCauzioneOcP2P({cauzione: {stato: 'tenuta', sats: 3000, mia: 
 out.scambio = [mia.includes('Cauzione bloccata') && mia.includes('3000 sats') && mia.includes('Torna a fine scambio'),
                tornata.includes('Cauzione restituita'), mod.includes('Cauzione di chi ha preso') && mod.includes('3000 sats'),
                riquadroCauzioneOcP2P({}), riquadroCauzioneOcP2P({cauzione: {stato: 'scaduta', sats: 3000, mia: true}})];
+/* la cauzione persa (quarto pezzo) */
+const persa = riquadroCauzioneOcP2P({cauzione: {stato: 'persa', sats: 3000, mia: true}});
+const modViva = riquadroCauzioneOcP2P({id: 7, stato: 'euro_inviati', cauzione: {stato: 'tenuta', sats: 3000, mia: false}});
+const modDisp = riquadroCauzioneOcP2P({id: 7, stato: 'disputa', cauzione: {stato: 'tenuta', sats: 3000, mia: false}});
+const META = {sats: 1500, a: 888, nome: 'Al<an', ln_address: 'alan@wos.it', mandata: false};
+const modPersa = riquadroCauzioneOcP2P({id: 7, stato: 'disputa', cauzione: {stato: 'persa', sats: 3000, mia: false, meta: META}});
+const modSenza = riquadroCauzioneOcP2P({id: 7, stato: 'disputa', cauzione: {stato: 'persa', sats: 3000, mia: false, meta: {...META, ln_address: ''}}});
+const modFatta = riquadroCauzioneOcP2P({id: 7, stato: 'rimborsato', cauzione: {stato: 'persa', sats: 3000, mia: false, meta: {...META, mandata: true}}});
+out.persa = [persa.includes('Cauzione persa') && persa.includes('3000 sats') && persa.includes('metà va a chi ha scambiato con te'),
+             modViva.includes('bruciaCauzioneOcP2P('), modDisp.includes('bruciaCauzioneOcP2P(7)') && modDisp.includes('prima'),
+             modPersa.includes('bruciata') && modPersa.includes('Metà da mandare a mano') && modPersa.includes('1500 sats')
+               && modPersa.includes('Al&lt;an') && modPersa.includes('(888)') && modPersa.includes('alan@wos.it')
+               && modPersa.includes('metaMandataOcP2P(7)') && !modPersa.includes('bruciaCauzioneOcP2P('),
+             modSenza.includes('chiedigli una fattura'),
+             modFatta.includes('Metà mandata') && !modFatta.includes('metaMandataOcP2P(')];
+const mioMeta = riquadroCauzioneOcP2P({cauzione_meta: {sats: 1500, mandata: false, ln: true}});
+const mioMetaNo = riquadroCauzioneOcP2P({cauzione_meta: {sats: 1500, mandata: false, ln: false}});
+const mioMetaSi = riquadroCauzioneOcP2P({cauzione_meta: {sats: 1500, mandata: true, ln: true}});
+out.meta = [mioMeta.includes('Metà della cauzione dell') && mioMeta.includes('1500 sats') && mioMeta.includes('al tuo indirizzo Lightning del Profilo'),
+            mioMetaNo.includes('scrivi il tuo indirizzo Lightning nel Profilo'),
+            mioMetaSi.includes('Metà della cauzione mandata'), mioMeta.includes('<button'),
+            riquadroCauzioneOcP2P({cauzione_meta: {sats: 0}})];
 console.log(JSON.stringify(out));
 """
     out = _node_banco(banco)
@@ -205260,6 +205360,13 @@ console.log(JSON.stringify(out));
     prova("la pagina dello scambio: a chi l'ha messa «bloccata» e poi «restituita» con le parole "
           "di Lightning, al moderatore una riga; senza cauzione, o mai pagata, niente",
           [True, True, True, "", ""], out.get("scambio"))
+    prova("la cauzione PERSA: a chi l'ha messa le parole di Lightning; al moderatore «Brucia» "
+          "solo in disputa, poi la meta' da mandare a mano con nome, id e indirizzo (o «chiedigli "
+          "una fattura»), e «Metà mandata» finche' non lo e'",
+          [True, False, True, True, True, True], out.get("persa"))
+    prova("...e a chi spetta la meta': quanto, che gliela manda un moderatore e dove; nessun "
+          "bottone (non incassa da solo)",
+          [True, True, True, False, ""], out.get("meta"))
 
 def prove_guida_wallet():
     """LA GUIDA «👛 IL TUO PRIMO WALLET» (17 nov 2026, cantiere
