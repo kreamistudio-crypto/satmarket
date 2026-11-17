@@ -32742,7 +32742,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   da `preso_dal`, la persona da `p2p_scambi` — tranne se il suo primo
   gesto risulta fatto nella cronaca del giro o se ha provato,
   `_ha_provato_p2p` dalla presa in poi col margine
-  `P2P_TENTATIVO_MARGINE_S`); `_reputazione_p2p` (completati di tutta la
+  `P2P_TENTATIVO_MARGINE_S`; e, dal 17 nov 2026 (CANTIERI, «L'annullo
+  chiesto che non arriva»), se aveva toccato «Annulla»: il telefono
+  dichiara il gesto `annullo_chiesto` (`P2P_GESTO_ANNULLO`) in
+  `inviaAnnulloP2P` prima del `cancel`, `_ha_chiesto_annullo_p2p` lo
+  legge, non si scrive ne' «mancato» ne' «scusato», e
+  `_avvisi_evento_p2p` mette `P2P_RIGA_ANNULLO_CHIESTO` nel `conto`;
+  `_ha_provato_p2p` quel gesto NON lo guarda); `_reputazione_p2p` (completati di tutta la
   memoria, mancati a 90 giorni `P2P_MANCATI_FINESTRA_S`, mancati a 30
   `P2P_MANCATI_FILTRO_S`); `_marchio_mancati_p2p` (il numero da
   scrivere, 0 sotto `P2P_MANCATI_TOLLERATI` + 1); `_marchi_mancati_p2p`

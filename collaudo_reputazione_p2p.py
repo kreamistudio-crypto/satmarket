@@ -62,6 +62,7 @@ F = "5a1e0000-0f0f-4a2b-9c3d-00000000000f"      # vendita di 111 di prima, senza
 G = "5a1e0000-0101-4a2b-9c3d-000000000010"      # le due prese aperte di 222
 H = "5a1e0000-0202-4a2b-9c3d-000000000011"
 I = "5a1e0000-0303-4a2b-9c3d-000000000012"      # una vendita PUBBLICATA da 222: il suo volto sul libro
+L = "5a1e0000-0404-4a2b-9c3d-000000000013"      # presa da 222, che tocca «Annulla» e l'annullo non arriva
 MAKER, TAKER, ESTRANEO, VETERANO = banco.VENDE, banco.COMPRA, banco.ESTRANEO, 444
 
 
@@ -116,7 +117,7 @@ def semina_ordini():
     con = banco.con_db()
     adesso = int(time.time())
     for ordine, lato in ((A, "sell"), (B, "sell"), (C, "buy"), (D, "sell"), (E, "sell"),
-                         (F, "sell"), (G, "sell"), (H, "sell")):
+                         (F, "sell"), (G, "sell"), (H, "sell"), (L, "sell")):
         con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,euro,"
                     "metodi) VALUES(?,?,?,'pending',?,1,15000,'10,00 €',?)",
                     (ordine, MAKER, adesso, lato, json.dumps(["SEPA"])))
@@ -244,6 +245,18 @@ async def giro():
     prova("lo stesso timeout rimandato: non nuovo", False,
           (await posta(busta(A, "expired", t0 + 400, "mostro", "taker-timeout")))["nuovo"])
     prova("...e gli esiti non raddoppiano", 2, len(esiti(TAKER)))
+
+    print("\n5-bis) l'annullo chiesto e non arrivato (17 nov 2026, annullo-registrato)")
+    await posta(busta(L, "taken", t0 + 25, "buyer", "invoice-next"))
+    await posta(busta(L, "buyer-invoice-requested", t0 + 25, "mostro", ""))
+    prova("chi ha preso tocca «Annulla»: il telefono lo dichiara, e la rotta lo prende",
+          {"ok": True, "motivo": ""}, await tentativo(TAKER, L, "annullo_chiesto"))
+    await posta(busta(L, "expired", t0 + 425, "mostro", "taker-timeout"))
+    con = banco.con_db()
+    righe_l = con.execute("SELECT COUNT(*) FROM p2p_esiti WHERE ordine=?", (L,)).fetchone()[0]
+    con.close()
+    prova("...il `cancel` non e' arrivato e il tempo scade: NON si conta, ne' «mancato» ne' "
+          "«scusato»; i suoi esiti restano due", (0, 2), (righe_l, len(esiti(TAKER))))
 
     print("\n6) lo scambio concluso, e le stelline")
     prima = stelle(TAKER)
