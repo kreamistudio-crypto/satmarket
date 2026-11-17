@@ -190775,6 +190775,33 @@ def prove_estensione_barattozon():
            and "const PAYCODE_PDF_PERCORSO = '/prod/generate-pdf';" in mini])
     prova("trovato il PayCode, la pagina non si guarda piu'", True,
           "if (d) { mostra(d); occhio.disconnect(); }" in ext_codice)
+    # COMPRA CON BARATTOZON (17 nov 2026, cantiere compra-con-bz): i
+    # bottoni su prodotto e carrello premono SOLO il passo innocuo di
+    # Amazon che hanno accanto, mai «Acquista ora» (con l'1-Click
+    # ordinerebbe da solo) ne' l'invio dell'ordine
+    prova("«Compra con Barattozon» non tocca mai Acquista ora, 1-Click o l'invio dell'ordine", [],
+          [x for x in ("buy-now", "buynow", "submit.buy-now", "placeYourOrder", "place-order",
+                       "turbo-checkout", "oneClick", "one-click", "Acquista ora", "Invia l'ordine",
+                       "submitOrder", "requestSubmit", ".submit(")
+           if x.lower() in ext_codice.lower()])
+    prova("...preme solo «Aggiungi al carrello» sul prodotto e «Procedi all'ordine» nel carrello, per id",
+          [True, True, 1],
+          ["() => document.getElementById('add-to-cart-button')" in ext_codice,
+           "() => document.querySelector('input[name=\"proceedToRetailCheckout\"]')" in ext_codice,
+           ext_codice.count(".click()")])
+    prova("...alla cassa nessun clic: il cartello e un contorno sulla riga del contanti", True,
+          "if (tipo === 'cassa') {\n      if (!messo) messo = cartello();\n      segnaContanti();\n      return;\n    }"
+          in ext_codice)
+    _logo = re.search(r"const LOGO_BZ = 'data:image/webp;base64,([A-Za-z0-9+/=]+)';", ext_codice)
+    import base64 as _b64
+    _logo_b = _b64.b64decode(_logo.group(1)) if _logo else b""
+    prova("il marchio Barattozon sta DENTRO il file (webp), niente risorse servite alla pagina",
+          [True, True, None],
+          [_logo_b[:4] == b"RIFF" and _logo_b[8:12] == b"WEBP", 2000 < len(_logo_b) < 20000,
+           man.get("web_accessible_resources")])
+    prova("il marchio sui tre bottoni: prodotto, carrello e cassa da `marchio()`, il PayCode col suo",
+          [2, 1], [ext_codice.count("i.src = LOGO_BZ;") + ext_codice.count("icona.src = LOGO_BZ;"),
+                   ext_codice.count("function marchio(){")])
 
     # --- 2) LA PORTA DI BARATTOLO --------------------------------------------
     prende = pezzo_js(mini, "function prendiBzDaLinkP2P(){", "\n}\n")
@@ -190809,7 +190836,10 @@ def prove_estensione_barattozon():
           _in_ordine(apri, "p2pBzDavanti = {stato: 'volo', visto: false};", "vaiP2P();"))
     for doc, cosa in (("docs/CANTIERI.md", "## L'estensione del browser per Barattozon"),
                       ("docs/ARCHITETTURA.md", "BARATTOZON DA UN LINK"),
-                      ("estensione/LEGGIMI.md", "Barattolo per Amazon")):
+                      ("estensione/LEGGIMI.md", "Barattolo per Amazon"),
+                      ("docs/CANTIERI.md", "## Compra con Barattozon: il bottone col marchio su prodotto, carrello e cassa"),
+                      ("docs/ARCHITETTURA.md", "COMPRA CON BARATTOZON"),
+                      ("estensione/LEGGIMI.md", "Compra con Barattozon")):
         prova(f"{doc} sa dell'estensione", True, cosa in open(doc, encoding="utf-8").read())
 
     # --- 3) IL BANCO IN NODE: dal PDF di Amazon ai campi del foglio ----------
@@ -190866,6 +190896,12 @@ r.testo = ['Il tuo PayCode: 479 868 518, da pagare entro', 'PAYCODE 479-868-518'
 r.pagina = [datiDaPaginaBz(['https://www.amazon.it/gp/css/order-details', LINK], 'PayCode: 479-868-518', ORA).pc,
             datiDaPaginaBz([], 'Il tuo PayCode: 479868518', ORA), datiDaPaginaBz([], 'niente', ORA)];
 r.importi = ['39,99', '39.9', '39', '€ 39,99', '0', '39,999', '-5', '1e3', ''].map(importoBz);
+r.pagine = ['/Pampers-Baby-Dry-Pannolini/dp/B0FQCDRHFQ/ref=sr_1_6', '/dp/B0FQCDRHFQ', '/gp/product/B0FQCDRHFQ?th=1',
+            '/gp/cart/view.html', '/cart/smart-wagon', '/cart', '/checkout/entry/cart', '/gp/buy/spc/handlers/display.html',
+            '/gp/buy/thankyou/handlers/display.html', '/checkout/p/p-123/thankyou', '/ap/signin', '/s', '/',
+            '/dp/corto', '/gp/css/order-details', '/cartoni/dp'].map(paginaBz);
+r.contanti = ['Paga in Contanti nel Punto Vendita più vicino', 'paga  in contanti', 'Contanti',
+              'pagamento in contanti non disponibile', ''].map(rigaContantiBz);
 r.dogana = [datiBzDaFrammentoP2P('#barattozon?paycode=479868518&importo=39.99&scade=1792326720'),
             datiBzDaFrammentoP2P('#barattozon?paycode=4798685&importo=abc&scade=12&barre=' + N),
             datiBzDaFrammentoP2P('#barattozon?paycode=479868518&barre=' + N),
@@ -190925,6 +190961,11 @@ console.log(JSON.stringify(r));
           ["479-868-518", "479-868-518", "", "", "", "", ""], out["testo"])
     prova("nella pagina il link del PDF vince sul testo; senza PayCode niente bottone",
           ["212-802-988", {"pc": "479-868-518", "importo": "", "scade": 0, "barre": ""}, None], out["pagina"])
+    prova("le pagine di Amazon dal percorso: prodotto, carrello, cassa, grazie; il resto niente",
+          ["prodotto", "prodotto", "prodotto", "carrello", "carrello", "carrello", "cassa", "cassa",
+           "grazie", "grazie", "", "", "", "", "", ""], out["pagine"])
+    prova("la riga del contanti dalla frase «Paga in contanti», mai dalla parola sola",
+          [True, True, False, False, False], out["contanti"])
     prova("gli importi: centesimi con la virgola, il € tollerato, il resto vuoto",
           ["39,99", "39,90", "39,00", "39,99", "", "", "", "", ""], out["importi"])
     prova("la dogana di Barattolo: i campi buoni passano, gli storti restano vuoti, il frammento altrui e' null",
