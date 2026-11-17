@@ -133412,8 +133412,11 @@ def prove_dati_spedizione_copia():
     # (5 ott 2026) i francobolli di «Controlla e paga» e la loro
     # sbirciata: FOTO, non dati — il tocco lungo li' apre la foto in
     # grande (prove_sbirciata), e un menu «Salva immagine» lo coprirebbe
+    # (17 nov 2026) la tela del Mondo di Tappo: un gioco che si guida col
+    # dito trascinato, senza un testo dentro — una selezione lì
+    # coprirebbe la guida a ogni tocco lungo
     prova("user-select:none solo su bottoni, stelle, foto e card: mai sopra un dato",
-          ["#sbirciata img", ".cat-cella", ".ctrl-mini", ".fb-stelle",
+          ["#sbirciata img", ".caccia-tela-box", ".cat-cella", ".ctrl-mini", ".fb-stelle",
            ".lb-slide img", ".p2p-recapito-copia",
            ".qta-mini .qm-btn"], censo(r"user-select\s*:\s*none"))
     prova("...il richiamo del tocco lungo spento solo sulla card del reparto "
@@ -136406,6 +136409,15 @@ def prove_effetti_ridotti():
     #   zoomQuiMappaP2P (3 nov 2026, mappa-contanti): segue le DITA e la
     #     rotellina sulla mappa del contanti, un ridisegno per fotogramma
     #     — come lbApplica, non e' un'animazione
+    #   mondoAccendi, mondoGiro (17 nov 2026, il Mondo di Tappo): il giro
+    #     del gioco, un fotogramma per volta SOLO con la scheda «Mondo» in
+    #     vista (`mondoDavanti`); muove Tappo dove lo guida il dito, come
+    #     lbApplica. Quel che si muove da solo (bulloni che girano,
+    #     barattoli che dondolano, la dissolvenza fra le zone) con gli
+    #     effetti ridotti sta fermo: `fermo = effettiRidotti()`
+    #   apriMissione (17 nov 2026): un'attesa di fotogramma prima della
+    #     classe `aperto` del foglio delle missioni; la dissolvenza e' del
+    #     CSS, e la classe la spegne
     chi = collections.Counter()
     for m in re.finditer(r"requestAnimationFrame", js):
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
@@ -136413,7 +136425,8 @@ def prove_effetti_ridotti():
     prova("chi chiama requestAnimationFrame e' censito, col suo perche'",
           {"togliGuscio": 2, "decodificaInVista": 2, "navArrivoSecco": 2,
            "avviaTour": 2, "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1,
-           "passo": 2, "zoomQuiMappaP2P": 1},
+           "passo": 2, "mondoAccendi": 1, "mondoGiro": 1, "apriMissione": 1,
+           "zoomQuiMappaP2P": 1},
           dict(chi))
 
     # --- 5) PRIMA DEL PRIMO PAINT, E DOPO /me -----------------------
