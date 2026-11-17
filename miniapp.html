@@ -69464,7 +69464,11 @@ function schedaOnchainP2P(o){
         + (o.decisione ? '<br><b>Deciso:</b> i sats vanno a chi ' + (o.decisione.verso === 'venditore' ? 'compra' : 'vende') + ' bitcoin.' : '');
       break;
     case 'rilasciato': testo = 'Concluso: i sats sono andati al wallet di chi ha comprato.'; break;
-    case 'rimborsato': testo = 'Rimborsato: i sats sono tornati a chi li aveva depositati.'; break;
+    case 'rimborsato': testo = 'Rimborsato: i sats sono tornati a chi li aveva depositati.'
+        /* (17 nov 2026 sera, onchain-ritiro) il «non completato» di chi
+           si e' ritirato dopo il deposito, detto a tutti e due */
+        + (o.non_completato === 'io' ? ' Ti è stato contato come <b>scambio non completato</b>: i sats di chi vendeva erano già bloccati.'
+           : o.non_completato === 'altro' ? ' A chi comprava è stato contato come <b>scambio non completato</b>.' : ''); break;
     case 'annullato': testo = (o.chiuso_perche === 'paracadute'
         ? '🪂 Annullato dal paracadute: BTC si è mosso più del ' + Number(o.paracadute) + '% da quando l\'hai pubblicato. Puoi ripubblicarlo al prezzo nuovo.'
         : 'Annullato prima del deposito.') + (o.ricevuti_sats ? ' <b>Attenzione:</b> dopo l\'annullo sono arrivati sats: un moderatore li rimanda indietro.' : ''); break;
@@ -69650,8 +69654,23 @@ const p2pOcRecChieste = new Set(); // una domanda per ordine e per sessione
 let p2pOcRecModifica = '';         // l'ordine la cui recensione sto modificando
 /* PURA: lo scambio on-chain e' arrivato dove si recensisce? */
 function recensibileOcP2P(o){
+  /* (17 nov 2026 sera, onchain-ritiro; Andrea: «si prende la penalità e
+     il rischio di un giudizio negativo, punto») dopo una RINUNCIA a
+     deposito fatto la recensione e' a senso unico: la lascia chi aveva
+     bloccato i sats (ruolo `compratore` nel 2-di-3), a chi si e'
+     ritirato. Lo decide il server (`non_completato`), come la rotta. */
   return !!(o && o.ruolo !== 'moderatore' && o.ordine
-    && (o.stato === 'rilasciato' || (o.stato === 'rimborsato' && o.decisione && o.disputa)));
+    && (o.stato === 'rilasciato' || (o.stato === 'rimborsato' && o.decisione && o.disputa)
+        || (o.stato === 'rimborsato' && o.ruolo === 'compratore'
+            && o.non_completato === 'altro' && o.non_completato_perche === 'onchain-rinuncia')));
+}
+/* PURA: la riga che dice a chi rinuncia, PRIMA della firma, che gli
+   conta (17 nov 2026 sera). Il server dice se conterebbe adesso
+   (`rinuncia_conta`: deposito confermato e recapito scritto). */
+function avvisoRinunciaContaOcP2P(o){
+  return o && o.rinuncia_conta && o.ruolo === 'venditore'
+    ? ' Chi vende ha già bloccato i sats: rinunciare adesso ti conta come scambio non completato (il primo è tollerato), e chi vende potrà lasciarti una recensione.'
+    : '';
 }
 /* PURA: il riquadro, dalla risposta del server; senza risposta niente */
 function riquadroRecensioneOcP2P(o, rec){
@@ -70484,7 +70503,8 @@ function rinunciaOnchainP2P(btn, id){
   const paroleOc = typeof paroleOcP2P === 'function' ? paroleOcP2P : (x, t) => t;
   haptic();
   chiediConferma({titolo: '↩️ Rinunci allo scambio?', etichetta: 'Rinuncio', vestito: 'allarme',
-    corpo: (o => o ? paroleOc(o, 'I sats tornano a chi li ha depositati, meno la commissione di rete. Se hai già mandato gli euro, apri una disputa invece.')
+    corpo: (o => o ? paroleOc(o, 'I sats tornano a chi li ha depositati, meno la commissione di rete. Se hai già mandato gli euro, apri una disputa invece.'
+        + (typeof avvisoRinunciaContaOcP2P === 'function' ? avvisoRinunciaContaOcP2P(o) : ''))
       : 'I sats tornano a chi li ha depositati, meno la commissione di rete. Se hai già mandato gli euro, apri una disputa invece.')(p2pOnchainMiei.find(x => x.id === id)),
     poi: () => firmaOnchainP2P(id, 'compratore')});
 }

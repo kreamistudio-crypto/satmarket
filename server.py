@@ -64576,14 +64576,17 @@ def _recensibile_onchain_p2p(stato, decisione_da, disputa_il=0) -> bool:
     firma di Barattolo e una disputa aperta). Un rimborso d'accordo, a
     tempo, o il moderatore che rimanda indietro i sats arrivati dopo un
     annullo (lo scambio non e' mai cominciato) NON aprono la recensione,
-    come l'annullo di la'."""
+    come l'annullo di la'. UN'ECCEZIONE, che non passa di qui perche'
+    vale per una parte sola (17 nov 2026 sera, onchain-ritiro): la
+    rinuncia contata come «non completato» apre la recensione a chi
+    aveva depositato — la decide `_riga_recensione_p2p`, che sa chi chiede."""
     if str(stato or "") == "rilasciato":
         return True
     return (str(stato or "") == "rimborsato" and int(decisione_da or 0) > 0
             and int(disputa_il or 0) > 0)
 
 
-def _riga_recensione_p2p(con, ordine: str):
+def _riga_recensione_p2p(con, ordine: str, chi: int = 0):
     """`{tg_id, preso_da, concluso}` dello scambio da recensire, o None.
     UNA SOLA PORTA PER LE DUE ROTTE, Lightning e on-chain: il Lightning
     legge `p2p_ordini` (chi ha pubblicato, chi ha preso, il giudice
@@ -64597,20 +64600,27 @@ def _riga_recensione_p2p(con, ordine: str):
     sempre (`_onchain_db` e' `db()`), e la rotta che scrive tiene un
     BEGIN IMMEDIATE — una seconda connessione che prepara le tabelle
     aspetterebbe il suo stesso lucchetto. Un database senza la tabella
-    (i banchi di ieri) vale «scambio che non c'e'», mai un errore."""
+    (i banchi di ieri) vale «scambio che non c'e'», mai un errore.
+    A SENSO UNICO DOPO UNA RINUNCIA (17 nov 2026 sera, onchain-ritiro):
+    lo scambio rimborsato perche' chi comprava si e' ritirato a deposito
+    fatto (`mancato_perche` = 'onchain-rinuncia') lo recensisce solo
+    `chi` aveva depositato; per l'altro resta «non concluso»."""
     if str(ordine).startswith(P2P_ONCHAIN_PREFISSO):
         try:
-            o = con.execute("SELECT depositante_id, ricevente_id, stato, decisione_da, "
-                            "disputa_il FROM p2p_onchain_ordini WHERE ordine=?",
+            o = con.execute("SELECT * FROM p2p_onchain_ordini WHERE ordine=?",
                             (ordine,)).fetchone()
         except sqlite3.OperationalError:
             return None
         if not o:
             return None
+        concluso = _recensibile_onchain_p2p(o["stato"], o["decisione_da"], o["disputa_il"])
+        if (not concluso and str(o["stato"] or "") == "rimborsato"
+                and str(_p2p_onchain_campo(o, "mancato_perche", "") or "") == "onchain-rinuncia"
+                and int(chi or 0) and int(chi) == int(o["depositante_id"] or 0)):
+            concluso = True
         return {"tg_id": int(o["depositante_id"] or 0),
                 "preso_da": int(o["ricevente_id"] or 0),
-                "concluso": _recensibile_onchain_p2p(o["stato"], o["decisione_da"],
-                                                     o["disputa_il"])}
+                "concluso": concluso}
     r = con.execute("SELECT tg_id, preso_da, stato FROM p2p_ordini "
                     "WHERE ordine=?", (ordine,)).fetchone()
     if not r:
@@ -64653,7 +64663,7 @@ async def recensibile_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Ordine in una forma sconosciuta")
     con = db()
     try:
-        r = _riga_recensione_p2p(con, ordine)
+        r = _riga_recensione_p2p(con, ordine, user["id"])
         mia = _mia_recensione_p2p(con, ordine, user["id"])
         concluso = bool(r) and r["concluso"]
         # (14 nov 2026) la recensione che ho cancellato io: la lapide
@@ -64760,7 +64770,7 @@ async def recensione_p2p(req: Request, x_tg_init_data: str = Header(""),
     con = db()
     try:
         con.execute("BEGIN IMMEDIATE")
-        r = _riga_recensione_p2p(con, ordine)
+        r = _riga_recensione_p2p(con, ordine, user["id"])
         if not r:
             con.rollback()
             raise HTTPException(404, "Scambio non trovato")
@@ -108177,7 +108187,13 @@ def _p2p_onchain_prepara(con):
                       # 17 nov 2026 sera: quando la ronda ha detto alle due
                       # parti che le 48 ore del bonifico sono passate (0 =
                       # non ancora): una volta sola
-                      ("bonifico_scaduto_il", "INTEGER DEFAULT 0")):
+                      ("bonifico_scaduto_il", "INTEGER DEFAULT 0"),
+                      # 17 nov 2026 sera, cantiere onchain-ritiro: a chi e'
+                      # stato contato lo «scambio non completato» alla
+                      # chiusura (0 = a nessuno), e perche' ('onchain-
+                      # rinuncia' apre la recensione a chi aveva depositato)
+                      ("mancato_a", "INTEGER DEFAULT 0"),
+                      ("mancato_perche", "TEXT DEFAULT ''")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -108698,6 +108714,16 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         # (17 nov 2026, onchain-rimborso-liscio) chi compra vuole
         # rinunciare e il rimborso aspetta l'indirizzo di chi ha depositato
         "rinuncia_chiesta_il": int(_p2p_onchain_campo(o, "rinuncia_chiesta_il", 0) or 0),
+        # (17 nov 2026 sera, onchain-ritiro) il «non completato» di chi si
+        # ritira dopo il deposito: se una rinuncia ADESSO conterebbe (il
+        # telefono lo dice prima della firma), e a chi e' stato contato
+        "rinuncia_conta": _p2p_onchain_rinuncia_conta(o),
+        "non_completato": (("io" if int(_p2p_onchain_campo(o, "mancato_a", 0) or 0) == tg_id
+                            else "altro")
+                           if int(_p2p_onchain_campo(o, "mancato_a", 0) or 0)
+                           and ruolo in ("compratore", "venditore") else ""),
+        "non_completato_perche": (str(_p2p_onchain_campo(o, "mancato_perche", "") or "")
+                                  if ruolo in ("compratore", "venditore") else ""),
         "cambio": _onchain_cambio_letto({"cambio": _p2p_onchain_campo(o, "cambio", "")}),
         "ln_possibile": bool(ruolo == "venditore" and p2p_onchain_ln_per(tg_id)),
         # (tappa 3) chi ha preso vendendo bitcoin puo' depositare in Lightning
@@ -110035,13 +110061,82 @@ def _p2p_onchain_esiti(o, stato) -> list:
     return [(tg, ruolo) for tg, ruolo in coppie if tg]
 
 
+# CHI SI RITIRA DOPO IL DEPOSITO (17 nov 2026 sera, cantiere onchain-
+# ritiro; un utente: «quando qualcuno si tira indietro dopo aver accettato
+# un ordine e aver fatto bloccare i sats alla controparte dovrebbe
+# accollarsi fee ed una piccola penale»; Alan sulla cauzione: «come
+# esperienza è pessima […] piuttosto si prende la penalità e il rischio di
+# un giudizio negativo»; Andrea: «Quindi piuttosto si prende la penalità e
+# il rischio di un giudizio negativo, punto.»). Niente denaro: nel 2-di-3
+# ci sono solo i sats di chi vende, e una cauzione vorrebbe un passo e una
+# custodia in piu'. A chi compra bitcoin e lascia l'altro coi sats bloccati
+# si conta uno «scambio non completato» nella reputazione di sempre
+# (`p2p_esiti`, esito `mancato`: la stessa tolleranza del primo, lo stesso
+# marchio, lo stesso filtro del Lightning), in due casi soli, tutti e due
+# fatti che il server SA:
+# • «Rinuncio» firmato da lui a deposito confermato (dettaglio
+#   `onchain-rinuncia`): e chi aveva depositato puo' lasciargli una
+#   recensione, a senso unico;
+# • il tempo per pagare finito senza «Ho inviato», la disputa, e il
+#   moderatore che rimanda i sats a chi li aveva depositati (dettaglio
+#   `onchain-non-pagato`): senza questo, per non essere contati basterebbe
+#   stare zitti invece di rinunciare. La recensione li' c'era gia'.
+# MAI se chi vende non aveva fatto la sua parte: senza il recapito scritto
+# (o il PayCode) chi compra non aveva dove pagare, e ritirarsi e' l'unica
+# cosa sensata — la regola del Lightning, «senza recapito non si conta a
+# nessuno». E mai prima del deposito confermato: li' c'e' «✕ Annulla».
+def _p2p_onchain_ha_dove_pagare(o) -> bool:
+    """PURA: chi vende ha fatto la sua parte — il recapito scritto, o il
+    PayCode di un Barattozon."""
+    return bool(str(_p2p_onchain_campo(o, "recapito", "") or "").strip()
+                or globals().get("p2p_onchain_tab_scade", lambda x: 0)(o))
+
+
+def _p2p_onchain_rinuncia_conta(o) -> bool:
+    """PURA: una rinuncia di chi compra, ADESSO, gli verrebbe contata? Lo
+    legge il telefono per dirlo PRIMA della firma: deposito confermato,
+    scambio ancora fra le due parti, e chi vende ha detto dove pagare."""
+    return (str(_p2p_onchain_campo(o, "stato", "") or "") in ("depositato", "euro_inviati")
+            and int(_p2p_onchain_campo(o, "depositato_il", 0) or 0) > 0
+            and _p2p_onchain_ha_dove_pagare(o))
+
+
+def _p2p_onchain_mancato(o, stato) -> tuple:
+    """PURA: `(tg_id, dettaglio)` di chi si vede contare come NON
+    COMPLETATO uno scambio on-chain chiuso col rimborso, o `(0, '')`.
+    `o` e' la riga PRIMA della chiusura (lo stato di allora), `stato`
+    quello nuovo."""
+    if str(stato or "") != "rimborsato":
+        return 0, ""
+    ric = int(_p2p_onchain_campo(o, "ricevente_id", 0) or 0)
+    prima = str(_p2p_onchain_campo(o, "stato", "") or "")
+    if (not ric or int(_p2p_onchain_campo(o, "depositato_il", 0) or 0) <= 0
+            or not _p2p_onchain_ha_dove_pagare(o)):
+        return 0, ""
+    if int(_p2p_onchain_campo(o, "decisione_da", 0) or 0):
+        # deciso da un moderatore: solo il fatto certo, il tempo per
+        # pagare finito senza che chi compra abbia mai detto «Ho inviato»
+        if (prima == "disputa"
+                and int(_p2p_onchain_campo(o, "pagamento_scaduto_il", 0) or 0) > 0
+                and int(_p2p_onchain_campo(o, "euro_inviati_il", 0) or 0) <= 0):
+            return ric, "onchain-non-pagato"
+        return 0, ""
+    if (prima in ("depositato", "euro_inviati")
+            and int(_p2p_onchain_campo(o, "proposta_da", 0) or 0) == ric):
+        return ric, "onchain-rinuncia"
+    return 0, ""
+
+
 def _p2p_onchain_segna_esiti(o, stato, adesso: int):
     """Scrive gli esiti di `_p2p_onchain_esiti` nella tabella di
     sempre, giro 0, dettaglio «onchain». La PK fa l'idempotenza, come
     il retry di mostrod. Un errore qui non ferma la chiusura dello
-    scambio: i sats sono gia' partiti, e la reputazione e' un conto."""
+    scambio: i sats sono gia' partiti, e la reputazione e' un conto.
+    Dal 17 nov 2026 sera anche il «non completato» di chi si ritira
+    dopo il deposito (`_p2p_onchain_mancato`)."""
     righe = _p2p_onchain_esiti(o, stato)
-    if not righe:
+    mancato, perche = _p2p_onchain_mancato(o, stato)
+    if not righe and not mancato:
         return
     try:
         con = db()
@@ -110051,6 +110146,13 @@ def _p2p_onchain_segna_esiti(o, stato, adesso: int):
                     "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, "
                     "ruolo, quando, dettaglio) VALUES(?,?,0,'completato',?,?,'onchain')",
                     (tg, o["ordine"], ruolo, int(adesso)))
+            if mancato:
+                con.execute(
+                    "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, "
+                    "ruolo, quando, dettaglio) VALUES(?,?,0,'mancato','compra',?,?)",
+                    (mancato, o["ordine"], int(adesso), perche))
+                print(f"⚠️ Reputazione P2P on-chain: a {mancato} si conta uno scambio "
+                      f"non completato ({o['ordine'][:20]}, {perche})", flush=True)
             con.commit()
         finally:
             con.close()
@@ -110126,11 +110228,15 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
         raise HTTPException(503, "mempool non risponde: riprova fra poco")
     stato = "rilasciato" if verso == "venditore" else "rimborsato"
     adesso = int(time.time())
+    # (17 nov 2026 sera, onchain-ritiro) chi si ritira dopo il deposito
+    mancato_a, mancato_perche = _p2p_onchain_mancato(o, stato)
     con = _p2p_onchain_db()
     try:
         con.execute("UPDATE p2p_onchain_ordini SET stato=?, txid_uscita=?,"
-                    " chiuso_il=?, aggiornato=? WHERE id=?",
-                    (stato, txid or arrivato, adesso, adesso, oid))
+                    " chiuso_il=?, aggiornato=?, mancato_a=?, mancato_perche=?"
+                    " WHERE id=?",
+                    (stato, txid or arrivato, adesso, adesso, mancato_a,
+                     mancato_perche, oid))
         con.commit()
     finally:
         con.close()
@@ -110155,8 +110261,28 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
     # lo stesso giudice della rotta che la scrive
     invito = ("\n\nLascia una recensione: la trovi nella pagina dello scambio."
               if _recensibile_onchain_p2p(stato, o["decisione_da"], o["disputa_il"]) else "")
+    # CHI SI E' RITIRATO DOPO IL DEPOSITO (17 nov 2026 sera): a lui la riga
+    # del conto, la stessa del Lightning; a chi aveva depositato l'invito
+    # alla recensione, che dopo una rinuncia e' solo sua
+    code = {}
+    if mancato_a:
+        con = db()
+        try:
+            riga = _conto_esito_p2p(con, mancato_a, o["ordine"], 0, adesso)["riga"]
+        except Exception:
+            riga = ""
+        finally:
+            con.close()
+        if riga:
+            code[int(mancato_a)] = "\n\n" + riga
+        if mancato_perche == "onchain-rinuncia" and not invito:
+            code[int(o["depositante_id"] or 0)] = (
+                "\n\nChi comprava si è ritirato coi tuoi sats già bloccati: gli "
+                "conta come scambio non completato, e puoi lasciargli una recensione "
+                "dalla pagina dello scambio.")
     for chi, testo in testi.items():
-        await _notifica_p2p_onchain(o, chi, testo + tx + invito, _p2p_onchain_bottone(o))
+        await _notifica_p2p_onchain(o, chi, testo + tx + invito + code.get(int(chi or 0), ""),
+                                    _p2p_onchain_bottone(o))
     return {"ok": True, "stato": stato, "txid": txid or arrivato}
 
 

@@ -203702,7 +203702,10 @@ def prove_onchain_come_lightning():
            "_recensibile_onchain_p2p(stato, o[\"decisione_da\"], o[\"disputa_il\"])" in firma
            and "testo + tx + invito" in firma,
            "_p2p_onchain_quanto(o, netti=True)" in firma,
-           "_riga_recensione_p2p(con, ordine)" in rec_si and "_riga_recensione_p2p(con, ordine)" in rec_scrivi
+           # (17 nov 2026 sera, onchain-ritiro) con chi chiede: dopo una
+           # rinuncia la recensione e' a senso unico
+           '_riga_recensione_p2p(con, ordine, user["id"])' in rec_si
+           and '_riga_recensione_p2p(con, ordine, user["id"])' in rec_scrivi
            and "FROM p2p_ordini" not in rec_si and "FROM p2p_ordini" not in rec_scrivi,
            "_p2p_onchain_passata_tempo_pagare(con, adesso)" in ronda,
            "Hai {ore} ore</b>, poi chi vende può aprire una disputa" in controlla,
@@ -204375,6 +204378,144 @@ console.log(JSON.stringify([
         prova("il giudice del telefono: dentro le 48 ore, a tempo passato, e null dove il "
               "bonifico non c'e' (USDT, monete, contanti), fuori da «euro inviati» e senza riga",
               [[5000, 48, False], [5000, 48, True], None, None, None, None], r)
+
+
+def prove_onchain_ritiro():
+    """CHI SI RITIRA DOPO IL DEPOSITO (17 nov 2026 sera, cantiere onchain-
+    ritiro; un utente: «quando qualcuno si tira indietro dopo aver […]
+    fatto bloccare i sats alla controparte dovrebbe accollarsi fee ed una
+    piccola penale»; Alan sulla cauzione: «come esperienza è pessima»;
+    Andrea: «si prende la penalità e il rischio di un giudizio negativo,
+    punto»). Niente denaro: a chi compra bitcoin e lascia l'altro coi
+    sats bloccati si conta uno «scambio non completato», e dopo una
+    rinuncia chi aveva depositato puo' recensirlo, a senso unico. Mai
+    senza il recapito di chi vende, mai prima del deposito confermato.
+    Il giro vero sta in `collaudo_p2p_onchain` (sezione 6)."""
+    print("\n[on-chain: chi si ritira dopo il deposito]")
+    import sqlite3
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    amb = {"json": json, "re": __import__("re"), "sqlite3": sqlite3, "time": time}
+    j = src.index("\nP2P_ONCHAIN_PREFISSO = ") + 1
+    exec(src[j:src.index("\n", j)].split("  #")[0], amb)
+    for f in ("_p2p_onchain_campo", "p2p_onchain_tab_dati", "p2p_onchain_tab_scade",
+              "_p2p_onchain_ha_dove_pagare", "_p2p_onchain_rinuncia_conta",
+              "_p2p_onchain_mancato", "_recensibile_onchain_p2p", "_riga_recensione_p2p"):
+        exec(pezzo(f), amb)
+    M, C = amb["_p2p_onchain_mancato"], amb["_p2p_onchain_rinuncia_conta"]
+    base = {"stato": "depositato", "depositante_id": 222, "ricevente_id": 111,
+            "depositato_il": 1000, "recapito": "IT60X…", "proposta_da": 111,
+            "decisione_da": 0, "disputa_il": 0, "euro_inviati_il": 0,
+            "pagamento_scaduto_il": 0, "paycode": ""}
+    prova("LA RINUNCIA di chi compra a deposito confermato e col recapito scritto: un «non "
+          "completato» a lui; anche dopo «Ho inviato»",
+          [(111, "onchain-rinuncia"), (111, "onchain-rinuncia")],
+          [M(base, "rimborsato"), M(dict(base, stato="euro_inviati", euro_inviati_il=2000),
+                                    "rimborsato")])
+    tab = dict(base, recapito="", paycode=json.dumps({"pc": "212802988", "scade": 9_999_999_999,
+                                                       "barre": ""}))
+    prova("...MAI se chi vende non aveva scritto il recapito (non c'era dove pagare); il "
+          "PayCode di un Barattozon vale come recapito",
+          [(0, ""), (0, ""), (111, "onchain-rinuncia")],
+          [M(dict(base, recapito=""), "rimborsato"), M(dict(base, recapito="   "), "rimborsato"),
+           M(tab, "rimborsato")])
+    prova("...mai prima del deposito confermato (sats arrivati dopo un annullo, o lo scambio "
+          "solo preso), mai su uno scambio concluso, e mai se il rimborso non l'ha proposto lui",
+          [(0, ""), (0, ""), (0, ""), (0, ""), (0, "")],
+          [M(dict(base, stato="annullato", depositato_il=0), "rimborsato"),
+           M(dict(base, stato="preso", depositato_il=0), "rimborsato"),
+           M(dict(base, stato="annullato"), "rimborsato"),
+           M(base, "rilasciato"), M(dict(base, proposta_da=0), "rimborsato")])
+    disp = dict(base, stato="disputa", disputa_il=5000, decisione_da=999, proposta_da=999)
+    prova("LA DISPUTA che rimanda i sats a chi li aveva depositati conta a chi compra SOLO col "
+          "fatto certo: il tempo per pagare finito e mai un «Ho inviato». Dentro il tempo, o "
+          "con «Ho inviato» detto, decide il moderatore e non si conta",
+          [(111, "onchain-non-pagato"), (0, ""), (0, ""), (0, "")],
+          [M(dict(disp, pagamento_scaduto_il=4000), "rimborsato"), M(disp, "rimborsato"),
+           M(dict(disp, pagamento_scaduto_il=4000, euro_inviati_il=4500), "rimborsato"),
+           M(dict(disp, pagamento_scaduto_il=4000, recapito=""), "rimborsato")])
+    prova("IL PREAVVISO: il server dice se una rinuncia ADESSO conterebbe (depositato o euro "
+          "inviati, col recapito); non prima del deposito, non senza recapito, non in disputa",
+          [True, True, False, False, False],
+          [C(base), C(dict(base, stato="euro_inviati")), C(dict(base, stato="preso", depositato_il=0)),
+           C(dict(base, recapito="")), C(disp)])
+    # la recensione a senso unico, sulla riga vera
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE p2p_onchain_ordini(ordine TEXT, depositante_id INT, "
+                "ricevente_id INT, stato TEXT, decisione_da INT DEFAULT 0, "
+                "disputa_il INT DEFAULT 0, mancato_a INT DEFAULT 0, mancato_perche TEXT DEFAULT '')")
+    PRE = amb["P2P_ONCHAIN_PREFISSO"]
+    con.executemany("INSERT INTO p2p_onchain_ordini(ordine, depositante_id, ricevente_id, stato, "
+                    "decisione_da, disputa_il, mancato_a, mancato_perche) VALUES(?,?,?,?,?,?,?,?)", [
+        (PRE + "a", 222, 111, "rimborsato", 0, 0, 111, "onchain-rinuncia"),
+        (PRE + "b", 222, 111, "rimborsato", 0, 0, 0, ""),
+        (PRE + "c", 222, 111, "rimborsato", 999, 5000, 111, "onchain-non-pagato"),
+        (PRE + "d", 222, 111, "rilasciato", 0, 0, 0, "")])
+    R = lambda o, chi: amb["_riga_recensione_p2p"](con, PRE + o, chi)["concluso"]
+    prova("LA RECENSIONE DOPO UNA RINUNCIA E' A SENSO UNICO: la lascia chi aveva depositato, "
+          "non chi si e' ritirato, non un estraneo, e non senza chi chiede",
+          [True, False, False, False], [R("a", 222), R("a", 111), R("a", 333), R("a", 0)])
+    prova("...il rimborso non contato resta senza recensione; la disputa decisa e lo scambio "
+          "concluso restano di tutti e due, come prima",
+          [False, False, True, True, True, True],
+          [R("b", 222), R("b", 111), R("c", 222), R("c", 111), R("d", 222), R("d", 111)])
+    # --- le cuciture ---
+    firma = src[src.index('async def p2p_onchain_firma('):src.index('@app.post("/api/p2p/onchain/{oid}/disputa")')]
+    segna = pezzo("_p2p_onchain_segna_esiti")
+    riga = pezzo("_p2p_onchain_per")
+    prova("cuciture: la firma che chiude decide il «non completato» sulla riga di PRIMA, lo "
+          "scrive sullo scambio e negli esiti di sempre, dice la riga del conto a lui e "
+          "l'invito a chi aveva depositato; le due colonne nascono da sole; la riga dello "
+          "scambio porta preavviso ed esito solo alle due parti",
+          (True, True, True, True, True, True, True),
+          ("mancato_a, mancato_perche = _p2p_onchain_mancato(o, stato)" in firma,
+           "mancato_a=?, mancato_perche=?" in firma,
+           "VALUES(?,?,0,'mancato','compra',?,?)" in segna,
+           '_conto_esito_p2p(con, mancato_a, o["ordine"], 0, adesso)["riga"]' in firma
+           and "puoi lasciargli una recensione" in firma,
+           '("mancato_a", "INTEGER DEFAULT 0")' in pezzo("_p2p_onchain_prepara")
+           and '("mancato_perche", "TEXT DEFAULT \'\'")' in pezzo("_p2p_onchain_prepara"),
+           '"rinuncia_conta": _p2p_onchain_rinuncia_conta(o)' in riga,
+           'and ruolo in ("compratore", "venditore") else ""' in riga))
+    prova("niente denaro: nessuna cauzione e nessuna quota nasce da questo cantiere",
+          [False, False], ["cauzione" in codice(pezzo("_p2p_onchain_mancato")),
+                           "quota" in codice(pezzo("_p2p_onchain_mancato"))])
+    # --- il telefono ---
+    r = _node_banco(_fn_js(mini, "function recensibileOcP2P(o){")
+                    + _fn_js(mini, "function avvisoRinunciaContaOcP2P(o){") + """
+const b = {ordine: 'bar-onchain-1', stato: 'rimborsato', non_completato: 'altro',
+           non_completato_perche: 'onchain-rinuncia', ruolo: 'compratore'};
+const A = Object.assign;
+console.log(JSON.stringify({
+  rec: [recensibileOcP2P(b), recensibileOcP2P(A({}, b, {ruolo: 'venditore', non_completato: 'io'})),
+        recensibileOcP2P(A({}, b, {non_completato: '', non_completato_perche: ''})),
+        recensibileOcP2P(A({}, b, {non_completato_perche: 'onchain-non-pagato'})),
+        recensibileOcP2P(A({}, b, {ruolo: 'moderatore'})),
+        recensibileOcP2P({ordine: 'x', stato: 'rilasciato', ruolo: 'venditore'}),
+        recensibileOcP2P({ordine: 'x', stato: 'rimborsato', ruolo: 'venditore', decisione: {}, disputa: {}})],
+  avviso: [avvisoRinunciaContaOcP2P({rinuncia_conta: true, ruolo: 'venditore'}).indexOf('scambio non completato') > 0,
+           avvisoRinunciaContaOcP2P({rinuncia_conta: true, ruolo: 'venditore'}).indexOf('recensione') > 0,
+           avvisoRinunciaContaOcP2P({rinuncia_conta: false, ruolo: 'venditore'}),
+           avvisoRinunciaContaOcP2P({rinuncia_conta: true, ruolo: 'compratore'}),
+           avvisoRinunciaContaOcP2P(null)]}));
+""")
+    if r is None:
+        salta("onchain_ritiro", "node non c'e': i giudici del telefono non si provano")
+    else:
+        prova("il telefono: dopo una rinuncia contata il riquadro della recensione compare solo "
+              "a chi aveva depositato; scambio concluso e disputa decisa restano com'erano",
+              [True, False, False, False, False, True, True], r.get("rec"))
+        prova("...e chi sta per rinunciare lo legge PRIMA di firmare, solo se conterebbe",
+              [True, True, "", "", ""], r.get("avviso"))
+    rin = pezzo_js(mini, "function rinunciaOnchainP2P(btn, id){", "\n}\n")
+    scheda = pezzo_js(mini, "function schedaOnchainP2P(o){", "\n}\n")
+    prova("...il foglio di «Rinuncio» porta l'avviso, e la pagina dello scambio rimborsato "
+          "dice a tutti e due a chi e' stato contato",
+          (True, True, True),
+          ("avvisoRinunciaContaOcP2P(o)" in rin,
+           "o.non_completato === 'io' ? ' Ti è stato contato come <b>scambio non completato</b>" in scheda,
+           "o.non_completato === 'altro' ? ' A chi comprava è stato contato" in scheda))
 
 
 def prove_guida_wallet():
@@ -207129,7 +207270,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -208147,6 +208288,7 @@ def main():
     prove_chat_onchain,
     prove_onchain_rimborso_liscio,
     prove_onchain_tempo_bonifico,
+    prove_onchain_ritiro,
     prove_guida_wallet,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
