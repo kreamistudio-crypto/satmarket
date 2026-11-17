@@ -88234,6 +88234,122 @@ l'elenco senza utenti). NON VISTO DAL VIVO: la spunta in un client Nostr
 vero (Damus, Primal, Amethyst) su collaudo.barattolo.store; e la riga
 del Profilo su un telefono.
 
+## Il Profilo con otto cassetti che si spiegano da soli (17 nov 2026, cantiere profilo-semplice; Andrea: «sono troppo confusionario, anche i titoli non si capisce. Per esempio, il tuo catalogo che cosa vuol dire? Negozio, spedizioni, è tutto confusionario. Il titolo deve far capire subito che cosa c'è dentro»)
+DECISO sulle foto prima/dopo (Andrea, 14:53 «Sì, così va bene»): il
+titolo di ogni cassetto dice COSA C'È DENTRO, con le parole di chi usa
+l'app. «Il tuo catalogo» → «Annunci»; «Negozio e spedizioni», che aveva
+dodici voci, si divide in «Il tuo negozio» (numeri, vetrina, banner,
+link, ferie, cassa, widget, pacchi al tuo punto) e «Spedizioni e
+sconti» (come spedisci, spedizione gratis, sconto, codici, premi
+fedeltà); «Incassi e pagamenti» → «Wallet e incassi»; «Livello e
+inviti» → «Livello e recensioni»; «Avvisi e aspetto» e «Privacy» →
+una sola «Impostazioni», con dentro anche «Esporta i tuoi dati» (è un
+dato tuo, non un incasso); «Supporto» → «Aiuto», che accoglie «Come
+funziona il pagamento protetto» (è una pagina che spiega, non una cosa
+da impostare quando compri). Voci rinominate: «Importa in blocco» →
+«Carica tanti annunci insieme» (anche col «/ catalogo esterno», e nei
+testi del server e di Tappo), «📊 Il tuo negozio» → «I numeri del
+negozio» (a chi ha solo comprato resta «I tuoi acquisti»), «Guarda il
+tuo negozio come lo vedono tutti» → «Guarda il tuo negozio», «Widget per
+il web» → «Mettilo sul tuo sito» (il foglio che apre si chiama ancora
+«Widget per il web»), «Punti di ritiro» → «I tuoi punti di ritiro»,
+«Identità» → «Nostr e identità».
+COME: le voci si spostano INTERE, coi loro commenti e gli id di sempre
+(uno script che le taglia per id e conta che non manchi niente: unica
+differenza nelle righe, le intestazioni). Gruppi nuovi `grpSpedizioni` e
+`grpImpostazioni`; spariscono `grpAspetto` e `grpPrivacy`. Tocca anche
+`apriCorrieriDaUrl` (apre `grpSpedizioni`), la pagina «I tuoi dati»
+(i nomi nuovi), cinque testi del server, `assistente/sapere.md`.
+SCARTATO: meno di otto cassetti. Unire ancora vuol dire rifare il
+lenzuolo da dodici voci che Andrea trovava confuso; il conto resta otto
+(come prima), ma ogni titolo si legge da solo.
+LE VOCI VECCHIE DI NOVITA.md NON SI TOCCANO (regola del file): i loro
+«dove» con i nomi di prima restano, e Tappo li legge; la voce nuova di
+oggi dice i nomi nuovi.
+PROVATO: `prove_profilo_elegante` col censimento nuovo e i titoli decisi
+(controprova: «Aiuto» rimesso a «Supporto» fa due rosse), le sezioni
+che leggevano i nomi vecchi (I tuoi dati, numeri del negozio, catalogo
+esterno, effetti ridotti, fila P2P, corrieri da link). Dal vivo in
+Chromium a 390 px sul server locale in collaudo: le otto intestazioni e
+il contenuto di ognuna. DA GUARDARE: chi ha imparato «Privacy» o
+«Supporto» li trova in «Impostazioni» e «Aiuto».
+
+## Le raccolte fondi in sats (17 nov 2026, cantiere raccolta; Andrea: «Tutte e due» e «ok» al piano in dieci righe)
+
+COSA. Chi ha almeno tre vendite concluse e un Lightning address apre una
+raccolta (titolo, racconto, obiettivo da 10 a 1.000 €, da 7 a 60
+giorni); la guardano i moderatori, poi va in vetrina (tessera «Raccolte»
+dopo le Aste, solo con almeno una viva) e nel Profilo («🎯 Raccolte
+fondi», nel cassetto «Il tuo negozio»). Due forme nella stessa raccolta: lo ZAP (il motore della
+mancia: dritto al wallet di chi raccoglie, niente fee, niente rimborso)
+e, se chi raccoglie l'ha scelta, il DEPOSITO DI GARANZIA (il 2-di-3 del
+mercatino, da 50 €): a scadenza Barattolo firma verso chi raccoglie se i
+DEPOSITI confermati arrivano all'obiettivo, sennò indietro, e la seconda
+firma è del telefono di chi riceve (`onchainCofirma`, lo stesso codice
+del mercatino e del P2P). Il disegno intero: ARCHITETTURA, «LE RACCOLTE
+IN SATS».
+DECISIONI E PERCHÉ. (1) Una tabella sua, non un annuncio: stock, prezzi
+e ordini non c'entrano. (2) Una garantita la decidono SOLO i depositi:
+chi raccoglie potrebbe mandarsi uno zap da solo e sbloccare i soldi
+degli altri. (3) L'obiettivo si fissa in sats al via del cambio di
+allora; il tetto in euro e il minimo del deposito si guardano al
+momento; senza cambio si dice no. (4) Una transazione per deposito e
+nessun timelock: riusano il giudice dei PSBT di oggi (`_onchain_psbt_barattolo`
+con verso venditore/compratore), mentre il batch o un ramo a tempo
+vorrebbero un secondo motore di firme. La rete la paga chi deposita, dal
+suo margine. (5) CAMBIATO RISPETTO AL PIANO: il rimborso lo co-firma SOLO
+chi ha depositato, non anche chi raccoglie. Il telefono di chi raccoglie
+non può rileggere la firma del seme del sostenitore sulla destinazione
+del rimborso: la sua seconda firma sarebbe cieca, e server + chiave di
+Barattolo + una firma cieca è una strada per portare via i sats. Se il
+sostenitore sparisce, i sats restano nel 2-di-3 con la nostra firma già
+pronta, finché non riapre l'app. (6) Un deposito vale se è confermato
+entro la chiusura; uno arrivato tardi o incompleto (riletto per sette
+giorni dopo la scadenza del suo indirizzo) torna indietro; «Ferma» di un
+moderatore rimanda indietro tutti i depositi, gli zap no. (7) La seconda
+firma non guarda la leva: spenta, i sats non restano chiusi. (8) Le
+parole di finanza (interessi, rendimento, quote, token, «%»…) si
+SEGNANO al moderatore, non bloccano: il giudice è lui. (9) Leve:
+`RACCOLTE_ATTIVE` accesa di serie, `RACCOLTA_GARANTITA_ATTIVA` SPENTA di
+serie finché Alan non la prova sul collaudo (regola del 17 nov sulle
+funzioni coi soldi). Zero XP. Nessun segreto nuovo sul VPS.
+STRADE SCARTATE: la raccolta come annuncio speciale; il timelock (secondo
+motore); la transazione unica di tutti i depositi (giudice nuovo); gli
+zap che contano per sbloccare i depositi; chi raccoglie che co-firma i
+rimborsi (vedi 5); una commissione (fuori dal piano). Nostr (NIP-75) è
+la fase 2.
+PROVATO. `collaudo_raccolta` (81 verdi, nella gabbia `collaudi_ci.py`):
+chi apre e i tetti, la bozza visibile solo a lui e agli admin, il via e il
+no (mai sulla propria), lo zap col wallet di cartone e LUD-21, l'anonimo,
+il deposito 2-di-3 vero con embit e i semi dei vettori BIP-39, raggiunta,
+mancata, fermata, tardi e incompleto, ogni volta con la seconda firma di
+chi riceve e MAI dell'altro, la segnalazione, /api/me, il pannello, la
+leva spenta. `prove_raccolte`: i giudici puri, le sentinelle (garantita
+spenta, motore della mancia e 2-di-3 riusati, nessuna chiave nuova nel
+blocco, firma senza leva e solo dal verso della proposta, zero XP) e il
+client in node (barra, «manca la tua firma», card che scappa i testi,
+tessera). CONTROPROVE ROSSE, cinque: garantita accesa di serie, firma
+senza controllo del verso, deposito confermato dopo la chiusura che va
+a chi raccoglie, esito che conta gli zap, deposito senza data.
+DAL VIVO: il server del worktree in collaudo (config in memoria, DNS
+spento fuori dal loopback) e Playwright a 360 px, chiaro e scuro: la
+tessera in vetrina, l'elenco, la scheda con la barra, il foglio dello
+zap e la sua fattura col QR, la voce nel Profilo, le righe nel pannello
+dei moderatori; nessun errore JS.
+IL VERBALE: suite intera severa sull'albero rebasato su develop f26f196,
+29.467 verdi, 0 rosse, 2 saltate di sempre (nostr-tools non c'è in
+cloud); collaudi della CI nella gabbia 149/149 prima dei rebase, e dopo
+l'ultimo i cinque vicini (raccolta, nip05-utenti, mancia, p2p-onchain,
+chiedi-locker) 5/5. Il ramo è corso di tre commit non miei nel frattempo
+(85369b3 il nome verificato su Nostr, 56093b4 la guida al wallet,
+f26f196 il Profilo in otto cassetti: la voce «🎯 Raccolte fondi» sta in
+«Il tuo negozio», dopo la cassa). Tutto girato in cloud, in un venv
+senza coincurve.
+RESTA DA GUARDARE. La prova di Alan sul collaudo con la garantita accesa
+(DA-FARE-ANDREA, voce 19): un deposito vero su signet, la scadenza e le
+seconde firme dai telefoni; poi, col suo ok, la leva nel config del VPS.
+La fase 2 su Nostr (NIP-75).
+
 ## Il rimborso on-chain che non si incaglia (17 nov 2026, cantiere onchain-rimborso-liscio; Andrea: «Ok, sì, vai, correggi tutto»)
 
 DA DOVE VIENE. Un utente all'assistenza (scambio on-chain #13, contanti):

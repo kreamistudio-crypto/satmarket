@@ -3146,6 +3146,13 @@ FRENI = {
     # la cassa in negozio (15 nov 2026): ogni conto battuto e ogni
     # tocco ⚡/⛓️ chiede una fattura al wallet di chi vende o un indirizzo
     "cassa": (300, 3600),             # conti e QR coniati alla cassa, per persona
+    # le raccolte in sats (17 nov 2026): scriverne una suona agli admin,
+    # uno zap e' una GET al wallet di chi raccoglie, un deposito fa nascere
+    # un 2-di-3, una segnalazione suona ai moderatori
+    "raccolta_apri": (5, 3600),       # raccolte scritte, per persona
+    "raccolta_zap": (30, 3600),       # fatture di zap chieste, per persona
+    "raccolta_deposito": (10, 3600),  # depositi di garanzia aperti, per persona
+    "raccolta_segnala": (10, 3600),   # segnalazioni, per persona
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
 MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
@@ -24086,7 +24093,7 @@ def numeri_assistente() -> str:
         # leva (sparisce solo in demo); il catalogo esterno ne ha due —
         # il ponte acceso e la porta aperta a tutti — e a porta chiusa lo
         # vedono solo i negozi gia' collegati e i moderatori
-        "- Import in blocco da CSV (Profilo → «📥 Importa in blocco»: il "
+        "- Import in blocco da CSV (Profilo → «📥 Carica tanti annunci insieme»: il "
         "modello CSV, una riga per annuncio, fino a 500 per volta, almeno "
         "una foto per riga con un link o uno ZIP): disponibile.",
         "- Collegare un negozio Shopify o WooCommerce (catalogo esterno, "
@@ -32983,7 +32990,7 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
         raise HTTPException(400, "Per modificare un annuncio importato serve "
                                  "l'accesso Nostr con la STESSA chiave che "
                                  "l'ha pubblicato: abilitalo dal Profilo "
-                                 "(cassetto 🆔 Identità)")
+                                 "(cassetto 🆔 Nostr e identità)")
     if ChiavePubblicaNostr is None:
         raise HTTPException(503, "Firma Nostr non disponibile: sul server "
                                  "manca il pacchetto coincurve")
@@ -36074,7 +36081,7 @@ def _leve_stato():
             _leva("Negozi collegati: la porta per tutti",
                   "CONNETTORI_NEGOZIO_PER_TUTTI",
                   bool(CONNETTORI_NEGOZIO_PER_TUTTI),
-                  spento="la sezione dentro «📥 Importa in blocco» la "
+                  spento="la sezione dentro «📥 Carica tanti annunci insieme» la "
                          "vedono solo i negozi già collegati e i "
                          "moderatori: gli altri venditori non la trovano, "
                          "e chi è collegato non perde niente",
@@ -37550,6 +37557,9 @@ def _leve_stato():
         ]},
         # LA MANCIA AL VENDITORE (14 nov 2026): accesa di serie
         {"gruppo": "🎁 Mancia al venditore", "voci": _mancia_leve()},
+        # LE RACCOLTE IN SATS (17 nov 2026): accese di serie, la garantita
+        # spenta nel codice finche' non e' provata sul collaudo
+        {"gruppo": "🎯 Raccolte in sats", "voci": _raccolte_leve()},
         # LA CASSA IN NEGOZIO (15 nov 2026): accesa di serie
         {"gruppo": "🏪 Cassa in negozio", "voci": _cassa_leve()},
         {"gruppo": "✔️ Nome verificato su Nostr", "voci": [
@@ -41585,7 +41595,7 @@ async def fai_puntata(annuncio_id: int, req: Request,
         raise HTTPException(400, "Per puntare serve il tuo Lightning "
                                  "address (per l'eventuale rimborso): "
                                  "lo imposti nel Profilo, sotto "
-                                 "«Incassi e pagamenti»")
+                                 "«Wallet e incassi»")
     mia = con.execute("SELECT * FROM puntate WHERE annuncio_id=? AND tg_id=?",
                       (annuncio_id, user["id"])).fetchone()
     if mia and mia["stato"] == "chiusa":
@@ -52477,6 +52487,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # a leva accesa; null = il client non disegna niente
     profilo["nip05"] = nip05_stato(u) if (NIP05_UTENTI_ATTIVO and u) \
         else None
+    # LE RACCOLTE IN SATS (17 nov 2026): la voce nel Profilo e la tessera
+    # in vetrina solo a leva accesa; la tessera solo se ce n'e' almeno una
+    # viva (una porta su un elenco vuoto e' un bottone che porta a un muro)
+    profilo["raccolte"] = _raccolte_per_me()
     # LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026): il client mostra la voce
     # nel Profilo solo a leva accesa. Il FATTO, dalla leva viva.
     profilo["account_cancellabile"] = bool(ACCOUNT_CANCELLABILE)
@@ -97575,7 +97589,7 @@ async def _connettore_in_errore(c: dict, errore: str):
             f"{html.escape(c['url_negozio'])} e non ci sono riuscito.\n\n"
             f"I tuoi annunci restano dove sono, ma non si aggiornano "
             f"più. Controlla il collegamento dal Profilo, in "
-            f"«📥 Importa in blocco / catalogo esterno»: se il token è "
+            f"«📥 Carica tanti annunci insieme / catalogo esterno»: se il token è "
             f"scaduto basta rifarlo.")
 
 
@@ -104190,7 +104204,9 @@ def _onchain_rimborsi_usati(con, tg_id: int, valore: str) -> int:
     le colonne che non ci sono ancora valgono «nessuno»."""
     alto = 0
     for tab, chi in (("onchain_ordini", "compratore_id"),
-                     ("p2p_onchain_ordini", "depositante_id")):
+                     ("p2p_onchain_ordini", "depositante_id"),
+                     # (17 nov 2026) i depositi di garanzia delle raccolte
+                     ("raccolta_depositi", "compratore_id")):
         try:
             r = con.execute(f"SELECT MAX(rimborso_indice) FROM {tab} WHERE "
                             f"{chi}=? AND rimborso_tipo='xpub' AND "
@@ -104277,6 +104293,16 @@ def _onchain_prossimo_esterno(con, venditore_id: int, valore: str) -> int:
                         "venditore_id=? AND oc_tipo='xpub' AND oc_valore=?",
                         (int(venditore_id), valore)).fetchone()
         if r and r[0] is not None and int(r[0]) >= 0:
+            nostro = max(nostro, int(r[0]) + 1)
+    except sqlite3.OperationalError:
+        pass
+    # (17 nov 2026, cantiere raccolta) ...e gli incassi dei depositi di
+    # garanzia delle RACCOLTE di questa persona: stessa chiave, stessa fila
+    try:
+        r = con.execute("SELECT MAX(incasso_indice) FROM raccolta_depositi WHERE "
+                        "venditore_id=? AND incasso_tipo='xpub' AND "
+                        "incasso_valore=?", (int(venditore_id), valore)).fetchone()
+        if r and r[0] is not None:
             nostro = max(nostro, int(r[0]) + 1)
     except sqlite3.OperationalError:
         pass
@@ -115262,6 +115288,1524 @@ def _mancia_leve() -> list:
 
 
 # (Qui finisce il blocco della mancia al venditore.)
+
+
+# ---------- LE RACCOLTE IN SATS (17 nov 2026, cantiere raccolta) ----------
+# IL CASO: Andrea, 17 nov 2026: «si possono attivare le campagne di
+# crowdfunding su un barattolo?». Lo studio (Library,
+# studi/crowdfunding-in-sats-2026-11-17.md) e le sue due risposte:
+# «Tutte e due» (14:52) e l'ok ai parametri (14:53). Il piano in dieci
+# righe ha avuto il suo «ok» alle 15:01. Due forme NELLA STESSA raccolta:
+#
+#   · LA RACCOLTA SEMPLICE: uno ZAP DIRETTO al Lightning address di chi
+#     raccoglie, col motore della mancia (`invoice_da_ln_address` con la
+#     sua guardia, LUD-21 `verify`, la preimage; la riga sale chiesta →
+#     dichiarata → arrivata e non scende mai). Barattolo NON TOCCA I
+#     SATS: nessuna commissione, nessun rimborso. Il foglio lo dice.
+#   · LA RACCOLTA GARANTITA: ogni sostenitore mette i sats in un 2-di-3
+#     on-chain SUO (sostenitore, chi raccoglie, Barattolo), lo stesso del
+#     mercatino e del P2P. A scadenza Barattolo firma (la chiave sul VPS,
+#     `_onchain_psbt_barattolo`): obiettivo raggiunto → verso chi
+#     raccoglie, e la seconda firma e' del SUO telefono; obiettivo
+#     mancato (o raccolta fermata da un admin) → tutto torna al wallet
+#     del sostenitore, e la seconda firma e' del telefono del sostenitore.
+#     Ogni telefono rifa' i conti prima di firmare (`onchainCofirma`):
+#     incasso e rimborso sono quelli che il SUO seme ha firmato. Una
+#     transazione per deposito: il giudice dei PSBT resta uno solo.
+#     Niente timelock: vorrebbe un secondo motore di firme. La rete la
+#     paga il sostenitore, col margine del mercatino (`onchain_margine`).
+#   · «OBIETTIVO RAGGIUNTO» PER LA GARANZIA LO DECIDONO SOLO I DEPOSITI
+#     confermati entro la scadenza: uno zap chi raccoglie se lo puo'
+#     mandare da solo, e allora gli zap non possono sbloccare i soldi
+#     degli altri. La barra li mostra tutti e due, in due colori.
+#   · CHI APRE: il Lightning address, almeno RACCOLTA_VENDITE_MIN vendite
+#     confermate (`utenti.vendite_ok`, come i codici digitali) e il VIA
+#     di un admin prima della vetrina (una raccolta e' una calamita per
+#     i furbi). Una raccolta viva alla volta per persona. VIETATO
+#     promettere quote, interessi, rendimenti o token: le regole lo
+#     dicono, il pannello segna le parole sospette, decide l'admin.
+#   · IL CAMBIO: il tetto in euro si guarda all'apertura, poi l'obiettivo
+#     resta FISSO in sats (una barra che si sposta col prezzo del
+#     bitcoin sarebbe una barra che mente). Il minimo del deposito si
+#     guarda al momento del deposito. Senza un cambio fresco: no.
+#   · ZERO XP da tutte e due le parti, niente distintivi: «gli XP sono
+#     il commercio e nient'altro». Nostr (zap goal NIP-75) e' la fase 2.
+#
+# LE LEVE (la regola di Andrea del 14 nov 2026: accese di serie; la
+# garantita SPENTA nel codice finche' Alan non la prova sul collaudo,
+# la regola del 17 nov sulle funzioni coi soldi):
+#   RACCOLTE_ATTIVE               le raccolte, la vetrina, gli zap; spenta
+#                                 = 404 ovunque e niente in vetrina (le
+#                                 uscite gia' firmate restano firmabili)
+#   RACCOLTA_GARANTITA_ATTIVA     i depositi 2-di-3 (con l'on-chain
+#                                 ammesso per chi deposita e per chi
+#                                 raccoglie, e la terza chiave vera)
+#   RACCOLTA_MAX_EURO             il tetto dell'obiettivo, all'apertura
+#   RACCOLTA_GIORNI_MAX           la durata massima
+#   RACCOLTA_MIN_GARANTITA_EURO   il minimo di un deposito di garanzia
+#   RACCOLTA_VENDITE_MIN          le vendite confermate per aprirne una
+#   RACCOLTA_ZAP_MAX_SATS         il tetto di UNO zap
+try:
+    from config import RACCOLTE_ATTIVE
+except ImportError:
+    RACCOLTE_ATTIVE = True
+try:
+    from config import RACCOLTA_GARANTITA_ATTIVA
+except ImportError:
+    RACCOLTA_GARANTITA_ATTIVA = False
+try:
+    from config import RACCOLTA_MAX_EURO
+except ImportError:
+    RACCOLTA_MAX_EURO = 1000
+try:
+    from config import RACCOLTA_GIORNI_MAX
+except ImportError:
+    RACCOLTA_GIORNI_MAX = 60
+try:
+    from config import RACCOLTA_MIN_GARANTITA_EURO
+except ImportError:
+    RACCOLTA_MIN_GARANTITA_EURO = 50
+try:
+    from config import RACCOLTA_VENDITE_MIN
+except ImportError:
+    RACCOLTA_VENDITE_MIN = 3
+try:
+    from config import RACCOLTA_ZAP_MAX_SATS
+except ImportError:
+    RACCOLTA_ZAP_MAX_SATS = 100_000
+
+RACCOLTA_GIORNI_MIN = 7          # meno di una settimana non e' una raccolta
+RACCOLTA_EURO_MIN = 10           # sotto, e' una mancia
+RACCOLTA_TITOLO_MAX = 80
+RACCOLTA_RACCONTO_MAX = 2000
+RACCOLTA_MOTIVO_MAX = 300
+RACCOLTA_ZAP_MIN_SATS = 1
+RACCOLTA_STATI = ("revisione", "attiva", "rifiutata", "fermata", "chiusa")
+# i depositi: attesa (l'indirizzo c'e', i sats no) | depositato (una
+# conferma e almeno l'importo) | incompleto (scaduto con meno
+# dell'importo: torna indietro) | scaduto (niente visto) | annullato
+# (da chi deposita, prima di pagare) | rilasciato | rimborsato
+RACCOLTA_DEPOSITO_STATI = ("attesa", "depositato", "incompleto", "scaduto",
+                           "annullato", "rilasciato", "rimborsato")
+# PAROLE DA GUARDARE (non un filtro che blocca: il giudice e' l'admin, che
+# le vede segnate nella coda). Promesse di finanza, non di grazie.
+RACCOLTA_PAROLE_SOSPETTE = ("interess", "rendiment", "dividend", "quota",
+                            "quote", "azion", "token", "roi", "profitt",
+                            "guadagn", "restituisc", "investiment",
+                            "investitor", "percentual", "%")
+
+
+def _raccolta_intero(v, serie: int, minimo: int = 0) -> int:
+    """Una leva numerica letta viva; storta = il valore di serie."""
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return serie
+    return n if n >= minimo else serie
+
+
+def raccolta_max_euro() -> int:
+    return _raccolta_intero(RACCOLTA_MAX_EURO, 1000, RACCOLTA_EURO_MIN)
+
+
+def raccolta_giorni_max() -> int:
+    return _raccolta_intero(RACCOLTA_GIORNI_MAX, 60, RACCOLTA_GIORNI_MIN)
+
+
+def raccolta_min_garantita_euro() -> int:
+    return _raccolta_intero(RACCOLTA_MIN_GARANTITA_EURO, 50, 1)
+
+
+def raccolta_vendite_min() -> int:
+    return _raccolta_intero(RACCOLTA_VENDITE_MIN, 3, 0)
+
+
+def raccolta_zap_max_sats() -> int:
+    return _raccolta_intero(RACCOLTA_ZAP_MAX_SATS, 100_000, RACCOLTA_ZAP_MIN_SATS)
+
+
+def raccolta_perche_non_apre(leva, vendite_ok, ln_address, viva: bool) -> str:
+    """PURA, il giudice unico di «chi puo' aprire»: '' se puo', sennò
+    il perche' a parole (lo legge chi tocca «Apri una raccolta»)."""
+    if not leva:
+        return "Le raccolte adesso non ci sono"
+    if viva:
+        return "Hai già una raccolta aperta o in attesa del via: una alla volta"
+    if "@" not in str(ln_address or ""):
+        return ("Serve un indirizzo Lightning nel Profilo: gli zap vanno "
+                "dritti lì")
+    n = int(vendite_ok or 0)
+    serve = raccolta_vendite_min()
+    if n < serve:
+        return (f"Serve aver concluso almeno {serve} vendite su Barattolo "
+                f"(ne hai {n}): è il nostro modo di sapere chi sei")
+    return ""
+
+
+def raccolta_giudica_campi(titolo, racconto, euro, giorni) -> tuple:
+    """PURA: ({titolo, racconto, euro, giorni}, '') o (None, perche')."""
+    t = " ".join(str(titolo or "").split())
+    r = str(racconto or "").strip()
+    if not 5 <= len(t) <= RACCOLTA_TITOLO_MAX:
+        return None, f"Il titolo va da 5 a {RACCOLTA_TITOLO_MAX} caratteri"
+    if not 30 <= len(r) <= RACCOLTA_RACCONTO_MAX:
+        return None, (f"Racconta la raccolta in 30-{RACCOLTA_RACCONTO_MAX} "
+                      "caratteri: per cosa servono i sats e cosa succede dopo")
+    try:
+        e = int(euro)
+        g = int(giorni)
+    except (TypeError, ValueError):
+        return None, "Scrivi l'obiettivo in euro e i giorni"
+    tetto = raccolta_max_euro()
+    if not RACCOLTA_EURO_MIN <= e <= tetto:
+        return None, (f"L'obiettivo va da {RACCOLTA_EURO_MIN} a "
+                      f"{_fmt_eur(tetto)} € in questa prima fase")
+    gmax = raccolta_giorni_max()
+    if not RACCOLTA_GIORNI_MIN <= g <= gmax:
+        return None, f"La raccolta dura da {RACCOLTA_GIORNI_MIN} a {gmax} giorni"
+    return {"titolo": t, "racconto": r, "euro": e, "giorni": g}, ""
+
+
+def raccolta_parole_sospette(*testi) -> list:
+    """PURA: le parole da guardare, per la coda dell'admin (mai un blocco)."""
+    tutto = " ".join(str(x or "") for x in testi).lower()
+    trovate = []
+    for p in RACCOLTA_PAROLE_SOSPETTE:
+        if p == "%":
+            if "%" in tutto:
+                trovate.append(p)
+        elif re.search(r"\b" + re.escape(p), tutto):
+            trovate.append(p)
+    return trovate
+
+
+def raccolta_sats_da_euro(euro_cent: int, eur_btc: float) -> int:
+    """PURA: gli euro (in centesimi) in sats al cambio dato; 0 se manca."""
+    try:
+        c = float(eur_btc or 0)
+        e = int(euro_cent)
+    except (TypeError, ValueError):
+        return 0
+    if not c > 0 or c == float("inf") or e <= 0:
+        return 0
+    return int(round(e / 100 / c * 100_000_000))
+
+
+def raccolta_esito(garantita: bool, obiettivo: int, garantiti: int,
+                   zap: int) -> str:
+    """PURA: 'raggiunta' | 'mancata'. Una raccolta garantita la decidono
+    SOLO i depositi confermati (uno zap a se stessi non sblocca i soldi
+    degli altri); una semplice, gli zap arrivati (li' non c'e' niente da
+    restituire: e' solo la parola sulla card)."""
+    conta = int(garantiti or 0) if garantita else int(garantiti or 0) + int(zap or 0)
+    return "raggiunta" if conta >= int(obiettivo or 0) > 0 else "mancata"
+
+
+def raccolta_verso_deposito(stato_dep: str, stato_racc: str, esito: str,
+                            depositato_il: int, chiusa_il: int) -> str:
+    """PURA: dove va UN deposito confermato, a raccolta finita.
+    'venditore' = a chi raccoglie (raccolta chiusa e raggiunta, deposito
+    confermato prima della chiusura); 'compratore' = indietro al
+    sostenitore (mancata, fermata, arrivato tardi, o incompleto); '' =
+    non ancora (raccolta viva, o deposito senza sats)."""
+    if stato_dep == "incompleto":
+        return "compratore"
+    if stato_dep != "depositato":
+        return ""
+    if stato_racc == "fermata":
+        return "compratore"
+    if stato_racc != "chiusa":
+        return ""
+    if esito == "raggiunta" and 0 < int(depositato_il or 0) <= int(chiusa_il or 0):
+        return "venditore"
+    return "compratore"
+
+
+def raccolta_garantita_ammessa(tg_id) -> bool:
+    """La via dei depositi esiste per questa persona: le due leve, e
+    l'on-chain ammesso (che porta con se' la rete e i suoi cancelli)."""
+    return (bool(RACCOLTE_ATTIVE) and bool(RACCOLTA_GARANTITA_ATTIVA)
+            and onchain_ammesso(tg_id))
+
+
+def _raccolte_prepara(con):
+    """Le tre tabelle delle raccolte (le colonne dei depositi stanno a
+    parte, `_raccolta_depositi_prepara`, coi nomi della cassa on-chain).
+    `raccolte`: una per raccolta; l'obiettivo e' in sats, fissato
+    all'apertura col cambio di allora (`cambio`), gli euro restano scritti
+    come li ha messi chi raccoglie. `scade` nasce al VIA, non alla bozza.
+    `raccolta_zap`: la gemella di `mance`. `raccolta_segnalazioni`: una
+    per persona per raccolta."""
+    con.execute("""CREATE TABLE IF NOT EXISTS raccolte(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        autore_id INTEGER NOT NULL,
+        titolo TEXT NOT NULL,
+        racconto TEXT NOT NULL,
+        obiettivo_sats INTEGER NOT NULL,
+        obiettivo_cent INTEGER NOT NULL,
+        cambio REAL NOT NULL DEFAULT 0,
+        giorni INTEGER NOT NULL,
+        garantita INTEGER NOT NULL DEFAULT 0,
+        stato TEXT NOT NULL DEFAULT 'revisione',
+        esito TEXT NOT NULL DEFAULT '',
+        perche TEXT NOT NULL DEFAULT '',
+        creata INTEGER NOT NULL,
+        approvata_il INTEGER NOT NULL DEFAULT 0,
+        approvata_da INTEGER NOT NULL DEFAULT 0,
+        scade INTEGER NOT NULL DEFAULT 0,
+        chiusa_il INTEGER NOT NULL DEFAULT 0,
+        avvisata INTEGER NOT NULL DEFAULT 0)""")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_raccolte_stato "
+                "ON raccolte(stato)")
+    con.execute("""CREATE TABLE IF NOT EXISTS raccolta_zap(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        raccolta_id INTEGER NOT NULL,
+        sostenitore_id INTEGER NOT NULL,
+        autore_id INTEGER NOT NULL,
+        sats INTEGER NOT NULL,
+        anonimo INTEGER NOT NULL DEFAULT 0,
+        bolt11 TEXT DEFAULT '',
+        payment_hash TEXT DEFAULT '',
+        verify TEXT DEFAULT '',
+        stato TEXT DEFAULT 'chiesta',
+        creato INTEGER DEFAULT 0,
+        pagata_il INTEGER DEFAULT 0,
+        avvisato INTEGER DEFAULT 0)""")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_raccolta_zap "
+                "ON raccolta_zap(raccolta_id)")
+    con.execute("""CREATE TABLE IF NOT EXISTS raccolta_segnalazioni(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        raccolta_id INTEGER NOT NULL,
+        tg_id INTEGER NOT NULL,
+        motivo TEXT NOT NULL DEFAULT '',
+        quando INTEGER NOT NULL,
+        guardata INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(raccolta_id, tg_id))""")
+
+
+def _raccolta_depositi_prepara(con):
+    """`raccolta_depositi`: un 2-di-3 per deposito. Le colonne della cassa
+    (`prezzo_sats` = il contributo, `margine_sats`, `importo_sats`,
+    `incasso*`, `rimborso*`, `quota_*`, `utxo`, `proposta_*`,
+    `decisione_*`) portano GLI STESSI NOMI di `onchain_ordini`, apposta,
+    come il P2P: `_onchain_psbt_giudica` e `_onchain_psbt_barattolo`
+    leggono una riga di qui come una di la'. I ruoli del 2-di-3: chi
+    deposita e' il «compratore» (mette i sats, il rimborso e il resto
+    tornano a lui), chi raccoglie e' il «venditore» (incassa il
+    contributo)."""
+    _onchain_prepara_tabelle(con)
+    con.execute("""CREATE TABLE IF NOT EXISTS raccolta_depositi(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        raccolta_id INTEGER NOT NULL,
+        compratore_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        stato TEXT NOT NULL DEFAULT 'attesa',
+        indirizzo_id INTEGER NOT NULL DEFAULT 0,
+        euro_cent INTEGER NOT NULL DEFAULT 0,
+        cambio REAL NOT NULL DEFAULT 0,
+        prezzo_sats INTEGER NOT NULL,
+        margine_sats INTEGER NOT NULL DEFAULT 0,
+        importo_sats INTEGER NOT NULL DEFAULT 0,
+        incasso TEXT NOT NULL DEFAULT '',
+        incasso_tipo TEXT NOT NULL DEFAULT '',
+        incasso_valore TEXT NOT NULL DEFAULT '',
+        incasso_firma TEXT NOT NULL DEFAULT '',
+        incasso_indice INTEGER NOT NULL DEFAULT 0,
+        rimborso TEXT NOT NULL DEFAULT '',
+        rimborso_tipo TEXT NOT NULL DEFAULT '',
+        rimborso_valore TEXT NOT NULL DEFAULT '',
+        rimborso_firma TEXT NOT NULL DEFAULT '',
+        rimborso_indice INTEGER NOT NULL DEFAULT 0,
+        quota_sats INTEGER NOT NULL DEFAULT 0,
+        quota_indirizzo TEXT NOT NULL DEFAULT '',
+        visti_sats INTEGER DEFAULT 0,
+        ricevuti_sats INTEGER DEFAULT 0,
+        utxo TEXT DEFAULT '[]',
+        proposta_verso TEXT DEFAULT '',
+        proposta_psbt TEXT DEFAULT '',
+        proposta_da INTEGER DEFAULT 0,
+        proposta_il INTEGER DEFAULT 0,
+        decisione_da INTEGER DEFAULT 0,
+        decisione_il INTEGER DEFAULT 0,
+        decisione_perche TEXT DEFAULT '',
+        txid_uscita TEXT DEFAULT '',
+        scade INTEGER NOT NULL,
+        depositato_il INTEGER DEFAULT 0,
+        chiuso_il INTEGER DEFAULT 0,
+        creato INTEGER NOT NULL,
+        aggiornato INTEGER NOT NULL)""")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_raccolta_depositi "
+                "ON raccolta_depositi(raccolta_id)")
+
+
+def _raccolte_db():
+    con = db()
+    _raccolte_prepara(con)
+    return con
+
+
+def _raccolta_depositi_db():
+    con = _onchain_db()
+    _raccolte_prepara(con)
+    _raccolta_depositi_prepara(con)
+    return con
+
+
+def _raccolte_per_me():
+    """Quel che /api/me dice delle raccolte: None a leva spenta (niente
+    voce, niente tessera), sennò quante ce n'e' di vive. Mai un errore:
+    /api/me non si chiude per una pagina di contorno."""
+    if not RACCOLTE_ATTIVE:
+        return None
+    try:
+        con = _raccolte_db()
+        try:
+            n = con.execute("SELECT COUNT(*) FROM raccolte WHERE stato='attiva'"
+                            ).fetchone()[0]
+        finally:
+            con.close()
+    except sqlite3.Error:
+        n = 0
+    return {"vive": int(n)}
+
+
+def _raccolte_serve():
+    """Il cancello di ogni rotta: a leva spenta le raccolte non esistono."""
+    if not RACCOLTE_ATTIVE:
+        raise HTTPException(404, "Le raccolte qui non ci sono")
+
+
+def _raccolta_bottone(rid: int) -> tuple:
+    """PURA: il bottone sotto ogni avviso di una raccolta (`/?raccolta=`)."""
+    return ("🎯 Apri la raccolta", f"{URL_PUBBLICO}/?raccolta={int(rid)}")
+
+
+def _raccolta_conti(con, ids: list) -> dict:
+    """{id: {zap, garantiti, sostenitori}}: gli zap ARRIVATI e i depositi
+    CONFERMATI (anche quelli gia' usciti verso chi raccoglie). Le
+    tabelle che non ci sono ancora valgono zero."""
+    conti = {int(i): {"zap": 0, "garantiti": 0, "sostenitori": set()}
+             for i in ids}
+    if not ids:
+        return {}
+    segnaposti = ",".join("?" * len(ids))
+    for r in con.execute(
+            "SELECT raccolta_id, sats, sostenitore_id FROM raccolta_zap "
+            f"WHERE raccolta_id IN ({segnaposti}) AND stato='arrivata'", ids):
+        c = conti[int(r["raccolta_id"])]
+        c["zap"] += int(r["sats"])
+        c["sostenitori"].add(int(r["sostenitore_id"]))
+    try:
+        for r in con.execute(
+                "SELECT raccolta_id, prezzo_sats, compratore_id FROM "
+                f"raccolta_depositi WHERE raccolta_id IN ({segnaposti}) AND "
+                "(stato='depositato' OR (stato='rilasciato'))", ids):
+            c = conti[int(r["raccolta_id"])]
+            c["garantiti"] += int(r["prezzo_sats"])
+            c["sostenitori"].add(int(r["compratore_id"]))
+    except sqlite3.OperationalError:
+        pass
+    return {k: {"zap": v["zap"], "garantiti": v["garantiti"],
+                "sostenitori": len(v["sostenitori"])}
+            for k, v in conti.items()}
+
+
+def _raccolta_vista(con, r, conti: dict, tg_id: int = 0,
+                    corta: bool = False) -> dict:
+    """Una raccolta come la vede chiunque: mai il Lightning address, mai
+    gli indirizzi dei depositi. `corta` = la card della vetrina."""
+    c = conti.get(int(r["id"]), {"zap": 0, "garantiti": 0, "sostenitori": 0})
+    adesso = int(time.time())
+    racconto = r["racconto"] or ""
+    d = {
+        "id": r["id"], "titolo": r["titolo"],
+        "racconto": (racconto[:180] + "…") if corta and len(racconto) > 180 else racconto,
+        "autore": {"id": int(r["autore_id"]),
+                   "nome": _onchain_nome(con, r["autore_id"])},
+        "obiettivo_sats": int(r["obiettivo_sats"]),
+        "obiettivo_euro": int(r["obiettivo_cent"]) // 100,
+        "zap_sats": c["zap"], "garantiti_sats": c["garantiti"],
+        "sostenitori": c["sostenitori"],
+        "garantita": bool(r["garantita"]),
+        "stato": r["stato"], "esito": r["esito"] or "",
+        "giorni": int(r["giorni"]),
+        "scade": int(r["scade"] or 0),
+        "secondi_rimasti": max(0, int(r["scade"] or 0) - adesso) if r["stato"] == "attiva" else 0,
+        "mia": bool(tg_id) and int(r["autore_id"]) == int(tg_id),
+    }
+    if r["stato"] in ("rifiutata", "fermata") and d["mia"]:
+        d["perche"] = r["perche"] or ""
+    return d
+
+
+def _raccolta_carica(con, rid: int):
+    r = con.execute("SELECT * FROM raccolte WHERE id=?", (int(rid),)).fetchone()
+    if not r:
+        raise HTTPException(404, "Raccolta non trovata")
+    return r
+
+
+def _raccolta_visibile(r, tg_id: int, admin: bool) -> bool:
+    """In vetrina solo dopo il via; la bozza e il no li vedono chi
+    raccoglie e i moderatori."""
+    if r["stato"] in ("attiva", "chiusa", "fermata"):
+        return True
+    return admin or (bool(tg_id) and int(r["autore_id"]) == int(tg_id))
+
+
+def _raccolta_viva_di(con, tg_id: int) -> bool:
+    return bool(con.execute(
+        "SELECT 1 FROM raccolte WHERE autore_id=? AND stato IN "
+        "('revisione','attiva') LIMIT 1", (int(tg_id),)).fetchone())
+
+
+def _raccolta_deposito_vista(con, dep, tg_id: int) -> dict:
+    """Un deposito come lo vede UNA delle due parti: la forma di
+    `_p2p_onchain_per`, con gli stessi nomi, perche' il codice delle firme
+    nel telefono (`onchainCofirma`) e' lo stesso. `rotta` dice al telefono
+    dove mandare la seconda firma. Le destinazioni portano la firma del
+    seme di chi le ha scelte: il suo telefono la rilegge."""
+    tg_id = int(tg_id)
+    ruolo = ("compratore" if int(dep["compratore_id"]) == tg_id
+             else "venditore" if int(dep["venditore_id"]) == tg_id else "")
+    altro = dep["venditore_id"] if ruolo == "compratore" else dep["compratore_id"]
+    proposta = None
+    if dep["proposta_psbt"]:
+        proposta = {"verso": dep["proposta_verso"], "psbt": dep["proposta_psbt"],
+                    "mia": int(dep["proposta_da"] or 0) == tg_id,
+                    "il": int(dep["proposta_il"] or 0),
+                    "barattolo": "raccolta"}
+    indirizzo = None
+    if dep["indirizzo_id"] and ruolo:
+        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                          (dep["indirizzo_id"],)).fetchone()
+        if ind:
+            indirizzo = onchain_riga_per(ind, tg_id, _onchain_nome(con, altro))
+    return {
+        "id": dep["id"], "raccolta_id": dep["raccolta_id"],
+        "rotta": f"/raccolte/depositi/{int(dep['id'])}",
+        "stato": dep["stato"], "ruolo": ruolo,
+        "euro": int(dep["euro_cent"] or 0) / 100,
+        "prezzo_sats": int(dep["prezzo_sats"]),
+        "margine_sats": int(dep["margine_sats"] or 0),
+        "importo_sats": int(dep["importo_sats"] or 0),
+        "visti_sats": int(dep["visti_sats"] or 0),
+        "ricevuti_sats": int(dep["ricevuti_sats"] or 0),
+        "utxo": json.loads(dep["utxo"] or "[]"),
+        "incasso": dep["incasso"] or "", "rimborso": dep["rimborso"] or "",
+        "destinazione": ({"tipo": dep["incasso_tipo"], "valore": dep["incasso_valore"],
+                          "firma": dep["incasso_firma"], "indice": dep["incasso_indice"]}
+                         if dep["incasso_tipo"] else None),
+        "destinazione_rimborso": ({"tipo": dep["rimborso_tipo"],
+                                   "valore": dep["rimborso_valore"],
+                                   "firma": dep["rimborso_firma"],
+                                   "indice": dep["rimborso_indice"]}
+                                  if dep["rimborso_tipo"] else None),
+        "quota_sats": 0, "quota_indirizzo": "", "quota_ricevente_sats": 0,
+        "indirizzo": indirizzo, "proposta": proposta,
+        "txid_uscita": dep["txid_uscita"] or "",
+        "scade": int(dep["scade"]), "depositato_il": int(dep["depositato_il"] or 0),
+        "chiuso_il": int(dep["chiuso_il"] or 0), "creato": int(dep["creato"]),
+        "altro": _onchain_nome(con, altro) if ruolo else "",
+        "rete": ONCHAIN_RETE,
+        "tariffa": _ONCHAIN_TARIFFA["sat_vb"] or 2.0,
+        "esploratore": onchain_mempool_api().rsplit("/api", 1)[0],
+    }
+
+
+def _raccolta_carica_deposito(con, did: int):
+    d = con.execute("SELECT * FROM raccolta_depositi WHERE id=?",
+                    (int(did),)).fetchone()
+    if not d:
+        raise HTTPException(404, "Deposito non trovato")
+    return d
+
+
+def _raccolta_parte_deposito(dep, tg_id) -> str:
+    """Il ruolo nel 2-di-3; 404 a chi non c'entra (non sa nemmeno che c'e')."""
+    if int(dep["compratore_id"]) == int(tg_id):
+        return "compratore"
+    if int(dep["venditore_id"]) == int(tg_id):
+        return "venditore"
+    raise HTTPException(404, "Deposito non trovato")
+
+
+# ---- LA VETRINA E LA SCHEDA ----
+
+@app.get("/api/raccolte")
+def raccolte_vetrina(x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """Le raccolte vive, le piu' vicine alla scadenza prima, e per chi e'
+    entrato: se puo' aprirne una (col perche'), e le sue."""
+    _raccolte_serve()
+    user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
+    tg = int(user["id"]) if user else 0
+    con = _raccolte_db()
+    try:
+        righe = con.execute("SELECT * FROM raccolte WHERE stato='attiva' "
+                            "ORDER BY scade LIMIT 60").fetchall()
+        mie = (con.execute("SELECT * FROM raccolte WHERE autore_id=? "
+                           "ORDER BY id DESC LIMIT 20", (tg,)).fetchall()
+               if tg else [])
+        conti = _raccolta_conti(con, [r["id"] for r in righe] + [r["id"] for r in mie])
+        io = None
+        if tg:
+            u = con.execute("SELECT ln_address, vendite_ok FROM utenti "
+                            "WHERE tg_id=?", (tg,)).fetchone()
+            perche = raccolta_perche_non_apre(
+                RACCOLTE_ATTIVE, u["vendite_ok"] if u else 0,
+                u["ln_address"] if u else "", _raccolta_viva_di(con, tg))
+            io = {"puo_aprire": not perche, "perche": perche,
+                  "garantita_possibile": raccolta_garantita_ammessa(tg)}
+        return {
+            "raccolte": [_raccolta_vista(con, r, conti, tg, corta=True) for r in righe],
+            "mie": [_raccolta_vista(con, r, conti, tg, corta=True) for r in mie],
+            "io": io,
+            "regole": {"max_euro": raccolta_max_euro(),
+                       "min_euro": RACCOLTA_EURO_MIN,
+                       "giorni_min": RACCOLTA_GIORNI_MIN,
+                       "giorni_max": raccolta_giorni_max(),
+                       "min_garantita_euro": raccolta_min_garantita_euro(),
+                       "zap_max": raccolta_zap_max_sats(),
+                       "vendite_min": raccolta_vendite_min()},
+        }
+    finally:
+        con.close()
+
+
+@app.get("/api/raccolte/mie-firme")
+def raccolte_mie_firme(x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """I depositi delle raccolte in cui ci sono io (da chi deposita o da
+    chi raccoglie), nella forma delle firme: il telefono ci trova le
+    seconde firme che aspettano lui. Risponde anche a leva garantita
+    spenta: un'uscita firmata da Barattolo non resta appesa."""
+    _raccolte_serve()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = _raccolta_depositi_db()
+    try:
+        righe = con.execute(
+            "SELECT * FROM raccolta_depositi WHERE (compratore_id=? OR "
+            "venditore_id=?) AND stato NOT IN ('scaduto','annullato') "
+            "ORDER BY id DESC LIMIT 100", (user["id"], user["id"])).fetchall()
+        return {"depositi": [_raccolta_deposito_vista(con, d, user["id"])
+                             for d in righe]}
+    finally:
+        con.close()
+
+
+@app.get("/api/raccolte/{rid}")
+def raccolta_scheda(rid: int, x_tg_init_data: str = Header(""),
+                    barattolo_sessione: str = Cookie("")):
+    """La scheda: il racconto, la barra, i sostenitori (nome o anonimo),
+    cosa posso fare io, e i miei depositi."""
+    _raccolte_serve()
+    user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
+    tg = int(user["id"]) if user else 0
+    admin = bool(tg) and e_admin(tg)
+    con = _raccolta_depositi_db()
+    try:
+        r = _raccolta_carica(con, rid)
+        if not _raccolta_visibile(r, tg, admin):
+            raise HTTPException(404, "Raccolta non trovata")
+        conti = _raccolta_conti(con, [r["id"]])
+        d = _raccolta_vista(con, r, conti, tg)
+        zap = []
+        for z in con.execute(
+                "SELECT z.sats, z.stato, z.anonimo, z.pagata_il, z.creato, "
+                "z.sostenitore_id FROM raccolta_zap z WHERE z.raccolta_id=? "
+                "AND z.stato IN ('dichiarata','arrivata') ORDER BY z.id DESC "
+                "LIMIT 50", (r["id"],)):
+            zap.append({"sats": z["sats"], "stato": z["stato"],
+                        "nome": "" if z["anonimo"] else _onchain_nome(con, z["sostenitore_id"]),
+                        "il": z["pagata_il"] or z["creato"]})
+        d["zap"] = zap
+        d["depositi_n"] = con.execute(
+            "SELECT COUNT(*) FROM raccolta_depositi WHERE raccolta_id=? AND "
+            "stato IN ('depositato','rilasciato')", (r["id"],)).fetchone()[0]
+        attiva = r["stato"] == "attiva" and int(r["scade"] or 0) > int(time.time())
+        ln = ""
+        if attiva:
+            a = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                            (r["autore_id"],)).fetchone()
+            ln = (a["ln_address"] if a else "") or ""
+        d["puo_zap"] = bool(attiva and tg and tg != int(r["autore_id"]) and "@" in ln)
+        d["puo_depositare"] = bool(attiva and tg and tg != int(r["autore_id"])
+                                   and r["garantita"] and raccolta_garantita_ammessa(tg))
+        d["min_garantita_euro"] = raccolta_min_garantita_euro()
+        d["zap_max"] = raccolta_zap_max_sats()
+        d["cambio"] = cambio_noto_ora()
+        d["miei_depositi"] = ([_raccolta_deposito_vista(con, x, tg) for x in con.execute(
+            "SELECT * FROM raccolta_depositi WHERE raccolta_id=? AND "
+            "compratore_id=? AND stato NOT IN ('scaduto','annullato') "
+            "ORDER BY id DESC", (r["id"], tg))] if tg else [])
+        if admin:
+            d["sospette"] = raccolta_parole_sospette(r["titolo"], r["racconto"])
+        return d
+    finally:
+        con.close()
+
+
+@app.post("/api/raccolte")
+async def raccolta_apri(req: Request, x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Chi raccoglie scrive la raccolta: nasce in 'revisione', e in
+    vetrina va solo col via di un admin. Il tetto in euro si guarda qui,
+    col cambio di adesso, che resta scritto accanto ai sats."""
+    _raccolte_serve()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    _frena("raccolta_apri", user["id"])
+    campi, err = raccolta_giudica_campi(d.get("titolo"), d.get("racconto"),
+                                        d.get("euro"), d.get("giorni"))
+    if err:
+        raise HTTPException(400, err)
+    garantita = d.get("garantita") is True
+    if garantita and not raccolta_garantita_ammessa(user["id"]):
+        raise HTTPException(400, "I depositi di garanzia adesso non ci sono")
+    cambio = await cambio_btc_eur()
+    sats = raccolta_sats_da_euro(campi["euro"] * 100, cambio)
+    if not sats:
+        raise HTTPException(503, "Il cambio di adesso non c'è: riprova fra un minuto")
+    adesso = int(time.time())
+    con = _raccolta_depositi_db() if garantita else _raccolte_db()
+    try:
+        u = con.execute("SELECT ln_address, vendite_ok FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        perche = raccolta_perche_non_apre(
+            RACCOLTE_ATTIVE, u["vendite_ok"] if u else 0,
+            u["ln_address"] if u else "", _raccolta_viva_di(con, user["id"]))
+        if perche:
+            raise HTTPException(400, perche)
+        if garantita:
+            # chi raccoglie deve poter RICEVERE: la chiave on-chain e un
+            # wallet suo scelto e firmato dal suo seme (Profilo)
+            x = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                            (user["id"],)).fetchone()
+            if not x:
+                raise HTTPException(409, "Per i depositi di garanzia ti serve "
+                                         "il wallet on-chain: Profilo → «₿ On-chain»")
+            if not _onchain_destinazione_viva(con, user["id"], x["xpub"]):
+                raise HTTPException(409, "Scegli prima dove ricevere i sats "
+                                         "on-chain: Profilo → «Incassi on-chain»")
+        cur = con.execute(
+            "INSERT INTO raccolte(autore_id, titolo, racconto, obiettivo_sats,"
+            " obiettivo_cent, cambio, giorni, garantita, stato, creata)"
+            " VALUES(?,?,?,?,?,?,?,?,'revisione',?)",
+            (user["id"], campi["titolo"], campi["racconto"], sats,
+             campi["euro"] * 100, float(cambio), campi["giorni"],
+             1 if garantita else 0, adesso))
+        con.commit()
+        rid = cur.lastrowid
+        nome = _onchain_nome(con, user["id"])
+    finally:
+        con.close()
+    sospette = raccolta_parole_sospette(campi["titolo"], campi["racconto"])
+    print(f"🎯 Raccolta #{rid} scritta da {user['id']}: {_fmt_sats(sats)} sats"
+          f"{' (garantita)' if garantita else ''}", flush=True)
+    await notifica_admin(
+        f"🎯 <b>Raccolta da approvare</b> #{rid}: «{html.escape(campi['titolo'][:60])}» "
+        f"di {html.escape(nome)}, obiettivo {campi['euro']} € "
+        f"({_fmt_sats(sats)} sats), {campi['giorni']} giorni"
+        + (", con depositi di garanzia" if garantita else "")
+        + (f".\n⚠️ Parole da guardare: {html.escape(', '.join(sospette))}" if sospette else ".")
+        + "\nDai il via dal Profilo → Amministrazione.",
+        _raccolta_bottone(rid), argomento="moderazione")
+    return {"ok": True, "id": rid}
+
+
+@app.post("/api/raccolte/{rid}/segnala")
+async def raccolta_segnala(rid: int, req: Request, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """«Questa raccolta non mi torna»: una riga per persona, e la prima
+    di ogni raccolta suona ai moderatori."""
+    _raccolte_serve()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    motivo = " ".join(str(d.get("motivo") or "").split())[:RACCOLTA_MOTIVO_MAX]
+    _frena("raccolta_segnala", user["id"])
+    con = _raccolte_db()
+    try:
+        r = _raccolta_carica(con, rid)
+        if r["stato"] != "attiva" or int(r["autore_id"]) == int(user["id"]):
+            raise HTTPException(400, "Questa raccolta non si può segnalare")
+        cur = con.execute("INSERT OR IGNORE INTO raccolta_segnalazioni("
+                          "raccolta_id, tg_id, motivo, quando) VALUES(?,?,?,?)",
+                          (r["id"], user["id"], motivo, int(time.time())))
+        con.commit()
+        n = con.execute("SELECT COUNT(*) FROM raccolta_segnalazioni WHERE "
+                        "raccolta_id=? AND guardata=0", (r["id"],)).fetchone()[0]
+    finally:
+        con.close()
+    if cur.rowcount and n == 1:
+        await notifica_admin(
+            f"🚩 <b>Raccolta segnalata</b> #{int(rid)}: «{html.escape(r['titolo'][:60])}»"
+            + (f"\n«{html.escape(motivo)}»" if motivo else "")
+            + "\nGuardala dal Profilo → Amministrazione: puoi fermarla.",
+            _raccolta_bottone(rid), argomento="moderazione")
+    return {"ok": True}
+
+
+# ---- LO ZAP: IL MOTORE DELLA MANCIA ----
+
+@app.post("/api/raccolte/{rid}/zap")
+async def raccolta_zap(rid: int, req: Request, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Il sostenitore chiede la fattura di uno zap: la conia il wallet di
+    chi raccoglie, dal suo Lightning address, con la guardia della mancia.
+    Torna {id, invoice, sats, verificabile}."""
+    _raccolte_serve()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    try:
+        sats = int(d.get("sats"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Scrivi quanti sats vuoi mandare")
+    if not RACCOLTA_ZAP_MIN_SATS <= sats <= raccolta_zap_max_sats():
+        raise HTTPException(400, f"Uno zap va da {RACCOLTA_ZAP_MIN_SATS} a "
+                                 f"{_fmt_sats(raccolta_zap_max_sats())} sats")
+    anonimo = d.get("anonimo") is True
+    _frena("raccolta_zap", user["id"])
+    con = _raccolte_db()
+    try:
+        r = _raccolta_carica(con, rid)
+        if (r["stato"] != "attiva" or int(r["scade"] or 0) <= int(time.time())
+                or int(r["autore_id"]) == int(user["id"])):
+            raise HTTPException(400, "Questa raccolta adesso non riceve zap")
+        a = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                        (r["autore_id"],)).fetchone()
+        ln = (a["ln_address"] if a else "") or ""
+        if "@" not in ln:
+            raise HTTPException(400, "Chi raccoglie non ha più un indirizzo "
+                                     "Lightning: per ora lo zap non si può mandare")
+    finally:
+        con.close()
+    extra: dict = {}
+    try:
+        bolt11 = await invoice_da_ln_address(ln, sats, extra)
+    except LnbitsMuto:
+        raise HTTPException(503, MSG_LNBITS_MUTO)
+    if not bolt11:
+        raise HTTPException(400, "Il wallet di chi raccoglie non ci ha dato una "
+                                 "fattura per questa cifra: prova un'altra cifra, "
+                                 "o riprova più tardi")
+    ph = zap_leggi_bolt11(bolt11).get("payment_hash") or ""
+    con = _raccolte_db()
+    try:
+        cur = con.execute(
+            "INSERT INTO raccolta_zap(raccolta_id, sostenitore_id, autore_id,"
+            " sats, anonimo, bolt11, payment_hash, verify, stato, creato)"
+            " VALUES(?,?,?,?,?,?,?,?,'chiesta',?)",
+            (r["id"], user["id"], r["autore_id"], sats, 1 if anonimo else 0,
+             bolt11, ph, extra.get("verify", ""), int(time.time())))
+        con.commit()
+        zid = cur.lastrowid
+    finally:
+        con.close()
+    print(f"🎯 Zap chiesto: raccolta #{int(rid)}, {_fmt_sats(sats)} sats "
+          f"(riga {zid}{', LUD-21' if extra.get('verify') else ''})", flush=True)
+    return {"id": zid, "invoice": bolt11, "sats": sats,
+            "verificabile": bool(extra.get("verify"))}
+
+
+def testo_avviso_zap_raccolta(sats: int, titolo: str, arrivato: bool) -> str:
+    """PURA: le parole per chi raccoglie, come quelle della mancia."""
+    if arrivato:
+        return (f"🎯 Uno zap di {_fmt_sats(sats)} sats per «{titolo}»! È già "
+                "nel tuo wallet: va dritto al tuo Lightning address, Barattolo "
+                "non lo tocca.")
+    return (f"🎯 Qualcuno dice di averti mandato uno zap di {_fmt_sats(sats)} "
+            f"sats per «{titolo}». Controlla il wallet: va dritto a te, "
+            "Barattolo non lo tocca.")
+
+
+@app.post("/api/raccolte/{rid}/zap/{zid}/esito")
+async def raccolta_zap_esito(rid: int, zid: int, req: Request,
+                             x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """Com'e' andato uno zap, detto da chi l'ha mandato: la preimage, poi
+    LUD-21, poi la parola («l'ho pagato»). La riga sale e non scende mai,
+    e l'avviso a chi raccoglie parte UNA volta (il cancello `avvisato=0`).
+    E' la rotta della mancia, riga per riga. Torna {stato}."""
+    _raccolte_serve()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = _raccolte_db()
+    try:
+        z = con.execute("SELECT * FROM raccolta_zap WHERE id=? AND raccolta_id=? "
+                        "AND sostenitore_id=?", (zid, rid, user["id"])).fetchone()
+        z = dict(z) if z else None
+    finally:
+        con.close()
+    if not z:
+        raise HTTPException(400, "Operazione non permessa")
+    nuovo = z["stato"]
+    if nuovo != "arrivata":
+        if preimage_giusta(d.get("preimage"), z["payment_hash"]):
+            nuovo = "arrivata"
+        elif z["verify"]:
+            _frena("mancia_guarda", user["id"])
+            if await mancia_verifica_lud21(z["verify"], z["payment_hash"]):
+                nuovo = "arrivata"
+        if nuovo == "chiesta" and d.get("dichiarata") is True:
+            nuovo = "dichiarata"
+    if nuovo == z["stato"]:
+        return {"stato": nuovo}
+    adesso = int(time.time())
+    con = _raccolte_db()
+    try:
+        con.execute("UPDATE raccolta_zap SET stato=?, pagata_il=? WHERE id=? "
+                    "AND stato=?", (nuovo, adesso, z["id"], z["stato"]))
+        cur = con.execute("UPDATE raccolta_zap SET avvisato=? WHERE id=? "
+                          "AND avvisato=0", (adesso, z["id"]))
+        con.commit()
+        avvisa = cur.rowcount == 1
+        t = con.execute("SELECT titolo FROM raccolte WHERE id=?", (rid,)).fetchone()
+        titolo = html.escape(((t["titolo"] if t else "") or "")[:50])
+    finally:
+        con.close()
+    print(f"🎯 Zap {nuovo}: raccolta #{int(rid)}, {_fmt_sats(z['sats'])} sats "
+          f"(riga {z['id']})", flush=True)
+    if avvisa:
+        await notifica(z["autore_id"], testo_avviso_zap_raccolta(
+            z["sats"], titolo, nuovo == "arrivata"), _raccolta_bottone(rid))
+    return {"stato": nuovo}
+
+
+# ---- IL DEPOSITO DI GARANZIA: IL 2-DI-3 DEL MERCATINO ----
+
+@app.post("/api/raccolte/{rid}/deposito")
+async def raccolta_deposito(rid: int, req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Nasce il 2-di-3 di UN deposito: sostenitore («compratore»), chi
+    raccoglie («venditore»), Barattolo. Il contributo in euro diventa
+    sats al cambio di adesso (minimo RACCOLTA_MIN_GARANTITA_EURO), piu'
+    il margine per la rete. Serve che il sostenitore abbia gia' scelto il
+    SUO wallet, dove tornerebbe il rimborso: senza, i sats non avrebbero
+    dove tornare. Un deposito da pagare per persona per raccolta: se
+    c'e', torna quello."""
+    _raccolte_serve()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not raccolta_garantita_ammessa(user["id"]):
+        raise HTTPException(404, "I depositi di garanzia qui non ci sono")
+    _onchain_serve_embit()
+    d = await leggi_json(req)
+    try:
+        euro = int(d.get("euro"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Scrivi quanti euro vuoi mettere")
+    minimo = raccolta_min_garantita_euro()
+    if euro < minimo:
+        raise HTTPException(400, f"Il deposito di garanzia parte da {minimo} €: "
+                                 "sotto, la rete costerebbe troppo. Per meno, "
+                                 "manda uno zap")
+    _frena("raccolta_deposito", user["id"])
+    cambio = await cambio_btc_eur()
+    sats = raccolta_sats_da_euro(euro * 100, cambio)
+    if not sats:
+        raise HTTPException(503, "Il cambio di adesso non c'è: riprova fra un minuto")
+    tariffa = await onchain_mempool_tariffa()
+    margine = onchain_margine(tariffa)
+    adesso = int(time.time())
+    con = _raccolta_depositi_db()
+    try:
+        r = _raccolta_carica(con, rid)
+        if (r["stato"] != "attiva" or not r["garantita"]
+                or int(r["scade"] or 0) <= adesso):
+            raise HTTPException(400, "Questa raccolta adesso non riceve depositi")
+        if int(r["autore_id"]) == int(user["id"]):
+            raise HTTPException(400, "Nella tua raccolta non puoi depositare")
+        if sats > int(r["obiettivo_sats"]):
+            raise HTTPException(400, "Il deposito è più grande dell'obiettivo "
+                                     "intero: scegli una cifra più piccola")
+        gia = con.execute("SELECT * FROM raccolta_depositi WHERE raccolta_id=? "
+                          "AND compratore_id=? AND stato='attesa'",
+                          (r["id"], user["id"])).fetchone()
+        if gia:
+            return _raccolta_deposito_vista(con, gia, user["id"])
+        x = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        if not x:
+            raise HTTPException(409, "Ti serve il wallet on-chain: Profilo → «₿ On-chain»")
+        if not _onchain_destinazione_viva(con, user["id"], x["xpub"]):
+            raise HTTPException(409, "Prima scegli il tuo wallet, dove tornano i sats "
+                                     "se l'obiettivo non arriva: Profilo → «Incassi on-chain»")
+        try:
+            ind_id = onchain_nuovo_indirizzo(con, user["id"], r["autore_id"], adesso)
+        except ValueError as e:
+            msg = str(e)
+            if "chi vende non ha" in msg:
+                msg = "Chi raccoglie non ha più la chiave on-chain"
+            raise HTTPException(409, msg)
+        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                          (ind_id,)).fetchone()
+        incasso, i_tipo, i_val, i_firma, i_ind = _p2p_onchain_incasso_di(
+            con, r["autore_id"], ind["xpub_venditore"])
+        rimborso, r_tipo, r_val, r_firma, r_ind = _onchain_rimborso_di(
+            con, user["id"], ind["xpub_compratore"])
+        if not incasso or not rimborso:
+            raise HTTPException(409, "Chi raccoglie non ha più un wallet on-chain "
+                                     "scelto: per ora il deposito non si può fare")
+        cur = con.execute(
+            "INSERT INTO raccolta_depositi(raccolta_id, compratore_id,"
+            " venditore_id, stato, indirizzo_id, euro_cent, cambio,"
+            " prezzo_sats, margine_sats, importo_sats, incasso, incasso_tipo,"
+            " incasso_valore, incasso_firma, incasso_indice, rimborso,"
+            " rimborso_tipo, rimborso_valore, rimborso_firma, rimborso_indice,"
+            " scade, creato, aggiornato)"
+            " VALUES(?,?,?,'attesa',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (r["id"], user["id"], r["autore_id"], ind_id, euro * 100,
+             float(cambio), sats, margine, sats + margine, incasso, i_tipo,
+             i_val, i_firma, i_ind, rimborso, r_tipo, r_val, r_firma, r_ind,
+             min(adesso + ONCHAIN_ORE_ATTESA * 3600, int(r["scade"])),
+             adesso, adesso))
+        con.commit()
+        dep = _raccolta_carica_deposito(con, cur.lastrowid)
+        fuori = _raccolta_deposito_vista(con, dep, user["id"])
+    finally:
+        con.close()
+    print(f"🎯 Deposito di garanzia #{fuori['id']}: raccolta #{int(rid)}, "
+          f"{_fmt_sats(sats)} sats + {_fmt_sats(margine)} di margine", flush=True)
+    return fuori
+
+
+async def raccolta_deposito_controlla(did: int) -> str:
+    """LA SORVEGLIANZA di un deposito, come `onchain_controlla`: con una
+    conferma e almeno l'importo → 'depositato' (la barra sale). Scaduto
+    senza niente → 'scaduto'; scaduto con meno dell'importo → 'incompleto'
+    (non conta, e torna indietro). Le monete non confermate si vedono ma
+    non contano. Un deposito gia' chiuso si rilegge solo per le monete
+    arrivate dopo (non si toccano sotto una proposta firmata)."""
+    con = _raccolta_depositi_db()
+    try:
+        o = con.execute("SELECT d.*, i.indirizzo AS dove FROM raccolta_depositi d"
+                        " JOIN onchain_indirizzi i ON i.id=d.indirizzo_id"
+                        " WHERE d.id=?", (int(did),)).fetchone()
+    finally:
+        con.close()
+    if not o:
+        return ""
+    if o["stato"] == "scaduto":
+        return await _raccolta_deposito_ritardatario(o)
+    if o["stato"] != "attesa":
+        return o["stato"]
+    utxo = await onchain_mempool_utxo(o["dove"])
+    buone = [{"txid": str(u["txid"]), "vout": int(u["vout"]),
+              "value": int(u["value"])}
+             for u in utxo if (u.get("status") or {}).get("confirmed")]
+    visti = sum(int(u["value"]) for u in utxo)
+    ricevuti = sum(u["value"] for u in buone)
+    adesso = int(time.time())
+    stato = "attesa"
+    con = _raccolta_depositi_db()
+    try:
+        con.execute("UPDATE raccolta_depositi SET visti_sats=?, ricevuti_sats=?,"
+                    " utxo=?, aggiornato=? WHERE id=? AND stato='attesa'",
+                    (visti, ricevuti, json.dumps(buone), adesso, o["id"]))
+        if ricevuti >= int(o["importo_sats"]):
+            if con.execute("UPDATE raccolta_depositi SET stato='depositato',"
+                           " depositato_il=? WHERE id=? AND stato='attesa'",
+                           (adesso, o["id"])).rowcount:
+                stato = "depositato"
+        elif adesso > int(o["scade"]) and visti == ricevuti:
+            # il tempo e' finito e in mempool non c'e' niente in volo
+            nuovo = "incompleto" if ricevuti > 0 else "scaduto"
+            if con.execute("UPDATE raccolta_depositi SET stato=?, chiuso_il=?"
+                           " WHERE id=? AND stato='attesa'",
+                           (nuovo, adesso if nuovo == "scaduto" else 0,
+                            o["id"])).rowcount:
+                stato = nuovo
+        con.commit()
+        t = con.execute("SELECT titolo FROM raccolte WHERE id=?",
+                        (o["raccolta_id"],)).fetchone()
+        titolo = html.escape(((t["titolo"] if t else "") or "")[:50])
+    finally:
+        con.close()
+    if stato == "depositato":
+        await notifica(o["compratore_id"],
+            f"🛡️ <b>Deposito confermato</b> per «{titolo}»: "
+            f"{_fmt_sats(o['prezzo_sats'])} sats nel deposito di garanzia 2-di-3. "
+            "Se a scadenza l'obiettivo non arriva, tornano al tuo wallet.",
+            _raccolta_bottone(o["raccolta_id"]))
+        await notifica(o["venditore_id"],
+            f"🛡️ <b>Nuovo deposito di garanzia</b> per «{titolo}»: "
+            f"{_fmt_sats(o['prezzo_sats'])} sats. Arrivano a te a scadenza, "
+            "se i depositi raggiungono l'obiettivo.",
+            _raccolta_bottone(o["raccolta_id"]))
+    return stato
+
+
+# I RITARDATARI: un deposito scaduto si rilegge per RACCOLTA_RITARDO_GIORNI
+# giorni. Chi paga tardi (un wallet lento, un QR fotografato ieri) manda i
+# sats a un 2-di-3 che c'e' ancora: non contano per la raccolta, e tornano
+# a lui come un deposito incompleto, con la stessa firma di Barattolo.
+RACCOLTA_RITARDO_GIORNI = 7
+
+
+async def _raccolta_deposito_ritardatario(o) -> str:
+    utxo = await onchain_mempool_utxo(o["dove"])
+    buone = [{"txid": str(u["txid"]), "vout": int(u["vout"]),
+              "value": int(u["value"])}
+             for u in utxo if (u.get("status") or {}).get("confirmed")]
+    if not buone:
+        return o["stato"]
+    adesso = int(time.time())
+    con = _raccolta_depositi_db()
+    try:
+        n = con.execute("UPDATE raccolta_depositi SET stato='incompleto',"
+                        " visti_sats=?, ricevuti_sats=?, utxo=?, chiuso_il=0,"
+                        " aggiornato=? WHERE id=? AND stato='scaduto'",
+                        (sum(int(u["value"]) for u in utxo),
+                         sum(u["value"] for u in buone), json.dumps(buone),
+                         adesso, o["id"])).rowcount
+        con.commit()
+    finally:
+        con.close()
+    if not n:
+        return o["stato"]
+    await notifica(o["compratore_id"],
+        "🛡️ Sono arrivati dei sats su un deposito di garanzia già scaduto: "
+        "non contano per la raccolta, e tornano al tuo wallet. Ti avviso io "
+        "quando c'è da mettere la seconda firma.", _raccolta_bottone(o["raccolta_id"]))
+    return "incompleto"
+
+
+@app.post("/api/raccolte/depositi/{did}/controlla")
+async def raccolta_deposito_controlla_rotta(did: int, x_tg_init_data: str = Header(""),
+                                            barattolo_sessione: str = Cookie("")):
+    """«Ho pagato, guarda adesso»: la stessa domanda della ronda."""
+    _raccolte_serve()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("p2p_onchain_controlla", user["id"])
+    con = _raccolta_depositi_db()
+    try:
+        _raccolta_parte_deposito(_raccolta_carica_deposito(con, did), user["id"])
+    finally:
+        con.close()
+    try:
+        await raccolta_deposito_controlla(did)
+    except Exception:
+        raise HTTPException(503, "mempool non risponde: riprova fra poco")
+    con = _raccolta_depositi_db()
+    try:
+        return _raccolta_deposito_vista(con, _raccolta_carica_deposito(con, did),
+                                        user["id"])
+    finally:
+        con.close()
+
+
+@app.post("/api/raccolte/depositi/{did}/annulla")
+async def raccolta_deposito_annulla(did: int, x_tg_init_data: str = Header(""),
+                                    barattolo_sessione: str = Cookie("")):
+    """Chi deposita ci ripensa PRIMA di pagare: solo se in rete non si e'
+    visto niente (un pagamento in volo non si annulla: arriverebbe a un
+    deposito chiuso, e tornerebbe indietro con la rete pagata due volte)."""
+    _raccolte_serve()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = _raccolta_depositi_db()
+    try:
+        dep = _raccolta_carica_deposito(con, did)
+        if _raccolta_parte_deposito(dep, user["id"]) != "compratore" or dep["stato"] != "attesa":
+            raise HTTPException(409, "Questo deposito non si annulla")
+        ind = con.execute("SELECT indirizzo FROM onchain_indirizzi WHERE id=?",
+                          (dep["indirizzo_id"],)).fetchone()
+    finally:
+        con.close()
+    try:
+        visti = await onchain_mempool_utxo(ind["indirizzo"]) if ind else []
+    except Exception:
+        raise HTTPException(503, "mempool non risponde: riprova fra poco")
+    if visti:
+        raise HTTPException(409, "I sats sono già in arrivo: il deposito non si "
+                                 "annulla più. Se l'obiettivo non arriva, tornano a te")
+    con = _raccolta_depositi_db()
+    try:
+        con.execute("UPDATE raccolta_depositi SET stato='annullato', chiuso_il=?,"
+                    " aggiornato=? WHERE id=? AND stato='attesa'",
+                    (int(time.time()), int(time.time()), int(did)))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True}
+
+
+@app.post("/api/raccolte/depositi/{did}/firma")
+async def raccolta_deposito_firma(did: int, req: Request, x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """LA SECONDA FIRMA, il calco di `p2p_onchain_firma`: la transazione
+    completa, lo STESSO txid della proposta firmata da Barattolo,
+    trasmessa. La mette solo chi riceve quell'uscita: chi raccoglie il
+    rilascio, chi ha depositato il rimborso. Risponde anche a leve spente:
+    un'uscita gia' firmata da Barattolo non resta appesa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("onchain_firma", user["id"])
+    _onchain_serve_embit()
+    from embit.psbt import PSBT
+    from embit.transaction import Transaction
+    d = await leggi_json(req)
+    tx_hex = str(d.get("tx") or "").strip()
+    if not tx_hex or len(tx_hex) > 40000:
+        raise HTTPException(400, "Manca la transazione")
+    con = _raccolta_depositi_db()
+    try:
+        dep = _raccolta_carica_deposito(con, did)
+        ruolo = _raccolta_parte_deposito(dep, user["id"])
+        if not dep["proposta_psbt"] or dep["stato"] not in ("depositato", "incompleto"):
+            raise HTTPException(409, "Non c'è niente da co-firmare")
+        if dep["proposta_verso"] != ruolo:
+            raise HTTPException(409, "Questa uscita non va a te: la co-firma "
+                                     "l'altra parte")
+        try:
+            atteso = PSBT.from_string(dep["proposta_psbt"]).tx.txid().hex()
+            arrivato = Transaction.from_string(tx_hex).txid().hex()
+        except Exception:
+            raise HTTPException(400, "La transazione non si legge")
+        if atteso != arrivato:
+            raise HTTPException(400, "Non è la transazione proposta")
+        verso = dep["proposta_verso"]
+    finally:
+        con.close()
+    try:
+        txid = await onchain_mempool_invia(tx_hex)
+    except ValueError as e:
+        raise HTTPException(400, f"La rete l'ha rifiutata: {e}")
+    except Exception:
+        raise HTTPException(503, "mempool non risponde: riprova fra poco")
+    stato = "rilasciato" if verso == "venditore" else "rimborsato"
+    adesso = int(time.time())
+    con = _raccolta_depositi_db()
+    try:
+        con.execute("UPDATE raccolta_depositi SET stato=?, txid_uscita=?,"
+                    " chiuso_il=?, aggiornato=? WHERE id=?",
+                    (stato, txid or arrivato, adesso, adesso, int(did)))
+        con.commit()
+    finally:
+        con.close()
+    altro = dep["compratore_id"] if verso == "venditore" else dep["venditore_id"]
+    await notifica(altro,
+        (f"🎯 Il tuo deposito di {_fmt_sats(dep['prezzo_sats'])} sats è arrivato "
+         "a chi raccoglie: grazie per il sostegno!")
+        if verso == "venditore" else
+        (f"↩️ Il deposito di {_fmt_sats(dep['prezzo_sats'])} sats è tornato a "
+         "chi l'aveva messo."), _raccolta_bottone(dep["raccolta_id"]))
+    print(f"🎯 Deposito #{int(did)} {stato}: {(txid or arrivato)[:12]}…", flush=True)
+    return {"ok": True, "stato": stato, "txid": txid or arrivato}
+
+
+async def _raccolta_firma_uscite(rid: int) -> int:
+    """A raccolta finita (o fermata), Barattolo mette la SUA firma su ogni
+    deposito confermato che non ne ha ancora una, verso chi gli spetta
+    (`raccolta_verso_deposito`), con lo stesso costruttore e lo stesso
+    giudice della disputa (`_onchain_psbt_barattolo`). La seconda firma
+    e' del telefono di chi riceve. Una firma data non si ritira: si
+    firma solo dove `proposta_psbt` e' vuoto (l'UPDATE lo ricontrolla).
+    Torna quante uscite ha firmato."""
+    if not EMBIT:
+        return 0
+    try:
+        await onchain_mempool_tariffa()
+    except Exception:
+        pass
+    con = _raccolta_depositi_db()
+    firmate = []
+    try:
+        r = con.execute("SELECT * FROM raccolte WHERE id=?", (int(rid),)).fetchone()
+        if not r:
+            return 0
+        deps = con.execute("SELECT * FROM raccolta_depositi WHERE raccolta_id=?"
+                           " AND stato IN ('depositato','incompleto') AND"
+                           " proposta_psbt=''", (r["id"],)).fetchall()
+        for dep in deps:
+            verso = raccolta_verso_deposito(dep["stato"], r["stato"], r["esito"],
+                                            dep["depositato_il"], r["chiusa_il"])
+            if not verso:
+                continue
+            try:
+                psbt = _onchain_psbt_barattolo(con, dep, verso)
+            except Exception as e:
+                print(f"⚠️ Raccolta #{r['id']}: deposito {dep['id']} non firmato ({e})",
+                      flush=True)
+                continue
+            adesso = int(time.time())
+            if con.execute("UPDATE raccolta_depositi SET proposta_verso=?,"
+                           " proposta_psbt=?, proposta_da=0, proposta_il=?,"
+                           " decisione_il=?, decisione_perche=?, aggiornato=?"
+                           " WHERE id=? AND proposta_psbt=''",
+                           (verso, psbt, adesso, adesso,
+                            "raccolta " + (r["esito"] or r["stato"]), adesso,
+                            dep["id"])).rowcount:
+                firmate.append((dep, verso))
+        con.commit()
+        titolo = html.escape((r["titolo"] or "")[:50])
+    finally:
+        con.close()
+    for dep, verso in firmate:
+        if verso == "venditore":
+            await notifica(dep["venditore_id"],
+                f"🎯 <b>Barattolo ha firmato</b> il deposito di "
+                f"{_fmt_sats(dep['prezzo_sats'])} sats per «{titolo}». Apri la "
+                "Mini App: il tuo telefono mette la seconda firma e i sats "
+                "partono verso il tuo wallet.", _raccolta_bottone(rid))
+        else:
+            await notifica(dep["compratore_id"],
+                f"↩️ <b>Il tuo deposito torna a te:</b> "
+                f"{_fmt_sats(dep['prezzo_sats'])} sats per «{titolo}». Barattolo "
+                "ha firmato: apri la Mini App, il tuo telefono mette la seconda "
+                "firma e i sats tornano al tuo wallet.", _raccolta_bottone(rid))
+    if firmate:
+        await notifica_admin(
+            f"₿ <b>Barattolo ha firmato</b> {len(firmate)} uscite della raccolta "
+            f"#{int(rid)} («{titolo}»): "
+            + ", ".join(f"#{d['id']} → {'chi raccoglie' if v == 'venditore' else 'indietro'}"
+                        for d, v in firmate) + ".", argomento="dispute")
+    return len(firmate)
+
+
+async def _raccolta_chiudi(rid: int, adesso: int) -> str:
+    """La scadenza di una raccolta attiva: 'chiusa' con l'esito
+    (`raccolta_esito`), e gli avvisi a chi raccoglie. Torna l'esito ('' se
+    un altro giro l'ha gia' chiusa)."""
+    con = _raccolta_depositi_db()
+    try:
+        r = con.execute("SELECT * FROM raccolte WHERE id=?", (int(rid),)).fetchone()
+        if not r or r["stato"] != "attiva":
+            return ""
+        # i depositi contano se confermati ENTRO la scadenza
+        garantiti = con.execute(
+            "SELECT COALESCE(SUM(prezzo_sats),0) FROM raccolta_depositi WHERE "
+            "raccolta_id=? AND stato='depositato' AND depositato_il>0 AND "
+            "depositato_il<=?", (r["id"], int(r["scade"]))).fetchone()[0]
+        zap = _raccolta_conti(con, [r["id"]]).get(int(r["id"]), {}).get("zap", 0)
+        esito = raccolta_esito(bool(r["garantita"]), r["obiettivo_sats"],
+                               garantiti, zap)
+        if not con.execute("UPDATE raccolte SET stato='chiusa', esito=?,"
+                           " chiusa_il=? WHERE id=? AND stato='attiva'",
+                           (esito, int(r["scade"]), r["id"])).rowcount:
+            return ""
+        con.commit()
+        titolo = html.escape((r["titolo"] or "")[:50])
+    finally:
+        con.close()
+    if r["garantita"]:
+        testo = (f"🎯 <b>«{titolo}» è finita: obiettivo raggiunto!</b> I depositi "
+                 "di garanzia arrivano a te: apri la Mini App e il tuo telefono "
+                 "mette la seconda firma su ognuno." if esito == "raggiunta" else
+                 f"🎯 <b>«{titolo}» è finita</b> senza raggiungere l'obiettivo con "
+                 "i depositi: tornano a chi li aveva messi. Gli zap restano tuoi.")
+    else:
+        testo = (f"🎯 <b>«{titolo}» è finita: obiettivo raggiunto!</b> Grazie a "
+                 "chi ti ha sostenuto." if esito == "raggiunta" else
+                 f"🎯 <b>«{titolo}» è finita.</b> Gli zap arrivati sono già nel "
+                 "tuo wallet.")
+    await notifica(r["autore_id"], testo, _raccolta_bottone(rid))
+    return esito
+
+
+async def _raccolte_ronda() -> None:
+    """Il battito delle raccolte (ogni due minuti): le scadenze, i
+    depositi in attesa sulla rete, le firme di Barattolo a raccolta
+    finita. Un pezzo che si rompe non ferma gli altri."""
+    adesso = int(time.time())
+    con = _raccolta_depositi_db()
+    try:
+        scadute = [x["id"] for x in con.execute(
+            "SELECT id FROM raccolte WHERE stato='attiva' AND scade>0 AND "
+            "scade<=? ORDER BY id LIMIT 50", (adesso,))]
+        attesa = [x["id"] for x in con.execute(
+            "SELECT id FROM raccolta_depositi WHERE stato='attesa' OR "
+            "(stato='scaduto' AND chiuso_il>?) ORDER BY id LIMIT 50",
+            (adesso - RACCOLTA_RITARDO_GIORNI * 86400,))]
+    finally:
+        con.close()
+    # prima i depositi (uno confermato all'ultimo minuto conta), poi le
+    # scadenze, poi le firme
+    if EMBIT and attesa:
+        for did in attesa:
+            try:
+                await raccolta_deposito_controlla(did)
+            except Exception as e:
+                print(f"⚠️ Raccolte: deposito {did} non controllato: {e}", flush=True)
+    for rid in scadute:
+        try:
+            await _raccolta_chiudi(rid, adesso)
+        except Exception as e:
+            print(f"⚠️ Raccolte: raccolta {rid} non chiusa: {e}", flush=True)
+    con = _raccolta_depositi_db()
+    try:
+        da_firmare = [x["raccolta_id"] for x in con.execute(
+            "SELECT DISTINCT d.raccolta_id FROM raccolta_depositi d JOIN raccolte r"
+            " ON r.id=d.raccolta_id WHERE d.stato IN ('depositato','incompleto')"
+            " AND d.proposta_psbt='' AND (r.stato IN ('chiusa','fermata')"
+            " OR d.stato='incompleto') LIMIT 50")]
+    finally:
+        con.close()
+    for rid in da_firmare:
+        try:
+            await _raccolta_firma_uscite(rid)
+        except Exception as e:
+            print(f"⚠️ Raccolte: firme della raccolta {rid} saltate: {e}", flush=True)
+
+
+_TASK_RACCOLTE = None
+
+
+async def orologio_raccolte():
+    """Ogni due minuti, a leva accesa. Le uscite gia' decise si firmano
+    anche a leva spenta? No: a leva spenta dorme, e riaccesa riprende da
+    dove era (le scadenze passate si chiudono al primo giro)."""
+    while True:
+        await asyncio.sleep(120)
+        if not RACCOLTE_ATTIVE:
+            continue
+        try:
+            await _raccolte_ronda()
+        except Exception as e:
+            print(f"⚠️ Raccolte: ronda saltata: {e}", flush=True)
+
+
+@app.on_event("startup")
+async def avvia_raccolte():
+    global _TASK_RACCOLTE
+    _TASK_RACCOLTE = asyncio.create_task(orologio_raccolte())
+
+
+# ---- IL PANNELLO DEGLI ADMIN ----
+
+def _raccolte_admin_serve(x_tg_init_data, barattolo_sessione) -> dict:
+    _raccolte_serve()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    return user
+
+
+@app.get("/api/admin/raccolte")
+def raccolte_admin(x_tg_init_data: str = Header(""),
+                   barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: le raccolte da approvare (con le parole da guardare),
+    quelle segnalate, e quelle vive (per poterle fermare)."""
+    user = _raccolte_admin_serve(x_tg_init_data, barattolo_sessione)
+    con = _raccolte_db()
+    try:
+        righe = con.execute("SELECT * FROM raccolte WHERE stato IN "
+                            "('revisione','attiva') ORDER BY id DESC LIMIT 100").fetchall()
+        conti = _raccolta_conti(con, [r["id"] for r in righe])
+        segn = {}
+        for s in con.execute("SELECT raccolta_id, COUNT(*) AS n, "
+                             "GROUP_CONCAT(motivo, ' · ') AS motivi FROM "
+                             "raccolta_segnalazioni WHERE guardata=0 "
+                             "GROUP BY raccolta_id"):
+            segn[int(s["raccolta_id"])] = {"n": s["n"], "motivi": (s["motivi"] or "")[:500]}
+        fuori = []
+        for r in righe:
+            v = _raccolta_vista(con, r, conti, user["id"])
+            v["sospette"] = raccolta_parole_sospette(r["titolo"], r["racconto"])
+            v["segnalazioni"] = segn.get(int(r["id"]))
+            v["vendite_ok"] = (con.execute("SELECT vendite_ok FROM utenti WHERE "
+                                           "tg_id=?", (r["autore_id"],)).fetchone()
+                               or {"vendite_ok": 0})["vendite_ok"]
+            fuori.append(v)
+    finally:
+        con.close()
+    return {"raccolte": fuori}
+
+
+@app.post("/api/admin/raccolte/{rid}/{gesto}")
+async def raccolta_admin_gesto(rid: int, gesto: str, req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN. `via`: in vetrina da adesso, la scadenza parte da qui.
+    `rifiuta`: no, col perche' detto a chi raccoglie. `ferma`: una
+    raccolta viva si chiude ora, e i depositi tornano tutti indietro (gli
+    zap no: sono gia' nel suo wallet). `guardata`: le segnalazioni lette.
+    Un moderatore che e' anche chi raccoglie non decide."""
+    user = _raccolte_admin_serve(x_tg_init_data, barattolo_sessione)
+    if gesto not in ("via", "rifiuta", "ferma", "guardata"):
+        raise HTTPException(404, "Gesto sconosciuto")
+    d = await leggi_json(req)
+    perche = " ".join(str(d.get("perche") or "").split())[:RACCOLTA_MOTIVO_MAX]
+    if gesto in ("rifiuta", "ferma") and len(perche) < 5:
+        raise HTTPException(400, "Scrivi il perché: lo legge chi raccoglie")
+    adesso = int(time.time())
+    con = _raccolte_db()
+    try:
+        r = _raccolta_carica(con, rid)
+        if int(r["autore_id"]) == int(user["id"]):
+            raise HTTPException(403, "Sulla tua raccolta decide un altro moderatore")
+        if gesto == "via":
+            n = con.execute("UPDATE raccolte SET stato='attiva', approvata_il=?,"
+                            " approvata_da=?, scade=? WHERE id=? AND stato='revisione'",
+                            (adesso, user["id"], adesso + int(r["giorni"]) * 86400,
+                             r["id"])).rowcount
+        elif gesto == "rifiuta":
+            n = con.execute("UPDATE raccolte SET stato='rifiutata', perche=?,"
+                            " approvata_da=? WHERE id=? AND stato='revisione'",
+                            (perche, user["id"], r["id"])).rowcount
+        elif gesto == "ferma":
+            n = con.execute("UPDATE raccolte SET stato='fermata', perche=?,"
+                            " esito='mancata', chiusa_il=? WHERE id=? AND stato='attiva'",
+                            (perche, adesso, r["id"])).rowcount
+        else:
+            n = con.execute("UPDATE raccolta_segnalazioni SET guardata=1 WHERE "
+                            "raccolta_id=? AND guardata=0", (r["id"],)).rowcount or 1
+        con.commit()
+    finally:
+        con.close()
+    if not n:
+        raise HTTPException(409, "La raccolta è già cambiata: riapri il pannello")
+    titolo = html.escape((r["titolo"] or "")[:50])
+    print(f"🎯 Raccolta #{int(rid)}: {gesto} da {user['id']}", flush=True)
+    if gesto == "via":
+        await notifica(r["autore_id"],
+            f"🎯 <b>La tua raccolta «{titolo}» è in vetrina!</b> Dura "
+            f"{int(r['giorni'])} giorni da adesso. Condividila: chi la apre può "
+            "mandarti uno zap" + (" o mettere un deposito di garanzia." if r["garantita"] else "."),
+            _raccolta_bottone(rid))
+    elif gesto == "rifiuta":
+        await notifica(r["autore_id"],
+            f"🎯 La tua raccolta «{titolo}» non è stata approvata: "
+            f"{html.escape(perche)}", _raccolta_bottone(rid))
+    elif gesto == "ferma":
+        await notifica(r["autore_id"],
+            f"🎯 La tua raccolta «{titolo}» è stata fermata dai moderatori: "
+            f"{html.escape(perche)}"
+            + (" I depositi di garanzia tornano a chi li aveva messi." if r["garantita"] else ""),
+            _raccolta_bottone(rid))
+        await notifica_admin(f"🎯 Raccolta #{int(rid)} («{titolo}») fermata da "
+                             f"{int(user['id'])}: {html.escape(perche)}",
+                             argomento="moderazione")
+    return {"ok": True}
+
+
+def _raccolte_leve() -> list:
+    """Le voci del pannello «Stato delle leve»."""
+    return [
+        _leva("Raccolte fondi in sats", "RACCOLTE_ATTIVE", bool(RACCOLTE_ATTIVE),
+              acceso="chi ha almeno le vendite richieste e un indirizzo "
+                     "Lightning apre una raccolta; va in vetrina col via di un "
+                     "admin; gli zap vanno dritti al suo wallet",
+              spento="nessuna raccolta in vetrina e le rotte rispondono 404; "
+                     "le uscite già firmate da Barattolo restano firmabili"),
+        _leva("Depositi di garanzia 2-di-3 nelle raccolte",
+              "RACCOLTA_GARANTITA_ATTIVA", bool(RACCOLTA_GARANTITA_ATTIVA),
+              acceso="chi sostiene può mettere un deposito on-chain: a "
+                     "scadenza va a chi raccoglie se i depositi raggiungono "
+                     "l'obiettivo, sennò torna indietro (serve l'on-chain)",
+              spento="solo zap; i depositi già fatti seguono la loro strada"),
+        _leva("Obiettivo massimo di una raccolta (€)", "RACCOLTA_MAX_EURO",
+              raccolta_max_euro()),
+        _leva("Durata massima di una raccolta (giorni)", "RACCOLTA_GIORNI_MAX",
+              raccolta_giorni_max()),
+        _leva("Deposito di garanzia minimo (€)", "RACCOLTA_MIN_GARANTITA_EURO",
+              raccolta_min_garantita_euro()),
+        _leva("Vendite confermate per aprire una raccolta",
+              "RACCOLTA_VENDITE_MIN", raccolta_vendite_min()),
+        _leva("Importo massimo di uno zap a una raccolta (sats)",
+              "RACCOLTA_ZAP_MAX_SATS", raccolta_zap_max_sats()),
+    ]
+
+
+# (Qui finisce il blocco delle raccolte.)
 
 
 # ---------- LA CASSA IN NEGOZIO (15 nov 2026, cantiere cassa-negozio) ----------

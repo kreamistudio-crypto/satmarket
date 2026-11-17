@@ -726,3 +726,35 @@ accetta «Contante per posta»: scegliendolo alla presa la riga «🔐 La
 cauzione di chi prende» compare (col testo «col contante per posta»),
 scegliendo SEPA no. Fatta, questa voce si cancella e il nuovo valore va
 in PRODUZIONE («LA SALITA ALLA -bar7», il blocco `[anti_abuse_bond]`).
+
+## 19. Le raccolte con deposito di garanzia: la leva sul collaudo, per la prova di Alan (17 nov 2026, cantiere raccolta)
+
+**Perché.** Le raccolte fondi arrivano su `develop` con lo zap acceso e il
+deposito di garanzia 2-di-3 SPENTO nel codice (`RACCOLTA_GARANTITA_ATTIVA
+= False`): è una funzione coi soldi, e la regola del 17 nov vuole prima la
+prova di Alan sul collaudo. In produzione NON si accende finché Alan non
+dice ok. Il perché di tutto: CANTIERI, «Le raccolte fondi in sats».
+
+**Il collaudo, la leva** (dopo che il collaudo ha tirato `develop` col
+cantiere). Sola lettura, deve dire `0`:
+```
+sudo grep -c "^RACCOLTA_GARANTITA_ATTIVA" /srv/collaudo/barattolo/config.py
+```
+Scrive: la copia, la riga, il controllo, il riavvio.
+```
+sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-raccolte
+```
+```
+printf '\nRACCOLTA_GARANTITA_ATTIVA = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
+```
+Atteso 200. La prova di Alan: un account con 3 vendite e un Lightning
+address apre una raccolta con «🛡️ Accetta anche depositi di garanzia»,
+un admin le dà il via (Profilo → pannello), un secondo account deposita
+50 € dalla scheda, poi si lascia scadere (o la si ferma): il telefono di
+chi riceve mette la seconda firma da solo all'apertura dell'app.

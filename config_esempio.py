@@ -2105,6 +2105,28 @@ CASSA_ATTIVA = True
 # passano da Barattolo).
 CASSA_MAX_SATS = 0
 
+# Le raccolte in sats (17 nov 2026): chi ha almeno RACCOLTA_VENDITE_MIN
+# vendite confermate e un indirizzo Lightning apre una raccolta (obiettivo,
+# scadenza, barra); va in vetrina col via di un admin. Gli zap vanno DRITTI
+# al wallet di chi raccoglie (il motore della mancia: niente fee, niente
+# rimborso). Nasce ACCESA; False e riavvia (o il pannello) per spegnerla.
+RACCOLTE_ATTIVE = True
+# I depositi di garanzia 2-di-3 on-chain nelle raccolte: a scadenza vanno a
+# chi raccoglie se i depositi raggiungono l'obiettivo, sennò tornano a chi li
+# ha messi. Servono l'on-chain e la terza chiave vera. SPENTA nel codice
+# finché non è provata sul collaudo (regola del 17 nov sulle funzioni coi
+# soldi): True per accenderla.
+RACCOLTA_GARANTITA_ATTIVA = False
+# Il tetto dell'obiettivo in euro (guardato all'apertura, poi l'obiettivo
+# resta fisso in sats), la durata massima in giorni, il minimo di un
+# deposito di garanzia in euro, le vendite confermate per aprirne una, il
+# tetto di UNO zap in sats.
+RACCOLTA_MAX_EURO = 1000
+RACCOLTA_GIORNI_MAX = 60
+RACCOLTA_MIN_GARANTITA_EURO = 50
+RACCOLTA_VENDITE_MIN = 3
+RACCOLTA_ZAP_MAX_SATS = 100_000
+
 # La ronda dei relay di Mostro (12 ott 2026): ogni dieci minuti il
 # server chiede ai relay che confermano (MOSTRO_RELAY_CONFERMA; senza,
 # a tutto MOSTRO_RELAY) se rispondono e se il coordinatore ci scrive

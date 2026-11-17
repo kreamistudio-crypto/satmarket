@@ -26139,6 +26139,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'intestazione prima e dopo e scorre della differenza, così quella
   toccata resta sotto il dito. Le voci (`toggleAcc`) restano
   indipendenti. Vedi CANTIERI, «Il profilo più elegante».
+  OTTO CASSETTI CHE SI SPIEGANO DA SOLI (17 nov 2026, Andrea: «il tuo
+  catalogo che cosa vuol dire?»). Oggi, nell'ordine: «Completa il
+  profilo» · «Annunci» (`grpCatalogo`: annunci, «Carica tanti annunci
+  insieme», doppioni) · «Il tuo negozio» (`grpNegozio`: «I numeri del
+  negozio», «Guarda il tuo negozio», banner, link, ferie, cassa, «Mettilo
+  sul tuo sito», pacchi al tuo punto) · «Spedizioni e sconti»
+  (`grpSpedizioni`, nuovo: come spedisci, spedizione gratis, sconto,
+  codici, premi fedeltà) · «Quando compri» (barattolo, avvisi di ricerca,
+  «I tuoi punti di ritiro») · «Wallet e incassi» (`grpIncassi`: Lightning
+  address, Come ricevi, On-chain, NWC) · «Livello e recensioni»
+  (`grpLivello`) · «Impostazioni» (`grpImpostazioni`, nuovo, prende il
+  posto di `grpAspetto` e `grpPrivacy`: avvisi, aspetto, «Nostr e
+  identità», I tuoi dati, Esporta, Sito Tor, Cancella) · «Aiuto»
+  (`grpSupporto`, id di sempre: Tappo, Assistenza, pagamento protetto) ·
+  Amministrazione. Le voci hanno gli id di sempre: `apriCassettoProfilo`
+  trova il gruppo con `closest`, e solo `apriCorrieriDaUrl` nomina il suo
+  (`grpSpedizioni`). La pagina «I tuoi dati» nomina «Wallet e incassi» e
+  «Quando compri» → «I tuoi punti di ritiro». Il censimento sta in
+  `prove_profilo_elegante`, coi titoli decisi.
   PWA installabile (lug 2026, Fase 1 del percorso PWA→APK→Zapstore;
   percorso ormai completo: Fase 2 = icona adattiva, Fase 3 =
   «Distribuzione dell'APK», più sotto): `manifest.json` (id/
@@ -36917,3 +36936,66 @@ mai il kind 0 di nessuno: regola ferrea 2).
   verificato su Nostr». La fusione porta il nome della metà Nostr se la
   metà Telegram non ne ha uno; la cancellazione lo libera con la riga.
 - Il collaudo: `collaudo_nip05_utenti.py` (in `ci/collaudi.txt`).
+
+- LE RACCOLTE IN SATS 🎯 (17 nov 2026, cantiere raccolta; il perché in
+  CANTIERI, «Le raccolte fondi in sats»). Un blocco suo in server.py,
+  subito DOPO quello della mancia (ne riusa il motore), fino a «(Qui
+  finisce il blocco delle raccolte.)». Due forme nella stessa raccolta.
+  LO ZAP è la mancia: `invoice_da_ln_address` sul Lightning address di
+  chi raccoglie (con l'`extra` di LUD-21), poi `preimage_giusta`,
+  `mancia_verifica_lud21` o la parola; la riga `raccolta_zap` sale
+  chiesta → dichiarata → arrivata con un UPDATE condizionato. Nessuna
+  fee, nessun rimborso. IL DEPOSITO DI GARANZIA è il 2-di-3 del
+  mercatino: `onchain_nuovo_indirizzo(con, sostenitore, raccoglitore)`,
+  la riga `raccolta_depositi` coi NOMI DELLE COLONNE della cassa
+  on-chain (compratore = chi sostiene, venditore = chi raccoglie,
+  come fa il P2P), le destinazioni firmate dal seme di ognuno
+  (`_onchain_rimborso_di` per chi deposita, `_p2p_onchain_incasso_di`
+  per chi raccoglie), la proposta firmata da Barattolo con
+  `_onchain_psbt_barattolo` e la seconda firma del telefono con
+  `onchainCofirma` (la `rotta` è `/raccolte/depositi/{id}`). Nessun
+  secondo motore di firme, nessun timelock, una transazione per
+  deposito, la rete dal margine di chi deposita. I GIUDICI PURI:
+  `raccolta_perche_non_apre` (leva, una viva alla volta, Lightning
+  address, `RACCOLTA_VENDITE_MIN` vendite concluse), `raccolta_giudica_campi`
+  (titolo 5-80, racconto 30-2000, 10 € - `RACCOLTA_MAX_EURO`, 7 -
+  `RACCOLTA_GIORNI_MAX` giorni), `raccolta_parole_sospette` (segnate
+  all'admin, mai un blocco), `raccolta_sats_da_euro` (l'obiettivo in
+  sats fissato all'apertura; senza cambio, no), `raccolta_esito` (una
+  garantita la decidono SOLO i depositi confermati) e
+  `raccolta_verso_deposito` (a chi raccoglie solo se chiusa, raggiunta
+  e confermato entro la chiusura; fermata, mancata, tardi o incompleto
+  → indietro). LE TABELLE: `raccolte` (revisione | attiva | rifiutata |
+  fermata | chiusa; `scade` nasce al via), `raccolta_zap`,
+  `raccolta_segnalazioni` (una per persona), `raccolta_depositi`
+  (attesa | depositato | incompleto | scaduto | annullato | rilasciato
+  | rimborsato; un deposito scade a min(24 h, scadenza della raccolta)).
+  LE ROTTE: `GET /api/raccolte` (vetrina, mie, io, regole), `GET
+  /api/raccolte/mie-firme`, `GET /api/raccolte/{id}`, `POST
+  /api/raccolte`, `POST /api/raccolte/{id}/segnala`, `POST
+  /api/raccolte/{id}/zap` e `.../zap/{zid}/esito`, `POST
+  /api/raccolte/{id}/deposito`, `POST /api/raccolte/depositi/{id}/controlla
+  | annulla | firma` (la firma NON guarda la leva: spenta, i sats non
+  restano chiusi; la mette solo il ruolo uguale a `proposta_verso`, e
+  quindi il rimborso solo chi ha depositato), `GET /api/admin/raccolte`
+  e `POST /api/admin/raccolte/{id}/{via|rifiuta|ferma|guardata}` (chi
+  raccoglie non giudica la propria). L'OROLOGIO `orologio_raccolte`
+  (ogni 120 s, all'avvio): guarda i depositi in attesa, rilegge per
+  `RACCOLTA_RITARDO_GIORNI` quelli scaduti (sats arrivati tardi →
+  incompleto → indietro), chiude le raccolte scadute, firma le uscite
+  e avvisa. I depositi entrano in `_onchain_prossimo_esterno` e
+  `_onchain_rimborsi_usati`, così gli indici esterni non si ripetono.
+  LE LEVE (gruppo «🎯 Raccolte in sats» del pannello, `_raccolte_leve`):
+  `RACCOLTE_ATTIVE` accesa di serie, `RACCOLTA_GARANTITA_ATTIVA` SPENTA
+  di serie (prima il collaudo), `RACCOLTA_MAX_EURO` 1000,
+  `RACCOLTA_GIORNI_MAX` 60, `RACCOLTA_MIN_GARANTITA_EURO` 50,
+  `RACCOLTA_VENDITE_MIN` 3, `RACCOLTA_ZAP_MAX_SATS` 100.000. In `/api/me`
+  `raccolte` = None a leva spenta, sennò {vive}. Zero XP. NEL TELEFONO:
+  la vista interna `#view-raccolte` (`apriRaccolte`, elenco e scheda in
+  `renderRaccolte` / `renderSchedaRaccolta`, voceNav → «esplora»), i
+  fogli `#raccNuovaSheet`, `#raccZapSheet`, `#raccDepSheet`, la voce-porta
+  `#vocRaccolte` nel Profilo, la tessera «Raccolte» dopo le Aste
+  (`raccolteSullaFila`: leva accesa e almeno una viva, entra nella firma
+  della fila), le seconde firme in `onchainCofirmeInSottofondo`
+  (`raccolteCofirmeInAttesa`), il link `/?raccolta=<id>` e il pannello
+  `boxRaccolteAdmin`. Prove: `prove_raccolte` e `collaudo_raccolta`.
