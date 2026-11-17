@@ -175679,7 +175679,7 @@ def prove_malus_p2p():
         for riga in ("P2P_MANCATI_FINESTRA_S = ", "P2P_MANCATI_FILTRO_S = ",
                      "P2P_MANCATI_TOLLERATI = ", "P2P_PRESE_APERTE_MAX = ",
                      "P2P_PRESA_APERTA_S = ", "P2P_ESITI_MEMORIA_S = ",
-                     "P2P_TENTATIVO_MARGINE_S = ", "P2P_DISPUTE_FINESTRA_S = ",
+                     "P2P_TENTATIVO_MARGINE_S = ", "P2P_GESTO_ANNULLO = ", "P2P_DISPUTE_FINESTRA_S = ",
                      "P2P_SCUSA_FINESTRA_S = ", "P2P_EURO_SOSPESI_MAX = ",
                      "P2P_EURO_SOSPESI_DOPO_S = ", "P2P_EURO_SOSPESI_FINO_S = ",
                      "P2P_MOTIVO_MIN = ", "P2P_MOTIVO_MAX = "):
@@ -175694,6 +175694,7 @@ def prove_malus_p2p():
             i = src.index("\n" + blocco) + 1
             exec(src[i:src.index("}\n", i) + 2], amb)
         for f in ("_primo_gesto_p2p", "_marchio_mancati_p2p", "_ha_provato_p2p",
+              "_ha_chiesto_annullo_p2p",
                   "_segna_esiti_p2p", "_reputazione_p2p", "_marchi_mancati_p2p",
                   "_prese_aperte_p2p", "_giudice_presa_p2p", "_soglia_filtro_p2p",
                   "_filtri_p2p", "_posso_prendere_p2p", "_segna_tentativo_p2p",
@@ -176295,7 +176296,7 @@ def prove_tempo_di_chi_pubblica():
     con, amb = _banco_eventi_p2p()
     for riga in ("P2P_MANCATI_FINESTRA_S = ", "P2P_MANCATI_FILTRO_S = ",
                  "P2P_MANCATI_TOLLERATI = ", "P2P_PRESE_APERTE_MAX = ",
-                 "P2P_PRESA_APERTA_S = ", "P2P_TENTATIVO_MARGINE_S = ",
+                 "P2P_PRESA_APERTA_S = ", "P2P_TENTATIVO_MARGINE_S = ", "P2P_GESTO_ANNULLO = ",
                  "P2P_DISPUTE_FINESTRA_S = ", "P2P_SCUSA_FINESTRA_S = ",
                  "P2P_EURO_SOSPESI_MAX = ", "P2P_EURO_SOSPESI_DOPO_S = ",
                  "P2P_EURO_SOSPESI_FINO_S = "):
@@ -176308,6 +176309,7 @@ def prove_tempo_di_chi_pubblica():
     i_p = src.index("\n_PESO_MOMENTO_P2P = {") + 1
     exec(src[i_p:src.index("}\n", i_p) + 2], amb)
     for f in ("_primo_gesto_p2p", "_marchio_mancati_p2p", "_ha_provato_p2p",
+              "_ha_chiesto_annullo_p2p",
               "_segna_esiti_p2p", "_reputazione_p2p", "_marchi_mancati_p2p",
               "_prese_aperte_p2p", "_giudice_presa_p2p", "_soglia_filtro_p2p",
               "_filtri_p2p", "_posso_prendere_p2p", "_segna_tentativo_p2p",
@@ -178134,7 +178136,7 @@ def prove_reputazione_p2p():
     for riga in ("P2P_MANCATI_FINESTRA_S = ", "P2P_MANCATI_FILTRO_S = ",
                  "P2P_MANCATI_TOLLERATI = ", "P2P_PRESE_APERTE_MAX = ",
                  "P2P_PRESA_APERTA_S = ", "P2P_ESITI_MEMORIA_S = ",
-                 "P2P_TENTATIVO_MARGINE_S = ",
+                 "P2P_TENTATIVO_MARGINE_S = ", "P2P_GESTO_ANNULLO = ",
                  # (10 ott 2026, malus-p2p) i malus dopo la garanzia
                  "P2P_DISPUTE_FINESTRA_S = ", "P2P_SCUSA_FINESTRA_S = ",
                  "P2P_EURO_SOSPESI_MAX = ", "P2P_EURO_SOSPESI_DOPO_S = ",
@@ -178147,6 +178149,7 @@ def prove_reputazione_p2p():
         i = src.index("\n" + blocco) + 1
         exec(src[i:src.index(")\n", i) + 2], amb)
     for f in ("_primo_gesto_p2p", "_marchio_mancati_p2p", "_ha_provato_p2p",
+              "_ha_chiesto_annullo_p2p",
               "_segna_esiti_p2p", "_reputazione_p2p", "_marchi_mancati_p2p",
               "_prese_aperte_p2p", "_giudice_presa_p2p", "_soglia_filtro_p2p",
               "_dichiara_filtri_p2p", "_filtri_p2p", "_posso_prendere_p2p",
@@ -178398,7 +178401,8 @@ def prove_reputazione_p2p():
           (t(con, 222, O2, "fattura_scartata", "IBAN IT60 X054 2811 1010 0000 0123 456 abcdefghijklmnop", ORA),
            con.execute("SELECT motivo FROM p2p_tentativi WHERE ordine=? AND gesto='fattura_scartata'",
                        (O2,)).fetchone()[0])[1])
-    prova("...i nove gesti del catalogo", 9, len(amb["P2P_GESTI_TENTATIVO"]))
+    prova("...i dieci gesti del catalogo (dal 17 nov 2026 anche l'annullo chiesto)", 10,
+          len(amb["P2P_GESTI_TENTATIVO"]))
     # q) la riga del conto nel messaggio a chi ha preso (richiesta di Andrea),
     #    con l'avviso del blocco sui filtri e la data (aggiunto lo stesso giorno)
     riga = amb["_riga_conto_p2p"]
@@ -178465,6 +178469,47 @@ def prove_reputazione_p2p():
     prova("...la riga nell'archivio e' la stessa (e tace su un giro che non lo riguarda)", [True, ""],
           [pezzo("_scambi_p2p").count('"conto": _conto_scambio_p2p(con, io, ordine, giro_s, adesso)') == 1,
            amb["_conto_scambio_p2p"](con, 222, O6, 1, ORA) if "_conto_scambio_p2p" in amb else ""])
+    # r) L'ANNULLO CHIESTO E NON ARRIVATO (17 nov 2026, cantiere annullo-
+    #    registrato; Andrea: «tu in effetti hai richiesto l'annullamento», e
+    #    alla proposta «si»): chi ha preso tocca «Annulla», il `cancel` non
+    #    arriva al coordinatore, il tempo scade. Non si conta, non e' la
+    #    scusa del tentativo (niente `scusato`), e vale solo per quel giro
+    O41 = ordine(41)
+    ev(O41, "taken", "buyer", "invoice-next", ORA - 800)
+    ev(O41, "buyer-invoice-requested", "mostro", "", ORA - 800)
+    t = amb["_segna_tentativo_p2p"](con, 222, O41, "annullo_chiesto", "", ORA - 500)
+    dal41 = ORA - 800
+    prova("r) «Annulla» di chi ha preso si dichiara come gli altri tentativi, ma NON e' un "
+          "«ci ha provato»: ha il suo giudice",
+          ({"ok": True, "motivo": ""}, False, True),
+          (t, amb["_ha_provato_p2p"](con, 222, O41, dal41),
+           amb["_ha_chiesto_annullo_p2p"](con, 222, O41, dal41)))
+    _, righe = ev(O41, "expired", "mostro", "taker-timeout", ORA - 10)
+    prova("...e al tempo scaduto NON si conta: nessuna riga per quell'ordine, ne' «mancato» "
+          "ne' «scusato» (la scusa dei 30 giorni non si consuma), e il journal dice perche'",
+          (0, True),
+          (con.execute("SELECT COUNT(*) FROM p2p_esiti WHERE ordine=?", (O41,)).fetchone()[0],
+           any("aveva chiesto di annullare" in r and "non si conta" in r for r in righe)))
+    ev(O41, "taken", "buyer", "invoice-next", ORA - 300)
+    ev(O41, "buyer-invoice-requested", "mostro", "", ORA - 300)
+    ev(O41, "expired", "mostro", "taker-timeout", ORA - 5)
+    prova("...ma l'annullo chiesto in un giro PRIMA non copre il giro dopo: ripreso e lasciato "
+          "scadere senza toccare niente, si conta",
+          [("mancato", O41, 2)], [x for x in esiti(222) if x[1] == O41])
+    O42 = ordine(42)
+    ev(O42, "taken", "buyer", "invoice-next", ORA - 800)
+    ev(O42, "buyer-invoice-requested", "mostro", "", ORA - 800)
+    amb["_segna_tentativo_p2p"](con, 111, O42, "annullo_chiesto", "", ORA - 500)
+    ev(O42, "expired", "mostro", "taker-timeout", ORA - 4)
+    prova("...e l'annullo chiesto dall'ALTRA parte non scusa chi aveva preso",
+          [("mancato", O42, 1)], [x for x in esiti(222) if x[1] == O42])
+    avvisi_src = pezzo("_avvisi_evento_p2p")
+    prova("...a chi legge «Non hai proseguito in tempo» dopo aver toccato «Annulla» si dice "
+          "che non conta; solo sul suo timeout e solo se la riga del conto e' vuota",
+          (True, True, True),
+          ('dati["conto"] = P2P_RIGA_ANNULLO_CHIESTO' in avvisi_src,
+           'if not dati["conto"] and con.execute(' in avvisi_src,
+           "non conta come" in src[src.index("P2P_RIGA_ANNULLO_CHIESTO = ("):][:200]))
     # o) la pulizia e la memoria lunga
     n_prima = con.execute("SELECT COUNT(*) FROM p2p_esiti").fetchone()[0]
     amb["_pulisci_memoria_p2p"](con, ORA + amb["P2P_LIBRO_MEMORIA_S"] + 10)
@@ -178769,6 +178814,14 @@ console.log(JSON.stringify(c));
            "segnaTentativoP2P(id, 'cauzione_aperta')" in fn("async function apriCauzioneP2P(){"),
            "p2pHoldModo === 'cauzione' ? 'cauzione_copiata' : 'garanzia_copiata'" in fn("function copiaHoldP2P(){"),
            m.count("typeof tentativoWalletP2P === 'function' ? tentativoWalletP2P : null")])
+    ann = re.sub(r"/\*[\s\S]*?\*/", "", fn("async function inviaAnnulloP2P(modo){"))
+    prova("l'annullo CHIESTO si dichiara prima di mandare il `cancel` (17 nov 2026): solo "
+          "«chiedi», mai il ritiro di un ordine mai preso ne' l'accettare",
+          [True, True, 1],
+          ["if (gesto === 'chiedi' && typeof segnaTentativoP2P === 'function') "
+           "segnaTentativoP2P(id, 'annullo_chiesto');" in ann,
+           ann.index("segnaTentativoP2P(id, 'annullo_chiesto')") < ann.index("chiamataOrdineP2P(o, 'cancel')"),
+           m.count("'annullo_chiesto');")])
     inc = re.sub(r"/\*[\s\S]*?\*/", "", fn("async function inviaIncassoP2P(){"))
     prova("...la fattura: inviata PRIMA della chiamata, scartata nei tre casi, rifiutata nel catch",
           [True, 3, True],
@@ -185769,7 +185822,7 @@ def prove_paracadute_p2p():
                  "P2P_BOTTONE_PARACADUTE = ", "P2P_MANCATI_FINESTRA_S = ",
                  "P2P_MANCATI_FILTRO_S = ", "P2P_MANCATI_TOLLERATI = ",
                  "P2P_PRESE_APERTE_MAX = ", "P2P_PRESA_APERTA_S = ",
-                 "P2P_TENTATIVO_MARGINE_S = ", "P2P_DISPUTE_FINESTRA_S = ",
+                 "P2P_TENTATIVO_MARGINE_S = ", "P2P_GESTO_ANNULLO = ", "P2P_DISPUTE_FINESTRA_S = ",
                  "P2P_SCUSA_FINESTRA_S = ", "P2P_EURO_SOSPESI_MAX = ",
                  "P2P_EURO_SOSPESI_DOPO_S = ", "P2P_EURO_SOSPESI_FINO_S = "):
         j = src.index("\n" + riga) + 1
@@ -185783,6 +185836,7 @@ def prove_paracadute_p2p():
     j = src.index("\n_PESO_MOMENTO_P2P = {") + 1
     exec(src[j:src.index("}\n", j) + 2], amb)
     for f in ("_primo_gesto_p2p", "_marchio_mancati_p2p", "_ha_provato_p2p",
+              "_ha_chiesto_annullo_p2p",
               "_segna_esiti_p2p", "_reputazione_p2p", "_marchi_mancati_p2p",
               "_prese_aperte_p2p", "_giudice_presa_p2p", "_soglia_filtro_p2p",
               "_filtri_p2p", "_posso_prendere_p2p", "_segna_tentativo_p2p",
