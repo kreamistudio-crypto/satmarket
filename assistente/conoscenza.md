@@ -209,7 +209,7 @@ Il prezzo di bitcoin nel libro: in cima al libro P2P, sotto i rettangoli «Novit
 
 Quanto si può per ordine nel P2P, per ora (fase beta): fino a 250 € negli scambi in Lightning e fino a 999 € in quelli on-chain (dal 16 novembre 2026; prima 500 €, e fino al 12 novembre 250 €). Lo stesso tetto di 999 € vale per gli acquisti on-chain del mercatino e per chi prende un ordine ricevendo sull'altra rete. Il foglio «Pubblica» lo scrive sotto la cifra e non lascia andare oltre.
 
-Il prezzo: gli ordini si scrivono in euro e i sats si contano al cambio del momento, per questo finché l'ordine è nel libro la cifra in sats ha il segno ≈. La cifra esatta si fissa quando l'ordine viene preso. Alcuni ordini hanno un intervallo («da 20 a 100 €»): lì scegli tu quanto.
+Il prezzo: gli ordini si scrivono in euro e i sats si contano al cambio del momento, per questo finché l'ordine è nel libro la cifra in sats ha il segno ≈. La cifra esatta si fissa quando l'ordine viene preso. Alcuni ordini hanno un intervallo («da 20 a 100 €»): lì scegli tu quanto. Nel foglio «Quanto vuoi scambiare?» il campo è vuoto (dal 17 novembre 2026; prima c'era già scritto il minimo e andava cancellato): si scrive la cifra, oppure si tocca «Minimo» o «Massimo» per metterla con un tocco, e poi «Continua».
 
 I tasti «Compra BTC» e «Vendi BTC» in cima al libro P2P sono due pillole (dal 16 novembre 2026, di giorno e di sera): quella accesa, verde per «Compra BTC» e corallo per «Vendi BTC», dice quale lato del libro stai guardando.
 
@@ -2073,10 +2073,18 @@ dove: P2P Lightning: la pagina dello scambio appena preso, «✕ Annulla» e «S
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-075 | novita -->
+<!-- pezzo novita-076 | novita -->
 ## Novità · 2026-11-17 · onchain-ritiro
 
 frase: Negli scambi P2P on-chain, chi si ritira dopo che l'altro ha già bloccato i sats si vede contare uno «scambio non completato», come negli scambi Lightning, e chi aveva bloccato i sats può lasciargli una recensione. Nessuna cauzione e nessuna penale in denaro. Il foglio di «Rinuncio» lo dice prima della firma. Non conta se chi vende non aveva ancora scritto dove pagare.
 dove: P2P on-chain: il foglio «↩️ Rinunci allo scambio?»; la pagina dello scambio rimborsato, con la frase «scambio non completato» e il riquadro «⭐ Lascia una recensione» per chi aveva depositato; il messaggio del bot «Scambio on-chain annullato».
 leva: nessuna
 pubblico: sì
+
+<!-- pezzo novita-077 | novita -->
+## Novità · 2026-11-17 · quanto-vuoto
+
+frase: Quando prendi un ordine P2P con un intervallo (per esempio da 50 a 276 €), il campo dell'importo ora è vuoto: scrivi subito la cifra che vuoi, senza cancellare il minimo che prima c'era già scritto. Sotto ci sono i tasti «Minimo» e «Massimo» per metterla con un tocco.
+dove: P2P: tocca un ordine con un intervallo, poi «Scegli»; foglio «Quanto vuoi scambiare?».
+leva: nessuna
+pubblico: no

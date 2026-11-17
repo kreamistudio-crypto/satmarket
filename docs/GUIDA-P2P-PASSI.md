@@ -461,8 +461,10 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
    **«Scegli»**.
 3. 🧑 Tocca «Scegli». 📱 Foglio «**Quanto vuoi scambiare?**»: «Quest'offerta
    va da **20 €** a **100 €**: scegli tu quanto vuoi inviare.», campo
-   «Quanti euro» (solo cifre intere), sotto la stima «Riceverai circa
-   <N> sats.», bottone «Continua».
+   «Quanti euro» (solo cifre intere) che nasce VUOTO col segnaposto
+   «20 – 100» (dal 17 nov 2026), sotto i due tasti «Minimo · 20 €» e
+   «Massimo · 100 €» che scrivono la cifra nel campo, poi la stima
+   «Riceverai circa <N> sats.» e il bottone «Continua».
 4. 📱 Di ritorno nel dettaglio: «Importo scelto: **50 €** (da 20 a 100)»
    col bottoncino «Cambia», il conto vero sulla cifra scelta, e il
    bottone torna «**Compra**». Da qui è uguale al fisso (2b dal passo 2).
