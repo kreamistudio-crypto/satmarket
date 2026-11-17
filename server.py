@@ -110082,8 +110082,8 @@ async def p2p_onchain_cauzione_brucia(oid: int, x_tg_init_data: str = Header("")
               else ": non ha un indirizzo Lightning nel Profilo, va chiesta una fattura")
            + ". Poi nella scheda dello scambio: «✅ Metà mandata»."
            if altro and meta else "Nessuna metà da mandare."))
-    print(f"🔐 cauzione on-chain: scambio #{int(oid)}, {sats} sats BRUCIATI dal "
-          f"moderatore {int(user['id'])}; metà da mandare a mano: {meta}", flush=True)
+    print(f"🔐 cauzione on-chain: scambio #{int(oid)}, {_fmt_sats(sats)} sats BRUCIATI dal "
+          f"moderatore {int(user['id'])}; metà da mandare a mano: {_fmt_sats(meta)}", flush=True)
     return {"ok": True, "sats": sats, "meta": meta}
 
 
@@ -110215,7 +110215,7 @@ async def avvia_cauzioni_onchain():
              else "ACCESA SOLO PER I MODERATORI" if P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN is not False
              else "ACCESA PER TUTTI")
           + f", {P2P_ONCHAIN_CAUZIONE_PCT}% con minimo "
-          f"{P2P_ONCHAIN_CAUZIONE_BASE_SATS} sats", flush=True)
+          f"{_fmt_sats(P2P_ONCHAIN_CAUZIONE_BASE_SATS)} sats", flush=True)
     asyncio.create_task(_ciclo_cauzioni_onchain())
 
 

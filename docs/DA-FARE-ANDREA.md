@@ -827,7 +827,7 @@ Scrive: il riavvio, e la salute (atteso `200`).
 sudo systemctl restart barattolo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://barattolo.store/api/salute
 ```
 Sola lettura: il journal deve dire «🔐 Cauzione del contanti on-chain:
-ACCESA SOLO PER I MODERATORI, 3% con minimo 1000 sats».
+ACCESA SOLO PER I MODERATORI, 3% con minimo 1.000 sats».
 ```
 sudo journalctl -u barattolo -n 200 --no-pager | grep "Cauzione del contanti"
 ```
