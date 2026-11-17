@@ -204165,7 +204165,7 @@ def prove_caccia_a_tappo():
                  "_tappo_prezzo_di", "_tappo_indizio", "_tappo_indizi", "_tappo_premio",
                  "_tappo_occhiate_max", "_tappo_calore", "_tappo_metallo",
                  "_tappo_gradi_aperti", "_tappo_sfide_raggiunte", "_tappo_e_qui",
-                 "_tappo_numeri"):
+                 "_tappo_numeri", "_completati_p2p"):
         exec(pezzo(nome), amb)
     G = amb
 
@@ -204300,7 +204300,7 @@ def prove_caccia_a_tappo():
            if any(x[0] >= y[0] or x[1] > y[1] for x, y in zip(f["soglie"], f["soglie"][1:]))])
     prova("la scala piu' lunga arriva a vent'anni di cacce", 7300, sfide[0]["soglie"][-1][0])
     tutte_le_sfide = G["_tappo_sfide_raggiunte"]({f["conta"]: 10 ** 6 for f in sfide})
-    prova("le sfide sono una cinquantina, e nessun id si ripete", (51, 51),
+    prova("le sfide sono una cinquantina, e nessun id si ripete", (56, 56),
           (len(tutte_le_sfide), len({s for s, _b in tutte_le_sfide})))
     prova("con cinque ritrovamenti: le prime due soglie del collezionista, e basta",
           [("tappi:1", 2), ("tappi:5", 4)], G["_tappo_sfide_raggiunte"]({"trovate": 5}))
@@ -204347,9 +204347,9 @@ def prove_caccia_a_tappo():
           [p for p in ("xp_eventi", "premia_xp", "premia_distintivi", "SET xp", "XP_COMMERCIO",
                        "crea_invoice", "paga_venditore", "payout", "LNBITS", "lnbits", "bolt11")
            if p in vivo])
-    prova("le sei rotte sono tutte dietro la leva, PRIMA di guardare chi e'", (6, 6),
+    prova("le nove rotte sono tutte dietro la leva, PRIMA di guardare chi e'", (9, 9),
           (vivo.count("@app."), vivo.count("    _tappo_acceso()\n    user = verifica_utente(")))
-    prova("...e tutte `async` (nel server mono-processo, senza await in mezzo, leggi-e-scrivi e' atomico)", 6,
+    prova("...e tutte `async` (nel server mono-processo, senza await in mezzo, leggi-e-scrivi e' atomico)", 9,
           len(re.findall(r'@app\.(?:get|post)\("/api/gioco/tappo[a-z/]*"\)\nasync def ', vivo)))
     prova("il nascondiglio esce dallo stato in UN punto solo, sotto «trovato»", 1,
           pezzo("_tappo_stato").count('stato["caccia"]["annuncio"]'))
@@ -204357,10 +204357,12 @@ def prove_caccia_a_tappo():
           'if riga["trovato"] and nascondiglio:\n            stato["caccia"]["annuncio"]'
           in pezzo("_tappo_stato"))
     fus = pezzo("esegui_fusione")
-    prova("le quattro tabelle del gioco seguono la fusione degli account e la cancellazione", [],
-          [t for t in ("gioco_tappo", "gioco_tappo_oggetti", "gioco_tappo_attrezzi", "gioco_tappo_sfide")
-           if f'"{t}"' not in fus and f"FROM {t} " not in fus
-           or f'("{t}", "tg_id")' not in src])
+    tabelle_gioco = re.findall(r"CREATE TABLE IF NOT EXISTS (gioco_tappo[a-z_]*)", src)
+    prova("le sette tabelle del gioco seguono la fusione degli account e la cancellazione",
+          (7, []), (len(tabelle_gioco),
+          [t for t in tabelle_gioco
+           if f'"{t}"' not in fus and f"FROM {t} " not in fus and f"UPDATE {t} SET" not in fus
+           or f'("{t}", "tg_id")' not in src]))
     prova("la leva nasce ACCESA, e sta nel config d'esempio", (True, True),
           ("except ImportError:\n    GIOCO_TAPPO_ATTIVO = True" in blocco,
            bool(re.search(r"^GIOCO_TAPPO_ATTIVO = True$",
@@ -204504,6 +204506,136 @@ console.log(JSON.stringify({
     prova("una scheda inventata e' la Caccia", True, r.get("schedaInventata"))
     prova("la festa dice il premio e il tempo, il biglietto la tappa", (True, True, True),
           (r.get("festaPremio"), r.get("festaTempo"), r.get("bigliettoTappa")))
+
+    # --- IL MONDO E LE MISSIONI (17 nov 2026: il mondo dipinto, le
+    # missioni su Bitcoin dello studio approvato). Il server: il catalogo
+    # delle missioni, chi le ha superate (lo legge il tabellone dei
+    # livelli), il saldo dalle sette tabelle. La pagina: la scena del
+    # mondo, il passo che scivola, la telecamera, e le cinque missioni
+    # giocate fino in fondo in node.
+    missioni = G["MISSIONI_TAPPO"]
+    prova("cinque missioni al lancio, una per zona del tabellone (0-4), id di casa e bulloni veri",
+          (5, [0, 1, 2, 3, 4], True, True),
+          (len(missioni), sorted(x["zona"] for x in missioni),
+           all(re.fullmatch(r"[a-z]{3,20}", x["id"]) for x in missioni),
+           all(isinstance(x["bulloni"], int) and x["bulloni"] >= 1 for x in missioni)))
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    for tab in tabelle_gioco:
+        i_tab = src.index(f"CREATE TABLE IF NOT EXISTS {tab}")
+        con.executescript(src[i_tab:src.index(");", i_tab) + 2])
+    for nome in ("missioni_superate", "_tappo_saldo"):
+        exec(pezzo(nome), amb)
+    prova("senza la tabella le missioni superate sono nessuna (mai un errore sul tabellone)", set(),
+          G["missioni_superate"](_sq.connect(":memory:"), 7))
+    con.execute("INSERT INTO gioco_tappo_missioni(tg_id, missione, iniziata, stelle, bulloni, finita) "
+                "VALUES(7,'quaderno',0,2,15,100), (7,'lucchetto',90,0,0,0), (8,'parole',0,3,30,100)")
+    prova("superata vuol dire almeno una stella, e solo le SUE", {"quaderno"}, G["missioni_superate"](con, 7))
+    con.execute(riga, ("2026-01-01", 1, 1, 0, "", 0, 1000, 1100, "Bitcoin"))
+    con.execute("UPDATE gioco_tappo SET bulloni=10 WHERE tg_id=7")
+    con.execute("INSERT INTO gioco_tappo_evidenza(giorno, annuncio_id, tg_id, zona, bulloni, creato) "
+                "VALUES('2026-01-01', 5, 7, 1, 4, 0)")
+    prova("il saldo: cacce piu' missioni, meno i giorni in evidenza", 10 + 15 - 4, G["_tappo_saldo"](con, 7))
+    con.close()
+    prova("le illustrazioni del mondo: una rotta con la sua whitelist, nessun percorso dal nome", (1, True, False),
+          (src.count('@app.get("/assets/mondo/{nome}")'), 'if slug not in MONDO_ASSET:' in src,
+           "os.path.join(\"assets\", \"mondo\", nome" in src))
+    # (il mondo e le missioni stanno gia' nel pezzo di pagina del banco
+    # di sopra: qui si spengono solo l'orologio e la riga in basso)
+    prova("...e il pezzo di pagina del banco li contiene tutti e due", (True, True, True),
+          ("const MONDO_L = 900" in js, "const MISS_CHI = {" in js, "function cacciaMissioniHTML(s){" in js))
+    banco2 = banco[:banco.index("const C = ")] + r"""
+const C = """ + json.dumps(cattivo) + r""";
+missioneTimer = () => {}; missioneRiga = () => {};
+const s = {scaffali: [{n: 1, nome: 'Il banco', emoji: '🔌', barattoli: [{categoria: 'Elettronica', metallo: 'oro', volte: 3},
+                                                                      {categoria: 'Telefonia' + C, metallo: 'x"y', volte: 0}]},
+                      {n: 2, nome: 'Lo svago', emoji: '🎮', barattoli: []}],
+  caccia: null,
+  mondo: {zone: [{n: 1, aperta: true}, {n: 2, aperta: false, mancano: 1}],
+          pezzi: [{n: 1, zona: 1, posto: 2, preso: false}, {n: 2, zona: 2, posto: 1}, {n: 3, zona: 1, posto: 99}],
+          cambio: {attivo: true, scambi: 2},
+          evidenza: {palchi: [{annuncio: 7, zona: 1, titolo: 'Cuffie bluetooth molto belle e nuove', mio: true}, {annuncio: 0, zona: 1}]}},
+  missioni: [{id: 'quaderno', emoji: '📓', nome: 'Il quaderno' + C, cosa: 'x', bulloni: 15, stelle: 2},
+             {id: "z');alert(1)//", emoji: '💣', nome: 'Bomba', cosa: '', bulloni: 1, stelle: 0},
+             {id: 'parole', emoji: '🗝️', nome: 'Parole', cosa: 'y', bulloni: 30, stelle: 0}]};
+const sc = mondoScena(s), z1 = sc.zone[0], z2 = sc.zone[1];
+const azioni = z1.luoghi.map(l => (mondoAzione(l, s) || [''])[0]);
+const muro = mondoMuovi(z1, 450, 520, 0, -200);
+const cam = [mondoInquadra(390, 700, 800, 450), mondoInquadra(1366, 700, 800, 450)];
+/* le cinque missioni giocate fino in fondo, scena dopo scena, senza esplodere */
+const giocate = {};
+for (const id of Object.keys(MISSIONI_GIOCO)) {
+  const g = MISSIONI_GIOCO[id];
+  missione = {id, passo: 0, errori: 0, dati: id === 'parole' ? {scelti: []} : {}};
+  let scene = 0, fine = false;
+  const guarda = () => { scene++; const h = g.html(missione); if (h.includes('missioneFine()')) fine = true; return h; };
+  guarda();
+  if (id === 'quaderno') { quadernoTocca(3); guarda(); missione.dati.respinto = true; missione.passo = 2; missione.dati = {}; guarda(); quadernoNulla(true); guarda(); quadernoRipara(); guarda(); }
+  if (id === 'lucchetto') { lucchettoPrima(true); guarda(); [0, 1, 2, 3].forEach(lucchettoPasso); guarda(); lucchettoProva(0); lucchettoProva(1); lucchettoDecidi(); guarda(); }
+  if (id === 'staffetta') { ['A', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); ['R', 'I', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); ['A', 'C'].forEach(staffettaTocca); staffettaManda(); guarda(); }
+  if (id === 'parole') { paroleScegli(3); paroleScegli(5); paroleNotte(); guarda(); PAROLE_FINTE.forEach(paroleMetti); guarda(); paroleAssistenza(true); guarda(); }
+  if (id === 'halving') { for (let i = 0; i < 5; i++) { halvingRaccogli(); guarda(); if (i === 2) { halvingTarlo(true); guarda(); } if (i < 4) halvingIndovina(true); } halvingAvanti(); guarda(); }
+  giocate[id] = [scene >= 4, fine, missione.errori];
+}
+const L2 = staffettaLivelli()[1];
+const lista = cacciaMissioniHTML(s);
+console.log(JSON.stringify({
+  stelle: [missioneStelle(0), missioneStelle(1), missioneStelle(2), missioneStelle(9), missioneStelle('x')],
+  paga: [staffettaPaga(L2.fili, ['T', 'A', 'C'], 4).errore || '', !!staffettaPaga(L2.fili, ['T', 'R', 'I', 'C'], 4).fili,
+         staffettaPaga(L2.fili, ['T', 'C'], 1).errore || ''],
+  spostate: staffettaPaga([{a: 'T', b: 'A', pa: 4, pb: 0}], ['T', 'A'], 3).fili[0],
+  parole: [paroleEsito([0]), paroleEsito([3]), paroleEsito([5]), paroleEsito([3, 4]), paroleEsito([3, 1]), paroleEsito([])],
+  pieno: [halvingPieno(0), halvingPieno(1), halvingPieno(5), Math.round(halvingPieno(33) * 1000) / 1000],
+  giocate,
+  stessiId: Object.keys(MISSIONI_GIOCO).sort(),
+  listaTasti: (lista.match(/onclick="apriMissione\('[a-z]+'\)"/g) || []).length,
+  listaBombe: (lista.match(/apriMissione\([^)]*alert/g) || []).length, listaTag: (lista.match(/<img src=x/g) || []).length,
+  listaStelle: lista.includes('★★<i>★</i>'), listaBulloni: lista.includes('+30 🔩'),
+  zone: [sc.zone.length, z1.aperta, z2.aperta, z1.vasi.length, z1.vasi[1].metallo, z1.pezzi.length, z2.pezzi.length],
+  azioni, muro: [Math.round(muro[0]), Math.round(muro[1])],
+  terra: [mondoTerra(z1, 450, 960), mondoTerra(z1, 10, 10), mondoTerra(z2, 450, 960), mondoTerra(z1, 220, 670)],
+  cam: cam.map(c => [Math.round(c.k * 1000) / 1000, Math.round(c.x0), Math.round(c.cima)]),
+  profondo: [mondoProfondo(0), mondoProfondo(1600), mondoProfondo(9999)],
+}));
+"""
+    r = _node_banco(banco2)
+    if r is None:
+        salta("il mondo e le missioni di Tappo", "node non c'e'")
+        return
+    prova("le stelle dagli errori: nessuno tre, uno due, di piu' una", [3, 2, 1, 1, 3], r.get("stelle"))
+    prova("la staffetta: la strada corta del secondo livello non regge, quella lunga si', e senza filo non si passa",
+          ["Il filo A–C ha solo 1 perline dal tuo lato", True, "Fra T e C non c'è un filo"], r.get("paga"))
+    prova("...e pagando le perline passano dall'altra parte", {"a": "T", "b": "A", "pa": 1, "pb": 3}, r.get("spostate"))
+    prova("le dodici parole: in rete le ruba la Gazza, una copia sola si perde, due su carta o metallo sono salve",
+          [{"rubate": True, "sola": False, "metallo": False, "salve": False},
+           {"rubate": False, "sola": True, "metallo": False, "salve": False},
+           {"rubate": False, "sola": True, "metallo": True, "salve": False},
+           {"rubate": False, "sola": False, "metallo": False, "salve": True},
+           {"rubate": True, "sola": False, "metallo": False, "salve": False},
+           {"rubate": False, "sola": True, "metallo": False, "salve": False}], r.get("parole"))
+    prova("il barattolone: vuoto, meta', 96,875% dopo cinque ere, e mai oltre i 21 milioni",
+          [0, 50, 96.875, 100.0], r.get("pieno"))
+    prova("le cinque missioni si giocano fino al «Avanti», senza errori, scena dopo scena",
+          {x: [True, True, 0] for x in ("quaderno", "lucchetto", "staffetta", "parole", "halving")}, r.get("giocate"))
+    prova("ogni missione del server ha il suo gioco nella pagina, e viceversa",
+          sorted(x["id"] for x in missioni), r.get("stessiId"))
+    prova("l'elenco nelle sfide: un tasto per missione conosciuta, nessuna bomba, nessun tag vivo",
+          (2, 0, 0, True, True), (r.get("listaTasti"), r.get("listaBombe"), r.get("listaTag"),
+                                  r.get("listaStelle"), r.get("listaBulloni")))
+    prova("la scena: sei zone, la seconda chiusa, due barattoli (metallo finto spento), il bullone fuori pianta e quello della zona chiusa non ci sono",
+          [6, True, False, 2, "", 1, 0], r.get("zone"))
+    prova("i tasti dei luoghi della prima zona",
+          ["🫙 Elettronica: guarda gli annunci", "🫙 Telefonia" + cattivo + ": guarda gli annunci",
+           "🔩 Caccia qui, su «Il banco»", "🛍️ Entra in bottega", "💱 Banco del cambio: apri gli scambi P2P",
+           "⭐ In evidenza: Cuffie bluetooth molto be…", "🔒 «Lo svago» si apre con un altro ritrovamento"],
+          r.get("azioni"))
+    prova("contro il bordo in alto Tappo si ferma sul pavimento, non lo buca", [450, 520], r.get("muro"))
+    prova("dove si sta: il pavimento si', fuori no, una zona chiusa no, dentro un barattolo no",
+          [True, False, False, False], r.get("terra"))
+    prova("la telecamera: in piedi il dipinto riempie la larghezza e segue Tappo, sullo schermo largo sta quasi intero al centro",
+          [[0.542, -49, 89], [0.561, 431, 114]], r.get("cam"))
+    prova("la profondita' finta: piu' piccolo in fondo, piu' grande davanti, mai oltre", [0.8, 1.1, 1.1],
+          r.get("profondo"))
 
 
 def prove_categorie_delle_prove():

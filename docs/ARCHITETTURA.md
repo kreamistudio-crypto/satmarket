@@ -31863,6 +31863,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    `/assets/caccia-tappo.webp` (Tappo in persona nella Caccia a Tappo,
    17 nov 2026: l'ufficiale scontornato, WebP con trasparenza, 560x721,
    ~58 KB, max-age di un giorno — vedi «LA CACCIA A TAPPO»),
+   `/assets/mondo/{nome}` (le illustrazioni del Mondo di Tappo, 17 nov
+   2026: sei zone `zona-1..6.webp` e quattro oggetti, whitelist
+   `MONDO_ASSET`, file in assets/mondo/, ETag e `no-cache`; senza il
+   file 404 e la zona si disegna da sola),
    `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
    `/assets/icona-192-maskable.png`, `/assets/icona-512-maskable.png`,
@@ -36689,3 +36693,36 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   I colori sono suoi (`--c-*` su `#view-caccia, .caccia-velo`), le
   animazioni solo `transform` e `opacity`. Le prove:
   `prove_caccia_a_tappo` e `collaudo_caccia_a_tappo`.
+  IL MONDO E LE MISSIONI (17 nov 2026, stesso cantiere; il perché in
+  CANTIERI, «Il Mondo di Tappo e le missioni su Bitcoin»). Tre tabelle
+  in più, sette in tutto: `gioco_tappo_mondo` (i bulloni raccolti nel
+  mondo, per persona e giorno), `gioco_tappo_evidenza` (chiave `giorno,
+  annuncio_id`: chi ha messo quale annuncio sul palco di quale zona, coi
+  bulloni spesi) e `gioco_tappo_missioni` (chiave `tg_id, missione`:
+  `iniziata`, stelle migliori, bulloni della prima volta). Il saldo
+  diventa cacce + sfide + mondo + missioni − oggetti − attrezzi −
+  evidenza. Fusione e cancellazione le portano tutte (l'evidenza passa
+  intera: la sua chiave non ha il tg_id). Rotte in più, sempre dietro la
+  leva: `POST .../raccogli` (un bullone del mondo, `{zona, posto}`),
+  `.../evidenza` `{annuncio}` (`GIOCO_TAPPO_EVIDENZA_BULLONI`,
+  `GIOCO_TAPPO_EVIDENZA_POSTI` per zona), `.../missione` `{missione,
+  azione: inizia|finisci, stelle}` (paga la prima volta, vale dopo
+  `GIOCO_TAPPO_MISSIONE_SECONDI`). Lo stato porta `mondo` (zone aperte,
+  pezzi, cambio, `evidenza`) e `missioni` (catalogo `MISSIONI_TAPPO` con
+  le stelle). Per il tabellone dei livelli: `missioni_superate(con,
+  tg_id)`, sola lettura, fail-open al vuoto.
+  Il client del mondo: le PURE `mondoScena(s)` (dallo stato alle sei
+  zone con barattoli, luoghi, ostacoli, bulloni e palchi), `mondoTerra`,
+  `mondoMuovi` (il passo che scivola sugli ostacoli), `mondoVicino`,
+  `mondoAzione` (il testo del tasto in basso), `mondoProfondo`,
+  `mondoInquadra` (la telecamera); la pianta di ogni zona in
+  `MONDO_PIANTA`/`MONDO_PIANTE`; il resto (`mondoNasci`, `mondoGiro`,
+  `mondoDisegna`) è canvas 2D, un fotogramma per volta solo con la
+  scheda «Mondo» in vista. Le missioni: `apriMissione(id)` apre
+  `#missioneVelo` (sul body), `MISSIONI_GIOCO` tiene per ogni id il
+  guaio, il gioco (`quadernoHTML`, `lucchettoHTML`, `staffettaHTML`,
+  `paroleHTML`, `halvingHTML`), il succo e il nome vero; pure
+  `missioneStelle`, `staffettaPaga`, `paroleEsito`, `halvingPieno`;
+  `missioneFine` manda le stelle e lancia l'evento `tappo:missione`.
+  Nel gioco l'elenco sta in cima a «Sfide» (`cacciaMissioniHTML`: un
+  tasto solo per un id che sta in `MISSIONI_GIOCO`).

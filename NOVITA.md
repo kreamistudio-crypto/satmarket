@@ -440,3 +440,9 @@ frase: È arrivata la Caccia a Tappo, il gioco di Barattolo. Ogni giorno Tappo s
 dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», nella Mini App, nell'app e sul sito; il tasto «Tappo è qui?» nella scheda di ogni annuncio, quando la caccia del giorno è aperta.
 leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
 pubblico: sì
+
+## 2026-11-17 · mondo-di-tappo
+frase: Nella Caccia a Tappo arriva il Mondo di Tappo: guidi Tappo dentro la dispensa, raccogli i bulloni 🔩, apri i barattoli e sali di zona. E ci sono le missioni: cinque giochi brevi per capire Bitcoin, dalle dodici parole al dimezzamento. Chi vende può mettere un annuncio sul palco del mondo per un giorno, coi bulloni.
+dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo»: scheda «Mondo» per camminare, scheda «Sfide» per le missioni.
+leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
+pubblico: sì

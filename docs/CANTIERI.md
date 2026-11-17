@@ -87397,3 +87397,79 @@ al venditore, il cappellino indossato. I numeri (premi, prezzi, soglie)
 sono una prima taratura: si ritoccano nei cataloghi, senza migrazioni.
 Proposta aperta con Andrea, NON costruita: le «Ere» a ogni halving. Se
 un giorno si vuole un premio in sats, prima il legale.
+
+## Il Mondo di Tappo e le missioni su Bitcoin (17 nov 2026, stesso cantiere caccia-a-tappo; Andrea: «voglio che sia più figo possibile in assoluto», sulla scheda «Mondo dipinto con Flow», sull'evidenza «Solo dentro il gioco», su gioco e tabellone «Sì, tutti e due»; dal thread della stradina: «ogni tanto nel tabellone devi giocare con Tappo per proseguire... missioni originali, educative su Bitcoin, simpatiche, emozionanti», e sullo studio «lo studio delle missioni mi va bene»)
+
+IL ROVESCIO, SAPENDOLO. La voce di sopra scartava «un gioco d'azione in
+canvas: bello un mese, e non porta nessuno sugli annunci». Andrea l'ha
+chiesto lui il giorno stesso («una mappa originale», poi «più figo
+possibile»), e il mondo è costruito PER portare sugli annunci: i
+barattoli del mondo aprono le categorie vere, il palco mostra annunci
+veri, il Banco del cambio apre il P2P. Il gioco di prima resta tutto
+(scheda «Caccia»): il mondo è una scheda in più, la prima.
+
+IL MONDO. Sei zone, una per scaffale, impilate come una dispensa:
+Tappo cammina (tocco, dito trascinato, frecce o WASD), passa da una
+zona all'altra sui ponticelli, raccoglie i bulloni sparsi (dieci posti
+per zona, il server dice solo «zona 2, posto 7» e paga una volta
+sola: `/raccogli`), apre i barattoli, legge il cartello (la caccia del
+giorno), entra in bottega. Le zone si aprono coi ritrovamenti
+(`_tappo_zone_aperte`). Il Banco del cambio, nella prima zona, apre gli
+scambi P2P e ha le sue sfide da Cambiavalute.
+
+LA GRAFICA: IL 3D BOCCIATO. La prima versione era un mondo WebGL in 3D
+disegnato dal codice; Andrea, visto il video: «la grafica è orrenda...
+fa pietà». La strada scelta sulla scheda è il MONDO DIPINTO: sei scene
+illustrate con Google Flow (una per zona, vista dall'alto a 50 gradi,
+nessuna scritta né personaggio) e quattro oggetti scontornati
+(barattolo, bullone, bancarella, chiosco), serviti da
+`/assets/mondo/{nome}` con la whitelist `MONDO_ASSET`. Il motore è 2D
+(canvas): la scena è una PIANTA per zona (`MONDO_PIANTA`, i ritocchi del
+singolo dipinto in `MONDO_PIANTE`) con il pavimento come poligono, i
+posti, i luoghi e gli ostacoli; la profondità è finta (più piccolo in
+fondo). Senza i dipinti la zona si disegna da sola, così il gioco
+funziona anche su un server che non li ha. Scartati: rifare il 3D
+meglio (il problema era il disegno, non la tecnica); Anycraft/Craft
+Anything per «copiare il meccanismo» di un gioco (crea un'app a parte, e
+copiare un gioco esistente non si fa: regola di casa).
+
+L'EVIDENZA COI BULLONI, SOLO NEL GIOCO. Un venditore spende 40 bulloni
+e il suo annuncio sta un giorno sul palco della sua zona (al più 3 per
+zona, uno al giorno a testa, uno al giorno per annuncio, solo annunci
+in vetrina: uno venduto scende da solo). Andrea ha scelto «Solo dentro
+il gioco»: niente posto in Esplora, che resta della vetrina vera.
+
+LE MISSIONI (lo studio approvato, Claude Doc «Studio: le missioni di
+Tappo su Bitcoin»). Cinque al lancio, una per zona del tabellone dei
+livelli: il quaderno di tutti (registro condiviso e doppia spesa), il
+barattolo col lucchetto (deposito di garanzia), la staffetta del
+fulmine (canali e liquidità di Lightning), le dodici parole (la frase di
+recupero, la custodia, la truffa dell'«assistenza»), l'ultimo bullone
+(il dimezzamento e i 21 milioni). Ognuna in tre tempi: il guaio (due
+fumetti), il gioco (la cosa si impara facendola, mai un quiz), il succo
+(una frase col nome vero). Stelle da 1 a 3 dagli errori; una basta per
+passare il gradino del tabellone. I guastafeste dello studio (la Gazza,
+il Tarlo, il signor Fidati) parlano con un'emoji finché non hanno un
+disegno. Niente dati veri: le parole e i conti sono finti, e Tappo lo
+dice.
+
+CONTRO I FURBI, NELLE MISSIONI. Il gioco lo fa il client, quindi il
+server paga solo la PRIMA volta (bulloni del catalogo, mai dal client),
+tiene le stelle migliori, e una fine vale solo dopo
+`GIOCO_TAPPO_MISSIONE_SECONDI` (30) dalla partenza segnata da lui:
+`/missione {azione: inizia|finisci, stelle}`, freno `tappo_oggetto`.
+Rigiocare per le tre stelle non paga di nuovo.
+
+IL PATTO CON LA STRADINA (il tabellone dei livelli, cantiere a parte).
+Il server espone `MISSIONI_TAPPO` (id, emoji, nome, zona 0-4) e
+`missioni_superate(con, tg_id)` (fail-open al vuoto); il client
+`apriMissione(id)`, che apre un foglio a tutto schermo sul body (si
+apre anche fuori dal gioco), e a missione finita l'evento
+`tappo:missione` {id, stelle}. Una missione non superata è un cancello
+del tabellone, mai un premio in XP: caselle e missioni SENZA XP
+(decisione di Andrea). Nel gioco le missioni stanno in cima alla scheda
+«Sfide», con le stelle.
+
+DA GUARDARE. I dipinti di Flow (in coda dopo la mappa del tabellone):
+quando arrivano, la pianta di ogni zona si prende guardando il dipinto.
+Le «Ere» a ogni halving (approvate, non ancora costruite).

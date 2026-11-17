@@ -378,7 +378,7 @@ La privacy dello Swap, cioè chi vede cosa:
 - Il consiglio di sempre: un indirizzo nuovo per ogni swap, in un wallet di cui solo tu hai le chiavi.
 
 <!-- pezzo libro-033 | libro -->
-## Libro · La Caccia a Tappo (il gioco)
+## Libro · La Caccia a Tappo (il gioco) (1/2)
 
 La Caccia a Tappo è il gioco di Barattolo (se nelle REGOLAZIONI del pannello «Caccia a Tappo (il gioco)» è accesa). Si apre dal Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», e funziona uguale nella Mini App di Telegram, nell'app e sul sito.
 
@@ -393,13 +393,20 @@ Coi bulloni, nella scheda «Bottega», si prendono: attrezzi che si consumano (�
 Per chi vende: se Tappo si nasconde in un tuo annuncio e qualcuno lo trova, il bot te lo dice (senza dire chi è stato). Non devi fare niente: sono visite in più. Nei tuoi annunci, per te, Tappo non si nasconde mai.
 
 <!-- pezzo libro-034 | libro -->
+## Libro · La Caccia a Tappo (il gioco) (2/2)
+
+Il Mondo di Tappo (scheda «Mondo», la prima): Tappo cammina dentro la dispensa, sei zone una sopra l'altra, una per scaffale. Si guida toccando dove andare o trascinando il dito (dal computer anche frecce o WASD). Nel mondo si raccolgono i bulloni sparsi (ognuno si prende una volta), si aprono i barattoli (portano agli annunci di quella categoria), si legge il cartello con la caccia del giorno, si entra in bottega e, nella prima zona, il Banco del cambio porta agli scambi P2P. Le zone più in alto si aprono trovando Tappo più volte. Sul palco di ogni zona ci sono gli annunci in evidenza: chi vende può metterci un suo annuncio in vetrina per un giorno spendendo 40 bulloni (uno al giorno a testa, al massimo 3 annunci per zona). L'evidenza vale solo dentro il gioco, non in Esplora.
+
+Le missioni di Tappo: cinque giochi brevi per capire Bitcoin, in cima alla scheda «Sfide» e come gradini nel tabellone dei livelli. Sono «Il quaderno di tutti» (Bitcoin è un registro che tengono in tanti, e un bullone si spende una volta sola), «Il barattolo col lucchetto» (il deposito di garanzia), «La staffetta del fulmine» (come corrono i pagamenti Lightning di canale in canale), «Le dodici parole» (dove tenere la frase di recupero, e che nessuno, nemmeno Barattolo, la chiede mai) e «L'ultimo bullone» (il dimezzamento e i 21 milioni). Danno da una a tre stelle: la prima volta pagano bulloni, rigiocarle per le tre stelle si può ma non paga di nuovo. Non danno XP. Le parole e i conti dentro le missioni sono finti.
+
+<!-- pezzo libro-035 | libro -->
 ## Libro · Nostr
 
 Gli annunci di Barattolo vengono pubblicati anche su Nostr, una rete aperta: esistono sui relay anche indipendentemente da Barattolo. Se colleghi una tua chiave Nostr dal Profilo, i tuoi annunci escono firmati da te (la firma la fa il tuo browser) e restano tuoi. Gli avvisi possono arrivarti anche su Nostr, oltre che su Telegram. La chiave privata (nsec) non va mai data a nessuno, nemmeno a Barattolo.
 
 Su Nostr risponde anche Tappo: si può scrivere un DM al profilo «Barattolo» (npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy) oppure rispondere sotto le sue note, e Tappo risponde come su Telegram. Ai bot e allo spam non risponde, e se qualcuno dello staff sta già seguendo quella conversazione lascia parlare lui. Per un problema con un ordine, in pubblico Tappo invita a scrivergli in privato.
 
-<!-- pezzo libro-035 | libro -->
+<!-- pezzo libro-036 | libro -->
 ## Libro · I tuoi dati, in breve
 
 Barattolo sa di te pochissimo: niente email, password o telefono. Da Telegram riceve il numero identificativo, il nome e lo username; da Nostr solo la chiave pubblica. L'indirizzo di spedizione è cifrato e si cancella quando confermi di aver ricevuto. Niente tracciamento, niente pubblicità, niente cookie di terzi. Tutto è spiegato nella pagina «I tuoi dati» (barattolo.store/privacy).
@@ -415,12 +422,12 @@ Cancellare l'account: nel Profilo, nella parte della privacy accanto a «🔐 I 
 
 Questo assistente: la tua domanda e le ultime battute arrivano ad Anthropic, l'azienda dell'intelligenza artificiale che risponde, ma mai il tuo nome, il tuo account o i tuoi ordini. Le conversazioni non vengono conservate: in chat privata l'assistente ricorda le domande e le risposte della giornata, per seguire il filo del discorso, e a mezzanotte spariscono.
 
-<!-- pezzo libro-036 | libro -->
+<!-- pezzo libro-037 | libro -->
 ## Libro · Se Barattolo sparisse
 
 Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma i sats del deposito stanno su un nodo Lightning separato, con la seed custodita offline; gli annunci restano su Nostr; lo storico è salvato ogni giorno con copie cifrate anche fuori dal server.
 
-<!-- pezzo libro-037 | libro | sempre -->
+<!-- pezzo libro-038 | libro | sempre -->
 ## Libro · Sicurezza e truffe
 
 - Nessuno di Barattolo ti chiederà mai la seed, le parole di recupero, la nsec, una chiave privata o una password. Chi le chiede è un truffatore. Se le hai date a qualcuno, considerale esposte e sposta subito i fondi su un wallet nuovo.
@@ -430,7 +437,7 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 - Paga sempre dentro Barattolo: un pagamento fuori dal deposito di garanzia non è protetto.
 - Nel P2P, libera i sats solo quando gli euro sono arrivati davvero sul tuo conto, non prima e non sulla fiducia di una ricevuta.
 
-<!-- pezzo libro-038 | libro | sempre -->
+<!-- pezzo libro-039 | libro | sempre -->
 ## Libro · Parlare con una persona
 
 Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Supporto → «💬 Assistenza» (fino al 16 novembre 2026 stava in Profilo → Privacy). Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta.
@@ -1905,5 +1912,13 @@ pubblico: sì
 
 frase: È arrivata la Caccia a Tappo, il gioco di Barattolo. Ogni giorno Tappo si nasconde in un annuncio vero, diverso per ognuno: leggi gli indizi, apri gli annunci e tocca «Tappo è qui?». Chi lo trova vince i bulloni 🔩, accende i barattoli della dispensa, sale di grado e completa le sfide. Coi bulloni prendi cappellini, attrezzi e 5 posti in più nei preferiti. Si gioca gratis: i bulloni non sono sats.
 dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo», nella Mini App, nell'app e sul sito; il tasto «Tappo è qui?» nella scheda di ogni annuncio, quando la caccia del giorno è aperta.
+leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-068 | novita -->
+## Novità · 2026-11-17 · mondo-di-tappo
+
+frase: Nella Caccia a Tappo arriva il Mondo di Tappo: guidi Tappo dentro la dispensa, raccogli i bulloni 🔩, apri i barattoli e sali di zona. E ci sono le missioni: cinque giochi brevi per capire Bitcoin, dalle dodici parole al dimezzamento. Chi vende può mettere un annuncio sul palco del mondo per un giorno, coi bulloni.
+dove: Profilo → «Livello e inviti» → «🔩 Caccia a Tappo»: scheda «Mondo» per camminare, scheda «Sfide» per le missioni.
 leva: GIOCO_TAPPO_ATTIVO (accesa di serie)
 pubblico: sì
