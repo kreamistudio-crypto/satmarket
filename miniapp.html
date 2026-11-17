@@ -4282,6 +4282,32 @@
     .miss-velo:not(.arena) .miss-figurina{background:linear-gradient(160deg,#FFF3D6,#FFE3A3);color:#3A2410;border:2.5px solid #2A1A0A;
       box-shadow:0 6px 0 #2A1A0A,0 16px 26px rgba(0,0,0,.45)}
     .miss-velo:not(.arena) .miss-figurina small{color:#B0631A}
+    /* LE CARTE DIPINTE (17 nov 2026, Flow sul PC di Andrea): dove una
+       scelta ha il suo disegno, la scelta diventa una carta illustrata
+       che entra di dorso e si gira (il dorso, a riposo, e' trasparente:
+       senza animazione non copre niente); le scelte dipinte vanno a
+       griglia (`.dipinte` sul contenitore, la mette missCarteDipinte) */
+    .miss-velo:not(.arena) .miss-scelte.dipinte{grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:12px 10px}
+    .miss-velo:not(.arena) .miss-scelta.dipinta{display:flex;flex-direction:column;align-items:center;gap:6px;
+      padding:10px 8px 11px;text-align:center;font-size:13.5px;line-height:1.25;min-height:150px;
+      background:radial-gradient(120% 80% at 50% 30%,#FFF9EA 0,#FFF3D6 55%,#FFE3A3 100%);
+      animation:miss-carta-gira .55s cubic-bezier(.3,1.25,.5,1) both;animation-delay:calc(var(--i,0) * 70ms)}
+    .miss-velo:not(.arena) .miss-scelta.dipinta::before{content:"";position:absolute;inset:-2.5px;border-radius:16px;
+      background:#FFF3D6 url('/assets/mondo/carta-dorso.webp') center/cover;backface-visibility:hidden;opacity:0;
+      animation:miss-dorso-via .55s ease-in both;animation-delay:calc(var(--i,0) * 70ms);pointer-events:none}
+    .miss-carta-img{width:auto;height:84px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 3px rgba(42,26,10,.35));pointer-events:none}
+    .miss-scelta.dipinta.presa .miss-carta-img{transform:scale(1.06)}
+    .miss-velo:not(.arena) .miss-due .caccia-btn.dipinta{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 8px 12px;
+      background:radial-gradient(120% 80% at 50% 30%,#FFF9EA 0,#FFF3D6 55%,#FFE3A3 100%);color:#3A2410}
+    /* (le due carte uguali: il bottone arancio diceva la risposta giusta) */
+    .miss-velo:not(.arena) .miss-due .caccia-btn.dipinta .miss-carta-img{height:70px}
+    .miss-velo:not(.arena) .miss-ordine li.dipinta{display:inline-flex;align-items:center;gap:6px;padding:3px 11px 3px 4px}
+    .miss-velo:not(.arena) .miss-ordine li.dipinta .miss-carta-img{height:28px;filter:none}
+    @keyframes miss-carta-gira{0%{opacity:0;transform:translateY(22px) rotateY(0) scale(.94)}35%{opacity:1}100%{opacity:1;transform:rotate(var(--r,0deg))}}
+    @keyframes miss-dorso-via{0%,30%{opacity:1;transform:rotateY(0)}100%{opacity:0;transform:rotateY(90deg)}}
+    @media (prefers-reduced-motion:reduce){
+      .miss-velo:not(.arena) .miss-scelta.dipinta,.miss-velo:not(.arena) .miss-scelta.dipinta::before{animation:none}
+    }
     @keyframes miss-tempo{from{transform:scaleX(1)}to{transform:scaleX(0)}}
     /* SUGLI SCHERMI GRANDI (web app e browser): due colonne — a sinistra
        Tappo, le schede e la caccia; a destra la dispensa, sempre li'. */
@@ -66334,6 +66360,7 @@ async function apriMissione(id){
    sinistra e il dispettoso della storia a destra; alla fine, al posto
    del dispettoso, lo stadio del razzo che quella missione monta (lo
    stesso disegno del tabellone). Un dipinto che manca sparisce da solo. */
+const MISS_SCENE = ['sats', 'lucchetto', 'parole', 'staffetta', 'oblo', 'quaderno', 'antenna', 'halving'];
 function missPalcoHTML(m, g){
   const z = Math.max(0, Math.min(7, Number(m.info && m.info.zona) || 0)) + 1;
   const altro = ((g.guaio || []).find(x => x[0] !== 'tappo') || [])[0];
@@ -66341,7 +66368,10 @@ function missPalcoHTML(m, g){
   const fondo = m.fase === 'fine'
     ? `<img class="miss-razzo-pezzo" src="/assets/stradina/razzo-${z}.webp" alt=""${via}>`
     : (c && c.img ? `<img class="miss-attore altro${c.specchio ? ' specchio' : ''}" src="${c.img}" alt=""${via}>` : '');
-  return `<div class="miss-palco ${esc(m.fase || '')}" style="--palco:url('/assets/stradina/zona${z}.webp')" aria-hidden="true">`
+  /* la scena dipinta della missione (Flow, 17 nov); una missione senza
+     scena tiene il pezzo di mappa della sua zona */
+  const fondo_palco = MISS_SCENE.includes(m.id) ? `/assets/mondo/scena-${m.id}.webp` : `/assets/stradina/zona${z}.webp`;
+  return `<div class="miss-palco ${esc(m.fase || '')}" style="--palco:url('${fondo_palco}')" aria-hidden="true">`
     + `<img class="miss-attore tappo" src="${MISS_CHI.tappo.img}" alt=""${via}>` + fondo + '</div>';
 }
 function missioneDisegna(){
@@ -66374,6 +66404,49 @@ function missioneDisegna(){
       + (st < 3 ? `<button type="button" class="caccia-btn piano" onclick="missioneDaCapo()">↺ Rigioca per le tre stelle</button>` : '') + '</div>';
   }
   corpo.innerHTML = h;
+  missCarteDipinte(corpo);
+}
+/* LE CARTE DIPINTE (17 nov 2026, Andrea: «più stile Barattolo, non
+   fatto alla veloce»): ogni scelta delle missioni che ha il suo disegno
+   (Flow, assets/mondo/carta-*.webp) lo prende sopra il testo, e
+   l'emoji davanti se ne va. La chiave e' il testo esatto del bottone;
+   senza il file l'immagine sparisce e torna il testo intero. I nomi
+   stanno anche nella whitelist MONDO_ASSET di server.py (una prova li
+   confronta). */
+const CARTA_DIPINTA = {
+  '🐐 Il baratto: una capra per un sacco di grano': 'capra-grano', '🐚 Le conchiglie': 'conchiglie',
+  '🪙 Le monete': 'monete-antiche', '💶 Le banconote': 'banconote', '⚡ I sats': 'moneta-sats',
+  '⏰ Mi sveglio e chiedo il pagamento': 'sveglia', '⚡ Arrivano da soli': 'wallet-acceso',
+  '💸 Pago subito, in privato': 'soldi-in-privato', '🔒 Uso il barattolo col lucchetto': 'barattolo-lucchetto',
+  'Metto i sats nel barattolo col lucchetto': 'barattolo-lucchetto',
+  'Il venditore vede i sats, ma non può toccarli, e spedisce': 'pacco-spedito',
+  'Arriva il frullatore': 'frullatore', 'Confermo, e il lucchetto si apre per il venditore': 'lucchetto-aperto',
+  '📦 Il codice di spedizione': 'etichetta-spedizione', '📸 La foto del pacco chiuso': 'foto-pacco',
+  '🙏 «Fidati, l\'ho mandato»': 'mani-fidati', '😡 Gli insulti in chat': 'nuvola-arrabbiata',
+  '📱 Foto sul telefono': 'telefono-foto', '☁️ Nota nel cloud': 'nuvola-cloud',
+  '💬 Messaggio a me stesso': 'fumetto-messaggio', '🗄️ Foglio nel cassetto': 'cassetto-foglio',
+  '🏡 Foglio dalla nonna': 'casa-nonna', '🔩 Piastra di metallo': 'piastra-metallo',
+  'La tua email': 'busta-email', 'Il nome che hai su Telegram': 'targhetta-nome', 'Una password': 'password',
+  'Il tuo numero di telefono': 'telefono-cornetta', 'Un documento d\'identità': 'carta-identita',
+  'La tua chiave pubblica Nostr': 'chiave-viola',
+  '🗄 Resta per sempre in archivio': 'schedario', '🧹 Viene cancellato': 'scopa',
+  '📡 Relay del porto': 'antenna-porto', '📡 Relay del bosco': 'antenna-bosco', '📡 Relay della vetta': 'antenna-vetta',
+  '😢 Più niente': 'cartello-vuoto', '📦 Il mio annuncio': 'annuncio-pacco',
+  '🏢 Un\'azienda, che me la presta': 'palazzo-azienda', '🗝 Io, e solo io': 'chiave-dorata',
+};
+function missCarteDipinte(corpo){
+  if (!corpo || !corpo.querySelectorAll) return;
+  let i = 0;
+  corpo.querySelectorAll('.miss-scelta, .miss-due .caccia-btn, .miss-ordine li').forEach(b => {
+    const t = (b.textContent || '').trim(), nome = CARTA_DIPINTA[t];
+    if (!nome) return;
+    const img = document.createElement('img');
+    img.className = 'miss-carta-img'; img.alt = ''; img.src = '/assets/mondo/carta-' + nome + '.webp';
+    img.onerror = () => { b.classList.remove('dipinta'); b.textContent = t; };
+    b.textContent = t.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '');
+    b.prepend(img); b.classList.add('dipinta');
+    if (b.classList.contains('miss-scelta')) { b.style.setProperty('--i', i++); b.parentNode.classList.add('dipinte'); }
+  });
 }
 /* Si parte: il server segna l'ora (la fine vale solo dopo un po') */
 async function missioneVia(){

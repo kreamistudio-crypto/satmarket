@@ -209080,6 +209080,22 @@ console.log(JSON.stringify({
            {"miss-sats", "miss-sat", "miss-wallet", "miss-gazza", "miss-gazza-ferma", "miss-quaderno",
             "miss-leggio", "miss-grande", "miss-cestino", "miss-busta", "miss-tarlo",
             "tappo-passo-1", "tappo-passo-2", "tappo-passo-3", "tappo-passo-4"} - presenti))
+    # LE CARTE DIPINTE (17 nov 2026): ogni disegno chiamato da
+    # CARTA_DIPINTA e' nella whitelist (sennò un 404 e il testo nudo), e
+    # ogni chiave e' ancora il testo di un bottone delle missioni (un
+    # testo ritoccato perderebbe il disegno in silenzio)
+    i_cd = js.index("const CARTA_DIPINTA = {")
+    blocco_cd = js[i_cd:js.index("\n};", i_cd)]
+    coppie_cd = re.findall(r"'((?:[^'\\]|\\.)*)': '([a-z-]+)'", blocco_cd)
+    resto_cd = js[:i_cd] + js[i_cd + len(blocco_cd):]
+    prova("le carte dipinte: sono tante, i disegni stanno nella whitelist e ogni chiave e' il testo "
+          "di un bottone delle missioni", (True, [], []),
+          (len(coppie_cd) >= 35,
+           sorted({n for _, n in coppie_cd} - {c[6:] for c in amb_ma["MONDO_ASSET"] if c.startswith("carta-")}),
+           [k for k, _ in coppie_cd if k not in resto_cd and k.replace("\\'", "'") not in resto_cd]))
+    prova("...le otto scene delle missioni e il dorso sono nella cartella", (set(), True),
+          ({f"scena-{m}" for m in ("sats", "lucchetto", "parole", "staffetta", "oblo", "quaderno",
+                                    "antenna", "halving")} - presenti, "carta-dorso" in presenti))
     prova("...leggeri: nessun dipinto sopra i 300 KB", [],
           [f for f in sorted(presenti) if os.path.getsize(os.path.join(cartella, f + ".webp")) > 300_000])
     # (il mondo e le missioni stanno gia' nel pezzo di pagina del banco

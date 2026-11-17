@@ -2171,7 +2171,7 @@ dove: P2P on-chain, tocca un ordine con più metodi fra cui «Contanti»: sotto 
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-087 | novita -->
+<!-- pezzo novita-089 | novita -->
 ## Novità · 2026-11-17 · paracadute-su-giu
 
 frase: Il paracadute degli ordini P2P adesso ha due scelte: una se BTC sale e una se BTC scende, ognuna 5%, 10%, 20% o nessuna. Così puoi tenere l'ordine se BTC sale e toglierlo se scende, o il contrario. Gli ordini già pubblicati restano come sono.

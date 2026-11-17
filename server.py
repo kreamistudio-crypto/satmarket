@@ -114238,7 +114238,29 @@ MONDO_ASSET = frozenset([f"zona-{n}" for n in range(1, 7)]
                            "miss-gazza-ferma",
                            "miss-quaderno", "miss-leggio", "miss-grande",
                            "miss-cestino", "miss-busta", "miss-tarlo"]
-                        + [f"tappo-passo-{n}" for n in range(1, 5)])
+                        + [f"tappo-passo-{n}" for n in range(1, 5)]
+                        # LE MISSIONI A CARTE DIPINTE (17 nov 2026, Flow
+                        # sul PC di Andrea, «più stile Barattolo»): la
+                        # scena di ogni missione, le carte scontornate e
+                        # il dorso. I nomi delle carte sono quelli di
+                        # CARTA_DIPINTA in miniapp.html (una prova li
+                        # confronta)
+                        + [f"scena-{m}" for m in ("sats", "lucchetto", "parole", "staffetta",
+                                                  "oblo", "quaderno", "antenna", "halving")]
+                        + ["carta-" + c for c in (
+                            "capra-grano", "conchiglie", "monete-antiche", "banconote",
+                            "moneta-sats", "sveglia", "wallet-acceso",
+                            "soldi-in-privato", "barattolo-lucchetto", "pacco-spedito",
+                            "frullatore", "lucchetto-aperto", "etichetta-spedizione",
+                            "foto-pacco", "mani-fidati", "nuvola-arrabbiata",
+                            "telefono-foto", "nuvola-cloud", "fumetto-messaggio",
+                            "cassetto-foglio", "casa-nonna", "piastra-metallo",
+                            "busta-email", "targhetta-nome", "password",
+                            "telefono-cornetta", "carta-identita", "chiave-viola",
+                            "schedario", "scopa",
+                            "antenna-porto", "antenna-bosco", "antenna-vetta",
+                            "cartello-vuoto", "annuncio-pacco", "palazzo-azienda",
+                            "chiave-dorata", "dorso")])
 
 
 @app.get("/assets/mondo/{nome}")

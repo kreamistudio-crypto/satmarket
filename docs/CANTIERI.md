@@ -89965,3 +89965,23 @@ scuro come i dipinti, e alla fine lo stadio del razzo appena montato.
 Nessun disegno nuovo: si riusano la mappa del tabellone, i dispettosi
 dipinti per il mondo e il razzo. Provato a schermo sulle tre missioni
 nuove, col razzo servito dalla prova.
+
+E i disegni veri (16:40, Andrea sulle carte crema: «fanno schifo, non
+originale, sembra fatto alla veloce»; sulla scheda sceglie «scene e carte
+dipinte»): Flow sul PC, Nano Banana a zero crediti, due versioni per
+prompt e tenuta la migliore. Otto scene 16:9 senza personaggi (il banco
+del mercato all'alba, la bancarella del frullatore, la stanzetta del
+faro, il bosco coi fili luminosi, la cabina del razzo, il rifugio coi
+cinque quaderni, le antenne sopra le nuvole, la macchina dei bitcoin
+sulla Luna), 37 carte su verde e il dorso col barattolino, nello stile
+delle icone della stradina, senza scritte né marchi. Scontornate qui
+(la stessa chiave del verde del platform), scene a 1376x768 e carte a
+300 px: 1,27 MB in tutto, ogni file sotto i 130 KB. Le carte si legano
+ai bottoni per TESTO, non toccando i quindici modelli delle missioni:
+un punto solo, e una prova che dice rosso se un testo cambia e la
+carta resterebbe senza disegno. SCARTATE: rifare le carte a 2K (a 84 px
+non si vede la differenza, e pesano il quadruplo); il dorso come cornice
+della figurina finale (il barattolino al centro si scontra con l'emoji).
+Da guardare: «carta-soldi-in-privato» ha le maniche tagliate dal bordo
+del disegno (si vede poco: le mani entrano dai lati). Provato a schermo
+sulle otto missioni.

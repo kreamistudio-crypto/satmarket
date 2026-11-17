@@ -37324,3 +37324,15 @@ mai il kind 0 di nessuno: regola ferrea 2).
   Lo stile (`.miss-velo:not(.arena)`): fondo caldo della mappa, fumetti
   e carte crema col contorno scuro, carte che arrivano come distribuite
   e tremano a uno sbaglio (`missioneMale` rimette `.scossa`).
+  LE CARTE DIPINTE (stessa sera, disegni Flow fatti apposta): il palco
+  prende la scena della missione (`/assets/mondo/scena-<id>.webp`, le
+  otto di `MISS_SCENE`; una missione senza scena tiene la zona). Dopo
+  ogni disegno, `missCarteDipinte(corpo)` guarda le scelte
+  (`.miss-scelta`, i due bottoni di `.miss-due`, la fila `.miss-ordine`)
+  e, se il TESTO ESATTO sta in `CARTA_DIPINTA`, mette sopra il disegno
+  `carta-<nome>.webp` e toglie l'emoji davanti; senza il file torna il
+  testo intero. Le scelte dipinte vanno a griglia ed entrano di dorso
+  (`carta-dorso.webp` in `::before`) girandosi; con «riduci movimento»
+  niente giro. I file stanno in assets/mondo/ e nella whitelist
+  `MONDO_ASSET` (la prova confronta whitelist, cartella e chiavi: un
+  testo di bottone ritoccato senza ritoccare la chiave fa rosso).
