@@ -87741,3 +87741,55 @@ sezioni toccate e i collaudi on-chain e della serie; poi su 1cb0b906
 DA GUARDARE. Il riquadro «Dove ricevi i bitcoin?» resta quello di tutti
 gli scambi on-chain, e nel conto «Totale da inviare» resta la parola di
 sempre.
+
+## Chi è l'altra parte nello scambio on-chain (17 nov 2026, cantiere onchain-controparte; un utente, girato da Andrea: «come faccio a capire chi ha preso l'ordine? Non c'è modo di scrivere un messaggio, né capire chi ha preso l'ordine»)
+
+LA VERIFICA. Andrea si aspettava chat e faccia dell'altra parte: nel
+P2P Lightning ci sono dal 12 ott (`profiloControparteP2P` e
+`bloccoChatScambioP2P`), nella pagina on-chain (`schedaOnchainP2P`) no,
+nessuna delle due. Il server mandava già alle parti il nome nudo
+(`altro`) ma la pagina non lo usava; i nomi con l'id andavano solo al
+moderatore (`parti`). La chat on-chain è il «punto 6» della lista di
+parità, mai fatta.
+
+DECISO. Il volto della card esce nell'ordine stesso, `controparte`, da
+`_volti_persone` (lo stesso costruttore del Lightning e del mercatino:
+una persona, una faccia), alle sole due parti e solo con tutt'e due le
+parti presenti; il moderatore no (ha la sua riga). La pagina lo disegna
+con `cardParte` (`controparteOcP2P`, sotto la nota dello stato e il
+tempo, sopra il recapito, come nel Lightning): la faccia apre il
+negozio, i tondi Telegram e Nostr dove ci sono.
+
+SCARTATO. Riusare `/api/p2p/controparte`: legge `p2p_ordini` e
+`p2p_scambi` di Mostro; l'ordine on-chain è nostro e la riga sa già chi
+sono le due parti, una domanda in più non serve. La frase «restano i
+recapiti, cifrati fra voi due» del Lightning: la frase della card on-chain
+rimanda alla chat della pagina.
+
+PROVATO. `collaudo_p2p_onchain` (+3): le due parti vedono il volto
+dell'altra (nome, negozio), prima della presa nessun volto, il
+moderatore senza; controprova (il campo rinominato nel server) rossa.
+`prove_deposito_p2p_onchain` (+1): la card con la porta solo se il
+server la manda, mai al moderatore.
+
+LA CHAT (punto 6) l'ha portata lo stesso giorno il cantiere
+onchain-chat-sollecito (voce qui sopra, «La chat dello scambio
+on-chain»): una seconda versione fatta qui in parallelo è stata
+lasciata cadere, la card ci si appoggia («per parlarvi c'è la chat qui
+sotto»).
+
+ANCHE L'ANNULLO DI CHI RICEVE (stesso giorno, secondo messaggio di
+Andrea: «Vorrei annullare lo scambio […] non c'è nessun pulsante "X
+Annulla". I Sats non sono ancora stati messi in garanzia»). Chi riceve
+in «preso» poteva solo «Rinuncia» e solo DOPO la finestra del deposito
+(il 409 «Chi vende ha ancora tempo»), una regola senza un perché
+scritto, mentre nel Lightning chi prende annulla finché la garanzia non
+è bloccata. DECISO: chi riceve annulla quando vuole finché nessun sats è
+visto; il riparo resta quello di prima — la rete guardata al momento
+(un sats visto e il 409 resta, per tutti e due) e lo swap del deposito
+in volo. Il tasto è «✕ Annulla», e dopo la finestra torna la scritta
+«Rinuncia: il deposito non è arrivato». RISCHIO DETTO: chi vende manda
+la transazione nello stesso minuto dell'annullo; i sats arrivati dopo un
+annullo hanno già la loro strada (la riga «un moderatore li rimanda
+indietro»). PROVATO: `collaudo_p2p_onchain`, su uno scambio a parte,
+chi compra annulla prima della scadenza e chi vende è avvisato.

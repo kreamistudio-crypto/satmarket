@@ -165452,6 +165452,7 @@ const daFirmareOnchainP2P = () => false;
 const cambioDaFirmareOnchainP2P = () => false;
 const incassoMancanteOnchainP2P = () => '';
 const incassoLnOnchainP2P = () => '';
+const cardParte = (c, chi, op) => '<CARD ' + c.nome + ' ' + chi + ' ' + !!op.porta + '>';
 let p2pOnchainMiei = [];
 """ + pezzo_js(mini, "const P2P_ONCHAIN_VIVI = ", ";\n") + ";\n" \
         + pezzo_js(mini, "const P2P_ONCHAIN_STATI = {", "};\n") + "};\n" \
@@ -165496,6 +165497,8 @@ out.schedaRiceve = [/apriDepositoOnchainP2P/.test(sr), /✋ Aspetta/.test(sr), /
 const m = Object.assign({}, base, {ruolo: 'moderatore', stato: 'disputa', parti: {vende: 'a', compra: 'b'}});
 const sm = schedaOnchainP2P(m);
 out.schedaMod = [/tb1qdueditre/.test(sm), /explorer/.test(sm), /tocca a te|Aspetta/.test(sm)];
+out.controparte = [/<CARD Mario Rossi a Mario true>/.test(schedaOnchainP2P(Object.assign({}, o, {controparte: {nome: 'Mario Rossi'}}))),
+  /<CARD/.test(sc), /<CARD/.test(schedaOnchainP2P(Object.assign({}, m, {controparte: {nome: 'x'}})))];
 const st = x => passiOnchainP2P(Object.assign({}, r, x));
 out.passi = [st({stato: 'pending'}).passi[0].t, st({stato: 'depositato'}).prog, st({stato: 'euro_inviati'}).prog,
   st({stato: 'rilasciato'}).prog, st({stato: 'rimborsato', euro_inviati_il: 5}).fermo,
@@ -165533,6 +165536,10 @@ console.log(JSON.stringify(out));
           [False, True, True, True, False], out["schedaRiceve"])
     prova("al moderatore l'indirizzo e l'explorer restano, senza pillole",
           [True, True, False], out["schedaMod"])
+    # CHI E' L'ALTRO (17 nov 2026, cantiere onchain-controparte)
+    prova("la card dell'altra parte, come nel Lightning (la faccia apre il "
+          "negozio), solo se il server la manda e mai al moderatore",
+          [True, False, False], out["controparte"])
     prova("i quattro passi seguono gli stati (pubblicato, euro, concluso, il fermo del "
           "rimborso e dell'annullo, la disputa dopo gli euro)",
           ["Ordine pubblicato", 2, 3, 4, 3, "Rimborsato", 0, 3], out["passi"])

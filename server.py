@@ -107827,6 +107827,14 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
     }
     if parte_vera and not admin:
         d["recapito"] = o["recapito"] or ""
+        # CHI E' L'ALTRO (17 nov 2026, cantiere onchain-controparte; un
+        # utente: «come faccio a capire chi ha preso l'ordine?»): il volto
+        # della card dell'altra parte, lo STESSO di `_controparti_p2p` nel
+        # Lightning (`_volti_persone`), alle sole due parti e solo da
+        # quando lo scambio ha le due parti. Il nome nudo (`altro`)
+        # c'era gia', la pagina non lo mostrava
+        if altro:
+            d["controparte"] = _volti_persone(con, [altro], int(time.time())).get(altro)
     # BARATTOZON ON-CHAIN (17 nov 2026): la scadenza la vedono le parti
     # (e il moderatore: e' il tempo, non il codice); il PayCode e il codice
     # a barre chi l'ha scritto sempre, chi paga SOLO a deposito confermato
@@ -108302,9 +108310,9 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
 async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
                               barattolo_sessione: str = Cookie("")):
     """ANNULLA. Nel libro (pending): chi l'ha pubblicato, quando vuole.
-    Preso ma senza un sats visto: chi deve depositare quando vuole (non
-    ha ancora messo niente), chi riceve solo DOPO la finestra del
-    deposito — e mai alla cieca: prima si guarda la rete, come
+    Preso ma senza un sats visto: tutt'e due quando vogliono (dal 17
+    nov 2026 anche chi riceve, prima solo dopo la finestra del
+    deposito) — e mai alla cieca: prima si guarda la rete, come
     nell'annullo del mercatino. Con anche un sats visto non si annulla:
     si esce col rimborso (due firme) o con una disputa."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
@@ -108342,10 +108350,13 @@ async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
                 raise HTTPException(409, "Ci sono già dei sats sull'indirizzo: "
                                          "ora si esce solo col rimborso o con "
                                          "una disputa")
-            if ruolo == "venditore" and adesso < int(o["deposito_entro"] or 0):
-                raise HTTPException(409, "Chi vende ha ancora tempo per "
-                                         "depositare: puoi rinunciare dopo "
-                                         "la scadenza")
+            # (17 nov 2026, cantiere onchain-controparte, Andrea: «non
+            # c'è nessun pulsante "X Annulla". I sats non sono ancora
+            # stati messi in garanzia») CHI RICEVE ANNULLA QUANDO VUOLE,
+            # come nel Lightning prima della garanzia: fino a ieri solo
+            # dopo la finestra del deposito. Il riparo resta quello di
+            # sopra: la rete guardata adesso (un sats visto e non si
+            # annulla piu') e lo swap del deposito in volo
         else:
             raise HTTPException(409, "Questo scambio non si annulla più")
         cur = con.execute(

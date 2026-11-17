@@ -67270,8 +67270,12 @@ function schedaOnchainP2P(o){
          (30 ott 2026): il suo tasto e' quello in evidenza */
       gesti = (deposito ? bott('orange', `apriDepositoOnchainP2P(${o.id})`, '🔒 Blocca i sats')
                           + g('controlla', '🔎 Ho depositato: controlla') : g('controlla', '🔎 Controlla la rete'))
-        + ((deposito && !o.visti_sats) || (ricevo && Date.now() / 1000 > o.deposito_entro && !o.visti_sats)
-           ? g('annulla', deposito ? 'Annulla (non deposito)' : 'Rinuncia: il deposito non è arrivato') : '');
+        /* «✕ Annulla» anche a chi riceve, finche' nessun sats e' visto
+           (17 nov 2026, come nel Lightning prima della garanzia); dopo
+           la finestra del deposito la scritta dice perche' */
+        + ((deposito || ricevo) && !o.visti_sats
+           ? g('annulla', deposito ? 'Annulla (non deposito)'
+               : Date.now() / 1000 > o.deposito_entro ? 'Rinuncia: il deposito non è arrivato' : '✕ Annulla') : '');
       break;
     case 'depositato':
       /* BARATTOZON ON-CHAIN (17 nov 2026): il PayCode nel riquadro qui
@@ -67457,6 +67461,8 @@ function schedaOnchainP2P(o){
       + '<br>' + testo + '</span></div>'
     /* il tempo per pagare, sotto la nota (17 nov 2026) */
     + (typeof tempoPagareRigaOcP2P === 'function' ? tempoPagareRigaOcP2P(o) : '')
+    /* chi e' l'altra parte (17 nov 2026), come nel Lightning */
+    + (typeof controparteOcP2P === 'function' ? controparteOcP2P(o, mod) : '')
     /* chi compra senza un posto dove ricevere lo scrive qui (thread del
        2-di-3, richiesta di Alan): subito sotto la nota, ben in vista */
     + `${incassoMancanteOnchainP2P(o)}`
@@ -67479,6 +67485,25 @@ function schedaOnchainP2P(o){
     + decidi
     + (typeof chatOcBloccoHTML === 'function' ? chatOcBloccoHTML(o) : '')
     + (typeof chatOcModHTML === 'function' ? chatOcModHTML(o) : '');
+}
+
+/* ---- CHI E' L'ALTRA PARTE NELLO SCAMBIO ON-CHAIN (17 nov 2026,
+   cantiere onchain-controparte; un utente: «come faccio a capire chi
+   ha preso l'ordine?») ----
+   La card del Lightning (`profiloControparteP2P`), con la stessa
+   fabbrica `cardParte`: la faccia apre il negozio, i tondi Telegram e
+   Nostr dove ci sono. Il volto lo manda il server nell'ordine stesso
+   (`controparte`, da `_volti_persone`), solo alle due parti: qui non
+   serve una domanda in piu' come nel Lightning, perche' l'ordine
+   on-chain e' nostro e il server sa gia' chi sono le due parti. Il
+   moderatore ha la sua riga («Vende bitcoin: … · compra: …»). */
+function controparteOcP2P(o, mod){
+  const c = o && !mod && o.controparte;
+  if (!c || typeof cardParte !== 'function') return '';
+  const primo = String(c.nome || '').split(' ')[0];
+  return cardParte(c, primo ? 'a ' + esc(primo) : "all'altra persona", {
+    porta: true,
+    nota: '<div class="hint">Non ha lasciato nessun canale pubblico per scrivergli.</div>'});
 }
 
 /* ---- LA RECENSIONE DI UNO SCAMBIO ON-CHAIN (17 nov 2026, cantiere

@@ -372,6 +372,9 @@ def main():
           (1, 0), (len(c.get("/api/p2p/onchain/miei").json()["ordini"]),
                    (come(888), len(c.get("/api/p2p/onchain/miei").json()["ordini"]))[1]))
 
+    prova("nel libro, prima della presa, nessun volto dell'altro", None,
+          uno(999, oid).get("controparte"))
+
     # ---- 3) prendere --------------------------------------------------------
     print("\n[prendere: nasce il 2-di-3]")
     prova("chi l'ha pubblicato non lo prende: 409", 409,
@@ -398,6 +401,13 @@ def main():
     prova("Andrea e' il «compratore» del 2-di-3 (deposita), parte 'vendo'",
           ("compratore", "vendo", "Alan", True),
           (oa["ruolo"], oa["parte"], oa["altro"], oa["deposito_entro"] > oa["preso_il"]))
+    # CHI E' L'ALTRO (17 nov 2026, cantiere onchain-controparte): il volto
+    # della card, lo stesso del Lightning, alle due parti dalla presa
+    prova("...e tutt'e due vedono il VOLTO dell'altro (la card col negozio)",
+          ("Andrea", "neg999999", "Alan"),
+          ((o.get("controparte") or {}).get("nome"),
+           (o.get("controparte") or {}).get("negozio"),
+           (oa.get("controparte") or {}).get("nome")))
     prova("...tutt'e due avvisati, nessuna xpub in giro",
           (True, True, False, False),
           (detto_a(999, "tocca a te depositare"), detto_a(888, "appena chi vende deposita"),
@@ -432,12 +442,21 @@ def main():
     prova("un moderatore terzo lo vede, ma senza recapito e con le parti",
           ("moderatore", False, "Andrea", "Alan"),
           (t["ruolo"], "recapito" in t, t["parti"]["vende"], t["parti"]["compra"]))
+    prova("...e senza il volto della card: quello e' delle due parti", False,
+          "controparte" in t)
 
     # ---- 4) il deposito -----------------------------------------------------
     print("\n[il deposito: mempool vede, una conferma decide]")
-    r = gesto(888, oid, "annulla")
-    prova("chi compra non rinuncia prima della finestra del deposito: 409",
-          (409, True), (r.status_code, "ancora tempo" in r.json()["detail"]))
+    # (17 nov 2026) chi compra annulla quando vuole, finche' niente e'
+    # visto in rete: su uno scambio a parte, questo deve andare avanti
+    ox = pubblica(999).json()
+    gesto(888, ox["id"], "prendi")
+    r = gesto(888, ox["id"], "annulla")
+    prova("chi compra annulla anche prima della fine della finestra del "
+          "deposito (niente in rete): annullato, e chi vende avvisato",
+          (200, "annullato", True),
+          (r.status_code, uno(999, ox["id"])["stato"],
+           detto_a(999, "annullato lo scambio")))
     prova("niente sull'indirizzo: resta preso", "preso",
           gesto(999, oid, "controlla").json()["stato"])
     paga(oa, confermata=False)

@@ -421,6 +421,16 @@ pubblico: no
 frase: Se un venditore non spedisce ai locker o ai punti di ritiro, alla cassa la riga del locker adesso resta visibile, spenta, con il tasto «Chiedi al venditore se spedisce con InPost o Poste»: lui riceve un avviso dal bot (senza sapere chi ha chiesto) che lo porta a spuntare i suoi corrieri, e quando lo fa chi aveva chiesto riceve l'avviso. Una richiesta per venditore ogni 7 giorni.
 dove: la cassa di un annuncio a spedizione di un venditore senza InPost, Poste o SDA, sotto «Spedizione a un indirizzo»; il messaggio del bot «Qualcuno vorrebbe ricevere … in un locker» col bottone «📦 Come spedisci».
 leva: RICHIESTA_PUNTI (accesa di serie)
+## 2026-11-17 · onchain-controparte
+frase: Negli scambi P2P on-chain ora vedi chi c'è dall'altra parte: appena l'ordine è preso, nella pagina dello scambio compare la sua scheda con faccia, nome e stelline, come negli scambi Lightning. Toccando la faccia si apre il suo negozio.
+dove: P2P → «I miei scambi» → uno scambio on-chain preso, sotto la nota dello stato.
+leva: nessuna
+pubblico: sì
+
+## 2026-11-17 · onchain-annulla
+frase: Negli scambi P2P on-chain chi compra può annullare con «✕ Annulla» finché chi vende non ha ancora depositato i sats, come negli scambi Lightning: prima bisognava aspettare la fine del tempo del deposito.
+dove: P2P → «I miei scambi» → uno scambio on-chain preso, in attesa del deposito.
+leva: nessuna
 pubblico: sì
 
 ## 2026-11-17 · barattozon-onchain
