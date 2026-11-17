@@ -7543,7 +7543,12 @@ def init_db():
         autore INTEGER NOT NULL,
         admin INTEGER NOT NULL DEFAULT 0,
         testo TEXT NOT NULL,
-        quando INTEGER NOT NULL
+        quando INTEGER NOT NULL,
+        -- gli screenshot del messaggio (17 nov 2026): i nomi dei file in
+        -- ASSISTENZA_IMG_DIR (buste/assistenza) separati da virgola,
+        -- '' = nessuno. Vedi
+        -- «GLI SCREENSHOT ALL'ASSISTENZA».
+        immagini TEXT NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_assistenza_utente ON assistenza(utente, id);
     CREATE TABLE IF NOT EXISTS assistenza_letture(
@@ -11349,6 +11354,13 @@ def init_db():
     con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_spese "
                 "ON rimborsi_asta(ordine_id) "
                 "WHERE motivo = 'spese_spedizione'")
+    # GLI SCREENSHOT ALL'ASSISTENZA (17 nov 2026): la colonna per i
+    # database nati prima (quelli nuovi la trovano gia' nel CREATE)
+    try:
+        con.execute("ALTER TABLE assistenza ADD COLUMN "
+                    "immagini TEXT NOT NULL DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
     for tabella in ("ordini", "rimborsi_asta", "pagamenti"):
         for colonna in ("payout_tentativi INTEGER DEFAULT 0",
                         "payout_ultimo INTEGER DEFAULT 0",
@@ -52959,18 +52971,185 @@ _CONTROLLO_ASSISTENZA = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 # righe di fila non fa suonare tre volte i telefoni dello staff.
 ASSISTENZA_AVVISO_PAUSA_S = 600
 ASSISTENZA_AVVISO_TESTO_MAX = 400   # quanto del messaggio entra nell'avviso
+# GLI SCREENSHOT ALL'ASSISTENZA (17 nov 2026, richiesta di Andrea: «dai
+# la possibilita' di aggiungere anche degli screenshot»). Chi scrive
+# allo staff allega fino a ASSISTENZA_IMMAGINI_MAX immagini per
+# messaggio; il telefono le prepara gia' (lato lungo 1600, JPEG), il
+# server le vaglia come il documento di ritiro — il tipo lo dicono i
+# BYTE, via i metadati (il GPS di una foto vera), la bomba si ferma
+# prima di decodificare — e le scrive CIFRATE in ASSISTENZA_IMG_DIR con
+# un nome imprevedibile. Non e' una cartella servita: si leggono SOLO da
+# /api/assistenza/immagine/{nome}, e solo chi ha scritto e gli admin.
+# Agli admin arrivano anche nel bot, una foto per screenshot, SEMPRE
+# (la pausa degli avvisi vale per il testo: uno screenshot e' il
+# contenuto, e il freno dei 20 messaggi l'ora tiene il conto).
+ASSISTENZA_IMMAGINI_MAX = 3
+ASSISTENZA_IMMAGINE_BYTE_MAX = 6 * 1024 * 1024   # una, dopo il base64
+# DENTRO buste/ e non una cartella nuova: in produzione il servizio
+# gira da `barattolo`, che scrive SOLO nelle sue cartelle
+# (deploy/utente/cambio-utente.sh, SUE=...) — una cartella nuova accanto
+# a server.py non nascerebbe, e il server non partirebbe. buste/ e' gia'
+# sua, privata (700), mai servita, e il backup fuori la porta con se'.
+ASSISTENZA_IMG_DIR = os.path.join(BUSTE_DIR, "assistenza")
+try:
+    os.makedirs(ASSISTENZA_IMG_DIR, exist_ok=True)
+except OSError as e:
+    # mai un server fermo per gli screenshot: senza cartella il messaggio
+    # con lo screenshot e' un 503 che lo dice, il resto gira
+    print(f"⚠️ Cartella degli screenshot dell'assistenza non creata: {e}")
+# whitelist di FORME, come NOME_FOTO: cio' che non ha questa forma non
+# arriva nemmeno al disco
+NOME_IMG_ASSISTENZA = re.compile(r"^as[0-9a-f]{24}\.(jpg|png|webp)$")
+_TIPO_IMG_ASSISTENZA = {"jpg": "image/jpeg", "png": "image/png",
+                        "webp": "image/webp"}
 
 
-def _testo_avviso_assistenza(nome: str, utente: int, testo: str) -> str:
+def _testo_avviso_assistenza(nome: str, utente: int, testo: str,
+                             immagini: int = 0) -> str:
     """PURA: l'avviso per gli admin. Il nome e il messaggio arrivano
     GREZZI e si scappano QUI, una volta (la regola degli avvisi: si
-    scappa all'assegnazione, e qui l'assegnazione e' questa)."""
+    scappa all'assegnazione, e qui l'assegnazione e' questa).
+    `immagini`: quanti screenshot porta il messaggio (si dice, e il
+    messaggio fatto solo di screenshot non mostra due virgolette vuote)."""
     corto = testo if len(testo) <= ASSISTENZA_AVVISO_TESTO_MAX \
         else testo[:ASSISTENZA_AVVISO_TESTO_MAX].rstrip() + "…"
+    citato = f"«{html.escape(corto)}»\n" if corto else ""
+    allegati = ""
+    if immagini:
+        allegati = ("📎 1 screenshot allegato\n" if immagini == 1
+                    else f"📎 {int(immagini)} screenshot allegati\n")
     return (f"💬 <b>Assistenza</b>: scrive {html.escape(nome or 'un utente')} "
-            f"(n. {int(utente)})\n\n«{html.escape(corto)}»\n\n"
+            f"(n. {int(utente)})\n\n{citato}{allegati}\n"
             "Rispondi dall'app: Profilo → Amministrazione → "
             "💬 Assistenza clienti.")
+
+
+def _immagine_assistenza(dataurl) -> tuple[bytes, str]:
+    """Dal data URL del telefono ai byte da salvare, con l'estensione.
+    Un 400 che DICE cosa non va: chi scrive cambia immagine da solo."""
+    m = re.match(r"^data:image/[\w.+-]*;base64,(.+)$", str(dataurl or ""), re.S)
+    if not m:
+        raise HTTPException(400, "Uno screenshot non si legge: riprova a "
+                                 "sceglierlo")
+    try:
+        raw = base64.b64decode(m.group(1), validate=True)
+    except Exception:
+        raise HTTPException(400, "Uno screenshot non si legge: riprova a "
+                                 "sceglierlo")
+    if not raw:
+        raise HTTPException(400, "Uno screenshot è vuoto")
+    if len(raw) > ASSISTENZA_IMMAGINE_BYTE_MAX:
+        raise HTTPException(400, "Uno screenshot è troppo pesante (massimo "
+                                 f"{ASSISTENZA_IMMAGINE_BYTE_MAX // (1024*1024)}"
+                                 " MB)")
+    # il tipo lo dicono i BYTE, mai l'etichetta del data URL
+    if raw.startswith(b"\xff\xd8\xff"):
+        est = "jpg"
+    elif raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        est = "png"
+    elif raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        est = "webp"
+    else:
+        raise HTTPException(400, "Si possono allegare solo immagini "
+                                 "(JPG, PNG, WebP)")
+    if not _e_immagine(raw):
+        raise HTTPException(400, "Uno screenshot non si riesce a leggere: "
+                                 "riprova con un altro")
+    motivo = _foto_anomala(raw)
+    if motivo:
+        raise HTTPException(400, f"Uno screenshot non va: {motivo}")
+    # i metadati se ne vanno (una foto vera porta il GPS di casa); se il
+    # formato non si sa spogliare si ridisegna in JPEG, e l'estensione
+    # cambia coi byte
+    pulito = spoglia_metadati(raw)
+    if pulito is None:
+        pulito = converti_in_jpeg(raw)
+        if pulito is None:
+            raise HTTPException(400, "Uno screenshot non si riesce a "
+                                     "preparare: riprova con un altro")
+        est = "jpg"
+    return pulito, est
+
+
+def _immagini_assistenza(lista) -> list:
+    """PURA quanto basta: la lista che arriva dal client, vagliata
+    TUTTA prima di scrivere un solo file (un 400 a meta' non lascia
+    orfani sul disco). Ritorna [(byte, est), ...]."""
+    if lista in (None, ""):
+        return []
+    if not isinstance(lista, list):
+        raise HTTPException(400, "Richiesta malformata")
+    if len(lista) > ASSISTENZA_IMMAGINI_MAX:
+        raise HTTPException(400, f"Al massimo {ASSISTENZA_IMMAGINI_MAX} "
+                                 "screenshot per messaggio")
+    return [_immagine_assistenza(x) for x in lista]
+
+
+def _scrivi_immagini_assistenza(pronte: list) -> list:
+    """Scrive i file CIFRATI e torna i nomi. Il disco che dice di no
+    e' un 503 e si porta via anche quelli gia' scritti: il messaggio non
+    nasce, e non restano file che nessuna riga nomina."""
+    nomi = []
+    try:
+        for raw, est in pronte:
+            nome = f"as{secrets.token_hex(12)}.{est}"
+            with open(os.path.join(ASSISTENZA_IMG_DIR, nome), "wb") as out:
+                out.write(_cifra_blob(raw))
+            nomi.append(nome)
+    except OSError as e:
+        _togli_immagini_assistenza(nomi)
+        print(f"⚠️ Screenshot dell'assistenza non scritti: {e}")
+        raise HTTPException(503, "Non riesco a salvare gli screenshot "
+                                 "adesso: riprova fra poco")
+    return nomi
+
+
+def _togli_immagini_assistenza(nomi) -> None:
+    """Via dal disco, solo nomi con la forma giusta. Fail-open."""
+    for nome in nomi or []:
+        if NOME_IMG_ASSISTENZA.match(str(nome or "")):
+            try:
+                os.remove(os.path.join(ASSISTENZA_IMG_DIR, nome))
+            except OSError:
+                pass
+
+
+def _nomi_immagini(colonna) -> list:
+    """PURA: la colonna `immagini` come lista di nomi validi."""
+    return [n for n in str(colonna or "").split(",")
+            if NOME_IMG_ASSISTENZA.match(n)]
+
+
+async def _foto_al_bot(chat_id: int, raw: bytes, tipo: str,
+                       didascalia: str, bottone: tuple = None):
+    """Una foto PRIVATA nella chat del bot: i byte viaggiano nel corpo
+    (multipart), perche' un URL a /api/assistenza/immagine Telegram non
+    lo saprebbe aprire — vuole chi sei. Simulata in collaudo, come ogni
+    uscita verso Telegram; fail-open, l'esito si stampa."""
+    if MODALITA_COLLAUDO:
+        print(f"📨 [foto simulata per l'utente {chat_id}] {didascalia} "
+              f"({len(raw)} byte)")
+        return "simulata (collaudo)"
+    dati = {"chat_id": str(int(chat_id)), "caption": didascalia,
+            "parse_mode": "HTML"}
+    if bottone:
+        dati["reply_markup"] = json.dumps({"inline_keyboard": [[
+            {"text": bottone[0], "url": _link_dentro_telegram(bottone[1])}]]})
+    est = {"image/png": "png", "image/webp": "webp"}.get(tipo, "jpg")
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto",
+                             data=dati,
+                             files={"photo": (f"screenshot.{est}", raw, tipo)})
+        if r.status_code != 200:
+            print(f"⚠️ Screenshot dell'assistenza non consegnato all'admin "
+                  f"{chat_id} ({r.status_code}): {r.text[:200]}")
+            return f"rifiutata ({r.status_code})"
+        return "consegnata"
+    except Exception as e:
+        print(f"⚠️ Screenshot dell'assistenza non consegnato all'admin "
+              f"{chat_id}: {e}")
+        return "non consegnata"
 
 
 def _assistenza_da_avvisare(con, utente: int, adesso: int) -> bool:
@@ -52987,29 +53166,52 @@ def _assistenza_da_avvisare(con, utente: int, adesso: int) -> bool:
     return True
 
 
-async def _avvisa_admin_assistenza(utente: int, nome: str, testo: str):
+async def _avvisa_admin_assistenza(utente: int, nome: str, testo: str,
+                                   avvisa: bool = True,
+                                   immagini: list = None):
     """Ogni admin, sul suo canale. Fail-open: un avviso che non parte
     non tocca il messaggio, che e' gia' salvato. Chi scrive, se e' admin
-    lui stesso, non avvisa se stesso."""
+    lui stesso, non avvisa se stesso.
+    `avvisa` e' la pausa dei dieci minuti (vale per l'avviso col testo);
+    `immagini` sono i nomi degli screenshot del messaggio: a ogni admin
+    su Telegram arrivano nel bot, uno per foto, anche dentro la pausa."""
     try:
-        avviso = _testo_avviso_assistenza(nome, utente, testo)
         bottone = ("💬 Apri la conversazione",
                    f"{URL_PUBBLICO}/?assistenza={int(utente)}")
-        for admin in sorted(_ids_staff()):
-            if admin != int(utente):
+        staff = [a for a in sorted(_ids_staff()) if a != int(utente)]
+        if avvisa:
+            avviso = _testo_avviso_assistenza(nome, utente, testo,
+                                              len(immagini or []))
+            for admin in staff:
                 await notifica(admin, avviso, bottone)
+        for i, n in enumerate(immagini or []):
+            try:
+                with open(os.path.join(ASSISTENZA_IMG_DIR, n), "rb") as f:
+                    raw = _decifra_blob(f.read())
+            except OSError:
+                raw = None
+            if not raw:
+                continue
+            tipo = _TIPO_IMG_ASSISTENZA.get(n.rsplit(".", 1)[-1], "image/jpeg")
+            conto = f" {i + 1}/{len(immagini)}" if len(immagini) > 1 else ""
+            didascalia = (f"📎 Screenshot{conto} all'assistenza da "
+                          f"{html.escape(nome or 'un utente')} (n. {int(utente)})")
+            for admin in staff:
+                if admin > 0:      # un account solo-Nostr non ha il bot
+                    await _foto_al_bot(admin, raw, tipo, didascalia, bottone)
     except Exception as e:
         print(f"⚠️ Avviso dell'assistenza agli admin saltato "
               f"(utente {utente}): {e}")
 
 
-def _testo_assistenza(grezzo) -> str:
+def _testo_assistenza(grezzo, vuoto_ok: bool = False) -> str:
     """PURA: il testo di un messaggio, pronto per il database — via i
     caratteri di controllo (gli a-capo restano), spazi ai bordi tolti.
-    Vuoto o troppo lungo: 400. Niente HTML costruito qui: si scappa
-    all'uscita."""
+    Vuoto o troppo lungo: 400 (il vuoto passa con `vuoto_ok`, cioe'
+    quando il messaggio porta uno screenshot). Niente HTML costruito
+    qui: si scappa all'uscita."""
     t = _CONTROLLO_ASSISTENZA.sub("", str(grezzo or "")).replace("\r", "").strip()
-    if not t:
+    if not t and not vuoto_ok:
         raise HTTPException(400, "Scrivi qualcosa prima di mandare")
     if len(t) > ASSISTENZA_TESTO_MAX:
         raise HTTPException(400, f"Al massimo {ASSISTENZA_TESTO_MAX} "
@@ -53036,14 +53238,16 @@ def _righe_assistenza(con, utente: int, per_admin: bool) -> list:
     """I messaggi di una conversazione, dal piu' vecchio. Per l'utente
     chi risponde e' «lo staff»; per gli admin anche il nome di chi."""
     righe = con.execute(
-        "SELECT a.id, a.autore, a.admin, a.testo, a.quando, u.nome "
+        "SELECT a.id, a.autore, a.admin, a.testo, a.quando, a.immagini, "
+        "u.nome "
         "FROM assistenza a LEFT JOIN utenti u ON u.tg_id = a.autore "
         "WHERE a.utente=? ORDER BY a.id DESC LIMIT ?",
         (int(utente), ASSISTENZA_RIGHE_MAX)).fetchall()
     fuori = []
     for r in reversed(righe):
         m = {"id": r["id"], "staff": bool(r["admin"]), "testo": r["testo"],
-             "quando": r["quando"]}
+             "quando": r["quando"],
+             "immagini": _nomi_immagini(r["immagini"])}
         if per_admin and r["admin"]:
             m["chi"] = r["nome"] or "Admin"
         fuori.append(m)
@@ -53079,25 +53283,72 @@ async def assistenza_scrivi(req: Request, x_tg_init_data: str = Header(""),
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     _frena("assistenza", user["id"])
     d = await leggi_json(req)
-    testo = _testo_assistenza(d.get("testo"))
+    # gli screenshot si vagliano TUTTI prima di toccare disco e database
+    pronte = _immagini_assistenza(d.get("immagini"))
+    testo = _testo_assistenza(d.get("testo"), vuoto_ok=bool(pronte))
+    nomi = _scrivi_immagini_assistenza(pronte)
     con = db()
     try:
         adesso = int(time.time())
         con.execute("INSERT INTO assistenza(utente, autore, admin, testo, "
-                    "quando) VALUES(?,?,0,?,?)",
-                    (user["id"], user["id"], testo, adesso))
+                    "quando, immagini) VALUES(?,?,0,?,?,?)",
+                    (user["id"], user["id"], testo, adesso, ",".join(nomi)))
         avvisa = _assistenza_da_avvisare(con, user["id"], adesso)
         con.commit()
         righe = _righe_assistenza(con, user["id"], False)
         u = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
                         (user["id"],)).fetchone()
+    except Exception:
+        # la riga non e' nata: i file scritti qui sopra non li nomina
+        # nessuno, e se ne vanno
+        _togli_immagini_assistenza(nomi)
+        raise
     finally:
         con.close()
     # dopo il commit e in sottofondo: chi scrive non aspetta i relay
-    if avvisa:
+    if avvisa or nomi:
         nome = (u["nome"] if u else "") or user.get("first_name") or ""
-        asyncio.create_task(_avvisa_admin_assistenza(user["id"], nome, testo))
+        asyncio.create_task(_avvisa_admin_assistenza(
+            user["id"], nome, testo, avvisa=avvisa, immagini=nomi))
     return {"ok": True, "messaggi": righe}
+
+
+@app.get("/api/assistenza/immagine/{nome}")
+def assistenza_immagine(nome: str, x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """I byte di uno screenshot dell'assistenza, decifrati al volo.
+    Solo chi l'ha mandato (cioe' il padrone della conversazione) e gli
+    admin; per tutti gli altri — e per un nome storto o che non esiste —
+    lo STESSO 404: l'estraneo non impara nemmeno che il file c'e'.
+    Niente cache: e' uno schermo di qualcuno, magari col saldo dentro."""
+    _assistenza_accesa()
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not NOME_IMG_ASSISTENZA.match(nome or ""):
+        raise HTTPException(404, "Screenshot non trovato")
+    con = db()
+    try:
+        r = con.execute("SELECT utente, immagini FROM assistenza "
+                        "WHERE instr(immagini, ?) > 0 LIMIT 1",
+                        (nome,)).fetchone()
+    finally:
+        con.close()
+    if (not r or nome not in _nomi_immagini(r["immagini"])
+            or (int(r["utente"]) != int(user["id"])
+                and not e_admin(user["id"]))):
+        raise HTTPException(404, "Screenshot non trovato")
+    try:
+        with open(os.path.join(ASSISTENZA_IMG_DIR, nome), "rb") as f:
+            raw = _decifra_blob(f.read())
+    except OSError:
+        raw = None
+    if not raw:
+        raise HTTPException(404, "Screenshot non trovato")
+    return Response(
+        content=raw,
+        media_type=_TIPO_IMG_ASSISTENZA[nome.rsplit(".", 1)[-1]],
+        headers={"Cache-Control": "no-store, private",
+                 "X-Content-Type-Options": "nosniff",
+                 "Content-Security-Policy": "sandbox; default-src 'none'"})
 
 
 def _solo_admin_assistenza(x_tg_init_data, barattolo_sessione) -> dict:
@@ -53132,7 +53383,7 @@ def assistenza_elenco_admin(x_tg_init_data: str = Header(""),
         "utente": r["utente"], "nome": r["nome"] or "",
         "username": r["username"] or "", "negozio": r["negozio"] or "",
         "staff_utente": e_staff(r["utente"]), "messaggi": r["n"],
-        "ultimo": r["testo"][:140], "quando": r["quando"],
+        "ultimo": r["testo"][:140] or "📎 Screenshot", "quando": r["quando"],
         "da_rispondere": not r["admin"]} for r in righe]}
 
 
@@ -117964,6 +118215,14 @@ def esegui_cancellazione(tg_id: int) -> dict:
                         (u["negozio_slug"],))
         con.execute("UPDATE codici_sconto SET attivo=0 WHERE venditore_id=?",
                     (tg,))
+        # --- gli screenshot della SUA conversazione con lo staff (17 nov
+        #     2026): i nomi si leggono PRIMA che la riga se ne vada, i
+        #     file dopo il commit (`_dopo_cancellazione`)
+        img_assistenza = []
+        if "immagini" in _colonne_di(con, "assistenza"):
+            for r in con.execute("SELECT immagini FROM assistenza WHERE "
+                                 "utente=? AND immagini<>''", (tg,)).fetchall():
+                img_assistenza += _nomi_immagini(r[0])
         # --- CIO' CHE ERA SUO se ne va
         for tab, col in CANCELLA_TOGLI:
             if col in _colonne_di(con, tab):
@@ -118011,6 +118270,7 @@ def esegui_cancellazione(tg_id: int) -> dict:
             "ritira_canali": ritira_canali, "foto": file_foto,
             "buste": [b for b in busta_file
                       if b and os.path.basename(b) == b],
+            "assistenza_img": img_assistenza,
             "reputazione": (rep["pubkey"], rep["evento_id"] or "")
             if rep else None}
 
@@ -118030,6 +118290,7 @@ async def _dopo_cancellazione(esito: dict):
             os.remove(os.path.join(BUSTE_DIR, nome))
         except OSError:
             pass
+    _togli_immagini_assistenza(esito.get("assistenza_img"))
     for aid in esito.get("ritira_nostr") or []:
         try:
             await ritira_da_nostr(aid)

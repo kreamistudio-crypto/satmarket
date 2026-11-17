@@ -3692,6 +3692,10 @@
        moderatore, con la lista piu' alta (e' la pagina intera) e le
        righe dell'elenco degli admin, una per utente */
     .assist-lista{max-height:none;min-height:120px}
+    /* gli screenshot nel messaggio (17 nov 2026): verticali come il
+       telefono che li ha fatti, interi e non ritagliati al quadrato */
+    .fb-foto.assist-foto img{width:auto;height:120px;max-width:100%;object-fit:contain;
+      border:1px solid var(--field-line)}
     .assist-conv{display:block;width:100%;text-align:left;margin:8px 0;padding:10px 12px;
       border-radius:14px;border:1px solid var(--field-line);background:var(--card);
       color:var(--ink);font:inherit;cursor:pointer}
@@ -61656,6 +61660,16 @@ function apriTappo(){
 let assistenzaMsgs = null, assistenzaMax = 2000;
 let assistenzaAdmLista = null, assistenzaAdmAperta = null;
 let assistenzaInvio = false;
+/* GLI SCREENSHOT ALL'ASSISTENZA (17 nov 2026, richiesta di Andrea): chi
+   scrive allo staff allega fino a ASSISTENZA_IMG_MAX immagini per
+   messaggio. Si preparano qui (lato lungo 1600, come la chat dello
+   scambio: in uno screenshot il testo deve leggersi) e partono col
+   messaggio, in data URL. Si leggono da /assistenza/immagine/<nome>,
+   che vuole chi sei: quindi fetch con l'intestazione e un objectURL,
+   tenuto in `assistenzaImgUrl` per non riscaricarle a ogni ridisegno. */
+const ASSISTENZA_IMG_MAX = 3;
+let assistenzaAllegati = [];        // [{dati: dataURL} | {caricando: true}]
+const assistenzaImgUrl = {};        // nome -> objectURL
 /* IL TASTO DELL'AVVISO (5 nov 2026, passo 2): `/?assistenza=mia` apre
    la propria chat, `/?assistenza=<utente>` la conversazione per un
    admin. Una volta sola, dopo /api/me (serve sapere leva e admin). */
@@ -61722,14 +61736,114 @@ function messaggiAssistenzaHTML(lista, perAdmin, nomeUtente){
     const chi = m.staff
       ? (perAdmin ? esc(m.chi || 'Staff') + ' ' + bollinoStaff() : bollinoStaff())
       : (perAdmin ? esc(nomeUtente || 'Utente') : 'Tu');
+    const imgs = Array.isArray(m.immagini) ? m.immagini : [];
     return '<div class="chatmod-msg' + (mio ? ' mio' : '') + '"><small>' + chi
       + (m.quando ? ' · ' + esc(quandoAssistenza(m.quando)) : '') + '</small>'
-      + esc(m.testo) + '</div>';
+      + esc(m.testo)
+      + (imgs.length ? '<div class="fb-foto assist-foto">' + imgs.map((n, j) =>
+          '<img alt="Screenshot ' + (j + 1) + '" data-assist-img="' + esc(n) + '" '
+          + 'onclick="apriScreenshotAssistenza(this)">').join('') + '</div>' : '')
+      + '</div>';
   }).join('');
 }
-function casellaAssistenzaHTML(id, invia, segnaposto){
+/* le miniature di una lista appena disegnata: ognuna si scarica UNA
+   volta (con chi sei), poi resta l'objectURL */
+async function caricaScreenshotAssistenza(id){
+  const box = el(id);
+  if (!box) return;
+  for (const img of box.querySelectorAll('img[data-assist-img]')) {
+    const n = img.getAttribute('data-assist-img');
+    if (!assistenzaImgUrl[n]) {
+      try {
+        const r = await fetch(`${API_BASE}/assistenza/immagine/${encodeURIComponent(n)}`,
+          {headers:{'X-Tg-Init-Data':authHdr()}});
+        if (!r.ok) { img.alt = 'Screenshot non disponibile'; continue; }
+        assistenzaImgUrl[n] = URL.createObjectURL(await r.blob());
+      } catch(e) { continue; }
+    }
+    img.src = assistenzaImgUrl[n];
+  }
+}
+/* tocco su una miniatura: il visore di casa (zoom e scorrimento), con
+   gli screenshot dello stesso messaggio */
+function apriScreenshotAssistenza(img){
+  const tutte = [...img.parentNode.querySelectorAll('img[data-assist-img]')];
+  const lista = tutte.map(i => assistenzaImgUrl[i.getAttribute('data-assist-img')]).filter(Boolean);
+  if (!lista.length) return;
+  apriLightbox(Math.max(0, lista.indexOf(assistenzaImgUrl[img.getAttribute('data-assist-img')])), lista);
+}
+/* le scelte sotto la casella, con la ✕ per toglierle prima dell'invio */
+function allegatiAssistenzaHTML(){
+  const scelte = assistenzaAllegati.map((a, j) => a.caricando
+    ? '<div class="fb-scelta" aria-label="Preparo lo screenshot">⏳</div>'
+    : '<div class="fb-scelta"><img src="' + esc(a.dati) + '" alt="Screenshot ' + (j + 1) + '">'
+      + '<button type="button" aria-label="Togli lo screenshot ' + (j + 1) + '" '
+      + 'onclick="togliAllegatoAssistenza(' + j + ')">✕</button></div>').join('');
+  return scelte + (assistenzaAllegati.length < ASSISTENZA_IMG_MAX
+    ? '<button type="button" class="btn ghost mini" onclick="haptic();el(\'assistenzaFile\').click()">📎 '
+      + (assistenzaAllegati.length ? 'Un altro screenshot'
+         : 'Allega screenshot (facoltativi, max ' + ASSISTENZA_IMG_MAX + ')') + '</button>'
+    : '');
+}
+function ridisegnaAllegatiAssistenza(){
+  const b = el('assistenzaAllegati');
+  if (b) b.innerHTML = allegatiAssistenzaHTML();
+}
+function togliAllegatoAssistenza(j){
+  haptic();
+  assistenzaAllegati.splice(j, 1);
+  ridisegnaAllegatiAssistenza();
+}
+/* PURA quanto basta: i byte pronti come data URL */
+function dataUrlDaByteAssistenza(dati, tipo){
+  return new Promise((ok, ko) => {
+    const fr = new FileReader();
+    fr.onload = () => ok(String(fr.result || ''));
+    fr.onerror = () => ko(new Error('lo screenshot non si legge'));
+    fr.readAsDataURL(new Blob([dati], {type: tipo}));
+  });
+}
+async function screenshotAssistenzaScelti(input){
+  const files = [...(input.files || [])];
+  input.value = '';            // cosi' si puo' riscegliere lo stesso file
+  if (!files.length) {
+    toast(tg?.initData
+      ? 'Non ho ricevuto nessuna immagine: controlla che Telegram possa accedere alla galleria'
+      : 'Non ho ricevuto nessuna immagine: controlla i permessi della galleria', 8000);
+    return;
+  }
+  for (const file of files) {
+    if (assistenzaAllegati.length >= ASSISTENZA_IMG_MAX) {
+      toast('Al massimo ' + ASSISTENZA_IMG_MAX + ' screenshot per messaggio'); break;
+    }
+    const segno = {caricando: true};
+    assistenzaAllegati.push(segno);
+    ridisegnaAllegatiAssistenza();
+    let dati = '';
+    try {
+      const p = await preparaFotoChatScP2P(file, 'image/jpeg');
+      dati = await dataUrlDaByteAssistenza(p.dati, p.tipo);
+    } catch(e) {
+      /* la strada robusta delle foto degli annunci (1200 px, i ripieghi
+         dei telefoni difficili e del server) */
+      const esito = await ridimensiona(file) || {};
+      dati = esito.foto || '';
+      if (!dati) toast(esito.motivo || '«' + file.name + '» non è entrata: riprova con un\'altra immagine', 7000);
+    }
+    const j = assistenzaAllegati.indexOf(segno);   // puo' essersi spostato (✕ su altre)
+    if (j >= 0) {
+      if (dati) assistenzaAllegati[j] = {dati}; else assistenzaAllegati.splice(j, 1);
+    }
+    ridisegnaAllegatiAssistenza();
+  }
+}
+function casellaAssistenzaHTML(id, invia, segnaposto, conAllegati){
   return '<div class="assist-casella"><textarea id="' + id + '" rows="3" maxlength="' + Number(assistenzaMax) + '" '
     + 'placeholder="' + esc(segnaposto) + '"></textarea>'
+    + (conAllegati
+      ? '<input type="file" id="assistenzaFile" accept="image/*" multiple hidden onchange="screenshotAssistenzaScelti(this)">'
+        + '<div class="fb-scelte" id="assistenzaAllegati">' + allegatiAssistenzaHTML() + '</div>'
+      : '')
     + '<button class="btn orange" id="' + id + 'Btn" onclick="' + invia + '">Invia</button></div>';
 }
 function scorriInFondoAssistenza(id){
@@ -61743,12 +61857,14 @@ async function renderAssistenza(){
   const disegna = () => {
     box.innerHTML = '<div class="hint">Hai un dubbio su un ordine, un pagamento o il tuo profilo? '
       + 'Scrivi allo staff di Barattolo: risponde una persona vera, col bollino ' + bollinoStaff() + '. '
+      + 'Se serve, allega uno screenshot. '
       + 'Non chiederemo mai la tua frase segreta, una chiave o un pagamento.</div>'
       + '<div class="chatmod-lista assist-lista" id="assistenzaLista">'
       + (assistenzaMsgs ? messaggiAssistenzaHTML(assistenzaMsgs, false)
                         : '<div class="hint">Carico la conversazione…</div>') + '</div>'
-      + casellaAssistenzaHTML('assistenzaTesto', 'inviaAssistenza()', 'Scrivi allo staff…');
+      + casellaAssistenzaHTML('assistenzaTesto', 'inviaAssistenza()', 'Scrivi allo staff…', true);
     scorriInFondoAssistenza('assistenzaLista');
+    caricaScreenshotAssistenza('assistenzaLista');
   };
   disegna();
   if (DEMO || !assistenzaAttiva) return;
@@ -61767,24 +61883,31 @@ async function renderAssistenza(){
 async function inviaAssistenza(){
   const t = el('assistenzaTesto');
   const testo = t ? t.value.trim() : '';
-  if (!testo || assistenzaInvio) return;
+  if (assistenzaAllegati.some(a => a.caricando)) { toast('Un momento: sto preparando lo screenshot'); return; }
+  const immagini = assistenzaAllegati.map(a => a.dati).filter(Boolean);
+  if ((!testo && !immagini.length) || assistenzaInvio) return;
   haptic();
   assistenzaInvio = true;
+  const btn = el('assistenzaTestoBtn');
+  if (btn && immagini.length) btn.disabled = true;
   try {
     const r = await fetch(`${API_BASE}/assistenza`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({testo})});
+       body: JSON.stringify(immagini.length ? {testo, immagini} : {testo})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Messaggio non mandato, riprova', 6000); return; }
     assistenzaMsgs = d.messaggi || [];
     if (el('assistenzaLista')) {
       el('assistenzaLista').innerHTML = messaggiAssistenzaHTML(assistenzaMsgs, false);
       scorriInFondoAssistenza('assistenzaLista');
+      caricaScreenshotAssistenza('assistenzaLista');
     }
     if (t) t.value = '';
+    assistenzaAllegati = [];
+    ridisegnaAllegatiAssistenza();
     toast('Mandato allo staff');
   } catch(e) { toast('Rete assente: riprova'); }
-  finally { assistenzaInvio = false; }
+  finally { assistenzaInvio = false; if (btn) btn.disabled = false; }
 }
 /* LA PAGINA DEGLI ADMIN: l'elenco (una riga per utente, dall'ultima che
    si e' mossa, «da rispondere» in evidenza), o la conversazione aperta.
@@ -61846,6 +61969,7 @@ async function renderConversazioneAdmin(){
                               'Rispondi come staff…')
       + '<button class="btn ghost" onclick="indietroAssistenzaAdmin()">← Tutte le conversazioni</button>';
     scorriInFondoAssistenza('assistenzaAdmLista');
+    caricaScreenshotAssistenza('assistenzaAdmLista');
   };
   disegna();
   try {

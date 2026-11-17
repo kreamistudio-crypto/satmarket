@@ -88351,3 +88351,90 @@ seconde firme dai telefoni; poi, col suo ok, la leva nel config del VPS.
 La fase 2 su Nostr (NIP-75).
 ## L'inglese, tappa 1: il traduttore, la lingua automatica, vetrina + annuncio + acquisto (17 nov 2026, cantiere inglese-tappa-1; Andrea, 14 nov: «la traduzione dell'app intera, la versione inglese», sospeso e riaperto il 17: «Puoi far la prima tappa?»). LA SCELTA DI FONDO: non si riscrive la pagina. `miniapp.html` è un file da 6 MB con ~3.300 frasi italiane dentro template, stringhe e HTML, e avvolgerle una a una in una `t()` sarebbe un refactoring di massa (regola 7), un diff che nessuno rilegge, e ogni cantiere futuro dovrebbe ricordarsi di farlo. Al suo posto un TRADUTTORE SUL DOM: la pagina nasce italiana com'è sempre nata, e quando la lingua è l'inglese un `MutationObserver` traduce i nodi di testo e gli attributi man mano che i render li disegnano, con un dizionario a parte (`lingua/en.js`, chiave = frase italiana). Il costo è UNA passata in più per nodo; il guadagno è che il codice italiano non cambia e una frase che manca nel dizionario resta italiana invece di rompere qualcosa. L'alternativa a metà — tradurre solo le stringhe «grosse» a mano — è stata scartata perché lascia la stessa regola non scritta ai cantieri dopo. LA LINGUA la decide `linguaApp()`: `?lingua=` vince e si ricorda (così Andrea prova l'inglese dal suo Telegram italiano), poi la scelta ricordata, poi il `language_code` di Telegram, poi il browser; italiano se comincia per «it», tutto il resto inglese (un tedesco legge inglese, non italiano). L'interruttore nel Profilo salvato sul server è la tappa dopo. I NUMERI: Andrea li vuole all'inglese («1,234.50 €»), e le 79 chiamate `toLocaleString('it-IT')` stanno in `fmt`, `fmtEur` e altrove, funzioni che `prove.py` ritaglia per testo (`pezzo_js`): toccarle rompeva i banchi. Si è messa una mappa sola sui prototipi (`numeriInglesi()`: `it-IT` → `en-GB`), accesa solo in inglese; SCARTATO riscrivere le cifre nel DOM a posteriori (un «1.234» può essere un prezzo o un codice). IL FILE SERVITO: rotta esplicita `/lingua/{codice}.js` con lista chiusa (regola ferrea 3), cache di un giorno e `?v=` con l'inizio dello sha256 del file, controllato dalla prova e tenuto uguale su Windows da `.gitattributes` (la lezione dei due bundle). Lo chiede solo chi legge in inglese: per l'italiano zero byte in più e zero lavoro. LA LEVA `LINGUA_INGLESE` (accesa di serie, come tutte le leve nuove) spenta fa 404 la rotta e l'app torna italiana per tutti: è il freno se una traduzione fa danni in produzione. Il pannello admin resta italiano. LE TRAPPOLE TROVATE: il contatore «1 di 4» del tour non può essere una forma `{} di {}` (prenderebbe «Bottega di prova di Bruno»), quindi passa da `self.t('{n} di {tot}')` — `self.` perché dentro `mostraTappa` la `t` è la tappa; `globalThis.navigator` in node 22 si sovrascrive solo con `defineProperty`; `it-IT` non raggruppa le migliaia sotto le cinque cifre («1234,50»), e la prova lo sa. PROVATO: `prove_lingua_inglese` (16: la versione, il caricatore solo in inglese, `.gitattributes`, il dizionario senza doppioni, coi segnaposto in pari e con le parole in pagina, in node i rami di `linguaApp`, `traduci`/`t`, i numeri prima e dopo e il `de-DE` lasciato stare, le sentinelle del server e del pannello, il collaudo nelle due liste della CI); `collaudo_lingua` (15, sul server vero: la rotta coi suoi header e il file byte per byte, i 404 dei nomi storti, la pagina con la versione giusta e `<html lang="it">`, la leva spenta e riaccesa); e il GIRO DAL VIVO in Chromium a 390 px con `?lingua=en` su un database seminato: vetrina, filtri, ordinamento, le quattro tappe del tour, la scheda, la cassa col ritiro e con la spedizione a casa (indirizzo e casella), il foglio del pagamento con la fattura, «Il pagamento protetto», e il controllo che in italiano il dizionario non venga nemmeno chiesto; da quel giro sono entrate ~70 chiavi che l'estrazione a tavolino non vedeva (le vie della consegna, l'indirizzo, il tour, le card «Da scoprire», «Prezzo», «Totale da pagare»). RESTA, per le tappe dopo: Ordini e dettaglio dell'ordine, il P2P, Vendi e Profilo (con l'interruttore della lingua salvato sul server), il bot e i messaggi del server (i 409/400 arrivano in italiano, tranne quello del «qualcun altro sta pagando» che la cassa mostra), i dettagli dei servizi nella scheda («Di persona · 1 ora»), e il libro di Tappo che risponda nella lingua di chi scrive.
 
+## Gli screenshot all'assistenza (17 nov 2026, cantiere assistenza-screenshot, richiesta di Andrea)
+
+**LA RICHIESTA.** «Nell'assistenza clienti, il messaggio che riceviamo
+all'interno del bot, dai la possibilità di aggiungere anche degli
+screenshot.» Chi scrive allo staff allega delle immagini; gli admin le
+ricevono, nel bot e nel pannello.
+
+**COSA C'È.** Sotto la casella dell'assistenza il bottone «📎 Allega
+screenshot (facoltativi, max 3)», le miniature con la ✕ prima
+dell'invio; col primo screenshot si può mandare anche senza testo. Nel
+messaggio le miniature sono verticali e intere (uno screenshot è alto),
+e il tocco apre il visore di casa con lo zoom. Agli admin: l'avviso di
+sempre dice «📎 N screenshot allegati», e ogni screenshot arriva nel bot
+come foto, con chi l'ha mandato e il tasto «💬 Apri la conversazione»;
+nel pannello «💬 Assistenza clienti» le miniature stanno nel messaggio.
+
+**LE DECISIONI, COI PERCHÉ.**
+1. *I file in `buste/assistenza`, non in una cartella nuova.* In
+   produzione il servizio gira da `barattolo` e scrive SOLO nelle sue
+   cartelle (`SUE=` di `deploy/utente/cambio-utente.sh`, con la
+   sentinella che le conta): una `assistenza_img/` accanto a server.py
+   non sarebbe nata e il server non sarebbe partito. L'ha detto la
+   sentinella «ogni cartella in cui il server scrive è fra le sue» al
+   primo giro della suite, ed è la ragione per cui c'è. buste/ è già
+   sua, 700, mai servita, e `backup-fuori.sh` la copia intera.
+2. *Cifrati e con nome imprevedibile*, come il documento di ritiro: uno
+   screenshot dell'app può avere dentro un saldo, un ordine, un nome.
+   La rotta che li legge vuole chi sei (il padrone della conversazione o
+   un admin) e a tutti gli altri dà lo stesso 404 del nome che non
+   esiste; niente cache, `nosniff`, `sandbox`.
+3. *Agli admin nel bot SEMPRE, anche dentro la pausa dei dieci minuti*:
+   la pausa evita tre squilli per tre righe di testo, ma lo screenshot è
+   il contenuto, e chi lo manda subito dopo il testo è il caso più
+   comune. A tenere il conto c'è il freno di sempre (20 messaggi l'ora,
+   3 screenshot l'uno). La foto viaggia in multipart coi byte, perché un
+   URL privato Telegram non lo sa aprire. Va a chi ha un id Telegram;
+   l'admin che ha scelto solo Nostr vede «📎 N screenshot» nell'avviso e
+   li apre nell'app.
+4. *Il vaglio prima di scrivere*: tutte le immagini si guardano prima
+   del primo file (tipo dai byte, 6 MB, `_e_immagine`, la bomba, i
+   metadati via), così un 400 a metà non lascia orfani; se il database
+   dice di no dopo i file, i file se ne vanno.
+5. *Preparati sul telefono a 1600 px* con `preparaFotoChatScP2P` (la
+   chat dello scambio): a 1200, come le foto degli annunci, il testo di
+   uno screenshot si legge peggio. Se quella strada non va, `ridimensiona`
+   coi suoi ripieghi.
+6. *La cancellazione dell'account porta via i file*: la riga se ne va
+   con `CANCELLA_TOGLI`, i nomi si leggono prima e `_dopo_cancellazione`
+   li toglie dal disco. La fusione degli account non ha bisogno di
+   niente: i nomi viaggiano con le righe.
+
+**STRADE SCARTATE.** Le immagini nel database (gonfierebbero il backup
+che va su Telegram, che ha un tetto); una cartella nuova (vedi 1); gli
+screenshot anche nelle risposte dello staff (non chiesto: in fondo alla
+risposta come proposta); il gruppo degli admin al posto delle chat
+private (il passo 2 l'aveva già escluso, per richiesta di Andrea).
+
+**PROVATO.** `collaudo_assistenza` 70/70 (29 nuove): l'invio con uno e
+con due screenshot, il testo vuoto ammesso solo con lo screenshot, il
+file cifrato sul disco, chi legge e chi no (l'altro utente, il nome
+storto, il nome giusto che non esiste: 404), le intestazioni, l'avviso
+che li conta, le foto all'admin anche dentro la pausa e mai a chi
+scrive, l'elenco degli admin, quattro immagini, un testo travestito da
+PNG, uno buono e uno cattivo senza orfani, il JPEG col GPS che esce
+nudo, la cancellazione dell'account che toglie il file e lascia quelli
+degli altri, la leva spenta. CONTROPROVE ROSSE, quattro: la rotta senza
+il controllo del padrone, la cancellazione che non toglie i file, il
+JPEG non spogliato, le foto all'admin solo fuori dalla pausa.
+DAL VIVO: il server in collaudo (relay morti) e Playwright a 400 px:
+l'utente sceglie uno screenshot 1080×2340, scrive, manda; la miniatura
+compare, il visore la apre; l'admin 999 la vede nella conversazione, e
+il journal dice «📨 [foto simulata per l'utente 999] 📎 Screenshot
+all'assistenza da Compratore (n. 111)».
+
+IL VERBALE: suite intera severa sull'albero del cantiere (sopra develop
+6f28209), 29.471 verdi, 2 rosse, 2 saltate di sempre (nostr-tools non
+c'è in cloud). Le due rosse erano sentinelle da aggiornare e lo sono:
+`conoscenza.md` da rigenerare (sapere.md toccato) e il censimento degli
+indirizzi Telegram, che ora ne conta otto (`_foto_al_bot`, guardia in
+cima); rigirate le due sezioni, 25/25. Prima ancora, al primo giro, le
+altre due sentinelle che contano i chiamanti (`ridimensiona`, cinque;
+`_link_dentro_telegram`, cinque) e quella delle cartelle (vedi 1).
+Collaudi della CI nella gabbia, in un venv SENZA coincurve, 150/150.
+Tutto girato in cloud.
+
+**RESTA DA GUARDARE.** La prima foto vera nel bot degli admin, sul
+collaudo: è l'unico pezzo che in cloud non esce (Telegram è simulato).

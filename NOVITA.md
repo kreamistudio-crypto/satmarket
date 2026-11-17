@@ -495,3 +495,8 @@ dove: tutta la Mini App e il sito per chi ha Telegram o il browser in una lingua
 leva: LINGUA_INGLESE (accesa di serie; spenta, l'app torna italiana per tutti)
 pubblico: sì
 
+## 2026-11-17 · assistenza-screenshot
+frase: Nella chat con l'assistenza di Barattolo ora puoi allegare anche degli screenshot, fino a tre per messaggio: lo staff vede subito cosa vedi tu. Li vedono solo lo staff e chi li ha mandati.
+dove: Profilo → «Aiuto» → «💬 Assistenza», il bottone «📎 Allega screenshot» sotto la casella.
+leva: ASSISTENZA_ATTIVA (quella dell'assistenza, già accesa)
+pubblico: sì

@@ -16372,8 +16372,9 @@ def prove_foto_scarti():
     # stringa) un oggetto sarebbe stato truthy SEMPRE, e la foto rotta
     # sarebbe entrata dappertutto
     # (ott 2026: il quarto e' il modulo del feedback con le foto)
-    prova("sentinella: tutti e quattro i chiamanti leggono l'esito",
-          (4, 4), (mini.count("await ridimensiona("),
+    # (17 nov 2026: il quinto e' il ripiego degli screenshot dell'assistenza)
+    prova("sentinella: tutti e cinque i chiamanti leggono l'esito",
+          (5, 5), (mini.count("await ridimensiona("),
                    mini.count("esito = await ridimensiona(")))
 
     # ---- LA MINIATURA NON E' MAI NERA, E L'AVVISO DICE QUALE FOTO ----
@@ -60002,11 +60003,15 @@ def prove_link_dentro_telegram():
            "_link_dentro_telegram" in dm])
     # (17 nov 2026, chiedi-locker) il quarto: il bottone «📦 Come spedisci»
     # dell'avviso «qualcuno vorrebbe un locker», che traduce /?corrieri=1
-    prova("la traduzione ha QUATTRO chiamanti: il bottone del ramo Telegram, lo "
+    # (17 nov 2026, assistenza-screenshot) il quinto: il bottone sotto lo
+    # screenshot che arriva agli admin nel bot (`_foto_al_bot`)
+    prova("la traduzione ha CINQUE chiamanti: il bottone del ramo Telegram, lo "
           "stesso bottone nel gruppo degli admin (12 ott 2026), il link di testo "
-          "dell'avviso dei nuovi ordini e il bottone di «chiedi al venditore»",
-          [4, True, True, True],
+          "dell'avviso dei nuovi ordini, il bottone di «chiedi al venditore» e "
+          "quello sotto lo screenshot dell'assistenza",
+          [5, True, True, True, True],
           [codice(src).count("_link_dentro_telegram(") - 1,
+           '"url": _link_dentro_telegram(bottone[1])' in pezzo("_foto_al_bot"),
            '"url": str(_link_dentro_telegram(bottone[1]))' in pezzo("_al_gruppo_admin"),
            # (13 ott 2026) uno o piu' bottoni: ognuno passa dalla traduzione
            "(b[0], _link_dentro_telegram(b[1])) for b in _bottoni_avviso(bottone)"
@@ -106451,9 +106456,11 @@ def prove_telegram_simulato_collaudo():
     # il gruppo degli admin. Ha la sua guardia in cima, come gli altri.
     # ...E SETTE dal 27 ott 2026: `leve_backup_telegram`, il backup delle
     # leve come file dal bot (sendDocument). Anche lui si ferma in collaudo.
-    prova("il censimento trova i sette indirizzi di oggi",
-          ["_foto_profilo_telegram", "_getme_telegram", "_manda_telegram",
-           "_posta_gruppo_admin", "_registra", "bot_api",
+    # ...E OTTO dal 17 nov 2026: `_foto_al_bot`, lo screenshot
+    # dell'assistenza agli admin (sendPhoto coi byte). Guardia in cima.
+    prova("il censimento trova gli otto indirizzi di oggi",
+          ["_foto_al_bot", "_foto_profilo_telegram", "_getme_telegram",
+           "_manda_telegram", "_posta_gruppo_admin", "_registra", "bot_api",
            "leve_backup_telegram"], sorted(trovati))
     for nome, ok in sorted(trovati.items()):
         prova(f"{nome}: in collaudo si ferma prima di Telegram", True, ok)

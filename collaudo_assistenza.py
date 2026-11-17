@@ -18,6 +18,11 @@ database usa-e-getta:
     cioe' il suo canale), col testo SCAPPATO e il tasto alla conversazione;
     un secondo messaggio entro dieci minuti non riavvisa; la risposta di un
     admin azzera la pausa; i link dei tasti si traducono per Telegram.
+  · GLI SCREENSHOT (17 nov 2026): fino a tre per messaggio, anche senza
+    testo; il tipo dai byte, i metadati via, cifrati sul disco; li legge
+    solo chi li ha mandati e gli admin (agli altri un 404 uguale per
+    tutti); agli admin arrivano nel bot anche dentro la pausa; con
+    l'account cancellato se ne vanno anche i file.
 
 NON TOCCA NIENTE DI VERO: il config finto lo installa `avvio()` del banco,
 e `notifica` e' sostituita da un registro.
@@ -195,10 +200,170 @@ def main():
     prova("venti passano, il ventunesimo e' un 429", [200] * 20 + [429], stati)
     S._SECCHI.clear()
 
+    gli_screenshot(c, S, avvisi, aspetta_sottofondo)
+
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
     print("=" * 58)
     return 1 if banco.FALLITE else 0
+
+
+def _png(colore=(200, 40, 40)) -> bytes:
+    import io
+    from PIL import Image
+    out = io.BytesIO()
+    Image.new("RGB", (60, 40), colore).save(out, "PNG")
+    return out.getvalue()
+
+
+def _jpeg_col_gps() -> bytes:
+    """Un JPEG con l'EXIF dentro (un GPS finto): deve uscire nudo."""
+    import io
+    from PIL import Image
+    img = Image.new("RGB", (60, 40), (10, 120, 200))
+    exif = Image.Exif()
+    exif[0x010F] = "MarcaFinta"          # Make
+    exif[0x8825] = {1: "N", 2: (45.0, 4.0, 0.0)}   # GPSInfo
+    out = io.BytesIO()
+    img.save(out, "JPEG", exif=exif.tobytes())
+    return out.getvalue()
+
+
+def _dataurl(raw: bytes, tipo="image/png") -> str:
+    import base64
+    return f"data:{tipo};base64," + base64.b64encode(raw).decode()
+
+
+def gli_screenshot(c, S, avvisi, aspetta_sottofondo):
+    import os
+    import tempfile
+    print("\n[gli screenshot all'assistenza]")
+    S._SECCHI.clear()
+    S.ASSISTENZA_IMG_DIR = tempfile.mkdtemp(prefix="barattolo-assist-img-")
+    cartella = S.ASSISTENZA_IMG_DIR
+    foto_bot = []
+
+    async def registra_foto(chat_id, raw, tipo, didascalia, bottone=None):
+        foto_bot.append((chat_id, raw, tipo, didascalia, bottone))
+        return "registrata"
+    S._foto_al_bot = registra_foto
+    TERZO = {"X-Tg-Init-Data": "collaudo:333:Terzo"}
+    con = S.db()
+    con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,registrato) "
+                "VALUES(333,'Terzo','neg333',1)")
+    con.execute("DELETE FROM assistenza_avvisi")
+    con.commit()
+    con.close()
+
+    png = _png()
+    r = c.post("/api/assistenza", headers=COMPRA,
+               json={"testo": "Ecco l'errore", "immagini": [_dataurl(png)]})
+    prova("un messaggio con uno screenshot entra", 200, r.status_code)
+    ultimo = r.json()["messaggi"][-1]
+    prova("...e porta UN nome con la forma giusta", (1, True),
+          (len(ultimo["immagini"]),
+           bool(ultimo["immagini"] and S.NOME_IMG_ASSISTENZA.match(ultimo["immagini"][0]))))
+    nome = ultimo["immagini"][0]
+    with open(os.path.join(cartella, nome), "rb") as f:
+        sul_disco = f.read()
+    prova("sul disco non c'e' un PNG leggibile da fuori (busta del blob)", (False, True),
+          (sul_disco.startswith(b"\x89PNG"), sul_disco.split(b":", 1)[0] in (b"plain", b"f2")))
+    aspetta_sottofondo()
+    prova("l'avviso all'admin dice lo screenshot", True,
+          "📎 1 screenshot allegato" in [a for a in avvisi if a[0] == 999][-1][1])
+    prova("...e lo screenshot arriva all'admin nel bot", [999],
+          [x[0] for x in foto_bot])
+    prova("...coi byte giusti, chi l'ha mandato e il tasto", (True, True, True),
+          (foto_bot[0][1][:8] == b"\x89PNG\r\n\x1a\n", "(n. 111)" in foto_bot[0][3],
+           foto_bot[0][4][1] == S.URL_PUBBLICO + "/?assistenza=111"))
+
+    r = c.get(f"/api/assistenza/immagine/{nome}", headers=COMPRA)
+    prova("chi l'ha mandato lo rilegge", (200, "image/png", True),
+          (r.status_code, r.headers.get("content-type"), r.content == png))
+    prova("...mai in cache, mai eseguito", (True, True, True),
+          ("no-store" in r.headers.get("cache-control", ""),
+           r.headers.get("x-content-type-options") == "nosniff",
+           "sandbox" in r.headers.get("content-security-policy", "")))
+    prova("un admin lo legge", 200,
+          c.get(f"/api/assistenza/immagine/{nome}", headers=ADMIN).status_code)
+    prova("un altro utente NO: 404", 404,
+          c.get(f"/api/assistenza/immagine/{nome}", headers=VENDE).status_code)
+    prova("un nome storto e' lo stesso 404", 404,
+          c.get("/api/assistenza/immagine/..%2Fserver.py", headers=ADMIN).status_code)
+    prova("...e uno con la forma giusta che non esiste pure", 404,
+          c.get("/api/assistenza/immagine/as" + "0" * 24 + ".jpg",
+                headers=ADMIN).status_code)
+    conv = c.get("/api/admin/assistenza/111", headers=ADMIN).json()
+    prova("nella conversazione dell'admin il messaggio porta lo screenshot", [nome],
+          conv["messaggi"][-1]["immagini"])
+
+    gia = len(foto_bot)
+    avvisi_prima = len([a for a in avvisi if a[0] == 999])
+    r = c.post("/api/assistenza", headers=COMPRA,
+               json={"testo": "", "immagini": [_dataurl(png), _dataurl(_png((1, 2, 3)))]})
+    prova("solo screenshot, senza testo: entra", (200, ""),
+          (r.status_code, r.json()["messaggi"][-1]["testo"] if r.status_code == 200 else None))
+    aspetta_sottofondo()
+    prova("dentro la pausa niente avviso col testo...", avvisi_prima,
+          len([a for a in avvisi if a[0] == 999]))
+    nuove = foto_bot[gia:]
+    prova("...ma i due screenshot arrivano lo stesso, contati", (2, True),
+          (len(nuove), len(nuove) == 2 and "1/2" in nuove[0][3] and "2/2" in nuove[1][3]))
+    el = c.get("/api/admin/assistenza", headers=ADMIN).json()["conversazioni"]
+    prova("nell'elenco l'ultimo messaggio vuoto dice lo screenshot", "📎 Screenshot",
+          [x for x in el if x["utente"] == 111][0]["ultimo"])
+
+    file_prima = sorted(os.listdir(cartella))
+    prova("quattro screenshot sono un 400", 400,
+          c.post("/api/assistenza", headers=COMPRA,
+                 json={"testo": "x", "immagini": [_dataurl(png)] * 4}).status_code)
+    prova("un testo travestito da PNG e' un 400", 400,
+          c.post("/api/assistenza", headers=COMPRA,
+                 json={"testo": "x", "immagini": [_dataurl(b"<html>ciao</html>")]}).status_code)
+    prova("uno buono e uno cattivo: 400, e il buono NON resta sul disco", (400, file_prima),
+          (c.post("/api/assistenza", headers=COMPRA,
+                  json={"testo": "x", "immagini": [_dataurl(png), "data:image/png;base64,@@"]}
+                  ).status_code, sorted(os.listdir(cartella))))
+    prova("un elenco che non e' un elenco e' un 400", 400,
+          c.post("/api/assistenza", headers=COMPRA,
+                 json={"testo": "x", "immagini": "ciao"}).status_code)
+    prova("niente testo e niente screenshot resta un 400", 400,
+          c.post("/api/assistenza", headers=COMPRA,
+                 json={"testo": " ", "immagini": []}).status_code)
+
+    r = c.post("/api/assistenza", headers=COMPRA,
+               json={"testo": "foto", "immagini": [_dataurl(_jpeg_col_gps(), "image/jpeg")]})
+    n_jpg = r.json()["messaggi"][-1]["immagini"][0]
+    letto = c.get(f"/api/assistenza/immagine/{n_jpg}", headers=COMPRA).content
+    prova("il JPEG col GPS esce NUDO (niente EXIF, ne' la marca)", (True, False, False),
+          (letto[:3] == b"\xff\xd8\xff", b"Exif" in letto, b"MarcaFinta" in letto))
+
+    gia = len(foto_bot)
+    c.post("/api/assistenza", headers=ADMIN, json={"testo": "", "immagini": [_dataurl(png)]})
+    aspetta_sottofondo()
+    prova("l'admin che allega nella SUA conversazione non manda la foto a se stesso",
+          [], [x[0] for x in foto_bot[gia:] if x[0] == 999])
+
+    print("\n[gli screenshot se ne vanno con l'account]")
+    r = c.post("/api/assistenza", headers=TERZO,
+               json={"testo": "ciao", "immagini": [_dataurl(png)]})
+    n_terzo = r.json()["messaggi"][-1]["immagini"][0]
+    prova("il file c'e'", True, os.path.exists(os.path.join(cartella, n_terzo)))
+    import asyncio
+    esito = S.esegui_cancellazione(333)
+    prova("la cancellazione nomina il suo screenshot", [n_terzo],
+          esito.get("assistenza_img"))
+    asyncio.run(S._dopo_cancellazione(esito))
+    prova("...e il file se ne va dal disco", False,
+          os.path.exists(os.path.join(cartella, n_terzo)))
+    prova("gli screenshot degli altri restano", True,
+          os.path.exists(os.path.join(cartella, nome)))
+
+    S.ASSISTENZA_ATTIVA = False
+    prova("a leva spenta anche lo screenshot e' un 404", 404,
+          c.get(f"/api/assistenza/immagine/{nome}", headers=ADMIN).status_code)
+    S.ASSISTENZA_ATTIVA = True
+    S._SECCHI.clear()
 
 
 if __name__ == "__main__":

@@ -35220,6 +35220,33 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   per gli account solo-Nostr); per Telegram `_startapp_da_link` li fa
   `assistenza` e `assistenza_<utente>`, `percorsoDaStartapp` li rilegge
   e `apriAssistenzaDaUrl` li apre dopo /api/me.
+  GLI SCREENSHOT (17 nov 2026, cantiere assistenza-screenshot; perché
+  in CANTIERI, «Gli screenshot all'assistenza»): `POST /api/assistenza`
+  accetta `immagini`, al più `ASSISTENZA_IMMAGINI_MAX` (3) data URL; col
+  primo screenshot il testo può essere vuoto. Il vaglio
+  (`_immagini_assistenza` → `_immagine_assistenza`) guarda TUTTE le
+  immagini prima di scrivere: tipo dai byte (JPG, PNG, WebP), 6 MB l'una,
+  `_e_immagine`, `_foto_anomala`, metadati via (`spoglia_metadati`, o
+  `converti_in_jpeg`). I file stanno CIFRATI (`_cifra_blob`) in
+  `ASSISTENZA_IMG_DIR` = `buste/assistenza` — dentro buste/ perché è
+  già una cartella del servizio (`SUE=` di cambio-utente.sh), privata e
+  nel backup fuori — con nomi imprevedibili `as<24 hex>.<est>`
+  (`NOME_IMG_ASSISTENZA`). La riga li nomina nella colonna
+  `assistenza.immagini` (separati da virgola); `_righe_assistenza` li dà
+  come `immagini`. Si leggono SOLO da `GET
+  /api/assistenza/immagine/{nome}`: il padrone della conversazione o un
+  admin, per tutti gli altri (e per un nome storto o inesistente) lo
+  stesso 404; `no-store`, `nosniff`, CSP `sandbox`. Agli admin arrivano
+  nel bot con `_foto_al_bot` (sendPhoto multipart, i byte nel corpo,
+  simulato in collaudo), uno per screenshot e ANCHE dentro la pausa
+  degli avvisi; l'avviso col testo dice «📎 N screenshot». La fusione
+  degli account li porta con le righe; la cancellazione li nomina
+  (`assistenza_img` nell'esito) e `_dopo_cancellazione` li toglie dal
+  disco. Client: `casellaAssistenzaHTML(..., conAllegati)`,
+  `screenshotAssistenzaScelti` (preparati con `preparaFotoChatScP2P` a
+  1600 px, ripiego `ridimensiona`), `caricaScreenshotAssistenza` (fetch
+  con chi sei → objectURL in `assistenzaImgUrl`), il tocco apre
+  `apriLightbox`. Le risposte dello staff restano solo testo.
 - LO SWAP, L'INSTRADATORE (20 ott 2026, cantiere swap-instradatore;
   perché in CANTIERI, «Lo swap, l'instradatore»). La tappa 3 qui sopra è
   divisa: `swap/boltz.js` (il TIPO «boltz»: il motore della tappa 3 —
