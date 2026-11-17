@@ -36519,6 +36519,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (foglio `p2pOcCauzSheet`, il QR e il battito), `riquadroCauzioneOcP2P`
   nella pagina dello scambio. Prove: `prove_onchain_cauzione`,
   `collaudo_p2p_onchain` 11-novies.
+  LA CAUZIONE PERSA (quarto pezzo; CANTIERI, «…quarto pezzo: la cauzione
+  persa per decisione del moderatore, la metà mandata a mano»).
+  `POST /api/p2p/onchain/{oid}/cauzione/brucia` (solo `e_admin`, mai una
+  parte, solo in disputa: giudice puro `p2p_onchain_cauzione_bruciabile`)
+  porta la riga `tenuta` → `saldando` → `persa` e in mezzo chiama
+  `_p2p_onchain_cauzione_salda` (`POST /v2/invoices/settle` col preimage
+  della riga): l'UNICA strada che salda una hold. Da `saldando` si esce
+  solo con `_p2p_onchain_cauzione_chiudi_saldando`, che scrive quel che
+  dice LND; il giro guarda le `saldando` appese da più di
+  `P2P_ONCHAIN_CAUZIONE_SALDANDO_S`. La metà (`p2p_onchain_cauzione_meta`,
+  colonne `meta_sats`, `meta_a`) NON si paga dal server: la manda a mano
+  un moderatore, e `…/cauzione/meta-mandata` è il timbro
+  (`meta_mandata_il/da`). Nella scheda: `cauzione.meta` al moderatore,
+  `cauzione_meta` {sats, mandata, ln} a chi spetta. Sul telefono:
+  `riquadroCauzioneOcP2P` (col gesto e la metà), `metaCauzioneOcP2P`,
+  `bruciaCauzioneOcP2P`, `metaMandataOcP2P`.
 - IL RIMBORSO ON-CHAIN CHE NON SI INCAGLIA (17 nov 2026, cantiere
   onchain-rimborso-liscio; CANTIERI, «Il rimborso on-chain che non si
   incaglia»). La regola del 10 nov non cambia (un rimborso vuoto non è

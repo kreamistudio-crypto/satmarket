@@ -844,7 +844,15 @@ essere uno di voi due):
 4. Da un account NON moderatore: lo stesso ordine non mostra nessuna
    cauzione.
 
+5. LA CAUZIONE BRUCIATA (un secondo scambio, e serve un TERZO moderatore
+   che non sia parte: il secondo account di Andrea). Come sopra fino al
+   passo 2; poi uno dei due apre la disputa. Il terzo moderatore apre lo
+   scambio, tocca «🔐 Brucia la cauzione» e conferma. Nel canale dei
+   moderatori arriva «DA MANDARE A MANO: N sats a…»: li manda dal suo
+   wallet e tocca «✅ Metà mandata». Poi decide la disputa come sempre.
+
 Da guardare e riferire: il wallet ha pagato la hold dal QR? È tornata?
+Bruciata, i sats sono rimasti fuori dal wallet di chi l'aveva messa?
 
 **PER SPEGNERE:** via la riga `P2P_ONCHAIN_CAUZIONE` e riavvio, LASCIANDO
 il macaroon finché ci sono cauzioni vive. **PER APRIRE A TUTTI** (a prova

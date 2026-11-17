@@ -89354,3 +89354,88 @@ la metà all'altra persona con una fattura sua, come `add-bond-invoice`
 di Mostro), e la prova di Andrea e Alan in produzione (DA-FARE-ANDREA,
 voce 20: il macaroon sul nodo, le due righe sul VPS, i passi).
 
+## Il contanti di persona on-chain come su Lightning, quarto pezzo: la cauzione persa per decisione del moderatore, la metà mandata a mano
+
+17 nov 2026 sera, cantiere `onchain-contanti`, quarto pezzo. Chiude la
+seconda decisione di Andrea del terzo pezzo (la cauzione si perde «come
+su Lightning»: solo per decisione di un moderatore, metà all'altra
+persona e metà al servizio, mai per un tempo scaduto).
+
+LA DECISIONE NUOVA (card del 17 nov, non riaprire): la metà dell'altra
+persona la manda A MANO un moderatore, e l'app gli dice quanti sats e a
+chi. Scartate: «dalla cassaforte, in automatico» e «da un wallet
+"cauzioni" a parte». IL PERCHÉ: la hold saldata finisce sul nodo, FUORI
+da LNbits; pagarne metà in automatico avrebbe voluto dire far uscire
+sats dal wallet dei depositi di garanzia di tutti (la cassaforte) per
+una cosa che lì dentro non è mai entrata, con uno sbilancio da
+pareggiare a mano a ogni cauzione persa, e una riga in più nel binario
+dei rimborsi (`rimborsi_asta`), che ha una ventina di lettori fra
+riconciliazioni, elenchi e testi. Un wallet a parte voleva una terza
+chiave che spende sul VPS. Le cauzioni perse sono rare per costruzione
+(serve un moderatore che decide) e piccole (3%, minimo 1000 sats): a
+mano non apre NESSUNA uscita nuova di denaro.
+
+COSA FA. (a) IL GESTO: nella pagina dello scambio il moderatore, a
+cauzione bloccata e scambio IN DISPUTA, ha «🔐 Brucia la cauzione»
+(`POST /api/p2p/onchain/{oid}/cauzione/brucia`), con la domanda unica e
+le parole della spunta di Lightning («solo se non si è presentato
+all'incontro…»). Solo `e_admin`, mai un moderatore che è parte dello
+scambio. (b) SUL NODO: SettleInvoice col preimage della riga
+(`_p2p_onchain_cauzione_salda`): è l'UNICA strada del server che salda
+una hold, e non si disfa. (c) LA RIGA: `tenuta` → `saldando` → `persa`,
+con chi l'ha bruciata (`persa_da`) e la metà dell'altra persona
+(`meta_sats`, in giù: il sat spaiato resta al servizio; `meta_a` = chi
+ha pubblicato). (d) GLI AVVISI: a chi l'ha persa; a chi riceve la metà
+(«te li manda un moderatore» al suo indirizzo Lightning del Profilo, o
+«scrivilo nel Profilo»); ai moderatori, argomento dispute, «DA MANDARE A
+MANO: N sats a nome (id), indirizzo…». (e) IL TIMBRO: mandati i sats dal
+suo wallet, il moderatore tocca «✅ Metà mandata»
+(`…/cauzione/meta-mandata`): non paga niente, scrive quando e chi, e
+avvisa l'altra persona. Chi riceve la metà non se la può timbrare da
+solo. (f) LE PAGINE: a chi l'ha persa il riquadro di Lightning
+(«Cauzione persa… metà va a chi ha scambiato con te, metà al
+servizio»); a chi spetta la metà un riquadro senza bottoni; al
+moderatore lo stato, la metà da mandare con nome, id e indirizzo, e il
+timbro.
+
+LE SCELTE, COI PERCHÉ. Il gesto è SEPARATO dalla decisione della
+disputa, non una spunta dentro: su Lightning la spunta viaggia nella
+decisione perché è Mostro a eseguirle insieme; qui la decisione è una
+firma sul 2-di-3 che non si ritira, e legarle avrebbe lasciato una
+decisione firmata con la cauzione non saldata se LND in quel momento
+non rispondeva. Separato, si riprova. VA FATTO PRIMA di decidere: a
+scambio chiuso il giro dei ritorni la rimanda indietro (lo dice la riga
+sotto il bottone). Solo IN DISPUTA: fuori non c'è un moderatore che
+decide. Lo stato `saldando` esiste per il giro dei ritorni: senza, una
+cancel partita nello stesso istante avrebbe potuto scrivere «tornata»
+su una hold appena saldata (LND risponde «already settled», e la
+vecchia `_p2p_onchain_cauzione_annulla` prendeva ogni «already» per un
+sì: corretto, adesso vale solo «already canceled»). Un gesto morto a
+metà lascia la riga `saldando`: dopo due minuti il giro chiede a LND e
+la chiude come dice lui (SETTLED persa, ACCEPTED di nuovo tenuta,
+CANCELED tornata). Le colonne nuove entrano con ALTER (la tabella del
+terzo pezzo può essere già nata sul collaudo).
+
+I CONTI, DETTI. Una cauzione bruciata resta TUTTA sul nodo (saldo di
+LND, non di LNbits): la metà dell'altra persona esce dal wallet del
+moderatore che la manda. Chi tiene i conti fra Andrea e Alan lo sa da
+qui: metà di ogni cauzione bruciata è un debito del servizio verso chi
+l'ha anticipata.
+
+I LIMITI. L'HTLC vive 576 blocchi: una disputa più lunga di quattro
+giorni vede la cauzione tornare da sola, e non si brucia più. La metà
+non ha scadenza né sollecito: resta «da mandare» nella scheda finché un
+moderatore non la timbra. Il timbro è sulla parola del moderatore.
+
+PROVATO: `prove_onchain_cauzione` (le pure: la metà, chi si può
+bruciare, il giro sulle `saldando`; le sentinelle: UNA strada salda e
+la chiama solo il gesto, `saldando` prima di LND, nessun pagamento in
+uscita, la cancel che non scambia «saldata» per «tornata»; il telefono
+in node), `prove_fogli_di_casa` (i gesti della domanda unica sono 125),
+`collaudo_p2p_onchain` 11-novies contro il LND di cartone (non in
+disputa, non moderatore, parte dello scambio, LND muto, bruciata, due
+volte, le tre schede, i tre avvisi, il giro che non la tocca a scambio
+chiuso, la cancel su una saldata, «Metà mandata», la `saldando` appesa
+nei due esiti). NON PROVATO: come tutto il terzo pezzo, niente ha
+ancora parlato con un LND vero: la prima SettleInvoice vera è la prova
+di Andrea e Alan (DA-FARE-ANDREA, voce 20, passo 5).
