@@ -29094,6 +29094,21 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Le prove: `prove_barattozon_onchain`; il collaudo:
   `collaudo_p2p_onchain_barattozon`. Il verbale: CANTIERI, «Barattozon
   anche on-chain».
+  COMPRA CON BARATTOZON (17 nov 2026, cantiere compra-con-bz, richiesta
+  di Andrea dopo il giro guidato su amazon.it). La stessa estensione
+  (0.2.0) mette il percorso INTERO col marchio Barattozon: sotto
+  «Aggiungi al carrello» (`#add-to-cart-button`) e sotto «Procedi
+  all'ordine» (`#sc-buy-box-ptc-button`) un bottone «Compra con» + logo,
+  che al tocco preme SOLO quel bottone di Amazon; alla cassa
+  (`/checkout/`, `/gp/buy/`) un cartello fisso coi tre passi e un
+  contorno arancio sulla riga della frase «Paga in contanti»
+  (`rigaContantiBz`), senza nessun clic. La pagina la decide
+  `paginaBz(location.pathname)`; «thankyou» resta al bottone del PayCode.
+  MAI «Acquista ora» (l'1-Click ordinerebbe) ne' l'invio dell'ordine:
+  sentinella in `prove_estensione_barattozon`. Il logo e' un data: URL
+  dentro `amazon.js` (`LOGO_BZ`, assets/barattozon.webp a 178x56): niente
+  `web_accessible_resources`, niente permessi nuovi. Il verbale: CANTIERI,
+  «Compra con Barattozon: il bottone col marchio su prodotto, carrello e cassa».
   IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea, rifatto due volte;
   il terzo giro il 24): nel libro, su «Vendi BTC», dal fondo del + rosso
   della barra scende A TENDINA la sua continuazione (`#navBarattozon`):

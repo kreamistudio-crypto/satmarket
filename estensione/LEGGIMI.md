@@ -18,6 +18,23 @@ dentro Barattolo in `docs/ARCHITETTURA.md`, «BARATTOZON DA UN LINK».
 Se non sei entrato su barattolo.store, prima ti chiede di entrare con
 Telegram; i campi aspettano mezz'ora nella memoria di quella scheda.
 
+## Compra con Barattozon (dal 17 nov 2026)
+
+Il percorso si vede fin dall'inizio, col marchio Barattozon:
+
+- **Pagina del prodotto**: sotto «Aggiungi al carrello» c'è
+  **«Compra con Barattozon»**. Al tocco preme «Aggiungi al carrello» di
+  Amazon, e basta.
+- **Carrello**: sotto «Procedi all'ordine» lo stesso bottone. Al tocco
+  preme «Procedi all'ordine».
+- **Cassa**: un cartello in basso a destra coi tre passi, e la riga
+  «Paga in Contanti nel Punto Vendita più vicino» contornata d'arancio.
+  Qui l'estensione non clicca niente: il pagamento lo scegli tu.
+- Poi, sulla pagina del PayCode, «Pubblica su Barattozon» come sopra.
+
+Non preme MAI «Acquista ora» (con l'1-Click ordinerebbe da solo) né il
+bottone che invia l'ordine.
+
 ## Cosa NON fa (e non deve mai fare)
 
 - Non parla con nessun server: niente rete, niente cookie, niente

@@ -87793,3 +87793,55 @@ la transazione nello stesso minuto dell'annullo; i sats arrivati dopo un
 annullo hanno già la loro strada (la riga «un moderatore li rimanda
 indietro»). PROVATO: `collaudo_p2p_onchain`, su uno scambio a parte,
 chi compra annulla prima della scadenza e chi vende è avvisato.
+
+## Compra con Barattozon: il bottone col marchio su prodotto, carrello e cassa (17 nov 2026, cantiere compra-con-bz; Andrea, dopo il giro guidato su amazon.it: «genera una estensione per il browser per comprare direttamente su barattozon da lì», poi «prima del carrello o anche nella cassa vorrei il pulsante "Compra con Barattozon" e il logo relativo di barattozon chiaramente»)
+IL GIRO GUIDATO: Playwright sul PC di Andrea (dal cloud amazon.it e'
+chiuso dalla rete), Chrome in un profilo temporaneo, pannolini taglia 3
+(Pampers Baby Dry T3, 35,61 €) fino a «Procedi all'ordine»: li' Amazon
+chiede l'accesso, quindi la scelta del pagamento non si e' vista. Video,
+HTML e schermate di ogni pagina, piu' le pagine di aiuto sul «Paga in
+Contanti nel Punto Vendita più vicino» (PuntoLis e Western Union, 72 ore,
+nessun costo, nessun tetto scritto, niente Prime/digitali/Warehouse, resi
+come saldo buono regalo), in /mnt/project-files/amazon-contanti/.
+COSA: l'estensione (0.2.0) mostra il percorso dall'inizio. Prodotto: sotto
+«Aggiungi al carrello» il bottone blu Barattozon «Compra con» + logo, con
+una riga sotto («tu paghi in sats»); al tocco preme «Aggiungi al
+carrello». Carrello (anche il pannello smart-wagon): sotto «Procedi
+all'ordine», al tocco preme quello. Cassa: un cartello fisso coi tre passi
+(scegli «Paga in Contanti…», completa, poi «Pubblica su Barattozon») e la
+riga del contanti contornata d'arancio. Anche il bottone del PayCode porta
+ora il logo al posto del 🫙 (regola 9: il barattolo non e' metafora
+dell'escrow, e qui il marchio e' Barattozon).
+ROVESCIA, SAPENDOLO, una riga di ieri: «SCARTATE: il bottone sulla pagina
+del prodotto alla Bitpost». Quello scartato era un ALTRO ordine (chi
+compra manda indirizzo e soldi a un terzo che ordina per lui); questo
+bottone non cambia chi ordina: fa solo il passo innocuo di Amazon che ha
+accanto, e il PayCode nasce comunque dopo l'ordine fatto dalle mani di
+chi compra. La decisione e' di Andrea (17 nov).
+LE SCELTE: (1) MAI «Acquista ora»: con l'1-Click acceso ordinerebbe da
+solo; mai l'invio dell'ordine; alla cassa nessun clic, solo un contorno
+(sentinella sulle parole e un solo `.click()` nel file); (2) i selettori
+sono quelli VISTI nelle pagine vere salvate (`#add-to-cart-button`,
+`#sc-buy-box-ptc-button`, `input[name="proceedToRetailCheckout"]`); la
+cassa no (dietro l'accesso), quindi li' si cerca la FRASE «paga in
+contanti», mai la parola sola; (3) il logo DENTRO il file come data: URL:
+servirlo dall'estensione vorrebbe `web_accessible_resources` e la
+sentinella vieta `chrome.`; 10 KB in piu'; (4) ombra chiusa come il
+bottone del PayCode, testi col textContent; (5) nessun permesso nuovo,
+nessuna rete, il manifest invariato tranne versione e descrizione.
+SCARTATE: il «Compra con Barattozon» che salta direttamente alla cassa
+con «Acquista ora» (il rischio 1-Click); il cartello anche sulla pagina
+d'accesso (non e' ancora la cassa); un ricordo del «voglio Barattozon»
+fra una pagina e l'altra (vorrebbe la memoria, vietata): il bottone sta su
+ogni passo.
+PROVATO: `prove_estensione_barattozon` allargata (sentinelle di Acquista
+ora/1-Click/invio, i due id premuti, la cassa senza clic, il logo webp
+dentro il file e niente risorse servite; in node `paginaBz` su 16 percorsi
+e `rigaContantiBz` su 5 frasi). Dal vivo: l'estensione caricata in
+Chromium sulle pagine VERE salvate il 17 nov (prodotto e carrello) e su
+una cassa disegnata: il bottone sotto quello di Amazon, il tocco manda
+proprio il POST /cart/add-to-cart e il GET /checkout/entry/cart, il
+cartello e il contorno sulla riga giusta, non sulle note legali.
+DA GUARDARE: la cassa VERA (serve un account: la frase e' quella delle
+pagine di aiuto, l'aspetto no); Firefox dal vivo; la pagina col PayCode
+resta da vedere (vedi la voce di ieri).
