@@ -488,3 +488,10 @@ frase: Su Barattolo si può aprire una raccolta fondi in sats: un obiettivo, una
 dove: Profilo → «Il tuo negozio» → «🎯 Raccolte fondi» (lì il bottone «🎯 Apri una raccolta»); in vetrina la tessera «Raccolte» accanto ad Aste, quando c'è almeno una raccolta; nella scheda di una raccolta il bottone «⚡ Sostieni con uno zap».
 leva: RACCOLTE_ATTIVE (accesa di serie; i depositi di garanzia, RACCOLTA_GARANTITA_ATTIVA, spenti di serie)
 pubblico: sì
+
+## 2026-11-17 · inglese-tappa-1
+frase: Barattolo si legge anche in inglese: se il tuo Telegram o il tuo browser non sono in italiano, la vetrina, gli annunci e l'acquisto compaiono in inglese da soli, coi prezzi all'inglese (1,234.50 €). Ordini, P2P, Profilo e bot arrivano nelle prossime tappe. Per provarlo da un telefono italiano apri barattolo.store/?lingua=en (?lingua=it per tornare).
+dove: tutta la Mini App e il sito per chi ha Telegram o il browser in una lingua diversa dall'italiano; la pagina «Il pagamento protetto» (barattolo.store/sicurezza) anche lei.
+leva: LINGUA_INGLESE (accesa di serie; spenta, l'app torna italiana per tutti)
+pubblico: sì
+

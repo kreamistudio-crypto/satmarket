@@ -20,6 +20,8 @@ Dove si trova:
 - come app per Android, da Zapstore o dalle release su GitHub (con Obtainium si aggiorna da sola). L'app è una finestra su barattolo.store: dentro non c'è niente di diverso. Per controllare che sia proprio quella ufficiale c'è AppVerifier: le due righe da incollare sono nella pagina «Il pagamento protetto» (barattolo.store/sicurezza);
 - su Nostr: gli annunci vengono pubblicati anche lì, e si leggono con qualunque app Nostr che mostra gli annunci (NIP-99).
 
+Barattolo in inglese (dal 17 novembre 2026): se il Telegram o il browser di chi apre Barattolo non è in italiano, la vetrina, le schede degli annunci e l'acquisto (carrello, cassa, pagamento) compaiono in inglese da soli, coi prezzi scritti all'inglese («1,234.50 €»). Ordini, scambio P2P, Vendi, Profilo e il bot sono ancora in italiano: arrivano nelle prossime tappe. Per vedere l'inglese da un telefono italiano si apre barattolo.store/?lingua=en, e ?lingua=it riporta all'italiano; la scelta resta su quel dispositivo. Se qualcuno scrive a Tappo in inglese, Tappo risponde in inglese.
+
 Il bot di Telegram serve a tre cose: aprire Barattolo, mandarti gli avvisi sui tuoi ordini e scambi, e sfogliare le categorie anche senza aprire la Mini App (scrivi /sfoglia). Gli acquisti, le vendite e le trattative si fanno nella Mini App o sul sito.
 
 <!-- pezzo libro-002 | libro -->
@@ -2015,4 +2017,12 @@ pubblico: sì
 frase: Su Barattolo si può aprire una raccolta fondi in sats: un obiettivo, una scadenza fino a 60 giorni e una barra che si riempie. Chi vuole sostenerla manda uno zap, che va dritto al wallet di chi raccoglie, senza commissioni. Per aprirne una servono tre vendite concluse e un indirizzo Lightning; ogni raccolta la guardano i moderatori prima della vetrina.
 dove: Profilo → «Il tuo negozio» → «🎯 Raccolte fondi» (lì il bottone «🎯 Apri una raccolta»); in vetrina la tessera «Raccolte» accanto ad Aste, quando c'è almeno una raccolta; nella scheda di una raccolta il bottone «⚡ Sostieni con uno zap».
 leva: RACCOLTE_ATTIVE (accesa di serie; i depositi di garanzia, RACCOLTA_GARANTITA_ATTIVA, spenti di serie)
+pubblico: sì
+
+<!-- pezzo novita-076 | novita -->
+## Novità · 2026-11-17 · inglese-tappa-1
+
+frase: Barattolo si legge anche in inglese: se il tuo Telegram o il tuo browser non sono in italiano, la vetrina, gli annunci e l'acquisto compaiono in inglese da soli, coi prezzi all'inglese (1,234.50 €). Ordini, P2P, Profilo e bot arrivano nelle prossime tappe. Per provarlo da un telefono italiano apri barattolo.store/?lingua=en (?lingua=it per tornare).
+dove: tutta la Mini App e il sito per chi ha Telegram o il browser in una lingua diversa dall'italiano; la pagina «Il pagamento protetto» (barattolo.store/sicurezza) anche lei.
+leva: LINGUA_INGLESE (accesa di serie; spenta, l'app torna italiana per tutti)
 pubblico: sì

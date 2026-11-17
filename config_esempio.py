@@ -1208,6 +1208,16 @@ AVVISI_BARATTOLO_ORE = 24
 # vedono. Accesa di serie; a False niente fiamma e nessun giorno contato
 # (riaccendendola chi ha saltato dei giorni riparte da 1, il record resta).
 SERIE_GIORNI_ATTIVA = True
+# L'APP IN INGLESE 🌍 (17 nov 2026, tappa 1): chi ha Telegram (o il
+# browser) in una lingua che non e' l'italiano legge in inglese le parti
+# gia' tradotte — vetrina, scheda dell'annuncio, carrello, cassa, foglio
+# del pagamento, «Il pagamento protetto» — e in italiano il resto, finche'
+# le tappe dopo non lo traducono. Il server non traduce niente: serve il
+# dizionario `lingua/en.js`, che la pagina chiede da sola. Accesa di
+# serie; a False il dizionario risponde 404 e l'app parla italiano a
+# tutti. Solo True accende. Per provare l'inglese con Telegram in
+# italiano: ?lingua=en nell'indirizzo (si ricorda; ?lingua=it per tornare).
+LINGUA_INGLESE = True
 # GLI AVVISI DEL MERCATINO (9 ott 2026): chi lo chiede dal cassetto Avvisi
 # del Profilo riceve un messaggio quando nel mercatino compaiono annunci
 # nuovi — TUTTI i nuovi, con un filtro facoltativo di categorie e prezzo

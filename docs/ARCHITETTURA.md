@@ -31796,6 +31796,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    acceso; vedi «LO SWAP, TAPPA 3» e «LO SWAP, L'INSTRADATORE»),
    `/vendor/pdf.mjs` e `/vendor/pdf.worker.mjs` (16 ott 2026: pdf.js
    4.10.38, per disegnare i PDF della chat; vedi «GLI ALLEGATI»),
+   `/lingua/{codice}.js` (17 nov 2026, inglese-tappa-1: il dizionario
+   inglese `lingua/en.js`, lista chiusa `LINGUE_FILE`, cache di un
+   giorno, `?v=` l'inizio del suo sha256; 404 a leva `LINGUA_INGLESE`
+   spenta e per ogni nome fuori lista — vedi «L'INGLESE: IL
+   TRADUTTORE NELLA PAGINA»),
    `/vendor/font/{nome}` (i sei .woff2 del brand, whitelist `FILE_FONT`:
    da ago 2026 i font stanno in casa e non li chiede più nessuno a
    Google — vedi «I FONT VENGONO IN CASA»),
@@ -36899,3 +36904,45 @@ mai il kind 0 di nessuno: regola ferrea 2).
   della fila), le seconde firme in `onchainCofirmeInSottofondo`
   (`raccolteCofirmeInAttesa`), il link `/?raccolta=<id>` e il pannello
   `boxRaccolteAdmin`. Prove: `prove_raccolte` e `collaudo_raccolta`.
+- L'INGLESE: IL TRADUTTORE NELLA PAGINA (17 nov 2026, cantiere
+  inglese-tappa-1). La pagina resta scritta in italiano — un file solo,
+  ~3.300 frasi — e l'inglese lo mette un traduttore che lavora sul DOM:
+  all'avvio passa ogni nodo di testo e i quattro attributi
+  (`placeholder`, `title`, `aria-label`, `alt`) e poi un
+  `MutationObserver` su `documentElement` (childList, characterData,
+  attributi) traduce quel che i render disegnano dopo. Il dizionario
+  `lingua/en.js` (~680 voci) ha per chiave la frase italiana con gli
+  spazi normalizzati; una chiave con `{}` diventa una forma (regex,
+  nel secchio della prima parola; l'inglese può riordinare con `{1}`,
+  `{2}`), e una frase che il dizionario non sa resta italiana: niente
+  si rompe, si legge in italiano. `t(frase, valori)` è per i testi che
+  non passano dal DOM (popup di Telegram, titolo della finestra, il
+  contatore «1 di 4» del tour). La lingua la decide `linguaApp()`
+  nello script di testa: `?lingua=it|en` (ricordato in localStorage
+  `barattolo_lingua`) > la scelta ricordata > `language_code` di
+  Telegram (solo con `initData`) > `navigator.language`; italiano se
+  comincia per «it», sennò inglese. `linguaSwap()` lo delega. Il
+  dizionario lo chiede solo chi legge in inglese
+  (`/lingua/en.js?v=LINGUA_VER`, `LINGUA_VER` = i primi 10 esadecimali
+  dello sha256 del file, tenuto uguale su ogni macchina da
+  `.gitattributes` `eol=lf`); si registra da solo in
+  `self.BARATTOLO_LINGUE.en` e chiama `registraTraduzioni('en')`, che
+  carica, arma, mette `<html lang="en">`, traduce il documento e
+  accende l'osservatore — e i due ordini di arrivo (dizionario prima o
+  dopo lo script grande) sono entrambi gestiti. I numeri e le date:
+  `numeriInglesi()` mappa `it-IT` → `en-GB` su
+  `Number.prototype.toLocaleString` e i tre `toLocale*` di `Date`, una
+  volta, senza toccare `fmt`/`fmtEur` (che le prove cercano per testo):
+  «1,234.50», «19,601», «14 Nov». Per chi legge in italiano non cambia
+  NIENTE: nessun fetch, `traduttoreArmato` resta falso, `traduci()`
+  risponde null. La leva `LINGUA_INGLESE` (accesa di serie, gruppo
+  «🌍 Lingua» del pannello) spenta fa rispondere 404 alla rotta: l'app
+  torna italiana per tutti, l'interruttore d'emergenza. Il pannello
+  admin resta italiano per scelta. Coperto in questa tappa: la
+  struttura (tab, testa, banner), la vetrina coi filtri, l'ordinamento
+  e il tour di benvenuto, le categorie, la scheda dell'annuncio, il
+  carrello, la cassa con le vie e l'indirizzo, il foglio del pagamento
+  e la pagina «Il pagamento protetto». Prove: `prove_lingua_inglese`
+  (la versione, il caricatore, il dizionario senza doppioni e con le
+  parole che stanno in pagina, il traduttore e i numeri in node, le
+  sentinelle del server) e `collaudo_lingua` (la rotta vera, la leva).

@@ -52,6 +52,10 @@ vendor/btc.bundle.js text eol=lf
 # (20 ott 2026, tappa 3): `prove_swap_telefono` confronta il suo sha256
 # con `IMPRONTA_SWAP`.
 vendor/swap.bundle.js text eol=lf
+# E il dizionario inglese (17 nov 2026, inglese-tappa-1): `LINGUA_VER`
+# nella pagina e' l'inizio del suo sha256, controllato da
+# `prove_lingua_inglese`, e deve tornare uguale su ogni macchina.
+lingua/en.js text eol=lf
 
 # GLI SCRIPT .sh ESCONO LF ANCHE SU WINDOWS (25 ott 2026, cantiere
 # prove-stabili, richiesta di Andrea). Sono scritti per bash — sul VPS,

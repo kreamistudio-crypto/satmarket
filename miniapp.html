@@ -13234,6 +13234,48 @@ function barreDellApp(){
   if (scala >= 0.5 && scala <= 2) barre.push(scala);
   return barre;
 }
+/* ══ LA LINGUA, PRIMA DEL PRIMO PAINT (17 nov 2026, cantiere
+   inglese-tappa-1, Andrea: «la traduzione dell'app intera, la versione
+   inglese») ════════════════════════════════════════════════════════
+   L'app e' scritta in italiano, e in italiano resta: l'inglese e' un
+   DIZIONARIO a parte (`lingua/en.js`, frase italiana → frase inglese)
+   che il traduttore in fondo alla pagina (vedi «L'INGLESE») applica
+   ai testi mentre compaiono. Qui si decide SOLO che lingua si parla,
+   e si chiede il dizionario subito, in parallelo col resto della
+   pagina: chi legge in inglese lo vuole prima delle card, chi legge
+   in italiano non scarica un byte in piu'.
+   CHI DECIDE, in ordine: `?lingua=it|en` nell'indirizzo (e si
+   ricorda), la scelta ricordata (`barattolo_lingua`, la scrivera' il
+   tasto nel Profilo di una tappa prossima), la lingua di Telegram
+   dentro la Mini App, la lingua del browser fuori. Italiano se e'
+   italiano, inglese per tutti gli altri — la regola che la pagina
+   «Cambio» segue dal 20 ott 2026 (`linguaSwap`, che da oggi legge
+   da qui). Senza il dizionario (leva LINGUA_INGLESE spenta sul
+   server, rete che manca) l'app resta in italiano: la lingua
+   DESIDERATA e' una cosa, quella PARLATA la decide l'arrivo del file.
+   LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
+   come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
+   dizionario cambiato non resta nella cache di un giorno. */
+const LINGUA_VER = '320d44d6cf';
+function linguaApp(){
+  const italiano = l => !l || String(l).toLowerCase().startsWith('it');
+  let scelta = '';
+  try {
+    const q = new URLSearchParams(location.search).get('lingua');
+    if (q === 'it' || q === 'en') { scelta = q; localStorage.setItem('barattolo_lingua', q); }
+    else scelta = localStorage.getItem('barattolo_lingua') || '';
+  } catch(e){}
+  if (scelta === 'it' || scelta === 'en') return scelta;
+  const tw = window.Telegram && window.Telegram.WebApp;
+  if (tw && tw.initData)
+    return italiano(tw.initDataUnsafe && tw.initDataUnsafe.user && tw.initDataUnsafe.user.language_code) ? 'it' : 'en';
+  return italiano(navigator.language) ? 'it' : 'en';
+}
+if (linguaApp() === 'en') {
+  const s = document.createElement('script');
+  s.src = '/lingua/en.js?v=' + LINGUA_VER;
+  document.head.appendChild(s);
+}
 </script>
 </head>
 <body>
@@ -21158,10 +21200,143 @@ const SWAP_TESTI = {
               rete_invio: 'Bitcoin network: departure',
               rete_ritiro: 'Bitcoin network: arrival to you (estimate)'}}};
 function linguaSwap(){
+  /* (17 nov 2026, inglese-tappa-1) la lingua di tutta l'app, decisa
+     in testa alla pagina; il ramo sotto resta per i banchi di prove.py,
+     che eseguono questa funzione da sola */
+  if (typeof linguaApp === 'function') return linguaApp();
   let l = '';
   try { l = String(tg?.initDataUnsafe?.user?.language_code || ''); } catch(e){}
   return (!l || l.toLowerCase().startsWith('it')) ? 'it' : 'en';
 }
+/* ══ L'INGLESE (17 nov 2026, cantiere inglese-tappa-1) ══════════════
+   IL TRADUTTORE GUARDA IL DOM, NON IL CODICE. Tremila frasi italiane
+   vivono in questo file, dentro il markup e dentro i template delle
+   funzioni che disegnano: avvolgerle una per una in una chiamata
+   sarebbe stato un diff di migliaia di righe, e ogni frase nuova
+   avrebbe dovuto ricordarselo. Qui invece ogni TESTO che compare
+   nella pagina — all'avvio e a ogni innerHTML, textContent o
+   attributo che arriva dopo (un MutationObserver sulla radice) — si
+   cerca nel dizionario cosi' com'e', spazi ripiegati: se c'e', si
+   riscrive in inglese; se non c'e', resta italiano. Chi legge in
+   italiano non paga niente: il traduttore non si arma nemmeno.
+   LE CHIAVI SONO LE FRASI ITALIANE, e questo e' il patto: cambiare
+   una frase qui vuol dire aggiornare `lingua/en.js`, e
+   `prove_lingua_inglese` lo ricorda — una chiave che non si trova piu'
+   nella pagina e' rossa. Le frasi con un numero dentro («3 oggetti»,
+   «si chiude tra 2h») stanno nel dizionario con `{}` al posto del
+   pezzo che cambia: diventano un'espressione regolare, e l'inglese
+   puo' riordinare i pezzi con `{1}`, `{2}`. I testi scritti dagli
+   utenti (titoli, descrizioni, chat) non sono mai una chiave intera,
+   e un titolo che per caso fosse «Nuovo» uscirebbe «New»: innocuo.
+   I NUMERI SEGUONO LE PAROLE: in inglese «1.234,50» si legge male.
+   Le 79 righe che formattano con 'it-IT' (fmt, fmtEur, le date) non
+   si toccano — una decina di banchi di prove.py le ritaglia per
+   testo — e il dizionario che arriva mappa 'it-IT' su 'en-GB' nei
+   metodi toLocale* di Number e Date, una volta sola: «1,234.50 €»,
+   «14 Nov». Scartato: cambiare fmt e fmtEur (i banchi) e una
+   riscrittura dei numeri nel DOM (avrebbe toccato anche le cifre
+   scritte dagli utenti). */
+let LINGUA = (typeof linguaApp === 'function') ? linguaApp() : 'it';
+const TRADUZIONI = new Map();          // frase italiana → inglese
+const TRADUZIONI_FORME = new Map();    // prima parola → [{re, resa}], le chiavi con {}
+const T_ATTRIBUTI = ['placeholder', 'title', 'aria-label', 'alt'];
+const T_SPAZI = /\s+/g;
+let traduttoreArmato = false;
+function caricaDizionario(diz){
+  for (const [k, v] of Object.entries(diz)) {
+    const chiave = k.replace(T_SPAZI, ' ').trim();
+    if (!chiave || typeof v !== 'string') continue;
+    if (!chiave.includes('{}')) { TRADUZIONI.set(chiave, v); continue; }
+    const re = new RegExp('^' + chiave.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                                      .replace(/\\\{\\\}/g, '([\\s\\S]+?)') + '$');
+    const prima = chiave.split(' ', 1)[0];
+    const secchio = prima.includes('{}') ? '' : prima;
+    if (!TRADUZIONI_FORME.has(secchio)) TRADUZIONI_FORME.set(secchio, []);
+    TRADUZIONI_FORME.get(secchio).push({re, resa: v});
+  }
+}
+/* la frase inglese, o null se il dizionario non la sa (o non c'e') */
+function traduci(testo){
+  if (!traduttoreArmato) return null;
+  const chiave = String(testo).replace(T_SPAZI, ' ').trim();
+  if (!chiave) return null;
+  const secca = TRADUZIONI.get(chiave);
+  if (secca !== undefined) return secca;
+  const prima = chiave.split(' ', 1)[0];
+  for (const forme of [TRADUZIONI_FORME.get(prima), TRADUZIONI_FORME.get('')]) {
+    if (!forme) continue;
+    for (const f of forme) {
+      const m = f.re.exec(chiave);
+      if (!m) continue;
+      let i = 0;
+      return f.resa.replace(/\{(\d*)\}/g, (_, n) => m[n ? +n : ++i] ?? '');
+    }
+  }
+  return null;
+}
+/* per i testi che non passano dal DOM (popup di Telegram, titolo
+   della finestra): la frase inglese se c'e', sennò quella italiana,
+   coi segnaposto {nome} riempiti */
+function t(frase, valori){
+  let resa = traduci(frase) ?? frase;
+  if (valori) for (const k of Object.keys(valori)) resa = resa.split('{' + k + '}').join(valori[k]);
+  return resa;
+}
+function traduciTesto(nodo){
+  const s = nodo.nodeValue;
+  if (!s || !/[A-Za-zÀ-ÿ]/.test(s)) return;
+  const p = nodo.parentNode;
+  if (p && (p.nodeName === 'SCRIPT' || p.nodeName === 'STYLE' || p.nodeName === 'TEXTAREA')) return;
+  const resa = traduci(s);
+  if (resa == null) return;
+  const nuovo = (/^\s/.test(s) ? ' ' : '') + resa + (/\s$/.test(s) ? ' ' : '');
+  if (nuovo !== s) nodo.nodeValue = nuovo;
+}
+function traduciAttributo(e, nome){
+  const v = e.getAttribute && e.getAttribute(nome);
+  if (!v) return;
+  const resa = traduci(v);
+  if (resa != null && resa !== v) e.setAttribute(nome, resa);
+}
+function traduciAlbero(radice){
+  if (radice.nodeType === 3) { traduciTesto(radice); return; }
+  if (radice.nodeType !== 1 && radice.nodeType !== 9 && radice.nodeType !== 11) return;
+  const w = document.createTreeWalker(radice, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) traduciTesto(n);
+  if (radice.nodeType === 1) T_ATTRIBUTI.forEach(a => traduciAttributo(radice, a));
+  if (radice.querySelectorAll)
+    radice.querySelectorAll('[' + T_ATTRIBUTI.join('],[') + ']')
+      .forEach(e => T_ATTRIBUTI.forEach(a => traduciAttributo(e, a)));
+}
+/* i numeri e le date all'inglese, con una mappa sola sui metodi che
+   le 79 righe di questo file gia' chiamano con 'it-IT' */
+function numeriInglesi(){
+  const mappa = f => function(loc, opt){ return f.call(this, loc === 'it-IT' ? 'en-GB' : loc, opt); };
+  Number.prototype.toLocaleString = mappa(Number.prototype.toLocaleString);
+  for (const m of ['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString'])
+    Date.prototype[m] = mappa(Date.prototype[m]);
+}
+/* la chiama il dizionario appena arriva (`lingua/en.js`), o l'avvio se
+   il dizionario e' arrivato prima di questo script: i due ordini sono
+   possibili tutti e due, e vanno bene tutti e due */
+function registraTraduzioni(codice){
+  const diz = (globalThis.BARATTOLO_LINGUE || {})[codice];
+  if (!diz || traduttoreArmato || LINGUA !== codice) return;
+  caricaDizionario(diz);
+  traduttoreArmato = true;
+  numeriInglesi();
+  document.documentElement.lang = codice;
+  traduciAlbero(document.documentElement);
+  new MutationObserver(records => {
+    for (const r of records) {
+      if (r.type === 'characterData') traduciTesto(r.target);
+      else if (r.type === 'attributes') traduciAttributo(r.target, r.attributeName);
+      else r.addedNodes.forEach(traduciAlbero);
+    }
+  }).observe(document.documentElement, {childList: true, subtree: true, characterData: true,
+                                        attributes: true, attributeFilter: T_ATTRIBUTI});
+}
+if (globalThis.BARATTOLO_LINGUE && globalThis.BARATTOLO_LINGUE[LINGUA]) registraTraduzioni(LINGUA);
 /* LA TAPPA 2, IL PREVENTIVO (19 ott 2026, cantiere swap-preventivo). A
    ordine confermato, nel pannello dell'incasso, chi vende sceglie
    «⚡ Lightning» (di serie: il pannello di sempre) o «₿ On-chain (swap)»:
@@ -29574,9 +29749,14 @@ function mostraTappa(){
   if (!b || b.offsetParent === null) { tourAvanti(); return; }  // sparito nel frattempo
   el('tourLuce').classList.toggle('centro', !!t.centro);
   const ultima = tourTappa === tourTappe.length - 1;
+  /* «1 di 4» passa dal traduttore (17 nov 2026): `globalThis.t` perche' qui
+     `t` e' la tappa, e col typeof perche' i banchi di node non lo hanno */
+  const passo = typeof globalThis.t === 'function'
+    ? globalThis.t('{n} di {tot}', {n: tourTappa + 1, tot: tourTappe.length})
+    : `${tourTappa + 1} di ${tourTappe.length}`;
   el('tourFumetto').innerHTML = `<span>${t.testo}</span>
     <div class="tour-az">
-      <span class="tour-passo">${tourTappa + 1} di ${tourTappe.length}</span>
+      <span class="tour-passo">${passo}</span>
       <button class="tour-salta" onclick="navIndietro()">Salta</button>
       <button class="tour-avanti" onclick="tourAvanti()">${ultima ? 'Fine 🎉' : 'Avanti'}</button>
     </div>`;

@@ -14,6 +14,8 @@ Dove si trova:
 - come app per Android, da Zapstore o dalle release su GitHub (con Obtainium si aggiorna da sola). L'app è una finestra su barattolo.store: dentro non c'è niente di diverso. Per controllare che sia proprio quella ufficiale c'è AppVerifier: le due righe da incollare sono nella pagina «Il pagamento protetto» (barattolo.store/sicurezza);
 - su Nostr: gli annunci vengono pubblicati anche lì, e si leggono con qualunque app Nostr che mostra gli annunci (NIP-99).
 
+Barattolo in inglese (dal 17 novembre 2026): se il Telegram o il browser di chi apre Barattolo non è in italiano, la vetrina, le schede degli annunci e l'acquisto (carrello, cassa, pagamento) compaiono in inglese da soli, coi prezzi scritti all'inglese («1,234.50 €»). Ordini, scambio P2P, Vendi, Profilo e il bot sono ancora in italiano: arrivano nelle prossime tappe. Per vedere l'inglese da un telefono italiano si apre barattolo.store/?lingua=en, e ?lingua=it riporta all'italiano; la scelta resta su quel dispositivo. Se qualcuno scrive a Tappo in inglese, Tappo risponde in inglese.
+
 Il bot di Telegram serve a tre cose: aprire Barattolo, mandarti gli avvisi sui tuoi ordini e scambi, e sfogliare le categorie anche senza aprire la Mini App (scrivi /sfoglia). Gli acquisti, le vendite e le trattative si fanno nella Mini App o sul sito.
 
 # Entrare e il profilo

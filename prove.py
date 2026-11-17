@@ -197906,6 +197906,200 @@ def types_ns(**k):
     return _t.SimpleNamespace(**k)
 
 
+def prove_lingua_inglese():
+    """L'INGLESE (17 nov 2026, cantiere inglese-tappa-1, Andrea: «la
+    traduzione dell'app intera, la versione inglese»; tappa 1: vetrina,
+    scheda, carrello, cassa, foglio del pagamento, «Il pagamento
+    protetto»). L'app resta scritta in italiano: l'inglese e' il
+    dizionario `lingua/en.js` (frase italiana → frase inglese) che la
+    pagina chiede da sola a chi legge in un'altra lingua, e un traduttore
+    che guarda il DOM — ogni testo che compare si cerca nel dizionario
+    cosi' com'e', spazi ripiegati; le frasi con `{}` sono forme.
+    QUATTRO GUARDIE:
+    1. LA VERSIONE: `LINGUA_VER` nella pagina e' l'inizio dello sha256 del
+       dizionario (righe LF, .gitattributes), come SWAP_TELEFONO_VER.
+    2. IL DIZIONARIO E' SANO (in node): un oggetto frase → frase, nessun
+       doppione, segnaposto in pari fra chiave e resa, niente spazi ai
+       bordi delle chiavi.
+    3. LE CHIAVI STANNO NELLA PAGINA: cambiare una frase in miniapp.html
+       senza aggiornare il dizionario lascia un inglese che non compare
+       piu'. La sentinella guarda le PAROLE (quattro lettere e piu', meno
+       l'ultima: «pezz${'o':'i'}» e' scritto a pezzi) e non la frase
+       intera: una frase riscritta con le stesse parole passa, una parola
+       nuova no. La frase intera la vede il giro dal vivo.
+    4. IL TRADUTTORE (in node, pezzi veri): la frase secca, la forma col
+       `{}`, i pezzi riordinati con `{1}` `{2}`, la frase che manca resta
+       italiana; `linguaApp` in tutti i suoi rami; i numeri e le date
+       all'inglese DOPO `numeriInglesi` e non prima, e solo per 'it-IT'.
+    Piu' le sentinelle del contorno: la rotta chiusa e la leva, il
+    pannello, il config d'esempio, il collaudo negli elenchi della CI."""
+    print("\n[l'inglese]")
+    import hashlib as _hl
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    grezzo = open(os.path.join("lingua", "en.js"), "rb").read()
+    testo = grezzo.decode("utf-8")
+    src = open("server.py", encoding="utf-8").read()
+
+    # --- 1. la versione ---
+    ver = re.search(r"const LINGUA_VER = '([0-9a-f]+)';", mini)
+    prova("inglese: LINGUA_VER e' l'inizio dello sha256 di lingua/en.js",
+          _hl.sha256(grezzo).hexdigest()[:10], ver and ver.group(1))
+    prova("inglese: la pagina chiede il dizionario con quella versione, "
+          "solo a chi legge in inglese", (True, True, True),
+          ("s.src = '/lingua/en.js?v=' + LINGUA_VER;" in mini,
+           "if (linguaApp() === 'en') {" in mini,
+           "\nlingua/en.js text eol=lf" in open(".gitattributes", encoding="utf-8").read()))
+
+    # --- 2. il dizionario ---
+    chiavi_testo = re.findall(r'^\s*"((?:[^"\\]|\\.)*)":', testo, re.M)
+    doppie = sorted({k for k in chiavi_testo if chiavi_testo.count(k) > 1})
+    prova("inglese: nessuna chiave scritta due volte nel dizionario", [], doppie)
+    banco = r"""
+globalThis.self = globalThis;
+__EN__
+const d = globalThis.BARATTOLO_LINGUE.en;
+const guai = [];
+for (const [k, v] of Object.entries(d)) {
+  if (typeof v !== 'string' || !v) guai.push('resa non testo: ' + k);
+  if (k !== k.replace(/\s+/g, ' ').trim()) guai.push('spazi ai bordi: ' + k);
+  const nk = (k.match(/\{\}/g) || []).length;
+  const segn = v.match(/\{\d*\}/g) || [];
+  const numerati = segn.filter(x => x !== '{}').map(x => +x.slice(1, -1));
+  if (numerati.length && (segn.length !== numerati.length || Math.max(...numerati) > nk || Math.min(...numerati) < 1))
+    guai.push('segnaposto numerati storti: ' + k);
+  if (!numerati.length && segn.length !== nk) guai.push('segnaposto non in pari: ' + k);
+}
+console.log(JSON.stringify({quante: Object.keys(d).length, guai}));
+""".replace("__EN__", testo)
+    esito = _node_banco(banco)
+    if esito is None:
+        salta("il dizionario inglese in node", "node non c'e'")
+    else:
+        prova("inglese: il dizionario e' un oggetto frase → frase, con "
+              "almeno trecento voci", True, esito.get("quante", 0) >= 300)
+        prova("inglese: segnaposto in pari, rese piene, chiavi senza "
+              "spazi ai bordi", [], esito.get("guai"))
+
+    # --- 3. le chiavi stanno nella pagina ---
+    import html as _html
+    piatto = re.sub(r"\s+", " ", _html.unescape(mini)).replace("\\'", "'")
+    senza = []
+    for k in dict.fromkeys(chiavi_testo):
+        k = k.replace('\\"', '"').replace("\\\\", "\\")
+        if "{}" not in k and k in piatto:
+            continue
+        parole = [w for w in re.findall(r"[A-Za-zÀ-ÿ']+", k) if len(w) >= 4]
+        if all(w[:-1] in piatto for w in parole):
+            continue
+        senza.append(k)
+    prova("inglese: ogni chiave del dizionario ha le sue parole in "
+          "miniapp.html (una frase cambiata la' si cambia anche qui)",
+          [], senza)
+
+    # --- 4. il traduttore ---
+    trad = pezzo_js(mini, "let LINGUA = (typeof linguaApp === 'function')",
+                    "if (globalThis.BARATTOLO_LINGUE && globalThis.BARATTOLO_LINGUE[LINGUA])")
+    lingua = pezzo_js(mini, "function linguaApp(){", "\n}") + "\n}\n"
+    fmt_riga = re.search(r"^const fmt = n => .*$", mini, re.M).group(0)
+    banco = r"""
+globalThis.self = globalThis;
+globalThis.location = {search: ''};
+const scatola = {};
+globalThis.localStorage = {getItem: k => scatola[k] ?? null, setItem: (k, v) => { scatola[k] = v; }};
+globalThis.window = {};
+/* in node 21+ `navigator` e' un globale di sola lettura: si ridefinisce */
+Object.defineProperty(globalThis, 'navigator', {value: {language: ''}, configurable: true, writable: true});
+__LINGUA__
+__TRAD__
+__FMT__
+const out = {};
+out.nulla = linguaApp();
+navigator.language = 'en-US'; out.browserEn = linguaApp();
+navigator.language = 'it-IT'; out.browserIt = linguaApp();
+window.Telegram = {WebApp: {initData: 'x', initDataUnsafe: {user: {language_code: 'de'}}}};
+out.tgDe = linguaApp();
+window.Telegram.WebApp.initDataUnsafe.user.language_code = 'it';
+out.tgIt = linguaApp();
+window.Telegram.WebApp.initDataUnsafe.user.language_code = 'en';
+location.search = '?lingua=it&x=1'; out.paramIt = linguaApp();
+location.search = ''; out.ricordato = [linguaApp(), scatola.barattolo_lingua];
+scatola.barattolo_lingua = 'en'; out.ricordatoEn = linguaApp();
+caricaDizionario({"Ciao": "Hello", "{} oggetti": "{} items", "da {} a {}": "from {2} to {1}",
+                  "· {} offerenti · si chiude tra": "· {} bidders · closes in", "Nuovo": "New"});
+out.spento = traduci("Ciao");
+traduttoreArmato = true;
+out.secca = traduci("  Ciao\n ");
+out.forma = traduci("12 oggetti");
+out.ordine = traduci("da 1 a 9");
+out.punto = traduci("· 3 offerenti · si chiude tra");
+out.manca = traduci("Arrivederci");
+out.vuota = traduci("   ");
+out.tManca = t("Arrivederci {n}", {n: 2});
+out.tOk = t("Ciao");
+const opz = {minimumFractionDigits: 2, maximumFractionDigits: 2};
+out.prima = [(1234.5).toLocaleString('it-IT', opz), fmt(19601), fmt(1234)];
+numeriInglesi();
+out.dopo = [(1234.5).toLocaleString('it-IT', opz), fmt(19601), fmt(1234), fmt(999)];
+out.data = new Date(Date.UTC(2026, 10, 14, 12)).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', timeZone: 'UTC'});
+out.altre = (1234.5).toLocaleString('de-DE');
+console.log(JSON.stringify(out));
+""".replace("__LINGUA__", lingua).replace("__TRAD__", trad).replace("__FMT__", fmt_riga)
+    o = _node_banco(banco)
+    if o is None:
+        salta("il traduttore in node", "node non c'e'")
+    else:
+        prova("inglese: linguaApp — niente = it, browser en/it, Telegram "
+              "de/it, ?lingua= vince e si ricorda, la scelta ricordata vince",
+              ["it", "en", "it", "en", "it", "it", ["it", "it"], "en"],
+              [o.get("nulla"), o.get("browserEn"), o.get("browserIt"),
+               o.get("tgDe"), o.get("tgIt"), o.get("paramIt"),
+               o.get("ricordato"), o.get("ricordatoEn")])
+        prova("inglese: traduci — spento tace; la frase secca (spazi "
+              "ripiegati), la forma, i pezzi riordinati, la forma con la "
+              "punteggiatura, la frase che manca, la frase vuota",
+              [None, "Hello", "12 items", "from 9 to 1",
+               "· 3 bidders · closes in", None, None],
+              [o.get("spento"), o.get("secca"), o.get("forma"),
+               o.get("ordine"), o.get("punto"), o.get("manca"), o.get("vuota")])
+        prova("inglese: t() — la frase che manca resta italiana coi "
+              "segnaposto riempiti, quella che c'e' esce inglese",
+              ["Arrivederci 2", "Hello"], [o.get("tManca"), o.get("tOk")])
+        # (l'it-IT non raggruppa a quattro cifre: «1234,50», e' noto)
+        prova("inglese: i numeri all'italiana PRIMA di numeriInglesi",
+              ["1234,50", "19 601", "1 234"], o.get("prima"))
+        prova("inglese: ...e all'inglese dopo — fmtEur, fmt a cinque e a "
+              "quattro cifre, a tre nessuna virgola",
+              ["1,234.50", "19,601", "1,234", "999"], o.get("dopo"))
+        prova("inglese: le date in inglese, le altre lingue non si toccano",
+              ("14 Nov", "1.234,5"), (o.get("data"), o.get("altre")))
+
+    # --- il contorno ---
+    prova("inglese: la rotta /lingua/{codice}.js con la lista chiusa e la "
+          "leva, e nessun mount", (True, True, True, True),
+          ('@app.get("/lingua/{codice}.js")' in src,
+           'LINGUE_FILE = ("en",)' in src,
+           "if codice not in LINGUE_FILE or not LINGUA_INGLESE:" in src,
+           'FileResponse(f"lingua/{codice}.js"' in src))
+    prova("inglese: la leva LINGUA_INGLESE nasce accesa, solo True accende, "
+          "e sta nel pannello e nel config d'esempio", (True, True, True),
+          ("    from config import LINGUA_INGLESE\nexcept ImportError:\n"
+           "    LINGUA_INGLESE = True\nLINGUA_INGLESE = LINGUA_INGLESE is True" in src,
+           '"LINGUA_INGLESE", LINGUA_INGLESE,' in src,
+           "\nLINGUA_INGLESE = True\n" in open("config_esempio.py", encoding="utf-8").read()))
+    prova("inglese: il traduttore guarda il DOM (osservatore sulla radice, "
+          "testi e attributi) e linguaSwap legge la lingua dell'app",
+          (True, True, True),
+          ("}).observe(document.documentElement, {childList: true, subtree: true, characterData: true," in mini,
+           "const T_ATTRIBUTI = ['placeholder', 'title', 'aria-label', 'alt'];" in mini,
+           "function linguaSwap(){\n  /* (17 nov 2026, inglese-tappa-1)" in mini
+           and "  if (typeof linguaApp === 'function') return linguaApp();" in mini))
+    lista = open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read()
+    compila = open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()
+    prova("inglese: il collaudo sta negli elenchi della CI", (True, True),
+          ("\ncollaudo_lingua\n" in "\n" + lista + "\n",
+           "collaudo_lingua.py" in compila))
+
+
 def prove_swap_fornitori():
     """I FORNITORI DELLO SWAP (20 ott 2026, cantiere swap-instradatore,
     decisione di Andrea: chi vende sceglie COSA, il telefono sceglie CHI).
@@ -206381,7 +206575,7 @@ CATEGORIE = {
     bundle_bitcoin journal_senza_buffer istanza_prova
     collaudo_segue_develop avvisi_nostr_arrivano notifiche_telefono filtro_10050
     semina_collaudo relay_risolti certificati_relay config_esempio
-    assistente_bot sentinella_server_fermo
+    assistente_bot sentinella_server_fermo lingua_inglese
     """.split(),
     "swap": """
     swap_cella swap_preventivo swap_telefono swap_fornitori
@@ -207299,6 +207493,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
+              prove_lingua_inglese,
               prove_swap_auto, prove_swap_auto_schermate, prove_swap_auto_tasto,
               prove_incasso_annuncio,
               prove_swap_auto_scalini,

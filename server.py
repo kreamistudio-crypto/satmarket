@@ -5423,6 +5423,25 @@ try:
 except ImportError:
     SERIE_GIORNI_ATTIVA = True
 SERIE_GIORNI_ATTIVA = bool(SERIE_GIORNI_ATTIVA)
+
+# L'INGLESE (17 nov 2026, cantiere inglese-tappa-1, Andrea: «la
+# traduzione dell'app intera, la versione inglese»). L'app resta scritta
+# in italiano: l'inglese e' un dizionario a parte, `lingua/en.js`, che la
+# pagina chiede da sola a chi ha Telegram (o il browser) in un'altra
+# lingua e applica ai testi mentre compaiono (miniapp.html, «L'INGLESE»).
+# Il server non traduce niente: serve il file, e basta.
+# LA LEVA: LINGUA_INGLESE, accesa di serie (regola del 14 nov 2026: le
+# leve nuove nascono accese). Spenta, `/lingua/en.js` risponde 404 e
+# l'app parla italiano a tutti — e' l'interruttore d'emergenza, una riga
+# nel config. Solo True accende.
+try:
+    from config import LINGUA_INGLESE
+except ImportError:
+    LINGUA_INGLESE = True
+LINGUA_INGLESE = LINGUA_INGLESE is True
+# la lista CHIUSA dei dizionari (regola ferrea 3: il nome arriva dal
+# client); oggi uno solo
+LINGUE_FILE = ("en",)
 # le tappe che il client festeggia un filo di piu': una settimana, un
 # mese, cento giorni, un anno. Viaggiano con la risposta, cosi' non ne
 # esiste una seconda copia nella pagina.
@@ -37587,6 +37606,20 @@ def _leve_stato():
                   spento="niente fiamma nel Profilo e nessun giorno "
                          "contato; riaccendendola chi ha saltato dei "
                          "giorni riparte da 1, il record resta"),
+        ]},
+        {"gruppo": "🌍 Lingua", "voci": [
+            # L'INGLESE (17 nov 2026, cantiere inglese-tappa-1): accesa
+            # di serie, nessun segreto; il server serve solo il dizionario
+            _leva("App in inglese (dizionario lingua/en.js)",
+                  "LINGUA_INGLESE", LINGUA_INGLESE,
+                  acceso="chi ha Telegram o il browser in una lingua che "
+                         "non è l'italiano legge in inglese le parti già "
+                         "tradotte (tappa 1: vetrina, scheda, carrello, "
+                         "cassa, pagamento); le altre restano in italiano. "
+                         "Si forza con ?lingua=en o ?lingua=it",
+                  spento="il dizionario risponde 404 e l'app parla "
+                         "italiano a tutti, qualunque sia la lingua di "
+                         "Telegram"),
         ]},
         {"gruppo": "🫙 Avvisi del barattolo", "voci": [
             # GLI AVVISI SUI PREFERITI (17 nov 2026, cantiere
@@ -110958,6 +110991,24 @@ def swap_file_telefono(nome: str):
     if nome not in SWAP_FILE_TELEFONO:
         raise HTTPException(404, "Non trovato")
     return FileResponse(f"swap/{nome}.js",
+                        media_type="application/javascript",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/lingua/{codice}.js")
+def lingua_file(codice: str):
+    """Il dizionario di una lingua (17 nov 2026, inglese-tappa-1): le
+    frasi italiane della pagina con la loro traduzione, che il
+    traduttore di miniapp.html applica ai testi mentre compaiono. Lo
+    chiede solo chi legge in quella lingua, con `?v=` uguale all'inizio
+    dello sha256 del file (`LINGUA_VER`, provato in
+    `prove_lingua_inglese`), quindi la cache di un giorno non trattiene
+    mai una versione vecchia. Lista chiusa `LINGUE_FILE` (regola ferrea
+    3). A leva LINGUA_INGLESE spenta e' un 404 come un nome che non
+    c'e': la pagina resta in italiano per tutti, senza sapere perche'."""
+    if codice not in LINGUE_FILE or not LINGUA_INGLESE:
+        raise HTTPException(404, "Non trovato")
+    return FileResponse(f"lingua/{codice}.js",
                         media_type="application/javascript",
                         headers={"Cache-Control": "public, max-age=86400"})
 

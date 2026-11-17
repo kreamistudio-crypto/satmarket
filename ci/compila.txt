@@ -218,3 +218,4 @@ collaudo_serie_giorni.py
 collaudo_sentinella.py
 collaudo_nip05_utenti.py
 collaudo_raccolta.py
+collaudo_lingua.py
