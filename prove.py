@@ -143047,9 +143047,14 @@ def prove_volto_unico():
         # (17 nov 2026) gli amici della stradina: pedine e gara fra amici
         "amici della stradina": ("voltoHTML(a, 'str-av'",
                                  "function voltoAmicoStradina(a){"),
+        # (17 nov 2026 sera) le righe della classifica dei giorni di fila:
+        # senza negozio, quindi senza chiave e senza porta
+        "classifica dei giorni di fila": (
+            "voltoHTML({nome: v.nome, avatar: v.avatar, ignoto: true}, 'avatar serie-cl-volto'",
+            "function serieClassificaRigaHTML(v){"),
     }
-    prova("il volto si disegna da dodici posti, ognuno col suo nome nel censimento",
-          [12, [1] * 12], [fuori.count("voltoHTML("),
+    prova("il volto si disegna da tredici posti, ognuno col suo nome nel censimento",
+          [13, [1] * 13], [fuori.count("voltoHTML("),
                            [fuori.count(v[0]) for v in POSTI.values()]])
     prova("...e ogni chiamata sta nella funzione del suo posto", [],
           [k for k, (pref, fn) in POSTI.items()
