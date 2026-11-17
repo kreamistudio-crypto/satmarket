@@ -68051,13 +68051,77 @@ async function apriCauzioneOcP2P(id, metodo){
    una riga. `c` = {stato, sats, mia} del server. */
 function riquadroCauzioneOcP2P(o){
   const c = o && o.cauzione;
-  if (!c || !(c.sats > 0)) return '';
-  const stato = c.stato === 'tenuta' ? 'bloccata' : c.stato === 'tornata' ? 'restituita' : '';
-  if (!stato) return '';
+  if (!c || !(c.sats > 0)) return metaCauzioneOcP2P(o);
+  const stato = c.stato === 'tenuta' ? 'bloccata' : c.stato === 'tornata' ? 'restituita'
+    : c.stato === 'persa' ? 'persa' : '';
+  if (!stato) return metaCauzioneOcP2P(o);
   if (c.mia && typeof riquadroCauzioneP2P === 'function')
-    return riquadroCauzioneP2P({stato: '', cauzione: {sats: c.sats, stato}});
-  return '<div class="p2p-box cauzione-box"><b>🔐 Cauzione di chi ha preso:</b> ' + fmt(c.sats) + ' sats, '
-    + (stato === 'bloccata' ? 'bloccata in Lightning. Torna a fine scambio.' : 'già tornata nel suo wallet.') + '</div>';
+    return riquadroCauzioneP2P({stato: '', cauzione: {sats: c.sats, stato, persa: c.sats}});
+  /* il moderatore: lo stato e, in disputa, il gesto che la brucia (17 nov
+     2026 sera, quarto pezzo; Andrea: «come su Lightning»). Bruciata, la
+     META' da mandare A MANO all'altra persona, col suo indirizzo */
+  let h = '<b>🔐 Cauzione di chi ha preso:</b> ' + fmt(c.sats) + ' sats, '
+    + (stato === 'bloccata' ? 'bloccata in Lightning. Torna a fine scambio.'
+      : stato === 'persa' ? '<b>bruciata</b>: incassata sul nodo.' : 'già tornata nel suo wallet.');
+  if (stato === 'bloccata' && o.stato === 'disputa')
+    h += '<div class="hint">Si brucia <b>prima</b> di decidere la disputa: a scambio chiuso torna da sola.</div>'
+      + '<div class="contanti-gesti"><button type="button" class="btn allarme" onclick="bruciaCauzioneOcP2P('
+      + Number(o.id) + ')">🔐 Brucia la cauzione</button></div>';
+  const m = c.meta;
+  if (stato === 'persa' && m && m.sats > 0)
+    h += '<div class="hint">' + (m.mandata ? '✅ Metà mandata: ' : '⚠️ <b>Metà da mandare a mano:</b> ')
+      + fmt(m.sats) + ' sats a <b>' + esc(m.nome || '') + '</b> (' + Number(m.a) + ')'
+      + (m.mandata ? '.' : m.ln_address
+          ? ', indirizzo Lightning <span class="mono" style="word-break:break-all">' + esc(m.ln_address) + '</span>.'
+          : ': non ha un indirizzo Lightning nel Profilo, chiedigli una fattura.') + '</div>'
+      + (m.mandata ? '' : '<div class="contanti-gesti"><button type="button" class="btn orange" onclick="metaMandataOcP2P('
+          + Number(o.id) + ')">✅ Metà mandata</button></div>');
+  return '<div class="p2p-box cauzione-box">' + h + '</div>';
+}
+/* LA META' DI UNA CAUZIONE PERSA, a chi spetta: gliela manda un
+   moderatore, a mano (decisione di Andrea, 17 nov 2026) */
+function metaCauzioneOcP2P(o){
+  const m = o && o.cauzione_meta;
+  if (!m || !(m.sats > 0)) return '';
+  const quanto = fmt(m.sats) + ' sats';
+  if (m.mandata)
+    return '<div class="p2p-box cauzione-box"><b>⚖️ Metà della cauzione mandata:</b> un moderatore ti ha inviato ' + esc(quanto) + '. Controlla il tuo wallet.</div>';
+  return '<div class="p2p-box cauzione-box"><b>⚖️ Metà della cauzione dell\'altra persona è tua:</b> ' + esc(quanto) + '. '
+    + (m.ln ? 'Te li manda un moderatore al tuo indirizzo Lightning del Profilo.'
+      : 'Te li manda un moderatore: <b>scrivi il tuo indirizzo Lightning nel Profilo</b>, lo legge da lì.') + '</div>';
+}
+function bruciaCauzioneOcP2P(id){
+  haptic();
+  chiediConferma({titolo: '🔐 Brucia la cauzione', vestito: 'allarme', etichetta: 'Brucia la cauzione',
+    corpo: 'La cauzione di chi ha preso non torna più: metà va all\'altra persona (gliela mandi tu a mano, l\'app ti dice quanto e dove), metà al servizio.'
+      + ' Solo se non si è presentato all\'incontro (nessun suo «📍 Sono qui» all\'ora e al luogo dell\'appuntamento): se no resta a chi l\'ha messa. Non si può annullare.',
+    poi: () => eseguiBruciaCauzioneOcP2P(id)});
+}
+async function eseguiBruciaCauzioneOcP2P(id){
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${id}/cauzione/brucia`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()}, body: '{}'});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non bruciata');
+    toast('🔐 Cauzione bruciata' + (d.meta > 0 ? ': ora manda ' + fmt(d.meta) + ' sats all\'altra persona' : ''), 7000);
+  } catch(e) { toast('🔐 ' + (e.message || 'errore'), 7000); }
+  renderP2POnchain();
+}
+function metaMandataOcP2P(id){
+  haptic();
+  chiediConferma({titolo: '✅ Metà mandata', etichetta: 'Sì, l\'ho mandata',
+    corpo: 'Confermi di aver già inviato la metà della cauzione all\'altra persona? L\'app la avvisa, e non manda niente da sola.',
+    poi: () => eseguiMetaMandataOcP2P(id)});
+}
+async function eseguiMetaMandataOcP2P(id){
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${id}/cauzione/meta-mandata`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()}, body: '{}'});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non segnata');
+    toast('✅ Segnata: l\'altra persona è stata avvisata', 5000);
+  } catch(e) { toast('🔐 ' + (e.message || 'errore'), 7000); }
+  renderP2POnchain();
 }
 async function prendiOnchainP2P(id){
   haptic();

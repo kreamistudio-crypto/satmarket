@@ -1457,9 +1457,22 @@ def main():
             if self.path == "/v2/invoices/cancel":
                 h = base64.b64decode(corpo["payment_hash"]).hex()
                 f = LND["fatture"].get(h)
+                if f and f["state"] == "SETTLED":
+                    return self._rispondi(500, {"code": 2, "message": "invoice already settled"})
                 if not f or f["state"] == "CANCELED":
                     return self._rispondi(500, {"code": 2, "message": "invoice already canceled"})
                 f["state"] = "CANCELED"
+                return self._rispondi(200, {})
+            if self.path == "/v2/invoices/settle":
+                h = hashlib.sha256(base64.b64decode(corpo["preimage"])).hexdigest()
+                f = LND["fatture"].get(h)
+                if not f:
+                    return self._rispondi(500, {"code": 2, "message": "unable to locate invoice"})
+                if f["state"] == "SETTLED":
+                    return self._rispondi(500, {"code": 2, "message": "invoice already settled"})
+                if f["state"] != "ACCEPTED":
+                    return self._rispondi(500, {"code": 2, "message": "invoice still open"})
+                f["state"] = "SETTLED"
                 return self._rispondi(200, {})
             return self._rispondi(404, {"code": 5, "message": "Not Found"})
 
@@ -1703,6 +1716,129 @@ def main():
     prova("in gioco, ma il nodo l'ha gia' rimandata: il giro lo scrive com'e'",
           (1, "tornata", "tornata da sola dal nodo"),
           (conto["tornate"], riga_cauz(c3)["stato"], riga_cauz(c3)["perche"]))
+    # -- LA CAUZIONE PERSA (quarto pezzo): la brucia un moderatore, solo in
+    #    disputa; meta' all'altra persona, mandata a mano
+    def brucia(tg, oid):
+        come(tg)
+        return c.post(f"/api/p2p/onchain/{oid}/cauzione/brucia")
+
+    def mandata(tg, oid):
+        come(tg)
+        return c.post(f"/api/p2p/onchain/{oid}/cauzione/meta-mandata")
+
+    def saldate():
+        return [v for v in LND["visti"] if v[1] == "/v2/invoices/settle"]
+
+    def in_disputa(oid):
+        con = SRV.db()
+        con.execute("UPDATE p2p_onchain_ordini SET stato='disputa' WHERE id=?", (oid,))
+        con.commit()
+        con.close()
+
+    def presa_con_cauzione():
+        oid = pubblica(888, metodi=["Contanti"], recapito="", zona="Milano centro").json().get("id")
+        cauz(999, oid, "Contanti")
+        LND["fatture"][riga_cauz(oid)["hash"]]["state"] = "ACCEPTED"
+        gesto(999, oid, "prendi")
+        return oid
+
+    c5 = presa_con_cauzione()
+    r5 = riga_cauz(c5)
+    prova("a scambio vivo ma NON in disputa la cauzione non si brucia: 409, e LND non vede niente",
+          (409, True, 0),
+          (lambda r: (r.status_code, "solo a scambio in disputa" in r.text, len(saldate())))(brucia(777, c5)))
+    in_disputa(c5)
+    prova("chi non e' moderatore non ha la strada (404), e chi e' parte dello scambio non "
+          "decide il suo (403): ne' chi ha preso ne' chi ha pubblicato",
+          (404, 403, 403, 0),
+          (brucia(111, c5).status_code, brucia(999, c5).status_code,
+           brucia(888, c5).status_code, len(saldate())))
+    LND["muto"] = True
+    r = brucia(777, c5)
+    prova("LND muto: 503 con la frase, e la cauzione resta TENUTA (si puo' riprovare)",
+          (503, True, "tenuta", 0),
+          (r.status_code, "ancora bloccata" in r.text, riga_cauz(c5)["stato"],
+           riga_cauz(c5)["persa_da"]))
+    LND["muto"] = False
+    n_b = len(BOTTONI)       # (mai svuotarla: la sezione 12 la legge intera)
+    banco.AVVISI.clear()
+    r = brucia(777, c5)
+    riga5 = riga_cauz(c5)
+    prova("il moderatore la brucia: 200, 3000 sats persi, 1500 all'altra persona",
+          (200, 3000, 1500), (r.status_code, r.json().get("sats"), r.json().get("meta")))
+    prova("...LND l'ha SALDATA col preimage della riga, e la riga dice persa, da chi, "
+          "e la meta' di chi ha pubblicato",
+          ("SETTLED", "persa", 777, 1500, 888, True),
+          (LND["fatture"][r5["hash"]]["state"], riga5["stato"], riga5["persa_da"],
+           riga5["meta_sats"], riga5["meta_a"],
+           hashlib.sha256(base64.b64decode(saldate()[-1][2]["preimage"])).hexdigest() == r5["hash"]))
+    prova("...avvisati tutti e tre: chi l'ha persa, chi riceve la meta', e i moderatori "
+          "con la cifra da mandare a mano",
+          (True, True, True),
+          (any(chi == 999 and "Cauzione persa" in t for chi, t, _ in BOTTONI[n_b:]),
+           any(chi == 888 and "Metà della cauzione" in t and "1.500" in t.replace("\u202f", ".").replace(" ", ".")
+               for chi, t, _ in BOTTONI[n_b:]),
+           any("DA MANDARE A MANO" in str(a) and "(888)" in str(a) for a in banco.AVVISI)))
+    prova("bruciata due volte no: 409, e LND non vede una seconda saldatura",
+          (409, True, 2),
+          (lambda r: (r.status_code, "già stata bruciata" in r.text, len(saldate())))(brucia(777, c5)))
+    prova("la scheda: a chi l'ha messa «persa»; a chi ha pubblicato la meta' da ricevere; "
+          "al moderatore quanto mandare e a chi",
+          ({"stato": "persa", "sats": 3000, "mia": True},
+           {"sats": 1500, "mandata": False, "ln": False},
+           {"sats": 1500, "a": 888, "nome": "Alan", "ln_address": "", "mandata": False}),
+          (uno(999, c5).get("cauzione"), uno(888, c5).get("cauzione_meta"),
+           (uno(777, c5).get("cauzione") or {}).get("meta")))
+    prova("...e a chi ha preso nessuna meta', a chi ha pubblicato nessuna cauzione",
+          (None, None), (uno(999, c5).get("cauzione_meta"), uno(888, c5).get("cauzione")))
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET stato='rimborsato' WHERE id=?", (c5,))
+    con.commit()
+    con.close()
+    n_cancel = len([v for v in LND["visti"] if v[1] == "/v2/invoices/cancel"])
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata())
+    prova("a scambio chiuso il giro NON tocca una cauzione persa: nessuna cancel, resta saldata",
+          ("persa", "SETTLED", n_cancel),
+          (riga_cauz(c5)["stato"], LND["fatture"][r5["hash"]]["state"],
+           len([v for v in LND["visti"] if v[1] == "/v2/invoices/cancel"])))
+    prova("una cancel su una hold gia' SALDATA non vale «tornata»",
+          False, asyncio.run(SRV._p2p_onchain_cauzione_annulla(r5["hash"])))
+    n_b = len(BOTTONI)
+    prova("«Metà mandata»: non chi la riceve (403), non chi non e' moderatore (404); il "
+          "moderatore si', una volta, e l'altra persona lo sa",
+          (403, 404, 200, True, True, True),
+          (mandata(888, c5).status_code, mandata(111, c5).status_code,
+           mandata(777, c5).status_code, mandata(777, c5).json().get("gia"),
+           uno(888, c5)["cauzione_meta"]["mandata"],
+           any(chi == 888 and "mandata" in t for chi, t, _ in BOTTONI[n_b:])))
+    # -- il gesto morto a meta': la riga resta «saldando», e decide LND
+    c6 = presa_con_cauzione()
+    in_disputa(c6)
+    r6 = riga_cauz(c6)
+
+    def saldando(oid, quando):
+        con = SRV.db()
+        con.execute("UPDATE p2p_onchain_cauzioni SET stato='saldando', saldando_il=?, persa_da=777"
+                    " WHERE ordine_id=?", (quando, oid))
+        con.commit()
+        con.close()
+
+    ora = int(time.time())
+    saldando(c6, ora)
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + 30))
+    prova("una «saldando» fresca il giro la lascia stare; al telefono e' ancora «tenuta», "
+          "e un secondo moderatore non la brucia sopra",
+          ("saldando", "tenuta", 409),
+          (riga_cauz(c6)["stato"], uno(999, c6)["cauzione"]["stato"], brucia(777, c6).status_code))
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + SRV.P2P_ONCHAIN_CAUZIONE_SALDANDO_S + 1))
+    prova("appesa da due minuti e LND dice ancora ACCEPTED: torna TENUTA, senza moderatore",
+          ("tenuta", 0), (riga_cauz(c6)["stato"], riga_cauz(c6)["persa_da"]))
+    saldando(c6, ora)
+    LND["fatture"][r6["hash"]]["state"] = "SETTLED"
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + SRV.P2P_ONCHAIN_CAUZIONE_SALDANDO_S + 1))
+    prova("appesa e LND dice SETTLED: e' PERSA, con la meta' scritta",
+          ("persa", 1500, 888),
+          (riga_cauz(c6)["stato"], riga_cauz(c6)["meta_sats"], riga_cauz(c6)["meta_a"]))
     # -- un ordine con piu' metodi, a leva accesa
     m5, m6 = misto(), misto()
     n_hodl = len(hodl_visti())
@@ -1723,13 +1859,15 @@ def main():
           503, (setattr(SRV, "LND_PONTE_MACAROON_CAUZIONE", "0201036c6e64" + "ef" * 40),
                 cauz(999, m6, "Contanti").status_code)[1])
     SRV.LND_PONTE_MACAROON_CAUZIONE = MAC_C
-    prova("al nodo passano solo hodl, cancel e la lettura di una fattura: nessuna strada "
-          "salda una cauzione",
-          set(), {v[1] for v in LND["visti"] if not v[1].startswith("/v1/invoice/")}
-          - {"/v2/invoices/hodl", "/v2/invoices/cancel"})
+    prova("al nodo passano solo hodl, cancel, la lettura di una fattura e le DUE saldature "
+          "chieste dal moderatore (una a LND muto): nient'altro salda una cauzione",
+          (set(), 2),
+          ({v[1] for v in LND["visti"] if not v[1].startswith("/v1/invoice/")}
+           - {"/v2/invoices/hodl", "/v2/invoices/cancel", "/v2/invoices/settle"},
+           len(saldate())))
     con = SRV.db()
-    con.execute("UPDATE p2p_onchain_ordini SET stato='annullato' WHERE id IN (?,?,?,?,?,?,?,?,?,?)",
-                (m1, m2, m3, m4, m5, m6, c3, c1, g1, g2))
+    con.execute("UPDATE p2p_onchain_ordini SET stato='annullato' WHERE id IN (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (m1, m2, m3, m4, m5, m6, c3, c1, g1, g2, c5, c6))
     con.commit()
     con.close()
     SRV.P2P_ONCHAIN_CAUZIONE, SRV.LND_PONTE_MACAROON_CAUZIONE = False, ""

@@ -4879,9 +4879,9 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   Sul NODO (`~/nodo`), prima si guarda: `docker compose exec lnd lncli listmacaroonids`
   Se il 5 è libero, si cuoce:
   `docker compose exec lnd lncli bakemacaroon --root_key_id 5 --save_to /tmp/barattolo-cauzione.macaroon uri:/invoicesrpc.Invoices/AddHoldInvoice uri:/invoicesrpc.Invoices/CancelInvoice uri:/lnrpc.Lightning/LookupInvoice uri:/invoicesrpc.Invoices/SettleInvoice`
-  (SettleInvoice serve al gesto del moderatore che fa perdere la
-  cauzione: finché quel pezzo non c'è il server non la chiama mai, e
-  cuocerla adesso evita un secondo macaroon). Si legge in esadecimale:
+  (SettleInvoice serve al solo gesto del moderatore che brucia la
+  cauzione, `…/cauzione/brucia`: nessun'altra strada del server la
+  chiama). Si legge in esadecimale:
   `docker compose exec lnd xxd -p -c 9999 /tmp/barattolo-cauzione.macaroon`
   poi `docker compose exec lnd rm /tmp/barattolo-cauzione.macaroon`.
   L'esadecimale non passa da chat né da canali: si incolla nel config
@@ -4890,7 +4890,7 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   deve dire 0; poi le due righe in coda al config e il riavvio.
   Controllo DOPO: `journalctl -u barattolo -n 80 | grep 🔐` deve dire
   «Cauzione del contanti on-chain: ACCESA SOLO PER I MODERATORI, 3% con
-  minimo 1000 sats» («ACCESA PER TUTTI» solo dopo il `False` della
+  minimo 1.000 sats» («ACCESA PER TUTTI» solo dopo il `False` della
   porticina; «leva spenta, solo il giro dei ritorni» col solo macaroon),
   e il pannello «⚙️ Stato delle leve» le voci «Cauzione nel contanti
   on-chain (in Lightning)» e «Cauzione on-chain solo ai moderatori»
@@ -4901,6 +4901,19 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   cauzioni vive si contano dal server con
   `sqlite3 /srv/barattolo/satmarket.db "SELECT stato, COUNT(*) FROM p2p_onchain_cauzioni GROUP BY stato"`
   (in sola lettura; la tabella sta nel database di sempre).
+  LA CAUZIONE BRUCIATA E LA METÀ A MANO (quarto pezzo). Un moderatore, a
+  scambio in disputa e PRIMA di decidere, tocca «🔐 Brucia la cauzione»
+  nella pagina dello scambio: la hold si salda sul nodo (i sats restano
+  nel saldo di LND, non in LNbits) e nel canale dei moderatori,
+  argomento dispute, arriva «DA MANDARE A MANO: N sats a nome (id),
+  indirizzo Lightning…». Un moderatore manda quei sats DAL SUO wallet
+  all'indirizzo scritto (se non c'è, si chiede una fattura alla
+  persona), poi tocca «✅ Metà mandata» nella stessa pagina: è un timbro,
+  il server non paga niente. Le metà ancora da mandare:
+  `sqlite3 /srv/barattolo/satmarket.db "SELECT ordine_id, meta_a, meta_sats FROM p2p_onchain_cauzioni WHERE stato='persa' AND meta_sats>0 AND meta_mandata_il=0"`
+  Il journal dice «🔐 cauzione on-chain: scambio #N, X sats BRUCIATI dal
+  moderatore M; metà da mandare a mano: Y». Una riga rimasta `saldando`
+  più di due minuti la chiude il giro, chiedendo a LND.
 - L'INDIRIZZO LIGHTNING DI CASA (10 ott 2026; perché in CANTIERI,
   «L'indirizzo Lightning di casa: zap@barattolo.store»; com'è fatto in
   ARCHITETTURA, stesso titolo). `zap@barattolo.store`, per ricevere gli
