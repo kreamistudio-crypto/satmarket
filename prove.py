@@ -135137,12 +135137,14 @@ def prove_recensione_p2p():
     _porta = codice(pezzo("_riga_recensione_p2p"))
     prova("il gate passa dai due giudici", True,
           "_parti_recensione_p2p(r[\"tg_id\"], r[\"preso_da\"]," in rec
-          and "_riga_recensione_p2p(con, ordine)" in rec
+          # (17 nov 2026 sera, onchain-ritiro) la porta vuole sapere CHI
+          # chiede: dopo una rinuncia on-chain recensisce solo chi aveva depositato
+          and "_riga_recensione_p2p(con, ordine, user[\"id\"])" in rec
           and "if not r[\"concluso\"]:" in rec
           and "_scambio_concluso_p2p(con, ordine, r[\"stato\"])" in _porta
           and "_ammette_recensione_p2p(" not in rec)
     prova("...e la domanda che apre il riquadro chiede allo stesso", True,
-          "_riga_recensione_p2p(con, ordine)" in codice(pezzo("recensibile_p2p"))
+          "_riga_recensione_p2p(con, ordine, user[\"id\"])" in codice(pezzo("recensibile_p2p"))
           and "concluso = bool(r) and r[\"concluso\"]" in codice(pezzo("recensibile_p2p"))
           and "_ammette_recensione_p2p(" not in codice(pezzo("recensibile_p2p")))
     _sc = codice(pezzo("_scambio_concluso_p2p"))
