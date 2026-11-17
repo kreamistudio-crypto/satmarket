@@ -480,11 +480,12 @@ def main():
           (True, True), (detto_a(888, "deposito di garanzia 2-di-3"),
                          detto_a(999, "Deposito confermato")))
     od = uno(888, oid)
-    prova("IL TEMPO PER PAGARE (17 nov 2026): in euro 72 ore dal deposito "
-          "confermato, e tutt'e due lo leggono nell'avviso",
-          (72, od["depositato_il"] + 72 * 3600, True, True),
-          (od["ore_pagamento"], od["paga_entro"], detto_a(888, "Hai 72 ore"),
-           detto_a(999, "Chi compra ha <b>72 ore</b>")))
+    prova("IL TEMPO PER PAGARE (17 nov 2026; 24 ore anche in euro dalla sera): 24 ore dal "
+          "deposito confermato, e tutt'e due lo leggono nell'avviso; il tempo del bonifico "
+          "non e' ancora partito",
+          (24, od["depositato_il"] + 24 * 3600, True, True, 0, 48),
+          (od["ore_pagamento"], od["paga_entro"], detto_a(888, "Hai 24 ore"),
+           detto_a(999, "Chi compra ha <b>24 ore</b>"), od["bonifico_entro"], od["ore_bonifico"]))
 
     # ---- 5) gli euro e le due firme --------------------------------------
     print("\n[gli euro, poi la prima e la seconda firma]")
@@ -778,12 +779,12 @@ def main():
     gesto(999, o8["id"], "controlla")
     con = SRV.db()
     con.execute("UPDATE p2p_onchain_ordini SET depositato_il=? WHERE id=?",
-                (int(time.time()) - 73 * 3600, o8["id"]))
+                (int(time.time()) - 25 * 3600, o8["id"]))
     con.commit()
     con.close()
     banco.DETTO.clear()
     asyncio.run(SRV._p2p_onchain_ronda())
-    prova("73 ore dopo il deposito, senza «Ho inviato»: la ronda avvisa tutt'e "
+    prova("25 ore dopo il deposito, senza «Ho inviato»: la ronda avvisa tutt'e "
           "due, e lo scambio resta depositato (niente si annulla)",
           (True, True, "depositato"),
           (detto_a(999, "Il tempo per pagare è finito"),
@@ -807,15 +808,21 @@ def main():
     con.close()
     banco.DETTO.clear()
     asyncio.run(SRV._p2p_onchain_ronda())
-    prova("due ore dopo il deposito: a chi paga il primo promemoria (72 ore in euro), a "
+    prova("due ore dopo il deposito: a chi paga il primo promemoria (24 ore in euro), a "
           "chi vende niente", (True, True, False),
           (detto_a(888, "Promemoria: i sats sono nel 2-di-3 da un'ora"),
-           detto_a(888, "Hai 72 ore in tutto"), detto_a(999, "Promemoria")))
+           detto_a(888, "Hai 24 ore in tutto"), detto_a(999, "Promemoria")))
     banco.DETTO.clear()
     asyncio.run(SRV._p2p_onchain_ronda())
     prova("...la ronda dopo non lo ripete", False, detto_a(888, "Promemoria"))
     prova("«Ho inviato gli euro» ferma quelli di chi paga", 200,
           gesto(888, o9["id"], "euro-inviati").status_code)
+    o9d = uno(999, o9["id"])
+    prova("...e da li' parte IL TEMPO DEL BONIFICO (17 nov 2026 sera): 48 ore a chi vende "
+          "per vederlo arrivare, scritte nell'avviso e nella riga dello scambio",
+          (True, o9d["euro_inviati_il"] + 48 * 3600, 48),
+          (detto_a(999, "Un bonifico può metterci fino a 48 ore"),
+           o9d["bonifico_entro"], o9d["ore_bonifico"]))
     con = SRV.db()
     con.execute("UPDATE p2p_onchain_ordini SET depositato_il=?, euro_inviati_il=? WHERE id=?",
                 (int(time.time()) - 30 * 3600, int(time.time()) - 7 * 3600, o9["id"]))
@@ -829,6 +836,35 @@ def main():
            sum(1 for tg, t in banco.DETTO if tg == 999 and any(
                x in t for x in ("Promemoria", "Sono passate sei ore", "Venti ore"))),
            detto_a(888, "Sono passate sei ore")))
+    # LE 48 ORE DEL BONIFICO PASSATE (17 nov 2026 sera): la ronda lo dice
+    # a tutti e due, una volta, e non annulla ne' libera niente
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET euro_inviati_il=? WHERE id=?",
+                (int(time.time()) - 47 * 3600, o9["id"]))
+    con.commit()
+    con.close()
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("47 ore dopo «Ho inviato»: del tempo del bonifico ancora niente", (False, False),
+          (detto_a(999, "Sono passate 48 ore"), detto_a(888, "Sono passate 48 ore")))
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET euro_inviati_il=? WHERE id=?",
+                (int(time.time()) - 49 * 3600, o9["id"]))
+    con.commit()
+    con.close()
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("49 ore dopo «Ho inviato», senza rilascio: la ronda lo dice a tutt'e due e a "
+          "tutt'e due indica la disputa; lo scambio resta «euro inviati»",
+          (True, True, True, True, "euro_inviati"),
+          (detto_a(999, "Sono passate 48 ore da «Ho inviato gli euro»"),
+           detto_a(888, "Sono passate 48 ore da «Ho inviato gli euro»"),
+           detto_a(999, "apri una disputa"), detto_a(888, "«⚖️ Apri una disputa»"),
+           uno(999, o9["id"])["stato"]))
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("...la ronda dopo non lo ripete", (False, False),
+          (detto_a(999, "Sono passate 48 ore"), detto_a(888, "Sono passate 48 ore")))
     # fuori dai piedi: i tetti qui sotto contano gli scambi aperti
     con = SRV.db()
     con.execute("UPDATE p2p_onchain_ordini SET stato='rimborsato', chiuso_il=? WHERE id IN (?, ?)",
