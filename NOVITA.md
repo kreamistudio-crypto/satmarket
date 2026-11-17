@@ -500,3 +500,9 @@ frase: Quando prendi un ordine P2P con un intervallo (per esempio da 50 a 276 �
 dove: P2P: tocca un ordine con un intervallo, poi «Scegli»; foglio «Quanto vuoi scambiare?».
 leva: nessuna
 pubblico: no
+
+## 2026-11-17 · onchain-contanti-luogo
+frase: Gli ordini P2P on-chain in contanti ora hanno il luogo dello scambio, come quelli Lightning: chi pubblica scrive la zona, e la card la mostra con «📍». Vale anche lo stesso tetto in euro del contanti.
+dove: P2P: «+», rete on-chain, metodo «Contanti», campo «Zona di scambio»; la card on-chain nel libro; il foglio che si apre toccandola.
+leva: nessuna
+pubblico: no
