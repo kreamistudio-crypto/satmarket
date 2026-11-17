@@ -15357,6 +15357,16 @@ document.getElementById('cartello')?.remove();</script>
         <div class="acc-b"><div id="codiciBlocco"></div></div>
       </div>
 
+      <!-- I PREMI FEDELTA' DEL NEGOZIO (17 nov 2026): «da 100 € spesi da
+           me, nel pacco dopo trovi la borsa». Fino a quattro gradini,
+           in euro; Barattolo conta e ricorda, il regalo lo mette chi
+           vende. Sta con le altre promesse commerciali, prima delle
+           ferie. In DEMO il cassetto sparisce, il patto del wallet. -->
+      <div class="acc" id="accPremiFedelta">
+        <button class="acc-h" onclick="toggleAcc('accPremiFedelta')"><span class="em">🎀</span>Premi fedeltà <span class="conta" id="premiFedeltaConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="premiFedeltaBlocco"></div></div>
+      </div>
+
       <!-- Il banner del negozio (ago 2026): l'insegna sopra il
            catalogo, una foto e un link al proprio sito. Ogni banner —
            e ogni sua modifica — passa da un moderatore: qui dentro
@@ -19148,6 +19158,9 @@ function mapOrder(o){
        cosa scritta dal compratore che un moderatore legge — «avevo
        chiesto la taglia L» e' una lite che senza non si decide. */
     notaCompratore:o.nota_compratore||'',
+    /* il premio fedelta' del negozio (17 nov 2026): {soglia, premio},
+       solo alle due parti e solo dove c'e' */
+    premioFedelta:o.premio_fedelta||null,
     /* la busta di consegna (ago 2026): nome e codice NON viaggiano
        mai in /api/orders — qui arrivano solo il quando (bustaIl =
        PRIMO deposito, 0 = mai) e le correzioni; il testo lo serve
@@ -26811,6 +26824,25 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
            <span>${frasePromessaSpedGratis(r)}</span></div>`
       : '';
   };
+  /* I PREMI FEDELTA' (17 nov 2026), dopo le due promesse sorelle: i
+     gradini del negozio e, a chi guarda da cliente, quanto ha gia'
+     speso qui e quanto manca al prossimo */
+  const premiNegozioRiga = w => {
+    const premi = (w.premi_fedelta || []).filter(p => p && p.premio);
+    if (!premi.length) return '';
+    const gradini = premi.map(p =>
+      `da ${fmt(p.soglia)} € <b>${esc(p.premio)}</b>`).join(' · ');
+    let mio = '';
+    if (typeof w.speso_qui_eur === 'number') {
+      const speso = w.speso_qui_eur;
+      const prossimo = premi.find(p => p.soglia > speso);
+      mio = `<br>Hai speso qui <b>${fmtEur(speso)} €</b>${prossimo
+        ? `: ti mancano ${fmtEur(prossimo.soglia - speso)} € per ${esc(prossimo.premio)}.`
+        : '.'}`;
+    }
+    return `<div class="trust-note nota-promessa" style="margin-top:12px">🎀
+      <span>Premi fedeltà, nel pacco dopo: ${gradini}.${mio}</span></div>`;
+  };
   const chi = (v.nome||'').split(' ')[0];
   /* I PONTI E IL LINK SONO TONDI DENTRO IL RIQUADRO (24 set 2026): i due
      ponti mai sul PROPRIO negozio, il link del negozio anche li'. Il
@@ -26849,7 +26881,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
      ogni apertura, e senza l'assegnazione la promessa del negozio di
      prima resterebbe a schermo su un negozio che non ne ha. */
   el('negozioPromesse').innerHTML =
-    `${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}`;
+    `${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}${premiNegozioRiga(v)}`;
   el('negozioFeedback').innerHTML = feedbackNegozioHTML(feedback, v.n_feedback);
   el('negozioGrid').innerHTML = annunci.length
     ? annunci.map(cardHTML).join('')
@@ -39572,6 +39604,7 @@ function openOrder(id){
             «libera i sats» qui, «apri disputa» in fondo — restavano
             davanti a chi aveva gia' confermato. Il server li rifiuta
             comunque (409): qui semplicemente non si offrono. */''}
+      ${notaPremioFedelta(o)}
       ${pannelloOnchainOrdine(o, s)}
       ${o.role==='buyer' && !inPagamento(o) && !(o.onchain && o.onchain.proposta && o.onchain.proposta.mia) && (['delivered'].includes(s) && !codiciInCorso(o) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && (o.consegnaScelta==='ritiro' || (o.consegnaScelta==='servizio' && o.appuntamentoIl && o.appuntamentoIl < Date.now()/1000)))) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='servizio'?'C\'è stata':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${/* A 'confirmed' ci si arriva in TRE modi, e la riga ne
@@ -43062,6 +43095,7 @@ function renderIdentita(){
   renderScontoPacco();
   renderSpedGratis();
   renderCodici();
+  renderPremiFedelta();
   renderFerie();
   renderBanner();
   renderSlugNegozio();
@@ -46294,6 +46328,106 @@ function scollegaConnettore(id){
     }});
 }
 
+/* «🎀 PREMI FEDELTA'» (17 nov 2026): la proposta di un negozio vero —
+   «chi compra da me sale di punteggio: a 100 € il pacco dopo ha la
+   borsa, a 200 la tazza». Fino a `max` gradini in euro, ognuno col suo
+   regalo scritto a parole. I campi scrivono nella bozza SENZA
+   ridisegnare (il fuoco resterebbe a meta' parola); aggiungere e
+   togliere una riga invece ridisegna. */
+let myPremiFedelta = [], premiFedeltaLeve = null, premiFedeltaBozza = null;
+function renderPremiFedelta(){
+  const box = el('premiFedeltaBlocco');
+  if (!box) return;
+  const sez = el('accPremiFedelta');
+  const L = premiFedeltaLeve;
+  if (DEMO || !(L && L.attivo)){
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  const n = myPremiFedelta.length;
+  el('premiFedeltaConta').textContent = n ? (n === 1 ? '1 premio' : `${n} premi`) : '';
+  if (!premiFedeltaBozza)
+    premiFedeltaBozza = n ? myPremiFedelta.map(p => ({soglia: p.soglia, premio: p.premio}))
+                          : [{soglia: 100, premio: ''}];
+  const b = premiFedeltaBozza;
+  const riga = (p, i) => `
+    <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+      <span style="font-size:12.5px;font-weight:700;color:var(--muted)">da</span>
+      <input type="number" inputmode="numeric" min="${L.min_eur}" max="${L.max_eur}" value="${esc(String(p.soglia||''))}"
+        oninput="premiFedeltaCampo(${i},'soglia',this.value)" aria-label="Soglia in euro"
+        style="width:78px;font:inherit;font-size:14px;padding:8px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink)">
+      <span style="font-size:12.5px;font-weight:700;color:var(--muted)">€</span>
+      <input type="text" maxlength="${L.testo_max}" value="${esc(p.premio||'')}" placeholder="es. la borsa di tela"
+        oninput="premiFedeltaCampo(${i},'premio',this.value)" aria-label="Il regalo"
+        style="flex:1;min-width:0;font:inherit;font-size:14px;padding:8px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink)">
+      <button type="button" onclick="premiFedeltaTogli(${i})" aria-label="Togli questo premio"
+        style="font:inherit;border:0;background:transparent;color:var(--muted);font-size:16px;cursor:pointer;padding:4px">✕</button>
+    </div>`;
+  box.innerHTML = `
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-bottom:2px">
+      Barattolo conta quanto ogni cliente ha speso da te (ordini conclusi,
+      in euro). Quando passa una soglia, il premio compare sul suo ordine
+      successivo: tu lo metti nel pacco.</div>
+    <div id="premiFedeltaErrore"></div>
+    ${b.map(riga).join('')}
+    ${b.length < L.max ? `<button type="button" class="scopri-link" style="margin-top:10px" onclick="premiFedeltaAggiungi()">＋ Aggiungi un premio</button>` : ''}
+    <button class="btn orange" onclick="setPremiFedelta()">🎀 Salva i premi</button>
+    ${n ? `<button class="btn ghost" onclick="setPremiFedelta(true)">Togli tutti i premi</button>` : ''}`;
+}
+function premiFedeltaCampo(i, campo, valore){
+  if (!premiFedeltaBozza || !premiFedeltaBozza[i]) return;
+  premiFedeltaBozza[i][campo] = campo === 'soglia' ? parseInt(valore, 10) || 0 : valore;
+}
+function premiFedeltaAggiungi(){
+  haptic();
+  const b = premiFedeltaBozza || [];
+  const ultima = b.length ? (b[b.length-1].soglia || 0) : 0;
+  b.push({soglia: ultima ? ultima * 2 : 100, premio: ''});
+  premiFedeltaBozza = b;
+  renderPremiFedelta();
+}
+function premiFedeltaTogli(i){
+  haptic();
+  (premiFedeltaBozza || []).splice(i, 1);
+  renderPremiFedelta();
+}
+async function setPremiFedelta(togliTutti){
+  haptic();
+  if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
+  const L = premiFedeltaLeve || {};
+  const errore = t => {
+    const dove = el('premiFedeltaErrore');
+    if (dove) dove.innerHTML =
+      `<div class="trust-note" style="margin-top:10px">⚠️ <span style="white-space:pre-line">${esc(t)}</span></div>`;
+    else toast(t, 6000);
+  };
+  /* le righe lasciate del tutto vuote si ignorano; quelle a meta' no:
+     un regalo senza soglia (o il contrario) e' quasi sempre un errore */
+  const premi = togliTutti ? [] : (premiFedeltaBozza || [])
+    .map(p => ({soglia: parseInt(p.soglia, 10) || 0, premio: String(p.premio||'').trim()}))
+    .filter(p => p.soglia || p.premio);
+  for (const p of premi) {
+    if (p.soglia < L.min_eur || p.soglia > L.max_eur)
+      return errore(`Ogni soglia va da ${fmt(L.min_eur)} a ${fmt(L.max_eur)} € di acquisti.`);
+    if (!p.premio) return errore(`Scrivi il regalo per la soglia di ${fmt(p.soglia)} €.`);
+  }
+  if (new Set(premi.map(p => p.soglia)).size !== premi.length)
+    return errore('Due premi hanno la stessa soglia.');
+  const box = el('premiFedeltaErrore');
+  if (box) box.innerHTML = '';
+  try {
+    const r = await fetch(`${API_BASE}/me/premi-fedelta`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({premi})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) return errore(d.detail || 'Non ci sono riuscito, riprova');
+    myPremiFedelta = d.premi || [];
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  premiFedeltaBozza = null;
+  renderPremiFedelta();
+  toast(myPremiFedelta.length ? '🎀 Premi fedeltà salvati' : 'Premi fedeltà tolti');
+}
 function renderSpedGratis(){
   const box = el('spedGratisBlocco');
   if (!box) return;
@@ -52050,6 +52184,18 @@ function notaChiusoDalTimer(o, s){
    problema. La finestra si scrive col NOT della forma positiva per la
    ragione della gemella: in DEMO `creato` non c'e' e NaN deve cadere
    sul ramo «non c'e'». */
+/* IL PREMIO FEDELTA' SULL'ORDINE (17 nov 2026): a chi vende cosa mettere
+   nel pacco, a chi compra cosa ci trovera'. Il server lo attacca solo
+   agli ordini pagati e non ancora spediti; una volta attaccato resta
+   scritto, anche dopo la consegna, come ricevuta. */
+function notaPremioFedelta(o){
+  const p = o && o.premioFedelta;
+  if (!p || !p.premio) return '';
+  const quanto = `${fmt(p.soglia)} €`;
+  return o.role === 'seller'
+    ? `<div class="trust-note nota-promessa">🎀 <span><b>Premio fedeltà:</b> questo cliente ha superato ${quanto} di acquisti da te. Nel pacco metti <b>${esc(p.premio)}</b>.</span></div>`
+    : `<div class="trust-note nota-promessa">🎀 <span><b>Premio fedeltà:</b> hai superato ${quanto} di acquisti in questo negozio. Nel pacco trovi <b>${esc(p.premio)}</b>.</span></div>`;
+}
 function notaFermo(o){
   if (o.role!=='buyer' || o.state!=='locked') return '';
   /* il ritiro ha gia' la sua nota verde e li' chi ha comprato conferma
@@ -107096,6 +107242,11 @@ async function avvia(){
                     valuta: me.sped_gratis_valuta || 'eur'};
     spedGratisLeve = me.sped_gratis_leve || null;   // idem
     spedGratisBozza = null;                         // idem, stessa ragione
+    /* i premi fedelta' (17 nov 2026): la lista pulita dal server, le
+       misure, e la bozza buttata per la stessa ragione delle sorelle */
+    myPremiFedelta = me.premi_fedelta || [];
+    premiFedeltaLeve = me.premi_fedelta_leve || null;
+    premiFedeltaBozza = null;
     /* il negozio collegato: la leva decide se il cassetto esiste, e
        la lista si rilegge da /api/me/connettori — puo' essere
        cambiata (un giro dell'orologio, un errore) mentre eravamo

@@ -205,6 +205,7 @@ collaudo_eth_xmr.py
 collaudo_mappa_ritiro.py
 collaudo_feedback_modificabile.py
 collaudo_mancia.py
+collaudo_premi_fedelta.py
 collaudo_cassa_negozio.py
 collaudo_payjoin.py
 collaudo_elimina_esauriti.py

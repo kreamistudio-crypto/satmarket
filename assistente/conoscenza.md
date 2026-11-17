@@ -163,6 +163,8 @@ I numeri del negozio: nel Profilo, gruppo «Negozio e spedizioni», il cassetto 
 
 I codici sconto: nel Profilo, alla voce «🎟 Codici sconto», chi vende crea i suoi codici (in percentuale o a cifra fissa, con una durata e un tetto di usi) e li dà a chi vuole; chi compra lo scrive alla cassa. Col tasto «📣» sulla riga di un codice ancora valido può anche mandarlo ai clienti che hanno già comprato da lui: sceglie chi (sono già tutti spuntati) e preme «Invia invito sconto». Il messaggio lo manda Barattolo, sul bot, come DM Nostr o dentro l'app, e chi vende non vede mai i contatti dei clienti. Ogni cliente riceve lo stesso codice una volta sola, e al massimo un invito a settimana dallo stesso negozio. Un codice scaduto, finito o in pausa non si può mandare: si riattiva con ✏️ (scegliendo di nuovo i giorni, che ripartono da oggi). La data «scade il» è scritta all'italiana, giorno/mese/anno. Chi riceve le offerte e non le vuole più le spegne in Profilo → «🔔 Avvisi» → «🎟️ Offerte dei negozi», per tutti i negozi o per uno solo.
 
+I premi fedeltà del negozio: nel Profilo, alla voce «🎀 Premi fedeltà», chi vende scrive fino a quattro gradini in euro, ognuno col suo regalo («da 100 € la borsa, da 200 € la tazza»). Barattolo conta quanto ogni cliente ha speso in quel negozio (solo gli ordini conclusi, in euro al cambio di quel giorno, mai gli altri negozi) e, quando passa una soglia, avvisa tutti e due e mostra il premio sul suo ordine successivo pagato e non ancora spedito: «Nel pacco trovi…» a chi compra, «Nel pacco metti…» a chi vende. Il regalo lo mette nel pacco il venditore: Barattolo non lo compra e non lo spedisce, e non è uno sconto (il prezzo non cambia). Ogni soglia vale una volta per cliente; se l'ordine col premio viene annullato, il premio passa al prossimo. Sulla pagina del negozio chi compra vede i gradini e quanto ha già speso lì. Non sono punti XP né livelli: quelli si fanno con tutti gli affari su Barattolo.
+
 Chi vende contenuti digitali può aggiungere all'annuncio le domande da fare a chi compra (testo breve, elenco a tendina, email, sì/no), obbligatorie o facoltative; nome, cognome ed email si aggiungono con un tocco. Il numero di telefono non si può chiedere.
 
 <!-- pezzo libro-014 | libro -->
@@ -998,6 +1000,7 @@ Negozio e spedizioni▾
 🚚Spedizione gratis ▾
 🎁Sconto sugli articoli ▾
 🎟Codici sconto ▾
+🎀Premi fedeltà ▾
 🖼Banner del negozio ▾
 🔗Link del negozio ▾
 🌴Negozio in ferie ▾
@@ -1867,14 +1870,6 @@ leva: nessuna
 pubblico: sì
 
 <!-- pezzo novita-063 | novita -->
-## Novità · 2026-11-17 · regali-livello
-
-frase: Salire di livello adesso regala qualcosa di vero: alla «Bottega avviata» la borsa di tela «Un tempo per te», al «Mercante pratico» la tazza, all'«esperto» la maglietta, al «Maestro del banco» il quaderno. Quando sblocchi un regalo il bot te lo dice: apri il Profilo, scrivi dove mandarlo (un locker o il tuo indirizzo) e te lo spediamo noi. Ogni regalo una volta sola, e i punti non cambiano.
-dove: il messaggio del bot «🎁 Hai sbloccato un regalo»; Profilo → «🎖 Livello e titolo» → «I tuoi regali» (il campo del recapito e «Mandamelo 🎁»); i regali di ogni gradino nella scala dei vantaggi.
-leva: REGALI_LIVELLO_ATTIVI (spenta di serie: si accende quando «Un tempo per te» aderisce)
-pubblico: no
-
-<!-- pezzo novita-064 | novita -->
 ## Novità · 2026-11-17 · chiedi-locker
 
 frase: Se un venditore non spedisce ai locker o ai punti di ritiro, alla cassa la riga del locker adesso resta visibile, spenta, con il tasto «Chiedi al venditore se spedisce con InPost o Poste»: lui riceve un avviso dal bot (senza sapere chi ha chiesto) che lo porta a spuntare i suoi corrieri, e quando lo fa chi aveva chiesto riceve l'avviso. Una richiesta per venditore ogni 7 giorni.
@@ -1882,7 +1877,7 @@ dove: la cassa di un annuncio a spedizione di un venditore senza InPost, Poste o
 leva: RICHIESTA_PUNTI (accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-065 | novita -->
+<!-- pezzo novita-064 | novita -->
 ## Novità · 2026-11-17 · barattozon-onchain
 
 frase: Barattozon adesso c'è anche on-chain: in «Vendi BTC» col tabacchino puoi toccare «On-chain» in cima al foglio e pubblicare il tuo PayCode nel libro on-chain. Serve un PayCode che scade fra almeno 12 ore; chi prende l'ordine vede il codice solo quando i tuoi sats sono confermati nel deposito di garanzia, poi lo paga al tabacchino e tocca «Ho pagato al tabacchino».
@@ -1890,7 +1885,7 @@ dove: Il P2P, «Vendi BTC» → la capsula Barattozon (o il + col metodo «Conta
 leva: P2P_ONCHAIN_BARATTOZON (accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-066 | novita -->
+<!-- pezzo novita-065 | novita -->
 ## Novità · 2026-11-17 · livelli-carosello
 
 frase: I tuoi livelli adesso si sfogliano: nel Profilo, sotto «Livello e titolo», ogni livello è una tessera da scorrere col dito. Sulla tua c'è l'anello con i tuoi XP sulla soglia del prossimo, i livelli già passati hanno la spunta, quelli davanti il lucchetto, e sotto vedi i vantaggi del livello che stai guardando: ✅ quelli già tuoi, 🔒 quelli da sbloccare.
@@ -1898,7 +1893,7 @@ dove: Profilo → «🎖 Livello e titolo» → «I vantaggi di ogni livello».
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-067 | novita -->
+<!-- pezzo novita-066 | novita -->
 ## Novità · 2026-11-17 · contante-per-posta
 
 frase: Nel P2P c'è un metodo in più, «Contante per posta»: chi compra sats spedisce le banconote a chi le vende, in una busta sigillata nascosta in un pacco, con un servizio tracciato. Le regole sono scritte nello scambio: chi spedisce filma l'imballo col numero di tracciamento in vista, chi riceve filma l'apertura prima di liberare i sats, e chi prende l'ordine blocca una piccola cauzione.
@@ -1906,7 +1901,7 @@ dove: P2P → «Pubblica» → «Altri metodi ▾» → «Contante per posta»; 
 leva: P2P_POSTA_ATTIVO (nuova, spenta di serie: in produzione resta spenta per scelta di Andrea, accesa solo sul collaudo)
 pubblico: no
 
-<!-- pezzo novita-068 | novita -->
+<!-- pezzo novita-067 | novita -->
 ## Novità · 2026-11-17 · chat-onchain
 
 frase: Anche negli scambi P2P on-chain adesso c'è la chat fra chi compra e chi vende, come nel Lightning: cifrata, con foto e PDF, da quando l'ordine è preso a quando i sats vengono liberati. Quando l'altra persona ti scrive, il bot te lo dice col tasto che apre dritto la chat; in una disputa il moderatore la può leggere, e a scambio finito si cancella.
@@ -1914,10 +1909,18 @@ dove: la pagina di uno scambio on-chain preso, riquadro «💬 Chat con …» in
 leva: P2P_CHAT_SCAMBIO (la stessa della chat del Lightning, accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-069 | novita -->
+<!-- pezzo novita-068 | novita -->
 ## Novità · 2026-11-17 · serie-giorni
 
 frase: Nel tuo Profilo c'è una fiamma che conta quanti giorni di fila hai aperto Barattolo, col tuo record e gli ultimi sette giorni. Basta entrare una volta al giorno. Se salti un giorno riparte da 1 e il record resta. Non dà punti né premi e la vedi solo tu: è solo la soddisfazione di non fermarla.
 dove: Profilo, nel riquadro col tuo nome (riga «5 giorni di fila · record 12») e la fila dei sette giorni subito sotto; al primo accesso del giorno il saluto che compare in basso per un paio di secondi.
 leva: SERIE_GIORNI_ATTIVA (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-069 | novita -->
+## Novità · 2026-11-17 · premi-fedelta
+
+frase: I negozi possono premiare chi torna a comprare: nel Profilo, «🎀 Premi fedeltà», chi vende scrive fino a quattro soglie in euro col suo regalo («da 100 € la borsa, da 200 € la tazza»). Barattolo conta quanto ogni cliente ha speso lì e, passata la soglia, il premio compare sul suo ordine successivo: il venditore lo mette nel pacco. Sulla pagina del negozio vedi i premi e quanto hai già speso.
+dove: Profilo → «🎀 Premi fedeltà»; la pagina di un negozio, riga «🎀 Premi fedeltà» sotto le promesse; il dettaglio dell'ordine, riga «🎀 Premio fedeltà»; il messaggio del bot «Premio fedeltà!».
+leva: PREMI_FEDELTA_ATTIVI (accesa di serie)
 pubblico: sì

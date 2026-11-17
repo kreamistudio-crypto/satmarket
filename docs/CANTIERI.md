@@ -87641,3 +87641,66 @@ sezioni toccate e i collaudi on-chain e della serie; poi su 1cb0b906
 DA GUARDARE. Il riquadro «Dove ricevi i bitcoin?» resta quello di tutti
 gli scambi on-chain, e nel conto «Totale da inviare» resta la parola di
 sempre.
+
+## I premi fedeltà del negozio, e i regali di Barattolo tolti (17 nov 2026, cantiere premi-fedelta; Andrea: «il negozio un tempo per te c'è già. Quel messaggio che ti avevo mandato era lui che proponeva, cioè in base a quanto la gente compra nel suo negozio»; sulla scheda: «Sì, premi del negozio»)
+
+LA STORIA. La mattina Andrea aveva girato la proposta di «Un tempo per
+te» (quattro articoli col logo; idea 1 preordini a quantità minima,
+idea 2 «chi compra da me sale di punteggio: a 100 il pacco dopo ha la
+borsa, a 200 la tazza»). L'avevo letta come un marchio di Andrea, e ne
+erano nati i REGALI PER LIVELLO di Barattolo (develop 37950a43: il merch
+a chi sale di gradino, spedito da Andrea), poi spenti (db98430e) quando
+si è capito che «Un tempo per te» non aveva aderito. Era invece un
+NEGOZIO già su Barattolo, e la proposta era sua, per i suoi clienti.
+Questo cantiere toglie i due commit (revert, non leva spenta: un
+codice morto con una tabella e un pannello admin che nessuno usa è un
+debito) e costruisce la cosa chiesta: soglie e regali li sceglie chi
+vende, Barattolo conta e ricorda, il regalo va nel SUO pacco.
+
+LE DECISIONI.
+- IN EURO E BASTA, non anche in sats come spedizione gratis e sconto: è
+  un conto lungo, fatto di ordini a cambi diversi, e l'euro di ognuno è
+  già fotografato in `cambio_eur`. Contano solo gli affari CONCLUSI
+  (released), non le prove, non i cambi sconosciuti (la regola di
+  xp_ordine). Il totale è quello pagato, spedizione compresa: lo stesso
+  numero degli XP, così due conti non si contraddicono mai.
+- IL PREMIO MATURA una volta per cliente, negozio e soglia, e il regalo
+  si FOTOGRAFA in riga: il negozio che poi cambia regalo non toglie
+  niente a chi l'aveva già guadagnato. Una soglia spostata (100 → 120)
+  è una soglia nuova e può maturare di nuovo: è il negozio a deciderlo.
+- SI ATTACCA al primo ordine pagato e non ancora spedito (locked): è
+  l'ultimo momento in cui il regalo può entrare nel pacco. Un premio per
+  ordine. L'ordine annullato o rimborsato lo stacca, e passa al prossimo.
+- L'AGGANCIO È PIGRO, alla lettura di /api/orders: i pagamenti entrano
+  da Lightning, on-chain e set, e un giudice solo dove tutti li leggono
+  non ne dimentica una. Lì matura anche, in silenzio, chi aveva già
+  speso abbastanza prima che il negozio scrivesse le soglie.
+- L'AVVISO a tutti e due parte allo sblocco dei sats (dopo i distintivi,
+  prima degli XP), fail-open come i distintivi.
+- NON È UNO SCONTO e non muove un sat: niente escrow, niente regola 10.
+  Niente avviso al canale admin: è un patto fra negozio e cliente.
+- Leva `PREMI_FEDELTA_ATTIVI` accesa di serie (regola del 14 nov).
+
+LE STRADE SCARTATE: i regali globali per livello (l'equivoco, tolti);
+il premio come sconto in sats sul pacco dopo (toccherebbe l'escrow);
+una scorta di regali tenuta da Barattolo; «Prenota senza pagare» per
+l'idea 1 dei preordini — proposta ad Andrea, non ancora decisa, NON
+costruita.
+
+IMPERFEZIONE DICHIARATA: se qualcuno apre la lista ordini proprio nei
+secondi fra lo sblocco e l'avviso, il premio matura in silenzio e
+l'avviso del bot non parte (la riga sull'ordine c'è comunque).
+
+PROVATO. `prove_premi_fedelta` (45: il giudice, il conto, la
+maturazione una volta sola col regalo fotografato, l'aggancio e lo
+stacco, la lista ordini solo alle due parti, la leva spenta, l'avviso
+scappato in HTML, le sentinelle, la riga del dettaglio in node);
+`collaudo_premi_fedelta` (25, sulle rotte vere: i no della rotta,
+/api/me, la vetrina con «hai speso qui», l'avviso una volta sola, il
+premio sul prossimo ordine solo alle due parti, la leva spenta). I
+banchi che eseguono `_sblocca_sats` e `miei_ordini` hanno il loro
+`premia_fedelta_negozio`/`premi_di_ordini` di cartone.
+
+DA GUARDARE DAL VIVO: il cassetto «🎀 Premi fedeltà» a 375 px (quattro
+righe con soglia e regalo), la riga sulla pagina del negozio, e un
+ordine vero di «Un tempo per te» che passa la soglia.

@@ -190,6 +190,7 @@ collaudo_eth_xmr
 collaudo_mappa_ritiro
 collaudo_feedback_modificabile
 collaudo_mancia
+collaudo_premi_fedelta
 collaudo_cassa_negozio
 collaudo_payjoin
 collaudo_elimina_esauriti

@@ -36697,3 +36697,37 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   di serie: spenta, niente timbro, niente chiave in /api/me, rotta 404,
   le righe restano. Prove: `prove_serie_giorni`,
   `collaudo_serie_giorni`.
+- I PREMI FEDELTÀ DEL NEGOZIO 🎀 (17 nov 2026, cantiere premi-fedelta; la
+  proposta di un negozio vero, «Un tempo per te»). Il venditore scrive
+  fino a `PREMI_FEDELTA_MAX` (4) gradini «da N € spesi da me, nel pacco
+  dopo metto X» in `utenti.premi_fedelta` (JSON), sempre letto dal
+  giudice unico `premi_fedelta_leggi` (soglie da `PREMI_FEDELTA_MIN_EUR`
+  a `PREMI_FEDELTA_MAX_EUR`, regalo di `PREMIO_TESTO_MAX` caratteri,
+  doppioni e sporcizia cadono in silenzio). Il conto è
+  `speso_nel_negozio`: ordini `released` della coppia, non di prova e
+  col cambio, in euro (`prezzo_sats × cambio_eur`, lo stesso numero
+  degli XP). Una soglia passata MATURA una riga in
+  `premi_fedelta_maturati` (UNIQUE compratore, venditore, soglia; il
+  regalo fotografato) — da `premia_fedelta_negozio`, chiamata in
+  `_sblocca_sats` dopo i distintivi, con l'avviso a tutti e due — e si
+  AGGANCIA (`ordine_id`) al primo ordine della coppia pagato e non
+  spedito (`PREMI_STATI_AGGANCIO` = locked), uno per ordine; un ordine
+  morto (`PREMI_STATI_MORTI`) lo stacca. L'aggancio è PIGRO, in
+  `premi_di_ordini` dentro `/api/orders` (scrittura idempotente su una
+  GET, come i distintivi in /api/me), perché i pagamenti entrano da
+  molte porte; lì matura anche in silenzio chi aveva già speso prima
+  che il negozio scrivesse le soglie. Escono: `premio_fedelta`
+  {soglia, premio} sulle righe di `/api/orders`, solo alle due parti;
+  `premi_fedelta` (e `speso_qui_eur` a chi guarda da cliente) in
+  `/api/negozio`; la lista pulita e `premi_fedelta_leve` in `/api/me`.
+  Rotta: `POST /api/me/premi-fedelta` {premi: [...]}, chiave
+  obbligatoria (MSG_CLIENT_VECCHIO), lista vuota = spento. Fusione e
+  cancellazione portano/tolgono le righe per `compratore_id` e
+  `venditore_id`. Leva `PREMI_FEDELTA_ATTIVI` (accesa di serie, gruppo
+  «🎁 Premi fedeltà del negozio» del pannello): spenta, niente vetrina,
+  niente maturazioni né agganci nuovi; gli agganci fatti restano
+  scritti. Nessun sat si muove. Nel telefono: il cassetto
+  `#accPremiFedelta` del Profilo (`renderPremiFedelta`,
+  `setPremiFedelta`), la riga `premiNegozioRiga` dopo le due promesse
+  sorelle in `#negozioPromesse`, e `notaPremioFedelta(o)` nel dettaglio
+  dell'ordine. Prove: `prove_premi_fedelta` e `collaudo_premi_fedelta`.
