@@ -4033,6 +4033,46 @@
     .miss-voce{width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer}
     .miss-stelline{color:#FFD25A;letter-spacing:1px}
     .miss-stelline i{font-style:normal;color:rgba(255,255,255,.18)}
+    /* L'ARENA (17 nov 2026): il minigioco dove Tappo si muove, a tutto
+       schermo dentro il foglio della missione. La tela in mezzo, sopra il
+       cruscotto, il fumetto o il cartello della cosa vicina; sotto il
+       tasto dell'azione (fuori dalla tela: non copre mai la stanza). */
+    .miss-velo.arena{padding:0;overflow:hidden}
+    .miss-velo.arena .miss-carta{width:min(100%,760px);height:100%;display:flex;flex-direction:column;
+      padding:calc(8px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom))}
+    .miss-velo.arena .miss-testa{margin:0 0 8px}
+    .miss-velo.arena #missioneCorpo{flex:1;min-height:0;display:flex;flex-direction:column}
+    .miss-velo.arena .miss-riga{bottom:calc(84px + env(safe-area-inset-bottom))}
+    .arena-box{position:relative;flex:1;min-height:0;border-radius:20px;overflow:hidden;background:#0B0F1F;
+      border:1px solid var(--c-riga);touch-action:none}
+    .arena-tela{display:block;width:100%;height:100%;touch-action:none;outline:none;cursor:pointer}
+    .arena-hud{position:absolute;left:8px;right:8px;top:8px;display:flex;flex-wrap:wrap;gap:6px;pointer-events:none}
+    .arena-hud span{padding:5px 10px;border-radius:999px;background:rgba(10,15,31,.8);color:#FFF6E3;
+      font-size:12.5px;font-weight:800}
+    .arena-hud span:first-child{color:#FFD25A;letter-spacing:1px}
+    .arena-hud i{font-style:normal;color:rgba(255,255,255,.2)}
+    .arena-hud .caldo{background:#7F1D1D}
+    .arena-hud .mano{background:rgba(247,147,26,.94);color:#1C1F24}
+    .arena-fumetto{position:absolute;left:8px;right:8px;top:44px;pointer-events:none;opacity:0;
+      transform:translateY(-8px);transition:opacity .25s ease,transform .25s ease}
+    .arena-fumetto.su{opacity:1;transform:none}
+    .arena-fumetto .miss-fumetto{margin:0;animation:none}
+    .arena-cartello{position:absolute;left:8px;right:8px;top:44px;padding:10px 12px;border-radius:14px;
+      background:#FFF6DC;color:#3A2A12;font-size:14.5px;line-height:1.45;pointer-events:none;
+      box-shadow:0 10px 24px rgba(0,0,0,.4)}
+    .arena-cartello[hidden]{display:none}
+    .arena-cartello ul{margin:4px 0 0;padding:0;list-style:none}
+    .arena-cartello ul.due{display:grid;grid-template-columns:1fr 1fr;column-gap:10px}
+    .arena-banner{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%) scale(.8);width:max-content;
+      max-width:calc(100% - 32px);padding:12px 20px;border-radius:18px;background:rgba(10,15,31,.88);color:#FFF6E3;
+      font-size:22px;font-weight:900;line-height:1.2;text-align:center;opacity:0;pointer-events:none;
+      transition:opacity .3s ease,transform .3s cubic-bezier(.2,1.4,.4,1)}
+    .arena-banner small{display:block;margin-bottom:3px;font-size:11.5px;font-weight:800;color:var(--c-ambra2);
+      letter-spacing:.06em;text-transform:uppercase}
+    .arena-banner.su{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    .caccia-btn.arena-azione{flex:none;margin:10px 0 0}
+    .caccia-btn.arena-azione:disabled{filter:none;opacity:1;background:rgba(255,255,255,.07);color:#F5F0E6;
+      border:1px solid var(--c-riga);box-shadow:none}
     .miss-velo{position:fixed;inset:0;z-index:4001;overflow-y:auto;overscroll-behavior:contain;
       padding:14px 12px 30px;background:radial-gradient(120% 50% at 50% -5%,#28346A 0%,rgba(40,52,106,0) 60%),#0A0F1F;
       color:#F5F0E6;opacity:0;transition:opacity .2s ease}
@@ -60867,7 +60907,8 @@ function mondoSottoIlDito(u, v){
 /* Il mondo e' davanti agli occhi? Sennò il giro si ferma da solo */
 function mondoDavanti(){
   const v = el('view-caccia');
-  return !!(mondo && v && v.classList.contains('active') && cacciaUi.scheda === 'mondo' && !document.hidden);
+  const mv = el('missioneVelo');      /* con una missione aperta sopra, il mondo si ferma */
+  return !!(mondo && v && v.classList.contains('active') && cacciaUi.scheda === 'mondo' && !document.hidden && !(mv && !mv.hidden));
 }
 /* Accende il giro (se serve): lo chiamano la scheda, lo stato nuovo, il
    ritorno alla pagina */
@@ -61285,6 +61326,7 @@ const MISS_CHI = {
   gazza: {nome: 'La Gazza', em: '🐦'},
   fidati: {nome: 'Il signor Fidati', em: '🦚'},
   topo: {nome: 'Topo', em: '🐭'}, ape: {nome: 'Ape', em: '🐝'}, rana: {nome: 'Rana', em: '🐸'}, riccio: {nome: 'Riccio', em: '🦔'},
+  gufo: {nome: 'Il Gufo', em: '🦉'}, lumaca: {nome: 'Lumaca', em: '🐌'},
 };
 let missione = null;     /* la missione aperta: {id, passo, errori, dati, scheda}, o null */
 
@@ -61632,9 +61674,851 @@ function halvingIndovina(giusto){
 }
 function halvingAvanti(){ const m = missione; if (m && m.id === 'halving') { m.passo = HALVING_ERE.length; m.dati = {}; missioneDisegna(); } }
 
+/* ============ L'ARENA: I MINIGIOCHI DOVE TAPPO SI MUOVE (17 nov 2026) ============
+   Andrea (17 nov): le missioni diventano minigiochi dove Tappo si muove
+   davvero, «assolutamente in maniera fluida», ognuno nel suo posto
+   dipinto, dall'alto (questa arena) o di lato (da fare); «devono essere
+   tantissimi» e sempre piu' difficili salendo il tabellone. La
+   difficolta' viene dalla ZONA della missione (`arenaLivello`).
+   Il motore e' uno per tutte: la tela, Tappo che va dove tocchi o dove
+   lo guidi col dito trascinato (o con frecce/WASD), i muri e gli
+   ostacoli, il tasto dell'azione vicino alle cose, i fumetti, le prove
+   una dopo l'altra. Ogni minigioco porta solo la sua scena (`ARENA_xxx`):
+   le cose, i guastafeste, le regole. Gli errori fanno le stelle come
+   sempre (`missioneStelle`) e la fine chiama `missioneFine`: server,
+   stelle e bulloni sono quelli di prima.
+   Il dipinto viene da Flow (`/assets/mondo/miss-<id>.webp`, la stanza
+   vuota con la stessa pianta); finche' non c'e', la scena si disegna da
+   sola. I suoni passano da `suonoTappo(nome)` del tabellone, sempre
+   dietro `typeof`: senza il tabellone si gioca muti. */
+const ARENA_LIVELLI = [
+  {veloce: 0.62, tempo: 22, morso: 1.9, tarli: 1, aiuti: true},    /* zone 0-1: largo, un guastafeste lento */
+  {veloce: 0.8, tempo: 26, morso: 1.5, tarli: 2, aiuti: true},     /* zone 2-3 */
+  {veloce: 1.0, tempo: 30, morso: 1.2, tarli: 2, aiuti: false},    /* zone 4-5 */
+  {veloce: 1.2, tempo: 34, morso: 0.95, tarli: 3, aiuti: false},   /* zone 6-7: stretto, tre guastafeste */
+];
+const ARENA_PASSO = 330;          /* quanto corre Tappo, in unita' della stanza al secondo */
+const ARENA_RAGGIO = 34;          /* l'ingombro dei piedi di Tappo */
+/* PURA: il livello di difficolta' per la zona del tabellone (0-7) */
+function arenaLivello(zona){
+  return ARENA_LIVELLI[Math.max(0, Math.min(3, Math.floor((Number(zona) || 0) / 2)))];
+}
+/* PURA: la profondita' finta — in fondo (in alto) piu' piccolo */
+function arenaProfondo(sc, y){
+  return 0.84 + 0.26 * Math.max(0, Math.min(1, y / sc.A));
+}
+/* PURA: il passo da (x, y) di (dx, dy) nella scena, SCIVOLANDO lungo
+   muri e ostacoli (cerchi {x,y,r} e rettangoli {x,y,w,h} di pianta) */
+function arenaMuovi(sc, x, y, dx, dy, r){
+  let nx = x + dx, ny = y + dy;
+  for (let giro = 0; giro < 3; giro++) {
+    for (const o of sc.ostacoli || []) {
+      if (o.w !== undefined) {
+        const px = Math.max(o.x, Math.min(o.x + o.w, nx)), py = Math.max(o.y, Math.min(o.y + o.h, ny));
+        const ex = nx - px, ey = ny - py, d = Math.hypot(ex, ey);
+        if (d < r) {
+          if (d > 1e-4) { nx = px + ex / d * r; ny = py + ey / d * r; }
+          else {                              /* il centro e' dentro: fuori dal lato piu' vicino */
+            const l = [nx - o.x, o.x + o.w - nx, ny - o.y, o.y + o.h - ny], m = Math.min(...l), k = l.indexOf(m);
+            if (k === 0) nx = o.x - r; else if (k === 1) nx = o.x + o.w + r; else if (k === 2) ny = o.y - r; else ny = o.y + o.h + r;
+          }
+        }
+      } else {
+        const ex = nx - o.x, ey = ny - o.y, d = Math.hypot(ex, ey), rr = o.r + r;
+        if (d < rr && d > 1e-4) { nx = o.x + ex / d * rr; ny = o.y + ey / d * rr; }
+      }
+    }
+    const m = sc.muri;
+    nx = Math.max(m[0] + r, Math.min(m[2] - r, nx));
+    ny = Math.max(m[1] + r * 0.5, Math.min(m[3] - r * 0.5, ny));
+  }
+  return [nx, ny];
+}
+/* PURA: la telecamera — la stanza intera dentro la tela (sul telefono
+   in piedi ci sta tutta), al centro */
+function arenaInquadra(L, A, sc){
+  const k = Math.min(L / sc.L, A / sc.A);
+  return {k, x0: (L - sc.L * k) / 2, y0: (A - sc.A * k) / 2};
+}
+/* PURA: la cosa piu' vicina a Tappo entro il suo raggio, o null */
+function arenaVicina(cose, x, y){
+  let meglio = null, quanto = 1e9;
+  for (const c of cose || []) {
+    if (!c.r || c.via) continue;
+    const d = Math.hypot(c.x - x, (c.y - y) * 1.3);
+    if (d <= c.r && d < quanto) { meglio = c; quanto = d; }
+  }
+  return meglio;
+}
+
+let arena = null;     /* il minigioco in corso: tutto quel che tiene in mano, o null */
+/* PURA: l'impalcatura della tela, nel foglio della missione */
+function arenaHTML(nome){
+  return `<div class="arena-box" id="arenaBox"><canvas class="arena-tela" id="arenaTela" role="img" aria-label="${esc(nome)}: Tappo si muove dove tocchi o dove lo guidi col dito"></canvas>`
+    + `<div class="arena-hud" id="arenaHud"></div><div class="arena-fumetto" id="arenaFumetto"></div>`
+    + `<div class="arena-cartello" id="arenaCartello" hidden></div><div class="arena-banner" id="arenaBanner"></div>`
+    + `<div class="caccia-leva" id="arenaLeva"><i></i></div></div>`
+    + `<button type="button" class="caccia-btn arena-azione" id="arenaAzione" onclick="arenaFai()" disabled>Tocca dove vuoi andare</button>`;
+}
+/* IL MINIGIOCO PARTE (da `missioneVia`): il foglio va a tutto schermo,
+   nasce la tela, comincia la prima prova */
+function arenaApri(m){
+  const def = (MISSIONI_GIOCO[m.id] || {}).arena, v = el('missioneVelo'), corpo = el('missioneCorpo');
+  if (!def || !v || !corpo) return false;
+  arenaFerma();
+  v.classList.add('arena');
+  corpo.innerHTML = arenaHTML(m.info.nome);
+  const tela = el('arenaTela'), g = tela && tela.getContext('2d');
+  if (!g) { v.classList.remove('arena'); return false; }
+  const tappo = new Image();
+  arena = {def, m, tela, g, sc: def.scena, liv: arenaLivello(m.info.zona), tempo: 0, prima: 0, giro: 0, dt: 0.016,
+    x: def.scena.via[0], y: def.scena.via[1], vx: 0, vy: 0, verso: 1, gira: 1, fase: 0, salto: 0, cammina: 0,
+    schiaccia: 0, meta: null, metaNata: 0, guida: null, tasti: {}, dito: null, blocco: 0, sbuffo: 0, ultimoPasso: 0,
+    pianta: def.scena, cose: [], nemici: [], polvere: [], scoppi: [], prova: -1, dice: null, vicino: null, scossa: 0,
+    banner: 0, attesa: null, hud: '', cartello: '', azione: '', tappo, tappoPronto: false};
+  tappo.decoding = 'async';
+  tappo.onload = () => { if (arena && arena.tappo === tappo) arena.tappoPronto = true; };
+  tappo.src = '/assets/caccia-tappo.webp';
+  mondoImmagine('miss-' + m.id);
+  arenaComandi(tela);
+  arenaProva(0);
+  arenaAccendi();
+  return true;
+}
+/* il minigioco si ferma (fine, chiusura, rigioca): via il giro e la tela */
+function arenaFerma(){
+  if (arena && arena.giro) cancelAnimationFrame(arena.giro);
+  arena = null;
+  const v = el('missioneVelo'); if (v) v.classList.remove('arena');
+}
+/* una prova dopo l'altra; finite le prove, la missione e' fatta */
+function arenaProva(n){
+  const a = arena; if (!a) return;
+  const p = a.def.prove[n];
+  if (!p) { arenaFerma(); missioneFine(); return; }
+  a.prova = n; a.cose = []; a.nemici = []; a.attesa = null; a.vicino = null; a.cartello = null; a.meta = null;
+  p.nasci(a);
+  /* la pianta di questa prova: i muri della stanza, gli ostacoli fissi e
+     le cose solide (un leggio non si attraversa) */
+  a.pianta = {muri: a.sc.muri, ostacoli: (a.sc.ostacoli || []).concat(a.cose.filter(c => c.solido).map(c => ({x: c.x, y: c.y, r: c.solido})))};
+  a.banner = effettiRidotti() ? 1.6 : 2.2;
+  const b = el('arenaBanner');
+  if (b) { b.innerHTML = `<small>Prova ${n + 1} di ${a.def.prove.length}</small>${esc(p.nome)}`; b.className = 'arena-banner su'; }
+  arenaSuono('porta');
+  arenaPannelli(a, true);
+}
+/* fra poco succede qualcosa (una prova che finisce, una busta che
+   arriva): un'attesa sola alla volta, a tempo di gioco */
+function arenaDopo(a, sec, poi){ a.attesa = {fra: sec, poi}; }
+function arenaSuono(nome){
+  if (typeof suonoTappo === 'function') { try { suonoTappo(nome); } catch(e) {} }
+}
+/* il fumetto in cima alla tela (testi nostri, mai dal server) */
+function arenaDice(a, chi, testo, sec){
+  a.dice = {chi, testo, fino: a.tempo + (sec || 4.5)};
+  const f = el('arenaFumetto');
+  if (f) { f.innerHTML = missFumettoHTML(chi, testo); f.className = 'arena-fumetto su'; }
+}
+function arenaBene(a, testo){ arenaSuono('giusto'); missioneBene(testo); }
+function arenaErrore(a, testo){
+  a.m.errori++; a.scossa = effettiRidotti() ? 0 : 0.35;
+  arenaSuono('sbagliato'); missioneMale(testo, 4200);
+}
+function arenaScoppio(a, x, y, colore, n){
+  if (effettiRidotti()) return;
+  for (let i = 0; i < (n || 14); i++) a.scoppi.push({x, y, a: i / (n || 14) * 6.2832 + Math.random() * 0.3, v: 120 + Math.random() * 120, vita: 0.7, c: colore || '255,214,107'});
+}
+
+/* I COMANDI: il dito (un tocco = «vai li'», trascinato = lo guidi) e la
+   tastiera (frecce o WASD; Invio, spazio o E per l'azione), solo mentre
+   il minigioco e' davanti */
+function arenaComandi(tela){
+  const punto = e => { const r = tela.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  tela.addEventListener('pointerdown', e => {
+    if (!arena) return;
+    const [u, v] = punto(e);
+    arena.dito = {id: e.pointerId, u, v, x0: e.clientX, y0: e.clientY, mosso: false};
+    try { tela.setPointerCapture(e.pointerId); } catch(_) {}
+    e.preventDefault();
+  });
+  tela.addEventListener('pointermove', e => {
+    const d = arena && arena.dito;
+    if (!d || d.id !== e.pointerId) return;
+    const dx = e.clientX - d.x0, dy = e.clientY - d.y0, l = Math.hypot(dx, dy);
+    if (l > 12) d.mosso = true;
+    if (d.mosso) {
+      const k = Math.min(1, l / 60) / (l || 1);
+      arena.guida = [dx * k, dy * k]; arena.meta = null;
+      arenaLeva(d.x0, d.y0, dx, dy);
+    }
+  });
+  const su = e => {
+    const d = arena && arena.dito;
+    if (!d || d.id !== e.pointerId) return;
+    arena.dito = null; arena.guida = null; arenaLeva();
+    if (!d.mosso && e.type === 'pointerup' && arena.camCss) {
+      const c = arena.camCss;
+      arena.meta = [(d.u - c.x0) / c.k, (d.v - c.y0) / c.k]; arena.metaNata = arena.tempo;
+    }
+  };
+  tela.addEventListener('pointerup', su);
+  tela.addEventListener('pointercancel', su);
+  if (arenaComandi.fatto) return;
+  arenaComandi.fatto = true;
+  const tasto = (e, giu) => {
+    if (!arena || !arenaDavanti()) return;
+    const dove = e.target && e.target.tagName;
+    if (dove === 'INPUT' || dove === 'TEXTAREA' || dove === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = {ArrowUp: 'su', KeyW: 'su', ArrowDown: 'giu', KeyS: 'giu', ArrowLeft: 'sx', KeyA: 'sx', ArrowRight: 'dx', KeyD: 'dx'}[e.code];
+    if (!k) {
+      if (giu && (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyE') && dove !== 'BUTTON') { e.preventDefault(); arenaFai(); }
+      return;
+    }
+    e.preventDefault();
+    arena.tasti[k] = giu;
+    if (giu) arena.meta = null;
+  };
+  window.addEventListener('keydown', e => tasto(e, true));
+  window.addEventListener('keyup', e => tasto(e, false));
+  window.addEventListener('blur', () => { if (arena) arena.tasti = {}; });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) arenaAccendi(); });
+}
+function arenaLeva(x0, y0, dx, dy){
+  const l = el('arenaLeva'), box = el('arenaBox');
+  if (!l || !box) return;
+  if (x0 === undefined) { l.style.display = 'none'; return; }
+  const r = box.getBoundingClientRect(), k = Math.min(1, 32 / (Math.hypot(dx, dy) || 1));
+  l.style.display = 'block';
+  l.style.left = (x0 - r.left) + 'px'; l.style.top = (y0 - r.top) + 'px';
+  l.firstElementChild.style.transform = 'translate(' + (dx * k) + 'px,' + (dy * k) + 'px)';
+}
+/* Il minigioco e' davanti agli occhi? Sennò il giro si ferma da solo
+   (e il tempo delle prove con lui) */
+function arenaDavanti(){
+  const v = el('missioneVelo');
+  return !!(arena && v && !v.hidden && !document.hidden && missione === arena.m && missione.fase === 'gioco');
+}
+function arenaAccendi(){
+  if (arena && !arena.giro && arenaDavanti()) { arena.prima = 0; arena.giro = requestAnimationFrame(arenaGiro); }
+}
+function arenaGiro(adesso){
+  const a = arena;
+  if (!a) return;
+  a.giro = 0;
+  if (!arenaDavanti()) { a.tasti = {}; return; }
+  const dt = Math.min(0.05, a.prima ? (adesso - a.prima) / 1000 : 0.016);
+  a.prima = adesso;
+  arenaPassa(a, dt);
+  if (arena !== a) return;            /* la missione e' finita in questo passo */
+  arenaDisegna(a);
+  a.giro = requestAnimationFrame(arenaGiro);
+}
+/* UN PASSO DEL TEMPO: Tappo si muove (molleggiando), la prova fa la sua
+   parte, le cose vicine accendono il tasto */
+function arenaPassa(a, dt){
+  const fermo = effettiRidotti();
+  a.dt = dt; a.tempo += dt;
+  let vx = 0, vy = 0;
+  const t = a.tasti;
+  if (t.su || t.giu || t.sx || t.dx) { vx = (t.dx ? 1 : 0) - (t.sx ? 1 : 0); vy = (t.giu ? 1 : 0) - (t.su ? 1 : 0); const l = Math.hypot(vx, vy) || 1; vx /= l; vy /= l; }
+  else if (a.guida) { vx = a.guida[0]; vy = a.guida[1]; }
+  else if (a.meta) {
+    const dx = a.meta[0] - a.x, dy = a.meta[1] - a.y, l = Math.hypot(dx, dy);
+    if (l < 8) a.meta = null; else { const k = Math.min(1, l / 46); vx = dx / l * k; vy = dy / l * k; }
+  }
+  /* la velocita' insegue la voglia: parte e si ferma morbido */
+  const mor = Math.min(1, dt * (vx || vy ? 12 : 16));
+  a.vx += (vx - a.vx) * mor; a.vy += (vy - a.vy) * mor;
+  const px = a.x, py = a.y, passo = ARENA_PASSO * arenaProfondo(a.sc, a.y) * dt;
+  if (Math.abs(a.vx) + Math.abs(a.vy) > 0.01) { const p = arenaMuovi(a.pianta, a.x, a.y, a.vx * passo, a.vy * passo, ARENA_RAGGIO); a.x = p[0]; a.y = p[1]; }
+  const fatto = Math.hypot(a.x - px, a.y - py);
+  if (a.meta && fatto < passo * 0.08) { a.blocco += dt; if (a.blocco > 0.35) a.meta = null; } else a.blocco = 0;
+  const va = fatto > passo * 0.15;
+  a.cammina += ((va ? 1 : 0) - a.cammina) * Math.min(1, dt * 9);
+  if (Math.abs(a.vx) > 0.15) a.verso = a.vx > 0 ? 1 : -1;
+  a.gira += (a.verso - a.gira) * Math.min(1, dt * 14);
+  if (va) {
+    const prima = Math.floor(a.fase / Math.PI);
+    a.fase += dt * 12;
+    if (Math.floor(a.fase / Math.PI) !== prima) {          /* un saltello che atterra */
+      a.schiaccia = fermo ? 0 : 0.14;
+      if (a.tempo - a.ultimoPasso > 0.26) { a.ultimoPasso = a.tempo; arenaSuono('passo'); }
+      if (!fermo) a.polvere.push({x: a.x - a.vx * 22, y: a.y + 3, vita: 0.45});
+    }
+  }
+  a.salto = fermo ? 0 : Math.abs(Math.sin(a.fase)) * 17 * a.cammina;
+  a.schiaccia = Math.max(0, a.schiaccia - dt * 0.9);
+  a.scossa = Math.max(0, a.scossa - dt);
+  a.polvere = a.polvere.filter(p => (p.vita -= dt) > 0);
+  a.scoppi = a.scoppi.filter(p => (p.vita -= dt) > 0);
+  if (a.banner > 0) { a.banner -= dt; if (a.banner <= 0) { const b = el('arenaBanner'); if (b) b.className = 'arena-banner'; } }
+  if (a.dice && a.tempo > a.dice.fino) { a.dice = null; const f = el('arenaFumetto'); if (f) f.className = 'arena-fumetto'; }
+  /* chi scappa torna alla tana da solo, in ogni prova */
+  a.nemici.forEach(n => { if (n.stato === 'fugge') { const t = arenaTana(a, n.x, n.y, true); if (!t || arenaTarloVa(a, n, t[0], t[1], 1.8, dt)) n.stato = 'tana'; } });
+  const p = a.def.prove[a.prova];
+  if (p && p.passa) p.passa(a, dt);
+  if (arena !== a) return;
+  if (a.attesa) { a.attesa.fra -= dt; if (a.attesa.fra <= 0) { const poi = a.attesa.poi; a.attesa = null; poi(); if (arena !== a) return; } }
+  /* le cose che si prendono passandoci sopra */
+  if (p && p.tocca) for (const c of a.cose) if (!c.via && c.tocca && Math.hypot(c.x - a.x, (c.y - a.y) * 1.3) < c.tocca) p.tocca(a, c);
+  a.vicino = arenaVicina(a.cose, a.x, a.y);
+  a.pannelli = (a.pannelli || 0) + dt;
+  if (a.pannelli > 0.12) { a.pannelli = 0; arenaPannelli(a); }
+}
+/* I PANNELLI SOPRA LA TELA: il cruscotto, il cartello della cosa vicina,
+   il tasto dell'azione. Si riscrivono solo quando cambiano. */
+function arenaPannelli(a, tutto){
+  const p = a.def.prove[a.prova]; if (!p) return;
+  const st = missioneStelle(a.m.errori);
+  const hud = `<span>${[1, 2, 3].map(i => i <= st ? '★' : '<i>★</i>').join('')}</span>` + (p.hud ? p.hud(a) : '');
+  if (tutto || hud !== a.hud) { a.hud = hud; const h = el('arenaHud'); if (h) h.innerHTML = hud; }
+  const cart = (a.vicino && p.cartello && p.cartello(a, a.vicino)) || '';
+  if (tutto || cart !== a.cartello) {
+    a.cartello = cart;
+    const c = el('arenaCartello');
+    if (c) { c.hidden = !cart; c.innerHTML = cart; }
+    const f = el('arenaFumetto'); if (f) f.style.visibility = cart ? 'hidden' : '';
+  }
+  const az = (a.vicino && p.azione && p.azione(a, a.vicino)) || null;
+  const testo = az ? az[0] : (p.invito ? p.invito(a) : 'Tocca dove vuoi andare');
+  const chiave = testo + (az && az[1] ? '|1' : '|0');
+  if (tutto || chiave !== a.azione) {
+    a.azione = chiave;
+    const b = el('arenaAzione');
+    if (b) { b.textContent = testo; b.disabled = !(az && az[1]); b.classList.toggle('vivo', !!(az && az[1])); }
+  }
+}
+/* il tasto in basso (o Invio): l'azione della cosa vicina */
+function arenaFai(){
+  const a = arena; if (!a || !a.vicino) return;
+  const p = a.def.prove[a.prova], az = p && p.azione && p.azione(a, a.vicino);
+  if (!az || !az[1]) return;
+  haptic();
+  az[1]();
+  if (arena === a) arenaPannelli(a);
+}
+
+/* ---------- IL DISEGNO di un fotogramma ---------- */
+function arenaDisegna(a){
+  const g = a.g, tela = a.tela, fermo = effettiRidotti(), sc = a.sc;
+  const dpr = Math.min(fermo ? 1 : 2, window.devicePixelRatio || 1);
+  const L = Math.max(2, Math.round(tela.clientWidth * dpr)), A = Math.max(2, Math.round(tela.clientHeight * dpr));
+  if (tela.width !== L || tela.height !== A) { tela.width = L; tela.height = A; }
+  const c = arenaInquadra(L, A, sc);
+  const sx = a.scossa > 0 ? Math.sin(a.tempo * 70) * a.scossa * 22 * c.k : 0;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  /* le fasce fuori dalla stanza col colore della parete e del pavimento */
+  const bordi = a.def.bordi || ['#0B0F1F', '#0B0F1F'];
+  g.fillStyle = bordi[0]; g.fillRect(0, 0, L, A / 2); g.fillStyle = bordi[1]; g.fillRect(0, A / 2, L, A - A / 2);
+  g.setTransform(c.k, 0, 0, c.k, c.x0 + sx, c.y0);
+  const fondo = mondoImmagine('miss-' + a.m.id);
+  if (fondo) {
+    if (c.x0 > 2) { g.save(); g.globalAlpha = 0.3; g.filter = 'blur(16px)'; g.drawImage(fondo, -sc.L, -sc.A * 0.1, sc.L * 3, sc.A * 1.2); g.restore(); }
+    g.drawImage(fondo, 0, 0, sc.L, sc.A);
+  } else a.def.fondo(g, a);
+  if (a.meta) {
+    const k = fermo ? 1 : 0.85 + Math.sin(a.tempo * 8) * 0.15;
+    g.save(); g.translate(a.meta[0], a.meta[1]); g.scale(1, 0.42);
+    g.strokeStyle = 'rgba(255,200,60,' + (0.9 * k) + ')'; g.lineWidth = 6;
+    g.beginPath(); g.arc(0, 0, 32 * k, 0, 6.2832); g.stroke(); g.restore();
+  }
+  /* la cosa vicina: un alone per terra, cosi' si capisce col tasto */
+  if (a.vicino) {
+    const v = a.vicino, k = fermo ? 1 : 0.9 + Math.sin(a.tempo * 5) * 0.1;
+    g.save(); g.translate(v.x, v.y + 6); g.scale(1, 0.4);
+    g.strokeStyle = 'rgba(255,214,107,.75)'; g.lineWidth = 7;
+    g.beginPath(); g.arc(0, 0, (v.alone || 80) * k, 0, 6.2832); g.stroke(); g.restore();
+  }
+  /* le cose in piedi, ordinate dal fondo al davanti */
+  const roba = [];
+  a.cose.forEach(x => { if (!x.via) roba.push([x.y, () => a.def.cosa(g, a, x)]); });
+  a.nemici.forEach(n => roba.push([n.y, () => a.def.nemico(g, a, n)]));
+  a.polvere.forEach(p => roba.push([p.y - 1, () => {
+    g.fillStyle = 'rgba(240,222,196,' + (p.vita * 0.9) + ')';
+    g.beginPath(); g.arc(p.x, p.y - (0.45 - p.vita) * 26, 6 + (0.45 - p.vita) * 18, 0, 6.2832); g.fill();
+  }]));
+  roba.push([a.y, () => arenaTappo(g, a, fermo)]);
+  roba.sort((p, q) => p[0] - q[0]);
+  for (const r of roba) r[1]();
+  a.scoppi.forEach(p => {
+    const t = 0.7 - p.vita;
+    g.fillStyle = 'rgba(' + p.c + ',' + Math.min(1, p.vita * 1.8) + ')';
+    g.beginPath(); g.arc(p.x + Math.cos(p.a) * t * p.v, p.y + Math.sin(p.a) * t * p.v - t * 50, 7 * (0.5 + p.vita), 0, 6.2832); g.fill();
+  });
+  if (a.def.sopra) a.def.sopra(g, a);
+  a.camCss = {k: c.k / dpr, x0: (c.x0) / dpr, y0: c.y0 / dpr};
+}
+/* TAPPO: il disegno ufficiale, che molleggia — si allunga sul salto, si
+   schiaccia all'atterraggio, si piega verso dove va, si gira passando
+   di taglio. Con gli effetti ridotti sta dritto e scivola. */
+function arenaTappo(g, a, fermo){
+  const sc = arenaProfondo(a.sc, a.y), ond = fermo ? 0 : Math.sin(a.fase) * 0.05 * a.cammina;
+  const resp = fermo ? 0 : Math.sin(a.tempo * 2.6) * 0.018 * (1 - a.cammina);
+  const alto = 176 * sc * (1 + ond * 0.6 + resp - a.schiaccia), largo = 176 * 0.78 * sc * (1 - ond * 0.4 - resp * 0.5 + a.schiaccia * 0.9);
+  arenaOmbra(g, a.x, a.y + 2, 62 * sc * (1 - a.salto / 60), 0.55);
+  g.save();
+  g.translate(a.x, a.y - a.salto);
+  if (!fermo) g.rotate(a.vx * 0.09 * a.cammina);
+  const giro = Math.sign(a.gira || 1) * Math.max(0.12, Math.abs(a.gira));
+  g.scale(giro, 1);
+  if (a.tappoPronto) g.drawImage(a.tappo, -largo / 2, -alto, largo, alto);
+  else {                                    /* finche' il disegno non arriva: un barattolino */
+    g.fillStyle = 'rgba(200,235,255,.75)'; g.strokeStyle = '#fff'; g.lineWidth = 4;
+    g.beginPath(); g.roundRect ? g.roundRect(-largo * 0.36, -alto * 0.8, largo * 0.72, alto * 0.8, 22) : g.rect(-largo * 0.36, -alto * 0.8, largo * 0.72, alto * 0.8); g.fill(); g.stroke();
+    g.fillStyle = '#F7931A'; g.fillRect(-largo * 0.4, -alto * 0.94, largo * 0.8, alto * 0.16);
+  }
+  g.restore();
+  const cap = cappelloCaccia(cacciaStato);
+  if (cap) {
+    g.font = Math.round(56 * sc) + 'px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(cap, a.x, a.y - a.salto - alto * 0.95);
+  }
+}
+function arenaOmbra(g, x, y, r, al){
+  g.save(); g.translate(x, y); g.scale(1, 0.36);
+  const o = g.createRadialGradient(0, 0, 0, 0, 0, Math.max(1, r));
+  o.addColorStop(0, 'rgba(20,10,0,' + al + ')'); o.addColorStop(1, 'rgba(20,10,0,0)');
+  g.fillStyle = o; g.beginPath(); g.arc(0, 0, Math.max(1, r), 0, 6.2832); g.fill(); g.restore();
+}
+/* un'emoji disegnata (i personaggi che non hanno ancora un dipinto) */
+function arenaEmoji(g, em, x, y, px){
+  g.font = Math.round(px) + 'px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(em, x, y);
+}
+/* IL TARLO: un vermetto a cinque anelli che si snoda dietro alla testa.
+   Rosicchia (la testa che va su e giu'), stordito (le stelline), in
+   fuga (piu' veloce, verso la tana) */
+function arenaTarlo(g, a, n){
+  const fermo = effettiRidotti(), sc = arenaProfondo(a.sc, n.y);
+  if (n.stato === 'tana') return;
+  const anelli = n.anelli;
+  arenaOmbra(g, n.x, n.y + 4, 46 * sc, 0.45);
+  for (let i = anelli.length - 1; i >= 0; i--) {
+    const p = anelli[i], r = (22 - i * 2.4) * sc, su = fermo ? 0 : Math.sin(a.tempo * 12 - i * 0.9) * 3 * (n.stato === 'stordito' ? 0 : 1);
+    g.fillStyle = i % 2 ? '#7FA83A' : '#94C24A'; g.strokeStyle = 'rgba(40,60,10,.6)'; g.lineWidth = 3;
+    g.beginPath(); g.arc(p[0], p[1] - 18 * sc - su, r, 0, 6.2832); g.fill(); g.stroke();
+  }
+  const morde = n.stato === 'morde' && !fermo ? Math.abs(Math.sin(a.tempo * 16)) * 8 : 0;
+  const hx = n.x, hy = n.y - 30 * sc - morde, r = 28 * sc, dir = n.dir || 1;
+  g.fillStyle = '#A8D45A'; g.strokeStyle = 'rgba(40,60,10,.7)'; g.lineWidth = 3;
+  g.beginPath(); g.arc(hx, hy, r, 0, 6.2832); g.fill(); g.stroke();
+  /* gli occhi: storditi diventano due X */
+  [-1, 1].forEach(k => {
+    const ex = hx + (k * 9 + dir * 6) * sc, ey = hy - 6 * sc;
+    if (n.stato === 'stordito') {
+      g.strokeStyle = '#2A1A0A'; g.lineWidth = 3; g.beginPath();
+      g.moveTo(ex - 4 * sc, ey - 4 * sc); g.lineTo(ex + 4 * sc, ey + 4 * sc); g.moveTo(ex + 4 * sc, ey - 4 * sc); g.lineTo(ex - 4 * sc, ey + 4 * sc); g.stroke();
+    } else {
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(ex, ey, 7 * sc, 0, 6.2832); g.fill();
+      g.fillStyle = '#1A1208'; g.beginPath(); g.arc(ex + dir * 2 * sc, ey + 1, 3.6 * sc, 0, 6.2832); g.fill();
+    }
+  });
+  /* il ghigno con i due dentoni */
+  g.strokeStyle = '#3A2A0A'; g.lineWidth = 3; g.beginPath(); g.arc(hx + dir * 5 * sc, hy + 6 * sc, 10 * sc, 0.15, 2.9); g.stroke();
+  g.fillStyle = '#fff'; g.fillRect(hx + dir * 5 * sc - 6 * sc, hy + 14 * sc, 5 * sc, 7 * sc); g.fillRect(hx + dir * 5 * sc + 1 * sc, hy + 14 * sc, 5 * sc, 7 * sc);
+  if (n.stato === 'stordito' && !fermo) for (let i = 0; i < 3; i++) {
+    const t = a.tempo * 5 + i * 2.09;
+    arenaEmoji(g, '⭐', hx + Math.cos(t) * 30 * sc, hy - 34 * sc + Math.sin(t) * 9 * sc, 20 * sc);
+  }
+}
+/* il Tarlo cammina: gli anelli seguono la testa a distanza fissa */
+function arenaTarloSegui(n){
+  let prima = [n.x, n.y];
+  for (const p of n.anelli) {
+    const dx = p[0] - prima[0], dy = p[1] - prima[1], d = Math.hypot(dx, dy) || 1;
+    if (d > 20) { p[0] = prima[0] + dx / d * 20; p[1] = prima[1] + dy / d * 20; }
+    prima = p;
+  }
+}
+/* PURA (a parte il caso): la tana dove scappare (la piu' vicina) o da
+   dove uscire (una delle due piu' lontane da Tappo: niente appostamenti) */
+function arenaTana(a, x, y, vicina){
+  const t = (a.sc.tane || []).slice().sort((p, q) => Math.hypot(p[0] - x, p[1] - y) - Math.hypot(q[0] - x, q[1] - y));
+  if (!t.length) return null;
+  if (vicina) return t[0];
+  return t[t.length - 1 - Math.floor(Math.random() * Math.min(2, t.length))];
+}
+function arenaTarloNasci(x, y){
+  return {x, y, dir: 1, stato: 'tana', fra: 0.6, meta: null, preda: null, anelli: [0, 1, 2, 3, 4].map(() => [x, y])};
+}
+/* il Tarlo fa un passo verso (tx, ty); vero se c'e' arrivato */
+function arenaTarloVa(a, n, tx, ty, veloce, dt){
+  const dx = tx - n.x, dy = ty - n.y, d = Math.hypot(dx, dy);
+  if (d < 14) return true;
+  const passo = Math.min(d, 260 * veloce * dt);
+  const p = arenaMuovi(a.pianta, n.x, n.y, dx / d * passo, dy / d * passo, 24);
+  if (Math.abs(dx) > 2) n.dir = dx > 0 ? 1 : -1;
+  n.x = p[0]; n.y = p[1];
+  arenaTarloSegui(n);
+  return false;
+}
+
+/* ============ MINIGIOCO 1: IL QUADERNO DI TUTTI (zona 0, la biblioteca) ============
+   Dall'elenco delle 24 missioni (studio, «Le 24 missioni»): la
+   biblioteca dei quaderni. Tre prove, una idea per prova:
+   1. LA COPIA DIVERSA — cinque leggii, ognuno con la copia di un amico;
+      il Tarlo ne ha rosicchiata una. Tappo le legge camminando e
+      corregge quella che non e' uguale alle altre: vince la maggioranza.
+   2. FERMA IL TARLO — sette copie; il Tarlo esce dalla tana e rosicchia
+      dove puo'. Tappo lo acchiappa e rimette a posto le copie passandoci
+      sopra. Se cambia piu' della meta' delle copie, ha vinto lui.
+   3. LA DOPPIA SPESA — arrivano le buste dei pagamenti. Il conto torna?
+      Si scrive nel quaderno grande. Gli stessi bulloni spesi due volte?
+      Si strappa nel cestino.
+   I conti e i nomi sono finti, come sempre. */
+const QUAD_SCENA = {L: 900, A: 1500, muri: [124, 372, 776, 1440], via: [450, 1330], ostacoli: [],
+  tane: [[700, 392], [200, 392], [146, 1060], [754, 1060]]};
+const QUAD_POSTI_5 = [[450, 600], [690, 800], [600, 1110], [300, 1110], [210, 800]];
+const QUAD_POSTI_7 = [[450, 560], [670, 660], [700, 930], [585, 1180], [315, 1180], [200, 930], [230, 660]];
+const QUAD_AMICI = ['topo', 'ape', 'rana', 'riccio', 'gufo', 'lumaca', 'tappo'];
+/* PURA: le quattro righe del quaderno (chi, a chi, quanto) */
+function quadernoRigheArena(){ return [['Topo', 'Ape', 3], ['Ape', 'Rana', 2], ['Rana', 'Tappo', 4], ['Riccio', 'Topo', 1]]; }
+/* i saldi di partenza della terza prova e le buste, in ordine */
+const QUAD_SALDI = {tarlo: 5, rana: 4, topo: 1, ape: 0, riccio: 2, tappo: 0};
+const QUAD_BUSTE = [['rana', 'topo', 2], ['tarlo', 'ape', 5], ['tarlo', 'riccio', 5], ['ape', 'tappo', 3]];
+const QUAD_POSTI_BUSTA = [[250, 560], [650, 560], [300, 1010], [620, 1010], [450, 1240], [200, 820], [700, 820]];
+/* PURA: una busta si puo' scrivere? Solo se chi paga ha ancora quei bulloni */
+function quadernoBustaValida(saldi, b){ return (Number(saldi[b[0]]) || 0) >= b[2]; }
+/* PURA: i saldi dopo aver scritto la busta */
+function quadernoScrivi(saldi, b){
+  const s = Object.assign({}, saldi);
+  s[b[0]] = (Number(s[b[0]]) || 0) - b[2]; s[b[1]] = (Number(s[b[1]]) || 0) + b[2];
+  return s;
+}
+/* PURA: quante copie sono rosicchiate, e se il Tarlo ha la maggioranza */
+function quadernoMaggioranza(cose){
+  const l = cose.filter(c => c.tipo === 'leggio'), rotti = l.filter(c => c.rotto).length;
+  return {rotti, tot: l.length, vinta: rotti * 2 > l.length};
+}
+function quadNome(chi){ return (MISS_CHI[chi] || {nome: chi}).nome; }
+function quadBustaTesto(b){ return quadNome(b[0]) + ' paga ' + b[2] + ' 🔩 a ' + quadNome(b[1]); }
+function quadLeggio(p, i, extra){
+  return Object.assign({tipo: 'leggio', x: p[0], y: p[1], r: 128, alone: 76, solido: 30, chi: QUAD_AMICI[i], letto: false, rotto: false, morso: 0}, extra || {});
+}
+
+const ARENA_QUADERNO = {
+  scena: QUAD_SCENA,
+  prove: [
+    {nome: 'La copia diversa',
+     nasci(a){
+       const truccato = Math.floor(Math.random() * 5), riga = Math.floor(Math.random() * 4);
+       a.dati = {truccato, riga, letti: 0, aiuto: false};
+       a.cose = QUAD_POSTI_5.map((p, i) => quadLeggio(p, i));
+       arenaDice(a, 'tappo', 'Ognuno dei miei amici ha una copia del quaderno dei conti. Stanotte il Tarlo ne ha rosicchiata <b>una</b>. Vai ai leggii, leggi e trova quella diversa!', 6.5);
+     },
+     hud(a){ return `<span>📖 lette ${a.cose.filter(c => c.letto).length}/5</span>`; },
+     passa(a){
+       const v = a.vicino;
+       if (v && v.tipo === 'leggio' && !v.letto) {
+         v.letto = true; arenaSuono('raccogli');
+         const letti = a.cose.filter(c => c.letto).length;
+         if (letti === 3 && a.liv.aiuti && !a.dati.aiuto) { a.dati.aiuto = true; arenaDice(a, 'tappo', 'Confronta le cifre: quella che hanno <b>quasi tutti</b> è quella vera.', 4.5); }
+       }
+     },
+     cartello(a, c){
+       if (c.tipo !== 'leggio') return '';
+       const d = a.dati, righe = quadernoRigheArena().map((r, k) => {
+         const falso = a.cose.indexOf(c) === d.truccato && k === d.riga;
+         return `<li>${esc(r[0])} → ${esc(r[1])}: <b>${falso ? r[2] * 10 : r[2]}</b> 🔩</li>`;
+       }).join('');
+       return `<b>📓 La copia di ${esc(quadNome(c.chi))}</b><ul>${righe}</ul>`;
+     },
+     invito(a){ return a.cose.some(c => c.letto) ? 'Vai a leggere un altro leggio' : 'Tocca un leggio per andarci'; },
+     azione(a, c){
+       if (c.tipo !== 'leggio' || c.giusto) return null;
+       return ['✏️ Questa copia è sbagliata: correggila', () => {
+         if (a.cose.indexOf(c) === a.dati.truccato) {
+           c.giusto = true; arenaScoppio(a, c.x, c.y - 120);
+           arenaBene(a, 'Trovata! Quattro copie su cinque dicevano un\'altra cifra: vince la maggioranza.');
+           const t = arenaTarloNasci(c.x + 40, c.y + 10); t.stato = 'fugge'; a.nemici = [t];
+           arenaDice(a, 'tarlo', 'Uffa, scoperto! Va bene… allora ne rosicchio TANTE insieme!', 3.2);
+           arenaDopo(a, 2.6, () => arenaProva(1));
+         } else arenaErrore(a, 'Questa copia è uguale alla maggioranza: confrontala con le altre.');
+       }];
+     }},
+    {nome: 'Ferma il Tarlo',
+     nasci(a){
+       const liv = a.liv;
+       a.dati = {resta: liv.tempo, finita: false, aiuto: liv.aiuti ? a.tempo + 4.8 : 0};
+       a.cose = QUAD_POSTI_7.map((p, i) => quadLeggio(p, i, {r: 0}));
+       a.nemici = Array.from({length: liv.tarli}, (_, i) => { const n = arenaTarloNasci(450, 392); n.fra = 1.2 + i * 2.4; return n; });
+       arenaDice(a, 'tarlo', 'Se cambio <b>più della metà</b> delle copie, il quaderno dice quello che voglio io! Gnam gnam.', 4.5);
+     },
+     hud(a){
+       const q = quadernoMaggioranza(a.cose);
+       return `<span>⏱ ${Math.max(0, Math.ceil(a.dati.resta))} s</span><span${q.rotti * 2 + 2 > q.tot ? ' class="caldo"' : ''}>📓 giuste ${q.tot - q.rotti}/${q.tot}</span>`;
+     },
+     invito(){ return 'Acchiappa il Tarlo e ripara le copie rosse'; },
+     passa(a, dt){
+       const d = a.dati, liv = a.liv;
+       if (d.finita) return;
+       if (d.aiuto && a.tempo > d.aiuto) { d.aiuto = 0; arenaDice(a, 'tappo', 'Toccalo per acchiapparlo, e passa vicino alle copie rosse per rimetterle a posto!', 4.5); }
+       d.resta -= dt;
+       for (const n of a.nemici) {
+         if (n.stato === 'tana') {
+           n.fra -= dt;
+           if (n.fra <= 0) {
+             const t = arenaTana(a, a.x, a.y, false);
+             n.stato = 'va'; n.x = t[0] + (t[0] < 300 && t[1] > 600 ? 30 : t[0] > 600 && t[1] > 600 ? -30 : 0); n.y = t[1] + (t[1] < 600 ? 30 : 0);
+             n.anelli.forEach(p => { p[0] = n.x; p[1] = n.y; });
+           }
+           continue;
+         }
+         if (n.stato === 'stordito') { n.fra -= dt; if (n.fra <= 0) n.stato = 'torna'; continue; }
+         if (n.stato === 'torna') { const t = arenaTana(a, n.x, n.y, true); if (arenaTarloVa(a, n, t[0], t[1], liv.veloce * 1.3, dt)) { n.stato = 'tana'; n.fra = 1.4 / liv.veloce; } continue; }
+         if (n.stato === 'va') {
+           if (!n.preda || n.preda.rotto) {
+             const prese = a.nemici.map(x => x.preda);
+             const libere = a.cose.filter(c => c.tipo === 'leggio' && !c.rotto && !prese.includes(c));
+             n.preda = libere.length ? libere[Math.floor(Math.random() * libere.length)] : null;
+             if (!n.preda) continue;
+           }
+           if (arenaTarloVa(a, n, n.preda.x + (n.x < n.preda.x ? -62 : 62), n.preda.y + 10, liv.veloce, dt)) { n.stato = 'morde'; n.morso = 0; }
+         } else if (n.stato === 'morde') {
+           n.morso += dt; n.preda.morso = Math.min(1, n.morso / liv.morso);
+           if (n.morso >= liv.morso) {
+             n.preda.rotto = true; n.preda.morso = 0; n.preda = null; n.stato = 'va'; arenaSuono('tarlo');
+             const q = quadernoMaggioranza(a.cose);
+             if (q.vinta) {
+               arenaErrore(a, 'Il Tarlo ha cambiato più della metà delle copie: per un attimo il quaderno ha detto il falso! Ricominciamo.');
+               a.cose.forEach(c => { c.rotto = false; c.morso = 0; });
+               a.nemici.forEach((x, i) => { x.stato = 'tana'; x.fra = 1.5 + i * 1.5; x.preda = null; });
+             }
+           }
+         }
+         /* Tappo lo tocca: stordito, e la copia smette di perdere pezzi */
+         if ((n.stato === 'va' || n.stato === 'morde') && Math.hypot(n.x - a.x, (n.y - a.y) * 1.3) < 74) {
+           if (n.preda) n.preda.morso = 0;
+           n.stato = 'stordito'; n.fra = 1.7; n.preda = null; arenaSuono('giusto'); haptic('success');
+           arenaScoppio(a, n.x, n.y - 40, '255,255,255', 10);
+         }
+       }
+       /* le copie rosse si riparano passandoci accanto */
+       for (const c of a.cose) if (c.rotto && Math.hypot(c.x - a.x, (c.y - a.y) * 1.3) < 96) {
+         c.rotto = false; arenaSuono('conto'); arenaScoppio(a, c.x, c.y - 110, '120,220,140', 12);
+       }
+       if (d.resta <= 0) {
+         d.finita = true;
+         a.cose.forEach(c => { c.rotto = false; c.morso = 0; });
+         a.nemici.forEach(n => { if (n.stato !== 'tana') n.stato = 'fugge'; n.preda = null; });
+         arenaBene(a, 'Con tante copie e tanti occhi, barare non conviene: il Tarlo si arrende!');
+         arenaDice(a, 'tarlo', 'Va bene, va bene! Ma ho ancora un trucco…', 3);
+         arenaDopo(a, 2.4, () => arenaProva(2));
+       }
+     }},
+    {nome: 'La doppia spesa',
+     nasci(a){
+       a.dati = {saldi: Object.assign({}, QUAD_SALDI), coda: 0, mano: null, fatte: 0, posti: missMescola(QUAD_POSTI_BUSTA)};
+       a.cose = [{tipo: 'grande', x: 450, y: 760, r: 180, alone: 110, solido: 92}, {tipo: 'cestino', x: 690, y: 1240, r: 140, alone: 70, solido: 40}];
+       a.nemici = [];
+       arenaDice(a, 'tappo', 'Arrivano le buste dei pagamenti! Prendile una alla volta: se il conto torna <b>scrivila</b> nel quaderno grande, se gli stessi bulloni sono spesi due volte <b>strappala</b>.', 7);
+       arenaDopo(a, 1.2, () => quadBustaArriva(a));
+     },
+     hud(a){
+       const d = a.dati;
+       return `<span>✉️ ${d.fatte}/${QUAD_BUSTE.length}</span>` + (d.mano ? `<span class="mano">In mano: ${esc(quadBustaTesto(d.mano))}</span>` : '');
+     },
+     invito(a){ return a.dati.mano ? 'Portala al quaderno o al cestino' : 'Prendi la busta: camminaci sopra'; },
+     tocca(a, c){
+       if (c.tipo !== 'busta' || a.dati.mano || c.z > 30) return;
+       c.via = true; a.dati.mano = c.busta; arenaSuono('raccogli'); haptic();
+     },
+     passa(a, dt){
+       for (const c of a.cose) if (c.tipo === 'busta' && c.z > 0) { c.z = Math.max(0, c.z - dt * 260); if (!c.z) arenaSuono('atterra'); }
+       a.cose = a.cose.filter(c => !(c.tipo === 'busta' && c.via));
+     },
+     cartello(a, c){
+       if (c.tipo === 'grande') {
+         const s = a.dati.saldi;
+         return `<b>📓 Il quaderno di tutti: i bulloni di ognuno</b><ul class="due">${Object.keys(QUAD_SALDI).map(k => `<li>${esc(quadNome(k))}: <b>${s[k]}</b> 🔩</li>`).join('')}</ul>`;
+       }
+       if (c.tipo === 'busta') return `<b>✉️ ${esc(quadBustaTesto(c.busta))}</b>`;
+       return '';
+     },
+     azione(a, c){
+       const d = a.dati, b = d.mano;
+       if (c.tipo === 'grande') return b ? ['📓 Scrivi nel quaderno', () => quadBustaDecidi(a, true)] : ['📓 Il quaderno dei conti', null];
+       if (c.tipo === 'cestino') return b ? ['🗑️ Strappa: è una doppia spesa', () => quadBustaDecidi(a, false)] : ['🗑️ Il cestino delle buste false', null];
+       return null;
+     }},
+  ],
+  fondo: quadFondo, bordi: ['#1E3328', '#1C120A'],
+  cosa: quadCosa,
+  nemico: arenaTarlo,
+};
+/* la busta che arriva dalla finestra e plana su un posto libero */
+function quadBustaArriva(a){
+  const d = a.dati, b = QUAD_BUSTE[d.coda];
+  if (!b) return;
+  const p = d.posti[d.coda % d.posti.length];
+  d.coda++;
+  a.cose.push({tipo: 'busta', x: p[0], y: p[1], z: effettiRidotti() ? 0 : 420, busta: b, r: 0, tocca: 70, alone: 50, seme: Math.random() * 6});
+  arenaSuono('porta');
+}
+/* scrivere (vero) o strappare (falso) la busta che si ha in mano */
+function quadBustaDecidi(a, scrivi){
+  const d = a.dati, b = d.mano; if (!b) return;
+  const valida = quadernoBustaValida(d.saldi, b);
+  if (scrivi && valida) arenaBene(a, 'Scritto! ' + quadNome(b[0]) + ' aveva i bulloni, il conto torna.');
+  else if (!scrivi && !valida) arenaBene(a, 'Strappata! Gli stessi bulloni non si spendono due volte: questa si chiama doppia spesa.');
+  else if (scrivi) arenaErrore(a, quadNome(b[0]) + ' quei bulloni li ha già spesi! Scritti due volte sarebbero una doppia spesa: andava strappata.');
+  else arenaErrore(a, 'Il conto tornava: ' + quadNome(b[0]) + ' aveva ancora i bulloni. Questa andava scritta.');
+  if (valida) { d.saldi = quadernoScrivi(d.saldi, b); arenaSuono('conto'); arenaScoppio(a, 450, 640); }
+  else arenaScoppio(a, 690, 1170, '255,120,90', 10);
+  d.mano = null; d.fatte++;
+  if (d.fatte >= QUAD_BUSTE.length) {
+    arenaDice(a, 'tarlo', 'Niente da fare: con un quaderno così, che tengono tutti, non si bara!', 3);
+    arenaDopo(a, 2.4, () => arenaProva(3));
+  } else arenaDopo(a, 0.9, () => quadBustaArriva(a));
+}
+/* LA BIBLIOTECA disegnata da sola, finche' non arriva il dipinto: la
+   parete in fondo con gli scaffali e la finestra della luna, il
+   parquet, il tappeto, le librerie ai lati, la tana del Tarlo */
+function quadFondo(g, a){
+  const L = 900, A = 1500;
+  if (!quadFondo.tela) {                      /* il fondo non cambia: si dipinge una volta */
+    const t = document.createElement('canvas'); t.width = L; t.height = A;
+    const q = t.getContext('2d');
+    q.fillStyle = '#2B1A10'; q.fillRect(0, 0, L, A);
+    /* la parete in fondo: verde scuro, la finestra ad arco con la luna */
+    const muro = q.createLinearGradient(0, 0, 0, 380); muro.addColorStop(0, '#1E3328'); muro.addColorStop(1, '#2C4A3A');
+    q.fillStyle = muro; q.fillRect(0, 0, L, 380);
+    q.fillStyle = '#16223A'; q.beginPath(); q.moveTo(370, 300); q.lineTo(370, 120); q.arc(450, 120, 80, Math.PI, 0); q.lineTo(530, 300); q.closePath(); q.fill();
+    const luna = q.createRadialGradient(480, 110, 4, 480, 110, 60); luna.addColorStop(0, 'rgba(255,248,220,1)'); luna.addColorStop(0.4, 'rgba(255,240,200,.9)'); luna.addColorStop(1, 'rgba(255,240,200,0)');
+    q.fillStyle = luna; q.beginPath(); q.arc(480, 110, 60, 0, 6.2832); q.fill();
+    for (let i = 0; i < 14; i++) { q.fillStyle = 'rgba(255,255,255,' + (0.3 + mondoCaso(i) * 0.6) + ')'; q.fillRect(380 + mondoCaso(i * 3) * 140, 60 + mondoCaso(i * 5) * 220, 2, 2); }
+    q.strokeStyle = '#5A3A1E'; q.lineWidth = 10; q.beginPath(); q.moveTo(370, 300); q.lineTo(370, 120); q.arc(450, 120, 80, Math.PI, 0); q.lineTo(530, 300); q.closePath(); q.stroke();
+    q.lineWidth = 5; q.beginPath(); q.moveTo(450, 40); q.lineTo(450, 300); q.moveTo(370, 180); q.lineTo(530, 180); q.stroke();
+    /* gli scaffali di libri ai due lati della finestra */
+    const scaffale = (x0, x1) => {
+      q.fillStyle = '#4A2C16'; q.fillRect(x0, 30, x1 - x0, 320);
+      for (let r = 0; r < 4; r++) {
+        const y = 48 + r * 78;
+        let x = x0 + 10, s = r * 31 + x0;
+        while (x < x1 - 14) {
+          const w = 14 + mondoCaso(s++) * 16, h = 52 + mondoCaso(s++) * 16;
+          const tinte = ['#B23A3A', '#2F6E8E', '#C9A227', '#3E7D4A', '#7A4A9A', '#D9783A', '#E9DFC6'];
+          q.fillStyle = tinte[Math.floor(mondoCaso(s++) * tinte.length)];
+          q.fillRect(x, y + 66 - h, w - 2, h);
+          q.fillStyle = 'rgba(255,255,255,.18)'; q.fillRect(x + 2, y + 66 - h + 8, w - 6, 3);
+          x += w;
+        }
+        q.fillStyle = '#6B4424'; q.fillRect(x0, y + 66, x1 - x0, 10);
+      }
+    };
+    scaffale(20, 340); scaffale(560, 880);
+    /* il battiscopa e la tana del Tarlo */
+    q.fillStyle = '#3A2414'; q.fillRect(0, 350, L, 26);
+    q.fillStyle = '#0D0805';
+    QUAD_SCENA.tane.forEach(([tx, ty]) => { if (ty < 600) { q.beginPath(); q.moveTo(tx - 34, 376); q.lineTo(tx - 34, 352); q.arc(tx, 352, 34, Math.PI, 0); q.lineTo(tx + 34, 376); q.closePath(); q.fill(); } });
+    /* il parquet a spina, caldo, e la luce delle lampade */
+    q.save(); q.beginPath(); q.rect(0, 376, L, A - 376); q.clip();
+    for (let y = 376, r = 0; y < A; y += 46, r++) {
+      for (let x = (r % 2) * -70; x < L; x += 140) {
+        const v = mondoCaso(x * 0.37 + r * 11.3);
+        q.fillStyle = 'rgb(' + Math.round(150 + v * 40) + ',' + Math.round(96 + v * 28) + ',' + Math.round(54 + v * 18) + ')';
+        q.fillRect(x + 1, y + 1, 138, 44);
+      }
+    }
+    const lampada = (x, y, r) => { const l = q.createRadialGradient(x, y, 10, x, y, r); l.addColorStop(0, 'rgba(255,214,140,.38)'); l.addColorStop(1, 'rgba(255,214,140,0)'); q.fillStyle = l; q.fillRect(x - r, y - r, r * 2, r * 2); };
+    lampada(450, 800, 560); lampada(200, 1250, 320); lampada(700, 1250, 320);
+    /* il tappeto rotondo al centro */
+    q.save(); q.translate(450, 880); q.scale(1, 0.62);
+    q.fillStyle = '#7E2A2A'; q.beginPath(); q.arc(0, 0, 300, 0, 6.2832); q.fill();
+    q.strokeStyle = '#D9A441'; q.lineWidth = 10; q.beginPath(); q.arc(0, 0, 270, 0, 6.2832); q.stroke();
+    q.lineWidth = 4; q.beginPath(); q.arc(0, 0, 200, 0, 6.2832); q.stroke();
+    q.fillStyle = '#A33B3B'; q.beginPath(); q.arc(0, 0, 120, 0, 6.2832); q.fill();
+    q.restore();
+    const vign = q.createRadialGradient(450, 900, 300, 450, 900, 900); vign.addColorStop(0, 'rgba(0,0,0,0)'); vign.addColorStop(1, 'rgba(0,0,0,.55)');
+    q.fillStyle = vign; q.fillRect(0, 376, L, A);
+    q.restore();
+    /* le librerie ai lati, viste dall'alto: dorsi in fila */
+    [[0, 120], [780, 900]].forEach(([x0, x1]) => {
+      q.fillStyle = '#3E2412'; q.fillRect(x0, 360, x1 - x0, A - 360);
+      for (let y = 380, s = x0; y < A - 20; y += 22) {
+        const tinte = ['#8E2F2F', '#2B5B75', '#A88A22', '#335F3C', '#5E3A78', '#B0602E'];
+        q.fillStyle = tinte[Math.floor(mondoCaso(s++ + y) * tinte.length)];
+        q.fillRect(x0 + 14, y, x1 - x0 - 28, 18);
+      }
+      q.fillStyle = 'rgba(0,0,0,.35)'; q.fillRect(x0 === 0 ? x1 - 10 : x0, 360, 10, A - 360);
+    });
+    QUAD_SCENA.tane.forEach(([tx, ty]) => {        /* le tane sotto le librerie dei fianchi */
+      if (ty < 600) return;
+      const x = tx < 450 ? 120 : 780;
+      q.fillStyle = '#0D0805'; q.beginPath(); q.ellipse(x, ty, 16, 34, 0, 0, 6.2832); q.fill();
+      q.fillStyle = 'rgba(0,0,0,.4)'; q.beginPath(); q.ellipse(x + (tx < 450 ? 8 : -8), ty + 4, 12, 30, 0, 0, 6.2832); q.fill();
+    });
+    quadFondo.tela = t;
+  }
+  g.drawImage(quadFondo.tela, 0, 0);
+}
+/* le cose della biblioteca: i leggii (con la copia e l'amico), il
+   quaderno grande, il cestino, le buste */
+function quadCosa(g, a, c){
+  const sc = arenaProfondo(a.sc, c.y), fermo = effettiRidotti();
+  if (c.tipo === 'leggio') {
+    arenaOmbra(g, c.x, c.y + 4, 64 * sc, 0.5);
+    const rosso = c.rotto ? (fermo ? 0.8 : 0.55 + Math.sin(a.tempo * 8) * 0.3) : 0;
+    if (rosso) { g.save(); g.translate(c.x, c.y); g.scale(1, 0.4); g.fillStyle = 'rgba(230,60,50,' + rosso * 0.6 + ')'; g.beginPath(); g.arc(0, 0, 80 * sc, 0, 6.2832); g.fill(); g.restore(); }
+    /* il piede e la colonnina */
+    g.fillStyle = '#4A2C16'; g.beginPath(); g.ellipse(c.x, c.y, 36 * sc, 13 * sc, 0, 0, 6.2832); g.fill();
+    g.fillStyle = '#6B4424'; g.fillRect(c.x - 8 * sc, c.y - 92 * sc, 16 * sc, 92 * sc);
+    /* il piano inclinato col quaderno aperto */
+    const y0 = c.y - 120 * sc, w = 116 * sc, h = 54 * sc;
+    g.fillStyle = '#7A4E28'; g.beginPath(); g.moveTo(c.x - w / 2, y0 + h); g.lineTo(c.x + w / 2, y0 + h); g.lineTo(c.x + w * 0.44, y0); g.lineTo(c.x - w * 0.44, y0); g.closePath(); g.fill();
+    g.fillStyle = c.rotto ? '#F3C9C0' : '#FFF8E6';
+    g.beginPath(); g.moveTo(c.x - w * 0.44, y0 + h - 6 * sc); g.lineTo(c.x - 2 * sc, y0 + h - 2 * sc); g.lineTo(c.x - 2 * sc, y0 + 4 * sc); g.lineTo(c.x - w * 0.38, y0 + 6 * sc); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(c.x + w * 0.44, y0 + h - 6 * sc); g.lineTo(c.x + 2 * sc, y0 + h - 2 * sc); g.lineTo(c.x + 2 * sc, y0 + 4 * sc); g.lineTo(c.x + w * 0.38, y0 + 6 * sc); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(80,60,40,.45)'; g.lineWidth = 2;
+    for (let i = 1; i < 5; i++) { const yy = y0 + 6 * sc + i * 9 * sc; g.beginPath(); g.moveTo(c.x - w * 0.36, yy); g.lineTo(c.x - 8 * sc, yy); g.moveTo(c.x + 8 * sc, yy); g.lineTo(c.x + w * 0.36, yy); g.stroke(); }
+    if (c.rotto) {                    /* il morso del Tarlo: una mezzaluna mangiata */
+      g.fillStyle = '#2B1A10'; g.beginPath(); g.arc(c.x + w * 0.4, y0 + 8 * sc, 14 * sc, 0, 6.2832); g.fill();
+    }
+    if (c.morso > 0) {                /* sta mangiando: l'anello che si chiude */
+      g.strokeStyle = '#FF6B4A'; g.lineWidth = 7 * sc;
+      g.beginPath(); g.arc(c.x, y0 - 22 * sc, 18 * sc, -Math.PI / 2, -Math.PI / 2 + c.morso * 6.2832); g.stroke();
+    }
+    /* l'amico padrone della copia, accanto al leggio */
+    const ch = MISS_CHI[c.chi];
+    if (ch && ch.em) arenaEmoji(g, ch.em, c.x - 70 * sc, c.y - 34 * sc + (fermo ? 0 : Math.sin(a.tempo * 2 + c.x) * 3), 46 * sc);
+    else arenaEmoji(g, '🫙', c.x - 70 * sc, c.y - 34 * sc, 42 * sc);
+    if (c.letto && a.prova === 0) arenaEmoji(g, c.giusto ? '✨' : '✓', c.x + 58 * sc, y0 - 8 * sc, 34 * sc);
+    if (c.giusto) { g.fillStyle = 'rgba(120,220,140,.9)'; g.beginPath(); g.arc(c.x + 58 * sc, y0 - 8 * sc, 4, 0, 6.2832); g.fill(); }
+  } else if (c.tipo === 'grande') {
+    arenaOmbra(g, c.x, c.y + 6, 120 * sc, 0.55);
+    const luce = fermo ? 0.5 : 0.4 + Math.sin(a.tempo * 2) * 0.12;
+    g.save(); g.translate(c.x, c.y - 40 * sc); g.scale(1, 0.5);
+    const o = g.createRadialGradient(0, 0, 10, 0, 0, 170 * sc); o.addColorStop(0, 'rgba(255,214,107,' + luce + ')'); o.addColorStop(1, 'rgba(255,214,107,0)');
+    g.fillStyle = o; g.beginPath(); g.arc(0, 0, 170 * sc, 0, 6.2832); g.fill(); g.restore();
+    g.fillStyle = '#5A3A1E'; g.fillRect(c.x - 70 * sc, c.y - 70 * sc, 140 * sc, 70 * sc);
+    g.fillStyle = '#7A4E28'; g.fillRect(c.x - 80 * sc, c.y - 82 * sc, 160 * sc, 16 * sc);
+    const w = 220 * sc, h = 96 * sc, y0 = c.y - 82 * sc - h;
+    g.fillStyle = '#8E2F2F'; g.beginPath(); g.roundRect ? g.roundRect(c.x - w / 2 - 6 * sc, y0 - 4 * sc, w + 12 * sc, h + 12 * sc, 10 * sc) : g.rect(c.x - w / 2, y0, w, h); g.fill();
+    g.fillStyle = '#FFF8E6'; g.fillRect(c.x - w / 2, y0, w / 2 - 3 * sc, h); g.fillRect(c.x + 3 * sc, y0, w / 2 - 3 * sc, h);
+    g.strokeStyle = 'rgba(80,60,40,.45)'; g.lineWidth = 2;
+    for (let i = 1; i < 7; i++) { const yy = y0 + i * 13 * sc; g.beginPath(); g.moveTo(c.x - w / 2 + 12 * sc, yy); g.lineTo(c.x - 12 * sc, yy); g.moveTo(c.x + 12 * sc, yy); g.lineTo(c.x + w / 2 - 12 * sc, yy); g.stroke(); }
+    arenaEmoji(g, '🦉', c.x + 120 * sc, c.y - 60 * sc, 54 * sc);
+  } else if (c.tipo === 'cestino') {
+    arenaOmbra(g, c.x, c.y + 4, 60 * sc, 0.5);
+    g.fillStyle = '#A8793E'; g.beginPath(); g.moveTo(c.x - 46 * sc, c.y - 90 * sc); g.lineTo(c.x + 46 * sc, c.y - 90 * sc); g.lineTo(c.x + 36 * sc, c.y); g.lineTo(c.x - 36 * sc, c.y); g.closePath(); g.fill();
+    g.strokeStyle = '#7A5428'; g.lineWidth = 4;
+    for (let i = 1; i < 4; i++) { const yy = c.y - i * 22 * sc; g.beginPath(); g.moveTo(c.x - (36 + i * 2.5) * sc, yy); g.lineTo(c.x + (36 + i * 2.5) * sc, yy); g.stroke(); }
+    g.fillStyle = '#5A3A1E'; g.beginPath(); g.ellipse(c.x, c.y - 90 * sc, 46 * sc, 12 * sc, 0, 0, 6.2832); g.fill();
+  } else if (c.tipo === 'busta') {
+    const z = c.z || 0, dondola = fermo ? 0 : Math.sin(a.tempo * 3 + c.seme) * Math.min(1, z / 80);
+    arenaOmbra(g, c.x, c.y + 2, 34 * sc * (1 - z / 600), 0.45);
+    g.save(); g.translate(c.x + dondola * 40, c.y - 18 * sc - z - (fermo || z ? 0 : Math.abs(Math.sin(a.tempo * 3 + c.seme)) * 6)); g.rotate(dondola * 0.5);
+    g.fillStyle = '#FFF3DC'; g.strokeStyle = '#B0631A'; g.lineWidth = 3;
+    g.beginPath(); g.rect(-30 * sc, -20 * sc, 60 * sc, 40 * sc); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(-30 * sc, -20 * sc); g.lineTo(0, 4 * sc); g.lineTo(30 * sc, -20 * sc); g.stroke();
+    g.fillStyle = '#C0392B'; g.beginPath(); g.arc(0, 4 * sc, 6 * sc, 0, 6.2832); g.fill();
+    g.restore();
+  }
+}
+
 /* ---------- il telaio comune ---------- */
 const MISSIONI_GIOCO = {
-  quaderno: {html: quadernoHTML, guaio: [['tappo', 'Nella dispensa i conti li teneva uno solo, in un quaderno.'], ['tarlo', 'E io stanotte gliel\'ho rosicchiato! Adesso risulto ricchissimo. Gnam gnam.']],
+  quaderno: {html: quadernoHTML, arena: ARENA_QUADERNO, guaio: [['tappo', 'Nella dispensa i conti li teneva uno solo, in un quaderno.'], ['tarlo', 'E io stanotte gliel\'ho rosicchiato! Adesso risulto ricchissimo. Gnam gnam.']],
     succo: 'Bitcoin è un quaderno dei conti che tengono in tantissimi: per barare bisognerebbe ingannarli tutti insieme.', nome: 'registro condiviso e doppia spesa'},
   lucchetto: {html: lucchettoHTML, guaio: [['tappo', 'Voglio comprare un frullatore da uno sconosciuto. Chi si muove per primo?'], ['tappo', 'Se pago prima rischio io. Se lui spedisce prima rischia lui. Come si fa?']],
     succo: 'I sats aspettano in mezzo finché tutti e due hanno fatto la loro parte: è il deposito di garanzia di Barattolo.', nome: 'deposito di garanzia (escrow)'},
@@ -61680,7 +62564,10 @@ function missioneDisegna(){
   if (m.fase === 'guaio') {
     h = `<div class="miss-cosa">🎯 ${esc(m.info.cosa)}</div>` + g.guaio.map(x => missFumettoHTML(x[0], esc(x[1]))).join('')
       + `<button type="button" class="caccia-btn" onclick="missioneVia()">▶️ Gioca</button>`;
-  } else if (m.fase === 'gioco') h = g.html(m);
+  } else if (m.fase === 'gioco') {
+    if (arena && arena.m === m) return;       /* il minigioco disegna da se', sulla sua tela */
+    h = g.html(m);
+  }
   else {
     const st = missioneStelle(m.errori);
     h = `<div class="miss-fine"><div class="miss-stelle">${[1, 2, 3].map(i => `<span class="${i <= st ? 'si' : ''}">★</span>`).join('')}</div>`
@@ -61697,14 +62584,16 @@ async function missioneVia(){
   const m = missione; if (!m) return;
   m.fase = 'gioco'; m.passo = 0; m.dati = {}; m.errori = 0;
   if (m.id === 'parole') m.dati = {scelti: []};
-  missioneDisegna();
+  /* dove c'e' l'arena (e la tela 2D), si gioca muovendo Tappo; se no la
+     versione a fumetti, che resta */
+  if (!(MISSIONI_GIOCO[m.id].arena && mondoPossibile() && arenaApri(m))) missioneDisegna();
   try { await cacciaChiama('/missione', {missione: m.id, azione: 'inizia'}); } catch(e) {}
 }
-function missioneDaCapo(){ const m = missione; if (m) { m.fase = 'guaio'; m.bulloni = 0; missioneDisegna(); } }
+function missioneDaCapo(){ const m = missione; if (m) { arenaFerma(); m.fase = 'guaio'; m.bulloni = 0; missioneDisegna(); } }
 /* La fine: le stelle al server, che paga i bulloni la prima volta */
 async function missioneFine(){
   const m = missione; if (!m || m.fase !== 'gioco') return;
-  m.fase = 'fine'; missioneTimer();
+  m.fase = 'fine'; missioneTimer(); arenaFerma();
   const stelle = missioneStelle(m.errori);
   if (typeof suonoTappo === 'function') { try { suonoTappo('traguardo'); } catch(e) {} }
   haptic('success');
@@ -61717,7 +62606,7 @@ async function missioneFine(){
   }
 }
 function missioneChiudi(){
-  missioneTimer();
+  missioneTimer(); arenaFerma();
   const v = el('missioneVelo');
   if (v) { v.classList.remove('aperto'); v.hidden = true; }
   missione = null;
