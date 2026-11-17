@@ -1424,6 +1424,16 @@ ONCHAIN_QUOTA_FISSA_SATS = 0
 # la rete) non si paga on-chain, resta il Lightning. 0 = nessun tetto.
 # Il valore del codice e' gia' 250: la riga serve il giorno che sale.
 ONCHAIN_MAX_EURO = 250
+# L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026, Andrea:
+# «per importi grossi deve venire proposto l'on-chain da solo», dal caso
+# di una croce da 3000 €): sopra questa cifra in euro la cassa del
+# mercatino mette On-chain in cima con «✅ Consigliato per questa cifra»
+# e la fattura Lightning dice che una cifra cosi' spesso non passa. Il
+# Lightning resta. 500 perche' il nodo ha ~1,7M sats in uscita (17 nov).
+# Si cambia anche dal pannello. 0 = spento (nessun consiglio). Accesa di
+# serie: vale anche senza questa riga. ⚠️ L'on-chain si offre solo fino
+# a ONCHAIN_MAX_EURO: fra le due cifre consiglia, sopra resta l'avviso.
+ONCHAIN_CONSIGLIATO_SOPRA_EURO = 500
 # IL PAYJOIN DEGLI ACQUISTI ON-CHAIN (16 nov 2026, cantiere payjoin): il
 # link di pagamento del mercatino porta `pj=` (BIP78), e il wallet di chi
 # compra che lo sa fare lascia aggiungere a Barattolo una sua moneta (le

@@ -159835,6 +159835,158 @@ def prove_onchain_tetto():
           "\nONCHAIN_MARGINE_MIN_SATS = 500\n" in _SORGENTE)
 
 
+def prove_onchain_consigliato():
+    """L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026,
+    cantiere onchain-importi-grossi, Andrea: «per importi grossi deve
+    venire proposto l'on-chain da solo», soglia 500 €). Il giudice del
+    server ESEGUITO, le due strade che lo chiedono (la scelta della rete
+    e la fattura Lightning), e i pezzi del telefono in node."""
+    print("\n⛓️ L'on-chain consigliato per gli acquisti grossi")
+    import asyncio
+    import subprocess
+    srv = _SORGENTE
+    es = open("config_esempio.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    # IL GIUDICE
+    amb = {"ONCHAIN_CONSIGLIATO_SOPRA_EURO": 500}
+    exec(pezzo("_onchain_soglia_consiglio"), amb)
+    exec(pezzo("onchain_consigliato"), amb)
+    c = amb["onchain_consigliato"]
+    prova("a 100.000 €/BTC: 500.000 sats (500 €) no, 500.001 si'; 5,2M si'; "
+          "senza cambio no", [False, True, True, False],
+          [c(500_000, 100_000.0), c(500_001, 100_000.0), c(5_200_000, 57_000.0),
+           c(5_200_000, 0)])
+    amb["ONCHAIN_CONSIGLIATO_SOPRA_EURO"] = 0
+    prova("...a soglia 0 nessun consiglio", False, c(10**9, 100_000.0))
+    amb["ONCHAIN_CONSIGLIATO_SOPRA_EURO"] = -3
+    prova("...una soglia negativa dal pannello non consiglia tutto", False,
+          c(1000, 100_000.0))
+    amb["ONCHAIN_CONSIGLIATO_SOPRA_EURO"] = "storta"
+    prova("...e una storta torna ai 500 di serie", (500, False, True),
+          (amb["_onchain_soglia_consiglio"](), c(500_000, 100_000.0),
+           c(500_001, 100_000.0)))
+    # LA FATTURA LIGHTNING DICE IL SUO
+    amb = {"ONCHAIN_CONSIGLIATO_SOPRA_EURO": 500}
+    exec(pezzo("_onchain_soglia_consiglio"), amb)
+    exec(pezzo("onchain_consigliato"), amb)
+
+    async def cambio_btc_eur():
+        return 100_000.0
+    amb["cambio_btc_eur"] = cambio_btc_eur
+    exec("async " + pezzo("_avviso_importo_grosso"), amb)
+    a = amb["_avviso_importo_grosso"]
+    grossa = asyncio.run(a({"invoice": "lnbc1", "prezzo_sats": 900_000}))
+    piccola = asyncio.run(a({"invoice": "lnbc1", "prezzo_sats": 20_000}))
+    senza = asyncio.run(a({"indirizzo": "bc1q", "prezzo_sats": 900_000}))
+    prova("la risposta con la fattura porta importo_grosso e la soglia; "
+          "una senza fattura resta com'e'",
+          ((True, 500), (False, 500), "importo_grosso" in senza),
+          ((grossa["importo_grosso"], grossa["consigliato_sopra_euro"]),
+           (piccola["importo_grosso"], piccola["consigliato_sopra_euro"]), False))
+    compra = pezzo("compra")
+    prova("la cassa del mercatino passa dal giudice su tutte e tre le uscite "
+          "con la fattura (set, ripresa, nuova) e nessuna gli scappa",
+          (3, 0, True),
+          (compra.count("return await _avviso_importo_grosso("),
+           compra.count('return {"ordine_id"'),
+           "return await _avviso_importo_grosso(await _compra_set(user, d))" in compra))
+    pronto = srv[srv.index('@app.get("/api/onchain/pronto/{venditore_id}")'):]
+    pronto = pronto[:pronto.index("\n@app.", 10)]
+    prova("/onchain/pronto dice il consiglio in OGNI risposta, anche nei no, "
+          "e il tetto usa lo stesso cambio",
+          (6, 0, True, True),
+          (pronto.count('return {**sopra, "pronto"'), pronto.count('return {"pronto"'),
+           '"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio)' in pronto,
+           "onchain_sopra_il_tetto(int(sats), cambio)" in pronto))
+    prova("leva ONCHAIN_CONSIGLIATO_SOPRA_EURO: 500 di serie (anche storta), "
+          "nell'esempio, nel pannello",
+          (2, True, True),
+          (srv.count("    ONCHAIN_CONSIGLIATO_SOPRA_EURO = 500\n"),
+           "\nONCHAIN_CONSIGLIATO_SOPRA_EURO = 500\n" in es,
+           '_leva("On-chain consigliato sopra (€)", "ONCHAIN_CONSIGLIATO_SOPRA_EURO"' in srv))
+    # IL TELEFONO
+    prova("la fattura del mercatino e quella del carrello scrivono l'avviso; "
+          "la riga c'e' nel foglio", (2, True),
+          (mini.count("  mostraQr(d.invoice);\n  payAvvisoGrosso(d);\n"),
+           '<div id="payGrossoNota" class="escrow-note"' in mini))
+    blocco = mini[mini.index("let acqMetodo = 'ln';"):mini.index("async function payPassaA(m){")]
+    banco = r"""
+const NODI = {};
+function el(id){
+  if (!NODI[id]) NODI[id] = {id, innerHTML: '', textContent: '', className: '',
+    style: {display: 'none'}, classList: {set: new Set(),
+      add(c){ this.set.add(c); }, remove(c){ this.set.delete(c); }, contains(c){ return this.set.has(c); }}};
+  return NODI[id];
+}
+let myOnchain = true, mySceltaRete = true, DEMO = false, VETRINA = false;
+let acqDati = {tipo: 'mono'};
+const corpoCodiceSconto = () => ({});
+const P2P_OC_MONETA = '<i>OC</i>', P2P_LN_MONETA = '<i>LN</i>';
+const esc = s => String(s).replace(/</g, '&lt;');
+const API_BASE = '/api', authHdr = () => 'x', haptic = () => {}, aggiornaPayHint = () => {};
+function fetch(u){ return new Promise(() => {}); }
+function startBuy(){}
+""" + blocco + r"""
+const out = {};
+const l = {id: 1, sellerId: 222};
+apriSceltaPagaRete(l, 900000);
+paySceltaPronto = {pronto: true, consigliato: true, consigliato_sopra_euro: 500}; renderSceltaPagaRete();
+let h = el('paySceltaCorpo').innerHTML;
+out.si = [/On-chain<small class="pay-consigliato">✅ Consigliato per questa cifra<\/small>/.test(h),
+          /Sopra 500 € il Lightning spesso non passa/.test(h), h.indexOf('On-chain') < h.indexOf('Lightning')];
+paySceltaPronto = {pronto: false, motivo: 'in questa fase <b>no</b>', consigliato: true, consigliato_sopra_euro: 500};
+renderSceltaPagaRete(); h = el('paySceltaCorpo').innerHTML;
+out.no = [/pay-consigliato/.test(h), /L'on-chain qui non si può: in questa fase &lt;b>no/.test(h)];
+paySceltaPronto = {pronto: true, consigliato: false, consigliato_sopra_euro: 500};
+renderSceltaPagaRete(); h = el('paySceltaCorpo').innerHTML;
+out.piccola = [/pay-consigliato/.test(h), /spesso non passa/.test(h)];
+// le porte e l'interruttore in cima alla fattura
+mySceltaRete = false;
+payMetodoPrepara(l, null, 900000, {pronto: true, consigliato: true});
+out.porte = /✅ consigliato per questa cifra/.test(el('payMetodo').innerHTML);
+// l'avviso della fattura Lightning, con le porte accese
+payAvvisoGrosso({importo_grosso: true, consigliato_sopra_euro: 500});
+out.avvisoPorte = [el('payGrossoNota').style.display, /scegli <b>On-chain<\/b> qui sopra/.test(el('payGrossoNota').innerHTML)];
+mySceltaRete = true;
+payMetodoPrepara(l, null, 900000, {pronto: true, consigliato: true});
+out.interruttore = /On-chain ✅/.test(el('payMetodo').innerHTML);
+payMetodoSpegni();
+out.spento = [el('payGrossoNota').style.display, el('payGrossoNota').innerHTML];
+// senza porte (carrello): chi vede l'on-chain sa dove trovarlo; chi no, solo l'avviso
+payAvvisoGrosso({importo_grosso: true, consigliato_sopra_euro: 500});
+out.carrello = /comprando un oggetto solo/.test(el('payGrossoNota').innerHTML);
+myOnchain = false; payAvvisoGrosso({importo_grosso: true, consigliato_sopra_euro: 500});
+out.senzaOc = [/spesso non passa/.test(el('payGrossoNota').innerHTML), /On-chain|on-chain/.test(el('payGrossoNota').innerHTML)];
+payAvvisoGrosso({importo_grosso: false});
+out.piccolaFattura = el('payGrossoNota').style.display;
+console.log(JSON.stringify(out));
+"""
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+        out = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else None
+    except (OSError, subprocess.TimeoutExpired):
+        salta("il banco dell'on-chain consigliato", "node assente")
+        return
+    if out is None:
+        prova("il banco dell'on-chain consigliato gira", "", (r.stderr or "")[-600:])
+        return
+    prova("sopra la soglia, nella scelta «Come vuoi pagare?» On-chain porta "
+          "«✅ Consigliato per questa cifra» e sotto il perche', On-chain in cima",
+          [True, True, True], out["si"])
+    prova("...con l'on-chain impossibile niente bollino, l'avviso col motivo "
+          "scritto pulito", [False, True], out["no"])
+    prova("...sotto la soglia la scelta di ieri", [False, False], out["piccola"])
+    prova("le porte ⚡/⛓️ e l'interruttore in cima alla fattura dicono il consiglio",
+          (True, True), (out["porte"], out["interruttore"]))
+    prova("la fattura Lightning sopra la soglia avvisa e indica On-chain qui sopra; "
+          "a foglio chiuso l'avviso sparisce",
+          (["block", True], ["none", ""]), (out["avvisoPorte"], out["spento"]))
+    prova("senza porte (carrello, offerta, codice sconto) dice dove l'on-chain "
+          "c'e'; a chi non lo vede solo l'avviso; sotto soglia niente",
+          (True, [True, False], "none"),
+          (out["carrello"], out["senzaOc"], out["piccolaFattura"]))
+
+
 def _pezzi_incasso_js(mini):
     """I pezzi del telefono per la destinazione firmata e la quota (27
     ott 2026), da mettere nei banchi node che fanno girare proponi e
@@ -209674,7 +209826,7 @@ CATEGORIE = {
     ordine_onchain ripristino_visibile chiave_che_nasce_da_sola
     checksum_descrittore leva_rgb annuncio_identita mutinynet_prep
     deposito_p2p_onchain grafica_p2p_onchain incasso_esterno_onchain
-    onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto payjoin
+    onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto onchain_consigliato payjoin
     p2p_onchain p2p_onchain_usdt p2p_onchain_tetto volto_porta_card rete_onchain_dal_pannello
     scelta_rete_mercatino cifra_btc foglio_oc_visto seconda_firma_parla
     """.split(),
@@ -210596,6 +210748,7 @@ def main():
     prove_onchain_disputa,
     prove_payjoin,
     prove_onchain_tetto,
+    prove_onchain_consigliato,
     prove_chiave_che_nasce_da_sola,
     prove_checksum_descrittore,
     prove_leva_rgb,

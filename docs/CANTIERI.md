@@ -89985,3 +89985,63 @@ della figurina finale (il barattolino al centro si scontra con l'emoji).
 Da guardare: «carta-soldi-in-privato» ha le maniche tagliate dal bordo
 del disegno (si vede poco: le mani entrano dai lati). Provato a schermo
 sulle otto missioni.
+
+## L'on-chain consigliato per gli acquisti grossi (17 nov 2026 sera, cantiere onchain-importi-grossi; Andrea, con lo screenshot di una croce da 3000 € «Preferisce ricevere in Lightning»: «Non si possono ricevere importi così grossi in lighting o sbaglio», poi «per importi grossi deve venire proposto l'on-chain da solo», «metti una soglia di 500 euro»)
+
+IL CASO. Un annuncio da 3000 €, circa 5,2M sats. Il nodo, letto da
+Andrea con `lncli channelbalance` lo stesso pomeriggio: 1.702.923 sats
+in uscita e 4.694.185 in entrata, sommando tutti i canali. Una cifra
+così in Lightning non passa né dal compratore al nodo né dal nodo al
+venditore, e molti wallet si fermano molto prima. Nel mercatino non
+c'era nessun tetto Lightning (`TETTO_SATS_ANNUNCIO` spenta): la fattura
+nasceva, e il pagamento sarebbe fallito nel wallet senza una parola.
+
+LA DECISIONE. Sopra una soglia in euro la cassa PROPONE l'on-chain da
+sola; il Lightning resta (un consiglio, non un divieto: Andrea ha detto
+«proposto»). Soglia 500 €, sua; il perché del numero: circa 870k sats
+a 57k €/BTC, sotto la metà dell'uscita del nodo, così due vendite
+grosse in un giorno non lo svuotano. Leva nuova
+`ONCHAIN_CONSIGLIATO_SOPRA_EURO`, 500 di serie e ACCESA (regola del 14
+nov), 0 = spenta, una riga storta torna a 500; nel pannello sotto il
+tetto on-chain, e si cambia anche da lì.
+
+COME. Un giudice solo, `onchain_consigliato(prezzo_sats, cambio)` (in
+euro sullo stesso prezzo del tetto; senza cambio non consiglia). Lo
+chiedono due strade: `/api/onchain/pronto` mette `consigliato` e
+`consigliato_sopra_euro` in OGNI risposta, anche nei no (sopra il tetto,
+venditore senza chiave), e la cassa Lightning del mercatino passa le sue
+tre uscite con la fattura (carrello, ripresa, nuova) da
+`_avviso_importo_grosso`, che aggiunge `importo_grosso`. Il telefono
+scrive solo le parole: nel foglio «Come vuoi pagare?» On-chain porta
+«✅ Consigliato per questa cifra» e sotto il perché; se l'on-chain lì
+non si può, niente bollino e l'avviso col motivo del server; le porte
+⚡/⛓️ e l'interruttore in cima alla fattura dicono «consigliato»; la
+fattura Lightning ha la riga `#payGrossoNota` («⚠️ Sopra 500 € il
+Lightning spesso non passa…», con «scegli On-chain qui sopra» dove le
+porte ci sono, o dove l'on-chain si trova dove non ci sono). Si spegne
+a foglio chiuso (`payMetodoSpegni`) e passando a On-chain. La funzione
+sta accanto a `payMetodoSpegni` e non vicino a `payCreaFattura`: il
+banco node di `prove_scelta_rete_mercatino` taglia quel blocco, e
+`payMetodoSpegni` la chiama.
+
+SCARTATE. Il divieto del Lightning sopra soglia (Andrea ha chiesto
+«proposto», e un wallet con canali grandi ce la fa). Il giudice nel
+telefono col cambio del telefono (due giudici; il server ha già il suo
+cambio). Un avviso dal bot al venditore senza chiave on-chain (gesto in
+più, non chiesto).
+
+ATTENZIONE, IL TETTO. L'on-chain si offre solo fino a `ONCHAIN_MAX_EURO`
+(999 in produzione dal 16 nov): fra 500 e 999 € consiglia, sopra resta
+il solo avviso. La croce da 3000 € si paga on-chain solo se Andrea alza
+quella riga sul VPS: è un gesto suo, non di questo cantiere.
+
+PROVATO: `prove_onchain_consigliato` (il giudice eseguito ai bordi, a
+soglia 0, negativa e storta; `_avviso_importo_grosso` eseguito; le tre
+uscite di `compra` e le sei risposte di `/onchain/pronto` contate; la
+leva in server, esempio e pannello; il telefono in node: bollino,
+avviso, motivo scritto pulito, porte, interruttore, carrello, chi non
+vede l'on-chain, foglio chiuso). Controprove: `>` diventato `>=`, il
+carrello senza giudice, il bollino anche a on-chain impossibile e
+l'avviso che resta a foglio chiuso fanno rosso, uno per uno.
+NON PROVATO dal vivo: nessun acquisto vero sopra 500 €; il foglio si
+guarda sul collaudo, che segue develop.

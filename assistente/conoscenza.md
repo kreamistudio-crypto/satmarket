@@ -377,14 +377,15 @@ Ricevere o pagare su un'altra rete (se nei NUMERI DI OGGI «P2P su un'altra rete
 Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla rete principale di Bitcoin: la moneta arancione ₿ le indica in tutta l'app. Quali sono accese, e per chi, lo dicono i NUMERI DI OGGI: una funzione spenta lì non c'è.
 
 - Pagare un ordine on-chain: chi compra manda i bitcoin a un indirizzo e l'ordine nasce alla prima conferma della rete. Appena la rete vede i sats la pagina del pagamento si chiude da sola, e in «Ordini» l'ordine dice «⏳ Visto in rete, aspetto la conferma» (etichetta «In arrivo»): non c'è altro da fare, si aspetta la conferma, circa dieci minuti. Se è arrivata solo una parte, la pagina resta aperta e dice quanti sats mancano. Appena il pagamento si vede in rete, chi vende riceve «Pagamento in arrivo»: l'oggetto è prenotato, ma non si spedisce finché non arriva l'avviso vero, alla conferma.
+- Gli acquisti grossi (dal 17 novembre 2026): sopra 500 € la cassa del mercatino propone da sola l'on-chain. Nel foglio «Come vuoi pagare?» On-chain porta «✅ Consigliato per questa cifra», e se si sceglie Lightning la fattura avvisa «Sopra 500 € il Lightning spesso non passa». Il motivo: con cifre così i wallet Lightning e i canali spesso non reggono, e il pagamento fallisce. Il Lightning si può comunque scegliere. L'on-chain si offre solo fino al tetto dei NUMERI DI OGGI, per un oggetto solo, senza offerta accettata né codice sconto: sopra il tetto, o nel carrello, resta solo l'avviso.
 - La quota fissa a Barattolo: negli acquisti on-chain del mercatino il conto può avere la riga «Quota fissa a Barattolo (spese di rete)». La paga chi compra, si vede prima di pagare, va a Barattolo quando i sats vengono liberati e col rimborso torna indietro. Quanto vale oggi (o se non c'è) lo dicono i NUMERI DI OGGI.
 - PayJoin negli acquisti on-chain del mercatino (dal 16 novembre 2026, se nei NUMERI DI OGGI è disponibile): il QR e «₿ Apri nel wallet» portano anche un link PayJoin («pj=»), e nel foglio di pagamento compare la riga «🔀 PayJoin». Se il tuo wallet lo sa fare (per esempio Sparrow, BlueWallet, Wasabi, Bull Bitcoin, Cake Wallet), mentre paghi Barattolo aggiunge alla transazione una sua piccola moneta: così chi guarda la blockchain non può più dire che tutti gli ingressi sono tuoi, né leggere a colpo d'occhio quale uscita è il tuo resto. Paghi la stessa cifra, e il deposito a tre chiavi riceve esattamente gli stessi sats. Il tuo wallet può mettere qualche sats in più di commissione di rete per l'ingresso aggiunto (lo decide lui, entro il limite che si dà). Se il wallet non lo sa fare, o se in quel momento Barattolo non ha una moneta pronta, si paga come sempre, senza differenze. La riga non c'è sempre: compare solo quando il PayJoin si può fare. Negli scambi P2P e nello Swap il PayJoin non c'è.
-- Quando paghi on-chain (un ordine, il deposito di uno scambio P2P, lo Swap) l'app scrive i sats da mandare e, sotto, la riga «In BTC» con la stessa cifra in bitcoin (per esempio 0,00008128 BTC): molti wallet on-chain la chiedono così. Un tocco la copia, col punto (0.00008128), pronta da incollare nel wallet. Se invece inquadri il QR, la cifra il wallet la compila da solo; anche «₿ Apri nel wallet» apre il wallet con indirizzo e cifra già scritti.
-- Profilo → «📥 Come ricevi»: due righe, «Quando ti pagano in Lightning, ricevi in» e «Quando ti pagano on-chain, ricevi in». Lì scegli se i sats ti arrivano in Lightning, on-chain, oppure «Ogni volta» (decidi tu ordine per ordine).
 
 <!-- pezzo libro-035 | libro -->
 ## Libro · Bitcoin on-chain (2/2)
 
+- Quando paghi on-chain (un ordine, il deposito di uno scambio P2P, lo Swap) l'app scrive i sats da mandare e, sotto, la riga «In BTC» con la stessa cifra in bitcoin (per esempio 0,00008128 BTC): molti wallet on-chain la chiedono così. Un tocco la copia, col punto (0.00008128), pronta da incollare nel wallet. Se invece inquadri il QR, la cifra il wallet la compila da solo; anche «₿ Apri nel wallet» apre il wallet con indirizzo e cifra già scritti.
+- Profilo → «📥 Come ricevi»: due righe, «Quando ti pagano in Lightning, ricevi in» e «Quando ti pagano on-chain, ricevi in». Lì scegli se i sats ti arrivano in Lightning, on-chain, oppure «Ogni volta» (decidi tu ordine per ordine).
 - Chi ha queste scelte trova anche, nel modulo dell'annuncio sotto il prezzo, «Come vuoi ricevere per questo oggetto?»: la scelta dell'annuncio vale più di quella del Profilo.
 - Nel mercatino, quando chi vende riceve su una rete diversa da quella con cui paga chi compra, lo swap di SATS Routing lo paga chi vende: esce dai suoi sats quando li riceve, e chi lo fa vede il costo prima di confermare. Chi compra paga solo il prezzo del conto, senza righe in più.
 - Profilo → «₿ On-chain»: «Dove ricevi i bitcoin» (l'unica cosa da compilare: il tuo indirizzo o il tuo wallet), poi la chiave e le 12 parole. Le 12 parole servono solo a FIRMARE i tuoi scambi on-chain: i sats non arrivano lì. Non darle mai a nessuno.
@@ -2177,4 +2178,12 @@ pubblico: no
 frase: Il paracadute degli ordini P2P adesso ha due scelte: una se BTC sale e una se BTC scende, ognuna 5%, 10%, 20% o nessuna. Così puoi tenere l'ordine se BTC sale e toglierlo se scende, o il contrario. Gli ordini già pubblicati restano come sono.
 dove: P2P, foglio «Pubblica» → «🪂 Paracadute», le righe «📈 Se BTC sale» e «📉 Se BTC scende»; sulla card del tuo ordine «🪂 Paracadute ↑10% ↓5%».
 leva: P2P_PARACADUTE (quella del paracadute, già accesa)
+pubblico: sì
+
+<!-- pezzo novita-090 | novita -->
+## Novità · 2026-11-17 · onchain-importi-grossi
+
+frase: Per gli acquisti sopra 500 € la cassa ti propone da sola l'on-chain: nel «Come vuoi pagare?» On-chain porta «✅ Consigliato per questa cifra», perché con cifre così il Lightning spesso non passa. Il Lightning resta, con un avviso.
+dove: Mercatino: un oggetto sopra 500 €, «Acquista», foglio «Come vuoi pagare?»; nel foglio della fattura Lightning la riga «⚠️ Sopra 500 € il Lightning spesso non passa».
+leva: ONCHAIN_CONSIGLIATO_SOPRA_EURO accesa di serie (500)
 pubblico: sì

@@ -35750,6 +35750,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   col cambio del momento; `onchain_sopra_il_tetto` lo giudica e la cassa
   (`_onchain_compra`) lo chiama prima di scrivere. Senza cambio: no.
   `GET /api/onchain/pronto/{venditore}?sats=N` lo dice prima del tocco.
+- L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026, cantiere
+  onchain-importi-grossi): `ONCHAIN_CONSIGLIATO_SOPRA_EURO` (500 di serie,
+  0 = spento, anche dal pannello) sullo stesso prezzo del tetto.
+  L'unico giudice è `onchain_consigliato`; lo chiedono `/onchain/pronto`
+  (`consigliato` e `consigliato_sopra_euro` in OGNI risposta, anche nei
+  no) e la cassa Lightning del mercatino, che passa ogni uscita con la
+  fattura (set, ripresa, nuova) da `_avviso_importo_grosso`
+  (`importo_grosso`). Il telefono scrive solo le parole: il bollino in
+  `renderSceltaPagaRete`, le porte e l'interruttore in `renderPayMetodo`,
+  la riga `#payGrossoNota` da `payAvvisoGrosso` (spenta da
+  `payMetodoSpegni` e passando a On-chain). Consiglia, non vieta.
 - LA CASSA A DUE PORTE E L'INCASSO SOLO SU UN WALLET TUO (27 ott 2026,
   cantiere onchain-cassa; perché in CANTIERI, «La cassa a due porte»).
   Il foglio del pagamento (`#paySheet`) ha in cima `#payMetodo` (⚡ giallo

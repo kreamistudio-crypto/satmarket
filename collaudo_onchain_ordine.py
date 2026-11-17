@@ -732,6 +732,37 @@ def main():
     prova("...e senza cambio, a tetto acceso, l'on-chain dice di no",
           True, "non sappiamo il cambio" in SRV.onchain_sopra_il_tetto(1000, 0))
 
+    # l'on-chain consigliato per gli acquisti grossi (17 nov 2026, cantiere
+    # onchain-importi-grossi): sopra la soglia la cassa lo propone. Al cambio
+    # finto 300.000 sats sono 300 €: sotto i 500 di serie no, sotto 200 si'
+    come(999)
+    x = c.get("/api/onchain/pronto/888?sats=300000").json()
+    prova("300 € sotto la soglia di serie: nessun consiglio, la soglia detta",
+          (False, 500), (x["consigliato"], x["consigliato_sopra_euro"]))
+    SRV.ONCHAIN_CONSIGLIATO_SOPRA_EURO = 200
+    x = c.get("/api/onchain/pronto/888?sats=300000").json()
+    prova("...a soglia 200 il consiglio c'e' anche se l'on-chain qui no (tetto)",
+          (True, False, 200), (x["consigliato"], x["pronto"], x["consigliato_sopra_euro"]))
+    prova("...senza la cifra nessun consiglio", False,
+          c.get("/api/onchain/pronto/888").json()["consigliato"])
+    con = SRV.db()
+    con.execute("UPDATE annunci SET stato='attivo' WHERE id=?", (caro,))
+    con.execute("UPDATE onchain_ordini SET stato='annullato' WHERE annuncio_id=? "
+                "AND stato='attesa'", (caro,))
+    con.commit()
+    con.close()
+    r = compra(999, caro)
+    prova("la fattura Lightning sopra la soglia lo dice: importo_grosso e la soglia",
+          (200, True, True, 200),
+          (r.status_code, r.json().get("invoice", "").startswith("lnbc"),
+           r.json().get("importo_grosso"), r.json().get("consigliato_sopra_euro")))
+    r2 = compra(999, caro)
+    prova("...anche la fattura ripresa", (True, True),
+          (r2.json().get("ripresa"), r2.json().get("importo_grosso")))
+    SRV.ONCHAIN_CONSIGLIATO_SOPRA_EURO = 0
+    prova("...a soglia 0 nessun avviso", False, compra(999, caro).json().get("importo_grosso"))
+    SRV.ONCHAIN_CONSIGLIATO_SOPRA_EURO = 500
+
     # ---- 7) la leva ---------------------------------------------------------
     SRV.ONCHAIN_ATTIVO = False
     come(999)

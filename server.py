@@ -37712,6 +37712,15 @@ def _leve_stato():
                          "paga on-chain: resta il Lightning; vale anche "
                          "per gli scambi P2P on-chain",
                   spento="nessun tetto: l'on-chain vale per qualunque cifra"),
+            # (17 nov 2026, cantiere onchain-importi-grossi) la soglia del
+            # consiglio: sopra, la cassa propone l'on-chain da sola
+            _leva("On-chain consigliato sopra (€)", "ONCHAIN_CONSIGLIATO_SOPRA_EURO",
+                  ONCHAIN_CONSIGLIATO_SOPRA_EURO,
+                  acceso="sopra questa cifra la cassa mette On-chain in cima "
+                         "con «✅ Consigliato per questa cifra», e la fattura "
+                         "Lightning avvisa che una cifra così spesso non passa; "
+                         "l'on-chain si offre solo fino al tetto qui sopra",
+                  spento="nessun consiglio: la cassa è quella di ieri"),
             # la prima leva che si cambia anche da qui (27 ott 2026)
             _leva_scrivibile_riga(_leva(
                 "Quota fissa di Barattolo (sats)", "ONCHAIN_QUOTA_FISSA_SATS",
@@ -46746,7 +46755,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # Il SET (lug 2026): col body a righe si passa dal ramo dedicato;
     # con annuncio_id tutto e' l'acquisto di sempre, byte per byte.
     if not d.get("annuncio_id") and isinstance(d.get("righe"), list):
-        return await _compra_set(user, d)
+        return await _avviso_importo_grosso(await _compra_set(user, d))
     # La destinazione, dal giudice unico: assente = il domestico (il
     # mondo di ieri), presente e ignota = 400. Sta PRIMA di aprire il
     # database perche' e' una pura, e un 400 che non ha aperto niente
@@ -47183,7 +47192,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             sc = mio["sconto_sats"] or 0
             art = (mio["prezzo_sats"] - mio["spedizione_sats"]
                    - mio["protezione_sats"])
-            return {"ordine_id": mio["id"], "invoice": mio["invoice"],
+            return await _avviso_importo_grosso({"ordine_id": mio["id"], "invoice": mio["invoice"],
                     "payment_hash": mio["payment_hash"],
                     "prezzo_sats": mio["prezzo_sats"],
                     "articolo_sats": art,
@@ -47212,7 +47221,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                     "articolo_unitario_sats":
                         (art + sc) // (mio["quantita"] or 1),
                     "offerta_id": legame["id"] if legame else 0,
-                    "ripresa": True}
+                    "ripresa": True})
         # Rinnovo: prima il controllo del pagamento — e l'await impone
         # di chiudere la connessione (niente transazioni in attesa)
         con.close()
@@ -47698,7 +47707,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     con.close()
     # prezzo_sats resta il TOTALE (i client di ieri leggono quello);
     # le quote scomposte sono in piu', per il conto in chiaro.
-    return {"ordine_id": ordine_id, "invoice": inv["payment_request"],
+    return await _avviso_importo_grosso({"ordine_id": ordine_id, "invoice": inv["payment_request"],
             "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
             # articolo_sats e' il NETTO dall'ago 2026, come nel set e
             # nel preventivo: lordo e sconto sono chiavi in piu' e si
@@ -47753,7 +47762,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "zona": zona if scelta == "spedizione" else "",
             "paese": paese if scelta == "spedizione" else "",
             "quantita": richiesti, "articolo_unitario_sats": unitario,
-            "offerta_id": off["id"] if off else 0}
+            "offerta_id": off["id"] if off else 0})
 
 
 def crea_ordine_pagato(con, a, compratore_id: int, totale_sats: int,
@@ -59130,6 +59139,28 @@ except (TypeError, ValueError):
     ONCHAIN_MAX_EURO = 250
     print("[onchain] ONCHAIN_MAX_EURO non e' un numero intero: il tetto "
           "resta 250 €")
+# L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026, cantiere
+# onchain-importi-grossi, Andrea: «per importi grossi deve venire proposto
+# l'on-chain da solo»; la soglia l'ha detta lui, 500 €). Il caso: una croce
+# da 3000 €, circa 5,2M sats, e il nodo che quel giorno aveva 1,7M sats in
+# uscita e 4,7M in entrata (`lncli channelbalance`): in Lightning non
+# sarebbe passata ne' dal compratore ne' verso il venditore, e molti
+# wallet hanno tetti piu' bassi ancora. Sopra la soglia la cassa mette
+# On-chain in cima, la fattura Lightning lo dice; il Lightning resta (e'
+# un consiglio, non un divieto). In EURO come il tetto, sullo stesso
+# prezzo. 0 = spento; ACCESA DI SERIE (regola del 14 nov); una riga
+# storta torna a 500, il consiglio non sparisce per un refuso.
+try:
+    from config import ONCHAIN_CONSIGLIATO_SOPRA_EURO
+    ONCHAIN_CONSIGLIATO_SOPRA_EURO = int(ONCHAIN_CONSIGLIATO_SOPRA_EURO)
+    if ONCHAIN_CONSIGLIATO_SOPRA_EURO < 0:
+        raise ValueError("una soglia negativa non e' una soglia")
+except ImportError:
+    ONCHAIN_CONSIGLIATO_SOPRA_EURO = 500
+except (TypeError, ValueError):
+    ONCHAIN_CONSIGLIATO_SOPRA_EURO = 500
+    print("[onchain] ONCHAIN_CONSIGLIATO_SOPRA_EURO non e' un numero intero: "
+          "la soglia resta 500 €")
 # IL PAYJOIN DEGLI ACQUISTI ON-CHAIN (16 nov 2026, cantiere payjoin,
 # Andrea: «potremo davvero sfruttarlo come PayJoin»): il link di
 # pagamento del mercatino porta `pj=`, e il wallet di chi compra che lo
@@ -59163,6 +59194,39 @@ def onchain_sopra_il_tetto(prezzo_sats: int, cambio_eur: float) -> str:
         return (f"In questa fase l'on-chain arriva fino a {tetto} €: per "
                 "questo ordine paga con Lightning")
     return ""
+
+
+def _onchain_soglia_consiglio() -> int:
+    """La soglia viva in euro, per le parole della cassa; 0 = spenta."""
+    try:
+        return max(0, int(ONCHAIN_CONSIGLIATO_SOPRA_EURO or 0))
+    except (TypeError, ValueError):
+        return 500
+
+
+def onchain_consigliato(prezzo_sats: int, cambio_eur: float) -> bool:
+    """Vero se l'ordine e' abbastanza grosso da consigliare l'on-chain
+    (`ONCHAIN_CONSIGLIATO_SOPRA_EURO`, 17 nov 2026). L'unico giudice: lo
+    chiedono la scelta della rete (/onchain/pronto) e la fattura
+    Lightning (`_avviso_importo_grosso`). Senza cambio non si consiglia
+    niente: un avviso a caso e' peggio di nessun avviso."""
+    soglia = _onchain_soglia_consiglio()
+    if not soglia or not cambio_eur or cambio_eur <= 0:
+        return False
+    return int(prezzo_sats or 0) * cambio_eur / 100_000_000 > soglia
+
+
+async def _avviso_importo_grosso(fuori):
+    """La fattura Lightning del mercatino che e' sopra la soglia lo dice
+    (17 nov 2026): `importo_grosso` e la soglia nella risposta, e il
+    foglio della fattura scrive l'avviso. Vale anche dove l'on-chain non
+    si offre (carrello, offerta accettata, codice sconto): li' l'avviso
+    e' l'unica cosa che si puo' dire."""
+    if isinstance(fuori, dict) and fuori.get("invoice"):
+        fuori["importo_grosso"] = onchain_consigliato(
+            int(fuori.get("prezzo_sats") or 0), await cambio_btc_eur())
+        fuori["consigliato_sopra_euro"] = _onchain_soglia_consiglio()
+    return fuori
 
 
 def onchain_ammesso(tg_id) -> bool:
@@ -105882,8 +105946,14 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not onchain_ammesso(user["id"]):
         raise HTTPException(404, "Non esiste")
+    # L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026): detto in
+    # OGNI risposta, anche nei no, perche' a on-chain impossibile la cassa
+    # avvisi almeno che una cifra cosi' in Lightning spesso non passa
+    cambio = await cambio_btc_eur() if sats > 0 else 0.0
+    sopra = {"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio),
+             "consigliato_sopra_euro": _onchain_soglia_consiglio()}
     if not EMBIT:
-        return {"pronto": False, "motivo": "manca la libreria embit"}
+        return {**sopra, "pronto": False, "motivo": "manca la libreria embit"}
     # (30 ott 2026, cantiere onchain-mainnet) la terza chiave che manca o
     # non e' di questa rete spegne la porta ⛓️ PRIMA del tocco, con le
     # parole del giudice: su mainnet senza la chiave di Barattolo non
@@ -105891,9 +105961,9 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
     try:
         onchain_xpub_barattolo()
     except ValueError as e:
-        return {"pronto": False, "motivo": str(e)}
+        return {**sopra, "pronto": False, "motivo": str(e)}
     if not onchain_ammesso(venditore_id):
-        return {"pronto": False, "motivo": "questo venditore non riceve on-chain"}
+        return {**sopra, "pronto": False, "motivo": "questo venditore non riceve on-chain"}
     con = _onchain_db()
     try:
         x = {r["tg_id"] for r in con.execute(
@@ -105904,7 +105974,7 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
     if int(venditore_id) not in x:
         # si accende da solo all'apertura dell'app (27 ott 2026): chi
         # non ce l'ha e' chi non l'ha ancora aperta da allora
-        return {"pronto": False,
+        return {**sopra, "pronto": False,
                 "motivo": "il venditore non ha ancora aperto Barattolo da "
                           "quando l'on-chain c'e': si accende da solo appena "
                           "lo apre"}
@@ -105914,12 +105984,12 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
     # che col Lightning sarebbe la fattura): la porta ⛓️ si spegne PRIMA
     # del tocco, invece di chiudere la fattura e poi dire di no
     if sats > 0:
-        troppo = onchain_sopra_il_tetto(int(sats), await cambio_btc_eur())
+        troppo = onchain_sopra_il_tetto(int(sats), cambio)
         if troppo:
-            return {"pronto": False, "motivo": troppo}
+            return {**sopra, "pronto": False, "motivo": troppo}
     # la quota fissa di Barattolo, detta PRIMA di pagare (regola ferrea
     # 10): la cassa la scrive accanto al margine per la rete
-    return {"pronto": True, "motivo": "", "io_acceso": user["id"] in x,
+    return {**sopra, "pronto": True, "motivo": "", "io_acceso": user["id"] in x,
             "quota_sats": onchain_quota_sats()}
 
 

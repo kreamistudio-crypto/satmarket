@@ -9710,6 +9710,8 @@
   .pay-rete{margin:4px 0 10px}
   .pay-rete .p2p-rete-tasto.spento,.btn.p2p-scelta-rete.spento{opacity:.5}
   .pay-scelta-nota{margin:10px 0 2px}
+  /* l'on-chain consigliato per gli acquisti grossi (17 nov 2026) */
+  .pay-consigliato{display:block;font-size:11.5px;font-weight:700;color:var(--trust);margin-top:2px}
   /* nel foglio puntata le chip vestono il blu dell'asta */
   #puntaSheet .consegna-pill.attiva{border-color:var(--asta);
     background:none;color:var(--asta-text)}
@@ -17204,6 +17206,10 @@ document.getElementById('cartello')?.remove();</script>
          spegne payMetodoSpegni a foglio chiuso -->
     <div class="pay-metodo" id="payMetodo" role="tablist" aria-label="Come paghi" style="display:none"></div>
     <div id="payMetodoNota" class="escrow-note" style="display:none;margin:0 0 8px"></div>
+    <!-- la fattura Lightning sopra la soglia lo dice (17 nov 2026,
+         ONCHAIN_CONSIGLIATO_SOPRA_EURO): la scrive payAvvisoGrosso con la
+         risposta del server, la spegne payMetodoSpegni a foglio chiuso -->
+    <div id="payGrossoNota" class="escrow-note" style="display:none;margin:0 0 8px"></div>
     <!-- Il conto scomposto (articolo/spedizione/protezione): compare
          solo quando c'e' qualcosa oltre all'articolo -->
     <div class="conto-scomposto" id="payScomposto" style="margin-bottom:8px"></div>
@@ -35682,6 +35688,7 @@ async function startBuySet(){
     scontoPct: d.sconto_percento||0, scontoOrigine: d.sconto_origine||''});
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
+  payAvvisoGrosso(d);
   avvisaEmailNonSalvata(d);
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
@@ -37014,6 +37021,7 @@ async function payCreaFattura(l, offAcc){
       scontoPct: d.sconto_percento||0, scontoOrigine: d.sconto_origine||''});
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
+  payAvvisoGrosso(d);
   avvisaEmailNonSalvata(d);
   /* La RIPRESA (ago 2026): avevi gia' un ordine 'creato' su questo
      annuncio e il server ti ha ridato la TUA fattura ancora viva —
@@ -70295,6 +70303,25 @@ function payGuidaWalletVista(si){
   const r = el('payGuidaWallet');
   if (r) r.style.display = si ? '' : 'none';
 }
+/* L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026, Andrea:
+   «per importi grossi deve venire proposto l'on-chain da solo»): la
+   fattura Lightning sopra la soglia lo dice, anche quella del carrello.
+   A giudicare e' il server (`importo_grosso`, da `onchain_consigliato`),
+   qui solo le parole: dove le porte ci sono si indica On-chain qui
+   sopra, dove no (carrello, offerta, codice sconto) quando l'on-chain c'e'. */
+function payAvvisoGrosso(d){
+  const n = el('payGrossoNota');
+  if (!n) return;
+  if (!d || !d.importo_grosso) { n.style.display = 'none'; n.innerHTML = ''; return; }
+  const soglia = Math.max(0, Math.floor(Number(d.consigliato_sopra_euro) || 0));
+  n.innerHTML = '⚠️ Sopra ' + soglia + ' € il Lightning spesso non passa: '
+    + 'canali e wallet hanno tetti più bassi. '
+    + (payMetodoAcceso ? 'Se il wallet dà errore, scegli <b>On-chain</b> qui sopra.'
+       : myOnchain ? 'L\'on-chain si può usare comprando un oggetto solo, senza offerta né codice sconto.'
+       : '');
+  n.style.display = 'block';
+}
+
 function payMetodoSpegni(){
   if (payOcTimer) { clearInterval(payOcTimer); payOcTimer = null; }
   if (payOc && el('payQrNota'))
@@ -70305,6 +70332,7 @@ function payMetodoSpegni(){
   const box = el('payMetodo'), nota = el('payMetodoNota');
   if (box) { box.style.display = 'none'; box.innerHTML = ''; }
   if (nota) { nota.style.display = 'none'; nota.innerHTML = ''; }
+  payAvvisoGrosso(null);
 }
 
 /* dove la porta ⛓️ si apre: chi vede l'on-chain, un oggetto solo, al
@@ -70348,7 +70376,7 @@ function renderPayMetodo(){
     /* fuori dalle regole di `.pay-metodo`, che vestirebbero i tasti */
     box.className = 'pay-rete';
     box.innerHTML = '<div class="p2p-rete-scelta" role="radiogroup" aria-label="Come paghi">'
-      + tasto('onchain', P2P_OC_MONETA, 'On-chain', !ocSi)
+      + tasto('onchain', P2P_OC_MONETA, ocSi && payOcPronto.consigliato ? 'On-chain ✅' : 'On-chain', !ocSi)
       + tasto('ln', P2P_LN_MONETA, 'Lightning', false) + '</div>';
     box.style.display = 'block';
     return;
@@ -70359,7 +70387,7 @@ function renderPayMetodo(){
        aria-selected="${acqMetodo === m}"${payMetodoOccupato ? ' aria-busy="true"' : ''}
        onclick="payPassaA('${m}')">${titolo}<small>${sotto}</small></button>`;
   box.innerHTML = porta('ln', 'ln', '⚡ Lightning', 'subito, in un secondo', false)
-    + porta('onchain', 'oc', P2P_OC_MONETA + 'On-chain 🛡️', ocSi ? '2-di-3, una conferma' : (payOcPronto ? 'non per questo oggetto' : 'guardo…'), !ocSi);
+    + porta('onchain', 'oc', P2P_OC_MONETA + 'On-chain 🛡️', ocSi ? (payOcPronto.consigliato ? '✅ consigliato per questa cifra' : '2-di-3, una conferma') : (payOcPronto ? 'non per questo oggetto' : 'guardo…'), !ocSi);
   box.style.display = 'flex';
 }
 
@@ -70399,10 +70427,22 @@ function renderSceltaPagaRete(){
   const ocSi = paySceltaPronto && paySceltaPronto.pronto;
   const tasto = (cls, rete, dentro, spento) => '<button type="button" class="btn ' + cls + ' p2p-scelta-rete'
     + (spento ? ' spento' : '') + '" onclick="sceltaPagaRete(\'' + rete + '\')">' + dentro + '</button>';
+  /* L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026): sopra
+     la soglia (il giudice e' il server, `consigliato` di /onchain/pronto)
+     On-chain porta «✅ Consigliato per questa cifra» e sotto si dice
+     perche'; se l'on-chain qui non si puo', l'avviso resta col motivo */
+  const cons = !!(paySceltaPronto && paySceltaPronto.consigliato);
+  const soglia = cons ? Math.max(0, Math.floor(Number(paySceltaPronto.consigliato_sopra_euro) || 0)) : 0;
+  const consNota = !cons ? ''
+    : ocSi ? 'Sopra ' + soglia + ' € il Lightning spesso non passa: canali e wallet hanno tetti più bassi. Con l\'on-chain il pagamento arriva comunque.'
+    : 'Sopra ' + soglia + ' € il Lightning spesso non passa. L\'on-chain qui non si può: ' + esc(paySceltaPronto.motivo || '') + '.';
   box.innerHTML = '<div class="p2p-scelta">'
-    + tasto('p2p-scelta-oc', 'onchain', P2P_OC_MONETA + '<span>On-chain</span>', !ocSi)
+    + tasto('p2p-scelta-oc', 'onchain', P2P_OC_MONETA + '<span>On-chain'
+            + (cons && ocSi ? '<small class="pay-consigliato">✅ Consigliato per questa cifra</small>' : '')
+            + '</span>', !ocSi)
     + tasto('p2p-scelta-ln', 'ln', P2P_LN_MONETA + '<span>Lightning</span>', false)
     + '</div>'
+    + (consNota ? '<div class="escrow-note pay-scelta-nota">' + consNota + '</div>' : '')
     + (paySceltaNota ? '<div class="escrow-note pay-scelta-nota">' + paySceltaNota + '</div>' : '');
 }
 function sceltaPagaRete(rete){
@@ -70448,6 +70488,7 @@ async function payPassaA(m){
         currentOrderId = null;
       }
       acqMetodo = 'onchain'; renderPayMetodo(); payMetodoNota('');
+      payAvvisoGrosso(null);
       await payMostraOnchain();
       /* l'indirizzo non e' nato (un no del server, la rete): la fattura
          di prima e' gia' chiusa, quindi se ne fa una nuova — il foglio

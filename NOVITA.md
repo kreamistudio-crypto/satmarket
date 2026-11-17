@@ -572,3 +572,9 @@ frase: Il paracadute degli ordini P2P adesso ha due scelte: una se BTC sale e un
 dove: P2P, foglio «Pubblica» → «🪂 Paracadute», le righe «📈 Se BTC sale» e «📉 Se BTC scende»; sulla card del tuo ordine «🪂 Paracadute ↑10% ↓5%».
 leva: P2P_PARACADUTE (quella del paracadute, già accesa)
 pubblico: sì
+
+## 2026-11-17 · onchain-importi-grossi
+frase: Per gli acquisti sopra 500 € la cassa ti propone da sola l'on-chain: nel «Come vuoi pagare?» On-chain porta «✅ Consigliato per questa cifra», perché con cifre così il Lightning spesso non passa. Il Lightning resta, con un avviso.
+dove: Mercatino: un oggetto sopra 500 €, «Acquista», foglio «Come vuoi pagare?»; nel foglio della fattura Lightning la riga «⚠️ Sopra 500 € il Lightning spesso non passa».
+leva: ONCHAIN_CONSIGLIATO_SOPRA_EURO accesa di serie (500)
+pubblico: sì
