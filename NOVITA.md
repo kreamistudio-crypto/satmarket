@@ -512,3 +512,9 @@ frase: Gli ordini P2P on-chain in contanti ora hanno il luogo dello scambio, com
 dove: P2P: «+», rete on-chain, metodo «Contanti», campo «Zona di scambio»; la card on-chain nel libro; il foglio che si apre toccandola.
 leva: nessuna
 pubblico: no
+
+## 2026-11-17 · onchain-contanti-scambio
+frase: Lo scambio P2P on-chain in contanti ora va come quello Lightning: chi vende scrive dove e quando vedervi, chi compra apre il navigatore, ognuno può segnare «📍 Sono qui» quando arriva, e il bottone è «Ho consegnato i contanti».
+dove: P2P on-chain con metodo «Contanti»: la pagina dello scambio, riquadro «📍 Dove vedervi» e, a sats bloccati, il riquadro con «📍 Sono qui»; il bottone «💵 Ho consegnato i contanti».
+leva: nessuna
+pubblico: no
