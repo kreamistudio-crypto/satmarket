@@ -32669,6 +32669,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   💵 solo davanti a «Contanti», a parola intera). Prove: `prove_contanti_zona`, la
   coda di `prove_p2p_libro` e `prove_card_p2p_vetrina`.
 
+- IL CONTANTE PER POSTA NEL P2P (17 nov 2026, perché in CANTIERI, «Il
+  contante per posta: la nona voce del P2P»). La voce «Contante per
+  posta» di `P2P_METODI` (sotto «Altri metodi ▾», anche in CHF) è la
+  busta di banconote spedita: chi compra sats la manda a chi li vende.
+  `P2P_POSTA` la nomina, `contantePerPostaFraP2P(metodi)` la cerca a
+  parola intera, `scambioInPostaP2P(o)` è la gemella di
+  `scambioInContantiP2P` coi tre gradi (recapito viaggiato
+  `recapitoInPostaP2P`, metodo scelto, unico dell'ordine). Il form del
+  recapito è `posta` (nome, via, CAP e città, note facoltative; si
+  ricorda come l'IBAN) e sta PRIMA di `contanti` in `P2P_FORME_RECAPITO`,
+  perché la regex del contanti prende «contant». Le regole sono quattro
+  costanti (`REGOLA_POSTA_COMPRA`, `REGOLA_POSTA_VENDE`, `CONSIGLI_POSTA`,
+  `REGOLA_DISPUTA_POSTA`), lette dal foglio Pubblica e dal dettaglio
+  (`regolaPostaFoglioP2P`), dalla pagina dello scambio
+  (`riquadroPostaP2P`) e da Info P2P (`#p2pinfo-posta`); il verbo del
+  gesto è «Ho spedito i contanti» (`gestoPagoP2P`), i passi e gli stati
+  (`STATI_POSTA_P2P`, dentro `statoContantiP2P`) dicono la spedizione e
+  l'apertura filmata. LA CAUZIONE LA DECIDE IL NODO: `only_payment_methods`
+  del suo settings.toml, letta dal 38385 (`cauzioneInfoP2P`); il client
+  cambia solo le parole («non hai spedito» al posto di «non ti sei
+  presentato»). Prove: `prove_contante_per_posta`.
+
 - LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, I TENTATIVI, IL
   FILTRO DI CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, perché
   in CANTIERI, «La reputazione del P2P»). Due tabelle: `p2p_esiti`

@@ -3777,7 +3777,10 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   (`slash_node_share_pct` 0.5, `payout_claim_window_days` 15 e
   `maker_bond_payment_timeout_seconds` 900 restano ai default del
   template; `only_payment_methods` è il campo della 0008 — sulla
-  `-bar5` NON esiste, ed è la ragione per cui il rollback lo toglie.)
+  `-bar5` NON esiste, ed è la ragione per cui il rollback lo toglie.
+  Dal 17 nov 2026 la lista vuole anche «Contante per posta», il nono
+  metodo: `["Contanti", "Contante per posta"]`, voce per voce a parola
+  intera — DA-FARE-ANDREA, voce 18, finché non è fatto.)
   Poi si rilegge: `grep -n -A7 "^\[anti_abuse_bond\]" ~/nodo/mostro/settings.toml`
   e `grep -n "hold_invoice_expiration_window" ~/nodo/mostro/settings.toml`
   → il blocco di sette righe e `= 900`. ⚠️ Il blocco vale dall'`up -d`

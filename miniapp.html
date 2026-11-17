@@ -13867,6 +13867,20 @@ document.getElementById('cartello')?.remove();</script>
       <p><b>📍 «Sono qui», la prova d'incontro.</b> Quando arrivate, ognuno tocca «Sono qui» dal suo telefono, senza aspettare l'altro: si registrano l'<b>ora esatta</b> e, se il telefono la dà, la <b>posizione</b>, firmate con la chiave usa-e-getta dello scambio. È <b>facoltativo</b>, per la privacy, ma aiuta a risolvere le dispute. L'altra persona vede l'ora in cui l'hai segnato, <b>mai la tua posizione</b>; un moderatore, solo in caso di disputa, vede se eravate lì insieme, all'ora e vicino al luogo dell'appuntamento. <b>Il GPS si può falsificare:</b> la posizione è una conferma, non una prova assoluta.</p>
       <p><b>In disputa, sul contanti.</b> Se chi vende dice di non aver ricevuto i contanti e non c'è la prova d'incontro, in disputa si dà ragione a chi vende. Ma se chi compra ha segnato la presenza all'ora e vicino al luogo dell'appuntamento e chi vende no, la disputa non va in automatico a chi vende: decide il moderatore. Lo scriviamo adesso, prima dello scambio, e non il giorno della disputa.</p>
 
+      <!-- IL CONTANTE PER POSTA (17 nov 2026, proposta di Andrea: «send
+           cash by mail»). Le frasi sono le costanti del client
+           (REGOLA_POSTA_*, CONSIGLI_POSTA, REGOLA_DISPUTA_POSTA): una
+           prova le confronta. -->
+      <h3 id="p2pinfo-posta">Contante per posta</h3>
+      <p>Il metodo «Contante per posta» è la <b>busta di banconote spedita</b>: chi compra sats la manda a chi li vende, chi vende la apre e libera i sats. È il metodo più facile da contestare, quindi le regole sono scritte prima, e in disputa valgono solo le prove.</p>
+      <ol class="sicu-passi">
+        <li><b>Chi spedisce.</b> Spedisci solo quando questa pagina dice «Sats in garanzia», con un servizio tracciato (meglio col servizio di Poste Italiane per denaro e valori, da sportello, che il contante lo ammette e lo rimborsa fino a 3.000 €): filma mentre chiudi busta e pacco col numero di tracciamento in vista, e scrivi il numero nella chat dello scambio.</li>
+        <li><b>Chi riceve.</b> Apri il pacco filmando, col numero di tracciamento in vista, dall'esterno sigillato fino alle banconote contate; poi libera i sats. Senza quel video, in disputa la tua parola non basta.</li>
+        <li><b>Il pacco.</b> Busta di carta sigillata dentro una busta di plastica sigillata, in un pacco con altro dentro che non suoni vuoto; mai la parola «contanti» sulla busta; mittente vero, che un pacco non consegnato torna indietro.</li>
+        <li><b>La cauzione.</b> Chi prende un ordine scegliendo «Contante per posta» blocca la stessa piccola cauzione del contanti di persona: torna a fine scambio, e si perde solo se un moderatore decide che non ha spedito.</li>
+      </ol>
+      <p><b>In disputa, sulla posta.</b> In disputa contano le prove: il tracciamento consegnato e i due video. Chi spedisce senza tracciamento non può provare di aver spedito; chi apre senza filmare non può provare che la busta era vuota. La posta ordinaria e i corrieri il denaro lo escludono dal rimborso: un pacco perso è perso; solo il servizio di Poste per denaro e valori lo rimborsa, fino a 3.000 €.</p>
+
       <h3>I tempi</h3>
       <!-- gli stessi segnaposto, per la stessa ragione: le finestre
            sono impostazioni del coordinatore e si LEGGONO -->
@@ -78391,13 +78405,17 @@ function rigaCauzioneDettP2P(o, info, leva, scelto, sulMetodo){
   if (!cauzioneServeP2P(Object.assign({}, o, {mio: false, metodoScelto: scelto || ''}), info, leva, sulMetodo)) return '';
   const c = cauzioneInfoP2P(info);
   const stima = importoCauzioneP2P(satsBaseCauzioneP2P(o), info);
+  /* per posta le parole del metodo (17 nov 2026): quello scelto, o
+     l'unico dell'ordine */
+  const posta = typeof P2P_POSTA !== 'undefined'
+    && String(scelto || ((o.metodi || []).length === 1 ? o.metodi[0] : '')).trim() === P2P_POSTA;
   return '<div class="hint cauzione-regola">🔐 <b>La cauzione di chi prende.</b> '
-    + 'Per prendere quest\'ordine in contanti blocchi una piccola cauzione'
+    + 'Per prendere quest\'ordine ' + (posta ? 'col contante per posta' : 'in contanti') + ' blocchi una piccola cauzione'
     + (stima > 0 ? ' di circa <b>' + fmt(stima) + ' sats</b>' : '')
     + (c.pct > 0 ? ' (il ' + esc(String(Math.round(c.pct * 1000) / 10).replace('.', ',')) + '%'
         + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats' : '') + ')' : '')
     + ': resta nel tuo wallet e <b>torna a fine scambio</b>. La perdi solo se un moderatore '
-    + 'decide che non ti sei presentato all\'incontro.'
+    + (posta ? 'decide che non hai spedito i contanti.' : 'decide che non ti sei presentato all\'incontro.')
     + ' Finché non è bloccata, l\'ordine resta nel libro e qualcun altro può prenderlo.</div>';
 }
 /* il riquadro nella pagina dello scambio, dal lato di chi la cauzione
@@ -78407,16 +78425,19 @@ function riquadroCauzioneP2P(o){
   const c = o && o.cauzione;
   if (!c) return '';
   const sats = c.sats > 0 ? fmt(c.sats) + ' sats' : 'la cauzione';
+  /* per posta la mancanza e' non aver spedito (17 nov 2026) */
+  const mancanza = typeof scambioInPostaP2P === 'function' && scambioInPostaP2P(o)
+    ? 'non hai spedito i contanti' : 'non ti sei presentato all\'incontro';
   let h = '';
   if (c.stato === 'persa')
     h = '<b>🔐 Cauzione persa:</b> ' + esc(c.persa > 0 ? fmt(c.persa) + ' sats' : sats)
-      + '. Un moderatore ha deciso che non ti sei presentato all\'incontro: metà va a chi ha scambiato con te, metà al servizio.';
+      + '. Un moderatore ha deciso che ' + mancanza + ': metà va a chi ha scambiato con te, metà al servizio.';
   else if (c.stato === 'restituita')
     h = '<b>🔐 Cauzione restituita:</b> ' + esc(sats) + ' sono tornati nel tuo wallet.';
   else if (c.stato === 'bloccata')
     h = '<b>🔐 Cauzione bloccata:</b> ' + esc(sats) + ', in sospeso nel tuo wallet. Torna a fine scambio.';
   else if (o.stato === 'attesa_mia_cauzione')
-    h = '<b>🔐 Cauzione da bloccare:</b> ' + esc(sats) + '. Torna a fine scambio: la perdi solo se un moderatore decide che non ti sei presentato.';
+    h = '<b>🔐 Cauzione da bloccare:</b> ' + esc(sats) + '. Torna a fine scambio: la perdi solo se un moderatore decide che ' + mancanza + '.';
   else return '';
   return '<div class="p2p-box cauzione-box">' + h + '</div>';
 }
@@ -78440,7 +78461,7 @@ function riquadroIncassoCauzioneP2P(o){
 function testoCauzioneInfoP2P(info, leva, sulMetodo){
   const c = cauzioneInfoP2P(info);
   if (!leva || !c.accesa)
-    return '<b>La cauzione di chi prende:</b> in questo momento non c\'è: chi prende un ordine in contanti non blocca niente prima dell\'incontro.';
+    return '<b>La cauzione di chi prende:</b> in questo momento non c\'è: chi prende un ordine in contanti, di persona o per posta, non blocca niente prima.';
   const chi = c.applyTo === 'both' ? 'chi prende e chi pubblica' : c.applyTo === 'make' ? 'chi pubblica' : 'chi prende';
   /* (10 ott 2026, cauzione-metodo-scelto) la chiede il metodo SCELTO alla
      presa: su un ordine a piu' metodi solo chi sceglie quello */
@@ -78452,7 +78473,7 @@ function testoCauzioneInfoP2P(info, leva, sulMetodo){
   return '<b>La cauzione di chi prende:</b>' + dove + ' ' + chi + ' blocca una piccola cauzione'
     + (c.pct > 0 ? ' — il <b>' + esc(String(Math.round(c.pct * 1000) / 10).replace('.', ',')) + '%</b> dei sats'
         + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats' : '') + ' —' : '')
-    + ' che resta nel suo wallet e torna a fine scambio. La perde solo se un moderatore decide che non si è presentato all\'incontro'
+    + ' che resta nel suo wallet e torna a fine scambio. La perde solo se un moderatore decide che non ha fatto la sua parte (all\'incontro non si è presentato; per posta non ha spedito)'
     + (c.timeoutBrucia ? ', o se lascia scadere il tempo di un passo' : '')
     + (c.quotaNodo > 0 && c.quotaNodo < 1 ? ': allora ' + esc(String(Math.round((1 - c.quotaNodo) * 100))) + '% va all\'altra persona e il resto al servizio' : '')
     + (c.giorniIncasso > 0 ? ' (chi la riceve ha ' + c.giorniIncasso + ' giorni per incassarla dall\'app)' : '')
@@ -78979,19 +79000,21 @@ function statoTestoP2P(o){
   /* col contanti di persona il recapito e' l'appuntamento (1 ott 2026):
      le due frasi dicono dove e quando vedersi, come il bottone */
   const appuntamento = typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o);
+  /* ...e per posta l'indirizzo della busta (17 nov 2026) */
+  const perPosta = !appuntamento && typeof scambioInPostaP2P === 'function' && scambioInPostaP2P(o);
   if (aspettaRecapitoP2P(o))
     return {t: s.t, d: appuntamento
       ? 'I sats sono al sicuro in garanzia. Aspetta che ' + nomeControparteP2P(o, 'chi vende')
         + ' ti indichi dove e quando vedervi: appena arriva lo leggi in cima, il bottone si accende e ti avvisiamo.'
       : 'I sats sono al sicuro in garanzia. Aspetta che '
-      + nomeControparteP2P(o, 'chi vende') + ' ti indichi dove inviare gli euro: '
+      + nomeControparteP2P(o, 'chi vende') + (perPosta ? ' ti indichi dove spedire i contanti: ' : ' ti indichi dove inviare gli euro: ')
       + 'appena arriva lo leggi qui, il bottone si accende e ti avvisiamo.'};
   if (o && o.stato === 'attivo' && o.lato === 'vendo' && o.peer && !(o.campiMiei || {}).euro)
     return {t: s.t, d: appuntamento
       ? 'I tuoi sats sono bloccati. Ora indica a ' + nomeControparteP2P(o, 'chi compra')
         + ' dove e quando vedervi: senza, non sa dove trovarti.'
       : 'I tuoi sats sono bloccati. Ora indica a '
-      + nomeControparteP2P(o, 'chi compra') + ' dove mandarti gli euro: senza, non può pagarti.'};
+      + nomeControparteP2P(o, 'chi compra') + (perPosta ? ' dove spedirti i contanti: senza, non può pagarti.' : ' dove mandarti gli euro: senza, non può pagarti.')};
   /* LA FATTURA SCADUTA SI DICE, QUANDO E' UN FATTO (21 set 2026): la
      frase di `fattura_nuova` elenca due cause perche' il coordinatore
      il motivo non lo dice — ma se la fattura che avevamo dato e' morta
@@ -81152,6 +81175,11 @@ function renderDettaglioP2P(){
     regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo]
                               : ((tuo || (o.metodi || []).length === 1) ? (o.metodi || []) : []),
                             maxEuroContantiP2P(), compro ? 'compro' : 'vendo') +
+    /* ...e la regola del contante per posta, con lo stesso confine (17 nov 2026) */
+    (typeof regolaPostaFoglioP2P === 'function'
+      ? regolaPostaFoglioP2P(p2pDettMetodo ? [p2pDettMetodo]
+                               : ((tuo || (o.metodi || []).length === 1) ? (o.metodi || []) : []),
+                             compro ? 'compro' : 'vendo') : '') +
     /* la cauzione di chi prende, PRIMA di premere (1 ott 2026) */
     (tuo ? '' : rigaCauzioneDettP2P(o, p2pInfo, cauzioneAccesaP2P(), p2pDettMetodo, cauzioneSulMetodoP2P())) +
     repRiquadroP2P(p2pFacce[o.id], o.id) +
@@ -81309,27 +81337,33 @@ function passiScambioP2P(q){
   const m = String(q.metodo || '').trim();
   const contanti = m === P2P_CONTANTI;
   const tab = !contanti && tabacchinoP2P([m]);
+  /* il contante per posta (17 nov 2026): si spedisce, si apre filmando */
+  const posta = typeof P2P_POSTA !== 'undefined' && m === P2P_POSTA;
   if (q.tuo) return ['Aspetti che qualcuno lo prenda'].concat(compro ? [
     'Chi vende mette i sats in garanzia',
     'Indichi dove ricevere i sats',
     contanti ? 'Consegni i contanti di persona'
-      : tab ? 'Paghi il PayCode al tabacchino' : 'Invii gli euro col metodo scelto',
+      : tab ? 'Paghi il PayCode al tabacchino'
+      : posta ? 'Spedisci i contanti tracciati' : 'Invii gli euro col metodo scelto',
     'I sats arrivano a te'
   ] : [
     'Metti i sats in garanzia',
     contanti ? 'Ricevi i contanti e li conti'
-      : tab ? 'Controlli su Amazon' : 'Ricevi e controlli gli euro',
+      : tab ? 'Controlli su Amazon'
+      : posta ? 'Ricevi il pacco e lo apri filmando' : 'Ricevi e controlli gli euro',
     contanti ? 'Liberi i sats sul posto' : 'Liberi i sats a chi compra'
   ]);
   if (compro) return [
     q.cauzione ? 'Blocchi la cauzione e indichi dove ricevere i sats' : 'Indichi dove ricevere i sats',
     'Chi vende li mette in garanzia',
     contanti ? 'Consegni i contanti di persona'
-      : tab ? 'Paghi il PayCode al tabacchino' : 'Invii gli euro col metodo scelto',
+      : tab ? 'Paghi il PayCode al tabacchino'
+      : posta ? 'Spedisci i contanti tracciati' : 'Invii gli euro col metodo scelto',
     'I sats arrivano a te'
   ];
   const primo = q.cauzione ? 'Blocchi la cauzione e metti i sats in garanzia' : 'Metti i sats in garanzia';
   if (contanti) return [primo, 'Ricevi i contanti di persona', 'Li conti', 'Liberi i sats sul posto'];
+  if (posta) return [primo, 'Ricevi il pacco', 'Lo apri filmando e conti', 'Liberi i sats a chi compra'];
   /* chi vende PRENDENDO un Barattozon in compra (31 ott 2026): il
      PayCode e' il suo, e parte da solo a garanzia bloccata */
   if (tab) return [primo, 'Il tuo PayCode parte cifrato a chi compra',
@@ -81990,7 +82024,9 @@ function recapitoCompratoreP2P(o){
   if (contanti && riquadroAppuntamentoP2P(o))
     return (P2P_PROGRESSO[o.stato] || 0) < P2P_PROGRESSO.attivo && P2P_FINALI.indexOf(o.stato) < 0
       ? '<div class="hint">⚠️ <b>Non consegnare ancora niente:</b> aspetta che questa pagina dica «Sats in garanzia».</div>' : '';
-  return riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : '', o)
+  /* per posta il recapito e' l'indirizzo della busta (17 nov 2026) */
+  const posta = !contanti && typeof scambioInPostaP2P === 'function' && scambioInPostaP2P(o);
+  return riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : posta ? '✉️ Dove spedire i contanti' : '', o)
     /* IL RECAPITO PUO' ARRIVARE PRIMA DELLA GARANZIA (i dati del
        tabacchino partono alla presa, e un'app di ieri — o un altro
        client — manda ancora il recapito ricordato): finche' la pagina non
@@ -82814,6 +82850,9 @@ function renderOrdineP2P(){
   const coinQui = typeof reteCoinScambioP2P === 'function' ? reteCoinScambioP2P(o) : null;
   if (coinQui) bottoni.recapito = '<button class="btn orange" onclick="apriCampiP2P()">🪙 Indica dove ricevere gli ' + esc(coinQui.coin) + '</button>';
   if (contantiQui) bottoni.recapito = '<button class="btn orange" onclick="apriCampiP2P()">📍 Indica dove e quando vedervi</button>';
+  /* ...e per posta l'indirizzo della busta (17 nov 2026) */
+  if (!contantiQui && !tabOrd && typeof scambioInPostaP2P === 'function' && scambioInPostaP2P(o))
+    bottoni.recapito = '<button class="btn orange" onclick="apriCampiP2P()">✉️ Indica dove spedirti i contanti</button>';
   /* ...e col PayCode il recapito E' il PayCode (15 ott 2026, lo scambio
      101e20d6): «dove ricevere gli euro» e' la frase dei bonifici, e chi
      vende non capiva che il gesto era mandarlo a chi compra */
@@ -82941,6 +82980,8 @@ function renderOrdineP2P(){
        consegnare */
     riquadroContantiP2P(o, azione) +
     passoDueContantiP2P(o, azione) +
+    /* ...e il contante per posta la sua regola (17 nov 2026) */
+    (typeof riquadroPostaP2P === 'function' ? riquadroPostaP2P(o) : '') +
     /* IL TEMPO DEL GESTO (10 ott 2026): sopra il suo bottone, quanto
        manca prima che il coordinatore annulli */
     rigaTempoGestoP2P(o, azione) +
@@ -84701,6 +84742,8 @@ function gestoPagoP2P(o){
   /* ...e con ETH o XMR la sua moneta (13 nov 2026, cantiere eth-xmr) */
   const coin = typeof reteCoinScambioP2P === 'function' ? reteCoinScambioP2P(o) : null;
   if (coin) return 'Ho inviato gli ' + coin.coin;
+  /* ...e per posta «spedito» (17 nov 2026) */
+  if (typeof scambioInPostaP2P === 'function' && scambioInPostaP2P(o)) return 'Ho spedito i contanti';
   return typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o)
     ? 'Ho consegnato i contanti' : 'Ho inviato gli euro';
 }
@@ -84937,7 +84980,14 @@ const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺
    «se l'utente vuole Wise può farlo, noi non tocchiamo nessuna banca»).
    Ha il suo form (`wise`: il Wisetag, l'email o l'IBAN del conto Wise),
    e nel foglio sta fra gli «Altri metodi» — vedi `P2P_METODI_ALTRI`. */
-const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Wise', 'Contanti', 'Contanti al tabacchino'];
+/* LA NONA E' «Contante per posta» (17 nov 2026, proposta di Andrea: «send
+   cash by mail»: banconote in una busta sigillata dentro un'altra,
+   nascoste in un pacco): chi compra sats spedisce i contanti a chi li
+   vende, tracciato e meglio se assicurato, e chi vende libera dopo aver
+   filmato l'apertura. La cauzione di chi prende la chiede il nodo come
+   per «Contanti» (`only_payment_methods` del suo settings.toml). Le
+   regole e i giudici stanno al blocco «IL CONTANTE PER POSTA». */
+const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Wise', 'Contanti', 'Contanti al tabacchino', 'Contante per posta'];
 /* la voce del tabacchino ha il suo nome in UN posto: i giudici la
    cercano per questo, mai per un testo ribattuto */
 const P2P_TABACCHINO = 'Contanti al tabacchino';
@@ -84954,7 +85004,7 @@ const P2P_TABACCHINO = 'Contanti al tabacchino';
    non col suo nome di variabile: i banchi delle prove raccolgono le
    liste `const P2P_… = [...]` una per una, e una che ne chiama un'altra
    li romperebbe. Una prova controlla che ogni voce sia in `P2P_METODI`. */
-const P2P_METODI_ALTRI = ['SEPA Instant', 'PayPal', 'Wise', 'Contanti al tabacchino'];
+const P2P_METODI_ALTRI = ['SEPA Instant', 'PayPal', 'Wise', 'Contanti al tabacchino', 'Contante per posta'];
 function vociTendinaMetodiP2P(lista, scelti, aperti){
   const s = scelti || [];
   /* ...e ETH, Monero e USDe (16 nov 2026, cantiere p2p-monete-ritocchi:
@@ -84996,7 +85046,7 @@ const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
    italiano. DIETRO DUE CANCELLI: `myP2PChf` (la leva `P2P_CHF_ATTIVO`
    del server, di serie solo per gli admin) e il nodo, che deve avere CHF
    fra le valute accettate. */
-const P2P_METODI_CHF = ['TWINT', 'Bonifico CH', 'Revolut', 'Wise', 'Contanti'];
+const P2P_METODI_CHF = ['TWINT', 'Bonifico CH', 'Revolut', 'Wise', 'Contanti', 'Contante per posta'];
 function chfVistoP2P(){
   return typeof myP2PChf !== 'undefined' && !!myP2PChf;
 }
@@ -86672,6 +86722,76 @@ const P2P_CONTANTI = 'Contanti';
 function contantiAManoP2P(metodi){
   return (metodi || []).some(m => String(m || '').trim() === P2P_CONTANTI);
 }
+/* ---- IL CONTANTE PER POSTA (17 nov 2026, proposta di Andrea: «send
+   cash by mail») ----
+   Le banconote viaggiano in una busta di carta sigillata dentro una
+   busta di plastica sigillata, nascoste in un pacco con altro dentro.
+   E' il metodo piu' facile da contestare («ho spedito» senza prova, «la
+   busta era vuota»), e le regole sono quelle che Bisq usa dal 2021:
+   spedizione TRACCIATA (meglio il servizio «valori» di Poste, l'unico
+   che ammette il denaro e lo rimborsa — il suo nome commerciale non si
+   scrive nei testi: la regola 9 vieta «assicurato»), video di chi imballa col
+   numero di tracciamento in vista, video di chi apre col numero in
+   vista, il numero mandato nella chat dello scambio; in disputa decide
+   il moderatore sulle prove, e chi non le ha perde. La cauzione di chi
+   prende la chiede il NODO, dalla lista del suo settings.toml: qui si
+   legge dal 38385 (`cauzioneInfoP2P`), e non si promette niente. La
+   PAROLA INTERA, come il contanti: il filtro del libro cerca per pezzo. */
+const P2P_POSTA = 'Contante per posta';
+const P2P_POSTA_ICO = '✉️';
+const REGOLA_POSTA_COMPRA = 'Spedisci solo quando questa pagina dice «Sats in garanzia», con un servizio tracciato (meglio col servizio di Poste Italiane per denaro e valori, da sportello, che il contante lo ammette e lo rimborsa fino a 3.000 €): filma mentre chiudi busta e pacco col numero di tracciamento in vista, e scrivi il numero nella chat dello scambio.';
+const REGOLA_POSTA_VENDE = 'Apri il pacco filmando, col numero di tracciamento in vista, dall\'esterno sigillato fino alle banconote contate; poi libera i sats. Senza quel video, in disputa la tua parola non basta.';
+const CONSIGLI_POSTA = 'Busta di carta sigillata dentro una busta di plastica sigillata, in un pacco con altro dentro che non suoni vuoto; mai la parola «contanti» sulla busta; mittente vero, che un pacco non consegnato torna indietro.';
+const REGOLA_DISPUTA_POSTA = 'In disputa contano le prove: il tracciamento consegnato e i due video. Chi spedisce senza tracciamento non può provare di aver spedito; chi apre senza filmare non può provare che la busta era vuota.';
+function contantePerPostaFraP2P(metodi){
+  return (metodi || []).some(m => String(m || '').trim() === P2P_POSTA);
+}
+/* PURO: true/false se un recapito e' viaggiato, null se non c'e' ancora
+   (la gemella di `recapitoInContantiP2P`) */
+function recapitoInPostaP2P(o){
+  const prima = testoRecapitoScambioP2P(o).replace(/\r/g, '').split('\n')
+    .map(r => r.trim()).filter(Boolean)[0] || '';
+  if (!prima) return null;
+  return /^contante per posta$/i.test(prima);
+}
+/* lo scambio si paga per posta? Lo stesso giudice del contanti, coi suoi
+   tre gradi: il recapito viaggiato, il metodo scelto, l'unico dell'ordine */
+function scambioInPostaP2P(o){
+  if (!o) return false;
+  const r = recapitoInPostaP2P(o);
+  if (r !== null) return r;
+  const m = metodoSceltoP2P(o);
+  if (m) return m === P2P_POSTA;
+  const met = o.metodi || [];
+  return met.length === 1 && String(met[0] || '').trim() === P2P_POSTA;
+}
+/* la riga sotto il metodo nel foglio Pubblica e nel dettaglio, quando
+   «Contante per posta» e' fra i metodi (o e' quello scelto) */
+function regolaPostaFoglioP2P(metodi, lato){
+  if (!contantePerPostaFraP2P(metodi)) return '';
+  const regola = lato === 'vendo' ? REGOLA_POSTA_VENDE : REGOLA_POSTA_COMPRA;
+  return '<div class="hint contanti-regola">' + P2P_POSTA_ICO + ' <b>Contante per posta.</b> '
+    + esc(regola) + ' ' + esc(CONSIGLI_POSTA) + '</div>';
+}
+/* il riquadro nella pagina dello scambio, sopra il bottone del passo:
+   la regola dal proprio lato e quella della disputa, finche' lo scambio
+   e' vivo */
+function riquadroPostaP2P(o){
+  if (!scambioInPostaP2P(o) || P2P_DISPUTABILI.indexOf(o.stato) < 0) return '';
+  const vendo = o.lato === 'vendo';
+  return '<div class="p2p-box contanti-box">'
+    + '<div class="contanti-regola-forte">' + P2P_POSTA_ICO + ' ' + esc(vendo ? REGOLA_POSTA_VENDE : REGOLA_POSTA_COMPRA) + '</div>'
+    + (vendo ? '' : '<div class="contanti-spiega">' + esc(CONSIGLI_POSTA) + '</div>')
+    + '<div class="contanti-disputa">⚖️ ' + esc(REGOLA_DISPUTA_POSTA) + '</div>'
+    + '</div>';
+}
+const STATI_POSTA_P2P = {
+  attivo: {d_compro: 'I sats sono al sicuro in garanzia. Spedisci i contanti tracciati, filma l\'imballo e scrivi qui il numero di tracciamento.',
+           d_vendo: 'I tuoi sats sono bloccati. Chi compra ti spedisce i contanti: aspetta il pacco.'},
+  euro_inviati: {t: 'Contanti spediti',
+                 d_compro: 'Hai detto di aver spedito i contanti: quando il pacco arriva, chi vende lo apre filmando e libera i sats.',
+                 d_vendo: 'Chi compra dice di averti spedito i contanti. Quando il pacco arriva, aprilo filmando col tracciamento in vista, conta, poi libera i sats.'}
+};
 /* ---- LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, IL FILTRO DI
    CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, cantiere
    reputazione-p2p, richiesta di Andrea) ----
@@ -88477,7 +88597,9 @@ const STATI_CONTANTI_P2P = {
                  d_vendo: 'Chi compra dice di averti consegnato i contanti. Contali davanti a lui, poi libera i sats.'}
 };
 function statoContantiP2P(o, t){
-  const c = o && pagaInContantiP2P(o) && STATI_CONTANTI_P2P[o.stato];
+  /* ...e per posta le sue frasi (17 nov 2026) */
+  const c = o && (pagaInContantiP2P(o) ? STATI_CONTANTI_P2P[o.stato]
+    : typeof scambioInPostaP2P === 'function' && scambioInPostaP2P(o) ? STATI_POSTA_P2P[o.stato] : null);
   if (!c) return null;
   return {t: c.t || t, d: o.lato === 'vendo' ? c.d_vendo : c.d_compro};
 }
@@ -90874,6 +90996,7 @@ function renderNuovoOrdineP2P(){
          compare quando «Contanti» e' scelto, e dice il tetto — e' la
          riga che cambia il gesto, non un avviso a ogni foglio */
       + regolaContantiFoglioP2P(p2pNuovoMetodi, maxEuroContantiP2P(), compro ? 'compro' : 'vendo')
+      + (typeof regolaPostaFoglioP2P === 'function' ? regolaPostaFoglioP2P(p2pNuovoMetodi, compro ? 'compro' : 'vendo') : '')
   });
 
   /* LA ZONA DI SCAMBIO (10 ott 2026): la sua sezione, subito sotto i
@@ -93940,6 +94063,18 @@ const P2P_FORME_RECAPITO = [
      compone `testoAppuntamentoP2P`, gemella di chi legge; il ricordo
      tiene il luogo e il punto, MAI l'ora: al prossimo scambio sarebbe
      gia' passata. */
+  /* IL CONTANTE PER POSTA STA PRIMA DEL CONTANTI, come il tabacchino:
+     la regex di `contanti` prende anche «Contante per posta». Il
+     recapito e' l'indirizzo a cui spedire la busta: si ricorda, come
+     l'IBAN. La prima riga senza cifre e' il nome del metodo, e il
+     riquadro di chi spedisce la legge come titolo (`righeRecapitoP2P`). */
+  {forma: 'posta', riconosce: /per posta|by mail|cash by/i,
+   campi: [{k: 'nome', et: 'Nome e cognome sulla busta', ph: 'Mario Rossi'},
+           {k: 'indirizzo', et: 'Via e numero civico', ph: 'Via Roma 12'},
+           {k: 'citta', et: 'CAP, città e provincia', ph: '20100 Milano (MI)'},
+           {k: 'note', et: 'Note per chi spedisce (facoltative)', ph: 'es. citofono, fermo posta', facoltativo: true, max: 140}],
+   componi: c => 'Contante per posta\nDestinatario: ' + c.nome + '\nIndirizzo: ' + c.indirizzo
+     + '\nCAP e città: ' + c.citta + (c.note ? '\nNote: ' + c.note : '')},
   {forma: 'contanti', riconosce: /contant|di persona|a mano|cash/i, appuntamento: true,
    campi: [{k: 'luogo', et: '📍 Dove proponi di vedervi', ph: 'Bar Sport, piazza Garibaldi…', luogo: true},
            {k: 'quando', et: '🕒 Quando', tipo: 'datetime-local', nonRicordato: true},

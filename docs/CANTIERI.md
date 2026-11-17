@@ -87265,3 +87265,123 @@ Categoria `mercatino` della suite verde (le 6 rosse erano il
 
 DA GUARDARE. Sul telefono vero il nastro sotto il dito; la tessera
 accanto a 320px di schermo.
+## Il contante per posta: la nona voce del P2P (17 nov 2026, cantiere contante-per-posta; Andrea: «aggiungere tra le modalità di pagamento anche il "send cash by mail", viene fatto un pacchetto con dentro materiale da imballaggio [...] assieme ad una busta di carta ben sigillata dentro una ulteriore busta apri chiudi di plastica e ulteriormente sigillata… Funziona!»; sulla scheda: «Sì, con cauzione obbligatoria»)
+
+LO STUDIO, PRIMA DEL CODICE (la domanda del coordinatore: si può fare?).
+Spedire banconote in Italia non è vietato per legge: Poste lo ammette
+con la Posta Assicurata («denaro nei limiti di legge, carte valori»,
+rimborso fino a 3.000 €, da 6,65 €, firma alla consegna), mentre la
+raccomandata ordinaria e i corrieri (BRT, GLS, DHL) il denaro lo
+escludono dalle condizioni: un pacco perso non si rimborsa. Il tetto ai
+contanti fra privati resta 5.000 € (dal 2027 il regolamento UE fissa
+10.000 € per le transazioni commerciali, l'Italia può tenere 5.000): il
+`P2P_MAX_EURO` a 250 € della beta è dentro con larghezza. Bisq ha il
+metodo dal 2021 (e Haveno lo eredita): chi spedisce filma l'imballo col
+numero di tracciamento in vista, chi riceve filma l'apertura col numero
+in vista, sempre tracciato e meglio assicurato, l'arbitro decide sulle
+prove e NON rimborsa chi le perde. Il metodo è il più truffabile del
+libro («ho spedito» senza prova, «la busta era vuota»), e la risposta
+di Bisq è l'unica che regge: le prove scritte PRIMA, non il giorno della
+disputa. Il deposito di Mostro basta (i sats di chi vende sono già
+fermi): non serve il 2-di-3 on-chain.
+
+COSA SI È FATTO. 1) La NONA VOCE di `P2P_METODI`, «Contante per posta»,
+sotto «Altri metodi ▾» (`P2P_METODI_ALTRI`) e anche in franchi
+(`P2P_METODI_CHF`). Il nome in italiano, non «cash by mail»: le voci del
+libro sono in italiano e viaggiano nel tag `pm` dei client altrui. 2) IL
+FORM DEL RECAPITO `posta`: nome e cognome sulla busta, via e civico, CAP
+e città, note facoltative (citofono, fermo posta); si ricorda come
+l'IBAN; il testo parte come «Contante per posta» + tre righe, che
+`righeRecapitoP2P` legge come il titolo e i dati. STA PRIMA DI `contanti`
+in `P2P_FORME_RECAPITO`, e non è ordine di comparsa: la regex del
+contanti (`/contant|di persona|a mano|cash/`) prende anche «Contante per
+posta», e chi vende finirebbe al form dell'appuntamento — la controprova
+di `prove_contante_per_posta` toglie il form e lo vede succedere. 3) I
+GIUDICI, gemelli di quelli del contanti: `P2P_POSTA`,
+`contantePerPostaFraP2P(metodi)` a parola intera (il filtro del libro
+cerca per pezzo), `recapitoInPostaP2P(o)` (la prima riga del recapito
+viaggiato, `/^contante per posta$/`), `scambioInPostaP2P(o)` coi tre
+gradi (recapito viaggiato, metodo scelto, unico dell'ordine — su «SEPA,
+Contante per posta» senza scelta tace, come il contanti dal 10 ott). 4)
+LE PAROLE: il gesto «Ho spedito i contanti» (`gestoPagoP2P`), i passi
+(«Spedisci i contanti tracciati», «Ricevi il pacco», «Lo apri filmando e
+conti»), gli stati (`STATI_POSTA_P2P` dentro `statoContantiP2P`:
+«Contanti spediti», le due frasi di chi aspetta), il recapito di chi
+spedisce intitolato «✉️ Dove spedire i contanti», il bottone di chi vende
+«✉️ Indica dove spedirti i contanti», le frasi dell'attesa del recapito.
+5) LE REGOLE, quattro costanti scritte una volta (`REGOLA_POSTA_COMPRA`,
+`REGOLA_POSTA_VENDE`, `CONSIGLI_POSTA`, `REGOLA_DISPUTA_POSTA`): nel
+foglio Pubblica e nel dettaglio sotto il metodo (`regolaPostaFoglioP2P`,
+con lo stesso confine del contanti: con più metodi solo scegliendolo),
+nella pagina dello scambio sopra il bottone del passo (`riquadroPostaP2P`,
+finché lo scambio è vivo: la regola dal proprio lato, i consigli
+dell'imballo a chi spedisce, la regola della disputa a tutti e due), e in
+«Info P2P» (`#p2pinfo-posta`, dopo il contanti di persona). Il numero di
+tracciamento e le foto vanno nella chat cifrata dello scambio, che c'è
+già; i video restano sui telefoni e si mostrano al moderatore in
+disputa. 6) LA CAUZIONE LA DECIDE IL NODO, e qui non si è toccato niente
+del giudice: `only_payment_methods` del blocco `[anti_abuse_bond]` di
+settings.toml (patch 0008 e 0010, a parola intera voce per voce), letta
+dal 38385 in `cauzioneInfoP2P`. Finché sul nodo c'è solo «Contanti», chi
+sceglie «Contante per posta» non blocca niente e il client non lo
+promette; la riga di DA-FARE-ANDREA (voce 18) aggiunge la voce alla
+lista, a libro fermo, dopo la promozione. Sono cambiate solo le PAROLE
+della cauzione: «col contante per posta» e «non hai spedito i contanti»
+al posto di «in contanti» e «non ti sei presentato all'incontro»
+(`rigaCauzioneDettP2P` sul metodo scelto o sull'unico dell'ordine,
+`riquadroCauzioneP2P` sullo scambio); la voce di Info P2P dice «non ha
+fatto la sua parte (all'incontro non si è presentato; per posta non ha
+spedito)». 7) Il libro di Tappo (l'elenco dei nove, gli «Altri metodi»,
+un paragrafo col metodo intero), `NOVITA.md`, ARCHITETTURA («IL CONTANTE
+PER POSTA NEL P2P»), PRODUZIONE (la nota al blocco della cauzione).
+
+IL NOME «POSTA ASSICURATA» NON STA NEI TESTI PER GLI UTENTI: la regola 9
+vieta «assicurato» (la sentinella del libro di Tappo e quelle di Info
+P2P cercano «assicurat»), e il nome commerciale del servizio di Poste
+l'avrebbe fatta rossa — visto alla prima suite. Nei testi si dice «il
+servizio di Poste Italiane per denaro e valori, da sportello, che il
+contante lo ammette e lo rimborsa fino a 3.000 €»; il nome resta qui e
+nello studio. Alla prima suite anche: `P2P_POSTA` nudo dentro
+`passiScambioP2P` rompeva i banchi che ritagliano i passi da soli
+(`typeof`, come le altre voci), NOVITA voleva la frase sotto i 400
+caratteri e `leva: nessuna` secca, `conoscenza.md` andava rigenerato, la
+sezione nuova voleva la sua categoria (`p2p`), e sette conteggi di
+metodi (otto → nove) in altre sezioni.
+SCARTATO. Un campo del tracciamento nel gesto «Ho spedito» (il `FiatSent`
+di Mostro non porta testo: il numero va in chat, che è cifrata e c'è
+già). Un video caricato nella chat (accetta foto e PDF; un video pesa e
+la prova vale anche se resta sul telefono). La mappa del contanti per la
+posta (è di chi si incontra: `contantiAManoP2P` resta a parola intera e
+la posta non ci entra). Una leva nuova (è una voce del vocabolario, come
+Wise: si toglie dalla lista se serve). Il 2-di-3 on-chain (il deposito
+Lightning basta).
+
+PROVATO. `prove_contante_per_posta` (nuova: il form e il suo posto, il
+testo composto con e senza note, la nona voce e gli «Altri metodi», il
+CHF, il giudice nei sette casi, il verbo, i passi, gli stati, la regola
+nel foglio, il riquadro, le quattro parole della cauzione, la
+controprova del form, i tre punti della pagina, Info P2P contro le
+costanti, la voce di Info sulla cauzione, il libro di Tappo, NOVITA).
+Aggiornate per la nona voce: `prove_lista_corta_metodi` (nove, cinque
+nascosti), `prove_p2p_chf` (sei metodi), `prove_contanti_zona` (nove
+etichette), le due sentinelle della lista letterale («nove voci»,
+«la stringa del protocollo non cambia»), `prove_contanti_pagina_leggera`
+(il titolo del recapito). Le chiamate nuove nel foglio e nel dettaglio
+sono dietro `typeof`: i banchi che ritagliano `renderNuovoOrdineP2P` da
+solo non la conoscono (visto rosso in `prove_pubblica_metodo_prima`,
+poi verde). IL VERBALE (17 nov 2026, albero del cantiere sopra
+origin/develop 108d8b7, venv come la CI senza coincurve): la suite
+severa intera 28.980 passate, 0 fallite, 2 saltate (le due di
+nostr-tools, che nel container non c'è: come negli altri cantieri
+cloud); i collaudi della CI `collaudi_ci.py --elenco ci/collaudi.txt
+--paralleli 2` 141 verdi, 0 rossi. POI IL REBASE su origin/develop
+868f797 (otto commit non miei: spedisci-entro, il primo wallet secondo e
+terzo giro, Packlink, lo specchio del relay, i regali per livello,
+chiedi-locker, la voce NOVITA dei regali), con tre conflitti di coda
+(NOVITA, CANTIERI: tenute tutt'e due; conoscenza.md rigenerato): nessun
+simbolo del cantiere toccato da quei commit (controllo per nome sul
+diff). Sull'albero rebasato: le 22 sezioni toccate e quelle che leggono
+i documenti, 0 fallite; i collaudi della CI di nuovo, 144 verdi, 0 rossi.
+RESTA DA GUARDARE. Il nodo: la riga di DA-FARE-ANDREA (voce 18), e poi
+dal telefono la riga della cauzione che compare scegliendo «Contante per
+posta» e tace con SEPA. Uno scambio vero per posta non c'è ancora stato.

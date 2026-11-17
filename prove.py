@@ -82334,9 +82334,10 @@ def prove_p2p_pubblica():
     # ROVESCIA il campo libero di ieri): il perche' e' che ogni voce
     # deve avere il SUO form di recapito, e lo prova il blocco 9.
     # (2 nov 2026) l'ottava e' Wise, chiesta da Sideral
-    prova("...e il vocabolario e' chiuso, otto voci", True,
+    # (17 nov 2026) la nona e' «Contante per posta», proposta di Andrea
+    prova("...e il vocabolario e' chiuso, nove voci", True,
           "const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', "
-          "'Satispay', 'PayPal', 'Wise', 'Contanti', 'Contanti al tabacchino'];" in mini)
+          "'Satispay', 'PayPal', 'Wise', 'Contanti', 'Contanti al tabacchino', 'Contante per posta'];" in mini)
     prova("...e del campo libero di ieri non resta niente", False,
           "Oppure scrivilo tu" in mini or "p2pNuovoMetodo =" in mini)
     # ⚠️ LE TRE PAROLE CHE LA RIGA DEL CANALE CHIEDE, e non e' pedanteria:
@@ -83316,8 +83317,9 @@ def prove_p2p_pubblica():
           [True, True], [tv["giro"], tv["aMano"]])
     prova("...e sulle date storte tace", [0, 0, 0, ""], tv["storta"])
     # (31 ott 2026, Barattozon anche in compra) ai due lati
-    prova("il foglio offre il tabacchino a tutt'e due i lati, otto voci",
-          [7, 7, 8], tv["offerti"])
+    # (17 nov 2026) ...nove col contante per posta
+    prova("il foglio offre il tabacchino a tutt'e due i lati, nove voci",
+          [7, 7, 9], tv["offerti"])
     # le righe del foglio che il banco puro non vede
     _sc = pezzo_js(mini, "function scegliMetodoP2P(m){", "\n}\n")
     prova("scegliere il tabacchino toglie gli altri, e viceversa", True,
@@ -83450,9 +83452,9 @@ def prove_p2p_pubblica():
     # PERCHE' ogni voce ha il suo form di recapito. Se un giorno se ne
     # aggiunge una senza forma, chi deve ricevere gli euro si trova la
     # casella generica — e questa riga diventa rossa prima.
-    prova("ognuna delle otto voci ha il suo form di recapito",
+    prova("ognuna delle nove voci ha il suo form di recapito",
           ["sepa", "sepa", "revolut", "satispay", "paypal", "wise", "contanti",
-           "tabacchino"],
+           "tabacchino", "posta"],
           out["forme"])
     # --- IL TABACCHINO (set 2026) ---------------------------------
     tab = out["tab"]
@@ -85317,7 +85319,7 @@ def prove_p2p_barattozon():
     # --- 2) IL TAG `pm` NON SI TOCCA -------------------------------
     prova("la stringa del protocollo non cambia", True,
           "const P2P_TABACCHINO = 'Contanti al tabacchino';" in mini
-          and "'Contanti', 'Contanti al tabacchino'];" in mini)
+          and "'Contanti', 'Contanti al tabacchino', 'Contante per posta'];" in mini)
     _cat = mini[mini.index("const P2P_VESTE_METODI = {"):]
     _cat = _cat[:_cat.index("\n};")]
     prova("il catalogo ha UNA voce: nome, logo e il fatto che basti da solo",
@@ -144757,7 +144759,7 @@ def prove_contanti_pagina_leggera():
     prova("la riga «✋ Aspetta» col contanti: consegnare e contare, non inviare e controllare", [True, True],
           ["'deve consegnarti i contanti'" in att, "'deve contare i contanti e liberare i sats'" in att])
     prova("il recapito arrivato a chi compra in contanti s'intitola «📍 Dove vedervi»; il titolo passa da esc()", [True, True],
-          ["riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : '', o)" in fn("function recapitoCompratoreP2P(o){"),
+          ["riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : posta ? '✉️ Dove spedire i contanti' : '', o)" in fn("function recapitoCompratoreP2P(o){"),
            "esc(titolo || '💶 Dove mandare gli euro')" in fn("function riquadroRecapitoP2P(testo, titolo, o){")])
     prova("«Libera i sats» col contanti chiede ancora del conteggio", True,
           "'Hai contato i contanti davanti a chi ti ha pagato?'" in fn("function rilasciaP2P(){"))
@@ -159256,7 +159258,7 @@ console.log(JSON.stringify(out));
           (True, True, True, True, True, True, True, True),
           ("myP2PCoin = !!me.p2p_coin;" in mini,
            "impostaCambioCoinP2P(j.cambio_coin)" in mini,
-           "riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : '', o)" in mini,
+           "riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : posta ? '✉️ Dove spedire i contanti' : '', o)" in mini,
            "if (typeof coinInviatiP2P === 'function' && reteCoinScambioP2P(o)) return coinInviatiP2P(o);" in mini,
            "(typeof campoTxidCoinP2P === 'function' ? campoTxidCoinP2P(o) : '')" in mini,
            "esploraCoinDaChatP2P(m.testo)" in mini,
@@ -159873,11 +159875,12 @@ console.log(JSON.stringify(out));
               "Invii gli ETH col metodo scelto", o.get("come"))
         prova("ai moderatori il terzo passo dice la moneta", ["XMR inviati", "Euro inviati"], o.get("mod"))
         prova("lista corta: le sette voci delle monete stanno sotto «Altri metodi ▾»",
-              [["SEPA", "Revolut", "Satispay", "Contanti"], 4 + 7], o.get("chiusa"))
-        prova("...aperta ci sono tutte, euro e monete", 8 + 7, o.get("aperta"))
+              # (17 nov 2026) ...e il contante per posta, il quinto degli euro nascosti
+              [["SEPA", "Revolut", "Satispay", "Contanti"], 5 + 7], o.get("chiusa"))
+        prova("...aperta ci sono tutte, euro e monete", 9 + 7, o.get("aperta"))
         prova("...e una moneta gia' scelta resta in vista, al suo posto",
               ["SEPA", "Revolut", "Satispay", "Contanti", "USDe (Solana)"], o.get("scelta"))
-        prova("le voci delle monete sono sette (ETH, XMR, cinque reti di USDe)", [7, 15], o.get("solo"))
+        prova("le voci delle monete sono sette (ETH, XMR, cinque reti di USDe)", [7, 16], o.get("solo"))
     rn = pezzo_js(mini, "function paroleUsdtHtmlP2P(o, html, dove){", "\n}\n")
     prova("anche l'HTML della pagina e delle card passa dal traduttore con una moneta",
           True, "coinParoleP2P(o)" in rn)
@@ -160074,20 +160077,20 @@ def prove_lista_corta_metodi():
     else:
         prova("il banco della lista corta gira", True, bool(o))
         o = o or {}
-        prova("chiusa: i quattro di tutti i giorni, e quattro nascosti",
-              [["SEPA", "Revolut", "Satispay", "Contanti"], 4],
+        prova("chiusa: i quattro di tutti i giorni, e cinque nascosti (il contante per posta dal 17 nov 2026)",
+              [["SEPA", "Revolut", "Satispay", "Contanti"], 5],
               [(o.get("chiusa") or {}).get("voci"), (o.get("chiusa") or {}).get("nascosti")])
-        prova("aperta: tutte e otto, nell'ordine del vocabolario, e niente da aprire",
-              [8, 0, "Wise"],
+        prova("aperta: tutte e nove, nell'ordine del vocabolario, e niente da aprire",
+              [9, 0, "Wise"],
               [len((o.get("aperta") or {}).get("voci") or []),
                (o.get("aperta") or {}).get("nascosti"),
                ((o.get("aperta") or {}).get("voci") or [""] * 6)[5]])
         prova("un metodo scelto fra gli altri resta in vista, al suo posto",
-              [["SEPA", "Revolut", "Satispay", "Wise", "Contanti"], 3],
+              [["SEPA", "Revolut", "Satispay", "Wise", "Contanti"], 4],
               [(o.get("scelto") or {}).get("voci"), (o.get("scelto") or {}).get("nascosti")])
         prova("...anche il tabacchino scelto, che il titolo dice «uno solo»",
               True, "Contanti al tabacchino" in ((o.get("tab") or {}).get("voci") or []))
-        prova("chi compra: niente tabacchino, e tre nascosti", 3,
+        prova("chi compra: niente tabacchino, e quattro nascosti", 4,
               (o.get("compro") or {}).get("nascosti"))
         prova("le reti USDT non sono fra gli altri: si vedono tutte e due", [2, 0],
               [len((o.get("usdt") or {}).get("voci") or []), (o.get("usdt") or {}).get("nascosti")])
@@ -160137,6 +160140,161 @@ def prove_lista_corta_metodi():
            "ico: usdtRete ? 'rete' : 'metodi'," in rn,
            re.search(r"\n  rete: '<path class=\"velo\"", mini) is not None,
            ".p2p-sez-ico.ico-rete{" in mini))
+
+
+def prove_contante_per_posta():
+    """IL CONTANTE PER POSTA (17 nov 2026, cantiere contante-per-posta,
+    proposta di Andrea: «aggiungere tra le modalità di pagamento anche il
+    "send cash by mail" [...] una busta di carta ben sigillata dentro una
+    ulteriore busta apri chiudi di plastica»; la sua scelta sulla scheda:
+    «Sì, con cauzione obbligatoria»). La nona voce del vocabolario, sotto
+    «Altri metodi ▾» e anche in franchi; il form dell'indirizzo PRIMA del
+    contanti (la cui regex prende «contant»); il verbo «Ho spedito», i
+    passi, le frasi degli stati, il titolo del recapito; le parole della
+    cauzione; la sezione di Info P2P e il libro di Tappo. La cauzione la
+    chiede il NODO (settings.toml, `only_payment_methods`): qui non si
+    promette niente, e la riga del dettaglio esce solo se il 38385 la
+    dice. Le controprove: senza il form `posta` la voce finirebbe
+    all'appuntamento; con un altro metodo scelto il giudice tace."""
+    print("\n✉️ Il contante per posta nel P2P")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    lista = _riga_js(mini, "const P2P_METODI = [")
+    altri = _riga_js(mini, "const P2P_METODI_ALTRI = [")
+    chf = _riga_js(mini, "const P2P_METODI_CHF = [")
+    i = mini.index("const P2P_FORME_RECAPITO = [")
+    forme = mini[i:mini.index("\n];\n", i) + 4]
+    j = forme.index("  {forma: 'posta',")
+    k = forme.index("  {forma: 'contanti',")
+    prova("il form «posta» sta PRIMA del contanti, e il contanti lo seguirebbe", True, 0 < j < k)
+    senza_posta = forme[:j] + forme[k:]
+    blocco = (mini[mini.index("const P2P_POSTA = 'Contante per posta';"):mini.index("const STATI_POSTA_P2P = {")]
+              + pezzo_js(mini, "const STATI_POSTA_P2P = {", "\n};\n") + "\n};\n")
+    comune = ("function esc(x){return String(x)}\nfunction fmt(n){return String(n)}\n"
+              "function testoAppuntamentoP2P(){return ''}\nfunction quandoDaCampoP2P(){return ''}\n"
+              "function puntoDaCampoP2P(){return ''}\n"
+              "const P2P_RETI_USDT = []; const P2P_RETI_COIN = [];\n"
+              + lista + altri + chf
+              + _riga_js(mini, "const P2P_CONTANTI = 'Contanti';")
+              + _riga_js(mini, "const P2P_FINALI = [")
+              + pezzo_js(mini, "const P2P_DISPUTABILI = [", "];\n") + "];\n"
+              + _fn_js(mini, "function contantiAManoP2P(metodi){")
+              + _fn_js(mini, "function testoRecapitoScambioP2P(o){")
+              + _fn_js(mini, "function metodoSceltoP2P(o){")
+              + _fn_js(mini, "function recapitoInContantiP2P(o){")
+              + _fn_js(mini, "function scambioInContantiP2P(o){")
+              + _fn_js(mini, "function pagaInContantiP2P(o){")
+              + _fn_js(mini, "function tabacchinoP2P(metodi){")
+              + _fn_js(mini, "function metodoBaseP2P(m){")
+              + _riga_js(mini, "const P2P_TABACCHINO_PM = ")
+              + _riga_js(mini, "const P2P_TABACCHINO = ")
+              + pezzo_js(mini, "const STATI_CONTANTI_P2P = {", "\n};\n") + "\n};\n"
+              + _fn_js(mini, "function statoContantiP2P(o, t){")
+              + blocco
+              + _fn_js(mini, "function gestoPagoP2P(o){")
+              + _fn_js(mini, "function passiScambioP2P(q){")
+              + _fn_js(mini, "function formaRecapito(")
+              # la cauzione: il giudice e la cifra sono stub, qui contano le parole
+              + "function cauzioneServeP2P(){return true}\nfunction cauzioneInfoP2P(){return {accesa:true,pct:0,base:0,metodi:[]}}\n"
+              "function importoCauzioneP2P(){return 0}\nfunction satsBaseCauzioneP2P(){return 0}\n"
+              "function cauzioneAFineP2P(o){return o}\nfunction usdtP2P(){return false}\nfunction chfP2P(){return false}\n"
+              "function reteCoinScambioP2P(){return null}\n"
+              + _fn_js(mini, "function rigaCauzioneDettP2P(o, info, leva, scelto, sulMetodo){")
+              + _fn_js(mini, "function riquadroCauzioneP2P(o){"))
+    posta = {"lato": "compro", "stato": "attivo", "metodi": ["SEPA", "Contante per posta"], "metodoScelto": "Contante per posta"}
+    js = (comune + forme + "\n"
+          + "const posta = " + json.dumps(posta) + ";\n"
+          + "const sepa = Object.assign({}, posta, {metodoScelto: 'SEPA'});\n"
+          + "const viaggiato = {lato: 'compro', stato: 'euro_inviati', metodi: ['SEPA', 'Contante per posta'],"
+          + " campiLoro: {euro: {testo: 'Contante per posta\\nDestinatario: Mario Rossi\\nIndirizzo: Via Roma 12\\nCAP e città: 20100 Milano (MI)'}}};\n"
+          + "const f = formaRecapito('Contante per posta');\n"
+          + "console.log(JSON.stringify({\n"
+          + "  forma: f.forma, campi: f.campi.map(c => c.k), ricorda: f.ricorda !== false,\n"
+          + "  testo: f.componi({nome: 'Mario Rossi', indirizzo: 'Via Roma 12', citta: '20100 Milano (MI)', note: ''}),\n"
+          + "  conNote: f.componi({nome: 'M', indirizzo: 'V', citta: 'C', note: 'citofono Rossi'}).split('\\n').pop(),\n"
+          + "  contanti: formaRecapito('Contanti').forma, chf: P2P_METODI_CHF.indexOf('Contante per posta') >= 0,\n"
+          + "  nona: P2P_METODI[8], fraAltri: P2P_METODI_ALTRI.indexOf('Contante per posta') >= 0,\n"
+          + "  giudice: [scambioInPostaP2P(posta), scambioInPostaP2P(sepa), scambioInPostaP2P(viaggiato),\n"
+          + "            scambioInPostaP2P({metodi: ['Contante per posta']}), scambioInPostaP2P({metodi: ['SEPA', 'Contante per posta']}),\n"
+          + "            scambioInContantiP2P(posta), contantiAManoP2P(['Contante per posta'])],\n"
+          + "  gesto: [gestoPagoP2P(posta), gestoPagoP2P(sepa)],\n"
+          + "  passi: [passiScambioP2P({compro: true, metodo: 'Contante per posta'})[2],\n"
+          + "          passiScambioP2P({compro: false, metodo: 'Contante per posta', cauzione: true}),\n"
+          + "          passiScambioP2P({tuo: true, compro: false, metodo: 'Contante per posta'})[2]],\n"
+          + "  stati: [statoContantiP2P(viaggiato, 'x').t, statoContantiP2P(Object.assign({}, posta, {lato: 'vendo'}), 'x').d.indexOf('I tuoi sats sono bloccati. Chi compra ti spedisce') === 0,\n"
+          + "          statoContantiP2P(sepa, 'x')],\n"
+          + "  regola: [regolaPostaFoglioP2P(['SEPA'], 'compro'), regolaPostaFoglioP2P(['Contante per posta'], 'vendo').indexOf(REGOLA_POSTA_VENDE) > 0,\n"
+          + "           regolaPostaFoglioP2P(['Contante per posta'], 'compro').indexOf(REGOLA_POSTA_COMPRA) > 0],\n"
+          + "  riquadro: [riquadroPostaP2P(posta).indexOf(REGOLA_DISPUTA_POSTA) > 0, riquadroPostaP2P(sepa),\n"
+          + "             riquadroPostaP2P(Object.assign({}, posta, {stato: 'concluso'}))],\n"
+          + "  cauzione: [rigaCauzioneDettP2P(posta, {}, true, 'Contante per posta', true),\n"
+          + "             rigaCauzioneDettP2P(posta, {}, true, 'Contanti', true),\n"
+          + "             riquadroCauzioneP2P(Object.assign({}, posta, {cauzione: {stato: 'persa', sats: 100}})),\n"
+          + "             riquadroCauzioneP2P(Object.assign({}, sepa, {cauzione: {stato: 'persa', sats: 100}}))],\n"
+          + "}));\n")
+    o = _node_banco(js)
+    if o is None:
+        salta("il contante per posta, sul banco", "node non c'e'")
+    else:
+        prova("il banco del contante per posta gira", True, bool(o))
+        o = o or {}
+        prova("«Contante per posta» ha il suo form: nome, indirizzo, città, note; e si ricorda",
+              ["posta", ["nome", "indirizzo", "citta", "note"], True],
+              [o.get("forma"), o.get("campi"), o.get("ricorda")])
+        prova("il testo parte col nome del metodo e le tre righe; le note solo se ci sono",
+              ["Contante per posta\nDestinatario: Mario Rossi\nIndirizzo: Via Roma 12\nCAP e città: 20100 Milano (MI)", "Note: citofono Rossi"],
+              [o.get("testo"), o.get("conNote")])
+        prova("il contanti resta all'appuntamento, e la posta sta anche in franchi", ["contanti", True],
+              [o.get("contanti"), o.get("chf")])
+        prova("e' la nona voce del vocabolario, sotto «Altri metodi ▾»", ["Contante per posta", True],
+              [o.get("nona"), o.get("fraAltri")])
+        prova("il giudice: scelta, recapito viaggiato, unico metodo; mai su SEPA scelto, su due senza scelta, ne' per il contanti",
+              [True, False, True, True, False, False, False], o.get("giudice"))
+        prova("il verbo del gesto: «Ho spedito i contanti», e con SEPA quello di sempre",
+              ["Ho spedito i contanti", "Ho inviato gli euro"], o.get("gesto"))
+        prova("i passi dicono la spedizione e l'apertura filmata",
+              ["Spedisci i contanti tracciati",
+               ["Blocchi la cauzione e metti i sats in garanzia", "Ricevi il pacco", "Lo apri filmando e conti", "Liberi i sats a chi compra"],
+               "Ricevi il pacco e lo apri filmando"], o.get("passi"))
+        prova("gli stati: «Contanti spediti», la frase di chi vende, e niente con SEPA",
+              ["Contanti spediti", True, None], o.get("stati"))
+        prova("la regola nel foglio: solo col metodo fra quelli, dal proprio lato",
+              ["", True, True], o.get("regola"))
+        prova("il riquadro nella pagina: con la disputa scritta; niente con SEPA o a scambio finito",
+              [True, "", ""], o.get("riquadro"))
+        cz = o.get("cauzione") or ["", "", "", ""]
+        prova("la riga della cauzione dice «col contante per posta» e «non hai spedito»; col contanti le parole di sempre",
+              (True, True, True, True),
+              ("col contante per posta" in cz[0] and "non hai spedito i contanti" in cz[0],
+               "in contanti" in cz[1] and "all'incontro" in cz[1],
+               "non hai spedito i contanti" in cz[2], "all'incontro" in cz[3]))
+    # LA CONTROPROVA: senza il form `posta` la regex del contanti se la prende
+    o2 = _node_banco(comune + senza_posta + "\nconsole.log(JSON.stringify({forma: formaRecapito('Contante per posta').forma}));\n")
+    if o2 is not None:
+        prova("controprova: tolto il form «posta», la voce finirebbe all'appuntamento del contanti",
+              "contanti", (o2 or {}).get("forma"))
+    # I PUNTI DELLA PAGINA
+    rn = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
+    prova("la regola sta nel foglio Pubblica e nel dettaglio, accanto a quella del contanti",
+          (True, 1), ("regolaPostaFoglioP2P(p2pNuovoMetodi," in rn, mini.count("? regolaPostaFoglioP2P(p2pDettMetodo ? [p2pDettMetodo]")))
+    prova("la pagina dello scambio monta il riquadro e il bottone del recapito dice la busta",
+          (True, True, True),
+          ("riquadroPostaP2P(o) : '') +" in mini,
+           "✉️ Indica dove spedirti i contanti</button>" in mini,
+           "posta ? '✉️ Dove spedire i contanti' : ''" in mini))
+    inf = mini[mini.index('<h3 id="p2pinfo-posta">'):mini.index("<h3>I tempi</h3>")]
+    prova("Info P2P ha la sezione, con le stesse frasi delle costanti", (True, True, True, True),
+          tuple(REGOLA_ in inf for REGOLA_ in (
+              _riga_js(mini, "const REGOLA_POSTA_COMPRA = ").split(" = '", 1)[1].rsplit("';", 1)[0].replace("\\'", "'"),
+              _riga_js(mini, "const REGOLA_POSTA_VENDE = ").split(" = '", 1)[1].rsplit("';", 1)[0].replace("\\'", "'"),
+              _riga_js(mini, "const CONSIGLI_POSTA = ").split(" = '", 1)[1].rsplit("';", 1)[0].replace("\\'", "'"),
+              _riga_js(mini, "const REGOLA_DISPUTA_POSTA = ").split(" = '", 1)[1].rsplit("';", 1)[0].replace("\\'", "'"))))
+    prova("...e la cauzione di Info P2P non parla piu' solo dell'incontro", True,
+          "per posta non ha spedito" in _fn_js(mini, "function testoCauzioneInfoP2P(info, leva, sulMetodo){"))
+    libro = open(os.path.join("assistente", "sapere.md"), encoding="utf-8").read()
+    prova("il libro di Tappo ha il paragrafo, col servizio di Poste per i valori, i due video e la cauzione", (True, True, True, True),
+          ("Contante per posta (metodo «Contante per posta»" in libro, "Poste Italiane per denaro e valori" in libro,
+           "apre il pacco filmando" in libro, "blocca la stessa piccola cauzione del contanti di persona" in libro))
+    prova("NOVITA ha la voce", True, "## 2026-11-17 · contante-per-posta" in open("NOVITA.md", encoding="utf-8").read())
 
 
 def prove_revolut_tre_modi():
@@ -161203,7 +161361,8 @@ console.log(JSON.stringify(out));""")
         "metro": [0.00096, 0.001],
         "tetto": [240, 250, 240, 0],
         "tettoMuto": 1,
-        "metodi": ["TWINT", "Bonifico CH", "Revolut", "Wise", "Contanti"],
+        # (17 nov 2026) ...e il contante per posta, anche in franchi
+        "metodi": ["TWINT", "Bonifico CH", "Revolut", "Wise", "Contanti", "Contante per posta"],
         "soldi": "i franchi",
         "iban": ["", "", "", "Questo IBAN non torna: controlla di averlo copiato giusto",
                  "Un IBAN svizzero comincia con CH (o LI) e ha 21 caratteri: controllalo",
@@ -170327,8 +170486,8 @@ def prove_contanti_zona():
           [o["voce"][1], o["voce"][4], o["voce"][5], o["voce"][6]])
     prova("...Barattozon tiene il suo marchio, senza banconote", [True, False, False],
           ['class="p2p-marca"' in o["tabVoce"], "💵" in o["tabVoce"], "p2p-contanti" in o["tabVoce"]])
-    prova("...nel vocabolario degli otto metodi l'etichetta ce l'ha uno solo, «Contanti»",
-          [False, False, False, False, False, False, True, False], o["etichette"])
+    prova("...nel vocabolario dei nove metodi l'etichetta ce l'ha uno solo, «Contanti»",
+          [False, False, False, False, False, False, True, False, False], o["etichette"])
     prova("il 💳 se ne va quando ogni voce ha il suo segno (solo contanti, solo marchio) e resta a intestare i nomi",
           ["", "💳 ", "💳 ", "", "💳 ", "💳 ", "💳 ", "💳 "], o["icone"])
     prova("...ma l'INSEGNA navy e' dei soli marchi: la scatola del contanti non lo diventa",
@@ -204265,7 +204424,7 @@ def _esce(f):
 # cambio libero), onchain (il 2-di-3 e RGB).
 CATEGORIE = {
     "p2p": """
-    controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano
+    controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
     luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
     autocomplete_comuni scambi_p2p_vecchi scambi_ovunque
     disputa_per_sbaglio tor_chiavi_scambio chi_e_l_altro
@@ -205247,6 +205406,7 @@ def main():
     prove_p2p_onchain_tetto,
     prove_volto_porta_card,
     prove_lista_corta_metodi,
+    prove_contante_per_posta,
     prove_revolut_tre_modi,
     prove_eth_xmr,
     prove_p2p_monete_ritocchi,

@@ -649,3 +649,43 @@ sudo grep -n "^URL_PUBBLICO" /srv/collaudo/barattolo/config.py
 
 Se uno dei tre non entra, non si tocca niente: si porta la frase
 dell'errore alla sessione.
+
+## 18. La cauzione anche sul «Contante per posta»: una riga nel settings.toml del nodo (17 nov 2026, cantiere contante-per-posta; Andrea sulla scheda: «Sì, con cauzione obbligatoria»)
+
+**Perché.** L'app ha il nono metodo P2P, «Contante per posta» (la busta
+di banconote spedita). La cauzione di chi prende la decide il NODO, dalla
+lista `only_payment_methods` del blocco `[anti_abuse_bond]` (patch 0008 e
+0010 del fork): oggi c'è solo «Contanti», quindi chi prende un ordine
+scegliendo «Contante per posta» NON blocca niente finché la riga non
+cambia. Il client non promette niente da solo: legge la lista dal 38385.
+Il confronto è a parola intera, senza maiuscole, voce per voce (la
+virgola separa): «Contante per posta» va scritto così, intero. Il perché:
+CANTIERI, «Il contante per posta: la nona voce del P2P». Va fatto DOPO la
+promozione (prima, nessun client la manda), e a LIBRO FERMO.
+
+**Sola lettura (NODO):**
+```
+grep -n "only_payment_methods" ~/nodo/mostro/settings.toml
+```
+Atteso: `only_payment_methods = ["Contanti"]`. Se c'è già «Contante per
+posta», non c'è niente da fare.
+
+**Scrive (NODO), a libro fermo:** la copia, la riga, la rilettura, il riavvio.
+```
+cp -p ~/nodo/mostro/settings.toml ~/nodo/mostro/settings.toml.prima-posta-$(date +%F)
+```
+```
+sed -i 's/^only_payment_methods = \["Contanti"\]$/only_payment_methods = ["Contanti", "Contante per posta"]/' ~/nodo/mostro/settings.toml
+```
+```
+grep -n -A7 "^\[anti_abuse_bond\]" ~/nodo/mostro/settings.toml
+```
+Atteso: il blocco di sempre, con `only_payment_methods = ["Contanti", "Contante per posta"]`.
+```
+cd ~/nodo && docker compose restart mostro && sleep 20 && docker compose logs --tail=30 mostro
+```
+Nei log nessun errore di settings. Poi dal telefono, su un ordine che
+accetta «Contante per posta»: scegliendolo alla presa la riga «🔐 La
+cauzione di chi prende» compare (col testo «col contante per posta»),
+scegliendo SEPA no. Fatta, questa voce si cancella e il nuovo valore va
+in PRODUZIONE («LA SALITA ALLA -bar7», il blocco `[anti_abuse_bond]`).
