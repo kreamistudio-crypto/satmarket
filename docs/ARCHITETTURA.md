@@ -36518,6 +36518,26 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   a chi libera (1, 6, 20 ore) restano. Nel telefono `tempoBonificoOcP2P`
   (pura) e le frasi di `schedaOnchainP2P` nello stato «euro inviati».
   Prove: `prove_onchain_tempo_bonifico`, `collaudo_p2p_onchain`.
+- CHI SI RITIRA DOPO IL DEPOSITO NEL P2P ON-CHAIN (17 nov 2026 sera,
+  cantiere onchain-ritiro; CANTIERI, «Chi si ritira dopo il deposito»).
+  Niente denaro: uno «scambio non completato» nella reputazione di
+  sempre (`p2p_esiti`, `mancato`, giro 0, ruolo `compra`). Giudici puri:
+  `_p2p_onchain_ha_dove_pagare(o)` (recapito scritto o PayCode),
+  `_p2p_onchain_mancato(o, stato)` sulla riga PRIMA della chiusura →
+  `(tg_id, dettaglio)`: `onchain-rinuncia` (rimborso proposto da chi
+  compra da `depositato`/`euro_inviati`) o `onchain-non-pagato` (disputa
+  decisa verso chi ha depositato, con `pagamento_scaduto_il` e senza
+  `euro_inviati_il`); `_p2p_onchain_rinuncia_conta(o)` e' il preavviso.
+  `p2p_onchain_firma` scrive `mancato_a`/`mancato_perche` sullo scambio,
+  `_p2p_onchain_segna_esiti` la riga negli esiti; a chi si e' ritirato
+  la riga di `_conto_esito_p2p`, a chi aveva depositato l'invito.
+  `_p2p_onchain_per` porta `rinuncia_conta`, `non_completato`
+  (io/altro) e `non_completato_perche` alle due parti.
+  `_riga_recensione_p2p(con, ordine, chi)`: dopo `onchain-rinuncia` la
+  recensione e' a senso unico (solo `chi` == depositante). Nel telefono
+  `recensibileOcP2P`, `avvisoRinunciaContaOcP2P` (nel foglio di
+  «Rinuncio») e la frase dello stato «rimborsato». Prove:
+  `prove_onchain_ritiro`, `collaudo_p2p_onchain` (sezione 6).
 - I DUE TASTI DELLA RETE NEL FOGLIO DELL'ORDINE (16 nov 2026, cantiere
   coin-quasi; il perché in CANTIERI, «I due tasti della rete nel foglio
   dell'ordine…»). `tastiReteFoglioP2P` disegna «⚡ Lightning» / «₿
