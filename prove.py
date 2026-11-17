@@ -201191,6 +201191,108 @@ console.log(JSON.stringify(out));
            "statoAnelloP2P(manca * (Number(box.dataset.scala) || 1))" in battito])
 
 
+def prove_onchain_promemoria():
+    """I PROMEMORIA DELLO SCAMBIO ON-CHAIN (17 nov 2026, cantiere
+    onchain-chat-sollecito, «tutto deve essere come la parte Lightning»):
+    come i solleciti del Lightning, battuti dalla ronda. A chi paga
+    un'ora, sei, e quattro ore prima della fine del tempo (solo col
+    recapito scritto, mai col contanti fra i metodi); a chi libera, dal
+    «Ho inviato», un'ora, sei, venti coi testi del Lightning. Un livello
+    si timbra prima dell'invio, una ronda in ritardo manda solo l'ultimo,
+    e disputa o tempo finito li fermano."""
+    print("\n[i promemoria dello scambio on-chain]")
+    import sqlite3
+    src = _SORGENTE
+    amb = {"json": json, "re": __import__("re"), "sqlite3": sqlite3}
+    i = src.index("P2P_COIN_METODI = {")
+    exec(src[i:src.index("\n}\n", i) + 3], amb)
+    i = src.index("P2P_ONCHAIN_RETI_USDT = {")
+    exec(src[i:src.index("\n}\n", i) + 3], amb)
+    for riga in ("P2P_ONCHAIN_ORE_PAGAMENTO_MONETE = ", "P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI = ",
+                 "P2P_ONCHAIN_SOLLECITI_PAGARE_PRIMA_S = ", "P2P_ONCHAIN_SEGNO = ",
+                 "SOLLECITI_PAYCODE_S = ", "SOLLECITI_RILASCIO_S = "):
+        j = src.index("\n" + riga) + 1
+        exec(src[j:src.index("\n", j)], amb)
+    for diz in ("SOLLECITO_RILASCIO_TESTI = {", "SOLLECITO_RILASCIO_CONTANTI_TESTI = {"):
+        i = src.index("\n" + diz) + 1
+        exec(src[i:src.index("\n}\n", i) + 3], amb)
+    amb["_metodi_libro"] = lambda m: [str(x).strip() for x in m or []]
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
+              "p2p_onchain_usdt", "_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin",
+              "p2p_onchain_ore_pagamento", "_p2p_onchain_intervalli_pagare",
+              "_p2p_onchain_testi_pagare", "_p2p_onchain_solo_contanti",
+              "_p2p_onchain_sollecito_dovuto", "_p2p_onchain_passata_solleciti"):
+        exec(pezzo(f), amb)
+    D = amb["_p2p_onchain_sollecito_dovuto"]
+    T0 = 1_000_000
+    base = {"stato": "depositato", "disputa_il": 0, "recapito": "IT60X...",
+            "ricevente_id": 111, "depositante_id": 222, "depositato_il": T0,
+            "euro_inviati_il": 0, "metodi": '["SEPA"]', "euro_cent": 5000,
+            "pagamento_scaduto_il": 0, "sollecito_pagare": 0, "sollecito_libera": 0}
+    usdt = dict(base, metodi='["USDT (Tron)"]')
+    liv = lambda o, dopo: (D(o, T0 + dopo) or (None, 0))[1]
+    H = 3600
+    prova("A CHI PAGA in euro (72 ore): niente prima di un'ora, poi 1 a un'ora, 2 a sei, "
+          "3 a 68 ore (quattro prima della fine)",
+          [0, 1, 1, 2, 2, 3], [liv(base, 59 * 60), liv(base, H), liv(base, 6 * H - 1),
+                               liv(base, 6 * H), liv(base, 68 * H - 1), liv(base, 68 * H)])
+    prova("...in USDT e nelle monete (24 ore) il terzo a 20 ore",
+          [2, 3], [liv(usdt, 20 * H - 1), liv(usdt, 20 * H)])
+    prova("UNA RONDA IN RITARDO manda solo l'ultimo dovuto, e un livello gia' mandato non "
+          "riparte",
+          [3, 0, 3], [liv(base, 70 * H), liv(dict(base, sollecito_pagare=3), 70 * H),
+                      liv(dict(base, sollecito_pagare=1), 70 * H)])
+    prova("NIENTE a chi paga senza il recapito, col contanti fra i metodi, a disputa aperta "
+          "o a tempo finito",
+          [0, 0, 0, 0], [liv(dict(base, recapito=" "), 7 * H),
+                         liv(dict(base, metodi='["SEPA", "Contanti"]'), 7 * H),
+                         liv(dict(base, disputa_il=T0 + 5), 7 * H),
+                         liv(dict(base, pagamento_scaduto_il=T0 + 9), 7 * H)])
+    d = D(base, T0 + H)
+    prova("il promemoria va a chi paga, nella sua colonna, e dice le ore",
+          ("sollecito_pagare", 1, 111, True),
+          (d[0], d[1], d[2], "Hai 72 ore in tutto" in d[3] and "«Ho inviato gli euro»" in d[3]))
+    inv = dict(base, stato="euro_inviati", euro_inviati_il=T0)
+    d = D(inv, T0 + 20 * H)
+    prova("A CHI LIBERA, dal «Ho inviato»: 1/2/3 a un'ora, sei, venti, coi testi del "
+          "Lightning; col SOLO «Contanti» quelli dei contanti",
+          [0, 1, 2, ("sollecito_libera", 3, 222), True, True],
+          [liv(inv, H - 1), liv(inv, H), liv(inv, 6 * H), d[:3],
+           d[3].endswith(amb["SOLLECITO_RILASCIO_TESTI"][3]),
+           D(dict(inv, metodi='["Contanti"]'), T0 + H)[3].endswith(
+               amb["SOLLECITO_RILASCIO_CONTANTI_TESTI"][1])])
+    prova("...niente a disputa aperta, ne' a scambio concluso",
+          [0, 0], [liv(dict(inv, disputa_il=T0 + 5), 2 * H),
+                   liv(dict(inv, stato="rilasciato"), 2 * H)])
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE p2p_onchain_ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                "disputa_il INT, recapito TEXT, ricevente_id INT, depositante_id INT, "
+                "depositato_il INT, euro_inviati_il INT, metodi TEXT, euro_cent INT, "
+                "pagamento_scaduto_il INT, sollecito_pagare INT, sollecito_libera INT)")
+    cols = list(base)
+    con.execute(f"INSERT INTO p2p_onchain_ordini(id, {', '.join(cols)}) VALUES(1, "
+                + ", ".join("?" * len(cols)) + ")", [base[c] for c in cols])
+    con.execute(f"INSERT INTO p2p_onchain_ordini(id, {', '.join(cols)}) VALUES(2, "
+                + ", ".join("?" * len(cols)) + ")", [inv[c] for c in cols])
+    P = amb["_p2p_onchain_passata_solleciti"]
+    primo = [(o["id"], chi) for o, chi, _ in P(con, T0 + 6 * H)]
+    secondo = P(con, T0 + 6 * H)
+    prova("LA PASSATA timbra prima dell'invio: alla prima ronda un promemoria per scambio, "
+          "alla seconda nello stesso momento niente",
+          ([(1, 111), (2, 222)], [], [2, 2]),
+          (primo, secondo, [con.execute("SELECT sollecito_pagare FROM p2p_onchain_ordini "
+                                        "WHERE id=1").fetchone()[0],
+                            con.execute("SELECT sollecito_libera FROM p2p_onchain_ordini "
+                                        "WHERE id=2").fetchone()[0]]))
+    ronda = pezzo("_p2p_onchain_ronda")
+    prova("la ronda li passa DOPO il tempo finito, e li manda col traduttore della valuta",
+          (True, True),
+          (ronda.index("_p2p_onchain_passata_solleciti(con, adesso)")
+           > ronda.index("_p2p_onchain_passata_tempo_pagare(con, adesso)"),
+           "await _notifica_p2p_onchain(o, chi, testo, _p2p_onchain_bottone(o))" in ronda))
+
+
 def prove_indirizzo_resta_dove_sta():
     """«MOSTRA L'INDIRIZZO» NON RIPORTA IN CIMA (16 nov 2026, cantiere
     indirizzo-resta, Andrea: «se premo mostra indirizzo in un ordine il
@@ -202787,7 +202889,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -203496,6 +203598,7 @@ def main():
     prove_usdt_cifra_copia,
     prove_convenienza_monete,
     prove_onchain_come_lightning,
+    prove_onchain_promemoria,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
     prove_scelta_rete_mercatino,
