@@ -92078,3 +92078,39 @@ resta com'era (è la storia del post).
 
 Provato: `prove_paracadute` legge l'ordine delle due righe coi pallini
 nuovi; controprova: rimettere 📈 nel codice fa rossa la sezione.
+## Il pallino grigio del cursore «Tempo per pagare» (18 nov 2026, cantiere cursore-tempo; Andrea: «se tengo premuto e striscio il pallino c'è questo bug»)
+
+Andrea, col video: «Se tengo premuto e striscio il pallino c'è questo
+bug. Solo se faccio così però, se ci clicco sopra invece non c'è». Poi:
+«c'è anche senza registrare lo schermo». Trascinando, nella mini app
+Android, un secondo pallino grigio staccato seguiva il dito sopra il
+testo. Il cursore era quello NATIVO, con sola `accent-color`: il disegno
+lo faceva la WebView. Prima lettura, scartata da Andrea: il segno
+«mostra tocchi» del registratore.
+
+Deciso: il cursore lo disegna la pagina, come quello del Paracadute
+(`appearance:none`, pista e pallino sui due motori). Il tratto arancio
+lo porta `--pieno`, calcolato da `pienoTempoPagareP2P`, scritto al
+disegno e a ogni passo del dito. Scartato `user-select:none`
+sull'orologio contro le maniglie della selezione: la regola di
+`prove_dati_copia` lo vuole solo su bottoni e card, mai sopra un dato.
+
+Provato: `prove_tempo_pagare_p2p` (il tratto in percentuale e la
+sentinella sul CSS) e uno scatto con Chromium in tema scuro e chiaro.
+NON riprodotto qui: l'unico banco vero è il telefono di Andrea, da
+guardare dopo il cherry-pick.
+
+Nello stesso commit, la CAUZIONE CHIESTA RESTA SALVATA (Andrea: «chi
+pubblica un ordine on-chain e spunta la casella che richiede la
+cauzione [...] questa opzione rimanga salvata per le volte dopo»). Il
+foglio «Pubblica» riparte dall'ultima scelta e non più da «No». La
+memoria sta in `localStorage`, accanto a quella dell'ordinamento e
+delle pillole (fuori dal blocco della lettura), con una chiave per
+conto (`chiaveP2P`): il secondo account non eredita la scelta del
+primo. Dove la cauzione non si offre la memoria resta, ma non parte
+niente: decide sempre `cauzioneNuovoAttivaP2P`, e il server rigiudica.
+Scartato il server come fonte (la via della zona): una preferenza del
+foglio non vale una colonna, e l'ordinamento del libro fa già così.
+Vale per telefono e conto. Provato in `prove_onchain_cauzione`
+(memoria finta, due conti, «No» che cancella, telefono che non
+ricorda).

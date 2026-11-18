@@ -208780,8 +208780,9 @@ def prove_onchain_cauzione():
         "function metaCauzioneOcP2P(o){",
         "function cauzioneAFineP2P(o){",
         "function cauzioneNuovoAttivaP2P(oc, libro, metodi, lato){",
-        "function notaCauzioneNuovoP2P(c){")) + "\n" \
-        + "".join(_riga_js(mini, r) for r in ("const P2P_METODO_FISSO = ",)) + r"""
+        "function notaCauzioneNuovoP2P(c){", "function ricordaCauzioneNuovoP2P(si){",
+        "function cauzioneRicordataP2P(){", "function chiaveP2P(base){")) + "\n" \
+        + "".join(_riga_js(mini, r) for r in ("const P2P_METODO_FISSO = ", "const P2P_CAUZIONE_CHIAVE = ")) + r"""
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -208875,6 +208876,25 @@ out.nuovo = [cauzioneNuovoAttivaP2P(true, AS, ['Revolut'], 'vendo'), cauzioneNuo
              cauzioneNuovoAttivaP2P(true, AS, ['Revolut'], 'compro'),
              notaCauzioneNuovoP2P(REGOLA).includes('metà va a te') && notaCauzioneNuovoP2P(REGOLA).includes('il 3%, almeno 1000 sats')
                && notaCauzioneNuovoP2P(REGOLA).includes('se rinuncia dopo il tuo deposito')];
+/* LA SCELTA SI RICORDA, una per conto (Andrea: «rimanga salvata per le volte dopo») */
+const MEM = {};
+globalThis.localStorage = {getItem: k => (k in MEM ? MEM[k] : null), setItem: (k, v) => { MEM[k] = String(v); },
+                           removeItem: k => { delete MEM[k]; }};
+globalThis.myTgId = 222;
+const r0 = cauzioneRicordataP2P();
+ricordaCauzioneNuovoP2P(true);
+const r1 = [cauzioneRicordataP2P(), JSON.stringify(Object.keys(MEM))];
+globalThis.myTgId = 333;
+const r2 = cauzioneRicordataP2P();
+globalThis.myTgId = 222;
+ricordaCauzioneNuovoP2P(false);
+const r3 = [cauzioneRicordataP2P(), Object.keys(MEM).length];
+ricordaCauzioneNuovoP2P(1);
+const r4 = cauzioneRicordataP2P();
+globalThis.localStorage = {getItem: () => { throw new Error('bloccato'); }, setItem: () => { throw new Error('bloccato'); },
+                           removeItem: () => { throw new Error('bloccato'); }};
+ricordaCauzioneNuovoP2P(true);
+out.memoria = [r0, ...r1, r2, ...r3, r4, cauzioneRicordataP2P()];
 console.log(JSON.stringify(out));
 """
     out = _node_banco(banco)
@@ -208920,6 +208940,16 @@ console.log(JSON.stringify(out));
     prova("la scelta nel foglio Pubblica: solo on-chain, solo con la leva del server, solo in "
           "«Vendi BTC», e la nota dice regola, quando si perde e meta' a chi vende",
           [True, False, False, False, False, True], out.get("nuovo"))
+    prova("LA SCELTA RESTA SALVATA (Andrea: «rimanga salvata per le volte dopo»): mai scelta "
+          "«No»; «Chiedila» si ricorda sotto la chiave del conto, l'altro conto non la eredita, "
+          "«No» la cancella, un 1 non vale, e un telefono che non ricorda torna a «No» senza rompersi",
+          [False, True, '["barattolo_p2p_cauzione_chiesta@222"]', False, False, 0, False, False],
+          out.get("memoria"))
+    ap = _fn_js(mini, "function apriNuovoOrdineP2P(metodo){")
+    sc = _fn_js(mini, "function scegliCauzioneNuovoP2P(si){")
+    prova("...il foglio la rilegge a ogni apertura e il tocco la riscrive", [True, False, True],
+          ["p2pNuovoCauzione = typeof cauzioneRicordataP2P === 'function' && cauzioneRicordataP2P();" in ap, "p2pNuovoCauzione = false;" in ap,
+           "ricordaCauzioneNuovoP2P(p2pNuovoCauzione);" in sc])
 
 def prove_guida_wallet():
     """LA GUIDA «👛 IL TUO PRIMO WALLET» (17 nov 2026, cantiere
@@ -213037,7 +213067,8 @@ def prove_tempo_pagare_p2p():
                "function tempoPagareAttivoP2P(coord, info, oc){",
                "function tempoPagarePossibileP2P(lato, metodi, oc){",
                "function minutiPagareFoglioP2P(scelta, lato, metodi, oc, attivo, veloci){",
-               "function fermoDaMinutiP2P(min){", "function quotaTempoP2P(min){",
+               "function fermoDaMinutiP2P(min){", "function pienoTempoPagareP2P(k){",
+               "function quotaTempoP2P(min){",
                "function anelloTempoP2P(quota, id){",
                "function prendiMinutiPagareP2P(m){", "function minutiPagareOrdineP2P(o){",
                "function bollinoTempoPagareP2P(min){",
@@ -213068,6 +213099,7 @@ out.corti = [15, 90, 240].map(minutiPagareCortiP2P);
 out.fermi = [P2P_MINUTI_PAGARE_FERMI.length, P2P_MINUTI_PAGARE_FERMI[0], P2P_MINUTI_PAGARE_FERMI[P2P_MINUTI_PAGARE_FERMI.length - 1],
   P2P_MINUTI_PAGARE_FERMI.every(m => minutiPagareSceltaP2P(m) === m),
   P2P_MINUTI_PAGARE_FERMI.every((m, i, a) => !i || a[i - 1] < m), fermoDaMinutiP2P(1440), fermoDaMinutiP2P(65)];
+out.pieno = [0, 33, 3, -4, 99, 'x'].map(pienoTempoPagareP2P);
 out.veloci = [metodoVeloceP2P('SEPA Instant'), metodoVeloceP2P('USDT (Tron)'), metodoVeloceP2P('ETH (Ethereum) 0.01'),
   metodoVeloceP2P('USDe (Base)'), metodoVeloceP2P('SEPA'), metodoVeloceP2P('Wise'), metodoVeloceP2P('Revolut', ['Satispay'])];
 out.coi = [minutiCoiMetodiP2P(60, ['SEPA Instant', 'Satispay']), minutiCoiMetodiP2P(60, ['SEPA Instant', 'SEPA']),
@@ -213118,6 +213150,21 @@ console.log(JSON.stringify(out));
     prova("I FERMI DEL CURSORE: 34, da 15 minuti a 24 ore, tutti nell'orologio e in salita; "
           "l'ultimo e' il giorno, e fra due fermi si va per difetto",
           [34, 15, 1440, True, True, 33, 3], o["fermi"])
+    prova("IL TRATTO ARANCIO del cursore disegnato dalla pagina: 0% al primo fermo, 100% "
+          "all'ultimo, in mezzo la sua parte; fuori o storto, ai capi", [0, 100, 9.1, 0, 100, 0],
+          o["pieno"])
+    css = mini[mini.index("  .p2p-orologio input[type=range]{"):mini.index("  .p2p-orologio.fermo .p2p-orologio-val{")]
+    prova("IL POLLICE NATIVO NON C'E' PIU' (Andrea: «se tengo premuto e striscio il pallino "
+          "c'e' questo bug»): `appearance:none`, pista e pallino della pagina sui due motori, "
+          "niente `accent-color`, e `--pieno` scritto al disegno E a ogni passo del dito",
+          [True, True, True, True, False, True, True],
+          ["-webkit-appearance:none;appearance:none" in css,
+           "::-webkit-slider-thumb{" in css and "::-moz-range-thumb{" in css,
+           "::-webkit-slider-runnable-track{" in css and "::-moz-range-track{" in css,
+           "var(--pieno,0%)" in css,
+           "accent-color" in css,
+           "' style=\"--pieno:' + pienoTempoPagareP2P(fermoDaMinutiP2P(min)) + '%\"'" in mini,
+           "cur0.style.setProperty('--pieno', pienoTempoPagareP2P(k) + '%');" in mini])
     prova("i metodi veloci della pagina, coi ripieghi e con la lista del server",
           [True, True, True, True, False, False, False], o["veloci"])
     prova("con un metodo lento il tempo resta 24 ore, e la nota li nomina",

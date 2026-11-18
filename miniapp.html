@@ -3630,8 +3630,35 @@
   .p2p-orologio .p2p-anello{width:44px;height:44px}
   .p2p-orologio-val{flex:0 0 auto;min-width:92px;font-weight:800;font-size:15px;
     color:var(--sats-text);font-variant-numeric:tabular-nums}
-  .p2p-orologio input[type=range]{flex:1 1 auto;min-width:0;margin:0;accent-color:var(--sats)}
-  .p2p-orologio.fermo input[type=range]{opacity:.45}
+  /* IL POLLICE LO DISEGNA LA PAGINA (18 nov 2026, cantiere cursore-tempo;
+     Andrea: «se tengo premuto e striscio il pallino c'e' questo bug»,
+     «c'e' anche senza registrare lo schermo»). Col cursore NATIVO
+     (`accent-color`) la WebView Android di Telegram, a dito trascinato,
+     dipingeva un secondo pallino grigio staccato che seguiva il dito
+     sopra il testo; col tocco secco no. `appearance:none` toglie di
+     mezzo il disegno del sistema: binario e pallino sono nostri, come
+     nel cursore del Paracadute, e il tratto pieno arancio lo dice
+     `--pieno`, scritto da `pienoTempoPagareP2P` a ogni passo. */
+  .p2p-orologio input[type=range]{flex:1 1 auto;min-width:0;margin:0;padding:0;
+    height:26px;background:none;-webkit-appearance:none;appearance:none;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;touch-action:pan-y}
+  .p2p-orologio input[type=range]:focus{outline:none}
+  .p2p-orologio input[type=range]::-webkit-slider-runnable-track{
+    height:6px;border-radius:999px;border:0;
+    background:linear-gradient(to right, var(--sats) 0 var(--pieno,0%),
+      rgba(128,128,128,.35) var(--pieno,0%) 100%)}
+  .p2p-orologio input[type=range]::-moz-range-track{
+    height:6px;border-radius:999px;border:0;
+    background:linear-gradient(to right, var(--sats) 0 var(--pieno,0%),
+      rgba(128,128,128,.35) var(--pieno,0%) 100%)}
+  .p2p-orologio input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:20px;height:20px;border-radius:999px;
+    margin-top:-7px;background:var(--sats);border:0;
+    box-shadow:0 1px 3px rgba(0,0,0,.28)}
+  .p2p-orologio input[type=range]::-moz-range-thumb{
+    width:20px;height:20px;border-radius:999px;background:var(--sats);border:0;
+    box-shadow:0 1px 3px rgba(0,0,0,.28)}
+  .p2p-orologio.fermo input[type=range]{opacity:.45;cursor:default}
   .p2p-orologio.fermo .p2p-orologio-val{color:var(--ink-soft)}
   /* il bollino della card nel libro: solo coi tempi sotto le 24 ore */
   .p2p-bollino-tempo{display:inline-block;font-size:11px;font-weight:800;line-height:1;
@@ -80737,6 +80764,24 @@ function noMoneteRicordateP2P(){
   const letto = k => { try { return localStorage.getItem(k) === '1'; } catch(e){ return false; } };
   return {soloBtc: letto(P2P_BTC_ONLY_CHIAVE), noStable: letto(P2P_NO_STABLE_CHIAVE)};
 }
+/* ...e la memoria della CAUZIONE CHIESTA nel foglio «Pubblica» (18 nov
+   2026, cantiere cursore-tempo; Andrea: «questa opzione rimanga salvata
+   per le volte dopo»), qui fuori per la stessa ragione. Una chiave per
+   conto (`chiaveP2P`), cosi' il secondo account non eredita la scelta
+   del primo. Il foglio la rilegge a ogni apertura e il tocco la
+   riscrive; dove la cauzione non si offre (Compra, Lightning, leva
+   spenta) la memoria resta e non parte niente: decide sempre
+   `cauzioneNuovoAttivaP2P`. */
+const P2P_CAUZIONE_CHIAVE = 'barattolo_p2p_cauzione_chiesta';
+function ricordaCauzioneNuovoP2P(si){
+  try {
+    if (si === true) localStorage.setItem(chiaveP2P(P2P_CAUZIONE_CHIAVE), '1');
+    else localStorage.removeItem(chiaveP2P(P2P_CAUZIONE_CHIAVE));
+  } catch(e){}
+}
+function cauzioneRicordataP2P(){
+  try { return localStorage.getItem(chiaveP2P(P2P_CAUZIONE_CHIAVE)) === '1'; } catch(e){ return false; }
+}
 
 
 /* ================= LO SCAMBIO P2P: BARATTOLO COME CLIENT DI MOSTRO (set 2026) =================
@@ -97810,16 +97855,27 @@ function sezioneTempoPagareNuovoP2P(){
       + '<div class="p2p-orologio-val" id="p2pTempoPagareVal">' + minutiPagareDetteP2P(min) + '</div>'
       + '<input type="range" id="p2pTempoPagareCursore" min="0" max="' + (P2P_MINUTI_PAGARE_FERMI.length - 1)
       + '" step="1" value="' + fermoDaMinutiP2P(min) + '"' + (lenti.length ? ' disabled' : '') + fermo
+      + ' style="--pieno:' + pienoTempoPagareP2P(fermoDaMinutiP2P(min)) + '%"'
       + ' aria-label="Tempo per pagare" aria-valuetext="' + minutiPagareDetteP2P(min) + '">'
       + '</div>',
     sotto: '<div class="hint" id="p2pTempoPagareNota">' + notaTempoPagareP2P(min, lenti) + '</div>'
   });
+}
+/* PURA: quanta pista e' arancio al passo k (in %, per `--pieno`): il
+   cursore e' disegnato dalla pagina e il tratto pieno non viene da se' */
+function pienoTempoPagareP2P(k){
+  const n = P2P_MINUTI_PAGARE_FERMI.length - 1;
+  if (n <= 0) return 0;
+  const x = Math.max(0, Math.min(n, Number(k) || 0));
+  return Math.round(x / n * 1000) / 10;
 }
 /* il dito sul cursore: tutto IN PLACE, mai il foglio rifatto (il cursore
    perderebbe la presa a meta' gesto) */
 function scegliTempoPagareNuovoP2P(i){
   const k = Math.max(0, Math.min(P2P_MINUTI_PAGARE_FERMI.length - 1, Math.floor(Number(i) || 0)));
   const min = P2P_MINUTI_PAGARE_FERMI[k];
+  const cur0 = el('p2pTempoPagareCursore');
+  if (cur0) cur0.style.setProperty('--pieno', pienoTempoPagareP2P(k) + '%');
   if (min === p2pNuovoMinutiPagare) return;
   p2pNuovoMinutiPagare = min;
   if (typeof haptic === 'function' && min % 60 === 0) haptic();
@@ -97847,7 +97903,7 @@ function minutiPagareDaCampiP2P(campi){
    tempo per pagare scaduto senza «Ho inviato»; meta' a chi vende. Solo
    «Vendi BTC» on-chain, solo con la leva del server
    (`p2pOnchainLibro.cauzione.aScelta`), mai col PayCode. */
-let p2pNuovoCauzione = false;   // la scelta nel foglio: di serie «No»
+let p2pNuovoCauzione = false;   // la scelta nel foglio: di serie «No», poi l'ultima (`cauzioneRicordataP2P`)
 /* PURA sulle sue fonti: la sezione si vede in questo foglio? */
 function cauzioneNuovoAttivaP2P(oc, libro, metodi, lato){
   const o = oc === undefined ? (typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc) : !!oc;
@@ -97886,6 +97942,7 @@ function scegliCauzioneNuovoP2P(si){
   if (typeof p2pPiuGestoAt === 'number' && performance.now() - p2pPiuGestoAt < 700) return;
   haptic();
   p2pNuovoCauzione = si === true;
+  ricordaCauzioneNuovoP2P(p2pNuovoCauzione);
   renderNuovoOrdineP2P();
 }
 /* quel che si DICHIARA al server all'intestazione: dalle righe dei MIEI
@@ -100770,8 +100827,9 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoFiltro = 0;
   /* ...e il tempo per pagare dalla proposta (18 nov 2026) */
   p2pNuovoMinutiPagare = 0;
-  /* ...e la cauzione chiesta riparte da «No» (18 nov 2026) */
-  p2pNuovoCauzione = false;
+  /* ...e la cauzione chiesta riparte dall'ULTIMA SCELTA (18 nov 2026,
+     Andrea: «rimanga salvata per le volte dopo»); mai scelta, «No» */
+  p2pNuovoCauzione = typeof cauzioneRicordataP2P === 'function' && cauzioneRicordataP2P();
   /* ...e il paracadute riparte SEMPRE DA «SPENTO» (13 ott 2026, sera,
      dalla prova di Andrea sul telefono): la scelta di prima non si
      ricorda — un paracadute che nessuno ha scelto annulla un ordine.
