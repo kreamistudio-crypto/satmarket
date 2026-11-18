@@ -2000,6 +2000,92 @@ def main():
           (409, 409),
           (gesto(999, m6, "prendi", metodo="Contanti").status_code,
            cauz(999, m6, "Bonifico").status_code))
+    # -- LA CAUZIONE A SCELTA DI CHI PUBBLICA (18 nov 2026, cantiere tempo-
+    # pagamento; Andrea: «chi pubblica un ordine decide se chiedere una
+    # cauzione a chi gli prende l'ordine»): con qualunque metodo
+    k1 = pubblica(888, cauzione=True).json()
+    k0 = pubblica(888).json()
+    k111 = pubblica(111, cauzione=True).json()
+    prova("chi pubblica chiede la cauzione e la riga lo dice; senza la scelta no; e a "
+          "porticina chiusa chi non e' moderatore non la puo' chiedere",
+          (True, False, False),
+          (k1.get("cauzione_chiesta"), k0.get("cauzione_chiesta"), k111.get("cauzione_chiesta")))
+    SRV._p2p_onchain_rifai_foto()
+    prova("...la busta del libro porta la leva per il foglio Pubblica",
+          True, busta_oc(999).get("cauzione", {}).get("aScelta"))
+    prova("...e con «Bonifico» chi prende non prende senza cauzione: 409 con la frase, "
+          "e l'ordine resta nel libro",
+          (409, True, "pending"),
+          (lambda r: (r.status_code, "serve la cauzione" in r.text, uno(888, k1["id"])["stato"]))(
+              gesto(999, k1["id"], "prendi")))
+    n_hodl = len(hodl_visti())
+    r = cauz(999, k1["id"], "")
+    prova("...la richiesta si conia anche senza contanti, coi sats della regola",
+          (200, n_hodl + 1, 3000),
+          (r.status_code, len(hodl_visti()), (r.json().get("cauzione") or {}).get("sats")))
+    prova("...mentre sull'ordine senza la scelta non serve", 409, cauz(999, k0["id"], "").status_code)
+    SRV.P2P_ONCHAIN_CAUZIONE_A_SCELTA = False
+    prova("a leva `P2P_ONCHAIN_CAUZIONE_A_SCELTA` spenta la scelta tace anche sugli ordini "
+          "gia' pubblicati, e si prende senza",
+          (False, 200),
+          (uno(888, k1["id"]).get("cauzione_chiesta"), gesto(999, k1["id"], "prendi").status_code))
+    SRV.P2P_ONCHAIN_CAUZIONE_A_SCELTA = True
+    k_buy = pubblica(888, lato="buy", recapito="", cauzione=True).json()
+    prova("...e solo chi VENDE la chiede: su un «Compra BTC» la scelta non si scrive",
+          (True, False), (bool(k_buy.get("id")), k_buy.get("cauzione_chiesta")))
+    # -- ...E SI PERDE DA SOLA (Andrea: «la perde solo se annulla lo scambio
+    #    o se lascia passare troppo tempo, in base alla scadenza»)
+    def presa_chiesta():
+        oid = pubblica(888, cauzione=True).json().get("id")
+        cauz(999, oid, "")
+        LND["fatture"][riga_cauz(oid)["hash"]]["state"] = "ACCEPTED"
+        gesto(999, oid, "prendi")
+        return oid
+
+    def metti(oid, **campi):
+        con = SRV.db()
+        con.execute("UPDATE p2p_onchain_ordini SET " + ", ".join(f"{k}=?" for k in campi)
+                    + " WHERE id=?", (*campi.values(), oid))
+        con.commit()
+        con.close()
+
+    k2, k3, k4 = presa_chiesta(), presa_chiesta(), presa_chiesta()
+    ora = int(time.time())
+    prova("presa con la cauzione chiesta: in gioco, tenuta, messa da chi riceve i bitcoin",
+          ("tenuta", 1, 999),
+          (riga_cauz(k2)["stato"], riga_cauz(k2)["in_gioco"], riga_cauz(k2)["tg_id"]))
+    for k in (k2, k3, k4):
+        metti(k, stato="depositato", depositato_il=ora)
+    n_s = len(saldate())
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + 10))
+    prova("a deposito confermato e col tempo che corre il giro non la tocca",
+          ("tenuta", "tenuta", "tenuta", n_s),
+          (riga_cauz(k2)["stato"], riga_cauz(k3)["stato"], riga_cauz(k4)["stato"],
+           len(saldate())))
+    metti(k2, pagamento_scaduto_il=ora)                       # tempo finito, niente «Ho inviato»
+    metti(k3, pagamento_scaduto_il=ora, euro_inviati_il=ora)  # tempo finito ma «Ho inviato» c'era
+    metti(k4, stato="rimborsato", mancato_perche="onchain-rinuncia", chiuso_il=ora)
+    n_b = len(BOTTONI)
+    banco.AVVISI.clear()
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + 20))
+    r2, r3, r4 = riga_cauz(k2), riga_cauz(k3), riga_cauz(k4)
+    prova("il tempo per pagare scaduto senza «Ho inviato» la fa perdere DA SOLA: saldata, "
+          "persa, da nessuno, meta' a chi vende",
+          ("SETTLED", "persa", 0, 1500, 888),
+          (LND["fatture"][r2["hash"]]["state"], r2["stato"], r2["persa_da"], r2["meta_sats"], r2["meta_a"]))
+    prova("...la rinuncia dopo il deposito pure; con «Ho inviato» toccato resta tenuta",
+          ("persa", 888, "tenuta"), (r4["stato"], r4["meta_a"], r3["stato"]))
+    prova("...avvisati chi la perde (col perche'), chi vende (la meta') e i moderatori "
+          "(da mandare a mano)",
+          (True, True, True, True),
+          (any(chi == 999 and "Cauzione persa" in t and "scadere il tempo" in t for chi, t, _ in BOTTONI[n_b:]),
+           any(chi == 999 and "Cauzione persa" in t and "rinunciato" in t for chi, t, _ in BOTTONI[n_b:]),
+           any(chi == 888 and "Metà della cauzione" in t for chi, t, _ in BOTTONI[n_b:]),
+           any("persa da sola" in str(a) and "DA MANDARE A MANO" in str(a) for a in banco.AVVISI)))
+    metti(k3, recapito="", pagamento_scaduto_il=ora, euro_inviati_il=0)
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + 30))
+    prova("...e senza il recapito di chi vende non si perde mai (la regola del «non completato»)",
+          "tenuta", riga_cauz(k3)["stato"])
     # -- LND muto
     LND["muto"] = True
     r = cauz(999, m6, "Contanti")
@@ -2011,14 +2097,17 @@ def main():
                 cauz(999, m6, "Contanti").status_code)[1])
     SRV.LND_PONTE_MACAROON_CAUZIONE = MAC_C
     prova("al nodo passano solo hodl, cancel, la lettura di una fattura e le DUE saldature "
-          "chieste dal moderatore (una a LND muto): nient'altro salda una cauzione",
-          (set(), 2),
+          "chieste dal moderatore (una a LND muto) e le DUE della cauzione chiesta persa da "
+          "sola: nient'altro salda una cauzione",
+          (set(), 4),
           ({v[1] for v in LND["visti"] if not v[1].startswith("/v1/invoice/")}
            - {"/v2/invoices/hodl", "/v2/invoices/cancel", "/v2/invoices/settle"},
            len(saldate())))
     con = SRV.db()
-    con.execute("UPDATE p2p_onchain_ordini SET stato='annullato' WHERE id IN (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (m1, m2, m3, m4, m5, m6, c3, c1, g1, g2, c5, c6))
+    con.execute("UPDATE p2p_onchain_ordini SET stato='annullato' WHERE id IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (m1, m2, m3, m4, m5, m6, c3, c1, g1, g2, c5, c6, k1["id"], k0["id"], k111["id"]))
+    con.execute("UPDATE p2p_onchain_ordini SET stato='annullato' WHERE id IN (?,?,?,?)",
+                (k_buy.get("id") or 0, k2, k3, k4))
     con.commit()
     con.close()
     SRV.P2P_ONCHAIN_CAUZIONE, SRV.LND_PONTE_MACAROON_CAUZIONE = False, ""

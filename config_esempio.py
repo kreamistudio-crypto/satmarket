@@ -224,6 +224,10 @@ P2P_ONCHAIN_CAUZIONE = False
 # vede e la mette SOLO un moderatore (ADMIN_IDS) che prende, per tutti gli
 # altri e' come spenta. Si apre a tutti scrivendo False, dopo la prova.
 P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True
+# La cauzione a scelta di chi pubblica (18 nov 2026): chi pubblica un ordine
+# on-chain puo' chiederla a chiunque lo prenda, con qualunque metodo.
+# Accesa di serie; vale solo con la cauzione on-chain accesa qui sopra.
+P2P_ONCHAIN_CAUZIONE_A_SCELTA = True
 
 # --- Regole del mercatino --------------------------------------------
 COMMISSIONE_PERCENTO = 0     # trattenuta a vendita conclusa (0 = sospesa: cifra da decidere)

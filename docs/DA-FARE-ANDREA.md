@@ -770,6 +770,14 @@ cambia niente. Il perché: CANTIERI, «…terzo pezzo: il metodo scelto alla
 presa e la cauzione in Lightning col QR». Va fatto DOPO la promozione
 (prima, il server non conosce le righe). Per ora la cauzione TORNA
 SEMPRE: il gesto del moderatore che la fa perdere è il pezzo dopo.
+(18 nov 2026) Questa voce accende anche la cauzione A SCELTA di chi
+pubblica (foglio Pubblica on-chain, «Cauzione di chi prende»): la sua
+leva `P2P_ONCHAIN_CAUZIONE_A_SCELTA` è accesa di serie, non c'è nessuna
+riga in più da scrivere. Nella prova con Alan: uno pubblica un «Vendi
+BTC» on-chain con «🔐 Chiedila» e un metodo online, l'altro lo prende e
+deve bloccare la cauzione prima; poi, a deposito confermato, «↩️ Rinuncio»:
+la cauzione si perde da sola e nel canale arriva «Cauzione persa da
+sola» con la metà da mandare.
 
 **A. SUL NODO (`~/nodo`): il macaroon delle cauzioni, numero 5.**
 

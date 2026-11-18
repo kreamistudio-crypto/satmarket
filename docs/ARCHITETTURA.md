@@ -36750,6 +36750,29 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (foglio `p2pOcCauzSheet`, il QR e il battito), `riquadroCauzioneOcP2P`
   nella pagina dello scambio. Prove: `prove_onchain_cauzione`,
   `collaudo_p2p_onchain` 11-novies.
+  LA CAUZIONE A SCELTA DI CHI PUBBLICA (18 nov 2026, CANTIERI, voce del
+  tempo per pagare, «LA CAUZIONE A SCELTA…»). Colonna
+  `p2p_onchain_ordini.cauzione_chiesta` (1 = sì), scritta da
+  `p2p_onchain_pubblica_rotta` solo con `"cauzione": true`, la leva
+  `P2P_ONCHAIN_CAUZIONE_A_SCELTA` (accesa di serie) e
+  `p2p_onchain_cauzione_accesa` di chi pubblica; mai col PayCode.
+  `p2p_onchain_cauzione_chiesta(o)` la legge a ogni giudizio, e
+  `p2p_onchain_cauzione_serve` vale anche lì, con qualunque metodo: la
+  richiesta e la presa sono le stesse. SI PERDE DA SOLA:
+  `p2p_onchain_cauzione_persa_da_sola(o, riga)` (puro: 'rinuncia' a
+  scambio rimborsato con `mancato_perche` = onchain-rinuncia e senza
+  `annullo_chiesto_il`, 'tempo' con
+  `pagamento_scaduto_il` e senza `euro_inviati_il`; solo cauzione tenuta
+  in gioco di chi riceve, ordine non in contanti, deposito confermato e
+  recapito scritto) e `_p2p_onchain_cauzione_persa_da_sola` (saldando →
+  SettleInvoice → persa, `persa_da` 0, metà a chi vende a mano), chiamati
+  da `p2p_onchain_cauzioni_passata` prima del ritorno. Solo `lato` sell.
+  `_p2p_onchain_per` porta anche `rinuncia_cauzione`. Esce in
+  `_p2p_onchain_per` come `cauzione_chiesta`, e la busta del libro porta
+  `cauzione.aScelta`. Sul telefono: `sezioneCauzioneNuovoP2P` nel foglio
+  Pubblica (dopo il tempo per pagare, `cauzioneNuovoAttivaP2P`), il
+  bollino «🔐 Cauzione» sulla card on-chain, la riga e il foglio della
+  cauzione con le parole del caso (`rigaCauzioneOcP2P`).
   LA CAUZIONE PERSA (quarto pezzo; CANTIERI, «…quarto pezzo: la cauzione
   persa per decisione del moderatore, la metà mandata a mano»).
   `POST /api/p2p/onchain/{oid}/cauzione/brucia` (solo `e_admin`, mai una

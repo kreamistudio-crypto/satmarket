@@ -91617,3 +91617,57 @@ della pagina mostra «finito, si sta annullando» su uno scambio che il
 nodo non annullerà (innocuo: chi compra paga lo stesso); gli scambi il
 cui tempo il nodo ha già letto lo tengono anche a leva spenta (si
 fermano togliendo le due variabili dal compose).
+
+LA CAUZIONE A SCELTA DI CHI PUBBLICA, LO STESSO GIORNO (Andrea: «se chi
+vende deposita nel 2 di 3 e poi gli torna indietro, lui paga le spese
+di commissione?», poi «chi pubblica un ordine decide se chiedere una
+cauzione a chi gli prende l'ordine», «accendilo subito»). Il conto,
+letto nel codice: on-chain chi deposita paga due commissioni di rete se
+lo scambio salta, il deposito dal suo wallet e il ritorno dal margine
+(`_onchain_psbt_barattolo`, ramo del rimborso: `tot - rete(1)`), mentre
+la commissione di Barattolo gli torna intera; chi sparisce non paga
+niente. Su Lightning no: la hold si annulla senza costi. DECISO: chi
+pubblica un ordine on-chain sceglie nel foglio «Cauzione di chi prende»
+(«No» di serie, «🔐 Chiedila») e chi prende blocca la STESSA cauzione
+del contanti on-chain, con qualunque metodo, solo in «Vendi BTC» (è chi
+vende che deposita e ci rimette). Si è riusata la macchina del 17 nov:
+hold del nostro LND col QR, 3% con minimo 1000 sats, la porticina degli
+admin, metà a chi vende mandata a mano da un moderatore. MA SI PERDE DA
+SOLA (Andrea, sul primo testo che diceva «la perdi solo se un moderatore
+decide»: «spiega che la cauzione la perde solo se annulla lo scambio o
+se lascia passare troppo tempo, in base alla scadenza»): rinuncia dopo
+il deposito confermato, o il tempo per pagare finito senza «Ho inviato»
+(anche se poi la disputa la chiude un moderatore), e solo se chi vende
+aveva scritto dove pagare, la regola del «non completato»; e mai se la
+rinuncia l'aveva chiesta chi vende («🙏 Chiedi a chi compra di
+annullare», cantiere chiedi-annullo dello stesso giorno). Giudice puro
+`p2p_onchain_cauzione_persa_da_sola`; la fa il giro delle cauzioni
+PRIMA del ritorno (a scambio chiuso dalla rinuncia la passata l'avrebbe
+rimandata indietro: col primo disegno chi rinunciava non perdeva
+niente). È la seconda strada che salda una hold, accanto al gesto del
+moderatore, e la sentinella lo conta. Il contanti resta come deciso il
+17 nov: mai al timeout, solo il moderatore. Il giudice di chi serve resta uno,
+`p2p_onchain_cauzione_serve`, allargato da `p2p_onchain_cauzione_chiesta`
+(colonna `cauzione_chiesta`, solo un 1 vero, letta a ogni giudizio:
+spenta la leva, tace anche sugli ordini già nel libro). Leva
+`P2P_ONCHAIN_CAUZIONE_A_SCELTA`, ACCESA di serie (Andrea), ma vive solo
+sopra `P2P_ONCHAIN_CAUZIONE` col macaroon, che in produzione non c'è
+ancora (DA-FARE-ANDREA voce 20). A porticina chiusa la sceglie solo un
+moderatore che pubblica, e la blocca solo un moderatore che prende: per
+gli altri è come spenta. Mai col PayCode. Sulla card il bollino
+«🔐 Cauzione». I testi della cauzione che dicevano «in contanti» ora
+dicono il perché giusto (memo della hold «dello scambio P2P», il
+messaggio della cauzione persa senza «in contanti»; il foglio di
+«Rinuncio» aggiunge «E perdi la cauzione…»). SCARTATE: la cauzione
+INTERA a chi vende (la metà a mano resta quella del 17 nov); una cifra
+pari alle due commissioni di rete (una regola nuova da spiegare, mentre
+il 3% è quella di Lightning e la metà copre già le due fee); la perdita
+decisa dal moderatore (il primo disegno, cambiato da Andrea). PROVATO:
+`prove_onchain_cauzione` (giudice, sentinelle della rotta, del libro,
+della leva, foglio e riga in node) e `collaudo_p2p_onchain` (pubblica
+con e senza, il 111 a porticina chiusa non la chiede, 409 senza
+cauzione con «Bonifico», la richiesta coniata senza contanti, leva
+spenta = si prende senza, «Compra BTC» non la scrive, la perdita da
+sola col tempo scaduto e con la rinuncia contro il LND di cartone, e
+niente perdita con «Ho inviato» toccato o senza recapito). NON PROVATO:
+un LND vero (come tutta la cauzione on-chain, voce 20).

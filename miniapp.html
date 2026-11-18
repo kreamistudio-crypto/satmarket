@@ -72559,7 +72559,9 @@ function accogliLibroOnchainP2P(busta){
        e la regola del server; null = spenta, o server di ieri */
     cauzione: busta.cauzione && busta.cauzione.accesa === true
       ? {accesa: true, pct: Number(busta.cauzione.pct) || 0, base: Number(busta.cauzione.base) || 0,
-         finestra: Number(busta.cauzione.finestra) || 900} : null};
+         finestra: Number(busta.cauzione.finestra) || 900,
+         /* (18 nov 2026) chi pubblica puo' chiederla a chiunque prenda */
+         aScelta: busta.cauzione.aScelta === true} : null};
   p2pOnchainLetto = Date.now();
   return p2pOnchainLibro.eventi.length > 0;
 }
@@ -73756,6 +73758,9 @@ function rigaOnchainP2P(o){
      2026, cantiere tempo-pagamento): solo sotto le 24 ore */
   const tempoB = !paghiEuro || typeof bollinoTempoPagareP2P !== 'function' ? ''
     : bollinoTempoPagareP2P(Number(o.minuti_pagamento) || 0);
+  /* ...e quello della cauzione chiesta da chi pubblica (18 nov 2026) */
+  const cauzB = o.cauzione_chiesta === true && p2pOnchainLibro.cauzione
+    ? '<span class="p2p-bollino-tempo p2p-bollino-cauz" title="Chi prende blocca una cauzione in Lightning">🔐 Cauzione</span>' : '';
   const metodi = Array.isArray(o.metodi) ? o.metodi : [];
   /* LA SCATOLA DIVENTA L'INSEGNA quando dentro c'e' solo un marchio, il
      banner pieno di Barattozon della card di Lightning (18 nov 2026): lo
@@ -73780,7 +73785,7 @@ function rigaOnchainP2P(o){
     ${fermo}
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${coppia}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
-    ${badge || tempoB ? '<div class="p2p-badge-riga">' + badge + affarone + tempoB + '</div>' : ''}
+    ${badge || tempoB || cauzB ? '<div class="p2p-badge-riga">' + badge + affarone + tempoB + cauzB + '</div>' : ''}
     ${paga}
     ${zona}
     ${filtro}
@@ -74369,15 +74374,26 @@ function cauzioneOcSatsP2P(sats, c){
   if (!c || !(s > 0)) return 0;
   return Math.max(Math.floor((c.pct * s + 50) / 100), c.base);
 }
-/* a chi prende QUEST'ordine col metodo scelto serve la cauzione? */
+/* a chi prende QUEST'ordine col metodo scelto serve la cauzione? In
+   contanti, o dove l'ha chiesta chi pubblica (18 nov 2026) */
 function cauzioneOcServeP2P(o){
   const c = p2pOnchainLibro.cauzione;
-  return !!(c && c.accesa && metodoPresaOcP2P(o) === 'Contanti');
+  return !!(c && c.accesa && ((o && o.cauzione_chiesta === true) || metodoPresaOcP2P(o) === 'Contanti'));
 }
 /* PURA: la riga della cauzione nel foglio di chi sta per prendere */
 function rigaCauzioneOcP2P(o, c){
   if (!c) return '';
   const stima = cauzioneOcSatsP2P(Number(o.sats) > 0 ? o.sats : o.stima, c);
+  /* LA CAUZIONE CHIESTA DA CHI PUBBLICA (18 nov 2026), con un metodo
+     che non e' il contanti: stessa regola, un'altra ragione */
+  if (o && o.cauzione_chiesta === true && metodoPresaOcP2P(o) !== 'Contanti')
+    return '<div class="hint cauzione-regola">🔐 <b>Chi vende chiede una cauzione.</b> '
+      + 'Per prendere quest\'ordine blocchi una piccola cauzione in Lightning'
+      + (stima > 0 ? ' di circa <b>' + fmt(stima) + ' sats</b>' : '')
+      + ' (il ' + esc(String(c.pct).replace('.', ',')) + '%' + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats' : '') + ')'
+      + ': resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>. La perdi se rinunci dopo che i '
+      + 'bitcoin sono nel deposito, o se lasci scadere il tempo per pagare senza toccare «Ho inviato».'
+      + ' Finché non è bloccata, l\'ordine resta nel libro e qualcun altro può prenderlo.</div>';
   return '<div class="hint cauzione-regola">🔐 <b>La cauzione di chi prende.</b> '
     + 'Per prendere quest\'ordine in contanti blocchi una piccola cauzione in Lightning'
     + (stima > 0 ? ' di circa <b>' + fmt(stima) + ' sats</b>' : '')
@@ -74433,7 +74449,9 @@ function renderCauzioneOcP2P(){
   const min = resta > 0 ? Math.max(1, Math.round(resta / 60)) : 0;
   box.innerHTML =
     '<div class="hint">' + (quanti ? 'Paga <b>' + esc(quanti) + '</b> dal tuo wallet Lightning: ' : 'Paga dal tuo wallet Lightning: ')
-      + 'è la <b>cauzione</b> dello scambio in contanti. Resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>; la perdi solo se un moderatore decide che non ti sei presentato.'
+      + (p2pOcCauz.metodo === 'Contanti'
+        ? 'è la <b>cauzione</b> dello scambio in contanti. Resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>; la perdi solo se un moderatore decide che non ti sei presentato.'
+        : 'è la <b>cauzione</b> che chiede chi vende. Resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>; la perdi se rinunci dopo il deposito o se lasci scadere il tempo per pagare senza «Ho inviato».')
       + (min ? ' Hai circa ' + min + (min === 1 ? ' minuto' : ' minuti') + ': scaduta, l\'ordine resta nel libro e va ripreso.' : '') + '</div>'
     + '<div class="qr" id="p2pOcCauzQr"></div>'
     + '<div class="invoice" id="p2pOcCauzInvoice"></div>'
@@ -76102,6 +76120,8 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
      Lightning, solo chi vende; il server lo rigiudica coi metodi */
   const minOc = vendo && typeof minutiPagareDaCampiP2P === 'function' ? minutiPagareDaCampiP2P(campi) : 0;
   if (minOc) corpo.minuti_pagare = minOc;
+  /* la cauzione chiesta a chi prende (18 nov 2026): il server la rigiudica */
+  if (campi.cauzione === true) corpo.cauzione = true;
   if (campi.fisso) corpo.sats = interoP2P(campi.sats).n;
   else corpo.premio = Number(campi.premio) || 0;
   /* IL PAYCODE (17 nov 2026): l'importo coi centesimi, il metodo con
@@ -76820,6 +76840,9 @@ function recensibileOcP2P(o){
 function avvisoRinunciaContaOcP2P(o){
   return o && o.rinuncia_conta && o.ruolo === 'venditore'
     ? ' Chi vende ha già bloccato i sats: rinunciare adesso ti conta come scambio non completato (il primo è tollerato), e chi vende potrà lasciarti una recensione.'
+      /* (18 nov 2026) ...e la cauzione chiesta da chi vende si perde */
+      + (o.rinuncia_cauzione && o.cauzione && o.cauzione.mia && o.cauzione.stato === 'tenuta'
+         ? ' E perdi la cauzione che hai bloccato (' + fmt(Number(o.cauzione.sats) || 0) + ' sats): metà va a chi vende.' : '')
     : '';
 }
 /* PURA: il riquadro, dalla risposta del server; senza risposta niente */
@@ -97538,6 +97561,59 @@ function scegliTempoPagareNuovoP2P(i){
 function minutiPagareDaCampiP2P(campi){
   return campi ? minutiPagareSceltaP2P(campi.minutiPagare) : 0;
 }
+/* ══ LA CAUZIONE A SCELTA DI CHI PUBBLICA (18 nov 2026, cantiere tempo-
+   pagamento; Andrea: «chi pubblica un ordine decide se chiedere una
+   cauzione a chi gli prende l'ordine») ══
+   Nell'on-chain chi deposita e si vede tornare i sats paga due
+   commissioni di rete, e chi sparisce niente. Chi pubblica puo' quindi
+   chiedere a chiunque prenda la cauzione del contanti on-chain
+   (Lightning, 3%, almeno 1000 sats, torna a fine scambio). Si perde DA
+   SOLA (Andrea: «la perde solo se annulla lo scambio o se lascia passare
+   troppo tempo, in base alla scadenza»): rinuncia dopo il deposito, o il
+   tempo per pagare scaduto senza «Ho inviato»; meta' a chi vende. Solo
+   «Vendi BTC» on-chain, solo con la leva del server
+   (`p2pOnchainLibro.cauzione.aScelta`), mai col PayCode. */
+let p2pNuovoCauzione = false;   // la scelta nel foglio: di serie «No»
+/* PURA sulle sue fonti: la sezione si vede in questo foglio? */
+function cauzioneNuovoAttivaP2P(oc, libro, metodi, lato){
+  const o = oc === undefined ? (typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc) : !!oc;
+  /* solo chi VENDE la chiede: e' lui che deposita e ci rimette le commissioni */
+  const l0 = lato === undefined ? (typeof p2pLato !== 'undefined' ? p2pLato : '') : lato;
+  if (l0 === 'compro') return false;
+  const l = libro === undefined ? (typeof p2pOnchainLibro !== 'undefined' ? p2pOnchainLibro : null) : libro;
+  const m = metodi === undefined ? (typeof p2pNuovoMetodi !== 'undefined' ? p2pNuovoMetodi : []) : (metodi || []);
+  const c = l && l.cauzione;
+  if (!(o && c && c.accesa === true && c.aScelta === true)) return false;
+  return !(typeof tabacchinoP2P === 'function' && tabacchinoP2P(m));
+}
+function sezioneCauzioneNuovoP2P(){
+  if (!cauzioneNuovoAttivaP2P()) return '';
+  const voce = (si, testo) =>
+    '<button type="button" class="p2p-accesso-chip' + (p2pNuovoCauzione === si ? ' on' : '')
+    + '" aria-pressed="' + (p2pNuovoCauzione === si ? 'true' : 'false')
+    + '" onclick="scegliCauzioneNuovoP2P(' + (si ? 'true' : 'false') + ')">' + testo + '</button>';
+  return sezioneNuovoP2P({
+    titolo: 'Cauzione di chi prende',
+    corpo: '<div class="p2p-accesso-scelte">' + voce(false, 'No') + voce(true, '🔐 Chiedila') + '</div>',
+    sotto: p2pNuovoCauzione ? '<div class="hint">' + notaCauzioneNuovoP2P(p2pOnchainLibro.cauzione) + '</div>' : ''
+  });
+}
+/* PURA: la nota sotto la scelta */
+function notaCauzioneNuovoP2P(c){
+  const pct = c && c.pct ? String(c.pct).replace('.', ',') : '3';
+  const base = c && c.base ? fmt(c.base) : '1.000';
+  return 'Chi prende il tuo ordine blocca prima una piccola cauzione in Lightning (il ' + pct
+    + '%, almeno ' + base + ' sats), che torna a fine scambio. La perde se rinuncia dopo il tuo deposito '
+    + 'o se lascia scadere il tempo per pagare senza «Ho inviato»: in quel caso metà va a te, per coprire '
+    + 'le commissioni di rete.';
+}
+function scegliCauzioneNuovoP2P(si){
+  /* il click che arriva dopo il tocco sul + (come `scegliFiltroNuovoP2P`) */
+  if (typeof p2pPiuGestoAt === 'number' && performance.now() - p2pPiuGestoAt < 700) return;
+  haptic();
+  p2pNuovoCauzione = si === true;
+  renderNuovoOrdineP2P();
+}
 /* quel che si DICHIARA al server all'intestazione: dalle righe dei MIEI
    ordini in questa lista (il calco dei filtri) */
 function minutiPagareDaDichiarareP2P(ids){
@@ -100420,6 +100496,8 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoFiltro = 0;
   /* ...e il tempo per pagare dalla proposta (18 nov 2026) */
   p2pNuovoMinutiPagare = 0;
+  /* ...e la cauzione chiesta riparte da «No» (18 nov 2026) */
+  p2pNuovoCauzione = false;
   /* ...e il paracadute riparte SEMPRE DA «SPENTO» (13 ott 2026, sera,
      dalla prova di Andrea sul telefono): la scelta di prima non si
      ricorda — un paracadute che nessuno ha scelto annulla un ordine.
@@ -101157,6 +101235,9 @@ function campiNuovoP2P(){
                            typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc,
                            tempoPagareAttivoP2P(undefined, undefined, typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc),
                            metodiVelociP2P()) : 0,
+    /* la cauzione chiesta a chi prende (18 nov 2026): solo on-chain, solo
+       dove la sezione si vede */
+    cauzione: typeof cauzioneNuovoAttivaP2P === 'function' && cauzioneNuovoAttivaP2P() && p2pNuovoCauzione === true,
     /* il paracadute (13 ott 2026): dal 17 nov `{su, giu}`, 0 = in quel verso niente */
     paracadute: typeof versiParacaduteP2P === 'function' ? versiParacaduteP2P(p2pNuovoParacadute) : {su: 0, giu: 0},
     /* la ripubblica (16 nov 2026): i due prezzi di BTC come li scrive il dito */
@@ -101816,6 +101897,9 @@ function renderNuovoOrdineP2P(){
   /* IL TEMPO PER PAGARE (18 nov 2026): subito dopo «chi puo' prendere»,
      solo in «Vendi BTC» su Lightning — vedi `sezioneTempoPagareNuovoP2P` */
   const tempoPagare = typeof sezioneTempoPagareNuovoP2P === 'function' ? sezioneTempoPagareNuovoP2P() : '';
+  /* LA CAUZIONE A SCELTA (18 nov 2026): subito dopo il tempo, solo
+     on-chain — vedi `sezioneCauzioneNuovoP2P` */
+  const cauzioneNuovo = typeof sezioneCauzioneNuovoP2P === 'function' ? sezioneCauzioneNuovoP2P() : '';
   /* LA PAUSA IN VISTA (cantiere pausa-in-vista): lo stato di adesso e
      il bottone che apre il foglio della pausa SOPRA questo, dopo «chi
      puo' prendere» e prima dei limiti — vedi `sezionePausaNuovoP2P` */
@@ -101958,7 +102042,7 @@ function renderNuovoOrdineP2P(){
        PRIMA del percorso (30 set 2026): il passo 4 e il riepilogo
        cambiano parole con lei, quindi si sceglie prima di arrivarci. */
     valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo)
-    + quanti + premio + accesso + tempoPagare + pausa + paracadute + ripubblica + riquadroLimitiP2P() +
+    + quanti + premio + accesso + tempoPagare + cauzioneNuovo + pausa + paracadute + ripubblica + riquadroLimitiP2P() +
     /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
        decisione di Andrea): qui stavano due righe sciolte — «Finche'
        nessuno lo prende puoi ritirarlo quando vuoi…» e l'avviso che le

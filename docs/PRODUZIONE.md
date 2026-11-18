@@ -4914,6 +4914,16 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   deve dire 2. Si revoca da solo con `lncli deletemacaroonid 4` sul
   nodo (e la riga via dal config). Finito l'esperimento la riga puo'
   sparire: G e H tornano «non attive» senza altro da fare.
+- LA CAUZIONE A SCELTA DI CHI PUBBLICA (18 nov 2026): leva
+  `P2P_ONCHAIN_CAUZIONE_A_SCELTA`, ACCESA di serie SENZA riga nel
+  config; si spegne con `P2P_ONCHAIN_CAUZIONE_A_SCELTA = False` e il
+  riavvio. Vive sopra la cauzione del contanti on-chain (qui sotto):
+  finché quella non è accesa col suo macaroon non si vede niente, e a
+  porticina chiusa la usano solo i moderatori. Si PERDE DA SOLA (il giro
+  delle cauzioni la salda: rinuncia dopo il deposito, o tempo per pagare
+  scaduto senza «Ho inviato»); la metà a chi vende la manda a mano un
+  moderatore, come per il contanti (avviso «Cauzione persa da sola» nel
+  canale delle dispute).
 - LA CAUZIONE DEL CONTANTI ON-CHAIN, IL MACAROON `root_key_id 5` (17 nov
   2026, cantiere onchain-contanti; perché in CANTIERI, «…terzo pezzo: il
   metodo scelto alla presa e la cauzione in Lightning col QR»). Chi

@@ -37947,6 +37947,14 @@ def _leve_stato():
                          "gli altri e' come spenta",
                   spento="la cauzione del contanti on-chain vale per "
                          "chiunque prenda in contanti (se la leva e' accesa)"),
+            # LA CAUZIONE A SCELTA DI CHI PUBBLICA (18 nov 2026)
+            _leva("Cauzione on-chain a scelta di chi pubblica",
+                  "P2P_ONCHAIN_CAUZIONE_A_SCELTA", P2P_ONCHAIN_CAUZIONE_A_SCELTA,
+                  acceso="chi pubblica un ordine on-chain puo' chiedere la "
+                         "cauzione a chiunque lo prenda, con qualunque "
+                         "metodo (vale se la cauzione on-chain e' accesa)",
+                  spento="la cauzione on-chain la blocca solo chi prende "
+                         "in contanti"),
             # IL TEMPO DI CHI PUBBLICA (12 ott 2026): il pacchetto di
             # Barattolo; le ore le decide il nodo (settings.toml,
             # `maker_expiration_seconds`, patch 0011) e le annuncia nel 38385
@@ -111398,7 +111406,10 @@ def _p2p_onchain_prepara(con):
                       # 18 nov 2026, cantiere tempo-pagamento: il tempo per
                       # pagare scelto da chi pubblica, in minuti, come nel
                       # Lightning (0 = non scelto: le ore di sempre)
-                      ("minuti_pagare", "INTEGER DEFAULT 0")):
+                      ("minuti_pagare", "INTEGER DEFAULT 0"),
+                      # 18 nov 2026: chi pubblica chiede la cauzione a
+                      # chiunque prenda, con qualunque metodo (1 = si')
+                      ("cauzione_chiesta", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
     # LE CAUZIONI DEL CONTANTI ON-CHAIN (17 nov 2026 sera): una riga per
@@ -111853,6 +111864,8 @@ def _p2p_onchain_libro(chi: int) -> dict:
              # la cauzione di chi prende in contanti (17 nov 2026 sera): la
              # leva e la regola, per la riga e il bottone del foglio
              "cauzione": {"accesa": p2p_onchain_cauzione_accesa(chi),
+                          # (18 nov 2026) chi pubblica puo' chiederla
+                          "aScelta": P2P_ONCHAIN_CAUZIONE_A_SCELTA is True,
                           "pct": P2P_ONCHAIN_CAUZIONE_PCT,
                           "base": P2P_ONCHAIN_CAUZIONE_BASE_SATS,
                           "finestra": P2P_ONCHAIN_CAUZIONE_FINESTRA_S},
@@ -112020,6 +112033,8 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "minuti_pagamento": _p2p_onchain_minuti(o),
         "minuti_scelti": _minuti_pagare_scelta_p2p(
             int(_p2p_onchain_campo(o, "minuti_pagare", 0) or 0)),
+        # (18 nov 2026) chi pubblica chiede la cauzione a chi prende
+        "cauzione_chiesta": p2p_onchain_cauzione_chiesta(o),
         "euro_inviati_il": int(o["euro_inviati_il"] or 0),
         # (17 nov 2026 sera) il tempo del bonifico, da «Ho inviato»
         "bonifico_entro": p2p_onchain_bonifico_entro(o),
@@ -112055,6 +112070,10 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         # ritira dopo il deposito: se una rinuncia ADESSO conterebbe (il
         # telefono lo dice prima della firma), e a chi e' stato contato
         "rinuncia_conta": _p2p_onchain_rinuncia_conta(o),
+        # (18 nov 2026) ...e se rinunciando si perde anche la cauzione chiesta
+        "rinuncia_cauzione": (_p2p_onchain_rinuncia_conta(o)
+                              and p2p_onchain_cauzione_chiesta(o)
+                              and not _p2p_onchain_contanti(o)),
         "non_completato": (("io" if int(_p2p_onchain_campo(o, "mancato_a", 0) or 0) == tg_id
                             else "altro")
                            if int(_p2p_onchain_campo(o, "mancato_a", 0) or 0)
@@ -112578,6 +112597,12 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     if minuti_pagare and not _ordine_col_tempo_p2p(
             lato, metodi if isinstance(metodi, list) else []):
         minuti_pagare = 0
+    # LA CAUZIONE A SCELTA (18 nov 2026): solo un si' vero, solo con la
+    # leva e la cauzione accese per chi pubblica (a porticina chiusa, un
+    # moderatore)
+    cauzione_chiesta = 1 if (d.get("cauzione") is True and lato == "sell"
+                             and P2P_ONCHAIN_CAUZIONE_A_SCELTA is True
+                             and p2p_onchain_cauzione_accesa(user["id"])) else 0
     if tab or fascia:
         # col PayCode niente ripubblica (rimetterebbe nel libro un codice
         # che sta per scadere), niente paracadute (come su Lightning:
@@ -112587,6 +112612,7 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
         para, para_da, para_letto = 0, 0.0, 0
         para_su = para_giu = 0
         minuti_pagare = 0
+        cauzione_chiesta = 0
     try:
         onchain_xpub_barattolo()
     except ValueError as e:
@@ -112607,8 +112633,8 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             " euro_cent, metodi, recapito, scade, creato, aggiornato,"
             " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura,"
             " rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu,"
-            " tab_min_cent, minuti_pagare)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " tab_min_cent, minuti_pagare, cauzione_chiesta)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ordine, lato, user["id"], sats, int(euro_cent),
              json.dumps(metodi, ensure_ascii=False), recapito,
              p2p_onchain_scade_libro(adesso, tab["scade"] if tab else 0),
@@ -112617,7 +112643,7 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
              para, para_da, para_letto,
              rip[0] if rip else 0, rip[1] if rip else 0, "CHF" if chf else "",
              json.dumps(tab) if tab else "", zona, para_su, para_giu,
-             fascia[0] if fascia else 0, minuti_pagare))
+             fascia[0] if fascia else 0, minuti_pagare, cauzione_chiesta))
         con.commit()
         oid = cur.lastrowid
         riga = _p2p_onchain_carica(con, oid)
@@ -112892,7 +112918,7 @@ P2P_ONCHAIN_CAUZIONE_CLTV = 576         # i blocchi dell'HTLC, come Mostro
 P2P_ONCHAIN_CAUZIONE_PRESA_S = 900      # tenuta ma non usata: poi torna
 P2P_ONCHAIN_CAUZIONE_GUARDA_S = 600     # ogni quanto si richiede a LND una in gioco
 P2P_ONCHAIN_CAUZIONE_SALDANDO_S = 120   # una «saldando» appesa: poi si chiede a LND
-P2P_ONCHAIN_CAUZIONE_MEMO = ("Barattolo: cauzione dello scambio in contanti. "
+P2P_ONCHAIN_CAUZIONE_MEMO = ("Barattolo: cauzione dello scambio P2P. "
                              "Resta in sospeso e torna a fine scambio")
 P2P_ONCHAIN_STATI_CHIUSI = ("rilasciato", "rimborsato", "annullato", "scaduto")
 try:
@@ -112910,6 +112936,29 @@ try:
     from config import LND_PONTE_MACAROON_CAUZIONE
 except ImportError:
     LND_PONTE_MACAROON_CAUZIONE = ""
+# LA CAUZIONE A SCELTA DI CHI PUBBLICA (18 nov 2026, cantiere tempo-
+# pagamento; Andrea: «chi pubblica un ordine decide se chiedere una
+# cauzione a chi gli prende l'ordine», «accendilo subito»). Nell'on-chain
+# chi deposita e poi si vede tornare i sats paga DUE commissioni di rete
+# (il deposito dal suo wallet, il ritorno dal margine), e chi sparisce
+# non paga niente; su Lightning no, la hold si annulla gratis. Chi
+# pubblica puo' quindi chiedere la STESSA cauzione del contanti a
+# chiunque prenda, con qualunque metodo: stessa macchina (la hold del
+# nostro LND), stessa regola (3%, almeno 1000 sats), stessa porticina
+# degli admin, meta' all'altra persona mandata a mano. Ma SI PERDE DA
+# SOLA, senza moderatore (Andrea, lo stesso giorno: «la perde solo se
+# annulla lo scambio o se lascia passare troppo tempo, in base alla
+# scadenza»): se chi prende rinuncia a deposito confermato, o se il tempo
+# per pagare finisce senza «Ho inviato» — sempre che chi vende avesse
+# scritto dove pagare, la regola del «non completato». Lo decide
+# `p2p_onchain_cauzione_persa_da_sola`, lo fa il giro delle cauzioni.
+# Il contanti resta com'era: solo il moderatore. Solo in «Vendi BTC».
+# Accesa di serie; senza `P2P_ONCHAIN_CAUZIONE` e il macaroon non si vede.
+try:
+    from config import P2P_ONCHAIN_CAUZIONE_A_SCELTA
+    P2P_ONCHAIN_CAUZIONE_A_SCELTA = P2P_ONCHAIN_CAUZIONE_A_SCELTA is not False
+except ImportError:
+    P2P_ONCHAIN_CAUZIONE_A_SCELTA = True
 
 
 def _p2p_onchain_cauzione_macaroon() -> bool:
@@ -112959,10 +113008,26 @@ def p2p_onchain_metodo_presa(o, chiesto) -> str:
     return c if c and c in metodi else ""
 
 
+def p2p_onchain_cauzione_chiesta(o) -> bool:
+    """PURA: chi ha pubblicato QUEST'ordine chiede la cauzione a chiunque
+    lo prenda (18 nov 2026)? La sua scelta, finche' la leva
+    `P2P_ONCHAIN_CAUZIONE_A_SCELTA` e' accesa."""
+    try:
+        chiesta = int(_p2p_onchain_campo(o, "cauzione_chiesta", 0) or 0)
+    except (TypeError, ValueError):
+        chiesta = 0
+    return P2P_ONCHAIN_CAUZIONE_A_SCELTA is True and chiesta == 1
+
+
 def p2p_onchain_cauzione_serve(o, scelto: str, accesa: bool) -> bool:
     """PURA: a chi prende QUEST'ordine con QUESTO metodo si chiede la
-    cauzione? Solo con la leva accesa e «Contanti» scelto (o unico)."""
-    return bool(accesa) and str(scelto or "") == "Contanti" \
+    cauzione? Solo con la leva accesa, e con «Contanti» scelto (o unico)
+    oppure su un ordine dove l'ha chiesta chi pubblica (18 nov 2026)."""
+    if not accesa:
+        return False
+    if p2p_onchain_cauzione_chiesta(o):
+        return True
+    return str(scelto or "") == "Contanti" \
         and "Contanti" in _metodi_libro(_p2p_onchain_metodi(o))
 
 
@@ -113192,6 +113257,105 @@ def p2p_onchain_cauzione_bruciabile(riga, stato_ordine: str) -> str:
     return ""
 
 
+def p2p_onchain_cauzione_persa_da_sola(o, riga) -> str:
+    """PURA: la cauzione CHIESTA da chi vende si perde da sola, adesso?
+    (18 nov 2026, Andrea: «la perde solo se annulla lo scambio o se lascia
+    passare troppo tempo, in base alla scadenza»). Torna 'rinuncia', 'tempo'
+    o ''. Solo una cauzione IN GIOCO e TENUTA, messa da chi riceve i
+    bitcoin, su un ordine con la cauzione chiesta e non in contanti (il
+    contanti resta al moderatore), a deposito confermato, e solo se chi
+    vende aveva detto dove pagare: la regola del «non completato»."""
+    if not o or not riga:
+        return ""
+    if str(riga["stato"] or "") != "tenuta" or not int(riga["in_gioco"] or 0):
+        return ""
+    if not p2p_onchain_cauzione_chiesta(o) or _p2p_onchain_contanti(o):
+        return ""
+    if int(riga["tg_id"] or 0) != int(_p2p_onchain_campo(o, "ricevente_id", 0) or 0):
+        return ""
+    if (int(_p2p_onchain_campo(o, "depositato_il", 0) or 0) <= 0
+            or not _p2p_onchain_ha_dove_pagare(o)):
+        return ""
+    stato = str(_p2p_onchain_campo(o, "stato", "") or "")
+    if stato == "rimborsato" and \
+            str(_p2p_onchain_campo(o, "mancato_perche", "") or "") == "onchain-rinuncia":
+        # ...ma non se l'annullo l'aveva CHIESTO chi vende («🙏 Chiedi a chi
+        # compra di annullare», cantiere chiedi-annullo): li' chi rinuncia
+        # fa un favore, e la cauzione torna
+        if int(_p2p_onchain_campo(o, "annullo_chiesto_il", 0) or 0) > 0:
+            return ""
+        return "rinuncia"
+    if (stato in ("depositato", "disputa", "rimborsato")
+            and int(_p2p_onchain_campo(o, "pagamento_scaduto_il", 0) or 0) > 0
+            and int(_p2p_onchain_campo(o, "euro_inviati_il", 0) or 0) <= 0):
+        return "tempo"
+    return ""
+
+
+async def _p2p_onchain_cauzione_persa_da_sola(o, r, motivo: str, adesso: int) -> bool:
+    """La cauzione chiesta da chi vende, persa DA SOLA (il giudice e'
+    `p2p_onchain_cauzione_persa_da_sola`): gli stessi gesti del moderatore
+    — «saldando», SettleInvoice, «persa» con la meta' scritta a chi vende,
+    e la meta' la manda A MANO un moderatore —, senza nessuno che decide.
+    `persa_da` resta 0. Se LND dice di no la riga torna «tenuta» e il giro
+    dopo riprova."""
+    con = _p2p_onchain_db()
+    try:
+        cur = con.execute(
+            "UPDATE p2p_onchain_cauzioni SET stato='saldando', saldando_il=?, persa_da=0"
+            " WHERE id=? AND stato='tenuta' AND in_gioco=1", (adesso, int(r["id"])))
+        con.commit()
+    finally:
+        con.close()
+    if not cur.rowcount:
+        return False
+    cid, sats, messa_da = int(r["id"]), int(r["sats"]), int(r["tg_id"])
+    ok, perche = await _p2p_onchain_cauzione_salda(str(r["preimage"]))
+    if not ok:
+        await _p2p_onchain_cauzione_chiudi_saldando(cid, "ACCEPTED", adesso)
+        print(f"⚠️ cauzione on-chain #{cid}: non saldata da sola ({perche}), riprovo",
+              flush=True)
+        return False
+    await _p2p_onchain_cauzione_chiudi_saldando(cid, "SETTLED", adesso)
+    meta = p2p_onchain_cauzione_meta(sats)
+    altro = int(o["maker_id"] or 0)
+    con = _p2p_onchain_db()
+    try:
+        u = con.execute("SELECT nome, ln_address FROM utenti WHERE tg_id=?",
+                        (altro,)).fetchone()
+    finally:
+        con.close()
+    ln = str(u["ln_address"] or "").strip() if u else ""
+    fatto = ("hai rinunciato dopo il deposito" if motivo == "rinuncia" else
+             "hai lasciato scadere il tempo per pagare senza «Ho inviato»")
+    await _notifica_p2p_onchain(o, messa_da,
+        "🔐 <b>Cauzione persa:</b> " + f"{_fmt_sats(sats)} sats.\n\n"
+        f"Lo scambio chiedeva una cauzione e {fatto}, quindi la cauzione non "
+        "torna. Metà va a chi vende.", _p2p_onchain_bottone(o))
+    if altro and meta:
+        await _notifica_p2p_onchain(o, altro,
+            "🔐 <b>Metà della cauzione di chi ha preso è tua:</b> "
+            + f"{_fmt_sats(meta)} sats.\n\n"
+            + ("Te li manda un moderatore al tuo indirizzo Lightning del Profilo."
+               if ln else
+               "Te li manda un moderatore: scrivi il tuo indirizzo Lightning nel "
+               "Profilo, lo legge da lì."),
+            _p2p_onchain_bottone(o))
+    await notifica_admin(argomento="dispute", testo=
+        f"🔐 <b>Cauzione persa da sola</b> sullo scambio P2P on-chain #{int(o['id'])} "
+        f"({'rinuncia dopo il deposito' if motivo == 'rinuncia' else 'tempo per pagare scaduto'}): "
+        f"{_fmt_sats(sats)} sats incassati sul nodo.\n\n"
+        + (f"<b>DA MANDARE A MANO: {_fmt_sats(meta)} sats</b> a "
+           f"{html.escape(str(u['nome'] or '') if u else '')} ({altro})"
+           + (f", indirizzo Lightning <code>{html.escape(ln)}</code>" if ln
+              else ": non ha un indirizzo Lightning nel Profilo, va chiesta una fattura")
+           + ". Poi nella scheda dello scambio: «✅ Metà mandata»."
+           if altro and meta else "Nessuna metà da mandare."))
+    print(f"🔐 cauzione on-chain: scambio #{int(o['id'])}, {_fmt_sats(sats)} sats PERSI "
+          f"da soli ({motivo}); metà da mandare a mano: {_fmt_sats(meta)}", flush=True)
+    return True
+
+
 def _p2p_onchain_cauzione_base_sats(o) -> int:
     """I sats su cui si conta la cauzione: quelli dell'ordine, o a
     prezzo di mercato quelli al cambio di ADESSO (0 = il cambio non c'e')."""
@@ -113328,7 +113492,7 @@ async def _p2p_onchain_cauzione_per_presa(oid: int, tg_id: int, chiesto) -> tupl
         return 0, ""
     r = await _p2p_onchain_cauzione_aggiorna(oid, tg_id)
     if not r:
-        return 0, ("Per prendere in contanti serve la cauzione: tocca "
+        return 0, ("Per prendere quest'ordine serve la cauzione: tocca "
                    "«🔐 Blocca la cauzione»")
     if r["stato"] != "tenuta":
         return 0, ("La cauzione non risulta ancora bloccata: paga la richiesta "
@@ -113433,8 +113597,8 @@ async def p2p_onchain_cauzione_brucia(oid: int, x_tg_init_data: str = Header("")
     ln = str(u["ln_address"] or "").strip() if u else ""
     await _notifica_p2p_onchain(o, messa_da,
         "🔐 <b>Cauzione persa:</b> " + f"{_fmt_sats(sats)} sats.\n\n"
-        "Un moderatore ha deciso che non hai fatto la tua parte nello scambio "
-        "in contanti: la cauzione non torna. Se pensi che ci sia un errore, "
+        "Un moderatore ha deciso che non hai fatto la tua parte nello scambio: "
+        "la cauzione non torna. Se pensi che ci sia un errore, "
         "scrivi ai moderatori.", _p2p_onchain_bottone(o))
     if altro and meta:
         await _notifica_p2p_onchain(o, altro,
@@ -113516,6 +113680,19 @@ async def p2p_onchain_cauzioni_passata(adesso: int | None = None) -> dict:
     finally:
         con.close()
     for r in righe:
+        # (18 nov 2026) PRIMA del ritorno: la cauzione chiesta da chi vende
+        # che si perde da sola (rinuncia, o tempo scaduto senza «Ho inviato»)
+        if r["stato"] == "tenuta" and int(r["in_gioco"] or 0):
+            con = _p2p_onchain_db()
+            try:
+                o = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                                (int(r["ordine_id"]),)).fetchone()
+            finally:
+                con.close()
+            motivo = p2p_onchain_cauzione_persa_da_sola(o, r) if o else ""
+            if motivo:
+                await _p2p_onchain_cauzione_persa_da_sola(o, r, motivo, t)
+                continue
         sorte = p2p_onchain_cauzione_sorte(r, r["stato_ordine"] or "", t)
         if sorte == "aspetta":
             continue
@@ -113726,7 +113903,7 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
         if p2p_onchain_cauzione_serve(o, scelto,
                                       p2p_onchain_cauzione_accesa(user["id"])) \
                 and not cauzione_id:
-            raise HTTPException(409, "Per prendere in contanti serve la cauzione: "
+            raise HTTPException(409, "Per prendere quest'ordine serve la cauzione: "
                                      "tocca «🔐 Blocca la cauzione»")
         if piu_metodi and scelto == "Contanti":
             rec = ""

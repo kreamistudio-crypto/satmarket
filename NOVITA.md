@@ -686,3 +686,9 @@ frase: Nel P2P chi vende sceglie con un orologio quanto tempo ha chi compra per 
 dove: P2P → «Pubblica» → «Vendi BTC», la sezione «Tempo per pagare» (il cursore con l'anello) sotto «Chi può prendere l'ordine»; sulla card del libro il bollino «⏱ …» per i tempi sotto le 24 ore; nel dettaglio dell'ordine la riga «Se lo prendi hai…»; nella pagina dello scambio il riquadro con l'anello.
 leva: P2P_TEMPO_PER_PAGARE (accesa di serie); sull'on-chain compare con la promozione, sul Lightning solo dopo la -bar10 sul nodo (patch 0013): «pubblico» diventa sì quel giorno
 pubblico: no
+
+## 2026-11-18 · cauzione-a-scelta
+frase: Negli scambi P2P on-chain chi vende può chiedere una cauzione a chi prende il suo ordine, con qualunque metodo: una piccola cauzione in Lightning col QR (il 3%, almeno 1000 sats) che torna a fine scambio. Chi prende la perde se rinuncia dopo il deposito o se lascia scadere il tempo per pagare senza «Ho inviato», e metà va a chi vende.
+dove: P2P → «Pubblica» → «Vendi BTC» a rete on-chain, la sezione «Cauzione di chi prende» («No» / «🔐 Chiedila») dopo «Tempo per pagare»; sulla card del libro il bollino «🔐 Cauzione»; nel foglio di chi prende la riga «Chi vende chiede una cauzione» e il foglio «🔐 Blocca la cauzione»; il foglio di «↩️ Rinuncio» lo ricorda.
+leva: P2P_ONCHAIN_CAUZIONE_A_SCELTA (accesa di serie), ma vive sopra P2P_ONCHAIN_CAUZIONE e il suo macaroon (DA-FARE-ANDREA voce 20) e, a porticina chiusa, solo per i moderatori: «pubblico» diventa sì quando la cauzione on-chain si apre a tutti
+pubblico: no
