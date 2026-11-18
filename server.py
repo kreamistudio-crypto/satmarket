@@ -5588,7 +5588,9 @@ def _serie_unisci(con, resta: int, va_via: int):
 # SUA, e solo lui. Niente `tg_id` in uscita, come nella classifica del
 # mercatino. Niente cache: e' una lettura su una tabella con una riga a
 # persona, e cambia una volta al giorno a testa.
-SERIE_CLASSIFICA_TOP = 20
+# 50 RIGHE (18 nov 2026, Andrea: «la classifica mostra le prime 50
+# persone, non solo le prime 20»): erano 20 dal lancio.
+SERIE_CLASSIFICA_TOP = 50
 SERIE_CLASSIFICA_MIN = 2
 
 
