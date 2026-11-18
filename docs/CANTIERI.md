@@ -90685,3 +90685,79 @@ NON PROVATO: un telefono vero, e un moderatore vero che decide.
 DA GUARDARE: il «Rimborso» a reso in corso c'è solo per i resi a spese
 del venditore; per un reso di sempre incagliato la pagina continua a
 offrire solo «meno le spese» (notato, non toccato).
+
+## La fotografia dell'annuncio all'acquisto (18 nov 2026, cantiere fotografia-annuncio; Andrea, dopo il telefono col blocco FRP dell'ordine #284: «se il venditore modificasse l'annuncio per raffreddare il compratore, c'è un modo per risalire all'annuncio originale da parte dei moderatori?», poi «se non occupa uno spazio esagerato e se non rallenta il sito, facciamolo», e «Ok» sulla proposta)
+
+COSA C'ERA. Niente: la modifica riscrive le colonne di `annunci`, cancella
+i file delle foto vecchie, e su Nostr il NIP-99 sostituisce l'evento. Dell'
+annuncio comprato restavano il titolo e l'unitario di `ordine_righe`.
+C'ERA PERO' GIA' UNA GUARDIA, ed è la notizia più utile per Andrea:
+`modifica_annuncio` rifiuta la modifica finché un ordine dell'annuncio non
+è chiuso («C'è un affare in corso su questo annuncio»), contando anche
+l'ordine solo creato. Quindi il venditore, dall'app, ad affare aperto non
+può ritoccare niente. La fotografia non la sostituisce: copre i buchi
+(il sync orario di un negozio collegato, un ritocco di un moderatore, la
+corsa fra la guardia e la scrittura) e dà al moderatore la prova scritta.
+
+COSA SI È DECISO. Al pagamento (`_incassa_ordine`, l'unico `UPDATE ordini
+SET stato='locked'` del server: Lightning, on-chain, swap e riacciuffo
+passano tutti da lì) l'ordine scrive in `ordine_fotografie` una riga per
+annuncio (il set ne ha più d'una) con i campi di `FOTOGRAFIA_CAMPI` in
+JSON: testo, categoria, condizione, prezzo, opzioni, etichetta, zona,
+consegna e spedizione, l'ELENCO delle foto, la data dell'ultimo ritocco.
+Dopo il CAS e PRIMA che lo stock scali; `INSERT OR IGNORE`, la prima
+fotografia non si riscrive; un guasto è una riga in console e l'ordine
+passa a locked lo stesso (l'incasso non si ferma mai per una prova).
+LE FOTO NON SI COPIANO: `modifica_annuncio` non cancella un file nominato
+dalla fotografia di un ordine ancora aperto (`_foto_protette_da_ordini`;
+chiusi = released, refunded, annullato). A ordine chiuso il file resta:
+pochi KB in un caso raro, e una pulizia rischierebbe di togliere la prova
+a una disputa riaperta. Il moderatore, nella pagina dell'ordine, trova
+«📸 L'annuncio al momento dell'acquisto» con «📸 Confronta con l'annuncio di
+oggi»: la rotta `GET /api/admin/orders/{id}/fotografia` (solo admin, una
+lettura a mano, mai in polling) torna com'era, com'è e i campi cambiati
+(`_differenze_fotografia`: la data del ritocco non conta, None/''/0 si
+equivalgono). La pagina mostra i soli campi cambiati, all'acquisto sopra e
+oggi sotto, foto in miniatura, e «Tutto l'annuncio all'acquisto» chiuso in
+un `details`; tutto il testo passa da `esc()`. Leva
+`ORDINE_FOTOGRAFIA_ATTIVA`, accesa di serie (solo False spegne), nel
+pannello delle leve: spenta, gli ordini nuovi non fotografano e le foto si
+cancellano come ieri; le fotografie già scritte restano leggibili.
+
+LO SPAZIO E LA VELOCITÀ (stima data ad Andrea con le misure della
+produzione del 18 nov: 126 ordini, descrizione più lunga 4 KB, dati 88 MB,
+20 GB liberi). Una fotografia pesa qualche centinaio di byte (470 nel
+collaudo), al massimo ~6 KB con la descrizione più lunga: meno di 1 MB per
+tutta la storia. Le foto in più esistono solo se cambiano con un ordine
+aperto, cioè quasi mai (la guardia qui sopra). Velocità: un INSERT nella
+transazione del pagamento; vetrina e ricerca non toccate.
+
+STRADE SCARTATE. Copiare i file delle foto a ogni pagamento (spazio per
+niente, quasi sempre identici). Una colonna in `ordini` (il set ha più
+annunci). Ripescare la versione vecchia da Nostr (l'evento sostituibile
+non la conserva, e gli annunci importati non sono nostri). Gli ordini di
+prima: l'originale non c'è più, la pagina lo dice.
+
+PROVATO. `collaudo_fotografia_annuncio.py` nuovo, sul server vero col nodo
+di cartone (28 prove: il pagamento che fotografa, una riga sola al secondo
+passaggio, le differenze quando l'annuncio cambia sotto, la guardia
+dell'affare in corso, LA CORSA — comprato e pagato mentre la modifica è in
+volo: le foto vecchie restano — la modifica senza ordini che cancella come
+ieri, la rotta dei soli moderatori e la lista vuota degli ordini di prima,
+la leva spenta, il guasto che non ferma l'incasso), in `ci/collaudi.txt` e
+`ci/compila.txt`; controprove: tolta la protezione delle foto 1 rossa,
+tolta la fotografia dal pagamento 3 rosse e il collaudo esplode.
+`prove_fotografia_annuncio` nuova (la leva, i giudici puri, scrittura e
+protezione su sqlite vero, i ganci nell'ordine giusto, la pagina in node);
+controprova: protezione tolta, OR REPLACE, vuoti non equivalenti e titolo
+senza esc(): 6 rosse. Ritoccate tre prove vecchie: i due banchi che
+eseguono `_incassa_ordine` (`prove_notifica_fail_open`,
+`prove_ricevuta_compratore`) montano la leva spenta, e la riga del
+pannello del reso in `prove_rimborso_meno_spese` ha il terzo pezzo; la
+sezione nuova sta nella categoria «mercatino». Suite severa intera
+(30032 passate; le due di nostr-tools girate a parte con
+IDENTITA_NODE_MODULES, verdi) e collaudi della CI (155 verdi) nel venv
+senza coincurve.
+NON PROVATO: un telefono vero, e un moderatore vero su una disputa vera.
+DA GUARDARE: il sync dei negozi collegati riscrive testo e prezzo anche ad
+affare aperto (la fotografia ora lo rende visibile, ma non lo impedisce).

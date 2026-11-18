@@ -417,6 +417,14 @@ FEEDBACK_MODIFICA_GIORNI = 7
 # accese di serie): la riga serve per SPEGNERLA, e solo False spegne.
 ETICHETTA_ALIMENTI = True
 
+# --- La fotografia dell'annuncio all'acquisto (18 nov 2026) -----------
+# Al pagamento l'ordine salva l'annuncio com'era (testo, condizione,
+# prezzo, consegna, elenco delle foto) e le foto cambiate con un ordine
+# aperto non si cancellano: in disputa il moderatore vede l'originale
+# accanto all'annuncio di oggi. Pochi KB per ordine. Nasce ACCESA: la
+# riga serve per SPEGNERLA, e solo False spegne.
+ORDINE_FOTOGRAFIA_ATTIVA = True
+
 # --- Consegna digitale (buoni regalo, codici, licenze) ---------------
 # Il codice passa DENTRO Barattolo: il venditore lo consegna in un
 # campo dedicato dell'ordine, il compratore lo rivela con un tocco

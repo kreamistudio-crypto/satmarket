@@ -20158,6 +20158,9 @@ def prove_notifica_fail_open():
               # (17 nov 2026, spedisci-entro) la data e il tasto hanno
               # la loro prova in `collaudo_spedisci_entro`: qui tacciono
               "spedire_entro": lambda *a: 0,
+              # (18 nov 2026, fotografia-annuncio) la fotografia
+              # dell'annuncio ha la sua prova e il suo collaudo: qui tace
+              "ORDINE_FOTOGRAFIA_ATTIVA": False,
               "WEB_PUSH_ATTIVO": False,
               "print": lambda s: None}
     exec(pezzo_async("notifica"), catena)
@@ -28728,7 +28731,8 @@ def prove_rimborso_meno_spese():
     prova("sotto: il reso in corso e le due meta' per chi modera, la sua "
           "meta' per chi vende", [1, 1],
           [mini.count("      ${isAdmin ? pannelloResoAdmin(o, s) + "
-                      "pannelloSpeseReseAdmin(o, s) : ''}\n"),
+                      "pannelloSpeseReseAdmin(o, s) + "
+                      "pannelloFotografiaAdmin(o, s) : ''}\n"),
            mini.count("      ${pannelloSpeseVenditore(o)}\n")])
     prova("la nota di chi compra, a rimborso uscito, ha le due storie",
           [1, 1],
@@ -40688,6 +40692,9 @@ def prove_ricevuta_compratore():
                # (17 nov 2026) la data e il tasto di «Hai venduto»
                # hanno la loro prova in `collaudo_spedisci_entro`
                "spedire_entro": lambda *a: 0,
+               # (18 nov 2026) la fotografia dell'annuncio ha la sua
+               # prova in `prove_fotografia_annuncio`: qui tace
+               "ORDINE_FOTOGRAFIA_ATTIVA": False,
                # il registro dei negozi collegati (tappa 4) passa dal
                # funnel: `reale()` non basta da solo, che questa
                # funzione ha delle dipendenze sue — chi estrae un
@@ -171738,6 +171745,191 @@ console.log(JSON.stringify({ levetta: [levetta.ico.textContent, levetta.title, l
     prova("...e NON il tondo della mappa, che resta «Mappa: …» per chi legge con la voce",
           ["Mappa: 3 annunci", "Mappa: 3 annunci"], r2.get("tondo"))
 
+def prove_fotografia_annuncio():
+    """LA FOTOGRAFIA DELL'ANNUNCIO (18 nov 2026, cantiere fotografia-
+    annuncio, ok di Andrea «se non occupa uno spazio esagerato e se non
+    rallenta il sito, facciamolo»). Al pagamento l'ordine si tiene
+    l'annuncio com'era; in disputa il moderatore lo vede accanto a
+    quello di oggi. Il giro vero (pagamento, modifica, rotta) sta in
+    `collaudo_fotografia_annuncio.py`; qui la forma, i giudici puri e
+    la pagina fatta girare.
+
+    QUEL CHE SI ROMPE IN SILENZIO: la fotografia scritta DOPO che lo
+    stock scala, o fuori dal passaggio unico a 'locked' (una strada di
+    pagamento senza prova); un guasto della fotografia che ferma
+    l'incasso; la seconda scrittura che riscrive la prima; la modifica
+    che torna a cancellare le foto nominate; i contatori che accendono
+    differenze finte; il testo di chi vende in pagina senza esc()."""
+    import sqlite3 as _sq
+    import json as _js
+    print("\n[fotografia-annuncio: l'annuncio com'era all'acquisto]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    es = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) LA LEVA -------------------------------------------------------
+    prova("1) la leva nasce ACCESA e solo False la spegne", [True] * 4,
+          ["except ImportError:\n    ORDINE_FOTOGRAFIA_ATTIVA = True" in src,
+           "ORDINE_FOTOGRAFIA_ATTIVA = ORDINE_FOTOGRAFIA_ATTIVA is not False"
+           in src,
+           "\nORDINE_FOTOGRAFIA_ATTIVA = True\n" in es,
+           bool(re.search(r'"ORDINE_FOTOGRAFIA_ATTIVA",\s+'
+                          r'ORDINE_FOTOGRAFIA_ATTIVA,', src))])
+
+    # --- 2) I GIUDICI PURI ------------------------------------------------
+    amb = {"json": _js}
+    i = src.index("FOTOGRAFIA_CAMPI = (")
+    exec(src[i:src.index("\n\n", i)], amb)
+    i = src.index("FOTOGRAFIA_ORDINI_CHIUSI = (")
+    exec(src[i:src.index("\n", i)], amb)
+    for nome in ("_fotografia_di", "_fotografa_annunci",
+                 "_foto_protette_da_ordini", "_differenze_fotografia"):
+        exec(pezzo(nome), amb)
+    riga = {"titolo": "Telefono", "descrizione": "Come nuovo", "foto":
+            '["a1_0.jpg", "a1_1.jpg"]', "prezzo_sats": 30000,
+            "condizione": "buono", "visualizzazioni": 99, "quantita": 3,
+            "modificato": 0}
+    f = amb["_fotografia_di"](riga)
+    prova("2) la fotografia: i campi della promessa, le foto come lista, "
+          "niente contatori", (["a1_0.jpg", "a1_1.jpg"], False, False, "Telefono"),
+          (f["foto"], "visualizzazioni" in f, "quantita" in f, f["titolo"]))
+    prova("...una lista di foto storta diventa vuota, non un errore",
+          [[], []], [amb["_fotografia_di"](dict(riga, foto="{rotto"))["foto"],
+                     amb["_fotografia_di"](dict(riga, foto='{"a": 1}'))["foto"]])
+    diff = amb["_differenze_fotografia"]
+    oggi = dict(f, titolo="Telefono (bloccato FRP)", foto=["a1_9.jpg"],
+                modificato=1234)
+    prova("...le differenze: titolo e foto, nell'ordine dei campi; la data "
+          "del ritocco non e' un ritocco", ["titolo", "foto"], diff(f, oggi))
+    prova("...uguale e' uguale, e None/''/0 si equivalgono", [[], []],
+          [diff(f, dict(f)), diff(dict(f, sottocategoria=None),
+                                  dict(f, sottocategoria=""))])
+    prova("...un campo che la fotografia non aveva non accende niente", [],
+          diff({k: v for k, v in f.items() if k != "condizione"},
+               dict(f, condizione="rotto")))
+
+    # --- 3) LA SCRITTURA E LA PROTEZIONE, su un database vero ---------------
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    i = src.index("CREATE TABLE IF NOT EXISTS ordine_fotografie(")
+    con.executescript(src[i:src.index("\n    );", i) + len("\n    );")])
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT, "
+                "descrizione TEXT, foto TEXT, prezzo_sats INTEGER, "
+                "visualizzazioni INTEGER)")
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT)")
+    con.execute("INSERT INTO annunci VALUES(1,'Telefono','Come nuovo',"
+                "'[\"a1_0.jpg\"]',30000,5)")
+    con.execute("INSERT INTO annunci VALUES(2,'Cover','Rossa','[]',1000,0)")
+    for oid, stato in ((10, "dispute"), (11, "released"), (12, "locked")):
+        con.execute("INSERT INTO ordini VALUES(?,?)", (oid, stato))
+    scritte = amb["_fotografa_annunci"](con, 10, [1, 2, 1, 0, 77], 500)
+    con.execute("UPDATE annunci SET titolo='Rotto', foto='[\"a1_5.jpg\"]' "
+                "WHERE id=1")
+    di_nuovo = amb["_fotografa_annunci"](con, 10, [1], 600)
+    dati = _js.loads(con.execute("SELECT dati FROM ordine_fotografie WHERE "
+                                 "ordine_id=10 AND annuncio_id=1").fetchone()[0])
+    prova("3) una riga per annuncio (doppioni, zeri e annunci spariti "
+          "saltati); la seconda volta non riscrive", (2, 0, "Telefono",
+                                                      ["a1_0.jpg"]),
+          (scritte, di_nuovo, dati["titolo"], dati["foto"]))
+    amb["_fotografa_annunci"](con, 11, [1], 700)   # ordine chiuso: foto a1_5
+    prova("...le foto protette: quelle dell'ordine APERTO, non del chiuso",
+          {"a1_0.jpg"}, amb["_foto_protette_da_ordini"](con, 1))
+    amb["_fotografa_annunci"](con, 12, [1], 800)
+    prova("...due ordini aperti, due fotografie diverse: si tengono tutte",
+          {"a1_0.jpg", "a1_5.jpg"}, amb["_foto_protette_da_ordini"](con, 1))
+    prova("...un annuncio senza ordini aperti non protegge niente", set(),
+          amb["_foto_protette_da_ordini"](con, 2) - {""})
+
+    # --- 4) I GANCI: il pagamento, la modifica, la rotta --------------------
+    inc = codice(pezzo("_incassa_ordine"))
+    i_cas = inc.find("UPDATE ordini SET stato='locked'")
+    i_foto = inc.find("_fotografa_annunci(con, ordine_id,")
+    i_stock = inc.find("UPDATE annunci SET quantita=MAX(quantita-?,0)")
+    prova("4) al pagamento: dopo il CAS e PRIMA che lo stock scali", True,
+          0 < i_cas < i_foto < i_stock)
+    blocco = inc[inc.rfind("if ORDINE_FOTOGRAFIA_ATTIVA:", 0, i_foto):i_stock]
+    prova("...dietro la leva, e un guasto non ferma l'incasso", [True, True],
+          ["if ORDINE_FOTOGRAFIA_ATTIVA:" in blocco,
+           "except Exception as e:" in blocco])
+    prova("...ed e' l'UNICO passaggio a 'locked' degli ordini", 1,
+          len(re.findall(r"UPDATE ordini SET stato='locked'", codice(src))))
+    mod = codice(pezzo("modifica_annuncio"))
+    prova("la modifica non cancella le foto della fotografia", [True, True],
+          ["protette = (_foto_protette_da_ordini(con, annuncio_id)" in mod,
+           "if v.startswith(\"http\") or v in nomi or v in protette:" in mod])
+    rotta = pezzo("fotografia_ordine")
+    prova("la rotta e' dei soli moderatori, e una lettura", [True, True],
+          ['@app.get("/api/admin/orders/{ordine_id}/fotografia")' in src,
+           'if not e_admin(user["id"]):\n        raise HTTPException(403'
+           in rotta])
+    prova("la tabella nasce in init_db, con la chiave (ordine, annuncio)",
+          True, "PRIMARY KEY(ordine_id, annuncio_id)" in
+          src[src.index("CREATE TABLE IF NOT EXISTS ordine_fotografie("):])
+
+    # --- 5) LA PAGINA DEL MODERATORE -----------------------------------------
+    prova("5) il riquadro sta nella pagina dell'ordine, accanto al reso", True,
+          "pannelloSpeseReseAdmin(o, s) + pannelloFotografiaAdmin(o, s)"
+          in mini)
+    try:
+        blocco_js = mini[mini.index("const FOTOGRAFIA_NOMI = {"):
+                         mini.index("async function apriFotografiaAdmin(")]
+        # col capo-riga davanti: le stesse parole stanno anche nei
+        # commenti, e il primo che le nomina ruberebbe il ritaglio
+        base = (pezzo_js(mini, "\nconst fmt = n => n.toLocaleString", "\n/*")
+                + pezzo_js(mini, "\nconst esc = s => String(", "));\n") + "));\n"
+                + "const FOTO_BASE = '';\n"
+                + pezzo_js(mini, "\nfunction fotoUrl(f){", "\n}\n") + "\n}\n"
+                + pezzo_js(mini, "\nfunction fotoMini(nome){", "\n}\n") + "\n}\n")
+        prog = base + blocco_js + r"""
+const A = {titolo:'Tel <b>', descrizione:'Come nuovo', prezzo_sats:30000,
+           foto:['a1_0.jpg'], modificato:0};
+const fuori = {
+  vuoto: corpoFotografiaAdmin({fotografie:[], attiva:true}),
+  spenta: corpoFotografiaAdmin({fotografie:[], attiva:false}),
+  uguale: corpoFotografiaAdmin({fotografie:[{il:1, allora:A, oggi:A, diversi:[]}]}),
+  diverso: corpoFotografiaAdmin({fotografie:[{il:1, allora:A,
+    oggi:Object.assign({}, A, {descrizione:'<img src=x onerror=alert(1)>',
+                              foto:['a1_9.jpg'], modificato:5}),
+    diversi:['descrizione', 'foto']}]}),
+  sparito: corpoFotografiaAdmin({fotografie:[{il:1, allora:A, oggi:null, diversi:[]}]}),
+  admin: pannelloFotografiaAdmin({role:'admin', id:7}, 'dispute'),
+  creato: pannelloFotografiaAdmin({role:'admin', id:7}, 'creato'),
+  compra: pannelloFotografiaAdmin({role:'buyer', id:7}, 'dispute')};
+console.log(JSON.stringify(fuori));
+"""
+        out = _node_banco(prog)
+    except ValueError as e:
+        out = {"ancora": str(e)}
+    if out is None:
+        salta("la pagina della fotografia dell'annuncio", "node non c'e'")
+        return
+    prova("pagina: un ordine di prima lo dice, e la leva spenta pure",
+          [True, False, True],
+          ["l'originale non c'è" in (out.get("vuoto") or ""),
+           "la leva è spenta" in (out.get("vuoto") or ""),
+           "la leva è spenta" in (out.get("spenta") or "")])
+    prova("...uguale: nessuna differenza, e il titolo di chi vende "
+          "passa da esc()", [True, True, False],
+          ["Nessuna differenza" in (out.get("uguale") or ""),
+           "Tel &lt;b&gt;" in (out.get("uguale") or ""),
+           "Tel <b>" in (out.get("uguale") or "")])
+    d = out.get("diverso") or ""
+    prova("...diverso: quanti campi, all'acquisto e oggi, le due foto",
+          [True] * 5,
+          ["2 campi sono cambiati" in d, "All'acquisto:" in d, "Oggi:" in d,
+           "/foto/a1_0_min.jpg" in d, "/foto/a1_9_min.jpg" in d])
+    prova("...e il testo cambiato non diventa HTML", [False, True],
+          ["<img src=x" in d, "&lt;img src=x onerror=alert(1)&gt;" in d])
+    prova("...annuncio sparito: com'era, campo per campo", [True, True],
+          ["non esiste più" in (out.get("sparito") or ""),
+           "Come nuovo" in (out.get("sparito") or "")])
+    prova("il riquadro: solo al moderatore, mai su un ordine non pagato",
+          [True, "", ""],
+          ["apriFotografiaAdmin(7, this)" in (out.get("admin") or ""),
+           out.get("creato"), out.get("compra")])
+
+
 def prove_etichetta_alimenti():
     """L'ETICHETTA DEGLI ALIMENTI (17 nov 2026, cantiere etichetta-
     alimenti). Da Luca, via Andrea: per l'art. 14 del Reg. UE 1169/2011
@@ -211001,7 +211193,7 @@ CATEGORIE = {
     venduto_canale esauriti_eliminabili chat_mercatino chat_dalla_notifica
     modifica_massiva_foto miniature_leggere leva_mercato_lavoro
     allegati_da_telegram domande_compratore incasso_annuncio
-    etichetta_alimenti
+    etichetta_alimenti fotografia_annuncio
     audit_pagamenti_2 audit_pagamenti_3 audit_tornata_tutto
     """.split(),
     "infrastruttura": """
@@ -212097,6 +212289,7 @@ def main():
               prove_contanti_zona,
               prove_esauriti_eliminabili,
               prove_etichetta_alimenti,
+              prove_fotografia_annuncio,
               prove_mappa_contanti,
               prove_mappa_ritiro,
               prove_mappa_ritocchi,

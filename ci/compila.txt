@@ -222,3 +222,4 @@ collaudo_nip05_utenti.py
 collaudo_raccolta.py
 collaudo_lingua.py
 collaudo_reso_spese_venditore.py
+collaudo_fotografia_annuncio.py
