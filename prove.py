@@ -1515,6 +1515,98 @@ def prove_sottocategorie():
           g("Sport e hobby", "Imparare ad amare", ""))
 
 
+def prove_sottocategorie_vetrina():
+    """LE SOTTOCATEGORIE IN VETRINA (18 nov 2026, cantiere sottocategorie,
+    richiesta di Andrea): l'albero dormiente si accende. La rotta vera la
+    fa girare collaudo_sottocategorie_vetrina; qui si tengono i fili —
+    la leva accesa di serie, la copia del catalogo nel client voce per
+    voce, la tendina sul tocco della card, lo scaffale nella richiesta,
+    il campo del form nei due payload giusti e MAI in quello firmato."""
+    print("\n[sottocategorie in vetrina: leva, tendina, form]")
+    import json as _json
+    import re as _re
+    src = _SORGENTE
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    es = open(os.path.join(QUI, "config_esempio.py"), encoding="utf-8").read()
+    amb = {}
+    i = src.index("SOTTOCATEGORIE = {")
+    exec(src[i:src.index("\n}", i) + 2], amb)
+    albero = {c: [list(v) for v in voci]
+              for c, voci in amb["SOTTOCATEGORIE"].items()}
+    i = mini.index("const SOTTOCAT = {")
+    js = mini[i + len("const SOTTOCAT = "):mini.index("\n};", i) + 2]
+    js = _re.sub(r",(\s*[\]}])", r"\1", js.replace("'", '"'))
+    prova("la copia del client e' l'albero del server, voce per voce e "
+          "nello stesso ordine", albero, _json.loads(js))
+
+    prova("accesa di serie: nel codice e nel config d'esempio, e solo "
+          "False la spegne", (True, True, True),
+          ("except ImportError:\n    SOTTOCATEGORIE_VETRINA = True" in src,
+           "\nSOTTOCATEGORIE_VETRINA = True\n" in es,
+           "SOTTOCATEGORIE_VETRINA = SOTTOCATEGORIE_VETRINA is not False"
+           in src))
+    prova("...e il pannello delle leve la nomina", True,
+          '_leva("Sottocategorie in vetrina e nel form",\n'
+          '                  "SOTTOCATEGORIE_VETRINA"' in src)
+    k = src.index("async def lista_annunci(")
+    corpo = src[k:src.index("\n@app.", k)]
+    prova("il server: lo scaffale filtra con una delle due leve, e solo "
+          "con la categoria", True,
+          "if ((MERCATO_LAVORO or SOTTOCATEGORIE_VETRINA) and sottocategoria\n"
+          '            and cat and cat != "Tutto"):' in corpo)
+    prova("...la busta porta leva e conteggi (soli attivi, capofila, "
+          "vuote fuori, voci valide)", (True, True, True, True),
+          ('risposta["sottocategorie_vetrina"] = bool(SOTTOCATEGORIE_VETRINA)'
+           in corpo,
+           "COALESCE(a.sottocategoria,'')!='' AND {SQL_CAPOFILA}" in corpo,
+           "if sottocategoria_valida(r[\"categoria\"], r[\"sottocategoria\"]):"
+           in corpo,
+           'risposta["sottoconteggi"] = _sc' in corpo))
+    prop = pezzo("sottocategoria_proposta")
+    prova("la proposta del form e' il giudice del server, a leva accesa",
+          (True, True), ("sottocategoria_indovina(" in prop,
+                         "if not SOTTOCATEGORIE_VETRINA:" in prop))
+
+    tocco = pezzo_js(mini, "function apriCategoriaDaTocco(e, c){", "\n}\n")
+    prova("il tocco della card apre la tendina quando ci sono scaffali "
+          "pieni, sennò filtra come sempre", (True, True),
+          ("if (vociTendinaSotto(c).length) { apriTendinaSotto(e.currentTarget, c); return; }"
+           in tocco, tocco.rstrip().endswith("apriCategoria(c);")))
+    voci = pezzo_js(mini, "function vociTendinaSotto(c){", "\n}\n")
+    prova("...la tendina mostra solo gli scaffali pieni, e niente a leva "
+          "spenta", (True, True),
+          ("if (!sottoLeva || !SOTTOCAT[c]) return [];" in voci,
+           "(Number(n[id]) || 0) > 0" in voci))
+    sc = pezzo_js(mini, "function setCat(c){", "\n}\n")
+    prova("ogni cambio di categoria riparte da «Tutta la categoria», "
+          "tranne lo scaffale chiesto dalla tendina (consumato una volta)",
+          (True, True),
+          ("activeSotto = (c !== 'Tutto' && sottoChiesto) ? sottoChiesto : '';"
+           in sc, "sottoChiesto = '';" in sc))
+    par = pezzo_js(mini, "function paramsVetrina(){", "\n}\n")
+    prova("lo scaffale viaggia nella richiesta solo con una categoria",
+          True, "} else if (sottoLeva && activeSotto && activeCat !== 'Tutto') {"
+          in par)
+    prova("la busta accende la leva e i conteggi", True,
+          "sottoLeva = j.sottocategorie_vetrina === true;" in mini)
+    prova("la card accesa scrive lo scaffale sotto il nome", True,
+          '<span class="cat-sotto">${esc(etichettaSotto(c, activeSotto))}</span>'
+          in mini)
+
+    prova("il form: il campo nasce nascosto", True,
+          '<div class="field" id="sellSottoField" style="display:none">' in mini)
+    prova("...e la sottocategoria va nella pubblicazione e nella modifica",
+          2, mini.count("...sottoPayload()"))
+    firm = pezzo_js(mini, "async function salvaModificaFirmata(t, p){", "\n}\n")
+    prova("...MAI nella modifica firmata degli importati (patto di agosto)",
+          False, "sottoPayload" in firm)
+    pay = pezzo_js(mini, "function sottoPayload(){", "\n}\n")
+    prova("...e in modifica, se il valore non e' noto, non si manda "
+          "(l'assenza conserva)", True,
+          "if (editandoId && sel.dataset.noto !== '1' && sel.dataset.manuale !== '1') return {};"
+          in pay)
+
+
 # ====================================================================
 def prove_ricategorizza():
     """Lo script di ricategorizzazione legge il catalogo da server.py
@@ -141423,6 +141515,9 @@ function clearInterval(id){ timer.delete(id); }
 function setTimeout(){ return 0; }
 let DEMO = false, VETRINA = false, datiVivi = true, conteggiServer = {};
 let myTgId = 111, activeCat = 'Tutto', vistaBarattolo = false;
+// lo scaffale della tendina (18 nov 2026): la striscia lo scrive sotto la card accesa
+let activeSotto = '';
+const etichettaSotto = () => '';
 let sponsorizzati = [], consigliatiServer = [];
 let ridotti = false, premutaFatta = false;
 const effettiRidotti = () => ridotti;
@@ -204544,7 +204639,10 @@ def prove_leva_mercato_lavoro():
     prova("il server: sezione e scaffale filtrano SOLO a leva accesa",
           (True, True, 0, 0),
           ('if MERCATO_LAVORO and sezione in ("mercato", "lavoro"):' in corpo,
-           "if MERCATO_LAVORO and sottocategoria and cat" in corpo,
+           # (18 nov 2026) lo scaffale ha anche la leva sua, vedi
+           # prove_sottocategorie_vetrina: basta una delle due
+           "if ((MERCATO_LAVORO or SOTTOCATEGORIE_VETRINA) and sottocategoria"
+           in corpo,
            corpo.count('\n    if sezione in ("mercato", "lavoro"):'),
            corpo.count("\n    if sottocategoria and cat")))
     prova("...e la busta lo dice alla pagina, anche agli anonimi", True,
@@ -204635,7 +204733,9 @@ def _banco_assistente(**leve):
            # (16 nov 2026, cantiere codici-uno-alla-volta) i codici a riquadri
            "CODICI_UNO_ALLA_VOLTA": True,
            # (18 nov 2026, cantiere bitcoin-only) l'interruttore del Filtro
-           "P2P_BITCOIN_ONLY_ATTIVO": True}
+           "P2P_BITCOIN_ONLY_ATTIVO": True,
+           # (18 nov 2026, cantiere sottocategorie) la tendina della vetrina
+           "SOTTOCATEGORIE_VETRINA": True}
     CHI_GUARDA = []
     for nome in ("cambio_libero_per", "swap_per", "onchain_ammesso",
                  "swap_auto_per", "p2p_usdt_ammesso", "p2p_onchain_ammesso",
@@ -211532,6 +211632,7 @@ CATEGORIE = {
     guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore raccolte premi_fedelta app_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
+    sottocategorie_vetrina
     ricategorizza collaudo_ricategorizza asta proxy_asta annullo
     annullo_venditore spunta_rimborso abbandonati pagamenti_non_arrivati
     ritiro disarmo importo_uscita foto foto_scarti fotocamera_pagina
@@ -212314,6 +212415,7 @@ def main():
               prove_anello, prove_categorie,
               prove_nome_nostr,
               prove_senza_condizione, prove_sottocategorie,
+              prove_sottocategorie_vetrina,
               prove_ricategorizza, prove_collaudo_ricategorizza,
               prove_asta, prove_proxy_asta,
               prove_annullo, prove_annullo_venditore, prove_spunta_rimborso,

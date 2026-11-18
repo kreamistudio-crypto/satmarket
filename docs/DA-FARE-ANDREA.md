@@ -908,3 +908,35 @@ sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w
 Atteso 200. Poi nel bot di collaudo: Profilo → «Livello e recensioni» →
 «🚀 Rotta per la Luna». **In produzione** la stessa riga nel config del VPS
 la accende per tutti, quando decidi tu.
+
+## 23. Le sottocategorie agli annunci già pubblicati, dopo la promozione (18 nov 2026, cantiere sottocategorie)
+
+**Perché.** Dalla promozione, toccando una categoria in Esplora si apre la
+tendina delle sottocategorie. Gli annunci nuovi la sottocategoria la
+prendono da soli; quelli vecchi l'hanno presa solo se sono nati dopo
+agosto o se nessuno ha mai lanciato lo script. Quelli senza si vedono
+sempre in «Tutta la categoria», ma non nelle voci della tendina. Lo script
+`assegna_sottocategorie.py` riempie SOLO i vuoti, e dove non è sicuro li
+lascia vuoti. Nessuna leva da toccare: `SOTTOCATEGORIE_VETRINA` è accesa
+di serie.
+
+**VPS, da root, dopo la promozione.** Il primo comando legge e basta: dice
+quante righe sono già assegnate e quante ancora vuote.
+```
+cd /srv/barattolo && sudo -u barattolo python3 assegna_sottocategorie.py --conta /srv/barattolo/dati/satmarket.db
+```
+L'anteprima, che non scrive niente: dice cosa farebbe.
+```
+cd /srv/barattolo && sudo -u barattolo python3 assegna_sottocategorie.py /srv/barattolo/dati/satmarket.db
+```
+Se l'anteprima ti convince, prima la copia del database:
+```
+python3 -c "import sqlite3; s=sqlite3.connect('file:/srv/barattolo/dati/satmarket.db?mode=ro', uri=True); d=sqlite3.connect('/root/prima-sottocategorie.db'); s.backup(d); d.close(); s.close(); print('copia ok')"
+```
+Poi lo scrive, da `barattolo` (non da root: un file nato da root il
+servizio non lo sa più riscrivere):
+```
+cd /srv/barattolo && sudo -u barattolo python3 assegna_sottocategorie.py --scrivi /srv/barattolo/dati/satmarket.db
+```
+Nessun riavvio: la tendina conta le righe a ogni apertura della vetrina.
+Si rilancia quando vuoi, tocca solo i vuoti.

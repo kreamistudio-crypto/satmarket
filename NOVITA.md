@@ -638,3 +638,9 @@ frase: Negli scambi on-chain un deposito con pochi sats in meno (succede con gli
 dove: P2P → «I miei scambi» → uno scambio on-chain preso: la riga «👀 Visti in rete … ne mancano N» e il bottone «↩️ Annulla e riprendi i sats» di chi ha depositato; il messaggio del bot «Sono arrivati N sats in meno».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-18 · sottocategorie
+frase: In Esplora le categorie hanno le sottocategorie: tocchi una categoria e si apre una tendina, con il numero di annunci accanto a ogni voce. Per esempio Informatica → Computer e portatili, oppure Tablet ed e-reader. E quando pubblichi Barattolo propone la sottocategoria leggendo il titolo; puoi cambiarla tu.
+dove: Esplora → «Esplora per categorie», tocca una categoria: la tendina sotto la card («Tutta la categoria» e le sottocategorie con annunci); la card accesa scrive la scelta sotto il nome. Vendi → il campo «Sottocategoria (facoltativa)» sotto la categoria.
+leva: SOTTOCATEGORIE_VETRINA (accesa di serie)
+pubblico: sì

@@ -1195,6 +1195,29 @@
   .cat-eti{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;margin-top:5px;font-size:11px;font-weight:700;
     line-height:1.2;color:var(--ink);text-align:center}
+  /* LO SCAFFALE SCELTO NELLA TENDINA (18 nov 2026): una riga sola sotto
+     il nome della card accesa, piccola e arancio come il nome acceso */
+  .cat-sotto{display:block;margin-top:1px;font-size:10px;font-weight:800;
+    line-height:1.2;color:var(--sats-text);text-align:center;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* LA TENDINA DELLE SOTTOCATEGORIE (18 nov 2026): appesa al body sotto
+     la card toccata, sopra la pagina ma sotto l'header (20 e' suo) */
+  .tendina-sotto{position:absolute;z-index:18;width:min(264px,calc(100vw - 24px));
+    background:var(--card);border:1.5px solid var(--line);border-radius:16px;
+    box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px}
+  /* niente overflow sul riquadro: taglierebbe la punta, che sta fuori
+     di 8px; le voci sono al piu' dieci (Lavoro e servizi), ci stanno */
+  .tendina-sotto .ts-punta{position:absolute;top:-8px;width:14px;height:14px;
+    background:var(--card);border-left:1.5px solid var(--line);
+    border-top:1.5px solid var(--line);transform:rotate(45deg)}
+  .ts-voce{display:flex;width:100%;justify-content:space-between;align-items:center;
+    gap:10px;padding:11px 12px;border:0;border-radius:10px;background:none;
+    font:700 15px/1.25 Nunito,sans-serif;color:var(--ink);text-align:left;cursor:pointer}
+  .ts-voce:active{background:var(--line)}
+  .ts-voce.sel{background:var(--sats);color:#fff}
+  .ts-voce .ts-n{opacity:.6;font-weight:800;font-variant-numeric:tabular-nums}
+  .ts-voce.ts-esci{color:var(--muted);font-size:14px;border-top:1px solid var(--line);
+    border-radius:0 0 10px 10px;margin-top:4px}
   /* LA CARD DELLO SCAMBIO: una riga sola, il logo piu' grosso (set
      2026, ritocco di Andrea — vedi Architettura, «LA CARD DELLO
      SCAMBIO NELLA STRISCIA»).
@@ -16049,6 +16072,14 @@ document.getElementById('cartello')?.remove();</script>
       <div class="field"><label>Categoria</label>
         <select id="sellCat" hidden><option>Elettronica</option><option>Informatica</option><option>Telefonia</option><option>Audio e video</option><option>Console e videogiochi</option><option>Foto e ottica</option><option>Bitcoin</option><option>Casa e giardino</option><option>Elettrodomestici</option><option>Fai da te e utensili</option><option>Alimenti e bevande</option><option>Bellezza e benessere</option><option>Abbigliamento</option><option>Scarpe e accessori</option><option>Orologi e gioielli</option><option>Bambini</option><option>Sport e hobby</option><option>Biciclette</option><option>Motori</option><option>Animali</option><option>Libri e media</option><option>Musica e film</option><option>Strumenti musicali</option><option>Collezionismo</option><option>Arte e artigianato</option><option>Buoni ed esperienze</option><option>Lezioni e corsi</option><option>Lavoro e servizi</option><option>Altro</option></select>
         <button type="button" class="campo-scelta" id="sellCatBtn" onclick="apriPicker('sellCat')" aria-haspopup="dialog"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
+      <!-- LA SOTTOCATEGORIA (18 nov 2026, cantiere sottocategorie):
+           facoltativa, solo dove la categoria ne ha e a leva accesa; la
+           preselezione la propone il giudice del server dal titolo
+           (proponiSotto), e chi la sceglie a mano ha l'ultima parola.
+           Le <option> le riscrive aggiornaSottoForm a ogni categoria. -->
+      <div class="field" id="sellSottoField" style="display:none"><label>Sottocategoria <span style="font-weight:600;color:var(--muted)">(facoltativa)</span></label>
+        <select id="sellSotto" hidden><option value=""></option></select>
+        <button type="button" class="campo-scelta" id="sellSottoBtn" onclick="apriPicker('sellSotto')" aria-haspopup="dialog"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
       <div class="field" id="sellCondField"><label>Condizioni dell'oggetto</label>
         <select id="sellCond" hidden>
           <option value="">Scegli le condizioni…</option>
@@ -19583,6 +19614,44 @@ const EMOJI_CAT = {'Elettronica':'🔌', 'Informatica':'💻', 'Telefonia':'📱
      illustrazioni, di cui l'emoji e' il ripiego. Il 🎓 era l'icona
      della STRADA «servizio» fino a ieri, e si e' spostata a 📅 */
   'Lezioni e corsi':'🎓', 'Lavoro e servizi':'💼', 'Altro':'📦'};
+/* LE SOTTOCATEGORIE (18 nov 2026, cantiere sottocategorie, richiesta di
+   Andrea): la copia ESATTA di SOTTOCATEGORIE in server.py — id e
+   etichetta, nello stesso ordine — e prove.py le confronta voce per
+   voce (`prove_sottocategorie_vetrina`). Servono alla tendina della
+   striscia (le etichette accanto ai conteggi del server) e al campo
+   «Sottocategoria» del form Vendi. Il giudice della validita' resta il
+   server: il client propone, `sottocategoria_valida` decide. */
+const SOTTOCAT = {
+  'Elettronica': [['droni-modellismo', 'Droni e modellismo RC'], ['stampa-3d', 'Stampa 3D'], ['smart-home', 'Smart home e domotica'], ['componenti-maker', 'Componenti ed elettronica fai da te'], ['strumenti-misura', 'Strumenti di misura']],
+  'Informatica': [['computer', 'Computer e portatili'], ['tablet', 'Tablet ed e-reader'], ['componenti-periferiche', 'Componenti e periferiche'], ['software-licenze', 'Software e licenze']],
+  'Telefonia': [['smartphone', 'Smartphone e cellulari'], ['cover-accessori', 'Cover e accessori']],
+  'Audio e video': [['cuffie', 'Cuffie e auricolari'], ['casse-ampli', 'Casse e amplificatori'], ['hifi-giradischi', 'Hi-fi e giradischi'], ['tv-proiettori', 'TV e proiettori']],
+  'Console e videogiochi': [['console', 'Console'], ['videogiochi', 'Videogiochi'], ['controller-accessori', 'Controller e accessori'], ['retrogaming', 'Retrogaming']],
+  'Foto e ottica': [['fotocamere', 'Fotocamere'], ['obiettivi', 'Obiettivi e ottiche'], ['binocoli-telescopi', 'Binocoli e telescopi'], ['treppiedi-accessori', 'Treppiedi e accessori']],
+  'Bitcoin': [['hardware-wallet', 'Hardware wallet e firma'], ['nodi-mining', 'Nodi e mining'], ['poster-stampe', 'Poster e stampe'], ['merch', 'Abbigliamento e gadget']],
+  'Casa e giardino': [['mobili', 'Mobili e arredamento'], ['cucina-tavola', 'Cucina e tavola'], ['giardino', 'Giardinaggio']],
+  'Elettrodomestici': [['grandi-elettrodomestici', 'Grandi elettrodomestici'], ['piccoli-elettrodomestici', 'Piccoli elettrodomestici e ricambi']],
+  'Fai da te e utensili': [['elettroutensili', 'Elettroutensili'], ['utensili-mano', 'Utensili a mano'], ['ferramenta', 'Ferramenta e materiali']],
+  'Alimenti e bevande': [['olio-condimenti', 'Olio e condimenti'], ['dolci-conserve', 'Dolci, creme e conserve'], ['spezie-erbe', 'Spezie ed erbe'], ['bevande', 'Vino, birra e bevande']],
+  'Bellezza e benessere': [['creme-cosmetici', 'Creme e cosmetici'], ['profumi', 'Profumi'], ['integratori', 'Integratori']],
+  'Abbigliamento': [['donna', 'Donna'], ['uomo', 'Uomo']],
+  'Scarpe e accessori': [['scarpe', 'Scarpe'], ['borse-zaini', 'Borse e zaini'], ['piccoli-accessori', 'Cinture, portafogli e occhiali']],
+  'Orologi e gioielli': [['orologi-smartwatch', 'Orologi e smartwatch'], ['gioielli', 'Gioielli e collane']],
+  'Bambini': [['passeggini-attrezzatura', 'Passeggini e attrezzatura'], ['giocattoli', 'Giocattoli e giochi'], ['abbigliamento-bimbi', 'Abbigliamento bimbi']],
+  'Sport e hobby': [['attrezzatura-sportiva', 'Attrezzatura sportiva'], ['outdoor', 'Campeggio e outdoor'], ['mare-piscina', 'Mare e piscina'], ['giochi-tavolo', 'Giochi da tavolo e puzzle']],
+  'Biciclette': [['corsa-gravel', 'Da corsa e gravel'], ['mtb', 'Mountain bike'], ['ebike', 'E-bike'], ['citta-pieghevoli', 'Da città e pieghevoli'], ['bici-bimbi', 'Per bambini'], ['componenti-bici', 'Componenti e accessori']],
+  'Motori': [['veicoli', 'Auto e moto'], ['ricambi-motori', 'Ricambi e accessori'], ['caschi-abbigliamento', 'Caschi e abbigliamento tecnico']],
+  'Animali': [['cani', 'Per cani'], ['gatti', 'Per gatti'], ['acquari-terrari', 'Acquari e terrari']],
+  'Libri e media': [['libri', 'Libri e saggi'], ['fumetti-manga', 'Fumetti e manga']],
+  'Musica e film': [['vinili', 'Vinili e dischi'], ['cd-dvd', 'CD, DVD e Blu-ray']],
+  'Strumenti musicali': [['chitarre-bassi', 'Chitarre e bassi'], ['tastiere-piano', 'Tastiere e pianoforti'], ['batteria-percussioni', 'Batteria e percussioni'], ['fiati-archi', 'Fiati e archi'], ['ampli-studio', 'Ampli, microfoni e studio']],
+  'Collezionismo': [['carte-tcg', 'Carte e giochi collezionabili'], ['edizioni', 'Libri ed edizioni da collezione'], ['monete-banconote', 'Monete e banconote']],
+  'Arte e artigianato': [['quadri-stampe', 'Quadri e stampe'], ['sculture-ceramiche', 'Sculture e ceramiche'], ['tessuti-ricami', 'Tessuti e ricami'], ['materiali-creativi', 'Materiali creativi']],
+  'Buoni ed esperienze': [['gift-card', 'Gift card e buoni acquisto'], ['soggiorni-esperienze', 'Soggiorni ed esperienze']],
+  'Lezioni e corsi': [['lingue', 'Lingue'], ['ripetizioni', 'Scuola e ripetizioni'], ['musica-lezioni', 'Musica e canto'], ['informatica-corsi', 'Informatica e digitale'], ['bitcoin-corsi', 'Bitcoin e criptovalute'], ['sport-benessere', 'Sport e benessere'], ['cucina-corsi', 'Cucina'], ['arte-corsi', 'Arte e creativita']],
+  'Lavoro e servizi': [['grafica-design', 'Grafica e design'], ['siti-e-app', 'Siti web e app'], ['traduzioni', 'Traduzioni'], ['scrittura-testi', 'Scrittura e testi'], ['consulenze', 'Consulenze'], ['riparazioni', 'Riparazioni'], ['casa-manutenzione', 'Casa e manutenzione'], ['foto-video-servizi', 'Foto e video']],
+};
+const etichettaSotto = (c, s) => (SOTTOCAT[c] || []).find(v => v[0] === s)?.[1] || '';
 const FOTO_BASE = API_BASE.replace(/\/api$/, '');   // dove stanno le foto sul server
 function fotoUrl(f){
   if (!f) return '';
@@ -20200,6 +20269,10 @@ function mapListing(a){
     slug:a.slug||'',
     price:a.prezzo_sats, valuta:a.valuta||'sats', priceEur:a.prezzo_eur||0,
     cat:a.categoria, zone:a.zona||'—',
+    /* la sottocategoria (18 nov 2026): c'e' solo dove la riga la porta
+       (I tuoi annunci, la scheda); assente resta undefined, che per il
+       form vuol dire «non so» e non «nessuna» — vedi sottoPayload */
+    sotto: typeof a.sottocategoria === 'string' ? a.sottocategoria : undefined,
     /* la regione: derivata dalla sigla lato server, '' se non c'e' */
     regione:a.regione||'',
     /* il solo comune estratto dalla zona, per la card ('' = la zona
@@ -20680,6 +20753,12 @@ let vetrinaPos = null;   // {y, n} — dove si era, e con quante card
    com'e', ed e' il patto dei nomi interni (`.lampo-was`, `pacco`,
    `sconto_pacco_*`): si rinominano i testi, mai le chiavi. */
 let conteggiServer = null, ultimaRicercaAI = false;
+/* LE SOTTOCATEGORIE (18 nov 2026): la leva e i conteggi arrivano nella
+   busta di prima pagina. Chiave assente = server di ieri o leva spenta =
+   niente tendina e niente campo nel form. `activeSotto` e' lo scaffale
+   scelto dentro `activeCat` ('' = «Tutta X»): lo azzera setCat a ogni
+   cambio di categoria, e vale solo con una categoria. */
+let sottoLeva = false, sottoConteggi = {}, activeSotto = '', sottoChiesto = '';
 let regioniServer = null;    // {regione: quanti} dal server, per i Filtri
 /* GLI SPAZI IN VETRINA, dalla busta di prima pagina: la fila delle
    card sponsorizzate, nell'ordine deciso da noi — [{slug}] per il
@@ -20812,6 +20891,9 @@ function paramsVetrina(){
   if (sc && sc.cat) {
     p.set('cat', sc.cat);
     if (sc.sotto) p.set('sottocategoria', sc.sotto);
+  } else if (sottoLeva && activeSotto && activeCat !== 'Tutto') {
+    /* lo scaffale scelto nella tendina della striscia (18 nov 2026) */
+    p.set('sottocategoria', activeSotto);
   }
   /* LA RICERCA E' DI TUTTI (ago 2026): vive qui dentro, quindi vale
      per gli anonimi come per chi è dentro Telegram — prima questa
@@ -21130,6 +21212,13 @@ async function loadListings(anonimo){
       ? j.p2p_arrivo : null;
   if (j.totale !== undefined) vetrinaTotale = j.totale;
   if (j.conteggi) conteggiServer = j.conteggi;
+  if (j.sottocategorie_vetrina !== undefined) {
+    sottoLeva = j.sottocategorie_vetrina === true;
+    sottoConteggi = (sottoLeva && j.sottoconteggi
+                     && typeof j.sottoconteggi === 'object') ? j.sottoconteggi : {};
+    if (!sottoLeva && activeSotto) activeSotto = '';
+    aggiornaSottoForm();
+  }
   if (j.regioni) regioniServer = j.regioni;
   if (j.occasioni) occasioniServer = j.occasioni;
   sponsorizzati = Array.isArray(j.sponsorizzati) ? j.sponsorizzati : [];
@@ -23194,6 +23283,7 @@ function libroDaPiuP2P(){
 }
 
 function go(view){
+  chiudiTendinaSotto();   /* la tendina della striscia non segue una vista che cambia */
   haptic();
   /* In vetrina Vendi, Ordini e Profilo non esistono: si fanno su Telegram */
   if (VETRINA && (view==='vendi' || view==='affari' || view==='profilo')) {
@@ -25333,6 +25423,12 @@ function renderChips(){
   centraNellaFila(el('chips'), el('chips').querySelector('.chip.active'));
 }
 function setCat(c){
+  /* LO SCAFFALE DELLA TENDINA (18 nov 2026): ogni cambio di categoria
+     riparte da «Tutta X», tranne quando a chiederlo e' la tendina, che
+     lascia la sua scelta in `sottoChiesto` (si consuma qui, una volta).
+     Con «Tutto» uno scaffale non esiste. */
+  activeSotto = (c !== 'Tutto' && sottoChiesto) ? sottoChiesto : '';
+  sottoChiesto = '';
   /* la card «Lavoro e servizi» dal Mercato e' la porta dell'altra
      sezione: li' dentro c'e' tutto quel che la categoria prometteva,
      mentre il Mercato la darebbe sempre vuota (solo a leva accesa:
@@ -25548,6 +25644,7 @@ function renderStriscia(){
   /* ...e LA TESSERA DELLE RACCOLTE (17 nov 2026): c'e' o non c'e' */
   const racc = typeof raccolteSullaFila === 'function' && raccolteSullaFila();
   const firma = voci.join('|') + '#' + activeCat + (racc ? '#R' : '')
+    + '#S' + activeSotto   /* lo scaffale della tendina (18 nov 2026) */
     + '#' + (jarCard ? 'J' : '') + (vistaBarattolo ? 'B' : '')
     + '#' + cons.map(v => v.slug + ':' + giuLogoConsigliato(v.giu)).join(',')
     + '#' + (carr ? `C${carr.pezzi}${carr.cambiato ? '!' : ''}:${carr.nome}` : '');
@@ -25683,7 +25780,12 @@ function renderStriscia(){
            alt="" loading="lazy" decoding="async"${caldaOk(c)}
            onload="this.dataset.ok=1" onerror="this.remove()"
         ><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span></span>
-      <span class="cat-eti">${esc(c)}</span>
+      <span class="cat-eti">${esc(c)}</span>${
+      /* lo scaffale scelto nella tendina (18 nov 2026) resta scritto
+         sotto il nome, piccolo: la card accesa dice il reparto E lo
+         scaffale, cioe' cosa sta filtrando la vetrina qui sotto */
+      c === activeCat && activeSotto && !vistaBarattolo
+        ? `<span class="cat-sotto">${esc(etichettaSotto(c, activeSotto))}</span>` : ''}
     </a>`).join('');
   armaGiroConsigliati(cons.length);
   /* le frecce seguono il contenuto: cambiando le celle cambia quanto
@@ -27166,6 +27268,109 @@ function apriCard(e, id){
   openDetail(id);
 }
 
+/* ---------- LA TENDINA DELLE SOTTOCATEGORIE (18 nov 2026) ----------
+   Cantiere sottocategorie, richiesta di Andrea che ha scelto lui la
+   forma: NON una seconda riga di pillole, ma una tendina che si apre
+   sotto la card toccata. In cima «Tutta la categoria», poi gli scaffali
+   PIENI col loro numero (una porta su una vetrina vuota e' un muro), e
+   a categoria gia' accesa in fondo «✕ Torna a Tutto», che e' il ritocco
+   di sempre (prima il ritocco della card accesa riportava a «Tutto»: con
+   la tendina il ritocco la riapre, e l'uscita sta dentro).
+   Non e' un foglio: vive appesa al body in coordinate di pagina, quindi
+   scorre con la pagina, e si chiude con un tocco fuori, Esc, il cambio
+   di vista o lo scorrimento della fila. I conteggi sono quelli GLOBALI
+   del server (sottoconteggi, come conteggi per categoria): le righe
+   senza sottocategoria stanno solo in «Tutta la categoria». */
+function vociTendinaSotto(c){
+  if (!sottoLeva || !SOTTOCAT[c]) return [];
+  const n = sottoConteggi[c] || {};
+  return SOTTOCAT[c].filter(([id]) => (Number(n[id]) || 0) > 0)
+    .map(([id, nome]) => ({id, nome, n: Number(n[id]) || 0}));
+}
+function chiudiTendinaSotto(){
+  const t = el('tendinaSotto');
+  if (t) t.remove();
+}
+function apriTendinaSotto(card, c){
+  chiudiTendinaSotto();
+  const dentro = c === activeCat && !vistaBarattolo;
+  const cur = dentro ? activeSotto : null;
+  const tot = Number(conteggiServer && conteggiServer[c]) || 0;
+  const voce = (sid, nome, n) => `<button type="button" role="menuitemradio"
+      aria-checked="${cur === sid}" class="ts-voce${cur === sid ? ' sel' : ''}"
+      data-sotto="${esc(sid)}" onclick="scegliTendinaSotto(this.dataset.sotto)"><span
+      class="ts-nome">${esc(nome)}</span>${n ? `<span class="ts-n">${n}</span>` : ''}</button>`;
+  const t = document.createElement('div');
+  t.id = 'tendinaSotto';
+  t.className = 'tendina-sotto';
+  t.setAttribute('role', 'menu');
+  t.setAttribute('aria-label', 'Sottocategorie di ' + c);
+  t.dataset.cat = c;
+  t.innerHTML = '<span class="ts-punta" aria-hidden="true"></span>'
+    + voce('', 'Tutta la categoria', tot)
+    + vociTendinaSotto(c).map(v => voce(v.id, v.nome, v.n)).join('')
+    + (dentro ? `<button type="button" role="menuitem" class="ts-voce ts-esci"
+        onclick="esciTendinaSotto()"><span class="ts-nome">✕ Torna a Tutto</span></button>` : '');
+  document.body.appendChild(t);
+  /* sotto la card, centrata su di lei ma mai oltre i 12px dal bordo;
+     la punta resta sulla card anche quando il riquadro si sposta */
+  const r = (card || document.body).getBoundingClientRect();
+  const w = t.offsetWidth, vw = document.documentElement.clientWidth;
+  const left = Math.min(Math.max(r.left + r.width / 2 - w / 2, 12), vw - w - 12);
+  t.style.left = (left + scrollX) + 'px';
+  t.style.top = (r.bottom + scrollY + 8) + 'px';
+  t.querySelector('.ts-punta').style.left =
+    Math.min(Math.max(r.left + r.width / 2 - left - 7, 14), w - 28) + 'px';
+  haptic();
+  (t.querySelector('.ts-voce.sel') || t.querySelector('.ts-voce'))?.focus({preventScroll: true});
+}
+function scegliTendinaSotto(sid){
+  const c = el('tendinaSotto')?.dataset.cat;
+  chiudiTendinaSotto();
+  if (!c) return;
+  if (c === activeCat && !vistaBarattolo) {
+    /* stesso reparto, altro scaffale: setCat resta il giudice unico
+       (ricarica la prima pagina, rifa' pillole e striscia) e la entry
+       della cronologia si SOSTITUISCE, come per ogni cambio di filtro */
+    if (sid === activeSotto) return;
+    el('grid').innerHTML = '';
+    el('gridEmpty').style.display = 'none';
+    sottoChiesto = sid;
+    setCat(c);
+    armaScrollReparto();
+    return;
+  }
+  /* un altro reparto: la discesa e' quella di sempre, con lo scaffale
+     in mano (apriCategoria non torna indietro qui: c non e' quello
+     acceso, o il barattolo e' acceso e ogni categoria e' un'uscita) */
+  sottoChiesto = sid;
+  apriCategoria(c);
+}
+function esciTendinaSotto(){
+  chiudiTendinaSotto();
+  haptic();
+  tornaATutto();
+}
+/* il tocco fuori chiude (in cattura: arriva prima del click, e un tocco
+   su un'altra card chiude questa e apre la sua); Esc e il ridimensiona
+   anche; e la fila che scorre si porterebbe via la card sotto la punta */
+/* ...ma il tocco sulla card della tendina APERTA la chiude e basta: senza
+   il segno, il click che arriva subito dopo la riaprirebbe */
+let tendinaChiusaSu = null;
+document.addEventListener('pointerdown', e => {
+  const t = el('tendinaSotto');
+  if (!t || t.contains(e.target)) return;
+  const card = e.target.closest?.('#catStrip .cat-cella[data-cat]');
+  tendinaChiusaSu = card && card.dataset.cat === t.dataset.cat
+    ? {cat: t.dataset.cat, at: performance.now()} : null;
+  chiudiTendinaSotto();
+}, true);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && el('tendinaSotto')) chiudiTendinaSotto();
+});
+window.addEventListener('resize', chiudiTendinaSotto);
+el('catStrip')?.addEventListener('scroll', chiudiTendinaSotto, {passive: true});
+
 /* La card della striscia: toccarla e' una DISCESA verso il reparto,
    quindi passa da apriCategoria, che alza navSpingi. Atterrarci da un
    motore di ricerca e' un'altra cosa — vedi apriCategoriaDaUrl. */
@@ -27176,6 +27381,16 @@ function apriCategoriaDaTocco(e, c){
      dire seguire l'href e ricaricare 900 KB */
   e.preventDefault();
   if (premutaFatta) { premutaFatta = false; return; }
+  /* LA TENDINA DELLE SOTTOCATEGORIE (18 nov 2026, Andrea: «quando
+     clicchi sulla categoria principale si apre una tendina e tu scegli
+     in quella tendina quali annunci mostrare»): se la categoria ha
+     almeno uno scaffale pieno il tocco apre la tendina sotto la card, e
+     la scelta la fa lei. Senza scaffali pieni (o a leva spenta) il
+     tocco e' quello di sempre. */
+  if (tendinaChiusaSu && tendinaChiusaSu.cat === c
+      && performance.now() - tendinaChiusaSu.at < 800) { tendinaChiusaSu = null; return; }
+  tendinaChiusaSu = null;
+  if (vociTendinaSotto(c).length) { apriTendinaSotto(e.currentTarget, c); return; }
   apriCategoria(c);
 }
 
@@ -38389,8 +38604,20 @@ const PICKER = {
       resa:`${icoCategoria(o.value)}<span><b>${esc(o.value)}</b></span>`})),
     campo: v => `${icoCategoria(v)}<span>${esc(v)}</span>`,
     /* certe categorie la condizione non la chiedono: il campo sotto
-       compare o sparisce con la scelta */
-    poi: aggiornaCondizioneForm},
+       compare o sparisce con la scelta (e con lei la sottocategoria,
+       che passa da aggiornaCondizioneForm); la proposta del giudice
+       riparte sulla categoria nuova */
+    poi: () => { aggiornaCondizioneForm(); proponiSotto(); }},
+  /* LA SOTTOCATEGORIA (18 nov 2026): le voci sono quelle della categoria
+     scelta, in testa il «decide Barattolo»; una scelta a mano non la
+     sovrascrive piu' la proposta del giudice */
+  sellSotto: {titolo:'Sottocategoria',
+    voci: () => [{val:'', resa:'<span><b>La sceglie Barattolo</b><span class="p-desc">Dal titolo, se è sicuro; sennò l\'annuncio sta solo nella categoria</span></span>'}]
+      .concat((SOTTOCAT[el('sellCat').value] || []).map(([id, nome]) =>
+        ({val:id, resa:`<span><b>${esc(nome)}</b></span>`}))),
+    campo: v => v ? `<span>${esc(etichettaSotto(el('sellCat').value, v))}</span>`
+                  : '<span class="cs-vuoto">La sceglie Barattolo</span>',
+    poi: () => { el('sellSotto').dataset.manuale = '1'; }},
   /* nel form la condizione porta la descrizione: aiuta a scegliere */
   sellCond: {titolo:'Condizioni dell\'oggetto',
     voci: () => Object.entries(CONDIZIONI).map(([id,c]) => ({val:id,
@@ -38558,7 +38785,7 @@ document.addEventListener('keydown', e => {
 /* I tre campi-bottone del form Vendi, riallineati in blocco: chi
    precompila o azzera il form chiama QUESTA e non se ne dimentica uno */
 function aggiornaPickerVendi(){
-  ['sellCat','sellCond','sellTaglia'].forEach(aggiornaPicker);
+  ['sellCat','sellCond','sellTaglia','sellSotto'].forEach(aggiornaPicker);
 }
 /* la prima etichetta di ogni campo-bottone (lo script vive in fondo
    alla pagina: il DOM c'e' gia') */
@@ -61263,7 +61490,86 @@ function aggiornaConsegnaForm(){
    e non era piu' vero dal cantiere dei metadati di commercio. Il tag
    `condition` c'e' e l'import lo rilegge, quindi il giro si chiude e
    il giudice torna a essere uno solo. */
+/* ---------- LA SOTTOCATEGORIA NEL FORM (18 nov 2026) ----------
+   Il campo c'e' solo a leva accesa, con una categoria che ha scaffali e
+   fuori dalla modifica FIRMATA degli importati (quella strada la
+   sottocategoria non la porta, patto di agosto). Le <option> seguono la
+   categoria: cambiandola, una voce che non le appartiene si azzera — lo
+   stesso giudizio che il server fa con sottocategoria_valida. */
+function aggiornaSottoForm(){
+  const f = el('sellSottoField'), sel = el('sellSotto');
+  if (!f || !sel) return;
+  const c = el('sellCat').value, voci = SOTTOCAT[c] || [];
+  /* chiamata anche dagli ingressi del form durante l'avvio: se le due
+     variabili non sono ancora nate (TDZ) il campo resta nascosto, e il
+     giro buono lo fa la busta di prima pagina */
+  let acceso = false;
+  try { acceso = sottoLeva && !editandoNostr; } catch (e) {}
+  f.style.display = (acceso && voci.length) ? '' : 'none';
+  if (sel.dataset.cat !== c) {
+    const prima = sel.value;
+    sel.innerHTML = '<option value=""></option>' + voci.map(([id, nome]) =>
+      `<option value="${id}">${esc(nome)}</option>`).join('');
+    sel.dataset.cat = c;
+    sel.value = voci.some(v => v[0] === prima) ? prima : '';
+    /* la scelta a mano valeva per l'altra categoria */
+    if (sel.value !== prima) sel.dataset.manuale = '';
+  }
+  aggiornaPicker('sellSotto');
+}
+/* Il valore che il form ritrova (modifica, duplicato) o '' per un form
+   nuovo. `noto` dice se il valore e' VERO: una riga che non porta la
+   sottocategoria (undefined) non la fa sapere, e allora la modifica non
+   la manda — l'assenza CONSERVA, sul server. */
+function impostaSottoForm(v){
+  const sel = el('sellSotto'); if (!sel) return;
+  sel.dataset.cat = '';   /* le opzioni si rifanno sulla categoria attuale */
+  sel.value = '';
+  aggiornaSottoForm();
+  const noto = typeof v === 'string';
+  sel.dataset.noto = noto ? '1' : '';
+  sel.value = noto && (SOTTOCAT[el('sellCat').value] || []).some(x => x[0] === v) ? v : '';
+  sel.dataset.manuale = sel.value ? '1' : '';
+  aggiornaPicker('sellSotto');
+}
+function sottoPayload(){
+  const sel = el('sellSotto');
+  if (!sel || !sottoLeva || !SOTTOCAT[el('sellCat').value]) return {};
+  if (editandoId && sel.dataset.noto !== '1' && sel.dataset.manuale !== '1') return {};
+  return {sottocategoria: sel.value || ''};
+}
+/* LA PROPOSTA DEL GIUDICE: mentre si scrive il titolo il campo mostra
+   quel che il server sceglierebbe (GET /api/sottocategoria, lo stesso
+   sottocategoria_indovina di pubblica, mai una copia qui). Solo finche'
+   nessuno ha scelto a mano; il giro vecchio che arriva tardi tace. */
+let sottoTimer = null, sottoGiro = 0;
+function proponiSotto(){
+  clearTimeout(sottoTimer);
+  sottoTimer = setTimeout(async () => {
+    const sel = el('sellSotto'), c = el('sellCat').value;
+    if (!sel || DEMO || !sottoLeva || !SOTTOCAT[c] || editandoNostr
+        || sel.dataset.manuale === '1') return;
+    const giro = ++sottoGiro;
+    try {
+      const q = new URLSearchParams({categoria: c,
+        titolo: el('sellTitle').value.trim().slice(0, 200),
+        descrizione: (el('sellDesc').value || '').slice(0, 500)});
+      const r = await fetch(`${API_BASE}/sottocategoria?${q}`);
+      if (!r.ok) return;
+      const v = String((await r.json()).sottocategoria || '');
+      if (giro !== sottoGiro || sel.dataset.manuale === '1'
+          || el('sellCat').value !== c) return;
+      if (v && !SOTTOCAT[c].some(x => x[0] === v)) return;
+      sel.value = v;
+      aggiornaPicker('sellSotto');
+    } catch (e) {}
+  }, 600);
+}
+el('sellTitle')?.addEventListener('input', proponiSotto);
+el('sellDesc')?.addEventListener('change', proponiSotto);
+
 function aggiornaCondizioneForm(){
+  aggiornaSottoForm();   /* la sottocategoria segue la categoria (18 nov 2026) */
   const f = el('sellCondField'); if (!f) return;
   const fuori = senzaCondizione(el('sellCat').value, consegnaForm().consegna);
   f.style.display = fuori ? 'none' : '';
@@ -61382,6 +61688,7 @@ function riempiFormDa(l){
   impostaSellValuta(l.valuta==='eur' && l.priceEur>0 ? 'eur' : 'sats');
   el('sellPrice').value = sellValuta==='eur' ? l.priceEur : l.price;
   el('sellCat').value = l.cat;
+  impostaSottoForm(l.sotto);
   /* il COMUNE e' un testo, e qui entra solo un testo: un oggetto
      scritto in un campo diventa «[object Object]», e salvando senza
      toccarlo si sarebbe mandato quello (18 set 2026, v. mapListing) */
@@ -61557,6 +61864,7 @@ function annullaModifica(){
   svuotaZoneIntl();
   el('sellTaglia').value = '';
   el('sellCond').value = '';
+  impostaSottoForm('');
   if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
   aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
@@ -62617,7 +62925,8 @@ async function publish(){
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
       body: JSON.stringify({titolo:t, ...prezzo, ...cns,
-        categoria:el('sellCat').value, condizione:el('sellCond').value,
+        categoria:el('sellCat').value, ...sottoPayload(),
+        condizione:el('sellCond').value,
         quantita:qtaForm(),
         ...(asta ? {asta} : {}),
         zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
@@ -62679,6 +62988,7 @@ async function publish(){
   svuotaZoneIntl();
   el('sellTaglia').value = '';
   el('sellCond').value = '';
+  impostaSottoForm('');
   if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
   aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
@@ -62756,6 +63066,7 @@ async function salvaModifica(t, p){
   } else {
     const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
     const body = {titolo:t, ...prezzo, ...cns, categoria:el('sellCat').value,
+      ...sottoPayload(),
       condizione:el('sellCond').value, quantita:qtaForm(),
       zona:el('sellZone').value||'', descrizione:el('sellDesc').value||''};
     if (sellFoto.length) body.foto = sellFoto;

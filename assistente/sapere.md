@@ -48,7 +48,7 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 
 # Comprare nel mercatino
 
-1. Trovi l'annuncio: dalla vetrina (Esplora), dalla ricerca, dalle categorie. Puoi salvare i preferiti e farti avvisare quando arriva quello che cerchi.
+1. Trovi l'annuncio: dalla vetrina (Esplora), dalla ricerca, dalle categorie. Toccando una categoria in «Esplora per categorie» si apre una tendina con le sue sottocategorie (per esempio Informatica → Computer e portatili, Tablet ed e-reader…), ognuna col numero di annunci: scegli quella che ti interessa, oppure «Tutta la categoria». Compaiono solo le sottocategorie che hanno annunci; «Altro» e le categorie senza sottocategorie piene filtrano subito. Per uscire: «✕ Torna a Tutto» nella tendina, o la card «Tutto». Puoi salvare i preferiti e farti avvisare quando arriva quello che cerchi.
 2. Scegli come riceverlo, fra quelli che il venditore offre: spedizione a un indirizzo, spedizione a un punto di ritiro o a un locker, ritiro a mano in zona, oppure consegna dentro Barattolo se è un codice o un buono digitale. Se il venditore non spedisce ai locker, la riga del locker è spenta e c'è il tasto «Chiedi al venditore se spedisce con InPost o Poste»: lui riceve un avviso (senza sapere chi ha chiesto) e, se aggiunge InPost, Poste Italiane o SDA nel Profilo, Barattolo ti avvisa. Una richiesta per venditore ogni 7 giorni.
 3. Paghi con «🔒 Compra in sicurezza»: arriva una fattura Lightning da pagare col wallet. La fattura dura pochi minuti (vedi i NUMERI DI OGGI): se scade non è successo niente, se ne fa un'altra al cambio del momento.
 4. I sats entrano nel deposito di garanzia. Il venditore viene avvisato, sa di essere pagato, ma i sats non sono ancora suoi.
@@ -106,7 +106,7 @@ Pagare fuori da Barattolo (un bonifico, un pagamento diretto al venditore) vuol 
 # Vendere nel mercatino
 
 1. Tocca «Vendi» (il tasto ＋ in basso).
-2. Aggiungi almeno una foto (senza foto non si pubblica), il titolo, la descrizione, la categoria e il prezzo.
+2. Aggiungi almeno una foto (senza foto non si pubblica), il titolo, la descrizione, la categoria e il prezzo. Sotto la categoria c'è «Sottocategoria (facoltativa)»: Barattolo la propone da solo leggendo il titolo, tu puoi cambiarla o lasciare «La sceglie Barattolo» (se dal titolo non è sicuro, l'annuncio sta solo nella categoria e si trova in «Tutta la categoria»).
 3. Scegli come consegni: spedizione (con i corrieri che usi), punto di ritiro o locker, ritiro a mano in zona, o consegna digitale per codici e buoni.
 4. Pubblica. Ogni annuncio passa dalla moderazione, anche quando lo modifichi: se qualcosa non convince resta in attesa di un moderatore, e se viene fermato il messaggio spiega perché e come rimediare.
 
